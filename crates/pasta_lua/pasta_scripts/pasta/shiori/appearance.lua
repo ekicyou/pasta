@@ -351,9 +351,149 @@ local function restore_surface(state, actor, spot, leading)
     return "\\s[" .. known .. "]"
 end
 
+--- 先頭タグ列の明示 bind（カテゴリ・パーツ・数値 0/1 が明示）の集合 cat → part → true（3.10）。
+--- トグル・カテゴリ単位 bind は含めない（抑止しない）
+local function leading_explicit_binds(leading)
+    local set = {}
+    for _, tag in ipairs(leading) do
+        if tag.kind == "bind" then
+            local cat, part, val = parse_bind(tag.value)
+            if cat and part ~= "" and BIND_VALUES[val] then
+                set[cat] = set[cat] or {}
+                set[cat][part] = true
+            end
+        end
+    end
+    return set
+end
+
+--- 既定着せ替えの 1 カテゴリ（非空文字列パーツで値 0/1 のもののみ。それ以外は無視）
+local function default_parts(dressup, cat)
+    local out = {}
+    local d = type(dressup) == "table" and dressup[cat]
+    if type(d) == "table" then
+        for part, v in pairs(d) do
+            if type(part) == "string" and part ~= "" and (v == 0 or v == 1) then
+                out[part] = v == 1 and 1 or 0
+            end
+        end
+    end
+    return out
+end
+
+--- 復旧対象カテゴリ（既定と記録の和集合。非空文字列のみ）をバイト昇順で返す
+local function dressup_categories(dressup, ac_binds)
+    local seen, cats = {}, {}
+    local function add(cat)
+        if type(cat) == "string" and cat ~= "" and not seen[cat] then
+            seen[cat] = true
+            cats[#cats + 1] = cat
+        end
+    end
+    if type(dressup) == "table" then
+        for cat in pairs(dressup) do
+            add(cat)
+        end
+    end
+    for cat in pairs(ac_binds) do
+        add(cat)
+    end
+    table.sort(cats)
+    return cats
+end
+
+--- カテゴリの既知着せ替えを出力順の { part, value } 列で返す:
+--- 全脱衣（part = ""）→ 既定パーツ（パーツ名昇順・記録で上書きされたものを除く）→ 記録パーツ（記録順）。
+--- アクター側が不明（false）なら空、全脱衣済みなら既定を使わない（3.4, 3.8, 3.11）
+local function known_dressup(dressup, ac, cat)
+    local rec = ac and ac.binds[cat]
+    if rec == false then
+        return {}
+    end
+    rec = rec or {}
+    local list = {}
+    if rec[""] == 0 then
+        list[1] = { part = "", value = 0 }
+    else
+        local defaults = default_parts(dressup, cat)
+        local names = {}
+        for part in pairs(defaults) do
+            if rec[part] == nil then
+                names[#names + 1] = part
+            end
+        end
+        table.sort(names)
+        for _, part in ipairs(names) do
+            list[#list + 1] = { part = part, value = defaults[part] }
+        end
+    end
+    for _, part in ipairs(ac and ac.order and ac.order[cat] or {}) do
+        list[#list + 1] = { part = part, value = rec[part] }
+    end
+    return list
+end
+
+--- 既知着せ替えのいずれかがスポット側の実効値と不一致・不明か（全脱衣は part = "" で同じ規則）
+local function dressup_differs(spot_cat, list)
+    for _, e in ipairs(list) do
+        if spot_effective(spot_cat, e.part) ~= e.value then
+            return true
+        end
+    end
+    return false
+end
+
+--- 全脱衣したアクター（rec[""] == 0）では、スポット側の他パーツもアクターの実効値と比較する
+--- （3.11。他者が着けたパーツ・不明パーツを残さない）。全脱衣でないカテゴリは走査しない（3.5）
+local function stripped_differs(rec, spot_cat)
+    if not (rec and rec[""] == 0 and spot_cat) then
+        return false
+    end
+    for q in pairs(spot_cat) do
+        if q ~= "" and spot_effective(spot_cat, q) ~= (rec[q] or rec[""]) then
+            return true
+        end
+    end
+    return false
+end
+
+--- カテゴリを丸ごと bind-noevent で返し、スポット側を観測と同じ規則で更新する（3.2, 3.7, 3.10, 3.11）。
+--- skip のパーツ（先頭タグ列の明示 bind）は出力しない。アクター側は変えない
+local function emit_dressup(sp, cat, list, skip)
+    local out = {}
+    for _, e in ipairs(list) do
+        if e.part == "" or not skip[e.part] then
+            out[#out + 1] = "\\![bind-noevent," .. cat .. "," .. e.part .. "," .. e.value .. "]"
+            if e.part == "" then
+                reset_category(sp, nil, cat, true)
+            else
+                record_bind(sp, nil, cat, e.part, e.value)
+            end
+        end
+    end
+    return table.concat(out)
+end
+
+--- 着せ替え復旧タグ列を返し、スポットの適用中着せ替え状態を更新する（3.2, 3.3, 3.5, 3.8〜3.11）。
+--- 走査はアクター側の集合のみ（スポット側にのみあるパーツには触れない。全脱衣カテゴリを除く）
+local function restore_dressup(state, actor, spot, leading)
+    local ac = state.actors[actor.name]
+    local skip = leading_explicit_binds(leading)
+    local out = {}
+    for _, cat in ipairs(dressup_categories(actor.dressup, ac and ac.binds or {})) do
+        local list = known_dressup(actor.dressup, ac, cat)
+        local cur = state.spots[spot]
+        local spot_cat = cur and cur.binds[cat]
+        if dressup_differs(spot_cat, list) or stripped_differs(ac and ac.binds[cat], spot_cat) then
+            out[#out + 1] = emit_dressup(entry(state.spots, spot), cat, list, skip[cat] or {})
+        end
+    end
+    return table.concat(out)
+end
+
 --- アクター切替時の復旧タグ列を返し、スポットの表示中状態を更新する。
 --- @param state table AppearanceState
---- @param actor table 切替先アクター（name / surface を参照）
+--- @param actor table 切替先アクター（name / surface / dressup を参照）
 --- @param spot integer 解決済みスポットID
 --- @param tokens table[] 切替先グループの内側トークン列（先頭タグ列の走査用・読み取りのみ）
 --- @return string 復旧タグ列（復旧不要なら空文字列）
@@ -368,7 +508,9 @@ function APPEARANCE.restore(state, actor, spot, tokens)
         return ""
     end
     state.last_spots[name] = spot
-    return restore_surface(state, actor, spot, leading_tags(tokens))
+    local leading = leading_tags(tokens)
+    -- サーフェス復旧が先、着せ替え復旧が後（3.2）
+    return restore_surface(state, actor, spot, leading) .. restore_dressup(state, actor, spot, leading)
 end
 
 return APPEARANCE

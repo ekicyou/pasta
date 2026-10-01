@@ -3,6 +3,7 @@
 -- actor-surface-restore Task 2.1 (Requirements: 1.2, 1.3, 1.4, 1.5, 1.7, 1.8)
 -- actor-surface-restore Task 2.2 (Requirements: 2.1, 2.2, 2.3, 2.4, 2.8, 2.9, 2.10, 2.11, 4.4, 5.5)
 -- actor-surface-restore Task 4.1 (Requirements: 3.1, 3.4, 3.11, 3.12, 3.13)
+-- actor-surface-restore Task 4.2 (Requirements: 3.2, 3.3, 3.5, 3.7, 3.8, 3.9, 3.10, 3.11, 2.11)
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -657,4 +658,222 @@ describe("APPEARANCE.restore - 継続と交代", function()
         APPEARANCE.observe(state, nil, nil, "\\s[1]")
         expect(APPEARANCE.restore(state, A, 0, {})):toBe("\\s[5]")
     end)
+end)
+
+--- スポット0で { actor, text } の列を順に発話させる（各発話の前に restore を呼ぶ）
+local function talk_seq(seq)
+    local state = APPEARANCE.new()
+    for _, s in ipairs(seq) do
+        APPEARANCE.restore(state, s[1], 0, {})
+        APPEARANCE.observe(state, s[1], 0, s[2])
+    end
+    return state
+end
+
+local B = { name = "B" }
+
+--- bind-noevent タグ列を作る（{ cat, part, value } の列）
+local function binds(list)
+    local out = {}
+    for _, b in ipairs(list) do
+        out[#out + 1] = "\\![bind-noevent," .. b[1] .. "," .. b[2] .. "," .. b[3] .. "]"
+    end
+    return table.concat(out)
+end
+
+describe("APPEARANCE.restore - 着せ替え復旧", function()
+    test("複数選択不可で A 麦わら→B リボン→A 戻りは A の記録順に再出力し麦わらが残る (3.2, 3.7)", function()
+        local state = talk_seq({
+            { A, "\\![bind,帽子,リボン,1]\\![bind,帽子,麦わら,1]\\![bind,腕,時計,1]" },
+            { B, "\\![bind,帽子,リボン,1]" },
+        })
+        expect(APPEARANCE.restore(state, A, 0, {}))
+            :toBe(binds({ { "帽子", "リボン", 1 }, { "帽子", "麦わら", 1 } }))
+        -- スポット側は観測と同じ規則で更新（数値1で他パーツは不明になり、最後の麦わらが残る）
+        local spot_hat = state.spots[0].binds["帽子"]
+        expect(spot_hat["麦わら"]):toBe(1)
+        expect(spot_hat["リボン"]):toBe(nil)
+        -- アクター側の既知状態・記録順は変えない
+        expect(table.concat(state.actors.A.order["帽子"], ",")):toBe("リボン,麦わら")
+        expect(state.actors.A.binds["帽子"]["リボン"]):toBe(1)
+    end)
+
+    test("全一致なら着せ替え復旧タグを出力しない (3.3)", function()
+        local state = talk_seq({
+            { A, "\\![bind,帽子,麦わら,1]\\![bind,腕,時計,0]" },
+            { B, "あ" },
+        })
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("")
+    end)
+
+    test("カテゴリ名のバイト昇順で並べ、サーフェス復旧の後に置く (3.2)", function()
+        local state = talk_seq({
+            { A, "\\s[5]\\![bind,b,x,1]\\![bind,a,y,0]" },
+            { B, "\\s[10]" },
+        })
+        APPEARANCE.observe(state, nil, nil, "\\![bind,a,y,1]") -- 全スポット不明化
+        expect(APPEARANCE.restore(state, A, 0, {}))
+            :toBe("\\s[5]" .. binds({ { "a", "y", 0 }, { "b", "x", 1 } }))
+    end)
+
+    test("スポット側にのみあるパーツ・カテゴリには触れない (3.5)", function()
+        local state = talk_seq({
+            { A, "\\![bind,帽子,リボン,0]" },
+            { B, "\\![bind,帽子,花,1]\\![bind,腕,時計,1]" },
+        })
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe(binds({ { "帽子", "リボン", 0 } }))
+        expect(state.spots[0].binds["帽子"]["花"]):toBe(1)
+        expect(state.spots[0].binds["帽子"]["リボン"]):toBe(0)
+        expect(state.spots[0].binds["腕"]["時計"]):toBe(1)
+    end)
+
+    test("記録が無ければ既定着せ替えをパーツ名昇順で出力する (3.8)", function()
+        local C = { name = "C", dressup = { ["帽子"] = { b = 1, a = 0 } } }
+        local state = spot0_by_x(nil)
+        expect(APPEARANCE.restore(state, C, 0, {})):toBe(binds({ { "帽子", "a", 0 }, { "帽子", "b", 1 } }))
+        expect(state.spots[0].binds["帽子"]["b"]):toBe(1)
+        expect(state.actors.C):toBe(nil)
+    end)
+
+    test("既定がスポットと一致なら出力しない (3.3, 3.8)", function()
+        local C = { name = "C", dressup = { ["帽子"] = { a = 1 } } }
+        local state = spot0_by_x(nil)
+        state.spots[0] = { binds = { ["帽子"] = { a = 1 } } }
+        expect(APPEARANCE.restore(state, C, 0, {})):toBe("")
+    end)
+
+    test("既定パーツ（記録で上書きされたものを除く）を先に、記録パーツを後に出力する (3.2, 3.8)", function()
+        local C = { name = "C", dressup = { ["帽子"] = { a = 1, b = 0 } } }
+        local state = talk_seq({ { C, "\\![bind,帽子,b,1]" }, { B, "\\![bind,帽子,a,0]" } })
+        expect(APPEARANCE.restore(state, C, 0, {})):toBe(binds({ { "帽子", "a", 1 }, { "帽子", "b", 1 } }))
+    end)
+
+    test("既定未設定・未記録なら出力しない (3.9)", function()
+        expect(APPEARANCE.restore(spot0_by_x(nil), { name = "C" }, 0, {})):toBe("")
+    end)
+
+    local unexpected = {
+        { "dressup が非テーブル", "帽子" },
+        { "カテゴリ値が非テーブル", { ["帽子"] = 1 } },
+        { "値が 0/1 以外", { ["帽子"] = { a = 2, b = "1", c = true, d = -1 } } },
+        { "パーツ名が非文字列・空", { ["帽子"] = { [1] = 1, [""] = 0 } } },
+        { "カテゴリ名が非文字列・空", { [1] = { a = 1 }, [""] = { a = 1 } } },
+    }
+    for _, c in ipairs(unexpected) do
+        test("想定外の型の既定は当該項目を無視する: " .. c[1], function()
+            local state = spot0_by_x(nil)
+            expect(APPEARANCE.restore(state, { name = "C", dressup = c[2] }, 0, {})):toBe("")
+            expect(state.spots[0]):toBe(nil)
+        end)
+    end
+
+    test("想定外の項目を無視し、正しい項目は出力する", function()
+        local C = { name = "C", dressup = { ["帽子"] = { a = 1, b = "0" }, ["腕"] = 5 } }
+        expect(APPEARANCE.restore(spot0_by_x(nil), C, 0, {})):toBe(binds({ { "帽子", "a", 1 } }))
+    end)
+
+    test("アクター側が不明（false）のカテゴリは既定も使わず出力しない (3.4)", function()
+        local C = { name = "C", dressup = { ["帽子"] = { a = 1 }, ["腕"] = { w = 1 } } }
+        local state = talk_seq({ { C, "\\![bind,帽子,z]" }, { B, "\\![bind,帽子,a,0]" } })
+        expect(state.actors.C.binds["帽子"]):toBe(false)
+        APPEARANCE.observe(state, nil, nil, "\\s[1]")
+        expect(APPEARANCE.restore(state, C, 0, {})):toBe(binds({ { "腕", "w", 1 } }))
+    end)
+
+    test("全脱衣をパーツ単位より先に出力し、既定は使わない (3.11)", function()
+        local C = { name = "C", dressup = { ["帽子"] = { a = 1 } } }
+        local state = talk_seq({
+            { C, "\\![bind,帽子,麦わら,1]\\![bind,帽子,,0]\\![bind,帽子,リボン,1]" },
+            { B, "\\![bind,帽子,花,1]" },
+        })
+        expect(APPEARANCE.restore(state, C, 0, {})):toBe(binds({ { "帽子", "", 0 }, { "帽子", "リボン", 1 } }))
+        local spot_hat = state.spots[0].binds["帽子"]
+        expect(spot_hat[""]):toBe(0)
+        expect(spot_hat["リボン"]):toBe(1)
+        expect(spot_hat["花"]):toBe(nil)
+    end)
+
+    test("スポットが不明なら全脱衣を出力する (3.11)", function()
+        local state = talk_seq({ { A, "\\![bind,帽子,,0]" }, { B, "あ" } })
+        APPEARANCE.observe(state, nil, nil, "\\s[1]")
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe(binds({ { "帽子", "", 0 } }))
+        expect(state.spots[0].binds["帽子"][""]):toBe(0)
+    end)
+
+    test("スポットが既に全脱衣なら出力しない (3.11)", function()
+        local state = talk_seq({ { A, "\\![bind,帽子,,0]" }, { B, "\\![bind,腕,時計,1]" } })
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("")
+    end)
+
+    test("全脱衣したアクターはスポットに他者が着けたパーツがあれば全脱衣を出力する (3.11)", function()
+        local state = talk_seq({ { A, "\\![bind,帽子,,0]" }, { B, "\\![bind,帽子,麦わら,1]" } })
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe(binds({ { "帽子", "", 0 } }))
+        local spot_hat = state.spots[0].binds["帽子"]
+        expect(spot_hat[""]):toBe(0)
+        expect(spot_hat["麦わら"]):toBe(nil)
+    end)
+
+    test("全脱衣＋記録パーツのアクターはスポットの他パーツ着衣で全脱衣から再出力する (3.11)", function()
+        local state = talk_seq({
+            { A, "\\![bind,帽子,,0]\\![bind,帽子,リボン,1]" },
+            { B, "\\![bind,帽子,麦わら,1]\\![bind,帽子,リボン,1]" },
+        })
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe(binds({ { "帽子", "", 0 }, { "帽子", "リボン", 1 } }))
+        local spot_hat = state.spots[0].binds["帽子"]
+        expect(spot_hat[""]):toBe(0)
+        expect(spot_hat["リボン"]):toBe(1)
+        expect(spot_hat["麦わら"]):toBe(nil)
+    end)
+
+    test("全脱衣したアクターはスポットの他パーツが脱衣なら出力しない (3.11)", function()
+        local state = talk_seq({ { A, "\\![bind,帽子,,0]" }, { B, "\\![bind,帽子,X,0]" } })
+        expect(state.spots[0].binds["帽子"]["X"]):toBe(0)
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("")
+    end)
+
+    test("同一アクターの継続ならスポット不明でも着せ替えを復旧しない (2.11)", function()
+        local C = { name = "C", dressup = { ["帽子"] = { a = 1 } } }
+        local state = talk_seq({ { C, "\\![bind,腕,時計,1]" } })
+        APPEARANCE.observe(state, nil, nil, "\\s[1]")
+        expect(APPEARANCE.restore(state, C, 0, {})):toBe("")
+        expect(next(state.spots)):toBe(nil)
+    end)
+end)
+
+describe("APPEARANCE.restore - 着せ替えの先頭タグ列", function()
+    --- A が帽子にリボン→麦わらを記録し、スポット0が不明の状態
+    local function a_hat_unknown()
+        local state = talk_seq({ { A, "\\![bind,帽子,リボン,1]\\![bind,帽子,麦わら,1]" }, { B, "あ" } })
+        APPEARANCE.observe(state, nil, nil, "\\s[1]")
+        return state
+    end
+
+    test("先頭タグ列の明示 bind と同一（カテゴリ, パーツ）のみ出力しない (3.10)", function()
+        local state = a_hat_unknown()
+        local tokens = { { type = "sakura_script", text = "\\![bind,帽子,麦わら,0]" }, { type = "talk", text = "あ" } }
+        expect(APPEARANCE.restore(state, A, 0, tokens)):toBe(binds({ { "帽子", "リボン", 1 } }))
+        expect(state.spots[0].binds["帽子"]["麦わら"]):toBe(nil)
+    end)
+
+    test("talk 先頭の bind-noevent でも抑止する (3.10)", function()
+        local state = a_hat_unknown()
+        local tokens = { { type = "talk", text = "\\![bind-noevent,帽子,リボン,0]あ" } }
+        expect(APPEARANCE.restore(state, A, 0, tokens)):toBe(binds({ { "帽子", "麦わら", 1 } }))
+    end)
+
+    local not_suppressed = {
+        { "トグル", "\\![bind,帽子,麦わら]" },
+        { "カテゴリ単位の着衣", "\\![bind,帽子,,1]" },
+        { "カテゴリ全脱衣", "\\![bind,帽子,,0]" },
+        { "他カテゴリの同名パーツ", "\\![bind,腕,麦わら,0]" },
+        { "一般文字列より後の明示 bind", "あ\\![bind,帽子,麦わら,0]" },
+        { "解釈不能な bind", '\\![bind,帽子,"麦わら",0]' },
+    }
+    for _, c in ipairs(not_suppressed) do
+        test(c[1] .. " では抑止しない (3.10)", function()
+            local tokens = { { type = "sakura_script", text = c[2] } }
+            expect(APPEARANCE.restore(a_hat_unknown(), A, 0, tokens))
+                :toBe(binds({ { "帽子", "リボン", 1 }, { "帽子", "麦わら", 1 } }))
+        end)
+    end
 end)
