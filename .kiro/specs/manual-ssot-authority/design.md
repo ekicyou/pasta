@@ -128,7 +128,7 @@ book/
 │   ├── SUMMARY.md                # [改] lua/shiori-events.md・reference/pasta-toml.md を目次へ追加
 │   ├── introduction.md           # [改] 「doc/spec が権威」記述を「本マニュアルが権威」へ
 │   ├── grammar/*.md (10 章)      # [改] doc/spec・GRAMMAR.md・スキル手書きの規範的内容を吸収。章末「権威的仕様」引用を削除
-│   ├── lua/modules.md            # [改] runtime-api 相当へ拡充（→ スキル runtime-api.md）
+│   ├── lua/modules.md            # [改] 旧スキル runtime-api 相当へ拡充（→ スキル modules.md）
 │   ├── lua/shiori-events.md      # [新] SHIORI イベントとハンドラ（REG/RES/イベント一覧/フォールバック/仮想ディスパッチャ）
 │   ├── lua/patterns.md           # [改] 生成対象外。REG ハンドラ署名・RES の誤記を実装に合わせて訂正し、詳細は shiori-events へ誘導
 │   ├── reference/pasta-toml.md   # [新] pasta.toml リファレンス（分類表・テンプレート・予約注記・各セクション詳細）
@@ -148,10 +148,10 @@ book/
 ├── pasta-ghost-authoring/
 │   ├── SKILL.md                  # [改] references 区分表・生成ファイル優先の明示・早見表の非規範注記・リンク更新
 │   └── references/
-│       ├── grammar-model.md      # [生成] ← grammar/index.md
+│       ├── grammar-index.md      # [生成・改名] ← grammar/index.md（旧 grammar-model.md は削除）
 │       ├── markers.md            # [生成・新] ← grammar/markers.md
 │       ├── block-structure.md    # [生成・新] ← grammar/block-structure.md
-│       ├── call-spec.md          # [生成] ← grammar/call-jump.md
+│       ├── call-jump.md          # [生成・改名] ← grammar/call-jump.md（旧 call-spec.md は削除）
 │       ├── literals.md           # [生成・新] ← grammar/literals.md
 │       ├── action-line.md        # [生成] ← grammar/action-line.md
 │       ├── sakura-script.md      # [生成] ← grammar/sakura-script.md
@@ -163,8 +163,8 @@ book/
 └── pasta-lua-coding/
     ├── SKILL.md                  # [改] 区分表・internal-modules 暫定注記・book/ への相対リンク除去
     └── references/
-        ├── runtime-api.md        # [生成] ← lua/modules.md
-        ├── shiori-handlers.md    # [生成] ← lua/shiori-events.md
+        ├── modules.md            # [生成・改名] ← lua/modules.md（旧 runtime-api.md は削除）
+        ├── shiori-events.md      # [生成・改名] ← lua/shiori-events.md（旧 shiori-handlers.md は削除）
         ├── startup.md            # [生成・新] ← reference/startup.md
         ├── internal-modules.md   # [手書き・暫定] 外部参照があれば除去のみ
         ├── coding-conventions.md # [手書き] 外部参照があれば除去のみ
@@ -348,8 +348,11 @@ type SkillName = 'pasta-ghost-authoring' | 'pasta-lua-coding';
 interface MapEntry {
   readonly chapter: string;   // book/src からの相対パス（例: 'grammar/markers.md'）
   readonly skill: SkillName;
-  readonly out: string;       // references/ 内のファイル名（例: 'markers.md'）
 }
+
+// references/ 内の出力ファイル名は章パスから導出する（対応表に持たない）。
+// 章のファイル名そのまま。ただし index.md は `{親ディレクトリ}-index.md`（例: grammar/index.md → grammar-index.md）。
+function outName(chapter: string): string;
 
 type GenError =
   | { kind: 'missing-chapter'; chapter: string }
@@ -375,12 +378,12 @@ function checkAll(repoRoot: string): CheckReport;
 
 - **対応表（確定値）**:
 
-| chapter | skill | out |
+| chapter | skill | out（`outName` の結果） |
 |---------|-------|-----|
-| grammar/index.md | pasta-ghost-authoring | grammar-model.md |
+| grammar/index.md | pasta-ghost-authoring | grammar-index.md |
 | grammar/markers.md | pasta-ghost-authoring | markers.md |
 | grammar/block-structure.md | pasta-ghost-authoring | block-structure.md |
-| grammar/call-jump.md | pasta-ghost-authoring | call-spec.md |
+| grammar/call-jump.md | pasta-ghost-authoring | call-jump.md |
 | grammar/literals.md | pasta-ghost-authoring | literals.md |
 | grammar/action-line.md | pasta-ghost-authoring | action-line.md |
 | grammar/sakura-script.md | pasta-ghost-authoring | sakura-script.md |
@@ -388,11 +391,11 @@ function checkAll(repoRoot: string): CheckReport;
 | grammar/words.md | pasta-ghost-authoring | words.md |
 | grammar/actor-dictionary.md | pasta-ghost-authoring | actor-dictionary.md |
 | reference/pasta-toml.md | pasta-ghost-authoring | pasta-toml.md |
-| lua/modules.md | pasta-lua-coding | runtime-api.md |
-| lua/shiori-events.md | pasta-lua-coding | shiori-handlers.md |
+| lua/modules.md | pasta-lua-coding | modules.md |
+| lua/shiori-events.md | pasta-lua-coding | shiori-events.md |
 | reference/startup.md | pasta-lua-coding | startup.md |
 
-  命名規則: 現行スキルに 1:1 で対応するファイルがあれば現行名を維持し（持ち出し先・`SKILL.md` への影響を最小化）、新規に分かれるものは章のファイル名を使う（OPEN QUESTION 1）。デバッグ・入門・`lua/basics`・`lua/patterns`・`lua/dsl-vs-lua`・`lua/index`・`reference/external-links` は生成しない（5.1）。
+  命名規則: 全生成ファイルを章名に揃える（設計ディスカッション #3。マニュアル章とスキルファイルの対応を名前だけで辿れるようにし、今後の整理負債を残さない）。出力名は `outName` で章パスから機械的に導出し、対応表に別名を持たせない。旧名ファイル（`grammar-model.md`・`call-spec.md`・`runtime-api.md`・`shiori-handlers.md`）は生成ヘッダを持たない手書きファイルのため孤立検出に掛からない。切替（Migration P4）で明示的に削除する。`(skill, outName(chapter))` は全体で一意でなければならず、`generateAll` は重複を `bad-structure` 相当の例外で拒否する。デバッグ・入門・`lua/basics`・`lua/patterns`・`lua/dsl-vs-lua`・`lua/index`・`reference/external-links` は生成しない（5.1）。
 
 - **抽出規則（`extractBody`）**: 入力を LF 正規化し、コードフェンス（```` ``` ```` / `~~~`）外で「行全体が `---`」の行を区切り行とみなす。区切り行が 2 本未満、または先頭行が `# ` で始まる H1 でなければ `bad-structure`。H1 行をタイトルとし、最初の区切り行の次行から最後の区切り行の前行までを本文とする（本文内の `---` は保持）。本文の前後の空行は除去する。最後の区切り行以降（締め・旧「権威的仕様」引用）はすべて捨てる。本文の散文部（コードフェンス・表の行（`|` 始まり）・インラインコードを除去した残り）に口調マーカー（`verify-content.mjs` の広い集合 `VOICE_MARKERS`: `ですわ`・`ますの`・`おほほ`・`わたくし`・`くてよ` 等）のいずれかが現れたら `voice-in-body`。`VOICE_MARKERS` は `gen-skill-refs.mjs` へ移して export し、`verify-content.mjs` はそれを import する（依存方向を守り、集合を一本化する）。生成対象章の本文では口調を全面禁止し、コラム・励ましは導入か締めへ置く（設計ディスカッション #1 で確定）。作例の台詞に口調を含めたい場合はコードフェンス内に置く。
 - **リンク書き換え規則（`rewriteLinks`）**: コードフェンス外のインラインリンク `[text](target)` のみを対象とする。
@@ -582,9 +585,10 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 - **Intent**: スキルの生成／手書き区分を明示し、手書きを作例・手順・規約に限定する。Requirements: 3.4, 6.1–6.7, 10.2。
 - 各 `SKILL.md` に「references 一覧」表を置く。列: ファイル／区分（`生成（マニュアルから）` or `手書き（スキルが権威）`／`手書き（暫定）`）／生成元マニュアル章（公開 URL）／用途。表の前文に「生成ファイルは編集しない。生成ファイルと手書きファイルが同じ事実を扱う場合は生成ファイルの記述を正とする」と明記する（6.1, 6.6）。
 - `pasta-lua-coding/SKILL.md`: `internal-modules.md` を「手書き（暫定）— 将来 `pasta-runtime-internals-doc` でマニュアル権威＋生成へ移行予定」と明記（3.4, 6.3）。`../../../book/src/reference/startup.md` へのリンクを `references/startup.md` へ置換（6.5）。
-- `pasta-ghost-authoring/SKILL.md`: マーカー表等の早見表は手書きで保持し、直前に「参照先を選ぶための非規範の要約。食い違う場合は生成ファイルが正」と注記する（6.7）。`grammar-model.md` への 11 件のリンクは、内容の移動先（`markers.md`・`block-structure.md`・`literals.md` 等）へ張り替える。アンカーは生成ファイルの見出しに合わせる（6.4）。
+- `pasta-ghost-authoring/SKILL.md`: マーカー表等の早見表は手書きで保持し、直前に「参照先を選ぶための非規範の要約。食い違う場合は生成ファイルが正」と注記する（6.7）。旧 `grammar-model.md` への 11 件のリンクは、内容の移動先（`grammar-index.md`・（`markers.md`・`block-structure.md`・`literals.md` 等）へ張り替える。アンカーは生成ファイルの見出しに合わせる（6.4）。
 - 手書き `authoring-patterns.md`: 時報変数・シャッフル消費・チェイントーク等の挙動説明を削り、作例と「詳細は `variables.md` 等を参照」の参照に置き換える（6.2）。残すのは作例・ファイル分割指針・自然言語→シーン変換指針等の手順のみ。
-- 手書き Lua 3 ファイル: スキル外参照があれば除去する以外は変更しない。ただし `testing-lint.md` は `runtime-api.md#set_scene_selector--set_word_selector` を参照しているため、`lua/modules.md` へ移すセレクタ節の見出しを同じアンカーになる形（`### set_scene_selector(...) / set_word_selector(...)`）で保つ。他の手書き→生成リンクも、生成後の見出しに合わせて張り替える。
+- 手書き Lua 3 ファイル: スキル外参照があれば除去する以外は変更しない。ただし旧名（`runtime-api.md`・`shiori-handlers.md`）へのリンクは新名（`modules.md`・`shiori-events.md`）へ張り替える。`testing-lint.md` の `runtime-api.md#set_scene_selector--set_word_selector` は `modules.md#set_scene_selector--set_word_selector` とし、`lua/modules.md` へ移すセレクタ節の見出しを同じアンカーになる形（`### set_scene_selector(...) / set_word_selector(...)`）で保つ。`internal-modules.md` の旧名リンク、他の手書き→生成リンクも、生成後のファイル名・見出しに合わせて張り替える（`skill-missing`・`skill-anchor` で機械確認）。
+- 改名に伴う持ち出し先の注意: 両 `SKILL.md` の references 区分表の前文に「持ち出し先を更新するときは `references/` を丸ごと置き換える（旧名ファイルを残さない）」と明記する。
 - `pasta-lua-coding/SKILL.md` の早見表（`pasta.*` 表）にある `function(req)` を実装どおり `function(act)` に訂正する（早見表は非規範だが誤りを残さない）。
 - 自己完結は LinkCheck が機械検証する（6.4, 6.5）。
 
@@ -635,6 +639,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 
 - `extractBody`: 導入・締め・締め後の引用が出力に含まれず、本文内の `---` は保持される（5.2）。区切り 1 本・H1 なしで `bad-structure`、本文散文に `わたくし` や文末 `ですわ` で `voice-in-body`、コードフェンス内・表の行・インラインコード内の `ですわ` や `---` は無視される（5.2, 5.9）。
 - `rewriteLinks`: 同一スキル宛て → 兄弟ファイル名＋アンカー、非生成章・別スキル宛て → 公開 URL（`.html`＋アンカー）、絶対 URL・`#anchor` は不変、画像相対リンクで `unresolvable-link`、コードフェンス内は不変（5.3, 5.4）。
+- `outName`: `grammar/markers.md` → `markers.md`、`grammar/index.md` → `grammar-index.md`、`(skill, outName)` 重複で例外。
 - 決定性: 同一章の LF 版と CRLF 版から生成した結果がバイト一致し、ヘッダの 2 行が固定文字列である（5.5, 5.6）。
 - `checkAll`（tmp サンドボックス）: 章だけ変更 → `stale`、生成物だけ手編集 → `stale`、生成物を CRLF 化しただけ → 一致、ヘッダ付きの対応表外ファイル → `orphans`（7.1, 7.2, 7.4）。
 - `checkSkillSelfContained`: `../` で脱出するリンク、実在しない `references/x.md`、存在しない見出しへの `x.md#anchor`、`doc/spec` を含む HTML コメントを検出し、`https://` リンクと実在見出しへのアンカーは許可する（5.3, 6.4, 6.5）。`headingSlug`: 英字見出し・日本語見出し・記号入り見出し（`set_scene_selector(...) / set_word_selector(...)` → `set_scene_selector--set_word_selector`）・同名見出しの付番。旧リンク切れケース（相対 `.md`・GitHub URL・トラバーサル）は非回帰（8.4）。
@@ -674,7 +679,7 @@ graph LR
 ```
 
 - P1 で吸収元を読みながら台帳を作るため、P6 で吸収元を削除する前に網羅が確定している。
-- P4 の時点で旧手書きスキルファイルは生成物で上書きされる。旧ファイルにしか無い内容は P1 の台帳で移設済みであることを前提とする。
+- P4 の時点で旧手書きスキルファイルは生成物で上書きされ、旧名 4 ファイル（`grammar-model.md`・`call-spec.md`・`runtime-api.md`・`shiori-handlers.md`）は `git rm` で削除する。旧ファイルにしか無い内容は P1 の台帳で移設済みであることを前提とする。
 - ロールバック: 全変更が 1 PR のため、マージ前なら PR を閉じる、マージ後なら squash コミットを revert する。
 
 ## Open Questions / Risks
@@ -687,7 +692,7 @@ graph LR
 
 ### 設計ディスカッションへ持ち越す論点（前提を置いて起草済み）
 
-1. スキル生成ファイルの命名（前提: 現行名を維持し、新規分割分は章名）。
+1. ~~スキル生成ファイルの命名~~ → 解決済み（#3）: 全生成ファイルを章名に揃える（`outName` で導出、`index.md` は `{dir}-index.md`）。旧名 4 ファイルは削除。
 2. 生成対象外・別スキル宛ての章間リンクの扱い（前提: 公開マニュアル URL へ書き換え）。
 3. 鮮度チェックの CI 配置（前提: `manual.yml` の `paths` 拡張＋先頭ステップ）。
 4. SHIORI 章の構成（前提: `lua/shiori-events.md` 1 章、`lua/modules.md` は 1 章のまま約 700 行へ拡充）。
