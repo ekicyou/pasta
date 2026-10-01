@@ -509,7 +509,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 - 起動 `paths`（push・pull_request 共通）: `book/**`・`.github/workflows/manual.yml`・`.claude/skills/pasta-ghost-authoring/**`・`.claude/skills/pasta-lua-coding/**`。生成器は `book/tools/` にあるため「生成機構のみの変更」も `book/**` で捕捉される（7.5）。
 - ステップ: Setup Node の直後（`npm ci` より前）に `node book/tools/gen-skill-refs.mjs --check` を置き、依存インストールやビルドの前に速く失敗させる。旧「Drift / broken-link check」位置に `node book/tools/link-check.mjs`。「Verify drift gate」削除。自己テスト一括実行は不変（新テストは自動で拾われる）。
 - 公開阻止: すべて `build` ジョブ内のステップであり、失敗時は `deploy`（`needs: build`）が走らない（7.6）。
-- 不採用: `build.yml`（Windows・cargo、2 アーキの行列）への Node ステップ追加は、全 PR で走る利点に比べセットアップ重複のコストが大きい。スキル手編集は `paths` 追加で捕捉できるため不要と判断した。
+- 不採用（設計ディスカッション #9 で確定）: 専用ワークフローは公開阻止のために `manual.yml` 側にも判定が要り二重化する。`build.yml`（Windows・cargo、2 アーキの行列）への Node ステップ追加は、全 PR で走る利点に比べセットアップ重複のコストが大きい。スキル手編集は `paths` 追加で捕捉できるため不要と判断した。
 
 #### CompletionGate（`workflow.md` DoD・`kiro-complete/SKILL.md`）
 
@@ -720,7 +720,7 @@ graph LR
 
 1. ~~スキル生成ファイルの命名~~ → 解決済み（#3）: 全生成ファイルを章名に揃える（`outName` で導出、`index.md` は `{dir}-index.md`）。旧名 4 ファイルは削除。
 2. ~~生成対象外・別スキル宛ての章間リンクの扱い~~ → 解決済み（#4）: 公開マニュアル URL へ書き換え。
-3. 鮮度チェックの CI 配置（前提: `manual.yml` の `paths` 拡張＋先頭ステップ）。
+3. ~~鮮度チェックの CI 配置~~ → 解決済み（#9）: `manual.yml` の `paths` 拡張＋Setup Node 直後のステップ。`build.yml`・専用ワークフローには置かない。
 4. ~~Lua API 章の構成~~ → 解決済み（#5）: モジュールごとに章を分ける（`lua/modules/` 配下 8 章、生成も 8 ファイル）。SHIORI は `lua/shiori-events.md` 1 章。
 5. ~~動的単語参照 `＠＄` を brief 化するか~~ → 解決済み（#8）: brief 起票＋roadmap キー情報。
 6. `book/CONTENT-REVIEW.md` の扱い（前提: 歴史的記録の注記を付けて残す）。
