@@ -370,6 +370,48 @@ describe("SHIORI_ACT - build()", function()
     end)
 end)
 
+-- actor-surface-restore Task 3.2: STORE.appearance をビルダーへ渡す（直接変更方式）
+describe("SHIORI_ACT - build() STORE.appearance連携 (actor-surface-restore)", function()
+    test("2.7/4.1: act 経由でストアの外見状態が更新され、後続ビルドの \\p[0] 直後に \\s[10] を復旧する", function()
+        local STORE = require("pasta.store")
+        STORE.reset()
+        local appearance = STORE.appearance
+
+        -- スポット未設定の2アクターはスポット0を共有する
+        local act, actors = new_act()
+        act:talk(actors.kero, "B1"):surface(10)
+        act:talk(actors.sakura, "A1"):surface(3)
+        act:build()
+
+        -- 直接変更方式: 同じ表がその場で更新される（サーフェスIDは出力どおりの文字列で記録: 1.5）
+        expect(STORE.appearance):toBe(appearance)
+        expect(appearance.actors["うにゅう"].surface):toBe("10")
+        expect(appearance.actors["さくら"].surface):toBe("3")
+        expect(appearance.spots[0].surface):toBe("3")
+
+        local act2 = new_act()
+        act2:talk(actors.kero, "B2")
+        expect(act2:build()):toBe("\\p[0]\\s[10]B2\\e")
+
+        STORE.reset()
+    end)
+
+    test("ストアに外見状態が無い環境でもビルドローカル状態でエラーなく動く", function()
+        local STORE = require("pasta.store")
+        STORE.reset()
+        STORE.appearance = nil
+
+        local act, actors = new_act()
+        act:talk(actors.kero, "B1"):surface(10)
+        act:talk(actors.sakura, "A1"):surface(3)
+        act:talk(actors.kero, "B2")
+        expect(act:build()):toBe("\\p[0]B1\\s[10]\\p[0]\\n[150]A1\\s[3]\\p[0]\\s[10]\\n[150]B2\\e")
+        expect(STORE.appearance):toBe(nil)
+
+        STORE.reset()
+    end)
+end)
+
 -- Test reset() method - REMOVED (reset is no longer a public API)
 -- The reset functionality is now integrated into build() method.
 -- build() automatically resets the token buffer and spot state.
