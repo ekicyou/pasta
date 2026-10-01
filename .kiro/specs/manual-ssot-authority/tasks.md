@@ -178,7 +178,7 @@
   - 完了状態: 鮮度照合が exit 0 で、両スキルの references に旧名ファイルが無い
   - _Requirements: 5.1, 10.2_
 
-- [ ] 4.2 (P) pasta-ghost-authoring の SKILL.md を区分表つきに更新する
+- [x] 4.2 (P) pasta-ghost-authoring の SKILL.md を区分表つきに更新する
   - references 一覧表（ファイル・区分・生成元章の公開 URL・用途）を全ファイル分置き、前文に「生成ファイルは編集しない・生成ファイルが正」「本文の早見表は非規範の要約」「持ち出し先は references を丸ごと置換」を明記する
   - 旧 grammar-model への 11 件・call-spec への 2 件のリンクを移動先の生成ファイルへ張り替え、アンカーを生成ファイルの見出しに合わせる。食い違い表に当たる記述を訂正し、metadata.version をバンプする
   - 完了状態: リンク検証でこのスキルの SKILL.md に起因する違反が 0
