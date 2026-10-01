@@ -132,7 +132,7 @@
   - 完了状態: 改名後の自己テストと検証スクリプト自己テストが緑で、実リポジトリに対する book 内リンク検査が exit 0
   - _Requirements: 8.1, 8.4_
 
-- [ ] 3.2 スキル自己完結検査と見出し slug を追加する
+- [x] 3.2 スキル自己完結検査と見出し slug を追加する
   - 2 スキルの全 `.md` に対し、規則 a（スキル外への脱出・実在しないファイル）・b（見出し slug と `<a id>`／`<a name>` の和集合に対するアンカー検証）・c（禁止トークン `doc/spec`・`GRAMMAR.md`・`book/src`・`crates/` を HTML コメント含む全文で検出）・d（`SKILL.md` からリンクされていない references ファイル）を検査し、違反を種別付きで報告する
   - GitHub 方式の見出し slug 関数を実装し、design.md の例（`[package] 予約注記`・全角括弧入り・`set_scene_selector(...) / set_word_selector(...)`・重複見出しの付番）を自己テストで固定する
   - 早期確認として、`mdbook build` が出力した生成対象章の見出し id と slug 関数の結果を突き合わせる。食い違う見出しがあれば、マニュアル章（ContentMigration の領域）の見出しを両方式で同じ slug になる形へ直す境界横断の作業となるため、直した見出しへの book 内アンカー参照（variables の見出しを参照する first-ghost・lua/patterns 等）も同時に直す
@@ -302,3 +302,4 @@
 - 2.9: パースエラーのログ文字列は `Parse error: ` 前置きが多重になる（loader/process.rs と pasta_dsl/parser の二重包み・見た目の冗長のみでバグ候補にしない）。startup.md §4 は内側の形式を「含む」とだけ書いた。
 - 2.10: config_defaults_test は「キー名と `値` を含む行がどれか 1 行あれば合格」（`.any`）のため、章に同じキーの表行が 2 つ（3分類表と [ghost] 表）あると片方だけ古くても通る。旧スキル側も同じ構成で既存の穴。design が照合規則の不変を指示しているため本仕様では変更せず、既知の制約として記録する。
 - 3.1: `maskFences` は開閉の区切り行も空行にし、CRLF を LF に正規化する（行数は保つ）。`.github/workflows/manual.yml` は 5.1 まで旧 drift-check.mjs／verify-drift-gate.mjs を参照したまま（ブランチ内の中間状態）。
+- 3.2: link-check のスキル検査は P4 まで実リポジトリで赤（skill-escape 1: lua SKILL.md → ../../../book/src/reference/startup.md、skill-forbidden-ref 11: 文法 7 ファイルの doc/spec source コメント・call-spec/pasta-toml L29/testing-lint L247 の crates/・lua SKILL.md L40 の book/src）。生成対象 21 章の見出し slug は mdBook id と全一致。headingSlug は生テキスト基準のため強調 `_x_`・全角空白入りの見出しは避ける。

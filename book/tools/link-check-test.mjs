@@ -1,4 +1,4 @@
-// link-check-test.mjs — link-check の自動検証（manual-ssot-authority タスク 3.1 / 要件 8.4）。
+// link-check-test.mjs — link-check の自動検証（manual-ssot-authority タスク 3.1・3.2 / 要件 8.4, 5.3, 6.1, 6.4, 6.5, 10.2, 2.4）。
 //
 // 検証方針:
 //   book/src を恒久変更しないため、検証は
@@ -13,6 +13,11 @@
 //   - book 内 .md リンク切れ / 存在しない GitHub blob URL / トラバーサル → 検出＆ failed=true。
 //   - 同一入力 → 同一結果（決定性）。
 //   - maskFences が CommonMark 準拠でフェンス内の行を空行に置換する（行数は保つ）。
+//   - headingSlug が GitHub 方式の slug を返し、重複見出しを -1・-2 と付番する（3.2）。
+//   - checkSkillSelfContained が 2 スキルの規則 (a)〜(d) 違反を種別付きで検出し、
+//     https・実在アンカー・明示アンカー（#s6-6）は許可する（3.2）。
+//   実リポジトリのスキル検査は P4（タスク 4.x）完了まで違反ありでよいため、
+//   (A)・(B-13) は book 部分（internal-md / github-repo-path）が 0 件であることだけを確かめる。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -25,6 +30,11 @@ import {
   LINK_RE,
   maskFences,
   extractLinks,
+  headingSlug,
+  headingSlugs,
+  checkSkillSelfContained,
+  CHECKED_SKILLS,
+  FORBIDDEN_SKILL_TOKENS,
   githubUrlToRepoPath,
   runLinkCheck,
   reportLinkCheck,
@@ -67,11 +77,13 @@ function rmrf(root) {
 
 // ============================================================
 log('\n== (A) 実リポジトリ現状: クリーン判定 ==');
+const BOOK_KINDS = new Set(['internal-md', 'github-repo-path']);
 {
   const result = runLinkCheck(REPO_ROOT);
-  check('実リポジトリでリンク切れ 0 件', result.broken.length === 0,
-    `broken=${JSON.stringify(result.broken)}`);
-  check('実リポジトリで failed=false（exit 0 相当）', result.failed === false);
+  const bookBroken = result.broken.filter((b) => BOOK_KINDS.has(b.kind));
+  check('実リポジトリで book 内リンク切れ 0 件', bookBroken.length === 0,
+    `broken=${JSON.stringify(bookBroken)}`);
+  check('failed はいずれかの違反の有無と一致', result.failed === (result.broken.length > 0));
   check('reportLinkCheck が文字列を返す', typeof reportLinkCheck(result) === 'string');
 }
 
@@ -184,9 +196,14 @@ log('\n== (B-13) CLI 結線（exit code / RESULT 出力） ==');
 {
   const cliPath = path.join(here, 'link-check.mjs');
   const r = spawnSync(process.execPath, [cliPath], { encoding: 'utf8', timeout: 60000 });
-  check('CLI: クリーンな実リポジトリで exit 0', r.status === 0,
+  const expected = runLinkCheck(REPO_ROOT).failed ? 1 : 0;
+  check(`CLI: 違反の有無どおりの exit code（期待 ${expected}）`, r.status === expected,
     `status=${r.status} stderr=${(r.stderr || '').slice(0, 300)}`);
-  check('CLI: RESULT: OK を出力', /RESULT: OK/.test(r.stdout || ''),
+  check('CLI: book 部分は 0 件', /\[1\][^\n]*: 0 件/.test(r.stdout || ''),
+    (r.stdout || '').slice(0, 300));
+  check('CLI: スキル検査の節を出力', /\[2\] スキル自己完結/.test(r.stdout || ''),
+    (r.stdout || '').slice(0, 300));
+  check('CLI: RESULT 行を出力', /RESULT: (OK|FAIL)/.test(r.stdout || ''),
     (r.stdout || '').slice(-200));
 }
 
@@ -313,6 +330,129 @@ log('\n== (C) maskFences（CommonMark 準拠のフェンス判定・行数保持
   {
     const out = maskFences('a\r\n```\r\ncode\r\n```\r\nb');
     check('CRLF 入力: LF 正規化して行数を保つ', out === 'a\n\n\n\nb', JSON.stringify(out));
+  }
+}
+
+// ============================================================
+log('\n== (D) headingSlug / headingSlugs（GitHub 方式） ==');
+{
+  const cases = [
+    ['## Overview', 'overview'],
+    ['## 単語定義', '単語定義'],
+    ['## [package] 予約注記', 'package-予約注記'],
+    ['### 予約グローバル変数（pasta_ で始まる名前）', '予約グローバル変数pasta_-で始まる名前'],
+    ['### set_scene_selector(...) / set_word_selector(...)', 'set_scene_selector--set_word_selector'],
+    ['### `ACT:talk(text)` の使い方', 'acttalktext-の使い方'],
+    ['## [リンク](other.md#x) 付き', 'リンク-付き'],
+    ['## A-B_c 2', 'a-b_c-2'],
+    ['同一スポット共有時の外見の復旧', '同一スポット共有時の外見の復旧'],
+    ['  ## 前後空白  ', '前後空白'],
+  ];
+  for (const [h, want] of cases) {
+    const got = headingSlug(h);
+    check(`headingSlug(${JSON.stringify(h)}) = ${want}`, got === want, `got=${got}`);
+  }
+
+  const md = ['# T', '## 例', '```', '## 例', '```', '## 例', '### 例', '## 別'].join('\n');
+  const slugs = headingSlugs(md);
+  check('headingSlugs: フェンス内を除き重複に -1・-2 を付番',
+    JSON.stringify(slugs) === JSON.stringify(['t', '例', '例-1', '例-2', '別']), JSON.stringify(slugs));
+}
+
+// ============================================================
+log('\n== (E) checkSkillSelfContained（規則 a〜d） ==');
+{
+  check('CHECKED_SKILLS は 2 スキル',
+    JSON.stringify(CHECKED_SKILLS) === JSON.stringify(['pasta-ghost-authoring', 'pasta-lua-coding']));
+  check('FORBIDDEN_SKILL_TOKENS は 4 語',
+    JSON.stringify(FORBIDDEN_SKILL_TOKENS) === JSON.stringify(['doc/spec', 'GRAMMAR.md', 'book/src', 'crates/']));
+
+  const G = '.claude/skills/pasta-ghost-authoring';
+  const L = '.claude/skills/pasta-lua-coding';
+
+  // E-1: 許可ケースのみ（違反 0）。
+  {
+    const root = makeSandbox();
+    try {
+      writeFile(root, `${G}/SKILL.md`, [
+        '# skill',
+        '- [a](references/a.md)',
+        '- [b](references/b.md#package-予約注記)',
+        '- [p](references/patterns.md#s6-6)',
+        '- [ext](https://ekicyou.github.io/pasta/grammar/index.html#x)',
+        '- [self](#skill)',
+        '',
+      ].join('\n'));
+      writeFile(root, `${G}/references/a.md`, [
+        '# A',
+        '## 同名', '## 同名',
+        '[dup](#同名-1) [sib](b.md#予約グローバル変数pasta_-で始まる名前) [enc](b.md#%E4%BE%8B)',
+        '```markdown',
+        '[フェンス内は無視](../../../escape.md) doc/x',
+        '```',
+      ].join('\n'));
+      writeFile(root, `${G}/references/b.md`, [
+        '# B', '## [package] 予約注記', '### 予約グローバル変数（pasta_ で始まる名前）', '## 例',
+      ].join('\n'));
+      writeFile(root, `${G}/references/patterns.md`, '# P\n\n<a id="s6-6"></a>\n### 6.6 x\n');
+      writeFile(root, `${L}/SKILL.md`, '# lua\n');
+      const broken = checkSkillSelfContained(root);
+      check('E-1 許可ケース（https・実在アンカー・重複付番・#s6-6・フェンス内）: 違反 0',
+        broken.length === 0, JSON.stringify(broken));
+      check('E-1 runLinkCheck も failed=false', runLinkCheck(root).failed === false);
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // E-2: 各違反の検出。
+  {
+    const root = makeSandbox();
+    try {
+      writeFile(root, 'outside.md', '# outside\n');
+      writeFile(root, `${G}/SKILL.md`, [
+        '# skill',
+        '- [esc](../../../outside.md)',
+        '- [man](../../../book/src/grammar/index.md)',
+        '- [miss](references/nope.md)',
+        '- [a](references/a.md#no-such-heading)',
+        '- [self](#missing-self)',
+        '',
+      ].join('\n'));
+      writeFile(root, `${G}/references/a.md`,
+        '<!-- source: doc/spec/02-markers.md -->\n# A\n\nGRAMMAR.md を参照。\n[x](only-from-ref.md)\n');
+      writeFile(root, `${G}/references/orphan.md`, '# orphan\n');
+      writeFile(root, `${G}/references/only-from-ref.md`, '# only from ref\n');
+      writeFile(root, `${L}/SKILL.md`, '# lua\n[t](references/t.md)\n');
+      writeFile(root, `${L}/references/t.md`, '# T\n\n```text\ncrates/pasta_lua/src/x.rs\n```\n');
+
+      const broken = checkSkillSelfContained(root);
+      const has = (kind, re) => broken.some((b) => b.kind === kind && re.test(`${b.file} ${b.target} ${b.detail}`));
+      check('a: ../ でスキル外へ脱出 → skill-escape', has('skill-escape', /outside\.md/), JSON.stringify(broken));
+      check('a: book/src を指すリンクも skill-escape', has('skill-escape', /book\/src\/grammar/), JSON.stringify(broken));
+      check('a: 実在しない references/nope.md → skill-missing', has('skill-missing', /nope\.md/), JSON.stringify(broken));
+      check('b: 存在しない見出しへのアンカー → skill-anchor', has('skill-anchor', /no-such-heading/), JSON.stringify(broken));
+      check('b: 同一ファイル内 #missing-self → skill-anchor', has('skill-anchor', /missing-self/), JSON.stringify(broken));
+      check('c: HTML コメント内 doc/spec → skill-forbidden-ref', has('skill-forbidden-ref', /a\.md.*doc\/spec/), JSON.stringify(broken));
+      check('c: 本文 GRAMMAR.md → skill-forbidden-ref', has('skill-forbidden-ref', /a\.md.*GRAMMAR\.md/), JSON.stringify(broken));
+      check('c: フェンス内の crates/ も検出（全文検査）', has('skill-forbidden-ref', /t\.md.*crates\//), JSON.stringify(broken));
+      check('c: SKILL.md 本文の book/src も検出', has('skill-forbidden-ref', /SKILL\.md.*book\/src/), JSON.stringify(broken));
+      check('d: SKILL.md 未リンクの references/orphan.md → skill-unlisted', has('skill-unlisted', /orphan\.md/), JSON.stringify(broken));
+      check('d: references 内からのみリンクされ SKILL.md から未リンク → skill-unlisted',
+        has('skill-unlisted', /only-from-ref\.md/), JSON.stringify(broken));
+      check('d: リンク済みの a.md・t.md は unlisted にならない',
+        !broken.some((b) => b.kind === 'skill-unlisted' && /\/(a|t)\.md/.test(b.file)), JSON.stringify(broken));
+      check('file はリポジトリ相対', broken.every((b) => b.file.startsWith('.claude/skills/')), JSON.stringify(broken));
+
+      const result = runLinkCheck(root);
+      check('E-2 runLinkCheck: スキル違反で failed=true', result.failed === true);
+      const rep = reportLinkCheck(result);
+      check('E-2 レポートに種別が出る',
+        ['skill-escape', 'skill-missing', 'skill-anchor', 'skill-forbidden-ref', 'skill-unlisted']
+          .every((k) => rep.includes(k)), rep);
+    } finally {
+      rmrf(root);
+    }
   }
 }
 

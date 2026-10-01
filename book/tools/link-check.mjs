@@ -9,6 +9,12 @@
 //       ローカルに実在するか（オフラインでローカル照合）、
 //   (c) (a)(b) とも repoRoot 外へ脱出するパス（トラバーサル）は実在しても違反。
 //
+// スキル自己完結検査（タスク 3.2・要件 5.3, 6.1, 6.4, 6.5, 10.2, 2.4）:
+//   .claude/skills/{pasta-ghost-authoring,pasta-lua-coding}/**/*.md を checkSkillSelfContained で
+//   検査する（skill-escape / skill-missing / skill-anchor / skill-forbidden-ref / skill-unlisted）。
+//   アンカーは GitHub 方式の headingSlug（生成対象 21 章で mdBook の id と一致を確認済み）と
+//   `<a id|name>` の明示アンカーで照合する。
+//
 // 共用 export（gen-skill-refs.mjs が import する）:
 //   LINK_RE    … インラインリンク `[text](target)` の正規表現（先頭キャプチャ=リンク先）
 //   maskFences … CommonMark 準拠でコードフェンス内の行を空行に置換（行数は保つ）
@@ -189,25 +195,176 @@ export function detectBrokenLinks(repoRoot = REPO_ROOT) {
   return broken;
 }
 
+// ---- 見出し slug（GitHub 方式） ----
+// 見出し記号と前後空白を除いたテキストについて、(1) インラインコードのバッククォートを外し
+// リンクは表示テキストへ、(2) 小文字化、(3) 文字・結合文字・数字と `_`・`-`・空白以外を除去、
+// (4) 空白 1 文字を `-` 1 文字へ（連続空白は畳まない）。重複の付番は headingSlugs が行う。
+export function headingSlug(heading) {
+  return heading
+    .trim()
+    .replace(/^#{1,6}(?:\s+|$)/, '')
+    .replace(/\s+#+\s*$/, '')
+    .trim()
+    .replace(/`+/g, '')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{M}\p{N}_\- ]/gu, '')
+    .replace(/ /g, '-');
+}
+
+// 文書のフェンス外 ATX 見出し（#〜######）の slug を出現順に返す。
+// 同一文書内の重複には出現順に -1・-2 … を付ける（GitHub・mdBook 共通の付番）。
+const HEADING_RE = /^ {0,3}#{1,6}(?:[ \t]+|$)/;
+export function headingSlugs(markdown) {
+  const seen = new Map();
+  const out = [];
+  for (const line of maskFences(markdown).split('\n')) {
+    if (!HEADING_RE.test(line)) continue;
+    const base = headingSlug(line);
+    let slug = base;
+    let n = seen.get(base) || 0;
+    while (seen.has(slug)) slug = `${base}-${++n}`;
+    seen.set(base, n);
+    if (slug !== base) seen.set(slug, 0);
+    out.push(slug);
+  }
+  return out;
+}
+
+// ---- スキル自己完結検査（2 スキル対象） ----
+export const CHECKED_SKILLS = Object.freeze(['pasta-ghost-authoring', 'pasta-lua-coding']);
+export const FORBIDDEN_SKILL_TOKENS = Object.freeze(['doc/spec', 'GRAMMAR.md', 'book/src', 'crates/']);
+
+// アンカー集合: フェンス外見出しの slug ∪ `<a id|name="…">` の明示アンカー。
+function anchorSet(markdown) {
+  const masked = maskFences(markdown);
+  const set = new Set(headingSlugs(markdown));
+  for (const m of masked.matchAll(/<a\s[^>]*\b(?:id|name)\s*=\s*["']([^"']+)["']/gi)) set.add(m[1]);
+  return set;
+}
+
+function decodeAnchor(a) {
+  try {
+    return decodeURIComponent(a);
+  } catch {
+    return a;
+  }
+}
+
+// 規則（リンク抽出はフェンス外のみ）:
+//   (a) 相対リンクはスキルディレクトリ内に解決され（skill-escape）、実在する（skill-missing）。
+//   (b) *.md#anchor・#anchor はリンク先のアンカー集合に含まれる（skill-anchor）。
+//   (c) ファイル全文（HTML コメント・フェンス内を含む）に禁止トークンが無い（skill-forbidden-ref）。
+//   (d) references/*.md は同じスキルの SKILL.md から 1 回以上リンクされる（skill-unlisted）。
+// スキルディレクトリが無ければ検査しない。
+export function checkSkillSelfContained(repoRoot = REPO_ROOT) {
+  const broken = [];
+  const rel = (abs) => path.relative(repoRoot, abs).split(path.sep).join('/');
+  const anchorCache = new Map();
+  const anchorsOf = (abs) => {
+    if (!anchorCache.has(abs)) anchorCache.set(abs, anchorSet(fs.readFileSync(abs, 'utf8')));
+    return anchorCache.get(abs);
+  };
+
+  for (const skill of CHECKED_SKILLS) {
+    const skillDir = path.resolve(repoRoot, '.claude/skills', skill);
+    if (!fs.existsSync(skillDir)) continue;
+    const skillMd = path.join(skillDir, 'SKILL.md');
+    const linkedFromSkillMd = new Set();
+
+    for (const file of listMarkdownFiles(skillDir).sort()) {
+      const text = fs.readFileSync(file, 'utf8');
+      const relFile = rel(file);
+
+      // (c) 全文検査（行ごと・語ごとに 1 件）。
+      text.replace(/\r\n?/g, '\n').split('\n').forEach((line, i) => {
+        for (const tok of FORBIDDEN_SKILL_TOKENS) {
+          if (line.includes(tok)) {
+            broken.push({ file: relFile, target: tok, kind: 'skill-forbidden-ref',
+              detail: `L${i + 1}: スキル外（リポジトリ内）参照の語 "${tok}" を含む` });
+          }
+        }
+      });
+
+      for (const rawTarget of extractLinks(maskFences(text))) {
+        const t = rawTarget.trim();
+        if (t === '' || /^[a-z][a-z0-9+.-]*:/i.test(t) || t.startsWith('//')) continue; // 絶対 URL
+        const h = t.indexOf('#');
+        const pathPart = stripFragment(t);
+        const anchor = h >= 0 ? decodeAnchor(t.slice(h + 1)) : '';
+        const abs = pathPart === '' ? file : path.resolve(path.dirname(file), decodeAnchor(pathPart));
+
+        // (a)
+        if (!isWithinRoot(skillDir, abs)) {
+          broken.push({ file: relFile, target: rawTarget, kind: 'skill-escape',
+            detail: `スキルディレクトリ外を指す: ${pathPart}` });
+          continue;
+        }
+        if (!fs.existsSync(abs)) {
+          broken.push({ file: relFile, target: rawTarget, kind: 'skill-missing',
+            detail: `リンク先が存在しない: ${pathPart}` });
+          continue;
+        }
+        if (file === skillMd) linkedFromSkillMd.add(abs);
+
+        // (b)
+        if (anchor !== '' && abs.endsWith('.md') && !anchorsOf(abs).has(anchor)) {
+          broken.push({ file: relFile, target: rawTarget, kind: 'skill-anchor',
+            detail: `リンク先 ${rel(abs)} に見出し／明示アンカー "${anchor}" が無い` });
+        }
+      }
+    }
+
+    // (d)
+    const refDir = path.join(skillDir, 'references');
+    if (fs.existsSync(refDir)) {
+      for (const name of fs.readdirSync(refDir).sort()) {
+        const abs = path.join(refDir, name);
+        if (!name.endsWith('.md') || !fs.statSync(abs).isFile()) continue;
+        if (!linkedFromSkillMd.has(abs)) {
+          broken.push({ file: rel(abs), target: '', kind: 'skill-unlisted',
+            detail: `${rel(skillMd)} からリンクされていない（区分表への記載漏れ／削除し忘れ）` });
+        }
+      }
+    }
+  }
+  return broken;
+}
+
 // ---- オーケストレーション ----
+const BOOK_KINDS = new Set(['internal-md', 'github-repo-path']);
+
 export function runLinkCheck(repoRoot = REPO_ROOT) {
-  const broken = detectBrokenLinks(repoRoot);
+  const broken = [...detectBrokenLinks(repoRoot), ...checkSkillSelfContained(repoRoot)];
   return { broken, failed: broken.length > 0 };
 }
 
-// 結果を標準出力へ分類表示する。
+// 結果を標準出力へ分類表示する（[1] book 内リンク切れ・[2] スキル自己完結を種別ごと）。
 export function reportLinkCheck(result) {
   const { broken } = result;
+  const book = broken.filter((b) => BOOK_KINDS.has(b.kind));
+  const skill = broken.filter((b) => !BOOK_KINDS.has(b.kind));
   const out = [];
+  const list = (items) => {
+    for (const b of items) {
+      out.push(`  BROKEN  ${b.file}${b.target ? `  ->  ${b.target}` : ''}`);
+      out.push(`          [${b.kind}] ${b.detail}`);
+    }
+  };
   out.push('link-check (git 非依存)');
   out.push('');
-  out.push(`[1] リンク切れ（book 内 .md / リポジトリ内 GitHub URL）: ${broken.length} 件`);
-  for (const b of broken) {
-    out.push(`  BROKEN  ${b.file}  ->  ${b.target}`);
-    out.push(`          [${b.kind}] ${b.detail}`);
+  out.push(`[1] リンク切れ（book 内 .md / リポジトリ内 GitHub URL）: ${book.length} 件`);
+  list(book);
+  out.push('');
+  out.push(`[2] スキル自己完結（${CHECKED_SKILLS.join(', ')}）: ${skill.length} 件`);
+  for (const kind of ['skill-escape', 'skill-missing', 'skill-anchor', 'skill-forbidden-ref', 'skill-unlisted']) {
+    const items = skill.filter((b) => b.kind === kind);
+    if (items.length === 0) continue;
+    out.push(` ${kind}: ${items.length} 件`);
+    list(items);
   }
   out.push('');
-  out.push(result.failed ? 'RESULT: FAIL（リンク切れあり）' : 'RESULT: OK');
+  out.push(result.failed ? 'RESULT: FAIL（違反あり）' : 'RESULT: OK');
   return out.join('\n');
 }
 
