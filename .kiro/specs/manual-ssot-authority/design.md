@@ -779,7 +779,7 @@ graph LR
 - **P3 ツール**: `drift-check.mjs` → `link-check.mjs`（縮小・スキル検査追加）、`gen-skill-refs.mjs` と両テスト、`verify-content.mjs` の A 改修と import 化、`verify-drift-gate.mjs`・`manual-sources.toml` の削除、`verify-scripts-test.mjs` の更新、章末「権威的仕様」引用と book 内の doc/spec リンクの削除。`link-check.mjs` は生成器が import するため先に作る。終了条件: 全 `*-test.mjs` と `verify-content.mjs` が緑。実リポジトリに対する `link-check.mjs` のスキル検査と `--check` は P4 完了まで赤でよい。
 - **P4 スキル切替**: 書き出しモードで 21 ファイルを生成（同名の旧手書き 6 ファイルは上書き）、旧名 4 ファイル（`grammar-model.md`・`call-spec.md`・`runtime-api.md`・`shiori-handlers.md`）を `git rm`、両 `SKILL.md` と手書きファイルを更新。旧ファイルにしか無い内容は P1 の台帳で移設済みであることを前提とする。終了条件: `gen-skill-refs.mjs --check` と `link-check.mjs` が緑。
 - **P5 CI・ゲート**: `manual.yml`、`workflow.md` DoD とスキル更新手順、`kiro-complete/SKILL.md`。
-- **P6 撤去**: `doc/spec/`、`GRAMMAR.md` 本文、`book/CONTENT-REVIEW.md`。
+- **P6 撤去**: `doc/spec/`、`GRAMMAR.md` 本文、`book/CONTENT-REVIEW.md`。P7 のうち brief 2 件と `roadmap.md` の申し送りは ch08・ch12 を参照するため、P6 より前に行う（tasks.md の大タスク 6）。
 - **P7 参照修正**: steering・README 類・`AUTHORING.md`・`review-improvement-loop`・ソースコメント、brief 2 件、`roadmap.md`。
 - **P8 全体検証**: Testing Strategy の全項目。
 - ロールバック: 全変更が 1 PR のため、マージ前なら PR を閉じる、マージ後なら squash コミットを revert する。
