@@ -613,6 +613,7 @@ hour_margin = 30
 - トークの間隔は、予約グローバル変数 `＄＊pasta_talk_interval_min`・`＄＊pasta_talk_interval_max` → `pasta.toml` の値 → 既定値、の順に決まる。数値でない値は無視され、小数は切り捨て、10 秒未満は 10 秒になり、最小間隔が最大間隔を上回ると最大間隔が最小間隔にそろえられる（[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前)）。
 - 設定は、次のトーク時刻を決めるたびに読み直される。
 - Lua から設定値を読むには [@pasta_config](modules/pasta-config.md) を使う。
+- `[ghost]` の全キー（`spot_newlines` を含む）と既定値は [pasta.toml リファレンス](../reference/pasta-toml.md#ghostゴースト動作) を参照する。
 
 ### テスト用関数
 

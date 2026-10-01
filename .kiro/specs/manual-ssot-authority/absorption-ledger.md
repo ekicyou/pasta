@@ -481,6 +481,8 @@
 
 既定値は同一行の表形式で書く（`config_defaults_test.rs` が照合する）。マニュアルにはリポジトリ内パスを書かない（5.3）。
 
+この小節の L259 以降の行番号は、main 取り込み（#45・actor-surface-restore）後の吸収元の行番号である（`default_surface` 節が `surface / dressup` 節に置き換わり、以降の見出しがずれた。2.7 で再同期）。
+
 | 吸収元（見出し） | 収録先（章#節）／既存収録済み／除外（理由） | 実装照合 | 備考 |
 | ---------------- | ------------------------------------------ | -------- | ---- |
 | L1 pasta.toml リファレンス | 収録先（新設）: reference/pasta-toml.md | 不要（題目） | — |
@@ -489,7 +491,7 @@
 | L27 3分類表 | 収録先（新設）: reference/pasta-toml.md#3分類表 | lua:loader/config/sections.rs `default_*`、lua:loader/config/mod.rs `default_pasta_patterns` ほか、crates/pasta_lua/tests/loader/config_defaults_test.rs | 既定値の出典 `crates/pasta_lua/src/loader/config.rs` は旧位置。マニュアルには「実装の既定値（SSOT）」とだけ書く |
 | L57 最小テンプレート | 収録先（新設）: reference/pasta-toml.md#最小テンプレート | lua:loader/config/mod.rs（`[actor]` 不在は警告のみで停止しない） | — |
 | L78 フルリファレンステンプレート | 収録先（新設）: reference/pasta-toml.md#フルリファレンステンプレート | lua:loader/config/sections.rs・mod.rs の既定値 | — |
-| L161 [package] 予約注記 | 収録先（新設）: reference/pasta-toml.md#[package] 予約注記（アンカーは見出しの slug に合わせて直す） | lua:loader/config/mod.rs（`[package]` は custom_fields に残るだけで使われない） | 吸収元の `#package予約注記` は切れたアンカー |
+| L161 [package] 予約注記 | 収録先（新設）: reference/pasta-toml.md#[package] 予約注記（アンカーは見出しの slug `package-予約注記` に合わせて直した） | lua:loader/config/mod.rs（`[package]` は custom_fields に残るだけで使われない） | 吸収元の `#package予約注記` は切れたアンカー |
 | L178 各セクション詳細 | 収録先（新設）: reference/pasta-toml.md#各セクション詳細 | 不要（節見出し） | — |
 | L182 [loader]（ファイル読み込み） | 収録先（新設）: reference/pasta-toml.md#[loader]（ファイル読み込み） | lua:loader/config/mod.rs `LoaderConfig` | — |
 | L193 pasta_patterns | 収録先（新設）: reference/pasta-toml.md#pasta_patterns（authoring-patterns §6.8 の自動読み込みを統合） | lua:loader/config/mod.rs `default_pasta_patterns`（`dic/**/*.pasta`） | — |
@@ -498,15 +500,15 @@
 | L225 talk_interval_min / talk_interval_max | 収録先（新設）: reference/pasta-toml.md#talk_interval_min / talk_interval_max | lua:loader/config/sections.rs `default_talk_interval_min`・`_max`、ps:pasta/shiori/event/virtual_dispatcher.lua `get_config` | — |
 | L235 spot_newlines | 収録先（新設）: reference/pasta-toml.md#spot_newlines（`\n[half]` 相当という説明は、実装の `\n[150]`（値×100 の百分率）へ訂正） | lua:loader/config/sections.rs `default_spot_newlines`、ps:pasta/shiori/sakura_builder.lua（`\n[%d]`、`spot_newlines * 100`） | — |
 | L246 [actor."名前"]（アクター設定） | 収録先（新設）: reference/pasta-toml.md#[actor."名前"]（アクター設定） | lua:runtime/module_registry.rs `inject_actor_names`、ps:pasta/actor.lua（CONFIG 由来アクター） | — |
-| L258 spot | 収録先（新設）: reference/pasta-toml.md#spot | ps:pasta/shiori/sakura_builder.lua `spot_to_tag` | — |
-| L270 budoux | 収録先（新設）: reference/pasta-toml.md#budoux | lua:sakura_script/mod.rs `apply_budoux_if_configured`、lua:sakura_script/line_breaker.rs | — |
-| L290 default_surface | 収録先（新設）: reference/pasta-toml.md#default_surface（実装の挙動に合わせて記述） | crates 配下で `default_surface` を読むコードが見当たらない（fixture と README のみ） | 「シーン開始時に自動適用」は実装で確認できない →1.3 |
-| L306 [talk]（トーク表示制御） | 収録先（新設）: reference/pasta-toml.md#[talk]（トーク表示制御） | lua:loader/config/sections.rs `TalkConfig`、lua:sakura_script/wait_inserter.rs | — |
-| L335 [persistence]（永続化） | 収録先（新設）: reference/pasta-toml.md#[persistence]（永続化） | lua:loader/config/sections.rs `PersistenceConfig`、lua:runtime/persistence.rs | — |
-| L353 [logging]（ログ出力） | 収録先（新設）: reference/pasta-toml.md#[logging]（ログ出力） | lua:loader/config/sections.rs `LoggingConfig` | — |
-| L372 [lua]（Lua ライブラリ）★ 上級者向け | 収録先（新設）: reference/pasta-toml.md#[lua]（Lua ライブラリ）（スキルへの案内は lua/modules/mlua-stdlib.md へのリンクに置き換える） | lua:loader/config/sections.rs `LuaConfig`・`default_libs`、lua:runtime/runtime_config.rs `from_libs` | — |
-| L387 [debug]（デバッグバックエンド）★ 上級者向け | 収録先（新設）: reference/pasta-toml.md#[debug]（デバッグバックエンド） | lua:loader/config/sections.rs `DebugFileConfig`・`default_debug_port` | — |
-| L407 [package]（パッケージ情報）★ エンジンプロファイル専用 | 収録先（新設）: reference/pasta-toml.md#[package]（パッケージ情報） | lua:loader/config/mod.rs（使われない） | — |
+| L259 spot | 収録先（新設）: reference/pasta-toml.md#spot | ps:pasta/shiori/sakura_builder.lua `spot_to_tag` | — |
+| L271 budoux | 収録先（新設）: reference/pasta-toml.md#budoux（幅は半角 1・全角 2 で数える。吸収元の「≤10文字」は実装の幅計算に合わせて訂正） | lua:sakura_script/mod.rs `apply_budoux_if_configured`、lua:sakura_script/line_breaker.rs | — |
+| L291 surface / dressup | 収録先（新設）: reference/pasta-toml.md#surface / dressup（詳細は grammar/actor-dictionary.md#同一スポット共有時の外見の復旧 へリンク） | ps:pasta/shiori/appearance.lua（`actor.surface`・`actor.dressup` を読む）、ps:pasta/shiori/sakura_builder.lua `emit_actor_switch`。`default_surface` キーを読むコードは無い | main 取り込み前は `default_surface` 節（X16）。2.7 で再同期 |
+| L311 [talk]（トーク表示制御） | 収録先（新設）: reference/pasta-toml.md#[talk]（トーク表示制御） | lua:loader/config/sections.rs `TalkConfig`、lua:sakura_script/wait_inserter.rs | — |
+| L340 [persistence]（永続化） | 収録先（新設）: reference/pasta-toml.md#[persistence]（永続化） | lua:loader/config/sections.rs `PersistenceConfig`、lua:runtime/persistence.rs | — |
+| L358 [logging]（ログ出力） | 収録先（新設）: reference/pasta-toml.md#[logging]（ログ出力） | lua:loader/config/sections.rs `LoggingConfig`、lua:logging/logger.rs `PastaLogger::new`（`Rotation::NEVER`・`profile` 配下の検査）、lua:logging/tracing_init.rs `build_filter`（`PASTA_LOG` > `filter` > `level`、解釈不能は `info`） | `rotation_days` はどこからも読まれない（ローテーションしない）。バグ候補の可能性があるため 2.7 ではマニュアルに書かず、付録への追加判断を申し送る |
+| L377 [lua]（Lua ライブラリ）★ 上級者向け | 収録先（新設）: reference/pasta-toml.md#[lua]（Lua ライブラリ）（スキルへの案内は lua/modules/mlua-stdlib.md へのリンクに置き換える） | lua:loader/config/sections.rs `LuaConfig`・`default_libs`、lua:runtime/runtime_config.rs `from_libs` | — |
+| L392 [debug]（デバッグバックエンド）★ 上級者向け | 収録先（新設）: reference/pasta-toml.md#[debug]（デバッグバックエンド） | lua:loader/config/sections.rs `DebugFileConfig`・`default_debug_port` | — |
+| L412 [package]（パッケージ情報）★ エンジンプロファイル専用 | 収録先（新設）: reference/pasta-toml.md#[package]（パッケージ情報） | lua:loader/config/mod.rs（使われない） | — |
 
 ### `.claude/skills/pasta-ghost-authoring/references/authoring-patterns.md`
 
@@ -646,7 +648,7 @@
 吸収元（doc/spec ch01–12・`GRAMMAR.md`・スキルの手書きリファレンス・現行 `book/src`）のどこにも書かれていない、現行実装が受理・処理する利用者向けの構文と挙動を 1 行ずつ挙げる（要件 1.8）。`grammar.pest` を規則ごとに読み、パーサ（`pasta_dsl`）・トランスパイラ（`pasta_lua` の code_gen）・ランタイム（`pasta_scripts`）で挙動を確かめた。本体の備考で「→1.2」とした項目はここで確定させる。
 
 - 判定列は「収録先: 章#節」か「バグ候補（根拠）」のどちらか。根拠 a＝実行時エラー・パニック・不正なさくらスクリプトを生む、b＝吸収元や他の規範記述と矛盾する結果を生む、c＝ソースコメント・テストで意図外と明示されている。どれにも当たらず意図が不明なだけのものは収録先を書く。
-- バグ候補はマニュアルに書かず、挙動も直さない（10.5）。`roadmap.md` へのキー行の申し送りは別タスクで行う。本表のバグ候補は 17 行（U06・U08・U12・U18・U19・U20・U21・U22・U23・U24・U25・U26・U27・U28・U29・U30・U31）。
+- バグ候補はマニュアルに書かず、挙動も直さない（10.5）。`roadmap.md` へのキー行の申し送りは別タスクで行う。本表のバグ候補は 18 行（U06・U08・U12・U18・U19・U20・U21・U22・U23・U24・U25・U26・U27・U28・U29・U30・U31・U32）。
 - U23〜U27 は、食い違い grep 記録（1.3）で見つかった挙動のうち、バグ候補かどうかの判定を 1.4 へ申し送ったもの（X19・D07・X18・D03）。吸収元に記述はあるが実装と食い違うため、現行挙動をマニュアルに書くかどうかをここで決める。実測はコミット `2d98dcf4`（`d95e12f2` から crates 配下は変わっていない）で同じ検証プログラムを動かした結果。
 - 実装照合列の「実測」は、コミット `6e914384` の実装をスクラッチの検証プログラム（`parse_str` → `LuaTranspiler::transpile` → `PastaLoader::load` → `SHIORI.request`）で動かした結果。検証プログラムはリポジトリに残していない。出力は SHIORI レスポンスの `Value`（さくらスクリプト）または状態コード。
 
@@ -683,6 +685,8 @@
 | U29 | セレクタの整数値が使われない: `@pasta_search` の `set_scene_selector(...)`・`set_word_selector(...)` に渡した整数の値は選択に使われず、整数が 1 つ以上あるとシャッフルが止まるだけ（候補は検索キーの文字コード順に先頭から 1 つずつ・一巡で先頭へ戻る） | lua:search/context.rs `parse_selector_args`・`replace_selector`、core:registry/random.rs `MockRandomSelector`（`shuffle_usize` は何もしない・`select_index` は random.rs 外から呼ばれない）。実測（2.4 レビュー）: セレクタ 0 で `search_word("挨拶")`×4 → `昼1,朝1,朝2,昼1` | バグ候補（b）: 吸収元 runtime-api L101「選択インデックスのシーケンス（0始まり）」・例 `set_word_selector(0, 1, 0)`→「1番目、2番目、1番目」、旧 lua/modules.md「整数インデックス（0 始まり）で固定できる」と矛盾。`MockRandomSelector` の doc コメント「Sequence of indices to select」も値の使用を示す | 2.4 の実装・レビューで発見。マニュアルは争いのない部分（整数を渡すとシャッフルせず決まった順になる）だけを書き、値が無視されることは書かない。大タスク 6 で roadmap のバグ候補キー行に含める |
 | U30 | 記号を含むグローバルシーン名: グローバルシーン名は登録時に英数字以外を `_` に置換される（`＊挨拶・朝` → 登録名 `挨拶_朝1`）ため、元の名前での検索・Call で見つからない | core:registry/scene_registry.rs `SceneRegistry::sanitize_name`、lua:search/context.rs `search_scene`（元の名前は登録名に一致しない）。実測（2.4 レビュー）: `search_scene("挨拶・朝")` → nil、`search_scene("挨拶")` → `挨拶_朝1` | バグ候補（b）: 「シーンは名前で呼び出せる」とする吸収元・マニュアル call-jump.md の規範と矛盾する | 2.4 レビューで発見。マニュアルは通常の名前（名前＋連番）の挙動だけを書く。大タスク 6 で roadmap のバグ候補キー行に含める |
 | U31 | 選択肢の自動ルーティングが表示ラベルで探す: 既定の `REG.OnChoiceSelectEx` は Reference0 を選択 ID として読むが、SSP は Reference0 に選択肢の表示テキスト、Reference1 に選択 ID を送るため、`「」` で表示名を付けた選択肢（`＠？天気「天気を聞く」` 等）は自動ルーティングされず 204 になる。表示名を省いた選択肢は表示とターゲットが同じ文字列のため偶然動く | ps:pasta/shiori/event/choice_select.lua `CHOICE_ID_REF_INDEX = 0`（L14 のコメント「\q[title,id] → Reference0=id」は UKADOC と逆）。実 SSP ログ crates/pasta_shiori/doc/shiori-sample.log L5202〜5204（Reference0=表示・Reference1=ID）。実測（2.6 レビュー）: Ref0=表示ラベル・Ref1=ローカル先 → 204、逆順 → 200 | バグ候補（b・c）: 完了仕様 choice-definition-dsl 要件 3.1「Reference1（選択ID）」・UKADOC と矛盾し、ソースコメントの意図（選択 ID で探す）とも一致しない | 2.6 の実装・レビューで発見。マニュアル lua/shiori-events.md は「選択 ID で探す」本来の挙動と UKADOC どおりの Reference 表だけを書く。U27・本体 L339・L605 の「選択 ID（Reference0）」はこのバグを取り込んだ表記。入門 first-ghost.md の `＠？天気「天気を聞く」` は実機で自動ルーティングされない（成果物ブロックは tutorial-check の逐語照合対象のため変更しない）。大タスク 6 で roadmap のバグ候補キー行に含める |
+| U32 | `[logging] rotation_days` が使われない: 設定しても読まれず、ログファイルはローテーションされない | lua:loader/config/sections.rs `LoggingConfig`（doc コメント「Number of days to retain log files」）、ロガー初期化は `Rotation::NEVER` 固定（crates 内に `rotation_days` を読む箇所なし）。2.7 実装・レビューで確認 | バグ候補（b・c）: 吸収元スキル pasta-toml.md「ログローテーション日数 7」と矛盾し、doc コメントの意図とも一致しない | 2.7 の実装・レビューで発見。マニュアル reference/pasta-toml.md は `rotation_days` を書かない（効くとも無視されるとも書かない・U26 と同じ扱い）。大タスク 6 で roadmap のバグ候補キー行に含める |
+| U33 | `pasta_patterns` からの `.lua` 自動パターン: `.pasta` で終わる各パターンの末尾を `.lua` に変えたパターンも作られ、一致した `.lua` はトランスパイルせずキャッシュへコピーして辞書モジュールとして読み込む。同名の `.pasta` があれば `.lua` は警告して除外、`init.lua` は読み込み失敗 | lua:loader/process.rs `discover_all_files`（`strip_suffix(".pasta")`→`.lua`、`module_key` による衝突除外、`init.lua`/`init.pasta` 拒否）・`process_incremental`（`.lua` は copy passthrough、scene_dic のモジュール名に含める） | 収録先: reference/pasta-toml.md#pasta_patterns | 2.7 レビューで発見（吸収元はスキル手書き internal-modules のみが触れる）。2.7 で収録済み |
 
 ## 食い違い grep 記録
 
@@ -1098,7 +1102,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| ga/references/pasta-toml.md:29 | 既定値は「Rust `crates/pasta_lua/src/loader/config.rs` の `Default` 実装・`default_*()` 関数」由来 | 生成で置換（4.1） | 2.7（移設時）・4.1 |
+| ga/references/pasta-toml.md:29 | 既定値は「Rust `crates/pasta_lua/src/loader/config.rs` の `Default` 実装・`default_*()` 関数」由来 | 生成で置換（4.1）・訂正済み（2.7） | 2.7（移設時）・4.1 |
 | ga/references/call-spec.md:116 | HTML コメント `source: doc/spec/04-call-spec.md, crates/pasta_dsl/src/parser/grammar.pest` | 生成で置換（4.1） | 4.1 |
 | lc/references/testing-lint.md:247 | `crates/pasta_lua/scriptlibs/lua_test/mocks.lua`（既定値の出典ではないが D18 の grep に当たったリポジトリ内パス。SkillLayout でモジュール名表記へ直す対象） | 訂正対象 | 4.4 |
 
@@ -1324,8 +1328,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| ga/references/pasta-toml.md:291 | 節「surface / dressup」（既定値、復旧時のみ出力） | 生成で置換（4.1） | 2.7（移設時）・4.1 |
-| ga/references/pasta-toml.md:307 | `default_surface` は実装されていない旨の注記 | 生成で置換（4.1） | 2.7（移設時）・4.1 |
+| ga/references/pasta-toml.md:291 | 節「surface / dressup」（既定値、復旧時のみ出力） | 生成で置換（4.1）・訂正済み（2.7） | 2.7（移設時）・4.1 |
+| ga/references/pasta-toml.md:307 | `default_surface` は実装されていない旨の注記 | 生成で置換（4.1）・訂正済み（2.7） | 2.7（移設時）・4.1 |
 | grammar/actor-dictionary.md:63 | 節「同一スポット共有時の外見の復旧」（main 取り込みで追加） | 正 | — |
 | grammar/actor-dictionary.md:100 | 節「任意キー `surface`・`dressup`」 | 正 | — |
 
@@ -1352,7 +1356,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | lua/modules.md:38 | `@pasta_log` は `RuntimeConfig` に関わらず利用可能 | 正 | — |
 | lc/references/runtime-api.md:655 | 有効化は Rust 側の `RuntimeConfig`（L658〜L672 と L681〜L694 の Rust コード例） | 生成で置換（4.1）・移設時訂正済み（2.5） | 2.5（移設時）・4.1 |
 | lc/references/runtime-api.md:703 | モジュールの有効／無効は `libs` 配列 | 生成で置換（4.1）・移設時訂正済み（2.5） | 2.5（移設時）・4.1 |
-| ga/references/pasta-toml.md:377 | 節「[lua]（Lua ライブラリ）」の `libs`（L49・L145〜L146・L383〜L387 を含む） | 生成で置換（4.1） | 2.7（移設時）・4.1 |
+| ga/references/pasta-toml.md:377 | 節「[lua]（Lua ライブラリ）」の `libs`（L49・L145〜L146・L383〜L387 を含む） | 生成で置換（4.1）・訂正済み（2.7） | 2.7（移設時）・4.1 |
 
 ### X19 REG ハンドラの戻り値（`RES.ok` の二重包み）
 
@@ -1388,8 +1392,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| ga/references/pasta-toml.md:223 | スポット切替時の改行量（`\n[半角]` の倍率） | 生成で置換（4.1） | 2.7（移設時）・4.1 |
-| ga/references/pasta-toml.md:237 | 値 `1.5` は `\n[half]`（1.5 行） | 生成で置換（4.1） | 2.7（移設時）・4.1 |
+| ga/references/pasta-toml.md:223 | スポット切替時の改行量（`\n[半角]` の倍率） | 生成で置換（4.1）・訂正済み（2.7） | 2.7（移設時）・4.1 |
+| ga/references/pasta-toml.md:237 | 値 `1.5` は `\n[half]`（1.5 行） | 生成で置換（4.1）・訂正済み（2.7） | 2.7（移設時）・4.1 |
 | ga/references/pasta-toml.md:45 | 既定 `1.5`（L116 を含む） | 正 | — |
 
 ### X22 実装に無い名前（`pasta.word_lookup`・`LabelNotFound`・`ScriptEvent::Error`・`CALLBACK.resume_pending`）

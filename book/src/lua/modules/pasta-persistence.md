@@ -116,7 +116,7 @@ debug_mode = false                            # デバッグログを出す
 | `file_path` | string | `"profile/pasta/save/save.json"` | 保存先パス（`pasta.toml` を置いたディレクトリからの相対パス） |
 | `debug_mode` | bool | `false` | 読み込み・保存のたびにデバッグログを出す |
 
-既定値は実装の既定値である。`[persistence]` セクションを書かないときは、すべて既定値になる。
+既定値は実装の既定値である。`[persistence]` セクションを書かないときは、すべて既定値になる。`pasta.toml` の全セクションは [pasta.toml リファレンス](../../reference/pasta-toml.md#persistence永続化) を参照する。
 
 - `obfuscate = true` のとき、`file_path` が `.json` で終わればその部分を `.dat` に変え、`.dat` 以外で終われば末尾に `.dat` を足したパスへ保存する（既定では `profile/pasta/save/save.dat`）。
 - `file_path` に絶対パスや `..` を含むパスを書くと、ゴーストの読み込みが失敗する（保存先がゴーストのディレクトリの外へ出ることを防ぐ）。

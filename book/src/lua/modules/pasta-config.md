@@ -48,6 +48,8 @@ version = "1.0.0"
 - **`[ghost]`**: 書かなくても必ず存在する。`talk_interval_min`・`talk_interval_max`・`hour_margin`・`spot_newlines` のうち書かなかったキーには、実装の既定値が入る（書いたキーはそのまま）。
 - **`[actor]`**: `[actor."名前"]` の各サブテーブルに、キー名と同じ値の `name` フィールドが入る（`config.actor["さくら"].name` は `"さくら"`）。`name` を書いていても、キー名で上書きされる。
 
+`[ghost]`・`[actor]` に書けるキーと既定値は、[pasta.toml リファレンス](../../reference/pasta-toml.md) の [[ghost]](../../reference/pasta-toml.md#ghostゴースト動作)・[[actor."名前"]](../../reference/pasta-toml.md#actor名前アクター設定) を参照する。
+
 `[loader]` 以外のセクションを 1 つも書かなかった場合、表は `ghost` だけを持つ。
 
 ## アクセス例
