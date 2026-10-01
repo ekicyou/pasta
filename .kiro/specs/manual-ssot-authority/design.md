@@ -602,7 +602,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 | スキル pasta-toml.md 全節、`pasta_patterns` の自動読み込み（authoring-patterns §6.8） | reference/pasta-toml.md（新章） |
 
 - 規則: 現行実装で確認できない記述は規範として収録せず、FutureSpecRouting へ回す（1.3）。
-- **マニュアル既存の「将来変更あり」節の整理（1.3）**: 未実装の機能を紹介している節は削除し、内容は FutureSpecRouting の行き先へ移す（`call-jump.md`「フィルター」、`words.md`「動的単語参照」）。構文が受理されるが処理に反映されないもの（`block-structure.md`「属性」、`grammar/index.md` の属性注記、`actor-dictionary.md`「コードブロック」。後者は `grammar.pest` の `actor_scope_item` が `code_scope` を受理する）は、現行挙動のみを記述した節へ書き換える。**前提 A3**: `introduction.md` の「将来変更あり」表記の定義は「現行挙動だが将来変わり得る箇所の注記」として残し（`verify-content.mjs` の `F-future` 検査も維持）、未実装機能の予告には使わない。
+- **マニュアル既存の「将来変更あり」節の整理（1.3）**: 未実装の機能を紹介している節は削除し、内容は FutureSpecRouting の行き先へ移す（`call-jump.md`「フィルター」、`words.md`「動的単語参照」）。構文が受理されるが処理に反映されないもの（`block-structure.md`「属性」、`grammar/index.md` の属性注記、`actor-dictionary.md`「コードブロック」。後者は `grammar.pest` の `actor_scope_item` が `code_scope` を受理する）は、現行挙動のみを記述した節へ書き換える。確定（#14）: `introduction.md` の「将来変更あり」表記の定義は「現行挙動だが将来変わり得る箇所の注記」として残し（`verify-content.mjs` の `F-future` 検査も維持）、未実装機能の予告には使わない。
 - **既知の食い違い（実装が正）**: 設計時調査で、吸収元（doc/spec・book・スキル）の記述が実装と食い違う箇所が見つかった。移し替えは食い違いを訂正したうえで行う（1.6, 3.3）。これは文書の訂正であり、挙動の変更ではない（10.5）。台帳には照合したソース位置を記録する。
 
 | 領域 | 文書の記述 | 実装（正） |
@@ -795,14 +795,13 @@ graph LR
 - 生成対象章の本文に口調コラムを置けなくなる（現行 `AUTHORING.md` はコラムを許容） → 生成器が `voice-in-body` で検出し、規約を `AUTHORING.md` へ明記する。現行の生成対象章の本文に該当は無い。
 - ゲート文面（`workflow.md`・`kiro-complete`）の自己検査は `verify-drift-gate.mjs` の削除で無くなる → 機械検証はコマンド（`--check`・`link-check`）に一本化し、文面は P8 の人手確認で見る。
 
-### 前提（要確認）
+### 補足（確定事項の詳細）
 
-設計の入力から一意に導けず、最小の案を前提として置いたもの。開発者の判断で変更しうる。
+未確定の前提は無い（整合性パスで置いた前提 3 件は #12〜#14 で確定済み）。
 
-- **旧公開 URL のリダイレクト（確定・#13）**: 章の分割で無くなる `lua/modules.html` は、`book/book.toml` に `[output.html.redirect]` を新設し `"/lua/modules.html" = "modules/index.html"`（相対指定。`site-url` に依存させない）の 1 行で `lua/modules/index.html` へ転送する。mdBook 標準機能で依存追加なし。Migration P2（章分割と同時）で入れ、`mdbook build` 後に `book/book/lua/modules.html` が生成され転送先が実在することを一度確認する。本仕様で消える公開ページは他に無い（文法章・`reference/startup.md` はパス不変）。
-- **A3 「将来変更あり」表記**: 未実装機能の節は削除し、表記は「受理されるが処理に反映されない」現行挙動の注記にのみ残す。代案は、表記と `F-future` 検査ごと廃止すること。
+- **旧公開 URL のリダイレクト（#13）**: 章の分割で無くなる `lua/modules.html` は、`book/book.toml` に `[output.html.redirect]` を新設し `"/lua/modules.html" = "modules/index.html"`（相対指定。`site-url` に依存させない）の 1 行で `lua/modules/index.html` へ転送する。mdBook 標準機能で依存追加なし。Migration P2（章分割と同時）で入れ、`mdbook build` 後に `book/book/lua/modules.html` が生成され転送先が実在することを一度確認する。本仕様で消える公開ページは他に無い（文法章・`reference/startup.md` はパス不変）。
 
-### 設計ディスカッションの決定記録（2026-10-01・全 11 件）
+### 設計ディスカッションの決定記録（2026-10-01・全 14 件。#12〜#14 は整合性パス後）
 
 | # | 論点 | 決定 |
 |---|------|------|
@@ -819,3 +818,4 @@ graph LR
 | 11 | `review-improvement-loop` の修正範囲 | 今後の指示として読まれる箇所のみ修正する。完了記録と `reports/` は残す |
 | 12 | 口調マーカーと普通文体の衝突 | 衝突する 3 語だけ否定先読みの正規表現にし、判定を `findVoice` に一本化する。書き手に言い換えを強いない |
 | 13 | 分割で消える公開 URL | `book.toml` の `[output.html.redirect]` で `lua/modules.html` を `lua/modules/index.html` へ転送する |
+| 14 | マニュアル既存の「将来変更あり」節 | 構文が受理されない未実装機能（フィルター・`＠＄`）の節は削除して brief へ。受理されるが処理に反映されないもの（属性・アクタースコープ内コードブロック）は現行挙動のみの記述に書き換える。表記と `F-future` 検査は「現行挙動だが変わり得る箇所の注記」として維持する |
