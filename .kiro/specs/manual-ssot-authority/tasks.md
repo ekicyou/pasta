@@ -286,3 +286,4 @@
 - 1.1: 台帳は design の食い違い表に無い実装差も備考に記録した（アクタースコープの `lua` コードブロックは実際に生成・A1 で到達する＝design #14 の「処理に反映されない」と食い違う、bool リテラルなし、`\]` 非対応、動的 Call は `tostring(expr)`、REG ハンドラの戻り値 `RES.ok` 二重包み疑い、`default_surface` 未参照など）。1.3・1.4・2.x は台帳の備考を実装照合の起点にすること。
 - 1.1: authoring-patterns.md L144 の閉じフェンスが ```` ```lua ```` になっており、以降のフェンスが CommonMark 上ずれている（§6.5 見出しがコード扱い）。4.3 で手書きファイルを直す際に修正する。
 - 1.2: 付録のバグ候補は 8 件（U06,U08,U12,U18,U19,U20,U21,U22）。バグ候補はマニュアルに書かない（10.5）。2.x は付録の「収録先」行（U11 の算術・数値変換、U19 備考のアクター名規則、U07 `＄＄` など）を収録し、U08 により本体 L148 の `\` 収録は取り消し。大タスク 6 で roadmap に 8 行のキー行を置く。
+- main 取り込み（91a00e11・actor-surface-restore #45）: `book/src/grammar/actor-dictionary.md` に節「同一スポット共有時の外見の復旧」が追加（first-ghost.md からこの見出しへアンカーリンクあり・見出し維持必須）。スキル pasta-toml.md の `default_surface` は `surface`/`dressup` に置換済み、internal-modules に `STORE.appearance` 追加。台帳 1.1 の `default_surface` 行はこの変更後の内容で照合し直すこと（1.3）。
