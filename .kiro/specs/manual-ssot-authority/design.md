@@ -576,7 +576,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 | さくらスクリプト変換のウェイト | `actor.talk` サブテーブル、既定 50/100/75、加算 | アクター表直下の `script_wait_normal/period/comma/strong/leader`、既定 50/1000/500/500/200、挿入値は `値 - 50`、連続句読点は最大値 |
 | pasta.toml の既定値の出典 | `src/loader/config.rs` | `src/loader/config/mod.rs`・`sections.rs` |
 
-  `book/src/lua/patterns.md`（生成対象外）と `pasta-lua-coding/SKILL.md` の早見表にも `function(req)`・`RES.ok_with` があるため同時に訂正する。実装照合で上表と異なる結果が出た場合は実装を正とし、台帳に記録する。
+  訂正範囲は生成対象章に限らない（設計ディスカッション #6）。食い違い表の各項目について `book/src/**/*.md`（`lua/patterns.md` 等の生成対象外章を含む）と両 `SKILL.md`・スキル手書きファイルを grep し、見つかった誤記をすべて同時に訂正する（既知: `lua/patterns.md` と `pasta-lua-coding/SKILL.md` 早見表の `function(req)`・`RES.ok_with`）。grep の結果と訂正箇所は台帳に記録する。実装照合で上表と異なる結果が出た場合は実装を正とし、台帳に記録する。
 - 吸収元のどこにも書かれていない実装上の構文（例: 単独 `＊` 行による直前グローバルシーンの継続、`％a＝0、b` の番号付け、`＄０` のシーン引数参照、末尾 `#` コメント）は本仕様の収録義務の対象外とする（1.1・1.2 は吸収元の内容が対象）。台帳の付録に「未記載の実装事実」として列挙し、扱いは設計ディスカッションで決める（OPEN QUESTION 9）。各章の導入・締めは Claudia 口調、本文・表・コード・構文定義は普通文体（1.7・AUTHORING.md 準拠）。生成対象章は本文に口調コラムを置かない。
 - 章末の `> **権威的仕様**` 引用、`grammar/index.md` の doc/spec 案内、`introduction.md` の権威記述、`external-links.md` の doc/spec リンク群を削除する（1.5, 9.7）。
 - 新章は `SUMMARY.md` へ追加する: 「Lua API / コーディング」配下に `[モジュールリファレンス](lua/modules/index.md)` とその子として 7 つのモジュール章（旧 `lua/modules.md` の行を置換）、`[SHIORI イベントとハンドラ](lua/shiori-events.md)`、「リファレンス」配下に `[pasta.toml リファレンス](reference/pasta-toml.md)`（4.2）。
@@ -722,7 +722,7 @@ graph LR
 5. 動的単語参照 `＠＄` を brief 化するか（前提: brief 起票）。
 6. `book/CONTENT-REVIEW.md` の扱い（前提: 歴史的記録の注記を付けて残す）。
 7. `review-improvement-loop` の修正範囲（前提: 今後の指示として読まれる箇所のみ。完了済みセル記録と `reports/` は歴史的記録として残す）。
-8. 既知の食い違いの訂正範囲（前提: 生成対象外の `lua/patterns.md` と `SKILL.md` 早見表も訂正）。
+8. ~~既知の食い違いの訂正範囲~~ → 解決済み（#6）: マニュアル全章・両 `SKILL.md`・スキル手書きファイルを grep し、生成対象外も同時に訂正。
 9. 吸収元に無い実装事実の扱い（前提: 収録義務の対象外。台帳付録に列挙）。
 10. ~~生成対象章の本文から口調を一切排除する規約~~ → 解決済み（#1）: 全面禁止。検出は広い `VOICE_MARKERS` をコードフェンス・表・インラインコード除去後の散文に適用。
 11. ~~生成ファイル内アンカーへのリンク検証~~ → 解決済み（#2）: 2 スキル内のアンカー付きリンクを `skill-anchor` で検証。book 内は対象外。
