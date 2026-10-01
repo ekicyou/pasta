@@ -102,8 +102,8 @@ function stripFragment(target) {
 // GitHub blob/tree URL がこのリポジトリ内を指す場合、対応するローカルパスを返す。
 // 対象外（別リポ・外部サイト・branch 名にスラッシュ等）は null。
 export function githubUrlToRepoPath(url) {
-  // 例: https://github.com/ekicyou/pasta/blob/main/doc/spec/02-markers.md
-  //     https://github.com/ekicyou/pasta/tree/main/doc/spec
+  // 例: https://github.com/ekicyou/pasta/blob/main/book/src/introduction.md
+  //     https://github.com/ekicyou/pasta/tree/main/book/src
   const re = new RegExp(
     `^https?://github\\.com/${REPO_SLUG}/(?:blob|tree)/[^/]+/(.+)$`,
   );
