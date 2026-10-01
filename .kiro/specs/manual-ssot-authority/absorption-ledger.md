@@ -888,14 +888,14 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/block-structure.md:30 | 属性定義: 処理は将来予定 | 訂正対象 | 2.1 |
-| grammar/block-structure.md:66 | グローバルシーン内部構造 2.「属性行 0 個以上／処理は将来予定」 | 訂正対象 | 2.1 |
-| grammar/block-structure.md:88 | ローカルシーンブロックは宣言行・属性行（0 個以上）… | 訂正対象 | 2.1 |
-| grammar/block-structure.md:112 | 節「属性（将来変更あり）」: ローカルシーンの直後にも置ける（L126）、処理は将来予定（L129）（L114〜L129） | 訂正対象 | 2.1 |
+| grammar/block-structure.md:30 | 属性定義: 処理は将来予定 | 訂正対象・訂正済み（2.1） | 2.1 |
+| grammar/block-structure.md:66 | グローバルシーン内部構造 2.「属性行 0 個以上／処理は将来予定」 | 訂正対象・訂正済み（2.1） | 2.1 |
+| grammar/block-structure.md:88 | ローカルシーンブロックは宣言行・属性行（0 個以上）… | 訂正対象・訂正済み（2.1） | 2.1 |
+| grammar/block-structure.md:112 | 節「属性（将来変更あり）」: ローカルシーンの直後にも置ける（L126）、処理は将来予定（L129）（L114〜L129） | 訂正対象・訂正済み（2.1） | 2.1 |
 | grammar/block-structure.md:148 | インデント判定の例 `  ＆author：Alice` | 正 | — |
 | grammar/index.md:29 | 俯瞰図のグローバルシーン配下に属性行 | 正 | — |
-| grammar/index.md:80 | 属性は処理が将来予定 | 訂正対象 | 2.1 |
-| grammar/markers.md:18 | 属性: メタデータ（処理は将来予定） | 訂正対象 | 2.1 |
+| grammar/index.md:80 | 属性は処理が将来予定 | 訂正対象・訂正済み（2.1） | 2.1 |
+| grammar/markers.md:18 | 属性: メタデータ（処理は将来予定） | 訂正対象・訂正済み（2.1） | 2.1 |
 | grammar/literals.md:9 | リテラルは属性値などで使用 | 正 | — |
 | ga/SKILL.md:50 | 属性 `＆`: メタデータ | 正 | — |
 | ga/SKILL.md:113 | よくある間違い d「シーン定義直後→属性行、属性はシーン定義の直後にのみ」（ローカルは宣言行への付記のみ） | 訂正対象 | 4.2 |
@@ -918,7 +918,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/block-structure.md:22 | Lua ブロックは ```` ``` ```` / ```` ```lua ```` | 訂正対象 | 2.1 |
+| grammar/block-structure.md:22 | Lua ブロックは ```` ``` ```` / ```` ```lua ```` | 訂正対象・訂正済み（2.1） | 2.1 |
 | grammar/block-structure.md:96 | 例のフェンス ```` ```lua ```` は行頭 | 正 | — |
 | grammar/call-jump.md:83 | 例のフェンス ```` ```lua ```` は行頭 | 正 | — |
 | ga/SKILL.md:226 | 例のフェンス ```` ```lua ```` は行頭（節見出し L216） | 正 | — |
@@ -945,7 +945,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/markers.md:23 | キューコマンド: 演出キュー（dola 側で処理）（`!select` はランタイムが処理する） | 訂正対象 | 2.1 |
+| grammar/markers.md:23 | キューコマンド: 演出キュー（dola 側で処理）（`!select` はランタイムが処理する） | 訂正対象・訂正済み（2.1） | 2.1 |
 | grammar/index.md:35 | 俯瞰図のキューコマンド行 | 正 | — |
 | getting-started/first-ghost.md:358 | `!select(10)` は選択待ちの設定（L339 の例を含む） | 正 | — |
 | lua/patterns.md:78 | `act:choice_timeout(30)` | 正 | — |
@@ -1110,7 +1110,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/markers.md:35 | Unicode の White_Space カテゴリから改行を除いたもの | 訂正対象 | 2.1 |
+| grammar/markers.md:35 | Unicode の White_Space カテゴリから改行を除いたもの | 訂正対象・訂正済み（2.1） | 2.1 |
 | ga/references/grammar-model.md:45 | 空白文字クラスの列挙（L50 で U+00A0 等を列挙） | 生成で置換（4.1） | 4.1 |
 
 ### X02 変数代入のコロン形
@@ -1121,7 +1121,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/markers.md:42 | コロンの用途例 `＄var_name：value # 変数代入` | 訂正対象 | 2.1 |
+| grammar/markers.md:42 | コロンの用途例 `＄var_name：value # 変数代入` | 訂正対象・訂正済み（2.1） | 2.1 |
 | grammar/call-jump.md:44 | `＄target：挨拶朝` | 訂正対象 | 2.2 |
 | grammar/call-jump.md:81 | `＄スコア：75` | 訂正対象 | 2.2 |
 | grammar/literals.md:37 | `＄is_active：true`・`＄done：false`（L38） | 訂正対象 | 2.2 |
@@ -1142,8 +1142,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/block-structure.md:107 | 関数定義のみ許可、変数宣言・トップレベルの文は不可 | 訂正対象 | 2.1 |
-| grammar/block-structure.md:108 | トランスパイラ層が検証 | 訂正対象 | 2.1 |
+| grammar/block-structure.md:107 | 関数定義のみ許可、変数宣言・トップレベルの文は不可 | 訂正対象・訂正済み（2.1） | 2.1 |
+| grammar/block-structure.md:108 | トランスパイラ層が検証 | 訂正対象・訂正済み（2.1） | 2.1 |
 | ga/SKILL.md:221 | 関数定義のみ許可（変数宣言やステートメントは不可） | 訂正対象 | 4.2 |
 | ga/references/grammar-model.md:131 | 関数定義のみ許可、トランスパイラーが検証（L132〜L133） | 生成で置換（4.1） | 4.1 |
 
@@ -1155,8 +1155,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/markers.md:39 | 比較・フィルター条件には `＝` `＞` `＜` などの比較演算子を用いる | 訂正対象 | 2.1 |
-| grammar/markers.md:85 | 節「比較演算子」の表（L87〜L96） | 訂正対象 | 2.1 |
+| grammar/markers.md:39 | 比較・フィルター条件には `＝` `＞` `＜` などの比較演算子を用いる | 訂正対象・訂正済み（2.1） | 2.1 |
+| grammar/markers.md:85 | 節「比較演算子」の表（L87〜L96） | 訂正対象・訂正済み（2.1） | 2.1 |
 | grammar/call-jump.md:117 | フィルターは比較演算子を使う（L119 を含む） | 訂正対象 | 2.2（節削除） |
 | lua/basics.md:103 | Lua の等値比較は `==`、非等値は `~=` | 正 | — |
 
@@ -1170,9 +1170,9 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/block-structure.md:67 | `__start__` に Lua ブロック・アクション行…を格納できる | 訂正対象 | 2.1 |
-| grammar/block-structure.md:92 | Lua ブロックは `__start__` 内に置かれる | 訂正対象 | 2.1 |
-| grammar/block-structure.md:102 | 例のアクターなし行 `    こんにちは`（実測: 9:5 でパースエラー） | 訂正対象 | 2.1 |
+| grammar/block-structure.md:67 | `__start__` に Lua ブロック・アクション行…を格納できる | 訂正対象・訂正済み（2.1） | 2.1 |
+| grammar/block-structure.md:92 | Lua ブロックは `__start__` 内に置かれる | 訂正対象・訂正済み（2.1） | 2.1 |
+| grammar/block-structure.md:102 | 例のアクターなし行 `    こんにちは`（実測: 9:5 でパースエラー） | 訂正対象・訂正済み（2.1） | 2.1 |
 | ga/references/grammar-model.md:128 | 節「Luaブロック配置ルール」 | 生成で置換（4.1） | 4.1 |
 
 ### X06 動的 Call の `tostring` と nil ガード
@@ -1201,7 +1201,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | grammar/literals.md:32 | 節「真偽値（bool）」（L34〜L38） | 訂正対象 | 2.2 |
 | grammar/literals.md:3 | 導入「真偽なのか」 | 訂正対象 | 2.2 |
 | grammar/variables.md:25 | 例 `＄is_active：true` | 訂正対象 | 2.3 |
-| grammar/index.md:69 | 章一覧「型変換ルール・文字列・数値・真偽値」 | 訂正対象 | 2.1 |
+| grammar/index.md:69 | 章一覧「型変換ルール・文字列・数値・真偽値」 | 訂正対象・訂正済み（2.1） | 2.1 |
 | grammar/block-structure.md:99 | Lua ブロック内の `save.talked = true`（Lua の真偽値） | 正 | — |
 | ga/references/grammar-model.md:154 | 型変換表の `true` / `false` → bool | 生成で置換（4.1） | 4.1 |
 
@@ -1254,7 +1254,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | ---- | ------------ | ---- | ------ |
 | grammar/words.md:15 | グローバル単語は「ファイル全体から参照できる」 | 訂正対象 | 2.3 |
 | grammar/words.md:84 | グローバル単語辞書は「ファイル先頭で定義された単語」 | 訂正対象 | 2.3 |
-| grammar/block-structure.md:20 | グローバル単語定義は「ファイル全体で参照可能」 | 訂正対象 | 2.1 |
+| grammar/block-structure.md:20 | グローバル単語定義は「ファイル全体で参照可能」 | 訂正対象・訂正済み（2.1） | 2.1 |
 | ga/SKILL.md:63 | グローバルシーンは「ファイル全体からアクセス可能」 | 訂正対象 | 4.2 |
 | ga/SKILL.md:121 | グローバル単語は「ファイル全体から参照可能」 | 訂正対象 | 4.2 |
 | ga/references/authoring-patterns.md:242 | `actors.pasta` は全ファイルで共有 | 正 | — |
