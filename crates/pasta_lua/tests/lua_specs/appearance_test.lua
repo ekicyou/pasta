@@ -167,6 +167,33 @@ describe("APPEARANCE.observe - スコープ切替タグ", function()
         expect(state.spots[0].surface):toBe("7")
         expect(state.spots[1].surface):toBe("8")
     end)
+
+    test("1.7: 別の observe 呼び出しに分かれた切替後のタグも記録せず、restore で記録を再開する", function()
+        local state = APPEARANCE.new()
+        -- DSL ではタグ 1 つずつが別の sakura_script トークンになる
+        APPEARANCE.observe(state, A, 0, "\\s[1]")
+        APPEARANCE.observe(state, A, 0, "\\1")
+        APPEARANCE.observe(state, A, 0, "\\s[10]")
+        expect(state.actors.A.surface):toBe("1")
+        expect(next(state.spots)):toBe(nil)
+        -- 次の \p[spot]（restore）で解除され、以後は再び記録される
+        APPEARANCE.restore(state, A, 0, {})
+        expect(state.detached):toBe(nil)
+        APPEARANCE.observe(state, A, 0, "\\s[5]")
+        expect(state.actors.A.surface):toBe("5")
+        expect(state.spots[0].surface):toBe("5")
+    end)
+
+    test("1.7: 同一アクター継続の restore でも切替状態を解除する", function()
+        local state = APPEARANCE.new()
+        state.owners[0] = "A"
+        state.last_spots.A = 0
+        APPEARANCE.observe(state, A, 0, "\\1")
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("")
+        expect(state.detached):toBe(nil)
+        APPEARANCE.observe(state, A, 0, "\\s[5]")
+        expect(state.actors.A.surface):toBe("5")
+    end)
 end)
 
 describe("APPEARANCE.observe - アクター未指定の生スクリプト", function()

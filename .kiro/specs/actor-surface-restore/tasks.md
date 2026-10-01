@@ -37,7 +37,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.8, 2.9, 2.10, 2.11, 4.4, 5.5_
 
 - [ ] 3. ステップA: ビルダーとセッション状態への統合
-- [ ] 3.1 ビルダーのアクター切替点と出力点に外見モジュールを接続する
+- [x] 3.1 ビルダーのアクター切替点と出力点に外見モジュールを接続する
   - アクター切替時、スポットタグ出力の直後・発話内容より前に復旧結果を出力する。スポット解決・警告ログ・スポットタグ・改行・終端は変えない
   - 内側トークンの出力ごとに出力文字列を観測させ、生スクリプトトークンとトップレベルの生スクリプトはアクター未指定として観測させる
   - ビルド関数は外見状態を第4引数で受け取り、省略時はビルドローカルの空状態を使う。ビルド本体のループに分岐を増やさない
@@ -97,3 +97,4 @@
 - 1.1: 特性化テストは appearance 第4引数なしで固定。3.1 でこれらのケースに共有 appearance を渡しても同じ期待値でグリーンであることを確認する。cargo は `env -u NoDefaultCurrentDirectoryInExePath` 必須、luacheck はローカル実行可（crates/pasta_lua で `R="$APPDATA/luarocks"; echo 'require("luacheck.main")' | LUA_PATH="scriptlibs/?.lua;scriptlibs/?/init.lua;$R/share/lua/5.4/?.lua;$R/share/lua/5.4/?/init.lua;;" LUA_CPATH="$R/lib/lua/5.4/?.dll;;" lua - pasta_scripts tests`、max_cyclomatic_complexity=15）。
 - 2.1: appearance.lua は分類を surface_id / is_scope / is_bind に分割して複雑度15以下。`\s[]`（空ID）は記録しない。エントリは `{ binds = {} }`、`order` は 4.1 で追加。
 - 2.2: `restore(state, actor, spot, tokens)` が owners/last_spots を読んでから更新（observe は触らない）。先頭タグ列は talk 本文も走査する（`＠表情` は talk テキスト先頭の `\s[ID]` として流れるため）。raw_script で即終了。
+- 3.1: DSL はタグ1つずつを別 sakura_script トークンにするため、スコープ切替後は `state.detached` で次の restore まで actor=nil 扱い（1.7。design 268/272 を改訂）。回帰差分の確認は BUILDER.build を restore スタブ版と実物で二重実行して比較する方法が有効。

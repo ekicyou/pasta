@@ -9,6 +9,7 @@ local BUILDER = {}
 local SAKURA_SCRIPT = require "@pasta_sakura_script"
 local log = require "@pasta_log"
 local buf = require("pasta.buf")
+local APPEARANCE = require("pasta.shiori.appearance")
 
 --- \q[display,target] 内のデリミタ文字をエスケープ
 --- @param s string エスケープ対象の文字列
@@ -35,14 +36,17 @@ local function clear_spots(actor_spots)
     end
 end
 
---- アクター切り替え時にスポットタグ `\p[spot]` を出力する。
---- スポット解決（未設定→0＋警告）と `\p[spot]` 出力のみを行い、
+--- アクター切り替え時にスポットタグ `\p[spot]` を出力し、直後に外見の復旧タグを出力する。
+--- スポット解決（未設定→0＋警告）・`\p[spot]` 出力・復旧タグ出力のみを行い、
 --- 段落区切り改行の判定・出力・保留（pending）はすべて呼び出し側（BUILDER.build ループ）が担う。
+--- 復旧タグは talk 経路を通らないため has-text・pending に影響しない。
 --- @param buffer table 出力バッファ（pasta.buf 互換）
 --- @param actor_spots table<string, integer> アクターごとのスポット位置マップ
 --- @param actor table 切り替え先アクター（非nil保証は呼び出し元）
+--- @param appearance table 外見状態（直接変更される）
+--- @param tokens table[] 切り替え先グループの内側トークン列（先頭タグ列の判定用）
 --- @return number spot 切り替え後のスポットID
-local function emit_actor_switch(buffer, actor_spots, actor)
+local function emit_actor_switch(buffer, actor_spots, actor, appearance, tokens)
     local actor_name = actor.name
     local spot = actor_spots[actor_name]
     if spot == nil then
@@ -53,6 +57,7 @@ local function emit_actor_switch(buffer, actor_spots, actor)
     end
 
     buffer:put(spot_to_tag(spot))
+    buffer:put(APPEARANCE.restore(appearance, actor, spot, tokens))
     return spot
 end
 
@@ -85,13 +90,21 @@ local function inner_token_to_string(actor, inner)
     return ""
 end
 
---- actorグループ内の単一トークンをさくらスクリプトへ変換して出力
+--- actorグループ内の単一トークンをさくらスクリプトへ変換して出力し、外見状態に観測させる
 --- @param buffer table 出力バッファ（pasta.buf 互換）
 --- @param actor table|nil グループの発言アクター
 --- @param inner table グループ内トークン
-local function emit_inner_token(buffer, actor, inner)
+--- @param appearance table 外見状態（直接変更される）
+--- @param spot integer|nil 現在スコープの解決済みスポットID
+local function emit_inner_token(buffer, actor, inner, appearance, spot)
     local s = inner_token_to_string(actor, inner)
     buffer:put(s)
+    -- raw_script はアクター未指定の生さくらスクリプトとして観測する（1.8）
+    local speaker = actor
+    if inner.type == "raw_script" then
+        speaker = nil
+    end
+    APPEARANCE.observe(appearance, speaker, spot, s)
 end
 
 --- @class BuildConfig
@@ -101,15 +114,18 @@ end
 --- @param grouped_tokens table[] グループ化されたトークン配列
 --- @param config BuildConfig|nil 設定
 --- @param input_actor_spots table<string, integer>|nil アクターごとのスポット位置マップ（直接変更される）
+--- @param appearance table|nil 外見状態（直接変更される。nil ならビルドローカルの空状態）
 --- @return string さくらスクリプト文字列（\e終端）
 -- ponytail: トークン種別の分岐が集まるため複雑度 22 > 15 を許容。分割はリファクタ時に（特性化テスト先行）。
-function BUILDER.build(grouped_tokens, config, input_actor_spots) -- luacheck: ignore 561
+function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) -- luacheck: ignore 561
     config = config or {}
     local spot_newlines = config.spot_newlines or 1.5
     local buffer = (config.buffer_factory or buf.new)()
 
     -- input_actor_spots を直接変更する（nilの場合は内部で空テーブルを作成）
     local actor_spots = input_actor_spots or {}
+    -- 外見状態も直接変更する（nilの場合はビルドローカル。clear_spot では破棄しない）
+    appearance = appearance or APPEARANCE.new()
     -- ビルドローカル状態機械（sakura-script-newline / 完全遅延方式）
     local last_actor = nil    -- 最後に発言したActor
     local last_spot = nil     -- 最後のスポットID（＝現在スコープ）
@@ -143,7 +159,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots) -- luacheck: i
                 -- S1: アクター切替検出。スポット解決＋`\p[spot]` 出力。
                 -- 切替先スポットの has-text で pending を再評価する（旧 pending は暗黙破棄）。
                 -- 先出し版の last_spot ~= spot / last_spot == spot ガードは復活させない。
-                local spot = emit_actor_switch(buffer, actor_spots, actor)
+                local spot = emit_actor_switch(buffer, actor_spots, actor, appearance, token.tokens)
                 pending_break = (spot_has_text[spot] == true)
                 last_spot = spot
                 last_actor = actor
@@ -154,7 +170,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots) -- luacheck: i
                     -- S4b: `\c` を従来どおり出力（emit_inner_token 経由で不変）したうえで、
                     -- 現在スポットの has-text を偽へリセットし pending を破棄する。
                     -- クリアで区切るべき先行テキストが消えるため、後続テキスト直前に改行を出さない。
-                    emit_inner_token(buffer, actor, inner)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
                     pending_break = false
                     if last_spot ~= nil then
                         spot_has_text[last_spot] = false
@@ -168,15 +184,16 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots) -- luacheck: i
                     if last_spot ~= nil then
                         spot_has_text[last_spot] = true
                     end
-                    emit_inner_token(buffer, actor, inner)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
                 else
                     -- S4: 空 talk・surface・wait・sakura_script・newline・choice・
                     -- choice_timeout・raw_script・yield。変換出力のみ（has-text・pending 不変）。
-                    emit_inner_token(buffer, actor, inner)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
                 end
             end
         elseif t == "raw_script" then
             buffer:put(token.text)
+            APPEARANCE.observe(appearance, nil, nil, token.text)
         end
     end
 

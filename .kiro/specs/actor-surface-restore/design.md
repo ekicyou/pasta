@@ -236,6 +236,7 @@ flowchart TD
 --- @field spots  table<integer, AppearanceEntry>             -- スポットID → 表示中状態
 --- @field owners table<integer, string>                      -- スポットID → 直前発話アクター名（不明化では消さない）
 --- @field last_spots table<string, integer>                 -- アクター名 → 前回発話したスポットID（不明化では消さない）
+--- @field detached boolean|nil                               -- スコープ切替後、次の restore まで true（一時フラグ。初期・リセット時は nil）
 
 --- 空の状態を生成する（STORE.appearance が無い環境のビルドローカル代替）
 --- @return AppearanceState
@@ -265,11 +266,11 @@ function APPEARANCE.restore(state, actor, spot, tokens) end
   - カテゴリ全脱衣（パーツ名空・数値 `0`）: `spots[spot].binds[cat]` と発話アクターの `binds[cat]` を `{ [""] = 0 }` に置き換える（3.11）。
   - パーツ名ありのトグル（数値省略・空）: スポット側の当該パーツの実効値が既知なら、`1 - 値` の明示 bind として記録する（3.12）。
   - 実効値が不明なパーツのトグル、またはカテゴリ単位着衣・トグル（パーツ名空・数値 `0` 以外）の bind: `spots[spot].binds[cat]` を nil、**発話アクター**の `binds[cat]` を false にする（3.4。false の間は既定着せ替えも使わない。後続の明示 bind で表に戻る）。他アクターの `binds[cat]` は変更しない（設計ディスカッション #4）。
-  - スコープ切替タグ: `state.spots` を空にし（全スポット不明）、その文字列の残りは記録しない（1.7）。
+  - スコープ切替タグ: `state.spots` を空にし（全スポット不明）、その文字列の残りは記録しない。さらに一時フラグ `state.detached = true` を立て、立っている間の `observe` は actor を nil（アクター未指定）として扱う。DSL ではタグ 1 つずつが別の `sakura_script` トークンになるため、文字列単位の停止だけでは「その発話内の当該タグ以降」（1.7）を満たせない。フラグは次の `\p[spot]`、つまり次の `restore` 呼び出しの冒頭（継続判定より前）で解除する。`detached` は初期状態・リセット状態では nil で、4 表の形は変えない。
   - `actor.name` が nil の場合はアクター側を記録せずスポット側のみ更新する。
 - Postconditions（`observe`・actor が nil）: サーフェス変更・bind・スコープ切替タグのいずれかを 1 つでも含めば `state.spots` を空にする。`state.actors` は変更しない（1.8）。
 - Postconditions（`restore`）:
-  - 最初に `owners[spot]` と `last_spots[name]` を読み、`owners[spot] = name`・`last_spots[name] = spot` へ更新する。読んだ値が `owners[spot] == name` かつ `last_spots[name] == spot`（同一アクターの継続）なら、状態を変えず空文字列を返す（2.11。不明状態でも復旧しない）。どちらかが不成立（別アクターとの交代、または別スポットから戻ってきた）なら以降の比較へ進む（5.5）。
+  - 最初に `state.detached` を解除する（`\p[spot]` を出力した時点でスコープ切替の影響は終わる。継続の場合も解除する）。次に `owners[spot]` と `last_spots[name]` を読み、`owners[spot] = name`・`last_spots[name] = spot` へ更新する。読んだ値が `owners[spot] == name` かつ `last_spots[name] == spot`（同一アクターの継続）なら、状態を変えず空文字列を返す（2.11。不明状態でも復旧しない）。どちらかが不成立（別アクターとの交代、または別スポットから戻ってきた）なら以降の比較へ進む（5.5）。
   - 既知サーフェス = `actors[name].surface`、無ければ `actor.surface`（既定、`tostring`）。既知があり `spots[spot].surface` と不一致で、先頭タグ列にサーフェス変更が無いとき `\s[既知]` を返し `spots[spot].surface` を更新。
   - カテゴリ全脱衣の復旧（3.11）: アクター側 `binds[cat][""] == 0` かつスポット側 `binds[cat][""] ~= 0`（nil 含む）なら、そのカテゴリのパーツ単位復旧より前に `\![bind-noevent,cat,,0]` を返し、スポット側を `{ [""] = 0 }` に置き換える。アクター側が `""` を持つカテゴリでは既定着せ替えを使わない（全脱衣が既定より新しいため）。
   - パーツの実効値 = `t[part]`、無ければ `t[""]`（スポット・アクター共通）。

@@ -127,7 +127,8 @@ function APPEARANCE.observe(state, actor, spot, text)
     if not text:find("\\", 1, true) then
         return
     end
-    if actor == nil then
+    -- 1.7: スコープ切替後は次の restore（\p[spot]）までアクター未指定として扱う
+    if actor == nil or state.detached then
         observe_raw(state, text)
         return
     end
@@ -135,8 +136,10 @@ function APPEARANCE.observe(state, actor, spot, text)
     while name do
         local kind, value = classify(name, arg)
         if kind == "scope" then
-            -- 1.7: 全スポット不明化し、残りは記録しない（owners・last_spots は保持）
+            -- 1.7: 全スポット不明化し、残りは記録しない（owners・last_spots は保持）。
+            -- DSL はタグごとに別トークンのため、後続の observe 呼び出しも detached で止める
             state.spots = {}
+            state.detached = true
             return
         elseif kind == "surface" then
             -- 1.2〜1.5: 出現順に上書き（最後が残る）。ID は文字列のまま
@@ -235,6 +238,8 @@ end
 --- @param tokens table[] 切替先グループの内側トークン列（先頭タグ列の走査用・読み取りのみ）
 --- @return string 復旧タグ列（復旧不要なら空文字列）
 function APPEARANCE.restore(state, actor, spot, tokens)
+    -- 1.7: \p[spot] 出力でスコープ切替の影響は終わる（継続でも解除する）
+    state.detached = nil
     local name = actor.name
     -- 2.11: 同一アクターの継続（スポットの直前発話者が自分で、前回も同じスポット）なら復旧しない
     local continuing = name ~= nil and state.owners[spot] == name and state.last_spots[name] == spot

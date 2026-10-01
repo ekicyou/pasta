@@ -2034,7 +2034,7 @@ describe("SAKURA_BUILDER - actor-surface-restore: 現行出力の特性化（Tas
         return { type = "sakura_script", actor = actor, text = text }
     end
 
-    test("5.1: 明示専用スポット・既定未設定の複数アクター（サーフェス・スコープ切替・生スクリプト）3ビルド", function()
+    local function case_dedicated(appearance)
         local BUILDER, actors = setup()
         local sakura, kero = actors.sakura, actors.kero
         local config = { spot_newlines = 1.5 }
@@ -2045,7 +2045,7 @@ describe("SAKURA_BUILDER - actor-surface-restore: 現行出力の特性化（Tas
             group(sakura, { { type = "surface", id = 5 }, talk(sakura, "A1") }),
             group(kero, { script(kero, "\\s[10]"), talk(kero, "B1") }),
             group(sakura, { talk(sakura, "A2") }),
-        }, config, actor_spots)
+        }, config, actor_spots, appearance)
         expect(r1):toBe("\\p[0]\\s[5]A1\\p[1]\\s[10]B1\\p[0]\\n[150]A2\\e")
 
         -- スコープ切替タグ（\1）以降のサーフェス変更と、アクター未指定の生さくらスクリプト
@@ -2054,21 +2054,21 @@ describe("SAKURA_BUILDER - actor-surface-restore: 現行出力の特性化（Tas
             { type = "raw_script", text = "\\0\\s[3]" },
             group(kero, { talk(kero, "B2") }),
             group(sakura, { talk(sakura, "A4") }),
-        }, config, actor_spots)
+        }, config, actor_spots, appearance)
         expect(r2):toBe("\\p[0]\\1\\s[11]A3\\0\\s[3]\\p[1]B2\\p[0]\\n[150]A4\\e")
 
         local r3 = BUILDER.build({
             group(kero, { talk(kero, "B3") }),
             group(sakura, { { type = "surface", id = "smile" }, talk(sakura, "A5"), script(sakura, "\\s6") }),
-        }, config, actor_spots)
+        }, config, actor_spots, appearance)
         expect(r3):toBe("\\p[1]B3\\p[0]\\s[smile]A5\\s6\\e")
 
         -- スポット位置マップは変化しない
         expect(actor_spots["さくら"]):toBe(0)
         expect(actor_spots["うにゅう"]):toBe(1)
-    end)
+    end
 
-    test("5.3: サーフェス・着せ替えなし会話（スポット0フォールバック共有）2ビルド", function()
+    local function case_no_surface(appearance)
         local BUILDER, actors = setup()
         local sakura, kero = actors.sakura, actors.kero
         local config = { spot_newlines = 1.5 }
@@ -2078,17 +2078,17 @@ describe("SAKURA_BUILDER - actor-surface-restore: 現行出力の特性化（Tas
             group(sakura, { talk(sakura, "A1") }),
             group(kero, { talk(kero, "B1"), { type = "wait", ms = 100 } }),
             group(sakura, { talk(sakura, "A2"), { type = "newline", n = 1 } }),
-        }, config, actor_spots)
+        }, config, actor_spots, appearance)
         expect(r1):toBe("\\p[0]A1\\p[0]\\n[150]B1\\_w[100]\\p[0]\\n[150]A2\\n\\e")
 
         local r2 = BUILDER.build({
             group(kero, { talk(kero, "B2") }),
             group(sakura, { talk(sakura, "A3") }),
-        }, config, actor_spots)
+        }, config, actor_spots, appearance)
         expect(r2):toBe("\\p[0]B2\\p[0]\\n[150]A3\\e")
-    end)
+    end
 
-    test("5.1/5.4: clear_spot を含む会話（クリア後に専用スポットを再割り当て）2ビルド", function()
+    local function case_clear_spot(appearance)
         local BUILDER, actors = setup()
         local sakura, kero = actors.sakura, actors.kero
         local config = { spot_newlines = 1.5 }
@@ -2104,17 +2104,17 @@ describe("SAKURA_BUILDER - actor-surface-restore: 現行出力の特性化（Tas
             { type = "spot", actor = kero,   spot = 1 },
             group(kero, { talk(kero, "B2") }),
             group(sakura, { talk(sakura, "A2") }),
-        }, config, actor_spots)
+        }, config, actor_spots, appearance)
         expect(r1):toBe("\\p[0]\\s[5]A1\\p[1]\\s[10]B1\\p[1]B2\\p[0]A2\\e")
 
         local r2 = BUILDER.build({
             group(sakura, { talk(sakura, "A3") }),
             group(kero, { talk(kero, "B3") }),
-        }, config, actor_spots)
+        }, config, actor_spots, appearance)
         expect(r2):toBe("\\p[0]A3\\p[1]B3\\e")
-    end)
+    end
 
-    test("5.2: 同一アクター連続発話（サーフェス変更を含む）2ビルド", function()
+    local function case_same_actor(appearance)
         local BUILDER, actors = setup()
         local sakura = actors.sakura
         local config = { spot_newlines = 1.5 }
@@ -2123,13 +2123,190 @@ describe("SAKURA_BUILDER - actor-surface-restore: 現行出力の特性化（Tas
         local r1 = BUILDER.build({
             group(sakura, { { type = "surface", id = 5 }, talk(sakura, "A1") }),
             group(sakura, { script(sakura, "\\s[6]"), talk(sakura, "A2") }),
-        }, config, actor_spots)
+        }, config, actor_spots, appearance)
         expect(r1):toBe("\\p[0]\\s[5]A1\\s[6]A2\\e")
 
         local r2 = BUILDER.build({
             group(sakura, { talk(sakura, "A3") }),
             group(sakura, { talk(sakura, "A4") }),
-        }, config, actor_spots)
+        }, config, actor_spots, appearance)
         expect(r2):toBe("\\p[0]A3A4\\e")
+    end
+
+    -- 特性化ケースを、第4引数なし（現行呼び出し）と共有外見状態（Task 3.1）の両方で同じ期待値に照合する
+    test("5.1: 明示専用スポット・既定未設定の複数アクター（サーフェス・スコープ切替・生スクリプト）3ビルド", function() case_dedicated(nil) end)
+    test("5.1: 明示専用スポット・既定未設定の複数アクター（サーフェス・スコープ切替・生スクリプト）3ビルド（共有外見状態）", function()
+        case_dedicated(require("pasta.shiori.appearance").new())
+    end)
+    test("5.3: サーフェス・着せ替えなし会話（スポット0フォールバック共有）2ビルド", function() case_no_surface(nil) end)
+    test("5.3: サーフェス・着せ替えなし会話（スポット0フォールバック共有）2ビルド（共有外見状態）", function()
+        case_no_surface(require("pasta.shiori.appearance").new())
+    end)
+    test("5.1/5.4: clear_spot を含む会話（クリア後に専用スポットを再割り当て）2ビルド", function() case_clear_spot(nil) end)
+    test("5.1/5.4: clear_spot を含む会話（クリア後に専用スポットを再割り当て）2ビルド（共有外見状態）", function()
+        case_clear_spot(require("pasta.shiori.appearance").new())
+    end)
+    test("5.2: 同一アクター連続発話（サーフェス変更を含む）2ビルド", function() case_same_actor(nil) end)
+    test("5.2: 同一アクター連続発話（サーフェス変更を含む）2ビルド（共有外見状態）", function()
+        case_same_actor(require("pasta.shiori.appearance").new())
+    end)
+end)
+
+describe("SAKURA_BUILDER - actor-surface-restore: サーフェス復旧の統合（Task 3.1）", function()
+    local function group(actor, inner_tokens)
+        return { type = "actor", actor = actor, tokens = inner_tokens }
+    end
+    local function talk(actor, text)
+        return { type = "talk", actor = actor, text = text }
+    end
+    local function script(actor, text)
+        return { type = "sakura_script", actor = actor, text = text }
+    end
+    local config = { spot_newlines = 1.5 }
+
+    test("2.6: 同一スポットで A(\\s[0]A1)→B(\\s[10]B1)→A(A2) は戻りの \\p[0] 直後に \\s[0] を復旧する", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { talk(a, "\\s[0]A1") }),
+            group(b, { talk(b, "\\s[10]B1") }),
+            group(a, { talk(a, "A2") }),
+        }, config, { ["さくら"] = 0, ["うにゅう"] = 0 })
+        expect(result):toBe("\\p[0]\\s[0]A1\\p[0]\\n[150]\\s[10]B1\\p[0]\\s[0]\\n[150]A2\\e")
+    end)
+
+    test("1.1: 構造化サーフェス指示も観測され、交代時に復旧される", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { { type = "surface", id = 5 }, talk(a, "A1") }),
+            group(b, { { type = "surface", id = "smile" }, talk(b, "B1") }),
+            group(a, { talk(a, "A2") }),
+            group(b, { talk(b, "B2") }),
+        }, config, { ["さくら"] = 0, ["うにゅう"] = 0 })
+        expect(result):toBe(
+            "\\p[0]\\s[5]A1\\p[0]\\s[smile]\\n[150]B1\\p[0]\\s[5]\\n[150]A2\\p[0]\\s[smile]\\n[150]B2\\e")
+    end)
+
+    test("2.5: 復旧タグだけが出た切替でも段落区切り改行の有無は復旧なしの場合と一致する", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local function run(sa, sb)
+            return BUILDER.build({
+                group(a, { talk(a, sa .. "A1") }),
+                group(b, { talk(b, sb .. "B1") }),
+                group(a, { { type = "wait", ms = 100 } }), -- 復旧タグのみ（一般文字列なし）
+                group(b, { talk(b, "B2") }),
+                group(a, { talk(a, "A2") }),
+            }, config, {})
+        end
+        local with_surface = run("\\s[0]", "\\s[10]")
+        local without_surface = run("", "")
+        expect(with_surface):toBe(
+            "\\p[0]\\s[0]A1\\p[0]\\n[150]\\s[10]B1\\p[0]\\s[0]\\_w[100]"
+            .. "\\p[0]\\s[10]\\n[150]B2\\p[0]\\s[0]\\n[150]A2\\e")
+        expect((with_surface:gsub("\\s%[%d+%]", ""))):toBe(without_surface)
+    end)
+
+    test("4.5: clear_spot 後も外見状態が保持され、スポット0共有の交代で復旧する", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { talk(a, "\\s[0]A1") }),
+            group(b, { talk(b, "\\s[10]B1") }),
+            { type = "clear_spot" },
+            group(a, { talk(a, "A2") }),
+        }, config, {})
+        expect(result):toBe("\\p[0]\\s[0]A1\\p[0]\\n[150]\\s[10]B1\\p[0]\\s[0]A2\\e")
+    end)
+
+    test("5.2: 同一アクターの連続グループでは復旧しない（生スクリプトでの不明化後も）", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { talk(a, "\\s[0]A1") }),
+            group(b, { talk(b, "\\s[10]B1") }),
+            group(a, { talk(a, "A2") }),
+            group(a, { talk(a, "A3") }),
+            { type = "raw_script", text = "\\s[7]" },
+            group(a, { talk(a, "A4") }),
+        }, config, {})
+        expect(result):toBe("\\p[0]\\s[0]A1\\p[0]\\n[150]\\s[10]B1\\p[0]\\s[0]\\n[150]A2A3\\s[7]A4\\e")
+    end)
+
+    test("5.5: spot トークンで移動したアクターは移動先スポットで復旧する", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            { type = "spot", actor = a, spot = 0 },
+            { type = "spot", actor = b, spot = 1 },
+            group(a, { talk(a, "\\s[0]A1") }),
+            group(b, { talk(b, "\\s[10]B1") }),
+            group(a, { talk(a, "A2") }),
+            { type = "spot", actor = b, spot = 0 },
+            group(b, { talk(b, "B2") }),
+        }, config, {})
+        expect(result):toBe("\\p[0]\\s[0]A1\\p[1]\\s[10]B1\\p[0]\\n[150]A2\\p[0]\\s[10]\\n[150]B2\\e")
+    end)
+
+    test("5.6: スポット未設定アクターのスポット0フォールバック共有で復旧する", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            { type = "spot", actor = a, spot = 0 },
+            group(a, { talk(a, "\\s[0]A1") }),
+            group(b, { talk(b, "\\s[10]B1") }), -- うにゅうは未設定 → spot 0
+            group(a, { talk(a, "A2") }),
+        }, config, {})
+        expect(result):toBe("\\p[0]\\s[0]A1\\p[0]\\n[150]\\s[10]B1\\p[0]\\s[0]\\n[150]A2\\e")
+    end)
+
+    test("2.11/5.1: 専用スポットのアクターがスコープ切替で変えた表示は次のビルドで巻き戻さない", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local APPEARANCE = require("pasta.shiori.appearance")
+        local appearance = APPEARANCE.new()
+        local actor_spots = { ["さくら"] = 0, ["うにゅう"] = 1 }
+        local r1 = BUILDER.build({
+            group(a, { talk(a, "\\s[0]A1\\1\\s[10]X\\0\\s[5]Y") }),
+            group(b, { talk(b, "B1") }),
+        }, config, actor_spots, appearance)
+        expect(r1):toBe("\\p[0]\\s[0]A1\\1\\s[10]X\\0\\s[5]Y\\p[1]B1\\e")
+        local r2 = BUILDER.build({
+            group(a, { talk(a, "A2") }),
+            group(b, { talk(b, "B2") }),
+        }, config, actor_spots, appearance)
+        expect(r2):toBe("\\p[0]A2\\p[1]B2\\e")
+    end)
+
+    test("2.11/5.1: タグごとに別トークンでも、スコープ切替で変えた表示を次のビルドで巻き戻さない", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local appearance = require("pasta.shiori.appearance").new()
+        local actor_spots = { ["さくら"] = 0, ["うにゅう"] = 1 }
+        local r1 = BUILDER.build({
+            group(a, {
+                script(a, "\\s[0]"), talk(a, "A1"), script(a, "\\1"), script(a, "\\s[10]"), talk(a, "X"),
+                script(a, "\\0"), script(a, "\\s[5]"), talk(a, "Y"),
+            }),
+            group(b, { talk(b, "B1") }),
+        }, config, actor_spots, appearance)
+        expect(r1):toBe("\\p[0]\\s[0]A1\\1\\s[10]X\\0\\s[5]Y\\p[1]B1\\e")
+        local r2 = BUILDER.build({
+            group(a, { talk(a, "A2") }),
+            group(b, { talk(b, "B2") }),
+        }, config, actor_spots, appearance)
+        expect(r2):toBe("\\p[0]A2\\p[1]B2\\e")
+    end)
+
+    test("1.7: タグごとに別トークンの発話でも、スコープ切替後のサーフェス変更をアクターへ記録しない", function()
+        local BUILDER, actors = setup()
+        local a, k = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { script(a, "\\s[0]"), talk(a, "A1"), script(a, "\\1"), script(a, "\\s[10]"), talk(a, "X") }),
+            group(k, { talk(k, "B1") }),
+            group(a, { talk(a, "A2") }),
+        }, config, { ["さくら"] = 0, ["うにゅう"] = 0 })
+        expect(result):toBe("\\p[0]\\s[0]A1\\1\\s[10]X\\p[0]\\n[150]B1\\p[0]\\s[0]\\n[150]A2\\e")
     end)
 end)
