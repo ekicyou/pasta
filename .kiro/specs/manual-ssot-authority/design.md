@@ -47,7 +47,7 @@
 ### Allowed Dependencies
 
 - Node.js 20（CI と同一）の標準モジュール（`node:fs`・`node:path`・`node:url`）のみ。新規 npm 依存は追加しない（5.8）。
-- 既存 `book/tools/` の関数の import（`link-check.mjs` の `extractLinks` 等）。依存方向は「`gen-skill-refs.mjs` → `link-check.mjs`」「`verify-content.mjs` → `gen-skill-refs.mjs`（対応表の読み取りのみ）」に限る。逆方向の import は禁止。
+- 既存 `book/tools/` の関数の import（`link-check.mjs` の `extractLinks` 等）。依存方向は「`gen-skill-refs.mjs` → `link-check.mjs`」「`verify-content.mjs` → `gen-skill-refs.mjs`（対応表と `VOICE_MARKERS` の読み取りのみ）」に限る。逆方向の import は禁止。
 - mdBook 0.5.3 の既存ビルド・公開パイプライン。
 - 生成物ヘッダが案内する公開 URL `https://ekicyou.github.io/pasta/`（`book.toml` の `site-url` と整合）。
 
@@ -354,7 +354,7 @@ interface MapEntry {
 type GenError =
   | { kind: 'missing-chapter'; chapter: string }
   | { kind: 'bad-structure'; chapter: string; detail: string }      // 区切り行 2 本未満・H1 なし
-  | { kind: 'voice-in-body'; chapter: string; markers: string[] }   // 本文散文にナレーション語
+  | { kind: 'voice-in-body'; chapter: string; markers: string[] }   // 本文散文に口調マーカー
   | { kind: 'unresolvable-link'; chapter: string; target: string }; // 章外の相対非 .md リンク等
 
 interface CheckReport {
@@ -394,7 +394,7 @@ function checkAll(repoRoot: string): CheckReport;
 
   命名規則: 現行スキルに 1:1 で対応するファイルがあれば現行名を維持し（持ち出し先・`SKILL.md` への影響を最小化）、新規に分かれるものは章のファイル名を使う（OPEN QUESTION 1）。デバッグ・入門・`lua/basics`・`lua/patterns`・`lua/dsl-vs-lua`・`lua/index`・`reference/external-links` は生成しない（5.1）。
 
-- **抽出規則（`extractBody`）**: 入力を LF 正規化し、コードフェンス（```` ``` ```` / `~~~`）外で「行全体が `---`」の行を区切り行とみなす。区切り行が 2 本未満、または先頭行が `# ` で始まる H1 でなければ `bad-structure`。H1 行をタイトルとし、最初の区切り行の次行から最後の区切り行の前行までを本文とする（本文内の `---` は保持）。本文の前後の空行は除去する。最後の区切り行以降（締め・旧「権威的仕様」引用）はすべて捨てる。本文の散文部（コードフェンス除去後）にナレーション語（`verify-content.mjs` の `NARRATION_MARKERS` と同一集合: `わたくし`・`おほほ`・`フンッ`）が現れたら `voice-in-body`。
+- **抽出規則（`extractBody`）**: 入力を LF 正規化し、コードフェンス（```` ``` ```` / `~~~`）外で「行全体が `---`」の行を区切り行とみなす。区切り行が 2 本未満、または先頭行が `# ` で始まる H1 でなければ `bad-structure`。H1 行をタイトルとし、最初の区切り行の次行から最後の区切り行の前行までを本文とする（本文内の `---` は保持）。本文の前後の空行は除去する。最後の区切り行以降（締め・旧「権威的仕様」引用）はすべて捨てる。本文の散文部（コードフェンス・表の行（`|` 始まり）・インラインコードを除去した残り）に口調マーカー（`verify-content.mjs` の広い集合 `VOICE_MARKERS`: `ですわ`・`ますの`・`おほほ`・`わたくし`・`くてよ` 等）のいずれかが現れたら `voice-in-body`。`VOICE_MARKERS` は `gen-skill-refs.mjs` へ移して export し、`verify-content.mjs` はそれを import する（依存方向を守り、集合を一本化する）。生成対象章の本文では口調を全面禁止し、コラム・励ましは導入か締めへ置く（設計ディスカッション #1 で確定）。作例の台詞に口調を含めたい場合はコードフェンス内に置く。
 - **リンク書き換え規則（`rewriteLinks`）**: コードフェンス外のインラインリンク `[text](target)` のみを対象とする。
   1. `http(s)://`・`mailto:` 等の絶対 URL、および `#anchor` のみのリンク → そのまま。
   2. 相対 `.md` リンク（アンカー付き可）→ 章のディレクトリ基準で `book/src` 内パスへ解決し、`GENERATION_MAP` に同一スキル宛てのエントリがあれば `{out}{#anchor}`（同じ `references/` 内の兄弟ファイル）。それ以外（非生成章・別スキル宛て）は `{MANUAL_BASE_URL}{chapterPath の .md を .html に置換}{#anchor}`。
@@ -600,7 +600,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 
 ### Domain Model
 
-- **章（Chapter）**: `book/src` 相対パスで識別。構造不変条件＝H1 1 行・区切り行 2 本以上・本文散文にナレーション語なし（生成対象章のみ）。
+- **章（Chapter）**: `book/src` 相対パスで識別。構造不変条件＝H1 1 行・区切り行 2 本以上・本文散文に口調マーカーなし（生成対象章のみ）。
 - **対応表エントリ（MapEntry）**: `chapter` と `(skill, out)` は 1 対 1。`(skill, out)` は全体で一意。
 - **生成ファイル（GeneratedRef）**: 1 行目の固定ヘッダで識別。内容は `renderEntry(entry)` の値と LF 正規化後に一致しなければならない。
 - **手書きファイル（HandwrittenRef）**: 固定ヘッダを持たない。生成器の書き込み対象外。
@@ -632,7 +632,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 
 ### Unit Tests（`gen-skill-refs-test.mjs`・`link-check-test.mjs`）
 
-- `extractBody`: 導入・締め・締め後の引用が出力に含まれず、本文内の `---` は保持される（5.2）。区切り 1 本・H1 なしで `bad-structure`、本文散文に `わたくし` で `voice-in-body`、コードフェンス内の `わたくし` や `---` は無視される（5.9）。
+- `extractBody`: 導入・締め・締め後の引用が出力に含まれず、本文内の `---` は保持される（5.2）。区切り 1 本・H1 なしで `bad-structure`、本文散文に `わたくし` や文末 `ですわ` で `voice-in-body`、コードフェンス内・表の行・インラインコード内の `ですわ` や `---` は無視される（5.2, 5.9）。
 - `rewriteLinks`: 同一スキル宛て → 兄弟ファイル名＋アンカー、非生成章・別スキル宛て → 公開 URL（`.html`＋アンカー）、絶対 URL・`#anchor` は不変、画像相対リンクで `unresolvable-link`、コードフェンス内は不変（5.3, 5.4）。
 - 決定性: 同一章の LF 版と CRLF 版から生成した結果がバイト一致し、ヘッダの 2 行が固定文字列である（5.5, 5.6）。
 - `checkAll`（tmp サンドボックス）: 章だけ変更 → `stale`、生成物だけ手編集 → `stale`、生成物を CRLF 化しただけ → 一致、ヘッダ付きの対応表外ファイル → `orphans`（7.1, 7.2, 7.4）。
@@ -695,5 +695,5 @@ graph LR
 7. `review-improvement-loop` の修正範囲（前提: 今後の指示として読まれる箇所のみ。完了済みセル記録と `reports/` は歴史的記録として残す）。
 8. 既知の食い違いの訂正範囲（前提: 生成対象外の `lua/patterns.md` と `SKILL.md` 早見表も訂正）。
 9. 吸収元に無い実装事実の扱い（前提: 収録義務の対象外。台帳付録に列挙）。
-10. 生成対象章の本文から口調を一切排除する規約（前提: 排除し、生成器で機械検出）。
+10. ~~生成対象章の本文から口調を一切排除する規約~~ → 解決済み（#1）: 全面禁止。検出は広い `VOICE_MARKERS` をコードフェンス・表・インラインコード除去後の散文に適用。
 11. 生成ファイル内アンカーへのリンク検証（設計検証で指摘。前提: ファイル実在のみ検証し、アンカーは検証しない）。
