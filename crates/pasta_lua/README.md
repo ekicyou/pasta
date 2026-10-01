@@ -150,11 +150,11 @@ spot = 1
 ```toml
 [actor."さくら"]
 spot = 0
-default_surface = 0
+surface = 0
 
 [actor."うにゅう"]  
 spot = 1
-default_surface = 10
+surface = 10
 ```
 
 **初期化フロー:**

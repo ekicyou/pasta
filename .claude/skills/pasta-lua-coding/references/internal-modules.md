@@ -18,6 +18,7 @@ local STORE = require("pasta.store")
 ```lua
 STORE.actors = {}          -- table<string, Actor>    アクターキャッシュ
 STORE.actor_spots = {}     -- table<string, integer>  スポット位置マップ
+STORE.appearance = { actors = {}, spots = {}, owners = {}, last_spots = {} } -- 外見状態（同一スポット共有時の復旧用。非永続）
 STORE.scenes = {}          -- table<string, table>    シーンレジストリ
 STORE.counters = {}        -- table<string, number>   シーン名カウンタ
 STORE.global_words = {}    -- table<string, table>    グローバル単語レジストリ
@@ -48,6 +49,7 @@ function STORE.reset()
     end
     STORE.actors = {}
     STORE.actor_spots = {}
+    STORE.appearance = { actors = {}, spots = {}, owners = {}, last_spots = {} }
     STORE.scenes = {}
     STORE.counters = {}
     STORE.global_words = {}
