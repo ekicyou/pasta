@@ -115,7 +115,7 @@
   - _Requirements: 4.2, 1.7, 3.1_
   - _Depends: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8_
 
-- [ ] 2.10 既定値整合テストの読み先をマニュアル章へ付け替える
+- [x] 2.10 既定値整合テストの読み先をマニュアル章へ付け替える
   - テストの読み先をスキルの pasta-toml からマニュアルの pasta.toml リファレンス章へ変え、doc コメントを更新する。照合規則と失敗メッセージは変えない
   - 実行前に `NoDefaultCurrentDirectoryInExePath` 環境変数を外す（LuaJIT ビルドの既知制約）
   - 完了状態: `cargo test -p pasta_lua --test loader` が緑。章の既定値を 1 つ変えると該当キー名付きで失敗することを一度確認して戻した。テストソースに `.claude/skills` のパスが無い
@@ -300,3 +300,4 @@
 - 2.7: `[logging] rotation_days` は読まれない（U32・バグ候補・マニュアルに書かない）。型の合わない値で `[talk]`・`[persistence]`・`[logging]`・`[debug]` 全体が黙って既定値に戻るのは意図された挙動（テスト `test_custom_section_type_mismatch_returns_none`）として章に記載。`pasta_patterns` から `.lua` パターンが自動生成される挙動（U33）をコントローラが章に追記した。台帳 pasta-toml 節は取り込み後の行番号へ再同期済み（ledger-check OK）。first-ghost.md L415 の「設定ファイルリファレンス」言及は 2.9 で新章へリンクする。
 - 2.8 後: 担当が未定だった台帳本体 2 行を割り当てる。L342（GRAMMAR.md L801 → reference/startup.md#4 に `Parse error: ファイル:行:列: 内容` の形式を追記）は 2.9（startup.md を触るため）。L262（doc/spec/README L63「外部仕様」→ reference/external-links.md に Unicode UAX #31・ukadoc さくらスクリプト一覧のリンク追記）は 3.5（external-links の doc/spec リンク群削除と同時）。verify-static R1.2 は新章が SUMMARY 未登録のため 2.9 まで 1 件失敗する（P2 中の一時状態）。
 - 2.9: パースエラーのログ文字列は `Parse error: ` 前置きが多重になる（loader/process.rs と pasta_dsl/parser の二重包み・見た目の冗長のみでバグ候補にしない）。startup.md §4 は内側の形式を「含む」とだけ書いた。
+- 2.10: config_defaults_test は「キー名と `値` を含む行がどれか 1 行あれば合格」（`.any`）のため、章に同じキーの表行が 2 つ（3分類表と [ghost] 表）あると片方だけ古くても通る。旧スキル側も同じ構成で既存の穴。design が照合規則の不変を指示しているため本仕様では変更せず、既知の制約として記録する。

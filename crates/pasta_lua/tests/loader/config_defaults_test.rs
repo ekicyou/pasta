@@ -217,13 +217,13 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
-/// フルリファレンステンプレート/ドキュメント（pasta-toml.md）に記載の ghost
-/// 既定値が SSOT と一致すること（R5.4 / R5.5）。テンプレートが独立に乖離した
-/// 場合に失敗する。
+/// マニュアルの pasta.toml リファレンス章（`book/src/reference/pasta-toml.md`）に
+/// 記載の ghost 既定値が SSOT と一致すること（R5.4 / R5.5、
+/// manual-ssot-authority 4.3–4.5）。章の記載が独立に乖離した場合に失敗する。
+/// 読み先はマニュアル章であり、スキル側の生成物は読まない。
 #[test]
 fn config_reference_doc_matches_ssot() {
-    let doc_path =
-        repo_root().join(".claude/skills/pasta-ghost-authoring/references/pasta-toml.md");
+    let doc_path = repo_root().join("book/src/reference/pasta-toml.md");
     let doc = std::fs::read_to_string(&doc_path)
         .unwrap_or_else(|e| panic!("config reference doc not readable at {doc_path:?}: {e}"));
 
