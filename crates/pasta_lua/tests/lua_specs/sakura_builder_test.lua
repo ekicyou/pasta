@@ -2013,3 +2013,123 @@ describe("SAKURA_BUILDER - string-buffer: フォールバック実走バイト�
         expect(native:sub(-2)):toBe("\\e")
     end)
 end)
+
+-- ============================================================================
+-- actor-surface-restore: 現行出力の特性化（Task 1.1）
+-- 外見復旧フック追加前の出力を完全一致で固定する。以下の構成はいずれも
+-- 機能導入後もバイト等価でなければならない（要件 5.1, 5.2, 5.3, 5.4）。
+-- 複数ビルドに跨る会話は同一 actor_spots を連続する BUILDER.build に渡す。
+-- 一般文字列は句読点を含めずウェイトタグが挿入されない決定的な出力にする。
+-- ============================================================================
+
+describe("SAKURA_BUILDER - actor-surface-restore: 現行出力の特性化（Task 1.1）", function()
+    -- ヘルパー: actor グループトークン
+    local function group(actor, inner_tokens)
+        return { type = "actor", actor = actor, tokens = inner_tokens }
+    end
+    local function talk(actor, text)
+        return { type = "talk", actor = actor, text = text }
+    end
+    local function script(actor, text)
+        return { type = "sakura_script", actor = actor, text = text }
+    end
+
+    test("5.1: 明示専用スポット・既定未設定の複数アクター（サーフェス・スコープ切替・生スクリプト）3ビルド", function()
+        local BUILDER, actors = setup()
+        local sakura, kero = actors.sakura, actors.kero
+        local config = { spot_newlines = 1.5 }
+        -- 明示的な専用スポット割り当て（共有なし）
+        local actor_spots = { ["さくら"] = 0, ["うにゅう"] = 1 }
+
+        local r1 = BUILDER.build({
+            group(sakura, { { type = "surface", id = 5 }, talk(sakura, "A1") }),
+            group(kero, { script(kero, "\\s[10]"), talk(kero, "B1") }),
+            group(sakura, { talk(sakura, "A2") }),
+        }, config, actor_spots)
+        expect(r1):toBe("\\p[0]\\s[5]A1\\p[1]\\s[10]B1\\p[0]\\n[150]A2\\e")
+
+        -- スコープ切替タグ（\1）以降のサーフェス変更と、アクター未指定の生さくらスクリプト
+        local r2 = BUILDER.build({
+            group(sakura, { script(sakura, "\\1\\s[11]"), talk(sakura, "A3") }),
+            { type = "raw_script", text = "\\0\\s[3]" },
+            group(kero, { talk(kero, "B2") }),
+            group(sakura, { talk(sakura, "A4") }),
+        }, config, actor_spots)
+        expect(r2):toBe("\\p[0]\\1\\s[11]A3\\0\\s[3]\\p[1]B2\\p[0]\\n[150]A4\\e")
+
+        local r3 = BUILDER.build({
+            group(kero, { talk(kero, "B3") }),
+            group(sakura, { { type = "surface", id = "smile" }, talk(sakura, "A5"), script(sakura, "\\s6") }),
+        }, config, actor_spots)
+        expect(r3):toBe("\\p[1]B3\\p[0]\\s[smile]A5\\s6\\e")
+
+        -- スポット位置マップは変化しない
+        expect(actor_spots["さくら"]):toBe(0)
+        expect(actor_spots["うにゅう"]):toBe(1)
+    end)
+
+    test("5.3: サーフェス・着せ替えなし会話（スポット0フォールバック共有）2ビルド", function()
+        local BUILDER, actors = setup()
+        local sakura, kero = actors.sakura, actors.kero
+        local config = { spot_newlines = 1.5 }
+        local actor_spots = {}
+
+        local r1 = BUILDER.build({
+            group(sakura, { talk(sakura, "A1") }),
+            group(kero, { talk(kero, "B1"), { type = "wait", ms = 100 } }),
+            group(sakura, { talk(sakura, "A2"), { type = "newline", n = 1 } }),
+        }, config, actor_spots)
+        expect(r1):toBe("\\p[0]A1\\p[0]\\n[150]B1\\_w[100]\\p[0]\\n[150]A2\\n\\e")
+
+        local r2 = BUILDER.build({
+            group(kero, { talk(kero, "B2") }),
+            group(sakura, { talk(sakura, "A3") }),
+        }, config, actor_spots)
+        expect(r2):toBe("\\p[0]B2\\p[0]\\n[150]A3\\e")
+    end)
+
+    test("5.1/5.4: clear_spot を含む会話（クリア後に専用スポットを再割り当て）2ビルド", function()
+        local BUILDER, actors = setup()
+        local sakura, kero = actors.sakura, actors.kero
+        local config = { spot_newlines = 1.5 }
+        local actor_spots = {}
+
+        local r1 = BUILDER.build({
+            { type = "spot", actor = sakura, spot = 0 },
+            { type = "spot", actor = kero,   spot = 1 },
+            group(sakura, { { type = "surface", id = 5 }, talk(sakura, "A1") }),
+            group(kero, { script(kero, "\\s[10]"), talk(kero, "B1") }),
+            { type = "clear_spot" },
+            { type = "spot", actor = sakura, spot = 0 },
+            { type = "spot", actor = kero,   spot = 1 },
+            group(kero, { talk(kero, "B2") }),
+            group(sakura, { talk(sakura, "A2") }),
+        }, config, actor_spots)
+        expect(r1):toBe("\\p[0]\\s[5]A1\\p[1]\\s[10]B1\\p[1]B2\\p[0]A2\\e")
+
+        local r2 = BUILDER.build({
+            group(sakura, { talk(sakura, "A3") }),
+            group(kero, { talk(kero, "B3") }),
+        }, config, actor_spots)
+        expect(r2):toBe("\\p[0]A3\\p[1]B3\\e")
+    end)
+
+    test("5.2: 同一アクター連続発話（サーフェス変更を含む）2ビルド", function()
+        local BUILDER, actors = setup()
+        local sakura = actors.sakura
+        local config = { spot_newlines = 1.5 }
+        local actor_spots = { ["さくら"] = 0 }
+
+        local r1 = BUILDER.build({
+            group(sakura, { { type = "surface", id = 5 }, talk(sakura, "A1") }),
+            group(sakura, { script(sakura, "\\s[6]"), talk(sakura, "A2") }),
+        }, config, actor_spots)
+        expect(r1):toBe("\\p[0]\\s[5]A1\\s[6]A2\\e")
+
+        local r2 = BUILDER.build({
+            group(sakura, { talk(sakura, "A3") }),
+            group(sakura, { talk(sakura, "A4") }),
+        }, config, actor_spots)
+        expect(r2):toBe("\\p[0]A3A4\\e")
+    end)
+end)
