@@ -21,12 +21,12 @@ Pasta ランタイムは Rust 側から Lua VM へモジュール群を公開し
 | `@pasta_search` | シーン・単語の前方一致検索 | `require "@pasta_search"` | [@pasta_search](pasta-search.md) |
 | `@pasta_persistence` | セーブデータの永続化 | `require "@pasta_persistence"` | [@pasta_persistence](pasta-persistence.md) |
 | `@pasta_config` | pasta.toml の設定の読み取り | `pcall(require, "@pasta_config")` | [@pasta_config](pasta-config.md) |
-| `@pasta_sakura_script` | さくらスクリプト変換（ウェイト挿入・自動改行） | `require "@pasta_sakura_script"` | @pasta_sakura_script |
-| `@enc` | UTF-8 ⇔ ANSI の文字コード変換 | `require "@enc"` | @enc |
-| `@pasta_log` | ロギング | `require "@pasta_log"` | @pasta_log |
+| `@pasta_sakura_script` | さくらスクリプト変換（ウェイト挿入・自動改行） | `require "@pasta_sakura_script"` | [@pasta_sakura_script](pasta-sakura-script.md) |
+| `@enc` | UTF-8 ⇔ ANSI の文字コード変換 | `require "@enc"` | [@enc](enc.md) |
+| `@pasta_log` | ロギング | `require "@pasta_log"` | [@pasta_log](pasta-log.md) |
 
 加えて、mlua-stdlib の統合モジュール `@json`・`@yaml`・`@regex`・`@assertions`・`@testing` が既定で有効である。
-`@env`（環境変数・パスへのアクセス）は既定で無効で、通常のゴーストからは使えない。これらは章「mlua-stdlib 統合モジュール」で扱う。
+`@env`（環境変数・パスへのアクセス）は既定で無効で、通常のゴーストからは使えない。これらは [mlua-stdlib 統合モジュール](mlua-stdlib.md) で扱う。
 
 ## 共通事項
 
@@ -48,7 +48,7 @@ Pasta ランタイムは Rust 側から Lua VM へモジュール群を公開し
 ### 失敗の返し方
 
 - 呼び出しの失敗を戻り値で返す関数は、成功時に `値, nil`、失敗時に `nil, エラーメッセージ` の 2 値を返す（`@pasta_persistence` の `save`、`@enc` の変換関数）。
-- 引数の型が合わない呼び出し（表を渡すべき所に文字列を渡すなど）は、戻り値ではなく Lua のエラーになる。
+- 引数の型が合わない呼び出し（表を渡すべき所に文字列を渡すなど）は、戻り値ではなく Lua のエラーになる（`@enc` の変換関数は例外で、文字列以外を渡しても `nil, エラーメッセージ` を返す）。
 
 ### モジュールのメタデータ
 

@@ -581,7 +581,7 @@
 | L635 @testing | 収録先（新設）: lua/modules/mlua-stdlib.md#@testing | lua:runtime/runtime_config.rs | — |
 | L649 デフォルトで無効なモジュール | 収録先（新設）: lua/modules/mlua-stdlib.md#デフォルトで無効なモジュール | lua:runtime/runtime_config.rs | — |
 | L651 @env | 収録先（新設）: lua/modules/mlua-stdlib.md#@env（ゴースト作者向けの有効化手段は pasta.toml `[lua] libs` への `"env"` 追加として書く） | lua:runtime/runtime_config.rs（`"env"`）、lua:loader/config/sections.rs `LuaConfig` | Rust の `RuntimeConfig` コード例は利用者が操作できない →1.3 |
-| L681 RuntimeConfig によるモジュール制御 | 収録先（訂正）: lua/modules/mlua-stdlib.md#libs によるモジュール制御（エントリで有効化、`-` 接頭辞で除外）。Rust のコンストラクタ（`new`・`full`・`minimal`）は除外（Rust 埋め込み API で利用者の操作対象外） | lua:runtime/runtime_config.rs `new`・`full`・`minimal`・`from_libs` | — |
+| L681 RuntimeConfig によるモジュール制御 | 収録先（訂正）: lua/modules/mlua-stdlib.md#Lua 標準ライブラリ（既定の構成のみ。`[lua] libs` による制御は U26・X18 によりマニュアルに書かない・2.5 で確定）。Rust のコンストラクタ（`new`・`full`・`minimal`）は除外（Rust 埋め込み API で利用者の操作対象外） | lua:runtime/runtime_config.rs `new`・`full`・`minimal`・`from_libs` | — |
 | L707 関連リファレンス | 除外（スキル内ナビゲーション。SKILL.md と手書き→生成のリンクが担う） | 不要（ナビゲーション） | — |
 
 ### `.claude/skills/pasta-lua-coding/references/shiori-handlers.md`
@@ -1074,15 +1074,15 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| lua/modules.md:156 | `local actor = { talk = {} }  -- talk サブテーブルにウェイト設定` | 訂正対象 | 2.5 |
-| lua/modules.md:158 | 結果例 `こ\_w[50]ん…は\_w[100]。`（既定では通常文字に挿入されない） | 訂正対象 | 2.5 |
-| lua/modules.md:161 | `actor.talk` の `script_wait_default` = 50ms、`script_wait_period` = 100ms（L162 を含む） | 訂正対象 | 2.5 |
+| lua/modules.md:156 | `local actor = { talk = {} }  -- talk サブテーブルにウェイト設定` | 訂正対象・訂正済み（2.5） | 2.5 |
+| lua/modules.md:158 | 結果例 `こ\_w[50]ん…は\_w[100]。`（既定では通常文字に挿入されない） | 訂正対象・訂正済み（2.5） | 2.5 |
+| lua/modules.md:161 | `actor.talk` の `script_wait_default` = 50ms、`script_wait_period` = 100ms（L162 を含む） | 訂正対象・訂正済み（2.5） | 2.5 |
 | lua/modules.md:150 | セリフにウェイトタグ `\_w[ms]` を自動挿入 | 正 | — |
 | lua/patterns.md:67 | `wait(ms)`（ウェイト） | 正 | — |
 | ga/SKILL.md:209 | `\w数字`: 数字×50ms | 正 | — |
 | ga/SKILL.md:315 | `[talk]`: ウェイト・禁則処理のカスタマイズ | 正 | — |
 | ga/references/pasta-toml.md:120 | `[talk]` の既定 50/1000/500/500/200（L317〜L321 の表も同じ）（L46・L119〜L124・L311〜L321・L332〜L335） | 正 | — |
-| lc/references/runtime-api.md:270 | `actor` は `talk` サブテーブルにウェイト設定（L273〜L295 の表・処理説明、L308・L313 の例、L328〜L334 の `[talk]` 例を含む）（L256 の冒頭、L321 のハーフウェイト例、L394 の break_lines 例も含む） | 生成で置換（4.1） | 2.5（移設時）・4.1 |
+| lc/references/runtime-api.md:270 | `actor` は `talk` サブテーブルにウェイト設定（L273〜L295 の表・処理説明、L308・L313 の例、L328〜L334 の `[talk]` 例を含む）（L256 の冒頭、L321 のハーフウェイト例、L394 の break_lines 例も含む） | 生成で置換（4.1）・移設時訂正済み（2.5） | 2.5（移設時）・4.1 |
 | lc/references/internal-modules.md:129 | `talk` は `@pasta_sakura_script` でウェイトタグ付きに変換 | 正 | — |
 
 他項目で記録: `lc/SKILL.md:132`（D03）。
@@ -1349,8 +1349,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | ---- | ------------ | ---- | ------ |
 | lua/modules.md:218 | `@env` はデフォルト無効、Rust 側の `RuntimeConfig` 設定が必要で通常のゴーストからは使えない | 正 | — |
 | lua/modules.md:38 | `@pasta_log` は `RuntimeConfig` に関わらず利用可能 | 正 | — |
-| lc/references/runtime-api.md:655 | 有効化は Rust 側の `RuntimeConfig`（L658〜L672 と L681〜L694 の Rust コード例） | 生成で置換（4.1） | 2.5（移設時）・4.1 |
-| lc/references/runtime-api.md:703 | モジュールの有効／無効は `libs` 配列 | 生成で置換（4.1） | 2.5（移設時）・4.1 |
+| lc/references/runtime-api.md:655 | 有効化は Rust 側の `RuntimeConfig`（L658〜L672 と L681〜L694 の Rust コード例） | 生成で置換（4.1）・移設時訂正済み（2.5） | 2.5（移設時）・4.1 |
+| lc/references/runtime-api.md:703 | モジュールの有効／無効は `libs` 配列 | 生成で置換（4.1）・移設時訂正済み（2.5） | 2.5（移設時）・4.1 |
 | ga/references/pasta-toml.md:377 | 節「[lua]（Lua ライブラリ）」の `libs`（L49・L145〜L146・L383〜L387 を含む） | 生成で置換（4.1） | 2.7（移設時）・4.1 |
 
 ### X19 REG ハンドラの戻り値（`RES.ok` の二重包み）

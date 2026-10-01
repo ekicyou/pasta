@@ -70,7 +70,7 @@
   - _Boundary: ContentMigration（lua/modules 前半 4 章）_
   - _Depends: 1.3_
 
-- [ ] 2.5 (P) 公開モジュール章（@pasta_sakura_script・@enc・@pasta_log・mlua-stdlib）を新設する
+- [x] 2.5 (P) 公開モジュール章（@pasta_sakura_script・@enc・@pasta_log・mlua-stdlib）を新設する
   - 旧 `lua/modules.md` とスキル runtime-api の該当節を移し、さくらスクリプト変換のウェイト（アクター表直下のキー・既定値・挿入値・連続句読点）を実装どおりに訂正する
   - 各章に導入と締めを書き下ろし、生成対象章の執筆制約を守る
   - 完了状態: 4 章が存在し、台帳の該当行がすべて収録先としてこれらの章を指している
@@ -294,3 +294,4 @@
 - 2.2: 実装照合で判明: 別グローバルシーンへの Call から戻ると `act.current_scene` が復元されない（U28 として付録に追加・バグ候補）。マニュアルは「実行中のグローバルシーン」の通常挙動だけを書く。OnBoot で始めたチェイントークの残りは次の OnTalk で出力される（台帳本体 ga call-spec L68 の「後半が出ない」は誤り）。ローカル単語参照（2.3）も U28 の影響を受けうるが、マニュアルには通常挙動だけを書く。
 - 2.3: grammar/variables.md は永続化の説明で `../lua/modules.md` にリンクしている。2.9（旧 lua/modules.md 削除時）に `../lua/modules/pasta-persistence.md` へ張り替える（detectBrokenLinks が検出する）。
 - 2.4: lua/modules/index.md は 2.5 の章（@pasta_sakura_script・@enc・@pasta_log・mlua-stdlib）を素の文字列で載せている。2.5 で表の章セルと「章「mlua-stdlib 統合モジュール」」を各章へのリンクにする。reference/pasta-toml.md へのリンク（pasta-persistence.md#pasta.toml 設定、pasta-config.md の `[ghost]`/`[actor]` 段落から）は 2.7 で章ができた後に張る（2.7 の担当）。セレクタの整数値不使用（U29）・記号入りシーン名（U30）はバグ候補で、マニュアルには書かない。
+- 2.5: mlua-stdlib の API は吸収元の記述（`find_all`・`assert.equal`・`testing.describe` 等）が実在せず、mlua-stdlib 0.1.0 の実 API に訂正した。標準ライブラリは既定で ALL_SAFE（debug・ffi なし）→ lua/index.md の「ffi が加わる」は誤り（2.8 で訂正）。`[talk]` に型の合わない値があるとセクション全体が黙って既定値に戻る（`get_custom_config` の `try_into().ok()`）→ 2.7 で扱いを判断。```lua ブロック内の `\` はそのまま出力される（シェル heredoc の `\` 潰れによる誤検出に注意。テスト入力は Python の chr(92) 等で書く）。
