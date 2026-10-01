@@ -446,7 +446,7 @@ function checkAll(repoRoot: string): CheckReport;
 interface BrokenLink {
   file: string;   // リポジトリ相対
   target: string;
-  kind: 'internal-md' | 'github-repo-path' | 'skill-escape' | 'skill-missing' | 'skill-forbidden-ref';
+  kind: 'internal-md' | 'github-repo-path' | 'skill-escape' | 'skill-missing' | 'skill-anchor' | 'skill-forbidden-ref';
   detail: string;
 }
 
@@ -455,10 +455,11 @@ declare const FORBIDDEN_SKILL_TOKENS: readonly ['doc/spec', 'GRAMMAR.md', 'book/
 
 function detectBrokenLinks(repoRoot: string): BrokenLink[];           // 既存（book/src 対象）
 function checkSkillSelfContained(repoRoot: string): BrokenLink[];     // 新規
+function headingSlug(heading: string): string;                       // 新規（GitHub 方式）
 function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean };
 ```
 
-- `checkSkillSelfContained` の規則: (a) 相対リンクはスキルディレクトリ内に解決され（`skill-escape`）、かつ実在すること（`skill-missing`）。(b) ファイル本文（HTML コメントを含む全文）に `FORBIDDEN_SKILL_TOKENS` のいずれかが含まれないこと（`skill-forbidden-ref`。旧 `<!-- source: doc/spec/... -->` の残存も捕捉する）。絶対 URL は許可する。
+- `checkSkillSelfContained` の規則: (a) 相対リンクはスキルディレクトリ内に解決され（`skill-escape`）、かつ実在すること（`skill-missing`）。(a') `*.md#anchor`（同一ファイル内の `#anchor` を含む）は、リンク先ファイルのコードフェンス外の見出し（`#`〜`######`）を `headingSlug` で変換した集合にアンカーが含まれること（`skill-anchor`）。`headingSlug` は GitHub 方式（小文字化、英数字・日本語・`-`・`_`・空白以外を除去、空白を `-` へ、同名見出しは `-1`・`-2` を付番）。対象は 2 スキル内のリンクに限り、book 内のアンカーは検証しない（設計ディスカッション #2）。(b) ファイル本文（HTML コメントを含む全文）に `FORBIDDEN_SKILL_TOKENS` のいずれかが含まれないこと（`skill-forbidden-ref`。旧 `<!-- source: doc/spec/... -->` の残存も捕捉する）。絶対 URL は許可する。
 - Batch: `node book/tools/link-check.mjs`。違反があれば分類表示して exit 1、無ければ exit 0。
 
 **Implementation Notes**
@@ -636,7 +637,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 - `rewriteLinks`: 同一スキル宛て → 兄弟ファイル名＋アンカー、非生成章・別スキル宛て → 公開 URL（`.html`＋アンカー）、絶対 URL・`#anchor` は不変、画像相対リンクで `unresolvable-link`、コードフェンス内は不変（5.3, 5.4）。
 - 決定性: 同一章の LF 版と CRLF 版から生成した結果がバイト一致し、ヘッダの 2 行が固定文字列である（5.5, 5.6）。
 - `checkAll`（tmp サンドボックス）: 章だけ変更 → `stale`、生成物だけ手編集 → `stale`、生成物を CRLF 化しただけ → 一致、ヘッダ付きの対応表外ファイル → `orphans`（7.1, 7.2, 7.4）。
-- `checkSkillSelfContained`: `../` で脱出するリンク、実在しない `references/x.md`、`doc/spec` を含む HTML コメントを検出し、`https://` リンクは許可する（5.3, 6.4, 6.5）。旧リンク切れケース（相対 `.md`・GitHub URL・トラバーサル）は非回帰（8.4）。
+- `checkSkillSelfContained`: `../` で脱出するリンク、実在しない `references/x.md`、存在しない見出しへの `x.md#anchor`、`doc/spec` を含む HTML コメントを検出し、`https://` リンクと実在見出しへのアンカーは許可する（5.3, 6.4, 6.5）。`headingSlug`: 英字見出し・日本語見出し・記号入り見出し（`set_scene_selector(...) / set_word_selector(...)` → `set_scene_selector--set_word_selector`）・同名見出しの付番。旧リンク切れケース（相対 `.md`・GitHub URL・トラバーサル）は非回帰（8.4）。
 
 ### Integration Tests（実リポジトリ）
 
@@ -680,7 +681,7 @@ graph LR
 
 - リスク: 移設時の規範内容の欠落 → 吸収台帳の全行充足を完了条件にする。
 - リスク: 単一 PR が大きくレビュー負荷が高い → Migration の P1〜P8 単位でコミットを分け、PR 説明に台帳へのリンクを置く。
-- リスク: 生成物の見出しアンカーが mdBook とスキル閲覧環境で異なる → スキル内アンカーの正確性は機械検証しない（ファイル実在のみ検証）。AI 読者への影響は小さいと判断。
+- リスク: マニュアルの見出し変更でスキル内アンカーリンクが黙って切れる → LinkCheck の `skill-anchor` で検出する（スキル内は GitHub 方式 slug で判定。mdBook の slug との差は公開 URL 側の問題であり本検査の対象外）。
 - リスク: 既知の食い違い（約 20 件）の訂正で作業量が増え、「移し替えのみ」の印象と衝突する → 訂正は「実装に合わせた記述修正」であり挙動不変（10.5）であることを台帳の実装照合列で示す。
 - リスク: 生成対象章の本文に口調コラムを置けなくなる（現行 `AUTHORING.md` はコラムを許容） → 生成器が `voice-in-body` で検出し、規約を `AUTHORING.md` へ明記する。
 
@@ -696,4 +697,4 @@ graph LR
 8. 既知の食い違いの訂正範囲（前提: 生成対象外の `lua/patterns.md` と `SKILL.md` 早見表も訂正）。
 9. 吸収元に無い実装事実の扱い（前提: 収録義務の対象外。台帳付録に列挙）。
 10. ~~生成対象章の本文から口調を一切排除する規約~~ → 解決済み（#1）: 全面禁止。検出は広い `VOICE_MARKERS` をコードフェンス・表・インラインコード除去後の散文に適用。
-11. 生成ファイル内アンカーへのリンク検証（設計検証で指摘。前提: ファイル実在のみ検証し、アンカーは検証しない）。
+11. ~~生成ファイル内アンカーへのリンク検証~~ → 解決済み（#2）: 2 スキル内のアンカー付きリンクを `skill-anchor` で検証。book 内は対象外。
