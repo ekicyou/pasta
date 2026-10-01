@@ -109,7 +109,7 @@ book/src/getting-started/first-ghost.md   # 変更: [actor] 任意キー surface
 ```
 
 ### Modified Files
-- `crates/pasta_lua/pasta_scripts/pasta/store.lua` — `STORE.appearance = { actors = {}, spots = {}, owners = {} }` を追加し、`STORE.reset()` で同形へ初期化（4.1, 4.2）。
+- `crates/pasta_lua/pasta_scripts/pasta/store.lua` — `STORE.appearance = { actors = {}, spots = {}, owners = {}, last_spots = {} }` を追加し、`STORE.reset()` で同形へ初期化（4.1, 4.2）。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` — (1) `emit_inner_token` の変換部を「文字列を返す」形へ振る舞い不変で整理し、出力後に `APPEARANCE.observe` を呼ぶ。(2) `emit_actor_switch` が `\p[spot]` 直後に `APPEARANCE.restore` の結果を出力。(3) トップレベル `raw_script` 出力後に `APPEARANCE.observe`。(4) `BUILDER.build` に第4引数 `appearance` を追加。`BUILDER.build` 本体のループに分岐を追加しない（引数の受け渡しのみ）。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua` — `BUILDER.build(token, cfg, STORE.actor_spots, STORE.appearance)`。
 - `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua` — 既存ケースのうちスポット0フォールバック共有で復旧が入るものは期待値を更新（5.6 による意図した変化）。
@@ -122,7 +122,7 @@ book/src/getting-started/first-ghost.md   # 変更: [actor] 任意キー surface
 
 ```mermaid
 flowchart TD
-    Start[switch detected and p tag emitted] --> Owner{last speaker on spot is same actor}
+    Start[switch detected and p tag emitted] --> Owner{same actor continuing on same spot}
     Owner -- yes --> Done
     Owner -- no or unknown --> Lead[scan leading tags of target group]
     Lead --> KnownS{actor has known or default surface}
@@ -166,7 +166,7 @@ flowchart TD
 | 2.8 | 既定サーフェスによるフォールバック | Appearance | `restore`（`actor.surface`） | 復旧判定 |
 | 2.9 | 既定サーフェス未設定なら無出力 | Appearance | `restore` | 復旧判定 |
 | 2.10 | 一般文字列より後のみのサーフェス変更 | Appearance | `restore` → `observe` | 復旧判定 |
-| 2.11 | 直前発話アクターが自分自身なら復旧しない | Appearance | `restore`（`owners`） | 復旧判定 |
+| 2.11 | 同一アクターの継続なら復旧しない | Appearance | `restore`（`owners`・`last_spots`） | 復旧判定 |
 | 3.1 | 明示 bind の記録 | Appearance | `observe` | — |
 | 3.2 | 差分パーツのみ bind 再出力 | Appearance | `restore` | 復旧判定 |
 | 3.3 | 全一致なら出力なし | Appearance | `restore` | 復旧判定 |
@@ -183,7 +183,7 @@ flowchart TD
 | 4.4 | 不明は不一致扱い | Appearance | nil 比較 | 復旧判定 |
 | 4.5 | `clear_spot` で保持 | SakuraBuilder | `clear_spot` 分岐を変更しない | — |
 | 5.1 | 専用スポット・既定未設定はバイト等価 | Appearance, 特性化テスト | 不変条件（後述） | — |
-| 5.2 | 同一アクター連続発話は無出力 | SakuraBuilder hook, Appearance | `restore` は切替検出時のみ呼ばれる。ビルド跨ぎの継続は `owners` で無出力 | — |
+| 5.2 | 同一アクター連続発話は無出力 | SakuraBuilder hook, Appearance | `restore` は切替検出時のみ呼ばれる。ビルド跨ぎの継続は `owners`・`last_spots` で無出力 | — |
 | 5.3 | サーフェス・bind なし会話はバイト等価 | Appearance | 既知なし→無出力 | — |
 | 5.4 | スポット解決・`\p`・改行・`\e` 不変 | SakuraBuilder | 既存処理を変更しない | — |
 | 5.5 | スポット移動に追従 | Appearance | `restore`（解決後スポットで比較） | 復旧判定 |
@@ -230,6 +230,7 @@ flowchart TD
 --- @field actors table<string, AppearanceEntry>              -- アクター名 → 既知状態
 --- @field spots  table<integer, AppearanceEntry>             -- スポットID → 表示中状態
 --- @field owners table<integer, string>                      -- スポットID → 直前発話アクター名（不明化では消さない）
+--- @field last_spots table<string, integer>                 -- アクター名 → 前回発話したスポットID（不明化では消さない）
 
 --- 空の状態を生成する（STORE.appearance が無い環境のビルドローカル代替）
 --- @return AppearanceState
@@ -260,14 +261,14 @@ function APPEARANCE.restore(state, actor, spot, tokens) end
   - `actor.name` が nil の場合はアクター側を記録せずスポット側のみ更新する。
 - Postconditions（`observe`・actor が nil）: サーフェス変更・bind・スコープ切替タグのいずれかを 1 つでも含めば `state.spots` を空にする。`state.actors` は変更しない（1.8）。
 - Postconditions（`restore`）:
-  - 最初に `owners[spot]` を読み、`owners[spot] = actor.name` へ更新する。読んだ値が `actor.name` と同じ（非 nil）なら、状態を変えず空文字列を返す（2.11。同一アクターの継続では不明状態でも復旧しない）。以降は直前発話アクターが別アクターまたは不明の場合のみ。
+  - 最初に `owners[spot]` と `last_spots[name]` を読み、`owners[spot] = name`・`last_spots[name] = spot` へ更新する。読んだ値が `owners[spot] == name` かつ `last_spots[name] == spot`（同一アクターの継続）なら、状態を変えず空文字列を返す（2.11。不明状態でも復旧しない）。どちらかが不成立（別アクターとの交代、または別スポットから戻ってきた）なら以降の比較へ進む（5.5）。
   - 既知サーフェス = `actors[name].surface`、無ければ `actor.surface`（既定、`tostring`）。既知があり `spots[spot].surface` と不一致で、先頭タグ列にサーフェス変更が無いとき `\s[既知]` を返し `spots[spot].surface` を更新。
   - 既知着せ替え = `actor.dressup`（既定）を `actors[name].binds` で上書きした集合。各パーツについて `spots[spot].binds[cat][part]` と不一致で、先頭タグ列に同一（カテゴリ, パーツ）の明示 bind が無いとき `\![bind-noevent,cat,part,値]` を返し、スポット側を更新。
   - 着せ替え復旧タグの出力順はカテゴリ名→パーツ名のバイト昇順（出力の決定性）。サーフェス復旧が先、着せ替え復旧が後（3.2）。
   - スポット側にのみ存在するパーツは走査しない（自動解除しない。3.5）。
 - Invariants:
-  - 既定未設定のアクターが他と共有しない専用スポットで発話する限り、`restore` は空文字列を返す（5.1）。初回は既知なし、2 回目以降は `owners[spot]` が自分自身のため、不明化（1.7・1.8）の有無に依らない。
-  - `owners` はスコープ切替・生スクリプトによる不明化（`state.spots = {}`）では変更しない。`STORE.reset()`・VM 再生成でのみ消える。
+  - 既定未設定のアクターが他と共有しない専用スポットで発話する限り、`restore` は空文字列を返す（5.1）。初回は既知なし、2 回目以降は `owners[spot]`・`last_spots[name]` がともに自分自身・同じスポットのため、不明化（1.7・1.8）の有無に依らない。
+  - `owners`・`last_spots` はスコープ切替・生スクリプトによる不明化（`state.spots = {}`）では変更しない。`STORE.reset()`・VM 再生成でのみ消える。
   - サーフェス変更・bind を一度も出力せず既定も無いアクターは既知状態を持たず、`restore` は常に空文字列（5.3, 2.3, 2.9, 3.9）。
 
 ##### タグ認識規則
@@ -286,7 +287,7 @@ function APPEARANCE.restore(state, actor, spot, tokens) end
 - 他タグの引数内に入れ子で現れるタグ（例 `\![raise,OnX,\s[0]]`）は、外側タグの `[...]` を読み飛ばすため検出しない。
 
 ##### State Management
-- State model: `AppearanceState`（上記）。不明＝nil。スポット全不明化は `state.spots = {}`（`owners` は保持）、カテゴリ不明化は `binds[cat] = nil`。
+- State model: `AppearanceState`（上記）。不明＝nil。スポット全不明化は `state.spots = {}`（`owners`・`last_spots` は保持）、カテゴリ不明化は `binds[cat] = nil`。
 - Persistence & consistency: メモリのみ。`state` テーブル自体の同一性は保ち、内部フィールドを差し替える（`STORE.appearance` の参照が切れない）。
 - Concurrency strategy: 単一 Lua VM・単一スレッド（アクタースレッドに pin）。排他不要。
 
@@ -345,7 +346,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) en
 **Contracts**: State [x]
 
 ##### State Management
-- State model: `STORE.appearance = { actors = {}, spots = {}, owners = {} }`（プレーンテーブル。`store.lua` は他モジュールを require しない方針を維持）。
+- State model: `STORE.appearance = { actors = {}, spots = {}, owners = {}, last_spots = {} }`（プレーンテーブル。`store.lua` は他モジュールを require しない方針を維持）。
 - Persistence & consistency: メモリ常駐のみ。`STORE.reset()` で同形の空テーブルへ再初期化。ゴースト再読込は Lua VM 再生成により破棄（4.2）。`pasta.save`・`@pasta_persistence` には置かない（4.3）。`CONFIG.actor` からの初期転送は行わない（既定値は `restore` が `actor.surface` / `actor.dressup` を都度参照する）。
 
 #### ShioriAct
@@ -401,7 +402,8 @@ surface = 0
 - `observe`: スコープ切替タグ（`\1` `\p[2]` 等）で全スポット不明化し、以降の `\s` をアクターへ記録しない（1.7）。
 - `observe`（actor = nil）: サーフェス・bind・スコープ切替を含む生スクリプトで全スポット不明化、アクター状態不変。タグを含まない生スクリプト（`\![set,property,...]`）では不明化しない（1.8）。
 - `observe`: 明示 bind の記録、トグル／カテゴリ単位 bind でスポットと全アクターの当該カテゴリが不明化され、後続の明示 bind で再記録される（3.1, 3.4）。
-- `restore`: 直前発話アクターが自分自身なら、スポット不明でも空文字列（2.11）。`owners` は不明化で消えない。
+- `restore`: 同一アクターの継続なら、スポット不明でも空文字列（2.11）。`owners`・`last_spots` は不明化で消えない。
+- `restore`: A がスポット0（`\s[0]`）→スポット1（`\s[5]`）→スポット0と戻ったとき、スポット0で `\s[5]` を返す（継続に当たらない。5.5）。
 - `restore`: 一致→空文字列、不明／不一致→`\s[ID]`、既知なし→空文字列、既定サーフェスのフォールバック、先頭タグ列にサーフェス変更があれば抑止・一般文字列より後なら抑止しない（2.1–2.4, 2.8–2.10, 4.4）。
 - `restore`: 差分パーツのみ `bind-noevent` をカテゴリ→パーツ昇順で出力、スポット側のみのパーツに触れない、既定着せ替え、先頭タグ列の明示 bind パーツのみ抑止（3.2, 3.3, 3.5, 3.7–3.10）。
 
@@ -423,7 +425,7 @@ surface = 0
 
 | ID | 論点 | 本設計の仮定 | 関連 |
 |----|------|--------------|------|
-| OQ-1 | 専用スポット構成でも、不明化（1.7・1.8）後の最初の切替で既知サーフェスが再出力され、作者が直接変えた表示が巻き戻る | **確定（設計ディスカッション #1）**: スポットごとに直前発話アクターを覚え（`owners`）、別アクターとの交代時のみ復旧する。5.1 は不明化の有無に依らず成立（要件 2.11 を追加） | 5.1, 2.11 と 1.7・1.8・2.1 |
+| OQ-1 | 専用スポット構成でも、不明化（1.7・1.8）後の最初の切替で既知サーフェスが再出力され、作者が直接変えた表示が巻き戻る | **確定（設計ディスカッション #1）**: スポットごとの直前発話アクター（`owners`）とアクターごとの前回発話スポット（`last_spots`）を覚え、同一アクターの継続以外（別アクターとの交代、別スポットからの戻り）でのみ復旧する。5.1 は不明化の有無に依らず成立（要件 2.11 を追加） | 5.1, 2.11 と 1.7・1.8・2.1 |
 | OQ-2 | アクター設定キー名と `dressup` の形 | **仮定**: `surface` / `dressup`（カテゴリ→パーツ→0/1 の入れ子テーブル） | 2.8, 3.8 |
 | OQ-3 | 先頭タグ列のトグル／カテゴリ単位 bind | **仮定**: 復旧を抑止しない（復旧後の状態に対して作者のトグルが作用し、その後カテゴリ不明化） | 3.10, 3.4 |
 | OQ-4 | カテゴリ単位 `,,0`（全脱衣）を確定状態として扱うか | **仮定**: 扱わない（3.4 どおり不明化）。ukadoc は `,,0` の全解除のみ明記し `,,1` は未定義 | 3.4 |
