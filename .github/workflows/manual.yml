@@ -1,13 +1,16 @@
 # .github/workflows/manual.yml
 # 利用者マニュアル（mdBook）を GitHub Pages へ公開する。
-# build.yml（Rust/WASM CI）とは独立。book/** 変更時のみ起動する。
+# build.yml（Rust/WASM CI）とは独立。book/**・本ワークフロー・スキル 2 種
+# （pasta-ghost-authoring / pasta-lua-coding）の変更時のみ起動する。
 # PR では検証（ビルド・検証スクリプト群）までを行い、Pages への公開は main push 時のみ。
 #
-# パイプライン（design「Publish Pipeline」/ 要件 1.3, 1.4, 10.2, 10.4）:
-#   mdbook build book
-#     -> node book/tools/bigram-index/build-index.mjs（日本語 bigram 索引を再生成）
-#     -> node book/tools/drift-check.mjs（ドリフト/リンク切れで中断）
+# パイプライン（manual-ssot-authority design「CI と公開」/ 要件 7.1, 7.2, 7.5, 7.6, 8.2, 10.4）:
+#   node book/tools/gen-skill-refs.mjs --check（スキル生成物の鮮度照合。不一致で中断）
+#     -> mdbook build book -> 着色 -> 日本語 bigram 索引を再生成
+#     -> node book/tools/link-check.mjs（マニュアル内リンク・スキル自己完結の検証。失敗で中断）
+#     -> チュートリアル・静的性・検索・コンテンツ検証・ツール自己テスト
 #     -> Pages artifact（./book/book）をアップロード -> deploy-pages で公開。
+# すべて build ジョブ内で検証するため、失敗時は deploy（needs: build）が走らず公開されない。
 name: Manual
 
 on:
@@ -16,11 +19,15 @@ on:
     paths:
       - 'book/**'
       - '.github/workflows/manual.yml'
+      - '.claude/skills/pasta-ghost-authoring/**'
+      - '.claude/skills/pasta-lua-coding/**'
   pull_request:
     branches: [main]
     paths:
       - 'book/**'
       - '.github/workflows/manual.yml'
+      - '.claude/skills/pasta-ghost-authoring/**'
+      - '.claude/skills/pasta-lua-coding/**'
   workflow_dispatch:  # 手動実行
 
 # Pages の同時デプロイを直列化（実行中のデプロイはキャンセルしない）。
@@ -46,6 +53,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      # スキル生成物（references/ の生成ファイル）がマニュアル章からの生成結果と一致するかを
+      # 照合する（要件 7.1, 7.2）。生成器は npm 依存を持たないため npm ci より前に置き、
+      # 依存インストールやビルドの前に速く失敗させる。不一致時は対象ファイルと再生成手順を報告。
+      - name: Skill references freshness
+        run: node book/tools/gen-skill-refs.mjs --check
 
       # build-time devDependency（vscode-textmate 等）を lockfile から厳密インストール。
       # npm ci＝決定論的インストール（要件 6.4）。working-directory は book（book/package.json）。
@@ -73,10 +86,11 @@ jobs:
       - name: Rebuild bigram search index
         run: node book/tools/bigram-index/build-index.mjs book/book
 
-      # ドリフト/リンク切れがあれば公開前に中断する（要件 10.2, 10.4）。
+      # マニュアル内リンク切れ・スキルの自己完結（実在ファイルへのリンクのみ）を検証し、
+      # 問題があれば公開前に中断する（要件 8.2, 10.4）。
       # スクリプトはリポジトリルートを自己解決するため引数不要。
-      - name: Drift / broken-link check
-        run: node book/tools/drift-check.mjs
+      - name: Link check
+        run: node book/tools/link-check.mjs
 
       # チュートリアル成果物ガード その1（要件 6.2 / design「Content: Getting Started」）。
       # book/src/getting-started/first-ghost.md の ```pasta 成果物ブロックが、
@@ -111,9 +125,6 @@ jobs:
 
       - name: Verify content
         run: node book/tools/verify-content.mjs
-
-      - name: Verify drift gate
-        run: node book/tools/verify-drift-gate.mjs
 
       # book/tools 配下のツール自己テスト群。
       - name: Book tools self-tests
