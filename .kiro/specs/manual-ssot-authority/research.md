@@ -175,19 +175,18 @@
 
 ### Design Decisions
 
-#### Decision: 対応表は生成器内の定数、出力名は現行名維持
+#### Decision: 対応表は生成器内の定数、出力名は章名から導出
 - **Context**: research §4.1 の A/B/C。
 - **Alternatives**: A 章と 1:1（章名）／B 現行名維持＋複数章連結／C 混在。
-- **Selected Approach**: 章と 1:1（連結なし）だが出力名は対応表で明示し、現行スキルに対応ファイルがあれば現行名（`grammar-model.md`・`call-spec.md`・`runtime-api.md`・`shiori-handlers.md` 等）、分割で新たに生じるものは章名（`markers.md`・`block-structure.md`・`literals.md`・`startup.md`）。
-- **Rationale**: 連結（B）は見出しレベル調整とアンカー衝突処理が要る。名前規則（A の機械的命名）は `index.md` 等で例外が出る。明示表なら規則は不要で、持ち出し先・`SKILL.md` の変更も最小。
-- **Trade-offs**: 章名とスキル名がずれる箇所が残る（`call-jump`↔`call-spec`）。
-- **Follow-up**: 設計ディスカッション OPEN QUESTION 1。
+- **Selected Approach**: A。章と 1:1（連結なし）で、出力名は `outName(chapter)` で章パスから導出する（`index.md` は `{直近の親ディレクトリ名}-index.md`）。旧名 `grammar-model.md`・`call-spec.md`・`runtime-api.md`・`shiori-handlers.md` は削除する。
+- **Rationale**: 連結（B）は見出しレベル調整とアンカー衝突処理が要る。当初案は「現行名を明示表で維持」だったが、章名とスキル名のずれ（`call-jump`↔`call-spec`）が整理負債として残るため、設計ディスカッション #3 で章名に統一した。
+- **Trade-offs**: `SKILL.md` のリンク全面張り替え。持ち出し先は `references/` を丸ごと置き換える必要がある（`SKILL.md` に明記）。
 
-#### Decision: 抽出は「最初と最後の `---`」、本文の口調は機械検出で禁止
+#### Decision: 抽出は「最初と最後の `---`」、本文の口調は機械検出で全面禁止
 - **Context**: research §6「落とす範囲の規約」。
-- **Selected Approach**: コードフェンス外の行全体 `---` を区切りとし、最初と最後の間を本文とする。締め以降（旧「権威的仕様」引用含む）は捨てる。本文散文にナレーション語（`わたくし`・`おほほ`・`フンッ`）があれば生成失敗。
+- **Selected Approach**: コードフェンス外の行全体 `---` を区切りとし、最初と最後の間を本文とする。締め以降（旧「権威的仕様」引用含む）は捨てる。本文の散文（コードフェンス・表の行・インラインコードを除く）に広い `VOICE_MARKERS` のいずれかがあれば生成失敗（設計ディスカッション #1。当初案の狭いナレーション語のみの検出から拡大）。
 - **Rationale**: 既存全章が満たす規約で、新しい記法を導入しない。コラムの口調混入を規約だけでなく機械で止める。
-- **Trade-offs**: 生成対象章では本文中コラムが書けない（`AUTHORING.md` を改訂）。
+- **Trade-offs**: 生成対象章では本文中コラムが書けない（`AUTHORING.md` を改訂）。部分一致のため普通文体と衝突する語がある（下記「設計再検証」参照）。
 
 #### Decision: 章外リンクは公開マニュアル URL へ書き換え
 - **Selected Approach**: 同一スキルの生成ファイル宛て → 兄弟ファイル名＋アンカー。非生成章・別スキル宛て → `https://ekicyou.github.io/pasta/{章}.html#anchor`。画像等の相対リンクはエラー。
@@ -210,9 +209,9 @@
 
 ### Synthesis
 
-- **Generalization**: 「文法・Lua API・pasta.toml・起動シーケンス」は同一の問題（章→スキルファイルの写像）であり、1 つの対応表と 1 つの生成関数で扱う。下流 `pasta-runtime-internals-doc` も対応表への行追加だけで再利用できる（インターフェースのみ汎用、実装は 14 行の定数）。
+- **Generalization**: 「文法・Lua API・pasta.toml・起動シーケンス」は同一の問題（章→スキルファイルの写像）であり、1 つの対応表と 1 つの生成関数で扱う。下流 `pasta-runtime-internals-doc` も対応表への行追加だけで再利用できる（インターフェースのみ汎用、実装は 21 行の定数）。
 - **Build vs. Adopt**: mdBook の Markdown 出力プラグイン（mdbook-markdown 等）や remark 系ライブラリは、新規エコシステム依存（5.8 違反）かつ必要機能（区切り抽出・リンク書き換え）が数十行で済むため不採用。リンク抽出は既存 `drift-check.mjs` の実装を再利用する。
-- **Simplification**: 対応表は設定ファイル化しない（消費者は生成器と verify-content のみ）。生成ヘッダの検出は 1 行目の固定文字列のみ。スキル内アンカーの正当性検査は行わない（ファイル実在のみ）。`verify-drift-gate.mjs` 相当のゲート文面自己検査は再実装しない。
+- **Simplification**: 対応表は設定ファイル化しない（消費者は生成器と verify-content のみ）。生成ヘッダの検出は 1 行目の固定文字列のみ。スキル内アンカーは 2 スキルに限って検証する（設計ディスカッション #2。book 内アンカーは検証しない）。`verify-drift-gate.mjs` 相当のゲート文面自己検査は再実装しない。
 
 ### Risks & Mitigations
 
@@ -220,3 +219,43 @@
 - 食い違い訂正による作業量増・「仕様変更」と誤解される — 台帳に実装照合位置を残し、挙動不変であることを示す。
 - 単一 PR の大きさ — 移行フェーズ単位でコミットを分け、PR 説明に台帳を添える。
 - 本文コラム禁止による執筆上の制約 — `voice-in-body` 検出と `AUTHORING.md` の規約化で早期に気づけるようにする。
+
+---
+
+## 設計再検証（整合性パス・2026-10-01）
+
+設計ディスカッション（全 11 件）の決定を前提に、design.md 全体をリポジトリの実物と突き合わせた。見つかった問題と修正を記録する。
+
+### 決定の波及漏れ（リポジトリの証拠つき）
+
+| # | 見つかった問題 | 証拠 | design.md の修正 |
+|---|----------------|------|------------------|
+| 1 | `lua/modules/` への分割で `verify-content.mjs` の B が失敗し、D がモジュール章を検査しなくなる | B・D は固定ディレクトリを非再帰で読む（`book/tools/verify-content.mjs:170`・`:241`）。`@pasta_search` 等 5 モジュールは `lua/modules.md` にしか登場しない | VerifyContent に「B・D の一覧へ `lua/modules` を追加」を明記。Migration P2 に配置 |
+| 2 | フェンス判定が単純な交互カウントだと、4 連バッククォート内の Lua ブロックが散文扱いになる | `book/src/grammar/block-structure.md:94-103`・`call-jump.md:79-107`・`actor-dictionary.md:67-76` | `maskFences`（CommonMark 準拠）を `link-check.mjs` に定義し生成器と共用。単体テストを追加 |
+| 3 | `skill-anchor` を見出しだけで判定すると、明示アンカーへの既存リンクが誤検出になる | `authoring-patterns.md` の `<a id="s6-N">`（L8 ほか 11 箇所）と `pasta-ghost-authoring/SKILL.md:65,123,124,168,349,350` | アンカー集合を「見出し slug ∪ `<a id>`／`<a name>`」に変更 |
+| 4 | `headingSlug` の規則が「英数字・日本語」と曖昧 | 実見出し `## [package] 予約注記`（`pasta-toml.md:161`）、`### 予約グローバル変数（pasta_ で始まる名前）`（`grammar/variables.md:164`） | Unicode 文字・数字＋`_`・`-`・空白を残す 5 手順として定義し、実例 3 つを記載 |
+| 5 | 吸収元に既に切れたアンカーがある | `pasta-toml.md:51,409` の `#package予約注記`（正しい slug は `package-予約注記`） | ContentMigration に「移設時に直す」を追加（`skill-anchor` が検出する） |
+| 6 | 広い `VOICE_MARKERS` が普通文体と衝突する | `くてよ` が「書かなくてよい」に一致（`pasta-toml.md:21`。吸収対象）。`ですの`・`ますの` は「ですので」「ますので」に一致。現行の生成対象章の本文には一致なし（全 12 章を走査） | 前提 A1（集合は変えず言い換える。エラーは行番号つき）として明記し、開発者確認事項とする |
+| 7 | 旧名ファイルの削除し忘れを検出する手段が無い | 旧名 4 ファイルは生成ヘッダを持たないため孤立検出に掛からない | LinkCheck に `skill-unlisted`（`references/*.md` が `SKILL.md` からリンクされていること）を追加。6.1 の区分漏れも同時に検出 |
+| 8 | Out of Boundary が決定 #6 と矛盾 | 旧記述「入門章・デバッグ章は参照されるのみ」「手書き 3 ファイルは外部参照除去以外触らない」 | 「誤記訂正・リンク張り替えは行う」へ修正。`first-ghost.md` の成果物ブロックは `tutorial-check` 対象のため不変と明記 |
+| 9 | 分割で切れる book 内リンクが File Structure Plan に無い | `book/src/lua/index.md:43`・`reference/startup.md:114`・`SUMMARY.md:28`、および `lua/modules.md:18,82` の `patterns.md` | `lua/index.md` を変更対象へ追加。`startup.md` の変更内容を「リンク張り替えのみ」に訂正（本文に口調は無い） |
+| 10 | book 内アンカーは未検証のため、見出し変更で黙って切れる | `getting-started/first-ghost.md:272,322`・`lua/patterns.md:117` → `grammar/variables.md` の 3 見出し | 維持すべき見出しとして明記 |
+| 11 | マニュアルの既存「将来変更あり」節が要件 1.3 と衝突 | `grammar/call-jump.md:109`（フィルター・構文未受理）、`words.md:96`（`＠＄`・パーサ未実装）、`block-structure.md:112`、`actor-dictionary.md:63`、`grammar/index.md:80` | 未実装機能の節は削除して brief へ、受理されるが未処理の構文は現行挙動のみ記述。前提 A3 |
+| 12 | スキル内のリポジトリ内パス記述を検出できない（6.5） | `pasta-toml.md:29`・`testing-lint.md:247` の `crates/…` | `FORBIDDEN_SKILL_TOKENS` に `crates/` を追加。マニュアルの pasta.toml 章にはリポジトリ内パスを書かない |
+| 13 | `workflow.md` のスキル更新手順が「references を直接更新」のまま | `.kiro/steering/workflow.md:62-79` | CompletionGate に手順の書き換えを追加（9.5） |
+| 14 | 移行順序の依存逆転 | 生成器が `link-check.mjs` を import するのに、旧案は生成器（P3）→ link-check（P5）の順。章末引用の削除は現行 `A-link`（`verify-content.mjs:122`）と同時でないと赤になる | P1〜P8 を組み直し、各フェーズの終了条件を記載 |
+| 15 | マニュアル章からスキル手書きファイルへはリンクできない | `runtime-api.md:114,709`・`shiori-handlers.md:441` が `testing-lint.md`・`internal-modules.md` を指す | 台帳で「除外（スキル内ナビゲーション）」とする規則を追加 |
+
+### 旧記述の残骸
+
+- `MapEntry` から消えた `out` を参照する記述（リンク書き換え規則・出力先・Data Models）を `outName(chapter)` に統一。
+- `outName` の重複を「`bad-structure` 相当の例外」とする曖昧な記述を、自己テストでの検査に変更。
+- Traceability・Components 表に 1.8 を反映。Testing Strategy に 1.8・1.3/1.4・6.x・2.x の確認項目を追加。「新章 2 つ」を「新章 10 個」に訂正。
+- `pasta-lua-coding/SKILL.md` の誤記は `function(req)`（L84）のみ。`RES.ok_with` は `lua/patterns.md:124` にだけある。
+- 末尾の「設計ディスカッションの決定」を取り消し線なしの決定記録（表）に置換。本書の Decision 2 件（命名・口調検出）も決定後の内容に更新。
+
+### 開発者判断が必要な前提（design.md「前提（要確認）」）
+
+- A1: 口調マーカーと普通文体の衝突は言い換えで回避する（集合は変更しない）。
+- A2: 旧公開 URL `lua/modules.html` のリダイレクトは設けない。
+- A3: 「将来変更あり」表記は現行挙動の注記にのみ残す。
