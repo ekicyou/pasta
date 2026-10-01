@@ -646,7 +646,8 @@
 吸収元（doc/spec ch01–12・`GRAMMAR.md`・スキルの手書きリファレンス・現行 `book/src`）のどこにも書かれていない、現行実装が受理・処理する利用者向けの構文と挙動を 1 行ずつ挙げる（要件 1.8）。`grammar.pest` を規則ごとに読み、パーサ（`pasta_dsl`）・トランスパイラ（`pasta_lua` の code_gen）・ランタイム（`pasta_scripts`）で挙動を確かめた。本体の備考で「→1.2」とした項目はここで確定させる。
 
 - 判定列は「収録先: 章#節」か「バグ候補（根拠）」のどちらか。根拠 a＝実行時エラー・パニック・不正なさくらスクリプトを生む、b＝吸収元や他の規範記述と矛盾する結果を生む、c＝ソースコメント・テストで意図外と明示されている。どれにも当たらず意図が不明なだけのものは収録先を書く。
-- バグ候補はマニュアルに書かず、挙動も直さない（10.5）。`roadmap.md` へのキー行の申し送りは別タスクで行う。本表のバグ候補は 8 行（U06・U08・U12・U18・U19・U20・U21・U22）。
+- バグ候補はマニュアルに書かず、挙動も直さない（10.5）。`roadmap.md` へのキー行の申し送りは別タスクで行う。本表のバグ候補は 13 行（U06・U08・U12・U18・U19・U20・U21・U22・U23・U24・U25・U26・U27）。
+- U23〜U27 は、食い違い grep 記録（1.3）で見つかった挙動のうち、バグ候補かどうかの判定を 1.4 へ申し送ったもの（X19・D07・X18・D03）。吸収元に記述はあるが実装と食い違うため、現行挙動をマニュアルに書くかどうかをここで決める。実測はコミット `2d98dcf4`（`d95e12f2` から crates 配下は変わっていない）で同じ検証プログラムを動かした結果。
 - 実装照合列の「実測」は、コミット `6e914384` の実装をスクラッチの検証プログラム（`parse_str` → `LuaTranspiler::transpile` → `PastaLoader::load` → `SHIORI.request`）で動かした結果。検証プログラムはリポジトリに残していない。出力は SHIORI レスポンスの `Value`（さくらスクリプト）または状態コード。
 
 | # | 実装事実（構文と挙動） | 実装照合 | 収録先（章#節）／バグ候補（根拠） | 備考 |
@@ -673,6 +674,11 @@
 | U20 | act のメンバー名と同じアクター名: アクター名が act のメソッド・フィールド名（`talk`・`word`・`wait`・`call`・`yield`・`clear`・`var`・`save` など）と同じだと、そのアクターのアクション行が実行時エラーになる | ps:pasta/act.lua `ACT_IMPL.__index`（メソッドを先に返し、アクターはその後）・`ACT.new`（`actors`・`save`・`var`・`token` などの実フィールド）、gen:elem `generate_action`（`act.名前:talk`）。実測: `％wait` を定義して `wait：こんにちは` → 500 | バグ候補（a）: 実行時エラーを生む | — |
 | U21 | 末尾が数字のシーン名: 同名グローバルシーンの通し番号を名前の末尾に連結して内部名にするため（`A` の 1 個目 → `A1`、`A1` の 1 個目 → `A11`）、末尾が数字のシーン名は別名シーンの内部名と重なる。`＊A1` と `＊A` を定義すると `＞A1` が `A` を選ぶことがある。コード上、番号まで一致すると（`A1` の 1 個目と `A` の 11 個目がともに `A11`）2 つのシーンが同じシーン表を共有し、後の定義が先の関数を上書きする | lua:transpiler.rs `process_global_scene`（`format!("{}{}", sanitize_name(name), counter)`）、ps:pasta/scene.lua `create_scene`（`base_name .. counter`）・`register`（同じ表へ上書き）。実測: `＊A1`（台詞 シーンA1）と `＊A`（台詞 シーンA）で `＞A1` を 6 回 → A1・A・A・A1・A1・A | バグ候補（b）: 前方一致の規範記述（book block-structure.md L51、GRAMMAR.md L120「`＞挨拶` では「挨拶」で始まるすべてのシーンが候補」）と矛盾する（`A` は `A1` で始まらない） | — |
 | U22 | 数値にできない被演算子の算術: 数字でない文字列・未代入の変数・nil を返す関数を算術演算子の被演算子にすると、Lua の実行時エラーになり、そのイベントは 500（`attempt to perform arithmetic on …`） | gen:elem `generate_expr_to_buffer`（`+ - * / %` をそのまま出力）・`resolve_var_path`（`var.名前` を nil の確認なしで参照）。実測: `＄z＝「a」＋「b」` → 500、`＄x＝＄未定義＋1` → 500 | バグ候補（a・b）: 受理される式が実行時エラーを生む。未代入の変数は「空文字として展開され、ログに警告」（book variables.md L68、GRAMMAR.md L252）とする規範記述と矛盾する | 算術の通常の挙動（連結演算子なし・数字だけの文字列の数値化）は U11 で収録する。バグ候補はこのエラー挙動だけ |
+| U23 | REG ハンドラの戻り値: `REG.イベント名 = function(act) … end` の戻り値は、文字列なら `RES.ok(文字列)`（200・`Value` にその文字列）、シーンのコルーチン（thread）なら再開して得た値を `RES.ok`、nil なら `RES.no_content()`（204）に変換される。ハンドラが `RES.ok(…)`・`RES.no_content()` の結果（応答全体の文字列）を返すと、それがさらに `RES.ok` で包まれ、`Value` に応答全体が入れ子になる | ps:pasta/shiori/event/init.lua `EVENT.fire`（L171〜。文字列・thread・nil の分岐）。同じファイルの使用例 L40 は `return RES.ok(act:build())`、L201 のコメントは「既存互換: 文字列をそのまま返す」。ps:pasta/shiori/event/register.lua の使用例（L27〜L35）も `return RES.ok(…)`。crates/pasta_lua/tests/shiori/event_dispatch_test.rs `test_event_fire_dispatches_registered_handler` は `return RES.ok("test response")` を部分一致（`find`）で検査するため入れ子でも通る。実測: `return RES.ok("hi")` → `Value: SHIORI/3.0 200 OK` に続けて応答全体（内側の `Value: hi` を含む）、`return "raw"` → `Value: raw` | バグ候補（a・b・c）: `Value` に改行入りの応答全体が入り、不正な SHIORI 応答（さくらスクリプトとしても不正）になる。吸収元（スキル shiori-handlers.md L22 ほかの登録パターン、book lua/patterns.md L96〜L104）の `return RES.ok(…)` の書き方と矛盾し、ソースの使用例・コメント・テストは `RES.ok(…)` を返す書き方を意図している | X19 の確定。マニュアル（2.6 lua/shiori-events.md の REG 節）に収録するのは「文字列を返すと 200、nil で 204、シーンのコルーチンも返せる」の部分だけ。`RES.ok(…)`・`RES.no_content()` を返す例は書かない（X19 の訂正対象はこの方針で直す） |
+| U24 | 改行を含む引用文字列: `「…」`・`"…"` の文字列は閉じの囲みまで改行をまたいで取り込まれる。改行を含む値は生成 Lua の `"…"` リテラルに改行がそのまま入り、ロード時に Lua の構文エラー（`unfinished string`）になって、ゴーストの Lua ランタイムの初期化全体が失敗する。同じ理由で、1 ファイルに空文字列 `""` を 2 つ以上書くと、最初の `""` が空文字列ではなく `""` 囲みの開始になり、次の `""` までを（改行を含めて）取り込んで同じロード失敗になる | pest:`string_contents = @{ (!PEEK ~ ANY)+ }`（改行を除かない）・`string_literal = _{ string_fenced \| string_blank }`（`slfence_en = _{ PUSH("\""+) }` が `""` を囲みとして先に試す）、dsl:parser/parse_action.rs（`Rule::string_contents` をそのまま `Expr::String`）、lua:string_literalizer.rs `needs_long_string`（`\` と `"` だけを見て、改行を含む値も `"…"` で出力する）。実測: `＄s＝"a`＋改行＋`b"`・`＄s＝「a`＋改行＋`b」` → `load: ERR … unfinished string near '"a'`（`pasta.scene_dic` のロード失敗）。`＄f＝""` と `＄g＝""` の 2 行 → 同じロード失敗（`＄f＝""` が 1 つだけなら空文字列） | バグ候補（a）: パースもトランスパイルも通る構文が、ロード時のエラーでゴースト全体を起動不能にする | D07 の確定（「改行入り `"` 文字列でロード失敗」を `「」` 囲みと `""` の 2 回使用まで広げた）。マニュアルには引用文字列が改行を含められるとは書かない。空文字列の例は `「」` で書く（`""` は 2 つ目でこの挙動に当たる） |
+| U25 | 単語値の `「」`・`""`: 単語定義の値に書いた `「」`・`""` は空文字列にならず、その 2 文字（`「」`・`""`）が候補の値になる。変数代入や引数などの式に書いた `「」`・`""` は空文字列になる | pest:`string_blank = @{ "\"\"" \| "「」" }`（`word` も `expr` も `string_literal` 経由で受け付ける）、dsl:parser/parse_elements.rs（単語値は `Rule::string_blank` の字面 `as_str()` をそのまま値にする。属性値の `parse_attr` も同じ）、dsl:parser/parse_action.rs（式では `Rule::string_blank` → `Expr::BlankString`）。実測: `＠w：x、「」` → `entry("x", "「」")`、`＠v：""` → `entry([[""]])`、出力は `「」`・`""`。`＄e＝「」`・`＄f＝""` → `var.e = ""`（空） | バグ候補（b）: 同じ空文字列リテラルが式では空、単語値では囲み文字そのものになり、「外側の `「」` は単語値の区切り」（GRAMMAR.md L517）・「引用符で囲まれた中身が文字列」（doc/spec ch05 L18、book literals.md L45）の規範記述と矛盾する | D07 の確定。マニュアルには単語値の空文字列の書き方を載せない。式の `「」` が空文字列になることは literals.md に書く（`""` は U24 に当たるため例にしない） |
+| U26 | pasta.toml の `[lua]` セクション: `[lua] libs` はロード時に読まれず、書いても Lua 標準ライブラリ・mlua-stdlib モジュールの構成は既定のまま変わらない（`"env"` を足しても `@env` は使えず、既定に含まれる `@json` などは外せない） | lua:loader/mod.rs `PastaLoader::load`（`load_with_config(base_dir, RuntimeConfig::new())`）、crates/pasta_shiori/src/shiori.rs（SHIORI のロードも `RuntimeConfig::new()` から作る）、lua:loader/config/mod.rs `PastaConfig::lua`（呼び出し元なし）、lua:runtime/runtime_config.rs `From<LuaConfig> for RuntimeConfig`（ロード経路から呼ばれない）、lua:loader/config/sections.rs `LuaConfig` の doc コメント（`[lua]` セクションで有効にするライブラリを構成すると明記）。実測: `[lua] libs = ["std_all", "env"]` で `require "@env"` は失敗し、`@json` は読める | バグ候補（b・c）: 吸収元（スキル pasta-toml.md L49・L145〜L146 の `[lua]` 既定値と節、runtime-api.md L655「`libs` 配列に `"env"` エントリを追加」）と矛盾し、ソースの doc コメントも `[lua]` が構成を決めると明記している | X18 の確定。マニュアル（2.5・2.7）は `[lua]` が効くとは書かず、`@env` は通常のゴーストから有効にできないことだけを書く（X18 の結論どおり） |
+| U27 | 選択肢の自動ルーティングの探索範囲: 既定の `REG.OnChoiceSelectEx` は、明示の `＊OnChoiceSelectEx` シーンが無いとき、選択 ID（Reference0）を直前に実行したグローバルシーンのローカルシーンからだけ前方一致で探す。グローバルシーンへはフォールバックせず、見つからなければ 204。シーンをまだ 1 つも実行していない（`STORE.last_global_scene` が nil の）ときだけグローバルシーンから探す | ps:pasta/shiori/event/choice_select.lua `REG.OnChoiceSelectEx`（`SCENE.search(choice_id, STORE.last_global_scene)`。L56 のコメントは「ローカル→グローバル、3.1/3.4」）、ps:pasta/scene.lua `SCENE.search` → lua:search/context.rs `search_scene`（親シーン名ありは「Local-only search … (no global fallback)」）、ps:pasta/act.lua（L181 で `STORE.last_global_scene` を更新）。完了済み仕様 `.kiro/specs/completed/choice-definition-dsl/requirements.md` 要件 3.4 は「ローカル → グローバルの順で前方一致検索」。実測: OnTest（ローカル「ローカル先」とグローバル「行き先」の選択肢）の後、選択 ID `ローカル先` → 200（`L`）、`行き先` → 204 | バグ候補（b・c）: 完了済み仕様の要件 3.4 と吸収元（スキル SKILL.md L276「ローカルシーン → グローバルシーンの順で検索」、authoring-patterns.md L347）に矛盾し、ソースのコメント（choice_select.lua L56）とも食い違う | D03 の確定。マニュアル（2.6 lua/shiori-events.md の OnChoiceSelectEx 節）に収録するのは「明示の `＊OnChoiceSelectEx` が優先」「選択 ID と同名のローカルシーン（直前のグローバルシーン内）を前方一致で自動実行し、見つからなければ 204」の部分。グローバルシーンへのフォールバックの有無は書かない（D03 の訂正対象 ga/SKILL.md L276・authoring-patterns.md L347 は、フォールバックの順序に触れない記述へ直す） |
 
 ## 食い違い grep 記録
 
@@ -1447,4 +1453,126 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 ## 将来仕様の仕分け表
 
-タスク 1.4 が記入する（ch08・ch12 の各項目の区分 M／B／R／除外と行き先、マニュアル既存の「将来変更あり」節の振り分け）。
+`doc/spec/` ch08・ch12 の各見出しと、台帳本体で「→1.4」と申し送った項目を、design.md「FutureSpecRouting」の仕分け規則で分類し、行き先を確定する（要件 1.3, 1.4）。
+
+- 区分: **M**（現行実装で確認できる事実 → マニュアルへ収録）／**B**（構文が定義され範囲が明確な未実装機能 → brief 起票＋roadmap のキー行）／**R**（方針未定・DSL 範囲外の留保 → roadmap のキー行のみ）／**除外**（理由を記す）。仕分けは優先度でなく具体度で行う。
+- 1 つの見出しが現行挙動と未実装の部分を併せ持つときは、部分ごとに行を分ける（吸収元列に部分を括弧書きする）。M が実装で確認できない部分は R へ倒した（design の規則）。design の仕分け結果表に無い R4〜R6 は、この規則で追加したもの。
+- 行き先の `B1`・`R1` などは下の「B・R の行き先（大タスク 6 への申し送り）」の ID。M の行き先は収録先表と台帳本体の該当行に従う（`章#節` は台帳本体と同じ書き方）。
+- 実装照合: コミット `2d98dcf4` の実装を、付録と同じスクラッチの検証プログラムで動かした結果（`d95e12f2` から crates 配下は変わっていない）。略記は凡例「実装照合列の略記」と同じ。
+
+### design #14 の前提の訂正（アクタースコープ内コードブロック）
+
+design.md（ContentMigration の「マニュアル既存の『将来変更あり』節の整理」と決定 #14）は、アクタースコープ内のコードブロックを「構文が受理されるが処理に反映されない」ものとして扱う。実装照合の結果、この前提は誤りだった（X12・台帳本体 ch11 L91 行の備考）。実装を正とし、次の現行挙動に基づいて仕分ける。
+
+- 出力: 識別子が小文字の `lua` と完全一致するブロックだけが、そのアクターの `do` ブロック内（単語定義の後）に出力され、辞書のロード時に実行される。ブロック内では局所変数 `ACTOR`（そのアクターの表）を使える。識別子が `text`・`Lua` のブロックや識別子なしのブロックは何も出力されない（シーン内の Lua ブロックが識別子を問わず出力されるのと異なる）。
+- 到達: `ACTOR.名前` に入れた値は、そのアクターのアクション行の単語参照 `＠名前` で A1（アクター表の完全一致）として最優先に見つかる。関数ならアクタープロキシ（`.actor` にアクター、`.act` に act）を唯一の引数として呼ばれ、戻り値が出力される。関数以外は `tostring` した値が出力される。
+- 届かない経路: アクション行の関数呼び出し `＠名前（）`（式の検索は A1・A2 を通らず L1〜L5 だけを探す）、アクターなしの単語参照（`＄x＝＠名前` など）、SHIORI イベントからは届かない。
+- 実装照合: pest:`actor_scope_item`（`code_scope`）・`` code_open = _{ PUSH("`"{3,}) ~ id? ~ eol } ``、dsl:parser/parse_elements.rs（識別子をそのまま `language` に入れる）、gen:scope `generate_actor`（`language.as_deref() == Some("lua")` のときだけ `generate_code_block`）と `generate_global_scene`（シーン内のブロックは無条件に出力）、ps:pasta/actor.lua `PROXY_IMPL.find_actor_handler`（`mode ~= "word"` なら nil。A1 は `self.actor[key]`）・`PROXY_IMPL.word`（関数なら `handler(self)`、他は `tostring`）、gen:elem `generate_action`（`＠名前（）` は `act.アクター:expr_fn`）。テスト: crates/pasta_lua/src/code_gen/scope_gen_tests.rs `actor_skips_empty_words_and_non_lua_code_blocks`、crates/pasta_dsl/tests/actor_code_block_test.rs。
+- 実測: `％さくら` 直下の ```` ```lua ```` で `function ACTOR.挨拶(p, ...)`（引数の種類と個数を返す）と `ACTOR.値 = "VAL"` を定義し、```` ```text ````・識別子なし・```` ```Lua ```` のブロックでも別の値を定義した。`さくら：[＠挨拶][＠値][＠テキスト][＠無印][＠大文字]` → `[ARG=proxy:さくら:0][VAL][][][]`。`さくら：[＠挨拶（）]` → `[]`。`＄x＝＠挨拶` の後の `[＄x]` → `[]`。
+- 帰結: `grammar/actor-dictionary.md`「コードブロック（将来変更あり）」は「現行挙動へ書き換え」とし、上の出力・到達・届かない経路を書く。ch11 §11.5 が予定する「アクター固有のイベントハンドラ・状態管理関数」という用途のうち、現行挙動を超える部分（イベント・式の呼び出しからの到達、アクター単位の状態の扱い）を R2 とする。design の仕分け結果表の「§11.5 … R（現行挙動は actor-dictionary.md へ）」という行き先は変えず、マニュアルへ書く現行挙動の内容だけを訂正する。
+
+### ch08 の仕分け
+
+| 吸収元（見出し） | 区分 | 行き先 | 実装照合 | 備考 |
+| ---------------- | ---- | ------ | -------- | ---- |
+| L1 8. 属性（Attribute） | 除外 | 章題（各節の行で仕分ける。章の受け皿は grammar/block-structure.md#属性） | 不要（章題） | — |
+| L3 8.1 構文 | M | grammar/block-structure.md#属性（`＆名前：値`。1 行に複数並べられる。値は整数・小数・引用文字列・引用なし文字列） | pest:`attr`・`attrs = attr+`・`attr_value` | 台帳本体 ch08 L3 行 |
+| L9 8.2 配置ルール（配置と制約） | M | grammar/block-structure.md#属性（属性行を置けるのはグローバルシーン初期部・ファイルレベル・アクタースコープ。シーン宣言行への付記はグローバル・ローカルとも可。ローカルシーン宣言の次の行には置けない） | pest:`global_scene_attr_line`・`file_attr_line`・`actor_scope_item`・`local_scene_line`（`scene = _{ id ~ s ~ attrs? }`）。実測は D09 | 食い違い表「属性行の配置」（D09）。アクタースコープ配下の属性行は U13 |
+| L9 8.2 配置ルール（セマンティクス「直前のシーンにメタデータを付与」） | B | B1（`.kiro/specs/scene-attribute-semantics/brief.md`＋roadmap キー行） | lua:context.rs `register_global_scene`（シーン自身の属性をシーン登録表に記録）、core:scene_table.rs `filter_by_attributes`（絞り込みの処理はある）、lua:search/context.rs `search_scene`（常に空の `filters` で検索）、gen:scope `generate_global_scene`（属性を Lua に出力しない）。実測: `＆警報：レッド`・`＊会話＆温度：暑い`・`＆作者：A`・`・ローカル＆優先：3` を含む辞書の生成 Lua に属性は現れない | 現行挙動（受理され、内部の登録表に記録されるが、シーンの選択・出力に影響しない）は M として grammar/block-structure.md#属性 へ |
+| L32 8.3 ファイルレベル属性（構文と現行挙動） | M | grammar/block-structure.md#属性（ファイルレベルの属性行は受理され、後続のグローバルシーンの属性と統合されるが、処理には使われない） | lua:transpiler.rs `merge_attrs`、gen:scope `generate_global_scene`（`_file_attrs` は未使用） | 台帳本体 ch08 L32 行 |
+| L32 8.3 ファイルレベル属性（継承のセマンティクス） | B | B1（`.kiro/specs/scene-attribute-semantics/brief.md`＋roadmap キー行） | lua:transpiler.rs `merge_attrs`（統合の結果を使う処理が無い） | 「将来予約」の扱いは B1 の brief で決める |
+| （章末）関連章 | 除外 | doc/spec の章間ナビゲーション | 不要（ナビゲーション） | — |
+
+### ch12 の仕分け
+
+| 吸収元（見出し） | 区分 | 行き先 | 実装照合 | 備考 |
+| ---------------- | ---- | ------ | -------- | ---- |
+| L1 12. 未確定事項・検討中の仕様 | 除外 | 章題（各節の行で仕分ける） | 不要（章題） | — |
+| L3 12.2 チェーントーク（DSL非採用） | M | grammar/call-jump.md#特殊な呼び出し（`＞チェイントーク`・`＞yield` による現行の実現方法で置き換える） | ps:pasta/global.lua（`GLOBAL.yield`・`GLOBAL["チェイントーク"]`）、ps:pasta/act.lua `ACT_IMPL.yield` | design の「M（置換）」 |
+| L9 12.4 ローカルシーンのパラメータ（将来検討） | R | R1（roadmap キー行） | pest:`scene = _{ id ~ s ~ attrs? }`（宣言にパラメータの構文が無い） | シーンへの値の受け渡しの現行挙動（Call の引数 U04・シーン引数 `＄０` U03）は M として grammar/call-jump.md#引数リスト・grammar/variables.md#シーン引数 へ |
+| L15 12.5 フィルター機能の詳細（初期版対応なし） | B | B1（`.kiro/specs/scene-attribute-semantics/brief.md`＋roadmap キー行） | pest:`call_scene = { call_marker ~ (id \| call_target_expr) ~ s ~ args? }`（`＆` を受ける規則が無い）。実測: `＞X＆k＝v` → パースエラー（`expected args`） | マニュアル grammar/call-jump.md「フィルター」節は削除（下の振り分け表）。OR/AND の結合も B1 |
+| L21 12.6 単語定義の値の型変換ルール（初期版） | M | grammar/literals.md・grammar/words.md#グローバル単語定義（台帳本体 ch12 L21 行） | pest:`words`・`word`、gen:elem `generate_word_definition` | 吸収元の空白区切りの例は誤り（D08）。単語値の `「」`・`""` は U25（バグ候補） |
+| L31 12.7 動的単語参照（＠＄var_name）の実装スケジュール | B | B2（`.kiro/specs/dynamic-word-reference/brief.md`＋roadmap キー行） | pest:`word_ref = word_marker ~ id ~ s`（`＠＄` の規則が無い）。実測: `さくら：[＠＄x]`・`＄y＝＠＄x` → パースエラー（`expected id`） | 「未実装期間は無視または警告」の方針も実装されていない（現行はパースエラー）。brief で扱う |
+| L37 12.8 Callの戻り値と変数代入（DSL非定義） | R | R3（roadmap キー行） | pest:`set`（`＞` を値に取らない） | — |
+| L43 12.9 ローカル変数のスコープ詳細（トランスパイラ/ランタイム） | 除外 | `ctx.local`／`ctx.global` は `var`／`save` に置き換わった旧方針。現行挙動は grammar/variables.md#ローカル変数・#グローバル変数（台帳本体 ch09 の行で収録） | gen:elem `resolve_var_path`（`var.`・`save.`・`args[n]`） | design の仕分け結果表どおり |
+| L50 12.10 属性値の型解釈（値の型） | M | grammar/literals.md（台帳本体 ch12 L50 行） | dsl:parser/parse_elements.rs `parse_attr`・`parse_attr_number` | — |
+| L50 12.10 属性値の型解釈（フィルターの比較演算との整合） | B | B1（`.kiro/specs/scene-attribute-semantics/brief.md`＋roadmap キー行） | pest:`call_scene`（フィルターが無い）、pest:`bin_op`（式に比較演算子が無い。X04） | — |
+| L55 12.11 前方一致時の複数候補選択ルール（DSL非定義） | M | grammar/call-jump.md#スコープ解決アルゴリズム（ローカル優先・シャッフル＆順次消費） | core:scene_table.rs `collect_scene_candidates`、core:random.rs | 食い違い表「ローカル／グローバル候補」（D03） |
+| L59 12.12 引数リストの値の型解釈 | M | grammar/literals.md・grammar/call-jump.md#引数リスト（引数は式。「文字列/リテラルのみ推奨」は現行の式の受理範囲で置き換える） | pest:`arg`・`key_expr`・`positional_arg = { expr }` | 食い違い表「引数」（D06） |
+| L64 12.13 行継続のインデント深さ制約 | M | grammar/action-line.md#行継続（継続は `：` 始まり。深さは問わない） | pest:`continue_action_line`、gen:elem `generate_continue_action` | 食い違い表「行継続」（D01） |
+| L69 12.14 コメント行の配置可能位置 | M | grammar/block-structure.md#コメント | pest:`blank_line`（全スコープの項目に含まれる） | 行末コメントは U05、単語定義行の行末は U06（バグ候補） |
+| L74 12.15 識別子と予約語の制限（DSL外） | M | grammar/variables.md#Lua 予約語の制約 | gen:elem `resolve_var_path` | — |
+| L80 12.16 Sakuraスクリプト括弧内のエスケープ（確定）（引用・`""`・非ネストの透過） | M | grammar/sakura-script.md#角括弧内のエスケープと引用 | pest:`sakura_args`・`sakura_body`・`sakura_str`（`"…"` 内の `""`） | 台帳本体 ch12 L80 行 |
+| L80 12.16 Sakuraスクリプト括弧内のエスケープ（確定）（`\]`・`\%` のエスケープ） | R | R4（roadmap キー行） | pest:`sakura_body = @{ ( sakura_str \| (!PEEK ~ ANY) )* }`（`"…"` の外では最初の `]` で閉じる）・`sakura_id`（`%` を含まない）。実測: `\s[a\]b]` は `\s[a\]` と台詞 `b]` に分かれる（X08）、`さくら：100\%です` → パースエラー | ukadoc の `\\`（`\` の表示）は U08（バグ候補）でマニュアルに書かない |
+| L109 12.17 ファイルエンコーディングとBOM（UTF-8 固定と BOM 付きの現行挙動） | M | grammar/block-structure.md#文字コード（UTF-8 固定。BOM 付きの `.pasta` はパースエラー） | lua:loader/process.rs（`fs::read_to_string`）→ dsl:lib.rs `parse_str`。実測は X13 | — |
+| L109 12.17 ファイルエンコーディングとBOM（「BOM は許容」） | R | R5（roadmap キー行） | 同上（BOM を除く処理が無い） | 実測で否定（X13） |
+| L114 12.18 ファイルレベル属性の継承詳細 | B | B1（`.kiro/specs/scene-attribute-semantics/brief.md`＋roadmap キー行） | lua:transpiler.rs `merge_attrs`（統合はするが利用されない） | 現行挙動は ch08 L32 行（M） |
+| L119 12.19 空行の配置と解釈（空行は無視） | M | grammar/block-structure.md#空行（空行はどこでも無視。継続中も何も出力しない） | pest:`blank_line` | — |
+| L119 12.19 空行の配置と解釈（継続領域の空行の糖衣構文） | R | R6（roadmap キー行） | pest:`blank_line`（継続中の空行の専用規則が無い）。実測は D02 | 食い違い表「継続内の空行」 |
+| L124 12.20 全角・半角混在時の正規化 | M | grammar/markers.md 冒頭本文（全角と半角は同等。`＠＠`・`＄＄` は 2 文字目を出力） | pest:`at_escape = @{ at{2} }`・`dollar_escape`、gen:elem `generate_action` | `＄＄` は U07 |
+| （章末）更新履歴・関連章 | 除外 | doc/spec の版管理とナビゲーション（履歴は git が保持） | 不要（履歴） | — |
+
+### ch08・ch12 以外で仕分けた見出し
+
+| 吸収元（見出し） | 区分 | 行き先 | 実装照合 | 備考 |
+| ---------------- | ---- | ------ | -------- | ---- |
+| `11-actor-dictionary.md` L91 11.5 将来拡張（コードブロック）（現行挙動） | M | grammar/actor-dictionary.md#コードブロック（「design #14 の前提の訂正」の出力・到達・届かない経路） | 「design #14 の前提の訂正」の実装照合 | design #14 の「処理に反映されない」を訂正 |
+| `11-actor-dictionary.md` L91 11.5 将来拡張（コードブロック）（アクター固有のイベントハンドラ・状態管理という用途） | R | R2（roadmap キー行） | ps:pasta/actor.lua `PROXY_IMPL.find_actor_handler`（word 以外は nil） | design の仕分け結果表の §11.5 行 |
+| `04-call-spec.md` L81 4.2 フィルター（属性フィルター） | B | B1（`.kiro/specs/scene-attribute-semantics/brief.md`＋roadmap キー行） | pest:`call_scene` | 台帳本体の行で除外済み。内容の行き先として記録 |
+
+### B・R の行き先（大タスク 6 への申し送り）
+
+大タスク 6 は、B の各行を brief として起票し、B・R の全行を roadmap の「将来仕様（doc/spec 廃止時の申し送り）」小節に 1 項目 1 行（名称 — 要旨 — brief 参照 or（brief なし））で書く。バグ候補のキー行は付録「未記載の実装事実」のバグ候補 13 行から作る（本表には含めない）。
+
+| ID | 区分 | 名称 | 要旨（roadmap キー行の内容） | 行き先 |
+| -- | ---- | ---- | -------------------------- | ------ |
+| B1 | B | シーン属性のセマンティクス | 属性によるシーンへのメタデータ付与、ファイルレベル属性の継承と上書き（ローカルシーンには影響しない）、Call の属性フィルター（`＞シーン＆k＝v`・比較演算子・複数条件の結合）。現行は構文の受理と内部の登録表への記録まで | `.kiro/specs/scene-attribute-semantics/brief.md`＋roadmap キー行 |
+| B2 | B | 動的単語参照 `＠＄` | `＠＄変数名` で変数の値を単語名として参照する。現行はパースエラー。未実装期間の扱い（無視・警告）も未定 | `.kiro/specs/dynamic-word-reference/brief.md`＋roadmap キー行 |
+| R1 | R | シーンのパラメータ | シーン宣言での名前付きパラメータ。対応予定なし。現行は Call の位置引数とシーン引数 `＄０`… で代替できる | roadmap キー行（brief なし） |
+| R2 | R | アクタースコープ内コードブロックの用途 | アクター固有のイベントハンドラ・状態管理関数としての用途。現行は `lua` ブロックで定義した値・関数がアクター付きの単語参照（A1）から使えるだけで、式の呼び出し・イベントからは届かない | roadmap キー行（brief なし） |
+| R3 | R | Call の戻り値と変数代入 | `＄x＝＞シーン` のような呼び出し結果の代入。DSL では定義せず、ランタイム設計の領域 | roadmap キー行（brief なし） |
+| R4 | R | さくらスクリプトの `\]`・`\%` | 角括弧内の `\]`（`]` を文字として含める）と `\%` を DSL から書けるようにするか。現行は `\]` を特別扱いせず、`\%` はパースエラー | roadmap キー行（brief なし） |
+| R5 | R | BOM 付きファイルの受理 | UTF-8 の BOM 付き `.pasta` を受理するか。現行はパースエラー | roadmap キー行（brief なし） |
+| R6 | R | 継続行内の空行の糖衣構文 | 行継続の途中の空行を改行として出力する糖衣構文。現行は何も出力しない | roadmap キー行（brief なし） |
+
+### マニュアル既存の「将来変更あり」節の振り分け
+
+| 節（`book/src/` 相対） | 振り分け | 実装照合 | 書き換え後の内容・移送先 | 担当 |
+| ---------------------- | -------- | -------- | ------------------------ | ---- |
+| grammar/call-jump.md「フィルター（将来変更あり）」（L109〜L119） | 削除して brief へ | pest:`call_scene`（`＆` を受けない）。実測: `＞X＆k＝v` → パースエラー | 節ごと削除する。比較演算子による拡張の予告を含め、内容は B1 へ移す | 2.2（削除）・6（brief） |
+| grammar/words.md「動的単語参照（将来変更あり）」（L96〜L100） | 削除して brief へ | pest:`word_ref`（`＠＄` の規則が無い）。実測: `＠＄x` → パースエラー | 節ごと削除する。内容は B2 へ移す | 2.3（削除）・6（brief） |
+| grammar/block-structure.md「属性（将来変更あり）」（L112〜L129） | 現行挙動へ書き換え | ch08 L3・L9・L32 行の実装照合 | 見出しから「（将来変更あり）」を外し、構文（ch08 L3 行）・配置（ch08 L9 行）・処理（受理され、内部の登録表に記録されるが、シーンの選択・出力に影響しない。ファイルレベル属性も統合されるだけで使われない）を書く。「将来予定」の注記と doc/spec へのリンクは削除し、継承・フィルターの意味論は書かない（B1） | 2.1 |
+| grammar/index.md「網羅範囲についての注記」の属性注記（L80） | 現行挙動へ書き換え | 同上 | 「属性の構文は受理されるが処理には反映されない（詳細は block-structure の属性節）」という現行挙動の注記にし、「将来予定」「将来変更あり」の文言と doc/spec ch08 への言及を外す | 2.1 |
+| grammar/actor-dictionary.md「コードブロック（将来変更あり）」（L149〜L164） | 現行挙動へ書き換え | 「design #14 の前提の訂正」の実装照合（X12） | 見出しから「（将来変更あり）」を外し、「design #14 の前提の訂正」の出力・到達・届かない経路を書く。例は `function SCENE.on_actor_event(act)` をやめ、`ACTOR.名前` に値・関数を入れて `アクター：＠名前` で使う形にする（フェンスは行頭。D10）。アクター固有のイベントハンドラという用途の予告は書かない（R2） | 2.3 |
+| introduction.md「安定機能と『将来変更あり』の区別について」（L30〜L37） | 定義の書き換え（節は残す） | book/tools/verify-content.mjs `F-future`（introduction に「将来変更あり」の注記があることを検査） | 表記と `F-future` 検査は残し、定義を「現行挙動だが将来変わり得る箇所の注記」に限定する（未実装機能の予告には使わない。design #14） | 2.8 |
+
+- `introduction.md`「安定機能と『将来変更あり』の区別について」は「削除・書き換え」の二択の対象外（定義の書き換えのみ）。design #14 のとおり表記と `verify-content.mjs` の `F-future` 検査は残し、定義を「現行挙動だが将来変わり得る箇所の注記」とする。現在の定義文（「未確定・実装予定…」）は #14 の定義と合わないため書き換えが要る。担当は 2.8（導入章の定義整理）。
+- 上の 5 節を処理すると、`book/src` の「将来変更あり」は `introduction.md` の定義だけになる（2026-10-01 時点の grep: 上記 5 節と `introduction.md` L30・L36〜L37 のみ）。
+
+### 「→1.4」申し送りの解決
+
+台帳本体の備考・収録先列で 1.4 へ申し送った行と、それを確定させた仕分けの対応。
+
+| 台帳行 | 確定させた仕分け | 結論 |
+| ------ | ---------------- | ---- |
+| `02-markers.md` L135 | ch12 L31 行（B2） | `＠＄` はマニュアルの単語参照から削除し B2 へ |
+| `02-markers.md` L170 | ch12 L15 行（B1） | Call のフィルターは構文として受理されない。B1 へ |
+| `02-markers.md` L272 | ch12 L50 行（フィルターの比較演算との整合、B1） | フィルター用の比較演算子は B1。現行の式に比較演算子は無い（X04） |
+| `04-call-spec.md` L81 | 「ch08・ch12 以外で仕分けた見出し」の同行（B1）・振り分け表 grammar/call-jump.md | 節を削除し B1 へ |
+| `08-attributes.md` L32 | ch08 L32 行（M・B1） | 構文と統合までは M、継承の意味論は B1 |
+| `10-words.md` L38 | ch12 L31 行（B2） | `＠＄` は B2 |
+| `11-actor-dictionary.md` L91 | 「ch08・ch12 以外で仕分けた見出し」の同行（M・R2）・「design #14 の前提の訂正」 | `lua` ブロックは出力され A1 で到達する（現行挙動へ書き換え）。用途は R2 |
+| `12-future.md` L1 | ch12 L1 行（除外） | 章題。各節を仕分けた |
+| `12-future.md` L9 | ch12 L9 行（R1） | R1 |
+| `12-future.md` L15 | ch12 L15 行（B1） | B1 |
+| `12-future.md` L31 | ch12 L31 行（B2） | B2 |
+| `12-future.md` L37 | ch12 L37 行（R3） | R3 |
+| `12-future.md` L43 | ch12 L43 行（除外） | 旧方針。現行挙動は variables.md |
+| `12-future.md` L114 | ch12 L114 行（B1） | B1 |
+| `grammar-model.md` L184 | ch08 L32 行（M・B1） | 構文と統合までは M、継承は B1 |
+| `call-spec.md` L8 | ch12 L15 行（B1） | フィルター付きの行を削除し B1 へ |
+| `call-spec.md` L46 | ch12 L15 行（B1） | B1 |
+| `words.md` L65 | ch12 L31 行（B2）・振り分け表 grammar/words.md | 節を削除し B2 へ |
+| 食い違い grep 記録 D05 | 振り分け表 grammar/call-jump.md（削除して brief へ）・B1 | 節の削除は 2.2、brief は 6 |
+| 食い違い grep 記録 X12、「→1.3」申し送りの解決の `11-actor-dictionary.md` L91 行、「台帳本体と異なる結論」の X12 | 「design #14 の前提の訂正」 | 実装が正。書き方は振り分け表 grammar/actor-dictionary.md |
+| 「台帳本体と異なる結論」末尾の新規バグ候補 5 件（X19・D07 ×2・X18・D03） | 付録 U23〜U27 | 5 件ともバグ候補。収録する現行挙動の範囲は各行の備考 |
