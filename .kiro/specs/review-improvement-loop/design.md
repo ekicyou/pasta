@@ -290,7 +290,7 @@ stateDiagram-v2
 | `pyproject.toml` 等（移植先で遭遇時） | 当該エコシステム | 当該標準ツール |
 
 - **領域分割規則**: トップレベル構成単位（クレート・パッケージ・資産ディレクトリ）を最小粒度とし、src 実測行数が約 3,000 行を超える単位はサブモジュール境界（ディレクトリモジュール）で細分化する。1 ディスパッチの点検対象は約 2,000 行以下を目安とする（R1.3）
-- **セル生成**: 領域 × 次元グループ（後述 5 グループ）でセルを生成。小領域（<1,500 行）はグループを統合し 1〜3 セルに圧縮。横断 D7（サプライチェーン・台帳同期・drift-check）は全体セル 1 件に集約
+- **セル生成**: 領域 × 次元グループ（後述 5 グループ）でセルを生成。小領域（<1,500 行）はグループを統合し 1〜3 セルに圧縮。横断 D7（サプライチェーン・台帳同期・マニュアル整合検査 link-check／tutorial-check／gen-skill-refs --check）は全体セル 1 件に集約
 - **matrix.md 生成**と **tasks.md への GENERATED-CELLS 追記**（書式は Data Models 参照）。追記後にチェックボックス書式の機械検証を行うこと（書式崩れの即時検出）
 
 **本リポジトリでの予想インスタンス（拘束ではなく目安）**: Rust 6 クレート＋pasta_lua サブモジュール約 6 領域＋Lua 資産 1〜2＋VSCode 拡張 1＋book/tools 1 ≒ 15〜17 領域、総セル数 ≈ 55〜65
@@ -404,7 +404,7 @@ kiro-impl は Blocked タスクの変更を残置して次タスクへ進むた�
 | Rust クレート | `cargo test -p {crate}` | `cargo test --workspace` | `cargo clippy -p {crate} --all-targets` | `cargo audit` / `cargo deny check` |
 | Lua 資産 | `cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` | 同左＋workspace | luacheck（.luacheckrc） | —（cargo audit が包含） |
 | VSCode 拡張 | `npm run test`（editors/vscode） | compile+lint+test | `npm run lint` | `npm audit` |
-| book/tools | `node book/tools/{tool}/*-test.mjs` | drift-check＋tutorial-check 含む全ツールテスト | —（N/A 記録） | `npm audit`（book/） |
+| book/tools | `node book/tools/{tool}/*-test.mjs` | link-check＋tutorial-check＋`gen-skill-refs --check` 含む全ツールテスト | —（N/A 記録） | `npm audit`（book/） |
 
 > すべての cargo コマンドには環境制約表の無害化（`NoDefaultCurrentDirectoryInExePath`・`PASTA_DEBUG`・`PASTA_DEBUG_PORT` 解除）をコマンド文字列として織り込む。
 

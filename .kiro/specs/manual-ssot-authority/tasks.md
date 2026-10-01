@@ -234,7 +234,7 @@
   - 完了状態: doc/spec が存在せず、GRAMMAR.md が告知と URL のみで、リンク検証とコンテンツ検証が緑のまま
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 10.2_
 
-- [ ] 8. 現行文書の参照修正（P7）
+- [x] 8. 現行文書の参照修正（P7）
 - [x] 8.1 (P) steering の grammar.md を非規範の要約へ縮小する
   - 「このドキュメントの役割」（権威はマニュアル・食い違い時はマニュアルが正）・マーカー一覧・よくある間違い・IR 出力のみを残し、他の節を削る。残す節も食い違い表に照らして訂正する
   - 完了状態: grammar.md が「完全参照」を名乗らず、残す 4 節のみで構成されている
@@ -257,7 +257,7 @@
   - _Requirements: 9.4, 9.1, 9.2_
   - _Boundary: ReferenceRepair（book/AUTHORING.md）_
 
-- [ ] 8.4 (P) review-improvement-loop の今後の指示を参照修正する
+- [x] 8.4 (P) review-improvement-loop の今後の指示を参照修正する
   - 文書整合タスクの確認対象・ツールのテストコマンド表・未完了セルと未完了タスクの記述のみを修正し、完了記録と reports は残す
   - 完了状態: 同 spec の残存する doc/spec・GRAMMAR.md・drift-check の行がすべて完了記録か reports である
   - _Requirements: 9.1, 9.2, 9.6_

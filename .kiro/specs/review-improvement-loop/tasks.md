@@ -38,7 +38,7 @@
   - design.md「領域発見プロトコル」の資産カテゴリ検出規則（マニフェストファイルの存在からのエコシステム検出 — 事前定義の固定領域リストは使用禁止）により、対象リポジトリの全ソース資産カテゴリを実行時に発見する（移植先でも同一規則で再発見できること）
   - 各資産カテゴリの品質検証インフラ（テスト・lint・監査ツール）を検出し、Task 1 の正準コマンド表と突き合わせる
   - 領域分割規則を適用する: トップレベル構成単位（クレート・パッケージ・資産ディレクトリ）を最小粒度とし、src 実測行数が約 3,000 行を超える単位はサブモジュール境界で細分化する（1 ディスパッチの点検対象 ≦ 約 2,000 行）
-  - 領域 × 次元グループ（G1〜G5 — design.md「次元グループ定義」）でセルを生成する。小領域（<1,500 行）はグループ統合で 1〜3 セルに圧縮し、横断 D7（サプライチェーン監査・台帳同期・drift-check）は全体セル 1 件に集約する
+  - 領域 × 次元グループ（G1〜G5 — design.md「次元グループ定義」）でセルを生成する。小領域（<1,500 行）はグループ統合で 1〜3 セルに圧縮し、横断 D7（サプライチェーン監査・台帳同期・マニュアル整合検査 link-check／tutorial-check／gen-skill-refs --check）は全体セル 1 件に集約する
   - matrix.md を生成する（design.md「matrix.md スキーマ」準拠。全セル PENDING・実行開始日時・ベースラインコミット hash を記録）
   - 本ファイル下方の GENERATED-CELLS マーカー区間へ 3.x サブタスクを追記する。書式は design.md「Data Models › tasks.md GENERATED-CELLS 追記書式」のコードブロックに**逐語準拠**する（固定部の編集は禁止）
   - 再実行時は GENERATED-CELLS 区間をクリアしてから再生成する（冪等）
@@ -794,7 +794,7 @@
 
 - [x] 5. ドキュメント整合性の確認と完了検証
 - [x] 5.1 ドキュメント整合性の確認と更新
-  - 改善ループの成果と以下のドキュメントの整合性を確認・更新する: SOUL.md（コアバリュー・設計原則との整合）/ doc/spec/（該当する場合）/ GRAMMAR.md（該当する場合）/ TEST_COVERAGE.md（ループで追加したテストのマッピング）/ クレート README（該当する場合）/ steering/*（該当領域）/ .agents/skills/pasta-ghost-authoring・pasta-lua-coding（DSL 文法・Lua API 変更時のみ — 本ループは外部仕様を変更しないため通常「該当なし」）
+  - 改善ループの成果と以下のドキュメントの整合性を確認・更新する: SOUL.md（コアバリュー・設計原則との整合）/ マニュアル book/src/（利用者向け情報〈文法・公開 Lua API・pasta.toml〉の権威。DSL 文法・Lua API・設定の変更時のみ — 本ループは外部仕様を変更しないため通常「該当なし」）/ TEST_COVERAGE.md（ループで追加したテストのマッピング）/ クレート README（該当する場合）/ steering/*（該当領域）/ .claude/skills/pasta-ghost-authoring・pasta-lua-coding（規範部分はマニュアルから生成 — 手編集せず `node book/tools/gen-skill-refs.mjs` で再生成し `node book/tools/gen-skill-refs.mjs --check` で同期を確認。マニュアル変更時のみ）
   - 横断 D7 セル（Task 3）で同期済みの項目は差分が無いことの確認のみで可（確認結果を記録する）
   - 更新が発生した場合は個別 `git add` でコミットする
   - 完了条件: 上記チェックリストの全項目が「更新済み（コミット参照）」または「該当なし（理由）」として記録されている
@@ -828,7 +828,7 @@
 | Rust クレート | `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p {crate}` | `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test --workspace` | `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo clippy -p {crate} --all-targets` | `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo audit`（導入済み）。`cargo-deny`・`cargo-machete` は未導入（D-6 ポリシーにより該当セルで導入可。導入後も同じ `env -u` プレフィックス必須） |
 | Lua 資産 | `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` | 同・全体検証（workspace） | luacheck CLI 未導入（vendored ライブラリのみ・設定は `crates/pasta_lua/.luacheckrc`）→ D-6 で導入可、不能なら N/A（ツール不可）記録 | —（cargo audit が包含） |
 | VSCode 拡張 | `npm --prefix C:/home/maz/git/pasta/editors/vscode run test` | `npm --prefix C:/home/maz/git/pasta/editors/vscode run compile && npm --prefix C:/home/maz/git/pasta/editors/vscode run lint && npm --prefix C:/home/maz/git/pasta/editors/vscode run test` | `npm --prefix C:/home/maz/git/pasta/editors/vscode run lint` | `npm --prefix C:/home/maz/git/pasta/editors/vscode audit` |
-| book/tools | `node C:/home/maz/git/pasta/book/tools/{tool}-test.mjs`（実在: `drift-check-test.mjs`・`tutorial-check-test.mjs` — フラット配置。design の `{tool}/*-test.mjs` パターンの本実行インスタンス補正） | `node C:/home/maz/git/pasta/book/tools/drift-check-test.mjs && node C:/home/maz/git/pasta/book/tools/tutorial-check-test.mjs && node C:/home/maz/git/pasta/book/tools/drift-check.mjs` | —（N/A 記録） | `npm --prefix C:/home/maz/git/pasta/book audit` |
+| book/tools | `node C:/home/maz/git/pasta/book/tools/{tool}-test.mjs`（実在: `link-check-test.mjs`・`tutorial-check-test.mjs`・`gen-skill-refs-test.mjs`・`verify-scripts-test.mjs` — フラット配置。design の `{tool}/*-test.mjs` パターンの本実行インスタンス補正） | `node C:/home/maz/git/pasta/book/tools/link-check-test.mjs && node C:/home/maz/git/pasta/book/tools/tutorial-check-test.mjs && node C:/home/maz/git/pasta/book/tools/gen-skill-refs-test.mjs && node C:/home/maz/git/pasta/book/tools/link-check.mjs && node C:/home/maz/git/pasta/book/tools/gen-skill-refs.mjs --check` | —（N/A 記録） | `npm --prefix C:/home/maz/git/pasta/book audit` |
 
 注: npm/node コマンドに cargo 環境制約は影響しないため、無害化は cargo を含むコマンドのみに適用する。`{crate}` ∈ {pasta_dsl, pasta_core, pasta_lua, pasta_shiori, pasta_lsp, pasta_check, pasta_sample_ghost}。
 
