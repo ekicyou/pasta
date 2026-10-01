@@ -36,6 +36,40 @@ SSPのプロパティシステムへのアクセスをpastaゴーストから可
 ## Phase 2: DSL統合
 - [x] property-dsl-extension -- `＄％` スコープ修飾子によるプロパティアクセスDSL構文（＄％prop.path＝value / ＄var＝＄％prop.path）。既存Lua APIにトランスパイル。Dependencies: property-write-helpers, shiori-async-talk
 
+### 将来仕様（doc/spec 廃止時の申し送り）
+
+manual-ssot-authority で旧文法仕様をマニュアルへ吸収した際に、マニュアルへ収録しなかった将来項目（B＝brief 起票済み、R＝キー行のみ）と、実装照合で見つかった未記載構文のバグ候補を 1 項目 1 行で申し送る。根拠と実装照合は `manual-ssot-authority` の吸収台帳（`absorption-ledger.md`）にある。
+
+- シーン属性のセマンティクス（B1） — 属性によるシーンへのメタデータ付与、ファイルレベル属性の継承と上書き（ローカルシーンには影響しない）、Call の属性フィルター（`＞シーン＆k＝v`・比較演算子・複数条件の結合）。現行は構文の受理と内部の登録表への記録まで — `.kiro/specs/scene-attribute-semantics/brief.md`
+- 動的単語参照 `＠＄`（B2） — `＠＄変数名` で変数の値を単語名として参照する。現行はパースエラー。未実装期間の扱い（無視・警告）も未定 — `.kiro/specs/dynamic-word-reference/brief.md`
+- シーンのパラメータ（R1） — シーン宣言での名前付きパラメータ。対応予定なし。現行は Call の位置引数とシーン引数 `＄０`… で代替できる — （brief なし）
+- アクタースコープ内コードブロックの用途（R2） — アクター固有のイベントハンドラ・状態管理関数としての用途。現行は `lua` ブロックで定義した値・関数がアクター付きの単語参照（A1）から使えるだけで、式の呼び出し・イベントからは届かない — （brief なし）
+- Call の戻り値と変数代入（R3） — `＄x＝＞シーン` のような呼び出し結果の代入。DSL では定義せず、ランタイム設計の領域 — （brief なし）
+- さくらスクリプトの `\]`・`\%`（R4） — 角括弧内の `\]`（`]` を文字として含める）と `\%` を DSL から書けるようにするか。現行は `\]` を特別扱いせず、`\%` はパースエラー — （brief なし）
+- BOM 付きファイルの受理（R5） — UTF-8 の BOM 付き `.pasta` を受理するか。現行はパースエラー — （brief なし）
+- 継続行内の空行の糖衣構文（R6） — 行継続の途中の空行を改行として出力する糖衣構文。現行は何も出力しない — （brief なし）
+
+#### 未記載構文のバグ候補
+
+- 単語定義行の行末コメント（U06） — 引用なしの単語値の後ろの `＃…` がコメントにならず、最後の値に取り込まれる — `manual-ssot-authority` の吸収台帳を参照
+- `\\` エスケープ（U08） — アクション行の `\\` が `\` 1 文字になり、直後の文字とさくらスクリプトのタグを作る（`\` の表示に `\\\\` が要る） — `manual-ssot-authority` の吸収台帳を参照
+- 括弧式の中の演算（U12） — `（1＋2）＊3` の括弧内が最初の項しか残らず `(1) * 3` になる — `manual-ssot-authority` の吸収台帳を参照
+- 未定義の `＠＊関数（）`（U18） — GLOBAL に無い関数の呼び出しが Lua の実行時エラーになり、イベントが 500 になる — `manual-ssot-authority` の吸収台帳を参照
+- 未登録アクターのアクション行（U19） — アクター辞書にも `[actor]` にも無い名前のアクション行が実行時エラー（500）になる — `manual-ssot-authority` の吸収台帳を参照
+- act のメンバー名と同じアクター名（U20） — `talk`・`word`・`call` などと同名のアクターのアクション行が実行時エラーになる — `manual-ssot-authority` の吸収台帳を参照
+- 末尾が数字のシーン名（U21） — 内部名（名前＋通し番号）が別名シーンと重なり、`＞A1` が `A` を選ぶ・同じシーン表を共有することがある — `manual-ssot-authority` の吸収台帳を参照
+- 数値にできない被演算子の算術（U22） — 数字でない文字列・未代入の変数・nil を返す関数の算術が実行時エラー（500）になる — `manual-ssot-authority` の吸収台帳を参照
+- REG ハンドラの戻り値の二重包み（U23） — `RES.ok(…)` などの応答を返すとさらに `RES.ok` で包まれ、不正な SHIORI 応答になる — `manual-ssot-authority` の吸収台帳を参照
+- 改行を含む引用文字列（U24） — 改行入りの文字列値（1 ファイルに `""` を 2 つ以上書いた場合を含む）で生成 Lua が構文エラーになり、ランタイムの初期化全体が失敗する — `manual-ssot-authority` の吸収台帳を参照
+- 単語値の `「」`・`""`（U25） — 単語定義の値では空文字列にならず、囲み文字そのものが候補の値になる — `manual-ssot-authority` の吸収台帳を参照
+- pasta.toml の `[lua]` セクション（U26） — `[lua] libs` がロード時に読まれず、標準ライブラリ・mlua-stdlib の構成が変わらない — `manual-ssot-authority` の吸収台帳を参照
+- 選択肢の自動ルーティングの探索範囲（U27） — 既定の OnChoiceSelectEx が直前のグローバルシーンのローカルシーンだけを探し、グローバルシーンへフォールバックしない — `manual-ssot-authority` の吸収台帳を参照
+- 別グローバルシーンへの Call 後のローカル探索（U28） — 呼んで戻ったあとの Call・ローカル単語参照が、呼ばれた側のローカルシーンを探す — `manual-ssot-authority` の吸収台帳を参照
+- セレクタの整数値が使われない（U29） — `set_scene_selector`・`set_word_selector` の整数値が選択に使われず、シャッフルが止まるだけ — `manual-ssot-authority` の吸収台帳を参照
+- 記号を含むグローバルシーン名（U30） — 登録時に英数字以外が `_` に置換され、元の名前で検索・Call できない — `manual-ssot-authority` の吸収台帳を参照
+- 選択肢の自動ルーティングが表示ラベルで探す（U31） — 既定の OnChoiceSelectEx が Reference0（表示テキスト）を選択 ID として読み、表示名付きの選択肢が 204 になる — `manual-ssot-authority` の吸収台帳を参照
+- `[logging] rotation_days` が使われない（U32） — 設定しても読まれず、ログファイルがローテーションされない — `manual-ssot-authority` の吸収台帳を参照
+
 ## Phase 3: 脆弱性監査・コード簡素化
 
 全クレートを対象に、同一仕様（外部振る舞い不変）のまま、脆弱性回避とコード量削減を実施する。
@@ -57,7 +91,7 @@ SSPのプロパティシステムへのアクセスをpastaゴーストから可
 ## Phase 4: 利用者マニュアルサイト
 
 pasta ゴースト作者向けの利用者マニュアルを、mdBook で**サーバー不要の静的 HTML+JS サイト**として構築する。
-既存の `doc/spec/` Markdown 資産を流用し、文法・Lua API・入門チュートリアルを検索可能な単一サイトに統合する。
+文法・Lua API・`pasta.toml`・入門チュートリアルを検索可能な単一サイトに統合する。マニュアルは利用者向け情報の唯一の権威であり、スキル `references/` の利用者向け部分はマニュアルから生成する（`gen-skill-refs.mjs`。鮮度とリンクは CI の `--check`・`link-check.mjs` が保証する）。
 
 ### アプローチ決定（Phase 4）
 - **採用**: mdBook（Rust 製・cargo bin に導入済み・追加エコシステム依存ゼロ）。`mdbook build` が静的 HTML+JS（クライアント側 elasticlunr 全文検索・`.nojekyll` 同梱）を出力 → GitHub Pages 等にサーバー不要で公開可能（実機検証済み: mdbook v0.5.3）
@@ -71,7 +105,7 @@ pasta ゴースト作者向けの利用者マニュアルを、mdBook で**サ�
 
 discovery（2026-10-01）で両仕様を起票。依存順は manual-ssot-authority → pasta-runtime-internals-doc。
 
-- [ ] manual-ssot-authority -- マニュアル全体の SSOT/権威化の再編。`doc/spec` を mdBook へ吸収・廃止（drift-check 撤去）、`GRAMMAR.md` 廃止。読者で線引きし、利用者向け（文法・公開 Lua API・`pasta.toml`）は mdBook を権威としてスキル `references/` を mdBook から自動生成（スキルは別リポジトリへ持ち出すため自己完結を維持）、AI 作業手順（作例・規約・テスト/lint）はスキル手書きを権威とする。権威移行と生成切替を 1 spec で一括完了。Dependencies: pasta-user-manual
+- [ ] manual-ssot-authority -- マニュアル全体の SSOT/権威化の再編。旧文法仕様ディレクトリを mdBook へ吸収・廃止し、旧乖離検出機構をリンク検証（`link-check.mjs`）と生成物鮮度チェック（`gen-skill-refs.mjs --check`）へ置換、`GRAMMAR.md` 廃止。読者で線引きし、利用者向け（文法・公開 Lua API・`pasta.toml`）は mdBook を権威としてスキル `references/` を mdBook から自動生成（スキルは別リポジトリへ持ち出すため自己完結を維持）、AI 作業手順（作例・規約・テスト/lint）はスキル手書きを権威とする。権威移行と生成切替を 1 spec で一括完了。Dependencies: pasta-user-manual
   - 由来: pasta-manual-debugging の discovery（2026-06-08）でユーザーが「mdbook に書いてる項目は mdbook を権威にしたい／別仕様で権威化の整理をすべき」と指摘。本仕様外・別仕様として申し送り
   - brief.md 作成済み（`.kiro/specs/manual-ssot-authority/brief.md`）
 - [ ] pasta-runtime-internals-doc -- pasta ランタイムの内部設計・アーキテクチャ解説（トランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期・アクター基盤 / デバッグ・ソースマップ / シーンキック）。読者＝コントリビュータ・実装理解者。同一 mdBook の末尾に「内部設計」パートとして置く。`OPTIMIZATION.md` を吸収・廃止、スキル `internal-modules` を mdBook 権威＋生成へ移行、クレート README の内部解説を移設。鮮度維持は kiro-complete DoD の追従確認＋review-improvement-loop 次元⑦の照合。Dependencies: manual-ssot-authority
@@ -81,7 +115,7 @@ discovery（2026-10-01）で両仕様を起票。依存順は manual-ssot-author
 ### Phase 4 派生（デバッグ利用者ガイド）
 - [x] pasta-manual-debugging -- VSCode Lua デバッグ（`.pasta` ソースレベルまで完全網羅）の利用者向けデバッグ章を mdBook マニュアルに追加。有効化／`launch.json`／attach／BP・ステップ・変数 inspect・提示モード切替／構造的制約と緩和策。ルート `DEBUGGING.md` をマニュアルへ統合・最新化しリダイレクト化（mdBook を権威）。Dependencies: pasta-vscode-lua-debug, pasta-source-map, pasta-user-manual
   - discovery 決定（2026-06-08）: DEBUGGING.md = マニュアルに一本化（推奨案）、スコープ = `.pasta` ソースレベルまで完全網羅。brief.md 作成済み（`.kiro/specs/completed/pasta-manual-debugging/brief.md`）。マニュアル全体の権威化再編は manual-ssot-authority へ分離
-  - 実装完了 2026-06-08（全8タスク・各独立レビュー APPROVED・機能レベルバリデーション GO・mdbook build/verify-content(G+A〜F)/verify-static/verify-search/drift-check 全緑）。spec 完了フロー未実施
+  - 実装完了 2026-06-08（全8タスク・各独立レビュー APPROVED・機能レベルバリデーション GO・mdbook build/verify-content(G+A〜F)/verify-static/verify-search/当時の文法乖離チェック（manual-ssot-authority で撤去） 全緑）。spec 完了フロー未実施
 
 ### Phase 5 派生（デバッグ観測性）
 - [x] debug-startup-logging -- pasta_lua デバッグバックエンドの `enable()` に「デバッグ有効化・DAP 待ち受け開始（実バインドアドレス `host:port`）」の `info!` 起動ログを追加し、`pasta.log` で起動確認できるようにする。無効時は無言・ゼロコスト維持。Dependencies: pasta-vscode-lua-debug

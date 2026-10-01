@@ -221,7 +221,7 @@
   - _Requirements: 7.8, 8.5, 9.5_
   - _Boundary: CompletionGate_
 
-- [ ] 6. 将来仕様の brief 2 件とロードマップ申し送りを作成する（P7 の一部を撤去前へ前倒し）
+- [x] 6. 将来仕様の brief 2 件とロードマップ申し送りを作成する（P7 の一部を撤去前へ前倒し）
   - 吸収元（doc/spec ch08・ch12）がまだ存在するうちに、属性セマンティクス（ファイルレベル属性・Call 属性フィルターを含む）と動的単語参照 `＠＄` の brief を起票する
   - roadmap の Phase 2 配下に「将来仕様（doc/spec 廃止時の申し送り）」小節を設け、B・R 項目とバグ候補を 1 項目 1 行のキー情報で記載する。roadmap 内の doc/spec・drift-check 記述も置換する
   - 完了状態: 仕分け表の B・R 全項目が brief か roadmap のキー行に存在し、バグ候補の行数と roadmap のバグ候補キー行数が一致する
