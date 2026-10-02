@@ -41,7 +41,7 @@ SSPのプロパティシステムへのアクセスをpastaゴーストから可
 manual-ssot-authority で旧文法仕様をマニュアルへ吸収した際に、マニュアルへ収録しなかった将来項目（B＝brief 起票済み、R＝キー行のみ）と、実装照合で見つかった未記載構文のバグ候補を 1 項目 1 行で申し送る。根拠と実装照合は `manual-ssot-authority` の吸収台帳（`.kiro/specs/completed/manual-ssot-authority/absorption-ledger.md`）にある。
 
 - シーン属性のセマンティクス（B1） — 属性によるシーンへのメタデータ付与、ファイルレベル属性の継承と上書き（ローカルシーンには影響しない）、Call の属性フィルター（`＞シーン＆k＝v`・比較演算子・複数条件の結合）。現行は構文の受理と内部の登録表への記録まで — `.kiro/specs/scene-attribute-semantics/brief.md`
-- 動的単語参照 `＠＄`（B2） — `＠＄変数名` で変数の値を単語名として参照する。現行はパースエラー。未実装期間の扱い（無視・警告）も未定 — `.kiro/specs/dynamic-word-reference/brief.md`
+- ✅ 動的単語参照 `＠＄`（B2） — 実装済み。`＠＄変数名` で変数の値を単語キーとして参照し、`＠＄変数名（…）` で変数の値を関数名として呼ぶ — `.kiro/specs/completed/dynamic-word-reference/`
 - 動的コールの nil ガード — `＞式` の値が nil のとき `tostring` で `"nil"` になり、`ACT_IMPL.call` の nil ガード（`dynamic-call-variable` R3-AC5）が働かない。マニュアル `call-jump.md` は現行挙動（`"nil"` で検索）を書いており、どちらを正とするか未決定（`dynamic-word-reference` の RN-4 で発見） — `.kiro/specs/dynamic-call-nil-guard/brief.md`
 - シーンのパラメータ（R1） — シーン宣言での名前付きパラメータ。対応予定なし。現行は Call の位置引数とシーン引数 `＄０`… で代替できる — （brief なし）
 - アクタースコープ内コードブロックの用途（R2） — アクター固有のイベントハンドラ・状態管理関数としての用途。現行は `lua` ブロックで定義した値・関数がアクター付きの単語参照（A1）から使えるだけで、式の呼び出し・イベントからは届かない — （brief なし）

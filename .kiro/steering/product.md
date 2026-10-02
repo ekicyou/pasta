@@ -96,7 +96,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 ### Phase 3: 高度機能（計画中）
 - [ ] シーン継続チェーン（`pasta-label-continuation`）
-- [ ] 動的単語参照（`＠＄変数` - 現行はパースエラー・`.kiro/specs/dynamic-word-reference/brief.md` 起票済み）
+- [x] 動的単語参照（`＠＄変数名`・`＠＄変数名（…）`） — `.kiro/specs/completed/dynamic-word-reference/`
 - [ ] ランタイム拡充・使い勝手向上
 - [ ] イベントハンドリングの拡充
 
