@@ -45,7 +45,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
 
         // Generate word definitions (Requirement 2, actor-word-dictionary Task 3.1)
-        // ACTOR:create_word() registers both in word.lua (L2 prefix search) and as actor attribute (L1 exact match)
+        // ACTOR:create_word() registers only in the actor word dictionary (STORE.actor_words, searched by
+        // the A2 prefix match); it does not set a field on the actor object
         for word_def in &actor.words {
             if word_def.words.is_empty() {
                 continue;

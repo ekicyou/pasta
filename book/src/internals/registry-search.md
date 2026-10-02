@@ -155,10 +155,10 @@ pasta.scene_dic
 
 ### ローカル優先の検索順
 
-Rust 側は 1 回の呼び出しで 1 つのスコープしか検索しないため、利用者向け章が定める検索順は Lua 側の検索手順が組み立てる。単語参照・Call・式関数の呼び出しは、いずれも `ACT_IMPL.find_act_handler(mode, key)` を通る（`mode` は `"word"`・`"scene"`・`"expr"`）。
+Rust 側は 1 回の呼び出しで 1 つのスコープしか検索しないため、利用者向け章が定める検索順は Lua 側の検索手順が組み立てる。単語参照・Call・式関数の呼び出しは、いずれも `ACT_IMPL.find_act_handler(mode, key, skip_methods)` を通る（`mode` は `"word"`・`"scene"`・`"expr"`。`skip_methods` は後述「動的参照の検索」）。
 
 ```text
-ACT_IMPL.find_act_handler(mode, key)
+ACT_IMPL.find_act_handler(mode, key, skip_methods)
   L1  current_scene[key]                             完全一致
   L2  ローカル辞書の前方一致                         @pasta_search があり、実行中のシーンがあるとき
         word        → SEARCH:search_word(key, グローバル名)
@@ -169,19 +169,38 @@ ACT_IMPL.find_act_handler(mode, key)
         word        → SEARCH:search_word(key, nil)
         scene/expr  → SCENE.search(key, nil) → .func
 
-PROXY_IMPL.find_handler(mode, key)                   act.アクター:word(…) など
+PROXY_IMPL.find_handler(mode, key, skip_methods)     act.アクター:word(…) など
   A1  actor[key]                                     word モードだけ。完全一致
   A2  SEARCH:search_word(key, "__actor_" .. アクター名 .. "__")
                                                      word モードだけ
-  →   act:find_act_handler(mode, key)                L1〜L5 へ委譲
+  →   act:find_act_handler(mode, key, skip_methods)  L1〜L5 へ委譲
 ```
 
 - L2 のグローバル名は、実行中のシーンテーブルの `__global_name__`（`メイン1` の形）である。`ACT_IMPL.init_scene` がシーン関数の先頭で `current_scene` を設定する。これがローカルキー `:メイン1:…` の前方一致になる。
 - A2 のスコープ名 `__actor_アクター名__` は、`search_word` の中で `:__actor_アクター名__:キー` の前方一致になり、`register_actor` のキーの形式と対応する。
 - `@pasta_search` の取得は、`find_act_handler`・`find_actor_handler` とも呼び出しごとの `pcall(require, "@pasta_search")` で行う。
-- 見つかった値の後処理（関数なら呼ぶ、それ以外は文字列にする、見つからなければ警告ログ）は `ACT_IMPL.word`・`ACT_IMPL.call`・`ACT_IMPL.expr_fn` と、PROXY 側の `word`・`expr_fn` が行う。
+- 見つかった値の後処理（関数なら呼ぶ、それ以外は文字列にする、見つからなければ警告ログ）は `ACT_IMPL.word`・`ACT_IMPL.call`・`ACT_IMPL.expr_fn`・`ACT_IMPL.expr_fn_var` と、PROXY 側の `word`・`expr_fn`・`expr_fn_var` が行う（[名前の解決のメソッド](internal-modules.md#名前の解決のメソッド)）。
 
 `ACT_IMPL.find_scene` は第 2 引数のグローバル名を使わず `find_handler("scene", key)` に委ねる。そのため、親を指定してローカルシーンを引く必要がある選択肢イベント（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`）とシーンキック（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`）は、`SCENE.search(名前, 親)` を直接呼んでコルーチンを作る。
+
+### 動的参照の検索
+
+動的参照（`＠＄変数名`・`＠＄変数名（…）`）では、変数の値が検索キーになる。生成コードは `word(値, "変数の経路")`・`expr_fn_var(値, "変数の経路", 引数…)` を呼び、値は `WORD.dynamic_key` が検索キーに変換する（数値は `tostring`、空でない文字列はそのまま。それ以外は警告して検索しない。[動的参照のキー](internal-modules.md#動的参照のキーworddynamic_key)）。キーに変換した後は、`skip_methods` を真にして同じ検索手順を通る。
+
+```text
+skip_methods が真のとき（動的参照）
+  A1  rawget(actor, key)              アクターオブジェクト自身のフィールドだけ
+  A2  静的と同じ
+  L1  rawget(current_scene, key)      シーンテーブル自身のキー（__global_name__・シーン関数）だけ
+  L2  静的と同じ
+  L3  探さない
+  L4  静的と同じ（GLOBAL[key]）
+  L5  静的と同じ
+```
+
+- L3 を飛ばすのは、変数の値が ACT のメソッド名（`talk`・`yield` など）と一致しても、そのメソッドを呼ばないためである。L1・A1 を `rawget` で引くのは、シーンテーブルの `SCENE_TABLE_IMPL`・アクターオブジェクトの `ACTOR_IMPL` からメタテーブル経由で継承した `create_word` などに一致させないためである。
+- `GLOBAL` はメタテーブルを持たない表として、静的と同じく `GLOBAL[key]` で引く。値が `GLOBAL` のキー（ランタイムが登録する `yield`・`チェイントーク`・`close_ghost`・`ゴースト終了` を含む）と一致すれば、その値が見つかる。
+- 前方一致の段（L2・L5・A2）に渡すキーは、静的な参照で同じ名前を書いた場合と同じ文字列である。選択状態のキャッシュのキーも同じになるため、`＠＄x`（値が `挨拶`）と `＠挨拶` は同じスコープでは 1 つの巡回を共有する。
 
 ### 検索結果からシーン関数へ
 

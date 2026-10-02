@@ -81,7 +81,7 @@ STORE.actors["さくら"] = { name = "さくら" }
 
 ## ACT の内部
 
-ACT は、シーン関数が第 1 引数で受け取るオブジェクトである。`pasta.act` が基本の ACT を、`pasta.shiori.act` が SHIORI 用の ACT を作る。SHIORI のイベントごとに `SHIORI_ACT.new(STORE.actors, req)` で新しい ACT が作られる（[イベントからシーンへ](execution-model.md#イベントからシーンへ)）。この節では ACT の構造と、メソッド・アクタープロキシの解決、`init_scene` を扱う。トーク系メソッドなど個々のメソッドの使い方は [スクリプト用ランタイム API](../lua/script-api.md) で、トークンの蓄積と組立は [トーク出力とアピアランス](talk-output.md#トークンの蓄積) で扱う。
+ACT は、シーン関数が第 1 引数で受け取るオブジェクトである。`pasta.act` が基本の ACT を、`pasta.shiori.act` が SHIORI 用の ACT を作る。SHIORI のイベントごとに `SHIORI_ACT.new(STORE.actors, req)` で新しい ACT が作られる（[イベントからシーンへ](execution-model.md#イベントからシーンへ)）。この節では ACT の構造と、メソッド・アクタープロキシの解決、`init_scene`、名前の解決のメソッドと動的参照のキーの変換を扱う。トーク系メソッドなど個々のメソッドの使い方は [スクリプト用ランタイム API](../lua/script-api.md) で、トークンの蓄積と組立は [トーク出力とアピアランス](talk-output.md#トークンの蓄積) で扱う。
 
 ### ACT オブジェクトの構造
 
@@ -152,6 +152,17 @@ end
 - `init_scene` は `current_scene` と `last_global_scene` を上書きするだけで、呼び出し元へ戻ったときに元へ戻す処理は無い。別のグローバルシーンを Call すると、戻った後の呼び出し元の名前の解決と、それ以降の選択肢の検索の親は、呼び出し先のシーンのものになる。
 - 返す `save`・`var` は `act.save`・`act.var` と同じ表である。`save` に入れた値は永続化され、`var` の値はその ACT の寿命の間だけ残る（[ローカル変数](../grammar/variables.md#ローカル変数)）。
 
+### 名前の解決のメソッド
+
+ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call` と `find_handler`・`find_act_handler` の引数・戻り値・警告は [検索と呼び出し](../lua/script-api.md#検索と呼び出し)（[word(name, var_path)](../lua/script-api.md#wordname-var_path)・[expr_fn_var(value, var_path, ...)](../lua/script-api.md#expr_fn_varvalue-var_path-) を含む）が、検索の各段の意味は [ローカル優先の検索順](registry-search.md#ローカル優先の検索順) が正である。ここでは実装の内部の構成だけを扱う。
+
+- `expr_fn(self, key, ...)` と `expr_fn_var(self, value, var_path, ...)` は、`pasta.act` の局所関数 `call_expr(self, key, skip_methods, ...)` を共有する。`expr_fn` は `call_expr(self, key, nil, ...)`、`expr_fn_var` はキーに直した後に `call_expr(self, キー, true, ...)` を呼ぶ。`call_expr` は `find_handler("expr", key, skip_methods)` が関数なら `h(self, ...)` の戻り値を返し、それ以外は接頭辞 `act:expr_fn` の警告ログ（`handler not found`）を出して `nil` を返す。アクタープロキシは `pasta.actor` に同じ形の別の局所関数を持つ（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
+- `skip_methods` を真にするのは、`var_path` を受け取った `word` と `expr_fn_var`（生成コードの動的参照）だけである。`find_scene`・`call` と、`var_path` の無い `word`・`expr_fn` は `skip_methods` を渡さない。`find_handler` は `find_act_handler` に引数をそのまま渡す。
+
+### 動的参照のキー（WORD.dynamic_key）
+
+`WORD.dynamic_key` の変換規則と警告は [WORD.dynamic_key(value, var_path, via)](../lua/script-api.md#worddynamic_keyvalue-var_path-via) が正である。この関数は、`pasta.act`（`word`・`expr_fn_var`）と `pasta.actor`（同名のプロキシのメソッド）の両方が使うため、どちらも `require` しない `pasta.word` に置かれている。`pasta.word` が `require` するのは `pasta.store` と `@pasta_log` だけであり、`pasta.act`・`pasta.actor` が `pasta.word` を `require` しても循環は生じない。
+
 ## PROXY パターン
 
 アクタープロキシは、`act.さくら` のようにアクター名で ACT を参照したときに作られる小さな表である。アクターと ACT への参照を持ち、アクターを添えて ACT のメソッドに委ねる。生成コードはアクターの発言と、アクター修飾付きの単語参照・関数呼び出しをこの形で書く。
@@ -160,6 +171,7 @@ end
 act.さくら:talk("こんにちは")
 act.さくら:talk(act.さくら:word("名前"))   -- アクター単語から探す
 act.さくら:expr_fn("関数名", 引数)          -- アクター修飾付きの関数呼び出し
+act.さくら:talk(act.さくら:word(var.x, "var.x"))   -- 動的単語参照（変数の値をキーにする）
 ```
 
 プロキシの実装（`PROXY_IMPL`）とアクターオブジェクトは、どちらも `pasta.actor` にある。
@@ -187,14 +199,16 @@ act.さくら:expr_fn("関数名", 引数)          -- アクター修飾付き�
 | -------- | ---- | ------ |
 | `talk(self, text, var_name)` | `self.act:talk(self.actor, text, var_name)` | `nil`（メソッドチェーンはできない） |
 | `sakura_script(self, text)` | `self.act:sakura_script(self.actor, text)` | `nil` |
-| `find_actor_handler(self, mode, key)` | `mode` が `"word"` でなければ `nil`。`self.actor[key]` が `nil` でなければそれ（A1）。次に `@pasta_search` を `pcall(require, …)` で得られれば `SEARCH:search_word(key, "__actor_" .. アクター名 .. "__")`（A2） | 見つかった値、または `nil` |
-| `find_handler(self, mode, key)` | `find_actor_handler` で見つからなければ `self.act:find_act_handler(mode, key)` に委ねる | 見つかった値、または `nil` |
-| `word(self, name)` | `name` が `nil` か空文字列なら `nil`。`find_handler("word", name)` の結果が関数なら `h(self)`（引数はプロキシ）の戻り値、それ以外の値なら `tostring(h)`。見つからなければ警告ログ（`via=proxy(アクター名)`）を出す | 単語の文字列、または `nil` |
-| `expr_fn(self, key, ...)` | `find_handler("expr", key)` の結果が関数なら `h(self, ...)`（第 1 引数はプロキシ）の戻り値。関数でなければ警告ログを出す | 関数の戻り値、または `nil` |
+| `find_actor_handler(self, mode, key, skip_methods)` | `mode` が `"word"` でなければ `nil`。`self.actor[key]`（`skip_methods` が真なら `rawget(self.actor, key)`）が `nil` でなければそれ（A1）。次に `@pasta_search` を `pcall(require, …)` で得られれば `SEARCH:search_word(key, "__actor_" .. アクター名 .. "__")`（A2） | 見つかった値、または `nil` |
+| `find_handler(self, mode, key, skip_methods)` | `find_actor_handler` で見つからなければ `self.act:find_act_handler(mode, key, skip_methods)` に委ねる。`skip_methods` は両方に渡す | 見つかった値、または `nil` |
+| `word(self, name, var_path)` | `var_path` が `nil` なら、`name` が `nil` か空文字列のとき `nil` を返す。`var_path` があれば `WORD.dynamic_key(name, var_path, "proxy:word")` でキーにし（`nil` ならそこで `nil` を返す）、`skip_methods` を真にする。そのうえで `find_handler("word", …)` を引く（ACT の `word` と同じ規則。[word(name, var_path)](../lua/script-api.md#wordname-var_path)）。結果が関数なら `h(self)`（引数はプロキシ）の戻り値、それ以外の値なら `tostring(h)`。見つからなければ警告ログ（`via=proxy(アクター名)`）を出す | 単語の文字列、または `nil` |
+| `expr_fn(self, key, ...)` | 局所関数 `call_expr(self, key, nil, ...)` | 関数の戻り値、または `nil` |
+| `expr_fn_var(self, value, var_path, ...)` | `value` を `WORD.dynamic_key(value, var_path, "proxy:expr_fn")` でキーにし（`nil` ならそこで `nil` を返す）、`call_expr(self, キー, true, ...)` | 関数の戻り値、または `nil` |
 
-- A1 は通常の添字参照であるため、アクターオブジェクトのフィールド（`name`・`spot`・`pasta.toml` の `[actor.名前]` のキー）と、メタテーブル経由の `create_word` も一致の対象になる。
+- `call_expr` は `pasta.actor` の局所関数で（`pasta.act` の同名の局所関数とは別）、`find_handler("expr", key, skip_methods)` の結果が関数なら `h(self, ...)`（第 1 引数はプロキシ）の戻り値を返し、関数でなければ警告ログ（`proxy:expr_fn - handler not found`）を出す。
+- A1 は通常の添字参照であるため、アクターオブジェクトのフィールド（`name`・`spot`・`pasta.toml` の `[actor.名前]` のキー）と、メタテーブル経由の `create_word` も一致の対象になる。`skip_methods` が真のとき（動的参照）は `rawget` で引くため、アクターオブジェクト自身のフィールドだけが対象になり、`create_word` などのメソッドには一致しない。
 - 検索の全体の順序（A1 → A2 → L1〜L5）と各段の意味は [ローカル優先の検索順](registry-search.md#ローカル優先の検索順) で扱う。
-- `word`・`expr_fn` が見つけた関数に渡す第 1 引数は ACT ではなくプロキシである。ACT の `word`・`expr_fn`・`call` が見つけた関数には ACT を渡す。
+- `word`・`expr_fn`・`expr_fn_var` が見つけた関数に渡す第 1 引数は ACT ではなくプロキシである。ACT の `word`・`expr_fn`・`expr_fn_var`・`call` が見つけた関数には ACT を渡す。
 
 ## SCENE モジュール
 
@@ -221,7 +235,7 @@ STORE.scenes = {
 
 - グローバルシーン名は、トランスパイラが渡す基本名（サニタイズ済みのシーン名）に、`create_scene` が振った番号を区切り無しで付けたものである（`メイン` → `メイン1`）。
 - `__global_name__` 以外のキーはすべてシーン関数として扱われ、辞書確定で `(グローバルシーン名, キー)` の組として集められる（[finalize_scene](#finalize_scene)）。
-- メタテーブルの `__index` が `SCENE_TABLE_IMPL` を指すため、`scene:create_word(キー)` は `WORD.create_local(scene.__global_name__, キー)` のビルダーを返す。生成コードの `SCENE:create_word(キー):entry(値, …)` がこれを使う。通常の添字参照（ACT の L1 の完全一致を含む）でも、キー `create_word` はこのメソッドに一致する。
+- メタテーブルの `__index` が `SCENE_TABLE_IMPL` を指すため、`scene:create_word(キー)` は `WORD.create_local(scene.__global_name__, キー)` のビルダーを返す。生成コードの `SCENE:create_word(キー):entry(値, …)` がこれを使う。通常の添字参照（ACT の L1 の完全一致を含む）でも、キー `create_word` はこのメソッドに一致する。動的参照の L1 は `rawget` で引くため、シーンテーブル自身のキー（`__global_name__` とシーン関数）だけが対象になり、`create_word` には一致しない。
 
 ### SCENE の関数
 

@@ -67,7 +67,7 @@ pub enum FileItem {
 
 /// Complete AST representation of a Pasta file.
 ///
-/// grammar.pest `file = ( file_scope | global_scene_scope )*` に完全準拠。
+/// grammar.pest `file = ( file_scope | global_scene_scope | actor_scope )*` に完全準拠。
 /// ファイル内の全アイテムを記述順序で保持します。
 ///
 /// # 使用例
@@ -89,8 +89,8 @@ pub struct PastaFile {
     pub path: PathBuf,
     /// ファイル内の全アイテム（記述順序を保持）
     ///
-    /// grammar.pest `( file_scope | global_scene_scope )*` に対応。
-    /// 複数の file_scope と global_scene_scope を任意順序で格納。
+    /// grammar.pest `( file_scope | global_scene_scope | actor_scope )*` に対応。
+    /// 複数の file_scope・global_scene_scope・actor_scope を任意順序で格納。
     pub items: Vec<FileItem>,
     /// Source location
     pub span: Span,

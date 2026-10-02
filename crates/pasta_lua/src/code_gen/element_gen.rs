@@ -641,7 +641,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     /// Generates: `SCENE:create_word("key"):entry("value1", "value2", ...)`
     ///
-    /// Called inside a local scene function, after init_scene.
+    /// Called inside the global scene's `do` block, before the scene function definitions.
     pub fn generate_local_word(&mut self, word: &KeyWords) -> Result<(), TranspileError> {
         self.generate_word_definition(word, "SCENE", ":")
     }

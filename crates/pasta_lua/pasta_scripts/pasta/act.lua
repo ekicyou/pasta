@@ -56,13 +56,13 @@ local function group_by_actor(tokens)
                 table.insert(result, token)
             end
         else
-            -- アクター行動トークン（surface, wait, newline, clear）
+            -- アクター行動トークン（surface, wait, newline, clear, choice, choice_timeout）
             -- 現在のアクターグループ内に追加
             if current_actor_token then
                 table.insert(current_actor_token.tokens, token)
             end
-            -- 注: current_actor_tokenがnilの場合（talkより先にアクター行動が来た場合）は無視
-            -- 現在の設計ではこの状況は発生しない
+            -- 注: current_actor_tokenがnilの場合（最初のtalk・sakura_scriptより先に積まれた場合）は捨てる
+            -- yield 直後の act:surface(…) など、1 回の出力の先頭に積むと起きる
         end
     end
 
@@ -298,16 +298,16 @@ local function search_dictionary(SEARCH, mode, key, scene_name)
     return nil
 end
 
---- ハンドラーフォールバック検索コア（6段階）
+--- ハンドラーフォールバック検索コア（5段階）
 ---
 --- 検索レベル:
 --- L1: current_scene[key] 完全一致（全モード共通）
 --- L2: ローカル辞書前方一致（word: search_word(key, scene_name)、scene/expr: SCENE.search(key, scene_name)）
---- L3: ACT_IMPL[key] function型のみ（act.XX フォールバック。全モード共通）
+--- L3: self[key] function型のみ（ACT_IMPL・SHIORI_ACT_IMPL の継承チェーン。全モード共通）
 --- L4: GLOBAL[key] 完全一致（全モード共通）
 --- L5: グローバル辞書前方一致（word: search_word(key, nil)、scene/expr: SCENE.search(key, nil)）
---- word モードの @pasta_search 未利用時はL2・L5 word 前方一致をスキップ
---- scene/expr モードは SCENE.search を直接呼び出す（@pasta_search 可用性チェックは package.loaded 参照）
+--- @pasta_search は呼び出し毎に pcall(require) で取得し、取得できないときは全モードで L2・L5 をスキップする
+--- （scene/expr モードの SCENE.search も内部で @pasta_search を使う）
 ---
 --- skip_methods（動的参照用）: 継承したメソッドに届かせない。L1 は rawget で表自身のフィールドだけを引き
 --- （SCENE_TABLE_IMPL の create_word 等に一致させない）、L3 は探さない。L2・L4・L5 は同じ。
@@ -371,7 +371,7 @@ function ACT_IMPL.find_handler(self, mode, key, skip_methods)
 end
 
 --- 単語取得（find_handler + word ポストプロセス）
---- 検索順序は find_act_handler の6段階フォールバック（word モード）
+--- 検索順序は find_act_handler の5段階フォールバック（L1〜L5、word モード）
 --- var_path があるとき（動的参照）は name を WORD.dynamic_key でキーにし、継承したメソッドに届かせずに検索する
 --- ポストプロセス: handler=nil → warn+nil、function → h(self)、その他 → tostring(h)
 --- @param self Act アクションオブジェクト

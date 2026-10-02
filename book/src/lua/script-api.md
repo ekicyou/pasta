@@ -34,7 +34,7 @@ local save, var = act:init_scene(SCENE)
 - 戻り値の `save`・`var` は `act.save`・`act.var` と同じ表である。
 - 呼ぶと、そのシーンが実行中のシーンになる。名前の検索（[検索と呼び出し](#検索と呼び出し)）の 1・2 段目と、選択肢の行き先の検索（[OnChoiceSelectEx](shiori-events.md#onchoiceselectex)）は、実行中のシーンを基準にする。
 - シーン関数でない関数（`GLOBAL` の関数など）で `save`・`var` が必要なときは、`init_scene` を呼ばずに `act.save`・`act.var` を使う。
-- アクション行の `＠名前（…）`・`＠単語` から呼ばれた関数は、第 1 引数に ACT ではなくアクタープロキシを受け取る（`＠＊名前（…）` は ACT を受け取る）。その場合の ACT はプロキシの `act` フィールドから取る（[関数スコープの展開先](../grammar/variables.md#関数スコープの展開先)）。
+- アクション行の `＠名前（…）`・`＠単語`・`＠＄変数名（…）`・`＠＄変数名` から呼ばれた関数は、第 1 引数に ACT ではなくアクタープロキシを受け取る（`＠＊名前（…）` は ACT を受け取る）。その場合の ACT はプロキシの `act` フィールドから取る（[関数スコープの展開先](../grammar/variables.md#関数スコープの展開先)）。
 
 ```lua
 function SCENE.カウント(act)
@@ -197,8 +197,9 @@ act:surface(5):wait(500):talk(act.さくら.actor, "驚いた！"):newline()
 | ------ | ---- | ------ |
 | `act.さくら:talk(text)` | `act:talk(act.さくら.actor, text)` と同じ | `nil` |
 | `act.さくら:sakura_script(text)` | `act:sakura_script(act.さくら.actor, text)` と同じ | `nil` |
-| `act.さくら:word(name)` | アクター辞書を先に探してから単語を探す（[アクタースコープと単語参照の統合](../grammar/actor-dictionary.md#アクタースコープと単語参照の統合)）。見つかった関数にはプロキシを渡す | 単語、または `nil` |
+| `act.さくら:word(name, var_path)` | アクター辞書を先に探してから単語を探す（[アクタースコープと単語参照の統合](../grammar/actor-dictionary.md#アクタースコープと単語参照の統合)）。見つかった関数にはプロキシを渡す。`var_path` の扱いは `act:word` と同じで、動的参照のときアクターの表は、表自身のフィールド（`name` と pasta.toml の `[actor.名前]` で設定した値など。`create_word` などのメソッドは含まない）だけを探す | 単語、または `nil` |
 | `act.さくら:expr_fn(key, ...)` | `act:expr_fn` と同じ検索で関数を探して呼ぶ。関数の第 1 引数はプロキシ | 関数の戻り値、または `nil` |
+| `act.さくら:expr_fn_var(value, var_path, ...)` | `act:expr_fn_var` と同じ検索で関数を探して呼ぶ。関数の第 1 引数はプロキシ | 関数の戻り値、または `nil` |
 | `act.さくら.actor` | アクターオブジェクト | — |
 | `act.さくら.act` | 元の ACT | — |
 
@@ -214,33 +215,41 @@ act:surface(5):wait(500):talk(act.さくら.actor, "驚いた！"):newline()
 | ------ | ------------------ | ------------------ | ------------ |
 | `"word"` | 実行中のシーンのローカル単語 | グローバル単語 | `word` |
 | `"scene"` | 実行中のシーンのローカルシーン | グローバルシーン | `find_scene`・`call` |
-| `"expr"` | 実行中のシーンのローカルシーン | グローバルシーン | `expr_fn` |
+| `"expr"` | 実行中のシーンのローカルシーン | グローバルシーン | `expr_fn`・`expr_fn_var` |
 
 - 1 段目（実行中のシーンのシーンテーブル）・3 段目（act のメソッド。関数の値だけ）・4 段目（`GLOBAL` テーブル）は、どのモードでも同じである。
 - `@pasta_search` を読み込めない環境（テストなど）では、2 段目と 5 段目を飛ばす。
+- 変数の値を名前にする動的参照（`var_path` を渡した `word` と `expr_fn_var`。DSL の [動的単語参照](../grammar/words.md#動的単語参照)）は、3 段目を探さず、1 段目はシーンテーブル自身のキー（`__global_name__`・シーン関数・Lua ブロックで定義した関数）だけを探す。4 段目の `GLOBAL` は探すため、値が `GLOBAL` に登録された名前（ランタイムが登録する `yield`・`チェイントーク` を含む）と同じなら、その関数が見つかって呼ばれる。
 
-#### word(name)
+#### word(name, var_path)
 
 ```lua
-act:word(name) -> string | nil
+act:word(name, var_path?) -> string | nil
 ```
 
-- `name` が `nil` か空文字列なら、何もせずに `nil` を返す。
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `name` | string（`var_path` があるときは任意の値） | 単語名。`var_path` があるときは変数の値 |
+| `var_path` | string または nil | 動的参照のときの変数の場所（`"var.x"`・`"save.x"`・`"args[1]"`）。警告ログに使う |
+
+- `var_path` が `nil` のとき、`name` が `nil` か空文字列なら、何もせずに `nil` を返す。
+- `var_path` があるときは、`name` を `WORD.dynamic_key` で単語名に直してから探す（[WORD.dynamic_key](#worddynamic_keyvalue-var_path-via)）。直せない値なら、警告ログを出して探さずに `nil` を返す。探すときは動的参照の探し方（[検索と呼び出し](#検索と呼び出し)）になる。
 - `"word"` モードで探し、見つかったのが関数なら `関数(act)` を呼んでその戻り値をそのまま返す。関数以外の値なら `tostring` した文字列を返す。
 - 見つからなければ警告ログを出して `nil` を返す。
-- DSL の `＄x＝＠単語` は `var.x = act:word("単語")` になる。アクション行の `＠単語` はアクタープロキシの `word` を使う（[DSL と Lua の対応表](../grammar/variables.md#dsl-と-lua-の対応表)）。
+- DSL の `＄x＝＠単語` は `var.x = act:word("単語")`、`＄x＝＠＄y` は `var.x = act:word(var.y, "var.y")` になる。アクション行の `＠単語`・`＠＄y` はアクタープロキシの `word` を使う（[DSL と Lua の対応表](../grammar/variables.md#dsl-と-lua-の対応表)）。
 
-#### find_handler(mode, key) と find_act_handler(mode, key)
+#### find_handler(mode, key, skip_methods) と find_act_handler(mode, key, skip_methods)
 
 ```lua
-act:find_handler(mode, key) -> any | nil
-act:find_act_handler(mode, key) -> any | nil
+act:find_handler(mode, key, skip_methods?) -> any | nil
+act:find_act_handler(mode, key, skip_methods?) -> any | nil
 ```
 
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
 | `mode` | string | `"word"`・`"scene"`・`"expr"` |
 | `key` | string | 検索する名前 |
+| `skip_methods` | boolean または nil | 真なら動的参照の探し方（3 段目を探さず、1 段目はシーンテーブル自身のキーだけ）にする。省略時は通常の探し方 |
 
 - 5 段で探し、最初に見つかった値（関数・文字列など）を、呼ばずにそのまま返す。見つからなければ `nil` を返す（警告ログは出さない）。
 - ACT の `find_handler` は `find_act_handler` と同じ結果を返す。アクタープロキシの `find_handler` は、`"word"` モードのときアクター辞書を先に探す。
@@ -256,6 +265,22 @@ act:expr_fn(key, ...) -> any
 - `"expr"` モードで探し、見つかったのが関数なら `関数(act, ...)` を呼んでその戻り値を返す。2・5 段目でシーンが見つかった場合も、そのシーン関数を同じく呼ぶ。
 - 関数以外の値が見つかったとき、または見つからないときは、警告ログを出して `nil` を返す。
 - DSL の式の中の `＠関数（…）` は `act:expr_fn("関数", …)` になる。アクション行の中ではアクタープロキシの `expr_fn` を使う（[関数スコープの展開先](../grammar/variables.md#関数スコープの展開先)）。
+
+#### expr_fn_var(value, var_path, ...)
+
+```lua
+act:expr_fn_var(value, var_path, ...) -> any
+```
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `value` | any | 関数名にする変数の値 |
+| `var_path` | string | 変数の場所（`"var.f"` など）。警告ログに使う |
+| `...` | any | 呼び出す関数に渡す引数 |
+
+- `value` を `WORD.dynamic_key` で関数名に直し（[WORD.dynamic_key](#worddynamic_keyvalue-var_path-via)）、動的参照の探し方（[検索と呼び出し](#検索と呼び出し)）で `"expr"` モードで探す。見つかった後の扱いは `expr_fn` と同じである。
+- `value` を関数名に直せないときは、警告ログを出して探さずに `nil` を返す。
+- DSL の式の中の `＠＄f（…）` は `act:expr_fn_var(var.f, "var.f", …)` になる。アクション行の中ではアクタープロキシの `expr_fn_var` を使う（[動的関数呼び出し](../grammar/words.md#動的関数呼び出し)）。
 
 #### find_scene(key)
 
@@ -414,6 +439,23 @@ WORD.create_actor("さくら", "一人称")
     :entry("わたし")
     :entry("あたし")
 ```
+
+### WORD.dynamic_key(value, var_path, via)
+
+```lua
+WORD.dynamic_key(value, var_path, via) -> string | nil
+```
+
+動的参照の変数の値を、単語名・関数名に直す補助関数である。`act:word`（`var_path` を渡したとき）と `act:expr_fn_var` が使う。
+
+| `value` | 戻り値 |
+| ------- | ------ |
+| 空でない文字列 | その文字列 |
+| 数値 | `tostring(value)`（`3` なら `"3"`） |
+| `nil`・空文字列・それ以外の型 | `nil`（警告ログを出す） |
+
+- 文字列は DSL として読み直さない。`__tostring` を持つ表も文字列にしない。
+- 警告ログは `{via} - undefined variable: '{var_path}'`（`nil`）・`{via} - empty variable: '{var_path}'`（空文字列）・`{via} - unsupported value type: '{var_path}' ({型名})`（それ以外の型）である。ランタイムは `via` に `"act:word"`・`"act:expr_fn"`・`"proxy:word"`・`"proxy:expr_fn"` を渡す。
 
 ### WORD.resolve_value(value, act)
 

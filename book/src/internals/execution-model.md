@@ -64,13 +64,16 @@ VM の組み立てからコルーチンの回し方、永続化まで、わた�
 pasta.shiori.entry（SHIORI.load / request / unload / kick）
   └→ pasta.shiori.event（EVENT.fire）
         ├→ pasta.shiori.act ──→ pasta.act ──→ pasta.actor, pasta.scene, pasta.global,
-        │                                     pasta.store, pasta.save（ACT.new の呼び出し時）
+        │                                     pasta.store, pasta.word,
+        │                                     pasta.save（ACT.new の呼び出し時）
         ├→ pasta.shiori.event.callback ──→ pasta.store
         └→ pasta.store
 
 pasta.store ──→ （@pasta_config だけを pcall で読む。他の pasta.* を require しない）
 pasta.save  ──→ @pasta_persistence
 ```
+
+この図ではログ出力の `@pasta_log` を省いている（`pasta.act`・`pasta.actor`・`pasta.word` などがモジュールの読み込み時に `require` する）。
 
 | モジュール | 実行モデルでの役割 |
 | ---------- | ------------------ |

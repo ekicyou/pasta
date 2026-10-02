@@ -58,6 +58,28 @@ PastaFile
 
 AST ノードは `Span`（開始・終了の行と桁、バイトオフセット）を持ち、エラー表示とソースマップに使われる。
 
+#### 動的参照の規則と AST
+
+変数の値を名前として使う動的参照（`＠＄変数名`・`＠＄変数名（…）`。書ける形と書けない形は利用者向けの [動的単語参照](../grammar/words.md#動的単語参照) が正）は、次の規則で解析する。
+
+| 規則 | 形 | 使われる位置 |
+| ---- | -- | ------------ |
+| `dyn_name_local` | `var_marker ~ var_id`（`＄名前`・`＄０`） | `dyn_name` の選択肢 |
+| `dyn_name_global` | `var_marker ~ global_marker ~ id`（`＄＊名前`） | `dyn_name` の選択肢（`dyn_name_local` より先に試す） |
+| `word_ref_dynamic` | `word_marker ~ dyn_name ~ s` | `action` の選択肢（`word_ref` の後）と、変数代入の右辺（`set`） |
+| `fn_call_dynamic` | `fn_marker ~ dyn_name ~ args` | `fn_call` の選択肢。`fn_call` はアクションと式の項の両方に現れる |
+
+`dyn_name` はプロパティ変数（`＄％`）を含まない。`action` では `fn_call` が `word_ref_dynamic` より先に試されるため、引数が正しく解析できる `＠＄変数名（…）` は関数呼び出しになる。AST では次の変種になる。
+
+| 構文の位置 | AST |
+| ---------- | --- |
+| アクションの `＠＄変数名` | `Action::DynamicWordRef { var_name, var_scope, span }` |
+| アクションの `＠＄変数名（…）` | `Action::DynamicFnCall { var_name, var_scope, args, span }` |
+| 式の中の `＠＄変数名（…）` | `Expr::DynamicFnCall { var_name, var_scope, args }` |
+| 変数代入の右辺の `＠＄変数名` | `SetValue::DynamicWordRef { var_name, var_scope }` |
+
+`var_scope` は `VarScope` であり、`dyn_name_global` は `VarScope::Global`、`dyn_name_local` は `var_ref_local` と同じ規則で、数字の名前なら `VarScope::Args(番号)`、それ以外なら `VarScope::Local` になる（`parse_action.rs` の `parse_dyn_name`）。部分パースの `shift_action` は、2 つの `Action` の変種の `Span`（`DynamicFnCall` は引数の `Span` も）を、静的な単語参照・関数呼び出しと同じくずらす。
+
 ### トランスパイラとコード生成
 
 | 要素 | 所在 | 役割 |
@@ -182,15 +204,17 @@ end
 
 | 項目 | 生成 |
 | ---- | ---- |
-| 変数代入（ローカル・グローバル） | `var.名前 = 式`・`save.名前 = 式`。右辺が単語参照なら `act:word(名前)`、プロパティ参照だけなら `act:get_property(名前)` |
-| 変数代入（プロパティ） | `act:set_property(名前, 式)` |
+| 変数代入（ローカル・グローバル） | `var.名前 = 式`・`save.名前 = 式`。右辺が単語参照なら `act:word(名前)`、動的単語参照なら `act:word(var.変数名, "var.変数名")`、プロパティ参照だけなら `act:get_property(名前)` |
+| 変数代入（プロパティ） | `act:set_property(名前, 式)`。右辺が単語参照・動的単語参照なら、式の代わりに上と同じ `act:word(…)` を渡す |
 | 式文（`＄＝`） | 式をそのまま 1 文として出力する |
 | Call | `act:call(SCENE.__global_name__, "名前", {}, 明示した引数…, table.unpack(args))`。動的ターゲットは名前の代わりに `tostring(式)` |
-| アクション行・継続行 | アクションごとに 1 文。発言は `act.アクター:talk(文字列)`、単語参照は `act.アクター:talk(act.アクター:word(名前))`、さくらスクリプトは `act.アクター:sakura_script(文字列)` |
+| アクション行・継続行 | アクションごとに 1 文。発言は `act.アクター:talk(文字列)`、単語参照は `act.アクター:talk(act.アクター:word(名前))`、動的単語参照は `act.アクター:talk(act.アクター:word(var.変数名, "var.変数名"))`、さくらスクリプトは `act.アクター:sakura_script(文字列)` |
 | 選択肢行 | `act:choice(ジャンプ先, 表示テキスト)` |
 | キューコマンド行 | `!select` だけを `act:choice_timeout(秒数)`（引数が数値でなければ `nil`）に変換する。他のキューコマンドは出力しない |
 
-変数参照のアクションは、値と変数の経路の文字列を渡す `act.アクター:talk(var.名前, "var.名前")` になり、プロパティ参照は `tostring(act:get_property(名前))` を話す。関数呼び出しのアクションは、戻り値の先頭だけを話すよう括弧で包む（`act.アクター:talk((act.アクター:expr_fn(名前, 引数…)))`、グローバル関数は `GLOBAL.名前(act, 引数…)`）。キーワード引数は値だけを位置で渡す。ここで生成した `act` のメソッドが実行時に何をするかは、[ランタイム実行モデル](execution-model.md) と [Lua ランタイム内部モジュール](internal-modules.md) で扱う。
+変数参照のアクションは、値と変数の経路の文字列を渡す `act.アクター:talk(var.名前, "var.名前")` になり、プロパティ参照は `tostring(act:get_property(名前))` を話す。関数呼び出しのアクションは、戻り値の先頭だけを話すよう括弧で包む（`act.アクター:talk((act.アクター:expr_fn(名前, 引数…)))`、グローバル関数は `GLOBAL.名前(act, 引数…)`、動的関数呼び出しは `act.アクター:expr_fn_var(var.変数名, "var.変数名", 引数…)`）。式の中の関数呼び出しはアクターを付けず、`act:expr_fn(名前, 引数…)`・`GLOBAL.名前(act, 引数…)`・`act:expr_fn_var(var.変数名, "var.変数名", 引数…)` になる。キーワード引数は値だけを位置で渡す。
+
+動的参照の生成（`element_gen.rs` の `dynamic_ref_args`）は、変数の値を `tostring` せずにそのまま渡し、変数の経路（`var.変数名`・`save.変数名`・`args[番号+1]`）を文字列リテラルにして続けて渡す。値の検査と検索キーへの変換は実行時に行う（[Lua ランタイム内部モジュール](internal-modules.md#動的参照のキーworddynamic_key)）。ここで生成した `act` のメソッドが実行時に何をするかは、[ランタイム実行モデル](execution-model.md) と [Lua ランタイム内部モジュール](internal-modules.md) で扱う。
 
 ### 生成時最適化
 

@@ -85,7 +85,7 @@ impl SearchContext {
                     })?;
 
                     // Extract global_name and local_name from fn_name
-                    // fn_name format: "親名_カウンタ::ローカル名" (e.g., "メイン_1::選択肢_1" or "メイン_1::__start__")
+                    // fn_name format: "グローバル名::ローカル名" (finalize: "メイン1::選択肢_1"; transpile-time registry: "メイン_1::選択肢_1")
                     let (global_name, local_name) = Self::parse_fn_name(&scene.fn_name);
                     Ok(Some((global_name, local_name)))
                 }
@@ -121,10 +121,10 @@ impl SearchContext {
     /// Parse fn_name to extract global_name and local_name in transpiler output format.
     ///
     /// # Arguments
-    /// * `fn_name` - e.g., "メイン_1::選択肢_1" or "メイン_1::__start__"
+    /// * `fn_name` - e.g., "メイン1::選択肢_1" or "メイン1::__start__" after `finalize_scene` ("メイン_1::…" in the transpile-time registry)
     ///
     /// # Returns
-    /// * `(global_name, local_name)` - e.g., ("メイン_1", "選択肢_1") or ("メイン_1", "__start__")
+    /// * `(global_name, local_name)` - e.g., ("メイン1", "選択肢_1") or ("メイン1", "__start__")
     fn parse_fn_name(fn_name: &str) -> (String, String) {
         if let Some((global_part, local_part)) = fn_name.split_once("::") {
             let local_name = if local_part == "__start__" {
