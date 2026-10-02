@@ -14,6 +14,7 @@ mod code_generator_test;
 mod comparison_test;
 mod cue_command_passthrough_test;
 mod dynamic_call_test;
+mod dynamic_word_ref_test;
 mod fallback_search_integration_test;
 mod final_regression_test;
 mod record_wiring_element_test;

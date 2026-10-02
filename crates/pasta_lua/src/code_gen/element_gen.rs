@@ -50,6 +50,15 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
     }
 
+    /// Runtime arguments of a dynamic reference: the variable's value and its path
+    /// as a string literal (e.g. `var.x, "var.x"`). The value is passed as-is (never
+    /// `tostring`-ed) so the runtime can tell nil / empty / bad types apart.
+    fn dynamic_ref_args(name: &str, scope: &VarScope) -> Result<String, TranspileError> {
+        let var_path = Self::resolve_var_path(name, scope)?;
+        let path_literal = StringLiteralizer::literalize(&var_path)?;
+        Ok(format!("{}, {}", var_path, path_literal))
+    }
+
     /// Generate variable assignment (Requirement 3d).
     ///
     /// Local: `var.変数名 = 値`
@@ -113,12 +122,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         let word_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!("{} = act:word({})", var_path, word_literal))?;
                     }
-                    // 暫定: 3.1 で生成コードに置換
-                    SetValue::DynamicWordRef { .. } => {
-                        return Err(TranspileError::unsupported(
-                            &var_set.span,
-                            "dynamic word reference",
-                        ));
+                    SetValue::DynamicWordRef {
+                        var_name,
+                        var_scope,
+                    } => {
+                        let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                        self.writeln(&format!("{} = act:word({})", var_path, ref_args))?;
                     }
                 }
             }
@@ -134,12 +143,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         let word_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!("act:word({})", word_literal))?;
                     }
-                    // 暫定: 3.1 で生成コードに置換
-                    SetValue::DynamicWordRef { .. } => {
-                        return Err(TranspileError::unsupported(
-                            &var_set.span,
-                            "dynamic word reference",
-                        ));
+                    SetValue::DynamicWordRef {
+                        var_name,
+                        var_scope,
+                    } => {
+                        let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                        self.writeln(&format!("act:word({})", ref_args))?;
                     }
                 }
             }
@@ -176,12 +185,15 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     name_literal, word_literal
                 ))?;
             }
-            // 暫定: 3.1 で生成コードに置換
-            SetValue::DynamicWordRef { .. } => {
-                return Err(TranspileError::unsupported(
-                    &Span::default(),
-                    "dynamic word reference",
-                ));
+            SetValue::DynamicWordRef {
+                var_name,
+                var_scope,
+            } => {
+                let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                self.writeln(&format!(
+                    "act:set_property({}, act:word({}))",
+                    name_literal, ref_args
+                ))?;
             }
         }
         Ok(())
@@ -379,12 +391,34 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     self.writeln(&format!("act.{}:talk({})", actor, literal))?;
                 }
             }
-            // 暫定: 3.1 で生成コードに置換
-            Action::DynamicWordRef { .. } => {
-                return Err(TranspileError::unsupported(&span, "dynamic word reference"));
+            Action::DynamicWordRef {
+                var_name,
+                var_scope,
+                ..
+            } => {
+                // act.アクター:talk(act.アクター:word(var.x, "var.x"))
+                let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                self.writeln(&format!(
+                    "act.{}:talk(act.{}:word({}))",
+                    actor, actor, ref_args
+                ))?;
             }
-            Action::DynamicFnCall { .. } => {
-                return Err(TranspileError::unsupported(&span, "dynamic function call"));
+            Action::DynamicFnCall {
+                var_name,
+                var_scope,
+                args,
+                ..
+            } => {
+                // act.アクター:talk((act.アクター:expr_fn_var(var.f, "var.f", 引数...)))
+                let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                let args_str = self.generate_args_string(args)?;
+                self.writeln(&format!(
+                    "act.{}:talk((act.{}:expr_fn_var({}{})))",
+                    actor,
+                    actor,
+                    ref_args,
+                    format_args_suffix(&args_str)
+                ))?;
             }
         }
 
@@ -461,12 +495,20 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 self.generate_expr_to_buffer(inner, buf)?;
                 write!(buf, ")")?;
             }
-            // 暫定: 3.1 で生成コードに置換
-            Expr::DynamicFnCall { .. } => {
-                return Err(TranspileError::unsupported(
-                    &Span::default(),
-                    "dynamic function call",
-                ));
+            Expr::DynamicFnCall {
+                var_name,
+                var_scope,
+                args,
+            } => {
+                // act:expr_fn_var(var.f, "var.f", 引数...)
+                let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                let args_str = self.generate_args_string(args)?;
+                write!(
+                    buf,
+                    "act:expr_fn_var({}{})",
+                    ref_args,
+                    format_args_suffix(&args_str)
+                )?;
             }
             Expr::Binary { op, lhs, rhs } => {
                 self.generate_expr_to_buffer(lhs, buf)?;
