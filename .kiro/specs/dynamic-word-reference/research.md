@@ -184,3 +184,107 @@
 - **RN-2**: mlua の `String` 引数への数値・真偽値・テーブルの変換挙動の確認（数値は文字列化、その他はエラーになるか）。設計では検索前の明示的な文字列化で回避する前提。
 - **RN-3**: `＠＄＄`・`＠＄` 単独・`＠＄％x` がパースエラーになったときのエラーメッセージが作者に分かる文言か（`expected id` 等）の実測。
 - **RN-4（付随発見）**: 動的コール `＞＄未定義` は `tostring(nil)` により `"nil"` という名のシーンを探し、`act:call` の nil ガードが働いていない。本仕様の範囲外だが、警告の考え方を揃える際の参考として記録する（修正は別件 → `.kiro/specs/dynamic-call-nil-guard/brief.md` で起票。マニュアル `call-jump.md` は現行の `"nil"` 検索を記述しており、どちらを正とするかは同 brief で決める）。
+
+---
+
+# 設計フェーズの調査と判断（kiro-spec-design）
+
+## Summary
+
+- **Feature**: `dynamic-word-reference`
+- **Discovery Scope**: Extension（既存の文法・パーサ・トランスパイラ・ランタイム・エディタ支援への追加。新しい外部依存なし → 軽量ディスカバリ）
+- **Key Findings**:
+  - 要件ディスカッション #3（`＠＄名前（…）` を動的関数呼び出しにする）により、ギャップ分析 §2.1・§6-2 の「`＠＄x（` をパースエラーにする否定先読み」は不要になった。代わりに `fn_call` に動的版を足し、`action` で `word_ref_dynamic` より先に試す（静的の `fn_call` → `word_ref` と同じ順）。
+  - 既存の `var_ref_local`／`var_ref_global` は末尾に空白 `s` を含むため、関数呼び出しに流用すると `＠＄f （）` が関数呼び出しになり、静的の `＠f （）`（単語参照＋台詞）とずれる。末尾の空白を含まない `dyn_name_local`／`dyn_name_global` を新設する。
+  - パーサの既定アームの落とし穴は 3 箇所: `parse_actions` は黙って捨てる、`try_parse_expr` は子を再帰して `args` 内の最初の引数を返す（`＄y＝＠＄f（１）` が `＄y＝１` になる）、`parse_var_set` は `try_parse_expr` に回して `BlankString` になる。いずれも明示アームで塞ぐ。
+  - L1（シーンテーブル）と A1（アクターの表）はメタテーブル経由で `SCENE_TABLE_IMPL.create_word`・`ACTOR_IMPL.create_word` に届く。L3 を外した理由と同種の到達であり、決定 #2 の範囲で残る（設計の OPEN QUESTION 1）。
+
+## Research Log
+
+### 構文規則の配置と衝突
+
+- **Context**: `＠＄` 系の規則を既存の `action`・`fn_call`・`set` にどう足すか。
+- **Sources Consulted**: `crates/pasta_dsl/src/parser/grammar.pest`（`action`・`fn_call`・`set`・`var_ref_*`・`talk_word`・`at_escape`）。
+- **Findings**:
+  - `fn_call` は `term` から参照されるため、動的版を足すだけで式・引数・Call の動的ターゲット・算術の項（R7.2）に入る。
+  - `＠＄％p`・`＠＊＄x`・`＠＄`＋変数名なしは、新規則がプロパティを含めず `fn_call_global` が `id` を要求するため、どの選択肢にも一致しない。`talk_word` が `＠` を除外しているので、追加の否定規則なしにパースエラーになる。
+  - `＠＠＄x` は `at_escape` が先に `＠＠` を取り、残りの `＄x` は変数展開になる（既存の意味のまま）。
+  - 引数が式として正しくない `＠＄f（時間：朝）` は PEG のバックトラックで `word_ref_dynamic`＋台詞になる。静的の `＠f（時間：朝）` と同じ挙動で、マニュアル `action-line.md` に静的の記述がある。
+- **Implications**: 規則は `action`・`fn_call`・`set` の末尾追加で足り、既存の選択肢の相対順は変えない。
+
+### ランタイムの検索段と警告
+
+- **Context**: L3 だけを飛ばす経路と、未代入・空・型不正の警告をどこに置くか。
+- **Sources Consulted**: `pasta_scripts/pasta/act.lua`（`find_act_handler`・`word`・`expr_fn`・`talk`・`call`）、`actor.lua`（`PROXY_IMPL.find_handler`・`word`・`expr_fn`・`ACTOR_IMPL`）、`scene.lua`（`SCENE_TABLE_IMPL`）、`word.lua`。
+- **Findings**:
+  - `act.lua` は `pasta.actor` を require しており、`actor.lua` から `pasta.act` を require すると循環になる。両者が共有するキー解決は `pasta.word`（`actor.lua` が既に require、`act.lua` からも require 可）に置ける。
+  - `expr_fn(self, key, ...)` は可変長引数を取るため、`talk(text, var_name)` のように末尾へ変数パスを足せない。動的関数呼び出しは別メソッド `expr_fn_var(self, value, var_path, ...)` にする。
+  - `find_act_handler` に省略可能な第 4 引数 `skip_methods` を足せば、既存の呼び出し（引数 2 つ）は挙動不変のまま L3 を飛ばせる。`find_handler` を上書きしている Lua スクリプトは `act.lua`・`actor.lua` 以外に無い。
+  - `PROXY_IMPL.find_actor_handler` は word モードだけで A1・A2 を探すため、動的関数呼び出しはアクター辞書を探さない（静的と同じ）。
+- **Implications**: 静的経路（`var_path == nil`・`skip_methods == nil`）のコードは分岐の外側に残り、`lua_specs/act_word_expr_test.lua` の既存テストはそのまま通る。
+
+### エディタ支援
+
+- **Context**: TextMate・LSP の追従範囲。
+- **Sources Consulted**: `editors/vscode/syntaxes/pasta.tmLanguage.json`、`crates/pasta_lsp/src/analysis/visit_action.rs`・`visit_expr.rs`・`text_utils.rs`、`book/tools/highlight/highlight-html.mjs`。
+- **Findings**:
+  - `inline-word-ref` は 2 文字目の `＄` を除外するため `＠＄x` に一致せず、`＠` だけが未着色で残る。`＠＄` で始まる規則を足せば、既存の正しい DSL には一致しない（`＠＠＄x` のエスケープ後の `＠＄x` を除く。TextMate の近似としての既知の限界）。
+  - 代入行は `variable` 規則が行全体を変数スコープで塗る。静的の `＄x＝＠単語` も同じで、動的参照は既に着色される。
+  - LSP の代入右辺・式は span を持たず文字列探索で位置を出す。既存の探索は「全角だけ」「半角だけ」の 2 パターンで、マーカーが 2〜3 個続く動的参照の全角半角混在には対応できないため、文字単位で全角半角を許す探索関数を足す。
+  - マニュアルのハイライトは VSCode の文法ファイルを直接読む（`highlight-html.mjs`）。
+- **Implications**: TextMate は 1 規則の追加、LSP は 2 アーム＋位置探索 1 関数。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A: AST 一般化 | `WordRef`・`FnCall` の名前を `Static`/`Var` に一般化 | 分岐が 1 箇所 | 既存変種の形が変わり、利用箇所すべてを書き換える | 不採用 |
+| B: 新変種＋新ランタイム関数 | 新変種、`word_var`・`expr_fn_var` を新設 | 静的が完全に不変、名前が対称 | ランタイムの公開メソッドが 2 つ増える | 次点（OPEN QUESTION 5） |
+| C: 新変種＋`word` の後方互換拡張 | 新変種、`word(値, パス)`、関数は `expr_fn_var` | 静的不変、`talk(値, パス)` と対称、メソッド増は 1 つ | `word`・`expr_fn_var` の形が非対称 | **採用** |
+
+## Design Decisions
+
+### Decision: 動的参照は新しい AST 変種で表す
+
+- **Context**: R2.7（既存辞書の不変）と `pasta_dsl` 公開 API への影響。
+- **Alternatives Considered**: 1. 既存変種の一般化 2. 新変種の追加
+- **Selected Approach**: `Action::DynamicWordRef`・`Action::DynamicFnCall`・`Expr::DynamicFnCall`・`SetValue::DynamicWordRef`（フィールドは `var_name`・`var_scope`、関数は `args` も）。
+- **Rationale**: 既存変種の形を変えずに済み、網羅 match のコンパイルエラーが code_gen・LSP・`partial.rs` の漏れを検出する。
+- **Trade-offs**: 変種の追加自体は公開 enum の破壊的変更。`#[non_exhaustive]` は既存 enum と揃えて付けない。
+- **Follow-up**: 版の上げ方は release-workflow で扱う（OPEN QUESTION 3）。
+
+### Decision: 値の型判定・文字列化はランタイムで行う
+
+- **Context**: R3.5・3.6・4.1・4.2・7.6・7.8。動的コールの `tostring(<式>)` は nil を `"nil"` に変える（RN-4）。
+- **Selected Approach**: 生成コードは値と変数パスをそのまま渡し、`WORD.dynamic_key` が nil → 空 → 型 → 数値の文字列化の順に判定する。
+- **Rationale**: nil の判定を文字列化の前に行える唯一の位置であり、単語・関数の両方で同じ規則を共有できる。
+- **Trade-offs**: `pasta.word` に公開関数が 1 つ増える（`ACT_IMPL` に置かないため L3 からは到達しない）。
+
+### Decision: 警告文言
+
+- **Context**: 要件ディスカッション #9（文言の形は既存の `undefined variable: 'var.x'` に揃え、設計で確定）。
+- **Selected Approach**: `{via} - undefined variable: '{path}'`／`{via} - empty variable: '{path}'`／`{via} - unsupported value type: '{path}' ({type})`。`via` は `act:word`・`proxy:word`・`act:expr_fn`・`proxy:expr_fn`。該当なしは静的と同一の `handler not found`。
+- **Follow-up**: `dynamic-call-nil-guard` が文言を揃えるときの基準になる。
+
+### Synthesis（一般化・採用/自作・簡素化）
+
+- **一般化**: 単語参照と関数呼び出しの動的版は「`＠` の後の名前を変数の値で差し替える」1 つの規則であり、参照変数の文法（`dyn_name`）・キー解決（`WORD.dynamic_key`）・L3 の除外（`skip_methods`）を共有する。
+- **採用/自作**: 新しいライブラリは不要。単語検索・巡回は既存の `@pasta_search`、変数パスは既存の `resolve_var_path`、引数は既存の `args`・`parse_args`・`generate_args_string` を使う。
+- **簡素化**: 否定先読み規則（ギャップ分析時の案）・検索モードの新設・動的専用の検索コアは作らない。L3 の除外はフラグ 1 つで足りる。マニュアル例の検証は書籍ツールに新しい仕組みを作らず、テストがマニュアル章から該当コードブロックを抽出する（OPEN QUESTION 4）。
+
+## Risks & Mitigations
+
+- パーサの既定アームによる誤解釈（`＄y＝＠＄f（１）` → `＄y＝１` など）— 3 箇所に明示アームを置き、AST をテストで固定する。
+- L1・A1 のメタテーブル経由のメソッド到達 — 決定 #2 の範囲として残し、設計ディスカッションで確認する（OPEN QUESTION 1）。
+- 公開 enum の破壊的変更 — 版の上げ方を release-workflow で扱う。
+- TextMate の近似による `＠＠＄x` の誤着色 — 既存の `＠＠word` と同種の限界として記録し、LSP のセマンティックトークンで正確に分類する。
+
+## References
+
+- `crates/pasta_dsl/src/parser/grammar.pest` — `action`・`fn_call`・`set`・`var_ref_*`・`at_escape`・`talk_word`
+- `crates/pasta_dsl/src/parser/parse_action.rs`・`parse_elements.rs`・`partial.rs` — 既定アームと span 補正
+- `crates/pasta_lua/src/code_gen/element_gen.rs` — `resolve_var_path`・静的参照・変数展開の生成
+- `crates/pasta_lua/pasta_scripts/pasta/act.lua`・`actor.lua`・`scene.lua`・`word.lua` — 検索コア・ポストプロセス・メタテーブル
+- `crates/pasta_lsp/src/analysis/visit_action.rs`・`visit_expr.rs` — トークン分類と位置探索
+- `editors/vscode/syntaxes/pasta.tmLanguage.json`・`book/tools/highlight/highlight-html.mjs` — ハイライト
+- `book/src/grammar/{words,markers,action-line,variables,actor-dictionary}.md`・`book/tools/gen-skill-refs.mjs` — マニュアルと生成スキル
