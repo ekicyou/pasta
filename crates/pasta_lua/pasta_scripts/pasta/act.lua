@@ -8,6 +8,7 @@ local ACTOR = require("pasta.actor")
 local SCENE = require("pasta.scene")
 local GLOBAL = require("pasta.global")
 local STORE = require("pasta.store")
+local WORD = require("pasta.word")
 local log = require "@pasta_log"
 
 -- ============================================================================
@@ -308,19 +309,26 @@ end
 --- word モードの @pasta_search 未利用時はL2・L5 word 前方一致をスキップ
 --- scene/expr モードは SCENE.search を直接呼び出す（@pasta_search 可用性チェックは package.loaded 参照）
 ---
+--- skip_methods（動的参照用）: 継承したメソッドに届かせない。L1 は rawget で表自身のフィールドだけを引き
+--- （SCENE_TABLE_IMPL の create_word 等に一致させない）、L3 は探さない。L2・L4・L5 は同じ。
+---
 --- @param self Act アクションオブジェクト
 --- @param mode string "word" | "scene" | "expr"
 --- @param key string 検索キー
+--- @param skip_methods boolean|nil true で継承したメソッドに届かせない。nil/false は既存どおり
 --- @return any|nil 見つかったハンドラー（関数または値）、またはnil
-function ACT_IMPL.find_act_handler(self, mode, key)
+function ACT_IMPL.find_act_handler(self, mode, key, skip_methods)
     -- @pasta_search 可用性チェック（オプショナルモジュールのため呼び出し毎に pcall で確認。
     -- require はロード済みキャッシュを返すため低コスト）
     local ok, SEARCH = pcall(require, "@pasta_search")
     if not ok then SEARCH = nil end
 
-    -- L1: current_scene[key] 完全一致
-    if self.current_scene and self.current_scene[key] ~= nil then
-        return self.current_scene[key]
+    -- L1: current_scene[key] 完全一致（skip_methods 時は表自身のフィールドだけ）
+    local scene = self.current_scene
+    if scene then
+        local value
+        if skip_methods then value = rawget(scene, key) else value = scene[key] end
+        if value ~= nil then return value end
     end
 
     -- L2: ローカル辞書前方一致（@pasta_search 利用可能かつ scene_name あり時のみ）
@@ -330,10 +338,12 @@ function ACT_IMPL.find_act_handler(self, mode, key)
         if result ~= nil then return result end
     end
 
-    -- L3: self[key] function型のみ（act.XX / SHIORI_ACT_IMPL 継承チェーンを含む）
-    local method = self[key]
-    if type(method) == "function" then
-        return method
+    -- L3: self[key] function型のみ（act.XX / SHIORI_ACT_IMPL 継承チェーンを含む。skip_methods 時は飛ばす）
+    if not skip_methods then
+        local method = self[key]
+        if type(method) == "function" then
+            return method
+        end
     end
 
     -- L4: GLOBAL[key] 完全一致（全モード共通）
@@ -354,23 +364,31 @@ end
 --- @param self Act アクションオブジェクト
 --- @param mode string "word" | "scene" | "expr"
 --- @param key string 検索キー
+--- @param skip_methods boolean|nil find_act_handler へそのまま渡す
 --- @return any|nil
-function ACT_IMPL.find_handler(self, mode, key)
-    return self:find_act_handler(mode, key)
+function ACT_IMPL.find_handler(self, mode, key, skip_methods)
+    return self:find_act_handler(mode, key, skip_methods)
 end
 
 --- 単語取得（find_handler + word ポストプロセス）
 --- 検索順序は find_act_handler の6段階フォールバック（word モード）
+--- var_path があるとき（動的参照）は name を WORD.dynamic_key でキーにし、継承したメソッドに届かせずに検索する
 --- ポストプロセス: handler=nil → warn+nil、function → h(self)、その他 → tostring(h)
 --- @param self Act アクションオブジェクト
---- @param name string 単語名
+--- @param name any 単語名。var_path があるときは参照変数の値
+--- @param var_path string|nil 動的参照の変数パス。nil なら既存の挙動（空キーは警告なしで nil）
 --- @return string|nil 見つかった単語、またはnil
-function ACT_IMPL.word(self, name)
-    if not name or name == "" then
+function ACT_IMPL.word(self, name, var_path)
+    local skip_methods = nil
+    if var_path ~= nil then
+        name = WORD.dynamic_key(name, var_path, "act:word")
+        if name == nil then return nil end
+        skip_methods = true
+    elseif not name or name == "" then
         return nil
     end
 
-    local handler = self:find_handler("word", name)
+    local handler = self:find_handler("word", name, skip_methods)
     if handler == nil then
         log.warn(string.format("act:word - handler not found: key='%s', mode='word', via=act",
             tostring(name)))
@@ -382,6 +400,22 @@ function ACT_IMPL.word(self, name)
     return tostring(handler)
 end
 
+--- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(self, ...)、非function → warn+nil
+--- @param self Act アクションオブジェクト
+--- @param key string 関数名
+--- @param skip_methods boolean|nil find_handler へ渡す
+--- @param ... any 可変引数（ハンドラーに伝搬）
+--- @return any ハンドラーの戻り値、またはnil
+local function call_expr(self, key, skip_methods, ...)
+    local handler = self:find_handler("expr", key, skip_methods)
+    if type(handler) == "function" then
+        return handler(self, ...)
+    end
+    log.warn(string.format("act:expr_fn - handler not found: key='%s', mode='expr', via=act",
+        tostring(key)))
+    return nil
+end
+
 --- expr関数呼び出し（find_handler + expr ポストプロセス）
 --- find_handler("expr", key) でハンドラーを取得してポストプロセスを実行する。
 --- ポストプロセス: function → h(self, ...) 可変引数を伝搬、非function → warn+nil
@@ -390,13 +424,20 @@ end
 --- @param ... any 可変引数（ハンドラーに伝搬）
 --- @return any ハンドラーの戻り値、またはnil
 function ACT_IMPL.expr_fn(self, key, ...)
-    local handler = self:find_handler("expr", key)
-    if type(handler) == "function" then
-        return handler(self, ...)
-    end
-    log.warn(string.format("act:expr_fn - handler not found: key='%s', mode='expr', via=act",
-        tostring(key)))
-    return nil
+    return call_expr(self, key, nil, ...)
+end
+
+--- 動的関数呼び出し（＠＄名前（…））
+--- value を WORD.dynamic_key で関数名にし、継承したメソッドに届かせずに expr_fn と同じ検索・ポストプロセスを行う
+--- @param self Act アクションオブジェクト
+--- @param value any 参照変数の値
+--- @param var_path string 参照変数の Lua パス（警告用）
+--- @param ... any 可変引数（ハンドラーに伝搬）
+--- @return any ハンドラーの戻り値、またはnil
+function ACT_IMPL.expr_fn_var(self, value, var_path, ...)
+    local key = WORD.dynamic_key(value, var_path, "act:expr_fn")
+    if key == nil then return nil end
+    return call_expr(self, key, true, ...)
 end
 
 --- トークン取得とリセット（グループ化・統合済み）
