@@ -217,28 +217,55 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
-/// フルリファレンステンプレート/ドキュメント（pasta-toml.md）に記載の ghost
-/// 既定値が SSOT と一致すること（R5.4 / R5.5）。テンプレートが独立に乖離した
-/// 場合に失敗する。
+/// マニュアルの pasta.toml リファレンス章（`book/src/reference/pasta-toml.md`）に
+/// 記載の ghost 既定値が SSOT と一致すること（R5.4 / R5.5、
+/// manual-ssot-authority 4.3–4.5）。章の記載が独立に乖離した場合に失敗する。
+/// 読み先はマニュアル章であり、スキル側の生成物は読まない。
 #[test]
 fn config_reference_doc_matches_ssot() {
-    let doc_path =
-        repo_root().join(".claude/skills/pasta-ghost-authoring/references/pasta-toml.md");
+    let doc_path = repo_root().join("book/src/reference/pasta-toml.md");
     let doc = std::fs::read_to_string(&doc_path)
         .unwrap_or_else(|e| panic!("config reference doc not readable at {doc_path:?}: {e}"));
 
     let d = GhostConfig::default();
 
-    // 分類表の各行に SSOT 値が記載されていること（例: `talk_interval_min` | ... | `180`）。
-    // SSOT 値の文字列表現でドリフトを検出する。
+    // キー名を含む表行（例: `talk_interval_min` | ... | `180`）はすべて SSOT 値を記載していること。
+    // テンプレートの既定値行（例: talk_interval_min = 180   # 既定 180）も SSOT 値と一致すること。
+    // 同じキーを複数箇所に書く章で、一部だけ古くなった場合も検出する。
     let expect_row = |key: &str, value: String| {
-        let has = doc
+        let cell = format!("`{key}`");
+        let want = format!("`{value}`");
+        let rows: Vec<&str> = doc
             .lines()
-            .any(|line| line.contains(key) && line.contains(&format!("`{value}`")));
+            .filter(|l| l.trim_start().starts_with('|') && l.contains(&cell))
+            .collect();
         assert!(
-            has,
-            "config reference doc の `{key}` 行に SSOT 値 `{value}` が見つからない (R5.4/R5.5)"
+            !rows.is_empty(),
+            "config reference doc に `{key}` の表行が見つからない (R5.4/R5.5)"
         );
+        for row in &rows {
+            assert!(
+                row.contains(&want),
+                "config reference doc の `{key}` 行に SSOT 値 `{value}` が見つからない (R5.4/R5.5): {row}"
+            );
+        }
+        for line in doc.lines().filter(|l| {
+            let t = l.trim_start();
+            t.starts_with(key) && t[key.len()..].trim_start().starts_with('=') && l.contains("既定")
+        }) {
+            let v = line
+                .split('=')
+                .nth(1)
+                .unwrap_or("")
+                .split('#')
+                .next()
+                .unwrap_or("")
+                .trim();
+            assert_eq!(
+                v, value,
+                "config reference doc のテンプレート `{key}` の既定値が SSOT `{value}` と食い違う (R5.4/R5.5): {line}"
+            );
+        }
     };
 
     expect_row("talk_interval_min", d.talk_interval_min.to_string());

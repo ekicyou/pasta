@@ -1,0 +1,23 @@
+{
+  "feature_name": "manual-ssot-authority",
+  "created_at": "2026-10-01T04:01:12Z",
+  "updated_at": "2026-10-02T09:36:32Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "completed_at": "2026-10-02T09:36:32Z"
+}

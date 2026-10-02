@@ -119,32 +119,20 @@ end)
 
 ランダム選択を含むモジュール（シーン選択・単語選択）のテストでは、セレクターを固定する。
 
-`@pasta_search` の `set_scene_selector` / `set_word_selector` は**整数インデックスのシーケンス（0始まり）**を受け取り、候補選択順序を事前指定する。Rust側で `MockRandomSelector` に変換される。
+`@pasta_search` の `set_scene_selector` / `set_word_selector` に整数を 1 個以上渡すと、シャッフルをやめて候補を決まった順に返すようになる。並び順の規則・引数の扱い・設定がランタイム全体に効くことは [pasta-search.md](pasta-search.md#set_scene_selector--set_word_selector) を正とする（本節は手順の例のみ）。
 
-### set_scene_selector
-
-```lua
-local SEARCH = require("@pasta_search")
-
--- 常に最初のシーンを選択（0始まりインデックス）
-SEARCH:set_scene_selector(0, 0, 0)
-
--- 1番目→2番目→1番目の順で選択
-SEARCH:set_scene_selector(0, 1, 0)
-```
-
-### set_word_selector
+### 固定する
 
 ```lua
 local SEARCH = require("@pasta_search")
 
--- 常に最初の候補を選択
-SEARCH:set_word_selector(0, 0, 0)
+SEARCH:set_scene_selector(0)  -- シーン検索を決定論的にする
+SEARCH:set_word_selector(0)   -- 単語検索を決定論的にする
 ```
 
 ### リセット
 
-テスト後は**引数なし**で呼び出してデフォルト（ランダム）動作に戻す:
+テスト後は**引数なし**で呼び出してデフォルト（シャッフル）動作に戻す。設定はランタイム全体の検索に効くため、戻し忘れると後続のテストに影響する。
 
 ```lua
 -- テスト終了後にリセット（引数なし = デフォルトに戻す）
@@ -156,15 +144,15 @@ SEARCH:set_word_selector()
 
 ```lua
 describe("トーク選択", function()
-    test("特定のシーンが選択される", function()
+    test("同じ順でシーンが選択される", function()
         local SEARCH = require("@pasta_search")
 
-        -- 常に2番目のシーンを選択するよう固定（0始まり）
-        SEARCH:set_scene_selector(1)
+        -- シャッフルをやめて決まった順にする
+        SEARCH:set_scene_selector(0)
 
         local result = SCENE.search("talk")
         expect(result).to_be_truthy()
-        -- 特定のシーンが返されることを検証
+        -- 期待するシーンが返されることを検証（順序の規則は pasta-search.md）
 
         -- リセット（引数なしでデフォルトに復帰）
         SEARCH:set_scene_selector()
@@ -173,7 +161,7 @@ describe("トーク選択", function()
 end)
 ```
 
-> 📖 `@pasta_search` モジュールの完全なAPI仕様は [runtime-api.md](runtime-api.md#set_scene_selector--set_word_selector) を参照。
+> 📖 `@pasta_search` モジュールの完全なAPI仕様は [pasta-search.md](pasta-search.md#set_scene_selector--set_word_selector) を参照。
 
 ---
 
@@ -244,7 +232,7 @@ lua_test フレームワークはRust側の `#[test]` 関数から呼び出さ�
 
 ## モックライブラリ (lua_test.mocks)
 
-`crates/pasta_lua/scriptlibs/lua_test/mocks.lua` は、Rustバックエンドモジュール5つのデフォルトスタブを一括で `package.loaded` に注入するライブラリ。テストごとの手動 `package.loaded` 設定ボイラープレートを排除する。
+`lua_test.mocks` モジュール（`require("lua_test.mocks")`）は、Rustバックエンドモジュール5つのデフォルトスタブを一括で `package.loaded` に注入するライブラリ。テストごとの手動 `package.loaded` 設定ボイラープレートを排除する。
 
 ### API
 
@@ -304,4 +292,4 @@ mocks.install({
 
 ## 関連リファレンス
 
-- [runtime-api.md](runtime-api.md#set_scene_selector--set_word_selector) — `@pasta_search` の `set_scene_selector` / `set_word_selector` 完全APIシグネチャ
+- [pasta-search.md](pasta-search.md#set_scene_selector--set_word_selector) — `@pasta_search` の `set_scene_selector` / `set_word_selector` 完全APIシグネチャ

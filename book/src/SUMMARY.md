@@ -25,7 +25,15 @@
 
 - [Lua マニュアル概要](lua/index.md)
   - [Lua の基礎](lua/basics.md)
-  - [公開モジュール API](lua/modules.md)
+  - [公開モジュール API](lua/modules/index.md)
+    - [@pasta_search](lua/modules/pasta-search.md)
+    - [@pasta_persistence](lua/modules/pasta-persistence.md)
+    - [@pasta_config](lua/modules/pasta-config.md)
+    - [@pasta_sakura_script](lua/modules/pasta-sakura-script.md)
+    - [@enc](lua/modules/enc.md)
+    - [@pasta_log](lua/modules/pasta-log.md)
+    - [mlua-stdlib 統合モジュール](lua/modules/mlua-stdlib.md)
+  - [SHIORI イベントとハンドラ](lua/shiori-events.md)
   - [scripts/ の記述パターン](lua/patterns.md)
   - [DSL と Lua の使い分け](lua/dsl-vs-lua.md)
 
@@ -41,4 +49,5 @@
 # リファレンス
 
 - [起動シーケンスとモジュール解決](reference/startup.md)
+- [pasta.toml リファレンス](reference/pasta-toml.md)
 - [外部リンク集](reference/external-links.md)

@@ -6,10 +6,10 @@
 
 ---
 
-本マニュアルは利用者向けの平易な派生物であり、厳密な定義や言語仕様そのものを再録しない。
-判断に迷ったとき、あるいは本書の記述だけでは足りないときは、本章のリンクから一次資料に当たること。
+本章は、本書が扱わない外部の一次資料（Lua 言語仕様・Unicode・ベースウェアの仕様）へのリンクをまとめる。
+本書の記述だけでは足りないときは、本章のリンクから一次資料に当たること。
 
-リンクはすべて**絶対 URL** で記載する。本書の外部（GitHub・外部サイト）を指すため、相対パスでは到達できない。
+リンクはすべて**絶対 URL** で記載する。本書の外部サイトを指すため、相対パスでは到達できない。
 
 ## Lua 言語リファレンス
 
@@ -43,22 +43,14 @@ LuaJIT 固有の拡張機能・標準ライブラリの差分・実装上の注�
 Lua 5.5 系の資料は、版が離れているため本書の言語リファレンスとしては案内しない。
 最新版の知識は LuaJIT 2.1 上では動作しない構文・関数を含むため、参照先として混在させないこと。
 
-## doc/spec — Pasta の権威的仕様
+## その他の外部仕様
 
-Pasta DSL の文法・処理系の挙動について、**最終的な正しさの基準**となるのは `doc/spec/` である。
-本マニュアルはこの仕様の利用者向け派生物であり、`doc/spec/` を置き換えるものではない。記述が食い違う場合は `doc/spec/` を正とする。
+Pasta が依拠する外部の仕様は、それぞれの一次資料を参照する。
 
 | 対象 | 用途 | リンク |
 | ---- | ---- | ------ |
-| doc/spec ディレクトリ（全体） | Pasta 仕様の入口・章一覧 | <https://github.com/ekicyou/pasta/tree/main/doc/spec> |
-| 文法モデル | 字句・構文の全体像 | <https://github.com/ekicyou/pasta/blob/main/doc/spec/01-grammar-model.md> |
-| マーカー一覧 | 全マーカー・演算子・区切り文字 | <https://github.com/ekicyou/pasta/blob/main/doc/spec/02-markers.md> |
-| ブロック構造 | 行種別・グローバル／ローカルブロック・インデント | <https://github.com/ekicyou/pasta/blob/main/doc/spec/03-block-structure.md> |
-| Call 仕様 | シーン呼び出し・前方一致・スコープ解決 | <https://github.com/ekicyou/pasta/blob/main/doc/spec/04-call-spec.md> |
-| 変数 | 変数・スコープの厳密仕様 | <https://github.com/ekicyou/pasta/blob/main/doc/spec/09-variables.md> |
-| 単語定義 | 単語・スコープ解決の共通仕様 | <https://github.com/ekicyou/pasta/blob/main/doc/spec/10-words.md> |
-
-各文法章の末尾にも、対応する `doc/spec/` 章への「権威的仕様」リンクを用意している。より深い定義が必要な場合は、そちらの導線も活用すること。
+| Unicode UAX #31（Unicode Identifier and Pattern Syntax） | 識別子に使える文字（XID_Start / XID_Continue）の定義 | <https://unicode.org/reports/tr31/> |
+| UKADOC さくらスクリプト一覧 | ベースウェアが解釈するさくらスクリプトのタグの意味と全一覧 | <https://ssp.shillest.net/ukadoc/manual/list_sakura_script.html> |
 
 ---
 

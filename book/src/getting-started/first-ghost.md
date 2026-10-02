@@ -412,7 +412,7 @@ spot = 1
 - 複数のアクターに同じ `spot` を割り当てて交代で話させる場合の立ち絵の扱いは、[同一スポット共有時の外見の復旧](../grammar/actor-dictionary.md#同一スポット共有時の外見の復旧) を参照。
 - 辞書は `[loader]` を書かなくても、`pasta_patterns` のデフォルト `["dic/**/*.pasta"]` により `dic/` 配下の `.pasta` ファイル（ステップ 2〜6 で書いた 5 つ）がすべて自動的に読み込まれる。
 
-この最小構成をそのまま `ghost/master/pasta.toml` として保存すれば、hello-pasta は起動する。各セクションの分類（省略可 / 必須 / エンジンプロファイル専用）と全フィールドのデフォルト値、フルリファレンステンプレートは設定ファイルリファレンスにまとまっている。ランダムトーク間隔（`[ghost]`）やログ設定（`[logging]`）などを明示したくなったら、そちらを参照して必要な項目だけ書き足すとよい。配布版 hello-pasta の完全な設定例は [hello-pasta の pasta.toml](https://github.com/ekicyou/pasta/blob/main/crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.toml) を参照すること。
+この最小構成をそのまま `ghost/master/pasta.toml` として保存すれば、hello-pasta は起動する。各セクションの分類（省略可 / 必須 / エンジンプロファイル専用）と全フィールドのデフォルト値、フルリファレンステンプレートは [pasta.toml リファレンス](../reference/pasta-toml.md) にまとまっている。ランダムトーク間隔（`[ghost]`）やログ設定（`[logging]`）などを明示したくなったら、そちらを参照して必要な項目だけ書き足すとよい。配布版 hello-pasta の完全な設定例は [hello-pasta の pasta.toml](https://github.com/ekicyou/pasta/blob/main/crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.toml) を参照すること。
 
 ### pasta.dll と Lua ランタイム
 

@@ -125,12 +125,13 @@ argument-hint: <feature-name>
    cargo test --all 2>&1 | Select-String "test result:|FAILED|error\["
    ```
 4. **Manual Sync Gate（条件付き）**: 判定ルールの本体は workflow.md「完了基準（DoD）> 6. Manual Sync Gate（条件付き）」にある（権威）。ここではその発火だけを行う。
-   - **発火条件**: 当該 spec の変更が `doc/spec/` または `book/` に**触れる場合のみ**、`drift-check` を実行する。
+   - **発火条件**: 当該 spec の変更が `book/`・`.claude/skills/pasta-ghost-authoring/`・`.claude/skills/pasta-lua-coding/` のいずれかに**触れる場合のみ**、鮮度チェックとリンク検証を実行する。
      ```powershell
-     node book/tools/drift-check.mjs
+     node book/tools/gen-skill-refs.mjs --check
+     node book/tools/link-check.mjs
      ```
-   - **中断**: `drift-check.mjs` が**非ゼロ終了**（未解決ドリフト / 未マップ / リンク切れ）した場合は、未解決ドリフトとして**ワークフローを中断し開発者に報告**する（下記5の「いずれかのゲート失敗時は中断」と整合）。ドリフト解消フローは workflow.md を参照。
-   - **スキップ**: 当該 spec の変更が `doc/spec/` にも `book/` にも触れない場合は、このゲートを**スキップ**する（Gate 1〜5 のみで完了可）。スキップ時は完了チェックリストに「(無関係変更によりスキップ)」と注記する。
+   - **中断**: いずれかが**非ゼロ終了**（スキル生成ファイルの不一致 / リンク切れ）した場合は、**ワークフローを中断し開発者に報告**する（下記5の「いずれかのゲート失敗時は中断」と整合）。解消フロー（マニュアル章を正として修正 → 再生成 → コミット → ゲート再実行）は workflow.md を参照。
+   - **スキップ**: 当該 spec の変更が上記のいずれにも触れない場合は、このゲートを**スキップ**する（Gate 1〜5 のみで完了可）。スキップ時は完了チェックリストに「(無関係変更によりスキップ)」と注記する。
 5. **いずれかのゲートが失敗した場合**: ワークフローを中断し、開発者に報告
 
 ### ステップ2: 未コミットファイルのコミット
@@ -286,7 +287,7 @@ PR の**作成またはマージ（API）が失敗**した場合（コンフリ�
 ```
 - [ ] DoD 全ゲート通過（workflow.md 準拠: Spec/Test/Doc/Steering/Soul）
 - [ ] cargo test --all 成功（またはセッション記録により省略）
-- [ ] Manual Sync Gate: 条件付き発火（doc/spec/ または book/ に触れる spec のみ drift-check 実行・非ゼロで中断／無関係変更はスキップ）
+- [ ] Manual Sync Gate: 条件付き発火（book/・.claude/skills/pasta-ghost-authoring/・.claude/skills/pasta-lua-coding/ に触れる spec のみ `node book/tools/gen-skill-refs.mjs --check` と `node book/tools/link-check.mjs` を実行・非ゼロで中断／無関係変更はスキップ）
 - [ ] 未コミットファイルをコミット済み（ステップ2）
 - [ ] completedフォルダへ移動済み（ステップ3）※繰り返し仕様はスキップ
 - [ ] spec.json の phase を "completed" に更新済み（ステップ4）※繰り返し仕様はスキップ

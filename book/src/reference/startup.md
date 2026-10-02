@@ -111,7 +111,7 @@ SHIORI の DLL には、設置パスを UTF-8 で受け取る初期化入口 `lo
 
 これらは本ランタイムの改善対象外であり、制限として残る。実測でも、絶対パスが 260 文字を超える場所へ設置したゴーストでは、ゴースト側の `SHIORI.unload` 内で呼ばれた `io.open` が失敗することが確認されている。
 
-データの永続化にこれらを使ってはならない。永続化は `@pasta_persistence` モジュールを用いること（[公開モジュール API](../lua/modules.md) を参照）。同モジュールはランタイム側でファイルを扱うため、設置パスの長さ・文字種の影響を受けない。
+データの永続化にこれらを使ってはならない。永続化は `@pasta_persistence` モジュールを用いること（[@pasta_persistence](../lua/modules/pasta-persistence.md) を参照）。同モジュールはランタイム側でファイルを扱うため、設置パスの長さ・文字種の影響を受けない。
 
 ## 4. ゴーストが起動しない・喋らないとき
 
@@ -133,7 +133,7 @@ profile/pasta/logs/pasta.log
 
 起動モジュールのロードに失敗すると、`module`（モジュール名）と `fatal`（致命なら `true`）のフィールドを持つ error レベルの行が記録される。まず `fatal=true` を含む行を探す。その行には根本原因の全文が、**複数行のメッセージとスタックトレースを含めて欠落なく**記録されている。`X-ERROR-REASON` で足りないときは、ここを読む。
 
-起動モジュールのロード失敗は必ず `fatal=true` で記録される。一方、継続扱いの処理（シーン identity 索引の突合）の失敗は、`module` / `fatal` のフィールドを持たない warn 行（`scene identity index join failed` を含む）として記録される。したがって `fatal` フィールドの有無で両者を区別できる。
+起動モジュールのロード失敗は必ず `fatal=true` で記録される。一方、継続扱いの処理（シーン identity 索引の突合）の失敗は、`module` / `fatal` のフィールドを持たない warn 行（`scene identity index join failed` を含む）として記録される。したがって `fatal` フィールドの有無で両者を区別できる。`.pasta` ファイルの文法エラーは起動モジュールのロードより前に検出されるため、`fatal=true` の行にはならない（手順 3 の「パースエラー」を参照）。
 
 あわせて、ロードの締めくくりに次の 1 行が記録される。
 
@@ -165,8 +165,19 @@ X-ERROR-REASON: Load error: ... failed to load startup module 'pasta.shiori.entr
 | `failed to load startup module 'pasta.shiori.entry'` ＋ 実行時エラー | `scripts/pasta/shiori/entry.lua` で内蔵の `entry.lua` を上書きしており、その内容に誤りがある | 上書きの必要が無ければ、そのファイルを削除して内蔵版に戻す |
 | `module 'X' not found:` ＋ `no file '…'` の並び | モジュール未検出 | `no file` の行が**実際に探したパスの全リスト**である。意図した置き場所が並んでいるか、ファイル名・モジュール名の綴りが一致しているかを照合する |
 | `error loading module 'X' from file '…'` | ファイルは見つかったが、構文エラーまたは読み込みに失敗した | 示されたファイルを確認する |
+| `Partial transpilation failure: …` ＋ ログに `Parse error: ファイル:行:列: 内容` | `.pasta` ファイルの文法エラー（パースエラー） | 示されたファイルの行・列を修正する（下記「パースエラー」） |
 
 `no file '…'` の並びは、第 1 節の優先順位とファイル名パターンの組み合わせがそのまま出力されたものである。置いたつもりのファイルがリストのどのパスとも一致しないなら、置き場所かモジュール名のどちらかが間違っている。
+
+#### パースエラー
+
+`.pasta` ファイルに文法エラーがあると、そのファイルは読み込まれず、ロード全体が失敗する。エラーは失敗したファイルごとに、error レベルの `Process failure` 行としてログファイルに記録される。行の `path` は失敗したファイル、`error` は原因で、`error` には次の形式のメッセージが含まれる。
+
+```text
+Parse error: ファイル:行:列: 内容
+```
+
+行と列は 1 から数える。`内容` には、該当する行の抜粋と、その位置で期待される要素の一覧が複数行で続く。`X-ERROR-REASON` とロード失敗の行（`PastaShiori load failed`）には、`Partial transpilation failure: 成功数 succeeded, 失敗数 failed [ファイルのパス]` の形で失敗したファイルの一覧だけが載り、行・列は載らない。行・列はログファイルの `Process failure` 行で確かめる。
 
 ---
 

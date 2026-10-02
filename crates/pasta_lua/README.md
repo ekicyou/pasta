@@ -141,7 +141,7 @@ spot = 1
 - `spot` はゴースト固有でデフォルト化できないため、各アクターで必ず指定します（`0`=sakura 側 / `1`=kero 側）。
 - 慣例的な dic 配置（`dic/**/*.pasta`）の辞書は、`[loader]` を書かなくても `pasta_patterns` の SHIORI デフォルト `["dic/**/*.pasta"]` で読み込まれます。
 
-全セクション・全フィールドの分類と SHIORI デフォルト値（SSOT 由来）、およびフルリファレンステンプレートは、設定ファイルリファレンス [`pasta-toml.md`](../../.claude/skills/pasta-ghost-authoring/references/pasta-toml.md) を参照してください。
+全セクション・全フィールドの分類と SHIORI デフォルト値（SSOT 由来）、およびフルリファレンステンプレートは、設定ファイルリファレンス [`pasta-toml.md`](../../book/src/reference/pasta-toml.md) を参照してください。
 
 ### [actor.*] セクション
 
@@ -183,61 +183,9 @@ print(sakura.spot)  -- 0（CONFIG由来プロパティを保持）
 - 動的に追加したアクターと CONFIG 由来アクターは共存可能
 - `ACTOR.get_or_create()` は既存アクターを返し、上書きしない
 
-### [lua] セクション詳細
+### [lua] セクション
 
-`libs` 配列はCargo風の記法をサポートし、Lua標準ライブラリとmlua-stdlibモジュールを統合制御します。
-
-#### 有効なライブラリ名
-
-**Lua標準ライブラリ（`std_*` プレフィックス）:**
-
-| ライブラリ名     | 説明                                         |
-| ---------------- | -------------------------------------------- |
-| `std_all`        | 安全な標準ライブラリ全部（debug除く）        |
-| `std_all_unsafe` | **全ライブラリ（debug含む、要注意）**        |
-| `std_coroutine`  | coroutine ライブラリ                         |
-| `std_table`      | table ライブラリ                             |
-| `std_io`         | io ライブラリ                                |
-| `std_os`         | os ライブラリ                                |
-| `std_string`     | string ライブラリ                            |
-| `std_math`       | math ライブラリ                              |
-| `std_package`    | package ライブラリ（require等）              |
-| `std_debug`      | **debug ライブラリ（セキュリティ警告発生）** |
-| `std_jit`        | jit ライブラリ（LuaJIT）                     |
-| `std_ffi`        | ffi ライブラリ（LuaJIT）                     |
-| `std_bit`        | bit ライブラリ（LuaJIT）                     |
-
-**mlua-stdlib モジュール:**
-
-| モジュール名 | 説明                        |
-| ------------ | --------------------------- |
-| `assertions` | @assertions モジュール      |
-| `testing`    | @testing モジュール         |
-| `env`        | **@env モジュール（警告）** |
-| `regex`      | @regex モジュール           |
-| `json`       | @json モジュール            |
-| `yaml`       | @yaml モジュール            |
-
-#### 減算記法
-
-`-` プレフィックスでライブラリを除外できます：
-
-```toml
-[lua]
-libs = [
-    "std_all",     # 安全な標準ライブラリをすべて有効化
-    "-std_io",     # io ライブラリを除外
-    "-std_os",     # os ライブラリを除外
-    "json",        # json モジュールを有効化
-]
-```
-
-#### セキュリティ警告
-
-以下のライブラリを有効にすると、ログに警告が出力されます：
-
-- `std_debug` または `std_all_unsafe`: デバッグライブラリはサンドボックス回避に使用される可能性があります
-- `env`: ファイルシステムと環境変数へのアクセスを提供します
+利用者向けの `pasta.toml` の仕様はマニュアルを正とします。`[lua]` セクションの扱いは [pasta.toml リファレンス](../../book/src/reference/pasta-toml.md#lualua-ライブラリ)、既定で使える Lua 標準ライブラリと mlua-stdlib モジュールは [mlua-stdlib 統合モジュール](../../book/src/lua/modules/mlua-stdlib.md) を参照してください。
 
 ## Lua モジュール検索パス
 
@@ -343,7 +291,7 @@ local data = JSON.decode('{"key": "value"}')
 
 ### API リファレンス
 
-各モジュールの詳細な API 仕様（関数シグネチャ、パラメータ、戻り値、使用例）については [LUA_API.md](./LUA_API.md) を参照してください。
+各モジュールの詳細な API 仕様（関数シグネチャ、パラメータ、戻り値、使用例）については マニュアルの [公開モジュール API](../../book/src/lua/modules/index.md) を参照してください。
 
 ## 使用方法
 

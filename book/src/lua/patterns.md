@@ -85,51 +85,58 @@ end
 
 ## パターン 2: イベントハンドラの登録
 
-カスタム SHIORI イベント処理は `REG` テーブルにハンドラを登録し、`RES` でレスポンスを返す。
+カスタム SHIORI イベント処理は `REG` テーブルにハンドラを登録する。ハンドラは `function(act)` の形で、
+`Value` にする文字列を返す。詳細は [SHIORI イベントとハンドラ](shiori-events.md#reg) を参照。
 
 ```lua
 local REG = require("pasta.shiori.event.register")
-local RES = require("pasta.shiori.res")
+local SCENE = require("pasta.scene")
 
-REG.OnBoot = function(req)
-    local shell_name = req.reference[0]  -- Reference0
-    return RES.ok("\\h\\s[0]起動しました。\\e")
+REG.OnClose = function(act)
+    local reason = act.req.reference[0]  -- Reference0: 終了の理由
+    if reason == "user" then
+        return "\\0\\s[0]またね。\\-"
+    end
+    return "\\0\\s[0]終了します。\\-"
 end
 
-REG.OnClose = function(req)
-    local reason = req.reference[0]
-    if reason == "user" then
-        return RES.ok("\\h\\s[0]またね。\\e")
-    end
-    return RES.no_content()  -- 表示なしで処理完了
+REG.OnMouseDoubleClick = function(act)
+    -- シーン「なでられ」のコルーチンを返す（見つからなければ nil → 204 No Content）
+    return SCENE.co_exec(act, "なでられ")
 end
 ```
 
-ハンドラは `req`（SHIORI リクエスト情報）を受け取る。主なフィールド:
+ハンドラの戻り値は、エンジンが SHIORI の応答にする。
+
+| 戻り値 | 応答 |
+| ---- | ---- |
+| 文字列 | 200 OK。その文字列が `Value` になる（空文字列なら 204 No Content） |
+| シーンのコルーチン | コルーチンを実行し、出力を `Value` にして 200 OK（出力が無ければ 204 No Content） |
+| `nil`（何も返さない） | 204 No Content（表示なし） |
+
+応答文字列は、エンジンが `RES`（`pasta.shiori.res`）で組み立てる。ハンドラは応答全体ではなく `Value` にする文字列を返す（[RES](shiori-events.md#res)）。
+
+リクエストの内容は `act.req` で読む。主なフィールド:
 
 | フィールド | 説明 |
 | ---- | ---- |
-| `req.id` | イベント名（`"OnBoot"` 等） |
-| `req.reference[N]` | Reference ヘッダ（0 始まり）。未送信時は `nil` |
-| `req.date` | 日時情報 |
-| `req.status` | ステータス（`"talking"` 等） |
+| `act.req.id` | イベント名（`"OnBoot"` 等） |
+| `act.req.reference[N]` | Reference ヘッダ（0 始まり）。未送信時は `nil` |
+| `act.req.date` | リクエストを受けた時点の日時（`year`・`hour` 等のフィールドを持つ表） |
+| `act.req.status` | `Status` ヘッダの値（`"talking,balloon(0=0)"` のようなカンマ区切りの文字列） |
+
+全フィールドは [act.req](shiori-events.md#actreq) を参照。
 
 DSL のシーンから `Reference` や日時を読むときは、Lua を書かずに `＄ｒ０` や `＄時１２` を使える（[エンジンが値を入れる変数](../grammar/variables.md#エンジンが値を入れる変数)を参照）。
 
-レスポンス生成 API:
-
-| 関数 | 説明 |
-| ---- | ---- |
-| `RES.ok(value)` | 200 OK + さくらスクリプト |
-| `RES.ok_with(headers)` | 200 OK + 複数ヘッダ |
-| `RES.no_content()` | 204 No Content（表示なし） |
-| `RES.err(message)` | 500 エラー |
+`OnBoot`・`OnChoiceSelectEx`・`OnSecondChange` には pasta の既定ハンドラがある。`scripts/main.lua` でこれらを上書きするときは、先に既定ハンドラを登録させる手順が要る（[既定ハンドラと上書き](shiori-events.md#既定ハンドラと上書き)）。
 
 ### REG 未登録時のフォールバック
 
 `REG` にハンドラが無いイベントは、同名のグローバルシーンが自動的に検索・実行される。
 つまり DSL で `＊OnBoot` シーンを定義しておけば、`REG.OnBoot` を書かなくても起動時に呼ばれる。
-凝った分岐が要るときだけ `REG` でハンドラを書く、というのが基本方針である。
+凝った分岐が要るときだけ `REG` でハンドラを書く、というのが基本方針である
+（[シーン関数フォールバック](shiori-events.md#シーン関数フォールバック)）。
 
 `OnTalk`（ランダムトーク）と `OnHour`（時報）は、ランタイムの仮想ディスパッチャが
 `OnSecondChange` を起点に自動発行する。これらも対応するシーンを定義しておけば呼ばれる。

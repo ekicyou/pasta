@@ -7,7 +7,7 @@
 
 ---
 
-このセクションは、Pasta DSL の**実装済み文法を網羅する参照型ドキュメント**である。手を動かして覚える入門は「入門ガイド」に譲り、ここでは各文法要素を要素ごとに整理し、試せる具体例と権威的仕様への導線を示す。
+このセクションは、Pasta DSL の**実装済み文法を網羅する参照型ドキュメント**である。手を動かして覚える入門は「入門ガイド」に譲り、ここでは各文法要素を要素ごとに整理し、試せる具体例とともに示す。
 
 ## Pasta DSL の文法モデル
 
@@ -21,30 +21,40 @@ Pasta DSL は、里々／さとりにインスパイアされた対話スクリ�
 
 ### ファイル構造の俯瞰
 
+ファイルは、ファイルレベルの行・アクター辞書・グローバルシーンを任意の順に並べたものである。
+
 ```text
 ファイル
+├─ ファイルレベル属性行 (＆)
 ├─ グローバル単語定義 (＠)
-├─ アクター辞書 (％)
-├─ グローバルシーン (＊)
+├─ アクター辞書 (％名前)
+│   ├─ 単語定義 (＠)
 │   ├─ 属性行 (＆)
-│   ├─ ローカル単語定義 (＠)
-│   ├─ アクション行 (アクター：内容)
 │   ├─ 変数代入 (＄)
-│   ├─ Call 行 (＞)
-│   ├─ 選択肢行 (＠？)
-│   ├─ キューコマンド行 (！)
-│   ├─ ローカルシーン (・)
-│   └─ Lua コードブロック
-└─ コメント行 (＃)
+│   └─ Lua ブロック
+├─ グローバルシーン (＊名前、または ＊ 単独行)
+│   ├─ 初期部: 属性行 (＆)・ローカル単語定義 (＠)・アクター指定行 (％)
+│   ├─ Lua ブロック
+│   ├─ 暗黙の開始ブロック
+│   │   ├─ アクション行 (アクター：内容)・継続行 (：内容)
+│   │   ├─ 変数代入 (＄)・Call 行 (＞)
+│   │   ├─ 選択肢行 (＠？)・キューコマンド行 (！)
+│   │   └─ Lua ブロック
+│   └─ ローカルシーン (・名前)
+│       ├─ アクション行・継続行・変数代入・Call 行・選択肢行・キューコマンド行
+│       └─ Lua ブロック
+└─ コメント行 (＃)・空行（どこにでも置ける）
 ```
+
+各行の置き方は [行とブロック構造](block-structure.md) で扱う。
 
 ### 式の基本例
 
 ```pasta
-＄count＝10 + 5            # 算術式
-＄result＝＄a * ＄b         # 変数を含む式
-＄nested＝（＄a + ＄b）* 2  # 括弧による優先順位制御
-＄＝＠副作用関数（）         # 式文: 結果を代入せず式を評価のみ
+＊計算
+    ＄count＝10 + 5            # 算術式
+    ＄result＝＄a * ＄b         # 変数を含む式
+    ＄＝＠副作用関数（）         # 式文: 結果を代入せず式を評価のみ
 ```
 
 対応する算術演算子は次のとおり（全角・半角は同等）。
@@ -59,30 +69,28 @@ Pasta DSL は、里々／さとりにインスパイアされた対話スクリ�
 
 ## このセクションの読み方
 
-各章は「軽い導入 → 普通文体の本体（試せる例つき）→ ひとことの締め」のリズムで構成され、章末には対応する `doc/spec/` の権威的仕様へのリンクを置いている。仕様の厳密な定義が必要になったら、章末リンクをたどること。
+各章は「軽い導入 → 普通文体の本体（試せる例つき）→ ひとことの締め」のリズムで構成される。本体が各文法要素の規範的な定義である。
 
-| 章 | 扱う内容 | 権威的仕様 |
-| -- | -------- | ---------- |
-| [キーワード・マーカー](markers.md) | 全マーカーと演算子・区切り文字の一覧 | [doc/spec/02-markers.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/02-markers.md) |
-| [行とブロック構造](block-structure.md) | 行種別・グローバル／ローカルブロック・インデント | [doc/spec/03-block-structure.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/03-block-structure.md) |
-| [Call / Jump](call-jump.md) | シーン呼び出し・前方一致・スコープ解決 | [doc/spec/04-call-spec.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/04-call-spec.md) |
-| [リテラル型](literals.md) | 型変換ルール・文字列・数値・真偽値 | [doc/spec/05-literals.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/05-literals.md) |
-| [アクション行](action-line.md) | 発言行・インライン要素・行継続・改行 | [doc/spec/06-action-line.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/06-action-line.md) |
-| [さくらスクリプト](sakura-script.md) | `\` で始まるコマンドの字句構造と透過処理 | [doc/spec/07-sakura-script.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/07-sakura-script.md) |
-| [変数・スコープ](variables.md) | ローカル／グローバル／プロパティ変数 | [doc/spec/09-variables.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/09-variables.md) |
-| [単語定義](words.md) | 単語の定義・参照・前方一致・複数キー | [doc/spec/10-words.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/10-words.md) |
-| [アクター辞書](actor-dictionary.md) | `％` によるアクター単位の単語辞書 | [doc/spec/11-actor-dictionary.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/11-actor-dictionary.md) |
+| 章 | 扱う内容 |
+| -- | -------- |
+| [キーワード・マーカー](markers.md) | 全マーカーと演算子・区切り文字の一覧 |
+| [行とブロック構造](block-structure.md) | 行種別・グローバル／ローカルブロック・インデント |
+| [Call / Jump](call-jump.md) | シーン呼び出し・前方一致・スコープ解決 |
+| [リテラル型](literals.md) | 文字列・数値・値の型の扱い |
+| [アクション行](action-line.md) | 発言行・インライン要素・行継続・改行 |
+| [さくらスクリプト](sakura-script.md) | `\` で始まるコマンドの字句構造と透過処理 |
+| [変数・スコープ](variables.md) | ローカル／グローバル／プロパティ変数 |
+| [単語定義](words.md) | 単語の定義・参照・前方一致・複数キー |
+| [アクター辞書](actor-dictionary.md) | `％` によるアクター単位の単語辞書 |
 
 ## 網羅範囲についての注記
 
-このリファレンスは**実装済みの文法要素のみ**を扱う。次の要素は意図的に除外、または注記つきで扱う。
+このリファレンスは**現行の実装が受理・処理する文法要素のみ**を扱う。次の要素は除外、または現行の扱いだけを記述する。
 
-- **属性（`＆`、doc/spec ch08）**: 構文はパーサーで受理されるが、トランスパイラ・ランタイムでの処理は将来予定である。本セクションでは「行とブロック構造」の中で構文と配置ルールのみ触れ、「将来変更あり」の注記を添える。
-- **将来仕様（doc/spec ch12）**: 未確定事項は本セクションの対象外とする。
+- **属性（`＆`）**: 構文は受理されるが処理には反映されない。構文・置ける場所・現行の扱いは [行とブロック構造](block-structure.md#属性) で扱う。
+- **未実装の構文・未確定事項**: 本セクションの対象外とする。
 
 ---
 
 さあ、準備はよろしくて？ お目当ての章へお進みなさいまし。
 迷ったらこの概要に戻ってくればよろしくてよ。熱く参りましょう！
-
-> **権威的仕様**: 文法モデル全体の厳密な定義は [doc/spec/01-grammar-model.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/01-grammar-model.md) を参照。各文法要素の権威は、章別に分割された [doc/spec/](https://github.com/ekicyou/pasta/tree/main/doc/spec) 各章が担う。

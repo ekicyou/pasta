@@ -792,5 +792,5 @@ end
 
 ## 関連リファレンス
 
-- [runtime-api.md](runtime-api.md) — `@pasta_search` の完全APIシグネチャ、`@pasta_persistence` の設定詳細
-- [shiori-handlers.md](shiori-handlers.md) — ACTオブジェクトの `req` フィールド（ShioriAct）の詳細、イベント一覧
+- [modules-index.md](modules-index.md) — Rust組み込みモジュールの一覧と各モジュール章（[`@pasta_search`](pasta-search.md) の完全APIシグネチャ、[`@pasta_persistence`](pasta-persistence.md) の設定詳細など）
+- [shiori-events.md](shiori-events.md) — ACTオブジェクトの `req` フィールド（[act.req](shiori-events.md#actreq)）の詳細、イベント一覧
