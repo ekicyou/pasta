@@ -108,7 +108,7 @@
   - _Requirements: 1.7, 1.10, 2.5, 3.2, 5.3, 6.1, 6.2, 8.2, 8.5, 8.8_
 
 - [ ] 5. 検証: CLI とサンプルの写し
-- [ ] 5.1 CLI の E2E テストで警告・エラー・後方互換の出力を確認する
+- [x] 5.1 CLI の E2E テストで警告・エラー・後方互換の出力を確認する
   - `homeurl` 無しの同梱バルーン: exit 0、stderr に `Warning:` とフォルダ名、stdout に `Generated bal/updates.txt (N entries)`
   - 宣言の無い install.txt: exit 1、stderr に `Error:` と `UTF-8`、nar が無い
   - 同梱バルーン無し: stderr に `Warning:` が出ない

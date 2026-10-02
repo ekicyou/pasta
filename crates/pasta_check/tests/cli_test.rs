@@ -136,6 +136,88 @@ fn test_release_end_to_end_via_binary() {
     assert!(nar.is_file(), "NAR created (parent dir auto-created)");
     assert!(fs::metadata(&nar).unwrap().len() > 0);
 
+    // 同梱バルーン無しでは警告を出さない（Req 8.3）
+    assert!(
+        !stderr_of(&output).contains("Warning:"),
+        "stderr: {}",
+        stderr_of(&output)
+    );
+
     // target は無変更（updates.txt が混入しない）
     assert!(!Path::new(&target).join("updates.txt").exists());
+}
+
+/// release を target / release_out / out.nar の配置で実行する
+fn run_release(temp: &TempDir, target: &Path) -> Output {
+    run(&[
+        "release",
+        "--target",
+        target.to_str().unwrap(),
+        "--release",
+        temp.path().join("release_out").to_str().unwrap(),
+        "--nar",
+        temp.path().join("out.nar").to_str().unwrap(),
+    ])
+}
+
+/// homeurl の無い同梱バルーン: 警告を `Warning: ` 付きで stderr に出し、
+/// 止めずにバルーン用 updates.txt と nar を作って終了コード 0（Req 4.9・7.3・7.4）
+#[test]
+fn test_release_bundled_balloon_without_homeurl_warns_and_succeeds() {
+    let temp = TempDir::new().unwrap();
+    let target = temp.path().join("target_ghost");
+    fs::create_dir_all(target.join("ghost/master")).unwrap();
+    fs::create_dir_all(target.join("bal")).unwrap();
+    fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
+    fs::write(
+        target.join("install.txt"),
+        "charset,UTF-8\r\ntype,ghost\r\nballoon.directory,bal\r\n",
+    )
+    .unwrap();
+    fs::write(
+        target.join("bal/descript.txt"),
+        "charset,UTF-8\r\ntype,balloon\r\n",
+    )
+    .unwrap();
+    fs::write(target.join("bal/balloons0.png"), "png").unwrap();
+
+    let output = run_release(&temp, &target);
+
+    assert!(output.status.success(), "stderr: {}", stderr_of(&output));
+    let stdout = stdout_of(&output);
+    assert!(
+        stdout.contains("Generated bal/updates.txt (2 entries)"),
+        "stdout: {stdout:?}"
+    );
+    let stderr = stderr_of(&output);
+    assert!(
+        stderr.contains("Warning: bundled balloon \"bal\""),
+        "stderr: {stderr:?}"
+    );
+    assert!(temp.path().join("release_out/bal/updates.txt").is_file());
+    assert!(temp.path().join("out.nar").is_file());
+}
+
+/// charset 宣言の無い install.txt: `Error:` と UTF-8 の旨を stderr に出し、
+/// 終了コード 1 で nar を作らない（Req 1.10・8.6）
+#[test]
+fn test_release_install_txt_without_charset_fails_without_nar() {
+    let temp = TempDir::new().unwrap();
+    let target = temp.path().join("target_ghost");
+    fs::create_dir_all(target.join("ghost/master")).unwrap();
+    fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
+    fs::write(target.join("install.txt"), "type,ghost\r\n").unwrap();
+
+    let output = run_release(&temp, &target);
+
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = stderr_of(&output);
+    assert!(
+        stderr.contains("Error: install.txt is not UTF-8: "),
+        "stderr: {stderr:?}"
+    );
+    assert!(
+        !temp.path().join("out.nar").exists(),
+        "nar must not be created"
+    );
 }
