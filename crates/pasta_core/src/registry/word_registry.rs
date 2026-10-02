@@ -1,7 +1,8 @@
 //! Word definition registry for tracking word entries during transpilation.
 //!
-//! This module collects word definitions from PastaFile and LabelDef during Pass 1
-//! and assigns unique entry IDs for runtime lookup in WordTable.
+//! This module collects word definitions (global, scene-local and actor words) at
+//! transpile time and at runtime finalize, and assigns unique entry IDs for runtime
+//! lookup in WordTable.
 
 use super::SceneRegistry;
 
@@ -18,7 +19,8 @@ pub struct WordEntry {
 
 /// Word definition registry (transpiler layer).
 ///
-/// Collects word definitions during Pass 1 and maintains entry IDs.
+/// Collects word definitions (at transpile time and at runtime finalize) and
+/// maintains entry IDs.
 /// Similar pattern to SceneRegistry but for word definitions.
 pub struct WordDefRegistry {
     /// All registered word entries.

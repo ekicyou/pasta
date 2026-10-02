@@ -18,7 +18,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// ```lua
     /// do
     ///     local ACTOR = PASTA.create_actor("アクター名")
-    ///     ACTOR.通常 = { [=[\s[0]]=], [=[\s[100]]=] }
+    ///     ACTOR:create_word("通常"):entry([=[\s[0]]=], [=[\s[100]]=])
     ///     
     ///     function ACTOR.時刻(act)
     ///         -- Lua関数定義
@@ -89,15 +89,15 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Generates:
     /// ```lua
     /// do
-    ///     local SCENE = PASTA.create_scene("モジュール名_N")
-    ///     
-    ///     function SCENE.__start__(ctx, ...)
+    ///     local SCENE = PASTA.create_scene("シーン名")
+    ///
+    ///     function SCENE.__start__(act, ...)
     ///         local args = { ... }
-    ///         local act, save, var = PASTA.create_session(SCENE, ctx)
+    ///         local save, var = act:init_scene(SCENE)
     ///         -- ...
     ///     end
-    ///     
-    ///     function SCENE.__シーン名_1__(ctx, ...)
+    ///
+    ///     function SCENE.ローカルシーン名_1(act, ...)
     ///         -- ...
     ///     end
     /// end
@@ -212,9 +212,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     /// Generates:
     /// ```lua
-    /// function SCENE.__シーン名_N__(ctx, ...)
+    /// function SCENE.シーン名_N(act, ...)
     ///     local args = { ... }
-    ///     local act, save, var = PASTA.create_session(SCENE, ctx)
+    ///     local save, var = act:init_scene(SCENE)
     ///     -- items...
     /// end
     /// ```

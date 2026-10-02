@@ -1,8 +1,8 @@
-//! Scene registry for tracking scenes and assigning unique IDs during transpilation.
+//! Scene registry for tracking scenes and assigning unique IDs.
 //!
-//! This module implements the two-pass transpiler strategy:
-//! - Pass 1: Collect all scenes from PastaFile(s) and assign unique IDs
-//! - Pass 2: Generate `mod pasta {}` with ID→function path mapping
+//! The registry is filled by the Lua transpiler's single document-order pass
+//! (each item is registered and then its code is generated), and rebuilt at
+//! runtime by `finalize_scene` from the Lua-side scene collection.
 
 use std::collections::HashMap;
 

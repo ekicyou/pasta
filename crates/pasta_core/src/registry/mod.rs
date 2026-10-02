@@ -1,12 +1,14 @@
-//! Shared registry module for Pasta transpilers.
+//! Shared registry module for Pasta.
 //!
-//! This module contains registry components shared between transpiler and transpiler2.
-//! Both modules use the same SceneRegistry and WordDefRegistry for scene/word management.
+//! SceneRegistry and WordDefRegistry are filled in two places: by the Lua
+//! transpiler's single document-order pass (each item is registered and then its
+//! code is generated), and at runtime by `finalize_scene`, which rebuilds them from
+//! the Lua-side scene/word collections. The runtime search uses the latter.
 //!
 //! # Design
 //!
-//! - SceneRegistry: Tracks scenes and assigns unique IDs during transpilation (Pass 1)
-//! - WordDefRegistry: Tracks word definitions during transpilation (Pass 1)
+//! - SceneRegistry: Tracks scenes and assigns unique IDs
+//! - WordDefRegistry: Tracks word definitions
 //! - SceneTable: Runtime lookup table for scenes (built from SceneRegistry)
 //! - WordTable: Runtime lookup table for words (built from WordDefRegistry)
 //! - RandomSelector: Language-agnostic random selection trait

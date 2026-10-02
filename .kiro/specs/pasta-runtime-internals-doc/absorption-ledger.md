@@ -21,23 +21,23 @@
 
 | 吸収元（ファイル#節） | 担当 | 処置 | 理由 | 実装照合 | 訂正 |
 |---|---|---|---|---|---|
-| `OPTIMIZATION.md` # Transpiler Optimization Reference | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ## 1. 最適化の概要 | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ## 2. 末尾呼び出し最適化 (Tail Call Optimization) | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ### 2.1 概要 | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ### 2.2 適用条件 | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ### 2.3 コード例 | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ### 2.4 TCO非適用ケース | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ## 3. アクター最適化 | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ### 3.1 概要 | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ### 3.2 実装 | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ## 4. 文字列リテラル最適化 | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ### 4.1 概要 | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ### 4.2 適用条件 | 4.1 |  |  |  |  |
-| `OPTIMIZATION.md` ### 4.3 例 | 4.1 |  |  |  |  |
+| `OPTIMIZATION.md` # Transpiler Optimization Reference | 4.1 | 収録先 `internals/transpiler.md#生成時最適化` |  | 照合不要（文書の導入文と最終更新日・ステータスの記載のみ。最適化の本体は各節の行で照合） | 「最終更新」「ステータス: Phase 0完了」は文書の管理情報であり引き継がない |
+| `OPTIMIZATION.md` ## 1. 最適化の概要 | 4.1 | 収録先 `internals/transpiler.md#生成時最適化` |  | `crates/pasta_lua/src/code_gen/scope_gen.rs` `generate_local_scene_items`、`crates/pasta_lua/src/code_gen/element_gen.rs` `generate_call_scene`・`generate_continue_action`、`crates/pasta_lua/src/string_literalizer.rs` | 「アクター最適化（連続発言のアクター切替最小化）」は現行実装に存在しない。`last_actor` は継続行の話者引継ぎ（構文上の要請）として収録。「ロングブラケット記法」は `"…"` とロングブラケットの選択として収録 |
+| `OPTIMIZATION.md` ## 2. 末尾呼び出し最適化 (Tail Call Optimization) | 4.1 | 収録先 `internals/transpiler.md#末尾呼び出し` |  | `crates/pasta_lua/src/code_gen/scope_gen.rs` `generate_local_scene_items`（`is_callable_item`・`is_tail_call`）、`crates/pasta_lua/src/code_gen/element_gen.rs` `generate_call_scene` | 参照実装 `code_generator.rs` は存在しない（現行は `crates/pasta_lua/src/code_gen/`） |
+| `OPTIMIZATION.md` ### 2.1 概要 | 4.1 | 収録先 `internals/transpiler.md#末尾呼び出し` |  | `crates/pasta_lua/pasta_scripts/pasta/act.lua` `ACT_IMPL.call`（`return handler(self, ...)` の末尾位置呼び出し） | 効果は「無限再帰を可能にする」ではなく、生成側の `return` と `act:call` 内の末尾位置呼び出しが連鎖してスタックが深くならない、として実装に即して記述 |
+| `OPTIMIZATION.md` ### 2.2 適用条件 | 4.1 | 収録先 `internals/transpiler.md#末尾呼び出し` |  | `crates/pasta_lua/src/code_gen/scope_gen.rs` `generate_local_scene_items`（`last_is_callable && index == last_index`） | なし（最後の項目が Call のときだけ `return` を前置する点は一致。暗黙の開始ブロックと名前付きローカルシーンの両方に適用されることを補記） |
+| `OPTIMIZATION.md` ### 2.3 コード例 | 4.1 | 収録先 `internals/transpiler.md#生成される-lua-コードの形` |  | `crates/pasta_lua/src/code_gen/scope_gen.rs` `generate_local_scene`、`crates/pasta_lua/tests/fixtures/sample.expected.lua` | なし（`function SCENE.__start__(act, ...)`・`act:init_scene(SCENE)`・`return act:call(...)` の形は一致。収録例は現行の空行配置で書き直した） |
+| `OPTIMIZATION.md` ### 2.4 TCO非適用ケース | 4.1 | 収録先 `internals/transpiler.md#末尾呼び出し` |  | `crates/pasta_lua/src/code_gen/scope_gen.rs` `generate_local_scene_items` | なし |
+| `OPTIMIZATION.md` ## 3. アクター最適化 | 4.1 | 収録先 `internals/transpiler.md#継続行の話者引継ぎ` |  | `crates/pasta_lua/src/code_gen/scope_gen.rs` `generate_local_scene_items`（`last_actor`）、`crates/pasta_lua/src/code_gen/element_gen.rs` `generate_action_line`・`generate_continue_action` | 最適化ではない。継続行の話者を決めるための構文上の処理として収録 |
+| `OPTIMIZATION.md` ### 3.1 概要 | 4.1 | 収録先 `internals/transpiler.md#継続行の話者引継ぎ` |  | `crates/pasta_lua/src/code_gen/element_gen.rs` `generate_action` | 「同じアクターの連続発言でコンテキストを保持して効率化」はしていない。アクションごとに常に `act.アクター:…` の文を生成する。連続発言のまとめは実行時のトーク組立（`talk-output.md`）が担う |
+| `OPTIMIZATION.md` ### 3.2 実装 | 4.1 | 収録先 `internals/transpiler.md#継続行の話者引継ぎ` |  | `crates/pasta_lua/src/code_gen/scope_gen.rs` `generate_local_scene_items`、`crates/pasta_lua/src/code_gen/element_gen.rs` `generate_continue_action` | `last_actor` は「必要な場合のみアクターを切り替える」ためではなく、継続行のアクターを決めるための状態。ローカルシーンごとに空から始まり、先行アクション行が無ければ `TranspileError::InvalidContinuation` |
+| `OPTIMIZATION.md` ## 4. 文字列リテラル最適化 | 4.1 | 収録先 `internals/transpiler.md#文字列リテラルの表記選択` |  | `crates/pasta_lua/src/string_literalizer.rs` `StringLiteralizer::literalize_with_span` | なし（節全体の位置づけ。個別の訂正は 4.1〜4.3 の行） |
+| `OPTIMIZATION.md` ### 4.1 概要 | 4.1 | 収録先 `internals/transpiler.md#文字列リテラルの表記選択` |  | `crates/pasta_lua/src/string_literalizer.rs` `literalize_with_span`・`contains_danger_pattern` | `[=[ ... ]=]` 固定ではない。`=` の数は 0 から試して内容に閉じ括弧の前半が現れない最小の数（最大 10、超過で `TranspileError::StringLiteralError`） |
+| `OPTIMIZATION.md` ### 4.2 適用条件 | 4.1 | 収録先 `internals/transpiler.md#文字列リテラルの表記選択` |  | `crates/pasta_lua/src/string_literalizer.rs` `needs_long_string` | ロングブラケットを使うのは `\` か `"` を含む場合だけ。改行・Unicode 文字を含むことは条件ではない（非 ASCII 文字だけなら `"…"`） |
+| `OPTIMIZATION.md` ### 4.3 例 | 4.1 | 収録先 `internals/transpiler.md#文字列リテラルの表記選択` |  | `crates/pasta_lua/src/code_gen/scope_gen.rs` `generate_actor`、`crates/pasta_lua/tests/fixtures/sample.expected.lua` | なし（`ACTOR:create_word("通常"):entry([=[\s[0]]=])` は現行の生成形と一致） |
 | `OPTIMIZATION.md` ## 5. 今後の最適化候補 | 5.4 |  |  |  |  |
 | `OPTIMIZATION.md` ## 6. ビルドプロファイル最適化 | 4.5 |  |  |  |  |
-| `OPTIMIZATION.md` ## 7. 関連ドキュメント | 4.1 |  |  |  |  |
+| `OPTIMIZATION.md` ## 7. 関連ドキュメント | 4.1 | 収録先 `internals/transpiler.md#ソースの所在` |  | `book/src/grammar/index.md`・`crates/pasta_lua/tests/fixtures/tail_call_optimization.pasta` は実在。`code_generator.rs` は不在 | `code_generator.rs`（末尾の「参照実装 code_generator.rs#L320-L460」を含む）は存在しない。現行の所在 `crates/pasta_lua/src/code_gen/` と TCO の用例を「ソースの所在」に記載。文法章は本文から `grammar/index.md` へリンク |
 
 ### `.claude/skills/pasta-lua-coding/references/internal-modules.md`
 
@@ -114,7 +114,7 @@
 | `crates/pasta_dsl/README.md` ### AST Types | 5.3 |  |  |  |  |
 | `crates/pasta_dsl/README.md` ### Error Types | 5.3 |  |  |  |  |
 | `crates/pasta_dsl/README.md` ## Dependencies | 5.3 |  |  |  |  |
-| `crates/pasta_dsl/README.md` ## Architecture | 4.1（→5.3） |  |  |  |  |
+| `crates/pasta_dsl/README.md` ## Architecture | 4.1（→5.3） | 収録先 `internals/transpiler.md#パーサと-ast`（ソース構成。テストファイルの一覧は `crates/pasta_dsl/tests/` の所在として「ソースの所在」に示す） |  | `crates/pasta_dsl/src/`（`lib.rs`・`error.rs`・`partial.rs`・`parser/mod.rs`・`parser/parse_scene.rs`・`parser/parse_action.rs`・`parser/parse_elements.rs`・`parser/ast/`・`parser/grammar.pest`）と `crates/pasta_dsl/tests/` の 15 ファイルを照合 | なし（ツリーは現行と一致） |
 | `crates/pasta_dsl/README.md` ## License | 5.3 |  |  |  |  |
 
 ### `crates/pasta_core/README.md`
@@ -206,6 +206,17 @@
 
 | ファイル | 位置 | 修正の要旨 | 担当 |
 |---|---|---|---|
+| `crates/pasta_core/src/lib.rs` | クレート doc の `registry` の説明行 | 「Pass 1 + Runtime tables」を、トランスパイル時に登録し実行時の確定で作り直すレジストリと実行時テーブル、に修正 | 4.1 |
+| `crates/pasta_core/src/registry/mod.rs` | モジュール doc（冒頭・Design の箇条） | 存在しない「transpiler と transpiler2 の共有」「(Pass 1)」を削除し、トランスパイル時の単一走査と実行時の `finalize_scene` の 2 か所で使われることを記述 | 4.1 |
+| `crates/pasta_core/src/registry/scene_registry.rs` | モジュール doc | 「two-pass transpiler strategy（Pass 1 / Pass 2: `mod pasta {}` 生成）」を、単一走査での登録と実行時の再構築に修正 | 4.1 |
+| `crates/pasta_core/src/registry/word_registry.rs` | モジュール doc・`WordDefRegistry` の doc | 「LabelDef」「during Pass 1」を、トランスパイル時と実行時の確定で収集する、に修正 | 4.1 |
+| `crates/pasta_lua/src/code_gen/scope_gen.rs` | `generate_actor`・`generate_global_scene`・`generate_local_scene` の doc の生成例 | 旧生成形（`ACTOR.通常 = { … }`・`create_scene("モジュール名_N")`・`(ctx, ...)`・`PASTA.create_session`・`__シーン名_N__`）を現行の生成形（`ACTOR:create_word(…):entry(…)`・基本名・`(act, ...)`・`act:init_scene(SCENE)`・`シーン名_N`）に修正 | 4.1 |
+| `crates/pasta_lua/src/code_gen/mod.rs` | `record_span` の doc（Coverage note） | 「`generate_action` だけが配線済みで残りは後続 spec の範囲外」を、現行の記録対象（スコープ見出し・アクション・変数代入・Call・選択肢・キューコマンド・単語定義、Lua ブロックは行ごと）と `LineShift` による写像に修正 | 4.1 |
+| `crates/pasta_lua/src/config.rs` | `TranspilerConfig::comment_mode` の doc | 「ソース行参照を含める」を、現行のコード生成は参照せず出力は変わらない、に修正 | 4.1 |
+| `crates/pasta_lua/src/lib.rs` | クレート doc（概要・Example） | 存在しない `pasta_rune` との比較と「Lua 5.3+」を LuaJIT 2.1（`luajit52`）に、旧シグネチャ `transpile(&actors, &scenes, …)` を `transpile(&pasta_file, …)` に修正 | 4.1 |
+| `crates/pasta_lua/src/code_gen/element_gen.rs` | `generate_local_word` の doc | 取り込み後に修正（並行 spec dynamic-word-reference が編集中のため未修正）。「Called inside a local scene function, after init_scene」は誤りで、実際はグローバルシーンの `do` ブロック内・関数定義より前に出力される | 4.1 |
+| `crates/pasta_dsl/src/parser/mod.rs` | モジュール doc（冒頭・Grammar Authority） | 取り込み後に修正（並行 spec 編集中のため未修正）。`file = ( file_scope \| global_scene_scope )*` に `actor_scope` が欠けている。`grammar.pest` は「手で編集してはならない」とあるが、文法は後続 spec で拡張されている（例: 選択肢行・プロパティ） | 4.1 |
+| `crates/pasta_dsl/src/parser/ast/mod.rs` | `PastaFile` の doc と `items` フィールドの doc | 取り込み後に修正（並行 spec 編集中のため未修正）。`file = ( file_scope \| global_scene_scope )*` に `actor_scope` が欠けている（`FileItem` の doc と `build_ast` の doc は正しい） | 4.1 |
 
 ## 付録 B: ロードマップへの申し送り
 
