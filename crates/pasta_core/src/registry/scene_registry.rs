@@ -15,13 +15,15 @@ pub struct SceneEntry {
     /// Original scene name (without counter suffix).
     pub name: String,
 
-    /// Attributes associated with this scene (for future P1 filtering).
+    /// Attributes associated with this scene (used by SceneTable attribute filters;
+    /// always empty when rebuilt by the runtime finalize).
     pub attributes: HashMap<String, String>,
 
-    /// Full Rune function path (e.g., "crate::会話_1::__start__").
+    /// `fn_name` with a `crate::` prefix (e.g., "crate::会話_1::__start__").
+    /// Not read by the runtime search, which uses `fn_name`.
     pub fn_path: String,
 
-    /// Module/function name without "crate::" prefix (e.g., "会話_1::__start__").
+    /// Scene function name in `global::local` form (e.g., "会話_1::__start__").
     pub fn_name: String,
 
     /// Parent scene name (for local scenes only, None for global scenes).
@@ -32,8 +34,8 @@ pub struct SceneEntry {
 ///
 /// # Design Notes
 ///
-/// - **P0 Implementation**: No duplicate scene names, all scenes get `_1` suffix
-/// - **P1 Implementation**: Handle duplicate names with sequential counters (`_1`, `_2`, ...)
+/// - `register_global` numbers duplicate names with per-name counters (`_1`, `_2`, ...)
+/// - `register_global_raw` (runtime finalize) takes names that already carry the counter
 /// - IDs start from 1 and increment sequentially (ID = Vec index + 1)
 /// - Each scene gets a unique ID even if names are the same
 /// - Vec-based storage ensures consistent iteration order
@@ -41,9 +43,8 @@ pub struct SceneRegistry {
     /// All registered scenes (index + 1 = scene ID).
     scenes: Vec<SceneEntry>,
 
-    /// Counter for tracking duplicate scene names (name → counter).
-    /// P0: Always returns 1 (no duplicates expected).
-    /// P1: Increments for each duplicate.
+    /// Counter for tracking duplicate scene names (sanitized name → counter).
+    /// Incremented by `register_global` for each occurrence.
     name_counters: HashMap<String, usize>,
 }
 
@@ -61,7 +62,7 @@ impl SceneRegistry {
     /// # Arguments
     ///
     /// * `name` - Original scene name (without scope prefix)
-    /// * `attributes` - Attributes for filtering (P1 feature)
+    /// * `attributes` - Attributes for filtering
     ///
     /// # Returns
     ///
@@ -98,7 +99,7 @@ impl SceneRegistry {
     /// * `parent_name` - Parent global scene name
     /// * `parent_counter` - Parent's counter value
     /// * `local_index` - Local scene index within parent (1-based, matches CodeGenerator)
-    /// * `attributes` - Attributes for filtering (P1 feature)
+    /// * `attributes` - Attributes for filtering
     ///
     /// # Returns
     ///
@@ -147,8 +148,8 @@ impl SceneRegistry {
     /// # Arguments
     ///
     /// * `full_name` - Full scene name with counter (e.g., "OnBoot1")
-    /// * `local_names` - List of local function names (e.g., ["__start__", "__選択肢_1__"])
-    /// * `attributes` - Attributes for filtering (P1 feature)
+    /// * `local_names` - List of local function names (e.g., ["__start__", "選択肢_1"])
+    /// * `attributes` - Attributes for filtering (applied to the global and its locals)
     ///
     /// # Returns
     ///
@@ -233,7 +234,7 @@ impl SceneRegistry {
         *counter
     }
 
-    /// Sanitize a scene name for use in Rune identifiers.
+    /// Sanitize a scene name for use in generated Lua identifiers and registry keys.
     ///
     /// Replaces any character that is not alphanumeric or underscore with underscore.
     /// This is used by both SceneRegistry and WordDefRegistry for consistent naming.

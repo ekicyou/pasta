@@ -7,9 +7,8 @@ use rand::prelude::*;
 
 /// Trait for random selection (allows mocking in tests).
 ///
-/// Note: Due to Rust's object safety rules, we use Any type for items.
-/// This is a workaround to make the trait dyn-safe while still allowing
-/// generic selection.
+/// The trait only has index-based methods so that it stays object-safe
+/// (`Box<dyn RandomSelector>`). SceneTable and WordTable use only `shuffle_usize`.
 pub trait RandomSelector: Send + Sync {
     /// Select a random index from 0..len.
     fn select_index(&mut self, len: usize) -> Option<usize>;

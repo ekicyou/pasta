@@ -85,7 +85,7 @@
   - _Requirements: 2.1, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.3, 3.4, 3.5, 3.8, 5.1, 5.2, 7.1_
   - _Boundary: InternalsChapters（transpiler）_
 
-- [ ] 4.2 (P) シーン・単語レジストリとシーン検索章を執筆する
+- [x] 4.2 (P) シーン・単語レジストリとシーン検索章を執筆する
   - シーン・単語レジストリ、前方一致検索、重複時の選択と乱数、ローカル優先の検索順、実行時の辞書確定（Rust 側）と Lua 側収集の受け渡し、検索モジュールの内部を現行コードと照合して書く。Lua 側の収集データ構造は 4.9 の内部モジュール章へリンクする
   - `pasta_core` README のアーキテクチャ・ディレクトリ構成の担当行を台帳で処置し、食い違うコメントはコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
   - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 で、台帳の担当行（自章が担う行のみ）の処置が埋まっている
@@ -223,3 +223,5 @@
 - 4.1: transpiler 章の「ソースの所在」に対応表外の `crates/pasta_lua/src/error.rs`・`crates/pasta_lua/src/loader/process.rs` を追加済み。`crates/pasta_lua/src/lib.rs` もどの行にも無い。4.11 で対応表への追加を判断する。
 - 4.1: 章の「生成される Lua コードの形」は現行 `element_gen.rs` に依拠。dynamic-word-reference 取り込み後に再照合する。
 - 4.1: pasta_core の Rune 時代のコメント（`SceneEntry.fn_path` の "Full Rune function path"、P0/P1 注記）は 4.2 の範囲として残置。
+- 4.2: PROXY の検索コードは `proxy.lua` ではなく `crates/pasta_lua/pasta_scripts/pasta/actor.lua` にある。並走 spec 合意の不可触対象として扱う。`act.lua` のコメント食い違い（「6段階」と L1〜L5）は付録 A に「取り込み後に修正」で記録済み。
+- 4.2: registry-search 章は internal-modules 章のアンカー `#finalize_scene`・`#scene-モジュール` にリンクしている。4.9 で見出しを変えたら 4.11 で再確認する。

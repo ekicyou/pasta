@@ -123,8 +123,8 @@
 |---|---|---|---|---|---|
 | `crates/pasta_core/README.md` # pasta_core | 5.3 |  |  |  |  |
 | `crates/pasta_core/README.md` ## 概要 | 5.3 |  |  |  |  |
-| `crates/pasta_core/README.md` ## アーキテクチャ | 4.2（→5.3） |  |  |  |  |
-| `crates/pasta_core/README.md` ## ディレクトリ構成 | 4.2（→5.3） |  |  |  |  |
+| `crates/pasta_core/README.md` ## アーキテクチャ | 4.2（→5.3） | 収録先 `internals/registry-search.md#pasta_core-のレジストリと検索表` |  | `crates/pasta_core/src/lib.rs`・`crates/pasta_core/src/registry/mod.rs`（公開する型）、`crates/pasta_core/src/registry/scene_registry.rs`・`scene_table.rs`・`word_registry.rs`・`word_table.rs`・`random.rs`、`crates/pasta_core/src/error.rs`、`crates/pasta_core/Cargo.toml`（依存） | 「SceneRegistry シーン登録（Pass 1）」は誤り。トランスパイル時の登録（`register_global`・`register_local`）と実行時の辞書確定での再構築（`register_global_raw`）の 2 か所で使われ、検索の権威は後者。`WordTable` も `SceneTable` と同じく RadixMap の前方一致で検索する。ツリーに無い乱数の抽象（`RandomSelector`・`DefaultRandomSelector`・`MockRandomSelector`）を構成要素に加えた |
+| `crates/pasta_core/README.md` ## ディレクトリ構成 | 4.2（→5.3） | 収録先 `internals/registry-search.md#pasta_core-のレジストリと検索表`（ファイルごとの役割）・`internals/registry-search.md#ソースの所在`（テストの所在） |  | `crates/pasta_core/src/`（`lib.rs`・`error.rs`・`registry/` の 9 ファイル）と `crates/pasta_core/tests/word_table_test.rs` を照合 | ファイル構成は現行と一致。注記の訂正: `registry/mod.rs` は API 本体ではなく再エクスポートだけを持つ。`random.rs` はインターフェースだけでなく既定の実装とモックの実装を持つ |
 | `crates/pasta_core/README.md` ## 公開API | 5.3 |  |  |  |  |
 | `crates/pasta_core/README.md` ### Registry | 5.3 |  |  |  |  |
 | `crates/pasta_core/README.md` ### Random | 5.3 |  |  |  |  |
@@ -217,6 +217,13 @@
 | `crates/pasta_lua/src/code_gen/element_gen.rs` | `generate_local_word` の doc | 取り込み後に修正（並行 spec dynamic-word-reference が編集中のため未修正）。「Called inside a local scene function, after init_scene」は誤りで、実際はグローバルシーンの `do` ブロック内・関数定義より前に出力される | 4.1 |
 | `crates/pasta_dsl/src/parser/mod.rs` | モジュール doc（冒頭・Grammar Authority） | 取り込み後に修正（並行 spec 編集中のため未修正）。`file = ( file_scope \| global_scene_scope )*` に `actor_scope` が欠けている。`grammar.pest` は「手で編集してはならない」とあるが、文法は後続 spec で拡張されている（例: 選択肢行・プロパティ） | 4.1 |
 | `crates/pasta_dsl/src/parser/ast/mod.rs` | `PastaFile` の doc と `items` フィールドの doc | 取り込み後に修正（並行 spec 編集中のため未修正）。`file = ( file_scope \| global_scene_scope )*` に `actor_scope` が欠けている（`FileItem` の doc と `build_ast` の doc は正しい） | 4.1 |
+| `crates/pasta_core/src/registry/scene_registry.rs` | `SceneEntry` の `attributes`・`fn_path`・`fn_name` の doc、`SceneRegistry` の Design Notes、`name_counters` の doc、3 つの登録関数の `attributes` 引数、`register_global_raw` の `local_names` の例、`sanitize_name` の doc | 「for future P1 filtering」「Full Rune function path」「P0/P1 Implementation」「(P1 feature)」「Rune identifiers」を、属性フィルタ用（辞書確定では常に空）・`fn_name` に `crate::` を付けたもので検索には使わない・カウンタの採番と `register_global_raw`・生成 Lua 識別子と登録キー用、に修正。`local_names` の例の旧形式 `__選択肢_1__` を現行の `選択肢_1` に修正 | 4.2 |
+| `crates/pasta_core/src/registry/scene_types.rs` | `SceneInfo::fn_name` の doc | 「Generated function name in Rune code」を `global::local` 形式のシーン関数名に修正 | 4.2 |
+| `crates/pasta_core/src/registry/scene_table.rs` | `from_scene_registry` の doc とコメント 2 か所、`resolve_scene_id`・`resolve_scene_id_unified`・`collect_scene_candidates`・`find_scene` の doc | トランスパイル専用という記述を辞書確定でも使うと修正。存在しない `select_label_to_id` への言及と「fn_name の一意性は SceneRegistry が検証する」（検証していない）を削除。「P1 runtime resolution」「2-stage search」「Fallback Strategy（ローカル→グローバル）」を、スコープ 1 つだけの検索でフォールバックしない、に修正し、`resolve_scene_id` がローカルのキーを除外しないことを明記。存在しない `execute_scene()` との互換という記述を、ランタイムの検索では使わない、に修正 | 4.2 |
+| `crates/pasta_core/src/registry/word_table.rs` | `collect_word_candidates`・`search_word` の doc | 「Fallback Strategy（ローカル→グローバル）」「2-stage prefix matching」「local + global merge」を、スコープ 1 つだけの検索でフォールバックしない、一致した項目の値をキー順につなげる、に修正 | 4.2 |
+| `crates/pasta_core/src/registry/random.rs` | `RandomSelector` の doc | 存在しない「Any 型を使う回避策」を、添字ベースのメソッドだけでオブジェクト安全を保ち、検索表は `shuffle_usize` だけを使う、に修正 | 4.2 |
+| `crates/pasta_lua/src/search/mod.rs` | `loader`・`register` の引数の doc | 「from transpilation」を、トランスパイル時または `finalize_scene` の再構築によるレジストリ、に修正 | 4.2 |
+| `crates/pasta_lua/pasta_scripts/pasta/act.lua` | `find_act_handler` の doc と `ACT_IMPL.word` の doc | 取り込み後に修正（並行 spec dynamic-word-reference が編集中のため未修正）。「6段階」とあるが検索レベルは L1〜L5 の 5 段。「scene/expr モードは SCENE.search を直接呼び出す（@pasta_search 可用性チェックは package.loaded 参照）」とあるが、実際は全モードとも呼び出しごとの `pcall(require, "@pasta_search")` で取得し、取得できたときだけ L2・L5 を行う | 4.2 |
 
 ## 付録 B: ロードマップへの申し送り
 
@@ -224,3 +231,5 @@
 
 | 項目 | 要旨 | 申し送り先 | 担当 |
 |---|---|---|---|
+| シーン・アクター名のサニタイズと検索キーの不一致（バグ候補） | 登録キーはサニタイズ済みの名前（`SceneRegistry::sanitize_name`。英数字と `_` 以外を `_` に置換）から作られる（生成コードの `PASTA.create_scene(サニタイズ済み基本名)`・ローカルシーン関数名・`register_actor`）が、検索側は名前をサニタイズせずに渡す（`act:call(…, "名前")`・`actor.lua` の `"__actor_" .. actor.name .. "__"`）。識別子に使えてサニタイズで置換される文字（例: `·` U+00B7。pest の Unicode 表によっては `・` U+30FB も）を含むシーン名・アクター名は、その名前の Call・アクター単語参照で前方一致しない。根拠: `crates/pasta_lua/src/code_gen/scope_gen.rs`、`crates/pasta_lua/src/code_gen/element_gen.rs`、`crates/pasta_core/src/registry/scene_registry.rs`、`crates/pasta_lua/pasta_scripts/pasta/actor.lua` | `.kiro/steering/roadmap.md` の「内部設計執筆で判明したバグ候補」小節（5.4 で追加） | 4.2 |
+| グローバルシーン検索がローカルのキーを除外しない（バグ候補） | `SearchContext::search_scene(名前, nil)` は `SceneTable::resolve_scene_id` を使い、`:` で始まるローカルのキーを除外しない（`collect_scene_candidates("", …)` は除外する）。`:` で始まる名前（動的な Call の値など）で、任意のグローバルシーンのローカルシーンが候補になりうる（ヒットした場合、`search_scene` はローカル名を `__start__` に置き換えるため、実際に解決されるのはその親グローバルシーンの `__start__`）。根拠: `crates/pasta_lua/src/search/context.rs`、`crates/pasta_core/src/registry/scene_table.rs` | `.kiro/steering/roadmap.md` の「内部設計執筆で判明したバグ候補」小節（5.4 で追加） | 4.2 |
