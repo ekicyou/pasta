@@ -119,7 +119,7 @@
   - _Requirements: 2.5, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.5, 3.8, 5.1, 5.2, 7.1_
   - _Boundary: InternalsChapters（shiori）_
 
-- [ ] 4.6 (P) トーク出力とアピアランス章を執筆する
+- [x] 4.6 (P) トーク出力とアピアランス章を執筆する
   - ACT のトークからさくらスクリプトへの組立、さくらスクリプト後処理（トークナイザ・ウェイト挿入・budoux 改行）、アピアランス（サーフェス・着せ替え復旧・スポット）を現行コードと照合して書く
   - `pasta_lua` README の `sakura_builder`（内部部分）の担当行を台帳で処置し、食い違うコメントはコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
   - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 で、台帳の担当行（自章が担う行のみ）の処置が埋まっている
@@ -231,3 +231,4 @@
 - 4.4: pasta_lua README「Lua パススルー機能」（5.2 担当）は古い（`dic/*/`・「debug_mode 時に出力」）。5.2 で loader 章・transpiler 章へ送る。利用者章 `reference/pasta-toml.md` の debug_mode 記述（孤立キャッシュ警告は常に出る）の食い違いはロードマップ申し送り候補。
 - dynamic-word-reference 確定 API（2026-10-03 受領、4.11 で main 取り込み後に吸収）: `ACT_IMPL.find_act_handler/find_handler(self, mode, key, skip_methods)`（真なら L1 を rawget・L3 を飛ばす）、`ACT_IMPL.word(self, name, var_path)`（var_path 時 `WORD.dynamic_key(name, var_path, "act:word")` で skip_methods=true 検索）、新設 `ACT_IMPL.expr_fn_var(self, value, var_path, ...)`（後処理は局所関数 `call_expr` を共有）、act.lua が `pasta.word` を require。PROXY: `find_actor_handler/find_handler(mode, key, skip_methods)`（A1 を rawget）、`word(name, var_path)`、新設 `expr_fn_var`。新設 `WORD.dynamic_key(value, var_path, via)`（数値は tostring、空でない文字列はそのまま、他は log.warn して nil）、word.lua が `@pasta_log` を require。生成形 `act.{a}:word(値, "パス")`・`act.{a}:expr_fn_var(値, "パス", 引数…)`・`act:word(…)`・`act:expr_fn_var(…)`。DSL 規則 dyn_name_local/dyn_name_global/word_ref_dynamic/fn_call_dynamic、AST Action::DynamicWordRef/DynamicFnCall・Expr::DynamicFnCall・SetValue::DynamicWordRef、partial.rs shift_action に 2 アーム。LSP `find_dynamic_ref`、TextMate inline-dynamic-ref。値が "yield"/"チェイントーク" のとき L4 の GLOBAL.yield に一致（設計で許容）。
 - 4.5: shiori 章の「ソースの所在」に対応表外の `crates/pasta_shiori/Cargo.toml` とテストパスを追加済み（4.11 で判断）。`kick.lua` の古いコメント（「kick の消費は別タスク」）は 4.7 に残置。付録 B に OnTalk 間隔の毎回同一（`math.randomseed` 未呼び出し）と unload 無し終了時の 5 秒停滞を記録済み。
+- 4.6: 付録 B に `group_by_actor` のトークン欠落・並べ替え（利用者章 `lua/patterns.md` の例も出力が落ちる）を記録済み。`pasta/shiori/act.lua` は不可触の対象か曖昧なため未変更。budoux 幅の数え直しは事実として章に記載し、付録 B には入れていない（budoux/areka はゴースト層で対処する方針）。
