@@ -17,7 +17,7 @@
   - _Requirements: 8.6_
   - _Boundary: pasta_check tests_
 
-- [ ] 1.3 (P) サンプルゴースト hello-pasta の install.txt に UTF-8 宣言を足し、サンプルのテストで固定する
+- [x] 1.3 (P) サンプルゴースト hello-pasta の install.txt に UTF-8 宣言を足し、サンプルのテストで固定する
   - hello-pasta の install.txt の 1 行目に `charset,UTF-8`（CRLF）を足す。他の行と改行コードは変えない
   - サンプルゴーストの ukadoc ファイル検証に「install.txt の 1 行目が `charset,UTF-8`」の確認を加える
   - cargo のビルド・テスト前に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す（LuaJIT のビルドが落ちるため）
