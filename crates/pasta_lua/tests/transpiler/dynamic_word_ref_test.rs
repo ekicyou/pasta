@@ -1,6 +1,6 @@
 //! 動的単語参照（＠＄変数名）・動的関数呼び出し（＠＄変数名（…））の生成コードテスト
 //!
-//! Requirements: 1.5, 3.2, 3.3, 3.9, 4.4, 7.2, 7.5
+//! Requirements: 1.5, 3.2, 3.3, 3.9, 4.4, 5.5, 7.2, 7.5
 //!
 //! 生成コードは値を文字列化せず、参照変数の値（`var.x`・`save.x`・`args[n]`）と
 //! その変数パスの文字列リテラルをランタイムへ渡す。アクション行はアクター経由
@@ -10,8 +10,9 @@ use crate::common;
 
 use common::e2e_helpers::transpile;
 use insta::assert_snapshot;
-use pasta_dsl::parser::{Action, Args, Span, VarScope};
+use pasta_dsl::parser::{Action, Args, Span, VarScope, parse_str};
 use pasta_lua::LineEnding;
+use pasta_lua::LuaTranspiler;
 use pasta_lua::code_gen::LuaCodeGenerator;
 use pasta_lua::code_gen::source_map::SourceMapSink;
 
@@ -187,4 +188,95 @@ fn test_dynamic_actions_record_source_map() {
          act.さくら:talk((act.さくら:expr_fn_var(save.f, \"save.f\")))\n"
     );
     assert_eq!(sink.records, vec![(1, 5), (2, 9)]);
+}
+
+// ========================================================================
+// マニュアルのコード例が読み込めること（5.5）
+// ========================================================================
+
+/// 動的参照を記載した文法の章（book/src/grammar/ 配下）
+const MANUAL_CHAPTERS: [&str; 5] = [
+    "words.md",
+    "markers.md",
+    "action-line.md",
+    "variables.md",
+    "actor-dictionary.md",
+];
+
+/// Markdown から言語注記が `pasta` のコードブロックを（開きフェンスの行番号, 本文）で返す。
+/// 閉じフェンスは開きと同じ長さ以上のバッククォートだけの行（CommonMark）。
+/// そのため 4 連フェンスの中の ```lua ブロックも本文に含まれる。
+fn pasta_code_blocks(markdown: &str) -> Vec<(usize, String)> {
+    let mut blocks = Vec::new();
+    // (開きの行番号, フェンス長, pasta か, 本文)
+    let mut open: Option<(usize, usize, bool, String)> = None;
+    for (i, line) in markdown.lines().enumerate() {
+        let trimmed = line.trim_start();
+        let ticks = trimmed.chars().take_while(|&c| c == '`').count();
+        let info = trimmed[ticks..].trim();
+        match open.as_mut() {
+            None if ticks >= 3 => open = Some((i + 1, ticks, info == "pasta", String::new())),
+            None => {}
+            Some((_, len, _, _)) if ticks >= *len && info.is_empty() => {
+                let (start, _, is_pasta, body) = open.take().unwrap();
+                if is_pasta {
+                    blocks.push((start, body));
+                }
+            }
+            Some((_, _, _, body)) => {
+                body.push_str(line);
+                body.push('\n');
+            }
+        }
+    }
+    blocks
+}
+
+/// 全角・半角いずれの組み合わせの `＠＄` を含むか
+fn has_dynamic_ref(code: &str) -> bool {
+    ["＠＄", "@$", "＠$", "@＄"]
+        .iter()
+        .any(|m| code.contains(m))
+}
+
+#[test]
+fn test_manual_dynamic_ref_examples_transpile() {
+    let grammar_dir =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../book/src/grammar");
+    let mut total = 0;
+    let mut failures = Vec::new();
+    for chapter in MANUAL_CHAPTERS {
+        let path = grammar_dir.join(chapter);
+        let markdown = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let blocks: Vec<_> = pasta_code_blocks(&markdown)
+            .into_iter()
+            .filter(|(_, code)| has_dynamic_ref(code))
+            .collect();
+        println!("{chapter}: {} block(s)", blocks.len());
+        total += blocks.len();
+        for (line, code) in blocks {
+            let name = format!("{chapter}:{line}");
+            let result = parse_str(&code, &name)
+                .map_err(|e| format!("parse: {e}"))
+                .and_then(|file| {
+                    LuaTranspiler::default()
+                        .transpile(&file, &mut Vec::new())
+                        .map(|_| ())
+                        .map_err(|e| format!("transpile: {e}"))
+                });
+            if let Err(e) = result {
+                failures.push(format!("{name}: {e}\n{code}"));
+            }
+        }
+    }
+    assert!(
+        total > 0,
+        "no pasta code block with ＠＄ found in the manual"
+    );
+    assert!(
+        failures.is_empty(),
+        "manual examples failed to load:\n{}",
+        failures.join("\n")
+    );
 }
