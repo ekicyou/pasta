@@ -353,7 +353,8 @@ fn check_overlaps(dirs: &[(String, String)]) -> io::Result<()>;
 |------|-----|----------|
 | UTF-8 でない | 1.10, 7.5 | `install.txt is not UTF-8: the first line must be "charset,UTF-8" (pasta_check supports UTF-8 only)` ／ 不正バイト時は `... contains invalid UTF-8 byte sequence` |
 | 不正な値 | 2.1 | `install.txt: invalid value for balloon0.source.directory: "../x" (parent directory reference)` ／ 理由は `empty`・`absolute path`・`path separator is not allowed in directory`・`parent directory reference`・`excluded folder (profile/var)` |
-| 欠番の後ろの指定 | 1.4 | `install.txt: balloon2.directory is never read by the baseware because balloon1 is missing (numbered entries must not have gaps)` |
+| 欠番の後ろの指定 | 1.4 | `install.txt: balloon2.directory is never read by the baseware because balloon1 is missing (numbered entries must not have gaps)` ／ u32 に収まらない番号もこの文言 |
+| 先頭に 0 の付いた番号 | 1.4 | `install.txt: balloon01.directory is never read by the baseware (numbers must not have leading zeros)`（ベースウェアは `balloon1` の文字列で引くため。実装時に追加） |
 | 重複キー | 2.7 | `install.txt: duplicate key balloon.source.directory` |
 | フォルダ不在 | 2.5 | `install.txt: bundled balloon folder "emo2-kakukaku" (balloon.source.directory) does not exist in the release folder` |
 | 重なり | 2.3 | `install.txt: bundled balloon folder "ghost" (balloon.directory) overlaps with ghost/master` ／ `... overlaps with bundled balloon folder "a" (balloon0.source.directory)` |
