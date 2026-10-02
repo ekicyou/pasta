@@ -157,6 +157,9 @@
                 "4": {
                     "patterns": [
                         {
+                            "include": "#inline-dynamic-ref"
+                        },
+                        {
                             "include": "#inline-word-ref"
                         },
                         {
@@ -175,6 +178,14 @@
                             "include": "#inline-talk"
                         }
                     ]
+                }
+            }
+        },
+        "inline-dynamic-ref": {
+            "match": "(?<![＠@])(?:[＠@]{2})*([＠@][＄$][＊*]?[^＠@＄$\\\\\\s]+)",
+            "captures": {
+                "1": {
+                    "name": "markup.inline.raw.string.pasta"
                 }
             }
         },

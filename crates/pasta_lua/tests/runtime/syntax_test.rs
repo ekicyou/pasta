@@ -430,3 +430,147 @@ fn test_e2e_undefined_refs_in_action_line_render_empty() {
         "undefined refs must render empty: {response}"
     );
 }
+
+// ============================================================================
+// dynamic-word-reference: ＠＄変数名 / ＠＄変数名（…） E2E
+// ============================================================================
+
+/// Transpile `source`, finalize, fire scene `id` once per entry of `ids` and
+/// return the responses (one runtime, so word rotations carry across fires).
+fn fire_scenes(source: &str, ids: &[&str]) -> Vec<String> {
+    let lua = create_runtime_with_finalize().unwrap();
+    let config = TalkConfig::default();
+    let module = sakura_script::register(&lua, Some(&config)).unwrap();
+    let package: mlua::Table = lua.globals().get("package").unwrap();
+    let loaded: mlua::Table = package.get("loaded").unwrap();
+    loaded.set("@pasta_sakura_script", module).unwrap();
+
+    lua.load(transpile(source)).exec().unwrap();
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+    ids.iter()
+        .map(|id| {
+            lua.load(format!(
+                r#"return require("pasta.shiori.event").fire({{ id = "{id}", reference = {{}} }})"#
+            ))
+            .eval()
+            .unwrap()
+        })
+        .collect()
+}
+
+const DYNAMIC_REF_SOURCE: &str = r#"
+％さくら
+  ＠通常：\s[0]
+  ＠表情：\s[5]
+
+＠表情：グローバル表情
+
+＊アクター辞書
+  ＄x＝「表情」
+  さくら：値＝＠＄x　です。
+
+＊代入の右辺
+  ＄x＝「表情」
+  ＄y＝＠＄x
+  さくら：右辺＝＄y　です。
+
+＊プロパティ代入
+  ＄x＝「表情」
+  ＄％prop＝＠＄x
+  さくら：済み。
+
+＊プロキシ
+  ＄f＝「whoami」
+  さくら：結果＝＠＄f（１）です。
+
+```lua
+function SCENE.whoami(p, n)
+    return "proxy:" .. tostring(p.actor and p.actor.name) .. ":" .. tostring(n)
+end
+```
+
+＊未代入
+  さくら：前＠＄z　後。
+"#;
+
+/// R3.2: アクター付きの行の `＠＄x` は、静的参照と同じくアクター辞書を先に探す。
+#[test]
+fn test_e2e_dynamic_word_ref_actor_line_uses_actor_dictionary() {
+    let out = fire_scenes(DYNAMIC_REF_SOURCE, &["アクター辞書"]).remove(0);
+    assert!(
+        out.contains(r"値＝\s[5]です。"),
+        "actor dictionary must win on an actor line: {out}"
+    );
+    assert!(!out.contains("グローバル表情"), "global word leaked: {out}");
+}
+
+/// R3.3: 代入の右辺 `＄y＝＠＄x` はアクター辞書を探さない。
+#[test]
+fn test_e2e_dynamic_word_ref_assignment_skips_actor_dictionary() {
+    let out = fire_scenes(DYNAMIC_REF_SOURCE, &["代入の右辺"]).remove(0);
+    assert!(
+        out.contains("右辺＝グローバル表情です。"),
+        "assignment RHS must not search the actor dictionary: {out}"
+    );
+}
+
+/// R1.5: プロパティ代入の右辺 `＄％prop＝＠＄x` は、動的参照の結果を代入する。
+#[test]
+fn test_e2e_dynamic_word_ref_property_assignment() {
+    let out = fire_scenes(DYNAMIC_REF_SOURCE, &["プロパティ代入"]).remove(0);
+    assert!(
+        out.contains(r"\![set,property,prop,グローバル表情]"),
+        "property must receive the dynamic reference result: {out}"
+    );
+}
+
+/// R7.5: アクター付きの行の `＠＄f（１）` は、関数の第 1 引数にアクターのプロキシを渡す。
+#[test]
+fn test_e2e_dynamic_fn_call_passes_actor_proxy() {
+    let out = fire_scenes(DYNAMIC_REF_SOURCE, &["プロキシ"]).remove(0);
+    assert!(
+        out.contains("結果＝proxy:さくら:1です。"),
+        "dynamic call on an actor line must receive the actor proxy: {out}"
+    );
+}
+
+/// R4.5: 未代入の `＠＄z` は空文字列になり、行の残りが出力される。
+#[test]
+fn test_e2e_dynamic_word_ref_unassigned_keeps_rest_of_line() {
+    let out = fire_scenes(DYNAMIC_REF_SOURCE, &["未代入"]).remove(0);
+    assert!(!out.contains("nil"), "must not render 'nil': {out}");
+    assert!(
+        out.contains("前後。"),
+        "unassigned dynamic ref must render empty and keep the rest: {out}"
+    );
+}
+
+/// R3.4: `＄x` の値が「果物」のとき、`＠＄x` と `＠果物` は実物の単語レジストリの
+/// 1 つの巡回を共有する。1 回の発火で静的 2 回・動的 2 回の計 4 回を引き、
+/// 候補 4 つがちょうど 1 回ずつ出ることを、複数回の発火で確認する
+/// （巡回が別々なら同じ候補が重複しうる）。
+#[test]
+fn test_e2e_dynamic_word_ref_shares_rotation_with_static() {
+    let source = r#"
+％さくら
+  ＠通常：\s[0]
+
+＠果物：りんご、みかん、ぶどう、もも
+
+＊巡回
+  ＄x＝「果物」
+  さくら：＠果物　＠＄x　＠果物　＠＄x　。
+"#;
+    let fruits = ["りんご", "みかん", "ぶどう", "もも"];
+    for (i, out) in fire_scenes(source, &["巡回"; 8]).iter().enumerate() {
+        for fruit in fruits {
+            assert_eq!(
+                out.matches(fruit).count(),
+                1,
+                "fire #{i}: each of the 4 words must appear once per cycle: {out}"
+            );
+        }
+    }
+}

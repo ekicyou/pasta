@@ -158,6 +158,24 @@ pub(super) fn find_binary_op(text: &str, op_chars: &[&str]) -> Option<(usize, us
     None
 }
 
+/// Find a dynamic reference `[＠@][＄$]` (plus `[＊*]` when `global`) followed by
+/// `var_name` in text. Full-width/half-width markers may be mixed.
+/// Returns (start_byte, end_byte) within text.
+pub(super) fn find_dynamic_ref(text: &str, var_name: &str, global: bool) -> Option<(usize, usize)> {
+    text.char_indices().find_map(|(i, _)| {
+        let rest = text[i..]
+            .strip_prefix(['＠', '@'])?
+            .strip_prefix(['＄', '$'])?;
+        let rest = if global {
+            rest.strip_prefix(['＊', '*'])?
+        } else {
+            rest
+        };
+        let rest = rest.strip_prefix(var_name)?;
+        Some((i, text.len() - rest.len()))
+    })
+}
+
 /// Find the end of an argument in a comma/、-separated list.
 /// Returns byte offset within the text where the argument ends.
 pub(super) fn find_arg_end(text: &str) -> usize {

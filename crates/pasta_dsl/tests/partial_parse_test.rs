@@ -320,3 +320,29 @@ fn test_phase2_span_correction_handles_crlf() {
         extracted
     );
 }
+
+#[test]
+fn test_phase2_span_correction_for_dynamic_refs() {
+    // 部分パース後も動的参照の span（関数呼び出しは引数の span も）がフルソース座標を指す。
+    use pasta_dsl::parser::Action;
+    let source = "これは不正な冒頭行\n＊挨拶\n  Alice：＠＄x　と＠＄＊f（１）\n";
+    let result = parse_str_partial(source);
+
+    let action = first_action_line(&result.items).expect("ActionLine が得られる");
+    match &action.actions[..] {
+        [
+            Action::DynamicWordRef { span: word, .. },
+            Action::Talk { .. },
+            Action::DynamicFnCall {
+                span: call, args, ..
+            },
+        ] => {
+            assert_eq!(word.start_line, 3);
+            assert_eq!(word.extract_source(source).unwrap(), "＠＄x　");
+            assert_eq!(call.start_line, 3);
+            assert_eq!(call.extract_source(source).unwrap(), "＠＄＊f（１）");
+            assert_eq!(args.span.extract_source(source).unwrap(), "（１）");
+        }
+        other => panic!("動的参照 2 つと台詞が得られる: {other:?}"),
+    }
+}
