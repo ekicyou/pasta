@@ -26,7 +26,7 @@
   - _Boundary: sample ghost_
 
 - [ ] 2. 同梱バルーンの判定（読み取り専用）
-- [ ] 2.1 UTF-8 の key,value ファイルの読み取りと charset 宣言の確認を実装する
+- [x] 2.1 UTF-8 の key,value ファイルの読み取りと charset 宣言の確認を実装する
   - 新しい判定モジュールを用意してクレートに登録する。release から呼ばれるまでの間 clippy の dead_code で落ちないよう、登録箇所にテスト以外での `dead_code` 許可を一時的に付ける（4.2 で外す）
   - 先頭の BOM を除き、UTF-8 として正しくないバイト列はエラーにする。文字コード変換は行わず、依存も足さない
   - 1 行目がキー・値とも大文字小文字無視・前後空白無視で `charset,UTF-8` でなければ、ファイル名を示す「UTF-8 でない」エラーにする
@@ -147,3 +147,7 @@
   - _Requirements: 9.4_
   - _Boundary: README, steering_
   - _Depends: 4.3_
+
+## Implementation Notes
+
+- 1.3: リポジトリに .gitattributes は無く `core.autocrlf=true`。テキストは index が LF・作業ツリーが CRLF（`git ls-files --eol` で `i/lf w/crlf`）。5.2 で写しを再生成するとき、md5 は作業ツリーの CRLF のバイト列で計算される点に注意する。

@@ -1,3 +1,6 @@
+// release から呼ぶまでの一時的な許可。タスク 4.2 で release に組み込むときに外す。
+#[cfg_attr(not(test), allow(dead_code))]
+mod balloon;
 mod copy;
 mod nar;
 mod release;
