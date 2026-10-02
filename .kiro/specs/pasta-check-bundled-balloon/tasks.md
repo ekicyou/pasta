@@ -115,13 +115,12 @@
   - 追加した E2E テストがすべて通る
   - _Requirements: 1.10, 4.9, 7.3, 7.4, 8.3, 8.6_
 
-- [ ] 5.2 リポジトリの release/hello-pasta の写しを新しい pasta_check で再生成する
+- [x] 5.2 リポジトリの release/hello-pasta の写しを新しい pasta_check で再生成する
   - 先に hello-pasta のフォルダに追跡外・無視対象のファイル（`profile/` など）が無いことを git で確認する（あれば写しに混ざるため、止めて報告する）
   - pwsh からリリーススクリプトを `-SkipSetup` で直接呼ぶ（`-ExecutionPolicy Bypass` は使わない）か、同じ引数で `cargo run -p pasta_check -- release` を実行し、写しの install.txt・updates.txt・`ghost/master/updates.txt` と nar を再生成する（手で直さない）
   - 写しの install.txt の 1 行目が `charset,UTF-8` で、updates.txt の install.txt 行の md5・size が実ファイルと一致する
   - 差分が install.txt の行・`date=`・nar に限られることを git の差分で確認する。それ以外（改行コードの違いによる md5 の変化など）が出たら手で直さず、止めて報告する
   - _Requirements: 8.7_
-  - _Blocked: 再生成すると install.txt 以外に ghost/master/THIRD_PARTY_LICENSES.txt と shell/master/surfaces.txt の md5・size も変わる。原因は改行コード（core.autocrlf=true で作業ツリーは CRLF、HEAD の写しは LF・混在のバイトで作られていた）。停止条件どおり手直し・コミットせず、受け入れ方針（CRLF で揃えて受け入れる／.gitattributes で改行を固定してから作り直す）は人の判断待ち。再生成結果はスクラッチパッドに退避済み_
 
 - [ ] 6. 参照文書の更新
 - [x] 6.1 (P) スキルの updates.txt 仕様と nar 仕様に同梱バルーンの扱いを書く
@@ -154,3 +153,4 @@
 - 1.3: リポジトリに .gitattributes は無く `core.autocrlf=true`。テキストは index が LF・作業ツリーが CRLF（`git ls-files --eol` で `i/lf w/crlf`）。5.2 で写しを再生成するとき、md5 は作業ツリーの CRLF のバイト列で計算される点に注意する。
 - 2.3: Windows では `bal.`・`bal `・`...`・`.. ` も `is_dir()` が真になる（`...` は親フォルダ自身を指す）。2.4 の解決は「`is_dir()` が真」だけで採らず、必ず `read_dir` の実在名との一致（完全一致または小文字一致）で採り、結合には実在名だけを使う。
 - 2.4: 重複除去は `dedup_dirs`（設計の判定規則 5）として独立させた。2.5 では解決 → `dedup_dirs` → `check_overlaps` の順に呼ぶ（逆だと同じフォルダが重なりと誤判定される）。大文字小文字違いの照合は Unicode の `to_lowercase()`（`is_dir()` が真の場合に限る）。
+- 5.2: 再生成で install.txt の行に加え、ghost/master/THIRD_PARTY_LICENSES.txt と shell/master/surfaces.txt の md5・size も変わった（旧写しは LF・混在のバイトで作られていた）。ユーザー判断で、作業ツリーの CRLF にそろえた結果を受け入れた。
