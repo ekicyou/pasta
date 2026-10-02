@@ -187,7 +187,7 @@ export function renderEntry(entry, repoRoot) {
   const { title, body } = extractBody(readChapter(entry.chapter, repoRoot), entry.chapter);
   return [
     GENERATED_MARK,
-    `<!-- このファイルは pasta 利用者マニュアル「${title}」（${MANUAL_BASE_URL}${toHtml(entry.chapter)}）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->`,
+    `<!-- このファイルは pasta マニュアル「${title}」（${MANUAL_BASE_URL}${toHtml(entry.chapter)}）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->`,
     '',
     `# ${title}`,
     '',

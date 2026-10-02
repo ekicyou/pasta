@@ -323,7 +323,7 @@ const URL_BASE = 'https://ekicyou.github.io/pasta/';
 // サンドボックス: 21 章すべてを合成した最小の book/src を持つ tmp リポジトリ。
 const HEADER1 = '<!-- GENERATED FROM PASTA MANUAL - DO NOT EDIT -->';
 const header2 = (title, chapter) =>
-  `<!-- このファイルは pasta 利用者マニュアル「${title}」（${URL_BASE}${chapter.replace(/\.md$/, '.html')}）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->`;
+  `<!-- このファイルは pasta マニュアル「${title}」（${URL_BASE}${chapter.replace(/\.md$/, '.html')}）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->`;
 const relOut = (e) => `.claude/skills/${e.skill}/references/${outName(e.chapter)}`;
 function synthChapter(entry, i) {
   const extra = entry.chapter === 'lua/modules/pasta-search.md'
