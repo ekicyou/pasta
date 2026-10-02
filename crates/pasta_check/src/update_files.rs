@@ -88,7 +88,7 @@ fn days_to_ymd(mut days: u32) -> (u32, u32, u32) {
 
 /// 更新ファイルを生成。戻り値は登録したファイルエントリ数。
 pub(crate) fn generate_update_files(root_dir: &Path) -> io::Result<usize> {
-    let entries = collect_files(root_dir)?;
+    let entries = collect_files(root_dir, &[])?;
     let count = entries.len();
 
     if entries.is_empty() {
@@ -110,9 +110,12 @@ pub(crate) fn generate_update_files(root_dir: &Path) -> io::Result<usize> {
 }
 
 /// ディレクトリ内のファイルを再帰的に収集
-fn collect_files(root_dir: &Path) -> io::Result<Vec<FileEntry>> {
+///
+/// `excluded_dirs`: 基準フォルダからの相対パス（`/` 区切り）が完全一致したフォルダを丸ごと外す
+/// （名前一致の既存除外に追加）
+fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<FileEntry>> {
     let mut entries = Vec::new();
-    collect_files_recursive(root_dir, root_dir, &mut entries)?;
+    collect_files_recursive(root_dir, root_dir, excluded_dirs, &mut entries)?;
     entries.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(entries)
 }
@@ -121,6 +124,7 @@ fn collect_files(root_dir: &Path) -> io::Result<Vec<FileEntry>> {
 fn collect_files_recursive(
     root_dir: &Path,
     current_dir: &Path,
+    excluded_dirs: &[String],
     entries: &mut Vec<FileEntry>,
 ) -> io::Result<()> {
     let read_dir = match fs::read_dir(current_dir) {
@@ -139,21 +143,22 @@ fn collect_files_recursive(
         let path = entry.path();
         let name = entry.file_name();
 
+        // 基準フォルダからの相対パス（スラッシュ区切り。read_dir の実在名から作る）
+        let relative_path = path
+            .strip_prefix(root_dir)
+            .map_err(|e| io::Error::other(e.to_string()))?
+            .to_string_lossy()
+            .replace('\\', "/");
+
         if file_type.is_dir() {
-            if EXCLUDED_DIRS.iter().any(|&d| d == name) {
+            if EXCLUDED_DIRS.iter().any(|&d| d == name) || excluded_dirs.contains(&relative_path) {
                 continue;
             }
-            collect_files_recursive(root_dir, &path, entries)?;
+            collect_files_recursive(root_dir, &path, excluded_dirs, entries)?;
         } else if file_type.is_file() {
             if EXCLUDED_FILES.iter().any(|&f| f == name) {
                 continue;
             }
-
-            let relative_path = path
-                .strip_prefix(root_dir)
-                .map_err(|e| io::Error::other(e.to_string()))?
-                .to_string_lossy()
-                .replace('\\', "/");
 
             let metadata = fs::metadata(&path)?;
 
@@ -239,7 +244,7 @@ mod tests {
         fs::create_dir(&profile_dir).unwrap();
         fs::write(profile_dir.join("user.txt"), "user data").unwrap();
 
-        let entries = collect_files(temp.path()).unwrap();
+        let entries = collect_files(temp.path(), &[]).unwrap();
 
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].path, "test.txt");
@@ -329,7 +334,7 @@ mod tests {
         fs::create_dir(&var_dir).unwrap();
         fs::write(var_dir.join("state.txt"), "state").unwrap();
 
-        let entries = collect_files(temp.path()).unwrap();
+        let entries = collect_files(temp.path(), &[]).unwrap();
         let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
         assert_eq!(paths, vec!["keep.txt"]);
     }
@@ -341,7 +346,7 @@ mod tests {
         fs::write(temp.path().join("keep.txt"), "keep").unwrap();
         fs::write(temp.path().join("developer_options.txt"), "dev only").unwrap();
 
-        let entries = collect_files(temp.path()).unwrap();
+        let entries = collect_files(temp.path(), &[]).unwrap();
         let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
         assert_eq!(paths, vec!["keep.txt"]);
     }
@@ -563,6 +568,40 @@ mod tests {
         }
     }
 
+    /// 相対パス完全一致の除外（Req 3.1・3.3・3.4）: `bal` を外すとルート直下の `bal/` だけが
+    /// 一覧から消え、`ghost/master/bal/` の同名フォルダとそれ以外のファイルは従来どおり載る。
+    /// 階層付きの指定（`skin/bal2`）も同じく相対パスで一致したフォルダだけを外す。
+    #[test]
+    fn test_collect_files_excludes_relative_dirs() {
+        let temp = TempDir::new().unwrap();
+        let root = temp.path();
+
+        fs::write(root.join("install.txt"), "inst").unwrap();
+        fs::create_dir_all(root.join("bal/sub")).unwrap();
+        fs::write(root.join("bal/descript.txt"), "bal").unwrap();
+        fs::write(root.join("bal/sub/arrow0.png"), "png").unwrap();
+        fs::create_dir_all(root.join("ghost/master/bal")).unwrap();
+        fs::write(root.join("ghost/master/bal/keep.txt"), "keep").unwrap();
+        fs::create_dir_all(root.join("skin/bal2")).unwrap();
+        fs::write(root.join("skin/bal2/descript.txt"), "bal2").unwrap();
+        fs::write(root.join("skin/other.txt"), "other").unwrap();
+        fs::create_dir_all(root.join("bal2")).unwrap();
+        fs::write(root.join("bal2/keep.txt"), "keep").unwrap();
+
+        let excluded = vec!["bal".to_string(), "skin/bal2".to_string()];
+        let entries = collect_files(root, &excluded).unwrap();
+        let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        assert_eq!(
+            paths,
+            vec![
+                "bal2/keep.txt",
+                "ghost/master/bal/keep.txt",
+                "install.txt",
+                "skin/other.txt",
+            ]
+        );
+    }
+
     /// サブディレクトリの updates.txt / updates2.dau もファイル一覧から除外されること
     #[test]
     fn test_collect_files_excludes_updates_in_subdirs() {
@@ -574,7 +613,7 @@ mod tests {
         fs::write(sub.join("updates.txt"), "should be excluded").unwrap();
         fs::write(sub.join("updates2.dau"), "should be excluded").unwrap();
 
-        let entries = collect_files(temp.path()).unwrap();
+        let entries = collect_files(temp.path(), &[]).unwrap();
 
         let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
         assert!(
