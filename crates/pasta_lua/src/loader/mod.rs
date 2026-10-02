@@ -53,9 +53,12 @@ use tracing::{debug, error, info, warn};
 /// 1. Load configuration from pasta.toml
 ///    1.5. Create logger with config, register, and update tracing filter
 /// 2. Prepare profile directories and cache with version check
-/// 3. Discover .pasta files in dic/*/*.pasta
-/// 4. Incremental transpile (only changed files)
+///    2.5. Self-deploy the embedded framework scripts (non-fatal)
+/// 3. Discover .pasta files matching `[loader] pasta_patterns`
+///    (default `dic/**/*.pasta`) and the derived `.lua` patterns
+/// 4. Incremental transpile (only changed files) and `.lua` passthrough copy
 /// 5. Generate scene_dic.lua
+///    5.5. Build the aggregated source map (only when debugging is enabled)
 /// 6. Initialize PastaLuaRuntime and load scene_dic
 pub struct PastaLoader;
 

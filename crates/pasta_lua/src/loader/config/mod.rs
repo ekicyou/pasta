@@ -212,7 +212,9 @@ pub struct LoaderConfig {
     #[serde(default = "default_transpiled_output_dir")]
     pub transpiled_output_dir: String,
 
-    /// Debug mode - save transpiled files (default: true)
+    /// Debug mode - additionally log processing statistics and orphaned cache paths at load
+    /// (orphaned caches are always warned regardless of this flag)
+    /// (default: true). Transpiled files are cached regardless of this flag.
     #[serde(default = "default_debug_mode")]
     pub debug_mode: bool,
 }

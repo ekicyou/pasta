@@ -272,9 +272,11 @@ impl PastaLoader {
 
 /// Compute the bare scene module key for a source file under `base_dir`.
 ///
-/// Same derivation as `CacheManager::source_to_module_name`, without the
-/// `pasta.scene.` prefix: strip `base_dir` and the leading `dic` component,
-/// drop the extension, then map path separators to `.` and `-` to `_`.
+/// Like `CacheManager::source_to_module_name`, without the `pasta.scene.`
+/// prefix: strip `base_dir` and a leading `dic`, drop the extension, then map
+/// path separators to `.` and `-` to `_`. Unlike `source_to_module_name`, the
+/// leading `dic` is stripped as a plain string prefix, without checking that it
+/// ends at a path component boundary (e.g. `dicx/foo.pasta` yields `x.foo`).
 fn module_key(base_dir: &Path, file: &Path) -> String {
     let relative = file
         .strip_prefix(base_dir)
