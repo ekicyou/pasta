@@ -2,7 +2,7 @@
 //!
 //! 配布フォルダの `install.txt`・バルーンの `descript.txt` を読むだけで、ファイルは書きません。
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -172,6 +172,91 @@ fn normalize_value(spec: &BalloonSpec) -> io::Result<Vec<String>> {
         return Err(invalid("excluded folder (profile/var)"));
     }
     Ok(comps)
+}
+
+/// 要素ごとに親フォルダを `read_dir` し、実在のフォルダ名へ解決して `/` で結ぶ。
+/// 名前が完全一致するフォルダ（シンボリックリンクでないもの）を採り、無ければ
+/// `親.join(要素).is_dir()` が真（ファイルシステムが同じとみなす）の場合に限り、
+/// 小文字化（Unicode）して一致するフォルダの実在名を採る。
+/// `is_dir()` だけでは採らない（Windows では `bal.`・`...` なども真になるため）。
+/// 結合には検証済みの要素と `read_dir` の実在名だけを使うので、配布フォルダの外を指さない。
+fn resolve_existing_dir(root: &Path, comps: &[String], key: &str) -> io::Result<String> {
+    let not_found = || {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "install.txt: bundled balloon folder \"{}\" ({key}) does not exist in the release folder",
+                comps.join("/")
+            ),
+        )
+    };
+
+    let mut dir = root.to_path_buf();
+    let mut names = Vec::with_capacity(comps.len());
+    for comp in comps {
+        // file_type() はリンクをたどらないので、シンボリックリンク（ジャンクション含む）は is_dir() が偽
+        let mut subdirs = Vec::new();
+        for entry in fs::read_dir(&dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir()
+                && let Ok(name) = entry.file_name().into_string()
+            {
+                subdirs.push(name);
+            }
+        }
+        let name = match subdirs.iter().find(|n| *n == comp) {
+            Some(name) => name,
+            None if dir.join(comp).is_dir() => {
+                let lower = comp.to_lowercase();
+                subdirs
+                    .iter()
+                    .find(|n| n.to_lowercase() == lower)
+                    .ok_or_else(not_found)?
+            }
+            None => return Err(not_found()),
+        };
+        dir.push(name);
+        names.push(name.clone());
+    }
+    Ok(names.join("/"))
+}
+
+/// 解決後のフォルダ（.0）が同じ指定は最初の 1 件だけ残す。重なり検出より前に行う。
+fn dedup_dirs(dirs: &mut Vec<(String, String)>) {
+    let mut seen = HashSet::new();
+    dirs.retain(|(dir, _)| seen.insert(dir.clone()));
+}
+
+/// (解決後のフォルダ, キー) の列で、ghost/master・他バルーンとの入れ子を検出する（重複除去済みとする）。
+/// 要素単位の前方一致で判定し、同じ・上位・配下を重なりとする。`ghost/master` との比較だけは
+/// 要素ごとに ASCII の大文字小文字を無視し、同梱バルーンどうしは実在名の完全一致で比べる。
+fn check_overlaps(dirs: &[(String, String)]) -> io::Result<()> {
+    let overlap = |dir: &str, key: &str, with: String| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("install.txt: bundled balloon folder \"{dir}\" ({key}) overlaps with {with}"),
+        )
+    };
+    let nested = |a: &str, b: &str, eq: fn(&str, &str) -> bool| {
+        a.split('/').zip(b.split('/')).all(|(x, y)| eq(x, y))
+    };
+
+    for (i, (dir, key)) in dirs.iter().enumerate() {
+        if nested(dir, "ghost/master", |x, y| x.eq_ignore_ascii_case(y)) {
+            return Err(overlap(dir, key, "ghost/master".to_string()));
+        }
+        if let Some((other, other_key)) = dirs[..i]
+            .iter()
+            .find(|(other, _)| nested(dir, other, |x, y| x == y))
+        {
+            return Err(overlap(
+                dir,
+                key,
+                format!("bundled balloon folder \"{other}\" ({other_key})"),
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -501,5 +586,184 @@ mod tests {
                 .starts_with("emo2-kakukaku/descript.txt is not UTF-8: "),
             "{err}"
         );
+    }
+
+    fn resolve(root: &Path, comps: &[&str]) -> io::Result<String> {
+        let comps: Vec<String> = comps.iter().map(|c| c.to_string()).collect();
+        resolve_existing_dir(root, &comps, "balloon.source.directory")
+    }
+
+    fn assert_not_exist(result: io::Result<String>, folder: &str) {
+        let err = result.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            err.to_string(),
+            format!(
+                "install.txt: bundled balloon folder \"{folder}\" (balloon.source.directory) does not exist in the release folder"
+            )
+        );
+    }
+
+    #[test]
+    fn test_resolve_existing_dir_joins_existing_names() {
+        let temp = TempDir::new().unwrap();
+        fs::create_dir_all(temp.path().join("extra/bal1")).unwrap();
+        assert_eq!(
+            resolve(temp.path(), &["extra", "bal1"]).unwrap(),
+            "extra/bal1"
+        );
+        assert_eq!(resolve(temp.path(), &["extra"]).unwrap(), "extra");
+    }
+
+    #[test]
+    fn test_resolve_existing_dir_rejects_missing_or_file() {
+        let temp = TempDir::new().unwrap();
+        fs::create_dir(temp.path().join("extra")).unwrap();
+        fs::write(temp.path().join("bal"), b"").unwrap();
+        fs::write(temp.path().join("extra/bal1"), b"").unwrap();
+        assert_not_exist(resolve(temp.path(), &["emo2-kakukaku"]), "emo2-kakukaku");
+        // 同名のファイルはフォルダではない
+        assert_not_exist(resolve(temp.path(), &["bal"]), "bal");
+        assert_not_exist(resolve(temp.path(), &["extra", "bal1"]), "extra/bal1");
+        assert_not_exist(resolve(temp.path(), &["nope", "bal1"]), "nope/bal1");
+    }
+
+    #[test]
+    fn test_resolve_existing_dir_rejects_names_only_the_os_resolves() {
+        // Windows では `bal.`・`bal `・`...` も is_dir() が真になるが、実在名と一致しないので不在とする
+        let temp = TempDir::new().unwrap();
+        fs::create_dir(temp.path().join("bal")).unwrap();
+        for name in ["bal.", "bal ", "..."] {
+            assert_not_exist(resolve(temp.path(), &[name]), name);
+        }
+        assert_not_exist(resolve(temp.path(), &["bal", "..."]), "bal/...");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_resolve_existing_dir_rejects_symlink() {
+        let temp = TempDir::new().unwrap();
+        let real = temp.path().join("real");
+        fs::create_dir(&real).unwrap();
+        std::os::unix::fs::symlink(&real, temp.path().join("bal")).unwrap();
+        assert_not_exist(resolve(temp.path(), &["bal"]), "bal");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_resolve_existing_dir_rejects_junction() {
+        // ジャンクションは権限なしで作れる: cmd /C mklink /J <link> <target>
+        let temp = TempDir::new().unwrap();
+        let real = temp.path().join("real");
+        fs::create_dir(&real).unwrap();
+        let status = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(temp.path().join("bal"))
+            .arg(&real)
+            .status()
+            .expect("failed to spawn cmd for mklink");
+        assert!(status.success(), "mklink /J failed");
+        assert_not_exist(resolve(temp.path(), &["bal"]), "bal");
+        assert_not_exist(resolve(temp.path(), &["BAL"]), "BAL");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_resolve_existing_dir_uses_existing_full_width_case_on_windows() {
+        let temp = TempDir::new().unwrap();
+        fs::create_dir(temp.path().join("ｂａｌ")).unwrap();
+        assert_eq!(resolve(temp.path(), &["ＢＡＬ"]).unwrap(), "ｂａｌ");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_resolve_existing_dir_uses_existing_case_on_windows() {
+        let temp = TempDir::new().unwrap();
+        fs::create_dir_all(temp.path().join("extra/emo2-kakukaku")).unwrap();
+        assert_eq!(
+            resolve(temp.path(), &["EMO2-KAKUKAKU"]).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+        assert_eq!(
+            resolve(temp.path(), &["Extra", "EMO2-KAKUKAKU"]).unwrap(),
+            "extra/emo2-kakukaku"
+        );
+        fs::create_dir(temp.path().join("emo2-kakukaku")).unwrap();
+        assert_eq!(
+            resolve(temp.path(), &["EMO2-KAKUKAKU"]).unwrap(),
+            "emo2-kakukaku"
+        );
+    }
+
+    fn dirs(v: &[(&str, &str)]) -> Vec<(String, String)> {
+        pairs(v)
+    }
+
+    #[test]
+    fn test_dedup_dirs_keeps_first() {
+        let mut d = dirs(&[
+            ("a", "balloon.directory"),
+            ("b", "balloon0.directory"),
+            ("a", "balloon1.source.directory"),
+        ]);
+        dedup_dirs(&mut d);
+        assert_eq!(
+            d,
+            dirs(&[("a", "balloon.directory"), ("b", "balloon0.directory")])
+        );
+    }
+
+    #[test]
+    fn test_check_overlaps_rejects_ghost_master() {
+        for dir in ["ghost", "ghost/master", "ghost/master/x", "Ghost/MASTER"] {
+            let err = check_overlaps(&dirs(&[
+                ("ok", "balloon.directory"),
+                (dir, "balloon0.source.directory"),
+            ]))
+            .unwrap_err();
+            assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+            assert_eq!(
+                err.to_string(),
+                format!(
+                    "install.txt: bundled balloon folder \"{dir}\" (balloon0.source.directory) overlaps with ghost/master"
+                )
+            );
+        }
+    }
+
+    #[test]
+    fn test_check_overlaps_rejects_nested_balloons() {
+        let expected = "install.txt: bundled balloon folder \"a/b\" (balloon1.source.directory) overlaps with bundled balloon folder \"a\" (balloon0.source.directory)";
+        let err = check_overlaps(&dirs(&[
+            ("a", "balloon0.source.directory"),
+            ("a/b", "balloon1.source.directory"),
+        ]))
+        .unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(err.to_string(), expected);
+
+        let err = check_overlaps(&dirs(&[
+            ("x/a/b", "balloon0.source.directory"),
+            ("x/a", "balloon1.source.directory"),
+        ]))
+        .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "install.txt: bundled balloon folder \"x/a\" (balloon1.source.directory) overlaps with bundled balloon folder \"x/a/b\" (balloon0.source.directory)"
+        );
+    }
+
+    #[test]
+    fn test_check_overlaps_accepts_separate_folders() {
+        check_overlaps(&dirs(&[
+            ("a", "balloon.directory"),
+            ("ab", "balloon0.directory"),
+            ("ghosts", "balloon1.directory"),
+            ("ghost2/master", "balloon2.source.directory"),
+            ("x/a", "balloon3.source.directory"),
+            ("ghost/masterx", "balloon4.source.directory"),
+        ]))
+        .unwrap();
+        check_overlaps(&[]).unwrap();
     }
 }
