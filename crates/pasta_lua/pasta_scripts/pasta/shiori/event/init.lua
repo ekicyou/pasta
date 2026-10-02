@@ -21,7 +21,7 @@
 ---
 --- 注意: act.req は読み取り専用として扱うこと。変更は未定義動作となる。
 ---
---- Rust側統合パターン（main.lua）:
+--- Rust側統合パターン（pasta.shiori.entry。実際は xpcall で保護して呼ぶ）:
 --- ```lua
 --- local EVENT = require("pasta.shiori.event")
 ---
@@ -33,11 +33,11 @@
 --- 使用例（ハンドラ登録）:
 --- ```lua
 --- local REG = require("pasta.shiori.event.register")
---- local RES = require("pasta.shiori.res")
 ---
+--- -- 返した文字列は EVENT.fire が RES.ok で包むため、ハンドラは応答ではなく Value の文字列を返す
 --- REG.OnBoot = function(act)
 ---     act.sakura:talk("こんにちは")
----     return RES.ok(act:build())
+---     return act:build()
 --- end
 --- ```
 ---
@@ -81,6 +81,8 @@ local function create_act(req)
 end
 
 --- STORE.co_sceneを統一管理するローカル関数
+--- LuaJIT 2.1 には coroutine.close が無いため、以下の close 分岐は実行されず、
+--- 破棄は参照を外すだけになる（破棄したコルーチンは GC が回収する）。
 --- @param co thread|nil コルーチンまたはnil
 local function set_co_scene(co)
     -- 1. 引数検証（suspended以外はclose）

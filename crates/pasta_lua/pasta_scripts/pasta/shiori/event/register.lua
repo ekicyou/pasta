@@ -21,18 +21,18 @@
 --- 使用例:
 --- ```lua
 --- local REG = require("pasta.shiori.event.register")
---- local RES = require("pasta.shiori.res")
 ---
+--- -- 返した文字列は EVENT.fire が RES.ok で包むため、ハンドラは応答ではなく Value の文字列を返す
 --- REG.OnBoot = function(act)
----     return RES.ok([[\0\s[0]こんにちは\e]])
+---     return [[\0\s[0]こんにちは\e]]
 --- end
 ---
 --- REG.OnClose = function(act)
----     return RES.ok([[\0\s[0]さようなら\e]])
+---     return [[\0\s[0]さようなら\e]]
 --- end
 ---
 --- REG.OnMouseDoubleClick = function(act)
----     return RES.ok([[\0\s[0]なあに？\e]])
+---     return [[\0\s[0]なあに？\e]]
 --- end
 --- ```
 

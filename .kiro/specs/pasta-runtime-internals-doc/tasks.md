@@ -93,7 +93,7 @@
   - _Requirements: 2.2, 2.7, 2.8, 2.9, 3.1, 3.2, 3.5, 3.8, 7.1_
   - _Boundary: InternalsChapters（registry-search）_
 
-- [ ] 4.3 (P) ランタイム実行モデル章を執筆する
+- [x] 4.3 (P) ランタイム実行モデル章を執筆する
   - Lua VM の構築とモジュール登録、イベントからシーンへのコルーチン実行（`co_scene`・resume ループ・継続トークン）、ランタイム内部モジュールの関係（詳細は内部モジュール章へリンク）、永続化の実装と保存タイミング、クリーンアップを現行コードと照合して書く
   - STORE・`finalize_scene`・ACT の初期化などモジュール単位の内部は 4.9 の内部モジュール章が書き、本章は関係と流れだけを書いてリンクする
   - 食い違うコメント（`pasta_lua` 冒頭コメントなど）はコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
@@ -225,3 +225,5 @@
 - 4.1: pasta_core の Rune 時代のコメント（`SceneEntry.fn_path` の "Full Rune function path"、P0/P1 注記）は 4.2 の範囲として残置。
 - 4.2: PROXY の検索コードは `proxy.lua` ではなく `crates/pasta_lua/pasta_scripts/pasta/actor.lua` にある。並走 spec 合意の不可触対象として扱う。`act.lua` のコメント食い違い（「6段階」と L1〜L5）は付録 A に「取り込み後に修正」で記録済み。
 - 4.2: registry-search 章は internal-modules 章のアンカー `#finalize_scene`・`#scene-モジュール` にリンクしている。4.9 で見出しを変えたら 4.11 で再確認する。
+- 4.3: `store.lua` の古いコメント（`ctx.save`、`reset` の close、未宣言の `co_callback` フィールド）は 4.9 に残置。`shiori/event/init.lua`・`register.lua`・`save.lua`・`global.lua` のコメントは 4.3 が修正し付録 A に記録済み（4.5・4.9 は重複行を作らない）。
+- 4.3: 付録 B にコールバック系のバグ候補（try_route の継続消失、sweep の二重包み、sweep の `_staged` 残留）と CT の LuaJIT 非動作を記録済み。いずれもコード読解に基づく。

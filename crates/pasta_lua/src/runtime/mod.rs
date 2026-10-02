@@ -165,7 +165,8 @@ impl PastaLuaRuntime {
         // accept custom StdLib flags. The safety invariants are upheld because:
         //  1. `std_lib` is constructed from validated `RuntimeConfig` via `to_stdlib()`,
         //     which only maps known library names to mlua `StdLib` flags.
-        //  2. `validate_and_warn()` above alerts on dangerous libraries (debug/ffi).
+        //  2. `validate_and_warn()` above alerts on dangerous libraries (std_debug /
+        //     std_all_unsafe) and the `env` module.
         //  3. Default LuaOptions are used, so no custom allocator or hook is involved.
         //  4. The returned `Lua` handle is used in a single-threaded context and is not
         //     shared across threads.

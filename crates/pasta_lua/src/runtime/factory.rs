@@ -113,7 +113,7 @@ impl PastaLuaRuntime {
     ///
     /// # Initialization Sequence
     /// 1. Setup package.path for module resolution
-    /// 2. Register Rust modules (@pasta_config, @enc, @pasta_persistence, @pasta_sakura_script)
+    /// 2. Register Rust modules (@pasta_config, @enc, @pasta_persistence, @pasta_log, @pasta_sakura_script)
     /// 3. Register finalize_scene Rust binding
     /// 4. require("main") - 利用者初期化スクリプト。失敗は**致命**（要件 5.2）
     /// 5. require("pasta.shiori.entry") - SHIORI 応答関数。失敗は**致命**（要件 4.1）
