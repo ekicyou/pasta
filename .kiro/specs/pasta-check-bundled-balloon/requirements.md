@@ -25,6 +25,7 @@
   - 同梱バルーンの `descript.txt` に `homeurl` が無いときの警告
   - 指定フォルダが存在しないとき・値が不正なときの扱い
   - 同梱バルーンが無いゴーストの出力が変わらないことの回帰テスト
+  - `install.txt`（と同梱バルーンの `descript.txt`）の UTF-8 宣言の確認と、リポジトリのサンプル hello-pasta の `install.txt` への宣言の追加
   - スキル `pasta-check`（`SKILL.md`・`references/updates-txt-spec.md`・`references/nar-spec.md`）と `crates/pasta_check/README.md` の記述更新
 - **Out of scope**:
   - 同梱シェル・プラグインなど、バルーン以外の同梱物（`install.txt` の他のキー）
@@ -48,15 +49,15 @@
 #### Acceptance Criteria
 1. When release の更新ファイル生成の段に入ったとき, the `pasta_check` shall 配布フォルダ直下の `install.txt` のバルーン指定に `source.directory` の行（例: `balloon.source.directory`）があれば、その値を同梱バルーンのフォルダとする
 2. If バルーン指定に `source.directory` の行が無く `directory` の行（例: `balloon.directory`）がある, then the `pasta_check` shall `directory` の値を同梱バルーンのフォルダとする
-3. If 配布フォルダ直下に `install.txt` が無い、または `install.txt` にバルーン指定が 1 つも無い, then the `pasta_check` shall 同梱バルーンは無いものとして、警告もエラーも出さずに従来どおりの更新ファイルを生成する
+3. If 配布フォルダ直下に `install.txt` が無い、または `install.txt` が 9 の確認を通り、バルーン指定が 1 つも無い, then the `pasta_check` shall 同梱バルーンは無いものとして、警告もエラーも出さずに従来どおりの更新ファイルを生成する
 4. Where `install.txt` に番号付きのバルーン指定（`balloon0.source.directory`・`balloon0.directory`・`balloon1.*`…）がある, the `pasta_check` shall ベースウェアと同じ順序（番号なし → 0 → 1 → 2 …、見つからない番号が出た時点で打ち切る）でバルーン指定を探し、見つかった各指定を 1 つの同梱バルーンとして 1・2 と同じ規則で扱う（ukadoc「install.txt」の同時インストールの規則に合わせる。番号なしと番号付きは別の指定として併存しうる。ディスカッション #1 で決定）
 5. If 複数のバルーン指定が同じフォルダを指す, then the `pasta_check` shall そのフォルダを 1 つの同梱バルーンとして 1 回だけ扱う
 6. The `pasta_check` shall 同梱バルーンの判定に、配布フォルダ直下の `install.txt` だけを使い、サブフォルダにある `install.txt`（例: 同梱バルーンのフォルダ内にあるバルーン自身の `install.txt`）は判定に使わない
 7. The `pasta_check` shall `--copy` による上書きが済んだ後の配布フォルダの `install.txt` を判定に使う
 8. The `pasta_check` shall `install.txt` のキー名を大文字小文字の違いを無視して照合し（例: `Charset`・`charset` を同じキーとみなす）、値の前後の空白を無視する（ukadoc はキーの大文字小文字に触れていないが、実在する `install.txt` に `Charset,UTF-8` の表記があり、ベースウェアで動作している。ディスカッションで決定）
-9. The `pasta_check` shall `install.txt` の先頭に UTF-8 の BOM があっても、`charset` 行が無くても（既定は Shift_JIS）、`charset` 行が UTF-8 以外を指定していても、ASCII で書かれたキーと値を正しく読み取り、他の行の文字コードが判定を妨げないようにする（**前提**: キーとフォルダ名は ASCII を想定。OPEN QUESTION 1）
-10. Where `install.txt` の `charset` 行が UTF-8 を指定している, the `pasta_check` shall ASCII 以外の文字を含むフォルダの値も UTF-8 として解釈する
-11. If 同梱バルーンのフォルダの値に ASCII 以外の文字が含まれ、かつ `install.txt` の `charset` 行が UTF-8 を指定していない, then the `pasta_check` shall 値を解釈できない旨のエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（**前提**: Shift_JIS などの文字コード変換は扱わない。OPEN QUESTION 1）
+9. When release の更新ファイル生成の段に入ったとき, the `pasta_check` shall 配布フォルダ直下に `install.txt` があれば、同梱バルーンの有無にかかわらず、その 1 行目（UTF-8 の BOM があればその直後）が `charset,UTF-8` の宣言（キーと値の大文字小文字、前後の空白は問わない）であることを確かめる（`pasta_check` は UTF-8 に限って動くツールとする。ukadoc では `charset` 行は 1 行目に書き、省略すると Shift_JIS とみなされる。ディスカッションで決定）
+10. If `install.txt` の 1 行目が `charset,UTF-8` の宣言でない（宣言が無い・UTF-8 以外を指定している）、または `install.txt` に UTF-8 として正しくないバイト列がある, then the `pasta_check` shall `install.txt` が UTF-8 でない旨のエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない
+11. The `pasta_check` shall 文字コードの変換を行わず、UTF-8 以外の文字コードの `install.txt`・`descript.txt` を処理する機能を持たない
 
 ### Requirement 2: 不正な指定と存在しないフォルダの扱い
 
@@ -121,7 +122,7 @@
 2. If 同梱バルーンのフォルダ直下に `descript.txt` が無い, then the `pasta_check` shall 同梱バルーンのフォルダを示し、`descript.txt` が無い旨のエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（バルーンとして成り立たない配布物のため。作成ツールは問題があれば止める。ディスカッションで決定）
 3. When 警告を表示したとき, the `pasta_check` shall 処理を止めずに、警告が無い場合と同じ生成物（ゴースト用・バルーン用 `updates.txt` と nar）を作成し、終了コード 0 で終了する
 4. The `pasta_check` shall 警告を、進捗表示と区別できる形（警告であることが分かる接頭辞を付ける）で表示する
-5. The `pasta_check` shall `descript.txt` の `homeurl` を、Requirement 1 の `install.txt` と同じキー照合・文字コードの扱いで読み取る
+5. The `pasta_check` shall 同梱バルーンの `descript.txt` にも Requirement 1.9〜1.11 と同じ UTF-8 の規則を適用し（満たさなければ 1.10 と同じくエラーで止める）、`homeurl` を Requirement 1.8 と同じキー照合で読み取る
 
 ### Requirement 8: 同梱バルーンが無いゴーストの後方互換
 
@@ -133,6 +134,8 @@
 3. While 同梱バルーンが無いとき, the `pasta_check` shall 同梱バルーンに関する警告を表示しない
 4. The `pasta_check` shall 同梱バルーンが無い配布フォルダについて 1 から 3 を検証する回帰テストを持つ
 5. The `pasta_check` shall 同梱バルーンがある配布フォルダについて、ゴースト用 `updates.txt` に同梱バルーン配下の行が無いこと、バルーン用 `updates.txt` の各行の md5 と size が実ファイルと一致すること、nar にバルーン用 `updates.txt` が入ることを検証するテストを持つ
+6. If 同梱バルーンが無いゴーストでも、配布フォルダ直下の `install.txt` が Requirement 1.9 の確認を通らない, then the `pasta_check` shall Requirement 1.10 のエラーで止める（1〜3 の後方互換の例外。ukadoc では宣言の無い `install.txt` は Shift_JIS であり、UTF-8 限定のツールとして扱わない）
+7. The リポジトリのサンプルゴースト hello-pasta の `install.txt`（`crates/pasta_sample_ghost/ghosts/hello-pasta/install.txt`）shall 1 行目に `charset,UTF-8` を持ち、新しい `pasta_check` の release を通る（リポジトリに置かれた `release/hello-pasta` の写しも同じ内容にそろえる）
 
 ### Requirement 9: スキル・README の記述更新
 
@@ -141,6 +144,6 @@
 #### Acceptance Criteria
 1. The スキル `pasta-check` の `references/updates-txt-spec.md` shall 同梱バルーンの判定方法（`install.txt` のキー・優先順位・番号付き指定・階層付きの値）、不正な値と重なりのエラー、ゴースト用 `updates.txt` からの除外、バルーン用 `updates.txt` の位置と相対パスの基準、適用する除外規則、`homeurl` 欠落の警告を記載する
 2. The スキル `pasta-check` の `references/nar-spec.md` shall nar にバルーン用 `updates.txt` が入ることと、同梱バルーンがあるときの内部構造の例を記載する
-3. The スキル `pasta-check` の `SKILL.md` shall 実行フローの更新ファイル生成の段の説明・ディレクトリ構成例・トラブルシューティング（`homeurl` 警告、不正な値のエラー、指定フォルダ不在の警告）に同梱バルーンの扱いを反映する
-4. The `crates/pasta_check/README.md` shall 仕様メモに同梱バルーンの扱い（判定・除外・バルーン用 `updates.txt`）を記載する（**前提**: crates.io の利用者向け文書も揃える。OPEN QUESTION 6）
+3. The スキル `pasta-check` の `SKILL.md` shall 実行フローの更新ファイル生成の段の説明・ディレクトリ構成例・トラブルシューティング（`homeurl` 警告、`install.txt`・`descript.txt` が UTF-8 でないエラー、不正な値・指定フォルダ不在・`descript.txt` 不在・重なりのエラー）に同梱バルーンの扱いを反映する
+4. The `crates/pasta_check/README.md` shall 仕様メモに同梱バルーンの扱い（判定・除外・バルーン用 `updates.txt`）と、`install.txt` に `charset,UTF-8` の宣言を必須とすることを記載する（**前提**: crates.io の利用者向け文書も揃える。OPEN QUESTION 6）
 5. When 上記の文書を更新するとき, the スキル `pasta-check` shall 同じ文書にある現行実装と食い違う既存の記述（例: 除外ファイル表に `updates2.dau` が無い、トラブルシューティングの「updates.txt が Shift_JIS でない」、nar 内部構造の例の `ghost/master/pasta_scripts/`）を現行実装に合わせて正す（**前提**: 触る文書の中の食い違いは同時に直す。OPEN QUESTION 6）
