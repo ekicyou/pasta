@@ -152,7 +152,7 @@
   - _Requirements: 2.3, 3.1, 3.6, 6.1, 6.6_
   - _Boundary: InternalsChapters（internal-modules）_
 
-- [ ] 4.10 (P) スクリプト用ランタイム API 章を執筆する
+- [x] 4.10 (P) スクリプト用ランタイム API 章を執筆する
   - 現行スキル `internal-modules.md` のゴースト作者向け API（ACT のトーク・SHIORI 固有プロパティ・表示制御・スポット操作・検索と呼び出し・`yield`・`choice`、WORD のファクトリとビルダ、GLOBAL、SAVE のキー規約とアクセス）を現行実装と照合し、情報量を減らさずに収録する
   - 既存の利用者向け章が権威の事実（`act.req` のフィールド・セーブキーの命名規約・REG/RES）はリンクで参照し、作例章との呼び出し形の重なりは許容して作例章は改訂しない。内部設計章へのリンクは張らない
   - 現行 `internal-modules.md` の担当行（利用者向け列）と作例章との重なりを台帳に記録する
@@ -235,3 +235,4 @@
 - 4.7: debug 章の「ソースの所在」にテストパス群を追加済み（4.11 で判断）。付録 B に 5 件（位置キックの前方一致誤起動、末尾数字のシーン名の identity 索引漏れ、Windows の SO_REUSEADDR 二重 bind、C フレームでの variables ずれ、1 起動 1 接続の利用者章未記載）。`ACT_IMPL.find_scene` が `global_scene_name` を捨てている点（`act.lua`、不可触）は末尾数字の件の原因でもあり、取り込み後に確認する。
 - 4.8: logging-encoding 章の「ソースの所在」にテストパス（`crates/pasta_lua/tests/log/`・`crates/pasta_lua/tests/runtime/encoding_test.rs`）を追加済み（4.11 で判断）。付録 B に 4 件（FFI 入口スレッドのログ破棄、フィルタの再読み込み不整合と利用者章 pasta-toml.md との食い違い、CP 65001 の to_ansi、未使用の公開関数）。
 - 4.9: internal-modules 章の「ACT の内部」に ACT のフィールドの作られ方を収録（talk-output 章が #act-の内部 を参照するため）。script-api 章（4.10）との線引きは 4.11 で確認。台帳の 4.9／4.10 共有行は各セルを「4.9: …」で記入済みで、4.10 は「／4.10: …」を追記する。付録 B に init_scene／call の文脈非復元を記録済み。`crates/pasta_lua/src/search/context.rs` の fn_name 例 `メイン_1::…` はトランスパイル時の形のみ正しい（4.11 で要確認）。
+- 4.10: script-api 章のアクタープロキシ表・`init_scene`・WORD スコープは internal-modules 章と一部重なる（4.11 で線引き）。`crates/pasta_lua/src/code_gen/scope_gen.rs` の `ACTOR:create_word()` がアクター属性も設定するという古いコメントは未修正（4.11 で修正）。回避レシピ（「代わりにこう書く」）は書かない方針を点検で確認済み。
