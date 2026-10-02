@@ -28,8 +28,14 @@ pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
 
     // Step 4: 更新ファイル生成
     println!("[4/5] Generating update files...");
-    let entries = generate_update_files(&args.release)?;
-    println!("  Generated updates.txt ({entries} entries)");
+    let summary = generate_update_files(&args.release, &[])?;
+    println!(
+        "  Generated updates.txt ({} entries)",
+        summary.ghost_entries
+    );
+    for (dir, entries) in &summary.balloon_entries {
+        println!("  Generated {dir}/updates.txt ({entries} entries)");
+    }
 
     // Step 5: NAR 作成
     println!("[5/5] Creating NAR archive...");
