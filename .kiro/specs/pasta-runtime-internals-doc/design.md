@@ -31,7 +31,7 @@
 - **Lua パートの新章** `book/src/lua/script-api.md`（ゴースト作者が `scripts/` で使うランタイム API の利用者向けリファレンス）と、その目次行。
 - **章と対象ソース範囲の対応表**（概要章 `internals/index.md` 内の表）。完了ゲートが照合に使うデータの正。
 - **生成対象の追加**: `GENERATION_MAP` への 2 エントリ（`lua/script-api.md`・`internals/internal-modules.md` → `pasta-lua-coding`）と、それに伴う生成物 2 ファイル・`SKILL.md` 区分表。
-- **検査の拡張**: `link-check.mjs` の内部設計章パス実在検査（`internals-path`）とクレート README のマニュアル URL 検査（`readme-manual-url`・OPEN QUESTION 1）、`verify-content.mjs` の内部設計パート検査（I 系・口調検査の対象拡大）、`verify-search.mjs` の索引対象パート追加。
+- **検査の拡張**: `link-check.mjs` の内部設計章パス実在検査（`internals-path`）とクレート README のマニュアル URL 検査（`readme-manual-url`・7.8）、`verify-content.mjs` の内部設計パート検査（I 系・口調検査の対象拡大）、`verify-search.mjs` の索引対象パート追加。
 - **Internals Sync Gate**（`workflow.md` DoD の条件付き Gate 7）とその発火（`kiro-complete`）。
 - **`review-improvement-loop` の D7 文言**への内部設計章照合の追加（4 ファイルの固定文言のみ）。
 - **吸収台帳** `.kiro/specs/pasta-runtime-internals-doc/absorption-ledger.md`（spec 成果物）。
@@ -124,7 +124,7 @@ graph TB
 - 採用パターン: 既存基盤の拡張（ギャップ分析の Option C）。基盤側は対応表・検査関数・ゲート条項の追加のみ、内容は題材ごとの独立章として新規執筆する。
 - 責務分離: 「事実の権威」（章）／「検査」（ツール）／「判定ルール」（`workflow.md`）／「発火」（`kiro-complete`）／「対応表データ」（概要章）を分ける。1 つの事実は 1 つの章だけに書く（後述「章の責務分担」）。
 - 維持する既存パターン: マニュアル権威＋スキル生成、生成物の手編集禁止、スキル自己完結、条件付きゲートの追加方式、Claudia ボイスの章構造。
-- 新規要素の必要性: 内部設計章のソースパスはインラインコードで書くのが自然だが既存検査の対象外なので、`internals-path` 検査が要る（3.7）。README は CI のリンク検証対象外なので、`readme-manual-url` 検査が要る（7.5 の鮮度・OPEN QUESTION 1）。
+- 新規要素の必要性: 内部設計章のソースパスはインラインコードで書くのが自然だが既存検査の対象外なので、`internals-path` 検査が要る（3.7）。README は CI のリンク検証対象外なので、`readme-manual-url` 検査が要る（7.8）。
 - ステアリング準拠: 追加エコシステム依存なし（Node 標準のみ）、`workflow.md` を判定ルールの権威とする関係の維持、`structure.md` の `book/` 位置づけの踏襲。
 
 ### Dependency Direction
@@ -137,7 +137,7 @@ graph TB
 |-------|------------------|-----------------|-------|
 | 文書 | mdBook 0.5.3（既存） | 内部設計パートの静的サイト化 | 変更なし |
 | 検査ツール | Node.js 20 標準モジュール（既存） | パス実在・README URL・章構造・口調の検査 | 新規 npm 依存なし（1.6） |
-| CI | GitHub Actions `manual.yml`（既存） | 検査の実行と Pages 公開 | `paths` に `crates/*/README.md` を追加（OPEN QUESTION 1） |
+| CI | GitHub Actions `manual.yml`（既存） | 検査の実行と Pages 公開 | `paths` に `crates/*/README.md` を追加（7.8） |
 | プロセス | `workflow.md` DoD・`kiro-complete` スキル（既存） | 完了時の追従確認 | 条件付き Gate 7 を追加 |
 
 ## File Structure Plan
@@ -182,7 +182,7 @@ book/src/
 - `book/tools/link-check-test.mjs` — 2 検査のサンドボックス・ケースを追加。
 - `book/tools/verify-content.mjs` — D-voice の走査ディレクトリに `internals` を追加、I 系検査（存在・本文・構造・必須見出し・機構網羅）を追加。
 - `book/tools/verify-search.mjs` — 索引に含まれるべきセクションに `internals` を追加。
-- `.github/workflows/manual.yml` — `push`・`pull_request` の `paths` に `crates/*/README.md` を追加（OPEN QUESTION 1）。
+- `.github/workflows/manual.yml` — `push`・`pull_request` の `paths` に `crates/*/README.md` を追加（7.8）。
 - `.claude/skills/pasta-lua-coding/SKILL.md` — 区分表の `internal-modules.md` を「生成（マニュアルから）」に改め、`script-api.md` 行を追加、§5 の暫定注記を書き換え、`metadata.version` をバンプ（6.7）。
 - `.kiro/steering/workflow.md` — DoD に「7. Internals Sync Gate（条件付き）」を追加（8.1–8.8）。
 - `.claude/skills/kiro-complete/SKILL.md` — ステップ 1 に Gate 7 の発火項目を追加、完了チェックリストに 1 行追加（8.6）。
@@ -276,6 +276,7 @@ flowchart TD
 | 7.3 | crates.io の顔を保つ | ReadmeMigration | 存置する節の規則 | — |
 | 7.4 | 概要数行に限る | ReadmeMigration | 同上 | — |
 | 7.5 | 相対パスで案内しない | ReadmeMigration, LinkCheck | 絶対 URL・`readme-manual-url` | CI |
+| 7.8 | README のマニュアル URL 実在検査 | LinkCheck | `checkReadmeManualLinks`・`manual.yml` の `paths` | CI |
 | 7.6 | 利用者向け重複のリンク化 | ReadmeMigration | README 節の処置表 | — |
 | 7.7 | 対応章の無い利用者向け記述 | ReadmeMigration, AbsorptionLedger | 存置規則 | — |
 | 8.1 | DoD の確認項目 | CompletionGate | Gate 7 条項 | Gate 7 |
@@ -306,7 +307,7 @@ flowchart TD
 | ScriptApiChapter | 文書 | 利用者向けランタイム API 章 | 6.2, 6.3 | 既存 Lua 章 (P1) | State |
 | AuthoringRules | 文書 | 内部設計パートの執筆規約 | 1.7, 3.3, 3.5, 3.6, 4.1 | AUTHORING.md (P1) | — |
 | GenMapEntries | ツール | 生成対象 2 章の追加 | 6.4–6.6, 6.8, 6.9 | gen-skill-refs (P0) | Batch |
-| LinkCheck | ツール | パス実在と README URL の検査 | 1.5, 3.2, 3.7, 7.5, 8.8 | link-check (P0) | Service, Batch |
+| LinkCheck | ツール | パス実在と README URL の検査 | 1.5, 3.2, 3.7, 7.5, 7.8, 8.8 | link-check (P0) | Service, Batch |
 | VerifyContent | ツール | 内部設計パートの構造・口調・網羅検査 | 1.4, 1.8, 2.7, 2.10, 2.11 | verify-content, gen-skill-refs (P0) | Batch |
 | SkillLayout | スキル | `SKILL.md` 区分表 | 6.7, 6.10, 10.2 | link-check (P1) | — |
 | CompletionGate | プロセス | Gate 7 の規則と発火 | 8.1–8.8 | workflow.md, kiro-complete (P0) | Batch |
@@ -503,7 +504,7 @@ flowchart TD
 | Field | Detail |
 |-------|--------|
 | Intent | 内部設計章のリポジトリ内パスと、クレート README のマニュアル URL の実在を検査する |
-| Requirements | 1.5, 3.2, 3.7, 7.5, 8.8 |
+| Requirements | 1.5, 3.2, 3.7, 7.5, 7.8, 8.8 |
 
 **Responsibilities & Constraints**
 - 既存の (a)(b)(c) と自己完結検査は変更しない。新しい 2 関数を追加して `runLinkCheck` で結合し、`BOOK_KINDS` に新種別を加えて [1] の区分で表示する。
@@ -517,7 +518,7 @@ flowchart TD
 type BrokenLinkKind =
   | 'internal-md' | 'github-repo-path'                  // 既存
   | 'internals-path'                                    // 新規（3.7）
-  | 'readme-manual-url'                                 // 新規（7.5・OPEN QUESTION 1）
+  | 'readme-manual-url'                                 // 新規（7.8）
   | 'skill-escape' | 'skill-missing' | 'skill-anchor'
   | 'skill-forbidden-ref' | 'skill-unlisted';           // 既存
 
@@ -734,7 +735,7 @@ type LedgerDisposition =
 
 ### Integration Tests（実リポジトリ）
 - `node book/tools/gen-skill-refs.mjs --check` が exit 0（`internal-modules.md`・`script-api.md` を含む 23 件が最新・6.8）。生成物を 1 行手で変えると exit 1（6.9。テスト時に一時的に確認）。
-- `node book/tools/link-check.mjs` が exit 0（book・スキル・内部設計パス・README URL のすべて。1.5, 3.7, 6.6, 7.5）。
+- `node book/tools/link-check.mjs` が exit 0（book・スキル・内部設計パス・README URL のすべて。1.5, 3.7, 6.6, 7.5, 7.8）。
 - `node book/tools/verify-content.mjs` が exit 0（D 系に `internals`・I 系全項目。1.8, 2.7, 2.10, 2.11）。
 - `cargo test --all`（`NoDefaultCurrentDirectoryInExePath` を外して実行）と `cargo build` が成功し、`git diff` の Rust/Lua 差分がコメント行のみ（3.8, 10.3）。
 
@@ -768,7 +769,7 @@ flowchart LR
 - **完了ゲートの形式**: 新規の条件付き Gate 7「Internals Sync Gate」とする（Doc Gate の拡張は既存ゲートの意味を変えるため 8.5 に反する）。対象領域データは概要章の対応表、判定ルールは `workflow.md`（OPEN QUESTION 2）。
 - **生成対象章のパス表記**: 研究段階の案 (a) を採用する。`internal-modules.md` はパスを書かず題材章のアンカーへリンクする。生成器の変更（案 b）は不要、`crates/` を外した表記（案 c）は採らない。
 - **題材章どうしの重複**: 「章の責務分担（1 事実 1 章）」のとおり。
-- **README リンクの鮮度**: `link-check.mjs` に `readme-manual-url` を追加し、`manual.yml` の起動条件に `crates/*/README.md` を加える（OPEN QUESTION 1）。
+- **README リンクの鮮度**: `link-check.mjs` に `readme-manual-url` を追加し、`manual.yml` の起動条件に `crates/*/README.md` を加える（7.8。設計ディスカッション #1 で要件化）。
 - **steering `tech.md` の「2パス変換」**: 行の内容は書き換えず、トランスパイル章へのリンクを追記する（OPEN QUESTION 6）。
 
 ### リスク
@@ -781,7 +782,7 @@ flowchart LR
 
 本文の「OPEN QUESTION n」はこの番号を指す。いずれも本文は「前提」の案で書いてある。
 
-1. **README のマニュアル URL 検査**（LinkCheck・ReadmeMigration）— 前提: `link-check.mjs` に `readme-manual-url` を追加し、`manual.yml` の起動条件に `crates/*/README.md` を加える。要件の Boundary Context は検査の拡張を「R3.7 のパス実在検査」に限っているため、この追加は境界の文言を越える。代替: (a) 自動検査を入れず Gate 7／D7 の目視確認とする（章・見出しのリネームで README が黙って切れる穴が残る）、(b) 要件の境界文言に README URL 検査を追記して本案を正式化する。
+1. ~~**README のマニュアル URL 検査**~~（→ 解決: 設計ディスカッション #1 で案 (b)。要件 R7.8 と Boundary Context に正式化し、本文の案を確定）— 当初の前提: `link-check.mjs` に `readme-manual-url` を追加し、`manual.yml` の起動条件に `crates/*/README.md` を加える。要件の Boundary Context は検査の拡張を「R3.7 のパス実在検査」に限っているため、この追加は境界の文言を越える。代替: (a) 自動検査を入れず Gate 7／D7 の目視確認とする（章・見出しのリネームで README が黙って切れる穴が残る）、(b) 要件の境界文言に README URL 検査を追記して本案を正式化する。
 2. **対応表の置き場所**（CompletionGate・InternalsChapters）— 前提: データは `internals/index.md`（パスが `internals-path` で実在検査される）、判定ルールは `workflow.md` が表の場所と照合規則を示す。代替: `workflow.md` に表を複製して置く（8.2 の「完了基準が示す」を字義どおり満たすが、パスが検査されず二重管理になる）。
 3. **生成ファイルのヘッダ文言**（ManualStructure）— 前提: 「pasta 利用者マニュアル「…」から自動生成」を変えない（書名変更は `book.toml` と「はじめに」に限る）。代替: 生成器の文言を「pasta マニュアル」に変え、23 ファイルを再生成する（`internal-modules.md` のヘッダが「利用者マニュアル」になる不整合を解消できる）。
 4. **スクリプト用 API 章の名前・位置・重複の扱い**（ScriptApiChapter）— 前提: `lua/script-api.md`（旧 `runtime-api.md` との混同回避）を `lua/shiori-events.md` の直後に置き、`lua/patterns.md` の早見表との呼び出し形の重なりは許容する（`patterns.md` は 4.3 により改訂しない）。代替: 名前を `runtime-api.md` にする／Lua パート末尾に置く／`patterns.md` の重なる表を `script-api.md` へのリンクに置き換える（4.3 の例外を広げる必要がある）。
