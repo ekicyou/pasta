@@ -145,5 +145,5 @@
 1. The スキル `pasta-check` の `references/updates-txt-spec.md` shall 同梱バルーンの判定方法（`install.txt` のキー・優先順位・番号付き指定・階層付きの値）、不正な値と重なりのエラー、ゴースト用 `updates.txt` からの除外、バルーン用 `updates.txt` の位置と相対パスの基準、適用する除外規則、`homeurl` 欠落の警告を記載する
 2. The スキル `pasta-check` の `references/nar-spec.md` shall nar にバルーン用 `updates.txt` が入ることと、同梱バルーンがあるときの内部構造の例を記載する
 3. The スキル `pasta-check` の `SKILL.md` shall 実行フローの更新ファイル生成の段の説明・ディレクトリ構成例・トラブルシューティング（`homeurl` 警告、`install.txt`・`descript.txt` が UTF-8 でないエラー、不正な値・指定フォルダ不在・`descript.txt` 不在・重なりのエラー）に同梱バルーンの扱いを反映する
-4. The `crates/pasta_check/README.md` shall 仕様メモに同梱バルーンの扱い（判定・除外・バルーン用 `updates.txt`）と、`install.txt` に `charset,UTF-8` の宣言を必須とすることを記載する（**前提**: crates.io の利用者向け文書も揃える。OPEN QUESTION 6）
-5. When 上記の文書を更新するとき, the スキル `pasta-check` shall 同じ文書にある現行実装と食い違う既存の記述（例: 除外ファイル表に `updates2.dau` が無い、トラブルシューティングの「updates.txt が Shift_JIS でない」、nar 内部構造の例の `ghost/master/pasta_scripts/`）を現行実装に合わせて正す（**前提**: 触る文書の中の食い違いは同時に直す。OPEN QUESTION 6）
+4. The `crates/pasta_check/README.md` shall 仕様メモに同梱バルーンの扱い（判定・除外・バルーン用 `updates.txt`）と、`install.txt` に `charset,UTF-8` の宣言を必須とすることを記載する（crates.io の利用者が読む説明であり、UTF-8 必須は利用者に見える変更のため。ディスカッションで決定）
+5. When 上記の文書を更新するとき, the スキル `pasta-check` shall 同じ文書にある現行実装と食い違う既存の記述（例: 除外ファイル表に `updates2.dau` が無い、トラブルシューティングの「updates.txt が Shift_JIS でない」、nar 内部構造の例の `ghost/master/pasta_scripts/`）を現行実装に合わせて正す（触る文書の中の食い違いは同時に直す。特に Shift_JIS の記述は UTF-8 限定の方針と矛盾する。ディスカッションで決定）
