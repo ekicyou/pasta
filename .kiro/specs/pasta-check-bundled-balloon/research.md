@@ -59,6 +59,26 @@
   - ゴーストの更新時に同梱バルーンも更新されるかは記載なし。
 - ゴーストの `updates.txt` はゴーストのルートに置く（`ghost/master` ではない）。`pasta_check` はルートと `ghost/master` の両方に置いており、そのまま。
 
+### 2.5 関連セッションからの事実（2026-10-02 照会）
+
+**areka（alpha release セッション、areka HEAD 25c5f22c と実機記録 run-A3r.log）**
+- `install.txt`: `source.directory` が無いか空なら `directory` を取り出し元にする。同梱を読むのは `type` が ghost/shell のときだけ。
+- 番号付き: `balloon` の直後が数字だけの接頭辞を全キー走査で拾う（欠番で打ち切らない）。ukadoc（欠番で打ち切り）と異なる。
+- 階層付きの値: `directory`・`source.directory` とも 1 階層の名前だけを受け、`/`・`\` を含むとインストール全体を拒否する（SSP 2.9.00 以降の仕様とは異なる）。
+- キーは大文字小文字を無視し、キーと値の前後空白を trim。値の大小はそのまま比較。
+- `charset` 行が無ければ CP932。UTF-8 の BOM は吸収する。
+- `..`・絶対パス・空などの値や、取り出し元フォルダが nar に無い（0 件）場合はインストール全体を拒否する。
+- ネットワーク更新: ゴーストの更新で同梱バルーンの実体は更新しない。対象は今のゴースト・シェル・使用中のバルーンで、それぞれ自分の `homeurl` を使う。バルーンの一覧のパスはバルーンのフォルダ基準。
+- バルーンに `homeurl` が無ければ更新対象から外し `no_homeurl` の WARN を出す。
+- `updates.txt` の `file,`・`charset,` は小文字の接頭辞だけを認識する（pasta_check の出力は小文字で適合）。
+- 要望: 同梱バルーンのファイルがゴーストの一覧に載らないこと（本件で満たす）、`file,`・`charset,` が小文字であること（現行で満たす）。
+
+**ghost_dev（emo2 開発セッション、ghost_dev 31cffa0）**
+- emo2 の `install.txt`: UTF-8・BOM なし・CRLF、1 行目が `Charset,UTF-8`。番号付き・階層付きの予定は無い。
+- `emo2-kakukaku/descript.txt` のソースには `homeurl` を追加済み。`release/emo2` は areka alpha の署名まで凍結中で旧版のまま。
+- バルーン内の `install.txt`・`online.pdn` は特別扱い不要。除外規則はゴースト側と揃えてほしい。
+- 実際に pasta_check でリリースしているのは emo2 と pasta-in-windows だけ。
+
 ## 3. 要件と既存資産の対応表
 
 | 要件 | 既存資産 | ギャップ |
