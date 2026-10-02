@@ -149,3 +149,106 @@ steering の「2 パス変換（Pass1: シーン登録、Pass2: コード生成�
 - 題材章どうしの重複の線引き（例: ACT は実行モデル章と内部モジュール章の両方に現れる）。
 - クレート README からマニュアルへの絶対 URL リンクの鮮度担保（link-check 対象拡張か、ゲートでの確認か）。
 - steering `tech.md` の「2 パス変換」記述との齟齬の扱い（steering 再編は Out。リンク追記の要否）。
+
+---
+
+# 設計フェーズ調査（2026-10-02・kiro-spec-design）
+
+## Summary
+
+- **Feature**: `pasta-runtime-internals-doc`
+- **Discovery Scope**: Extension（ライト・ディスカバリ。既存の mdBook 基盤・生成器・リンク検証・完了ゲートへの追加。新しい外部依存なし）
+- **Key Findings**:
+  - 新パートへの基盤適用は自動で足りる。`verify-static.mjs` は `SUMMARY.md` 由来の全章、`highlight-html.mjs` は出力 HTML の再帰走査、`build-index.mjs` は mdBook の検索索引全体を処理する（§2 の Research Needed「bigram・ハイライトの自動処理」を解消）。`verify-search.mjs` だけは索引に含まれるべきセクションを列挙しているため `internals` の追加が要る。
+  - 章を `internals/internal-modules.md` とすれば `outName` は現行と同じ `internal-modules.md` になり、生成器のコード変更は不要（§6 Research Needed「章名と出力名の対応」を解消）。
+  - `link-check.mjs` の (b) はこのリポジトリを指す GitHub blob/tree URL の実在をすでに検査するが、インラインコードのパスは見ない。R3.7 はインラインコードのパスを対象にする小さな拡張で満たせる。
+
+## Research Log
+
+### 生成器とリンク検証の拡張点
+- **Context**: R3.7（パス実在）、R6.4（2 ファイル生成）、R7.5（README の絶対 URL）。
+- **Sources Consulted**: `book/tools/gen-skill-refs.mjs`（`GENERATION_MAP`・`outName`・`extractBody`・`rewriteLinks`）、`book/tools/link-check.mjs`（`detectBrokenLinks`・`checkSkillSelfContained`・`BOOK_KINDS`）、`book/tools/gen-skill-refs-test.mjs` L100（`HANDWRITTEN`）。
+- **Findings**:
+  - 対応表は凍結配列で、テストが件数と内容を固定している（`EXPECTED_MAP`・A-5「21 エントリ」）。
+  - `extractBody` は export 済みで、`verify-content.mjs` は既に `gen-skill-refs.mjs` を import している。内部設計章の構造・本文口調検査に再利用できる。
+  - `reportLinkCheck` は `BOOK_KINDS` 以外をスキル区分に表示するため、新種別は `BOOK_KINDS` へ加える必要がある。
+  - 生成ヘッダは「pasta 利用者マニュアル」を固定文言で持ち、テスト（`header2`）も同文言を期待する。
+- **Implications**: 生成器は対応表の 2 行追加のみ。リンク検証は 2 関数の追加。ヘッダ文言の変更は 23 ファイルの再生成を伴うため OPEN QUESTION とした。
+
+### 口調検査の現状
+- **Context**: R1.7・R1.8。
+- **Findings**: `verify-content.mjs` の D-voice は列挙ディレクトリの章について「散文部に口調がある」ことだけを確認し、本体に口調が無いこと・区切り構造は検査しない（生成対象章のみ生成器が検査）。
+- **Implications**: 内部設計章は D-voice の対象ディレクトリへ `internals` を加え、さらに `extractBody` を全内部設計章へ適用する I-structure を新設する。
+
+### 完了ゲートと定期総点検の組み込み先
+- **Sources Consulted**: `.kiro/steering/workflow.md` L27-54、`.claude/skills/kiro-complete/SKILL.md` L105-134・L285-290、`.kiro/specs/review-improvement-loop/{brief.md L54, requirements.md L63, design.md L293・L316-326, tasks.md L41・L770-779・L797}`、`matrix.md` の位置づけ（design.md L31）。
+- **Findings**:
+  - `kiro-complete` のステップ 1 はステップ 2（未コミットのコミット）より前に走るため、変更ファイル一覧は作業ツリーとの差分＋未追跡ファイルで取る必要がある。
+  - `review-improvement-loop` の結果台帳は `matrix.md`。横断 D7 は全体セル 1 件に集約され、セル本文は Task 2 の固定文から再生成される。
+- **Implications**: Gate 7 は Manual Sync Gate と同型の条件付き追加。D7 は固定文言 4 ファイルの追記のみで、生成済みセルとチェックボックスは触らない。
+
+### 「2 パス」の現行実装
+- **Sources Consulted**: `crates/pasta_lua/src/transpiler.rs`（`transpile_with_source_map`）、`crates/pasta_core/src/lib.rs`・`registry/*.rs` の doc コメント。
+- **Findings**: トランスパイラはファイル項目を文書順に 1 回走査し、項目ごとに `TranspileContext` のレジストリ登録と Lua 生成を続けて行う。「Pass 1」の語は `pasta_core` の doc コメントにのみ残る。
+- **Implications**: トランスパイル章は「トランスパイル時の単一走査」と「実行時の辞書確定」の 2 段で定義し、旧称との対応を明記する。`pasta_core` のコメントは R3.8 の修正候補。`tech.md` は行の内容を変えずリンクを追記する。
+
+### `OPTIMIZATION.md` の照合
+- **Sources Consulted**: `crates/pasta_lua/src/code_gen/element_gen.rs`（`generate_call_scene` の `is_tail_call`・`last_actor`・`invalid_continuation`）、`crates/pasta_lua/src/string_literalizer.rs`（`needs_long_string` は `\`・`"`）、ルート `Cargo.toml` `[profile.release]`、`.cargo/config.toml`（crt-static）。
+- **Findings**: ギャップ分析 §2.2 の 4 点の食い違いを再確認した。§6 は一致。
+- **Implications**: design.md の「既知の食い違い」表に固定し、吸収台帳で再照合する。
+
+### 陳腐化コメントの候補
+- **Findings**: `crates/pasta_lua/src/lib.rs` L4-5（pasta_rune・Lua 5.3+）、`crates/pasta_core` の「Pass 1」、`crates/pasta_shiori/src/actor/{mod,mailbox}.rs` と `crates/pasta_shiori/Cargo.toml` L28 の `actor_poc`、`mailbox.rs` L18 の「将来の新メッセージ源（Kick 等）」（`ActorMsg::Kick` は実装済み）。`scriptlibs/luacheck` の Lua 5.3 言及は第三者コードのため対象外。
+- **Implications**: CommentFix の候補として design.md に列挙し、確定は執筆時に台帳へ記録する。
+
+### README の利用者向け記述とマニュアルの対応
+- **Findings**: `pasta_patterns` の既定は `reference/pasta-toml.md`・`getting-started/first-ghost.md` にある。`pasta_lua` README の「Lua パススルー機能」はマニュアルに対応章が無い。
+- **Implications**: 対応の無い利用者向け記述は README に存置し台帳に理由を記録する（R7.7）。既存章の改訂は R4.3 で禁止されているため、マニュアル収録はロードマップへ申し送る（OPEN QUESTION 7）。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| 対応表を `workflow.md` に置く | 判定ルールとデータを同じ場所に | 8.2 の字義に忠実 | パスが検査されず腐る・章の「ソースの所在」と二重管理 | 不採用（OPEN QUESTION 2） |
+| 対応表を概要章に置く | データは章、ルールは `workflow.md` | `internals-path` で実在保証・コントリビュータにも有用 | `workflow.md` だけでは表が見えない | 採用 |
+| README URL をゲートの目視で確認 | 自動検査なし | 要件の境界文言に収まる | 章・見出しのリネームで黙って切れる | 不採用（OPEN QUESTION 1） |
+| README URL を link-check で検査 | 既存検査の拡張 | CI と Gate で常時検出 | 境界文言を越える | 採用（要確認） |
+| 生成時にパス節を落とす機能（案 b） | 生成器にマーカー除去を追加 | 生成元章にもパスを書ける | 生成器の変更・規則が増える | 不採用（R3.6 で案 a に決定済み） |
+
+## Design Decisions
+
+### Decision: Internals Sync Gate を条件付き Gate 7 として追加
+- **Context**: R8・Category B「完了ゲートの形式」。
+- **Alternatives Considered**: 1. Doc Gate の拡張 2. 新規条件付き Gate 7
+- **Selected Approach**: 2。発火は変更ファイルと対応表の機械照合、判定は章の更新または理由の記録＋`link-check.mjs`。
+- **Rationale**: 1 は既存ゲートの意味を変え 8.5 に反する。Manual Sync Gate の前例と同型にできる。
+- **Trade-offs**: 対応表が粗いと過剰発火するが、理由の記録で通過でき安全側。
+- **Follow-up**: 本 spec 自身の完了時に Gate 7 を通しで確認する。
+
+### Decision: 1 事実 1 章の責務分担
+- **Context**: Category B「題材章どうしの重複」、R4.1、R6.1–6.3。
+- **Selected Approach**: 題材章＝仕組みと流れ、`internal-modules.md`＝Lua 内部モジュールの単位リファレンス、`script-api.md`＝作者向け API、既存利用者章＝利用者から観測できる挙動。重なる箇所はリンク。
+- **Rationale**: 同じ事実を 2 か所に書くと片方だけ更新される。生成対象章はパスを書けないため、ソースの所在は題材章に一本化するのが自然。
+
+### Decision: 追加章 2 つ（`talk-output.md`・`logging-encoding.md`）
+- **Context**: R2.10（ランタイム内部機構の網羅）。
+- **Selected Approach**: さくらスクリプト後処理とアピアランスは出力系として `talk-output.md`、ロギングとエンコーディングは横断機構として `logging-encoding.md`。仮想ディスパッチャはイベント配送の一部として `shiori.md`、永続化は `execution-model.md`、設定読込は `loader.md`。
+- **Trade-offs**: 章数は増えるが、`shiori.md`（約 4.5k 行相当）のさらなる肥大を避けられる。OPEN QUESTION 5。
+
+### Decision: 検査の拡張は既存ツール内に置く
+- **Context**: R1.8・R2.7・R3.7・R7.5、新規エコシステム依存なし（R1.6）。
+- **Selected Approach**: `link-check.mjs` に 2 関数、`verify-content.mjs` に I 系、`verify-search.mjs` に 1 語。新しいスクリプトや npm 依存は作らない。
+- **Rationale**: Build vs Adopt — 既存の `maskFences`・`headingSlugs`・`extractBody` がそのまま使える。新ツールは不要。
+
+## Synthesis Outcomes
+
+- **Generalization**: 「文書に書いたリポジトリ参照が実在する」という同じ問題が 3 つある（book 内リンク・内部設計章のソースパス・README のマニュアル URL）。いずれも `link-check.mjs` の「抽出 → 写像 → 実在確認」の型に乗せ、種別だけを分ける。
+- **Build vs Adopt**: 生成・鮮度・自己完結・口調判定・slug 計算はすべて既存関数を採用。新規に作るのは 2 つの抽出関数と I 系検査だけ。
+- **Simplification**: Gate 7 の照合用スクリプトは作らない（`git diff` と表の目視照合で機械的に判定できる）。生成器の変更（パス節の除去・ヘッダ変更）はしない。題材章の細分化（1 題材を複数章）はしない。
+
+## Risks & Mitigations
+
+- 正確性の手照合コスト — 題材ごとの独立レビュー、吸収台帳の照合列、定期総点検。
+- フェンス内の図のパスは検査対象外 — 「ソースの所在」をインラインコードに限定する規則。
+- README URL 検査が要件境界を越える — OPEN QUESTION 1 で確認し、不可なら目視確認案に戻す。
+- `internal-modules.md` の手書き版を置換する前に台帳の行が揃っていないと内容が欠ける — P1 で台帳の行を先に列挙し、P3 の切替前に処置列の完了を確認する。
