@@ -127,7 +127,7 @@
   - _Requirements: 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.5, 3.8, 7.1_
   - _Boundary: InternalsChapters（talk-output）_
 
-- [ ] 4.7 (P) デバッグ基盤とシーンキック章を執筆する
+- [x] 4.7 (P) デバッグ基盤とシーンキック章を執筆する
   - DAP バックエンド、デバッグ通信（loopback 固定・opt-in）、セッション（ステップ・停止ループ・アンカー）、wiring、ソースマップ（生成・サイドカー・解決）、ブレークポイント・inspect・hook、シーンキックを現行コードと照合して書く
   - 利用者向けのデバッグ操作はデバッグパートへリンクし、食い違うコメントはコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
   - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 になる
@@ -232,3 +232,4 @@
 - dynamic-word-reference 確定 API（2026-10-03 受領、4.11 で main 取り込み後に吸収）: `ACT_IMPL.find_act_handler/find_handler(self, mode, key, skip_methods)`（真なら L1 を rawget・L3 を飛ばす）、`ACT_IMPL.word(self, name, var_path)`（var_path 時 `WORD.dynamic_key(name, var_path, "act:word")` で skip_methods=true 検索）、新設 `ACT_IMPL.expr_fn_var(self, value, var_path, ...)`（後処理は局所関数 `call_expr` を共有）、act.lua が `pasta.word` を require。PROXY: `find_actor_handler/find_handler(mode, key, skip_methods)`（A1 を rawget）、`word(name, var_path)`、新設 `expr_fn_var`。新設 `WORD.dynamic_key(value, var_path, via)`（数値は tostring、空でない文字列はそのまま、他は log.warn して nil）、word.lua が `@pasta_log` を require。生成形 `act.{a}:word(値, "パス")`・`act.{a}:expr_fn_var(値, "パス", 引数…)`・`act:word(…)`・`act:expr_fn_var(…)`。DSL 規則 dyn_name_local/dyn_name_global/word_ref_dynamic/fn_call_dynamic、AST Action::DynamicWordRef/DynamicFnCall・Expr::DynamicFnCall・SetValue::DynamicWordRef、partial.rs shift_action に 2 アーム。LSP `find_dynamic_ref`、TextMate inline-dynamic-ref。値が "yield"/"チェイントーク" のとき L4 の GLOBAL.yield に一致（設計で許容）。
 - 4.5: shiori 章の「ソースの所在」に対応表外の `crates/pasta_shiori/Cargo.toml` とテストパスを追加済み（4.11 で判断）。`kick.lua` の古いコメント（「kick の消費は別タスク」）は 4.7 に残置。付録 B に OnTalk 間隔の毎回同一（`math.randomseed` 未呼び出し）と unload 無し終了時の 5 秒停滞を記録済み。
 - 4.6: 付録 B に `group_by_actor` のトークン欠落・並べ替え（利用者章 `lua/patterns.md` の例も出力が落ちる）を記録済み。`pasta/shiori/act.lua` は不可触の対象か曖昧なため未変更。budoux 幅の数え直しは事実として章に記載し、付録 B には入れていない（budoux/areka はゴースト層で対処する方針）。
+- 4.7: debug 章の「ソースの所在」にテストパス群を追加済み（4.11 で判断）。付録 B に 5 件（位置キックの前方一致誤起動、末尾数字のシーン名の identity 索引漏れ、Windows の SO_REUSEADDR 二重 bind、C フレームでの variables ずれ、1 起動 1 接続の利用者章未記載）。`ACT_IMPL.find_scene` が `global_scene_name` を捨てている点（`act.lua`、不可触）は末尾数字の件の原因でもあり、取り込み後に確認する。

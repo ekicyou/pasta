@@ -62,8 +62,9 @@ pub(crate) fn run_socket_bridge(
     // this thread. No map / `Lua` mode → existing `.lua` behavior (6.1/6.2/7.2).
     source_map: SourceMapWiring,
     // The (optional) host-injected scene-kick sink (pasta-scene-kick tasks 2.2 /
-    // 2.3 / R2.4 / R2.6). Passed to `handle_inbound` so an inbound `pasta/playScene`
-    // request invokes it. `None` keeps the kick path inert (R2.6).
+    // 2.3 / R2.4 / R2.6). Passed to `handle_inbound` so an inbound
+    // `pasta/playSceneAt` / `pasta/reloadShiori` request invokes it. `None` keeps
+    // the kick path inert (R2.6).
     kick_sink: Option<KickSink>,
 ) {
     // Task 5.2: install the `.pasta` source resolver on the shared adapter when

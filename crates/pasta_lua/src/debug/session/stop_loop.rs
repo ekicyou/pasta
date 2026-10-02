@@ -122,9 +122,10 @@ impl DebugSession {
 
                 // `setBreakpoints` is the one command valid during execution
                 // (design "System Flows": `Arc<Mutex>` 共有). Apply it live to
-                // the shared set and keep blocking. Full reply routing is task
-                // 4.1; here we only mutate the shared store so a just-set
-                // breakpoint is observed when the session resumes.
+                // the shared set and keep blocking. In production the socket
+                // bridge applies `setBreakpoints` itself (and replies) and never
+                // forwards it here, so this arm is reached only when a command
+                // is sent to the session directly (e.g. tests).
                 Ok(SessionCommand::SetBreakpoints { source, lines }) => {
                     let _ = self.breakpoints.set_breakpoints(&source, &lines);
                     continue;

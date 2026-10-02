@@ -33,10 +33,9 @@
 //! フォールバックは「クリック行以上の開始行」を `range(line..)` の先頭で引く。いずれも
 //! `BTreeMap` の対数オーダ操作であり、SHIORI GET 処理ブロックを延ばさない（8.3）。
 
-// NOTE: 本モジュールは foundation データ構造であり、構築側（loader の
-// build_source_map・finalize join）と参照側（PositionResolver）への結線は
-// task 2.2 / 3.1 で行う。結線完了までは公開項目が未使用のため、本モジュール内の
-// dead_code を明示許可する（結線後に各項目が消費され警告は自然消滅する）。
+// NOTE: 構築側（ランタイム構築時の `scene_join::build_scene_index`）と参照側
+// （`SourceMap::scene_at` → `playscene::resolve_and_kick`）には結線済み。下の
+// dead_code 許可は結線前に置いたものである。
 #![allow(dead_code)]
 
 use std::collections::{BTreeMap, HashMap};

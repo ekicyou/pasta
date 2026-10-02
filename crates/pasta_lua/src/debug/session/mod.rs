@@ -178,9 +178,9 @@ pub(crate) enum RunMode {
 /// per executed line; on a breakpoint hit the session emits
 /// [`SessionEvent::Stopped`] and blocks until the controller resumes it.
 ///
-/// `RunMode` is interior-mutable via a `Cell` (rather than `&mut self`) because
+/// `RunMode` is interior-mutable via a `RefCell` (rather than `&mut self`) because
 /// the [`LineHook`] trait hands the hook a `&self`; `DebugSession` is owned on a
-/// single (VM) thread, so a `Cell` is sufficient and keeps the value mutable
+/// single (VM) thread, so a `RefCell` is sufficient and keeps the value mutable
 /// across the many `&self` line-hook calls without a lock.
 pub(crate) struct DebugSession {
     /// Shared breakpoint store (an `Arc<Mutex<…>>` clone; live-updated by the
@@ -197,10 +197,11 @@ pub(crate) struct DebugSession {
     /// so interior mutability is race-free here.
     mode: std::cell::RefCell<RunMode>,
     /// Immutable shared source map for `.pasta`↔`.lua` resolution, threaded in by
-    /// [`enable`](crate::debug::enable) (task 4.2 plumbing). `Some` only when a
-    /// map was supplied AND the present mode is [`SourceMode::Pasta`]; `None`
-    /// otherwise (no map, or `SourceMode::Lua`) so the stepper keeps its existing
-    /// `.lua` granularity (requirements 6.1 / 6.2). Consumed (task 5.4 / break
+    /// [`enable`](crate::debug::enable) (task 4.2 plumbing). `Some` whenever a
+    /// map was supplied, regardless of the present mode; the `.pasta` behavior is
+    /// gated per line on the EFFECTIVE mode being [`SourceMode::Pasta`], so with
+    /// no map or in `SourceMode::Lua` the stepper keeps its existing `.lua`
+    /// granularity (requirements 6.1 / 6.2). Consumed (task 5.4 / break
     /// anchor) via [`resolve_current_pasta`](Self::resolve_current_pasta) by the
     /// `.pasta`-granular stepper and the breakpoint coalescing in
     /// [`on_line_impl`](Self::on_line_impl). `Arc` is the immutable shared form
@@ -270,10 +271,10 @@ impl DebugSession {
     ///
     /// It STORES the map+mode read by the `.pasta`-granular stepper and the
     /// breakpoint coalescing (task 5.4 / break-anchor integration).
-    /// The gating decision lives in [`enable`](crate::debug::enable):
-    /// it passes `Some(map)` only when a map exists AND the present mode is
-    /// [`SourceMode::Pasta`] (requirements 6.1); for `None`/`SourceMode::Lua` the
-    /// session keeps its existing `.lua` behavior (requirements 6.2, 7.2).
+    /// [`enable`](crate::debug::enable) passes `Some(map)` whenever a map exists;
+    /// the gating is applied per line on the EFFECTIVE mode (requirements 6.1):
+    /// for a `None` map or `SourceMode::Lua` the session keeps its existing `.lua`
+    /// behavior (requirements 6.2, 7.2).
     pub(crate) fn with_source_map(
         mut self,
         source_map: Option<Arc<SourceMap>>,
@@ -312,8 +313,8 @@ impl DebugSession {
     }
 
     /// The threaded shared source map, if any (task 4.2 plumbing observation /
-    /// task 5.4 stepper consumer). `Some` only when `enable` was given a map in
-    /// [`SourceMode::Pasta`]; `None` for the default `.lua` behavior.
+    /// task 5.4 stepper consumer). `Some` whenever `enable` was given a map
+    /// (regardless of the present mode); `None` when no map was supplied.
     ///
     /// Test-only observation of the injection path (no production caller).
     #[cfg(test)]

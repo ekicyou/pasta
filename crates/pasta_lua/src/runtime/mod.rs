@@ -213,15 +213,18 @@ impl PastaLuaRuntime {
         // mapped to `mlua::Error` at this boundary.
         // Task 4.4: HAND the aggregated `.pasta` source map (built by the loader
         // AFTER transpile, only when debugging is enabled) to the enable choke
-        // point. `enable` clones the `Arc` into the backend wiring/session when
-        // `config.debug.source_mode == Pasta`; the disabled gate / `Lua` mode /
-        // `None` map keeps the default `.lua` behavior (requirements 6.1 / 6.2 /
-        // 7.2). We keep a runtime-scope clone in `self.source_map` so the held map
-        // outlives a single request (requirement 3.1).
+        // point. When enabled, `enable` clones the `Arc` into the backend
+        // wiring/session regardless of `config.debug.source_mode`; each consumer
+        // applies the `.pasta` behavior only while a map is present AND the
+        // effective mode is `Pasta`, so `Lua` mode / `None` map keeps the default
+        // `.lua` behavior (requirements 6.1 / 6.2 / 7.2). We keep a runtime-scope
+        // clone in `self.source_map` so the held map outlives a single request
+        // (requirement 3.1).
         // pasta-scene-kick tasks 1.1 / 2.3: thread the host-injected kick sink
         // (`RuntimeConfig.kick_sink`) through to the debug backend so an inbound
-        // `pasta/playScene` invokes it (R2.4). When debug is disabled or no sink
-        // was bound, the kick path stays inert (R2.6). Cloning is a refcount bump.
+        // `pasta/playSceneAt` / `pasta/reloadShiori` invokes it (R2.4). When debug
+        // is disabled or no sink was bound, the kick path stays inert (R2.6).
+        // Cloning is a refcount bump.
         let debug_handle = crate::debug::enable(
             &lua,
             &config.debug,

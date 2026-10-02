@@ -13,8 +13,8 @@ use crate::debug::source_map::SourceMap;
 ///
 /// A [`SourceResolver`] returns this for a frame's `(lua_source, lua_line)`. The
 /// [default resolver](default_source_resolver) returns the generated `.lua`
-/// unchanged (`{ "path": <lua source> }`, `line = lua_line`); a future
-/// `pasta-source-map` resolver returns a `.pasta` path and the mapped `.pasta`
+/// unchanged (`{ "path": <lua source> }`, `line = lua_line`); the
+/// [`pasta_source_resolver`] returns a `.pasta` path and the mapped `.pasta`
 /// line instead.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedSource {
@@ -38,8 +38,8 @@ pub struct ResolvedSource {
 /// the two: it builds a [`SourceMap`](crate::debug::source_map::SourceMap) via the
 /// producer seam and installs a resolver here (see
 /// [`pasta_source_resolver`]) that consults that map to present `.pasta`
-/// paths/lines. No `.pasta` mapping is implemented in this layer — only the
-/// swappable口.
+/// paths/lines. The mapping itself lives in the `SourceMap`; this layer only
+/// holds the swappable口 and the two resolver constructors.
 pub type SourceResolver = Box<dyn Fn(&str, u32) -> ResolvedSource + Send>;
 
 /// The default [`SourceResolver`]: present the generated `.lua` unchanged.

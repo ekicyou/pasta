@@ -143,9 +143,10 @@ pub struct DapAdapter {
     pending: PendingTable,
     /// The DAP-presentation source seam consulted per stack frame (R4.3).
     ///
-    /// Defaults to [`default_source_resolver`] (generated `.lua` unchanged); a
-    /// future `.pasta` resolver is installed via
-    /// [`set_source_resolver`](DapAdapter::set_source_resolver).
+    /// Defaults to [`default_source_resolver`] (generated `.lua` unchanged); the
+    /// wiring installs [`pasta_source_resolver`] via
+    /// [`set_source_resolver`](DapAdapter::set_source_resolver) while `.pasta`
+    /// presentation is active.
     source_resolver: SourceResolver,
 }
 

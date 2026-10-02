@@ -80,7 +80,7 @@ impl DebugConfig {
     /// * `file_sidecar` - the `[debug]` sidecar flag, if present.
     ///   The two `file_*` mode/sidecar values are supplied separately (not via
     ///   [`DebugFileConfig`]) because the pasta.toml loading of these fields lands
-    ///   in task 4.4 (`loader/config.rs`); `resolve` only needs to ACCEPT them.
+    ///   in task 4.4 (`loader/config/`); `resolve` only needs to ACCEPT them.
     /// * `attach_source_mode` - the DAP `attach` `sourcePresentation` override,
     ///   set ONLY when the client explicitly specifies it (task 5.5 plumbing).
     ///   A client default is NOT passed here, so it never overrides env/file.
@@ -142,7 +142,7 @@ impl DebugConfig {
     /// [`resolve`](Self::resolve) in tests to avoid global-env races.
     ///
     /// The pasta.toml `[debug]` source-mode (`present_as`) / sidecar
-    /// (`source_map_sidecar`) values are loaded by `loader/config.rs` (task 4.4)
+    /// (`source_map_sidecar`) values are loaded by `loader/config/` (task 4.4)
     /// and SUPPLIED here from `file`: they are fed to [`resolve`](Self::resolve)
     /// as the `file_*` inputs so the precedence becomes `env > file > 既定`
     /// (requirements 6.3 / 3.2). No DAP attach override is available at this

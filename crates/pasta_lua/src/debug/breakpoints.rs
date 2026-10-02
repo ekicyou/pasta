@@ -22,8 +22,8 @@
 //! [`should_pause`](BreakpointSet::should_pause) is a quick lock / check /
 //! unlock: it takes the mutex, runs the containment predicate, and drops the
 //! guard before returning. The hook MUST NOT hold this lock across a blocking
-//! stop (the blocking stop is task 2.2's `block_until_command`, which runs
-//! *after* `should_pause` has already returned and released the lock).
+//! stop (the blocking stop is the session's `stop_loop`, which runs *after*
+//! `should_pause` has already returned and released the lock).
 //!
 //! # Two-tier resolution semantics (the heart of this module)
 //!
@@ -49,7 +49,7 @@
 //! (the caller sets `present_source == chunk ==` the DAP `.lua` source path), so
 //! the prior single-key behaviour is preserved byte-for-byte. The `.pasta`
 //! translation that populates `present_source = .pasta` with a distinct
-//! `chunk`/`lua_line` is task 5.3.
+//! `chunk`/`lua_line` is `wiring::resolver::translate_pasta_breakpoints`.
 //!
 //! [`set_breakpoints`](BreakpointSet::set_breakpoints) returns the resolved
 //! breakpoints as `Vec<`[`ResolvedBreakpoint`]`>`, each `verified: true` —
@@ -141,7 +141,8 @@ impl BreakpointSet {
     /// `present_source`, `chunk`, and `lua_line` collapse to
     /// `(source.path, source.path, line)` — identical to the prior single-key
     /// behaviour. (The `.pasta` path, which fills a distinct `chunk`/`lua_line`
-    /// per requested line via the source map, is task 5.3 and will call
+    /// per requested line via the source map, is
+    /// `wiring::resolver::translate_pasta_breakpoints`; it calls
     /// [`register`](Self::register) with explicit execution coordinates.)
     ///
     /// **Retain/replace is by present source only.** Entries whose
@@ -185,8 +186,9 @@ impl BreakpointSet {
     /// from OTHER present sources (requirements 4.4 / 8.2).
     ///
     /// This is the shared registration primitive the `.lua` path
-    /// ([`set_breakpoints`](Self::set_breakpoints)) and the future `.pasta`
-    /// translation (task 5.3) both funnel through: the caller resolves a
+    /// ([`set_breakpoints`](Self::set_breakpoints)) and the `.pasta` translation
+    /// (`wiring::resolver::translate_pasta_breakpoints`) both funnel through: the
+    /// caller resolves a
     /// presented source into zero-or-more execution-coordinate [`Breakpoint`]s
     /// (one `.pasta` line may yield MANY, requirement 8.2) and hands them here
     /// tagged with the same `present_source`. Retain/replace keys ONLY on
