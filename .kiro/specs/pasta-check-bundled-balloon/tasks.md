@@ -141,7 +141,7 @@
   - _Boundary: skill docs (SKILL.md)_
   - _Depends: 4.3_
 
-- [ ] 6.3 (P) pasta_check の README と steering の構成一覧を更新する
+- [x] 6.3 (P) pasta_check の README と steering の構成一覧を更新する
   - README の仕様メモに同梱バルーンの判定・除外・バルーン用 updates.txt、install.txt の `charset,UTF-8` 宣言の必須化、release 開始時の前回の nar の削除を書き、ソース構成に判定モジュールを足す
   - steering の structure.md の pasta_check のソース一覧に判定モジュールを 1 行足す
   - 記載内容が実装の挙動と一致している
