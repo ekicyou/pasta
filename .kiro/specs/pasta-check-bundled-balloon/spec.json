@@ -1,16 +1,16 @@
 {
   "feature_name": "pasta-check-bundled-balloon",
   "created_at": "2026-10-02T13:47:38Z",
-  "updated_at": "2026-10-02T13:53:27Z",
+  "updated_at": "2026-10-02T14:20:46Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {

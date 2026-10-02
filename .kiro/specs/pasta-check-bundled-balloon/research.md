@@ -186,3 +186,90 @@ Req 1.11・2.1・2.3 は「ゼロ以外で終了し nar を作らない」。現
 5. **`descript.txt` が無い同梱バルーン**（Req 7.2）— **決定: エラーで停止する（作成ツールは問題があれば止める）。** 当初の前提: 警告のみでビルドは止めない。
 6. **文書の範囲**（Req 9.4, 9.5）— **決定: README も更新し、触る文書の既存の食い違いも同時に直す。** 当初の前提: `crates/pasta_check/README.md` も更新し、触るスキル文書の既存の食い違い（`updates2.dau`・Shift_JIS 記述・`pasta_scripts` の例）も同時に直す。
 7. **番号付きのバルーン指定**（Req 1.4, 1.5, 3.1, 4.1）— **決定（#1）: 対象に含める。** 当初の前提: brief は番号なしの `balloon.*` だけを挙げているが、ukadoc の `balloon0.*`… も同じ問題を起こすため対象に含め、ベースウェアと同じ探索順（欠番で打ち切り）で扱う。
+
+---
+
+# 設計フェーズの調査と決定（2026-10-02）
+
+## Summary
+- **Feature**: `pasta-check-bundled-balloon`
+- **Discovery Scope**: Extension（既存 CLI の段 4 の拡張。light discovery。新しい外部依存なし、外部仕様は §2.4・§2.5 で調査済み）
+- **Key Findings**:
+  - 既存テストのフィクスチャ（`release.rs` の `test_execute_release_full_pipeline`、`tests/cli_test.rs` の `test_release_end_to_end_via_binary`）は `install.txt` の中身が `"install"` で、Req 8.6（UTF-8 宣言必須）により新しい実装では失敗する。フィクスチャの更新が必要。
+  - リポジトリの `release/hello-pasta/`（`updates.txt`・`ghost/master/updates.txt`・`install.txt`）と `release/hello-pasta.nar` は git 管理下にある。`install.txt` だけを直すと写しの `updates.txt` の `install.txt` 行の md5・size が実ファイルと食い違うため、Req 8.7 の同期は再生成で行うのが一貫する（OPEN QUESTION 3）。hello-pasta の開発フォルダは `pasta.dll` まで git 管理下なので、段 4 だけ（`release.ps1 -SkipSetup` 相当）で再生成できる。
+  - CI（`.github/workflows/build.yml`）のテストは `windows-latest`。大文字小文字を区別しないファイルシステムに依存するテスト（Req 2.6）は `#[cfg(windows)]` で CI 上でも実行される。
+  - `nar.rs` は変更不要（段 4 → 段 5 の順序で、配布フォルダ内の `updates.txt` は通常ファイルとして封入される）。
+
+## Research Log
+
+### 既存コードとの接点（コード確認）
+- **Context**: §7 の申し送り（戻り値・大文字小文字・正規化順・書く前の検証）を決めるため。
+- **Sources Consulted**: `crates/pasta_check/src/{update_files,release,main,nar,copy}.rs`、`tests/cli_test.rs`、`crates/pasta_sample_ghost/{release.ps1,tests/*.rs,ghosts/hello-pasta/install.txt}`、`.github/workflows/build.yml`、steering `structure.md`・`tech.md`
+- **Findings**:
+  - `collect_files_recursive` の相対パスは `strip_prefix(root)` ＋ `\`→`/` で作られ、各要素は `read_dir` が返す実在名になる。
+  - `generate_update_files` の呼び出し元は `release.rs` だけ（テストを除く）。戻り値の形を変えても影響は閉じている。
+  - `main.rs` はエラーを `Error: {e}` で stderr に出し exit 1。警告の経路は無い。
+  - hello-pasta の `install.txt` は `type,ghost`・`name`・`directory`・`accept` の 4 行で `charset` 行が無い（CRLF）。`pasta_sample_ghost` のテストは `contains` で確認しており、1 行目の追加では壊れない。
+  - steering `structure.md` と README の「ソース構成」が `pasta_check/src/` のファイル一覧を持つ。新しいモジュールを足すと両方の更新が要る。
+- **Implications**: 戻り値の変更・除外の追加・新モジュールはいずれも `pasta_check` の中で閉じる。既存フィクスチャの更新はタスクに明示する。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A: `update_files.rs` に集約 | 解析・検証・生成を 1 ファイルに | ファイルが増えない・文書の「ソース構成」更新が不要 | 1 ファイルが 1000 行級になり、「更新ファイル生成」と「install.txt の判定」が混ざる | §5 Option A |
+| B: `balloon.rs` を新設（採用） | 判定（読み取り専用）を新モジュール、生成は既存 | 判定のエラー種別ごとの単体テストを分けて置ける。読み取り専用と書き込みの境界がファイル境界と一致し、「書く前に検証」が構造で保証される | ファイル 1 つと steering・README の 1 行追記 | §5 Option B。OPEN QUESTION 1 |
+| C: 行解析と検証だけ新設 | 折衷 | 新ファイル最小 | 判定の責務が 2 ファイルに割れる | §5 Option C |
+
+## Design Decisions
+
+### Decision: 戻り値の形と警告の表示（§7-1）
+- **Context**: Req 4.9（バルーンごとの件数表示）、7.3・7.4（警告は止めず接頭辞付き）。
+- **Alternatives Considered**:
+  1. `update_files.rs` が直接 `eprintln!` する
+  2. 判定は `BalloonPlan { dirs, warnings }`、生成は `UpdateSummary { ghost_entries, balloon_entries }` を返し、表示は `release.rs` に集約
+- **Selected Approach**: 2。警告文は `balloon.rs` が組み立て（接頭辞なし）、`release.rs` が段 4 の進捗の後に `eprintln!("Warning: {w}")`。
+- **Rationale**: 既存の「表示は `release.rs`／`main.rs`、処理は戻り値で返す」の形に合い、警告の有無を単体テストで確かめられる。
+- **Trade-offs**: 構造体が 2 つ増える。
+- **Follow-up**: E2E で stderr の `Warning:` と exit 0 を確認。
+
+### Decision: 大文字小文字の扱い（§7-2、Req 2.6）
+- **Context**: Windows では `root.join("EMO2-KAKUKAKU").is_dir()` が真になるが、収集の相対パスは実在名（`emo2-kakukaku`）になるため、文字列比較の除外がずれる。
+- **Alternatives Considered**:
+  1. 除外・重複除去・重なりの比較をすべて大文字小文字無視にする
+  2. 判定時に `read_dir` で各要素を実在名へ解決し、以降は完全一致で扱う
+  3. `fs::canonicalize` で実在名を得る
+- **Selected Approach**: 2。完全一致の実在名を優先し、無ければ `親.join(要素).is_dir()` が真のときに限り小文字化一致の実在名を採る。`ghost/master` との重なり判定だけは ASCII 大文字小文字無視。
+- **Rationale**: 比較の箇所（除外・重複除去・重なり・表示）がすべて同じ文字列で済み、「ファイルシステムが同じとみなすときだけ同じ」（Req 2.6 の条件）をそのまま実装できる。結合に `read_dir` の実在名だけを使うので、配布フォルダの外を指さないことの保証にもなる（Req 2.4）。案 3 は 8.3 短縮名・`\?\` 接頭辞で CI だけ壊れる既知の問題がある（メモリ「CI固有の8.3短縮名パスバグ」）。案 1 は大文字小文字を区別するファイルシステムで別フォルダを誤って外しうる。
+- **Trade-offs**: 要素ごとに `read_dir` を 1 回。同梱バルーンは数個なので無視できる。
+- **Follow-up**: `#[cfg(windows)]` のテスト。
+
+### Decision: 正規化と検証の順序（§7-3、Req 2.1・2.2）
+- **Selected Approach**: trim → 空 → （`directory` 代用時）区切りの有無 → 先頭区切り（ルート・UNC） → `:`（ドライブ・ドライブ相対・代替ストリーム） → `/`・`\` で分割し空要素と `.` を捨てる → `..` → 残りが空。
+- **Rationale**: 区切りの種類に依存しない判定を分割前に済ませ、分割後は要素単位で判定する。`:` を一律に拒むことで `C:x` のようなドライブ相対も漏れない。末尾の区切り（`extra/bal1/`）は `source.directory` では許し、`directory` では区切りとして拒む（ukadoc の「1 階層の名前」）。
+
+### Decision: 書く前に検証を確定させる（§7-4、§4.1）
+- **Selected Approach**: `plan_bundled_balloons` は読み取り専用で、判定に関わるエラー（Req 1.10・2.1・2.3・2.5・7.2・7.5）をすべてここで返す。書き出し（`generate_update_files`）はその後。
+- **Rationale**: エラー時に書きかけの `updates.txt` が配布フォルダに残らない。モジュール境界（読むだけ／書く）と一致する。
+- **Trade-offs**: 前回の nar は既存どおり残る（OPEN QUESTION 2）。
+
+### Decision: 番号付き指定の探索と同じキーの扱い
+- **Selected Approach**: 番号なしを調べた後、`balloon0` から順に `.source.directory` か `.directory` の行がある番号を拾い、どちらも無い最初の番号で打ち切る。番号なしの有無は番号付きの探索に影響しない。同じキーが複数あるときは最初の行を採る。
+- **Rationale**: ukadoc の探索順に従う（Req 1.4）。§2.5 のとおり areka は欠番で打ち切らないが、要件はベースウェア（ukadoc）に合わせると決めている。同じキーの扱いは SSP の挙動が未確認のため前提とし、OPEN QUESTION 4・5 に回す。
+
+### Synthesis
+- **Generalization**: ゴースト用とバルーン用の `updates.txt` は「基準フォルダ＋除外する相対フォルダ」の 1 つの操作の 2 つの呼び方として扱う（`collect_files(root, excluded)` → `generate_updates_txt`）。`install.txt` と `descript.txt` の読み取りは同じ `read_utf8_kv` を共有する。
+- **Build vs. Adopt**: `install.txt` の `key,value` 形式は数行の標準ライブラリで足り、INI/CSV クレートは採らない（依存を増やさない方針。キーの大文字小文字・BOM・charset 行の扱いが独自）。
+- **Simplification**: エラー型は新設せず `io::Error(InvalidData)` と既存の `Error:` 経路を使う。警告は `Vec<String>`。nar.rs・copy.rs は触らない。バルーン用には `ghost/master` 複製をしないので、既存の `generate_update_files` を再帰的に呼ぶのではなく内部の部品を直接呼ぶ。
+
+## Risks & Mitigations
+- 除外の追加でバルーン無しの出力が変わる — 除外の変更より前に、`date=` を伏せた全バイト比較の特性化テストを置く。
+- UTF-8 宣言の必須化で既存の配布フォルダが止まる（pasta-in-windows など） — README・スキルに明記。下流の確認は OPEN QUESTION 6。
+- 大文字小文字の違いで除外と生成先がずれる — 実在名への解決で一本化し、Windows でテスト。
+- `profile/` 配下を指す同梱バルーンは nar に入らない — 要件の範囲外として受け入れる前提（OPEN QUESTION 7）。
+
+## §7 の申し送りの解決状況
+1. 戻り値の形と警告の表示 → 上記「戻り値の形と警告の表示」で決定
+2. 相対パス一致の除外の渡し方と大文字小文字 → `collect_files(root, excluded_dirs)`、実在名への解決で決定
+3. 値の正規化と検証の順序 → 上記で決定
+4. 検証エラーを書き出しより前に確定させる流れ → 上記で決定
