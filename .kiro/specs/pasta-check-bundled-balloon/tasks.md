@@ -121,6 +121,7 @@
   - 写しの install.txt の 1 行目が `charset,UTF-8` で、updates.txt の install.txt 行の md5・size が実ファイルと一致する
   - 差分が install.txt の行・`date=`・nar に限られることを git の差分で確認する。それ以外（改行コードの違いによる md5 の変化など）が出たら手で直さず、止めて報告する
   - _Requirements: 8.7_
+  - _Blocked: 再生成すると install.txt 以外に ghost/master/THIRD_PARTY_LICENSES.txt と shell/master/surfaces.txt の md5・size も変わる。原因は改行コード（core.autocrlf=true で作業ツリーは CRLF、HEAD の写しは LF・混在のバイトで作られていた）。停止条件どおり手直し・コミットせず、受け入れ方針（CRLF で揃えて受け入れる／.gitattributes で改行を固定してから作り直す）は人の判断待ち。再生成結果はスクラッチパッドに退避済み_
 
 - [ ] 6. 参照文書の更新
 - [ ] 6.1 (P) スキルの updates.txt 仕様と nar 仕様に同梱バルーンの扱いを書く
