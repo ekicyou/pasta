@@ -1,6 +1,6 @@
 [book]
-title = "pasta 利用者マニュアル"
-description = "pasta ゴースト作者向けの Pasta DSL 文法・Lua API・入門チュートリアル統合マニュアル"
+title = "pasta マニュアル"
+description = "ゴースト作者向けの Pasta DSL 文法・Lua API・入門チュートリアルと、コントリビュータ向けのランタイム内部設計をまとめた pasta のマニュアル"
 authors = ["pasta project"]
 language = "ja"
 src = "src"
