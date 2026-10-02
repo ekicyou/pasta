@@ -143,7 +143,7 @@
   - _Requirements: 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.5, 3.8_
   - _Boundary: InternalsChapters（logging-encoding）_
 
-- [ ] 4.9 (P) Lua ランタイム内部モジュール章（生成元）を執筆する
+- [x] 4.9 (P) Lua ランタイム内部モジュール章（生成元）を執筆する
   - 現行スキル `internal-modules.md` の純内部事項（STORE パターン・循環参照回避・`finalize_scene`・PROXY の仕組み・SCENE の内部・ACT の初期化・SAVE の内部実装・ユーティリティ）を現行実装と照合し、情報量を減らさずに収録する
   - リポジトリ内パス・`crates/` を含む URL をどこにも書かず、モジュールはモジュール名で示し、ソースの所在は題材章の「ソースの所在」アンカーへのリンクで示す
   - 現行 `internal-modules.md` の担当行（内部設計パート列）を台帳で処置し、実装と食い違った記述は訂正して台帳に要旨を残す
@@ -234,3 +234,4 @@
 - 4.6: 付録 B に `group_by_actor` のトークン欠落・並べ替え（利用者章 `lua/patterns.md` の例も出力が落ちる）を記録済み。`pasta/shiori/act.lua` は不可触の対象か曖昧なため未変更。budoux 幅の数え直しは事実として章に記載し、付録 B には入れていない（budoux/areka はゴースト層で対処する方針）。
 - 4.7: debug 章の「ソースの所在」にテストパス群を追加済み（4.11 で判断）。付録 B に 5 件（位置キックの前方一致誤起動、末尾数字のシーン名の identity 索引漏れ、Windows の SO_REUSEADDR 二重 bind、C フレームでの variables ずれ、1 起動 1 接続の利用者章未記載）。`ACT_IMPL.find_scene` が `global_scene_name` を捨てている点（`act.lua`、不可触）は末尾数字の件の原因でもあり、取り込み後に確認する。
 - 4.8: logging-encoding 章の「ソースの所在」にテストパス（`crates/pasta_lua/tests/log/`・`crates/pasta_lua/tests/runtime/encoding_test.rs`）を追加済み（4.11 で判断）。付録 B に 4 件（FFI 入口スレッドのログ破棄、フィルタの再読み込み不整合と利用者章 pasta-toml.md との食い違い、CP 65001 の to_ansi、未使用の公開関数）。
+- 4.9: internal-modules 章の「ACT の内部」に ACT のフィールドの作られ方を収録（talk-output 章が #act-の内部 を参照するため）。script-api 章（4.10）との線引きは 4.11 で確認。台帳の 4.9／4.10 共有行は各セルを「4.9: …」で記入済みで、4.10 は「／4.10: …」を追記する。付録 B に init_scene／call の文脈非復元を記録済み。`crates/pasta_lua/src/search/context.rs` の fn_name 例 `メイン_1::…` はトランスパイル時の形のみ正しい（4.11 で要確認）。

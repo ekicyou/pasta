@@ -2,7 +2,7 @@
 --- シーンレジストリモジュール
 ---
 --- シーン関数の登録と検索を担当する。
---- グローバルシーン名（ファイル名）とローカルシーン名（シーン関数名）の階層構造を管理する。
+--- グローバルシーン名（基本名＋連番。例: メイン1）とローカルシーン名（シーン関数名）の階層構造を管理する。
 --- カウンタ管理機能により、同名シーンに対して一意な番号を自動割当する。
 
 local STORE = require("pasta.store")
@@ -53,7 +53,7 @@ function SCENE.get_or_increment_counter(base_name)
 end
 
 --- シーン登録
---- @param global_name string グローバルシーン名（ファイル名）
+--- @param global_name string グローバルシーン名（基本名＋連番）
 --- @param local_name string ローカルシーン名（シーン関数名）
 --- @param scene_func function シーン関数
 --- @return nil
