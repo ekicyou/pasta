@@ -40,6 +40,14 @@ fn ensure_no_parent_component(relative: &str) -> io::Result<()> {
     Ok(())
 }
 
+/// Unicode として不正な名前は化けさせずに止める（UTF-8 限定の作成ツール）
+fn non_unicode_name(path: &Path) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("file name is not valid Unicode: {}", path.display()),
+    )
+}
+
 fn add_dir_to_zip<W: Write + io::Seek>(
     zip: &mut ZipWriter<W>,
     root: &Path,
@@ -68,7 +76,8 @@ fn add_dir_to_zip<W: Write + io::Seek>(
             let relative = path
                 .strip_prefix(root)
                 .map_err(|e| io::Error::other(e.to_string()))?
-                .to_string_lossy()
+                .to_str()
+                .ok_or_else(|| non_unicode_name(&path))?
                 .replace('\\', "/");
 
             // パストラバーサル防御: ZIPエントリ名に ".." が含まれないこと（Req 1.3）
@@ -347,5 +356,30 @@ mod tests {
         let file = File::open(&nar_path).unwrap();
         let archive = zip::ZipArchive::new(file).unwrap();
         assert_eq!(archive.len(), 1);
+    }
+
+    /// Unicode として不正な名前のファイルは名前を化けさせず InvalidData で止める
+    #[cfg(windows)]
+    #[test]
+    fn test_create_nar_rejects_non_unicode_name() {
+        use std::ffi::OsString;
+        use std::os::windows::ffi::OsStringExt;
+
+        let temp = TempDir::new().unwrap();
+        let release = temp.path().join("release");
+        fs::create_dir_all(release.join("ghost")).unwrap();
+        fs::write(
+            release.join("ghost").join(OsString::from_wide(&[0xD800])),
+            "a",
+        )
+        .unwrap();
+
+        let err = create_nar(&release, &temp.path().join("out.nar")).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(
+            err.to_string()
+                .starts_with("file name is not valid Unicode: "),
+            "{err}"
+        );
     }
 }

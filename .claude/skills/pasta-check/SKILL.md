@@ -146,6 +146,7 @@ gh release create v{VERSION} "release/{ghost-name}.nar" `
 | `Error: install.txt: duplicate key ...`／`... is never read by the baseware ...` | バルーン指定のキーの重複・番号の先頭の 0・欠番の後ろの番号 | キーを 1 行ずつ、番号は `balloon0` から欠番なく書く |
 | `Error: install.txt: bundled balloon folder "<フォルダ>" (<キー>) does not exist in the release folder` | 指定したフォルダが `--copy` 上書き後の配布フォルダに無い（同名のファイル・シンボリックリンクも不可） | フォルダを配布物に含めるか、指定を実在のフォルダに合わせる |
 | `Error: bundled balloon "<フォルダ>": descript.txt not found` | 同梱バルーンのフォルダ直下に `descript.txt` が無い | バルーンのフォルダ直下に `descript.txt` を置く |
+| `Error: file name is not valid Unicode: <パス>` | 配布フォルダ内のファイル・フォルダ名が Unicode として正しくない（名前を化けさせて封入しないため止める） | そのファイル・フォルダの名前を正しい名前に付け直す |
 | `Error: install.txt: bundled balloon folder "<フォルダ>" (<キー>) overlaps with ...` | 指定したフォルダが `ghost/master` や別の同梱バルーンと同じ・上位・配下 | 互いに入れ子にならないフォルダを指定する |
 | updates.txt が仕様（UTF-8・1 行目 `charset,UTF-8`）と違う | pasta_check のバグ | [updates.txt 仕様](./references/updates-txt-spec.md)と照合 |
 

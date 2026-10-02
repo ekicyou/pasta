@@ -488,8 +488,8 @@ mod tests {
     }
 
     /// 段 5 の nar 作成が途中で失敗しても --nar の位置に作りかけの nar が残らない（Req 8.8）。
-    /// 不正なサロゲートを含む 2 つの名前は to_string_lossy で同じエントリ名になり、
-    /// nar ファイル作成後の 2 件目で ZIP の重複名エラーになる。
+    /// Unicode として不正な名前（対のないサロゲート）は、nar ファイル作成後の封入時に
+    /// InvalidData で止まる。
     /// var/ は段 4（updates.txt）の対象外で、段 5 だけが読む。
     #[cfg(windows)]
     #[test]
@@ -504,7 +504,6 @@ mod tests {
         fs::create_dir_all(&var).unwrap();
         fs::write(target.join("a.txt"), "fresh").unwrap();
         fs::write(var.join(OsString::from_wide(&[0xD800])), "a").unwrap();
-        fs::write(var.join(OsString::from_wide(&[0xD801])), "b").unwrap();
 
         let nar = temp.path().join("out.nar");
         let release = temp.path().join("release_out");
@@ -515,7 +514,9 @@ mod tests {
             copy_dirs: vec![],
         };
 
-        assert!(execute_release(&args).is_err());
+        let err = execute_release(&args).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(err.to_string().contains("not valid Unicode"), "{err}");
         // 段 4 までは完了している（失敗は段 5）
         assert!(release.join("updates.txt").exists());
         assert!(!nar.exists());

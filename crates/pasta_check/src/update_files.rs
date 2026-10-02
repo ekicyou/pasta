@@ -147,6 +147,14 @@ fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<Fi
     Ok(entries)
 }
 
+/// Unicode として不正な名前は化けさせずに止める（UTF-8 限定の作成ツール）
+fn non_unicode_name(path: &Path) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("file name is not valid Unicode: {}", path.display()),
+    )
+}
+
 /// 再帰的にファイルを収集
 fn collect_files_recursive(
     root_dir: &Path,
@@ -174,7 +182,8 @@ fn collect_files_recursive(
         let relative_path = path
             .strip_prefix(root_dir)
             .map_err(|e| io::Error::other(e.to_string()))?
-            .to_string_lossy()
+            .to_str()
+            .ok_or_else(|| non_unicode_name(&path))?
             .replace('\\', "/");
 
         if file_type.is_dir() {
@@ -747,5 +756,34 @@ mod tests {
             !paths.iter().any(|p| p.contains("updates2.dau")),
             "updates2.dau should be excluded from listing"
         );
+    }
+
+    /// Unicode として不正な名前のファイル・フォルダは名前を化けさせず InvalidData で止める
+    #[cfg(windows)]
+    #[test]
+    fn test_generate_update_files_rejects_non_unicode_names() {
+        use std::ffi::OsString;
+        use std::os::windows::ffi::OsStringExt;
+
+        let bad = OsString::from_wide(&[0xD800]);
+
+        // ファイル名
+        let temp = TempDir::new().unwrap();
+        fs::write(temp.path().join(&bad), "a").unwrap();
+        let err = generate_update_files(temp.path(), &[]).err().unwrap();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(
+            err.to_string()
+                .starts_with("file name is not valid Unicode: "),
+            "{err}"
+        );
+
+        // フォルダ名（中のファイルが正常な名前でも止める）
+        let temp = TempDir::new().unwrap();
+        fs::create_dir_all(temp.path().join(&bad)).unwrap();
+        fs::write(temp.path().join(&bad).join("ok.txt"), "a").unwrap();
+        let err = generate_update_files(temp.path(), &[]).err().unwrap();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(!temp.path().join("updates.txt").exists());
     }
 }
