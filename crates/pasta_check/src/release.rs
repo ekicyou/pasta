@@ -1,4 +1,5 @@
 use crate::ReleaseArgs;
+use crate::balloon::plan_bundled_balloons;
 use crate::copy::{copy_dir_recursive, prepare_release_dir};
 use crate::nar::create_nar;
 use crate::update_files::generate_update_files;
@@ -29,15 +30,20 @@ pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
         println!("[3/5] Applying overlay copies... (none specified)");
     }
 
-    // Step 4: 更新ファイル生成
+    // Step 4: 更新ファイル生成（判定は --copy 上書き後の配布フォルダで行う・Req 1.7）
     println!("[4/5] Generating update files...");
-    let summary = generate_update_files(&args.release, &[])?;
+    let plan = plan_bundled_balloons(&args.release)?;
+    let summary = generate_update_files(&args.release, &plan.dirs)?;
     println!(
         "  Generated updates.txt ({} entries)",
         summary.ghost_entries
     );
     for (dir, entries) in &summary.balloon_entries {
         println!("  Generated {dir}/updates.txt ({entries} entries)");
+    }
+    // 警告は止めずに段 5 へ進む（Req 7.3・7.4）
+    for w in &plan.warnings {
+        eprintln!("Warning: {w}");
     }
 
     // Step 5: NAR 作成
@@ -196,6 +202,80 @@ mod tests {
         let mut archive = zip::ZipArchive::new(file).unwrap();
         assert!(archive.by_name("updates.txt").is_ok());
         assert!(archive.by_name("ghost/master/updates.txt").is_ok());
+    }
+
+    /// homeurl の無い同梱バルーンは警告だけで止まらず、nar とバルーン用 updates.txt を作る（Req 7.3）。
+    /// 判定は --copy の上書き後の install.txt で行う（Req 1.7）
+    #[test]
+    fn test_execute_release_bundled_balloon_without_homeurl_succeeds() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("target_ghost");
+        fs::create_dir_all(target.join("ghost/master")).unwrap();
+        fs::create_dir_all(target.join("bal")).unwrap();
+        fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
+        fs::write(
+            target.join("install.txt"),
+            "charset,UTF-8\r\ntype,ghost\r\n",
+        )
+        .unwrap();
+        fs::write(
+            target.join("bal/descript.txt"),
+            "charset,UTF-8\r\nname,bal\r\n",
+        )
+        .unwrap();
+        fs::write(target.join("bal/balloons0.png"), "png").unwrap();
+
+        let overlay = temp.path().join("overlay");
+        fs::create_dir_all(&overlay).unwrap();
+        fs::write(
+            overlay.join("install.txt"),
+            "charset,UTF-8\r\ntype,ghost\r\nballoon.directory,bal\r\n",
+        )
+        .unwrap();
+
+        let release = temp.path().join("release_out");
+        let nar = temp.path().join("out.nar");
+        let args = ReleaseArgs {
+            target,
+            release: release.clone(),
+            nar: nar.clone(),
+            copy_dirs: vec![overlay],
+        };
+
+        execute_release(&args).unwrap();
+
+        assert!(nar.exists());
+        let bal_updates = fs::read_to_string(release.join("bal/updates.txt")).unwrap();
+        assert!(bal_updates.contains("file,balloons0.png\x01"));
+        // ゴースト用 updates.txt には同梱バルーンのファイルを載せない
+        let ghost_updates = fs::read_to_string(release.join("updates.txt")).unwrap();
+        assert!(!ghost_updates.contains("bal/"));
+    }
+
+    /// 判定エラーでは段 5 に進まず nar を作らない
+    #[test]
+    fn test_execute_release_balloon_plan_error_creates_no_nar() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("target_ghost");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(
+            target.join("install.txt"),
+            "charset,UTF-8\r\nballoon.directory,missing\r\n",
+        )
+        .unwrap();
+
+        let nar = temp.path().join("out.nar");
+        let args = ReleaseArgs {
+            target,
+            release: temp.path().join("release_out"),
+            nar: nar.clone(),
+            copy_dirs: vec![],
+        };
+
+        assert!(execute_release(&args).is_err());
+        assert!(!nar.exists());
     }
 
     /// 後段で失敗しても --nar の位置に前回の nar が残らない（Req 8.8）
