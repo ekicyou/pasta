@@ -53,7 +53,7 @@
 5. If 複数のバルーン指定が同じフォルダを指す, then the `pasta_check` shall そのフォルダを 1 つの同梱バルーンとして 1 回だけ扱う
 6. The `pasta_check` shall 同梱バルーンの判定に、配布フォルダ直下の `install.txt` だけを使い、サブフォルダにある `install.txt`（例: 同梱バルーンのフォルダ内にあるバルーン自身の `install.txt`）は判定に使わない
 7. The `pasta_check` shall `--copy` による上書きが済んだ後の配布フォルダの `install.txt` を判定に使う
-8. The `pasta_check` shall `install.txt` のキー名を大文字小文字の違いを無視して照合し（例: `Charset`・`charset` を同じキーとみなす）、値の前後の空白を無視する（**前提**: 実在する `install.txt` に `Charset,UTF-8` の表記がある。OPEN QUESTION 4）
+8. The `pasta_check` shall `install.txt` のキー名を大文字小文字の違いを無視して照合し（例: `Charset`・`charset` を同じキーとみなす）、値の前後の空白を無視する（ukadoc はキーの大文字小文字に触れていないが、実在する `install.txt` に `Charset,UTF-8` の表記があり、ベースウェアで動作している。ディスカッションで決定）
 9. The `pasta_check` shall `install.txt` の先頭に UTF-8 の BOM があっても、`charset` 行が無くても（既定は Shift_JIS）、`charset` 行が UTF-8 以外を指定していても、ASCII で書かれたキーと値を正しく読み取り、他の行の文字コードが判定を妨げないようにする（**前提**: キーとフォルダ名は ASCII を想定。OPEN QUESTION 1）
 10. Where `install.txt` の `charset` 行が UTF-8 を指定している, the `pasta_check` shall ASCII 以外の文字を含むフォルダの値も UTF-8 として解釈する
 11. If 同梱バルーンのフォルダの値に ASCII 以外の文字が含まれ、かつ `install.txt` の `charset` 行が UTF-8 を指定していない, then the `pasta_check` shall 値を解釈できない旨のエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（**前提**: Shift_JIS などの文字コード変換は扱わない。OPEN QUESTION 1）
@@ -63,8 +63,8 @@
 **Objective:** As a ゴーストの作者, I want `install.txt` の書き誤りや配置漏れを release の時点で知りたい, so that 壊れた配布物や意図しないファイル操作を避けられる
 
 #### Acceptance Criteria
-1. If 同梱バルーンのフォルダの値が空である、絶対パス（ドライブ名・ルート・UNC から始まるもの）である、または `..` の要素を含む, then the `pasta_check` shall 不正な値とその行のキーを示すエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（**前提**: 不正な値はビルドを止める。OPEN QUESTION 3）
-2. Where 同梱バルーンのフォルダの値がパス区切り（`/`・`\` のどちらも可）を含む配布フォルダ内の相対パスである, the `pasta_check` shall それを配布フォルダからの階層付きの相対パスとして扱い、指すフォルダを同梱バルーンとする（SSP 2.9.00 以降の `*.source.directory` の仕様に合わせる。**前提**: `directory` で代用する場合も同じ扱い。OPEN QUESTION 3）
+1. If 同梱バルーンのフォルダの値が空である、絶対パス（ドライブ名・ルート・UNC から始まるもの）である、`..` の要素を含む、または `source.directory` の行が無く代わりに使う `directory` の値がパス区切り（`/`・`\`）を含む, then the `pasta_check` shall 不正な値とその行のキーを示すエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（ukadoc「install.txt」: `..` による上位階層への参照はできない／`*.directory` は 1 階層のディレクトリ名だけでパス区切りは使えない。ディスカッションで決定）
+2. Where バルーン指定の `source.directory` の値がパス区切り（`/`・`\` のどちらも可）を含む配布フォルダ内の相対パスである, the `pasta_check` shall それを配布フォルダからの階層付きの相対パスとして扱い、指すフォルダを同梱バルーンとする（ukadoc: SSP 2.9.00 以降の `*.source.directory` の仕様。ディスカッションで決定）
 3. If 同梱バルーンのフォルダが `ghost/master` と同じ・その上位・その配下のいずれかである、または別の同梱バルーンのフォルダの上位・配下である, then the `pasta_check` shall 重なっているフォルダを示すエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（**前提**: ゴースト本体や他のバルーンと入れ子の指定は配布物の誤りとみなす。OPEN QUESTION 3）
 4. The `pasta_check` shall `install.txt` の値がどのようなものであっても、配布フォルダの外にあるファイルを読み取り・作成・変更しない
 5. If 値は妥当だが、配布フォルダ内にそのフォルダが存在しない（同名のファイルがある場合を含む）, then the `pasta_check` shall 指定されたフォルダを示す警告を表示し、そのバルーン指定は無いものとして処理を続ける（**前提**: ビルドは止めない。OPEN QUESTION 3）
@@ -89,7 +89,7 @@
 2. The `pasta_check` shall バルーン用 `updates.txt` の各行のパスを、同梱バルーンのフォルダからの相対パス（スラッシュ区切り。例: `file,arrow0.png…`）で書く
 3. The `pasta_check` shall バルーン用 `updates.txt` を、ゴースト用 `updates.txt` と同じ形式（1 行目 `charset,UTF-8`、CRLF 改行、区切りのバイト値 1、32 文字小文字 16 進の md5、`size=`、`date=`、パスの辞書順）で書く
 4. The `pasta_check` shall バルーン用 `updates.txt` に自分自身（同梱バルーンのフォルダ直下の `updates.txt`）を載せない
-5. The `pasta_check` shall バルーン用 `updates.txt` の収集にも、ゴースト用と同じ除外規則（フォルダ `profile`・`var`、ファイル名 `updates2.dau`・`updates.txt`・`developer_options.txt`）を適用する（**前提**: 規則を 1 つに揃える。OPEN QUESTION 2）
+5. The `pasta_check` shall バルーン用 `updates.txt` の収集にも、ゴースト用と同じ除外規則（フォルダ `profile`・`var`、ファイル名 `updates2.dau`・`updates.txt`・`developer_options.txt`）を適用する（ukadoc の更新ファイルの配置と生成時の除外はゴーストとバルーンで共通。emo2 開発セッションの希望とも一致。ディスカッションで決定）
 6. If 配布フォルダの同梱バルーンのフォルダ直下に `--target` または `--copy` 由来の `updates.txt` が既にある, then the `pasta_check` shall それを生成したバルーン用 `updates.txt` で置き換える
 7. If 同梱バルーンのフォルダに除外規則を適用した後の対象ファイルが 0 件である, then the `pasta_check` shall そのバルーン用 `updates.txt` を生成しない（ゴースト用で 0 件のときと同じ扱い）
 8. The `pasta_check` shall バルーン用 `updates.txt` を同梱バルーンのフォルダ直下以外（例: `ghost/master/`）へ書き出さない
