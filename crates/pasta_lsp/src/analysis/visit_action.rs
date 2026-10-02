@@ -282,7 +282,9 @@ impl super::AnalysisEngine {
                     Self::add_token_from_span(span, source, token_type::VARIABLE, 0, tokens);
                 }
             }
-            Action::FnCall { span, .. } => {
+            Action::FnCall { span, .. }
+            | Action::DynamicWordRef { span, .. }
+            | Action::DynamicFnCall { span, .. } => {
                 if span.is_valid() {
                     Self::add_token_from_span(span, source, token_type::WORD, 0, tokens);
                 }
@@ -297,8 +299,6 @@ impl super::AnalysisEngine {
                     Self::add_token_from_span(span, source, token_type::ESCAPE, 0, tokens);
                 }
             }
-            // 暫定: 4.1 で WORD トークン化に置換（現状はトークンを出さない）
-            Action::DynamicWordRef { .. } | Action::DynamicFnCall { .. } => {}
         }
     }
 
