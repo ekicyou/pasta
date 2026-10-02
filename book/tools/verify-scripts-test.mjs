@@ -57,6 +57,15 @@ log('\n== verify-content.mjs（コンテンツ整合・網羅レビュー検証�
     m ? `検証項目=${m[1]}` : '(サマリなし)');
   check('FAIL 0 件', m && Number(m[3]) === 0, m ? `FAIL=${m[3]}` : '(サマリなし)');
   check('RESULT: OK を出力', /RESULT: OK/.test(out), out.slice(-200));
+  // 内部設計パート（I 系）が空回りしていない: 10 章の構造検査・題材章 8 章の必須 H2・機構網羅が走る。
+  const count = (re) => (out.match(re) || []).length;
+  check('I-structure を内部設計 10 章に実行', count(/PASS {2}\[I-structure:/g) === 10,
+    `I-structure PASS=${count(/PASS {2}\[I-structure:/g)}`);
+  check('I-sections を題材章 8 章に実行', count(/PASS {2}\[I-sections:/g) === 8,
+    `I-sections PASS=${count(/PASS {2}\[I-sections:/g)}`);
+  check('I-fact（機構網羅・概要章）を実行', count(/PASS {2}\[I-fact:/g) === 2,
+    `I-fact PASS=${count(/PASS {2}\[I-fact:/g)}`);
+  check('口調検査の走査対象に内部設計パートを含む', /PASS {2}\[D-voice:book\/src\/internals\//.test(out));
 }
 
 // ============================================================

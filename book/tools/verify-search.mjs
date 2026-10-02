@@ -139,7 +139,7 @@ log('--- フィクスチャ（本番フルコンテンツ）---');
   const sections = new Set(
     indexObj.doc_urls.map((u) => (u || '').split('/')[0].split('.')[0]),
   );
-  for (const sec of ['introduction', 'getting-started', 'grammar', 'lua', 'reference']) {
+  for (const sec of ['introduction', 'getting-started', 'grammar', 'lua', 'reference', 'internals']) {
     check(`章「${sec}」が索引に含まれる`, sections.has(sec),
       `sections=${JSON.stringify([...sections])}`);
   }
