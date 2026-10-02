@@ -38,7 +38,7 @@ SSPのプロパティシステムへのアクセスをpastaゴーストから可
 
 ### 将来仕様（doc/spec 廃止時の申し送り）
 
-manual-ssot-authority で旧文法仕様をマニュアルへ吸収した際に、マニュアルへ収録しなかった将来項目（B＝brief 起票済み、R＝キー行のみ）と、実装照合で見つかった未記載構文のバグ候補を 1 項目 1 行で申し送る。根拠と実装照合は `manual-ssot-authority` の吸収台帳（`absorption-ledger.md`）にある。
+manual-ssot-authority で旧文法仕様をマニュアルへ吸収した際に、マニュアルへ収録しなかった将来項目（B＝brief 起票済み、R＝キー行のみ）と、実装照合で見つかった未記載構文のバグ候補を 1 項目 1 行で申し送る。根拠と実装照合は `manual-ssot-authority` の吸収台帳（`.kiro/specs/completed/manual-ssot-authority/absorption-ledger.md`）にある。
 
 - シーン属性のセマンティクス（B1） — 属性によるシーンへのメタデータ付与、ファイルレベル属性の継承と上書き（ローカルシーンには影響しない）、Call の属性フィルター（`＞シーン＆k＝v`・比較演算子・複数条件の結合）。現行は構文の受理と内部の登録表への記録まで — `.kiro/specs/scene-attribute-semantics/brief.md`
 - 動的単語参照 `＠＄`（B2） — `＠＄変数名` で変数の値を単語名として参照する。現行はパースエラー。未実装期間の扱い（無視・警告）も未定 — `.kiro/specs/dynamic-word-reference/brief.md`
@@ -105,9 +105,10 @@ pasta ゴースト作者向けの利用者マニュアルを、mdBook で**サ�
 
 discovery（2026-10-01）で両仕様を起票。依存順は manual-ssot-authority → pasta-runtime-internals-doc。
 
-- [ ] manual-ssot-authority -- マニュアル全体の SSOT/権威化の再編。旧文法仕様ディレクトリを mdBook へ吸収・廃止し、旧乖離検出機構をリンク検証（`link-check.mjs`）と生成物鮮度チェック（`gen-skill-refs.mjs --check`）へ置換、`GRAMMAR.md` 廃止。読者で線引きし、利用者向け（文法・公開 Lua API・`pasta.toml`）は mdBook を権威としてスキル `references/` を mdBook から自動生成（スキルは別リポジトリへ持ち出すため自己完結を維持）、AI 作業手順（作例・規約・テスト/lint）はスキル手書きを権威とする。権威移行と生成切替を 1 spec で一括完了。Dependencies: pasta-user-manual
+- [x] manual-ssot-authority -- マニュアル全体の SSOT/権威化の再編。旧文法仕様ディレクトリを mdBook へ吸収・廃止し、旧乖離検出機構をリンク検証（`link-check.mjs`）と生成物鮮度チェック（`gen-skill-refs.mjs --check`）へ置換、`GRAMMAR.md` 廃止。読者で線引きし、利用者向け（文法・公開 Lua API・`pasta.toml`）は mdBook を権威としてスキル `references/` を mdBook から自動生成（スキルは別リポジトリへ持ち出すため自己完結を維持）、AI 作業手順（作例・規約・テスト/lint）はスキル手書きを権威とする。権威移行と生成切替を 1 spec で一括完了。Dependencies: pasta-user-manual
   - 由来: pasta-manual-debugging の discovery（2026-06-08）でユーザーが「mdbook に書いてる項目は mdbook を権威にしたい／別仕様で権威化の整理をすべき」と指摘。本仕様外・別仕様として申し送り
-  - brief.md 作成済み（`.kiro/specs/manual-ssot-authority/brief.md`）
+  - brief.md 作成済み（`.kiro/specs/completed/manual-ssot-authority/brief.md`）
+  - 完了（2026-10-02）。吸収台帳は `.kiro/specs/completed/manual-ssot-authority/absorption-ledger.md`
 - [ ] pasta-runtime-internals-doc -- pasta ランタイムの内部設計・アーキテクチャ解説（トランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期・アクター基盤 / デバッグ・ソースマップ / シーンキック）。読者＝コントリビュータ・実装理解者。同一 mdBook の末尾に「内部設計」パートとして置く。`OPTIMIZATION.md` を吸収・廃止、スキル `internal-modules` を mdBook 権威＋生成へ移行、クレート README の内部解説を移設。鮮度維持は kiro-complete DoD の追従確認＋review-improvement-loop 次元⑦の照合。Dependencies: manual-ssot-authority
   - 由来: pasta-user-manual の設計ディスカッションで「ランタイム内部設計は本仕様外・将来仕様」と決定（R5 は API 使用法に限定）
   - brief.md 作成済み（`.kiro/specs/pasta-runtime-internals-doc/brief.md`）

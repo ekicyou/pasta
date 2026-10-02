@@ -10,7 +10,7 @@
 
 ## Current State
 
-実装照合は `manual-ssot-authority` の吸収台帳（`absorption-ledger.md`「将来仕様の仕分け表」ch12 L31 の B2 行）による。
+実装照合は `manual-ssot-authority` の吸収台帳（`.kiro/specs/completed/manual-ssot-authority/absorption-ledger.md`「将来仕様の仕分け表」ch12 L31 の B2 行）による。
 
 - `grammar.pest` の単語参照は `word_ref = { word_marker ~ id ~ s }` で、`＠＄` を受ける規則が無い。
 - 実測: `さくら：[＠＄x]`・`＄y＝＠＄x` はパースエラー（`expected id`）。

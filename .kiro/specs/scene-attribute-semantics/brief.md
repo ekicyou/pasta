@@ -10,7 +10,7 @@ Pasta DSL の属性（`＆名前：値`）は、構文だけが受理され、�
 
 ## Current State
 
-実装照合は `manual-ssot-authority` の吸収台帳（`absorption-ledger.md`「将来仕様の仕分け表」ch08・ch12 の B1 行、食い違い grep 記録 D05・D09）による。
+実装照合は `manual-ssot-authority` の吸収台帳（`.kiro/specs/completed/manual-ssot-authority/absorption-ledger.md`「将来仕様の仕分け表」ch08・ch12 の B1 行、食い違い grep 記録 D05・D09）による。
 
 - **構文（受理される）**: `＆名前：値`。1 行に複数並べられる。値は整数・小数・引用文字列（`「…」` / `"…"`）・引用なし文字列。置ける場所は、グローバルシーンの初期部の属性行・ファイルレベルの属性行（インデントなし・シーンの外）・アクター辞書配下の属性行・グローバル／ローカルシーン宣言行への付記（`＊会話＆作者：Alice`・`・選択肢＆優先：3`）。ローカルシーン宣言の次の行やコンテンツ行の後の属性行はパースエラー（旧仕様 §8.2 の「ローカルシーンの直後の属性行」とは食い違う。D09）。
 - **記録（されるが使われない）**: グローバルシーン自身の属性はシーン登録表に記録される（`pasta_lua` の `register_global_scene`）。ファイルレベルの属性は後続のグローバルシーンの属性と統合される（`pasta_lua` transpiler の `merge_attrs`）が、統合結果を使う処理は無い（`generate_global_scene` の `_file_attrs` は未使用）。生成 Lua に属性は現れない。
