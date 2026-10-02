@@ -102,6 +102,14 @@
 - 既存の関連テスト: `pasta_lua/tests/transpiler/code_generator_test.rs:25`（単語参照の生成）・`:116-182`（代入右辺の単語参照）、`tests/property_scope_codegen_test.rs:118`、スナップショット `final_regression_test.rs:120`（`kind_word_reference`）・`snapshot_test.rs:180-217`（動的コールのスナップショット＝新規スナップショットの手本）、`lua_specs/act_word_expr_test.lua:22-60`（`word(nil)`・`word("")` が nil を返すことを固定 — 第 2 引数を省略した既存呼び出しの挙動は変えない）、`runtime/syntax_test.rs:400`（未定義の単語・変数・関数が空で描画される E2E）、`pasta_lsp/tests/var_set_token_test.rs:180`、`editors/vscode/src/test/tmGrammar.test.ts:309`、`book/tools/highlight/tokenizer-test.mjs`。
 - 既存テストに「`＠＄` がパースエラーであること」を固定するものは見当たらない（grep で `＠＄` の出現は 0 件）→ 置き換え対象なし。
 
+### 2.6 動的関数呼び出しの追加分（要件ディスカッション #3）
+
+- 文法: `fn_call = _{ fn_call_global | fn_call_local }` は `term`（式の項）とアクションの両方から参照されるため、`fn_call` に動的版（例: `fn_marker ~ (var_ref_global | var_ref_local) ~ args`）を足せば、アクション行・代入の右辺・引数・Call の動的ターゲット・算術の項（R7.2）に一度に入る。アクションの選択肢では動的関数呼び出しを動的単語参照より先に試す必要がある（最長一致。静的の `fn_call` → `word_ref` と同じ順）。
+- AST: `Action::FnCall`・`Expr::FnCall` は `name: String`。動的版の変種か、名前を `Static`/`Var` に一般化するかは設計判断（単語参照と同じ論点）。
+- 生成コード: 静的ローカルは `act:expr_fn("名前", 引数…)`（アクション行は `act.アクター:expr_fn`）。動的は `act:expr_fn(var.x, 引数…)` に変数パスを渡す形が自然。`ACT_IMPL.expr_fn` は現行で nil キーのガードが無く、`find_handler("expr", nil)` に nil が届く — nil/空の警告（R7.6）と L3 の除外（R7.4）の経路が要る — **Missing**。
+- `expr_fn` の検索も 5 段（L3 = act のメソッドを含む）。動的のときだけ L3 を飛ばす分岐は、単語参照（R3.10）と同じ仕組みで共有できる。
+- 工数への影響: 文法・AST・codegen・LSP・TextMate がそれぞれ 1 変種ずつ増える。S の上限〜M の下限。
+
 ## 3. 要件ごとの充足状況
 
 | 要件 | 状態 | 備考 |
@@ -118,6 +126,7 @@
 | R4.1, 4.2 | Missing | `word()` の空キー無警告。変数パス付き警告の経路が要る |
 | R4.3–4.5 | 既存で充足 | `handler not found` 警告・nil 代入・実行継続 |
 | R5.1–5.4, 5.6 | Missing | マニュアル 5 章の追記と再生成、手書きスキル資料の追従 |
+| R7（動的関数呼び出し） | Missing | ディスカッション #3 で追加。下の「2.6 動的関数呼び出しの追加分」を参照 |
 | R5.5 | Constraint | 自動検証なし。テスト入力で担保 |
 | R6.1, 6.2, 6.4 | Missing（小） | TextMate 規則追加。マニュアルは自動追従 |
 | R6.3 | Missing（小） | LSP の match・右辺位置探索 |
@@ -152,7 +161,7 @@
 
 ## 5. 工数とリスク
 
-- **工数: S（1–3 日）** — 既存パターン（動的コール・変数展開の nil 警告）の踏襲で、新しい依存も新しい仕組みも要らない。マニュアル 5 章の追記と再生成を含めても小さい。OQ-5（式への一般化）や OQ-3（プロパティ）を取り込むと M。
+- **工数: S〜M（2–4 日。動的関数呼び出しを含む）** — 既存パターン（動的コール・変数展開の nil 警告）の踏襲で、新しい依存も新しい仕組みも要らない。マニュアル 5 章の追記と再生成を含めても小さい。OQ-5（式への一般化）や OQ-3（プロパティ）を取り込むと M。
 - **リスク: Low〜Medium** — 字句の衝突は無く既存辞書への影響も無い（現行は必ずパースエラー）。Medium 要因は (1) OQ-2 の検索段の扱い（変数の値が act のメソッド名に一致したときの副作用）、(2) `pasta_dsl` 公開 enum の破壊的変更に伴う版上げの扱い。
 
 ## 6. 設計フェーズへの申し送り
