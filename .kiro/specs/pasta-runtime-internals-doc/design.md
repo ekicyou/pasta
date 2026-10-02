@@ -212,7 +212,7 @@ flowchart TD
     LinkCheck -- exit 0 --> Pass[gate passed]
 ```
 
-- 変更ファイルの一覧は、`kiro-complete` が解決済みの `{default-branch}` を使い `git diff --name-only $(git merge-base HEAD {default-branch})`（作業ツリーとの差分）と `git ls-files --others --exclude-standard`（未追跡）の和とする（ステップ 1 はステップ 2 のコミットより前に走るため）。
+- 変更ファイルの一覧は、`kiro-complete` が解決済みの `{default-branch}` を使い `git diff --name-only --no-renames $(git merge-base HEAD {default-branch})`（作業ツリーとの差分）と `git ls-files --others --exclude-standard`（未追跡）の和とする（ステップ 1 はステップ 2 のコミットより前に走るため）。
 - 照合規則: 対応表の各セルの値が `/` で終わるならパス接頭辞一致、それ以外は完全一致。1 ファイルが複数の章に一致したら、一致したすべての章を確認対象にする（過剰発火は「更新不要の理由」の記録で解消できるため安全側に倒す）。
 - 章を更新した場合は `book/` に触れるので、既存の Manual Sync Gate（Gate 6）が鮮度チェックとリンク検証を要求する（8.7）。Gate 7 自身も、章の更新の有無にかかわらず `link-check.mjs`（`internals-path` を含む）を実行する（8.8）。
 
