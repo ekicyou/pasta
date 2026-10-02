@@ -427,6 +427,7 @@ fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<Fi
 - `prepare_release_dir` の直後に `remove_stale_nar(&args.nar)` を呼ぶ。`fs::remove_file` を行い、`NotFound` は成功とみなす。それ以外のエラー（`--nar` がフォルダ・削除できない）はそのまま返して止める。
 - 消したときは `  Removed previous {nar}` を stdout に出す（何を消したか作者に分かるように）。
 - 置き場所は `release.rs` の非公開関数。`nar.rs`（封入規則・Out of Boundary）には入れない。
+- 段 5 の `create_nar` が途中で失敗したときは、作りかけの nar を `fs::remove_file` で消してから元のエラーを返す（削除の失敗は無視）。これで、どの段で失敗しても `--nar` に nar が残らない（実装時に追加）。
 
 **Contracts**: Batch [x]
 

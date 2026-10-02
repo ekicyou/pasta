@@ -2,13 +2,16 @@ use crate::ReleaseArgs;
 use crate::copy::{copy_dir_recursive, prepare_release_dir};
 use crate::nar::create_nar;
 use crate::update_files::generate_update_files;
+use std::fs;
 use std::io;
+use std::path::Path;
 
 /// release サブコマンドを実行
 pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
     // Step 1: リリースフォルダー初期化
     println!("[1/5] Preparing release folder...");
     prepare_release_dir(&args.release)?;
+    remove_stale_nar(&args.nar)?;
 
     // Step 2: target → release コピー
     println!("[2/5] Copying target files...");
@@ -39,7 +42,10 @@ pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
 
     // Step 5: NAR 作成
     println!("[5/5] Creating NAR archive...");
-    let nar_size = create_nar(&args.release, &args.nar)?;
+    // 途中で失敗したら作りかけの nar を消してから元のエラーを返す（Req 8.8）
+    let nar_size = create_nar(&args.release, &args.nar).inspect_err(|_| {
+        let _ = fs::remove_file(&args.nar);
+    })?;
     let nar_size_kb = nar_size as f64 / 1024.0;
     println!("  Created {} ({nar_size_kb:.1} KB)", args.nar.display());
 
@@ -49,10 +55,22 @@ pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
     Ok(())
 }
 
+/// --nar の位置の前回の nar を消す（失敗時に古い nar を最新と誤って配らないため）。
+/// 無いときは成功とみなし、それ以外の削除エラー（フォルダ・削除できない）はそのまま返す。
+fn remove_stale_nar(nar: &Path) -> io::Result<()> {
+    match fs::remove_file(nar) {
+        Ok(()) => {
+            println!("  Removed previous {}", nar.display());
+            Ok(())
+        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use tempfile::TempDir;
 
     #[test]
@@ -178,6 +196,114 @@ mod tests {
         let mut archive = zip::ZipArchive::new(file).unwrap();
         assert!(archive.by_name("updates.txt").is_ok());
         assert!(archive.by_name("ghost/master/updates.txt").is_ok());
+    }
+
+    /// 後段で失敗しても --nar の位置に前回の nar が残らない（Req 8.8）
+    #[test]
+    fn test_execute_release_removes_stale_nar_on_failure() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("target_ghost");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(target.join("a.txt"), "fresh").unwrap();
+
+        let nar = temp.path().join("out.nar");
+        fs::write(&nar, "old nar").unwrap();
+
+        let args = ReleaseArgs {
+            target,
+            release: temp.path().join("release_out"),
+            nar: nar.clone(),
+            copy_dirs: vec![temp.path().join("no_such_overlay")],
+        };
+
+        assert!(execute_release(&args).is_err());
+        assert!(!nar.exists());
+    }
+
+    /// 成功時は前回の nar が新しい nar に置き換わる（Req 8.8）
+    #[test]
+    fn test_execute_release_replaces_stale_nar_on_success() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("target_ghost");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(target.join("a.txt"), "fresh").unwrap();
+
+        let nar = temp.path().join("out.nar");
+        fs::write(&nar, "old nar").unwrap();
+
+        let args = ReleaseArgs {
+            target,
+            release: temp.path().join("release_out"),
+            nar: nar.clone(),
+            copy_dirs: vec![],
+        };
+
+        execute_release(&args).unwrap();
+
+        let mut archive = zip::ZipArchive::new(fs::File::open(&nar).unwrap()).unwrap();
+        assert!(archive.by_name("a.txt").is_ok());
+    }
+
+    /// 段 5 の nar 作成が途中で失敗しても --nar の位置に作りかけの nar が残らない（Req 8.8）。
+    /// 不正なサロゲートを含む 2 つの名前は to_string_lossy で同じエントリ名になり、
+    /// nar ファイル作成後の 2 件目で ZIP の重複名エラーになる。
+    /// var/ は段 4（updates.txt）の対象外で、段 5 だけが読む。
+    #[cfg(windows)]
+    #[test]
+    fn test_execute_release_removes_partial_nar_on_stage5_failure() {
+        use std::ffi::OsString;
+        use std::os::windows::ffi::OsStringExt;
+
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("target_ghost");
+        let var = target.join("var");
+        fs::create_dir_all(&var).unwrap();
+        fs::write(target.join("a.txt"), "fresh").unwrap();
+        fs::write(var.join(OsString::from_wide(&[0xD800])), "a").unwrap();
+        fs::write(var.join(OsString::from_wide(&[0xD801])), "b").unwrap();
+
+        let nar = temp.path().join("out.nar");
+        let release = temp.path().join("release_out");
+        let args = ReleaseArgs {
+            target,
+            release: release.clone(),
+            nar: nar.clone(),
+            copy_dirs: vec![],
+        };
+
+        assert!(execute_release(&args).is_err());
+        // 段 4 までは完了している（失敗は段 5）
+        assert!(release.join("updates.txt").exists());
+        assert!(!nar.exists());
+    }
+
+    /// --nar がフォルダのときは段 1 で止まる（削除エラーをそのまま返す・Req 8.8）
+    #[test]
+    fn test_execute_release_nar_is_dir_errors_at_stage1() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("target_ghost");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(target.join("a.txt"), "fresh").unwrap();
+
+        let nar = temp.path().join("out.nar");
+        fs::create_dir_all(&nar).unwrap();
+
+        let release = temp.path().join("release_out");
+        let args = ReleaseArgs {
+            target,
+            release: release.clone(),
+            nar: nar.clone(),
+            copy_dirs: vec![],
+        };
+
+        assert!(execute_release(&args).is_err());
+        // 段 2 以降に進んでいない
+        assert!(!release.join("a.txt").exists());
+        assert!(nar.is_dir());
     }
 
     /// target が存在しない場合はエラーが伝播する
