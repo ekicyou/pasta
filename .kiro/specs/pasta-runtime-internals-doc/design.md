@@ -41,7 +41,7 @@
 ### Out of Boundary
 
 - 既存の利用者向け章（入門・文法・Lua・デバッグ・リファレンス）の本文。重複や誤りを見つけても本仕様では直さず、吸収台帳とロードマップに記録する。
-- 生成器のアルゴリズム（本文抽出・リンク書き換え・ヘッダ）と、スキル自己完結規則（`FORBIDDEN_SKILL_TOKENS`）そのもの。本仕様は対応表に行を足すだけで、規則は変えない。
+- 生成器のアルゴリズム（本文抽出・リンク書き換え・ヘッダの構成。ヘッダ内の書名の語だけは 1.9 に合わせて改める）と、スキル自己完結規則（`FORBIDDEN_SKILL_TOKENS`）そのもの。本仕様は対応表に行を足すだけで、規則は変えない。
 - 既存 Gate 1〜6（Spec / Test / Doc / Steering / Soul / Manual Sync）の意味・順序（8.5）。
 - `review-improvement-loop` の他の次元・反復プロセス・タスクの進捗状態・生成済みセル（`tasks.md` の GENERATED-CELLS 区間）・`matrix.md`（9.3, 9.4）。
 - ランタイム外ツールのクレート（`pasta_lsp`・`pasta_check`・`pasta_sample_ghost`）の README とコード。
@@ -176,8 +176,8 @@ book/src/
 - `book/book.toml` — `title` を「pasta マニュアル」、`description` を利用者とコントリビュータの双方を含む表現へ変更（1.9）。
 - `book/src/introduction.md` — 「このマニュアルの歩き方」の後に、内部設計パートの存在とゴースト作者は読む必要がない旨を 1〜2 文（リンクなし）で追記（1.9）。
 - `book/AUTHORING.md` — 冒頭コメントの対象章に `internals` を追加、第 6 節「内部設計パートの執筆規約」を新設、執筆チェックリストに項目を追加。
-- `book/tools/gen-skill-refs.mjs` — `GENERATION_MAP` 末尾に 2 エントリ追加（21 → 23）、冒頭コメントの件数更新。
-- `book/tools/gen-skill-refs-test.mjs` — `EXPECTED_MAP` に 2 行追加、件数検査を 23 に、`HANDWRITTEN` から `internal-modules.md` を削除。
+- `book/tools/gen-skill-refs.mjs` — `GENERATION_MAP` 末尾に 2 エントリ追加（21 → 23）、冒頭コメントの件数更新。生成ヘッダの書名を「pasta 利用者マニュアル」から「pasta マニュアル」へ改め、全 23 ファイルを再生成する（1.9）。
+- `book/tools/gen-skill-refs-test.mjs` — `EXPECTED_MAP` に 2 行追加、件数検査を 23 に、ヘッダの期待文言を「pasta マニュアル」に、`HANDWRITTEN` から `internal-modules.md` を削除。
 - `book/tools/link-check.mjs` — `checkInternalsPaths`・`checkReadmeManualLinks` を追加し `runLinkCheck`・`reportLinkCheck` に結線。
 - `book/tools/link-check-test.mjs` — 2 検査のサンドボックス・ケースを追加。
 - `book/tools/verify-content.mjs` — D-voice の走査ディレクトリに `internals` を追加、I 系検査（存在・本文・構造・必須見出し・機構網羅）を追加。
@@ -188,8 +188,8 @@ book/src/
 - `.claude/skills/kiro-complete/SKILL.md` — ステップ 1 に Gate 7 の発火項目を追加、完了チェックリストに 1 行追加（8.6）。
 - `.kiro/specs/review-improvement-loop/{brief,requirements,design,tasks}.md` — D7 の固定文言に内部設計章照合を追加（9.1–9.4）。
 - `.kiro/steering/roadmap.md` — 最適化の将来候補（5.3）と、執筆中に判明したバグ候補（3.4）の申し送り小節を追加。
-- `.kiro/steering/tech.md` — 設計哲学表「2パス変換」行に段階構成の権威（トランスパイル章の URL）を追記、マニュアル節に内部設計パートの 1 行を追記（OPEN QUESTION 6）。
-- `.kiro/steering/structure.md` — `book/` の説明とディレクトリ表に内部設計パートを追記（OPEN QUESTION 6）。
+- `.kiro/steering/tech.md` — 設計哲学表「2パス変換」行に段階構成の権威（トランスパイル章の URL）を追記、マニュアル節に内部設計パートの 1 行を追記。
+- `.kiro/steering/structure.md` — `book/` の説明とディレクトリ表に内部設計パートを追記。
 - `SOUL.md`（L33・L478）・`TEST_COVERAGE.md`（L203・L295） — `OPTIMIZATION.md` 参照をトランスパイル章の URL へ置換（5.5）。
 - `OPTIMIZATION.md` — 削除（スタブなし・5.4）。
 - `crates/pasta_lua/README.md`・`crates/pasta_shiori/README.md`・`crates/pasta_core/README.md`・`crates/pasta_dsl/README.md` — 内部解説と利用者向け重複を概要数行＋絶対 URL リンクへ置換（7.2–7.6）。
@@ -265,7 +265,7 @@ flowchart TD
 | 6.2 | 利用者 API 章の新設 | ScriptApiChapter | 分割表 | — |
 | 6.3 | 利用者章規約・重複回避 | ScriptApiChapter | リンク規則 | — |
 | 6.4 | 両ファイルの生成 | GenMapEntries | `GENERATION_MAP` +2 | 生成 |
-| 6.5 | 生成の明示 | GenMapEntries | 既存ヘッダ（変更なし） | 生成 |
+| 6.5 | 生成の明示 | GenMapEntries | 既存ヘッダ（書名の語のみ変更） | 生成 |
 | 6.6 | 自己完結 | GenMapEntries, LinkCheck | 既存 `checkSkillSelfContained` | CI |
 | 6.7 | 区分表の更新 | SkillLayout | `SKILL.md` | — |
 | 6.8 | 鮮度チェック対象 | GenMapEntries | 既存 `--check` | CI |
@@ -342,10 +342,10 @@ flowchart TD
     - [デバッグ基盤とシーンキック](internals/debug.md)
     - [ロギングとエンコーディング](internals/logging-encoding.md)
   ```
-- Lua パートには `[スクリプト用ランタイム API](lua/script-api.md)` を `lua/shiori-events.md` の直後（`lua/patterns.md` の前）に追加する。既存章の相対順序は変えない（1.3・4.3 の例外。OPEN QUESTION 4）。
+- Lua パートには `[スクリプト用ランタイム API](lua/script-api.md)` を `lua/shiori-events.md` の直後（`lua/patterns.md` の前）に追加する。既存章の相対順序は変えない（1.3・4.3 の例外）。
 - `book.toml`: `title = "pasta マニュアル"`、`description = "ゴースト作者向けの Pasta DSL 文法・Lua API・入門チュートリアルと、コントリビュータ向けのランタイム内部設計をまとめた pasta のマニュアル"`。
 - `introduction.md`: 「このマニュアルの歩き方」の箇条書きの後に普通文体で 1〜2 文を追記する（例:「目次末尾の『内部設計（コントリビュータ向け）』パートは pasta 本体のコードを読み・直す開発者向けの解説である。ゴーストを作るだけなら読む必要はない。」）。リンクは張らない（利用者向け章から内部設計章への逆リンクを追加しない・1.9）。
-- 生成ファイルのヘッダ文言（「pasta 利用者マニュアル「…」から自動生成」）は変更しない（OPEN QUESTION 3）。
+- 生成ファイルのヘッダ文言は、書名の変更に合わせて「pasta マニュアル「…」から自動生成」に改める（書名の語のみ。ヘッダの構成は変えない）。内部設計章から生成される `internal-modules.md` が「利用者マニュアル」を名乗る不整合を避けるためである。既存 21 ファイルを含む全 23 ファイルを再生成し、鮮度チェックを通す。書名を引用する他の文書（ルート `README.md`・ステアリング等の「利用者マニュアル」という呼称）は 1.9 の範囲外であり変えない。
 
 **Implementation Notes**
 - Validation: `verify-static.mjs`（SUMMARY 由来の全章・目次・前後ナビ）、`verify-search.mjs`（`internals` セクションの索引入り）、`highlight-html.mjs`（出力 HTML 全体を走査）が自動で新パートを対象にする（1.4）。
@@ -473,9 +473,9 @@ flowchart TD
 | Requirements | 6.2, 6.3 |
 
 **Responsibilities & Constraints**
-- 章名: 「スクリプト用ランタイム API」。出力名 `script-api.md` は旧スキルの `runtime-api.md`（manual-ssot-authority で廃止した別内容のファイル）との混同を避けるため別名とする（OPEN QUESTION 4）。
+- 章名: 「スクリプト用ランタイム API」。出力名 `script-api.md` は旧スキルの `runtime-api.md`（manual-ssot-authority で廃止した別内容のファイル）との混同を避けるため別名とする。
 - 利用者向け章の既存規約（ボイス・生成対象章の規約・リポジトリ内パス禁止）に従う。
-- 既存の利用者向け章が権威として持つ事実はリンクで参照する: `act.req` のフィールド（`shiori-events.md#actreq`）、セーブキーの命名規約（`modules/pasta-persistence.md`）、REG/RES（`shiori-events.md`）。`lua/patterns.md` は作例・手順の章で、`script-api.md` は網羅的なリファレンスであるため、`patterns.md` の早見表と呼び出し形が重なることは許容する（`patterns.md` は改訂しない・4.3。OPEN QUESTION 4）。
+- 既存の利用者向け章が権威として持つ事実はリンクで参照する: `act.req` のフィールド（`shiori-events.md#actreq`）、セーブキーの命名規約（`modules/pasta-persistence.md`）、REG/RES（`shiori-events.md`）。`lua/patterns.md` は作例・手順の章で、`script-api.md` は網羅的なリファレンスであるため、`patterns.md` が作例の説明として示す早見表・呼び出し形と重なることは許容する（`patterns.md` は改訂しない・4.3。6.3 の但し書き）。API の事実の権威は `script-api.md` とし、重なりは吸収台帳に記録して、`patterns.md` 側をリンクへ寄せる整理はロードマップへ申し送る。
 
 #### AuthoringRules（`book/AUTHORING.md` 第 6 節）
 
@@ -496,7 +496,7 @@ flowchart TD
 ##### Batch / Job Contract
 - 変更: `GENERATION_MAP` の末尾に `['lua/script-api.md', LC]`・`['internals/internal-modules.md', LC]` を追加する（23 エントリ・順序固定）。出力は `.claude/skills/pasta-lua-coding/references/script-api.md`・`internal-modules.md`。
 - 既存の手書き `internal-modules.md` は書き出しモードで生成物に置き換わる（同名のため孤立ファイルにならない）。
-- 鮮度（6.8）・手編集の検出（6.9）・生成ヘッダ（6.5）は既存の `--check`・`renderEntry` がそのまま担う。
+- 鮮度（6.8）・手編集の検出（6.9）・生成ヘッダ（6.5）は既存の `--check`・`renderEntry` が担う。`renderEntry` のヘッダ文字列は書名の語だけを「pasta マニュアル」に改める。
 - `gen-skill-refs-test.mjs`: `EXPECTED_MAP` に同じ 2 行、件数検査を 23、`HANDWRITTEN = ['authoring-patterns.md', 'coding-conventions.md', 'testing-lint.md']`。
 
 #### LinkCheck（`book/tools/link-check.mjs`）
@@ -591,7 +591,7 @@ function checkReadmeManualLinks(repoRoot: string): BrokenLink[];
 
 ##### Batch / Job Contract（`workflow.md` に追加する条項の契約）
 - 位置: DoD の列挙に「7. **Internals Sync Gate（条件付き）**: 内部設計章（`book/src/internals/`）と実装の追従確認」を追加し、`#### 6. Manual Sync Gate` 節の後に `#### 7. Internals Sync Gate（条件付き）` 節を置く。既存 Gate 1〜6 の文言と順序は変えない（8.5）。節末に「既存 Gate 1〜6 の意味・順序は変更しない。本ゲートは条件付きの追加である」と書く。
-- 権威: ルール本体はこの節（8.6）。対象領域の**データ**は `book/src/internals/index.md` の「章と対象ソース範囲」表を正とし、この節は表の場所と照合規則を示す（8.2。OPEN QUESTION 2）。
+- 権威: ルール本体はこの節（8.6）。対象領域の**データ**は `book/src/internals/index.md` の「章と対象ソース範囲」表を正とし、この節は表の場所と照合規則を示す（8.2）。
 - 発火条件: 変更ファイル一覧（System Flows の定義）のいずれかが対応表のパスに一致する場合のみ（照合規則は System Flows のとおり）。
 - 判定: 一致した章ごとに、(a) 当該 spec がその章を更新した（変更ファイル一覧に `book/src/internals/<章>` が含まれる）、または (b) 更新不要の理由（例: テストのみの変更、章の記述粒度に影響しない内部リファクタ）を完了チェックリストに記録した、のいずれかを満たす（8.1）。加えて `node book/tools/link-check.mjs` が exit 0（8.8）。
 - 中断: (a)(b) のどちらも無い章がある、または link-check が非ゼロのとき、完了を中断し開発者に報告する（8.4）。
@@ -653,7 +653,7 @@ function checkReadmeManualLinks(repoRoot: string): BrokenLink[];
 - アーキテクチャ節: 3〜6 行の全体像（クレート内の主要部品の名前と流れ）に縮め、末尾に「詳細は [内部設計: <章名>](https://ekicyou.github.io/pasta/internals/<章>.html)」を置く（7.4）。
 - 内部節（ソースモジュール構成・ディレクトリ構成・FFI 境界の安全性・内部データフロー等）: 本文を削除し、該当章の絶対 URL で案内する（7.2）。内容は吸収台帳を通じて内部設計章へ収録済みであること（7.1）。
 - 利用者向け重複（`pasta.toml`・モジュール検索パスと UTF-8 契約・起動失敗・組み込みモジュール API・SHIORI 応答の組み立て）: 概要数行と利用者向け章の絶対 URL へ置き換える（7.6）。
-- 利用者向けだがマニュアルに対応章が無い記述（設計時の候補: `pasta_lua` README の「Lua パススルー機能」、ゴーストディレクトリ構成表の一部、モジュール名の生成例）: 既存の利用者向け章は改訂しないため README に**存置**し、台帳に「README 存置（対応する利用者向け章なし・既存章の改訂は本仕様外）」と記録する。マニュアルへの収録はロードマップへ申し送る（7.7・OPEN QUESTION 7）。
+- 利用者向けだがマニュアルに対応章が無い記述（設計時の候補: `pasta_lua` README の「Lua パススルー機能」、ゴーストディレクトリ構成表の一部、モジュール名の生成例）: 既存の利用者向け章は改訂しないため README に**存置**し、台帳に「README 存置（対応する利用者向け章なし・既存章の改訂は本仕様外）」と記録する。マニュアルへの収録はロードマップへ申し送る（7.7）。
 - 全リンクは `https://ekicyou.github.io/pasta/…` の絶対 URL（7.5）。`readme-manual-url` が章・アンカーの実在を検査する。
 - 初期の処置表（設計時の分類。台帳で確定する）:
 
@@ -679,7 +679,7 @@ function checkReadmeManualLinks(repoRoot: string): BrokenLink[];
 - `roadmap.md` の「将来仕様（Phase 4 派生・未着手）」に次の 2 小節を追加する（前例: 「未記載構文のバグ候補」）。
   - `#### トランスパイラ最適化の将来候補（OPTIMIZATION.md 廃止時の申し送り）`: 定数畳み込み・デッドコード削除・インライン展開・単語プリフェッチを 1 項目 1 行のキー情報で（5.3）。
   - `#### 内部設計執筆で判明したバグ候補（pasta-runtime-internals-doc からの申し送り）`: 1 項目 1 行（名称 — 要旨 — 吸収台帳付録 B を参照）（3.4）。該当なしなら小節を作らず台帳にその旨を書く。
-- ステアリング（OPEN QUESTION 6）: `tech.md` 設計哲学表「2パス変換」行の内容欄末尾に「（現行の段階構成は[内部設計: トランスパイルパイプライン](https://ekicyou.github.io/pasta/internals/transpiler.html)を参照）」を追記、マニュアル節に「内部設計パート（`book/src/internals/`）: コントリビュータ向け・権威は実装＋本パート」の 1 行を追記。`structure.md` のディレクトリツリーと表に `book/src/internals/` の 1 行を追記。表現の再編はしない。
+- ステアリング: `tech.md` 設計哲学表「2パス変換」行の内容欄末尾に「（現行の段階構成は[内部設計: トランスパイルパイプライン](https://ekicyou.github.io/pasta/internals/transpiler.html)を参照）」を追記、マニュアル節に「内部設計パート（`book/src/internals/`）: コントリビュータ向け・権威は実装＋本パート」の 1 行を追記。`structure.md` のディレクトリツリーと表に `book/src/internals/` の 1 行を追記。表現の再編はしない。
 
 #### CommentFix（3.8）
 
@@ -766,11 +766,11 @@ flowchart LR
 
 ### 設計判断の前提（Category B の解決）
 
-- **完了ゲートの形式**: 新規の条件付き Gate 7「Internals Sync Gate」とする（Doc Gate の拡張は既存ゲートの意味を変えるため 8.5 に反する）。対象領域データは概要章の対応表、判定ルールは `workflow.md`（OPEN QUESTION 2）。
+- **完了ゲートの形式**: 新規の条件付き Gate 7「Internals Sync Gate」とする（Doc Gate の拡張は既存ゲートの意味を変えるため 8.5 に反する）。対象領域データは概要章の対応表、判定ルールは `workflow.md`。
 - **生成対象章のパス表記**: 研究段階の案 (a) を採用する。`internal-modules.md` はパスを書かず題材章のアンカーへリンクする。生成器の変更（案 b）は不要、`crates/` を外した表記（案 c）は採らない。
 - **題材章どうしの重複**: 「章の責務分担（1 事実 1 章）」のとおり。
 - **README リンクの鮮度**: `link-check.mjs` に `readme-manual-url` を追加し、`manual.yml` の起動条件に `crates/*/README.md` を加える（7.8。設計ディスカッション #1 で要件化）。
-- **steering `tech.md` の「2パス変換」**: 行の内容は書き換えず、トランスパイル章へのリンクを追記する（OPEN QUESTION 6）。
+- **steering `tech.md` の「2パス変換」**: 行の内容は書き換えず、トランスパイル章へのリンクを追記する。
 
 ### リスク
 
@@ -780,14 +780,14 @@ flowchart LR
 
 ### 未決事項（設計ディスカッションで確認する OPEN QUESTION）
 
-本文の「OPEN QUESTION n」はこの番号を指す。いずれも本文は「前提」の案で書いてある。
+設計ディスカッション（2026-10-02）で全件処理済み。各項の「前提」「代替」は当時の記録として残す。
 
 1. ~~**README のマニュアル URL 検査**~~（→ 解決: 設計ディスカッション #1 で案 (b)。要件 R7.8 と Boundary Context に正式化し、本文の案を確定）— 当初の前提: `link-check.mjs` に `readme-manual-url` を追加し、`manual.yml` の起動条件に `crates/*/README.md` を加える。要件の Boundary Context は検査の拡張を「R3.7 のパス実在検査」に限っているため、この追加は境界の文言を越える。代替: (a) 自動検査を入れず Gate 7／D7 の目視確認とする（章・見出しのリネームで README が黙って切れる穴が残る）、(b) 要件の境界文言に README URL 検査を追記して本案を正式化する。
-2. **対応表の置き場所**（CompletionGate・InternalsChapters）— 前提: データは `internals/index.md`（パスが `internals-path` で実在検査される）、判定ルールは `workflow.md` が表の場所と照合規則を示す。代替: `workflow.md` に表を複製して置く（8.2 の「完了基準が示す」を字義どおり満たすが、パスが検査されず二重管理になる）。
-3. **生成ファイルのヘッダ文言**（ManualStructure）— 前提: 「pasta 利用者マニュアル「…」から自動生成」を変えない（書名変更は `book.toml` と「はじめに」に限る）。代替: 生成器の文言を「pasta マニュアル」に変え、23 ファイルを再生成する（`internal-modules.md` のヘッダが「利用者マニュアル」になる不整合を解消できる）。
-4. **スクリプト用 API 章の名前・位置・重複の扱い**（ScriptApiChapter）— 前提: `lua/script-api.md`（旧 `runtime-api.md` との混同回避）を `lua/shiori-events.md` の直後に置き、`lua/patterns.md` の早見表との呼び出し形の重なりは許容する（`patterns.md` は 4.3 により改訂しない）。代替: 名前を `runtime-api.md` にする／Lua パート末尾に置く／`patterns.md` の重なる表を `script-api.md` へのリンクに置き換える（4.3 の例外を広げる必要がある）。
-5. **章の分け方**（InternalsChapters）— 前提: 6 題材に加え、2.10 の機構のために `talk-output.md` と `logging-encoding.md` を追加章とし、`internal-modules.md` を独立章とする（計 10 章）。代替: 追加機構を 6 題材の章へ吸収して 7 章（概要＋6 題材＋`internal-modules.md`）にする（`shiori.md` が肥大する）。
-6. **ステアリングの追記範囲**（Retirement / FutureRouting）— 前提: `tech.md`（2パス行へのリンク追記・マニュアル節 1 行）と `structure.md`（ツリーと表に 1 行）を最小追記する。要件は「必要ならリンクの追記のみ」。代替: `tech.md` の 2パス行へのリンク追記だけにとどめ、`structure.md` は触らない（Steering Gate で `book/` の説明が古いと指摘される可能性が残る）。
-7. **README の利用者向け記述でマニュアルに対応章が無いもの**（ReadmeMigration）— 前提: README に存置し台帳に理由を記録、マニュアル収録はロードマップへ申し送る。代替: 内部設計章（`loader.md`）へ移す（利用者向けの事実が内部設計パートに置かれ、4.1 の役割分担とずれる）。
-8. **題材章の必須 H2 を機械検査するか**（VerifyContent）— 前提: I-sections で 7 種の見出しを強制する（2.7 の機械的担保）。代替: 執筆規約とレビューだけにする（章ごとに見出しを柔軟にできるが、欠落を検出できない）。
-9. **Gate 7 の「更新不要の理由」の記録先**（CompletionGate）— 前提: 完了チェックリスト（`kiro-complete` の出力）に記録する（8.3 の文言どおり）。代替: PR 本文にも転記して永続化する（後から理由を辿れる）。
+2. ~~**対応表の置き場所**~~（→ 解決: 設計ディスカッションの再判定で自明と判断。設計書の案のまま。データは `internals/index.md`、ルールは `workflow.md`。要件 R8.2 の文言を「示す、または参照する」に合わせた）（CompletionGate・InternalsChapters）— 前提: データは `internals/index.md`（パスが `internals-path` で実在検査される）、判定ルールは `workflow.md` が表の場所と照合規則を示す。代替: `workflow.md` に表を複製して置く（8.2 の「完了基準が示す」を字義どおり満たすが、パスが検査されず二重管理になる）。
+3. ~~**生成ファイルのヘッダ文言**~~（→ 解決: 設計ディスカッションの再判定で自明と判断。代替案を採用。生成ヘッダの書名を「pasta マニュアル」に改め全 23 ファイルを再生成する）（ManualStructure）— 前提: 「pasta 利用者マニュアル「…」から自動生成」を変えない（書名変更は `book.toml` と「はじめに」に限る）。代替: 生成器の文言を「pasta マニュアル」に変え、23 ファイルを再生成する（`internal-modules.md` のヘッダが「利用者マニュアル」になる不整合を解消できる）。
+4. ~~**スクリプト用 API 章の名前・位置・重複の扱い**~~（→ 解決: 設計ディスカッションの再判定で自明と判断。設計書の案のまま（`lua/script-api.md`・`shiori-events.md` の直後）。`patterns.md` との重なりは許容し、要件 R6.3 に但し書きを追加、整理はロードマップへ申し送る）（ScriptApiChapter）— 前提: `lua/script-api.md`（旧 `runtime-api.md` との混同回避）を `lua/shiori-events.md` の直後に置き、`lua/patterns.md` の早見表との呼び出し形の重なりは許容する（`patterns.md` は 4.3 により改訂しない）。代替: 名前を `runtime-api.md` にする／Lua パート末尾に置く／`patterns.md` の重なる表を `script-api.md` へのリンクに置き換える（4.3 の例外を広げる必要がある）。
+5. ~~**章の分け方**~~（→ 解決: 設計ディスカッションの再判定で自明と判断。設計書の案のまま（10 章）。章への割り振りは R2.10 が設計に委ねている）（InternalsChapters）— 前提: 6 題材に加え、2.10 の機構のために `talk-output.md` と `logging-encoding.md` を追加章とし、`internal-modules.md` を独立章とする（計 10 章）。代替: 追加機構を 6 題材の章へ吸収して 7 章（概要＋6 題材＋`internal-modules.md`）にする（`shiori.md` が肥大する）。
+6. ~~**ステアリングの追記範囲**~~（→ 解決: 設計ディスカッションの再判定で自明と判断。設計書の案のまま（`tech.md`・`structure.md` への最小追記）。Steering Gate の整合に必要な範囲で、再編ではない）（Retirement / FutureRouting）— 前提: `tech.md`（2パス行へのリンク追記・マニュアル節 1 行）と `structure.md`（ツリーと表に 1 行）を最小追記する。要件は「必要ならリンクの追記のみ」。代替: `tech.md` の 2パス行へのリンク追記だけにとどめ、`structure.md` は触らない（Steering Gate で `book/` の説明が古いと指摘される可能性が残る）。
+7. ~~**README の利用者向け記述でマニュアルに対応章が無いもの**~~（→ 解決: 設計ディスカッションの再判定で自明と判断。設計書の案のまま（README 存置＋台帳に理由＋ロードマップ申し送り）。R7.7 が認める扱い）（ReadmeMigration）— 前提: README に存置し台帳に理由を記録、マニュアル収録はロードマップへ申し送る。代替: 内部設計章（`loader.md`）へ移す（利用者向けの事実が内部設計パートに置かれ、4.1 の役割分担とずれる）。
+8. ~~**題材章の必須 H2 を機械検査するか**~~（→ 解決: 設計ディスカッションの再判定で自明と判断。設計書の案のまま（I-sections で機械検査する））（VerifyContent）— 前提: I-sections で 7 種の見出しを強制する（2.7 の機械的担保）。代替: 執筆規約とレビューだけにする（章ごとに見出しを柔軟にできるが、欠落を検出できない）。
+9. ~~**Gate 7 の「更新不要の理由」の記録先**~~（→ 解決: 設計ディスカッションの再判定で自明と判断。設計書の案のまま（完了チェックリストに記録）。Manual Sync Gate のスキップ記録と同じ前例に従う）（CompletionGate）— 前提: 完了チェックリスト（`kiro-complete` の出力）に記録する（8.3 の文言どおり）。代替: PR 本文にも転記して永続化する（後から理由を辿れる）。
