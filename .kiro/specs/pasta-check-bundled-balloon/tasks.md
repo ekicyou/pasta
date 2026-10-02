@@ -124,7 +124,7 @@
   - _Blocked: 再生成すると install.txt 以外に ghost/master/THIRD_PARTY_LICENSES.txt と shell/master/surfaces.txt の md5・size も変わる。原因は改行コード（core.autocrlf=true で作業ツリーは CRLF、HEAD の写しは LF・混在のバイトで作られていた）。停止条件どおり手直し・コミットせず、受け入れ方針（CRLF で揃えて受け入れる／.gitattributes で改行を固定してから作り直す）は人の判断待ち。再生成結果はスクラッチパッドに退避済み_
 
 - [ ] 6. 参照文書の更新
-- [ ] 6.1 (P) スキルの updates.txt 仕様と nar 仕様に同梱バルーンの扱いを書く
+- [x] 6.1 (P) スキルの updates.txt 仕様と nar 仕様に同梱バルーンの扱いを書く
   - updates.txt 仕様: 判定方法（キー・優先順位・番号付き指定と欠番・階層付きの値）、不正な値・重複キー・重なりのエラー、ゴースト用からの除外、バルーン用の位置と相対パスの基準、適用する除外規則、`homeurl` 警告を記載する
   - nar 仕様: バルーン用 updates.txt が入ることと、同梱バルーンがあるときの内部構造の例を記載する
   - 同じ文書の現行実装との食い違い（除外ファイル表の `updates2.dau`、nar 構造例の `ghost/master/pasta_scripts/` など）を正す
