@@ -19,19 +19,18 @@
 //!   は 204。SHIORI スレッドを無限待機させない（デッドロック経路を作らない）。
 //! - **timeout→204＋コルーチン保存（R5.7）**: 閾値超過で 204 を返し SHIORI スレッドの
 //!   待機を打ち切る。LuaJIT はプリエンプション不可ゆえ **アクタースレッドの Lua 実行は
-//!   止めない**。`STORE.co_scene` は VM 内に persist し、次 `OnSecondChange`
-//!   （`resume_until_valid` 駆動）が同コルーチンを resume して回復する。
+//!   止めない**。タイムアウトした GET の処理はアクタースレッドで最後まで続き、その応答は
+//!   受信側が無いため捨てられる。`STORE.co_scene` などの VM 内状態はその処理の結果どおりに
+//!   更新され、後続のイベントは通常どおり処理される。
 //!
-//! # 本タスクのスコープ / 申し送り
-//! - 本モジュールは marshaling 契約を **隔離テスト**するための本番ロジックである。FFI
-//!   入口（`windows.rs`/`shiori.rs`）の `static MAILBOX` への配線は **task 5.1**。それまで
-//!   `static MAILBOX` の実体は導入せず、marshaling 自由関数は **呼び出し側が渡した
-//!   `Sender`** に対して動作する（テストは task 3.3 の `spawn_actor_thread` が返す mailbox
-//!   `Sender` を直接渡す）。これにより既存出荷 `PastaShiori::request` 同期経路を一切
-//!   改変せず（byte-invariant ゴールデン 4/4 を緑のまま保つ）、5.1 の所有モデル再配線へ
-//!   素直に接続できる。
-//! - 本モジュールは task 5.1 で FFI 出荷経路（`windows.rs`→`lifecycle::marshal_request`）へ
-//!   接続され、既定（本番）ビルドに含まれる。
+//! # 呼び出し経路
+//! - marshaling 自由関数は **呼び出し側が渡した `Sender`** に対して動作する。出荷経路では
+//!   `lifecycle::marshal_request` が `static MAILBOX` から読んだ `Sender` を
+//!   [`determine_method`]・[`marshal_get`]・[`marshal_notify`] に渡す（`windows.rs` の
+//!   `request` から呼ばれる）。テストは `spawn_actor_thread` が返す mailbox の `Sender` を
+//!   直接渡して契約を隔離検証する。
+//! - 本モジュールの [`marshal_request`]（`Sender` と `seq` を引数に取る版）はテスト用の
+//!   ディスパッチで、出荷経路は `lifecycle::marshal_request` を使う。
 //!
 //! # GET タイムアウト閾値（R5.8/R5.9・RN4 決定）
 //! [`GET_TIMEOUT`] は **通常運転で決して発火しない安全網**である（R5.8: 通常経路バイト不変）。
@@ -42,7 +41,7 @@
 //! 閾値を実 GET が決して接近しない **秒オーダーの安全網**（[`GET_TIMEOUT`] = 5 秒）へ引き上げる。
 //! これは「病的ブロッキング／デバッガ停止で SHIORI スレッドが無限ハングするのを防ぐ最後の砦」
 //! であって、タイトな SLA ではない。タイムアウトは **デバッガ停止中も抑止しない**（R5.9）——
-//! 停止中の 204 は次 `OnSecondChange` でコルーチンが resume され回復する。実機 SSP での更なる
+//! 停止中の GET は 204 になり、再開後に完了したその応答は捨てられる。実機 SSP での更なる
 //! チューニング（必要なら短縮）は後続の実測作業に委ねる（design.md OPEN QUESTION 3）。
 //!
 //! # panic-free 正常経路（R5.10）/ abort プロファイル割り切り（R5.11）

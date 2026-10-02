@@ -1,6 +1,6 @@
 //! 本番アクターランタイムモジュール（design.md「File Structure Plan」`actor/`）。
 //!
-//! `actor_poc/`（feature-gated・default off の使い捨て足場）を出荷経路へ昇格する先。
+//! PoC 段階の足場（feature-gated の `actor_poc/`）は撤去済みで、本モジュール群が出荷経路である。
 //! 本仕様（pasta-actor-runtime）は `!Send` な Lua VM をアクタースレッドへ pin し、
 //! SHIORI スレッドはチャネル marshaling 経由でのみ VM へアクセスする構造を確立する。
 //!
@@ -30,7 +30,7 @@ pub mod thread;
 pub mod marshaling;
 
 /// 本番 teardown（task 4.1）。`ActorMsg::Stop { done }` 制御メッセージで drain→VM 破棄・
-/// debug teardown・ウィンドウ破棄→done ack を成立させ、SHIORI 側は ack を有界に待って
+/// debug teardown→done ack を成立させ（executor のウィンドウはその後のスレッド終了時に破棄）、SHIORI 側は ack を有界に待って
 /// スレッドを detach する（join 廃止・冪等・異常記録）。reload 反復のリーク検査
 /// （`GetProcessHandleCount`/`GetGuiResources`）も提供する。task 5.1 で FFI 入口
 /// （`windows.rs` の load/unload）へ配線され、既定ビルドでコンパイルされる。

@@ -111,7 +111,7 @@
   - _Requirements: 2.4, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.5, 3.8, 4.1, 4.2, 7.1_
   - _Boundary: InternalsChapters（loader）_
 
-- [ ] 4.5 (P) SHIORI 層章を執筆する
+- [x] 4.5 (P) SHIORI 層章を執筆する
   - FFI 境界、リクエスト解析と Lua への受け渡し、アクターランタイム（mailbox・スレッド・CH marshaling・lifecycle・teardown）、非同期トーク、presentation event stream と renderer 注入、SHIORI エントリとイベント配送、仮想イベントディスパッチャ（OnTalk/OnHour）、DLL ビルド構成（リリースプロファイル・静的 CRT）を現行コードと照合して書く
   - `OPTIMIZATION.md` §6 と `pasta_shiori` README・`pasta_lua` README の SHIORI 統合（内部部分）の担当行を台帳で処置し、食い違うコメント（削除済み PoC への言及など）はコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
   - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 で、台帳の担当行（自章が担う行のみ）の処置が埋まっている
@@ -230,3 +230,4 @@
 - 4.4: loader 章の「ソースの所在」に対応表外の `crates/pasta_lua/src/runtime/module_registry.rs`・`crates/pasta_lua/pasta_scripts/`（広すぎ）・`crates/pasta_lua/src/loader/config/`（`loader/` と重複）が入っている。4.11 で調整する。transpiler 章「トランスパイル結果キャッシュ」のモジュール名導出の再掲は loader 章へのリンクに寄せる（1 事実 1 章）。
 - 4.4: pasta_lua README「Lua パススルー機能」（5.2 担当）は古い（`dic/*/`・「debug_mode 時に出力」）。5.2 で loader 章・transpiler 章へ送る。利用者章 `reference/pasta-toml.md` の debug_mode 記述（孤立キャッシュ警告は常に出る）の食い違いはロードマップ申し送り候補。
 - dynamic-word-reference 確定 API（2026-10-03 受領、4.11 で main 取り込み後に吸収）: `ACT_IMPL.find_act_handler/find_handler(self, mode, key, skip_methods)`（真なら L1 を rawget・L3 を飛ばす）、`ACT_IMPL.word(self, name, var_path)`（var_path 時 `WORD.dynamic_key(name, var_path, "act:word")` で skip_methods=true 検索）、新設 `ACT_IMPL.expr_fn_var(self, value, var_path, ...)`（後処理は局所関数 `call_expr` を共有）、act.lua が `pasta.word` を require。PROXY: `find_actor_handler/find_handler(mode, key, skip_methods)`（A1 を rawget）、`word(name, var_path)`、新設 `expr_fn_var`。新設 `WORD.dynamic_key(value, var_path, via)`（数値は tostring、空でない文字列はそのまま、他は log.warn して nil）、word.lua が `@pasta_log` を require。生成形 `act.{a}:word(値, "パス")`・`act.{a}:expr_fn_var(値, "パス", 引数…)`・`act:word(…)`・`act:expr_fn_var(…)`。DSL 規則 dyn_name_local/dyn_name_global/word_ref_dynamic/fn_call_dynamic、AST Action::DynamicWordRef/DynamicFnCall・Expr::DynamicFnCall・SetValue::DynamicWordRef、partial.rs shift_action に 2 アーム。LSP `find_dynamic_ref`、TextMate inline-dynamic-ref。値が "yield"/"チェイントーク" のとき L4 の GLOBAL.yield に一致（設計で許容）。
+- 4.5: shiori 章の「ソースの所在」に対応表外の `crates/pasta_shiori/Cargo.toml` とテストパスを追加済み（4.11 で判断）。`kick.lua` の古いコメント（「kick の消費は別タスク」）は 4.7 に残置。付録 B に OnTalk 間隔の毎回同一（`math.randomseed` 未呼び出し）と unload 無し終了時の 5 秒停滞を記録済み。

@@ -25,8 +25,9 @@
 //! # panic 封じ込め（R3.7 維持）
 //! 各 extern 入口は引き続き [`catch_unwind`] で panic を SHIORI エラー契約へ封じる
 //! （unwind プロファイル＝dev/test 向けの保険。release `panic=abort` では到達不能）。
-//! marshaling 自体は正常経路 panic-free（R5.10）で、アクタースレッド上の VM panic は
-//! アクター側で捕捉され reply drop → 204 へ倒れる（SHIORI スレッドへ unwind しない）。
+//! marshaling 自体は正常経路 panic-free（R5.10）で、アクタースレッド上の panic は
+//! （unwind プロファイルでは）アクタースレッドだけを終わらせ、reply の drop により 204 へ
+//! 倒れる（SHIORI スレッドへ unwind しない）。
 //! 一方、リクエスト処理が**エラー**で終わった場合は 204 ではなく 500 応答を返す
 //! （要件 4.9・task 2.2 で変更済み。204 は panic／reply 喪失時の安全網のみ）。
 

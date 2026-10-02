@@ -20,7 +20,7 @@ pub trait Shiori {
 /// PastaShiori only manages the GlobalLoggerRegistry for log routing.
 #[derive(Default)]
 pub struct PastaShiori {
-    /// DLL module handle (for future Windows API integration)
+    /// Value passed to `SHIORI.load` as `hinst` (the FFI path always passes 0)
     hinst: isize,
 
     /// Base directory for ghost scripts (master/ directory)

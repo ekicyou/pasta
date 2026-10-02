@@ -231,7 +231,8 @@ pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg
                 //     PastaShiori が内包する !Send Lua VM・debug backend（socket bridge
                 //     join・port 解放）・関連リソースが解放される（debug backend は VM の
                 //     一部として VM drop 時にこのアクタースレッド上で teardown される）。
-                //     メッセージ専用ウィンドウは block_on 完了時に executor が破棄する。
+                //     executor のメッセージ専用ウィンドウ（wintf の thread_local）は ack の後、
+                //     スレッド終了時に破棄される。
                 drop(shiori);
                 // mailbox receiver も ack 前に閉じる。ack 受信後の Stop 再送（二重 teardown）が
                 // 確実に Disconnected＝already-done になる（R7.4）。async ブロック完了まで rx を
@@ -246,8 +247,9 @@ pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg
                     // 観測ログ点（R10.4）: cleanup 完了後に done ack を送出（全資源解放済み）。
                     tracing::debug!(seam = "actor.done", "actor sent done ack after VM/resource cleanup");
                 }
-                // block_on はこの async ブロック完了で戻り、メッセージ専用ウィンドウ等
-                // executor 資源が解放される。スレッドは SHIORI 側が detach 済み。
+                // block_on はこの async ブロック完了で戻り、スレッドが終了するときに
+                // thread_local のメッセージ専用ウィンドウが破棄される。スレッドは SHIORI 側が
+                // detach 済み。
             });
         })
         .expect("actor thread must spawn");

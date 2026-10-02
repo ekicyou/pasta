@@ -25,8 +25,8 @@ pest_derive.workspace = true
 flume.workspace = true
 # 本番アクタースレッドの block_on メッセージループ。task 5.1 で FFI 入口が本スレッドへ
 # 切り替わったため、optional/actor-poc から通常依存へ昇格（R4.4: アクタースレッド所有を
-# アダプタ層に閉じ込める）。リリースは default 無効の actor_poc 由来コードを含まないが
-# wintf 自体は出荷経路がリンクする。
+# アダプタ層に閉じ込める）。PoC の feature（actor-poc）は撤去済みで、wintf は出荷経路の
+# 通常依存としてリンクされる。
 wintf-winmsg-executor.workspace = true
 # static MAILBOX の lock-free 再設定可能スロット（RN6: respawn モデル）。reload で
 # アクタースレッド＋チャネルを teardown→再 spawn するため、送信端 Sender を Mutex なしで
