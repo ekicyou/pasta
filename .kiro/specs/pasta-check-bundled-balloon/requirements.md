@@ -65,7 +65,7 @@
 #### Acceptance Criteria
 1. If 同梱バルーンのフォルダの値が空である、絶対パス（ドライブ名・ルート・UNC から始まるもの）である、`..` の要素を含む、または `source.directory` の行が無く代わりに使う `directory` の値がパス区切り（`/`・`\`）を含む, then the `pasta_check` shall 不正な値とその行のキーを示すエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（ukadoc「install.txt」: `..` による上位階層への参照はできない／`*.directory` は 1 階層のディレクトリ名だけでパス区切りは使えない。ディスカッションで決定）
 2. Where バルーン指定の `source.directory` の値がパス区切り（`/`・`\` のどちらも可）を含む配布フォルダ内の相対パスである, the `pasta_check` shall それを配布フォルダからの階層付きの相対パスとして扱い、指すフォルダを同梱バルーンとする（ukadoc: SSP 2.9.00 以降の `*.source.directory` の仕様。ディスカッションで決定）
-3. If 同梱バルーンのフォルダが `ghost/master` と同じ・その上位・その配下のいずれかである、または別の同梱バルーンのフォルダの上位・配下である, then the `pasta_check` shall 重なっているフォルダを示すエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（**前提**: ゴースト本体や他のバルーンと入れ子の指定は配布物の誤りとみなす。OPEN QUESTION 3）
+3. If 同梱バルーンのフォルダが `ghost/master` と同じ・その上位・その配下のいずれかである、または別の同梱バルーンのフォルダの上位・配下である, then the `pasta_check` shall 重なっているフォルダを示すエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（ゴースト本体や他のバルーンと入れ子の指定は配布物の誤り。作成ツールは問題があれば止める。ディスカッションで決定）
 4. The `pasta_check` shall `install.txt` の値がどのようなものであっても、配布フォルダの外にあるファイルを読み取り・作成・変更しない
 5. If 値は妥当だが、配布フォルダ内にそのフォルダが存在しない（同名のファイルがある場合を含む）, then the `pasta_check` shall 指定されたフォルダとその行のキーを示すエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（同梱を宣言したのに実体が無い nar はインストールに失敗する配布物であり、警告では見落とされるため。ディスカッションで決定）
 6. When 値と配布フォルダ内のフォルダ名が大文字小文字だけ異なり、ファイルシステムがそれらを同じフォルダとして扱う, the `pasta_check` shall そのフォルダを同梱バルーンとして扱い、Requirement 3 の除外と Requirement 4 の生成を同じフォルダに対して一貫して行う
@@ -118,7 +118,7 @@
 
 #### Acceptance Criteria
 1. If 同梱バルーンのフォルダ直下の `descript.txt` に `homeurl` の行が無い、または値が空である, then the `pasta_check` shall 同梱バルーンのフォルダを示し、`homeurl` が無いためバルーンのネットワーク更新ができない旨の警告を表示する
-2. If 同梱バルーンのフォルダ直下に `descript.txt` が無い, then the `pasta_check` shall 同梱バルーンのフォルダを示し、`descript.txt` が無い旨の警告を表示する（**前提**: 致命的扱いにはしない。OPEN QUESTION 5）
+2. If 同梱バルーンのフォルダ直下に `descript.txt` が無い, then the `pasta_check` shall 同梱バルーンのフォルダを示し、`descript.txt` が無い旨のエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（バルーンとして成り立たない配布物のため。作成ツールは問題があれば止める。ディスカッションで決定）
 3. When 警告を表示したとき, the `pasta_check` shall 処理を止めずに、警告が無い場合と同じ生成物（ゴースト用・バルーン用 `updates.txt` と nar）を作成し、終了コード 0 で終了する
 4. The `pasta_check` shall 警告を、進捗表示と区別できる形（警告であることが分かる接頭辞を付ける）で表示する
 5. The `pasta_check` shall `descript.txt` の `homeurl` を、Requirement 1 の `install.txt` と同じキー照合・文字コードの扱いで読み取る
