@@ -339,7 +339,7 @@ pub enum SetValue {
 ```
 
 - 不変条件: `var_scope` は `Local`・`Global`・`Args(n)` のいずれかで、パーサは `Property` を生成しない。`var_name` は書いたままの識別子（`Args` のときは書いた数字列。既存の `VarRef` と同じ）。
-- `#[non_exhaustive]` は付けない（**前提 A-3**。既存の公開 enum と揃え、網羅 match のコンパイルエラーで利用箇所の漏れを検出する。OPEN QUESTION 3）。
+- `#[non_exhaustive]` は付けない（既存の公開 enum と揃え、網羅 match のコンパイルエラーで `pasta_lua`・`pasta_lsp` の対応漏れを検出する。設計ディスカッション #4）。
 
 #### DynamicRefParser
 
@@ -571,7 +571,7 @@ pub(super) fn find_dynamic_ref(text: &str, var_name: &str, global: bool) -> Opti
 
 - E2E（`runtime/syntax_test.rs` に追記）: アクター付きの行の `＠＄x` がアクター辞書から選ばれる、代入の右辺 `＄y＝＠＄x` がアクター辞書を探さない、`＠＄f（１）` の関数にプロキシが渡る、未代入の `＠＄z` で行の残りが出力される（3.2, 3.3, 4.5, 7.5）。
 - 回帰: 既存の全テスト・スナップショット（`snapshot_test.rs`・`final_regression_test.rs`）が無変更で通る（2.7）。
-- マニュアル例（`transpiler/dynamic_word_ref_test.rs`）: `book/src/grammar/` の 5 章から `＠＄`／`@$` を含む pasta コードブロックを抽出し、パースとトランスパイルが成功することを確認する（5.5。**前提 A-5**、OPEN QUESTION 4）。
+- マニュアル例（`transpiler/dynamic_word_ref_test.rs`）: `book/src/grammar/` の 5 章から `＠＄`／`@$` を含む pasta コードブロックを抽出し、パースとトランスパイルが成功することを確認する（5.5。設計ディスカッション #5）。
 
 ### E2E/UI Tests
 
@@ -589,15 +589,15 @@ pub(super) fn find_dynamic_ref(text: &str, var_name: &str, global: bool) -> Opti
 ## Migration Strategy
 
 - 既存の辞書は変更不要（現行で `＠＄` はパースエラーのため、動的参照を含む辞書は存在しない）。
-- `pasta_dsl` の公開 enum `Action`・`Expr`・`SetValue` への変種追加は、enum を網羅 match する crates.io 利用者にとって破壊的変更になる。版の上げ方は `release-workflow` に委ねる（OPEN QUESTION 3）。
+- `pasta_dsl` の公開 enum `Action`・`Expr`・`SetValue` への変種追加は、enum を網羅 match する crates.io 利用者にとって破壊的変更になる。過去の AST 追加（`CallTarget::Dynamic` など）と同じく、版の上げ方は `release-workflow` に委ねる（設計ディスカッション #4）。
 
-## Open Questions / Risks（設計ディスカッションで確認する事項）
+## 設計ディスカッションの決定
 
-| # | 節 | 問題 | 選択肢 | 起草時の前提 |
+| # | 節 | 問題 | 選択肢 | 決定 |
 |---|----|------|--------|--------------|
 | 1 | DynamicLookup | L1・A1 からメタテーブル経由で `create_word` 等の組み込みメソッドに届く | (a) 静的と同じ (b) 動的のときだけ L1・A1 を `rawget` (c) 組み込みメソッド名を除外 | **解決（設計ディスカッション #1）: (b)**。`skip_methods` に統合。R3.11 を追加 |
 | 2 | DynamicRefTextMate | 代入行は既存規則が行全体を変数スコープで塗るため、R6.1 の右辺の単語参照の色分けと R6.2 が衝突する | (a) 既存規則のまま (b) 右辺をインライン規則で塗り分ける | **解決（設計ディスカッション #3）: (a)**。R6.1 を代入の右辺は既存の代入行の色分けに従う形に修正 |
-| 3 | DynamicRefAst（前提 A-3）・Migration | 公開 enum への変種追加は破壊的変更。`#[non_exhaustive]` を付けるか、版をどう上げるか | (a) 付けない・版は release-workflow に委ねる (b) 今回 `#[non_exhaustive]` を付ける（それ自体が破壊的変更で、内部の網羅検出も失う） | (a) |
-| 4 | Testing（前提 A-5） | R5.5（マニュアル例が読み込み可能）の担保方法 | (a) テストがマニュアル章から該当コードブロックを抽出して検証 (b) 同じ入力をテストに手で写す (c) 書籍ツールに文法章のコード例検証を新設 | (a)。マニュアルとの乖離を自動で検出できる最小の手段 |
-| 5 | DynamicLookup | 単語は `word(値, パス)` の第 2 引数拡張、関数は可変長引数のため別メソッド `expr_fn_var(値, パス, …)` で、名前の形が揃わない | (a) この非対称のまま (b) 単語も `word_var(値, パス)` を新設して対称にする | (a)。`talk(値, パス)` の既存規約と対称 |
+| 3 | DynamicRefAst・Migration | 公開 enum への変種追加は破壊的変更 | (a) `#[non_exhaustive]` を付けない・版は release-workflow に委ねる (b) 付ける | **解決（設計ディスカッション #4・自明）: (a)**。既存 enum の慣行と過去の AST 追加に揃う |
+| 4 | Testing | R5.5（マニュアル例が読み込み可能）の担保方法 | (a) テストがマニュアル章からコードブロックを抽出して検証 (b) 手で写す (c) 書籍ツールに新設 | **解決（設計ディスカッション #5・自明）: (a)**。乖離を自動検出できる最小の手段 |
+| 5 | DynamicLookup | `word(値, パス)` と `expr_fn_var(値, パス, …)` で名前の形が揃わない | (a) 非対称のまま (b) `word_var` を新設 | **解決（設計ディスカッション #6・自明）: (a)**。`talk(値, パス)` の既存規約に揃い、API を増やさない |
 | 6 | DynamicRefGrammar | 引数が式として正しくない `＠＄f（時間：朝）` の扱い（R7.1 と R7.3 の食い違い） | (a) 静的と同じく分かれる (b) 動的だけパースエラー | **解決（設計ディスカッション #2）: (a)**。R7.1 にただし書きを追加 |
