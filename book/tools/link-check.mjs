@@ -11,6 +11,10 @@
 //   book/src/internals/**/*.md のフェンス外インラインコードに書いたリポジトリ内パスを
 //   checkInternalsPaths で検査し、[1] の区分に internals-path として報告する。
 //
+// クレート README のマニュアル URL 実在検査（同タスク 1.2・要件 7.5, 7.8）:
+//   crates/*/README.md のフェンス外のリンクと裸の URL のうち公開マニュアル（MANUAL_URL）を指すものを
+//   checkReadmeManualLinks で book/src の章・見出しへ写像して照合し、[1] の区分に readme-manual-url として報告する。
+//
 // スキル自己完結検査（タスク 3.2・要件 5.3, 6.1, 6.4, 6.5, 10.2, 2.4）:
 //   .claude/skills/{pasta-ghost-authoring,pasta-lua-coding}/**/*.md を checkSkillSelfContained で
 //   検査する（skill-escape / skill-missing / skill-anchor / skill-forbidden-ref / skill-unlisted）。
@@ -365,13 +369,69 @@ export function checkInternalsPaths(repoRoot = REPO_ROOT) {
   return broken;
 }
 
+// ---- クレート README の公開マニュアル URL 実在検査（readme-manual-url） ----
+// pasta-runtime-internals-doc タスク 1.2（要件 7.5, 7.8, 1.6）。
+// crates/*/README.md のフェンス外・インラインコード外のインラインリンクと裸の URL のうち MANUAL_URL で始まるものを
+// 写像する: 残りが空・index.html → 合格（末尾 `/` は index.html を補う）。`<path>.html[#anchor]` → book/src/<path>.md が
+// 実在し、アンカーがあればその章の見出し slug ∪ 明示アンカーに含まれること（パーセントエンコードはデコードして照合）。
+// 違反: .html 以外で章に写像できない、book/src 外へ解決される（トラバーサル）、章が無い、見出しが無い。
+export const MANUAL_URL = 'https://ekicyou.github.io/pasta/'; // gen-skill-refs の MANUAL_BASE_URL と同値（import しない）
+const BARE_MANUAL_URL_RE = new RegExp(MANUAL_URL.replace(/\./g, '\\.') + '[^\\s<>()\\[\\]`"\'、。]*', 'g');
+
+function manualUrlProblem(repoRoot, url) {
+  const rest = url.slice(MANUAL_URL.length);
+  const h = rest.indexOf('#');
+  const anchor = h >= 0 ? decodeAnchor(rest.slice(h + 1)) : '';
+  let page = decodeAnchor(stripFragment(rest));
+  if (page.endsWith('/')) page += 'index.html';
+  if (page === '' || page === 'index.html') return null;
+  if (!page.endsWith('.html')) return `章に写像できない（.html でない）: ${page}`;
+  const srcDir = path.resolve(repoRoot, 'book/src');
+  const abs = path.resolve(srcDir, page.replace(/\.html$/, '.md'));
+  const chapter = path.relative(repoRoot, abs).split(path.sep).join('/');
+  if (!isWithinRoot(srcDir, abs)) return `マニュアル外を指すパス（トラバーサル）: ${page}`;
+  if (!fs.existsSync(abs)) return `写像先の章が存在しない: ${chapter}`;
+  if (anchor !== '' && !anchorSet(fs.readFileSync(abs, 'utf8')).has(anchor)) {
+    return `写像先 ${chapter} に見出し／明示アンカー "${anchor}" が無い`;
+  }
+  return null;
+}
+
+export function checkReadmeManualLinks(repoRoot = REPO_ROOT) {
+  const cratesDir = path.resolve(repoRoot, 'crates');
+  if (!fs.existsSync(cratesDir)) return [];
+  const readmes = fs.readdirSync(cratesDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => path.join(cratesDir, d.name, 'README.md'))
+    .filter((f) => fs.existsSync(f))
+    .sort();
+  const broken = [];
+  for (const file of readmes) {
+    const relFile = path.relative(repoRoot, file).split(path.sep).join('/');
+    maskFences(fs.readFileSync(file, 'utf8')).split('\n').forEach((line, i) => {
+      const noCode = line.replace(CODE_SPAN_RE, '');
+      const links = extractLinks(noCode).map((t) => t.trim());
+      // インラインリンクの行き先を除いた残りから裸の URL（自動リンク `<…>` を含む）を拾う。末尾の句読点は URL に含めない。
+      const bare = [...noCode.replace(LINK_RE, '](').matchAll(BARE_MANUAL_URL_RE)]
+        .map((m) => m[0].replace(/[.,;:!?]+$/, ''));
+      for (const url of new Set([...links, ...bare])) {
+        if (!url.startsWith(MANUAL_URL)) continue;
+        const problem = manualUrlProblem(repoRoot, url);
+        if (problem) broken.push({ file: relFile, target: url, kind: 'readme-manual-url', detail: `L${i + 1}: ${problem}` });
+      }
+    });
+  }
+  return broken;
+}
+
 // ---- オーケストレーション ----
-const BOOK_KINDS = new Set(['internal-md', 'github-repo-path', 'internals-path']);
+const BOOK_KINDS = new Set(['internal-md', 'github-repo-path', 'internals-path', 'readme-manual-url']);
 
 export function runLinkCheck(repoRoot = REPO_ROOT) {
   const broken = [
     ...detectBrokenLinks(repoRoot),
     ...checkInternalsPaths(repoRoot),
+    ...checkReadmeManualLinks(repoRoot),
     ...checkSkillSelfContained(repoRoot),
   ];
   return { broken, failed: broken.length > 0 };
@@ -391,7 +451,7 @@ export function reportLinkCheck(result) {
   };
   out.push('link-check (git 非依存)');
   out.push('');
-  out.push(`[1] リンク切れ（book 内 .md / リポジトリ内 GitHub URL / 内部設計章のパス）: ${book.length} 件`);
+  out.push(`[1] リンク切れ（book 内 .md / リポジトリ内 GitHub URL / 内部設計章のパス / README のマニュアル URL）: ${book.length} 件`);
   list(book);
   out.push('');
   out.push(`[2] スキル自己完結（${CHECKED_SKILLS.join(', ')}）: ${skill.length} 件`);
