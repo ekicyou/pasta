@@ -7,6 +7,10 @@
 //       ローカルに実在するか（オフラインでローカル照合）、
 //   (c) (a)(b) とも repoRoot 外へ脱出するパス（トラバーサル）は実在しても違反。
 //
+// 内部設計章のパス実在検査（pasta-runtime-internals-doc タスク 1.1・要件 3.7）:
+//   book/src/internals/**/*.md のフェンス外インラインコードに書いたリポジトリ内パスを
+//   checkInternalsPaths で検査し、[1] の区分に internals-path として報告する。
+//
 // スキル自己完結検査（タスク 3.2・要件 5.3, 6.1, 6.4, 6.5, 10.2, 2.4）:
 //   .claude/skills/{pasta-ghost-authoring,pasta-lua-coding}/**/*.md を checkSkillSelfContained で
 //   検査する（skill-escape / skill-missing / skill-anchor / skill-forbidden-ref / skill-unlisted）。
@@ -329,11 +333,47 @@ export function checkSkillSelfContained(repoRoot = REPO_ROOT) {
   return broken;
 }
 
+// ---- 内部設計章のリポジトリ内パス実在検査（internals-path） ----
+// pasta-runtime-internals-doc タスク 1.1（要件 3.2, 3.7, 1.6）。
+// book/src/internals/**/*.md のフェンス外インラインコード（同数のバッククォートで閉じる区間）の
+// 中身（前後空白除去）のうち、空白を含まず REPO_PATH_PREFIXES で始まるものを repoRoot 基準で照合する。
+// 違反: repoRoot 外へ解決される（トラバーサル）、実在しない（末尾 `/` はディレクトリとして実在すること）。
+// `:行番号` 付き・ワイルドカード入りは OS（Windows の代替データストリーム等）に依らず実在しない扱い。
+export const INTERNALS_DIR = 'book/src/internals';
+export const REPO_PATH_PREFIXES = Object.freeze(['crates/', 'book/', '.github/', '.cargo/', '.kiro/', '.claude/']);
+const CODE_SPAN_RE = /(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)/g;
+
+export function checkInternalsPaths(repoRoot = REPO_ROOT) {
+  const broken = [];
+  for (const file of listMarkdownFiles(path.resolve(repoRoot, INTERNALS_DIR)).sort()) {
+    const relFile = path.relative(repoRoot, file).split(path.sep).join('/');
+    maskFences(fs.readFileSync(file, 'utf8')).split('\n').forEach((line, i) => {
+      for (const m of line.matchAll(CODE_SPAN_RE)) {
+        const p = m[2].trim();
+        if (/\s/.test(p) || !REPO_PATH_PREFIXES.some((pre) => p.startsWith(pre))) continue;
+        const abs = path.resolve(repoRoot, p);
+        let problem = null;
+        if (!isWithinRoot(repoRoot, abs)) problem = 'リポジトリ外を指すパス（トラバーサル）';
+        else if (/[:*?]/.test(p) || !fs.existsSync(abs)) problem = 'リポジトリ内に実在しない';
+        else if (p.endsWith('/') && !fs.statSync(abs).isDirectory()) problem = '末尾 / だがディレクトリでない';
+        if (problem) {
+          broken.push({ file: relFile, target: p, kind: 'internals-path', detail: `L${i + 1}: ${problem}: ${p}` });
+        }
+      }
+    });
+  }
+  return broken;
+}
+
 // ---- オーケストレーション ----
-const BOOK_KINDS = new Set(['internal-md', 'github-repo-path']);
+const BOOK_KINDS = new Set(['internal-md', 'github-repo-path', 'internals-path']);
 
 export function runLinkCheck(repoRoot = REPO_ROOT) {
-  const broken = [...detectBrokenLinks(repoRoot), ...checkSkillSelfContained(repoRoot)];
+  const broken = [
+    ...detectBrokenLinks(repoRoot),
+    ...checkInternalsPaths(repoRoot),
+    ...checkSkillSelfContained(repoRoot),
+  ];
   return { broken, failed: broken.length > 0 };
 }
 
@@ -351,7 +391,7 @@ export function reportLinkCheck(result) {
   };
   out.push('link-check (git 非依存)');
   out.push('');
-  out.push(`[1] リンク切れ（book 内 .md / リポジトリ内 GitHub URL）: ${book.length} 件`);
+  out.push(`[1] リンク切れ（book 内 .md / リポジトリ内 GitHub URL / 内部設計章のパス）: ${book.length} 件`);
   list(book);
   out.push('');
   out.push(`[2] スキル自己完結（${CHECKED_SKILLS.join(', ')}）: ${skill.length} 件`);

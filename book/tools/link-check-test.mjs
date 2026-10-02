@@ -17,7 +17,11 @@
 //   - checkSkillSelfContained が 2 スキルの規則 (a)〜(d) 違反を種別付きで検出し、
 //     https・実在アンカー・明示アンカー（#s6-6）は許可する（3.2）。
 //   実リポジトリのスキル検査は P4（タスク 4.x）完了まで違反ありでよいため、
-//   (A)・(B-13) は book 部分（internal-md / github-repo-path）が 0 件であることだけを確かめる。
+//   (A)・(B-13) は book 部分（internal-md / github-repo-path / internals-path）が 0 件であることだけを確かめる。
+//   - checkInternalsPaths が内部設計章のフェンス外インラインコードのリポジトリ内パスについて、
+//     実在しない・`:行番号` 付き・トラバーサル・末尾 `/` なのにディレクトリでないものを
+//     internals-path として行番号付きで検出し、フェンス内・接頭辞外・内部設計章以外は対象外とする
+//     （pasta-runtime-internals-doc タスク 1.1 / 要件 3.2, 3.7, 1.6）。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -33,6 +37,9 @@ import {
   headingSlug,
   headingSlugs,
   checkSkillSelfContained,
+  checkInternalsPaths,
+  INTERNALS_DIR,
+  REPO_PATH_PREFIXES,
   CHECKED_SKILLS,
   FORBIDDEN_SKILL_TOKENS,
   githubUrlToRepoPath,
@@ -77,7 +84,7 @@ function rmrf(root) {
 
 // ============================================================
 log('\n== (A) 実リポジトリ現状: クリーン判定 ==');
-const BOOK_KINDS = new Set(['internal-md', 'github-repo-path']);
+const BOOK_KINDS = new Set(['internal-md', 'github-repo-path', 'internals-path']);
 {
   const result = runLinkCheck(REPO_ROOT);
   const bookBroken = result.broken.filter((b) => BOOK_KINDS.has(b.kind));
@@ -453,6 +460,117 @@ log('\n== (E) checkSkillSelfContained（規則 a〜d） ==');
     } finally {
       rmrf(root);
     }
+  }
+}
+
+// ============================================================
+log('\n== (F) checkInternalsPaths（内部設計章のリポジトリ内パス実在） ==');
+{
+  check('INTERNALS_DIR は book/src/internals', INTERNALS_DIR === 'book/src/internals');
+  check('REPO_PATH_PREFIXES は 6 接頭辞',
+    JSON.stringify(REPO_PATH_PREFIXES)
+    === JSON.stringify(['crates/', 'book/', '.github/', '.cargo/', '.kiro/', '.claude/']),
+    JSON.stringify(REPO_PATH_PREFIXES));
+
+  // F-1: 内部設計章が無ければ検査しない（違反 0）。
+  {
+    const root = makeSandbox();
+    try {
+      check('F-1 内部設計章が無ければ違反 0', checkInternalsPaths(root).length === 0);
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // F-2: 合格・違反・対象外の混在。repoRoot 外に実在ファイルを置き、トラバーサルを確かめる。
+  {
+    const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'link-check-'));
+    const root = path.join(outer, 'repo');
+    try {
+      writeFile(outer, 'outside.md', '# repoRoot の外に実在\n');
+      writeFile(root, 'crates/pasta_lua/src/lib.rs', '// lib\n');
+      writeFile(root, '.claude/skills/x/SKILL.md', '# x\n');
+      writeFile(root, 'book/src/internals/index.md', [
+        '# 概要', // L1
+        '実在ファイル `crates/pasta_lua/src/lib.rs` と実在ディレクトリ `crates/pasta_lua/src/`。', // L2
+        '二重バッククォート `` .claude/skills/x/SKILL.md `` も合格。', // L3
+        '欠落 `crates/pasta_lua/src/missing.rs`。', // L4
+        '行番号付き `crates/pasta_lua/src/lib.rs:12`。', // L5
+        'トラバーサル `crates/../../outside.md`。', // L6
+        'ファイルに末尾スラッシュ `crates/pasta_lua/src/lib.rs/`。', // L7
+        '二重バッククォートの欠落 `` book/nope.md ``。', // L8
+        '接頭辞外 `scripts/main.lua` と `pasta.store`、空白入り `crates/a b`。', // L9
+        '```text', // L10
+        'フェンス内 `crates/fenced-nope.rs`', // L11
+        '```', // L12
+        '',
+      ].join('\n'));
+      writeFile(root, 'book/src/internals/sub/deep.md', '# 深い章\n\n`.github/workflows/nope.yml`\n');
+      // 内部設計章以外は対象外。
+      writeFile(root, 'book/src/grammar/markers.md', '`crates/not-checked.rs`\n');
+
+      const broken = checkInternalsPaths(root);
+      const targets = broken.map((b) => b.target).sort();
+      const want = [
+        '.github/workflows/nope.yml',
+        'book/nope.md',
+        'crates/../../outside.md',
+        'crates/pasta_lua/src/lib.rs/',
+        'crates/pasta_lua/src/lib.rs:12',
+        'crates/pasta_lua/src/missing.rs',
+      ];
+      check('F-2 違反は欠落・行番号付き・トラバーサル・非ディレクトリ末尾 / ・二重 ` 内欠落・下位章の 6 件',
+        JSON.stringify(targets) === JSON.stringify(want), JSON.stringify(broken));
+      check('F-2 種別はすべて internals-path', broken.every((b) => b.kind === 'internals-path'),
+        JSON.stringify(broken));
+      const byTarget = (t) => broken.find((b) => b.target === t) || {};
+      check('F-2 detail に行番号（欠落=L4・行番号付き=L5・トラバーサル=L6・下位章=L3）',
+        /\bL4\b/.test(byTarget('crates/pasta_lua/src/missing.rs').detail)
+        && /\bL5\b/.test(byTarget('crates/pasta_lua/src/lib.rs:12').detail)
+        && /\bL6\b/.test(byTarget('crates/../../outside.md').detail)
+        && /\bL3\b/.test(byTarget('.github/workflows/nope.yml').detail),
+        JSON.stringify(broken));
+      check('F-2 トラバーサルは実在してもトラバーサルとして報告',
+        /トラバーサル/.test(byTarget('crates/../../outside.md').detail), JSON.stringify(broken));
+      check('F-2 file はリポジトリ相対の章パス',
+        byTarget('crates/pasta_lua/src/missing.rs').file === 'book/src/internals/index.md'
+        && byTarget('.github/workflows/nope.yml').file === 'book/src/internals/sub/deep.md',
+        JSON.stringify(broken));
+      check('F-2 フェンス内・接頭辞外・空白入り・内部設計章以外は対象外',
+        !broken.some((b) => /fenced-nope|scripts\/|pasta\.store|a b|not-checked/.test(b.target)),
+        JSON.stringify(broken));
+
+      const result = runLinkCheck(root);
+      check('F-2 runLinkCheck に結合され failed=true',
+        result.failed === true && result.broken.filter((b) => b.kind === 'internals-path').length === 6,
+        JSON.stringify(result.broken));
+      const rep = reportLinkCheck(result);
+      check('F-2 レポートの [1] 区分に internals-path 6 件が出る',
+        /\[1\][^\n]*: 6 件/.test(rep) && rep.includes('[internals-path]'), rep);
+    } finally {
+      rmrf(outer);
+    }
+  }
+
+  // F-3: 実在パスだけなら合格。
+  {
+    const root = makeSandbox();
+    try {
+      writeFile(root, 'crates/pasta_lua/src/lib.rs', '// lib\n');
+      writeFile(root, 'book/src/internals/index.md',
+        '# 概要\n\n`crates/pasta_lua/src/lib.rs`・`crates/pasta_lua/`・`book/src/internals/index.md`\n');
+      const broken = checkInternalsPaths(root);
+      check('F-3 実在パスのみ: 違反 0', broken.length === 0, JSON.stringify(broken));
+      check('F-3 runLinkCheck も failed=false', runLinkCheck(root).failed === false);
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // F-4: 実リポジトリで internals-path 0 件。
+  {
+    const broken = checkInternalsPaths(REPO_ROOT);
+    check('F-4 実リポジトリで internals-path 0 件', broken.length === 0, JSON.stringify(broken));
   }
 }
 
