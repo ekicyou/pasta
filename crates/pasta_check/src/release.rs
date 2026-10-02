@@ -77,6 +77,8 @@ fn remove_stale_nar(nar: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
+    use std::io::Read;
     use tempfile::TempDir;
 
     #[test]
@@ -204,67 +206,138 @@ mod tests {
         assert!(archive.by_name("ghost/master/updates.txt").is_ok());
     }
 
-    /// homeurl の無い同梱バルーンは警告だけで止まらず、nar とバルーン用 updates.txt を作る（Req 7.3）。
-    /// 判定は --copy の上書き後の install.txt で行う（Req 1.7）
+    /// root 配下に (相対パス, 内容) のファイルを親フォルダごと書く
+    fn write_files(root: &Path, files: &[(&str, &str)]) {
+        for (path, body) in files {
+            let path = root.join(path);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, body).unwrap();
+        }
+    }
+
+    /// nar の全エントリ（エントリ名 → バイト列）
+    fn read_nar(nar: &Path) -> BTreeMap<String, Vec<u8>> {
+        let mut archive = zip::ZipArchive::new(fs::File::open(nar).unwrap()).unwrap();
+        (0..archive.len())
+            .map(|i| {
+                let mut entry = archive.by_index(i).unwrap();
+                let mut bytes = Vec::new();
+                entry.read_to_end(&mut bytes).unwrap();
+                (entry.name().to_string(), bytes)
+            })
+            .collect()
+    }
+
+    /// nar 内の updates.txt の各行の md5・size が、nar 内の `{base}{パス}` のバイト列と一致することを
+    /// 確かめ、記載されたパスを返す（Req 5.3）
+    fn assert_updates_match_nar(
+        entries: &BTreeMap<String, Vec<u8>>,
+        updates: &str,
+        base: &str,
+    ) -> Vec<String> {
+        let text = std::str::from_utf8(&entries[updates]).unwrap();
+        let mut lines = text.split("\r\n");
+        assert_eq!(lines.next(), Some("charset,UTF-8"));
+        lines
+            .filter(|l| !l.is_empty())
+            .map(|line| {
+                let fields: Vec<&str> = line.strip_prefix("file,").unwrap().split('\x01').collect();
+                let name = format!("{base}{}", fields[0]);
+                let bytes = entries
+                    .get(&name)
+                    .unwrap_or_else(|| panic!("{updates} lists {name}, not in nar"));
+                assert_eq!(fields[1], format!("{:032x}", md5::compute(bytes)), "{name}");
+                assert_eq!(fields[2], format!("size={}", bytes.len()), "{name}");
+                fields[0].to_string()
+            })
+            .collect()
+    }
+
+    /// 同梱バルーン付きのパイプライン。判定は --copy の上書き後の install.txt で行い（Req 1.7）、
+    /// homeurl が無くても警告だけで nar を作る（Req 7.3）。nar に bal/updates.txt が入り（Req 6.1）、
+    /// nar の各ファイルが updates.txt の md5・size と一致し（Req 5.3・8.5）、ゴースト用（ルート・
+    /// ghost/master）に bal/ の行が無く（Req 3.2）、エントリのパス体系と profile/ 除外は従来どおり（Req 6.2）
     #[test]
-    fn test_execute_release_bundled_balloon_without_homeurl_succeeds() {
+    fn test_execute_release_bundled_balloon_pipeline() {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
-        fs::create_dir_all(target.join("ghost/master")).unwrap();
-        fs::create_dir_all(target.join("bal")).unwrap();
-        fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
-        fs::write(
-            target.join("install.txt"),
-            "charset,UTF-8\r\ntype,ghost\r\n",
-        )
-        .unwrap();
-        fs::write(
-            target.join("bal/descript.txt"),
-            "charset,UTF-8\r\nname,bal\r\n",
-        )
-        .unwrap();
-        fs::write(target.join("bal/balloons0.png"), "png").unwrap();
-
+        write_files(
+            &target,
+            &[
+                ("install.txt", "charset,UTF-8\r\ntype,ghost\r\n"),
+                ("ghost/master/descript.txt", "desc"),
+                ("ghost/master/profile/user.txt", "user"),
+                ("bal/descript.txt", "charset,UTF-8\r\nname,bal\r\n"),
+                ("bal/balloons0.png", "png"),
+                ("bal/sub/arrow0.png", "arrow"),
+                ("bal/profile/user.txt", "user"),
+            ],
+        );
+        // target の install.txt には指定が無く、--copy の上書きで加わる
         let overlay = temp.path().join("overlay");
-        fs::create_dir_all(&overlay).unwrap();
-        fs::write(
-            overlay.join("install.txt"),
-            "charset,UTF-8\r\ntype,ghost\r\nballoon.directory,bal\r\n",
-        )
-        .unwrap();
+        write_files(
+            &overlay,
+            &[(
+                "install.txt",
+                "charset,UTF-8\r\ntype,ghost\r\nballoon.directory,bal\r\n",
+            )],
+        );
 
-        let release = temp.path().join("release_out");
         let nar = temp.path().join("out.nar");
         let args = ReleaseArgs {
             target,
-            release: release.clone(),
+            release: temp.path().join("release_out"),
             nar: nar.clone(),
             copy_dirs: vec![overlay],
         };
 
         execute_release(&args).unwrap();
 
-        assert!(nar.exists());
-        let bal_updates = fs::read_to_string(release.join("bal/updates.txt")).unwrap();
-        assert!(bal_updates.contains("file,balloons0.png\x01"));
-        // ゴースト用 updates.txt には同梱バルーンのファイルを載せない
-        let ghost_updates = fs::read_to_string(release.join("updates.txt")).unwrap();
-        assert!(!ghost_updates.contains("bal/"));
+        let entries = read_nar(&nar);
+        assert_eq!(
+            entries.keys().map(String::as_str).collect::<Vec<_>>(),
+            [
+                "bal/balloons0.png",
+                "bal/descript.txt",
+                "bal/sub/arrow0.png",
+                "bal/updates.txt",
+                "ghost/master/descript.txt",
+                "ghost/master/updates.txt",
+                "install.txt",
+                "updates.txt",
+            ]
+        );
+        assert_eq!(
+            assert_updates_match_nar(&entries, "bal/updates.txt", "bal/"),
+            ["balloons0.png", "descript.txt", "sub/arrow0.png"]
+        );
+        assert_eq!(
+            assert_updates_match_nar(&entries, "updates.txt", ""),
+            ["ghost/master/descript.txt", "install.txt"]
+        );
+        assert_eq!(entries["ghost/master/updates.txt"], entries["updates.txt"]);
     }
 
-    /// 判定エラーでは段 5 に進まず nar を作らない
+    /// 同梱バルーンが無いときの nar のエントリ集合とエントリ名は従来どおり（Req 8.2・6.2）。
+    /// 宣言の無い同名フォルダ bal/ はゴーストの一部として扱われる
     #[test]
-    fn test_execute_release_balloon_plan_error_creates_no_nar() {
+    fn test_execute_release_no_balloon_nar_entries_unchanged() {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
-        fs::create_dir_all(&target).unwrap();
-        fs::write(
-            target.join("install.txt"),
-            "charset,UTF-8\r\nballoon.directory,missing\r\n",
-        )
-        .unwrap();
+        write_files(
+            &target,
+            &[
+                ("install.txt", "charset,UTF-8\r\ntype,ghost\r\n"),
+                ("readme.txt", "readme"),
+                ("ghost/master/descript.txt", "desc"),
+                ("ghost/master/profile/user.txt", "user"),
+                ("ghost/master/var/save.dat", "save"),
+                ("shell/master/surface0.png", "png"),
+                ("bal/descript.txt", "charset,UTF-8\r\nname,bal\r\n"),
+            ],
+        );
 
         let nar = temp.path().join("out.nar");
         let args = ReleaseArgs {
@@ -274,8 +347,96 @@ mod tests {
             copy_dirs: vec![],
         };
 
-        assert!(execute_release(&args).is_err());
-        assert!(!nar.exists());
+        execute_release(&args).unwrap();
+
+        let entries = read_nar(&nar);
+        assert_eq!(
+            entries.keys().map(String::as_str).collect::<Vec<_>>(),
+            [
+                "bal/descript.txt",
+                "ghost/master/descript.txt",
+                "ghost/master/updates.txt",
+                "ghost/master/var/save.dat",
+                "install.txt",
+                "readme.txt",
+                "shell/master/surface0.png",
+                "updates.txt",
+            ]
+        );
+        assert_eq!(
+            assert_updates_match_nar(&entries, "updates.txt", ""),
+            [
+                "bal/descript.txt",
+                "ghost/master/descript.txt",
+                "install.txt",
+                "readme.txt",
+                "shell/master/surface0.png",
+            ]
+        );
+    }
+
+    /// 判定エラーでは段 5 に進まず nar を作らず、配布フォルダのルートに updates.txt を書かない
+    /// （Req 1.10・2.5）。--nar の位置の前回の nar も残らない（Req 8.8）。
+    /// 判定は --copy の上書き後の install.txt で行う（Req 1.7）
+    #[test]
+    fn test_execute_release_balloon_plan_error_creates_no_nar() {
+        let cases: [(&str, &str, Option<&str>, &str); 3] = [
+            (
+                "no charset declaration",
+                "type,ghost\r\nballoon.directory,bal\r\n",
+                None,
+                "not UTF-8",
+            ),
+            (
+                "missing folder",
+                "charset,UTF-8\r\nballoon.directory,missing\r\n",
+                None,
+                "\"missing\" (balloon.directory) does not exist",
+            ),
+            (
+                "missing folder added by --copy",
+                "charset,UTF-8\r\ntype,ghost\r\n",
+                Some("charset,UTF-8\r\nballoon.directory,missing\r\n"),
+                "\"missing\" (balloon.directory) does not exist",
+            ),
+        ];
+
+        for (label, install, overlay_install, expected) in cases {
+            let temp = TempDir::new().unwrap();
+
+            let target = temp.path().join("target_ghost");
+            write_files(
+                &target,
+                &[
+                    ("install.txt", install),
+                    ("a.txt", "fresh"),
+                    ("bal/descript.txt", "charset,UTF-8\r\nhomeurl,x\r\n"),
+                ],
+            );
+            let mut copy_dirs = vec![];
+            if let Some(body) = overlay_install {
+                let overlay = temp.path().join("overlay");
+                write_files(&overlay, &[("install.txt", body)]);
+                copy_dirs.push(overlay);
+            }
+
+            let nar = temp.path().join("out.nar");
+            fs::write(&nar, "old nar").unwrap();
+            let release = temp.path().join("release_out");
+            let args = ReleaseArgs {
+                target,
+                release: release.clone(),
+                nar: nar.clone(),
+                copy_dirs,
+            };
+
+            let err = execute_release(&args).unwrap_err();
+            assert!(err.to_string().contains(expected), "{label}: {err}");
+            // 段 3 までは完了している（失敗は段 4 の判定）
+            assert!(release.join("a.txt").exists(), "{label}");
+            assert!(!release.join("updates.txt").exists(), "{label}");
+            assert!(!nar.exists(), "{label}");
+        }
     }
 
     /// 後段で失敗しても --nar の位置に前回の nar が残らない（Req 8.8）

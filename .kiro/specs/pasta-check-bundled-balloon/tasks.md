@@ -98,7 +98,7 @@
   - _Depends: 2.5, 3.2_
   - _Requirements: 7.3, 7.4_
 
-- [ ] 4.3 同梱バルーン付き・判定エラー時・同梱バルーン無しの release 統合テストを追加する
+- [x] 4.3 同梱バルーン付き・判定エラー時・同梱バルーン無しの release 統合テストを追加する
   - 同梱バルーン付き: nar に `bal/updates.txt` があり、nar 内の各ファイルのバイト列の md5・size がバルーン用 updates.txt の記載と一致し、ルートと `ghost/master` の updates.txt に `bal/` の行が無く、nar のエントリのパス体系と `profile/` 除外が保たれる
   - 判定エラー時（宣言無しの install.txt・指定フォルダ不在）: nar が作られず、配布フォルダのルートに updates.txt が新しく書かれない
   - `--copy` の後の install.txt で判定する: target の install.txt には指定が無く `--copy` の上書きで指定が加わると `bal/updates.txt` が生成され、上書きで加わった指定のフォルダが無ければエラーになる
