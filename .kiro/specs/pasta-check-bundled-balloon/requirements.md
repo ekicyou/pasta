@@ -50,7 +50,7 @@
 1. When release の更新ファイル生成の段に入ったとき, the `pasta_check` shall 配布フォルダ直下の `install.txt` のバルーン指定に `source.directory` の行（例: `balloon.source.directory`）があれば、その値を同梱バルーンのフォルダとする
 2. If バルーン指定に `source.directory` の行が無く `directory` の行（例: `balloon.directory`）がある, then the `pasta_check` shall `directory` の値を同梱バルーンのフォルダとする
 3. If 配布フォルダ直下に `install.txt` が無い、または `install.txt` が 9 の確認を通り、バルーン指定が 1 つも無い, then the `pasta_check` shall 同梱バルーンは無いものとして、警告もエラーも出さずに従来どおりの更新ファイルを生成する
-4. Where `install.txt` に番号付きのバルーン指定（`balloon0.source.directory`・`balloon0.directory`・`balloon1.*`…）がある, the `pasta_check` shall ベースウェアと同じ順序（番号なし → 0 → 1 → 2 …、見つからない番号が出た時点で打ち切る）でバルーン指定を探し、見つかった各指定を 1 つの同梱バルーンとして 1・2 と同じ規則で扱う（ukadoc「install.txt」の同時インストールの規則に合わせる。番号なしと番号付きは別の指定として併存しうる。ディスカッション #1 で決定）
+4. Where `install.txt` に番号付きのバルーン指定（`balloon0.source.directory`・`balloon0.directory`・`balloon1.*`…）がある, the `pasta_check` shall ベースウェアと同じ順序（番号なし → 0 → 1 → 2 …、見つからない番号が出た時点で打ち切る）でバルーン指定を探し、見つかった各指定を 1 つの同梱バルーンとして 1・2 と同じ規則で扱う（ukadoc「install.txt」の同時インストールの規則に合わせる。番号なしと番号付きは別の指定として併存しうる。ディスカッション #1 で決定）。打ち切った番号より後ろの番号の指定（例: `balloon0` と `balloon2` だけがあり、`balloon2` がベースウェアに読まれない）がある場合は、その指定のキーを示すエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（ukadoc「欠番を作ってはいけない」。読まれないバルーンのフォルダはゴースト用 `updates.txt` に載り、元の不具合が再発するため。作成ツールは問題があれば止める。設計ディスカッションで決定）
 5. If 複数のバルーン指定が同じフォルダを指す, then the `pasta_check` shall そのフォルダを 1 つの同梱バルーンとして 1 回だけ扱う
 6. The `pasta_check` shall 同梱バルーンの判定に、配布フォルダ直下の `install.txt` だけを使い、サブフォルダにある `install.txt`（例: 同梱バルーンのフォルダ内にあるバルーン自身の `install.txt`）は判定に使わない
 7. The `pasta_check` shall `--copy` による上書きが済んだ後の配布フォルダの `install.txt` を判定に使う
@@ -70,6 +70,8 @@
 4. The `pasta_check` shall `install.txt` の値がどのようなものであっても、配布フォルダの外にあるファイルを読み取り・作成・変更しない
 5. If 値は妥当だが、配布フォルダ内にそのフォルダが存在しない（同名のファイルがある場合を含む）, then the `pasta_check` shall 指定されたフォルダとその行のキーを示すエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（同梱を宣言したのに実体が無い nar はインストールに失敗する配布物であり、警告では見落とされるため。ディスカッションで決定）
 6. When 値と配布フォルダ内のフォルダ名が大文字小文字だけ異なり、ファイルシステムがそれらを同じフォルダとして扱う, the `pasta_check` shall そのフォルダを同梱バルーンとして扱い、Requirement 3 の除外と Requirement 4 の生成を同じフォルダに対して一貫して行う
+7. If バルーン指定のキー（`*.source.directory`・`*.directory`）が `install.txt` に複数行ある（キーの大文字小文字の違いだけのものを含む）, then the `pasta_check` shall 重複したキーを示すエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（ベースウェアがどの行を採るかは未確認で、食い違えば判定がずれるため。作成ツールは問題があれば止める。設計ディスカッションで決定）
+8. If 同梱バルーンのフォルダの値の要素に `profile` または `var`（大文字小文字は問わない）がある, then the `pasta_check` shall 不正な値とその行のキーを示すエラーを表示してゼロ以外の終了コードで終了し、nar を作成しない（どちらも SSP の生成機能が配布物から外すフォルダで、`profile/` は nar にも入らず、インストールできない配布物になるため。設計ディスカッションで決定）
 
 ### Requirement 3: ゴースト用 updates.txt からの同梱バルーンの除外
 

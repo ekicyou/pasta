@@ -82,7 +82,7 @@ graph TB
 - 選んだ形: 既存のオーケストレーター＋段関数。新しい層や trait は作らない。
 - 責務の分離: `balloon.rs` は配布フォルダを**読むだけ**で、同梱バルーンのフォルダ一覧と警告を返す。`update_files.rs` は `install.txt` を知らず、「外す相対フォルダ」と「バルーン用を書くフォルダ」を同じ `&[String]` で受け取る。
 - 既存の規則の保持: 名前一致の除外・ソート・形式・0 件で書かない・`ghost/master` への複製は変えない。
-- 新しいモジュールの理由: `install.txt`／`descript.txt` の解析と値の検証は単体テストの数が多く（エラー種別ごと）、`update_files.rs`（現在 534 行）に混ぜると責務が「更新ファイル生成」から外れる。モジュールの分け方は OPEN QUESTION 1。
+- 新しいモジュールの理由: `install.txt`／`descript.txt` の解析と値の検証は単体テストの数が多く（エラー種別ごと）、`update_files.rs`（現在 534 行）に混ぜると責務が「更新ファイル生成」から外れる。モジュールの分け方は、既存の「関心ごとに 1 モジュール」（`copy.rs`・`nar.rs`）の形に合わせて `balloon.rs` を新設する（設計ディスカッションで確定）。
 - steering 準拠: 依存追加なし、UTF-8 限定、作成ツールは問題があれば止める。
 
 ### Technology Stack
@@ -116,7 +116,7 @@ crates/pasta_check/
 - `crates/pasta_check/tests/cli_test.rs` — 既存 E2E の `install.txt` を UTF-8 宣言付きに変更。`Warning:` の E2E とエラー（exit 1・nar なし）の E2E を追加。
 - `crates/pasta_sample_ghost/ghosts/hello-pasta/install.txt` — 1 行目に `charset,UTF-8`（CRLF）を追加。
 - `crates/pasta_sample_ghost/tests/integration_test.rs` — `test_ukadoc_files` に「`install.txt` の 1 行目が `charset,UTF-8`」の確認を追加（Req 8.7 の固定）。
-- `release/hello-pasta/`（`install.txt`・`updates.txt`・`ghost/master/updates.txt`）と `release/hello-pasta.nar` — 新しい `pasta_check release`（`release.ps1 -SkipSetup` と同じ段 4 のみ）で再生成して同期する（OPEN QUESTION 3）。
+- `release/hello-pasta/`（`install.txt`・`updates.txt`・`ghost/master/updates.txt`）と `release/hello-pasta.nar` — 新しい `pasta_check release`（`release.ps1 -SkipSetup` と同じ段 4 のみ）で再生成して同期する（`install.txt` だけを手で直すと、写しの `updates.txt` の `install.txt` 行の md5・size が実ファイルと食い違い、壊れた写しになるため。設計ディスカッションで確定）。
 - `.claude/skills/pasta-check/SKILL.md`・`references/updates-txt-spec.md`・`references/nar-spec.md` — Req 9.1〜9.3・9.5。
 - `crates/pasta_check/README.md` — Req 9.4 と「ソース構成」への `balloon.rs` の追記。
 - `.kiro/steering/structure.md` — `pasta_check/src/` の一覧に `balloon.rs` を 1 行追記（steering を現行に保つ）。
@@ -166,7 +166,7 @@ flowchart TD
     UseDir --> SepCheck{区切りを含む}
     SepCheck -->|yes| ErrVal[不正な値エラー]
     SepCheck -->|no| Norm
-    Norm --> Valid{空 絶対 コロン 親参照}
+    Norm --> Valid{空 絶対 コロン 親参照 除外フォルダ}
     Valid -->|該当| ErrVal
     Valid -->|なし| Resolve[read_dir で実在名に解決]
     Resolve -->|見つからない| ErrMissing[フォルダ不在エラー]
@@ -192,7 +192,7 @@ flowchart TD
 | 1.1 | `source.directory` を採用 | balloon | `find_balloon_specs` | 1 件の判定 |
 | 1.2 | 無ければ `directory` | balloon | `find_balloon_specs` | 1 件の判定 |
 | 1.3 | `install.txt` 無し・指定無しは従来どおり | balloon, update_files | `plan_bundled_balloons` が空を返す | 段 4 |
-| 1.4 | 番号付き指定を 番号なし→0→1… で探索・欠番で打ち切り | balloon | `find_balloon_specs` | 1 件の判定 |
+| 1.4 | 番号付き指定を 番号なし→0→1… で探索・欠番で打ち切り・欠番の後ろの指定はエラー | balloon | `find_balloon_specs` | 1 件の判定 |
 | 1.5 | 同じフォルダは 1 回 | balloon | 解決後の実在名で重複除去 | 1 件の判定 |
 | 1.6 | 直下の `install.txt` のみ | balloon | `release_dir.join("install.txt")` だけを読む | 段 4 |
 | 1.7 | `--copy` 後の `install.txt` | release | 段 4 で呼ぶ | 段 4 |
@@ -206,6 +206,8 @@ flowchart TD
 | 2.4 | 配布フォルダの外を触らない | balloon, update_files | 検証済み要素＋実在名だけで結合 | 1 件の判定 |
 | 2.5 | フォルダ不在（同名ファイル含む）はエラー | balloon | `resolve_existing_dir` | 1 件の判定 |
 | 2.6 | 大文字小文字違いを一貫して扱う | balloon, update_files | 実在名に解決し以降は完全一致 | 1 件の判定 |
+| 2.7 | バルーン指定のキーの重複はエラー | balloon | `find_balloon_specs` | 1 件の判定 |
+| 2.8 | `profile`・`var` を含む値はエラー | balloon | `normalize_value` | 1 件の判定 |
 | 3.1 | 同梱バルーン配下をルート `updates.txt` に載せない | update_files | `collect_files(root, excluded)` | 段 4 |
 | 3.2 | `ghost/master/updates.txt` は同内容 | update_files | 既存の `fs::copy` | 段 4 |
 | 3.3 | それ以外は従来どおり載せる | update_files | 除外は相対パス完全一致のみ | 段 4 |
@@ -246,7 +248,7 @@ flowchart TD
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|--------------|--------|--------------|------------------|-----------|
-| BalloonPlanner（`balloon.rs`） | 判定 | `install.txt` から同梱バルーンのフォルダを決め、警告を集める（読み取り専用） | 1.1–1.11, 2.1–2.6, 5.2, 7.1, 7.2, 7.5, 8.3, 8.6 | std::fs (P0) | Service |
+| BalloonPlanner（`balloon.rs`） | 判定 | `install.txt` から同梱バルーンのフォルダを決め、警告を集める（読み取り専用） | 1.1–1.11, 2.1–2.8, 5.2, 7.1, 7.2, 7.5, 8.3, 8.6 | std::fs (P0) | Service |
 | UpdateFilesGenerator（`update_files.rs`） | 生成 | ゴースト用・バルーン用 `updates.txt` を書く | 3.1–3.4, 4.1–4.8, 5.1, 5.2, 8.1, 8.4, 8.5 | md5 (P0) | Service |
 | ReleaseOrchestrator（`release.rs`） | オーケストレーション | 段 4 で判定→生成→表示 | 1.7, 4.9, 7.3, 7.4, 8.5 | BalloonPlanner (P0), UpdateFilesGenerator (P0) | Batch |
 | NarBuilder（`nar.rs`） | 封入 | 変更なし。段 4 の成果物をそのまま封入 | 5.3, 6.1, 6.2, 8.2 | zip (P0) | — |
@@ -259,7 +261,7 @@ flowchart TD
 | Field | Detail |
 |-------|--------|
 | Intent | 配布フォルダを読むだけで、同梱バルーンのフォルダ一覧と警告を返す |
-| Requirements | 1.1–1.11, 2.1–2.6, 5.2, 7.1, 7.2, 7.5, 8.3, 8.6 |
+| Requirements | 1.1–1.11, 2.1–2.8, 5.2, 7.1, 7.2, 7.5, 8.3, 8.6 |
 
 **Responsibilities & Constraints**
 - 読むファイルは `<release>/install.txt` と `<release>/<バルーン>/descript.txt` だけ。ファイルを書かない、作らない、消さない（5.2・2.4）。
@@ -298,8 +300,8 @@ fn read_utf8_kv(path: &Path, label: &str) -> io::Result<Vec<(String, String)>>;
 /// バルーン指定 1 件。key は採用した行のキー（エラー表示用）。
 struct BalloonSpec { key: String, value: String, hierarchical_allowed: bool }
 
-/// 番号なし → balloon0 → balloon1 … の順に探す。
-fn find_balloon_specs(kv: &[(String, String)]) -> Vec<BalloonSpec>;
+/// 番号なし → balloon0 → balloon1 … の順に探す（キーの重複・欠番の後ろの指定はエラー）。
+fn find_balloon_specs(kv: &[(String, String)]) -> io::Result<Vec<BalloonSpec>>;
 
 /// 値を要素列に正規化し検証する（不正なら 2.1 のエラー）。
 fn normalize_value(spec: &BalloonSpec) -> io::Result<Vec<String>>;
@@ -322,11 +324,12 @@ fn check_overlaps(dirs: &[(String, String)]) -> io::Result<()>;
    - 先頭の UTF-8 BOM（`EF BB BF`）を除き、`String::from_utf8` に失敗したらエラー（1.10）。
    - 行は `\n` で分け、末尾の `\r` と前後の空白を除く。
    - 1 行目を最初の `,` で分け、キーと値を trim して、どちらも ASCII 大文字小文字無視で `charset`・`UTF-8` に一致しなければエラー（1.9・1.10）。この確認は同梱バルーンの有無より先に行う（8.6）。
-   - 2 行目以降は最初の `,` で分け、キーは trim して ASCII 小文字化、値は trim。カンマの無い行は無視。同じキーが複数あるときは**最初の行を採る**（前提。OPEN QUESTION 4）。
+   - 2 行目以降は最初の `,` で分け、キーは trim して ASCII 小文字化、値は trim。カンマの無い行は無視。バルーン指定のキー（`*.source.directory`・`*.directory`）が複数行あればエラー（Req 2.7）。それ以外のキー（`homeurl` など）が複数行あるときは最初の行を採る。
 2. **バルーン指定の探索**（1.1, 1.2, 1.4）
    - 接頭辞 `balloon` を調べ、続いて `balloon0`, `balloon1`, … を調べる。各接頭辞 `P` について `P.source.directory` か `P.directory` のどちらかの行があれば指定が 1 件あるとみなす。
    - `P.source.directory` の行があれば（値が空でも）それを採る（`hierarchical_allowed = true`）。無ければ `P.directory` を採る（`hierarchical_allowed = false`）。
-   - 番号付きは、どちらの行も無い最初の番号で探索を打ち切る。番号なしの指定の有無は番号付きの探索に影響しない（両者は併存しうる。前提。OPEN QUESTION 5）。
+   - 番号付きは、どちらの行も無い最初の番号で探索を打ち切る。番号なしの指定の有無は番号付きの探索に影響しない（ukadoc の例「`balloon0` と `balloon2` だけなら `balloon0` は読まれる」より、番号なしの不在は打ち切りにならない。両者は併存しうる）。
+   - 打ち切った番号より後ろの番号の指定（キーが `balloon<数字>.source.directory`・`balloon<数字>.directory` の形で、数字が打ち切った番号より大きいもの）が 1 つでもあればエラー（Req 1.4 の欠番。ukadoc「欠番を作ってはいけない」）。
 3. **値の正規化と検証**（2.1, 2.2）— 次の順で行い、最初に該当したものでエラー:
    1. trim 後に空 → 不正（空）
    2. `hierarchical_allowed = false` で `/` か `\` を含む → 不正（`directory` に区切り）
@@ -334,6 +337,7 @@ fn check_overlaps(dirs: &[(String, String)]) -> io::Result<()>;
    4. `:` を含む（ドライブ名・ドライブ相対・代替ストリーム） → 不正（絶対パス）
    5. `/` と `\` で分割し、空要素と `.` を捨てる。残りに `..` があれば → 不正（親参照）
    6. 残りが空（例 `.`・`./`） → 不正（空）
+   7. 要素のどれかが ASCII 大文字小文字無視で `profile`・`var` → 不正（除外フォルダ。Req 2.8）
 4. **実在のフォルダ名への解決**（2.5, 2.6, 2.4）— 要素ごとに親フォルダを `read_dir` し、
    - 名前が完全に一致するフォルダ（シンボリックリンクでないもの）があればそれを採る。
    - 無ければ、`親.join(要素).is_dir()` が真（＝ファイルシステムが同じフォルダとみなす）の場合に限り、小文字化して一致するフォルダの実在名を採る。
@@ -348,7 +352,9 @@ fn check_overlaps(dirs: &[(String, String)]) -> io::Result<()>;
 | 種別 | Req | 文言の形 |
 |------|-----|----------|
 | UTF-8 でない | 1.10, 7.5 | `install.txt is not UTF-8: the first line must be "charset,UTF-8" (pasta_check supports UTF-8 only)` ／ 不正バイト時は `... contains invalid UTF-8 byte sequence` |
-| 不正な値 | 2.1 | `install.txt: invalid value for balloon0.source.directory: "../x" (parent directory reference)` ／ 理由は `empty`・`absolute path`・`path separator is not allowed in directory`・`parent directory reference` |
+| 不正な値 | 2.1 | `install.txt: invalid value for balloon0.source.directory: "../x" (parent directory reference)` ／ 理由は `empty`・`absolute path`・`path separator is not allowed in directory`・`parent directory reference`・`excluded folder (profile/var)` |
+| 欠番の後ろの指定 | 1.4 | `install.txt: balloon2.directory is never read by the baseware because balloon1 is missing (numbered entries must not have gaps)` |
+| 重複キー | 2.7 | `install.txt: duplicate key balloon.source.directory` |
 | フォルダ不在 | 2.5 | `install.txt: bundled balloon folder "emo2-kakukaku" (balloon.source.directory) does not exist in the release folder` |
 | 重なり | 2.3 | `install.txt: bundled balloon folder "ghost" (balloon.directory) overlaps with ghost/master` ／ `... overlaps with bundled balloon folder "a" (balloon0.source.directory)` |
 | `descript.txt` 不在 | 7.2 | `bundled balloon "emo2-kakukaku": descript.txt not found` |
@@ -463,8 +469,8 @@ fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<Fi
 
 ### Unit Tests（`balloon.rs`）
 - `read_utf8_kv`: `Charset,UTF-8`（大文字）・BOM 付き・前後空白を受け入れ、宣言無し・`charset,Shift_JIS`・不正バイト（`0x82 0xA0`）をエラーにする（1.8–1.10）。
-- `find_balloon_specs`: `source.directory` 優先・`directory` 代用・番号なし＋`balloon0`＋`balloon1` の 3 件・`balloon1` 欠番で `balloon2` を拾わない・キーの大文字小文字無視（1.1, 1.2, 1.4, 1.8）。
-- `normalize_value`: `extra\bal1`・`extra/bal1/` を受け入れ、空・`/abs`・`\\server\x`・`C:\x`・`C:x`・`a/../b`・`.`・`directory` 代用時の `a/b` を各理由でエラーにする（2.1, 2.2）。
+- `find_balloon_specs`: `source.directory` 優先・`directory` 代用・番号なし＋`balloon0`＋`balloon1` の 3 件・`balloon0`＋`balloon2`（`balloon1` 欠番）→ 欠番エラー・番号なし無しで `balloon0` を拾う・キーの大文字小文字無視・`balloon.directory` の 2 行（`Balloon.Directory` を含む）→ 重複エラー（1.1, 1.2, 1.4, 1.8, 2.7）。
+- `normalize_value`: `extra\bal1`・`extra/bal1/` を受け入れ、空・`/abs`・`\\server\x`・`C:\x`・`C:x`・`a/../b`・`.`・`directory` 代用時の `a/b`・`profile/bal`・`x/Var/bal` を各理由でエラーにする（2.1, 2.2, 2.8）。
 - 解決と重なり: 不在・同名ファイル → 不在エラー、`ghost`・`ghost/master`・`ghost/master/x`・バルーン同士の入れ子 → 重なりエラー、同じフォルダを指す 2 件 → 1 件（1.5, 2.3, 2.5）。`#[cfg(windows)]` で `EMO2-KAKUKAKU` → 実在名 `emo2-kakukaku` に解決（2.6）。
 - `descript.txt`: 不在 → エラー、Shift_JIS 宣言 → エラー、`homeurl` 無し・空 → 警告 1 件、`HomeURL,https://…` → 警告なし（7.1, 7.2, 7.5）。`install.txt` 無し・指定無し → 空・警告なし（1.3, 8.3）。
 
@@ -490,14 +496,14 @@ fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<Fi
 ## Migration Strategy
 - 利用者に見える変更は「`install.txt` に `charset,UTF-8` の宣言が必須」の 1 点。README とスキルに明記する（9.4）。
 - リポジトリ内: hello-pasta の `install.txt` に宣言を足し、`release/hello-pasta` を新しい `pasta_check release` で再生成する。
-- 下流: emo2（`Charset,UTF-8` 済み）は追加作業なし。pasta-in-windows の `install.txt` に宣言があるかは本リポジトリから確認できない（リスク。OPEN QUESTION 6）。
+- 下流: emo2（`Charset,UTF-8` 済み）は追加作業なし。pasta-in-windows（ghost_dev の `project/pasta-in-windows` と `release/pasta-in-windows`）も 1 行目が `Charset,UTF-8` で、追加作業なし（設計ディスカッションで確認）。ghost_dev 側にある hello-pasta の写しは、本リポジトリの hello-pasta の更新に追従すればよい。
 
 ## Open Questions（設計ディスカッションで決める）
 
-1. **モジュールの分け方**（Architecture・File Structure Plan）— 案 A: すべて `update_files.rs` に入れる（ファイルが増えない）／案 B: `balloon.rs` を新設（本書の前提）／案 C: 行解析と値の検証だけを新設。前提: 案 B。
+1. **モジュールの分け方** — **決定: 案 B（`balloon.rs` を新設）。** 既存の関心ごとに 1 モジュールの形に合わせる。
 2. **失敗時に残る前回の nar**（Error Handling）— 案: 既存どおり残す（本書の前提）／段 1 で `--nar` の既存ファイルを消す。作成ツールは問題があれば止める方針から、誤って古い nar を配る危険をどう見るか。
-3. **`release/hello-pasta` の写しの同期方法**（File Structure Plan）— 案: `pasta_check release` で再生成（`updates.txt` の全行の `date=` と nar が変わる。本書の前提）／`install.txt` だけ手で直す（写しの `updates.txt` の `install.txt` 行の md5・size が実ファイルと食い違う）。
-4. **同じキーが複数あるとき**（BalloonPlanner 判定規則 1）— 案: 最初の行を採る（本書の前提）／最後の行を採る／エラーで止める。SSP の挙動は未確認。
-5. **番号なしの指定が無いときの番号付きの探索**（BalloonPlanner 判定規則 2）— 案: 番号なしの有無に関係なく `balloon0` から探す（本書の前提）／番号なしが無ければ探索しない。ukadoc の「番号なし → 0 → 1 …、欠番で打ち切り」の「欠番」に番号なしを含むかの解釈。
-6. **pasta-in-windows の `install.txt` の UTF-8 宣言**（Migration Strategy）— 宣言が無ければ新しい `pasta_check` で release が止まる（Req 8.6 どおり）。リリース告知・README の記載で足りるか、pasta-in-windows 側の対応を本件の完了条件に含めるか。
-7. **`profile`・`var` の配下を指すバルーン指定**（BalloonPlanner 判定規則 3）— `profile/` は nar に入らないため、その配下の同梱バルーンはインストールできない配布物になる。案: 要件どおり受け入れる（本書の前提）／不正な値としてエラーにする。
+3. **`release/hello-pasta` の写しの同期方法** — **決定: `pasta_check release` で再生成。** 手直しは md5・size が食い違う壊れた写しになる（作成ツールは問題があれば止める原則から自明）。
+4. **同じキーが複数あるとき** — **決定: バルーン指定のキーの重複はエラー（Req 2.7）。** SSP の挙動が未確認で、食い違えば判定がずれるため（原則から自明）。その他のキーは最初の行。
+5. **番号なしの指定が無いときの番号付きの探索** — **決定: 番号なしの有無に関係なく `balloon0` から探す（ukadoc の例より自明）。** あわせて、ukadoc「欠番を作ってはいけない」から、欠番の後ろの指定はエラーとする（Req 1.4）。
+6. **pasta-in-windows の `install.txt` の UTF-8 宣言** — **解消: 1 行目が `Charset,UTF-8` であることを ghost_dev で確認。** 下流の追加作業なし。
+7. **`profile`・`var` の配下を指すバルーン指定** — **決定: 不正な値としてエラー（Req 2.8）。** インストールできない配布物のため（原則から自明）。

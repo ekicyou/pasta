@@ -196,7 +196,7 @@ Req 1.11・2.1・2.3 は「ゼロ以外で終了し nar を作らない」。現
 - **Discovery Scope**: Extension（既存 CLI の段 4 の拡張。light discovery。新しい外部依存なし、外部仕様は §2.4・§2.5 で調査済み）
 - **Key Findings**:
   - 既存テストのフィクスチャ（`release.rs` の `test_execute_release_full_pipeline`、`tests/cli_test.rs` の `test_release_end_to_end_via_binary`）は `install.txt` の中身が `"install"` で、Req 8.6（UTF-8 宣言必須）により新しい実装では失敗する。フィクスチャの更新が必要。
-  - リポジトリの `release/hello-pasta/`（`updates.txt`・`ghost/master/updates.txt`・`install.txt`）と `release/hello-pasta.nar` は git 管理下にある。`install.txt` だけを直すと写しの `updates.txt` の `install.txt` 行の md5・size が実ファイルと食い違うため、Req 8.7 の同期は再生成で行うのが一貫する（OPEN QUESTION 3）。hello-pasta の開発フォルダは `pasta.dll` まで git 管理下なので、段 4 だけ（`release.ps1 -SkipSetup` 相当）で再生成できる。
+  - リポジトリの `release/hello-pasta/`（`updates.txt`・`ghost/master/updates.txt`・`install.txt`）と `release/hello-pasta.nar` は git 管理下にある。`install.txt` だけを直すと写しの `updates.txt` の `install.txt` 行の md5・size が実ファイルと食い違うため、Req 8.7 の同期は再生成で行う（設計ディスカッションで確定）。hello-pasta の開発フォルダは `pasta.dll` まで git 管理下なので、段 4 だけ（`release.ps1 -SkipSetup` 相当）で再生成できる。
   - CI（`.github/workflows/build.yml`）のテストは `windows-latest`。大文字小文字を区別しないファイルシステムに依存するテスト（Req 2.6）は `#[cfg(windows)]` で CI 上でも実行される。
   - `nar.rs` は変更不要（段 4 → 段 5 の順序で、配布フォルダ内の `updates.txt` は通常ファイルとして封入される）。
 
@@ -218,7 +218,7 @@ Req 1.11・2.1・2.3 は「ゼロ以外で終了し nar を作らない」。現
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
 | A: `update_files.rs` に集約 | 解析・検証・生成を 1 ファイルに | ファイルが増えない・文書の「ソース構成」更新が不要 | 1 ファイルが 1000 行級になり、「更新ファイル生成」と「install.txt の判定」が混ざる | §5 Option A |
-| B: `balloon.rs` を新設（採用） | 判定（読み取り専用）を新モジュール、生成は既存 | 判定のエラー種別ごとの単体テストを分けて置ける。読み取り専用と書き込みの境界がファイル境界と一致し、「書く前に検証」が構造で保証される | ファイル 1 つと steering・README の 1 行追記 | §5 Option B。OPEN QUESTION 1 |
+| B: `balloon.rs` を新設（採用） | 判定（読み取り専用）を新モジュール、生成は既存 | 判定のエラー種別ごとの単体テストを分けて置ける。読み取り専用と書き込みの境界がファイル境界と一致し、「書く前に検証」が構造で保証される | ファイル 1 つと steering・README の 1 行追記 | §5 Option B。設計ディスカッションで確定 |
 | C: 行解析と検証だけ新設 | 折衷 | 新ファイル最小 | 判定の責務が 2 ファイルに割れる | §5 Option C |
 
 ## Design Decisions
@@ -255,7 +255,8 @@ Req 1.11・2.1・2.3 は「ゼロ以外で終了し nar を作らない」。現
 
 ### Decision: 番号付き指定の探索と同じキーの扱い
 - **Selected Approach**: 番号なしを調べた後、`balloon0` から順に `.source.directory` か `.directory` の行がある番号を拾い、どちらも無い最初の番号で打ち切る。番号なしの有無は番号付きの探索に影響しない。同じキーが複数あるときは最初の行を採る。
-- **Rationale**: ukadoc の探索順に従う（Req 1.4）。§2.5 のとおり areka は欠番で打ち切らないが、要件はベースウェア（ukadoc）に合わせると決めている。同じキーの扱いは SSP の挙動が未確認のため前提とし、OPEN QUESTION 4・5 に回す。
+- **Rationale**: ukadoc の探索順に従う（Req 1.4）。§2.5 のとおり areka は欠番で打ち切らないが、要件はベースウェア（ukadoc）に合わせると決めている。
+- **設計ディスカッションでの更新**: ukadoc「同時インストール」は「無印と0は別もの」「`balloon0` と `balloon2` だけなら `balloon2` は読まれない」「欠番を作ってはいけない」と書く。番号なしの不在は打ち切りにならないことがこの例から確定した。欠番の後ろの指定は読まれないバルーン＝ゴースト用 `updates.txt` に載る元の不具合なので、エラーとする（Req 1.4）。バルーン指定のキーの重複は SSP の挙動が未確認で食い違いうるため、エラーとする（Req 2.7）。いずれも「作成ツールは問題があれば止める」原則から自明として議題にせず確定。
 
 ### Synthesis
 - **Generalization**: ゴースト用とバルーン用の `updates.txt` は「基準フォルダ＋除外する相対フォルダ」の 1 つの操作の 2 つの呼び方として扱う（`collect_files(root, excluded)` → `generate_updates_txt`）。`install.txt` と `descript.txt` の読み取りは同じ `read_utf8_kv` を共有する。
@@ -264,9 +265,9 @@ Req 1.11・2.1・2.3 は「ゼロ以外で終了し nar を作らない」。現
 
 ## Risks & Mitigations
 - 除外の追加でバルーン無しの出力が変わる — 除外の変更より前に、`date=` を伏せた全バイト比較の特性化テストを置く。
-- UTF-8 宣言の必須化で既存の配布フォルダが止まる（pasta-in-windows など） — README・スキルに明記。下流の確認は OPEN QUESTION 6。
+- UTF-8 宣言の必須化で既存の配布フォルダが止まる — README・スキルに明記。下流の emo2・pasta-in-windows は 1 行目が `Charset,UTF-8` であることを ghost_dev で確認済み。
 - 大文字小文字の違いで除外と生成先がずれる — 実在名への解決で一本化し、Windows でテスト。
-- `profile/` 配下を指す同梱バルーンは nar に入らない — 要件の範囲外として受け入れる前提（OPEN QUESTION 7）。
+- `profile/` 配下を指す同梱バルーンは nar に入らない — 値の要素に `profile`・`var` があればエラー（Req 2.8）。
 
 ## §7 の申し送りの解決状況
 1. 戻り値の形と警告の表示 → 上記「戻り値の形と警告の表示」で決定
