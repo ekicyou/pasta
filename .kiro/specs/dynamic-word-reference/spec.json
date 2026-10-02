@@ -1,9 +1,9 @@
 {
   "feature_name": "dynamic-word-reference",
   "created_at": "2026-10-02T11:30:24Z",
-  "updated_at": "2026-10-02T12:16:24Z",
+  "updated_at": "2026-10-02T12:43:05Z",
   "language": "ja",
-  "phase": "design-generated",
+  "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -11,11 +11,11 @@
     },
     "design": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "tasks": {
-      "generated": false,
-      "approved": false
+      "generated": true,
+      "approved": true
     }
   },
   "ready_for_implementation": false
