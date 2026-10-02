@@ -30,7 +30,9 @@ fn action_span(action: &Action) -> Span {
         | Action::VarRef { span, .. }
         | Action::FnCall { span, .. }
         | Action::SakuraScript { span, .. }
-        | Action::Escape { span, .. } => *span,
+        | Action::Escape { span, .. }
+        | Action::DynamicWordRef { span, .. }
+        | Action::DynamicFnCall { span, .. } => *span,
     }
 }
 
@@ -111,6 +113,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         let word_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!("{} = act:word({})", var_path, word_literal))?;
                     }
+                    // 暫定: 3.1 で生成コードに置換
+                    SetValue::DynamicWordRef { .. } => {
+                        return Err(TranspileError::unsupported(
+                            &var_set.span,
+                            "dynamic word reference",
+                        ));
+                    }
                 }
             }
             None => {
@@ -124,6 +133,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     SetValue::WordRef { name } => {
                         let word_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!("act:word({})", word_literal))?;
+                    }
+                    // 暫定: 3.1 で生成コードに置換
+                    SetValue::DynamicWordRef { .. } => {
+                        return Err(TranspileError::unsupported(
+                            &var_set.span,
+                            "dynamic word reference",
+                        ));
                     }
                 }
             }
@@ -159,6 +175,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     "act:set_property({}, act:word({}))",
                     name_literal, word_literal
                 ))?;
+            }
+            // 暫定: 3.1 で生成コードに置換
+            SetValue::DynamicWordRef { .. } => {
+                return Err(TranspileError::unsupported(
+                    &Span::default(),
+                    "dynamic word reference",
+                ));
             }
         }
         Ok(())
@@ -356,6 +379,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     self.writeln(&format!("act.{}:talk({})", actor, literal))?;
                 }
             }
+            // 暫定: 3.1 で生成コードに置換
+            Action::DynamicWordRef { .. } => {
+                return Err(TranspileError::unsupported(&span, "dynamic word reference"));
+            }
+            Action::DynamicFnCall { .. } => {
+                return Err(TranspileError::unsupported(&span, "dynamic function call"));
+            }
         }
 
         // Record the (out_line -> span) correspondence for the line(s) just emitted.
@@ -430,6 +460,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 write!(buf, "(")?;
                 self.generate_expr_to_buffer(inner, buf)?;
                 write!(buf, ")")?;
+            }
+            // 暫定: 3.1 で生成コードに置換
+            Expr::DynamicFnCall { .. } => {
+                return Err(TranspileError::unsupported(
+                    &Span::default(),
+                    "dynamic function call",
+                ));
             }
             Expr::Binary { op, lhs, rhs } => {
                 self.generate_expr_to_buffer(lhs, buf)?;

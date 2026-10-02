@@ -163,6 +163,8 @@ impl super::AnalysisEngine {
             SetValue::Expr(expr) => {
                 Self::tokenize_expr_recursive(text, base_offset, line, expr, tokens, line_text);
             }
+            // 暫定: 4.1 で WORD トークン化に置換（現状はトークンを出さない）
+            SetValue::DynamicWordRef { .. } => {}
         }
     }
 
@@ -347,6 +349,8 @@ impl super::AnalysisEngine {
                     }
                 }
             }
+            // 暫定: 4.1 で WORD トークン化に置換（現状はトークンを出さない）
+            Expr::DynamicFnCall { .. } => {}
         }
     }
 

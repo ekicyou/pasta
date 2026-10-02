@@ -297,6 +297,8 @@ impl super::AnalysisEngine {
                     Self::add_token_from_span(span, source, token_type::ESCAPE, 0, tokens);
                 }
             }
+            // 暫定: 4.1 で WORD トークン化に置換（現状はトークンを出さない）
+            Action::DynamicWordRef { .. } | Action::DynamicFnCall { .. } => {}
         }
     }
 

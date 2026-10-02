@@ -332,8 +332,9 @@ fn shift_action(action: &mut Action, b: usize, l: usize) {
         | Action::WordRef { span, .. }
         | Action::VarRef { span, .. }
         | Action::SakuraScript { span, .. }
-        | Action::Escape { span, .. } => shift_span(span, b, l),
-        Action::FnCall { span, args, .. } => {
+        | Action::Escape { span, .. }
+        | Action::DynamicWordRef { span, .. } => shift_span(span, b, l),
+        Action::FnCall { span, args, .. } | Action::DynamicFnCall { span, args, .. } => {
             shift_span(span, b, l);
             shift_args(args, b, l);
         }
@@ -434,5 +435,43 @@ fn shift_actor_scope(actor: &mut ActorScope, b: usize, l: usize) {
     }
     for cb in &mut actor.code_blocks {
         shift_code_block(cb, b, l);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::ast::VarScope;
+
+    #[test]
+    fn shift_action_shifts_dynamic_variants() {
+        let span = Span::new(1, 1, 1, 5, 0, 10);
+        let mut word = Action::DynamicWordRef {
+            var_name: "x".into(),
+            var_scope: VarScope::Local,
+            span,
+        };
+        shift_action(&mut word, 100, 3);
+        let Action::DynamicWordRef { span: s, .. } = word else {
+            unreachable!()
+        };
+        assert_eq!((s.start_byte, s.end_byte, s.start_line), (100, 110, 4));
+
+        let mut call = Action::DynamicFnCall {
+            var_name: "f".into(),
+            var_scope: VarScope::Global,
+            args: Args {
+                items: vec![],
+                span: Span::new(1, 3, 1, 5, 4, 8),
+            },
+            span,
+        };
+        shift_action(&mut call, 100, 3);
+        let Action::DynamicFnCall { span: s, args, .. } = call else {
+            unreachable!()
+        };
+        assert_eq!((s.start_byte, s.end_byte, s.start_line), (100, 110, 4));
+        assert_eq!((args.span.start_byte, args.span.end_byte), (104, 108));
+        assert_eq!(args.span.end_line, 4);
     }
 }
