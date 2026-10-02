@@ -47,12 +47,17 @@ pasta_check release --target <path> --release <path> --nar <path> [--copy <path>
 #### release の実行フロー（5ステップ）
 
 ```
-[1/5] Preparing release folder   ← --release を削除して新規作成
+[1/5] Preparing release folder   ← --release を削除して新規作成、--nar の位置の前回の nar を削除
 [2/5] Copying target files       ← --target → --release に再帰コピー
 [3/5] Applying overlay copies    ← --copy（指定があれば）上書きコピー
-[4/5] Generating update files    ← updates.txt を自動生成
+[4/5] Generating update files    ← 同梱バルーンを判定し、ゴースト用・バルーン用の updates.txt を自動生成
 [5/5] Creating NAR archive       ← --release を ZIP 圧縮して --nar に出力
 ```
+
+- 段 1 で配布フォルダを準備した後に前回の nar を消し、段 5 で失敗したときは作りかけの nar も消すため、削除した後の段でエラーになったときは nar が残らない（古い nar を最新と誤って配らない）。
+- 段 4 は `--copy` 上書き後の配布フォルダ直下の `install.txt` を読む。`install.txt` があるときは、UTF-8 で 1 行目が `charset,UTF-8` でなければならない（同梱バルーンの有無にかかわらず必須）。`install.txt` が無ければ同梱バルーンは無いものとする。
+- `install.txt` のバルーン指定（`balloon[N].source.directory`・`balloon[N].directory`）が指すフォルダを同梱バルーンとし、そのフォルダ配下はゴースト用 `updates.txt` から除き、フォルダ直下にバルーン用 `updates.txt`（パスはバルーンのフォルダが基準）を生成する。
+- 判定方法・エラー・警告の詳細は [updates.txt の仕様](./references/updates-txt-spec.md#同梱バルーン) を参照。
 
 #### 使用例
 
@@ -97,8 +102,11 @@ workspace/
 │   ├── {ghost-name}/                    # --release 出力先
 │   │   ├── ghost/master/                # ゴースト本体
 │   │   ├── shell/master/                # シェル（画像等）
-│   │   ├── install.txt
-│   │   └── updates.txt                  # 自動生成
+│   │   ├── balloon/{balloon-name}/      # 同梱バルーンの置き場所の例（install.txt のバルーン指定が指す任意のフォルダ。hello-pasta には無い）
+│   │   │   ├── descript.txt
+│   │   │   └── updates.txt              # 自動生成（バルーン用）
+│   │   ├── install.txt                  # UTF-8・1 行目は charset,UTF-8
+│   │   └── updates.txt                  # 自動生成（ゴースト用）
 │   └── {ghost-name}.nar                 # --nar 出力
 └── crates/pasta_sample_ghost/
     ├── release.ps1                      # Setup + Release を統合したスクリプト
@@ -131,4 +139,14 @@ gh release create v{VERSION} "release/{ghost-name}.nar" `
 | `pasta_shiori build failed` | 32bit ターゲット未インストール | `rustup target add i686-pc-windows-msvc` |
 | `pasta.dll not found` | DLL ビルドをスキップしたが未ビルド | DLL ビルドを先に実行 |
 | `pasta_check release failed` | パス不正 or ディスク容量 | エラーメッセージの詳細を確認 |
-| updates.txt が Shift_JIS でない | pasta_check のバグ | [updates.txt 仕様](./references/updates-txt-spec.md)と照合 |
+| `Warning: bundled balloon "<フォルダ>": descript.txt has no homeurl` | 同梱バルーンの `descript.txt` に `homeurl` が無いか値が空（nar は作成される） | バルーンをネットワーク更新させるなら `descript.txt` に `homeurl` を書く |
+| `Error: install.txt is not UTF-8: ...` | `install.txt` が UTF-8 でない、または 1 行目が `charset,UTF-8` でない | `install.txt` を UTF-8 で保存し、1 行目を `charset,UTF-8` にする |
+| `Error: <フォルダ>/descript.txt is not UTF-8: ...` | 同梱バルーンの `descript.txt` が同上 | `descript.txt` を UTF-8 で保存し、1 行目を `charset,UTF-8` にする |
+| `Error: install.txt: invalid value for <キー>: ...` | バルーン指定の値が不正（括弧内が理由: 空・`directory` に区切り・絶対パス・`..`・`profile`/`var`） | 配布フォルダからの相対パスで指定する（階層付きの値は `source.directory` だけに書ける） |
+| `Error: install.txt: duplicate key ...`／`... is never read by the baseware ...` | バルーン指定のキーの重複・番号の先頭の 0・欠番の後ろの番号 | キーを 1 行ずつ、番号は `balloon0` から欠番なく書く |
+| `Error: install.txt: bundled balloon folder "<フォルダ>" (<キー>) does not exist in the release folder` | 指定したフォルダが `--copy` 上書き後の配布フォルダに無い（同名のファイル・シンボリックリンクも不可） | フォルダを配布物に含めるか、指定を実在のフォルダに合わせる |
+| `Error: bundled balloon "<フォルダ>": descript.txt not found` | 同梱バルーンのフォルダ直下に `descript.txt` が無い | バルーンのフォルダ直下に `descript.txt` を置く |
+| `Error: install.txt: bundled balloon folder "<フォルダ>" (<キー>) overlaps with ...` | 指定したフォルダが `ghost/master` や別の同梱バルーンと同じ・上位・配下 | 互いに入れ子にならないフォルダを指定する |
+| updates.txt が仕様（UTF-8・1 行目 `charset,UTF-8`）と違う | pasta_check のバグ | [updates.txt 仕様](./references/updates-txt-spec.md)と照合 |
+
+`Error:` で始まるものは終了コード 1 で終了し、nar を作成しない。メッセージと不正な値の理由の一覧は [updates.txt 仕様のエラー](./references/updates-txt-spec.md#エラー) を参照。

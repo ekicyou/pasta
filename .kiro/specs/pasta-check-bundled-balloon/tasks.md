@@ -133,7 +133,7 @@
   - _Boundary: skill docs (references)_
   - _Depends: 4.3_
 
-- [ ] 6.2 (P) スキルの SKILL.md に同梱バルーンの扱いを反映する
+- [x] 6.2 (P) スキルの SKILL.md に同梱バルーンの扱いを反映する
   - 実行フローの更新ファイル生成の段の説明とディレクトリ構成例に同梱バルーンを加える
   - トラブルシューティングに `homeurl` 警告、install.txt・descript.txt が UTF-8 でないエラー、不正な値・指定フォルダ不在・descript.txt 不在・重なりのエラーを加え、「updates.txt が Shift_JIS でない」の記述を UTF-8 限定の方針に合わせて正す
   - 記載内容が実装のエラー文言・挙動と一致している
