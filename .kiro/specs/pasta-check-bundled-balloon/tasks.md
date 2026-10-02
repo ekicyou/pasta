@@ -3,7 +3,7 @@
 > 各タスクの完了時に `cargo clippy --all-targets --workspace -- -D warnings` と `cargo test -p pasta_check` が通る状態を保つ（CI と同じ基準）。
 
 - [ ] 1. 基盤: 後方互換の固定と UTF-8 宣言付きフィクスチャ
-- [ ] 1.1 同梱バルーンが無い配布フォルダのゴースト用 updates.txt を特性化テストで固定する
+- [x] 1.1 同梱バルーンが無い配布フォルダのゴースト用 updates.txt を特性化テストで固定する
   - 固定フィクスチャには `ghost/master`・入れ子のフォルダと、既存の除外対象（`profile/`・`var/`・`updates2.dau`・`developer_options.txt`・既存の `updates.txt`）を含める
   - 同梱バルーンの無いそのフィクスチャから生成したルートと `ghost/master` の updates.txt の全バイトを、`date=` の値だけ伏せて期待値と比べる
   - 除外の仕組みを変える前に置き、以降の変更で後方互換が崩れたら落ちるようにする

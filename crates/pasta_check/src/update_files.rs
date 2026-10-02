@@ -504,6 +504,65 @@ mod tests {
         assert_eq!(count, 2, "only the 2 normal files should be counted");
     }
 
+    /// `date=` の値（次の SOH まで）を `<DATE>` に伏せる
+    fn mask_dates(s: &str) -> String {
+        let mut out = String::new();
+        let mut rest = s;
+        while let Some(i) = rest.find("date=") {
+            out.push_str(&rest[..i + "date=".len()]);
+            out.push_str("<DATE>");
+            let after = &rest[i + "date=".len()..];
+            rest = &after[after.find('\x01').expect("date= の後に SOH が必要")..];
+        }
+        out.push_str(rest);
+        out
+    }
+
+    /// 特性化テスト（Req 8.1・8.4）: 同梱バルーンの無い固定フィクスチャについて、
+    /// ルートと `ghost/master` の updates.txt の全バイトが `date=` の値を除き期待値と一致する。
+    ///
+    /// 除外の仕組みを変える前に置き、後方互換が崩れたら落ちるようにする。
+    #[test]
+    fn test_updates_txt_characterization_without_balloon() {
+        let temp = TempDir::new().unwrap();
+        let root = temp.path();
+
+        // 対象ファイル（入れ子のフォルダを含む）
+        fs::write(root.join("readme.txt"), "readme").unwrap();
+        let ghost_master = root.join("ghost/master");
+        fs::create_dir_all(ghost_master.join("dic/sub")).unwrap();
+        fs::write(ghost_master.join("descript.txt"), "desc").unwrap();
+        fs::write(ghost_master.join("dic/sub/foo.pasta"), "foo").unwrap();
+        fs::create_dir_all(root.join("shell/master")).unwrap();
+        fs::write(root.join("shell/master/surface0.png"), "png").unwrap();
+
+        // 既存の除外対象（ルートと ghost/master の双方）
+        for dir in [root, ghost_master.as_path()] {
+            fs::create_dir_all(dir.join("profile/pasta")).unwrap();
+            fs::write(dir.join("profile/pasta/save.lua"), "save").unwrap();
+            fs::create_dir_all(dir.join("var")).unwrap();
+            fs::write(dir.join("var/state.txt"), "state").unwrap();
+            fs::write(dir.join("updates2.dau"), "stale dau").unwrap();
+            fs::write(dir.join("developer_options.txt"), "dev only").unwrap();
+            fs::write(dir.join("updates.txt"), "stale updates").unwrap();
+        }
+
+        let count = generate_update_files(root).unwrap();
+        assert_eq!(count, 4);
+
+        let expected = concat!(
+            "charset,UTF-8\r\n",
+            "file,ghost/master/descript.txt\x011dee80c7d5ab2c1c90aa8d2f7dd47256\x01size=4\x01date=<DATE>\x01\r\n",
+            "file,ghost/master/dic/sub/foo.pasta\x01acbd18db4cc2f85cedef654fccc4a4d8\x01size=3\x01date=<DATE>\x01\r\n",
+            "file,readme.txt\x013905d7917f2b3429490b01cfb60d8f5b\x01size=6\x01date=<DATE>\x01\r\n",
+            "file,shell/master/surface0.png\x01bff139fa05ac583f685a523ab3d110a0\x01size=3\x01date=<DATE>\x01\r\n",
+        );
+        for path in [root.join("updates.txt"), ghost_master.join("updates.txt")] {
+            let content = String::from_utf8(fs::read(&path).unwrap()).unwrap();
+            assert_eq!(mask_dates(&content), expected, "{}", path.display());
+        }
+    }
+
     /// サブディレクトリの updates.txt / updates2.dau もファイル一覧から除外されること
     #[test]
     fn test_collect_files_excludes_updates_in_subdirs() {
