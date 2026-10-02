@@ -241,4 +241,4 @@ areka 実機検証（2026-09-18）で発覚した、深いフォルダへ設置�
 areka alpha の実機ラップ（2026-10-02・A3r 項目 8）で発覚した、同梱バルーンのファイルがゴーストの `updates.txt` に載り、ネットワーク更新でゴースト配下へ誤配置される不具合への対処。emo2 開発セッション（ghost_dev）からのブリーフィングで discovery（2026-10-02）。方針は「pasta_check 側で汎用に直す（案 A）」でユーザー決定済み。
 
 ### Specs (dependency order)
-- [ ] pasta-check-bundled-balloon -- `install.txt` の `balloon.source.directory`／`balloon.directory` で同梱バルーンを判定し、その配下をゴーストの `updates.txt`（ルート・`ghost/master`）から除外、同梱バルーン直下へバルーン用 `updates.txt` を生成して nar に封入。`homeurl` 欠落は警告。同梱バルーンの無いゴーストは date 以外バイト不変・改行変換なし。Dependencies: none。完了後に `release-workflow` で crates.io へ出し、emo2 開発セッションへバージョンを連絡する。brief.md 作成済み（`.kiro/specs/pasta-check-bundled-balloon/brief.md`）
+- [x] pasta-check-bundled-balloon -- `install.txt` の `balloon.source.directory`／`balloon.directory` で同梱バルーンを判定し、その配下をゴーストの `updates.txt`（ルート・`ghost/master`）から除外、同梱バルーン直下へバルーン用 `updates.txt` を生成して nar に封入。`homeurl` 欠落は警告。同梱バルーンの無いゴーストは date 以外バイト不変・改行変換なし。Dependencies: none。完了後に `release-workflow` で crates.io へ出し、emo2 開発セッションへバージョンを連絡する。実装済み（`.kiro/specs/completed/pasta-check-bundled-balloon/`）
