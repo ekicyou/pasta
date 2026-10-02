@@ -273,14 +273,7 @@ AST の文字列（発言・単語の値・名前など）は `StringLiteralizer
 6. **失敗の集約**: 読み込み・パース・トランスパイル・`.lua` のコピーの失敗は全ファイルを処理し終えてからまとめ、1 件でもあればロードを失敗させる。
 7. **`scene_dic.lua` の生成**（`generate_scene_dic`）: 省いたファイルも含めた全モジュールの名前を並べ替えて `require` し、最後に `require("pasta").finalize_scene()` を呼ぶ `scene_dic.lua` を毎回生成する。これが第 2 段の入口になる。
 
-キャッシュ先とモジュール名は、ゴーストのディレクトリからの相対パスから先頭の `dic` を除き、`-` を `_` に置き換えて導出する。
-
-```text
-dic/baseware/system.pasta
-  キャッシュ先:  <キャッシュ>/pasta/scene/baseware/system.lua
-  モジュール名:  pasta.scene.baseware.system
-scene_dic.lua:   <キャッシュ>/pasta/scene_dic.lua（require("pasta.scene_dic") で読み込む）
-```
+キャッシュ先と `pasta.scene.*` のモジュール名の導出は [モジュール名の生成](loader.md#モジュール名の生成) で扱う。`scene_dic.lua` はキャッシュ直下の `pasta/scene_dic.lua` に置かれ、`require("pasta.scene_dic")` で読み込まれる。
 
 ソースが削除されて対応を失ったキャッシュファイルは `find_orphaned_caches` で検出してログに出すが、削除はしない。ローダの各段階の順序とモジュールの検索パスは [ローダ自己展開とモジュール解決](loader.md) で扱う。
 

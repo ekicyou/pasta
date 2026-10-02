@@ -440,7 +440,8 @@ KICK.try_dispatch(act)
 - `crates/pasta_lua/src/loader/source_map_build.rs`
 - `crates/pasta_lua/src/code_gen/source_map.rs`
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`
-- テスト: `crates/pasta_lua/src/debug/` の `*_tests.rs`・`*_e2e.rs`・`crates/pasta_lua/tests/loader_source_map_build_test.rs`・`crates/pasta_lua/tests/scene_identity_index_test.rs`・`crates/pasta_lua/tests/chunk_name_validation_test.rs`・`crates/pasta_lua/tests/lua_specs/kick_try_dispatch_test.lua`・`crates/pasta_shiori/tests/scene_kick_e2e_test.rs`・`crates/pasta_shiori/tests/actor_kick_test.rs`
+
+テストは `crates/pasta_lua/src/debug/` の `*_tests.rs`・`*_e2e.rs`・`crates/pasta_lua/tests/loader_source_map_build_test.rs`・`crates/pasta_lua/tests/scene_identity_index_test.rs`・`crates/pasta_lua/tests/chunk_name_validation_test.rs`・`crates/pasta_lua/tests/lua_specs/kick_try_dispatch_test.lua`・`crates/pasta_shiori/tests/scene_kick_e2e_test.rs`・`crates/pasta_shiori/tests/actor_kick_test.rs` にある。
 
 ## 経緯
 

@@ -249,16 +249,15 @@ Rust 側で登録するモジュール（`@pasta_config`・`@pasta_search` な�
 ## ソースの所在
 
 - `crates/pasta_lua/src/loader/`
-- `crates/pasta_lua/src/loader/config/`
 - `crates/pasta_lua/build.rs`
 - `crates/pasta_lua/build_zip.rs`
 - `crates/pasta_lua/src/runtime/searcher.rs`
 - `crates/pasta_lua/src/runtime/module_registry.rs`
 - `crates/pasta_lua/src/runtime/runtime_config.rs`
-- `crates/pasta_lua/pasta_scripts/`
 - `crates/pasta_lua/pasta_scripts/main.lua`
 - `crates/pasta_lua/pasta_scripts/pasta/config.lua`
-- テスト: `crates/pasta_lua/src/loader/extract_tests.rs`・`crates/pasta_lua/src/loader/discovery_tests.rs`・`crates/pasta_lua/src/loader/config_tests.rs`・`crates/pasta_lua/tests/build_determinism_test.rs`・`crates/pasta_lua/tests/loader/`
+
+埋め込みの zip に固める対象は `crates/pasta_lua/pasta_scripts/` のツリー全体である。テストは `crates/pasta_lua/src/loader/extract_tests.rs`・`crates/pasta_lua/src/loader/discovery_tests.rs`・`crates/pasta_lua/src/loader/config_tests.rs`・`crates/pasta_lua/tests/build_determinism_test.rs`・`crates/pasta_lua/tests/loader/` にある。
 
 ## 経緯
 

@@ -101,6 +101,8 @@
 | `.claude/skills/pasta-lua-coding/references/internal-modules.md` ### pasta.lua_version | 4.9 | 収録先 `internals/internal-modules.md#pastalua_version` |  | `crates/pasta_lua/pasta_scripts/pasta/lua_version.lua` | なし。判定の順（`jit.version_num` → `jit.version`）と判定不能時の既定値（221・151）を補記 |
 | `.claude/skills/pasta-lua-coding/references/internal-modules.md` ## 関連リファレンス | 4.9／4.10 | 4.9: 本文中のリンクで代替（`lua/modules/pasta-persistence.md`・`lua/shiori-events.md#actreq`・`internals/registry-search.md`）／4.10: 本文中のリンクで代替（`lua/shiori-events.md#actreq`・`lua/modules/pasta-persistence.md`・`lua/modules/pasta-search.md`・`lua/modules/pasta-sakura-script.md`） |  | 4.9: 照合不要（リンク集）／4.10: 照合不要（リンク集） | 4.9: なし／4.10: なし |
 
+4.11 による 4.9／4.10 の線引きの見直し（2026-10-03）: 共有行の分担（`internals/internal-modules.md` は内部の構造、`lua/script-api.md` は作者から見た API）は妥当と確認した。両章に同じ事実が書かれていた箇所は、内部設計章の側を利用者向け章へのリンクに寄せた（ACT のフィールドの使い方 → `lua/script-api.md#act-のフィールド`、メソッド名と同名のアクターがプロキシにならないこと → `lua/script-api.md#アクタープロキシ`、`init_scene` の戻り値の `save`・`var` の寿命 → 削除（`init_scene` の処理の手順 3 と `lua/script-api.md#init_scene` が扱う））。`lua/script-api.md` は内部設計章へリンクしない規則のため変更していない。WORD のスコープ（ファクトリ関数の登録先）は、内部設計章が STORE の表、利用者向け章が検索される段を書いており、同じ事実の重複ではない。
+
 ### `crates/pasta_dsl/README.md`
 
 | 吸収元（ファイル#節） | 担当 | 処置 | 理由 | 実装照合 | 訂正 |
@@ -171,8 +173,8 @@
 |---|---|---|---|---|---|
 | `crates/pasta_lua/README.md` # pasta_lua | 5.2 |  |  |  |  |
 | `crates/pasta_lua/README.md` ## 概要 | 5.2 |  |  |  |  |
-| `crates/pasta_lua/README.md` ## アーキテクチャ | 4.11（→5.2） |  |  |  |  |
-| `crates/pasta_lua/README.md` ## ソースモジュール構成 | 4.11（→5.2） |  |  |  |  |
+| `crates/pasta_lua/README.md` ## アーキテクチャ | 4.11（→5.2） | 収録先 `internals/index.md#全体像`（クレート構成とデータの流れ）。各段の詳細は `internals/loader.md#起動の段階構成`・`internals/execution-model.md#vm-の構築とモジュール登録` |  | `crates/pasta_lua/Cargo.toml`（`pasta_core`・`pasta_dsl` への依存）、`crates/pasta_lua/src/loader/mod.rs` `PastaLoader::load_with_config`、`crates/pasta_lua/src/context.rs` `TranspileContext`、`crates/pasta_lua/src/runtime/finalize.rs` | 図の矢印は呼び出しの主従（ローダがトランスパイラを呼び、VM を構築する）であり、データの変換順（パース → トランスパイル → ローダ → VM → SHIORI 応答）とは別である。概要章は両者を分けて書いた。`pasta_core` のレジストリは VM の段だけでなく、トランスパイル時の `TranspileContext` と実行時の辞書確定の両方で使う。「SHIORI Integration」は `pasta_lua` の `pasta.shiori.*`（Lua 側のエントリとイベント配送）と `pasta_shiori`（FFI 境界・アクターランタイム）にまたがり、図にはトーク出力（`sakura_script`）と `presentation` が無い |
+| `crates/pasta_lua/README.md` ## ソースモジュール構成 | 4.11（→5.2） | 収録先 `internals/index.md#章と対象ソース範囲`（ファイル・ディレクトリと担当章の対応）。各モジュールの役割は各題材章の「構成要素」（`internals/transpiler.md#構成要素`・`internals/loader.md#構成要素`・`internals/execution-model.md#構成要素`・`internals/debug.md#構成要素`・`internals/logging-encoding.md#構成要素`・`internals/registry-search.md#構成要素`・`internals/talk-output.md#構成要素`・`internals/shiori.md#構成要素`） |  | `crates/pasta_lua/src/lib.rs`（`pub mod` の一覧）、`crates/pasta_lua/src/`・`crates/pasta_lua/pasta_scripts/` のファイル一覧（`git ls-files`）、`crates/pasta_lua/tests/common/` | README のツリーには `crates/pasta_lua/src/presentation/`（presentation マーカー。`internals/shiori.md#presentation-マーカーとレンダラ注入`）とフレームワークスクリプトの `crates/pasta_lua/pasta_scripts/` が無い。`lib.rs` は「エントリーポイント」ではなく、モジュールの宣言と再エクスポートだけを持つ。テストの共有ヘルパーは `tests/common/mod.rs` のほか `tests/common/e2e_helpers.rs` にもある。その他のファイルの役割は一致 |
 | `crates/pasta_lua/README.md` ## ディレクトリ構成 | 5.2 |  |  |  |  |
 | `crates/pasta_lua/README.md` ### Lua パススルー機能 | 5.2 |  |  |  |  |
 | `crates/pasta_lua/README.md` ## 設定ファイル（pasta.toml） | 5.2 |  |  |  |  |

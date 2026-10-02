@@ -409,8 +409,8 @@ dispatch(act)
 - `crates/pasta_lua/src/runtime/renderer_injection.rs`
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/`
 - `.cargo/config.toml`
-- ルートの [Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml)（リリースプロファイル）
-- テスト: `crates/pasta_shiori/tests/`・`crates/pasta_shiori/src/windows_tests.rs`・`crates/pasta_shiori/src/shiori_lifecycle_tests.rs`・`crates/pasta_shiori/src/shiori_request_tests.rs`
+
+リリースプロファイルはルートの [Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml) にある。テストは `crates/pasta_shiori/tests/`・`crates/pasta_shiori/src/windows_tests.rs`・`crates/pasta_shiori/src/shiori_lifecycle_tests.rs`・`crates/pasta_shiori/src/shiori_request_tests.rs` にある。
 
 本文で参照した主なファイルは次のとおりである。FFI 入口は `crates/pasta_shiori/src/windows.rs`、アクターランタイムは `crates/pasta_shiori/src/actor/`、リクエストの解析は `crates/pasta_shiori/src/lua_request.rs` と `crates/pasta_shiori/src/util/parsers/req_parser.pest`、Lua 側の振り分けは `crates/pasta_lua/pasta_scripts/pasta/shiori/entry.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`、仮想イベントは `crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua` にある。`@pasta_sakura_script` の登録を呼ぶ側は `crates/pasta_lua/src/runtime/module_registry.rs`・`crates/pasta_lua/src/runtime/factory.rs` である。
 

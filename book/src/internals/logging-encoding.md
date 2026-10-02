@@ -217,7 +217,8 @@ VM の中の文字列（DSL から生成したコード、`scripts/` の Lua ソ
 - `crates/pasta_lua/src/encoding/`
 - `crates/pasta_lua/src/runtime/log.rs`
 - `crates/pasta_lua/src/runtime/enc.rs`
-- テスト: `crates/pasta_lua/tests/log/`・`crates/pasta_lua/tests/runtime/encoding_test.rs`
+
+テストは `crates/pasta_lua/tests/log/`・`crates/pasta_lua/tests/runtime/encoding_test.rs` にある。
 
 本文で参照した、他の章の範囲にあるファイルは次のとおりである。`[logging]` の型は `crates/pasta_lua/src/loader/config/sections.rs`、段階 1.5 は `crates/pasta_lua/src/loader/mod.rs`、段階 1 とガードは `crates/pasta_shiori/src/shiori.rs`、`load_impl` のガードは `crates/pasta_shiori/src/windows.rs`、SHIORI 境界の変換は `crates/pasta_shiori/src/util/hglobal/` にある。
 

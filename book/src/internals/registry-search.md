@@ -185,7 +185,7 @@ PROXY_IMPL.find_handler(mode, key, skip_methods)     act.アクター:word(…) 
 
 ### 動的参照の検索
 
-動的参照（`＠＄変数名`・`＠＄変数名（…）`）では、変数の値が検索キーになる。生成コードは `word(値, "変数の経路")`・`expr_fn_var(値, "変数の経路", 引数…)` を呼び、値は `WORD.dynamic_key` が検索キーに変換する（数値は `tostring`、空でない文字列はそのまま。それ以外は警告して検索しない。[動的参照のキー](internal-modules.md#動的参照のキーworddynamic_key)）。キーに変換した後は、`skip_methods` を真にして同じ検索手順を通る。
+動的参照（`＠＄変数名`・`＠＄変数名（…）`）では、変数の値が検索キーになる。生成コードは `word(値, "変数の経路")`・`expr_fn_var(値, "変数の経路", 引数…)` を呼び、値は `WORD.dynamic_key` が検索キーに変換する（変換規則は [WORD.dynamic_key(value, var_path, via)](../lua/script-api.md#worddynamic_keyvalue-var_path-via)、置き場所は [動的参照のキー](internal-modules.md#動的参照のキーworddynamic_key)）。キーに変換した後は、`skip_methods` を真にして同じ検索手順を通る。
 
 ```text
 skip_methods が真のとき（動的参照）
@@ -204,7 +204,7 @@ skip_methods が真のとき（動的参照）
 
 ### 検索結果からシーン関数へ
 
-`SCENE.search(name, global_scene_name)` は、`name` が文字列でなければ `nil` を返す。文字列なら `@pasta_search` をその場で `require` して `search_scene` を呼び、返った `(グローバル名, ローカル名)` で Lua 側のシーンテーブルから関数を引く。関数が無ければ `nil`、あれば `global_name`・`local_name`・`func` を持ち `__call` で呼べる結果オブジェクトを返す。Rust 側が返すのは名前だけであり、シーン関数そのものは Rust を通らない。`SCENE.co_exec` は `act:find_scene` で得た関数をコルーチンで包む。コルーチンの実行は [ランタイム実行モデル](execution-model.md) で扱う。
+`SCENE.search(name, global_scene_name)` は `@pasta_search` の `search_scene` が返した `(グローバル名, ローカル名)` で Lua 側のシーンテーブルから関数を引き、結果オブジェクトにして返す（手順と結果オブジェクトの形は [search と結果オブジェクト](internal-modules.md#search-と結果オブジェクト)）。Rust 側が返すのは名前だけであり、シーン関数そのものは Rust を通らない。`SCENE.co_exec` は `act:find_scene` で得た関数をコルーチンで包む。コルーチンの実行は [ランタイム実行モデル](execution-model.md) で扱う。
 
 ## 境界の受け渡し
 
