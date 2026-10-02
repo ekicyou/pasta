@@ -1,6 +1,8 @@
 # Implementation Plan
 
 > 実装はすべて 1 ブランチ上で行い、全タスク完了後に 1 PR の squash マージで一括統合する（途中を先行出荷しない）。並行タスク（`(P)`）は吸収台帳の自分の担当行だけを編集し、概要章の対応表は編集しない（4.11 が確定する）。
+>
+> **並走 spec との合意（dynamic-word-reference, 2026-10-02）**: 先方が先にマージする。先方マージまで `word.lua`・`act.lua`・`proxy.lua`・`element_gen.rs` と `pasta_dsl` の grammar/AST/parser のコメントには触れない（食い違いは取り込み後にまとめて修正）。4.11 着手前に main を取り込み、先方の新機構（DynamicWordRef/DynamicFnCall の生成・`WORD.dynamic_key`・`ACT_IMPL.word(self, name, var_path)`・動的参照（＠＄変数名 / ＠＄変数名（…））時に L3 を飛ばし L1/A1 を `rawget` で引く検索）を 4.1・4.2・4.3・4.9・4.10 に吸収する。
 
 - [ ] 1. 基盤: 検査ツールの拡張と生成ヘッダの書名変更
 - [ ] 1.1 内部設計章に書いたリポジトリ内パスの実在検査を追加する
