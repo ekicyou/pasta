@@ -13,7 +13,7 @@
 - `＠＄名前`・`＠＄＊名前`・`＠＄０` をアクション行・アクター付きの行・代入の右辺で受理し、参照変数の値を単語キーとした単語検索を行う（1.x, 3.x）。
 - `＠＄名前（…）` を静的関数呼び出しを書けるすべての位置で受理し、参照変数の値を関数名とした関数検索・呼び出しを行う（7.x）。
 - 未代入・空・型不正・該当なしを、行と後続の実行を止めずに空（値の無い呼び出し）として扱い、区別できる警告を出す（4.x, 3.6, 7.6–7.8）。
-- 変数の値で act のメソッド（`talk`・`yield` など）が意図せず呼ばれないよう、動的参照の検索から act のメソッドの段（L3）だけを外す（3.10, 7.4）。
+- 変数の値で act のメソッド（`talk`・`yield` など）や表の組み込みメソッド（`create_word` など）が意図せず呼ばれないよう、動的参照の検索から act のメソッドの段（L3）を外し、L1・A1 は表自身のフィールドだけを探す（3.10, 3.11, 7.4）。
 - マニュアル 5 章・生成スキル・手書きスキル資料・TextMate 文法・LSP を追従させる（5.x, 6.x, 7.9, 7.10）。
 
 ### Non-Goals
@@ -31,7 +31,7 @@
 - 文法規則 `dyn_name_local`・`dyn_name_global`・`word_ref_dynamic`・`fn_call_dynamic` と、それを `action`・`fn_call`・`set` に組み込む順序。
 - `pasta_dsl` の AST 変種 `Action::DynamicWordRef`・`Action::DynamicFnCall`・`Expr::DynamicFnCall`・`SetValue::DynamicWordRef` と、そのパース・span 補正。
 - 動的参照の生成コード規約（`word(値, "変数パス")`・`expr_fn_var(値, "変数パス", 引数…)`）。
-- ランタイムの動的キー解決規約（`WORD.dynamic_key`）、警告文言 3 種（未代入・空・型不正）、L3 を飛ばす検索フラグ（`find_act_handler` の第 4 引数）。
+- ランタイムの動的キー解決規約（`WORD.dynamic_key`）、警告文言 3 種（未代入・空・型不正）、継承したメソッドに届かせない検索フラグ（`find_act_handler` の第 4 引数 `skip_methods`。L3 を飛ばし、L1・A1 を `rawget` で引く）。
 - `ACT_IMPL.word`／`PROXY_IMPL.word` の省略可能な第 2 引数と、`ACT_IMPL.expr_fn_var`／`PROXY_IMPL.expr_fn_var`。
 - LSP の動的参照のトークン分類、TextMate の `inline-dynamic-ref` 規則。
 - マニュアル `grammar/words.md`・`markers.md`・`action-line.md`・`variables.md`・`actor-dictionary.md` の動的参照の記述と、その生成スキル `references/` の再生成、手書きスキル資料の追従。
@@ -59,7 +59,8 @@
 - `find_act_handler`／`find_handler` の引数構成の変更（`PROXY_IMPL`・`SHIORI_ACT` 継承チェーン・lua_specs の再確認）。
 - 警告文言 3 種の変更（`dynamic-call-nil-guard` が文言を揃える前提にしている）。
 - TextMate のスコープ名の変更（マニュアルのハイライトの CSS 対応表に波及）。
-- `act` のメソッド構成の変更は影響しない（L3 を丸ごと飛ばすため）。
+- `act` のメソッド構成・`SCENE_TABLE_IMPL`・`ACTOR_IMPL` のメソッド構成の変更は影響しない（L3 を丸ごと飛ばし、L1・A1 は `rawget` で引くため）。
+- シーンテーブル・アクターの表の作り（メタテーブルを使わず生フィールドに機能を置く等）の変更は、`rawget` で届く範囲が変わるため再確認が要る。
 
 ## Architecture
 
@@ -84,7 +85,7 @@ graph TB
     GeneratedLua --> ActExprFnVar[act and proxy expr_fn_var]
     ActWord --> DynamicKey[WORD dynamic_key]
     ActExprFnVar --> DynamicKey
-    ActWord --> FindHandler[find_act_handler skip L3]
+    ActWord --> FindHandler[find_act_handler skip_methods]
     ActExprFnVar --> FindHandler
     TextMate[TextMate grammar] --> VSCode[VSCode highlight]
     TextMate --> ManualHighlight[manual highlight]
@@ -190,7 +191,7 @@ flowchart TD
 
 - `var_path` が `nil`（第 2 引数を省略した既存の呼び出し）のときは、この流れに入らず既存の経路（空キーは警告なしで `nil`）を通る（4.6）。
 - 「該当なし」の警告と、見つかった後のポストプロセス（関数なら呼ぶ・それ以外は `tostring`）は静的と同一のコードを通る（3.8, 4.3, 7.7）。
-- 検索段: アクター付きの行の単語参照は A1 → A2 → L1 → L2 → L4 → L5、それ以外の単語参照は L1 → L2 → L4 → L5、関数呼び出しは L1 → L2（シーン辞書）→ L4 → L5（シーン辞書）。L3 だけを飛ばす（3.1, 3.2, 3.3, 3.10, 7.4）。
+- 検索段: アクター付きの行の単語参照は A1 → A2 → L1 → L2 → L4 → L5、それ以外の単語参照は L1 → L2 → L4 → L5、関数呼び出しは L1 → L2（シーン辞書）→ L4 → L5（シーン辞書）。L3 を飛ばし、L1・A1 は `rawget` で表自身のフィールドだけを引く（3.1, 3.2, 3.3, 3.10, 3.11, 7.4）。
 
 ## Requirements Traceability
 
@@ -221,6 +222,7 @@ flowchart TD
 | 3.8 | 関数が見つかれば呼ぶ | Runtime | 既存ポストプロセス | 同上 |
 | 3.9 | 評価のたびにその時点の値 | CodeGen | 生成コードが実行時に変数を読む | — |
 | 3.10 | act のメソッドの段を飛ばす | Runtime | `find_act_handler(mode, key, skip_methods)` | 同上 |
+| 3.11 | L1・A1 は表自身のフィールドだけ | Runtime | `skip_methods` 時の `rawget(current_scene, key)`・`rawget(actor, key)` | 同上 |
 | 4.1 | 未代入は空＋変数パス付き警告 | Runtime | `undefined variable` 警告 | 同上 |
 | 4.2 | 空文字列は区別できる警告 | Runtime | `empty variable` 警告 | 同上 |
 | 4.3 | 該当なしは静的と同じ警告 | Runtime | 既存 `handler not found` | 同上 |
@@ -257,7 +259,7 @@ flowchart TD
 | DynamicRefParser | Parser | Pest ペア → AST・span 補正 | 1.1–1.5, 7.1–7.3 | DynamicRefAst（P0） | Service |
 | DynamicRefCodeGen | Transpiler | 動的変種 → Lua 呼び出し | 1.5, 3.2, 3.3, 3.9, 4.4, 7.5 | `resolve_var_path`（P0） | Service |
 | DynamicKeyResolver | Runtime | 値 → 単語キー／関数名と警告 | 3.5–3.7, 4.1, 4.2, 7.6, 7.8 | `@pasta_log`（P1） | Service |
-| DynamicLookup | Runtime | L3 を飛ばす検索と既存ポストプロセス | 3.1–3.4, 3.8, 3.10, 4.3–4.6, 7.4, 7.5, 7.7 | `find_act_handler`（P0） | Service |
+| DynamicLookup | Runtime | 継承メソッドに届かせない検索と既存ポストプロセス | 3.1–3.4, 3.8, 3.10, 3.11, 4.3–4.6, 7.4, 7.5, 7.7 | `find_act_handler`（P0） | Service |
 | DynamicRefLsp | Editor | セマンティックトークン | 6.3, 7.10 | DynamicRefAst（P0） | Service |
 | DynamicRefTextMate | Editor | 構文ハイライト | 6.1, 6.2, 6.4, 7.10 | なし | State |
 | DynamicRefManual | Docs | マニュアル・スキルの記載 | 5.1–5.6, 7.9 | `gen-skill-refs.mjs`（P0） | Batch |
@@ -430,14 +432,14 @@ function WORD.dynamic_key(value, var_path, via) end
 
 | Field | Detail |
 |-------|--------|
-| Intent | 動的キーで L3 を飛ばして検索し、静的と同じポストプロセス・警告を通す |
-| Requirements | 3.1, 3.2, 3.3, 3.4, 3.8, 3.10, 4.3, 4.4, 4.5, 4.6, 7.4, 7.5, 7.7 |
+| Intent | 動的キーで継承メソッドに届かせずに検索し、静的と同じポストプロセス・警告を通す |
+| Requirements | 3.1, 3.2, 3.3, 3.4, 3.8, 3.10, 3.11, 4.3, 4.4, 4.5, 4.6, 7.4, 7.5, 7.7 |
 
 **Contracts**: Service [x]
 
 ```lua
 -- pasta/act.lua
---- @param skip_methods boolean|nil true のとき L3（self[key] の関数）を探さない。nil/false は既存どおり
+--- @param skip_methods boolean|nil true のとき L1 を rawget(current_scene, key) で引き、L3（self[key] の関数）を探さない。nil/false は既存どおり
 function ACT_IMPL.find_act_handler(self, mode, key, skip_methods) end
 function ACT_IMPL.find_handler(self, mode, key, skip_methods) end   -- find_act_handler へそのまま渡す
 
@@ -450,7 +452,8 @@ function ACT_IMPL.word(self, name, var_path) end
 function ACT_IMPL.expr_fn_var(self, value, var_path, ...) end
 
 -- pasta/actor.lua（PROXY_IMPL も同じシグネチャ。A1・A2 は word モードだけで探す既存規則のまま）
-function PROXY_IMPL.find_handler(self, mode, key, skip_methods) end -- act:find_act_handler(mode, key, skip_methods)
+function PROXY_IMPL.find_actor_handler(self, mode, key, skip_methods) end -- skip_methods なら A1 を rawget(self.actor, key) で引く
+function PROXY_IMPL.find_handler(self, mode, key, skip_methods) end -- find_actor_handler と act:find_act_handler の両方へ skip_methods を渡す
 function PROXY_IMPL.word(self, name, var_path) end
 function PROXY_IMPL.expr_fn_var(self, value, var_path, ...) end    -- handler(proxy, ...) を呼ぶ（7.5）
 ```
@@ -461,8 +464,11 @@ function PROXY_IMPL.expr_fn_var(self, value, var_path, ...) end    -- handler(pr
   - `var_path == nil`／`skip_methods == nil` の既存呼び出しは、検索段・警告・戻り値が現行と同一（4.6, 2.7）。`lua_specs/act_word_expr_test.lua` の `word(nil)`・`word("")` の既存テストはそのまま通る。
   - 「該当なし」の警告文言は静的と同一（`act:word - handler not found: key='…', mode='word', via=act` など）。
   - 巡回の共有は、単語キー文字列で既存の `search_word(key, scope)` を引くことで成立する（3.4）。数値キーも文字列化してから L1・L4・A1 を引く。
-- 段の扱い（要件ディスカッション #2 の決定どおり）: L1・L2・L4・L5・A1・A2 は静的と同じく探し、L3 だけを飛ばす。
-  - **前提 A-2**: L1 のシーンテーブルと A1 のアクターの表は、メタテーブル経由で `create_word` などの組み込みメソッドにも到達する。決定 #2 と R3.1（L3 以外は静的と同じ）に従い、`rawget` 等で絞らない（OPEN QUESTION 1）。
+- 段の扱い（要件ディスカッション #2・設計ディスカッション #1）: `skip_methods` は「継承したメソッドに届かせない」の 1 つの意味を持つ。
+  - L3 は飛ばす（3.10）。
+  - L1 のシーンテーブル（`__index = SCENE_TABLE_IMPL`）と A1 のアクターの表（`ACTOR_IMPL` を継承）は `rawget` で引き、表自身のフィールド（シーン関数・`__global_name__`・作者が定義したアクターのフィールド）だけに一致させる。`create_word`・`__index` などメタテーブル経由の組み込みメソッドには届かない（3.11。値が `create_word` のときキー nil の単語ビルダー生成で `table index is nil` になりシーンが止まる、`__index` のとき `table: 0x…` を出力する、を防ぐ）。
+  - L2・L4・L5・A2 は静的と同じ。`GLOBAL` はメタテーブルを持たない作者の表のため絞らない。
+  - `skip_methods` が nil／false の既存呼び出しは L1・A1 を従来どおり `[]` で引く（2.7, 4.6）。
 
 ### Editor
 
@@ -519,7 +525,7 @@ pub(super) fn find_dynamic_ref(text: &str, var_name: &str, global: bool) -> Opti
 - Input: 下の記載内容。
 - Output: マニュアル 5 章、`node book/tools/gen-skill-refs.mjs` による `references/` の再生成、`node book/tools/gen-skill-refs.mjs --check` と `node book/tools/link-check.mjs` の成功。
 - 記載内容:
-  - `words.md` に「動的単語参照」節（「単語の参照」の後、「未定義単語の参照」の前）: 書き方（`＠＄名前`・`＠＄＊名前`・`＠＄０`・代入の右辺）、静的と同じ探し方・選び方と巡回の共有、act のメソッドの段（3 段目）だけを探さないこと、数値は文字列にして探すこと、未代入・空・型不正・該当なしの挙動と警告、値を DSL として読み直さないこと（多段階参照をしない）、動的関数呼び出し `＠＄名前（…）` の概要、書けない形（`＠＄％名前`・`＠＊＄名前`・`＠＄` の後に変数名が無い形）はパースエラーになること。
+  - `words.md` に「動的単語参照」節（「単語の参照」の後、「未定義単語の参照」の前）: 書き方（`＠＄名前`・`＠＄＊名前`・`＠＄０`・代入の右辺）、静的と同じ探し方・選び方と巡回の共有、act のメソッドの段（3 段目）を探さないこと、シーンテーブル・アクターの段では作者が定義したもの（シーン関数・アクターのフィールド）だけに一致し組み込みのメソッドには一致しないこと、数値は文字列にして探すこと、未代入・空・型不正・該当なしの挙動と警告、値を DSL として読み直さないこと（多段階参照をしない）、動的関数呼び出し `＠＄名前（…）` の概要、書けない形（`＠＄％名前`・`＠＊＄名前`・`＠＄` の後に変数名が無い形）はパースエラーになること。
   - `action-line.md`: インライン要素の表に「動的単語参照 `＠＄名前`」「動的関数呼び出し `＠＄名前（引数）`」、判定順の文を「エスケープ → 関数呼び出し（動的を含む）→ 単語参照（動的を含む）→ 変数参照 → …」に更新。
   - `variables.md`: 右辺の表に動的単語参照・動的関数呼び出し、関数スコープの展開先の表に `＠＄名前（…）` → `act:expr_fn_var(var.名前, "var.名前", …)`、DSL と Lua の対応表に `＄x＝＠＄y` → `var.x = act:word(var.y, "var.y")`。補足の警告文言に動的参照の 3 種を追記。
   - `actor-dictionary.md`: アクター付きの行の動的単語参照も A1・A2 から探すこと、代入の右辺・関数呼び出しは探さないこと、3 段目を探さないこと。
@@ -559,7 +565,7 @@ pub(super) fn find_dynamic_ref(text: &str, var_name: &str, global: bool) -> Opti
 - パーサ（`pasta_dsl/tests/dynamic_word_ref_test.rs`）: `＠＄x`・`＠＄＊x`・`＠＄０`・`@$x`・`＠$＊x` が `Action::DynamicWordRef`（スコープ・名前・span）になる。`＄y＝＠＄x`・`＄＊y＝＠＄＊x`・`＄＝＠＄x`・`＄％p＝＠＄x` が `SetValue::DynamicWordRef` になり、`Expr::VarRef` に化けない。`＠＄f（１、＄a）`・`＄y＝＠＄f（）＋１`・`＞＠＄f（）` が動的関数呼び出しになる（1.1–1.7, 7.1–7.3）。
 - 既存字句との区別: `＠＠＄x` が「＠」エスケープ＋`VarRef`、`＄＄`・`＠名前`・`＠名前（）`・`＠＊名前（）` の AST が従来と同一。`＠＄％p`・`＠＄％p（）`・`＠＊＄x（）`・`＠＄`・`＠＄＄`・`＠＄　x` がパースエラーになり、エラーに該当行の行番号と列が含まれる（列は Pest が最も先まで試した位置であり、`＠` そのものとは限らない。2.1–2.8）。
 - 生成コード（`pasta_lua/tests/transpiler/dynamic_word_ref_test.rs`）: 上表の 6 形式の出力文字列、アクター付きの行は `act.アクター:` 経由・右辺は `act:` 経由であること、`insta` スナップショット 1 本（3.2, 3.3, 7.5）。
-- ランタイム（`lua_specs/act_dynamic_ref_test.lua`）: `word(nil, "var.x")`・`word("", "var.x")`・`word(true, "var.x")` が `nil` と各警告、`word(1, "var.n")` が「1」をキーに検索、値が `"talk"`・`"yield"` のとき act のメソッドを呼ばず L4・L5 へ進む、`SCENE`・`GLOBAL`・A1 の関数は呼ばれる、`word("挨拶", "var.x")` と `word("挨拶")` が巡回を共有、`word(nil)`・`word("")` は警告なし（3.1–3.10, 4.1–4.6, 7.4–7.8）。
+- ランタイム（`lua_specs/act_dynamic_ref_test.lua`）: `word(nil, "var.x")`・`word("", "var.x")`・`word(true, "var.x")` が `nil` と各警告、`word(1, "var.n")` が「1」をキーに検索、値が `"talk"`・`"yield"` のとき act のメソッドを呼ばず L4・L5 へ進む、値が `"create_word"`・`"__index"` のときシーンテーブル・アクターの組み込みメソッドに一致せず（シーンが止まらず）次の段へ進む、`SCENE`・`GLOBAL`・A1 の作者定義の関数は呼ばれる、`word("挨拶", "var.x")` と `word("挨拶")` が巡回を共有、`word(nil)`・`word("")` は警告なし（3.1–3.10, 4.1–4.6, 7.4–7.8）。
 
 ### Integration Tests
 
@@ -576,9 +582,9 @@ pub(super) fn find_dynamic_ref(text: &str, var_name: &str, global: bool) -> Opti
 
 ## Security Considerations
 
-- 参照変数の値は、セーブデータ・SHIORI リクエスト由来の値・ユーザー入力を経由しうる。値によって act のメソッド（`yield` などコルーチン操作を含む）が呼ばれないよう、動的参照では L3 を探さない（3.10, 7.4）。
+- 参照変数の値は、セーブデータ・SHIORI リクエスト由来の値・ユーザー入力を経由しうる。値によって act のメソッド（`yield` などコルーチン操作を含む）や表の組み込みメソッドが呼ばれないよう、動的参照では L3 を探さず、L1・A1 は `rawget` で引く（3.10, 3.11, 7.4）。
 - 値は検索キーとしてだけ使い、DSL・Lua として評価しない（3.7）。生成コードに値は埋め込まれない（変数パスだけが文字列リテラルとして埋め込まれ、`StringLiteralizer` を通す）。
-- 残余リスク: L1（シーンテーブル）・A1（アクターの表）のメタテーブル経由のメソッド到達（前提 A-2、OPEN QUESTION 1）。
+- 残余リスク: 表自身のフィールドに置かれた関数（シーン関数・作者が定義したアクターの関数・`GLOBAL` の関数）は値で呼び分けられる。これは作者が定義した関数を呼び分ける用途として意図した挙動（3.8）。
 
 ## Migration Strategy
 
@@ -589,7 +595,7 @@ pub(super) fn find_dynamic_ref(text: &str, var_name: &str, global: bool) -> Opti
 
 | # | 節 | 問題 | 選択肢 | 起草時の前提 |
 |---|----|------|--------|--------------|
-| 1 | DynamicLookup（前提 A-2） | L1 のシーンテーブルと A1 のアクターの表は、メタテーブル経由で `create_word` 等の組み込みメソッドに届く。変数の値が `create_word` だと、それが `h(self)` で呼ばれる（L3 を外した理由と同種の到達） | (a) 決定 #2 のまま静的と同じに探す (b) 動的のときだけ L1・A1 を `rawget` で引く (c) 関数値のうち組み込みメソッドだけ除外する | (a)。決定 #2・R3.1 を優先 |
+| 1 | DynamicLookup | L1・A1 からメタテーブル経由で `create_word` 等の組み込みメソッドに届く | (a) 静的と同じ (b) 動的のときだけ L1・A1 を `rawget` (c) 組み込みメソッド名を除外 | **解決（設計ディスカッション #1）: (b)**。`skip_methods` に統合。R3.11 を追加 |
 | 2 | DynamicRefTextMate（前提 A-4） | R6.1 は代入の右辺も「単語参照（または単語参照と変数参照の組み合わせ）」として色分けを求めるが、代入行は既存規則が行全体を変数スコープで塗る | (a) 既存規則のまま（静的の右辺と同じ扱い） (b) 代入行の右辺だけインライン規則で塗り分ける（静的の右辺の色も変わり 6.2 と衝突） | (a) |
 | 3 | DynamicRefAst（前提 A-3）・Migration | 公開 enum への変種追加は破壊的変更。`#[non_exhaustive]` を付けるか、版をどう上げるか | (a) 付けない・版は release-workflow に委ねる (b) 今回 `#[non_exhaustive]` を付ける（それ自体が破壊的変更で、内部の網羅検出も失う） | (a) |
 | 4 | Testing（前提 A-5） | R5.5（マニュアル例が読み込み可能）の担保方法 | (a) テストがマニュアル章から該当コードブロックを抽出して検証 (b) 同じ入力をテストに手で写す (c) 書籍ツールに文法章のコード例検証を新設 | (a)。マニュアルとの乖離を自動で検出できる最小の手段 |
