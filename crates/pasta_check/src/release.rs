@@ -57,7 +57,8 @@ mod tests {
         let target = temp.path().join("target_ghost");
         fs::create_dir_all(target.join("ghost/master")).unwrap();
         fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
-        fs::write(target.join("install.txt"), "install").unwrap();
+        let install_txt = "charset,UTF-8\r\ntype,ghost\r\n";
+        fs::write(target.join("install.txt"), install_txt).unwrap();
 
         let release = temp.path().join("release_out");
         let nar = temp.path().join("out.nar");
@@ -81,7 +82,7 @@ mod tests {
         assert!(!target.join("updates2.dau").exists());
         assert_eq!(
             fs::read_to_string(target.join("install.txt")).unwrap(),
-            "install"
+            install_txt
         );
     }
 

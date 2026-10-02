@@ -98,7 +98,11 @@ fn test_release_end_to_end_via_binary() {
     let target = temp.path().join("target_ghost");
     fs::create_dir_all(target.join("ghost/master")).unwrap();
     fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
-    fs::write(target.join("install.txt"), "install").unwrap();
+    fs::write(
+        target.join("install.txt"),
+        "charset,UTF-8\r\ntype,ghost\r\n",
+    )
+    .unwrap();
 
     let overlay = temp.path().join("overlay");
     fs::create_dir_all(&overlay).unwrap();

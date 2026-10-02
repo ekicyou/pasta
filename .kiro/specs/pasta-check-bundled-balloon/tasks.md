@@ -10,7 +10,7 @@
   - 現行の実装のままでテストが通る
   - _Requirements: 8.1, 8.4_
 
-- [ ] 1.2 (P) 既存の release 統合テストと CLI の E2E テストの install.txt フィクスチャを UTF-8 宣言付きにする
+- [x] 1.2 (P) 既存の release 統合テストと CLI の E2E テストの install.txt フィクスチャを UTF-8 宣言付きにする
   - 対象は release の統合テスト（target の install.txt を書く箇所と、その内容を照合する箇所）と CLI の E2E テストの install.txt フィクスチャ
   - フィクスチャの install.txt の 1 行目を `charset,UTF-8`（CRLF）にする。フィクスチャの内容に結び付いた期待値はそれに合わせて直し、何を検証するかは変えない
   - 現行の実装のままで、変更したテストがすべて通る（宣言の必須化を入れた後も通る形になっている）
