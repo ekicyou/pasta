@@ -6,6 +6,7 @@
 --- ビルダーパターンAPIで可変長引数・メソッドチェーンを提供（Requirement 9）。
 
 local STORE = require("pasta.store")
+local log = require "@pasta_log"
 
 --- @class Word モジュールテーブル
 local WORD = {}
@@ -149,6 +150,36 @@ function WORD.resolve_value(value, act)
     else
         return tostring(value)
     end
+end
+
+-------------------------------------------
+-- dynamic_key - 動的参照のキー解決（dynamic-word-reference）
+-------------------------------------------
+
+--- 動的参照（＠＄名前・＠＄名前（…））の参照変数の値を検索キーに変換する。
+--- 空でない文字列はそのまま、数値は変数展開と同じ tostring 表記にする（値を DSL として読み直さない）。
+--- それ以外（nil・空文字列・真偽値・テーブル（__tostring 付きを含む）・関数・userdata・thread）は
+--- 警告して nil を返す。
+--- act・actor の両方から使うため、両者を require しないこのモジュールに置く。
+--- @param value any 参照変数の値
+--- @param var_path string 参照変数の Lua パス（"var.x" / "save.x" / "args[1]"）
+--- @param via string 警告の接頭辞（"act:word" / "proxy:word" / "act:expr_fn" / "proxy:expr_fn"）
+--- @return string|nil 検索キー。nil のときは警告済み
+function WORD.dynamic_key(value, var_path, via)
+    local t = type(value)
+    if t == "number" then
+        return tostring(value)
+    elseif t == "string" then
+        if value ~= "" then
+            return value
+        end
+        log.warn(string.format("%s - empty variable: '%s'", via, var_path))
+    elseif value == nil then
+        log.warn(string.format("%s - undefined variable: '%s'", via, var_path))
+    else
+        log.warn(string.format("%s - unsupported value type: '%s' (%s)", via, var_path, t))
+    end
+    return nil
 end
 
 return WORD

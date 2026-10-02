@@ -163,7 +163,43 @@ impl super::AnalysisEngine {
             SetValue::Expr(expr) => {
                 Self::tokenize_expr_recursive(text, base_offset, line, expr, tokens, line_text);
             }
+            SetValue::DynamicWordRef {
+                var_name,
+                var_scope,
+            } => {
+                Self::push_dynamic_ref_token(
+                    text,
+                    base_offset,
+                    line,
+                    var_name,
+                    var_scope,
+                    tokens,
+                    line_text,
+                );
+            }
         }
+    }
+
+    /// Find `＠＄name` (full-width/half-width mixes, `＊` for global) in text and
+    /// emit it as a WORD token. Returns the byte end of the reference within text.
+    fn push_dynamic_ref_token(
+        text: &str,
+        base_offset: usize,
+        line: u32,
+        var_name: &str,
+        var_scope: &VarScope,
+        tokens: &mut Vec<RawToken>,
+        line_text: &str,
+    ) -> Option<usize> {
+        let (start, end) = find_dynamic_ref(text, var_name, *var_scope == VarScope::Global)?;
+        tokens.push(RawToken {
+            line,
+            start_char: utf8_offset_to_utf16(line_text, base_offset + start),
+            length: utf8_len_to_utf16(&text[start..end]),
+            token_type: token_type::WORD,
+            modifiers: 0,
+        });
+        Some(end)
     }
 
     /// Recursively tokenize an Expr by scanning the source text.
@@ -347,6 +383,30 @@ impl super::AnalysisEngine {
                     }
                 }
             }
+            Expr::DynamicFnCall {
+                var_name,
+                var_scope,
+                ..
+            } => {
+                if let Some(end) = Self::push_dynamic_ref_token(
+                    text,
+                    base_offset,
+                    line,
+                    var_name,
+                    var_scope,
+                    tokens,
+                    line_text,
+                ) {
+                    Self::tokenize_args_text(
+                        &text[end..],
+                        base_offset + end,
+                        line,
+                        expr,
+                        tokens,
+                        line_text,
+                    );
+                }
+            }
         }
     }
 
@@ -359,7 +419,7 @@ impl super::AnalysisEngine {
         tokens: &mut Vec<RawToken>,
         line_text: &str,
     ) {
-        if let Expr::FnCall { args, .. } = fn_expr {
+        if let Expr::FnCall { args, .. } | Expr::DynamicFnCall { args, .. } = fn_expr {
             // Find opening paren
             if let Some(paren_pos) = find_open_paren(text) {
                 let paren_len =

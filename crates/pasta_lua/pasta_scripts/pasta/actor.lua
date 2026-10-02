@@ -116,19 +116,22 @@ end
 --- A1: proxy.actor[key] 完全一致
 --- A2: アクター単語辞書前方一致 ("__actor_{name}__" スコープ)
 --- @pasta_search 未利用時は A2 をスキップ
+--- skip_methods（動的参照用）: A1 を rawget で表自身のフィールドだけに絞る（ACTOR_IMPL の create_word 等に一致させない）
 ---
 --- @param self ActorProxy プロキシオブジェクト
 --- @param mode string "word" | "scene" | "expr"
 --- @param key string 検索キー
+--- @param skip_methods boolean|nil true で継承したメソッドに届かせない。nil/false は既存どおり
 --- @return any|nil 見つかったハンドラー、またはnil
-function PROXY_IMPL.find_actor_handler(self, mode, key)
+function PROXY_IMPL.find_actor_handler(self, mode, key, skip_methods)
     -- アクター検索は word モードのみ
     if mode ~= "word" then
         return nil
     end
 
-    -- A1: proxy.actor[key] 完全一致
-    local actor_value = self.actor[key]
+    -- A1: proxy.actor[key] 完全一致（skip_methods 時は表自身のフィールドだけ）
+    local actor_value
+    if skip_methods then actor_value = rawget(self.actor, key) else actor_value = self.actor[key] end
     if actor_value ~= nil then
         return actor_value
     end
@@ -152,15 +155,32 @@ end
 --- @param self ActorProxy プロキシオブジェクト
 --- @param mode string "word" | "scene" | "expr"
 --- @param key string 検索キー
+--- @param skip_methods boolean|nil find_actor_handler・act:find_act_handler の両方へ渡す
 --- @return any|nil
-function PROXY_IMPL.find_handler(self, mode, key)
+function PROXY_IMPL.find_handler(self, mode, key, skip_methods)
     -- まずアクターレベル検索
-    local handler = self:find_actor_handler(mode, key)
+    local handler = self:find_actor_handler(mode, key, skip_methods)
     if handler ~= nil then
         return handler
     end
     -- マッチしなければ act:find_act_handler に委譲
-    return self.act:find_act_handler(mode, key)
+    return self.act:find_act_handler(mode, key, skip_methods)
+end
+
+--- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(self, ...)、非function → warn+nil
+--- @param self ActorProxy プロキシオブジェクト
+--- @param key string 関数名
+--- @param skip_methods boolean|nil find_handler へ渡す
+--- @param ... any 可変引数
+--- @return any|nil ハンドラー戻り値、またはnil
+local function call_expr(self, key, skip_methods, ...)
+    local handler = self:find_handler("expr", key, skip_methods)
+    if type(handler) == "function" then
+        return handler(self, ...)
+    end
+    log.warn(string.format("proxy:expr_fn - handler not found: key='%s', mode='expr', via=proxy(%s)",
+        tostring(key), tostring(self.actor.name)))
+    return nil
 end
 
 --- expr 関数呼び出し（find_handler + expr ポストプロセス）
@@ -169,13 +189,20 @@ end
 --- @param ... any 可変引数
 --- @return any|nil ハンドラー戻り値、またはnil
 function PROXY_IMPL.expr_fn(self, key, ...)
-    local handler = self:find_handler("expr", key)
-    if type(handler) == "function" then
-        return handler(self, ...)
-    end
-    log.warn(string.format("proxy:expr_fn - handler not found: key='%s', mode='expr', via=proxy(%s)",
-        tostring(key), tostring(self.actor.name)))
-    return nil
+    return call_expr(self, key, nil, ...)
+end
+
+--- 動的関数呼び出し（アクター付きの行の＠＄名前（…））
+--- value を WORD.dynamic_key で関数名にし、継承したメソッドに届かせずに expr_fn と同じ検索・ポストプロセスを行う
+--- @param self ActorProxy プロキシオブジェクト
+--- @param value any 参照変数の値
+--- @param var_path string 参照変数の Lua パス（警告用）
+--- @param ... any 可変引数（ハンドラーに伝搬。第 1 引数はプロキシ）
+--- @return any|nil ハンドラー戻り値、またはnil
+function PROXY_IMPL.expr_fn_var(self, value, var_path, ...)
+    local key = WORD.dynamic_key(value, var_path, "proxy:expr_fn")
+    if key == nil then return nil end
+    return call_expr(self, key, true, ...)
 end
 
 -------------------------------------------
@@ -185,14 +212,21 @@ end
 --- word（find_handler + word ポストプロセス）
 --- 検索順序は find_handler → find_actor_handler(A1+A2) → act:find_act_handler(L1-L5)
 --- ポストプロセス: handler=nil → warn+nil、function → h(self)、その他 → tostring(h)
+--- var_path があるとき（動的参照）は name を WORD.dynamic_key でキーにし、継承したメソッドに届かせずに検索する
 --- @param self ActorProxy プロキシオブジェクト
---- @param name string 単語名（＠なし）
+--- @param name any 単語名（＠なし）。var_path があるときは参照変数の値
+--- @param var_path string|nil 動的参照の変数パス。nil なら既存の挙動（空キーは警告なしで nil）
 --- @return string|nil 見つかった単語、またはnil
-function PROXY_IMPL.word(self, name)
-    if not name or name == "" then
+function PROXY_IMPL.word(self, name, var_path)
+    local skip_methods = nil
+    if var_path ~= nil then
+        name = WORD.dynamic_key(name, var_path, "proxy:word")
+        if name == nil then return nil end
+        skip_methods = true
+    elseif not name or name == "" then
         return nil
     end
-    local handler = self:find_handler("word", name)
+    local handler = self:find_handler("word", name, skip_methods)
     if handler == nil then
         log.warn(string.format("proxy:word - handler not found: key='%s', mode='word', via=proxy(%s)",
             tostring(name), tostring(self.actor.name)))

@@ -35,6 +35,19 @@ pub enum Action {
     ///
     /// In pasta2.pest, these are atomic rules that match the literal text.
     Escape { sequence: String, span: Span },
+    /// Dynamic word reference (@$var, @$*var, @$0)
+    DynamicWordRef {
+        var_name: String,
+        var_scope: VarScope,
+        span: Span,
+    },
+    /// Dynamic function call (@$var(args))
+    DynamicFnCall {
+        var_name: String,
+        var_scope: VarScope,
+        args: Args,
+        span: Span,
+    },
 }
 
 // ============================================================================
@@ -233,6 +246,12 @@ pub enum Expr {
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
+    /// Dynamic function call (@$var(args)) inside an expression
+    DynamicFnCall {
+        var_name: String,
+        var_scope: VarScope,
+        args: Args,
+    },
 }
 
 // ============================================================================
@@ -249,6 +268,11 @@ pub enum SetValue {
     Expr(Expr),
     /// Word reference (`@word_name` form)
     WordRef { name: String },
+    /// Dynamic word reference on the right-hand side (`$y = @$x`)
+    DynamicWordRef {
+        var_name: String,
+        var_scope: VarScope,
+    },
 }
 
 // ============================================================================

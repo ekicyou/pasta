@@ -193,6 +193,22 @@ function hasLuaScope(tokens: vsctm.IToken[]): boolean {
   );
 }
 
+// True when every character of `text` (first occurrence at/after `from`) in
+// `line` carries `scope`, and the characters just outside it do not — i.e.
+// `scope` covers exactly that range.
+function scopeCoversExactly(line: string, text: string, scope: string, from = 0): boolean {
+  const start = line.indexOf(text, from);
+  if (start < 0) return false;
+  const end = start + text.length;
+  const tokens = tokenizeLine(line).tokens;
+  const has = (i: number) =>
+    tokens.some((t) => t.startIndex <= i && i < t.endIndex && t.scopes.includes(scope));
+  for (let i = start; i < end; i++) {
+    if (!has(i)) return false;
+  }
+  return !(start > 0 && has(start - 1)) && !(end < line.length && has(end));
+}
+
 function findTokenWithScope(tokens: vsctm.IToken[], scope: string): vsctm.IToken | undefined {
   return tokens.find((t) => t.scopes.includes(scope));
 }
@@ -312,6 +328,60 @@ async function runTests(): Promise<void> {
       hasScope(result.tokens, 'markup.inline.raw.string.pasta'),
       'inline word reference should have markup.inline.raw.string scope'
     );
+  });
+
+  // --- Dynamic Word Reference Tests (dynamic-word-reference 6.1, 6.2, 7.10) ---
+  const WORD_SCOPE = 'markup.inline.raw.string.pasta';
+  const VAR_REF_SCOPE = 'variable.other.reference.pasta';
+
+  test('動的単語参照 ＠＄x の ＠ を含む範囲が単語参照スコープ', () => {
+    expect(scopeCoversExactly('　さくら：＠＄x　です', '＠＄x', WORD_SCOPE), '＠＄x should be one word-ref range');
+  });
+
+  test('動的単語参照 ＠＄＊x の ＠ を含む範囲が単語参照スコープ', () => {
+    expect(scopeCoversExactly('　さくら：＠＄＊x　です', '＠＄＊x', WORD_SCOPE), '＠＄＊x should be one word-ref range');
+  });
+
+  test('動的関数呼び出し ＠＄f（１） の ＠ から引数までが単語参照スコープ', () => {
+    expect(scopeCoversExactly('　さくら：＠＄f（１）　です', '＠＄f（１）', WORD_SCOPE), '＠＄f（１） should be one word-ref range');
+  });
+
+  test('動的単語参照の全角半角混在（@$x・＠$＊x）が単語参照スコープ', () => {
+    expect(scopeCoversExactly('　さくら：@$x　です', '@$x', WORD_SCOPE), '@$x should be one word-ref range');
+    expect(scopeCoversExactly('　さくら：＠$＊x　です', '＠$＊x', WORD_SCOPE), '＠$＊x should be one word-ref range');
+  });
+
+  test('エスケープ＋動的単語参照 ＠＠＠＄x は ＠＄x だけが単語参照スコープ', () => {
+    const line = '　さくら：＠＠＠＄x';
+    expect(scopeCoversExactly(line, '＠＄x', WORD_SCOPE, line.indexOf('＠＠＠') + 2), '＠＄x after escape should be word-ref');
+  });
+
+  test('既存: 静的単語参照 ＠笑顔 の範囲は不変', () => {
+    expect(scopeCoversExactly('　さくら：＠笑顔　こんにちは', '＠笑顔', WORD_SCOPE), '＠笑顔 should stay one word-ref range');
+  });
+
+  test('既存: 変数参照 ＄x・＄＊x の範囲は不変', () => {
+    expect(scopeCoversExactly('　さくら：＄x　です', '＄x', VAR_REF_SCOPE), '＄x should stay variable reference');
+    expect(scopeCoversExactly('　さくら：＄＊x　です', '＄＊x', VAR_REF_SCOPE), '＄＊x should stay variable reference');
+  });
+
+  test('既存: エスケープ ＠＠＄x はエスケープ＋変数参照のまま', () => {
+    const line = '　さくら：＠＠＄x';
+    expect(scopeCoversExactly(line, '＄x', VAR_REF_SCOPE), '＄x should stay variable reference');
+    expect(!hasScope(tokenizeLine(line).tokens, WORD_SCOPE), '＠＠＄x must not get word-ref scope');
+  });
+
+  test('既存: エスケープ ＠＠単語・＄＄x の色分けは不変', () => {
+    const at = '　さくら：＠＠単語';
+    expect(scopeCoversExactly(at, '＠単語', WORD_SCOPE, at.indexOf('＠＠') + 1), '＠＠単語 keeps its existing word-ref range');
+    const dollar = '　さくら：＄＄x';
+    expect(scopeCoversExactly(dollar, '＄x', VAR_REF_SCOPE, dollar.indexOf('＄＄') + 1), '＄＄x keeps its existing variable range');
+  });
+
+  test('既存: 代入行の右辺の動的参照は行全体の変数スコープのまま', () => {
+    const line = '＄x＝＠＄y';
+    expect(scopeCoversExactly(line, 'x＝＠＄y', 'variable.other.pasta'), 'assignment body stays variable.other.pasta');
+    expect(!hasScope(tokenizeLine(line).tokens, WORD_SCOPE), 'assignment line must not get inline word-ref scope');
   });
 
   // --- Variable Tests ---

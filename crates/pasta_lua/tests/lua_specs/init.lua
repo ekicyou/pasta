@@ -61,6 +61,7 @@ local specs = {
     "kick_position_path_inheritance_test", -- 位置パスの dispatch 越し kick 継承テスト (pasta-scene-kick-from-cursor 6.2)
     "store_appearance_test",              -- STORE.appearance 外見状態のセッション常駐テスト (actor-surface-restore 1.3)
     "appearance_test",                    -- pasta.shiori.appearance タグ走査・サーフェス観測テスト (actor-surface-restore 2.1)
+    "act_dynamic_ref_test",               -- 動的参照のキー解決・警告テスト (dynamic-word-reference 2.1)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

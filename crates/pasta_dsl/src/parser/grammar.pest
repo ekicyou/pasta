@@ -93,12 +93,20 @@ var_set        =_{ var_set_property | var_set_global | var_set_local | var_set_n
 var_set_local  = { var_marker ~                 id ~ s ~ set }
 var_set_global = { var_marker ~ global_marker ~ id ~ s ~ set }
 var_set_none   = { var_marker ~                            set }
-set            =_{ set_marker ~ s ~ ( expr | word_ref ) }
+set            =_{ set_marker ~ s ~ ( expr | word_ref | word_ref_dynamic ) }
 
 // ################################################# fn_call
-fn_call        =_{ fn_call_global | fn_call_local }
+fn_call        =_{ fn_call_global | fn_call_local | fn_call_dynamic }
 fn_call_local  = { fn_marker ~ id ~ args }
 fn_call_global = { fn_marker ~ global_marker ~ id ~ args }
+
+// ################################################# dynamic word_ref / fn_call
+// 参照変数（プロパティ ＄％ は含めない。末尾の空白は含めない）
+dyn_name_local   = { var_marker ~ var_id }
+dyn_name_global  = { var_marker ~ global_marker ~ id }
+dyn_name         =_{ dyn_name_global | dyn_name_local }
+word_ref_dynamic = { word_marker ~ dyn_name ~ s }
+fn_call_dynamic  = { fn_marker ~ dyn_name ~ args }
 
 // ################################################# args
 args           = { lparen ~ s ~ (arg ~ (comma_sep ~ arg)*)? ~ s ~ rparen }
@@ -164,7 +172,7 @@ call_scene = { call_marker ~ (id | call_target_expr) ~ s ~ args? }
 scene = _{ id ~ s ~ attrs? }
 
 // ################################################# action
-action  =_{ at_escape | dollar_escape | sakura_escape | fn_call | word_ref | var_ref | sakura_script | talk }
+action  =_{ at_escape | dollar_escape | sakura_escape | fn_call | word_ref | word_ref_dynamic | var_ref | sakura_script | talk }
 actions = { action+ }
 
 word_ref        = { word_marker ~ id ~ s}
