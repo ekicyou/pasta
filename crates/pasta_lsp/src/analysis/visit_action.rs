@@ -282,7 +282,9 @@ impl super::AnalysisEngine {
                     Self::add_token_from_span(span, source, token_type::VARIABLE, 0, tokens);
                 }
             }
-            Action::FnCall { span, .. } => {
+            Action::FnCall { span, .. }
+            | Action::DynamicWordRef { span, .. }
+            | Action::DynamicFnCall { span, .. } => {
                 if span.is_valid() {
                     Self::add_token_from_span(span, source, token_type::WORD, 0, tokens);
                 }

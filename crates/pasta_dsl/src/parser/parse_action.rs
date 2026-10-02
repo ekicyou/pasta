@@ -143,6 +143,24 @@ pub(crate) fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError>
                     span: action_span,
                 });
             }
+            Rule::word_ref_dynamic => {
+                if let Some((var_name, var_scope)) = parse_dyn_name(inner) {
+                    actions.push(Action::DynamicWordRef {
+                        var_name,
+                        var_scope,
+                        span: action_span,
+                    });
+                }
+            }
+            Rule::fn_call_dynamic => {
+                let (var_name, var_scope, args) = parse_dyn_fn_call_inner(inner)?;
+                actions.push(Action::DynamicFnCall {
+                    var_name,
+                    var_scope,
+                    args,
+                    span: action_span,
+                });
+            }
             Rule::sakura_script => {
                 actions.push(Action::SakuraScript {
                     script: inner.as_str().to_string(),
@@ -180,6 +198,34 @@ pub(crate) fn parse_fn_call_inner(pair: Pair<Rule>) -> Result<(String, Args), Pa
     }
 
     Ok((name, args))
+}
+
+/// Extract `(var_name, var_scope)` from a pair containing `dyn_name_local` / `dyn_name_global`.
+///
+/// `dyn_name_local` splits into Local / Args(n) by the same rule as `var_ref_local`.
+pub(crate) fn parse_dyn_name(pair: Pair<Rule>) -> Option<(String, VarScope)> {
+    pair.into_inner().find_map(|inner| match inner.as_rule() {
+        Rule::dyn_name_local => parse_var_ref_local_inner(inner),
+        Rule::dyn_name_global => inner
+            .into_inner()
+            .find(|id| id.as_rule() == Rule::id)
+            .map(|id| (id.as_str().to_string(), VarScope::Global)),
+        _ => None,
+    })
+}
+
+/// Parse `fn_call_dynamic` into `(var_name, var_scope, args)`.
+pub(crate) fn parse_dyn_fn_call_inner(
+    pair: Pair<Rule>,
+) -> Result<(String, VarScope, Args), ParseError> {
+    // The grammar requires a dyn_name; the fallback mirrors parse_fn_call_inner's empty name.
+    let (var_name, var_scope) =
+        parse_dyn_name(pair.clone()).unwrap_or((String::new(), VarScope::Local));
+    let args = match pair.into_inner().find(|p| p.as_rule() == Rule::args) {
+        Some(args) => parse_args(args)?,
+        None => Args::empty(),
+    };
+    Ok((var_name, var_scope, args))
 }
 
 /// Parse args.
@@ -350,6 +396,15 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Option<Expr> {
                 name,
                 args,
                 scope: FnScope::Global,
+            })
+        }
+        Rule::fn_call_dynamic => {
+            // Explicit arm: the default arm would recurse into args and return the first argument
+            let (var_name, var_scope, args) = parse_dyn_fn_call_inner(pair).ok()?;
+            Some(Expr::DynamicFnCall {
+                var_name,
+                var_scope,
+                args,
             })
         }
         Rule::paren_expr => {

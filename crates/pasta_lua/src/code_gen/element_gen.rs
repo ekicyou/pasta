@@ -30,7 +30,9 @@ fn action_span(action: &Action) -> Span {
         | Action::VarRef { span, .. }
         | Action::FnCall { span, .. }
         | Action::SakuraScript { span, .. }
-        | Action::Escape { span, .. } => *span,
+        | Action::Escape { span, .. }
+        | Action::DynamicWordRef { span, .. }
+        | Action::DynamicFnCall { span, .. } => *span,
     }
 }
 
@@ -46,6 +48,15 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             VarScope::Args(index) => Ok(format!("args[{}]", index + 1)),
             VarScope::Property => Err(TranspileError::property_in_expression()),
         }
+    }
+
+    /// Runtime arguments of a dynamic reference: the variable's value and its path
+    /// as a string literal (e.g. `var.x, "var.x"`). The value is passed as-is (never
+    /// `tostring`-ed) so the runtime can tell nil / empty / bad types apart.
+    fn dynamic_ref_args(name: &str, scope: &VarScope) -> Result<String, TranspileError> {
+        let var_path = Self::resolve_var_path(name, scope)?;
+        let path_literal = StringLiteralizer::literalize(&var_path)?;
+        Ok(format!("{}, {}", var_path, path_literal))
     }
 
     /// Generate variable assignment (Requirement 3d).
@@ -111,6 +122,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         let word_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!("{} = act:word({})", var_path, word_literal))?;
                     }
+                    SetValue::DynamicWordRef {
+                        var_name,
+                        var_scope,
+                    } => {
+                        let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                        self.writeln(&format!("{} = act:word({})", var_path, ref_args))?;
+                    }
                 }
             }
             None => {
@@ -124,6 +142,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     SetValue::WordRef { name } => {
                         let word_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!("act:word({})", word_literal))?;
+                    }
+                    SetValue::DynamicWordRef {
+                        var_name,
+                        var_scope,
+                    } => {
+                        let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                        self.writeln(&format!("act:word({})", ref_args))?;
                     }
                 }
             }
@@ -158,6 +183,16 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 self.writeln(&format!(
                     "act:set_property({}, act:word({}))",
                     name_literal, word_literal
+                ))?;
+            }
+            SetValue::DynamicWordRef {
+                var_name,
+                var_scope,
+            } => {
+                let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                self.writeln(&format!(
+                    "act:set_property({}, act:word({}))",
+                    name_literal, ref_args
                 ))?;
             }
         }
@@ -356,6 +391,35 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     self.writeln(&format!("act.{}:talk({})", actor, literal))?;
                 }
             }
+            Action::DynamicWordRef {
+                var_name,
+                var_scope,
+                ..
+            } => {
+                // act.アクター:talk(act.アクター:word(var.x, "var.x"))
+                let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                self.writeln(&format!(
+                    "act.{}:talk(act.{}:word({}))",
+                    actor, actor, ref_args
+                ))?;
+            }
+            Action::DynamicFnCall {
+                var_name,
+                var_scope,
+                args,
+                ..
+            } => {
+                // act.アクター:talk((act.アクター:expr_fn_var(var.f, "var.f", 引数...)))
+                let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                let args_str = self.generate_args_string(args)?;
+                self.writeln(&format!(
+                    "act.{}:talk((act.{}:expr_fn_var({}{})))",
+                    actor,
+                    actor,
+                    ref_args,
+                    format_args_suffix(&args_str)
+                ))?;
+            }
         }
 
         // Record the (out_line -> span) correspondence for the line(s) just emitted.
@@ -430,6 +494,21 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 write!(buf, "(")?;
                 self.generate_expr_to_buffer(inner, buf)?;
                 write!(buf, ")")?;
+            }
+            Expr::DynamicFnCall {
+                var_name,
+                var_scope,
+                args,
+            } => {
+                // act:expr_fn_var(var.f, "var.f", 引数...)
+                let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
+                let args_str = self.generate_args_string(args)?;
+                write!(
+                    buf,
+                    "act:expr_fn_var({}{})",
+                    ref_args,
+                    format_args_suffix(&args_str)
+                )?;
             }
             Expr::Binary { op, lhs, rhs } => {
                 self.generate_expr_to_buffer(lhs, buf)?;

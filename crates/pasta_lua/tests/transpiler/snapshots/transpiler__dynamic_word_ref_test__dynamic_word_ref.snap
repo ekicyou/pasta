@@ -1,0 +1,26 @@
+---
+source: crates/pasta_lua/tests/transpiler/dynamic_word_ref_test.rs
+expression: transpile(source)
+---
+local PASTA = require "pasta"
+local GLOBAL = require "pasta.global"
+
+do
+    local SCENE = PASTA.create_scene("メイン")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        var.x = "挨拶"
+        act.さくら:talk(act.さくら:word(var.x, "var.x"))
+        act.さくら:talk("です")
+        act.うにゅう:talk(act.うにゅう:word(save.k, "save.k"))
+        act.うにゅう:talk((act.うにゅう:expr_fn_var(args[1], "args[1]", 1, var.a)))
+        var.y = act:word(save.k, "save.k")
+        save.y = act:word(var.x, "var.x")
+        act:word(var.x, "var.x")
+        act:set_property("prop", act:word(var.x, "var.x"))
+        var.z = act:expr_fn_var(var.f, "var.f") + 1
+    end
+end

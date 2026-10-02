@@ -195,6 +195,27 @@ async function run() {
   log('');
 
   // -----------------------------------------------------------------------
+  // 動的単語参照（dynamic-word-reference 6.4, 7.10）: ＠ から変数名・引数までが
+  // 1 つの単語参照スコープの span になる（VSCode 拡張と同じ色分け）。
+  // -----------------------------------------------------------------------
+  {
+    const cases = [
+      ['　さくら：＠＄x　です', '＠＄x'],
+      ['　さくら：＠＄＊x　です', '＠＄＊x'],
+      ['　さくら：＠＄f（１）　です', '＠＄f（１）'],
+    ];
+    for (const [line, ref] of cases) {
+      const [spans] = tok.tokenizeText(line);
+      const start = line.indexOf(ref);
+      check(`6.4: 動的参照 ${ref} が単語参照スコープ`,
+        spans.some((s) => s.startIndex === start && s.endIndex === start + ref.length &&
+          s.scopes[s.scopes.length - 1] === 'markup.inline.raw.string.pasta'),
+        JSON.stringify(spans));
+    }
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
   // 入れ子 lua の二段化（核心・1.3）。
   // 単一パス（pasta のみ）では lua 本体は meta.embedded.block.lua.content 止まり。
   // 二段化後は lua スコープが付くことを検証（差を示す）。

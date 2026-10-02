@@ -118,7 +118,7 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
     let mut name: Option<String> = None;
     let mut terms: Vec<Expr> = Vec::new();
     let mut operators: Vec<BinOp> = Vec::new();
-    let mut word_ref_name: Option<String> = None;
+    let mut word_ref_value: Option<SetValue> = None;
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
@@ -133,10 +133,20 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
                 // word_marker is a hidden rule, so only id is in inner pairs
                 for word_inner in inner.into_inner() {
                     if word_inner.as_rule() == Rule::id {
-                        word_ref_name = Some(word_inner.as_str().to_string());
+                        word_ref_value = Some(SetValue::WordRef {
+                            name: word_inner.as_str().to_string(),
+                        });
                         break;
                     }
                 }
+            }
+            Rule::word_ref_dynamic => {
+                // Explicit arm: the default arm would not yield the dynamic reference
+                word_ref_value =
+                    parse_dyn_name(inner).map(|(var_name, var_scope)| SetValue::DynamicWordRef {
+                        var_name,
+                        var_scope,
+                    });
             }
             rule => {
                 if let Some(op) = bin_op_from_rule(rule) {
@@ -149,18 +159,14 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
         }
     }
 
-    // Build value based on whether we have word_ref or expr
-    let value = if let Some(ref_name) = word_ref_name {
-        // word_ref was detected
-        SetValue::WordRef { name: ref_name }
-    } else {
-        let expr = if terms.is_empty() {
+    // Build value based on whether we have a (static or dynamic) word_ref or expr
+    let value = word_ref_value.unwrap_or_else(|| {
+        SetValue::Expr(if terms.is_empty() {
             Expr::BlankString
         } else {
             build_left_assoc_expr(terms, operators)
-        };
-        SetValue::Expr(expr)
-    };
+        })
+    });
 
     Ok(VarSet {
         name,
