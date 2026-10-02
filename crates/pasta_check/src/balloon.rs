@@ -259,6 +259,61 @@ fn check_overlaps(dirs: &[(String, String)]) -> io::Result<()> {
     Ok(())
 }
 
+/// 同梱バルーンの判定結果。ファイルは一切書かない。
+pub(crate) struct BalloonPlan {
+    /// 同梱バルーンのフォルダ（配布フォルダからの相対パス、`/` 区切り、実在のフォルダ名）。
+    /// 探索順（番号なし → 0 → 1 …）で並び、重複は除去済み。
+    pub dirs: Vec<String>,
+    /// 警告文（接頭辞なし。表示は呼び出し側が `Warning: ` を付ける）。
+    pub warnings: Vec<String>,
+}
+
+/// 配布フォルダ直下の install.txt から同梱バルーンを判定する。
+/// - install.txt が無い: Ok(空の BalloonPlan)
+/// - 判定に関わる問題: Err(io::Error)（kind は InvalidData。メッセージにファイル・キー・値を含める）
+pub(crate) fn plan_bundled_balloons(release_dir: &Path) -> io::Result<BalloonPlan> {
+    // 宣言の確認（read_utf8_kv）は指定の有無より先に行う
+    let kv = match read_utf8_kv(&release_dir.join("install.txt"), "install.txt") {
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Vec::new(),
+        r => r?,
+    };
+
+    let mut dirs = Vec::new();
+    for spec in find_balloon_specs(&kv)? {
+        let comps = normalize_value(&spec)?;
+        dirs.push((
+            resolve_existing_dir(release_dir, &comps, &spec.key)?,
+            spec.key,
+        ));
+    }
+    // 解決 → 重複除去 → 重なり検出の順（逆だと同じフォルダが重なりと誤判定される）
+    dedup_dirs(&mut dirs);
+    check_overlaps(&dirs)?;
+
+    let mut warnings = Vec::new();
+    for (dir, _) in &dirs {
+        let path = release_dir.join(dir).join("descript.txt");
+        if !path.is_file() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("bundled balloon \"{dir}\": descript.txt not found"),
+            ));
+        }
+        let kv = read_utf8_kv(&path, &format!("{dir}/descript.txt"))?;
+        let homeurl = kv.iter().find(|(k, _)| k == "homeurl");
+        if homeurl.is_none_or(|(_, v)| v.is_empty()) {
+            warnings.push(format!(
+                "bundled balloon \"{dir}\": descript.txt has no homeurl; the balloon cannot be network-updated"
+            ));
+        }
+    }
+
+    Ok(BalloonPlan {
+        dirs: dirs.into_iter().map(|(dir, _)| dir).collect(),
+        warnings,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -765,5 +820,251 @@ mod tests {
         ]))
         .unwrap();
         check_overlaps(&[]).unwrap();
+    }
+
+    /// 配布フォルダを作り、(相対パス, 内容) のファイルを置く。
+    fn release_with(files: &[(&str, &[u8])]) -> TempDir {
+        let temp = TempDir::new().unwrap();
+        for (rel, bytes) in files {
+            let path = temp.path().join(rel);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, bytes).unwrap();
+        }
+        temp
+    }
+
+    fn plan(root: &Path) -> io::Result<(Vec<String>, Vec<String>)> {
+        plan_bundled_balloons(root).map(|p| (p.dirs, p.warnings))
+    }
+
+    fn plan_err(root: &Path) -> String {
+        let err = plan_bundled_balloons(root).err().unwrap();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        err.to_string()
+    }
+
+    const INSTALL_BAL: &[u8] = b"charset,UTF-8\r\ntype,ghost\r\nballoon.source.directory,bal\r\n";
+    const DESCRIPT_OK: &[u8] =
+        b"charset,UTF-8\r\ntype,balloon\r\nHomeURL,https://example.com/bal/\r\n";
+
+    #[test]
+    fn test_plan_empty_without_install_txt() {
+        let temp = release_with(&[("ghost/master/descript.txt", b"charset,UTF-8\r\n")]);
+        assert_eq!(plan(temp.path()).unwrap(), (vec![], vec![]));
+    }
+
+    #[test]
+    fn test_plan_empty_without_spec() {
+        let temp = release_with(&[(
+            "install.txt",
+            b"charset,UTF-8\r\ntype,ghost\r\ndirectory,hello\r\n",
+        )]);
+        assert_eq!(plan(temp.path()).unwrap(), (vec![], vec![]));
+    }
+
+    #[test]
+    fn test_plan_checks_charset_before_spec() {
+        // 指定が無くても宣言の無い install.txt はエラー
+        let temp = release_with(&[("install.txt", b"type,ghost\r\ndirectory,hello\r\n")]);
+        assert_eq!(
+            plan_err(temp.path()),
+            "install.txt is not UTF-8: the first line must be \"charset,UTF-8\" (pasta_check supports UTF-8 only)"
+        );
+    }
+
+    #[test]
+    fn test_plan_returns_dir_without_warning_when_homeurl_present() {
+        let temp = release_with(&[
+            ("install.txt", INSTALL_BAL),
+            ("bal/descript.txt", DESCRIPT_OK),
+        ]);
+        assert_eq!(
+            plan(temp.path()).unwrap(),
+            (vec!["bal".to_string()], vec![])
+        );
+    }
+
+    #[test]
+    fn test_plan_warns_when_homeurl_missing_or_empty() {
+        for descript in [
+            &b"charset,UTF-8\r\ntype,balloon\r\n"[..],
+            b"charset,UTF-8\r\nhomeurl,\r\n",
+            b"charset,UTF-8\r\nhomeurl,   \r\n",
+            // 2 行目以降の homeurl は見ない（最初の行を採る）
+            b"charset,UTF-8\r\nhomeurl,\r\nhomeurl,https://example.com/\r\n",
+        ] {
+            let temp = release_with(&[
+                (
+                    "install.txt",
+                    b"charset,UTF-8\r\nballoon.source.directory,extra/emo2-kakukaku\r\n",
+                ),
+                ("extra/emo2-kakukaku/descript.txt", descript),
+            ]);
+            assert_eq!(
+                plan(temp.path()).unwrap(),
+                (
+                    vec!["extra/emo2-kakukaku".to_string()],
+                    vec![
+                        "bundled balloon \"extra/emo2-kakukaku\": descript.txt has no homeurl; the balloon cannot be network-updated"
+                            .to_string()
+                    ]
+                )
+            );
+        }
+    }
+
+    #[test]
+    fn test_plan_rejects_missing_descript_txt() {
+        let temp = release_with(&[
+            (
+                "install.txt",
+                b"charset,UTF-8\r\nballoon.directory,emo2-kakukaku\r\n",
+            ),
+            ("emo2-kakukaku/readme.txt", b""),
+        ]);
+        assert_eq!(
+            plan_err(temp.path()),
+            "bundled balloon \"emo2-kakukaku\": descript.txt not found"
+        );
+        // 同名のフォルダはファイルではない
+        fs::create_dir(temp.path().join("emo2-kakukaku/descript.txt")).unwrap();
+        assert_eq!(
+            plan_err(temp.path()),
+            "bundled balloon \"emo2-kakukaku\": descript.txt not found"
+        );
+    }
+
+    #[test]
+    fn test_plan_rejects_non_utf8_descript_txt() {
+        let temp = release_with(&[
+            (
+                "install.txt",
+                b"charset,UTF-8\r\nballoon.directory,emo2-kakukaku\r\n",
+            ),
+            (
+                "emo2-kakukaku/descript.txt",
+                b"charset,Shift_JIS\r\nhomeurl,x\r\n",
+            ),
+        ]);
+        assert_eq!(
+            plan_err(temp.path()),
+            "emo2-kakukaku/descript.txt is not UTF-8: the first line must be \"charset,UTF-8\" (pasta_check supports UTF-8 only)"
+        );
+    }
+
+    #[test]
+    fn test_plan_ignores_install_txt_in_subfolders() {
+        // バルーン自身の install.txt（指定・宣言なし）も ghost/master の install.txt も判定に使わない
+        let temp = release_with(&[
+            (
+                "bal/install.txt",
+                b"type,balloon\r\nballoon.directory,ghost\r\n",
+            ),
+            (
+                "ghost/master/install.txt",
+                b"charset,UTF-8\r\nballoon.directory,bal\r\n",
+            ),
+            ("bal/descript.txt", b"charset,UTF-8\r\n"),
+        ]);
+        assert_eq!(plan(temp.path()).unwrap(), (vec![], vec![]));
+
+        fs::write(temp.path().join("install.txt"), INSTALL_BAL).unwrap();
+        fs::write(temp.path().join("bal/descript.txt"), DESCRIPT_OK).unwrap();
+        assert_eq!(
+            plan(temp.path()).unwrap(),
+            (vec!["bal".to_string()], vec![])
+        );
+    }
+
+    #[test]
+    fn test_plan_dedups_specs_pointing_to_same_folder() {
+        // 区切りの違いだけの指定は 1 件になり、警告も 1 件
+        let temp = release_with(&[
+            (
+                "install.txt",
+                b"charset,UTF-8\r\nballoon.source.directory,extra\\bal\r\nballoon0.source.directory,extra/bal/\r\n",
+            ),
+            ("extra/bal/descript.txt", b"charset,UTF-8\r\n"),
+        ]);
+        let (dirs, warnings) = plan(temp.path()).unwrap();
+        assert_eq!(dirs, ["extra/bal"]);
+        assert_eq!(warnings.len(), 1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_plan_dedups_case_variants_on_windows() {
+        let temp = release_with(&[
+            (
+                "install.txt",
+                b"charset,UTF-8\r\nballoon.source.directory,extra\\Bal\r\nballoon0.source.directory,EXTRA/bal\r\n",
+            ),
+            ("extra/bal/descript.txt", DESCRIPT_OK),
+        ]);
+        assert_eq!(
+            plan(temp.path()).unwrap(),
+            (vec!["extra/bal".to_string()], vec![])
+        );
+    }
+
+    #[test]
+    fn test_plan_keeps_search_order() {
+        let temp = release_with(&[
+            (
+                "install.txt",
+                b"charset,UTF-8\r\nballoon1.directory,b\r\nballoon0.directory,a\r\nballoon.directory,c\r\n",
+            ),
+            ("a/descript.txt", DESCRIPT_OK),
+            ("b/descript.txt", DESCRIPT_OK),
+            ("c/descript.txt", b"charset,UTF-8\r\n"),
+        ]);
+        assert_eq!(
+            plan(temp.path()).unwrap(),
+            (
+                vec!["c".to_string(), "a".to_string(), "b".to_string()],
+                vec![
+                    "bundled balloon \"c\": descript.txt has no homeurl; the balloon cannot be network-updated"
+                        .to_string()
+                ]
+            )
+        );
+    }
+
+    /// 配布フォルダの (相対パス, ファイルなら内容) をすべて集める。
+    fn snapshot(root: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Option<Vec<u8>>> {
+        let mut out = std::collections::BTreeMap::new();
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            for entry in fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                let rel = path.strip_prefix(root).unwrap().to_path_buf();
+                if path.is_dir() {
+                    out.insert(rel, None);
+                    stack.push(path);
+                } else {
+                    out.insert(rel, Some(fs::read(&path).unwrap()));
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn test_plan_does_not_change_release_folder() {
+        let ok = release_with(&[
+            ("install.txt", INSTALL_BAL),
+            ("bal/descript.txt", b"charset,UTF-8\r\n"),
+            ("bal/install.txt", b"type,balloon\r\n"),
+            ("ghost/master/descript.txt", b"charset,UTF-8\r\nname,x\n"),
+        ]);
+        let ng = release_with(&[
+            ("install.txt", INSTALL_BAL),
+            ("bal/readme.txt", b"no descript\r\n"),
+        ]);
+        for (temp, ok) in [(ok, true), (ng, false)] {
+            let before = snapshot(temp.path());
+            assert_eq!(plan_bundled_balloons(temp.path()).is_ok(), ok);
+            assert_eq!(snapshot(temp.path()), before);
+        }
     }
 }

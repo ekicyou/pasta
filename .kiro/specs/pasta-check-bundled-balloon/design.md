@@ -226,7 +226,7 @@ flowchart TD
 | 6.1 | nar に `<バルーン>/updates.txt` | nar（変更なし） | 段 4 → 段 5 の順序 | 段 5 |
 | 6.2 | nar のパス体系・除外規則を保つ | nar（変更なし） | — | 段 5 |
 | 7.1 | `homeurl` 無し・空は警告 | balloon | `BalloonPlan.warnings` | 1 件の判定 |
-| 7.2 | `descript.txt` 不在はエラー | balloon | `io::Error(NotFound 系)` | 1 件の判定 |
+| 7.2 | `descript.txt` 不在はエラー | balloon | `io::Error(InvalidData)` | 1 件の判定 |
 | 7.3 | 警告では止めない | release | 警告表示後に段 5 へ | 段 4 |
 | 7.4 | 警告の接頭辞 | release | `eprintln!("Warning: {w}")` | 段 4 |
 | 7.5 | `descript.txt` にも UTF-8 規則・キー照合 | balloon | `read_utf8_kv` を共有 | 1 件の判定 |
