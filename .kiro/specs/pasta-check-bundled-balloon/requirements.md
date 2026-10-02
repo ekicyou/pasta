@@ -49,7 +49,7 @@
 1. When release の更新ファイル生成の段に入ったとき, the `pasta_check` shall 配布フォルダ直下の `install.txt` のバルーン指定に `source.directory` の行（例: `balloon.source.directory`）があれば、その値を同梱バルーンのフォルダとする
 2. If バルーン指定に `source.directory` の行が無く `directory` の行（例: `balloon.directory`）がある, then the `pasta_check` shall `directory` の値を同梱バルーンのフォルダとする
 3. If 配布フォルダ直下に `install.txt` が無い、または `install.txt` にバルーン指定が 1 つも無い, then the `pasta_check` shall 同梱バルーンは無いものとして、警告もエラーも出さずに従来どおりの更新ファイルを生成する
-4. Where `install.txt` に番号付きのバルーン指定（`balloon0.source.directory`・`balloon0.directory`・`balloon1.*`…）がある, the `pasta_check` shall ベースウェアと同じ順序（番号なし → 0 → 1 → 2 …、見つからない番号が出た時点で打ち切る）でバルーン指定を探し、見つかった各指定を 1 つの同梱バルーンとして 1・2 と同じ規則で扱う（**前提**: 複数同梱も対象に含める。OPEN QUESTION 7）
+4. Where `install.txt` に番号付きのバルーン指定（`balloon0.source.directory`・`balloon0.directory`・`balloon1.*`…）がある, the `pasta_check` shall ベースウェアと同じ順序（番号なし → 0 → 1 → 2 …、見つからない番号が出た時点で打ち切る）でバルーン指定を探し、見つかった各指定を 1 つの同梱バルーンとして 1・2 と同じ規則で扱う（ukadoc「install.txt」の同時インストールの規則に合わせる。番号なしと番号付きは別の指定として併存しうる。ディスカッション #1 で決定）
 5. If 複数のバルーン指定が同じフォルダを指す, then the `pasta_check` shall そのフォルダを 1 つの同梱バルーンとして 1 回だけ扱う
 6. The `pasta_check` shall 同梱バルーンの判定に、配布フォルダ直下の `install.txt` だけを使い、サブフォルダにある `install.txt`（例: 同梱バルーンのフォルダ内にあるバルーン自身の `install.txt`）は判定に使わない
 7. The `pasta_check` shall `--copy` による上書きが済んだ後の配布フォルダの `install.txt` を判定に使う
