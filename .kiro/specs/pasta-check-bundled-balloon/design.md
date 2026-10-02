@@ -6,7 +6,7 @@
 
 **利用者**: バルーンを同梱して配るゴーストの作者（emo2 など）が `pasta_check release` で配布物を作る。同梱バルーンを持たないゴースト（hello-pasta・pasta-in-windows）は、`install.txt` に `charset,UTF-8` の宣言がある限り従来どおりの出力を得る。
 
-**影響**: 段 4（更新ファイル生成）の前半に「同梱バルーンの判定（読み取りと検証のみ・書き込みなし）」を挟み、段 4 の書き出しに「相対パス一致の除外」と「バルーン用 `updates.txt` の書き出し」を加える。`install.txt` の UTF-8 宣言が必須になる（利用者に見える変更）。nar 作成（段 5）は変更しない。
+**影響**: 段 1 で `--nar` の位置の前回の nar を消す（Req 8.8）。段 4（更新ファイル生成）の前半に「同梱バルーンの判定（読み取りと検証のみ・書き込みなし）」を挟み、段 4 の書き出しに「相対パス一致の除外」と「バルーン用 `updates.txt` の書き出し」を加える。`install.txt` の UTF-8 宣言が必須になる（利用者に見える変更）。nar 作成（段 5）は変更しない。
 
 ### Goals
 - 同梱バルーン配下のファイルがゴースト用 `updates.txt`（ルート・`ghost/master`）に 1 行も載らない
@@ -20,7 +20,6 @@
 - `delete.txt` の生成、nar の構造・既存の除外規則の変更、`updates.txt` の形式変更
 - SSP の生成機能が外すファイル（`desktop.ini` など）や `developer_options.txt` の解釈の追加
 - 文字コード変換（Shift_JIS 等の `install.txt`・`descript.txt` は扱わない）
-- 失敗時に `--nar` の位置に残る前回の nar の削除（既存の挙動のまま。OPEN QUESTION 2）
 
 ## Boundary Commitments
 
@@ -101,7 +100,7 @@ crates/pasta_check/
 ├── src/
 │   ├── balloon.rs        # 新規: 同梱バルーンの判定（install.txt・descript.txt の読み取り、値の検証、実在名への解決、警告の組み立て）
 │   ├── update_files.rs   # 変更: 相対パス一致の除外・バルーン用 updates.txt の書き出し・戻り値を UpdateSummary に
-│   ├── release.rs        # 変更: 段 4 で判定→生成を呼び、件数と警告を表示
+│   ├── release.rs        # 変更: 段 1 で前回の nar を消す・段 4 で判定→生成を呼び、件数と警告を表示
 │   ├── main.rs           # 変更: `mod balloon;` の追加のみ
 │   ├── nar.rs            # 変更なし
 │   └── copy.rs           # 変更なし
@@ -111,7 +110,7 @@ crates/pasta_check/
 
 ### Modified Files
 - `crates/pasta_check/src/update_files.rs` — `generate_update_files(root, balloon_dirs)` に変更し、`collect_files` に除外する相対フォルダを渡す。バルーンごとに `collect_files(root.join(dir), &[])` → `generate_updates_txt` を呼ぶ。特性化テストと新しい単体テストを追加。
-- `crates/pasta_check/src/release.rs` — 段 4 を「`plan_bundled_balloons` → `generate_update_files` → 進捗表示 → 警告表示」に変更。既存テストの `install.txt` フィクスチャに `charset,UTF-8` を追加し、同梱バルーンのパイプラインテストを追加。
+- `crates/pasta_check/src/release.rs` — 段 1 で `--nar` の既存ファイルを消す（Req 8.8）。段 4 を「`plan_bundled_balloons` → `generate_update_files` → 進捗表示 → 警告表示」に変更。既存テストの `install.txt` フィクスチャに `charset,UTF-8` を追加し、同梱バルーンのパイプラインテストを追加。
 - `crates/pasta_check/src/main.rs` — `mod balloon;` を追加。
 - `crates/pasta_check/tests/cli_test.rs` — 既存 E2E の `install.txt` を UTF-8 宣言付きに変更。`Warning:` の E2E とエラー（exit 1・nar なし）の E2E を追加。
 - `crates/pasta_sample_ghost/ghosts/hello-pasta/install.txt` — 1 行目に `charset,UTF-8`（CRLF）を追加。
@@ -238,6 +237,7 @@ flowchart TD
 | 8.5 | 同梱ありのテスト | update_files, release, cli_test | パイプラインテスト | — |
 | 8.6 | バルーン無しでも UTF-8 宣言は必須 | balloon | 指定の有無より先に宣言を確認 | 段 4 |
 | 8.7 | hello-pasta に宣言追加・写しを同期 | sample ghost | `install.txt`・`integration_test.rs`・`release/hello-pasta` | — |
+| 8.8 | 段 1 で前回の nar を消す | release | `remove_stale_nar` | 段 1 |
 | 9.1 | `updates-txt-spec.md` | skill docs | — | — |
 | 9.2 | `nar-spec.md` | skill docs | — | — |
 | 9.3 | `SKILL.md` | skill docs | — | — |
@@ -250,7 +250,7 @@ flowchart TD
 |-----------|--------------|--------|--------------|------------------|-----------|
 | BalloonPlanner（`balloon.rs`） | 判定 | `install.txt` から同梱バルーンのフォルダを決め、警告を集める（読み取り専用） | 1.1–1.11, 2.1–2.8, 5.2, 7.1, 7.2, 7.5, 8.3, 8.6 | std::fs (P0) | Service |
 | UpdateFilesGenerator（`update_files.rs`） | 生成 | ゴースト用・バルーン用 `updates.txt` を書く | 3.1–3.4, 4.1–4.8, 5.1, 5.2, 8.1, 8.4, 8.5 | md5 (P0) | Service |
-| ReleaseOrchestrator（`release.rs`） | オーケストレーション | 段 4 で判定→生成→表示 | 1.7, 4.9, 7.3, 7.4, 8.5 | BalloonPlanner (P0), UpdateFilesGenerator (P0) | Batch |
+| ReleaseOrchestrator（`release.rs`） | オーケストレーション | 段 1 で前回の nar を消し、段 4 で判定→生成→表示 | 1.7, 4.9, 7.3, 7.4, 8.5, 8.8 | BalloonPlanner (P0), UpdateFilesGenerator (P0) | Batch |
 | NarBuilder（`nar.rs`） | 封入 | 変更なし。段 4 の成果物をそのまま封入 | 5.3, 6.1, 6.2, 8.2 | zip (P0) | — |
 | 文書・サンプル | 文書 | スキル・README・hello-pasta の更新 | 8.7, 9.1–9.5 | — | — |
 
@@ -419,8 +419,13 @@ fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<Fi
 
 | Field | Detail |
 |-------|--------|
-| Intent | 段 4 で判定 → 生成 → 進捗表示 → 警告表示を行う |
-| Requirements | 1.7, 4.9, 7.3, 7.4, 8.5 |
+| Intent | 段 1 で前回の nar を消し、段 4 で判定 → 生成 → 進捗表示 → 警告表示を行う |
+| Requirements | 1.7, 4.9, 7.3, 7.4, 8.5, 8.8 |
+
+##### 段 1 の追加（Req 8.8）
+- `prepare_release_dir` の直後に `remove_stale_nar(&args.nar)` を呼ぶ。`fs::remove_file` を行い、`NotFound` は成功とみなす。それ以外のエラー（`--nar` がフォルダ・削除できない）はそのまま返して止める。
+- 消したときは `  Removed previous {nar}` を stdout に出す（何を消したか作者に分かるように）。
+- 置き場所は `release.rs` の非公開関数。`nar.rs`（封入規則・Out of Boundary）には入れない。
 
 **Contracts**: Batch [x]
 
@@ -453,7 +458,7 @@ fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<Fi
 ### Error Strategy
 - **Fail fast・書く前に止める**: 配布物の誤りはすべて `plan_bundled_balloons` の中で `io::Error`（`ErrorKind::InvalidData`）として返し、何も書かずに終了する。既存の `Error:` ＋ exit 1 の経路をそのまま使い、新しいエラー型は作らない。
 - **警告は 1 種類**: `homeurl` 欠落だけ（valid だが更新できない状態）。生成物と終了コードに影響しない。
-- **前回の nar**: エラー時に `--nar` の位置に前回の nar が残るのは既存の IO エラーと同じ挙動で、本仕様では変えない（OPEN QUESTION 2）。
+- **前回の nar**: 段 1 で `--nar` の位置の既存ファイルを消す（Req 8.8）。どの段で失敗しても、`--nar` の位置に古い nar は残らない。
 
 ### Error Categories and Responses
 | 分類 | 条件 | 応答 |
@@ -482,6 +487,7 @@ fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<Fi
 ### Integration Tests（`release.rs`）
 - 同梱バルーン付きパイプライン: nar に `bal/updates.txt` があり、nar 内の各ファイルのバイト列の md5・size がバルーン用 `updates.txt` の記載と一致し、ルート・`ghost/master` の `updates.txt` に `bal/` の行が無い（3.2, 5.3, 6.1, 8.5）。
 - 判定エラー時: nar が作られず、配布フォルダのルートに `updates.txt` が新しく書かれない（validate-before-write、1.10, 2.5）。
+- 前回の nar: `--nar` の位置にダミーの nar を置いて判定エラーを起こすと、そのファイルが消えている（8.8）。成功時は新しい nar で置き換わる。
 - 既存テストの `install.txt` フィクスチャを `charset,UTF-8\r\n…` に更新し、バルーン無しの nar のエントリ集合が従来と同じであることを確認（8.2, 8.6）。
 
 ### E2E Tests（`tests/cli_test.rs`）
@@ -494,14 +500,14 @@ fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<Fi
 - `install.txt` は作者が書く入力で、値で任意のパスを指しうる。値は「区切りで分割 → `..`・`:`・先頭区切りを拒否 → `read_dir` の実在名だけで結合」の順で扱い、配布フォルダの外を読み書きしない（2.4）。シンボリックリンクのフォルダは同梱バルーンとして採らない（既存の収集・nar がリンクを辿らない方針と一致）。
 
 ## Migration Strategy
-- 利用者に見える変更は「`install.txt` に `charset,UTF-8` の宣言が必須」の 1 点。README とスキルに明記する（9.4）。
+- 利用者に見える変更は「`install.txt` に `charset,UTF-8` の宣言が必須」と「release の開始時に `--nar` の前回の nar を消す」の 2 点。README とスキルに明記する（9.4）。
 - リポジトリ内: hello-pasta の `install.txt` に宣言を足し、`release/hello-pasta` を新しい `pasta_check release` で再生成する。
 - 下流: emo2（`Charset,UTF-8` 済み）は追加作業なし。pasta-in-windows（ghost_dev の `project/pasta-in-windows` と `release/pasta-in-windows`）も 1 行目が `Charset,UTF-8` で、追加作業なし（設計ディスカッションで確認）。ghost_dev 側にある hello-pasta の写しは、本リポジトリの hello-pasta の更新に追従すればよい。
 
 ## Open Questions（設計ディスカッションで決める）
 
 1. **モジュールの分け方** — **決定: 案 B（`balloon.rs` を新設）。** 既存の関心ごとに 1 モジュールの形に合わせる。
-2. **失敗時に残る前回の nar**（Error Handling）— 案: 既存どおり残す（本書の前提）／段 1 で `--nar` の既存ファイルを消す。作成ツールは問題があれば止める方針から、誤って古い nar を配る危険をどう見るか。
+2. **失敗時に残る前回の nar** — **決定（設計ディスカッション #1）: 段 1 で `--nar` の既存ファイルを消す（Req 8.8）。** 古い nar を最新と誤って配るのを防ぐ。
 3. **`release/hello-pasta` の写しの同期方法** — **決定: `pasta_check release` で再生成。** 手直しは md5・size が食い違う壊れた写しになる（作成ツールは問題があれば止める原則から自明）。
 4. **同じキーが複数あるとき** — **決定: バルーン指定のキーの重複はエラー（Req 2.7）。** SSP の挙動が未確認で、食い違えば判定がずれるため（原則から自明）。その他のキーは最初の行。
 5. **番号なしの指定が無いときの番号付きの探索** — **決定: 番号なしの有無に関係なく `balloon0` から探す（ukadoc の例より自明）。** あわせて、ukadoc「欠番を作ってはいけない」から、欠番の後ろの指定はエラーとする（Req 1.4）。

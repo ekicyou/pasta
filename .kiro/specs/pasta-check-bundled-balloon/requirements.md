@@ -138,6 +138,7 @@
 5. The `pasta_check` shall 同梱バルーンがある配布フォルダについて、ゴースト用 `updates.txt` に同梱バルーン配下の行が無いこと、バルーン用 `updates.txt` の各行の md5 と size が実ファイルと一致すること、nar にバルーン用 `updates.txt` が入ることを検証するテストを持つ
 6. If 同梱バルーンが無いゴーストでも、配布フォルダ直下の `install.txt` が Requirement 1.9 の確認を通らない, then the `pasta_check` shall Requirement 1.10 のエラーで止める（1〜3 の後方互換の例外。ukadoc では宣言の無い `install.txt` は Shift_JIS であり、UTF-8 限定のツールとして扱わない）
 7. The リポジトリのサンプルゴースト hello-pasta の `install.txt`（`crates/pasta_sample_ghost/ghosts/hello-pasta/install.txt`）shall 1 行目に `charset,UTF-8` を持ち、新しい `pasta_check` の release を通る（リポジトリに置かれた `release/hello-pasta` の写しも同じ内容にそろえる）
+8. When release を開始したとき, the `pasta_check` shall `--nar` の位置に既にあるファイルを、配布フォルダの準備と同じ段で削除し、その後のどの段で失敗しても `--nar` の位置に nar が残らないようにする（失敗時に前回の nar が残ると、古い配布物を最新と誤って配りうるため。同梱バルーンの有無によらない既存の挙動の変更で、1〜3 の後方互換の例外。作成ツールは問題があれば止める。設計ディスカッション #1 で決定）
 
 ### Requirement 9: スキル・README の記述更新
 
@@ -147,5 +148,5 @@
 1. The スキル `pasta-check` の `references/updates-txt-spec.md` shall 同梱バルーンの判定方法（`install.txt` のキー・優先順位・番号付き指定・階層付きの値）、不正な値と重なりのエラー、ゴースト用 `updates.txt` からの除外、バルーン用 `updates.txt` の位置と相対パスの基準、適用する除外規則、`homeurl` 欠落の警告を記載する
 2. The スキル `pasta-check` の `references/nar-spec.md` shall nar にバルーン用 `updates.txt` が入ることと、同梱バルーンがあるときの内部構造の例を記載する
 3. The スキル `pasta-check` の `SKILL.md` shall 実行フローの更新ファイル生成の段の説明・ディレクトリ構成例・トラブルシューティング（`homeurl` 警告、`install.txt`・`descript.txt` が UTF-8 でないエラー、不正な値・指定フォルダ不在・`descript.txt` 不在・重なりのエラー）に同梱バルーンの扱いを反映する
-4. The `crates/pasta_check/README.md` shall 仕様メモに同梱バルーンの扱い（判定・除外・バルーン用 `updates.txt`）と、`install.txt` に `charset,UTF-8` の宣言を必須とすることを記載する（crates.io の利用者が読む説明であり、UTF-8 必須は利用者に見える変更のため。ディスカッションで決定）
+4. The `crates/pasta_check/README.md` shall 仕様メモに同梱バルーンの扱い（判定・除外・バルーン用 `updates.txt`）と、`install.txt` に `charset,UTF-8` の宣言を必須とすること、release の開始時に `--nar` の位置の前回の nar を消すこと（Requirement 8.8）を記載する（crates.io の利用者が読む説明であり、どちらも利用者に見える変更のため。ディスカッションで決定）
 5. When 上記の文書を更新するとき, the スキル `pasta-check` shall 同じ文書にある現行実装と食い違う既存の記述（例: 除外ファイル表に `updates2.dau` が無い、トラブルシューティングの「updates.txt が Shift_JIS でない」、nar 内部構造の例の `ghost/master/pasta_scripts/`）を現行実装に合わせて正す（触る文書の中の食い違いは同時に直す。特に Shift_JIS の記述は UTF-8 限定の方針と矛盾する。ディスカッションで決定）

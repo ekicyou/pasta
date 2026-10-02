@@ -251,7 +251,7 @@ Req 1.11・2.1・2.3 は「ゼロ以外で終了し nar を作らない」。現
 ### Decision: 書く前に検証を確定させる（§7-4、§4.1）
 - **Selected Approach**: `plan_bundled_balloons` は読み取り専用で、判定に関わるエラー（Req 1.10・2.1・2.3・2.5・7.2・7.5）をすべてここで返す。書き出し（`generate_update_files`）はその後。
 - **Rationale**: エラー時に書きかけの `updates.txt` が配布フォルダに残らない。モジュール境界（読むだけ／書く）と一致する。
-- **Trade-offs**: 前回の nar は既存どおり残る（OPEN QUESTION 2）。
+- **Trade-offs**: 前回の nar は段 1 で消す（Req 8.8、設計ディスカッション #1 で決定）。書く前の検証と合わせ、失敗時に古い配布物が `--nar` の位置に残らない。
 
 ### Decision: 番号付き指定の探索と同じキーの扱い
 - **Selected Approach**: 番号なしを調べた後、`balloon0` から順に `.source.directory` か `.directory` の行がある番号を拾い、どちらも無い最初の番号で打ち切る。番号なしの有無は番号付きの探索に影響しない。同じキーが複数あるときは最初の行を採る。
