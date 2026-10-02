@@ -54,7 +54,8 @@ use std::sync::Arc;
 pub struct PastaLuaRuntime {
     lua: Lua,
     /// Instance-specific logger (optional).
-    /// If set, this logger is used for tracing output.
+    /// Held so the logger lives as long as the runtime; tracing output reaches
+    /// it through the GlobalLoggerRegistry entry, not through this field.
     /// Wrapped in Arc for sharing with GlobalLoggerRegistry.
     logger: Option<Arc<PastaLogger>>,
     /// Configuration for persistence and other runtime settings.

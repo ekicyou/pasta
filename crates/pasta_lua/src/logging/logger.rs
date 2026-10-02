@@ -1,6 +1,7 @@
-//! PastaLogger - Instance-specific file logger with rotation.
+//! PastaLogger - Instance-specific file logger.
 //!
-//! Each ghost instance can have its own log file with automatic rotation.
+//! Each ghost instance can have its own log file. The file name is fixed
+//! (`Rotation::NEVER`); the file is appended to and never rotated.
 
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -10,10 +11,10 @@ use tracing_appender::rolling::{RollingFileAppender, Rotation};
 
 use crate::loader::LoggingConfig;
 
-/// PastaLogger - Instance-specific file logger with rotation.
+/// PastaLogger - Instance-specific file logger.
 ///
-/// Each instance manages its own log file with non-blocking writes
-/// and automatic rotation.
+/// Each instance manages its own log file with non-blocking writes.
+/// The file is never rotated.
 pub struct PastaLogger {
     /// Absolute path to the log file.
     log_path: PathBuf,

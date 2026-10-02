@@ -135,7 +135,7 @@
   - _Requirements: 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.5, 3.8, 4.1_
   - _Boundary: InternalsChapters（debug）_
 
-- [ ] 4.8 (P) ロギングとエンコーディング章を執筆する
+- [x] 4.8 (P) ロギングとエンコーディング章を執筆する
   - ロギング（初期化・ロガー登録・ログモジュールの実装・ファイル出力）とエンコーディング（OS 別実装・エンコーディングモジュールの実装・SHIORI 境界での文字コード）を現行コードと照合して書く
   - 食い違うコメントはコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
   - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 になる
@@ -233,3 +233,4 @@
 - 4.5: shiori 章の「ソースの所在」に対応表外の `crates/pasta_shiori/Cargo.toml` とテストパスを追加済み（4.11 で判断）。`kick.lua` の古いコメント（「kick の消費は別タスク」）は 4.7 に残置。付録 B に OnTalk 間隔の毎回同一（`math.randomseed` 未呼び出し）と unload 無し終了時の 5 秒停滞を記録済み。
 - 4.6: 付録 B に `group_by_actor` のトークン欠落・並べ替え（利用者章 `lua/patterns.md` の例も出力が落ちる）を記録済み。`pasta/shiori/act.lua` は不可触の対象か曖昧なため未変更。budoux 幅の数え直しは事実として章に記載し、付録 B には入れていない（budoux/areka はゴースト層で対処する方針）。
 - 4.7: debug 章の「ソースの所在」にテストパス群を追加済み（4.11 で判断）。付録 B に 5 件（位置キックの前方一致誤起動、末尾数字のシーン名の identity 索引漏れ、Windows の SO_REUSEADDR 二重 bind、C フレームでの variables ずれ、1 起動 1 接続の利用者章未記載）。`ACT_IMPL.find_scene` が `global_scene_name` を捨てている点（`act.lua`、不可触）は末尾数字の件の原因でもあり、取り込み後に確認する。
+- 4.8: logging-encoding 章の「ソースの所在」にテストパス（`crates/pasta_lua/tests/log/`・`crates/pasta_lua/tests/runtime/encoding_test.rs`）を追加済み（4.11 で判断）。付録 B に 4 件（FFI 入口スレッドのログ破棄、フィルタの再読み込み不整合と利用者章 pasta-toml.md との食い違い、CP 65001 の to_ansi、未使用の公開関数）。

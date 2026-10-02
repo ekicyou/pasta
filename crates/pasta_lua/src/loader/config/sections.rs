@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 /// Logging configuration from [logging] section in pasta.toml.
 ///
-/// Configures instance-specific logging with file rotation and log level filtering.
+/// Configures the instance-specific log file path and log level filtering.
 #[derive(Debug, Clone, Deserialize)]
 pub struct LoggingConfig {
     /// Log file path relative to load_dir.
@@ -20,6 +20,7 @@ pub struct LoggingConfig {
 
     /// Number of days to retain log files.
     /// Default: 7
+    /// Note: currently not read anywhere; the log file is never rotated.
     #[serde(default = "default_rotation_days")]
     pub rotation_days: usize,
 
@@ -49,7 +50,7 @@ impl Default for LoggingConfig {
 
 impl LoggingConfig {
     /// Build EnvFilter directive string.
-    /// Priority: filter > level > default ("debug")
+    /// Priority: filter > level (`level` defaults to "info")
     pub fn to_filter_directive(&self) -> String {
         if let Some(ref filter) = self.filter {
             filter.clone()
