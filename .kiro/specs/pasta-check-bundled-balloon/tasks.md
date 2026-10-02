@@ -42,7 +42,7 @@
   - 単体テスト: `source.directory` 優先・`directory` 代用・番号なし＋0＋1 の 3 件・番号なし無しで `balloon0`・`balloon0`＋`balloon2` の欠番エラー・キーの大文字小文字無視・`Balloon.Directory` を含む重複エラーがそれぞれ期待どおりになる
   - _Requirements: 1.1, 1.2, 1.4, 2.7_
 
-- [ ] 2.3 バルーン指定の値の正規化と検証を実装する
+- [x] 2.3 バルーン指定の値の正規化と検証を実装する
   - 設計の順（空 → `directory` 代用時の区切り → 先頭区切り → `:` → `..` → 正規化後の空 → `profile`・`var`）で検査し、最初に該当した理由とキー・値を示すエラーにする
   - `source.directory` の値は `/`・`\` どちらの区切りでも階層付きの相対パスとして要素列にする（空要素と `.` は捨てる）
   - 単体テスト: `extra\bal1`・`extra/bal1/` を受け入れ、空・`/abs`・`\\server\x`・`C:\x`・`C:x`・`a/../b`・`.`・`directory` 代用時の `a/b`・`profile/bal`・`x/Var/bal` が各理由のエラーになる
@@ -151,3 +151,4 @@
 ## Implementation Notes
 
 - 1.3: リポジトリに .gitattributes は無く `core.autocrlf=true`。テキストは index が LF・作業ツリーが CRLF（`git ls-files --eol` で `i/lf w/crlf`）。5.2 で写しを再生成するとき、md5 は作業ツリーの CRLF のバイト列で計算される点に注意する。
+- 2.3: Windows では `bal.`・`bal `・`...`・`.. ` も `is_dir()` が真になる（`...` は親フォルダ自身を指す）。2.4 の解決は「`is_dir()` が真」だけで採らず、必ず `read_dir` の実在名との一致（完全一致または小文字一致）で採り、結合には実在名だけを使う。

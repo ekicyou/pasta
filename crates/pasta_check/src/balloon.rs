@@ -128,6 +128,52 @@ fn parse_spec_key(key: &str) -> Option<(&str, bool)> {
         .then_some((num, source))
 }
 
+/// 値を要素列に正規化し検証する。`/`・`\` のどちらも区切りとみなし、空要素と `.` は捨てる。
+/// 検査は 空 → `directory` に区切り → 先頭区切り → `:` → `..` → 正規化後の空 → `profile`・`var`
+/// の順で、最初に該当した理由でエラーにする。
+fn normalize_value(spec: &BalloonSpec) -> io::Result<Vec<String>> {
+    let value = spec.value.trim();
+    let invalid = |reason: &str| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "install.txt: invalid value for {}: \"{value}\" ({reason})",
+                spec.key
+            ),
+        )
+    };
+    let is_sep = |c: char| c == '/' || c == '\\';
+
+    if value.is_empty() {
+        return Err(invalid("empty"));
+    }
+    if !spec.hierarchical_allowed && value.contains(is_sep) {
+        return Err(invalid("path separator is not allowed in directory"));
+    }
+    // 先頭の区切りはルート・UNC、`:` はドライブ名・ドライブ相対・代替ストリーム
+    if value.starts_with(is_sep) || value.contains(':') {
+        return Err(invalid("absolute path"));
+    }
+    let comps: Vec<String> = value
+        .split(is_sep)
+        .filter(|c| !c.is_empty() && *c != ".")
+        .map(str::to_string)
+        .collect();
+    if comps.iter().any(|c| c == "..") {
+        return Err(invalid("parent directory reference"));
+    }
+    if comps.is_empty() {
+        return Err(invalid("empty"));
+    }
+    if comps
+        .iter()
+        .any(|c| c.eq_ignore_ascii_case("profile") || c.eq_ignore_ascii_case("var"))
+    {
+        return Err(invalid("excluded folder (profile/var)"));
+    }
+    Ok(comps)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -363,6 +409,85 @@ mod tests {
             ]),
             "install.txt: duplicate key balloon0.source.directory",
         );
+    }
+
+    fn normalize(key: &str, value: &str, hierarchical_allowed: bool) -> io::Result<Vec<String>> {
+        normalize_value(&BalloonSpec {
+            key: key.to_string(),
+            value: value.to_string(),
+            hierarchical_allowed,
+        })
+    }
+
+    #[test]
+    fn test_normalize_value_accepts_hierarchical_paths() {
+        let key = "balloon.source.directory";
+        assert_eq!(
+            normalize(key, r"extra\bal1", true).unwrap(),
+            ["extra", "bal1"]
+        );
+        assert_eq!(
+            normalize(key, "extra/bal1/", true).unwrap(),
+            ["extra", "bal1"]
+        );
+        assert_eq!(normalize(key, "./a//b", true).unwrap(), ["a", "b"]);
+        assert_eq!(
+            normalize("balloon.directory", "bal1", false).unwrap(),
+            ["bal1"]
+        );
+    }
+
+    #[test]
+    fn test_normalize_value_rejects_each_reason() {
+        let src = "balloon0.source.directory";
+        let dir = "balloon.directory";
+        for (key, value, hierarchical_allowed, reason) in [
+            (src, "", true, "empty"),
+            (src, "/abs", true, "absolute path"),
+            (src, r"\\server\x", true, "absolute path"),
+            (src, r"C:\x", true, "absolute path"),
+            (src, "C:x", true, "absolute path"),
+            (src, "a/../b", true, "parent directory reference"),
+            (src, ".", true, "empty"),
+            (src, "./", true, "empty"),
+            (
+                dir,
+                "a/b",
+                false,
+                "path separator is not allowed in directory",
+            ),
+            (
+                dir,
+                r"a\b",
+                false,
+                "path separator is not allowed in directory",
+            ),
+            (
+                dir,
+                "/abs",
+                false,
+                "path separator is not allowed in directory",
+            ),
+            (src, "profile/bal", true, "excluded folder (profile/var)"),
+            (src, "x/Var/bal", true, "excluded folder (profile/var)"),
+            (dir, "PROFILE", false, "excluded folder (profile/var)"),
+            // 最初に該当した理由でエラーにする
+            (src, "/../x", true, "absolute path"),
+            (src, "../profile", true, "parent directory reference"),
+            (
+                dir,
+                "profile/x",
+                false,
+                "path separator is not allowed in directory",
+            ),
+        ] {
+            let err = normalize(key, value, hierarchical_allowed).unwrap_err();
+            assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+            assert_eq!(
+                err.to_string(),
+                format!("install.txt: invalid value for {key}: \"{value}\" ({reason})")
+            );
+        }
     }
 
     #[test]
