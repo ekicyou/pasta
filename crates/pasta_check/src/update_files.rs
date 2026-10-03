@@ -86,41 +86,80 @@ fn days_to_ymd(mut days: u32) -> (u32, u32, u32) {
     (year, month, days + 1)
 }
 
-/// 更新ファイルを生成。戻り値は登録したファイルエントリ数。
-pub(crate) fn generate_update_files(root_dir: &Path) -> io::Result<usize> {
-    let entries = collect_files(root_dir)?;
-    let count = entries.len();
+/// 段 4 の生成結果
+pub(crate) struct UpdateSummary {
+    /// ゴースト用 updates.txt の登録件数（0 なら生成していない。従来の戻り値と同じ意味）
+    pub ghost_entries: usize,
+    /// 生成したバルーン用 updates.txt の (フォルダ, 登録件数)。0 件で生成しなかったものは含めない
+    pub balloon_entries: Vec<(String, usize)>,
+}
 
-    if entries.is_empty() {
-        return Ok(0);
+/// 更新ファイルを生成する。
+///
+/// `balloon_dirs`: 配布フォルダからの相対パス（`/` 区切り・実在名・検証済み）。
+/// ゴースト用の収集から外し、各フォルダ直下にバルーン用 updates.txt を書く。
+pub(crate) fn generate_update_files(
+    root_dir: &Path,
+    balloon_dirs: &[String],
+) -> io::Result<UpdateSummary> {
+    let entries = collect_files(root_dir, balloon_dirs)?;
+    let ghost_entries = entries.len();
+
+    if !entries.is_empty() {
+        generate_updates_txt(root_dir, &entries)?;
+
+        // ghost/master が存在する場合、updates.txt をそこにもコピー
+        let ghost_master = root_dir.join("ghost/master");
+        if ghost_master.is_dir() {
+            fs::copy(
+                root_dir.join("updates.txt"),
+                ghost_master.join("updates.txt"),
+            )?;
+        }
     }
 
-    generate_updates_txt(root_dir, &entries)?;
-
-    // ghost/master が存在する場合、updates.txt をそこにもコピー
-    let ghost_master = root_dir.join("ghost/master");
-    if ghost_master.is_dir() {
-        fs::copy(
-            root_dir.join("updates.txt"),
-            ghost_master.join("updates.txt"),
-        )?;
+    // バルーン用: フォルダ直下にだけ書く（ghost/master への複製はしない）
+    let mut balloon_entries = Vec::new();
+    for dir in balloon_dirs {
+        let balloon_dir = root_dir.join(dir);
+        let entries = collect_files(&balloon_dir, &[])?;
+        if entries.is_empty() {
+            continue;
+        }
+        generate_updates_txt(&balloon_dir, &entries)?;
+        balloon_entries.push((dir.clone(), entries.len()));
     }
 
-    Ok(count)
+    Ok(UpdateSummary {
+        ghost_entries,
+        balloon_entries,
+    })
 }
 
 /// ディレクトリ内のファイルを再帰的に収集
-fn collect_files(root_dir: &Path) -> io::Result<Vec<FileEntry>> {
+///
+/// `excluded_dirs`: 基準フォルダからの相対パス（`/` 区切り）が完全一致したフォルダを丸ごと外す
+/// （名前一致の既存除外に追加）
+fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<FileEntry>> {
     let mut entries = Vec::new();
-    collect_files_recursive(root_dir, root_dir, &mut entries)?;
+    collect_files_recursive(root_dir, root_dir, excluded_dirs, &mut entries)?;
     entries.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(entries)
+}
+
+/// Unicode として不正な名前は化けさせずに止める（UTF-8 限定の作成ツール）
+fn non_unicode_name(path: &Path) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("file name is not valid Unicode: {}", path.display()),
+    )
 }
 
 /// 再帰的にファイルを収集
 fn collect_files_recursive(
     root_dir: &Path,
     current_dir: &Path,
+    excluded_dirs: &[String],
     entries: &mut Vec<FileEntry>,
 ) -> io::Result<()> {
     let read_dir = match fs::read_dir(current_dir) {
@@ -139,21 +178,23 @@ fn collect_files_recursive(
         let path = entry.path();
         let name = entry.file_name();
 
+        // 基準フォルダからの相対パス（スラッシュ区切り。read_dir の実在名から作る）
+        let relative_path = path
+            .strip_prefix(root_dir)
+            .map_err(|e| io::Error::other(e.to_string()))?
+            .to_str()
+            .ok_or_else(|| non_unicode_name(&path))?
+            .replace('\\', "/");
+
         if file_type.is_dir() {
-            if EXCLUDED_DIRS.iter().any(|&d| d == name) {
+            if EXCLUDED_DIRS.iter().any(|&d| d == name) || excluded_dirs.contains(&relative_path) {
                 continue;
             }
-            collect_files_recursive(root_dir, &path, entries)?;
+            collect_files_recursive(root_dir, &path, excluded_dirs, entries)?;
         } else if file_type.is_file() {
             if EXCLUDED_FILES.iter().any(|&f| f == name) {
                 continue;
             }
-
-            let relative_path = path
-                .strip_prefix(root_dir)
-                .map_err(|e| io::Error::other(e.to_string()))?
-                .to_string_lossy()
-                .replace('\\', "/");
 
             let metadata = fs::metadata(&path)?;
 
@@ -239,7 +280,7 @@ mod tests {
         fs::create_dir(&profile_dir).unwrap();
         fs::write(profile_dir.join("user.txt"), "user data").unwrap();
 
-        let entries = collect_files(temp.path()).unwrap();
+        let entries = collect_files(temp.path(), &[]).unwrap();
 
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].path, "test.txt");
@@ -257,7 +298,9 @@ mod tests {
         fs::create_dir_all(&shell_dir).unwrap();
         fs::write(shell_dir.join("surface0.png"), "fake png").unwrap();
 
-        let count = generate_update_files(temp.path()).unwrap();
+        let count = generate_update_files(temp.path(), &[])
+            .unwrap()
+            .ghost_entries;
         assert_eq!(count, 2);
 
         assert!(!temp.path().join("updates2.dau").exists());
@@ -306,7 +349,9 @@ mod tests {
     #[test]
     fn test_generate_update_files_empty_dir_creates_nothing() {
         let temp = TempDir::new().unwrap();
-        let count = generate_update_files(temp.path()).unwrap();
+        let count = generate_update_files(temp.path(), &[])
+            .unwrap()
+            .ghost_entries;
         assert_eq!(count, 0);
         assert!(!temp.path().join("updates.txt").exists());
     }
@@ -316,7 +361,7 @@ mod tests {
     fn test_generate_update_files_nonexistent_root_returns_zero() {
         let temp = TempDir::new().unwrap();
         let missing = temp.path().join("no_such_dir");
-        let count = generate_update_files(&missing).unwrap();
+        let count = generate_update_files(&missing, &[]).unwrap().ghost_entries;
         assert_eq!(count, 0);
     }
 
@@ -329,7 +374,7 @@ mod tests {
         fs::create_dir(&var_dir).unwrap();
         fs::write(var_dir.join("state.txt"), "state").unwrap();
 
-        let entries = collect_files(temp.path()).unwrap();
+        let entries = collect_files(temp.path(), &[]).unwrap();
         let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
         assert_eq!(paths, vec!["keep.txt"]);
     }
@@ -341,7 +386,7 @@ mod tests {
         fs::write(temp.path().join("keep.txt"), "keep").unwrap();
         fs::write(temp.path().join("developer_options.txt"), "dev only").unwrap();
 
-        let entries = collect_files(temp.path()).unwrap();
+        let entries = collect_files(temp.path(), &[]).unwrap();
         let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
         assert_eq!(paths, vec!["keep.txt"]);
     }
@@ -360,7 +405,7 @@ mod tests {
         fs::write(sub.join("inner.txt"), "i").unwrap();
         fs::write(temp.path().join("pkg.txt"), "p").unwrap();
 
-        generate_update_files(temp.path()).unwrap();
+        generate_update_files(temp.path(), &[]).unwrap();
         let content = fs::read_to_string(temp.path().join("updates.txt")).unwrap();
         let file_paths: Vec<&str> = content
             .lines()
@@ -410,7 +455,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
         fs::write(temp.path().join("test.txt"), "hello").unwrap();
 
-        generate_update_files(temp.path()).unwrap();
+        generate_update_files(temp.path(), &[]).unwrap();
         let bytes = fs::read(temp.path().join("updates.txt")).unwrap();
         let content = String::from_utf8(bytes).unwrap();
 
@@ -435,7 +480,7 @@ mod tests {
         fs::create_dir_all(&ghost_dir).unwrap();
         fs::write(ghost_dir.join("descript.txt"), "desc").unwrap();
 
-        generate_update_files(temp.path()).unwrap();
+        generate_update_files(temp.path(), &[]).unwrap();
 
         // ルートに生成
         assert!(temp.path().join("updates.txt").exists());
@@ -473,7 +518,9 @@ mod tests {
         fs::write(self_deploy.join("main.lua"), "-- framework script").unwrap();
         fs::write(self_deploy.join(".md5"), "deadbeef").unwrap();
 
-        let count = generate_update_files(temp.path()).unwrap();
+        let count = generate_update_files(temp.path(), &[])
+            .unwrap()
+            .ghost_entries;
         let content = fs::read_to_string(temp.path().join("updates.txt")).unwrap();
 
         // 通常ファイルは含まれる
@@ -504,6 +551,185 @@ mod tests {
         assert_eq!(count, 2, "only the 2 normal files should be counted");
     }
 
+    /// `date=` の値（次の SOH まで）を `<DATE>` に伏せる
+    fn mask_dates(s: &str) -> String {
+        let mut out = String::new();
+        let mut rest = s;
+        while let Some(i) = rest.find("date=") {
+            out.push_str(&rest[..i + "date=".len()]);
+            out.push_str("<DATE>");
+            let after = &rest[i + "date=".len()..];
+            rest = &after[after.find('\x01').expect("date= の後に SOH が必要")..];
+        }
+        out.push_str(rest);
+        out
+    }
+
+    /// 特性化テスト（Req 8.1・8.4）: 同梱バルーンの無い固定フィクスチャについて、
+    /// ルートと `ghost/master` の updates.txt の全バイトが `date=` の値を除き期待値と一致する。
+    ///
+    /// 除外の仕組みを変える前に置き、後方互換が崩れたら落ちるようにする。
+    #[test]
+    fn test_updates_txt_characterization_without_balloon() {
+        let temp = TempDir::new().unwrap();
+        let root = temp.path();
+
+        // 対象ファイル（入れ子のフォルダを含む）
+        fs::write(root.join("readme.txt"), "readme").unwrap();
+        let ghost_master = root.join("ghost/master");
+        fs::create_dir_all(ghost_master.join("dic/sub")).unwrap();
+        fs::write(ghost_master.join("descript.txt"), "desc").unwrap();
+        fs::write(ghost_master.join("dic/sub/foo.pasta"), "foo").unwrap();
+        fs::create_dir_all(root.join("shell/master")).unwrap();
+        fs::write(root.join("shell/master/surface0.png"), "png").unwrap();
+
+        // 既存の除外対象（ルートと ghost/master の双方）
+        for dir in [root, ghost_master.as_path()] {
+            fs::create_dir_all(dir.join("profile/pasta")).unwrap();
+            fs::write(dir.join("profile/pasta/save.lua"), "save").unwrap();
+            fs::create_dir_all(dir.join("var")).unwrap();
+            fs::write(dir.join("var/state.txt"), "state").unwrap();
+            fs::write(dir.join("updates2.dau"), "stale dau").unwrap();
+            fs::write(dir.join("developer_options.txt"), "dev only").unwrap();
+            fs::write(dir.join("updates.txt"), "stale updates").unwrap();
+        }
+
+        let count = generate_update_files(root, &[]).unwrap().ghost_entries;
+        assert_eq!(count, 4);
+
+        let expected = concat!(
+            "charset,UTF-8\r\n",
+            "file,ghost/master/descript.txt\x011dee80c7d5ab2c1c90aa8d2f7dd47256\x01size=4\x01date=<DATE>\x01\r\n",
+            "file,ghost/master/dic/sub/foo.pasta\x01acbd18db4cc2f85cedef654fccc4a4d8\x01size=3\x01date=<DATE>\x01\r\n",
+            "file,readme.txt\x013905d7917f2b3429490b01cfb60d8f5b\x01size=6\x01date=<DATE>\x01\r\n",
+            "file,shell/master/surface0.png\x01bff139fa05ac583f685a523ab3d110a0\x01size=3\x01date=<DATE>\x01\r\n",
+        );
+        for path in [root.join("updates.txt"), ghost_master.join("updates.txt")] {
+            let content = String::from_utf8(fs::read(&path).unwrap()).unwrap();
+            assert_eq!(mask_dates(&content), expected, "{}", path.display());
+        }
+    }
+
+    /// 相対パス完全一致の除外（Req 3.1・3.3・3.4）: `bal` を外すとルート直下の `bal/` だけが
+    /// 一覧から消え、`ghost/master/bal/` の同名フォルダとそれ以外のファイルは従来どおり載る。
+    /// 階層付きの指定（`skin/bal2`）も同じく相対パスで一致したフォルダだけを外す。
+    #[test]
+    fn test_collect_files_excludes_relative_dirs() {
+        let temp = TempDir::new().unwrap();
+        let root = temp.path();
+
+        fs::write(root.join("install.txt"), "inst").unwrap();
+        fs::create_dir_all(root.join("bal/sub")).unwrap();
+        fs::write(root.join("bal/descript.txt"), "bal").unwrap();
+        fs::write(root.join("bal/sub/arrow0.png"), "png").unwrap();
+        fs::create_dir_all(root.join("ghost/master/bal")).unwrap();
+        fs::write(root.join("ghost/master/bal/keep.txt"), "keep").unwrap();
+        fs::create_dir_all(root.join("skin/bal2")).unwrap();
+        fs::write(root.join("skin/bal2/descript.txt"), "bal2").unwrap();
+        fs::write(root.join("skin/other.txt"), "other").unwrap();
+        fs::create_dir_all(root.join("bal2")).unwrap();
+        fs::write(root.join("bal2/keep.txt"), "keep").unwrap();
+
+        let excluded = vec!["bal".to_string(), "skin/bal2".to_string()];
+        let entries = collect_files(root, &excluded).unwrap();
+        let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        assert_eq!(
+            paths,
+            vec![
+                "bal2/keep.txt",
+                "ghost/master/bal/keep.txt",
+                "install.txt",
+                "skin/other.txt",
+            ]
+        );
+    }
+
+    /// `updates.txt` の file 行を (パス, md5, size) に分解する
+    fn parse_file_lines(content: &str) -> Vec<(String, String, u64)> {
+        content
+            .lines()
+            .filter_map(|l| l.strip_prefix("file,"))
+            .map(|l| {
+                let f: Vec<&str> = l.split('\x01').collect();
+                let size = f[2].strip_prefix("size=").unwrap().parse().unwrap();
+                (f[0].to_string(), f[1].to_string(), size)
+            })
+            .collect()
+    }
+
+    /// バルーン用 updates.txt（Req 3.2・4.1〜4.8・5.1・5.2）:
+    /// - `bal/updates.txt` の各行はバルーン基準の相対パスで、自分自身・`profile/`・`var/`・
+    ///   `updates2.dau`・`developer_options.txt` を含まず、md5・size が実ファイルと一致する
+    /// - 既存の `bal/updates.txt` は置き換わり、`bal/ghost/master/` があっても複製しない
+    /// - 0 件のバルーン（`empty`）には書かず、要約にも含めない
+    /// - ルートと `ghost/master` の updates.txt は同内容で、同梱バルーン配下の行を含まない
+    #[test]
+    fn test_generate_update_files_writes_balloon_updates() {
+        let temp = TempDir::new().unwrap();
+        let root = temp.path();
+
+        let ghost_master = root.join("ghost/master");
+        fs::create_dir_all(&ghost_master).unwrap();
+        fs::write(ghost_master.join("descript.txt"), "desc").unwrap();
+        fs::write(root.join("install.txt"), "inst").unwrap();
+
+        let bal = root.join("bal");
+        fs::create_dir_all(bal.join("sub")).unwrap();
+        fs::write(bal.join("descript.txt"), "bal desc\r\n").unwrap();
+        fs::write(bal.join("sub/arrow0.png"), "png bytes").unwrap();
+        fs::write(bal.join("updates.txt"), "stale from target").unwrap();
+        fs::write(bal.join("updates2.dau"), "dau").unwrap();
+        fs::write(bal.join("developer_options.txt"), "dev").unwrap();
+        fs::create_dir_all(bal.join("profile")).unwrap();
+        fs::write(bal.join("profile/p.txt"), "p").unwrap();
+        fs::create_dir_all(bal.join("var")).unwrap();
+        fs::write(bal.join("var/v.txt"), "v").unwrap();
+        fs::create_dir_all(bal.join("ghost/master")).unwrap();
+        fs::write(bal.join("ghost/master/x.txt"), "x").unwrap();
+
+        // 除外規則を適用すると 0 件になるバルーン
+        let empty = root.join("empty");
+        fs::create_dir_all(empty.join("profile")).unwrap();
+        fs::write(empty.join("profile/p.txt"), "p").unwrap();
+        fs::write(empty.join("updates2.dau"), "dau").unwrap();
+
+        let dirs = vec!["bal".to_string(), "empty".to_string()];
+        let summary = generate_update_files(root, &dirs).unwrap();
+
+        assert_eq!(summary.ghost_entries, 2);
+        assert_eq!(summary.balloon_entries, vec![("bal".to_string(), 3)]);
+
+        // バルーン用
+        let bal_content = fs::read_to_string(bal.join("updates.txt")).unwrap();
+        assert!(bal_content.starts_with("charset,UTF-8\r\n"));
+        let lines = parse_file_lines(&bal_content);
+        let paths: Vec<&str> = lines.iter().map(|(p, _, _)| p.as_str()).collect();
+        assert_eq!(
+            paths,
+            vec!["descript.txt", "ghost/master/x.txt", "sub/arrow0.png"]
+        );
+        for (p, md5, size) in &lines {
+            let bytes = fs::read(bal.join(p)).unwrap();
+            assert_eq!(md5, &format!("{:032x}", md5::compute(&bytes)), "{p}");
+            assert_eq!(*size, bytes.len() as u64, "{p}");
+        }
+        assert!(!bal.join("ghost/master/updates.txt").exists());
+        assert!(!empty.join("updates.txt").exists());
+
+        // ゴースト用（ルートと ghost/master が同内容・バルーン配下を含まない）
+        let root_content = fs::read_to_string(root.join("updates.txt")).unwrap();
+        let copy_content = fs::read_to_string(ghost_master.join("updates.txt")).unwrap();
+        assert_eq!(root_content, copy_content);
+        let ghost_paths: Vec<String> = parse_file_lines(&root_content)
+            .into_iter()
+            .map(|(p, _, _)| p)
+            .collect();
+        assert_eq!(
+            ghost_paths,
+            vec!["ghost/master/descript.txt", "install.txt"]
+        );
+    }
+
     /// サブディレクトリの updates.txt / updates2.dau もファイル一覧から除外されること
     #[test]
     fn test_collect_files_excludes_updates_in_subdirs() {
@@ -515,7 +741,7 @@ mod tests {
         fs::write(sub.join("updates.txt"), "should be excluded").unwrap();
         fs::write(sub.join("updates2.dau"), "should be excluded").unwrap();
 
-        let entries = collect_files(temp.path()).unwrap();
+        let entries = collect_files(temp.path(), &[]).unwrap();
 
         let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
         assert!(
@@ -530,5 +756,34 @@ mod tests {
             !paths.iter().any(|p| p.contains("updates2.dau")),
             "updates2.dau should be excluded from listing"
         );
+    }
+
+    /// Unicode として不正な名前のファイル・フォルダは名前を化けさせず InvalidData で止める
+    #[cfg(windows)]
+    #[test]
+    fn test_generate_update_files_rejects_non_unicode_names() {
+        use std::ffi::OsString;
+        use std::os::windows::ffi::OsStringExt;
+
+        let bad = OsString::from_wide(&[0xD800]);
+
+        // ファイル名
+        let temp = TempDir::new().unwrap();
+        fs::write(temp.path().join(&bad), "a").unwrap();
+        let err = generate_update_files(temp.path(), &[]).err().unwrap();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(
+            err.to_string()
+                .starts_with("file name is not valid Unicode: "),
+            "{err}"
+        );
+
+        // フォルダ名（中のファイルが正常な名前でも止める）
+        let temp = TempDir::new().unwrap();
+        fs::create_dir_all(temp.path().join(&bad)).unwrap();
+        fs::write(temp.path().join(&bad).join("ok.txt"), "a").unwrap();
+        let err = generate_update_files(temp.path(), &[]).err().unwrap();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(!temp.path().join("updates.txt").exists());
     }
 }

@@ -176,6 +176,12 @@ fn test_ukadoc_files() {
 
     // install.txt (Req 9.1)
     let install = std::fs::read_to_string(ghost_dir.join("install.txt")).unwrap();
+    // pasta_check release は install.txt の charset,UTF-8 宣言を必須とする
+    assert_eq!(
+        install.lines().next(),
+        Some("charset,UTF-8"),
+        "install.txt の 1 行目が charset,UTF-8 ではありません"
+    );
     assert!(
         install.contains("type,ghost"),
         "install.txt に type,ghost がありません"
