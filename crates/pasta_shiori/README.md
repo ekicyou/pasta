@@ -11,106 +11,34 @@ Windows DLL（`pasta.dll`）として出力され、伺かベースウェアか�
 
 ## アーキテクチャ
 
-```
-pasta_shiori
-├── SHIORI Protocol    # SHIORI/3.0 プロトコル実装
-│   ├── load           # 初期化
-│   ├── request        # イベント処理
-│   └── unload         # 終了
-├── Lua Integration    # pasta_lua ランタイムとの統合
-│   ├── PastaLoader    # スクリプトロード（pasta_lua 提供）
-│   └── lua_request    # SHIORI リクエスト→Lua テーブル変換
-└── Windows DLL        # C FFI エクスポート（windows.rs）
-    └── load / unload / request  # SHIORI DLL エントリポイント（+ DllMain）
-```
+ベースウェアは pasta.dll のエクスポート関数 `loadu`（設置パスを UTF-8 で受け取る）または `load`（ANSI で受け取る）・`request`・`unload` を呼びます。FFI 入口（`windows.rs`）は Lua VM を直接触らず、アクターランタイム（`actor/`）が起こした専用スレッドへ mailbox 経由でメッセージを送ります。そのスレッド上の `PastaShiori`（`shiori.rs`）が `pasta_lua` の `PastaLoader` で VM を構築し、リクエスト文字列を Lua の表に変換して（`lua_request.rs`）、Lua 側の `SHIORI.request` を呼びます。
 
-## ディレクトリ構成
-
-```
-pasta_shiori/
-├── Cargo.toml
-└── src/
-    ├── lib.rs           # クレートエントリーポイント
-    ├── error.rs         # エラー型定義
-    ├── shiori.rs        # PastaShiori - SHIORI プロトコル実装
-    ├── shiori_lifecycle_tests.rs # SHIORI テスト（load/reload/unload ライフサイクル・#[path]属性）
-    ├── shiori_request_tests.rs   # SHIORI テスト（リクエスト処理/エラーパス・#[path]属性）
-    ├── lua_request.rs   # Lua リクエスト処理
-    ├── windows.rs       # Windows DLL エクスポート（#[cfg(windows)]）
-    └── util/            # ユーティリティ
-        ├── hglobal/     # HGLOBAL 文字列・ANSI/UTF-8 エンコーディング（#[cfg(windows)]）
-        └── parsers/     # SHIORI リクエストパーサー（pest 文法）
-```
+詳細は [内部設計: SHIORI 層](https://ekicyou.github.io/pasta/internals/shiori.html#構成要素) を参照してください。ファイルごとの役割は [Rust 側（pasta_shiori）](https://ekicyou.github.io/pasta/internals/shiori.html#rust-側pasta_shiori) にあります。
 
 ## SHIORI プロトコル
 
-### プロトコルフロー
+`loadu`・`load` でアクタースレッドを起こしてランタイムを構築し、`request` は GET を同期で、NOTIFY を即時の 204 応答で処理し、`unload` でアクターを終了します。HGLOBAL の所有と解放、panic の封じ込め、応答を返せないときの 204 などの FFI 境界の約束も内部設計の章にまとめています。
 
-```
-ベースウェア → shiori32.dll
-                    ↓
-               load(hinst, load_dir)     # 初期化
-                    ↓
-               request(SHIORI/3.0)       # イベント処理（繰り返し）
-                    ↓
-               unload()                  # 終了
-```
-
-### サポートイベント
-
-| イベント  | 説明                                          |
-| --------- | --------------------------------------------- |
-| `load`    | 初期化。`pasta.toml` 読み込み、ランタイム起動 |
-| `request` | SHIORI/3.0 リクエスト処理                     |
-| `unload`  | 終了処理。リソース解放                        |
-
-### SHIORI/3.0 リクエスト形式
-
-```
-GET SHIORI/3.0
-Charset: UTF-8
-Sender: SSP
-SecurityLevel: local
-ID: OnFirstBoot
-Reference0: 1
-
-```
-
-### レスポンス形式
-
-```
-SHIORI/3.0 200 OK
-Charset: UTF-8
-Value: \0\s[0]初めまして！\e
-
-```
-
-### FFI 境界の安全性
-
-`windows.rs` の DLL エントリポイントは、SHIORI ホスト（SSP 等）を巻き込む
-クラッシュを防ぐため、次の安全性保証を実装しています。
-
-- **パニック封じ込め**: `load` / `request` / `unload` の各ディスパッチは
-  `catch_unwind` で全包囲され、パニックは SHIORI エラー契約へ縮退します
-  （`load`→`false`、`request`→`500` + `X-ERROR-REASON`、`unload`→`true`）。
-  FFI 境界を越えるパニックは未定義動作であるためです。
-- **入力 HGLOBAL の解放保証**: 入力 HGLOBAL の所有権は SHIORI 契約により
-  DLL 側へ移転します。長さ 0・未初期化などのガードパスを含む全経路で解放されます。
-- **アロケーション失敗の明示エラー化**: `GlobalAlloc` 失敗は null ポインタの
-  まま流通させず、明示的なエラーとして処理されます。
-- **反復パース**: SHIORI リクエストヘッダのパースは反復実装であり、
-  ホスト制御のヘッダ数によるスタック枯渇は発生しません。
+- loadu・load・request・unload の流れ: [内部設計: 処理とデータの流れ](https://ekicyou.github.io/pasta/internals/shiori.html#処理とデータの流れ)
+- FFI 境界の約束: [内部設計: 不変条件と制約](https://ekicyou.github.io/pasta/internals/shiori.html#不変条件と制約)
+- SHIORI イベントの一覧: [主要イベント](https://ekicyou.github.io/pasta/lua/shiori-events.html#主要イベント)
+- Lua に渡るリクエストの表と応答の組み立て: [act.req](https://ekicyou.github.io/pasta/lua/shiori-events.html#actreq)・[RES](https://ekicyou.github.io/pasta/lua/shiori-events.html#res)
 
 ## 公開API
 
+ライブラリ名は DLL 名に合わせて `pasta` です。Rust からは `pasta::` で参照します（`use pasta::{PastaShiori, Shiori};`）。
+
 ### PastaShiori
 
-| メソッド                | 説明                                       |
-| ----------------------- | ------------------------------------------ |
-| `load(hinst, load_dir)` | ランタイム初期化                           |
-| `request(request)`      | SHIORI リクエスト処理                      |
-| `runtime()`             | ロード済み Lua ランタイム参照（テスト用） |
-| `Default::default()`    | 新規インスタンス作成                       |
+| メソッド                | 説明                                                          |
+| ----------------------- | ------------------------------------------------------------- |
+| `load(hinst, load_dir)` | ランタイム初期化（`Shiori` トレイト）                         |
+| `request(request)`      | SHIORI リクエスト処理（`Shiori` トレイト）                    |
+| `runtime()`             | ロード済み Lua ランタイム参照（テスト用）                     |
+| `kick(scene)`           | Lua 側の `SHIORI.kick` を保護呼び出しする（デバッグ通信用）  |
+| `Default::default()`    | 新規インスタンス作成                                          |
+
+このほか、アクターランタイムの `actor`・エラー型の `error`・リクエスト解析の `lua_request` の各モジュールと、Windows ではエクスポート関数 `load`・`loadu`・`request`・`unload` を公開しています（統合テスト用）。
 
 ### Shiori トレイト
 
@@ -128,7 +56,7 @@ pub trait Shiori {
 ### Rust からの利用（テスト用）
 
 ```rust
-use pasta_shiori::{PastaShiori, Shiori};
+use pasta::{PastaShiori, Shiori};
 
 let mut shiori = PastaShiori::default();
 
@@ -144,22 +72,9 @@ println!("Response: {}", response);
 
 ### ゴーストディレクトリ構成
 
-```
-ghost/
-└── master/                  # load_dir（SHIORIのload_dir）
-    ├── pasta.toml           # 設定ファイル（必須）
-    ├── dic/                 # Pasta DSL ソース
-    │   └── *.pasta
-    ├── scripts/             # Lua スクリプト
-    │   └── pasta/
-    │       └── shiori/
-    │           └── entry.lua # SHIORI エントリーポイント
-    └── profile/             # ランタイム生成
-        └── pasta/
-            ├── save/        # 永続化データ
-            ├── cache/       # キャッシュ
-            └── logs/        # ログ
-```
+`load_dir` にはゴーストの `ghost/master/` を渡します。必須なのは設定ファイル `pasta.toml` で、辞書は `dic/`、ゴースト作者の Lua スクリプトは `scripts/` に置きます。SHIORI のエントリ（`pasta.shiori.entry`）は pasta.dll に同梱されており、ゴースト側に置く必要はありません。実行時には `profile/pasta/` に同梱スクリプトの展開先・キャッシュ・保存データ・ログが作られます。
+
+フォルダ構成は [最初のゴーストを作る](https://ekicyou.github.io/pasta/getting-started/first-ghost.html#ゴーストのフォルダ構成)、起動の流れとモジュール検索パスは [起動シーケンスとモジュール解決](https://ekicyou.github.io/pasta/reference/startup.html) を参照してください。
 
 ## 依存関係
 
@@ -173,18 +88,30 @@ ghost/
 | thiserror   | 2          | エラー型定義                                      |
 | pest        | 2.8        | SHIORI リクエストパース                           |
 | pest_derive | 2.8        | pest パーサー導出マクロ                           |
+| flume       | 0.12       | アクタースレッドの mailbox（チャネル）            |
+| wintf-winmsg-executor | 0.0.3 | アクタースレッドのメッセージループ           |
+| arc-swap    | 1.9        | mailbox の送信端の差し替え                        |
 
 ### Windows 専用
 
 | クレート    | バージョン | 用途                              |
 | ----------- | ---------- | --------------------------------- |
-| windows-sys | 0.61       | Windows API（メモリ、文字コード） |
+| windows-sys | 0.61       | Windows API（メモリ、文字コード、ハンドル数の計測） |
+
+### ビルド用（build-dependencies）
+
+| クレート       | バージョン | 用途                                       |
+| -------------- | ---------- | ------------------------------------------ |
+| embed-resource | 3          | pasta.dll へのバージョン情報の埋め込み     |
 
 ### 開発用（dev-dependencies）
 
 | クレート | バージョン | 用途                     |
 | -------- | ---------- | ------------------------ |
 | tempfile | 3          | テスト用一時ディレクトリ |
+| ctor     | 0.2        | テスト前の環境変数の中和 |
+| serde_json | 1        | デバッグ通信のテスト     |
+| tracing-test | 0.2    | ログ出力のテスト         |
 
 ## ビルド
 
@@ -209,11 +136,12 @@ cargo test -p pasta_shiori
 
 ## 関連クレート
 
-- [pasta_dsl](../pasta_dsl/README.md) - DSLパーサー
-- [pasta_core](../pasta_core/README.md) - レジストリ
-- [pasta_lua](../pasta_lua/README.md) - Luaバックエンド
-- [プロジェクト概要](../../README.md) - pasta プロジェクト全体
+- [`pasta_dsl`](https://crates.io/crates/pasta_dsl) - DSLパーサー
+- [`pasta_core`](https://crates.io/crates/pasta_core) - レジストリ
+- [`pasta_lua`](https://crates.io/crates/pasta_lua) - Luaバックエンド
+- [プロジェクト概要](https://github.com/ekicyou/pasta) - pasta プロジェクト全体
+- [pasta マニュアル](https://ekicyou.github.io/pasta/) - ゴースト作者向けの使い方とコントリビュータ向けの内部設計
 
 ## ライセンス
 
-プロジェクトルートの [LICENSE](../../LICENSE) ファイルを参照してください。
+プロジェクトルートの [LICENSE](https://github.com/ekicyou/pasta/blob/main/LICENSE) ファイルを参照してください。

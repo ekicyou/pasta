@@ -189,7 +189,7 @@
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7_
   - _Boundary: ReadmeMigration（pasta_lua）_
 
-- [ ] 5.3 (P) `pasta_shiori`・`pasta_core`・`pasta_dsl` の README の内部解説をマニュアルへの絶対 URL に置き換える
+- [x] 5.3 (P) `pasta_shiori`・`pasta_core`・`pasta_dsl` の README の内部解説をマニュアルへの絶対 URL に置き換える
   - アーキテクチャ・ディレクトリ構成・FFI 境界の安全性・プロトコルフロー等を数行の全体像と該当する内部設計章への絶対 URL に置き換え、イベント一覧は利用者向けの SHIORI イベント章へ案内する（`pasta_dsl` は英語 README のため案内文も英語）
   - crates.io の顔としての情報は存置し、全担当行の処置を台帳で確定する
   - 3 本の README がリポジトリ内相対パスで内部設計パートを案内せず、リンク検証が exit 0 になる

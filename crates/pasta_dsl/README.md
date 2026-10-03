@@ -51,7 +51,7 @@ for item in &ast.items {
 - `GlobalSceneScope` — グローバルシーン定義
 - `LocalSceneScope` — ローカルシーン定義
 - `ActorScope` — アクター定義
-- `Action` — アクション（Talk, WordRef, VarRef, FnCall, SakuraScript, Escape）
+- `Action` — アクション（Talk, WordRef, VarRef, FnCall, SakuraScript, Escape, DynamicWordRef, DynamicFnCall）
 - `CueCommandNode` / `ChoiceNode` — キューコマンド行・選択肢行
 - `Span` — ソース位置情報（行/列 + バイトオフセット）
 
@@ -74,41 +74,9 @@ for item in &ast.items {
 
 ## Architecture
 
-```
-pasta_dsl
-├── src/
-│   ├── lib.rs               # クレートエントリーポイント
-│   ├── error.rs             # ParseError, ParseErrorInfo, ParseResult
-│   ├── partial.rs           # 部分パースAPI（parse_str_partial）
-│   └── parser/
-│       ├── mod.rs           # パーサーAPI（parse_str, parse_file）
-│       ├── parse_scene.rs   # シーン解析
-│       ├── parse_action.rs  # アクション解析
-│       ├── parse_elements.rs # 要素解析
-│       ├── ast/             # AST型定義（ディレクトリ）
-│       │   ├── mod.rs       # AST公開エントリ
-│       │   ├── span.rs      # Span型定義
-│       │   ├── scene.rs     # シーン関連AST
-│       │   ├── action.rs    # アクション関連AST
-│       │   └── cue.rs       # キューコマンド関連AST
-│       └── grammar.pest     # Pest文法定義（権威的仕様）
-└── tests/
-    ├── actor_code_block_test.rs   # アクターコードブロック解析テスト
-    ├── ast_test.rs                # AST型テスト
-    ├── choice_line_test.rs        # 選択肢行テスト
-    ├── cue_cmd_grammar_test.rs    # キューコマンド行テスト（文法・AST）
-    ├── cue_cmd_parse_test.rs      # キューコマンド行テスト（パース・行推論）
-    ├── digit_id_var_test.rs       # 全角数字変数テスト
-    ├── dynamic_call_test.rs       # 動的コールテスト
-    ├── error_api_test.rs          # ParseError APIテスト
-    ├── expr_parse_test.rs         # 式ASTパーステスト
-    ├── parser_test.rs             # パーサー統合テスト
-    ├── partial_parse_test.rs      # 部分パースAPIテスト
-    ├── property_scope_test.rs     # プロパティスコープテスト
-    ├── sakura_symbol_tag_test.rs  # さくらスクリプト記号タグテスト
-    ├── span_byte_offset_test.rs   # バイトオフセットテスト
-    └── var_set_none_test.rs       # 式文（$=）テスト
-```
+`parse_str` / `parse_file` parse the source with the Pest grammar (`grammar.pest`, the authoritative syntax) and convert the result, via `parser/parse_scene.rs`, `parser/parse_action.rs` and `parser/parse_elements.rs`, into the AST types under `parser/ast/`. `parse_str_partial` (`partial.rs`) falls back from a full parse to per-scope and then per-line parsing; it is used by the language server, not by the runtime transpiler. The crate has no runtime state; `pasta_lua` consumes the AST to generate Lua code.
+
+See [Internals: Parser and AST](https://ekicyou.github.io/pasta/internals/transpiler.html#パーサと-ast) for the source layout and how the parser feeds the transpiler (the manual is written in Japanese).
 
 ## License
 
