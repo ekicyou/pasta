@@ -226,6 +226,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   ├── book.toml            # mdBook 設定（language=ja, 検索有効, site-url）
 │   ├── package.json         # book ツールの npm 依存（vscode-textmate/oniguruma/jsdom・lockfile コミット・node_modules 非コミット）
 │   ├── src/                 # 章ソース（grammar/lua/getting-started/reference）
+│   │   └── internals/       # 内部設計パート（コントリビュータ向け・末尾パート）
 │   ├── theme/head.hbs       # 日本語 bigram 検索 tokenizer ＋ pasta ハイライト中和の override
 │   ├── tools/               # build-time Node（スキル references 生成 gen-skill-refs・リンク検証 link-check・bigram 索引再生成・pasta 構文ハイライト 等）
 │   └── book/                # mdbook build 生成物（.gitignore 済み・CI で再生成）
@@ -375,6 +376,7 @@ pasta_dsl（パーサー） + pasta_core（レジストリ）
 | SOUL.md    | プロジェクトの憲法（ビジョン・コアバリュー）     |
 | README.md  | プロジェクト概要                                 |
 | book/src/  | 利用者マニュアル章（文法・公開 Lua API・`pasta.toml` の唯一の権威） |
+| book/src/internals/ | 内部設計パート（コントリビュータ向け・権威は実装＋本パート） |
 | CLAUDE.md  | AI開発支援（プロジェクト指示・Kiro ワークフロー・コマンド一覧） |
 
 ### Kiro仕様管理

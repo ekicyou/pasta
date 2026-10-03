@@ -30,7 +30,7 @@ pastaプロジェクトのドキュメントは、以下の優先順位と役割
 
 **品質管理ドキュメント**:
 - [TEST_COVERAGE.md](TEST_COVERAGE.md) - テストカバレッジマップ
-- [OPTIMIZATION.md](OPTIMIZATION.md) - トランスパイラ最適化リファレンス
+- [内部設計: トランスパイルパイプライン（生成時最適化）](https://ekicyou.github.io/pasta/internals/transpiler.html#生成時最適化) - トランスパイラ最適化の解説
 - [SCENE_TABLE_REVIEW.md](SCENE_TABLE_REVIEW.md) - シーンテーブル設計レビュー
 
 #### Level 3: Steering (AI向け)
@@ -475,7 +475,7 @@ Phase 0（一次設計の再構築）は完了しました。以下は各要素�
   - 8つのスナップショットテスト実装済み
   - comprehensive_control_flow.pastaは旧文法のためスキップ（TODO: 更新予定）
 - [x] スナップショットテスト整備（insta crate使用）
-- [x] 最適化レベルの文書化（OPTIMIZATION.md）
+- [x] 最適化レベルの文書化（[内部設計: トランスパイルパイプライン](https://ekicyou.github.io/pasta/internals/transpiler.html#生成時最適化)）
 
 #### ドキュメント整合性
 - [x] SOUL.md ⇔ SPECIFICATION.md 一貫性検証（完全）

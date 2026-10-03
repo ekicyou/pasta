@@ -202,7 +202,7 @@
 | cargo test pasta_shiori 100%パス    | 全pasta_shioriテスト          | ✅ 157テスト                    |
 | comprehensive_control_flow検証      | `transpiler_snapshot_test.rs` | ✅ 8スナップショット            |
 | スナップショットテスト整備          | insta crate                   | ✅ 実装済み                     |
-| 最適化レベルの文書化                | OPTIMIZATION.md               | ✅ 完了                         |
+| 最適化レベルの文書化                | [内部設計: トランスパイル](https://ekicyou.github.io/pasta/internals/transpiler.html#生成時最適化) | ✅ 完了                         |
 | ドキュメント整合性検証              | -                             | ✅ 本セッションで検証           |
 | TEST_COVERAGE.md作成                | -                             | ✅ 本ドキュメント               |
 | 未テスト領域の特定                  | -                             | ✅ 本ドキュメント Section 4参照 |
@@ -294,7 +294,7 @@
 
 1. ~~**優先度 High**: pasta_shiori 5テスト失敗の修正~~ ✅ 完了
 2. ~~**優先度 High**: Golden Test（スナップショットテスト）整備~~ ✅ 完了（8スナップショット）
-3. ~~**優先度 Medium**: 最適化レベルの文書化~~ ✅ 完了（OPTIMIZATION.md）
+3. ~~**優先度 Medium**: 最適化レベルの文書化~~ ✅ 完了（[内部設計: トランスパイルパイプライン](https://ekicyou.github.io/pasta/internals/transpiler.html#生成時最適化)）
 4. ~~**優先度 Medium**: シーンテーブル設計レビュー~~ ✅ 完了（SCENE_TABLE_REVIEW.md）
 
 ### Phase 1に向けて

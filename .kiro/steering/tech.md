@@ -126,7 +126,7 @@ pasta (workspace)
 | UI独立性     | Wait/Syncはマーカーのみ、areka側で制御 |
 | 宣言的フロー | Call/Jumpで制御、if/while/forなし      |
 | Yield型      | 全出力はyield、Generator継続           |
-| 2パス変換    | Pass1: シーン登録、Pass2: コード生成   |
+| 2パス変換    | Pass1: シーン登録、Pass2: コード生成（現行の段階構成は[内部設計: トランスパイルパイプライン](https://ekicyou.github.io/pasta/internals/transpiler.html)を参照） |
 
 **結果**: 完全なユニットテスト可能性を実現
 
@@ -211,6 +211,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
 - **リンク検証**: `book/tools/link-check.mjs` がマニュアル章と 2 スキルの相対リンク・アンカーを検証する。鮮度照合とあわせて `workflow.md` DoD の条件付き「Manual Sync Gate」と結線し、失敗で完了を中断
 - **pasta 構文ハイライト**: build-time Node スクリプト（`book/tools/highlight/`）が VSCode TextMate 文法（`editors/vscode` の SSOT・読み取り再利用）で `language-pasta` ブロックをトークナイズし highlight.js 互換クラスの span を静的 HTML へ焼き込む（決定論・冪等・入れ子 lua は vendor 文法で二段トークナイズ）。`theme/head.hbs` が book.js の無条件再ハイライトを中和し事前 span を保持（正準 `neutralizer.mjs` の逐語ミラー）。`book/` 初の npm devDependency（`vscode-textmate`/`vscode-oniguruma`/`jsdom`・`package-lock.json` コミット・`node_modules` 非コミット・CI は `npm ci`）。WASM は build-time のみで公開成果物にランタイム依存を持ち込まない
 - **正の分離**: 利用者向け仕様（文法・公開 Lua API・`pasta.toml`）の唯一の権威はマニュアル（`book/src/`）。スキルの規範部分はマニュアルからの生成物、README は開発者向けの入口
+- **内部設計パート**（`book/src/internals/`）: コントリビュータ向け・権威は実装＋本パート
 
 ## Luaランタイムパターン
 
