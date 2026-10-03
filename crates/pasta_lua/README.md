@@ -11,125 +11,31 @@ Pasta DSL を Lua にトランスパイルし、Lua VM 上で実行するため�
 - モジュール解決とパッケージパス管理
 - SHIORI/3.0 プロトコル統合サポート
 
+ゴースト作者向けの使い方とコントリビュータ向けの内部設計は、[pasta マニュアル](https://ekicyou.github.io/pasta/) にまとめています。
+
 ## アーキテクチャ
 
-```
-PastaLoader (起動シーケンス)
-    ↓
-LuaTranspiler (AST → Lua変換)
-    ↓            ← pasta_dsl (DSLパーサー)
-PastaLuaRuntime (Lua VM ホスト)
-    ↓            ← pasta_core (レジストリ)
-SHIORI Integration (プロトコル処理)
-```
+起動時は `PastaLoader` が `pasta.toml` を読み、同梱のフレームワークスクリプトを自己展開し、辞書ファイルを検出します。更新された `.pasta` だけを `pasta_dsl` でパースして `LuaTranspiler` で Lua コードへ変換し（結果はキャッシュ）、`PastaLuaRuntime` が Lua VM を構築して組み込みモジュールを登録します。実行時は `pasta_core` のレジストリで辞書を確定し、SHIORI のイベントからシーン関数をコルーチンとして実行して、蓄積したトークンをさくらスクリプトに組み立てます。DLL としての SHIORI の入口は `pasta_shiori` が担います。
 
-## ソースモジュール構成
-
-```
-pasta_lua/
-├── Cargo.toml
-├── build.rs                  # pasta_scripts/ の決定論的 zip 埋め込み
-├── build_zip.rs              # 決定論的 zip パッカー（build.rs/テスト共有）
-└── src/
-    ├── lib.rs                # クレートエントリーポイント
-    ├── transpiler.rs         # LuaTranspiler（トランスパイラエントリ）
-    ├── config.rs             # TranspilerConfig / LineEnding
-    ├── context.rs            # TranspileContext（レジストリ・属性管理）
-    ├── error.rs              # TranspileError / ConfigError
-    ├── normalize.rs          # 出力正規化・LineShift（行番号リベース）
-    ├── string_literalizer.rs # Lua 文字列リテラル変換
-    ├── code_gen/             # コード生成モジュール
-    ├── loader/               # 起動・設定読み込み・キャッシュ
-    ├── runtime/              # Lua VM ランタイム（PastaLuaRuntime）
-    ├── debug/                # DAP デバッグサポート・ソースマップ
-    ├── encoding/             # 文字エンコーディング変換
-    ├── logging/              # tracing ログ統合
-    ├── search/               # シーン・単語検索 API
-    └── sakura_script/        # さくらスクリプト変換
-```
-
-> **Note**: テストは `tests/common/mod.rs` に共有ヘルパーを集約し、統合テストを複数ファイルに分割しています。
+詳細は [内部設計: 内部設計の概要](https://ekicyou.github.io/pasta/internals/index.html#全体像) を参照してください。章ごとの対象ソース範囲は [章と対象ソース範囲](https://ekicyou.github.io/pasta/internals/index.html#章と対象ソース範囲) にあります。
 
 ## ディレクトリ構成
 
-`pasta_lua` が想定する標準的なプロジェクト構造：
+`pasta_lua` はゴーストの `ghost/master/`（SHIORI の `load_dir`）を基準ディレクトリとして扱います。主な構成要素は次のとおりです。
 
-```
-{base_dir}/                          # ベースディレクトリ（SHIORIのload_dir）
-├── pasta.toml                       # 設定ファイル（必須）
-│
-├── dic/                             # Pasta DSL ソースファイル
-│   ├── baseware/                    # カテゴリ別サブディレクトリ
-│   │   ├── system.pasta
-│   │   └── events.pasta
-│   └── conversation/
-│       ├── greeting.pasta
-│       └── talk.pasta
-│
-├── scripts/                         # ユーザーカスタム Lua スクリプト（pasta_scripts/ より優先）
-│   └── (your_modules)/              # ユーザー定義モジュール
-│
-├── pasta_scripts/                   # Pasta 標準ランタイムスクリプト
-│   ├── pasta/                       # Pasta ランタイムライブラリ
-│   │   ├── init.lua                 # PASTA モジュール
-│   │   ├── ctx.lua                  # コンテキスト管理
-│   │   ├── actor.lua                # アクター管理
-│   │   ├── scene.lua                # シーン管理
-│   │   └── shiori/
-│   │       └── entry.lua            # SHIORI エントリーポイント
-│   └── main.lua                     # エントリーポイント（scripts/main.lua で上書き可）
-│
-├── scriptlibs/                      # 外部 Lua ライブラリ
-│   └── (external_libs)/             # サードパーティライブラリ
-│
-└── profile/                         # ランタイム生成ディレクトリ
-    └── pasta/
-        ├── save/                    # 永続化データ
-        │   └── lua/                 # Lua 保存用モジュール
-        ├── cache/                   # キャッシュ
-        │   └── lua/                 # トランスパイル済み Lua キャッシュ
-        └── logs/
-            └── pasta.log            # ログファイル
-```
+- `pasta.toml` — 設定ファイル（必須）
+- `dic/` — Pasta DSL の辞書（既定の検出パターンは `dic/**/*.pasta`。同じ場所の `.lua` もトランスパイルせずに読み込まれる）
+- `scripts/` — ゴースト作者の Lua スクリプト（同梱スクリプトより優先される）
+- `scriptlibs/` — 外部 Lua ライブラリ
+- `profile/pasta/` — 実行時に作られる領域（同梱スクリプトの自己展開先、トランスパイル結果のキャッシュ、保存データ、ログ）
 
-### Lua パススルー機能
-
-辞書ディレクトリ（`dic/*/`）に `.lua` ファイルを配置すると、トランスパイルなしにキャッシュディレクトリへ直接コピーされ、`scene_dic.lua` から自動的に読み込まれます。
-
-- `.pasta` と同じディレクトリ構造・モジュール命名規則が適用されます
-- インクリメンタル更新（タイムスタンプ比較）が有効です
-- `.pasta` と同名の `.lua` が存在する場合、`.pasta` が優先されます
-- `init.lua` / `init.pasta` は禁止ファイル名です（エラーになります）
-- `profile/` ディレクトリは検出対象から除外されます
-
-| パス                             | 用途                      | 備考                                     |
-| -------------------------------- | ------------------------- | ---------------------------------------- |
-| `pasta.toml`                     | 設定ファイル              | 必須。存在しない場合はエラー             |
-| `dic/**/*.pasta`                 | Pasta DSL ソース          | デフォルトの検出パターン（再帰）         |
-| `dic/**/*.lua`                   | Lua パススルー            | トランスパイルなしでキャッシュにコピー   |
-| `scripts/`                       | ユーザーカスタム Lua | `pasta_scripts/` より優先される             |
-| `pasta_scripts/`                 | 標準ランタイム        | エンジン同梱スクリプト                 |
-| `pasta_scripts/pasta/`           | Pasta ランタイム          | トランスパイル済みコードから呼び出される |
-| `pasta_scripts/pasta/shiori/entry.lua` | SHIORI エントリーポイント | 起動時に `require` される（失敗は致命）  |
-| `scriptlibs/`                    | 外部ライブラリ            | package.path の最後に追加                |
-| `profile/pasta/save/lua/`        | 永続化モジュール          | 最優先で検索される                       |
-| `profile/pasta/cache/lua/`       | Lua キャッシュ            | debug_mode 時に出力                      |
-| `profile/pasta/logs/`            | ログ出力先                | ローテーション対応                       |
+ゴーストのフォルダ構成は [最初のゴーストを作る](https://ekicyou.github.io/pasta/getting-started/first-ghost.html#ゴーストのフォルダ構成)、辞書ファイルの検出パターンと `.lua` の扱いは [pasta_patterns](https://ekicyou.github.io/pasta/reference/pasta-toml.html#pasta_patterns) を参照してください。検出とモジュール名の生成の仕組みは [内部設計: ファイル検出](https://ekicyou.github.io/pasta/internals/loader.html#ファイル検出)・[モジュール名の生成](https://ekicyou.github.io/pasta/internals/loader.html#モジュール名の生成) にあります。
 
 ## 設定ファイル（pasta.toml）
 
-`pasta.toml` の各セクション・各フィールドは、**プロファイルモデル**に基づき次の3分類のいずれか1つへ一意に分類されます。
-
-1. **SHIORI デフォルト有（省略可）** — 省略すると SSOT（Rust ローダ）のデフォルト値が自動補完されます。最小構成では書かなくてよい。`[loader]` / `[ghost]` / `[talk]` / `[persistence]` / `[logging]` / `[lua]` / `[debug]` が該当します。
-2. **必須（デフォルト不能）** — ゴースト固有でデフォルト化できないため必ず記述が必要。現状は `[actor]`（1つ以上）のみ。
-3. **エンジンプロファイル専用** — SHIORI 用途では記述不要。現状は `[package]` のみ（記述しても無視され、従来どおり起動します）。
-
-### 最小構成（必須の `[actor]` のみ）
-
-SHIORI として起動するために**必須なのは `[actor]` だけ**です。他の全セクションは省略でき、SSOT デフォルトが自動補完されます。`[package]` / `[loader]` を含む必要はありません。
+SHIORI として起動するために必須なのは `[actor]`（1 つ以上）だけで、他のセクションは省略すると既定値が使われます。
 
 ```toml
-# 最小構成: 必須の [actor] のみ。他は SHIORI デフォルトで補完される。
 [actor."女の子"]
 spot = 0
 
@@ -137,161 +43,17 @@ spot = 0
 spot = 1
 ```
 
-- `"名前"` は `descript.txt` の `sakura.name` / `kero.name` と一致させます。
-- `spot` はゴースト固有でデフォルト化できないため、各アクターで必ず指定します（`0`=sakura 側 / `1`=kero 側）。
-- 慣例的な dic 配置（`dic/**/*.pasta`）の辞書は、`[loader]` を書かなくても `pasta_patterns` の SHIORI デフォルト `["dic/**/*.pasta"]` で読み込まれます。
+全セクション・全フィールドの分類と既定値は [pasta.toml リファレンス](https://ekicyou.github.io/pasta/reference/pasta-toml.html) を参照してください。`[actor]` の設定が Lua 側のアクターになる仕組みは [内部設計: @pasta_config からの初期化](https://ekicyou.github.io/pasta/internals/internal-modules.html#pasta_config-からの初期化) にあります。
 
-全セクション・全フィールドの分類と SHIORI デフォルト値（SSOT 由来）、およびフルリファレンステンプレートは、設定ファイルリファレンス [`pasta-toml.md`](../../book/src/reference/pasta-toml.md) を参照してください。
+## Lua モジュール検索パスと起動
 
-### [actor.*] セクション
+`require` は既定で `profile/pasta/save/lua` → `scripts` → `profile/pasta/pasta_scripts` → `profile/pasta/cache/lua` → `scriptlibs` の順にモジュールを探します（`[loader] lua_search_paths` で変更可）。`package.path` は UTF-8 として解釈され、設置パスの長さや ANSI コードページに無い文字に左右されません（ホスト側の制約は起動シーケンスの章を参照）。起動時には `main`・`pasta.shiori.entry`・`pasta.scene_dic` を順に読み込み、いずれかの失敗で起動を中止します。
 
-`[actor.*]` セクションで定義したアクター設定は、Lua ランタイム起動時に `STORE.actors` へ自動的に参照共有されます。
-
-```toml
-[actor."さくら"]
-spot = 0
-surface = 0
-
-[actor."うにゅう"]  
-spot = 1
-surface = 10
-```
-
-**初期化フロー:**
-
-1. `@pasta_config` モジュール（Rust側）が TOML をパースし `CONFIG.actor` テーブルとして公開
-2. `pasta.store` モジュール（Lua）が `STORE.actors = CONFIG.actor` で参照共有
-3. `pasta.actor` モジュール（Lua）が各アクターに `ACTOR_IMPL` メタテーブルを設定
-
-**Lua からのアクセス:**
-
-```lua
-local STORE = require "pasta.store"
-local ACTOR = require "pasta.actor"
-
--- 直接アクセス
-print(STORE.actors["さくら"].spot)  -- 0
-
--- ACTOR API経由（推奨）
-local sakura = ACTOR.get_or_create("さくら")
-print(sakura.spot)  -- 0（CONFIG由来プロパティを保持）
-```
-
-**特徴:**
-
-- 参照共有のため、`STORE.actors` への変更は `CONFIG.actor` にも反映される
-- 動的に追加したアクターと CONFIG 由来アクターは共存可能
-- `ACTOR.get_or_create()` は既存アクターを返し、上書きしない
-
-### [lua] セクション
-
-利用者向けの `pasta.toml` の仕様はマニュアルを正とします。`[lua]` セクションの扱いは [pasta.toml リファレンス](../../book/src/reference/pasta-toml.md#lualua-ライブラリ)、既定で使える Lua 標準ライブラリと mlua-stdlib モジュールは [mlua-stdlib 統合モジュール](../../book/src/lua/modules/mlua-stdlib.md) を参照してください。
-
-## Lua モジュール検索パス
-
-`package.path` は `[loader].lua_search_paths` の各エントリ（優先度順）から `?.lua` → `?/init.lua` の 2 パターンを生成し、`;` で連結した文字列です。パス区切りは Lua 向けに `/` へ正規化されます。
-
-```lua
--- 生成されるpackage.path（既定の lua_search_paths の場合）
-"/path/to/base/profile/pasta/save/lua/?.lua;"..
-"/path/to/base/profile/pasta/save/lua/?/init.lua;"..
-"/path/to/base/scripts/?.lua;"..
-"/path/to/base/scripts/?/init.lua;"..
-"/path/to/base/profile/pasta/pasta_scripts/?.lua;"..
-"/path/to/base/profile/pasta/pasta_scripts/?/init.lua;"..
-"/path/to/base/profile/pasta/cache/lua/?.lua;"..
-"/path/to/base/profile/pasta/cache/lua/?/init.lua;"..
-"/path/to/base/scriptlibs/?.lua;"..
-"/path/to/base/scriptlibs/?/init.lua"
-```
-
-### 検索優先順位
-
-1. **`profile/pasta/save/lua/`** - 永続化されたユーザーモジュール（最優先）
-2. **`scripts/`** - 利用者のカスタムスクリプト
-3. **`profile/pasta/pasta_scripts/`** - 内蔵ランタイムスクリプトの自己展開先
-4. **`profile/pasta/cache/lua/`** - トランスパイル済み Pasta コード
-5. **`scriptlibs/`** - 外部 Lua ライブラリ
-
-### UTF-8 契約
-
-`package.path` は **UTF-8 のまま** 設定されます。ANSI（システムのマルチバイト文字コード）への変換は行いません。
-
-あわせて、Lua ファイルを探す searcher（`package.loaders[2]`）は LuaJIT 標準品と同型の Rust 実装（`src/runtime/searcher.rs`）へ置換されています。候補パスの生成規則は標準と同一（`;` で分割・空要素はスキップ・テンプレート中の `?` をすべて置換・モジュール名の `.` を OS のディレクトリ区切りへ置換）で、ファイルを開く API だけが Rust の `std::fs`（wide API）になります。
-
-- 設置パスに非 ASCII 文字が含まれていてもモジュールを解決できます（ただし設置パスを UTF-8 で受け取る `loadu` を呼ばないホストでは、パスがランタイムへ届く前に欠落します。ホスト側の制約でランタイムからは回復できません。詳細はマニュアル [`startup.md`](../../book/src/reference/startup.md) の「既知の制限」を参照してください）。
-- 独自のパス長上限を持たず、候補パス・チャンク識別子・エラー文言に拡張長プレフィックス（`\\?\`）が現れることもありません（長パスに必要な付与は Rust `std` が内部で行います）。設置パスが 260 文字を超えても解決できます。
-- 候補パス文字列は、開くパス・チャンク識別子（`@` + 候補パス）・エラーメッセージにそのまま使われます。ASCII パスでは標準 searcher とバイト単位で同一の結果になります。
-- 未検出時のメッセージには、試した候補パスが探索順に `no file '<候補パス>'` として並びます。
-- `package.path` に UTF-8 として不正なバイト列（ANSI バイト列など）を追記すると、その候補は開けず `no file` 行に載ります。作者コードから検索パスを足す場合は UTF-8 で書いてください。
-
-> **Note**: `@enc` モジュールの ANSI 変換 API は従来どおりです。上記は `package.path` とモジュール解決に限った契約です。
-
-### 起動モジュールのロード失敗
-
-起動シーケンスは `require` で次の順にモジュールをロードし、**いずれも失敗は致命**です（ロード全体が失敗し、`X-ERROR-REASON` とログに理由が出ます）。
-
-| 順 | モジュール | 失敗時 | 備考 |
-| -- | ---------- | ------ | ---- |
-| 1 | `main` | 致命 | 利用者初期化スクリプト。既定の `main.lua` は自己展開されるため不在は正常状態ではない |
-| 2 | `pasta.shiori.entry` | 致命 | SHIORI 応答関数の唯一の定義元 |
-| 3 | `pasta.scene_dic` | 致命 | シーン読み込みと finalize |
-
-- 失敗は `module`（モジュール名）と `fatal` フィールド付きの error ログに記録され、`failed to load startup module '<モジュール名>'` の文脈を付けた `Err` として伝搬します。入れ子の `require` 失敗でも、起動モジュール名と根本原因の両方が読み取れます。
-- ロード失敗の原因（未検出・構文エラー・読み込みエラー）は区別せず、すべて同じ経路で可視化されます。
-- シーン identity 索引の突合（デバッグ有効時のみ実行）はモジュールロードではないため、失敗しても起動は継続します。
+詳細は [起動シーケンスとモジュール解決](https://ekicyou.github.io/pasta/reference/startup.html) を参照してください。searcher の実装は [内部設計: require の解決（searcher）](https://ekicyou.github.io/pasta/internals/loader.html#require-の解決searcher) にあります。
 
 ## 組み込みモジュール
 
-ランタイムに自動登録されるモジュール：
-
-| モジュール名           | 用途                            | デフォルト                 |
-| ---------------------- | ------------------------------- | -------------------------- |
-| `@pasta_search`        | シーン・単語検索 API            | 常に有効                   |
-| `@pasta_config`        | pasta.toml のカスタムフィールド | 常に有効                   |
-| `@pasta_sakura_script` | さくらスクリプト変換 API        | 常に有効                   |
-| `@pasta_log`           | Lua→Rust tracing ログブリッジ   | 常に有効                   |
-| `@pasta_persistence`   | 永続化データの load/save        | 常に有効                   |
-| `@enc`                 | エンコーディング変換            | 常に有効                   |
-| `@assertions`          | アサーション関数                | 有効                       |
-| `@testing`             | テストフレームワーク            | 有効                       |
-| `@regex`               | 正規表現サポート                | 有効                       |
-| `@json`                | JSON エンコード/デコード        | 有効                       |
-| `@yaml`                | YAML エンコード/デコード        | 有効                       |
-| `@env`                 | 環境変数アクセス                | **無効**（セキュリティ上） |
-
-### 使用例
-
-```lua
--- Pasta 検索 API
-local SEARCH = require "@pasta_search"
-local global_name, local_name = SEARCH:search_scene("シーン名", "親シーン")
-
--- 設定ファイルからカスタム値を取得
-local CONFIG = require "@pasta_config"
-print(CONFIG.ghost_name)  -- pasta.toml の [user].ghost_name
-
--- さくらスクリプト変換 API
-local SAKURA_SCRIPT = require "@pasta_sakura_script"
-local actor = { talk = { script_wait_default = 50 } }
-local result = SAKURA_SCRIPT.talk_to_script(actor, "こんにちは。")
--- 結果: "こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[100]。"
-
--- ログ出力 API
-local log = require "@pasta_log"
-log.info("Hello from Lua!")        -- INFOレベルでログ出力
-log.debug({key = "value"})         -- テーブルはJSON変換される
-log.warn(42)                        -- 数値は文字列変換される
-log.trace(nil)                      -- nilは空文字列、エラーなし
-
--- JSON 処理
-local JSON = require "@json"
-local data = JSON.decode('{"key": "value"}')
-```
-
-### API リファレンス
-
-各モジュールの詳細な API 仕様（関数シグネチャ、パラメータ、戻り値、使用例）については マニュアルの [公開モジュール API](../../book/src/lua/modules/index.md) を参照してください。
+ランタイムは `@pasta_search`・`@pasta_persistence`・`@pasta_config`・`@pasta_sakura_script`・`@enc`・`@pasta_log` を登録し、mlua-stdlib の `@json`・`@yaml`・`@regex`・`@assertions`・`@testing` を既定で有効にします（`@env` は既定で無効）。各モジュールの API は [公開モジュール API](https://ekicyou.github.io/pasta/lua/modules/index.html) を参照してください。
 
 ## 使用方法
 
@@ -352,170 +114,19 @@ runtime.exec(&lua_code)?;
 
 ## SHIORI 統合
 
-SHIORI/3.0 プロトコルとの統合には `scripts/pasta/shiori/entry.lua` を配置します：
+SHIORI のエントリ（`pasta.shiori.entry`）はフレームワークスクリプトとして同梱され、起動時に読み込まれます。ゴースト作者は `REG` にイベントハンドラを登録し、ハンドラはさくらスクリプトの文字列（応答の `Value`）を返します。SHIORI/3.0 の応答文字列への組み立てはエンジンが `RES`（`pasta.shiori.res`）で行います。
 
-```lua
--- scripts/pasta/shiori/entry.lua
-local EVENT = require "pasta.shiori.event"
-
-SHIORI = SHIORI or {}
-
-function SHIORI.load(hinst, load_dir)
-    -- 初期化処理
-    return true
-end
-
-function SHIORI.request(req)
-    -- req テーブル経由でイベント振り分け
-    return EVENT.fire(req)
-end
-
-function SHIORI.unload()
-    -- クリーンアップ処理
-end
-
-return SHIORI
-```
-
-### pasta.shiori.res モジュール
-
-SHIORI/3.0 レスポンス文字列を構築するためのユーティリティモジュールです。
-
-```lua
-local RES = require "pasta.shiori.res"
-
--- 200 OK レスポンス
-return RES.ok("Hello!")
-
--- 204 No Content（処理完了、返却値なし）
-return RES.no_content()
-
--- カスタムヘッダー付きレスポンス
-return RES.no_content({ ["X-Custom"] = "value" })
-
--- エラーレスポンス
-return RES.err("Something went wrong")
-
--- ワーニング付きレスポンス（204 + X-Warn-Reason）
-return RES.warn("Deprecated feature used")
-
--- TEACH イベント用レスポンス
-return RES.not_enough()  -- 311 Not Enough
-return RES.advice()      -- 312 Advice
-```
-
-**利用可能な関数**:
-
-| 関数                    | ステータス                | 説明                                |
-| ----------------------- | ------------------------- | ----------------------------------- |
-| `RES.ok(value, dic)`    | 200 OK                    | Value ヘッダー付き成功レスポンス    |
-| `RES.no_content(dic)`   | 204 No Content            | 値なし成功レスポンス                |
-| `RES.not_enough(dic)`   | 311 Not Enough            | TEACH イベント（情報不足）          |
-| `RES.advice(dic)`       | 312 Advice                | TEACH イベント（アドバイス）        |
-| `RES.bad_request(dic)`  | 400 Bad Request           | クライアントエラー                  |
-| `RES.err(reason, dic)`  | 500 Internal Server Error | サーバーエラー（X-Error-Reason 付） |
-| `RES.warn(reason, dic)` | 204 No Content            | 警告付きレスポンス（X-Warn-Reason） |
-| `RES.build(code, dic)`  | 任意                      | 汎用ビルダー（上記の基盤）          |
-
-**環境設定**:
-
-```lua
-RES.env.charset = "UTF-8"       -- デフォルト
-RES.env.sender = "Pasta"        -- デフォルト
-RES.env.security_level = "local" -- デフォルト
-```
-
-### pasta.shiori.sakura_builder モジュール
-
-トークン配列からさくらスクリプト文字列を生成するための純粋関数モジュールです。`pasta.shiori.act` の `build()` メソッド内部で使用されます。
-
-#### グループ化トークン形式（推奨）
-
-`ACT_IMPL.build()` は **グループ化されたトークン配列** を返します（actor-talk-grouping 機能）:
-
-```lua
-local BUILDER = require "pasta.shiori.sakura_builder"
-
--- グループ化形式: type="actor" がトークングループを保持
-local grouped_tokens = {
-    { type = "spot", actor = sakura, spot = 0 },
-    { type = "actor", actor = sakura, tokens = {
-        { type = "talk", actor = sakura, text = "こんにちは！" },
-        { type = "surface", id = 5 },
-        { type = "wait", ms = 1000 },
-    }},
-}
-local config = { spot_newlines = 0.5 }
-local script = BUILDER.build(grouped_tokens, config)
--- 結果: "\p[0]こんにちは！\s[5]\_w[1000]\e"
-```
-
-#### レガシーフラット形式（後方互換）
-
-```lua
--- フラット形式: 個別トークンの配列（後方互換のため引き続きサポート）
-local tokens = {
-    { type = "actor", actor = { spot = 0 } },
-    { type = "talk", text = "こんにちは！" },
-    { type = "surface", id = 5 },
-    { type = "wait", ms = 1000 },
-}
-local script = BUILDER.build(tokens, config)
-```
-
-**トークンタイプ**:
-
-| タイプ          | フィールド        | 出力例                               |
-| --------------- | ----------------- | ------------------------------------ |
-| `talk`          | `text`            | エスケープ済みテキスト               |
-| `actor`         | `actor`, `tokens` | グループ内トークンを順次処理         |
-| `actor`(legacy) | `actor.spot`      | `\p[n]` (スポットタグ)               |
-| `spot`          | `actor`, `spot`   | 内部状態更新（出力なし）             |
-| `clear_spot`    | -                 | 内部状態リセット（出力なし）         |
-| `spot_switch`   | -                 | `\n[percent]` (段落区切り、レガシー) |
-| `surface`       | `id`              | `\s[id]`                             |
-| `wait`          | `ms`              | `\_w[ms]` (精密ウェイト)             |
-| `newline`       | `n`               | `\n` × n回                           |
-| `clear`         | -                 | `\c`                                 |
-| `raw_script`    | `text`            | そのまま出力                         |
-| `yield`         | -                 | 無視（出力対象外）                   |
-
-## ファイル検出パターン
-
-デフォルトの `dic/**/*.pasta` パターン（再帰）では：
-
-- ✅ `dic/root.pasta` - 検出される（直下も対象）
-- ✅ `dic/baseware/system.pasta` - 検出される
-- ✅ `dic/talk/greeting.pasta` - 検出される
-- ❌ `profile/pasta/cache/lua/cached.pasta` - 除外される
-
-カスタムパターン例：
-
-```toml
-[loader]
-# 再帰的に全ての .pasta ファイルを検出
-pasta_patterns = ["dic/**/*.pasta"]
-
-# 複数パターンの指定
-pasta_patterns = ["dic/*/*.pasta", "extra/*.pasta"]
-```
-
-## モジュール名の生成
-
-Pasta ファイルのパスからモジュール名が自動生成されます：
-
-| ソースパス                  | モジュール名          |
-| --------------------------- | --------------------- |
-| `dic/baseware/system.pasta` | `dic_baseware_system` |
-| `dic/talk/greeting.pasta`   | `dic_talk_greeting`   |
+- イベントハンドラと `RES`: [SHIORI イベントとハンドラ](https://ekicyou.github.io/pasta/lua/shiori-events.html)
+- イベント配送の内部: [内部設計: Lua 側の SHIORI エントリとイベント配送](https://ekicyou.github.io/pasta/internals/shiori.html#lua-側の-shiori-エントリとイベント配送)
+- トークンからさくらスクリプトへの組み立て: [内部設計: さくらスクリプトの組立](https://ekicyou.github.io/pasta/internals/talk-output.html#さくらスクリプトの組立)
 
 ## 関連クレート
 
-- [`pasta_dsl`](../pasta_dsl/) - DSLパーサー、AST
-- [`pasta_core`](../pasta_core/) - レジストリ（シーン/単語テーブル）
-- [`pasta_shiori`](../pasta_shiori/) - SHIORI DLL ラッパー
-- [プロジェクト概要](../../README.md) - pasta プロジェクト全体
+- [`pasta_dsl`](https://crates.io/crates/pasta_dsl) - DSLパーサー、AST
+- [`pasta_core`](https://crates.io/crates/pasta_core) - レジストリ（シーン/単語テーブル）
+- [`pasta_shiori`](https://crates.io/crates/pasta_shiori) - SHIORI DLL ラッパー
+- [プロジェクト概要](https://github.com/ekicyou/pasta) - pasta プロジェクト全体
 
 ## ライセンス
 
-プロジェクトルートの LICENSE ファイルを参照してください。
+プロジェクトルートの [LICENSE](https://github.com/ekicyou/pasta/blob/main/LICENSE) ファイルを参照してください。
