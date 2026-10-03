@@ -6,7 +6,7 @@ pasta ランタイムの内部設計（トランスパイル・コルーチン�
 
 本仕様は、同じ mdBook マニュアルの末尾に **「内部設計（コントリビュータ向け）」パート**を新設してランタイム内部設計を一貫して解説し、散在する内部向け記述をそこへ集約して権威を一本化する。あわせて、内部設計章が実装と乖離し続けないよう、spec 完了ゲートでの追従確認と定期総点検（`review-improvement-loop` 次元⑦）での照合を運用に組み込む。コード・挙動は変更しない（記述のみ）。
 
-（詳細は `.kiro/specs/pasta-runtime-internals-doc/brief.md` を参照）
+（詳細は `.kiro/specs/completed/pasta-runtime-internals-doc/brief.md` を参照）
 
 ## Introduction
 

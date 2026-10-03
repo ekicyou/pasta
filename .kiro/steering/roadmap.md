@@ -110,9 +110,9 @@ discovery（2026-10-01）で両仕様を起票。依存順は manual-ssot-author
   - 由来: pasta-manual-debugging の discovery（2026-06-08）でユーザーが「mdbook に書いてる項目は mdbook を権威にしたい／別仕様で権威化の整理をすべき」と指摘。本仕様外・別仕様として申し送り
   - brief.md 作成済み（`.kiro/specs/completed/manual-ssot-authority/brief.md`）
   - 完了（2026-10-02）。吸収台帳は `.kiro/specs/completed/manual-ssot-authority/absorption-ledger.md`
-- [ ] pasta-runtime-internals-doc -- pasta ランタイムの内部設計・アーキテクチャ解説（トランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期・アクター基盤 / デバッグ・ソースマップ / シーンキック）。読者＝コントリビュータ・実装理解者。同一 mdBook の末尾に「内部設計」パートとして置く。`OPTIMIZATION.md` を吸収・廃止、スキル `internal-modules` を mdBook 権威＋生成へ移行、クレート README の内部解説を移設。鮮度維持は kiro-complete DoD の追従確認＋review-improvement-loop 次元⑦の照合。Dependencies: manual-ssot-authority
+- [x] pasta-runtime-internals-doc -- pasta ランタイムの内部設計・アーキテクチャ解説（トランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期・アクター基盤 / デバッグ・ソースマップ / シーンキック）。読者＝コントリビュータ・実装理解者。同一 mdBook の末尾に「内部設計」パートとして置く。`OPTIMIZATION.md` を吸収・廃止、スキル `internal-modules` を mdBook 権威＋生成へ移行、クレート README の内部解説を移設。鮮度維持は kiro-complete DoD の追従確認＋review-improvement-loop 次元⑦の照合。Dependencies: manual-ssot-authority
   - 由来: pasta-user-manual の設計ディスカッションで「ランタイム内部設計は本仕様外・将来仕様」と決定（R5 は API 使用法に限定）
-  - brief.md 作成済み（`.kiro/specs/pasta-runtime-internals-doc/brief.md`）
+  - 完了（2026-10-03）。成果: マニュアル「内部設計（コントリビュータ向け）」パート・Gate 7・吸収台帳（`.kiro/specs/completed/pasta-runtime-internals-doc/absorption-ledger.md`）
 
 #### トランスパイラ最適化の将来候補（旧最適化メモ廃止時の申し送り）
 
@@ -125,7 +125,7 @@ discovery（2026-10-01）で両仕様を起票。依存順は manual-ssot-author
 
 #### 内部設計執筆で判明したバグ候補（pasta-runtime-internals-doc からの申し送り）
 
-内部設計パートの執筆で現行実装と照合した際に見つかった不備。章には現行挙動だけを書いている。根拠（ソースの所在・確認方法）は本 spec の吸収台帳（`.kiro/specs/pasta-runtime-internals-doc/absorption-ledger.md`）の付録 B にある。
+内部設計パートの執筆で現行実装と照合した際に見つかった不備。章には現行挙動だけを書いている。根拠（ソースの所在・確認方法）は本 spec の吸収台帳（`.kiro/specs/completed/pasta-runtime-internals-doc/absorption-ledger.md`）の付録 B にある。
 
 - シーン・アクター名のサニタイズと検索キーの不一致 — 登録キーはサニタイズ済みの名前、検索は元の名前のため、置換される文字を含むシーン名・アクター名の Call・アクター単語参照が一致しない（U30 をアクター名・ローカルシーンへ広げたもの） — 吸収台帳付録 B を参照
 - グローバルシーン検索がローカルのキーを除外しない — `search_scene(名前, nil)` が `:` で始まるローカルのキーも候補にし、`:` で始まる動的な値で任意の親グローバルシーンの `__start__` が選ばれうる — 吸収台帳付録 B を参照

@@ -34,7 +34,7 @@
 - **検査の拡張**: `link-check.mjs` の内部設計章パス実在検査（`internals-path`）とクレート README のマニュアル URL 検査（`readme-manual-url`・7.8）、`verify-content.mjs` の内部設計パート検査（I 系・口調検査の対象拡大）、`verify-search.mjs` の索引対象パート追加。
 - **Internals Sync Gate**（`workflow.md` DoD の条件付き Gate 7）とその発火（`kiro-complete`）。
 - **`review-improvement-loop` の D7 文言**への内部設計章照合の追加（4 ファイルの固定文言のみ）。
-- **吸収台帳** `.kiro/specs/pasta-runtime-internals-doc/absorption-ledger.md`（spec 成果物）。
+- **吸収台帳** `.kiro/specs/completed/pasta-runtime-internals-doc/absorption-ledger.md`（spec 成果物）。
 - **旧文書の撤去と参照修正**: `OPTIMIZATION.md` の削除、`SOUL.md`・`TEST_COVERAGE.md` の参照修正、クレート README 4 本の書き換え、ロードマップへの申し送り、ステアリングの最小追記。
 - **陳腐化したソースコメントの修正**（3.8。実行されるコードは変えない）。
 
@@ -165,7 +165,7 @@ book/src/
 ├── internal-modules.md              # 手書き → 生成物に置換（internals/internal-modules.md から）
 └── script-api.md                    # 新規生成物（lua/script-api.md から）
 
-.kiro/specs/pasta-runtime-internals-doc/
+.kiro/specs/completed/pasta-runtime-internals-doc/
 └── absorption-ledger.md             # 新規 spec 成果物: 吸収元の各節 → 収録先／存置／除外（理由）＋実装照合位置
 ```
 
@@ -615,7 +615,7 @@ function checkReadmeManualLinks(repoRoot: string): BrokenLink[];
 
 ### 集約層
 
-#### AbsorptionLedger（`.kiro/specs/pasta-runtime-internals-doc/absorption-ledger.md`）
+#### AbsorptionLedger（`.kiro/specs/completed/pasta-runtime-internals-doc/absorption-ledger.md`）
 
 | Field | Detail |
 |-------|--------|
@@ -675,7 +675,7 @@ function checkReadmeManualLinks(repoRoot: string): BrokenLink[];
 
 #### Retirement / FutureRouting
 
-- `OPTIMIZATION.md` を削除する（スタブなし・5.4）。参照元 `SOUL.md` L33・L478、`TEST_COVERAGE.md` L203・L295 をトランスパイル章の URL（`https://ekicyou.github.io/pasta/internals/transpiler.html`）へ置換する。完了前にリポジトリ全体を `OPTIMIZATION.md` で grep し、現存文書として参照する箇所が 0 件であることを確認する（5.5）。除外してよいのは `.kiro/specs/completed/` 配下、本 spec 自身のディレクトリ（`.kiro/specs/pasta-runtime-internals-doc/`。完了時に `completed/` へ移る）、`roadmap.md` の本 spec の項目（廃止を説明する記述であり現存文書としての参照ではない）に限る。
+- `OPTIMIZATION.md` を削除する（スタブなし・5.4）。参照元 `SOUL.md` L33・L478、`TEST_COVERAGE.md` L203・L295 をトランスパイル章の URL（`https://ekicyou.github.io/pasta/internals/transpiler.html`）へ置換する。完了前にリポジトリ全体を `OPTIMIZATION.md` で grep し、現存文書として参照する箇所が 0 件であることを確認する（5.5）。除外してよいのは `.kiro/specs/completed/` 配下、本 spec 自身のディレクトリ（`.kiro/specs/completed/pasta-runtime-internals-doc/`。完了時に `completed/` へ移る）、`roadmap.md` の本 spec の項目（廃止を説明する記述であり現存文書としての参照ではない）に限る。
 - `roadmap.md` の「将来仕様（Phase 4 派生・未着手）」に次の 2 小節を追加する（前例: 「未記載構文のバグ候補」）。
   - `#### トランスパイラ最適化の将来候補（旧最適化メモ廃止時の申し送り）`: 定数畳み込み・デッドコード削除・インライン展開・単語プリフェッチを 1 項目 1 行のキー情報で（5.3）。
   - `#### 内部設計執筆で判明したバグ候補（pasta-runtime-internals-doc からの申し送り）`: 1 項目 1 行（名称 — 要旨 — 吸収台帳付録 B を参照）（3.4）。該当なしなら小節を作らず台帳にその旨を書く。
