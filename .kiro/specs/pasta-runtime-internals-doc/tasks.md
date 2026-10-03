@@ -204,14 +204,14 @@
   - 許可された除外（完了済み spec・本 spec のディレクトリ・ロードマップの本 spec 項目）以外で `OPTIMIZATION.md` を grep して 0 件になる
   - _Requirements: 3.4, 5.3, 5.4, 5.5_
 
-- [ ] 6. 統合検証
+- [x] 6. 統合検証
 - [x] 6.1 吸収台帳を完結させ、手書きの写しが残っていないことを確認する
   - 台帳の全行の処置が埋まり、「除外」「README 存置」に理由があり、実装照合列が埋まっていることを確認する
   - `OPTIMIZATION.md` の参照、手書き版 `internal-modules.md` 固有の見出し、台帳で「削除」とした README 節の見出しを grep し、現行文書に残っていないことを確認する
   - 台帳に空の処置・理由欠落が 0 件で、残存 grep が 0 件になる
   - _Requirements: 3.1, 5.1, 5.5, 6.1, 6.2, 6.10, 7.7, 10.2, 10.6_
 
-- [ ] 6.2 全検査・ビルド・テストを通し、完了ゲートを本 spec 自身の差分で机上確認する
+- [x] 6.2 全検査・ビルド・テストを通し、完了ゲートを本 spec 自身の差分で机上確認する
   - 鮮度チェック・リンク検証・内容検査・静的検査・検索検査・ツール自己テストとマニュアルのビルド・着色・索引生成を実行し、既存パートの章順が変わっていないことを確認する
   - `cargo build` と `cargo test --all`（`NoDefaultCurrentDirectoryInExePath` を外して実行）・`cargo fmt --check` が成功し、Rust/Lua の差分がコメント行のみで、新しいエコシステム依存が増えていないことを確認する
   - 本 spec の差分（コメント修正で `crates/` に触れる）に Gate 7 の手順を当て、発火・章ごとの更新済み判定・リンク検証の通過を確認する
@@ -237,3 +237,4 @@
 - 4.9: internal-modules 章の「ACT の内部」に ACT のフィールドの作られ方を収録（talk-output 章が #act-の内部 を参照するため）。script-api 章（4.10）との線引きは 4.11 で確認。台帳の 4.9／4.10 共有行は各セルを「4.9: …」で記入済みで、4.10 は「／4.10: …」を追記する。付録 B に init_scene／call の文脈非復元を記録済み。`crates/pasta_lua/src/search/context.rs` の fn_name 例 `メイン_1::…` はトランスパイル時の形のみ正しい（4.11 で要確認）。
 - 4.10: script-api 章のアクタープロキシ表・`init_scene`・WORD スコープは internal-modules 章と一部重なる（4.11 で線引き）。`crates/pasta_lua/src/code_gen/scope_gen.rs` の `ACTOR:create_word()` がアクター属性も設定するという古いコメントは未修正（4.11 で修正）。回避レシピ（「代わりにこう書く」）は書かない方針を点検で確認済み。
 - 4.11: 対応表は各題材章「ソースの所在」の箇条書きと集合一致（テスト・ルート Cargo.toml・`crates/pasta_lua/src/lib.rs` は除外し index に明記）。`crates/pasta_lua/pasta_scripts/` 直下の `pasta/` 外の新規ファイルはどの行にも一致しない（現状は README のみ）。付録 B にアクション行で GLOBAL 組み込み（yield 等）に一致するとプロキシが渡りエラーになる件を追加済み（dynamic-word-reference 由来）。
+- 6.2: 全検査・`cargo test --all`（2285 passed）・`cargo fmt --check` 成功。merge-base 差分の crates/ .rs/.lua 変更 610 行はすべてコメント、依存変更なし。Gate 7 机上確認: 変更ファイル 139 件で 9 章すべてが発火し、全章 (a) 本 spec で更新済み、link-check exit 0。
