@@ -20,7 +20,7 @@
 **開発者提供の手順概要**:
 
 1. バージョン（1.2.0など）を開発者に確認する
-2. Cargo.toml のバージョン表記および editors/vscode/package.json を更新し、build が通ることを確認してコミット
+2. Cargo.toml のバージョン表記、editors/vscode/package.json、およびマニュアル（book/src/introduction.md）の対象バージョン行を更新し、build とマニュアルの内容検証が通ることを確認してコミット
 3. cargo publish する（依存関係順）
 4. VSCode 拡張をビルド・公開する（非クリティカル）
 5. サンプルゴーストをビルド（release.ps1 の実行）してコミット
@@ -48,9 +48,9 @@
 
 ## Boundary Context
 
-- **In scope**: Cargo.toml / package.json のバージョン更新、crates.io 公開（5クレート）、VSCode Marketplace 公開、サンプルゴーストビルド、Git タグ・プッシュ、GitHub Release 作成、これらの**実行順序と並行スケジューリング**、ならびに**ワークツリー（非デフォルトブランチ）上での実行と、リリースコミット・タグの PR マージコミット方式（非 squash）による main 統合**
-- **Out of scope**: CI/CD パイプライン統合、クロスプラットフォーム対応、認証トークンの自動設定、pasta_lsp の独立リリース管理、release.ps1 スクリプト自体の修正、**spec 完了の squash-PR 統合フロー**（リリースは別系統のため対象外）、**GitHub ブランチ保護設定そのものの構成**（本仕様は保護下でも成立する手順を定めるが、保護ルールの設定作業は対象外）
-- **Adjacent expectations**: `release.ps1` は既存の成熟スクリプトとしてそのまま利用する。`gh` CLI および `cargo` / `vsce` の認証は事前に設定済みであることを前提とする。フィーチャーブランチ／ワークツリーは Claude Code ハーネスが供給する。リリースの main 統合は **PR ベース**（マージコミット方式 `--merge`、squash を行わない）で行い、将来 GitHub 側で main への直接 push を禁止しても成立させる。なお steering `workflow.md` のリリースカーブアウト改訂、`.claude/settings.json` のタグ push 許可追加・`git push origin main` 許可の縮退、および repo の merge-commit 有効化（必要時）は、**繰り返し実行されるリリース手順には含めない一回限りのセットアップ**として扱い、本 spec の設計確定後（タスク分解の前後）に**手動で実施**する（ワークツリー隔離のため別セッションへは委譲しない）。整合は Steering Gate でも確認する
+- **In scope**: Cargo.toml / package.json / マニュアルの対象バージョン行（`book/src/introduction.md`）のバージョン更新、crates.io 公開（5クレート）、VSCode Marketplace 公開、サンプルゴーストビルド、Git タグ・プッシュ、GitHub Release 作成、これらの**実行順序と並行スケジューリング**、ならびに**ワークツリー（非デフォルトブランチ）上での実行と、リリースコミット・タグの PR マージコミット方式（非 squash）による main 統合**
+- **Out of scope**: CI/CD パイプライン統合、クロスプラットフォーム対応、認証トークンの自動設定、pasta_lsp の独立リリース管理、release.ps1 スクリプト自体の修正、**spec 完了の squash-PR 統合フロー**（リリースは別系統のため対象外）、**GitHub ブランチ保護設定そのものの構成**（本仕様は保護下でも成立する手順を定めるが、保護ルールの設定作業は対象外）、**マニュアルの対象バージョン行以外の改訂とマニュアルの公開**（公開は main への統合を契機にマニュアル側の既存 CI が行い、本仕様は関与しない）
+- **Adjacent expectations**: `release.ps1` は既存の成熟スクリプトとしてそのまま利用する。マニュアルの内容検証（対象バージョン行と `Cargo.toml` の照合を含む）はマニュアル側の既存ツールをそのまま利用し、対象バージョン行の書式はマニュアル側が維持する。`gh` CLI および `cargo` / `vsce` の認証は事前に設定済みであることを前提とする。フィーチャーブランチ／ワークツリーは Claude Code ハーネスが供給する。リリースの main 統合は **PR ベース**（マージコミット方式 `--merge`、squash を行わない）で行い、将来 GitHub 側で main への直接 push を禁止しても成立させる。なお steering `workflow.md` のリリースカーブアウト改訂、`.claude/settings.json` のタグ push 許可追加・`git push origin main` 許可の縮退、および repo の merge-commit 有効化（必要時）は、**繰り返し実行されるリリース手順には含めない一回限りのセットアップ**として扱い、本 spec の設計確定後（タスク分解の前後）に**手動で実施**する（ワークツリー隔離のため別セッションへは委譲しない）。整合は Steering Gate でも確認する
 
 ---
 
@@ -76,16 +76,17 @@
 
 ### Requirement 2: バージョン更新
 
-**Objective:** As a 開発者, I want ワークスペース全体と関連プロジェクトのバージョンを一括更新したい, so that 全クレートおよび VSCode 拡張のバージョンが同期される
+**Objective:** As a 開発者, I want ワークスペース全体と関連プロジェクト、およびマニュアルの対象バージョン表記を一括更新したい, so that 全クレート・VSCode 拡張・マニュアルが示すバージョンが同期され、公開マニュアルの対象バージョンが古いまま残らない
 
 #### Acceptance Criteria
 
 1. When バージョン番号が確定する, the Release Workflow shall `Cargo.toml`（ワークスペースルート）の `[workspace.package].version` フィールドを新バージョンに更新する
 2. When ワークスペースバージョンが更新される, the Release Workflow shall `[workspace.dependencies]` セクション内の内部クレート参照（`pasta_core`, `pasta_dsl`, `pasta_lua`, `pasta_shiori`, `pasta_check`）の `version` フィールドも同じバージョンに更新する
 3. When Cargo.toml が更新される, the Release Workflow shall `editors/vscode/package.json` の `version` フィールドも同じバージョンに更新する
-4. When バージョン更新が完了する, the Release Workflow shall ワークスペース全体のビルドを実行しビルドが成功することを確認する
-5. If ビルドが失敗する, the Release Workflow shall バージョン変更をロールバックし、エラーを報告する
-6. When ビルドが成功する, the Release Workflow shall バージョン更新をコミットする
+4. When Cargo.toml が更新される, the Release Workflow shall マニュアルのトップページ（`book/src/introduction.md`）の対象バージョン行 `| 対象 pasta バージョン | **vX.Y.Z** |` を同じバージョン（`v` 接頭辞付き）に更新し、それ以外のマニュアル本文は変更しない
+5. When バージョン更新が完了する, the Release Workflow shall ワークスペース全体のビルドと、マニュアルの内容検証（対象バージョン行が `Cargo.toml` のバージョンと一致することの照合を含む）を実行し、両方が成功することを確認する
+6. If ビルドまたはマニュアルの内容検証が失敗する（対象バージョン行が見つからず更新できなかった場合を含む）, the Release Workflow shall バージョン変更（`Cargo.toml`・`package.json`・マニュアル）をファイル単位でロールバックし、エラーを報告してリリース作業を中止する
+7. When ビルドとマニュアルの内容検証が成功する, the Release Workflow shall マニュアルの対象バージョン更新を含むバージョン更新を 1 つのコミットにまとめる
 
 ### Requirement 3: crates.io 公開
 
@@ -233,3 +234,4 @@
 6. **cc-sdd 3.0 タスク注釈の採用**: tasks.md に `(P)` 並行マーカー、`_Depends:_`、`_Boundary:_` を導入し、並行実行可能なタスクと依存関係を明示
 7. **番号体系**: 旧 Req 8（繰り返し実行）→ Req 9 に繰り下げ（Req 8 を実行モデルに割当）
 8. **ワークツリー実行と PR ベース main 統合の追加（Req 10 新設）**: Claude Code ハーネスのワークツリー（非デフォルトブランチ）上での起動を前提とし、リリースコミット・タグを **PR のマージコミット方式（`--merge`）** で main へ統合する要件を新設。spec 完了用の squash-PR や直接 push を排除し、コミット SHA とタグの参照整合性を保ちつつ将来の GitHub ブランチ保護に前方互換とする。これに伴い Req 6.4（タグ・プッシュ）の統合方式を更新し、Boundary Context に統合方針を明記。さらに**安全順序を「main 統合 → crates.io 公開 → GitHub Release」へ反転**し、不可逆な crates.io 公開を可逆な main 統合の後段に配置（Req 8.5・8.2・6.1・3.1・10 AC6–8 を更新。旧仕様は crates.io 公開を先行させていた）
+9. **マニュアルの対象バージョン行を版の同期対象に追加（Req 2.4–2.7）**: マニュアルのトップページが示す対象バージョンが古いまま公開されていた（v0.3.7 時点で「v0.2 系列」）。版上げの同期対象に `book/src/introduction.md` の対象バージョン行を加え（2.4）、ビルド検証にマニュアルの内容検証を加え（2.5）、ロールバック（2.6）とバージョン更新コミット（2.7）の対象にもマニュアルを含める。これに伴い旧 2.4–2.6 は 2.5–2.7 へ繰り下げ
