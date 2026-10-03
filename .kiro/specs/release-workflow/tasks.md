@@ -25,8 +25,9 @@
   - `gh auth status` で ekicyou アカウントの認証を確認する（未認証なら `gh auth login` を案内）
   - `gh repo view --json mergeCommitAllowed` が `true` であることを確認する（`false` なら一回限りセットアップ `gh repo edit --enable-merge-commit` の未実施を報告し中止）
   - 現在ブランチが非デフォルトブランチ（ハーネス供給のワークツリー）であることを確認する（`main` 上ならワークツリー上での再実行を促す）
+  - main の CI が全緑であることを確認する。`git fetch origin main` のあと `gh run list --branch main --workflow build.yml --limit 1 --json headSha,status,conclusion` の `headSha` が `origin/main` と一致し、`status: completed`・`conclusion: success` であること。実行中なら完了後の再実行を案内して中止し、失敗なら main を直してからリリースするよう報告して中止する（spec 完了の squash マージは CI を待たないため、取り消せない公開の前にここで課す）
   - 第2段リトライは ScheduleWakeup（同一セッション内待機→再開）で行うため、完遂までセッションを開いておく運用である旨を周知する
-  - 完了条件: 認証済み・`mergeCommitAllowed: true`・非デフォルトブランチであることが確認された
+  - 完了条件: 認証済み・`mergeCommitAllowed: true`・非デフォルトブランチ・main の CI 全緑であることが確認された
   - _Requirements: 8.1, 10.1, 10.3, 11.2, 11.3, 11.4_
 - [ ] 1.2 リリースバージョンを決定し Resume を検知する
   - main の現行 Cargo.toml バージョン V を取得し、V が完全公開（全公開クレートが crates.io に存在 かつ タグ `vV` が push 済み かつ GitHub Release が存在）かを確認する

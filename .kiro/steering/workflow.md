@@ -140,6 +140,8 @@ gh pr create --base {default-branch} --head $branch --title "<subject>" --body "
 gh pr merge --squash --delete-branch --subject "<subject>" --body "<body>"
 ```
 
+**CI を待たない**: squash マージは PR の CI 完了を待たずに行う。マージ前の関門は DoD の Test Gate（ローカルの `cargo test --all` と `cargo clippy --all-targets --workspace -- -D warnings`）であり、CI の緑を人や AI が見張る運用はしない。CI にしか見えない失敗（x86 ターゲット・ランナー固有のパス・cargo-deny・クリーンチェックアウト）で main が赤くなった場合は、次の作業より先に追いかけの修正で直す。取り消せない crates.io 公開の前にだけ「main の CI 全緑」を関門として課す（`release-workflow` Task 1.1）。
+
 **ブランチ削除のタイミング**: リモートの feature ブランチは `gh pr merge --delete-branch` が **PR マージ成功後に** API で削除する。**マージ成功前にブランチを削除しない**（復旧可能性を確保するため）。ローカルブランチおよびワークツリーは、カレントワークツリーで実行中のため構造的に削除できない。これらの後始末はハーネスのワークツリー teardown に委ねる（`--delete-branch` のローカル削除試行がブロックされて警告を出しても、これは非致命でありマージ成功を覆さない）。
 
 **フォールバック（PR 不可時）**: 現在のブランチがデフォルトブランチである / `{remote}` が不在・オフライン / `gh` 未認証 のいずれかの場合は、**警告を出力して PR 操作・push をスキップ**し、ローカルコミットを保持したまま継続する。**デフォルトブランチへの直接 push は一切行わない。**
