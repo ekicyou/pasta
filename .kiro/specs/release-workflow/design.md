@@ -33,7 +33,7 @@
 
 ### This Spec Owns
 - バージョン番号の決定・検証・全ソース調査
-- Cargo.toml（5箇所）および package.json のバージョン更新
+- Cargo.toml（6箇所）・package.json・**マニュアルの対象バージョン行（`book/src/introduction.md` の 1 行）**のバージョン更新と、その整合検証（マニュアル内容検証の実行）
 - crates.io への依存関係順公開（4クレート + pasta_check の計5クレート）
 - VSCode 拡張のビルド（パッケージング）と Marketplace 公開（非クリティカル）
 - サンプルゴースト（hello-pasta）のビルドと成果物確認
@@ -50,6 +50,7 @@
 - crates.io に公開済みクレートの yank 操作
 - **spec 完了の squash-PR 統合フロー**（kiro-complete が管轄）
 - **GitHub ブランチ保護／タグ保護ルールの構成**
+- **マニュアルの対象バージョン行以外の改訂・マニュアルの公開**（公開は main 統合後にマニュアル CI `manual.yml` が行う）・**マニュアル検証ツール（`book/tools/`）自体の修正**（対象バージョン行の書式と照合規則はマニュアル側が維持する）
 
 ### Allowed Dependencies
 - External: `cargo` CLI — ビルド・テスト・公開（R1 cargo ロックを保持）(P0)
@@ -57,6 +58,7 @@
 - External: `gh` CLI — **PR 作成・マージコミット統合**（`gh pr create` / `gh pr merge --merge --delete-branch`、R3）および GitHub Release 作成（R3）(P0)
 - External: `npm` / `vsce` — VSCode 拡張ビルド・公開（build:wasm は R1、publish は R3）(P0)
 - Script: `release.ps1` — サンプルゴーストビルド（内部で cargo を呼び R1 を保持）(P0)
+- Script: `node book/tools/verify-content.mjs` — マニュアル内容検証（`F-version` が `book/src/introduction.md` の対象バージョン行と `Cargo.toml` の版を照合する。Node 標準モジュールのみで動作し `npm install` 不要・読み取り専用）(P0)
 - Pattern: `kiro-complete` SKILL.md の PR 統合パターン（PR 可否判定・中断セマンティクス・ローカル削除警告の非致命扱い）を**流用**（`--squash` → `--merge` に置換）(P1)
 - One-Time: `gh repo edit --enable-merge-commit` — repo の merge-commit 方式の有効化（前提セットアップ）(P0)
 - Infra: crates.io registry / VSCode Marketplace — 公開先（R3）(P1)
@@ -65,6 +67,7 @@
 
 ### Revalidation Triggers
 - Cargo.toml の workspace 構造変更（クレート追加・削除）
+- `book/src/introduction.md` の対象バージョン行の書式変更、または `verify-content.mjs` の `F-version` 照合規則の変更（Phase 2 の置換パターンと検証コマンドが崩れる）
 - release.ps1 のインターフェース変更（特にローカルビルド方式が crates.io 依存へ変わると Req 5.9 / 8.6 の前提が崩れる）
 - VSCode 拡張のビルドパイプライン変更（特に `build:wasm` が R1 を要するか）
 - **repo の merge-method 設定変更**（merge-commit 無効化／squash 無効化）→ Req 10 AC3 の前提が崩れる
@@ -84,6 +87,8 @@
 | ----------------------------- | ------------------------ | ------------------------------------ |
 | `Cargo.toml`（ルート）        | ✅ ワークスペース集中管理 | バージョン更新対象（6箇所）          |
 | `editors/vscode/package.json` | ✅ バージョン同期対象     | バージョン更新対象（1箇所）          |
+| `book/src/introduction.md`    | ✅ 対象バージョン行 `\| 対象 pasta バージョン \| **vX.Y.Z** \|` | バージョン更新対象（1行） |
+| `book/tools/verify-content.mjs` | ✅ `F-version` が上記行と Cargo.toml を照合 | Phase 2 の検証コマンド（読み取り専用） |
 | `release.ps1`                 | ✅ 成熟スクリプト         | ゴーストビルド実行（ローカル）       |
 | `gh` CLI                      | ✅ 認証済み（ekicyou）    | PR 統合・GitHub Release 作成         |
 | `kiro-complete` SKILL.md      | ✅ PR 統合の参照実装      | PR 可否判定・中断セマンティクスを流用 |
@@ -124,7 +129,7 @@ graph TB
     subgraph StageA ["Stage A: Prepare and Build （ローカル直列 R1+R2 排他）"]
         A0[Phase 0: gh auth と merge-commit 許可の確認]
         A1[Phase 1: バージョン決定 + 未コミット自動コミット + cargo test]
-        A2[Phase 2: Cargo.toml 6箇所 + package.json 更新 build commit]
+        A2[Phase 2: Cargo.toml 6箇所 + package.json + マニュアル対象バージョン行 更新 build verify-content commit]
         A3[Phase 5: release.ps1 ローカルビルド dll.zip 圧縮 commit]
         A4[Phase 4a: npm package build wasm R1 VSIX 生成]
         AZ[Phase Z: git log チェンジログ整形 読み取り専用]
@@ -182,6 +187,7 @@ graph TB
 | CLI     | `gh` (GitHub CLI)          | **PR 作成・マージコミット統合**・Release | R3       | `gh pr merge --merge --delete-branch`      |
 | CLI     | `npm` / `vsce`             | VSCode 拡張ビルド・公開                  | R1(build)/R3(publish) | `@vscode/vsce ^3.0.0`         |
 | Script  | `release.ps1` (PowerShell) | x86 DLL ビルド + .nar 生成               | R1+R2    | 既存成熟スクリプト・ローカルビルド         |
+| Script  | `node book/tools/verify-content.mjs` | マニュアル内容検証（対象バージョン行 ↔ Cargo.toml 照合） | R2(read) | 既存マニュアルツール。Node 標準モジュールのみ・`npm install` 不要 |
 | Config  | repo merge-method 設定     | `--merge` 方式の有効化（一回限り）       | —        | `gh repo edit --enable-merge-commit`       |
 | Runtime | Windows + PowerShell       | 実行環境                                 | —        | `i686-pc-windows-msvc` ターゲット必須      |
 
@@ -207,6 +213,7 @@ graph TB
 | --------------------------------------------------- | ------------------------------------------------------------------------------- | ------- |
 | `Cargo.toml`                                        | `[workspace.package].version` + 5クレートの `version` フィールド更新（計6箇所） | A (P2)  |
 | `editors/vscode/package.json`                       | `version` フィールド更新                                                        | A (P2)  |
+| `book/src/introduction.md`                          | 対象バージョン行 `\| 対象 pasta バージョン \| **vX.Y.Z** \|` の 1 行のみ更新   | A (P2)  |
 | `release/hello-pasta.nar`                           | release.ps1 による再生成                                                        | A (P5)  |
 | `target/i686-pc-windows-msvc/release/pasta.dll(.zip)` | release.ps1 ビルド + zip 圧縮                                                  | A (P5)  |
 | `editors/vscode/pasta-vscode-X.Y.Z.vsix`            | npm run package による生成                                                      | A (P4a) |
@@ -309,7 +316,7 @@ flowchart TD
     A --> D[Stage D gh release]
 
     B --> B1[作業不要 変更なし]
-    C --> C1[git restore Cargo.toml package.json]
+    C --> C1[git restore Cargo.toml package.json introduction.md]
     P5 --> P51[エラー報告 手動対応]
     INT --> INT1[非破壊中断 第2段 ScheduleWakeup 再試行 or 非一時は未完了報告 Stage C/D 不実行]
     X --> X1[main 統合は保持 未公開分を第2段 ScheduleWakeup 再試行 既公開は残す]
@@ -324,8 +331,8 @@ flowchart TD
 | 1.1–1.7     | バージョン決定・semver・重複チェック          | A / Phase 1       | メインフロー: Stage A          |
 | 1.8–1.9     | 未コミット変更の自動コミット                  | A / Phase 1       | メインフロー: Stage A          |
 | 1.10–1.11   | cargo test 実行・失敗時中止                   | A / Phase 1       | エラーフロー: Stage A 検証     |
-| 2.1–2.3     | Cargo.toml 6箇所 + package.json 更新          | A / Phase 2       | メインフロー: Stage A          |
-| 2.4–2.6     | cargo build 検証・失敗時 git restore・コミット | A / Phase 2       | エラーフロー: Stage A Phase2   |
+| 2.1–2.4     | Cargo.toml 6箇所 + package.json + マニュアル対象バージョン行 更新 | A / Phase 2 | メインフロー: Stage A      |
+| 2.5–2.7     | cargo build + verify-content 検証・失敗時 git restore（3ファイル）・単一コミット | A / Phase 2 | エラーフロー: Stage A Phase2 |
 | 3.1         | ローカル完了＋**統合成功後**に依存関係順 publish | C / Track X     | メインフロー: Stage C Track X  |
 | 3.2–3.4     | 成功確認後に次・段階的リトライ・失敗時中断     | C / Track X       | 共通リトライ戦略               |
 | 3.5–3.6     | pasta_sample_ghost スキップ・index 待機       | C / Track X       | メインフロー: Stage C Track X  |
@@ -369,7 +376,7 @@ flowchart TD
 | ---------------------- | ----- | ---------------------------------------- | --------------- | ---------------------------------------------------- | --------- |
 | Phase 0: Prerequisites | A     | gh 認証・merge-commit 許可・第2段前提周知 | 10.3, 11.2–11.4 | gh auth / gh repo view (R3), env 認証                 | yes       |
 | Phase 1: Validation    | A     | バージョン決定と事前検証                 | 1.1–1.11        | Cargo.toml (R2), cargo test (R1), git (R2)           | yes       |
-| Phase 2: VersionBump   | A     | Cargo.toml + package.json 更新           | 2.1–2.6         | Cargo.toml/package.json (R2), cargo build (R1)       | yes       |
+| Phase 2: VersionBump   | A     | Cargo.toml + package.json + マニュアル対象バージョン行 更新 | 2.1–2.7 | Cargo.toml/package.json/introduction.md (R2), cargo build (R1), verify-content (R2 read) | yes |
 | Phase 5: GhostBuild    | A     | サンプルゴーストビルド（ローカル）       | 5.1–5.9         | release.ps1 (R1+R2), i686 target                     | yes       |
 | Phase 4a: VsixPackage  | A     | VSCode 拡張ビルド・VSIX 生成             | 4.1, 4.2, 4.6   | npm/build:wasm (R1+R2)                               | no        |
 | Phase Z: Changelog     | A     | チェンジログ整形（読み取り専用）         | 7.1–7.3, 7.9    | git log (read-only)                                  | no        |
@@ -416,14 +423,17 @@ flowchart TD
 
 | Field        | Detail                                                       |
 | ------------ | ----------------------------------------------------------- |
-| Intent       | ワークスペース全体のバージョンを一括更新し、ビルド検証する  |
-| Requirements | 2.1–2.6                                                     |
+| Intent       | ワークスペース全体とマニュアルの対象バージョンを一括更新し、ビルドとマニュアル内容検証で整合を確認する |
+| Requirements | 2.1–2.7                                                     |
 
 **実行手順**
 1. **Cargo.toml 更新（6箇所）** (2.1, 2.2): `[workspace.package].version` および `[workspace.dependencies]` の `pasta_core`/`pasta_dsl`/`pasta_lua`/`pasta_shiori`/`pasta_check` の `version`。
 2. **package.json 更新** (2.3)。
-3. **ビルド検証** (2.4): `cargo build --workspace`。失敗時 `git restore Cargo.toml editors/vscode/package.json`（ファイル単位復元）→ 中止 (2.5)。
-4. **コミット** (2.6): `git commit -m "chore(release): bump version to vX.Y.Z"`。
+3. **マニュアル対象バージョン行の更新** (2.4): `book/src/introduction.md` で正規表現 `^\| 対象 pasta バージョン \| \*\*v[^*]+\*\* \|` に一致する**ちょうど 1 行**を `| 対象 pasta バージョン | **vX.Y.Z** |` に置換する。一致が 0 行または 2 行以上なら置換せず手順 4 の失敗扱いとする。この行以外は変更しない（改行コードも維持する）。
+4. **ビルド＋マニュアル検証** (2.5): `cargo build --workspace` → `node book/tools/verify-content.mjs`（`F-version` が対象バージョン行と `Cargo.toml` の版の一致を照合する。Node 標準モジュールのみ・`npm install` 不要）。いずれかが失敗（非ゼロ終了、または手順 3 の一致行数異常）なら `git restore Cargo.toml editors/vscode/package.json book/src/introduction.md`（ファイル単位復元）→ 中止 (2.6)。
+5. **コミット** (2.7): `git add Cargo.toml editors/vscode/package.json book/src/introduction.md; git commit -m "chore(release): bump version to vX.Y.Z"`（3 ファイルを 1 コミット）。
+
+> **公開側の二重防御**: Phase 2 で検証漏れがあっても、main 統合後に走るマニュアル CI（`manual.yml`）が同じ `verify-content.mjs` を実行し、不一致ならマニュアルを公開しない。Phase 2 の検証はこれを**統合前**に前倒ししたものであり、CI の失敗がリリース後に発覚することを防ぐ。
 
 #### Phase 5: GhostBuild
 
@@ -566,7 +576,7 @@ flowchart TD
 | ------------------- | ---------------------- | ----------------------------------------------------- | ---------------------------------- |
 | A / Phase 0         | gh 未認証 / merge-commit 無効 / main 上 | ガイダンス提示 → 中止                | 不要                               |
 | A / Phase 1         | テスト失敗             | エラー報告・中止                                      | 不要（変更なし）                   |
-| A / Phase 2         | ビルド失敗             | `git restore Cargo.toml editors/vscode/package.json`  | Cargo.toml + package.json 復元     |
+| A / Phase 2         | ビルド失敗 / verify-content 失敗 / 対象バージョン行が 1 行に定まらない | `git restore Cargo.toml editors/vscode/package.json book/src/introduction.md` → 中止 | Cargo.toml + package.json + introduction.md 復元 |
 | A / Phase 5         | release.ps1 失敗       | エラー報告・中断                                      | 手動対応                           |
 | A / Phase 4a        | npm/package 失敗       | 一時障害→第2段 ScheduleWakeup 再試行 / 非一時(ビルドエラー)→未完了報告。**完了とせず**（VSIX 未生成のまま完了しない） | 不要 |
 | B / Phase 6         | PR 作成/マージ失敗     | 第1段バックオフ → 一時障害は第2段 ScheduleWakeup 再試行 / 非一時(コンフリクト)は未完了報告。Stage C/D 不実行 | ブランチ非削除・公開未実行・ローカルタグ削除可 |
@@ -633,7 +643,7 @@ LLM セッションが途中で切断された場合の復旧:
 
 - **Phase 0**: `gh repo view --json mergeCommitAllowed` が `true`（一回限りセットアップ完了の検証）
 - **Phase 1**: `cargo test --all` による全テスト通過
-- **Phase 2**: `cargo build --workspace` によるビルド検証
+- **Phase 2**: `cargo build --workspace` によるビルド検証、および `node book/tools/verify-content.mjs` の `F-version` PASS（マニュアルの対象バージョン行 = `Cargo.toml` の版）
 - **Phase 5**: `release.ps1` による成果物生成と存在確認
 - **Stage B**: `gh pr merge --merge` 成功（API 結果）、タグが main から到達可能（`git describe` / Release コミットリンク）
 - **Stage D**: GitHub Release の作成成功確認

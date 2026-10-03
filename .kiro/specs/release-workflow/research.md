@@ -292,3 +292,29 @@ Option A に対しマージ可能性プローブのみ独立サブステップ�
 - `.kiro/steering/workflow.md` L83–113 — リモート同期（PR squash）＋リリースタグ公開カーブアウト
 - `.claude/settings.json` — `git push origin main` 許可（カーブアウト用、要見直し）
 - `.kiro/specs/completed/kiro-gitflow-worktree-pr/` — PR 化の設計判断（DD5 カーブアウト、`deleteBranchOnMerge: false` 等）
+
+---
+
+# 追補: マニュアルの対象バージョン行を版の同期対象に加える（Req 2.4–2.7）
+
+> 2026-10-03 追記。ディスカバリー種別: Extension（Light）。既存 Phase 2: VersionBump への統合のみで、新規アーキテクチャ要素は無い。
+
+## Context
+- v0.3.7 公開時点で、マニュアルのトップページ `book/src/introduction.md` が「v0.2 系列」を対象バージョンと表示していた。版上げの同期対象に含まれていなかったことが原因。
+- 同日の直接修正（コミット `64ca4075`）で表記を v0.3.7 に直し、`verify-content.mjs` の `F-version` を「対象バージョン行が `Cargo.toml` の `version` と一致する」照合に強化済み。本追補はこれをリリース手順に組み込む。
+
+## Findings
+- **置換対象は 1 行**: `| 対象 pasta バージョン | **vX.Y.Z** |`（Markdown 表のセル）。`verify-content.mjs` の照合正規表現は `^\| 対象 pasta バージョン \| \*\*v([^*]+)\*\* \|\r?$`（行末 CRLF 許容）。Phase 2 の置換パターンはこの書式を正とする。
+- **検証ツールの依存**: `verify-content.mjs` → `tutorial-check.mjs` / `gen-skill-refs.mjs` / `link-check.mjs` を import するが、いずれも `node:fs` / `node:path` / `node:url` のみ。`book/node_modules` は不要（`npm install` 無しで実行可）。
+- **Manual Sync Gate（steering workflow.md Gate 6）との関係**: 当該ゲートは `kiro-complete` の完了承認時に発火するもので、`completed` に遷移しない本 spec には適用されない。`introduction.md` は `gen-skill-refs.mjs` の `GENERATION_MAP`（grammar/lua 章）に含まれず、スキル生成物の鮮度にも影響しない。よって Phase 2 で追加するのは `verify-content.mjs` のみでよい。
+- **公開側の防御**: `manual.yml`（main への push で起動）が `verify-content.mjs` を build ジョブで実行し、失敗時は deploy を走らせない。Phase 2 の検証はこれを統合前に前倒しする二重防御となる。
+- **確認済み**: 対象バージョン行を意図的に v0.3.6 にずらすと `F-version` が FAIL し exit 1、戻すと PASS（159/159）。
+
+## Decision
+- Phase 2 の手順に「対象バージョン行の置換（ちょうど 1 行一致を要求）→ `cargo build` → `verify-content.mjs` → 3 ファイルを `git add` して 1 コミット」を組み込む。失敗時の `git restore` 対象に `book/src/introduction.md` を加える。
+- 置換は専用スクリプトを作らず、エージェントが正規表現置換（Edit 相当）で行う。一致行数が 1 でなければ置換せず中止する（書式変更の検知）。
+- マニュアル本文のその他の改訂・公開・`book/tools/` の修正は本 spec の対象外（マニュアル側 spec の責務）。
+
+## Risks
+- `introduction.md` の表の書式が変わると置換が 0 件になる → 置換せず中止するため、黙って古い版が残ることはない（Revalidation Trigger に登録）。
+- 旧 2.4–2.6 → 新 2.5–2.7 への番号繰り下げ: design.md の traceability・Phase 2・Error Categories・Testing Strategy を同時更新済み。tasks.md のタスク 2.1/2.2 は `/kiro-spec-tasks` で追従する。
