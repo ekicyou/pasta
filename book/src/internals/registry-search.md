@@ -181,7 +181,7 @@ PROXY_IMPL.find_handler(mode, key, skip_methods)     act.アクター:word(…) 
 - `@pasta_search` の取得は、`find_act_handler`・`find_actor_handler` とも呼び出しごとの `pcall(require, "@pasta_search")` で行う。
 - 見つかった値の後処理（関数なら呼ぶ、それ以外は文字列にする、見つからなければ警告ログ）は `ACT_IMPL.word`・`ACT_IMPL.call`・`ACT_IMPL.expr_fn`・`ACT_IMPL.expr_fn_var` と、PROXY 側の `word`・`expr_fn`・`expr_fn_var` が行う（[名前の解決のメソッド](internal-modules.md#名前の解決のメソッド)）。
 
-`ACT_IMPL.find_scene` は第 2 引数のグローバル名を使わず `find_handler("scene", key)` に委ねる。そのため、親を指定してローカルシーンを引く必要がある選択肢イベント（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`）とシーンキック（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`）は、`SCENE.search(名前, 親)` を直接呼んでコルーチンを作る。
+`ACT_IMPL.find_scene` は第 2 引数のグローバル名を使わず `find_handler("scene", key)` に委ねる。そのため、親を指定してローカルシーンを引く必要がある選択肢イベント（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`）と、ローカルシーンを対象とするシーンキック（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`）は、`SCENE.search(名前, 親)` を直接呼んでコルーチンを作る（グローバルシーンのキックは `SCENE.co_exec` を使う）。
 
 ### 動的参照の検索
 

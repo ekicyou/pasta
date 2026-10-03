@@ -677,7 +677,7 @@ function checkReadmeManualLinks(repoRoot: string): BrokenLink[];
 
 - `OPTIMIZATION.md` を削除する（スタブなし・5.4）。参照元 `SOUL.md` L33・L478、`TEST_COVERAGE.md` L203・L295 をトランスパイル章の URL（`https://ekicyou.github.io/pasta/internals/transpiler.html`）へ置換する。完了前にリポジトリ全体を `OPTIMIZATION.md` で grep し、現存文書として参照する箇所が 0 件であることを確認する（5.5）。除外してよいのは `.kiro/specs/completed/` 配下、本 spec 自身のディレクトリ（`.kiro/specs/pasta-runtime-internals-doc/`。完了時に `completed/` へ移る）、`roadmap.md` の本 spec の項目（廃止を説明する記述であり現存文書としての参照ではない）に限る。
 - `roadmap.md` の「将来仕様（Phase 4 派生・未着手）」に次の 2 小節を追加する（前例: 「未記載構文のバグ候補」）。
-  - `#### トランスパイラ最適化の将来候補（OPTIMIZATION.md 廃止時の申し送り）`: 定数畳み込み・デッドコード削除・インライン展開・単語プリフェッチを 1 項目 1 行のキー情報で（5.3）。
+  - `#### トランスパイラ最適化の将来候補（旧最適化メモ廃止時の申し送り）`: 定数畳み込み・デッドコード削除・インライン展開・単語プリフェッチを 1 項目 1 行のキー情報で（5.3）。
   - `#### 内部設計執筆で判明したバグ候補（pasta-runtime-internals-doc からの申し送り）`: 1 項目 1 行（名称 — 要旨 — 吸収台帳付録 B を参照）（3.4）。該当なしなら小節を作らず台帳にその旨を書く。
 - ステアリング: `tech.md` 設計哲学表「2パス変換」行の内容欄末尾に「（現行の段階構成は[内部設計: トランスパイルパイプライン](https://ekicyou.github.io/pasta/internals/transpiler.html)を参照）」を追記、マニュアル節に「内部設計パート（`book/src/internals/`）: コントリビュータ向け・権威は実装＋本パート」の 1 行を追記。`structure.md` のディレクトリツリーと表に `book/src/internals/` の 1 行を追記。表現の再編はしない。
 
