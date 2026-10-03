@@ -18,7 +18,7 @@
 // スキル自己完結検査（タスク 3.2・要件 5.3, 6.1, 6.4, 6.5, 10.2, 2.4）:
 //   .claude/skills/{pasta-ghost-authoring,pasta-lua-coding}/**/*.md を checkSkillSelfContained で
 //   検査する（skill-escape / skill-missing / skill-anchor / skill-forbidden-ref / skill-unlisted）。
-//   アンカーは GitHub 方式の headingSlug（生成対象 21 章で mdBook の id と一致を確認済み）と
+//   アンカーは GitHub 方式の headingSlug（生成対象 23 章で mdBook の id と一致を確認済み）と
 //   `<a id|name>` の明示アンカーで照合する。
 //
 // 共用 export（gen-skill-refs.mjs が import する）:
