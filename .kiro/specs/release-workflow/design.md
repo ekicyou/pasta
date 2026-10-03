@@ -391,7 +391,8 @@ flowchart TD
 1. `gh auth status` — 未認証なら「`gh auth login` を実行してください」とガイダンス。
 2. `gh repo view --json mergeCommitAllowed` — `false` の場合は「一回限りセットアップ（`gh repo edit --enable-merge-commit`）が未実施です」と報告し中止。`true` なら続行。
 3. 現在ブランチが**非デフォルトブランチ（ワークツリー）**であることを確認（`git rev-parse --abbrev-ref HEAD` が `main` でない）。`main` 上ならハーネスのワークツリー上での再実行を促す（10.1）。
-4. **第2段リトライ前提の確認**（Req 11.2–11.4）: 第2段は ScheduleWakeup（同一セッション内待機→再開）で行うため、特別なスケジュール基盤は不要。完遂までセッションを開いておく運用である旨を開発者に周知する（セッションを閉じた場合は手動 resume で続行）。
+4. **main の CI 全緑の確認**: `gh run list --branch main --workflow build.yml --limit 1 --json headSha,status,conclusion` の `headSha` が `origin/main` と一致し、`completed`・`success` であること。実行中・失敗なら中止して報告する。spec 完了の squash マージは CI を待たない（workflow.md「3. リモート同期」）ため、取り消せない crates.io 公開の前の関門をここに置く。
+5. **第2段リトライ前提の確認**（Req 11.2–11.4）: 第2段は ScheduleWakeup（同一セッション内待機→再開）で行うため、特別なスケジュール基盤は不要。完遂までセッションを開いておく運用である旨を開発者に周知する（セッションを閉じた場合は手動 resume で続行）。
 
 **Note**: `cargo publish` の認証は環境変数 `CARGO_REGISTRY_TOKEN`、`vsce` は `VSCE_PAT`、`gh` は env トークンで有効。第2段は同一セッション継続のため、初回実行と同じ認証・ツールチェーンをそのまま使う。
 
