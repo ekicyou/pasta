@@ -2208,7 +2208,6 @@ SOFTWARE.
 ================================================================================
 MIT License
 Used by:
-  - lazy_static 1.5.0 <https://github.com/rust-lang-nursery/lazy-static.rs>
   - rayon-core 1.13.0 <https://github.com/rayon-rs/rayon>
   - rayon 1.12.0 <https://github.com/rayon-rs/rayon>
 
@@ -2242,7 +2241,7 @@ DEALINGS IN THE SOFTWARE.
 ================================================================================
 MIT License
 Used by:
-  - pasta_lua 0.3.6 <https://github.com/ekicyou/pasta>
+  - pasta_lua 0.3.7 <https://github.com/ekicyou/pasta>
 
 Copyright (c) 2013 Enrique García Cota, Eike Decker, Jeffrey Friedl
 Copyright (c) 2018 Peter Melnichenko
@@ -4767,12 +4766,12 @@ SOFTWARE.
 ================================================================================
 MIT License
 Used by:
-  - pasta_check 0.3.6 <https://github.com/ekicyou/pasta>
-  - pasta_core 0.3.6 <https://github.com/ekicyou/pasta>
-  - pasta_dsl 0.3.6 <https://github.com/ekicyou/pasta>
-  - pasta_lsp 0.3.6 <https://github.com/ekicyou/pasta>
-  - pasta_sample_ghost 0.3.6 <https://github.com/ekicyou/pasta>
-  - pasta_shiori 0.3.6 <https://github.com/ekicyou/pasta>
+  - pasta_check 0.3.7 <https://github.com/ekicyou/pasta>
+  - pasta_core 0.3.7 <https://github.com/ekicyou/pasta>
+  - pasta_dsl 0.3.7 <https://github.com/ekicyou/pasta>
+  - pasta_lsp 0.3.7 <https://github.com/ekicyou/pasta>
+  - pasta_sample_ghost 0.3.7 <https://github.com/ekicyou/pasta>
+  - pasta_shiori 0.3.7 <https://github.com/ekicyou/pasta>
   - libm 0.2.16 <https://github.com/rust-lang/compiler-builtins>
   - md5 0.8.1 <https://github.com/stainless-steel/md5>
   - mlua-sys 0.10.0 <https://github.com/mlua-rs/mlua>
@@ -5102,6 +5101,7 @@ Used by:
   - erased-serde 0.4.10 <https://github.com/dtolnay/erased-serde>
   - fastrand 2.5.0 <https://github.com/smol-rs/fastrand>
   - itoa 1.0.18 <https://github.com/dtolnay/itoa>
+  - lazy_static 1.5.1 <https://github.com/rust-lang-nursery/lazy-static.rs>
   - once_cell 1.21.4 <https://github.com/matklad/once_cell>
   - paste 1.0.15 <https://github.com/dtolnay/paste>
   - pastey 0.1.1 <https://github.com/as1100k/pastey>
@@ -5800,7 +5800,7 @@ Used by:
   - potential_utf 0.1.6 <https://github.com/unicode-org/icu4x>
   - tinystr 0.8.4 <https://github.com/unicode-org/icu4x>
   - writeable 0.6.4 <https://github.com/unicode-org/icu4x>
-  - yoke-derive 0.8.3 <https://github.com/unicode-org/icu4x>
+  - yoke-derive 0.8.4 <https://github.com/unicode-org/icu4x>
   - yoke 0.8.3 <https://github.com/unicode-org/icu4x>
   - zerofrom-derive 0.1.8 <https://github.com/unicode-org/icu4x>
   - zerofrom 0.1.8 <https://github.com/unicode-org/icu4x>
