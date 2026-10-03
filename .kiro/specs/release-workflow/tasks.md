@@ -56,18 +56,21 @@
 > Resume Mode の場合は Task 2 をスキップする（main は既に V へ更新・統合済み）。
 
 - [ ] 2. バージョン更新とビルド検証
-- [ ] 2.1 Cargo.toml と package.json のバージョンを更新する
+- [ ] 2.1 Cargo.toml・package.json・マニュアルの対象バージョン行を更新する
   - `[workspace.package].version` と `[workspace.dependencies]` の5クレート（pasta_core, pasta_dsl, pasta_lua, pasta_shiori, pasta_check）の `version` を新バージョンへ更新する（計6箇所）
   - `editors/vscode/package.json` の `version` を同期する
-  - 完了条件: Cargo.toml の6箇所と package.json の version すべてに新バージョンが反映されている
-  - _Requirements: 2.1, 2.2, 2.3_
-- [ ] 2.2 ビルド検証を行いバージョン更新をコミットする
-  - `cargo build --workspace` でビルド成功を確認する
-  - 失敗時: `git restore Cargo.toml editors/vscode/package.json` でファイル単位ロールバックしエラーを報告する（破壊的 Git 操作は禁止）
-  - 成功時: `git add Cargo.toml editors/vscode/package.json; git commit -m "chore(release): bump version to vX.Y.Z"`
-  - 完了条件: `cargo build --workspace` が成功し、バージョン更新コミットが git ログに記録されている
-  - _Requirements: 2.4, 2.5, 2.6_
+  - `book/src/introduction.md` で `^\| 対象 pasta バージョン \| \*\*v[^*]+\*\* \|` に一致する**ちょうど 1 行**を `| 対象 pasta バージョン | **vX.Y.Z** |` に置換する。この行以外・改行コードは変更しない。一致が 0 行または 2 行以上なら置換せず、2.2 の失敗時処理（ロールバック・中止）へ進む
+  - 完了条件: Cargo.toml の6箇所・package.json の version・introduction.md の対象バージョン行すべてに新バージョンが反映され、`git diff --stat` の変更が introduction.md では 1 行のみである
+  - _Requirements: 2.1, 2.2, 2.3, 2.4_
+  - _Boundary: Phase 2: VersionBump_
+- [ ] 2.2 ビルドとマニュアル内容検証を行いバージョン更新をコミットする
+  - `cargo build --workspace` でビルド成功を確認し、続けて `node book/tools/verify-content.mjs` を実行して exit 0（`F-version` が PASS＝対象バージョン行が Cargo.toml の版と一致）を確認する（`npm install` 不要）
+  - 失敗時（ビルド失敗・verify-content 非ゼロ終了・2.1 の一致行数異常）: `git restore Cargo.toml editors/vscode/package.json book/src/introduction.md` でファイル単位ロールバックし、エラーを報告してリリース作業を中止する（破壊的 Git 操作は禁止）
+  - 成功時: `git add Cargo.toml editors/vscode/package.json book/src/introduction.md; git commit -m "chore(release): bump version to vX.Y.Z"`（3 ファイルを 1 コミット）
+  - 完了条件: ビルドと verify-content がともに成功し、3 ファイルを含むバージョン更新コミットが git ログに記録されている（`git show --stat HEAD` に 3 ファイルが並ぶ）
+  - _Requirements: 2.5, 2.6, 2.7_
   - _Depends: 2.1_
+  - _Boundary: Phase 2: VersionBump_
 
 ## Task 3: ローカル成果物のビルド（Stage A / 直列・R1+R2 共有のため非並行）
 
