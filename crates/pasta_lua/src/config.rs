@@ -42,7 +42,10 @@ impl Default for LineEnding {
 /// Transpiler configuration.
 #[derive(Debug, Clone)]
 pub struct TranspilerConfig {
-    /// Enable comment mode (include Pasta source line references)
+    /// Comment mode flag (default `true`).
+    ///
+    /// Not consulted by the current code generator: the generated output is the
+    /// same whether it is `true` or `false`.
     pub comment_mode: bool,
     /// Line ending style for the intermediate code-generation buffer.
     ///

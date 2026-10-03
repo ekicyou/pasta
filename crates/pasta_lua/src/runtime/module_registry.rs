@@ -56,8 +56,8 @@ impl PastaLuaRuntime {
 
     /// Register @pasta_config module with custom fields.
     ///
-    /// Creates a read-only Lua table from the TOML custom_fields and
-    /// registers it as the @pasta_config module.
+    /// Creates a plain (writable, not read-only) Lua table from the TOML
+    /// custom_fields and registers it as the @pasta_config module.
     pub(crate) fn register_config_module(lua: &Lua, custom_fields: &toml::Table) -> LuaResult<()> {
         let config_table = Self::toml_to_lua(lua, &toml::Value::Table(custom_fields.clone()))?;
 

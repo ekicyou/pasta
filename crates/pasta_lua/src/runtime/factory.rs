@@ -113,7 +113,7 @@ impl PastaLuaRuntime {
     ///
     /// # Initialization Sequence
     /// 1. Setup package.path for module resolution
-    /// 2. Register Rust modules (@pasta_config, @enc, @pasta_persistence, @pasta_sakura_script)
+    /// 2. Register Rust modules (@pasta_config, @enc, @pasta_persistence, @pasta_log, @pasta_sakura_script)
     /// 3. Register finalize_scene Rust binding
     /// 4. require("main") - 利用者初期化スクリプト。失敗は**致命**（要件 5.2）
     /// 5. require("pasta.shiori.entry") - SHIORI 応答関数。失敗は**致命**（要件 4.1）
@@ -192,8 +192,8 @@ impl PastaLuaRuntime {
         //
         // R3 論理デカップリング: コアはさくら描画を無条件 hard-code 起点としては
         // 保持せず、注入シーム（RendererInjection）経由で登録する。既定（SHIORI 宿主）
-        // は SHIORI さくらレンダラで既存挙動・バイト不変（R3.5/R3.6）。アダプタ
-        // （pasta_shiori）が別レンダラを注入する場合はこの既定を差し替える。
+        // は SHIORI さくらレンダラで既存挙動・バイト不変（R3.5/R3.6）。現行は常に
+        // この既定を渡し、アダプタ（pasta_shiori）から差し替える経路は無い。
         Self::register_sakura_script_module(
             &runtime.lua,
             &runtime.config,

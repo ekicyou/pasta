@@ -1,5 +1,5 @@
 <!-- GENERATED FROM PASTA MANUAL - DO NOT EDIT -->
-<!-- このファイルは pasta 利用者マニュアル「行とブロック構造」（https://ekicyou.github.io/pasta/grammar/block-structure.html）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->
+<!-- このファイルは pasta マニュアル「行とブロック構造」（https://ekicyou.github.io/pasta/grammar/block-structure.html）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->
 
 # 行とブロック構造
 

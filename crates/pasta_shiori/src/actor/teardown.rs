@@ -8,11 +8,12 @@
 //! `spawn_actor_thread` が回す単一 `recv_async` ループ）は Stop で:
 //!
 //! 1. 残メッセージを drain 後（FIFO 順序が保証）、
-//! 2. VM（`PastaShiori` が内包する `!Send` Lua VM）を drop し、debug backend teardown・
-//!    メッセージ専用ウィンドウ破棄を完了させ（block_on 完了時にこのスレッド上で実行）、
-//! 3. `done` ack を送ってループを抜ける、
+//! 2. VM（`PastaShiori` が内包する `!Send` Lua VM）を drop して debug backend teardown を
+//!    完了させ、mailbox の receiver を閉じ、
+//! 3. `done` ack を送る、
 //!
-//! という順序で teardown する。SHIORI 側は `done_rx.recv_timeout` で **有界に** ack を
+//! という順序で teardown する。executor のメッセージ専用ウィンドウ（wintf の thread_local）
+//! は ack の後、`block_on` が戻ってスレッドが終了するときに破棄される。SHIORI 側は `done_rx.recv_timeout` で **有界に** ack を
 //! 待ち、ack 受信＝全資源解放済みを確認してからスレッドを **detach** する
 //! （[`thread::ActorThread::detach`]）。
 //!
@@ -77,8 +78,8 @@ impl TeardownReport {
 /// アクタースレッドを teardown する（本番経路・design.md「reload teardown」）。
 ///
 /// `tx`（mailbox 送信端）から `ActorMsg::Stop { done }` を送り、`timeout` 付きで done ack
-/// を待つ。ack 受信＝アクターが残メッセージ drain・VM 破棄・debug teardown・ウィンドウ
-/// 破棄を全て終えた合図なので、その後 `actor` を **detach** する（join しない）。
+/// を待つ。ack 受信＝アクターが残メッセージ drain・VM 破棄・debug teardown を終えた合図
+/// （メッセージ専用ウィンドウはこの後のスレッド終了時に破棄される）なので、その後 `actor` を **detach** する（join しない）。
 ///
 /// - ack 受信: `acked=true`・clean（[`TeardownReport::is_clean`]）。
 /// - Stop 送信が `Disconnected`（アクター既終了）: `already_done=true`（冪等 no-op）。

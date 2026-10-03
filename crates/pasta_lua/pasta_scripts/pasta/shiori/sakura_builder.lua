@@ -69,7 +69,7 @@ end
 --- actorグループ内の単一トークンをさくらスクリプト文字列へ変換する
 --- @param actor table|nil グループの発言アクター
 --- @param inner table グループ内トークン
---- @return string 変換結果（yield 等の出力しないトークンは空文字列）
+--- @return string 変換結果（下記以外の型のトークンは空文字列）
 local function inner_token_to_string(actor, inner)
     local inner_type = inner.type
 
@@ -91,7 +91,7 @@ local function inner_token_to_string(actor, inner)
         local ms = inner.seconds and math.floor(inner.seconds * 1000) or 0
         return "\\![set,choicetimeout," .. ms .. "]"
     end
-    -- yield は無視
+    -- 上記以外の型は出力しない
     return ""
 end
 
@@ -114,6 +114,7 @@ end
 
 --- @class BuildConfig
 --- @field spot_newlines number スポット変更時の改行量（デフォルト1.5）
+--- @field buffer_factory (fun(): table)|nil 出力バッファの生成関数（デフォルト pasta.buf.new。テスト用）
 
 --- グループ化されたトークン配列をさくらスクリプト文字列に変換
 --- @param grouped_tokens table[] グループ化されたトークン配列
@@ -192,7 +193,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                     emit_inner_token(buffer, actor, inner, appearance, last_spot)
                 else
                     -- S4: 空 talk・surface・wait・sakura_script・newline・choice・
-                    -- choice_timeout・raw_script・yield。変換出力のみ（has-text・pending 不変）。
+                    -- choice_timeout・raw_script。変換出力のみ（has-text・pending 不変）。
                     emit_inner_token(buffer, actor, inner, appearance, last_spot)
                 end
             end

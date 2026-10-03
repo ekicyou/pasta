@@ -22,13 +22,13 @@ ACTOR_IMPL.__index = ACTOR_IMPL
 -------------------------------------------
 
 --- ActorWordBuilderクラス実装メタテーブル（WordBuilderを拡張）
---- word.lua辞書への登録とACTORプロパティへの設定を同時に行う
+--- WORD.create_actor のビルダー経由で STORE.actor_words に登録する（アクターのフィールドには設定しない）
 --- @class ActorWordBuilder
 --- @field _word_builder WordBuilder 内部のWordBuilder
 local ACTOR_WORD_BUILDER_IMPL = {}
 ACTOR_WORD_BUILDER_IMPL.__index = ACTOR_WORD_BUILDER_IMPL
 
---- 値を追加（辞書登録＋ACTORプロパティ設定）
+--- 値を追加（アクター単語辞書への登録だけを行う）
 --- @param self ActorWordBuilder ビルダーオブジェクト
 --- @param ... string 可変長引数で値を受け取る
 --- @return ActorWordBuilder メソッドチェーン用に自身を返す

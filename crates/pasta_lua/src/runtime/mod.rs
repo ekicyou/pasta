@@ -54,7 +54,8 @@ use std::sync::Arc;
 pub struct PastaLuaRuntime {
     lua: Lua,
     /// Instance-specific logger (optional).
-    /// If set, this logger is used for tracing output.
+    /// Held so the logger lives as long as the runtime; tracing output reaches
+    /// it through the GlobalLoggerRegistry entry, not through this field.
     /// Wrapped in Arc for sharing with GlobalLoggerRegistry.
     logger: Option<Arc<PastaLogger>>,
     /// Configuration for persistence and other runtime settings.
@@ -165,7 +166,8 @@ impl PastaLuaRuntime {
         // accept custom StdLib flags. The safety invariants are upheld because:
         //  1. `std_lib` is constructed from validated `RuntimeConfig` via `to_stdlib()`,
         //     which only maps known library names to mlua `StdLib` flags.
-        //  2. `validate_and_warn()` above alerts on dangerous libraries (debug/ffi).
+        //  2. `validate_and_warn()` above alerts on dangerous libraries (std_debug /
+        //     std_all_unsafe) and the `env` module.
         //  3. Default LuaOptions are used, so no custom allocator or hook is involved.
         //  4. The returned `Lua` handle is used in a single-threaded context and is not
         //     shared across threads.
@@ -212,15 +214,18 @@ impl PastaLuaRuntime {
         // mapped to `mlua::Error` at this boundary.
         // Task 4.4: HAND the aggregated `.pasta` source map (built by the loader
         // AFTER transpile, only when debugging is enabled) to the enable choke
-        // point. `enable` clones the `Arc` into the backend wiring/session when
-        // `config.debug.source_mode == Pasta`; the disabled gate / `Lua` mode /
-        // `None` map keeps the default `.lua` behavior (requirements 6.1 / 6.2 /
-        // 7.2). We keep a runtime-scope clone in `self.source_map` so the held map
-        // outlives a single request (requirement 3.1).
+        // point. When enabled, `enable` clones the `Arc` into the backend
+        // wiring/session regardless of `config.debug.source_mode`; each consumer
+        // applies the `.pasta` behavior only while a map is present AND the
+        // effective mode is `Pasta`, so `Lua` mode / `None` map keeps the default
+        // `.lua` behavior (requirements 6.1 / 6.2 / 7.2). We keep a runtime-scope
+        // clone in `self.source_map` so the held map outlives a single request
+        // (requirement 3.1).
         // pasta-scene-kick tasks 1.1 / 2.3: thread the host-injected kick sink
         // (`RuntimeConfig.kick_sink`) through to the debug backend so an inbound
-        // `pasta/playScene` invokes it (R2.4). When debug is disabled or no sink
-        // was bound, the kick path stays inert (R2.6). Cloning is a refcount bump.
+        // `pasta/playSceneAt` / `pasta/reloadShiori` invokes it (R2.4). When debug
+        // is disabled or no sink was bound, the kick path stays inert (R2.6).
+        // Cloning is a refcount bump.
         let debug_handle = crate::debug::enable(
             &lua,
             &config.debug,

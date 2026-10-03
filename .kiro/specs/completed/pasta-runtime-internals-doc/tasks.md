@@ -1,0 +1,240 @@
+# Implementation Plan
+
+> 実装はすべて 1 ブランチ上で行い、全タスク完了後に 1 PR の squash マージで一括統合する（途中を先行出荷しない）。並行タスク（`(P)`）は吸収台帳の自分の担当行だけを編集し、概要章の対応表は編集しない（4.11 が確定する）。
+>
+> **並走 spec との合意（dynamic-word-reference, 2026-10-02）**: 先方が先にマージする。先方マージまで `word.lua`・`act.lua`・`proxy.lua`・`element_gen.rs` と `pasta_dsl` の grammar/AST/parser のコメントには触れない（食い違いは取り込み後にまとめて修正）。4.11 着手前に main を取り込み、先方の新機構（DynamicWordRef/DynamicFnCall の生成・`WORD.dynamic_key`・`ACT_IMPL.word(self, name, var_path)`・動的参照（＠＄変数名 / ＠＄変数名（…））時に L3 を飛ばし L1/A1 を `rawget` で引く検索）を 4.1・4.2・4.3・4.9・4.10 に吸収する。
+
+- [x] 1. 基盤: 検査ツールの拡張と生成ヘッダの書名変更
+- [x] 1.1 内部設計章に書いたリポジトリ内パスの実在検査を追加する
+  - 内部設計パートの章のフェンス外インラインコードのうち、リポジトリ内の接頭辞（`crates/`・`book/`・`.github/`・`.cargo/`・`.kiro/`・`.claude/`）で始まるものを抽出し、実在しない・リポジトリ外へ解決される・行番号付きのパスを新種別の違反として報告する
+  - 末尾 `/` はディレクトリとして実在することを要求し、違反には行番号を含める
+  - 既存のリンク検証の結合・報告区分に新種別を加え、新しい依存を追加しない
+  - サンドボックス・ケース（実在ファイルと末尾 `/` のディレクトリは合格、実在しないパス・`:行番号` 付き・トラバーサルは違反、フェンス内と接頭辞外は対象外）を自己テストに追加し、自己テストと実リポジトリでのリンク検証がともに exit 0 になる
+  - _Requirements: 3.2, 3.7, 1.6_
+  - _Boundary: LinkCheck_
+
+- [x] 1.2 クレート README に書いた公開マニュアル URL の実在検査を追加する
+  - 各クレート README のフェンス外のリンクと裸の URL のうち公開マニュアルを指すものについて、写像先の章と見出し（アンカー）がマニュアルに実在することを検査し、無ければ新種別の違反として報告する
+  - マニュアル CI の起動条件にクレート README の変更を加え、README の変更でもリンク検証が走るようにする
+  - サンドボックス・ケース（ルート URL・実在章・実在アンカー（日本語見出し・パーセントエンコード）は合格、存在しない章・アンカーは違反、README 以外は走査しない）を自己テストに追加し、自己テストと実リポジトリでのリンク検証がともに exit 0 になる
+  - 1.1 と同じ検査ファイルを編集するため 1.1 の後に行う
+  - _Requirements: 7.5, 7.8, 1.6_
+  - _Boundary: LinkCheck, manual CI workflow_
+
+- [x] 1.3 (P) 生成ファイルのヘッダの書名を「pasta マニュアル」に改め、既存の生成物を再生成する
+  - 生成ヘッダの書名の語だけを改め（ヘッダの構成・生成アルゴリズムは変えない）、生成器の自己テストの期待文言を合わせる
+  - 既存 21 件の生成物を再生成し、鮮度チェック（`--check`）と生成器の自己テストが exit 0 になる
+  - _Requirements: 1.9, 6.5_
+  - _Boundary: GenMapEntries_
+
+- [x] 2. マニュアルの骨格・執筆規約・内部設計パートの機械検査
+- [x] 2.1 目次・書名・はじめに章と、内部設計パート全章および新しい Lua 章の骨格を作る
+  - 目次の最終パートとして「内部設計（コントリビュータ向け）」を追加し、概要章の配下に 9 章を並べる。Lua パートには「スクリプト用ランタイム API」を SHIORI イベント章の直後に追加し、既存の章の行と相対順序は変えない
+  - 書名・説明を利用者とコントリビュータの双方を含む表現に改め、「はじめに」章に内部設計パートの存在とゴースト作者は読む必要がない旨を 1〜2 文（リンクなし）で追記する
+  - 全 10 章と新しい Lua 章を、H1・キャラ口調の導入・区切り・普通文体の本体・区切り・キャラ口調の締めの構造で作る。題材章 8 章は必須 H2 7 種をこの順で持ち、「目的と責務」に割り振られた機構名を、「ソースの所在」に実在するパスだけを書く
+  - 概要章には読者・全体像・利用者向け章との関係・対象外（ランタイム外ツール 3 種）・章と対象ソース範囲の節を置き、対応表は設計の初期内容で埋める
+  - マニュアルのビルドが成功し、全章が目次から到達でき、既存の検査（鮮度・リンク検証（1.1 の新種別を含む）・静的検査・口調検査）が exit 0 になる
+  - _Requirements: 1.1, 1.3, 1.4, 1.9, 4.3, 8.2_
+
+- [x] 2.2 (P) 内部設計パートの執筆規約を執筆ガイドに追加する
+  - 読者と位置づけ、共通の章構造と題材章の H2 構成、ソースパスの表記規則（架空パスは `text` フェンスに置く）、章の責務分担（1 事実 1 章・利用者章の事実はリンク）、生成元章の追加規則（パス禁止・題材章へのリンク）、将来構想を書かないこと、実装の不備はロードマップへ送ること、コメントの食い違いの修正手順、対応表の同時更新を定める
+  - 冒頭コメントの対象章に内部設計パートを加え、執筆チェックリストに内部設計章の規約遵守とリンク検証の通過を追加する
+  - 執筆ガイドに内部設計パートの節があり、以降の章執筆タスクがそれを参照できる状態になる
+  - _Requirements: 1.7, 3.3, 3.5, 3.6, 4.1_
+  - _Boundary: AuthoringRules_
+
+- [x] 2.3 内部設計パートの構造・口調・必須見出し・機構網羅の機械検査を追加する
+  - 口調検査の走査対象に内部設計パートを加える
+  - 内部設計 10 章について、存在・本文の実体・章構造（生成器の本文抽出が例外を投げないこと）を、題材章 8 章について必須 H2 7 種を検査する
+  - 割り振られた機構を示す語がパート全体に現れること、概要章にランタイム外ツール 3 種とコントリビュータ向けである旨が現れることを検査する
+  - 検索検査の索引対象セクションに内部設計パートを加える
+  - 2.1 の骨格に対して内容検査と検索検査が exit 0 になり、骨格から必須 H2 を 1 つ削ると内容検査が exit 1 になることを確認する
+  - _Requirements: 1.4, 1.8, 2.7, 2.10, 2.11_
+
+- [x] 2.4 (P) 吸収台帳を作り、吸収元の全節を行として列挙する
+  - `OPTIMIZATION.md` の各節、スキル `internal-modules.md` の各見出し（H2〜H4）、クレート README 4 本の各節を 1 行ずつ列挙し、処置・理由・実装照合・訂正の列を用意する（処置は空でよい）
+  - 付録 A（コメント修正）と付録 B（ロードマップへの申し送り）の見出しを置く
+  - 吸収元の全節が台帳に行として存在し、以降のタスクが自分の担当行の処置を埋められる状態になる
+  - _Requirements: 10.2, 10.6_
+  - _Boundary: AbsorptionLedger_
+
+- [x] 3. 鮮度維持の運用への組み込み
+- [x] 3.1 (P) 完了基準に条件付きの Internals Sync Gate を追加し、完了スキルに発火手順を加える
+  - workflow 規約の DoD に Gate 7 を条件付きの追加として置き、既存 Gate 1〜6 の文言・順序を変えない旨を明記する
+  - 変更ファイル一覧の定義（マージベースからの差分と未追跡ファイルの和）、概要章の対応表の場所と照合規則（末尾 `/` は接頭辞一致・それ以外は完全一致・一致した全章を確認）、章ごとの判定（更新済みまたは更新不要の理由の記録）、リンク検証の実行、中断条件、スキップ時の記録を定める
+  - 完了スキルの手順に Gate 7 の発火項目を加え（判定ルールは複製せず workflow 規約を参照）、完了チェックリストに 1 行追加する
+  - 規約の Gate 7 節と完了スキルの発火手順・チェックリスト行が揃い、Gate 6 以前の節が無変更であることを差分で確認できる
+  - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8_
+  - _Boundary: CompletionGate_
+
+- [x] 3.2 (P) 定期総点検の次元⑦に内部設計章と実装の照合を追加する
+  - `review-improvement-loop` の brief・requirements・design・tasks の D7 固定文言に、内部設計章照合（存在しないソースの参照・食い違う記述・未記載の主要機構）と章ごとの照合結果の記録・乖離の改善対象化を追記する
+  - チェックボックスの状態・生成済みセル・`matrix.md`・他の次元の文言を変えない
+  - 4 ファイルの差分が D7 の文言追記のみであることを確認できる
+  - _Requirements: 9.1, 9.2, 9.3, 9.4_
+  - _Boundary: LoopD7_
+
+- [x] 4. 内部設計章とスクリプト用 API 章の執筆（題材ごとに並行・概要章で統合）
+- [x] 4.1 (P) トランスパイルパイプライン章を執筆する
+  - パース・正規化・登録とコード生成・出力の正規化・生成時最適化（末尾呼び出し・継続行の話者引継ぎ・文字列リテラル）・トランスパイル結果キャッシュ・ソースマップ生成の出入口を、現行コードと照合して書く
+  - 段階構成を「トランスパイル時の単一走査（登録と生成）」と「実行時の辞書確定」の 2 段として定義し、旧称「2 パス」との対応を明記する
+  - `OPTIMIZATION.md` §1–4・§7 と `pasta_dsl` README Architecture の担当行を台帳で処置し、既知の食い違い（存在しないファイル参照・話者引継ぎの位置づけ・ロングブラケットの適用条件）を実装どおりに訂正する
+  - 食い違うコメント（`pasta_core` の「Pass 1」表記・`scope_gen` の旧生成形など）をコメントのみ修正し、台帳付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
+  - 章が必須 H2 をすべて持ち、内容検査・リンク検証（パス実在を含む）が exit 0 で、台帳の担当行（自章が担う行のみ）の処置が埋まっている
+  - `crates/` のコメントを修正した場合は、`NoDefaultCurrentDirectoryInExePath` を外して当該クレートの `cargo build`・`cargo test --doc`・`cargo fmt --check` を実行し成功させる
+  - _Requirements: 2.1, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.3, 3.4, 3.5, 3.8, 5.1, 5.2, 7.1_
+  - _Boundary: InternalsChapters（transpiler）_
+
+- [x] 4.2 (P) シーン・単語レジストリとシーン検索章を執筆する
+  - シーン・単語レジストリ、前方一致検索、重複時の選択と乱数、ローカル優先の検索順、実行時の辞書確定（Rust 側）と Lua 側収集の受け渡し、検索モジュールの内部を現行コードと照合して書く。Lua 側の収集データ構造は 4.9 の内部モジュール章へリンクする
+  - `pasta_core` README のアーキテクチャ・ディレクトリ構成の担当行を台帳で処置し、食い違うコメントはコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
+  - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 で、台帳の担当行（自章が担う行のみ）の処置が埋まっている
+  - `crates/` のコメントを修正した場合は、`NoDefaultCurrentDirectoryInExePath` を外して当該クレートの `cargo build`・`cargo test --doc`・`cargo fmt --check` を実行し成功させる
+  - _Requirements: 2.2, 2.7, 2.8, 2.9, 3.1, 3.2, 3.5, 3.8, 7.1_
+  - _Boundary: InternalsChapters（registry-search）_
+
+- [x] 4.3 (P) ランタイム実行モデル章を執筆する
+  - Lua VM の構築とモジュール登録、イベントからシーンへのコルーチン実行（`co_scene`・resume ループ・継続トークン）、ランタイム内部モジュールの関係（詳細は内部モジュール章へリンク）、永続化の実装と保存タイミング、クリーンアップを現行コードと照合して書く
+  - STORE・`finalize_scene`・ACT の初期化などモジュール単位の内部は 4.9 の内部モジュール章が書き、本章は関係と流れだけを書いてリンクする
+  - 食い違うコメント（`pasta_lua` 冒頭コメントなど）はコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
+  - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 で、台帳の担当行（自章が担う行のみ）の処置が埋まっている
+  - `crates/` のコメントを修正した場合は、`NoDefaultCurrentDirectoryInExePath` を外して当該クレートの `cargo build`・`cargo test --doc`・`cargo fmt --check` を実行し成功させる
+  - _Requirements: 2.3, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.5, 3.8, 7.1_
+  - _Boundary: InternalsChapters（execution-model）_
+
+- [x] 4.4 (P) ローダ自己展開とモジュール解決章を執筆する
+  - 起動シーケンスの実装、埋め込み zip とフレームワークスクリプトの自己展開・版比較、ファイル検出とモジュール名生成、モジュール検索と `require` 解決、設定読込の仕組みを現行コードと照合して書く
+  - 利用者向けの起動挙動は起動シーケンスの利用者章へリンクし、実現する仕組みだけを書く
+  - `pasta_lua` README のファイル検出・モジュール名の生成（内部部分）の担当行を台帳で処置し、食い違うコメントはコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
+  - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 で、台帳の担当行（自章が担う行のみ）の処置が埋まっている
+  - `crates/` のコメントを修正した場合は、`NoDefaultCurrentDirectoryInExePath` を外して当該クレートの `cargo build`・`cargo test --doc`・`cargo fmt --check` を実行し成功させる
+  - _Requirements: 2.4, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.5, 3.8, 4.1, 4.2, 7.1_
+  - _Boundary: InternalsChapters（loader）_
+
+- [x] 4.5 (P) SHIORI 層章を執筆する
+  - FFI 境界、リクエスト解析と Lua への受け渡し、アクターランタイム（mailbox・スレッド・CH marshaling・lifecycle・teardown）、非同期トーク、presentation event stream と renderer 注入、SHIORI エントリとイベント配送、仮想イベントディスパッチャ（OnTalk/OnHour）、DLL ビルド構成（リリースプロファイル・静的 CRT）を現行コードと照合して書く
+  - `OPTIMIZATION.md` §6 と `pasta_shiori` README・`pasta_lua` README の SHIORI 統合（内部部分）の担当行を台帳で処置し、食い違うコメント（削除済み PoC への言及など）はコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
+  - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 で、台帳の担当行（自章が担う行のみ）の処置が埋まっている
+  - `crates/` のコメントを修正した場合は、`NoDefaultCurrentDirectoryInExePath` を外して当該クレートの `cargo build`・`cargo test --doc`・`cargo fmt --check` を実行し成功させる
+  - _Requirements: 2.5, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.5, 3.8, 5.1, 5.2, 7.1_
+  - _Boundary: InternalsChapters（shiori）_
+
+- [x] 4.6 (P) トーク出力とアピアランス章を執筆する
+  - ACT のトークからさくらスクリプトへの組立、さくらスクリプト後処理（トークナイザ・ウェイト挿入・budoux 改行）、アピアランス（サーフェス・着せ替え復旧・スポット）を現行コードと照合して書く
+  - `pasta_lua` README の `sakura_builder`（内部部分）の担当行を台帳で処置し、食い違うコメントはコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
+  - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 で、台帳の担当行（自章が担う行のみ）の処置が埋まっている
+  - `crates/` のコメントを修正した場合は、`NoDefaultCurrentDirectoryInExePath` を外して当該クレートの `cargo build`・`cargo test --doc`・`cargo fmt --check` を実行し成功させる
+  - _Requirements: 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.5, 3.8, 7.1_
+  - _Boundary: InternalsChapters（talk-output）_
+
+- [x] 4.7 (P) デバッグ基盤とシーンキック章を執筆する
+  - DAP バックエンド、デバッグ通信（loopback 固定・opt-in）、セッション（ステップ・停止ループ・アンカー）、wiring、ソースマップ（生成・サイドカー・解決）、ブレークポイント・inspect・hook、シーンキックを現行コードと照合して書く
+  - 利用者向けのデバッグ操作はデバッグパートへリンクし、食い違うコメントはコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
+  - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 になる
+  - `crates/` のコメントを修正した場合は、`NoDefaultCurrentDirectoryInExePath` を外して当該クレートの `cargo build`・`cargo test --doc`・`cargo fmt --check` を実行し成功させる
+  - _Requirements: 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.5, 3.8, 4.1_
+  - _Boundary: InternalsChapters（debug）_
+
+- [x] 4.8 (P) ロギングとエンコーディング章を執筆する
+  - ロギング（初期化・ロガー登録・ログモジュールの実装・ファイル出力）とエンコーディング（OS 別実装・エンコーディングモジュールの実装・SHIORI 境界での文字コード）を現行コードと照合して書く
+  - 食い違うコメントはコメントのみ修正して付録 A に記録する。対応表は編集せず、自章の「ソースの所在」を確定させる（対応表への反映は 4.11 が行う）
+  - 章が必須 H2 をすべて持ち、内容検査・リンク検証が exit 0 になる
+  - `crates/` のコメントを修正した場合は、`NoDefaultCurrentDirectoryInExePath` を外して当該クレートの `cargo build`・`cargo test --doc`・`cargo fmt --check` を実行し成功させる
+  - _Requirements: 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.5, 3.8_
+  - _Boundary: InternalsChapters（logging-encoding）_
+
+- [x] 4.9 (P) Lua ランタイム内部モジュール章（生成元）を執筆する
+  - 現行スキル `internal-modules.md` の純内部事項（STORE パターン・循環参照回避・`finalize_scene`・PROXY の仕組み・SCENE の内部・ACT の初期化・SAVE の内部実装・ユーティリティ）を現行実装と照合し、情報量を減らさずに収録する
+  - リポジトリ内パス・`crates/` を含む URL をどこにも書かず、モジュールはモジュール名で示し、ソースの所在は題材章の「ソースの所在」アンカーへのリンクで示す
+  - 現行 `internal-modules.md` の担当行（内部設計パート列）を台帳で処置し、実装と食い違った記述は訂正して台帳に要旨を残す
+  - Rust 側の辞書確定は 4.2 のレジストリ章へリンクし、本章は Lua 側の収集データ構造だけを書く
+  - 章の本文が生成器の本文抽出を通り、章ファイルをスキル禁止トークン（`crates/`・`book/src` 等）で grep して 0 件で、内容検査・リンク検証が exit 0 になる（生成物での最終確認は 5.1）
+  - _Requirements: 2.3, 3.1, 3.6, 6.1, 6.6_
+  - _Boundary: InternalsChapters（internal-modules）_
+
+- [x] 4.10 (P) スクリプト用ランタイム API 章を執筆する
+  - 現行スキル `internal-modules.md` のゴースト作者向け API（ACT のトーク・SHIORI 固有プロパティ・表示制御・スポット操作・検索と呼び出し・`yield`・`choice`、WORD のファクトリとビルダ、GLOBAL、SAVE のキー規約とアクセス）を現行実装と照合し、情報量を減らさずに収録する
+  - 既存の利用者向け章が権威の事実（`act.req` のフィールド・セーブキーの命名規約・REG/RES）はリンクで参照し、作例章との呼び出し形の重なりは許容して作例章は改訂しない。内部設計章へのリンクは張らない
+  - 現行 `internal-modules.md` の担当行（利用者向け列）と作例章との重なりを台帳に記録する
+  - 章が利用者向け章の規約（口調・構造・パス禁止）を満たし、内容検査・リンク検証が exit 0 になる
+  - _Requirements: 4.1, 4.3, 6.2, 6.3, 6.6_
+  - _Boundary: ScriptApiChapter_
+
+- [x] 4.11 概要章を書き上げ、対応表と章間の線引きを確定する
+  - 対象読者（コントリビュータ・ゴースト作成には不要）、全体像（クレート構成とパース → トランスパイル → ローダ → VM 実行 → SHIORI 応答の流れ）と各章への案内、利用者から観測できる挙動は利用者向け章が正であることとリンク規則、ランタイム外ツールを対象外とする理由を書く
+  - 「章と対象ソース範囲」の対応表を、4.1〜4.8 の各章と内部モジュール章の「ソースの所在」に一致させて確定する
+  - 内部モジュール章 ↔ 題材章のアンカー、スクリプト用 API 章 ↔ 内部モジュール章の線引きを見直し、同じ事実が 2 章に書かれていないことを確認して必要なら担当章を直す
+  - `pasta_lua` README のアーキテクチャ・ソースモジュール構成の担当行を台帳で処置する
+  - 概要章が必須節をすべて持ち、対応表のパスと各章の「ソースの所在」が一致し、内容検査・リンク検証が exit 0 になる
+  - 題材章の見出しと「ソースの所在」が固まってから行うため 4.1〜4.10 の後に行う
+  - _Depends: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10_
+  - _Requirements: 1.2, 2.11, 3.5, 4.4, 8.2_
+  - _Boundary: InternalsChapters（index）・章間統合_
+
+- [x] 5. 生成への切替と既存文書の集約
+- [x] 5.1 内部モジュール章とスクリプト用 API 章をスキルへの生成対象に加え、スキルの区分表を改める
+  - 生成対応表の末尾に 2 エントリを加え（計 23 件）、生成器の自己テストの期待表・件数・手書きファイル一覧を合わせる
+  - 再生成して手書きの `internal-modules.md` を生成物に置き換え、`script-api.md` を追加する
+  - スキルの区分表で `internal-modules.md` を「生成（マニュアルから）」に改めて生成元の章を示し、`script-api.md` 行を加え、暫定注記を削除して参照先を 2 本に改め、メタデータの版を上げる（同一コミットで行う）
+  - 鮮度チェック（`--check`）・生成器の自己テスト・リンク検証（スキル自己完結と区分表の掲載漏れを含む）が exit 0 になり、生成物を 1 行手で変えると鮮度チェックが exit 1 になる
+  - _Depends: 1.3, 4.9, 4.10, 4.11_
+  - _Requirements: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 10.2_
+
+- [x] 5.2 (P) `pasta_lua` README を crates.io の顔に絞り、内部解説と利用者向け重複をマニュアルへの絶対 URL に置き換える
+  - 概要・Rust からの使い方・依存・ビルド・ライセンス等を存置し、アーキテクチャは数行の全体像と内部設計章への案内に縮め、内部節は削除して該当章へ案内する
+  - 設定ファイル・モジュール検索パスと UTF-8 契約・起動失敗・組み込みモジュール・SHIORI 応答の組み立ては概要数行と利用者向け章の絶対 URL に置き換える
+  - マニュアルに対応章の無い利用者向け記述は存置し、台帳に理由を記録する。全担当行の処置を台帳で確定する
+  - README がリポジトリ内相対パスで内部設計パートを案内せず、リンク検証（README の URL 実在を含む）が exit 0 になる
+  - _Depends: 1.2, 4.3, 4.4, 4.5, 4.6, 4.11_
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7_
+  - _Boundary: ReadmeMigration（pasta_lua）_
+
+- [x] 5.3 (P) `pasta_shiori`・`pasta_core`・`pasta_dsl` の README の内部解説をマニュアルへの絶対 URL に置き換える
+  - アーキテクチャ・ディレクトリ構成・FFI 境界の安全性・プロトコルフロー等を数行の全体像と該当する内部設計章への絶対 URL に置き換え、イベント一覧は利用者向けの SHIORI イベント章へ案内する（`pasta_dsl` は英語 README のため案内文も英語）
+  - crates.io の顔としての情報は存置し、全担当行の処置を台帳で確定する
+  - 3 本の README がリポジトリ内相対パスで内部設計パートを案内せず、リンク検証が exit 0 になる
+  - _Depends: 1.2, 4.1, 4.2, 4.5, 4.11_
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
+  - _Boundary: ReadmeMigration（pasta_shiori, pasta_core, pasta_dsl）_
+
+- [x] 5.4 `OPTIMIZATION.md` を廃止し、参照修正・ロードマップへの申し送り・ステアリングの最小追記を行う
+  - `OPTIMIZATION.md` をスタブなしで削除し、`SOUL.md`・`TEST_COVERAGE.md` の参照をトランスパイル章の公開 URL に置き換える
+  - ロードマップに最適化の将来候補（キー情報のみ）と、執筆中に判明したバグ候補（該当があれば）の小節を加え、作例章とスクリプト用 API 章の重なりの整理と README に存置した利用者向け記述のマニュアル収録を申し送る。台帳付録 B に記録する
+  - `tech.md` の 2 パス変換の行にトランスパイル章へのリンクを、マニュアル節に内部設計パートの 1 行を、`structure.md` のツリーと表に内部設計パートの 1 行を追記する
+  - 許可された除外（完了済み spec・本 spec のディレクトリ・ロードマップの本 spec 項目）以外で `OPTIMIZATION.md` を grep して 0 件になる
+  - _Requirements: 3.4, 5.3, 5.4, 5.5_
+
+- [x] 6. 統合検証
+- [x] 6.1 吸収台帳を完結させ、手書きの写しが残っていないことを確認する
+  - 台帳の全行の処置が埋まり、「除外」「README 存置」に理由があり、実装照合列が埋まっていることを確認する
+  - `OPTIMIZATION.md` の参照、手書き版 `internal-modules.md` 固有の見出し、台帳で「削除」とした README 節の見出しを grep し、現行文書に残っていないことを確認する
+  - 台帳に空の処置・理由欠落が 0 件で、残存 grep が 0 件になる
+  - _Requirements: 3.1, 5.1, 5.5, 6.1, 6.2, 6.10, 7.7, 10.2, 10.6_
+
+- [x] 6.2 全検査・ビルド・テストを通し、完了ゲートを本 spec 自身の差分で机上確認する
+  - 鮮度チェック・リンク検証・内容検査・静的検査・検索検査・ツール自己テストとマニュアルのビルド・着色・索引生成を実行し、既存パートの章順が変わっていないことを確認する
+  - `cargo build` と `cargo test --all`（`NoDefaultCurrentDirectoryInExePath` を外して実行）・`cargo fmt --check` が成功し、Rust/Lua の差分がコメント行のみで、新しいエコシステム依存が増えていないことを確認する
+  - 本 spec の差分（コメント修正で `crates/` に触れる）に Gate 7 の手順を当て、発火・章ごとの更新済み判定・リンク検証の通過を確認する
+  - 上記がすべて成功し、全タスクが同一ブランチ上で完了して一括統合できる状態になる
+  - _Requirements: 1.3, 1.4, 1.5, 1.6, 3.8, 8.1, 8.3, 8.4, 8.8, 10.1, 10.3, 10.4, 10.5_
+
+## Implementation Notes
+
+- 4.1: transpiler 章の「ソースの所在」に対応表外の `crates/pasta_lua/src/error.rs`・`crates/pasta_lua/src/loader/process.rs` を追加済み。`crates/pasta_lua/src/lib.rs` もどの行にも無い。4.11 で対応表への追加を判断する。
+- 4.1: 章の「生成される Lua コードの形」は現行 `element_gen.rs` に依拠。dynamic-word-reference 取り込み後に再照合する。
+- 4.1: pasta_core の Rune 時代のコメント（`SceneEntry.fn_path` の "Full Rune function path"、P0/P1 注記）は 4.2 の範囲として残置。
+- 4.2: PROXY の検索コードは `proxy.lua` ではなく `crates/pasta_lua/pasta_scripts/pasta/actor.lua` にある。並走 spec 合意の不可触対象として扱う。`act.lua` のコメント食い違い（「6段階」と L1〜L5）は付録 A に「取り込み後に修正」で記録済み。
+- 4.2: registry-search 章は internal-modules 章のアンカー `#finalize_scene`・`#scene-モジュール` にリンクしている。4.9 で見出しを変えたら 4.11 で再確認する。
+- 4.3: `store.lua` の古いコメント（`ctx.save`、`reset` の close、未宣言の `co_callback` フィールド）は 4.9 に残置。`shiori/event/init.lua`・`register.lua`・`save.lua`・`global.lua` のコメントは 4.3 が修正し付録 A に記録済み（4.5・4.9 は重複行を作らない）。
+- 4.3: 付録 B にコールバック系のバグ候補（try_route の継続消失、sweep の二重包み、sweep の `_staged` 残留）と CT の LuaJIT 非動作を記録済み。いずれもコード読解に基づく。
+- 4.4: loader 章の「ソースの所在」に対応表外の `crates/pasta_lua/src/runtime/module_registry.rs`・`crates/pasta_lua/pasta_scripts/`（広すぎ）・`crates/pasta_lua/src/loader/config/`（`loader/` と重複）が入っている。4.11 で調整する。transpiler 章「トランスパイル結果キャッシュ」のモジュール名導出の再掲は loader 章へのリンクに寄せる（1 事実 1 章）。
+- 4.4: pasta_lua README「Lua パススルー機能」（5.2 担当）は古い（`dic/*/`・「debug_mode 時に出力」）。5.2 で loader 章・transpiler 章へ送る。利用者章 `reference/pasta-toml.md` の debug_mode 記述（孤立キャッシュ警告は常に出る）の食い違いはロードマップ申し送り候補。
+- dynamic-word-reference 確定 API（2026-10-03 受領、4.11 で main 取り込み後に吸収）: `ACT_IMPL.find_act_handler/find_handler(self, mode, key, skip_methods)`（真なら L1 を rawget・L3 を飛ばす）、`ACT_IMPL.word(self, name, var_path)`（var_path 時 `WORD.dynamic_key(name, var_path, "act:word")` で skip_methods=true 検索）、新設 `ACT_IMPL.expr_fn_var(self, value, var_path, ...)`（後処理は局所関数 `call_expr` を共有）、act.lua が `pasta.word` を require。PROXY: `find_actor_handler/find_handler(mode, key, skip_methods)`（A1 を rawget）、`word(name, var_path)`、新設 `expr_fn_var`。新設 `WORD.dynamic_key(value, var_path, via)`（数値は tostring、空でない文字列はそのまま、他は log.warn して nil）、word.lua が `@pasta_log` を require。生成形 `act.{a}:word(値, "パス")`・`act.{a}:expr_fn_var(値, "パス", 引数…)`・`act:word(…)`・`act:expr_fn_var(…)`。DSL 規則 dyn_name_local/dyn_name_global/word_ref_dynamic/fn_call_dynamic、AST Action::DynamicWordRef/DynamicFnCall・Expr::DynamicFnCall・SetValue::DynamicWordRef、partial.rs shift_action に 2 アーム。LSP `find_dynamic_ref`、TextMate inline-dynamic-ref。値が "yield"/"チェイントーク" のとき L4 の GLOBAL.yield に一致（設計で許容）。
+- 4.5: shiori 章の「ソースの所在」に対応表外の `crates/pasta_shiori/Cargo.toml` とテストパスを追加済み（4.11 で判断）。`kick.lua` の古いコメント（「kick の消費は別タスク」）は 4.7 に残置。付録 B に OnTalk 間隔の毎回同一（`math.randomseed` 未呼び出し）と unload 無し終了時の 5 秒停滞を記録済み。
+- 4.6: 付録 B に `group_by_actor` のトークン欠落・並べ替え（利用者章 `lua/patterns.md` の例も出力が落ちる）を記録済み。`pasta/shiori/act.lua` は不可触の対象か曖昧なため未変更。budoux 幅の数え直しは事実として章に記載し、付録 B には入れていない（budoux/areka はゴースト層で対処する方針）。
+- 4.7: debug 章の「ソースの所在」にテストパス群を追加済み（4.11 で判断）。付録 B に 5 件（位置キックの前方一致誤起動、末尾数字のシーン名の identity 索引漏れ、Windows の SO_REUSEADDR 二重 bind、C フレームでの variables ずれ、1 起動 1 接続の利用者章未記載）。`ACT_IMPL.find_scene` が `global_scene_name` を捨てている点（`act.lua`、不可触）は末尾数字の件の原因でもあり、取り込み後に確認する。
+- 4.8: logging-encoding 章の「ソースの所在」にテストパス（`crates/pasta_lua/tests/log/`・`crates/pasta_lua/tests/runtime/encoding_test.rs`）を追加済み（4.11 で判断）。付録 B に 4 件（FFI 入口スレッドのログ破棄、フィルタの再読み込み不整合と利用者章 pasta-toml.md との食い違い、CP 65001 の to_ansi、未使用の公開関数）。
+- 4.9: internal-modules 章の「ACT の内部」に ACT のフィールドの作られ方を収録（talk-output 章が #act-の内部 を参照するため）。script-api 章（4.10）との線引きは 4.11 で確認。台帳の 4.9／4.10 共有行は各セルを「4.9: …」で記入済みで、4.10 は「／4.10: …」を追記する。付録 B に init_scene／call の文脈非復元を記録済み。`crates/pasta_lua/src/search/context.rs` の fn_name 例 `メイン_1::…` はトランスパイル時の形のみ正しい（4.11 で要確認）。
+- 4.10: script-api 章のアクタープロキシ表・`init_scene`・WORD スコープは internal-modules 章と一部重なる（4.11 で線引き）。`crates/pasta_lua/src/code_gen/scope_gen.rs` の `ACTOR:create_word()` がアクター属性も設定するという古いコメントは未修正（4.11 で修正）。回避レシピ（「代わりにこう書く」）は書かない方針を点検で確認済み。
+- 4.11: 対応表は各題材章「ソースの所在」の箇条書きと集合一致（テスト・ルート Cargo.toml・`crates/pasta_lua/src/lib.rs` は除外し index に明記）。`crates/pasta_lua/pasta_scripts/` 直下の `pasta/` 外の新規ファイルはどの行にも一致しない（現状は README のみ）。付録 B にアクション行で GLOBAL 組み込み（yield 等）に一致するとプロキシが渡りエラーになる件を追加済み（dynamic-word-reference 由来）。
+- 6.2: 全検査・`cargo test --all`（2285 passed）・`cargo fmt --check` 成功。merge-base 差分の crates/ .rs/.lua 変更 610 行はすべてコメント、依存変更なし。Gate 7 机上確認: 変更ファイル 139 件で 9 章すべてが発火し、全章 (a) 本 spec で更新済み、link-check exit 0。

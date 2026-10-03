@@ -41,7 +41,7 @@ end
 --- SHIORI load イベントを処理
 --- ベースウェアによって SHIORI DLL がロードされた時に呼び出されます。
 ---
---- @param hinst integer DLL インスタンスハンドル
+--- @param hinst integer DLL インスタンスハンドル（FFI 経路では常に 0）
 --- @param load_dir string ロードディレクトリパス (ghost/master/)
 --- @return boolean success 常に true を返却（将来の初期化処理の拡張ポイント）
 function SHIORI.load(hinst, load_dir)
@@ -69,7 +69,7 @@ end
 ---
 --- @param req table パース済み SHIORI リクエストテーブル
 --- @field req.id string イベントID（例: "OnBoot", "OnSecondChange"）
---- @field req.method string HTTP風メソッド（"GET", "NOTIFY"）
+--- @field req.method string メソッド（"get" または "notify"）
 --- @field req.version integer プロトコルバージョン（SHIORI/3.0 は 30）
 --- @field req.charset string 文字エンコーディング（例: "UTF-8"）
 --- @field req.sender string 送信者識別子

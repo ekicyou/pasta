@@ -105,9 +105,9 @@ const POLL_INTERVAL: Duration = Duration::from_millis(5);
 /// calling [`shutdown`](Transport::shutdown)) drops the outbound sender, which
 /// unblocks and ends the writer side of the bridge.
 pub(crate) struct Transport {
-    /// Inbound frames parsed off the socket (reader → owner). `None` when
-    /// disabled (`listen == None`), so the owner observes an immediately-closed
-    /// channel and never blocks.
+    /// Inbound frames parsed off the socket (reader → owner). When disabled
+    /// (`listen == None`) its sender is already dropped, so the owner observes an
+    /// immediately-closed channel and never blocks.
     inbound: Receiver<Value>,
     /// Outbound frames to write to the socket (owner → writer). `None` when
     /// disabled; sending is a silent no-op (the channel is already closed).
@@ -354,9 +354,9 @@ fn serve(
                 // BLOCKING stream (the reader parks on a blocking read, the
                 // writer blocks on write); restore blocking so a transient
                 // `WouldBlock` is never mistaken for an error/EOF that would
-                // abort the freshly accepted connection. (Interruptible poll for
-                // the connected bridge is a later task; this keeps the existing
-                // blocking bridge unchanged in behavior.)
+                // abort the freshly accepted connection. (The connected bridge
+                // is made interruptible below by the reader's read timeout and
+                // the writer's `recv_timeout` flag poll, not by non-blocking I/O.)
                 if s.set_nonblocking(false).is_err() {
                     return;
                 }

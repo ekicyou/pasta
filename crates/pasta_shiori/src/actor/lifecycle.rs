@@ -76,8 +76,12 @@ static ACTOR_HANDLE: std::sync::Mutex<Option<ActorThread>> = std::sync::Mutex::n
 /// 既存アクターがあれば先に [`teardown_actor`] して reload する（新スレッド＋新チャネル）。
 /// VM（`!Send`）はアクタースレッド上で構築・pin され、ここを越境しない（R8.1/R8.3）。
 ///
-/// 戻り値はアクタースレッド上での `SHIORI.load` 成否（VM ロード成功＝true）。spawn 自体に
-/// 失敗した場合（スレッド起動不可など）は `false`。
+/// 戻り値はアクタースレッド上での `PastaShiori::load` 成否（VM 構築と `SHIORI.load` の成功＝true）。
+/// ロードに失敗してもアクタースレッドは起動したまま `MAILBOX` に登録される。以後の GET の
+/// 応答は失敗の種類で異なる（`PastaShiori::request` を参照）。ランタイム構築の失敗は
+/// 理由付きの 500、設置ディレクトリ不在は原因を含まない 500（`Not initialized error`）、
+/// `SHIORI.load` の失敗はランタイムが残るため通常どおり処理される。スレッドの起動自体の失敗は `spawn_actor_thread` の `expect` で
+/// panic する（unwind プロファイルでは FFI 入口の `catch_unwind` が `false` に変える）。
 pub fn spawn_actor(hinst: isize, load_dir: PathBuf) -> bool {
     // reload: 既存アクターがあれば teardown してからスレッド／チャネルを差し替える。
     teardown_actor();

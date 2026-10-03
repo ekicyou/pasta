@@ -26,9 +26,8 @@
 //! 本解決器・composite-string は **debug kick 経路でのみ**到達する。通常 SSP トーク
 //! 再生は `:`-prefixed scene を生成せず、本モジュールにも到達しない（debug opt-in）。
 
-// NOTE: 参照側（DAP decode → transport dispatch）への結線は task 4.1。それまで
-// `resolve_and_kick`/`ResolveOutcome`/`uri_to_pasta_path` は未消費のため、本モジュール
-// 内の dead_code を明示許可する（結線後に消費され警告は自然消滅する）。
+// NOTE: 参照側は `wiring::inbound` の `pasta/playSceneAt` 処理（結線済み）。下の
+// dead_code 許可は結線前に置いたもので、現在の本番コードでは各項目が消費されている。
 #![allow(dead_code)]
 
 use super::kick::{KickRequest, KickSink};

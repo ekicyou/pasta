@@ -2,16 +2,16 @@
 //!
 //! SHIORI スレッド（producer）↔アクタースレッド（consumer）間の単一直列キュー。
 //! 本番アクターランタイム（design.md「Mailbox / Reply / Teardown」コンポーネント）の
-//! メッセージ契約の中核であり、`actor_poc/mailbox.rs`（std mpsc・PoC）を **flume**
+//! メッセージ契約の中核であり、PoC 段階の std mpsc 実装（撤去済み）を **flume**
 //! へ差し替えて本番昇格したもの。
 //!
 //! # チャンネル決定（design.md Technology Stack / RN7）
 //! - mailbox 本体 = **flume unbounded**。consumer は単一（アクタースレッド）で、
-//!   `recv_async().await`（task 3.3 で配線）による直列処理。flume `Sender` は
-//!   `Send + Sync + Clone` ゆえ将来 `static MAILBOX` へ lock-free 共有でき、
-//!   送信パスに Mutex を置かない（R8 構造的達成の素地）。
-//! - reply / done = **flume bounded(1)**。GET 応答は `recv_timeout`（同期・task 3.4）、
-//!   teardown done ack は `recv()` で待つ（task 7.x）。
+//!   `recv_async().await`（`thread.rs`）による直列処理。flume `Sender` は
+//!   `Send + Sync + Clone` ゆえ `static MAILBOX`（`lifecycle.rs`）へ lock-free に共有され、
+//!   送信パスに Mutex を置かない（R8）。
+//! - reply / done = **flume bounded(1)**。GET 応答・teardown done ack とも
+//!   `recv_timeout` で有界に待つ（`marshaling.rs`・`teardown.rs`）。
 //!
 //! # 単一 consumer 不変条件（design.md Revalidation Trigger）
 //! mailbox は **単一の非 cancel `recv_async` ループ**で消費し、`select!` を張らない。
@@ -25,31 +25,25 @@
 //! 同時並行 VM アクセスは構造的に発生しない。複数の `Sender` クローンから合流した
 //! 場合も、各送信は flume 内部で全順序化され、drain 順は一意に確定する。
 //!
-//! ## task 3.2 のスコープ
-//! 本タスクは mailbox の FIFO / 単一直列 / 順序契約を確立・検証する。`ActorMsg` の
-//! `Get`/`Stop` が運ぶ実 payload（`!Send` な Lua リクエストテーブル・VM 応答）の
-//! marshaling は task 3.3（VM pin）/ 3.4（marshaling 本番化）の責務であり、ここでは
-//! mailbox 層が運ぶ最小の placeholder 型（[`MailboxRequest`] / [`Reply`]）で
-//! FIFO・単一直列・順序一意性を実証する。
+//! ## payload の形
+//! mailbox が運ぶのは `Send` な値だけである。リクエストは生の SHIORI リクエスト文字列
+//! （[`MailboxRequest`]）のまま運び、`!Send` な Lua リクエストテーブルへの変換は
+//! アクタースレッド上の `PastaShiori::request` が行う。応答は SHIORI 応答文字列
+//! （[`Reply`]）で返る。
 
 use flume::{Receiver, Sender, bounded, unbounded};
 
-/// mailbox が運ぶ SHIORI リクエストの最小表現（task 3.2 の placeholder）。
+/// mailbox が運ぶ SHIORI リクエスト（生のリクエスト文字列）。
 ///
-/// 本番では GET/NOTIFY が VM へ渡す Lua リクエストテーブル相当を運ぶが、それは
-/// `!Send` であり marshaling（task 3.4）の責務。task 3.2 では FIFO / 単一直列 /
-/// 順序一意性を実証するための最小・`Send` な表現に留める。`seq` は投入順＝処理順を
-/// 検証するための順序識別子。
-///
-/// > 申し送り（task 3.3/3.4）: 本番では `req: LuaRequestTable`（VM スレッド内で構築・
-/// > 消費する `!Send` 値）へ置換する。mailbox は `Send` 境界を越えるため、SHIORI
-/// > スレッド側で受け取った生リクエスト文字列を運び、VM 側でパース／テーブル化する
-/// > 設計（design.md の `LuaRequestTable` は VM 同居の表現）が自然。
+/// Lua リクエストテーブルは `!Send` で mailbox を越えられないため、SHIORI スレッドが
+/// 受け取った生文字列をそのまま運び、アクタースレッド上の `PastaShiori::request` が
+/// パースしてテーブル化する（design.md の `LuaRequestTable` は VM 同居の表現）。
+/// `seq` は投入順＝処理順を観測するための順序識別子（ログに出る）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MailboxRequest {
     /// 投入順＝処理順の検証に用いる順序識別子。
     pub seq: u64,
-    /// SHIORI リクエスト本文（本番では VM 側でパースされる生文字列を想定）。
+    /// SHIORI リクエスト本文（アクタースレッド側でパースされる生文字列）。
     pub raw: String,
 }
 
@@ -63,16 +57,15 @@ impl MailboxRequest {
     }
 }
 
-/// GET 応答（task 3.2 の placeholder）。
+/// GET 応答（design.md「Reply」）。
 ///
-/// 本番では VM が構築したさくらスクリプト応答文字列を運ぶ（design.md「Reply」）。
-/// exactly-once は flume の move/drop 意味論が自然に与える（独自 `Responder` 不要）:
-/// アクターが `reply.send(Reply::Value(..))` すれば値、send せず drop すれば受信側の
-/// 同期 `recv_timeout` が `Disconnected`→204。task 3.2 では型と FIFO 投入のみ扱い、
-/// 実 `recv_timeout` 消費は task 3.4。
+/// SHIORI 応答文字列の全体（`SHIORI.request` の戻り値、またはリクエスト処理エラー時の
+/// 500 応答）を運ぶ。exactly-once は flume の move/drop 意味論が自然に与える（独自
+/// `Responder` 不要）: アクターが `reply.send(Reply::Value(..))` すれば値、send せず
+/// drop すれば受信側の同期 `recv_timeout`（`marshaling.rs`）が `Disconnected`→204。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Reply {
-    /// VM が構築した応答値（本番ではさくらスクリプト文字列）。
+    /// SHIORI 応答文字列（ステータス行・ヘッダを含む全体）。
     Value(String),
 }
 
@@ -97,19 +90,19 @@ pub enum Reply {
 pub enum ActorMsg {
     /// GET 同期メッセージ。`reply` は flume `bounded(1)` の応答経路（exactly-once）。
     Get {
-        /// VM へ渡す SHIORI リクエスト（task 3.2 placeholder・本番は `!Send` テーブル化）。
+        /// VM へ渡す SHIORI リクエスト（生文字列。テーブル化はアクタースレッド側）。
         req: MailboxRequest,
         /// GET 応答経路。アクターが `send` すれば値、drop すれば受信側 `recv_timeout`→204。
         reply: Sender<Reply>,
     },
     /// NOTIFY fire-and-forget メッセージ。応答経路を持たない。
     Notify {
-        /// VM へ渡す SHIORI リクエスト（task 3.2 placeholder）。
+        /// VM へ渡す SHIORI リクエスト（生文字列。テーブル化はアクタースレッド側）。
         req: MailboxRequest,
     },
     /// teardown 制御メッセージ。drain 完了・資源解放後に `done` で ack を返す。
     Stop {
-        /// teardown 完了 ack 経路（flume `bounded(1)`）。SHIORI 側は `recv()` で待つ。
+        /// teardown 完了 ack 経路（flume `bounded(1)`）。SHIORI 側は `recv_timeout` で有界に待つ。
         done: Sender<()>,
     },
     /// シーンキック fire-and-forget メッセージ（仕様 `pasta-scene-kick` 3.1）。
@@ -151,7 +144,8 @@ impl ActorMsg {
 
     /// teardown 制御メッセージを構築する。
     ///
-    /// 返り値の done [`Receiver`]（`bounded(1)`）で完了 ack を待つ（task 7.x の素地）。
+    /// 返り値の done [`Receiver`]（`bounded(1)`）で完了 ack を待つ（`teardown.rs` の
+    /// `teardown_via_sender` が `recv_timeout` で待つ）。
     pub fn stop() -> (ActorMsg, Receiver<()>) {
         let (done, done_rx) = bounded(1);
         (ActorMsg::Stop { done }, done_rx)
@@ -161,9 +155,9 @@ impl ActorMsg {
 /// 単一直列 mailbox を生成し、producer 側 [`Sender`] と consumer 側 [`Receiver`] の
 /// ペアを返す（flume unbounded）。
 ///
-/// `Sender<ActorMsg>` は `Send + Sync + Clone` ゆえ複数 SHIORI 経路（および将来の
+/// `Sender<ActorMsg>` は `Send + Sync + Clone` ゆえ複数 SHIORI 経路（および
 /// `static MAILBOX`）から lock-free に合流でき、`Receiver<ActorMsg>` は単一 consumer
-/// （アクタースレッド）が所有する。consumer は `recv_async().await`（task 3.3 配線）で
+/// （アクタースレッド）が所有する。consumer は `recv_async().await`（`thread.rs`）で
 /// 単一 recv ループを回し、`select!` を張らない（単一 consumer 不変条件）。
 pub fn mailbox() -> (Sender<ActorMsg>, Receiver<ActorMsg>) {
     unbounded()

@@ -27,7 +27,8 @@ function IMPL.__close(self, err)
 end
 
 --- キャンセルトークンオブジェクトを生成します。
---- キャンセルトークンは<close>構文で利用します。
+--- __close は Lua 5.4 の <close> 構文向けのメタメソッドです。LuaJIT 2.1 ランタイムには
+--- <close> 構文が無いため、__close は自動では呼ばれません（ランタイムはこのモジュールを使っていません）。
 --- @return CT CTオブジェクト
 local function new()
     local obj = {

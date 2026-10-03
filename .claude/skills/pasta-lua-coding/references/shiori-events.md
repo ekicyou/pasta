@@ -1,5 +1,5 @@
 <!-- GENERATED FROM PASTA MANUAL - DO NOT EDIT -->
-<!-- このファイルは pasta 利用者マニュアル「SHIORI イベントとハンドラ」（https://ekicyou.github.io/pasta/lua/shiori-events.html）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->
+<!-- このファイルは pasta マニュアル「SHIORI イベントとハンドラ」（https://ekicyou.github.io/pasta/lua/shiori-events.html）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->
 
 # SHIORI イベントとハンドラ
 

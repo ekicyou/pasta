@@ -16,6 +16,8 @@
 //   D. ボイス（R7.1, R7.2, R7.4 / ssot 1.7） — 導入/締めのキャラ口調（判定は findVoice）・コードフェンス内に口調なし
 //   E. 外部参照（R8.2, R8.3）   — milkpot(lua51/lua52)＋luajit.org 絶対 URL・lua55 不採用明記
 //   F. バージョン（R9.1, R9.3, R9.4） — introduction に対象系列・LuaJIT 2.1・将来変更注記
+//   I. 内部設計パート（pasta-runtime-internals-doc 1.2, 1.8, 2.7, 2.10, 2.11） — 10 章の存在・本文・
+//      章構造（extractBody）、題材章 8 章の必須 H2 7 種（この順）、機構語の網羅、概要章の対象外ツールと読者
 //
 // 成功で exit 0、失敗（1 件でも）で exit 1。
 
@@ -23,7 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runTutorialCheck } from './tutorial-check.mjs';
-import { GENERATION_MAP, findVoice } from './gen-skill-refs.mjs';
+import { GENERATION_MAP, findVoice, extractBody } from './gen-skill-refs.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(here, '../..');
@@ -246,7 +248,7 @@ const LUA_MODULES = [
 // ============================================================
 {
   const contentFiles = [];
-  for (const dir of ['', 'grammar', 'lua', 'lua/modules', 'getting-started', 'reference']) {
+  for (const dir of ['', 'grammar', 'lua', 'lua/modules', 'getting-started', 'reference', 'internals']) {
     const d = dir ? `${SRC}/${dir}` : SRC;
     for (const f of fs.readdirSync(abs(d))) {
       if (f === 'SUMMARY.md') continue;
@@ -411,6 +413,96 @@ for (const ch of DEBUG_CHAPTERS) {
     missing.length === 0,
     `デバッグ章に主要事実が登場する (${FACTS.join(', ')})`,
     `デバッグ章に未登場の主要事実: ${missing.join(', ')}`,
+  );
+}
+
+// ============================================================
+// I. 内部設計パート（1.8 章構造・本文に口調なし / 2.7 必須 H2 / 2.10 機構網羅 / 1.2・2.11 概要章）
+// ============================================================
+// DEBUG_CHAPTERS（G 系）と同じイディオム。口調の存在は D-voice（走査ディレクトリに internals）が見る。
+const INTERNALS_CHAPTERS = [
+  'index.md', 'transpiler.md', 'registry-search.md', 'execution-model.md', 'internal-modules.md',
+  'loader.md', 'shiori.md', 'talk-output.md', 'debug.md', 'logging-encoding.md',
+];
+// 題材章（index.md・internal-modules.md 以外）が持つ H2。この順で現れること。
+const INTERNALS_SECTIONS = [
+  '目的と責務', '構成要素', '処理とデータの流れ', '境界の受け渡し', '不変条件と制約', 'ソースの所在', '経緯',
+];
+const INTERNALS_NON_TOPIC = new Set(['index.md', 'internal-modules.md']);
+
+for (const ch of INTERNALS_CHAPTERS) {
+  const rel = `${SRC}/internals/${ch}`;
+  if (!exists(rel)) {
+    fail(`I-exist:${ch}`, `内部設計章が存在しない: ${rel}`);
+    continue;
+  }
+  ok(`I-exist:${ch}`, `内部設計章 ${ch} が存在する`);
+  const md = read(rel);
+  assert(
+    `I-body:${ch}`,
+    isSubstantive(md),
+    `内部設計章 ${ch} が本文を持つ`,
+    `内部設計章 ${ch} が本文不足/プレースホルダ`,
+  );
+  // I-structure: H1・区切り 2 本・本文散文に口調なし（生成器と同じ規則を生成対象外の章にも課す）。
+  let structErr = null;
+  try {
+    extractBody(md, `internals/${ch}`);
+  } catch (e) {
+    structErr = e.message;
+  }
+  assert(
+    `I-structure:${ch}`,
+    structErr === null,
+    `内部設計章 ${ch} の章構造（H1・区切り・本文に口調なし）が正しい`,
+    `内部設計章 ${ch} の章構造不備: ${structErr}`,
+  );
+  if (INTERNALS_NON_TOPIC.has(ch)) continue;
+  // I-sections: 必須 H2 7 種がこの順で揃う（フェンス内の行は見出しとみなさない）。
+  const h2s = stripCodeFences(md)
+    .split(/\r?\n/)
+    .filter((l) => l.startsWith('## '))
+    .map((l) => l.slice(3).trim());
+  const idx = INTERNALS_SECTIONS.map((h) => h2s.indexOf(h));
+  const missing = INTERNALS_SECTIONS.filter((_, i) => idx[i] < 0);
+  const ordered = idx.every((v, i) => i === 0 || v > idx[i - 1]);
+  assert(
+    `I-sections:${ch}`,
+    missing.length === 0 && ordered,
+    `題材章 ${ch} が必須 H2 7 種をこの順で持つ`,
+    missing.length > 0
+      ? `題材章 ${ch} に必須 H2 が無い: ${missing.join(', ')}`
+      : `題材章 ${ch} の必須 H2 の順序が違う（期待: ${INTERNALS_SECTIONS.join(' → ')}）`,
+  );
+}
+
+// I-fact: 割り振られた機構を示す語がパート全体に現れる（2.10）、概要章に対象外ツールと読者（1.2, 2.11）。
+{
+  const allInternals = INTERNALS_CHAPTERS
+    .map((ch) => `${SRC}/internals/${ch}`)
+    .filter((rel) => exists(rel))
+    .map((rel) => read(rel))
+    .join('\n');
+  const MECHANISMS = [
+    'ウェイト', 'budoux', 'OnTalk', 'OnHour', 'サーフェス', '着せ替え',
+    '永続化', 'ロギング', 'エンコーディング', 'pasta.toml', 'トランスパイル結果キャッシュ',
+  ];
+  const missingMech = MECHANISMS.filter((kw) => !allInternals.includes(kw));
+  assert(
+    'I-fact:mechanisms',
+    missingMech.length === 0,
+    `内部設計パートに割り振り機構の語が登場する (${MECHANISMS.join(', ')})`,
+    `内部設計パートに未登場の機構語: ${missingMech.join(', ')}`,
+  );
+  const indexRel = `${SRC}/internals/index.md`;
+  const indexMd = exists(indexRel) ? read(indexRel) : '';
+  const INDEX_FACTS = ['pasta_lsp', 'pasta_check', 'pasta_sample_ghost', 'コントリビュータ'];
+  const missingIdx = INDEX_FACTS.filter((kw) => !indexMd.includes(kw));
+  assert(
+    'I-fact:index',
+    missingIdx.length === 0,
+    `概要章に対象外ツールと読者の語が登場する (${INDEX_FACTS.join(', ')})`,
+    `概要章に未登場の語: ${missingIdx.join(', ')}`,
   );
 }
 

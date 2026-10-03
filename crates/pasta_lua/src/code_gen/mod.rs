@@ -96,16 +96,15 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Invalid/default spans (`end_byte == 0`) are skipped so synthetic/headerless
     /// output does not pollute the map.
     ///
-    /// # Coverage note (future `pasta-source-map` spec)
+    /// # Coverage
     ///
-    /// This seam is wired for the representative action-emitting path
-    /// (`generate_action`). Full coverage — recording every `generate_*` construct
-    /// (var sets, calls, choices, word definitions, scene/function headers, code
-    /// blocks) and handling the `currentline` edge cases plus the post-transpile
-    /// `normalize_output` line-shift — is OUT OF BOUNDARY here and is owned by the
-    /// downstream `pasta-source-map` spec. To extend coverage, thread the relevant
-    /// node's `span` to its emit point and call `record_span(span)` immediately
-    /// before the corresponding `writeln`.
+    /// Span-bearing constructs call this right after their `writeln`: scope
+    /// headers (actor / global scene / local scene), actions, var sets, calls,
+    /// choices, cue commands, and global / scene word definitions. Code blocks use
+    /// [`record_block_line`](Self::record_block_line) per content line instead. The
+    /// post-transpile normalize line shift is applied by the consumer, using the
+    /// [`LineShift`](crate::normalize::LineShift) returned by
+    /// `LuaTranspiler::transpile_with_source_map`.
     fn record_span(&mut self, span: Span) {
         if let Some(sink) = self.source_map.as_deref_mut()
             && span.is_valid()

@@ -70,10 +70,10 @@ impl SceneTable {
         }
     }
 
-    /// Create a scene table from a transpiler's SceneRegistry.
+    /// Create a scene table from a SceneRegistry.
     ///
-    /// This converts the SceneRegistry (used during transpilation) into
-    /// a SceneTable (used during runtime).
+    /// This converts the SceneRegistry (filled at transpile time or rebuilt by the
+    /// runtime finalize) into a SceneTable (used for runtime search).
     ///
     /// Key format conversion for prefix_index (WordTable unified format):
     /// - Local scene: `fn_name "会話_1::選択肢_1"` → `":会話_1:選択肢_1"`
@@ -83,7 +83,7 @@ impl SceneTable {
         random_selector: Box<dyn RandomSelector>,
     ) -> Result<Self, SceneTableError> {
         // Build Vec storage with ID assignment
-        // Note: Internal IDs are 0-based (Vec index), but select_label_to_id converts to 1-based
+        // Note: Internal IDs are 0-based Vec indices (SceneRegistry's 1-based IDs are not carried over)
         let labels: Vec<SceneInfo> = registry
             .all_scenes()
             .into_iter()
@@ -116,7 +116,7 @@ impl SceneTable {
                 .or_insert_with(Vec::new);
 
             // Allow duplicates for search key (multiple scenes with same prefix)
-            // The original fn_name uniqueness is validated in SceneRegistry
+            // fn_name uniqueness is not validated (SceneRegistry does not check it)
             entry.push(scene.id);
         }
 
@@ -146,7 +146,10 @@ impl SceneTable {
         }
     }
 
-    /// Resolve scene ID by search key and filters (P1 runtime resolution).
+    /// Resolve scene ID by search key and filters (search without module context).
+    ///
+    /// Unlike `collect_scene_candidates("", ..)`, keys starting with `:` (local
+    /// scenes) are not excluded; only a search key starting with `:` can match them.
     ///
     /// # Algorithm
     /// 1. Prefix search using RadixMap (search_key → candidate IDs)
@@ -185,12 +188,13 @@ impl SceneTable {
         self.select_from_cache(cache_key, filtered_ids)
     }
 
-    /// Resolve scene ID with unified scope search (local + global).
+    /// Resolve scene ID with module context.
     ///
-    /// This is the new unified method that uses module context for local scope search.
+    /// Searches local scenes of `module_name` only (global scenes when it is empty);
+    /// there is no local → global fallback.
     ///
     /// # Algorithm
-    /// 1. Collect candidates using 2-stage search (collect_scene_candidates)
+    /// 1. Collect candidates (collect_scene_candidates)
     /// 2. Filter by attributes
     /// 3. Cache-based sequential selection (no repeat until exhausted)
     /// 4. Return selected SceneId
@@ -205,7 +209,7 @@ impl SceneTable {
         search_key: &str,
         filters: &HashMap<String, String>,
     ) -> Result<SceneId, SceneTableError> {
-        // Phase 1: Collect candidates using 2-stage search
+        // Phase 1: Collect candidates from a single scope (no fallback)
         let candidate_ids = self.collect_scene_candidates(module_name, search_key)?;
 
         // Phase 2: Filter by attributes
@@ -315,13 +319,12 @@ impl SceneTable {
         self.shuffle_enabled = enabled;
     }
 
-    /// Collect all scene candidates using fallback strategy (local → global).
+    /// Collect scene candidates for one scope (no local → global fallback).
     ///
-    /// # Algorithm (Fallback Strategy)
-    /// 1. Local search: `:module_name:prefix` で前方一致
-    ///    - 結果あり → ローカル候補のみ返す（終了）
-    /// 2. Global search: `prefix` で前方一致（`:` で始まるキーを除外）
-    ///    - ローカル検索結果が0件の場合のみ実行
+    /// # Algorithm
+    /// - `module_name` が空: `prefix` で前方一致（`:` で始まるキーを除外）
+    /// - `module_name` が非空: `:module_name:prefix` で前方一致（ローカルのみ）
+    /// - ローカル→グローバルの順序は呼び出し側（Lua の検索手順）が 2 回の呼び出しで組む
     ///
     /// # Arguments
     /// * `module_name` - グローバルシーン名
@@ -382,10 +385,10 @@ impl SceneTable {
         Ok(local_candidates)
     }
 
-    /// Find a scene by name, with optional attribute filters (legacy method).
+    /// Find a scene by name, with optional attribute filters (returns fn_name).
     ///
-    /// This is kept for backward compatibility with execute_scene().
-    /// For new code, use resolve_scene_id() instead.
+    /// Not used by the runtime search (`@pasta_search` uses resolve_scene_id /
+    /// resolve_scene_id_unified).
     pub fn find_scene(
         &mut self,
         name: &str,

@@ -1,8 +1,8 @@
 --- @module pasta.save
 --- 永続化データモジュール
 ---
---- ランタイム起動時に自動ロードされ、セッションを跨いで保持される。
---- ctx.saveから参照可能。Drop時に自動保存される。
+--- 最初に require された時点で @pasta_persistence.load() により読み込まれ、セッションを跨いで保持される。
+--- act.save（act:init_scene の戻り値 save）から参照可能。ランタイムの Drop 時に自動保存される。
 
 local persistence = require("@pasta_persistence")
 

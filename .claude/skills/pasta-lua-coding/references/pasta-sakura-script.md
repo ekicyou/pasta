@@ -1,5 +1,5 @@
 <!-- GENERATED FROM PASTA MANUAL - DO NOT EDIT -->
-<!-- このファイルは pasta 利用者マニュアル「@pasta_sakura_script」（https://ekicyou.github.io/pasta/lua/modules/pasta-sakura-script.html）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->
+<!-- このファイルは pasta マニュアル「@pasta_sakura_script」（https://ekicyou.github.io/pasta/lua/modules/pasta-sakura-script.html）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->
 
 # @pasta_sakura_script
 

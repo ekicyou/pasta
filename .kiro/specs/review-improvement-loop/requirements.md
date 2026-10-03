@@ -60,7 +60,7 @@
 6. When lint 徹底次元のセルを実行する, the Review Improvement Loop shall 対象プロジェクト標準の lint（本リポジトリでは `cargo clippy`）を警告ゼロ相当の水準で通過させ、慣用句からの逸脱を是正する
 7. When デッドコード/未使用除去次元のセルを実行する, the Review Improvement Loop shall 未使用の公開エクスポート・関数・依存を検出して除去する
 8. When パニック経路削減次元のセルを実行する, the Review Improvement Loop shall 回復不能停止に至る経路（`unwrap`/`expect`/インデックスパニック等）を明示的なエラー処理へ置換し、FFI/SHIORI 等の外部境界を特に重視する
-9. When ドキュメント/依存整合次元のセルを実行する, the Review Improvement Loop shall テストマッピング台帳・README・仕様ドキュメントの同期確認、およびサプライチェーン監査（本リポジトリでは `cargo-audit`/`cargo-deny`）を実施する
+9. When ドキュメント/依存整合次元のセルを実行する, the Review Improvement Loop shall テストマッピング台帳・README・仕様ドキュメントの同期確認、内部設計章（`book/src/internals/`）と現行実装の照合（存在しないソースの参照・実装と食い違う記述・実装にあって章に無い主要機構の有無。内部設計章ごとに照合結果を記録し、乖離を改善対象として扱う）、およびサプライチェーン監査（本リポジトリでは `cargo-audit`/`cargo-deny`）を実施する
 10. Where レビュー領域が特定の資産種別に属する, the Review Improvement Loop shall 各次元を当該資産種別に適合したツール・手法で実現し（本リポジトリでは Rust=`cargo clippy`/`cargo-audit`/`cargo-deny`、Lua=`luacheck`/`lua_test`、TypeScript/JS=型検査・lint・`npm` テスト等）、当該資産種別に適用不能な次元は「該当なし」として記録する
 
 ### Requirement 3: 挙動保存ポリシー

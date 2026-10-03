@@ -11,7 +11,7 @@
 //! 戻すことで順序非依存を保つ。`loadu` のフラグ契約を検証するテストは、実在しない
 //! ディレクトリを渡して `spawn_actor` へ到達させる（VM は起こさず MAILBOX のみ設定される）。
 //! 実 VM を起こす load→request→unload→reload サイクルの E2E はアクタースレッド・実ゴーストを
-//! 要するため統合テスト（`tests/`・`actor-poc` 不要の既定ビルド）側に置く。
+//! 要するため統合テスト（`tests/`・既定ビルド）側に置く。
 
 use super::*;
 use crate::actor::marshaling::default_204;

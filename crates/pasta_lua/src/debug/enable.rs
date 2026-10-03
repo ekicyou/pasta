@@ -89,7 +89,8 @@ use super::wiring;
 /// `kick_sink` is the OPTIONAL host-injected scene-kick closure
 /// ([`KickSink`](crate::debug::kick::KickSink)). When supplied AND debug is
 /// enabled, it is threaded to the socket-bridge thread so an inbound
-/// `pasta/playScene` request invokes it (pasta-scene-kick R2.4); `pasta_lua`
+/// `pasta/playSceneAt` / `pasta/reloadShiori` request invokes it
+/// (pasta-scene-kick R2.4); `pasta_lua`
 /// holds it opaquely and never references `pasta_shiori` (R2.4 dependency
 /// direction). On the disabled path the sink is dropped here unused, keeping the
 /// kick path inert (R2.6, zero cost).
@@ -212,7 +213,8 @@ pub fn enable(
         // 5.3): deliver the gated map+mode there too (task 4.2 plumbing).
         let source_map_wiring = source_map_wiring.clone();
         // pasta-scene-kick tasks 2.3 / 2.4: deliver the (optional) host kick sink
-        // to the bridge so an inbound `pasta/playScene` invokes it (R2.4). `None`
+        // to the bridge so an inbound `pasta/playSceneAt` / `pasta/reloadShiori`
+        // invokes it (R2.4). `None`
         // keeps the kick path inert (R2.6). Cloning an `Arc<dyn Fn…>` is a
         // refcount bump.
         let kick_sink = kick_sink.clone();

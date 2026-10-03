@@ -51,7 +51,7 @@
 4. **clippy/lint 徹底**: `cargo clippy` を warnings=deny 相当で全領域通過、慣用句逸脱を是正。
 5. **デッドコード/未使用除去**: 未使用の pub export・関数・依存を検出し除去（コード量削減）。
 6. **パニック経路削減**: `unwrap`/`expect`/index panic を `Result`/明示エラーへ。FFI/SHIORI 境界を特に重視。
-7. **ドキュメント/依存整合**: `TEST_COVERAGE.md`/README/マニュアル（`book/src`・利用者向け情報の権威）同期、`cargo-audit`/`cargo-deny` サプライチェーン監査の組み込み。
+7. **ドキュメント/依存整合**: `TEST_COVERAGE.md`/README/マニュアル（`book/src`・利用者向け情報の権威）同期、内部設計章（`book/src/internals/`）と実装の照合（存在しないソースの参照・実装と食い違う記述・実装にあって章に無い主要機構の有無。章ごとに照合結果を記録し、乖離は改善対象とする）、`cargo-audit`/`cargo-deny` サプライチェーン監査の組み込み。
 
 ### 挙動保存ポリシー（確定）
 - **正常系（妥当な入力）の外部観測挙動は厳密に保存する**。

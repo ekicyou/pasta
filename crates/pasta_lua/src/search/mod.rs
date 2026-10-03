@@ -34,8 +34,8 @@ use pasta_core::registry::{SceneRegistry, WordDefRegistry};
 ///
 /// # Arguments
 /// * `lua` - The Lua instance
-/// * `scene_registry` - SceneRegistry from transpilation
-/// * `word_registry` - WordDefRegistry from transpilation
+/// * `scene_registry` - SceneRegistry (from transpilation, or rebuilt by `finalize_scene`)
+/// * `word_registry` - WordDefRegistry (from transpilation, or rebuilt by `finalize_scene`)
 ///
 /// # Returns
 /// A Lua UserData representing the `@pasta_search` module
@@ -59,8 +59,8 @@ pub fn loader(
 ///
 /// # Arguments
 /// * `lua` - The Lua instance
-/// * `scene_registry` - SceneRegistry from transpilation
-/// * `word_registry` - WordDefRegistry from transpilation
+/// * `scene_registry` - SceneRegistry (from transpilation, or rebuilt by `finalize_scene`)
+/// * `word_registry` - WordDefRegistry (from transpilation, or rebuilt by `finalize_scene`)
 ///
 /// # Returns
 /// The registered module (UserData)

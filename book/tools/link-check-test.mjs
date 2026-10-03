@@ -17,7 +17,17 @@
 //   - checkSkillSelfContained が 2 スキルの規則 (a)〜(d) 違反を種別付きで検出し、
 //     https・実在アンカー・明示アンカー（#s6-6）は許可する（3.2）。
 //   実リポジトリのスキル検査は P4（タスク 4.x）完了まで違反ありでよいため、
-//   (A)・(B-13) は book 部分（internal-md / github-repo-path）が 0 件であることだけを確かめる。
+//   (A)・(B-13) は book 部分（internal-md / github-repo-path / internals-path / readme-manual-url）が
+//   0 件であることだけを確かめる。
+//   - checkInternalsPaths が内部設計章のフェンス外インラインコードのリポジトリ内パスについて、
+//     実在しない・`:行番号` 付き・トラバーサル・末尾 `/` なのにディレクトリでないものを
+//     internals-path として行番号付きで検出し、フェンス内・接頭辞外・内部設計章以外は対象外とする
+//     （pasta-runtime-internals-doc タスク 1.1 / 要件 3.2, 3.7, 1.6）。
+//   - checkReadmeManualLinks が crates/*/README.md のフェンス外のリンクと裸の URL のうち公開マニュアルを
+//     指すものについて、写像先の章・見出し（日本語見出し・パーセントエンコード・明示アンカー）の実在を照合し、
+//     存在しない章・アンカー・トラバーサル・章に写像できない URL を readme-manual-url として行番号付きで検出する。
+//     インラインコード内・crates/*/README.md 以外は対象外。manual.yml は crates/*/README.md の変更でも起動する
+//     （pasta-runtime-internals-doc タスク 1.2 / 要件 7.5, 7.8, 1.6）。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -33,6 +43,11 @@ import {
   headingSlug,
   headingSlugs,
   checkSkillSelfContained,
+  checkInternalsPaths,
+  checkReadmeManualLinks,
+  MANUAL_URL,
+  INTERNALS_DIR,
+  REPO_PATH_PREFIXES,
   CHECKED_SKILLS,
   FORBIDDEN_SKILL_TOKENS,
   githubUrlToRepoPath,
@@ -77,7 +92,7 @@ function rmrf(root) {
 
 // ============================================================
 log('\n== (A) 実リポジトリ現状: クリーン判定 ==');
-const BOOK_KINDS = new Set(['internal-md', 'github-repo-path']);
+const BOOK_KINDS = new Set(['internal-md', 'github-repo-path', 'internals-path', 'readme-manual-url']);
 {
   const result = runLinkCheck(REPO_ROOT);
   const bookBroken = result.broken.filter((b) => BOOK_KINDS.has(b.kind));
@@ -453,6 +468,238 @@ log('\n== (E) checkSkillSelfContained（規則 a〜d） ==');
     } finally {
       rmrf(root);
     }
+  }
+}
+
+// ============================================================
+log('\n== (F) checkInternalsPaths（内部設計章のリポジトリ内パス実在） ==');
+{
+  check('INTERNALS_DIR は book/src/internals', INTERNALS_DIR === 'book/src/internals');
+  check('REPO_PATH_PREFIXES は 6 接頭辞',
+    JSON.stringify(REPO_PATH_PREFIXES)
+    === JSON.stringify(['crates/', 'book/', '.github/', '.cargo/', '.kiro/', '.claude/']),
+    JSON.stringify(REPO_PATH_PREFIXES));
+
+  // F-1: 内部設計章が無ければ検査しない（違反 0）。
+  {
+    const root = makeSandbox();
+    try {
+      check('F-1 内部設計章が無ければ違反 0', checkInternalsPaths(root).length === 0);
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // F-2: 合格・違反・対象外の混在。repoRoot 外に実在ファイルを置き、トラバーサルを確かめる。
+  {
+    const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'link-check-'));
+    const root = path.join(outer, 'repo');
+    try {
+      writeFile(outer, 'outside.md', '# repoRoot の外に実在\n');
+      writeFile(root, 'crates/pasta_lua/src/lib.rs', '// lib\n');
+      writeFile(root, '.claude/skills/x/SKILL.md', '# x\n');
+      writeFile(root, 'book/src/internals/index.md', [
+        '# 概要', // L1
+        '実在ファイル `crates/pasta_lua/src/lib.rs` と実在ディレクトリ `crates/pasta_lua/src/`。', // L2
+        '二重バッククォート `` .claude/skills/x/SKILL.md `` も合格。', // L3
+        '欠落 `crates/pasta_lua/src/missing.rs`。', // L4
+        '行番号付き `crates/pasta_lua/src/lib.rs:12`。', // L5
+        'トラバーサル `crates/../../outside.md`。', // L6
+        'ファイルに末尾スラッシュ `crates/pasta_lua/src/lib.rs/`。', // L7
+        '二重バッククォートの欠落 `` book/nope.md ``。', // L8
+        '接頭辞外 `scripts/main.lua` と `pasta.store`、空白入り `crates/a b`。', // L9
+        '```text', // L10
+        'フェンス内 `crates/fenced-nope.rs`', // L11
+        '```', // L12
+        '',
+      ].join('\n'));
+      writeFile(root, 'book/src/internals/sub/deep.md', '# 深い章\n\n`.github/workflows/nope.yml`\n');
+      // 内部設計章以外は対象外。
+      writeFile(root, 'book/src/grammar/markers.md', '`crates/not-checked.rs`\n');
+
+      const broken = checkInternalsPaths(root);
+      const targets = broken.map((b) => b.target).sort();
+      const want = [
+        '.github/workflows/nope.yml',
+        'book/nope.md',
+        'crates/../../outside.md',
+        'crates/pasta_lua/src/lib.rs/',
+        'crates/pasta_lua/src/lib.rs:12',
+        'crates/pasta_lua/src/missing.rs',
+      ];
+      check('F-2 違反は欠落・行番号付き・トラバーサル・非ディレクトリ末尾 / ・二重 ` 内欠落・下位章の 6 件',
+        JSON.stringify(targets) === JSON.stringify(want), JSON.stringify(broken));
+      check('F-2 種別はすべて internals-path', broken.every((b) => b.kind === 'internals-path'),
+        JSON.stringify(broken));
+      const byTarget = (t) => broken.find((b) => b.target === t) || {};
+      check('F-2 detail に行番号（欠落=L4・行番号付き=L5・トラバーサル=L6・下位章=L3）',
+        /\bL4\b/.test(byTarget('crates/pasta_lua/src/missing.rs').detail)
+        && /\bL5\b/.test(byTarget('crates/pasta_lua/src/lib.rs:12').detail)
+        && /\bL6\b/.test(byTarget('crates/../../outside.md').detail)
+        && /\bL3\b/.test(byTarget('.github/workflows/nope.yml').detail),
+        JSON.stringify(broken));
+      check('F-2 トラバーサルは実在してもトラバーサルとして報告',
+        /トラバーサル/.test(byTarget('crates/../../outside.md').detail), JSON.stringify(broken));
+      check('F-2 file はリポジトリ相対の章パス',
+        byTarget('crates/pasta_lua/src/missing.rs').file === 'book/src/internals/index.md'
+        && byTarget('.github/workflows/nope.yml').file === 'book/src/internals/sub/deep.md',
+        JSON.stringify(broken));
+      check('F-2 フェンス内・接頭辞外・空白入り・内部設計章以外は対象外',
+        !broken.some((b) => /fenced-nope|scripts\/|pasta\.store|a b|not-checked/.test(b.target)),
+        JSON.stringify(broken));
+
+      const result = runLinkCheck(root);
+      check('F-2 runLinkCheck に結合され failed=true',
+        result.failed === true && result.broken.filter((b) => b.kind === 'internals-path').length === 6,
+        JSON.stringify(result.broken));
+      const rep = reportLinkCheck(result);
+      check('F-2 レポートの [1] 区分に internals-path 6 件が出る',
+        /\[1\][^\n]*: 6 件/.test(rep) && rep.includes('[internals-path]'), rep);
+    } finally {
+      rmrf(outer);
+    }
+  }
+
+  // F-3: 実在パスだけなら合格。
+  {
+    const root = makeSandbox();
+    try {
+      writeFile(root, 'crates/pasta_lua/src/lib.rs', '// lib\n');
+      writeFile(root, 'book/src/internals/index.md',
+        '# 概要\n\n`crates/pasta_lua/src/lib.rs`・`crates/pasta_lua/`・`book/src/internals/index.md`\n');
+      const broken = checkInternalsPaths(root);
+      check('F-3 実在パスのみ: 違反 0', broken.length === 0, JSON.stringify(broken));
+      check('F-3 runLinkCheck も failed=false', runLinkCheck(root).failed === false);
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // F-4: 実リポジトリで internals-path 0 件。
+  {
+    const broken = checkInternalsPaths(REPO_ROOT);
+    check('F-4 実リポジトリで internals-path 0 件', broken.length === 0, JSON.stringify(broken));
+  }
+}
+
+// ============================================================
+log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュアル URL 実在） ==');
+{
+  check('MANUAL_URL は公開マニュアルのルート', MANUAL_URL === 'https://ekicyou.github.io/pasta/');
+  const U = MANUAL_URL;
+
+  // G-1: クレート README が無ければ違反 0。
+  {
+    const root = makeSandbox();
+    try {
+      check('G-1 クレート README が無ければ違反 0', checkReadmeManualLinks(root).length === 0);
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // G-2: 合格・違反・対象外の混在。repoRoot 外に実在ファイルを置き、トラバーサルを確かめる。
+  {
+    const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'link-check-'));
+    const root = path.join(outer, 'repo');
+    try {
+      writeFile(outer, 'outside.md', '# repoRoot の外に実在\n');
+      writeFile(root, 'book/src/introduction.md', '# はじめに\n');
+      writeFile(root, 'book/src/debug/index.md', '# デバッグ\n\n## VSCode から接続する\n');
+      writeFile(root, 'book/src/lua/modules/index.md',
+        '# モジュール\n\n## pasta.store モジュール\n\n<a id="s6-6"></a>\n\n### 6.6 永続化\n');
+      const enc = encodeURIComponent('pastastore-モジュール');
+      writeFile(root, 'crates/pasta_lua/README.md', [
+        '# pasta_lua', // L1
+        `[ルート](${U}) と裸のルート ${U}index.html、`, // L2
+        `[章](${U}lua/modules/index.html) と [日本語見出し](${U}lua/modules/index.html#pastastore-モジュール)。`, // L3
+        `[エンコード済み](${U}lua/modules/index.html#${enc}) と [明示アンカー](<${U}lua/modules/index.html#s6-6>)。`, // L4
+        `自動リンク <${U}debug/index.html#vscode-から接続する> とクエリ付き [q](${U}debug/index.html?x=1)。`, // L5
+        `欠落章 [x](${U}nope.html)。`, // L6
+        `裸の欠落アンカー ${U}lua/modules/index.html#no-such。`, // L7
+        `トラバーサル [t](${U}../../outside.html)。`, // L8
+        `章に写像できない [p](${U}book.pdf)。`, // L9
+        `インラインコード \`${U}code-nope.html\` と他サイト https://example.com/nope.html。`, // L10
+        '```text', // L11
+        `${U}fenced-nope.html`, // L12
+        '```', // L13
+        '',
+      ].join('\n'));
+      writeFile(root, 'crates/pasta_core/README.md', `# core\n\n[欠落アンカー](${U}debug/index.html#無い見出し)\n`);
+      // 対象外: book/src・リポジトリ直下の README・入れ子の README・README 以外。
+      writeFile(root, 'book/src/grammar/markers.md', `[x](${U}book-nope.html)\n`);
+      writeFile(root, 'README.md', `[x](${U}root-nope.html)\n`);
+      writeFile(root, 'crates/pasta_lua/docs/README.md', `[x](${U}nested-nope.html)\n`);
+      writeFile(root, 'crates/pasta_lua/OTHER.md', `[x](${U}other-nope.html)\n`);
+
+      const broken = checkReadmeManualLinks(root);
+      const targets = broken.map((b) => b.target).sort();
+      const want = [
+        `${U}../../outside.html`,
+        `${U}book.pdf`,
+        `${U}debug/index.html#無い見出し`,
+        `${U}lua/modules/index.html#no-such`,
+        `${U}nope.html`,
+      ].sort();
+      check('G-2 違反は欠落章・欠落アンカー（裸・別クレート）・トラバーサル・写像不能の 5 件（重複なし）',
+        JSON.stringify(targets) === JSON.stringify(want), JSON.stringify(broken));
+      check('G-2 種別はすべて readme-manual-url', broken.every((b) => b.kind === 'readme-manual-url'),
+        JSON.stringify(broken));
+      const byTarget = (t) => broken.find((b) => b.target === t) || {};
+      check('G-2 detail に行番号（欠落章=L6・裸の欠落アンカー=L7・トラバーサル=L8）',
+        /\bL6\b/.test(byTarget(`${U}nope.html`).detail)
+        && /\bL7\b/.test(byTarget(`${U}lua/modules/index.html#no-such`).detail)
+        && /\bL8\b/.test(byTarget(`${U}../../outside.html`).detail),
+        JSON.stringify(broken));
+      check('G-2 トラバーサルは実在してもトラバーサルとして報告',
+        /トラバーサル/.test(byTarget(`${U}../../outside.html`).detail), JSON.stringify(broken));
+      check('G-2 file はリポジトリ相対の README パス',
+        byTarget(`${U}nope.html`).file === 'crates/pasta_lua/README.md'
+        && byTarget(`${U}debug/index.html#無い見出し`).file === 'crates/pasta_core/README.md',
+        JSON.stringify(broken));
+      check('G-2 インラインコード内・フェンス内・他サイト・README 以外は対象外',
+        !broken.some((b) => /code-nope|fenced-nope|example\.com|book-nope|root-nope|nested-nope|other-nope/.test(b.target)),
+        JSON.stringify(broken));
+
+      const result = runLinkCheck(root);
+      check('G-2 runLinkCheck に結合され failed=true',
+        result.failed === true && result.broken.filter((b) => b.kind === 'readme-manual-url').length === 5,
+        JSON.stringify(result.broken));
+      const rep = reportLinkCheck(result);
+      check('G-2 レポートの [1] 区分に readme-manual-url 5 件が出る',
+        /\[1\][^\n]*: 5 件/.test(rep) && rep.includes('[readme-manual-url]'), rep);
+    } finally {
+      rmrf(outer);
+    }
+  }
+
+  // G-3: 実在章・実在アンカー（パーセントエンコード）だけなら合格。
+  {
+    const root = makeSandbox();
+    try {
+      writeFile(root, 'book/src/introduction.md', '# はじめに\n');
+      writeFile(root, 'book/src/lua/index.md', '# Lua\n\n## 起動の流れ\n');
+      writeFile(root, 'crates/pasta_shiori/README.md',
+        `# shiori\n\n${U}\n\n[起動](${U}lua/index.html#${encodeURIComponent('起動の流れ')})\n`);
+      const broken = checkReadmeManualLinks(root);
+      check('G-3 実在章・実在アンカーのみ: 違反 0', broken.length === 0, JSON.stringify(broken));
+      check('G-3 runLinkCheck も failed=false', runLinkCheck(root).failed === false);
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // G-4: 実リポジトリで readme-manual-url 0 件。
+  {
+    const broken = checkReadmeManualLinks(REPO_ROOT);
+    check('G-4 実リポジトリで readme-manual-url 0 件', broken.length === 0, JSON.stringify(broken));
+  }
+
+  // G-5: manual.yml は push・pull_request の両方で crates/*/README.md の変更でも起動する（7.8）。
+  {
+    const yml = fs.readFileSync(path.join(REPO_ROOT, '.github/workflows/manual.yml'), 'utf8');
+    const n = (yml.match(/^\s*-\s*'crates\/\*\/README\.md'\s*$/gm) || []).length;
+    check('G-5 manual.yml の paths（push・pull_request）に crates/*/README.md', n === 2, `count=${n}`);
   }
 }
 

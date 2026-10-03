@@ -2,7 +2,7 @@
 // タスク 3.3（要件 5.1, 5.2, 5.8, 5.9, 1.7 / design「GenSkillRefs」）: 対応表・出力名・口調判定・本文抽出。
 //
 // export:
-//   GENERATION_MAP  … 対応表（21 エントリ・順序固定）。入力の定義はこれだけ（設定ファイルなし）。
+//   GENERATION_MAP  … 対応表（23 エントリ・順序固定）。入力の定義はこれだけ（設定ファイルなし）。
 //   outName         … 章パス → references/ 内の出力名（index.md は直近の親ディレクトリ名付き）。
 //   VOICE_MARKERS   … 口調マーカー（verify-content.mjs から移設）。普通文体と衝突する 3 語だけ否定先読み。
 //   findVoice       … 一致したマーカーの語を返す（空なら口調なし）。
@@ -54,6 +54,8 @@ export const GENERATION_MAP = Object.freeze([
   ['lua/modules/mlua-stdlib.md', LC],
   ['lua/shiori-events.md', LC],
   ['reference/startup.md', LC],
+  ['lua/script-api.md', LC],
+  ['internals/internal-modules.md', LC],
 ].map(([chapter, skill]) => Object.freeze({ chapter, skill })));
 
 // grammar/markers.md → markers.md、grammar/index.md → grammar-index.md、lua/modules/index.md → modules-index.md
@@ -187,7 +189,7 @@ export function renderEntry(entry, repoRoot) {
   const { title, body } = extractBody(readChapter(entry.chapter, repoRoot), entry.chapter);
   return [
     GENERATED_MARK,
-    `<!-- このファイルは pasta 利用者マニュアル「${title}」（${MANUAL_BASE_URL}${toHtml(entry.chapter)}）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->`,
+    `<!-- このファイルは pasta マニュアル「${title}」（${MANUAL_BASE_URL}${toHtml(entry.chapter)}）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->`,
     '',
     `# ${title}`,
     '',

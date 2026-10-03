@@ -1,11 +1,11 @@
 //! Logging module for pasta_lua.
 //!
-//! Provides instance-specific logging with file rotation and
-//! a global registry for multi-instance log routing.
+//! Provides instance-specific logging to a fixed-name file (no rotation)
+//! and a global registry for multi-instance log routing.
 //!
 //! # Components
 //!
-//! - `PastaLogger` - Instance-specific file logger with rotation
+//! - `PastaLogger` - Instance-specific file logger (fixed file name, never rotated)
 //! - `GlobalLoggerRegistry` - Singleton registry for log routing
 //! - `LoadDirGuard` - RAII guard for setting log context
 

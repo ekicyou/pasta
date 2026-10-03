@@ -9,7 +9,7 @@ use mlua::{LuaSerdeExt, Table, Value};
 use std::path::Path;
 
 impl PastaLuaRuntime {
-    /// Save persistence data from ctx.save.
+    /// Save persistence data from the `pasta.save` table (`require("pasta.save")`).
     ///
     /// Called automatically on Drop to save any modified persistent data.
     fn save_persistence_data(&self) -> Result<(), persistence::PersistenceError> {

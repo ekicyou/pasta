@@ -2,7 +2,7 @@
 // 要件 5.1–5.9, 1.7, 7.1–7.4, 7.7）。
 //
 // 検証方針（design「Testing Strategy / Unit Tests」）:
-//   - outName と実物の GENERATION_MAP（21 エントリ・(skill, outName) 重複なし）。
+//   - outName と実物の GENERATION_MAP（23 エントリ・(skill, outName) 重複なし）。
 //   - findVoice: 口調マーカーの検出と、普通文体と衝突する 3 語（否定先読み）の非検出。
 //   - extractBody: 導入・締めの除去、本文内 `---` の保持、bad-structure、voice-in-body（行番号つき）、
 //     フェンス・表の行・インラインコード内の無視（4 連バッククォートのフェンスを含む）、LF/CRLF の同一性。
@@ -14,7 +14,7 @@
 //     CRLF 化だけは一致、orphan、部分書き出しなし、同一内容は書き換えない。
 //   - CLI（サンドボックスへツールを複製）: 書き出し直後の --check が exit 0、STALE/ORPHAN 報告と exit 1、
 //     GenError で exit 1。
-//   - 実リポジトリ: 21 章すべてが抽出・口調判定・リンク書き換えを通る（メモリ上のみ）。
+//   - 実リポジトリ: 23 章すべてが抽出・口調判定・リンク書き換えを通る（メモリ上のみ）。
 //   実リポジトリの book/src・スキルには書き込まない。
 
 import fs from 'node:fs';
@@ -91,13 +91,15 @@ const EXPECTED_MAP = [
   ['lua/modules/mlua-stdlib.md', 'pasta-lua-coding'],
   ['lua/shiori-events.md', 'pasta-lua-coding'],
   ['reference/startup.md', 'pasta-lua-coding'],
+  ['lua/script-api.md', 'pasta-lua-coding'],
+  ['internals/internal-modules.md', 'pasta-lua-coding'],
 ];
-check('A-5 GENERATION_MAP は 21 エントリ', GENERATION_MAP.length === 21, String(GENERATION_MAP.length));
+check('A-5 GENERATION_MAP は 23 エントリ', GENERATION_MAP.length === 23, String(GENERATION_MAP.length));
 check('A-6 GENERATION_MAP は design の確定表と順序・内容一致',
   JSON.stringify(GENERATION_MAP.map((e) => [e.chapter, e.skill])) === JSON.stringify(EXPECTED_MAP));
 const keys = GENERATION_MAP.map((e) => `${e.skill}/${outName(e.chapter)}`);
 check('A-7 (skill, outName) に重複なし', new Set(keys).size === keys.length, keys.join(', '));
-const HANDWRITTEN = ['authoring-patterns.md', 'internal-modules.md', 'coding-conventions.md', 'testing-lint.md'];
+const HANDWRITTEN = ['authoring-patterns.md', 'coding-conventions.md', 'testing-lint.md'];
 check('A-8 出力名が手書きファイル名と重ならない',
   GENERATION_MAP.every((e) => !HANDWRITTEN.includes(outName(e.chapter))));
 check('A-9 GENERATION_MAP は凍結（順序固定の定数）', Object.isFrozen(GENERATION_MAP) && GENERATION_MAP.every(Object.isFrozen));
@@ -252,7 +254,7 @@ log('\n[D] readChapter');
 }
 
 // ============================================================
-log('\n[E] 実リポジトリ: 21 章の抽出・口調判定');
+log('\n[E] 実リポジトリ: 23 章の抽出・口調判定');
 for (const entry of GENERATION_MAP) {
   const e = thrown(() => extractBody(readChapter(entry.chapter, REPO_ROOT), entry.chapter));
   check(`E ${entry.chapter}`, e === null, e && e.message);
@@ -320,10 +322,10 @@ const URL_BASE = 'https://ekicyou.github.io/pasta/';
 }
 
 // ============================================================
-// サンドボックス: 21 章すべてを合成した最小の book/src を持つ tmp リポジトリ。
+// サンドボックス: 23 章すべてを合成した最小の book/src を持つ tmp リポジトリ。
 const HEADER1 = '<!-- GENERATED FROM PASTA MANUAL - DO NOT EDIT -->';
 const header2 = (title, chapter) =>
-  `<!-- このファイルは pasta 利用者マニュアル「${title}」（${URL_BASE}${chapter.replace(/\.md$/, '.html')}）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->`;
+  `<!-- このファイルは pasta マニュアル「${title}」（${URL_BASE}${chapter.replace(/\.md$/, '.html')}）から自動生成されたものです。手で編集しないでください。修正はマニュアルの該当章で行い、pasta リポジトリで再生成してください。 -->`;
 const relOut = (e) => `.claude/skills/${e.skill}/references/${outName(e.chapter)}`;
 function synthChapter(entry, i) {
   const extra = entry.chapter === 'lua/modules/pasta-search.md'
@@ -399,13 +401,13 @@ log('\n[H] generateAll / writeAll / checkAll（サンドボックス）');
   const root = makeSandbox();
   try {
     const all = generateAll(root);
-    check('H-1 generateAll は 21 エントリ（リポジトリ相対パス → 内容）',
-      all instanceof Map && all.size === 21 && GENERATION_MAP.every((e) => all.has(relOut(e))), [...all.keys()].join(', '));
+    check('H-1 generateAll は 23 エントリ（リポジトリ相対パス → 内容）',
+      all instanceof Map && all.size === 23 && GENERATION_MAP.every((e) => all.has(relOut(e))), [...all.keys()].join(', '));
     check('H-2 全エントリが固定 1 行目で始まる', [...all.values()].every((c) => c.startsWith(HEADER1 + '\n')));
 
     const before = checkAll(root);
-    check('H-3 未生成なら全 21 件が stale・orphan なし・fixCommand',
-      before.stale.length === 21 && before.orphans.length === 0 && before.fixCommand === 'node book/tools/gen-skill-refs.mjs',
+    check('H-3 未生成なら全 23 件が stale・orphan なし・fixCommand',
+      before.stale.length === 23 && before.orphans.length === 0 && before.fixCommand === 'node book/tools/gen-skill-refs.mjs',
       JSON.stringify(before));
 
     // 部分書き出しなし: 最後のエントリだけ壊すと何も書かれない。
@@ -423,7 +425,7 @@ log('\n[H] generateAll / writeAll / checkAll（サンドボックス）');
     fs.mkdirSync(path.dirname(path.join(root, relOut(ga0))), { recursive: true });
     writeOut(root, relOut(ga0), '# 手書き\n');
     const w = writeAll(root);
-    check('H-6 書き出しは 21 件（未生成 20＋手書き同名 1 を上書き）', w.written.length === 21 && w.unchanged.length === 0, JSON.stringify(w));
+    check('H-6 書き出しは 23 件（未生成 22＋手書き同名 1 を上書き）', w.written.length === 23 && w.unchanged.length === 0, JSON.stringify(w));
     check('H-7 書き出した内容は generateAll と一致', GENERATION_MAP.every((x) => readOut(root, relOut(x)) === all.get(relOut(x))));
     const after = checkAll(root);
     check('H-8 書き出し直後の checkAll は stale・orphan とも空', after.stale.length === 0 && after.orphans.length === 0, JSON.stringify(after));
@@ -434,7 +436,7 @@ log('\n[H] generateAll / writeAll / checkAll（サンドボックス）');
     check('H-9 生成物を CRLF 化しただけなら一致', checkAll(root).stale.length === 0);
     const w2 = writeAll(root);
     check('H-10 LF 正規化後に同一なら書き換えない（CRLF のまま残る）',
-      w2.written.length === 0 && w2.unchanged.length === 21 && readOut(root, target).includes('\r\n'), JSON.stringify(w2));
+      w2.written.length === 0 && w2.unchanged.length === 23 && readOut(root, target).includes('\r\n'), JSON.stringify(w2));
 
     // 生成物だけ手編集 → stale。
     writeOut(root, target, readOut(root, target) + '手で追記。\n');
@@ -521,13 +523,13 @@ log('\n[I] CLI（サンドボックスへツールを複製して実行）');
 }
 
 // ============================================================
-log('\n[J] 実リポジトリ: 21 章のメモリ上全生成（書き出さない）');
+log('\n[J] 実リポジトリ: 23 章のメモリ上全生成（書き出さない）');
 {
   let all = null;
   const e = thrown(() => { all = generateAll(REPO_ROOT); });
   check('J-1 generateAll が生成エラーなし', e === null, e && e.message);
   if (all) {
-    check('J-2 21 エントリ', all.size === 21, String(all.size));
+    check('J-2 23 エントリ', all.size === 23, String(all.size));
     // 生成物内の相対リンクは同一スキルの生成ファイル（兄弟）か #anchor だけ。
     const siblings = (skill) => new Set(GENERATION_MAP.filter((x) => x.skill === skill).map((x) => outName(x.chapter)));
     for (const entry of GENERATION_MAP) {

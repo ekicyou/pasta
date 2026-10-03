@@ -45,7 +45,7 @@ struct LuaCallerInfo {
 /// source file, line number, and function name.
 ///
 /// # Verification Result
-/// Stack level 1 was verified in `log_stack_level_test.rs`:
+/// Stack level 1 was verified in `tests/log/stack_level_test.rs`:
 /// - level=0: Rust function ([C]) — not useful
 /// - level=1: Direct Lua caller — correct level
 ///

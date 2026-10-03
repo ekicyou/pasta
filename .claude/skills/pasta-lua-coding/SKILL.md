@@ -17,7 +17,7 @@ description: >-
   汎用Luaプログラミング, SHIORIプロトコル実装.
 metadata:
   author: ekicyou
-  version: "1.10.0"
+  version: "1.11.0"
 ---
 
 # Pasta Lua Coding Skill
@@ -76,7 +76,8 @@ metadata:
 | [mlua-stdlib.md](references/mlua-stdlib.md) | 生成（マニュアルから） | [mlua-stdlib 統合モジュール](https://ekicyou.github.io/pasta/lua/modules/mlua-stdlib.html) | `@json`・`@yaml`・`@regex`・`@assertions`・`@testing`・`@env` と Lua 標準ライブラリの構成 |
 | [shiori-events.md](references/shiori-events.md) | 生成（マニュアルから） | [SHIORI イベントとハンドラ](https://ekicyou.github.io/pasta/lua/shiori-events.html) | `REG`・`RES`・主要イベント・シーン関数フォールバック・仮想ディスパッチャ |
 | [startup.md](references/startup.md) | 生成（マニュアルから） | [起動シーケンスとモジュール解決](https://ekicyou.github.io/pasta/reference/startup.html) | モジュール検索パス・起動シーケンス・既知の制限・起動しないときの調べ方 |
-| [internal-modules.md](references/internal-modules.md) | 手書き（暫定）— 将来 `pasta-runtime-internals-doc` でマニュアル権威＋生成へ移行予定 | — | `pasta.*` 名前空間の内部モジュール（STORE, ACT, SCENE, WORD 等） |
+| [script-api.md](references/script-api.md) | 生成（マニュアルから） | [スクリプト用ランタイム API](https://ekicyou.github.io/pasta/lua/script-api.html) | ACT・WORD・GLOBAL・SAVE のスクリプト向け API |
+| [internal-modules.md](references/internal-modules.md) | 生成（マニュアルから） | [Lua ランタイム内部モジュール](https://ekicyou.github.io/pasta/internals/internal-modules.html) | `pasta.*` の内部モジュール（STORE・SCENE・PROXY・`finalize_scene` 等） |
 | [coding-conventions.md](references/coding-conventions.md) | 手書き（スキルが権威） | — | 命名規約、モジュール構造、クラス設計、型注釈、エラーハンドリング |
 | [testing-lint.md](references/testing-lint.md) | 手書き（スキルが権威） | — | lua_test、テストファイル規約、決定論的テストの手順、luacheck |
 
@@ -165,9 +166,7 @@ Rust組み込みモジュールの完全APIリファレンス。モジュール�
 
 pasta.*名前空間の内部Luaモジュール。`STORE`（一元データ管理）、`ACT`（シーン実行コンテキスト、`init_scene`/`talk`/`yield`等）、`SCENE`（シーン登録・検索・コルーチン実行）、`WORD`（ビルダーパターン単語定義）、`GLOBAL`（ユーザー定義関数）、`SAVE`（永続化データ）、`finalize_scene`（検索インデックス構築）。
 
-`internal-modules.md` は手書き（暫定）であり、将来 `pasta-runtime-internals-doc` でマニュアル権威＋生成へ移行する予定。公開モジュール・SHIORI イベントと食い違う場合は生成ファイルが正。
-
-> 📖 詳細: [references/internal-modules.md](references/internal-modules.md)
+> 📖 詳細: [references/internal-modules.md](references/internal-modules.md)（内部）／[script-api.md](references/script-api.md)（スクリプト向け API）
 
 ---
 

@@ -1,8 +1,9 @@
 //! Pasta Lua - Lua integration for Pasta DSL
 //!
 //! This crate provides a Lua transpiler for Pasta DSL, converting Pasta AST
-//! to Lua source code. It follows the same architecture as pasta_rune but
-//! targets Lua 5.3+ instead of Rune VM.
+//! to Lua source code, together with the loader and the Lua runtime that
+//! executes it. The runtime targets LuaJIT 2.1 (built with Lua 5.2
+//! compatibility through mlua's `luajit52` feature).
 //!
 //! # Architecture
 //!
@@ -21,7 +22,7 @@
 //! let transpiler = LuaTranspiler::default();
 //! let mut output = Vec::new();
 //!
-//! let context = transpiler.transpile(&actors, &scenes, &mut output)?;
+//! let context = transpiler.transpile(&pasta_file, &mut output)?;
 //! let lua_code = String::from_utf8(output)?;
 //!
 //! // Create runtime with the context

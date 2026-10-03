@@ -18,7 +18,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// ```lua
     /// do
     ///     local ACTOR = PASTA.create_actor("アクター名")
-    ///     ACTOR.通常 = { [=[\s[0]]=], [=[\s[100]]=] }
+    ///     ACTOR:create_word("通常"):entry([=[\s[0]]=], [=[\s[100]]=])
     ///     
     ///     function ACTOR.時刻(act)
     ///         -- Lua関数定義
@@ -45,7 +45,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
 
         // Generate word definitions (Requirement 2, actor-word-dictionary Task 3.1)
-        // ACTOR:create_word() registers both in word.lua (L2 prefix search) and as actor attribute (L1 exact match)
+        // ACTOR:create_word() registers only in the actor word dictionary (STORE.actor_words, searched by
+        // the A2 prefix match); it does not set a field on the actor object
         for word_def in &actor.words {
             if word_def.words.is_empty() {
                 continue;
@@ -89,15 +90,15 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Generates:
     /// ```lua
     /// do
-    ///     local SCENE = PASTA.create_scene("モジュール名_N")
-    ///     
-    ///     function SCENE.__start__(ctx, ...)
+    ///     local SCENE = PASTA.create_scene("シーン名")
+    ///
+    ///     function SCENE.__start__(act, ...)
     ///         local args = { ... }
-    ///         local act, save, var = PASTA.create_session(SCENE, ctx)
+    ///         local save, var = act:init_scene(SCENE)
     ///         -- ...
     ///     end
-    ///     
-    ///     function SCENE.__シーン名_1__(ctx, ...)
+    ///
+    ///     function SCENE.ローカルシーン名_1(act, ...)
     ///         -- ...
     ///     end
     /// end
@@ -212,9 +213,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     /// Generates:
     /// ```lua
-    /// function SCENE.__シーン名_N__(ctx, ...)
+    /// function SCENE.シーン名_N(act, ...)
     ///     local args = { ... }
-    ///     local act, save, var = PASTA.create_session(SCENE, ctx)
+    ///     local save, var = act:init_scene(SCENE)
     ///     -- items...
     /// end
     /// ```

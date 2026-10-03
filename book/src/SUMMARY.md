@@ -34,6 +34,7 @@
     - [@pasta_log](lua/modules/pasta-log.md)
     - [mlua-stdlib 統合モジュール](lua/modules/mlua-stdlib.md)
   - [SHIORI イベントとハンドラ](lua/shiori-events.md)
+  - [スクリプト用ランタイム API](lua/script-api.md)
   - [scripts/ の記述パターン](lua/patterns.md)
   - [DSL と Lua の使い分け](lua/dsl-vs-lua.md)
 
@@ -51,3 +52,16 @@
 - [起動シーケンスとモジュール解決](reference/startup.md)
 - [pasta.toml リファレンス](reference/pasta-toml.md)
 - [外部リンク集](reference/external-links.md)
+
+# 内部設計（コントリビュータ向け）
+
+- [内部設計の概要](internals/index.md)
+  - [トランスパイルパイプライン](internals/transpiler.md)
+  - [シーン・単語レジストリとシーン検索](internals/registry-search.md)
+  - [ランタイム実行モデル](internals/execution-model.md)
+  - [Lua ランタイム内部モジュール](internals/internal-modules.md)
+  - [ローダ自己展開とモジュール解決](internals/loader.md)
+  - [SHIORI 層](internals/shiori.md)
+  - [トーク出力とアピアランス](internals/talk-output.md)
+  - [デバッグ基盤とシーンキック](internals/debug.md)
+  - [ロギングとエンコーディング](internals/logging-encoding.md)

@@ -6,7 +6,9 @@
 ---
 --- 本モジュールはフラグを立てるだけで、シーン解決・resume・レンダリングは
 --- 一切行わない（GET をブロックしない・R3.1）。実行・継続・配信は次 tick の
---- 既存 OnSecondChange dispatch 機構が担う（kick の消費は別タスク）。
+--- 既存 OnSecondChange dispatch 機構が担う（`STORE.kick_force` は
+--- virtual_dispatcher の dispatch 入口が、`STORE.kick_pending` は本モジュールの
+--- `KICK.try_dispatch` が消費する）。
 ---
 --- 即時単一モード（モードフラグを持たない・R5.4）。連続キックは
 --- `STORE.kick_pending` を上書きし、最後のキックが次 tick で起動する。

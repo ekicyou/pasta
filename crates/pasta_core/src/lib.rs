@@ -5,7 +5,8 @@
 //!
 //! # Modules
 //!
-//! - `registry`: Scene and word registration (Pass 1 + Runtime tables)
+//! - `registry`: Scene and word registries (filled at transpile time and rebuilt at
+//!   runtime finalize) and the runtime lookup tables
 //! - `error`: Registry-related error types (SceneTableError, WordTableError)
 //!
 //! # Example

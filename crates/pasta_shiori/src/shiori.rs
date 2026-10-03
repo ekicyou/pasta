@@ -16,11 +16,12 @@ pub trait Shiori {
 /// - Runtime initialization via PastaLoader
 /// - SHIORI protocol handling
 ///
-/// Note: Logging is handled internally by PastaLuaRuntime (encapsulation).
-/// PastaShiori only manages the GlobalLoggerRegistry for log routing.
+/// Note: Before loading, PastaShiori registers a default logger and initializes
+/// tracing (Stage 1); PastaLoader then replaces it with the configured logger
+/// (Stage 1.5). PastaShiori unregisters the logger on reload and drop.
 #[derive(Default)]
 pub struct PastaShiori {
-    /// DLL module handle (for future Windows API integration)
+    /// Value passed to `SHIORI.load` as `hinst` (the FFI path always passes 0)
     hinst: isize,
 
     /// Base directory for ghost scripts (master/ directory)

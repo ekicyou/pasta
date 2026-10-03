@@ -29,7 +29,7 @@ pub struct SceneInfo {
     pub scope: SceneScope,
     /// Attributes for filtering.
     pub attributes: HashMap<String, String>,
-    /// Generated function name in Rune code.
+    /// Scene function name in `global::local` form (from `SceneEntry::fn_name`).
     pub fn_name: String,
     /// Parent scene name (for local scenes).
     pub parent: Option<String>,

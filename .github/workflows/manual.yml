@@ -1,13 +1,14 @@
 # .github/workflows/manual.yml
 # 利用者マニュアル（mdBook）を GitHub Pages へ公開する。
 # build.yml（Rust/WASM CI）とは独立。book/**・本ワークフロー・スキル 2 種
-# （pasta-ghost-authoring / pasta-lua-coding）の変更時のみ起動する。
+# （pasta-ghost-authoring / pasta-lua-coding）・クレート README（crates/*/README.md。
+# マニュアル URL の実在検査のため。pasta-runtime-internals-doc 要件 7.8）の変更時のみ起動する。
 # PR では検証（ビルド・検証スクリプト群）までを行い、Pages への公開は main push 時のみ。
 #
 # パイプライン（manual-ssot-authority design「CI と公開」/ 要件 7.1, 7.2, 7.5, 7.6, 8.2, 10.4）:
 #   node book/tools/gen-skill-refs.mjs --check（スキル生成物の鮮度照合。不一致で中断）
 #     -> mdbook build book -> 着色 -> 日本語 bigram 索引を再生成
-#     -> node book/tools/link-check.mjs（マニュアル内リンク・スキル自己完結の検証。失敗で中断）
+#     -> node book/tools/link-check.mjs（マニュアル内リンク・README のマニュアル URL・スキル自己完結の検証。失敗で中断）
 #     -> チュートリアル・静的性・検索・コンテンツ検証・ツール自己テスト
 #     -> Pages artifact（./book/book）をアップロード -> deploy-pages で公開。
 # すべて build ジョブ内で検証するため、失敗時は deploy（needs: build）が走らず公開されない。
@@ -21,6 +22,7 @@ on:
       - '.github/workflows/manual.yml'
       - '.claude/skills/pasta-ghost-authoring/**'
       - '.claude/skills/pasta-lua-coding/**'
+      - 'crates/*/README.md'
   pull_request:
     branches: [main]
     paths:
@@ -28,6 +30,7 @@ on:
       - '.github/workflows/manual.yml'
       - '.claude/skills/pasta-ghost-authoring/**'
       - '.claude/skills/pasta-lua-coding/**'
+      - 'crates/*/README.md'
   workflow_dispatch:  # 手動実行
 
 # Pages の同時デプロイを直列化（実行中のデプロイはキャンセルしない）。

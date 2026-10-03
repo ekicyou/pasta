@@ -110,9 +110,53 @@ discovery（2026-10-01）で両仕様を起票。依存順は manual-ssot-author
   - 由来: pasta-manual-debugging の discovery（2026-06-08）でユーザーが「mdbook に書いてる項目は mdbook を権威にしたい／別仕様で権威化の整理をすべき」と指摘。本仕様外・別仕様として申し送り
   - brief.md 作成済み（`.kiro/specs/completed/manual-ssot-authority/brief.md`）
   - 完了（2026-10-02）。吸収台帳は `.kiro/specs/completed/manual-ssot-authority/absorption-ledger.md`
-- [ ] pasta-runtime-internals-doc -- pasta ランタイムの内部設計・アーキテクチャ解説（トランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期・アクター基盤 / デバッグ・ソースマップ / シーンキック）。読者＝コントリビュータ・実装理解者。同一 mdBook の末尾に「内部設計」パートとして置く。`OPTIMIZATION.md` を吸収・廃止、スキル `internal-modules` を mdBook 権威＋生成へ移行、クレート README の内部解説を移設。鮮度維持は kiro-complete DoD の追従確認＋review-improvement-loop 次元⑦の照合。Dependencies: manual-ssot-authority
+- [x] pasta-runtime-internals-doc -- pasta ランタイムの内部設計・アーキテクチャ解説（トランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期・アクター基盤 / デバッグ・ソースマップ / シーンキック）。読者＝コントリビュータ・実装理解者。同一 mdBook の末尾に「内部設計」パートとして置く。`OPTIMIZATION.md` を吸収・廃止、スキル `internal-modules` を mdBook 権威＋生成へ移行、クレート README の内部解説を移設。鮮度維持は kiro-complete DoD の追従確認＋review-improvement-loop 次元⑦の照合。Dependencies: manual-ssot-authority
   - 由来: pasta-user-manual の設計ディスカッションで「ランタイム内部設計は本仕様外・将来仕様」と決定（R5 は API 使用法に限定）
-  - brief.md 作成済み（`.kiro/specs/pasta-runtime-internals-doc/brief.md`）
+  - 完了（2026-10-03）。成果: マニュアル「内部設計（コントリビュータ向け）」パート・Gate 7・吸収台帳（`.kiro/specs/completed/pasta-runtime-internals-doc/absorption-ledger.md`）
+
+#### トランスパイラ最適化の将来候補（旧最適化メモ廃止時の申し送り）
+
+いずれも未実装。現行の生成時最適化はマニュアルの [内部設計: トランスパイルパイプライン](https://ekicyou.github.io/pasta/internals/transpiler.html#生成時最適化) が書く。
+
+- 定数畳み込み — トランスパイル時に定数式を評価する（旧優先度 Medium） — （brief なし）
+- デッドコード削除 — 到達不能コードを生成しない（旧優先度 Low） — （brief なし）
+- インライン展開 — 小さなローカルシーンを呼び出し元に展開する（旧優先度 Low） — （brief なし）
+- 単語プリフェッチ — 単語辞書を先読みする（旧優先度 Medium） — （brief なし）
+
+#### 内部設計執筆で判明したバグ候補（pasta-runtime-internals-doc からの申し送り）
+
+内部設計パートの執筆で現行実装と照合した際に見つかった不備。章には現行挙動だけを書いている。根拠（ソースの所在・確認方法）は本 spec の吸収台帳（`.kiro/specs/completed/pasta-runtime-internals-doc/absorption-ledger.md`）の付録 B にある。
+
+- シーン・アクター名のサニタイズと検索キーの不一致 — 登録キーはサニタイズ済みの名前、検索は元の名前のため、置換される文字を含むシーン名・アクター名の Call・アクター単語参照が一致しない（U30 をアクター名・ローカルシーンへ広げたもの） — 吸収台帳付録 B を参照
+- グローバルシーン検索がローカルのキーを除外しない — `search_scene(名前, nil)` が `:` で始まるローカルのキーも候補にし、`:` で始まる動的な値で任意の親グローバルシーンの `__start__` が選ばれうる — 吸収台帳付録 B を参照
+- コールバック再開後の継続の消失 — `CALLBACK.try_route` が再開後に `set_co_scene` を呼ばず、`get_property` の後のチェイントークの続きと出力の無い最初の中断が失われる — 吸収台帳付録 B を参照
+- CT（`ct.lua`）が LuaJIT で機能しない（既知負債） — `IMPL` に `__index` が無く、`__close` も LuaJIT では呼ばれない。修正か撤去かの判断を要する — 吸収台帳付録 B を参照
+- コールバックのタイムアウト応答の二重包み — `CALLBACK.sweep` が返す `RES.err(…)` の全文を `EVENT.fire` が `RES.ok` で包み、`Value` に 500 応答を持つ 200 になる（U23 と同じ機構の内部経路） — 吸収台帳付録 B を参照
+- タイムアウト掃引で再開結果が捨てられ予約が残る — `CALLBACK.sweep` が `coroutine.resume` の結果を捨て、`_staged` が残って次のイベントでエラーか誤登録になる — 吸収台帳付録 B を参照
+- モジュール名に `.` を含むファイル名 — `dic/v1.2.pasta` などのキャッシュを searcher が見つけられず、`pasta.scene_dic` の `require` が失敗して起動が止まる — 吸収台帳付録 B を参照
+- 設置パスの glob メタ文字 — 基準ディレクトリをエスケープせずに `glob` へ渡すため、`[`・`]` を含む設置パスでファイルが見つからないか起動が止まる — 吸収台帳付録 B を参照
+- `.pasta` と `.lua` の同名衝突の判定 — 衝突判定の `module_key` が実際のモジュール名と異なる規則で `dic` を除き、誤除外かキャッシュの上書きが起きる — 吸収台帳付録 B を参照
+- ランダムトークの間隔が起動ごとに同じ — ランタイムが `math.randomseed` を呼ばず、OnTalk の間隔が起動のたびに同じ並びになる — 吸収台帳付録 B を参照
+- `unload` を経ないプロセス終了での 5 秒停滞 — `DllMain` の detach が完了通知の来ない teardown を `TEARDOWN_TIMEOUT` まで待ち、`SHIORI.unload` と保存も行われない — 吸収台帳付録 B を参照
+- ACT のグループ化がトークンを捨てる・並べ替える — `group_by_actor` が最初の発言より前の表示制御を捨て、スポット変更でグループを閉じない — 吸収台帳付録 B を参照
+- 位置からのキックの前方一致 — `KICK.try_dispatch` が前方一致の検索で引くため、名前が接頭辞になる別シーン（`会話1` に対する `会話10` など）が再生されうる — 吸収台帳付録 B を参照
+- 末尾が数字のシーン名のシーン identity 索引漏れ — `split_runtime_global` が名前末尾の数字まで連番とみなし、その範囲のキックが別のシーンを選ぶ（U21 のデバッグ基盤側の現れ） — 吸収台帳付録 B を参照
+- Windows で同じデバッグポートへの二重 bind が成功する — `SO_REUSEADDR` のため 2 つ目のゴーストも bind に成功し、接続先が定まらない — 吸収台帳付録 B を参照
+- C のフレームを挟むと下位フレームの変数がずれる — `variables` が C のフレームを数える `lua_getstack` のレベルをそのまま使い、別のフレームの変数を表示する — 吸収台帳付録 B を参照
+- FFI 入口スレッドのログの破棄 — `request`・`unload`・`DllMain` の detach で `LoadDirGuard` が張られず、本番でそれらのログがファイルに残らない — 吸収台帳付録 B を参照
+- ログフィルタの再読み込み不整合 — `[logging]` の無い再読み込みで前のフィルタが残り、`file_path` が不正だと `level`・`filter` も効かず既定ファイルに書き続ける（利用者章 `reference/pasta-toml.md` と食い違う） — 吸収台帳付録 B を参照
+- ANSI コードページが UTF-8（65001）の Windows での `@enc.to_ansi`（要実機確認） — `WideCharToMultiByte` に 65001 で許されないフラグと引数を渡し、変換が失敗すると読める — 吸収台帳付録 B を参照
+- `encoding` の未使用の公開関数 — `to_ansi_bytes`・`path_from_lua` に呼び出し元が無く、`path_from_lua` は非 ASCII を正しく変換できない（不要コード候補） — 吸収台帳付録 B を参照
+- Call から戻った後のシーン文脈 — `ACT_IMPL.call` が `current_scene`・`STORE.last_global_scene` を復元せず、呼び出し元の単語・Call と以後の選択肢が呼び出し先で解決される（U28 の原因。選択肢の探索範囲にも及ぶ） — 吸収台帳付録 B を参照
+- アクター付きの名前の解決で ACT を前提とする関数にプロキシが渡る — アクション行の `＠yield`・`＠ゴースト終了`・値が `yield` の `＠＄x` などが、プロキシを ACT として扱う関数に渡ってエラーになる — 吸収台帳付録 B を参照
+
+#### 内部設計執筆からのその他の申し送り（利用者章の改訂候補）
+
+既存の利用者向け章は本 spec の範囲外として改訂していない。根拠は同じく吸収台帳の付録 B にある。
+
+- 作例章とスクリプト用 API 章の重なりの整理 — `lua/patterns.md` の早見表・呼び出し形を API の権威 `lua/script-api.md` へのリンクに寄せ、あわせて作例の誤り（`WORD.create_local("メイン_1", …)` のシーン名、末尾の不要な `act:yield()`、「`＠関数名()` はローカル呼び出し」の説明、`act:yield()` 直後の表示制御が出力されない例）を直す。シーン関数末尾の不要な `act:yield()` は `lua/dsl-vs-lua.md`・pasta-lua-coding スキルの SKILL.md（DSL→Luaブリッジ基本形）・`.kiro/steering/tech.md` の作例にもある — 吸収台帳付録 B を参照
+- `reference/pasta-toml.md` の `[loader] debug_mode` の説明 — 孤立キャッシュの warn は `debug_mode` に関わらず出る（`true` のときはローダが各パスを重ねて出す）が、章は `true` のときだけ出るように書いている — 吸収台帳付録 B を参照
+- デバッグ接続の 1 起動 1 回の制限 — 切断後は SHIORI を読み込み直すまで attach できないことを `debug/troubleshooting.md` に追記する — 吸収台帳付録 B を参照
 
 ### Phase 4 派生（デバッグ利用者ガイド）
 - [x] pasta-manual-debugging -- VSCode Lua デバッグ（`.pasta` ソースレベルまで完全網羅）の利用者向けデバッグ章を mdBook マニュアルに追加。有効化／`launch.json`／attach／BP・ステップ・変数 inspect・提示モード切替／構造的制約と緩和策。ルート `DEBUGGING.md` をマニュアルへ統合・最新化しリダイレクト化（mdBook を権威）。Dependencies: pasta-vscode-lua-debug, pasta-source-map, pasta-user-manual

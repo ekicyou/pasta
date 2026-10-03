@@ -108,7 +108,7 @@ argument-hint: <feature-name>
 `.kiro/steering/workflow.md` の「完了基準（DoD）」セクションを読み込み、**workflow.md が定義する全ゲートを順に検証**する。判定ルールの本体は workflow.md（権威）にあり、このスキルは発火・オーケストレーションのみを行いルールを複製しない。
 
 1. **workflow.md を読み込む**（未読の場合）
-2. **workflow.md の DoD に列挙された全ゲート**（現状: Spec / Test / Doc / Steering / Soul、および条件付きの **Manual Sync Gate**）を順に検証する。ゲートの構成は workflow.md を正とし、ここで個数や内訳を固定しない。
+2. **workflow.md の DoD に列挙された全ゲート**（現状: Spec / Test / Doc / Steering / Soul、および条件付きの **Manual Sync Gate**・**Internals Sync Gate**）を順に検証する。ゲートの構成は workflow.md を正とし、ここで個数や内訳を固定しない。
 3. **Test Gate**:
    - まず `session_store_sql` でセッション記録を確認し、直近のターンで `cargo test` が実行され全テスト成功していたか判定する
      ```sql
@@ -130,9 +130,22 @@ argument-hint: <feature-name>
      node book/tools/gen-skill-refs.mjs --check
      node book/tools/link-check.mjs
      ```
-   - **中断**: いずれかが**非ゼロ終了**（スキル生成ファイルの不一致 / リンク切れ）した場合は、**ワークフローを中断し開発者に報告**する（下記5の「いずれかのゲート失敗時は中断」と整合）。解消フロー（マニュアル章を正として修正 → 再生成 → コミット → ゲート再実行）は workflow.md を参照。
-   - **スキップ**: 当該 spec の変更が上記のいずれにも触れない場合は、このゲートを**スキップ**する（Gate 1〜5 のみで完了可）。スキップ時は完了チェックリストに「(無関係変更によりスキップ)」と注記する。
-5. **いずれかのゲートが失敗した場合**: ワークフローを中断し、開発者に報告
+   - **中断**: いずれかが**非ゼロ終了**（スキル生成ファイルの不一致 / リンク切れ）した場合は、**ワークフローを中断し開発者に報告**する（下記6の「いずれかのゲート失敗時は中断」と整合）。解消フロー（マニュアル章を正として修正 → 再生成 → コミット → ゲート再実行）は workflow.md を参照。
+   - **スキップ**: 当該 spec の変更が上記のいずれにも触れない場合は、このゲートを**スキップ**する（本ゲートは不要）。スキップ時は完了チェックリストに「(無関係変更によりスキップ)」と注記する。
+5. **Internals Sync Gate（条件付き）**: 判定ルールの本体（照合規則・章ごとの判定・中断・スキップ）は workflow.md「完了基準（DoD）> 7. Internals Sync Gate（条件付き）」にある（権威）。ここではその発火だけを行う。
+   - **変更ファイル一覧の取得**: ステップ2のコミットより前に、ステップ0で解決した `{default-branch}` を使って取得する（2 コマンドの出力の和）。
+     ```powershell
+     git diff --name-only --no-renames $(git merge-base HEAD {default-branch})
+     git ls-files --others --exclude-standard
+     ```
+   - **照合**: 一覧を `book/src/internals/index.md` の「章と対象ソース範囲」表と、workflow.md の照合規則に従って照合する。一致した章ごとに判定結果（更新済み、または更新不要の理由）を完了チェックリストに記録する。
+   - **リンク検証**: 一致が 1 件でもあれば、章の更新の有無にかかわらず実行する。
+     ```powershell
+     node book/tools/link-check.mjs
+     ```
+   - **中断**: workflow.md の中断条件（判定を満たさない章がある / link-check が非ゼロ終了）に該当した場合は、**ワークフローを中断し開発者に報告**する（下記6と整合）。
+   - **スキップ**: 一致が 1 件も無い場合は、このゲートを**スキップ**し、完了チェックリストに「(対象領域外によりスキップ)」と注記する。
+6. **いずれかのゲートが失敗した場合**: ワークフローを中断し、開発者に報告
 
 ### ステップ2: 未コミットファイルのコミット
 
@@ -289,6 +302,7 @@ PR の**作成またはマージ（API）が失敗**した場合（コンフリ�
 - [ ] DoD 全ゲート通過（workflow.md 準拠: Spec/Test/Doc/Steering/Soul）
 - [ ] cargo test --all 成功（またはセッション記録により省略）
 - [ ] Manual Sync Gate: 条件付き発火（book/・.claude/skills/pasta-ghost-authoring/・.claude/skills/pasta-lua-coding/ に触れる spec のみ `node book/tools/gen-skill-refs.mjs --check` と `node book/tools/link-check.mjs` を実行・非ゼロで中断／無関係変更はスキップ）
+- [ ] Internals Sync Gate: 条件付き発火（変更ファイルが book/src/internals/index.md「章と対象ソース範囲」に一致する spec のみ、一致章ごとに「更新済み／更新不要の理由」を記録し `node book/tools/link-check.mjs` を実行・未記録の章または非ゼロで中断／一致なしは「(対象領域外によりスキップ)」と記録。判定ルールは workflow.md Gate 7）
 - [ ] 未コミットファイルをコミット済み（ステップ2）
 - [ ] completedフォルダへ移動済み（ステップ3）※繰り返し仕様はスキップ
 - [ ] spec.json の phase を "completed" に更新済み（ステップ4）※繰り返し仕様はスキップ

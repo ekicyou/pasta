@@ -33,8 +33,8 @@ pub(crate) mod dap;
 pub(crate) mod hook;
 pub(crate) mod inspect;
 pub mod kick;
-// 位置→シーン解決器（task 3.1）。DAP decode から呼ぶ口は task 4.1 で結線するため、
-// それまで `resolve_and_kick`/`ResolveOutcome` は未消費（crate 内可視・dead_code 許可）。
+// 位置→シーン解決器（task 3.1）。`wiring::inbound` の `pasta/playSceneAt` 処理が
+// `resolve_and_kick`/`ResolveOutcome` を呼ぶ（crate 内可視）。
 pub(crate) mod playscene;
 pub(crate) mod session;
 pub(crate) mod transport;

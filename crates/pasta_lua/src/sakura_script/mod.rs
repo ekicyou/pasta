@@ -1,19 +1,22 @@
-//! Sakura Script Module - Wait insertion for talk text.
+//! Sakura Script Module - Wait insertion and budoux line breaking for talk text.
 //!
 //! This module provides the `@pasta_sakura_script` Lua module for inserting
-//! sakura script wait tags (`\_w[ms]`) into conversation text.
+//! sakura script wait tags (`\_w[ms]`) into conversation text and, when the
+//! actor table has a `budoux` width array, line break tags (`\n`) at budoux
+//! word boundaries.
 //!
 //! # Usage from Lua
 //!
 //! ```lua
 //! local SAKURA = require "@pasta_sakura_script"
 //!
-//! -- Basic usage
+//! -- Actor table with script_wait_normal = 100 (effective wait = value - 50)
 //! local script = SAKURA.talk_to_script(CONFIG.actor.sakura, "こんにちは。")
 //! -- → "こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]。\_w[950]"
 //!
-//! -- With nil actor (uses pasta.toml defaults)
+//! -- With nil actor (uses [talk] values or built-in defaults, no line breaking)
 //! local script = SAKURA.talk_to_script(nil, "こんにちは。")
+//! -- → "こんにちは。\_w[950]" (default script_wait_normal = 50 inserts no per-char wait)
 //! ```
 
 pub mod line_breaker;

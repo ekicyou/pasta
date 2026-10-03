@@ -87,13 +87,12 @@ impl WordTable {
         }
     }
 
-    /// Collect all word candidates using fallback strategy (local → global).
+    /// Collect word candidates for one scope (no local → global fallback).
     ///
-    /// # Algorithm (Fallback Strategy)
-    /// 1. Local search: `:module_name:key` prefix match
-    ///    - 結果あり → ローカル候補のみ返す（終了）
-    /// 2. Global search: `key` prefix match (exclude keys starting with ':')
-    ///    - ローカル検索結果が0件の場合のみ実行
+    /// # Algorithm
+    /// - `module_name` empty: `key` prefix match (exclude keys starting with ':')
+    /// - `module_name` non-empty: `:module_name:key` prefix match (local only)
+    /// - Values of all matched entries are concatenated in key order
     ///
     /// # Arguments
     /// * `module_name` - Current module name (empty for global scope)
@@ -171,10 +170,10 @@ impl WordTable {
         Ok(local_words)
     }
 
-    /// Search for a word using 2-stage prefix matching with caching.
+    /// Search for a word using prefix matching with caching.
     ///
     /// # Algorithm
-    /// 1. Collect word candidates (local + global merge)
+    /// 1. Collect word candidates for the given scope (collect_word_candidates)
     /// 2. Check/build cache for shuffled selection
     /// 3. Return next word from cache
     ///
