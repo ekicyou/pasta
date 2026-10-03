@@ -154,7 +154,7 @@ discovery（2026-10-01）で両仕様を起票。依存順は manual-ssot-author
 
 既存の利用者向け章は本 spec の範囲外として改訂していない。根拠は同じく吸収台帳の付録 B にある。
 
-- 作例章とスクリプト用 API 章の重なりの整理 — `lua/patterns.md` の早見表・呼び出し形を API の権威 `lua/script-api.md` へのリンクに寄せ、あわせて作例の誤り（`WORD.create_local("メイン_1", …)` のシーン名、末尾の不要な `act:yield()`、「`＠関数名()` はローカル呼び出し」の説明、`act:yield()` 直後の表示制御が出力されない例）を直す — 吸収台帳付録 B を参照
+- 作例章とスクリプト用 API 章の重なりの整理 — `lua/patterns.md` の早見表・呼び出し形を API の権威 `lua/script-api.md` へのリンクに寄せ、あわせて作例の誤り（`WORD.create_local("メイン_1", …)` のシーン名、末尾の不要な `act:yield()`、「`＠関数名()` はローカル呼び出し」の説明、`act:yield()` 直後の表示制御が出力されない例）を直す。シーン関数末尾の不要な `act:yield()` は `lua/dsl-vs-lua.md`・pasta-lua-coding スキルの SKILL.md（DSL→Luaブリッジ基本形）・`.kiro/steering/tech.md` の作例にもある — 吸収台帳付録 B を参照
 - `reference/pasta-toml.md` の `[loader] debug_mode` の説明 — 孤立キャッシュの warn は `debug_mode` に関わらず出る（`true` のときはローダが各パスを重ねて出す）が、章は `true` のときだけ出るように書いている — 吸収台帳付録 B を参照
 - デバッグ接続の 1 起動 1 回の制限 — 切断後は SHIORI を読み込み直すまで attach できないことを `debug/troubleshooting.md` に追記する — 吸収台帳付録 B を参照
 
