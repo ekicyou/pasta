@@ -15,7 +15,7 @@
 //   C. チュートリアル（R6.1, R6.2） — 前提環境/手順/UTF-8 注意・tutorial-check 逐語一致
 //   D. ボイス（R7.1, R7.2, R7.4 / ssot 1.7） — 導入/締めのキャラ口調（判定は findVoice）・コードフェンス内に口調なし
 //   E. 外部参照（R8.2, R8.3）   — milkpot(lua51/lua52)＋luajit.org 絶対 URL・lua55 不採用明記
-//   F. バージョン（R9.1, R9.3, R9.4） — introduction に対象系列・LuaJIT 2.1・将来変更注記
+//   F. バージョン（R9.1, R9.3, R9.4） — introduction の対象バージョンが Cargo.toml と一致・LuaJIT 2.1・将来変更注記
 //   I. 内部設計パート（pasta-runtime-internals-doc 1.2, 1.8, 2.7, 2.10, 2.11） — 10 章の存在・本文・
 //      章構造（extractBody）、題材章 8 章の必須 H2 7 種（この順）、機構語の網羅、概要章の対象外ツールと読者
 //
@@ -324,18 +324,21 @@ const LUA_MODULES = [
 }
 
 // ============================================================
-// F. バージョン（R9.1 対象系列 / R9.3 LuaJIT 2.1 / R9.4 将来変更注記）
+// F. バージョン（R9.1 対象バージョン＝Cargo.toml / R9.3 LuaJIT 2.1 / R9.4 将来変更注記）
 // ============================================================
 {
   const rel = `${SRC}/introduction.md`;
   assert('F-exist', exists(rel), `introduction.md が存在する`, `introduction.md が無い`);
   if (exists(rel)) {
     const md = read(rel);
+    // 対象バージョンの行はリリース手順が機械的に書き換える目印。Cargo.toml の版と一致を要求する。
+    const ver = read('Cargo.toml').match(/^version\s*=\s*"([^"]+)"/m)?.[1];
+    const shown = md.match(/^\| 対象 pasta バージョン \| \*\*v([^*]+)\*\* \|\r?$/m)?.[1];
     assert(
       'F-version',
-      /v0\.\d+\s*系列|バージョン[^\n]*系列|対象[^\n]*pasta[^\n]*バージョン/.test(md),
-      `introduction に対象 pasta バージョン系列の明示がある`,
-      `introduction に対象バージョン系列の明示が無い`,
+      ver !== undefined && shown === ver,
+      `introduction の対象 pasta バージョン（v${shown}）が Cargo.toml と一致する`,
+      `introduction の対象 pasta バージョン（${shown ? 'v' + shown : '行なし'}）が Cargo.toml（v${ver}）と一致しない`,
     );
     assert(
       'F-luajit',
