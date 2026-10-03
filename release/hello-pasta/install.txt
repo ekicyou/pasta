@@ -1,3 +1,4 @@
+charset,UTF-8
 type,ghost
 name,hello-pasta
 directory,hello-pasta

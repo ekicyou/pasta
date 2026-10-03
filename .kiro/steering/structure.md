@@ -187,6 +187,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │   └── src/
 │   │       ├── main.rs          # CLIエントリーポイント
 │   │       ├── release.rs       # リリースビルドオーケストレーション
+│   │       ├── balloon.rs       # 同梱バルーン判定（install.txt）
 │   │       ├── update_files.rs  # 更新ファイル（updates.txt）生成
 │   │       ├── nar.rs           # NAR（ZIP）アーカイブ作成
 │   │       └── copy.rs          # ファイルコピーユーティリティ
