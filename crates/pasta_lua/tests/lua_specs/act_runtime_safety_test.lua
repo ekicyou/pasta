@@ -207,13 +207,18 @@ describe("act:actor_proxy - 未登録アクター", function()
         end)
     end)
 
-    test("未登録アクターの行の＠関数（）は act の検索へ委譲されて解決する", function()
+    test("未登録アクターの行の＠関数（）は act の検索へ委譲されて解決し、関数は ACT を受け取る", function()
         with_captured_act(function(ACT, warns)
             local act = ACT.new({})
-            GLOBAL["rs_関数"] = function(proxy, a) return proxy.actor.name .. ":" .. a end
+            local received = nil
+            GLOBAL["rs_関数"] = function(a, x)
+                received = a
+                return "結果:" .. x
+            end
             local p = act:actor_proxy("rs_謎")
             p:talk(p:expr_fn("rs_関数", "x"))
-            expect(act.token[2].text):toBe("rs_謎:x")
+            expect(received):toBe(act)
+            expect(act.token[2].text):toBe("結果:x")
             expect(#warns):toBe(1)
         end)
     end)
