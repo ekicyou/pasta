@@ -147,7 +147,7 @@ graph TB
 - `crates/pasta_lua/src/search/context.rs` — コメントの形式の説明を 1 形式にする。振る舞いは変えない。「確定前／確定後」2 形式のテストを 1 つにまとめる。
 - `crates/pasta_lua/src/debug/source_map/scene_join.rs` — `split_runtime_global` と `(base, counter)` の表を削除し、実行時のグローバルシーンを定義元の `.pasta` ファイルごとに分けて、ファイルの中の順位で記録と突き合わせる（SceneJoin）。
 - `crates/pasta_lua/src/debug/source_map/mod.rs` — 生成 Lua のチャンク名から `.pasta` ファイルを引く読み出しを 1 つ足す（`insert_chunk` が既に両方を受け取っている）。
-- `crates/pasta_lua/src/debug/source_map/scene_join_tests.rs` — `split_runtime_global` の直接テストを削除し、組み立て方式のテストに置き換える。
+- `crates/pasta_lua/src/debug/source_map/scene_join_tests.rs` — `split_runtime_global` の直接テストを削除し、ファイルごとの突き合わせのテストに置き換える。
 - `crates/pasta_lua/src/debug/source_map/scene_index_tests.rs`・`debug/playscene_tests.rs`・`debug/wiring_play_scene_at_tests.rs` — ID 文字列の例を新形式にする（ロジックは ID を不透明な文字列として扱うので変更なし）。
 
 **pasta_lua（Lua）**
@@ -546,7 +546,7 @@ function KICK.try_dispatch(act) end
 | Requirements | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 2.11 |
 
 - 利用者章（`lua/modules/pasta-search.md`・`lua/patterns.md`・`lua/script-api.md`）: 登録名の説明と例を `"メイン_1"`・`"会話_朝_1"` にする。`search_scene` の第 1 引数は作者が書くシーン名であり、登録名を渡してもそのシーンを指さないことを書く。決まった順に選ぶときの並び（キーのバイト順、同名は通し番号順）を書く。Lua で直接定義したシーン関数の照合相手（名前の全体。`_` と数字で終わる名前は最後の `_` と数字を除いた部分）を書く。
-- 内部設計章（`internals/internal-modules.md`・`internals/debug.md`・`internals/registry-search.md`・`internals/transpiler.md`）: 登録名の構成と分ける規則、検索キーの表、デバッガの突き合わせ（組み立て方式）、キックの完全一致、辞書確定の登録順を書く。「区切り無し」「確定前は形式が違う」「`split_runtime_global`」の記述を残さない。
+- 内部設計章（`internals/internal-modules.md`・`internals/debug.md`・`internals/registry-search.md`・`internals/transpiler.md`）: 登録名の構成と分ける規則、検索キーの表、デバッガの突き合わせ（定義元のファイルごと）、キックの完全一致、辞書確定の登録順を書く。「区切り無し」「確定前は形式が違う」「`split_runtime_global`」の記述を残さない。
 - 回避の書き方（「代わりにこう書く」）は載せない。規則だけを書く。
 - `node book/tools/gen-skill-refs.mjs` で再生成し、`--check` と `node book/tools/link-check.mjs` を通す。
 
@@ -594,7 +594,7 @@ function KICK.try_dispatch(act) end
 
 1. 規則の関数を足す（`registered_name`・`split_registered_name` と往復テスト。振る舞いは変わらない）。
 2. キックの完全一致（形式に依存しない。単独でテストが通る）。
-3. 形式の切り替え（`scene.lua`・`pasta_shiori` の写し・`transpiler.rs` の単語スコープ名・`scene_join.rs` の組み立て方式・期待値の更新を 1 つのタスクで同時に入れる。Rust と Lua の片方だけを変えると突き合わせが全滅するため、分けない）。
+3. 形式の切り替え（`scene.lua`・`pasta_shiori` の写し・`transpiler.rs` の単語スコープ名・`scene_join.rs` のファイルごとの突き合わせ・期待値の更新を 1 つのタスクで同時に入れる。Rust と Lua の片方だけを変えると突き合わせが全滅するため、分けない）。
 4. 検索キーの変更と辞書確定の登録順、辞書確定前のローカルシーンの番号。
 5. マニュアルと `references/` の再生成。
 
