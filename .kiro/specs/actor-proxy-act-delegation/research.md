@@ -209,3 +209,11 @@
 - プロキシを前提にした作者の `GLOBAL` 関数・シーンの関数が動かなくなる — 要件ディスカッションで受け入れ済み。マニュアルの規則の記述で知らせる。
 - マニュアルの記述の取りこぼし — `book/src` を「プロキシ」で検索して残りが無いことを完了の条件にする。
 - 継続トークの E2E が時刻に依存する — `X-Pasta-Time` と固定のトーク間隔で決定論にする。
+
+## 9. 設計の形の再試作（2026-10-04、設計ディスカッション中）
+
+design.md の ProxyDispatch の形を `actor.lua` に一時的に書き、`pasta_lua` の全テストを実行した。試作は確認後に破棄した。
+
+- **書いた形**: 局所関数 `drop_self(self, r, ...)`（`r` が `self.act` または `self` と同一なら `nil`、そうでなければ `r, ...` をそのまま返す）。`call_expr` は `drop_self(self, handler(self.act, ...))`。`word` は `find_actor_handler` で見つからなければ受け取り手を `self.act` に替えて `find_act_handler` を呼び、関数なら `drop_self(self, handler(受け取り手))`。
+- **落ちたテスト**: `cargo test -p pasta_lua --no-fail-fast` で落ちたのは、Lua の `actor_module_test.lua`（expr_fn の後処理）と Rust の `syntax_test::test_e2e_dynamic_fn_call_passes_actor_proxy` だけだった。Lua のランナーは最初の失敗で止まるため、design.md に挙げた Lua の 3 件の期待を新しい規則に替えて再実行し、57 スイートすべてが通ることを確かめた。期待を変える既存テストは design.md の 4 件で尽きている。
+- **未実施**: `pasta_shiori` のテストは、この再試作では実行できていない（ビルドが通らず、原因は未調査）。実装フェーズの全テスト実行で確かめる。
