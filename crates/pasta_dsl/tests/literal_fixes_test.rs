@@ -4,8 +4,8 @@
 
 use pasta_dsl::ParseError;
 use pasta_dsl::parser::{
-    Attr, AttrValue, Expr, FileItem, GlobalSceneScope, KeyWords, LocalSceneItem, PastaFile,
-    SetValue, parse_str,
+    Attr, AttrValue, CueArgToken, Expr, FileItem, GlobalSceneScope, KeyWords, LocalSceneItem,
+    PastaFile, SetValue, parse_str,
 };
 
 const NEWLINES: [&str; 2] = ["\n", "\r\n"];
@@ -142,6 +142,9 @@ fn blank_quotes_on_separate_lines_make_two_words() {
             })
             .collect();
         assert_eq!(names, ["a", "b"], "source: {src:?}");
+        for kw in all_words(&file) {
+            assert_eq!(kw.words, [""], "source: {src:?}");
+        }
     }
 }
 
@@ -290,6 +293,69 @@ fn quote_char_after_first_char_is_part_of_attr_value() {
 fn hash_in_unquoted_word_value_is_part_of_value() {
     assert_word_candidates("＠w：あ、い ＃c", &["あ", "い ＃c"]);
     assert_word_candidates("＠話題：＃伺か", &["＃伺か"]);
+}
+
+// ============================================================================
+// 3.1〜3.3: 空の引用 `「」`・`""` は空文字列
+// ============================================================================
+
+#[test]
+fn blank_quote_in_word_value_is_empty_string() {
+    assert_word_candidates("＠w：「」、\"\"", &["", ""]);
+    assert_word_candidates("＠w：「」、あ", &["", "あ"]);
+}
+
+#[test]
+fn blank_quote_in_attr_value_is_empty_string() {
+    for ctx in DEF_CONTEXTS {
+        for line in ["＆k：「」", "＆k：\"\""] {
+            let src = in_context(ctx, &[line], "\n");
+            let file = parse_ok(&src);
+            match &all_attrs(&file)[..] {
+                [attr] => assert_eq!(
+                    attr.value,
+                    AttrValue::String(String::new()),
+                    "context: {}, source: {src:?}",
+                    ctx.0
+                ),
+                other => panic!("expected one attr, got {other:?}\nsource: {src:?}"),
+            }
+        }
+    }
+}
+
+#[test]
+fn blank_quote_in_expression_is_empty_string() {
+    for q in ["「」", "\"\""] {
+        let src = format!("＊s\n　＄x＝{q}\n");
+        let file = parse_ok(&src);
+        match &first_scene(&file).local_scenes[0].items[0] {
+            LocalSceneItem::VarSet(vs) => {
+                assert_eq!(
+                    vs.value,
+                    SetValue::Expr(Expr::BlankString),
+                    "source: {src:?}"
+                )
+            }
+            other => panic!("expected VarSet, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn blank_quote_in_cue_command_arg_is_empty_string() {
+    for q in ["「」", "\"\""] {
+        let src = format!("＊s\n　！cmd（{q}）\n");
+        let file = parse_ok(&src);
+        match &first_scene(&file).local_scenes[0].items[0] {
+            LocalSceneItem::CueCommand(node) => assert_eq!(
+                node.args,
+                [CueArgToken::StringLiteral(String::new())],
+                "source: {src:?}"
+            ),
+            other => panic!("expected CueCommand, got {other:?}"),
+        }
+    }
 }
 
 #[test]
