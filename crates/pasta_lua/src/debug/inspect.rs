@@ -123,10 +123,26 @@ pub(crate) fn capture_stack(lua: &Lua, thread: &mlua::Thread) -> Vec<FrameInfo> 
         return Vec::new();
     }
 
-    let mut out: Vec<FrameInfo> = Vec::new();
     // SAFETY: `l` is a live lua_State (owned by `thread`, kept alive by `lua`).
-    // `lua_getinfo("Snl")` reads into our owned `ar` and pushes nothing, so the
-    // VM stack depth is unchanged across the whole walk.
+    unsafe { lua_frames(l) }
+        .into_iter()
+        .map(|(_, frame)| frame)
+        .collect()
+}
+
+/// Walk `l`'s call stack and return `(raw lua_getstack level, FrameInfo)` for
+/// each Lua frame, top first, skipping C frames (e.g. an interposed `pcall`).
+///
+/// The single source of truth for the logical frame index: index `i` of
+/// [`capture_stack`]'s result and `frame_level == i` in [`capture_variables`]
+/// both resolve through this walk, so a C frame between Lua frames cannot make
+/// the two disagree.
+///
+/// # Safety
+/// `l` must be a live `lua_State`. `lua_getinfo("Snl")` reads into our owned
+/// `ar` and pushes nothing, so the VM stack depth is unchanged.
+unsafe fn lua_frames(l: *mut mlua::ffi::lua_State) -> Vec<(c_int, FrameInfo)> {
+    let mut out = Vec::new();
     unsafe {
         let what = match CString::new("Snl") {
             Ok(c) => c,
@@ -141,7 +157,7 @@ pub(crate) fn capture_stack(lua: &Lua, thread: &mlua::Thread) -> Vec<FrameInfo> 
             if mlua::ffi::lua_getinfo(l, what.as_ptr(), &mut ar as *mut _) != 0
                 && let Some(frame) = frame_info_from_ar(&ar)
             {
-                out.push(frame);
+                out.push((level, frame));
             }
             level += 1;
         }
@@ -205,7 +221,8 @@ unsafe fn frame_info_from_ar(ar: &mlua::ffi::lua_Debug) -> Option<FrameInfo> {
 /// (R2.5) — NEVER crashing, erroring, or corrupting the VM stack.
 ///
 /// `frame_level` is the logical call-stack level on `thread.state()` where the
-/// frame is found (0 = the stopped/top frame). The session passes the level
+/// frame is found (0 = the stopped/top frame). C frames are not counted, so
+/// it is the same index as in [`capture_stack`]'s result. The session passes the level
 /// requested by the DAP client; for a running coroutine it passes that
 /// coroutine's `Thread`, whose own `state()` likewise has its body frame at
 /// the requested level.
@@ -233,8 +250,12 @@ pub(crate) fn capture_variables(
         let top_at_entry = mlua::ffi::lua_gettop(l);
 
         let mut ar: mlua::ffi::lua_Debug = std::mem::zeroed();
-        // Resolve the activation record for the requested level.
-        if mlua::ffi::lua_getstack(l, frame_level as c_int, &mut ar as *mut _) != 0 {
+        // Map the logical (C-frame-skipping) level to the raw lua_getstack
+        // level the same way capture_stack numbers frames, then resolve it.
+        let raw_level = lua_frames(l).get(frame_level as usize).map(|(lv, _)| *lv);
+        if let Some(raw_level) = raw_level
+            && mlua::ffi::lua_getstack(l, raw_level, &mut ar as *mut _) != 0
+        {
             collect_locals(l, &ar, &mut out);
             collect_upvalues(l, &mut ar, &mut out);
         }

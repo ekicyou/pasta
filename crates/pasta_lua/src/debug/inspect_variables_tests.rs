@@ -358,6 +358,66 @@ return result
     );
 }
 
+/// A C frame (`pcall`) between two Lua frames must not shift the level:
+/// `frame_level` uses the same C-skipping numbering as `capture_stack`, so
+/// level 1 is the Lua caller (`outer_var`), not the `pcall` C frame.
+#[test]
+fn capture_variables_skips_interposed_c_frame() {
+    let lua = build_jit_off_vm();
+    type Capture = Option<(Vec<Variable>, usize)>; // (level-1 vars, stack depth)
+    let captured: Arc<Mutex<Capture>> = Arc::new(Mutex::new(None));
+    let captured_hook = Arc::clone(&captured);
+    let target_line: u32 = 4; // `return inner_var` inside inner
+
+    lua.set_global_hook(HookTriggers::EVERY_LINE, move |hook_lua, debug| {
+        let (source, line) = source_and_line(debug);
+        if source == "@pcall_frame_chunk" && line == target_line {
+            let thread = hook_lua.current_thread();
+            let vars = capture_variables(hook_lua, &thread, 1);
+            let depth = capture_stack(hook_lua, &thread).len();
+            if let Ok(mut g) = captured_hook.lock()
+                && g.is_none()
+            {
+                *g = Some((vars, depth));
+            }
+        }
+        Ok(VmState::Continue)
+    })
+    .expect("set_global_hook should succeed");
+
+    let chunk = "\
+local outer_var = 99
+local function inner()
+local inner_var = 7
+return inner_var
+end
+local ok, result = pcall(inner)
+return result
+";
+    lua.load(chunk)
+        .set_name("@pcall_frame_chunk")
+        .exec()
+        .expect("chunk should execute");
+    lua.remove_global_hook();
+
+    let (vars, depth) = captured
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("the hook must have stopped inside inner()");
+    assert_eq!(
+        depth, 2,
+        "capture_stack must list inner + chunk only (pcall skipped)"
+    );
+    let outer = find_var(&vars, "outer_var")
+        .unwrap_or_else(|| panic!("level 1 must be the Lua caller across pcall. got: {vars:?}"));
+    assert_eq!(outer.repr, "99");
+    assert!(
+        find_var(&vars, "inner_var").is_none(),
+        "level 1 must not be the stopped frame. got: {vars:?}"
+    );
+}
+
 /// R2.5 (graceful): a `frame_level` beyond the call stack has no activation
 /// record (`lua_getstack` returns 0) — the capture must return EMPTY, not
 /// crash, and the VM must remain usable (stack balanced).

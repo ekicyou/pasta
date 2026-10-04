@@ -282,7 +282,7 @@ on_line_impl(lua, debug)
 `capture_stack` と `capture_variables` は、Lua の `debug` ライブラリを使わず、`mlua::ffi` で `thread.state()` を直接たどる。フックの中では `lua.current_thread()` が実行中のコルーチンを指すため、コルーチンの中で止まってもその本体のフレームに届く。
 
 - `capture_stack` は `lua_getstack` をレベル 0 から最大 256 まで進め、`lua_getinfo("Snl")` でソース・行・関数名を読む。C のフレーム（`what == "C"`）は除く。
-- `capture_variables` は、指定したレベルの `lua_getstack` に対して `lua_getlocal` でローカル変数を、`lua_getinfo("f")` と `lua_getupvalue` でアップバリューを読む。型は `number`・`string`・`boolean`・`table`（`table: 0x…` のアドレス表記）を区別し、それ以外は `<unsupported 型名>` にする。スタックの深さを入口で覚え、出口で `lua_settop` で戻す。
+- `capture_variables` は、指定したレベルを `capture_stack` と同じ数え方（C のフレームを数えない）で `lua_getstack` の実レベルに直してから、`lua_getlocal` でローカル変数を、`lua_getinfo("f")` と `lua_getupvalue` でアップバリューを読む。型は `number`・`string`・`boolean`・`table`（`table: 0x…` のアドレス表記）を区別し、それ以外は `<unsupported 型名>` にする。スタックの深さを入口で覚え、出口で `lua_settop` で戻す。
 - どちらも `Result` を返さず、読めなかった分は空や途中までの結果にする。
 
 ### ソースマップ
