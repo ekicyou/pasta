@@ -82,3 +82,79 @@
 - **確定時に通し番号を除いた名前を得る方法**（設計で決める）: 登録名を形式の関数で分けるか、Lua 側がシーン表に名前と番号を記録して渡すか。Lua で直接登録したシーン・関数（通し番号を持たない名前。例: Lua ブロックの `function SCENE.加算ループ`）は、名前全体をキーにする。
 - **決まった順に選ぶとき（`set_scene_selector`）の並び**: 同名シーンは索引の同じキーに入るので、並びは通し番号順に決める必要がある（今は登録名の文字コード順で `メイン10` が `メイン2` より先。確定時の登録順は `HashMap` の走査順で不定）。
 - **辞書確定前のローカルシーン**: トランスパイル時の `register_local` は番号に定義位置を使い、生成コードは名前ごとの通し番号を使う（既存の食い違い）。形式の関数を 1 つにするときにそろえる。
+
+## 8. 設計フェーズの調査と決定（2026-10-04）
+
+- **Discovery Scope**: Extension（既存システムの拡張。light discovery）。外部依存の追加なし。
+- **Key Findings**:
+  - 生成コードは 1 バイトも変えずに済む（登録名は Lua の `create_scene` が作り、ローカル関数名の形は変えない）。トランスパイラの insta スナップショットは変わらない。
+  - 検索キーの変更は `SceneTable::fn_name_to_search_key` の 1 関数で、辞書確定前・確定後の両方に効く。
+  - 本番でキックを設置する経路は `playscene.rs` の `build_kick_scene`（確定済みの identity）とリロードの予約文字列だけである。
+
+### 8.1 コードで確かめたこと
+
+- **登録名の生成元**: `scene.lua` 132 行（`base_name .. counter`）、`scene_registry.rs` 78 行（`{}_{}::__start__`）、`transpiler.rs` 206 行（`{}{}`）。`register_local`（120〜126 行）は `{親}_{番号}::{名前}_{local_index}`。
+- **検索キー**: `scene_table.rs` 139〜147 行 `fn_name_to_search_key`。検索の結果は `SearchContext::parse_fn_name` が `fn_name` を `::` で分けて返す（キーとは独立）。
+- **辞書確定の順序**: `finalize.rs` 159〜178 行。`HashMap<String, Vec<String>>` を走査して `register_global_raw` を呼ぶ。ローカル名の順は Lua の `pairs` の順。現状はキーが 1 シーン 1 つなので候補の並びに影響しないが、同名シーンが同じキーに入ると登録順が並びを決める。
+- **辞書確定前のローカルシーン**: `transpiler.rs` 220〜224 行は `local_idx + 1`（無名の開始シーンも数える定義位置）を渡す。`scope_gen.rs` 177〜187 行は名前ごとの通し番号（生の名前がキー）で関数名を作る。一致しない。
+- **辞書確定前のレジストリの中身**: `loader/process.rs` はファイルごとに新しい `TranspileContext` でトランスパイルして `merge_from` する。通し番号はファイルごとに 1 から始まる（`merge_from` は番号を振り直さない）。キャッシュが新しいファイルはトランスパイルを飛ばすので、そのファイルのシーンはレジストリに入らない。さらに `main.lua`・`entry.lua` の実行中は `scene_dic` がまだ読み込まれておらず、`STORE.scenes` は空である。
+- **デバッガの記録**: `loader/source_map_build.rs` もファイルごとにトランスパイルするので、`join_key` の通し番号はファイルごとである。複数ファイルに同名のグローバルシーンがあると、2 つ目以降のファイルの記録は 1 つ目のファイルのシーンに解決される（既存の制約。名前の形によらない。テストは 1 ファイルのフィクスチャだけ）。
+- **キック**: `kick.lua` 140〜150 行。`KICK.install` を呼ぶのは `SHIORI.kick` だけで、`KickRequest` を作る本番コードは `debug/playscene.rs` 76 行と `debug/wiring/inbound.rs` 418 行（リロード）だけ。`virtual_dispatcher.lua` 245 行が `KICK.try_dispatch(act)` を呼ぶ。
+- **登録名を使う Lua コード**: `act.lua`（`__global_name__` を読むだけ）、`choice_select.lua`（`SCENE.search(選択 ID, last_global_scene)`。選択 ID は作者が書いた名前）、`boot.lua`・`init.lua`・`virtual_dispatcher.lua`（イベント名で `co_exec`）。登録名を第 1 引数に渡して検索しているのはキックだけ。
+- **`pasta_shiori` のテスト支援 `scene.lua`**: 現行 `scene.lua` の複製ではなく古いランタイムの写し（`SCENE.search`・`co_exec` を持たない）。113 行に `base_name .. counter` がある。
+- **`search-selector-indices` との重なり**: 同 spec は `random.rs` を中心にし、`scene_table.rs` では `select_from_cache`（264〜289 行）の `shuffle_usize` の呼び出しに触れうる。本設計が触るのは 73〜147 行（`fn_name_to_search_key` とコメント）。ソースは重ならない。マニュアルは `lua/modules/pasta-search.md`（セレクタの節 124〜155 行）と `internals/registry-search.md` が重なる。
+
+### 8.2 設計の決定
+
+#### Decision: 通し番号を除いた名前は、1 つの分ける関数で得る
+
+- **Context**: 辞書確定で、検索キーに使う「通し番号を除いた名前」をどう得るか（5 章・7 章の持ち越し）。
+- **Alternatives Considered**:
+  1. Rust の `split_registered_name` で登録名を分ける。
+  2. Lua がシーン表に名前と番号を記録し、辞書確定で渡す（グローバルは `create_scene` が、ローカルは生成コードが記録する）。
+- **Selected Approach**: 1。`SceneTable::fn_name_to_search_key` が `fn_name` の各部分を分ける。
+- **Rationale**: 2 はローカルシーンについて生成コードの変更が要る（`function SCENE.名前_N` は代入であり、生成されたものと手書きを表の上で見分けられない）。スナップショット 29 件が変わり、下流の spec との順序制約が重くなる。1 は生成コードを変えず、辞書確定前と確定後が同じ 1 関数を通る。
+- **Trade-offs**: 手書きの `_数字` で終わるシーン関数は、生成されたローカルシーンと見分けられない。要件 2.11 が認める「見分けられない場合」として、最後の `_` と数字を除いた部分を照合相手にし、マニュアルに書く。
+- **Follow-up**: 設計ディスカッションで確認する（design.md Open Questions 1）。
+
+#### Decision: 同名シーンの並びは辞書確定で決める
+
+- **Context**: 要件 2.9。同名シーンが同じキーに入るので、キーの中の並びが登録順になる。
+- **Alternatives Considered**:
+  1. `finalize.rs` の `build_scene_registry` が（名前, 番号）の昇順で登録する。
+  2. `SceneTable::from_scene_registry` がキーごとに ID を並べ替える。
+- **Selected Approach**: 1。
+- **Rationale**: 順序が不定になる原因（`HashMap` と `pairs`）は辞書確定にある。`scene_table.rs` の変更を 1 関数に抑え、並走する `search-selector-indices` との重なりを最小にする。トランスパイル時レジストリは定義順に登録するので、並べ替えなくても同じ並びになる。
+- **Trade-offs**: `SceneTable` は「登録順が通し番号順である」ことを呼び出し側に頼る。
+
+#### Decision: キック・索引の修正と形式の変更は 1 つの PR で、キックを先のタスクにする
+
+- **Context**: 5 章 OQ4。
+- **Selected Approach**: 1 spec 1 PR。タスクの順序は「規則の関数 → キックの完全一致 → 形式の切り替え（Lua・Rust・索引を同時に）→ 検索キーと登録順 → マニュアル」。
+- **Rationale**: キックの完全一致は形式に依存せず単独で通る。索引の組み立て方式は、Lua の形式と同時に切り替えないと突き合わせが全滅するので、形式の切り替えと同じタスクにする。別の PR に分けると、要件 3.5 の告知と完了フロー（squash マージ）が 2 回になる。
+
+#### Decision: Lua 側には作る規則だけを置く
+
+- **Context**: 要件 6.1「Rust 側とランタイム側でそれぞれ一か所」。
+- **Selected Approach**: Lua は `create_scene` の 1 行が作る規則。分ける関数は Lua に置かない。
+- **Rationale**: Lua に登録名を分ける処理が無い。使う所の無い関数を足さない。Rust と Lua の食い違いは、Rust が組み立てた名前と実行時の登録名を突き合わせるテスト（索引の統合テストを含む）で検出する（要件 6.3）。
+- **Follow-up**: 設計ディスカッションで確認する（Open Questions 2）。
+
+#### Decision: 辞書確定前は形式と照合相手だけをそろえる
+
+- **Context**: 要件 2.12 と 8.1 の調査（確定前のレジストリはファイルごとの番号で、キャッシュ済みファイルを含まない）。
+- **Selected Approach**: 単語スコープ名を `registered_name` に、ローカルシーンの番号を生成器と同じ名前ごとの通し番号にそろえる。ファイルをまたぐ番号とキャッシュ済みファイルは既存の制約のまま。
+- **Follow-up**: Open Questions 3。
+
+### 8.3 Synthesis（一般化・既存の採用・単純化）
+
+- **一般化**: グローバルの登録名とローカルの登録名は同じ形（`名前_番号`）なので、作る・分けるの 2 関数を両方に使う。検索キーの規則もグローバル・ローカルで同じ「分けた名前」になる。
+- **既存の採用**: `SceneRegistry::sanitize_name`（一元化の前例）の隣に置く。キックは既存の `SCENE.get`・`SCENE.get_start`・`wrap_local_func` を使う。索引は既存の `locals_by_global` のキーを実行時の登録名の集合として使う。
+- **単純化**: 新しい型・モジュール・設定を足さない。Lua の分ける関数、`SceneTable` の並べ替え、生成コードへの記録、旧形式の別名は足さない。
+
+### 8.4 リスク
+
+- 手書きの `_数字` で終わるシーン関数の照合相手が変わる — マニュアルと PR 本文に書く。
+- 期待値の更新が要るテストが多い（Lua のテスト・デバッガのテスト） — 最初のタスクで `cargo test --all` の失敗一覧から全数を確定する。
+- `search-selector-indices` とマニュアル 2 章が重なる — 後からマージする側が取り込む。
+- ファイルをまたぐ同名シーンのデバッガ索引は直らない（既存の制約） — 別の spec に送るかをディスカッションで決める。
