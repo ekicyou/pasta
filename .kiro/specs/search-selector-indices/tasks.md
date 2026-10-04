@@ -85,3 +85,4 @@
 ## Implementation Notes
 
 - 4.1: 候補の並びの規則（文字コード順・定義順・`メイン10`）はセレクタ節から同じファイルの `## 候補の選び方` に移した。spec 完了時のスキル文書同期で、手書きの `references/testing-lint.md`（並び順の参照先が `#set_scene_selector--set_word_selector`）を `#候補の選び方` も指すよう直す。
+- 完了時: 公開クレート `pasta_core` の破壊的変更（`RandomSelector::select_index`、`DefaultRandomSelector::select`・`shuffle` の削除）は 969717b9 の `BREAKING CHANGE:` にしか書いていない。squash マージで消えないよう、PR 本文と squash のコミットメッセージに転記する。
