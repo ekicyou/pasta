@@ -150,3 +150,8 @@
   - ワークスペース全体の `cargo test` と `cargo clippy` が通る
   - 応答内容・待ち時間を固定している既存テスト（FFI セッションの E2E・バイト不変・marshaling・teardown）が変更なしで通る
   - _Requirements: 4.8_
+
+## Implementation Notes
+
+- ログ内容を読むテストは `PASTA_LOG` 中和の `#[ctor]` が効くバイナリに置く（統合テストは `tests/common`、`pasta_shiori` の lib テストは `shiori_request_tests.rs`）。
+- 追跡対象の `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.dll` は旧コードのビルドで `rotation_days` の文字列を含む。次のリリースで再ビルドされる。

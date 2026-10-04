@@ -381,12 +381,7 @@ mod tests {
         {
             let _guard = LoadDirGuard::new(load_dir.clone());
             let mut writer = registry.make_writer();
-            writer
-                .write_all(
-                    b"routed via registry
-",
-                )
-                .unwrap();
+            writer.write_all(b"routed via registry\n").unwrap();
             writer.flush().unwrap();
         }
 
