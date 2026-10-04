@@ -10,6 +10,7 @@ local expect = require("lua_test.test").expect
 -- pasta.shiori.event のリロード時に内部 require で追従するため、明示 require の省略は等価。
 local function reload_event_modules(reset_res)
     package.loaded["pasta.shiori.event"] = nil
+    package.loaded["pasta.shiori.event.callback"] = nil
     package.loaded["pasta.shiori.event.register"] = nil
     package.loaded["pasta.store"] = nil
     if reset_res ~= false then

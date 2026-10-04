@@ -71,7 +71,8 @@ function CALLBACK.discard_staged()
     _staged = nil
 end
 
---- 到着イベントが pending と一致するなら該当コルーチンを resume してレスポンスを返す
+--- 到着イベントが pending と一致するなら該当コルーチンを EVENT.drive で再開してレスポンスを返す
+--- シーンのエラーは error で伝える
 --- @param req table SHIORI リクエスト
 --- @return string|nil response 一致時は SHIORI レスポンス文字列、不一致は nil
 function CALLBACK.try_route(req)
@@ -95,18 +96,15 @@ function CALLBACK.try_route(req)
         i = i + 1
     end
 
-    -- Resume coroutine with references
-    local ok, yielded = coroutine.resume(entry.co, refs)
+    -- 通常のイベントと同じ再開の手順（予約の消費・継続の更新を含む）で再開する
+    -- EVENT は呼び出し時に読み込む（読み込み時に require すると循環する）
+    local EVENT = require("pasta.shiori.event")
+    local ok, value = EVENT.drive(entry.co, entry.act, refs)
     if not ok then
-        error(yielded)
+        error(value)
     end
 
-    -- R4: callback chaining — coroutine may have called stage_pending again
-    if coroutine.status(entry.co) == "suspended" then
-        CALLBACK.consume_staged(entry.co, entry.act)
-    end
-
-    return RES.ok(yielded)
+    return RES.ok(value)
 end
 
 --- タイムアウト時刻超過エントリを掃引

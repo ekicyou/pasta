@@ -119,12 +119,12 @@ end)
 -- Task 1.2: try_route / sweep tests
 -- ============================================================================
 describe("CALLBACK.try_route", function()
-    local CALLBACK
+    local CALLBACK, STORE
 
     local function setup()
         mocks.reset()
         mocks.install()
-        CALLBACK = reload_callback_modules(true)
+        CALLBACK, STORE = reload_callback_modules(true)
     end
 
     test("returns nil when req.id does not match any pending entry", function()
@@ -230,6 +230,78 @@ describe("CALLBACK.try_route", function()
         expect(CALLBACK.pending["OnPastaCallBack2"].on_timeout):toBe("chained timeout")
         -- Response from intermediate yield
         expect(result:find("200 OK")).not_:toBe(nil)
+        -- 待機として登録したシーンは継続に入れない（1.4）
+        expect(STORE.co_scene):toBe(nil)
+        expect(STORE.co_callback):toBe(nil)
+    end)
+
+    -- ========================================================================
+    -- callback-resume-unification 2.1: 再開を EVENT.drive 経由にする
+    -- ========================================================================
+    test("出力の無い中断を飛ばして出力まで進め、出力付きの中断は継続に入る (1.1)", function()
+        setup()
+        local co = coroutine.create(function()
+            coroutine.yield()
+            coroutine.yield() -- 出力の無い中断
+            coroutine.yield("talk1")
+            coroutine.yield("talk2")
+        end)
+        coroutine.resume(co)
+        CALLBACK.pending["OnPastaCallBack1"] = { co = co, act = {}, timeout_at = 999999 }
+
+        local result = CALLBACK.try_route({ id = "OnPastaCallBack1", reference = {} })
+
+        expect(result:find("Value: talk1", 1, true)).not_:toBe(nil)
+        expect(STORE.co_scene):toBe(co)
+    end)
+
+    test("出力の無いまま終わったシーンは 204 になる (1.1)", function()
+        setup()
+        local co = coroutine.create(function()
+            coroutine.yield()
+        end)
+        coroutine.resume(co)
+        CALLBACK.pending["OnPastaCallBack1"] = { co = co, act = {}, timeout_at = 999999 }
+
+        local result = CALLBACK.try_route({ id = "OnPastaCallBack1", reference = {} })
+
+        expect(result:find("204 No Content", 1, true)).not_:toBe(nil)
+        expect(STORE.co_scene):toBe(nil)
+    end)
+
+    test("遅れて届いた結果は待っていないイベントとして nil を返す (2.8)", function()
+        setup()
+        local co = coroutine.create(function() coroutine.yield() end)
+        coroutine.resume(co)
+        CALLBACK.pending["OnPastaCallBack1"] = { co = co, act = {}, timeout_at = 100 }
+        CALLBACK.sweep(200)
+
+        expect(CALLBACK.try_route({ id = "OnPastaCallBack1", reference = { [0] = "late" } })):toBe(nil)
+    end)
+
+    test("再開したシーンのエラーは伝わり、待機にも継続にも予約にも残らない (1.5)", function()
+        setup()
+        -- 別のシーンの継続がある状態
+        local other = coroutine.create(function() coroutine.yield() end)
+        coroutine.resume(other)
+        STORE.co_scene = other
+
+        local co = coroutine.create(function()
+            coroutine.yield()
+            CALLBACK.stage_pending("OnPastaCallBack2", 999999, "timeout")
+            error("callback scene exploded")
+        end)
+        coroutine.resume(co)
+        CALLBACK.pending["OnPastaCallBack1"] = { co = co, act = {}, timeout_at = 999999 }
+
+        local ok, err = pcall(CALLBACK.try_route, { id = "OnPastaCallBack1", reference = {} })
+
+        expect(ok):toBe(false)
+        expect(tostring(err):find("callback scene exploded", 1, true)).not_:toBe(nil)
+        expect(next(CALLBACK.pending)):toBe(nil)
+        expect(STORE.co_scene):toBe(nil)
+        -- 予約は捨てられている（次の予約が multiple staging にならない）
+        expect(pcall(CALLBACK.stage_pending, "OnPastaCallBack3", 999999, nil)):toBe(true)
     end)
 
     -- ========================================================================

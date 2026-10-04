@@ -17,7 +17,7 @@
   - _Requirements: 2.8, 3.1, 3.2, 4.1, 4.2, 4.4, 4.5, 4.6, 4.7, 6.2, 6.3, 6.5_
 
 - [ ] 2. コールバックの再開と掃引を共通の手順に載せる
-- [ ] 2.1 一致したコールバックの再開を駆動ルーチン経由にする
+- [x] 2.1 一致したコールバックの再開を駆動ルーチン経由にする
   - 一致の判定・待機の取り外し・Reference の配列化は現行のまま、再開を駆動ルーチン（呼び出し時に読み込む）に置き換え、エラーは例外として伝え、出力は 200（出力なしで終われば 204）にする
   - Lua テストのモジュール読み直しの組（イベント配送・コールバック管理・ストア）を、コールバックのモジュールテストの補助関数と、コールバック管理を使う他の Lua スイートのすべてでそろえる
   - コールバックのモジュールテストの既存の再開の検査を新しい挙動に改める
@@ -90,3 +90,4 @@
 ## Implementation Notes
 - 1.2: E2E フィクスチャの OnTestTimeout は理由 `test timeout` を明示して渡すため、タイムアウト応答の `X-Error-Reason` は `test timeout`（design の E2E #1 の `callback timeout: get_property` は理由省略時の既定値）。
 - cargo は `env -u NoDefaultCurrentDirectoryInExePath` 付きで回す。`tests/fixtures/sample.generated.lua` はテスト実行で改行コードだけ変わるので stage しない。
+- テスト実行で `crates/pasta_lua/profile/pasta/save/save.json` が書き換わることがある（既存の汚染）。stage しない。
