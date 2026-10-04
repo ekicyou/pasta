@@ -237,6 +237,10 @@ impl PastaLoader {
     ) -> Result<Option<std::sync::Arc<crate::logging::PastaLogger>>, LoaderError> {
         let logging_config = config.logging();
 
+        // Always update the tracing filter: a reload without `[logging]` resets it
+        // to the default, and a logger creation failure still applies level/filter.
+        crate::logging::update_tracing_filter(&logging_config.clone().unwrap_or_default());
+
         match crate::logging::PastaLogger::new(base_dir, logging_config.as_ref()) {
             Ok(logger) => {
                 let logger = std::sync::Arc::new(logger);
@@ -245,11 +249,6 @@ impl PastaLoader {
                 // Register with global registry (overwrites Stage 1 default writer)
                 crate::logging::GlobalLoggerRegistry::instance()
                     .register(base_dir.to_path_buf(), logger.clone());
-
-                // Update tracing filter with config
-                if let Some(ref cfg) = logging_config {
-                    crate::logging::update_tracing_filter(cfg);
-                }
 
                 Ok(Some(logger))
             }

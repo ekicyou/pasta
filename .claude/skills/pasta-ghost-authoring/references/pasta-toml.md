@@ -417,7 +417,7 @@ level = "debug"
 filter = "debug,pasta_shiori=info"
 ```
 
-- `file_path` に書けるのは、`profile` で始まり `..` を含まない相対パスだけである。条件を満たさない値のときはログファイルが作られない（ゴーストの起動は続く）。
+- `file_path` に書けるのは、`profile` で始まり `..` を含まない相対パスだけである。条件を満たさない値のときはログファイルが作られない（ゴーストの起動は続き、`level`・`filter` は反映される）。
 - `filter`・`level` として解釈できない値のときは `info` になる。
 - 環境変数 `PASTA_LOG` が設定されていると、`filter`・`level` より優先される。
 - Lua からのログ出力は [@pasta_log](https://ekicyou.github.io/pasta/lua/modules/pasta-log.html)、起動に失敗したときのログの読み方は [ゴーストが起動しない・喋らないとき](https://ekicyou.github.io/pasta/reference/startup.html#4-ゴーストが起動しない喋らないとき) を参照する。
