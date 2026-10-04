@@ -146,7 +146,7 @@
   - _Requirements: 6.5, 6.6_
   - _Depends: 7.1, 7.2_
 
-- [ ] 8. 最終検証
+- [x] 8. 最終検証
   - ワークスペース全体の `cargo test` と `cargo clippy` が通る
   - 応答内容・待ち時間を固定している既存テスト（FFI セッションの E2E・バイト不変・marshaling・teardown）が変更なしで通る
   - _Requirements: 4.8_
