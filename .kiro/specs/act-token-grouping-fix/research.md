@@ -131,3 +131,47 @@
 - **CT は撤去で確定**（議題にせず閉じた）。
 
 実装の見込み: `group_by_actor` で、(1) グループが無いときの表示制御などをアクターの無いグループに入れる、(2) `clear_spot` で `current_actor_token`・`current_actor` を戻す。`sakura_builder.lua`・`appearance.lua` は変更しない。
+
+## 設計フェーズの調査と決定（2026-10-04）
+
+- **Discovery Scope**: Extension（light discovery）。新しい依存・外部調査は無い。
+
+### 5. 「組み立ては変更不要」の実コード確認
+- **Context**: 要件ディスカッションの決定（案 (a)・`clear_spot` だけ閉じる）は、`sakura_builder.lua`・`appearance.lua` を変更しない見込みに立つ。設計の前にこの見込みを実コードで確かめた。
+- **Sources Consulted**: `pasta/act.lua`（`group_by_actor`・`merge_consecutive_talks`・`ACT_IMPL.build`）、`pasta/shiori/sakura_builder.lua`（`BUILDER.build` の S1・S3・S4・S4b・S5・最上位 `raw_script`、`emit_inner_token`）、`pasta/shiori/appearance.lua`（`observe`・`observe_raw`・`restore`・`leading_tags`）、`pasta/shiori/act.lua`（`SHIORI_ACT_IMPL.build`）、`pasta/shiori/entry.lua`（`GLOBAL.close_ghost`）。
+- **Findings**:
+  - アクター `nil` のグループは 164 行の `if actor and last_actor ~= actor` で切替・復旧を飛ばし、内側を順に出力する。`last_actor` を変えないため、次の発言者のグループで必ず `\p[N]` が出る。
+  - 内側の観測は `APPEARANCE.observe(appearance, nil, last_spot, s)` で、アクター `nil` は `observe_raw` に入り `spot` を使わない。サーフェス変更・着せ替え・スコープ切替タグがあれば `state.spots = {}` にするだけである。`\_w`・`
+`・`\c`・`\![*]`・`\q[…]`・`\![set,choicetimeout,…]` は `classify` に当たらない。
+  - `nil` グループが開いている間の `raw_script` はグループの内側に入る（既存のハイブリッド分類）。内側の `raw_script` は S4 で `text` のまま出力され、アクター `nil` として観測されるため、最上位の `raw_script` とバイトも観測も同じである。
+  - `clear`（S4b）は `last_spot ~= nil` のガードを持つ。`nil` グループが現れるのは出力の先頭か `clear_spot` の直後だけで、そこでは `last_spot == nil`・`pending_break == false` である。
+  - `merge_consecutive_talks` はアクター `nil` のグループもそのまま写す。
+  - 変更後の `group_by_actor` をスクラッチの写しに作り、同梱 luacheck で複雑度を測った。13（変更前と同じ。上限 15）。`find_act_handler` は 14 で変更しない。
+  - 既存の Lua テストに、先頭の表示制御が捨てられることを固定するものは無い（`shiori_act_test.lua` の表示制御のテストは、先に空の `talk` を積んでいる）。
+- **Implications**: 見込みはすべて成り立つ。変更は `group_by_actor` の 2 か所だけで、関数の切り出しも要らない。
+
+### 6. 設計フェーズで確かめていないこと
+- Rust 側の E2E（`crates/pasta_lua/tests/shiori/`・`crates/pasta_shiori`・`crates/pasta_sample_ghost`）に、2 現象に当たるシーンの期待値があるか。設計フェーズではソースを変更しないため、変更後のコードでテストを実行していない。実装の最初に全テストを走らせて確かめる（design.md の GroupByActor の Risks）。
+
+### Synthesis（設計の統合）
+- **Generalization**: 「出力の先頭の表示制御」と「`clear_spot` の後の表示制御」は同じ問題（現在のグループが無いときの表示制御の行き先）である。`clear_spot` でグループを閉じれば、後者は前者と同じ分岐を通る。別の仕掛けは要らない。
+- **Build vs. Adopt**: アクター未指定の出力は、組み立てが既に持つアクター `nil` のグループの経路を使う。最上位のトークンとして表す案は組み立ての変更が要るため採らない。
+- **Simplification**: 保留・流し込み・フォールバック・直前の発言者の開き直し・関数の切り出しは、どれも作らない。`require("ct")` のエラーの専用テストも足さない。
+
+### Design Decisions（設計フェーズ）
+
+#### Decision: アクターの無いグループの表し方（要件 D1）
+- **Alternatives Considered**:
+  1. アクター `nil` の `type = "actor"` グループ
+  2. 最上位に表示制御のトークンを直接置く
+- **Selected Approach**: 1。
+- **Rationale**: `BUILDER.build` の最上位は `spot`・`clear_spot`・`actor`・`raw_script` だけを扱う。2 は組み立ての変更が要り、範囲の外に出る。
+- **Trade-offs**: グループ化トークンに「アクター `nil` のグループ」が現れる場面が増える（形は既存のまま）。
+
+#### Decision: `shiori/init.lua` のコメント（要件 D2）
+- **Selected Approach**: コメントから `ct.lua` の言及を外す（1 行。挙動は変えない）。
+- **Rationale**: 削除したファイルを指すコメントを残さない。Wave 2 の他の spec（`actor-proxy-act-delegation`・`string-concat-operator`）は `pasta/shiori/init.lua` を触らないため、並走の衝突は無い。
+
+### 未決事項（設計ディスカッションへ）
+- **OQ1**: 発言の後で、同じ配置の `％` 行を持つシーンを呼ぶと、同じ発言者の台詞の結合が切れ、`\p[0]A\p[0]B` になる（budoux の行幅は B で数え直し。段落区切りの改行は出ない）。要件 2.2・2.3 の帰結であり、設計はそのまま採った。この副作用を受け入れてよいかを確認する。DSL の例は design.md の末尾にある。
+
