@@ -136,7 +136,7 @@ impl PastaLoader {
         // Phase 3: Discover files
         debug!("Phase 3: Discovering pasta and lua files");
         let (pasta_files, lua_files) =
-            Self::discover_all_files(base_dir, &config.loader.pasta_patterns)?;
+            Self::discover_all_files(base_dir, &config.loader.pasta_patterns, &cache_manager)?;
         let total_files = pasta_files.len() + lua_files.len();
         if total_files == 0 {
             warn!(path = %base_dir.display(), "No .pasta or .lua files found");

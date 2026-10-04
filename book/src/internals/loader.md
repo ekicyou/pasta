@@ -154,7 +154,7 @@ sync_pasta_scripts(base_dir)
 2. `.pasta` で終わる各パターンの末尾を `.lua` に替えたパターンを作る。`.pasta` で終わらないパターンは警告を出して飛ばす。
 3. 作ったパターンで `discover_files` を呼び、`.lua` を集める。ここでのエラーは警告にとどめ、`.lua` は 0 件として扱う。0 件でも警告は出さない。
 4. `.pasta` と `.lua` のどちらかにファイル名が `init.lua` または `init.pasta` のものがあれば、`LoaderError::InvalidFileName` で起動を止める。
-5. `.pasta` のモジュールキー（後述の `module_key`）の集合を作り、同じキーの `.lua` を警告付きで除く。
+5. `.pasta` のモジュール名（後述の `source_to_module_name`）の集合を作り、同じモジュール名の `.lua` を警告付きで除く。
 
 `discover_files` は各パターンについて次を行う。
 
@@ -188,8 +188,6 @@ dic/v1.2.pasta
 - `.lua` も `.pasta` と同じ規則で名前とキャッシュ先が決まる。拡張子が違うだけの同名ファイルは同じモジュール名になるため、検出の手順 5 で `.lua` を除く。
 - 非 ASCII の文字はそのまま残す。モジュール名を解決する searcher も UTF-8 のまま扱う（次節）。
 - `dic` を除くのは、`dic` がパス要素として完結する場合だけである。`dictionary.pasta` や `dicx/foo.pasta` はそのまま残る。
-- 同名衝突の判定に使う `module_key`（`crates/pasta_lua/src/loader/process.rs`）は、`pasta.scene.` を付けない名前を返す。こちらは先頭の `dic` を文字列の接頭辞として除き、パス要素の境界を確かめない。
-
 モジュール名の一覧は増分処理で集められ、`scene_dic.lua` が並べ替えて `require` する（[トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ)）。`require("pasta.scene.baseware.system")` は、次節の searcher が検索パスの `profile/pasta/cache/lua` から `pasta/scene/baseware/system.lua` を見つけることで解決する。searcher はモジュール名の `.` をすべてパス区切りに戻すため、キャッシュ先はモジュール名から同じ規則で導出し、ファイル名やディレクトリ名に含まれる `.` はモジュール名の時点で `_` に置き換えておく。
 
 ### モジュール検索パス

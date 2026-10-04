@@ -28,6 +28,7 @@ impl PastaLoader {
     pub(super) fn discover_all_files(
         base_dir: &Path,
         pasta_patterns: &[String],
+        cache_manager: &CacheManager,
     ) -> Result<(Vec<std::path::PathBuf>, Vec<std::path::PathBuf>), LoaderError> {
         // Discover .pasta files
         let pasta_files = discovery::discover_files(base_dir, pasta_patterns)?;
@@ -76,18 +77,18 @@ impl PastaLoader {
         // Build HashSet of .pasta module names for conflict detection
         let pasta_module_names: std::collections::HashSet<String> = pasta_files
             .iter()
-            .map(|f| module_key(base_dir, f))
+            .map(|f| cache_manager.source_to_module_name(f))
             .collect();
 
         // Filter out conflicting .lua files
         let mut filtered_lua_files = Vec::new();
         for lua_file in &lua_files {
-            let module_key = module_key(base_dir, lua_file);
+            let module_name = cache_manager.source_to_module_name(lua_file);
 
-            if pasta_module_names.contains(&module_key) {
+            if pasta_module_names.contains(&module_name) {
                 warn!(
                     lua_file = %lua_file.display(),
-                    module_name = %format!("pasta.scene.{}", module_key),
+                    module_name = %module_name,
                     "Module name conflict: .pasta file takes priority, .lua file ignored"
                 );
             } else {
@@ -268,29 +269,4 @@ impl PastaLoader {
 
         Ok((combined_context, module_names, stats))
     }
-}
-
-/// Compute the bare scene module key for a source file under `base_dir`.
-///
-/// Like `CacheManager::source_to_module_name`, without the `pasta.scene.`
-/// prefix: strip `base_dir` and a leading `dic`, drop the extension, then map
-/// path separators to `.` and `-` to `_`. Unlike `source_to_module_name`, the
-/// leading `dic` is stripped as a plain string prefix, without checking that it
-/// ends at a path component boundary (e.g. `dicx/foo.pasta` yields `x.foo`).
-fn module_key(base_dir: &Path, file: &Path) -> String {
-    let relative = file
-        .strip_prefix(base_dir)
-        .unwrap_or(file)
-        .to_string_lossy()
-        .to_string();
-    let without_prefix = relative
-        .strip_prefix("dic")
-        .unwrap_or(&relative)
-        .trim_start_matches(['/', '\\'])
-        .to_string();
-    let stem = std::path::Path::new(&without_prefix)
-        .with_extension("")
-        .to_string_lossy()
-        .to_string();
-    stem.replace(['/', '\\'], ".").replace('-', "_")
 }
