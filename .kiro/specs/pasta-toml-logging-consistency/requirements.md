@@ -24,7 +24,7 @@
   - `pasta.toml` の `[lua]`（`libs`）と `[logging] rotation_days` の撤去（設定の読み取り・公開 API・サンプルゴースト・マニュアル・テスト）
   - `RuntimeConfig::from_libs` などで pasta に必要なライブラリを欠いた構成を渡したときのエラーの明示
   - pasta.dll（SHIORI）が出すログのうち、FFI 入口スレッド・アクタースレッド・ゴーストの終了処理で出すものの保存
-  - 不正な `[logging] file_path` のときの挙動の確定と、それを知らせる warn
+  - 不正な `[logging] file_path` のときの挙動の確定（`profile/` の下に限る判定の厳密化を含む）と、それを知らせる warn
   - 上記を固定する自動テスト
   - マニュアルの該当章の更新とスキル `references/` の再生成
 - **Out of scope**:
@@ -92,18 +92,18 @@
 **Objective:** ゴースト作者として、`file_path` を書き間違えたとき、ログがどこへ行くかと、なぜそうなったかを知りたい。ログを失わずに設定を直せるようにするためである。
 
 #### Acceptance Criteria
-1. If `[logging] file_path` が条件（設置ディレクトリからの相対パスで、`profile` で始まり、`..` を含まない）を満たさない, the pasta ローダ shall SHIORI 経由でも `PastaLoader` を直接使う組み込みでも、ゴーストの起動を続け、既定のログファイル `profile/pasta/logs/pasta.log` にログを書く（**前提 A4・A8**）。
+1. If `[logging] file_path` が条件（設置ディレクトリからの相対パスで、最初の要素がちょうど `profile` であり（`profile/` ディレクトリの下）、`..` を含まない）を満たさない, the pasta ローダ shall SHIORI 経由でも `PastaLoader` を直接使う組み込みでも、ゴーストの起動を続け、既定のログファイル `profile/pasta/logs/pasta.log` にログを書く（**前提 A4・A8**）。
 2. If `[logging] file_path` が条件を満たさない, the pasta ローダ shall 不正と判断した `file_path` の値と、既定のログファイルへ書くことを示す warn を、既定のログファイルに書く（経路によって文言を変えない）。
 3. If `[logging] file_path` が条件を満たさない, the pasta.dll shall 同じ `[logging]` の `level`・`filter` を反映する（現行の挙動を維持する）。
 4. When 不正な `file_path` で読み込んだゴーストを、正しい `file_path` に直して再読み込みする, the pasta.dll shall 以後のログを直した `file_path` のファイルに書く。
-5. The pasta.dll shall `file_path` が条件を満たすかどうかの判定基準を変えない。
+5. The pasta ローダ shall `profile.log`・`profiles/x.log` のように、文字列として `profile` で始まっても `profile/` ディレクトリの下にない `file_path` を不正と判定する（**前提 A10**）。
 
 ### Requirement 6: マニュアル・サンプル・スキルの一致
 
 **Objective:** ゴースト作者として、マニュアルとスキルに書かれた挙動が実際の挙動と一致していてほしい。マニュアルが利用者向け設定の唯一の権威だからである。
 
 #### Acceptance Criteria
-1. The pasta マニュアル shall `reference/pasta-toml.md` の `[logging]` の節と `reference/startup.md` で、不正な `file_path` のときに既定のログファイルへ書き続けることと、warn が出ることを説明する。
+1. The pasta マニュアル shall `reference/pasta-toml.md` の `[logging]` の節と `reference/startup.md` で、`file_path` に書けるのは `profile/` ディレクトリの下の相対パスであること、不正な `file_path` のときに既定のログファイルへ書くことと、warn が出ることを説明する。
 2. The pasta マニュアル shall `internals/logging-encoding.md` で、ログがゴーストのログファイルへ届く条件（どのスレッド・どの時点のログが残り、どの場合に捨てられるか）と、不正な `file_path` のときのロガーの扱いを、本仕様の挙動のとおりに説明する。
 3. The pasta マニュアル shall `internals/shiori.md` で、`request`・`unload`・`DllMain` の detach・終了処理のログの扱いを、本仕様の挙動のとおりに説明する。
 4. The pasta マニュアル shall `internals/loader.md` など内部設計の章から、撤去した設定型（`[lua]` の設定型）と `rotation_days` への言及を除く。
@@ -118,7 +118,7 @@
 1. The pasta テストスイート shall `[lua] libs` と `rotation_days` を書いた `pasta.toml` でゴーストが読み込めることを検証する。
 2. The pasta テストスイート shall 必須ライブラリを欠いた構成が、欠けたライブラリ名を含む構成エラーになることを検証する。
 3. The pasta テストスイート shall SHIORI の FFI 入口から `load`・`request`・`unload` を通したとき、`request` 入口と終了処理で出したログがゴーストのログファイルに残ることを検証する。
-4. The pasta テストスイート shall 不正な `file_path` で読み込んだとき、既定のログファイルに warn とその後のログが残ることを検証する。
+4. The pasta テストスイート shall 不正な `file_path`（`profile.log` など `profile/` の外を指す値を含む）で読み込んだとき、既定のログファイルに warn とその後のログが残ることを、SHIORI 経由と組み込みの両方で検証する。
 5. The pasta テストスイート shall ロガーが登録されていないときのログが、エラーや panic を起こさずに捨てられることを検証する。
 
 ## 前提と未決事項
@@ -136,7 +136,7 @@
 | A7 | Boundary | 確定 | プロセス終了による `DLL_PROCESS_DETACH`（`unload` を経ない終了）では何もしない現行の挙動を保ち、ログの保存の対象にしない | 現行はこの経路でログを出さない。プロセス終了中は書き込み用のスレッドが止まっており、ロガーは「生きている範囲」の外 |
 | A8 | 5 | 確定（議題 3） | 不正な `file_path` のときは、SHIORI 経由でも組み込みでも既定のログファイルへフォールバックする（段階 1.5 自身が既定の設定でロガーを作って登録する） | 現行の組み込みはロガー無しになり、`[logging]` を書かない場合（既定ファイルに書く）より悪い。挙動・warn の文言・マニュアルを 1 通りにする。SHIORI では段階 1 の既定ロガーを上書き登録する正常時と同じ流れになる |
 | A9 | 4 | 確定 | デバッグバックエンドのログは範囲外とし、保存の挙動を保証しない（実現方法によっては副次的に残るようになってもよい） | brief の Out of scope は「デバッグバックエンドのログ（を対象にすること）」。設計の自由度を残す |
-| A10 | 5.5 | 議題 | `file_path` の判定基準（文字列として `profile` で始まる）は変えない | `profile` ディレクトリの下であることを厳密に判定する（`profiles/`・`profile.log` などを拒否する） |
+| A10 | 5.5 | 確定（議題 4） | `file_path` の判定を厳密にし、最初の要素がちょうど `profile` であることを求める（`profile.log`・`profiles/` は不正） | 現行の文字列の前方一致では `profile.log` が通り、`pasta_check` は `profile` ディレクトリだけを配布物から外すため、ログファイルが `.nar`・`updates.txt` に紛れ込む。不正と判定されても議題 3 のフォールバックで起動は続き、ログも失われない |
 | D1 | 1.5 | 設計 | `default_libs` の定義場所と公開パス（`pasta_lua::default_libs`・`pasta_lua::loader::default_libs`）の維持 | `LuaConfig` と同じ `sections.rs` から `runtime_config.rs` へ移すか |
 | D2 | 3.1 | 設計 | 必須ライブラリの一覧とエラーの種類・文言 | `std_package` のほか、ローダ経由の `pasta_scripts` が要る `string`・`table`・`coroutine` などを調査して確定 |
 | D3 | 4 | 設計 | 入口・アクタースレッドのログの振り分け方式（research.md 4.1 の案 A〜C）と `PastaShiori::drop` の順序 | 複数ロガー時の誤配防止（4.6）と、テストの並列実行下での E2E 検証の作り方を含む |
