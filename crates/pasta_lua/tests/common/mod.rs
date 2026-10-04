@@ -231,6 +231,30 @@ pub fn value_as_str(value: &mlua::Value) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+/// SHIORI 応答を厳密に検査する（二重包みを見逃さない）。
+///
+/// - 先頭行がステータス行 `SHIORI/3.0 {status}` と完全に一致する
+/// - `SHIORI/3.0` が応答の中に 1 回だけ現れる
+/// - `Value` 行が `Value: {value}` と完全に一致する（`None` なら `Value` 行が無い）
+pub fn assert_shiori_response(response: &str, status: &str, value: Option<&str>) {
+    assert_eq!(
+        response.lines().next(),
+        Some(format!("SHIORI/3.0 {status}").as_str()),
+        "status line mismatch: {response:?}"
+    );
+    assert_eq!(
+        response.matches("SHIORI/3.0").count(),
+        1,
+        "SHIORI/3.0 must appear exactly once: {response:?}"
+    );
+    let value_lines: Vec<&str> = response
+        .lines()
+        .filter(|l| l.starts_with("Value:"))
+        .collect();
+    let expected: Vec<String> = value.map(|v| format!("Value: {v}")).into_iter().collect();
+    assert_eq!(value_lines, expected, "Value line mismatch: {response:?}");
+}
+
 // ============================================================================
 // Sakura Script Test Helpers
 // ============================================================================
