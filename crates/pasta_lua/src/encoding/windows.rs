@@ -13,15 +13,6 @@ use std::ptr;
 use windows_sys::Win32::Globalization::*;
 
 // ============================================================================
-// Code page constants
-// ============================================================================
-
-/// ANSI code page (system default for GUI applications)
-const CP_ACP_VALUE: u32 = CP_ACP;
-/// OEM code page (system default for console applications)
-const CP_OEMCP_VALUE: u32 = CP_OEMCP;
-
-// ============================================================================
 // MultiByteToWideChar flags
 // ============================================================================
 
@@ -41,11 +32,15 @@ const WC_COMPOSITECHECK_FLAG: u32 = 0x0000_0200;
 // ============================================================================
 
 impl Encoding {
-    /// Get the Windows code page for this encoding.
+    /// Get the actual Windows code page for this encoding (resolved, never
+    /// CP_ACP / CP_OEMCP), so that a UTF-8 system code page can be detected.
     fn codepage(&self) -> u32 {
-        match self {
-            Encoding::ANSI => CP_ACP_VALUE,
-            Encoding::OEM => CP_OEMCP_VALUE,
+        // SAFETY: GetACP / GetOEMCP take no arguments and only read process state.
+        unsafe {
+            match self {
+                Encoding::ANSI => GetACP(),
+                Encoding::OEM => GetOEMCP(),
+            }
         }
     }
 }
@@ -93,6 +88,11 @@ fn buffer_len_to_i32(len: usize) -> Result<i32> {
 /// * `Ok(Vec<u8>)` - Converted multibyte string
 /// * `Err` - If an invalid input character is encountered and `default_char` is `None`
 fn string_to_multibyte(codepage: u32, data: &str, default_char: Option<u8>) -> Result<Vec<u8>> {
+    // UTF-8 (65001) rejects WC_COMPOSITECHECK and a non-null lpUsedDefaultChar
+    // (ERROR_INVALID_FLAGS / ERROR_INVALID_PARAMETER); the input already is UTF-8.
+    if codepage == CP_UTF8 {
+        return Ok(data.as_bytes().to_vec());
+    }
     let wstr: Vec<u16> = OsStr::new(data).encode_wide().collect();
     wide_char_to_multi_byte(
         codepage,
@@ -317,8 +317,7 @@ mod tests {
     fn test_wide_char_to_multi_byte_ascii() {
         let wide: Vec<u16> = "Test".encode_utf16().collect();
         let (result, _) =
-            wide_char_to_multi_byte(CP_ACP_VALUE, WC_COMPOSITECHECK_FLAG, &wide, None, true)
-                .unwrap();
+            wide_char_to_multi_byte(CP_ACP, WC_COMPOSITECHECK_FLAG, &wide, None, true).unwrap();
         assert_eq!(result, b"Test");
     }
 
@@ -361,6 +360,17 @@ mod tests {
         // "日本語" in Shift-JIS: 日 = 0x93FA, 本 = 0x967B, 語 = 0x8CEA
         let result = string_to_multibyte(CP932, "日本語", None).unwrap();
         assert_eq!(result, [0x93u8, 0xFA, 0x96, 0x7B, 0x8C, 0xEA]);
+    }
+
+    #[test]
+    fn test_string_to_multibyte_utf8_codepage_returns_utf8_bytes() {
+        // ANSI コードページが UTF-8（65001）のシステム向け。API の仕様上 65001 では
+        // WC_COMPOSITECHECK と lpUsedDefaultChar を渡せないため、UTF-8 のバイト列をそのまま返す。
+        let result = string_to_multibyte(CP_UTF8, "日本語", None).unwrap();
+        assert_eq!(result, "日本語".as_bytes());
+        let restored =
+            multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS_FLAG, &result).unwrap();
+        assert_eq!(restored, "日本語");
     }
 
     #[test]

@@ -166,10 +166,10 @@ log.info(値)
 
 ### OS 別の変換の実装
 
-Windows の実装は、`Encoding` を `CP_ACP`（`ANSI`）か `CP_OEMCP`（`OEM`）に対応させる。コードページはシステムのロケール設定で決まる。
+Windows の実装は、`Encoding` を `GetACP`（`ANSI`）か `GetOEMCP`（`OEM`）が返す実際のコードページに対応させる。コードページはシステムのロケール設定で決まる。
 
 - `to_string`（コードページ → UTF-8）: `MultiByteToWideChar` を `MB_ERR_INVALID_CHARS` 付きで呼び、UTF-16 を `String::from_utf16` で UTF-8 にする。コードページとして不正なバイト列はエラーになる。
-- `to_bytes`（UTF-8 → コードページ）: 文字列を UTF-16 にしてから `WideCharToMultiByte` を `WC_COMPOSITECHECK` 付きで呼ぶ。代替文字を指定せず、代替文字を使ったかどうかを受け取り、使っていたら（コードページで表せない文字があったら）`InvalidInput` のエラーにする。
+- `to_bytes`（UTF-8 → コードページ）: 文字列を UTF-16 にしてから `WideCharToMultiByte` を `WC_COMPOSITECHECK` 付きで呼ぶ。代替文字を指定せず、代替文字を使ったかどうかを受け取り、使っていたら（コードページで表せない文字があったら）`InvalidInput` のエラーにする。ただし、コードページが UTF-8（65001）のときは API を呼ばずに UTF-8 のバイト列をそのまま返す（65001 では `WC_COMPOSITECHECK` と代替文字の受け取りが許されないため）。
 - どちらの API も、1 回目で必要な長さを問い合わせ、確保したバッファに 2 回目で書かせる。入力の長さは `buffer_len_to_i32` で `i32` に収まるか確かめ、2 GiB 以上はエラーにする（`as` で変換すると負の値になり、API が入力を NUL 終端として読み進めるため）。空の入力は API を呼ばずに空を返す。
 
 Windows 以外の実装は、`to_bytes` で UTF-8 のバイト列をそのまま返し、`to_string` で `String::from_utf8` が通ればそのまま返す（不正な UTF-8 は `InvalidData` のエラー）。
