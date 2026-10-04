@@ -390,3 +390,49 @@ fn test_persistence_effective_file_path() {
     };
     assert_eq!(config.effective_file_path(), "profile/pasta/save/save.dat");
 }
+
+/// 1.3, 2.3, 7.1: 撤去したキー（`[lua] libs`・`[logging] rotation_days`）を書いた
+/// `pasta.toml` でも読み込みが成功し、`[logging]` の他の 3 項目は書いたとおりに効き、
+/// `[lua] libs` に書いた `env` で `@env` が有効にならない。
+#[test]
+fn removed_keys_are_ignored_on_load() {
+    use crate::common::copy_fixture_to_temp;
+    use pasta_lua::loader::PastaLoader;
+
+    let temp = copy_fixture_to_temp("minimal");
+    std::fs::write(
+        temp.path().join("pasta.toml"),
+        r#"
+[loader]
+debug_mode = true
+
+[lua]
+libs = ["std_all", "env"]
+
+[logging]
+rotation_days = 14
+file_path = "profile/pasta/logs/custom.log"
+level = "debug"
+filter = "warn,pasta_lua=debug"
+"#,
+    )
+    .unwrap();
+
+    let runtime = PastaLoader::load(temp.path()).expect("load must succeed with removed keys");
+
+    let logging = runtime
+        .config()
+        .expect("loader sets config")
+        .logging()
+        .expect("[logging] must parse despite rotation_days");
+    assert_eq!(logging.file_path, "profile/pasta/logs/custom.log");
+    assert_eq!(logging.level, "debug");
+    assert_eq!(logging.filter.as_deref(), Some("warn,pasta_lua=debug"));
+
+    let env_loadable = runtime.exec(r#"return (pcall(require, "@env"))"#).unwrap();
+    assert_eq!(
+        env_loadable.as_boolean(),
+        Some(false),
+        "[lua] libs = [\"env\"] must not enable @env"
+    );
+}
