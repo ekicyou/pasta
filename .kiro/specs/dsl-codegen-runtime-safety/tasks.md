@@ -73,7 +73,7 @@
   - _Depends: 3.1, 3.2, 3.3_
 
 - [ ] 5. マニュアルとスキル生成物の更新
-- [ ] 5.1 (P) 文法の章を新しい挙動にそろえる
+- [x] 5.1 (P) 文法の章を新しい挙動にそろえる
   - アクション行の章に、`\\` のエスケープ（インライン要素・エスケープの表）、未登録アクターの挙動（目印付きで立ち位置 0 に発言・警告ログ）、act のメンバー名と同名のアクターも使えることを書く
   - 変数の章に、未定義の `＠＊名前（）` と数値にできない算術の挙動を書き、Lua 展開の表を新しい生成形にそろえる。単語の章の生成形の記述もそろえる
   - 足した・変えた pasta コード例を一時的な `.pasta` に写して `pasta_check` にかけ、パースエラーにならない
@@ -111,3 +111,5 @@
 - テスト実行で `crates/pasta_lua/profile/pasta/save/save.json` が書き換わることがある（既存テストの副作用）。`git checkout --` で戻し、コミットに含めない。
 - 生成形を変えると `src/debug/wiring_pasta_break_coalesce_e2e.rs` の最小 Lua シム（ACT）にも act の新メソッドが要る（3.1 で `ACT.actor_proxy` を追加済み）。3.2 で `act:arith` を生成するなら同シムも確認する。
 - `crates/pasta_shiori/tests/support/scripts/` は古いランタイムの写しで act の新メソッドを持たない。生成コードを実行する E2E フィクスチャは `lua_search_paths` から `scripts` を外して埋め込みランタイムを通す（4.2 の codegen_runtime_safety フィクスチャ参照）。
+- `pasta_check` には `.pasta` を検証するサブコマンドが無い（`release` のみ）。マニュアル例の読み込み確認は `pasta_dsl::parser::parse_file`＋`pasta_lua::LuaTranspiler` を呼ぶ使い捨てクレートで行う（5.1 で実施）。
+- マニュアルを変えると `gen-skill-refs.mjs --check` は 5.4 で再生成するまで STALE で失敗する（想定どおり）。
