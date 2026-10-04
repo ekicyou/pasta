@@ -1,5 +1,6 @@
 -- 生成コードが呼ぶ存在確認付き act メソッドのランタイムテスト (dsl-codegen-runtime-safety)
 -- act:global_fn: ＠＊名前（…）の呼び出し（未定義・関数でないときは警告して値なし）
+-- act:actor_proxy: アクション行のアクター解決（未登録は目印付きのその場限りのアクター）
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -98,6 +99,140 @@ describe("act:global_fn - 未定義・関数でない値", function()
             act:global_fn("rs_関数")
             expect(#warns):toBe(before + 1)
             expect(warns[#warns]):toBe("act:global_fn - function not found: key='rs_関数'")
+        end)
+    end)
+end)
+
+-- act:actor_proxy: アクション行のアクター解決（登録済みは act.名前 と同じ・未登録はその場限りのアクター）
+local STORE = require("pasta.store")
+
+--- act の自身のキー一覧（フィールドを足していないことの確認用）
+local function own_keys(t)
+    local keys = {}
+    for k in pairs(t) do table.insert(keys, tostring(k)) end
+    table.sort(keys)
+    return table.concat(keys, ",")
+end
+
+describe("act:actor_proxy - 登録済みアクター", function()
+    test("act.名前 と同じアクターのトークンを積み、ログ・トークンを足さない", function()
+        with_captured_act(function(ACT, warns)
+            local actors = { ["さくら"] = { name = "さくら" } }
+            local act = ACT.new(actors)
+            local p = act:actor_proxy("さくら")
+            expect(#act.token):toBe(0)
+            p:talk("こんにちは")
+            act["さくら"]:talk("こんにちは")
+            expect(#act.token):toBe(2)
+            expect(act.token[1].actor):toBe(actors["さくら"])
+            expect(act.token[1].actor):toBe(act.token[2].actor)
+            expect(act.token[1].text):toBe(act.token[2].text)
+            expect(#warns):toBe(0)
+        end)
+    end)
+
+    test("talk・var・save・actors という名前の登録済みアクターが話せる", function()
+        with_captured_act(function(ACT, warns)
+            local names = { "talk", "var", "save", "actors" }
+            local actors = {}
+            for _, n in ipairs(names) do actors[n] = { name = n } end
+            local act = ACT.new(actors)
+            for _, n in ipairs(names) do
+                act:actor_proxy(n):talk(n .. "です")
+            end
+            expect(#act.token):toBe(4)
+            for i, n in ipairs(names) do
+                expect(act.token[i].type):toBe("talk")
+                expect(act.token[i].actor):toBe(actors[n])
+                expect(act.token[i].text):toBe(n .. "です")
+            end
+            expect(#warns):toBe(0)
+        end)
+    end)
+
+    test("talk という名前のアクターを登録しても、手書き Lua の act.talk はメソッドを返す", function()
+        with_captured_act(function(ACT)
+            local act = ACT.new({ talk = { name = "talk" } })
+            expect(act.talk):toBe(ACT.IMPL.talk)
+        end)
+    end)
+end)
+
+describe("act:actor_proxy - 未登録アクター", function()
+    test("1 行の複数アクションで目印と警告は 1 回、同じ actor テーブルで積む", function()
+        with_captured_act(function(ACT, warns)
+            local act = ACT.new({})
+            local keys_before = own_keys(act)
+            act:actor_proxy("rs_謎"):talk("こんにちは")
+            act:actor_proxy("rs_謎"):sakura_script("\n")
+            act:actor_proxy("rs_謎"):talk("さよなら")
+            expect(#act.token):toBe(4)
+            local adhoc = act.token[1].actor
+            expect(act.token[1].type):toBe("talk")
+            expect(act.token[1].text):toBe("【未登録アクター：rs_謎】")
+            expect(act.token[2].text):toBe("こんにちは")
+            expect(act.token[3].type):toBe("sakura_script")
+            for i = 2, 4 do expect(act.token[i].actor):toBe(adhoc) end
+            expect(adhoc.name):toBe("rs_謎")
+            expect(getmetatable(adhoc)):toBeNil()
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe("act:actor_proxy - unregistered actor: name='rs_謎'")
+            expect(own_keys(act)):toBe(keys_before)
+        end)
+    end)
+
+    test("実行後も STORE.actors[名前]・act.名前・act.actors[名前] は nil のまま", function()
+        with_captured_act(function(ACT)
+            local act = ACT.new({})
+            act:actor_proxy("rs_謎"):talk("やあ")
+            expect(STORE.actors["rs_謎"]):toBeNil()
+            expect(act["rs_謎"]):toBeNil()
+            expect(act.actors["rs_謎"]):toBeNil()
+        end)
+    end)
+
+    test("話者が別のアクターに切り替わってから戻ると、目印と警告がもう一度出る", function()
+        with_captured_act(function(ACT, warns)
+            local actors = { ["さくら"] = { name = "さくら" } }
+            local act = ACT.new(actors)
+            act:actor_proxy("rs_謎"):talk("一")
+            act:actor_proxy("さくら"):talk("二")
+            act:actor_proxy("rs_謎"):talk("三")
+            act:actor_proxy("rs_別"):talk("四")
+            expect(#act.token):toBe(7)
+            expect(act.token[4].text):toBe("【未登録アクター：rs_謎】")
+            expect(act.token[4].actor == act.token[1].actor):toBe(false)
+            expect(act.token[6].text):toBe("【未登録アクター：rs_別】")
+            expect(#warns):toBe(3)
+        end)
+    end)
+
+    test("直前の話者が sakura_script のトークンでも切り替わりとして扱う", function()
+        with_captured_act(function(ACT, warns)
+            local actors = { ["さくら"] = { name = "さくら" } }
+            local act = ACT.new(actors)
+            act:actor_proxy("さくら"):talk("a")
+            act:actor_proxy("rs_謎"):talk("b")
+            act:actor_proxy("さくら"):sakura_script("\n")
+            act:actor_proxy("rs_謎"):talk("c")
+            expect(act.token[5].text):toBe("【未登録アクター：rs_謎】")
+            expect(#warns):toBe(2)
+        end)
+    end)
+
+    test("話者を持たないトークンは飛ばして直前の話者を探し、build 後は目印が再び付く", function()
+        with_captured_act(function(ACT, warns)
+            local act = ACT.new({})
+            act:actor_proxy("rs_謎"):talk("一")
+            act:surface(1)
+            act:actor_proxy("rs_謎"):talk("二")
+            expect(#act.token):toBe(4)
+            expect(act.token[4].actor):toBe(act.token[1].actor)
+            expect(#warns):toBe(1)
+            act:build()
+            act:actor_proxy("rs_謎"):talk("三")
+            expect(act.token[1].text):toBe("【未登録アクター：rs_謎】")
+            expect(#warns):toBe(2)
         end)
     end)
 end)

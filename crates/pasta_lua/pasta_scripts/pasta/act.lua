@@ -440,6 +440,35 @@ function ACT_IMPL.expr_fn_var(self, value, var_path, ...)
     return call_expr(self, key, true, ...)
 end
 
+--- アクター名からプロキシを得る（アクション行の生成コードが呼ぶ）
+--- 登録済み（self.actors[name]）なら act.名前 と同じプロキシを返す。名前を文字列で受けるため
+--- act のメンバー名と同名のアクターでも __index を通らない。
+--- 未登録なら名前だけのその場限りのアクター（{ name = name }・メタテーブルなし）のプロキシを返す。
+--- 直前の話者（self.token を末尾から見て最初の talk／sakura_script の actor）が同じ未登録名ならそれを再利用し、
+--- そうでなければ警告を 1 行出して目印の talk トークンを積む。登録状態・立ち位置・act のフィールドには書かない
+--- @param self Act アクションオブジェクト
+--- @param name string アクター名
+--- @return ActorProxy プロキシ（常に非 nil）
+function ACT_IMPL.actor_proxy(self, name)
+    local actor = self.actors[name]
+    if actor then
+        return ACTOR.create_proxy(actor, self)
+    end
+    for i = #self.token, 1, -1 do
+        local t = self.token[i]
+        if t.type == "talk" or t.type == "sakura_script" then
+            if t.actor and t.actor.name == name then
+                return ACTOR.create_proxy(t.actor, self)
+            end
+            break
+        end
+    end
+    actor = { name = name }
+    log.warn(string.format("act:actor_proxy - unregistered actor: name='%s'", tostring(name)))
+    table.insert(self.token, { type = "talk", actor = actor, text = "【未登録アクター：" .. tostring(name) .. "】" })
+    return ACTOR.create_proxy(actor, self)
+end
+
 --- グローバル関数呼び出し（＠＊名前（…））
 --- GLOBAL[name] が関数なら act を第1引数にして呼ぶ（中のエラーはそのまま伝わる）。
 --- 無い・関数でないときは警告して nil（act:expr_fn と同じ warn レベル）
