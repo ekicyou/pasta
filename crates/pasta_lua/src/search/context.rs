@@ -561,6 +561,40 @@ mod tests {
     }
 
     #[test]
+    fn test_register_then_search_by_raw_name_round_trip() {
+        // Registration and search must share one matching rule: whatever
+        // the raw name, registering it and searching by the same raw name
+        // finds it. Fails if either side alone changes the rule.
+        for sym in ["・", "·", "＿", "-", ":", " ", "！"] {
+            let global = format!("会話{sym}朝");
+            let local = format!("選択{sym}A");
+            let actor = format!("さくら{sym}改");
+
+            let mut scenes = SceneRegistry::new();
+            let (_, counter) = scenes.register_global(&global, HashMap::new());
+            scenes.register_local(&local, &global, counter, 1, HashMap::new());
+            let mut words = WordDefRegistry::new();
+            words.register_actor(&actor, "通常", vec!["\\s[0]".to_string()]);
+            let mut ctx = SearchContext::new(scenes, words).unwrap();
+
+            let (parent, _) = ctx
+                .search_scene(&global, None)
+                .unwrap()
+                .unwrap_or_else(|| panic!("global not found: sym={sym:?}"));
+            assert!(
+                ctx.search_scene(&local, Some(&parent)).unwrap().is_some(),
+                "local not found: sym={sym:?}"
+            );
+            assert_eq!(
+                ctx.search_word("通常", Some(&format!("__actor_{actor}__")))
+                    .unwrap(),
+                Some("\\s[0]".to_string()),
+                "actor word not found: sym={sym:?}"
+            );
+        }
+    }
+
+    #[test]
     fn test_selector_reset_to_default_succeeds() {
         let mut ctx = create_test_search_context();
         ctx.set_scene_selector(Some(vec![0])).unwrap();
