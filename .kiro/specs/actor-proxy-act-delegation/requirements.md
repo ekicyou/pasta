@@ -95,7 +95,7 @@
 
 #### Acceptance Criteria
 
-1. The マニュアル shall 要件 2 の規則を、`grammar/variables.md#関数スコープの展開先`・`lua/script-api.md`（アクタープロキシの節と、アクション行から呼ばれた関数の受け取るものに触れる記述）・`internals/internal-modules.md` で、互いに矛盾しない 1 つの規則として記述する。
+1. The マニュアル shall 要件 2 の規則を、アクション行から呼ばれた関数の受け取るものに触れるすべての箇所（少なくとも `grammar/variables.md#関数スコープの展開先`・`grammar/words.md` の動的関数呼び出し・`grammar/actor-dictionary.md` のアクターの関数・`lua/script-api.md` のアクタープロキシの節と関連する記述・`internals/internal-modules.md`）で、互いに矛盾しない 1 つの規則として記述する。
 2. The マニュアル shall アクション行の `＠yield`・`＠チェイントーク`・`＠ゴースト終了` が、行の外の `＞yield`・`＞チェイントーク`・`＞ゴースト終了` と同じ動作であることが読み取れるように記述する。
 3. The マニュアル shall どの関数がアクタープロキシを受け取り、どの関数が ACT を受け取るかを、作者が自分の関数の置き場所から判断できるように記述する。
 4. When マニュアルの記述を変えたとき, the pasta リポジトリ shall 同じ変更で生成スキルの `references/` を再生成し、マニュアルとスキルの食い違いの検査に通る。
