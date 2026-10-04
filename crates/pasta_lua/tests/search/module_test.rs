@@ -306,7 +306,7 @@ fn test_search_word_deterministic_with_mock_selector() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
-    // MockRandomSelector disables shuffling, so "場所" words come back in
+    // set_word_selector(0) keeps candidate order, so "場所" words come back in
     // registration order without repetition: 東京 → 大阪.
     let result = runtime.exec(
         r#"

@@ -76,7 +76,7 @@
   - _Requirements: 5.3, 5.4, 5.5_
   - _Depends: 1.2, 4.1_
 
-- [ ] 5. 全体の回帰確認
+- [x] 5. 全体の回帰確認
   - ワークスペース全体の `cargo test` と `cargo clippy --all-targets` を通す
   - マニュアルの検査（`gen-skill-refs.mjs --check`・`link-check.mjs`）を走らせ直す
   - 完了: テスト・clippy・マニュアルの検査がすべて緑で、作業ツリーに意図しない差分（`sample.generated.lua` の改行差分を含む）が無い

@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn test_search_scene_global_found() {
         let mut ctx = create_test_search_context();
-        // Deterministic order: mock selector disables shuffling.
+        // Deterministic order: mock selector [0] keeps candidate order.
         ctx.set_scene_selector(Some(vec![0])).unwrap();
 
         let result = ctx.search_scene("メイン", None).unwrap();
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn test_search_scene_sequential_no_repeat_with_mock_selector() {
-        // With a mock selector (no shuffle), candidates with the same prefix
+        // With mock selector [0] (candidate order), candidates with the same prefix
         // are consumed sequentially without repetition until exhausted.
         let mut ctx = create_test_search_context();
         ctx.set_scene_selector(Some(vec![0])).unwrap();
@@ -477,7 +477,7 @@ mod tests {
 
     #[test]
     fn test_search_word_deterministic_with_mock_selector() {
-        // Mock selector disables shuffle: words come back in registration
+        // Mock selector [0] keeps candidate order: words come back in registration
         // order, sequentially, without repetition until exhausted.
         let mut ctx = create_test_search_context();
         ctx.set_word_selector(Some(vec![0])).unwrap();
