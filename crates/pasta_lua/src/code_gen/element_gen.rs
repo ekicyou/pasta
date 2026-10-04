@@ -4,8 +4,8 @@ use super::LuaCodeGenerator;
 use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
 use pasta_dsl::parser::{
-    Action, ActionLine, Args, CallScene, CodeBlock, ContinueAction, Expr, KeyWords, SetValue, Span,
-    VarScope, VarSet,
+    Action, ActionLine, Args, BinOp, CallScene, CodeBlock, ContinueAction, Expr, KeyWords,
+    SetValue, Span, VarScope, VarSet,
 };
 use std::io::Write;
 
@@ -25,6 +25,45 @@ fn global_fn_call(name: &str, args_str: &str) -> Result<String, TranspileError> 
         StringLiteralizer::literalize(name)?,
         format_args_suffix(args_str)
     ))
+}
+
+/// Flatten a left-assoc binary chain into terms and operators. Only the left
+/// spine is unrolled; a right-hand operand stays one term.
+fn flatten_binary<'e>(expr: &'e Expr, terms: &mut Vec<&'e Expr>, ops: &mut Vec<BinOp>) {
+    if let Expr::Binary { op, lhs, rhs } = expr {
+        flatten_binary(lhs, terms, ops);
+        ops.push(*op);
+        terms.push(rhs);
+    } else {
+        terms.push(expr);
+    }
+}
+
+/// `act:arith("op", 左, 右, 左の説明, 右の説明)`: descriptions are omitted when
+/// both are absent, and `nil` fills a missing left one. The result is nested
+/// arithmetic, so it carries no description of its own.
+fn arith_node(
+    op: BinOp,
+    (lhs, lhs_desc): (String, Option<String>),
+    (rhs, rhs_desc): (String, Option<String>),
+) -> (String, Option<String>) {
+    let op_str = match op {
+        BinOp::Add => "\"+\"",
+        BinOp::Sub => "\"-\"",
+        BinOp::Mul => "\"*\"",
+        BinOp::Div => "\"/\"",
+        BinOp::Mod => "\"%\"",
+    };
+    let descs = match (lhs_desc, rhs_desc) {
+        (None, None) => String::new(),
+        (Some(l), None) => format!(", {}", l),
+        (None, Some(r)) => format!(", nil, {}", r),
+        (Some(l), Some(r)) => format!(", {}, {}", l, r),
+    };
+    (
+        format!("act:arith({}, {}, {}{})", op_str, lhs, rhs, descs),
+        None,
+    )
 }
 
 /// Extract the `.pasta` [`Span`] carried by every [`Action`] variant.
@@ -511,21 +550,84 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     format_args_suffix(&args_str)
                 )?;
             }
-            Expr::Binary { op, lhs, rhs } => {
-                self.generate_expr_to_buffer(lhs, buf)?;
-                let op_str = match op {
-                    pasta_dsl::parser::BinOp::Add => " + ",
-                    pasta_dsl::parser::BinOp::Sub => " - ",
-                    pasta_dsl::parser::BinOp::Mul => " * ",
-                    pasta_dsl::parser::BinOp::Div => " / ",
-                    pasta_dsl::parser::BinOp::Mod => " % ",
-                };
-                write!(buf, "{}", op_str)?;
-                self.generate_expr_to_buffer(rhs, buf)?;
+            Expr::Binary { .. } => {
+                write!(buf, "{}", self.arith_to_string(expr)?)?;
             }
         }
 
         Ok(())
+    }
+
+    /// Render a binary chain as nested `act:arith("op", 左, 右[, 左の説明, 右の説明])`.
+    ///
+    /// The parser builds a precedence-less left-assoc tree (`1＋2＊3` is
+    /// `(1＋2)＊3`), so the chain is flattened back to terms and operators and
+    /// regrouped like Lua: `＊／％` fold left to right first, then `＋－`.
+    /// A `Paren` is one term; a right-hand `Binary` (never produced by the
+    /// parser) is also one term.
+    fn arith_to_string(&self, expr: &Expr) -> Result<String, TranspileError> {
+        let mut terms = Vec::new();
+        let mut ops = Vec::new();
+        flatten_binary(expr, &mut terms, &mut ops);
+
+        let mut terms = terms.into_iter().map(|t| self.arith_operand(t));
+        // Additive-level operands with multiplicative runs already folded in.
+        let mut sums = vec![terms.next().expect("binary chain has a first term")?];
+        let mut add_ops = Vec::new();
+        for (op, term) in ops.into_iter().zip(terms) {
+            let rhs = term?;
+            if matches!(op, BinOp::Mul | BinOp::Div | BinOp::Mod) {
+                let lhs = sums.pop().expect("sums is never empty");
+                sums.push(arith_node(op, lhs, rhs));
+            } else {
+                add_ops.push(op);
+                sums.push(rhs);
+            }
+        }
+        let mut sums = sums.into_iter();
+        let first = sums.next().expect("sums is never empty");
+        let (code, _) = add_ops
+            .into_iter()
+            .zip(sums)
+            .fold(first, |lhs, (op, rhs)| arith_node(op, lhs, rhs));
+        Ok(code)
+    }
+
+    /// One arithmetic operand: its Lua code and its warning description as a
+    /// string literal (variable path, `@名前()`, `@*名前()`, `@$パス()`), or
+    /// `None` for literals and nested arithmetic.
+    fn arith_operand(&self, expr: &Expr) -> Result<(String, Option<String>), TranspileError> {
+        let code = self.expr_to_string(expr)?;
+        let desc = Self::operand_desc(expr)?
+            .map(|d| StringLiteralizer::literalize(&d))
+            .transpose()?;
+        Ok((code, desc))
+    }
+
+    fn operand_desc(expr: &Expr) -> Result<Option<String>, TranspileError> {
+        Ok(match expr {
+            Expr::VarRef { name, scope } => Some(Self::resolve_var_path(name, scope)?),
+            Expr::FnCall {
+                name,
+                scope: pasta_dsl::parser::FnScope::Local,
+                ..
+            } => Some(format!("@{}()", name)),
+            Expr::FnCall {
+                name,
+                scope: pasta_dsl::parser::FnScope::Global,
+                ..
+            } => Some(format!("@*{}()", name)),
+            Expr::DynamicFnCall {
+                var_name,
+                var_scope,
+                ..
+            } => Some(format!(
+                "@${}()",
+                Self::resolve_var_path(var_name, var_scope)?
+            )),
+            Expr::Paren(inner) => Self::operand_desc(inner)?,
+            _ => None,
+        })
     }
 
     /// Generate arguments as a string.

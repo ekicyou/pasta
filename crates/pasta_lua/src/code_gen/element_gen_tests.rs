@@ -289,7 +289,11 @@ fn expr_renders_float_blank_string_paren_and_all_binary_ops() {
         }),
     };
     let text = gen_to_string(|cg| cg.generate_var_set(&expr_stmt(expr)));
-    assert_eq!(text, "(1 - 2) * 3 / 4 % 5 + var.x\n");
+    assert_eq!(
+        text,
+        "act:arith(\"+\", act:arith(\"%\", act:arith(\"/\", act:arith(\"*\", \
+         (act:arith(\"-\", 1, 2)), 3), 4), 5), var.x, nil, \"var.x\")\n"
+    );
 
     let float_text = gen_to_string(|cg| cg.generate_var_set(&expr_stmt(Expr::Float(1.5))));
     assert_eq!(float_text, "1.5\n");
@@ -523,4 +527,218 @@ fn expr_global_fn_call_uses_act_global_fn() {
         }))
     });
     assert_eq!(no_args, "act:global_fn(\"end\")\n");
+}
+
+// ------------------------------------------------------------------
+// Arithmetic: precedence regrouping into nested act:arith (Req 3.1, 3.2, 3.6)
+// ------------------------------------------------------------------
+
+/// Build a left-associative chain exactly like the parser's
+/// `build_left_assoc_expr` (no precedence): `t0 op0 t1 op1 t2 ...`.
+fn left_assoc(first: Expr, rest: Vec<(pasta_dsl::parser::BinOp, Expr)>) -> Expr {
+    rest.into_iter().fold(first, |lhs, (op, rhs)| Expr::Binary {
+        op,
+        lhs: Box::new(lhs),
+        rhs: Box::new(rhs),
+    })
+}
+
+fn int(n: i64) -> Expr {
+    Expr::Integer(n)
+}
+
+fn var(name: &str, scope: VarScope) -> Expr {
+    Expr::VarRef {
+        name: name.to_string(),
+        scope,
+    }
+}
+
+fn paren(e: Expr) -> Expr {
+    Expr::Paren(Box::new(e))
+}
+
+fn expr_text(expr: Expr) -> String {
+    gen_to_string(|cg| cg.generate_var_set(&expr_stmt(expr)))
+        .trim_end()
+        .to_string()
+}
+
+/// `＊／％` fold before `＋－`, each left to right; parens are one term.
+#[test]
+fn arith_regroups_left_assoc_tree_by_lua_precedence() {
+    use pasta_dsl::parser::BinOp::{Add, Div, Mod, Mul, Sub};
+    let cases: Vec<(Expr, &str)> = vec![
+        // 1＋2＊3
+        (
+            left_assoc(int(1), vec![(Add, int(2)), (Mul, int(3))]),
+            r#"act:arith("+", 1, act:arith("*", 2, 3))"#,
+        ),
+        // 1－2－3
+        (
+            left_assoc(int(1), vec![(Sub, int(2)), (Sub, int(3))]),
+            r#"act:arith("-", act:arith("-", 1, 2), 3)"#,
+        ),
+        // （1＋2）＊3
+        (
+            left_assoc(
+                paren(left_assoc(int(1), vec![(Add, int(2))])),
+                vec![(Mul, int(3))],
+            ),
+            r#"act:arith("*", (act:arith("+", 1, 2)), 3)"#,
+        ),
+        // 1－2＊3－4
+        (
+            left_assoc(int(1), vec![(Sub, int(2)), (Mul, int(3)), (Sub, int(4))]),
+            r#"act:arith("-", act:arith("-", 1, act:arith("*", 2, 3)), 4)"#,
+        ),
+        // 8／2／2
+        (
+            left_assoc(int(8), vec![(Div, int(2)), (Div, int(2))]),
+            r#"act:arith("/", act:arith("/", 8, 2), 2)"#,
+        ),
+        // 1＋2＊3＋4＊5
+        (
+            left_assoc(
+                int(1),
+                vec![(Add, int(2)), (Mul, int(3)), (Add, int(4)), (Mul, int(5))],
+            ),
+            r#"act:arith("+", act:arith("+", 1, act:arith("*", 2, 3)), act:arith("*", 4, 5))"#,
+        ),
+        // 2＊（3＋4）％5
+        (
+            left_assoc(
+                int(2),
+                vec![
+                    (Mul, paren(left_assoc(int(3), vec![(Add, int(4))]))),
+                    (Mod, int(5)),
+                ],
+            ),
+            r#"act:arith("%", act:arith("*", 2, (act:arith("+", 3, 4))), 5)"#,
+        ),
+        // 10－－3 (negative literal stays a plain term)
+        (
+            left_assoc(int(10), vec![(Sub, int(-3))]),
+            r#"act:arith("-", 10, -3)"#,
+        ),
+    ];
+    for (expr, expected) in cases {
+        assert_eq!(expr_text(expr), expected);
+    }
+}
+
+/// Operand descriptions: emitted as string literals, omitted when both are
+/// absent, and `nil` stands in for a missing left description.
+#[test]
+fn arith_operand_descriptions() {
+    use pasta_dsl::parser::BinOp::{Add, Mul};
+    let local_x = || var("x", VarScope::Local);
+    let f_call = Expr::FnCall {
+        name: "f".to_string(),
+        args: Args::empty(),
+        scope: FnScope::Local,
+    };
+    let cases: Vec<(Expr, &str)> = vec![
+        // ＄x＋＠f（）＊2
+        (
+            left_assoc(local_x(), vec![(Add, f_call.clone()), (Mul, int(2))]),
+            r#"act:arith("+", var.x, act:arith("*", act:expr_fn("f"), 2, "@f()"), "var.x")"#,
+        ),
+        // ＄x＋1
+        (
+            left_assoc(local_x(), vec![(Add, int(1))]),
+            r#"act:arith("+", var.x, 1, "var.x")"#,
+        ),
+        // 1＋2＊＄y
+        (
+            left_assoc(
+                int(1),
+                vec![(Add, int(2)), (Mul, var("y", VarScope::Local))],
+            ),
+            r#"act:arith("+", 1, act:arith("*", 2, var.y, nil, "var.y"))"#,
+        ),
+        // （＄x＋1）＊2
+        (
+            left_assoc(
+                paren(left_assoc(local_x(), vec![(Add, int(1))])),
+                vec![(Mul, int(2))],
+            ),
+            r#"act:arith("*", (act:arith("+", var.x, 1, "var.x")), 2)"#,
+        ),
+        // ＄＊s＋＄1 (global / scene argument)
+        (
+            left_assoc(
+                var("s", VarScope::Global),
+                vec![(Add, var("1", VarScope::Args(1)))],
+            ),
+            r#"act:arith("+", save.s, args[2], "save.s", "args[2]")"#,
+        ),
+        // ＠＊g（1）＊＠＄h（）
+        (
+            left_assoc(
+                Expr::FnCall {
+                    name: "g".to_string(),
+                    args: Args {
+                        items: vec![Arg::Positional(int(1))],
+                        span: Span::default(),
+                    },
+                    scope: FnScope::Global,
+                },
+                vec![(
+                    Mul,
+                    Expr::DynamicFnCall {
+                        var_name: "h".to_string(),
+                        var_scope: VarScope::Local,
+                        args: Args::empty(),
+                    },
+                )],
+            ),
+            r#"act:arith("*", act:global_fn("g", 1), act:expr_fn_var(var.h, "var.h"), "@*g()", "@$var.h()")"#,
+        ),
+        // （＄x）＋「a」: paren passes the inner description through; literal has none
+        (
+            left_assoc(paren(local_x()), vec![(Add, Expr::String("a".to_string()))]),
+            r#"act:arith("+", (var.x), "a", "var.x")"#,
+        ),
+    ];
+    for (expr, expected) in cases {
+        assert_eq!(expr_text(expr), expected);
+    }
+}
+
+/// Arithmetic inside a function argument goes through the same generator
+/// (every expression position shares `generate_expr_to_buffer`, Req 3.6).
+#[test]
+fn arith_in_function_argument_uses_same_generator() {
+    use pasta_dsl::parser::BinOp::{Add, Mul};
+    let expr = Expr::FnCall {
+        name: "f".to_string(),
+        args: Args {
+            items: vec![Arg::Positional(left_assoc(
+                int(1),
+                vec![(Add, int(2)), (Mul, int(3))],
+            ))],
+            span: Span::default(),
+        },
+        scope: FnScope::Local,
+    };
+    assert_eq!(
+        expr_text(expr),
+        r#"act:expr_fn("f", act:arith("+", 1, act:arith("*", 2, 3)))"#
+    );
+}
+
+/// A right-hand Binary (never produced by the parser) is one term.
+#[test]
+fn arith_right_hand_binary_is_one_term() {
+    use pasta_dsl::parser::BinOp::{Add, Mul};
+    let expr = Expr::Binary {
+        op: Mul,
+        lhs: Box::new(int(2)),
+        rhs: Box::new(left_assoc(int(3), vec![(Add, int(4))])),
+    };
+    assert_eq!(
+        expr_text(expr),
+        r#"act:arith("*", 2, act:arith("+", 3, 4))"#
+    );
 }

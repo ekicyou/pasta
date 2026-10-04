@@ -91,7 +91,7 @@ do
         act:actor_proxy("さくら"):talk("変数を代入。")
         act:actor_proxy("うにゅう"):talk("中身は内緒や。")
         var.カウンタ = 10
-        save.グローバル = act:expr_fn("関数", 2 + 1)
+        save.グローバル = act:expr_fn("関数", act:arith("+", 2, 1))
         var.場所 = act:word("場所")
     end
 

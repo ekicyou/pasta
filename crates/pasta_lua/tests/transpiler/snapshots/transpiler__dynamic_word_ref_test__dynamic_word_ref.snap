@@ -21,6 +21,6 @@ do
         save.y = act:word(var.x, "var.x")
         act:word(var.x, "var.x")
         act:set_property("prop", act:word(var.x, "var.x"))
-        var.z = act:expr_fn_var(var.f, "var.f") + 1
+        var.z = act:arith("+", act:expr_fn_var(var.f, "var.f"), 1, "@$var.f()")
     end
 end
