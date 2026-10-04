@@ -382,6 +382,13 @@ pub struct SourceMap {
     /// `HashMap` を用いるのは O(1) のチャンク引きのため（design 459）。キーは
     /// [`canonicalize_chunk_name`] による正規形（STORE/QUERY 共通）。
     chunks: HashMap<ChunkName, ChunkSourceMap>,
+    /// 正規化チャンク名 → 正規化 `.pasta` ファイルキー（[`insert_chunk`](Self::insert_chunk)
+    /// が受け取った対応をそのまま保持する）。
+    ///
+    /// 実行時のシーンを定義元の `.pasta` ファイルごとに分けるために、関数の定義元
+    /// チャンク名からファイルを引く（scene-identity-format・requirements 4.5）。値は
+    /// [`scene_records`](Self::scene_records) のキーと同じ正規形。
+    chunk_files: HashMap<ChunkName, String>,
     /// 逆引き索引: 正規化 `.pasta` ファイル → (`.pasta` 行 → `[(ChunkName, lua_line)]`)。
     ///
     /// 外側は `HashMap`（ファイル引き O(1)）、内側は `BTreeMap`（`.pasta` 行昇順反復＋
@@ -417,6 +424,7 @@ impl Clone for SourceMap {
         }
         Self {
             chunks: self.chunks.clone(),
+            chunk_files: self.chunk_files.clone(),
             reverse: self.reverse.clone(),
             scene_records: self.scene_records.clone(),
             scene_index,
@@ -464,6 +472,9 @@ impl SourceMap {
                 !per_file.is_empty()
             });
         }
+
+        // チャンク → `.pasta` ファイルの対応を記録する（再投入時は上書き）。
+        self.chunk_files.insert(chunk_key.clone(), file_key.clone());
 
         // シーン記録の集約キー（reverse へ move する前にクローンを確保）。
         let scene_file_key = file_key.clone();
@@ -539,6 +550,19 @@ impl SourceMap {
     pub fn resolve_lua_to_pasta(&self, chunk: &str, lua_line: u32) -> Option<&PastaPos> {
         let chunk_key = canonicalize_chunk_name(chunk);
         self.chunks.get(&chunk_key)?.pasta_for_lua(lua_line)
+    }
+
+    /// チャンク名 → そのチャンクを生成した `.pasta` ファイルの正規化キーを返す
+    /// （scene-identity-format・requirements 4.5）。
+    ///
+    /// [`resolve_lua_to_pasta`](Self::resolve_lua_to_pasta) と同じく、`chunk` 引数
+    /// （フック source／`Function::info().source` の生の形）を
+    /// [`canonicalize_chunk_name`] で正規化してから引く。返るキーは
+    /// [`scene_records`](Self::scene_records) のキーと同じ正規形。登録されていない
+    /// チャンク（利用者の `.lua` など）なら `None`。
+    pub fn pasta_file_for_chunk(&self, chunk: &str) -> Option<&str> {
+        let chunk_key = canonicalize_chunk_name(chunk);
+        self.chunk_files.get(&chunk_key).map(String::as_str)
     }
 
     /// `.pasta` 行 → 対応する全 `(ChunkName, lua_line)` を返す（requirements 4.1, 3.3）。

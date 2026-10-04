@@ -550,3 +550,43 @@ fn source_map_reinsert_same_chunk_replaces_reverse_entries() {
     // 他チャンクの a.pasta エントリは引き続き温存。
     assert_eq!(sm.resolve_pasta_to_lua(file_a, 3), vec![(other_key, 50u32)]);
 }
+
+// =======================================================================
+// チャンク名 → `.pasta` ファイル（scene-identity-format task 3.1・requirements 4.5）
+// =======================================================================
+
+/// 登録済みのチャンク名から、そのチャンクの `.pasta` ファイル（正規化キー）が引ける。
+/// チャンク名は `resolve_lua_to_pasta` と同じく呼び出し側の生の形（`@` 付き・区切り
+/// 混在・大小違い）で渡してよい。返るファイルキーは `scene_records` のキーと同じ正規形。
+#[test]
+fn source_map_pasta_file_for_chunk_returns_registered_file() {
+    let sm = sample_source_map();
+
+    #[cfg(windows)]
+    let (key_a, key_b) = ("c:/proj/scene/a.pasta", "c:/proj/scene/b.pasta");
+    #[cfg(not(windows))]
+    let (key_a, key_b) = ("C:/proj/scene/a.pasta", "C:/proj/scene/b.pasta");
+
+    // 格納時と同じ形・別の等価形のどちらでも引ける。
+    assert_eq!(
+        sm.pasta_file_for_chunk(r"@C:\proj\cache\A.lua"),
+        Some(key_a)
+    );
+    #[cfg(windows)]
+    assert_eq!(sm.pasta_file_for_chunk("c:/proj/cache/a.lua"), Some(key_a));
+    assert_eq!(sm.pasta_file_for_chunk("@C:/proj/cache/b.lua"), Some(key_b));
+    // 別チャンクが同じ `.pasta` ファイルを指していても、それぞれ引ける。
+    assert_eq!(sm.pasta_file_for_chunk(r"C:\proj\cache\c.lua"), Some(key_a));
+}
+
+/// 未登録のチャンク名（利用者の `.lua` など）では何も返らない。
+#[test]
+fn source_map_pasta_file_for_chunk_unknown_returns_none() {
+    let sm = sample_source_map();
+    assert_eq!(sm.pasta_file_for_chunk("@C:/proj/cache/unknown.lua"), None);
+    assert_eq!(sm.pasta_file_for_chunk("@C:/proj/scripts/user.lua"), None);
+    assert_eq!(
+        SourceMap::new().pasta_file_for_chunk("@C:/proj/cache/a.lua"),
+        None
+    );
+}

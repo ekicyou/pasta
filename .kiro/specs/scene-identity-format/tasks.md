@@ -26,7 +26,7 @@
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 8.4, 8.6_
 
 - [ ] 3. 登録名の形式を切り替え、デバッガの突き合わせを定義元のファイルごとにする
-- [ ] 3.1 (P) 生成 Lua のチャンク名から `.pasta` ファイルを引く読み出しをソースマップに足す
+- [x] 3.1 (P) 生成 Lua のチャンク名から `.pasta` ファイルを引く読み出しをソースマップに足す
   - チャンクを登録するときに既に受け取っているファイルの情報を、正規化したチャンク名から引けるようにする
   - 登録済みのチャンク名で `.pasta` ファイルが返り、未登録のチャンク名では何も返らないことを単体テストで確かめる
   - ソースマップの既存テストが変更なしで通る
@@ -112,3 +112,5 @@
 - 2.1: lua_unittest_runner は最初に落ちたスイートで止まる。キックのテストはアサーション失敗時にモックの復元まで届かず後続スイートを汚すので、書き換えるときは復元を必ず走らせる。
 - 2.2: `cargo test --all` の後に `crates/pasta_lua/profile/pasta/save/save.json` が変わることがある（テストの副産物）。`sample.generated.lua` と同じく `git checkout --` で戻し、コミットに混ぜない。
 - 2.2: `pasta_shiori` の e2e 4 本はキック名を登録名 `{name}1` で送っている（`scene_kick_e2e_test`・`scene_kick_multibeat_e2e_test` はキックの箇所、`scene_kick_gate_e2e_test`・`scene_kick_preempt_e2e_test` は `kick()` ヘルパー）。3.2 で `{name}_1` に替える。
+- 3.1: `SourceMap::pasta_file_for_chunk(生のチャンク名)` は内部で `canonicalize_chunk_name` してから引き、`scene_records()` のキーと同じ正規形の `.pasta` ファイルキーを返す。3.2 は `Function::info().source` をそのまま渡せる。
+- 3.1: レビュアーと親が同時に cargo を回すと「only metadata stub found」等のビルド成果物の競合で落ちることがある。全体テストは単独で回す。
