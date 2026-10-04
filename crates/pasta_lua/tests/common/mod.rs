@@ -20,6 +20,10 @@ use std::path::PathBuf;
 /// as `module 'i18n' not found`). Tests must behave identically regardless of the
 /// session environment, so we clear these here.
 ///
+/// `PASTA_LOG` is cleared for the same reason: it overrides the `[logging]`
+/// filter, so an ambient value (e.g. `PASTA_LOG=error`) would hide the log
+/// levels the tests expect.
+///
 /// Running inside a `#[ctor]` (executed before `main`, while the process is still
 /// single-threaded) makes the `remove_var` calls race-free, which matters under
 /// the Rust 2024 edition where `std::env::remove_var` is `unsafe`.
@@ -28,6 +32,7 @@ fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
         std::env::remove_var("PASTA_DEBUG_PORT");
+        std::env::remove_var("PASTA_LOG");
     }
 }
 
