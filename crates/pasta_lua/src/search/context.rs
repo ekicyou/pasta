@@ -212,13 +212,21 @@ impl SearchContext {
     }
 }
 
-/// Parse Lua varargs into a selector sequence (all arguments must be integers).
+/// Parse Lua varargs into a selector sequence (all arguments must be
+/// non-negative integers). Values beyond `usize` become `usize::MAX`, which
+/// every search ignores as out of range.
 fn parse_selector_args(args: &MultiValue) -> mlua::Result<Vec<usize>> {
     args.iter()
         .map(|v| {
-            v.as_integer()
-                .ok_or_else(|| mlua::Error::RuntimeError("expected integer argument".into()))
-                .map(|i| i as usize)
+            let i = v
+                .as_integer()
+                .ok_or_else(|| mlua::Error::RuntimeError("expected integer argument".into()))?;
+            if i < 0 {
+                return Err(mlua::Error::RuntimeError(
+                    "expected non-negative integer argument".into(),
+                ));
+            }
+            Ok(usize::try_from(i).unwrap_or(usize::MAX))
         })
         .collect()
 }
