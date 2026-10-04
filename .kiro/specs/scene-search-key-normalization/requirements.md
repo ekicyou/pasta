@@ -73,7 +73,7 @@ Pasta は、シーン名・アクター名を登録するとき、Unicode の英
 
 1. The Pasta runtime shall シーン名・アクター名を登録するときと、作者が書いた名前で検索するときに、同じ照合規則（Unicode の英字・数字と `_` 以外を `_` に置き換える規則）を使う。
 2. When 検索する名前として登録名（例: `会話_朝1`・`選択_A_1`）を渡したとき, the Pasta runtime shall 本仕様の変更前と同じ検索結果を返す。
-3. The Pasta runtime shall ローカル検索の第 2 引数（グローバルシーンの登録名）には照合規則を適用せず、渡された登録名のまま扱う。
+3. The Pasta runtime shall ローカルシーンの検索（`search_scene`）の第 2 引数（グローバルシーンの登録名）には照合規則を適用せず、渡された登録名のまま扱う。
 4. When 記号を含まない名前で Call・シーン検索・アクター単語参照をしたとき, the Pasta runtime shall 本仕様の変更前と同じ候補・同じ選択・同じ出力を返す。
 5. If 記号を含む名前で探したシーンが存在しないとき, the Pasta runtime shall 本仕様の変更前と同じく警告をログに出して次の行へ進み、警告には作者が書いた元の名前を表示する。
 6. When 第 2 引数なしで `:` で始まる名前を検索したとき, the Pasta runtime shall 本仕様の変更前と同じく、ローカルシーンを候補にしない。
@@ -111,10 +111,9 @@ Pasta は、シーン名・アクター名を登録するとき、Unicode の英
 1. The Pasta manual shall Call の章（`grammar/call-jump.md`）に、シーン名に記号を使えることと、検索では照合用の名前どうしで照合することを書く。
 2. The Pasta manual shall アクター辞書の章に、記号を含むアクター名でもアクター辞書の単語を引けることと、照合用の名前で照合することを書く。
 3. The Pasta manual shall 「書いた名前をそのまま検索キーにする」「検索キーとして渡す名前はサニタイズされない」など、本仕様の変更後の挙動と食い違う記述を残さない。
-4. The Pasta manual shall `@pasta_search` の `search_scene` の説明に、第 1 引数は照合用の名前で照合されることと、返る登録名・第 2 引数に渡す登録名は照合用の名前を元にした名前（例: `会話・朝` の 1 つ目は `会話_朝1`）であることを書く。
+4. The Pasta manual shall `@pasta_search` の章に、`search_scene` の第 1 引数は照合用の名前で照合されること、返る登録名・第 2 引数に渡す登録名は照合用の名前を元にした名前（例: `会話・朝` の 1 つ目は `会話_朝1`）であること、および `search_word` の第 2 引数（スコープ）は照合用の名前に揃えてから照合されることを書く。
 5. The Pasta manual shall 内部構造の章（`internals/internal-modules.md`・`internals/registry-search.md` ほか）に、登録と検索が同じ照合規則を共有することを書く。
-6. Where アクター単語の参照のために `@pasta_search` にメソッドを足すとき, the Pasta manual shall そのメソッドを既存のメソッド（`search_word` など）と同じく公開 API として `@pasta_search` の章に書き、内部用の扱いにしない。
-7. When マニュアルを更新したとき, the 生成スキルの `references/` shall マニュアルから再生成され、鮮度の検査とリンク検査に通る。
+6. When マニュアルを更新したとき, the 生成スキルの `references/` shall マニュアルから再生成され、鮮度の検査とリンク検査に通る。
 
 ### Requirement 7: 修正を固定するテスト
 
