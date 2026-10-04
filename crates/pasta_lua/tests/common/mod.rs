@@ -20,6 +20,10 @@ use std::path::PathBuf;
 /// as `module 'i18n' not found`). Tests must behave identically regardless of the
 /// session environment, so we clear these here.
 ///
+/// `PASTA_LOG` is cleared for the same reason: it overrides the `[logging]`
+/// filter, so an ambient value (e.g. `PASTA_LOG=error`) would hide the log
+/// levels the tests expect.
+///
 /// Running inside a `#[ctor]` (executed before `main`, while the process is still
 /// single-threaded) makes the `remove_var` calls race-free, which matters under
 /// the Rust 2024 edition where `std::env::remove_var` is `unsafe`.
@@ -28,6 +32,7 @@ fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
         std::env::remove_var("PASTA_DEBUG_PORT");
+        std::env::remove_var("PASTA_LOG");
     }
 }
 
@@ -229,6 +234,30 @@ pub fn value_as_str(value: &mlua::Value) -> Option<String> {
         .as_string()
         .and_then(|s| s.to_str().ok())
         .map(|s| s.to_string())
+}
+
+/// SHIORI 応答を厳密に検査する（二重包みを見逃さない）。
+///
+/// - 先頭行がステータス行 `SHIORI/3.0 {status}` と完全に一致する
+/// - `SHIORI/3.0` が応答の中に 1 回だけ現れる
+/// - `Value` 行が `Value: {value}` と完全に一致する（`None` なら `Value` 行が無い）
+pub fn assert_shiori_response(response: &str, status: &str, value: Option<&str>) {
+    assert_eq!(
+        response.lines().next(),
+        Some(format!("SHIORI/3.0 {status}").as_str()),
+        "status line mismatch: {response:?}"
+    );
+    assert_eq!(
+        response.matches("SHIORI/3.0").count(),
+        1,
+        "SHIORI/3.0 must appear exactly once: {response:?}"
+    );
+    let value_lines: Vec<&str> = response
+        .lines()
+        .filter(|l| l.starts_with("Value:"))
+        .collect();
+    let expected: Vec<String> = value.map(|v| format!("Value: {v}")).into_iter().collect();
+    assert_eq!(value_lines, expected, "Value line mismatch: {response:?}");
 }
 
 // ============================================================================

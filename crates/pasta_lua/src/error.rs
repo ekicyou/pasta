@@ -120,8 +120,8 @@ impl fmt::Display for SpanDisplay {
 
 /// Configuration errors for Lua library settings.
 ///
-/// These errors occur during configuration parsing and validation,
-/// particularly for the `[lua]` section's `libs` array.
+/// These errors occur while validating a `RuntimeConfig`,
+/// particularly its `libs` array.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum ConfigError {
     /// Unknown library name in libs array.
@@ -129,11 +129,25 @@ pub enum ConfigError {
         "Unknown library: {0}. Valid libraries: std_all, std_all_unsafe, std_coroutine, std_table, std_io, std_os, std_string, std_math, std_package, std_debug, std_jit, std_ffi, std_bit, assertions, testing, env, regex, json, yaml"
     )]
     UnknownLibrary(String),
+
+    /// Required library missing from libs array.
+    ///
+    /// Holds the missing library names joined by ", ".
+    #[error(
+        "Missing required library: {0}. pasta cannot run without it; add it to libs (std_all includes it)"
+    )]
+    MissingRequiredLibrary(String),
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_config_error_missing_required_library_names_the_library() {
+        let msg = ConfigError::MissingRequiredLibrary("std_package".into()).to_string();
+        assert!(msg.contains("std_package"), "{msg}");
+    }
 
     #[test]
     fn test_span_display_format() {

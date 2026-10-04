@@ -4,7 +4,7 @@
 //! (`Rotation::NEVER`); the file is appended to and never rotated.
 
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
@@ -80,7 +80,7 @@ impl PastaLogger {
     /// Validate that the log path is within allowed directories.
     ///
     /// Prevents path traversal attacks by ensuring the log path
-    /// stays within the profile/pasta/ directory.
+    /// stays under the profile/ directory.
     fn validate_path(base_dir: &Path, log_path: &Path) -> io::Result<()> {
         // The log path should be within profile/ directory
         let relative = log_path.strip_prefix(base_dir).map_err(|_| {
@@ -91,7 +91,12 @@ impl PastaLogger {
         })?;
 
         let relative_str = relative.to_string_lossy();
-        if !relative_str.starts_with("profile") {
+        // The first component must be exactly `profile`, followed by at least
+        // one more component (`profile.log`, `profiles/x.log`, `profile` are invalid).
+        let mut components = relative.components();
+        let under_profile = components.next() == Some(Component::Normal("profile".as_ref()))
+            && components.next().is_some();
+        if !under_profile {
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
                 format!("Log path must be within profile/ directory: {:?}", log_path),
@@ -172,7 +177,6 @@ mod tests {
 
         let config = LoggingConfig {
             file_path: "../outside.log".to_string(),
-            rotation_days: 7,
             level: "debug".to_string(),
             filter: None,
         };
@@ -188,7 +192,6 @@ mod tests {
 
         let config = LoggingConfig {
             file_path: "other/logs/pasta.log".to_string(),
-            rotation_days: 7,
             level: "debug".to_string(),
             filter: None,
         };
@@ -244,7 +247,6 @@ mod tests {
 
         let config = LoggingConfig {
             file_path: "profile/custom/app.log".to_string(),
-            rotation_days: 7,
             level: "info".to_string(),
             filter: None,
         };
@@ -263,7 +265,6 @@ mod tests {
 
         let config = LoggingConfig {
             file_path: "profile/../escape.log".to_string(),
-            rotation_days: 7,
             level: "info".to_string(),
             filter: None,
         };
@@ -272,6 +273,48 @@ mod tests {
         match result {
             Err(err) => assert_eq!(err.kind(), io::ErrorKind::PermissionDenied),
             Ok(_) => panic!("traversal inside profile/ should be rejected"),
+        }
+    }
+
+    /// Judgment table of design.md `LogFilePathValidation` (requirement 5.5).
+    #[test]
+    fn test_validate_path_judgment_table() {
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path();
+        let check =
+            |file_path: &str| PastaLogger::validate_path(base_dir, &base_dir.join(file_path));
+
+        let mut valid = vec![
+            crate::loader::default_log_file_path(),
+            "profile/pasta/logs/pasta.log".to_string(),
+            "profile/x.log".to_string(),
+        ];
+        if cfg!(windows) {
+            // `\` is a path separator only on Windows.
+            valid.push("profile\\x.log".to_string());
+        }
+        for file_path in &valid {
+            assert!(check(file_path).is_ok(), "{file_path:?} should be valid");
+        }
+
+        for file_path in [
+            "profile.log",
+            "profiles/x.log",
+            "profile",
+            "profile/",
+            "../x.log",
+            "profile/../x.log",
+            "C:/x.log",
+            "logs/x.log",
+        ] {
+            match check(file_path) {
+                Err(err) => assert_eq!(
+                    err.kind(),
+                    io::ErrorKind::PermissionDenied,
+                    "{file_path:?} wrong error kind"
+                ),
+                Ok(()) => panic!("{file_path:?} should be invalid"),
+            }
         }
     }
 

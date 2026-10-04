@@ -5,7 +5,7 @@
 
 use crate::common;
 
-use common::create_runtime_with_pasta_path;
+use common::{assert_shiori_response, create_runtime_with_pasta_path, value_as_str};
 
 // ============================================================================
 // Task 1.1, 3.1: REG Module Tests
@@ -121,18 +121,16 @@ fn test_event_fire_dispatches_registered_handler() {
         end
         
         local req = { id = "OnTest", method = "get", version = 30 }
-        local response = EVENT.fire(req)
-        
-        return response:find("200 OK") ~= nil and response:find("Value: test response") ~= nil
+        return EVENT.fire(req)
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "EVENT.fire should dispatch to registered handler: {:?}",
-        result
+    let response = result.expect("EVENT.fire should dispatch to registered handler");
+    assert_shiori_response(
+        &value_as_str(&response).unwrap(),
+        "200 OK",
+        Some("test response"),
     );
-    assert!(result.unwrap().as_boolean().unwrap_or(false));
 }
 
 #[test]
@@ -296,29 +294,24 @@ fn test_event_module_with_res_module() {
             return RES.ok("Hello World")
         end
         local res1 = EVENT.fire({ id = "TestOk", method = "get", version = 30 })
-        local ok_works = res1:find("200 OK") ~= nil and res1:find("Value: Hello World") ~= nil
         
         -- Test 2: RES.no_content integration via EVENT.no_entry
         local res2 = EVENT.fire({ id = "Unregistered", method = "get", version = 30 })
-        local no_content_works = res2:find("204 No Content") ~= nil
+        assert(res2:find("204 No Content") ~= nil, res2)
         
         -- Test 3: RES.err integration via error handling (use SHIORI.request for xpcall)
         REG.TestErr = function(act)
             error("Intentional error")
         end
         local res3 = SHIORI.request({ id = "TestErr", method = "get", version = 30 })
-        local err_works = res3:find("500 Internal Server Error") ~= nil and res3:find("X%-Error%-Reason:") ~= nil
+        assert(res3:find("500 Internal Server Error") ~= nil and res3:find("X%-Error%-Reason:") ~= nil, res3)
         
-        return ok_works and no_content_works and err_works
+        return res1
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "EVENT module should integrate correctly with RES module: {:?}",
-        result
-    );
-    assert!(result.unwrap().as_boolean().unwrap_or(false));
+    let res1 = result.expect("EVENT module should integrate correctly with RES module");
+    assert_shiori_response(&value_as_str(&res1).unwrap(), "200 OK", Some("Hello World"));
 }
 
 /// Task 4.2: Tests complete handler registration and dispatch flow
@@ -351,21 +344,17 @@ fn test_handler_registration_and_dispatch() {
         local ghost_res = EVENT.fire({ id = "OnGhostChanged", method = "get", version = 30 })
         local unknown_res = EVENT.fire({ id = "OnUnknown", method = "get", version = 30 })
         
-        local boot_correct = boot_res:find("Booting up!") ~= nil
-        local close_correct = close_res:find("Shutting down!") ~= nil
-        local ghost_correct = ghost_res:find("Ghost changed!") ~= nil
-        local unknown_correct = unknown_res:find("204 No Content") ~= nil
-        
-        return boot_correct and close_correct and ghost_correct and unknown_correct
+        return { boot_res, close_res, ghost_res, unknown_res }
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "Multiple handlers should be dispatched correctly: {:?}",
-        result
-    );
-    assert!(result.unwrap().as_boolean().unwrap_or(false));
+    let responses = result.expect("Multiple handlers should be dispatched correctly");
+    let responses = responses.as_table().unwrap();
+    let get = |i: usize| responses.get::<String>(i).unwrap();
+    assert_shiori_response(&get(1), "200 OK", Some("Booting up!"));
+    assert_shiori_response(&get(2), "200 OK", Some("Shutting down!"));
+    assert_shiori_response(&get(3), "200 OK", Some("Ghost changed!"));
+    assert_shiori_response(&get(4), "204 No Content", None);
 }
 
 // ============================================================================
@@ -436,18 +425,16 @@ fn test_custom_onboot_overrides_default() {
         end
         
         local req = { id = "OnBoot", method = "get", version = 30 }
-        local response = EVENT.fire(req)
-        
-        return response:find("200 OK") ~= nil and response:find("Custom Boot!") ~= nil
+        return EVENT.fire(req)
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "Custom OnBoot should override default: {:?}",
-        result
+    let response = result.expect("Custom OnBoot should override default");
+    assert_shiori_response(
+        &value_as_str(&response).unwrap(),
+        "200 OK",
+        Some("Custom Boot!"),
     );
-    assert!(result.unwrap().as_boolean().unwrap_or(false));
 }
 
 // ============================================================================

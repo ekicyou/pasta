@@ -18,6 +18,7 @@ describe("Integration - GLOBAL chaintalk via EVENT.fire", function()
         -- （pasta.shiori.res は EVENT ロード時の内部 require で再読込されるため明示束縛は不要）
         package.loaded["pasta.store"] = nil
         package.loaded["pasta.shiori.event"] = nil
+        package.loaded["pasta.shiori.event.callback"] = nil
         package.loaded["pasta.shiori.event.register"] = nil
         package.loaded["pasta.shiori.res"] = nil
         package.loaded["pasta.shiori.act"] = nil

@@ -113,7 +113,7 @@ local ok, results = t:run({ quiet = true })
 
 ### @env
 
-環境変数・カレントディレクトリ・実行ファイルのパスなどへアクセスするモジュールである。既定で無効で、`require "@env"` はエラーになる（`pcall(require, "@env")` は `false` を返す）。環境変数やファイルシステムに触れられるため、セキュリティ上の理由から既定で無効にしてある。ゴーストからこのモジュールを有効にする手段は無い。
+環境変数・カレントディレクトリ・実行ファイルのパスなどへアクセスするモジュールである。既定で無効で、`require "@env"` はエラーになる（`pcall(require, "@env")` は `false` を返す）。環境変数やファイルシステムに触れられるため、セキュリティ上の理由から既定で無効にしてある。
 
 ## Lua 標準ライブラリ
 
@@ -121,6 +121,8 @@ local ok, results = t:run({ quiet = true })
 
 - 既定で使える: `string`・`table`・`math`・`io`・`os`・`package`・`coroutine`・`bit`・`jit`
 - 既定では使えない: `debug`・`ffi`（`require "ffi"` はエラーになる）
+
+ここに示した構成（mlua-stdlib のモジュールと Lua 標準ライブラリの有効・無効）は pasta が固定しており、ゴーストから変える手段は無い。
 
 ---
 

@@ -6,12 +6,34 @@
 use crate::debug::kick::KickSink;
 use crate::debug::{DebugConfig, DebugFileConfig};
 use crate::error::ConfigError;
-use crate::loader::{LuaConfig, default_libs};
 use mlua::{Function, Lua, Result as LuaResult, StdLib, Value};
+
+/// Default libs configuration used by [`RuntimeConfig::new`].
+///
+/// Returns: ["std_all", "assertions", "testing", "regex", "json", "yaml"]
+/// Note: `env` is excluded by default for security (filesystem access).
+pub fn default_libs() -> Vec<String> {
+    vec![
+        "std_all".into(),
+        "assertions".into(),
+        "testing".into(),
+        "regex".into(),
+        "json".into(),
+        "yaml".into(),
+    ]
+}
+
+/// Libraries the VM cannot be built without (Rust-side module registration
+/// uses them). Checked by [`RuntimeConfig::ensure_libs`].
+const REQUIRED_LIBS: &[&str] = &["std_package"];
 
 /// Configuration for which standard libraries to enable in the Lua runtime.
 ///
 /// Uses Cargo-style array notation with optional subtraction syntax.
+///
+/// `std_package` is required: a configuration without it (including one that
+/// subtracts it with `-std_package`) fails with
+/// [`ConfigError::MissingRequiredLibrary`] before the VM is built.
 ///
 /// # Examples
 ///
@@ -49,6 +71,15 @@ pub struct RuntimeConfig {
     ///
     /// Valid mlua-stdlib modules:
     /// - `assertions`, `testing`, `env`, `regex`, `json`, `yaml`
+    ///
+    /// Required: `std_package` (`std_all` / `std_all_unsafe` include it).
+    /// Without it the runtime returns [`ConfigError::MissingRequiredLibrary`]
+    /// and builds no VM.
+    ///
+    /// The framework scripts (`pasta_scripts`, loaded via the loader) also use
+    /// `std_string`, `std_table`, `std_math` and `std_os`. These are not
+    /// checked; if one is missing, the Lua error names it
+    /// (e.g. `attempt to index global 'os' (a nil value)`).
     pub libs: Vec<String>,
 
     /// Resolved debug backend configuration (task 4.2 — single enable choke point).
@@ -56,7 +87,7 @@ pub struct RuntimeConfig {
     /// This is the ONE place the runtime VM init reads to decide whether to call
     /// [`crate::debug::enable`]. It defaults to **disabled** (`enabled = false`,
     /// `listen = None`), so every existing `RuntimeConfig` constructor
-    /// (`new`/`minimal`/`full`/`from_libs`/`From<LuaConfig>`) is zero-cost: no
+    /// (`new`/`minimal`/`full`/`from_libs`) is zero-cost: no
     /// hook, no port, no `std_debug` exposure (R5.2 / R5.3 / R5.5). The loader
     /// path overrides this via [`with_debug`](Self::with_debug) after resolving
     /// pasta.toml `[debug]` + the `PASTA_DEBUG`/`PASTA_DEBUG_PORT` environment.
@@ -135,6 +166,10 @@ impl RuntimeConfig {
     }
 
     /// Create a configuration from a custom libs array.
+    ///
+    /// `libs` must include `std_package` (see [`libs`](Self::libs)); the
+    /// framework scripts loaded via the loader also use `std_string`,
+    /// `std_table`, `std_math` and `std_os`.
     pub fn from_libs(libs: Vec<String>) -> Self {
         Self {
             libs,
@@ -231,6 +266,25 @@ impl RuntimeConfig {
         Ok(additions ^ intersection)
     }
 
+    /// Return [`ConfigError::MissingRequiredLibrary`] if this configuration
+    /// lacks any library in `REQUIRED_LIBS` (judged on the [`to_stdlib`]
+    /// flags, so `-std_package` subtraction counts as missing).
+    ///
+    /// [`to_stdlib`]: Self::to_stdlib
+    pub(crate) fn ensure_libs(&self) -> Result<(), ConfigError> {
+        let std_lib = self.to_stdlib()?;
+        let missing: Vec<&str> = REQUIRED_LIBS
+            .iter()
+            .copied()
+            .filter(|name| Self::parse_std_lib(name).is_ok_and(|flag| !std_lib.contains(flag)))
+            .collect();
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(ConfigError::MissingRequiredLibrary(missing.join(", ")))
+        }
+    }
+
     /// Parse a std_* library name to StdLib flag.
     fn parse_std_lib(name: &str) -> Result<StdLib, ConfigError> {
         match name {
@@ -318,16 +372,6 @@ impl Default for RuntimeConfig {
     }
 }
 
-impl From<LuaConfig> for RuntimeConfig {
-    fn from(config: LuaConfig) -> Self {
-        Self {
-            libs: config.libs,
-            debug: DebugConfig::default(),
-            kick_sink: None,
-        }
-    }
-}
-
 /// Execute Lua `require()` from Rust.
 ///
 /// This helper function calls Lua's standard `require()` function,
@@ -352,6 +396,38 @@ impl From<LuaConfig> for RuntimeConfig {
 pub fn lua_require(lua: &Lua, module_name: &str) -> LuaResult<Value> {
     let require: Function = lua.globals().get("require")?;
     require.call(module_name)
+}
+
+#[cfg(test)]
+mod ensure_libs_tests {
+    use super::*;
+
+    fn libs(names: &[&str]) -> RuntimeConfig {
+        RuntimeConfig::from_libs(names.iter().map(|s| s.to_string()).collect())
+    }
+
+    #[test]
+    fn standard_configs_pass() {
+        assert_eq!(RuntimeConfig::new().ensure_libs(), Ok(()));
+        assert_eq!(RuntimeConfig::minimal().ensure_libs(), Ok(()));
+        assert_eq!(RuntimeConfig::full().ensure_libs(), Ok(()));
+        assert_eq!(libs(&["std_all", "-std_math"]).ensure_libs(), Ok(()));
+    }
+
+    #[test]
+    fn missing_std_package_is_named() {
+        for cfg in [libs(&["std_string"]), libs(&["std_all", "-std_package"])] {
+            match cfg.ensure_libs() {
+                Err(ConfigError::MissingRequiredLibrary(names)) => {
+                    assert!(names.contains("std_package"), "{names}")
+                }
+                other => panic!(
+                    "expected MissingRequiredLibrary for {:?}, got {other:?}",
+                    cfg.libs
+                ),
+            }
+        }
+    }
 }
 
 #[cfg(test)]

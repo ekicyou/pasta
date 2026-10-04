@@ -235,7 +235,7 @@ function M.dispatch(act)
     -- キック起動フック（KickDispatchHook）:
     -- check_talk/random talk より前段で保留シーンを起動する。try_dispatch が
     -- 非 nil co（解決済みキックシーン）を返したら、それを dispatch の結果として
-    -- 返す。EVENT.fire が当該 co を resume_until_valid で初回ビートのみ配信し
+    -- 返す。EVENT.fire が当該 co を EVENT.drive で初回ビートのみ配信し
     -- （高々1ビート/GET・R3.4）、set_co_scene 置換で前 co_scene を閉じる
     -- （preempt・自動復帰なし・R5.2/R5.3）。残りビートは次 tick の check_talk
     -- 継続（STORE.co_scene）が配信する（R4.1）。

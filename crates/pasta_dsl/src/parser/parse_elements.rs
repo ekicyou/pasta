@@ -18,8 +18,11 @@ pub(crate) fn parse_attr(pair: Pair<Rule>) -> Result<Attr, ParseError> {
                     Rule::number_literal => {
                         value = parse_attr_number(kv_inner.as_str());
                     }
-                    Rule::string_contents | Rule::string_blank => {
+                    Rule::string_contents => {
                         value = AttrValue::String(kv_inner.as_str().to_string());
+                    }
+                    Rule::string_blank => {
+                        value = AttrValue::String(String::new());
                     }
                     Rule::attr_string => {
                         value = AttrValue::AttrString(kv_inner.as_str().to_string());
@@ -61,8 +64,11 @@ pub(crate) fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> 
             Rule::words => {
                 for word_inner in inner.into_inner() {
                     match word_inner.as_rule() {
-                        Rule::string_contents | Rule::string_blank => {
+                        Rule::string_contents => {
                             words.push(word_inner.as_str().to_string());
+                        }
+                        Rule::string_blank => {
+                            words.push(String::new());
                         }
                         Rule::word_nofenced => {
                             words.push(word_inner.as_str().to_string());

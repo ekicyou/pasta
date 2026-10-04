@@ -35,7 +35,7 @@
 | ---- | ---- | ---- |
 | `PastaLoader` | `crates/pasta_lua/src/loader/mod.rs` | 起動シーケンスの本体。`load`（既定の `RuntimeConfig`）と `load_with_config`（呼び出し側が渡す `RuntimeConfig`）を持つ。ディレクトリの準備も行う |
 | `PastaConfig`・`LoaderConfig` | `crates/pasta_lua/src/loader/config/mod.rs` | `pasta.toml` の読込と解析。`[loader]` を型付きの `LoaderConfig` に、それ以外を `custom_fields`（TOML の表）に分ける。SHIORI 用の既定値を補完する |
-| 型付きの設定セクション | `crates/pasta_lua/src/loader/config/sections.rs` | `LoggingConfig`・`PersistenceConfig`・`LuaConfig`・`TalkConfig`・`GhostConfig`・`DebugFileConfig` と各既定値の関数 |
+| 型付きの設定セクション | `crates/pasta_lua/src/loader/config/sections.rs` | `LoggingConfig`・`PersistenceConfig`・`TalkConfig`・`GhostConfig`・`DebugFileConfig` と各既定値の関数 |
 | ビルドスクリプト | `crates/pasta_lua/build.rs` | `crates/pasta_lua/pasta_scripts/` を zip に固めて `OUT_DIR` に書き出し、その MD5 を環境変数 `PASTA_SCRIPTS_MD5` としてコンパイルに渡す |
 | 決定論的 zip パッカー | `crates/pasta_lua/build_zip.rs` | ソースツリーから毎回バイト単位で同じ zip を作る純粋な関数。ビルドスクリプトとビルド決定論テスト（`crates/pasta_lua/tests/build_determinism_test.rs`）が共有する |
 | 自己展開 | `crates/pasta_lua/src/loader/extract.rs` | `sync_pasta_scripts`。埋め込んだ zip と MD5 を定数として持ち、版を比較して必要なら展開する |
@@ -60,7 +60,7 @@
 load_with_config(base_dir, runtime_config)
  0.   基準ディレクトリの存在確認                         … 無ければ DirectoryNotFound（致命）
  1.   PastaConfig::load                                   … pasta.toml の読込と既定値の補完（致命）
- 1.5  インスタンスロガーの作成と登録・ログフィルタの更新   … 失敗は警告を出しロガー無しで続行（継続）
+ 1.5  インスタンスロガーの作成と登録・ログフィルタの更新   … 失敗は既定のログファイルへ切り替えて続行（継続）
  2.   profile/ 配下のディレクトリの作成・キャッシュの版確認  … 致命
  2.5  sync_pasta_scripts（フレームワークスクリプトの自己展開） … 失敗は ERROR ログで続行（継続）
  3.   discover_all_files（.pasta と .lua の検出）           … glob の誤り・禁止ファイル名は致命
@@ -71,6 +71,8 @@ load_with_config(base_dir, runtime_config)
  6.   LoaderContext::from_config → PastaLuaRuntime::from_loader_with_scene_dic … 失敗は Runtime（致命）
 ```
 
+- 0 の直後に、基準ディレクトリで `LoadDirGuard` を張り、`load_with_config` を抜けるまで保つ。組み込みで複数のゴーストを読んでも、ローダのログは自分のロガーへ届く（[ロギングとエンコーディング](logging-encoding.md#振り分けの規則)）。
+- 1.5 で `[logging]` の `file_path` からロガーを作れないとき（`profile/` ディレクトリの下にないなど）は、既定のログファイル `profile/pasta/logs/pasta.log` のロガーに切り替えて登録し、不正と判断した `file_path` を warn に残して続ける。`level`・`filter` は反映される（[ロギングとエンコーディング](logging-encoding.md#ロガーの-2-段階の初期化)）。
 - 2 で作るディレクトリは `profile/pasta/save`・`profile/pasta/save/lua`・`profile/pasta/cache` と `[loader] transpiled_output_dir` である。続けて `CacheManager::prepare_cache_dir` がキャッシュの版を確認する（[トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ)）。
 - 2.5 を 3 より前に置くのは、検出とトランスパイルより前、`package.path` を組む 6 より前に、フレームワークスクリプトをディスク上で最新にしておくためである。
 - 4 の統計（トランスパイル・省略・失敗・コピーの件数）は、`[loader] debug_mode` が `true` のときだけ info ログに出る。孤立キャッシュは `CacheManager::find_orphaned_caches` が `debug_mode` に関わらず件数と各パスを警告し、`debug_mode` が `true` のときはローダが各パスを重ねて警告する。キャッシュへの保存は `debug_mode` に関わらず行う。
@@ -92,7 +94,7 @@ load_with_config(base_dir, runtime_config)
 
 `apply_shiori_defaults` は `custom_fields` の `[ghost]` に、書かれていないキー（`talk_interval_min`・`talk_interval_max`・`hour_margin`・`spot_newlines`）だけを `GhostConfig::default()` の値で書き足す。`[ghost]` が無ければ表を作って 4 キーとも入れる。書かれている値は上書きしないため、2 回適用しても結果は変わらない。あわせて `[actor]` が表として存在しなければ警告を 1 行出す（起動は止めない）。補完をここ 1 か所でだけ行うので、Rust 側の消費者と Lua 側（`@pasta_config`）は同じ補完後の値を見る。
 
-`[ghost]` 以外のセクションは、使う側が必要になった時点でアクセサ（`logging`・`persistence`・`lua`・`talk`・`debug`）を呼び、`custom_fields` の該当セクションを型付きの構造体へ変換する。セクションが無いとき、または変換に失敗したときは `None` を返し、使う側が既定値を使う。型の合わない値を含むセクションが丸ごと既定値になるのはこのためである（利用者向けの説明は [値の型が合わないとき](../reference/pasta-toml.md#値の型が合わないとき)）。
+`[ghost]` 以外のセクションは、使う側が必要になった時点でアクセサ（`logging`・`persistence`・`talk`・`debug`）を呼び、`custom_fields` の該当セクションを型付きの構造体へ変換する。セクションが無いとき、または変換に失敗したときは `None` を返し、使う側が既定値を使う。型の合わない値を含むセクションが丸ごと既定値になるのはこのためである（利用者向けの説明は [値の型が合わないとき](../reference/pasta-toml.md#値の型が合わないとき)）。
 
 | アクセサ | 使う場所 |
 | -------- | -------- |
@@ -100,7 +102,6 @@ load_with_config(base_dir, runtime_config)
 | `debug` | ローダの段階 5.5 と VM の構築（`from_loader_with_scene_dic`） |
 | `persistence` | `@pasta_persistence` の登録と、ランタイムの破棄時の保存 |
 | `talk` | `@pasta_sakura_script` の登録 |
-| `lua` | ローダ・ランタイムの構築経路からは呼ばれない。VM に入れるライブラリは `load_with_config` に渡された `RuntimeConfig`（SHIORI 層は `RuntimeConfig::new()` に既定のライブラリ構成を持たせて渡す）で決まる |
 
 `custom_fields` は `LoaderContext` に複製されてランタイムへ渡り、`register_config_module` が Lua の表へ変換して `@pasta_config` として `package.loaded` に置く。変換では TOML の整数・浮動小数は Lua の数値に、日時は文字列になり、`[actor]` の各サブテーブルにはキー名を `name` として書き込む。作る表は普通の Lua の表である。Lua 側のスクリプトは `@pasta_config` を直接 `require` するか、`pasta.config` の `get` を通して読む。`[loader]` は `custom_fields` に含まれないため Lua からは見えない。利用者から見た `@pasta_config` は [@pasta_config](../lua/modules/pasta-config.md) が正である。
 
@@ -268,6 +269,7 @@ Rust 側で登録するモジュール（`@pasta_config`・`@pasta_search` な�
 - [lua-require-robustness](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-require-robustness) — 長パス・非 ANSI パスでの `require`（searcher の置換）
 - [lua-passthrough](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-passthrough) — 辞書ディレクトリの `.lua` の素通し
 - [pasta-config-restructure](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-config-restructure) — `pasta.toml` の構成と既定値の補完
+- [pasta-toml-logging-consistency](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-toml-logging-consistency) — `[lua]` の設定型の撤去、段階 1.5 のフォールバック
 
 ---
 

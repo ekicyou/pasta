@@ -78,7 +78,7 @@ end
 ## パターン 2: イベントハンドラの登録
 
 カスタム SHIORI イベント処理は `REG` テーブルにハンドラを登録する。ハンドラは `function(act)` の形で、
-`Value` にする文字列を返す。詳細は [SHIORI イベントとハンドラ](shiori-events.md#reg) を参照。
+`Value` にする文字列（または `RES` で作った応答全体）を返す。詳細は [SHIORI イベントとハンドラ](shiori-events.md#reg) を参照。
 
 ```lua
 local REG = require("pasta.shiori.event.register")
@@ -102,11 +102,12 @@ end
 
 | 戻り値 | 応答 |
 | ---- | ---- |
-| 文字列 | 200 OK。その文字列が `Value` になる（空文字列なら 204 No Content） |
-| シーンのコルーチン | コルーチンを実行し、出力を `Value` にして 200 OK（出力が無ければ 204 No Content） |
+| 文字列（`SHIORI/` で始まらない） | 200 OK。その文字列が `Value` になる（空文字列なら 204 No Content） |
+| `SHIORI/` で始まる文字列 | 応答全体として扱い、包まずにそのまま返す |
+| シーンのコルーチン | コルーチンを実行し、出力を `Value` にして 200 OK（出力が無ければ 204 No Content。出力が `SHIORI/` で始まっても `Value` になる） |
 | `nil`（何も返さない） | 204 No Content（表示なし） |
 
-応答文字列は、エンジンが `RES`（`pasta.shiori.res`）で組み立てる。ハンドラは応答全体ではなく `Value` にする文字列を返す（[RES](shiori-events.md#res)）。
+応答文字列は、エンジンが `RES`（`pasta.shiori.res`）で組み立てる。ハンドラは `Value` にする文字列を返すほか、`RES` で作った応答全体（`SHIORI/` で始まる文字列）を返してもよい（[RES](shiori-events.md#res)）。
 
 リクエストの内容は `act.req` で読む。主なフィールド:
 

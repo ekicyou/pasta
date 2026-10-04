@@ -79,6 +79,59 @@ ID: OnResumeChain
 }
 
 // ============================================================================
+// Scenario: get_property → チェイントーク（callback-resume-unification 1.3, 6.1）
+// コールバックの応答に前半、次の OnTalk の機会に後半が出る。
+// OnTalk は OnSecondChange → 仮想ディスパッチャで起こす（scene_kick_multibeat_e2e_test.rs
+// と同じく X-Pasta-Time で時刻を固定し、talk 間隔はフィクスチャの pasta.toml で 10 秒に固定）。
+// ============================================================================
+
+/// X-Pasta-Time を固定した OnSecondChange（仮想ディスパッチャ経由の OnTalk 判定）を送る
+fn on_second_change(env: &mut AsyncCallbackEnv, time: &str) -> common::response::ShioriResponse {
+    env.request(&format!(
+        "GET SHIORI/3.0\r\nCharset: UTF-8\r\nStatus: idle\r\nID: OnSecondChange\r\nReference0: 1\r\nX-Pasta-Time: {time}\r\n\r\n"
+    ))
+}
+
+/// Round 0: OnSecondChange → 仮想ディスパッチャの次回トーク時刻を初期化（204）
+/// Round 1: GET OnTestCallbackChainTalk → get_property タグ
+/// Round 2: GET OnPastaCallBack{N} → 前半のトーク（後半は出ない）
+/// Round 3: OnSecondChange（talk 間隔経過）→ OnTalk の機会に後半のトーク
+#[test]
+fn test_callback_resume_then_chain_talk_on_next_ontalk() {
+    let mut env = AsyncCallbackEnv::new();
+
+    // Round 0: 次回トーク時刻を 12:05:10 に設定
+    let resp0 = on_second_change(&mut env, "2025-07-15T12:05:00Z");
+    assert_eq!(resp0.status_code, 204, "R0 should return 204");
+
+    // Round 1: get_property → get タグ
+    let resp1 = env.request(
+        r#"
+GET SHIORI/3.0
+Charset: UTF-8
+ID: OnTestCallbackChainTalk
+"#,
+    );
+    assert_eq!(resp1.status_code, 200, "R1 should return 200 OK");
+    let v1 = resp1.value.as_ref().expect("R1 should have Value");
+    let cb_id = extract_callback_id(v1);
+
+    // Round 2: コールバック → 前半のトークだけが出る
+    let resp2 = env.request(&format!(
+        "GET SHIORI/3.0\r\nCharset: UTF-8\r\nID: {cb_id}\r\nReference0: 2.6.77\r\n\r\n"
+    ));
+    assert_eq!(resp2.status_code, 200);
+    assert_eq!(resp2.status_text, "OK");
+    assert_eq!(resp2.value.as_deref(), Some("前半=2.6.77\\e"));
+
+    // Round 3: 次の OnTalk の機会 → 後半のトーク
+    let resp3 = on_second_change(&mut env, "2025-07-15T12:05:10Z");
+    assert_eq!(resp3.status_code, 200);
+    assert_eq!(resp3.status_text, "OK");
+    assert_eq!(resp3.value.as_deref(), Some("後半\\e"));
+}
+
+// ============================================================================
 // Scenario: 複数プロパティの Reference マッピング
 // get_property({name1, name2}) → Reference0, Reference1 が正しくマッピング
 // ============================================================================
@@ -204,12 +257,11 @@ ID: OnSecondChange
 Reference0: 1
 "#,
     );
-    // sweep は 500 文字列を返すが、EVENT.fire が RES.ok() でラップするため 200 になる
-    // （二重ラップは既知の設計上の挙動）
-    assert_eq!(
-        resp2.status_code, 200,
-        "R2 sweep response should be 200 (double-wrapped)"
-    );
+    // sweep の 500 応答は EVENT.fire で包まれずにそのまま返る
+    assert_eq!(resp2.status_code, 500, "R2 sweep response should be 500");
+    assert_eq!(resp2.status_text, "Internal Server Error");
+    assert_eq!(resp2.value, None, "R2 should have no Value");
+    assert_eq!(resp2.header("X-Error-Reason"), Some("test timeout"));
 
     // Round 3: Late callback → 既に sweep で削除済み → 204
     let resp3 = env.request(&format!(

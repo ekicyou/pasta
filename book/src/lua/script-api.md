@@ -446,7 +446,7 @@ local WORD = require("pasta.word")
 | `WORD.create_word(key)` | グローバル単語（`create_global` の別名） | 単語参照の 5 段目 |
 
 - `require("pasta").create_word(key)` も `WORD.create_global(key)` と同じである。
-- `scene_name` には、グローバルシーンの登録名（シーン名の後ろに同名シーンの通し番号を付けた名前。1 つ目の `＊メイン` なら `"メイン1"`）を渡す（[search_scene](modules/pasta-search.md#search_scenename-global_scene_name)）。
+- `scene_name` には、グローバルシーンの登録名（シーン名の照合用の名前の後ろに、照合用の名前が同じシーンの通し番号を付けた名前。1 つ目の `＊メイン` なら `"メイン1"`、1 つ目の `＊会話・朝` なら `"会話_朝1"`）を渡す（[search_scene](modules/pasta-search.md#search_scenename-global_scene_name)）。
 - どの関数もビルダーを返す。値はビルダーの `entry` で足す。
 - 単語の検索対象は、シーン辞書の読み込みの最後に確定する（[利用できる時期](modules/pasta-search.md#利用できる時期)）。`main.lua` や Lua ブロックのトップレベルで登録した単語は検索できる。シーン関数やイベントハンドラの実行中に登録した単語は、検索の対象にならない。
 

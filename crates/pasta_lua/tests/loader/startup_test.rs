@@ -4,6 +4,7 @@ use crate::common;
 
 use common::{copy_dir_recursive, copy_fixture_to_temp, loader_fixtures_path, value_as_str};
 use pasta_lua::loader::{LoaderError, PastaConfig, PastaLoader};
+use pasta_lua::{ConfigError, RuntimeConfig, mlua};
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -219,6 +220,28 @@ fn test_load_nonexistent_directory() {
     }
 }
 
+/// ローダ経由でも `std_package` を欠いた構成は名前付きの構成エラーになる（3.1、7.2）。
+#[test]
+fn test_load_with_config_missing_std_package_fails_with_name() {
+    for libs in [vec!["std_string"], vec!["std_all", "-std_package"]] {
+        let temp = copy_fixture_to_temp("minimal");
+        let config = RuntimeConfig::from_libs(libs.iter().map(|s| s.to_string()).collect());
+        let err = match PastaLoader::load_with_config(temp.path(), config) {
+            Ok(_) => panic!("load_with_config should fail without std_package: {libs:?}"),
+            Err(e) => e,
+        };
+        let config_err = match &err {
+            LoaderError::Runtime(mlua::Error::ExternalError(e)) => e.downcast_ref::<ConfigError>(),
+            _ => None,
+        };
+        assert!(
+            matches!(config_err, Some(ConfigError::MissingRequiredLibrary(name)) if name == "std_package"),
+            "{libs:?}: expected Runtime(MissingRequiredLibrary(std_package)), got {err:?}"
+        );
+        assert!(err.to_string().contains("std_package"), "{libs:?}: {err}");
+    }
+}
+
 #[test]
 fn test_load_empty_dic() {
     // Create a temporary directory with no .pasta files
@@ -270,6 +293,38 @@ fn test_load_missing_pasta_toml() {
         Err(other) => panic!("Expected ConfigNotFound error, got: {}", other),
         Ok(_) => panic!("Expected ConfigNotFound error, got Ok"),
     }
+}
+
+/// dsl-literal-fixes 8.2: 別々の行の `""` を含む辞書でも、ローダ経由で scene_dic のロードが通る（U24）。
+#[test]
+fn test_load_separate_line_blank_strings() {
+    let temp = TempDir::new().unwrap();
+    let base_dir = temp.path();
+
+    std::fs::write(base_dir.join("pasta.toml"), "[loader]\ndebug_mode = true\n").unwrap();
+    std::fs::create_dir_all(base_dir.join("dic/talk")).unwrap();
+    std::fs::write(
+        base_dir.join("dic/talk/blank.pasta"),
+        "＠a：\"\"\n＠b：\"\"\n＊s\n　＄x＝\"\"\n　＄y＝\"\"\n　さくら：「ok」\n",
+    )
+    .unwrap();
+
+    let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for dir_name in &["pasta_scripts", "scriptlibs"] {
+        let src = crate_root.join(dir_name);
+        let dst = base_dir.join(dir_name);
+        if src.exists() {
+            std::fs::create_dir_all(&dst).unwrap();
+            copy_dir_recursive(&src, &dst).unwrap();
+        }
+    }
+
+    let runtime = PastaLoader::load(base_dir).unwrap();
+
+    let loaded = runtime
+        .exec("return package.loaded['pasta.scene.talk.blank'] ~= nil")
+        .unwrap();
+    assert_eq!(loaded.as_boolean(), Some(true));
 }
 
 #[test]

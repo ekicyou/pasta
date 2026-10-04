@@ -27,8 +27,6 @@ transpiled_output_dir = "profile/pasta/cache/lua"
 [logging]
 # ログファイルパス（load_dir からの相対パス）
 file_path = "profile/pasta/logs/pasta.log"
-# ログローテーション日数
-rotation_days = 7
 # デフォルトログレベル（error/warn/info/debug/trace）
 level = "debug"
 # EnvFilter ディレクティブ（設定時は level より優先）
