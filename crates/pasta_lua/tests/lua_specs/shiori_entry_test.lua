@@ -45,11 +45,35 @@ local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
 local GLOBAL = require("pasta.global")
 local STORE = require("pasta.store")
 local SHIORI_ACT = require("pasta.shiori.act")
+local RES = require("pasta.shiori.res")
 
 --- fire 系テストの共通状態リセット
 local function reset_state()
     STORE.reset()
     CALLBACK.reset()
+end
+
+--- 応答のヘッダ行の値を返す（行全体が「name: 値」の形のものだけを拾う。無ければ nil）
+--- @param res string SHIORI 応答
+--- @param name string ヘッダ名
+--- @return string|nil
+local function header_value(res, name)
+    local prefix = name .. ": "
+    for line in res:gmatch("(.-)\r\n") do
+        if line:sub(1, #prefix) == prefix then
+            return line:sub(#prefix + 1)
+        end
+    end
+    return nil
+end
+
+--- 応答の形を検査する（6.2）: 先頭行がステータス行と完全に一致し、SHIORI/3.0 が 1 回だけ現れる
+--- @param res string SHIORI 応答
+--- @param status_line string 期待するステータス行
+local function expect_status(res, status_line)
+    expect(res:match("^(.-)\r\n")):toBe(status_line)
+    local _, count = res:gsub("SHIORI/3%.0", "")
+    expect(count):toBe(1)
 end
 
 -- ============================================================================
@@ -274,5 +298,54 @@ describe("OnSecondChange - sweep タイムアウト分岐", function()
         expect(dispatch_called):toBe(false)
         -- 掃引済みエントリは pending から除去される
         expect(CALLBACK.pending["OnPastaCallBackEntryTimeout"]):toBe(nil)
+    end)
+end)
+
+-- ============================================================================
+-- SHIORI.request - ハンドラの戻り値の応答化（4.1, 4.2, 4.4, 4.5, 4.6）
+-- ============================================================================
+describe("SHIORI.request - ハンドラの戻り値の応答化", function()
+    --- 戻り値を返すハンドラを登録して SHIORI.request を通した応答を返す
+    --- @param value any ハンドラの戻り値
+    --- @return string
+    local function request_with(value)
+        reset_state()
+        REG.OnEntryReturnTest = function(_act)
+            return value
+        end
+        return ENTRY.request({ id = "OnEntryReturnTest", method = "get", version = 30 })
+    end
+
+    local responses = {
+        { "RES.ok", RES.ok("x") },
+        { "RES.no_content", RES.no_content() },
+        { "RES.warn", RES.warn("r") },
+        { "RES.not_enough", RES.not_enough() },
+        { "RES.advice", RES.advice() },
+        { "RES.err", RES.err("r") },
+    }
+    for _, case in ipairs(responses) do
+        local name, built = case[1], case[2]
+        test(name .. " で作った応答は包まれずにそのまま返る", function()
+            expect(request_with(built)):toBe(built)
+        end)
+    end
+
+    test("普通の文字列は Value にした 200 OK になる", function()
+        local res = request_with("plain")
+        expect_status(res, "SHIORI/3.0 200 OK")
+        expect(header_value(res, "Value")):toBe("plain")
+    end)
+
+    test("空文字列は Value の無い 204 No Content になる", function()
+        local res = request_with("")
+        expect_status(res, "SHIORI/3.0 204 No Content")
+        expect(header_value(res, "Value")):toBe(nil)
+    end)
+
+    test("nil は Value の無い 204 No Content になる", function()
+        local res = request_with(nil)
+        expect_status(res, "SHIORI/3.0 204 No Content")
+        expect(header_value(res, "Value")):toBe(nil)
     end)
 end)

@@ -453,4 +453,26 @@ describe("EVENT.fire - 後方互換性", function()
     end)
 end)
 
+-- ============================================================================
+-- EVENT.fire - コルーチンの出力は接頭辞にかかわらず Value（4.7）
+-- ============================================================================
+describe("EVENT.fire - コルーチンの出力の応答化", function()
+    test("SHIORI/ で始まる出力も素通しせず Value にした 200 OK になる", function()
+        local EVENT, REG = reload_event_modules()
+        REG.TestEvent = function(_act)
+            return coroutine.create(function()
+                return "SHIORI/こんにちは"
+            end)
+        end
+
+        local result = EVENT.fire({ id = "TestEvent" })
+
+        -- 先頭行の完全一致・SHIORI/3.0 が 1 回だけ・Value 行の完全一致（6.2）
+        expect(result:match("^(.-)\r\n")):toBe("SHIORI/3.0 200 OK")
+        local _, count = result:gsub("SHIORI/3%.0", "")
+        expect(count):toBe(1)
+        expect(result:find("\r\nValue: SHIORI/こんにちは\r\n", 1, true)).not_:toBe(nil)
+    end)
+end)
+
 return true

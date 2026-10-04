@@ -8,7 +8,7 @@
   - 完了状態: 既存のテストの検査が変更なしで通り、「予約の後に中断せずエラーで終わるシーンを入口で動かした後、コルーチンを返す別のイベントを送っても、そのシーンが古いイベント名で待機に登録されず『multiple staging』にもならない」モジュールテストが通る（修正前に戻すと失敗する）
   - _Requirements: 1.2, 1.5, 1.7, 1.8, 2.4, 4.3, 5.2_
 
-- [ ] 1.2 ハンドラの戻り値の `SHIORI/` 接頭辞の素通しを入れる
+- [x] 1.2 ハンドラの戻り値の `SHIORI/` 接頭辞の素通しを入れる
   - ハンドラが返した文字列が `SHIORI/` で始まるときは包まずにそのまま応答にし、それ以外の文字列は従来どおり 200（空なら 204）、`nil` は 204 とする
   - シーンのコルーチンの出力は接頭辞にかかわらず常に `Value` の 200 にする
   - 素通しによりタイムアウト掃引の応答が 500 になるため、同じ変更で非同期コールバック E2E のタイムアウト掃引テストの 2 回目の応答を 500 と `X-Error-Reason` の完全一致に改め、「二重包みは既知の挙動」の記述を消す（遅れて届いた結果が 204 になる 3 回目は現行のまま）
@@ -86,3 +86,7 @@
   - 仮想ディスパッチャ・キック・グローバルチェイントーク・`get_property`・選択肢の自動ルーティングの既存テストが変更なしで通ることを、既存挙動の維持の根拠として確かめる
   - 完了状態: `cargo test --workspace`（Lua スイートを含む）、`cargo clippy --all-targets --workspace -- -D warnings`、luacheck がすべて通る
   - _Requirements: 5.1, 5.2, 5.3, 6.6_
+
+## Implementation Notes
+- 1.2: E2E フィクスチャの OnTestTimeout は理由 `test timeout` を明示して渡すため、タイムアウト応答の `X-Error-Reason` は `test timeout`（design の E2E #1 の `callback timeout: get_property` は理由省略時の既定値）。
+- cargo は `env -u NoDefaultCurrentDirectoryInExePath` 付きで回す。`tests/fixtures/sample.generated.lua` はテスト実行で改行コードだけ変わるので stage しない。

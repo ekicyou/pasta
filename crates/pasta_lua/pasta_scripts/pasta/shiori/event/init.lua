@@ -216,9 +216,13 @@ function EVENT.fire(req)
         if not ok then
             error(yielded_value)
         end
+        -- シーンの出力は接頭辞にかかわらず常に Value にする
         return RES.ok(yielded_value)
     elseif type(result) == "string" then
-        -- 既存互換: 文字列をそのまま返す
+        -- SHIORI/ で始まる文字列は RES で作った応答全体として包まずに返す
+        if result:sub(1, 7) == "SHIORI/" then
+            return result
+        end
         return RES.ok(result)
     else
         -- nil

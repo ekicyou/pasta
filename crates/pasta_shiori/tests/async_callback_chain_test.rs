@@ -204,12 +204,11 @@ ID: OnSecondChange
 Reference0: 1
 "#,
     );
-    // sweep は 500 文字列を返すが、EVENT.fire が RES.ok() でラップするため 200 になる
-    // （二重ラップは既知の設計上の挙動）
-    assert_eq!(
-        resp2.status_code, 200,
-        "R2 sweep response should be 200 (double-wrapped)"
-    );
+    // sweep の 500 応答は EVENT.fire で包まれずにそのまま返る
+    assert_eq!(resp2.status_code, 500, "R2 sweep response should be 500");
+    assert_eq!(resp2.status_text, "Internal Server Error");
+    assert_eq!(resp2.value, None, "R2 should have no Value");
+    assert_eq!(resp2.header("X-Error-Reason"), Some("test timeout"));
 
     // Round 3: Late callback → 既に sweep で削除済み → 204
     let resp3 = env.request(&format!(
