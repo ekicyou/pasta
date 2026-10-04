@@ -32,7 +32,7 @@
   - _Boundary: StringLiteralizer_
 
 - [ ] 3. ランタイム: 修正後の値がロード・実行できることを固定する
-- [ ] 3.1 空の候補の実行時挙動を確かめる
+- [x] 3.1 空の候補の実行時挙動を確かめる
   - 設計の仮定 B のリスクを早く出すため、1.3 の直後（2・3.2・4 より先）に着手する
   - ランタイムテストの新規ファイルを作り、テストのモジュール一覧に登録する
   - `＠w：「」` を定義して単語参照を実行し、結果が `nil` ではなく空文字列になる（未定義単語の警告の経路を通らない）ことを、`act` 経由とアクター単語の経路の両方で確かめる
@@ -82,3 +82,4 @@
 - キューコマンドのマーカーは `！`/`!`（grammar.pest の `cue_cmd_marker`）。設計の表の `＠＠cmd` は誤記で、テストは `！cmd（…）` を使う。選択肢の表示テキストは 1 重の `「」` しか取らない
 - パーサテストのヘルパ（`error_line`・`assert_cross_line_error`・`first_scene`・`parse_ok`）は `crates/pasta_dsl/tests/literal_fixes_test.rs` にある。1.2・1.3 はここに足す
 - `cargo test -p pasta_lua` は `crates/pasta_lua/tests/fixtures/sample.generated.lua` を改行コードだけ書き換える（内容差分なし）。コミットに含めない
+- 仮定 B は成立（ランタイム Lua の変更なしで 3.4・3.5 を満たす）。ランタイムテストの `load()` ヘルパ（transpile → exec → finalize_scene）は `crates/pasta_lua/tests/runtime/literal_fixes_test.rs` にあり 3.2 で再利用できる
