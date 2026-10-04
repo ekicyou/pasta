@@ -35,7 +35,7 @@
   - _Boundary: Tokenizer_
 
 - [ ] 3. トランスパイラの生成形を act のメソッド経由にする
-- [ ] 3.1 アクション行のアクター参照とグローバル関数呼び出しの生成形を変える
+- [x] 3.1 アクション行のアクター参照とグローバル関数呼び出しの生成形を変える
   - アクション行（継続行を含む）のすべてのアーム（台詞・単語・変数・ローカル関数・動的参照・プロパティ参照・さくらスクリプト・エスケープ）で、アクター参照を名前を文字列で渡すプロキシ取得の形にする。引数の形は変えない
   - `＠＊名前（…）` をアクション行・式の両方で、名前を文字列で渡すグローバル関数呼び出しの形にする（第 1 引数は act のまま）
   - 1 アクション＝1 行と、行対応の記録位置を保つ
@@ -108,3 +108,5 @@
 
 ## Implementation Notes
 - `cargo test --workspace` が `crates/pasta_lua/tests/fixtures/sample.generated.lua` の改行コードだけを書き換えることがある。`git diff --ignore-all-space` で中身の差分が無ければ `git checkout --` で戻し、コミットに含めない。
+- テスト実行で `crates/pasta_lua/profile/pasta/save/save.json` が書き換わることがある（既存テストの副作用）。`git checkout --` で戻し、コミットに含めない。
+- 生成形を変えると `src/debug/wiring_pasta_break_coalesce_e2e.rs` の最小 Lua シム（ACT）にも act の新メソッドが要る（3.1 で `ACT.actor_proxy` を追加済み）。3.2 で `act:arith` を生成するなら同シムも確認する。

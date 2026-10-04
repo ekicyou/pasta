@@ -65,11 +65,11 @@ fn test_non_cue_items_emitted_correctly_alongside_cue() {
 
     // Action lines should still be emitted
     assert!(
-        lua_code.contains("act.さくら:talk"),
+        lua_code.contains("act:actor_proxy(\"さくら\"):talk"),
         "Action line for さくら should be emitted"
     );
     assert!(
-        lua_code.contains("act.うにゅう:talk"),
+        lua_code.contains("act:actor_proxy(\"うにゅう\"):talk"),
         "Action line for うにゅう should be emitted"
     );
     // Variable set should still be emitted
@@ -99,7 +99,7 @@ fn test_transpile_fullwidth_cue_marker_passthrough() {
         "Fullwidth cue command should not appear in Lua output"
     );
     assert!(
-        lua_code.contains("act.さくら:talk"),
+        lua_code.contains("act:actor_proxy(\"さくら\"):talk"),
         "Action lines should still be emitted"
     );
 }
@@ -132,11 +132,11 @@ fn test_transpile_requirements_sample_scene() {
         "Scene should be created"
     );
     assert!(
-        lua_code.contains("act.さくら:talk"),
+        lua_code.contains("act:actor_proxy(\"さくら\"):talk"),
         "Action lines should be present"
     );
     assert!(
-        lua_code.contains("act.うにゅう:talk"),
+        lua_code.contains("act:actor_proxy(\"うにゅう\"):talk"),
         "All action lines should be present"
     );
 }

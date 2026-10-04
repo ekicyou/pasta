@@ -60,7 +60,10 @@ fn test_no_sink_is_byte_identical_and_records_nothing() {
     let with_seam = String::from_utf8(output).unwrap();
 
     // Baseline: the exact bytes the generator has always produced for a talk action.
-    assert_eq!(with_seam, "act.さくら:talk(\"こんにちは\")\n");
+    assert_eq!(
+        with_seam,
+        "act:actor_proxy(\"さくら\"):talk(\"こんにちは\")\n"
+    );
 }
 
 #[test]
@@ -82,7 +85,7 @@ fn test_capturing_sink_records_line_to_span_for_action_path() {
 
     // Output bytes are unchanged by the presence of the sink.
     let lua = String::from_utf8(output).unwrap();
-    assert_eq!(lua, "act.さくら:talk(\"こんにちは\")\n");
+    assert_eq!(lua, "act:actor_proxy(\"さくら\"):talk(\"こんにちは\")\n");
 
     // The seam recorded exactly the line that was emitted for this action,
     // mapped back to the originating `.pasta` span.
@@ -239,8 +242,8 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk(\"「こんにちは」\")
-        act.うにゅう:talk(\"「やあ」\")
+        act:actor_proxy(\"さくら\"):talk(\"「こんにちは」\")
+        act:actor_proxy(\"うにゅう\"):talk(\"「やあ」\")
     end
 end
 ";

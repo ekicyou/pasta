@@ -4,7 +4,7 @@
 //!
 //! 生成コードは値を文字列化せず、参照変数の値（`var.x`・`save.x`・`args[n]`）と
 //! その変数パスの文字列リテラルをランタイムへ渡す。アクション行はアクター経由
-//! （`act.アクター:`）、代入の右辺・式の中は act 経由（`act:`）で呼ぶ。
+//! （`act:actor_proxy("アクター"):`）、代入の右辺・式の中は act 経由（`act:`）で呼ぶ。
 
 use crate::common;
 
@@ -38,16 +38,16 @@ fn assert_has_line(body: &str, line: &str) {
 fn test_action_dynamic_word_ref() {
     assert_has_line(
         "さくら：＠＄x　です",
-        r#"act.さくら:talk(act.さくら:word(var.x, "var.x"))"#,
+        r#"act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(var.x, "var.x"))"#,
     );
     assert_has_line(
         "さくら：＠＄＊k",
-        r#"act.さくら:talk(act.さくら:word(save.k, "save.k"))"#,
+        r#"act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(save.k, "save.k"))"#,
     );
     // シーン引数は既存の変数展開と同じパス
     assert_has_line(
         "さくら：＠＄０",
-        r#"act.さくら:talk(act.さくら:word(args[1], "args[1]"))"#,
+        r#"act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(args[1], "args[1]"))"#,
     );
 }
 
@@ -55,11 +55,11 @@ fn test_action_dynamic_word_ref() {
 fn test_action_dynamic_fn_call() {
     assert_has_line(
         "さくら：＠＄０（１）",
-        r#"act.さくら:talk((act.さくら:expr_fn_var(args[1], "args[1]", 1)))"#,
+        r#"act:actor_proxy("さくら"):talk((act:actor_proxy("さくら"):expr_fn_var(args[1], "args[1]", 1)))"#,
     );
     assert_has_line(
         "さくら：＠＄＊f（）",
-        r#"act.さくら:talk((act.さくら:expr_fn_var(save.f, "save.f")))"#,
+        r#"act:actor_proxy("さくら"):talk((act:actor_proxy("さくら"):expr_fn_var(save.f, "save.f")))"#,
     );
 }
 
@@ -103,7 +103,7 @@ fn test_expr_dynamic_fn_call() {
     // 静的関数呼び出しの引数の中
     assert_has_line(
         "さくら：＠g（＠＄f（））",
-        r#"act.さくら:talk((act.さくら:expr_fn("g", act:expr_fn_var(var.f, "var.f"))))"#,
+        r#"act:actor_proxy("さくら"):talk((act:actor_proxy("さくら"):expr_fn("g", act:expr_fn_var(var.f, "var.f"))))"#,
     );
 }
 
@@ -184,8 +184,8 @@ fn test_dynamic_actions_record_source_map() {
 
     assert_eq!(
         String::from_utf8(output).unwrap(),
-        "act.さくら:talk(act.さくら:word(var.x, \"var.x\"))\n\
-         act.さくら:talk((act.さくら:expr_fn_var(save.f, \"save.f\")))\n"
+        "act:actor_proxy(\"さくら\"):talk(act:actor_proxy(\"さくら\"):word(var.x, \"var.x\"))\n\
+         act:actor_proxy(\"さくら\"):talk((act:actor_proxy(\"さくら\"):expr_fn_var(save.f, \"save.f\")))\n"
     );
     assert_eq!(sink.records, vec![(1, 5), (2, 9)]);
 }

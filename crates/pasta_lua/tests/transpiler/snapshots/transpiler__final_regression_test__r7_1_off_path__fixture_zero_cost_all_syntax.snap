@@ -32,14 +32,14 @@ do
         var.カウンタ = "10"
         save.グローバル = "永続値"
         act:set_property("mood", "happy")
-        act.さくら:talk("「")
-        act.さくら:talk(act.さくら:word("挨拶"))
-        act.さくら:talk("！")
-        act.さくら:talk(act.さくら:word("一人称は元気です"))
-        act.さくら:talk("」")
-        act.うにゅう:talk("「")
-        act.うにゅう:talk(act.うにゅう:word("場所にいるよ"))
-        act.うにゅう:talk("」")
+        act:actor_proxy("さくら"):talk("「")
+        act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("挨拶"))
+        act:actor_proxy("さくら"):talk("！")
+        act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("一人称は元気です"))
+        act:actor_proxy("さくら"):talk("」")
+        act:actor_proxy("うにゅう"):talk("「")
+        act:actor_proxy("うにゅう"):talk(act:actor_proxy("うにゅう"):word("場所にいるよ"))
+        act:actor_proxy("うにゅう"):talk("」")
         return act:call(SCENE.__global_name__, "サブ会話", {}, table.unpack(args))
     end
 
@@ -47,11 +47,11 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk("「カウンタは")
-        act.さくら:talk(var.カウンタ, "var.カウンタ")
-        act.さくら:talk("、グローバルは")
-        act.さくら:talk(save.グローバル, "save.グローバル")
-        act.さくら:talk("」")
+        act:actor_proxy("さくら"):talk("「カウンタは")
+        act:actor_proxy("さくら"):talk(var.カウンタ, "var.カウンタ")
+        act:actor_proxy("さくら"):talk("、グローバルは")
+        act:actor_proxy("さくら"):talk(save.グローバル, "save.グローバル")
+        act:actor_proxy("さくら"):talk("」")
     end
 
     local total = 1 + 2

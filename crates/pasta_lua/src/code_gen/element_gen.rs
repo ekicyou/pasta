@@ -18,6 +18,15 @@ fn format_args_suffix(args_str: &str) -> String {
     }
 }
 
+/// `＠＊名前（…）` call: `act:global_fn("名前", 引数...)` (name as a string literal).
+fn global_fn_call(name: &str, args_str: &str) -> Result<String, TranspileError> {
+    Ok(format!(
+        "act:global_fn({}{})",
+        StringLiteralizer::literalize(name)?,
+        format_args_suffix(args_str)
+    ))
+}
+
 /// Extract the `.pasta` [`Span`] carried by every [`Action`] variant.
 ///
 /// Source-map seam helper (R4): used to thread the originating `.pasta` location to
@@ -309,21 +318,20 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     pub fn generate_action(&mut self, action: &Action, actor: &str) -> Result<(), TranspileError> {
         let span = action_span(action);
         let out_line_before = self.out_line();
+        // Actor reference by name string: act:actor_proxy("アクター")
+        let actor = &format!("act:actor_proxy({})", StringLiteralizer::literalize(actor)?);
         match action {
             Action::Talk { text, .. } => {
-                // act.アクター:talk("文字列")
+                // act:actor_proxy("アクター"):talk("文字列")
                 let literal = StringLiteralizer::literalize(text)?;
-                self.writeln(&format!("act.{}:talk({})", actor, literal))?;
+                self.writeln(&format!("{}:talk({})", actor, literal))?;
             }
             Action::WordRef {
                 name: word_name, ..
             } => {
-                // act.アクター:talk(act.アクター:word("単語名"))
+                // act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word("単語名"))
                 let word_literal = StringLiteralizer::literalize(word_name)?;
-                self.writeln(&format!(
-                    "act.{}:talk(act.{}:word({}))",
-                    actor, actor, word_literal
-                ))?;
+                self.writeln(&format!("{}:talk({}:word({}))", actor, actor, word_literal))?;
             }
             Action::VarRef { name, scope, .. } => {
                 // Variable interpolation: generate talk with concatenation
@@ -331,7 +339,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     VarScope::Property => {
                         let prop_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!(
-                            "act.{}:talk(tostring(act:get_property({})))",
+                            "{}:talk(tostring(act:get_property({})))",
                             actor, prop_literal
                         ))?;
                     }
@@ -342,10 +350,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         // the variable path (2nd arg) instead of printing "nil".
                         let var_path = Self::resolve_var_path(name, scope)?;
                         let path_literal = StringLiteralizer::literalize(&var_path)?;
-                        self.writeln(&format!(
-                            "act.{}:talk({}, {})",
-                            actor, var_path, path_literal
-                        ))?;
+                        self.writeln(&format!("{}:talk({}, {})", actor, var_path, path_literal))?;
                     }
                 }
             }
@@ -355,11 +360,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 let args_str = self.generate_args_string(args)?;
                 match scope {
                     pasta_dsl::parser::FnScope::Local => {
-                        // act.アクター:expr_fn("関数名", 引数...)
+                        // act:actor_proxy("アクター"):expr_fn("関数名", 引数...)
                         // Outer parens keep only the first return value; talk() renders nil as empty.
                         let name_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!(
-                            "act.{}:talk((act.{}:expr_fn({}{})))",
+                            "{}:talk(({}:expr_fn({}{})))",
                             actor,
                             actor,
                             name_literal,
@@ -367,20 +372,19 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         ))?;
                     }
                     pasta_dsl::parser::FnScope::Global => {
-                        // GLOBAL.関数名(act, 引数...)
+                        // act:global_fn("関数名", 引数...)
                         self.writeln(&format!(
-                            "act.{}:talk((GLOBAL.{}(act{})))",
+                            "{}:talk(({}))",
                             actor,
-                            name,
-                            format_args_suffix(&args_str)
+                            global_fn_call(name, &args_str)?
                         ))?;
                     }
                 }
             }
             Action::SakuraScript { script, .. } => {
-                // SakuraScript is output as act.{actor}:sakura_script()
+                // SakuraScript is output as act:actor_proxy("アクター"):sakura_script()
                 let literal = StringLiteralizer::literalize(script)?;
-                self.writeln(&format!("act.{}:sakura_script({})", actor, literal))?;
+                self.writeln(&format!("{}:sakura_script({})", actor, literal))?;
             }
             Action::Escape {
                 sequence: escape, ..
@@ -388,7 +392,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 // Extract the escaped character (second char) and literalize
                 if let Some(c) = escape.chars().nth(1) {
                     let literal = StringLiteralizer::literalize(&c.to_string())?;
-                    self.writeln(&format!("act.{}:talk({})", actor, literal))?;
+                    self.writeln(&format!("{}:talk({})", actor, literal))?;
                 }
             }
             Action::DynamicWordRef {
@@ -396,12 +400,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 var_scope,
                 ..
             } => {
-                // act.アクター:talk(act.アクター:word(var.x, "var.x"))
+                // act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(var.x, "var.x"))
                 let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
-                self.writeln(&format!(
-                    "act.{}:talk(act.{}:word({}))",
-                    actor, actor, ref_args
-                ))?;
+                self.writeln(&format!("{}:talk({}:word({}))", actor, actor, ref_args))?;
             }
             Action::DynamicFnCall {
                 var_name,
@@ -409,11 +410,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 args,
                 ..
             } => {
-                // act.アクター:talk((act.アクター:expr_fn_var(var.f, "var.f", 引数...)))
+                // act:actor_proxy("アクター"):talk((act:actor_proxy("アクター"):expr_fn_var(var.f, "var.f", 引数...)))
                 let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
                 let args_str = self.generate_args_string(args)?;
                 self.writeln(&format!(
-                    "act.{}:talk((act.{}:expr_fn_var({}{})))",
+                    "{}:talk(({}:expr_fn_var({}{})))",
                     actor,
                     actor,
                     ref_args,
@@ -485,8 +486,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         )?;
                     }
                     pasta_dsl::parser::FnScope::Global => {
-                        // GLOBAL.関数名(act, 引数...)
-                        write!(buf, "GLOBAL.{}(act{})", name, format_args_suffix(&args_str))?;
+                        // act:global_fn("関数名", 引数...)
+                        write!(buf, "{}", global_fn_call(name, &args_str)?)?;
                     }
                 }
             }

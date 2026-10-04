@@ -54,7 +54,7 @@ fn escape_with_single_char_sequence_emits_nothing() {
     assert!(sink.records.is_empty(), "no record without an emitted line");
 }
 
-/// SakuraScript action emits `act.{actor}:sakura_script(<literal>)`.
+/// SakuraScript action emits `act:actor_proxy("{actor}"):sakura_script(<literal>)`.
 #[test]
 fn sakura_script_action_emits_sakura_script_call() {
     let text = gen_to_string(|cg| {
@@ -67,7 +67,7 @@ fn sakura_script_action_emits_sakura_script_call() {
         )
     });
     assert!(
-        text.contains("act.さくら:sakura_script("),
+        text.contains("act:actor_proxy(\"さくら\"):sakura_script("),
         "must route through sakura_script, got: {}",
         text
     );
@@ -133,7 +133,8 @@ fn continue_action_inherits_actor_from_preceding_action_line() {
         )
     });
     assert_eq!(
-        text, "act.うにゅう:talk(\"やあ\")\nact.うにゅう:talk(\"続き\")\n",
+        text,
+        "act:actor_proxy(\"うにゅう\"):talk(\"やあ\")\nact:actor_proxy(\"うにゅう\"):talk(\"続き\")\n",
         "continuation must reuse the inherited speaker"
     );
 }
@@ -311,7 +312,7 @@ fn expr_args_var_ref_converts_to_one_based_lua_index() {
 }
 
 /// Local fn call in expression position uses `act:expr_fn("name", ...)`;
-/// global fn call uses `GLOBAL.name(act, ...)`.
+/// global fn call uses `act:global_fn("name", ...)`.
 #[test]
 fn expr_fn_call_local_and_global_spellings() {
     let local_text = gen_to_string(|cg| {
@@ -333,7 +334,7 @@ fn expr_fn_call_local_and_global_spellings() {
             scope: FnScope::Global,
         }))
     });
-    assert_eq!(global_text, "GLOBAL.rand(act, 6)\n");
+    assert_eq!(global_text, "act:global_fn(\"rand\", 6)\n");
 }
 
 // ------------------------------------------------------------------
@@ -410,4 +411,116 @@ fn code_block_with_invalid_span_emits_lines_without_records() {
         "invalid span must not pollute the source map, got {:?}",
         sink.records
     );
+}
+
+// ------------------------------------------------------------------
+// Actor reference / global function call forms (runtime safety)
+// ------------------------------------------------------------------
+
+/// Every action arm emits ONE line that obtains the actor through
+/// `act:actor_proxy("名前")` (name passed as a string literal), keeping the
+/// arguments unchanged. Actor names colliding with act members / Lua
+/// keywords (`talk`, `var`, `end`) produce the same form (Req 2.1, 2.2, 5.3, 5.4).
+#[test]
+fn action_arms_use_actor_proxy_with_string_name_for_any_actor() {
+    let one = || Args {
+        items: vec![Arg::Positional(Expr::Integer(1))],
+        span: Span::default(),
+    };
+    for actor in ["さくら", "talk", "var", "end"] {
+        let actions = vec![
+            Action::Talk {
+                text: "x".to_string(),
+                span: Span::default(),
+            },
+            Action::WordRef {
+                name: "w".to_string(),
+                span: Span::default(),
+            },
+            Action::VarRef {
+                name: "x".to_string(),
+                scope: VarScope::Local,
+                span: Span::default(),
+            },
+            Action::VarRef {
+                name: "p".to_string(),
+                scope: VarScope::Property,
+                span: Span::default(),
+            },
+            Action::FnCall {
+                name: "f".to_string(),
+                args: Args::empty(),
+                scope: FnScope::Local,
+                span: Span::default(),
+            },
+            Action::FnCall {
+                name: "g".to_string(),
+                args: one(),
+                scope: FnScope::Global,
+                span: Span::default(),
+            },
+            Action::FnCall {
+                name: "end".to_string(),
+                args: Args::empty(),
+                scope: FnScope::Global,
+                span: Span::default(),
+            },
+            Action::SakuraScript {
+                script: "\\n".to_string(),
+                span: Span::default(),
+            },
+            Action::Escape {
+                sequence: "@@".to_string(),
+                span: Span::default(),
+            },
+            Action::DynamicWordRef {
+                var_name: "w".to_string(),
+                var_scope: VarScope::Local,
+                span: Span::default(),
+            },
+            Action::DynamicFnCall {
+                var_name: "f".to_string(),
+                var_scope: VarScope::Local,
+                args: one(),
+                span: Span::default(),
+            },
+        ];
+        let text = gen_to_string(|cg| {
+            for a in &actions {
+                cg.generate_action(a, actor)?;
+            }
+            Ok(())
+        });
+        let p = format!("act:actor_proxy(\"{}\")", actor);
+        let expected = [
+            format!("{p}:talk(\"x\")"),
+            format!("{p}:talk({p}:word(\"w\"))"),
+            format!("{p}:talk(var.x, \"var.x\")"),
+            format!("{p}:talk(tostring(act:get_property(\"p\")))"),
+            format!("{p}:talk(({p}:expr_fn(\"f\")))"),
+            format!("{p}:talk((act:global_fn(\"g\", 1)))"),
+            format!("{p}:talk((act:global_fn(\"end\")))"),
+            format!("{p}:sakura_script([[\\n]])"),
+            format!("{p}:talk(\"@\")"),
+            format!("{p}:talk({p}:word(var.w, \"var.w\"))"),
+            format!("{p}:talk(({p}:expr_fn_var(var.f, \"var.f\", 1)))"),
+        ]
+        .map(|l| l + "\n")
+        .concat();
+        assert_eq!(text, expected, "actor = {}", actor);
+    }
+}
+
+/// `＠＊名前（…）` in expression position calls `act:global_fn("名前", …)`
+/// (first arg stays act, implicitly via the method call) (Req 1.2).
+#[test]
+fn expr_global_fn_call_uses_act_global_fn() {
+    let no_args = gen_to_string(|cg| {
+        cg.generate_var_set(&expr_stmt(Expr::FnCall {
+            name: "end".to_string(),
+            args: Args::empty(),
+            scope: FnScope::Global,
+        }))
+    });
+    assert_eq!(no_args, "act:global_fn(\"end\")\n");
 }

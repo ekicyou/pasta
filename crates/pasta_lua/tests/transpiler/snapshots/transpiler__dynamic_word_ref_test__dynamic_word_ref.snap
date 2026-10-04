@@ -13,10 +13,10 @@ do
         local save, var = act:init_scene(SCENE)
 
         var.x = "挨拶"
-        act.さくら:talk(act.さくら:word(var.x, "var.x"))
-        act.さくら:talk("です")
-        act.うにゅう:talk(act.うにゅう:word(save.k, "save.k"))
-        act.うにゅう:talk((act.うにゅう:expr_fn_var(args[1], "args[1]", 1, var.a)))
+        act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(var.x, "var.x"))
+        act:actor_proxy("さくら"):talk("です")
+        act:actor_proxy("うにゅう"):talk(act:actor_proxy("うにゅう"):word(save.k, "save.k"))
+        act:actor_proxy("うにゅう"):talk((act:actor_proxy("うにゅう"):expr_fn_var(args[1], "args[1]", 1, var.a)))
         var.y = act:word(save.k, "save.k")
         save.y = act:word(var.x, "var.x")
         act:word(var.x, "var.x")

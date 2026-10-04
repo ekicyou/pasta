@@ -78,7 +78,7 @@ fn test_transpile_with_sink_collects_records() {
     // 出力は実際に Lua を生成している（vacuous でない）。
     let lua = String::from_utf8(output).expect("utf-8");
     assert!(
-        lua.contains("act.さくら:talk("),
+        lua.contains("act:actor_proxy(\"さくら\"):talk("),
         "talk action emitted: {lua}"
     );
 

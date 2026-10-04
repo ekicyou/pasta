@@ -14,10 +14,10 @@ do
 
         var.カウンタ = "10"
         save.グローバル = "永続値"
-        act.さくら:talk("「カウンタは")
-        act.さくら:talk(var.カウンタ, "var.カウンタ")
-        act.さくら:talk("、グローバルは")
-        act.さくら:talk(save.グローバル, "save.グローバル")
-        act.さくら:talk("」")
+        act:actor_proxy("さくら"):talk("「カウンタは")
+        act:actor_proxy("さくら"):talk(var.カウンタ, "var.カウンタ")
+        act:actor_proxy("さくら"):talk("、グローバルは")
+        act:actor_proxy("さくら"):talk(save.グローバル, "save.グローバル")
+        act:actor_proxy("さくら"):talk("」")
     end
 end

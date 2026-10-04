@@ -221,7 +221,7 @@ fn test_property_get_assign_global() {
 // Inline GET tests (generate_action with VarRef + Property)
 // ============================================================================
 
-/// 4.1: さくら：＄％p → act.さくら:talk(tostring(act:get_property("p")))
+/// 4.1: さくら：＄％p → act:actor_proxy("さくら"):talk(tostring(act:get_property("p")))
 #[test]
 fn test_property_inline_get() {
     let mut output = Vec::new();
@@ -236,7 +236,7 @@ fn test_property_inline_get() {
 
     let result = String::from_utf8(output).unwrap();
     assert!(
-        result.contains(r#"act.さくら:talk(tostring(act:get_property("p")))"#),
+        result.contains(r#"act:actor_proxy("さくら"):talk(tostring(act:get_property("p")))"#),
         "expected inline get_property via talk, got: {}",
         result
     );
