@@ -26,7 +26,7 @@
 
 ### This Spec Owns
 - `MockRandomSelector::shuffle_usize` の並べ替え規則（指定列の意味の実体）
-- `RandomSelector` トレイトからの `select_index` の削除（指定列を別の意味で読む、検索表から使われない経路。下記「select_index の削除」）
+- `RandomSelector` トレイトからの `select_index` の削除と、`DefaultRandomSelector` の未使用の便利メソッド `select`・`shuffle` の削除（指定列を別の意味で読む、検索表から使われない経路。下記「使われない選び方の削除」）
 - `SceneTable::select_from_cache` の一巡後の作り直し（Phase 4）が `shuffle_usize` に渡す配列の基準
 - `@pasta_search` の API 口（`parse_selector_args`）での負の整数の拒否
 - 上記を固定するテスト（`pasta_core` の単体テスト、Lua からの結合テスト）
@@ -96,7 +96,7 @@ graph LR
 新規ファイルは無い。
 
 ### Modified Files
-- `crates/pasta_core/src/registry/random.rs` — `MockRandomSelector::shuffle_usize` を指定列に従う並べ替えにする。`RandomSelector::select_index` を両実装ごと削除し、`MockRandomSelector` の `index` フィールドも除く。型・トレイトの doc コメントを新しい意味に直す。単体テスト `test_mock_selector_shuffle_usize_is_noop` を新しい規則のテストに置き換え、`select_index` を使う単体テストは削除または `shuffle_usize` で書き直す。
+- `crates/pasta_core/src/registry/random.rs` — `MockRandomSelector::shuffle_usize` を指定列に従う並べ替えにする。`RandomSelector::select_index` を両実装ごと削除し、`MockRandomSelector` の `index` フィールドと、`DefaultRandomSelector` の `select`・`shuffle` も除く。型・トレイトの doc コメントを新しい意味に直す。単体テスト `test_mock_selector_shuffle_usize_is_noop` を新しい規則のテストに置き換え、`select_index` を使う単体テストは削除または `shuffle_usize` で書き直す。
 - `crates/pasta_core/README.md` — `MockRandomSelector` の説明「テスト用固定選択実装」を、指定列で巡の順を決める実装である旨に直す。
 - `crates/pasta_core/src/registry/scene_table.rs` — `select_from_cache` の Phase 4 が、`cached.candidates` ではなく引数 `filtered_ids` から配列を作って `shuffle_usize` に渡す（1 か所）。
 - `crates/pasta_core/src/registry/scene_table_candidate_tests.rs` — モック＋シャッフル有効で、指定列が 1 巡目・2 巡目とも候補の並びに当てはまることのテストを足す。
@@ -213,7 +213,7 @@ impl RandomSelector for MockRandomSelector {
 - Validation: `random.rs` の単体テストで上の表を固定する。
 - Risks: なし（`select_index` は削除するため、指定列を別の意味で読む経路は残らない）。
 
-#### select_index の削除
+#### 使われない選び方の削除（select_index・select・shuffle）
 
 | Field | Detail |
 |-------|--------|
@@ -224,7 +224,8 @@ impl RandomSelector for MockRandomSelector {
 - 呼び出し元は `random.rs` の単体テストだけ（`crates/` 全体を検索して確認済み）。`pasta_lua` は `set_*_selector` で `MockRandomSelector::new`・`DefaultRandomSelector::new` を使うだけで、影響しない。
 - 種固定の再現性のテスト（`test_with_seed_is_reproducible` など）は `shuffle_usize` で書き直して残す。`select_index` 自体のテストは削除する。
 - **公開 API の破壊的変更**: `pasta_core` は crates.io に公開しているクレートで、トレイトのメソッドを除くと外部の実装・呼び出しが壊れる。0.x 系なので、リリースノート（`release-workflow`）に破壊的変更として書く。
-- `DefaultRandomSelector` の便利メソッド `select<T>`・`shuffle<T>` もクレート内で使われていないが、指定列を読まず意味の食い違いを生まないため、本 spec では残す。
+- `DefaultRandomSelector` の便利メソッド `select<T>`・`shuffle<T>` も削除する（開発者の指示）。呼んでいるのは自身を確かめる単体テスト（`test_default_selector`・`test_default_selector_empty`・`test_shuffle`）だけで、他のテストの道具でもない。これらのテストも一緒に削除する。`with_seed` はシーン表のテストが種の固定に使うため残す。
+- 同時に作業中の pasta 系 4 セッション（string-concat-operator・act-token-grouping-fix・actor-proxy-act-delegation・scene-identity-format）に確認し、`random.rs` とこれらの API を触る・呼ぶ作業は無いことを確かめた（2026-10-04）。
 
 #### SceneTable::select_from_cache（Phase 4）
 
@@ -286,7 +287,7 @@ impl RandomSelector for MockRandomSelector {
 見出し `### set_scene_selector(...) / set_word_selector(...)` は変えない。本文に次を書く（5.1・5.2）。
 
 - 整数は、巡（候補を重複なく返し切るまで）の中で返す順番を、候補の並びの 0 始まりの位置で指定する。
-- 候補の並びの規則（現行の記述: 文字コード順、同じ単語キーの値は定義した順、`メイン10` が `メイン2` より先）はそのまま残し、「候補の並び」の定義として使う。
+- 候補の並びの規則は、セレクタの節で繰り返して書かず、規則を書いている箇所を参照する。`scene-identity-format` が同名シーンの並び（`メイン10` が `メイン2` より先になる問題）を直す予定で、同じ章を編集するため、規則の細部をセレクタの節に持たないことで文章の衝突と記述の二重化を避ける。整数の意味は「候補の並びの位置」で、並びの規則には依らない。
 - 指定列を使い切ったら、まだ返していない候補を候補の並びの順に返す。一巡すると、次の巡も指定列の先頭から当てはめる。
 - 指定列は検索（名前と範囲の組）ごとに独立して当てはまる。
 - 候補の数以上の整数と、巡の中ですでに返した位置の整数は無視する。負の整数は Lua のエラー。整数でない引数は `expected integer argument`。
@@ -334,9 +335,12 @@ impl RandomSelector for MockRandomSelector {
 - 既定への復帰: `set_word_selector(1)` の後 `set_word_selector()` を呼び、「`set_word_selector()` → 最初の検索」を 40 回くり返して、最初の結果が 2 種類以上あることを見る（4.4。候補 3 つで誤って失敗する確率は 3^-39 程度）。
 - 既存の `set_word_selector(0)`（東京 → 大阪）・`set_word_selector(0, 1, 2)`（scene_test.rs）は変更せずに通る（1.7・1.8）。
 
+- 同名シーンのテストは 3 つ（10 個未満）で組み、同名シーンの並びの規則が `scene-identity-format` の前後どちらでも同じ結果になるようにする。
+
 4.5 は、上の「先頭以外の位置」を期待するテストが、整数が使われない実装（恒等の並び）で失敗することで満たす。
 
 ### マニュアルの検証
+- 並走する spec も同じ生成物を作り直すため、後からマージする側は main を取り込んだ後に `node book/tools/gen-skill-refs.mjs` を走らせ直す。マニュアル 2 章は `scene-identity-format` も編集するので、後からマージする側が `origin/main` に乗せ直して意味を揃える。
 - `node book/tools/gen-skill-refs.mjs --check` と `node book/tools/link-check.mjs`（見出しのアンカーが残っていること）。
 
 ## 確定事項（設計ディスカッション 2026-10-04）
