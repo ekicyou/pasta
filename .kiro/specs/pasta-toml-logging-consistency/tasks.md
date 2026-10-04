@@ -131,7 +131,7 @@
   - _Requirements: 1.1, 1.2, 2.1, 2.2, 6.1_
   - _Boundary: ManualAndSkills_
 
-- [ ] 7.2 (P) 内部設計の章を更新する
+- [x] 7.2 (P) 内部設計の章を更新する
   - `internals/logging-encoding.md` から `rotation_days` を消し、振り分けの 3 規則・文脈を張る箇所・残るログと捨てるログ・段階 1.5 のフォールバック・`file_path` の判定を書く
   - `internals/shiori.md` に、破棄の順序、`request`・`unload`・`DllMain` detach・終了処理のログの扱い、完了通知の後のログは捨てることを書く
   - `internals/loader.md` から `[lua]` の設定型への言及を消し、段階 1.5 の失敗時を「既定のログファイルへ切り替えて続行」に直す
