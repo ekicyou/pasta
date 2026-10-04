@@ -75,7 +75,7 @@ impl SceneRegistry {
         let counter = self.increment_counter(name);
         let id = (self.scenes.len() + 1) as i64;
 
-        let fn_name = format!("{}_{}::__start__", Self::sanitize_name(name), counter);
+        let fn_name = format!("{}::__start__", Self::registered_name(name, counter));
         let fn_path = format!("crate::{}", fn_name);
 
         let entry = SceneEntry {
@@ -118,11 +118,9 @@ impl SceneRegistry {
         // Format: crate::親_番号::子_番号
         // Use local_index to match CodeGenerator's generate_local_scene
         let fn_name = format!(
-            "{}_{}::{}_{}",
-            Self::sanitize_name(parent_name),
-            parent_counter,
-            Self::sanitize_name(name),
-            local_index
+            "{}::{}",
+            Self::registered_name(parent_name, parent_counter),
+            Self::registered_name(name, local_index)
         );
         let fn_path = format!("crate::{}", fn_name);
 
@@ -247,6 +245,29 @@ impl SceneRegistry {
         name.replace(|c: char| !c.is_alphanumeric() && c != '_', "_")
     }
 
+    /// 登録名を作る: 照合用の名前（`sanitize_name`）・`_`・通し番号。
+    ///
+    /// 例: `registered_name("会話・朝", 1)` = `会話_朝_1`。結果に `:` は含まれない。
+    pub fn registered_name(name: &str, counter: usize) -> String {
+        format!("{}_{}", Self::sanitize_name(name), counter)
+    }
+
+    /// 登録名を（名前, 通し番号）に分ける。`registered_name` の逆。
+    ///
+    /// 最後の `_` の後ろが 1 文字以上の ASCII 数字で、前が空でないときだけ分ける。
+    /// それ以外（`__start__`・`加算ループ`・`_1`・usize に収まらない数字列）は（全体, None）。
+    pub fn split_registered_name(registered: &str) -> (&str, Option<usize>) {
+        if let Some((name, digits)) = registered.rsplit_once('_')
+            && !name.is_empty()
+            && !digits.is_empty()
+            && digits.bytes().all(|b| b.is_ascii_digit())
+            && let Ok(counter) = digits.parse()
+        {
+            return (name, Some(counter));
+        }
+        (registered, None)
+    }
+
     /// Merge scenes and counters from another registry.
     ///
     /// Used by PastaLoader to combine registries from multiple files.
@@ -353,6 +374,52 @@ mod tests {
         assert_eq!(SceneRegistry::sanitize_name("hello-world"), "hello_world");
         assert_eq!(SceneRegistry::sanitize_name("会話"), "会話");
         assert_eq!(SceneRegistry::sanitize_name("＊会話"), "_会話");
+    }
+
+    #[test]
+    fn test_registered_name_round_trip() {
+        // 末尾が数字・`_` と数字で終わる・記号を含む・`_` だけの名前で往復一致する
+        for name in ["メイン", "章11", "章_1", "会話・朝", "_", "__", "a_"] {
+            for counter in [1, 2, 11, usize::MAX] {
+                let registered = SceneRegistry::registered_name(name, counter);
+                assert!(!registered.contains(':'), "{registered}");
+                assert_eq!(
+                    SceneRegistry::split_registered_name(&registered),
+                    (SceneRegistry::sanitize_name(name).as_str(), Some(counter)),
+                    "{name} / {counter}"
+                );
+            }
+        }
+        assert_eq!(SceneRegistry::registered_name("会話・朝", 1), "会話_朝_1");
+        // `A1` の 1 つ目と `A` の 11 個目は別の登録名
+        assert_ne!(
+            SceneRegistry::registered_name("A1", 1),
+            SceneRegistry::registered_name("A", 11)
+        );
+    }
+
+    #[test]
+    fn test_split_registered_name() {
+        assert_eq!(
+            SceneRegistry::split_registered_name("章_1_1"),
+            ("章_1", Some(1))
+        );
+        assert_eq!(
+            SceneRegistry::split_registered_name("章_11"),
+            ("章", Some(11))
+        );
+        // 分けられない名前は（全体, 番号なし）
+        for whole in [
+            "__start__",
+            "加算ループ",
+            "_1",
+            "章_",
+            "章_1a",
+            "章_１",
+            "章_99999999999999999999999999",
+        ] {
+            assert_eq!(SceneRegistry::split_registered_name(whole), (whole, None));
+        }
     }
 
     #[test]
