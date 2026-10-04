@@ -63,6 +63,7 @@ Pasta は、シーン名・アクター名を登録するとき、Unicode の英
 1. When グローバルシーンの中で `・選択・A` と定義したローカルシーンを、同じグローバルシーンの中から `＞選択・A` で Call したとき, the Pasta runtime shall そのローカルシーンを実行する。
 2. When Lua から `SCENE.search("選択・A", 登録名)`（第 2 引数にそのグローバルシーンの登録名）を呼んだとき, the Pasta runtime shall ローカルシーン `・選択・A` を検索結果として返す。
 3. When 記号を含むローカルシーン名の先頭部分で検索したとき, the Pasta runtime shall グローバルシーンと同じく、照合用の名前どうしの前方一致で候補を決める。
+4. When 選択肢行（`＠？選択・A「Aにする」`）のジャンプ先が記号を含むローカルシーン名で、プレイヤーがその選択肢を選んだとき, the Pasta runtime shall 選択 ID（作者が書いた元の名前）で照合し、そのローカルシーンを実行する（何も出力しない応答（204）にしない）。
 
 ### Requirement 3: 名前の照合規則（共通）
 
@@ -122,7 +123,7 @@ Pasta は、シーン名・アクター名を登録するとき、Unicode の英
 #### Acceptance Criteria
 
 1. The Pasta test suite shall 記号を含むグローバルシーン名を元の名前で Call・検索できることを確かめるテストを含む。
-2. The Pasta test suite shall 記号を含むローカルシーン名を元の名前で Call・検索できることを確かめるテストを含む。
+2. The Pasta test suite shall 記号を含むローカルシーン名を元の名前で Call・検索できること、および選択肢のジャンプ先として選べること（要件 2.4）を確かめるテストを含む。
 3. The Pasta test suite shall 記号を含むアクター名のアクター単語を、アクターを付けた単語参照で引けることを確かめるテストを含む。
 4. The Pasta test suite shall 登録名を検索に渡したときの結果が変わらないこと（要件 3.2）と、照合用の名前が重なる名前の扱い（要件 5.1）を確かめるテストを含む。
 5. When 本仕様の変更を入れたとき, the Pasta test suite shall 記号を含まない名前に関する既存のテストを、期待値を変えずにすべて通す。
