@@ -55,7 +55,6 @@
 | `[talk]` | SHIORI デフォルト有（省略可） | （[[talk]](#talkトーク表示制御) 参照） |
 | `[persistence]` | SHIORI デフォルト有（省略可） | （[[persistence]](#persistence永続化) 参照） |
 | `[logging]` | SHIORI デフォルト有（省略可） | （[[logging]](#loggingログ出力) 参照） |
-| `[lua]` | SHIORI デフォルト有（省略可） | （[[lua]](#lualua-ライブラリ) 参照） |
 | `[debug]` | SHIORI デフォルト有（省略可） | `enabled = false` / `port = 9276` |
 | `[package]` | **エンジンプロファイル専用** | （SHIORI では不要。[予約注記](#package-予約注記) 参照） |
 
@@ -145,9 +144,6 @@ debug_mode = false                                  # 既定 false
 file_path = "profile/pasta/logs/pasta.log"   # 既定 "profile/pasta/logs/pasta.log"
 level = "info"                               # 既定 "info"
 # filter = "debug,pasta_shiori=info"         # 未設定（設定時は level より優先）
-
-# --- 省略可（SHIORI デフォルト有）: Lua ライブラリ ---
-# [lua] は上級者向け。「[lua]（Lua ライブラリ）」の節を参照。
 
 # --- 省略可（SHIORI デフォルト有）: デバッグバックエンド ---
 [debug]
@@ -407,7 +403,7 @@ file_path = "profile/pasta/save/save.json"
 
 | キー | 型 | 既定値 | 説明 |
 | ---- | -- | ------ | ---- |
-| `file_path` | 文字列 | `"profile/pasta/logs/pasta.log"` | ログファイルのパス（設置ディレクトリからの相対パス） |
+| `file_path` | 文字列 | `"profile/pasta/logs/pasta.log"` | ログファイルのパス（設置ディレクトリからの相対パスで、`profile/` ディレクトリの下だけ） |
 | `level` | 文字列 | `"info"` | 記録するログレベル（`error`/`warn`/`info`/`debug`/`trace`） |
 | `filter` | 文字列 | （なし） | ログのフィルター指定（tracing の EnvFilter の書式）。設定すると `level` より優先される |
 
@@ -417,18 +413,10 @@ level = "debug"
 filter = "debug,pasta_shiori=info"
 ```
 
-- `file_path` に書けるのは、`profile` で始まり `..` を含まない相対パスだけである。条件を満たさない値のときはログファイルが作られない（ゴーストの起動は続き、`level`・`filter` は反映される）。
+- `file_path` に書けるのは、`profile/` ディレクトリの下を指す相対パスだけである（`profile/` の後にファイル名が要る。`..` を含むパスと絶対パスは不可。`profile` の大文字・小文字は区別する）。条件を満たさない値のときは既定のログファイル `profile/pasta/logs/pasta.log` へ書き、その値を示す warn をログに出す。ゴーストの起動は続き、`level`・`filter` は反映される。
 - `filter`・`level` として解釈できない値のときは `info` になる。
 - 環境変数 `PASTA_LOG` が設定されていると、`filter`・`level` より優先される。
 - Lua からのログ出力は [@pasta_log](https://ekicyou.github.io/pasta/lua/modules/pasta-log.html)、起動に失敗したときのログの読み方は [ゴーストが起動しない・喋らないとき](https://ekicyou.github.io/pasta/reference/startup.html#4-ゴーストが起動しない喋らないとき) を参照する。
-
----
-
-### [lua]（Lua ライブラリ）
-
-上級者向けのセクションである。**分類: SHIORI デフォルト有（省略可）**。
-
-ゴーストの Lua で使える標準ライブラリと mlua-stdlib のモジュールは、[mlua-stdlib 統合モジュール](https://ekicyou.github.io/pasta/lua/modules/mlua-stdlib.html) に示すとおりである。`@env` は通常のゴーストから有効にできない。
 
 ---
 

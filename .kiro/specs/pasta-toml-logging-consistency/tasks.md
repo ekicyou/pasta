@@ -121,7 +121,7 @@
   - _Requirements: 4.4_
   - _Depends: 4.2, 6.2_
 
-- [ ] 7. マニュアル・サンプル・スキルを挙動に合わせる
+- [x] 7. マニュアル・サンプル・スキルを挙動に合わせる
 - [x] 7.1 (P) 利用者向けの章とサンプルゴーストを更新する
   - サンプルゴースト hello-pasta の `pasta.toml` から `rotation_days` の行を消す
   - `reference/pasta-toml.md` から `[lua]` の一覧の行・テンプレートのコメント・節を消し、`[logging]` の `file_path` の説明を「`profile/` の下の相対パスだけ。不正なら既定のログファイルへ書き warn を出す」に直す
@@ -139,7 +139,7 @@
   - _Requirements: 2.1, 6.2, 6.3, 6.4_
   - _Boundary: ManualAndSkills_
 
-- [ ] 7.3 スキルを更新・再生成し、効かないキーが残っていないことを確かめる
+- [x] 7.3 スキルを更新・再生成し、効かないキーが残っていないことを確かめる
   - 手書きスキル `pasta-ghost-authoring/SKILL.md` から `[lua]` の行を消す
   - スキル `references/` を生成スクリプトで再生成し、差分検査（`--check`）が通る
   - `rotation_days` と `[lua]` を `book/`・`crates/*/README.md`・`crates/pasta_sample_ghost/`・`.claude/skills/` で検索して 0 件である
