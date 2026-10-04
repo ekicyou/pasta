@@ -76,7 +76,7 @@
   - _Requirements: 7.3_
   - _Boundary: book internals chapters_
 
-- [ ] 5.4 スキル references を再生成し、鮮度照合とリンク検証を通す
+- [x] 5.4 スキル references を再生成し、鮮度照合とリンク検証を通す
   - マニュアルから生成する references を生成ツールで再生成する（手で編集しない）
   - 完了状態: 鮮度照合（`--check`）とリンク検証がともに通る
   - _Requirements: 7.4_
