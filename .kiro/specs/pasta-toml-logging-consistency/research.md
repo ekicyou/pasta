@@ -183,3 +183,88 @@
 - A6: Disconnected は release（`panic=abort`）では実質起きない。実運用で意味があるのは Timeout で、そのうちロガーが既に登録解除されているのは「ランタイム破棄（永続化保存）の途中で止まった」場合に限られる。drop の順序を直せば、この場合もロガーは登録されたままになる。
 - A7: プロセス終了中は書き込み用のワーカースレッドが止まっているため、記録しようとしても届く保証が無い。
 - A9: 案 B を採るとデバッグバックエンドのログも副次的に残る。brief の Out of scope は「デバッグバックエンドのログ（の挙動を変えること）」と読めるため、副次的に残ることを許すかを確定したい。
+
+---
+
+# 設計フェーズの調査と決定（2026-10-04）
+
+- 種別: 既存システムの拡張（light discovery）。外部の新しい依存は無いため、Web 調査はしていない。
+- 方法: コード読解（`crates/pasta_lua`・`crates/pasta_shiori`・`book/`）。cargo の実行なし。
+
+## 8. 6 節「調査が要る項目」の結果
+
+### 8.1 ローダ経由で要る最小のライブラリ構成
+
+- Rust 側が無条件に使うのは `package` だけである（`search::register`・`module_registry.rs` の `set_loaded_module` と `setup_package_path`・`searcher.rs`・`exec.rs`・`finalize.rs`）。
+- `math` は無くても VM を作れる。乱数の種の設定は `if let Ok(math)` で守られ、既存テスト `test_runtime_without_math_library_still_builds`（`tests/runtime/runtime_api_test.rs`）がこの挙動を固定している。必須ライブラリの検査を `to_stdlib()` に入れると、`test_to_stdlib_empty_libs`（空の一覧は `StdLib::NONE`）などフラグ計算のテストが壊れるため、検査は `to_stdlib()` の外（`ensure_libs`）に置く。
+- `pasta_scripts` の標準ライブラリの使用（コメント行を除く検索）: `string` 22 か所、`table` 34 か所、`math` 10 か所（`act.lua`・`virtual_dispatcher.lua`・`sakura_builder.lua`・`lua_version.lua`）、`os` 2 か所（`shiori/act.lua` の `os.time() + timeout`、`shiori/event/second_change.lua` の `CALLBACK.sweep(os.time())`）、`coroutine` 22 か所、`jit` 2 か所（`lua_version.lua`。引数で受けた表を読むだけ）。`io`・`bit`・`ffi`・`debug` は 0 か所。
+- `std_coroutine` は `StdLib::NONE` に対応する（LuaJIT では基本ライブラリに含まれる）。必須の一覧に入れる必要は無い。
+- `os`・`math` の使用は呼び出し時で、欠けていても起動は通り、毎秒の OnSecondChange やトークの時点で Lua エラーになる。構成の誤りから遠いエラーになるので、ローダ経由では起動前に止める（設計 D2）。
+- mlua-stdlib の `register` が `package` 無しで動くかは未確認（ソースが手元のレジストリに見つからなかった）。`package` は Rust 側の登録で必ず要るため、結論に影響しない。
+
+### 8.2 並列実行の下での E2E テスト
+
+- `tests/` 直下の 1 ファイルは 1 つのテストバイナリ（1 プロセス）になる。登録簿・購読者・フィルタはプロセスごとに独立する。
+- 先例が 2 つある。`pasta_shiori/tests/ffi_loadu_test.rs` は FFI の static（`MAILBOX`・`LOADU_INITIALIZED`）を共有するため `#[test]` を 1 本にして直列化している。`pasta_lua/tests/logging_filter_reload_test.rs` はフィルタがプロセスに 1 つのため専用バイナリに 1 本だけ置いている。
+- 専用バイナリに `#[test]` を 1 本だけ置き、ゴーストを 1 つずつ順に読めば、登録簿は常に 0 個か 1 個になる。`serial` 用のクレートを足す必要は無い。
+- 振り分けの規則そのものは、`registry.rs` の `mod tests` から private な `GlobalLoggerRegistry::new()` で登録簿を作って単体テストできる（プロセス全域の登録簿を使わない）。
+- `PASTA_LOG` はフィルタを上書きする（`tracing_init.rs` の `build_filter`）。`tests/common` の `#[ctor]` は `PASTA_DEBUG`・`PASTA_DEBUG_PORT` だけを消しているので、`PASTA_LOG` を足す。
+- `unload` は done ack を受けてから戻り、ack は `drop(shiori)` の後に送られる。順序を直した後は、ack の時点でロガーは破棄済み（フラッシュ済み）なので、`unload` の直後にログファイルを読める。
+
+### 8.3 `PastaShiori::drop` の順序と不変条件
+
+- 現行: `SHIORI.unload` → 登録解除 → 登録解除のログ → 関数のキャッシュを捨てる → ランタイム破棄（永続化保存・DAP バックエンドの片付け）。
+- 変更後: 文脈を張る → `SHIORI.unload` → 関数のキャッシュを捨てる → ランタイム破棄 → 登録解除のログ → 登録解除。
+- `actor/thread.rs` は `drop(shiori)` → `drop(rx)` → done ack の順で、本仕様で変えない。「ack を受け取った時点で VM と DAP バックエンドの解放が済んでいる」（`internals/shiori.md`）は保たれる。
+- 順序を直すと、ロガーの最後の `Arc` が `unregister` の中で落ちる。現行の `unregister` は `loggers.remove()` の戻り値をミューテックスを持ったまま破棄するため、`WorkerGuard` のフラッシュ待ちの間、他のスレッドの `make_writer` が待たされる。外したロガーをロックの外で破棄する（`register` の置き換えも同じ）。
+- 再読み込みの分岐（`PastaShiori::load` の先頭）も同じ順序の問題を持つ。FFI 経路では通らない（アクターごとに新しい `PastaShiori` を作る）が、`PastaShiori` を直接使うテストでは通る。`Drop` と共通のメソッドにまとめる。
+
+### 8.4 撤去する公開 API の利用者
+
+- リポジトリ内の呼び出し元はテストだけ（`tests/loader/config_test.rs`・`tests/runtime/unit_test.rs`）。
+- リポジトリに CHANGELOG ファイルは無い。告知はリリース時に `release-workflow` が扱う（本仕様の範囲外）。
+
+## 9. その他の発見
+
+- `.claude/skills/pasta-ghost-authoring/SKILL.md` の 355 行付近（手書き部分）が `[lua]` を載せている。生成物ではないので、手で消す（要件 6.6）。
+- `PastaLoader::load_with_config` は `LoadDirGuard` を張らない。組み込みでは、呼び出し側が張らない限りローダのログに文脈が無い。
+- 不正な `file_path` のテストの先例: `logging_filter_reload_test.rs` が `file_path = "../outside.log"` で `PastaLoader::load` が成功することを見ている（フィルタの反映だけを検証）。
+- FFI 入口スレッドの観測ログのレベル: `actor.try_send` の成功は trace、失敗・timeout・drop は debug。`teardown: Stop enqueued` と `lifecycle: actor spawned` は debug。既定の `info` では、FFI 入口スレッドは正常時にログを出さない。
+
+## 10. 設計の統合（Synthesis）
+
+### 一般化
+
+- 要件 4.1・4.4・4.5 は「設置パスを知らないスレッドのログ」という 1 つの問題である。入口ごとにガードを足すのではなく、振り分けの規則に「文脈なし → 唯一のロガー」を足して 1 か所で解く。
+- 要件 4.2 と 5.2（組み込み）は「設置パスを知っているのに文脈を張っていない」という 1 つの問題である。知っている側（アクタースレッド・ローダ）が張る。
+- 要件 4.3 と再読み込みの順序は同じ処理なので、`release_runtime` の 1 か所にまとめる。
+
+### 作るか、既存を使うか
+
+- 新しい依存は足さない。テストの直列化は、専用バイナリという既存の型で足りる。
+- ロガーの寿命を FFI 側へ延ばす案（4.2 節の (ii)）は採らない。順序を直せば、待ち時間切れのときロガーは登録されたままである。
+
+### 簡素化
+
+- `windows.rs` に static を足してガードを張る案（案 A）は採らない。入口が増えるたびに漏れる構造が残る。
+- 必須ライブラリを黙って足す案は採らない（前提 A3）。
+- 既に登録されている既定ロガーを段階 1.5 で再利用する最適化は採らない。組み込みの再読み込みで前回の設定のロガーが残っている場合に、既定ファイルへ切り替わらないためである。常に既定の設定で作り直す。
+- 必須ライブラリの定数は公開しない。rustdoc の文章で示す。
+
+## 11. 設計の決定
+
+| ID | 決定 | 採らなかった案 |
+| -- | ---- | -------------- |
+| D1 | `default_libs` を `runtime/runtime_config.rs` へ移し、`pasta_lua::default_libs`・`pasta_lua::loader::default_libs` は再エクスポートで保つ | `sections.rs` に残す（設定セクションの型でない関数が孤立し、`runtime` → `loader` の依存が残る）。`loader` の公開パスを消す（破壊が 1 つ増える） |
+| D2 | 必須は 2 段。VM の構築は `std_package`、ローダ経由は加えて `std_string`・`std_table`・`std_math`・`std_os`。エラーは `ConfigError::MissingRequiredLibrary(String)`。検査は `RuntimeConfig::ensure_libs`（`to_stdlib()` は変えない） | `to_stdlib()` で検査する（フラグ計算のテストが壊れる）。`math` などを VM の構築の必須にする（`math` 無しの VM を作れる現行の挙動が壊れる）。`package` を黙って足す |
+| D3 | 案 C。`GlobalLoggerRegistry::resolve` で「文脈あり → そのロガー（未登録なら捨てる）／文脈なし → 登録がちょうど 1 つならそれ／それ以外は捨てる」。アクタースレッドの入口と `load_with_config` で文脈を張る。`PastaShiori` は `release_runtime` で「ランタイム破棄 → 登録解除のログ → 登録解除」。teardown の異常の warn は今の位置（FFI 入口）のまま、規則で届ける（4.2 節の (i)） | 案 A（入口ごとのガード）。文脈ありで未登録のときも唯一のロガーへ流す（別のゴーストへの誤配になりうる） |
+| — | 不正な `file_path`: 4.3 節の案 2（段階 1.5 が既定の設定で作り直して登録する）。warn は登録の後に出す。判定は「最初の要素がちょうど `profile`、その後に要素が続く、`..` を含まない」 | 案 1（文言だけ直す。組み込みでロガーが無くなる） |
+
+## 12. リスク
+
+| リスク | 対処 |
+| ------ | ---- |
+| ローダ経由の必須ライブラリの一覧が `pasta_scripts` の変更に追随しない | 設計の Revalidation Triggers に挙げる。実装タスクで、構成を 1 つずつ外して起動とリクエストが通るかを実行で確かめる |
+| 「文脈なし → 唯一のロガー」が、組み込みで意図しないログを拾う | ロガーが 2 つ以上なら捨てる。1 つのときは、そのプロセスのログはそのゴーストのものとみなせる |
+| FFI 入口スレッドが登録簿のミューテックスを取る | 取るのはログのイベントがフィルタを通ったときだけで、保持は表を引く間だけ。mailbox の送信パスは変えない |
+| ログの E2E がフラッシュの時点に左右される | ロガーの破棄の後に読む（`unload` の戻りの後） |
