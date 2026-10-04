@@ -69,7 +69,7 @@
 | CueCommandパススルー   | `cue_command_passthrough_test.rs`                                                           | ✅ 完了 | 5テスト（Lua変換スキップ検証）     |
 | 複数キー単語登録       | `transpiler.rs`（インライン）                                                               | ✅ 完了 | 7テスト（登録・Lua出力・後方互換） |
 | 動的単語参照（＠＄）   | `transpiler/dynamic_word_ref_test.rs`<br>`lua_specs/act_dynamic_ref_test.lua`<br>`runtime/syntax_test.rs`（E2E）<br>`pasta_lsp/tests/dynamic_ref_token_test.rs` | ✅ 完了 | 生成コード・スナップショット・マニュアル例の読み込み・キー解決と検索段・E2E・LSP トークン |
-| 書き間違いの実行時安全性 | `transpiler/runtime_safety_test.rs`<br>`lua_specs/act_runtime_safety_test.lua`<br>`code_gen/element_gen_tests.rs`<br>`sakura_script/tokenizer.rs`・`line_breaker.rs`（インライン）<br>`pasta_shiori/tests/codegen_runtime_safety_e2e_test.rs`（E2E） | ✅ 完了 | 未定義の `＠＊`・未登録アクター・act メンバー名のアクター・数値にできない算術・`\` の生成形と実行（算術の組み直しが旧来の平らな式と同値である関門を含む）（dsl-codegen-runtime-safety） |
+| 書き間違いの実行時安全性 | `transpiler/runtime_safety_test.rs`<br>`lua_specs/act_runtime_safety_test.lua`<br>`code_gen/element_gen_tests.rs`<br>`sakura_script/tokenizer.rs`・`line_breaker.rs`（インライン）<br>`pasta_shiori/tests/codegen_runtime_safety_e2e_test.rs`（E2E） | ✅ 完了 | 未定義の `＠＊`・未登録アクター・act メンバー名のアクター・数値にできない算術・`\\` の生成形と実行（算術の組み直しが旧来の平らな式と同値である関門を含む）（dsl-codegen-runtime-safety） |
 | エンコーディング       | `pasta_lua_encoding_test.rs`                                                                | ✅ 完了 | 文字エンコード                     |
 | プロパティLua変換      | `property_scope_codegen_test.rs`                                                            | ✅ 完了 | 10テスト（property-dsl-extension） |
 | プロパティトークン保全 | `property_token_preservation_test.rs`                                                       | ✅ 完了 | 3テスト（property-dsl-extension）  |
