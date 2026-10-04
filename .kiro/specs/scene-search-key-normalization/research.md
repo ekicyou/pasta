@@ -71,7 +71,7 @@
 | `internals/transpiler.md` | 200, 300 | 規則の説明・共有の記述 | 6.5（整合確認） |
 | `internals/debug.md` | 348, 376 | キック番兵の非衝突の根拠（「グローバル名は英数字と `_` だけ」） | 変更不要（根拠は保たれる） |
 
-- 生成スキル: `book/tools/gen-skill-refs.mjs` が `grammar/call-jump.md`・`grammar/actor-dictionary.md`（→ pasta-ghost-authoring）、`lua/modules/pasta-search.md`・`internals/internal-modules.md`（→ pasta-lua-coding）を写す。`--check` と `book/tools/link-check.mjs` が鮮度とリンクを検査する（要件 6.6）。`internals/registry-search.md` はスキルに写されない。
+- 生成スキル: `book/tools/gen-skill-refs.mjs` が `grammar/call-jump.md`・`grammar/actor-dictionary.md`（→ pasta-ghost-authoring）、`lua/modules/pasta-search.md`・`internals/internal-modules.md`（→ pasta-lua-coding）を写す。`--check` と `book/tools/link-check.mjs` が鮮度とリンクを検査する（要件 6.7）。`internals/registry-search.md` はスキルに写されない。
 
 ## 3. 要件と資産の対応（ギャップ）
 
