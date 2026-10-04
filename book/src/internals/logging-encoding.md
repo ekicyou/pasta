@@ -60,12 +60,12 @@ RoutingWriter ── 見つかった → PastaLogger::write → NonBlocking → 
 
 | ファイル | 主な型・関数 | 役割 |
 | -------- | ------------ | ---- |
-| `crates/pasta_lua/src/encoding/mod.rs` | `Encoder`・`Encoding`・`to_ansi_bytes`・`path_from_lua` | 変換のトレイトと、コードページの種類（`ANSI`・`OEM`）の列挙 |
+| `crates/pasta_lua/src/encoding/mod.rs` | `Encoder`・`Encoding` | 変換のトレイトと、コードページの種類（`ANSI`・`OEM`）の列挙 |
 | `crates/pasta_lua/src/encoding/windows.rs` | `Encoder for Encoding` | Windows の実装。`MultiByteToWideChar`・`WideCharToMultiByte` で変換する |
 | `crates/pasta_lua/src/encoding/unix.rs` | `Encoder for Encoding` | Windows 以外の実装。UTF-8 のまま通す |
 | `crates/pasta_lua/src/runtime/enc.rs` | `register`・`to_ansi_impl`・`to_utf8_impl` | `@enc` のモジュール表と 2 つの変換関数 |
 
-どちらの OS の実装を使うかは `#[cfg(windows)]` でビルド時に決まる。`Encoder` と `Encoding` はクレートのルートから再エクスポートされる。`to_ansi_bytes` と `path_from_lua` も公開されているが、ワークスペース内に呼び出し元は無い。`Encoding::OEM`（`CP_OEMCP`）を使うのはテストだけである。
+どちらの OS の実装を使うかは `#[cfg(windows)]` でビルド時に決まる。`Encoder` と `Encoding` はクレートのルートから再エクスポートされる。`Encoding::OEM`（`CP_OEMCP`）を使うのはテストだけである。
 
 pasta_shiori は FFI の文字列を読むための変換を、`crates/pasta_shiori/src/util/hglobal/` に別に持つ（`enc.rs` と `windows_api.rs`）。`crates/pasta_lua/src/encoding/windows.rs` と同じく local-encoding-rs に由来する実装で、`crates/pasta_lua/src/encoding/` は使わない。
 
