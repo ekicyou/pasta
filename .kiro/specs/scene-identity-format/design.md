@@ -14,7 +14,7 @@
 
 - どんなシーン名でも登録名が一意で、最後の `_` と数字で一通りに分けられる（1.1〜1.6）。
 - シーン検索は通し番号を除いた照合用の名前と前方一致させる（グローバル・ローカルとも。2.1〜2.12）。
-- 位置からのキックは登録名の完全一致で引く（5.1〜5.5）。デバッガの索引は登録名を組み立てて突き合わせる（4.1〜4.4）。
+- 位置からのキックは登録名の完全一致で引く（5.1〜5.5）。デバッガの索引は定義元のファイルごとに突き合わせる（4.1〜4.5）。
 - 登録名を作る規則・分ける規則を Rust 1 か所・Lua 1 か所にまとめる（6.1〜6.3）。
 - マニュアル 7 章と生成スキル `references/` を新形式にそろえる（7.1〜7.6）。
 
@@ -36,7 +36,7 @@
 - 辞書確定（`finalize_scene`）でのシーンの登録順（照合用の名前・通し番号の昇順）。
 - トランスパイル時レジストリ（辞書確定前の `@pasta_search` の元）の登録名の形（単語スコープ名・ローカルシーンの番号）。
 - 位置からのキックの解決手順（`kick.lua` の `KICK.try_dispatch` のシーン解決部分）。
-- デバッガのシーン identity 索引の突き合わせ（`scene_join.rs`）。
+- デバッガのシーン identity 索引の突き合わせ（`scene_join.rs`）。複数の `.pasta` ファイルに同名のグローバルシーンがある場合を含む。
 - 上記に対応するマニュアルの記述と、修正を固定するテスト。
 
 ### Out of Boundary
@@ -45,7 +45,6 @@
 - `pasta_core` の `registry/random.rs` と、`scene_table.rs` のシャッフル部分（`select_from_cache`）。`search-selector-indices` が持つ。
 - 生成器（`code_gen`）の出力バイト列。ローカルシーン関数名の組み立てを共通関数に差し替えるだけで、出力は変えない。
 - ローカルシーンの通し番号の採番キー（`scope_gen.rs` は生の名前ごとに数える）。変えない（Open Questions 5）。
-- 複数ファイルにまたがる同名グローバルシーンの、デバッガ記録（`join_key`）の通し番号（ファイルごとに 1 から数える既存の制約）。変えない（Open Questions 4）。
 - 辞書確定前のレジストリに、キャッシュ済みで再トランスパイルされなかったファイルのシーンが入らないこと（既存の制約）。変えない（Open Questions 3）。
 - VSCode 拡張（シーン名を解析しない）、保存データ（登録名は永続化されない）。
 
@@ -146,7 +145,8 @@ graph TB
 - `crates/pasta_lua/src/code_gen/source_map.rs` — コメントの例（`会話1`）だけ更新する。
 - `crates/pasta_lua/src/runtime/finalize.rs` — `build_scene_registry` を、照合用の名前・通し番号の昇順で登録する形に変える（`HashMap` の走査順に依存しない）。
 - `crates/pasta_lua/src/search/context.rs` — コメントの形式の説明を 1 形式にする。振る舞いは変えない。「確定前／確定後」2 形式のテストを 1 つにまとめる。
-- `crates/pasta_lua/src/debug/source_map/scene_join.rs` — `split_runtime_global` と `(base, counter)` の表を削除し、記録ごとに `registered_name` で登録名を組み立てて、実行時の登録名の集合（`locals_by_global` のキー）と突き合わせる。
+- `crates/pasta_lua/src/debug/source_map/scene_join.rs` — `split_runtime_global` と `(base, counter)` の表を削除し、実行時のグローバルシーンを定義元の `.pasta` ファイルごとに分けて、ファイルの中の順位で記録と突き合わせる（SceneJoin）。
+- `crates/pasta_lua/src/debug/source_map/mod.rs` — 生成 Lua のチャンク名から `.pasta` ファイルを引く読み出しを 1 つ足す（`insert_chunk` が既に両方を受け取っている）。
 - `crates/pasta_lua/src/debug/source_map/scene_join_tests.rs` — `split_runtime_global` の直接テストを削除し、組み立て方式のテストに置き換える。
 - `crates/pasta_lua/src/debug/source_map/scene_index_tests.rs`・`debug/playscene_tests.rs`・`debug/wiring_play_scene_at_tests.rs` — ID 文字列の例を新形式にする（ロジックは ID を不透明な文字列として扱うので変更なし）。
 
@@ -226,9 +226,10 @@ sequenceDiagram
 | 3.3 | `search_word(キー, 登録名)` | SceneLua、TranspileRegistry | 同上 | — |
 | 3.4 | 旧形式は別名にしない | — | 該当なしの既存経路（コードを足さない） | — |
 | 3.5 | PR の件名・本文で破壊的変更を告知 | Delivery | Migration Strategy | — |
-| 4.1 | `＊章11` を `＊章` の 11 個目にしない | SceneJoin | `registered_name` で組み立て | 索引 |
+| 4.1 | `＊章11` を `＊章` の 11 個目にしない | SceneJoin | `split_registered_name` | 索引 |
 | 4.2 | どんな名前でも identity に解決 | SceneJoin | 同上 | 索引 |
-| 4.3 | 実行時に無いシーンは索引に入れない | SceneJoin | 集合の所属判定 | 索引 |
+| 4.5 | 複数ファイルの同名シーンを取り違えない | SceneJoin | 定義元ファイルごとの順位 | 索引 |
+| 4.3 | 実行時に無いシーンは索引に入れない | SceneJoin | 順位が無ければ捨てる | 索引 |
 | 4.4 | ソースマップ・BP・範囲を保つ | SceneJoin | 突き合わせ以外は変更なし | 索引 |
 | 5.1 | グローバルは完全一致 | KickDispatch | `SCENE.get_start` | キック |
 | 5.2 | シーン表のシーンだけ再生 | KickDispatch | `SCENE.get_start`（`find_handler` を通らない） | キック |
@@ -236,7 +237,7 @@ sequenceDiagram
 | 5.4 | 一致なしは破棄＋診断ログ | KickDispatch | 既存の `seam=kick.unresolved` | キック |
 | 5.5 | 再生手順・リロード予約を変えない | KickDispatch | 既存のコルーチン化ラッパー | キック |
 | 6.1 | 規則を Rust・Lua 各 1 か所に | RegisteredNameRule、SceneLua | `registered_name`・`split_registered_name`・`create_scene` | — |
-| 6.2 | デバッガは推測で分けない | SceneJoin | `registered_name` | 索引 |
+| 6.2 | デバッガは推測で分けない | SceneJoin | `split_registered_name` | 索引 |
 | 6.3 | 形式が食い違えばテストが落ちる | Tests | Rust で組み立てた名前と実行時の登録名の一致テスト | — |
 | 7.1〜7.5 | マニュアル更新 | Manual | — | — |
 | 7.6 | `references/` の再生成 | Manual | `gen-skill-refs.mjs`・`link-check.mjs` | — |
@@ -252,7 +253,7 @@ sequenceDiagram
 | TranspileRegistry | pasta_lua transpiler | 辞書確定前のレジストリを同じ形式にする | 2.12, 3.3, 6.1 | RegisteredNameRule（P0） | Service |
 | SceneLua | pasta_lua Lua | 実行時に登録名を作る | 1.1, 1.3, 1.6, 3.1〜3.3, 6.1 | `STORE.counters`（P0） | Service |
 | KickDispatch | pasta_lua Lua | キックを完全一致で解決する | 5.1〜5.5 | `SCENE.get`・`get_start`（P0） | Service |
-| SceneJoin | pasta_lua debug | 記録から登録名を組み立てて突き合わせる | 4.1〜4.4, 6.2 | RegisteredNameRule（P0）、`collect_scenes`（P0） | Batch |
+| SceneJoin | pasta_lua debug | 定義元のファイルごとに記録と登録名を突き合わせる | 4.1〜4.5, 6.2 | RegisteredNameRule（P0）、`collect_scenes`（P0） | Batch |
 | Manual | book・skills | 新形式と規則を書く | 7.1〜7.6, 2.11 | `gen-skill-refs.mjs`（P0） | — |
 
 ### pasta_core
@@ -429,31 +430,43 @@ impl SceneRegistry {
 
 | Field | Detail |
 |-------|--------|
-| Intent | 記録（名前・通し番号）から登録名を組み立て、実行時の登録名と突き合わせる |
-| Requirements | 4.1, 4.2, 4.3, 4.4, 6.2 |
+| Intent | 記録（ファイルごとの名前・通し番号）と実行時の登録名を、定義元のファイルごとに突き合わせる |
+| Requirements | 4.1, 4.2, 4.3, 4.4, 4.5, 6.2 |
+
+**背景（既存の不具合）**
+
+- 記録（`join_key`）の通し番号は `.pasta` ファイルごとに 1 から数える（デバッグ用のソースマップは、ファイルごとに新しいレジストリでトランスパイルし直す。`loader/source_map_build.rs`）。
+- 実行時の通し番号は、全ファイルを通して数える（`STORE.counters`。`scene_dic.lua` がモジュール名の順に `require` する）。
+- 変更前は（名前, 通し番号）で全体を引くため、`a.pasta` と `b.pasta` の両方に `＊雑談` があると、`b.pasta` の記録 `G:雑談#1` が `a.pasta` のシーンに解決される。
 
 **Responsibilities & Constraints**
 
 - `split_runtime_global` と `global_by_base_counter` を削除する。
-- 実行時の登録名の集合は、既存の `locals_by_global`（登録名 → ローカルの登録名の一覧）のキーを使う。
-- `G:{base}#{counter}` の記録は、`registered_name(base, counter)` を作り、集合にあればその登録名を `scene_id` にする。無ければ索引に入れない（4.3）。
-- `L:{base}#{counter}:{関数名}` の記録は、親を同じ方法で登録名にし、その配下に同じ関数名があるときだけ採る（今までどおり）。`__start__` は索引に入れない（今までどおり）。
-- `join_key` の形、`end_line`・`level` の計算、`SceneIdentityIndex` の作り方は変えない（4.4）。`scene_index.rs`・`playscene.rs` は ID を不透明な文字列として扱うので変えない。
+- **実行時のグローバルシーンを、定義元の `.pasta` ファイルごとに分ける**。
+  - シーン表の中の関数（`__start__` を優先し、無ければ任意の関数）の定義元チャンク名を mlua の `Function::info().source` で得る。
+  - チャンク名を `SourceMap` で `.pasta` ファイルに引く。引けないシーン（利用者の `.lua` で作ったシーン、関数を 1 つも持たないシーン）は索引の対象にしない。
+- **ファイルの中で、順位で突き合わせる**。
+  - そのファイルの実行時のグローバルシーンを `SceneRegistry::split_registered_name` で（名前, 通し番号）に分け、名前ごとに通し番号の昇順に並べる。
+  - 記録 `G:{base}#{k}` は、そのファイルの名前 `base` の k 番目の登録名を `scene_id` にする。k 番目が無ければ索引に入れない（4.3）。
+  - 読み込み順の仮定（どのファイルが先に `require` されるか）には頼らない。ファイルの中の定義順と実行時の通し番号の大小が一致することだけを使う。
+- `L:{base}#{k}:{関数名}` の記録は、親を同じ方法で登録名にし、その配下に同じ関数名があるときだけ採る（今までどおり）。`__start__` は索引に入れない（今までどおり）。
+- 登録名を分けるのは `split_registered_name`（一か所の規則）だけで、独自に末尾の数字を推測しない（6.2）。`＊章` を 11 個と `＊章11` の場合、実行時の `章_11` は（`章`, 11）、`章11_1` は（`章11`, 1）に分かれ、取り違えが起きない（4.1）。
+- `join_key` の形、`end_line`・`level` の計算、`SceneIdentityIndex` の作り方は変えない（4.4）。`scene_index.rs`・`playscene.rs` は ID を不透明な文字列として扱うので変えない。`collect_scenes` のシグネチャも変えない（定義元の取得は `scene_join.rs` の中で行う）。
 
 **Contracts**: Batch [x]
 
 ##### Batch / Job Contract
 
 - Trigger: ランタイム構築の最後（`scene_dic` の読み込み後。デバッグ有効時だけ）。
-- Input / validation: `SourceMap::scene_records()` と `collect_scenes`。
+- Input / validation: `SourceMap::scene_records()`、`collect_scenes`、シーン表の関数の定義元チャンク名。
 - Output / destination: `SceneIdentityIndex`。
 - Idempotency & recovery: 突き合わなかった記録は捨てる。失敗は致命にしない（今までどおり）。
 
 **Implementation Notes**
 
-- Integration: `＊章` を 11 個と `＊章11` の場合、記録は `G:章#11` と `G:章11#1`、組み立てた登録名は `章_11` と `章11_1` で、取り違えが起きない（4.1）。
-- Validation: `scene_join_tests.rs`（単体）と `scene_identity_index_test.rs`（実行時との突き合わせ。Rust と Lua の形式が食い違うと全件が索引から落ちて失敗する。6.3）。
-- Risks: ファイルをまたぐ同名シーンは、記録の通し番号がファイルごとなので、今までどおり取り違えうる（Open Questions 4）。
+- Integration: チャンク名は `canonicalize_chunk_name` で正規化してから引く（フックのチャンク名と同じ規則）。
+- Validation: `scene_join_tests.rs`（単体）と `scene_identity_index_test.rs`（実行時との突き合わせ）。2 つの `.pasta` ファイルに同名のグローバルシーンを置き、2 つ目のファイルのシーンの identity が 2 つ目のファイルのシーンを指すテスト（4.5）。Rust と Lua の形式が食い違うと全件が索引から落ちて失敗する（6.3）。
+- Risks: 同じ `.pasta` ファイルの Lua ブロックで、利用者が `名前_数字` の形の名前のシーンを手で登録すると、順位がずれる。生成コード以外でそうする理由は無く、対処しない。
 
 ### pasta_lua（Lua）
 
@@ -551,7 +564,7 @@ function KICK.try_dispatch(act) end
 - `SceneRegistry::registered_name`／`split_registered_name` の往復一致: `メイン`・`章11`・`章_1`・`会話・朝`・`_` だけの名前（8.5・1.4）。分けられない名前（`__start__`・`加算ループ`・`_1`・数字が大きすぎる名前）は (全体, None)。
 - `registered_name("A1", 1)` ≠ `registered_name("A", 11)`（1.2）。結果に `:` が無い（1.5）。
 - `SceneTable`: `A`×11＋`A1` で、`A1` の検索の候補が `A1_1` だけ（2.2）。`章`×2＋`章_1` で、`章_1` の検索の候補に `章_1`・`章_2` が入らない（2.4）。ローカル `挨拶`×10＋`挨拶_1` で同様（2.10）。`メイン_1` を検索しても `メイン` の 1 つ目が候補にならない（2.5）。`加算ループ` はキーが名前の全体、`step_2` はキーが `step`（2.11）。
-- `scene_join`: `章`×11＋`章11` の記録と実行時の名前で、`G:章11#1` が `章11_1` に、`G:章#11` が `章_11` に解決する（4.1・8.3）。実行時に無い記録は索引に入らない（4.3）。
+- `scene_join`: `章`×11＋`章11` の記録と実行時の名前で、`G:章11#1` が `章11_1` に、`G:章#11` が `章_11` に解決する（4.1・8.3）。実行時に無い記録は索引に入らない（4.3）。2 ファイルの記録がどちらも `G:雑談#1` のとき、それぞれ自分のファイルの登録名（`雑談_1`・`雑談_2`）に解決する（4.5）。
 
 ### Integration Tests
 
@@ -562,7 +575,7 @@ function KICK.try_dispatch(act) end
 - Rust と Lua の形式の一致: 実行時の `collect_scenes` の登録名の集合が、定義から `registered_name` で組み立てた集合と一致する（6.3）。
 - 辞書確定前と確定後: 1 ファイルのフィクスチャで、トランスパイル時レジストリから作った検索の結果と、確定後の検索の結果が同じ `(登録名, ローカルの登録名)` になる（2.12）。
 - `WORD.create_local("メイン_1", キー)` と `search_word(キー, "メイン_1")` が動き、`"メイン1"` では見つからずエラーにもならない（3.2〜3.4）。
-- `scene_identity_index_test.rs`: 末尾が数字・`_` と数字で終わる・記号を含むシーン名で、索引の identity が `SCENE.get`／`SCENE.get_start` で引ける（4.2・8.3）。行の対応の往復テストは変更なしで通る（4.4）。
+- `scene_identity_index_test.rs`: 2 つの `.pasta` ファイルに同名のグローバルシーン（とその中のローカルシーン）を置き、2 つ目のファイルの行から得た identity が 2 つ目のファイルのシーンを指す（4.5）。末尾が数字・`_` と数字で終わる・記号を含むシーン名で、索引の identity が `SCENE.get`／`SCENE.get_start` で引ける（4.2・8.3）。行の対応の往復テストは変更なしで通る（4.4）。
 
 ### Lua Specs
 
@@ -608,7 +621,8 @@ function KICK.try_dispatch(act) end
 5. **`pasta_shiori` のテスト支援 `scene.lua`**: 形式の 1 行だけをそろえる（形式の定義を 2 つ残さない）。
 6. **要件 8.6 とキックのテスト**: キックのテストは、要件 5（完全一致）の振る舞いの変更に伴って前提ごと書き換える。要件 8.6 にその旨を足した。
 
+7. **ファイルをまたぐ同名シーンのデバッガ索引（4.5）**: 本仕様に含める。実行時のシーンを定義元の `.pasta` ファイルごとに分け、ファイルの中の順位で記録と突き合わせる（SceneJoin）。読み込み順の仮定には頼らない。
+
 ### 未決（設計ディスカッションの議題）
 
-- **ファイルをまたぐ同名シーンのデバッガ索引（4.2）**: 記録（`join_key`）の通し番号はファイルごとに 1 から数え、実行時の通し番号は全ファイルを通して数える。2 つ目以降のファイルの同名シーンは、1 つ目のファイルのシーンに解決される（既存の不具合。名前の形によらず起きる）。
 - **ローカルシーンの通し番号の採番キー**: `scope_gen.rs` 182 行は生の名前ごとに数えるため、照合用の名前が同じになる 2 つのローカル名（`・挨拶・1` と `・挨拶_1`）は同じ関数名になり、片方が上書きされる。
