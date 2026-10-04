@@ -206,6 +206,7 @@ act.さくら:talk(act.さくら:word(var.x, "var.x"))   -- 動的単語参照�
 
 - `call_expr` は `pasta.actor` の局所関数で（`pasta.act` の同名の局所関数とは別）、`find_handler("expr", key, skip_methods)` の結果が関数なら `h(self, ...)`（第 1 引数はプロキシ）の戻り値を返し、関数でなければ警告ログ（`proxy:expr_fn - handler not found`）を出す。
 - A1 は通常の添字参照であるため、アクターオブジェクトのフィールド（`name`・`spot`・`pasta.toml` の `[actor.名前]` のキー）と、メタテーブル経由の `create_word` も一致の対象になる。`skip_methods` が真のとき（動的参照）は `rawget` で引くため、アクターオブジェクト自身のフィールドだけが対象になり、`create_word` などのメソッドには一致しない。
+- A2 が渡すスコープ名は元のアクター名から組み立てるが、`search_word` の入口でサニタイズされてから照合されるため、記号を含むアクター名（`さくら・改`）でも、`register_actor` がサニタイズした名前で登録したキー（`:__actor_さくら_改__:…`）に一致する（[照合規則の共有](registry-search.md#照合規則の共有)）。
 - 検索の全体の順序（A1 → A2 → L1〜L5）と各段の意味は [ローカル優先の検索順](registry-search.md#ローカル優先の検索順) で扱う。
 - `word`・`expr_fn`・`expr_fn_var` が見つけた関数に渡す第 1 引数は ACT ではなくプロキシである。ACT の `word`・`expr_fn`・`expr_fn_var`・`call` が見つけた関数には ACT を渡す。
 
