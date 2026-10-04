@@ -38,6 +38,16 @@ const SYMBOL_SCENES_PASTA: &str = "\
 ＊不明呼び出し
   ＞存在しない・朝
   さくら：次の行です
+
+＊OnSymbolCall
+  ＞会話・朝
+
+＊選択肢表示
+  さくら：どれにする？
+  ＠？選択・A「Aにする」
+
+  ・選択・A
+    さくら：選択肢からAに来ました
 ";
 
 /// テスト用ゴーストのアクター設定（pasta.toml へ追記する）。
@@ -161,4 +171,45 @@ fn missing_symbol_call_warns_with_raw_name_and_continues() {
 
     assert_ok_with(&fire(&runtime, "不明呼び出し"), "次の行です");
     assert!(logs_contain("handler not found: key='存在しない・朝'"));
+}
+
+/// 要件 1.5: SHIORI イベントのシーンが記号を含むグローバルシーンを Call すると、
+/// 応答が 200 でシーンの出力を含む（204 にならない）。
+#[test]
+fn event_scene_calling_symbol_global_scene_responds_200() {
+    let (_temp, runtime) = load_ghost(SYMBOL_SCENES_PASTA, ACTOR_TOML);
+
+    let response = fire(&runtime, "OnSymbolCall");
+
+    assert!(
+        !response.starts_with("SHIORI/3.0 204"),
+        "204 になった: {response:?}"
+    );
+    assert_ok_with(&response, "朝の会話です");
+}
+
+/// 要件 2.4・7.2: 選択肢行 `＠？選択・A「Aにする」` を出したあと、選択 ID `選択・A` の
+/// `OnChoiceSelectEx` を起こすと、記号を含むローカルシーンが実行される（204 にならない）。
+#[test]
+fn choice_select_jumps_to_symbol_local_scene() {
+    let (_temp, runtime) = load_ghost(SYMBOL_SCENES_PASTA, ACTOR_TOML);
+
+    assert_ok_with(&fire(&runtime, "選択肢表示"), r"\q[Aにする,選択・A]");
+
+    let value = runtime
+        .exec(
+            r#"local EVENT = require "pasta.shiori.event"
+return EVENT.fire({
+    id = "OnChoiceSelectEx", method = "get", version = 30,
+    reference = { [0] = "Aにする", [1] = "選択・A" },
+})"#,
+        )
+        .expect("EVENT.fire に失敗");
+    let response = value_as_str(&value).expect("応答が文字列でない");
+
+    assert!(
+        !response.starts_with("SHIORI/3.0 204"),
+        "204 になった: {response:?}"
+    );
+    assert_ok_with(&response, "選択肢からAに来ました");
 }

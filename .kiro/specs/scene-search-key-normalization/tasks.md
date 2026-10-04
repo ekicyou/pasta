@@ -39,7 +39,7 @@
   - _Depends: 1.1_
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 3.5, 7.1, 7.2_
 
-- [ ] 2.2 SHIORI イベントの応答と選択肢のジャンプ先を確かめる
+- [x] 2.2 SHIORI イベントの応答と選択肢のジャンプ先を確かめる
   - イベントを起こし、そのイベントのシーンが記号を含むグローバルシーンを Call したとき、応答が 200 でシーンの出力を含む（204 にならない）
   - 選択肢行（`＠？選択・A「Aにする」`）を出したあと、選択 ID `選択・A` の選択イベントを起こすと、応答が 200 でローカルシーンの出力を含む
   - 完了状態: 2.1 と同じ結合テストファイルに足したこれらのテストが通る
@@ -91,3 +91,4 @@
 ## Implementation Notes
 - `cargo test -p pasta_lua` は `crates/pasta_lua/tests/fixtures/sample.generated.lua` を改行コードだけ書き換える。コミットに含めず `git checkout --` で戻す
 - 結合テストのゴーストは pasta.toml に `[actor."さくら"]` が無いと実行時に nil 参照で落ちる。`symbol_name_search_test.rs` の `load_ghost(pasta, extra_toml)` で追記する
+- 台詞の行が 1 つも無いうちに書いた選択肢行は出力されない（`act.lua` の `group_by_actor` が捨てる既存の挙動）。選択肢のテストでは選択肢の前に台詞を置く
