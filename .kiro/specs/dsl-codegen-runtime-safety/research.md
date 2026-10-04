@@ -109,6 +109,7 @@
 4. `\\` のトークナイザ上の種別（SakuraScript 扱いでウェイト無し／General 扱いで 1 文字として数える）と、BudouX の改行位置推定での幅の数え方（OQ-6 と合わせて決める）。
 5. LuaJIT の暗黙の文字列→数値変換と、ヘルパーで使う変換の規則が一致することの確認（R3.1・R3.7）。`％` の負数の扱い（Lua の `a - floor(a/b)*b`）を含めて同じ結果になること。
 6. 生成形を文字列で検査している既存テストの更新範囲の確定と、正常系の最終出力が変わらないことを示すテスト（SHIORI 経由）の選定。
+7. （要件ディスカッションで追加）`pasta_scripts/pasta/shiori/appearance.lua` も `SAKURA_TAG_PATTERN` と同じ規則で `\` 始まりのタグを読む（`NAME_PATTERN`・`ARG_PATTERN`）。`\\s[0]` のような台詞で、2 文字目の `\` から `\s[0]` を表情タグとして読み誤るおそれがある。トークナイザと同じく `\\` を 1 単位として飛ばす必要があるかを確認する（R4.2・R4.5）。
 
 ### 境界の確認
 - `actor.lua`（`PROXY_IMPL`）・`pasta_dsl` の文法・`shiori/event/*` は触らない（Wave 1 の並走条件）。`sakura_script/tokenizer.rs` は brief の Boundary Candidates に載っていないが、並走条件の禁止対象ではない。設計の Boundary Commitments に明記する。
