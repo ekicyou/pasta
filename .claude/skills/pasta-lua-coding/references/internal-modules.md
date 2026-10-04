@@ -79,7 +79,7 @@ STORE.actors["さくら"] = { name = "さくら" }
 
 ## ACT の内部
 
-ACT は、シーン関数が第 1 引数で受け取るオブジェクトである。`pasta.act` が基本の ACT を、`pasta.shiori.act` が SHIORI 用の ACT を作る。SHIORI のイベントごとに `SHIORI_ACT.new(STORE.actors, req)` で新しい ACT が作られる（[イベントからシーンへ](https://ekicyou.github.io/pasta/internals/execution-model.html#イベントからシーンへ)）。この節では ACT の構造と、メソッド・アクタープロキシの解決、`init_scene`、名前の解決のメソッドと動的参照のキーの変換を扱う。トーク系メソッドなど個々のメソッドの使い方は [スクリプト用ランタイム API](script-api.md) で、トークンの蓄積と組立は [トーク出力とアピアランス](https://ekicyou.github.io/pasta/internals/talk-output.html#トークンの蓄積) で扱う。
+ACT は、シーン関数が第 1 引数で受け取るオブジェクトである。`pasta.act` が基本の ACT を、`pasta.shiori.act` が SHIORI 用の ACT を作る。SHIORI のイベントごとに `SHIORI_ACT.new(STORE.actors, req)` で新しい ACT が作られる（[イベントからシーンへ](https://ekicyou.github.io/pasta/internals/execution-model.html#イベントからシーンへ)）。この節では ACT の構造と、メソッド・アクタープロキシの解決、`init_scene`、名前の解決のメソッド、生成コード用のメソッドと動的参照のキーの変換を扱う。トーク系メソッドなど個々のメソッドの使い方は [スクリプト用ランタイム API](script-api.md) で、トークンの蓄積と組立は [トーク出力とアピアランス](https://ekicyou.github.io/pasta/internals/talk-output.html#トークンの蓄積) で扱う。
 
 ### ACT オブジェクトの構造
 
@@ -114,6 +114,7 @@ act[key]（ACT のフィールドに無いとき）
 
 - 解決の優先順はフィールド → メソッド → アクター名である。この優先順により、メソッド名やフィールド名と同じ名前のアクターがプロキシにならないこと（利用者から見た振る舞い）は [アクタープロキシ](script-api.md#アクタープロキシ) が正である。
 - アクタープロキシは参照のたびに新しく作られ、キャッシュされない（[PROXY パターン](#proxy-パターン)）。
+- 生成コードはアクターをこの経路で引かず、`act:actor_proxy("名前")` を呼ぶ（[生成コード用のメソッド](#生成コード用のメソッドactor_proxyglobal_fnarith)）。`actor_proxy` は `act.actors[名前]` を直接引くため、メソッド名・フィールド名と同じ名前のアクターもプロキシになる。
 - `SHIORI_ACT_IMPL` 自身にも `__index = ACT.IMPL` のメタテーブルが付いており、`SHIORI_ACT_IMPL.talk` のように実装表から直接引いても `ACT_IMPL` のメソッドが得られる。
 
 ### 継承（ACT.IMPL）
@@ -156,19 +157,28 @@ ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call` と `find_han
 - `expr_fn(self, key, ...)` と `expr_fn_var(self, value, var_path, ...)` は、`pasta.act` の局所関数 `call_expr(self, key, skip_methods, ...)` を共有する。`expr_fn` は `call_expr(self, key, nil, ...)`、`expr_fn_var` はキーに直した後に `call_expr(self, キー, true, ...)` を呼ぶ。`call_expr` は `find_handler("expr", key, skip_methods)` が関数なら `h(self, ...)` の戻り値を返し、それ以外は接頭辞 `act:expr_fn` の警告ログ（`handler not found`）を出して `nil` を返す。アクタープロキシは `pasta.actor` に同じ形の別の局所関数を持つ（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
 - `skip_methods` を真にするのは、`var_path` を受け取った `word` と `expr_fn_var`（生成コードの動的参照）だけである。`find_scene`・`call` と、`var_path` の無い `word`・`expr_fn` は `skip_methods` を渡さない。`find_handler` は `find_act_handler` に引数をそのまま渡す。
 
+### 生成コード用のメソッド（actor_proxy・global_fn・arith）
+
+アクション行のアクター（`act:actor_proxy("名前")`）、`＠＊名前（…）`（`act:global_fn("名前", …)`）、式の算術（`act:arith(…)`）の生成コードが呼ぶメソッドである。引数・戻り値・警告の文言は [アクター・グローバル関数・算術](script-api.md#アクターグローバル関数算術) が、生成コードの形は [生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形) が正である。ここでは実装の内部の構成だけを扱う。
+
+- `actor_proxy(self, name)` は、`self.actors[name]` があれば `ACTOR.create_proxy(アクター, self)` を返す。無ければ `self.token` を末尾から見て、最初に当たる `talk`・`sakura_script` のトークンの `actor.name` が `name` と同じならその `actor` の表を再利用してプロキシを作る。そうでなければ `{ name = name }`（メタテーブルなし）を作り、警告ログを出し、目印の `talk` トークン（`text` は `【未登録アクター：名前】`）を積んでからプロキシを作る。再利用によって同じ未登録の名前の連続する発言は同じ表を持ち、`build` のグループ化（表の同一性で判定する）で 1 つのグループになる（[グループ化トークン](https://ekicyou.github.io/pasta/internals/talk-output.html#グループ化トークン)）。
+- その場限りのアクターは `STORE.actors`・`self.actors`・`STORE.actor_spots` のどれにも書かれず、ACT にもフィールドを足さない。状態は `self.token` の中にしか無いため、`build`・`yield` でトークンが空になると、次の発言で目印がまた付く。`name` だけの表のため、プロキシの検索の A1 は `name` にしか一致せず、A2 のアクター単語も無い（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
+- `global_fn(self, name, ...)` は `GLOBAL[name]` が関数なら `f(self, ...)` の戻り値をすべて返し、関数でなければ警告ログを出して `nil` を返す。名前の解決の 5 段の検索（`find_act_handler`）は通らない。関数の中で起きたエラーは捕まえない。
+- `arith(self, op, lhs, rhs, lhs_desc, rhs_desc)` は、局所関数 `arith_operand` で被演算子を数値にし（`number` はそのまま、`string` は `tonumber`、それ以外は数値にできない）、両方が数値になったときだけ局所の表 `ARITH_OPS` の関数で Lua の演算子を適用する。演算子に渡るのは数値だけのため、表の `__add` などのメタメソッドは呼ばれない。数値にできない被演算子ごとに警告ログを出すが、値も説明も `nil` の被演算子（内側の `arith` が既に失敗したもの）では出さない。`self` は使わず、ACT の状態を読み書きしない。
+
 ### 動的参照のキー（WORD.dynamic_key）
 
 `WORD.dynamic_key` の変換規則と警告は [WORD.dynamic_key(value, var_path, via)](script-api.md#worddynamic_keyvalue-var_path-via) が正である。この関数は、`pasta.act`（`word`・`expr_fn_var`）と `pasta.actor`（同名のプロキシのメソッド）の両方が使うため、どちらも `require` しない `pasta.word` に置かれている。`pasta.word` が `require` するのは `pasta.store` と `@pasta_log` だけであり、`pasta.act`・`pasta.actor` が `pasta.word` を `require` しても循環は生じない。
 
 ## PROXY パターン
 
-アクタープロキシは、`act.さくら` のようにアクター名で ACT を参照したときに作られる小さな表である。アクターと ACT への参照を持ち、アクターを添えて ACT のメソッドに委ねる。生成コードはアクターの発言と、アクター修飾付きの単語参照・関数呼び出しをこの形で書く。
+アクタープロキシは、`act:actor_proxy("さくら")` を呼んだとき、または `act.さくら` のようにアクター名で ACT を参照したときに作られる小さな表である。アクターと ACT への参照を持ち、アクターを添えて ACT のメソッドに委ねる。生成コードはアクターの発言と、アクター修飾付きの単語参照・関数呼び出しを、`actor_proxy` で得たプロキシで書く。
 
 ```lua
-act.さくら:talk("こんにちは")
-act.さくら:talk(act.さくら:word("名前"))   -- アクター単語から探す
-act.さくら:expr_fn("関数名", 引数)          -- アクター修飾付きの関数呼び出し
-act.さくら:talk(act.さくら:word(var.x, "var.x"))   -- 動的単語参照（変数の値をキーにする）
+act:actor_proxy("さくら"):talk("こんにちは")
+act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("名前"))   -- アクター単語から探す
+act:actor_proxy("さくら"):talk((act:actor_proxy("さくら"):expr_fn("関数名", 引数)))   -- アクター修飾付きの関数呼び出し
+act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(var.x, "var.x"))   -- 動的単語参照（変数の値をキーにする）
 ```
 
 プロキシの実装（`PROXY_IMPL`）とアクターオブジェクトは、どちらも `pasta.actor` にある。
@@ -188,7 +198,7 @@ act.さくら:talk(act.さくら:word(var.x, "var.x"))   -- 動的単語参照�
 
 ### プロキシの構造と生成
 
-`ACTOR.create_proxy(actor, act)` は `{ actor = アクター, act = ACT }` にメタテーブル `PROXY_IMPL`（`__index` は `PROXY_IMPL` 自身）を付けて返す。ACT の `__index` が、アクター名の参照のたびにこの関数を呼ぶ（[メソッドとアクタープロキシの解決](#メソッドとアクタープロキシの解決__index)）。プロキシは状態を持たず、同じアクターのプロキシを何度作っても振る舞いは変わらない。
+`ACTOR.create_proxy(actor, act)` は `{ actor = アクター, act = ACT }` にメタテーブル `PROXY_IMPL`（`__index` は `PROXY_IMPL` 自身）を付けて返す。ACT の `actor_proxy` と `__index` が、呼び出し・参照のたびにこの関数を呼ぶ（[生成コード用のメソッド](#生成コード用のメソッドactor_proxyglobal_fnarith)・[メソッドとアクタープロキシの解決](#メソッドとアクタープロキシの解決__index)）。プロキシは状態を持たず、同じアクターのプロキシを何度作っても振る舞いは変わらない。
 
 ### PROXY_IMPL のメソッド
 
