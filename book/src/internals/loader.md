@@ -269,6 +269,7 @@ Rust 側で登録するモジュール（`@pasta_config`・`@pasta_search` な�
 - [lua-require-robustness](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-require-robustness) — 長パス・非 ANSI パスでの `require`（searcher の置換）
 - [lua-passthrough](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-passthrough) — 辞書ディレクトリの `.lua` の素通し
 - [pasta-config-restructure](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-config-restructure) — `pasta.toml` の構成と既定値の補完
+- [pasta-toml-logging-consistency](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-toml-logging-consistency) — `[lua]` の設定型の撤去、段階 1.5 のフォールバック
 
 ---
 

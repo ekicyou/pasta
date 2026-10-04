@@ -271,6 +271,7 @@ VM の中の文字列（DSL から生成したコード、`scripts/` の Lua ソ
 - [lua-logging](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-logging) — `@pasta_log`（Lua からのロギング）
 - [logger-configuration](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/logger-configuration) — `[logging]` によるフィルタの設定と差し替え
 - [load-error-logging](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/load-error-logging) — 段階 1 のロガーによる起動時のログの記録と、固定のファイル名
+- [pasta-toml-logging-consistency](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-toml-logging-consistency) — 文脈の無いログを唯一のロガーへ書く振り分け、不正な `file_path` の既定ファイルへのフォールバック、`rotation_days` の撤去
 
 ---
 

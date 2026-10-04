@@ -473,6 +473,7 @@ dispatch(act)
 - [pasta-actor-feasibility](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-actor-feasibility)・[pasta-actor-runtime](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-actor-runtime) — アクターランタイム、presentation マーカーとレンダラ注入
 - [lua-require-robustness](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-require-robustness) — `loadu`、処理のエラーを 500 応答で返す契約
 - [pasta-scene-kick](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-scene-kick) — `ActorMsg::Kick` と `SHIORI.kick`
+- [pasta-toml-logging-consistency](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-toml-logging-consistency) — ランタイムの解放を `release_runtime` にまとめ、ロガーの登録解除を最後にする
 
 ---
 
