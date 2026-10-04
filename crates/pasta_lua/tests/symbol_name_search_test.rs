@@ -55,13 +55,44 @@ const ACTOR_TOML: &str = "[actor.\"さくら\"]
 spot = 0
 ";
 
+/// 記号を含む名前のアクター辞書と、そのアクターの単語を参照するシーンを集めたゴースト。
+const SYMBOL_ACTOR_PASTA: &str = "％さくら・改
+  ＠通常：改の通常顔
+
+＊アクター辞書参照
+  さくら・改：＠通常
+
+＊Lua登録参照
+  さくら・改：＠口癖
+";
+
+/// `WORD.create_actor` で記号を含むアクター名に単語を登録する `scripts/main.lua`。
+const ACTOR_WORD_MAIN_LUA: &str = r#"local WORD = require("pasta.word")
+WORD.create_actor("さくら・改", "口癖"):entry("Luaで登録した口癖")
+return {}
+"#;
+
 /// 一時ゴーストを作って実物のランタイムを読み込む。`extra_toml` は pasta.toml へ追記する。
 /// `TempDir` はランタイムより長く保持すること。
 fn load_ghost(pasta: &str, extra_toml: &str) -> (TempDir, PastaLuaRuntime) {
+    load_ghost_with_main(pasta, extra_toml, None)
+}
+
+/// `load_ghost` に加えて、`main_lua` があれば `scripts/main.lua` として書いてから読み込む。
+fn load_ghost_with_main(
+    pasta: &str,
+    extra_toml: &str,
+    main_lua: Option<&str>,
+) -> (TempDir, PastaLuaRuntime) {
     let temp = create_temp_with_pasta(pasta);
     let toml = temp.path().join("pasta.toml");
     let base = std::fs::read_to_string(&toml).unwrap();
     std::fs::write(&toml, format!("{base}{extra_toml}")).unwrap();
+    if let Some(main_lua) = main_lua {
+        let scripts = temp.path().join("scripts");
+        std::fs::create_dir_all(&scripts).unwrap();
+        std::fs::write(scripts.join("main.lua"), main_lua).unwrap();
+    }
     let runtime = PastaLoader::load(temp.path()).expect("ゴーストの読み込みに失敗");
     (temp, runtime)
 }
@@ -212,4 +243,33 @@ return EVENT.fire({
         "204 になった: {response:?}"
     );
     assert_ok_with(&response, "選択肢からAに来ました");
+}
+
+/// 要件 4.1・7.3: `％さくら・改` のアクター辞書の単語 `通常` を `さくら・改：＠通常` で出力できる
+/// （アクター辞書の単語はアクターの表に入らないので、actor.lua の A2 段で見つかる）。
+#[test]
+fn symbol_actor_dictionary_word_is_output() {
+    let (_temp, runtime) = load_ghost(SYMBOL_ACTOR_PASTA, ACTOR_TOML);
+
+    assert_ok_with(&fire(&runtime, "アクター辞書参照"), "改の通常顔");
+}
+
+/// 要件 4.2・7.3: `scripts/main.lua` から `WORD.create_actor("さくら・改", "口癖")` で登録した単語を、
+/// `さくら・改：＠口癖` で引ける。
+#[test]
+fn lua_registered_symbol_actor_word_is_output() {
+    let (_temp, runtime) =
+        load_ghost_with_main(SYMBOL_ACTOR_PASTA, ACTOR_TOML, Some(ACTOR_WORD_MAIN_LUA));
+
+    assert_ok_with(&fire(&runtime, "Lua登録参照"), "Luaで登録した口癖");
+}
+
+/// 要件 4.3・7.3: pasta.toml の `[actor."さくら・改"]` で記号を含む名前のアクターを設定し、
+/// 同じ名前のアクター辞書の単語を引ける。
+#[test]
+fn toml_symbol_actor_finds_dictionary_word() {
+    let toml = format!("{ACTOR_TOML}[actor.\"さくら・改\"]\nspot = 1\n");
+    let (_temp, runtime) = load_ghost(SYMBOL_ACTOR_PASTA, &toml);
+
+    assert_ok_with(&fire(&runtime, "アクター辞書参照"), "改の通常顔");
 }
