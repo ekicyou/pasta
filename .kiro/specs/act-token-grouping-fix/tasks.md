@@ -41,7 +41,7 @@
   - _Boundary: ShioriActBytesTest_
   - _Depends: 2.1_
 
-- [ ] 4. 修正対象以外の出力が変わらないことを確かめる
+- [x] 4. 修正対象以外の出力が変わらないことを確かめる
   - ワークスペース全体のテストを走らせる
   - 既存の期待値に差分が出たら、タスク 1 の候補と照らして 1 件ずつ見る。2 現象（先頭の表示制御・`clear_spot` の後の発言）に当たる差分は、根拠を残して期待値を更新する。当たらない差分が出たら設計に戻る
   - clippy と luacheck を走らせる
@@ -81,4 +81,5 @@
 - 並列負荷が高いと Rust の `debug::hook::tests::hook_panic_*` と `runtime_toggle_e2e_basic_test` の TCP テストが不安定に落ちることがある（本仕様と無関係。単独の再実行で通る）。
 - タスク 5.1 で、設計の「書き換える内容」に無い `lua/script-api.md`「スポット操作」の箇条も直した。旧記述は `clear_spot` の前後で同じアクターの発言が古い立ち位置で出るという、要件 2.2 で直した不具合の挙動を書いていたため、`set_spot`（不変）と `clear_spot`（新しい立ち位置で出る）の 2 箇条に分けた。
 - タスク 5.2 で、設計の行番号の外の `internals/talk-output.md` のトークン表の後の説明（先頭のトークンが nil グループに入る旨の括弧書き）と `internals/index.md` の章一覧の「、CT」も直した。
+- タスク 4 の結果: `cargo test --workspace` 105 スイート・2385 件すべて合格（基準線と同数。Lua テストは Rust 側で `lua_unittest_runner` の 1 件に数えられる。Lua ランナーは 56 スイートすべて合格）、clippy 警告 0、luacheck `0 warnings / 0 errors in 82 files`。既存の期待値の変更は 0 件で、2 現象に当たる差分も無かった。
 - ビルド環境: C: の空きが少ないと `LNK1318`（PDB）やメモリ確保失敗でビルドが落ちる。`cargo test` は `-j 8` 程度に絞る。
