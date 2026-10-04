@@ -150,3 +150,63 @@
 - `.kiro/specs/call-attribute-filter/brief.md`（フィルター構文の論点。13・30–37・78 行）
 - `.kiro/specs/scene-attribute-store/brief.md`（旧文法の `filter_list`。56–61 行）
 - `.kiro/steering/roadmap.md`（Wave 2 の並走条件。108・124・127・140 行）
+
+---
+
+# 設計フェーズの追記（kiro-spec-design）
+
+## Discovery（Light・Extension）
+
+- **Discovery Scope**: Extension。新しい依存・外部サービスは無く、Full discovery への昇格条件に当たらない。
+- **追加の確認結果**:
+  - `act:arith` の被演算子処理（`arith_operand`）は「数値化」と警告文面が算術専用で、連結からそのまま呼べない。連結は同じ流儀の小さな関数（`concat_operand`）を持ち、値の表記だけ既存の `arith_value_text` を共用する。
+  - `Expr::Paren` は生成 Lua でも `(…)` で包まれ、`operand_desc` は括弧の中が変数・関数呼び出しなら説明を返し、演算なら返さない。連結でもこの規則のままで 3.3・3.5 を満たす。
+  - `script-api.md` は `act:arith` を「手書きの Lua からも呼べる」作者向け API として載せ、act のメソッド名であることによる制限（同名アクター・`＠名前（…）` の検索 3 段目）を書いている。`concat` を足すと同じ制限が生じる。
+  - **LSP の既存の誤り**: `tokenize_expr_recursive` の Binary アームは「頂点の演算子の文字が最初に現れる位置」で分割するが、木は左結合で頂点は最後の演算子である。`1＋2＋3` は lhs のテキストが `1` だけになり、lhs（`1＋2`）の分割に失敗して全体を変数トークンで出す。`「合計」＆＄n＆「個」` も同じ形で誤る。ほかに、文字列リテラルの中、`＄＊`・`＠＊`・`＄％` の記号、識別子の中の `ー`（`op_chars` に入っているが文法の演算子ではない）を演算子と見誤る。
+  - `test_regrouped_arith_matches_flat_lua` の比較は `type(got) == "number"` を条件にしている。連結は別の表（`CONCAT_CASES`）と「型と値が同じ」条件で同じ仕組みを使える。Lua の `..` は算術より優先順位が低いので、期待値を平らな Lua 式にそのまま書ける。
+  - LuaJIT の `..` と `tostring` は数値に同じ整形（`%.14g`）を使う。`act:concat` は `tostring` を明示して、アクション行（`ACT_IMPL.talk` の `tostring(text)`）と同じ経路にする。`-0`・`inf`・`nan` の一致はテストで固定する。
+  - Wave 2 の並走 spec で `element_gen.rs` を触るものは無い（roadmap の表）。Wave 3 の `call-execution-correctness` は Call の生成を触る。
+
+## Synthesis
+
+- **Generalization**: 「算術 2 段＋連結」を別々に扱わず、`precedence(op)` による n 段の左畳み込み 1 つにまとめる。段の定義と生成形がどちらも `BinOp` の網羅 `match` になり、変種の追加がコンパイルエラーで強制される（研究段階で挙げた「加減の段への黙った混入」が構造的に起きない）。LSP も「演算子ごとの文字を探す」から「連鎖の演算子の位置を順に見つける」に一般化し、算術と連結を同じ処理にする。
+- **Build vs Adopt**: 連結そのものは Lua の `..`／`tostring` を使う。自前で持つのは「エラーにしない」ための型の確認と警告だけ。数値の表記規則は作らない。
+- **Simplification**: 可変長ヘルパー・`Expr::Concat` の別ノード・文法の 2 層化・nil の空文字化・Call ターゲットの括弧必須は採らない。文法の変更は規則 1 つ、AST は変種 1 つ。4.5–4.8・5 は新しい禁止規則を書かず、既存の `bin` の構造から導かれる結果をテストで固定する。
+
+## Design Decisions（確定）
+
+### Decision: 優先順位はコード生成で持ち、`precedence` の 1 か所で定義する
+- **Alternatives**: (1) `arith_to_string` に第 3 段を手書きで足す、(2) 連結で区間に分けて既存の 2 段の畳み込みに渡す、(3) `precedence` による段ごとの畳み込み、(4) 文法の 2 層化。
+- **Selected**: (3)。
+- **Rationale**: (1)(2) は「乗除以外は加減」の分岐が残り、変種の追加で黙って混ざる。(3) は網羅 `match` で防げ、コードも短い。(4) は変更範囲が広く、既存のテストの前提と二重構造になる。
+- **Follow-up**: 算術だけの式の生成結果が 1 文字も変わらないことを既存の単体テスト・スナップショットで確認する。
+
+### Decision: ヘルパーは二項の `act:concat(lhs, rhs, lhs_desc?, rhs_desc?)`
+- **Alternatives**: `act:arith("&", …)`／可変長。
+- **Rationale**: `arith` の契約（数値を返す）は前 spec の Revalidation Trigger。可変長は説明の対応づけと「説明なし nil は黙る」規則を引数の並びで表す仕掛けが要る。二項の入れ子なら `arith` と同じ規則がそのまま成り立つ。
+- **Trade-offs**: n 項の連結で関数呼び出しが n-1 回になる（辞書の式の規模では問題にならない）。
+
+### Decision: `act:concat` を `script-api.md` に載せる
+- **Rationale**: メソッド名の追加は `＠concat（…）` の検索と同名アクターに影響し、作者に見える。`arith` と同じ節に並べる。
+- **Trade-offs**: 作者向け API が 1 つ増え、名前を変えにくくなる（設計ディスカッション DQ-3）。
+
+### Decision: 式の生成を `expr_gen.rs` へ先に切り出す
+- **Rationale**: `element_gen.rs` 761 行・`element_gen_tests.rs` 769 行は目安（600 行）を超えている。式の生成は 1 つの責務としてまとまっており、切り出しは責務をまたがない。並走の衝突も無い。
+- **Trade-offs**: 差分が増える。Wave 3 の `call-execution-correctness` は切り出し後のファイル配置を前提にする（DQ-1）。
+- **Follow-up**: 移動だけのコミットにし、既存のテスト・スナップショットを検証とする。
+
+### Decision: LSP は連鎖を左から走査する方式に置き換える
+- **Alternatives**: (1) `match` に 1 行足すだけ、(2) 文字列リテラルを飛ばすだけ、(3) 連鎖の走査、(4) AST の式に span を持たせる。
+- **Selected**: (3)。
+- **Rationale**: (1)(2) では 3 項以上の連結（本機能の代表的な書き方）が誤って着色される。(4) は AST の変更が広い。(3) は Binary アームと `find_binary_op` の置き換えに収まる。
+- **Trade-offs**: 既存の算術の表示も変わる（直る方向）。本仕様の範囲がエディタ側へ少し広がる（DQ-2）。
+
+### Decision: 申し送りは `call-attribute-filter/brief.md` とマニュアルに書く
+- **内容**: 式の `＆` の後は項の開始文字だけ。フィルターのキーは識別子で始める。`call_target_expr` の後に `＆識別子` が来たらフィルターと区別できる。`＞＄名前＆k＝v`・`＞シーン名＆k＝v`・`＄x＝＠単語＆k＝v` は本仕様の後もパースエラー。
+- **Trade-offs**: 他 spec のファイルを編集する（DQ-4）。
+
+## Risks & Mitigations（設計時点）
+- 切り出しで可視性（`pub(super)`）を誤る — コンパイルで検出される。振る舞いは既存テストで固定。
+- LSP の走査の規則漏れ（プロパティ名の `(`・`)`、負号の連続など）— 数が合わないときは現行と同じフォールバックにし、落ちない。代表例をテストで固定。
+- 動的コールのターゲットが値なしのとき警告が 2 行になる — 既存の動的コールの挙動どおり。nil ガードは `call-execution-correctness`。
+- `act.lua` の並走 — `ACT_IMPL.arith` の直後だけに追加する。
