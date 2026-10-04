@@ -58,7 +58,26 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 ### 即時修正（spec なし・本棚卸で実施して閉じた）
 
-- 括弧式の中の演算（U12）— `（1＋2）＊3` の括弧内が最初の項しか残らなかった。
+設計判断を要さず、1 か所の修正とテストで閉じられるもの。各修正は、現行挙動を書いていたマニュアル（利用者章・内部設計章）も同じコミットで直した。
+
+- DSL・検索・選択肢
+  - 括弧式の中の演算（U12）— `（1＋2）＊3` の括弧内が最初の項しか残らなかった。
+  - BOM 付きの `.pasta`（旧 R5）— 先頭の UTF-8 BOM を読み飛ばす（`pasta_dsl::parse_str`）。
+  - 選択肢の自動ルーティングが表示ラベルで探す（U31）— 選択 ID を Reference1 から読む。
+  - 選択肢の自動ルーティングの探索範囲（U27）— ローカルに無ければグローバルシーンを探す（`choice-definition-dsl` 要件 3.4 どおり）。
+  - グローバルシーン検索がローカルのキーを除外しない — `:` で始まるキーを候補にしない。
+- ローダ・ログ
+  - 設置パスの glob メタ文字 — 基準ディレクトリをエスケープする。
+  - モジュール名に `.` を含むファイル名 — `.` を `_` にし、キャッシュ先をモジュール名から導く。
+  - `.pasta` と `.lua` の同名衝突の判定 — 実際のモジュール名で判定する。
+  - ログフィルタの再読み込み不整合（の一部）— `[logging]` の無い再読み込みで既定に戻り、不正な `file_path` でも `level`・`filter` が効く。既定ファイルへのフォールバックは `pasta-toml-logging-consistency` が扱う。
+- ランタイム・SHIORI・デバッグ
+  - ランダムトークの間隔が起動ごとに同じ — VM 作成直後に `math.randomseed` で種を与える。
+  - `unload` を経ないプロセス終了での 5 秒停滞 — プロセス終了による detach では teardown しない（その場合 `SHIORI.unload` と保存は走らない。内部設計に記載）。
+  - ANSI コードページが UTF-8（65001）の Windows での `@enc.to_ansi` — 65001 では UTF-8 のバイト列をそのまま返す（開発機では不具合を再現できず、API の制約に基づいて修正）。
+  - `encoding` の未使用の公開関数 — `to_ansi_bytes`・`path_from_lua` を削除。
+  - Windows で同じデバッグポートへの二重 bind — Windows では `SO_REUSEADDR` を立てない。
+  - C のフレームを挟むと下位フレームの変数がずれる — 論理レベルを実レベルへ直す処理を 1 か所にまとめる。
 - 利用者章の改訂 — `lua/patterns.md` の作例の誤り（末尾の不要な `act:yield()`・`WORD.create_local` のシーン名・`＠関数名（）` の検索段・`yield` 直後の表示制御）と、同じ作例のある `lua/dsl-vs-lua.md`・pasta-lua-coding スキル・`steering/tech.md`。`reference/pasta-toml.md` の `[loader] debug_mode`（孤立キャッシュの warn）。`debug/troubleshooting.md` の 1 起動 1 接続と `pasta.log` の待ち受けログ（`debug-startup-logging` の申し送りも同時に解消）。
 
 ### 統合・分割・改名
@@ -130,3 +149,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 ### その他
 
 - `pasta_novel` アダプタ（ノベルゲーム宿主）— 遠い将来。Phase 7 の宿主非依存コアと presentation event stream 契約が土台になる。
+- モジュール名の衝突（即時修正で判明）— ファイル名の `-`・`.` はどちらも `_` になるため、`a-b.pasta`・`a.b.pasta`・`a_b.pasta` が同じモジュール名になる。`.pasta` 同士の衝突は検出しない（従来から `-` で起きていた）。
+- デバッグポートの他プロセスによる奪取（即時修正で判明）— 相手が `SO_REUSEADDR` を立てて bind する場合まで防ぐには、Windows の `SO_EXCLUSIVEADDRUSE` が要る。ゴースト同士の二重 bind は防いだ。
+- `pasta_core` の `resolve_scene_id`（即時修正で判明）— 本番の呼び出し元が無くなった公開 API。`find_scene`・`crates/pasta_core/README.md` の例・テストとあわせて整理するかを決める。
+- `pasta_shiori` の `util/hglobal/windows_api.rs` の `string_to_multibyte`（即時修正で判明）— `@enc` と同じ 65001 で不正になるフラグを渡すが、テストからしか呼ばれない。

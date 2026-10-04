@@ -22,6 +22,7 @@
   - `PastaConfig::lua()`（`loader/config/mod.rs` 173 行付近）と `From<LuaConfig>`（`runtime/runtime_config.rs` 321 行付近）に呼び出し元は無い。
   - マニュアル `book/src/reference/pasta-toml.md` 430–435 行付近は `[lua]` を載せ、既定値を示すだけで、`@env` は有効にできないと書く。
   - `lua/modules/mlua-stdlib.md` 116 行付近は「ゴーストから有効にする方法は無い」と書く（吸収台帳 X18 の決定）。
+- **棚卸の即時修正で見つかった観察（未調査）**: `RuntimeConfig::from_libs(["std_string"])` だけで VM を作ると、`with_config` が「nil→table の変換エラー」で失敗した（randomseed のテストを書く途中で発見）。U26 を撤去しても組み込み向けに残す `from_libs` の不具合の可能性があるため、要件フェーズで原因を確かめ、範囲に入れるかを決める。
 - **U32**: `loader/config/sections.rs` 24–25 行付近がフィールドを宣言し、`logging/logger.rs` 65 行付近は `Rotation::NEVER` 固定。
   - サンプルゴーストの `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.toml` 31 行付近が書いている。
   - 内部設計 `book/src/internals/logging-encoding.md` 39・131 行付近が触れる。利用者章は載せていない。
