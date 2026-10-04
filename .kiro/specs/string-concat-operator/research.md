@@ -118,6 +118,16 @@
 - **Context**: `lua/script-api.md` は `act:arith` を作者向け API として載せている。
 - **Alternatives**: 作者向け API として載せる／内部扱いとして内部設計の章だけに載せる。
 
+### Decision 候補: 式生成の切り出し（`element_gen.rs` の肥大）
+- **Context**: `element_gen.rs` は 761 行で「600 行未満」の目安を超えている。連結の第 3 段を足すとさらに増える。
+- **Alternatives**: (1) そのまま足す、(2) 式生成（`arith_to_string`・`arith_node`・`operand_desc` と連結の段）を別ファイルへ振る舞い不変で切り出してから足す。
+- **推奨の方向**: (2)。特性化テストを先に置き、切り出しと機能追加を別コミットにする（リファクタリングは安全かつ可逆に）。
+
+### Decision 候補: 優先順位の回帰テストの形
+- **Context**: R2・R6.6。連結が加算段に黙って混ざる誤りを確実に検出したい。
+- **Alternatives**: (1) `test_regrouped_arith_matches_flat_lua` の「平らな Lua との一致」比較を `..` を含む式へ広げる、(2) 混在式ごとに期待値を書いた個別テスト。
+- **推奨の方向**: (1) を主とし、代表例を (2) で補う。
+
 ## Implementation Complexity & Risk
 - **Effort**: M（3–7 日）。文法・AST・コード生成・ランタイム・LSP・マニュアル・4 層のテストにまたがるが、どれも既存の算術の流儀の延長。
 - **Risk**: Low〜Medium。パターンは確立済み。リスクは (a) 組み直しの第 3 段の誤り（加算段への黙った混入）、(b) アクション行の `＠f（…＆…）` の意味の変化、(c) `act-token-grouping-fix` との `act.lua` の並走による衝突。
