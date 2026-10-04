@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. 変更前の基準線を取る
+- [x] 1. 変更前の基準線を取る
   - 環境変数 `NoDefaultCurrentDirectoryInExePath` を外したうえで、ワークスペース全体のテスト・clippy・luacheck を変更前のソースで走らせ、結果を記録する
   - `pasta_lua` のテストが `sample.generated.lua` を改行コードだけ書き換えた場合は元に戻す
   - Rust 側の E2E（`pasta_lua` の SHIORI テスト・`pasta_shiori`・`pasta_sample_ghost`）から、2 現象（先頭の表示制御・発言の後の `clear_spot`）に当たりそうな期待値の候補を書き出し、タスク 4 の判定材料にする
@@ -72,3 +72,9 @@
   - リポジトリ全体の検索で、CT への残る言及が `.kiro/specs/` の過去の記録とロードマップだけである
   - _Requirements: 4.1, 5.4, 5.5_
   - _Depends: 2.2, 5.1, 5.2_
+
+## Implementation Notes
+
+- タスク 1 の基準線（273fa925）: `cargo test --workspace` 105 スイート・2385 件すべて合格、`cargo clippy --workspace --all-targets` 警告 0、luacheck `Total: 0 warnings / 0 errors in 84 files`。テスト後に `crates/pasta_lua/profile/pasta/save/save.json` と `tests/fixtures/sample.generated.lua` が書き換わるので `git checkout --` で戻す。
+- タスク 1 の候補: 2 現象に当たる既存の期待値は見つからなかった。最も近いのは `act_grouping_test.lua` の「トークン順序を保持する」（`clear_spot` の後は別アクターで、結果は変わらない）と `act_test.lua` の `surface` 単独 `build()`（結果の中身を検証していない）。`shiori_act_test.lua` などにある「先に `talk(…, "")` を積む」回避はそのまま通る。
+- ビルド環境: C: の空きが少ないと `LNK1318`（PDB）やメモリ確保失敗でビルドが落ちる。`cargo test` は `-j 8` 程度に絞る。
