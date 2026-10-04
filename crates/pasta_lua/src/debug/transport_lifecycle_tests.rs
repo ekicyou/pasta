@@ -508,6 +508,28 @@ fn repeated_teardown_rebind_same_port_succeeds() {
     }
 }
 
+/// A second `Transport::start` on a port whose first listener is still alive
+/// must FAIL with `DebugError::Bind` (two ghosts must not share one debug
+/// port). On Windows SO_REUSEADDR would let the second bind succeed, which is
+/// why it is set only off Windows.
+#[test]
+fn second_bind_while_first_listener_alive_fails() {
+    let mut first =
+        Transport::start(Some("127.0.0.1:0".parse().unwrap())).expect("first bind must succeed");
+    let addr = first.local_addr().expect("enabled transport exposes addr");
+
+    let second = Transport::start(Some(addr));
+    assert!(
+        matches!(second, Err(DebugError::Bind(_))),
+        "second bind of live port {addr} must fail with Bind; got ok={}",
+        second.is_ok()
+    );
+
+    first.shutdown();
+    let _ = connect_client(addr);
+    join_transport_with_watchdog(first, WATCHDOG);
+}
+
 /// Join the transport's listener thread bounded by a TEST-ONLY watchdog so a
 /// regression that hangs the thread fails the test instead of the suite.
 fn join_transport_with_watchdog(mut transport: Transport, timeout: Duration) {

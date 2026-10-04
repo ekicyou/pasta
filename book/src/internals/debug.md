@@ -144,7 +144,7 @@ enable
 
 ### デバッグ通信
 
-`Transport::start` は、`listen` が `None` なら何も開かず、閉じた受信チャネルだけを持つ `Transport` を返す。`Some` なら `socket2` でソケットを作り、`SO_REUSEADDR` を立ててから bind し、backlog 1 で listen し、非ブロッキングにして serve スレッドを起こす。
+`Transport::start` は、`listen` が `None` なら何も開かず、閉じた受信チャネルだけを持つ `Transport` を返す。`Some` なら `socket2` でソケットを作り、Windows 以外では `SO_REUSEADDR` を立ててから bind し、backlog 1 で listen し、非ブロッキングにして serve スレッドを起こす。Windows で立てないのは、立てると同じポートを使う 2 体目のゴーストの bind まで通ってしまうためである（Windows は立てなくても TIME_WAIT 後の再 bind ができる）。
 
 ```text
 serve（Transport のスレッド）
