@@ -63,7 +63,7 @@
   - _Boundary: shiori event modules (comments only)_
   - _Depends: 2.2_
 
-- [ ] 5.2 (P) 利用者向け SHIORI イベントの章を更新する
+- [x] 5.2 (P) 利用者向け SHIORI イベントの章を更新する
   - ハンドラの戻り値の表に `SHIORI/` の規則・`RES` で 204（理由付き）・311・312・500 を返せること・コルーチンの出力には適用しないことを書き、RES の節の末尾の記述を合わせる
   - OnSecondChange（掃引が応答を生んだ回は OnHour・OnTalk を出さない）と OnPastaCallBack（再開後の継続・タイムアウトの 500・遅れて届いた結果）を書く。回避レシピは載せない
   - 完了状態: 章の記述が要件 4 と OnPastaCallBack の新しい挙動に一致する
