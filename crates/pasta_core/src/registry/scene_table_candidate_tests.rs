@@ -570,3 +570,35 @@ fn test_resolve_scene_id_unified_cycling() {
     let scene = table.get_scene(r3.unwrap()).unwrap();
     assert!(scene.parent.is_some(), "返却されたシーンがローカルでない");
 }
+
+#[test]
+fn test_resolve_scene_id_selector_applies_to_candidate_order_each_round() {
+    // 索引の SceneId の並びが昇順でない表（候補の並び [2, 0, 1]）に、
+    // 指定列 [2, 0]（位置で読む）を当てはめると、どの巡も
+    // 位置 2 → 位置 0 → 残り（位置 1）= SceneId 1 → 2 → 0 になる。
+    let selector = Box::new(MockRandomSelector::new(vec![2, 0]));
+    let mut table = SceneTable {
+        labels: vec![
+            create_test_scene_info(0, "OnTalk1", "OnTalk"),
+            create_test_scene_info(1, "OnTalk2", "OnTalk"),
+            create_test_scene_info(2, "OnTalk3", "OnTalk"),
+        ],
+        prefix_index: {
+            let mut map = RadixMap::new();
+            map.insert(b"OnTalk", vec![SceneId(2), SceneId(0), SceneId(1)]);
+            map
+        },
+        cache: HashMap::new(),
+        random_selector: selector,
+        shuffle_enabled: true,
+    };
+
+    let expected = vec![SceneId(1), SceneId(2), SceneId(0)];
+    let mut round = || -> Vec<SceneId> {
+        (0..3)
+            .map(|_| table.resolve_scene_id("OnTalk", &HashMap::new()).unwrap())
+            .collect()
+    };
+    assert_eq!(round(), expected, "1 巡目");
+    assert_eq!(round(), expected, "2 巡目");
+}
