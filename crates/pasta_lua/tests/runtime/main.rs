@@ -11,6 +11,7 @@ mod debug_integration_test;
 mod debug_integration_zero_cost_test;
 mod encoding_test;
 mod finalize_scene_test;
+mod literal_fixes_test;
 mod local_scene_call_test;
 mod module_searcher_test;
 mod persistence_integration_test;

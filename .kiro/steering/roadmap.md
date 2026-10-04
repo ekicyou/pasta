@@ -111,7 +111,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 ## Specs (dependency order)
 
-- [ ] dsl-literal-fixes -- 改行を含む引用文字列・2 つ目の `""` で生成 Lua が壊れ起動不能になる不具合（U24）、単語値の `「」`・`""` が空にならない（U25）、引用なしの単語値の行末コメント（U06）。Dependencies: none
+- [x] dsl-literal-fixes -- 改行を含む引用文字列・2 つ目の `""` で生成 Lua が壊れ起動不能になる不具合（U24）、単語値の `「」`・`""` が空にならない（U25）、引用なしの単語値の行末コメント（U06）。Dependencies: none
 - [ ] dsl-codegen-runtime-safety -- 未定義の `＠＊関数（）`（U18）・未登録アクター（U19）・act のメンバー名と同じアクター名（U20）・数値にできない算術（U22）で 500 になる不具合と、アクション行の `\\`（U08）。生成コードを存在確認付きのヘルパー経由にする。Dependencies: none
 - [ ] callback-resume-unification -- コールバック再開後の継続の消失、タイムアウト掃引の結果の破棄と予約の残留、タイムアウト応答の二重包み、REG ハンドラの戻り値の二重包み（U23）。コールバックの再開を `EVENT.fire` の再開ループに一本化する。Dependencies: none
 - [ ] scene-search-key-normalization -- 記号を含むシーン名（U30）・ローカルシーン名・アクター名が、登録キー（サニタイズ済み）と検索キー（元の名前）の食い違いで見つからない不具合。Dependencies: none
