@@ -155,9 +155,14 @@ impl SearchContext {
     /// that parent scope (no local → global fallback). When it is `None`,
     /// only global words are searched.
     ///
+    /// `global_scene_name` (the scope) is matched with the same rule as
+    /// registration (`SceneRegistry::sanitize_name`), so the actor scope
+    /// `__actor_さくら・改__` built by actor.lua finds words registered for
+    /// `さくら・改`. `name` (the word key) is passed through unchanged.
+    ///
     /// # Arguments
-    /// * `name` - Search key
-    /// * `global_scene_name` - Parent scene name (None for global only)
+    /// * `name` - Search key, not sanitized
+    /// * `global_scene_name` - Scope: parent scene's registered name or actor scope, sanitized before matching (None for global only)
     ///
     /// # Returns
     /// * `Ok(Some(word))` - Word found
@@ -168,9 +173,11 @@ impl SearchContext {
         name: &str,
         global_scene_name: Option<&str>,
     ) -> Result<Option<String>, SearchError> {
-        let module_name = global_scene_name.unwrap_or("");
+        let module_name = global_scene_name
+            .map(SceneRegistry::sanitize_name)
+            .unwrap_or_default();
 
-        match self.word_table.search_word(module_name, name, &[]) {
+        match self.word_table.search_word(&module_name, name, &[]) {
             Ok(word) => Ok(Some(word)),
             Err(pasta_core::WordTableError::WordNotFound { .. }) => Ok(None),
         }
@@ -494,6 +501,63 @@ mod tests {
         let mut ctx = create_test_search_context();
         let result = ctx.search_word("存在しない単語", None).unwrap();
         assert_eq!(result, None);
+    }
+
+    /// Build a SearchContext holding only the given actor words
+    /// `(actor_name, word_name, value)`, with a mock word selector.
+    fn create_actor_word_context(words: &[(&str, &str, &str)]) -> SearchContext {
+        let mut word_registry = WordDefRegistry::new();
+        for (actor, name, value) in words {
+            word_registry.register_actor(actor, name, vec![value.to_string()]);
+        }
+        let mut ctx = SearchContext::new(SceneRegistry::new(), word_registry).unwrap();
+        ctx.set_word_selector(Some(vec![0])).unwrap();
+        ctx
+    }
+
+    #[test]
+    fn test_search_word_actor_scope_with_symbol() {
+        // The scope is built by actor.lua from the raw actor name.
+        let mut ctx = create_actor_word_context(&[("さくら・改", "通常", "\\s[0]")]);
+        let scope = Some("__actor_さくら・改__");
+        assert_eq!(
+            ctx.search_word("通常", scope).unwrap(),
+            Some("\\s[0]".to_string())
+        );
+        assert_eq!(ctx.search_word("存在しない", scope).unwrap(), None);
+    }
+
+    #[test]
+    fn test_search_word_actor_scope_colon_not_confused() {
+        // Actor `a__:b` word `x` vs actor `a` word `b__:x`: the scope's `:`
+        // becomes `_`, the word key is not sanitized.
+        let mut ctx = create_actor_word_context(&[("a__:b", "x", "AB_X"), ("a", "b__:x", "A_BX")]);
+        assert_eq!(
+            ctx.search_word("x", Some("__actor_a__:b__")).unwrap(),
+            Some("AB_X".to_string())
+        );
+        assert_eq!(
+            ctx.search_word("b__:x", Some("__actor_a__")).unwrap(),
+            Some("A_BX".to_string())
+        );
+    }
+
+    #[test]
+    fn test_search_word_overlapping_actor_names_share_dictionary() {
+        // `さくら・改` and `さくら_改` sanitize to the same name, so either
+        // actor's scope yields both words, each once, in sequential consumption.
+        for actor in ["さくら・改", "さくら_改"] {
+            let mut ctx = create_actor_word_context(&[
+                ("さくら・改", "通常", "A"),
+                ("さくら_改", "通常", "B"),
+            ]);
+            let scope = format!("__actor_{actor}__");
+            let mut got: Vec<String> = (0..2)
+                .map(|_| ctx.search_word("通常", Some(&scope)).unwrap().unwrap())
+                .collect();
+            got.sort();
+            assert_eq!(got, ["A", "B"], "actor={actor}");
+        }
     }
 
     #[test]
