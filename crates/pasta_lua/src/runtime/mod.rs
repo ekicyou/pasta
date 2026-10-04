@@ -157,6 +157,11 @@ impl PastaLuaRuntime {
         // Validate configuration and emit warnings
         config.validate_and_warn();
 
+        // Required libraries must be present before any VM is built.
+        config
+            .ensure_libs()
+            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+
         // Convert libs array to StdLib flags
         let std_lib = config
             .to_stdlib()

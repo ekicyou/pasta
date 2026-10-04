@@ -100,7 +100,7 @@ fn test_to_stdlib_rejects_removed_std_utf8() {
             assert!(valid_libraries.contains("std_ffi"));
             assert!(valid_libraries.contains("std_bit"));
         }
-        Ok(_) => panic!("Expected error for removed std_utf8 library"),
+        other => panic!("Expected UnknownLibrary for removed std_utf8 library, got {other:?}"),
     }
 }
 
@@ -141,7 +141,7 @@ fn test_to_stdlib_unknown_library_error() {
         Err(ConfigError::UnknownLibrary(name)) => {
             assert_eq!(name, "std_nonexistent");
         }
-        Ok(_) => panic!("Expected error for unknown library"),
+        other => panic!("Expected UnknownLibrary for unknown library, got {other:?}"),
     }
 }
 
