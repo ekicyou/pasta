@@ -11,7 +11,7 @@
   - _Requirements: 1.2, 1.4, 1.5, 6.1, 8.5_
 
 - [ ] 2. 位置からのキックを完全一致にする
-- [ ] 2.1 (P) キックのシーン解決を、シーン表からの完全一致の引き当てに替える
+- [x] 2.1 (P) キックのシーン解決を、シーン表からの完全一致の引き当てに替える
   - `:親:ローカル` の形はローカルシーンの取得、それ以外はグローバルシーンの開始関数の取得で引き、得た関数を既存のコルーチン化ラッパーで包む
   - act の 5 段の探索・前方一致の検索・`GLOBAL` の関数を通らないようにする（呼び出しのシグネチャは保つ）
   - 保留フラグの消費、リロードの予約文字列、一致なしの破棄と診断ログ（`seam=kick.unresolved`）は変えない。コメントを新しい解決手順に合わせる
@@ -105,3 +105,8 @@
   - 生成ツールで 2 つのスキルの `references/` を再生成する（手で編集しない）
   - 鮮度の検査（`--check`）とリンク検査が通る
   - _Requirements: 7.6_
+
+## Implementation Notes
+
+- 2.1: キックを完全一致にすると、2.2 に挙げた 3 ファイルのほかに、旧来の解決（`SCENE.co_exec`・`act:find_scene`・作者が書いた名前でのキック）を前提にしたテストも落ちる。`kick_reload_shiori_test` の「RELOAD_SENTINEL 以外は global へ素通り」、`virtual_dispatcher_kick_hook_test` の 3 件、`pasta_shiori` の `scene_kick_e2e_test`・`scene_kick_gate_e2e_test`・`scene_kick_preempt_e2e_test`・`scene_kick_multibeat_e2e_test`（作者名 `KickE2EProbe` 等でキックしている）。決定済み 6 と 8.6 に従い 2.2 で前提ごと書き換える。e2e のキック名は登録名（この時点では `KickE2EProbe1`、3.2 で `_1` 形式）にする。
+- 2.1: lua_unittest_runner は最初に落ちたスイートで止まる。キックのテストはアサーション失敗時にモックの復元まで届かず後続スイートを汚すので、書き換えるときは復元を必ず走らせる。
