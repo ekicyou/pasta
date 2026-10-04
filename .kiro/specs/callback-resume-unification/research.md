@@ -124,8 +124,8 @@ U23（Q3）の方式は上の 3 案と直交する。
 ### Decision: U23 の方式（要件ディスカッションで決定）
 - **Context**: Requirement 3・4、未決 Q3。
 - **Alternatives Considered**: 素通し / 設計どおり。
-- **Selected Approach**: 要件は素通しを仮定して起草。
-- **Follow-up**: 素通しの場合、接頭辞判定の誤検出（`SHIORI/` で始まるトーク）をマニュアルの制約として書くかを決める。
+- **Selected Approach**: 素通し（要件ディスカッション #1 で決定）。`EVENT.fire` の文字列分岐で `SHIORI/` 接頭辞なら包まない。シーンの出力には適用しない。
+- **Follow-up**: マニュアルに「`SHIORI/` で始まる文字列は応答全体として扱う」規則を 1 行書く。
 
 ## Implementation Complexity & Risk
 
