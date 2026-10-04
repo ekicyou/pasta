@@ -238,6 +238,11 @@ impl SceneRegistry {
     ///
     /// Replaces any character that is not alphanumeric or underscore with underscore.
     /// This is used by both SceneRegistry and WordDefRegistry for consistent naming.
+    ///
+    /// It is also the matching rule on the search side: pasta_lua's
+    /// `SearchContext::search_scene` applies it to the scene name and
+    /// `SearchContext::search_word` to the scope, so a raw name finds what was
+    /// registered from it. Registration and search must keep sharing this one rule.
     pub fn sanitize_name(name: &str) -> String {
         name.replace(|c: char| !c.is_alphanumeric() && c != '_', "_")
     }

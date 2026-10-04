@@ -17,7 +17,9 @@ pub struct StringLiteralizer;
 impl StringLiteralizer {
     /// Convert a string to Lua literal format.
     ///
-    /// # Rules
+    /// # Rules (evaluated in order)
+    /// - Rule 0: If text contains CR or LF, use `"text"` format on a single line,
+    ///   escaping `\`→`\\`, `"`→`\"`, CR→`\r`, LF→`\n`.
     /// - Rule 1: If no escape-needing characters (`\` or `"`), use `"text"` format.
     /// - Rule 2: If escape-needing characters exist, use long string format `[=[text]=]`.
     ///
@@ -29,6 +31,7 @@ impl StringLiteralizer {
     /// # Examples
     /// - `hello world` → `"hello world"`
     /// - `hello\nworld` (with backslash) → `[[hello\nworld]]`
+    /// - `a` + LF + `b` → `"a\nb"`
     /// - `hello]world` → `[=[hello]world]=]`
     pub fn literalize(text: &str) -> Result<String, TranspileError> {
         Self::literalize_with_span(text, &Span::default())
@@ -36,7 +39,23 @@ impl StringLiteralizer {
 
     /// Convert a string to Lua literal format with span information for errors.
     pub fn literalize_with_span(text: &str, span: &Span) -> Result<String, TranspileError> {
-        if !Self::needs_long_string(text) {
+        if text.contains(['\r', '\n']) {
+            // Rule 0: Escaped single-line double-quoted string. Long strings are
+            // not used because Lua normalizes CR/CRLF and drops a leading newline.
+            let mut out = String::with_capacity(text.len() + 2);
+            out.push('"');
+            for c in text.chars() {
+                match c {
+                    '\\' => out.push_str("\\\\"),
+                    '"' => out.push_str("\\\""),
+                    '\r' => out.push_str("\\r"),
+                    '\n' => out.push_str("\\n"),
+                    _ => out.push(c),
+                }
+            }
+            out.push('"');
+            Ok(out)
+        } else if !Self::needs_long_string(text) {
             // Rule 1: Simple double-quoted string
             Ok(format!("\"{}\"", text))
         } else {
@@ -226,6 +245,41 @@ mod tests {
             msg.contains("[L8:4-L8:20]"),
             "error message must include the caller-provided span: {msg}"
         );
+    }
+
+    /// Rule 0: values with CR/LF become a single-line escaped `"…"` literal.
+    fn assert_newline_literal(text: &str, expected: &str) {
+        let result = StringLiteralizer::literalize(text).unwrap();
+        assert_eq!(result, expected);
+        assert!(
+            !result.contains(['\r', '\n']),
+            "output must not contain raw newlines: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_newline_lf() {
+        assert_newline_literal("a\nb", "\"a\\nb\"");
+    }
+
+    #[test]
+    fn test_newline_cr() {
+        assert_newline_literal("a\rb", "\"a\\rb\"");
+    }
+
+    #[test]
+    fn test_newline_crlf() {
+        assert_newline_literal("a\r\nb", "\"a\\r\\nb\"");
+    }
+
+    #[test]
+    fn test_newline_with_backslash_quote_bracket() {
+        assert_newline_literal("\\s[0]\"x\"]]\ny", "\"\\\\s[0]\\\"x\\\"]]\\ny\"");
+    }
+
+    #[test]
+    fn test_newline_leading() {
+        assert_newline_literal("\nhello", "\"\\nhello\"");
     }
 
     #[test]
