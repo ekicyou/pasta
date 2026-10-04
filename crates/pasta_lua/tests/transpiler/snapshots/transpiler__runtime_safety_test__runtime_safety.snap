@@ -1,0 +1,47 @@
+---
+source: crates/pasta_lua/tests/transpiler/runtime_safety_test.rs
+expression: transpile(RUNTIME_SAFETY_SOURCE)
+---
+local PASTA = require "pasta"
+local GLOBAL = require "pasta.global"
+
+do
+    local ACTOR = PASTA.create_actor("さくら")
+    ACTOR:create_word("通常"):entry([=[\s[0]]=])
+end
+
+do
+    local ACTOR = PASTA.create_actor("talk")
+    ACTOR:create_word("通常"):entry([=[\s[5]]=])
+end
+
+do
+    local ACTOR = PASTA.create_actor("var")
+    ACTOR:create_word("通常"):entry([=[\s[6]]=])
+end
+
+do
+    local SCENE = PASTA.create_scene("メイン")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act:actor_proxy("さくら"):talk("開始")
+        act:actor_proxy("さくら"):talk((act:global_fn("未定義関数")))
+        act:actor_proxy("さくら"):talk("です")
+        var.u18 = act:global_fn("未定義関数", 1)
+        act:actor_proxy("未登録さん"):talk("こんにちは")
+        act:actor_proxy("未登録さん"):talk("続きです")
+        act:actor_proxy("talk"):talk("トークです")
+        act:actor_proxy("var"):talk("変数です")
+        var.x = act:arith("+", var.未代入, 1, "var.未代入")
+        var.y = act:arith("*", "abc", 2)
+        act:actor_proxy("さくら"):talk(var.x, "var.x")
+        act:actor_proxy("さくら"):talk("C：")
+        act:actor_proxy("さくら"):talk([[\\]])
+        act:actor_proxy("さくら"):talk("new")
+        act:actor_proxy("さくら"):talk("終わり")
+        act:actor_proxy("さくら"):talk([[\\]])
+    end
+end
