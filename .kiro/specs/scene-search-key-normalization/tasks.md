@@ -27,7 +27,7 @@
   - _Requirements: 3.1, 7.6_
 
 - [ ] 2. 実物のランタイムで記号を含む名前の挙動を確かめる結合テスト
-- [ ] 2.1 記号を含むシーン名の Call と検索の結合テストを作る
+- [x] 2.1 記号を含むシーン名の Call と検索の結合テストを作る
   - 独立した新しい結合テストファイルを作り、テスト用の `.pasta` を文字列で書いて一時ゴーストを作り、実物のランタイムを読み込む
   - 共通のテスト支援モジュールを取り込み、デバッグ用環境変数を中和する既存のガードを効かせる（ガードを複製しない）
   - `＊会話・朝` を別のシーンから `＞会話・朝` で Call すると、そのシーンの出力が得られ警告が出ない
@@ -90,3 +90,4 @@
 
 ## Implementation Notes
 - `cargo test -p pasta_lua` は `crates/pasta_lua/tests/fixtures/sample.generated.lua` を改行コードだけ書き換える。コミットに含めず `git checkout --` で戻す
+- 結合テストのゴーストは pasta.toml に `[actor."さくら"]` が無いと実行時に nil 参照で落ちる。`symbol_name_search_test.rs` の `load_ghost(pasta, extra_toml)` で追記する
