@@ -92,8 +92,8 @@
 **Objective:** ゴースト作者として、`file_path` を書き間違えたとき、ログがどこへ行くかと、なぜそうなったかを知りたい。ログを失わずに設定を直せるようにするためである。
 
 #### Acceptance Criteria
-1. If `[logging] file_path` が条件（設置ディレクトリからの相対パスで、`profile` で始まり、`..` を含まない）を満たさない, the pasta.dll shall ゴーストの起動を続け、既定のログファイル `profile/pasta/logs/pasta.log` にログを書き続ける（**前提 A4**）。
-2. If `[logging] file_path` が条件を満たさない, the pasta.dll shall 不正と判断した `file_path` の値と、既定のログファイルへ書き続けることを示す warn を、既定のログファイルに書く。
+1. If `[logging] file_path` が条件（設置ディレクトリからの相対パスで、`profile` で始まり、`..` を含まない）を満たさない, the pasta ローダ shall SHIORI 経由でも `PastaLoader` を直接使う組み込みでも、ゴーストの起動を続け、既定のログファイル `profile/pasta/logs/pasta.log` にログを書く（**前提 A4・A8**）。
+2. If `[logging] file_path` が条件を満たさない, the pasta ローダ shall 不正と判断した `file_path` の値と、既定のログファイルへ書くことを示す warn を、既定のログファイルに書く（経路によって文言を変えない）。
 3. If `[logging] file_path` が条件を満たさない, the pasta.dll shall 同じ `[logging]` の `level`・`filter` を反映する（現行の挙動を維持する）。
 4. When 不正な `file_path` で読み込んだゴーストを、正しい `file_path` に直して再読み込みする, the pasta.dll shall 以後のログを直した `file_path` のファイルに書く。
 5. The pasta.dll shall `file_path` が条件を満たすかどうかの判定基準を変えない。
@@ -134,7 +134,7 @@
 | A5 | 1, 2 | 確定（議題 2） | 撤去したキーが書かれていても警告は出さず、他の未知のキーと同じく黙って無視する | 両キーはもともと効いておらず、撤去しても挙動は変わらない。警告のために撤去済みキー名を DLL に持ち続けることはしない（実行時 warn・`pasta_check` での警告は採らない） |
 | A6 | 4.4 | 確定 | teardown の異常の warn は、ロガーが登録されている間に起きたものを残す | brief の「ロガーが生きている範囲で」に従う。切断（Disconnected）は unwind の panic でしか起きず、release（`panic=abort`）では起きない。`PastaShiori::drop` の順序を直せば待ち時間切れはロガーの登録中に起きる |
 | A7 | Boundary | 確定 | プロセス終了による `DLL_PROCESS_DETACH`（`unload` を経ない終了）では何もしない現行の挙動を保ち、ログの保存の対象にしない | 現行はこの経路でログを出さない。プロセス終了中は書き込み用のスレッドが止まっており、ロガーは「生きている範囲」の外 |
-| A8 | 5 | 議題 | `PastaLoader` を SHIORI 以外から直接使う組み込みの場合は、不正な `file_path` のときロガーを作らない現行の挙動を保ち、内部設計の章に書くだけにする | 組み込みでも既定のログファイルへフォールバックする |
+| A8 | 5 | 確定（議題 3） | 不正な `file_path` のときは、SHIORI 経由でも組み込みでも既定のログファイルへフォールバックする（段階 1.5 自身が既定の設定でロガーを作って登録する） | 現行の組み込みはロガー無しになり、`[logging]` を書かない場合（既定ファイルに書く）より悪い。挙動・warn の文言・マニュアルを 1 通りにする。SHIORI では段階 1 の既定ロガーを上書き登録する正常時と同じ流れになる |
 | A9 | 4 | 確定 | デバッグバックエンドのログは範囲外とし、保存の挙動を保証しない（実現方法によっては副次的に残るようになってもよい） | brief の Out of scope は「デバッグバックエンドのログ（を対象にすること）」。設計の自由度を残す |
 | A10 | 5.5 | 議題 | `file_path` の判定基準（文字列として `profile` で始まる）は変えない | `profile` ディレクトリの下であることを厳密に判定する（`profiles/`・`profile.log` などを拒否する） |
 | D1 | 1.5 | 設計 | `default_libs` の定義場所と公開パス（`pasta_lua::default_libs`・`pasta_lua::loader::default_libs`）の維持 | `LuaConfig` と同じ `sections.rs` から `runtime_config.rs` へ移すか |
