@@ -37,7 +37,7 @@
 - `WordTable`（`word_table.rs`）— 巡ごとに `0..len` を渡す現行のままで要件を満たすため、変更しない
 - `scene_registry.rs`・`word_registry.rs`・検索キーの照合規則（`scene-search-key-normalization` が完了済みで持つ）
 - 属性フィルター、候補の収集順
-- 手書きのスキル文書 `references/testing-lint.md`（spec 完了時のスキル文書同期で扱う。Open Question 4）
+- 手書きのスキル文書 `references/testing-lint.md`（spec 完了時のスキル文書同期で扱う）
 
 ### Allowed Dependencies
 - `pasta_lua` → `pasta_core`（既存の向き。逆向きの依存を作らない）
@@ -210,7 +210,7 @@ impl RandomSelector for MockRandomSelector {
 **Implementation Notes**
 - Integration: 既存の `pasta_core` のテストで、シャッフル有効のモックが使う指定列は `[0]` と `[]` だけで、どちらも恒等になる。期待値は変わらない。
 - Validation: `random.rs` の単体テストで上の表を固定する。
-- Risks: `select_index`（剰余で巡回・状態あり）は `shuffle_usize` と意味が異なるまま残る。検索表は使わないため挙動には影響しない（Open Question 3）。
+- Risks: `select_index`（剰余で巡回・状態あり）は `shuffle_usize` と意味が異なるまま残る。検索表は使わないため挙動には影響しない。
 
 #### SceneTable::select_from_cache（Phase 4）
 
@@ -248,7 +248,7 @@ impl RandomSelector for MockRandomSelector {
 
 **Responsibilities & Constraints**
 - 整数でない引数は現行どおり `expected integer argument` のエラー。
-- 負の整数は Lua のエラー（メッセージ: `expected non-negative integer argument`。Open Question 2）。
+- 負の整数は Lua のエラー（メッセージ: `expected non-negative integer argument`）。
 - 0 以上の整数は `usize` に変換する。`usize` に収まらない値（32 ビットのターゲットでの大きな整数）は `usize::MAX` にする（どの検索でも範囲外として無視される。2.1）。`as usize` の折り返しを残さない。
 - 検査は `replace_selector` より前に終わる（現行の呼び出し順のまま）。エラーのとき、セレクタも巡の記録も変わらない（2.3「それまでの選び方を変えない」）。
 
@@ -316,7 +316,7 @@ impl RandomSelector for MockRandomSelector {
 - 負の整数: `set_word_selector(1)` → 1 回検索 → `pcall` で `set_word_selector(-1)` がエラー → 次の検索が巡の続き（1 番目）を返す（4.3、2.3）。
 - 検索の独立: `set_word_selector(1)` の後、`場所` の検索を挟んでも `挨拶` の巡が変わらない（1.6）。
 - シーンと単語の独立: `set_scene_selector(2)` と `set_word_selector(1)` を両方設定し、それぞれが自分の指定列に従う（3.2・3.3）。
-- 既定への復帰: `set_word_selector(1)` の後 `set_word_selector()` を呼び、「`set_word_selector()` → 最初の検索」を 40 回くり返して、最初の結果が 2 種類以上あることを見る（4.4。候補 3 つで誤って失敗する確率は 3^-39 程度。Open Question 5）。
+- 既定への復帰: `set_word_selector(1)` の後 `set_word_selector()` を呼び、「`set_word_selector()` → 最初の検索」を 40 回くり返して、最初の結果が 2 種類以上あることを見る（4.4。候補 3 つで誤って失敗する確率は 3^-39 程度）。
 - 既存の `set_word_selector(0)`（東京 → 大阪）・`set_word_selector(0, 1, 2)`（scene_test.rs）は変更せずに通る（1.7・1.8）。
 
 4.5 は、上の「先頭以外の位置」を期待するテストが、整数が使われない実装（恒等の並び）で失敗することで満たす。
@@ -324,10 +324,10 @@ impl RandomSelector for MockRandomSelector {
 ### マニュアルの検証
 - `node book/tools/gen-skill-refs.mjs --check` と `node book/tools/link-check.mjs`（見出しのアンカーが残っていること）。
 
-## Open Questions（設計ディスカッションで確定する）
+## 確定事項（設計ディスカッション 2026-10-04）
 
-1. **Phase 4 の入力の変更と 3.1**: 本番でも一巡後のシャッフルの入力が「前の巡の並び」から「収集した順」に変わる。分布と乱数の消費回数は同じ、種固定時の 2 巡目以降の具体的な並びだけが変わる。**仮定**: これは「本番の選択を変えない」に反しない（確定事項 7 が許す最小変更）。
-2. **負の整数のエラー文言**: **仮定**: `expected non-negative integer argument`。既存の `expected integer argument` を流用する案もある。利用者章にどこまで文言を書くか（`-0` が `expected integer argument` になる実測結果は利用者章に書かない仮定）。
-3. **`select_index` と `index` フィールド**: 検索表は使わないが、`shuffle_usize` と意味が異なるまま残る。**仮定**: 触らない（公開クレートのトレイトの形を変えない）。
-4. **手書きのスキル文書 `testing-lint.md`**: 現行の記述（「整数を 1 個以上渡すと、シャッフルをやめて候補を決まった順に返す」）は新しい意味でも誤りではない。**仮定**: 本 spec の実装では触らず、spec 完了時のスキル文書同期で扱う（要件の Adjacent expectations）。生成物 `references/pasta-search.md` は実装の中で再生成する。
-5. **既定への復帰のテスト（4.4）**: Lua からは種を固定できない。**仮定**: 40 回の試行で「最初の結果が 2 種類以上」を見る確率的なテスト。
+1. **Phase 4 の入力の変更**: `filtered_ids` から作り直す（1 か所）。本番でも一巡後のシャッフルの入力の順が変わるが、分布と乱数の消費回数は同じで、Requirement 3.1 に反しない（要件の確定事項 7 が許した最小変更）。
+2. **負の整数のエラー文言**: `expected non-negative integer argument`。原因が文言で分かるようにする。利用者章にはこの文言を書く。`-0` が `expected integer argument` になることは書かない（LuaJIT の数値表現の細部で、作者が書く値ではない）。
+3. **`select_index` と `index` フィールド**: 触らない。トレイトの doc コメントが「検索表は `shuffle_usize` だけを使う」と既に書いている。削除は公開クレートのトレイトの破壊的変更で、本 spec（バグ修正）の範囲外。
+4. **手書きのスキル文書 `testing-lint.md`**: 本 spec の実装では触らず、spec 完了時のスキル文書同期で扱う。生成物 `references/pasta-search.md` は実装の中で再生成する（CI の `--check` が見るため）。
+5. **既定への復帰のテスト（4.4）**: Lua からの 40 回の試行で「最初の結果が 2 種類以上」を見る。誤って失敗する確率は 3^-39 程度で、Lua の API を通した実際の経路を検証できる。
