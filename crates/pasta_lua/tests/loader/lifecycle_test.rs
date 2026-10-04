@@ -361,3 +361,28 @@ fn test_scene_dic_old_path_cleanup() {
         "scene_dic.lua should exist at new path cache/lua/pasta/scene_dic.lua"
     );
 }
+
+#[test]
+fn test_scene_module_with_dot_in_file_name() {
+    // `require` maps every `.` in a module name to a path separator, so a `.` in the
+    // file stem must not survive into the module name (`dic/v1.2.pasta` → `v1_2`).
+    let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
+    let base_dir = temp.path();
+    std::fs::write(
+        base_dir.join("dic/v1.2.pasta"),
+        "＊版数\n  ゴースト：「v1.2」\n",
+    )
+    .unwrap();
+
+    let runtime = PastaLoader::load(base_dir).unwrap();
+
+    let result = runtime
+        .exec(r#"return package.loaded["pasta.scene.v1_2"] ~= nil"#)
+        .unwrap();
+    assert_eq!(result.as_boolean(), Some(true));
+    assert!(
+        base_dir
+            .join("profile/pasta/cache/lua/pasta/scene/v1_2.lua")
+            .exists()
+    );
+}
