@@ -5,15 +5,17 @@
 
 use rand::prelude::*;
 
-/// Trait for random selection (allows mocking in tests).
+/// Trait that decides the order of a round (allows mocking in tests).
 ///
-/// The trait only has index-based methods so that it stays object-safe
-/// (`Box<dyn RandomSelector>`). SceneTable and WordTable use only `shuffle_usize`.
+/// SceneTable and WordTable call `shuffle_usize` once at the start of each
+/// round, passing an array in candidate order, and then consume the reordered
+/// array from its head. The trait has only this method and stays object-safe
+/// (`Box<dyn RandomSelector>`).
 pub trait RandomSelector: Send + Sync {
-    /// Select a random index from 0..len.
-    fn select_index(&mut self, len: usize) -> Option<usize>;
-
-    /// Shuffle a vec of usize in-place (for scene IDs).
+    /// Reorder `items` in-place; the result decides the order of the round.
+    ///
+    /// `items` arrives in candidate order. Implementations must return a
+    /// permutation of it (no element added or lost).
     fn shuffle_usize(&mut self, items: &mut [usize]);
 }
 
@@ -36,16 +38,6 @@ impl DefaultRandomSelector {
             rng: StdRng::seed_from_u64(seed),
         }
     }
-
-    /// Select a random element from a slice (convenience method).
-    pub fn select<'a, T>(&mut self, items: &'a [T]) -> Option<&'a T> {
-        items.choose(&mut self.rng)
-    }
-
-    /// Shuffle a slice in-place (convenience method).
-    pub fn shuffle<T>(&mut self, items: &mut [T]) {
-        items.shuffle(&mut self.rng);
-    }
 }
 
 impl Default for DefaultRandomSelector {
@@ -55,45 +47,31 @@ impl Default for DefaultRandomSelector {
 }
 
 impl RandomSelector for DefaultRandomSelector {
-    fn select_index(&mut self, len: usize) -> Option<usize> {
-        if len == 0 {
-            None
-        } else {
-            Some(self.rng.random_range(0..len))
-        }
-    }
-
     fn shuffle_usize(&mut self, items: &mut [usize]) {
         items.shuffle(&mut self.rng);
     }
 }
 
-/// Mock random selector for deterministic testing.
+/// Mock selector that decides the order of a round by a specified sequence.
+///
+/// `shuffle_usize` reads the sequence as positions into the candidate-order
+/// array and reorders it accordingly. The sequence is applied from its head
+/// on every call; the selector holds only the sequence and keeps no state.
 ///
 /// This selector is always public (not just for tests) to support
 /// Lua-side selector control for test scenarios.
 pub struct MockRandomSelector {
-    sequence: Vec<usize>, // Sequence of indices to select
-    index: usize,         // Current position in sequence
+    sequence: Vec<usize>, // Positions into the candidate-order array
 }
 
 impl MockRandomSelector {
-    /// Create a mock selector with a predetermined sequence of indices.
+    /// Create a mock selector with a predetermined sequence of positions.
     pub fn new(sequence: Vec<usize>) -> Self {
-        Self { sequence, index: 0 }
+        Self { sequence }
     }
 }
 
 impl RandomSelector for MockRandomSelector {
-    fn select_index(&mut self, len: usize) -> Option<usize> {
-        if len == 0 || self.sequence.is_empty() {
-            return None;
-        }
-        let idx = self.sequence[self.index % self.sequence.len()] % len;
-        self.index += 1;
-        Some(idx)
-    }
-
     /// Reorder `items` by the sequence, read as positions into `items`.
     ///
     /// Values at valid positions (in range, first occurrence) come first in
@@ -124,89 +102,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_default_selector() {
-        let mut selector = DefaultRandomSelector::with_seed(42);
-        let items = vec![1, 2, 3, 4, 5];
-
-        // Should select something
-        let result = selector.select(&items);
-        assert!(result.is_some());
-        assert!(items.contains(result.unwrap()));
-    }
-
-    #[test]
-    fn test_default_selector_empty() {
-        let mut selector = DefaultRandomSelector::new();
-        let items: Vec<i32> = vec![];
-
-        let result = selector.select(&items);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_mock_selector() {
-        let mut selector = MockRandomSelector::new(vec![0, 2, 1]);
-
-        assert_eq!(selector.select_index(3), Some(0)); // index 0
-        assert_eq!(selector.select_index(3), Some(2)); // index 2
-        assert_eq!(selector.select_index(3), Some(1)); // index 1
-        assert_eq!(selector.select_index(3), Some(0)); // wraps around to index 0
-    }
-
-    #[test]
-    fn test_mock_selector_empty() {
-        let mut selector = MockRandomSelector::new(vec![0]);
-
-        assert_eq!(selector.select_index(0), None);
-    }
-
-    #[test]
-    fn test_shuffle() {
-        let mut selector = DefaultRandomSelector::with_seed(42);
-        let mut items = vec![1, 2, 3, 4, 5];
-        let original = items.clone();
-
-        selector.shuffle(&mut items);
-
-        // After shuffling, items should still contain all elements
-        items.sort();
-        assert_eq!(items, original);
-    }
-
-    #[test]
-    fn test_default_selector_select_index_zero_len() {
-        // RandomSelector trait: len == 0 must yield None
-        let mut selector = DefaultRandomSelector::with_seed(1);
-        assert_eq!(selector.select_index(0), None);
-    }
-
-    #[test]
-    fn test_default_selector_select_index_in_range() {
-        // RandomSelector trait: returned index must always be < len
-        let mut selector = DefaultRandomSelector::with_seed(7);
-        for _ in 0..100 {
-            let idx = selector.select_index(5).expect("len > 0 must yield Some");
-            assert!(idx < 5, "index {} out of range", idx);
-        }
-        // len == 1 must always return 0
-        assert_eq!(selector.select_index(1), Some(0));
-    }
-
-    #[test]
     fn test_with_seed_is_reproducible() {
-        // Same seed must produce the same selection sequence (documented testing contract)
+        // Same seed must produce the same order (documented testing contract)
         let mut a = DefaultRandomSelector::with_seed(42);
         let mut b = DefaultRandomSelector::with_seed(42);
-
-        let seq_a: Vec<_> = (0..20).map(|_| a.select_index(10)).collect();
-        let seq_b: Vec<_> = (0..20).map(|_| b.select_index(10)).collect();
-        assert_eq!(seq_a, seq_b);
-
-        let mut items_a = vec![1, 2, 3, 4, 5, 6, 7, 8];
-        let mut items_b = items_a.clone();
-        a.shuffle(&mut items_a);
-        b.shuffle(&mut items_b);
-        assert_eq!(items_a, items_b);
+        for _ in 0..5 {
+            let mut items_a: Vec<usize> = (0..10).collect();
+            let mut items_b = items_a.clone();
+            a.shuffle_usize(&mut items_a);
+            b.shuffle_usize(&mut items_b);
+            assert_eq!(items_a, items_b);
+        }
     }
 
     #[test]
@@ -218,20 +124,6 @@ mod tests {
         let mut sorted = items.clone();
         sorted.sort();
         assert_eq!(sorted, (0..10).collect::<Vec<usize>>());
-    }
-
-    #[test]
-    fn test_mock_selector_empty_sequence_returns_none() {
-        // Empty sequence must yield None even when len > 0
-        let mut selector = MockRandomSelector::new(vec![]);
-        assert_eq!(selector.select_index(5), None);
-    }
-
-    #[test]
-    fn test_mock_selector_index_wraps_by_len() {
-        // Sequence values larger than len are reduced modulo len
-        let mut selector = MockRandomSelector::new(vec![7]);
-        assert_eq!(selector.select_index(3), Some(1)); // 7 % 3 == 1
     }
 
     /// Apply a mock sequence to `items` and return the reordered vec.
@@ -258,6 +150,11 @@ mod tests {
         assert_eq!(mock_shuffle(vec![1, 1, 0], &abc), vec![1, 0, 2]);
         // All ignored -> original order
         assert_eq!(mock_shuffle(vec![5, 9], &abc), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn test_mock_selector_shuffle_usize_empty_items() {
+        assert_eq!(mock_shuffle(vec![1, 0], &[]), Vec::<usize>::new());
     }
 
     #[test]
