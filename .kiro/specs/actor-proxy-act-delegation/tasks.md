@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. 基盤: テスト環境の確認と、修正前に失敗する回帰テスト
-- [ ] 1.1 修正前の状態で両クレートのテストがビルド・実行できることを確かめる
+- [x] 1.1 修正前の状態で両クレートのテストがビルド・実行できることを確かめる
   - 環境変数 `NoDefaultCurrentDirectoryInExePath` を外したうえで、変更のない作業ツリーで `pasta_lua` と `pasta_shiori` のテストを実行する
   - 設計時の再試作で未確認だった `pasta_shiori` のビルド失敗が再現するかを確かめ、再現する場合は原因を特定して、この spec の範囲で直せるか（環境要因か、他 spec 由来か）を記録する
   - テスト実行後に `sample.generated.lua` の改行だけの差分が出たら `git checkout --` で戻す
@@ -80,3 +80,7 @@
   - 全テスト・clippy・luacheck・マニュアルの検査が通り、変更が設計の範囲（`actor.lua`・テスト・マニュアル・生成スキル）に収まっている状態になっている
   - _Requirements: 1.6, 1.7, 3.2, 4.4_
   - _Depends: 2, 3.3_
+
+## Implementation Notes
+
+- 1.1: 基準線（修正前・`NoDefaultCurrentDirectoryInExePath` を外した状態）で `cargo test -p pasta_lua -p pasta_shiori` は exit 0・1705 件成功・0 件失敗。設計時に見えた `pasta_shiori` のビルド失敗は再現しない（環境変数が原因だったとみられる）。テスト後に `sample.generated.lua` の改行差分が出るので `git checkout --` で戻す。
