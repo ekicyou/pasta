@@ -4,7 +4,8 @@
 
 use pasta_dsl::ParseError;
 use pasta_dsl::parser::{
-    Expr, FileItem, GlobalSceneScope, LocalSceneItem, PastaFile, SetValue, parse_str,
+    Attr, AttrValue, Expr, FileItem, GlobalSceneScope, KeyWords, LocalSceneItem, PastaFile,
+    SetValue, parse_str,
 };
 
 const NEWLINES: [&str; 2] = ["\n", "\r\n"];
@@ -168,4 +169,130 @@ fn blank_quotes_on_same_line_are_double_fence() {
         [FileItem::GlobalWord(kw)] => assert_eq!(kw.words, vec!["、".to_string()]),
         other => panic!("expected one GlobalWord, got {other:?}"),
     }
+}
+
+// ============================================================================
+// 1.6・1.7・4.1〜4.3: 単語値・属性値の引用なしの値（グローバル・ローカル・アクター）
+// ============================================================================
+
+/// 単語定義・属性を書く文脈: (名前, 先頭の行, 字下げ, 定義を書いた最初の行の番号)
+const DEF_CONTEXTS: [(&str, &str, &str, usize); 3] = [
+    ("global", "", "", 1),
+    ("local", "＊s", "　", 2),
+    ("actor", "％さくら", "　", 2),
+];
+
+/// 文脈の中に `lines` を（字下げして）置いたソースを作る
+fn in_context(ctx: (&str, &str, &str, usize), lines: &[&str], nl: &str) -> String {
+    let (_, head, indent, _) = ctx;
+    let mut src = String::new();
+    if !head.is_empty() {
+        src.push_str(head);
+        src.push_str(nl);
+    }
+    for line in lines {
+        src.push_str(indent);
+        src.push_str(line);
+        src.push_str(nl);
+    }
+    src
+}
+
+fn all_words(file: &PastaFile) -> Vec<&KeyWords> {
+    file.items
+        .iter()
+        .flat_map(|i| match i {
+            FileItem::GlobalWord(kw) => vec![kw],
+            FileItem::GlobalSceneScope(s) => s.words.iter().collect(),
+            FileItem::ActorScope(a) => a.words.iter().collect(),
+            _ => vec![],
+        })
+        .collect()
+}
+
+fn all_attrs(file: &PastaFile) -> Vec<&Attr> {
+    file.items
+        .iter()
+        .flat_map(|i| match i {
+            FileItem::FileAttr(a) => vec![a],
+            FileItem::GlobalSceneScope(s) => s.attrs.iter().collect(),
+            FileItem::ActorScope(a) => a.attrs.iter().collect(),
+            _ => vec![],
+        })
+        .collect()
+}
+
+/// 1 行の単語定義を各文脈に置き、候補を確かめる
+fn assert_word_candidates(line: &str, expected: &[&str]) {
+    for ctx in DEF_CONTEXTS {
+        let src = in_context(ctx, &[line], "\n");
+        let file = parse_ok(&src);
+        match &all_words(&file)[..] {
+            [kw] => assert_eq!(kw.words, expected, "context: {}, source: {src:?}", ctx.0),
+            other => panic!("expected one word def, got {other:?}\nsource: {src:?}"),
+        }
+    }
+}
+
+/// (閉じ忘れた引用, 閉じた引用) の組。閉じた側はパースが通る
+const UNCLOSED_QUOTES: [(&[&str], &[&str]); 8] = [
+    (&["＠w：「a", "b」"], &["＠w：「ab」"]),
+    (&["＠w：「a", "＠v：b」"], &["＠w：「a」", "＠v：b」"]),
+    (&["＠w：「abc"], &["＠w：「abc」"]),
+    (&["＠w：\"abc"], &["＠w：\"abc\""]),
+    (&["＠w：あ、「い"], &["＠w：あ、「い」"]),
+    (&["＆k：「a", "b」"], &["＆k：「ab」"]),
+    (&["＆k：「abc"], &["＆k：「abc」"]),
+    (&["＆k：\"abc"], &["＆k：\"abc\""]),
+];
+
+#[test]
+fn unclosed_quote_in_word_or_attr_value_errors_at_start_line() {
+    for ctx in DEF_CONTEXTS {
+        for nl in NEWLINES {
+            for (unclosed, closed) in UNCLOSED_QUOTES {
+                parse_ok(&in_context(ctx, closed, nl));
+                let src = in_context(ctx, unclosed, nl);
+                assert_eq!(
+                    error_line(&src),
+                    ctx.3,
+                    "context: {}, source: {src:?}",
+                    ctx.0
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn quote_char_after_first_char_is_part_of_word_value() {
+    assert_word_candidates("＠w：あ「い、う\"え", &["あ「い", "う\"え"]);
+}
+
+#[test]
+fn quote_char_after_first_char_is_part_of_attr_value() {
+    for ctx in DEF_CONTEXTS {
+        let src = in_context(ctx, &["＆k：a「b"], "\n");
+        let file = parse_ok(&src);
+        match &all_attrs(&file)[..] {
+            [attr] => assert_eq!(
+                attr.value,
+                AttrValue::AttrString("a「b".to_string()),
+                "context: {}, source: {src:?}",
+                ctx.0
+            ),
+            other => panic!("expected one attr, got {other:?}\nsource: {src:?}"),
+        }
+    }
+}
+
+#[test]
+fn hash_in_unquoted_word_value_is_part_of_value() {
+    assert_word_candidates("＠w：あ、い ＃c", &["あ", "い ＃c"]);
+    assert_word_candidates("＠話題：＃伺か", &["＃伺か"]);
+}
+
+#[test]
+fn hash_after_quoted_word_value_is_comment() {
+    assert_word_candidates("＠w：「あ」 ＃c", &["あ"]);
 }

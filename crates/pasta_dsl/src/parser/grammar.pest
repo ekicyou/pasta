@@ -151,7 +151,7 @@ key_words   = { key_list ~ s ~ kv_marker ~ s ~ words }
 // ################################################# word_dic
 words         =  { word ~ ( comma_sep ~ word )* ~ comma_sep? }
 word          = _{ string_literal | sakura_script | word_nofenced }
-word_nofenced = @{ (!(comma_sep | "\r" | "\n") ~ ANY)+ }
+word_nofenced = @{ !("「" | "\"") ~ (!(comma_sep | "\r" | "\n") ~ ANY)+ }
 
 // ################################################# actors
 actors       = _{ actors_item ~ ( comma_sep ~ actors_item )* ~ comma_sep? }
@@ -162,7 +162,7 @@ attr  =  { attr_marker ~ key_attr ~ s }
 attrs = _{ attr+ }
 key_attr = { id ~ s ~ kv_marker ~ s ~ attr_value }
 attr_value = _{ number_literal | string_literal | attr_string }
-attr_string = @ { ( !( kv_marker | attr_marker | comment_marker ) ~ no_ws )+ }
+attr_string = @ { !("「" | "\"") ~ ( !( kv_marker | attr_marker | comment_marker ) ~ no_ws )+ }
 
 // ################################################# call
 call_target_expr = { expr }
