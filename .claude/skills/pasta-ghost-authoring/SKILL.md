@@ -353,7 +353,6 @@ end
 | `[persistence]`  | 保存ファイルの形式・場所                               | ★                    |
 | `[logging]`      | ログ出力の設定                                         | ★                    |
 | `[debug]`        | デバッグバックエンド（上級者向け）                     | ★                    |
-| `[lua]`          | Lua ライブラリ（上級者向け。通常は書かない）           | ★                    |
 | `[package]`      | エンジンプロファイル専用（SHIORI では不要・書いても無視） | —                 |
 
 > 📖 全セクション・全キーの詳細: [references/pasta-toml.md](references/pasta-toml.md)

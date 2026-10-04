@@ -3,9 +3,7 @@
 //! from_str: #[cfg(test)] 除去 → pub に昇格
 //! default_lua_search_paths, default_log_file_path: pub に昇格
 
-use pasta_lua::loader::{
-    LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, default_log_file_path,
-};
+use pasta_lua::loader::{LoggingConfig, PastaConfig, PersistenceConfig, default_log_file_path};
 
 // ============================================================================
 // Task 4.4 — pasta.toml [debug] 提示モード/サイドカー供給 (requirements 6.3 / 3.2)
@@ -216,7 +214,6 @@ ghost_name = "NoLoaderGhost"
 fn test_logging_config_default() {
     let config = LoggingConfig::default();
     assert_eq!(config.file_path, "profile/pasta/logs/pasta.log");
-    assert_eq!(config.rotation_days, 7);
     assert_eq!(config.level, "info");
     assert!(config.filter.is_none());
 }
@@ -226,7 +223,6 @@ fn test_logging_config_to_filter_directive_with_filter() {
     // filter優先: filterが設定されている場合はfilterを返す
     let config = LoggingConfig {
         file_path: default_log_file_path(),
-        rotation_days: 7,
         level: "info".to_string(),
         filter: Some("debug,pasta_shiori=trace".to_string()),
     };
@@ -238,7 +234,6 @@ fn test_logging_config_to_filter_directive_with_level_only() {
     // filterなし: levelを返す
     let config = LoggingConfig {
         file_path: default_log_file_path(),
-        rotation_days: 7,
         level: "warn".to_string(),
         filter: None,
     };
@@ -260,12 +255,10 @@ debug_mode = true
 
 [logging]
 file_path = "profile/custom/logs/my.log"
-rotation_days = 14
 "#;
     let config = PastaConfig::from_str(toml_str).unwrap();
     let logging = config.logging().expect("logging section should exist");
     assert_eq!(logging.file_path, "profile/custom/logs/my.log");
-    assert_eq!(logging.rotation_days, 14);
     assert_eq!(logging.level, "info"); // default
     assert!(logging.filter.is_none());
 }
@@ -313,7 +306,6 @@ file_path = "profile/pasta/logs/custom.log"
     let config = PastaConfig::from_str(toml_str).unwrap();
     let logging = config.logging().expect("logging section should exist");
     assert_eq!(logging.file_path, "profile/pasta/logs/custom.log");
-    assert_eq!(logging.rotation_days, 7); // default
 }
 
 #[test]
@@ -399,72 +391,79 @@ fn test_persistence_effective_file_path() {
     assert_eq!(config.effective_file_path(), "profile/pasta/save/save.dat");
 }
 
-// ========================================
-// LuaConfig tests
-// ========================================
-
+/// 1.3, 2.3, 7.1: 撤去したキー（`[lua] libs`・`[logging] rotation_days`）を書いた
+/// `pasta.toml` でも読み込みが成功し、`[logging]` の他の 3 項目は書いたとおりに効き、
+/// `[lua] libs` に書いた `env` で `@env` が有効にならない。
 #[test]
-fn test_lua_config_default() {
-    let config = LuaConfig::default();
-    assert_eq!(
-        config.libs,
-        vec!["std_all", "assertions", "testing", "regex", "json", "yaml"]
-    );
-}
+fn removed_keys_are_ignored_on_load() {
+    use crate::common::copy_fixture_to_temp;
+    use pasta_lua::loader::PastaLoader;
 
-#[test]
-fn test_lua_config_from_toml() {
-    let toml_str = r#"
-[lua]
-libs = ["std_string", "std_table", "testing"]
-"#;
-    let config = PastaConfig::from_str(toml_str).unwrap();
-    let lua = config.lua().expect("lua section should exist");
-    assert_eq!(lua.libs, vec!["std_string", "std_table", "testing"]);
-}
-
-#[test]
-fn test_lua_config_with_subtraction() {
-    let toml_str = r#"
-[lua]
-libs = ["std_all", "-std_debug", "testing"]
-"#;
-    let config = PastaConfig::from_str(toml_str).unwrap();
-    let lua = config.lua().expect("lua section should exist");
-    assert_eq!(lua.libs, vec!["std_all", "-std_debug", "testing"]);
-}
-
-#[test]
-fn test_lua_config_empty_array() {
-    let toml_str = r#"
-[lua]
-libs = []
-"#;
-    let config = PastaConfig::from_str(toml_str).unwrap();
-    let lua = config.lua().expect("lua section should exist");
-    assert!(lua.libs.is_empty());
-}
-
-#[test]
-fn test_lua_config_defaults_when_libs_omitted() {
-    let toml_str = r#"
-[lua]
-"#;
-    let config = PastaConfig::from_str(toml_str).unwrap();
-    let lua = config.lua().expect("lua section should exist");
-    // libs should use default when omitted
-    assert_eq!(
-        lua.libs,
-        vec!["std_all", "assertions", "testing", "regex", "json", "yaml"]
-    );
-}
-
-#[test]
-fn test_lua_config_none_when_section_missing() {
-    let toml_str = r#"
+    let temp = copy_fixture_to_temp("minimal");
+    std::fs::write(
+        temp.path().join("pasta.toml"),
+        r#"
 [loader]
 debug_mode = true
-"#;
-    let config = PastaConfig::from_str(toml_str).unwrap();
-    assert!(config.lua().is_none());
+
+[lua]
+libs = ["std_all", "env"]
+
+[logging]
+rotation_days = 14
+file_path = "profile/pasta/logs/custom.log"
+level = "debug"
+filter = "warn,pasta_lua=debug"
+"#,
+    )
+    .unwrap();
+
+    let runtime = PastaLoader::load(temp.path()).expect("load must succeed with removed keys");
+
+    let logging = runtime
+        .config()
+        .expect("loader sets config")
+        .logging()
+        .expect("[logging] must parse despite rotation_days");
+    assert_eq!(logging.file_path, "profile/pasta/logs/custom.log");
+    assert_eq!(logging.level, "debug");
+    assert_eq!(logging.filter.as_deref(), Some("warn,pasta_lua=debug"));
+
+    let env_loadable = runtime.exec(r#"return (pcall(require, "@env"))"#).unwrap();
+    assert_eq!(
+        env_loadable.as_boolean(),
+        Some(false),
+        "[lua] libs = [\"env\"] must not enable @env"
+    );
+}
+
+/// 5.1: 不正な `[logging] file_path`（`profile/` の下にない `profile.log`）でも、ローダは
+/// 既定のログファイルのロガーを登録して起動を続ける。warn の内容は専用バイナリの
+/// `logging_file_path_fallback_test.rs` で見る（購読者がプロセスに 1 つのため）。
+#[test]
+fn invalid_log_file_path_falls_back_to_default_logger() {
+    use crate::common::copy_fixture_to_temp;
+    use pasta_lua::GlobalLoggerRegistry;
+    use pasta_lua::loader::PastaLoader;
+
+    let temp = copy_fixture_to_temp("minimal");
+    let base_dir = temp.path();
+    std::fs::write(
+        base_dir.join("pasta.toml"),
+        "[loader]\ndebug_mode = true\n\n[logging]\nfile_path = \"profile.log\"\n",
+    )
+    .unwrap();
+
+    let runtime = PastaLoader::load(base_dir).expect("load must continue with invalid file_path");
+
+    let registry = GlobalLoggerRegistry::instance();
+    let logger = registry.get(base_dir);
+    registry.unregister(base_dir);
+    drop(runtime);
+
+    let logger = logger.expect("a fallback logger must be registered for the ghost dir");
+    assert_eq!(logger.log_path(), base_dir.join(default_log_file_path()));
+    drop(logger);
+    assert!(base_dir.join(default_log_file_path()).exists());
+    assert!(!base_dir.join("profile.log").exists());
 }

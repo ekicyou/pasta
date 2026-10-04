@@ -537,3 +537,60 @@ end
     // Modifying one instance's cache should not affect the other
     // (This is implicitly verified by the above assertions)
 }
+
+// ========================================================================
+// pasta-toml-logging-consistency 5.1: 終了処理のログはファイルを閉じる前に残る
+// ========================================================================
+
+/// 永続化の保存が必ず失敗するゴーストを用意する（保存先の親が通常ファイル）。
+/// 保存失敗の error ログは、ロガーがまだ登録されている間に出ればログファイルに残る。
+fn copy_fixture_with_failing_persistence() -> TempDir {
+    let temp = copy_fixture_to_temp("minimal");
+    std::fs::write(temp.path().join("blocker"), "not a directory").unwrap();
+    let toml = temp.path().join("pasta.toml");
+    let mut content = std::fs::read_to_string(&toml).unwrap();
+    content.push_str("\n[persistence]\nfile_path = \"blocker/save.json\"\n");
+    std::fs::write(&toml, content).unwrap();
+    temp
+}
+
+fn read_default_log(temp: &TempDir) -> String {
+    std::fs::read_to_string(temp.path().join("profile/pasta/logs/pasta.log")).unwrap_or_default()
+}
+
+/// 解放の順序: 永続化の保存（ランタイム破棄）→ 登録解除のログ → 登録解除。
+fn assert_release_logged_in_order(log: &str) {
+    let save = log.find("Failed to save persistence data on drop");
+    let unregister = log.find("Unregistering logger");
+    assert!(
+        matches!((save, unregister), (Some(s), Some(u)) if s < u),
+        "persistence-save log must precede 'Unregistering logger' in the ghost log:\n{log}"
+    );
+}
+
+#[test]
+fn test_drop_logs_release_before_logger_unregistered() {
+    let temp = copy_fixture_with_failing_persistence();
+    {
+        let mut shiori = PastaShiori::default();
+        assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    }
+    assert_release_logged_in_order(&read_default_log(&temp));
+}
+
+#[test]
+fn test_reload_logs_release_before_logger_unregistered() {
+    let temp1 = copy_fixture_with_failing_persistence();
+    let temp2 = copy_fixture_to_temp("minimal");
+
+    let mut shiori = PastaShiori::default();
+    assert!(shiori.load(0, temp1.path().as_os_str()).unwrap());
+    assert!(shiori.load(0, temp2.path().as_os_str()).unwrap());
+
+    // 旧設置パスのロガーは登録解除済み（ファイルは閉じている）
+    assert!(
+        GlobalLoggerRegistry::instance().get(temp1.path()).is_none(),
+        "old logger must be unregistered after reload"
+    );
+    assert_release_logged_in_order(&read_default_log(&temp1));
+}

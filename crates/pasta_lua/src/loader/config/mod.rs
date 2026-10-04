@@ -169,11 +169,6 @@ impl PastaConfig {
         self.get_custom_config("persistence")
     }
 
-    /// Get Lua library configuration from [lua] section.
-    pub fn lua(&self) -> Option<LuaConfig> {
-        self.get_custom_config("lua")
-    }
-
     /// Get talk configuration from [talk] section.
     pub fn talk(&self) -> Option<TalkConfig> {
         self.get_custom_config("talk")
@@ -252,7 +247,7 @@ fn default_debug_mode() -> bool {
     true
 }
 
-/// Typed custom-field sections (`[logging]`/`[persistence]`/`[lua]`/`[talk]`/
+/// Typed custom-field sections (`[logging]`/`[persistence]`/`[talk]`/
 /// `[ghost]`/`[debug]`) split out to keep this hub small. Re-exported so the
 /// public surface (and `loader::mod` re-exports) stays unchanged.
 mod sections;

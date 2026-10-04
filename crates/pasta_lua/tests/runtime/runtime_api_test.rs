@@ -13,7 +13,7 @@
 use crate::common::create_empty_context;
 use pasta_lua::context::TranspileContext;
 use pasta_lua::loader::{LoaderContext, TranspileResult};
-use pasta_lua::{PastaLuaRuntime, RuntimeConfig};
+use pasta_lua::{ConfigError, PastaLuaRuntime, RuntimeConfig};
 use std::path::Path;
 use tempfile::TempDir;
 
@@ -155,6 +155,27 @@ fn test_with_config_unknown_library_fails_with_name() {
         err.to_string().contains("std_bogus"),
         "error should name the unknown library: {err}"
     );
+}
+
+/// `std_package` を欠いた構成は、VM を作らずに名前付きの構成エラーになる（3.1、7.2）。
+#[test]
+fn test_with_config_missing_std_package_fails_with_name() {
+    for libs in [vec!["std_string"], vec!["std_all", "-std_package"]] {
+        let config = RuntimeConfig::from_libs(libs.iter().map(|s| s.to_string()).collect());
+        let err = match PastaLuaRuntime::with_config(create_empty_context(), config) {
+            Ok(_) => panic!("with_config should fail without std_package: {libs:?}"),
+            Err(e) => e,
+        };
+        let config_err = match &err {
+            pasta_lua::mlua::Error::ExternalError(e) => e.downcast_ref::<ConfigError>(),
+            _ => None,
+        };
+        assert!(
+            matches!(config_err, Some(ConfigError::MissingRequiredLibrary(name)) if name == "std_package"),
+            "{libs:?}: expected MissingRequiredLibrary(std_package), got {err:?}"
+        );
+        assert!(err.to_string().contains("std_package"), "{libs:?}: {err}");
+    }
 }
 
 // ============================================================================

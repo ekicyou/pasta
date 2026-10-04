@@ -69,7 +69,7 @@ future_option = "tolerated"
 fn test_custom_section_type_mismatch_returns_none() {
     let toml_str = r#"
 [logging]
-rotation_days = "fourteen"
+level = 1
 "#;
     let config = PastaConfig::from_str(toml_str).unwrap();
     assert!(

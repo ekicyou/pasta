@@ -229,10 +229,51 @@ teardown_via_sender(tx, timeout)
 ```
 
 - `Stop` は他のメッセージと同じ FIFO を通るため、先に積まれたメッセージを処理し終えてからループを抜ける。
-- `PastaShiori` の `Drop` は、キャッシュした `SHIORI.unload` を呼び、ロガーの登録を外し、キャッシュした関数を捨ててからランタイムを破棄する。ランタイムの破棄で永続化データが保存される（[永続化](execution-model.md#永続化)）。DAP のバックエンドも VM の一部としてこのとき片付く。
+- `PastaShiori` の `Drop` は、キャッシュした `SHIORI.unload` を呼び（`call_lua_unload`）、続けて `release_runtime` でランタイムを手放す。`release_runtime` は次の順に進む。
+  1. 設置パスがあれば `LoadDirGuard` を張る（メソッドを抜けるまで保つ）。
+  2. キャッシュした Lua 関数を捨てる（VM を参照しているため、ランタイムより先に捨てる）。
+  3. ランタイムを破棄する。ここで永続化データが保存され（[永続化](execution-model.md#永続化)）、DAP のバックエンドも VM の一部として片付く。
+  4. info「Unregistering logger」を出す。
+  5. ロガーの登録を外す。最後の参照が落ち、フラッシュしてログファイルが閉じる。
+
+  登録を外すのを最後にするのは、`SHIORI.unload` の結果・永続化データの保存の失敗・登録解除の通知を、ファイルを閉じる前に書くためである（[FFI 入口と終了処理のログ](#ffi-入口と終了処理のログ)）。
 - 完了の通知は、VM の破棄と mailbox の受信側の破棄が終わってから送る。通知を受け取った時点で、VM と DAP バックエンドの解放は済んでいる。executor のメッセージ専用ウィンドウ（`wintf-winmsg-executor` の thread_local）は、その後 `block_on` が戻ってスレッドが終わるときに破棄される。
 - `DllMain` は `DLL_PROCESS_DETACH` のうち `FreeLibrary` によるもの（`lpReserved` が null）で `unload()` を呼び、それ以外の通知では何もしない。プロセスの終了による `DLL_PROCESS_DETACH`（`lpReserved` が null でない）では、他のスレッドが既に止められていてアクターが応答できないため、teardown せずに `true` を返す。そのため、`unload` を呼ばれずにホストのプロセスが終わったときは、`SHIORI.unload` も永続化データの保存も走らない。`DllMain` はローダーロックを持ったまま呼ばれるため、そこでスレッドを起こさない。スレッドは `load` を起点に起こす。
-- 再読み込み（`unload` の後の `load`、または `load` の再呼び出し）は、`spawn_actor` の 1 で前のアクターを終わらせ、新しいスレッド・チャネル・VM を作る。`PastaShiori::load` の中にある、既存のランタイムを捨てて作り直す分岐は、FFI の経路では通らない（アクターごとに新しい `PastaShiori` を作るため）。
+- 再読み込み（`unload` の後の `load`、または `load` の再呼び出し）は、`spawn_actor` の 1 で前のアクターを終わらせ、新しいスレッド・チャネル・VM を作る。`PastaShiori::load` の中にある、既存のランタイムを捨てて作り直す分岐（info「Releasing existing runtime for reload」→ `release_runtime` → `last_load_error` を消す。`SHIORI.unload` は呼ばない）は、FFI の経路では通らない（アクターごとに新しい `PastaShiori` を作るため）。
+
+### FFI 入口と終了処理のログ
+
+ログの振り分けの規則は [ロギングとエンコーディング](logging-encoding.md#振り分けの規則) が書く。この節は、SHIORI の各入口と終了処理のログがその規則でどうなるかを書く。pasta.dll の登録簿のロガーは 0 個か 1 個である。
+
+| 入口・処理 | スレッドの文脈 | 扱い |
+| ---------- | -------------- | ---- |
+| アクタースレッド（メッセージループの観測ログ、`PastaShiori` の各メソッドのログ） | スレッドの入口で設置パスの `LoadDirGuard` を張り、スレッドの終わりまで保つ | 自分のロガーへ届く |
+| `loadu`・`load`（`load_entry`） | 無し。`load_impl` は入口名と成否の 1 行を出す間だけ張り直す | 最初のロード前の引数の誤りや設置パスを読めないときのログは、登録が無いので捨てる。`loadu` 済みで無視した `load` の warn は、登録されたロガーへ届く |
+| `request` | 無し | 不正なリクエストの warn、境界での panic の error、観測用の debug・trace は、ロガーが登録されていれば届く。`load` の前・`unload` の後は捨てる |
+| `unload` | 無し | teardown の異常の warn は後述 |
+| `DllMain` の detach（`FreeLibrary`） | 無し | `unload()` を呼ぶので、`unload` と同じ |
+| `DllMain` の detach（プロセスの終了） | — | 何もしないので、ログも出ない。`SHIORI.unload` と永続化データの保存も走らない |
+
+終了処理（`unload`、または `FreeLibrary` による detach）のログは、出る時点で次のように分かれる。
+
+```text
+FFI 入口のスレッド: send(Stop{done})
+  debug「Stop enqueued」                  … アクターの登録解除より前なら届く
+アクタースレッド: Stop を受けてループを抜け、drop(shiori)（PastaShiori の Drop）
+  SHIORI.unload・永続化データの保存のログ … 届く
+  info「Unregistering logger」            … 届く
+  ロガーの登録を外す（ファイルを閉じる）
+アクタースレッド: drop(rx) → done.send(())
+  debug「actor.done」                     … 捨てる
+FFI 入口のスレッド: recv_timeout(5 秒)
+  届いた       → debug「done ack received」 … 捨てる
+  Timeout      → warn                       … 届く（ロガーはまだ登録されている）
+  Disconnected → warn                       … 登録解除の後なら捨てる
+```
+
+- 完了の通知（done ack）の後のログは、ロガーが 1 つも登録されていないので捨てる。done ack を送る位置は変えないため、通知を受け取った時点で VM・DAP バックエンド・ログファイルの解放が済んでいる、という不変条件は保たれる。
+- Timeout のとき、アクターは終了処理の途中で、ロガーは登録されたままである。FFI 入口のスレッドの warn は唯一のロガーへ届く。Disconnected は巻き戻すプロファイルでの panic でしか起きず、そのときロガーが既に登録を外されていれば warn は捨てる。
+- ログを残すために、`unload` の戻り値（常に `true`）・待ち時間の上限（5 秒）・応答の内容は変えない。
 
 ### Lua 側の SHIORI エントリとイベント配送
 
@@ -399,6 +440,7 @@ dispatch(act)
 - 各 FFI 入口は `catch_unwind` で panic をホストへ伝えない。ただしリリースでは `panic = "abort"` のため、正常な経路では panic を起こさない書き方をする（`crates/pasta_shiori/src/actor/marshaling.rs` の正常経路に `unwrap`・`expect` が無いことをテストが確かめる。リクエストの解析は再帰しない）。
 - `DllMain` ではスレッドを起こさない。アクタースレッドは `load` を起点に起こす。
 - 終了処理は何度呼んでも安全である（`unload` の二重呼び出し、`unload` と `DllMain` の detach の重なり）。スレッドは join せず detach する。完了の通知は VM の破棄と mailbox の受信側の破棄が済んでから送る。
+- ロガーの登録を外すのは、ランタイムを手放す処理（`release_runtime`）の最後である。完了の通知の後に出たログは捨てる。
 - `default_204` のバイト列は `RES.no_content()` と同じであり、FFI 入口の応答のバイト列はテスト `crates/pasta_shiori/tests/byte_invariant_test.rs` が固定している。再読み込みを繰り返しても OS のハンドルが増えないことは `crates/pasta_shiori/tests/actor_reload_leak_test.rs` が確かめる。
 - 仮想イベントディスパッチャの状態は保存されず、再読み込みのたびに初めからになる。
 - 静的 CRT の設定は、ワークスペースのルートから実行したビルドにだけ効く（ルートの `.cargo/config.toml`）。
@@ -434,6 +476,7 @@ dispatch(act)
 - [pasta-actor-feasibility](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-actor-feasibility)・[pasta-actor-runtime](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-actor-runtime) — アクターランタイム、presentation マーカーとレンダラ注入
 - [lua-require-robustness](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-require-robustness) — `loadu`、処理のエラーを 500 応答で返す契約
 - [pasta-scene-kick](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-scene-kick) — `ActorMsg::Kick` と `SHIORI.kick`
+- [pasta-toml-logging-consistency](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-toml-logging-consistency) — ランタイムの解放を `release_runtime` にまとめ、ロガーの登録解除を最後にする
 
 ---
 

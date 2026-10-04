@@ -10,6 +10,9 @@ use tempfile::TempDir;
 /// this test binary then collide with `AddrInUse` and the tests fail. Tests must
 /// behave identically regardless of the session environment, so we clear these.
 ///
+/// `PASTA_LOG` is cleared too: it overrides the `[logging]` filter, so an
+/// ambient value would hide the log lines the lifecycle tests read back.
+///
 /// Running inside a `#[ctor]` (executed before `main`, while the process is still
 /// single-threaded) makes the `remove_var` calls race-free under the Rust 2024
 /// edition where `std::env::remove_var` is `unsafe`.
@@ -18,6 +21,7 @@ fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
         std::env::remove_var("PASTA_DEBUG_PORT");
+        std::env::remove_var("PASTA_LOG");
     }
 }
 

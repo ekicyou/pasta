@@ -33,14 +33,15 @@ mod source_map_build;
 
 pub use cache::{CURRENT_VERSION, CacheManager};
 pub use config::{
-    DebugFileConfig, GhostConfig, LoaderConfig, LoggingConfig, LuaConfig, PastaConfig,
-    PersistenceConfig, TalkConfig, default_debug_port, default_hour_margin, default_libs,
-    default_log_file_path, default_lua_search_paths, default_spot_newlines,
-    default_talk_interval_max, default_talk_interval_min,
+    DebugFileConfig, GhostConfig, LoaderConfig, LoggingConfig, PastaConfig, PersistenceConfig,
+    TalkConfig, default_debug_port, default_hour_margin, default_log_file_path,
+    default_lua_search_paths, default_spot_newlines, default_talk_interval_max,
+    default_talk_interval_min,
 };
 pub use context::LoaderContext;
 pub use error::{LoaderError, TranspileFailure};
 
+pub use crate::runtime::default_libs;
 use crate::runtime::{PastaLuaRuntime, RuntimeConfig};
 
 use std::fs;
@@ -97,6 +98,10 @@ impl PastaLoader {
         if !base_dir.exists() {
             return Err(LoaderError::DirectoryNotFound(base_dir.to_path_buf()));
         }
+
+        // Route this thread's logs to this ghost's logger until the load returns,
+        // even when several ghosts are loaded in one process (nests under SHIORI's guard).
+        let _log_guard = crate::logging::LoadDirGuard::new(base_dir.to_path_buf());
 
         info!(path = %base_dir.display(), "Starting pasta loader");
 
@@ -235,29 +240,42 @@ impl PastaLoader {
         base_dir: &Path,
         config: &PastaConfig,
     ) -> Result<Option<std::sync::Arc<crate::logging::PastaLogger>>, LoaderError> {
-        let logging_config = config.logging();
+        let logging_config = config.logging().unwrap_or_default();
 
         // Always update the tracing filter: a reload without `[logging]` resets it
         // to the default, and a logger creation failure still applies level/filter.
-        crate::logging::update_tracing_filter(&logging_config.clone().unwrap_or_default());
+        crate::logging::update_tracing_filter(&logging_config);
 
-        match crate::logging::PastaLogger::new(base_dir, logging_config.as_ref()) {
+        let registry = crate::logging::GlobalLoggerRegistry::instance();
+        let logger = match crate::logging::PastaLogger::new(base_dir, Some(&logging_config)) {
             Ok(logger) => {
                 let logger = std::sync::Arc::new(logger);
                 info!(path = %logger.log_path().display(), "Created instance logger");
-
-                // Register with global registry (overwrites Stage 1 default writer)
-                crate::logging::GlobalLoggerRegistry::instance()
-                    .register(base_dir.to_path_buf(), logger.clone());
-
-                Ok(Some(logger))
+                // Overwrites the Stage 1 default writer when loaded via SHIORI.
+                registry.register(base_dir.to_path_buf(), logger.clone());
+                logger
             }
             Err(e) => {
-                // Log warning but don't fail startup
-                warn!(error = %e, "Failed to create instance logger, logging disabled");
-                Ok(None)
+                // Whatever the reason, fall back to the default log file so no logs are lost.
+                let logger = match crate::logging::PastaLogger::new(base_dir, None) {
+                    Ok(logger) => std::sync::Arc::new(logger),
+                    Err(default_err) => {
+                        warn!(error = %default_err, "Failed to create instance logger, logging disabled");
+                        return Ok(None);
+                    }
+                };
+                // Register first so the warn lands in the default log file.
+                registry.register(base_dir.to_path_buf(), logger.clone());
+                warn!(
+                    file_path = %logging_config.file_path,
+                    fallback = %default_log_file_path(),
+                    error = %e,
+                    "Cannot use [logging] file_path; logging to the default log file instead"
+                );
+                logger
             }
-        }
+        };
+        Ok(Some(logger))
     }
 
     /// Prepare profile directories.

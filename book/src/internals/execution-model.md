@@ -113,6 +113,7 @@ from_loader_with_scene_dic
  0. pasta.toml の [debug] と環境変数からデバッグ設定を解決し、RuntimeConfig に載せる
  1. with_config_and_source_map
     a. RuntimeConfig の libs を検証して警告（std_debug・std_all_unsafe・env）
+       std_package を欠けば ConfigError::MissingRequiredLibrary で失敗（VM を作らない）
     b. libs を mlua の StdLib に変換し、Lua::unsafe_new_with で VM を作る
        math があれば、時刻とプロセス ID から作った種で math.randomseed を呼ぶ
     c. @pasta_search を登録（トランスパイル時の TranspileContext のレジストリから）
@@ -130,6 +131,7 @@ from_loader_with_scene_dic
 ```
 
 - 1 の `with_config_and_source_map` は `PastaLuaRuntime::new`・`with_config` の実体でもあり、そこで作った VM は 2 以降の登録を持たない。`@pasta_log` は 1e と 4 の 2 回登録され、2 回目が置き換える。
+- 1a の必須ライブラリの検査（`RuntimeConfig::ensure_libs`）は、VM を作るすべての入口がここを通るため 1 か所にある。必須は `std_package` だけである。1c・1e と 3 が `package` 表を無条件に使うためである。`std_string`・`std_table`・`std_math`・`std_os` は検査しない。
 - 6〜8 は `require_startup_module` を通る。失敗は `module`・`fatal` 付きのエラーログと、`failed to load startup module '…'` の文脈を付けた `Err` になり、構築全体が失敗する。利用者から見た扱いは [起動シーケンス](../reference/startup.md#2-起動シーケンス) を参照する。
 - 8 の `pasta.scene_dic` が `finalize_scene()` を呼ぶと、`@pasta_search` が Lua 側の登録から作り直される（[辞書確定](registry-search.md#辞書確定)）。
 - 4 の `@pasta_persistence` の登録はファイルを読まない。永続化ファイルを読むのは、後述のとおり `pasta.save` が最初に `require` されたときである。

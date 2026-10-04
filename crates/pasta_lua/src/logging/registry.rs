@@ -3,6 +3,19 @@
 //! This module provides a singleton registry for PastaLogger instances,
 //! allowing log routing based on the current load_dir context.
 //!
+//! # Routing rules
+//!
+//! Each log event is routed by the calling thread's load_dir context:
+//!
+//! 1. Context set -> the logger registered for that load_dir; discarded if
+//!    none is registered (never written to another instance's logger).
+//! 2. No context and exactly one logger registered -> that logger.
+//! 3. Otherwise (no context with zero or two or more loggers) -> discarded.
+//!
+//! Discarded output still reports success. Threads that know their load_dir
+//! (actor threads, the loader) set the context with [`LoadDirGuard`] so that
+//! routing stays correct when several loggers are registered.
+//!
 //! # Usage
 //!
 //! Applications using pasta_lua (SHIORI DLLs, CLI tools, etc.) can register
@@ -24,7 +37,7 @@ use super::PastaLogger;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use tracing_subscriber::fmt::MakeWriter;
 
 /// Global singleton instance of the logger registry.
@@ -33,7 +46,8 @@ static REGISTRY: OnceLock<GlobalLoggerRegistry> = OnceLock::new();
 /// Global Logger Registry - Manages multiple PastaLogger instances.
 ///
 /// Each application instance registers its PastaLogger with load_dir as key.
-/// The registry routes log output based on the current thread's load_dir context.
+/// The registry routes log output based on the current thread's load_dir context
+/// (see the module-level routing rules).
 ///
 /// This is useful for:
 /// - SHIORI DLLs with multiple ghost instances
@@ -58,33 +72,47 @@ impl GlobalLoggerRegistry {
         REGISTRY.get_or_init(GlobalLoggerRegistry::new)
     }
 
+    /// Lock the table, recovering from a poisoned mutex.
+    fn table(&self) -> MutexGuard<'_, HashMap<PathBuf, Arc<PastaLogger>>> {
+        self.loggers
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     /// Register a logger for the given load_dir.
     ///
     /// If a logger already exists for the load_dir, it is replaced.
+    /// The replaced logger is dropped (flushed) after the lock is released.
     pub fn register(&self, load_dir: PathBuf, logger: Arc<PastaLogger>) {
-        let mut loggers = self
-            .loggers
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        loggers.insert(load_dir, logger);
+        let replaced = self.table().insert(load_dir, logger);
+        drop(replaced);
     }
 
     /// Unregister the logger for the given load_dir.
+    ///
+    /// The removed logger is dropped (flushed) after the lock is released.
     pub fn unregister(&self, load_dir: &Path) {
-        let mut loggers = self
-            .loggers
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        loggers.remove(load_dir);
+        let removed = self.table().remove(load_dir);
+        drop(removed);
     }
 
     /// Get the logger for the given load_dir.
     pub fn get(&self, load_dir: &Path) -> Option<Arc<PastaLogger>> {
-        let loggers = self
-            .loggers
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        loggers.get(load_dir).cloned()
+        self.table().get(load_dir).cloned()
+    }
+
+    /// Decide which logger a log event goes to.
+    ///
+    /// - `Some(dir)` -> the logger registered for `dir` (`None` if unregistered;
+    ///   never falls back to another ghost's logger).
+    /// - `None` -> the sole logger if exactly one is registered, otherwise `None`.
+    fn resolve(&self, context: Option<&Path>) -> Option<Arc<PastaLogger>> {
+        let loggers = self.table();
+        match context {
+            Some(dir) => loggers.get(dir).cloned(),
+            None if loggers.len() == 1 => loggers.values().next().cloned(),
+            None => None,
+        }
     }
 }
 
@@ -119,11 +147,7 @@ impl<'a> MakeWriter<'a> for GlobalLoggerRegistry {
     type Writer = RoutingWriter;
 
     fn make_writer(&'a self) -> Self::Writer {
-        // Get the current load_dir from thread-local context
-        let load_dir = CURRENT_LOAD_DIR.with(|cell| cell.borrow().clone());
-
-        let logger = load_dir.and_then(|path| self.get(&path));
-
+        let logger = CURRENT_LOAD_DIR.with(|cell| self.resolve(cell.borrow().as_deref()));
         RoutingWriter { logger }
     }
 }
@@ -236,24 +260,75 @@ mod tests {
         assert!(get_current_load_dir().is_none());
     }
 
+    /// A logger writing under a fresh temp dir (kept alive by the returned TempDir).
+    fn temp_logger() -> (tempfile::TempDir, Arc<PastaLogger>) {
+        let dir = tempfile::TempDir::new().unwrap();
+        let logger = Arc::new(PastaLogger::new(dir.path(), None).unwrap());
+        (dir, logger)
+    }
+
+    fn same(a: Option<Arc<PastaLogger>>, b: &Arc<PastaLogger>) -> bool {
+        a.is_some_and(|a| Arc::ptr_eq(&a, b))
+    }
+
+    // The tests below use a private registry (not the process-wide singleton),
+    // so they are not affected by other tests running in parallel.
+
+    #[test]
+    fn test_resolve_no_context_zero_loggers_discards() {
+        let registry = GlobalLoggerRegistry::new();
+        assert!(registry.resolve(None).is_none());
+    }
+
+    #[test]
+    fn test_resolve_no_context_sole_logger() {
+        let registry = GlobalLoggerRegistry::new();
+        let (dir, logger) = temp_logger();
+        registry.register(dir.path().to_path_buf(), logger.clone());
+        assert!(same(registry.resolve(None), &logger));
+    }
+
+    #[test]
+    fn test_resolve_no_context_two_loggers_discards() {
+        let registry = GlobalLoggerRegistry::new();
+        let (dir_a, a) = temp_logger();
+        let (dir_b, b) = temp_logger();
+        registry.register(dir_a.path().to_path_buf(), a);
+        registry.register(dir_b.path().to_path_buf(), b);
+        assert!(registry.resolve(None).is_none());
+    }
+
+    #[test]
+    fn test_resolve_context_registered() {
+        let registry = GlobalLoggerRegistry::new();
+        let (dir_a, a) = temp_logger();
+        let (dir_b, b) = temp_logger();
+        registry.register(dir_a.path().to_path_buf(), a.clone());
+        registry.register(dir_b.path().to_path_buf(), b.clone());
+        assert!(same(registry.resolve(Some(dir_a.path())), &a));
+        assert!(same(registry.resolve(Some(dir_b.path())), &b));
+    }
+
+    #[test]
+    fn test_resolve_context_unregistered_does_not_fall_back() {
+        // Another ghost's logger is the only one registered: still discard (4.6).
+        let registry = GlobalLoggerRegistry::new();
+        let (dir, logger) = temp_logger();
+        registry.register(dir.path().to_path_buf(), logger);
+        let other = tempfile::TempDir::new().unwrap();
+        assert!(registry.resolve(Some(other.path())).is_none());
+    }
+
     #[test]
     fn test_registry_register_get_unregister() {
-        // The registry is a process-wide singleton shared with other tests,
-        // so a unique temp dir is used as the key.
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let load_dir = temp_dir.path().to_path_buf();
-        let registry = GlobalLoggerRegistry::instance();
+        let registry = GlobalLoggerRegistry::new();
+        let (dir, logger) = temp_logger();
+        let load_dir = dir.path().to_path_buf();
 
-        // Not registered yet
         assert!(registry.get(&load_dir).is_none());
 
-        let logger = Arc::new(PastaLogger::new(&load_dir, None).unwrap());
         registry.register(load_dir.clone(), logger.clone());
-
-        let fetched = registry
-            .get(&load_dir)
-            .expect("logger should be registered");
-        assert_eq!(fetched.log_path(), logger.log_path());
+        assert!(same(registry.get(&load_dir), &logger));
 
         registry.unregister(&load_dir);
         assert!(registry.get(&load_dir).is_none());
@@ -261,63 +336,45 @@ mod tests {
 
     #[test]
     fn test_registry_register_replaces_existing() {
-        let temp_a = tempfile::TempDir::new().unwrap();
-        let temp_b = tempfile::TempDir::new().unwrap();
-        let key = temp_a.path().to_path_buf();
-        let registry = GlobalLoggerRegistry::instance();
+        let registry = GlobalLoggerRegistry::new();
+        let (dir, first) = temp_logger();
+        let (_dir_b, second) = temp_logger();
+        let key = dir.path().to_path_buf();
 
-        // Two loggers with distinct log paths, registered under the same key.
-        let first = Arc::new(PastaLogger::new(temp_a.path(), None).unwrap());
-        let second = Arc::new(PastaLogger::new(temp_b.path(), None).unwrap());
-
-        registry.register(key.clone(), first.clone());
+        registry.register(key.clone(), first);
         registry.register(key.clone(), second.clone());
 
-        let fetched = registry.get(&key).expect("logger should be registered");
-        assert_eq!(
-            fetched.log_path(),
-            second.log_path(),
+        assert!(
+            same(registry.get(&key), &second),
             "second registration should replace the first"
         );
-
-        registry.unregister(&key);
     }
 
     #[test]
-    fn test_make_writer_without_context_is_noop() {
-        // Without a load_dir context, the routing writer silently discards
-        // output but still reports success.
+    fn test_make_writer_without_logger_is_noop() {
+        // No logger resolved (empty registry, with and without context):
+        // the routing writer silently discards output but still reports success.
+        let registry = GlobalLoggerRegistry::new();
+        let other = tempfile::TempDir::new().unwrap();
+
+        for context in [None, Some(other.path().to_path_buf())] {
+            set_current_load_dir(context);
+            let mut writer = registry.make_writer();
+            assert!(writer.logger.is_none());
+            let n = writer.write(b"discarded").unwrap();
+            assert_eq!(n, b"discarded".len());
+            writer.flush().unwrap();
+        }
         set_current_load_dir(None);
-        let registry = GlobalLoggerRegistry::instance();
-
-        let mut writer = registry.make_writer();
-        let n = writer.write(b"discarded").unwrap();
-        assert_eq!(n, b"discarded".len());
-        writer.flush().unwrap();
-    }
-
-    #[test]
-    fn test_make_writer_with_unregistered_dir_is_noop() {
-        // Context is set but no logger is registered for it: no-op success.
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let _guard = LoadDirGuard::new(temp_dir.path().to_path_buf());
-        let registry = GlobalLoggerRegistry::instance();
-
-        let mut writer = registry.make_writer();
-        let n = writer.write(b"discarded").unwrap();
-        assert_eq!(n, b"discarded".len());
-        writer.flush().unwrap();
     }
 
     #[test]
     fn test_make_writer_routes_to_registered_logger() {
         // End-to-end: register a logger, set the context, write through the
         // MakeWriter interface, then verify the bytes reached the log file.
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let load_dir = temp_dir.path().to_path_buf();
-        let registry = GlobalLoggerRegistry::instance();
-
-        let logger = Arc::new(PastaLogger::new(&load_dir, None).unwrap());
+        let registry = GlobalLoggerRegistry::new();
+        let (dir, logger) = temp_logger();
+        let load_dir = dir.path().to_path_buf();
         let log_path = logger.log_path().to_path_buf();
         registry.register(load_dir.clone(), logger);
 
@@ -328,7 +385,7 @@ mod tests {
             writer.flush().unwrap();
         }
 
-        // Drop all Arc references so the worker guard flushes on drop.
+        // Drop the last Arc reference so the worker guard flushes on drop.
         registry.unregister(&load_dir);
 
         let content = std::fs::read_to_string(&log_path).unwrap();
