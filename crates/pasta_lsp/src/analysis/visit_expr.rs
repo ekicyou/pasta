@@ -327,61 +327,8 @@ impl super::AnalysisEngine {
                     }
                 }
             }
-            Expr::Binary { op, lhs, rhs } => {
-                // Find the operator in the text, split into lhs and rhs
-                // First tokenize lhs, then operator, then rhs
-                // We need to find the binary op position - scan for it
-                let op_chars: &[&str] = match op {
-                    BinOp::Add => &["+", "＋"],
-                    BinOp::Sub => &["-", "ー", "－"],
-                    BinOp::Mul => &["*", "＊"],
-                    BinOp::Div => &["/", "／"],
-                    BinOp::Mod => &["%", "％"],
-                };
-                // Find a split point: we need to tokenize lhs first, then find op
-                // Strategy: find the operator that splits the text
-                if let Some((op_pos, op_len)) = find_binary_op(text, op_chars) {
-                    let lhs_text = &text[..op_pos];
-                    let rhs_text = &text[op_pos + op_len..];
-                    // LHS
-                    Self::tokenize_expr_recursive(
-                        lhs_text,
-                        base_offset,
-                        line,
-                        lhs,
-                        tokens,
-                        line_text,
-                    );
-                    // Operator
-                    let op_str = &text[op_pos..op_pos + op_len];
-                    tokens.push(RawToken {
-                        line,
-                        start_char: utf8_offset_to_utf16(line_text, base_offset + op_pos),
-                        length: utf8_len_to_utf16(op_str),
-                        token_type: token_type::OPERATOR,
-                        modifiers: 0,
-                    });
-                    // RHS
-                    Self::tokenize_expr_recursive(
-                        rhs_text,
-                        base_offset + op_pos + op_len,
-                        line,
-                        rhs,
-                        tokens,
-                        line_text,
-                    );
-                } else {
-                    // Fallback: emit entire text as variable token
-                    if !text.trim().is_empty() {
-                        tokens.push(RawToken {
-                            line,
-                            start_char: utf8_offset_to_utf16(line_text, base_offset),
-                            length: utf8_len_to_utf16(text),
-                            token_type: token_type::VARIABLE,
-                            modifiers: 0,
-                        });
-                    }
-                }
+            Expr::Binary { .. } => {
+                Self::tokenize_chain(text, base_offset, line, expr, tokens, line_text);
             }
             Expr::DynamicFnCall {
                 var_name,
@@ -408,6 +355,71 @@ impl super::AnalysisEngine {
                 }
             }
         }
+    }
+
+    /// Tokenize a binary chain: flatten the left spine into n+1 terms and n
+    /// operators, then match them to the operator positions found by one
+    /// left-to-right scan of the text. On a count mismatch the whole text is
+    /// emitted as a single token.
+    fn tokenize_chain(
+        text: &str,
+        base_offset: usize,
+        line: u32,
+        expr: &Expr,
+        tokens: &mut Vec<RawToken>,
+        line_text: &str,
+    ) {
+        // Left spine: rhs terms are collected right to left.
+        let mut terms = Vec::new();
+        let mut head = expr;
+        while let Expr::Binary { lhs, rhs, .. } = head {
+            terms.push(rhs.as_ref());
+            head = lhs;
+        }
+        terms.push(head);
+        terms.reverse();
+
+        let ops = find_chain_ops(text);
+        if ops.len() + 1 != terms.len() {
+            if !text.trim().is_empty() {
+                tokens.push(RawToken {
+                    line,
+                    start_char: utf8_offset_to_utf16(line_text, base_offset),
+                    length: utf8_len_to_utf16(text),
+                    token_type: token_type::VARIABLE,
+                    modifiers: 0,
+                });
+            }
+            return;
+        }
+
+        let mut term_start = 0;
+        for (term, &(op_pos, op_len)) in terms.iter().zip(&ops) {
+            Self::tokenize_expr_recursive(
+                &text[term_start..op_pos],
+                base_offset + term_start,
+                line,
+                term,
+                tokens,
+                line_text,
+            );
+            tokens.push(RawToken {
+                line,
+                start_char: utf8_offset_to_utf16(line_text, base_offset + op_pos),
+                length: utf8_len_to_utf16(&text[op_pos..op_pos + op_len]),
+                token_type: token_type::OPERATOR,
+                modifiers: 0,
+            });
+            term_start = op_pos + op_len;
+        }
+        Self::tokenize_expr_recursive(
+            &text[term_start..],
+            base_offset + term_start,
+            line,
+            terms[ops.len()],
+            tokens,
+            line_text,
+        );
     }
 
     /// Tokenize arguments inside parentheses of a function call.

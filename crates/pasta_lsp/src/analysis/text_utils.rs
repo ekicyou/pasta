@@ -137,25 +137,65 @@ pub(super) fn char_len_at(text: &str, byte_pos: usize) -> usize {
     text[byte_pos..].chars().next().map_or(1, |c| c.len_utf8())
 }
 
-/// Find the position and byte-length of a binary operator in the text.
-/// Skips operators inside parentheses.
-pub(super) fn find_binary_op(text: &str, op_chars: &[&str]) -> Option<(usize, usize)> {
+/// Arithmetic operator characters of the grammar (`add`/`sub`/`mul`/`div`/`modulo`).
+#[inline]
+fn is_chain_op_char(c: char) -> bool {
+    matches!(
+        c,
+        '+' | '＋' | '-' | '－' | '*' | '＊' | '×' | '/' | '／' | '÷' | '%' | '％'
+    )
+}
+
+/// Scan an expression left to right once and return the (byte_pos, byte_len)
+/// of each operator of its top-level binary chain.
+///
+/// An operator character counts only when it is at paren depth 0, outside a
+/// string literal (`「…」` / `"…"`, any fence length), not at the start of a
+/// term (so the sign of `－1` belongs to the term) and not right after
+/// `＄`/`＠` (so `＄＊`, `＠＊`, `＄％` are markers).
+pub(super) fn find_chain_ops(text: &str) -> Vec<(usize, usize)> {
+    let mut ops = Vec::new();
     let mut depth = 0i32;
-    for (i, c) in text.char_indices() {
+    let mut expect_term = true;
+    let mut prev = ' ';
+    let mut i = 0;
+    while let Some(c) = text[i..].chars().next() {
+        let mut next = i + c.len_utf8();
         match c {
+            _ if c.is_whitespace() => {}
+            '「' | '"' => {
+                // String literal: the fence is the run of opening chars,
+                // closed by the same number of closing chars.
+                let close = if c == '「' { '」' } else { '"' };
+                let fence = text[i..].chars().take_while(|&x| x == c).count();
+                let after_open = i + fence * c.len_utf8();
+                let closing = close.to_string().repeat(fence);
+                next = text[after_open..]
+                    .find(&closing)
+                    .map_or(after_open, |p| after_open + p + closing.len());
+            }
             '(' | '（' => depth += 1,
             ')' | '）' => depth -= 1,
-            _ if depth == 0 => {
-                for &op in op_chars {
-                    if text[i..].starts_with(op) {
-                        return Some((i, op.len()));
-                    }
-                }
+            _ if depth == 0
+                && !expect_term
+                && !matches!(prev, '＄' | '$' | '＠' | '@')
+                && is_chain_op_char(c) =>
+            {
+                ops.push((i, c.len_utf8()));
+                expect_term = true;
+                prev = c;
+                i = next;
+                continue;
             }
             _ => {}
         }
+        if !c.is_whitespace() {
+            expect_term = false;
+        }
+        prev = c;
+        i = next;
     }
-    None
+    ops
 }
 
 /// Find a dynamic reference `[＠@][＄$]` (plus `[＊*]` when `global`) followed by
