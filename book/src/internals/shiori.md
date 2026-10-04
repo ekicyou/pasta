@@ -275,7 +275,7 @@ pasta.shiori.entry
 | ハンドラ | 動作 |
 | -------- | ---- |
 | `REG.OnBoot` | `SCENE.co_exec(act, act.req.id)`。シーン関数フォールバックと同じ |
-| `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ `act.req.reference[0]`（選択 ID）を `SCENE.search(選択 ID, STORE.last_global_scene)` で探し、見つかった関数をコルーチンに包んで返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
+| `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ `act.req.reference[1]`（選択 ID）を `SCENE.search(選択 ID, STORE.last_global_scene)` で探し、見つかった関数をコルーチンに包んで返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
 | `REG.OnSecondChange` | `CALLBACK.sweep(os.time())` が応答を返せばそれを返し、そうでなければ `virtual_dispatcher.dispatch(act)` の結果（コルーチンか `nil`）を返す |
 
 ### 非同期トーク

@@ -532,7 +532,7 @@ fn test_default_onchoiceselectex_returns_204_no_match() {
             id = "OnChoiceSelectEx",
             method = "get",
             version = 30,
-            reference = { [0] = "nonexistent_choice_id" }
+            reference = { [0] = "label", [1] = "nonexistent_choice_id" }
         }
         local response = EVENT.fire(req)
         

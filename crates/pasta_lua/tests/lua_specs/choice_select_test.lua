@@ -51,8 +51,8 @@ describe("OnChoiceSelectEx auto-routing handler", function()
             method = "get",
             version = 30,
             reference = {
-                [0] = choice_id,
-                [1] = choice_label or "label",
+                [0] = choice_label or "label",
+                [1] = choice_id,
             },
         }
     end

@@ -11,9 +11,9 @@ local SCENE = require("pasta.scene")
 local STORE = require("pasta.store")
 
 --- 選択IDの Reference インデックス
---- ukadoc 仕様: \q[title,id] → Reference0=id, Reference1=title
+--- ukadoc 仕様: \q[title,id] → Reference0=title, Reference1=id
 --- SSP 実装差異があれば定数変更で吸収する
-local CHOICE_ID_REF_INDEX = 0
+local CHOICE_ID_REF_INDEX = 1
 
 --- SCENE.co_exec と同等のコルーチン作成（スコープ付き SCENE.search 用）
 --- co_exec/find_scene は global_scene_name を透過しないため、
