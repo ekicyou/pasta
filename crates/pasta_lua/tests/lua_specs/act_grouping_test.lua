@@ -497,3 +497,115 @@ describe("ACT.build() - raw_script ハイブリッド分類", function()
         expect(result[2].tokens[1].text):toBe("こんにちは")
     end)
 end)
+
+-- ============================================================================
+-- グループの開き方・閉じ方 (act-token-grouping-fix)
+-- 先頭の表示制御はアクター未指定のグループに入り、clear_spot はグループを閉じる
+-- ============================================================================
+
+describe("ACT.build() - グループの開き方・閉じ方", function()
+    test("先頭のwaitはアクター未指定のグループに入り、後の発言は別グループになる", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local sakura = actors["さくら"]
+        local act = ACT.new(actors)
+
+        act:wait(500)
+        act:talk(sakura, "こんにちは")
+        local result = act:build()
+
+        expect(#result):toBe(2)
+        -- アクター未指定のグループ（wait だけを持つ）
+        expect(result[1].type):toBe("actor")
+        expect(result[1].actor == nil):toBe(true)
+        expect(#result[1].tokens):toBe(1)
+        expect(result[1].tokens[1].type):toBe("wait")
+        expect(result[1].tokens[1].ms):toBe(500)
+        -- さくらのグループ
+        expect(result[2].type):toBe("actor")
+        expect(result[2].actor):toBe(sakura)
+        expect(#result[2].tokens):toBe(1)
+        expect(result[2].tokens[1].type):toBe("talk")
+        expect(result[2].tokens[1].text):toBe("こんにちは")
+    end)
+
+    test("clear_spotで閉じたグループに、spotの後の同じアクターの発言は入らない", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local sakura = actors["さくら"]
+        local act = ACT.new(actors)
+
+        act:talk(sakura, "A")
+        act:clear_spot()
+        act:set_spot("さくら", 0)
+        act:talk(sakura, "B")
+        local result = act:build()
+
+        expect(#result):toBe(4)
+        expect(result[1].type):toBe("actor")
+        expect(result[1].actor):toBe(sakura)
+        expect(#result[1].tokens):toBe(1)
+        expect(result[1].tokens[1].text):toBe("A")
+        expect(result[2].type):toBe("clear_spot")
+        expect(result[3].type):toBe("spot")
+        expect(result[3].actor):toBe(sakura)
+        expect(result[3].spot):toBe(0)
+        expect(result[4].type):toBe("actor")
+        expect(result[4].actor):toBe(sakura)
+        expect(#result[4].tokens):toBe(1)
+        expect(result[4].tokens[1].text):toBe("B")
+    end)
+
+    test("clear_spotの後のwaitはアクター未指定のグループに入る", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local sakura = actors["さくら"]
+        local act = ACT.new(actors)
+
+        act:talk(sakura, "A")
+        act:clear_spot()
+        act:wait(500)
+        act:talk(sakura, "B")
+        local result = act:build()
+
+        expect(#result):toBe(4)
+        expect(result[1].type):toBe("actor")
+        expect(result[1].actor):toBe(sakura)
+        expect(#result[1].tokens):toBe(1)
+        expect(result[1].tokens[1].text):toBe("A")
+        expect(result[2].type):toBe("clear_spot")
+        -- 閉じたさくらのグループには入らない
+        expect(result[3].type):toBe("actor")
+        expect(result[3].actor == nil):toBe(true)
+        expect(#result[3].tokens):toBe(1)
+        expect(result[3].tokens[1].type):toBe("wait")
+        expect(result[3].tokens[1].ms):toBe(500)
+        expect(result[4].type):toBe("actor")
+        expect(result[4].actor):toBe(sakura)
+        expect(#result[4].tokens):toBe(1)
+        expect(result[4].tokens[1].text):toBe("B")
+    end)
+
+    test("発言の途中のset_spot単独はグループを閉じない（変更前と同じ）", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local sakura = actors["さくら"]
+        local act = ACT.new(actors)
+
+        act:talk(sakura, "A")
+        act:set_spot("さくら", 1)
+        act:talk(sakura, "B")
+        local result = act:build()
+
+        -- 前後の発言は 1 つのグループにまとまり、spot はその後ろに出る
+        expect(#result):toBe(2)
+        expect(result[1].type):toBe("actor")
+        expect(result[1].actor):toBe(sakura)
+        expect(#result[1].tokens):toBe(1)
+        expect(result[1].tokens[1].type):toBe("talk")
+        expect(result[1].tokens[1].text):toBe("AB")
+        expect(result[2].type):toBe("spot")
+        expect(result[2].actor):toBe(sakura)
+        expect(result[2].spot):toBe(1)
+    end)
+end)

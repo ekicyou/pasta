@@ -17,7 +17,6 @@ VM の組み立てからコルーチンの回し方、永続化まで、わた�
 - イベントからシーンへのコルーチン実行。コルーチンの作り方、再開のループ（`resume_until_valid`）、継続トーク（チェイントーク）のための `STORE.co_scene` の更新規則、コールバック待ちのコルーチンとの関係
 - ランタイム内部モジュール（ACT・STORE・SCENE・WORD・GLOBAL・SAVE）の関係と、実行中にどれが何を持つか
 - 永続化（`@pasta_persistence` の実装と、`save` テーブルの読み込み・保存のタイミング）
-- CT（`ct.lua`）の位置づけ
 - Lua 方言（LuaJIT 2.1）がこの実行モデルに課す制約
 
 次の事項は他の章が権威を持ち、この章では再記述しない。
@@ -335,14 +334,6 @@ VM の構築      register_persistence_module → persistence::register
 
 保存先の計算は `PersistenceConfig::effective_file_path`（`crates/pasta_lua/src/loader/config/sections.rs`）にある。
 
-### CT（クリーンアップ）
-
-`crates/pasta_lua/pasta_scripts/ct.lua` は、クリーンアップ関数を登録しておき、スコープを出るときに登録の逆順で呼ぶためのオブジェクトを作るモジュールである。`require("ct")` はファクトリ関数を返し、作ったオブジェクトは `_cleanups`（関数の配列）と `_cancelled` を持つ。メタテーブルの `defer` が関数を登録し、`cancel` が登録を捨て、`__close` が登録を逆順に `pcall` で呼ぶ。
-
-- `__close` は Lua 5.4 の to-be-closed 変数（`<close>`）のためのメタメソッドである。LuaJIT 2.1 には `<close>` 構文が無いため、ランタイムでは `__close` は自動では呼ばれない。
-- メタテーブルは `__index` を持たないため、`defer`・`cancel` はオブジェクトのメソッドとしては参照できず、`getmetatable(obj).defer(obj, fn)` の形でしか呼べない。
-- ランタイムの Lua モジュールは CT を使っていない。現行の挙動はテスト `crates/pasta_lua/tests/lua_specs/ct_test.lua` が固定している。
-
 ## 境界の受け渡し
 
 | 境界 | 渡す側 → 受ける側 | 渡すもの | 所有 |
@@ -370,7 +361,7 @@ VM の構築      register_persistence_module → persistence::register
 ランタイムの Lua は、Lua 5.2 互換を有効にした LuaJIT 2.1（mlua の `luajit52`。[Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml) のワークスペース依存）である。実行モデルに関わる制約は次のとおりである。
 
 - `coroutine.close` が無い。`set_co_scene` と `STORE.reset` は `if coroutine.close then` で分岐しているため、LuaJIT では閉じる処理は実行されない。中断中のコルーチンを「破棄する」とは、参照を外して GC に回収させることである。破棄したコルーチンは、`yield` より後のコードを二度と実行しない（後始末のコードも動かない）。
-- to-be-closed 変数（`<close>`）が無い。`__close` メタメソッドは自動では呼ばれない（CT を参照）。
+- to-be-closed 変数（`<close>`）が無い。`__close` メタメソッドは自動では呼ばれない。
 - コルーチンの中断は Lua の関数の中でだけ行える。Rust の関数（`@pasta_*` の関数など）から呼ばれた Lua の関数の内側で `yield` すると、C 呼び出しの境界をまたぐためエラーになる。
 - `_VERSION` は `"Lua 5.1"` を返す。ランタイムの種類と版は `pasta.lua_version` が `jit` の有無で判定する。
 - Lua 5.2 互換により `table.unpack` などが使える。生成コードと `pasta.shiori.act` はこれを使う。
@@ -379,7 +370,6 @@ VM の構築      register_persistence_module → persistence::register
 
 - `crates/pasta_lua/src/runtime/`
 - `crates/pasta_lua/pasta_scripts/pasta/`
-- `crates/pasta_lua/pasta_scripts/ct.lua`
 
 本文で参照した主なファイルは次のとおりである。VM の構築は `crates/pasta_lua/src/runtime/mod.rs`・`crates/pasta_lua/src/runtime/factory.rs`・`crates/pasta_lua/src/runtime/module_registry.rs`、永続化は `crates/pasta_lua/src/runtime/persistence.rs`・`crates/pasta_lua/src/runtime/lifecycle.rs`・`crates/pasta_lua/pasta_scripts/pasta/save.lua`、イベントとコルーチンは `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/callback.lua`・`crates/pasta_lua/pasta_scripts/pasta/scene.lua`・`crates/pasta_lua/pasta_scripts/pasta/act.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua` にある。`SHIORI.request` を呼ぶ側は `crates/pasta_shiori/src/shiori.rs`、構築を呼ぶローダは `crates/pasta_lua/src/loader/mod.rs` である。
 
