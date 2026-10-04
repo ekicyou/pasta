@@ -122,7 +122,7 @@
   - _Depends: 4.2, 6.2_
 
 - [ ] 7. マニュアル・サンプル・スキルを挙動に合わせる
-- [ ] 7.1 (P) 利用者向けの章とサンプルゴーストを更新する
+- [x] 7.1 (P) 利用者向けの章とサンプルゴーストを更新する
   - サンプルゴースト hello-pasta の `pasta.toml` から `rotation_days` の行を消す
   - `reference/pasta-toml.md` から `[lua]` の一覧の行・テンプレートのコメント・節を消し、`[logging]` の `file_path` の説明を「`profile/` の下の相対パスだけ。不正なら既定のログファイルへ書き warn を出す」に直す
   - `reference/startup.md` の `file_path` の条件と不正時の挙動を直す
