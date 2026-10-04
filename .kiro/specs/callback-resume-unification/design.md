@@ -292,7 +292,7 @@ function EVENT.drive(co, act, ...)
 
 **Implementation Notes**
 - Integration: `EVENT._resume_until_valid`（テスト用の公開）は現行のまま残す。
-- Risks: シーンが `stage_pending` の後、中断の前にエラーで終わると予約が残る。これは現行の `EVENT.fire` にもある経路で、`get_property` の中（`act.lua`）でしか起きないため、本設計では扱わない（Open Questions 5）。
+- Risks: シーンが `stage_pending` の後、中断の前にエラーで終わると予約が残る。これは現行の `EVENT.fire` にもある経路で、`get_property` の中（`act.lua`）でしか起きないため、本設計では扱わない（Open Questions 2）。
 
 #### EVENT.fire
 
@@ -384,7 +384,7 @@ function CALLBACK.sweep(now)
 **Implementation Notes**
 - Integration: `EVENT` は関数の中で `require("pasta.shiori.event")` して得る（読み込み時に `require` しない）。
 - Validation: 応答を捨てた待機も、`EVENT.drive` を通っているため、予約と継続は規則どおりに更新されている。
-- Risks: 2 番目以降の待機が「再度の `get_property`」で中断した場合、その出力（get タグ）は捨てられるため、その待機は結果が届かず次の期限でタイムアウトする（Open Questions 3）。
+- Risks: 2 番目以降の待機が「再度の `get_property`」で中断した場合、その出力（get タグ）は捨てられるため、その待機は結果が届かず次の期限でタイムアウトする（Open Questions 4）。
 
 ### 定期イベント（`second_change.lua`）
 
@@ -433,7 +433,7 @@ function CALLBACK.sweep(now)
 5. 遅れて届いた結果: 掃引済みのイベント名で `try_route` が `nil` を返す（2.8）。一致しない名前も `nil`（1.6）。
 6. `try_route` のエラー: 再開したシーンがエラーなら `error` が伝わり、`pending` にも `STORE.co_scene` にも残らない（1.5）。
 
-読み直しの補助関数（`reload_callback_modules`）に `package.loaded["pasta.shiori.event"] = nil` を加える。`callback.lua` が呼び出し時に `require` する `EVENT` が、読み直した `CALLBACK`・`STORE` を使うようにするためである。
+読み直しの補助関数（`reload_callback_modules`）に `package.loaded["pasta.shiori.event"] = nil` を加える。`callback.lua` が呼び出し時に `require` する `EVENT` が、読み直した `CALLBACK`・`STORE` を使うようにするためである。 `callback.lua` を使う他の Lua スイート（`shiori_entry_test.lua`・`second_change_thread_test.lua` など）も、読み直すモジュールの組が `EVENT`・`CALLBACK`・`STORE` でそろっているかを実装時に確かめ、そろっていなければ同じ行を足す。
 
 ### E2E（Rust、`crates/pasta_shiori/tests/`）
 1. `async_callback_chain_test.rs` の `test_timeout_sweep_releases_coroutine`: 2 回目の応答を 500 と `X-Error-Reason: callback timeout: get_property` に改める。「二重包みは既知の挙動」のコメントを消す（6.5, 3.1）。3 回目（遅れて届いた結果が 204）は現行のまま（2.8）。
@@ -470,15 +470,20 @@ function CALLBACK.sweep(now)
 
 ## Open Questions / Risks
 
-設計ディスカッションで確認する項目。どれも、本設計では「採った案」で書いてある。
+### 確定済み（開発者の確認が要らないもの）
+
+- **`STORE.co_callback` の印は残す**（Architecture › 設計判断 (c)）。削除しても挙動は変わらず、印の説明が編集範囲の外（`pasta/store.lua` のコメント）にあるため、削除する理由が無い。
+- **コールバック・掃引のシーンのエラーで既存の継続も空になる**（Error Handling）。要件ディスカッションで決めた「通常のイベントと同じ規則」（1.7・1.8）の帰結であり、現行からの挙動の変化として記録する。
+- **`RES.ok(…)` を返す既存テストは書き方を残し、検査だけ厳密にする**（Testing Strategy、6.4）。素通しにより正しい書き方になり、素通しの回帰テストを兼ねる。
+
+### 設計ディスカッションで確認する項目
+
+どれも、本設計では「採った案」で書いてある。
 
 1. **(a) `EVENT.drive` の置き場所**（Architecture › 設計判断）。採った案: `init.lua` に置き、`callback.lua` は呼び出し時の `require` で使う。代案 1: `resume_until_valid`・`set_co_scene` ごと `callback.lua` へ移す（逆向きの依存は無くなるが、`callback` を読み直さない 5 つ前後のテストスイートの補助関数を直す必要がある）。代案 2: `try_route`・`sweep` を待機の取り出しだけにして `EVENT.fire` 側で駆動する（オプション A。`callback_module_test.lua` の 14 件前後を書き直し、ハンドラの戻り値に新しい型が要る）。推奨: 採った案。
-2. **(c) `STORE.co_callback` の印**（Architecture › 設計判断）。採った案: 残す。代案: 削除して `consume_staged` の戻り値で分岐する（`pasta/store.lua` のコメントの修正が要り、編集範囲の外に出る）。推奨: 残す。範囲外のコメント修正を許すなら削除もできる。
-3. **複数の待機が同時にタイムアウトしたとき、2 番目以降の出力が get タグでも捨てる**（CALLBACK.sweep）。2.7 の決定どおりだが、捨てられた get タグの待機は必ず次の期限でタイムアウトする。代案: 応答の採用で get タグを優先する（規則が増える）。推奨: 2.7 のまま受け入れ、警告ログで分かるようにする。
-4. **静かなタイムアウトで再開したシーンがエラーで終わったとき**（Error Handling）。採った案: 応答は作らず、警告ログだけ出す（3.5 の「500 応答を返さず」と 2.9 から）。代案: エラーの 1 行目を理由に 500 を返す。あわせて、理由付きの待機はシーンがどのエラーで終わっても理由に `timeout_message` を使う。推奨: 採った案。
-5. **予約したまま中断の前にエラーで終わったシーンの予約**（EVENT.drive）。現行にもある経路で、`get_property` の中でしか起きない。採った案: 扱わない。代案: `EVENT.drive` の失敗時に予約を捨てる関数を `callback.lua` に足す。推奨: 扱わない（要件に無い）。
-6. **コールバック・掃引のシーンのエラーで既存の継続も空になる**（Error Handling）。通常のイベントと同じ規則（Q1 の決定）の帰結だが、現行からの挙動の変化である。確認だけ求める。推奨: このまま。
-7. **6.4 の「そろえる」の読み方**（Testing Strategy）。採った案: `RES.ok(…)` を返す既存テストは書き方を残し、検査だけ厳密にする。代案: ハンドラを `Value` の文字列を返す形に書き直す。推奨: 採った案（素通しの回帰テストを兼ねる）。
+2. **予約したまま中断の前にエラーで終わったシーンの予約**（EVENT.drive）。現行にもある経路で、`get_property` の中でしか起きない。採った案: 扱わない。代案: `EVENT.drive` の失敗時に予約を捨てる関数を `callback.lua` に足す。推奨: 扱わない（要件に無い）。
+3. **静かなタイムアウトで再開したシーンがエラーで終わったとき**（Error Handling）。採った案: 応答は作らず、警告ログだけ出す（3.5 の「500 応答を返さず」と 2.9 から）。代案: エラーの 1 行目を理由に 500 を返す。あわせて、理由付きの待機はシーンがどのエラーで終わっても理由に `timeout_message` を使う。推奨: 採った案。
+4. **複数の待機が同時にタイムアウトしたとき、2 番目以降の出力が get タグでも捨てる**（CALLBACK.sweep）。2.7 の決定どおりだが、捨てられた get タグの待機は必ず次の期限でタイムアウトする。代案: 応答の採用で get タグを優先する（規則が増える）。推奨: 2.7 のまま受け入れ、警告ログで分かるようにする。
 
 リスク:
 - 掃引の出力は、ベースウェアの状態（トーク中など）を見ずにその回の応答になる。現行のタイムアウト 500 も同じ扱いであり、要件も条件を付けていないため、そのままとする。
