@@ -119,7 +119,7 @@ end)
 
 ランダム選択を含むモジュール（シーン選択・単語選択）のテストでは、セレクターを固定する。
 
-`@pasta_search` の `set_scene_selector` / `set_word_selector` に整数を 1 個以上渡すと、シャッフルをやめて候補を決まった順に返すようになる。並び順の規則・引数の扱い・設定がランタイム全体に効くことは [pasta-search.md](pasta-search.md#set_scene_selector--set_word_selector) を正とする（本節は手順の例のみ）。
+`@pasta_search` の `set_scene_selector` / `set_word_selector` に整数を 1 個以上渡すと、シャッフルをやめ、渡した整数（候補の並びの 0 始まりの位置）の順に候補を返すようになる。`(0)` なら候補の並びの順、`(1)` なら 2 番目の候補から返す。整数の意味・引数の扱い・設定がランタイム全体に効くことは [pasta-search.md](pasta-search.md#set_scene_selector--set_word_selector) を、候補の並びの規則は [pasta-search.md](pasta-search.md#候補の選び方) を正とする（本節は手順の例のみ）。
 
 ### 固定する
 

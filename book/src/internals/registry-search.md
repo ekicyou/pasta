@@ -35,7 +35,7 @@
 | `SceneTable` | `crates/pasta_core/src/registry/scene_table.rs` | シーンの検索表。`SceneInfo` の `Vec`、前方一致の索引（`RadixMap<Vec<SceneId>>`）、選択状態のキャッシュ、`RandomSelector` を持つ |
 | `WordDefRegistry`・`WordEntry` | `crates/pasta_core/src/registry/word_registry.rs` | 単語の定義を、検索キーと値のリストの組（`WordEntry`）として登録順に集める。グローバル・ローカル・アクターの 3 種の登録関数がキーの形式を決める |
 | `WordTable`・`WordCacheKey` | `crates/pasta_core/src/registry/word_table.rs` | 単語の検索表。`WordEntry` の `Vec`、前方一致の索引（`RadixMap<Vec<usize>>`）、選択状態のキャッシュ、`RandomSelector` を持つ |
-| `RandomSelector`・`DefaultRandomSelector`・`MockRandomSelector` | `crates/pasta_core/src/registry/random.rs` | 乱数の抽象。検索表が使うのは `shuffle_usize` だけである。既定の実装はシステムの乱数で種を決めた `StdRng`、モックはシャッフルしない |
+| `RandomSelector`・`DefaultRandomSelector`・`MockRandomSelector` | `crates/pasta_core/src/registry/random.rs` | 乱数の抽象。トレイトが持つのは配列の並べ替え（`shuffle_usize`）1 つだけである。既定の実装はシステムの乱数で種を決めた `StdRng` でシャッフルし、モックは `shuffle_usize` で、渡された配列を指定列（位置の並び）に従って並べ替える |
 | `SceneTableError`・`WordTableError` | `crates/pasta_core/src/error.rs` | 検索の失敗。シーンは `SceneNotFound`・`NoMatchingScene`・`InvalidScene`・`RandomSelectionFailed` などを返し、単語は `WordNotFound` だけを返す |
 
 レジストリは登録を集める側、検索表は検索する側である。`SceneTable::from_scene_registry`・`WordTable::from_word_def_registry` がレジストリを消費して検索表を作り、作った後の検索表は選択状態のキャッシュと `RandomSelector` 以外を変更しない。
@@ -160,14 +160,16 @@ pasta.scene_dic
 | キャッシュのキー | `SceneCacheKey`（親のグローバル名・サニタイズした検索キー・整列したフィルタ。第 2 引数なしは親を空文字列） | `WordCacheKey`（サニタイズしたスコープ名・検索キー。第 2 引数なしは空文字列） |
 | 初回 | 候補の ID をシャッフルしてキャッシュし、先頭を返す | 候補を集めてシャッフルし、先頭を返して残りをキャッシュする |
 | 2 回目以降 | 次の ID を返す | 候補を集め直さず、キャッシュの次の値を返す |
-| 一巡した後 | 同じ候補の並びをシャッフルし直して先頭から使う | 候補を集め直してシャッフルし、新しいキャッシュで置き換える |
+| 一巡した後 | その呼び出しで集めた候補（収集した順）をシャッフルし直して先頭から使う | 候補を集め直してシャッフルし、新しいキャッシュで置き換える |
 
 - 一巡するまで同じ候補は選ばれない。一巡の境目では、前の巡の最後と次の巡の最初が同じになりうる。
 - シーンのキャッシュは選んだ ID の履歴（`history`）も記録するが、選択には使わない。
 - キャッシュは `SearchContext` の寿命の間、イベントをまたいで保たれる。辞書確定で `SearchContext` が作り直されると消える。
 - 第 2 引数あり・なしはキャッシュのキーが異なる。ローカル優先の検索順で同じ名前をローカル・グローバルの順に引いても、2 つの選択状態は独立に進む。
 
-乱数は `RandomSelector` の `shuffle_usize` だけを通して使う。`SearchContext::new` は、シーンと単語にそれぞれ別の `DefaultRandomSelector` を与える。Lua の `set_scene_selector(n1, …)`・`set_word_selector(n1, …)` は、引数があれば `MockRandomSelector`、無ければ新しい `DefaultRandomSelector` を作り、検索表の `replace_selector` で差し替える。差し替えはキャッシュを消す。`MockRandomSelector` の `shuffle_usize` は何もしないため、モックに差し替えた後の候補は収集した順（キーのバイト列の辞書順）のまま使われ、渡した整数の値は検索表の選択に影響しない。検索表にはシャッフルの有無を切り替える `set_shuffle_enabled` もあるが、Lua からは呼べない（テスト用）。
+乱数は `RandomSelector` の `shuffle_usize` だけを通して使う。検索表は巡の始まり（初回と一巡した後）ごとに、候補を収集した順に並べた配列を `shuffle_usize` に渡し、並べ替えた結果をその巡の順にする。シーンは候補の ID の配列を、単語は候補の値の添字（0 から候補数 − 1）の配列を渡す。`SearchContext::new` は、シーンと単語にそれぞれ別の `DefaultRandomSelector` を与える。Lua の `set_scene_selector(n1, …)`・`set_word_selector(n1, …)` は、引数があれば `MockRandomSelector`、無ければ新しい `DefaultRandomSelector` を作り、検索表の `replace_selector` で差し替える。差し替えはキャッシュを消す。引数は差し替えの前に `parse_selector_args` が検査し、負の整数は `expected non-negative integer argument`、整数でない引数は `expected integer argument` の Lua エラーにする。エラーのときは差し替えず、キャッシュも消さない。
+
+`MockRandomSelector` は Lua に渡された整数の列（指定列）を持つ。`shuffle_usize` は指定列の整数を、渡された配列の 0 始まりの位置として読む（配列の値としては読まない）。有効な位置の値を指定列の順に先に置き、残りを元の順（収集した順）に並べる。配列の長さ以上の位置と、その呼び出しですでに置いた位置は読み飛ばす。並べ替えは呼び出しごとに指定列の先頭から始まり、モックは指定列のほかに状態を持たない。そのため、キャッシュのキーごと（検索ごと）にも巡ごとにも同じ順が当てはまる。これが利用者向け章の、候補の並びの位置による指定（[set_scene_selector(...) / set_word_selector(...)](../lua/modules/pasta-search.md#set_scene_selector--set_word_selector)）の仕組みである。検索表にはシャッフルの有無を切り替える `set_shuffle_enabled` もあり、`false` のときは `shuffle_usize` を呼ばないため、候補は収集した順のまま使われ、指定列は効かない。`set_shuffle_enabled` は Lua からは呼べない（テスト用）。
 
 ### ローカル優先の検索順
 

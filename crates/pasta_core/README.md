@@ -35,11 +35,11 @@ DSLパーサーは独立クレート `pasta_dsl` に分離されており、
 
 ### Random
 
-| 型                      | 説明                 |
-| ----------------------- | -------------------- |
-| `RandomSelector`        | ランダム選択トレイト |
-| `DefaultRandomSelector` | 本番用ランダム実装   |
-| `MockRandomSelector`    | テスト用固定選択実装 |
+| 型                      | 説明                               |
+| ----------------------- | ---------------------------------- |
+| `RandomSelector`        | ランダム選択トレイト               |
+| `DefaultRandomSelector` | 本番用ランダム実装                 |
+| `MockRandomSelector`    | 指定列で巡の順を決めるテスト用実装 |
 
 ## 使用例
 
