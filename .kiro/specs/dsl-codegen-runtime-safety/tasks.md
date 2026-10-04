@@ -55,7 +55,7 @@
   - _Requirements: 4.1, 4.3, 4.6, 4.7_
   - _Depends: 2, 3.2_
 
-- [ ] 4. 書き間違いの回帰テスト（統合）
+- [x] 4. 書き間違いの回帰テスト（統合）
 - [x] 4.1 (P) トランスパイル→実行で 5 件の書き間違いが例外にならないことを固定する
   - U18・U19・U20・U22・U08 を含む `.pasta` をトランスパイルして生成形のスナップショットを取り、実行して例外にならず、期待したトークン・変数状態（値なしの代入は未代入、その後の参照は空文字＋警告）になることを確認する
   - 新しいテストモジュールをトランスパイラ統合テストの入口に登録し、新しいスナップショットを確認して受け入れる
@@ -64,7 +64,7 @@
   - _Requirements: 3.1, 3.4, 5.5_
   - _Boundary: Tests_
   - _Depends: 3.1, 3.2, 3.3_
-- [ ] 4.2 (P) SHIORI リクエスト経由で 500 にならないことを固定する
+- [x] 4.2 (P) SHIORI リクエスト経由で 500 にならないことを固定する
   - 既存の E2E ハーネスの流儀でフィクスチャのゴーストを用意し、U18・U19・U20・U22 を含むシーンを起動して、ステータスが 500 でなく既定の結果に置き換えたトークが返ること（U19 は目印と立ち位置 0 のタグを含む）を確認する
   - U08 について、`C:\\new`・行末の `\\` を含むシーンの応答が `C:\\new`・`\\\e` を含み、ウェイト設定ありでも `\\` が割れないことを確認する
   - 新しい E2E テストが通る
@@ -110,3 +110,4 @@
 - `cargo test --workspace` が `crates/pasta_lua/tests/fixtures/sample.generated.lua` の改行コードだけを書き換えることがある。`git diff --ignore-all-space` で中身の差分が無ければ `git checkout --` で戻し、コミットに含めない。
 - テスト実行で `crates/pasta_lua/profile/pasta/save/save.json` が書き換わることがある（既存テストの副作用）。`git checkout --` で戻し、コミットに含めない。
 - 生成形を変えると `src/debug/wiring_pasta_break_coalesce_e2e.rs` の最小 Lua シム（ACT）にも act の新メソッドが要る（3.1 で `ACT.actor_proxy` を追加済み）。3.2 で `act:arith` を生成するなら同シムも確認する。
+- `crates/pasta_shiori/tests/support/scripts/` は古いランタイムの写しで act の新メソッドを持たない。生成コードを実行する E2E フィクスチャは `lua_search_paths` から `scripts` を外して埋め込みランタイムを通す（4.2 の codegen_runtime_safety フィクスチャ参照）。
