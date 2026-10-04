@@ -94,8 +94,28 @@ impl RandomSelector for MockRandomSelector {
         Some(idx)
     }
 
-    fn shuffle_usize(&mut self, _items: &mut [usize]) {
-        // Mock implementation does not shuffle
+    /// Reorder `items` by the sequence, read as positions into `items`.
+    ///
+    /// Values at valid positions (in range, first occurrence) come first in
+    /// sequence order; the rest follow in their original order. The sequence
+    /// is applied from its head on every call and no state is written.
+    fn shuffle_usize(&mut self, items: &mut [usize]) {
+        let mut used = vec![false; items.len()];
+        let mut ordered = Vec::with_capacity(items.len());
+        for &n in &self.sequence {
+            if n < items.len() && !used[n] {
+                used[n] = true;
+                ordered.push(items[n]);
+            }
+        }
+        ordered.extend(
+            items
+                .iter()
+                .zip(&used)
+                .filter(|(_, u)| !**u)
+                .map(|(v, _)| *v),
+        );
+        items.copy_from_slice(&ordered);
     }
 }
 
@@ -214,13 +234,46 @@ mod tests {
         assert_eq!(selector.select_index(3), Some(1)); // 7 % 3 == 1
     }
 
-    #[test]
-    fn test_mock_selector_shuffle_usize_is_noop() {
-        // Mock shuffle must not reorder (deterministic testing contract)
-        let mut selector = MockRandomSelector::new(vec![0]);
-        let mut items = vec![3, 1, 4, 1, 5];
-        let original = items.clone();
+    /// Apply a mock sequence to `items` and return the reordered vec.
+    fn mock_shuffle(sequence: Vec<usize>, items: &[usize]) -> Vec<usize> {
+        let mut selector = MockRandomSelector::new(sequence);
+        let mut items = items.to_vec();
         selector.shuffle_usize(&mut items);
-        assert_eq!(items, original);
+        items
+    }
+
+    #[test]
+    fn test_mock_selector_shuffle_usize_follows_sequence() {
+        // items = [a, b, c] = [0, 1, 2]; sequence values are positions
+        let abc = [0, 1, 2];
+        assert_eq!(mock_shuffle(vec![1], &abc), vec![1, 0, 2]);
+        assert_eq!(mock_shuffle(vec![2, 0], &abc), vec![2, 0, 1]);
+        // Identity cases
+        assert_eq!(mock_shuffle(vec![0], &abc), vec![0, 1, 2]);
+        assert_eq!(mock_shuffle(vec![0, 1, 2], &abc), vec![0, 1, 2]);
+        assert_eq!(mock_shuffle(vec![], &abc), vec![0, 1, 2]);
+        // Out-of-range positions are skipped
+        assert_eq!(mock_shuffle(vec![7, 1], &abc), vec![1, 0, 2]);
+        // Duplicate positions are skipped
+        assert_eq!(mock_shuffle(vec![1, 1, 0], &abc), vec![1, 0, 2]);
+        // All ignored -> original order
+        assert_eq!(mock_shuffle(vec![5, 9], &abc), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn test_mock_selector_shuffle_usize_reads_positions_not_values() {
+        assert_eq!(mock_shuffle(vec![2, 0], &[10, 20, 30]), vec![30, 10, 20]);
+    }
+
+    #[test]
+    fn test_mock_selector_shuffle_usize_restarts_each_call() {
+        // Each call applies the sequence from its head, regardless of earlier calls
+        let mut selector = MockRandomSelector::new(vec![2, 0]);
+        let mut first = vec![10, 20, 30, 40];
+        selector.shuffle_usize(&mut first);
+        assert_eq!(first, vec![30, 10, 20, 40]);
+        let mut second = vec![5, 6, 7];
+        selector.shuffle_usize(&mut second);
+        assert_eq!(second, vec![7, 5, 6]);
     }
 }
