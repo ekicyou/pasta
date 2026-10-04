@@ -366,7 +366,7 @@ warn!(
     file_path = %logging_config.file_path,   // 不正と判断した値
     fallback = %default_log_file_path(),     // "profile/pasta/logs/pasta.log"
     error = %e,
-    "Invalid [logging] file_path; logging to the default log file instead"
+    "Cannot use [logging] file_path; logging to the default log file instead"
 );
 ```
 
@@ -660,7 +660,7 @@ impl PastaShiori {
 
 ### E2E Tests（`pasta_shiori/tests/ffi_logging_test.rs`・1 本の直列テスト）
 
-フィクスチャは既存の `shiori_lifecycle` を一時ディレクトリへ複製し、テストが `pasta.toml` の `[logging]`・`[persistence]` を書き足す。
+フィクスチャは既存の `shiori_lifecycle` を一時ディレクトリへ複製し、テストが `pasta.toml` の `[logging]`・`[persistence]` を書き足す。観測ログの検証は、文言ではなく `seam=` フィールドの値で行う（文言の変更で壊れないようにする）。warn・info は、下に挙げる固定の文言で検証する。
 
 1. **ロガー無し**: 最初の `load` の前に、null と不正な UTF-8 の `request`、`unload` を呼ぶ。panic せず、従来どおりの戻り値になる（4.7、4.8、7.5）。
 2. **`request` 入口**: `[logging] level = "trace"` で `loadu` し、不正な UTF-8 の `request` と通常の GET を送る。`unload` の後のログファイルに、入口の warn「utf8 decode failed」と、marshaling の観測ログ（`seam="actor.try_send"`。trace レベル）がある（4.1、7.3）。
@@ -702,11 +702,16 @@ impl PastaShiori {
 
 ## Open Questions / Risks
 
-設計ディスカッションで確かめる項目。下の前提で設計を書いている。
+設計ディスカッションでの扱い。「確定」は要件・前提・既存のコードから自明として議題にせず閉じたもの、「議題」は開発者と確認するもの。
 
-1. **ローダ経由の必須ライブラリ（D2）**: `std_string`・`std_table`・`std_math`・`std_os` を必須にする前提。代わりに `std_package` だけを必須にし、他は rustdoc に書くだけにする案もある。
-2. **文脈を張る範囲（D3）**: アクタースレッドの入口と `load_with_config` に文脈を足す前提（案 C）。足さずに振り分け規則だけを変える案（案 B）でも、pasta.dll の本番（ロガーは 1 つ）では同じ結果になる。
-3. **フォールバックの対象**: 判定で不正な場合だけでなく、設定どおりのロガーを作れないすべての場合（ディレクトリを作れないなど）で既定へ切り替える前提。
-4. **`profile` の比較**: 大文字小文字を区別し、`file_path = "profile"`（ファイル名なし）も不正とする前提。
-5. **`pasta_lua::loader::default_libs` の公開パス**: 再エクスポートで残す前提。
-6. **待ち時間切れのテスト（4.4）**: FFI の `unload` ではなく `teardown_via_sender` を短い待ち時間で呼んで検証する前提。
+| # | 項目 | 状態 | 結論と根拠 |
+| - | ---- | ---- | ---------- |
+| 1 | ローダ経由の必須ライブラリ（D2） | 議題 1 | `std_string`・`std_table`・`std_math`・`std_os` も必須にするか、`std_package` だけを必須にして他は rustdoc に書くか |
+| 2 | 文脈を張る範囲（D3） | 確定 | 案 C。案 B だけでは、組み込みで複数のゴーストを読むときに段階 1.5 の warn が捨てられ、5.2 を満たさない |
+| 3 | フォールバックの対象 | 確定 | 設定どおりのロガーを作れないすべての場合に既定へ切り替える。ログを失わない（前提 A4）ことを優先し、挙動と warn を 1 通りにする |
+| 4 | `profile` の比較 | 確定 | 大文字小文字を区別し、`file_path = "profile"` も不正。`pasta_check` の `.nar` の除外（`nar.rs`）が `profile` の完全一致であり、`Profile/` に書くと配布物に紛れ込むため（前提 A10 と同じ理由） |
+| 5 | `pasta_lua::loader::default_libs` の公開パス | 確定 | 再エクスポートで残す。API の破壊を `[lua]` を読む 3 点に限る |
+| 6 | 待ち時間切れのテスト（4.4） | 確定 | `teardown_via_sender` を短い待ち時間で呼ぶ。FFI の `unload`（5 秒固定）ではテストが 5 秒待つ |
+| 7 | 登録解除の後のログ | 確定 | `actor.done`・「done ack received」・切断（Disconnected）の warn は捨てる（4.7、前提 A6）。ログの位置は動かさない |
+| 8 | 再読み込みの分岐での `SHIORI.unload` | 確定 | 呼ばない現行の挙動を保つ（範囲外。FFI 経由では通らない） |
+| 9 | 文脈なしのログの範囲の広がり | 確定 | デバッグバックエンドのログも残るようになる（前提 A9 が許す）。FFI 入口スレッドがミューテックスを取るのは、フィルタを通ったイベントのときだけ |
