@@ -51,9 +51,14 @@ impl SearchContext {
     /// that parent scope (no local → global fallback). When it is `None`,
     /// only global scenes are searched.
     ///
+    /// `name` is matched with the same rule as registration
+    /// (`SceneRegistry::sanitize_name`), so `会話・朝` finds the scene
+    /// registered from `＊会話・朝`. `global_scene_name` is a registered name
+    /// and is passed through unchanged.
+    ///
     /// # Arguments
-    /// * `name` - Search prefix
-    /// * `global_scene_name` - Parent scene name (None for global only)
+    /// * `name` - Search prefix (sanitized before matching)
+    /// * `global_scene_name` - Parent scene's registered name, not sanitized (None for global only)
     ///
     /// # Returns
     /// * `Ok(Some((global_name, local_name)))` - Scene found
@@ -71,6 +76,7 @@ impl SearchContext {
         global_scene_name: Option<&str>,
     ) -> Result<Option<(String, String)>, SearchError> {
         let filters = HashMap::new();
+        let name = &SceneRegistry::sanitize_name(name);
 
         // Determine search strategy based on global_scene_name
         if let Some(parent) = global_scene_name {
@@ -357,6 +363,101 @@ mod tests {
         // Third call wraps around after the cache is exhausted.
         let third = ctx.search_scene("挨拶", None).unwrap().unwrap();
         assert_eq!(third.0, "挨拶_1");
+    }
+
+    /// Build contexts holding a global scene `会話・朝` with a local scene
+    /// `選択・A`, in both registry shapes: transpile-time (`register_global` /
+    /// `register_local`) and finalized (`register_global_raw`).
+    /// Each entry carries the global scene's registered name.
+    fn create_symbol_name_contexts() -> Vec<(SearchContext, &'static str)> {
+        let mut transpiled = SceneRegistry::new();
+        let (_, counter) = transpiled.register_global("会話・朝", HashMap::new());
+        transpiled.register_local("選択・A", "会話・朝", counter, 1, HashMap::new());
+
+        let mut finalized = SceneRegistry::new();
+        finalized.register_global_raw(
+            "会話_朝1",
+            &["__start__".to_string(), "選択_A_1".to_string()],
+            HashMap::new(),
+        );
+
+        vec![
+            (
+                SearchContext::new(transpiled, WordDefRegistry::new()).unwrap(),
+                "会話_朝_1",
+            ),
+            (
+                SearchContext::new(finalized, WordDefRegistry::new()).unwrap(),
+                "会話_朝1",
+            ),
+        ]
+    }
+
+    #[test]
+    fn test_search_scene_symbol_global_name_and_prefix() {
+        for (mut ctx, global) in create_symbol_name_contexts() {
+            let expected = Some((global.to_string(), "__start__".to_string()));
+            assert_eq!(ctx.search_scene("会話・朝", None).unwrap(), expected);
+            assert_eq!(ctx.search_scene("会話・", None).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn test_search_scene_symbol_local_name_and_prefix() {
+        // The parent (registered name) is passed through unchanged.
+        for (mut ctx, global) in create_symbol_name_contexts() {
+            let expected = Some((global.to_string(), "選択_A_1".to_string()));
+            assert_eq!(ctx.search_scene("選択・A", Some(global)).unwrap(), expected);
+            assert_eq!(ctx.search_scene("選択・", Some(global)).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn test_search_scene_registered_names_unchanged() {
+        // Registered names are already sanitized, so results stay the same.
+        for (mut ctx, global) in create_symbol_name_contexts() {
+            assert_eq!(
+                ctx.search_scene(global, None).unwrap(),
+                Some((global.to_string(), "__start__".to_string()))
+            );
+            assert_eq!(
+                ctx.search_scene("選択_A_1", Some(global)).unwrap(),
+                Some((global.to_string(), "選択_A_1".to_string()))
+            );
+        }
+    }
+
+    #[test]
+    fn test_search_scene_overlapping_sanitized_names_share_candidates() {
+        // `会話・朝` and `会話_朝` sanitize to the same name, so either name
+        // yields both scenes, each once, in sequential consumption.
+        let build = |finalized: bool| {
+            let mut registry = SceneRegistry::new();
+            if finalized {
+                registry.register_global_raw("会話_朝1", &[], HashMap::new());
+                registry.register_global_raw("会話_朝2", &[], HashMap::new());
+            } else {
+                registry.register_global("会話・朝", HashMap::new());
+                registry.register_global("会話_朝", HashMap::new());
+            }
+            let mut ctx = SearchContext::new(registry, WordDefRegistry::new()).unwrap();
+            ctx.set_scene_selector(Some(vec![0])).unwrap();
+            ctx
+        };
+
+        for (finalized, expected) in [
+            (false, ["会話_朝_1", "会話_朝_2"]),
+            (true, ["会話_朝1", "会話_朝2"]),
+        ] {
+            for name in ["会話・朝", "会話_朝"] {
+                let mut ctx = build(finalized);
+                let mut got: Vec<String> = (0..2)
+                    .map(|_| ctx.search_scene(name, None).unwrap().unwrap().0)
+                    .collect();
+                got.sort();
+                assert_eq!(got, expected, "name={name} finalized={finalized}");
+            }
+        }
     }
 
     #[test]
