@@ -9,7 +9,7 @@
   - 両クレートのテストが修正前の実装で全件通る（または既知の失敗の原因が特定され、以降のタスクの判定に使える基準線が記録されている）状態になっている
   - _Requirements: 4.4_
 
-- [ ] 1.2 (P) プロキシ単体の回帰テスト（Lua spec）を追加する
+- [x] 1.2 (P) プロキシ単体の回帰テスト（Lua spec）を追加する
   - 新しい Lua spec を作り、spec の一覧に登録する
   - 規則: 行のアクターの表の関数はプロキシを、シーンテーブル・`GLOBAL` の関数は ACT を第 1 引数に受け取ることを、登録済みのアクターと未登録のアクター（`act:actor_proxy` のその場限りのプロキシ）の両方で確かめる
   - `expr_fn`・`expr_fn_var` が 2 番目以降の引数と複数の戻り値をそのまま通すこと、ACT・プロキシそのものの戻り値が `nil` になり文字列・数値・`nil` は現行どおりであることを確かめる
@@ -84,3 +84,4 @@
 ## Implementation Notes
 
 - 1.1: 基準線（修正前・`NoDefaultCurrentDirectoryInExePath` を外した状態）で `cargo test -p pasta_lua -p pasta_shiori` は exit 0・1705 件成功・0 件失敗。設計時に見えた `pasta_shiori` のビルド失敗は再現しない（環境変数が原因だったとみられる）。テスト後に `sample.generated.lua` の改行差分が出るので `git checkout --` で戻す。
+- 1.2: `lua_test` は最上位 describe が失敗すると `os.exit(1)` し後続スイートを飛ばす。新 spec は一覧の最後に置き、修正前は 18 件失敗・8 件成功。タスク 2 の検証では期待を変える既存 4 件（`actor_module_test` が最初に落ちる）を同時に直さないと後続が走らない。
