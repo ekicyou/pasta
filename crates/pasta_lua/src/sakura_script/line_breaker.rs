@@ -392,4 +392,71 @@ mod tests {
         let tokens = tokenize_plain_chars(r"\h\s[0]", &re);
         assert_eq!(tokens.chars.len(), 0);
     }
+
+    // --- `\\`（エスケープされた `\`）は割れない (Requirement 4.5) ---
+
+    /// `talk_to_script` と同じ順（トークナイズ → ウェイト挿入 → 改行推定）で組み立てる
+    fn pipeline(input: &str, widths: &[usize]) -> String {
+        use super::super::wait_inserter::{WaitValues, insert_waits};
+        let tokenizer = Tokenizer::new(&crate::loader::TalkConfig::default()).unwrap();
+        let waits = WaitValues {
+            normal: 100,
+            period: 1000,
+            comma: 500,
+            strong: 500,
+            leader: 200,
+        };
+        let waited = insert_waits(&tokenizer.tokenize(input), &waits);
+        break_lines_impl(&waited, widths, tokenizer.tag_regex(), &parser())
+    }
+
+    /// さくらスクリプトの規約どおり左から読み、表示される単位を返す。
+    /// `\\` は 1 単位、`\_w[…]` と `\n` は読み捨て、それ以外は 1 文字ずつ。
+    /// 検査対象の正規表現に依存しない独立した読み手。
+    fn displayed_units(s: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut rest = s;
+        while let Some(c) = rest.chars().next() {
+            if let Some(after) = rest.strip_prefix(r"\\") {
+                out.push(r"\\".to_string());
+                rest = after;
+            } else if let Some(after) = rest.strip_prefix(r"\n") {
+                rest = after;
+            } else if let Some(after) = rest.strip_prefix(r"\_w[") {
+                rest = &after[after.find(']').unwrap() + 1..];
+            } else {
+                out.push(c.to_string());
+                rest = &rest[c.len_utf8()..];
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn test_escaped_backslash_gets_no_wait_inside() {
+        // ウェイトのみ（改行推定なし）。`\\` の 2 文字の間・直後にウェイトが入らない
+        assert_eq!(
+            pipeline(r"ab\\cd", &[]),
+            r"a\_w[50]b\_w[50]\\c\_w[50]d\_w[50]"
+        );
+        assert_eq!(pipeline(r"a\\\\", &[]), r"a\_w[50]\\\\");
+        assert_eq!(pipeline(r"a\\\n", &[]), r"a\_w[50]\\\n");
+    }
+
+    #[test]
+    fn test_escaped_backslash_not_split_with_waits_and_line_breaks() {
+        let input = r"C:\\new\\s[0]フォルダ\\\\の中に\\あるファイルを今日は開きます\\";
+        for width in 1..=12 {
+            let result = pipeline(input, &[width]);
+            assert_eq!(
+                displayed_units(&result),
+                displayed_units(input),
+                "width={} で `\\\\` が割れた: {}",
+                width,
+                result
+            );
+        }
+        // 改行推定が実際に働いていること（狭い幅では改行が足される）
+        assert_ne!(pipeline(input, &[1]), pipeline(input, &[]));
+    }
 }

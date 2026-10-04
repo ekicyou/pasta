@@ -108,8 +108,13 @@ pub struct Tokenizer {
 
 impl Tokenizer {
     /// Sakura script tag pattern.
-    /// Matches: \tag or \tag[param]
+    /// Matches: `\\` (escaped backslash), \tag or \tag[param]
     /// Examples: \h, \s[0], \_w[500], \![open,inputbox], \-, \+, \*, \_?, \&[ID]
+    ///
+    /// `\\` は分割できない 1 単位（`TokenKind::SakuraScript`）として読む。
+    /// 選択肢の先頭に置き左優先で一致させるため、`C:\\new` は `\\` ＋ `new`、
+    /// `\\s[0]` は `\\` ＋ 平文 `s[0]` になる（`\new`・`\s[0]` のタグにならない）。
+    /// タグ扱いなのでウェイトは付かず、改行推定では幅 0 として前の文字に付いて運ばれる。
     ///
     /// # ReDoS Safety
     /// This pattern is safe from ReDoS (Regular expression Denial of Service):
@@ -119,7 +124,7 @@ impl Tokenizer {
     ///   negated character class) operate on atomic character classes with no
     ///   overlap, so even a backtracking engine would not exhibit exponential
     ///   behavior.
-    pub const SAKURA_TAG_PATTERN: &'static str = r"\\[0-9a-zA-Z_!+*?&-]+(?:\[[^\]]*\])?";
+    pub const SAKURA_TAG_PATTERN: &'static str = r"\\\\|\\[0-9a-zA-Z_!+*?&-]+(?:\[[^\]]*\])?";
     /// Create a new Tokenizer from TalkConfig.
     ///
     /// # Arguments
@@ -397,5 +402,104 @@ mod tests {
         assert_eq!(tokens[5].kind, TokenKind::SakuraScript); // \-
         assert_eq!(tokens[5].text, r"\-");
         assert_eq!(tokens[6].kind, TokenKind::Period); // 。
+    }
+
+    // ====================================================================
+    // `\\`（エスケープされた `\`）を 1 単位として読む
+    // Requirement: 4.2, 4.4, 4.5, 4.7
+    // ====================================================================
+
+    fn kinds_texts(input: &str) -> Vec<(TokenKind, String)> {
+        let tokenizer = Tokenizer::new(&default_config()).unwrap();
+        tokenizer
+            .tokenize(input)
+            .into_iter()
+            .map(|t| (t.kind, t.text))
+            .collect()
+    }
+
+    fn sakura(text: &str) -> (TokenKind, String) {
+        (TokenKind::SakuraScript, text.to_string())
+    }
+
+    fn general(text: &str) -> (TokenKind, String) {
+        (TokenKind::General, text.to_string())
+    }
+
+    #[test]
+    fn test_tokenize_escaped_backslash_before_tag_chars() {
+        // `C:\\new` は `\\` ＋ `new`（`\new` のタグにならない）
+        assert_eq!(
+            kinds_texts(r"C:\\new"),
+            vec![
+                general("C"),
+                (TokenKind::LineStartProhibited, ":".to_string()),
+                sakura(r"\\"),
+                general("n"),
+                general("e"),
+                general("w"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_tokenize_escaped_backslash_at_line_end() {
+        assert_eq!(kinds_texts(r"あ\\"), vec![general("あ"), sakura(r"\\")]);
+        // 終端の `\e` と並んでも壊れない
+        assert_eq!(
+            kinds_texts(r"あ\\\e"),
+            vec![general("あ"), sakura(r"\\"), sakura(r"\e")]
+        );
+    }
+
+    #[test]
+    fn test_tokenize_double_escaped_backslash() {
+        assert_eq!(kinds_texts(r"\\\\"), vec![sakura(r"\\"), sakura(r"\\")]);
+    }
+
+    #[test]
+    fn test_tokenize_escaped_backslash_then_newline_tag() {
+        assert_eq!(kinds_texts(r"\\\n"), vec![sakura(r"\\"), sakura(r"\n")]);
+    }
+
+    #[test]
+    fn test_tokenize_escaped_backslash_then_surface_text() {
+        // `\\s[0]` は `\\` ＋ 平文 `s[0]`（表情タグではない）
+        assert_eq!(
+            kinds_texts(r"\\s[0]"),
+            vec![
+                sakura(r"\\"),
+                general("s"),
+                (TokenKind::LineEndProhibited, "[".to_string()),
+                general("0"),
+                (TokenKind::LineStartProhibited, "]".to_string()),
+            ]
+        );
+        // エスケープの後の本物のタグはタグのまま
+        assert_eq!(
+            kinds_texts(r"\\\s[0]"),
+            vec![sakura(r"\\"), sakura(r"\s[0]")]
+        );
+    }
+
+    #[test]
+    fn test_tokenize_existing_tags_unchanged() {
+        assert_eq!(
+            kinds_texts(r"\h\s[0]\_w[500]\![open,inputbox]\-\+\*\_?\&[ID]\n\w8\e"),
+            vec![
+                sakura(r"\h"),
+                sakura(r"\s[0]"),
+                sakura(r"\_w[500]"),
+                sakura(r"\![open,inputbox]"),
+                sakura(r"\-"),
+                sakura(r"\+"),
+                sakura(r"\*"),
+                sakura(r"\_?"),
+                sakura(r"\&[ID]"),
+                sakura(r"\n"),
+                sakura(r"\w8"),
+                sakura(r"\e"),
+            ]
+        );
     }
 }

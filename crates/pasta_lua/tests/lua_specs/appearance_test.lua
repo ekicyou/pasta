@@ -70,6 +70,14 @@ describe("APPEARANCE.observe - サーフェス変更", function()
         expect(state.spots[0]):toBe(nil)
     end)
 
+    test("talk 中の \\\\s[0] (エスケープ後の平文) では既知の表情を変えない (dsl-codegen-runtime-safety 4.2)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\s[5]")
+        APPEARANCE.observe(state, A, 0, "C:\\\\s[0]\\_w[50]と\\\\\\\\s[0]")
+        expect(state.actors.A.surface):toBe("5")
+        expect(state.spots[0].surface):toBe("5")
+    end)
+
     test("\\\\\\s[5] (エスケープ後の本物のタグ) は検出する", function()
         local state = APPEARANCE.new()
         APPEARANCE.observe(state, A, 0, "\\\\\\s[5]")
@@ -564,6 +572,7 @@ describe("APPEARANCE.restore - 先頭タグ列", function()
         { "入れ子の \\s のみ", { { type = "sakura_script", text = "\\![raise,OnX,\\s[3]]" } } },
         { "talk 内の一般文字の後", { { type = "talk", text = "あ\\s[3]" } } },
         { "talk 内のスコープ切替タグの後", { { type = "talk", text = "\\1\\s[3]あ" } } },
+        { "talk 先頭の \\\\s[ID]（エスケープ後の平文）", { { type = "talk", text = "\\\\s[3]あ" } } },
     }
     for _, c in ipairs(not_suppressed) do
         test(c[1] .. " のサーフェス変更では抑止しない (2.10)", function()

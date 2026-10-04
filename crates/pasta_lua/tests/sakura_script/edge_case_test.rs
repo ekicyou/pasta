@@ -63,15 +63,16 @@ fn test_tokenize_backslash_before_non_tag_char_is_general() {
 
 #[test]
 fn test_tokenize_double_backslash_then_tag() {
-    // r"\\h": the first backslash cannot start a tag (second char is `\`),
-    // so it is a General char; the remaining r"\h" is a tag.
+    // r"\\h": r"\\" is an escaped backslash read as one unbreakable unit
+    // (dsl-codegen-runtime-safety 4.2), so the following `h` is plain text,
+    // not part of an r"\h" tag.
     let tokens = default_tokenizer().tokenize(r"\\h");
 
     assert_eq!(tokens.len(), 2);
-    assert_eq!(tokens[0].kind, TokenKind::General);
-    assert_eq!(tokens[0].text, "\\");
-    assert_eq!(tokens[1].kind, TokenKind::SakuraScript);
-    assert_eq!(tokens[1].text, r"\h");
+    assert_eq!(tokens[0].kind, TokenKind::SakuraScript);
+    assert_eq!(tokens[0].text, r"\\");
+    assert_eq!(tokens[1].kind, TokenKind::General);
+    assert_eq!(tokens[1].text, "h");
 }
 
 #[test]
