@@ -45,3 +45,13 @@
 - **キックの実装の道筋**: グローバルは `SCENE.get_start`、ローカルは `SCENE.get` で完全一致に引き、コルーチン化には `wrap_local_func` を流用する。`act.lua` には触れない。
 - **辞書確定前の検索との整合**: トランスパイル時の単語レジストリのスコープ名（`transpiler.rs` 206 行）と `SceneRegistry::register_global` を、一か所の形式関数にそろえる。
 - **要調査**: 期待値の更新が要るテストの全数。保存データ（`save`）に登録名が載るかどうか（載るなら移行の要件を足す）。
+
+## 6. 追加調査の結果（遅れて戻ったコード調査）
+- **保存データ**: フレームワークが永続化するのは利用者の `save` テーブルだけ。`STORE.scenes`・`counters`・`last_global_scene`・`kick_pending` はメモリ上のみで、`store.lua` 96–105 行でリセットされる。デバッグ用サイドカー（`sidecar.rs`）は行の対応だけを持つ。**移行の要件は不要**。利用者のスクリプトが `__global_name__` などを自分で保存している場合だけが例外。
+- **見落としていた変更箇所**:
+  - `crates/pasta_shiori/tests/support/scripts/pasta/scene.lua` 113 行は `scene.lua` の複製。同じ変更が要る。
+  - `book/src/internals/registry-search.md`（101・111–114・130–131・195・239 行。239 行は辞書確定前と確定後で形式が違うことの説明で、変更後は不要になる）。
+  - `book/src/internals/transpiler.md` 132 行。
+- **デバッガの結合キー**: `scope_gen.rs` が出す `G:{名前}#{番号}`・`L:{親}#{番号}:{関数名}` は、既に `#` を区切りに使っている（`parse_base_counter`）。登録名の形式とは独立。
+- **単語の登録キー**: 確定時に `WordDefRegistry::register_local` が `":{sanitize(登録名)}:{キー}"` を作る。区切りを照合規則で置き換わる文字にする場合は、ここと `search_word` の第 2 引数の照合をそろえる必要がある（議題 1 の結論しだい）。
+- **期待値の更新が要るテスト**（形式に依存するもの）: `scene_identity_index_test.rs`（約 52 箇所）、`finalize_scene_test.rs`、`local_scene_call_test.rs`、`runtime_toggle_e2e_step_test.rs`、`runtime_safety_test.rs`、`lua_specs/scene_registry_test.lua`、`scene_join_tests.rs`。トランスパイラの insta スナップショット 29 件は影響を受けない。`search/context.rs` の「確定前／確定後」2 形式のテストは、形式が 1 つにそろうと区別する意味がなくなる。
