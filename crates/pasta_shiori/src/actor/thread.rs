@@ -38,6 +38,7 @@ use std::path::PathBuf;
 use std::thread::{self, JoinHandle, ThreadId};
 
 use flume::Receiver;
+use pasta_lua::LoadDirGuard;
 
 use crate::actor::mailbox::{ActorMsg, Reply};
 use crate::shiori::{PastaShiori, Shiori};
@@ -136,6 +137,10 @@ pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg
     let handle = thread::Builder::new()
         .name("pasta-actor".to_string())
         .spawn(move || {
+            // ログの振り分けの文脈（仕様 `pasta-toml-logging-consistency` 4.2）。スレッドの
+            // 終わりまで保ち、メッセージループの観測ログをロガーの数によらず自分のロガーへ
+            // 届ける。done ack の後に出るログは登録解除の後なので捨てられる（4.7）。
+            let _log_context = LoadDirGuard::new(load_dir.clone());
             // このスレッドの Windows メッセージループ上で future を完走させる。
             // future は `!Send` な PastaShiori を所有し、recv_async().await のみで待機。
             wintf_winmsg_executor::block_on(async move {
