@@ -387,7 +387,7 @@ impl SceneTable {
 
     /// Find a scene by name, with optional attribute filters (returns fn_name).
     ///
-    /// Not used by the runtime search (`@pasta_search` uses resolve_scene_id /
+    /// Not used by the runtime search (`@pasta_search` uses
     /// resolve_scene_id_unified).
     pub fn find_scene(
         &mut self,
