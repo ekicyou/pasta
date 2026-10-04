@@ -48,7 +48,6 @@ Lua で書ける。また DSL のシーン・単語定義は内部的に Lua（`
 function SCENE.func_name(act)
     local save, var = act:init_scene(SCENE)  -- 必須
     act:talk(act.ぱすた.actor, "セリフ")
-    act:yield()
 end
 ```
 

@@ -248,15 +248,14 @@ cargo test -p pasta_lua     # pasta_luaテスト
 function SCENE.func_name(act)
     local save, var = act:init_scene(SCENE)  -- 必須
     act:talk(act.アクター名.actor, "セリフ")
-    act:yield()
 end
 ```
 
 ### SHIORIハンドラ登録パターン
 
 ```lua
-REG.OnBoot = function(req)
-    return RES.ok("value0")
+REG.OnBoot = function(act)
+    return "\\0\\s[0]起動しました。\\e"  -- Value にする文字列を返す（RES で包まない）
 end
 ```
 

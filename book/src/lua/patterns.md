@@ -21,51 +21,44 @@
 ## パターン 1: シーン関数の定型
 
 すべてのシーン関数は `act:init_scene(SCENE)` で始まる。これが必須の定型である。
-戻り値の `save`（セッション間で永続するデータ）と `var`（このアクション内だけの一時変数）を受け取る。
+戻り値の `save`（セッション間で永続するデータ）と `var`（この ACT の間だけ有効な一時変数）を受け取る。
 
 ```lua
 function SCENE.挨拶(act)
     local save, var = act:init_scene(SCENE)  -- 必須: save / var を取得
     act:talk(act.ぱすた.actor, "こんにちは！")  -- アクター名でトーク
-    act:yield()                                 -- 蓄積トークンを送出
 end
 ```
 
-| 要素 | 役割 |
-| ---- | ---- |
-| `act:init_scene(SCENE)` | シーン初期化。`save`（永続）と `var`（一時）を返す。必須 |
-| `act:talk(actor, text)` | アクターのセリフを出力（さくらスクリプトへ自動変換） |
-| `act:yield()` | 蓄積したトークンを送出し、トークの区切りを作る |
+各メソッドの引数・戻り値は [スクリプト用ランタイム API](script-api.md#act) を参照する。シーン関数が終わると、積んだトークンは自動で組み立てられて出力される。そのため、シーン関数の最後に `act:yield()` は書かない（最後に置くと、シーンが中断したまま残り、次の OnTalk の機会に何も出力せずに終わる。[yield](script-api.md#yield)）。
 
-`save` は `@pasta_persistence` 管理の永続変数で、セッションをまたいで保持される。`var` は
-そのアクション実行中のみ有効な一時変数である。
+`save` は `@pasta_persistence` 管理の永続変数で、セッションをまたいで保持される。`var` は ACT ごとの一時変数で、Call で呼んだ先のシーンやチェイントークの続きとも共有される（[ACT のフィールド](script-api.md#act-のフィールド)）。
 
 ```lua
 function SCENE.カウント(act)
     local save, var = act:init_scene(SCENE)
     save.count = (save.count or 0) + 1      -- セッション間で累積
-    var.temp = "一時データ"                  -- このアクション内のみ
+    var.temp = "一時データ"                  -- この ACT の間だけ有効
     act:talk(act.ぱすた.actor, save.count .. "回目ですね")
-    act:yield()
 end
 ```
 
 ### 複数トークと表示制御
 
-`act` のメソッドはチェーンできる。複数のセリフ区切りは `yield()` を複数回呼んで作る。
+`act` のメソッドはチェーンできる。途中で `act:yield()` を呼ぶと、そこまでを 1 回の出力として区切る。
 
 ```lua
 function SCENE.物語(act)
     local save, var = act:init_scene(SCENE)
     act:talk(act.ぱすた.actor, "最初のセリフ")
     act:yield()  -- ここで一区切り
+    act:talk(act.ぱすた.actor, "えっ")
     act:surface(5):wait(500):talk(act.ぱすた.actor, "驚いた！"):newline()
-    act:yield()  -- 2区切り目
+    -- 残りはシーンの終了時に出力される
 end
 ```
 
-主な表示制御メソッド: `surface(id)`（サーフェス変更）、`wait(ms)`（ウェイト）、`newline(n?)`（改行）、
-`clear()`（表示クリア）。いずれも `self` を返すのでチェーン可能。
+表示制御メソッド（`surface`・`wait`・`newline`・`clear`）は [表示制御](script-api.md#表示制御) を参照する。1 回の出力（`yield` またはシーンの終了で区切られる範囲）の中で、まだ `talk` を積んでいないうちに積んだ表示制御は出力されない。`yield` の直後は、先に `talk` を積んでから表示制御を続ける。
 
 ### 選択肢
 
@@ -76,12 +69,11 @@ function SCENE.分岐(act)
     act:choice("挨拶", "挨拶する")   -- ジャンプ先シーン名, 表示テキスト
     act:choice("自己紹介")           -- 表示テキスト省略時はシーン名を表示
     act:choice_timeout(30)           -- 30秒でタイムアウト
-    act:yield()
 end
 ```
 
 選択肢が選ばれると、ランタイムが `OnChoiceSelectEx` を発火し、選択 ID（`choice` の第1引数）を
-シーン名として前方一致検索して該当シーンを実行する。通常はこの自動ルーティングに任せればよい。
+シーン名として前方一致検索して該当シーンを実行する。通常はこの自動ルーティングに任せればよい（[choice と choice_timeout](script-api.md#choice-と-choice_timeout)・[OnChoiceSelectEx](shiori-events.md#onchoiceselectex)）。
 
 ## パターン 2: イベントハンドラの登録
 
@@ -161,8 +153,8 @@ WORD.create_global("挨拶")
     :entry("こんにちは", "やあ")
     :entry("ごきげんよう")
 
--- ローカル単語（シーン名スコープ）
-WORD.create_local("メイン_1", "返事")
+-- ローカル単語（グローバルシーンの登録名。1 つ目の ＊メイン なら "メイン1"）
+WORD.create_local("メイン1", "返事")
     :entry("はい", "ええ")
     :entry("そうね")
 
@@ -172,11 +164,7 @@ WORD.create_actor("ぱすた", "一人称")
     :entry("あたし")
 ```
 
-| ファクトリ関数 | スコープ |
-| ---- | ---- |
-| `WORD.create_global(key)` | グローバル |
-| `WORD.create_local(scene_name, key)` | ローカル（指定シーン内） |
-| `WORD.create_actor(actor_name, key)` | アクター |
+各ファクトリ関数のスコープと引数は [ファクトリ関数](script-api.md#ファクトリ関数) を参照する。
 
 `entry(...)` は可変長引数で値を追加し、`self` を返すのでチェーンできる。外部 JSON / YAML を
 `@json` / `@yaml` で読み込んでループ投入すれば、データ駆動の大規模辞書も構築できる。
@@ -194,7 +182,7 @@ end
 -- DSL から呼び出し: ＠＊時報()  （グローバル関数は ＊ 付きで呼ぶ）
 ```
 
-DSL の `＠関数名()` はローカル（`SCENE.`）呼び出し、`＠＊関数名()` がグローバル（`GLOBAL.`）呼び出しである点に注意する。
+DSL の `＠関数名（）` は、名前を 5 段（実行中のシーンのシーンテーブル → ローカルシーン → act のメソッド → `GLOBAL` → グローバルシーン）で探して呼ぶ。`GLOBAL` は 4 段目のため、同じ名前のローカルシーンや act のメソッドがあるとそちらが呼ばれる。`＠＊関数名（）` は検索せずに `GLOBAL.関数名` を直接呼ぶ。グローバル関数を確実に呼ぶには `＊` を付ける（[検索と呼び出し](script-api.md#検索と呼び出し)・[GLOBAL](script-api.md#global)）。
 
 ---
 
