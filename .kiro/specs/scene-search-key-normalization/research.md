@@ -171,3 +171,112 @@
 - **議題 2（衝突の扱い）**: 案 C1（現行の挙動を保ち、マニュアルに明記）に決定。読み込み時の警告（C2）は採らない。検出・警告は需要が出たら別 spec で検査ツールに持たせる（C3）。要件 5.1・5.2 の前提注記を外し、範囲外に追記。Research Needed 2 は不要になった。
 - **議題 3（増えるメソッドの扱い）**: 公開 API として `lua/modules/pasta-search.md` に載せることに決定（内部用にしない）。要件 6.6 を追加（旧 6.6 は 6.7 へ）。メソッドの形は設計フェーズで `search_word` との一貫性を見て決める。Research Needed 4 は解決。
 - **議題 4（選択肢のジャンプ先）**: 要件 2.4 として明記し、要件 7.2 のテストで固定することに決定。選択肢のジャンプ先は `act:choice("…")` の文字列リテラルで Lua の識別子にはならず、`escape_choice` は `\`・`]`・`,` だけを逃がすため `・` 等は `\q[...]` をそのまま往復する（Research Needed 1 は解決）。選択肢の自動ルーティングの仕組み自体は引き続き範囲外。
+
+## 8. 設計フェーズの調査と決定（2026-10-04）
+
+- **Feature**: `scene-search-key-normalization`
+- **Discovery Scope**: Extension（既存システムの拡張。軽量ディスカバリ）
+- **Key Findings**:
+  - ギャップ分析の行番号と記述はコードと一致した（`context.rs:68`・`scene_registry.rs:241`・`word_registry.rs:83-84`・`actor.lua:142-143`・`choice_select.lua:61-62`・`act.lua:513`）。文法ファイルの場所だけ補足が要る（`crates/pasta_dsl/src/parser/grammar.pest`）。
+  - `・`（U+30FB）・`·`（U+00B7）・`＿`（U+FF3F）は pest 2.8.6／2.9.2 の `XID_CONTINUE` に含まれ、`XID_START` には含まれない。`＊会話・朝`・`％さくら・改`・`・選択・A` は識別子として読める（先頭には置けない）。
+  - スコープ名 `__actor_…__` の形は、登録（`word_registry.rs`）と検索（`actor.lua`）が別々に書いている。規則だけでなくこの形も共有しないと、食い違いの元が残る。
+  - `@pasta_search` を表で差し替える既存の Lua テストがあり、A2 段が呼ぶメソッドを変えると追従が要る。
+
+### 8.1 調査ログ
+
+#### 記号が識別子として読めるか
+- **Context**: 要件の例（`＊会話・朝`）が構文エラーにならないことの確認。`・` はローカルシーンのマーカーでもある。
+- **Sources Consulted**: `crates/pasta_dsl/src/parser/grammar.pest`（`id`・`xidn`・`local_marker`）、pest 2.8.6／2.9.2 の `src/unicode/binary.rs`（`XID_CONTINUE`・`XID_START` の表を復号して確認）。
+- **Findings**: U+30FB・U+00B7・U+FF3F・U+FF65・U+203F は `XID_CONTINUE` に含まれる。`id` は最長一致なので `会話・朝` は 1 つの識別子になる。行頭の `・` はマーカーとして先に読まれる（`XID_START` ではないので識別子の先頭にならない）。
+- **Implications**: 文法は変えない。テストは `.pasta` のソースから書ける。
+
+#### アクター単語の経路
+- **Context**: 検索側のどこでアクター名を照合するか。
+- **Sources Consulted**: `actor.lua:126-148`、`word_registry.rs:81-87`、`word_table.rs`（`collect_word_candidates`）、`runtime/finalize.rs:181-197`、`code_gen/scope_gen.rs:28-70`、`transpiler.rs:229-243`。
+- **Findings**: 登録は確定時・トランスパイル時とも `register_actor`（元のアクター名を受け取り、内部で照合）。検索は `:{scope}:{key}` の前方一致で、スコープは渡された文字列のまま。`a__:b`＋`x` は `:__actor_a___b__:x`、`a`＋`b__:x` は `:__actor_a__:b__:x` になり、区別できる（要件 4.6）。
+- **Implications**: 検索側でも `sanitize_name` を通したスコープ名を作ればよい。形を `WordDefRegistry::actor_scope` に切り出して登録と共有する。
+
+#### 既存テストへの影響
+- **Context**: `actor.lua` の A2 段が呼ぶメソッドを変えたときの影響。
+- **Sources Consulted**: `crates/pasta_lua/tests/lua_specs/proxy_find_handler_test.lua:74-94`、`act_dynamic_ref_test.lua:161-170,468`、`act_find_act_handler_test.lua:28`、`global_fallback_integration_test.lua:94`、`crates/pasta_lua/scriptlibs/lua_test/mocks.lua`。
+- **Findings**: 前 2 つは A2 段が `search_word(key, "__actor_…__")` を呼ぶことを直接確かめている。`lua_test.mocks` の既定の代役は `__index` でどのメソッド名にも `nil` を返す関数を返すので影響を受けない。表で作った代役（`search_scene`・`search_word` だけを持つ）は、A2 段に届くと `search_actor_word` が無くエラーになる。
+- **Implications**: 代役の追従が要る（設計の Open Question 1）。要件 7.5 の読み方を設計ディスカッションで確認する。
+
+#### SHIORI 応答テストの置き場所
+- **Context**: 要件 1.5・2.4（204 にならないこと）をどこで確かめるか（旧 Research Needed 5）。
+- **Sources Consulted**: `crates/pasta_lua/tests/common/mod.rs`（`create_temp_with_pasta`）、`crates/pasta_lua/tests/runtime/syntax_test.rs`（`EVENT.fire`）、`crates/pasta_lua/tests/shiori/event_dispatch_test.rs`、`crates/pasta_shiori/tests/common/`（`ShioriTestEnv`・`copy_fixture_into`）、`crates/pasta_shiori/tests/support/scripts/`。
+- **Findings**: `pasta_shiori` のテスト環境は `tests/support/scripts` の写しを読み込む。この写しは本体（`crates/pasta_lua/pasta_scripts`）と内容がずれており、`pasta/shiori/event/`（選択肢のルーティングを含む）・`res.lua` などが無い。`pasta_lua` 側は実物の `pasta_scripts` を一時ゴーストへ写して `PastaLoader::load` できる。
+- **Implications**: 結合テストは `pasta_lua/tests/` に新しいファイルとして置く。応答は `EVENT.fire` が返す文字列で確かめる。
+
+### 8.2 アーキテクチャ案の評価
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| 入口での正規化（採用） | `SearchContext` の入口で作者の名前を照合する | 全経路に 1 か所で効く。検索表は照合済みキーだけを扱う | Lua から直接呼ぶ利用者にも効く（マニュアルに書く） | ギャップ分析の案 S1＋A1 |
+| 検索表での正規化 | `SceneTable::collect_scene_candidates` で照合する | `pasta_core` で完結 | 検索表が「作者の名前」を知る。経路が複数ある | 案 S2。不採用 |
+| Lua 側での正規化 | `scene.lua`・`actor.lua` に規則を書く | Rust を変えない | 規則が二重になる（要件 3.1 に反する）。`scene.lua` は範囲外 | 案 S3。不採用 |
+
+### 8.3 設計判断
+
+#### Decision: シーン検索の修正場所
+- **Context**: 要件 1〜3。持ち越し項目。
+- **Alternatives Considered**: 案 S1（`search_scene` の入口）／案 S2（検索表）／案 S3（Lua 側）。
+- **Selected Approach**: `SearchContext::search_scene` の冒頭で第 1 引数だけを `SceneRegistry::sanitize_name` に通す。
+- **Rationale**: すべての呼び出し元がここを通る。並走条件の範囲内。第 2 引数に触れない。
+- **Trade-offs**: 順次消費のキャッシュキーが照合後の名前になる（`会話・朝` と `会話_朝` が同じ記録を進める）。要件 5.1 と整合する。
+- **Follow-up**: 登録名を渡したときの結果が変わらないことを単体テストで固定する。
+
+#### Decision: 照合規則の関数は動かさない
+- **Context**: 「規則を 1 か所にまとめる」の解釈。持ち越し項目。
+- **Alternatives Considered**: `pasta_core::registry` に自由関数を足して委譲／`SceneRegistry::sanitize_name` のまま。
+- **Selected Approach**: 動かさない。改名もしない。
+- **Rationale**: 実体はすでに 1 つである。動かすと `scope_gen.rs`・`transpiler.rs`（並走条件の範囲外）の呼び出しも変わる。
+- **Trade-offs**: 名前が「Scene」に偏ったままになる。
+- **Follow-up**: なし。
+
+#### Decision: アクター単語の公開メソッドの形
+- **Context**: 要件 4.5・6.6。持ち越し項目（議題 1・3）。
+- **Alternatives Considered**:
+  1. 案 A1 — `SEARCH:search_actor_word(name, actor_name)`。
+  2. 案 A2 — `SEARCH:normalize_name(name)` を公開し、Lua 側でスコープ名を組み立てる。
+  3. `search_word` の第 2 引数を常に照合規則に通す（公開 API・Lua の変更なし）。
+- **Selected Approach**: 案 A1。Rust 側は `WordDefRegistry::actor_scope(actor_name)` でスコープ名を作り、既存の `search_word` に委ねる。
+- **Rationale**: `search_word` と引数の並び・戻り値が同じ。呼び出し側が規則の適用を忘れる余地が無い。キー形式が Lua に漏れない。汎用の正規化 API を必要とする要件は無い。
+- **Trade-offs**: 公開メソッドが 1 つ増える。A2 段の代役を持つ Lua テストの追従が要る。3 番目の案は差分が最小だが、brief の「スコープ引数には適用しない」と要件ディスカッションの決定に反するので採らなかった（設計の Open Question 1 に記録）。
+- **Follow-up**: `lua_specs` を全件実行して、表で作った代役が A2 段に届く箇所を洗い出す。
+
+#### Decision: スコープ名の形を `WordDefRegistry::actor_scope` に切り出す
+- **Context**: 要件 3.1・7.6。
+- **Alternatives Considered**: `context.rs` に `format!("__actor_{}__", …)` を直接書く／`pasta_core` に関数を足して登録と共有する。
+- **Selected Approach**: `pasta_core::registry` の `WordDefRegistry` に関連関数を 1 つ足し、`register_actor` と `search_actor_word` の両方から呼ぶ。
+- **Rationale**: 形を 2 か所に書くと、そこが次の食い違いの元になる。
+- **Trade-offs**: 公開関数が 1 つ増える。
+- **Follow-up**: `register_actor` のキーが変更前と同じであることを既存テストで確かめる。
+
+#### Decision: SHIORI 応答テストの置き場所
+- **Context**: 要件 1.5・2.4・7.2。持ち越し項目。
+- **Alternatives Considered**: `pasta_lua/tests/shiori/` に足す／`pasta_shiori` の `ShioriTestEnv`／`pasta_lua/tests/` の新しいファイル。
+- **Selected Approach**: `crates/pasta_lua/tests/symbol_name_search_test.rs` を新しく作り、`create_temp_with_pasta` → `PastaLoader::load` → `EVENT.fire` で確かめる。
+- **Rationale**: 実物のランタイムスクリプトで選択肢のルーティングまで通せる。独立したファイルなので、同じ波で走るほかの spec と衝突しない。
+- **Trade-offs**: DLL の入口（`pasta_shiori`）までは通さない。
+- **Follow-up**: `EVENT.fire` の水準で足りるかを設計ディスカッションで確認する（Open Question 4）。
+
+### 8.4 統合（Synthesis）の結果
+
+- **Generalization**: 要件 1〜4 は「検索の入口が照合規則を通らない」という 1 つの問題の変形である。シーンは既存の入口 1 か所、アクターは入口を 1 つ足すことで同じ形にそろえた。汎用の「名前の正規化 API」には広げない（要件が無い）。
+- **Build vs. Adopt**: 新しい仕組みは作らず、既存の `SceneRegistry::sanitize_name` と `search_word` をそのまま使う。
+- **Simplification**: 関数の移動・改名、検索表の変更、衝突の検出、Lua 側の規則の実装は行わない。足すのは Rust の関数 2 つ（`actor_scope`・`search_actor_word`）と `search_scene` 冒頭の 1 行、`actor.lua` の 2 行の置き換えだけである。
+
+### 8.5 リスクと対策
+
+- 記号を含む検索キー（SHIORI イベント ID の `sakura.recommendsites` など）が `_` の名前のシーンに一致するようになる — 変更前は一致しなかったので既存の挙動は壊れない。マニュアルに書くかどうかを設計ディスカッションで決める。
+- 表で作った `@pasta_search` の代役が A2 段でエラーになる — 実装時に Lua の単体テストを全件実行して洗い出し、代役に `search_actor_word` を足す。
+- `crates/pasta_shiori/tests/support/scripts/` の写しが古い — 本仕様では触らない。`search_word` を変えないので写しの `actor.lua` は今までどおり動く。写しの同期は別の課題である。
+
+### 8.6 References
+
+- `crates/pasta_lua/src/search/context.rs` — 検索の入口
+- `crates/pasta_core/src/registry/scene_registry.rs`・`word_registry.rs` — 照合規則と登録キー
+- `crates/pasta_lua/pasta_scripts/pasta/actor.lua` — A2 段
+- `crates/pasta_dsl/src/parser/grammar.pest` — 識別子の定義
+- `book/tools/gen-skill-refs.mjs`・`book/tools/link-check.mjs` — 生成スキルの再生成と検査
