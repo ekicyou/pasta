@@ -1,4 +1,4 @@
-# Gap Analysis: search-selector-indices
+# Research & Design Decisions: search-selector-indices
 
 ## Summary
 - **Feature**: `search-selector-indices`
@@ -121,7 +121,92 @@
 
 ### Research Needed
 1. （解決済み）候補の並びの順と `SceneId` の昇順は一致しない。
-2. LuaJIT＋mlua 0.11 で `1.0`・`-1`・大きな整数を渡したときの `as_integer()` の結果。
+2. （解決済み。設計フェーズで実測）LuaJIT＋mlua 0.11 の `as_integer()` の結果は下の「設計フェーズの調査」を参照。
+
+## 設計フェーズの調査（2026-10-04）
+
+Discovery は Extension 向けの軽い手順（統合点・互換性・リスクの確認）で行った。新しい依存は無い。
+
+### `as_integer()` の実測（LuaJIT＋mlua 0.11、x86_64）
+- **Context**: Requirement 2.3・2.4。`parse_selector_args` に届く値の形を確かめる。
+- **Sources Consulted**: 使い捨てのテスト（`mlua::Lua` に可変長引数の関数を登録し、各値の `Value` と `as_integer()` を出力。実行後に削除済み）
+- **Findings**:
+
+  | Lua の値 | mlua の `Value` | `as_integer()` |
+  | -------- | --------------- | -------------- |
+  | `1`・`1.0` | `Integer(1)` | `Some(1)` |
+  | `1.5` | `Number(1.5)` | `None` |
+  | `-1` | `Integer(-1)` | `Some(-1)` |
+  | `-0`・`-0.0` | `Number(-0)` | `None` |
+  | `2^31`・`2^32`・`2^53`・`2^53+2`・`2^62` | `Integer(…)` | `Some(…)` |
+  | `2^63`・`2^64`・`1e300` | `Number(…)` | `None` |
+  | `0/0`・`1/0` | `Number(NaN)`・`Number(inf)` | `None` |
+  | `"1"`・`true`・`nil` | `String`・`Boolean`・`Nil` | `None`（文字列からの変換はしない） |
+
+  x86_64 では `mlua::Integer` は 8 バイト、`usize` は 64 ビット。
+- **Implications**:
+  - 負の整数は `Integer(-1)` として届くので、API 口で `i < 0` を見ればエラーにできる（2.3）。現行の `i as usize` は巨大な値に折り返すだけである。
+  - 小数・文字列・`2^63` 以上は現行どおり `expected integer argument` になる（2.4）。
+  - `-0` は整数でない扱いになる（`expected integer argument`）。負の整数のエラーとは別の文言になるが、書き間違い以外で渡す値ではないので、利用者章には書かない（設計の Open Question 2）。
+  - 32 ビットのターゲットで `usize` に収まらない正の整数が届いた場合に備え、変換は `as usize` の折り返しを残さず `usize::MAX`（常に範囲外）にする。
+
+### Phase 4 を `filtered_ids` から作り直す案の確認
+- **Context**: Requirement 1.5（シーン）・3.1。要件ディスカッションの「設計への候補」。
+- **Sources Consulted**: `scene_table.rs` の `select_from_cache`・`resolve_scene_id`・`resolve_scene_id_unified`、`scene_table_candidate_tests.rs` の `test_resolve_scene_id_cycling_reshuffles`、`pasta_lua` の `SearchContext::new`
+- **Findings**:
+  - Phase 4 の変更は 1 か所（`cached.candidates.iter()` → `filtered_ids.iter()`）で足りる。Phase 3 のクロージャは `filtered_ids` を参照で使うだけなので、Phase 4 でも使える。
+  - 検索表は作成後に変わらず、キャッシュのキーが親・検索キー・フィルタを含むため、同じキーの `filtered_ids` は巡をまたいで同じ集合・同じ順になる。
+  - `shuffle_enabled` が偽の経路は Phase 4 で並べ替えを呼ばないので、変更の影響を受けない。
+  - 種固定のシーンのテストは `test_resolve_scene_id_cycling_reshuffles`（種 42）だけで、候補の集合しか見ていない。`SearchContext::new` は種を固定しない。
+  - `scene_table.rs` を触る Wave 2 の他 spec は無い（roadmap のウェーブ構成）。Wave 5 の `call-attribute-filter` が検索を触るが、後のウェーブである。
+- **Implications**: 元の並びをキャッシュに保存する案より小さい。本番は分布・乱数の消費回数が同じで、種固定時の 2 巡目以降の具体的な並びだけが変わる。
+
+### マニュアルとスキル文書の生成関係
+- **Context**: Requirement 5.5、Boundary Context の Adjacent expectations
+- **Sources Consulted**: `book/tools/gen-skill-refs.mjs` 48 行、`.github/workflows/manual.yml` 64 行、`.claude/skills/pasta-lua-coding/SKILL.md` 70・82 行
+- **Findings**: `references/pasta-search.md` は `lua/modules/pasta-search.md` からの生成物で、CI が `gen-skill-refs.mjs --check` で鮮度を見る。`references/testing-lint.md` は手書き（スキルが権威）で、セレクタの意味は `pasta-search.md` を正とすると書いている。
+- **Implications**: マニュアルを変えたら同じ変更で `references/pasta-search.md` を再生成する。`testing-lint.md` の現行の記述は新しい意味でも誤りではないため、spec 完了時の同期に任せる（設計の Open Question 4）。
+
+## Design Decisions（設計フェーズ）
+
+### Decision: モックの並べ替えは位置で読み、状態を持たない
+- **Context**: Requirement 1.1〜1.8・2.1・2.2・2.5
+- **Alternatives Considered**:
+  1. `shuffle_usize` が指定列を配列の位置として読み、有効な位置を先に、残りを元の順に並べる（呼び出しごとに先頭から）
+  2. 値の昇順を基準にする — `SceneId` の昇順が候補の並びと一致しないため不可（確認済み）
+  3. 指定列の消費位置をモックに持たせる — 他の検索の回数で結果が変わる（1.6 に反する）
+- **Selected Approach**: 1。`MockRandomSelector::shuffle_usize` の 1 メソッドだけを実装する。
+- **Rationale**: 単語表は `random.rs` だけで要件を満たす。型・トレイト・コンストラクタを変えない。
+- **Trade-offs**: `select_index`（剰余・状態あり）と意味がそろわないまま残る。検索表は使わない。
+- **Follow-up**: 既存テスト（指定列 `[0]`・`[]`）が変更なしで通ることを実装時に確認する。
+
+### Decision: シーン表の Phase 4 は `filtered_ids` から作り直す
+- **Context**: Requirement 1.5（シーン）、確定事項 7
+- **Alternatives Considered**:
+  1. Phase 4 の入力を `filtered_ids` にする（1 か所）
+  2. `CachedSelection` に元の並びを保存する（フィールド追加）
+  3. Phase 3 と Phase 4 を 1 つの「作り直し」にまとめる（単語表と同じ形に書き直す）
+- **Selected Approach**: 1。
+- **Rationale**: 最小の差分。新しいフィールドも書き直しも要らない。
+- **Trade-offs**: 本番でもシャッフルの入力の順が変わる（分布・乱数の消費回数は同じ）。
+- **Follow-up**: 設計ディスカッションで 3.1 の解釈を確認する（Open Question 1）。
+
+### Decision: 負の整数は `parse_selector_args` で弾く
+- **Context**: Requirement 2.3
+- **Selected Approach**: `as_integer()` の後に負の値を Lua のエラーにし、0 以上は `usize` へ変換する（収まらなければ `usize::MAX`）。検査は `replace_selector` の前に終わるため、エラーのときは何も変わらない。
+- **Rationale**: 実測で `-1` は `Integer(-1)` として届く。`pasta_core` の `MockRandomSelector::new(Vec<usize>)` の形は変えずに済む。
+- **Follow-up**: エラー文言（Open Question 2）。
+
+### Synthesis（一般化・既存の利用・単純化）
+- **一般化**: 単語とシーンは同じ契約（「巡の始まりに候補の並びの順の配列を `shuffle_usize` に渡す」）の 2 つの利用者である。契約を満たしていないのはシーンの一巡後だけなので、そこだけを直す。新しい共通部品は作らない。
+- **既存の利用**: 新しい依存・新しい型は無い。既存の `RandomSelector` の差し替えをそのまま使う。
+- **単純化**: 元の並びの保存、`select_index` の整理、`set_shuffle_enabled(false)` で指定列を効かせる対応は入れない。
+
+## Risks & Mitigations
+- 既存のモック利用テストの期待が変わる — シャッフル有効のものは指定列 `[0]`・`[]` だけで恒等になる。実装時に `cargo test -p pasta_core`・`-p pasta_lua` で確認する。
+- 本番のシーン選択の分布が変わる — 一様なシャッフルの入力順を変えるだけで、分布・乱数の消費回数は変わらない。`DefaultRandomSelector` には触れない。
+- マニュアルの見出しを変えてリンク検査が落ちる — 見出しは変えない。`link-check.mjs` と `gen-skill-refs.mjs --check` を実装の検証に入れる。
+- 既定への復帰のテストが確率的 — 40 回の試行で誤って失敗する確率は 3^-39 程度（Open Question 5）。
 
 ## References
 - `.kiro/specs/completed/manual-ssot-authority/absorption-ledger.md` 685 行（U29。吸収元 runtime-api L101「選択インデックスのシーケンス（0 始まり）」・例 `set_word_selector(0, 1, 0)` →「1 番目、2 番目、1 番目」）
