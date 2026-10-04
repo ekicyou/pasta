@@ -14,7 +14,7 @@
 この章が責務を持つのは次の事項である。
 
 - `pasta_core` のレジストリ（`SceneRegistry`・`WordDefRegistry`）と検索表（`SceneTable`・`WordTable`）、乱数の抽象（`RandomSelector`）
-- 検索キーの形式と、RadixMap による前方一致での候補の収集
+- 検索キーの形式と、登録と検索が共有する照合規則（サニタイズ）、RadixMap による前方一致での候補の収集
 - 候補が複数あるときの選択（シャッフルと順次消費）と、その状態の持ち方
 - ローカル優先の検索順を、Lua 側の検索手順が `@pasta_search` の呼び出しでどう組み立てているか
 - 実行時の辞書確定のうち Rust 側の処理（`finalize_scene` による Lua 側の収集とレジストリの再構築）と、Lua 側との受け渡し
@@ -30,7 +30,7 @@
 
 | 型 | 所在 | 役割 |
 | -- | ---- | ---- |
-| `SceneRegistry`・`SceneEntry` | `crates/pasta_core/src/registry/scene_registry.rs` | シーンを登録順の `Vec` に集め、1 始まりの ID を振る。`register_global`・`register_local` はトランスパイル時の登録で、同名のグローバルシーンにサニタイズ後の名前ごとのカウンタで番号を振る。`register_global_raw` は辞書確定での登録で、番号付きの名前をそのまま受け取る。`merge_from` はファイルごとのレジストリを統合する。`sanitize_name` は名前の英数字と `_` 以外を `_` に置き換える |
+| `SceneRegistry`・`SceneEntry` | `crates/pasta_core/src/registry/scene_registry.rs` | シーンを登録順の `Vec` に集め、1 始まりの ID を振る。`register_global`・`register_local` はトランスパイル時の登録で、同名のグローバルシーンにサニタイズ後の名前ごとのカウンタで番号を振る。`register_global_raw` は辞書確定での登録で、番号付きの名前をそのまま受け取る。`merge_from` はファイルごとのレジストリを統合する。`sanitize_name` は名前の英数字と `_` 以外を `_` に置き換える。登録と検索が共有する照合規則である（[照合規則の共有](#照合規則の共有)） |
 | `SceneId`・`SceneScope`・`SceneInfo` | `crates/pasta_core/src/registry/scene_types.rs` | 検索表が持つシーン情報。`SceneId` は `SceneTable` 内の 0 始まりの添字である |
 | `SceneTable` | `crates/pasta_core/src/registry/scene_table.rs` | シーンの検索表。`SceneInfo` の `Vec`、前方一致の索引（`RadixMap<Vec<SceneId>>`）、選択状態のキャッシュ、`RandomSelector` を持つ |
 | `WordDefRegistry`・`WordEntry` | `crates/pasta_core/src/registry/word_registry.rs` | 単語の定義を、検索キーと値のリストの組（`WordEntry`）として登録順に集める。グローバル・ローカル・アクターの 3 種の登録関数がキーの形式を決める |
@@ -45,7 +45,7 @@
 | 要素 | 所在 | 役割 |
 | ---- | ---- | ---- |
 | `register`・`loader` | `crates/pasta_lua/src/search/mod.rs` | 2 つのレジストリから `SearchContext` を作り、Lua のユーザーデータとして `package.loaded["@pasta_search"]` に置く |
-| `SearchContext` | `crates/pasta_lua/src/search/context.rs` | `SceneTable` と `WordTable` を 1 組ずつ所有する。Lua へ `search_scene`・`search_word`・`set_scene_selector`・`set_word_selector` の 4 メソッドを公開する |
+| `SearchContext` | `crates/pasta_lua/src/search/context.rs` | `SceneTable` と `WordTable` を 1 組ずつ所有する。Lua へ `search_scene`・`search_word`・`set_scene_selector`・`set_word_selector` の 4 メソッドを公開する。`search_scene` の名前と `search_word` のスコープは、`sanitize_name` でサニタイズしてから検索表に渡す |
 | `SearchError` | `crates/pasta_lua/src/search/error.rs` | `pasta_core` のエラーを包み、Lua の `RuntimeError` に変換する |
 
 `SearchContext` は Lua VM ごとに 1 つであり、複数のランタイムの間で共有しない。
@@ -116,16 +116,32 @@ pasta.scene_dic
 
 ローカルとアクターのキーは `:` で始まり、グローバルのキーは `:` で始まらない。前方一致の範囲は、この先頭の `:` とスコープ名の後ろの `:` で区切られる。たとえば `:メイン1:` で始まるキーに `:メイン10:…` は含まれない。同じ単語キーに `entry` を複数回呼ぶと、同じキーの `WordEntry` が複数でき、索引の同じキーに登録順で並ぶ。
 
+### 照合規則の共有
+
+登録と検索は、同じ照合規則 `SceneRegistry::sanitize_name` を共有する。`sanitize_name` は、Unicode の英字・数字（`char::is_alphanumeric`。かな・漢字を含む）と `_` 以外の文字を 1 文字ずつ `_` に置き換える（`WordDefRegistry::sanitize_name` は同じ関数を呼ぶ）。利用者向けの章が「照合用の名前」と呼ぶものは、この関数でサニタイズした名前である（[シーン名の照合](../grammar/call-jump.md#シーン名の照合)）。
+
+| 側 | サニタイズする名前 | サニタイズする所 |
+| -- | ------------------ | ---------------- |
+| 登録 | グローバルシーンの基本名、名前付きローカルシーンの名前（`_番号` を付ける前） | 生成器（`crates/pasta_lua/src/code_gen/scope_gen.rs`）。トランスパイル時の `register_global`・`register_local` も同じ |
+| 登録 | ローカル単語・アクター単語のスコープ名 | `WordDefRegistry::register_local`・`register_actor` |
+| 検索 | `search_scene` の第 1 引数（シーン名） | `SearchContext::search_scene` の入口 |
+| 検索 | `search_word` の第 2 引数（スコープ） | `SearchContext::search_word` の入口 |
+
+- サニタイズしないのは、`search_scene` の第 2 引数（親のグローバル名）、単語キー（`search_word` の第 1 引数と、登録の単語名）、`register_global_raw` が受け取る番号付きの名前である。第 2 引数と `register_global_raw` には、サニタイズ済みの基本名から作った登録名（`メイン1`）が渡る。
+- サニタイズは何度かけても結果が変わらない。そのため、登録名（`メイン1`）をスコープとして `search_word` に渡しても、照合する名前は変わらない。
+- A2 のスコープ名（`"__actor_" .. アクター名 .. "__"`）は元のアクター名から作られるが、`search_word` の入口でサニタイズされて `__actor_`＋サニタイズしたアクター名＋`__` になり、`register_actor` のキーのスコープと一致する。
+- サニタイズ後の名前が同じになるグローバルシーン名・アクター名は、同じ名前として扱われる。グローバルシーンは同じ基本名のもとで通し番号が振られて同じ名前の候補になり、アクター単語は同じスコープのキーに入る。
+
 ### 前方一致による候補の収集
 
 `SearchContext` の 2 つの検索メソッドは、第 2 引数（親のグローバル名）の有無で検索表の呼び分けを変える。
 
 | 呼び出し | 検索表の処理 | 候補 |
 | -------- | ------------ | ---- |
-| `search_scene(名前, nil)` | `SceneTable::resolve_scene_id_unified("", 名前)` → `collect_scene_candidates` | `名前` で前方一致したキーのうち `:` で始まらないもののシーン |
-| `search_scene(名前, 親)` | `SceneTable::resolve_scene_id_unified` → `collect_scene_candidates` | `:親:名前` で前方一致したローカルシーンだけ |
+| `search_scene(名前, nil)` | `SceneTable::resolve_scene_id_unified("", サニタイズした名前)` → `collect_scene_candidates` | サニタイズした `名前` で前方一致したキーのうち `:` で始まらないもののシーン |
+| `search_scene(名前, 親)` | `SceneTable::resolve_scene_id_unified(親, サニタイズした名前)` → `collect_scene_candidates` | `:親:サニタイズした名前` で前方一致したローカルシーンだけ |
 | `search_word(名前, nil)` | `WordTable::search_word("", 名前)` → `collect_word_candidates` | `名前` で前方一致したキーのうち `:` で始まらないものの値すべて |
-| `search_word(名前, 親)` | `WordTable::search_word(親, 名前)` → `collect_word_candidates` | `:親:名前` で前方一致したキーの値すべて |
+| `search_word(名前, 親)` | `WordTable::search_word(サニタイズした親, 名前)` → `collect_word_candidates` | `:サニタイズした親:名前` で前方一致したキーの値すべて |
 
 - どの経路も、ローカルに候補が無いときにグローバルへ移ることはない。ローカルからグローバルへの順序は Lua 側の検索手順が組み立てる（後述「ローカル優先の検索順」）。
 - 候補は RadixMap の `iter_prefix` が列挙する順に集まる。RadixMap はキーのバイト列の辞書順で列挙する。同じキーに複数の項目があれば、その中は登録順である。
@@ -141,7 +157,7 @@ pasta.scene_dic
 
 | | シーン（`SceneTable::select_from_cache`） | 単語（`WordTable::search_word`） |
 | - | ---------------------------------------- | -------------------------------- |
-| キャッシュのキー | `SceneCacheKey`（親のグローバル名・検索キー・整列したフィルタ。第 2 引数なしは親を空文字列） | `WordCacheKey`（親のグローバル名・検索キー。第 2 引数なしは空文字列） |
+| キャッシュのキー | `SceneCacheKey`（親のグローバル名・サニタイズした検索キー・整列したフィルタ。第 2 引数なしは親を空文字列） | `WordCacheKey`（サニタイズしたスコープ名・検索キー。第 2 引数なしは空文字列） |
 | 初回 | 候補の ID をシャッフルしてキャッシュし、先頭を返す | 候補を集めてシャッフルし、先頭を返して残りをキャッシュする |
 | 2 回目以降 | 次の ID を返す | 候補を集め直さず、キャッシュの次の値を返す |
 | 一巡した後 | 同じ候補の並びをシャッフルし直して先頭から使う | 候補を集め直してシャッフルし、新しいキャッシュで置き換える |
@@ -177,7 +193,7 @@ PROXY_IMPL.find_handler(mode, key, skip_methods)     act.アクター:word(…) 
 ```
 
 - L2 のグローバル名は、実行中のシーンテーブルの `__global_name__`（`メイン1` の形）である。`ACT_IMPL.init_scene` がシーン関数の先頭で `current_scene` を設定する。これがローカルキー `:メイン1:…` の前方一致になる。
-- A2 のスコープ名 `__actor_アクター名__` は、`search_word` の中で `:__actor_アクター名__:キー` の前方一致になり、`register_actor` のキーの形式と対応する。
+- A2 のスコープ名 `__actor_アクター名__` は、`search_word` の入口でサニタイズされてから `:__actor_サニタイズしたアクター名__:キー` の前方一致になり、`register_actor` のキーの形式と対応する（[照合規則の共有](#照合規則の共有)）。
 - `@pasta_search` の取得は、`find_act_handler`・`find_actor_handler` とも呼び出しごとの `pcall(require, "@pasta_search")` で行う。
 - 見つかった値の後処理（関数なら呼ぶ、それ以外は文字列にする、見つからなければ警告ログ）は `ACT_IMPL.word`・`ACT_IMPL.call`・`ACT_IMPL.expr_fn`・`ACT_IMPL.expr_fn_var` と、PROXY 側の `word`・`expr_fn`・`expr_fn_var` が行う（[名前の解決のメソッド](internal-modules.md#名前の解決のメソッド)）。
 
@@ -222,8 +238,8 @@ skip_methods が真のとき（動的参照）
 - 検索の権威は辞書確定後の `SearchContext` である。VM の構築から辞書確定までの間（`main.lua`・`entry.lua` の実行中）は、トランスパイル時のレジストリから作った `SearchContext` が登録されており、グローバル名の形式（`メイン_1`）も内容も確定後と異なる（[@pasta_search の利用できる時期](../lua/modules/pasta-search.md#利用できる時期)）。
 - 辞書確定は `package.loaded["@pasta_search"]` を新しいユーザーデータで置き換える。それ以前に `require` して保持した参照は古い `SearchContext` を指したままになる。ランタイムの Lua コードは、`SCENE.search` が呼び出し時に、`find_act_handler`・`find_actor_handler` が呼び出しごとに取得し直す。
 - Rust 側の検索は、1 回の呼び出しで 1 つのスコープだけを検索し、ローカルからグローバルへ移らない。
-- 第 2 引数なしの `search_scene` は、`:` で始まるローカルのキーを除外する。`:` で始まる名前を渡しても、ローカルシーンは候補にならない。
-- 登録キーはサニタイズ済みの名前から作られる。グローバルシーンの名前は生成コードがサニタイズした基本名に番号を付けたもの、ローカルシーン名はサニタイズしたローカル名に `_番号` を付けたもの、ローカル単語・アクター単語のスコープ名は登録時にサニタイズされる。検索キーとして渡す名前はサニタイズされない。
+- 第 2 引数なしの `search_scene` は、`:` で始まるローカルのキーを除外する。渡した名前の `:` はサニタイズで `_` になるため、`:` で始まる名前を渡しても、ローカルシーンは候補にならない。
+- 登録キーと検索に使う名前は、同じ `sanitize_name` でサニタイズされる（[照合規則の共有](#照合規則の共有)）。登録では、グローバルシーンの名前は生成コードがサニタイズした基本名に番号を付けたもの、ローカルシーン名はサニタイズしたローカル名に `_番号` を付けたもの、ローカル単語・アクター単語のスコープ名は登録時にサニタイズされる。検索では、`search_scene` の名前と `search_word` のスコープが入口でサニタイズされる。`search_scene` の第 2 引数と単語キーはサニタイズされない。
 - 候補の列挙順はキーのバイト列の辞書順で決まり、`SceneId` の値（辞書確定では `HashMap` の走査順で決まる）には依存しない。
 - 検索表は構築後に項目を追加・削除しない。変化するのは選択状態のキャッシュと `RandomSelector` だけである。
 - `SearchContext` は Lua VM ごとに 1 つであり、検索表の選択状態はその VM の中だけで共有される。
