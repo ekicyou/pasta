@@ -114,3 +114,95 @@
 ### 境界の確認
 - `actor.lua`（`PROXY_IMPL`）・`pasta_dsl` の文法・`shiori/event/*` は触らない（Wave 1 の並走条件）。`sakura_script/tokenizer.rs` は brief の Boundary Candidates に載っていないが、並走条件の禁止対象ではない。設計の Boundary Commitments に明記する。
 - `entry.lua` の `xpcall` → 500 の経路は変えない（テストの観測点として使うだけ）。
+
+---
+
+# 設計フェーズの調査と判断（2026-10-04）
+
+## Summary
+- **Discovery Scope**: Extension（light discovery。外部依存の追加なし）
+- **Key Findings**:
+  - 式の AST は優先順位なしの左結合で組まれている（`pasta_dsl` `build_left_assoc_expr`）。現行の正しい計算結果は「演算子を平らに出力して Lua の優先順位に任せる」ことで成り立っている。算術を入れ子の呼び出しにするなら、生成側で優先順位を組み直す必要がある（ギャップ分析では未検出）。
+  - `ACTOR.create_proxy(actor, act)` は任意のテーブルを受け、`PROXY_IMPL` は `actor.name` と `actor[key]` しか読まない。`actor.lua` を変えず、`STORE.actors` にも触れずに、その場限りのアクターを作れる。
+  - `appearance.lua` は既に `\` を読み飛ばす（`next_tag`）・一般文字として扱う（`scan_leading_text`）。申し送り 7 の懸念は現行コードで解消済みで、変更は不要（回帰テストだけ足す）。
+
+## Research Log
+
+### 式の優先順位（申し送り外の発見）
+- **Sources**: `crates/pasta_dsl/src/parser/parse_action.rs` `build_left_assoc_expr`、`element_gen.rs` `Expr::Binary` アーム
+- **Findings**: `1＋2＊3` の木は `Binary(Mul, Binary(Add, 1, 2), 3)`。生成は `lhs op rhs` を括弧なしで並べるため、Lua が `1 + 2 * 3` として 7 と評価する。右辺は常に項（リテラル・参照・`Paren`）で、Binary は左の背骨にだけ現れる。
+- **Implications**: 木のとおり `arith("*", arith("+", 1, 2), 3)` にすると 9 になり 3.1 に反する。生成側で「左の背骨を項と演算子の列に戻す → `＊／％` を左から畳む → `＋－` を左から畳む」を行う。文法は境界外のため直さない。
+
+### その場限りのアクター（申し送り 2・項目 e）
+- **Sources**: `actor.lua`（`create_proxy`・`find_actor_handler`・`call_expr`）、`act.lua`（`group_by_actor`）、`sakura_builder.lua`（`emit_actor_switch`）、`sakura_script/mod.rs`（`resolve_wait_values`・`apply_budoux_if_configured`）、`shiori/event/init.lua`（`SHIORI_ACT.new(STORE.actors, req)`）
+- **Findings**:
+  - プロキシが要求するのは `actor.name` だけ。単語の A1 は `actor[key]`、A2 は `"__actor_名前__"` スコープの検索で、どちらも空振りして act の検索に委ねられる（R2.5 どおり）。
+  - `group_by_actor` と `sakura_builder` は話者の切り替えをテーブルの同一性で判定する。アクションごとに新しいテーブルを作ると、1 行の中でアクター切り替え（`\p[0]`・段落改行）が何度も起きる。同じ話者の連続では同じテーブルを返す必要がある。
+  - スポットは `actor_spots[名前]` が nil → 0＋既存の警告。`talk_to_script` はアクターのテーブルにウェイト・`budoux` のキーが無ければ既定値を使う。
+  - `self.actors` は `STORE.actors` そのもの。`set_spot` と同じく `self.actors[名前]` を登録済みの判定に使える。
+- **Implications**: `{ name = 名前 }` だけのテーブルで足りる。同一性は「`self.token` の末尾から最初の talk／sakura_script の `actor` を見て、同じ未登録名なら再利用」で保てる。キャッシュ用の状態（act のフィールド・モジュールの弱参照表）は要らない。
+
+### `\` と最終組み立て（申し送り 4・7、項目 c・d）
+- **Sources**: `tokenizer.rs`（`tokenize`）、`wait_inserter.rs`（`insert_waits`）、`line_breaker.rs`（`tokenize_plain_chars`）、`appearance.lua`（`next_tag`・`scan_leading_text`）、`grammar.pest`（`sakura_escape = @{ sakura_marker{2} }`、`sakura_marker = "\\"`）
+- **Findings**:
+  - トークナイザは `\` の位置で正規表現が先頭一致すれば `TokenKind::SakuraScript` にする。`\\` の選択肢を先頭に足せば `\` が 1 トークンになる。`regex` は左優先のため `C:\new` は `\`＋`n`＋`e`＋`w`。
+  - `SakuraScript` 種別は `wait_inserter` でウェイトなし・そのまま出力。`line_breaker` は同じ正規表現でタグ範囲を取り、前の文字の付随として運ぶ（幅に数えない・途中で切らない）。どちらも本体変更なしで R4.5 を満たす。
+  - `merge_consecutive_talks` が連続 talk を連結するため、`C:` ＋ `\` ＋ `new` は 1 つの文字列 `C:\new` としてトークナイザに入る。talk 経路なので has-text が立つ（R4.6）。
+  - `appearance.lua` は `\` を 2 文字読み飛ばす実装が既にある。
+- **Implications**: 変更は正規表現 1 行と Escape アーム。専用の `TokenKind` を足す案（ウェイト・幅を 1 文字ぶん数える）は `wait_inserter`・`line_breaker` の変更を伴うため採らない（DQ-4）。
+
+### 数値変換の一致（申し送り 5・項目 f）
+- **Findings**: LuaJIT は算術の暗黙変換と `tonumber(s)`（基数なし）の両方で同じ文字列スキャナ（`lj_strscan`）を使うため、受ける範囲（10 進・16 進・指数・前後の空白）は一致する見込み。違いは型で、暗黙変換は nil・boolean・table でエラー、`tonumber` は nil を返す。ヘルパーは number／string だけを数値化の対象にする。
+- **Implications**: 手元に LuaJIT 単体の実行環境が無いため、実機での確認は実装時のランタイムテスト（数値化の範囲の表）で固定する。`__add` などのメタメソッドを持つテーブルの算術は nil＋警告に変わる（DSL から届く経路は考えにくい。Risks に記載）。
+
+### 更新範囲（申し送り 6・項目 g）
+- 生成形に依存: スナップショット 22 件前後、`tests/transpiler/*.rs` 7 件、`element_gen_tests.rs`、`tests/fixtures/sample.expected.lua`・`sample.generated.lua`、`property_scope_codegen_test.rs`・`property_token_preservation_test.rs`。
+- 手書き Lua で `act.X:talk` を使うもの（`lua_specs` 6 件、`pasta_shiori` のフィクスチャ・`support`、`pasta_scripts` 内の `global.lua`・`entry.lua`・`init.lua` のコメント等）は、`__index` を変えないため更新不要。
+- マニュアル: ギャップ分析 1.3 の一覧に `internals/registry-search.md`・`lua/modules/pasta-sakura-script.md` を加える。`internals/talk-output.md` 166 行のトークナイザの説明は `\` の記述を足す。`SOUL.md` にも生成形の記述があるため実装時に確認する。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A（採用） | act にメソッド 3 つ・生成形を置換・正規表現 1 行 | 変更最小。前例どおり。後続仕様の前提と一致 | act のメンバー名・検索 3 段目に名前が 3 つ増える | DQ-3 |
+| B | 生成コード専用モジュール | act を汚さない | ファイルヘッダが変わりスナップショットの揺れが増える。brief の前提から外れる | 不採用 |
+| C | 算術だけ act の外 | act に足す名前が 2 つ | 呼び出し形が 2 系統。`string-concat-operator` の持ち場（`act.lua` の算術・連結ヘルパー）とずれる | 不採用 |
+
+## Design Decisions
+
+### Decision: 算術の優先順位を生成側で組み直す
+- **Alternatives**: (1) パーサで優先順位付きの木を作る（境界外・`dsl-literal-fixes` と文法が競合）／(2) 生成側で組み直す
+- **Selected**: (2)。左の背骨を平らに戻し、`＊／％` → `＋－` の順に左から畳む。
+- **Trade-offs**: 生成側に小さな畳み込みが要る。パーサの木の形に依存する（右辺が Binary の木は 1 項として扱う）。
+- **Follow-up**: 変更前の平らな Lua 式の評価値と一致することを式の一覧で固定する。
+
+### Decision: その場限りのアクターは `{ name }` のテーブル、同一性はトークン列から復元
+- **Alternatives**: (1) act にキャッシュ用フィールド／(2) モジュールの弱参照表／(3) トークン列の直前の話者を再利用／(4) `ACTOR.get_or_create`（名前が残るため要件で却下済み）
+- **Selected**: (3)。状態を足さない。build・yield でトークンが空になれば自然にリセットされる。
+- **Trade-offs**: 末尾からの走査が要る（通常は 1〜2 個で当たる）。目印の単位が「行」ではなく「話者の切り替わり」になる（DQ-1）。
+
+### Decision: 目印は `actor_proxy` が talk トークンとして積む
+- **Alternatives**: (1) `group_by_actor` でグループ先頭に差し込む（グループ化は `act-token-grouping-fix` が触る領域）／(2) 生成コードが行頭を示す引数を渡す／(3) `actor_proxy` で積む
+- **Selected**: (3)。警告ログと同じ場所・同じ回数になる。グループ化・ビルダーに手を入れない。
+- **Trade-offs**: 行が何も出力しなくても目印だけは出る（書き間違いの発見には有利）。
+
+### Decision: 警告は入れ子の算術で根本原因 1 回
+- **Selected**: 値が nil で説明も nil の被演算子は、内側の算術が失敗した結果としか起こらない（リテラルは nil にならず、変数・関数呼び出しには必ず説明が付く）ため警告しない。
+- **Trade-offs**: 重複抑止の状態を持たずに、1 つの書き間違いにつき警告 1 行にできる。
+
+### Decision: `\` はタグ種別のトークン
+- **Selected**: `SAKURA_TAG_PATTERN` の先頭に `\\` を足す。`TokenKind` は増やさない。
+- **Trade-offs**: `\` 1 文字ぶんのウェイト・幅を数えない（DQ-4）。
+
+## Synthesis
+- **Generalization**: U18・U19・U20・U22 は「生成コードが存在確認なしに Lua を直接触る」という 1 つの問題。3 メソッドとも「名前（または値）を引数で受け、だめなら警告＋既定の結果」という同じ形にそろえた。共通の基盤クラス等は作らない。
+- **Build vs Adopt**: 新規の依存なし。プロキシは既存の `ACTOR.create_proxy`、スポット 0 は既存のフォールバック、未代入変数の警告は既存の `talk(値, パス)` をそのまま使う。
+- **Simplification**: キャッシュ・重複抑止・専用モジュール・専用トークン種別・`appearance.lua` の変更を削った。新規の Lua／Rust ファイルはテストだけ。
+
+## Risks & Mitigations
+- 優先順位の組み直しの誤りで正常な式の結果が変わる — 変更前の平らな式との一致テストで固定。
+- スナップショットの広い更新に意図しない差分が紛れる — 差分が 4 種類の置換だけであることをレビュー観点にする。
+- `PROXY_IMPL` が将来アクターのメタテーブルや追加フィールドを要求する — Revalidation Trigger に記載。ランタイムテストが検出する。
+- 新メソッド名が `GLOBAL` の同名関数を `＠名前（）` から隠す — マニュアルの一覧に明記（DQ-3）。
+- `__add` 等を持つテーブルの算術が nil＋警告に変わる — DSL からは届きにくい。マニュアルの算術の節に「数値と数値文字列だけ」と書く。
+- `STORE.appearance` に未登録名の外見の記録が残る — 登録ではないため許容（DQ-8）。
