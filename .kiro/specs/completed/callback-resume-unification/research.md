@@ -180,7 +180,7 @@ U23（Q3）の方式は上の 3 案と直交する。
 - **Simplification**: 新しいモジュール、ハンドラの新しい戻り値の型、`pending` のエントリへの項目の追加（登録順の番号など）はどれも採らない。順序はイベント名の番号から得る。印の削除と、予約を捨てる関数の追加は、要件に無いため見送る。
 
 ## References
-- `.kiro/specs/callback-resume-unification/brief.md` — 問題・方針・スコープ
+- `.kiro/specs/completed/callback-resume-unification/brief.md` — 問題・方針・スコープ
 - `.kiro/specs/completed/pasta-runtime-internals-doc/absorption-ledger.md` 付録 B（300–303 行）— 継続の消失・二重包み・掃引の予約残留の照合記録
 - `.kiro/specs/completed/manual-ssot-authority/absorption-ledger.md` U23 — REG 戻り値の二重包みの照合記録
 - `.kiro/specs/review-improvement-loop/matrix.md` 3.48・3.49 — `EVENT.fire`×CALLBACK 統合テストの追加と、掃引修正の見送り理由
