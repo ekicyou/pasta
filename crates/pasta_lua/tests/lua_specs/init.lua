@@ -63,6 +63,7 @@ local specs = {
     "appearance_test",                    -- pasta.shiori.appearance タグ走査・サーフェス観測テスト (actor-surface-restore 2.1)
     "act_dynamic_ref_test",               -- 動的参照のキー解決・警告テスト (dynamic-word-reference 2.1)
     "act_runtime_safety_test",            -- 生成コードが呼ぶ存在確認付き act メソッドのテスト (dsl-codegen-runtime-safety 1.1)
+    "act_concat_test",                    -- act:concat 文字列と数値の連結・警告＋値なし・伝播テスト (string-concat-operator 3)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
