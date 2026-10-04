@@ -24,7 +24,7 @@
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _Boundary: CtRemoval_
 
-- [ ] 3. 新しい挙動をテストで固定する
+- [x] 3. 新しい挙動をテストで固定する
 - [x] 3.1 (P) グループ化の結果のテストを足す
   - 先頭の `wait` の後の発言、発言・`clear_spot`・`spot`・発言、`clear_spot` の後の `wait`、発言の途中の `set_spot` 単独の 4 件で、グループ化の結果の件数・アクター・内側のトークンを検証する
   - 4 件が通り、`set_spot` 単独の件は変更前と同じ結果を期待値にしている
@@ -32,7 +32,7 @@
   - _Boundary: ActGroupingTest_
   - _Depends: 2.1_
 
-- [ ] 3.2 (P) さくらスクリプトのバイト比較のテストを足す
+- [x] 3.2 (P) さくらスクリプトのバイト比較のテストを足す
   - 設計の表にある 13 件（`yield` 直後の先頭の表示制御、シーン冒頭の全種の表示制御、発言の無い出力、`＞ゴースト終了` 相当、`raw_script` との混在、先頭の `surface` の観測と復旧、`clear_spot` を挟む 4 パターン、`clear_spot` の後の `wait`、`set_spot` 単独）を追加する
   - 各テストで `STORE.actor_spots`・`STORE.appearance` を初期化し、本文に句読点を含めない
   - 実行結果が期待値と食い違ったら、期待値を合わせずに設計の規則のどこと食い違うかを調べ、規則どおりでなければ設計に戻る
@@ -77,4 +77,6 @@
 
 - タスク 1 の基準線（273fa925）: `cargo test --workspace` 105 スイート・2385 件すべて合格、`cargo clippy --workspace --all-targets` 警告 0、luacheck `Total: 0 warnings / 0 errors in 84 files`。テスト後に `crates/pasta_lua/profile/pasta/save/save.json` と `tests/fixtures/sample.generated.lua` が書き換わるので `git checkout --` で戻す。
 - タスク 1 の候補: 2 現象に当たる既存の期待値は見つからなかった。最も近いのは `act_grouping_test.lua` の「トークン順序を保持する」（`clear_spot` の後は別アクターで、結果は変わらない）と `act_test.lua` の `surface` 単独 `build()`（結果の中身を検証していない）。`shiori_act_test.lua` などにある「先に `talk(…, "")` を積む」回避はそのまま通る。
+- Lua テストランナーは最初に落ちたスイートで止まる。修正前の act.lua（273fa925）で RED を確かめるときは、後ろのスイートを一時的に外すか分けて走らせる。
+- 並列負荷が高いと Rust の `debug::hook::tests::hook_panic_*` と `runtime_toggle_e2e_basic_test` の TCP テストが不安定に落ちることがある（本仕様と無関係。単独の再実行で通る）。
 - ビルド環境: C: の空きが少ないと `LNK1318`（PDB）やメモリ確保失敗でビルドが落ちる。`cargo test` は `-j 8` 程度に絞る。
