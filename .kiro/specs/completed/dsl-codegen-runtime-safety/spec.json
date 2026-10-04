@@ -1,9 +1,9 @@
 {
   "feature_name": "dsl-codegen-runtime-safety",
   "created_at": "2026-10-04T02:29:31Z",
-  "updated_at": "2026-10-04T03:29:36Z",
+  "updated_at": "2026-10-04T08:36:42Z",
   "language": "ja",
-  "phase": "tasks-generated",
+  "phase": "completed",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -18,5 +18,6 @@
       "approved": true
     }
   },
-  "ready_for_implementation": true
+  "ready_for_implementation": true,
+  "completed_at": "2026-10-04T08:36:42Z"
 }
