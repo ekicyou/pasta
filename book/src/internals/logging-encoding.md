@@ -60,12 +60,12 @@ RoutingWriter ── 見つかった → PastaLogger::write → NonBlocking → 
 
 | ファイル | 主な型・関数 | 役割 |
 | -------- | ------------ | ---- |
-| `crates/pasta_lua/src/encoding/mod.rs` | `Encoder`・`Encoding`・`to_ansi_bytes`・`path_from_lua` | 変換のトレイトと、コードページの種類（`ANSI`・`OEM`）の列挙 |
+| `crates/pasta_lua/src/encoding/mod.rs` | `Encoder`・`Encoding` | 変換のトレイトと、コードページの種類（`ANSI`・`OEM`）の列挙 |
 | `crates/pasta_lua/src/encoding/windows.rs` | `Encoder for Encoding` | Windows の実装。`MultiByteToWideChar`・`WideCharToMultiByte` で変換する |
 | `crates/pasta_lua/src/encoding/unix.rs` | `Encoder for Encoding` | Windows 以外の実装。UTF-8 のまま通す |
 | `crates/pasta_lua/src/runtime/enc.rs` | `register`・`to_ansi_impl`・`to_utf8_impl` | `@enc` のモジュール表と 2 つの変換関数 |
 
-どちらの OS の実装を使うかは `#[cfg(windows)]` でビルド時に決まる。`Encoder` と `Encoding` はクレートのルートから再エクスポートされる。`to_ansi_bytes` と `path_from_lua` も公開されているが、ワークスペース内に呼び出し元は無い。`Encoding::OEM`（`CP_OEMCP`）を使うのはテストだけである。
+どちらの OS の実装を使うかは `#[cfg(windows)]` でビルド時に決まる。`Encoder` と `Encoding` はクレートのルートから再エクスポートされる。`Encoding::OEM`（`CP_OEMCP`）を使うのはテストだけである。
 
 pasta_shiori は FFI の文字列を読むための変換を、`crates/pasta_shiori/src/util/hglobal/` に別に持つ（`enc.rs` と `windows_api.rs`）。`crates/pasta_lua/src/encoding/windows.rs` と同じく local-encoding-rs に由来する実装で、`crates/pasta_lua/src/encoding/` は使わない。
 
@@ -86,10 +86,10 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 
 段階 1.5（PastaLoader::load_with_config。pasta.toml を読んだ直後）
  5. config.logging()                       … [logging] が無い・型が合わない → None
+    update_tracing_filter([logging] または既定) で FILTER_HANDLE のフィルタを差し替える
  6. PastaLogger::new(設置パス, [logging] または既定)
     成功 → 同じ設置パスで登録し直す（段階 1 のロガーを置き換える）
-           [logging] があれば update_tracing_filter で FILTER_HANDLE のフィルタを差し替える
-    失敗 → warn ログを出し、ロガー無しで続行（登録も、フィルタも変えない）
+    失敗 → warn ログを出し、ロガー無しで続行（登録は変えない。フィルタは 5 で差し替え済み）
  7. 作ったロガーの Arc を PastaLuaRuntime へ渡す（段階 6 で構造体に保持）
 ```
 
@@ -107,7 +107,7 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 2. `LoggingConfig::to_filter_directive` の文字列（`filter` があればそれ、無ければ `level`。`level` の既定は `"info"`）を解釈できれば、それを使う。
 3. どちらも使えなければ、標準エラーに警告を出して `"info"` にする。
 
-段階 1 は既定の設定でこの順をたどり、段階 1.5 は `[logging]` があるときだけ、その設定で作り直したフィルタに差し替える。フィルタは `reload::Layer` で包まれており、購読者を設置し直さずに `FILTER_HANDLE` 経由で中身だけを入れ替える。
+段階 1 は既定の設定でこの順をたどり、段階 1.5 は毎回、`[logging]` の設定（無ければ既定の設定）で作り直したフィルタに差し替える。再読み込みで `[logging]` を消すと、フィルタは既定に戻る。フィルタは `reload::Layer` で包まれており、購読者を設置し直さずに `FILTER_HANDLE` 経由で中身だけを入れ替える。
 
 ### ログ 1 件がファイルに届くまで
 
@@ -166,10 +166,10 @@ log.info(値)
 
 ### OS 別の変換の実装
 
-Windows の実装は、`Encoding` を `CP_ACP`（`ANSI`）か `CP_OEMCP`（`OEM`）に対応させる。コードページはシステムのロケール設定で決まる。
+Windows の実装は、`Encoding` を `GetACP`（`ANSI`）か `GetOEMCP`（`OEM`）が返す実際のコードページに対応させる。コードページはシステムのロケール設定で決まる。
 
 - `to_string`（コードページ → UTF-8）: `MultiByteToWideChar` を `MB_ERR_INVALID_CHARS` 付きで呼び、UTF-16 を `String::from_utf16` で UTF-8 にする。コードページとして不正なバイト列はエラーになる。
-- `to_bytes`（UTF-8 → コードページ）: 文字列を UTF-16 にしてから `WideCharToMultiByte` を `WC_COMPOSITECHECK` 付きで呼ぶ。代替文字を指定せず、代替文字を使ったかどうかを受け取り、使っていたら（コードページで表せない文字があったら）`InvalidInput` のエラーにする。
+- `to_bytes`（UTF-8 → コードページ）: 文字列を UTF-16 にしてから `WideCharToMultiByte` を `WC_COMPOSITECHECK` 付きで呼ぶ。代替文字を指定せず、代替文字を使ったかどうかを受け取り、使っていたら（コードページで表せない文字があったら）`InvalidInput` のエラーにする。ただし、コードページが UTF-8（65001）のときは API を呼ばずに UTF-8 のバイト列をそのまま返す（65001 では `WC_COMPOSITECHECK` と代替文字の受け取りが許されないため）。
 - どちらの API も、1 回目で必要な長さを問い合わせ、確保したバッファに 2 回目で書かせる。入力の長さは `buffer_len_to_i32` で `i32` に収まるか確かめ、2 GiB 以上はエラーにする（`as` で変換すると負の値になり、API が入力を NUL 終端として読み進めるため）。空の入力は API を呼ばずに空を返す。
 
 Windows 以外の実装は、`to_bytes` で UTF-8 のバイト列をそのまま返し、`to_string` で `String::from_utf8` が通ればそのまま返す（不正な UTF-8 は `InvalidData` のエラー）。
@@ -192,7 +192,7 @@ VM の中の文字列（DSL から生成したコード、`scripts/` の Lua ソ
 | 境界 | 渡す側 → 受ける側 | 渡すもの | 所有 |
 | ---- | ----------------- | -------- | ---- |
 | SHIORI → ロギング | `PastaShiori::load` → `GlobalLoggerRegistry`・`init_tracing_with_reload` | 段階 1 の `Arc<PastaLogger>`（キーは設置パス）、既定の `LoggingConfig` | 登録簿が `Arc` を持つ。登録を外すのは `PastaShiori` |
-| ローダ → ロギング | `PastaLoader::create_and_register_logger` → `GlobalLoggerRegistry`・`update_tracing_filter` | 段階 1.5 の `Arc<PastaLogger>`、`[logging]` の `LoggingConfig` | 同上 |
+| ローダ → ロギング | `PastaLoader::create_and_register_logger` → `GlobalLoggerRegistry`・`update_tracing_filter` | 段階 1.5 の `Arc<PastaLogger>`、`[logging]`（無ければ既定）の `LoggingConfig` | 同上 |
 | ローダ → ランタイム | `PastaLoader` → `PastaLuaRuntime::from_loader_with_scene_dic` | 段階 1.5 の `Arc<PastaLogger>`（無ければ `None`） | ランタイムは参照を保持するだけで、書き込みには使わない |
 | Rust → Lua | `crates/pasta_lua/src/runtime/module_registry.rs` → `package.loaded` | `@pasta_log`・`@enc` のモジュール表 | VM が持つ |
 | Lua → Rust（`@pasta_log`） | Lua の呼び出し → tracing | 任意の値 1 つ（2 つ目以降は無視）。呼び出し元の情報は Rust 側がスタックから取る | 文字列化した結果だけがイベントに載る |

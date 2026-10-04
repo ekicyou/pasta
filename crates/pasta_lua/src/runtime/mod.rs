@@ -43,7 +43,7 @@ use crate::debug::source_map::SourceMap;
 use crate::loader::PastaConfig;
 use crate::logging::PastaLogger;
 pub(crate) use finalize::register_finalize_scene;
-use mlua::{Lua, Result as LuaResult};
+use mlua::{Function, Lua, Result as LuaResult, Table};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -172,6 +172,19 @@ impl PastaLuaRuntime {
         //  4. The returned `Lua` handle is used in a single-threaded context and is not
         //     shared across threads.
         let lua = unsafe { Lua::unsafe_new_with(std_lib, mlua::LuaOptions::default()) };
+
+        // LuaJIT の乱数は固定の種で始まるため、起動ごとに同じ列になる。
+        // math がある構成でだけ、時刻とプロセス ID から種を与える。
+        if let Ok(math) = lua.globals().get::<Table>("math") {
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(0);
+            // f64 で誤差なく表せる 53 ビットに収める。
+            let seed = (nanos ^ u64::from(std::process::id())) & ((1u64 << 53) - 1);
+            math.get::<Function>("randomseed")?
+                .call::<()>(seed as f64)?;
+        }
 
         // Extract registries from context
         let scene_registry = context.scene_registry;

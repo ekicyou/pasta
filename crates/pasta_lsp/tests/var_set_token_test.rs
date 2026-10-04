@@ -261,51 +261,28 @@ fn test_var_set_fn_call_with_args_rhs() {
 }
 
 #[test]
-fn test_var_set_paren_expr_rhs_characterization() {
-    // ＄ｗ＝（１＋２）＊３ — 特性化テスト。
-    //
-    // 既知の上流問題（pasta_dsl 申し送り・3.40 G1 ではプロダクション不変更）:
-    // pasta_dsl parse_action.rs try_parse_expr の Rule::paren_expr 分岐は
-    // 括弧内の最初の term しか AST 化せず、（１＋２）は Paren(Integer(1)) になる。
-    // そのため括弧内の ＋ と ２ のトークンは現状生成されない。
-    // 本テストは LSP 側の現在の振る舞い（括弧 OPERATOR・lhs 数値・外側の
-    // ＊ OPERATOR・rhs 数値）を固定する。上流修正時は本テストの期待値を
-    // ＋/２ トークン込みに更新すること。
-    let source = "＊挨拶\n　＄ｗ＝（１＋２）＊３\n　Alice：や\n";
+fn test_var_set_paren_expr_rhs() {
+    // ＄ｗ＝（１＋２）＊３ — 括弧内の ＋ と ２ もトークンになる。
+    let source = "＊挨拶
+　＄ｗ＝（１＋２）＊３
+　Alice：や
+";
     let result = AnalysisEngine::analyze(source);
     assert!(result.diagnostics.is_empty(), "パースエラーなし");
     let vt = tokens_on_line(&decode_tokens(&result), 1);
 
-    assert_eq!(
-        vt[3],
-        (1, 4, 1, token_type::OPERATOR, 0),
-        "開き括弧: {:?}",
-        vt
-    );
-    assert_eq!(
-        vt[4],
-        (1, 5, 1, token_type::NUMBER, 0),
-        "括弧内lhs数値: {:?}",
-        vt
-    );
-    assert_eq!(
-        vt[5],
-        (1, 8, 1, token_type::OPERATOR, 0),
-        "閉じ括弧: {:?}",
-        vt
-    );
-    assert_eq!(
-        vt[6],
-        (1, 9, 1, token_type::OPERATOR, 0),
-        "＊演算子: {:?}",
-        vt
-    );
-    assert_eq!(
-        vt[7],
-        (1, 10, 1, token_type::NUMBER, 0),
-        "rhs数値: {:?}",
-        vt
-    );
+    let expected = [
+        (4, token_type::OPERATOR, "開き括弧"),
+        (5, token_type::NUMBER, "括弧内lhs数値"),
+        (6, token_type::OPERATOR, "括弧内＋演算子"),
+        (7, token_type::NUMBER, "括弧内rhs数値"),
+        (8, token_type::OPERATOR, "閉じ括弧"),
+        (9, token_type::OPERATOR, "＊演算子"),
+        (10, token_type::NUMBER, "rhs数値"),
+    ];
+    for (i, (col, ty, label)) in expected.iter().enumerate() {
+        assert_eq!(vt[3 + i], (1, *col, 1, *ty, 0), "{}: {:?}", label, vt);
+    }
 }
 
 // ============================================================================

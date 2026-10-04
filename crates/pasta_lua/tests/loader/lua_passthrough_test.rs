@@ -270,6 +270,53 @@ fn test_hyphen_normalized_module_name_conflict() {
 }
 
 #[test]
+fn test_conflict_uses_real_module_names_for_dic_like_dirs() {
+    // The conflict check must strip `dic` only at a path component boundary,
+    // exactly like the real module names do.
+    let temp = create_test_base();
+    let base_dir = temp.path();
+    fs::write(
+        base_dir.join("pasta.toml"),
+        "[loader]\ndebug_mode = true\npasta_patterns = [\"dic/**/*.pasta\", \"dicx/**/*.pasta\"]\n",
+    )
+    .unwrap();
+
+    fs::create_dir_all(base_dir.join("dic/dicx")).unwrap();
+    fs::create_dir_all(base_dir.join("dic/x")).unwrap();
+    fs::create_dir_all(base_dir.join("dicx")).unwrap();
+    // Same real module name `pasta.scene.dicx.a` -> .pasta wins.
+    fs::write(
+        base_dir.join("dicx/a.pasta"),
+        "＊衝突\n  ゴースト：「パスタ優先」\n",
+    )
+    .unwrap();
+    fs::write(
+        base_dir.join("dic/dicx/a.lua"),
+        "-- lua side should be ignored\nreturn {}\n",
+    )
+    .unwrap();
+    // Different real module names (`pasta.scene.x.b` / `pasta.scene.dicx.b`) -> both load.
+    fs::write(
+        base_dir.join("dic/x/b.pasta"),
+        "＊別名\n  ゴースト：「B」\n",
+    )
+    .unwrap();
+    fs::write(base_dir.join("dicx/b.lua"), "-- dicx b\nreturn {}\n").unwrap();
+
+    let _runtime = PastaLoader::load(base_dir).unwrap();
+
+    let scene_dic =
+        fs::read_to_string(base_dir.join("profile/pasta/cache/lua/pasta/scene_dic.lua")).unwrap();
+    assert_eq!(scene_dic.matches("\"pasta.scene.dicx.a\"").count(), 1);
+    assert!(scene_dic.contains("\"pasta.scene.x.b\""));
+    assert!(scene_dic.contains("\"pasta.scene.dicx.b\""));
+    let cached =
+        fs::read_to_string(base_dir.join("profile/pasta/cache/lua/pasta/scene/dicx/a.lua"))
+            .unwrap();
+    assert!(!cached.contains("-- lua side should be ignored"));
+}
+
+#[test]
 fn test_no_conflict_different_dirs() {
     let temp = create_test_base();
     let base_dir = temp.path();

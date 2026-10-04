@@ -167,6 +167,23 @@ fn test_source_to_module_name_deep_nested() {
     );
 }
 
+/// `.` は `require` がパス区切りへ写すため、モジュール名では `_` に置き換え、
+/// キャッシュパスもモジュール名から同じ規則で導くこと。
+#[test]
+fn test_source_to_module_name_and_cache_path_with_dot() {
+    let (temp, manager) = create_test_cache_manager();
+    let source = temp.path().join("dic/ver.1/v1.2.pasta");
+    assert_eq!(
+        manager.source_to_module_name(&source),
+        "pasta.scene.ver_1.v1_2"
+    );
+    assert_eq!(
+        manager.source_to_cache_path(&source),
+        temp.path()
+            .join("profile/pasta/cache/lua/pasta/scene/ver_1/v1_2.lua")
+    );
+}
+
 #[test]
 fn test_source_to_module_name_with_hyphen() {
     let (temp, manager) = create_test_cache_manager();

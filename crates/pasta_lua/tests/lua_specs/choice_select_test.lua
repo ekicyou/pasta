@@ -51,8 +51,8 @@ describe("OnChoiceSelectEx auto-routing handler", function()
             method = "get",
             version = 30,
             reference = {
-                [0] = choice_id,
-                [1] = choice_label or "label",
+                [0] = choice_label or "label",
+                [1] = choice_id,
             },
         }
     end
@@ -152,14 +152,14 @@ describe("OnChoiceSelectEx auto-routing handler", function()
     -- ================================================================
     -- 3.4: ローカル→グローバル検索 — STORE.last_global_scene をスコープに使用
     -- ================================================================
-    test("passes STORE.last_global_scene to SCENE.search for scoped search (3.4)", function()
+    test("searches local scope first, then global (3.4)", function()
         setup()
 
-        local captured_global_scope = nil
+        local scopes = {}
         SCENE.search = function(name, global_scene_name, attrs)
             -- Only capture for the choice_id search, not the explicit handler check
             if name ~= "OnChoiceSelectEx" then
-                captured_global_scope = global_scene_name
+                table.insert(scopes, global_scene_name or "<global>")
             end
             return nil
         end
@@ -168,7 +168,35 @@ describe("OnChoiceSelectEx auto-routing handler", function()
         local act = SHIORI_ACT.new(make_actors(), make_req("some_choice"))
         REG.OnChoiceSelectEx(act)
 
-        expect(captured_global_scope):toBe("MyGlobalScene1")
+        expect(table.concat(scopes, ",")):toBe("MyGlobalScene1,<global>")
+
+        teardown()
+    end)
+
+    test("falls back to global scene when no local scene matches (3.4)", function()
+        setup()
+
+        SCENE.search = function(name, global_scene_name, attrs)
+            if name == "global_target" and global_scene_name == nil then
+                return {
+                    func = function(act)
+                        act.sakura:talk("global hit")
+                    end,
+                    global_name = "global_target1",
+                    local_name = "__start__",
+                }
+            end
+            return nil
+        end
+
+        STORE.last_global_scene = "MyGlobalScene1"
+        local act = SHIORI_ACT.new(make_actors(), make_req("global_target"))
+        local result = REG.OnChoiceSelectEx(act)
+
+        expect(type(result)):toBe("thread")
+        local ok, value = coroutine.resume(result, act)
+        expect(ok):toBe(true)
+        expect(value:find("global hit")):toBeTruthy()
 
         teardown()
     end)

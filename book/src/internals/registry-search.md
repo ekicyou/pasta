@@ -122,7 +122,7 @@ pasta.scene_dic
 
 | 呼び出し | 検索表の処理 | 候補 |
 | -------- | ------------ | ---- |
-| `search_scene(名前, nil)` | `SceneTable::resolve_scene_id` | 索引を `名前` で前方一致した全キーのシーン |
+| `search_scene(名前, nil)` | `SceneTable::resolve_scene_id_unified("", 名前)` → `collect_scene_candidates` | `名前` で前方一致したキーのうち `:` で始まらないもののシーン |
 | `search_scene(名前, 親)` | `SceneTable::resolve_scene_id_unified` → `collect_scene_candidates` | `:親:名前` で前方一致したローカルシーンだけ |
 | `search_word(名前, nil)` | `WordTable::search_word("", 名前)` → `collect_word_candidates` | `名前` で前方一致したキーのうち `:` で始まらないものの値すべて |
 | `search_word(名前, 親)` | `WordTable::search_word(親, 名前)` → `collect_word_candidates` | `:親:名前` で前方一致したキーの値すべて |
@@ -222,7 +222,7 @@ skip_methods が真のとき（動的参照）
 - 検索の権威は辞書確定後の `SearchContext` である。VM の構築から辞書確定までの間（`main.lua`・`entry.lua` の実行中）は、トランスパイル時のレジストリから作った `SearchContext` が登録されており、グローバル名の形式（`メイン_1`）も内容も確定後と異なる（[@pasta_search の利用できる時期](../lua/modules/pasta-search.md#利用できる時期)）。
 - 辞書確定は `package.loaded["@pasta_search"]` を新しいユーザーデータで置き換える。それ以前に `require` して保持した参照は古い `SearchContext` を指したままになる。ランタイムの Lua コードは、`SCENE.search` が呼び出し時に、`find_act_handler`・`find_actor_handler` が呼び出しごとに取得し直す。
 - Rust 側の検索は、1 回の呼び出しで 1 つのスコープだけを検索し、ローカルからグローバルへ移らない。
-- 第 2 引数なしの `search_scene`（`resolve_scene_id`）は、`:` で始まるローカルのキーを除外しない。グローバルのキーは `:` で始まらないため、`:` で始まらない名前の検索ではローカルシーンは候補にならない。
+- 第 2 引数なしの `search_scene` は、`:` で始まるローカルのキーを除外する。`:` で始まる名前を渡しても、ローカルシーンは候補にならない。
 - 登録キーはサニタイズ済みの名前から作られる。グローバルシーンの名前は生成コードがサニタイズした基本名に番号を付けたもの、ローカルシーン名はサニタイズしたローカル名に `_番号` を付けたもの、ローカル単語・アクター単語のスコープ名は登録時にサニタイズされる。検索キーとして渡す名前はサニタイズされない。
 - 候補の列挙順はキーのバイト列の辞書順で決まり、`SceneId` の値（辞書確定では `HashMap` の走査順で決まる）には依存しない。
 - 検索表は構築後に項目を追加・削除しない。変化するのは選択状態のキャッシュと `RandomSelector` だけである。

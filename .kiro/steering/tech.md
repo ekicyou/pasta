@@ -42,7 +42,7 @@
 - **md5 0.8**: ビルド時の基準ダイジェスト算出（pasta_scripts 自己展開のドリフト検知、build/dev-dependency。ランタイムはマーカー文字列比較のみで md5 不使用）
 - **budouy 0.2.2**: 日本語改行位置推定（BudouX、vendored-models）
 - **unicode-width 0.2.2**: Unicode文字幅計算
-- **socket2 0.5**: debug transport 待受ソケットの `SO_REUSEADDR` 設定・非ブロック化（reload 時の再バインド堅牢化、cross-platform）
+- **socket2 0.5**: debug transport 待受ソケットの `SO_REUSEADDR` 設定（Windows 以外。Windows では二重 bind を許してしまうため立てない）・非ブロック化（reload 時の再バインド堅牢化）
 - **tracing 0.1 / tracing-appender 0.2 / tracing-subscriber 0.3**: ロギング・診断
 - **windows-sys 0.61**: Windows API（Shift_JISエンコーディング等、cfg(windows)）
 - **luacheck v1.2.0**: 静的解析ツール（scriptlibs/）
@@ -248,15 +248,14 @@ cargo test -p pasta_lua     # pasta_luaテスト
 function SCENE.func_name(act)
     local save, var = act:init_scene(SCENE)  -- 必須
     act:talk(act.アクター名.actor, "セリフ")
-    act:yield()
 end
 ```
 
 ### SHIORIハンドラ登録パターン
 
 ```lua
-REG.OnBoot = function(req)
-    return RES.ok("value0")
+REG.OnBoot = function(act)
+    return "\\0\\s[0]起動しました。\\e"  -- Value にする文字列を返す（RES で包まない）
 end
 ```
 

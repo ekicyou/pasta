@@ -136,7 +136,7 @@ impl PastaLoader {
         // Phase 3: Discover files
         debug!("Phase 3: Discovering pasta and lua files");
         let (pasta_files, lua_files) =
-            Self::discover_all_files(base_dir, &config.loader.pasta_patterns)?;
+            Self::discover_all_files(base_dir, &config.loader.pasta_patterns, &cache_manager)?;
         let total_files = pasta_files.len() + lua_files.len();
         if total_files == 0 {
             warn!(path = %base_dir.display(), "No .pasta or .lua files found");
@@ -237,6 +237,10 @@ impl PastaLoader {
     ) -> Result<Option<std::sync::Arc<crate::logging::PastaLogger>>, LoaderError> {
         let logging_config = config.logging();
 
+        // Always update the tracing filter: a reload without `[logging]` resets it
+        // to the default, and a logger creation failure still applies level/filter.
+        crate::logging::update_tracing_filter(&logging_config.clone().unwrap_or_default());
+
         match crate::logging::PastaLogger::new(base_dir, logging_config.as_ref()) {
             Ok(logger) => {
                 let logger = std::sync::Arc::new(logger);
@@ -245,11 +249,6 @@ impl PastaLoader {
                 // Register with global registry (overwrites Stage 1 default writer)
                 crate::logging::GlobalLoggerRegistry::instance()
                     .register(base_dir.to_path_buf(), logger.clone());
-
-                // Update tracing filter with config
-                if let Some(ref cfg) = logging_config {
-                    crate::logging::update_tracing_filter(cfg);
-                }
 
                 Ok(Some(logger))
             }

@@ -154,12 +154,12 @@ sync_pasta_scripts(base_dir)
 2. `.pasta` で終わる各パターンの末尾を `.lua` に替えたパターンを作る。`.pasta` で終わらないパターンは警告を出して飛ばす。
 3. 作ったパターンで `discover_files` を呼び、`.lua` を集める。ここでのエラーは警告にとどめ、`.lua` は 0 件として扱う。0 件でも警告は出さない。
 4. `.pasta` と `.lua` のどちらかにファイル名が `init.lua` または `init.pasta` のものがあれば、`LoaderError::InvalidFileName` で起動を止める。
-5. `.pasta` のモジュールキー（後述の `module_key`）の集合を作り、同じキーの `.lua` を警告付きで除く。
+5. `.pasta` のモジュール名（後述の `source_to_module_name`）の集合を作り、同じモジュール名の `.lua` を警告付きで除く。
 
 `discover_files` は各パターンについて次を行う。
 
 - パターンが `..`・ルート・ドライブ接頭辞を含むなら、警告を出してそのパターンを使わない。
-- 基準ディレクトリとパターンを連結した文字列を `glob` クレートに渡す。パターンの誤りと走査中のエラーは `LoaderError` として返る。
+- 基準ディレクトリとパターンを連結した文字列を `glob` クレートに渡す。基準ディレクトリの部分は `glob::Pattern::escape` でエスケープするため、設置先のパスに `[`・`]`・`*`・`?` が含まれてもそのまま一致する。パターンの誤りと走査中のエラーは `LoaderError` として返る。
 - 一致したパスのうち、基準ディレクトリの外にあるもの、基準ディレクトリからの途中にシンボリックリンク（Windows のジャンクションを含む）を含むもの、メタデータを読めないもの、`profile/` 配下にあるものを除く。
 
 返す一覧はパターンの順・glob の列挙順に並び、重複は取り除かない。
@@ -170,8 +170,8 @@ sync_pasta_scripts(base_dir)
 
 | 導出 | 手順 |
 | ---- | ---- |
-| `source_to_module_name` | 相対パスの先頭の `dic` を除く（パス要素の境界で一致する場合だけ）→ 拡張子を除く → `/`・`\` を `.` に、`-` を `_` に置き換える → 先頭に `pasta.scene.` を付ける |
-| `source_to_cache_path` | 相対パスの先頭の `dic` を除く（同上）→ `-` を `_` に置き換える → 拡張子を `.lua` にする → `<キャッシュ>/pasta/scene/` の下に置く |
+| `source_to_module_name` | 相対パスの先頭の `dic` を除く（パス要素の境界で一致する場合だけ）→ 拡張子を除く → `.`・`-` を `_` に置き換える → `/`・`\` を `.` に置き換える → 先頭に `pasta.scene.` を付ける |
+| `source_to_cache_path` | `source_to_module_name` のモジュール名の `.` を `/` に置き換え、末尾に `.lua` を付けて `<キャッシュ>/` の下に置く |
 
 ```text
 dic/baseware/system.pasta
@@ -180,14 +180,15 @@ dic/baseware/system.pasta
 dic/会話.pasta
   モジュール名:  pasta.scene.会話
   キャッシュ先:  <キャッシュ>/pasta/scene/会話.lua
+dic/v1.2.pasta
+  モジュール名:  pasta.scene.v1_2
+  キャッシュ先:  <キャッシュ>/pasta/scene/v1_2.lua
 ```
 
 - `.lua` も `.pasta` と同じ規則で名前とキャッシュ先が決まる。拡張子が違うだけの同名ファイルは同じモジュール名になるため、検出の手順 5 で `.lua` を除く。
 - 非 ASCII の文字はそのまま残す。モジュール名を解決する searcher も UTF-8 のまま扱う（次節）。
 - `dic` を除くのは、`dic` がパス要素として完結する場合だけである。`dictionary.pasta` や `dicx/foo.pasta` はそのまま残る。
-- 同名衝突の判定に使う `module_key`（`crates/pasta_lua/src/loader/process.rs`）は、`pasta.scene.` を付けない名前を返す。こちらは先頭の `dic` を文字列の接頭辞として除き、パス要素の境界を確かめない。
-
-モジュール名の一覧は増分処理で集められ、`scene_dic.lua` が並べ替えて `require` する（[トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ)）。`require("pasta.scene.baseware.system")` は、次節の searcher が検索パスの `profile/pasta/cache/lua` から `pasta/scene/baseware/system.lua` を見つけることで解決する。モジュール名とキャッシュ先は別々の関数で導出しており、両者が対応するのは、モジュール名の `.` を区切りに戻したパスがキャッシュ先の相対パスと一致する場合である。
+モジュール名の一覧は増分処理で集められ、`scene_dic.lua` が並べ替えて `require` する（[トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ)）。`require("pasta.scene.baseware.system")` は、次節の searcher が検索パスの `profile/pasta/cache/lua` から `pasta/scene/baseware/system.lua` を見つけることで解決する。searcher はモジュール名の `.` をすべてパス区切りに戻すため、キャッシュ先はモジュール名から同じ規則で導出し、ファイル名やディレクトリ名に含まれる `.` はモジュール名の時点で `_` に置き換えておく。
 
 ### モジュール検索パス
 

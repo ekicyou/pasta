@@ -11,9 +11,9 @@ local SCENE = require("pasta.scene")
 local STORE = require("pasta.store")
 
 --- 選択IDの Reference インデックス
---- ukadoc 仕様: \q[title,id] → Reference0=id, Reference1=title
+--- ukadoc 仕様: \q[title,id] → Reference0=title, Reference1=id
 --- SSP 実装差異があれば定数変更で吸収する
-local CHOICE_ID_REF_INDEX = 0
+local CHOICE_ID_REF_INDEX = 1
 
 --- SCENE.co_exec と同等のコルーチン作成（スコープ付き SCENE.search 用）
 --- co_exec/find_scene は global_scene_name を透過しないため、
@@ -56,8 +56,10 @@ REG.OnChoiceSelectEx = function(act)
     -- 3. 選択IDでシーンを前方一致検索（ローカル→グローバル、3.1/3.4）
     --    SCENE.search を直接呼び出し、STORE.last_global_scene をスコープに使用
     --    co_exec/find_scene は global_scene_name を透過しないため直接検索が必須
+    --    ローカルに無ければグローバルシーンを探す
     --    シャッフル＆順次消費は SCENE.search 内部で処理される（3.2）
     local result = SCENE.search(choice_id, STORE.last_global_scene)
+        or SCENE.search(choice_id, nil)
     if not result or type(result.func) ~= "function" then
         return nil
     end

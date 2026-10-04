@@ -46,24 +46,30 @@ use windows_sys::Win32::Foundation::*;
 /// This function is called by the Windows loader. The caller must ensure:
 /// - `hinst` is a valid module handle provided by the OS
 /// - `call_reason` is a valid DLL notification code
-/// - `_reserved` may be null or a valid pointer depending on `call_reason`
+/// - `reserved` may be null or a valid pointer depending on `call_reason`
 ///
 /// `#[unsafe(no_mangle)]` is required for the Windows loader to find this symbol.
 ///
 /// # ロード起点 spawn / loader lock 回避（R4.4）
 /// DllMain attach ではアクタースレッドを spawn しない（DllMain は loader lock 保持下で
 /// 呼ばれ、スレッド生成は deadlock を招きうる）。スレッド spawn は SHIORI `load` 起点で
-/// 行う。detach ではアクターを teardown する（VM・スレッド・チャネルの解放）。
+/// 行う。FreeLibrary による detach（`reserved` が null）ではアクターを teardown する
+/// （VM・スレッド・チャネルの解放）。プロセス終了による detach（`reserved` が非 null）では
+/// 何もしない（`SHIORI.unload` と保存は走らない）。
 #[unsafe(no_mangle)]
 extern "system" fn DllMain(
     _hinst: isize,
     call_reason: u32,
-    _reserved: *mut std::ffi::c_void,
+    reserved: *mut std::ffi::c_void,
 ) -> bool {
     const DLL_PROCESS_DETACH: u32 = 0;
 
-    if call_reason == DLL_PROCESS_DETACH {
-        // detach: アクタースレッドを teardown（unload と重なっても冪等 no-op で安全）。
+    if call_reason == DLL_PROCESS_DETACH && !reserved.is_null() {
+        // プロセス終了中（他スレッドは既に停止済み）。アクターは応答できず teardown は
+        // タイムアウトまで待つだけなので、何もせず OS に後始末を任せる。
+        true
+    } else if call_reason == DLL_PROCESS_DETACH {
+        // FreeLibrary による detach: アクタースレッドを teardown（unload と重なっても冪等 no-op で安全）。
         unload()
     } else {
         // attach を含む他の通知では何もしない（spawn は load 起点・loader lock 回避）。

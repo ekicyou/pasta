@@ -178,6 +178,26 @@ fn test_lua_accessor_shares_vm_state_with_exec() {
     assert_eq!(value.as_i64(), Some(7));
 }
 
+/// VM ごとに乱数の種が与えられ、2 つのランタイムの math.random の列が一致しない。
+#[test]
+fn test_math_random_sequence_differs_between_runtimes() {
+    let script = "local t = {} for i = 1, 8 do t[i] = math.random(1, 1000000) end \
+                  return table.concat(t, ',')";
+    let a = PastaLuaRuntime::new(create_empty_context()).unwrap();
+    let b = PastaLuaRuntime::new(create_empty_context()).unwrap();
+    let seq_a = a.exec(script).unwrap().to_string().unwrap();
+    let seq_b = b.exec(script).unwrap().to_string().unwrap();
+    assert_ne!(seq_a, seq_b, "math.random sequences must differ per VM");
+}
+
+/// math を読み込まない構成でも VM を作れる（種の設定は math がある時だけ）。
+#[test]
+fn test_runtime_without_math_library_still_builds() {
+    let config = RuntimeConfig::from_libs(vec!["std_all".into(), "-std_math".into()]);
+    let runtime = PastaLuaRuntime::with_config(create_empty_context(), config).unwrap();
+    assert!(runtime.exec("return math").unwrap().is_nil());
+}
+
 // ============================================================================
 // load_scene_dic
 // ============================================================================

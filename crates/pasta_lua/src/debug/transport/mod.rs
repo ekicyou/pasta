@@ -160,16 +160,22 @@ impl Transport {
         };
 
         // Enabled: build the listener via socket2 so SO_REUSEADDR is set BEFORE
-        // bind (R3.1). std `TcpListener::bind` cannot set SO_REUSEADDR pre-bind,
-        // so we drive the raw socket: SO_REUSEADDR → bind → listen → convert to a
-        // std `TcpListener`, then set it NON-BLOCKING. Non-blocking is the
+        // bind on non-Windows (R3.1). std `TcpListener::bind` cannot set
+        // SO_REUSEADDR pre-bind, so we drive the raw socket: [SO_REUSEADDR] →
+        // bind → listen → convert to a std `TcpListener`, then set it
+        // NON-BLOCKING. Non-blocking is the
         // precondition for `serve()`'s interruptible accept poll loop: a parked
         // accept must yield `WouldBlock` so the loop can check the shutdown flag
         // and wind down (R2.2/R2.3). Any socket2 / nonblocking step failing maps
         // to `DebugError::Bind` (same as today's bind-failure path, R3.1).
         let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))
             .map_err(DebugError::Bind)?;
-        socket.set_reuse_address(true).map_err(DebugError::Bind)?; // SO_REUSEADDR (R3.1/R3.2)
+        // SO_REUSEADDR only off Windows (R3.1/R3.2): on Unix it lets a reload
+        // rebind past TIME_WAIT. On Windows it would instead let a SECOND
+        // listener (another ghost) bind the same live port, and Windows needs no
+        // help to rebind after TIME_WAIT — so leave it unset there.
+        #[cfg(not(windows))]
+        socket.set_reuse_address(true).map_err(DebugError::Bind)?;
         socket.bind(&addr.into()).map_err(DebugError::Bind)?;
         socket.listen(1).map_err(DebugError::Bind)?; // single-client design → tiny backlog
         let listener = TcpListener::from(socket);

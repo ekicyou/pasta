@@ -97,8 +97,11 @@ impl SearchContext {
                 Err(e) => Err(SearchError::SceneTableError(e)),
             }
         } else {
-            // Global search only
-            match self.scene_table.resolve_scene_id(name, &filters) {
+            // Global search only (local keys starting with ':' are excluded)
+            match self
+                .scene_table
+                .resolve_scene_id_unified("", name, &filters)
+            {
                 Ok(scene_id) => {
                     let scene = self.scene_table.get_scene(scene_id).ok_or_else(|| {
                         SearchError::InvalidArgument("Scene ID not found".to_string())
@@ -318,6 +321,15 @@ mod tests {
         // found via fallback (collect_scene_candidates has no fallback).
         let mut ctx = create_test_search_context();
         let result = ctx.search_scene("挨拶", Some("メイン_1")).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_search_scene_global_excludes_local_keys() {
+        // A global search for a ':'-prefixed name must not hit the local
+        // scene registered under ":メイン_1:選択肢_1".
+        let mut ctx = create_test_search_context();
+        let result = ctx.search_scene(":メイン_1:選択肢", None).unwrap();
         assert_eq!(result, None);
     }
 

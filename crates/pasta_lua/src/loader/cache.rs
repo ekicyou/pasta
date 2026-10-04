@@ -164,14 +164,18 @@ impl CacheManager {
         let cache_path = self.source_to_cache_path(source_path);
         let module_name = self.source_to_module_name(source_path);
 
-        // Validate cache path stays within cache directory (prevent directory traversal).
-        // `Path::starts_with` alone is lexical: a path like
-        // `{cache_dir}/pasta/scene/../../../evil.lua` passes the prefix check but
-        // escapes after OS resolution. Reject any `..` component in the remainder.
-        let escapes_cache_dir = match cache_path.strip_prefix(&self.cache_dir) {
-            Ok(rel) => rel.components().any(|c| matches!(c, Component::ParentDir)),
-            Err(_) => true,
-        };
+        // Reject sources outside base_dir or with `..` components (directory traversal).
+        // The cache path is derived from the module name, which maps `.` to `_`, so such
+        // a source would not escape the cache directory but land under a mangled name.
+        let relative = source_path
+            .strip_prefix(&self.base_dir)
+            .unwrap_or(source_path);
+        let escapes_cache_dir = relative.components().any(|c| {
+            matches!(
+                c,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        });
         if escapes_cache_dir {
             return Err(LoaderError::cache_write(
                 &cache_path,
@@ -216,27 +220,24 @@ impl CacheManager {
         let stem = Path::new(without_prefix).with_extension("");
         let stem_str = stem.to_string_lossy();
 
-        // Convert path separators to dots, hyphens to underscores
-        let module_path = stem_str.replace(['/', '\\'], ".").replace('-', "_");
+        // Dots and hyphens to underscores (`require` maps every `.` to a path
+        // separator), then path separators to dots
+        let module_path = stem_str.replace(['.', '-'], "_").replace(['/', '\\'], ".");
 
         format!("pasta.scene.{}", module_path)
     }
 
     /// Convert source path to cache file path.
     ///
+    /// Derived from [`Self::source_to_module_name`] the same way `require` resolves
+    /// a module name, so the two cannot diverge.
+    ///
     /// # Example
     /// `dic/baseware/system.pasta` → `{cache_dir}/pasta/scene/baseware/system.lua`
     pub fn source_to_cache_path(&self, source_path: &Path) -> PathBuf {
-        let relative = self.get_relative_path(source_path);
-
-        // Remove dic/ prefix
-        let without_prefix = Self::strip_component_prefix(&relative, &self.dic_prefix);
-
-        // Replace extension and convert hyphens
-        let lua_path = without_prefix.replace('-', "_");
-        let lua_path = Path::new(&lua_path).with_extension("lua");
-
-        self.cache_dir.join("pasta/scene").join(lua_path)
+        let module_name = self.source_to_module_name(source_path);
+        self.cache_dir
+            .join(format!("{}.lua", module_name.replace('.', "/")))
     }
 
     /// Strip `prefix` from a relative path string, only when it ends at a path

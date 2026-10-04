@@ -167,6 +167,30 @@ fn test_paren_single_term_in_binary() {
     }
 }
 
+#[test]
+fn test_paren_binary_keeps_all_terms() {
+    // （1＋2）＊3 → Paren(1 + 2) * 3（括弧内の演算が最初の項だけにならない）
+    let expr = parse_var_set_expr("（1＋2）＊3");
+    match expr {
+        Expr::Binary { op, lhs, rhs } => {
+            assert_eq!(op, BinOp::Mul);
+            assert_eq!(*rhs, Expr::Integer(3));
+            match *lhs {
+                Expr::Paren(ref inner) => assert_eq!(
+                    **inner,
+                    Expr::Binary {
+                        op: BinOp::Add,
+                        lhs: Box::new(Expr::Integer(1)),
+                        rhs: Box::new(Expr::Integer(2)),
+                    }
+                ),
+                ref other => panic!("Expected Paren lhs, got {:?}", other),
+            }
+        }
+        other => panic!("Expected Binary, got {:?}", other),
+    }
+}
+
 // ============================================================================
 // 変数参照を含む式
 // ============================================================================

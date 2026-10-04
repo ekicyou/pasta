@@ -187,9 +187,9 @@ source_map_sidecar = false  # 既定 false
 | `pasta_patterns` | 文字列の配列 | `["dic/**/*.pasta"]` | 読み込む `.pasta` ファイルの glob パターン |
 | `lua_search_paths` | 文字列の配列 | （[lua_search_paths](#lua_search_paths) 参照） | Lua モジュールの検索パス（優先順位順） |
 | `transpiled_output_dir` | 文字列 | `"profile/pasta/cache/lua"` | トランスパイルした Lua（キャッシュ）の出力先 |
-| `debug_mode` | 真偽値 | `true` | `true` のとき、読み込み時の処理件数（トランスパイル・スキップ・失敗・コピー）を info ログに、元のファイルが無くなったキャッシュを warn ログに出す |
+| `debug_mode` | 真偽値 | `true` | `true` のとき、読み込み時の処理件数（トランスパイル・スキップ・失敗・コピー）を info ログに出す |
 
-パスはすべて設置ディレクトリからの相対パスで書く。トランスパイル結果のキャッシュへの保存は、`debug_mode` の値に関わらず行われる。
+パスはすべて設置ディレクトリからの相対パスで書く。トランスパイル結果のキャッシュへの保存は、`debug_mode` の値に関わらず行われる。元のファイルが無くなったキャッシュ（孤立キャッシュ）は、`debug_mode` の値に関わらず warn ログに出る（削除はしない）。`true` のときは各パスがもう一度出る。
 
 #### pasta_patterns
 
@@ -417,7 +417,7 @@ level = "debug"
 filter = "debug,pasta_shiori=info"
 ```
 
-- `file_path` に書けるのは、`profile` で始まり `..` を含まない相対パスだけである。条件を満たさない値のときはログファイルが作られない（ゴーストの起動は続く）。
+- `file_path` に書けるのは、`profile` で始まり `..` を含まない相対パスだけである。条件を満たさない値のときはログファイルが作られない（ゴーストの起動は続き、`level`・`filter` は反映される）。
 - `filter`・`level` として解釈できない値のときは `info` になる。
 - 環境変数 `PASTA_LOG` が設定されていると、`filter`・`level` より優先される。
 - Lua からのログ出力は [@pasta_log](https://ekicyou.github.io/pasta/lua/modules/pasta-log.html)、起動に失敗したときのログの読み方は [ゴーストが起動しない・喋らないとき](https://ekicyou.github.io/pasta/reference/startup.html#4-ゴーストが起動しない喋らないとき) を参照する。

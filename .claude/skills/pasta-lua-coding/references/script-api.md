@@ -351,7 +351,7 @@ act:choice(target, display?) -> act
 | `display` | string または nil | 表示テキスト。`nil` なら `target` を表示する |
 
 - `\![*]\q[表示テキスト,ID]` を出力する選択肢を積む。表示テキストと ID の中の `\`・`]`・`,` は `\` でエスケープされる。
-- 選ばれると、OnChoiceSelectEx の既定の処理が、ID と前方一致するローカルシーンを、直前に実行したグローバルシーンの配下から探して実行する（[OnChoiceSelectEx](shiori-events.md#onchoiceselectex)）。
+- 選ばれると、OnChoiceSelectEx の既定の処理が、ID と前方一致するローカルシーンを、直前に実行したグローバルシーンの配下から探して実行する。見つからなければ、ID と前方一致するグローバルシーンを探す（[OnChoiceSelectEx](shiori-events.md#onchoiceselectex)）。
 - 表示制御と同じく、1 回の出力の中で `talk`・`sakura_script` より前に積むと出力されない（[表示制御](#表示制御)）。
 - DSL の選択肢行 `＠？行き先` も同じ選択肢を出力する（[選択肢行](https://ekicyou.github.io/pasta/grammar/block-structure.html#選択肢行)）。
 

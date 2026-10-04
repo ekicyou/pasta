@@ -129,8 +129,7 @@ metadata:
 function SCENE.func_name(act)
     local save, var = act:init_scene(SCENE)  -- 必須: save/var を取得
     act:talk(act.さくら.actor, "セリフ")    -- アクター名でトーク
-    act:yield()                               -- トークンをyield
-end
+end                                           -- 終了時に自動で出力（末尾に yield は書かない）
 ```
 
 ---

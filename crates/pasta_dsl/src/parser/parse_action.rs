@@ -407,14 +407,7 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Option<Expr> {
                 args,
             })
         }
-        Rule::paren_expr => {
-            for inner in pair.into_inner() {
-                if let Some(expr) = try_parse_expr(inner) {
-                    return Some(Expr::Paren(Box::new(expr)));
-                }
-            }
-            None
-        }
+        Rule::paren_expr => parse_expr_from_parts(pair).map(|e| Expr::Paren(Box::new(e))),
         Rule::add_op | Rule::sub_op | Rule::mul_op | Rule::div_op | Rule::modulo_op => {
             // Binary operators are handled at a higher level
             None

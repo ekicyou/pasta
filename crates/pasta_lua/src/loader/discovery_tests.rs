@@ -506,3 +506,17 @@ fn test_discover_skips_symlinked_directory() {
     assert_eq!(files.len(), 3);
     assert!(!file_names.contains(&"secret.pasta".to_string()));
 }
+
+#[test]
+fn test_discover_base_dir_with_glob_metacharacters() {
+    let temp = TempDir::new().unwrap();
+    let base_dir = temp.path().join("ghost[1]");
+    fs::create_dir_all(base_dir.join("dic/greeting")).unwrap();
+    fs::write(base_dir.join("dic/greeting/hello.pasta"), "# hello").unwrap();
+
+    let patterns = vec!["dic/*/*.pasta".to_string()];
+    let files = discover_files(&base_dir, &patterns).unwrap();
+
+    assert_eq!(files.len(), 1);
+    assert!(files[0].ends_with("dic/greeting/hello.pasta"));
+}

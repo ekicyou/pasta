@@ -81,7 +81,9 @@ pub(crate) fn discover_files(
             continue;
         }
 
-        let full_pattern = base_dir.join(pattern);
+        // Escape glob metacharacters (e.g. `[`) in the install path only, not in the user pattern
+        let escaped_base = glob::Pattern::escape(&base_dir.to_string_lossy());
+        let full_pattern = Path::new(&escaped_base).join(pattern);
         let pattern_str = full_pattern.to_string_lossy();
 
         tracing::debug!(pattern = %pattern_str, "Searching for files");
