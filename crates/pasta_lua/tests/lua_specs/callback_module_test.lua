@@ -12,6 +12,8 @@ local mocks = require("lua_test.mocks")
 -- 共通リロード: callback/store（reset_res=true なら res も）を package.loaded から
 -- 一括リロードする（スイート分離規約）。呼び出し前に mocks.install を済ませること。
 local function reload_callback_modules(reset_res)
+    -- EVENT も外す: 次の require("pasta.shiori.event") が読み直した CALLBACK・STORE を使うようにする
+    package.loaded["pasta.shiori.event"] = nil
     package.loaded["pasta.shiori.event.callback"] = nil
     package.loaded["pasta.store"] = nil
     if reset_res then
@@ -504,5 +506,82 @@ describe("CALLBACK.sweep", function()
         if result then
             expect(result:find("500 Internal Server Error")).not_:toBe(nil)
         end
+    end)
+end)
+
+-- ============================================================================
+-- callback-resume-unification 1.1: EVENT.drive の失敗の経路での予約の掃除
+-- 予約（stage_pending）の後、中断せずにエラーで終わるシーンの予約が残ると、
+-- 次にコルーチンを返すイベントで古いイベント名での登録や「multiple staging」が起きる（2.4）
+-- ============================================================================
+describe("EVENT.drive - エラー時の予約の掃除", function()
+    local CALLBACK, STORE, EVENT, REG
+
+    local function setup()
+        mocks.reset()
+        mocks.install()
+        CALLBACK, STORE = reload_callback_modules(true)
+        STORE.reset()
+        CALLBACK.reset()
+        EVENT = require("pasta.shiori.event")
+        REG = require("pasta.shiori.event.register")
+        -- 予約した直後に中断せずエラーで終わるシーン
+        REG.OnTestStageThenError = function()
+            return coroutine.create(function()
+                CALLBACK.stage_pending("OnPastaCallBack1", 999999, "timeout")
+                error("scene exploded")
+            end)
+        end
+    end
+
+    local function teardown()
+        REG.OnTestStageThenError = nil
+        REG.OnTestNext = nil
+    end
+
+    test("エラーの後のイベントのシーンが古いイベント名で待機に登録されない", function()
+        setup()
+        local ok, err = pcall(EVENT.fire, { id = "OnTestStageThenError" })
+        expect(ok):toBe(false)
+        expect(tostring(err):find("scene exploded", 1, true)).not_:toBe(nil)
+        expect(STORE.co_scene):toBe(nil)
+
+        local co2
+        REG.OnTestNext = function()
+            co2 = coroutine.create(function()
+                coroutine.yield("talk2")
+                coroutine.yield("talk3")
+            end)
+            return co2
+        end
+        EVENT.fire({ id = "OnTestNext" })
+
+        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
+        expect(next(CALLBACK.pending)):toBe(nil)
+        expect(STORE.co_scene):toBe(co2)
+        expect(STORE.co_callback):toBe(nil)
+        teardown()
+    end)
+
+    test("エラーの後のイベントのシーンが予約しても multiple staging にならない", function()
+        setup()
+        pcall(EVENT.fire, { id = "OnTestStageThenError" })
+
+        local co2
+        REG.OnTestNext = function()
+            co2 = coroutine.create(function()
+                CALLBACK.stage_pending("OnPastaCallBack2", 999999, "timeout2")
+                coroutine.yield("get_tag")
+            end)
+            return co2
+        end
+        local ok, err = pcall(EVENT.fire, { id = "OnTestNext" })
+
+        expect(ok):toBe(true)
+        expect(err ~= nil and tostring(err):find("multiple staging", 1, true)):toBe(nil)
+        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
+        expect(CALLBACK.pending["OnPastaCallBack2"].co):toBe(co2)
+        expect(STORE.co_scene):toBe(nil)
+        teardown()
     end)
 end)

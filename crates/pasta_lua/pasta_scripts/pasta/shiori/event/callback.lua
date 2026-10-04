@@ -65,6 +65,12 @@ function CALLBACK.consume_staged(co, act)
     return true
 end
 
+--- 消費されていない予約を捨てる（予約が無ければ何もしない）
+--- EVENT.drive の失敗の経路だけが呼ぶ。pending・STORE には触れない
+function CALLBACK.discard_staged()
+    _staged = nil
+end
+
 --- 到着イベントが pending と一致するなら該当コルーチンを resume してレスポンスを返す
 --- @param req table SHIORI リクエスト
 --- @return string|nil response 一致時は SHIORI レスポンス文字列、不一致は nil
