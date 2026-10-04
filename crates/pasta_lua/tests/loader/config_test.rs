@@ -436,3 +436,34 @@ filter = "warn,pasta_lua=debug"
         "[lua] libs = [\"env\"] must not enable @env"
     );
 }
+
+/// 5.1: 不正な `[logging] file_path`（`profile/` の下にない `profile.log`）でも、ローダは
+/// 既定のログファイルのロガーを登録して起動を続ける。warn の内容は専用バイナリの
+/// `logging_file_path_fallback_test.rs` で見る（購読者がプロセスに 1 つのため）。
+#[test]
+fn invalid_log_file_path_falls_back_to_default_logger() {
+    use crate::common::copy_fixture_to_temp;
+    use pasta_lua::GlobalLoggerRegistry;
+    use pasta_lua::loader::PastaLoader;
+
+    let temp = copy_fixture_to_temp("minimal");
+    let base_dir = temp.path();
+    std::fs::write(
+        base_dir.join("pasta.toml"),
+        "[loader]\ndebug_mode = true\n\n[logging]\nfile_path = \"profile.log\"\n",
+    )
+    .unwrap();
+
+    let runtime = PastaLoader::load(base_dir).expect("load must continue with invalid file_path");
+
+    let registry = GlobalLoggerRegistry::instance();
+    let logger = registry.get(base_dir);
+    registry.unregister(base_dir);
+    drop(runtime);
+
+    let logger = logger.expect("a fallback logger must be registered for the ghost dir");
+    assert_eq!(logger.log_path(), base_dir.join(default_log_file_path()));
+    drop(logger);
+    assert!(base_dir.join(default_log_file_path()).exists());
+    assert!(!base_dir.join("profile.log").exists());
+}
