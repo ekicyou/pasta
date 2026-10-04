@@ -12,7 +12,7 @@
 
 ### Goals
 
-- どんなシーン名でも登録名が一意で、最後の `_` と数字で一通りに分けられる（1.1〜1.6）。
+- どんなシーン名でも登録名が一意で、最後の `_` と数字で一通りに分けられる（1.1〜1.7）。
 - シーン検索は通し番号を除いた照合用の名前と前方一致させる（グローバル・ローカルとも。2.1〜2.12）。
 - 位置からのキックは登録名の完全一致で引く（5.1〜5.5）。デバッガの索引は定義元のファイルごとに突き合わせる（4.1〜4.5）。
 - 登録名を作る規則・分ける規則を Rust 1 か所・Lua 1 か所にまとめる（6.1〜6.3）。
@@ -43,8 +43,7 @@
 
 - `act.lua`（`act-token-grouping-fix`）・`actor.lua`（`actor-proxy-act-delegation`）。本設計は 1 行も触れない。
 - `pasta_core` の `registry/random.rs` と、`scene_table.rs` のシャッフル部分（`select_from_cache`）。`search-selector-indices` が持つ。
-- 生成器（`code_gen`）の出力バイト列。ローカルシーン関数名の組み立てを共通関数に差し替えるだけで、出力は変えない。
-- ローカルシーンの通し番号の採番キー（`scope_gen.rs` は生の名前ごとに数える）。変えない（Open Questions 5）。
+- 生成器（`code_gen`）の出力バイト列。ローカルシーン関数名の組み立てを共通関数に差し替え、通し番号を照合用の名前ごとに数える。照合用の名前が重なるローカルシーン（`・挨拶・1` と `・挨拶_1`）がある場合を除き、出力は変えない。
 - 辞書確定前のレジストリに、キャッシュ済みで再トランスパイルされなかったファイルのシーンが入らないこと（既存の制約）。変えない（Open Questions 3）。
 - VSCode 拡張（シーン名を解析しない）、保存データ（登録名は永続化されない）。
 
@@ -141,7 +140,7 @@ graph TB
 **pasta_lua（Rust）**
 
 - `crates/pasta_lua/src/transpiler.rs` — 206 行の単語スコープ名を `registered_name` に替える。220〜224 行のローカルシーン登録に、生成器と同じ名前ごとの通し番号を渡す。
-- `crates/pasta_lua/src/code_gen/scope_gen.rs` — 242 行のローカル関数名 `format!("{}_{}", …)` を `registered_name` に替える（出力は同じ）。157 行付近のコメントの `会話N` を新形式にする。
+- `crates/pasta_lua/src/code_gen/scope_gen.rs` — 182 行のローカルシーンの通し番号を、照合用の名前（`sanitize_name` の結果）ごとに数える（1.7）。242 行のローカル関数名 `format!("{}_{}", …)` を `registered_name` に替える（出力は同じ）。157 行付近のコメントの `会話N` を新形式にする。
 - `crates/pasta_lua/src/code_gen/source_map.rs` — コメントの例（`会話1`）だけ更新する。
 - `crates/pasta_lua/src/runtime/finalize.rs` — `build_scene_registry` を、照合用の名前・通し番号の昇順で登録する形に変える（`HashMap` の走査順に依存しない）。
 - `crates/pasta_lua/src/search/context.rs` — コメントの形式の説明を 1 形式にする。振る舞いは変えない。「確定前／確定後」2 形式のテストを 1 つにまとめる。
@@ -209,6 +208,7 @@ sequenceDiagram
 | 1.4 | 一通りに復元できる | RegisteredNameRule | `split_registered_name` | — |
 | 1.5 | `:` を含めない | RegisteredNameRule | `registered_name`（サニタイズ済み＋`_`＋数字） | — |
 | 1.6 | 通し番号・ローカル形式を変えない | SceneLua、TranspileRegistry | — | — |
+| 1.7 | 照合用の名前が同じローカルシーンを上書きしない | TranspileRegistry | 通し番号のキーを `sanitize_name` の結果にする | 登録 |
 | 2.1 | 通し番号を除いた名前と前方一致 | SceneSearchKey | `fn_name_to_search_key` | 検索 |
 | 2.2 | `＞A1` は `＊A` を候補にしない | SceneSearchKey | 同上 | 検索 |
 | 2.3 | `SCENE.search("A1")`・`search_scene("A1")` | SceneSearchKey | 同上 | 検索 |
@@ -250,7 +250,7 @@ sequenceDiagram
 | RegisteredNameRule | pasta_core | 登録名を作る・分ける規則 | 1.1, 1.2, 1.4, 1.5, 6.1 | `sanitize_name`（P0） | Service |
 | SceneSearchKey | pasta_core | 通し番号を除いた名前を検索キーにする | 2.1〜2.8, 2.10, 2.11 | RegisteredNameRule（P0） | Service |
 | FinalizeOrdering | pasta_lua runtime | 辞書確定の登録順を決める | 2.9 | RegisteredNameRule（P0） | Batch |
-| TranspileRegistry | pasta_lua transpiler | 辞書確定前のレジストリを同じ形式にする | 2.12, 3.3, 6.1 | RegisteredNameRule（P0） | Service |
+| TranspileRegistry | pasta_lua transpiler | 辞書確定前のレジストリを同じ形式にし、ローカルシーンの通し番号を照合用の名前ごとに数える | 1.7, 2.12, 3.3, 6.1 | RegisteredNameRule（P0） | Service |
 | SceneLua | pasta_lua Lua | 実行時に登録名を作る | 1.1, 1.3, 1.6, 3.1〜3.3, 6.1 | `STORE.counters`（P0） | Service |
 | KickDispatch | pasta_lua Lua | キックを完全一致で解決する | 5.1〜5.5 | `SCENE.get`・`get_start`（P0） | Service |
 | SceneJoin | pasta_lua debug | 定義元のファイルごとに記録と登録名を突き合わせる | 4.1〜4.5, 6.2 | RegisteredNameRule（P0）、`collect_scenes`（P0） | Batch |
@@ -392,12 +392,12 @@ impl SceneTable {
 | Field | Detail |
 |-------|--------|
 | Intent | 辞書確定前の `@pasta_search` が、確定後と同じ形式の登録名と照合相手を使うようにする |
-| Requirements | 2.12, 3.3, 6.1 |
+| Requirements | 1.7, 2.12, 3.3, 6.1 |
 
 **Responsibilities & Constraints**
 
 - `transpiler.rs` 206 行の単語スコープ名を `SceneRegistry::registered_name(&scene.name, counter)` にする（`メイン1` → `メイン_1`）。
-- ローカルシーンの登録に、生成器（`scope_gen.rs` 179〜187 行）と同じ「名前ごとの通し番号」を渡す。`register_local` の引数を `local_counter` に改め、登録名が生成コードの関数名（`選択肢_1`）と一致するようにする。
+- ローカルシーンの登録に、生成器（`scope_gen.rs` 179〜187 行）と同じ「照合用の名前ごとの通し番号」を渡す。生成器も、数えるキーを書いたままの名前から照合用の名前に変える（1.7。`・挨拶・1` は `挨拶_1_1`、`・挨拶_1` は `挨拶_1_2` になり、関数が上書きされない）。`register_local` の引数を `local_counter` に改め、登録名が生成コードの関数名（`選択肢_1`）と一致するようにする。
 - `scope_gen.rs` 242 行のローカル関数名は `registered_name` で作る。出力バイト列は変わらない（スナップショットは変わらない）。
 - 範囲: 本コンポーネントが保証するのは「登録名の形式」と「照合相手」が確定後と同じであること。ファイルをまたぐ通し番号と、キャッシュ済みファイルのシーンが入らないことは、既存の制約のまま（Open Questions 3）。
 
@@ -563,6 +563,7 @@ function KICK.try_dispatch(act) end
 
 - `SceneRegistry::registered_name`／`split_registered_name` の往復一致: `メイン`・`章11`・`章_1`・`会話・朝`・`_` だけの名前（8.5・1.4）。分けられない名前（`__start__`・`加算ループ`・`_1`・数字が大きすぎる名前）は (全体, None)。
 - `registered_name("A1", 1)` ≠ `registered_name("A", 11)`（1.2）。結果に `:` が無い（1.5）。
+- 生成器: 同じグローバルシーンの中の `・挨拶・1` と `・挨拶_1` が、別々の関数名（`挨拶_1_1`・`挨拶_1_2`）になる（1.7）。
 - `SceneTable`: `A`×11＋`A1` で、`A1` の検索の候補が `A1_1` だけ（2.2）。`章`×2＋`章_1` で、`章_1` の検索の候補に `章_1`・`章_2` が入らない（2.4）。ローカル `挨拶`×10＋`挨拶_1` で同様（2.10）。`メイン_1` を検索しても `メイン` の 1 つ目が候補にならない（2.5）。`加算ループ` はキーが名前の全体、`step_2` はキーが `step`（2.11）。
 - `scene_join`: `章`×11＋`章11` の記録と実行時の名前で、`G:章11#1` が `章11_1` に、`G:章#11` が `章_11` に解決する（4.1・8.3）。実行時に無い記録は索引に入らない（4.3）。2 ファイルの記録がどちらも `G:雑談#1` のとき、それぞれ自分のファイルの登録名（`雑談_1`・`雑談_2`）に解決する（4.5）。
 
@@ -622,7 +623,6 @@ function KICK.try_dispatch(act) end
 6. **要件 8.6 とキックのテスト**: キックのテストは、要件 5（完全一致）の振る舞いの変更に伴って前提ごと書き換える。要件 8.6 にその旨を足した。
 
 7. **ファイルをまたぐ同名シーンのデバッガ索引（4.5）**: 本仕様に含める。実行時のシーンを定義元の `.pasta` ファイルごとに分け、ファイルの中の順位で記録と突き合わせる（SceneJoin）。読み込み順の仮定には頼らない。
+8. **ローカルシーンの通し番号を数えるキー（1.7）**: 本仕様に含める。照合用の名前ごとに数える（グローバルシーンと同じ）。生成コードが変わるのは、照合用の名前が重なるローカルシーンがある場合だけである。
 
-### 未決（設計ディスカッションの議題）
-
-- **ローカルシーンの通し番号の採番キー**: `scope_gen.rs` 182 行は生の名前ごとに数えるため、照合用の名前が同じになる 2 つのローカル名（`・挨拶・1` と `・挨拶_1`）は同じ関数名になり、片方が上書きされる。
+未決の項目は無い。
