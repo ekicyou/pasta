@@ -1,6 +1,11 @@
 [loader]
 debug_mode = true
 
+# OnTalk の機会を決定論化するため talk 間隔を固定（get_property → チェイントーク E2E 用）
+[ghost]
+talk_interval_min = 10
+talk_interval_max = 10
+
 # テスト用アクター定義（talk()チェーン + get_property 干渉テスト用）
 [actor."さくら"]
 spot = 0
