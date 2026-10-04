@@ -193,6 +193,15 @@ describe("ACT - set_spot() トークン化", function()
         expect(before):toBe(after)
         expect(act.token[1].spot):toBe(99)
     end)
+
+    test("未登録アクターの set_spot() は何もせず無視する（％行・dsl-codegen-runtime-safety 2.8）", function()
+        local ACT = require("pasta.act")
+        local act = ACT.new(create_mock_actors())
+
+        act:set_spot("未登録さん", 1)
+
+        expect(#act.token):toBe(0)
+    end)
 end)
 
 -- ============================================================================
