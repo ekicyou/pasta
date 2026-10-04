@@ -4,7 +4,6 @@
 
 use mlua::StdLib;
 use mlua::prelude::*;
-use pasta_lua::loader::LuaConfig;
 use pasta_lua::runtime::lua_require;
 use pasta_lua::{ConfigError, RuntimeConfig};
 
@@ -186,16 +185,16 @@ fn test_should_enable_module_subtraction_without_positive() {
 }
 
 // ============================================================================
-// From<LuaConfig> tests
+// default_libs public paths
 // ============================================================================
 
 #[test]
-fn test_from_lua_config() {
-    let lua_config = LuaConfig {
-        libs: vec!["std_all".into(), "testing".into()],
-    };
-    let runtime_config: RuntimeConfig = lua_config.into();
-    assert_eq!(runtime_config.libs, vec!["std_all", "testing"]);
+fn test_default_libs_public_paths_agree() {
+    let expected = vec!["std_all", "assertions", "testing", "regex", "json", "yaml"];
+    assert_eq!(pasta_lua::runtime::default_libs(), expected);
+    assert_eq!(pasta_lua::default_libs(), expected);
+    assert_eq!(pasta_lua::loader::default_libs(), expected);
+    assert_eq!(RuntimeConfig::new().libs, expected);
 }
 
 // ============================================================================

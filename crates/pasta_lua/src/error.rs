@@ -120,8 +120,8 @@ impl fmt::Display for SpanDisplay {
 
 /// Configuration errors for Lua library settings.
 ///
-/// These errors occur during configuration parsing and validation,
-/// particularly for the `[lua]` section's `libs` array.
+/// These errors occur while validating a `RuntimeConfig`,
+/// particularly its `libs` array.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum ConfigError {
     /// Unknown library name in libs array.

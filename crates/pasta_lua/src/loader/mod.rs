@@ -33,14 +33,15 @@ mod source_map_build;
 
 pub use cache::{CURRENT_VERSION, CacheManager};
 pub use config::{
-    DebugFileConfig, GhostConfig, LoaderConfig, LoggingConfig, LuaConfig, PastaConfig,
-    PersistenceConfig, TalkConfig, default_debug_port, default_hour_margin, default_libs,
-    default_log_file_path, default_lua_search_paths, default_spot_newlines,
-    default_talk_interval_max, default_talk_interval_min,
+    DebugFileConfig, GhostConfig, LoaderConfig, LoggingConfig, PastaConfig, PersistenceConfig,
+    TalkConfig, default_debug_port, default_hour_margin, default_log_file_path,
+    default_lua_search_paths, default_spot_newlines, default_talk_interval_max,
+    default_talk_interval_min,
 };
 pub use context::LoaderContext;
 pub use error::{LoaderError, TranspileFailure};
 
+pub use crate::runtime::default_libs;
 use crate::runtime::{PastaLuaRuntime, RuntimeConfig};
 
 use std::fs;

@@ -6,8 +6,22 @@
 use crate::debug::kick::KickSink;
 use crate::debug::{DebugConfig, DebugFileConfig};
 use crate::error::ConfigError;
-use crate::loader::{LuaConfig, default_libs};
 use mlua::{Function, Lua, Result as LuaResult, StdLib, Value};
+
+/// Default libs configuration used by [`RuntimeConfig::new`].
+///
+/// Returns: ["std_all", "assertions", "testing", "regex", "json", "yaml"]
+/// Note: `env` is excluded by default for security (filesystem access).
+pub fn default_libs() -> Vec<String> {
+    vec![
+        "std_all".into(),
+        "assertions".into(),
+        "testing".into(),
+        "regex".into(),
+        "json".into(),
+        "yaml".into(),
+    ]
+}
 
 /// Configuration for which standard libraries to enable in the Lua runtime.
 ///
@@ -56,7 +70,7 @@ pub struct RuntimeConfig {
     /// This is the ONE place the runtime VM init reads to decide whether to call
     /// [`crate::debug::enable`]. It defaults to **disabled** (`enabled = false`,
     /// `listen = None`), so every existing `RuntimeConfig` constructor
-    /// (`new`/`minimal`/`full`/`from_libs`/`From<LuaConfig>`) is zero-cost: no
+    /// (`new`/`minimal`/`full`/`from_libs`) is zero-cost: no
     /// hook, no port, no `std_debug` exposure (R5.2 / R5.3 / R5.5). The loader
     /// path overrides this via [`with_debug`](Self::with_debug) after resolving
     /// pasta.toml `[debug]` + the `PASTA_DEBUG`/`PASTA_DEBUG_PORT` environment.
@@ -315,16 +329,6 @@ impl RuntimeConfig {
 impl Default for RuntimeConfig {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl From<LuaConfig> for RuntimeConfig {
-    fn from(config: LuaConfig) -> Self {
-        Self {
-            libs: config.libs,
-            debug: DebugConfig::default(),
-            kick_sink: None,
-        }
     }
 }
 

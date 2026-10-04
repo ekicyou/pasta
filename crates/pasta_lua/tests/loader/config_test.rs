@@ -3,9 +3,7 @@
 //! from_str: #[cfg(test)] 除去 → pub に昇格
 //! default_lua_search_paths, default_log_file_path: pub に昇格
 
-use pasta_lua::loader::{
-    LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, default_log_file_path,
-};
+use pasta_lua::loader::{LoggingConfig, PastaConfig, PersistenceConfig, default_log_file_path};
 
 // ============================================================================
 // Task 4.4 — pasta.toml [debug] 提示モード/サイドカー供給 (requirements 6.3 / 3.2)
@@ -391,74 +389,4 @@ fn test_persistence_effective_file_path() {
         debug_mode: false,
     };
     assert_eq!(config.effective_file_path(), "profile/pasta/save/save.dat");
-}
-
-// ========================================
-// LuaConfig tests
-// ========================================
-
-#[test]
-fn test_lua_config_default() {
-    let config = LuaConfig::default();
-    assert_eq!(
-        config.libs,
-        vec!["std_all", "assertions", "testing", "regex", "json", "yaml"]
-    );
-}
-
-#[test]
-fn test_lua_config_from_toml() {
-    let toml_str = r#"
-[lua]
-libs = ["std_string", "std_table", "testing"]
-"#;
-    let config = PastaConfig::from_str(toml_str).unwrap();
-    let lua = config.lua().expect("lua section should exist");
-    assert_eq!(lua.libs, vec!["std_string", "std_table", "testing"]);
-}
-
-#[test]
-fn test_lua_config_with_subtraction() {
-    let toml_str = r#"
-[lua]
-libs = ["std_all", "-std_debug", "testing"]
-"#;
-    let config = PastaConfig::from_str(toml_str).unwrap();
-    let lua = config.lua().expect("lua section should exist");
-    assert_eq!(lua.libs, vec!["std_all", "-std_debug", "testing"]);
-}
-
-#[test]
-fn test_lua_config_empty_array() {
-    let toml_str = r#"
-[lua]
-libs = []
-"#;
-    let config = PastaConfig::from_str(toml_str).unwrap();
-    let lua = config.lua().expect("lua section should exist");
-    assert!(lua.libs.is_empty());
-}
-
-#[test]
-fn test_lua_config_defaults_when_libs_omitted() {
-    let toml_str = r#"
-[lua]
-"#;
-    let config = PastaConfig::from_str(toml_str).unwrap();
-    let lua = config.lua().expect("lua section should exist");
-    // libs should use default when omitted
-    assert_eq!(
-        lua.libs,
-        vec!["std_all", "assertions", "testing", "regex", "json", "yaml"]
-    );
-}
-
-#[test]
-fn test_lua_config_none_when_section_missing() {
-    let toml_str = r#"
-[loader]
-debug_mode = true
-"#;
-    let config = PastaConfig::from_str(toml_str).unwrap();
-    assert!(config.lua().is_none());
 }

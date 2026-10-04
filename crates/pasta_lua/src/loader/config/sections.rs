@@ -1,7 +1,7 @@
 //! Custom-field configuration sections for pasta.toml.
 //!
 //! These typed sections back the `PastaConfig` accessor methods
-//! (`logging()`, `persistence()`, `lua()`, `talk()`, `debug()`) and the
+//! (`logging()`, `persistence()`, `talk()`, `debug()`) and the
 //! SHIORI-profile `[ghost]` defaults applied at config-construction time.
 //! They are split out of `config/mod.rs` purely to keep each file small;
 //! the public surface is unchanged (re-exported via `pub use sections::*`).
@@ -107,66 +107,6 @@ impl PersistenceConfig {
             format!("{}.dat", self.file_path)
         } else {
             self.file_path.clone()
-        }
-    }
-}
-
-/// Lua library configuration from [lua] section in pasta.toml.
-///
-/// Configures which Lua standard libraries and mlua-stdlib modules to enable.
-/// Uses Cargo-style array notation with optional subtraction syntax.
-///
-/// # Examples
-///
-/// ```toml
-/// [lua]
-/// # Default: all safe libraries + common mlua-stdlib modules
-/// libs = ["std_all", "assertions", "testing", "regex", "json", "yaml"]
-///
-/// # Minimal configuration
-/// libs = []
-///
-/// # Subtraction syntax
-/// libs = ["std_all", "testing", "-std_debug"]
-/// ```
-#[derive(Debug, Clone, Deserialize)]
-pub struct LuaConfig {
-    /// Library configuration array.
-    ///
-    /// Supports Lua standard libraries (std_* prefix) and mlua-stdlib modules.
-    /// Use `-` prefix to subtract/exclude a library.
-    ///
-    /// Valid Lua standard libraries:
-    /// - `std_all` - All safe libraries (StdLib::ALL_SAFE)
-    /// - `std_all_unsafe` - All libraries including debug (StdLib::ALL)
-    /// - `std_coroutine`, `std_table`, `std_io`, `std_os`, `std_string`
-    /// - `std_math`, `std_package`, `std_debug`, `std_jit`, `std_ffi`, `std_bit`
-    ///
-    /// Valid mlua-stdlib modules:
-    /// - `assertions`, `testing`, `env`, `regex`, `json`, `yaml`
-    #[serde(default = "default_libs")]
-    pub libs: Vec<String>,
-}
-
-/// Default libs configuration.
-///
-/// Returns: ["std_all", "assertions", "testing", "regex", "json", "yaml"]
-/// Note: `env` is excluded by default for security (filesystem access).
-pub fn default_libs() -> Vec<String> {
-    vec![
-        "std_all".into(),
-        "assertions".into(),
-        "testing".into(),
-        "regex".into(),
-        "json".into(),
-        "yaml".into(),
-    ]
-}
-
-impl Default for LuaConfig {
-    fn default() -> Self {
-        Self {
-            libs: default_libs(),
         }
     }
 }
