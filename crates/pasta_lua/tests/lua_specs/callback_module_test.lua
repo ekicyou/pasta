@@ -363,7 +363,7 @@ describe("CALLBACK.try_route", function()
 end)
 
 describe("CALLBACK.sweep", function()
-    local CALLBACK
+    local CALLBACK, STORE
     local warn_calls
 
     local function setup()
@@ -378,7 +378,44 @@ describe("CALLBACK.sweep", function()
                 error = function() end,
             },
         })
-        CALLBACK = reload_callback_modules(true)
+        CALLBACK, STORE = reload_callback_modules(true)
+        STORE.co_scene = nil
+    end
+
+    -- act:get_property と同じく、理由付きで再開されたら理由のエラーで終わる待機シーン
+    local function timeout_scene(after)
+        local co = coroutine.create(function()
+            local _, reason = coroutine.yield()
+            if reason then
+                error(reason)
+            end
+            if after then
+                after()
+            end
+        end)
+        coroutine.resume(co)
+        return co
+    end
+
+    -- 応答の先頭行（ステータス行）
+    local function status_line(res)
+        return res:match("^([^\r\n]*)")
+    end
+
+    -- 応答のヘッダーの値（無ければ nil）
+    local function header(res, name)
+        return res:match("\r\n" .. name .. ": ([^\r\n]*)\r\n")
+    end
+
+    -- 警告ログのうち、needle を含むものの数
+    local function count_warns(needle)
+        local n = 0
+        for _, msg in ipairs(warn_calls) do
+            if msg:find(needle, 1, true) then
+                n = n + 1
+            end
+        end
+        return n
     end
 
     test("does nothing when no entries exist", function()
@@ -414,6 +451,8 @@ describe("CALLBACK.sweep", function()
             local val, reason = coroutine.yield()
             received_args.val = val
             received_args.reason = reason
+            -- act:get_property と同じく理由のエラーで終わる
+            error(reason)
         end)
         coroutine.resume(co)
 
@@ -470,11 +509,8 @@ describe("CALLBACK.sweep", function()
 
     test("returns only first string on_timeout as 500 among multiple timeouts", function()
         setup()
-        -- Create two timed-out entries with string on_timeout
-        local co1 = coroutine.create(function() coroutine.yield() end)
-        coroutine.resume(co1)
-        local co2 = coroutine.create(function() coroutine.yield() end)
-        coroutine.resume(co2)
+        local co1 = timeout_scene()
+        local co2 = timeout_scene()
 
         CALLBACK.pending["OnPastaCallBack1"] = {
             co = co1,
@@ -494,10 +530,180 @@ describe("CALLBACK.sweep", function()
         -- Both entries removed
         expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
         expect(CALLBACK.pending["OnPastaCallBack2"]):toBe(nil)
-        -- Only one 500 response (the first one encountered)
-        expect(result:find("500 Internal Server Error")).not_:toBe(nil)
-        -- Both should have been logged
+        -- 番号の小さい待機の 500 だけを採用する
+        expect(status_line(result)):toBe("SHIORI/3.0 500 Internal Server Error")
+        expect(header(result, "X%-Error%-Reason")):toBe("timeout reason 1")
+        -- 理由の警告 2 件と、捨てた応答の警告 1 件
+        expect(count_warns("OnPastaCallBack1: timeout reason 1")):toBe(1)
+        expect(count_warns("OnPastaCallBack2: timeout reason 2")):toBe(1)
+        expect(#warn_calls):toBe(3)
+    end)
+
+    -- ========================================================================
+    -- callback-resume-unification 2.2: 集める → 外す → 並べる → 順に再開
+    -- ========================================================================
+    test("番号の小さい順（1 → 2 → 10）に再開し、最初の応答を返して残りは警告して捨てる (2.1, 2.7)", function()
+        setup()
+        local order = {}
+        local function talk_scene(n)
+            local co = coroutine.create(function()
+                coroutine.yield()
+                order[#order + 1] = n
+                coroutine.yield("talk" .. n)
+            end)
+            coroutine.resume(co)
+            return co
+        end
+        CALLBACK.pending["OnPastaCallBack2"] = { co = talk_scene(2), act = {}, timeout_at = 50 }
+        CALLBACK.pending["OnPastaCallBack10"] = { co = talk_scene(10), act = {}, timeout_at = 50 }
+        CALLBACK.pending["OnPastaCallBack1"] = { co = talk_scene(1), act = {}, timeout_at = 50 }
+
+        local result = CALLBACK.sweep(200)
+
+        expect(table.concat(order, ",")):toBe("1,2,10")
+        expect(status_line(result)):toBe("SHIORI/3.0 200 OK")
+        expect(header(result, "Value")):toBe("talk1")
+        expect(select(2, result:gsub("SHIORI/3%.0", ""))):toBe(1)
+        expect(next(CALLBACK.pending)):toBe(nil)
+        -- 捨てた待機ごとに 1 件ずつ警告する
         expect(#warn_calls):toBe(2)
+        expect(count_warns("OnPastaCallBack2")):toBe(1)
+        expect(count_warns("OnPastaCallBack10")):toBe(1)
+    end)
+
+    test("番号を持たない名前は末尾に名前順で並ぶ (2.7)", function()
+        setup()
+        local order = {}
+        local function silent_scene(name)
+            local co = coroutine.create(function()
+                coroutine.yield()
+                order[#order + 1] = name
+            end)
+            coroutine.resume(co)
+            return co
+        end
+        for _, name in ipairs({ "OnZeta", "OnPastaCallBack3", "OnAlpha", "OnPastaCallBack1" }) do
+            CALLBACK.pending[name] = { co = silent_scene(name), act = {}, timeout_at = 50 }
+        end
+
+        CALLBACK.sweep(200)
+
+        expect(table.concat(order, ",")):toBe("OnPastaCallBack1,OnPastaCallBack3,OnAlpha,OnZeta")
+    end)
+
+    test("処理中に登録された待機は同じ回では扱わず pending に残す (2.2, 2.3)", function()
+        setup()
+        local resumed = 0
+        local co = coroutine.create(function()
+            coroutine.yield()
+            resumed = resumed + 1
+            -- 再度の get_property（期限は既に過ぎている）
+            CALLBACK.stage_pending("OnPastaCallBack2", 0, "again")
+            coroutine.yield("get_tag")
+            resumed = resumed + 1
+        end)
+        coroutine.resume(co)
+        CALLBACK.pending["OnPastaCallBack1"] = { co = co, act = {}, timeout_at = 50 }
+
+        local result = CALLBACK.sweep(200)
+
+        expect(resumed):toBe(1)
+        expect(header(result, "Value")):toBe("get_tag")
+        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
+        expect(CALLBACK.pending["OnPastaCallBack2"].co):toBe(co)
+        expect(STORE.co_scene):toBe(nil)
+        expect(STORE.co_callback):toBe(nil)
+        -- 予約は消費済み（次の予約が multiple staging にならない）
+        expect(pcall(CALLBACK.stage_pending, "OnPastaCallBack3", 999999, nil)):toBe(true)
+    end)
+
+    test("出力付きで中断したシーンは継続に入る (2.5)", function()
+        setup()
+        local co = coroutine.create(function()
+            coroutine.yield()
+            coroutine.yield() -- 出力の無い中断は同じ回の中で進める
+            coroutine.yield("talk1")
+            coroutine.yield("talk2")
+        end)
+        coroutine.resume(co)
+        CALLBACK.pending["OnPastaCallBack1"] = { co = co, act = {}, timeout_at = 50 }
+
+        local result = CALLBACK.sweep(200)
+
+        expect(status_line(result)):toBe("SHIORI/3.0 200 OK")
+        expect(header(result, "Value")):toBe("talk1")
+        expect(STORE.co_scene):toBe(co)
+    end)
+
+    test("静かなタイムアウトで再開したシーンの出力は 200 の応答になる (3.5)", function()
+        setup()
+        local co = coroutine.create(function()
+            coroutine.yield()
+            coroutine.yield("after silent timeout")
+        end)
+        coroutine.resume(co)
+        CALLBACK.pending["OnPastaCallBack1"] = { co = co, act = {}, timeout_at = 50, on_timeout = nil }
+
+        local result = CALLBACK.sweep(200)
+
+        expect(status_line(result)):toBe("SHIORI/3.0 200 OK")
+        expect(header(result, "Value")):toBe("after silent timeout")
+        expect(header(result, "X%-Error%-Reason")):toBe(nil)
+        expect(#warn_calls):toBe(0)
+    end)
+
+    test("1 つ目がエラーで終わっても 2 つ目を処理し、イベント名と理由を警告する (2.9, 3.3)", function()
+        setup()
+        local second_resumed = false
+        local co2 = coroutine.create(function()
+            coroutine.yield()
+            second_resumed = true
+            coroutine.yield("talk2")
+            coroutine.yield("talk3")
+        end)
+        coroutine.resume(co2)
+        CALLBACK.pending["OnPastaCallBack1"] = {
+            co = timeout_scene(), act = {}, timeout_at = 50, on_timeout = "reason one",
+        }
+        CALLBACK.pending["OnPastaCallBack2"] = { co = co2, act = {}, timeout_at = 50 }
+
+        local result = CALLBACK.sweep(200)
+
+        -- 理由付きの待機のエラーは timeout_message を理由とする 500（シーン内のエラー文字列は使わない）
+        expect(status_line(result)):toBe("SHIORI/3.0 500 Internal Server Error")
+        expect(header(result, "X%-Error%-Reason")):toBe("reason one")
+        expect(header(result, "Value")):toBe(nil)
+        -- 2 つ目も再開され、継続に入り、出力は警告して捨てる
+        expect(second_resumed):toBe(true)
+        expect(STORE.co_scene):toBe(co2)
+        expect(count_warns("OnPastaCallBack1: reason one")):toBe(1)
+        expect(count_warns("OnPastaCallBack2")):toBe(1)
+        expect(next(CALLBACK.pending)):toBe(nil)
+    end)
+
+    test("静かなタイムアウトのシーンのエラーは警告ログだけにし、2 つ目の出力を応答にする (2.9, 3.5)", function()
+        setup()
+        local co1 = coroutine.create(function()
+            coroutine.yield()
+            error("silent scene exploded")
+        end)
+        coroutine.resume(co1)
+        local co2 = coroutine.create(function()
+            coroutine.yield()
+            coroutine.yield("talk2")
+        end)
+        coroutine.resume(co2)
+        CALLBACK.pending["OnPastaCallBack1"] = { co = co1, act = {}, timeout_at = 50 }
+        CALLBACK.pending["OnPastaCallBack2"] = { co = co2, act = {}, timeout_at = 50 }
+
+        local result = CALLBACK.sweep(200)
+
+        expect(status_line(result)):toBe("SHIORI/3.0 200 OK")
+        expect(header(result, "Value")):toBe("talk2")
+        expect(#warn_calls):toBe(1)
+        expect(count_warns("OnPastaCallBack1")):toBe(1)
+        expect(count_warns("silent scene exploded")):toBe(1)
+        expect(STORE.co_scene):toBe(co2)
     end)
 
     -- ========================================================================
@@ -506,8 +712,7 @@ describe("CALLBACK.sweep", function()
     -- ========================================================================
     test("sweep: タイムアウト 500 は RES.err 経路で X-Error-Reason 正準ヘッダーを出力する (3.49 G3)", function()
         setup()
-        local co = coroutine.create(function() coroutine.yield() end)
-        coroutine.resume(co)
+        local co = timeout_scene()
 
         CALLBACK.pending["OnPastaCallBack1"] = {
             co = co,
@@ -530,8 +735,7 @@ describe("CALLBACK.sweep", function()
 
     test("sweep: 空文字列 on_timeout は RES.err 規約で Unknown error に正規化される (3.49 G3)", function()
         setup()
-        local co = coroutine.create(function() coroutine.yield() end)
-        coroutine.resume(co)
+        local co = timeout_scene()
 
         CALLBACK.pending["OnPastaCallBack1"] = {
             co = co,
@@ -548,10 +752,8 @@ describe("CALLBACK.sweep", function()
 
     test("handles mixed on_timeout types (string and nil)", function()
         setup()
-        local co1 = coroutine.create(function() coroutine.yield() end)
-        coroutine.resume(co1)
-        local co2 = coroutine.create(function() coroutine.yield() end)
-        coroutine.resume(co2)
+        local co1 = timeout_scene()
+        local co2 = timeout_scene()
 
         CALLBACK.pending["OnPastaCallBack1"] = {
             co = co1,
@@ -573,11 +775,9 @@ describe("CALLBACK.sweep", function()
         expect(CALLBACK.pending["OnPastaCallBack2"]):toBe(nil)
         -- Only one warn call (the string one)
         expect(#warn_calls):toBe(1)
-        -- Response may or may not be nil depending on iteration order,
-        -- but at least one had string on_timeout
-        if result then
-            expect(result:find("500 Internal Server Error")).not_:toBe(nil)
-        end
+        -- 理由付きの待機のエラーが応答になる（静かな待機は出力なしで終わり候補を作らない）
+        expect(status_line(result)):toBe("SHIORI/3.0 500 Internal Server Error")
+        expect(header(result, "X%-Error%-Reason")):toBe("timeout reason")
     end)
 end)
 

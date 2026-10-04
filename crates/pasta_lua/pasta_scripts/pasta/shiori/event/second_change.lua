@@ -11,7 +11,7 @@ local CALLBACK = require("pasta.shiori.event.callback")
 
 ---OnSecondChange デフォルトハンドラ
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス可能）
----@return string|thread|nil タイムアウト時は500レスポンス文字列、それ以外はシーンコルーチンまたはnil
+---@return string|thread|nil 掃引が応答を生んだ回はその応答（200 または 500 の全文）、それ以外はシーンコルーチンまたはnil
 REG.OnSecondChange = function(act)
     -- コールバックのタイムアウトsweepを先に実行
     local timeout_response = CALLBACK.sweep(os.time())

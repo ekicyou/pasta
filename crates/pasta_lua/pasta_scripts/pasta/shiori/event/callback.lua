@@ -107,32 +107,93 @@ function CALLBACK.try_route(req)
     return RES.ok(value)
 end
 
---- タイムアウト時刻超過エントリを掃引
---- @param now number 現在時刻（os.time() 戻り値）
---- @return string|nil response 最初の on_timeout=string エントリの 500 レスポンス、なければ nil
-function CALLBACK.sweep(now)
-    local timeout_response = nil
-    local to_remove = {}
+--- イベント名の番号（OnPastaCallBack{N} の N）。番号を持たない名前は nil
+--- @param event_id string
+--- @return number|nil
+local function callback_number(event_id)
+    return tonumber(event_id:match("^OnPastaCallBack(%d+)$"))
+end
+
+--- 番号の小さい順。番号を持たない名前は末尾に置き、名前の文字列順にする
+local function event_id_less(a, b)
+    local na, nb = callback_number(a), callback_number(b)
+    if na and nb then
+        return na < nb
+    end
+    if na or nb then
+        return na ~= nil
+    end
+    return a < b
+end
+
+--- 期限切れの待機を集めてから pending から外し、番号順に並べる
+--- 再開より前に外すため、再開中に登録された待機は同じ回では扱われない
+--- @param now number 現在時刻
+--- @return string[] event_ids 並べたイベント名
+--- @return table<string, table> entries イベント名 → 外した待機
+local function take_expired(now)
+    local event_ids = {}
     for event_id, entry in pairs(CALLBACK.pending) do
         if now > entry.timeout_at then
-            to_remove[#to_remove + 1] = event_id
-            if type(entry.on_timeout) == "string" then
-                coroutine.resume(entry.co, nil, entry.on_timeout)
-                log.warn(event_id .. ": " .. entry.on_timeout)
-                -- 3.49 (G3): RES.err 経路へ統一（旧インライン構築はヘッダーキーが
-                -- "X-ERROR-REASON" で res.lua の "X-Error-Reason" と不一致だった）
-                if timeout_response == nil then
-                    timeout_response = RES.err(entry.on_timeout)
-                end
+            event_ids[#event_ids + 1] = event_id
+        end
+    end
+    local entries = {}
+    for _, event_id in ipairs(event_ids) do
+        entries[event_id] = CALLBACK.pending[event_id]
+        CALLBACK.pending[event_id] = nil
+    end
+    table.sort(event_ids, event_id_less)
+    return event_ids, entries
+end
+
+--- 待機 1 つをタイムアウトとして EVENT.drive で再開し、応答の候補を返す
+--- @param event_id string
+--- @param entry table pending から外した待機
+--- @return string|nil candidate 出力なら 200、理由付きのエラーなら 500、それ以外は nil
+local function time_out(event_id, entry)
+    local reason = nil
+    if type(entry.on_timeout) == "string" then
+        reason = entry.on_timeout
+        log.warn(event_id .. ": " .. reason)
+    end
+    -- EVENT は呼び出し時に読み込む（読み込み時に require すると循環する）
+    local EVENT = require("pasta.shiori.event")
+    local ok, value = EVENT.drive(entry.co, entry.act, nil, reason)
+    if not ok then
+        if reason then
+            -- 理由はシーン内のエラー文字列ではなく timeout_message そのものを使う
+            return RES.err(reason)
+        end
+        -- 静かなタイムアウトのエラーは応答を作らず警告ログだけにする
+        log.warn(event_id .. ": scene error after silent timeout: " .. tostring(value))
+        return nil
+    end
+    if value ~= nil and value ~= "" then
+        return RES.ok(value)
+    end
+    return nil
+end
+
+--- 期限を過ぎた待機をタイムアウトとして再開し、その回の応答を 1 つ作る
+--- 集める → 外す → 番号順に並べる → 順に EVENT.drive で再開する。
+--- 最初の候補を応答に採用し、2 番目以降は警告ログを出して捨てる。途中のエラーでも残りを続ける。
+--- @param now number 現在時刻（os.time() 戻り値）
+--- @return string|nil response その回の応答（200 または 500 の全文）、応答が生まれなければ nil
+function CALLBACK.sweep(now)
+    local response = nil
+    local event_ids, entries = take_expired(now)
+    for _, event_id in ipairs(event_ids) do
+        local candidate = time_out(event_id, entries[event_id])
+        if candidate then
+            if response == nil then
+                response = candidate
             else
-                coroutine.resume(entry.co, nil)
+                log.warn(event_id .. ": timeout response discarded (an earlier response was adopted)")
             end
         end
     end
-    for _, event_id in ipairs(to_remove) do
-        CALLBACK.pending[event_id] = nil
-    end
-    return timeout_response
+    return response
 end
 
 --- 全状態リセット（テスト用）

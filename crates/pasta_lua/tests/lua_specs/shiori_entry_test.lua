@@ -264,8 +264,10 @@ describe("OnSecondChange - sweep タイムアウト分岐", function()
         reset_state()
         dispatcher._reset()
 
+        -- act:get_property と同じく理由のエラーで終わる待機シーン
         local co = coroutine.create(function()
-            coroutine.yield()
+            local _, reason = coroutine.yield()
+            error(reason)
         end)
         coroutine.resume(co)
         CALLBACK.pending["OnPastaCallBackEntryTimeout"] = {
