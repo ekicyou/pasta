@@ -1,15 +1,16 @@
 -- kick_local_composite_test.lua
 -- Lua-side BDD tests for KICK.try_dispatch の local-composite (`:parent:local`) 分岐
 -- pasta-scene-kick-from-cursor Task 3.1 (Requirements: 2.2, 2.4)
+-- scene-identity-format Task 2.2 (Requirements: 5.3, 5.4, 8.4, 8.6)
 --
--- 検証契約（composite-string 方式・debug 限定）:
+-- 検証契約（composite-string 方式・debug 限定・シーン表への完全一致）:
 --   KICK.try_dispatch(act):
---     - scene_name が `:会話1:挨拶_1` 形式 → local 分岐:
---         SCENE.search("挨拶_1", "会話1") の **local 分岐**で func を取得しコルーチン化
---         （global の __start__ へ潰さず local 同一性を保持）。
---     - scene_name に先頭 `:` が無い（`intro` 等）→ global 分岐:
---         従来通り SCENE.co_exec(act, scene)（act:find_scene 流用・挙動不変）。
---     - local-composite が解決不能（SCENE.search が nil）→ warn + drop + nil。
+--     - scene_name が `:会話_1:挨拶_1` 形式 → local 分岐:
+--         SCENE.get("会話_1", "挨拶_1") で親の中のローカルを完全一致で引きコルーチン化
+--         （global の __start__ へ潰さず local 同一性を保持・`挨拶_10` を再生しない）。
+--     - scene_name に先頭 `:` が無い（`会話_1` 等）→ global 分岐:
+--         SCENE.get_start("会話_1")（ローカルは再生しない）。
+--     - local-composite が解決不能（親の中に完全一致なし）→ warn + drop + nil。
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -29,124 +30,89 @@ local KICK = require("pasta.shiori.event.kick")
 local SCENE = require("pasta.scene")
 local STORE = require("pasta.store")
 
---- 最小モック act。
---- global 分岐は act:find_scene を使う。local 分岐は SCENE.search を使い act:build を呼ぶ。
---- @param resolvable boolean global 分岐用: find_scene が関数を返すか
---- @return table mock_act, table calls（find_scene の name 記録）
-local function make_act(resolvable)
-    local calls = { names = {} }
+--- 最小モック act。ラッパー（wrap_local_func）が co の中で resumed_act:build() を呼ぶ。
+--- @return table mock_act
+local function make_act()
     local act = {}
-    function act.find_scene(_self, name, _global_scene_name, _attrs)
-        table.insert(calls.names, name)
-        if resolvable then
-            return function(_resumed_act) end
-        end
-        return nil
-    end
-    -- local 分岐ラッパー（wrap_local_func）が co の中で resumed_act:build() を呼ぶ。
     function act.build(_self)
         return "<built>"
     end
-    return act, calls
+    return act
+end
+
+--- STORE を初期化して body を実行し、成否にかかわらず初期化し直す
+--- （アサーション失敗で後続スイートへシーン表・保留フラグを残さない）
+--- @param body fun()
+local function with_clean_state(body)
+    STORE.reset()
+    local ok, err = pcall(body)
+    STORE.reset()
+    if not ok then error(err, 0) end
+end
+
+--- 親 `会話_1` に __start__・`挨拶_1`・`挨拶_10` を登録する。再生されたシーンを ran に記録する。
+--- @return table ran 再生されたシーン名の列
+local function register_greetings()
+    local ran = {}
+    SCENE.register("会話_1", "__start__", function() table.insert(ran, "__start__") end)
+    SCENE.register("会話_1", "挨拶_1", function() table.insert(ran, "挨拶_1") end)
+    SCENE.register("会話_1", "挨拶_10", function() table.insert(ran, "挨拶_10") end)
+    return ran
 end
 
 describe("KICK.try_dispatch - local-composite (`:parent:local`) 分岐", function()
-    local original_search
+    test("`:会話_1:挨拶_1` は親の中の `挨拶_1` だけを再生し `挨拶_10` を再生しない（5.3）", function()
+        with_clean_state(function()
+            local ran = register_greetings()
+            STORE.kick_pending = ":会話_1:挨拶_1"
+            local act = make_act()
 
-    local function save_search()
-        original_search = SCENE.search
-    end
-    local function restore_search()
-        if original_search then
-            SCENE.search = original_search
-        end
-    end
+            local co = KICK.try_dispatch(act)
 
-    test("`:会話1:挨拶_1` は SCENE.search(local, parent) の local 分岐で解決する", function()
-        STORE.reset()
-        save_search()
+            -- コルーチンが返る
+            expect(type(co)):toBe("thread")
+            -- フラグ消費
+            expect(STORE.kick_pending):toBeNil()
 
-        local captured = {}
-        SCENE.search = function(name, global_scene_name, _attrs)
-            captured.name = name
-            captured.parent = global_scene_name
-            return {
-                func = function(act)
-                    -- local シーン本体が実行されたことを観測可能にする
-                    act.local_ran = true
-                end,
-                global_name = "会話1",
-                local_name = "挨拶_1",
-            }
-        end
-
-        STORE.kick_pending = ":会話1:挨拶_1"
-        local act = make_act(true)
-
-        local co = KICK.try_dispatch(act)
-
-        -- local 分岐: search に (local_name=挨拶_1, parent=会話1) が渡る
-        expect(captured.name):toBe("挨拶_1")
-        expect(captured.parent):toBe("会話1")
-        -- コルーチンが返る
-        expect(type(co)):toBe("thread")
-        -- フラグ消費
-        expect(STORE.kick_pending):toBeNil()
-
-        -- resume で local func が走り、build() の結果が返る（local 同一性を保持）
-        local ok, value = coroutine.resume(co, act)
-        expect(ok):toBe(true)
-        expect(act.local_ran):toBe(true)
-        expect(value):toBe("<built>")
-
-        restore_search()
+            -- resume で local func が走り、build() の結果が返る（local 同一性を保持）
+            local ok, value = coroutine.resume(co, act)
+            expect(ok):toBe(true)
+            expect(value):toBe("<built>")
+            expect(#ran):toBe(1)
+            expect(ran[1]):toBe("挨拶_1")
+        end)
     end)
 
-    test("local-composite が解決不能なら warn + drop + nil（kick_pending 消費）", function()
-        STORE.reset()
-        save_search()
+    test("local-composite が親の中で完全一致しなければ warn + drop + nil（kick_pending 消費）", function()
+        with_clean_state(function()
+            local ran = register_greetings()
+            -- `挨拶` は `挨拶_1`・`挨拶_10` の前方一致だが、完全一致ではない
+            STORE.kick_pending = ":会話_1:挨拶"
+            local act = make_act()
 
-        local searched = false
-        SCENE.search = function(_name, _parent, _attrs)
-            searched = true
-            return nil
-        end
+            local co = KICK.try_dispatch(act)
 
-        STORE.kick_pending = ":会話9:存在しない_1"
-        local act = make_act(true)
-
-        local co = KICK.try_dispatch(act)
-
-        expect(searched):toBe(true)
-        expect(co):toBeNil()
-        -- 解決不能でもフラグ消費（再発火しない）
-        expect(STORE.kick_pending):toBeNil()
-
-        restore_search()
+            expect(co):toBeNil()
+            expect(#ran):toBe(0)
+            -- 解決不能でもフラグ消費（再発火しない）
+            expect(STORE.kick_pending):toBeNil()
+        end)
     end)
 
-    test("先頭 `:` 無しは従来 global 分岐（co_exec→find_scene）で不変", function()
-        STORE.reset()
-        save_search()
+    test("先頭 `:` 無しは global 分岐（親の __start__ だけを再生しローカルは再生しない）", function()
+        with_clean_state(function()
+            local ran = register_greetings()
+            STORE.kick_pending = "会話_1"
+            local act = make_act()
 
-        -- local 分岐が誤って呼ばれていないことを観測するため search をトラップ
-        local local_branch_called = false
-        SCENE.search = function(_name, _parent, _attrs)
-            local_branch_called = true
-            return nil
-        end
+            local co = KICK.try_dispatch(act)
 
-        STORE.kick_pending = "intro"
-        local act, calls = make_act(true)
-
-        local co = KICK.try_dispatch(act)
-
-        -- global 分岐: act:find_scene("intro") を経由（SCENE.search の local 分岐は不使用）
-        expect(calls.names):toContain("intro")
-        expect(local_branch_called):toBe(false)
-        expect(type(co)):toBe("thread")
-        expect(STORE.kick_pending):toBeNil()
-
-        restore_search()
+            expect(type(co)):toBe("thread")
+            expect(STORE.kick_pending):toBeNil()
+            local ok = coroutine.resume(co, act)
+            expect(ok):toBe(true)
+            expect(#ran):toBe(1)
+            expect(ran[1]):toBe("__start__")
+        end)
     end)
 end)

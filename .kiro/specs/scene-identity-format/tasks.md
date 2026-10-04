@@ -19,7 +19,7 @@
   - 登録名の形式に依存しないので、タスク 1 とは独立に進められる。差し替えを前提にした既存のキックのテストはこの時点で落ちるので、大項目 2 が通るのは 2.2 の後である
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
   - _Boundary: KickDispatch_
-- [ ] 2.2 キックの Lua テストを完全一致の前提に書き換える
+- [x] 2.2 キックの Lua テストを完全一致の前提に書き換える
   - 検索・act の探索の差し替えを前提にした 3 つのキックのテストを、シーン表への登録を前提にしたテストに書き換える
   - `会話_1`・`会話_10` を登録して `会話_1` だけが再生される、`:会話_1:挨拶_1` で `挨拶_10` が再生されない、`GLOBAL` に同名の関数を置いても再生されない、一致なしで警告ログと nil になる、を確かめる
   - 書き換えたテストを含む Lua テスト一式が通る
@@ -110,3 +110,5 @@
 
 - 2.1: キックを完全一致にすると、2.2 に挙げた 3 ファイルのほかに、旧来の解決（`SCENE.co_exec`・`act:find_scene`・作者が書いた名前でのキック）を前提にしたテストも落ちる。`kick_reload_shiori_test` の「RELOAD_SENTINEL 以外は global へ素通り」、`virtual_dispatcher_kick_hook_test` の 3 件、`pasta_shiori` の `scene_kick_e2e_test`・`scene_kick_gate_e2e_test`・`scene_kick_preempt_e2e_test`・`scene_kick_multibeat_e2e_test`（作者名 `KickE2EProbe` 等でキックしている）。決定済み 6 と 8.6 に従い 2.2 で前提ごと書き換える。e2e のキック名は登録名（この時点では `KickE2EProbe1`、3.2 で `_1` 形式）にする。
 - 2.1: lua_unittest_runner は最初に落ちたスイートで止まる。キックのテストはアサーション失敗時にモックの復元まで届かず後続スイートを汚すので、書き換えるときは復元を必ず走らせる。
+- 2.2: `cargo test --all` の後に `crates/pasta_lua/profile/pasta/save/save.json` が変わることがある（テストの副産物）。`sample.generated.lua` と同じく `git checkout --` で戻し、コミットに混ぜない。
+- 2.2: `pasta_shiori` の e2e 4 本はキック名を登録名 `{name}1` で送っている（`scene_kick_e2e_test`・`scene_kick_multibeat_e2e_test` はキックの箇所、`scene_kick_gate_e2e_test`・`scene_kick_preempt_e2e_test` は `kick()` ヘルパー）。3.2 で `{name}_1` に替える。

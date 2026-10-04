@@ -29,22 +29,24 @@ end
 
 local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
 local KICK = require("pasta.shiori.event.kick")
+local SCENE = require("pasta.scene")
 local STORE = require("pasta.store")
 
 local function create_mock_act(req)
     return { req = req }
 end
 
--- KICK.try_dispatch は SCENE.co_exec(act, name) → act:find_scene(name) を使う。
--- SCENE.co_exec は scene_fn を wrapped_fn でラップし、末尾で resumed_act:build() を呼ぶ。
+-- KICK.try_dispatch はシーン表（STORE.scenes）から SCENE.get_start(name) で完全一致で引き、
+-- scene_fn をラッパーで包む。ラッパーは末尾で resumed_act:build() を呼ぶ。
 -- そのため scene_fn 内ではビートを coroutine.yield で吐き、build は nil を返すモックにする。
---- @param scene_fn function|nil 解決シーン関数（nil なら解決不能）
-local function make_act_with_scene(req, scene_fn)
-    local act = create_mock_act(req)
-    function act.find_scene(_self, _name, _global, _attrs)
-        return scene_fn
+--- @param name string キック対象の登録名
+--- @param scene_fn function|nil シーン表へ登録する開始関数（nil なら登録せず解決不能）
+local function make_act_with_scene(req, name, scene_fn)
+    if scene_fn then
+        SCENE.register(name, "__start__", scene_fn)
     end
-    -- co_exec の wrapped_fn 末尾で呼ばれる build。nil を返し追加ビートを生まない。
+    local act = create_mock_act(req)
+    -- ラッパー末尾で呼ばれる build。nil を返し追加ビートを生まない。
     function act.build(_self)
         return nil
     end
@@ -62,13 +64,24 @@ describe("KickDispatchHook - dispatch 前段キック起動と preempt", functio
         dispatcher.dispatch(init_act)
     end
 
-    test("kick_pending + status=talking で dispatch がキックシーン co を返す（R5.1）", function()
-        setup()
+    --- setup して body を実行し、成否にかかわらずシーン表・保留フラグ・dispatcher を初期化し直す
+    --- （アサーション失敗で後続スイートへ状態を残さない）
+    local function kick_test(name, body)
+        test(name, function()
+            setup()
+            local ok, err = pcall(body)
+            STORE.reset()
+            dispatcher._reset()
+            if not ok then error(err, 0) end
+        end)
+    end
+
+    kick_test("kick_pending + status=talking で dispatch がキックシーン co を返す（R5.1）", function()
         -- KICK.install 相当: 保留シーン名 + force を設置
         KICK.install("kick_scene")
 
         local act = make_act_with_scene(
-            { id = "OnSecondChange", status = "talking", date = { unix = 1702648900 } },
+            { id = "OnSecondChange", status = "talking", date = { unix = 1702648900 } }, "kick_scene",
             function(_resumed_act)
                 -- ビートは yield で吐く（wrapped_fn が末尾で build を呼ぶため）
                 coroutine.yield("kick_beat_1")
@@ -84,8 +97,7 @@ describe("KickDispatchHook - dispatch 前段キック起動と preempt", functio
         expect(value):toBe("kick_beat_1")
     end)
 
-    test("preempt: 前 co_scene がキック起動後に閉じる（R5.2 / 自動復帰なし R5.3）", function()
-        setup()
+    kick_test("preempt: 前 co_scene がキック起動後に閉じる（R5.2 / 自動復帰なし R5.3）", function()
         -- 前進行中シーン（suspended）を co_scene に据える
         local prev_co = coroutine.create(function()
             coroutine.yield("prev_beat")
@@ -96,7 +108,7 @@ describe("KickDispatchHook - dispatch 前段キック起動と preempt", functio
 
         KICK.install("kick_scene")
         local act = make_act_with_scene(
-            { id = "OnSecondChange", status = "talking", date = { unix = 1702648900 } },
+            { id = "OnSecondChange", status = "talking", date = { unix = 1702648900 } }, "kick_scene",
             function() return "kick_beat_1" end)
 
         -- dispatch はキック co を返す。preempt は EVENT.fire の set_co_scene で起こるため、
@@ -108,8 +120,7 @@ describe("KickDispatchHook - dispatch 前段キック起動と preempt", functio
         expect(result ~= prev_co):toBe(true)
     end)
 
-    test("kick_pending=nil でフックが完全素通り（既存 dispatch と同一・R6.3）", function()
-        setup()
+    kick_test("kick_pending=nil でフックが完全素通り（既存 dispatch と同一・R6.3）", function()
         -- キック未設置。talking は通常どおりブロックされ nil。
         expect(STORE.kick_pending):toBeNil()
         local act = create_mock_act({
@@ -122,8 +133,7 @@ describe("KickDispatchHook - dispatch 前段キック起動と preempt", functio
         expect(result):toBe(nil)
     end)
 
-    test("kick_pending=nil + idle で既存 dispatch と同一結果（バイト不変・R6.2/R6.3）", function()
-        setup()
+    kick_test("kick_pending=nil + idle で既存 dispatch と同一結果（バイト不変・R6.2/R6.3）", function()
         -- 既存挙動: 初回 idle dispatch 後の同一 tick は talk タイマ未到達で nil
         expect(STORE.kick_pending):toBeNil()
         local act = create_mock_act({
@@ -135,11 +145,10 @@ describe("KickDispatchHook - dispatch 前段キック起動と preempt", functio
         expect(result):toBe(nil)
     end)
 
-    test("マルチ yield キックシーンは初回ビートのみ今 tick・残りは次 tick 継続（R3.4/R4.1）", function()
-        setup()
+    kick_test("マルチ yield キックシーンは初回ビートのみ今 tick・残りは次 tick 継続（R3.4/R4.1）", function()
         KICK.install("multi_scene")
         local act = make_act_with_scene(
-            { id = "OnSecondChange", status = "talking", date = { unix = 1702648900 } },
+            { id = "OnSecondChange", status = "talking", date = { unix = 1702648900 } }, "multi_scene",
             function(_resumed_act)
                 coroutine.yield("beat_1")
                 coroutine.yield("beat_2")
@@ -163,8 +172,7 @@ describe("KickDispatchHook - dispatch 前段キック起動と preempt", functio
         expect(v2):toBe("beat_2")
     end)
 
-    test("解決不能キックシーンは素通り（前会話保持・R3.5）", function()
-        setup()
+    kick_test("解決不能キックシーンは素通り（前会話保持・R3.5）", function()
         -- 前 co_scene を据える（解決不能時に閉じないこと）
         local prev_co = coroutine.create(function()
             coroutine.yield("prev")
@@ -174,9 +182,9 @@ describe("KickDispatchHook - dispatch 前段キック起動と preempt", functio
         STORE.co_scene = prev_co
 
         KICK.install("missing_scene")
-        -- find_scene が nil を返す（解決不能）
+        -- シーン表に登録しない（解決不能）
         local act = make_act_with_scene(
-            { id = "OnSecondChange", status = "talking", date = { unix = 1702648900 } },
+            { id = "OnSecondChange", status = "talking", date = { unix = 1702648900 } }, "missing_scene",
             nil)
 
         local result = dispatcher.dispatch(act)

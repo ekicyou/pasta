@@ -187,10 +187,13 @@ fn on_second_change(status: &str, offset_secs: i64) -> String {
 }
 
 /// キック注入（実 sink＝`pasta/playScene` inbound ハンドラと同一クロージャ）。
+///
+/// キックはシーン表の登録名に完全一致で引くため、作者が書いた名前ではなく登録名
+/// （1 個目の定義＝作者名＋通し番号 `1`）を載せる。
 fn kick(scene: &str) {
     let sink = pasta::actor::lifecycle::kick_sink();
     sink(KickRequest {
-        scene: scene.to_string(),
+        scene: format!("{scene}1"),
     });
 }
 

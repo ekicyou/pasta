@@ -7,7 +7,7 @@
 --     - scene_name == RELOAD_SENTINEL（完全一致）→ reload 分岐:
 --         act:raw_script("\\![reload,shiori]") → act:build() を行うコルーチンを返す。
 --         resume すると build() の結果（`\![reload,shiori]` を含む）が返る。
---     - RELOAD_SENTINEL は `:` local-composite 分岐や global co_exec より前で完全一致判定。
+--     - RELOAD_SENTINEL は `:` local-composite 分岐や global のシーン表引き当てより前で完全一致判定。
 --     - sentinel 値は Rust 側 RELOAD_SENTINEL とバイト一致（@@pasta/reloadShiori@@）。
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
@@ -50,57 +50,67 @@ describe("KICK.try_dispatch - SHIORI リロード sentinel 分岐", function()
     test("RELOAD_SENTINEL は reload さくらスクリプトを出すコルーチンを返す", function()
         STORE.reset()
 
-        -- local/global 分岐が誤って呼ばれていないことを観測するため search をトラップ
-        local original_search = SCENE.search
+        -- local/global 分岐が誤って呼ばれていないことを観測するため、シーン表の引き当てをトラップ
+        local original_get = SCENE.get
+        local original_get_start = SCENE.get_start
         local other_branch_called = false
-        SCENE.search = function(_name, _parent, _attrs)
+        SCENE.get = function()
+            other_branch_called = true
+            return nil
+        end
+        SCENE.get_start = function()
             other_branch_called = true
             return nil
         end
 
-        STORE.kick_pending = RELOAD_SENTINEL
-        local act = make_act()
+        local ok_all, err = pcall(function()
+            STORE.kick_pending = RELOAD_SENTINEL
+            local act = make_act()
 
-        local co = KICK.try_dispatch(act)
+            local co = KICK.try_dispatch(act)
 
-        -- コルーチンが返り、フラグ消費
-        expect(type(co)):toBe("thread")
-        expect(STORE.kick_pending):toBeNil()
-        -- local-composite/global 分岐は通っていない
-        expect(other_branch_called):toBe(false)
+            -- コルーチンが返り、フラグ消費
+            expect(type(co)):toBe("thread")
+            expect(STORE.kick_pending):toBeNil()
+            -- local-composite/global 分岐は通っていない
+            expect(other_branch_called):toBe(false)
 
-        -- resume すると build() の結果が返り、`\![reload,shiori]` を含む
-        local ok, value = coroutine.resume(co, act)
-        expect(ok):toBe(true)
-        expect(type(value)):toBe("string")
-        -- `\![reload,shiori]` を含む（plain 部分一致・パターン無効化のため find の 4th 引数 true）
-        local found = type(value) == "string"
-            and string.find(value, "\\![reload,shiori]", 1, true) ~= nil
-        expect(found):toBe(true)
+            -- resume すると build() の結果が返り、`\![reload,shiori]` を含む
+            local ok, value = coroutine.resume(co, act)
+            expect(ok):toBe(true)
+            expect(type(value)):toBe("string")
+            -- `\![reload,shiori]` を含む（plain 部分一致・パターン無効化のため find の 4th 引数 true）
+            local found = type(value) == "string"
+                and string.find(value, "\\![reload,shiori]", 1, true) ~= nil
+            expect(found):toBe(true)
+        end)
 
-        SCENE.search = original_search
+        SCENE.get = original_get
+        SCENE.get_start = original_get_start
+        if not ok_all then error(err, 0) end
     end)
 
-    test("RELOAD_SENTINEL 以外は reload 分岐を通らない（global へ素通り）", function()
+    test("RELOAD_SENTINEL 以外は reload 分岐を通らない（シーン表の global へ素通り）", function()
         STORE.reset()
+        local ok, err = pcall(function()
+            -- シーン表に登録した global シーンが再生されることで、reload 分岐の誤発火が無いことを観測
+            local intro_ran = false
+            SCENE.register("intro", "__start__", function() intro_ran = true end)
 
-        -- global co_exec をトラップして reload 分岐が誤発火しないことを観測
-        local original_co_exec = SCENE.co_exec
-        local co_exec_called_with
-        SCENE.co_exec = function(_act, scene)
-            co_exec_called_with = scene
-            return coroutine.create(function() end)
-        end
+            STORE.kick_pending = "intro"
+            local act = make_act()
 
-        STORE.kick_pending = "intro"
-        local act = make_act()
+            local co = KICK.try_dispatch(act)
 
-        local co = KICK.try_dispatch(act)
-
-        -- 通常 global 分岐: co_exec(act, "intro") が呼ばれる（reload 分岐ではない）
-        expect(co_exec_called_with):toBe("intro")
-        expect(type(co)):toBe("thread")
-
-        SCENE.co_exec = original_co_exec
+            -- 通常 global 分岐: シーン表の intro が再生され、reload は出ない
+            expect(type(co)):toBe("thread")
+            local resumed, value = coroutine.resume(co, act)
+            expect(resumed):toBe(true)
+            expect(intro_ran):toBe(true)
+            expect(value):toBe("")
+        end)
+        -- 成否にかかわらずシーン表・保留フラグを残さない
+        STORE.reset()
+        if not ok then error(err, 0) end
     end)
 end)
