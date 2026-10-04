@@ -405,7 +405,7 @@ function ACT_IMPL.arith(self, op, lhs, rhs, lhs_desc, rhs_desc) end
 |----|----------|------|--------|------------------|
 | ~~DQ-1~~ | System Flows／未登録アクターの行、ActSafety `actor_proxy` | 目印を付ける単位 | (a) 話者が未登録アクターに切り替わるたびに 1 回（同じ未登録アクターの連続行は 1 回。生成形に手を入れない）／(b) 行ごとに必ず 1 回（生成コードが行頭を示す引数を渡す。全アクション行の先頭アクションの形が変わる） | 確定（議題 1）: (a)。連続行の台詞は現行でも区切りなく連結されて 1 つの発言になるため。R2.4 の文面も「話者の切り替わりごとに 1 回」に合わせた |
 | ~~DQ-2~~ | ActSafety `actor_proxy` | 目印の文言 | `【未登録アクター：名前】`／`（未登録：名前）`／ほか | 確定（議題 2）: `【未登録アクター：名前】`（talk トークン）。隅付き括弧は台詞と紛れず、「アクター」はマニュアルの用語で調べられる |
-| DQ-3 | ActSafety／Implementation Notes | メソッド名と検索 3 段目・メンバー一覧への影響 | (a) `actor_proxy`・`global_fn`・`arith`（前例 `expr_fn`・`set_spot` と同じ素の名前。公開 API として載せる）／(b) `_` 始まりなど衝突しにくい名前／(c) `arith` だけ act の外に置く | (a)。`arith` も一覧に載せる |
+| ~~DQ-3~~ | ActSafety／Implementation Notes | メソッド名と検索 3 段目・メンバー一覧への影響 | (a) `actor_proxy`・`global_fn`・`arith`（前例 `expr_fn`・`set_spot` と同じ素の名前。公開 API として載せる）／(b) `_` 始まりなど衝突しにくい名前／(c) `arith` だけ act の外に置く | 確定（議題 3）: (a)。3 つとも公開 API としてマニュアルの一覧に載せる。`GLOBAL` の同名関数に `＠名前（）` で届かなくなる制限は、既存の act メソッドと同じ種類のものとして明記する |
 | DQ-4 | Tokenizer | `\\` のトークン種別 | (a) タグ扱い（ウェイトなし・幅 0。変更は正規表現 1 行）／(b) 専用の種別を足し、ウェイト 1 文字ぶん・幅 1 として数える（`wait_inserter`・`line_breaker` も変更） | (a) |
 | ~~DQ-5~~ | Boundary Commitments | `sakura_script/tokenizer.rs` はロードマップの持ち場（`element_gen.rs`・`act.lua`）に載っていない | 本仕様で持つ／別 spec に切り出す | 確定: 本仕様で持つ（Wave 1 のほかの spec の持ち場と重ならない。U08 は生成側だけでは 4.5 を満たせない）。ロードマップの持ち場に追記済み |
 | ~~DQ-6~~ | ElementGen／説明文字列、ActSafety `arith` | 警告に出す被演算子の名前の形 | (a) Lua のパス（`var.x`。既存の `act:talk - undefined variable: 'var.x'` と同じ）／(b) DSL の書き方（`＄x`） | 確定: (a)。既存の警告と形をそろえる |
