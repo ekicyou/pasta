@@ -256,7 +256,7 @@
 | ID | 決定 | 採らなかった案 |
 | -- | ---- | -------------- |
 | D1 | `default_libs` を `runtime/runtime_config.rs` へ移し、`pasta_lua::default_libs`・`pasta_lua::loader::default_libs` は再エクスポートで保つ | `sections.rs` に残す（設定セクションの型でない関数が孤立し、`runtime` → `loader` の依存が残る）。`loader` の公開パスを消す（破壊が 1 つ増える） |
-| D2 | 必須は 2 段。VM の構築は `std_package`、ローダ経由は加えて `std_string`・`std_table`・`std_math`・`std_os`。エラーは `ConfigError::MissingRequiredLibrary(String)`。検査は `RuntimeConfig::ensure_libs`（`to_stdlib()` は変えない） | `to_stdlib()` で検査する（フラグ計算のテストが壊れる）。`math` などを VM の構築の必須にする（`math` 無しの VM を作れる現行の挙動が壊れる）。`package` を黙って足す |
+| D2 | 必須は `std_package` だけ（設計ディスカッション議題 1 で、ローダ経由の 2 段目 `std_string`・`std_table`・`std_math`・`std_os` を外した）。エラーは `ConfigError::MissingRequiredLibrary(String)`。検査は `RuntimeConfig::ensure_libs`（`to_stdlib()` は変えない） | `to_stdlib()` で検査する（フラグ計算のテストが壊れる）。`pasta_scripts` が使う 4 つも検査する（手で保守する一覧が古くなる。欠けたときの Lua のエラーは名前を示す）。`package` を黙って足す |
 | D3 | 案 C。`GlobalLoggerRegistry::resolve` で「文脈あり → そのロガー（未登録なら捨てる）／文脈なし → 登録がちょうど 1 つならそれ／それ以外は捨てる」。アクタースレッドの入口と `load_with_config` で文脈を張る。`PastaShiori` は `release_runtime` で「ランタイム破棄 → 登録解除のログ → 登録解除」。teardown の異常の warn は今の位置（FFI 入口）のまま、規則で届ける（4.2 節の (i)） | 案 A（入口ごとのガード）。文脈ありで未登録のときも唯一のロガーへ流す（別のゴーストへの誤配になりうる） |
 | — | 不正な `file_path`: 4.3 節の案 2（段階 1.5 が既定の設定で作り直して登録する）。warn は登録の後に出す。判定は「最初の要素がちょうど `profile`、その後に要素が続く、`..` を含まない」 | 案 1（文言だけ直す。組み込みでロガーが無くなる） |
 

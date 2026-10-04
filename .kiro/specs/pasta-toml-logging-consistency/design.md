@@ -64,7 +64,7 @@
 - ログの振り分け規則の変更（文脈なしのログの扱い、文脈ありで未登録のときの扱い）
 - `PastaShiori` の終了処理の順序の変更、または done ack を送る位置の変更
 - `PastaLogger::validate_path` の条件の変更（`pasta_check` が配布物から外すディレクトリとの整合）
-- `RuntimeConfig` の必須ライブラリ一覧の変更（`pasta_scripts` が新しい標準ライブラリを使い始めたとき）
+- `RuntimeConfig` の必須ライブラリ一覧の変更（Rust 側のモジュール登録が新しい標準ライブラリを無条件に使い始めたとき）
 - 段階 1・段階 1.5 の役割分担の変更
 
 ## Architecture
@@ -118,7 +118,7 @@ graph TB
 | ID | 決定 | 理由 |
 | -- | ---- | ---- |
 | D1 | `default_libs` を `runtime/runtime_config.rs` へ移す。公開パス `pasta_lua::default_libs`・`pasta_lua::loader::default_libs` は再エクスポートで両方保つ | 使うのは `RuntimeConfig::new` だけで、`sections.rs` に残すと「設定セクションの型」でない関数が孤立する。公開パスを保てば、API の破壊は `[lua]` を読む 3 点に限られる |
-| D2 | 必須ライブラリは 2 段。VM の構築（`with_config` 系のすべて）は `std_package`。ローダ経由（`from_loader`・`from_loader_with_scene_dic`）は `std_package`・`std_string`・`std_table`・`std_math`・`std_os`。欠けていれば `ConfigError::MissingRequiredLibrary` | `package` は Rust 側のモジュール登録が無条件に要る。`string`・`table`・`math`・`os` は `pasta_scripts` が使い（`os.time` は毎秒の OnSecondChange で呼ばれる）、欠けると起動後のリクエストで原因の遠い Lua エラーになる。`math` を VM の構築の必須にしないのは、`math` 無しで VM を作れる現行の挙動を保つため |
+| D2 | 必須ライブラリは `std_package` だけ。VM を作るすべての入口（`with_config` 系・`from_loader*`）が通る 1 か所で検査し、欠けていれば `ConfigError::MissingRequiredLibrary`。`pasta_scripts` が使う `std_string`・`std_table`・`std_math`・`std_os` は検査せず、rustdoc に書く（設計ディスカッション議題 1） | 原因の分からない変換エラーになるのは `package` が欠けたときだけである。他の 4 つは、欠けると Lua のエラーが欠けた名前を示す（`attempt to index global 'os' (a nil value)`）。手で保守する一覧を持つと、`pasta_scripts` の変更で古くなり誤った検査になる |
 | D3 | 振り分けは案 C（文脈なし→唯一のロガー、アクタースレッドとローダは文脈を張る）。`PastaShiori` の終了処理は「文脈を張る → `SHIORI.unload` → 関数のキャッシュを捨てる → ランタイム破棄 → 登録解除のログ → 登録解除」 | 変更が `registry.rs` の 1 か所で済み、今後入口が増えても漏れない。設置パスを知るスレッドは文脈を張るので、複数ロガーのときも正しく届く。E2E テストは「1 テストバイナリに `#[test]` を 1 本」で登録簿を 1 個に保つ（Testing Strategy） |
 
 ### Technology Stack
@@ -140,9 +140,8 @@ graph TB
 - `crates/pasta_lua/src/loader/config/mod.rs` — `PastaConfig::lua()` を削除。
 - `crates/pasta_lua/src/loader/mod.rs` — 再エクスポートから `LuaConfig` を外す。`default_libs` は `crate::runtime::default_libs` の再エクスポートに変える。段階 1.5 のフォールバックと warn。`load_with_config` の先頭で `LoadDirGuard` を張る。
 - `crates/pasta_lua/src/lib.rs` — 再エクスポートから `LuaConfig` を外す。`default_libs` は `runtime` から再エクスポートする。
-- `crates/pasta_lua/src/runtime/runtime_config.rs` — `default_libs` の定義を置く。`From<LuaConfig>` を削除。`ensure_libs` と必須ライブラリの定数を足す。`libs`・`from_libs` の doc に必須ライブラリを書く。
+- `crates/pasta_lua/src/runtime/runtime_config.rs` — `default_libs` の定義を置く。`From<LuaConfig>` を削除。`ensure_libs` と必須ライブラリの定数を足す。`libs`・`from_libs` の doc に、`std_package` が必須であることと、`pasta_scripts`（ローダ経由）が `std_string`・`std_table`・`std_math`・`std_os` を使うことを書く。
 - `crates/pasta_lua/src/runtime/mod.rs` — `pub use runtime_config::default_libs`。`with_config_and_source_map` で VM を作る前に `ensure_libs` を呼ぶ。
-- `crates/pasta_lua/src/runtime/factory.rs` — `from_loader`・`from_loader_with_scene_dic` の先頭で、ローダ経由の必須ライブラリを検査する。
 - `crates/pasta_lua/src/error.rs` — `ConfigError::MissingRequiredLibrary` を足す。
 
 **ロガー（pasta_lua）**
@@ -390,14 +389,8 @@ warn!(
 - `default_libs()` を `runtime_config.rs` に定義する。内容は変えない（`["std_all", "assertions", "testing", "regex", "json", "yaml"]`）。
 - `From<LuaConfig> for RuntimeConfig` を消す。
 - `to_stdlib()` は「名前の一覧を `StdLib` のフラグへ変換する」純粋な関数のまま変えない（空の一覧は `StdLib::NONE` を返す。既存のテストと doc テストを保つ）。
-- 必須ライブラリの検査は `ensure_libs` に置き、VM を作る 2 つの入口から呼ぶ。
-
-| 入口 | 必須 | 理由 |
-| ---- | ---- | ---- |
-| `PastaLuaRuntime::with_config_and_source_map`（`new`・`with_config`・`from_loader*` のすべてが通る） | `std_package` | `@pasta_search`・`@pasta_log` の登録、`package.path` の設定、searcher が `package` 表を無条件に使う |
-| `PastaLuaRuntime::from_loader`・`from_loader_with_scene_dic` | `std_package`・`std_string`・`std_table`・`std_math`・`std_os` | `pasta_scripts`（フレームワークスクリプト）が使う。`os.time` は CALLBACK の期限と毎秒の掃除で、`math` はトーク間隔の抽選とウェイトの計算で使う |
-
-- `coroutine` は LuaJIT では基本ライブラリに含まれ、常に使える（`std_coroutine` は `StdLib::NONE` に対応する）。`io`・`bit`・`jit`・`ffi`・`debug` は `pasta_scripts` の動作に要らない（`jit` は版の判定で、有るときだけ使う）。
+- 必須ライブラリは `std_package` だけである。検査は `ensure_libs` に置き、`PastaLuaRuntime::with_config_and_source_map`（`new`・`with_config`・`from_loader*` のすべてが通る）で VM を作る前に呼ぶ。`@pasta_search`・`@pasta_log` の登録、`package.path` の設定、searcher が `package` 表を無条件に使うためである。
+- `pasta_scripts`（ローダ経由で読み込むフレームワークスクリプト）は `std_string`・`std_table`・`std_math`・`std_os` を使うが、検査しない。欠けると Lua のエラーが欠けた名前を示すので、原因は分かる。rustdoc にこの 4 つを使うことを書く（3.3）。
 - `std_all`・`std_all_unsafe` は必須をすべて含む。`"-std_package"` のように引き算で外した場合も欠落として検出する（判定は `to_stdlib()` の結果のフラグで行う）。
 
 **Contracts**: Service [x]
@@ -408,14 +401,11 @@ pub fn default_libs() -> Vec<String>;
 
 /// VM の構築に必須（Rust 側のモジュール登録が使う）。
 const REQUIRED_LIBS: &[&str] = &["std_package"];
-/// ローダ経由（pasta_scripts を読み込む）で必須。
-const LOADER_REQUIRED_LIBS: &[&str] =
-    &["std_package", "std_string", "std_table", "std_math", "std_os"];
 
 impl RuntimeConfig {
-    /// `required` のうち、この構成が含まないライブラリがあれば
+    /// `REQUIRED_LIBS` のうち、この構成が含まないライブラリがあれば
     /// `ConfigError::MissingRequiredLibrary` を返す。
-    pub(crate) fn ensure_libs(&self, required: &[&str]) -> Result<(), ConfigError>;
+    pub(crate) fn ensure_libs(&self) -> Result<(), ConfigError>;
 }
 
 // error.rs
@@ -429,13 +419,13 @@ pub enum ConfigError {
 
 - Preconditions: なし（未知の名前は従来どおり `UnknownLibrary`）。
 - Postconditions: エラーのとき VM を作らない（`Lua::unsafe_new_with` より前に返す）。エラーの文字列は欠けているライブラリ名をすべて含む。
-- Invariants: `RuntimeConfig::new`・`minimal`・`full` は検査を通る。`from_libs(["std_all", "-std_math"])` は `with_config` では通り、ローダ経由では `std_math` の欠落で止まる。
+- Invariants: `RuntimeConfig::new`・`minimal`・`full` は検査を通る。`from_libs(["std_all", "-std_math"])` は従来どおり通る。
 
 **Implementation Notes**
 
 - Integration: エラーは既存の `UnknownLibrary` と同じ経路で運ぶ（`mlua::Error::ExternalError(Arc<ConfigError>)`。ローダ経由では `LoaderError::Runtime`）。`search/` は触らない。
-- Validation: `runtime_api_test.rs` に、`from_libs(["std_string"])` と `["std_all", "-std_package"]` が `std_package` を含むエラーになること、ローダ経由で `["std_package"]` が `std_string` などを含むエラーになることを足す。
-- Risks: ローダ経由の一覧は `pasta_scripts` の実装に追随させる必要がある（Revalidation Triggers）。一覧はコード読解（`pasta_scripts` の全ファイルの検索）で決めており、構成を 1 つずつ外した実行での確認は実装タスクで行う。
+- Validation: `runtime_api_test.rs` に、`from_libs(["std_string"])` と `["std_all", "-std_package"]` が `std_package` を含むエラーになることを足す。
+- Risks: なし（必須の一覧は Rust 側のコードだけで決まる）。
 
 ### pasta_lua / logging
 
@@ -648,12 +638,12 @@ impl PastaShiori {
 2. `registry.rs`: ロガーが無いときの `RoutingWriter` の `write`・`flush` が成功を返す（既存のテストを保つ。7.5）。
 3. `logger.rs`: `validate_path` — 上の表の各値（5.5）。既定の `file_path` が通ること。
 4. `error.rs`: `MissingRequiredLibrary` の表示が、欠けた名前を含む。
-5. `runtime_config.rs`: `ensure_libs` — `new`・`minimal`・`full` が両方の一覧を通る。`["std_string"]` は `std_package` の欠落、`["std_all", "-std_os"]` はローダ経由で `std_os` の欠落（3.1、3.2）。
+5. `runtime_config.rs`: `ensure_libs` — `new`・`minimal`・`full` が通る。`["std_string"]` と `["std_all", "-std_package"]` は `std_package` の欠落（3.1、3.2）。
 
 ### Integration Tests
 
 1. `runtime_api_test.rs`: `with_config(from_libs(["std_string"]))` と `from_libs(["std_all", "-std_package"])` が、`std_package` を含むエラーになる。`from_libs(["std_all", "-std_math"])` は従来どおり VM を作れる（3.1、3.2、7.2）。
-2. `runtime_api_test.rs` またはローダのテスト: `PastaLoader::load_with_config(dir, from_libs(["std_package"]))` が、`std_string`・`std_table`・`std_math`・`std_os` を含むエラーになる（3.1、7.2）。
+2. ローダのテスト: `PastaLoader::load_with_config(dir, from_libs(["std_string"]))` が、`std_package` を含むエラーになる（ローダ経由でも同じ検査を通ること。3.1、7.2）。
 3. `config_test.rs`: `[lua] libs = ["std_all", "env"]` と `[logging] rotation_days = 14`・`file_path`・`level`・`filter` を書いた `pasta.toml` で、`PastaLoader::load` が成功し、`logging()` が書かれたとおりの 3 つの値を返し、`@env` が有効にならない（1.3、2.3、7.1）。
 4. `config_sections_test.rs`: `[logging] level = 1`（型不一致）で `logging()` が `None`。
 5. `logging_file_path_fallback_test.rs`（専用バイナリ・組み込み）: 購読者を設置し、`file_path = "profile.log"` で `PastaLoader::load` する。ランタイムを破棄して登録を外した後、`profile/pasta/logs/pasta.log` に、`profile.log` を含む warn と、その後のローダのログがあること、設置ディレクトリ直下に `profile.log` が無いことを見る（5.1、5.2、5.5、7.4）。
@@ -706,7 +696,7 @@ impl PastaShiori {
 
 | # | 項目 | 状態 | 結論と根拠 |
 | - | ---- | ---- | ---------- |
-| 1 | ローダ経由の必須ライブラリ（D2） | 議題 1 | `std_string`・`std_table`・`std_math`・`std_os` も必須にするか、`std_package` だけを必須にして他は rustdoc に書くか |
+| 1 | ローダ経由の必須ライブラリ（D2） | 確定（議題 1） | `std_package` だけを必須にする。`std_string`・`std_table`・`std_math`・`std_os` は検査せず rustdoc に書く。欠けたときの Lua のエラーは欠けた名前を示すので、手で保守する一覧を持たない |
 | 2 | 文脈を張る範囲（D3） | 確定 | 案 C。案 B だけでは、組み込みで複数のゴーストを読むときに段階 1.5 の warn が捨てられ、5.2 を満たさない |
 | 3 | フォールバックの対象 | 確定 | 設定どおりのロガーを作れないすべての場合に既定へ切り替える。ログを失わない（前提 A4）ことを優先し、挙動と warn を 1 通りにする |
 | 4 | `profile` の比較 | 確定 | 大文字小文字を区別し、`file_path = "profile"` も不正。`pasta_check` の `.nar` の除外（`nar.rs`）が `profile` の完全一致であり、`Profile/` に書くと配布物に紛れ込むため（前提 A10 と同じ理由） |

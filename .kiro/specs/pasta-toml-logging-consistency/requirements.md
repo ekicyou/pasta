@@ -69,7 +69,7 @@
 **Objective:** pasta_lua を組み込む開発者として、構成に必要なライブラリが欠けているとき、その理由が分かるエラーを受け取りたい。原因の分からない変換エラーで調査に時間を使わないためである。
 
 #### Acceptance Criteria
-1. If ランタイム構成のライブラリ一覧が pasta の動作に必須の Lua 標準ライブラリ（少なくとも `std_package`。ローダ経由で読み込むフレームワークスクリプトが要るものを含めた一覧は設計で確定する）を含まない, the pasta_lua ランタイム shall VM を構築せずに、欠けているライブラリ名を含む構成エラーを返す。
+1. If ランタイム構成のライブラリ一覧が pasta の動作に必須の Lua 標準ライブラリ（`std_package`）を含まない, the pasta_lua ランタイム shall VM を構築せずに、欠けているライブラリ名を含む構成エラーを返す。
 2. The pasta_lua ランタイム shall 必須ライブラリを含む構成（既定の構成・最小構成・全機能構成を含む）では、従来どおり VM を構築する。
 3. The pasta_lua の Rust API ドキュメント shall ライブラリ一覧の説明で、どのライブラリが必須かを示す。
 
@@ -138,5 +138,5 @@
 | A9 | 4 | 確定 | デバッグバックエンドのログは範囲外とし、保存の挙動を保証しない（実現方法によっては副次的に残るようになってもよい） | brief の Out of scope は「デバッグバックエンドのログ（を対象にすること）」。設計の自由度を残す |
 | A10 | 5.5 | 確定（議題 4） | `file_path` の判定を厳密にし、最初の要素がちょうど `profile` であることを求める（`profile.log`・`profiles/` は不正） | 現行の文字列の前方一致では `profile.log` が通り、`pasta_check` は `profile` ディレクトリだけを配布物から外すため、ログファイルが `.nar`・`updates.txt` に紛れ込む。不正と判定されても議題 3 のフォールバックで起動は続き、ログも失われない |
 | D1 | 1.5 | 設計 | `default_libs` の定義場所と公開パス（`pasta_lua::default_libs`・`pasta_lua::loader::default_libs`）の維持 | `LuaConfig` と同じ `sections.rs` から `runtime_config.rs` へ移すか |
-| D2 | 3.1 | 設計 | 必須ライブラリの一覧とエラーの種類・文言 | `std_package` のほか、ローダ経由の `pasta_scripts` が要る `string`・`table`・`coroutine` などを調査して確定 |
+| D2 | 3.1 | 確定（設計議題 1） | 必須ライブラリは `std_package` だけ。エラーは `ConfigError::MissingRequiredLibrary` | フレームワークスクリプトが使う `string`・`table`・`math`・`os` は検査せず、Rust API ドキュメントに書く。欠けたときの Lua のエラーが欠けた名前を示すため |
 | D3 | 4 | 設計 | 入口・アクタースレッドのログの振り分け方式（research.md 4.1 の案 A〜C）と `PastaShiori::drop` の順序 | 複数ロガー時の誤配防止（4.6）と、テストの並列実行下での E2E 検証の作り方を含む |
