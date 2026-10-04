@@ -113,6 +113,7 @@ from_loader_with_scene_dic
  1. with_config_and_source_map
     a. RuntimeConfig の libs を検証して警告（std_debug・std_all_unsafe・env）
     b. libs を mlua の StdLib に変換し、Lua::unsafe_new_with で VM を作る
+       math があれば、時刻とプロセス ID から作った種で math.randomseed を呼ぶ
     c. @pasta_search を登録（トランスパイル時の TranspileContext のレジストリから）
     d. libs に応じて @assertions・@testing・@env・@regex・@json・@yaml を登録
     e. @pasta_log を登録（libs に依らず常に）
