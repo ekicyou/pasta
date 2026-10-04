@@ -54,18 +54,7 @@ impl Drop for PastaShiori {
     fn drop(&mut self) {
         // Call SHIORI.unload if available (before runtime drop)
         self.call_lua_unload();
-
-        // Unregister logger from global registry
-        if let Some(ref load_dir) = self.load_dir {
-            GlobalLoggerRegistry::instance().unregister(load_dir);
-            info!(load_dir = %load_dir.display(), "Unregistered logger");
-        }
-
-        // Clear cached functions before dropping runtime
-        self.clear_cached_lua_functions();
-
-        // Drop runtime (logger is dropped with it)
-        self.runtime = None;
+        self.release_runtime();
     }
 }
 
@@ -83,11 +72,7 @@ impl Shiori for PastaShiori {
         // If already loaded, cleanup previous instance
         if self.runtime.is_some() {
             info!("Releasing existing runtime for reload");
-            self.clear_cached_lua_functions();
-            if let Some(ref old_load_dir) = self.load_dir {
-                GlobalLoggerRegistry::instance().unregister(old_load_dir);
-            }
-            self.runtime = None;
+            self.release_runtime();
             self.last_load_error = None;
         }
 
@@ -214,6 +199,24 @@ impl PastaShiori {
                 warn!("SHIORI.{} function not found", name);
                 None
             }
+        }
+    }
+
+    /// Release the runtime, then unregister the logger (last, so every log
+    /// emitted while releasing — persistence save, unregister notice — is
+    /// written before the log file is closed). Shared by `Drop` and reload.
+    fn release_runtime(&mut self) {
+        let _guard = self.load_dir.as_ref().map(|p| LoadDirGuard::new(p.clone()));
+
+        // Cached functions reference the VM; drop them before the runtime.
+        self.clear_cached_lua_functions();
+
+        // Runtime drop saves persistence data (logs still reach the ghost logger).
+        self.runtime = None;
+
+        if let Some(ref load_dir) = self.load_dir {
+            info!(load_dir = %load_dir.display(), "Unregistering logger");
+            GlobalLoggerRegistry::instance().unregister(load_dir);
         }
     }
 
