@@ -440,6 +440,22 @@ function ACT_IMPL.expr_fn_var(self, value, var_path, ...)
     return call_expr(self, key, true, ...)
 end
 
+--- グローバル関数呼び出し（＠＊名前（…））
+--- GLOBAL[name] が関数なら act を第1引数にして呼ぶ（中のエラーはそのまま伝わる）。
+--- 無い・関数でないときは警告して nil（act:expr_fn と同じ warn レベル）
+--- @param self Act アクションオブジェクト
+--- @param name string 関数名
+--- @param ... any 関数に渡す引数
+--- @return any ... 関数の戻り値すべて、または nil
+function ACT_IMPL.global_fn(self, name, ...)
+    local f = GLOBAL[name]
+    if type(f) == "function" then
+        return f(self, ...)
+    end
+    log.warn(string.format("act:global_fn - function not found: key='%s'", tostring(name)))
+    return nil
+end
+
 --- トークン取得とリセット（グループ化・統合済み）
 --- @param self Act アクションオブジェクト
 --- @return table[]|nil グループ化されたトークン配列、またはnil（トークン0件時）

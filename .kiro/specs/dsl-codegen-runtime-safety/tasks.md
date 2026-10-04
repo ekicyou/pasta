@@ -3,7 +3,7 @@
 > 前提: `cargo build`／`cargo test` の前に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す（LuaJIT のビルドが失敗するため）。生成形の変更は各タスクの中で影響するスナップショット・期待値まで更新し、各タスクの完了時点で `cargo test --workspace` が通る状態を保つ。
 
 - [ ] 1. act の存在確認付きメソッド（ランタイム）
-- [ ] 1.1 グローバル関数を名前で呼ぶメソッドを act に足す
+- [x] 1.1 グローバル関数を名前で呼ぶメソッドを act に足す
   - 名前の値が関数なら act を第 1 引数にして呼び、戻り値をすべて返す。関数でない・無いときは関数名を含む警告を `act:expr_fn` と同じレベルで 1 行出し、値なしを返す
   - 関数の中で起きたエラーは握りつぶさずそのまま伝える
   - 新しいランタイムテストのファイルを作り、Lua テストの入口に登録する（既存の `act_test.lua` は膨らませない）
@@ -105,3 +105,6 @@
   - `cargo test --workspace` と `cargo clippy` が成功し、生成形の差分がアクター参照・グローバル関数・算術・`\\` の 4 種類だけであることをスナップショットの差分で確かめる
   - _Requirements: 2.8, 5.1, 5.3, 5.4, 5.5_
   - _Depends: 4.1, 4.2, 5.4_
+
+## Implementation Notes
+- `cargo test --workspace` が `crates/pasta_lua/tests/fixtures/sample.generated.lua` の改行コードだけを書き換えることがある。`git diff --ignore-all-space` で中身の差分が無ければ `git checkout --` で戻し、コミットに含めない。
