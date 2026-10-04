@@ -181,7 +181,7 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.ぱすた:talk("こんにちは")
+        act:actor_proxy("ぱすた"):talk("こんにちは")
         return act:call(SCENE.__global_name__, "サブ", {}, table.unpack(args))
     end
 
@@ -189,7 +189,7 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.ぱすた:talk("サブです")
+        act:actor_proxy("ぱすた"):talk("サブです")
     end
 end
 ```
@@ -208,11 +208,26 @@ end
 | 変数代入（プロパティ） | `act:set_property(名前, 式)`。右辺が単語参照・動的単語参照なら、式の代わりに上と同じ `act:word(…)` を渡す |
 | 式文（`＄＝`） | 式をそのまま 1 文として出力する |
 | Call | `act:call(SCENE.__global_name__, "名前", {}, 明示した引数…, table.unpack(args))`。動的ターゲットは名前の代わりに `tostring(式)` |
-| アクション行・継続行 | アクションごとに 1 文。発言は `act.アクター:talk(文字列)`、単語参照は `act.アクター:talk(act.アクター:word(名前))`、動的単語参照は `act.アクター:talk(act.アクター:word(var.変数名, "var.変数名"))`、さくらスクリプトは `act.アクター:sakura_script(文字列)` |
+| アクション行・継続行 | アクションごとに 1 文。アクターは `act:actor_proxy("アクター")` で得たプロキシで書く。発言は `act:actor_proxy("アクター"):talk(文字列)`、単語参照は `act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(名前))`、動的単語参照は `act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(var.変数名, "var.変数名"))`、さくらスクリプトは `act:actor_proxy("アクター"):sakura_script(文字列)` |
 | 選択肢行 | `act:choice(ジャンプ先, 表示テキスト)` |
 | キューコマンド行 | `!select` だけを `act:choice_timeout(秒数)`（引数が数値でなければ `nil`）に変換する。他のキューコマンドは出力しない |
 
-変数参照のアクションは、値と変数の経路の文字列を渡す `act.アクター:talk(var.名前, "var.名前")` になり、プロパティ参照は `tostring(act:get_property(名前))` を話す。関数呼び出しのアクションは、戻り値の先頭だけを話すよう括弧で包む（`act.アクター:talk((act.アクター:expr_fn(名前, 引数…)))`、グローバル関数は `GLOBAL.名前(act, 引数…)`、動的関数呼び出しは `act.アクター:expr_fn_var(var.変数名, "var.変数名", 引数…)`）。式の中の関数呼び出しはアクターを付けず、`act:expr_fn(名前, 引数…)`・`GLOBAL.名前(act, 引数…)`・`act:expr_fn_var(var.変数名, "var.変数名", 引数…)` になる。キーワード引数は値だけを位置で渡す。
+変数参照のアクションは、値と変数の経路の文字列を渡す `act:actor_proxy("アクター"):talk(var.名前, "var.名前")` になり、プロパティ参照は `tostring(act:get_property(名前))` を話す。関数呼び出しのアクションは、戻り値の先頭だけを話すよう括弧で包む（`act:actor_proxy("アクター"):talk((act:actor_proxy("アクター"):expr_fn(名前, 引数…)))`、グローバル関数は `act:global_fn("名前", 引数…)`、動的関数呼び出しは `act:actor_proxy("アクター"):expr_fn_var(var.変数名, "var.変数名", 引数…)`）。式の中の関数呼び出しはアクターを付けず、`act:expr_fn(名前, 引数…)`・`act:global_fn("名前", 引数…)`・`act:expr_fn_var(var.変数名, "var.変数名", 引数…)` になる。キーワード引数は値だけを位置で渡す。
+
+アクター名と `＠＊` の関数名は、`StringLiteralizer::literalize` で文字列リテラルにして渡す（`act:actor_proxy("ぱすた")`・`act:global_fn("関数名", 引数…)`）。名前を Lua の添字（`act.名前`・`GLOBAL.名前`）にしないため、act のメソッド名・フィールド名や Lua の予約語と同じ名前でも、別のものに解決されず、構文エラーにもならない。
+
+エスケープのアクションは `talk` で出力する。`＠＠`・`＄＄` は 2 文字目の 1 文字を、`\\` は 2 文字のままを話す（`C:\\new` は `talk("C:")`・`talk([[\\]])`・`talk("new")` の 3 文になる）。`\\` の 2 文字はさくらスクリプトの後処理で 1 つのタグとして扱われ、間にウェイトなどが入らない（[さくらスクリプトの後処理](talk-output.md#さくらスクリプトの後処理)）。
+
+式の算術（`＋`・`－`・`＊`・`／`・`％`）は、演算ごとに `act:arith("演算子", 左, 右, 左の説明, 右の説明)` の呼び出しになる。パーサは優先順位を付けずに左結合の木を作る（`1＋2＊3` は `(1＋2)＊3` の形）ため、`element_gen.rs` の `arith_to_string` が木を項と演算子の列に戻し、`＊`・`／`・`％` を左から畳んでから `＋`・`－` を左から畳んで入れ子にする（Lua の優先順位・結合と同じ）。括弧（`Paren`）は 1 つの項で、`( … )` で囲んだまま出力する。
+
+```text
+＄a＝＄x＋1         → var.a = act:arith("+", var.x, 1, "var.x")
+＄b＝1＋2＊＄y      → var.b = act:arith("+", 1, act:arith("*", 2, var.y, nil, "var.y"))
+＄c＝（＄x＋1）＊2  → var.c = act:arith("*", (act:arith("+", var.x, 1, "var.x")), 2)
+＄d＝＠＊f（1）＋＠g（） → var.d = act:arith("+", act:global_fn("f", 1), act:expr_fn("g"), "@*f()", "@g()")
+```
+
+説明は、実行時の警告に被演算子の場所を出すための文字列リテラルである（`operand_desc`）。変数参照は変数の経路（`"var.x"`・`"save.x"`・`"args[1]"`）、関数呼び出しは `"@名前()"`・`"@*名前()"`・`"@$変数の経路()"`、括弧は中身の説明になり、リテラルと入れ子の算術には説明が無い。両方とも無ければ説明の引数を省き、右だけあるときは左に `nil` を置く。`act:arith` の実行時の振る舞いは [arith](../lua/script-api.md#arithop-lhs-rhs-lhs_desc-rhs_desc) が正である。
 
 動的参照の生成（`element_gen.rs` の `dynamic_ref_args`）は、変数の値を `tostring` せずにそのまま渡し、変数の経路（`var.変数名`・`save.変数名`・`args[番号+1]`）を文字列リテラルにして続けて渡す。値の検査と検索キーへの変換は実行時に行う（[Lua ランタイム内部モジュール](internal-modules.md#動的参照のキーworddynamic_key)）。ここで生成した `act` のメソッドが実行時に何をするかは、[ランタイム実行モデル](execution-model.md) と [Lua ランタイム内部モジュール](internal-modules.md) で扱う。
 
@@ -239,7 +254,7 @@ Lua は末尾位置の関数呼び出しで呼び出し元のスタックフレ�
 
 `last_actor` はローカルシーンごとに空から始まるため、先行するアクション行が無い位置の継続行は `TranspileError::InvalidContinuation` になる。
 
-これは生成コードを小さくする最適化ではなく、継続行の話者を決めるための構文上の処理である。生成されるのはアクションごとの `act.アクター:…` の文であり、同じアクターが続いても文は省略しない。連続する同じアクターの発言をまとめる処理は実行時のトーク組立が担う（[トーク出力とアピアランス](talk-output.md)）。
+これは生成コードを小さくする最適化ではなく、継続行の話者を決めるための構文上の処理である。生成されるのはアクションごとの `act:actor_proxy("アクター"):…` の文であり、同じアクターが続いても文は省略しない。連続する同じアクターの発言をまとめる処理は実行時のトーク組立が担う（[トーク出力とアピアランス](talk-output.md)）。
 
 #### 文字列リテラルの表記選択
 
@@ -305,7 +320,7 @@ AST の文字列（発言・単語の値・名前など）は `StringLiteralizer
 ## 不変条件と制約
 
 - 生成される Lua コードは、ランタイムの Lua 方言である LuaJIT 2.1 で実行できる形でなければならない。生成コードは `table.unpack` を使うため、Lua 5.2 互換を有効にした LuaJIT（ルートの [Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml) の `mlua` の `luajit52` 機能）を前提とする。
-- アクター名・ローカル関数名・グローバル関数名は Lua の識別子としてそのまま出力される（`act.ぱすた`・`SCENE.サブ_1`・`GLOBAL.名前`）。LuaJIT が 0x80 以上のバイトを識別子の文字として受け付けることを前提にしている。文法の識別子は `"` や `\` を含まないため、`"…"` の中にもそのまま埋め込む。
+- ローカルシーンの関数名は Lua の識別子としてそのまま出力される（`SCENE.サブ_1`）。LuaJIT が 0x80 以上のバイトを識別子の文字として受け付けることを前提にしている。アクター名と `＠＊` の関数名は識別子にせず、文字列リテラルにして渡す（`act:actor_proxy("ぱすた")`・`act:global_fn("名前", …)`）。文法の識別子は `"` や `\` を含まないため、`"…"` の中にもそのまま埋め込む。
 - 名前付きローカルシーンの関数名には常に `_番号` が付くため、利用者のローカルシーン名が `SCENE.__start__`・`SCENE.__global_name__` と衝突することはない。
 - シンクを付けても付けなくても、`normalize_output` を通しても `normalize_output_with_shift` を通しても、書き出されるバイト列は同一である。出力の正規化は行の削除だけを行う。
 - 末尾呼び出しの `return` は、ローカルシーンの最後の項目が Call のときにだけ付く。
