@@ -97,7 +97,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | Wave | spec（並走可） | 種別 | ソースの持ち場 |
 | ---- | -------------- | ---- | -------------- |
 | 1 | dsl-literal-fixes | バグ（起動不能を含む） | `pasta_dsl` の文法・パーサ、`string_literalizer.rs` |
-| 1 | dsl-codegen-runtime-safety | バグ（500） | `element_gen.rs`、`act.lua` |
+| 1 | dsl-codegen-runtime-safety | バグ（500） | `element_gen.rs`、`act.lua`、`sakura_script/tokenizer.rs` |
 | 1 | callback-resume-unification | バグ（継続の消失・潜在 500） | `pasta_scripts/pasta/shiori/event/`（`choice_select.lua` 以外） |
 | 1 | scene-search-key-normalization | バグ | `search/`、`pasta_core` の registry（`random.rs` 以外）、`actor.lua` のアクター単語検索 |
 | 1 | pasta-toml-logging-consistency | バグ（設定・ログ） | `pasta_lua` の `loader/config/`・`logging/`、`pasta_shiori` |

@@ -47,6 +47,7 @@
 - アクション行の生成形（`act:actor_proxy("名前"):メソッド(…)`）の変更。
 - その場限りのアクターの形（`{ name = 名前 }` のみ・未登録）の変更（`act-token-grouping-fix` のグループ化・`sakura_builder.lua` が読む）。
 - `SAKURA_TAG_PATTERN` の再変更（`appearance.lua` のタグ読みと対で保つ）。
+- `pasta_dsl` の式の AST の組み方（優先順位なしの左結合。`build_left_assoc_expr`）の変更。Wave 1 では `dsl-literal-fixes` がパーサを持つ。組み方が変わると生成側の優先順位の組み直しが結果を変えうるため、「変更前の平らな Lua 式と同じ値になる」テスト（Testing Strategy／Integration 1）を必須の関門とする。
 - `PROXY_IMPL` が登録済みアクター固有のフィールド・メタテーブルを要求するようになった場合（`scene-search-key-normalization` が `actor.lua` を持つ）。
 
 ## Architecture
@@ -322,6 +323,7 @@ function ACT_IMPL.arith(self, op, lhs, rhs, lhs_desc, rhs_desc) end
 - 警告: 数値にできなかった被演算子ごとに 1 行。ただし値が nil で説明も nil の被演算子（＝内側の算術が既に失敗して警告済み）は警告しない。
   - 説明あり: `act:arith - operand is not a number: op='+', operand='var.x', value=nil`
   - 説明なし: `act:arith - operand is not a number: op='+', value='a' (string)`
+- テーブルの被演算子は数値にできない扱い（nil＋警告）。`__add` などのメタメソッドは呼ばない（通常の DSL からは届かない。変更前は呼ばれていた点だけが違う）。
 - Invariants: act の状態を読まない・書かない。未知の `op` は生成コードからは来ない（来たら警告して nil）。
 
 **Dependencies**
@@ -405,7 +407,7 @@ function ACT_IMPL.arith(self, op, lhs, rhs, lhs_desc, rhs_desc) end
 | DQ-2 | ActSafety `actor_proxy` | 目印の文言 | `【未登録アクター：名前】`／`（未登録：名前）`／ほか | `【未登録アクター：名前】`（talk トークン） |
 | DQ-3 | ActSafety／Implementation Notes | メソッド名と検索 3 段目・メンバー一覧への影響 | (a) `actor_proxy`・`global_fn`・`arith`（前例 `expr_fn`・`set_spot` と同じ素の名前。公開 API として載せる）／(b) `_` 始まりなど衝突しにくい名前／(c) `arith` だけ act の外に置く | (a)。`arith` も一覧に載せる |
 | DQ-4 | Tokenizer | `\\` のトークン種別 | (a) タグ扱い（ウェイトなし・幅 0。変更は正規表現 1 行）／(b) 専用の種別を足し、ウェイト 1 文字ぶん・幅 1 として数える（`wait_inserter`・`line_breaker` も変更） | (a) |
-| DQ-5 | Boundary Commitments | `sakura_script/tokenizer.rs` はロードマップの持ち場（`element_gen.rs`・`act.lua`）に載っていない | 本仕様で持つ／別 spec に切り出す | 本仕様で持つ（Wave 1 のほかの spec の持ち場と重ならない。U08 は生成側だけでは 4.5 を満たせない） |
-| DQ-6 | ElementGen／説明文字列、ActSafety `arith` | 警告に出す被演算子の名前の形 | (a) Lua のパス（`var.x`。既存の `act:talk - undefined variable: 'var.x'` と同じ）／(b) DSL の書き方（`＄x`） | (a) |
-| DQ-7 | ActSafety／Implementation Notes | 警告の回数 | 発生のたび（入れ子の算術は根本原因 1 回、未登録アクターは話者の切り替わりごと）／同じ内容は 1 回に抑止 | 発生のたび。抑止の状態は持たない |
-| DQ-8 | ActSafety／Risks | 未登録アクターの行のサーフェスタグが `STORE.appearance` に名前付きで残る | 許容／本仕様で `appearance` 側に手を入れる（境界外） | 許容（登録ではない） |
+| ~~DQ-5~~ | Boundary Commitments | `sakura_script/tokenizer.rs` はロードマップの持ち場（`element_gen.rs`・`act.lua`）に載っていない | 本仕様で持つ／別 spec に切り出す | 確定: 本仕様で持つ（Wave 1 のほかの spec の持ち場と重ならない。U08 は生成側だけでは 4.5 を満たせない）。ロードマップの持ち場に追記済み |
+| ~~DQ-6~~ | ElementGen／説明文字列、ActSafety `arith` | 警告に出す被演算子の名前の形 | (a) Lua のパス（`var.x`。既存の `act:talk - undefined variable: 'var.x'` と同じ）／(b) DSL の書き方（`＄x`） | 確定: (a)。既存の警告と形をそろえる |
+| ~~DQ-7~~ | ActSafety／Implementation Notes | 警告の回数 | 発生のたび（入れ子の算術は根本原因 1 回、未登録アクターは話者の切り替わりごと）／同じ内容は 1 回に抑止 | 確定: 発生のたび。抑止の状態は持たない（Non-Goals） |
+| ~~DQ-8~~ | ActSafety／Risks | 未登録アクターの行のサーフェスタグが `STORE.appearance` に名前付きで残る | 許容／本仕様で `appearance` 側に手を入れる（境界外） | 確定: 許容（アクターの登録ではなく、`appearance.lua` は境界外） |
