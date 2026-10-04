@@ -68,7 +68,8 @@ pub struct PastaParser2;
 ///
 /// # Arguments
 ///
-/// * `source` - Pasta DSL source code as a string
+/// * `source` - Pasta DSL source code as a string. A leading UTF-8 BOM (U+FEFF)
+///   is ignored; spans and error positions are relative to the text after it.
 /// * `filename` - Filename for error reporting (does not need to exist)
 ///
 /// # Returns
@@ -94,6 +95,7 @@ pub struct PastaParser2;
 /// }
 /// ```
 pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, ParseError> {
+    let source = source.strip_prefix('\u{FEFF}').unwrap_or(source);
     let pairs = PastaParser2::parse(Rule::file, source).map_err(|e| {
         let (line, column) = match e.line_col {
             pest::error::LineColLocation::Pos((l, c)) => (l, c),
@@ -309,6 +311,14 @@ mod tests {
         assert_eq!(normalize_number_str("１2３"), "123");
         assert_eq!(normalize_number_str("3．１４"), "3.14");
         assert_eq!(normalize_number_str("－123"), "-123");
+    }
+
+    #[test]
+    fn test_parse_str_ignores_leading_bom() {
+        let source = "＊挨拶\n  Alice：こんにちは\n";
+        let plain = parse_str(source, "a.pasta").unwrap();
+        let with_bom = parse_str(&format!("\u{FEFF}{source}"), "a.pasta").unwrap();
+        assert_eq!(format!("{with_bom:?}"), format!("{plain:?}"));
     }
 
     #[test]
