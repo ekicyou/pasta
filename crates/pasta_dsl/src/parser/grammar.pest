@@ -120,7 +120,7 @@ string_nofenced = @{ (!strfence ~ no_ws)+ }
 string_blank    = @{ "\"\"" | "「」" }
 string_fenced   = _{ strfence ~ string_contents ~ strclose }
 
-string_contents = @{ (!PEEK ~ ANY)+ }
+string_contents = @{ (!(PEEK | "\r" | "\n") ~ ANY)+ }
 strclose         = _{ POP }
 
 strfence = _{
