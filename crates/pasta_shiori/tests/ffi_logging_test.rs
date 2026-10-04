@@ -18,9 +18,13 @@
 mod common;
 
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use common::copy_fixture_to_temp;
+use pasta::actor::mailbox::mailbox;
 use pasta::actor::marshaling::default_204;
+use pasta::actor::teardown::teardown_via_sender;
+use pasta::actor::thread::spawn_actor_thread;
 use pasta::{load, request, unload};
 use tempfile::TempDir;
 use windows_sys::Win32::Foundation::{GlobalFree, HGLOBAL};
@@ -236,4 +240,38 @@ fn ffi_logs_reach_the_ghost_log_file() {
     assert!(unload(), "unload returns true");
     let log = read_log(ghost.path(), CUSTOM_LOG);
     assert_log_contains(&log, "Unregistering logger", "fixed file_path log (5.4)");
+
+    // --- 段 8: teardown の待ち時間切れ（4.4） ---
+    // `SHIORI.unload` が 1 秒待つゴーストをアクタースレッドで起こし、送信側から短い待ち時間で
+    // teardown する（FFI の `unload` は 5 秒固定なので使わない）。待ち時間切れの warn は文脈の
+    // 無いこのスレッドから出て、まだ登録中のロガーへ「文脈なし→唯一のロガー」で届く。
+    let ghost = install_ghost("[logging]\nlevel = \"trace\"\n");
+    let entry = ghost.path().join("scripts/pasta/shiori/entry.lua");
+    let src = std::fs::read_to_string(&entry).expect("read entry.lua");
+    const UNLOAD_FN: &str = "function SHIORI.unload()";
+    assert!(
+        src.contains(UNLOAD_FN),
+        "entry.lua must define SHIORI.unload"
+    );
+    let slow = src.replace(
+        UNLOAD_FN,
+        "function SHIORI.unload()\n    local t = os.clock() + 1.0\n    while os.clock() < t do end",
+    );
+    std::fs::write(&entry, slow).expect("write entry.lua");
+
+    let (tx, rx) = mailbox();
+    let actor = spawn_actor_thread(0, ghost.path().to_path_buf(), rx);
+    assert!(
+        actor.loaded(),
+        "actor thread must load the slow-unload ghost"
+    );
+    let report = teardown_via_sender(&tx, Duration::from_millis(200));
+    assert!(
+        !report.acked && report.anomaly.is_some(),
+        "teardown must time out while SHIORI.unload waits: {report:?}"
+    );
+    // アクターの終了（unload → ロガー登録解除）を待ってからログを読む。
+    actor.join().expect("actor thread must finish");
+    let log = read_log(ghost.path(), DEFAULT_LOG);
+    assert_log_contains(&log, "done ack timed out", "teardown timeout warn (4.4)");
 }
