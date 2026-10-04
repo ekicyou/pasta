@@ -145,3 +145,67 @@
 - **既存のテスト**: 試作で落ちたのは 2.4 に挙げた「プロキシを受け取ることを固定しているテスト」だけである（最初に落ちたのは `actor_module_test.lua` の expr_fn の後処理のテスト）。
 - **テスト用スクリプトの写し**: `crates/pasta_shiori/tests/support/scripts/pasta/` は古いランタイムの写しで、本番の `actor.lua` とは既に違う。`fixtures/codegen_runtime_safety/pasta.toml` が本番のランタイムを使う方法を示しているので、E2E はその形にならう（写しは追従させない）。
 - **マニュアルの該当箇所の追加**: 受け取るものに触れる記述は `grammar/words.md` 303 行（動的関数呼び出し）と `grammar/actor-dictionary.md` 255 行（アクターの関数。案 A でも記述は変わらない）にもある。要件 5.1 を「触れるすべての箇所」に直した。
+
+## 8. 設計フェーズの調査と判断（2026-10-04）
+
+- **Discovery の種類**: Extension（既存のプロキシの後処理の変更）。軽量の調査（統合点・既存のパターン・テストとマニュアルの影響範囲）を行った。外部の依存・新しいライブラリは無い。
+
+### 8.1 調査の記録
+
+- **第 1 引数を固定している既存テストの追加の発見**
+  - 2.4 に挙げた 3 件のほかに、`crates/pasta_lua/tests/runtime/syntax_test.rs` の「アクター付きの行の `＠＄f（１）` は、関数の第 1 引数にアクターのプロキシを渡す」（シーン `＊プロキシ`、`SCENE.whoami(p, n)` が `p.actor.name` を使う）が、アクターの外の関数がプロキシを受け取ることを固定している。期待を変えるテストは 4 件になる。
+  - 2.4 の `act_dynamic_ref_test.lua` 528 行付近は、`expr_fn_var` がシーンテーブルの関数にプロキシを渡すことを固定するテストである。
+  - `proxy_find_handler_test.lua`・`literal_fixes_test.rs`・`scene_test.rs`・`fallback_search_integration_test.rs` は、検索と文字列の単語だけを確かめており、影響を受けない（読んで確認した。実行はしていない）。
+- **サンプル・マニュアルの例**
+  - `book/src` と `crates/pasta_sample_ghost` に、アクション行から `GLOBAL` 関数・シーンの関数がプロキシを使う例は無い。プロキシを使う例は `grammar/actor-dictionary.md` の `function ACTOR.自己紹介(proxy)` だけで、これはアクターの段の関数であり、規則を変えても正しい。
+- **マニュアルの該当箇所（設計時の全文検索）**
+  - 受け取るものを述べる記述: `grammar/variables.md` 177・179 行、`grammar/words.md` 194・303 行、`grammar/actor-dictionary.md` 255 行、`lua/script-api.md` 37・200–202・538 行、`internals/internal-modules.md` 213・217・221 行。
+  - `lua/script-api.md` 239・267・283 行は「アクション行ではプロキシの `word`・`expr_fn`・`expr_fn_var` を使う」という経路の説明で、規則を変えても正しい。
+  - 組み込みの呼び出しの説明は `grammar/call-jump.md` 168–200 行にある（`＞チェイントーク`・`＞yield`・`＞ゴースト終了`）。要件 5.2 の記述の置き場所の候補である。
+  - 上の章はすべて `gen-skill-refs.mjs` の対象である（`pasta-ghost-authoring`・`pasta-lua-coding`）。
+- **E2E の手本**
+  - 500 にならないことと応答の一致: `codegen_runtime_safety_e2e_test.rs`（`ShioriTestEnv`・シーン名をイベント ID にしてシーン関数フォールバックで起動）。
+  - 継続トークの残り: `scene_kick_multibeat_e2e_test.rs`（OnSecondChange と `X-Pasta-Time`・固定のトーク間隔）。フィクスチャでトーク間隔を固定する書き方は `fixtures/async_callback/pasta.toml` にある。
+- **設計時の再試作**
+  - 設計で足した 2 点（下の 8.2）を確かめるため `actor.lua` を一時的に書き換えて試そうとしたが、実行環境の権限で止められたため行っていない。7 節の試作の結果はそのまま有効で、足した 2 点は実装の最初のタスクで確かめる。
+
+### 8.2 設計判断
+
+#### Decision: 見つかった段の伝え方
+
+- **Context**: 後処理が「アクターの段で見つかったか、act の段で見つかったか」を知る必要がある（2.1・2.2）。`find_handler` はマニュアルに載る公開の形である。
+- **Alternatives Considered**:
+  1. `find_handler` の戻り値を増やす（ハンドラーと段）。
+  2. `word` が `find_actor_handler` と `self.act:find_act_handler` を自分で順に呼ぶ。`call_expr` は常に `self.act` を渡す。
+- **Selected Approach**: 2。expr モードはアクターの段を探さないため、`call_expr` は検索を変えずに渡すものだけを変える。
+- **Rationale**: 公開の形を変えずに済み、変更が最も小さい（7 節の試作と同じ）。
+- **Trade-offs**: `word` の中に `find_handler` と同じ「アクターの段 → act の段」の順序がもう 1 か所現れる。2 行であり、共通化はしない。
+
+#### Decision: 戻り値の正規化の範囲
+
+- **Context**: act のメソッドはメソッドチェーン用に ACT を返す。要件 2.5 は「ACT またはアクタープロキシそのもの」を値なしにする。
+- **Alternatives Considered**:
+  1. `self.act` と同一のときだけ（7 節の試作）。
+  2. `self.act` または `self`（呼び出しに使ったプロキシ）と同一のとき。
+  3. テーブル全般、またはメタテーブルで判定したプロキシ全般。
+- **Selected Approach**: 2。先頭の戻り値だけを見て、該当すれば `nil` だけを返す。該当しなければ戻り値をすべてそのまま返す。
+- **Rationale**: 要件 2.5 の文言（ACT・プロキシそのもの）を満たす最小の判定である。3 は要件が求めておらず、作者が意図して返したテーブルの扱い（現行は `tostring`）を変えてしまう。
+- **Trade-offs**: 関数が別に作ったプロキシを返した場合は対象にならない（設計ディスカッションの確認事項）。
+
+#### Decision: 組み込み関数の側の防御は足さない
+
+- **Context**: 並走条件は `global.lua`・`shiori/entry.lua` の変更を許している（4 節の案 C）。
+- **Selected Approach**: 足さない。`global.lua`・`shiori/entry.lua` は変更しない。
+- **Rationale**: 生成コードの経路はすべてプロキシの後処理を通り、そこで ACT になる。手書き Lua が組み込み関数にプロキシを直接渡す使い方は、要件に無い。
+
+### 8.3 統合（Synthesis）の結果
+
+- **Generalization**: 要件 1（組み込み関数）・2.4（シーン関数）・act のメソッドの呼び出しは、すべて「アクターの外で見つかった関数に ACT を渡す」という 1 つの規則の特殊な場合である。組み込み関数ごとの対応は作らない。
+- **Build vs. Adopt**: 新しく作るものは局所関数 1 つだけである。検索は既存の `find_actor_handler`・`find_act_handler` を使い、E2E は既存の `ShioriTestEnv` とフィクスチャの形を使う。
+- **Simplification**: 段を表す戻り値・印・新しい公開メソッド・設定・互換の切り替えは足さない。`global.lua`・`shiori/entry.lua` の変更は無しにした。
+
+### 8.4 リスクと対処
+
+- プロキシを前提にした作者の `GLOBAL` 関数・シーンの関数が動かなくなる — 要件ディスカッションで受け入れ済み。マニュアルの規則の記述で知らせる。
+- マニュアルの記述の取りこぼし — `book/src` を「プロキシ」で検索して残りが無いことを完了の条件にする。
+- 継続トークの E2E が時刻に依存する — `X-Pasta-Time` と固定のトーク間隔で決定論にする。
