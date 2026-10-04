@@ -31,7 +31,7 @@
 
 ```text
 シーン関数
-  act.アクター:talk(…) / :sakura_script(…)、act:surface(…) / :wait(…) / :set_spot(…) …
+  act:actor_proxy("アクター"):talk(…) / :sakura_script(…)、act:surface(…) / :wait(…) / :set_spot(…) …
     │  フラットなトークンの列（act.token）
     ▼
 pasta.shiori.act  SHIORI_ACT_IMPL.build
@@ -55,7 +55,7 @@ pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_n
 | モジュール（ファイル） | 役割 |
 | ---------------------- | ---- |
 | `pasta.act`（`crates/pasta_lua/pasta_scripts/pasta/act.lua`） | トークンの蓄積（`talk`・`sakura_script`・`raw_script`・`surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout`・`set_spot`・`clear_spot`）と、`build` の前処理（局所関数 `group_by_actor`・`merge_consecutive_talks`） |
-| `pasta.actor`（`crates/pasta_lua/pasta_scripts/pasta/actor.lua`） | アクタープロキシ。`act.アクター:talk(…)`・`:sakura_script(…)` を、アクターを添えた ACT の `talk`・`sakura_script` に委ねる |
+| `pasta.actor`（`crates/pasta_lua/pasta_scripts/pasta/actor.lua`） | アクタープロキシ。`act:actor_proxy("アクター")` などで得たプロキシの `:talk(…)`・`:sakura_script(…)` を、アクターを添えた ACT の `talk`・`sakura_script` に委ねる |
 | `pasta.shiori.act`（`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`） | `pasta.act` を継承し、`build` を「`ACT_IMPL.build` でグループ化トークンを得て `BUILDER.build` に渡す」処理に差し替える。`spot_newlines` は `[ghost]` から読む |
 | `pasta.shiori.sakura_builder`（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`） | グループ化トークンをさくらスクリプト文字列にする `BUILDER.build` |
 | `pasta.shiori.appearance`（`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`） | 外見状態の生成（`APPEARANCE.new`）・観測（`APPEARANCE.observe`）・復旧（`APPEARANCE.restore`）。状態を持たず、渡された状態の表をその場で更新する。`STORE` や `@pasta_*` を `require` しない |
@@ -81,7 +81,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 | `type` | フィールド | 積むメソッド |
 | ------ | ---------- | ------------ |
-| `talk` | `actor`・`text` | `act:talk(アクター, テキスト)`（アクタープロキシの `talk` 経由を含む）。`text` が `nil` なら積まない |
+| `talk` | `actor`・`text` | `act:talk(アクター, テキスト)`（アクタープロキシの `talk` 経由を含む）。`text` が `nil` なら積まない。未登録のアクターの目印（`【未登録アクター：名前】`）は `act:actor_proxy` が積む（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fnarith)） |
 | `sakura_script` | `actor`・`text` | `act:sakura_script(アクター, テキスト)`（アクタープロキシ経由） |
 | `raw_script` | `text` | `act:raw_script(テキスト)`。SHIORI 用の ACT では `set_property`・`get_property` も積む |
 | `surface` | `id` | `act:surface(ID)` |
@@ -145,7 +145,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 グループのアクターが `last_actor` と別の表であれば、アクターの切り替えとして次を行う（`emit_actor_switch`）。
 
-1. スポットを `actor_spots[アクター名]` から引く。無ければ 0 とし、アクターに名前があれば警告をログに出す。
+1. スポットを `actor_spots[アクター名]` から引く。無ければ 0 とし、アクターに名前があれば警告をログに出す。`act:actor_proxy` が作るその場限りのアクター（未登録の名前）は `actor_spots` に無いため、ここで 0 になる。
 2. `\p[スポット]` を出力する。
 3. 続けて `APPEARANCE.restore(appearance, アクター, スポット, グループの内側のトークン)` が返す復旧タグを出力する（[アピアランスの観測と復旧](#アピアランスの観測と復旧)）。
 4. `pending_break` を `spot_has_text[スポット]` で決め直し、`last_spot`・`last_actor` を更新する。
@@ -163,7 +163,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 `talk_to_script(actor, talk)` は、`talk` が `nil` か空文字列なら空文字列を返す。それ以外は次の順に処理する。
 
 1. **ウェイト値の決定**: `actor` が表なら、その直下の `script_wait_normal`・`script_wait_period`・`script_wait_comma`・`script_wait_strong`・`script_wait_leader` を整数として読み、読めないキーは登録時の既定値（`[talk]` の値、無ければ `TalkConfig` の既定値）を使う。表でなければ既定値だけを使う。
-2. **トークナイザ**: 文字列を先頭から走査する。`\` の位置で `SAKURA_TAG_PATTERN`（`\` に続く `[0-9a-zA-Z_!+*?&-]` の 1 文字以上と、任意の `[…]` の引数）に一致すればタグのトークンにし、そうでなければ 1 文字を `CharSets::classify` で分類する。分類の優先順は句点・読点・強調・リーダー・行頭禁則・行末禁則で、どれにも当たらなければ一般の文字である。
+2. **トークナイザ**: 文字列を先頭から走査する。`\` の位置で `SAKURA_TAG_PATTERN`（`\\` の 2 文字、または `\` に続く `[0-9a-zA-Z_!+*?&-]` の 1 文字以上と、任意の `[…]` の引数）に一致すればタグのトークンにし、そうでなければ 1 文字を `CharSets::classify` で分類する。分類の優先順は句点・読点・強調・リーダー・行頭禁則・行末禁則で、どれにも当たらなければ一般の文字である。`\\` は正規表現の先頭の選択肢のため、左から先に一致する（`C:\\new` は `\\` のタグと `new` の文字になり、`\n` のタグにはならない）。`\\` もタグのトークンであるため、ウェイトは付かず、budoux 改行の幅にも数えない。
 3. **ウェイト挿入**（`insert_waits`）: タグと行末禁則の文字はそのまま出力する。一般の文字とリーダーは 1 文字ごとに `\_w[値 - 50]` を後ろに付ける。句点・読点・強調・行頭禁則は連続する並びとしてためておき、並びが途切れたところで、並びの中の最大値から 50 を引いたウェイトを 1 つだけ付ける（行頭禁則の文字は自分の値を持たず、並びを延ばすだけである）。計算したウェイトが 0 以下なら付けない。
 4. **budoux 改行**: `actor` が表で、`budoux` が空でない配列なら、ウェイト挿入後の文字列に `break_lines_impl` を適用する。
 

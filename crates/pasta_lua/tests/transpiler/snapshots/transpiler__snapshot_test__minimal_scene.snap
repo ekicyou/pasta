@@ -12,6 +12,6 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk("「こんにちは」")
+        act:actor_proxy("さくら"):talk("「こんにちは」")
     end
 end

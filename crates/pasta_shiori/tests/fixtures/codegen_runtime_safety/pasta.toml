@@ -1,0 +1,32 @@
+# codegen_runtime_safety E2E 用フィクスチャ（dsl-codegen-runtime-safety task 4.2）
+#
+# lua_search_paths から "scripts" を外している。ハーネス（common::copy_fixture_to_temp）が
+# tests/support/scripts を scripts/ にコピーするが、それは古い runtime の写しで
+# act:actor_proxy などを持たない。ここでは埋め込みの pasta 標準ランタイム
+# （profile/pasta/pasta_scripts）と本番の entry.lua をそのまま通す。
+
+[loader]
+pasta_patterns = ["dic/*.pasta"]
+lua_search_paths = [
+    "profile/pasta/save/lua",
+    "profile/pasta/pasta_scripts",
+    "profile/pasta/cache/lua",
+    "scriptlibs",
+]
+transpiled_output_dir = "profile/pasta/cache/lua"
+
+# ウェイト設定あり（U08 で \\ が割れないことを確かめる）
+[talk]
+script_wait_normal = 50
+script_wait_period = 1000
+script_wait_comma = 500
+script_wait_strong = 500
+script_wait_leader = 200
+
+# 登録済みアクターは立ち位置 1・2 に置き、\p[0] が未登録アクター（U19）の
+# 立ち位置 0 フォールバックからだけ出るようにする。
+[actor."さくら"]
+spot = 1
+
+[actor."talk"]
+spot = 2

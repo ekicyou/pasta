@@ -12,7 +12,7 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk("「おはようございます」")
+        act:actor_proxy("さくら"):talk("「おはようございます」")
     end
 end
 
@@ -23,7 +23,7 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk("「こんにちは」")
+        act:actor_proxy("さくら"):talk("「こんにちは」")
     end
 end
 
@@ -34,7 +34,7 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk("「おはよう！朝だね」")
+        act:actor_proxy("さくら"):talk("「おはよう！朝だね」")
     end
 end
 

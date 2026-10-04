@@ -79,8 +79,8 @@ do
 
         -- 　％さくら、うにゅう
         -- 意図: シーンアクター設定。set_spot(n)でアクターの表示位置を設定
-        act.さくら:set_spot(0)
-        act.うにゅう:set_spot(1)
+        act:set_spot("さくら", 0)
+        act:set_spot("うにゅう", 1)
 
         -- 　　　＞グローバル単語呼び出し
         -- 意図: Call文は act:call(モジュール名, ラベル名, 属性フィルター, ...引数) 形式（Requirement 3d）
@@ -119,13 +119,13 @@ do
         -- 　　　さくら　：＠笑顔　＠挨拶！
         -- 意図: ＠XXX 参照は word("XXX") に展開（Requirement 3e）
         --       通常テキストは talk() に展開（Requirement 3d）
-        act.さくら:word("笑顔")
-        act.さくら:word("挨拶")
-        act.さくら:talk("！")
+        act:actor_proxy("さくら"):word("笑顔")
+        act:actor_proxy("さくら"):word("挨拶")
+        act:actor_proxy("さくら"):talk("！")
 
         -- 　　　うにゅう：＠通常　やふぅ。
-        act.うにゅう:word("通常")
-        act.うにゅう:talk("やふぅ。")
+        act:actor_proxy("うにゅう"):word("通常")
+        act:actor_proxy("うにゅう"):talk("やふぅ。")
     end
 
     -- 　・ローカル単語呼び出し
@@ -135,13 +135,13 @@ do
 
         -- 　　　さくら　：＠通常　＠場所　の天気は？
         -- 意図: ＠XXX 参照と通常テキストの混在を word() と talk() に分割（Requirement 3e, 3d）
-        act.さくら:word("通常")
-        act.さくら:word("場所")
-        act.さくら:talk("の天気は？")
+        act:actor_proxy("さくら"):word("通常")
+        act:actor_proxy("さくら"):word("場所")
+        act:actor_proxy("さくら"):talk("の天気は？")
 
         -- 　　　うにゅう：＠天気　らしいで。
-        act.うにゅう:word("天気")
-        act.うにゅう:talk("らしいで。")
+        act:actor_proxy("うにゅう"):word("天気")
+        act:actor_proxy("うにゅう"):talk("らしいで。")
     end
 
     -- 　・会話分岐
@@ -151,10 +151,10 @@ do
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
         -- 　　　さくら　：ローカル分岐１だよ。
-        act.さくら:talk("ローカル分岐１だよ。")
+        act:actor_proxy("さくら"):talk("ローカル分岐１だよ。")
 
         -- 　　　うにゅう：ちっぽけやね。
-        act.うにゅう:talk("ちっぽけやね。")
+        act:actor_proxy("うにゅう"):talk("ちっぽけやね。")
     end
 
     -- 　・会話分岐
@@ -164,15 +164,15 @@ do
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
         -- 　　　さくら　：ローカル分岐２だよ。
-        act.さくら:talk("ローカル分岐２だよ。")
+        act:actor_proxy("さくら"):talk("ローカル分岐２だよ。")
 
         -- 　　　うにゅう：もっと飛べる、ワイは飛べるんや！
-        act.うにゅう:talk("もっと飛べる、ワイは飛べるんや！")
+        act:actor_proxy("うにゅう"):talk("もっと飛べる、ワイは飛べるんや！")
 
         -- 　　　さくら　：＠ぐんにょり　なんでだよ。
         -- 意図: ＠XXX 参照は word() に展開（Requirement 3e）
-        act.さくら:word("ぐんにょり")
-        act.さくら:talk("なんでだよ。")
+        act:actor_proxy("さくら"):word("ぐんにょり")
+        act:actor_proxy("さくら"):talk("なんでだよ。")
     end
 
     -- 　・変数代入
@@ -181,11 +181,11 @@ do
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
         -- 　　　さくら　：＠通常　変数を代入。
-        act.さくら:word("通常")
-        act.さくら:talk("変数を代入。")
+        act:actor_proxy("さくら"):word("通常")
+        act:actor_proxy("さくら"):talk("変数を代入。")
 
         -- 　　　うにゅう：中身は内緒や。
-        act.うにゅう:talk("中身は内緒や。")
+        act:actor_proxy("うにゅう"):talk("中身は内緒や。")
 
         -- 　　　＄カウンタ＝１０
         -- 意図: ローカル変数（＄変数名）は var.変数名 に代入（Requirement 3d）
@@ -209,14 +209,14 @@ do
         -- 　　　さくら　：第１引数は＄０　だよ。
         -- 意図: 引数参照（＄０→args[1]、＄１→args[2]）Pasta DSLの0-baseをLua 1-baseに変換（Requirement 3d）
         --       各アクション要素は個別のtalk/tostring呼び出しに展開（Requirement 3d）
-        act.さくら:talk("第１引数は")
-        act.さくら:talk(args[1], "args[1]")
-        act.さくら:talk("だよ。")
+        act:actor_proxy("さくら"):talk("第１引数は")
+        act:actor_proxy("さくら"):talk(args[1], "args[1]")
+        act:actor_proxy("さくら"):talk("だよ。")
 
         -- 　　　うにゅう：第２引数は＄１　やね。
-        act.うにゅう:talk("第２引数は")
-        act.うにゅう:talk(args[2], "args[2]")
-        act.うにゅう:talk("やね。")
+        act:actor_proxy("うにゅう"):talk("第２引数は")
+        act:actor_proxy("うにゅう"):talk(args[2], "args[2]")
+        act:actor_proxy("うにゅう"):talk("やね。")
     end
 
     -- ```
@@ -248,17 +248,17 @@ do
         save.幅 = act:get_property("currentghost.balloon.scope(0).validwidth.initial")
 
         -- 　　　さくら　：＠通常　名前は＄％currentghost.name　です。
-        -- 意図: インラインGETは act.X:talk(tostring(act:get_property("prop"))) に展開
-        act.さくら:word("通常")
-        act.さくら:talk("名前は")
-        act.さくら:talk(tostring(act:get_property("currentghost.name")))
-        act.さくら:talk("です。")
+        -- 意図: インラインGETは act:actor_proxy("X"):talk(tostring(act:get_property("prop"))) に展開
+        act:actor_proxy("さくら"):word("通常")
+        act:actor_proxy("さくら"):talk("名前は")
+        act:actor_proxy("さくら"):talk(tostring(act:get_property("currentghost.name")))
+        act:actor_proxy("さくら"):talk("です。")
 
         -- 　　　うにゅう：幅は＄ゴースト名　だって。
         -- 意図: 通常のローカル変数参照は tostring(var.name) に展開
-        act.うにゅう:talk("幅は")
-        act.うにゅう:talk(var.ゴースト名, "var.ゴースト名")
-        act.うにゅう:talk("だって。")
+        act:actor_proxy("うにゅう"):talk("幅は")
+        act:actor_proxy("うにゅう"):talk(var.ゴースト名, "var.ゴースト名")
+        act:actor_proxy("うにゅう"):talk("だって。")
     end
 end
 
@@ -278,10 +278,10 @@ do
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
         -- 　　さくら　：グローバルの分岐に飛んできた。
-        act.さくら:talk("グローバルの分岐に飛んできた。")
+        act:actor_proxy("さくら"):talk("グローバルの分岐に飛んできた。")
 
         -- 　　うにゅう：世界取れるで。
-        act.うにゅう:talk("世界取れるで。")
+        act:actor_proxy("うにゅう"):talk("世界取れるで。")
     end
 end
 

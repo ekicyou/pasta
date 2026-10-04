@@ -440,6 +440,113 @@ function ACT_IMPL.expr_fn_var(self, value, var_path, ...)
     return call_expr(self, key, true, ...)
 end
 
+--- アクター名からプロキシを得る（アクション行の生成コードが呼ぶ）
+--- 登録済み（self.actors[name]）なら act.名前 と同じプロキシを返す。名前を文字列で受けるため
+--- act のメンバー名と同名のアクターでも __index を通らない。
+--- 未登録なら名前だけのその場限りのアクター（{ name = name }・メタテーブルなし）のプロキシを返す。
+--- 直前の話者（self.token を末尾から見て最初の talk／sakura_script の actor）が同じ未登録名ならそれを再利用し、
+--- そうでなければ警告を 1 行出して目印の talk トークンを積む。登録状態・立ち位置・act のフィールドには書かない
+--- @param self Act アクションオブジェクト
+--- @param name string アクター名
+--- @return ActorProxy プロキシ（常に非 nil）
+function ACT_IMPL.actor_proxy(self, name)
+    local actor = self.actors[name]
+    if actor then
+        return ACTOR.create_proxy(actor, self)
+    end
+    for i = #self.token, 1, -1 do
+        local t = self.token[i]
+        if t.type == "talk" or t.type == "sakura_script" then
+            if t.actor and t.actor.name == name then
+                return ACTOR.create_proxy(t.actor, self)
+            end
+            break
+        end
+    end
+    actor = { name = name }
+    log.warn(string.format("act:actor_proxy - unregistered actor: name='%s'", tostring(name)))
+    table.insert(self.token, { type = "talk", actor = actor, text = "【未登録アクター：" .. tostring(name) .. "】" })
+    return ACTOR.create_proxy(actor, self)
+end
+
+--- グローバル関数呼び出し（＠＊名前（…））
+--- GLOBAL[name] が関数なら act を第1引数にして呼ぶ（中のエラーはそのまま伝わる）。
+--- 無い・関数でないときは警告して nil（act:expr_fn と同じ warn レベル）
+--- @param self Act アクションオブジェクト
+--- @param name string 関数名
+--- @param ... any 関数に渡す引数
+--- @return any ... 関数の戻り値すべて、または nil
+function ACT_IMPL.global_fn(self, name, ...)
+    local f = GLOBAL[name]
+    if type(f) == "function" then
+        return f(self, ...)
+    end
+    log.warn(string.format("act:global_fn - function not found: key='%s'", tostring(name)))
+    return nil
+end
+
+--- act:arith のネイティブ演算（メタメソッドに届く前に数値化済みの値だけを渡す）
+local ARITH_OPS = {
+    ["+"] = function(a, b) return a + b end,
+    ["-"] = function(a, b) return a - b end,
+    ["*"] = function(a, b) return a * b end,
+    ["/"] = function(a, b) return a / b end,
+    ["%"] = function(a, b) return a % b end,
+}
+
+--- act:arith の警告に出す値の表記。table 等は tostring しない（__tostring を呼ばないため）
+--- @param v any
+--- @return string
+local function arith_value_text(v)
+    local t = type(v)
+    if t == "nil" then return "nil" end
+    if t == "string" then return string.format("'%s' (string)", v) end
+    if t == "boolean" then return string.format("%s (boolean)", tostring(v)) end
+    return string.format("(%s)", t)
+end
+
+--- 被演算子を数値にする。number はそのまま、string は tonumber（変更前の暗黙変換と同じ範囲）、
+--- それ以外は nil。数値にできないときは警告する（値も説明も nil なら内側の失敗の伝播として黙る）
+--- @param op string 演算子
+--- @param v any 被演算子
+--- @param desc string|nil 被演算子の説明（変数パス・関数名）
+--- @return number|nil
+local function arith_operand(op, v, desc)
+    local t = type(v)
+    local n = (t == "number" and v) or (t == "string" and tonumber(v)) or nil
+    if n ~= nil or (v == nil and desc == nil) then
+        return n
+    end
+    local value = arith_value_text(v)
+    local operand = desc and string.format("operand='%s', ", desc) or ""
+    log.warn(string.format("act:arith - operand is not a number: op='%s', %svalue=%s", op, operand, value))
+    return nil
+end
+
+--- 数値の二項演算（算術式の生成コードが呼ぶ）
+--- 両方が数値にできれば Lua のネイティブ演算の結果、どちらかが数値にできなければ nil。
+--- act の状態は読み書きしない
+--- @param self Act アクションオブジェクト（未使用）
+--- @param op string "+" | "-" | "*" | "/" | "%"
+--- @param lhs any 左の被演算子
+--- @param rhs any 右の被演算子
+--- @param lhs_desc string|nil 左の説明（警告用）
+--- @param rhs_desc string|nil 右の説明（警告用）
+--- @return number|nil 演算結果
+function ACT_IMPL.arith(self, op, lhs, rhs, lhs_desc, rhs_desc) -- luacheck: ignore 212/self
+    local f = ARITH_OPS[op]
+    if not f then
+        log.warn(string.format("act:arith - unknown operator: op='%s'", tostring(op)))
+        return nil
+    end
+    local a = arith_operand(op, lhs, lhs_desc)
+    local b = arith_operand(op, rhs, rhs_desc)
+    if a == nil or b == nil then
+        return nil
+    end
+    return f(a, b)
+end
+
 --- トークン取得とリセット（グループ化・統合済み）
 --- @param self Act アクションオブジェクト
 --- @return table[]|nil グループ化されたトークン配列、またはnil（トークン0件時）

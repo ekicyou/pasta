@@ -97,7 +97,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | Wave | spec（並走可） | 種別 | ソースの持ち場 |
 | ---- | -------------- | ---- | -------------- |
 | 1 | dsl-literal-fixes | バグ（起動不能を含む） | `pasta_dsl` の文法・パーサ、`string_literalizer.rs` |
-| 1 | dsl-codegen-runtime-safety | バグ（500） | `element_gen.rs`、`act.lua` |
+| 1 | dsl-codegen-runtime-safety | バグ（500） | `element_gen.rs`、`act.lua`、`sakura_script/tokenizer.rs` |
 | 1 | callback-resume-unification | バグ（継続の消失・潜在 500） | `pasta_scripts/pasta/shiori/event/`（`choice_select.lua` 以外） |
 | 1 | scene-search-key-normalization | バグ | `search/`、`pasta_core` の registry（`random.rs` 以外）、`actor.lua` のアクター単語検索 |
 | 1 | pasta-toml-logging-consistency | バグ（設定・ログ） | `pasta_lua` の `loader/config/`・`logging/`、`pasta_shiori` |
@@ -105,6 +105,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 2 | actor-proxy-act-delegation | バグ（500） | `actor.lua`、`global.lua`、`shiori/entry.lua` |
 | 2 | act-token-grouping-fix | バグ | `act.lua`（グループ化）、`sakura_builder.lua`、`ct.lua` |
 | 2 | search-selector-indices | バグ（テスト用 API） | `pasta_core` の `random.rs` |
+| 2 | string-concat-operator | 機能 | `pasta_dsl` の式の文法（演算子）、`element_gen.rs`（式の Binary）、`act.lua`（算術・連結ヘルパーの領域。グループ化は触らない） |
 | 3 | call-execution-correctness | バグ | `element_gen.rs`（Call）、`act.lua`（`init_scene`・`call`） |
 | 4 | scene-attribute-store | 機能 | 属性の文法・コード生成・`scene.lua`・`finalize.rs` |
 | 5 | call-attribute-filter | 機能 | フィルターの文法・Call のコード生成・検索 |
@@ -112,7 +113,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 ## Specs (dependency order)
 
 - [x] dsl-literal-fixes -- 改行を含む引用文字列・2 つ目の `""` で生成 Lua が壊れ起動不能になる不具合（U24）、単語値の `「」`・`""` が空にならない（U25）、引用なしの単語値の行末コメント（U06）。Dependencies: none
-- [ ] dsl-codegen-runtime-safety -- 未定義の `＠＊関数（）`（U18）・未登録アクター（U19）・act のメンバー名と同じアクター名（U20）・数値にできない算術（U22）で 500 になる不具合と、アクション行の `\\`（U08）。生成コードを存在確認付きのヘルパー経由にする。Dependencies: none
+- [x] dsl-codegen-runtime-safety -- 未定義の `＠＊関数（）`（U18）・未登録アクター（U19）・act のメンバー名と同じアクター名（U20）・数値にできない算術（U22）で 500 になる不具合と、アクション行の `\\`（U08）。生成コードを存在確認付きのヘルパー経由にする。Dependencies: none
 - [x] callback-resume-unification -- コールバック再開後の継続の消失、タイムアウト掃引の結果の破棄と予約の残留、タイムアウト応答の二重包み、REG ハンドラの戻り値の二重包み（U23）。コールバックの再開を `EVENT.fire` の再開ループに一本化する。Dependencies: none
 - [x] scene-search-key-normalization -- 記号を含むシーン名（U30）・ローカルシーン名・アクター名が、登録キー（サニタイズ済み）と検索キー（元の名前）の食い違いで見つからない不具合。Dependencies: none
 - [x] pasta-toml-logging-consistency -- 使われない `[lua] libs`（U26）・`[logging] rotation_days`（U32）の扱い、FFI 入口スレッド（`request`・`unload`・detach）のログの破棄、不正な `file_path` のときの挙動とマニュアルの食い違い。Dependencies: none
@@ -120,9 +121,10 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - [ ] actor-proxy-act-delegation -- アクション行の `＠yield`・`＠ゴースト終了`・`＠＄x` などで、ACT を前提とする関数にアクタープロキシが渡って 500 になる不具合。Dependencies: dsl-codegen-runtime-safety, scene-search-key-normalization
 - [ ] act-token-grouping-fix -- ACT のグループ化が最初の発言より前の表示制御を捨て、スポット変更でグループを閉じない不具合。LuaJIT で機能しない CT（`ct.lua`）の撤去または修正。Dependencies: dsl-codegen-runtime-safety
 - [ ] search-selector-indices -- `set_scene_selector`・`set_word_selector` の整数が選択に使われない不具合（U29）。Dependencies: scene-search-key-normalization
+- [ ] string-concat-operator -- 式の文字列連結演算子 `＆`／`&`（算術より低い優先順位・数値は文字列化）。`＋` は数値専用のまま。動的コールのターゲット式での `＆` と `call-attribute-filter` の切り分けを決めて申し送る。`dsl-codegen-runtime-safety` の完成を前提とし、調整は本 spec 側で行う。Dependencies: dsl-codegen-runtime-safety, dsl-literal-fixes
 - [ ] call-execution-correctness -- Call から戻った後のシーン文脈が復元されない不具合（U28）と、動的コール `＞式` の値が nil のときの nil ガード（旧 `dynamic-call-nil-guard`）。Dependencies: dsl-codegen-runtime-safety, act-token-grouping-fix, scene-identity-format
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: dsl-literal-fixes, scene-identity-format, call-execution-correctness
-- [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, scene-search-key-normalization, call-execution-correctness
+- [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, scene-search-key-normalization, call-execution-correctness, string-concat-operator
 
 ## バックログ（brief なし・保留）
 

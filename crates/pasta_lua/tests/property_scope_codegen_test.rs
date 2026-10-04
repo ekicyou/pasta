@@ -137,7 +137,7 @@ fn test_property_set_word_ref() {
     );
 }
 
-/// 2.6: ＄％prop＝1＋2 → act:set_property("prop", 1 + 2)
+/// 2.6: ＄％prop＝1＋2 → act:set_property("prop", act:arith("+", 1, 2))
 #[test]
 fn test_property_set_binary_expr() {
     let mut output = Vec::new();
@@ -157,7 +157,7 @@ fn test_property_set_binary_expr() {
 
     let result = String::from_utf8(output).unwrap();
     assert!(
-        result.contains(r#"act:set_property("prop", 1 + 2)"#),
+        result.contains(r#"act:set_property("prop", act:arith("+", 1, 2))"#),
         "expected set_property with binary expr, got: {}",
         result
     );
@@ -221,7 +221,7 @@ fn test_property_get_assign_global() {
 // Inline GET tests (generate_action with VarRef + Property)
 // ============================================================================
 
-/// 4.1: さくら：＄％p → act.さくら:talk(tostring(act:get_property("p")))
+/// 4.1: さくら：＄％p → act:actor_proxy("さくら"):talk(tostring(act:get_property("p")))
 #[test]
 fn test_property_inline_get() {
     let mut output = Vec::new();
@@ -236,7 +236,7 @@ fn test_property_inline_get() {
 
     let result = String::from_utf8(output).unwrap();
     assert!(
-        result.contains(r#"act.さくら:talk(tostring(act:get_property("p")))"#),
+        result.contains(r#"act:actor_proxy("さくら"):talk(tostring(act:get_property("p")))"#),
         "expected inline get_property via talk, got: {}",
         result
     );

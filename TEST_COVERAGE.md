@@ -70,6 +70,7 @@
 | CueCommandパススルー   | `cue_command_passthrough_test.rs`                                                           | ✅ 完了 | 5テスト（Lua変換スキップ検証）     |
 | 複数キー単語登録       | `transpiler.rs`（インライン）                                                               | ✅ 完了 | 7テスト（登録・Lua出力・後方互換） |
 | 動的単語参照（＠＄）   | `transpiler/dynamic_word_ref_test.rs`<br>`lua_specs/act_dynamic_ref_test.lua`<br>`runtime/syntax_test.rs`（E2E）<br>`pasta_lsp/tests/dynamic_ref_token_test.rs` | ✅ 完了 | 生成コード・スナップショット・マニュアル例の読み込み・キー解決と検索段・E2E・LSP トークン |
+| 書き間違いの実行時安全性 | `transpiler/runtime_safety_test.rs`<br>`lua_specs/act_runtime_safety_test.lua`<br>`code_gen/element_gen_tests.rs`<br>`sakura_script/tokenizer.rs`・`line_breaker.rs`（インライン）<br>`pasta_shiori/tests/codegen_runtime_safety_e2e_test.rs`（E2E） | ✅ 完了 | 未定義の `＠＊`・未登録アクター・act メンバー名のアクター・数値にできない算術・`\\` の生成形と実行（算術の組み直しが旧来の平らな式と同値である関門を含む）（dsl-codegen-runtime-safety） |
 | エンコーディング       | `pasta_lua_encoding_test.rs`                                                                | ✅ 完了 | 文字エンコード                     |
 | プロパティLua変換      | `property_scope_codegen_test.rs`                                                            | ✅ 完了 | 10テスト（property-dsl-extension） |
 | プロパティトークン保全 | `property_token_preservation_test.rs`                                                       | ✅ 完了 | 3テスト（property-dsl-extension）  |
@@ -94,7 +95,7 @@
 | SHIORIレスポンスビルダー              | `shiori_res_test.rs`                                              | ✅ 完了 | 14テスト                                                         |
 | SHIORIイベントディスパッチ            | `shiori_event_dispatch_test.rs`<br>`shiori_event_handler_test.rs` | ✅ 完了 | 27テスト（2ファイルに分割）                                      |
 | SHIORI_ACT さくらスクリプト生成       | `shiori_act_test.lua`                                             | ✅ 完了 | 43テスト（日時転記 transfer_date_to_var 6テストを含むファイル全体実測 — 旧 47＋7 の二重計上を是正） |
-| ACT トークンバッファ（親クラス）      | `act_test.lua`                                                    | ✅ 完了 | 36テスト（act-token-buffer-refactor）                            |
+| ACT トークンバッファ（親クラス）      | `act_test.lua`                                                    | ✅ 完了 | 37テスト（act-token-buffer-refactor、未登録アクターの set_spot 無視を追加）                            |
 | ACT トークングループ化                | `act_grouping_test.lua`                                           | ✅ 完了 | 25テスト（actor-talk-grouping、sakura_script grouping追加）      |
 | sakura_builder トークン変換           | `sakura_builder_test.lua`                                         | ✅ 完了 | 52テスト（ファイル全体実測 — スポット/sakura_script/choice/string-buffer 系を含む） |
 | RuntimeConfig libs配列                | `runtime_test.rs`（外部化）                                       | ✅ 完了 | 17テスト（外部化済み）                                           |

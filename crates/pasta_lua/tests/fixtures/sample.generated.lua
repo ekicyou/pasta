@@ -43,51 +43,51 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk(act.さくら:word("笑顔"))
-        act.さくら:talk(act.さくら:word("挨拶"))
-        act.さくら:talk("！")
-        act.うにゅう:talk(act.うにゅう:word("通常"))
-        act.うにゅう:talk("やふぅ。")
+        act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("笑顔"))
+        act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("挨拶"))
+        act:actor_proxy("さくら"):talk("！")
+        act:actor_proxy("うにゅう"):talk(act:actor_proxy("うにゅう"):word("通常"))
+        act:actor_proxy("うにゅう"):talk("やふぅ。")
     end
 
     function SCENE.ローカル単語呼び出し_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk(act.さくら:word("通常"))
-        act.さくら:talk(act.さくら:word("場所"))
-        act.さくら:talk("の天気は？")
-        act.うにゅう:talk(act.うにゅう:word("天気"))
-        act.うにゅう:talk("らしいで。")
+        act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("通常"))
+        act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("場所"))
+        act:actor_proxy("さくら"):talk("の天気は？")
+        act:actor_proxy("うにゅう"):talk(act:actor_proxy("うにゅう"):word("天気"))
+        act:actor_proxy("うにゅう"):talk("らしいで。")
     end
 
     function SCENE.会話分岐_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk("ローカル分岐１だよ。")
-        act.うにゅう:talk("ちっぽけやね。")
+        act:actor_proxy("さくら"):talk("ローカル分岐１だよ。")
+        act:actor_proxy("うにゅう"):talk("ちっぽけやね。")
     end
 
     function SCENE.会話分岐_2(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk("ローカル分岐２だよ。")
-        act.うにゅう:talk("もっと飛べる、ワイは飛べるんや！")
-        act.さくら:talk(act.さくら:word("ぐんにょり"))
-        act.さくら:talk("なんでだよ。")
+        act:actor_proxy("さくら"):talk("ローカル分岐２だよ。")
+        act:actor_proxy("うにゅう"):talk("もっと飛べる、ワイは飛べるんや！")
+        act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("ぐんにょり"))
+        act:actor_proxy("さくら"):talk("なんでだよ。")
     end
 
     function SCENE.変数代入_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk(act.さくら:word("通常"))
-        act.さくら:talk("変数を代入。")
-        act.うにゅう:talk("中身は内緒や。")
+        act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("通常"))
+        act:actor_proxy("さくら"):talk("変数を代入。")
+        act:actor_proxy("うにゅう"):talk("中身は内緒や。")
         var.カウンタ = 10
-        save.グローバル = act:expr_fn("関数", 2 + 1)
+        save.グローバル = act:expr_fn("関数", act:arith("+", 2, 1))
         var.場所 = act:word("場所")
     end
 
@@ -95,25 +95,25 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk("第１引数は")
-        act.さくら:talk(args[1], "args[1]")
-        act.さくら:talk("だよ。")
-        act.うにゅう:talk("第２引数は")
-        act.うにゅう:talk(args[2], "args[2]")
-        act.うにゅう:talk("やね。")
+        act:actor_proxy("さくら"):talk("第１引数は")
+        act:actor_proxy("さくら"):talk(args[1], "args[1]")
+        act:actor_proxy("さくら"):talk("だよ。")
+        act:actor_proxy("うにゅう"):talk("第２引数は")
+        act:actor_proxy("うにゅう"):talk(args[2], "args[2]")
+        act:actor_proxy("うにゅう"):talk("やね。")
     end
 
     function SCENE.グローバル関数呼び出し_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk((GLOBAL.グローバル関数(act, "グローバル")))
-        act.さくら:talk("　を呼んだよ。")
-        var.結果 = GLOBAL.グローバル関数(act, "代入テスト")
-        GLOBAL.グローバル関数(act, "式文テスト")
+        act:actor_proxy("さくら"):talk((act:global_fn("グローバル関数", "グローバル")))
+        act:actor_proxy("さくら"):talk("　を呼んだよ。")
+        var.結果 = act:global_fn("グローバル関数", "代入テスト")
+        act:global_fn("グローバル関数", "式文テスト")
         act:expr_fn("関数", 42)
-        act.うにゅう:talk("ローカルもいけるで")
-        act.うにゅう:talk((act.うにゅう:expr_fn("関数", 1)))
+        act:actor_proxy("うにゅう"):talk("ローカルもいけるで")
+        act:actor_proxy("うにゅう"):talk((act:actor_proxy("うにゅう"):expr_fn("関数", 1)))
     end
 
     function SCENE.共有プロパティ操作_1(act, ...)
@@ -123,13 +123,13 @@ do
         act:set_property("system.name", "テストゴースト")
         var.ゴースト名 = act:get_property("currentghost.name")
         save.幅 = act:get_property("currentghost.balloon.scope(0).validwidth.initial")
-        act.さくら:talk(act.さくら:word("通常"))
-        act.さくら:talk("名前は")
-        act.さくら:talk(tostring(act:get_property("currentghost.name")))
-        act.さくら:talk("です。")
-        act.うにゅう:talk("幅は")
-        act.うにゅう:talk(var.ゴースト名, "var.ゴースト名")
-        act.うにゅう:talk("だって。")
+        act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("通常"))
+        act:actor_proxy("さくら"):talk("名前は")
+        act:actor_proxy("さくら"):talk(tostring(act:get_property("currentghost.name")))
+        act:actor_proxy("さくら"):talk("です。")
+        act:actor_proxy("うにゅう"):talk("幅は")
+        act:actor_proxy("うにゅう"):talk(var.ゴースト名, "var.ゴースト名")
+        act:actor_proxy("うにゅう"):talk("だって。")
     end
 end
 
@@ -140,7 +140,7 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk("グローバルの分岐に飛んできた。")
-        act.うにゅう:talk("世界取れるで。")
+        act:actor_proxy("さくら"):talk("グローバルの分岐に飛んできた。")
+        act:actor_proxy("うにゅう"):talk("世界取れるで。")
     end
 end

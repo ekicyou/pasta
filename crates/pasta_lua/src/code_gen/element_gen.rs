@@ -4,8 +4,8 @@ use super::LuaCodeGenerator;
 use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
 use pasta_dsl::parser::{
-    Action, ActionLine, Args, CallScene, CodeBlock, ContinueAction, Expr, KeyWords, SetValue, Span,
-    VarScope, VarSet,
+    Action, ActionLine, Args, BinOp, CallScene, CodeBlock, ContinueAction, Expr, KeyWords,
+    SetValue, Span, VarScope, VarSet,
 };
 use std::io::Write;
 
@@ -16,6 +16,54 @@ fn format_args_suffix(args_str: &str) -> String {
     } else {
         format!(", {}", args_str)
     }
+}
+
+/// `＠＊名前（…）` call: `act:global_fn("名前", 引数...)` (name as a string literal).
+fn global_fn_call(name: &str, args_str: &str) -> Result<String, TranspileError> {
+    Ok(format!(
+        "act:global_fn({}{})",
+        StringLiteralizer::literalize(name)?,
+        format_args_suffix(args_str)
+    ))
+}
+
+/// Flatten a left-assoc binary chain into terms and operators. Only the left
+/// spine is unrolled; a right-hand operand stays one term.
+fn flatten_binary<'e>(expr: &'e Expr, terms: &mut Vec<&'e Expr>, ops: &mut Vec<BinOp>) {
+    if let Expr::Binary { op, lhs, rhs } = expr {
+        flatten_binary(lhs, terms, ops);
+        ops.push(*op);
+        terms.push(rhs);
+    } else {
+        terms.push(expr);
+    }
+}
+
+/// `act:arith("op", 左, 右, 左の説明, 右の説明)`: descriptions are omitted when
+/// both are absent, and `nil` fills a missing left one. The result is nested
+/// arithmetic, so it carries no description of its own.
+fn arith_node(
+    op: BinOp,
+    (lhs, lhs_desc): (String, Option<String>),
+    (rhs, rhs_desc): (String, Option<String>),
+) -> (String, Option<String>) {
+    let op_str = match op {
+        BinOp::Add => "\"+\"",
+        BinOp::Sub => "\"-\"",
+        BinOp::Mul => "\"*\"",
+        BinOp::Div => "\"/\"",
+        BinOp::Mod => "\"%\"",
+    };
+    let descs = match (lhs_desc, rhs_desc) {
+        (None, None) => String::new(),
+        (Some(l), None) => format!(", {}", l),
+        (None, Some(r)) => format!(", nil, {}", r),
+        (Some(l), Some(r)) => format!(", {}, {}", l, r),
+    };
+    (
+        format!("act:arith({}, {}, {}{})", op_str, lhs, rhs, descs),
+        None,
+    )
 }
 
 /// Extract the `.pasta` [`Span`] carried by every [`Action`] variant.
@@ -309,21 +357,20 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     pub fn generate_action(&mut self, action: &Action, actor: &str) -> Result<(), TranspileError> {
         let span = action_span(action);
         let out_line_before = self.out_line();
+        // Actor reference by name string: act:actor_proxy("アクター")
+        let actor = &format!("act:actor_proxy({})", StringLiteralizer::literalize(actor)?);
         match action {
             Action::Talk { text, .. } => {
-                // act.アクター:talk("文字列")
+                // act:actor_proxy("アクター"):talk("文字列")
                 let literal = StringLiteralizer::literalize(text)?;
-                self.writeln(&format!("act.{}:talk({})", actor, literal))?;
+                self.writeln(&format!("{}:talk({})", actor, literal))?;
             }
             Action::WordRef {
                 name: word_name, ..
             } => {
-                // act.アクター:talk(act.アクター:word("単語名"))
+                // act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word("単語名"))
                 let word_literal = StringLiteralizer::literalize(word_name)?;
-                self.writeln(&format!(
-                    "act.{}:talk(act.{}:word({}))",
-                    actor, actor, word_literal
-                ))?;
+                self.writeln(&format!("{}:talk({}:word({}))", actor, actor, word_literal))?;
             }
             Action::VarRef { name, scope, .. } => {
                 // Variable interpolation: generate talk with concatenation
@@ -331,7 +378,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     VarScope::Property => {
                         let prop_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!(
-                            "act.{}:talk(tostring(act:get_property({})))",
+                            "{}:talk(tostring(act:get_property({})))",
                             actor, prop_literal
                         ))?;
                     }
@@ -342,10 +389,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         // the variable path (2nd arg) instead of printing "nil".
                         let var_path = Self::resolve_var_path(name, scope)?;
                         let path_literal = StringLiteralizer::literalize(&var_path)?;
-                        self.writeln(&format!(
-                            "act.{}:talk({}, {})",
-                            actor, var_path, path_literal
-                        ))?;
+                        self.writeln(&format!("{}:talk({}, {})", actor, var_path, path_literal))?;
                     }
                 }
             }
@@ -355,11 +399,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 let args_str = self.generate_args_string(args)?;
                 match scope {
                     pasta_dsl::parser::FnScope::Local => {
-                        // act.アクター:expr_fn("関数名", 引数...)
+                        // act:actor_proxy("アクター"):expr_fn("関数名", 引数...)
                         // Outer parens keep only the first return value; talk() renders nil as empty.
                         let name_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!(
-                            "act.{}:talk((act.{}:expr_fn({}{})))",
+                            "{}:talk(({}:expr_fn({}{})))",
                             actor,
                             actor,
                             name_literal,
@@ -367,28 +411,33 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         ))?;
                     }
                     pasta_dsl::parser::FnScope::Global => {
-                        // GLOBAL.関数名(act, 引数...)
+                        // act:global_fn("関数名", 引数...)
                         self.writeln(&format!(
-                            "act.{}:talk((GLOBAL.{}(act{})))",
+                            "{}:talk(({}))",
                             actor,
-                            name,
-                            format_args_suffix(&args_str)
+                            global_fn_call(name, &args_str)?
                         ))?;
                     }
                 }
             }
             Action::SakuraScript { script, .. } => {
-                // SakuraScript is output as act.{actor}:sakura_script()
+                // SakuraScript is output as act:actor_proxy("アクター"):sakura_script()
                 let literal = StringLiteralizer::literalize(script)?;
-                self.writeln(&format!("act.{}:sakura_script({})", actor, literal))?;
+                self.writeln(&format!("{}:sakura_script({})", actor, literal))?;
             }
             Action::Escape {
                 sequence: escape, ..
             } => {
-                // Extract the escaped character (second char) and literalize
+                // `\\` talks both chars (the sakura tokenizer treats `\\` as one literal
+                // backslash unit); `＠＠`/`＄＄` talk only the second char.
                 if let Some(c) = escape.chars().nth(1) {
-                    let literal = StringLiteralizer::literalize(&c.to_string())?;
-                    self.writeln(&format!("act.{}:talk({})", actor, literal))?;
+                    let text = if c == '\\' {
+                        escape.clone()
+                    } else {
+                        c.to_string()
+                    };
+                    let literal = StringLiteralizer::literalize(&text)?;
+                    self.writeln(&format!("{}:talk({})", actor, literal))?;
                 }
             }
             Action::DynamicWordRef {
@@ -396,12 +445,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 var_scope,
                 ..
             } => {
-                // act.アクター:talk(act.アクター:word(var.x, "var.x"))
+                // act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(var.x, "var.x"))
                 let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
-                self.writeln(&format!(
-                    "act.{}:talk(act.{}:word({}))",
-                    actor, actor, ref_args
-                ))?;
+                self.writeln(&format!("{}:talk({}:word({}))", actor, actor, ref_args))?;
             }
             Action::DynamicFnCall {
                 var_name,
@@ -409,11 +455,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 args,
                 ..
             } => {
-                // act.アクター:talk((act.アクター:expr_fn_var(var.f, "var.f", 引数...)))
+                // act:actor_proxy("アクター"):talk((act:actor_proxy("アクター"):expr_fn_var(var.f, "var.f", 引数...)))
                 let ref_args = Self::dynamic_ref_args(var_name, var_scope)?;
                 let args_str = self.generate_args_string(args)?;
                 self.writeln(&format!(
-                    "act.{}:talk((act.{}:expr_fn_var({}{})))",
+                    "{}:talk(({}:expr_fn_var({}{})))",
                     actor,
                     actor,
                     ref_args,
@@ -485,8 +531,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         )?;
                     }
                     pasta_dsl::parser::FnScope::Global => {
-                        // GLOBAL.関数名(act, 引数...)
-                        write!(buf, "GLOBAL.{}(act{})", name, format_args_suffix(&args_str))?;
+                        // act:global_fn("関数名", 引数...)
+                        write!(buf, "{}", global_fn_call(name, &args_str)?)?;
                     }
                 }
             }
@@ -510,21 +556,84 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     format_args_suffix(&args_str)
                 )?;
             }
-            Expr::Binary { op, lhs, rhs } => {
-                self.generate_expr_to_buffer(lhs, buf)?;
-                let op_str = match op {
-                    pasta_dsl::parser::BinOp::Add => " + ",
-                    pasta_dsl::parser::BinOp::Sub => " - ",
-                    pasta_dsl::parser::BinOp::Mul => " * ",
-                    pasta_dsl::parser::BinOp::Div => " / ",
-                    pasta_dsl::parser::BinOp::Mod => " % ",
-                };
-                write!(buf, "{}", op_str)?;
-                self.generate_expr_to_buffer(rhs, buf)?;
+            Expr::Binary { .. } => {
+                write!(buf, "{}", self.arith_to_string(expr)?)?;
             }
         }
 
         Ok(())
+    }
+
+    /// Render a binary chain as nested `act:arith("op", 左, 右[, 左の説明, 右の説明])`.
+    ///
+    /// The parser builds a precedence-less left-assoc tree (`1＋2＊3` is
+    /// `(1＋2)＊3`), so the chain is flattened back to terms and operators and
+    /// regrouped like Lua: `＊／％` fold left to right first, then `＋－`.
+    /// A `Paren` is one term; a right-hand `Binary` (never produced by the
+    /// parser) is also one term.
+    fn arith_to_string(&self, expr: &Expr) -> Result<String, TranspileError> {
+        let mut terms = Vec::new();
+        let mut ops = Vec::new();
+        flatten_binary(expr, &mut terms, &mut ops);
+
+        let mut terms = terms.into_iter().map(|t| self.arith_operand(t));
+        // Additive-level operands with multiplicative runs already folded in.
+        let mut sums = vec![terms.next().expect("binary chain has a first term")?];
+        let mut add_ops = Vec::new();
+        for (op, term) in ops.into_iter().zip(terms) {
+            let rhs = term?;
+            if matches!(op, BinOp::Mul | BinOp::Div | BinOp::Mod) {
+                let lhs = sums.pop().expect("sums is never empty");
+                sums.push(arith_node(op, lhs, rhs));
+            } else {
+                add_ops.push(op);
+                sums.push(rhs);
+            }
+        }
+        let mut sums = sums.into_iter();
+        let first = sums.next().expect("sums is never empty");
+        let (code, _) = add_ops
+            .into_iter()
+            .zip(sums)
+            .fold(first, |lhs, (op, rhs)| arith_node(op, lhs, rhs));
+        Ok(code)
+    }
+
+    /// One arithmetic operand: its Lua code and its warning description as a
+    /// string literal (variable path, `@名前()`, `@*名前()`, `@$パス()`), or
+    /// `None` for literals and nested arithmetic.
+    fn arith_operand(&self, expr: &Expr) -> Result<(String, Option<String>), TranspileError> {
+        let code = self.expr_to_string(expr)?;
+        let desc = Self::operand_desc(expr)?
+            .map(|d| StringLiteralizer::literalize(&d))
+            .transpose()?;
+        Ok((code, desc))
+    }
+
+    fn operand_desc(expr: &Expr) -> Result<Option<String>, TranspileError> {
+        Ok(match expr {
+            Expr::VarRef { name, scope } => Some(Self::resolve_var_path(name, scope)?),
+            Expr::FnCall {
+                name,
+                scope: pasta_dsl::parser::FnScope::Local,
+                ..
+            } => Some(format!("@{}()", name)),
+            Expr::FnCall {
+                name,
+                scope: pasta_dsl::parser::FnScope::Global,
+                ..
+            } => Some(format!("@*{}()", name)),
+            Expr::DynamicFnCall {
+                var_name,
+                var_scope,
+                ..
+            } => Some(format!(
+                "@${}()",
+                Self::resolve_var_path(var_name, var_scope)?
+            )),
+            Expr::Paren(inner) => Self::operand_desc(inner)?,
+            _ => None,
+        })
     }
 
     /// Generate arguments as a string.

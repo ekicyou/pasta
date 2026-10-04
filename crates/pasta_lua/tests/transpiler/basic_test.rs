@@ -164,11 +164,11 @@ fn test_transpile_sample_pasta_actions() {
 
     // Verify talk actions (Requirement 3d)
     assert!(
-        lua_code.contains("act.さくら:talk(\"こんにちは。\")"),
+        lua_code.contains("act:actor_proxy(\"さくら\"):talk(\"こんにちは。\")"),
         "Missing さくら talk action"
     );
     assert!(
-        lua_code.contains("act.うにゅう:talk(\"やふぅ。\")"),
+        lua_code.contains("act:actor_proxy(\"うにゅう\"):talk(\"やふぅ。\")"),
         "Missing うにゅう talk action"
     );
 }

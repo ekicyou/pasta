@@ -18,7 +18,7 @@ fn test_generate_talk_action() {
     codegen.generate_action(&action, "さくら").unwrap();
 
     let result = String::from_utf8(output).unwrap();
-    assert!(result.contains("act.さくら:talk(\"こんにちは\")"));
+    assert!(result.contains("act:actor_proxy(\"さくら\"):talk(\"こんにちは\")"));
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn test_generate_word_ref_action() {
     codegen.generate_action(&action, "さくら").unwrap();
 
     let result = String::from_utf8(output).unwrap();
-    assert!(result.contains("act.さくら:word(\"挨拶\")"));
+    assert!(result.contains("act:actor_proxy(\"さくら\"):word(\"挨拶\")"));
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn test_generate_var_ref_local() {
     codegen.generate_action(&action, "さくら").unwrap();
 
     let result = String::from_utf8(output).unwrap();
-    assert!(result.contains(r#"act.さくら:talk(var.カウンタ, "var.カウンタ")"#));
+    assert!(result.contains(r#"act:actor_proxy("さくら"):talk(var.カウンタ, "var.カウンタ")"#));
 }
 
 #[test]
@@ -65,7 +65,9 @@ fn test_generate_var_ref_global() {
     codegen.generate_action(&action, "さくら").unwrap();
 
     let result = String::from_utf8(output).unwrap();
-    assert!(result.contains(r#"act.さくら:talk(save.グローバル, "save.グローバル")"#));
+    assert!(
+        result.contains(r#"act:actor_proxy("さくら"):talk(save.グローバル, "save.グローバル")"#)
+    );
 }
 
 #[test]
@@ -82,7 +84,7 @@ fn test_generate_var_ref_args() {
     codegen.generate_action(&action, "さくら").unwrap();
 
     let result = String::from_utf8(output).unwrap();
-    assert!(result.contains(r#"act.さくら:talk(args[1], "args[1]")"#));
+    assert!(result.contains(r#"act:actor_proxy("さくら"):talk(args[1], "args[1]")"#));
 }
 
 #[test]
@@ -97,7 +99,7 @@ fn test_generate_escape_action() {
     codegen.generate_action(&action, "さくら").unwrap();
 
     let result = String::from_utf8(output).unwrap();
-    assert!(result.contains("act.さくら:talk(\"@\")"));
+    assert!(result.contains("act:actor_proxy(\"さくら\"):talk(\"@\")"));
 }
 
 #[test]
@@ -234,8 +236,8 @@ fn test_generate_global_fn_call_action() {
 
     let result = String::from_utf8(output).unwrap();
     assert!(
-        result.contains("GLOBAL.func(act)"),
-        "Expected GLOBAL.func(act) in action output, got: {}",
+        result.contains("act:global_fn(\"func\")"),
+        "Expected act:global_fn(\"func\") in action output, got: {}",
         result
     );
 }
@@ -255,8 +257,8 @@ fn test_generate_local_fn_call_action_still_scene() {
 
     let result = String::from_utf8(output).unwrap();
     assert!(
-        result.contains("act.さくら:expr_fn(\"func\")"),
-        "Expected act.さくら:expr_fn(\"func\") for local scope, got: {}",
+        result.contains("act:actor_proxy(\"さくら\"):expr_fn(\"func\")"),
+        "Expected act:actor_proxy(\"さくら\"):expr_fn(\"func\") for local scope, got: {}",
         result
     );
 }
@@ -280,8 +282,8 @@ fn test_generate_global_fn_call_in_var_set_rhs() {
 
     let result = String::from_utf8(output).unwrap();
     assert!(
-        result.contains("var.結果 = GLOBAL.func(act)"),
-        "Expected 'var.結果 = GLOBAL.func(act)' but got: {}",
+        result.contains("var.結果 = act:global_fn(\"func\")"),
+        "Expected 'var.結果 = act:global_fn(\"func\")' but got: {}",
         result
     );
 }
@@ -339,8 +341,8 @@ fn test_generate_var_set_none_global_expr_stmt() {
 
     let result = String::from_utf8(output).unwrap();
     assert!(
-        result.contains("GLOBAL.gfunc(act)"),
-        "Expected 'GLOBAL.gfunc(act)' but got: {}",
+        result.contains("act:global_fn(\"gfunc\")"),
+        "Expected 'act:global_fn(\"gfunc\")' but got: {}",
         result
     );
     assert!(
