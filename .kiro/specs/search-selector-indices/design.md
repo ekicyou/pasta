@@ -20,13 +20,13 @@
 - 候補の並びの規則（文字コード順・同名シーン 10 個以上の並び）の変更
 - 「検索のたびに指定列の次の値の位置を返す」意味（要件ディスカッションで不採用）
 - 巡ごとに違う順を指定する機能（呼び直しで対応する。要件の「限界」）
-- `RandomSelector` トレイトの形の変更、`select_index` の整理（検索表は使っていない。触らない）
 - `set_shuffle_enabled(false)` のときに指定列を効かせること（Lua から呼べない内部テスト用の経路。現行どおり並べ替えを呼ばない）
 
 ## Boundary Commitments
 
 ### This Spec Owns
 - `MockRandomSelector::shuffle_usize` の並べ替え規則（指定列の意味の実体）
+- `RandomSelector` トレイトからの `select_index` の削除（指定列を別の意味で読む、検索表から使われない経路。下記「select_index の削除」）
 - `SceneTable::select_from_cache` の一巡後の作り直し（Phase 4）が `shuffle_usize` に渡す配列の基準
 - `@pasta_search` の API 口（`parse_selector_args`）での負の整数の拒否
 - 上記を固定するテスト（`pasta_core` の単体テスト、Lua からの結合テスト）
@@ -41,7 +41,7 @@
 
 ### Allowed Dependencies
 - `pasta_lua` → `pasta_core`（既存の向き。逆向きの依存を作らない）
-- 新しいクレート・新しい型・新しいトレイトメソッドを足さない
+- 新しいクレート・新しい型・新しいトレイトメソッドを足さない（トレイトからは `select_index` を除くだけ）
 - マニュアルの見出し `### set_scene_selector(...) / set_word_selector(...)` を変えない（`book/tools/link-check-test.mjs` がアンカーを検査する）
 
 ### Revalidation Triggers
@@ -96,7 +96,8 @@ graph LR
 新規ファイルは無い。
 
 ### Modified Files
-- `crates/pasta_core/src/registry/random.rs` — `MockRandomSelector::shuffle_usize` を指定列に従う並べ替えにする。型の doc コメントを新しい意味に直す。単体テスト `test_mock_selector_shuffle_usize_is_noop` を新しい規則のテストに置き換える。
+- `crates/pasta_core/src/registry/random.rs` — `MockRandomSelector::shuffle_usize` を指定列に従う並べ替えにする。`RandomSelector::select_index` を両実装ごと削除し、`MockRandomSelector` の `index` フィールドも除く。型・トレイトの doc コメントを新しい意味に直す。単体テスト `test_mock_selector_shuffle_usize_is_noop` を新しい規則のテストに置き換え、`select_index` を使う単体テストは削除または `shuffle_usize` で書き直す。
+- `crates/pasta_core/README.md` — `MockRandomSelector` の説明「テスト用固定選択実装」を、指定列で巡の順を決める実装である旨に直す。
 - `crates/pasta_core/src/registry/scene_table.rs` — `select_from_cache` の Phase 4 が、`cached.candidates` ではなく引数 `filtered_ids` から配列を作って `shuffle_usize` に渡す（1 か所）。
 - `crates/pasta_core/src/registry/scene_table_candidate_tests.rs` — モック＋シャッフル有効で、指定列が 1 巡目・2 巡目とも候補の並びに当てはまることのテストを足す。
 - `crates/pasta_core/tests/word_table_test.rs` — 単語表で指定列が効き、次の巡で当てはめ直すことのテストを足す。
@@ -179,9 +180,9 @@ flowchart TD
 
 **Responsibilities & Constraints**
 - 入力 `items` を「候補の並びの順に並んだ配列」とみなし、指定列の整数を**位置**として読む（値としては読まない）。
-- 呼び出しごとに指定列の先頭から当てはめる。`shuffle_usize` は `self` の状態を読むだけで書かない（既存の `index` フィールドは `select_index` 専用のままで、触らない）。これにより、ある検索の巡が他の検索の回数に左右されない（1.6）。
+- 呼び出しごとに指定列の先頭から当てはめる。`MockRandomSelector` は指定列だけを持ち、`shuffle_usize` は状態を書かない（`index` フィールドは `select_index` とともに削除する）。これにより、ある検索の巡が他の検索の回数に左右されない（1.6）。
 - 範囲外（`n >= items.len()`）と、同じ呼び出しの中ですでに使った位置は読み飛ばす。
-- 型・コンストラクタ（`MockRandomSelector::new(Vec<usize>)`）・トレイトの形は変えない。
+- 型名・コンストラクタ（`MockRandomSelector::new(Vec<usize>)`）は変えない。
 
 **Contracts**: Service [x]
 
@@ -210,7 +211,20 @@ impl RandomSelector for MockRandomSelector {
 **Implementation Notes**
 - Integration: 既存の `pasta_core` のテストで、シャッフル有効のモックが使う指定列は `[0]` と `[]` だけで、どちらも恒等になる。期待値は変わらない。
 - Validation: `random.rs` の単体テストで上の表を固定する。
-- Risks: `select_index`（剰余で巡回・状態あり）は `shuffle_usize` と意味が異なるまま残る。検索表は使わないため挙動には影響しない。
+- Risks: なし（`select_index` は削除するため、指定列を別の意味で読む経路は残らない）。
+
+#### select_index の削除
+
+| Field | Detail |
+|-------|--------|
+| Intent | 指定列を `shuffle_usize` と違う意味（剰余で巡回・状態あり）で読む、使われない経路を無くす |
+| Requirements | 5.4（意味の一意化）、Boundary Context（In scope） |
+
+- `RandomSelector` トレイトから `select_index` を除き、トレイトは `shuffle_usize` 1 つにする。`DefaultRandomSelector`・`MockRandomSelector` の実装も除く。
+- 呼び出し元は `random.rs` の単体テストだけ（`crates/` 全体を検索して確認済み）。`pasta_lua` は `set_*_selector` で `MockRandomSelector::new`・`DefaultRandomSelector::new` を使うだけで、影響しない。
+- 種固定の再現性のテスト（`test_with_seed_is_reproducible` など）は `shuffle_usize` で書き直して残す。`select_index` 自体のテストは削除する。
+- **公開 API の破壊的変更**: `pasta_core` は crates.io に公開しているクレートで、トレイトのメソッドを除くと外部の実装・呼び出しが壊れる。0.x 系なので、リリースノート（`release-workflow`）に破壊的変更として書く。
+- `DefaultRandomSelector` の便利メソッド `select<T>`・`shuffle<T>` もクレート内で使われていないが、指定列を読まず意味の食い違いを生まないため、本 spec では残す。
 
 #### SceneTable::select_from_cache（Phase 4）
 
@@ -283,7 +297,7 @@ impl RandomSelector for MockRandomSelector {
 
 #### `book/src/internals/registry-search.md`
 
-- 構成要素の表の `RandomSelector` 行: 「モックはシャッフルしない」→「モックは `shuffle_usize` で、渡された配列を指定列（位置の並び）に従って並べ替える」。
+- 構成要素の表の `RandomSelector` 行: 「モックはシャッフルしない」→「モックは `shuffle_usize` で、渡された配列を指定列（位置の並び）に従って並べ替える」。トレイトは `shuffle_usize` だけを持つ書き方にする。
 - 「候補の選択と乱数」の表、シーンの「一巡した後」: 「同じ候補の並びをシャッフルし直して」→「その呼び出しで集めた候補（収集した順）をシャッフルし直して」。
 - 段落「`MockRandomSelector` の `shuffle_usize` は何もしないため…渡した整数の値は検索表の選択に影響しない」を除き、次を内部の言葉で書く（5.3・5.4）: 検索表は巡の始まりごとに収集した順の配列を `shuffle_usize` に渡す。モックは指定列の整数を配列の位置として読み、有効な位置の値を先に、残りを元の順に並べる。範囲外・重複は読み飛ばす。並べ替えは呼び出しごとに指定列の先頭から始まり、状態を持たないため、検索ごと・巡ごとに同じ順になる。負の整数は API 口（`parse_selector_args`）がエラーにする。`set_shuffle_enabled(false)` のときは `shuffle_usize` を呼ばないため、指定列は効かない。
 
@@ -306,6 +320,7 @@ impl RandomSelector for MockRandomSelector {
 - `random.rs`: 指定列 `[2, 0]` で `[10, 20, 30]` が `[30, 10, 20]` になる（位置で読む。値では読まない）（1.1・1.4）。
 - `random.rs`: 範囲外 `[7, 1]`・重複 `[1, 1, 0]`・すべて無視 `[5, 9]`・空 `[]` の結果（2.1・2.2・2.5・1.7）。
 - `random.rs`: 長さの違う配列に続けて 2 回呼んでも、どちらも指定列の先頭から当てはまる（1.6）。`test_mock_selector_shuffle_usize_is_noop` はこれらに置き換える。
+- `random.rs`: 同じ種の `DefaultRandomSelector` 2 つで `shuffle_usize` の結果が一致する（`select_index` 削除後も種固定の再現性を保つ）。
 - `scene_table_candidate_tests.rs`: 索引の `SceneId` の並びを昇順でない順（例 `[2, 0, 1]`）にした表に、モック `[2, 0]`・シャッフル有効で、1 巡目と 2 巡目が同じ順になる（1.2・1.5。Phase 4 を直さないと 2 巡目で失敗する）。
 - `word_table_test.rs`: モック `[1]`・シャッフル有効で、2 番目 → 1 番目 → 3 番目、次の巡も 2 番目から（1.1・1.3・1.5）。
 
@@ -328,6 +343,6 @@ impl RandomSelector for MockRandomSelector {
 
 1. **Phase 4 の入力の変更**: `filtered_ids` から作り直す（1 か所）。本番でも一巡後のシャッフルの入力の順が変わるが、分布と乱数の消費回数は同じで、Requirement 3.1 に反しない（要件の確定事項 7 が許した最小変更）。
 2. **負の整数のエラー文言**: `expected non-negative integer argument`。原因が文言で分かるようにする。利用者章にはこの文言を書く。`-0` が `expected integer argument` になることは書かない（LuaJIT の数値表現の細部で、作者が書く値ではない）。
-3. **`select_index` と `index` フィールド**: 触らない。トレイトの doc コメントが「検索表は `shuffle_usize` だけを使う」と既に書いている。削除は公開クレートのトレイトの破壊的変更で、本 spec（バグ修正）の範囲外。
+3. **`select_index` と `index` フィールド**: 本 spec で削除する（開発者の指示）。指定列を `shuffle_usize` と違う意味で読む経路が残ると、整数の意味が 1 つに定まらない。公開クレートの破壊的変更として、リリースノートに書く。
 4. **手書きのスキル文書 `testing-lint.md`**: 本 spec の実装では触らず、spec 完了時のスキル文書同期で扱う。生成物 `references/pasta-search.md` は実装の中で再生成する（CI の `--check` が見るため）。
 5. **既定への復帰のテスト（4.4）**: Lua からの 40 回の試行で「最初の結果が 2 種類以上」を見る。誤って失敗する確率は 3^-39 程度で、Lua の API を通した実際の経路を検証できる。

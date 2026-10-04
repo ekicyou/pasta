@@ -22,6 +22,7 @@
 - **In scope**:
   - `set_scene_selector`・`set_word_selector` に渡した整数の意味の確定と、その意味どおりに選択へ効かせること
   - 範囲外・重複・負の整数の扱いの確定
+  - 指定列を別の意味で読む、検索表から使われていない選び方（`select_index`。剰余で巡回し、状態を持つ）を取り除き、指定列の意味を 1 つにすること
   - 修正を固定するテスト
   - 利用者マニュアル（`lua/modules/pasta-search.md`）と内部設計章（`internals/registry-search.md`）を同じ意味に揃えること
 - **Out of scope**:
