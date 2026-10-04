@@ -4,6 +4,7 @@ use crate::common;
 
 use common::{copy_dir_recursive, copy_fixture_to_temp, loader_fixtures_path, value_as_str};
 use pasta_lua::loader::{LoaderError, PastaConfig, PastaLoader};
+use pasta_lua::{ConfigError, RuntimeConfig, mlua};
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -216,6 +217,28 @@ fn test_load_nonexistent_directory() {
             assert!(path.to_string_lossy().contains("definitely_nonexistent"));
         }
         _ => panic!("Expected DirectoryNotFound error"),
+    }
+}
+
+/// ローダ経由でも `std_package` を欠いた構成は名前付きの構成エラーになる（3.1、7.2）。
+#[test]
+fn test_load_with_config_missing_std_package_fails_with_name() {
+    for libs in [vec!["std_string"], vec!["std_all", "-std_package"]] {
+        let temp = copy_fixture_to_temp("minimal");
+        let config = RuntimeConfig::from_libs(libs.iter().map(|s| s.to_string()).collect());
+        let err = match PastaLoader::load_with_config(temp.path(), config) {
+            Ok(_) => panic!("load_with_config should fail without std_package: {libs:?}"),
+            Err(e) => e,
+        };
+        let config_err = match &err {
+            LoaderError::Runtime(mlua::Error::ExternalError(e)) => e.downcast_ref::<ConfigError>(),
+            _ => None,
+        };
+        assert!(
+            matches!(config_err, Some(ConfigError::MissingRequiredLibrary(name)) if name == "std_package"),
+            "{libs:?}: expected Runtime(MissingRequiredLibrary(std_package)), got {err:?}"
+        );
+        assert!(err.to_string().contains("std_package"), "{libs:?}: {err}");
     }
 }
 
