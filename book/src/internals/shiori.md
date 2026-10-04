@@ -231,7 +231,7 @@ teardown_via_sender(tx, timeout)
 - `Stop` は他のメッセージと同じ FIFO を通るため、先に積まれたメッセージを処理し終えてからループを抜ける。
 - `PastaShiori` の `Drop` は、キャッシュした `SHIORI.unload` を呼び、ロガーの登録を外し、キャッシュした関数を捨ててからランタイムを破棄する。ランタイムの破棄で永続化データが保存される（[永続化](execution-model.md#永続化)）。DAP のバックエンドも VM の一部としてこのとき片付く。
 - 完了の通知は、VM の破棄と mailbox の受信側の破棄が終わってから送る。通知を受け取った時点で、VM と DAP バックエンドの解放は済んでいる。executor のメッセージ専用ウィンドウ（`wintf-winmsg-executor` の thread_local）は、その後 `block_on` が戻ってスレッドが終わるときに破棄される。
-- `DllMain` は `DLL_PROCESS_DETACH` で `unload()` を呼び、それ以外の通知では何もしない。`DllMain` はローダーロックを持ったまま呼ばれるため、そこでスレッドを起こさない。スレッドは `load` を起点に起こす。
+- `DllMain` は `DLL_PROCESS_DETACH` のうち `FreeLibrary` によるもの（`lpReserved` が null）で `unload()` を呼び、それ以外の通知では何もしない。プロセスの終了による `DLL_PROCESS_DETACH`（`lpReserved` が null でない）では、他のスレッドが既に止められていてアクターが応答できないため、teardown せずに `true` を返す。そのため、`unload` を呼ばれずにホストのプロセスが終わったときは、`SHIORI.unload` も永続化データの保存も走らない。`DllMain` はローダーロックを持ったまま呼ばれるため、そこでスレッドを起こさない。スレッドは `load` を起点に起こす。
 - 再読み込み（`unload` の後の `load`、または `load` の再呼び出し）は、`spawn_actor` の 1 で前のアクターを終わらせ、新しいスレッド・チャネル・VM を作る。`PastaShiori::load` の中にある、既存のランタイムを捨てて作り直す分岐は、FFI の経路では通らない（アクターごとに新しい `PastaShiori` を作るため）。
 
 ### Lua 側の SHIORI エントリとイベント配送

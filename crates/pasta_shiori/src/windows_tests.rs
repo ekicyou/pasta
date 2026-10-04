@@ -212,6 +212,25 @@ fn dll_main_non_attach_paths() {
     assert!(DllMain(0, 99, ptr::null_mut()));
 }
 
+/// プロセス終了による DETACH（reserved 非 null）は teardown（unload）を呼ばない。
+#[test]
+fn dll_main_process_termination_detach_skips_teardown() {
+    let _guard = lock_global_state();
+    const DLL_PROCESS_DETACH: u32 = 0;
+    let mut marker = 0u8;
+
+    LOADU_INITIALIZED.store(true, Ordering::SeqCst);
+    assert!(DllMain(
+        0,
+        DLL_PROCESS_DETACH,
+        (&mut marker as *mut u8).cast()
+    ));
+    // unload() を通っていればフラグは下りている。
+    assert!(LOADU_INITIALIZED.load(Ordering::SeqCst));
+
+    assert!(unload());
+}
+
 // ------------------------------------------------------------------
 // R8: unsafe impl Send/Sync 撤去の静的確認。
 // ------------------------------------------------------------------

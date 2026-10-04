@@ -266,7 +266,7 @@ VM の構築      register_persistence_module → persistence::register
 - `load_from_file` はファイルを読み、空なら空の JSON オブジェクトにする。先頭 2 バイトが gzip のマジック（`1f 8b`）なら `GzDecoder` で展開してから、そうでなければそのまま `serde_json` で解析する。`load_impl` はその結果を Lua の値に変換し、読み込みの失敗と表にならない値を警告ログ付きの空の表に置き換える。
 - `save_impl` と `save_persistence_data` は、表を `serde_json::Value` に変換して `save_to_file` に渡す。Lua の表と JSON の変換は mlua の serde 連携（`LuaSerdeExt`）で行う。`save_to_file` は親ディレクトリを作り、`obfuscate` に応じて `GzEncoder` で圧縮するか整形した JSON にして、`Path::with_extension("tmp")` のファイルに書いて `sync_all` し、`fs::rename` で保存先に置き換える。`rename` が失敗したら一時ファイルを消してエラーを返す。
 - `Drop` での保存（`crates/pasta_lua/src/runtime/lifecycle.rs`）は、`PastaLuaRuntime` が保持する `PastaConfig` とベースディレクトリから保存先を計算し直し、`require("pasta.save")` を評価した表を書き出す。`require` が失敗した場合（`@pasta_persistence` の登録前など）は保存を省く。変換・書き込みの失敗はエラーログに出し、`Drop` からは伝えない。
-- `Drop` での保存は、`PastaLuaRuntime` が破棄されるすべての場合に走る。SHIORI 層では、ゴーストの終了（`SHIORI.unload` を呼んだ後のランタイムの破棄）と、`load` のやり直しで前のランタイムを捨てるときがこれにあたる。起動が途中で失敗して構築中のランタイムが破棄されるときも同じ処理が走る。
+- `Drop` での保存は、`PastaLuaRuntime` が破棄されるすべての場合に走る。SHIORI 層では、ゴーストの終了（`SHIORI.unload` を呼んだ後のランタイムの破棄）と、`load` のやり直しで前のランタイムを捨てるときがこれにあたる。起動が途中で失敗して構築中のランタイムが破棄されるときも同じ処理が走る。`unload` を呼ばれずにホストのプロセスが終わったときはランタイムが破棄されないため、保存されない（[SHIORI 層](shiori.md#unloaddllmain-と-teardown)）。
 - `Drop` は `pasta.save` を `require` して保存するため、セッション中に一度も読み込まれていなければ、破棄の時点で読み込んでそのまま書き戻す。
 - VM を破棄すると、コルーチン・STORE・ACT はすべて失われる。セッションをまたいで残るのは保存した `save` テーブルだけである。
 
