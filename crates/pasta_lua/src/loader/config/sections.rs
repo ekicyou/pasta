@@ -18,12 +18,6 @@ pub struct LoggingConfig {
     #[serde(default = "default_log_file_path")]
     pub file_path: String,
 
-    /// Number of days to retain log files.
-    /// Default: 7
-    /// Note: currently not read anywhere; the log file is never rotated.
-    #[serde(default = "default_rotation_days")]
-    pub rotation_days: usize,
-
     /// Default log level.
     /// Default: "info"
     /// Valid: "error", "warn", "info", "debug", "trace"
@@ -41,7 +35,6 @@ impl Default for LoggingConfig {
     fn default() -> Self {
         Self {
             file_path: default_log_file_path(),
-            rotation_days: default_rotation_days(),
             level: default_log_level(),
             filter: None,
         }
@@ -62,10 +55,6 @@ impl LoggingConfig {
 
 pub fn default_log_file_path() -> String {
     "profile/pasta/logs/pasta.log".to_string()
-}
-
-fn default_rotation_days() -> usize {
-    7
 }
 
 fn default_log_level() -> String {

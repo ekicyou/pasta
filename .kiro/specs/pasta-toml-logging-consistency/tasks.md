@@ -6,7 +6,7 @@
   - _Requirements: 7.3, 7.4_
 
 - [ ] 2. 効かない設定キーの撤去
-- [ ] 2.1 `[logging] rotation_days` を設定型から取り除く
+- [x] 2.1 `[logging] rotation_days` を設定型から取り除く
   - `[logging]` の設定型を `file_path`・`level`・`filter` の 3 項目にし、既定値の関数も消す
   - 設定型をフィールド列挙で作っているテストから `rotation_days` を消す
   - 型不一致で `[logging]` を読めないことを見るテストのキーを、`level` の型不一致に替える

@@ -172,7 +172,6 @@ mod tests {
 
         let config = LoggingConfig {
             file_path: "../outside.log".to_string(),
-            rotation_days: 7,
             level: "debug".to_string(),
             filter: None,
         };
@@ -188,7 +187,6 @@ mod tests {
 
         let config = LoggingConfig {
             file_path: "other/logs/pasta.log".to_string(),
-            rotation_days: 7,
             level: "debug".to_string(),
             filter: None,
         };
@@ -244,7 +242,6 @@ mod tests {
 
         let config = LoggingConfig {
             file_path: "profile/custom/app.log".to_string(),
-            rotation_days: 7,
             level: "info".to_string(),
             filter: None,
         };
@@ -263,7 +260,6 @@ mod tests {
 
         let config = LoggingConfig {
             file_path: "profile/../escape.log".to_string(),
-            rotation_days: 7,
             level: "info".to_string(),
             filter: None,
         };

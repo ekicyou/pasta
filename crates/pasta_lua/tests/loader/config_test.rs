@@ -216,7 +216,6 @@ ghost_name = "NoLoaderGhost"
 fn test_logging_config_default() {
     let config = LoggingConfig::default();
     assert_eq!(config.file_path, "profile/pasta/logs/pasta.log");
-    assert_eq!(config.rotation_days, 7);
     assert_eq!(config.level, "info");
     assert!(config.filter.is_none());
 }
@@ -226,7 +225,6 @@ fn test_logging_config_to_filter_directive_with_filter() {
     // filter優先: filterが設定されている場合はfilterを返す
     let config = LoggingConfig {
         file_path: default_log_file_path(),
-        rotation_days: 7,
         level: "info".to_string(),
         filter: Some("debug,pasta_shiori=trace".to_string()),
     };
@@ -238,7 +236,6 @@ fn test_logging_config_to_filter_directive_with_level_only() {
     // filterなし: levelを返す
     let config = LoggingConfig {
         file_path: default_log_file_path(),
-        rotation_days: 7,
         level: "warn".to_string(),
         filter: None,
     };
@@ -260,12 +257,10 @@ debug_mode = true
 
 [logging]
 file_path = "profile/custom/logs/my.log"
-rotation_days = 14
 "#;
     let config = PastaConfig::from_str(toml_str).unwrap();
     let logging = config.logging().expect("logging section should exist");
     assert_eq!(logging.file_path, "profile/custom/logs/my.log");
-    assert_eq!(logging.rotation_days, 14);
     assert_eq!(logging.level, "info"); // default
     assert!(logging.filter.is_none());
 }
@@ -313,7 +308,6 @@ file_path = "profile/pasta/logs/custom.log"
     let config = PastaConfig::from_str(toml_str).unwrap();
     let logging = config.logging().expect("logging section should exist");
     assert_eq!(logging.file_path, "profile/pasta/logs/custom.log");
-    assert_eq!(logging.rotation_days, 7); // default
 }
 
 #[test]
