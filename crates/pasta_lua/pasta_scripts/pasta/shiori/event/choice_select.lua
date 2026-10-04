@@ -56,8 +56,10 @@ REG.OnChoiceSelectEx = function(act)
     -- 3. 選択IDでシーンを前方一致検索（ローカル→グローバル、3.1/3.4）
     --    SCENE.search を直接呼び出し、STORE.last_global_scene をスコープに使用
     --    co_exec/find_scene は global_scene_name を透過しないため直接検索が必須
+    --    ローカルに無ければグローバルシーンを探す
     --    シャッフル＆順次消費は SCENE.search 内部で処理される（3.2）
     local result = SCENE.search(choice_id, STORE.last_global_scene)
+        or SCENE.search(choice_id, nil)
     if not result or type(result.func) ~= "function" then
         return nil
     end

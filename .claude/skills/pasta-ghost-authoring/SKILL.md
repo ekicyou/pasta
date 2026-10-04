@@ -309,7 +309,7 @@ end
 `!select(秒数)` キューコマンドで選択の制限時間を設定する。
 
 #### 自動ルーティング
-選択後は既定の `OnChoiceSelectEx` イベントハンドラが、選択 ID と前方一致するローカルシーンを、直前に実行したグローバルシーン（通常は選択肢を出したシーン）の配下から探して自動実行する。`＊OnChoiceSelectEx` という名前のシーンがあれば、そちらが優先される。詳細はマニュアルの [OnChoiceSelectEx](https://ekicyou.github.io/pasta/lua/shiori-events.html#onchoiceselectex) を参照。
+選択後は既定の `OnChoiceSelectEx` イベントハンドラが、選択 ID と前方一致するローカルシーンを、直前に実行したグローバルシーン（通常は選択肢を出したシーン）の配下から探して自動実行する。ローカルシーンが無ければ、選択 ID と前方一致するグローバルシーンを探す。`＊OnChoiceSelectEx` という名前のシーンがあれば、そちらが優先される。詳細はマニュアルの [OnChoiceSelectEx](https://ekicyou.github.io/pasta/lua/shiori-events.html#onchoiceselectex) を参照。
 
 #### 使用例
 ```pasta
