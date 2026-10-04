@@ -18,11 +18,17 @@
 ---
 --- 注意: act.req テーブルはread-only契約。ハンドラ内で変更しないこと。
 ---
+--- 戻り値の規則（EVENT.fire が応答にする）:
+---   - "SHIORI/" で始まる文字列: RES で作った応答全体としてそのまま返す（204・311・312・500 も可）
+---   - それ以外の文字列: Value の 200（空文字列なら 204）
+---   - nil: 204
+---   - thread: EVENT.drive で再開し、出力を接頭辞にかかわらず常に Value の 200 にする（出力が無ければ 204）
+---
 --- 使用例:
 --- ```lua
 --- local REG = require("pasta.shiori.event.register")
 ---
---- -- 返した文字列は EVENT.fire が RES.ok で包むため、ハンドラは応答ではなく Value の文字列を返す
+--- -- 返した文字列は Value の 200 になる（SHIORI/ で始まる文字列は応答全体としてそのまま返る）
 --- REG.OnBoot = function(act)
 ---     return [[\0\s[0]こんにちは\e]]
 --- end

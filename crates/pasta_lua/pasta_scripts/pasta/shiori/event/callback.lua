@@ -1,11 +1,17 @@
 --- @module pasta.shiori.event.callback
---- コールバック登録・ルーティング・タイムアウト sweep・ユニーク ID 生成モジュール
+--- コールバック登録・ルーティング・タイムアウト掃引・ユニーク ID 生成モジュール
 ---
---- コールバック関連の状態とロジックを集約し、EVENT.fire への変更を局所化する。
---- SHIORI_ACT.get_property 等のコンシューマが stage_pending → consume_staged パターンで
---- コールバック待ちコルーチンを登録し、try_route で到着イベントとマッチングする。
+--- コールバック関連の状態を集約する。SHIORI_ACT.get_property 等のコンシューマが
+--- stage_pending で予約し、EVENT.drive が中断直後に consume_staged で待機として登録する。
+--- 再開は通常のイベントと同じ EVENT.drive で行う（予約の消費・継続の更新も同じ規則）:
+---   - try_route: 到着イベントに一致した待機を外して再開し、出力を常に Value の 200 にする
+---   - sweep: 期限切れの待機を 集める → 外す → 番号順に並べる → 順に EVENT.drive で再開する。
+---     最初の候補を応答に採用し、残りは警告ログを出して捨てる。理由付きの待機がエラーで
+---     終わったら timeout_message を理由とする 500、静かなタイムアウトのエラーは警告ログだけ
 ---
 --- 循環参照回避: このモジュールは pasta.shiori.act を require しない。
+--- pasta.shiori.event（EVENT）は読み込み時にこのモジュールを require するため、
+--- こちらからは関数内で呼び出し時にだけ require する（読み込み時に require すると循環する）。
 
 local STORE = require("pasta.store")
 local log = require("@pasta_log")
@@ -45,7 +51,7 @@ function CALLBACK.stage_pending(event_id, timeout_at, on_timeout)
 end
 
 --- ステージング状態を消費し、resume されたコルーチンをペンディングテーブルに登録
---- EVENT.fire が resume 直後に呼び出す
+--- EVENT.drive がシーンの中断直後（エラーで終わらなかったとき）に呼び出す
 --- @param co thread resume されたコルーチン
 --- @param act table コルーチンに紐づく act オブジェクト
 --- @return boolean staged_consumed true: コールバック待ちとして登録, false: ステージングなし（通常チェーントーク）
@@ -72,7 +78,7 @@ function CALLBACK.discard_staged()
 end
 
 --- 到着イベントが pending と一致するなら該当コルーチンを EVENT.drive で再開してレスポンスを返す
---- シーンのエラーは error で伝える
+--- 出力は接頭辞にかかわらず Value の 200（出力が無ければ 204）。シーンのエラーは error で伝える
 --- @param req table SHIORI リクエスト
 --- @return string|nil response 一致時は SHIORI レスポンス文字列、不一致は nil
 function CALLBACK.try_route(req)
