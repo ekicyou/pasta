@@ -428,9 +428,15 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Action::Escape {
                 sequence: escape, ..
             } => {
-                // Extract the escaped character (second char) and literalize
+                // `\\` talks both chars (the sakura tokenizer treats `\\` as one literal
+                // backslash unit); `＠＠`/`＄＄` talk only the second char.
                 if let Some(c) = escape.chars().nth(1) {
-                    let literal = StringLiteralizer::literalize(&c.to_string())?;
+                    let text = if c == '\\' {
+                        escape.clone()
+                    } else {
+                        c.to_string()
+                    };
+                    let literal = StringLiteralizer::literalize(&text)?;
                     self.writeln(&format!("{}:talk({})", actor, literal))?;
                 }
             }

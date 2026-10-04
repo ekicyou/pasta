@@ -54,6 +54,31 @@ fn escape_with_single_char_sequence_emits_nothing() {
     assert!(sink.records.is_empty(), "no record without an emitted line");
 }
 
+/// `\\` escape talks both characters (`[[\\]]` evaluates to the 2-char string `\\`),
+/// while `＠＠`/`＄＄`/`@@`/`$$` keep talking only the second character (Req 4.1/4.6/4.7).
+#[test]
+fn escape_backslash_talks_two_chars_others_talk_one() {
+    let cases = [
+        ("\\\\", "act:actor_proxy(\"さくら\"):talk([[\\\\]])\n"),
+        ("＠＠", "act:actor_proxy(\"さくら\"):talk(\"＠\")\n"),
+        ("＄＄", "act:actor_proxy(\"さくら\"):talk(\"＄\")\n"),
+        ("@@", "act:actor_proxy(\"さくら\"):talk(\"@\")\n"),
+        ("$$", "act:actor_proxy(\"さくら\"):talk(\"$\")\n"),
+    ];
+    for (sequence, expected) in cases {
+        let text = gen_to_string(|cg| {
+            cg.generate_action(
+                &Action::Escape {
+                    sequence: sequence.to_string(),
+                    span: Span::default(),
+                },
+                "さくら",
+            )
+        });
+        assert_eq!(text, expected, "escape {:?}", sequence);
+    }
+}
+
 /// SakuraScript action emits `act:actor_proxy("{actor}"):sakura_script(<literal>)`.
 #[test]
 fn sakura_script_action_emits_sakura_script_call() {
