@@ -173,4 +173,67 @@ fn ffi_logs_reach_the_ghost_log_file() {
         "ignored: already initialized via loadu",
         "ignored load warn (4.5)",
     );
+
+    // --- 段 5: 終了処理（4.3、7.3） ---
+    // 永続化保存のログ（debug）は `[persistence] debug_mode = true` のときだけ出る。
+    let ghost = install_ghost("[logging]\nlevel = \"trace\"\n\n[persistence]\ndebug_mode = true\n");
+    assert!(drive_loadu(ghost.path()), "loadu must load the ghost");
+    assert!(unload(), "unload returns true");
+    let log = read_log(ghost.path(), DEFAULT_LOG);
+    let pos = |needle: &str| {
+        log.find(needle)
+            .unwrap_or_else(|| panic!("teardown log missing {needle:?}\nlog:\n{log}"))
+    };
+    let unloaded = pos("SHIORI.unload called successfully");
+    let saved = pos("Saved persistence data on drop");
+    let unregistered = pos("Unregistering logger");
+    assert!(
+        unloaded < saved && saved < unregistered,
+        "teardown logs must be ordered unload -> save -> unregister\nlog:\n{log}"
+    );
+
+    // --- 段 6: 不正な `file_path`（5.1、5.2、5.3、7.4） ---
+    let ghost = install_ghost("[logging]\nlevel = \"trace\"\nfile_path = \"profile.log\"\n");
+    assert!(
+        drive_loadu(ghost.path()),
+        "loadu must load despite invalid file_path"
+    );
+    assert_eq!(
+        drive_request(GET_REQUEST.as_bytes()),
+        GOLDEN_OK,
+        "GET response must be unchanged with invalid file_path"
+    );
+    assert!(unload(), "unload returns true");
+    let log = read_log(ghost.path(), DEFAULT_LOG);
+    const FALLBACK_WARN: &str =
+        "Cannot use [logging] file_path; logging to the default log file instead";
+    let warned = log
+        .find(FALLBACK_WARN)
+        .unwrap_or_else(|| panic!("fallback warn missing (5.1)\nlog:\n{log}"));
+    let warn_line = log.lines().find(|l| l.contains(FALLBACK_WARN)).unwrap();
+    assert_log_contains(warn_line, "profile.log", "fallback warn names file_path");
+    // warn の後のログ（ロード・request・終了処理）も既定のログファイルへ届く（5.2）。
+    assert_log_contains(
+        &log[warned..],
+        "Unregistering logger",
+        "logs after the fallback warn (5.2)",
+    );
+    assert!(
+        !ghost.path().join("profile.log").exists(),
+        "invalid file_path must not be created (5.3)"
+    );
+
+    // --- 段 7: 同じゴーストの `file_path` を直して再読み込み（5.4） ---
+    const CUSTOM_LOG: &str = "profile/pasta/logs/custom.log";
+    set_extra_toml(
+        ghost.path(),
+        &format!("[logging]\nlevel = \"trace\"\nfile_path = \"{CUSTOM_LOG}\"\n"),
+    );
+    assert!(
+        drive_loadu(ghost.path()),
+        "loadu must reload the fixed ghost"
+    );
+    assert!(unload(), "unload returns true");
+    let log = read_log(ghost.path(), CUSTOM_LOG);
+    assert_log_contains(&log, "Unregistering logger", "fixed file_path log (5.4)");
 }

@@ -104,7 +104,7 @@
   - _Requirements: 4.1, 4.2, 4.5, 4.7, 4.8, 7.3, 7.5_
   - _Depends: 1, 4.2, 5.2_
 
-- [ ] 6.2 終了処理・不正な `file_path`・直して再読み込みの検証
+- [x] 6.2 終了処理・不正な `file_path`・直して再読み込みの検証
   - 6.1 で作ったテスト関数の続きとして、同じゴーストを順に読む直列の手順で書き足す
   - `[persistence] debug_mode = true` で、`unload` の後のログファイルに `SHIORI.unload` の成功・永続化データの保存・登録解除のログがこの順にあることを検証する
   - `file_path = "profile.log"` で `loadu`・`request`・`unload` し、既定のログファイルに warn とその後のログがあり、`profile.log` が作られないことを検証する
