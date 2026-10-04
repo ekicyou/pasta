@@ -7,7 +7,17 @@
 --- エラーは呼び出し元（SHIORI.request）の xpcall でキャッチされる。
 ---
 --- ハンドラシグネチャ:
----   function(act: ShioriAct) -> string
+---   function(act: ShioriAct) -> string|thread|nil
+---
+--- 戻り値の規則（EVENT.fire）:
+---   - "SHIORI/" で始まる文字列: RES で作った応答全体として包まずにそのまま返す
+---   - それ以外の文字列: Value の 200（空文字列なら 204）
+---   - nil: 204
+---   - thread: EVENT.drive で再開し、出力を接頭辞にかかわらず常に Value の 200 にする（出力が無ければ 204）
+---
+--- 再開の手順は EVENT.drive に一本化している。通常のイベント（EVENT.fire）・
+--- コールバックの再開（CALLBACK.try_route）・タイムアウト掃引（CALLBACK.sweep）の
+--- 3 つの呼び出し元が同じ手順（予約の消費・継続の更新）でシーンを再開する。
 ---
 --- act オブジェクト経由で SHIORI リクエスト情報にアクセス:
 ---   - act.req.id: イベント名（例: "OnBoot", "OnClose"）
@@ -34,7 +44,7 @@
 --- ```lua
 --- local REG = require("pasta.shiori.event.register")
 ---
---- -- 返した文字列は EVENT.fire が RES.ok で包むため、ハンドラは応答ではなく Value の文字列を返す
+--- -- 返した文字列は Value の 200 になる（SHIORI/ で始まる文字列は応答全体としてそのまま返る）
 --- REG.OnBoot = function(act)
 ---     act.sakura:talk("こんにちは")
 ---     return act:build()
@@ -43,7 +53,7 @@
 ---
 --- シーン関数フォールバック:
 --- REG にハンドラが未登録の場合、SCENE.co_exec(act, req.id) でシーンを検索し、
---- 見つかればシーンコルーチンを resume してさくらスクリプトを 200 OK で返す。
+--- 見つかればシーンコルーチンを EVENT.drive で再開してさくらスクリプトを 200 OK で返す。
 --- 見つからなければ 204 No Content を返す。
 ---
 --- テスト用reqテーブル:
@@ -166,8 +176,34 @@ function EVENT.no_entry(act)
     return SCENE.co_exec(act, act.req.id, nil, nil)
 end
 
+--- シーンコルーチンを出力が得られるか終わるまで再開し、予約の消費と継続の更新までを行う
+--- 失敗時（エラーで終わったとき）は消費されていない予約を捨て、継続を空にする。
+--- 応答文字列は作らず、エラーを投げるかどうかも呼び出し元が決める。
+--- @param co thread 再開するシーンコルーチン（suspended、CALLBACK.pending から外し済み）
+--- @param act table このコルーチンに紐づく act（待機を登録するときに使う）
+--- @param ... any 最初の resume に渡す引数
+--- @return boolean ok false ならシーンがエラーで終わった
+--- @return any value ok=true: 出力（nil は出力の無いまま終了）／ok=false: エラーの値
+function EVENT.drive(co, act, ...)
+    -- nil yieldをスキップ
+    local ok, value = resume_until_valid(co, ...)
+    if not ok then
+        -- 予約の後、中断の前にエラーで終わったシーンの予約を残さない
+        CALLBACK.discard_staged()
+        -- dead のコルーチンを渡し継続を空にする
+        set_co_scene(co)
+        return false, value
+    end
+    -- ステージング消費
+    CALLBACK.consume_staged(co, act)
+    -- 状態保存（set_co_scene内部でstatus判断）
+    set_co_scene(co)
+    return true, value
+end
+
 --- イベント振り分け
---- ハンドラを実行し、コルーチンの場合はresumeして状態管理を行う
+--- 待機中のコールバックに一致すれば CALLBACK.try_route の応答を返す。
+--- それ以外はハンドラを実行し、戻り値をモジュール冒頭の規則で応答にする（thread は EVENT.drive で再開）
 --- @param req table リクエストテーブル（req.id にイベント名）
 --- @return string SHIORI レスポンス
 function EVENT.fire(req)
@@ -187,20 +223,17 @@ function EVENT.fire(req)
 
     -- 型判定
     if type(result) == "thread" then
-        -- コルーチン実行: resume_until_validでnil yieldをスキップ
-        local ok, yielded_value = resume_until_valid(result, act)
+        local ok, yielded_value = EVENT.drive(result, act, act)
         if not ok then
-            -- エラー処理: close & 例外伝搬
-            set_co_scene(result)
             error(yielded_value)
         end
-        -- (新規) ステージング消費
-        CALLBACK.consume_staged(result, act)
-        -- 状態保存（set_co_scene内部でstatus判断）
-        set_co_scene(result)
+        -- シーンの出力は接頭辞にかかわらず常に Value にする
         return RES.ok(yielded_value)
     elseif type(result) == "string" then
-        -- 既存互換: 文字列をそのまま返す
+        -- SHIORI/ で始まる文字列は RES で作った応答全体として包まずに返す
+        if result:sub(1, 7) == "SHIORI/" then
+            return result
+        end
         return RES.ok(result)
     else
         -- nil

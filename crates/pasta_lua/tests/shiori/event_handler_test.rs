@@ -6,7 +6,10 @@
 
 use crate::common;
 
-use common::{create_empty_context, create_runtime_with_pasta_path, get_scripts_dir};
+use common::{
+    assert_shiori_response, create_empty_context, create_runtime_with_pasta_path, get_scripts_dir,
+    value_as_str,
+};
 use pasta_lua::PastaLuaRuntime;
 
 // ============================================================================
@@ -220,16 +223,17 @@ fn test_onfirstboot_handler_with_reference() {
         }
         local response = EVENT.fire(req)
         
-        return response:find("200 OK") ~= nil and vanish_flag == "1"
+        assert(vanish_flag == "1")
+        return response
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "OnFirstBoot should access Reference0: {:?}",
-        result
+    let response = result.expect("OnFirstBoot should access Reference0");
+    assert_shiori_response(
+        &value_as_str(&response).unwrap(),
+        "200 OK",
+        Some("First Boot!"),
     );
-    assert!(result.unwrap().as_boolean().unwrap_or(false));
 }
 
 /// Tests OnBoot handler with multiple Reference fields
@@ -263,19 +267,15 @@ fn test_onboot_handler_with_references() {
         }
         local response = EVENT.fire(req)
         
-        return response:find("200 OK") ~= nil
-            and shell_name == "master"
+        assert(shell_name == "master"
             and shell_path == "C:/ghost/shell/master"
-            and ghost_path == "C:/ghost"
+            and ghost_path == "C:/ghost")
+        return response
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "OnBoot should access Reference0/6/7: {:?}",
-        result
-    );
-    assert!(result.unwrap().as_boolean().unwrap_or(false));
+    let response = result.expect("OnBoot should access Reference0/6/7");
+    assert_shiori_response(&value_as_str(&response).unwrap(), "200 OK", Some("Boot!"));
 }
 
 /// Tests OnClose handler with Reference0 (close reason)
@@ -303,16 +303,17 @@ fn test_onclose_handler_with_reference() {
         }
         local response = EVENT.fire(req)
         
-        return response:find("200 OK") ~= nil and close_reason == "user"
+        assert(close_reason == "user")
+        return response
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "OnClose should access Reference0: {:?}",
-        result
+    let response = result.expect("OnClose should access Reference0");
+    assert_shiori_response(
+        &value_as_str(&response).unwrap(),
+        "200 OK",
+        Some("Goodbye!"),
     );
-    assert!(result.unwrap().as_boolean().unwrap_or(false));
 }
 
 // ============================================================================
@@ -348,18 +349,17 @@ fn test_onghostchanged_handler_with_references() {
         }
         local response = EVENT.fire(req)
         
-        return response:find("200 OK") ~= nil
-            and to_ghost == "NewGhost"
-            and from_ghost == "OldGhost"
+        assert(to_ghost == "NewGhost" and from_ghost == "OldGhost")
+        return response
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "OnGhostChanged should access Reference0/1: {:?}",
-        result
+    let response = result.expect("OnGhostChanged should access Reference0/1");
+    assert_shiori_response(
+        &value_as_str(&response).unwrap(),
+        "200 OK",
+        Some("Changed!"),
     );
-    assert!(result.unwrap().as_boolean().unwrap_or(false));
 }
 
 /// Tests OnSecondChange handler with Reference0/1
@@ -391,18 +391,13 @@ fn test_onsecondchange_handler_with_references() {
         }
         local response = EVENT.fire(req)
         
-        return response:find("204 No Content") ~= nil
-            and current_sec == "30"
-            and total_sec == "12345"
+        assert(current_sec == "30" and total_sec == "12345")
+        return response
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "OnSecondChange should access Reference0/1: {:?}",
-        result
-    );
-    assert!(result.unwrap().as_boolean().unwrap_or(false));
+    let response = result.expect("OnSecondChange should access Reference0/1");
+    assert_shiori_response(&value_as_str(&response).unwrap(), "204 No Content", None);
 }
 
 /// Tests OnMinuteChange handler with Reference0/1
@@ -434,18 +429,13 @@ fn test_onminutechange_handler_with_references() {
         }
         local response = EVENT.fire(req)
         
-        return response:find("204 No Content") ~= nil
-            and current_min == "45"
-            and current_hour == "14"
+        assert(current_min == "45" and current_hour == "14")
+        return response
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "OnMinuteChange should access Reference0/1: {:?}",
-        result
-    );
-    assert!(result.unwrap().as_boolean().unwrap_or(false));
+    let response = result.expect("OnMinuteChange should access Reference0/1");
+    assert_shiori_response(&value_as_str(&response).unwrap(), "204 No Content", None);
 }
 
 // ============================================================================
@@ -481,16 +471,15 @@ fn test_onmousedoubleclick_handler_with_references() {
         }
         local response = EVENT.fire(req)
         
-        return response:find("200 OK") ~= nil
-            and scope == "0"
-            and hit_area == "Head"
+        assert(scope == "0" and hit_area == "Head")
+        return response
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "OnMouseDoubleClick should access Reference0/4: {:?}",
-        result
+    let response = result.expect("OnMouseDoubleClick should access Reference0/4");
+    assert_shiori_response(
+        &value_as_str(&response).unwrap(),
+        "200 OK",
+        Some("Clicked!"),
     );
-    assert!(result.unwrap().as_boolean().unwrap_or(false));
 }

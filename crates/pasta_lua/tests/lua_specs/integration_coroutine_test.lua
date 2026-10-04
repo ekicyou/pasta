@@ -12,6 +12,7 @@ local expect = require("lua_test.test").expect
 local function reload_modules()
     package.loaded["pasta.store"] = nil
     package.loaded["pasta.shiori.event"] = nil
+    package.loaded["pasta.shiori.event.callback"] = nil
     package.loaded["pasta.shiori.event.register"] = nil
     package.loaded["pasta.shiori.res"] = nil
     package.loaded["pasta.shiori.act"] = nil

@@ -44,12 +44,35 @@ local CALLBACK = require("pasta.shiori.event.callback")
 local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
 local GLOBAL = require("pasta.global")
 local STORE = require("pasta.store")
-local SHIORI_ACT = require("pasta.shiori.act")
+local RES = require("pasta.shiori.res")
 
 --- fire 系テストの共通状態リセット
 local function reset_state()
     STORE.reset()
     CALLBACK.reset()
+end
+
+--- 応答のヘッダ行の値を返す（行全体が「name: 値」の形のものだけを拾う。無ければ nil）
+--- @param res string SHIORI 応答
+--- @param name string ヘッダ名
+--- @return string|nil
+local function header_value(res, name)
+    local prefix = name .. ": "
+    for line in res:gmatch("(.-)\r\n") do
+        if line:sub(1, #prefix) == prefix then
+            return line:sub(#prefix + 1)
+        end
+    end
+    return nil
+end
+
+--- 応答の形を検査する（6.2）: 先頭行がステータス行と完全に一致し、SHIORI/3.0 が 1 回だけ現れる
+--- @param res string SHIORI 応答
+--- @param status_line string 期待するステータス行
+local function expect_status(res, status_line)
+    expect(res:match("^(.-)\r\n")):toBe(status_line)
+    local _, count = res:gsub("SHIORI/3%.0", "")
+    expect(count):toBe(1)
 end
 
 -- ============================================================================
@@ -233,46 +256,274 @@ describe("EVENT.fire - コールバックルーティング統合", function()
 end)
 
 -- ============================================================================
--- OnSecondChange - コールバックタイムアウト sweep 分岐
+-- SHIORI.request - コールバック・掃引の再開の回帰テスト（1.1–1.4, 1.7, 1.8, 2.2, 2.4, 2.6, 3.1, 3.2, 3.4）
 -- ============================================================================
-describe("OnSecondChange - sweep タイムアウト分岐", function()
-    test("タイムアウト済みペンディングがあれば dispatcher を呼ばず 500 を返す", function()
+describe("SHIORI.request - コールバック・掃引の再開", function()
+    --- シーン関数をコルーチンにして返すハンドラを登録する
+    --- @param event_name string 登録イベント名
+    --- @param scene function シーン関数（引数は EVENT.fire が渡す act）
+    local function register_scene(event_name, scene)
+        REG[event_name] = function(_act)
+            return coroutine.create(scene)
+        end
+    end
+
+    --- イベントを SHIORI.request で送る
+    --- @param id string イベント名
+    --- @param reference table|nil Reference（0 始まり）
+    --- @return string
+    local function request(id, reference)
+        return ENTRY.request({ id = id, method = "get", version = 30, reference = reference })
+    end
+
+    --- 次の OnTalk の機会の代わりに、保存された継続をそのまま返すハンドラ
+    REG.OnEntryContinue = function(_act)
+        return STORE.co_scene
+    end
+
+    --- 200 OK と Value の完全一致を検査する
+    --- @param res string SHIORI 応答
+    --- @param script string 期待する Value（act:build が末尾に付ける \e を除いた部分）
+    local function expect_ok(res, script)
+        expect_status(res, "SHIORI/3.0 200 OK")
+        expect(header_value(res, "Value")):toBe(script .. "\\e")
+    end
+
+    test("コールバックの後のチェイントークは応答に前半、次の OnTalk の機会に後半が出る", function()
         reset_state()
-        dispatcher._reset()
-
-        local co = coroutine.create(function()
-            coroutine.yield()
+        local scene_co
+        register_scene("OnEntryChainStart", function(act)
+            scene_co = coroutine.running()
+            local v = act:get_property("name")
+            act:raw_script("前半:" .. tostring(v))
+            act:yield()
+            act:raw_script("後半")
+            return act:build()
         end)
-        coroutine.resume(co)
-        CALLBACK.pending["OnPastaCallBackEntryTimeout"] = {
-            co = co,
-            act = {},
-            timeout_at = 0, -- 必ず現在時刻超過
-            on_timeout = "entry sweep timeout",
-        }
 
-        local dispatch_called = false
+        expect_ok(request("OnEntryChainStart"), "\\![get,property,OnPastaCallBack1,name]")
+
+        expect_ok(request("OnPastaCallBack1", { [0] = "v1" }), "前半:v1")
+        expect(STORE.co_scene):toBe(scene_co)
+        expect(STORE.co_callback):toBe(nil)
+
+        expect_ok(request("OnEntryContinue"), "後半")
+        expect(STORE.co_scene):toBe(nil)
+    end)
+
+    test("出力の無い最初の中断は同じイベントの中で進み、トークの 200 になる", function()
+        reset_state()
+        register_scene("OnEntryQuietYield", function(act)
+            act:get_property("name")
+            act:yield() -- トークを積まずに中断
+            act:raw_script("後半")
+            return act:build()
+        end)
+
+        request("OnEntryQuietYield")
+
+        expect_ok(request("OnPastaCallBack1", { [0] = "v1" }), "後半")
+        expect(STORE.co_scene):toBe(nil)
+    end)
+
+    test("コールバックの後の再度の get_property は新しい待機になり、継続には残らない", function()
+        reset_state()
+        local scene_co
+        register_scene("OnEntryGetTwice", function(act)
+            scene_co = coroutine.running()
+            act:get_property("a")
+            act:get_property("b")
+        end)
+
+        request("OnEntryGetTwice")
+
+        expect_ok(request("OnPastaCallBack1", { [0] = "v1" }), "\\![get,property,OnPastaCallBack2,b]")
+        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
+        expect(CALLBACK.pending["OnPastaCallBack2"].co):toBe(scene_co)
+        expect(STORE.co_scene):toBe(nil)
+        expect(STORE.co_callback):toBe(nil)
+    end)
+
+    --- コールバック待ちの間に、別のシーンの継続を作る
+    --- @return thread other_co 別のシーンのコルーチン
+    local function start_other_continuation()
+        local other_co
+        register_scene("OnEntryOther", function(act)
+            other_co = coroutine.running()
+            act:raw_script("別1")
+            act:yield()
+            act:raw_script("別2")
+            return act:build()
+        end)
+        expect_ok(request("OnEntryOther"), "別1")
+        expect(STORE.co_scene):toBe(other_co)
+        return other_co
+    end
+
+    test("コールバック側のシーンが中断すれば、既存の継続を置き換える", function()
+        reset_state()
+        local scene_co
+        register_scene("OnEntryReplace", function(act)
+            scene_co = coroutine.running()
+            act:get_property("name")
+            act:raw_script("前半")
+            act:yield()
+            act:raw_script("後半")
+            return act:build()
+        end)
+
+        request("OnEntryReplace")
+        local other_co = start_other_continuation()
+
+        expect_ok(request("OnPastaCallBack1", { [0] = "v1" }), "前半")
+        expect(STORE.co_scene):toBe(scene_co)
+        expect(STORE.co_scene).not_:toBe(other_co)
+    end)
+
+    test("コールバック側のシーンが終われば、既存の継続を空にする", function()
+        reset_state()
+        register_scene("OnEntryFinish", function(act)
+            act:get_property("name")
+            act:raw_script("終わり")
+            return act:build()
+        end)
+
+        request("OnEntryFinish")
+        start_other_continuation()
+
+        expect_ok(request("OnPastaCallBack1", { [0] = "v1" }), "終わり")
+        expect(STORE.co_scene):toBe(nil)
+    end)
+
+    --- 仮想ディスパッチャの呼び出しを数えながら OnSecondChange を SHIORI.request で送る
+    --- @return string res 応答
+    --- @return number dispatch_count 仮想ディスパッチャが呼ばれた回数
+    local function request_second_change()
+        local dispatch_count = 0
         local original_dispatch = dispatcher.dispatch
-        dispatcher.dispatch = function(...)
-            dispatch_called = true
+        dispatcher.dispatch = function(_act)
+            dispatch_count = dispatch_count + 1
             return nil
         end
-
-        local act = SHIORI_ACT.new(STORE.actors, {
-            id = "OnSecondChange",
-            status = "idle",
-            date = { unix = os.time(), year = 2026, month = 6, day = 11, hour = 12, min = 0, sec = 0, wday = 4 },
-        })
-        local result = REG.OnSecondChange(act)
-
+        local ok, res = pcall(request, "OnSecondChange")
         dispatcher.dispatch = original_dispatch
+        assert(ok, res)
+        return res, dispatch_count
+    end
 
-        expect(type(result)):toBe("string")
-        expect(result:find("500 Internal Server Error", 1, true)).not_:toBe(nil)
-        expect(result:find("entry sweep timeout", 1, true)).not_:toBe(nil)
-        -- タイムアウト応答時は仮想イベントディスパッチへ進まない
-        expect(dispatch_called):toBe(false)
-        -- 掃引済みエントリは pending から除去される
-        expect(CALLBACK.pending["OnPastaCallBackEntryTimeout"]):toBe(nil)
+    test("理由付きの待機のタイムアウトは X-Error-Reason に理由を持つ 500 で、仮想イベントを出さない", function()
+        reset_state()
+        dispatcher._reset()
+        register_scene("OnEntryTimeout", function(act)
+            act:get_property("name", -1, "entry sweep timeout") -- 期限は既に過ぎている
+            act:raw_script("届かない")
+            return act:build()
+        end)
+        request("OnEntryTimeout")
+
+        local res, dispatch_count = request_second_change()
+
+        expect_status(res, "SHIORI/3.0 500 Internal Server Error")
+        expect(header_value(res, "X-Error-Reason")):toBe("entry sweep timeout")
+        expect(header_value(res, "Value")):toBe(nil)
+        expect(dispatch_count):toBe(0)
+        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
+        expect(STORE.co_scene):toBe(nil)
+    end)
+
+    --- タイムアウトを捕まえて再度 get_property するシーンを掃引する
+    --- 掃引の応答の検査は各テストの最後に回し、予約の漏れの検査を先に行う
+    --- @return thread scene_co 掃引したシーンのコルーチン
+    --- @return function expect_sweep_response 掃引の応答（再度の get_property の get タグの 200）を検査する
+    local function sweep_retrying_scene()
+        local scene_co
+        register_scene("OnEntryRetry", function(act)
+            scene_co = coroutine.running()
+            pcall(act.get_property, act, "a", -1, "entry retry timeout") -- 期限は既に過ぎている
+            act:get_property("b", 60)
+        end)
+        request("OnEntryRetry")
+        local res, dispatch_count = request_second_change()
+        return scene_co, function()
+            expect_ok(res, "\\![get,property,OnPastaCallBack2,b]")
+            expect(dispatch_count):toBe(0)
+        end
+    end
+
+    test("掃引の後、コルーチンを返す別のイベントのシーンは古いイベント名で登録されない", function()
+        reset_state()
+        dispatcher._reset()
+        local scene_co, expect_sweep_response = sweep_retrying_scene()
+        register_scene("OnEntryAfterSweep", function(act)
+            act:raw_script("別のシーン")
+            return act:build()
+        end)
+
+        expect_ok(request("OnEntryAfterSweep"), "別のシーン")
+        expect(CALLBACK.pending["OnPastaCallBack2"].co):toBe(scene_co)
+        expect(STORE.co_callback):toBe(nil)
+        expect_sweep_response()
+    end)
+
+    test("掃引の後、get_property する別のイベントは multiple staging にならない", function()
+        reset_state()
+        dispatcher._reset()
+        local _, expect_sweep_response = sweep_retrying_scene()
+        register_scene("OnEntryGetAfterSweep", function(act)
+            act:get_property("c")
+        end)
+
+        expect_ok(request("OnEntryGetAfterSweep"), "\\![get,property,OnPastaCallBack3,c]")
+        expect(CALLBACK.pending["OnPastaCallBack3"]).not_:toBe(nil)
+        expect_sweep_response()
+    end)
+end)
+
+-- ============================================================================
+-- SHIORI.request - ハンドラの戻り値の応答化（4.1, 4.2, 4.4, 4.5, 4.6）
+-- ============================================================================
+describe("SHIORI.request - ハンドラの戻り値の応答化", function()
+    --- 戻り値を返すハンドラを登録して SHIORI.request を通した応答を返す
+    --- @param value any ハンドラの戻り値
+    --- @return string
+    local function request_with(value)
+        reset_state()
+        REG.OnEntryReturnTest = function(_act)
+            return value
+        end
+        return ENTRY.request({ id = "OnEntryReturnTest", method = "get", version = 30 })
+    end
+
+    local responses = {
+        { "RES.ok", RES.ok("x") },
+        { "RES.no_content", RES.no_content() },
+        { "RES.warn", RES.warn("r") },
+        { "RES.not_enough", RES.not_enough() },
+        { "RES.advice", RES.advice() },
+        { "RES.err", RES.err("r") },
+    }
+    for _, case in ipairs(responses) do
+        local name, built = case[1], case[2]
+        test(name .. " で作った応答は包まれずにそのまま返る", function()
+            expect(request_with(built)):toBe(built)
+        end)
+    end
+
+    test("普通の文字列は Value にした 200 OK になる", function()
+        local res = request_with("plain")
+        expect_status(res, "SHIORI/3.0 200 OK")
+        expect(header_value(res, "Value")):toBe("plain")
+    end)
+
+    test("空文字列は Value の無い 204 No Content になる", function()
+        local res = request_with("")
+        expect_status(res, "SHIORI/3.0 204 No Content")
+        expect(header_value(res, "Value")):toBe(nil)
+    end)
+
+    test("nil は Value の無い 204 No Content になる", function()
+        local res = request_with(nil)
+        expect_status(res, "SHIORI/3.0 204 No Content")
+        expect(header_value(res, "Value")):toBe(nil)
     end)
 end)

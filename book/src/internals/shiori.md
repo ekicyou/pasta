@@ -268,7 +268,7 @@ pasta.shiori.entry
 1. `CALLBACK.try_route(req)` が応答を返せば、それを返す（待っているコールバックの再開）。
 2. `act = SHIORI_ACT.new(STORE.actors, req)` を作る。
 3. `REG[req.id]` があればそれを、無ければ `EVENT.no_entry` を `act` で呼ぶ。`EVENT.no_entry` は `SCENE.co_exec(act, req.id)` でイベント名のシーンを探し、見つかればそのコルーチンを、無ければ `nil` を返す（`pasta.scene` は循環を避けるため呼び出し時に `require` する）。
-4. 戻り値がコルーチンなら再開して応答にし、文字列なら `RES.ok` で包み、それ以外なら 204 を返す。コルーチンの扱いは [イベントからシーンへ](execution-model.md#イベントからシーンへ) で扱う。
+4. 戻り値がコルーチンなら `EVENT.drive` で再開し、その出力を `RES.ok` で応答にする（出力は接頭辞にかかわらず常に `Value`）。`SHIORI/` で始まる文字列なら応答全体として包まずに返し、それ以外の文字列なら `RES.ok` で包み、それ以外なら 204 を返す。コルーチンの扱いは [イベントからシーンへ](execution-model.md#イベントからシーンへ) で扱う。
 
 既定ハンドラの中身は次のとおりである。
 
@@ -276,7 +276,7 @@ pasta.shiori.entry
 | -------- | ---- |
 | `REG.OnBoot` | `SCENE.co_exec(act, act.req.id)`。シーン関数フォールバックと同じ |
 | `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ `act.req.reference[1]`（選択 ID）を `SCENE.search(選択 ID, STORE.last_global_scene)` で探し、無ければ `SCENE.search(選択 ID, nil)` でグローバルシーンを探し、見つかった関数をコルーチンに包んで返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
-| `REG.OnSecondChange` | `CALLBACK.sweep(os.time())` が応答を返せばそれを返し、そうでなければ `virtual_dispatcher.dispatch(act)` の結果（コルーチンか `nil`）を返す |
+| `REG.OnSecondChange` | `CALLBACK.sweep(os.time())` が応答を返せばそれを返し（その回は仮想イベントを出さない）、そうでなければ `virtual_dispatcher.dispatch(act)` の結果（コルーチンか `nil`）を返す。`sweep` の応答は、期限切れの待機を再開した結果（出力の 200、または理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す |
 
 ### 非同期トーク
 
@@ -289,13 +289,16 @@ SHIORI はベースウェアが問い合わせるだけの通信であり、シ�
     応答の Value に \![get,property,OnPastaCallBack{N},名前…] を載せて中断
 リクエスト 2（SSP が発行する OnPastaCallBack{N}。値は Reference に入る）
   EVENT.fire → CALLBACK.try_route
-    待っているコルーチンを Reference の配列で再開し、その出力を応答にする
-期限切れ
+    待っているコルーチンを pending から外し、EVENT.drive で Reference の配列を渡して再開し、
+    その出力を応答にする
+期限切れ（OnSecondChange のたびに確認）
   OnSecondChange の既定ハンドラ → CALLBACK.sweep
+    期限切れの待機を集めて pending から外し、番号順に EVENT.drive で (nil, 理由) を渡して再開する
+    最初に生まれた応答（出力の 200、または理由付きタイムアウトの 500）をその回の応答にする
 ```
 
 - アクターランタイムの上では、リクエスト 1 と 2 は別々の mailbox のメッセージとして順に処理される。待っているコルーチンは、その間 VM の `CALLBACK.pending` に保たれる。Rust 側はコルーチンを持たない。
-- 待ち合わせの状態の遷移（`consume_staged`・`STORE.co_callback`・`set_co_scene` との関係）は [コールバック待ちとの関係](execution-model.md#コールバック待ちとの関係) で扱う。利用者から見た挙動は [OnPastaCallBack](../lua/shiori-events.md#onpastacallbackコールバック応答) が正である。
+- 再開したシーンは、通常のイベントと同じ再開の手順（`EVENT.drive`）を通る。待ち合わせの状態の遷移（`consume_staged`・`STORE.co_callback`・`set_co_scene` との関係）は [コールバック待ちとの関係](execution-model.md#コールバック待ちとの関係) で、掃引の手順は [期限切れの掃引](execution-model.md#期限切れの掃引callbacksweep) で扱う。利用者から見た挙動は [OnPastaCallBack](../lua/shiori-events.md#onpastacallbackコールバック応答) が正である。
 
 ### 仮想イベントディスパッチャ（OnTalk・OnHour）
 

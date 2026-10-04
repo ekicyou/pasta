@@ -16,6 +16,7 @@ end
 local function setup()
     mocks.reset()
     mocks.install()
+    package.loaded["pasta.shiori.event"] = nil
     package.loaded["pasta.shiori.event.callback"] = nil
     package.loaded["pasta.store"] = nil
     package.loaded["pasta.shiori.res"] = nil

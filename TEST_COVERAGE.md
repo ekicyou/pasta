@@ -101,9 +101,10 @@
 | LuaConfig TOML設定                    | `loader_config_test.rs`（外部化）                                 | ✅ 完了 | 6テスト（外部化済み）                                            |
 | さくらスクリプトウェイト挿入          | `sakura_script_basic_test.rs`<br>`sakura_script_output_test.rs`   | ✅ 完了 | 22テスト（2ファイルに分割）                                      |
 | さくらスクリプト記号タグトークナイズ  | `tokenizer.rs` 内テスト                                           | ✅ 完了 | 6テスト（`-+*?&` タグ認識）                                      |
-| EVENT.fire コルーチン対応             | `event_coroutine_test.lua`                                        | ✅ 完了 | 16テスト（resume_until_valid含む）                               |
+| EVENT.fire コルーチン対応             | `event_coroutine_test.lua`                                        | ✅ 完了 | 17テスト（resume_until_valid含む、callback-resume-unification追加1） |
 | resume_until_valid nil yieldスキップ  | `event_coroutine_test.lua`                                        | ✅ 完了 | 6テスト（coroutine-resume-loop）                                 |
-| CALLBACK モジュール（非同期通信基盤） | `callback_module_test.lua`                                        | ✅ 完了 | 21テスト（shiori-async-talk）                                    |
+| CALLBACK モジュール（非同期通信基盤） | `callback_module_test.lua`                                        | ✅ 完了 | 34テスト（shiori-async-talk、callback-resume-unification追加13） |
+| コールバック再開・掃引・戻り値の入口回帰 | `shiori_entry_test.lua`                                           | ✅ 完了 | 17テスト（callback-resume-unification）                          |
 | get_property バリデーション・タグ発行 | `get_property_test.lua`                                           | ✅ 完了 | 18テスト（shiori-async-talk）                                    |
 | set_property バリデーション・反映     | `set_property_test.lua`                                           | ✅ 完了 | 18テスト                                                         |
 | REQ→変数転記                          | `transfer_req_to_var_test.lua`                                    | ✅ 完了 | 8テスト                                                          |
@@ -134,7 +135,7 @@
 | トランスパイル失敗中止                | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（load-error-logging）                                    |
 | ログファイル名固定（Rotation::NEVER） | `logger.rs`                                                       | ✅ 完了 | 1テスト（load-error-logging）                                    |
 | load失敗→requestエラー伝搬            | `shiori_request_tests.rs`                                         | ✅ 完了 | 1テスト（load-error-logging）                                    |
-| 非同期コールバック統合（SHIORI層）    | `async_callback_simple_test.rs` / `async_callback_chain_test.rs`  | ✅ 完了 | 12テスト（shiori-async-talk、property-dsl-extension追加2テスト） |
+| 非同期コールバック統合（SHIORI層）    | `async_callback_simple_test.rs` / `async_callback_chain_test.rs`  | ✅ 完了 | 13テスト（shiori-async-talk、property-dsl-extension追加2テスト、callback-resume-unification追加1） |
 | OnChoiceSelectEx 自動ルーティング     | `choice_select_test.lua`（Luaテストスイート）                     | ✅ 完了 | 選択肢コールバック→シーン自動解決                                |
 
 ### 2.5 LSP層テスト（Language Server）

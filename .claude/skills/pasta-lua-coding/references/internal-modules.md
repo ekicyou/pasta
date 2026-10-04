@@ -32,7 +32,7 @@ local STORE = require("pasta.store")
 | `last_global_scene` | `string\|nil` | 最後に `init_scene` したシーンテーブルの `__global_name__` | `ACT_IMPL.init_scene` が書き、OnChoiceSelectEx の既定ハンドラが選択 ID の検索の親に使う |
 | `kick_pending` | `string\|nil` | 保留中のキック対象のシーン名 | `KICK.install` が書き、`KICK.try_dispatch` が消費する（[キックの保留と起動](https://ekicyou.github.io/pasta/internals/debug.html#キックの保留と起動kicklua)） |
 | `kick_force` | `boolean` | キックの割り込み許可（既定 `false`） | `KICK.install` が立て、仮想イベントの `dispatch` の入口が 1 回で下ろす |
-| `co_callback` | `thread\|nil` | コールバック待ちとして登録したコルーチンの印 | `pasta.store` は初期化しない（未設定のときは `nil`）。`CALLBACK.consume_staged` が書き、`set_co_scene` と `CALLBACK.reset` が `nil` に戻す（[コールバック待ちとの関係](https://ekicyou.github.io/pasta/internals/execution-model.html#コールバック待ちとの関係)） |
+| `co_callback` | `thread\|nil` | コールバック待ちとして登録したコルーチンの印 | `pasta.store` は初期化しない（未設定のときは `nil`）。`CALLBACK.consume_staged` が書き、直後の `set_co_scene`（どちらも `EVENT.drive` の中）が `nil` に戻す。`CALLBACK.reset` も `nil` に戻す（[コールバック待ちとの関係](https://ekicyou.github.io/pasta/internals/execution-model.html#コールバック待ちとの関係)） |
 
 単語の 3 つのフィールドの値の形は [finalize_scene](#finalize_scene) の「単語収集データ構造」で扱う。
 

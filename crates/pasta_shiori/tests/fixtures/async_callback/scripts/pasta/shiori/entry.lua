@@ -100,6 +100,20 @@ REG.OnTestChain = function(act)
     end)
 end
 
+--- Scenario: get_property → チェイントーク（3ラウンド）
+--- Round 1: get_property → get タグ
+--- Round 2: コールバック到着 → 前半のトーク（act:yield() で中断し STORE.co_scene に保存）
+--- Round 3: 次の OnTalk の機会（OnSecondChange → 仮想ディスパッチャ）→ 後半のトーク
+REG.OnTestCallbackChainTalk = function(act)
+    return coroutine.create(function(act)
+        local ver = act:get_property("baseware.version")
+        act:raw_script("前半=" .. tostring(ver))
+        act:yield()
+        act:raw_script("後半")
+        coroutine.yield(act:build())
+    end)
+end
+
 --- Resume chain talk handler
 --- STORE.co_scene に保存されたコルーチンを返して resume させる
 REG.OnResumeChain = function(act)
