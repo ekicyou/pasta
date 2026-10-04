@@ -31,8 +31,14 @@ local function group_by_actor(tokens)
         local t = token.type
 
         -- アクター属性設定トークン: 独立して出力
-        if t == "spot" or t == "clear_spot" then
+        if t == "spot" then
+            -- spot はグループを閉じない
             table.insert(result, token)
+        elseif t == "clear_spot" then
+            -- clear_spot は現在のグループを閉じる（後の発言・表示制御は新しいグループに入る）
+            table.insert(result, token)
+            current_actor_token = nil
+            current_actor = nil
         elseif t == "talk" or t == "sakura_script" then
             local talk_actor = token.actor
             -- アクター変更検出（最初のtalkまたはアクター変更時）
@@ -58,11 +64,15 @@ local function group_by_actor(tokens)
         else
             -- アクター行動トークン（surface, wait, newline, clear, choice, choice_timeout）
             -- 現在のアクターグループ内に追加
-            if current_actor_token then
-                table.insert(current_actor_token.tokens, token)
-            end
-            -- 注: current_actor_tokenがnilの場合（最初のtalk・sakura_scriptより先に積まれた場合）は捨てる
+            -- 現在のグループが無い場合（出力の先頭や clear_spot の後で、発言より先に積まれた場合）は
+            -- アクター nil（アクター未指定）のグループを開いて入れ、切替タグなしで積んだ位置に出す
             -- yield 直後の act:surface(…) など、1 回の出力の先頭に積むと起きる
+            if not current_actor_token then
+                current_actor_token = { type = "actor", actor = nil, tokens = {} }
+                table.insert(result, current_actor_token)
+                current_actor = nil
+            end
+            table.insert(current_actor_token.tokens, token)
         end
     end
 

@@ -690,3 +690,169 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
         expect(result):toBe(act)
     end)
 end)
+
+-- ============================================================================
+-- act-token-grouping-fix: さくらスクリプトのバイト比較
+-- 先頭（と clear_spot の後、発言より前）の表示制御はアクター未指定として積んだ位置に出る。
+-- clear_spot は現在のグループを閉じる。set_spot（spot）はグループを閉じない。
+-- 前提: 既定サーフェスを持たないアクター（さくら＝立ち位置 0、うにゅう＝立ち位置 1）。
+-- 本文は句読点を含めない（ウェイト挿入を避ける）。
+-- ============================================================================
+
+--- STORE.actor_spots・STORE.appearance を初期化し、act と さくら・うにゅう を返す
+--- @param sakura_surface number|nil さくらの既定サーフェス（nil は持たない）
+local function new_bytes_act(sakura_surface)
+    local STORE = require("pasta.store")
+    STORE.reset()
+    STORE.actor_spots["さくら"] = 0
+    STORE.actor_spots["うにゅう"] = 1
+    local SHIORI_ACT = require("pasta.shiori.act")
+    local actors = {
+        ["さくら"] = { name = "さくら", surface = sakura_surface },
+        ["うにゅう"] = { name = "うにゅう" },
+    }
+    return SHIORI_ACT.new(actors), actors["さくら"], actors["うにゅう"], STORE
+end
+
+describe("SHIORI_ACT - 先頭の表示制御のバイト比較 (act-token-grouping-fix)", function()
+    test("1: yield の区切りの後に積んだ wait は切替タグの前に出る", function()
+        local act, sakura, _, STORE = new_bytes_act()
+        act:talk(sakura, "X")
+        expect(act:build()):toBe("\\p[0]X\\e") -- yield が呼ぶ区切り
+        act:wait(500)
+        act:talk(sakura, "A")
+        expect(act:build()):toBe("\\_w[500]\\p[0]A\\e")
+        STORE.reset()
+    end)
+
+    test("2: シーン冒頭の表示制御は積んだ順に切替タグなしで出る", function()
+        local act, sakura, _, STORE = new_bytes_act()
+        act:surface(5)
+        act:wait(500)
+        act:newline()
+        act:clear()
+        act:choice("t", "d")
+        act:choice_timeout(30)
+        act:talk(sakura, "A")
+        expect(act:build()):toBe("\\s[5]\\_w[500]\\n\\c\\![*]\\q[d,t]\\![set,choicetimeout,30000]\\p[0]A\\e")
+        STORE.reset()
+    end)
+
+    test("3: 発言の無い出力でも wait が出る", function()
+        local act, _, _, STORE = new_bytes_act()
+        act:wait(1000)
+        expect(act:build()):toBe("\\_w[1000]\\e")
+        STORE.reset()
+    end)
+
+    test("4: GLOBAL.close_ghost（ゴースト終了）は wait と \\- を出す", function()
+        local act, _, _, STORE = new_bytes_act()
+        require("pasta.shiori.entry") -- GLOBAL.close_ghost を定義する
+        local GLOBAL = require("pasta.global")
+        GLOBAL.close_ghost(act, 1500)
+        expect(act:build()):toBe("\\_w[1500]\\-\\e")
+        STORE.reset()
+    end)
+
+    test("5: raw_script と wait が混在しても積んだ位置に出る", function()
+        local act, sakura, _, STORE = new_bytes_act()
+        act:raw_script("\\![x]")
+        act:wait(100)
+        act:raw_script("\\![y]")
+        act:talk(sakura, "A")
+        expect(act:build()):toBe("\\![x]\\_w[100]\\![y]\\p[0]A\\e")
+        STORE.reset()
+    end)
+
+    test("6: 先頭の surface はさくらのサーフェスとして記録されず既定サーフェスを復旧する", function()
+        local act, sakura, _, STORE = new_bytes_act(0)
+        act:surface(5)
+        act:talk(sakura, "A")
+        expect(act:build()):toBe("\\s[5]\\p[0]\\s[0]A\\e")
+        local rec = STORE.appearance.actors["さくら"]
+        expect(rec == nil or rec.surface ~= "5"):toBe(true)
+        STORE.reset()
+    end)
+
+    test("7: 6 の続きの出力で同じアクターが同じスポットで続くと復旧タグは出ない", function()
+        local act, sakura, _, STORE = new_bytes_act(0)
+        act:surface(5)
+        act:talk(sakura, "A")
+        expect(act:build()):toBe("\\s[5]\\p[0]\\s[0]A\\e")
+        act:surface(5)
+        act:talk(sakura, "B")
+        expect(act:build()):toBe("\\s[5]\\p[0]B\\e")
+        local rec = STORE.appearance.actors["さくら"]
+        expect(rec == nil or rec.surface ~= "5"):toBe(true)
+        STORE.reset()
+    end)
+end)
+
+describe("SHIORI_ACT - clear_spot を挟む出力のバイト比較 (act-token-grouping-fix)", function()
+    test("8: clear_spot の後の同じ発言者の発言は切替タグの後に出る", function()
+        local act, sakura, _, STORE = new_bytes_act()
+        act:talk(sakura, "A")
+        act:clear_spot()
+        act:set_spot("さくら", 0)
+        act:set_spot("うにゅう", 1)
+        act:talk(sakura, "B")
+        expect(act:build()):toBe("\\p[0]A\\p[0]B\\e")
+        STORE.reset()
+    end)
+
+    test("9: clear_spot の後の立ち位置の入れ替えが発言に効く", function()
+        local act, sakura, _, STORE = new_bytes_act()
+        act:talk(sakura, "A")
+        act:clear_spot()
+        act:set_spot("うにゅう", 0)
+        act:set_spot("さくら", 1)
+        act:talk(sakura, "B")
+        expect(act:build()):toBe("\\p[0]A\\p[1]B\\e")
+        STORE.reset()
+    end)
+
+    test("10: clear_spot の後に発言者が変わる", function()
+        local act, sakura, kero, STORE = new_bytes_act()
+        act:talk(sakura, "A")
+        act:clear_spot()
+        act:set_spot("さくら", 0)
+        act:set_spot("うにゅう", 1)
+        act:talk(kero, "B")
+        expect(act:build()):toBe("\\p[0]A\\p[1]B\\e")
+        STORE.reset()
+    end)
+
+    test("11: clear_spot の後は段落区切りの判定を持ち越さない", function()
+        local act, sakura, kero, STORE = new_bytes_act()
+        act:talk(sakura, "A")
+        act:talk(kero, "B")
+        act:talk(sakura, "C")
+        act:clear_spot()
+        act:set_spot("さくら", 0)
+        act:set_spot("うにゅう", 1)
+        act:talk(sakura, "D")
+        expect(act:build()):toBe("\\p[0]A\\p[1]B\\p[0]\\n[150]C\\p[0]D\\e")
+        STORE.reset()
+    end)
+
+    test("12: clear_spot の後、発言より前の wait は切替タグの前に出る", function()
+        local act, sakura, _, STORE = new_bytes_act()
+        act:talk(sakura, "A")
+        act:clear_spot()
+        act:set_spot("さくら", 0)
+        act:set_spot("うにゅう", 1)
+        act:wait(300)
+        act:talk(sakura, "B")
+        expect(act:build()):toBe("\\p[0]A\\_w[300]\\p[0]B\\e")
+        STORE.reset()
+    end)
+
+    test("13: set_spot 単独はグループを閉じない", function()
+        local act, sakura, _, STORE = new_bytes_act()
+        act:talk(sakura, "A")
+        act:set_spot("さくら", 1)
+        act:talk(sakura, "B")
+        expect(act:build()):toBe("\\p[0]AB\\e")
+        STORE.reset()
+    end)
+end)
