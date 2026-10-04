@@ -236,3 +236,148 @@ describe("act:actor_proxy - 未登録アクター", function()
         end)
     end)
 end)
+
+-- act:arith: 算術式の生成コードが呼ぶ数値の二項演算（数値にできない被演算子は値なし＋警告）
+local NATIVE_OPS = {
+    ["+"] = function(a, b) return a + b end,
+    ["-"] = function(a, b) return a - b end,
+    ["*"] = function(a, b) return a * b end,
+    ["/"] = function(a, b) return a / b end,
+    ["%"] = function(a, b) return a % b end,
+}
+
+--- 変更前の生成コード（Lua のネイティブ演算）の結果。エラーなら ok=false
+local function native(op, a, b)
+    return pcall(NATIVE_OPS[op], a, b)
+end
+
+describe("act:arith - 数値にできる被演算子（ネイティブ演算と同じ結果）", function()
+    test("数値・数値文字列・「1」＋2・負数の剰余・0 除算がネイティブ演算と一致し、警告なし", function()
+        with_captured_act(function(ACT, warns)
+            local act = ACT.new({})
+            local cases = {
+                { "+", 1, 2 }, { "-", 1, 2 }, { "*", 3, 4 }, { "/", 7, 2 }, { "%", 7, 3 },
+                { "/", 1, 3 }, { "+", "1", 2 }, { "+", 1, "2" }, { "*", "1.5", "2" },
+                { "%", -7, 3 }, { "%", 7, -3 }, { "%", -7.5, 2 },
+                { "/", 1, 0 }, { "/", -1, 0 }, { "%", 5, 0 }, { "/", 0, 0 },
+            }
+            for _, c in ipairs(cases) do
+                local op, a, b = c[1], c[2], c[3]
+                local ok, want = native(op, a, b)
+                expect(ok):toBe(true)
+                local got = act:arith(op, a, b)
+                if want ~= want then
+                    expect(got ~= got):toBe(true)
+                else
+                    expect(got):toBe(want)
+                end
+            end
+            expect(act:arith("+", "1", 2)):toBe(3)
+            expect(act:arith("/", 1, 2)):toBe(0.5)
+            expect(#warns):toBe(0)
+        end)
+    end)
+
+    test("文字列の数値化の範囲が変更前の暗黙変換と一致する（16 進・指数・空白・全角・空文字列）", function()
+        with_captured_act(function(ACT, warns)
+            local act = ACT.new({})
+            local inputs = {
+                "0x10", "0XfF", "1e2", "1E-1", "2.5e+1", " 1 ", "\t2\n", "  3", "4  ",
+                "-3", "+3", ".5", "5.", "１２", "１", "", "   ", "abc", "1a", "0x", "1e", "1 2",
+            }
+            for _, s in ipairs(inputs) do
+                local ok, want = native("+", s, 0)
+                local before = #warns
+                local got = act:arith("+", s, 0)
+                if ok then
+                    expect(got):toBe(want)
+                    expect(#warns):toBe(before)
+                else
+                    expect(got):toBeNil()
+                    expect(#warns):toBe(before + 1)
+                end
+            end
+            -- 全角数字・空文字列は変換しない（3.7）
+            expect(act:arith("+", "１２", 0)):toBeNil()
+            expect(act:arith("+", "", 0)):toBeNil()
+            expect(act:arith("+", "0x10", 0)):toBe(16)
+            expect(act:arith("+", " 1 ", 0)):toBe(1)
+            expect(act:arith("+", "1e2", 0)):toBe(100)
+        end)
+    end)
+end)
+
+describe("act:arith - 数値にできない被演算子", function()
+    test("説明ありの nil は値なし＋演算子と説明を含む警告", function()
+        with_captured_act(function(ACT, warns)
+            local act = ACT.new({})
+            expect(act:arith("+", nil, 1, "var.x")):toBeNil()
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe("act:arith - operand is not a number: op='+', operand='var.x', value=nil")
+        end)
+    end)
+
+    test("説明なしの非数値文字列は値なし＋値と種類を含む警告（文字列どうしの＋は連結しない）", function()
+        with_captured_act(function(ACT, warns)
+            local act = ACT.new({})
+            expect(act:arith("+", "a", 1)):toBeNil()
+            expect(warns[1]):toBe("act:arith - operand is not a number: op='+', value='a' (string)")
+            expect(act:arith("+", "a", "b")):toBeNil()
+            expect(#warns):toBe(3)
+            expect(warns[2]):toBe("act:arith - operand is not a number: op='+', value='a' (string)")
+            expect(warns[3]):toBe("act:arith - operand is not a number: op='+', value='b' (string)")
+        end)
+    end)
+
+    test("真偽値・全角数字は値なし＋警告、説明ありなら説明と値を含む", function()
+        with_captured_act(function(ACT, warns)
+            local act = ACT.new({})
+            expect(act:arith("*", 2, true)):toBeNil()
+            expect(warns[1]):toBe("act:arith - operand is not a number: op='*', value=true (boolean)")
+            expect(act:arith("-", "１２", 1, "var.y")):toBeNil()
+            expect(warns[2]):toBe("act:arith - operand is not a number: op='-', operand='var.y', value='１２' (string)")
+            expect(#warns):toBe(2)
+        end)
+    end)
+
+    test("テーブルは数値にできない扱いで、メタメソッドを呼ばない", function()
+        with_captured_act(function(ACT, warns)
+            local act = ACT.new({})
+            local called = false
+            local mt = {
+                __add = function() called = true; return 1 end,
+                __tostring = function() called = true; return "x" end,
+            }
+            local t = setmetatable({}, mt)
+            expect(act:arith("+", t, 1)):toBeNil()
+            expect(called):toBe(false)
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe("act:arith - operand is not a number: op='+', value=(table)")
+        end)
+    end)
+
+    test("入れ子で内側が失敗すると外側は値なし＋追加の警告なし", function()
+        with_captured_act(function(ACT, warns)
+            local act = ACT.new({})
+            -- （＄x＋1）＊2 ／ 1＋2＊＄y
+            expect(act:arith("*", (act:arith("+", nil, 1, "var.x")), 2)):toBeNil()
+            expect(#warns):toBe(1)
+            expect(act:arith("+", 1, act:arith("*", 2, nil, nil, "var.y"))):toBeNil()
+            expect(#warns):toBe(2)
+            expect(warns[2]):toBe("act:arith - operand is not a number: op='*', operand='var.y', value=nil")
+        end)
+    end)
+
+    test("未知の演算子は警告して値なし、act の状態に触れない", function()
+        with_captured_act(function(ACT, warns)
+            local act = ACT.new({})
+            local keys_before = own_keys(act)
+            expect(act:arith("^", 2, 3)):toBeNil()
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe("act:arith - unknown operator: op='^'")
+            expect(act:arith("+", 1, 2)):toBe(3)
+            expect(#act.token):toBe(0)
+            expect(own_keys(act)):toBe(keys_before)
+        end)
+    end)
+end)
