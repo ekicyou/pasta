@@ -94,9 +94,9 @@
 | CONFIG.actor→STORE.actors初期化       | `config_actors_initialization_test.rs`                            | ✅ 完了 | 8テスト（pasta.tomlアクター設定）                                |
 | SHIORIレスポンスビルダー              | `shiori_res_test.rs`                                              | ✅ 完了 | 14テスト                                                         |
 | SHIORIイベントディスパッチ            | `shiori_event_dispatch_test.rs`<br>`shiori_event_handler_test.rs` | ✅ 完了 | 27テスト（2ファイルに分割）                                      |
-| SHIORI_ACT さくらスクリプト生成       | `shiori_act_test.lua`                                             | ✅ 完了 | 43テスト（日時転記 transfer_date_to_var 6テストを含むファイル全体実測 — 旧 47＋7 の二重計上を是正） |
+| SHIORI_ACT さくらスクリプト生成       | `shiori_act_test.lua`                                             | ✅ 完了 | 58テスト（ファイル全体実測。act-token-grouping-fix のバイト比較 13 件を含む） |
 | ACT トークンバッファ（親クラス）      | `act_test.lua`                                                    | ✅ 完了 | 37テスト（act-token-buffer-refactor、未登録アクターの set_spot 無視を追加）                            |
-| ACT トークングループ化                | `act_grouping_test.lua`                                           | ✅ 完了 | 25テスト（actor-talk-grouping、sakura_script grouping追加）      |
+| ACT トークングループ化                | `act_grouping_test.lua`                                           | ✅ 完了 | 29テスト（actor-talk-grouping、sakura_script grouping、act-token-grouping-fix のグループの開閉 4 件） |
 | sakura_builder トークン変換           | `sakura_builder_test.lua`                                         | ✅ 完了 | 52テスト（ファイル全体実測 — スポット/sakura_script/choice/string-buffer 系を含む） |
 | RuntimeConfig libs配列                | `runtime_test.rs`（外部化）                                       | ✅ 完了 | 17テスト（外部化済み）                                           |
 | LuaConfig TOML設定                    | `loader_config_test.rs`（外部化）                                 | ✅ 完了 | 6テスト（外部化済み）                                            |
