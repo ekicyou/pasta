@@ -2,7 +2,7 @@
 
 ## Summary
 - **Feature**: `callback-resume-unification`
-- **Discovery Scope**: Extension（既存のイベント配送・コールバック管理の修正。新しい外部依存なし）
+- **Discovery Scope**: Extension（既存のイベント配送・コールバック管理の修正。新しい外部依存なし）。設計フェーズでは light discovery を行い、結果を「設計フェーズの追加調査」と Design Decisions に追記した
 - **Key Findings**:
   - 通常イベントの再開経路（`resume_until_valid` → `consume_staged` → `set_co_scene`）は `event/init.lua` のローカル関数として完結しており、`callback.lua` の `try_route`・`sweep` はそのどれも通らない。再開経路を共有できる形にすることが修正の中心。
   - 4 つの不具合のうち、タイムアウトの二重包みと U23 は同じ 1 箇所（`EVENT.fire` の「文字列は常に `RES.ok`」分岐）に根がある。U23 の方式（素通し or 設計どおり）を決めると、タイムアウト応答の直し方もほぼ決まる。
@@ -117,9 +117,25 @@ U23（Q3）の方式は上の 3 案と直交する。
 
 ### Decision: 再開経路の一本化の形（設計フェーズで決定）
 - **Context**: Requirement 1・2。
-- **Alternatives Considered**: 上表 A / B / C。
-- **Selected Approach**: 未決（情報提供のみ）。
-- **Follow-up**: Q2（掃引の出力）が決まると A/C の選択が絞れる。
+- **Alternatives Considered**: 上表 A / B / C。B の置き場所として (B1) `init.lua` に置き `callback.lua` が呼び出し時に `require` する、(B2) `resume_until_valid`・`set_co_scene` ごと `callback.lua` へ移す、(B3) `event/` に新しい小モジュールを作る。
+- **Selected Approach**: B1。`init.lua` に `EVENT.drive(co, act, ...)`（`resume_until_valid` → `consume_staged` → `set_co_scene`、戻り値は `ok, value`）を置き、`EVENT.fire`・`try_route`・`sweep` の 3 箇所が呼ぶ。`try_route`・`sweep` の戻り値の型（応答文字列または `nil`）は変えない。
+- **Rationale**: 掃引の結果をハンドラの戻り値で運ぶ（次の Decision）ため、`callback.lua` から再開の手順へ届く経路はどのみち要る。そうなると `try_route` だけを A にする利点が無く、契約とテストが変わるだけになる。B2 は依存の向きがきれいだが、テスト群の読み直しと衝突する（下の「設計フェーズの追加調査」）。B3 は `drive` が `consume_staged` を呼び、`sweep` が `drive` を呼ぶため、モジュールを分けても循環は消えない。
+- **Trade-offs**: `callback.lua` → `pasta.shiori.event` の逆向きの依存が、呼び出し時の `require` として 1 つ増える。同じ書き方は `EVENT.no_entry`・`virtual_dispatcher.lua`・`kick.lua` に既にある。
+- **Follow-up**: `callback_module_test.lua` の読み直し補助関数に `pasta.shiori.event` を加える。
+
+### Decision: 掃引の結果を `EVENT.fire` へ運ぶ形（設計フェーズで決定）
+- **Context**: Requirement 2.6・2.7・3.1。`REG.OnSecondChange` は利用者が上書き・ラップできる。
+- **Alternatives Considered**: (1) 掃引が SHIORI 応答の全文を作り、ハンドラの戻り値（文字列）で返す。(2) ハンドラが「駆動してほしい待機の一覧」という新しい型を返し、`EVENT.fire` が駆動する。(3) 掃引を既定ハンドラから `EVENT.fire` へ移す。
+- **Selected Approach**: (1)。出力は `RES.ok`、理由付きタイムアウトは `RES.err(entry.on_timeout)`。`EVENT.fire` の `SHIORI/` 接頭辞の素通しで、その回の応答になる。
+- **Rationale**: ハンドラの戻り値の型を増やさず、`second_change.lua` のコードも変わらない。既定ハンドラを変数に取って呼ぶ使い方がそのまま動く。(3) は「`REG.OnSecondChange` を上書きすると掃引が止まる」という、マニュアルに書かれた既存の規則を変える。
+- **Trade-offs**: 掃引の中で応答の文字列まで作るため、`callback.lua` は `RES` に依存し続ける（現行と同じ）。
+
+### Decision: `STORE.co_callback` の印（設計フェーズで決定）
+- **Context**: 一本化の後、`consume_staged` と `set_co_scene` は必ず `EVENT.drive` の中で続けて呼ばれる。
+- **Alternatives Considered**: 残す / 削除して `consume_staged` の戻り値で分岐する。
+- **Selected Approach**: 残す。
+- **Rationale**: 印の説明は `pasta/store.lua` のコメント（Wave 1 の編集範囲の外）にあり、削除すると食い違う記述が範囲外に残る。削除しても挙動は変わらない。一本化だけで「`try_route` の経路で印が残る」現象は消える。
+- **Follow-up**: 範囲外のコメント修正を許すかどうかを設計ディスカッションで確認する。許すなら削除できる。
 
 ### Decision: U23 の方式（要件ディスカッションで決定）
 - **Context**: Requirement 3・4、未決 Q3。
@@ -139,10 +155,29 @@ U23（Q3）の方式は上の 3 案と直交する。
 - `LuaJIT 2.1` に `coroutine.close` が無い — 破棄は参照を外して GC に任せる既存方針を踏襲する（`set_co_scene` のコメントどおり）。
 - 並走条件（Wave 1）: `pasta/act.lua`・`pasta/shiori/act.lua`・`choice_select.lua` を触らずに済むことを設計で確認する。`crates/pasta_shiori/tests/async_callback_chain_test.rs` の更新可否は Q4。
 
-## Research Needed（設計フェーズへ持ち越し）
-- OnSecondChange の既定ハンドラ（利用者が上書き・ラップしうる）から、掃引で再開した結果を `EVENT.fire` へ渡す形（戻り値の型を増やすか、掃引内で応答まで作るか）。マニュアルの「既定ハンドラを変数に取っておき、上書きしたハンドラから呼び出す」パターンが引き続き動くこと。
-- 掃引で再開したシーンが中断したとき、その回に OnTalk の判定が走ると同じ継続を二重に配信しないか（Q2 の仮定では仮想イベントを発行しないので回避されるが、代案 (b) では要確認）。
-- `STORE.co_callback` の印を一本化後も必要とするか（`set_co_scene` の分岐を単純化できる可能性）。`internal-modules.md` の STORE 表の記述と連動。
+## 設計フェーズの追加調査（2026-10-04）
+
+### テストのモジュール読み直しと `STORE` の取り違え
+- **Context**: `set_co_scene` をどのモジュールに置くかの判断材料。
+- **Sources Consulted**: `crates/pasta_lua/tests/lua_specs/` の `event_coroutine_test.lua`・`global_chaintalk_integration_test.lua`・`global_fallback_integration_test.lua`・`integration_coroutine_test.lua`・`callback_module_test.lua`・`get_property_test.lua` の読み直し補助関数。
+- **Findings**:
+  - `EVENT.fire` を検査するスイートは `pasta.store` と `pasta.shiori.event` を `package.loaded` から外すが、`pasta.shiori.event.callback` は外さない。`callback.lua` は古い `STORE` を持ち続ける（現行は印の読み書きだけなので害が無い）。
+  - `callback_module_test.lua`・`get_property_test.lua` は逆に `callback` と `store` だけを外す。`get_property_test.lua` は `try_route`・`sweep` を呼ばない。
+- **Implications**: `set_co_scene` を `callback.lua` へ移す（B2）と、`STORE.co_scene` の書き込み先が古い `STORE` になり、`EVENT.fire` を検査する複数のスイートが壊れる。`init.lua` に置いたまま（B1）なら、直すのは `callback_module_test.lua` の補助関数 1 箇所で済む。
+
+### 編集範囲と `STORE.co_callback`
+- **Findings**: `pasta/store.lua` 21 行・77–79 行のコメントが印の持ち主（`consume_staged` が書き、`set_co_scene` と `CALLBACK.reset` が戻す）を説明している。`store.lua` は `event/` の外。B1 かつ印を残す場合、このコメントは一本化の後も正しいままである。
+
+### 掃引の応答の候補と順序
+- **Findings**:
+  - 理由付きの待機は `get_property` が `error(reason)` を投げるため、`EVENT.drive` は `ok=false` を返す。応答は保持していた `entry.on_timeout` から作る（Q6）。
+  - 再度の `get_property` で中断した場合の出力は get タグであり、応答としてベースウェアへ届かなければコールバックは来ない。2.7 の「残りの出力は捨てる」に従うと、2 番目以降の待機の get タグは捨てられ、その待機は次の期限でタイムアウトする（設計の Open Questions 3）。
+  - テストは番号を持たないイベント名（`OnPastaCallBackEntryTimeout` など）を `pending` に直接入れる。並べ替えは、番号の無い名前を末尾（文字列順）に置く全順序にする。
+
+### 設計の統合（Synthesis）
+- **Generalization**: 4 つの不具合のうち 2 つ（継続の消失・掃引の予約の残留）は「再開の手順を通らない」という同じ問題で、`EVENT.drive` の 1 箇所で直る。残りの 2 つ（タイムアウトの二重包み・U23）は「文字列を常に包む」という同じ問題で、接頭辞の判定 1 つで直る。
+- **Build vs. Adopt**: 新しい部品は作らない。`resume_until_valid`・`set_co_scene`・`consume_staged`・`RES.*` を中身を変えずに使う。
+- **Simplification**: 新しいモジュール、ハンドラの新しい戻り値の型、`pending` のエントリへの項目の追加（登録順の番号など）はどれも採らない。順序はイベント名の番号から得る。印の削除と、予約を捨てる関数の追加は、要件に無いため見送る。
 
 ## References
 - `.kiro/specs/callback-resume-unification/brief.md` — 問題・方針・スコープ
