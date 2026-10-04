@@ -58,6 +58,7 @@
 | finalize_scene処理         | `finalize_scene_test.rs`                                         | ✅ 完了 | シーン初期化                |
 | SCENE.search() API         | `scene_search_test.rs`                                           | ✅ 完了 | 14テスト                    |
 | Registry境界回帰テスト     | `scene_registry.rs`<br>`word_registry.rs`<br>`scene_table_candidate_tests.rs`<br>`scene_table_resolve_filter_tests.rs`<br>`word_table_test.rs`<br>`random.rs`<br>`error.rs`（各内テスト） | ✅ 完了 | 38テスト（merge_from/register_global_raw/解決境界/セレクタ契約/エラー表示文言） |
+| 記号を含む名前の照合       | `search/context.rs`（インライン）<br>`symbol_name_search_test.rs` | ✅ 完了 | 登録と検索が同じ照合規則を共有（単体8＋結合10。Call・SCENE.search・SHIORI応答・選択肢・アクター単語） |
 
 ### 2.3 Transpiler層テスト（Lua変換）
 
