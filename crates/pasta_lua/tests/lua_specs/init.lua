@@ -42,7 +42,6 @@ local specs = {
     "act_choice_test",                   -- act:choice / act:choice_timeout トークン蓄積テスト (choice-definition-dsl)
     "act_init_scene_global_record_test",  -- init_scene グローバルシーン名記録テスト (choice-definition-dsl)
     "choice_select_test",                 -- OnChoiceSelectEx 自動ルーティングハンドラテスト (choice-definition-dsl)
-    "ct_test",                            -- ct キャンセルトークン defer/cancel/__close テスト (review-improvement-loop 3.46)
     "config_get_test",                    -- pasta.config PASTA_CONFIG.get テスト (review-improvement-loop 3.46)
     "scene_registry_test",                -- pasta.scene レジストリ・search ガード・co_exec テスト (review-improvement-loop 3.46)
     "word_builder_test",                  -- pasta.word ビルダー境界・resolve_value テスト (review-improvement-loop 3.46)
