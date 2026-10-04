@@ -35,7 +35,7 @@
 - `crates/pasta_lua/pasta_scripts/pasta/act.lua`・`pasta/shiori/act.lua`・`crates/pasta_lua/src/**/element_gen.rs`（`dsl-codegen-runtime-safety` が持つ）。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`。
 - `event/` ディレクトリの外のソース（`pasta/store.lua`・`pasta/shiori/res.lua`・`pasta/shiori/entry.lua` を含む）。コメントも変えない。
-- `CALLBACK.stage_pending`・`consume_staged`・`next_event_id`・`reset` の契約。
+- `CALLBACK.stage_pending`・`consume_staged`・`next_event_id`・`reset` の契約（変えない。`CALLBACK.discard_staged` を新しく足すだけである）。
 
 ### Allowed Dependencies
 - `event/init.lua` → `event/callback.lua`・`event/register.lua`・`pasta.shiori.res`・`pasta.store`（現行どおり、読み込み時の `require`）。
@@ -85,7 +85,7 @@ graph TB
 - **Selected pattern**: 共通の駆動ルーチン（research.md のオプション B）。再開の手順を `EVENT.drive` の 1 箇所に置き、`EVENT.fire`・`try_route`・`sweep` が呼ぶ。
 - **責務の分け方**: `init.lua` は「再開の手順と継続（`STORE.co_scene`）の更新」「戻り値の応答化」を持つ。`callback.lua` は「待機の表（`pending`）と予約（`_staged`）」「待機の取り出し（一致・期限切れ）と、取り出した待機の応答化」を持つ。
 - **保つ既存パターン**: `resume_until_valid`・`set_co_scene`・`consume_staged` の中身、`try_route`・`sweep` の戻り値の型、`second_change.lua` のコードの形、呼び出し時の `require` による循環の回避（`EVENT.no_entry`・`virtual_dispatcher.lua` と同じ書き方）。
-- **新しい要素**: 公開関数 `EVENT.drive` 1 つ。新しいモジュールは作らない。
+- **新しい要素**: 公開関数 `EVENT.drive` と `CALLBACK.discard_staged`。新しいモジュールは作らない。
 
 ### 設計判断
 
@@ -119,7 +119,7 @@ graph TB
 
 ### Modified Files — ソース（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/`）
 - `init.lua` — `EVENT.drive` を追加する。`EVENT.fire` のコルーチン分岐を `EVENT.drive` の呼び出しに置き換える。文字列分岐に `SHIORI/` 接頭辞の素通しを足す。冒頭の doc コメント（戻り値の規則・使用例）を改める。
-- `callback.lua` — `try_route` の再開を `EVENT.drive` に置き換える。`sweep` を「集める → 外す → 並べる → 順に `EVENT.drive`」に書き換える。モジュールと各関数の doc コメントを改める。
+- `callback.lua` — `try_route` の再開を `EVENT.drive` に置き換える。`sweep` を「集める → 外す → 並べる → 順に `EVENT.drive`」に書き換える。`discard_staged` を追加する。モジュールと各関数の doc コメントを改める。
 - `second_change.lua` — コードは変えない。doc コメント（戻り値の説明）を改める。
 - `register.lua` — コードは変えない。doc コメント（ハンドラの戻り値の規則と使用例）を改める。
 
@@ -146,7 +146,8 @@ graph TB
 flowchart TB
     Start[drive co act args] --> Resume[resume_until_valid]
     Resume --> Failed{error}
-    Failed -->|yes| ClearErr[set_co_scene with dead co]
+    Failed -->|yes| Discard[discard_staged]
+    Discard --> ClearErr[set_co_scene with dead co]
     ClearErr --> RetErr[return false and error]
     Failed -->|no| Consume[consume_staged co act]
     Consume --> SetCo[set_co_scene co]
@@ -204,7 +205,7 @@ sequenceDiagram
 | 2.1 | 期限切れを漏れなく 1 回ずつ処理 | sweep | `CALLBACK.sweep` | 掃引 |
 | 2.2 | 再予約を待機に登録 | sweep・drive | `EVENT.drive` | 掃引 |
 | 2.3 | 処理中に登録された待機は次回以降 | sweep | 収集を再開より前に行う | 掃引 |
-| 2.4 | 後続のイベントに影響しない | sweep・drive | 予約を必ず消費する | 掃引 |
+| 2.4 | 後続のイベントに影響しない | sweep・drive | 予約を必ず消費する。エラー時は `discard_staged` で捨てる | 掃引 |
 | 2.5 | 出力付きの中断を継続に保存 | sweep・drive | `EVENT.drive` | 掃引 |
 | 2.6 | 出力をその回の応答にし、仮想イベントは出さない | sweep・second_change・fire | `RES.ok` → 素通し | 掃引 |
 | 2.7 | 登録順・最初の応答を採用・残りは警告して捨てる | sweep | 番号の昇順 | 掃引 |
@@ -282,7 +283,7 @@ function EVENT.drive(co, act, ...)
 
 - Preconditions: `co` は suspended。`co` は `CALLBACK.pending` に入っていない（呼び出し元が先に外す）。
 - Postconditions（`ok=true`）: 予約は消費済み。`co` は「`pending` に登録」「`STORE.co_scene` に保存」「どこにも無い（dead）」のどれか 1 つ。`STORE.co_callback` は `nil`。
-- Postconditions（`ok=false`）: `co` は dead でどこにも残らない。`STORE.co_scene` は `nil`（通常のイベントのエラーと同じ）。
+- Postconditions（`ok=false`）: `co` は dead でどこにも残らない。予約は残らない（`CALLBACK.discard_staged` で捨てる）。`STORE.co_scene` は `nil`（通常のイベントのエラーと同じ）。
 - Invariants: 最初の resume 以外は引数なしで再開する（現行の `resume_until_valid`）。
 
 ##### State Management
@@ -292,7 +293,7 @@ function EVENT.drive(co, act, ...)
 
 **Implementation Notes**
 - Integration: `EVENT._resume_until_valid`（テスト用の公開）は現行のまま残す。
-- Risks: シーンが `stage_pending` の後、中断の前にエラーで終わると予約が残る。これは現行の `EVENT.fire` にもある経路で、`get_property` の中（`act.lua`）でしか起きないため、本設計では扱わない（Open Questions 1）。
+- 予約の掃除: シーンが `stage_pending` の後、中断の前にエラーで終わると予約だけが残る（`get_property` の内部でエラーが出たときに限る）。`EVENT.drive` は失敗の経路で `CALLBACK.discard_staged()` を呼び、残った予約を捨てる。3 つの呼び出し元すべてに 1 か所で効く（2.4、設計ディスカッション #2 で決定）。
 
 #### EVENT.fire
 
@@ -343,6 +344,14 @@ function CALLBACK.try_route(req)
 - 再開は `EVENT.drive(entry.co, entry.act, refs)` に置き換える。`ok=false` なら `error(value)`（`SHIORI.request` の `xpcall` が 500 にする）。`ok=true` なら `RES.ok(value)`。
 - 自前の `consume_staged` の呼び出しは無くなる（`EVENT.drive` が行う）。
 
+#### CALLBACK.discard_staged
+
+```lua
+--- 消費されていない予約を捨てる（予約が無ければ何もしない）
+function CALLBACK.discard_staged()
+```
+- `EVENT.drive` の失敗の経路だけが呼ぶ。`_staged` を `nil` にするだけで、`pending`・`STORE` には触れない。
+
 #### CALLBACK.sweep
 
 | Field | Detail |
@@ -384,7 +393,7 @@ function CALLBACK.sweep(now)
 **Implementation Notes**
 - Integration: `EVENT` は関数の中で `require("pasta.shiori.event")` して得る（読み込み時に `require` しない）。
 - Validation: 応答を捨てた待機も、`EVENT.drive` を通っているため、予約と継続は規則どおりに更新されている。
-- Risks: 2 番目以降の待機が「再度の `get_property`」で中断した場合、その出力（get タグ）は捨てられるため、その待機は結果が届かず次の期限でタイムアウトする（Open Questions 3）。
+- Risks: 2 番目以降の待機が「再度の `get_property`」で中断した場合、その出力（get タグ）は捨てられるため、その待機は結果が届かず次の期限でタイムアウトする（Open Questions 2）。
 
 ### 定期イベント（`second_change.lua`）
 
@@ -432,6 +441,7 @@ function CALLBACK.sweep(now)
 4. エラーで終わる待機と続行: 1 つ目がエラーで終わっても 2 つ目が処理される（2.9）。警告ログにイベント名と理由が出る（3.3）。
 5. 遅れて届いた結果: 掃引済みのイベント名で `try_route` が `nil` を返す（2.8）。一致しない名前も `nil`（1.6）。
 6. `try_route` のエラー: 再開したシーンがエラーなら `error` が伝わり、`pending` にも `STORE.co_scene` にも残らない（1.5）。
+7. 予約の掃除: 予約（`stage_pending`）の後、中断せずにエラーで終わるコルーチンを `EVENT.fire` で動かす。その後にコルーチンを返す別のイベントを送っても、そのシーンが古いイベント名で `pending` に登録されず、`stage_pending` が「multiple staging」にならない（2.4）。
 
 読み直しの補助関数（`reload_callback_modules`）に `package.loaded["pasta.shiori.event"] = nil` を加える。`callback.lua` が呼び出し時に `require` する `EVENT` が、読み直した `CALLBACK`・`STORE` を使うようにするためである。 `callback.lua` を使う他の Lua スイート（`shiori_entry_test.lua`・`second_change_thread_test.lua` など）も、読み直すモジュールの組が `EVENT`・`CALLBACK`・`STORE` でそろっているかを実装時に確かめ、そろっていなければ同じ行を足す。
 
@@ -476,14 +486,14 @@ function CALLBACK.sweep(now)
 - **コールバック・掃引のシーンのエラーで既存の継続も空になる**（Error Handling）。要件ディスカッションで決めた「通常のイベントと同じ規則」（1.7・1.8）の帰結であり、現行からの挙動の変化として記録する。
 - **`RES.ok(…)` を返す既存テストは書き方を残し、検査だけ厳密にする**（Testing Strategy、6.4）。素通しにより正しい書き方になり、素通しの回帰テストを兼ねる。
 - **`EVENT.drive` は `init.lua` に置き、`callback.lua` は呼び出し時の `require` で使う**（Architecture › 設計判断 (a)、設計ディスカッション #1 で決定）。動かすコードとテストが最も少ない。再開の手順ごと `callback.lua` へ移す案と、`EVENT.fire` 側で駆動する案（オプション A）は採らない。
+- **予約したまま中断の前にエラーで終わったシーンの予約は、`EVENT.drive` の失敗の経路で捨てる**（EVENT.drive、設計ディスカッション #2 で決定）。要件 2.4 が禁じる現象であり、直す場所が共通の 1 か所で、編集範囲の中（`callback.lua`）で閉じる。
 
 ### 設計ディスカッションで確認する項目
 
 どれも、本設計では「採った案」で書いてある。
 
-1. **予約したまま中断の前にエラーで終わったシーンの予約**（EVENT.drive）。現行にもある経路で、`get_property` の中でしか起きない。採った案: 扱わない。代案: `EVENT.drive` の失敗時に予約を捨てる関数を `callback.lua` に足す。推奨: 扱わない（要件に無い）。
-2. **静かなタイムアウトで再開したシーンがエラーで終わったとき**（Error Handling）。採った案: 応答は作らず、警告ログだけ出す（3.5 の「500 応答を返さず」と 2.9 から）。代案: エラーの 1 行目を理由に 500 を返す。あわせて、理由付きの待機はシーンがどのエラーで終わっても理由に `timeout_message` を使う。推奨: 採った案。
-3. **複数の待機が同時にタイムアウトしたとき、2 番目以降の出力が get タグでも捨てる**（CALLBACK.sweep）。2.7 の決定どおりだが、捨てられた get タグの待機は必ず次の期限でタイムアウトする。代案: 応答の採用で get タグを優先する（規則が増える）。推奨: 2.7 のまま受け入れ、警告ログで分かるようにする。
+1. **静かなタイムアウトで再開したシーンがエラーで終わったとき**（Error Handling）。採った案: 応答は作らず、警告ログだけ出す（3.5 の「500 応答を返さず」と 2.9 から）。代案: エラーの 1 行目を理由に 500 を返す。あわせて、理由付きの待機はシーンがどのエラーで終わっても理由に `timeout_message` を使う。推奨: 採った案。
+2. **複数の待機が同時にタイムアウトしたとき、2 番目以降の出力が get タグでも捨てる**（CALLBACK.sweep）。2.7 の決定どおりだが、捨てられた get タグの待機は必ず次の期限でタイムアウトする。代案: 応答の採用で get タグを優先する（規則が増える）。推奨: 2.7 のまま受け入れ、警告ログで分かるようにする。
 
 リスク:
 - 掃引の出力は、ベースウェアの状態（トーク中など）を見ずにその回の応答になる。現行のタイムアウト 500 も同じ扱いであり、要件も条件を付けていないため、そのままとする。
