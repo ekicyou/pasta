@@ -98,7 +98,7 @@ graph LR
 | D7 | LSP の演算子の位置決め | 連鎖を平らにして左から 1 回走査する方式に置き換える | 見出しの例 `「合計」＆＄n＆「個」` が現行方式では誤って着色される。`「A＆B」＆＄x` の誤分割も同じ修正で消える |
 | D8 | 申し送りの置き場所 | マニュアル `call-jump.md` と `.kiro/specs/call-attribute-filter/brief.md` の Constraints | 下流 spec が要件定義で必ず読む場所 |
 
-D5・D7 は代替案との得失があり、「Open Questions」に挙げる。D4・D8 と警告の文面は、`act:arith` の前例と brief の指示から決まるため確定とする。
+D7 は代替案との得失があり、「Open Questions」に挙げる。D4・D8 と警告の文面は、`act:arith` の前例と brief の指示から決まるため確定とする。
 
 ### Technology Stack
 
@@ -418,7 +418,7 @@ act:concat(lhs, rhs, lhs_desc, rhs_desc)
 
 | ID | 対象の節 | 起草時の前提 | 代替案 |
 | -- | -------- | ------------ | ------ |
-| DQ-1 | File Structure Plan・Migration 1・D5 | 機能追加の前に式の生成を `expr_gen.rs` へ切り出す | (B) `element_gen.rs` にそのまま足す（差分は最小。761 行がさらに 40 行ほど増える）。(C) 切り出しを別 spec にする |
+| DQ-1（**確定**: 起草時の前提どおり先に切り出す。設計ディスカッション議題 1。Wave 2 は本 spec が `element_gen.rs` の持ち主で衝突が無く、移動だけの独立コミットで取り消せる） | File Structure Plan・Migration 1・D5 | 機能追加の前に式の生成を `expr_gen.rs` へ切り出す | (B) `element_gen.rs` にそのまま足す（差分は最小。761 行がさらに 40 行ほど増える）。(C) 切り出しを別 spec にする |
 | DQ-2 | LspChainTokens・D7 | LSP の連鎖の位置決めを置き換える（既存の算術の誤りも直る） | (B) `BinOp` の `match` に `＆` を 1 行足すだけ（`＆` は `＋` と同じ誤りを持つ。3 項以上の連結と `「A＆B」` で着色を誤る）。(C) 文字列リテラルを飛ばす修正だけ |
 | DQ-3（**確定**: 起草時の前提どおり。`act:arith` と同じ扱い。リポジトリ内の辞書・スクリプトに `concat` という名前の関数・アクターは無い） | ConcatRuntime・Docs・D4 | ヘルパー名は `concat`。`script-api.md` に `act:arith` と並べて載せる | (B) 内部設計の章だけに載せる（`＠concat` の検索への影響は別に注記が要る）。名前の代替: `join` など |
 | DQ-4（**確定**: 起草時の前提どおり。brief が「`call-attribute-filter` へ申し送る」と指示しており、下流が要件定義で必ず読む場所に置く） | Docs・D8 | 申し送りを `.kiro/specs/call-attribute-filter/brief.md` の Constraints に追記する（他 spec のファイルを編集する） | (B) マニュアル `call-jump.md` と本 spec の design だけに書き、下流の要件定義で拾う |
