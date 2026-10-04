@@ -107,3 +107,64 @@ fn test_count_mismatch_falls_back_to_single_token() {
     // 見つからない。落ちずに式全体を 1 トークンで出す。
     assert_eq!(rhs_tokens("＄％a(＋１"), vec![(4, 6, token_type::VARIABLE)]);
 }
+
+#[test]
+fn test_half_width_digit_chain() {
+    // 1＋2＋3: 半角数字でも両方の ＋ が演算子。
+    assert_eq!(operator_cols("1＋2＋3"), vec![5, 7]);
+}
+
+#[test]
+fn test_concat_chain() {
+    // 「合計」＆＄ｎ＆「個」: 両方の ＆ が演算子。
+    let vt = rhs_tokens("「合計」＆＄ｎ＆「個」");
+    assert_eq!(
+        vt.iter()
+            .filter(|t| t.2 == token_type::OPERATOR)
+            .map(|t| (t.0, t.1))
+            .collect::<Vec<_>>(),
+        vec![(8, 1), (11, 1)]
+    );
+    assert!(vt.contains(&(9, 2, token_type::VARIABLE)), "{vt:?}");
+}
+
+#[test]
+fn test_concat_half_width() {
+    // 「a」&＄ｘ: 半角 & も演算子。
+    assert_eq!(operator_cols("「a」&＄ｘ"), vec![7]);
+}
+
+#[test]
+fn test_concat_inside_string_literal_is_not_operator() {
+    // 「A＆B」＆＄ｘ: 文字列の中の ＆ は演算子でない。
+    assert_eq!(operator_cols("「A＆B」＆＄ｘ"), vec![9]);
+}
+
+#[test]
+fn test_concat_after_paren() {
+    // （1＋2）＆「x」: 括弧内の ＋ と括弧の後の ＆ が演算子。
+    assert_eq!(operator_cols("（1＋2）＆「x」"), vec![4, 6, 8, 9]);
+}
+
+#[test]
+fn test_attribute_marker_stays_decorator() {
+    // 行頭の属性 ＆ は AST 由来の DECORATOR のまま、式の ＆ だけが OPERATOR。
+    let source = "＆author：Test\n＊挨拶\n　＄ｘ＝「a」＆「b」\n　Alice：や\n";
+    let result = AnalysisEngine::analyze(source);
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+    let tokens = decode_tokens(&result);
+    assert!(
+        tokens.contains(&(0, 0, 12, token_type::DECORATOR)),
+        "{tokens:?}"
+    );
+    assert!(
+        !tokens
+            .iter()
+            .any(|t| t.0 == 0 && t.3 == token_type::OPERATOR),
+        "{tokens:?}"
+    );
+    assert!(
+        tokens.contains(&(2, 7, 1, token_type::OPERATOR)),
+        "{tokens:?}"
+    );
+}

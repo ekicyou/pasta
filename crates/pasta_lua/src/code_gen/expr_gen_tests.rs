@@ -337,3 +337,119 @@ fn arith_right_hand_binary_is_one_term() {
         r#"act:arith("*", 2, act:arith("+", 3, 4))"#
     );
 }
+
+// ------------------------------------------------------------------
+// Concatenation: a third, lowest level below arithmetic (Req 1.3, 2.1–2.3, 3.3)
+// ------------------------------------------------------------------
+
+/// Transpile one line of a `メイン` scene and return its generated Lua line.
+fn scene_line(line: &str) -> String {
+    let source = format!("＊メイン\n　{}\n", line);
+    let file = pasta_dsl::parser::parse_str(&source, "test.pasta").unwrap();
+    let mut output = Vec::new();
+    crate::LuaTranspiler::default()
+        .transpile(&file, &mut output)
+        .unwrap();
+    let lua = String::from_utf8(output).unwrap();
+    let mut lines = lua
+        .lines()
+        .map(str::trim)
+        .skip_while(|l| !l.contains("act:init_scene"));
+    lines
+        .find(|l| !l.is_empty() && !l.contains("act:init_scene"))
+        .unwrap()
+        .to_string()
+}
+
+/// The design's generated forms, from DSL text through the parser.
+#[test]
+fn concat_generated_forms_from_dsl() {
+    let cases = [
+        (
+            "＄表示＝「合計」＆＄n＆「個」",
+            r#"var.表示 = act:concat(act:concat("合計", var.n, nil, "var.n"), "個")"#,
+        ),
+        (
+            "＄s＝「合計」＆＄a＋＄b",
+            r#"var.s = act:concat("合計", act:arith("+", var.a, var.b, "var.a", "var.b"))"#,
+        ),
+        (
+            "＄n＝（「1」＆「2」）＋1",
+            r#"var.n = act:arith("+", (act:concat("1", "2")), 1)"#,
+        ),
+        (
+            "＞＄種類＆「_挨拶」",
+            r#"return act:call(SCENE.__global_name__, tostring(act:concat(var.種類, "_挨拶", "var.種類")), {}, table.unpack(args))"#,
+        ),
+    ];
+    for (dsl, expected) in cases {
+        assert_eq!(scene_line(dsl), expected, "{dsl}");
+    }
+}
+
+/// `＊／％`, then `＋－`, then `＆`, each left to right.
+#[test]
+fn concat_regroups_below_arithmetic() {
+    use pasta_dsl::parser::BinOp::{Add, Concat, Mul};
+    let s = |t: &str| Expr::String(t.to_string());
+    let cases: Vec<(Expr, &str)> = vec![
+        // 「x」＆1＋2＊3
+        (
+            left_assoc(s("x"), vec![(Concat, int(1)), (Add, int(2)), (Mul, int(3))]),
+            r#"act:concat("x", act:arith("+", 1, act:arith("*", 2, 3)))"#,
+        ),
+        // 1＋2＆3＊4
+        (
+            left_assoc(int(1), vec![(Add, int(2)), (Concat, int(3)), (Mul, int(4))]),
+            r#"act:concat(act:arith("+", 1, 2), act:arith("*", 3, 4))"#,
+        ),
+        // 「a」＆「b」＆「c」
+        (
+            left_assoc(s("a"), vec![(Concat, s("b")), (Concat, s("c"))]),
+            r#"act:concat(act:concat("a", "b"), "c")"#,
+        ),
+    ];
+    for (expr, expected) in cases {
+        assert_eq!(expr_text(expr), expected);
+    }
+}
+
+/// Descriptions follow the arithmetic rules: `nil` fills a missing left one,
+/// a parenthesized variable keeps its description, nested operations have none.
+#[test]
+fn concat_operand_descriptions() {
+    use pasta_dsl::parser::BinOp::{Add, Concat};
+    let s = |t: &str| Expr::String(t.to_string());
+    let cases: Vec<(Expr, &str)> = vec![
+        // 「a」＆＄x
+        (
+            left_assoc(s("a"), vec![(Concat, var("x", VarScope::Local))]),
+            r#"act:concat("a", var.x, nil, "var.x")"#,
+        ),
+        // （＄＊g）＆「a」
+        (
+            left_assoc(paren(var("g", VarScope::Global)), vec![(Concat, s("a"))]),
+            r#"act:concat((save.g), "a", "save.g")"#,
+        ),
+        // ＄x＋1＆（＄y＆「a」）
+        (
+            left_assoc(
+                var("x", VarScope::Local),
+                vec![
+                    (Add, int(1)),
+                    (
+                        Concat,
+                        paren(left_assoc(
+                            var("y", VarScope::Local),
+                            vec![(Concat, s("a"))],
+                        )),
+                    ),
+                ],
+            ),
+            r#"act:concat(act:arith("+", var.x, 1, "var.x"), (act:concat(var.y, "a", "var.y")))"#,
+        ),
+    ];
+    for (expr, expected) in cases {
+        assert_eq!(expr_text(expr), expected);
+    }
+}

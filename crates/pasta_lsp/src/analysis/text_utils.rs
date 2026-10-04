@@ -137,12 +137,13 @@ pub(super) fn char_len_at(text: &str, byte_pos: usize) -> usize {
     text[byte_pos..].chars().next().map_or(1, |c| c.len_utf8())
 }
 
-/// Arithmetic operator characters of the grammar (`add`/`sub`/`mul`/`div`/`modulo`).
+/// Binary operator characters of the grammar
+/// (`add`/`sub`/`mul`/`div`/`modulo`/`concat_op`).
 #[inline]
 fn is_chain_op_char(c: char) -> bool {
     matches!(
         c,
-        '+' | '＋' | '-' | '－' | '*' | '＊' | '×' | '/' | '／' | '÷' | '%' | '％'
+        '+' | '＋' | '-' | '－' | '*' | '＊' | '×' | '/' | '／' | '÷' | '%' | '％' | '&' | '＆'
     )
 }
 

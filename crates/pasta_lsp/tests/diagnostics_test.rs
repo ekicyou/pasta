@@ -77,3 +77,20 @@ fn test_diagnostics_line_numbers_are_0_based() {
         );
     }
 }
+
+#[test]
+fn test_concat_expression_no_diagnostics() {
+    // 連結（全角・半角・算術との混在・括弧）を含む正しい式は診断なし。
+    let source =
+        "＊挨拶\n  ＄ｘ＝「合計」＆＄ｎ＆「個」\n  ＄ｙ＝（1＋2）& 「x」\n  Alice：こんにちは\n";
+    let result = AnalysisEngine::analyze(source);
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+}
+
+#[test]
+fn test_concat_missing_operand_has_diagnostics() {
+    // ＆ の右の被演算子が欠けた式は診断あり。
+    let source = "＊挨拶\n  ＄ｘ＝「a」＆\n  Alice：こんにちは\n";
+    let result = AnalysisEngine::analyze(source);
+    assert!(!result.diagnostics.is_empty(), "被演算子の欠けで診断あり");
+}

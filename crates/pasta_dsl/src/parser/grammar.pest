@@ -59,12 +59,13 @@ actor_marker   = _{ modulo }
 // ################################################# expr
 expr   = _{ term ~ s ~ bin* }
 bin    = _{ bin_op ~ s ~ term ~ s }
-bin_op = _{ add_op | sub_op | mul_op | div_op | modulo_op }
+bin_op = _{ add_op | sub_op | mul_op | div_op | modulo_op | concat_op }
 add_op = @{ add }
 sub_op = @{ sub }
 mul_op = @{ mul }
 div_op = @{ div }
 modulo_op = @{ modulo }
+concat_op = @{ amp }
 
 term = _{
     paren_expr
