@@ -385,7 +385,7 @@ function ACT_IMPL.arith(self, op, lhs, rhs, lhs_desc, rhs_desc) end
 
 ### Integration Tests
 1. `tests/transpiler/runtime_safety_test.rs`: 5 件の書き間違いを含む `.pasta` をトランスパイル→実行し、例外にならず、期待したトークン・変数状態になる（5.5）。算術は、同じ式の「変更前の平らな Lua 式」を評価した値と一致することを式の一覧で確かめる（3.1）。
-2. 既存スナップショット・フィクスチャの更新。`source_map_seam_test.rs`・`loader_source_map_build_test.rs` の行対応の期待値は変更なしで通る（5.4）。
+2. 既存スナップショット・フィクスチャの更新。`source_map_seam_test.rs`・`loader_source_map_build_test.rs` の行対応（行番号）の期待値は変えない（`source_map_seam_test.rs` が比較する生成コード文字列は新しい形に更新する）（5.4）。
 3. 既存のランタイム・SHIORI テスト（最終出力を比較するもの）が、期待値を変えずに通る（5.1, 5.3）。
 
 ### E2E Tests（`pasta_shiori/tests/codegen_runtime_safety_e2e_test.rs`）
