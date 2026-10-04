@@ -14,7 +14,7 @@ description: >-
   SHIORIプロトコル実装, Luaランタイム開発, pasta言語仕様の設計変更.
 metadata:
   author: ekicyou
-  version: "1.7.1"
+  version: "1.7.2"
 ---
 
 # Pasta Ghost Authoring Skill
@@ -155,6 +155,7 @@ metadata:
 - 参照時 `＠単語名` で値リストからシャッフル＆順次消費方式で1つ選択される（詳細は [words.md](references/words.md#シャッフル順次消費)）
 - スコープ解決: ローカル → グローバルの順に前方一致検索。ローカル単語に候補があればそれだけを使い、グローバル単語の候補とは合わせない
 - 単語定義の行末にコメントを書けるのは、値を `「」` または `"` で囲んだときだけ。引用なしの値の単語定義にコメントを付けるときは別の行に書く（[block-structure.md](references/block-structure.md#コメント)）
+- `「」`・`""` は空文字列の候補になる。引用は開始した行の中で閉じる（行をまたぐとパースエラー）。引用なしの値は `「`・`"` で始められない（[literals.md](references/literals.md)）
 
 ```pasta
 ＠挨拶：こんにちは、おはよう、やあ
