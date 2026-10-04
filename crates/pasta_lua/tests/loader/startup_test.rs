@@ -272,6 +272,38 @@ fn test_load_missing_pasta_toml() {
     }
 }
 
+/// dsl-literal-fixes 8.2: 別々の行の `""` を含む辞書でも、ローダ経由で scene_dic のロードが通る（U24）。
+#[test]
+fn test_load_separate_line_blank_strings() {
+    let temp = TempDir::new().unwrap();
+    let base_dir = temp.path();
+
+    std::fs::write(base_dir.join("pasta.toml"), "[loader]\ndebug_mode = true\n").unwrap();
+    std::fs::create_dir_all(base_dir.join("dic/talk")).unwrap();
+    std::fs::write(
+        base_dir.join("dic/talk/blank.pasta"),
+        "＠a：\"\"\n＠b：\"\"\n＊s\n　＄x＝\"\"\n　＄y＝\"\"\n　さくら：「ok」\n",
+    )
+    .unwrap();
+
+    let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for dir_name in &["pasta_scripts", "scriptlibs"] {
+        let src = crate_root.join(dir_name);
+        let dst = base_dir.join(dir_name);
+        if src.exists() {
+            std::fs::create_dir_all(&dst).unwrap();
+            copy_dir_recursive(&src, &dst).unwrap();
+        }
+    }
+
+    let runtime = PastaLoader::load(base_dir).unwrap();
+
+    let loaded = runtime
+        .exec("return package.loaded['pasta.scene.talk.blank'] ~= nil")
+        .unwrap();
+    assert_eq!(loaded.as_boolean(), Some(true));
+}
+
 #[test]
 fn test_load_custom_pasta_patterns() {
     // Custom [loader] pasta_patterns are honored, and the derived .lua pattern
