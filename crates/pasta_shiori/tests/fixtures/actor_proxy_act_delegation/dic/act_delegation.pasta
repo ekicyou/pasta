@@ -1,0 +1,107 @@
+＃ act_delegation.pasta - アクション行から呼ぶ組み込み関数（yield・チェイントーク・ゴースト終了）の E2E 用シーン
+＃ シーン名を SHIORI イベント ID と一致させ、シーン関数フォールバックで起動する。
+＃ シーンの検索は前方一致なので、どのシーン名も他のシーン名の先頭部分にならないようにする（…Plain／…Ms）。
+＃ OnUnreg… は未登録アクター（未登録さん）の行で同じ呼び出しをするシーン。
+＃ 単語参照の形（＠yield など）は直後の全角空白で区切る（区切りの空白は出力されない）。
+
+＃ ---- 継続トーク：最初の応答は「前」まで、「後」は次の OnTalk の機会に出る ----
+
+＊OnYieldWord
+　さくら：前＠yield　後
+
+＊OnChainWord
+　さくら：前＠チェイントーク　後
+
+＊OnYieldCall
+　さくら：前＠yield（）後
+
+＊OnChainCall
+　さくら：前＠チェイントーク（）後
+
+＊OnYieldVarWord
+　＄x＝「yield」
+　さくら：前＠＄x　後
+
+＊OnYieldVarCall
+　＄x＝「yield」
+　さくら：前＠＄x（）後
+
+＊OnUnregYieldWord
+　未登録さん：前＠yield　後
+
+＊OnUnregChainWord
+　未登録さん：前＠チェイントーク　後
+
+＊OnUnregYieldCall
+　未登録さん：前＠yield（）後
+
+＊OnUnregChainCall
+　未登録さん：前＠チェイントーク（）後
+
+＊OnUnregYieldVarWord
+　＄x＝「yield」
+　未登録さん：前＠＄x　後
+
+＊OnUnregYieldVarCall
+　＄x＝「yield」
+　未登録さん：前＠＄x（）後
+
+＃ ---- ゴースト終了：行の外の ＞ゴースト終了 と同じ出力になる ----
+
+＊OnCloseOutsidePlain
+　さくら：終了
+　＞ゴースト終了
+
+＊OnCloseOutsideMs
+　さくら：終了
+　＞ゴースト終了（500）
+
+＊OnCloseWord
+　さくら：終了＠ゴースト終了
+
+＊OnCloseCallPlain
+　さくら：終了＠ゴースト終了（）
+
+＊OnCloseCallMs
+　さくら：終了＠ゴースト終了（500）
+
+＊OnCloseVarWord
+　＄x＝「ゴースト終了」
+　さくら：終了＠＄x
+
+＊OnCloseVarCallPlain
+　＄x＝「ゴースト終了」
+　さくら：終了＠＄x（）
+
+＊OnCloseVarCallMs
+　＄x＝「ゴースト終了」
+　さくら：終了＠＄x（500）
+
+＊OnUnregCloseOutsidePlain
+　未登録さん：終了
+　＞ゴースト終了
+
+＊OnUnregCloseOutsideMs
+　未登録さん：終了
+　＞ゴースト終了（500）
+
+＊OnUnregCloseWord
+　未登録さん：終了＠ゴースト終了
+
+＊OnUnregCloseCallPlain
+　未登録さん：終了＠ゴースト終了（）
+
+＊OnUnregCloseCallMs
+　未登録さん：終了＠ゴースト終了（500）
+
+＊OnUnregCloseVarWord
+　＄x＝「ゴースト終了」
+　未登録さん：終了＠＄x
+
+＊OnUnregCloseVarCallPlain
+　＄x＝「ゴースト終了」
+　未登録さん：終了＠＄x（）
+
+＊OnUnregCloseVarCallMs
+　＄x＝「ゴースト終了」
+　未登録さん：終了＠＄x（500）

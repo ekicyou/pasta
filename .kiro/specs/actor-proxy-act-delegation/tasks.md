@@ -20,7 +20,7 @@
   - _Boundary: RegressionTests (Lua spec)_
   - _Depends: 1.1_
 
-- [ ] 1.3 (P) SHIORI 経由の E2E テストとフィクスチャを追加する
+- [x] 1.3 (P) SHIORI 経由の E2E テストとフィクスチャを追加する
   - 埋め込みの標準ランタイムと本番の入口を通すフィクスチャ（既存の codegen_runtime_safety と同じ形。トーク間隔を固定）を作る
   - アクション行の `＠yield`・`＠チェイントーク`・`＠yield（）`・`＠チェイントーク（）` のシーンが 200 を返し、最初の応答が中断点まで、残りが OnSecondChange（`X-Pasta-Time` 付き）による次の OnTalk の機会の応答に出て、どちらにも `table:` が混ざらないことを確かめる
   - `＠ゴースト終了`・`＠ゴースト終了（）`・`＠ゴースト終了（500）` が `\-`（ミリ秒ありは待ちに続く `\-`）を含み、行の外の `＞ゴースト終了（500）` と同じ出力になることを確かめる
@@ -85,3 +85,4 @@
 
 - 1.1: 基準線（修正前・`NoDefaultCurrentDirectoryInExePath` を外した状態）で `cargo test -p pasta_lua -p pasta_shiori` は exit 0・1705 件成功・0 件失敗。設計時に見えた `pasta_shiori` のビルド失敗は再現しない（環境変数が原因だったとみられる）。テスト後に `sample.generated.lua` の改行差分が出るので `git checkout --` で戻す。
 - 1.2: `lua_test` は最上位 describe が失敗すると `os.exit(1)` し後続スイートを飛ばす。新 spec は一覧の最後に置き、修正前は 18 件失敗・8 件成功。タスク 2 の検証では期待を変える既存 4 件（`actor_module_test` が最初に落ちる）を同時に直さないと後続が走らない。
+- 1.3: シーン名の検索は前方一致なので、E2E フィクスチャのシーン名はどれも他の名前の先頭部分にしない（`…Plain`／`…Ms`）。`pasta_scripts` は build.rs で埋め込むため、`actor.lua` の変更は再ビルドで `pasta_shiori` のテストに反映される。

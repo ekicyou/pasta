@@ -1,0 +1,25 @@
+# actor_proxy_act_delegation E2E 用フィクスチャ（actor-proxy-act-delegation task 1.3）
+#
+# lua_search_paths から "scripts" を外している（codegen_runtime_safety と同じ理由）。
+# ハーネス（common::copy_fixture_to_temp）が tests/support/scripts を scripts/ にコピーするが、
+# それは古い runtime の写しで act:actor_proxy などを持たない。ここでは埋め込みの pasta
+# 標準ランタイム（profile/pasta/pasta_scripts）と本番の entry.lua（GLOBAL.ゴースト終了 を登録する）を通す。
+
+[loader]
+pasta_patterns = ["dic/*.pasta"]
+lua_search_paths = [
+    "profile/pasta/save/lua",
+    "profile/pasta/pasta_scripts",
+    "profile/pasta/cache/lua",
+    "scriptlibs",
+]
+transpiled_output_dir = "profile/pasta/cache/lua"
+
+# 継続トークの残りを出す OnTalk の機会を決定論化するため、トーク間隔を固定する
+# （OnSecondChange に X-Pasta-Time を載せて 10 秒進める。手本は fixtures/async_callback）。
+[ghost]
+talk_interval_min = 10
+talk_interval_max = 10
+
+[actor."さくら"]
+spot = 0
