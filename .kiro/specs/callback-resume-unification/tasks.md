@@ -82,7 +82,7 @@
   - _Requirements: 7.4_
   - _Depends: 5.2, 5.3_
 
-- [ ] 6. 全体の関門を通す
+- [x] 6. 全体の関門を通す
   - 仮想ディスパッチャ・キック・グローバルチェイントーク・`get_property`・選択肢の自動ルーティングの既存テストが変更なしで通ることを、既存挙動の維持の根拠として確かめる
   - 完了状態: `cargo test --workspace`（Lua スイートを含む）、`cargo clippy --all-targets --workspace -- -D warnings`、luacheck がすべて通る
   - _Requirements: 5.1, 5.2, 5.3, 6.6_
