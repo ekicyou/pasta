@@ -4,6 +4,7 @@
 //! Implements Requirements 1, 3a-3g for Lua code generation.
 
 mod element_gen;
+mod expr_gen;
 mod scope_gen;
 pub mod source_map;
 
