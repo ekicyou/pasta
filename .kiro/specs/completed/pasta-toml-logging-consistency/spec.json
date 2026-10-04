@@ -1,9 +1,10 @@
 {
   "feature_name": "pasta-toml-logging-consistency",
   "created_at": "2026-10-04T02:29:48Z",
-  "updated_at": "2026-10-04T03:30:00Z",
+  "updated_at": "2026-10-04T05:43:34Z",
   "language": "ja",
-  "phase": "tasks-generated",
+  "phase": "completed",
+  "completed_at": "2026-10-04T05:43:34Z",
   "approvals": {
     "requirements": {
       "generated": true,

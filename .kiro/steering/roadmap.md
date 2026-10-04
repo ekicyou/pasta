@@ -115,7 +115,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - [ ] dsl-codegen-runtime-safety -- 未定義の `＠＊関数（）`（U18）・未登録アクター（U19）・act のメンバー名と同じアクター名（U20）・数値にできない算術（U22）で 500 になる不具合と、アクション行の `\\`（U08）。生成コードを存在確認付きのヘルパー経由にする。Dependencies: none
 - [ ] callback-resume-unification -- コールバック再開後の継続の消失、タイムアウト掃引の結果の破棄と予約の残留、タイムアウト応答の二重包み、REG ハンドラの戻り値の二重包み（U23）。コールバックの再開を `EVENT.fire` の再開ループに一本化する。Dependencies: none
 - [ ] scene-search-key-normalization -- 記号を含むシーン名（U30）・ローカルシーン名・アクター名が、登録キー（サニタイズ済み）と検索キー（元の名前）の食い違いで見つからない不具合。Dependencies: none
-- [ ] pasta-toml-logging-consistency -- 使われない `[lua] libs`（U26）・`[logging] rotation_days`（U32）の扱い、FFI 入口スレッド（`request`・`unload`・detach）のログの破棄、不正な `file_path` のときの挙動とマニュアルの食い違い。Dependencies: none
+- [x] pasta-toml-logging-consistency -- 使われない `[lua] libs`（U26）・`[logging] rotation_days`（U32）の扱い、FFI 入口スレッド（`request`・`unload`・detach）のログの破棄、不正な `file_path` のときの挙動とマニュアルの食い違い。Dependencies: none
 - [ ] scene-identity-format -- 末尾が数字のシーン名で内部名が重なる不具合（U21）、デバッガのシーン identity の索引漏れ、位置からのキックの前方一致。ランタイム名に区切りを入れ、形式の関数を 1 つにする。Dependencies: scene-search-key-normalization, dsl-codegen-runtime-safety
 - [ ] actor-proxy-act-delegation -- アクション行の `＠yield`・`＠ゴースト終了`・`＠＄x` などで、ACT を前提とする関数にアクタープロキシが渡って 500 になる不具合。Dependencies: dsl-codegen-runtime-safety, scene-search-key-normalization
 - [ ] act-token-grouping-fix -- ACT のグループ化が最初の発言より前の表示制御を捨て、スポット変更でグループを閉じない不具合。LuaJIT で機能しない CT（`ct.lua`）の撤去または修正。Dependencies: dsl-codegen-runtime-safety
