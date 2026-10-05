@@ -419,16 +419,14 @@ mod tests {
     }
 
     #[test]
-    fn test_search_scene_registered_names_unchanged() {
-        // Registered names are already sanitized, so results stay the same.
+    fn test_search_scene_registered_name_is_treated_as_name() {
+        // 第 1 引数の登録名は作者が書いた名前として扱う（scene-identity-format 2.5）。
+        // 検索キーは通し番号を除いた名前なので、登録名ではそのシーンに当たらない。
         for mut ctx in create_symbol_name_contexts() {
-            assert_eq!(
-                ctx.search_scene(SYMBOL_GLOBAL, None).unwrap(),
-                Some((SYMBOL_GLOBAL.to_string(), "__start__".to_string()))
-            );
+            assert_eq!(ctx.search_scene(SYMBOL_GLOBAL, None).unwrap(), None);
             assert_eq!(
                 ctx.search_scene("選択_A_1", Some(SYMBOL_GLOBAL)).unwrap(),
-                Some((SYMBOL_GLOBAL.to_string(), "選択_A_1".to_string()))
+                None
             );
         }
     }

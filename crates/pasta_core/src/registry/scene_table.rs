@@ -76,8 +76,10 @@ impl SceneTable {
     /// runtime finalize) into a SceneTable (used for runtime search).
     ///
     /// Key format conversion for prefix_index (WordTable unified format):
-    /// - Local scene: `fn_name "会話_1::選択肢_1"` → `":会話_1:選択肢_1"`
-    /// - Global scene: `fn_name "会話_1::__start__"` → `"会話_1"`
+    /// - Local scene: `fn_name "会話_1::選択肢_1"` → `":会話_1:選択肢"`
+    /// - Global scene: `fn_name "会話_1::__start__"` → `"会話"`
+    ///
+    /// 通し番号は照合に使わない（`SceneRegistry::split_registered_name` で外す）。
     pub fn from_scene_registry(
         registry: crate::registry::SceneRegistry,
         random_selector: Box<dyn RandomSelector>,
@@ -132,17 +134,27 @@ impl SceneTable {
     /// Convert fn_name to search key for prefix_index.
     ///
     /// # Key format
-    /// - Local scene: `fn_name "親シーン::ローカル名"` → `":親シーン:ローカル名"`
-    /// - Global scene: `fn_name "グローバル名::__start__"` → `"グローバル名"`
+    /// - Local scene: `fn_name "親の登録名::ローカルの登録名"` → `":親の登録名:ローカルの名前の部分"`
+    /// - Global scene: `fn_name "グローバルの登録名::__start__"` → `"グローバルの名前の部分"`
+    ///
+    /// 名前の部分は登録名から通し番号を除いたもの（`SceneRegistry::split_registered_name`）。
+    /// 分けられない名前（Lua で直接定義した `加算ループ` 等）は全体がキーになる。
+    /// 親の部分は登録名のまま（検索側が親の登録名で引くため）。
     ///
     /// This format is unified with WordTable's key format for consistency.
     fn fn_name_to_search_key(fn_name: &str, is_local: bool) -> String {
+        use crate::registry::SceneRegistry;
+        let (global, local) = fn_name.split_once("::").unwrap_or((fn_name, ""));
         if is_local {
-            // Local scene: "会話_1::選択肢_1" → ":会話_1:選択肢_1"
-            format!(":{}", fn_name.replace("::", ":"))
+            // Local scene: "会話_1::選択肢_1" → ":会話_1:選択肢"
+            format!(
+                ":{}:{}",
+                global,
+                SceneRegistry::split_registered_name(local).0
+            )
         } else {
-            // Global scene: "会話_1::__start__" → "会話_1"
-            fn_name.split("::").next().unwrap_or(fn_name).to_string()
+            // Global scene: "会話_1::__start__" → "会話"
+            SceneRegistry::split_registered_name(global).0.to_string()
         }
     }
 

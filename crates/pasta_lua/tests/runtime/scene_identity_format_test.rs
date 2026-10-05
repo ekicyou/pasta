@@ -21,7 +21,12 @@ const FIXTURE: &str = include_str!("../fixtures/scene_identity_format.pasta");
 /// フィクスチャをトランスパイル→実行→`finalize_scene` し、ランタイムと、
 /// トランスパイル時のシーンレジストリから作ったグローバルの登録名の集合を返す。
 fn load_fixture() -> (Lua, BTreeSet<String>) {
-    let file = parse_str(FIXTURE, "scene_identity_format.pasta").expect("fixture must parse");
+    load_source(FIXTURE)
+}
+
+/// `.pasta` のソースをトランスパイル→実行→`finalize_scene` する（`load_fixture` の本体）。
+fn load_source(source: &str) -> (Lua, BTreeSet<String>) {
+    let file = parse_str(source, "scene_identity_format.pasta").expect("fixture must parse");
     let mut out = Vec::new();
     let ctx = LuaTranspiler::default()
         .transpile(&file, &mut out)
@@ -102,4 +107,31 @@ fn runtime_registered_names_match_rust_registered_name_rule() {
         actual, expected,
         "Lua の登録名と Rust の registered_name の形式が一致する"
     );
+}
+
+/// 2.9: 決まった順に選ぶ設定（`set_scene_selector(0)`）の下で、`＊メイン`×10 は
+/// `メイン_1`・`メイン_2`・…・`メイン_10` の順に返る（辞書確定の登録順と検索キーの統合確認）。
+#[test]
+fn deterministic_selector_returns_scenes_in_counter_order() {
+    let source: String = (1..=10)
+        .map(|i| format!("＊メイン\n　さくら：「メイン本体{i}」\n\n"))
+        .collect();
+    let (lua, _) = load_source(&source);
+    let picked: Vec<String> = lua
+        .load(
+            r#"
+            local SEARCH = require "@pasta_search"
+            SEARCH:set_scene_selector(0)
+            local picked = {}
+            for _ = 1, 10 do
+                local g = SEARCH:search_scene("メイン", nil)
+                picked[#picked + 1] = g
+            end
+            return picked
+        "#,
+        )
+        .eval()
+        .unwrap();
+    let expected: Vec<String> = (1..=10).map(|i| format!("メイン_{i}")).collect();
+    assert_eq!(picked, expected, "通し番号の順に返る");
 }
