@@ -1,0 +1,22 @@
+# call_execution_correctness E2E 用フィクスチャ（call-execution-correctness requirements 8.1–8.3）
+#
+# lua_search_paths から "scripts" を外している（codegen_runtime_safety フィクスチャと同じ理由）。
+# ハーネス（common::copy_fixture_to_temp）が tests/support/scripts を scripts/ にコピーするが、
+# それは古い runtime の写しで act:actor_proxy などを持たない。ここでは埋め込みの pasta 標準
+# ランタイム（profile/pasta/pasta_scripts）と本番の entry.lua をそのまま通す。
+# ウェイト設定は置かない（応答のさくらスクリプトにウェイトを混ぜない）。
+
+[loader]
+pasta_patterns = ["dic/*.pasta"]
+lua_search_paths = [
+    "profile/pasta/save/lua",
+    "profile/pasta/pasta_scripts",
+    "profile/pasta/cache/lua",
+    "scriptlibs",
+]
+transpiled_output_dir = "profile/pasta/cache/lua"
+
+# アクターを登録して、未設定の警告や立ち位置フォールバックの警告をログに混ぜない
+# （ログの警告の文言・件数を確かめるテストのため）。
+[actor."さくら"]
+spot = 0
