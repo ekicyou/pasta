@@ -143,7 +143,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Source-map scene recording (task 2.1, Requirements 3.1/3.3): flow the
         // global scene's deterministic join key + `.pasta` header span to the sink
         // so the finalize side (task 2.2) can reconstruct the scene index and join
-        // the runtime identity (e.g. `会話1`).
+        // the runtime identity (e.g. `会話_1`).
         //
         // JOIN-KEY ENCODING (consumed verbatim by task 2.2; keep in sync):
         //   global: "G:{base}#{counter}"
@@ -152,9 +152,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         //   - `base` / `parent_base` = `SceneRegistry::sanitize_name(name)` (NOT
         //     re-sanitized here — reuse the registry rule to avoid format drift,
         //     Requirement 3.3 / design.md:329,350).
-        //   - `counter` / `parent_counter` = the per-base occurrence order
-        //     (`scene_counter`), which equals the runtime `create_scene` per-base
-        //     counter order. This is the key that lets task 2.2 match `会話N`.
+        //   - `counter` / `parent_counter` = the per-base occurrence order within
+        //     this `.pasta` file (`scene_counter`). The join matches it against the
+        //     rank of the runtime `create_scene` counters of the same base within
+        //     the same file (`会話_N`; scene_join.rs).
         //   - `fn_name` = the code_gen-computed local fn name (`{sanitize}_{counter}`
         //     for named locals, `__start__` for the anonymous start scene), reusing
         //     the SAME per-name counter computed below (do not recompute differently).

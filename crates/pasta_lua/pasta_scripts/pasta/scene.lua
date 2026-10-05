@@ -2,7 +2,7 @@
 --- シーンレジストリモジュール
 ---
 --- シーン関数の登録と検索を担当する。
---- グローバルシーン名（基本名＋連番。例: メイン1）とローカルシーン名（シーン関数名）の階層構造を管理する。
+--- グローバルシーン名（基本名・`_`・連番。例: メイン_1）とローカルシーン名（シーン関数名）の階層構造を管理する。
 --- カウンタ管理機能により、同名シーンに対して一意な番号を自動割当する。
 
 local STORE = require("pasta.store")
@@ -120,7 +120,7 @@ end
 --- シーンを登録し、グローバルシーンテーブルを返す
 ---
 --- カウンタ管理を使用してベース名から一意なグローバルシーン名を生成する。
---- 例: create_scene("メイン") → "メイン1", 2回目 → "メイン2"
+--- 例: create_scene("メイン") → "メイン_1", 2回目 → "メイン_2"
 ---
 --- @param base_name string ベース名（シーン名のベース）
 --- @param local_name string|nil ローカルシーン名（シーン関数名）
@@ -129,7 +129,7 @@ end
 function SCENE.create_scene(base_name, local_name, scene_func)
     -- カウンタからグローバルシーン名を生成
     local counter = SCENE.get_or_increment_counter(base_name)
-    local global_name = base_name .. counter
+    local global_name = base_name .. "_" .. counter
 
     if scene_func and local_name then
         SCENE.register(global_name, local_name, scene_func)

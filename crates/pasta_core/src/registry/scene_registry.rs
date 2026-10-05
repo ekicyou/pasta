@@ -145,7 +145,7 @@ impl SceneRegistry {
     ///
     /// # Arguments
     ///
-    /// * `full_name` - Full scene name with counter (e.g., "OnBoot1")
+    /// * `full_name` - Full scene name with counter (e.g., "OnBoot_1")
     /// * `local_names` - List of local function names (e.g., ["__start__", "選択肢_1"])
     /// * `attributes` - Attributes for filtering (applied to the global and its locals)
     ///
@@ -441,13 +441,13 @@ mod tests {
         let mut registry = SceneRegistry::new();
 
         // full_name already contains the counter; no auto-increment
-        let id = registry.register_global_raw("OnBoot1", &[], HashMap::new());
+        let id = registry.register_global_raw("OnBoot_1", &[], HashMap::new());
         assert_eq!(id, 1);
 
         let scene = registry.get_scene(id).unwrap();
-        assert_eq!(scene.name, "OnBoot1");
-        assert_eq!(scene.fn_name, "OnBoot1::__start__");
-        assert_eq!(scene.fn_path, "crate::OnBoot1::__start__");
+        assert_eq!(scene.name, "OnBoot_1");
+        assert_eq!(scene.fn_name, "OnBoot_1::__start__");
+        assert_eq!(scene.fn_path, "crate::OnBoot_1::__start__");
         assert_eq!(scene.parent, None);
     }
 
@@ -456,7 +456,7 @@ mod tests {
         let mut registry = SceneRegistry::new();
 
         let locals = vec!["__start__".to_string(), "__選択肢_1__".to_string()];
-        let global_id = registry.register_global_raw("会話1", &locals, HashMap::new());
+        let global_id = registry.register_global_raw("会話_1", &locals, HashMap::new());
 
         // Returns the GLOBAL scene's ID
         assert_eq!(global_id, 1);
@@ -467,9 +467,9 @@ mod tests {
 
         let local = registry.get_scene(2).unwrap();
         assert_eq!(local.name, "__選択肢_1__");
-        assert_eq!(local.fn_name, "会話1::__選択肢_1__");
-        assert_eq!(local.fn_path, "crate::会話1::__選択肢_1__");
-        assert_eq!(local.parent, Some("会話1".to_string()));
+        assert_eq!(local.fn_name, "会話_1::__選択肢_1__");
+        assert_eq!(local.fn_path, "crate::会話_1::__選択肢_1__");
+        assert_eq!(local.parent, Some("会話_1".to_string()));
     }
 
     #[test]
@@ -497,7 +497,7 @@ mod tests {
         let mut registry = SceneRegistry::new();
 
         // raw registration must not consume a counter for "会話"
-        registry.register_global_raw("会話1", &[], HashMap::new());
+        registry.register_global_raw("会話_1", &[], HashMap::new());
 
         // counter-based registration still starts at 1
         let (_, counter) = registry.register_global("会話", HashMap::new());

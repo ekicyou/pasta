@@ -68,7 +68,7 @@ impl SearchContext {
     /// # Note
     ///
     /// The returned names match the transpiler output format:
-    /// - `global_name`: e.g., "メイン1" (from fn_name before "::")
+    /// - `global_name`: e.g., "メイン_1" (from fn_name before "::")
     /// - `local_name`: e.g., "選択肢_1" or "__start__" (Lua function name format)
     pub fn search_scene(
         &mut self,
@@ -91,7 +91,7 @@ impl SearchContext {
                     })?;
 
                     // Extract global_name and local_name from fn_name
-                    // fn_name format: "グローバル名::ローカル名" (finalize: "メイン1::選択肢_1"; transpile-time registry: "メイン_1::選択肢_1")
+                    // fn_name format: "グローバル名::ローカル名" (e.g. "メイン_1::選択肢_1")
                     let (global_name, local_name) = Self::parse_fn_name(&scene.fn_name);
                     Ok(Some((global_name, local_name)))
                 }
@@ -130,10 +130,10 @@ impl SearchContext {
     /// Parse fn_name to extract global_name and local_name in transpiler output format.
     ///
     /// # Arguments
-    /// * `fn_name` - e.g., "メイン1::選択肢_1" or "メイン1::__start__" after `finalize_scene` ("メイン_1::…" in the transpile-time registry)
+    /// * `fn_name` - e.g., "メイン_1::選択肢_1" or "メイン_1::__start__"
     ///
     /// # Returns
-    /// * `(global_name, local_name)` - e.g., ("メイン1", "選択肢_1") or ("メイン1", "__start__")
+    /// * `(global_name, local_name)` - e.g., ("メイン_1", "選択肢_1") or ("メイン_1", "__start__")
     fn parse_fn_name(fn_name: &str) -> (String, String) {
         if let Some((global_part, local_part)) = fn_name.split_once("::") {
             let local_name = if local_part == "__start__" {
@@ -372,38 +372,36 @@ mod tests {
         assert_eq!(third.0, "挨拶_1");
     }
 
+    /// Registered name of the global scene `会話・朝` (same form before and
+    /// after finalize).
+    const SYMBOL_GLOBAL: &str = "会話_朝_1";
+
     /// Build contexts holding a global scene `会話・朝` with a local scene
     /// `選択・A`, in both registry shapes: transpile-time (`register_global` /
-    /// `register_local`) and finalized (`register_global_raw`).
-    /// Each entry carries the global scene's registered name.
-    fn create_symbol_name_contexts() -> Vec<(SearchContext, &'static str)> {
+    /// `register_local`) and finalized (`register_global_raw`). Both shapes
+    /// yield the registered name [`SYMBOL_GLOBAL`].
+    fn create_symbol_name_contexts() -> Vec<SearchContext> {
         let mut transpiled = SceneRegistry::new();
         let (_, counter) = transpiled.register_global("会話・朝", HashMap::new());
         transpiled.register_local("選択・A", "会話・朝", counter, 1, HashMap::new());
 
         let mut finalized = SceneRegistry::new();
         finalized.register_global_raw(
-            "会話_朝1",
+            SYMBOL_GLOBAL,
             &["__start__".to_string(), "選択_A_1".to_string()],
             HashMap::new(),
         );
 
-        vec![
-            (
-                SearchContext::new(transpiled, WordDefRegistry::new()).unwrap(),
-                "会話_朝_1",
-            ),
-            (
-                SearchContext::new(finalized, WordDefRegistry::new()).unwrap(),
-                "会話_朝1",
-            ),
-        ]
+        [transpiled, finalized]
+            .into_iter()
+            .map(|r| SearchContext::new(r, WordDefRegistry::new()).unwrap())
+            .collect()
     }
 
     #[test]
     fn test_search_scene_symbol_global_name_and_prefix() {
-        for (mut ctx, global) in create_symbol_name_contexts() {
-            let expected = Some((global.to_string(), "__start__".to_string()));
+        let expected = Some((SYMBOL_GLOBAL.to_string(), "__start__".to_string()));
+        for mut ctx in create_symbol_name_contexts() {
             assert_eq!(ctx.search_scene("会話・朝", None).unwrap(), expected);
             assert_eq!(ctx.search_scene("会話・", None).unwrap(), expected);
         }
@@ -412,24 +410,25 @@ mod tests {
     #[test]
     fn test_search_scene_symbol_local_name_and_prefix() {
         // The parent (registered name) is passed through unchanged.
-        for (mut ctx, global) in create_symbol_name_contexts() {
-            let expected = Some((global.to_string(), "選択_A_1".to_string()));
-            assert_eq!(ctx.search_scene("選択・A", Some(global)).unwrap(), expected);
-            assert_eq!(ctx.search_scene("選択・", Some(global)).unwrap(), expected);
+        let expected = Some((SYMBOL_GLOBAL.to_string(), "選択_A_1".to_string()));
+        for mut ctx in create_symbol_name_contexts() {
+            let parent = Some(SYMBOL_GLOBAL);
+            assert_eq!(ctx.search_scene("選択・A", parent).unwrap(), expected);
+            assert_eq!(ctx.search_scene("選択・", parent).unwrap(), expected);
         }
     }
 
     #[test]
     fn test_search_scene_registered_names_unchanged() {
         // Registered names are already sanitized, so results stay the same.
-        for (mut ctx, global) in create_symbol_name_contexts() {
+        for mut ctx in create_symbol_name_contexts() {
             assert_eq!(
-                ctx.search_scene(global, None).unwrap(),
-                Some((global.to_string(), "__start__".to_string()))
+                ctx.search_scene(SYMBOL_GLOBAL, None).unwrap(),
+                Some((SYMBOL_GLOBAL.to_string(), "__start__".to_string()))
             );
             assert_eq!(
-                ctx.search_scene("選択_A_1", Some(global)).unwrap(),
-                Some((global.to_string(), "選択_A_1".to_string()))
+                ctx.search_scene("選択_A_1", Some(SYMBOL_GLOBAL)).unwrap(),
+                Some((SYMBOL_GLOBAL.to_string(), "選択_A_1".to_string()))
             );
         }
     }
@@ -437,12 +436,13 @@ mod tests {
     #[test]
     fn test_search_scene_overlapping_sanitized_names_share_candidates() {
         // `会話・朝` and `会話_朝` sanitize to the same name, so either name
-        // yields both scenes, each once, in sequential consumption.
+        // yields both scenes, each once, in sequential consumption. Both
+        // registry shapes give the same registered names.
         let build = |finalized: bool| {
             let mut registry = SceneRegistry::new();
             if finalized {
-                registry.register_global_raw("会話_朝1", &[], HashMap::new());
-                registry.register_global_raw("会話_朝2", &[], HashMap::new());
+                registry.register_global_raw("会話_朝_1", &[], HashMap::new());
+                registry.register_global_raw("会話_朝_2", &[], HashMap::new());
             } else {
                 registry.register_global("会話・朝", HashMap::new());
                 registry.register_global("会話_朝", HashMap::new());
@@ -452,10 +452,8 @@ mod tests {
             ctx
         };
 
-        for (finalized, expected) in [
-            (false, ["会話_朝_1", "会話_朝_2"]),
-            (true, ["会話_朝1", "会話_朝2"]),
-        ] {
+        let expected = ["会話_朝_1", "会話_朝_2"];
+        for finalized in [false, true] {
             for name in ["会話・朝", "会話_朝"] {
                 let mut ctx = build(finalized);
                 let mut got: Vec<String> = (0..2)

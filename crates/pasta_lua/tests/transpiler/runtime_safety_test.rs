@@ -13,7 +13,7 @@ use common::e2e_helpers::{create_runtime_with_finalize, transpile};
 use insta::assert_snapshot;
 use mlua::Lua;
 
-/// 警告を記録する `@pasta_log` を差し込んだランタイムで生成コードを読み込み、`メイン1` を実行する。
+/// 警告を記録する `@pasta_log` を差し込んだランタイムで生成コードを読み込み、`メイン_1` を実行する。
 ///
 /// 差し込みは pasta.act のロード前に行う（act.lua はロード時に `@pasta_log` を取り込むため）。
 /// 実行後の act は Lua のグローバル `RS_ACT`、警告は `RS_WARNS` に置く。
@@ -41,7 +41,7 @@ fn run_main_scene(lua_code: &str) -> Lua {
         local STORE = require "pasta.store"
         local ACT = require "pasta.act"
         RS_ACT = ACT.new(STORE.actors)
-        SCENE.get_start("メイン1")(RS_ACT)
+        SCENE.get_start("メイン_1")(RS_ACT)
         "#,
     )
     .exec()

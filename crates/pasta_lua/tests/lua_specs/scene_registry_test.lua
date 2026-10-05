@@ -107,19 +107,19 @@ describe("SCENE.create_scene - カウンタ採番", function()
     test("ベース名にカウンタを付与した一意なグローバル名で登録する", function()
         local fn1 = function() end
         local tbl1 = SCENE.create_scene("spec346_cs", "__start__", fn1)
-        expect(tbl1.__global_name__):toBe("spec346_cs1")
-        expect(SCENE.get("spec346_cs1", "__start__")):toBe(fn1)
+        expect(tbl1.__global_name__):toBe("spec346_cs_1")
+        expect(SCENE.get("spec346_cs_1", "__start__")):toBe(fn1)
 
         local fn2 = function() end
         local tbl2 = SCENE.create_scene("spec346_cs", "__start__", fn2)
-        expect(tbl2.__global_name__):toBe("spec346_cs2")
-        expect(SCENE.get("spec346_cs2", "__start__")):toBe(fn2)
+        expect(tbl2.__global_name__):toBe("spec346_cs_2")
+        expect(SCENE.get("spec346_cs_2", "__start__")):toBe(fn2)
     end)
 
     test("local_name / scene_func 省略時は登録なしで空のグローバルテーブルを返す", function()
         local tbl = SCENE.create_scene("spec346_cs_empty")
-        expect(tbl.__global_name__):toBe("spec346_cs_empty1")
-        expect(SCENE.get_start("spec346_cs_empty1")):toBeNil()
+        expect(tbl.__global_name__):toBe("spec346_cs_empty_1")
+        expect(SCENE.get_start("spec346_cs_empty_1")):toBeNil()
     end)
 end)
 

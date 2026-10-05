@@ -78,7 +78,7 @@ pub trait SourceMapSink {
     ///
     /// `scene_join_key` is a *deterministic join key* reproducible at BOTH code_gen
     /// and finalize time (example: `sanitize_name(base)` + 出現順). The
-    /// counter-suffixed runtime identity (e.g. `会話1`) is deliberately NOT recorded
+    /// counter-suffixed runtime identity (e.g. `会話_1`) is deliberately NOT recorded
     /// here — it is undetermined at code_gen time and is assigned later by the
     /// runtime, then joined back to this span via the join key (see Design Decision 1:
     /// runtime-authoritative capture). `span` carries the scene declaration's line
@@ -172,7 +172,7 @@ mod tests {
         // calling it neither panics nor records anything into `records`.
         // `span` carries the scene declaration's line range; `scene_join_key` is the
         // deterministic base-name + 出現順 join key (NOT the counter-suffixed final
-        // identity such as `会話1`).
+        // identity such as `会話_1`).
         let span = Span::new(PASTA_LINE as usize, 1, (PASTA_LINE + 4) as usize, 1, 0, 99);
         sink.record_scene("会話#1", span);
 

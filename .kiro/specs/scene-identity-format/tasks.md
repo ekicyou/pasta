@@ -32,7 +32,7 @@
   - ソースマップの既存テストが変更なしで通る
   - _Requirements: 4.5_
   - _Boundary: debug source_map_
-- [ ] 3.2 Rust と Lua の登録名の形式を同時に切り替え、既存テストの期待値を更新する
+- [x] 3.2 Rust と Lua の登録名の形式を同時に切り替え、既存テストの期待値を更新する
   - 実行時に登録名を作る唯一の箇所を「名前・`_`・通し番号」にし、`pasta_shiori` のテスト支援の写しの同じ 1 行もそろえる（通し番号の振り方は変えない）
   - トランスパイル時の単語スコープ名を、タスク 1 の規則で作る
   - デバッガの突き合わせから末尾の数字を推測する処理を削除し、実行時のグローバルシーンを、シーン表の関数の定義元チャンクからソースマップで `.pasta` ファイルに分け、ファイルの中で名前ごとの通し番号の順位で記録と突き合わせる（分けるのはタスク 1 の規則だけ。引けないシーン・順位の無い記録は索引に入れない）
@@ -114,3 +114,5 @@
 - 2.2: `pasta_shiori` の e2e 4 本はキック名を登録名 `{name}1` で送っている（`scene_kick_e2e_test`・`scene_kick_multibeat_e2e_test` はキックの箇所、`scene_kick_gate_e2e_test`・`scene_kick_preempt_e2e_test` は `kick()` ヘルパー）。3.2 で `{name}_1` に替える。
 - 3.1: `SourceMap::pasta_file_for_chunk(生のチャンク名)` は内部で `canonicalize_chunk_name` してから引き、`scene_records()` のキーと同じ正規形の `.pasta` ファイルキーを返す。3.2 は `Function::info().source` をそのまま渡せる。
 - 3.1: レビュアーと親が同時に cargo を回すと「only metadata stub found」等のビルド成果物の競合で落ちることがある。全体テストは単独で回す。
+- 3.2: デバッガの突き合わせは `scene_join.rs` の純関数 `join_records`・`rank_globals` に切り出した。`build_scene_index` は `collect_scenes` を使わず `get_all_scenes()` を 1 度走査し、`__start__`（無ければ任意の関数）の `info().source` から定義元ファイルを引く。
+- 3.2: 他セッションの cargo と重なるとページングファイル不足（os error 1455）で落ちる。全体テストは `-j 4` で単独で回す。

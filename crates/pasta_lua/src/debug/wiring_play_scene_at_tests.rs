@@ -91,13 +91,13 @@ fn recording_sink() -> (KickSink, Arc<Mutex<Vec<String>>>) {
 }
 
 /// A `SourceMapWiring` carrying a loaded `SourceMap` whose scene index resolves
-/// `file` line 25 to the local scene `挨拶_1` (parent `会話1` → composite
-/// `:会話1:挨拶_1`) and line 15 to the global `会話1` (mirrors the
+/// `file` line 25 to the local scene `挨拶_1` (parent `会話_1` → composite
+/// `:会話_1:挨拶_1`) and line 15 to the global `会話_1` (mirrors the
 /// `playscene_tests` fixture). Lines past 40 are not found.
 fn wiring_with_index(file: &str) -> SourceMapWiring {
     let mut b = SceneIdentityIndex::builder();
-    b.add_scene(file, "会話1", None, 10, 40, 0);
-    b.add_scene(file, "挨拶_1", Some("会話1"), 20, 30, 1);
+    b.add_scene(file, "会話_1", None, 10, 40, 0);
+    b.add_scene(file, "挨拶_1", Some("会話_1"), 20, 30, 1);
     let index = b.finish();
 
     let map = SourceMap::new();
@@ -121,7 +121,7 @@ fn play_at_req(seq: u64, uri: &str, line: u32) -> Value {
 
 /// 4.2: a `pasta/playSceneAt` at a resolvable position with a wired sink — the
 /// sink is called exactly once with the resolved composite scene
-/// (`:会話1:挨拶_1`) and a success ack is sent, correlated to the request seq.
+/// (`:会話_1:挨拶_1`) and a success ack is sent, correlated to the request seq.
 #[test]
 fn resolvable_position_calls_sink_once_and_acks() {
     let file = "C:/work/dic/talk.pasta";
@@ -148,7 +148,7 @@ fn resolvable_position_calls_sink_once_and_acks() {
         let recorded = calls.lock().unwrap();
         assert_eq!(
             recorded.as_slice(),
-            [":会話1:挨拶_1".to_string()],
+            [":会話_1:挨拶_1".to_string()],
             "sink called once with the resolved scene"
         );
     }
@@ -168,7 +168,7 @@ fn resolvable_position_calls_sink_once_and_acks() {
 }
 
 /// 4.2 (global): a position inside the global scene body (line 15, outside the
-/// local span) resolves to the plain scene id `会話1`.
+/// local span) resolves to the plain scene id `会話_1`.
 #[test]
 fn resolvable_global_position_kicks_plain_scene() {
     let file = "C:/work/dic/talk.pasta";
@@ -192,7 +192,7 @@ fn resolvable_global_position_kicks_plain_scene() {
 
     assert_eq!(
         calls.lock().unwrap().as_slice(),
-        ["会話1".to_string()],
+        ["会話_1".to_string()],
         "global position resolves to plain scene id"
     );
     let resp = h.recv();

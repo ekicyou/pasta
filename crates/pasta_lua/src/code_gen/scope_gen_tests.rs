@@ -334,7 +334,7 @@ fn non_select_cue_command_emits_nothing() {
 // level, the parent-global reference for locals, and per-base occurrence order
 // (globals' occurrence == runtime `create_scene` counter order). The captured
 // (join_key, start_line) pairs let task 2.2 reconstruct end_line/level and join
-// the runtime identity (e.g. `会話1`).
+// the runtime identity (e.g. `会話_1`).
 // ------------------------------------------------------------------
 
 /// Build a named local scene with an explicit span (start_line carried into the
@@ -410,7 +410,7 @@ fn global_and_local_scenes_record_join_keys_and_header_lines() {
         let mut output = Vec::new();
         let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
         cg.set_source_map(&mut sink);
-        // counter == 1: first occurrence of base 会話 (matches runtime 会話1).
+        // counter == 1: first occurrence of base 会話 (matches runtime 会話_1).
         cg.generate_global_scene(&scene, 1, &ctx, &attrs).unwrap();
     }
 
@@ -429,7 +429,7 @@ fn global_and_local_scenes_record_join_keys_and_header_lines() {
 
 /// Two global scenes sharing a base name get distinct per-base occurrence
 /// counters in their join keys, matching the runtime `create_scene` counter
-/// order (会話1, 会話2). This is the property task 2.2 relies on to join the
+/// order (会話_1, 会話_2). This is the property task 2.2 relies on to join the
 /// runtime identity back to the recorded span.
 #[test]
 fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {

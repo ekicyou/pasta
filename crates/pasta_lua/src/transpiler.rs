@@ -203,7 +203,7 @@ impl LuaTranspiler {
         let (_, counter) = context.register_global_scene(scene);
 
         // Register scene-level word definitions in WordDefRegistry
-        let module_name = format!("{}{}", SceneRegistry::sanitize_name(&scene.name), counter);
+        let module_name = SceneRegistry::registered_name(&scene.name, counter);
         for kw in &scene.words {
             for name in &kw.names {
                 context

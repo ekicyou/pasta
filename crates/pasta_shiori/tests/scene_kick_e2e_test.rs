@@ -157,8 +157,8 @@ fn kick_to_next_on_second_change_delivers_first_beat_end_to_end() {
     // 停止ループ（SessionCommand）は一切経由しない（停止非依存・socket-bridge inbound 同型）。
     let sink = pasta::actor::lifecycle::kick_sink();
     sink(KickRequest {
-        // キックはシーン表の登録名に完全一致で引く（作者名＋通し番号 `1` が登録名）。
-        scene: format!("{KICK_SCENE}1"),
+        // キックはシーン表の登録名に完全一致で引く（作者名・`_`・通し番号 `1` が登録名）。
+        scene: format!("{KICK_SCENE}_1"),
     });
 
     // --- フェーズ 4: 次の OnSecondChange GET でキック初回ビートが配信される ---

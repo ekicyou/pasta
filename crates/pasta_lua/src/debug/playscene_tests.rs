@@ -4,8 +4,8 @@
 //! 観測対象:
 //! 1. 正規化済みパスの一致: 同一ファイルを指す別形式 uri（パーセントエンコード・
 //!    区切り違い）が同一シーンへ解決する（`std::path::absolute` 正規化の固定）。
-//! 2. global 確定 → 取次呼出（`scene == "会話1"`・parent None）。
-//! 3. local 確定 → 取次呼出（`scene == ":会話1:挨拶_1"`・parent Some）。
+//! 2. global 確定 → 取次呼出（`scene == "会話_1"`・parent None）。
+//! 3. local 確定 → 取次呼出（`scene == ":会話_1:挨拶_1"`・parent Some）。
 //! 4. 未検出 → 取次しない・`ResolveOutcome::NotFound`。
 
 use std::sync::{Arc, Mutex};
@@ -26,12 +26,12 @@ fn mock_sink() -> (KickSink, Arc<Mutex<Vec<String>>>) {
 
 /// テスト用 `SourceMap`（索引充填済み）を構築する。
 ///
-/// `file` の global 会話1（行 10..=40・parent None）と、その内側 local 挨拶_1
-/// （行 20..=30・parent Some(会話1)）を投入する。
+/// `file` の global 会話_1（行 10..=40・parent None）と、その内側 local 挨拶_1
+/// （行 20..=30・parent Some(会話_1)）を投入する。
 fn map_with_index(file: &str) -> SourceMap {
     let mut b = SceneIdentityIndex::builder();
-    b.add_scene(file, "会話1", None, 10, 40, 0);
-    b.add_scene(file, "挨拶_1", Some("会話1"), 20, 30, 1);
+    b.add_scene(file, "会話_1", None, 10, 40, 0);
+    b.add_scene(file, "挨拶_1", Some("会話_1"), 20, 30, 1);
     let index = b.finish();
 
     let map = SourceMap::new();
@@ -42,20 +42,20 @@ fn map_with_index(file: &str) -> SourceMap {
 
 #[test]
 fn global_confirmed_kicks_with_plain_scene_id() {
-    // global 本体行（local 範囲外）→ scene == "会話1"（parent None）。
+    // global 本体行（local 範囲外）→ scene == "会話_1"（parent None）。
     let file = "C:/work/dic/talk.pasta";
     let map = map_with_index(file);
     let (sink, captured) = mock_sink();
 
     let outcome = resolve_and_kick(&map, &sink, "file:///C:/work/dic/talk.pasta", 15);
 
-    assert_eq!(outcome, ResolveOutcome::Resolved("会話1".to_string()));
-    assert_eq!(captured.lock().unwrap().as_slice(), &["会話1".to_string()]);
+    assert_eq!(outcome, ResolveOutcome::Resolved("会話_1".to_string()));
+    assert_eq!(captured.lock().unwrap().as_slice(), &["会話_1".to_string()]);
 }
 
 #[test]
 fn local_confirmed_kicks_with_composite_scene() {
-    // local 範囲内（最内 local 優先）→ scene == ":会話1:挨拶_1"（parent Some）。
+    // local 範囲内（最内 local 優先）→ scene == ":会話_1:挨拶_1"（parent Some）。
     let file = "C:/work/dic/talk.pasta";
     let map = map_with_index(file);
     let (sink, captured) = mock_sink();
@@ -64,11 +64,11 @@ fn local_confirmed_kicks_with_composite_scene() {
 
     assert_eq!(
         outcome,
-        ResolveOutcome::Resolved(":会話1:挨拶_1".to_string())
+        ResolveOutcome::Resolved(":会話_1:挨拶_1".to_string())
     );
     assert_eq!(
         captured.lock().unwrap().as_slice(),
-        &[":会話1:挨拶_1".to_string()]
+        &[":会話_1:挨拶_1".to_string()]
     );
 }
 
@@ -104,7 +104,10 @@ fn differently_formatted_equivalent_uris_resolve_to_same_scene() {
     let out_b = resolve_and_kick(&map, &sink_b, "file:///C:/work/dic/talk.pasta", 25);
 
     assert_eq!(out_a, out_b, "別形式 uri は同一シーンへ解決する");
-    assert_eq!(out_a, ResolveOutcome::Resolved(":会話1:挨拶_1".to_string()));
+    assert_eq!(
+        out_a,
+        ResolveOutcome::Resolved(":会話_1:挨拶_1".to_string())
+    );
     assert_eq!(*cap_a.lock().unwrap(), *cap_b.lock().unwrap());
 }
 
@@ -157,7 +160,7 @@ fn windows_and_uri_encoded_forms_all_resolve_to_same_local_scene() {
         "file:///c:/work/dic/talk.pasta",   // file:// + 小文字ドライブ
     ];
 
-    let expected = ResolveOutcome::Resolved(":会話1:挨拶_1".to_string());
+    let expected = ResolveOutcome::Resolved(":会話_1:挨拶_1".to_string());
     for form in equivalent_forms {
         let (sink, _captured) = mock_sink();
         let outcome = resolve_and_kick(&map, &sink, form, 25);
@@ -195,7 +198,7 @@ fn japanese_filename_percent_encoded_uri_resolves_to_same_scene() {
 
     assert_eq!(
         out_enc,
-        ResolveOutcome::Resolved(":会話1:挨拶_1".to_string()),
+        ResolveOutcome::Resolved(":会話_1:挨拶_1".to_string()),
         "マルチバイト日本語名の %xx デコードが正しく UTF-8 を復元し解決する"
     );
     assert_eq!(
@@ -282,7 +285,7 @@ fn nonexistent_path_still_resolves_fs_independent() {
 
     assert_eq!(
         outcome,
-        ResolveOutcome::Resolved(":会話1:挨拶_1".to_string()),
+        ResolveOutcome::Resolved(":会話_1:挨拶_1".to_string()),
         "実在しないパス（8.3 短縮名 RUNNER~1 を含む）でも字句的に正規化され解決する＝\n\
          FS 非依存（std::path::absolute）。fs::canonicalize は実在しないパスで Err になる。"
     );
