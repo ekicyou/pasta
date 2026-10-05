@@ -383,3 +383,78 @@ fn test_break_lines_tags_only_input_unchanged() {
 
     assert_eq!(result, r"\h\s[0]");
 }
+
+// ============================================
+// SSP にそろえたタグの読み取り: ウェイトはタグの直後の字に付き、
+// エスケープ・囲み・引数の中には入らない（paragraph-break-tag-only-talk 6.5）
+// Requirement: 6.4, 6.5, 7.4, 7.6, 7.7, 8.2, 9.2
+// ============================================
+
+/// `talk_to_script(nil, input)` を指定の設定で呼ぶ
+fn talk_with(config: &TalkConfig, input: &str) -> String {
+    let lua = create_sakura_test_runtime_with_config(config);
+    let talk_to_script: mlua::Function = lua
+        .load(r#"return require("@pasta_sakura_script").talk_to_script"#)
+        .eval()
+        .unwrap();
+    talk_to_script.call((mlua::Value::Nil, input)).unwrap()
+}
+
+/// 通常の字のウェイトが見える設定（100ms → 実効 50ms → `\_w[50]`）
+fn visible_normal_wait() -> TalkConfig {
+    TalkConfig {
+        script_wait_normal: 100,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn test_wait_follows_char_right_after_tag_name() {
+    // `\n` の名前は 1 文字で終わり、後ろの `Hello` は通常の字としてウェイトが付く（7.4）
+    assert_eq!(
+        talk_with(&visible_normal_wait(), r"\nHello"),
+        r"\nH\_w[50]e\_w[50]l\_w[50]l\_w[50]o\_w[50]"
+    );
+}
+
+#[test]
+fn test_strong_wait_after_tag_name_with_default_config() {
+    // 既定値でも `\n` の後ろの `!?` は強調の字としてウェイトが付く（7.4）
+    assert_eq!(talk_with(&TalkConfig::default(), r"\n!?"), r"\n!?\_w[450]");
+}
+
+#[test]
+fn test_no_wait_inside_or_right_after_percent_escape() {
+    // `\%` は 1 単位。間にも直後にもウェイトは入らない（8.2）
+    assert_eq!(
+        talk_with(&visible_normal_wait(), r"100\%です"),
+        r"1\_w[50]0\_w[50]0\_w[50]\%で\_w[50]す\_w[50]"
+    );
+}
+
+#[test]
+fn test_no_wait_inside_literal_region() {
+    // `\_?` … `\_?` の囲みは全体で 1 単位。中の字にもタグにもウェイトは入らない（9.2）
+    assert_eq!(
+        talk_with(&visible_normal_wait(), r"あ\_?\s[1]abc\_?い"),
+        r"あ\_w[50]\_?\s[1]abc\_?い\_w[50]"
+    );
+}
+
+#[test]
+fn test_no_wait_inside_tag_argument_with_escaped_bracket() {
+    // 引数の中の `\]` は `\` ＋ 1 文字の組で、引数は `X]` で閉じる（7.6）
+    assert_eq!(
+        talk_with(&visible_normal_wait(), r"\q[a\]b,X]やあ"),
+        r"\q[a\]b,X]や\_w[50]あ\_w[50]"
+    );
+}
+
+#[test]
+fn test_no_wait_inside_quoted_tag_argument() {
+    // 引数の先頭の `"…"` は引用で、中の `]` で引数は閉じない（7.7）
+    assert_eq!(
+        talk_with(&visible_normal_wait(), r#"\![raise,X,"a]b"]やあ"#),
+        r#"\![raise,X,"a]b"]や\_w[50]あ\_w[50]"#
+    );
+}
