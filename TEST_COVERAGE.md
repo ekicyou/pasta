@@ -37,7 +37,7 @@
 | アクション行（発言）         | `transpiler_basic_test.rs`                     | ✅ 完了 | キャラクター発言                                |
 | Luaコードブロック            | `actor_code_block_test.rs`                     | ✅ 完了 | 関数定義                                        |
 | バイトオフセット             | `span_byte_offset_test.rs`                     | ✅ 完了 | エラー位置特定                                  |
-| さくらスクリプト記号タグ     | `sakura_symbol_tag_test.rs`                    | ✅ 完了 | `-+*?&` 5文字タグパース（7テスト）              |
+| さくらスクリプト記号タグ     | `sakura_symbol_tag_test.rs`                    | ✅ 完了 | `-+*?&` 5文字タグパース（7テスト）、SSP にそろえた読み方（名前 1 文字・数字付きの形・引数のエスケープと先頭の引用・`\%`・囲み・1 行の中だけで読む・単語の値）（paragraph-break-tag-only-talk） |
 | キューコマンド行（！/!）     | `cue_cmd_test.rs`                              | ✅ 完了 | 63テスト（AST型・PEG文法・パース・推定）        |
 | プロパティスコープ（＄％）   | `property_scope_test.rs`                       | ✅ 完了 | 16テスト（property-dsl-extension）              |
 | 選択肢行（＠？）             | `choice_line_test.rs`                          | ✅ 完了 | 選択肢行パース（省略形・括弧形・半角対応）      |
@@ -106,6 +106,9 @@
 | LuaConfig TOML設定                    | `loader_config_test.rs`（外部化）                                 | ✅ 完了 | 6テスト（外部化済み）                                            |
 | さくらスクリプトウェイト挿入          | `sakura_script_basic_test.rs`<br>`sakura_script_output_test.rs`   | ✅ 完了 | 22テスト（2ファイルに分割）                                      |
 | さくらスクリプト記号タグトークナイズ  | `tokenizer.rs` 内テスト                                           | ✅ 完了 | 6テスト（`-+*?&` タグ認識）                                      |
+| タグの読み取りの 3 か所の一致         | `sakura_script/conformance_test.rs`<br>`tokenizer.rs` 内 `test_tag_pattern_table` | ✅ 完了 | 38 事例の表を Rust・Lua（`APPEARANCE.tag_at`）・DSL の 3 つに通す＋正規表現の表 31 事例（paragraph-break-tag-only-talk） |
+| タグ・エスケープ・囲みとウェイト・改行 | `sakura_script/edge_case_test.rs`<br>`sakura_script/budoux_test.rs` | ✅ 完了 | タグ直後の字のウェイト・`\%`/囲み/引数の中に何も入らない・単位にならない `\` の直後にウェイトを入れない（paragraph-break-tag-only-talk） |
+| 段落区切りの字の判定                  | `sakura_builder_test.lua`<br>`shiori_act_test.lua`<br>`appearance_test.lua` | ✅ 完了 | 申し送り (a)(b)・字の境界 28 件・保留中の改行・スクリプト API 経路、外見の観測の正確な名前の判定と囲み（paragraph-break-tag-only-talk） |
 | EVENT.fire コルーチン対応             | `event_coroutine_test.lua`                                        | ✅ 完了 | 17テスト（resume_until_valid含む、callback-resume-unification追加1） |
 | resume_until_valid nil yieldスキップ  | `event_coroutine_test.lua`                                        | ✅ 完了 | 6テスト（coroutine-resume-loop）                                 |
 | CALLBACK モジュール（非同期通信基盤） | `callback_module_test.lua`                                        | ✅ 完了 | 34テスト（shiori-async-talk、callback-resume-unification追加13） |
@@ -170,7 +173,7 @@
 
 | 機能                              | テストファイル                                | 状態   | 説明                                                       |
 | --------------------------------- | --------------------------------------------- | ------ | ---------------------------------------------------------- |
-| TextMate文法（全角/半角マーカー） | `editors/vscode/src/test/tmGrammar.test.ts`   | ✅ 完了 | 27テスト（9構文×全角半角+アクション行ほか）                |
+| TextMate文法（全角/半角マーカー） | `editors/vscode/src/test/tmGrammar.test.ts`   | ✅ 完了 | 27テスト（9構文×全角半角+アクション行ほか）、タグ・`\%`・囲みの色分け 4 件（paragraph-break-tag-only-talk） |
 | デバッグアダプタファクトリ        | `editors/vscode/src/test/debugAdapterFactory.test.ts` | ✅ 完了 | 16テスト（attach 解決・ポート既定値）             |
 | ソース表示トグル                  | `editors/vscode/src/test/sourcePresentationToggle.test.ts` | ✅ 完了 | 17テスト                                     |
 | VSCodeモジュール直接テスト        | `editors/vscode/src/test/vscodeModules.test.ts` | ✅ 完了 | 45テスト（esbuild --alias:vscode モックで実モジュール検証。旧 wasmBridge.test.ts / integration.test.ts は 3.57 で本テストへ統合・削除済み） |
