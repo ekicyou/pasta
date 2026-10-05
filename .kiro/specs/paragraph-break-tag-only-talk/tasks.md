@@ -140,7 +140,7 @@
   - _Requirements: 5.1, 5.2, 5.4, 5.6_
   - _Boundary: Docs_
 
-- [ ] 6.4 スキル `references/` を生成ツールで再生成し、マニュアルの検証を通す
+- [x] 6.4 スキル `references/` を生成ツールで再生成し、マニュアルの検証を通す
   - 生成ファイルは手で編集しない
   - 完了状態: `node book/tools/gen-skill-refs.mjs` の後に `--check`・`link-check.mjs`・`verify-content.mjs` がすべて成功し、2 スキルの対象 6 ファイルだけが再生成で変わっている
   - _Requirements: 5.3, 5.4_
