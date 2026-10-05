@@ -20,7 +20,16 @@ use pasta::{PastaShiori, Shiori};
 /// 確かめる（204 は Value が無いので空文字列を返す。話すことが無い OnSecondChange が 204 になる）。
 /// ロガーは non_blocking で書くため、ゴーストを drop して書き出しを待ってからログを読む。
 fn run(requests: &[&str]) -> (Vec<String>, String) {
+    run_with_extra_dic(None, requests)
+}
+
+/// `run` に、読み込み前のフィクスチャへ足す辞書（`dic/extra.pasta` の中身）を指定できるようにしたもの。
+/// 共有のフィクスチャに置くとほかのテストの挙動を変えてしまうシーン（`＊OnChoiceSelectEx` など）に使う。
+fn run_with_extra_dic(extra_dic: Option<&str>, requests: &[&str]) -> (Vec<String>, String) {
     let temp = copy_fixture_to_temp("call_execution_correctness");
+    if let Some(extra) = extra_dic {
+        std::fs::write(temp.path().join("dic/extra.pasta"), extra).expect("write extra dic");
+    }
     let values = {
         let mut shiori = PastaShiori::default();
         assert!(
@@ -228,4 +237,189 @@ fn test_dynamic_mid_call_to_other_global_restores_context() {
 #[test]
 fn test_mid_call_to_global_function_calling_other_global() {
     assert_fires("OnGlobalTargetMid", r"\p[0]先元\e");
+}
+
+// ---------------------------------------------------------------------------
+// 選択肢の探索範囲（tasks 4.2）
+// 辞書: dic/choice_scope.pasta（2.6 は dic/characterization.pasta の OnChoiceMenu）。選択肢を出したシーン（A）と
+// もう一方のシーン（B）の両方に同名のローカルシーンを置き、ジャンプ先の出力でどちらから探したかを見分ける。
+// `\q` の第 3 引数は登録名（元の名前_連番）。
+// ---------------------------------------------------------------------------
+
+/// `OnChoiceSelectEx` のリクエスト（Reference0=表示、Reference1=ジャンプ先、Reference2=探索範囲）
+fn choice_select(display: &str, target: &str, scope: Option<&str>) -> String {
+    let mut req = format!("ID: OnChoiceSelectEx\r\nReference0: {display}\r\nReference1: {target}");
+    if let Some(scope) = scope {
+        req.push_str(&format!("\r\nReference2: {scope}"));
+    }
+    req
+}
+
+/// 応答の `\q[display,target,scope]` から scope（第 3 引数）を取り出す
+fn choice_scope<'a>(value: &'a str, display: &str, target: &str) -> &'a str {
+    let head = format!(r"\q[{display},{target},");
+    let start = value
+        .find(&head)
+        .unwrap_or_else(|| panic!("{head} not found in {value}"))
+        + head.len();
+    let len = value[start..].find(']').expect(r"\q must be closed");
+    &value[start..start + len]
+}
+
+/// `event` を起こし、続けて `choices` の選択肢（表示、ジャンプ先、`\q` の第 3 引数、選んだときの応答）を
+/// その第 3 引数を Reference2 に載せて選ぶ。`event` の応答が `response` で、その中の `\q` の第 3 引数が
+/// 送ったものと同じであること（応答に載った探索範囲が SSP から戻る）と、ジャンプ先の出力を確かめる。
+/// 選択肢ごとに新しいゴーストで起こし直す
+fn assert_choice_jumps(event: &str, response: &str, choices: &[(&str, &str, &str, &str)]) {
+    for &(display, target, scope, expected) in choices {
+        let (values, log) = run(&[
+            &format!("ID: {event}"),
+            &choice_select(display, target, Some(scope)),
+        ]);
+        assert_eq!(values[0], response, "{event}");
+        assert_eq!(
+            choice_scope(&values[0], display, target),
+            scope,
+            "{event}: {target}"
+        );
+        assert_eq!(values[1], expected, "{event}: choose {display}/{target}");
+        assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+    }
+}
+
+/// 2.1・2.7: A が途中の Call で B を呼び、戻った後に A が出した選択肢は A の配下から探し、A の配下に
+/// 無ければ（B の配下にあっても）グローバルシーンを探す
+#[test]
+fn test_choice_after_mid_call_routes_to_emitter() {
+    assert_choice_jumps(
+        "OnCsAfterMid",
+        r"\p[0]Ｂ通過選んで\![*]\q[後,後選先,OnCsAfterMid_1]\![*]\q[外,後選外,OnCsAfterMid_1]\e",
+        &[
+            ("後", "後選先", "OnCsAfterMid_1", r"\p[0]Ａの後選先\e"),
+            (
+                "外",
+                "後選外",
+                "OnCsAfterMid_1",
+                r"\p[0]グローバルの後選外\e",
+            ),
+        ],
+    );
+}
+
+/// 2.2: A が選択肢を出した後に途中の Call で B を呼び、戻って A の続きの行を実行して終わっても、A の配下から探す
+#[test]
+fn test_choice_before_mid_call_routes_to_emitter() {
+    assert_choice_jumps(
+        "OnCsBeforeMid",
+        r"\p[0]選んで\![*]\q[前,前選先,OnCsBeforeMid_1]Ｂ通過Ａ再開\e",
+        &[("前", "前選先", "OnCsBeforeMid_1", r"\p[0]Ａの前選先\e")],
+    );
+}
+
+/// 2.3・2.7: 呼ばれた側 B が出した選択肢は、A に戻って A が（自分のローカルシーンを呼んでから）終わっても
+/// B の配下から探し、B の配下に無ければ（A の配下にあっても）グローバルシーンを探す
+#[test]
+fn test_choice_from_callee_routes_to_callee() {
+    assert_choice_jumps(
+        "OnCsFromCallee",
+        r"\p[0]選んで\![*]\q[出,出選先,出選Ｂ_1]\![*]\q[外,出選外,出選Ｂ_1]Ａ通過\e",
+        &[
+            ("出", "出選先", "出選Ｂ_1", r"\p[0]Ｂの出選先\e"),
+            ("外", "出選外", "出選Ｂ_1", r"\p[0]グローバルの出選外\e"),
+        ],
+    );
+}
+
+/// 2.4: 1 つの応答に A と、A が途中の Call で呼んだ B が同じジャンプ先名で出した選択肢があるとき、どちらを選んでも出したシーンの
+/// 配下から探す
+#[test]
+fn test_choices_from_both_scenes_in_one_response() {
+    assert_choice_jumps(
+        "OnCsBoth",
+        r"\p[0]Ａから\![*]\q[Ａの,両選先,OnCsBoth_1]Ｂから\![*]\q[Ｂの,両選先,両選Ｂ_1]Ａ再開\e",
+        &[
+            ("Ａの", "両選先", "OnCsBoth_1", r"\p[0]Ａの両選先\e"),
+            ("Ｂの", "両選先", "両選Ｂ_1", r"\p[0]Ｂの両選先\e"),
+        ],
+    );
+}
+
+/// 2.5: A が末尾の Call で B へ移り、B が出した選択肢は B の配下から探す
+#[test]
+fn test_choice_after_tail_call_routes_to_callee() {
+    assert_choice_jumps(
+        "OnCsTail",
+        r"\p[0]Ａ通過選んで\![*]\q[末,末選先,末選Ｂ_1]\e",
+        &[("末", "末選先", "末選Ｂ_1", r"\p[0]Ｂの末選先\e")],
+    );
+}
+
+/// 2.6: 別のグローバルシーンへの途中の Call を含まないシーンの選択肢は、`\q` に出したシーンが加わり、
+/// ジャンプ先は現行どおり（出したシーンの配下、無ければグローバルシーン）
+#[test]
+fn test_choice_without_mid_call_carries_scope() {
+    assert_choice_jumps(
+        "OnChoiceMenu",
+        r"\p[0]どれ？\_w[450]\![*]\q[甲,選択肢甲,OnChoiceMenu_1]\![*]\q[乙,選択肢乙,OnChoiceMenu_1]\e",
+        &[
+            ("甲", "選択肢甲", "OnChoiceMenu_1", r"\p[0]メニューの甲\e"),
+            ("乙", "選択肢乙", "OnChoiceMenu_1", r"\p[0]グローバルの乙\e"),
+        ],
+    );
+}
+
+/// 2.8: 呼ばれた側 B が選択肢を出した後に `＞チェイントーク` で中断し、中断中に選ばれても B の配下から探す
+#[test]
+fn test_choice_during_chain_talk_suspension_routes_to_callee() {
+    assert_choice_jumps(
+        "OnCsSuspend",
+        r"\p[0]選んで\![*]\q[止,止選先,止選Ｂ_1]\e",
+        &[("止", "止選先", "止選Ｂ_1", r"\p[0]Ｂの止選先\e")],
+    );
+}
+
+/// 3.2: 式の関数呼び出しが 5 段目で別のグローバルシーン B を実行した後も、B が出した選択肢は B の配下から、
+/// A が出した選択肢は A の配下から探す
+#[test]
+fn test_choices_after_expr_fn_global_scene_route_to_emitters() {
+    assert_choice_jumps(
+        "OnCsExpr",
+        r"\p[0]Ｂから\![*]\q[Ｂの,式選先,式選Ｂ_1]Ａから\![*]\q[Ａの,式選先,OnCsExpr_1]\e",
+        &[
+            ("Ｂの", "式選先", "式選Ｂ_1", r"\p[0]Ｂの式選先\e"),
+            ("Ａの", "式選先", "OnCsExpr_1", r"\p[0]Ａの式選先\e"),
+        ],
+    );
+}
+
+/// 2.9: Reference2 が無い、または既知のグローバルシーン名でない選択は、最後にシーン文脈となったグローバル
+/// シーンの配下から探す。OnCsAfterMid では途中の Call の先（後選Ｂ）が最後にシーン文脈となっている
+#[test]
+fn test_choice_without_known_scope_falls_back_to_last_global_scene() {
+    for scope in [None, Some("無いシーン")] {
+        let (values, log) = run(&["ID: OnCsAfterMid", &choice_select("後", "後選先", scope)]);
+        assert_eq!(values[1], r"\p[0]Ｂの後選先\e", "Reference2 = {scope:?}");
+        assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+    }
+}
+
+/// 2.7: 明示的な `＊OnChoiceSelectEx` シーンは Reference2 があっても優先される。見つからない選択 ID は
+/// 現行どおり 204（話すことが無い）
+#[test]
+fn test_choice_routing_order_unchanged() {
+    let (values, log) = run_with_extra_dic(
+        Some("＊OnChoiceSelectEx\n　さくら：明示シーン\n"),
+        &[
+            "ID: OnCsAfterMid",
+            &choice_select("後", "後選先", Some("OnCsAfterMid_1")),
+        ],
+    );
+    assert_eq!(values[1], r"\p[0]明示シーン\e");
+    assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+
+    let (values, _) = run(&[
+        "ID: OnCsAfterMid",
+        &choice_select("無", "どこにも無い先", Some("OnCsAfterMid_1")),
+    ]);
+    assert_eq!(values[1], "");
 }
