@@ -404,6 +404,14 @@ fn test_talk_to_script_budoux_no_break_inside_literal_region() {
 }
 
 #[test]
+fn test_talk_to_script_budoux_no_break_right_after_non_unit_backslash() {
+    // 単位にならない `\` の直後に改行を挿むと `\\n` ができるので、改行は `\` の前に入れる（7.10）
+    let out = talk_with_budoux(r"今日は\いい天気ですね");
+    assert!(!out.contains(r"\\"), "`\\` が作られた: {out}");
+    assert_eq!(out.replace(r"\n", ""), r"今日は\いい天気ですね");
+}
+
+#[test]
 fn test_talk_to_script_budoux_no_break_inside_percent_escape() {
     // `\%` は幅 0 の 1 単位として前の字に付いて運ばれ、`\%` の前にも間にも改行は入らない（8.2）
     assert_eq!(

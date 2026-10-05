@@ -451,6 +451,16 @@ fn test_no_wait_inside_tag_argument_with_escaped_bracket() {
 }
 
 #[test]
+fn test_no_wait_right_after_non_unit_backslash() {
+    // 単位にならない `\` は通常の字（7.10）。直後にウェイトを挿むと `\\` ができ、
+    // SSP がエスケープ ＋ 字として読むので、ウェイトは続く字の後ろに付ける
+    let config = visible_normal_wait();
+    assert_eq!(talk_with(&config, r"\あい"), r"\あ\_w[50]い\_w[50]");
+    assert_eq!(talk_with(&config, r"\_あ"), r"\_\_w[50]あ\_w[50]");
+    assert_eq!(talk_with(&config, r"あ\"), r"あ\_w[50]\");
+}
+
+#[test]
 fn test_no_wait_inside_quoted_tag_argument() {
     // 引数の先頭の `"…"` は引用で、中の `]` で引数は閉じない（7.7）
     assert_eq!(
