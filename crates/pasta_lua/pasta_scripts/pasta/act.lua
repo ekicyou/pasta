@@ -405,7 +405,8 @@ function ACT_IMPL.word(self, name, var_path)
         return nil
     end
     if type(handler) == "function" then
-        return handler(self)
+        local scene = self.current_scene
+        return self:restore_scene(scene, handler(self))
     end
     return tostring(handler)
 end
@@ -419,7 +420,8 @@ end
 local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
-        return handler(self, ...)
+        local scene = self.current_scene
+        return self:restore_scene(scene, handler(self, ...))
     end
     log.warn(string.format("act:expr_fn - handler not found: key='%s', mode='expr', via=act",
         tostring(key)))
@@ -489,7 +491,8 @@ end
 function ACT_IMPL.global_fn(self, name, ...)
     local f = GLOBAL[name]
     if type(f) == "function" then
-        return f(self, ...)
+        local scene = self.current_scene
+        return self:restore_scene(scene, f(self, ...))
     end
     log.warn(string.format("act:global_fn - function not found: key='%s'", tostring(name)))
     return nil

@@ -236,7 +236,9 @@ fn test_t1_actor_function_exact_match() {
         sakura.時刻 = function(act) return "朝" end
         
         -- Create mock act
+        -- プロキシは関数ハンドラの後に act:restore_scene で文脈を戻す（call-execution-correctness 2.3）
         local act = { current_scene = nil }
+        function act:restore_scene(scene, ...) self.current_scene = scene; return ... end
         local proxy = ACTOR.create_proxy(sakura, act)
         
         return proxy:word("時刻")
@@ -268,7 +270,9 @@ fn test_t12_function_priority_over_dict() {
         local sakura = ACTOR.get_or_create("さくら")
         sakura.天気 = function(act) return "アクター関数の天気" end
         
+        -- プロキシは関数ハンドラの後に act:restore_scene で文脈を戻す（call-execution-correctness 2.3）
         local act = { current_scene = nil }
+        function act:restore_scene(scene, ...) self.current_scene = scene; return ... end
         local proxy = ACTOR.create_proxy(sakura, act)
         
         return proxy:word("天気")

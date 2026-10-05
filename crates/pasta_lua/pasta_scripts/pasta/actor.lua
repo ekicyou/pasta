@@ -189,7 +189,8 @@ end
 local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
-        return drop_self(self, handler(self.act, ...))
+        local scene = self.act.current_scene
+        return drop_self(self, self.act:restore_scene(scene, handler(self.act, ...)))
     end
     log.warn(string.format("proxy:expr_fn - handler not found: key='%s', mode='expr', via=proxy(%s)",
         tostring(key), tostring(self.actor.name)))
@@ -250,7 +251,8 @@ function PROXY_IMPL.word(self, name, var_path)
         return nil
     end
     if type(handler) == "function" then
-        return drop_self(self, handler(receiver))
+        local scene = self.act.current_scene
+        return drop_self(self, self.act:restore_scene(scene, handler(receiver)))
     end
     return tostring(handler)
 end

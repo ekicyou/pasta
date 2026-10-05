@@ -421,3 +421,119 @@ describe("act:call の失敗の分岐", function()
         end)
     end)
 end)
+
+-- ============================================================================
+-- 式の関数呼び出し・＠＊関数・単語の関数ハンドラの後の文脈 (call-execution-correctness 2.3)
+-- ============================================================================
+
+--- 呼び出しの戻り値を個数つきで受ける
+local function pack(...) return select("#", ...), ... end
+
+describe("式の関数呼び出し・＠＊関数・単語の関数ハンドラの後の文脈", function()
+    test("act:expr_fn: ハンドラが別シーンを初期化しても戻し、複数の戻り値と引数をそのまま通す", function()
+        with_captured_act(function(ACT)
+            local act = ACT.new({})
+            local got
+            local A = { __global_name__ = "A" }
+            A.f = function(a, x, y)
+                a:init_scene({ __global_name__ = "B" })
+                got = { x, y }
+                return "r1", nil, "r3"
+            end
+            act:init_scene(A)
+            local n, r1, r2, r3 = pack(act:expr_fn("f", "p1", "p2"))
+            expect(act.current_scene):toBe(A)
+            expect(n):toBe(3)
+            expect(r1):toBe("r1")
+            expect(r2):toBe(nil)
+            expect(r3):toBe("r3")
+            expect(got[1]):toBe("p1")
+            expect(got[2]):toBe("p2")
+        end)
+    end)
+
+    test("act:expr_fn_var（＠＄変数（…））も同じく戻す", function()
+        with_captured_act(function(ACT)
+            local act = ACT.new({})
+            local A = { __global_name__ = "A", f = scene_handler({ __global_name__ = "B" }, "ret") }
+            act:init_scene(A)
+            expect(act:expr_fn_var("f", "var.x")):toBe("ret")
+            expect(act.current_scene):toBe(A)
+        end)
+    end)
+
+    test("proxy:expr_fn: 戻した後も drop_self の正規化と複数の戻り値はそのまま", function()
+        with_captured_act(function(ACT)
+            local ACTOR = require("pasta.actor")
+            local act = ACT.new({ ["復元テスト俳優_expr"] = ACTOR.get_or_create("復元テスト俳優_expr") })
+            local proxy = act["復元テスト俳優_expr"]
+            local A = { __global_name__ = "A" }
+            A.f = function(a, x)
+                a:init_scene({ __global_name__ = "B" })
+                return x, "r2"
+            end
+            A.self_ret = function(a)
+                a:init_scene({ __global_name__ = "B" })
+                return a
+            end
+            act:init_scene(A)
+            local n, r1, r2 = pack(proxy:expr_fn("f", "p1"))
+            expect(act.current_scene):toBe(A)
+            expect(n):toBe(2)
+            expect(r1):toBe("p1")
+            expect(r2):toBe("r2")
+            expect(proxy:expr_fn("self_ret")):toBe(nil)
+            expect(act.current_scene):toBe(A)
+        end)
+    end)
+
+    test("act:global_fn（＠＊関数（…））: 中から別シーンを初期化しても戻し、戻り値をそのまま通す", function()
+        with_captured_act(function(ACT)
+            local GLOBAL = require("pasta.global")
+            local act = ACT.new({})
+            local A = { __global_name__ = "A" }
+            GLOBAL.__expr_restore_test_fn = function(a, x)
+                a:init_scene({ __global_name__ = "B" })
+                return x, nil, "r3"
+            end
+            act:init_scene(A)
+            local n, r1, r2, r3 = pack(act:global_fn("__expr_restore_test_fn", "p1"))
+            GLOBAL.__expr_restore_test_fn = nil
+            expect(act.current_scene):toBe(A)
+            expect(n):toBe(3)
+            expect(r1):toBe("p1")
+            expect(r2):toBe(nil)
+            expect(r3):toBe("r3")
+        end)
+    end)
+
+    test("act:word: 関数ハンドラが別シーンを初期化しても戻す", function()
+        with_captured_act(function(ACT)
+            local act = ACT.new({})
+            local A = { __global_name__ = "A", w = scene_handler({ __global_name__ = "B" }, "単語") }
+            act:init_scene(A)
+            expect(act:word("w")):toBe("単語")
+            expect(act.current_scene):toBe(A)
+        end)
+    end)
+
+    test("proxy:word: アクターの段・act の段のどちらの関数ハンドラでも戻す", function()
+        with_captured_act(function(ACT)
+            local ACTOR = require("pasta.actor")
+            local actor = ACTOR.get_or_create("復元テスト俳優_word")
+            local act = ACT.new({ ["復元テスト俳優_word"] = actor })
+            local proxy = act["復元テスト俳優_word"]
+            local A = { __global_name__ = "A", w = scene_handler({ __global_name__ = "B" }, "act段") }
+            actor.aw = function(p)
+                p.act:init_scene({ __global_name__ = "C" })
+                return "アクター段"
+            end
+            act:init_scene(A)
+            expect(proxy:word("aw")):toBe("アクター段")
+            expect(act.current_scene):toBe(A)
+            expect(proxy:word("w")):toBe("act段")
+            expect(act.current_scene):toBe(A)
+            actor.aw = nil
+        end)
+    end)
+end)
