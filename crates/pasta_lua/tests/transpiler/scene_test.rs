@@ -239,11 +239,11 @@ fn test_multiple_call_scenes_only_last_gets_return() {
     // Verify first and second calls do NOT have return (Requirement 4.2)
     // Counter now assigned by Lua runtime, uses SCENE.__global_name__
     assert!(
-        lua_code.contains(r#"act:call(SCENE.__global_name__, "シーン1""#),
+        lua_code.contains(r#"act:call_restore(SCENE.__global_name__, "シーン1""#),
         "First call should NOT have 'return' prefix. Generated code:\n{lua_code}"
     );
     assert!(
-        lua_code.contains(r#"act:call(SCENE.__global_name__, "シーン2""#),
+        lua_code.contains(r#"act:call_restore(SCENE.__global_name__, "シーン2""#),
         "Second call should NOT have 'return' prefix. Generated code:\n{lua_code}"
     );
 
@@ -285,7 +285,7 @@ fn test_call_scene_followed_by_action_no_return() {
     // Counter now assigned by Lua runtime, uses SCENE.__global_name__
     // The call should appear without return prefix
     assert!(
-        lua_code.contains(r#"act:call(SCENE.__global_name__, "シーン2""#),
+        lua_code.contains(r#"act:call_restore(SCENE.__global_name__, "シーン2""#),
         "Call should be present. Generated code:\n{lua_code}"
     );
 
@@ -297,7 +297,7 @@ fn test_call_scene_followed_by_action_no_return() {
 
     // Verify the talk action comes after the call
     let call_pos = lua_code
-        .find(r#"act:call(SCENE.__global_name__, "シーン2""#)
+        .find(r#"act:call_restore(SCENE.__global_name__, "シーン2""#)
         .expect("Call not found");
     let talk_pos = lua_code
         .find(r#"act:actor_proxy("さくら"):talk("#)

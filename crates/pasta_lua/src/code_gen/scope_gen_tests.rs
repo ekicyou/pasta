@@ -248,7 +248,7 @@ fn tco_return_only_for_trailing_call_scene() {
         cg.generate_local_scene_items(&[call_item("次"), talk_line("さくら", "やあ")])
     });
     assert!(
-        non_tail.contains("act:call(SCENE.__global_name__, \"次\"")
+        non_tail.contains("act:call_restore(SCENE.__global_name__, \"次\"")
             && !non_tail.contains("return act:call"),
         "non-trailing call must NOT get return prefix: {}",
         non_tail

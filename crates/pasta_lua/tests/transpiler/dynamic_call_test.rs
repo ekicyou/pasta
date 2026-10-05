@@ -41,10 +41,10 @@ fn test_dynamic_call_resolves_scene() {
     // Load the transpiled code — registers scenes
     lua.load(&lua_code).exec().unwrap();
 
-    // Verify Lua code contains tostring(var.target)
+    // Verify Lua code contains act:call_key(var.target, "var.target")
     assert!(
-        lua_code.contains("tostring(var.target)"),
-        "Dynamic call should use tostring(var.target). Code:\n{lua_code}"
+        lua_code.contains(r#"act:call_key(var.target, "var.target")"#),
+        "Dynamic call should use act:call_key(var.target, \"var.target\"). Code:\n{lua_code}"
     );
 }
 
@@ -67,11 +67,12 @@ fn test_dynamic_call_code_gen_output() {
         "Variable assignment not found. Code:\n{lua_code}"
     );
     assert!(
-        lua_code.contains("tostring(var.target)"),
-        "Dynamic call tostring not found. Code:\n{lua_code}"
+        lua_code.contains(r#"act:call_key(var.target, "var.target")"#),
+        "Dynamic call act:call_key not found. Code:\n{lua_code}"
     );
     assert!(
-        lua_code.contains("act:call(SCENE.__global_name__, tostring(var.target)"),
+        lua_code
+            .contains(r#"act:call(SCENE.__global_name__, act:call_key(var.target, "var.target")"#),
         "Dynamic call format incorrect. Code:\n{lua_code}"
     );
 }
@@ -196,7 +197,7 @@ fn test_dynamic_call_global_var_code_gen() {
     let (lua_code, _ctx) = transpile_with_context(source);
 
     assert!(
-        lua_code.contains("tostring(save.global_target)"),
+        lua_code.contains(r#"act:call_key(save.global_target, "save.global_target")"#),
         "Global var dynamic call should use save.xxx. Code:\n{lua_code}"
     );
 }
