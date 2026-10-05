@@ -1,9 +1,9 @@
 {
   "feature_name": "call-execution-correctness",
   "created_at": "2026-10-05T06:27:22Z",
-  "updated_at": "2026-10-05T12:00:00Z",
+  "updated_at": "2026-10-05T08:21:42Z",
   "language": "ja",
-  "phase": "design-generated",
+  "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -11,12 +11,12 @@
     },
     "design": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "tasks": {
-      "generated": false,
-      "approved": false
+      "generated": true,
+      "approved": true
     }
   },
-  "ready_for_implementation": false
+  "ready_for_implementation": true
 }

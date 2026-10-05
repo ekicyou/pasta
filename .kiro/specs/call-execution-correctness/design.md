@@ -461,7 +461,7 @@ function ACT_IMPL.failure(self, text, warning) end
 
 ### 既存テスト
 
-`cargo test --workspace` と `luacheck` が、生成形・検索キーの検証を書き換えた箇所を除いて変更なしで通る（8.5）。選択肢の応答文字列を完全一致で見ている既存のテストがあれば、`\q` の第 3 引数の分だけ更新する（Open Questions 1）。
+`cargo test --workspace` と `luacheck` が、生成形・検索キーの検証を書き換えた箇所を除いて変更なしで通る（8.5）。選択肢の応答文字列を完全一致で見ている既存のテストがあれば、`\q` の第 3 引数の分だけ更新する（設計ディスカッション #1）。
 
 ## Migration Strategy
 
