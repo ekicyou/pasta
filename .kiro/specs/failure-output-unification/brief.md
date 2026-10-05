@@ -47,6 +47,11 @@
   - 発言より前・アクター未確定の位置で失敗した場合の出し方。
   - 入れ子の失敗（内側が報告済み）で表記を 1 つに保つ規則。
   - 変数・関数の表記を DSL の書き方（`＄x`・`＠名前（）`）に揃えるか。`call-execution-correctness` は、ログの警告と同じ表記（`var.x`・`@名前()`）を `【Call失敗：…】` の枠で出し、失敗の出口を `act:failure(text, warning)` の 1 関数にした（同 spec の設計ディスカッション #2）。
+- **申し送り（`call-execution-correctness` より、2026-10-05）**: 完了時点の失敗表記の出口は次のとおり。詳細は `.kiro/specs/completed/call-execution-correctness/design.md` の ActFailure・DynamicCallKey。
+  - `act:failure(text, warning)` は、`warning` があれば `log.warn` し、既存の `raw_script` トークン `【text】` を積む。当初はアクター nil の `talk` だったが、句読点ウェイト（例 `var.\_w[950]`）と budoux の改行が入るため、開発者の判断で `raw_script` に変えた。新しいトークン型は作っていない。呼び出し元は `act:call`（見つからない）と `act:call_key`（キーにならない値）の 2 か所だけ。
+  - `raw_script` は直前に話したアクターのグループに入り、グループを区切らない。そのため（1）スコープを戻った直後が発言以外で始まる場合、段落区切りの改行が失敗表記の前に入らない（受け入れた差）。（2）`act:actor_proxy` の直前の話者の遡りが失敗表記で止まらず、未登録アクターの目印と警告は話者の切り替わりで 1 回だけ出る。他の失敗を載せ替えるときもこの性質を引き継ぐか決める。
+  - 失敗表記の中身はエスケープしていない。見つからない名前や値にさくらスクリプトのタグ（`\-` など）が入っているとそのまま実行される（アクション行の変数展開と同じ扱い）。一本化するときにエスケープするかを論点にする。
+  - 「Current State」の警告一覧に、次の警告が増えた: `act:call - key is not a string or number: [operand='…', ]value=…`（動的コールのキーが使えない値のとき）と、`WORD.dynamic_key(値, 経路, "act:call")` が出す `act:call - undefined variable`・`empty variable`・`unsupported value type`。`act:call - handler not found` は失敗表記を伴うようになった。
 
 ## Scope
 
