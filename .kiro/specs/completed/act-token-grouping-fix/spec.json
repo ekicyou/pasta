@@ -1,0 +1,23 @@
+{
+  "feature_name": "act-token-grouping-fix",
+  "created_at": "2026-10-04T09:04:35Z",
+  "updated_at": "2026-10-05T00:00:00Z",
+  "completed_at": "2026-10-05T00:00:00Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": false
+}

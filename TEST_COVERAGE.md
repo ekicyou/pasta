@@ -58,6 +58,7 @@
 | finalize_scene処理         | `finalize_scene_test.rs`                                         | ✅ 完了 | シーン初期化                |
 | SCENE.search() API         | `scene_search_test.rs`                                           | ✅ 完了 | 14テスト                    |
 | Registry境界回帰テスト     | `scene_registry.rs`<br>`word_registry.rs`<br>`scene_table_candidate_tests.rs`<br>`scene_table_resolve_filter_tests.rs`<br>`word_table_test.rs`<br>`random.rs`<br>`error.rs`（各内テスト） | ✅ 完了 | 38テスト（merge_from/register_global_raw/解決境界/セレクタ契約/エラー表示文言） |
+| セレクタの指定列           | `random.rs`（インライン）<br>`scene_table_candidate_tests.rs`<br>`word_table_test.rs`<br>`tests/search/module_test.rs` | ✅ 完了 | 整数を候補の並びの位置として巡ごとに当てはめる（モックの並べ替え・シーン/単語の 2 巡目・Lua 結合 8。範囲外・重複・負の整数・既定への復帰）（search-selector-indices） |
 | 記号を含む名前の照合       | `search/context.rs`（インライン）<br>`symbol_name_search_test.rs` | ✅ 完了 | 登録と検索が同じ照合規則を共有（単体8＋結合10。Call・SCENE.search・SHIORI応答・選択肢・アクター単語） |
 
 ### 2.3 Transpiler層テスト（Lua変換）
@@ -94,9 +95,9 @@
 | CONFIG.actor→STORE.actors初期化       | `config_actors_initialization_test.rs`                            | ✅ 完了 | 8テスト（pasta.tomlアクター設定）                                |
 | SHIORIレスポンスビルダー              | `shiori_res_test.rs`                                              | ✅ 完了 | 14テスト                                                         |
 | SHIORIイベントディスパッチ            | `shiori_event_dispatch_test.rs`<br>`shiori_event_handler_test.rs` | ✅ 完了 | 27テスト（2ファイルに分割）                                      |
-| SHIORI_ACT さくらスクリプト生成       | `shiori_act_test.lua`                                             | ✅ 完了 | 43テスト（日時転記 transfer_date_to_var 6テストを含むファイル全体実測 — 旧 47＋7 の二重計上を是正） |
+| SHIORI_ACT さくらスクリプト生成       | `shiori_act_test.lua`                                             | ✅ 完了 | 58テスト（ファイル全体実測。act-token-grouping-fix のバイト比較 13 件を含む） |
 | ACT トークンバッファ（親クラス）      | `act_test.lua`                                                    | ✅ 完了 | 37テスト（act-token-buffer-refactor、未登録アクターの set_spot 無視を追加）                            |
-| ACT トークングループ化                | `act_grouping_test.lua`                                           | ✅ 完了 | 25テスト（actor-talk-grouping、sakura_script grouping追加）      |
+| ACT トークングループ化                | `act_grouping_test.lua`                                           | ✅ 完了 | 29テスト（actor-talk-grouping、sakura_script grouping、act-token-grouping-fix のグループの開閉 4 件） |
 | sakura_builder トークン変換           | `sakura_builder_test.lua`                                         | ✅ 完了 | 52テスト（ファイル全体実測 — スポット/sakura_script/choice/string-buffer 系を含む） |
 | RuntimeConfig libs配列                | `runtime_test.rs`（外部化）                                       | ✅ 完了 | 17テスト（外部化済み）                                           |
 | LuaConfig TOML設定                    | `loader_config_test.rs`（外部化）                                 | ✅ 完了 | 6テスト（外部化済み）                                            |
