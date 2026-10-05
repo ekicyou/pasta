@@ -378,6 +378,37 @@ async function runTests(): Promise<void> {
     expect(scopeCoversExactly(dollar, '＄x', VAR_REF_SCOPE, dollar.indexOf('＄＄') + 1), '＄＄x keeps its existing variable range');
   });
 
+  // --- Sakura Script / Escape Tests (paragraph-break-tag-only-talk 10.6) ---
+  const SAKURA_SCOPE = 'string.other.sakura-script.pasta';
+  const ESCAPE_SCOPE = 'constant.character.escape.pasta';
+
+  test('さくらスクリプト \\nHello は \\n だけがタグ', () => {
+    expect(scopeCoversExactly('　さくら：\\nHello', '\\n', SAKURA_SCOPE), '\\n only should be sakura-script');
+  });
+
+  test('エスケープ \\% はエスケープスコープ', () => {
+    expect(scopeCoversExactly('　さくら：a\\%b', '\\%', ESCAPE_SCOPE), '\\% should be escape');
+  });
+
+  test('囲み \\_?＠w\\_? は全体がさくらスクリプト', () => {
+    const line = '　さくら：a\\_?＠w\\_?b';
+    expect(scopeCoversExactly(line, '\\_?＠w\\_?', SAKURA_SCOPE), 'literal region should be sakura-script');
+    expect(!hasScope(tokenizeLine(line).tokens, WORD_SCOPE), '＠w inside literal region must not be word-ref');
+  });
+
+  test('引数の中の \\] を含む \\s[a\\]b] は 1 つのトークン', () => {
+    const line = '　さくら：\\s[a\\]b]x';
+    const text = '\\s[a\\]b]';
+    const start = line.indexOf(text);
+    const end = start + text.length;
+    expect(
+      tokenizeLine(line).tokens.some(
+        (t) => t.startIndex === start && t.endIndex === end && t.scopes.includes(SAKURA_SCOPE)
+      ),
+      '\\s[a\\]b] should be one sakura-script token'
+    );
+  });
+
   test('既存: 代入行の右辺の動的参照は行全体の変数スコープのまま', () => {
     const line = '＄x＝＠＄y';
     expect(scopeCoversExactly(line, 'x＝＠＄y', 'variable.other.pasta'), 'assignment body stays variable.other.pasta');

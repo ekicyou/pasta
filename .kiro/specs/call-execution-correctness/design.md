@@ -390,7 +390,7 @@ function ACT_IMPL.failure(self, text, warning) end
 - `raw_script` にする理由: `sakura_builder` は `raw_script` の `text` をそのまま出し、`talk_to_script` を通さない。失敗表記はアクターの台詞ではないため、句読点のウェイトも budoux の改行も入れない（2026-10-05 に変更。それまではアクター nil の `talk` トークンで、全体の既定ウェイトが失敗表記にかかっていた）。
 - `group_by_actor` は `raw_script` を、アクターのグループがあればその内側に、無ければ最上位に置く。どちらも `sakura_builder` はスコープ切替タグを出さずにその位置へ文字を出す。直前に話したアクターのバルーンに続けて表示され、グループを区切らないため、次の発言が同じアクターなら切替タグも増えない。
 - まだ誰も話していない位置（出力の先頭、yield の直後）では、切替タグなしで現在のスコープ（応答の先頭なら `\0`）のバルーンに出る。
-- `raw_script` は空でない `talk` ではないため、段落区切りの判定（`pending_break`・`spot_has_text`）を変えない。保留中の段落区切りの改行は失敗表記の前には出ず、次の空でない `talk` の前に出る（受け入れた差）。
+- `raw_script` は字を出すトークン（talk-output.md の「字の定義」）ではないため、段落区切りの判定（`pending_break`・`spot_has_text`）を変えない。保留中の段落区切りの改行は失敗表記の前には出ず、その後の字を出すトークンの直前に出る（受け入れた差）。
 - 新しいトークン型は作らない（`sakura_builder`・`presentation` に手を入れない）。
 - `failure-output-unification` は、この関数の呼び出し元を増やす形で載せ替える。本 spec の呼び出し元は `act:call` と `act:call_key` の 2 か所だけである。
 

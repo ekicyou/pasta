@@ -156,7 +156,9 @@ fn append_with_per_char_wait(result: &mut String, text: &str, wait_ms: i64) {
 
     for c in text.chars() {
         result.push(c);
-        if effective_wait > 0 {
+        // Units never reach here, so a `\` is one that starts no unit. A wait right
+        // after it would form `\\` (an escape), so its wait goes after the next char.
+        if effective_wait > 0 && c != '\\' {
             result.push_str(&format!(r"\_w[{}]", effective_wait));
         }
     }

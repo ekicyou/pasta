@@ -4,6 +4,7 @@
 -- actor-surface-restore Task 2.2 (Requirements: 2.1, 2.2, 2.3, 2.4, 2.8, 2.9, 2.10, 2.11, 4.4, 5.5)
 -- actor-surface-restore Task 4.1 (Requirements: 3.1, 3.4, 3.11, 3.12, 3.13)
 -- actor-surface-restore Task 4.2 (Requirements: 3.2, 3.3, 3.5, 3.7, 3.8, 3.9, 3.10, 3.11, 2.11)
+-- paragraph-break-tag-only-talk Task 3.2 (Requirements: 8.3, 9.3, 9.4, 10.5)
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -84,6 +85,35 @@ describe("APPEARANCE.observe - サーフェス変更", function()
         expect(state.actors.A.surface):toBe("5")
     end)
 
+    test("\\%s[5] (エスケープ \\% の後の平文) は検出しない (8.3)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\%s[5]")
+        expect(state.actors.A):toBe(nil)
+        expect(state.spots[0]):toBe(nil)
+    end)
+
+    test("閉じた囲みの中の \\s[1] は記録しない (9.3)", function()
+        local state = known_spots()
+        APPEARANCE.observe(state, A, 0, "\\_?\\s[1]\\1\\_?")
+        expect(state.actors.A):toBe(nil)
+        expect(state.spots[0].surface):toBe("7")
+        expect(state.spots[1].surface):toBe("8")
+    end)
+
+    test("閉じない \\_? の後の \\s[1] は記録する (9.4)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\_?\\s[1]")
+        expect(state.actors.A.surface):toBe("1")
+        expect(state.spots[0].surface):toBe("1")
+    end)
+
+    test("\\s3x は \\s3 と読みサーフェス 3 を記録する (10.5)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\s3x")
+        expect(state.actors.A.surface):toBe("3")
+        expect(state.spots[0].surface):toBe("3")
+    end)
+
     test("他タグ引数内の入れ子タグは検出しない", function()
         local state = APPEARANCE.new()
         APPEARANCE.observe(state, A, 0, "\\![raise,OnX,\\s[0]]あ\\_a[\\s[3]]い")
@@ -143,7 +173,8 @@ describe("APPEARANCE.observe - サーフェス変更", function()
 end)
 
 describe("APPEARANCE.observe - スコープ切替タグ", function()
-    local scope_tags = { "\\0", "\\1", "\\h", "\\u", "\\p[2]", "\\p3" }
+    -- \hello・\p3x は \h・\p3 と読む（10.5）
+    local scope_tags = { "\\0", "\\1", "\\h", "\\u", "\\p[2]", "\\p3", "\\hello", "\\p3x" }
     for _, tag in ipairs(scope_tags) do
         test(tag .. " で全スポットを不明化し、以降の \\s を記録しない", function()
             local state = known_spots()
@@ -170,6 +201,21 @@ describe("APPEARANCE.observe - スコープ切替タグ", function()
         expect(state.actors == actors):toBe(true)
         expect(type(state.spots)):toBe("table")
     end)
+
+    local not_scope = {
+        { "\\_u[0x3042]（名前 _u）", "\\_u[0x3042]" },
+        { "閉じた囲みの中の \\1", "\\_?\\1\\_?" },
+    }
+    for _, c in ipairs(not_scope) do
+        test(c[1] .. " はスコープ切替でなく、後ろの \\s を記録する (9.3, 10.5)", function()
+            local state = known_spots()
+            APPEARANCE.observe(state, A, 0, c[2] .. "\\s[3]")
+            expect(state.detached):toBe(nil)
+            expect(state.spots[1].surface):toBe("8")
+            expect(state.spots[0].surface):toBe("3")
+            expect(state.actors.A.surface):toBe("3")
+        end)
+    end
 
     test("\\_u や \\pX など切替でないタグでは不明化しない", function()
         local state = known_spots()
@@ -573,6 +619,9 @@ describe("APPEARANCE.restore - 先頭タグ列", function()
         { "talk 内の一般文字の後", { { type = "talk", text = "あ\\s[3]" } } },
         { "talk 内のスコープ切替タグの後", { { type = "talk", text = "\\1\\s[3]あ" } } },
         { "talk 先頭の \\\\s[ID]（エスケープ後の平文）", { { type = "talk", text = "\\\\s[3]あ" } } },
+        { "talk 先頭の \\%s[ID]（エスケープ後の平文）", { { type = "talk", text = "\\%s[3]あ" } } },
+        -- 中身のある囲みは字なので先頭タグ列はそこで終わる（9.3）
+        { "talk 先頭の中身のある囲みの後", { { type = "talk", text = "\\_?x\\_?\\s[5]" } } },
     }
     for _, c in ipairs(not_suppressed) do
         test(c[1] .. " のサーフェス変更では抑止しない (2.10)", function()

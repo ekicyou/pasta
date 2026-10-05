@@ -392,10 +392,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Action::Escape {
                 sequence: escape, ..
             } => {
-                // `\\` talks both chars (the sakura tokenizer treats `\\` as one literal
-                // backslash unit); `＠＠`/`＄＄` talk only the second char.
+                // `\\`/`\%` talk both chars (the sakura tokenizer treats them as one
+                // literal unit); `＠＠`/`＄＄` talk only the second char.
                 if let Some(c) = escape.chars().nth(1) {
-                    let text = if c == '\\' {
+                    let text = if escape.starts_with('\\') {
                         escape.clone()
                     } else {
                         c.to_string()

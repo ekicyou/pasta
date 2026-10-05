@@ -54,12 +54,14 @@ fn escape_with_single_char_sequence_emits_nothing() {
     assert!(sink.records.is_empty(), "no record without an emitted line");
 }
 
-/// `\\` escape talks both characters (`[[\\]]` evaluates to the 2-char string `\\`),
-/// while `＠＠`/`＄＄`/`@@`/`$$` keep talking only the second character (Req 4.1/4.6/4.7).
+/// `\\` and `\%` escapes talk both characters (`[[\\]]`/`[[\%]]` evaluate to the 2-char
+/// strings), while `＠＠`/`＄＄`/`@@`/`$$` keep talking only the second character
+/// (Req 4.1/4.6/4.7; paragraph-break-tag-only-talk Req 8.4).
 #[test]
 fn escape_backslash_talks_two_chars_others_talk_one() {
     let cases = [
         ("\\\\", "act:actor_proxy(\"さくら\"):talk([[\\\\]])\n"),
+        ("\\%", "act:actor_proxy(\"さくら\"):talk([[\\%]])\n"),
         ("＠＠", "act:actor_proxy(\"さくら\"):talk(\"＠\")\n"),
         ("＄＄", "act:actor_proxy(\"さくら\"):talk(\"＄\")\n"),
         ("@@", "act:actor_proxy(\"さくら\"):talk(\"@\")\n"),

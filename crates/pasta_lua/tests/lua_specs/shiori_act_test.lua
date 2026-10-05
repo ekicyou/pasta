@@ -186,6 +186,20 @@ describe("SHIORI_ACT - talk()", function()
         expect(result:find("\\p%[1%]Hi")):toBeTruthy()
     end)
 
+    test("4.4: tag-only talk (word reference path) gets no paragraph break", function()
+        local act, actors = new_act()
+        act:set_spot("sakura", 0)
+        act:set_spot("kero", 1)
+
+        act:talk(actors.sakura, "A1")
+        act:talk(actors.kero, "B1")
+        act:talk(actors.sakura, "\\s[1000]") -- タグだけの行（単語参照と同じ talk トークン）
+        act:talk(actors.kero, "B2")
+
+        -- \p[0]\s[1000] の直後に \n[150] が無く、\p[1]\n[150]B2 が 1 回だけ出る
+        expect(act:build()):toBe("\\p[0]A1\\p[1]B1\\p[0]\\s[1000]\\p[1]\\n[150]B2\\e")
+    end)
+
     test("supports method chaining", function()
         local act, actors = new_act()
 

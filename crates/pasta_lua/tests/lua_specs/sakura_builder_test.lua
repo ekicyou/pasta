@@ -2465,3 +2465,175 @@ describe("SAKURA_BUILDER - actor-surface-restore: 着せ替え復旧の統合（
         end
     end)
 end)
+
+-- ============================================================================
+-- paragraph-break-tag-only-talk: 字のある talk の段落区切りの特性化（Task 1.2）
+-- 本仕様で変えない部分（Requirement 3.1・3.3・4.3）を現行コードで固定する。
+-- 戻り時の改行 1 つ・\c・clear_spot・終端での破棄・改行幅は sakura-script-newline の Task 3.1/3.2 の
+-- 「完全遅延」「保留破棄・フラッシュ・クリア」の各テストが押さえている。
+-- ============================================================================
+
+describe("SAKURA_BUILDER - paragraph-break-tag-only-talk: タグを含む字のある talk（Task 1.2）", function()
+    local function group(actor, inner_tokens)
+        return { type = "actor", actor = actor, tokens = inner_tokens }
+    end
+    local function talk(actor, text)
+        return { type = "talk", actor = actor, text = text }
+    end
+
+    test("3.1/4.3: 保留中の改行は talk の先頭のタグより前に 1 つだけ出る", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { talk(a, "A1") }),
+            group(b, { talk(b, "\\s[10]B1") }),
+            group(a, { talk(a, "\\s[5]A2") }),
+            group(b, { talk(b, "B2\\s[11]B3") }),
+        }, { spot_newlines = 1.5 }, { ["さくら"] = 0, ["うにゅう"] = 1 })
+        expect(result):toBe("\\p[0]A1\\p[1]\\s[10]B1\\p[0]\\n[150]\\s[5]A2\\p[1]\\n[150]B2\\s[11]B3\\e")
+    end)
+end)
+
+-- ============================================================================
+-- paragraph-break-tag-only-talk: 字の無いトークンを段落区切りの状態から外す（Task 5.1）
+-- 既定設定（script_wait_normal=50 → 実効ウェイト 0）で句読点の無いテキストを使い、ウェイトを入れない。
+-- スポットは さくら=0・うにゅう=1 を明示する（スポット共有の復旧タグを出さない）。
+-- ============================================================================
+
+describe("SAKURA_BUILDER - paragraph-break-tag-only-talk: 字の無いトークン（Task 5.1）", function()
+    local function group(actor, inner_tokens)
+        return { type = "actor", actor = actor, tokens = inner_tokens }
+    end
+    local function talk(actor, text)
+        return { type = "talk", actor = actor, text = text }
+    end
+    local function script(actor, text)
+        return { type = "sakura_script", actor = actor, text = text }
+    end
+    local config = { spot_newlines = 1.5 }
+    local function spots()
+        return { ["さくら"] = 0, ["うにゅう"] = 1 }
+    end
+
+    -- 申し送りの最小例（6.1）
+    test("4.1: タグだけの talk の後のアクターの初回の手番に改行を出さない（申し送り a）", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(b, { talk(b, "\\s[10]\\1\\![move,-353,,,0,base,base]") }),
+            group(a, { talk(a, "A1") }),
+            group(b, { talk(b, "\\s[11]B1") }),
+        }, config, spots())
+        expect(result):toBe("\\p[1]\\s[10]\\1\\![move,-353,,,0,base,base]\\p[0]A1\\p[1]\\s[11]B1\\e")
+    end)
+
+    test("4.2: タグだけの talk の手番に改行を出さず、後の字のある手番には出す（申し送り b）", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { talk(a, "A1") }),
+            group(b, { talk(b, "B1") }),
+            group(a, { talk(a, "\\s[1000]\\![bind,腕,組み,1]") }),
+            group(b, { talk(b, "B2") }),
+            group(a, { talk(a, "A2") }),
+        }, config, spots())
+        expect(result):toBe(
+            "\\p[0]A1\\p[1]B1\\p[0]\\s[1000]\\![bind,腕,組み,1]\\p[1]\\n[150]B2\\p[0]\\n[150]A2\\e")
+    end)
+
+    -- 字の境界（6.2）。共通の並び: さくら A1 → うにゅう X → さくら A2 → うにゅう B2。
+    -- X が字を出すなら B2 の前に \n[150] が出る。X の出力は X の文字列そのまま（既定設定でウェイト 0）。
+    local boundary_cases = {
+        { "talk", "\\s[1000]", false, "1.2" },
+        { "talk", "\\s[1000]\\![bind,腕,組み,1]", false, "1.2" },
+        { "talk", "\\_w[500]", false, "1.2" },
+        { "talk", "\\n", false, "1.2" },
+        { "talk", "\\n[150]", false, "1.2" },
+        { "talk", "\\1\\![move,-353,,,0,base,base]", false, "1.2" },
+        { "talk", "\\\\", true, "1.3" },
+        { "talk", "\\%", true, "1.3" },
+        { "talk", "\\_u[0x3042]", true, "1.4" },
+        { "talk", "\\_m[0x41]", true, "1.4" },
+        { "talk", "\\&[amp]", true, "1.4" },
+        { "talk", "\\s[0] ", true, "1.5" },
+        { "talk", "\\s[0]　", true, "1.5" },
+        { "talk", "\\s[0]\t", true, "1.5" },
+        { "talk", "\\q[はい,OnYes]", false, "1.6" },
+        { "talk", "\\q[a\\]b,OnX]", false, "1.6/7.6" },
+        { "talk", "\\あ", true, "1.7" },
+        { "talk", "\\nHello", true, "1.1/7.4" },
+        { "talk", "\\w9OK", true, "1.1/7.4" },
+        { "talk", "\\w0", true, "1.1/7.4" },
+        { "talk", "\\_?\\s[1]\\_?", true, "1.10" },
+        { "talk", "\\_?\\_?", false, "1.10" },
+        { "talk", "\\_?", false, "1.10" },
+        { "sakura_script", "\\_u[0x3042]", true, "1.9" },
+        { "sakura_script", "\\&[amp]", true, "1.9" },
+        { "sakura_script", "\\s[1]\\_u[0x3042]", true, "1.9" },
+        { "sakura_script", "\\_?abc\\_?", true, "1.10" },
+        { "sakura_script", "\\s[5]", false, "1.9/3.4" },
+    }
+    for _, c in ipairs(boundary_cases) do
+        local kind, text, has_char, req = c[1], c[2], c[3], c[4]
+        test(string.format("%s: %s %q は%s", req, kind, text, has_char and "字あり" or "字なし"), function()
+            local BUILDER, actors = setup()
+            local a, b = actors.sakura, actors.kero
+            local x = kind == "talk" and talk(b, text) or script(b, text)
+            local result = BUILDER.build({
+                group(a, { talk(a, "A1") }),
+                group(b, { x }),
+                group(a, { talk(a, "A2") }),
+                group(b, { talk(b, "B2") }),
+            }, config, spots())
+            expect(result):toBe("\\p[0]A1\\p[1]" .. text .. "\\p[0]\\n[150]A2\\p[1]"
+                .. (has_char and "\\n[150]" or "") .. "B2\\e")
+        end)
+    end
+
+    test("1.9: 文字を表示する sakura_script の直前に保留中の改行を出す", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { talk(a, "A1") }),
+            group(b, { talk(b, "B1") }),
+            group(a, { script(a, "\\_u[0x3042]") }),
+        }, config, spots())
+        expect(result):toBe("\\p[0]A1\\p[1]B1\\p[0]\\n[150]\\_u[0x3042]\\e")
+    end)
+
+    -- 保留中の改行（6.3）
+    test("2.4: 字の無い talk と wait の後の字のある talk の直前に改行を出す", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { talk(a, "A1") }),
+            group(b, { talk(b, "B1") }),
+            group(a, { talk(a, "\\s[5]"), { type = "wait", ms = 100 }, talk(a, "A2") }),
+        }, config, spots())
+        expect(result):toBe("\\p[0]A1\\p[1]B1\\p[0]\\s[5]\\_w[100]\\n[150]A2\\e")
+    end)
+
+    test("2.5: 字の無い talk だけで終端すると改行を出さない", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { talk(a, "A1") }),
+            group(b, { talk(b, "B1") }),
+            group(a, { talk(a, "\\s[5]") }),
+        }, config, spots())
+        expect(result):toBe("\\p[0]A1\\p[1]B1\\p[0]\\s[5]\\e")
+    end)
+
+    test("2.5/2.2: 字の無い talk だけで離脱し、戻った字のある手番の前に改行を 1 つだけ出す", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { talk(a, "A1") }),
+            group(b, { talk(b, "B1") }),
+            group(a, { talk(a, "\\s[5]") }),
+            group(b, { talk(b, "B2") }),
+            group(a, { talk(a, "A2") }),
+        }, config, spots())
+        expect(result):toBe("\\p[0]A1\\p[1]B1\\p[0]\\s[5]\\p[1]\\n[150]B2\\p[0]\\n[150]A2\\e")
+    end)
+end)

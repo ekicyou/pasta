@@ -107,6 +107,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 2 | search-selector-indices | バグ（テスト用 API） | `pasta_core` の `random.rs` |
 | 2 | string-concat-operator | 機能 | `pasta_dsl` の式の文法（演算子）、`element_gen.rs`（式の Binary）、`act.lua`（算術・連結ヘルパーの領域。グループ化は触らない） |
 | 3 | call-execution-correctness | バグ | `element_gen.rs`（Call）、`act.lua`（`init_scene`・`call`） |
+| 3 | paragraph-break-tag-only-talk | バグ（表示の空き） | `sakura_builder.lua`（段落区切りの判定）、`appearance.lua`（タグの読み取りの共有だけ） |
 | 4 | scene-attribute-store | 機能 | 属性の文法・コード生成・`scene.lua`・`finalize.rs` |
 | 5 | call-attribute-filter | 機能 | フィルターの文法・Call のコード生成・検索 |
 | 6 | failure-output-unification | 機能 | `act.lua`・`actor.lua`・`word.lua` の警告箇所、失敗表記の出力（2026-10-05 起票。ウェーブは次の棚卸で見直す） |
@@ -124,6 +125,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - [x] search-selector-indices -- `set_scene_selector`・`set_word_selector` の整数が選択に使われない不具合（U29）。Dependencies: scene-search-key-normalization
 - [x] string-concat-operator -- 式の文字列連結演算子 `＆`／`&`（算術より低い優先順位・数値は文字列化）。`＋` は数値専用のまま。動的コールのターゲット式での `＆` と `call-attribute-filter` の切り分けを決めて申し送る。`dsl-codegen-runtime-safety` の完成を前提とし、調整は本 spec 側で行う。Dependencies: dsl-codegen-runtime-safety, dsl-literal-fixes
 - [ ] call-execution-correctness -- Call から戻った後のシーン文脈が復元されない不具合（U28）と、動的コール `＞式` の値が nil のときの nil ガード（旧 `dynamic-call-nil-guard`）。Dependencies: dsl-codegen-runtime-safety, act-token-grouping-fix, scene-identity-format
+- [x] paragraph-break-tag-only-talk -- タグだけを返す `talk`（表情の単語 `＠通常` など）を `sakura_builder` が字ありと数え、余分な段落区切りの `\n[150]` が出る不具合（2026-10-05 areka「emo2初回起動」からの申し送り）。Dependencies: none
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: dsl-literal-fixes, scene-identity-format, call-execution-correctness
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, scene-search-key-normalization, call-execution-correctness, string-concat-operator
 - [ ] failure-output-unification -- 実行時の失敗（未定義の参照・見つからない Call など）をログとさくらスクリプトの両方へ 1 つの仕組みから出す。`call-execution-correctness` が Call 行に入れる失敗表記を載せ替え、他の失敗へ広げる。Dependencies: call-execution-correctness, call-attribute-filter
@@ -157,3 +159,8 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - デバッグポートの他プロセスによる奪取（即時修正で判明）— 相手が `SO_REUSEADDR` を立てて bind する場合まで防ぐには、Windows の `SO_EXCLUSIVEADDRUSE` が要る。ゴースト同士の二重 bind は防いだ。
 - `pasta_core` の `resolve_scene_id`（即時修正で判明）— 本番の呼び出し元が無くなった公開 API。`find_scene`・`crates/pasta_core/README.md` の例・テストとあわせて整理するかを決める。
 - `pasta_shiori` の `util/hglobal/windows_api.rs` の `string_to_multibyte`（即時修正で判明）— `@enc` と同じ 65001 で不正になるフラグを渡すが、テストからしか呼ばれない。
+- budoux の自動改行の禁則（2026-10-05、ghost_dev「emo2 開発」からの申し送り）— `line_breaker.rs` の `break_lines_impl` は禁則を見ない。BudouX の語の区切りの直前で改行するだけである。
+  - 方針は JIS X 4051 どおりとする。リーダー（`‥…`）は行頭に置いてよい。並びの途中では分けない。
+  - この方針では、申し送りの実例「イイジャン！／‥‥ええと、」は正しい組版になる。
+  - 句読点・`！？`・閉じ括弧の前、開き括弧の後ろでは、BudouX の既定の日本語モデルは区切らない（手元で確認）。
+  - BudouX が行頭禁則の字の直前（または行末禁則の字の直後）で区切る実例が出たら、その実例から起票する。その場合は、既存の `[talk]` の `chars_*` を使った追い出しを第一候補とする。

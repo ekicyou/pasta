@@ -180,24 +180,25 @@ word_ref        = { word_marker ~ id ~ s}
 
 at_escape     = @{ at{2} }
 dollar_escape = @{ dollar{2} }
-sakura_escape = @{ sakura_marker{2} }
+sakura_escape = @{ sakura_marker ~ ( sakura_marker | "%" ) }
 talk_word = _{ !(at | dollar | sakura_marker | eol) ~ ANY }
 talk      = @{ talk_word+ }
 
 // ################################################# sakura_script
-sakura_script = @{ sakura_marker ~ sakura_id ~ sakura_args? }
-sakura_id     = @{ (('a'..'z') | ('A'..'Z') | ('0'..'9') | "_" | "!" | "-" | "+" | "*" | "?" | "&" )+ }
-sakura_args   =  { sakura_open ~ sakura_body ~ sakura_close }
-sakura_open   = _{ "[" ~ PUSH_LITERAL("]") }
-sakura_body   = @{ ( sakura_str | (!PEEK ~ ANY) )* }
-sakura_close  = _{ POP }
+// Rust Tokenizer::SAKURA_TAG_PATTERN（pasta_lua）の写し。引数・引用・囲みは 1 行の中だけを読む。
+sakura_script    = @{ sakura_literal | sakura_marker ~ ( sakura_digit_id | sakura_id ~ sakura_args? ) }
+sakura_literal   = _{ "\\_?" ~ ( !( "\\_?" | eol ) ~ ANY )* ~ "\\_?"
+                    | "\\_!" ~ ( !( "\\_!" | eol ) ~ ANY )* ~ "\\_!" }
+sakura_digit_id  = _{ ( "s" | "p" | "b" ) ~ ASCII_DIGIT | "w" ~ '1'..'9' }
+sakura_id        = _{ "_"{0,2} ~ sakura_name_char }
+sakura_name_char = _{ ASCII_ALPHANUMERIC | "!" | "-" | "+" | "*" | "?" | "&" }
+sakura_args      = _{ "[" ~ sakura_arg ~ ( "," ~ sakura_arg )* ~ "]" }
+sakura_arg       = _{ sakura_str ~ sakura_arg_rest | !"\"" ~ sakura_arg_rest }
+sakura_arg_rest  = _{ ( sakura_pair | !( "]" | "\\" | "," | eol ) ~ ANY )* }
+sakura_pair      = _{ "\\" ~ !eol ~ ANY }
+sakura_str       = _{ "\"" ~ ( "\"\"" | !( "\"" | eol ) ~ ANY )* ~ "\"" }
 
-sakura_str       =  { sakura_str_open ~ sakura_str_body ~ sakura_str_close }
-sakura_str_open  = _{ PUSH("\"") }
-sakura_str_body  = @{ ( PEEK{2} | (!PEEK ~ ANY) )* }
-sakura_str_close = _{ POP }
-
-sakura_marker     = _{ "\\" }
+sakura_marker    = _{ "\\" }
 
 // ################################################# eol
 eol             = _{ NEWLINE }
