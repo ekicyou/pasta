@@ -667,6 +667,47 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
     return nil
 end
 
+--- 実行中のシーンを scene に戻し、残りの引数をそのまま返す
+--- @param self Act アクションオブジェクト
+--- @param scene SceneTable|nil 戻す先（呼び出し前の act.current_scene）
+--- @param ... any そのまま返す値
+--- @return any ...
+function ACT_IMPL.restore_scene(self, scene, ...)
+    self.current_scene = scene
+    return ...
+end
+
+--- act:call と同じ引数で呼び、戻った後に実行中のシーンを呼び出し前のものへ戻す
+---
+--- DSL の途中の Call 行が使う（末尾の Call は act:call のまま）。Lua からも呼べる。
+--- 呼ばれた側がシーン・Lua の関数・見つからないのいずれでも戻す。STORE.last_global_scene は触らない。
+--- @param self Act アクションオブジェクト
+--- @param global_scene_name string|nil 未使用（act:call と同じ）
+--- @param key string 検索キー
+--- @param attrs table|nil act:call へそのまま渡す
+--- @param ... any 呼ばれた側へ渡す引数
+--- @return any ... 呼ばれた側の戻り値
+function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...)
+    local scene = self.current_scene
+    return self:restore_scene(scene, self:call(global_scene_name, key, attrs, ...))
+end
+
+--- 失敗表記の唯一の出口: 警告があればログへ出し、【text】をアクター無しの talk トークンとして積む
+---
+--- アクター nil の talk は切替タグを出さずに積んだ位置（直前に話したアクターのバルーン、
+--- または出力の先頭なら現在のスコープ）へ文字を出す。
+--- @param self Act アクションオブジェクト
+--- @param text string 失敗表記の中身（【】はこの関数が付ける）
+--- @param warning string|nil ログに出す警告文。nil なら出さない
+--- @return nil
+function ACT_IMPL.failure(self, text, warning)
+    if warning then
+        log.warn(warning)
+    end
+    table.insert(self.token, { type = "talk", actor = nil, text = "【" .. text .. "】" })
+    return nil
+end
+
 --- スポット設定トークン生成（状態レス化）
 --- @param self Act アクションオブジェクト
 --- @param name string アクター名
