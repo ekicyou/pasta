@@ -27,6 +27,11 @@ fn load_fixture() -> (Lua, SceneRegistry) {
 
 /// `.pasta` のソースをトランスパイル→実行→`finalize_scene` する（`load_fixture` の本体）。
 fn load_source(source: &str) -> (Lua, SceneRegistry) {
+    load_source_with(source, "")
+}
+
+/// `load_source` に、辞書確定の前に実行する Lua（`WORD.create_local` 等）を足したもの。
+fn load_source_with(source: &str, before_finalize: &str) -> (Lua, SceneRegistry) {
     let file = parse_str(source, "scene_identity_format.pasta").expect("fixture must parse");
     let mut out = Vec::new();
     let ctx = LuaTranspiler::default()
@@ -35,6 +40,7 @@ fn load_source(source: &str) -> (Lua, SceneRegistry) {
 
     let lua = create_runtime_with_finalize().unwrap();
     lua.load(String::from_utf8(out).unwrap()).exec().unwrap();
+    lua.load(before_finalize).exec().unwrap();
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
@@ -225,4 +231,192 @@ fn deterministic_selector_returns_scenes_in_counter_order() {
         .unwrap();
     let expected: Vec<String> = (1..=10).map(|i| format!("メイン_{i}")).collect();
     assert_eq!(picked, expected, "通し番号の順に返る");
+}
+
+/// 呼ぶ回数。候補が混ざっていれば、シャッフル＆順次消費で必ず 1 巡する数より多くする。
+const REPEAT: usize = 30;
+
+/// 8.2（2.2・2.3・2.4・2.10）: `＞A1`・`search_scene("A1")`・`SCENE.search("A1")` を繰り返しても
+/// `＊A` は 1 度も選ばれない。`＊章`／`＊章・1`、`＊会話・朝` の中の `・挨拶`／`・挨拶・1` も同様。
+#[test]
+fn call_and_search_never_pick_scene_named_by_shorter_prefix() {
+    let (lua, _) = load_fixture();
+    let search: mlua::Function = lua
+        .load(
+            r#"
+            local SEARCH = require "@pasta_search"
+            local SCENE = require "pasta.scene"
+            return function(name, parent)
+                local g, l = SEARCH:search_scene(name, parent)
+                local r = SCENE.search(name, parent)
+                return g, l, r and r.global_name, r and r.local_name
+            end
+        "#,
+        )
+        .eval()
+        .unwrap();
+    // (検索する名前, 親の登録名, 選ばれるべき (グローバル, ローカル))
+    let queries = [
+        ("A1", None, ("A1_1", "__start__")),
+        ("章・1", None, ("章_1_1", "__start__")),
+        ("挨拶・1", Some("会話_朝_1"), ("会話_朝_1", "挨拶_1_1")),
+    ];
+    for (name, parent, (g, l)) in queries {
+        let expected = Some((g.to_string(), l.to_string()));
+        for _ in 0..REPEAT {
+            let (sg, sl, rg, rl): (
+                Option<String>,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+            ) = search.call((name, parent)).unwrap();
+            assert_eq!(sg.zip(sl), expected, "search_scene({name}, {parent:?})");
+            assert_eq!(rg.zip(rl), expected, "SCENE.search({name}, {parent:?})");
+        }
+    }
+
+    // DSL の Call（呼ぶ側のシーン, 呼ぶ側のローカル, 呼ばれる側の出力。「」も本文に含まれる）
+    let calls = [
+        ("呼出A1_1", "__start__", "「A1本体」"),
+        ("呼出章_1_1", "__start__", "「章・1本体」"),
+        ("会話_朝_1", "呼出挨拶_1", "「挨拶・1本体」"),
+    ];
+    for (g, l, out) in calls {
+        for _ in 0..REPEAT {
+            assert_eq!(run_scene(&lua, g, l), out, "{g}::{l} の Call");
+        }
+    }
+}
+
+/// 2.5: 登録名の形の名前（`メイン_1`）を `search_scene` の第 1 引数に渡すと、作者が書いた名前として
+/// 扱われ、`＊メイン` の 1 つ目（`メイン_1`）ではなく `＊メイン・1`（`メイン_1_1`）だけが返る。
+#[test]
+fn registered_name_as_search_name_does_not_point_to_first_scene() {
+    let source = "＊メイン\n　さくら：「メイン本体1」\n\n\
+                  ＊メイン\n　さくら：「メイン本体2」\n\n\
+                  ＊メイン・1\n　さくら：「メイン・1本体」\n";
+    let (lua, _) = load_source(source);
+    let picked: Vec<String> = lua
+        .load(
+            r#"
+            local SEARCH = require "@pasta_search"
+            local picked = {}
+            for _ = 1, 10 do
+                local g = SEARCH:search_scene("メイン_1", nil)
+                picked[#picked + 1] = tostring(g)
+            end
+            return picked
+        "#,
+        )
+        .eval()
+        .unwrap();
+    assert!(
+        picked.iter().all(|g| g == "メイン_1_1"),
+        "メイン_1 は ＊メイン・1 だけを指す: {picked:?}"
+    );
+}
+
+/// 2.7: `search_scene` が返したグローバルの登録名を第 2 引数に渡すと、そのシーンのローカルシーンが返る。
+#[test]
+fn returned_registered_name_finds_local_scenes() {
+    let (lua, _) = load_fixture();
+    let (g, lg, ll): (String, Option<String>, Option<String>) = lua
+        .load(
+            r#"
+            local SEARCH = require "@pasta_search"
+            local g = SEARCH:search_scene("会話・朝", nil)
+            local lg, ll = SEARCH:search_scene("挨拶", g)
+            return g, lg, ll
+        "#,
+        )
+        .eval()
+        .unwrap();
+    assert_eq!(g, "会話_朝_1");
+    assert_eq!(lg.as_deref(), Some("会話_朝_1"));
+    let ll = ll.expect("ローカルシーンが返る");
+    assert!(ll.starts_with("挨拶_"), "・挨拶 のどれか: {ll}");
+}
+
+/// 2.8: 動的ターゲット（`＞＄変数`）と SHIORI イベントの経路（`SCENE.co_exec`）は、`＞シーン名` と
+/// 同じ候補から選ぶ。`章・1` は `＊章・1` だけ、`章` は `＊章`×11・`＊章11`・`＊章_2`・`＊章・1` の 14 個。
+#[test]
+fn dynamic_target_and_event_choose_from_same_candidates_as_call() {
+    let (lua, _) = load_fixture();
+    let event: mlua::Function = lua
+        .load(
+            r#"
+            local SCENE = require "pasta.scene"
+            return function(name)
+                local act = require("pasta.act").new({ ["さくら"] = { name = "さくら" } })
+                local texts = {}
+                act.build = function(self)
+                    for _, t in ipairs(self.token) do
+                        if t.type == "talk" then texts[#texts + 1] = t.text end
+                    end
+                end
+                local co = SCENE.co_exec(act, name)
+                if not co then error("event scene not found: " .. name) end
+                assert(coroutine.resume(co, act))
+                return table.concat(texts)
+            end
+        "#,
+        )
+        .eval()
+        .unwrap();
+
+    // (検索する名前, 候補の数, `＞名前` のシーン, `＞＄変数` のシーン)
+    let targets = [
+        ("章・1", 1, "呼出章_1_1", "動的呼出章_1_1"),
+        ("章", 14, "呼出章_1", "動的呼出章_1"),
+    ];
+    for (name, n, static_caller, dynamic_caller) in targets {
+        // 候補の数ちょうど呼ぶと、シャッフル＆順次消費で候補を 1 巡する（3 経路は同じキャッシュを共有するが、各経路が 1 巡の長さずつ引くので、どの経路も巡の頭から引き始める）。
+        let collect = |f: &dyn Fn() -> String| (0..n).map(|_| f()).collect::<BTreeSet<_>>();
+        let by_call = collect(&|| run_scene(&lua, static_caller, "__start__"));
+        let by_dynamic = collect(&|| run_scene(&lua, dynamic_caller, "__start__"));
+        let by_event = collect(&|| event.call::<String>(name).unwrap());
+        assert_eq!(by_call.len(), n, "{name}: ＞{name} の候補 {by_call:?}");
+        assert!(by_call.contains("「章・1本体」"), "{name}: {by_call:?}");
+        assert_eq!(by_dynamic, by_call, "{name}: 動的ターゲット");
+        assert_eq!(by_event, by_call, "{name}: SHIORI イベント");
+    }
+}
+
+/// 3.2〜3.4: `WORD.create_local("メイン_1", キー)` の単語は `メイン_1` の実行中に参照でき、
+/// `search_word(キー, "メイン_1")` で見つかる。旧形式 `メイン1` では見つからず、エラーにもならない。
+#[test]
+fn local_words_use_new_registered_name() {
+    let source = "＊メイン\n　さくら：「＠ローカル語」\n\n\
+                  ＊メイン\n　さくら：「＠旧形式語」\n";
+    let (lua, _) = load_source_with(
+        source,
+        r#"
+        local WORD = require "pasta.word"
+        WORD.create_local("メイン_1", "ローカル語"):entry("新形式の単語")
+        WORD.create_local("メイン1", "旧形式語"):entry("旧形式の単語")
+        "#,
+    );
+    let (new_hit, old_miss, old_key_miss): (Option<String>, Option<String>, Option<String>) = lua
+        .load(
+            r#"
+            local SEARCH = require "@pasta_search"
+            return SEARCH:search_word("ローカル語", "メイン_1"),
+                SEARCH:search_word("ローカル語", "メイン1"),
+                SEARCH:search_word("旧形式語", "メイン_2")
+        "#,
+        )
+        .eval()
+        .unwrap();
+    assert_eq!(new_hit.as_deref(), Some("新形式の単語"));
+    assert_eq!(old_miss, None, "旧形式の登録名では見つからない");
+    assert_eq!(
+        old_key_miss, None,
+        "メイン1 に登録した単語は メイン_2 にも無い"
+    );
+
+    assert_eq!(run_scene(&lua, "メイン_1", "__start__"), "「新形式の単語」");
+    assert!(
+        !run_scene(&lua, "メイン_2", "__start__").contains("旧形式の単語"),
+        "メイン1 に登録した単語はどのシーンの実行中にも参照されない"
+    );
 }
