@@ -156,25 +156,40 @@ pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
 ///
 /// Uses `register_global_raw` to preserve the full name with counter
 /// as collected from Lua runtime. This avoids double-counting.
+///
+/// 登録順は（名前, 通し番号）の昇順に決める（2.9）。グローバルを並べ、
+/// 同じグローバルの中のローカルも同じ規則で並べる。`HashMap` の走査順や
+/// Lua の `pairs` の順には依存しない。
 fn build_scene_registry(scenes: &[(String, String)]) -> SceneRegistry {
     let mut registry = SceneRegistry::new();
 
     // Group by global scene name
-    let mut grouped: HashMap<String, Vec<String>> = HashMap::new();
+    let mut grouped: HashMap<&str, Vec<String>> = HashMap::new();
     for (global_name, local_name) in scenes {
         grouped
-            .entry(global_name.clone())
+            .entry(global_name.as_str())
             .or_default()
             .push(local_name.clone());
     }
 
+    let mut globals: Vec<_> = grouped.into_iter().collect();
+    globals.sort_by(|(a, _), (b, _)| scene_order_key(a).cmp(&scene_order_key(b)));
+
     // Register scenes using raw method (full name already includes counter)
-    for (global_name, local_names) in grouped {
+    for (global_name, mut local_names) in globals {
+        local_names.sort_by(|a, b| scene_order_key(a).cmp(&scene_order_key(b)));
         // Use register_global_raw to preserve the full name with counter
-        registry.register_global_raw(&global_name, &local_names, HashMap::new());
+        registry.register_global_raw(global_name, &local_names, HashMap::new());
     }
 
     registry
+}
+
+/// 登録順の並べ替えキー：（名前, 通し番号）。番号は数値で比べ、番号なし（`None`）が先。
+/// 同じ（名前, 番号）になる名前（`_01` と `_1` など）は登録名そのもので順を決める。
+fn scene_order_key(registered: &str) -> (&str, Option<usize>, &str) {
+    let (name, counter) = SceneRegistry::split_registered_name(registered);
+    (name, counter, registered)
 }
 
 /// Build WordDefRegistry from collected word data (Requirement 2.7, 5.3).
@@ -276,3 +291,65 @@ pub fn register_finalize_scene(lua: &Lua) -> LuaResult<()> {
 // Future extension point (Requirement 7.1, 7.2, 7.3):
 // a `collect_actors()` for actor dictionary support can be added here, e.g.
 // `pub fn collect_actors(lua: &Lua) -> LuaResult<Vec<ActorCollectionEntry>>`.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 登録順を (名前, 親) の並びで取り出す
+    fn registration_order(registry: &SceneRegistry) -> Vec<(String, Option<String>)> {
+        registry
+            .all_scenes()
+            .into_iter()
+            .map(|e| (e.name.clone(), e.parent.clone()))
+            .collect()
+    }
+
+    fn scenes(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+        pairs
+            .iter()
+            .map(|(g, l)| (g.to_string(), l.to_string()))
+            .collect()
+    }
+
+    /// 2.9: 登録順は（名前, 通し番号）の昇順（番号は数値比較・番号なしが先）。
+    /// 走査順を変えても同じ登録順になる。
+    #[test]
+    fn test_build_scene_registry_orders_by_name_and_counter() {
+        let scrambled = scenes(&[
+            ("メイン_10", "__start__"),
+            ("会話_1", "挨拶_10"),
+            ("メイン_2", "__start__"),
+            ("会話_1", "__start__"),
+            ("会話_1", "加算ループ"),
+            ("メイン_1", "__start__"),
+            ("会話_1", "挨拶_2"),
+            ("メイン", "__start__"),
+            ("会話_1", "挨拶"),
+        ]);
+        let mut reversed = scrambled.clone();
+        reversed.reverse();
+
+        let parent = Some("会話_1".to_string());
+        let expected = vec![
+            ("メイン".to_string(), None),
+            ("メイン_1".to_string(), None),
+            ("メイン_2".to_string(), None),
+            ("メイン_10".to_string(), None),
+            ("会話_1".to_string(), None),
+            ("加算ループ".to_string(), parent.clone()),
+            ("挨拶".to_string(), parent.clone()),
+            ("挨拶_2".to_string(), parent.clone()),
+            ("挨拶_10".to_string(), parent),
+        ];
+
+        assert_eq!(
+            registration_order(&build_scene_registry(&scrambled)),
+            expected
+        );
+        assert_eq!(
+            registration_order(&build_scene_registry(&reversed)),
+            expected
+        );
+    }
+}
