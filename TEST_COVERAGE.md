@@ -61,6 +61,7 @@
 | Registry境界回帰テスト     | `scene_registry.rs`<br>`word_registry.rs`<br>`scene_table_candidate_tests.rs`<br>`scene_table_resolve_filter_tests.rs`<br>`word_table_test.rs`<br>`random.rs`<br>`error.rs`（各内テスト） | ✅ 完了 | 38テスト（merge_from/register_global_raw/解決境界/セレクタ契約/エラー表示文言） |
 | セレクタの指定列           | `random.rs`（インライン）<br>`scene_table_candidate_tests.rs`<br>`word_table_test.rs`<br>`tests/search/module_test.rs` | ✅ 完了 | 整数を候補の並びの位置として巡ごとに当てはめる（モックの並べ替え・シーン/単語の 2 巡目・Lua 結合 8。範囲外・重複・負の整数・既定への復帰）（search-selector-indices） |
 | 記号を含む名前の照合       | `search/context.rs`（インライン）<br>`symbol_name_search_test.rs` | ✅ 完了 | 登録と検索が同じ照合規則を共有（単体8＋結合10。Call・SCENE.search・SHIORI応答・選択肢・アクター単語） |
+| 登録名の形式と照合相手     | `scene_registry.rs`・`scene_table_candidate_tests.rs`・`finalize.rs`・`context.rs`・`scope_gen_tests.rs`・`scene_join_tests.rs`（インライン）<br>`runtime/scene_identity_format_test.rs`<br>`scene_identity_index_test.rs`<br>`lua_specs/kick_*_test.lua` | ✅ 完了 | 登録名 `名前_通し番号` の作成・分割の往復、通し番号を除いた検索キー、確定時の登録順、ローカルの通し番号の共有、定義元ファイルごとのデバッガ索引、キックの完全一致（scene-identity-format） |
 
 ### 2.3 Transpiler層テスト（Lua変換）
 
