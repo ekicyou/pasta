@@ -225,6 +225,7 @@ sequenceDiagram
 | 2.9 | 記録の無い選択 ID | ChoiceScope | `STORE.last_global_scene` へフォールバック | 選択肢 |
 | 3.1, 3.2 | 式の関数呼び出し後の文脈 | ExprCallRestore | `call_expr`（act・proxy）→ `act:restore_scene` | — |
 | 3.3 | 検索順・引数・戻り値は不変 | ExprCallRestore | `restore_scene` は戻り値をそのまま通す | — |
+| 3.4 | `＠＊関数`・単語の関数ハンドラの後の文脈 | ExprCallRestore | `act:global_fn`・`word`（act・proxy）→ `act:restore_scene` | — |
 | 4.1, 4.2, 4.8, 4.9 | 末尾の Call | CallCodeGen, ActCall | `return act:call(…)` 不変 | — |
 | 4.3 | 途中の Call の中の末尾の Call | ActCallRestore | 外側が復元 | 途中の Call |
 | 4.4, 4.5, 4.7 | 既存挙動の維持 | ActCall, ActCallRestore | 検索・引数・変数共有・中断は不変 | — |
@@ -369,7 +370,7 @@ function ACT_IMPL.call_key(self, value, var_path, desc) end
 - `key` が印: 何も出さずに nil。
 - ハンドラが関数: `return handler(self, ...)`（不変。末尾位置）。
 - それ以外（見つからない・関数でない値）: 現行の警告 `act:call - handler not found: key='…', mode='scene', via=act` を `act:failure` 経由で出し、失敗表記 `【Call失敗：「名前」が見つからない】` を積んで nil を返す。
-- **仮定（Open Questions 3）**: 末尾の静的コールの生成コードは手書きの `act:call(nil, "名前", nil)` と区別できないため、Lua から直接呼んで見つからない場合も同じ失敗表記を出す。
+- 末尾の静的コールの生成コードは手書きの `act:call(nil, "名前", nil)` と区別できないため、Lua から直接呼んで見つからない場合も同じ失敗表記を出す。
 
 #### ActFailure
 
