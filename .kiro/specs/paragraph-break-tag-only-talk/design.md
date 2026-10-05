@@ -307,7 +307,7 @@ local function emits_text(inner) end
 2. 2.5: `さくら[talk "A1"]` → `うにゅう[talk "B1"]` → `さくら[talk "\s[5]"]` で終端。`\n[150]` は出ない。続けて `うにゅう[talk "B2"]` → `さくら[talk "A2"]` を足した並びでは、`A2` の前に 1 つだけ出る（2.2: 字なしの手番の後もスポットは字ありのまま）。
 
 ### DSL の経路（`shiori_act_test.lua`、4.4）
-- `act:set_spot` でスポットを決め、`act:talk(sakura, "A1")`・`act:talk(kero, "B1")`・`act:talk(sakura, "\s[1000]")`・`act:talk(kero, "B2")` を積んで `act:build()`。`\p[0]\s[1000]` の直後に `\n[150]` が無く、`\p[1]\n[150]B2` があること。単語参照は `ACT_IMPL.talk` が値を `tostring` した `talk` トークンになるため、この経路で 4.4 を代表させる（仮定。Open Questions 2）。
+- `act:set_spot` でスポットを決め、`act:talk(sakura, "A1")`・`act:talk(kero, "B1")`・`act:talk(sakura, "\s[1000]")`・`act:talk(kero, "B2")` を積んで `act:build()`。`\p[0]\s[1000]` の直後に `\n[150]` が無く、`\p[1]\n[150]B2` があること。単語参照は `ACT_IMPL.talk` が値を `tostring` した `talk` トークンになるため、この経路で 4.4 を代表させる。DSL から `act:actor_proxy(…):talk(…:word(…))` を生成する部分は本仕様で変えないため、DSL の `＠通常` から通す e2e（`pasta_shiori`）は足さない。
 
 ### 回帰（6.4・3.2・3.3）
 - `cargo test -p pasta_lua`（lua_specs 全体）と `cargo test -p pasta_shiori`（`byte_invariant_test.rs`・`codegen_runtime_safety_e2e_test.rs`・`kick_unused_byte_invariant_test.rs` ほか）を、既存の期待値を変えずに通す。実行前に `NoDefaultCurrentDirectoryInExePath` を外す。`sample.generated.lua` の改行だけの差分は戻す。
@@ -317,5 +317,5 @@ local function emits_text(inner) end
 ## Open Questions / Risks
 
 1. **`sakura_script` を先頭のタグだけで判定すること**（仮定）: DSL 由来の `sakura_script` は常にタグ 1 つなので要件 1.9 を満たす。Lua から `act:sakura_script` に複数のタグや字を混ぜて渡した場合は先頭のタグだけで決まる（例: `\s[1]\_u[0x3042]` は字なし）。テキスト全体を走査する案は、DSL の `"…"` 引数に `]` を含む書き方で引数の残りを字と誤認し、3.4 を破るため採らなかった。
-2. **4.4 のテストの置き場所**（仮定）: Wave 3 の並走条件では編集できるテストは `sakura_builder`・`appearance` のテストとされる。4.4 の経路（`act:talk` → `act:build`）は `shiori_act_test.lua` に 1 件足す案とした（`call-execution-correctness` は `act.lua` の `init_scene`・`call` を持ち、このテストファイルには触れない見込み）。DSL の `＠通常` から通す e2e（`pasta_shiori`）までは足さない。
-3. **既知の制約の扱い**: `\nHello` を字なしと判定するなど、共有するタグの区切り方の制約はウェイトの挿入・外見の観測と同じで、本仕様では直さない（要件の Out of scope）。内部設計のマニュアルに制約として明記する。
+2. **4.4 のテストの置き場所**（確定）: 4.4 の経路（`act:talk` → `act:build`）は `shiori_act_test.lua` に 1 件足す。並走する `call-execution-correctness` の仕様（brief・要件・設計）はこのファイルに触れないことを確認済みで、Wave 3 の並走条件（`act.lua`・`element_gen.rs` に触れない）の趣旨を守る。
+3. **既知の制約の扱い**（確定）: `\nHello` を字なしと判定するなど、共有するタグの区切り方の制約はウェイトの挿入・外見の観測と同じで、本仕様では直さない（要件の Out of scope「タグの区切り方そのものの変更」）。内部設計のマニュアルに制約として明記する。
