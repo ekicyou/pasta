@@ -111,17 +111,22 @@
   - SOUL.md・book/src・TEST_COVERAGE.md・クレート README・steering・生成スキルとの整合を確認し、必要なものを更新する
   - 完了状態: TEST_COVERAGE.md に本 spec のテストのマッピングがあり、SOUL.md の Call の生成形の例が新しい形になっている
   - _Requirements: 7.5, 8.5_
+- [x] 6.3 失敗表記をウェイトのかからない出し方にする（kiro-validate-impl 後の人の判断で追加）
+  - `act:failure` が積むトークンを、アクター nil の `talk` から既存の `raw_script` に替える（新しいトークン型は作らない）
+  - 単体テスト・E2E の期待値、設計、マニュアル、steering、生成スキルを合わせて更新する
+  - 完了状態: 失敗表記にウェイト（`\_w[…]`）が入らず、テスト一式が成功する
+  - _Requirements: 4.6, 5.1, 6.3_
 
 ## Implementation Notes
 - 1.2: 特性化の選択肢テスト（2.6）は Reference2 を送らない形。2.4 以降は 2.9 のフォールバック経路になるため、2.6 の Reference2 経路は 4.2 で必ず確かめる。
 - E2E の辞書は dic/ 配下すべてが同じゴーストに載る。イベント名・シーン名は既存とかぶらないものにする。
 - Lua 単体テストは crates/pasta_lua/tests/lua_specs/ に置き init.lua に登録。cargo test -p pasta_lua --test lua_unittest_runner で走る（最初に落ちた describe でスイートが止まる）。
-- 失敗表記はアクター nil の talk トークンなので、全体の既定ウェイト（句読点の \_w[…]）がかかる。E2E で句読点を含む名前の失敗表記を完全一致で比べるときは、ウェイトが入るかを実出力で確かめる。
+- 失敗表記は raw_script トークン（6.3 で talk から変更）。ウェイト・budoux はかからず、E2E は完全一致で比べられる。
 - 2.3: プロキシが self.act:restore_scene を呼ぶため、fallback_search_integration_test.rs の偽の act（2 件）に restore_scene を 1 行足した（act の契約に合わせただけで、アサーションは不変）。
 - 2.4: グローバルシーン名は SCENE.create_scene が「元の名前_連番」（例: 選択肢表示_1）で作る。E2E で \q の第 3 引数や Reference2 を書くときはこの実名を使う。
 - 3.1: 3.1 のコミット時点では旧生成形を見ている pasta_lua のテスト 14 件（lib 2・transpiler 12）と sample.generated.lua が未更新で赤。3.2 で解消する。
 - 4.1: チェイントークの再開を決定論化するため E2E フィクスチャに talk_interval=10 を置いた。run() は 204 を空文字列で返す。
 - 4.2: シーンの最後の行の Call は末尾の Call（act:call_restore を通らない）。途中の Call を確かめる並びでは Call の後に行を置く。
-- 4.3: 失敗表記には全体の既定ウェイトが入る（例: 【Call失敗：var.\_w[950]未代入 が nil】）。設計の範囲内として E2E はこの出力で固定。直すなら failure-output-unification で期待値も更新する。
+- 4.3: 当初は失敗表記に全体の既定ウェイトが入っていた（例: 【Call失敗：var.\_w[950]未代入 が nil】）。人の判断で 6.3 にて raw_script に変え、ウェイトなしの出力で固定した。
 - 6.1: 同梱辞書（pasta_sample_ghost hello-pasta の dic/*.pasta、release/ の同一コピー、first-ghost.md）を確認。Call は boot.pasta の末尾の `＞ゴースト終了（３００）`（GLOBAL に存在）だけで、戻った後のローカル依存・「あれば呼ぶ」Call・nil になりうる動的 Call は無し。workspace test 2525 passed / luacheck 0 / clippy clean。
 - 6.2: TEST_COVERAGE.md・SOUL.md 5.4・steering/grammar.md のトークン表・pasta-ghost-authoring SKILL.md §3.5/§3.10 を更新。クレート README・pasta-lua-coding の手書きファイルは食い違いなし。

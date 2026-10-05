@@ -183,7 +183,7 @@ describe("act:call_restore", function()
 end)
 
 describe("act:failure", function()
-    test("警告ありはログへ 1 件出し、【…】のアクター無し talk トークンを積んで nil を返す", function()
+    test("警告ありはログへ 1 件出し、【…】の raw_script トークンを積んで nil を返す", function()
         with_captured_act(function(ACT, warns)
             local act = ACT.new({})
             local r = act:failure("Call失敗：「X」が見つからない", "act:call - test warning")
@@ -191,8 +191,7 @@ describe("act:failure", function()
             expect(#warns):toBe(1)
             expect(warns[1]):toBe("act:call - test warning")
             expect(#act.token):toBe(1)
-            expect(act.token[1].type):toBe("talk")
-            expect(act.token[1].actor):toBe(nil)
+            expect(act.token[1].type):toBe("raw_script")
             expect(act.token[1].text):toBe("【Call失敗：「X」が見つからない】")
         end)
     end)
@@ -256,6 +255,52 @@ describe("act:failure → group_by_actor → sakura_builder", function()
             expect(count(out, "\\p%[")):toBe(1)
         end)
     end)
+
+    -- 失敗表記は raw_script なので talk_to_script（句読点ウェイト・分かち書き改行）を通らない。
+    -- 「.」の後に \_w[950] を入れる talk_to_script を差し込んだビルダーで確かめる
+    -- （どのスイートの後でも実モジュールかスタブかに左右されないように、ビルダーを新規ロードする）
+    local NOTE = "Call失敗：var.未代入 が nil"
+
+    --- ウェイトを入れる talk_to_script を差し込んだ sakura_builder を新規ロードして body を実行し、元に戻す
+    --- @param body fun(BUILDER: table)
+    local function with_wait_builder(body)
+        local saved_ss = package.loaded["@pasta_sakura_script"]
+        local saved_builder = package.loaded["pasta.shiori.sakura_builder"]
+        package.loaded["@pasta_sakura_script"] = {
+            talk_to_script = function(_, text) return (text:gsub("%.", ".\\_w[950]")) end,
+        }
+        package.loaded["pasta.shiori.sakura_builder"] = nil
+        local ok, err = pcall(function()
+            body(require("pasta.shiori.sakura_builder"))
+        end)
+        package.loaded["@pasta_sakura_script"] = saved_ss
+        package.loaded["pasta.shiori.sakura_builder"] = saved_builder
+        if not ok then error(err, 0) end
+    end
+
+    test("発言の後: 失敗表記にウェイトが入らず、後続の同じアクターの発言に切替タグが増えない", function()
+        with_captured_act(function(ACT)
+            with_wait_builder(function(BUILDER)
+                local sakura = { name = "さくら" }
+                local act = ACT.new({ ["さくら"] = sakura })
+                act:talk(sakura, "あ.")
+                act:failure(NOTE)
+                act:talk(sakura, "い")
+                local out = BUILDER.build(act:build(), {}, { ["さくら"] = 0 })
+                expect(out):toBe("\\p[0]あ.\\_w[950]【" .. NOTE .. "】い\\e")
+            end)
+        end)
+    end)
+
+    test("出力の先頭: 失敗表記にウェイトが入らない", function()
+        with_captured_act(function(ACT)
+            with_wait_builder(function(BUILDER)
+                local act = ACT.new({})
+                act:failure(NOTE)
+                expect(BUILDER.build(act:build(), {}, {})):toBe("【" .. NOTE .. "】\\e")
+            end)
+        end)
+    end)
 end)
 
 --- act の検索（find_handler、SCENE.search へ至る唯一の入口）を記録用に差し替える
@@ -309,8 +354,7 @@ describe("act:call_key（名前に使えない値）", function()
                 expect(#warns):toBe(0)
             end
             expect(#act.token):toBe(1)
-            expect(act.token[1].type):toBe("talk")
-            expect(act.token[1].actor):toBe(nil)
+            expect(act.token[1].type):toBe("raw_script")
             expect(act.token[1].text):toBe(text)
         end)
     end
@@ -405,7 +449,7 @@ describe("act:call の失敗の分岐", function()
             expect(warns[1]):toBe(
                 "act:call - handler not found: key='__no_such_scene_2_2__', mode='scene', via=act")
             expect(#act.token):toBe(1)
-            expect(act.token[1].actor):toBe(nil)
+            expect(act.token[1].type):toBe("raw_script")
             expect(act.token[1].text):toBe("【Call失敗：「__no_such_scene_2_2__」が見つからない】")
         end)
     end)

@@ -59,9 +59,9 @@
 
 | トークン `type`  | フィールド         | 生成元                       |
 | ---------------- | ------------------ | ---------------------------- |
-| `talk`           | `actor`, `text`    | `act:talk`（発言テキスト）・`act:failure`（失敗表記【…】。`actor` は nil） |
+| `talk`           | `actor`, `text`    | `act:talk`（発言テキスト）   |
 | `sakura_script`  | `actor`, `text`    | `act:sakura_script`          |
-| `raw_script`     | `text`             | `act:raw_script`（アクター未指定の生スクリプト） |
+| `raw_script`     | `text`             | `act:raw_script`（アクター未指定の生スクリプト）・`act:failure`（失敗表記【…】。ウェイト・改行なし） |
 | `surface`        | `id`               | `act:surface`                |
 | `wait`           | `ms`               | `act:wait`                   |
 | `newline`        | `n`                | `act:newline`                |

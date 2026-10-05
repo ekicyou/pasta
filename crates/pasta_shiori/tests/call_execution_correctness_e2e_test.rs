@@ -472,7 +472,7 @@ fn assert_failed_call(event_id: &str, expected: &str, warnings: &[&str]) {
 fn test_failed_call_undefined_variable() {
     assert_failed_call(
         "OnFcVarMid",
-        r"\p[0]前【Call失敗：var.\_w[950]未代入 が nil】後元\e",
+        r"\p[0]前【Call失敗：var.未代入 が nil】後元\e",
         &["act:call - undefined variable: 'var.未代入'"],
     );
 }
@@ -510,7 +510,7 @@ fn test_call_string_nil_is_searched() {
 fn test_failed_call_empty_string() {
     assert_failed_call(
         "OnFcEmptyMid",
-        r"\p[0]前【Call失敗：var.\_w[950]空 が空文字列】【Call失敗：値が空文字列】後元\e",
+        r"\p[0]前【Call失敗：var.空 が空文字列】【Call失敗：値が空文字列】後元\e",
         &[
             "act:call - empty variable: 'var.空'",
             "act:call - key is not a string or number: value='' (string)",
@@ -523,7 +523,7 @@ fn test_failed_call_empty_string() {
 fn test_failed_call_boolean() {
     assert_failed_call(
         "OnFcBoolMid",
-        r"\p[0]前【Call失敗：var.\_w[950]真 が boolean】【Call失敗：@真を返す() が boolean】後元\e",
+        r"\p[0]前【Call失敗：var.真 が boolean】【Call失敗：@真を返す() が boolean】後元\e",
         &[
             "act:call - unsupported value type: 'var.真' (boolean)",
             "act:call - key is not a string or number: operand='@真を返す()', value=true (boolean)",
@@ -537,7 +537,7 @@ fn test_failed_call_boolean() {
 fn test_failed_call_with_argument_list() {
     assert_failed_call(
         "OnFcArgsMid",
-        r"\p[0]前【Call失敗：var.\_w[950]未代入 が nil】甲乙後\e",
+        r"\p[0]前【Call失敗：var.未代入 が nil】甲乙後\e",
         &["act:call - undefined variable: 'var.未代入'"],
     );
 }
@@ -548,7 +548,7 @@ fn test_failed_call_with_argument_list() {
 fn test_failed_tail_call() {
     assert_failed_call(
         "OnFcTailEnd",
-        r"\p[0]前中【Call失敗：var.\_w[950]未代入甲 が nil】後【Call失敗：var.\_w[950]未代入乙 が nil】\e",
+        r"\p[0]前中【Call失敗：var.未代入甲 が nil】後【Call失敗：var.未代入乙 が nil】\e",
         &[
             "act:call - undefined variable: 'var.未代入甲'",
             "act:call - undefined variable: 'var.未代入乙'",

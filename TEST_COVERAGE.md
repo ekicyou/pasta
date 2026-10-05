@@ -143,7 +143,7 @@
 | load失敗→requestエラー伝搬            | `shiori_request_tests.rs`                                         | ✅ 完了 | 1テスト（load-error-logging）                                    |
 | 非同期コールバック統合（SHIORI層）    | `async_callback_simple_test.rs` / `async_callback_chain_test.rs`  | ✅ 完了 | 13テスト（shiori-async-talk、property-dsl-extension追加2テスト、callback-resume-unification追加1） |
 | OnChoiceSelectEx 自動ルーティング     | `choice_select_test.lua`（Luaテストスイート）                     | ✅ 完了 | 選択肢コールバック→シーン自動解決（Reference2 を最初の探索範囲に使い、不明・無しは直前のグローバルシーンへ。call-execution-correctness 追加3） |
-| Call の文脈の復元・失敗表記・動的キー | `act_call_restore_test.lua`                                       | ✅ 完了 | 32テスト（`act:restore_scene`・`act:call_restore`・`act:failure` とさくらスクリプトまでの出力・`act:call_key` の値ごとの判定・`act:call` の失敗の分岐・式の関数呼び出し／`＠＊関数`／単語の関数ハンドラの後の文脈）（call-execution-correctness） |
+| Call の文脈の復元・失敗表記・動的キー | `act_call_restore_test.lua`                                       | ✅ 完了 | 34テスト（`act:restore_scene`・`act:call_restore`・`act:failure` とさくらスクリプトまでの出力（失敗表記にウェイトが入らないこと）・`act:call_key` の値ごとの判定・`act:call` の失敗の分岐・式の関数呼び出し／`＠＊関数`／単語の関数ハンドラの後の文脈）（call-execution-correctness） |
 | 選択肢の探索範囲（`\q` 第 3 引数）   | `act_choice_test.lua`<br>`sakura_builder_test.lua`                | ✅ 完了 | 3＋5テスト（選択肢トークンに出したグローバルシーン名を載せる・`\q[表示,ジャンプ先,探索範囲]` の出力とエスケープ・On／script: では付けない）（call-execution-correctness） |
 
 ### 2.5 LSP層テスト（Language Server）

@@ -386,9 +386,11 @@ function ACT_IMPL.call_key(self, value, var_path, desc) end
 function ACT_IMPL.failure(self, text, warning) end
 ```
 
-- `warning` があれば `log.warn(warning)`。続けて `{ type = "talk", actor = nil, text = "【" .. text .. "】" }` を `self.token` に積む。
-- アクター nil の `talk` トークンは、`group_by_actor` がアクター未指定のグループに入れ、`sakura_builder` はスコープ切替タグを出さずにその位置へ文字を出す。直前に話したアクターのバルーンに続けて表示され、次の発言が同じアクターなら切替タグも増えない。
+- `warning` があれば `log.warn(warning)`。続けて既存の `raw_script` トークン `{ type = "raw_script", text = "【" .. text .. "】" }` を `self.token` に積む（`text` はエスケープしない）。
+- `raw_script` にする理由: `sakura_builder` は `raw_script` の `text` をそのまま出し、`talk_to_script` を通さない。失敗表記はアクターの台詞ではないため、句読点のウェイトも budoux の改行も入れない（2026-10-05 に変更。それまではアクター nil の `talk` トークンで、全体の既定ウェイトが失敗表記にかかっていた）。
+- `group_by_actor` は `raw_script` を、アクターのグループがあればその内側に、無ければ最上位に置く。どちらも `sakura_builder` はスコープ切替タグを出さずにその位置へ文字を出す。直前に話したアクターのバルーンに続けて表示され、グループを区切らないため、次の発言が同じアクターなら切替タグも増えない。
 - まだ誰も話していない位置（出力の先頭、yield の直後）では、切替タグなしで現在のスコープ（応答の先頭なら `\0`）のバルーンに出る。
+- `raw_script` は空でない `talk` ではないため、段落区切りの判定（`pending_break`・`spot_has_text`）を変えない。保留中の段落区切りの改行は失敗表記の前には出ず、次の空でない `talk` の前に出る（受け入れた差）。
 - 新しいトークン型は作らない（`sakura_builder`・`presentation` に手を入れない）。
 - `failure-output-unification` は、この関数の呼び出し元を増やす形で載せ替える。本 spec の呼び出し元は `act:call` と `act:call_key` の 2 か所だけである。
 
@@ -438,11 +440,11 @@ function ACT_IMPL.failure(self, text, warning) end
 ### Unit Tests（`tests/lua_specs/`）
 
 1. `act:call_restore`: 呼ばれた関数が `init_scene(別シーン)` しても、戻った後の `current_scene` が呼び出し前の表である。見つからない・印・Lua の関数でも同じ。戻り値（複数）がそのまま返る（1.1–1.6, 1.10, 4.8）。
-2. `act:call_key`: 上の表の 8 行それぞれの戻り値・警告の文言と件数・積まれる `talk` トークン。文字列 `"nil"` はキーとして返る（5.1–5.7, 6.1–6.3）。
+2. `act:call_key`: 上の表の 8 行それぞれの戻り値・警告の文言と件数・積まれる `raw_script` トークン。文字列 `"nil"` はキーとして返る（5.1–5.7, 6.1–6.3）。
 3. `act:call`: 印で nil・警告なし。nil キーは現行の警告だけでトークンなし。見つからないと警告＋失敗表記トークン（4.6, 5.8, 5.10）。
 4. `call_expr`（act・proxy）・`act:global_fn`・`word`（act・proxy）の関数ハンドラ: ハンドラが `init_scene(別シーン)` した後に `current_scene` が戻る。戻り値・`drop_self` は不変（3.1, 3.3, 3.4）。
 5. `act:choice` の `scope`、`sakura_builder` の `\q` 第 3 引数（`On`・`script:` 始まりと scope なしは 2 引数）、`choice_select` の Reference2 採用・未知の名前と欠落時の `last_global_scene` フォールバック（2.1–2.9）。
-6. `act:failure` のトークンを `group_by_actor` → `sakura_builder` に通し、発言の後・出力の先頭のどちらでも切替タグが増えずに文字が出る。
+6. `act:failure` のトークンを `group_by_actor` → `sakura_builder` に通し、発言の後・出力の先頭のどちらでも切替タグが増えずに文字が出る。ウェイトを入れる `talk_to_script` を差し込んでも、失敗表記の中に `\_w[…]` が入らない。
 
 ### Code Generation Tests
 
@@ -480,7 +482,7 @@ function ACT_IMPL.failure(self, text, warning) end
 - **Lua から `act:call` を直接呼んで見つからない場合も失敗表記を出す**。末尾の静的コールの生成コードは手書きの `act:call(nil, "名前", nil)` と区別できないため、こうなる。nil キーの直接呼び出しは要件 5.10 のとおり現行のまま（警告だけ）。`lua/script-api.md` に書く。
 - **`＠＊関数（…）` と単語参照で見つかった関数ハンドラの後も文脈を戻す**。要件ディスカッション #2（同じ原因の経路を残さない）に従い、要件 3.4 として足した。
 - **`STORE.last_global_scene` は途中の Call の後に戻さない**。`init_scene` だけが書く現行の仕組みのまま、出したシーンの記録が無い選択 ID の探索範囲としてだけ使う（要件 2.9）。
-- **失敗表記はアクター nil の `talk` トークンで積む**。直前のアクターのバルーンに続けて出る。そのアクターの `budoux`・ウェイトの設定は失敗表記には適用されない。
+- **失敗表記は既存の `raw_script` トークンで積む**（2026-10-05 に人間の判断で変更。当初はアクター nil の `talk` トークンで、全体の既定ウェイトが失敗表記にかかっていた）。直前のアクターのバルーンに続けて出る。句読点のウェイトも budoux の改行も入らない。新しいトークン型は作らない。
 - **`On`・`script:` で始まるジャンプ先には scope を付けない**。SSP の `\q` がこれらの ID で第 3 引数以降を別の意味に使うため。
 - **失敗表記はキーの式の評価時に積む**。引数の式がトークンを積む場合、失敗表記がその前に来る。
 - **公開メソッド名**: `act:call_restore`・`act:restore_scene`・`act:call_key`・`act:failure`。`call_restore` を Lua から使える「戻す呼び出し口」として `lua/script-api.md` に書く（要件 1.9）。既存の act のメソッドと同じく、5 段の検索のメソッドの段から名前で届く。

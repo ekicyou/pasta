@@ -732,9 +732,10 @@ function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...)
     return self:restore_scene(scene, self:call(global_scene_name, key, attrs, ...))
 end
 
---- 失敗表記の唯一の出口: 警告があればログへ出し、【text】をアクター無しの talk トークンとして積む
+--- 失敗表記の唯一の出口: 警告があればログへ出し、【text】を raw_script トークンとして積む
 ---
---- アクター nil の talk は切替タグを出さずに積んだ位置（直前に話したアクターのバルーン、
+--- raw_script はそのまま出力される（句読点ウェイト・分かち書き改行は入らない）。
+--- 切替タグを出さずに積んだ位置（直前に話したアクターのバルーン、
 --- または出力の先頭なら現在のスコープ）へ文字を出す。
 --- @param self Act アクションオブジェクト
 --- @param text string 失敗表記の中身（【】はこの関数が付ける）
@@ -744,7 +745,7 @@ function ACT_IMPL.failure(self, text, warning)
     if warning then
         log.warn(warning)
     end
-    table.insert(self.token, { type = "talk", actor = nil, text = "【" .. text .. "】" })
+    table.insert(self.token, { type = "raw_script", text = "【" .. text .. "】" })
     return nil
 end
 

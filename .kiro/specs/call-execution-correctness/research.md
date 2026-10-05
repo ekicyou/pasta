@@ -209,7 +209,7 @@
 | デバッガのステップ | ステップは `(thread, base_depth)` と行で判定し、`.pasta` にマップされない行（`act.lua` のフレーム）は step in / step out で飛ばす（`debug/session/stepping.rs`）。途中の Call に `act:call_restore` のフレームが 1 つ増えても、止まる行は変わらない見込み。Call 1 行 = Lua 1 行を保つため、ソースマップの記録も変わらない | コードの読解。実装で既存のステップ E2E が通ることを確かめる |
 | 呼ばれた側がエラーで抜けた場合 | 文脈は戻らないが、エラーはコルーチンごと失敗して 500 になり、`act` はイベントごとに作り直されるため残らない | コードの読解 |
 | `pasta_shiori/tests/support/scripts/pasta/act.lua` | 古いランタイムの写し。新しい E2E フィクスチャ（`codegen_runtime_safety`）は `lua_search_paths` から `scripts` を外して埋め込みの標準ランタイムを通している。本 spec も同じ形にし、写しは変更しない | `tests/fixtures/codegen_runtime_safety/pasta.toml` のコメント |
-| アクター nil の `talk` トークン | `group_by_actor` はアクター nil のグループを作り、`sakura_builder` は `actor` が nil のとき切替タグを出さず、`last_actor`・`last_spot` も変えない。`talk_to_script` は actor が表でなければ既定のウェイトで変換する（`sakura_script/mod.rs` `resolve_wait_values`・`apply_budoux_if_configured`） | コードの読解。実装の単体テストで固定する |
+| アクター nil の `talk` トークン（2026-10-05 に `raw_script` へ変更。design.md の ActFailure を参照） | `group_by_actor` はアクター nil のグループを作り、`sakura_builder` は `actor` が nil のとき切替タグを出さず、`last_actor`・`last_spot` も変えない。`talk_to_script` は actor が表でなければ既定のウェイトで変換する（`sakura_script/mod.rs` `resolve_wait_values`・`apply_budoux_if_configured`） | コードの読解。実装の単体テストで固定する |
 | SSP の `\q` の追加引数 | `\q[タイトル,ID,r2,r3...]` の `r*` は `OnChoiceSelectEx` の Reference2 以降に入る。ID が `On` で始まる場合は書いたとおりのイベントが起き、追加引数は Reference0 以降に入る。`script:` で始まる場合はさくらスクリプトとして実行される | ukadoc（さくらスクリプト一覧 `\q[タイトル,ID,r2,r3...]`・`\q[タイトル,OnID,r0,r1,...]`、SHIORI イベント `OnChoiceSelectEx`） |
 | 同梱の辞書の依存の有無 | 未確認。実装時に確認する（design.md「Migration Strategy」） | — |
 
@@ -219,7 +219,7 @@
 - **式の関数呼び出し**: `call_expr`（act・proxy）の中で、ハンドラの呼び出しを `act:restore_scene(保存値, …)` で包む。生成コードは変えない。
 - **動的コールの口**: 3.3 の案 N1 の変形。専用の呼び出しメソッド（N1-a）ではなく、キーの式だけを `act:call_key(値, 変数の経路, 関数の表記)` に替え、`act:call`・`act:call_restore` の引数の並び（`attrs` の位置）を静的・動的で同じにした。名前に使えない値のとき `call_key` はモジュールローカルな「呼ばない」印を返し、`act:call` は印を見て黙って nil を返す。末尾の動的コールも `return act:call(…)` の形のままである（要件 4.9）。
 - **警告**: 変数参照 1 つのときは `WORD.dynamic_key(値, 経路, "act:call")` をそのまま使う。関数呼び出し 1 つ・それ以外は `act:concat` と同じ形（`operand='…', value=…`）。値が nil で説明も無いとき（演算の結果）は黙る。
-- **失敗表記**: `act:failure(text, warning)` の 1 関数。アクター nil の `talk` トークン `【text】` を積む。新しいトークン型は作らない。
+- **失敗表記**: `act:failure(text, warning)` の 1 関数。アクター nil の `talk` トークン `【text】` を積む。新しいトークン型は作らない。（2026-10-05 に、ウェイトと budoux の改行を入れないため既存の `raw_script` トークンへ変更。design.md の ActFailure を参照）
 - **選択肢の探索範囲**: ランタイムに記録を置かず、`\q` の第 3 引数に出したグローバルシーン名を載せて、`OnChoiceSelectEx` の Reference2 で受け取る。記録の寿命・破棄・同じジャンプ先名の衝突の問題が無くなる。`STORE` に表を持つ案は、破棄の時点（チェイントークで応答が分かれる場合を含む）と衝突の規則を別に決める必要があるため採らない。
 
 #### 8.3 統合（Synthesis）

@@ -371,8 +371,8 @@ act:restore_scene(scene, ...) -> ...
 act:failure(text, warning?) -> nil
 ```
 
-- `warning` があれば警告ログに出し、`【text】` をアクターの無い台詞として積む。
-- アクターの無い台詞は、スコープ切替タグを付けずに積んだ位置へ出力される。直前に話したアクターのバルーンに続けて出て、次に同じアクターが話してもスコープ切替タグは増えない。出力の先頭では、その時点のスコープのバルーンに出る（[Call が失敗したとき](https://ekicyou.github.io/pasta/grammar/call-jump.html#call-が失敗したとき)）。
+- `warning` があれば警告ログに出し、`【text】` を生のさくらスクリプト（`act:raw_script` と同じトークン）として積む。句読点のウェイトも budoux の改行も入らず、`text` はエスケープしない。
+- スコープ切替タグを付けずに積んだ位置へ出力される。直前に話したアクターのバルーンに続けて出て、次に同じアクターが話してもスコープ切替タグは増えない。出力の先頭では、その時点のスコープのバルーンに出る（[Call が失敗したとき](https://ekicyou.github.io/pasta/grammar/call-jump.html#call-が失敗したとき)）。
 - `act:call`（見つからないとき）と `act:call_key`（検索キーにならない値のとき）が、Call の失敗表記を出すのに使う。
 
 `call_restore`・`call_key`・`restore_scene`・`failure` は act のメソッドのため、ほかの act のメソッドと同じく、`＠名前（…）`・`＠名前`・`＞名前` の検索の 3 段目で名前から見つかる（[検索と呼び出し](#検索と呼び出し)）。

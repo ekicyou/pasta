@@ -182,7 +182,7 @@ end
 - `var_path` があるときの警告は、`WORD.dynamic_key(value, var_path, "act:call")` を呼んで出させる（戻り値は使わない）。`var_path` が無いときの警告の `value=` の表記は、`arith`・`concat` と同じ局所関数 `arith_value_text` が作る。
 - `ACT_IMPL.call` の `key == nil` の分岐は、Lua から直接呼んだ場合のためのもので、警告だけを出して `nil` を返し、`failure` を呼ばない。生成コードの動的コールは `call_key` を通るため、`nil` のキーで `act:call` を呼ぶことはない。
 - `ACT_IMPL.call` は、見つかった値が関数でないとき（見つからないときを含む）、`handler not found` の警告文を組み立てて `failure` に渡し、その戻り値の `nil` を返す。
-- `failure(self, text, warning)` は、`warning` があれば `log.warn` で出し、`{ type = "talk", actor = nil, text = "【" .. text .. "】" }` を `self.token` に積んで `nil` を返す。新しいトークン型は作らない。アクター `nil` の `talk` のグループ化と組立は [グループ化トークン](https://ekicyou.github.io/pasta/internals/talk-output.html#グループ化トークン) で扱う。失敗表記を出すのは `call` と `call_key` の 2 か所だけである。
+- `failure(self, text, warning)` は、`warning` があれば `log.warn` で出し、`{ type = "raw_script", text = "【" .. text .. "】" }` を `self.token` に積んで `nil` を返す。新しいトークン型は作らない。`raw_script` は `talk_to_script` を通らないため、失敗表記には句読点のウェイトも budoux の改行も入らない（`text` はエスケープしない）。`raw_script` のグループ化と組立（保留中の段落区切りの改行が失敗表記の前には出ないことを含む）は [グループ化トークン](https://ekicyou.github.io/pasta/internals/talk-output.html#グループ化トークン)・[さくらスクリプトの組立](https://ekicyou.github.io/pasta/internals/talk-output.html#さくらスクリプトの組立) で扱う。失敗表記を出すのは `call` と `call_key` の 2 か所だけである。
 
 ### 名前の解決のメソッド
 

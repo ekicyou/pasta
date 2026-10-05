@@ -4,7 +4,8 @@
 # ハーネス（common::copy_fixture_to_temp）が tests/support/scripts を scripts/ にコピーするが、
 # それは古い runtime の写しで act:actor_proxy などを持たない。ここでは埋め込みの pasta 標準
 # ランタイム（profile/pasta/pasta_scripts）と本番の entry.lua をそのまま通す。
-# ウェイト設定は置かない（既定のウェイトがそのままかかる。失敗表記の句読点にも \_w[…] が入る）。
+# ウェイト設定は置かない（発言には既定のウェイトがそのままかかる。失敗表記は raw_script なので
+# 既定のウェイトがかかる文字（「var.」の「.」など）を含んでも \_w[…] は入らない）。
 
 [loader]
 pasta_patterns = ["dic/*.pasta"]

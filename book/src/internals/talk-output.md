@@ -81,9 +81,9 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 | `type` | フィールド | 積むメソッド |
 | ------ | ---------- | ------------ |
-| `talk` | `actor`・`text` | `act:talk(アクター, テキスト)`（アクタープロキシの `talk` 経由を含む）。`text` が `nil` なら積まない。未登録のアクターの目印（`【未登録アクター：名前】`）は `act:actor_proxy` が積む（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fnarithconcat)）。Call の失敗表記（`【Call失敗：…】`）は `act:failure` がアクター `nil` で積む（[Call のキーと失敗表記](internal-modules.md#call-のキーと失敗表記call_keyfailure)） |
+| `talk` | `actor`・`text` | `act:talk(アクター, テキスト)`（アクタープロキシの `talk` 経由を含む）。`text` が `nil` なら積まない。未登録のアクターの目印（`【未登録アクター：名前】`）は `act:actor_proxy` が積む（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fnarithconcat)） |
 | `sakura_script` | `actor`・`text` | `act:sakura_script(アクター, テキスト)`（アクタープロキシ経由） |
-| `raw_script` | `text` | `act:raw_script(テキスト)`。SHIORI 用の ACT では `set_property`・`get_property` も積む |
+| `raw_script` | `text` | `act:raw_script(テキスト)`。SHIORI 用の ACT では `set_property`・`get_property` も積む。Call の失敗表記（`【Call失敗：…】`）は `act:failure` が積む（[Call のキーと失敗表記](internal-modules.md#call-のキーと失敗表記call_keyfailure)） |
 | `surface` | `id` | `act:surface(ID)` |
 | `wait` | `ms` | `act:wait(ミリ秒)`（0 以上の整数に丸める） |
 | `newline` | `n` | `act:newline(回数)`（既定 1） |
@@ -107,7 +107,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
    - それ以外（`surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout`）は、グループがあればその `tokens` に入れ、無ければアクター `nil` のグループ `{ type = "actor", actor = nil, tokens = {} }` を結果に追加してから、そのグループの `tokens` に入れる。グループが無いのは、出力の先頭か `clear_spot` の後で、まだ発言を積んでいないときである。
 2. `merge_consecutive_talks` は、各グループの `tokens` の中で隣り合う `talk` のテキストを連結して 1 つの `talk` にする。`sakura_script` など `talk` 以外のトークンが間にあれば結合は切れる。
 
-結果は、`type = "actor"` のグループと、`spot`・`clear_spot`・グループの外の `raw_script` が並ぶ列になる。アクター `nil` のグループは、発言より前に積んだ表示制御などを積んだ順に持つ。アクター `nil` の `talk`（Call の失敗表記）を、アクターのあるグループの後に積んだ場合は、アクター `nil` のグループが新しく始まり、後に続く表示制御などもそのグループに入る。組立はこのグループでスコープ切替タグを出さず、内側の出力はアクター未指定（`nil`）として観測される（[さくらスクリプトの組立](#さくらスクリプトの組立)）。
+結果は、`type = "actor"` のグループと、`spot`・`clear_spot`・グループの外の `raw_script` が並ぶ列になる。アクター `nil` のグループは、発言より前に積んだ表示制御などを積んだ順に持つ。組立はこのグループでスコープ切替タグを出さず、内側の出力はアクター未指定（`nil`）として観測される（[さくらスクリプトの組立](#さくらスクリプトの組立)）。Call の失敗表記は `raw_script` のため、直前に話したアクターのグループの内側か、グループが無ければ最上位に置かれる。どちらもスコープ切替タグを出さず、グループも区切らないため、後に同じアクターが話しても切り替えの出力は増えない。
 
 ### トークンの種類と出力
 
@@ -153,7 +153,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 `last_actor` は各ビルドの初めに `nil` なので、アクターを持つ最初のグループでは必ず `\p[N]` が出る。グループのアクターが `nil` のときは切り替えの出力をせず、現在のスコープのまま内側を出力する。
 
-内側のトークンのうち、空でない `talk` の前では、`pending_break` が真なら `\n[spot_newlines × 100 の切り捨て]` を出力して `pending_break` を偽にし、`spot_has_text[last_spot]` を真にしてから本文を出力する。`clear` は `\c` を出力したうえで `pending_break` を偽にし、`spot_has_text[last_spot]` を偽に戻す。それ以外のトークン（空の `talk`・`sakura_script` を含む）は判定の状態を変えない。復旧タグは `talk` の経路を通らないため、段落区切りの判定に影響しない。
+内側のトークンのうち、空でない `talk` の前では、`pending_break` が真なら `\n[spot_newlines × 100 の切り捨て]` を出力して `pending_break` を偽にし、`spot_has_text[last_spot]` を真にしてから本文を出力する。`clear` は `\c` を出力したうえで `pending_break` を偽にし、`spot_has_text[last_spot]` を偽に戻す。それ以外のトークン（空の `talk`・`sakura_script` を含む）は判定の状態を変えない。復旧タグは `talk` の経路を通らないため、段落区切りの判定に影響しない。Call の失敗表記も `raw_script` のため判定の状態を変えず、保留中の段落区切りの改行は失敗表記の前ではなく、次の空でない `talk` の前に出る。
 
 内側のトークンを出力するたびに、出力した文字列を `APPEARANCE.observe(appearance, アクター, last_spot, 文字列)` に渡す。内側の `raw_script` と最上位の `raw_script` は、アクター未指定（`nil`）として観測させる。
 
