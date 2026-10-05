@@ -194,3 +194,43 @@
 - **後続 spec の起票（2026-10-05）**: 失敗の出力の一本化を `failure-output-unification` として起票した（brief のみ）。本 spec は Call 行の失敗表記だけを持つ。設計では、失敗表記の出力を 1 つの関数にまとめ、後続がそのまま載せ替えられる形にする。アクション行の未定義の参照などへ広げることは後続が持つ。
 - **#5 失敗表記の範囲（2026-10-05）**: Call 行の失敗すべて（値が nil、ターゲットが見つからない。静的・動的とも）。Call 行以外の失敗は `failure-output-unification` が持つ。設計で決めること: 末尾の Call が失敗した場合も失敗表記を出しつつ末尾呼び出しを保つ形（`act:call` の「見つからない」分岐で出す）、Lua から `act:call` を直接呼んで見つからない場合の扱い（要件 5.10 は nil のキーについて現行どおりと定める）。
 - **#6 名前に使えない値（2026-10-05）**: 動的単語参照と同じ規則にそろえる。調査結果: 空の検索キーは `pasta_core` の `scene_table.rs`（177・359 行）が `InvalidScene` を返し、`search/context.rs` の `test_search_scene_empty_name_is_error` が `Err` になることを固定している。`SCENE.search`（`scene.lua` 150 行〜）は `SEARCH:search_scene` を保護せずに呼ぶため、動的コールの値が空文字列だと Lua のエラーになり 500 になる見込み（コードの読解。実行での確認は設計・実装で行う）。真偽値・テーブルは `tostring` で `"true"`・`"table: 0x…"` になって検索される。判定には `WORD.dynamic_key`（`word.lua` 168 行）と同じ規則を使える（6.4 の「空文字列」の Research Needed はこれで解消）。
+
+### 8. 設計フェーズの調査と決定（2026-10-05）
+
+発見の種別: 既存システムの拡張（light discovery）。外部の新しい依存は無い。
+
+#### 8.1 調査結果（Research Needed の解消）
+
+| 項目 | 結果 | 根拠 |
+| ---- | ---- | ---- |
+| 空文字列の動的コール | Lua のエラーになる（SHIORI 層では 500）。`act:call(nil, "", {})` を `pcall` で実行し、`runtime error: Scene search error: Invalid scene name: ''`（`scene.lua` 160 行 `search_scene` → `act.lua` `search_dictionary` → `find_handler` → `call`）を確認した | 一時的なテストで実行して確認（コードは残していない） |
+| 真偽値の動的コール | `tostring(true)` の `"true"` を検索し、見つからない警告で nil を返す（エラーにならない） | 同上 |
+| 末尾の Call の連鎖を実行で確かめるテスト | 無い。`scene_test.rs`・`snapshot_test.rs`・`final_regression_test.rs` は生成形（`return` の有無）だけを見ている | テストの検索 |
+| デバッガのステップ | ステップは `(thread, base_depth)` と行で判定し、`.pasta` にマップされない行（`act.lua` のフレーム）は step in / step out で飛ばす（`debug/session/stepping.rs`）。途中の Call に `act:call_restore` のフレームが 1 つ増えても、止まる行は変わらない見込み。Call 1 行 = Lua 1 行を保つため、ソースマップの記録も変わらない | コードの読解。実装で既存のステップ E2E が通ることを確かめる |
+| 呼ばれた側がエラーで抜けた場合 | 文脈は戻らないが、エラーはコルーチンごと失敗して 500 になり、`act` はイベントごとに作り直されるため残らない | コードの読解 |
+| `pasta_shiori/tests/support/scripts/pasta/act.lua` | 古いランタイムの写し。新しい E2E フィクスチャ（`codegen_runtime_safety`）は `lua_search_paths` から `scripts` を外して埋め込みの標準ランタイムを通している。本 spec も同じ形にし、写しは変更しない | `tests/fixtures/codegen_runtime_safety/pasta.toml` のコメント |
+| アクター nil の `talk` トークン | `group_by_actor` はアクター nil のグループを作り、`sakura_builder` は `actor` が nil のとき切替タグを出さず、`last_actor`・`last_spot` も変えない。`talk_to_script` は actor が表でなければ既定のウェイトで変換する（`sakura_script/mod.rs` `resolve_wait_values`・`apply_budoux_if_configured`） | コードの読解。実装の単体テストで固定する |
+| SSP の `\q` の追加引数 | `\q[タイトル,ID,r2,r3...]` の `r*` は `OnChoiceSelectEx` の Reference2 以降に入る。ID が `On` で始まる場合は書いたとおりのイベントが起き、追加引数は Reference0 以降に入る。`script:` で始まる場合はさくらスクリプトとして実行される | ukadoc（さくらスクリプト一覧 `\q[タイトル,ID,r2,r3...]`・`\q[タイトル,OnID,r0,r1,...]`、SHIORI イベント `OnChoiceSelectEx`） |
+| 同梱の辞書の依存の有無 | 未確認。実装時に確認する（design.md「Migration Strategy」） | — |
+
+#### 8.2 設計の決定
+
+- **文脈を戻す位置**: 案 B（ランタイムの「呼んで戻す」口）。途中の Call は `act:call_restore(…)`、末尾の Call は `return act:call(…)` のまま。案 A（生成コードに復元の文を足す）は 1 行 2 文になり、式の関数呼び出しに使えないため採らない。案 C・D は不採用のまま。
+- **式の関数呼び出し**: `call_expr`（act・proxy）の中で、ハンドラの呼び出しを `act:restore_scene(保存値, …)` で包む。生成コードは変えない。
+- **動的コールの口**: 3.3 の案 N1 の変形。専用の呼び出しメソッド（N1-a）ではなく、キーの式だけを `act:call_key(値, 変数の経路, 関数の表記)` に替え、`act:call`・`act:call_restore` の引数の並び（`attrs` の位置）を静的・動的で同じにした。名前に使えない値のとき `call_key` はモジュールローカルな「呼ばない」印を返し、`act:call` は印を見て黙って nil を返す。末尾の動的コールも `return act:call(…)` の形のままである（要件 4.9）。
+- **警告**: 変数参照 1 つのときは `WORD.dynamic_key(値, 経路, "act:call")` をそのまま使う。関数呼び出し 1 つ・それ以外は `act:concat` と同じ形（`operand='…', value=…`）。値が nil で説明も無いとき（演算の結果）は黙る。
+- **失敗表記**: `act:failure(text, warning)` の 1 関数。アクター nil の `talk` トークン `【text】` を積む。新しいトークン型は作らない。
+- **選択肢の探索範囲**: ランタイムに記録を置かず、`\q` の第 3 引数に出したグローバルシーン名を載せて、`OnChoiceSelectEx` の Reference2 で受け取る。記録の寿命・破棄・同じジャンプ先名の衝突の問題が無くなる。`STORE` に表を持つ案は、破棄の時点（チェイントークで応答が分かれる場合を含む）と衝突の規則を別に決める必要があるため採らない。
+
+#### 8.3 統合（Synthesis）
+
+- **一般化**: 要件 1（Call）と要件 3（式の関数呼び出し）は「呼び出しの前後で `current_scene` を保存・復元する」という同じ操作であり、`act:restore_scene` の 1 つにまとめた。値が nil の Call（要件 5）と見つからない Call（要件 4.6）は、同じ `act:failure` に出す。
+- **既存の採用**: 警告は `WORD.dynamic_key`・`arith_value_text`・`operand_desc`・`dynamic_ref_args`、失敗表記は `actor_proxy` の未登録アクターの前例（`talk` トークンの直接挿入）、探索範囲の往復は SSP の `\q` の既存の仕様を使う。新しいモジュール・トークン型・STORE のフィールドは作らない。
+- **単純化**: 動的コール専用の呼び出しメソッド、選択肢の記録の表とその破棄、失敗表記用のトークン型、`last_global_scene` の復元を落とした。
+
+#### 8.4 リスク
+
+- 選択肢の応答文字列が変わる（`\q` の第 3 引数）。要件 4.7・8.5 の読み方に関わる（design.md Open Questions 1）。
+- Reference2 を送らないベースウェアでは、選択肢の探索範囲が現行の `last_global_scene` のままになる（要件 2 が満たされるのは SSP）。
+- 手書きの `act:call` が見つからない場合にも失敗表記が出る（Open Questions 3）。
+- `call_restore` と `call_expr` の復元で、途中の Call・式の関数呼び出しのたびに Lua のフレームが 1 つ増える（末尾の Call の連鎖には影響しない）。
