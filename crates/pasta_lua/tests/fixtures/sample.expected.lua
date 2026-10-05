@@ -30,12 +30,12 @@ do
         act:set_spot("さくら", 0)
         act:set_spot("うにゅう", 1)
 
-        act:call(SCENE.__global_name__, "グローバル単語呼び出し", {}, table.unpack(args))
-        act:call(SCENE.__global_name__, "ローカル単語呼び出し", {}, table.unpack(args))
-        act:call(SCENE.__global_name__, "会話分岐", {}, table.unpack(args))
-        act:call(SCENE.__global_name__, "変数代入", {}, table.unpack(args))
-        act:call(SCENE.__global_name__, "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
-        act:call(SCENE.__global_name__, "グローバル関数呼び出し", {}, table.unpack(args))
+        act:call_restore(SCENE.__global_name__, "グローバル単語呼び出し", {}, table.unpack(args))
+        act:call_restore(SCENE.__global_name__, "ローカル単語呼び出し", {}, table.unpack(args))
+        act:call_restore(SCENE.__global_name__, "会話分岐", {}, table.unpack(args))
+        act:call_restore(SCENE.__global_name__, "変数代入", {}, table.unpack(args))
+        act:call_restore(SCENE.__global_name__, "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
+        act:call_restore(SCENE.__global_name__, "グローバル関数呼び出し", {}, table.unpack(args))
         return act:call(SCENE.__global_name__, "共有プロパティ操作", {}, table.unpack(args))
     end
 

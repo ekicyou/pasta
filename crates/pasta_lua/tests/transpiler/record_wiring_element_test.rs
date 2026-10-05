@@ -179,6 +179,50 @@ fn call_scene_records_call_pasta_line_via_pipeline() {
     );
 }
 
+/// 途中の Call（後ろに行が続く `＞`）は `act:call_restore(...)` 1 行になり、末尾の Call と
+/// 同じくその 1 行だけが呼び出し元 `.pasta` 行（このフィクスチャでは行 3）へ対応づく
+/// （call-execution-correctness: 途中の Call の生成形の切り替え）。
+#[test]
+fn mid_call_scene_records_call_restore_line_via_pipeline() {
+    // 行1: 空, 行2: ＊メイン, 行3: ＞サブ会話（途中）, 行4: トーク, ...
+    let source = "\n＊メイン\n  ＞サブ会話\n  さくら：「戻った」\n\n  ・サブ会話\n    うにゅう：「サブです」\n";
+    let file = parse_str(source, "mid_call.pasta").expect("parse ok");
+
+    let mut sink = LinePairSink::default();
+    let mut output = Vec::new();
+    LuaTranspiler::default()
+        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .expect("transpile ok");
+
+    let lua = String::from_utf8(output).unwrap();
+    let call_lua_lines: Vec<u32> = lua
+        .lines()
+        .enumerate()
+        .filter(|(_, l)| l.contains("act:call_restore("))
+        .map(|(i, _)| i as u32 + 1)
+        .collect();
+    assert_eq!(
+        call_lua_lines.len(),
+        1,
+        "a mid Call must emit exactly one act:call_restore(...) line; lua:\n{lua}"
+    );
+    let call_lua_line = call_lua_lines[0];
+
+    // その 1 行の記録は呼び出し元 .pasta 行（3）だけ。
+    let pasta_lines_for_call: Vec<u32> = sink
+        .records
+        .iter()
+        .filter(|(lua_line, _)| *lua_line == call_lua_line)
+        .map(|(_, pasta_line)| *pasta_line)
+        .collect();
+    assert_eq!(
+        pasta_lines_for_call,
+        vec![3],
+        "1.1: mid Call output line {call_lua_line} must map to .pasta call line 3; records = {:?}",
+        sink.records
+    );
+}
+
 // ============================================================================
 // 1.1 / 1.3 — 単語定義（global / local）の record 配線
 // ============================================================================

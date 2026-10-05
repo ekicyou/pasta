@@ -379,7 +379,7 @@ fn concat_generated_forms_from_dsl() {
         ),
         (
             "＞＄種類＆「_挨拶」",
-            r#"return act:call(SCENE.__global_name__, tostring(act:concat(var.種類, "_挨拶", "var.種類")), {}, table.unpack(args))"#,
+            r#"return act:call(SCENE.__global_name__, act:call_key(act:concat(var.種類, "_挨拶", "var.種類")), {}, table.unpack(args))"#,
         ),
     ];
     for (dsl, expected) in cases {

@@ -61,12 +61,12 @@
 | ---------------- | ------------------ | ---------------------------- |
 | `talk`           | `actor`, `text`    | `act:talk`（発言テキスト）   |
 | `sakura_script`  | `actor`, `text`    | `act:sakura_script`          |
-| `raw_script`     | `text`             | `act:raw_script`（アクター未指定の生スクリプト） |
+| `raw_script`     | `text`             | `act:raw_script`（アクター未指定の生スクリプト）・`act:failure`（失敗表記【…】。ウェイト・改行なし） |
 | `surface`        | `id`               | `act:surface`                |
 | `wait`           | `ms`               | `act:wait`                   |
 | `newline`        | `n`                | `act:newline`                |
 | `clear`          | （なし）           | `act:clear`                  |
-| `choice`         | `target`, `display`| `act:choice`（選択肢行）     |
+| `choice`         | `target`, `display`, `scope` | `act:choice`（選択肢行。`scope` は出した時点のグローバルシーン名で `\q` の第 3 引数になる） |
 | `choice_timeout` | `seconds`          | `act:choice_timeout`（`!select`） |
 | `spot`           | `actor`, `spot`    | `act:set_spot`（アクター指定行） |
 | `clear_spot`     | （なし）           | `act:clear_spot`（アクター指定行の先頭） |

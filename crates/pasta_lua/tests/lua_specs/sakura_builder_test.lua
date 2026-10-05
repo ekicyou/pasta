@@ -1718,6 +1718,45 @@ describe("SAKURA_BUILDER - choiceトークン処理", function()
     end)
 end)
 
+-- ============================================================================
+-- call-execution-correctness 2.4: 選択肢トークンの scope を \q の第 3 引数に出す
+-- ============================================================================
+
+describe("SAKURA_BUILDER - choiceトークンの scope（\\q 第 3 引数）", function()
+    local function build_choice(choice)
+        local BUILDER, actors = setup()
+        choice.type = "choice"
+        return BUILDER.build({
+            { type = "actor", actor = actors.sakura, tokens = { choice } },
+        }, {})
+    end
+
+    test("scope があれば \\q[display,target,scope] を出す", function()
+        local result = build_choice({ display = "はい", target = "分岐", scope = "メイン" })
+        expect(result:find("\\![*]\\q[はい,分岐,メイン]", 1, true)):toBeTruthy()
+    end)
+
+    test("scope が無ければ現行の \\q[display,target] を出す", function()
+        local result = build_choice({ display = "はい", target = "分岐" })
+        expect(result:find("\\![*]\\q[はい,分岐]", 1, true)):toBeTruthy()
+    end)
+
+    test("target が On で始まるときは scope を付けない", function()
+        local result = build_choice({ display = "はい", target = "OnTest", scope = "メイン" })
+        expect(result:find("\\![*]\\q[はい,OnTest]", 1, true)):toBeTruthy()
+    end)
+
+    test("target が script: で始まるときは scope を付けない", function()
+        local result = build_choice({ display = "はい", target = "script:\\e", scope = "メイン" })
+        expect(result:find("\\![*]\\q[はい,script:\\\\e]", 1, true)):toBeTruthy()
+    end)
+
+    test("scope のデリミタも display・target と同じくエスケープする", function()
+        local result = build_choice({ display = "はい", target = "分岐", scope = "a],b\\c" })
+        expect(result:find("\\![*]\\q[はい,分岐,a\\]\\,b\\\\c]", 1, true)):toBeTruthy()
+    end)
+end)
+
 describe("SAKURA_BUILDER - choice_timeoutトークン処理", function()
     test("choice_timeoutトークンを \\![set,choicetimeout,<ms>] に変換する", function()
         local BUILDER, actors = setup()

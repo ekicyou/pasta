@@ -200,7 +200,14 @@ return found and (found.global_name .. "|" .. found.local_name) or "nil""#,
 fn missing_symbol_call_warns_with_raw_name_and_continues() {
     let (_temp, runtime) = load_ghost(SYMBOL_SCENES_PASTA, ACTOR_TOML);
 
-    assert_ok_with(&fire(&runtime, "不明呼び出し"), "次の行です");
+    let response = fire(&runtime, "不明呼び出し");
+    assert_ok_with(&response, "次の行です");
+    // call-execution-correctness 4.6: 見つからない Call は Call 行の位置に失敗表記を出す
+    // （失敗表記は raw_script なので句読点のウェイトは入らない）
+    assert_ok_with(
+        &response,
+        "【Call失敗：「存在しない・朝」が見つからない】\\p[0]次の行です",
+    );
     assert!(logs_contain("handler not found: key='存在しない・朝'"));
 }
 
@@ -225,7 +232,10 @@ fn event_scene_calling_symbol_global_scene_responds_200() {
 fn choice_select_jumps_to_symbol_local_scene() {
     let (_temp, runtime) = load_ghost(SYMBOL_SCENES_PASTA, ACTOR_TOML);
 
-    assert_ok_with(&fire(&runtime, "選択肢表示"), r"\q[Aにする,選択・A]");
+    assert_ok_with(
+        &fire(&runtime, "選択肢表示"),
+        r"\q[Aにする,選択・A,選択肢表示_1]",
+    );
 
     let value = runtime
         .exec(

@@ -83,12 +83,12 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 | ------ | ---------- | ------------ |
 | `talk` | `actor`・`text` | `act:talk(アクター, テキスト)`（アクタープロキシの `talk` 経由を含む）。`text` が `nil` なら積まない。未登録のアクターの目印（`【未登録アクター：名前】`）は `act:actor_proxy` が積む（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fnarithconcat)） |
 | `sakura_script` | `actor`・`text` | `act:sakura_script(アクター, テキスト)`（アクタープロキシ経由） |
-| `raw_script` | `text` | `act:raw_script(テキスト)`。SHIORI 用の ACT では `set_property`・`get_property` も積む |
+| `raw_script` | `text` | `act:raw_script(テキスト)`。SHIORI 用の ACT では `set_property`・`get_property` も積む。Call の失敗表記（`【Call失敗：…】`）は `act:failure` が積む（[Call のキーと失敗表記](internal-modules.md#call-のキーと失敗表記call_keyfailure)） |
 | `surface` | `id` | `act:surface(ID)` |
 | `wait` | `ms` | `act:wait(ミリ秒)`（0 以上の整数に丸める） |
 | `newline` | `n` | `act:newline(回数)`（既定 1） |
 | `clear` | — | `act:clear()` |
-| `choice` | `target`・`display` | `act:choice(ジャンプ先, 表示)` |
+| `choice` | `target`・`display`・`scope` | `act:choice(ジャンプ先, 表示)`。`scope` は積んだ時点の `current_scene.__global_name__`（実行中のシーンが無ければ `nil`） |
 | `choice_timeout` | `seconds` | `act:choice_timeout(秒)` |
 | `spot` | `actor`・`spot` | `act:set_spot(名前, 番号)`。`act.actors` に無い名前なら積まない |
 | `clear_spot` | — | `act:clear_spot()` |
@@ -107,7 +107,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
    - それ以外（`surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout`）は、グループがあればその `tokens` に入れ、無ければアクター `nil` のグループ `{ type = "actor", actor = nil, tokens = {} }` を結果に追加してから、そのグループの `tokens` に入れる。グループが無いのは、出力の先頭か `clear_spot` の後で、まだ発言を積んでいないときである。
 2. `merge_consecutive_talks` は、各グループの `tokens` の中で隣り合う `talk` のテキストを連結して 1 つの `talk` にする。`sakura_script` など `talk` 以外のトークンが間にあれば結合は切れる。
 
-結果は、`type = "actor"` のグループと、`spot`・`clear_spot`・グループの外の `raw_script` が並ぶ列になる。アクター `nil` のグループは、発言より前に積んだ表示制御などを積んだ順に持つ。組立はこのグループでスコープ切替タグを出さず、内側の出力はアクター未指定（`nil`）として観測される（[さくらスクリプトの組立](#さくらスクリプトの組立)）。
+結果は、`type = "actor"` のグループと、`spot`・`clear_spot`・グループの外の `raw_script` が並ぶ列になる。アクター `nil` のグループは、発言より前に積んだ表示制御などを積んだ順に持つ。組立はこのグループでスコープ切替タグを出さず、内側の出力はアクター未指定（`nil`）として観測される（[さくらスクリプトの組立](#さくらスクリプトの組立)）。Call の失敗表記は `raw_script` のため、直前に話したアクターのグループの内側か、グループが無ければ最上位に置かれる。どちらもスコープ切替タグを出さず、グループも区切らないため、後に同じアクターが話しても切り替えの出力は増えない。
 
 ### トークンの種類と出力
 
@@ -125,7 +125,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 | 内側 | `newline` | `\n` を `n` 回 |
 | 内側 | `clear` | `\c` |
 | 内側 | `raw_script` | `text` をそのまま |
-| 内側 | `choice` | `\![*]\q[display,target]`（`display`・`target` の `\`・`]`・`,` を `\` でエスケープする） |
+| 内側 | `choice` | `scope` が文字列で、`target` が `On`・`script:` で始まらなければ `\![*]\q[display,target,scope]`、それ以外は `\![*]\q[display,target]`（`display`・`target`・`scope` の `\`・`]`・`,` を `\` でエスケープする）。`scope` は選択時に OnChoiceSelectEx の Reference2 として戻る（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)） |
 | 内側 | `choice_timeout` | `\![set,choicetimeout,ミリ秒]`（`seconds` の 1000 倍を切り捨て。`seconds` が無ければ 0） |
 | 内側 | 上記以外 | 空文字列 |
 
@@ -153,7 +153,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 `last_actor` は各ビルドの初めに `nil` なので、アクターを持つ最初のグループでは必ず `\p[N]` が出る。グループのアクターが `nil` のときは切り替えの出力をせず、現在のスコープのまま内側を出力する。
 
-内側のトークンのうち、字を出すトークン（[字の定義](#字の定義)）の前では、`pending_break` が真なら `\n[spot_newlines × 100 の切り捨て]` を出力して `pending_break` を偽にし、`spot_has_text[last_spot]` を真にしてから本文を出力する。改行は字を出すトークンの出力の先頭（テキストの先頭のタグより前）に入る。`clear` は `\c` を出力したうえで `pending_break` を偽にし、`spot_has_text[last_spot]` を偽に戻す。それ以外のトークン（空の `talk`・字の無い `talk`・字を表示しない `sakura_script` を含む）は出力するだけで、判定の状態を変えない。そのため、字の無い `talk` だけを出したスポットは字を出したスポットにならず、保留中の改行はその後の字を出すトークンの直前まで持ち越される（次の切り替えか列の終わりまでに字を出すトークンが無ければ捨てられる）。復旧タグは内側のトークンの経路を通らないため、段落区切りの判定に影響しない。
+内側のトークンのうち、字を出すトークン（[字の定義](#字の定義)）の前では、`pending_break` が真なら `\n[spot_newlines × 100 の切り捨て]` を出力して `pending_break` を偽にし、`spot_has_text[last_spot]` を真にしてから本文を出力する。改行は字を出すトークンの出力の先頭（テキストの先頭のタグより前）に入る。`clear` は `\c` を出力したうえで `pending_break` を偽にし、`spot_has_text[last_spot]` を偽に戻す。それ以外のトークン（空の `talk`・字の無い `talk`・字を表示しない `sakura_script` を含む）は出力するだけで、判定の状態を変えない。そのため、字の無い `talk` だけを出したスポットは字を出したスポットにならず、保留中の改行はその後の字を出すトークンの直前まで持ち越される（次の切り替えか列の終わりまでに字を出すトークンが無ければ捨てられる）。復旧タグは内側のトークンの経路を通らないため、段落区切りの判定に影響しない。Call の失敗表記は `raw_script`（字を出すトークンではない）のため判定の状態を変えず、保留中の段落区切りの改行は失敗表記の前ではなく、その後の字を出すトークンの直前に出る。
 
 #### 字の定義
 

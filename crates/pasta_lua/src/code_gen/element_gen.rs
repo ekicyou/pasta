@@ -193,9 +193,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
     /// Generate scene call (Requirement 3d, 3g).
     ///
-    /// Generates: `act:call(SCENE.__global_name__, "ラベル名", {}, table.unpack(args))`
-    ///
-    /// When `is_tail_call` is true, prepends `return` to enable Lua TCO.
+    /// Tail: `return act:call(SCENE.__global_name__, <key>, {}, <args>)` (Lua TCO).
+    /// Mid: `act:call_restore(SCENE.__global_name__, <key>, {}, <args>)`.
+    /// `<key>` is `"名前"` (static) or `act:call_key(…)` (dynamic, see [`Self::call_key`]).
     ///
     /// Source-map wiring (Requirement 1.1): records the call's `.pasta` [`Span`]
     /// against the single output line it emits, following `generate_action`'s
@@ -218,29 +218,23 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             "table.unpack(args)".to_string()
         };
 
-        // Generate call statement based on target type
-        let call_stmt = match &call_scene.target {
-            pasta_dsl::parser::CallTarget::Static(name) => {
-                format!(
-                    "act:call(SCENE.__global_name__, \"{}\", {{}}, {})",
-                    name, args_str
-                )
-            }
-            pasta_dsl::parser::CallTarget::Dynamic(expr) => {
-                let expr_str = self.expr_to_string(expr)?;
-                format!(
-                    "act:call(SCENE.__global_name__, tostring({}), {{}}, {})",
-                    expr_str, args_str
-                )
-            }
+        // Key: a string literal (static) or `act:call_key(…)` (dynamic). It is
+        // left of the args, so the evaluation order is unchanged.
+        let key = match &call_scene.target {
+            pasta_dsl::parser::CallTarget::Static(name) => format!("\"{}\"", name),
+            pasta_dsl::parser::CallTarget::Dynamic(expr) => self.call_key(expr)?,
         };
-
-        // Tail call optimization: prepend 'return' for the last callable item
-        if is_tail_call {
-            self.writeln(&format!("return {}", call_stmt))?;
+        // Tail: `return act:call` (Lua TCO). Mid: `act:call_restore` restores the
+        // caller's scene after the callee returns.
+        let call_head = if is_tail_call {
+            "return act:call"
         } else {
-            self.writeln(&call_stmt)?;
-        }
+            "act:call_restore"
+        };
+        self.writeln(&format!(
+            "{}(SCENE.__global_name__, {}, {{}}, {})",
+            call_head, key, args_str
+        ))?;
 
         // Record the (out_line -> span) correspondence for the line just emitted
         // (Requirement 1.1).
@@ -249,6 +243,32 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
 
         Ok(())
+    }
+
+    /// Key expression of a dynamic Call: `act:call_key(value, "var.x")` for a
+    /// single variable reference, `act:call_key(value, nil, "@f()")` for a single
+    /// function call, `act:call_key(value)` otherwise. Parentheses are looked
+    /// through when classifying. The value is never `tostring`-ed here.
+    fn call_key(&self, expr: &Expr) -> Result<String, TranspileError> {
+        let mut inner = expr;
+        while let Expr::Paren(e) = inner {
+            inner = e;
+        }
+        if let Expr::VarRef { name, scope } = inner {
+            return Ok(format!(
+                "act:call_key({})",
+                Self::dynamic_ref_args(name, scope)?
+            ));
+        }
+        let value = self.expr_to_string(expr)?;
+        Ok(match Self::operand_desc(expr)? {
+            Some(desc) => format!(
+                "act:call_key({}, nil, {})",
+                value,
+                StringLiteralizer::literalize(&desc)?
+            ),
+            None => format!("act:call_key({})", value),
+        })
     }
 
     /// Generate action line (with speaker).

@@ -1,0 +1,23 @@
+{
+  "feature_name": "call-execution-correctness",
+  "created_at": "2026-10-05T06:27:22Z",
+  "updated_at": "2026-10-05T13:42:11Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "completed_at": "2026-10-05T13:42:11Z"
+}

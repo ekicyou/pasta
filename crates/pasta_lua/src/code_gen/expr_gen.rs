@@ -204,7 +204,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok((code, desc))
     }
 
-    fn operand_desc(expr: &Expr) -> Result<Option<String>, TranspileError> {
+    pub(super) fn operand_desc(expr: &Expr) -> Result<Option<String>, TranspileError> {
         Ok(match expr {
             Expr::VarRef { name, scope } => Some(Self::resolve_var_path(name, scope)?),
             Expr::FnCall {

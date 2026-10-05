@@ -79,3 +79,7 @@ Call の属性フィルター（`＞シーン＆k＝v`）は、旧文法仕様�
 - 現行実装を正として設計する。旧仕様の記述は材料であり規範ではない。
 - 並走条件（Wave 5）: Wave 5 はこの spec だけ。
 - `string-concat-operator` からの申し送り: 式の `＆` は連結演算子になった（`＞＄種類＆「_挨拶」` は受理される）。式の `＆` の後は項の開始文字（`＄`・`＠`・数字・`－`・文字列の開き・括弧の開き）だけ。フィルターのキーは識別子で始める。`＞＄名前＆k＝v`・`＞シーン名＆k＝v`・`＄x＝＠単語＆k＝v` は `string-concat-operator` の後もパースエラー（マニュアル `grammar/call-jump.md`・`grammar/variables.md` の「連結の評価」）。
+- 申し送り（`call-execution-correctness` より、2026-10-05）: Call の実行経路が次のように変わった。「実行時の経路」と「候補なし」の論点はこれを前提に決め直す。詳細は `.kiro/specs/completed/call-execution-correctness/design.md` の CallCodeGen・ActCall・DynamicCallKey。
+  - 生成形が 4 通りになった。末尾の Call は `return act:call(SCENE.__global_name__, <キー>, {}, <引数>)`、途中の Call は `act:call_restore(…同じ並び…)`。`attrs` はどちらも第 3 引数で、`call_restore` は `act:call` へそのまま渡す。フィルターを出すときは両方の形に同じ位置で出せる。
+  - 動的コールのキーは `act:call_key(値, 変数の経路, 説明)` が判定する。値が nil・空文字列・使えない型なら「呼ばない」印を返し、`act:call` は検索の前（フィルターより前）に nil を返す。
+  - ターゲットが見つからないとき、`act:call` は現行の警告に加えて失敗表記 `【Call失敗：「名前」が見つからない】` を出して次の行へ進むようになった（同 spec の要件 4.6）。「一致する候補が無いとき」をこれと同じ扱いにするか、フィルター条件を表記に含めるかを決める。

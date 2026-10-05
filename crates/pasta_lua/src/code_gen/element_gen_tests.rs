@@ -1,7 +1,7 @@
 use super::*;
 use crate::code_gen::source_map::SourceMapSink;
 use crate::config::LineEnding;
-use pasta_dsl::parser::{Arg, Args, CallTarget, FnScope};
+use pasta_dsl::parser::{Arg, Args, BinOp, CallTarget, FnScope};
 
 /// Test sink capturing each `(lua_line, pasta_line)` record.
 #[derive(Default)]
@@ -178,7 +178,8 @@ fn call_scene(target: CallTarget, args: Option<Args>) -> CallScene {
     }
 }
 
-/// Static call without args forwards only `table.unpack(args)`.
+/// Static mid call (not tail) goes through `act:call_restore` and forwards only
+/// `table.unpack(args)`.
 #[test]
 fn call_scene_static_without_args_forwards_table_unpack_only() {
     let text = gen_to_string(|cg| {
@@ -189,7 +190,7 @@ fn call_scene_static_without_args_forwards_table_unpack_only() {
     });
     assert_eq!(
         text,
-        "act:call(SCENE.__global_name__, \"次シーン\", {}, table.unpack(args))\n"
+        "act:call_restore(SCENE.__global_name__, \"次シーン\", {}, table.unpack(args))\n"
     );
 }
 
@@ -205,7 +206,7 @@ fn call_scene_with_empty_args_list_matches_no_args_form() {
     });
     assert_eq!(
         text,
-        "act:call(SCENE.__global_name__, \"次\", {}, table.unpack(args))\n"
+        "act:call_restore(SCENE.__global_name__, \"次\", {}, table.unpack(args))\n"
     );
 }
 
@@ -231,32 +232,24 @@ fn call_scene_emits_positional_and_keyword_args_before_unpack() {
     });
     assert_eq!(
         text,
-        "act:call(SCENE.__global_name__, \"次\", {}, 1, \"さくら\", table.unpack(args))\n"
+        "act:call_restore(SCENE.__global_name__, \"次\", {}, 1, \"さくら\", table.unpack(args))\n"
     );
 }
 
-/// Dynamic target evaluates the expression and wraps it in `tostring(...)`.
-#[test]
-fn call_scene_dynamic_target_wraps_expr_in_tostring() {
-    let text = gen_to_string(|cg| {
-        cg.generate_call_scene(
-            &call_scene(
-                CallTarget::Dynamic(Expr::VarRef {
-                    name: "行き先".to_string(),
-                    scope: VarScope::Local,
-                }),
-                None,
-            ),
-            false,
-        )
-    });
-    assert_eq!(
-        text,
-        "act:call(SCENE.__global_name__, tostring(var.行き先), {}, table.unpack(args))\n"
-    );
+fn dyn_call(expr: Expr, args: Option<Args>, is_tail_call: bool) -> String {
+    gen_to_string(|cg| {
+        cg.generate_call_scene(&call_scene(CallTarget::Dynamic(expr), args), is_tail_call)
+    })
 }
 
-/// Tail call prepends `return ` (Lua TCO).
+fn var_ref(name: &str, scope: VarScope) -> Expr {
+    Expr::VarRef {
+        name: name.to_string(),
+        scope,
+    }
+}
+
+/// Tail static call is unchanged: `return act:call(...)` (Lua TCO, Req 4.9).
 #[test]
 fn call_scene_tail_call_prepends_return() {
     let text = gen_to_string(|cg| {
@@ -265,11 +258,126 @@ fn call_scene_tail_call_prepends_return() {
             true,
         )
     });
-    assert!(
-        text.starts_with("return act:call("),
-        "tail call must start with 'return ', got: {}",
-        text
+    assert_eq!(
+        text,
+        "return act:call(SCENE.__global_name__, \"次\", {}, table.unpack(args))\n"
     );
+}
+
+/// The 4 forms: tail/mid × static/dynamic (Req 1.8, 4.9). The key expression
+/// sits left of the args (evaluation order unchanged, Req 5.9, 6.5) and no
+/// `tostring(...)` is generated.
+#[test]
+fn call_scene_dynamic_tail_and_mid_forms() {
+    let args = || {
+        Some(Args {
+            items: vec![Arg::Positional(Expr::Integer(1))],
+            span: Span::default(),
+        })
+    };
+    assert_eq!(
+        dyn_call(var_ref("行き先", VarScope::Local), args(), true),
+        "return act:call(SCENE.__global_name__, act:call_key(var.行き先, \"var.行き先\"), {}, 1, table.unpack(args))\n"
+    );
+    assert_eq!(
+        dyn_call(var_ref("行き先", VarScope::Local), args(), false),
+        "act:call_restore(SCENE.__global_name__, act:call_key(var.行き先, \"var.行き先\"), {}, 1, table.unpack(args))\n"
+    );
+}
+
+/// Key form 1: a single variable reference passes the value and its path
+/// (`＄x`・`＄＊x`・`＄０`).
+#[test]
+fn call_scene_dynamic_key_single_var_ref_passes_value_and_path() {
+    let cases = [
+        (
+            var_ref("x", VarScope::Local),
+            "act:call_key(var.x, \"var.x\")",
+        ),
+        (
+            var_ref("x", VarScope::Global),
+            "act:call_key(save.x, \"save.x\")",
+        ),
+        (
+            var_ref("0", VarScope::Args(0)),
+            "act:call_key(args[1], \"args[1]\")",
+        ),
+    ];
+    for (expr, key) in cases {
+        assert_eq!(
+            dyn_call(expr, None, false),
+            format!("act:call_restore(SCENE.__global_name__, {key}, {{}}, table.unpack(args))\n")
+        );
+    }
+}
+
+/// Key form 2: a single function call (incl. parenthesized) passes the value,
+/// `nil` and the operand notation (`@f()`・`@*f()`・`@$var.v()`).
+#[test]
+fn call_scene_dynamic_key_single_fn_call_passes_value_and_desc() {
+    let local_fn = || Expr::FnCall {
+        name: "f".to_string(),
+        args: Args::empty(),
+        scope: FnScope::Local,
+    };
+    let cases = [
+        (
+            local_fn(),
+            "act:call_key(act:expr_fn(\"f\"), nil, \"@f()\")",
+        ),
+        (
+            Expr::FnCall {
+                name: "g".to_string(),
+                args: Args::empty(),
+                scope: FnScope::Global,
+            },
+            "act:call_key(act:global_fn(\"g\"), nil, \"@*g()\")",
+        ),
+        (
+            Expr::DynamicFnCall {
+                var_name: "v".to_string(),
+                var_scope: VarScope::Local,
+                args: Args::empty(),
+            },
+            "act:call_key(act:expr_fn_var(var.v, \"var.v\"), nil, \"@$var.v()\")",
+        ),
+        (
+            Expr::Paren(Box::new(local_fn())),
+            "act:call_key((act:expr_fn(\"f\")), nil, \"@f()\")",
+        ),
+    ];
+    for (expr, key) in cases {
+        assert_eq!(
+            dyn_call(expr, None, true),
+            format!("return act:call(SCENE.__global_name__, {key}, {{}}, table.unpack(args))\n")
+        );
+    }
+}
+
+/// Key form 3: anything else (string, number, arithmetic, concat) passes the
+/// value only.
+#[test]
+fn call_scene_dynamic_key_other_expr_passes_value_only() {
+    let cases = [
+        (Expr::String("名前".to_string()), "act:call_key(\"名前\")"),
+        (Expr::Integer(3), "act:call_key(3)"),
+        (
+            Expr::Binary {
+                op: BinOp::Concat,
+                lhs: Box::new(Expr::String("a".to_string())),
+                rhs: Box::new(var_ref("x", VarScope::Local)),
+            },
+            "act:call_key(act:concat(\"a\", var.x, nil, \"var.x\"))",
+        ),
+    ];
+    for (expr, key) in cases {
+        let text = dyn_call(expr, None, false);
+        assert_eq!(
+            text,
+            format!("act:call_restore(SCENE.__global_name__, {key}, {{}}, table.unpack(args))\n")
+        );
+        assert!(!text.contains("tostring("), "no tostring: {text}");
+    }
 }
 
 // ------------------------------------------------------------------
