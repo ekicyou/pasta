@@ -20,6 +20,7 @@ mod runtime_toggle_e2e_basic_test;
 mod runtime_toggle_e2e_common;
 mod runtime_toggle_e2e_initial_mode_test;
 mod runtime_toggle_e2e_step_test;
+mod scene_identity_format_test;
 mod scene_test;
 mod source_map_handoff_test;
 mod stdlib_modules_test;
