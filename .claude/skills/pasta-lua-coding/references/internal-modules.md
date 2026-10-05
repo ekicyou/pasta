@@ -29,7 +29,7 @@ local STORE = require("pasta.store")
 | `actor_words` | `table<string, table>` | アクター名 → { 単語キー → 値リストの配列 } | `pasta.word` の `create_actor` のビルダー |
 | `app_ctx` | `table` | セッション中の汎用の表 | ACT の生成時に同じ表が `act.app_ctx` に入る |
 | `co_scene` | `thread\|nil` | 中断中の継続待ちのコルーチン | `pasta.shiori.event` の `set_co_scene`（[継続トーク（チェイントーク）と co_scene の更新](https://ekicyou.github.io/pasta/internals/execution-model.html#継続トークチェイントークと-co_scene-の更新)） |
-| `last_global_scene` | `string\|nil` | 最後に `init_scene` したシーンテーブルの `__global_name__` | `ACT_IMPL.init_scene` が書き、OnChoiceSelectEx の既定ハンドラが選択 ID の検索の親に使う |
+| `last_global_scene` | `string\|nil` | 最後に `init_scene` したシーンテーブルの `__global_name__` | `ACT_IMPL.init_scene` だけが書く（Call から戻っても戻さない）。OnChoiceSelectEx の既定ハンドラが、Reference2 から選択肢を出したグローバルシーンが得られないときの、選択 ID の検索の親に使う |
 | `kick_pending` | `string\|nil` | 保留中のキック対象のシーン名 | `KICK.install` が書き、`KICK.try_dispatch` が消費する（[キックの保留と起動](https://ekicyou.github.io/pasta/internals/debug.html#キックの保留と起動kicklua)） |
 | `kick_force` | `boolean` | キックの割り込み許可（既定 `false`） | `KICK.install` が立て、仮想イベントの `dispatch` の入口が 1 回で下ろす |
 | `co_callback` | `thread\|nil` | コールバック待ちとして登録したコルーチンの印 | `pasta.store` は初期化しない（未設定のときは `nil`）。`CALLBACK.consume_staged` が書き、直後の `set_co_scene`（どちらも `EVENT.drive` の中）が `nil` に戻す。`CALLBACK.reset` も `nil` に戻す（[コールバック待ちとの関係](https://ekicyou.github.io/pasta/internals/execution-model.html#コールバック待ちとの関係)） |
@@ -79,7 +79,7 @@ STORE.actors["さくら"] = { name = "さくら" }
 
 ## ACT の内部
 
-ACT は、シーン関数が第 1 引数で受け取るオブジェクトである。`pasta.act` が基本の ACT を、`pasta.shiori.act` が SHIORI 用の ACT を作る。SHIORI のイベントごとに `SHIORI_ACT.new(STORE.actors, req)` で新しい ACT が作られる（[イベントからシーンへ](https://ekicyou.github.io/pasta/internals/execution-model.html#イベントからシーンへ)）。この節では ACT の構造と、メソッド・アクタープロキシの解決、`init_scene`、名前の解決のメソッド、生成コード用のメソッドと動的参照のキーの変換を扱う。トーク系メソッドなど個々のメソッドの使い方は [スクリプト用ランタイム API](script-api.md) で、トークンの蓄積と組立は [トーク出力とアピアランス](https://ekicyou.github.io/pasta/internals/talk-output.html#トークンの蓄積) で扱う。
+ACT は、シーン関数が第 1 引数で受け取るオブジェクトである。`pasta.act` が基本の ACT を、`pasta.shiori.act` が SHIORI 用の ACT を作る。SHIORI のイベントごとに `SHIORI_ACT.new(STORE.actors, req)` で新しい ACT が作られる（[イベントからシーンへ](https://ekicyou.github.io/pasta/internals/execution-model.html#イベントからシーンへ)）。この節では ACT の構造と、メソッド・アクタープロキシの解決、`init_scene` とシーン文脈の復元、名前の解決のメソッド、Call のキーと失敗表記、生成コード用のメソッドと動的参照のキーの変換を扱う。トーク系メソッドなど個々のメソッドの使い方は [スクリプト用ランタイム API](script-api.md) で、トークンの蓄積と組立は [トーク出力とアピアランス](https://ekicyou.github.io/pasta/internals/talk-output.html#トークンの蓄積) で扱う。
 
 ### ACT オブジェクトの構造
 
@@ -92,7 +92,7 @@ ACT は、シーン関数が第 1 引数で受け取るオブジェクトであ�
 | `app_ctx` | `STORE.app_ctx` と同じ表 |
 | `var` | ACT ごとの新しい空の表 |
 | `token` | 積んだトークンの配列。`build` が新しい空の配列に置き換える |
-| `current_scene` | 実行中のシーンテーブル。初期値は `nil` で、`init_scene` が設定する |
+| `current_scene` | 実行中のシーンテーブル。初期値は `nil` で、`init_scene` が設定し、`restore_scene` が呼ぶ前の値に戻す（[シーン文脈の復元](#シーン文脈の復元call_restorerestore_scene)） |
 
 `SHIORI_ACT.new(actors, req)` は `ACT.new(actors)` で作った表に、`_spot_newlines`（`pasta.config` から読む `[ghost]` の `spot_newlines`。既定 1.5）と `req`（SHIORI のリクエストの表）を足し、メタテーブルを `SHIORI_ACT_IMPL` に付け替える。`act.req` のフィールドは [act.req](shiori-events.md#actreq) が正である。
 
@@ -148,13 +148,47 @@ end
 
 - トランスパイラは、すべてのシーン関数の先頭に `local save, var = act:init_scene(SCENE)` を生成する（[生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形)）。
 - `current_scene` は、単語参照・Call・式関数の名前の解決のうち、L1（`current_scene[key]` の完全一致）と L2（`current_scene.__global_name__` をスコープとするローカル辞書の前方一致）が使う（[ローカル優先の検索順](https://ekicyou.github.io/pasta/internals/registry-search.html#ローカル優先の検索順)）。`init_scene` を呼ばない関数の中では、`current_scene` は直前に `init_scene` したシーンのままである。
-- `init_scene` は `current_scene` と `last_global_scene` を上書きするだけで、呼び出し元へ戻ったときに元へ戻す処理は無い。別のグローバルシーンを Call すると、戻った後の呼び出し元の名前の解決と、それ以降の選択肢の検索の親は、呼び出し先のシーンのものになる。
+- `init_scene` は `current_scene` と `last_global_scene` を上書きするだけで、自分では元へ戻さない。呼び出し元へ戻ったときに `current_scene` を戻すのは呼ぶ側である（次節）。`last_global_scene` は戻さない。
+
+### シーン文脈の復元（call_restore・restore_scene）
+
+`current_scene` の書き手は `init_scene` と `restore_scene` の 2 つである。呼ばれた側のシーン関数が `init_scene` で自分のシーンを設定し、呼ぶ側が、戻った後に `restore_scene` で呼ぶ前の値に書き戻す。利用者から見た振る舞いは [Call から戻った後の名前解決](https://ekicyou.github.io/pasta/grammar/call-jump.html#call-から戻った後の名前解決) と [call_restore](script-api.md#call_restoreglobal_scene_name-key-attrs-) が正である。
+
+```lua
+function ACT_IMPL.restore_scene(self, scene, ...)
+    self.current_scene = scene
+    return ...
+end
+
+function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...)
+    local scene = self.current_scene
+    return self:restore_scene(scene, self:call(global_scene_name, key, attrs, ...))
+end
+```
+
+- `restore_scene` は `self.current_scene` だけを書き、`STORE.last_global_scene` は触らない。残りの引数をそのまま返すため、呼んだ関数の複数の戻り値も保たれる。
+- 途中の Call（ローカルシーンの最後の項目でない Call）の生成コードは `act:call_restore(…)` である（[生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形)）。`call_restore` の中の `self:call(…)` は末尾位置ではないため、呼び出しのたびにフレームが 1 つ増える。呼ばれた側の中で `return act:call(…)` がつながっても深くならず、その連鎖から戻った時点で、外側の `call_restore` が 1 回だけ復元する。
+- 復元は、`act:call` の中で何が起きたか（シーン関数・Lua の関数を呼んだ、見つからなかった、キーが `nil`・「呼ばない」印だった）にかかわらず同じ経路で行う。呼ばれた側が `yield` で中断した場合は、コルーチンの再開後に戻った時点で行う。
+- 呼ばれた側が Lua のエラーで抜けた場合は復元しない。エラーはコルーチンごと失敗し（500 応答）、その ACT は捨てられる。
+- 関数を呼ぶ ACT のメソッドも同じ形で復元する。`pasta.act` の局所関数 `call_expr`（`expr_fn`・`expr_fn_var`）・`global_fn`・`word`（見つかったのが関数のとき）は、`local scene = self.current_scene` の後に `return self:restore_scene(scene, h(self, ...))` とする（`word` は引数を渡さず `h(self)`）。`pasta.actor` の `call_expr` とプロキシの `word` は、`self.act.current_scene` を保存して `drop_self(self, self.act:restore_scene(scene, h(…)))` とする。`pasta.actor` は `pasta.act` を `require` せず、プロキシが持つ `self.act` のメソッドを呼ぶ。
+- 末尾の Call（`return act:call(…)`）は復元しない。戻る行が無いため、呼ばれた側のシーンが実行中のまま、その Call を含むシーン関数が終わる。そのシーン関数を `call_restore` で呼んだ側があれば、その側が復元する。
+
+### Call のキーと失敗表記（call_key・failure）
+
+`call_key`・`failure` の引数・戻り値・警告の文言は [call_key](script-api.md#call_keyvalue-var_path-desc)・[failure](script-api.md#failuretext-warning) が、失敗表記の文言は [動的ターゲットの値](https://ekicyou.github.io/pasta/grammar/call-jump.html#動的ターゲットの値)・[Call が失敗したとき](https://ekicyou.github.io/pasta/grammar/call-jump.html#call-が失敗したとき) が正である。ここでは実装の内部の構成だけを扱う。
+
+- 動的コールの値の判定（`nil` の判定を含む）は、生成コードではなく実行時の `call_key` が行う。生成コードは式の値を `tostring` せずにそのまま渡す（[生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形)）。キーの式は `act:call`・`act:call_restore` の第 2 引数のため、引数の式より先に評価される。
+- 検索キーにできない値のとき、`call_key` は警告と失敗表記を出してから、`pasta.act` の局所の表 `SKIP_CALL`（「呼ばない」印）を返す。`ACT_IMPL.call` は `key == SKIP_CALL` なら検索も警告もせずに `nil` を返す。印はモジュールの外へ公開されず、文字列や `false` と一致しない。
+- `var_path` があるときの警告は、`WORD.dynamic_key(value, var_path, "act:call")` を呼んで出させる（戻り値は使わない）。`var_path` が無いときの警告の `value=` の表記は、`arith`・`concat` と同じ局所関数 `arith_value_text` が作る。
+- `ACT_IMPL.call` の `key == nil` の分岐は、Lua から直接呼んだ場合のためのもので、警告だけを出して `nil` を返し、`failure` を呼ばない。生成コードの動的コールは `call_key` を通るため、`nil` のキーで `act:call` を呼ぶことはない。
+- `ACT_IMPL.call` は、見つかった値が関数でないとき（見つからないときを含む）、`handler not found` の警告文を組み立てて `failure` に渡し、その戻り値の `nil` を返す。
+- `failure(self, text, warning)` は、`warning` があれば `log.warn` で出し、`{ type = "talk", actor = nil, text = "【" .. text .. "】" }` を `self.token` に積んで `nil` を返す。新しいトークン型は作らない。アクター `nil` の `talk` のグループ化と組立は [グループ化トークン](https://ekicyou.github.io/pasta/internals/talk-output.html#グループ化トークン) で扱う。失敗表記を出すのは `call` と `call_key` の 2 か所だけである。
 
 ### 名前の解決のメソッド
 
-ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call` と `find_handler`・`find_act_handler` の引数・戻り値・警告は [検索と呼び出し](script-api.md#検索と呼び出し)（[word(name, var_path)](script-api.md#wordname-var_path)・[expr_fn_var(value, var_path, ...)](script-api.md#expr_fn_varvalue-var_path-) を含む）が、検索の各段の意味は [ローカル優先の検索順](https://ekicyou.github.io/pasta/internals/registry-search.html#ローカル優先の検索順) が正である。ここでは実装の内部の構成だけを扱う。
+ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call`・`call_restore` と `find_handler`・`find_act_handler` の引数・戻り値・警告は [検索と呼び出し](script-api.md#検索と呼び出し)（[word(name, var_path)](script-api.md#wordname-var_path)・[expr_fn_var(value, var_path, ...)](script-api.md#expr_fn_varvalue-var_path-) を含む）が、検索の各段の意味は [ローカル優先の検索順](https://ekicyou.github.io/pasta/internals/registry-search.html#ローカル優先の検索順) が正である。ここでは実装の内部の構成だけを扱う。
 
-- `expr_fn(self, key, ...)` と `expr_fn_var(self, value, var_path, ...)` は、`pasta.act` の局所関数 `call_expr(self, key, skip_methods, ...)` を共有する。`expr_fn` は `call_expr(self, key, nil, ...)`、`expr_fn_var` はキーに直した後に `call_expr(self, キー, true, ...)` を呼ぶ。`call_expr` は `find_handler("expr", key, skip_methods)` が関数なら `h(self, ...)` の戻り値を返し、それ以外は接頭辞 `act:expr_fn` の警告ログ（`handler not found`）を出して `nil` を返す。アクタープロキシは `pasta.actor` に同じ形の別の局所関数を持つ（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
+- `expr_fn(self, key, ...)` と `expr_fn_var(self, value, var_path, ...)` は、`pasta.act` の局所関数 `call_expr(self, key, skip_methods, ...)` を共有する。`expr_fn` は `call_expr(self, key, nil, ...)`、`expr_fn_var` はキーに直した後に `call_expr(self, キー, true, ...)` を呼ぶ。`call_expr` は `find_handler("expr", key, skip_methods)` が関数なら、`h(self, ...)` を呼んで `restore_scene` で `current_scene` を呼ぶ前の値に戻してから戻り値を返し、それ以外は接頭辞 `act:expr_fn` の警告ログ（`handler not found`）を出して `nil` を返す。アクタープロキシは `pasta.actor` に同じ形の別の局所関数を持つ（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
 - `skip_methods` を真にするのは、`var_path` を受け取った `word` と `expr_fn_var`（生成コードの動的参照）だけである。`find_scene`・`call` と、`var_path` の無い `word`・`expr_fn` は `skip_methods` を渡さない。`find_handler` は `find_act_handler` に引数をそのまま渡す。
 
 ### 生成コード用のメソッド（actor_proxy・global_fn・arith・concat）
@@ -163,7 +197,7 @@ ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call` と `find_han
 
 - `actor_proxy(self, name)` は、`self.actors[name]` があれば `ACTOR.create_proxy(アクター, self)` を返す。無ければ `self.token` を末尾から見て、最初に当たる `talk`・`sakura_script` のトークンの `actor.name` が `name` と同じならその `actor` の表を再利用してプロキシを作る。そうでなければ `{ name = name }`（メタテーブルなし）を作り、警告ログを出し、目印の `talk` トークン（`text` は `【未登録アクター：名前】`）を積んでからプロキシを作る。再利用によって同じ未登録の名前の連続する発言は同じ表を持ち、`build` のグループ化（表の同一性で判定する）で 1 つのグループになる（[グループ化トークン](https://ekicyou.github.io/pasta/internals/talk-output.html#グループ化トークン)）。
 - その場限りのアクターは `STORE.actors`・`self.actors`・`STORE.actor_spots` のどれにも書かれず、ACT にもフィールドを足さない。状態は `self.token` の中にしか無いため、`build`・`yield` でトークンが空になると、次の発言で目印がまた付く。`name` だけの表のため、プロキシの検索の A1 は `name` にしか一致せず、A2 のアクター単語も無い（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
-- `global_fn(self, name, ...)` は `GLOBAL[name]` が関数なら `f(self, ...)` の戻り値をすべて返し、関数でなければ警告ログを出して `nil` を返す。名前の解決の 5 段の検索（`find_act_handler`）は通らない。関数の中で起きたエラーは捕まえない。
+- `global_fn(self, name, ...)` は `GLOBAL[name]` が関数なら、`f(self, ...)` を呼んで `restore_scene` で `current_scene` を戻してから戻り値をすべて返し、関数でなければ警告ログを出して `nil` を返す。名前の解決の 5 段の検索（`find_act_handler`）は通らない。関数の中で起きたエラーは捕まえない。
 - `arith(self, op, lhs, rhs, lhs_desc, rhs_desc)` は、局所関数 `arith_operand` で被演算子を数値にし（`number` はそのまま、`string` は `tonumber`、それ以外は数値にできない）、両方が数値になったときだけ局所の表 `ARITH_OPS` の関数で Lua の演算子を適用する。演算子に渡るのは数値だけのため、表の `__add` などのメタメソッドは呼ばれない。数値にできない被演算子ごとに警告ログを出すが、値も説明も `nil` の被演算子（内側の `arith`・`concat` が既に失敗したもの）では出さない。`self` は使わず、ACT の状態を読み書きしない。
 - `concat(self, lhs, rhs, lhs_desc, rhs_desc)` は `ACT_IMPL.arith` の直後に置かれ、局所関数 `concat_operand` で被演算子を文字列にする（`string` はそのまま、`number` は `tostring`、それ以外は文字列にできない）。両方が文字列になったときだけ Lua の `..` でつなぐ。`..` に渡るのは文字列だけのため、表の `__concat`・`__tostring` などのメタメソッドは呼ばれない。文字列にできない被演算子ごとに警告ログを出すが、値も説明も `nil` の被演算子（内側の `concat`・`arith` が既に失敗したもの）では出さない。警告の `value=` の表記は `arith` と同じ局所関数 `arith_value_text` が作る。`self` は使わず、ACT の状態を読み書きしない。
 
@@ -213,7 +247,7 @@ act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(var.x, "var.
 | `expr_fn(self, key, ...)` | 局所関数 `call_expr(self, key, nil, ...)` | 関数の戻り値、または `nil` |
 | `expr_fn_var(self, value, var_path, ...)` | `value` を `WORD.dynamic_key(value, var_path, "proxy:expr_fn")` でキーにし（`nil` ならそこで `nil` を返す）、`call_expr(self, キー, true, ...)` | 関数の戻り値、または `nil` |
 
-- `call_expr` は `pasta.actor` の局所関数で（`pasta.act` の同名の局所関数とは別）、`find_handler("expr", key, skip_methods)` の結果が関数なら `h(self.act, ...)`（第 1 引数は ACT）を呼び、戻り値を `drop_self` で正規化して返す。関数でなければ警告ログ（`proxy:expr_fn - handler not found`）を出す。`"expr"` モードでは `find_actor_handler` が `nil` を返すため、見つかる関数は常に ACT の段のものである。
+- `call_expr` は `pasta.actor` の局所関数で（`pasta.act` の同名の局所関数とは別）、`find_handler("expr", key, skip_methods)` の結果が関数なら `h(self.act, ...)`（第 1 引数は ACT）を呼び、`self.act:restore_scene` で `current_scene` を呼ぶ前の値に戻し、戻り値を `drop_self` で正規化して返す。プロキシの `word` も、関数を呼んだ後に同じく `current_scene` を戻す。関数でなければ警告ログ（`proxy:expr_fn - handler not found`）を出す。`"expr"` モードでは `find_actor_handler` が `nil` を返すため、見つかる関数は常に ACT の段のものである。
 - `drop_self(self, r, ...)` は `pasta.actor` の局所関数で、先頭の戻り値 `r` が `self.act` または `self`（プロキシ）と `==` で等しければ `nil` を返し、そうでなければ `r, ...` を複数の戻り値も含めてそのまま返す。ACT・プロキシは `__eq` を持たないため、比較は同一性である。正規化はプロキシの `word`・`expr_fn`・`expr_fn_var` だけが行い、ACT の `word`・`expr_fn`・`expr_fn_var`・`global_fn` は関数の戻り値をそのまま返す。
 - A1 は通常の添字参照であるため、アクターオブジェクトのフィールド（`name`・`spot`・`pasta.toml` の `[actor.名前]` のキー）と、メタテーブル経由の `create_word` も一致の対象になる。`skip_methods` が真のとき（動的参照）は `rawget` で引くため、アクターオブジェクト自身のフィールドだけが対象になり、`create_word` などのメソッドには一致しない。
 - A2 が渡すスコープ名は元のアクター名から組み立てるが、`search_word` の入口でサニタイズされてから照合されるため、記号を含むアクター名（`さくら・改`）でも、`register_actor` がサニタイズした名前で登録したキー（`:__actor_さくら_改__:…`）に一致する（[照合規則の共有](https://ekicyou.github.io/pasta/internals/registry-search.html#照合規則の共有)）。
@@ -303,8 +337,8 @@ end
 ```
 
 - こうして定義した関数は、生成されたシーン関数と同じくシーンテーブルのキーになり、辞書確定でローカルシーンとして集められる。
-- DSL の `＠関数名(…)` は `act:expr_fn("関数名", …)` などに、`＞関数名` は `act:call(…)` になり、どちらも L1 の完全一致（`current_scene[key]`）でこの関数に一致する。
-- 関数の中で `init_scene` を呼ぶと `current_scene` と `last_global_scene` がこのシーンテーブルになり、`save`・`var` が得られる（[init_scene](#init_scene)）。書き方の利用者向けの説明は [スクリプト用ランタイム API](script-api.md) で扱う。
+- DSL の `＠関数名(…)` は `act:expr_fn("関数名", …)` などに、`＞関数名` は `act:call(…)`・`act:call_restore(…)` になり、どちらも L1 の完全一致（`current_scene[key]`）でこの関数に一致する。
+- 関数の中で `init_scene` を呼ぶと `current_scene` と `last_global_scene` がこのシーンテーブルになり、`save`・`var` が得られる（[init_scene](#init_scene)）。途中の Call・式の関数呼び出しから呼ばれた場合は、戻った後に `current_scene` だけが呼ぶ前の値に戻る（[シーン文脈の復元](#シーン文脈の復元call_restorerestore_scene)）。書き方の利用者向けの説明は [スクリプト用ランタイム API](script-api.md) で扱う。
 
 ## SAVE モジュールの内部
 
