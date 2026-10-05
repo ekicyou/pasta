@@ -75,7 +75,7 @@
   - トランスパイラのスナップショットが 1 件も変わらず、`cargo test --all` が通る
   - _Requirements: 1.6, 1.7, 2.12, 6.1, 8.1_
 
-- [ ] 5. 検索と Lua API の統合テストと回帰確認
+- [x] 5. 検索と Lua API の統合テストと回帰確認
 - [x] 5.1 Call・シーン検索・Lua API を新しい形式で確かめる統合テストを足す
   - `＞A1` と `search_scene("A1")`・`SCENE.search("A1")` を繰り返しても `＊A` が 1 度も選ばれない。`＊章`／`＊章・1`、同じシーンの中の `・挨拶`／`・挨拶・1` も同様
   - `search_scene("メイン_1")` が `＊メイン` の 1 つ目を指さない
@@ -83,7 +83,7 @@
   - `WORD.create_local("メイン_1", キー)` と `search_word(キー, "メイン_1")` が動き、`"メイン1"` では見つからずエラーにもならない
   - 追加したテストがすべて通る
   - _Requirements: 2.2, 2.3, 2.4, 2.5, 2.7, 2.8, 2.10, 3.2, 3.3, 3.4, 8.2_
-- [ ] 5.2 全体の回帰を確かめる
+- [x] 5.2 全体の回帰を確かめる
   - `cargo test --all`・`cargo clippy --all-targets --workspace -- -D warnings`・`scene.lua` と `kick.lua` の luacheck が通る
   - トランスパイラのスナップショットが変わっていないことを確かめる（変わっていたら設計の前提が崩れているので原因を調べる）
   - 破壊的変更の告知（3.5）に載せる 3 項目（登録名の形・`search_scene` の第 1 引数・`_数字` で終わる手書きのシーン関数）が実装の振る舞いと一致することを確かめる。告知そのものは完了フローの PR の件名と本文に書く
@@ -120,3 +120,4 @@
 - 4.1: `set_scene_selector(0)` で `メイン_1`〜`メイン_10` が順に返る確認は、キーを変える 4.2 の後でないと観測できないので 4.2 で入れる。4.1 は登録順を直接見る単体テスト（`finalize.rs` の `test_build_scene_registry_orders_by_name_and_counter`）だけ。
 - 4.2: 登録名を `search_scene` の第 1 引数に渡すと候補が無くなる（2.5。旧 spec `scene-search-key-normalization` の要件 3.2 を意図して廃止）。`search/context.rs` のテストを `test_search_scene_registered_name_is_treated_as_name` に書き換えた。`runtime_toggle_e2e_step_test` は TCP の ConnectionReset で稀に落ちる（単独で再実行すると通る）。
 - 4.3: ローカルシーンの通し番号は `context.rs` の `local_scene_counters` 1 か所で数え、生成器とトランスパイラの両方が使う（開始シーンは 0 で、名前に使わない）。以前はトランスパイラが開始シーンを含む定義位置を渡していたため、開始シーンがあるだけでレジストリと実行時の関数名がずれていた。
+- 5.2: 破壊的変更の告知 3 項目の裏付け: 登録名の形は `scene.lua` の `base_name .. "_" .. counter`、`search_scene` の第 1 引数は `search/context.rs` の `test_search_scene_registered_name_is_treated_as_name` と runtime の `registered_name_as_search_name_does_not_point_to_first_scene`、`_数字` で終わる手書きのシーン関数は `scene_table_candidate_tests.rs` の `test_fn_name_to_search_key_lua_defined_scene_names`（`step_2` → `step`）。
