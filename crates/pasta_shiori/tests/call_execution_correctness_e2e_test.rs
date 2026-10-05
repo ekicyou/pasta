@@ -16,7 +16,8 @@ use pasta::{PastaShiori, Shiori};
 /// 1 つのゴーストに、順にリクエストを送り、各応答の Value とゴーストのログファイルの中身を返す。
 ///
 /// `requests` の各要素は `GET SHIORI/3.0` 行・`Charset`・`Sender` に続くヘッダ行（`\r\n` 区切り）。
-/// 例: `"ID: OnFoo"`、`"ID: OnChoiceSelectEx\r\nReference0: …"`。各応答が 200 であることを確かめる。
+/// 例: `"ID: OnFoo"`、`"ID: OnChoiceSelectEx\r\nReference0: …"`。各応答が 200 か 204 であることを
+/// 確かめる（204 は Value が無いので空文字列を返す。話すことが無い OnSecondChange が 204 になる）。
 /// ロガーは non_blocking で書くため、ゴーストを drop して書き出しを待ってからログを読む。
 fn run(requests: &[&str]) -> (Vec<String>, String) {
     let temp = copy_fixture_to_temp("call_execution_correctness");
@@ -37,6 +38,9 @@ fn run(requests: &[&str]) -> (Vec<String>, String) {
                     ))
                     .expect("request should succeed");
                 let resp = ShioriResponse::parse(&raw).expect("response should parse");
+                if resp.status_code == 204 {
+                    return String::new();
+                }
                 assert_eq!(
                     resp.status_code, 200,
                     "{headers} must not be 500: {} {:?}",
@@ -134,4 +138,94 @@ fn test_tail_call_return_value_propagates() {
     let (value, log) = fire("OnTailReturn");
     assert_eq!(value, r"\p[0]末尾の戻り値\e");
     assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+}
+
+// ---------------------------------------------------------------------------
+// 途中の Call と式の関数呼び出しから戻った後の文脈（tasks 4.1）
+// 辞書: dic/mid_call_context.pasta。呼び出し元と呼ばれた側に同名のローカル単語・ローカルシーン・
+// 関数を置き、出力でどちらの文脈で解決されたかを見分ける。
+// ---------------------------------------------------------------------------
+
+/// イベント ID 1 つを送り、応答が `expected` で Lua 側の警告が出ないことを確かめる
+fn assert_fires(event_id: &str, expected: &str) {
+    let (value, log) = fire(event_id);
+    assert_eq!(value, expected, "{event_id}");
+    assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+}
+
+/// 1.11（U28）・1.1–1.3・1.7・1.8: `＞挨拶` → `＞別グローバル` → `＞挨拶` の 2 回とも呼び出し元の
+/// ローカルシーンを実行し、戻った後の単語参照（アクター付き・代入）・関数呼び出し（アクター付き・代入）・
+/// 動的コールも呼び出し元で解決される。呼ばれた側の行は呼ばれた側で解決される
+#[test]
+fn test_u28_mid_call_restores_caller_context() {
+    assert_fires(
+        "OnU28Twice",
+        r"\p[0]Ａ挨拶Ｂ単語Ｂ関数Ａ挨拶Ａ単語Ａ単語Ａ関数Ａ関数Ａ挨拶終\e",
+    );
+}
+
+/// 1.4: 入れ子（A→B→C）。戻った行はそれぞれ自分のシーンで解決される
+#[test]
+fn test_nested_mid_calls_restore_each_level() {
+    assert_fires("OnNestedMid", r"\p[0]ＣＢＡ\e");
+}
+
+/// 1.5: 呼ばれた側が `＞チェイントーク` で中断し、次の OnTalk の機会に再開して最後まで実行した後、
+/// 呼び出し元の続きが呼び出し元で解決される
+#[test]
+fn test_mid_call_restores_after_chain_talk_resume() {
+    let second_change = |time: &str| {
+        format!("ID: OnSecondChange\r\nStatus: idle\r\nReference0: 1\r\nX-Pasta-Time: {time}")
+    };
+    let (values, log) = run(&[
+        // 次回トーク時刻を 12:05:10 に決める（話すことは無いので 204）
+        &second_change("2025-07-15T12:05:00Z"),
+        "ID: OnChainResumeMid",
+        // 次の OnTalk の機会 → 中断点から再開
+        &second_change("2025-07-15T12:05:10Z"),
+    ]);
+    assert_eq!(values[0], "");
+    assert_eq!(values[1], r"\p[0]先\e");
+    assert_eq!(values[2], r"\p[0]再開先元\e");
+    assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+}
+
+/// 1.10: 途中の Call のターゲットが Lua の関数で、その中から別のグローバルシーンが呼ばれた後も、
+/// 次の行は呼び出し元で解決される
+#[test]
+fn test_mid_call_to_lua_function_calling_other_global() {
+    assert_fires("OnLuaTargetMid", r"\p[0]先元\e");
+}
+
+/// 4.3・4.2: G→A→(末尾)B→G。A の末尾の Call の後は B の文脈で、G に戻った行は G で解決される
+#[test]
+fn test_mid_call_then_tail_call_returns_to_caller_context() {
+    assert_fires("OnMidThenTail", r"\p[0]ＡＢＧ\e");
+}
+
+/// 3.1: 式の関数呼び出しが 5 段目（グローバル辞書の前方一致）で別のグローバルシーンを実行した後、
+/// 同じ行の残りと次の行（単語参照・Call）が呼び出し元で解決される
+#[test]
+fn test_expr_fn_stage5_global_scene_restores_context() {
+    assert_fires("OnExprStage5", r"\p[0]先元元元ローカル終\e");
+}
+
+/// 3.4: `＠＊関数（…）` の中から別のグローバルシーンを呼んだ後、同じ行の残りと次の行が呼び出し元で
+/// 解決される
+#[test]
+fn test_global_fn_calling_other_global_restores_context() {
+    assert_fires("OnGlobalFnCall", r"\p[0]先元元\e");
+}
+
+/// 1.8: 別のグローバルシーンへの途中の Call が動的コール（`＞＄g`）でも、次の行は呼び出し元で解決される
+#[test]
+fn test_dynamic_mid_call_to_other_global_restores_context() {
+    assert_fires("OnDynamicMid", r"\p[0]先元\e");
+}
+
+/// 1.6: 途中の Call のターゲットが `GLOBAL` の関数で、その中から別のグローバルシーンが呼ばれた後も、
+/// 次の行は呼び出し元で解決される
+#[test]
+fn test_mid_call_to_global_function_calling_other_global() {
+    assert_fires("OnGlobalTargetMid", r"\p[0]先元\e");
 }
