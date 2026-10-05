@@ -2426,3 +2426,31 @@ describe("SAKURA_BUILDER - actor-surface-restore: 着せ替え復旧の統合（
         end
     end)
 end)
+
+-- ============================================================================
+-- paragraph-break-tag-only-talk: 字のある talk の段落区切りの特性化（Task 1.2）
+-- 本仕様で変えない部分（Requirement 3.1・3.3・4.3）を現行コードで固定する。
+-- 戻り時の改行 1 つ・\c・clear_spot・終端での破棄・改行幅は sakura-script-newline の Task 3.1/3.2 の
+-- 「完全遅延」「保留破棄・フラッシュ・クリア」の各テストが押さえている。
+-- ============================================================================
+
+describe("SAKURA_BUILDER - paragraph-break-tag-only-talk: タグを含む字のある talk（Task 1.2）", function()
+    local function group(actor, inner_tokens)
+        return { type = "actor", actor = actor, tokens = inner_tokens }
+    end
+    local function talk(actor, text)
+        return { type = "talk", actor = actor, text = text }
+    end
+
+    test("3.1/4.3: 保留中の改行は talk の先頭のタグより前に 1 つだけ出る", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { talk(a, "A1") }),
+            group(b, { talk(b, "\\s[10]B1") }),
+            group(a, { talk(a, "\\s[5]A2") }),
+            group(b, { talk(b, "B2\\s[11]B3") }),
+        }, { spot_newlines = 1.5 }, { ["さくら"] = 0, ["うにゅう"] = 1 })
+        expect(result):toBe("\\p[0]A1\\p[1]\\s[10]B1\\p[0]\\n[150]\\s[5]A2\\p[1]\\n[150]B2\\s[11]B3\\e")
+    end)
+end)
