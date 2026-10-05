@@ -73,7 +73,7 @@
   - _Requirements: 5.4_
   - _Depends: 3.1, 3.2_
 
-- [ ] 4. 最終検証
+- [x] 4. 最終検証
   - `pasta_lua`・`pasta_shiori` の全テストと clippy が通ることを確かめる（実行前に環境変数を外し、実行後に `sample.generated.lua` の改行差分を戻す）
   - 行の外の呼び出し（`＞チェイントーク`・`＠＊名前（…）`・`＄x＝＠名前`）の既存テストが変更なしで通ることを確かめる
   - `global.lua`・`shiori/entry.lua`・`act.lua`・生成コードに差分が無いことを確かめる
@@ -88,3 +88,4 @@
 - 1.3: シーン名の検索は前方一致なので、E2E フィクスチャのシーン名はどれも他の名前の先頭部分にしない（`…Plain`／`…Ms`）。`pasta_scripts` は build.rs で埋め込むため、`actor.lua` の変更は再ビルドで `pasta_shiori` のテストに反映される。
 - 2: `word` は `find_handler` を使わず、同じ順序（`find_actor_handler` → `act:find_act_handler`）・同じ `skip_methods` でその場に 2 段の検索を展開し、見つかった段で第 1 引数（プロキシ／ACT）を切り替える。`expr` の形は `find_handler` のまま（expr ではアクターの段が常に nil）。`drop_self` の比較は設計どおり `==`（ACT・プロキシに `__eq` は無い）。
 - 3.1: 戻り値の正規化はプロキシ経由（`word`・`expr_fn`・`expr_fn_var`）だけで、アクション行の `＠＊名前（…）`（`act:global_fn`）には効かない。マニュアルで正規化を書くときは主語をプロキシを通る形に限定する（3.2 も同様）。
+- 4: 最終検証で `cargo test -p pasta_lua -p pasta_shiori` は exit 0・1731 件成功・0 件失敗（Lua スイート 58 件）。clippy（`-D warnings`）・luacheck（0/0）・`gen-skill-refs --check`・link-check が通過。仕様着手前（5ad2978f）からのランタイム差分は `actor.lua` のみで、`global.lua`・`act.lua`・`shiori/entry.lua`・生成コード（`crates/pasta_lua/src`）は無変更。
