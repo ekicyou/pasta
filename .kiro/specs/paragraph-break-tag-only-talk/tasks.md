@@ -147,7 +147,7 @@
   - _Depends: 6.1, 6.2, 6.3_
 
 - [ ] 7. 最終検証と破壊的変更の告知
-- [ ] 7.1 ワークスペース全体の回帰と静的検査を通す
+- [x] 7.1 ワークスペース全体の回帰と静的検査を通す
   - `NoDefaultCurrentDirectoryInExePath` を外して `cargo test --all` と `cargo clippy --all-targets --workspace -- -D warnings` を実行する
   - 同梱の luacheck で `pasta_scripts` と `tests` を検査する。VS Code 拡張で `npm run test:grammar` と `npm run test:unit` を実行する（`test:e2e` は VS Code の electron か画面が要るため関門に含めない）
   - テストの実行で書き換わった `sample.generated.lua` の改行だけの差分を戻す
@@ -155,7 +155,7 @@
   - 完了状態: 上のコマンドがすべて成功し、既存のテストの期待値の変更は要件 3.2 の条件を満たさない入力の分だけで、変更箇所ごとに根拠の要件が書かれている
   - _Requirements: 3.2, 3.3, 6.4_
 
-- [ ] 7.2 統合コミットの件名と PR 本文の「破壊的変更」の節の文面を用意する
+- [x] 7.2 統合コミットの件名と PR 本文の「破壊的変更」の節の文面を用意する
   - 件名は `fix(paragraph-break-tag-only-talk)!: …（破壊的変更）` の形にする
   - 本文の節に要件 11.1 の 8 項目を、マニュアルの該当章へのリンクとともに列挙する（代わりの書き方の手引きは書かない）
   - プッシュ・PR 作成・マージはしない（`kiro-complete` が行う）
