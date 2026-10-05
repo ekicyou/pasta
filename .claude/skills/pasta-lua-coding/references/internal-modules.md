@@ -208,15 +208,16 @@ act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(var.x, "var.
 | `sakura_script(self, text)` | `self.act:sakura_script(self.actor, text)` | `nil` |
 | `find_actor_handler(self, mode, key, skip_methods)` | `mode` が `"word"` でなければ `nil`。`self.actor[key]`（`skip_methods` が真なら `rawget(self.actor, key)`）が `nil` でなければそれ（A1）。次に `@pasta_search` を `pcall(require, …)` で得られれば `SEARCH:search_word(key, "__actor_" .. アクター名 .. "__")`（A2） | 見つかった値、または `nil` |
 | `find_handler(self, mode, key, skip_methods)` | `find_actor_handler` で見つからなければ `self.act:find_act_handler(mode, key, skip_methods)` に委ねる。`skip_methods` は両方に渡す | 見つかった値、または `nil` |
-| `word(self, name, var_path)` | `var_path` が `nil` なら、`name` が `nil` か空文字列のとき `nil` を返す。`var_path` があれば `WORD.dynamic_key(name, var_path, "proxy:word")` でキーにし（`nil` ならそこで `nil` を返す）、`skip_methods` を真にする。そのうえで `find_handler("word", …)` を引く（ACT の `word` と同じ規則。[word(name, var_path)](script-api.md#wordname-var_path)）。結果が関数なら `h(self)`（引数はプロキシ）の戻り値、それ以外の値なら `tostring(h)`。見つからなければ警告ログ（`via=proxy(アクター名)`）を出す | 単語の文字列、または `nil` |
+| `word(self, name, var_path)` | `var_path` が `nil` なら、`name` が `nil` か空文字列のとき `nil` を返す。`var_path` があれば `WORD.dynamic_key(name, var_path, "proxy:word")` でキーにし（`nil` ならそこで `nil` を返す）、`skip_methods` を真にする。そのうえで `find_handler` と同じ順序で、`find_actor_handler("word", …)`（アクターの段）、見つからなければ `self.act:find_act_handler("word", …)`（ACT の段）を引く（ACT の `word` と同じ規則。[word(name, var_path)](script-api.md#wordname-var_path)）。結果が関数なら、アクターの段で見つかったときは `h(self)`（引数はプロキシ）、ACT の段で見つかったときは `h(self.act)`（引数は ACT）を呼び、戻り値を `drop_self` で正規化して返す。それ以外の値なら `tostring(h)`。見つからなければ警告ログ（`via=proxy(アクター名)`）を出す | 単語の文字列、関数の戻り値（正規化後）、または `nil` |
 | `expr_fn(self, key, ...)` | 局所関数 `call_expr(self, key, nil, ...)` | 関数の戻り値、または `nil` |
 | `expr_fn_var(self, value, var_path, ...)` | `value` を `WORD.dynamic_key(value, var_path, "proxy:expr_fn")` でキーにし（`nil` ならそこで `nil` を返す）、`call_expr(self, キー, true, ...)` | 関数の戻り値、または `nil` |
 
-- `call_expr` は `pasta.actor` の局所関数で（`pasta.act` の同名の局所関数とは別）、`find_handler("expr", key, skip_methods)` の結果が関数なら `h(self, ...)`（第 1 引数はプロキシ）の戻り値を返し、関数でなければ警告ログ（`proxy:expr_fn - handler not found`）を出す。
+- `call_expr` は `pasta.actor` の局所関数で（`pasta.act` の同名の局所関数とは別）、`find_handler("expr", key, skip_methods)` の結果が関数なら `h(self.act, ...)`（第 1 引数は ACT）を呼び、戻り値を `drop_self` で正規化して返す。関数でなければ警告ログ（`proxy:expr_fn - handler not found`）を出す。`"expr"` モードでは `find_actor_handler` が `nil` を返すため、見つかる関数は常に ACT の段のものである。
+- `drop_self(self, r, ...)` は `pasta.actor` の局所関数で、先頭の戻り値 `r` が `self.act` または `self`（プロキシ）と `==` で等しければ `nil` を返し、そうでなければ `r, ...` を複数の戻り値も含めてそのまま返す。ACT・プロキシは `__eq` を持たないため、比較は同一性である。正規化はプロキシの `word`・`expr_fn`・`expr_fn_var` だけが行い、ACT の `word`・`expr_fn`・`expr_fn_var`・`global_fn` は関数の戻り値をそのまま返す。
 - A1 は通常の添字参照であるため、アクターオブジェクトのフィールド（`name`・`spot`・`pasta.toml` の `[actor.名前]` のキー）と、メタテーブル経由の `create_word` も一致の対象になる。`skip_methods` が真のとき（動的参照）は `rawget` で引くため、アクターオブジェクト自身のフィールドだけが対象になり、`create_word` などのメソッドには一致しない。
 - A2 が渡すスコープ名は元のアクター名から組み立てるが、`search_word` の入口でサニタイズされてから照合されるため、記号を含むアクター名（`さくら・改`）でも、`register_actor` がサニタイズした名前で登録したキー（`:__actor_さくら_改__:…`）に一致する（[照合規則の共有](https://ekicyou.github.io/pasta/internals/registry-search.html#照合規則の共有)）。
 - 検索の全体の順序（A1 → A2 → L1〜L5）と各段の意味は [ローカル優先の検索順](https://ekicyou.github.io/pasta/internals/registry-search.html#ローカル優先の検索順) で扱う。
-- `word`・`expr_fn`・`expr_fn_var` が見つけた関数に渡す第 1 引数は ACT ではなくプロキシである。ACT の `word`・`expr_fn`・`expr_fn_var`・`call` が見つけた関数には ACT を渡す。
+- `word` が見つけた関数に渡す第 1 引数は、アクターの段で見つかったときはプロキシ、ACT の段で見つかったときは ACT である。`expr_fn`・`expr_fn_var` が見つけた関数には常に ACT を渡す。ACT の `word`・`expr_fn`・`expr_fn_var`・`call` が見つけた関数にも ACT を渡す。利用者から見た規則は [関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先) が正である。
 
 ## SCENE モジュール
 
