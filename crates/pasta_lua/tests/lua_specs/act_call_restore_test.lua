@@ -301,6 +301,37 @@ describe("act:failure → group_by_actor → sakura_builder", function()
             end)
         end)
     end)
+
+    test("スコープ切替をはさむ: 直前に話したアクター（けろ）のバルーンに出る", function()
+        with_captured_act(function(ACT)
+            local BUILDER = require("pasta.shiori.sakura_builder")
+            local sakura, kero = { name = "さくら" }, { name = "けろ" }
+            local act = ACT.new({ ["さくら"] = sakura, ["けろ"] = kero })
+            act:talk(sakura, "A")
+            act:talk(kero, "B")
+            act:failure("F")
+            act:talk(sakura, "C")
+            local out = BUILDER.build(act:build(), {}, { ["さくら"] = 0, ["けろ"] = 1 })
+            expect(out):toBe("\\p[0]A\\p[1]B【F】\\p[0]\\n[150]C\\e")
+        end)
+    end)
+
+    -- 受け入れた差（design.md ActFailure）: raw_script は段落区切りの改行を出さないので、
+    -- 戻った先が発言以外で始まると、改行は失敗表記の後（次の発言の前）に出る
+    test("戻った先が発言以外で始まる: 段落区切りの改行は失敗表記の後に出る", function()
+        with_captured_act(function(ACT)
+            local BUILDER = require("pasta.shiori.sakura_builder")
+            local sakura, kero = { name = "さくら" }, { name = "けろ" }
+            local act = ACT.new({ ["さくら"] = sakura, ["けろ"] = kero })
+            act:talk(sakura, "A")
+            act:talk(kero, "B")
+            act:sakura_script(sakura, "\\s[1]")
+            act:failure("F")
+            act:talk(sakura, "C")
+            local out = BUILDER.build(act:build(), {}, { ["さくら"] = 0, ["けろ"] = 1 })
+            expect(out):toBe("\\p[0]A\\p[1]B\\p[0]\\s[1]【F】\\n[150]C\\e")
+        end)
+    end)
 end)
 
 --- act の検索（find_handler、SCENE.search へ至る唯一の入口）を記録用に差し替える

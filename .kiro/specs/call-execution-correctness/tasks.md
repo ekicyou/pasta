@@ -130,3 +130,4 @@
 - 4.3: 当初は失敗表記に全体の既定ウェイトが入っていた（例: 【Call失敗：var.\_w[950]未代入 が nil】）。人の判断で 6.3 にて raw_script に変え、ウェイトなしの出力で固定した。
 - 6.1: 同梱辞書（pasta_sample_ghost hello-pasta の dic/*.pasta、release/ の同一コピー、first-ghost.md）を確認。Call は boot.pasta の末尾の `＞ゴースト終了（３００）`（GLOBAL に存在）だけで、戻った後のローカル依存・「あれば呼ぶ」Call・nil になりうる動的 Call は無し。workspace test 2525 passed / luacheck 0 / clippy clean。
 - 6.2: TEST_COVERAGE.md・SOUL.md 5.4・steering/grammar.md のトークン表・pasta-ghost-authoring SKILL.md §3.5/§3.10 を更新。クレート README・pasta-lua-coding の手書きファイルは食い違いなし。
+- 完了時にその場で解決: 受け入れた差（スコープ切替をはさむ位置・段落区切りの改行の位置）を act_call_restore_test.lua の単体テスト 2 本で固定した。
