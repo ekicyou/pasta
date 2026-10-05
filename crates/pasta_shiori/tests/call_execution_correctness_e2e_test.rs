@@ -423,3 +423,135 @@ fn test_choice_routing_order_unchanged() {
     ]);
     assert_eq!(values[1], "");
 }
+
+// ---------------------------------------------------------------------------
+// 失敗した Call（tasks 4.3）
+// 辞書: dic/failed_call.pasta。失敗表記が Call 行の位置に出て、ログの警告が design.md の
+// DynamicCallKey の表（と ActCall の「見つからない」）の文言・件数どおりで、途中の Call の後は
+// 呼び出し元の文脈（＠失話題：元）で続く。
+// ---------------------------------------------------------------------------
+
+/// Lua 側の警告の本文（`pasta_lua::runtime::log:` の後ろから、呼び出し元の ` lua_source=…` の前まで）
+fn lua_warning_messages(log: &str) -> Vec<&str> {
+    lua_warnings(log)
+        .into_iter()
+        .map(|l| {
+            let msg = l
+                .split_once(" WARN pasta_lua::runtime::log: ")
+                .map_or(l, |(_, m)| m);
+            msg.split_once(" lua_source=").map_or(msg, |(m, _)| m)
+        })
+        .collect()
+}
+
+/// イベント ID 1 つを送り（応答が 200 であることは `run` が確かめる）、応答が `expected` で、
+/// Lua 側の警告が `warnings` と同じ文言・同じ件数・同じ順であることを確かめる
+fn assert_failed_call(event_id: &str, expected: &str, warnings: &[&str]) {
+    let (value, log) = fire(event_id);
+    assert_eq!(value, expected, "{event_id}");
+    assert_eq!(lua_warning_messages(&log), warnings, "{event_id}:\n{log}");
+}
+
+/// 5.1–5.4・5.2・5.11: `＞＄未代入` は検索せず（`nil` で始まるローカルシーン・関数・グローバルシーンを
+/// 呼ばない）、変数のパスを含む警告 1 件と失敗表記を出し、次の行を呼び出し元で解決する
+#[test]
+fn test_failed_call_undefined_variable() {
+    assert_failed_call(
+        "OnFcVarMid",
+        r"\p[0]前【Call失敗：var.\_w[950]未代入 が nil】後元\e",
+        &["act:call - undefined variable: 'var.未代入'"],
+    );
+}
+
+/// 5.1・5.3・5.5: `＞＠値なし（）` は関数の表記を含む警告 1 件と失敗表記
+#[test]
+fn test_failed_call_function_returning_nothing() {
+    assert_failed_call(
+        "OnFcFnMid",
+        r"\p[0]前【Call失敗：@値なし() が nil】後元\e",
+        &["act:call - key is not a string or number: operand='@値なし()', value=nil"],
+    );
+}
+
+/// 5.6: `＞＄未代入＆「x」` は連結の警告 1 件だけで、Call の警告を重ねない
+#[test]
+fn test_failed_call_concat_with_nil_operand() {
+    assert_failed_call(
+        "OnFcConcatMid",
+        r"\p[0]前【Call失敗：値が nil】後元\e",
+        &[
+            "act:concat - operand is not a string or number: op='&', operand='var.未代入', value=nil",
+        ],
+    );
+}
+
+/// 5.7: `＞「nil」` は文字列 `nil` を検索キーにして通常どおり検索する（警告なし）
+#[test]
+fn test_call_string_nil_is_searched() {
+    assert_failed_call("OnFcNilStrMid", r"\p[0]前nil先後\e", &[]);
+}
+
+/// 6.3・6.6: 空文字列（変数と式）は検索せず、それぞれ警告 1 件と失敗表記
+#[test]
+fn test_failed_call_empty_string() {
+    assert_failed_call(
+        "OnFcEmptyMid",
+        r"\p[0]前【Call失敗：var.\_w[950]空 が空文字列】【Call失敗：値が空文字列】後元\e",
+        &[
+            "act:call - empty variable: 'var.空'",
+            "act:call - key is not a string or number: value='' (string)",
+        ],
+    );
+}
+
+/// 6.3・6.6: 真偽値（変数と関数）は検索せず、それぞれ型名を含む警告 1 件と失敗表記
+#[test]
+fn test_failed_call_boolean() {
+    assert_failed_call(
+        "OnFcBoolMid",
+        r"\p[0]前【Call失敗：var.\_w[950]真 が boolean】【Call失敗：@真を返す() が boolean】後元\e",
+        &[
+            "act:call - unsupported value type: 'var.真' (boolean)",
+            "act:call - key is not a string or number: operand='@真を返す()', value=true (boolean)",
+        ],
+    );
+}
+
+/// 5.9: 引数リスト付きでも引数の式は書いた順に評価され、Call だけを行わない。失敗表記はキーの評価の
+/// 時点（引数の式が積む出力より前）に出る
+#[test]
+fn test_failed_call_with_argument_list() {
+    assert_failed_call(
+        "OnFcArgsMid",
+        r"\p[0]前【Call失敗：var.\_w[950]未代入 が nil】甲乙後\e",
+        &["act:call - undefined variable: 'var.未代入'"],
+    );
+}
+
+/// 5.8: 値が nil の動的コールが末尾の Call（ローカルシーンの最後の行・グローバルシーンの最後の行）でも
+/// エラーにせず、ローカルシーンの後は呼び出し元の続きを実行し、シーンを通常どおり終える
+#[test]
+fn test_failed_tail_call() {
+    assert_failed_call(
+        "OnFcTailEnd",
+        r"\p[0]前中【Call失敗：var.\_w[950]未代入甲 が nil】後【Call失敗：var.\_w[950]未代入乙 が nil】\e",
+        &[
+            "act:call - undefined variable: 'var.未代入甲'",
+            "act:call - undefined variable: 'var.未代入乙'",
+        ],
+    );
+}
+
+/// 4.6: 存在しないシーンへの静的と動的の Call は、見つからない名前を含む失敗表記と警告 1 件ずつを出し、
+/// 次の行を呼び出し元で解決する
+#[test]
+fn test_failed_call_scene_not_found() {
+    assert_failed_call(
+        "OnFcNotFound",
+        r"\p[0]前【Call失敗：「どこにも無いシーン」が見つからない】【Call失敗：「どこにも無い動的先」が見つからない】後元\e",
+        &[
+            "act:call - handler not found: key='どこにも無いシーン', mode='scene', via=act",
+            "act:call - handler not found: key='どこにも無い動的先', mode='scene', via=act",
+        ],
+    );
+}
