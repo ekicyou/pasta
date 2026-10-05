@@ -172,7 +172,7 @@ fn check(reader: &str, rewritten: bool, run: impl Fn(&Case) -> (Option<Units>, O
 #[test]
 fn conformance_rust_tokenizer() {
     let tokenizer = Tokenizer::new(&TalkConfig::default()).unwrap();
-    check("rust", false, |case| {
+    check("rust", true, |case| {
         let mut got = Units::new();
         for token in tokenizer.tokenize(case.input) {
             let kind = if token.kind == TokenKind::SakuraScript {
