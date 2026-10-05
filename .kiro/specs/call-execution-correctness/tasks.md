@@ -107,6 +107,10 @@
   - 同梱のサンプルゴーストなどの辞書に、戻った後に呼ばれた側のローカルが見えることへの依存や、存在しないシーンへの「あれば呼ぶ」つもりの Call が無いことを確かめ、あれば直す
   - 完了状態: テスト一式・luacheck・clippy が成功し、同梱の辞書の確認結果が記録されている
   - _Requirements: 4.5, 4.7, 8.5_
+- [x] 6.2 ドキュメント整合性の確認と更新（steering/workflow.md の必須最終タスク。kiro-validate-impl の指摘で追加）
+  - SOUL.md・book/src・TEST_COVERAGE.md・クレート README・steering・生成スキルとの整合を確認し、必要なものを更新する
+  - 完了状態: TEST_COVERAGE.md に本 spec のテストのマッピングがあり、SOUL.md の Call の生成形の例が新しい形になっている
+  - _Requirements: 7.5, 8.5_
 
 ## Implementation Notes
 - 1.2: 特性化の選択肢テスト（2.6）は Reference2 を送らない形。2.4 以降は 2.9 のフォールバック経路になるため、2.6 の Reference2 経路は 4.2 で必ず確かめる。
@@ -120,3 +124,4 @@
 - 4.2: シーンの最後の行の Call は末尾の Call（act:call_restore を通らない）。途中の Call を確かめる並びでは Call の後に行を置く。
 - 4.3: 失敗表記には全体の既定ウェイトが入る（例: 【Call失敗：var.\_w[950]未代入 が nil】）。設計の範囲内として E2E はこの出力で固定。直すなら failure-output-unification で期待値も更新する。
 - 6.1: 同梱辞書（pasta_sample_ghost hello-pasta の dic/*.pasta、release/ の同一コピー、first-ghost.md）を確認。Call は boot.pasta の末尾の `＞ゴースト終了（３００）`（GLOBAL に存在）だけで、戻った後のローカル依存・「あれば呼ぶ」Call・nil になりうる動的 Call は無し。workspace test 2525 passed / luacheck 0 / clippy clean。
+- 6.2: TEST_COVERAGE.md・SOUL.md 5.4・steering/grammar.md のトークン表・pasta-ghost-authoring SKILL.md §3.5/§3.10 を更新。クレート README・pasta-lua-coding の手書きファイルは食い違いなし。

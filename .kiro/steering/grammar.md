@@ -59,14 +59,14 @@
 
 | トークン `type`  | フィールド         | 生成元                       |
 | ---------------- | ------------------ | ---------------------------- |
-| `talk`           | `actor`, `text`    | `act:talk`（発言テキスト）   |
+| `talk`           | `actor`, `text`    | `act:talk`（発言テキスト）・`act:failure`（失敗表記【…】。`actor` は nil） |
 | `sakura_script`  | `actor`, `text`    | `act:sakura_script`          |
 | `raw_script`     | `text`             | `act:raw_script`（アクター未指定の生スクリプト） |
 | `surface`        | `id`               | `act:surface`                |
 | `wait`           | `ms`               | `act:wait`                   |
 | `newline`        | `n`                | `act:newline`                |
 | `clear`          | （なし）           | `act:clear`                  |
-| `choice`         | `target`, `display`| `act:choice`（選択肢行）     |
+| `choice`         | `target`, `display`, `scope` | `act:choice`（選択肢行。`scope` は出した時点のグローバルシーン名で `\q` の第 3 引数になる） |
 | `choice_timeout` | `seconds`          | `act:choice_timeout`（`!select`） |
 | `spot`           | `actor`, `spot`    | `act:set_spot`（アクター指定行） |
 | `clear_spot`     | （なし）           | `act:clear_spot`（アクター指定行の先頭） |

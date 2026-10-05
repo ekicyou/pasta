@@ -75,6 +75,7 @@
 | 動的単語参照（＠＄）   | `transpiler/dynamic_word_ref_test.rs`<br>`lua_specs/act_dynamic_ref_test.lua`<br>`runtime/syntax_test.rs`（E2E）<br>`pasta_lsp/tests/dynamic_ref_token_test.rs` | ✅ 完了 | 生成コード・スナップショット・マニュアル例の読み込み・キー解決と検索段・E2E・LSP トークン |
 | 書き間違いの実行時安全性 | `transpiler/runtime_safety_test.rs`<br>`lua_specs/act_runtime_safety_test.lua`<br>`code_gen/element_gen_tests.rs`<br>`sakura_script/tokenizer.rs`・`line_breaker.rs`（インライン）<br>`pasta_shiori/tests/codegen_runtime_safety_e2e_test.rs`（E2E） | ✅ 完了 | 未定義の `＠＊`・未登録アクター・act メンバー名のアクター・数値にできない算術・`\\` の生成形と実行（算術の組み直しが旧来の平らな式と同値である関門を含む）（dsl-codegen-runtime-safety） |
 | 文字列の連結（＆）     | `code_gen/expr_gen_tests.rs`<br>`transpiler/runtime_safety_test.rs`<br>`transpiler/source_map_seam_test.rs`<br>`lua_specs/act_concat_test.lua`<br>`pasta_shiori/tests/codegen_runtime_safety_e2e_test.rs`（E2E） | ✅ 完了 | 3 段の組み直しの生成形・平らな Lua 式と同値の関門・行対応・`act:concat` の値ごとの扱いと警告・伝播・SHIORI 経由で 500 にならないこと（string-concat-operator） |
+| Call の生成形（途中／末尾 × 静的／動的） | `code_gen/element_gen_tests.rs`<br>`transpiler/scene_test.rs`<br>`transpiler/dynamic_call_test.rs`<br>`transpiler/record_wiring_element_test.rs`<br>`transpiler/snapshot_test.rs`・`final_regression_test.rs`（スナップショット） | ✅ 完了 | 途中の Call は `act:call_restore(…)`・末尾は `return act:call(…)`、動的コールのキーは `act:call_key(値[, 変数パス／関数の表記])`（`tostring` しない）。途中の Call の 1 行がその `.pasta` 行へ対応づくこと（call-execution-correctness） |
 | エンコーディング       | `pasta_lua_encoding_test.rs`                                                                | ✅ 完了 | 文字エンコード                     |
 | プロパティLua変換      | `property_scope_codegen_test.rs`                                                            | ✅ 完了 | 10テスト（property-dsl-extension） |
 | プロパティトークン保全 | `property_token_preservation_test.rs`                                                       | ✅ 完了 | 3テスト（property-dsl-extension）  |
@@ -141,7 +142,9 @@
 | ログファイル名固定（Rotation::NEVER） | `logger.rs`                                                       | ✅ 完了 | 1テスト（load-error-logging）                                    |
 | load失敗→requestエラー伝搬            | `shiori_request_tests.rs`                                         | ✅ 完了 | 1テスト（load-error-logging）                                    |
 | 非同期コールバック統合（SHIORI層）    | `async_callback_simple_test.rs` / `async_callback_chain_test.rs`  | ✅ 完了 | 13テスト（shiori-async-talk、property-dsl-extension追加2テスト、callback-resume-unification追加1） |
-| OnChoiceSelectEx 自動ルーティング     | `choice_select_test.lua`（Luaテストスイート）                     | ✅ 完了 | 選択肢コールバック→シーン自動解決                                |
+| OnChoiceSelectEx 自動ルーティング     | `choice_select_test.lua`（Luaテストスイート）                     | ✅ 完了 | 選択肢コールバック→シーン自動解決（Reference2 を最初の探索範囲に使い、不明・無しは直前のグローバルシーンへ。call-execution-correctness 追加3） |
+| Call の文脈の復元・失敗表記・動的キー | `act_call_restore_test.lua`                                       | ✅ 完了 | 32テスト（`act:restore_scene`・`act:call_restore`・`act:failure` とさくらスクリプトまでの出力・`act:call_key` の値ごとの判定・`act:call` の失敗の分岐・式の関数呼び出し／`＠＊関数`／単語の関数ハンドラの後の文脈）（call-execution-correctness） |
+| 選択肢の探索範囲（`\q` 第 3 引数）   | `act_choice_test.lua`<br>`sakura_builder_test.lua`                | ✅ 完了 | 3＋5テスト（選択肢トークンに出したグローバルシーン名を載せる・`\q[表示,ジャンプ先,探索範囲]` の出力とエスケープ・On／script: では付けない）（call-execution-correctness） |
 
 ### 2.5 LSP層テスト（Language Server）
 
@@ -193,6 +196,7 @@
 | Sample Ghost 構成検証         | `dist_src_validation_test.rs::test_ghost_directory_structure`                                       | ✅ 完了 | 1テスト（ghosts/hello-pasta/ 8ファイル存在確認）※テストファイル名は旧称                                    |
 | Sample Ghost 画像構造検証     | `integration_test.rs::test_generated_images_structure`                                              | ✅ 完了 | 1テスト（shell/master/*.png 18枚＋surfaces.txt）                                                           |
 | チェイントーク E2E            | `runtime_scene_test.rs`                                                                             | ✅ 完了 | 2テスト（yield-continuation-token Pasta→Lua→実行）                                                         |
+| Call の実行の正しさ E2E       | `call_execution_correctness_e2e_test.rs`<br>`fixtures/call_execution_correctness/dic/`（`characterization`・`mid_call_context`・`choice_scope`・`failed_call`・`basic`） | ✅ 完了 | 36テスト（現行挙動の特性化・途中の Call から戻った後の文脈（入れ子・チェイントーク再開・Lua／`GLOBAL`／act のメソッドのターゲット・動的参照）・選択肢の探索範囲・失敗した Call の失敗表記と警告）（call-execution-correctness） |
 
 ---
 

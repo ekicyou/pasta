@@ -239,6 +239,20 @@ fn test_mid_call_to_global_function_calling_other_global() {
     assert_fires("OnGlobalTargetMid", r"\p[0]先元\e");
 }
 
+/// 1.1・1.3: 別のグローバルシーンへの途中の Call から戻った後、動的単語参照（`＠＄変数`）と動的関数
+/// 呼び出し（`＠＄変数（…）`）が呼び出し元で解決される（呼ばれた側では同じ書き方が呼ばれた側に解決される）
+#[test]
+fn test_dynamic_refs_after_mid_call_resolve_in_caller_context() {
+    assert_fires("OnDynRefAfterMid", r"\p[0]先語先関数元語元関数\e");
+}
+
+/// 1.6: 途中の Call のターゲットが act のメソッド（3 段目の `call`）で、その中で別のグローバルシーンが
+/// 実行された後も、次の行は呼び出し元で解決される
+#[test]
+fn test_mid_call_to_act_method_restores_caller_context() {
+    assert_fires("OnActMethodMid", r"\p[0]先元\e");
+}
+
 // ---------------------------------------------------------------------------
 // 選択肢の探索範囲（tasks 4.2）
 // 辞書: dic/choice_scope.pasta（2.6 は dic/characterization.pasta の OnChoiceMenu）。選択肢を出したシーン（A）と

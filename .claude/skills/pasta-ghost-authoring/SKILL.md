@@ -199,8 +199,9 @@ metadata:
 
 ### 3.5 Call Statements（Call文）
 
-- 構文: `＞シーン名` — 指定シーンを呼び出し、実行後に復帰
-- 動的ターゲット: `＞式` — 式（`＞＄変数名`・`＞＠関数（）`・`＞「文字列」` など）の評価結果を文字列にしてシーン名として解決
+- 構文: `＞シーン名` — 指定シーンを呼び出し、実行後に復帰。戻った後の行は、別のグローバルシーンを呼んだ後でも呼び出し元のグローバルシーンで名前を解決する（詳細は [call-jump.md](references/call-jump.md#call-から戻った後の名前解決)）
+- 動的ターゲット: `＞式` — 式（`＞＄変数名`・`＞＠関数（）`・`＞「文字列」` など）の値を検索キーにしてシーン名として解決（文字列はそのまま、数値は文字列にする。値なし・空文字列・真偽値などは呼ばない）
+- Call の失敗: 見つからない・動的ターゲットの値が検索キーにならないときは、警告ログを出し、Call 行の位置に失敗表記（`【Call失敗：「名前」が見つからない】` など）を出力して次の行へ進む（詳細は [call-jump.md](references/call-jump.md#call-が失敗したとき)）
 - 前方一致で候補が複数ある場合はシャッフル＆順次消費で1つ選ぶ
 - 特殊Call: `＞ゴースト終了（ミリ秒）` — ゴーストを終了させる
 - 特殊Call: `＞チェイントーク` / `＞yield` — シーン出力を分割し、次回 OnTalk の機会に残りを出力する（詳細は [call-jump.md](references/call-jump.md#チェイントーク)、作例は [authoring-patterns.md §6.7](references/authoring-patterns.md#s6-7)）
@@ -313,7 +314,7 @@ end
 `!select(秒数)` キューコマンドで選択の制限時間を設定する。
 
 #### 自動ルーティング
-選択後は既定の `OnChoiceSelectEx` イベントハンドラが、選択 ID と前方一致するローカルシーンを、直前に実行したグローバルシーン（通常は選択肢を出したシーン）の配下から探して自動実行する。ローカルシーンが無ければ、選択 ID と前方一致するグローバルシーンを探す。`＊OnChoiceSelectEx` という名前のシーンがあれば、そちらが優先される。詳細はマニュアルの [OnChoiceSelectEx](https://ekicyou.github.io/pasta/lua/shiori-events.html#onchoiceselectex) を参照。
+選択後は既定の `OnChoiceSelectEx` イベントハンドラが、選択 ID と前方一致するローカルシーンを、その選択肢行を出したグローバルシーンの配下から探して自動実行する（Call で呼んだ別のグローバルシーンが出した選択肢はそのシーン、戻った後に出した選択肢は呼び出し元のシーン）。ローカルシーンが無ければ、選択 ID と前方一致するグローバルシーンを探す。`＊OnChoiceSelectEx` という名前のシーンがあれば、そちらが優先される。詳細はマニュアルの [OnChoiceSelectEx](https://ekicyou.github.io/pasta/lua/shiori-events.html#onchoiceselectex) を参照。
 
 #### 使用例
 ```pasta
