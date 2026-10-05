@@ -274,7 +274,9 @@ end
 --- @param display string|nil 表示テキスト（nilの場合targetを使用）
 --- @return Act self メソッドチェーン用
 function ACT_IMPL.choice(self, target, display)
-    table.insert(self.token, { type = "choice", target = target, display = display or target })
+    -- scope: 選択肢を出した時点の実行中のグローバルシーン名（シーンの外なら nil）
+    local scope = self.current_scene and self.current_scene.__global_name__
+    table.insert(self.token, { type = "choice", target = target, display = display or target, scope = scope })
     return self
 end
 

@@ -87,6 +87,46 @@ describe("ACT - choice()", function()
 end)
 
 -- ============================================================================
+-- call-execution-correctness 2.4: 選択肢トークンに出したシーンを載せる
+-- ============================================================================
+
+describe("ACT - choice() の scope", function()
+    test("シーンの中では実行中のグローバルシーン名を scope に記録する", function()
+        local ACT = require("pasta.act")
+        local act = ACT.new(create_mock_actors())
+        act:init_scene({ __global_name__ = "メイン" })
+
+        act:choice("target_scene", "表示")
+
+        expect(act.token[1].scope):toBe("メイン")
+    end)
+
+    test("シーン文脈が戻されたら戻った先のグローバルシーン名を記録する", function()
+        local ACT = require("pasta.act")
+        local act = ACT.new(create_mock_actors())
+        local caller = { __global_name__ = "呼び出し元" }
+        act:init_scene(caller)
+        act:init_scene({ __global_name__ = "呼ばれた側" })
+        act:choice("t1", "d1")
+        act:restore_scene(caller)
+
+        act:choice("t2", "d2")
+
+        expect(act.token[1].scope):toBe("呼ばれた側")
+        expect(act.token[2].scope):toBe("呼び出し元")
+    end)
+
+    test("シーンの外では scope を記録しない", function()
+        local ACT = require("pasta.act")
+        local act = ACT.new(create_mock_actors())
+
+        act:choice("target_scene", "表示")
+
+        expect(act.token[1].scope):toBe(nil)
+    end)
+end)
+
+-- ============================================================================
 -- act:choice_timeout
 -- ============================================================================
 

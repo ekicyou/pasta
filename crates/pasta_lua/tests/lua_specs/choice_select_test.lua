@@ -222,6 +222,51 @@ describe("OnChoiceSelectEx auto-routing handler", function()
     end)
 
     -- ================================================================
+    -- call-execution-correctness 2.4: Reference2（選択肢を出したシーン）を最初の探索範囲にする
+    -- ================================================================
+    local function capture_scopes(ref2)
+        local scopes = {}
+        SCENE.search = function(name, global_scene_name, attrs)
+            if name ~= "OnChoiceSelectEx" then
+                table.insert(scopes, global_scene_name or "<global>")
+            end
+            return nil
+        end
+        local req = make_req("some_choice")
+        req.reference[2] = ref2
+        REG.OnChoiceSelectEx(SHIORI_ACT.new(make_actors(), req))
+        return table.concat(scopes, ",")
+    end
+
+    test("uses Reference2 as the first scope when it is a known global scene (2.1-2.6)", function()
+        setup()
+        STORE.scenes["出したシーン"] = {}
+        STORE.last_global_scene = "最後のシーン"
+
+        expect(capture_scopes("出したシーン")):toBe("出したシーン,<global>")
+
+        teardown()
+    end)
+
+    test("falls back to last_global_scene when Reference2 is an unknown name (2.9)", function()
+        setup()
+        STORE.last_global_scene = "最後のシーン"
+
+        expect(capture_scopes("無いシーン")):toBe("最後のシーン,<global>")
+
+        teardown()
+    end)
+
+    test("falls back to last_global_scene when Reference2 is missing (2.9)", function()
+        setup()
+        STORE.last_global_scene = "最後のシーン"
+
+        expect(capture_scopes(nil)):toBe("最後のシーン,<global>")
+
+        teardown()
+    end)
+
+    -- ================================================================
     -- 3.5: 明示的 OnChoiceSelectEx シーン優先
     -- ================================================================
     test("explicit OnChoiceSelectEx scene takes priority over auto-routing (3.5)", function()

@@ -21,6 +21,21 @@ local function escape_choice(s)
     return s
 end
 
+--- choiceトークンを \![*]\q[display,target(,scope)] へ変換する
+--- scope（選択肢を出したグローバルシーン名）は OnChoiceSelectEx の Reference2 として戻る。
+--- On・script: で始まる ID は SSP が第 3 引数以降を別の意味で使うため付けない。
+--- @param inner table choiceトークン
+--- @return string さくらスクリプト
+local function choice_to_script(inner)
+    local target = inner.target
+    local s = "\\![*]\\q[" .. escape_choice(inner.display) .. "," .. escape_choice(target)
+    if type(inner.scope) == "string"
+        and target:sub(1, 2) ~= "On" and target:sub(1, 7) ~= "script:" then
+        s = s .. "," .. escape_choice(inner.scope)
+    end
+    return s .. "]"
+end
+
 --- スポットタグを生成（SSP ukadoc準拠: 常に\p[ID]形式）
 --- @param spot_id number スポットID番号
 --- @return string スポットタグ
@@ -86,7 +101,7 @@ local function inner_token_to_string(actor, inner)
     elseif inner_type == "raw_script" then
         return inner.text
     elseif inner_type == "choice" then
-        return "\\![*]\\q[" .. escape_choice(inner.display) .. "," .. escape_choice(inner.target) .. "]"
+        return choice_to_script(inner)
     elseif inner_type == "choice_timeout" then
         local ms = inner.seconds and math.floor(inner.seconds * 1000) or 0
         return "\\![set,choicetimeout," .. ms .. "]"
