@@ -32,7 +32,7 @@ local save, var = act:init_scene(SCENE)
 - 戻り値の `save`・`var` は `act.save`・`act.var` と同じ表である。
 - 呼ぶと、そのシーンが実行中のシーンになる。名前の検索（[検索と呼び出し](#検索と呼び出し)）の 1・2 段目と、選択肢の行き先の検索（[OnChoiceSelectEx](shiori-events.md#onchoiceselectex)）は、実行中のシーンを基準にする。
 - シーン関数でない関数（`GLOBAL` の関数など）で `save`・`var` が必要なときは、`init_scene` を呼ばずに `act.save`・`act.var` を使う。
-- アクション行の `＠名前（…）`・`＠単語`・`＠＄変数名（…）`・`＠＄変数名` から呼ばれた関数は、第 1 引数に ACT ではなくアクタープロキシを受け取る（`＠＊名前（…）` は ACT を受け取る）。その場合の ACT はプロキシの `act` フィールドから取る（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
+- シーン関数は、アクション行の `＠名前（…）`・`＠単語`・`＠＄変数名（…）`・`＠＄変数名` から呼ばれた場合も、第 1 引数に ACT を受け取る。アクタープロキシを受け取るのは、アクション行のアクターの表の関数だけである（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
 
 ```lua
 function SCENE.カウント(act)
@@ -197,12 +197,13 @@ act:surface(5):wait(500):talk(act.さくら.actor, "驚いた！"):newline()
 | ------ | ---- | ------ |
 | `act.さくら:talk(text)` | `act:talk(act.さくら.actor, text)` と同じ | `nil` |
 | `act.さくら:sakura_script(text)` | `act:sakura_script(act.さくら.actor, text)` と同じ | `nil` |
-| `act.さくら:word(name, var_path)` | アクター辞書を先に探してから単語を探す（[アクタースコープと単語参照の統合](https://ekicyou.github.io/pasta/grammar/actor-dictionary.html#アクタースコープと単語参照の統合)）。見つかった関数にはプロキシを渡す。`var_path` の扱いは `act:word` と同じで、動的参照のときアクターの表は、表自身のフィールド（`name` と pasta.toml の `[actor.名前]` で設定した値など。`create_word` などのメソッドは含まない）だけを探す | 単語、または `nil` |
-| `act.さくら:expr_fn(key, ...)` | `act:expr_fn` と同じ検索で関数を探して呼ぶ。関数の第 1 引数はプロキシ | 関数の戻り値、または `nil` |
-| `act.さくら:expr_fn_var(value, var_path, ...)` | `act:expr_fn_var` と同じ検索で関数を探して呼ぶ。関数の第 1 引数はプロキシ | 関数の戻り値、または `nil` |
+| `act.さくら:word(name, var_path)` | アクター辞書を先に探してから単語を探す（[アクタースコープと単語参照の統合](https://ekicyou.github.io/pasta/grammar/actor-dictionary.html#アクタースコープと単語参照の統合)）。見つかった関数には、アクターの表で見つかったときはプロキシを、それ以外の段で見つかったときは ACT を渡す。`var_path` の扱いは `act:word` と同じで、動的参照のときアクターの表は、表自身のフィールド（`name` と pasta.toml の `[actor.名前]` で設定した値など。`create_word` などのメソッドは含まない）だけを探す | 単語、関数の戻り値、または `nil` |
+| `act.さくら:expr_fn(key, ...)` | `act:expr_fn` と同じ検索で関数を探して呼ぶ（アクターの表は探さない）。関数の第 1 引数は ACT | 関数の戻り値、または `nil` |
+| `act.さくら:expr_fn_var(value, var_path, ...)` | `act:expr_fn_var` と同じ検索で関数を探して呼ぶ（アクターの表は探さない）。関数の第 1 引数は ACT | 関数の戻り値、または `nil` |
 | `act.さくら.actor` | アクターオブジェクト | — |
 | `act.さくら.act` | 元の ACT | — |
 
+- `word`・`expr_fn`・`expr_fn_var` は、呼んだ関数の先頭の戻り値が ACT またはそのプロキシそのものなら `nil` を返す。それ以外の戻り値は、複数の値も含めてそのまま返す。ACT の `word`・`expr_fn`・`expr_fn_var`・`global_fn` は戻り値を変えない（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
 - `talk`・`sakura_script` は `nil` を返すため、プロキシの呼び出しは続けて書けない。
 - メソッド名（`talk`・`wait`・`yield` など）やフィールド名（`save`・`var`・`actors` など）と同じ名前のアクターは、`act.名前` ではプロキシにならない。
 - 生成コードは、アクション行の発言とアクター付きの単語参照・関数呼び出しを、`act.名前` ではなく [actor_proxy](#actor_proxyname) で得たプロキシで書く（`ぱすた：こんにちは` は `act:actor_proxy("ぱすた"):talk("こんにちは")`）。名前を文字列で渡すため、メソッド名・フィールド名と同じ名前のアクターも、アクション行では話せる。
@@ -559,7 +560,7 @@ end
 戻り値を使わない呼び出し `＄＝式` は [式文](https://ekicyou.github.io/pasta/grammar/variables.html#式文exprstmt) で扱う。
 
 - DSL の `＠＊名前（引数…）` は `act:global_fn("名前", 引数…)` になり、`GLOBAL` の関数を `(act, 引数…)` で呼ぶ。5 段の検索は行わない。未定義の名前・関数でない値のときは、警告ログを出して `nil` になる（[global_fn](#global_fnname-)）。アクション行で呼んだ場合は戻り値が出力され（`nil` なら何も出力しない）、変数代入の右辺なら戻り値が代入される（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
-- `GLOBAL` は 5 段の検索の 4 段目（完全一致）でもある。`＠名前（…）`（ローカル呼び出し）・`＠名前`（単語参照）・`＞名前`（Call）は、1〜3 段目に無ければ `GLOBAL` の値を見つける（[検索と呼び出し](#検索と呼び出し)）。関数は `(act, 引数…)` で呼ばれる（アクション行の中の単語参照と関数呼び出しでは第 1 引数がアクタープロキシになる）。関数以外の値は、単語参照では文字列として出力される。
+- `GLOBAL` は 5 段の検索の 4 段目（完全一致）でもある。`＠名前（…）`（ローカル呼び出し）・`＠名前`（単語参照）・`＞名前`（Call）は、1〜3 段目に無ければ `GLOBAL` の値を見つける（[検索と呼び出し](#検索と呼び出し)）。関数は `(act, 引数…)` で呼ばれる（アクション行の中の単語参照と関数呼び出しでも第 1 引数は act である。[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。関数以外の値は、単語参照では文字列として出力される。
 - DSL の `＠名前（）` は `GLOBAL` の関数を直接は呼ばない。グローバル関数を確実に呼ぶには `＊` を付けた `＠＊名前（）` を使う。
 - 関数は、呼ばれる前であればいつ登録してもよい（`main.lua`・Lua ブロックなど）。
 

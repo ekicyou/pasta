@@ -167,7 +167,20 @@ function PROXY_IMPL.find_handler(self, mode, key, skip_methods)
     return self.act:find_act_handler(mode, key, skip_methods)
 end
 
---- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(self, ...)、非function → warn+nil
+--- 戻り値の正規化（expr・word 共通）
+--- 先頭の戻り値が ACT またはプロキシ自身と同一なら値なし（nil）にする。
+--- それ以外は複数の戻り値も含めてそのまま返す。
+--- @param self ActorProxy プロキシオブジェクト
+--- @param r any 先頭の戻り値
+--- @param ... any 残りの戻り値
+--- @return any ... 正規化した戻り値
+local function drop_self(self, r, ...)
+    if r == self.act or r == self then return nil end
+    return r, ...
+end
+
+--- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(act, ...)、非function → warn+nil
+--- 見つかった段にかかわらず第 1 引数は常に ACT。戻り値は drop_self で正規化する
 --- @param self ActorProxy プロキシオブジェクト
 --- @param key string 関数名
 --- @param skip_methods boolean|nil find_handler へ渡す
@@ -176,7 +189,7 @@ end
 local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
-        return handler(self, ...)
+        return drop_self(self, handler(self.act, ...))
     end
     log.warn(string.format("proxy:expr_fn - handler not found: key='%s', mode='expr', via=proxy(%s)",
         tostring(key), tostring(self.actor.name)))
@@ -197,7 +210,7 @@ end
 --- @param self ActorProxy プロキシオブジェクト
 --- @param value any 参照変数の値
 --- @param var_path string 参照変数の Lua パス（警告用）
---- @param ... any 可変引数（ハンドラーに伝搬。第 1 引数はプロキシ）
+--- @param ... any 可変引数（ハンドラーに伝搬。第 1 引数は ACT）
 --- @return any|nil ハンドラー戻り値、またはnil
 function PROXY_IMPL.expr_fn_var(self, value, var_path, ...)
     local key = WORD.dynamic_key(value, var_path, "proxy:expr_fn")
@@ -206,12 +219,13 @@ function PROXY_IMPL.expr_fn_var(self, value, var_path, ...)
 end
 
 -------------------------------------------
--- PROXY_IMPL:word find_handler ベース実装
+-- PROXY_IMPL:word 段別検索の実装
 -------------------------------------------
 
---- word（find_handler + word ポストプロセス）
---- 検索順序は find_handler → find_actor_handler(A1+A2) → act:find_act_handler(L1-L5)
---- ポストプロセス: handler=nil → warn+nil、function → h(self)、その他 → tostring(h)
+--- word（find_handler と同じ順序で検索 + word ポストプロセス）
+--- 検索順序は find_actor_handler(A1+A2) → act:find_act_handler(L1-L5)
+--- ポストプロセス: handler=nil → warn+nil、その他 → tostring(h)
+--- function は見つかった段で第 1 引数が変わる: アクターの段 → h(proxy)、act の段 → h(act)。戻り値は drop_self で正規化する
 --- var_path があるとき（動的参照）は name を WORD.dynamic_key でキーにし、継承したメソッドに届かせずに検索する
 --- @param self ActorProxy プロキシオブジェクト
 --- @param name any 単語名（＠なし）。var_path があるときは参照変数の値
@@ -226,14 +240,17 @@ function PROXY_IMPL.word(self, name, var_path)
     elseif not name or name == "" then
         return nil
     end
-    local handler = self:find_handler("word", name, skip_methods)
+    local handler, receiver = self:find_actor_handler("word", name, skip_methods), self
+    if handler == nil then
+        handler, receiver = self.act:find_act_handler("word", name, skip_methods), self.act
+    end
     if handler == nil then
         log.warn(string.format("proxy:word - handler not found: key='%s', mode='word', via=proxy(%s)",
             tostring(name), tostring(self.actor.name)))
         return nil
     end
     if type(handler) == "function" then
-        return handler(self)
+        return drop_self(self, handler(receiver))
     end
     return tostring(handler)
 end

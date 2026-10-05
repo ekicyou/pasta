@@ -118,7 +118,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - [x] scene-search-key-normalization -- 記号を含むシーン名（U30）・ローカルシーン名・アクター名が、登録キー（サニタイズ済み）と検索キー（元の名前）の食い違いで見つからない不具合。Dependencies: none
 - [x] pasta-toml-logging-consistency -- 使われない `[lua] libs`（U26）・`[logging] rotation_days`（U32）の扱い、FFI 入口スレッド（`request`・`unload`・detach）のログの破棄、不正な `file_path` のときの挙動とマニュアルの食い違い。Dependencies: none
 - [ ] scene-identity-format -- 末尾が数字のシーン名で内部名が重なる不具合（U21）、デバッガのシーン identity の索引漏れ、位置からのキックの前方一致。ランタイム名に区切りを入れ、形式の関数を 1 つにする。Dependencies: scene-search-key-normalization, dsl-codegen-runtime-safety
-- [ ] actor-proxy-act-delegation -- アクション行の `＠yield`・`＠ゴースト終了`・`＠＄x` などで、ACT を前提とする関数にアクタープロキシが渡って 500 になる不具合。Dependencies: dsl-codegen-runtime-safety, scene-search-key-normalization
+- [x] actor-proxy-act-delegation -- アクション行の `＠yield`・`＠ゴースト終了`・`＠＄x` などで、ACT を前提とする関数にアクタープロキシが渡って 500 になる不具合。Dependencies: dsl-codegen-runtime-safety, scene-search-key-normalization
 - [x] act-token-grouping-fix -- ACT のグループ化が最初の発言より前の表示制御を捨て、スポット変更でグループを閉じない不具合。LuaJIT で機能しない CT（`ct.lua`）の撤去または修正。Dependencies: dsl-codegen-runtime-safety
 - [x] search-selector-indices -- `set_scene_selector`・`set_word_selector` の整数が選択に使われない不具合（U29）。Dependencies: scene-search-key-normalization
 - [x] string-concat-operator -- 式の文字列連結演算子 `＆`／`&`（算術より低い優先順位・数値は文字列化）。`＋` は数値専用のまま。動的コールのターゲット式での `＆` と `call-attribute-filter` の切り分けを決めて申し送る。`dsl-codegen-runtime-safety` の完成を前提とし、調整は本 spec 側で行う。Dependencies: dsl-codegen-runtime-safety, dsl-literal-fixes
