@@ -226,7 +226,7 @@ impl PastaLuaRuntime {
         // この時点で BOTH が揃う: (a) loader が transpile 中に蓄積した
         // `(join_key, .pasta 宣言行)` 記録（`runtime.source_map` 内）、(b) finalize
         // （scene_dic ロードで実行済み）が登録した runtime 実シーン identity
-        // （`collect_scenes`）。両者を同一突合キーで突き合わせ、`.pasta` (ファイル,
+        // （シーン表の登録名を定義元 `.pasta` ファイルごとに分けたもの）。両者をファイルごとの順位で突き合わせ、`.pasta` (ファイル,
         // 行範囲) → (scene_id, parent) の `SceneIdentityIndex` を確定し、共有 `Arc<
         // SourceMap>` の write-once `scene_index` スロットへ充填する（resolver=task 3.1
         // が読む）。

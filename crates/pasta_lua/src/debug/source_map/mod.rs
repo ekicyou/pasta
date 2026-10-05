@@ -640,7 +640,7 @@ pub(crate) use scene_index::{SceneIdentityIndex, SceneIdentityIndexBuilder};
 
 // ===========================================================================
 // finalize シーン突合（task 2.2・requirements 3.1/3.2/3.3/7.1）。
-// 蓄積記録（scene_records）と runtime 実 identity（collect_scenes）を突合し、
+// 蓄積記録（scene_records）と runtime のシーン表の登録名（定義元 `.pasta` ファイルごとに分けたもの）を突合し、
 // `SourceMap` の write-once `scene_index` スロットへ充填する索引を構築する。
 // ===========================================================================
 mod scene_join;
