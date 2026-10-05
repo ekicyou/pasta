@@ -25,7 +25,7 @@ end
 --- @param i integer
 --- @return string|nil name タグ名（`\` を除く）。タグでなければ nil
 --- @return string|nil arg 角括弧の中身（無ければ nil）
---- @return integer|nil next_pos タグ直後の位置
+--- @return integer|nil next_pos タグ直後の位置（タグでなければ nil）
 local function tag_at(s, i)
     local name = s:match(NAME_PATTERN, i + 1)
     if name then
@@ -35,6 +35,9 @@ local function tag_at(s, i)
     end
     return nil
 end
+
+--- タグの読み取り（適合テスト tests/sakura_script/conformance_test.rs が使う）
+APPEARANCE.tag_at = tag_at
 
 --- pos 以降の次のタグを返す（戻り値は tag_at と同じ）。`\\` は 2 文字読み飛ばす。
 --- @param s string
