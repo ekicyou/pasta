@@ -17,3 +17,33 @@
 ＊OnEscapeCheck
 　さくら：パスは、C:\\new。
 　さくら：終わり。\\
+
+＃ 以下は string-concat-operator task 5.1 の連結（＆）の E2E 用シーン
+
+＊OnConcatUnassigned
+　＄＝＄未代入＆「x」
+　さくら：続行
+
+＊OnConcatNilShow
+　＄名前＝＄未代入＆「さん」
+　さくら：前＄名前　後
+
+＊OnConcatArgs
+```lua
+function SCENE.echo(act, s)
+    return s
+end
+```
+　＄種類＝「連結」
+　さくら：＠echo（＄種類＆「引数」）
+　＞連結受取（＄種類＆「呼出」、1＋2＆「個」）
+
+＊連結受取
+　さくら：＄０と＄１
+
+＊OnConcatDynamic
+　＄種類＝「連結」
+　＞＄種類＆「_挨拶」
+
+＊連結_挨拶
+　さくら：動的に呼ばれた
