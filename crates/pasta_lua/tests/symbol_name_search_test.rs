@@ -232,7 +232,10 @@ fn event_scene_calling_symbol_global_scene_responds_200() {
 fn choice_select_jumps_to_symbol_local_scene() {
     let (_temp, runtime) = load_ghost(SYMBOL_SCENES_PASTA, ACTOR_TOML);
 
-    assert_ok_with(&fire(&runtime, "選択肢表示"), r"\q[Aにする,選択・A,選択肢表示_1]");
+    assert_ok_with(
+        &fire(&runtime, "選択肢表示"),
+        r"\q[Aにする,選択・A,選択肢表示_1]",
+    );
 
     let value = runtime
         .exec(

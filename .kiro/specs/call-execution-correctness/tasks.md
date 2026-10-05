@@ -101,8 +101,8 @@
   - _Depends: 5.1, 5.2_
   - _Requirements: 7.6_
 
-- [ ] 6. 最終検証
-- [ ] 6.1 全体の回帰と同梱の辞書を確認する
+- [x] 6. 最終検証
+- [x] 6.1 全体の回帰と同梱の辞書を確認する
   - ワークスペース全体のテストと luacheck、clippy を走らせ、生成形・検索キー・選択肢の文字列を書き換えた箇所以外が変更なしで成功することを確かめる
   - 同梱のサンプルゴーストなどの辞書に、戻った後に呼ばれた側のローカルが見えることへの依存や、存在しないシーンへの「あれば呼ぶ」つもりの Call が無いことを確かめ、あれば直す
   - 完了状態: テスト一式・luacheck・clippy が成功し、同梱の辞書の確認結果が記録されている
@@ -119,3 +119,4 @@
 - 4.1: チェイントークの再開を決定論化するため E2E フィクスチャに talk_interval=10 を置いた。run() は 204 を空文字列で返す。
 - 4.2: シーンの最後の行の Call は末尾の Call（act:call_restore を通らない）。途中の Call を確かめる並びでは Call の後に行を置く。
 - 4.3: 失敗表記には全体の既定ウェイトが入る（例: 【Call失敗：var.\_w[950]未代入 が nil】）。設計の範囲内として E2E はこの出力で固定。直すなら failure-output-unification で期待値も更新する。
+- 6.1: 同梱辞書（pasta_sample_ghost hello-pasta の dic/*.pasta、release/ の同一コピー、first-ghost.md）を確認。Call は boot.pasta の末尾の `＞ゴースト終了（３００）`（GLOBAL に存在）だけで、戻った後のローカル依存・「あれば呼ぶ」Call・nil になりうる動的 Call は無し。workspace test 2525 passed / luacheck 0 / clippy clean。
