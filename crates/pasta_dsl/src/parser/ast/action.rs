@@ -318,4 +318,6 @@ pub enum BinOp {
     Div,
     /// Modulo (%)
     Mod,
+    /// String concatenation (＆ / &)
+    Concat,
 }

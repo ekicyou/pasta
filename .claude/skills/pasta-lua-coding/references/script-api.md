@@ -317,17 +317,18 @@ act:call(nil, "挨拶", nil)           -- 「挨拶」で前方一致するシ�
 local fn = act:find_scene("挨拶")    -- 呼ばずに関数だけを得る
 ```
 
-### アクター・グローバル関数・算術
+### アクター・グローバル関数・算術・連結
 
-アクション行のアクター、`＠＊名前（…）`、式の算術の生成コードは、次のメソッドを呼ぶ。どれも、アクターや関数が無いとき・値が数値にできないときに Lua のエラーにせず、警告ログを出して続ける。手書きの Lua からも呼べる。
+アクション行のアクター、`＠＊名前（…）`、式の算術と連結の生成コードは、次のメソッドを呼ぶ。どれも、アクターや関数が無いとき・値が数値や文字列にできないときに Lua のエラーにせず、警告ログを出して続ける。手書きの Lua からも呼べる。
 
 | メソッド | 内容 | 戻り値 |
 | -------- | ---- | ------ |
 | `act:actor_proxy(name)` | アクター `name` のアクタープロキシを得る | アクタープロキシ（常に `nil` でない） |
 | `act:global_fn(name, ...)` | `GLOBAL` の関数 `name` を呼ぶ | 関数の戻り値、または `nil` |
 | `act:arith(op, lhs, rhs, lhs_desc, rhs_desc)` | 数値の二項演算 | 演算結果、または `nil` |
+| `act:concat(lhs, rhs, lhs_desc, rhs_desc)` | 文字列の連結 | 連結した文字列、または `nil` |
 
-- 3 つの名前は act のメソッドのため、ほかの act のメソッド（`talk`・`wait` など）と同じ制限を受ける。手書き Lua の `act.actor_proxy`・`act.global_fn`・`act.arith` は、同じ名前のアクターがいてもプロキシにならない（[アクタープロキシ](#アクタープロキシ)）。また、`＠名前（…）`・`＠名前` の検索の 3 段目で見つかるため、`GLOBAL` に同じ名前の関数があっても `＠名前（…）` では届かない（`＠＊名前（…）` では届く）。1・2 段目（実行中のシーンのシーンテーブル、ローカル単語・ローカルシーン）にある同じ名前は、3 段目より先に見つかる（[検索と呼び出し](#検索と呼び出し)）。
+- 4 つの名前は act のメソッドのため、ほかの act のメソッド（`talk`・`wait` など）と同じ制限を受ける。手書き Lua の `act.actor_proxy`・`act.global_fn`・`act.arith`・`act.concat` は、同じ名前のアクターがいてもプロキシにならない（[アクタープロキシ](#アクタープロキシ)）。また、`＠名前（…）`・`＠名前` の検索の 3 段目で見つかるため、`GLOBAL` に同じ名前の関数があっても `＠名前（…）` では届かない（`＠＊名前（…）` では届く）。1・2 段目（実行中のシーンのシーンテーブル、ローカル単語・ローカルシーン）にある同じ名前は、3 段目より先に見つかる（[検索と呼び出し](#検索と呼び出し)）。
 
 #### actor_proxy(name)
 
@@ -363,10 +364,33 @@ act:arith(op, lhs, rhs, lhs_desc?, rhs_desc?) -> number | nil
 | `lhs_desc`・`rhs_desc` | string または nil | 警告ログに出す被演算子の説明（`"var.x"`・`"@f()"` など） |
 
 - 被演算子は、数値ならそのまま、文字列なら `tonumber` で数値にする。両方が数値になれば、演算の結果を返す。
-- 数値にできない被演算子（`nil`・数字でない文字列・真偽値・表など）があれば `nil` を返し、その被演算子ごとに警告ログ `act:arith - operand is not a number` を出す。ただし、値が `nil` で説明も `nil` の被演算子では警告しない（内側の `act:arith` が既に警告して `nil` を返した場合）。
+- 数値にできない被演算子（`nil`・数字でない文字列・真偽値・表など）があれば `nil` を返し、その被演算子ごとに警告ログ `act:arith - operand is not a number: op='+', operand='var.x', value=nil` を出す。`operand=` は説明があるときだけ付く。`value=` は値の種類を表し、`nil`・`'abc' (string)`・`true (boolean)`、それ以外は `(table)` のように型名だけになる（表の `__tostring` は呼ばない）。ただし、値が `nil` で説明も `nil` の被演算子では警告しない（内側の `act:arith`・`act:concat` が既に警告して `nil` を返した場合）。
 - 表の被演算子に `__add` などのメタメソッドがあっても呼ばない。
 - `op` が上のどれでもないときは、警告ログを出して `nil` を返す。
 - DSL の式の算術は、演算ごとに `act:arith` になる。優先順位と括弧は入れ子で表される（[算術の評価](https://ekicyou.github.io/pasta/grammar/variables.html#算術の評価)・[DSL と Lua の対応表](https://ekicyou.github.io/pasta/grammar/variables.html#dsl-と-lua-の対応表)）。
+
+#### concat(lhs, rhs, lhs_desc, rhs_desc)
+
+```lua
+act:concat(lhs, rhs, lhs_desc?, rhs_desc?) -> string | nil
+```
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `lhs`・`rhs` | any | 左と右の被演算子 |
+| `lhs_desc`・`rhs_desc` | string または nil | 警告ログに出す被演算子の説明（`"var.x"`・`"@f()"` など） |
+
+- 被演算子は、文字列ならそのまま、数値なら `tostring` で文字列にする（アクション行で表示したときと同じ表記）。両方が文字列になれば、左の直後に右をつないだ文字列を返す。区切りの文字は入れない。
+- 文字列と数値以外の被演算子（`nil`・真偽値・表・関数など）があれば `nil` を返し、その被演算子ごとに警告ログ `act:concat - operand is not a string or number: op='&', operand='var.x', value=nil` を出す。`op` は DSL で全角・半角のどちらを書いても `'&'` である。`operand=` は説明があるときだけ付き、`value=` の表記は [arith](#arithop-lhs-rhs-lhs_desc-rhs_desc) と同じである。
+- 値が `nil` で説明も `nil` の被演算子では警告しない（内側の `act:concat`・`act:arith` が既に警告して `nil` を返した場合）。外側の演算は黙って `nil` を返す。
+- 表の被演算子に `__concat`・`__tostring` などのメタメソッドがあっても呼ばない。
+- DSL の式の連結は、演算ごとに `act:concat` になる。連結の連鎖・算術との組み合わせ・括弧は `act:concat` と `act:arith` の入れ子で表される（[連結の評価](https://ekicyou.github.io/pasta/grammar/variables.html#連結の評価)・[DSL と Lua の対応表](https://ekicyou.github.io/pasta/grammar/variables.html#dsl-と-lua-の対応表)）。
+
+```lua
+act:concat("合計", 3)                -- "合計3"
+act:concat("a", nil, nil, "var.x")   -- nil（警告を 1 行出す）
+act:concat(nil, "個")                -- nil（警告しない）
+```
 
 ### yield
 

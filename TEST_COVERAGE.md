@@ -45,6 +45,7 @@
 | 式文（＄＝expr）             | `var_set_none_test.rs`                         | ✅ 完了 | 8テスト（名前なしVarSet）                       |
 | ParseError 公開API           | `error_api_test.rs`                            | ✅ 完了 | 16テスト（コンストラクタ・Display・行列位置）   |
 | 式AST（二項演算・括弧）      | `expr_parse_test.rs`                           | ✅ 完了 | 14テスト（左結合・全角数値・キーワード引数）    |
+| 連結演算子（＆/&）           | `concat_parse_test.rs`                         | ✅ 完了 | 23テスト（全角半角・位置ごとの受理・属性/台詞の不変・パースエラーの切り分け）（string-concat-operator） |
 
 ### 2.2 Registry層テスト（シーン/単語テーブル）
 
@@ -72,6 +73,7 @@
 | 複数キー単語登録       | `transpiler.rs`（インライン）                                                               | ✅ 完了 | 7テスト（登録・Lua出力・後方互換） |
 | 動的単語参照（＠＄）   | `transpiler/dynamic_word_ref_test.rs`<br>`lua_specs/act_dynamic_ref_test.lua`<br>`runtime/syntax_test.rs`（E2E）<br>`pasta_lsp/tests/dynamic_ref_token_test.rs` | ✅ 完了 | 生成コード・スナップショット・マニュアル例の読み込み・キー解決と検索段・E2E・LSP トークン |
 | 書き間違いの実行時安全性 | `transpiler/runtime_safety_test.rs`<br>`lua_specs/act_runtime_safety_test.lua`<br>`code_gen/element_gen_tests.rs`<br>`sakura_script/tokenizer.rs`・`line_breaker.rs`（インライン）<br>`pasta_shiori/tests/codegen_runtime_safety_e2e_test.rs`（E2E） | ✅ 完了 | 未定義の `＠＊`・未登録アクター・act メンバー名のアクター・数値にできない算術・`\\` の生成形と実行（算術の組み直しが旧来の平らな式と同値である関門を含む）（dsl-codegen-runtime-safety） |
+| 文字列の連結（＆）     | `code_gen/expr_gen_tests.rs`<br>`transpiler/runtime_safety_test.rs`<br>`transpiler/source_map_seam_test.rs`<br>`lua_specs/act_concat_test.lua`<br>`pasta_shiori/tests/codegen_runtime_safety_e2e_test.rs`（E2E） | ✅ 完了 | 3 段の組み直しの生成形・平らな Lua 式と同値の関門・行対応・`act:concat` の値ごとの扱いと警告・伝播・SHIORI 経由で 500 にならないこと（string-concat-operator） |
 | エンコーディング       | `pasta_lua_encoding_test.rs`                                                                | ✅ 完了 | 文字エンコード                     |
 | プロパティLua変換      | `property_scope_codegen_test.rs`                                                            | ✅ 完了 | 10テスト（property-dsl-extension） |
 | プロパティトークン保全 | `property_token_preservation_test.rs`                                                       | ✅ 完了 | 3テスト（property-dsl-extension）  |
@@ -151,7 +153,8 @@
 | UTF-8→UTF-16位置変換             | `utf16_conversion_test.rs`    | ✅ 完了 | 12テスト（サロゲートペア含む）                    |
 | LSPライフサイクル統合            | `lsp_lifecycle_test.rs`       | ✅ 完了 | 4テスト                                           |
 | ドキュメント同期                 | `document_sync_test.rs`       | ✅ 完了 | 4テスト（増分更新含む）                           |
-| Diagnostics通知                  | `diagnostics_test.rs`         | ✅ 完了 | 6テスト                                           |
+| Diagnostics通知                  | `diagnostics_test.rs`         | ✅ 完了 | 8テスト（連結を含む式の診断を含む）               |
+| 二項演算の連鎖トークン           | `binary_chain_token_test.rs`  | ✅ 完了 | 13テスト（左から1回走査・文字列内/＄＊/×÷・連結・属性の DECORATOR 不変） |
 | パーサークラッシュ回復           | `crash_recovery_test.rs`      | ✅ 完了 | 4テスト（catch_unwind保護）                       |
 | 部分パーストークン提供           | `partial_token_test.rs`       | ✅ 完了 | 5テスト（Phase 1→2→3フォールバック）              |
 | キューコマンドトークン生成       | `cue_command_token_test.rs`   | ✅ 完了 | 10テスト（4形式・全角半角・引数種別・混在・診断） |

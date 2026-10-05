@@ -384,6 +384,41 @@ async function runTests(): Promise<void> {
     expect(!hasScope(tokenizeLine(line).tokens, WORD_SCOPE), 'assignment line must not get inline word-ref scope');
   });
 
+  // --- String Concat Operator Tests (string-concat-operator 7.6, 7.7) ---
+  // The grammar has no operator scopes and is NOT changed: the expression `＆`
+  // must get exactly the scopes `＋` gets in the same position, and the
+  // line-head attribute `＆` / talk-line `＆` keep their pre-existing scopes.
+  const scopesAt = (line: string, ch: string): string[] => {
+    const i = line.indexOf(ch);
+    const t = tokenizeLine(line).tokens.find((tok) => tok.startIndex <= i && i < tok.endIndex);
+    return t ? t.scopes : [];
+  };
+  const sameScopes = (a: string[], b: string[]) => a.join(' ') === b.join(' ');
+
+  test('式の ＆ は同じ位置の ＋ と同じスコープ（全角・半角）', () => {
+    for (const [cat, plus, op, pl] of [
+      ['＄x＝「a」＆＄b', '＄x＝１＋＄b', '＆', '＋'],
+      ['$x=「a」&$b', '$x=1+$b', '&', '+'],
+      ['＞「挨拶」＆＄種類', '＞「挨拶」＋＄種類', '＆', '＋'],
+    ]) {
+      const c = scopesAt(cat, op);
+      expect(c.length > 0 && sameScopes(c, scopesAt(plus, pl)), `${cat}: ${c.join(' ')}`);
+      expect(!c.includes('meta.attribute.pasta'), `${cat}: ＆ must not be shown as attribute marker`);
+    }
+  });
+
+  test('行頭の属性マーカー ＆ の表示は不変（全角・半角）', () => {
+    const attr = ['source.pasta', 'meta.attribute.pasta', 'keyword.other.marker.pasta'];
+    expect(sameScopes(scopesAt('  ＆author：Test', '＆'), attr), 'full-width attribute marker');
+    expect(sameScopes(scopesAt('  &author:Test', '&'), attr), 'half-width attribute marker');
+  });
+
+  test('台詞の中の ＆ の表示は不変（全角・半角）', () => {
+    const talk = ['source.pasta', 'meta.talk.pasta'];
+    expect(sameScopes(scopesAt('　さくら：A＆B', '＆'), talk), 'full-width talk ＆');
+    expect(sameScopes(scopesAt('　さくら：A&B', '&'), talk), 'half-width talk &');
+  });
+
   // --- Variable Tests ---
   test('全角変数マーカーの認識', () => {
     const result = tokenizeLine('  ＄count：1');

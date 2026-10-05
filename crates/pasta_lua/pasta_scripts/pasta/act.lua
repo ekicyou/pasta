@@ -557,6 +557,41 @@ function ACT_IMPL.arith(self, op, lhs, rhs, lhs_desc, rhs_desc) -- luacheck: ign
     return f(a, b)
 end
 
+--- 被演算子を文字列にする。string はそのまま、number は tostring（アクション行の表示と同じ表記）、
+--- それ以外は nil。文字列にできないときは警告する（値も説明も nil なら内側の失敗の伝播として黙る）
+--- @param v any 被演算子
+--- @param desc string|nil 被演算子の説明（変数パス・関数名）
+--- @return string|nil
+local function concat_operand(v, desc)
+    local t = type(v)
+    if t == "string" then return v end
+    if t == "number" then return tostring(v) end
+    if v ~= nil or desc ~= nil then
+        local operand = desc and string.format("operand='%s', ", desc) or ""
+        log.warn(string.format("act:concat - operand is not a string or number: op='&', %svalue=%s",
+            operand, arith_value_text(v)))
+    end
+    return nil
+end
+
+--- 文字列の二項連結（連結式の生成コードが呼ぶ）
+--- 両方が文字列か数値なら区切りなしでつないだ文字列、どちらかがそうでなければ nil。
+--- メタメソッドは呼ばない。act の状態は読み書きしない
+--- @param self Act アクションオブジェクト（未使用）
+--- @param lhs any 左の被演算子
+--- @param rhs any 右の被演算子
+--- @param lhs_desc string|nil 左の説明（警告用）
+--- @param rhs_desc string|nil 右の説明（警告用）
+--- @return string|nil 連結結果
+function ACT_IMPL.concat(self, lhs, rhs, lhs_desc, rhs_desc) -- luacheck: ignore 212/self
+    local a = concat_operand(lhs, lhs_desc)
+    local b = concat_operand(rhs, rhs_desc)
+    if a == nil or b == nil then
+        return nil
+    end
+    return a .. b
+end
+
 --- トークン取得とリセット（グループ化・統合済み）
 --- @param self Act アクションオブジェクト
 --- @return table[]|nil グループ化されたトークン配列、またはnil（トークン0件時）

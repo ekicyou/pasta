@@ -14,7 +14,7 @@ description: >-
   SHIORIプロトコル実装, Luaランタイム開発, pasta言語仕様の設計変更.
 metadata:
   author: ekicyou
-  version: "1.7.2"
+  version: "1.8.0"
 ---
 
 # Pasta Ghost Authoring Skill
@@ -73,7 +73,7 @@ metadata:
 | 変数             | `＄`   | `$`  | 変数代入・参照                       | `＄count＝1` / `＄％prop＝「値」`                                         | [variables.md](references/variables.md)                             |
 | 代入             | `＝`   | `=`  | 変数代入の区切り（`：` では代入不可） | `＄count＝1`                                                              | [variables.md](references/variables.md#変数の種類とスコープ)         |
 | Call             | `＞`   | `>`  | シーン呼び出し                       | `＞次の会話`                                                              | [call-jump.md](references/call-jump.md)                             |
-| 属性             | `＆`   | `&`  | メタデータ（処理には反映されない）   | `＆author：Alice`                                                         | [block-structure.md](references/block-structure.md#属性)             |
+| 属性             | `＆`   | `&`  | メタデータ（処理には反映されない）。式の中では連結演算子 | `＆author：Alice`                                                         | [block-structure.md](references/block-structure.md#属性)・[markers.md](references/markers.md#属性マーカーと連結演算子) |
 | コメント         | `＃`   | `#`  | コメント行                           | `＃ メモ`                                                                 | [block-structure.md](references/block-structure.md#コメント)         |
 | アクター辞書     | `％`   | `%`  | アクター辞書定義・アクター指定行     | `％さくら`                                                                | [actor-dictionary.md](references/actor-dictionary.md)               |
 | キューコマンド   | `！`   | `!`  | 演出指示（`select` だけが有効）      | `！select(30)`                                                            | [block-structure.md](references/block-structure.md#キューコマンド行) |
@@ -176,6 +176,7 @@ metadata:
 - 代入: `＄変数名＝値`（代入は `＝` のみ。`＄変数名：値` はパースエラー）。値にはリテラル値・単語参照・変数参照・式・関数呼び出しが使用可能
 - **グローバル関数代入**: `＄result＝＠＊func()` → `GLOBAL` テーブルの関数 `func` の戻り値を代入（生成コードは `act:global_fn("func")`。関数が無いときはエラーにならず、警告ログを出して値なし）
 - **算術**: `＋` `－` `＊` `／` `％` はすべて数値の演算（文字列の連結にはならない）。数値にできない被演算子（未代入の変数・数字でない文字列など）があると、その演算は値なしになり警告ログが出る（詳細は [variables.md](references/variables.md#算術の評価)）
+- **連結**: `＆` は左右の被演算子を文字列にしてつなぐ（`＄表示＝「合計」＆＄n＆「個」`）。算術より後に計算される。式の中（代入の右辺・式文・関数呼び出しの引数・Call の引数・動的ターゲット）だけで連結になり、台詞に書いた `＆` は文字のまま出力される。値なしの変数などをつなぐと値なしになり警告ログが出る（詳細は [variables.md](references/variables.md#連結の評価)）
 - **式文（副作用のみ）**: `＄＝expr` — 戻り値を使わず式を実行するだけ
 - 参照: アクション行内で `＄変数名` と記述
 
@@ -183,6 +184,7 @@ metadata:
 ＊会話
   ＄count＝1
   ＄＊total＝＄＊total＋1
+  ＄label＝「合計」＆＄＊total   ＃ 文字列の連結
   ＄result＝＠＊globalFunc()     ＃ グローバル関数の戻り値を代入
   ＄＝＠＊logEvent（「起動」）   ＃ 戻り値不要の式文
   ＄％sakura.name＝「Alice」     ＃ SSP共有プロパティに書き込み

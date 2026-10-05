@@ -6,10 +6,15 @@
 //! イベント ID（シーン関数フォールバック）で起動し、500 にならず、書き間違いの箇所を既定の
 //! 結果に置き換えたトークが返ることを、最終さくらスクリプトの一致で固定する。
 //! フィクスチャは埋め込みの標準ランタイムと本番 entry.lua を通す（理由は pasta.toml のコメント）。
+//!
+//! 仕様 `string-concat-operator` task 5.1 の連結（`＆`）のシーンも同じフィクスチャで動かす。
 
 mod common;
 
+use common::copy_fixture_to_temp;
+use common::response::ShioriResponse;
 use common::test_env::ShioriTestEnv;
+use pasta::{PastaShiori, Shiori};
 
 /// イベント ID を指定して GET を送り、200 OK であることを確かめて Value を返す
 fn fire(event_id: &str) -> String {
@@ -25,6 +30,36 @@ fn fire(event_id: &str) -> String {
         resp.status_text, resp.value
     );
     resp.value.expect("Value header must exist")
+}
+
+/// `fire` と同じく GET を送り、Value とゴーストのログファイルの中身を返す。
+/// ロガーは non_blocking で書くため、ゴーストを drop して書き出しを待ってからログを読む。
+fn fire_with_log(event_id: &str) -> (String, String) {
+    let temp = copy_fixture_to_temp("codegen_runtime_safety");
+    let value = {
+        let mut shiori = PastaShiori::default();
+        assert!(
+            shiori
+                .load(0, temp.path().as_os_str())
+                .expect("SHIORI load should not error"),
+            "SHIORI load should return true"
+        );
+        let raw = shiori
+            .request(format!(
+                "GET SHIORI/3.0\r\nCharset: UTF-8\r\nSender: SSP\r\nID: {event_id}\r\n\r\n"
+            ))
+            .expect("request should succeed");
+        let resp = ShioriResponse::parse(&raw).expect("response should parse");
+        assert_eq!(
+            resp.status_code, 200,
+            "{event_id} must not be 500: {} {:?}",
+            resp.status_text, resp.value
+        );
+        resp.value.expect("Value header must exist")
+    };
+    let log = std::fs::read_to_string(temp.path().join("profile/pasta/logs/pasta.log"))
+        .unwrap_or_default();
+    (value, log)
 }
 
 /// U18・U19・U20・U22 を含むシーンが 500 にならず、既定の結果に置き換えたトークを返す（5.2, 5.5）
@@ -52,4 +87,36 @@ fn test_escaped_backslash_survives_wait_insertion() {
         value,
         r"\p[1]パスは、\_w[450]C:\\new。\_w[950]終わり。\_w[950]\\\e"
     );
+}
+
+/// 連結の警告（被演算子 `var.未代入` が nil）
+const CONCAT_NIL_WARNING: &str =
+    "act:concat - operand is not a string or number: op='&', operand='var.未代入', value=nil";
+
+/// 未代入の変数を連結する式文があっても 500 にならず、警告を出して続きの行を話す（string-concat-operator 6.4）
+#[test]
+fn test_concat_with_unassigned_variable_does_not_500() {
+    let (value, log) = fire_with_log("OnConcatUnassigned");
+    assert_eq!(value, r"\p[1]続行\e");
+    assert!(log.contains(CONCAT_NIL_WARNING), "warning expected:\n{log}");
+}
+
+/// 連結の結果が nil なら代入先は値なしで、参照は空文字になる（1.7, 1.8, 3.3, 3.6）
+#[test]
+fn test_concat_nil_result_shows_as_empty() {
+    let (value, log) = fire_with_log("OnConcatNilShow");
+    assert_eq!(value, r"\p[1]前後\e");
+    assert!(log.contains(CONCAT_NIL_WARNING), "warning expected:\n{log}");
+}
+
+/// 関数呼び出しと Call の引数に連結した文字列が渡る（算術が連結より先: 1＋2＆「個」→「3個」）（1.5, 1.6, 4.4, 6.6）
+#[test]
+fn test_concat_passed_to_function_and_call_args() {
+    assert_eq!(fire("OnConcatArgs"), r"\p[1]連結引数連結呼出と3個\e");
+}
+
+/// 連結した名前（「連結」＆「_挨拶」）を動的ターゲットにして Call できる（4.4, 6.6）
+#[test]
+fn test_concat_as_dynamic_call_target() {
+    assert_eq!(fire("OnConcatDynamic"), r"\p[1]動的に呼ばれた\e");
 }
