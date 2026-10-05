@@ -80,3 +80,84 @@
 - 4: 改行は字のある `talk` の直前に出す（完全遅延の規則からの帰結として確定）。
 - 5: 文字を表示するタグの `sakura_script` トークンも字として数え、書いた経路によらずそろえる（要件 1.9）。ビルダーの S3/S4 の振り分けで `sakura_script` にも同じ判定を当てる。
 - 6: 判定の位置は設計フェーズで決める（本分析の推奨は Option A）。
+
+---
+
+# 設計フェーズの調査と決定（kiro-spec-design）
+
+## Summary
+- **Feature**: `paragraph-break-tag-only-talk`
+- **Discovery Scope**: Extension（既存の `sakura_builder.lua` の S3/S4 の振り分けと、`appearance.lua` のタグ読み取りの延長。軽量ディスカバリ）
+- **Key Findings**:
+  - 「字が残るか」の判定は、`appearance.lua` の `scan_leading_text`（279 行）とほぼ同じ走査で書ける。`tag_at` が `nil` を返す位置（`\`・`\` ＋ タグ名に使えない文字）はすでに「一般文字」として扱われており、要件 1.3・1.7 と一致する。外から使える部品は `tag_at` 1 つで足りる（`next_tag` は字を読み飛ばすため字の検出には使えない）。
+  - DSL の行内のさくらスクリプト（`sakura_script` トークン）は、文法 `sakura_script = sakura_marker ~ sakura_id ~ sakura_args?`（`pasta_dsl` の `.pest` 188 行）により 1 トークン＝タグ 1 つである。ただし DSL の引数は `"…"` で `]` を囲めるのに対し、Lua の `ARG_PATTERN` は最初の `]` までしか読まない。`sakura_script` のテキスト全体に字の走査をかけると、`\![raise,"a]b"]` のような書き方で引数の残りが字に見え、要件 3.4（それ以外の `sakura_script` は従来どおり）を破る。
+  - 字の無い `talk` を S4 に流すだけで、保留・破棄・外見の観測（要件 2.1〜2.5）は既存の規則のまま動く。新しい状態は要らない。
+
+## Research Log
+
+### タグの読み取り部品の公開範囲
+- **Context**: Option A（ビルダー内で判定し、`appearance.lua` の読み取りを共有する）の具体化。
+- **Sources Consulted**: `crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua` 12–55 行（`NAME_PATTERN`・`ARG_PATTERN`・`tag_at`・`next_tag`）、279–298 行（`scan_leading_text`）。
+- **Findings**:
+  - `tag_at(s, i)` は位置 `i` の `\` に続くタグ名と引数を読み、タグでなければ `nil` を返す。位置 `i` が `\` であることは呼び出し側が保証する（`scan_leading_text` と同じ使い方）。
+  - `next_tag` は `\` 以外の文字を読み飛ばすため、「字が残るか」には使えない。
+- **Implications**: `APPEARANCE.tag_at` として既存の局所関数をそのまま公開する（1 行の追加）。走査と字の規則（文字を表示するタグの一覧）はビルダー側に置く。`appearance.lua` の挙動は変えない。
+
+### `sakura_script` トークンの形
+- **Context**: 要件 1.9（文字を表示するタグの `sakura_script` トークンを字として数える）。
+- **Sources Consulted**: `crates/pasta_dsl/src/parser/*.pest` 187–200 行、`crates/pasta_lua/src/code_gen/element_gen.rs` 366–371 行、`act.lua` 221 行（`ACT_IMPL.sakura_script`）、`act.lua` 85 行付近（`merge_consecutive_talks` は `sakura_script` で結合を切る）。
+- **Findings**:
+  - DSL 由来の `sakura_script` は常にタグ 1 つ。Lua から `act:sakura_script(…)` を直接呼べば任意の文字列も渡せる（DSL の正規の経路ではない）。
+  - DSL の `\` は `Action::Escape` として `talk` になる（`element_gen.rs` 372 行付近）。
+- **Implications**: `sakura_script` は先頭のタグの名前だけで判定する（先頭が `\` で、`tag_at` で読んだ名前が文字を表示するタグ）。引数の読み方の違いの影響を受けない。
+
+### 既存の出力と不変性
+- **Context**: 要件 3.2・6.4（字のある `talk` だけのトークの出力をバイト単位で変えない）。
+- **Sources Consulted**: `sakura_builder.lua` 184–198 行、`sakura_builder_test.lua`、ギャップ分析 1 節。
+- **Findings**: 新しい判定が旧条件（`talk` かつ非空）と食い違うのは「字の無い非空の `talk`」と「文字を表示するタグの `sakura_script`」の 2 つだけ。それ以外の入力では S3/S4 の振り分けは変わらない。
+- **Implications**: 既存のテストの期待値は変わらない見込み。実装時に全体のテスト（`pasta_lua` の lua_specs、`pasta_shiori` の e2e）で確認する。
+
+### マニュアルの影響範囲
+- **Sources Consulted**: `book/src/internals/talk-output.md` 61・144–145・156・192・219 行、`book/src/reference/pasta-toml.md` 248–268 行、`book/tools/gen-skill-refs.mjs` 46 行。
+- **Findings**: 内部設計の章は状態表・本文・モジュール表（`appearance` の公開関数）・境界表（`sakura_builder` → `appearance`）の 4 か所が影響を受ける。`reference/pasta-toml.md` は `pasta-ghost-authoring/references/pasta-toml.md` に生成される。`internals/` は生成対象外。
+- **Implications**: 要件 5.1〜5.4 はこの 2 章と再生成で満たせる。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A（採用） | ビルダーの局所関数で判定し、`appearance.lua` から `tag_at` だけを公開して共有 | 差分最小（Lua 2 ファイル）。タグの区切り方が外見の観測と 1 か所で一致。Wave 3 の並走条件を守る | `appearance` がタグ読み取りの部品も公開する（責務が少しにじむ） | 公開は既存関数 1 つで、挙動は変えない |
+| B | タグ読み取りを新モジュールへ移す | 責務が明確 | `appearance.lua` の変更が「読み取りの共有」を超える。新ファイルの埋め込み確認が要る | 2 つ目の利用者が出たときに検討 |
+| C | Rust の `@pasta_sakura_script` に判定関数 | タグの定義が Rust 1 か所 | Out of Boundary（Rust の `sakura_script/`）。注入レンダラ全部に関数が要る | 不採用 |
+
+## Design Decisions
+
+### Decision: 判定の位置は Option A
+- **Context**: 要件「設計フェーズへ送る事項」・ギャップ分析 5 節。
+- **Alternatives Considered**: Option B（新モジュール）、Option C（Rust）。
+- **Selected Approach**: `sakura_builder.lua` に局所関数「字を出すトークンか」を置き、S3 の条件をこれに置き換える。`appearance.lua` は既存の `tag_at` を `APPEARANCE.tag_at` として公開するだけ。
+- **Rationale**: 最小差分で、タグの区切り方を外見の観測・ウェイトの挿入と共有できる（要件の用語「タグ」の定義どおり）。
+- **Trade-offs**: `appearance` の公開面が 1 関数増える。将来タグ読み取りの利用者が増えたら Option B へ移す（そのときは関数の移動だけで済む）。
+- **Follow-up**: マニュアルのモジュール表・境界表に `APPEARANCE.tag_at` を追記する。
+
+### Decision: `sakura_script` は先頭のタグの名前だけで判定する
+- **Context**: 要件 1.9・3.4。
+- **Alternatives Considered**: `talk` と同じ走査をテキスト全体にかける。
+- **Selected Approach**: 先頭が `\` で、先頭のタグの名前が文字を表示するタグ（`_u`・`_m`・`&`）なら字を出すトークンとする。それ以外は従来どおり字を出さない。
+- **Rationale**: DSL の `sakura_script` はタグ 1 つで、`"…"` で囲んだ引数に `]` を含められる。全体を走査すると引数の残りを字と誤認し、3.4 の不変性を破る。
+- **Trade-offs**: Lua から `act:sakura_script` に複数のタグや字を混ぜて渡した場合は、先頭のタグだけで決まる（仮定。設計ディスカッションで確認）。
+
+### Decision: 文字を表示するタグの一覧はビルダー側に置く
+- **Context**: 要件 1.4。
+- **Selected Approach**: `sakura_builder.lua` の局所の表 `{ _u, _m, & }`。
+- **Rationale**: 「字」は段落区切りの判定の概念で、外見の観測には関係しない。`appearance` に置くと責務がさらににじむ。
+
+### Generalization / Build vs. Adopt / Simplification（synthesis）
+- **Generalization**: 要件 1.1〜1.7 と 1.9 は「トークンが字を出すか」という 1 つの述語の場合分けである。述語 1 つ（`talk` はテキスト全体を走査、`sakura_script` は先頭のタグ）にまとめ、S3 の条件をその述語に置き換える。
+- **Build vs. Adopt**: タグの区切り方は既存の `tag_at` を採用（新しいパターンを書かない）。Rust の `SAKURA_TAG_PATTERN` は Lua から呼べず（Option C の理由）、採用しない。
+- **Simplification**: 新しいモジュール・新しい状態・設定キーは足さない。空白の特別扱い（1.5）は規則を書かないことで満たす（`\` 以外の文字はすべて字）。
+
+## Risks & Mitigations
+- 既存の出力が変わる — 新旧の条件が食い違う入力は 2 種だけ（上記）。全体のテストで確認し、期待値を変える場合は要件 6.4 のとおり根拠を明記する。
+- 共有するタグの区切り方の既知の制約（`\nHello` を名前 `nHello` のタグと読む、`\_?…\_?` の中もタグとして読む、エスケープした `\]` を含む引数）— 範囲外（要件の Out of scope「タグの区切り方そのものの変更」）。内部設計のマニュアルに制約として書く。
+- `BUILDER.build` の複雑度 — 条件を局所関数に外出しするため、`and` の分岐がむしろ減る。`luacheck` で確認する。
