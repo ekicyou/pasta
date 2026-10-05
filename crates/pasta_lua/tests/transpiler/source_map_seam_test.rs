@@ -159,6 +159,40 @@ fn test_out_line_counter_matches_emitted_line_count() {
     assert_eq!(emitted, 4, "actual emitted lines should match out_line");
 }
 
+/// A line containing concatenation maps back to its own `.pasta` line, the same
+/// way a line containing arithmetic does (string-concat-operator Req 6.5).
+#[test]
+fn test_concat_line_maps_to_its_pasta_line_like_arith() {
+    use pasta_dsl::parser::parse_str;
+    use pasta_lua::LuaTranspiler;
+
+    // .pasta lines 2..=4: arithmetic, concatenation, dynamic call with concatenation.
+    let source = "＊メイン
+　＄x＝＄a＋1
+　＄y＝「合計」＆＄n＆「個」
+　＞＄種類＆「_挨拶」
+";
+    let file = parse_str(source, "test.pasta").expect("parse ok");
+    let mut sink = CapturingSink::default();
+    let mut output = Vec::new();
+    LuaTranspiler::default()
+        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .expect("transpile ok");
+    let lua = String::from_utf8(output).unwrap();
+    let lua_lines: Vec<&str> = lua.lines().collect();
+
+    let pasta_line_of = |needle: &str| -> Vec<usize> {
+        sink.records
+            .iter()
+            .filter(|(lua_line, _)| lua_lines[*lua_line as usize - 1].contains(needle))
+            .map(|(_, span)| span.start_line)
+            .collect()
+    };
+    assert_eq!(pasta_line_of("var.x = act:arith("), vec![2]);
+    assert_eq!(pasta_line_of("var.y = act:concat("), vec![3]);
+    assert_eq!(pasta_line_of("act:call("), vec![4]);
+}
+
 /// Task 8.2 — ゼロコスト/サンドボックス **集約回帰ゲート（バイト一致サブ）**。
 ///
 /// このモジュールは「本番 transpile（sink 非装着）出力のバイト不変」を **一箇所に集約** し、

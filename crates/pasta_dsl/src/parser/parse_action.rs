@@ -262,6 +262,7 @@ pub(crate) fn bin_op_from_rule(rule: Rule) -> Option<BinOp> {
         Rule::mul_op => Some(BinOp::Mul),
         Rule::div_op => Some(BinOp::Div),
         Rule::modulo_op => Some(BinOp::Mod),
+        Rule::concat_op => Some(BinOp::Concat),
         _ => None,
     }
 }
@@ -408,7 +409,12 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Option<Expr> {
             })
         }
         Rule::paren_expr => parse_expr_from_parts(pair).map(|e| Expr::Paren(Box::new(e))),
-        Rule::add_op | Rule::sub_op | Rule::mul_op | Rule::div_op | Rule::modulo_op => {
+        Rule::add_op
+        | Rule::sub_op
+        | Rule::mul_op
+        | Rule::div_op
+        | Rule::modulo_op
+        | Rule::concat_op => {
             // Binary operators are handled at a higher level
             None
         }

@@ -81,7 +81,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 | `type` | フィールド | 積むメソッド |
 | ------ | ---------- | ------------ |
-| `talk` | `actor`・`text` | `act:talk(アクター, テキスト)`（アクタープロキシの `talk` 経由を含む）。`text` が `nil` なら積まない。未登録のアクターの目印（`【未登録アクター：名前】`）は `act:actor_proxy` が積む（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fnarith)） |
+| `talk` | `actor`・`text` | `act:talk(アクター, テキスト)`（アクタープロキシの `talk` 経由を含む）。`text` が `nil` なら積まない。未登録のアクターの目印（`【未登録アクター：名前】`）は `act:actor_proxy` が積む（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fnarithconcat)） |
 | `sakura_script` | `actor`・`text` | `act:sakura_script(アクター, テキスト)`（アクタープロキシ経由） |
 | `raw_script` | `text` | `act:raw_script(テキスト)`。SHIORI 用の ACT では `set_property`・`get_property` も積む |
 | `surface` | `id` | `act:surface(ID)` |
@@ -93,20 +93,21 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 | `spot` | `actor`・`spot` | `act:set_spot(名前, 番号)`。`act.actors` に無い名前なら積まない |
 | `clear_spot` | — | `act:clear_spot()` |
 
-`talk` と `sakura_script` だけが発言したアクターを持つ。`surface` などアクターを持たないトークンは、次のグループ化で直前の発言者のグループに入る。
+`talk` と `sakura_script` だけが発言したアクターを持つ。`surface` などアクターを持たないトークンは、次のグループ化で直前の発言者のグループに入る（出力の先頭か `clear_spot` の後で、発言より前に積んだものはアクター `nil` のグループに入る）。
 
 ### グループ化トークン
 
 `ACT_IMPL.build` は `act.token` を取り出して空にし、0 件なら `nil` を返す。1 件以上なら次の 2 段で列を作り直す。
 
 1. `group_by_actor` は列を先頭から走査する。
-   - `spot`・`clear_spot` は、そのまま結果に置く。グループは閉じない。
+   - `spot` は、そのまま結果に置く。グループは閉じない。
+   - `clear_spot` は、そのまま結果に置き、現在のグループを閉じる。後の発言と表示制御などは新しいグループに入る。
    - `talk`・`sakura_script` は、グループがまだ無いか、トークンの `actor` が現在のグループのアクターと別の表であれば、新しいグループ `{ type = "actor", actor = …, tokens = {} }` を結果に追加してから、そのグループの `tokens` に入れる。同じアクターなら現在のグループに入れる。
    - `raw_script` は、グループがあればその `tokens` に、無ければ結果に直接置く。
-   - それ以外（`surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout`）は、グループがあればその `tokens` に入れ、無ければ捨てる。
+   - それ以外（`surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout`）は、グループがあればその `tokens` に入れ、無ければアクター `nil` のグループ `{ type = "actor", actor = nil, tokens = {} }` を結果に追加してから、そのグループの `tokens` に入れる。グループが無いのは、出力の先頭か `clear_spot` の後で、まだ発言を積んでいないときである。
 2. `merge_consecutive_talks` は、各グループの `tokens` の中で隣り合う `talk` のテキストを連結して 1 つの `talk` にする。`sakura_script` など `talk` 以外のトークンが間にあれば結合は切れる。
 
-結果は、`type = "actor"` のグループと、`spot`・`clear_spot`・グループの外の `raw_script` が並ぶ列になる。
+結果は、`type = "actor"` のグループと、`spot`・`clear_spot`・グループの外の `raw_script` が並ぶ列になる。アクター `nil` のグループは、発言より前に積んだ表示制御などを積んだ順に持つ。組立はこのグループでスコープ切替タグを出さず、内側の出力はアクター未指定（`nil`）として観測される（[さくらスクリプトの組立](#さくらスクリプトの組立)）。
 
 ### トークンの種類と出力
 
@@ -226,7 +227,9 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 - budoux の行の幅は `talk_to_script` の呼び出しごとに 1 行目から数え直す。`merge_consecutive_talks` で結合された `talk` は 1 回の呼び出しになるが、`sakura_script` などで区切られた `talk` は別の呼び出しになる。組立が出す `\n`・`\n[N]` や前の呼び出しの改行は幅の計算に入らない。テキスト内の `
 ` も幅を数えないタグとして扱うため、そこでも行の幅は数え直さない。
 - `budoux` の配列に整数にできない要素があると `talk_to_script` は Lua のエラーになる。ウェイトのキーは読めなければ既定値になる。
-- `group_by_actor` は、グループが始まる前の `surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout` を出力に含めない。`spot`・`clear_spot` はグループを閉じないため、同じアクターの発言が `spot`・`clear_spot` の前後にあると、後の発言も前のグループに入り、`spot`・`clear_spot` の処理はそのグループの出力の後になる。
+- 出力の先頭と `clear_spot` の後で、発言より前に積んだ `surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout` は、アクター未指定として、積んだ位置に積んだ順で出力される。スコープ切替タグを伴わないため、その時点のスコープに効く。内側の出力にサーフェス変更などの分類に当たるタグがあれば全スポットが不明になり（[アピアランスの観測と復旧](#アピアランスの観測と復旧)）、次の発言者の切り替えで復旧タグが出ることがある。
+- `clear_spot` は現在のグループを閉じる。そのため `clear_spot` の後の発言は、前のグループと同じアクターでも新しいグループに入り、`clear_spot` で組立の状態をリセットした後の切り替えの出力（`\p[N]`）の後に出力される。
+- `spot` はグループを閉じない。同じアクターの発言が `spot` の前後にあると、後の発言も前のグループに入り、`spot` の処理はそのグループの出力の後になる。それでも出力は変わらない。`spot` をまたいで同じグループに入るのは切り替えを伴わない同じ発言者の発言だけであり、`spot` が記録した立ち位置は次に発言者が切り替わるときに初めて使われるためである。
 - 組立の状態のうち、`actor_spots` と外見状態はビルドをまたいで `STORE` に残り、`last_actor`・`spot_has_text`・`pending_break` はビルドごとに作り直す。そのため段落区切りの改行は 1 回の出力の中だけで判定され、外見の復旧はトークをまたいで判定される。
 - `clear_spot` は `actor_spots` を表ごと差し替えず、エントリを 1 つずつ消す。`STORE.actor_spots` と同じ表を指し続けるためである。外見状態は `clear_spot` では消さない。
 - アピアランスは pasta 自身が出力した文字列だけを観測する。ベースウェア側だけで起きた外見の変化は状態に入らない。

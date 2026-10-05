@@ -505,3 +505,23 @@ fn test_search_word_merge_duplicate_with_global() {
     assert!(results.contains(&"d".to_string()));
     assert!(results.contains(&"e".to_string()));
 }
+
+#[test]
+fn test_search_word_mock_sequence_applies_each_round() {
+    // Mock [1] with shuffle enabled: the 2nd candidate comes first, the rest
+    // follow in candidate order, and the next round applies [1] again.
+    let mut registry = WordDefRegistry::new();
+    registry.register_global(
+        "test",
+        vec!["a".to_string(), "b".to_string(), "c".to_string()],
+    );
+
+    let selector = Box::new(MockRandomSelector::new(vec![1]));
+    let mut table = WordTable::from_word_def_registry(registry, selector);
+
+    let results: Vec<_> = (0..4)
+        .map(|_| table.search_word("", "test", &[]).unwrap())
+        .collect();
+
+    assert_eq!(results, ["b", "a", "c", "b"]);
+}

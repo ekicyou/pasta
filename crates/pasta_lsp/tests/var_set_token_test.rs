@@ -1,7 +1,7 @@
 //! 変数代入行（var_set）のセマンティックトークン生成テスト (3.40 G1)
 //!
 //! visitors.rs の visit_var_set / tokenize_var_set_text / tokenize_expr_recursive
-//! および text_utils の式スキャンヘルパー（find_number_literal / find_binary_op /
+//! および text_utils の式スキャンヘルパー（find_number_literal / find_chain_ops /
 //! find_open_paren / find_close_paren / find_arg_end）は本ファイル以前は
 //! テスト未到達だった（tests/・src 内に ＄/$ を含むテストが 0 件）。
 
