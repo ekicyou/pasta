@@ -209,10 +209,6 @@ fn conformance_lua_tag_at() -> LuaResult<()> {
                         i = j
                     else
                         local name, _, next_pos, literal = tag_at(s, i)
-                        -- 移行用の補い（3.1 で削る）: 現行の tag_at はタグでないとき次の位置を返さない
-                        if not name and not next_pos then
-                            next_pos = i + ((s:sub(i + 1, i + 1) == "\\") and 2 or 1)
-                        end
                         local kind = (literal and "Literal") or (name and "Tag")
                             or (next_pos == i + 2 and "Escape") or "Text"
                         out[#out + 1] = { kind, s:sub(i, next_pos - 1) }
@@ -224,7 +220,7 @@ fn conformance_lua_tag_at() -> LuaResult<()> {
             "#,
         )
         .eval()?;
-    check("lua", false, |case| {
+    check("lua", true, |case| {
         let mut got = Units::new();
         let out: LuaTable = read.call(case.input).unwrap();
         for unit in out.sequence_values::<LuaTable>() {

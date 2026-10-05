@@ -6,13 +6,12 @@
 --- いずれも引数で受け取った状態テーブルをその場で更新する。
 --- モジュール自身は状態を持たず、STORE・@pasta_* を require しない。
 --- 出力文字列は読み取るのみで変更しない。
+---
+--- タグの読み取り（tag_at）は Rust Tokenizer::SAKURA_TAG_PATTERN
+--- （src/sakura_script/tokenizer.rs）と同じ規則の写しで、左から 1 回読むだけで後戻りしない。
+--- 一致は適合テスト tests/sakura_script/conformance_test.rs で保つ。
 
 local APPEARANCE = {}
-
---- タグ名の文字集合（Rust Tokenizer::SAKURA_TAG_PATTERN と同じ）
-local NAME_PATTERN = "^[0-9a-zA-Z_!+*?&%-]+"
---- 角括弧引数（最初の ] まで。SAKURA_TAG_PATTERN と同じ）
-local ARG_PATTERN = "^%[([^%]]*)%]"
 
 --- 空の外見状態を生成する
 --- @return table AppearanceState
@@ -20,26 +19,79 @@ function APPEARANCE.new()
     return { actors = {}, spots = {}, owners = {}, last_spots = {} }
 end
 
---- 位置 i の `\` から始まるタグを読む
---- @param s string
---- @param i integer
---- @return string|nil name タグ名（`\` を除く）。タグでなければ nil
---- @return string|nil arg 角括弧の中身（無ければ nil）
---- @return integer|nil next_pos タグ直後の位置（タグでなければ nil）
-local function tag_at(s, i)
-    local name = s:match(NAME_PATTERN, i + 1)
-    if name then
-        local j = i + 1 + #name
-        local arg = s:match(ARG_PATTERN, j)
-        return name, arg, j + (arg and #arg + 2 or 0)
+--- 位置 k の `"` から始まる引用の直後の位置（中の `""` は 1 文字）。閉じなければ nil
+local function quote_end(s, k)
+    local q = s:find('"', k + 1, true)
+    while q and s:sub(q + 1, q + 1) == '"' do
+        q = s:find('"', q + 2, true)
+    end
+    return q and q + 1
+end
+
+--- 位置 j の `[` から始まる引数の `]` の次の位置。閉じなければ nil。
+--- `\` ＋ 1 文字の組は読み飛ばし、引用は引数の先頭（`[` と `,` の直後）でだけ開く
+local function args_end(s, j)
+    local k, at_start = j + 1, true
+    while k <= #s do
+        local c = s:sub(k, k)
+        if at_start and c == '"' then
+            k = quote_end(s, k)
+            if not k then
+                return nil -- 先頭の引用が閉じない
+            end
+            at_start = false
+        elseif c == "]" then
+            return k + 1
+        else
+            -- 末尾の `\` は k が #s を越えて閉じないことになる
+            k = k + ((c == "\\") and 2 or 1)
+            at_start = c == ","
+        end
     end
     return nil
+end
+
+--- 位置 i の `\` から始まる単位（タグ・エスケープ・囲み）を読む
+--- @param s string
+--- @param i integer s:sub(i, i) == "\\" であること（呼び出し側の責任）
+--- @return string|nil name タグ名（`\` を除く。数字付きは "s3"、囲みは "_?"・"_!"）。
+---                         エスケープ・単位にならない `\` は nil
+--- @return string|nil arg 角括弧の中身（外側の括弧を除く生の文字列。無ければ nil）
+--- @return integer next_pos 単位の直後の位置（エスケープは i + 2、単位にならない `\` は i + 1）
+--- @return string|nil literal 囲みの中身（囲みのときだけ。空の囲みは ""）
+local function tag_at(s, i)
+    local c1 = s:sub(i + 1, i + 1)
+    if c1 == "\\" or c1 == "%" then
+        return nil, nil, i + 2
+    end
+    local mark = s:sub(i, i + 2)
+    if mark == "\\_?" or mark == "\\_!" then
+        local e = s:find(mark, i + 3, true)
+        if e then
+            return mark:sub(2), nil, e + 3, s:sub(i + 3, e - 1)
+        end
+    end
+    local name = s:match("^[spb]%d", i + 1) or s:match("^w[1-9]", i + 1)
+    if name then
+        return name, nil, i + 3
+    end
+    name = s:match("^_?_?[0-9A-Za-z!+*?&%-]", i + 1)
+    if not name then
+        return nil, nil, i + 1
+    end
+    local j = i + 1 + #name
+    local e = s:sub(j, j) == "[" and args_end(s, j)
+    if e then
+        return name, s:sub(j + 1, e - 2), e
+    end
+    return name, nil, j
 end
 
 --- タグの読み取り（適合テスト tests/sakura_script/conformance_test.rs が使う）
 APPEARANCE.tag_at = tag_at
 
---- pos 以降の次のタグを返す（戻り値は tag_at と同じ）。`\\` は 2 文字読み飛ばす。
+--- pos 以降の次のタグ（囲みを含む）を返す（戻り値は tag_at の先頭 3 つ）。
+--- 名前の無い単位は tag_at の次の位置で読み飛ばす。囲みの中は観測しない
 --- @param s string
 --- @param pos integer
 local function next_tag(s, pos)
@@ -52,8 +104,7 @@ local function next_tag(s, pos)
         if name then
             return name, arg, next_pos
         end
-        -- `\\` はエスケープ。それ以外（`\` + 非タグ文字）は 1 文字進める
-        pos = i + ((s:sub(i + 1, i + 1) == "\\") and 2 or 1)
+        pos = next_pos
     end
 end
 
