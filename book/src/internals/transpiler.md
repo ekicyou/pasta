@@ -88,7 +88,8 @@ AST ノードは `Span`（開始・終了の行と桁、バイトオフセット
 | `TranspileContext` | `crates/pasta_lua/src/context.rs` | 走査中の状態。`SceneRegistry`・`WordDefRegistry`（`pasta_core`）とファイル属性の累積を持つ |
 | `LuaCodeGenerator` | `crates/pasta_lua/src/code_gen/mod.rs` | 出力先・インデント・出力行番号（`out_line`）・ソースマップ用シンクを持つ生成器本体。ヘッダ出力と行出力の共通処理 |
 | スコープ単位の生成 | `crates/pasta_lua/src/code_gen/scope_gen.rs` | アクター辞書・グローバルシーン・ローカルシーンの Lua ブロック、末尾呼び出しの判定、選択肢 |
-| 要素単位の生成 | `crates/pasta_lua/src/code_gen/element_gen.rs` | アクション・変数代入・Call・式・単語定義・Lua ブロック |
+| 要素単位の生成 | `crates/pasta_lua/src/code_gen/element_gen.rs` | アクション・変数代入・Call・単語定義・Lua ブロック、変数の経路と動的参照の引数 |
+| 式の生成 | `crates/pasta_lua/src/code_gen/expr_gen.rs` | 式の値・関数呼び出し・引数リストと、算術・連結の連鎖の組み直し |
 | ソースマップのシンク | `crates/pasta_lua/src/code_gen/source_map.rs` | 生成器が対応を記録する先の `SourceMapSink` トレイト |
 | 出力の正規化 | `crates/pasta_lua/src/normalize.rs` | `normalize_output`・`normalize_output_with_shift` と、削除行の記録 `LineShift` |
 | 文字列リテラル化 | `crates/pasta_lua/src/string_literalizer.rs` | `StringLiteralizer`。文字列を Lua のリテラル表記に変換する |
@@ -219,16 +220,20 @@ end
 
 エスケープのアクションは `talk` で出力する。`＠＠`・`＄＄` は 2 文字目の 1 文字を、`\\` は 2 文字のままを話す（`C:\\new` は `talk("C:")`・`talk([[\\]])`・`talk("new")` の 3 文になる）。`\\` の 2 文字はさくらスクリプトの後処理で 1 つのタグとして扱われ、間にウェイトなどが入らない（[さくらスクリプトの後処理](talk-output.md#さくらスクリプトの後処理)）。
 
-式の算術（`＋`・`－`・`＊`・`／`・`％`）は、演算ごとに `act:arith("演算子", 左, 右, 左の説明, 右の説明)` の呼び出しになる。パーサは優先順位を付けずに左結合の木を作る（`1＋2＊3` は `(1＋2)＊3` の形）ため、`element_gen.rs` の `arith_to_string` が木を項と演算子の列に戻し、`＊`・`／`・`％` を左から畳んでから `＋`・`－` を左から畳んで入れ子にする（Lua の優先順位・結合と同じ）。括弧（`Paren`）は 1 つの項で、`( … )` で囲んだまま出力する。
+式の算術（`＋`・`－`・`＊`・`／`・`％`）は演算ごとに `act:arith("演算子", 左, 右, 左の説明, 右の説明)` の呼び出しに、連結（`＆`）は演算ごとに `act:concat(左, 右, 左の説明, 右の説明)` の呼び出しになる。パーサは優先順位を付けずに左結合の木を作る（`1＋2＊3` は `(1＋2)＊3`、`「x」＆1＋2` は `(「x」＆1)＋2` の形）ため、`expr_gen.rs` の `binary_to_string` が木を項と演算子の列に戻し、優先順位の高い段から順に、段ごとに左から畳んで入れ子にする。段は `＊`・`／`・`％` → `＋`・`－` → `＆` の 3 段で、段の高さは `precedence` だけが、演算ごとの生成形は `binary_node` だけが決める。算術の 2 段は Lua の優先順位・結合と同じである。括弧（`Paren`）は 1 つの項で、`( … )` で囲んだまま出力する。
 
 ```text
 ＄a＝＄x＋1         → var.a = act:arith("+", var.x, 1, "var.x")
 ＄b＝1＋2＊＄y      → var.b = act:arith("+", 1, act:arith("*", 2, var.y, nil, "var.y"))
 ＄c＝（＄x＋1）＊2  → var.c = act:arith("*", (act:arith("+", var.x, 1, "var.x")), 2)
 ＄d＝＠＊f（1）＋＠g（） → var.d = act:arith("+", act:global_fn("f", 1), act:expr_fn("g"), "@*f()", "@g()")
+＄表示＝「合計」＆＄n＆「個」 → var.表示 = act:concat(act:concat("合計", var.n, nil, "var.n"), "個")
+＄s＝「合計」＆＄a＋＄b → var.s = act:concat("合計", act:arith("+", var.a, var.b, "var.a", "var.b"))
+＄n＝（「1」＆「2」）＋1 → var.n = act:arith("+", (act:concat("1", "2")), 1)
+＞＄種類＆「_挨拶」  → return act:call(SCENE.__global_name__, tostring(act:concat(var.種類, "_挨拶", "var.種類")), {}, table.unpack(args))
 ```
 
-説明は、実行時の警告に被演算子の場所を出すための文字列リテラルである（`operand_desc`）。変数参照は変数の経路（`"var.x"`・`"save.x"`・`"args[1]"`）、関数呼び出しは `"@名前()"`・`"@*名前()"`・`"@$変数の経路()"`、括弧は中身の説明になり、リテラルと入れ子の算術には説明が無い。両方とも無ければ説明の引数を省き、右だけあるときは左に `nil` を置く。`act:arith` の実行時の振る舞いは [arith](../lua/script-api.md#arithop-lhs-rhs-lhs_desc-rhs_desc) が正である。
+説明は、実行時の警告に被演算子の場所を出すための文字列リテラルである（`binary_operand` が `operand_desc` の結果を文字列リテラルにする）。変数参照は変数の経路（`"var.x"`・`"save.x"`・`"args[1]"`）、関数呼び出しは `"@名前()"`・`"@*名前()"`・`"@$変数の経路()"`、括弧は中身の説明になり、リテラルと入れ子の演算（算術・連結）には説明が無い。両方とも無ければ説明の引数を省き、右だけあるときは左に `nil` を置く。省き方は `act:arith` と `act:concat` で同じである。入れ子の演算に説明が無いため、内側が失敗して `nil` を返したとき、外側の演算は警告を重ねない。`act:arith`・`act:concat` の実行時の振る舞いは [arith](../lua/script-api.md#arithop-lhs-rhs-lhs_desc-rhs_desc)・[concat](../lua/script-api.md#concatlhs-rhs-lhs_desc-rhs_desc) が正である。
 
 動的参照の生成（`element_gen.rs` の `dynamic_ref_args`）は、変数の値を `tostring` せずにそのまま渡し、変数の経路（`var.変数名`・`save.変数名`・`args[番号+1]`）を文字列リテラルにして続けて渡す。値の検査と検索キーへの変換は実行時に行う（[Lua ランタイム内部モジュール](internal-modules.md#動的参照のキーworddynamic_key)）。ここで生成した `act` のメソッドが実行時に何をするかは、[ランタイム実行モデル](execution-model.md) と [Lua ランタイム内部モジュール](internal-modules.md) で扱う。
 

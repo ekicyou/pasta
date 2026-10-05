@@ -81,7 +81,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 | `type` | フィールド | 積むメソッド |
 | ------ | ---------- | ------------ |
-| `talk` | `actor`・`text` | `act:talk(アクター, テキスト)`（アクタープロキシの `talk` 経由を含む）。`text` が `nil` なら積まない。未登録のアクターの目印（`【未登録アクター：名前】`）は `act:actor_proxy` が積む（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fnarith)） |
+| `talk` | `actor`・`text` | `act:talk(アクター, テキスト)`（アクタープロキシの `talk` 経由を含む）。`text` が `nil` なら積まない。未登録のアクターの目印（`【未登録アクター：名前】`）は `act:actor_proxy` が積む（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fnarithconcat)） |
 | `sakura_script` | `actor`・`text` | `act:sakura_script(アクター, テキスト)`（アクタープロキシ経由） |
 | `raw_script` | `text` | `act:raw_script(テキスト)`。SHIORI 用の ACT では `set_property`・`get_property` も積む |
 | `surface` | `id` | `act:surface(ID)` |

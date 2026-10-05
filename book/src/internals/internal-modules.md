@@ -116,7 +116,7 @@ act[key]（ACT のフィールドに無いとき）
 
 - 解決の優先順はフィールド → メソッド → アクター名である。この優先順により、メソッド名やフィールド名と同じ名前のアクターがプロキシにならないこと（利用者から見た振る舞い）は [アクタープロキシ](../lua/script-api.md#アクタープロキシ) が正である。
 - アクタープロキシは参照のたびに新しく作られ、キャッシュされない（[PROXY パターン](#proxy-パターン)）。
-- 生成コードはアクターをこの経路で引かず、`act:actor_proxy("名前")` を呼ぶ（[生成コード用のメソッド](#生成コード用のメソッドactor_proxyglobal_fnarith)）。`actor_proxy` は `act.actors[名前]` を直接引くため、メソッド名・フィールド名と同じ名前のアクターもプロキシになる。
+- 生成コードはアクターをこの経路で引かず、`act:actor_proxy("名前")` を呼ぶ（[生成コード用のメソッド](#生成コード用のメソッドactor_proxyglobal_fnarithconcat)）。`actor_proxy` は `act.actors[名前]` を直接引くため、メソッド名・フィールド名と同じ名前のアクターもプロキシになる。
 - `SHIORI_ACT_IMPL` 自身にも `__index = ACT.IMPL` のメタテーブルが付いており、`SHIORI_ACT_IMPL.talk` のように実装表から直接引いても `ACT_IMPL` のメソッドが得られる。
 
 ### 継承（ACT.IMPL）
@@ -159,14 +159,15 @@ ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call` と `find_han
 - `expr_fn(self, key, ...)` と `expr_fn_var(self, value, var_path, ...)` は、`pasta.act` の局所関数 `call_expr(self, key, skip_methods, ...)` を共有する。`expr_fn` は `call_expr(self, key, nil, ...)`、`expr_fn_var` はキーに直した後に `call_expr(self, キー, true, ...)` を呼ぶ。`call_expr` は `find_handler("expr", key, skip_methods)` が関数なら `h(self, ...)` の戻り値を返し、それ以外は接頭辞 `act:expr_fn` の警告ログ（`handler not found`）を出して `nil` を返す。アクタープロキシは `pasta.actor` に同じ形の別の局所関数を持つ（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
 - `skip_methods` を真にするのは、`var_path` を受け取った `word` と `expr_fn_var`（生成コードの動的参照）だけである。`find_scene`・`call` と、`var_path` の無い `word`・`expr_fn` は `skip_methods` を渡さない。`find_handler` は `find_act_handler` に引数をそのまま渡す。
 
-### 生成コード用のメソッド（actor_proxy・global_fn・arith）
+### 生成コード用のメソッド（actor_proxy・global_fn・arith・concat）
 
-アクション行のアクター（`act:actor_proxy("名前")`）、`＠＊名前（…）`（`act:global_fn("名前", …)`）、式の算術（`act:arith(…)`）の生成コードが呼ぶメソッドである。引数・戻り値・警告の文言は [アクター・グローバル関数・算術](../lua/script-api.md#アクターグローバル関数算術) が、生成コードの形は [生成される Lua コードの形](transpiler.md#生成される-lua-コードの形) が正である。ここでは実装の内部の構成だけを扱う。
+アクション行のアクター（`act:actor_proxy("名前")`）、`＠＊名前（…）`（`act:global_fn("名前", …)`）、式の算術（`act:arith(…)`）と連結（`act:concat(…)`）の生成コードが呼ぶメソッドである。引数・戻り値・警告の文言は [アクター・グローバル関数・算術・連結](../lua/script-api.md#アクターグローバル関数算術連結) が、生成コードの形は [生成される Lua コードの形](transpiler.md#生成される-lua-コードの形) が正である。ここでは実装の内部の構成だけを扱う。
 
 - `actor_proxy(self, name)` は、`self.actors[name]` があれば `ACTOR.create_proxy(アクター, self)` を返す。無ければ `self.token` を末尾から見て、最初に当たる `talk`・`sakura_script` のトークンの `actor.name` が `name` と同じならその `actor` の表を再利用してプロキシを作る。そうでなければ `{ name = name }`（メタテーブルなし）を作り、警告ログを出し、目印の `talk` トークン（`text` は `【未登録アクター：名前】`）を積んでからプロキシを作る。再利用によって同じ未登録の名前の連続する発言は同じ表を持ち、`build` のグループ化（表の同一性で判定する）で 1 つのグループになる（[グループ化トークン](talk-output.md#グループ化トークン)）。
 - その場限りのアクターは `STORE.actors`・`self.actors`・`STORE.actor_spots` のどれにも書かれず、ACT にもフィールドを足さない。状態は `self.token` の中にしか無いため、`build`・`yield` でトークンが空になると、次の発言で目印がまた付く。`name` だけの表のため、プロキシの検索の A1 は `name` にしか一致せず、A2 のアクター単語も無い（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
 - `global_fn(self, name, ...)` は `GLOBAL[name]` が関数なら `f(self, ...)` の戻り値をすべて返し、関数でなければ警告ログを出して `nil` を返す。名前の解決の 5 段の検索（`find_act_handler`）は通らない。関数の中で起きたエラーは捕まえない。
-- `arith(self, op, lhs, rhs, lhs_desc, rhs_desc)` は、局所関数 `arith_operand` で被演算子を数値にし（`number` はそのまま、`string` は `tonumber`、それ以外は数値にできない）、両方が数値になったときだけ局所の表 `ARITH_OPS` の関数で Lua の演算子を適用する。演算子に渡るのは数値だけのため、表の `__add` などのメタメソッドは呼ばれない。数値にできない被演算子ごとに警告ログを出すが、値も説明も `nil` の被演算子（内側の `arith` が既に失敗したもの）では出さない。`self` は使わず、ACT の状態を読み書きしない。
+- `arith(self, op, lhs, rhs, lhs_desc, rhs_desc)` は、局所関数 `arith_operand` で被演算子を数値にし（`number` はそのまま、`string` は `tonumber`、それ以外は数値にできない）、両方が数値になったときだけ局所の表 `ARITH_OPS` の関数で Lua の演算子を適用する。演算子に渡るのは数値だけのため、表の `__add` などのメタメソッドは呼ばれない。数値にできない被演算子ごとに警告ログを出すが、値も説明も `nil` の被演算子（内側の `arith`・`concat` が既に失敗したもの）では出さない。`self` は使わず、ACT の状態を読み書きしない。
+- `concat(self, lhs, rhs, lhs_desc, rhs_desc)` は `ACT_IMPL.arith` の直後に置かれ、局所関数 `concat_operand` で被演算子を文字列にする（`string` はそのまま、`number` は `tostring`、それ以外は文字列にできない）。両方が文字列になったときだけ Lua の `..` でつなぐ。`..` に渡るのは文字列だけのため、表の `__concat`・`__tostring` などのメタメソッドは呼ばれない。文字列にできない被演算子ごとに警告ログを出すが、値も説明も `nil` の被演算子（内側の `concat`・`arith` が既に失敗したもの）では出さない。警告の `value=` の表記は `arith` と同じ局所関数 `arith_value_text` が作る。`self` は使わず、ACT の状態を読み書きしない。
 
 ### 動的参照のキー（WORD.dynamic_key）
 
@@ -200,7 +201,7 @@ act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(var.x, "var.
 
 ### プロキシの構造と生成
 
-`ACTOR.create_proxy(actor, act)` は `{ actor = アクター, act = ACT }` にメタテーブル `PROXY_IMPL`（`__index` は `PROXY_IMPL` 自身）を付けて返す。ACT の `actor_proxy` と `__index` が、呼び出し・参照のたびにこの関数を呼ぶ（[生成コード用のメソッド](#生成コード用のメソッドactor_proxyglobal_fnarith)・[メソッドとアクタープロキシの解決](#メソッドとアクタープロキシの解決__index)）。プロキシは状態を持たず、同じアクターのプロキシを何度作っても振る舞いは変わらない。
+`ACTOR.create_proxy(actor, act)` は `{ actor = アクター, act = ACT }` にメタテーブル `PROXY_IMPL`（`__index` は `PROXY_IMPL` 自身）を付けて返す。ACT の `actor_proxy` と `__index` が、呼び出し・参照のたびにこの関数を呼ぶ（[生成コード用のメソッド](#生成コード用のメソッドactor_proxyglobal_fnarithconcat)・[メソッドとアクタープロキシの解決](#メソッドとアクタープロキシの解決__index)）。プロキシは状態を持たず、同じアクターのプロキシを何度作っても振る舞いは変わらない。
 
 ### PROXY_IMPL のメソッド
 
