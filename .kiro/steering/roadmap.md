@@ -109,6 +109,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 3 | call-execution-correctness | バグ | `element_gen.rs`（Call）、`act.lua`（`init_scene`・`call`） |
 | 4 | scene-attribute-store | 機能 | 属性の文法・コード生成・`scene.lua`・`finalize.rs` |
 | 5 | call-attribute-filter | 機能 | フィルターの文法・Call のコード生成・検索 |
+| 6 | failure-output-unification | 機能 | `act.lua`・`actor.lua`・`word.lua` の警告箇所、失敗表記の出力（2026-10-05 起票。ウェーブは次の棚卸で見直す） |
 
 ## Specs (dependency order)
 
@@ -125,6 +126,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - [ ] call-execution-correctness -- Call から戻った後のシーン文脈が復元されない不具合（U28）と、動的コール `＞式` の値が nil のときの nil ガード（旧 `dynamic-call-nil-guard`）。Dependencies: dsl-codegen-runtime-safety, act-token-grouping-fix, scene-identity-format
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: dsl-literal-fixes, scene-identity-format, call-execution-correctness
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, scene-search-key-normalization, call-execution-correctness, string-concat-operator
+- [ ] failure-output-unification -- 実行時の失敗（未定義の参照・見つからない Call など）をログとさくらスクリプトの両方へ 1 つの仕組みから出す。`call-execution-correctness` が Call 行に入れる失敗表記を載せ替え、他の失敗へ広げる。Dependencies: call-execution-correctness, call-attribute-filter
 
 ## バックログ（brief なし・保留）
 
