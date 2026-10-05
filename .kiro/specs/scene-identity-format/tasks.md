@@ -89,7 +89,7 @@
   - 破壊的変更の告知（3.5）に載せる 3 項目（登録名の形・`search_scene` の第 1 引数・`_数字` で終わる手書きのシーン関数）が実装の振る舞いと一致することを確かめる。告知そのものは完了フローの PR の件名と本文に書く
   - _Requirements: 3.5, 8.6_
 
-- [ ] 6. マニュアルとスキルの `references/` を新形式にそろえる
+- [x] 6. マニュアルとスキルの `references/` を新形式にそろえる
 - [x] 6.1 (P) 利用者向けの章を更新する
   - 検索モジュール・パターン集・スクリプト API の章で、登録名の説明と例を `"メイン_1"`・`"会話_朝_1"`・`WORD.create_local("メイン_1", …)` にする
   - `search_scene` の第 1 引数は作者が書くシーン名であり登録名を渡してもそのシーンを指さないこと、決まった順に選ぶときの並び（キーのバイト順、同名は通し番号順）、Lua で直接定義したシーン関数の照合相手を書く（回避の書き方は載せない）
@@ -101,7 +101,7 @@
   - 「区切り無し」「確定前は形式が違う」「末尾の数字を推測する関数」の記述が残っていないことを grep で確かめる（「確定前は内容が異なる」は残す）
   - _Requirements: 7.2, 7.3, 7.4, 7.5_
   - _Boundary: Manual（内部設計章）_
-- [ ] 6.3 スキルの `references/` を再生成して検査を通す
+- [x] 6.3 スキルの `references/` を再生成して検査を通す
   - 生成ツールで 2 つのスキルの `references/` を再生成する（手で編集しない）
   - 鮮度の検査（`--check`）とリンク検査が通る
   - _Requirements: 7.6_
@@ -122,3 +122,4 @@
 - 4.3: ローカルシーンの通し番号は `context.rs` の `local_scene_counters` 1 か所で数え、生成器とトランスパイラの両方が使う（開始シーンは 0 で、名前に使わない）。以前はトランスパイラが開始シーンを含む定義位置を渡していたため、開始シーンがあるだけでレジストリと実行時の関数名がずれていた。
 - 5.2: 破壊的変更の告知 3 項目の裏付け: 登録名の形は `scene.lua` の `base_name .. "_" .. counter`、`search_scene` の第 1 引数は `search/context.rs` の `test_search_scene_registered_name_is_treated_as_name` と runtime の `registered_name_as_search_name_does_not_point_to_first_scene`、`_数字` で終わる手書きのシーン関数は `scene_table_candidate_tests.rs` の `test_fn_name_to_search_key_lua_defined_scene_names`（`step_2` → `step`）。
 - 6.1: `split_registered_name` が分けるのは `_` の後ろが半角数字（`0`〜`9`）のときだけ。マニュアルで「数字」と書くと全角数字も含むと読めるので、半角数字と明記する（6.2 の内部章も同じ）。
+- 6.3: 内部設計章の本文に `crates/…` のようなリポジトリ内パスを書くと、スキルへ写されたときに link-check の自己完結検査（skill-forbidden-ref）で落ちる。本文には型名・クレート名だけを書く。
