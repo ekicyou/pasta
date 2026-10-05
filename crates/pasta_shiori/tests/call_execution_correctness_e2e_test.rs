@@ -75,3 +75,63 @@ fn test_minimal_scene_talks() {
     );
     assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
 }
+
+// ---------------------------------------------------------------------------
+// 特性化テスト（tasks 1.2）: 変更前のコードで成功し、以後の変更で落ちないことの基準
+// 辞書: dic/characterization.pasta
+// ---------------------------------------------------------------------------
+
+/// 4.1: 末尾の Call（動的コール `＞＠次（）`、Lua のカウンタ）だけで 10 万回つないでも
+/// 深さの上限によるエラーにならず、最後のシーンまで実行される
+#[test]
+fn test_tail_call_chain_100k_completes() {
+    let (value, log) = fire("OnTailChain");
+    assert_eq!(value, r"\p[0]完走\e");
+    assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+}
+
+/// 4.4: 同じグローバルシーンの配下のローカルシーンを Call したときの応答（途中の Call と
+/// 末尾の Call）。前方一致するグローバルシーンよりローカルシーンが選ばれる
+#[test]
+fn test_call_local_scene_in_same_global() {
+    let (value, log) = fire("OnSameGlobalCall");
+    assert_eq!(value, r"\p[0]［ローカル］締め\e");
+    assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+}
+
+/// 4.2: 末尾の Call で別のグローバルシーンへ移った後は、移った先のシーンの文脈で解決される
+/// （単語参照は移った先のローカル単語、Call は移った先の配下のローカルシーン）
+#[test]
+fn test_tail_call_to_other_global_resolves_in_callee_context() {
+    let (value, log) = fire("OnTailToOther");
+    assert_eq!(value, r"\p[0]元先の単語先の後半\e");
+    assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+}
+
+/// 2.6: 別のグローバルシーンへの途中の Call を含まないシーンが出した選択肢を、既定の自動
+/// ルーティングで選んだときのジャンプ先。出したシーンの配下のローカルシーンが先に選ばれ、
+/// 無ければグローバルシーンへフォールバックする。`\q` の文字列そのものは確かめない（2.4 で変わる）
+#[test]
+fn test_choice_routing_without_mid_call() {
+    let select = |title: &str, id: &str| {
+        format!("ID: OnChoiceSelectEx\r\nReference0: {title}\r\nReference1: {id}")
+    };
+    for (title, id, expected) in [
+        ("甲", "選択肢甲", r"\p[0]メニューの甲\e"),
+        ("乙", "選択肢乙", r"\p[0]グローバルの乙\e"),
+    ] {
+        let (values, log) = run(&["ID: OnChoiceMenu", &select(title, id)]);
+        assert!(values[0].contains("どれ？"), "menu: {}", values[0]);
+        assert_eq!(values[1], expected, "choice {id}");
+        assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+    }
+}
+
+/// 4.8: ローカルシーンの最後の行が Call のとき、呼ばれた側の戻り値がそのシーンの戻り値になる。
+/// Lua の関数が `act:call` でローカルシーンを呼び、その戻り値をアクション行で出力する
+#[test]
+fn test_tail_call_return_value_propagates() {
+    let (value, log) = fire("OnTailReturn");
+    assert_eq!(value, r"\p[0]末尾の戻り値\e");
+    assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+}
