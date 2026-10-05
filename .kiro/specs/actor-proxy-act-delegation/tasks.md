@@ -39,7 +39,7 @@
   - _Boundary: RegressionTests (既存 Lua spec・pasta_lua 統合テスト)_
   - _Depends: 1.1_
 
-- [ ] 2. アクタープロキシの第 1 引数の規則と戻り値の正規化を実装する
+- [x] 2. アクタープロキシの第 1 引数の規則と戻り値の正規化を実装する
   - 関数呼び出しの形（`expr_fn`・`expr_fn_var`）では、見つかった関数に常に ACT を第 1 引数として渡す
   - 単語参照の形（`word`）では、アクターの段を先に探し、見つかった関数にはプロキシを、act の段で見つかった関数には ACT を渡す。検索順序・`skip_methods`・警告の文言・関数でない値の文字列化は変えない
   - 戻り値の先頭が ACT またはそのプロキシ自身と同一なら値なしにし、それ以外は複数の戻り値も含めてそのまま返す局所関数を 1 つ足し、両方の形で使う
@@ -86,3 +86,4 @@
 - 1.1: 基準線（修正前・`NoDefaultCurrentDirectoryInExePath` を外した状態）で `cargo test -p pasta_lua -p pasta_shiori` は exit 0・1705 件成功・0 件失敗。設計時に見えた `pasta_shiori` のビルド失敗は再現しない（環境変数が原因だったとみられる）。テスト後に `sample.generated.lua` の改行差分が出るので `git checkout --` で戻す。
 - 1.2: `lua_test` は最上位 describe が失敗すると `os.exit(1)` し後続スイートを飛ばす。新 spec は一覧の最後に置き、修正前は 18 件失敗・8 件成功。タスク 2 の検証では期待を変える既存 4 件（`actor_module_test` が最初に落ちる）を同時に直さないと後続が走らない。
 - 1.3: シーン名の検索は前方一致なので、E2E フィクスチャのシーン名はどれも他の名前の先頭部分にしない（`…Plain`／`…Ms`）。`pasta_scripts` は build.rs で埋め込むため、`actor.lua` の変更は再ビルドで `pasta_shiori` のテストに反映される。
+- 2: `word` は `find_handler` を使わず、同じ順序（`find_actor_handler` → `act:find_act_handler`）・同じ `skip_methods` でその場に 2 段の検索を展開し、見つかった段で第 1 引数（プロキシ／ACT）を切り替える。`expr` の形は `find_handler` のまま（expr ではアクターの段が常に nil）。`drop_self` の比較は設計どおり `==`（ACT・プロキシに `__eq` は無い）。
