@@ -5,8 +5,7 @@
 //! - Lua: `pasta.shiori.appearance` の `tag_at`（写し）
 //! - DSL: `grammar.pest` のアクション行（写し）
 //!
-//! 期待値は新しい規則（要件 7〜9）で書く。移行中は、`changes`（読みが変わる事例）の
-//! 印が付いた事例を、まだ書き換えていない読み取りでは飛ばす。
+//! 期待値は新しい規則（要件 7〜9）で書く。3 つの読み取りが全事例を通る。
 
 use mlua::prelude::*;
 use pasta_dsl::parser::{Action, FileItem, LocalSceneItem, parse_str};
@@ -37,73 +36,58 @@ struct Case {
     input: &'static str,
     units: &'static [(K, &'static str)],
     dsl: Dsl,
-    /// 読みが変わる事例（現行の読み取りと期待値が食い違う）
-    changes: bool,
 }
 
-const fn case(
-    input: &'static str,
-    units: &'static [(K, &'static str)],
-    dsl: Dsl,
-    changes: bool,
-) -> Case {
-    Case {
-        input,
-        units,
-        dsl,
-        changes,
-    }
+const fn case(input: &'static str, units: &'static [(K, &'static str)], dsl: Dsl) -> Case {
+    Case { input, units, dsl }
 }
 
 use Dsl::*;
 
-const CHG: bool = true;
-const KEEP: bool = false;
-
 #[rustfmt::skip]
 const CASES: &[Case] = &[
     // 要件 10.4 の 19 件
-    case(r"\nHello", &[(Tag, r"\n"), (Text, "Hello")], Same, CHG),
-    case(r"\w9OK", &[(Tag, r"\w9"), (Text, "OK")], Same, CHG),
-    case(r"\w0", &[(Tag, r"\w"), (Text, "0")], Same, CHG),
-    case(r"\s12", &[(Tag, r"\s1"), (Text, "2")], Same, CHG),
-    case(r"\_w[100]", &[(Tag, r"\_w[100]")], Same, KEEP),
-    case(r"\__w[1]", &[(Tag, r"\__w[1]")], Same, KEEP),
-    case(r#"\![raise,X,"a]b"]"#, &[(Tag, r#"\![raise,X,"a]b"]"#)], Same, CHG),
-    case(r"\q[a\]b,X]", &[(Tag, r"\q[a\]b,X]")], Same, CHG),
-    case(r"\s[0", &[(Tag, r"\s"), (Text, "[0")], Same, KEEP),
-    case(r"\\", &[(Escape, r"\\")], Same, KEEP),
-    case(r"\%", &[(Escape, r"\%")], Same, CHG),
-    case(r"\あ", &[(Text, r"\あ")], ParseError, KEEP),
-    case(r"あ\", &[(Text, r"あ\")], ParseError, KEEP),
-    case(r"\_?\s[1]\_?", &[(Literal, r"\_?\s[1]\_?")], Same, CHG),
-    case(r"\_?abc", &[(Tag, r"\_?"), (Text, "abc")], Same, CHG),
-    case(r"\-", &[(Tag, r"\-")], Same, KEEP),
-    case(r"\+", &[(Tag, r"\+")], Same, KEEP),
-    case(r"\*", &[(Tag, r"\*")], Same, KEEP),
-    case(r"\&[amp]", &[(Tag, r"\&[amp]")], Same, KEEP),
+    case(r"\nHello", &[(Tag, r"\n"), (Text, "Hello")], Same),
+    case(r"\w9OK", &[(Tag, r"\w9"), (Text, "OK")], Same),
+    case(r"\w0", &[(Tag, r"\w"), (Text, "0")], Same),
+    case(r"\s12", &[(Tag, r"\s1"), (Text, "2")], Same),
+    case(r"\_w[100]", &[(Tag, r"\_w[100]")], Same),
+    case(r"\__w[1]", &[(Tag, r"\__w[1]")], Same),
+    case(r#"\![raise,X,"a]b"]"#, &[(Tag, r#"\![raise,X,"a]b"]"#)], Same),
+    case(r"\q[a\]b,X]", &[(Tag, r"\q[a\]b,X]")], Same),
+    case(r"\s[0", &[(Tag, r"\s"), (Text, "[0")], Same),
+    case(r"\\", &[(Escape, r"\\")], Same),
+    case(r"\%", &[(Escape, r"\%")], Same),
+    case(r"\あ", &[(Text, r"\あ")], ParseError),
+    case(r"あ\", &[(Text, r"あ\")], ParseError),
+    case(r"\_?\s[1]\_?", &[(Literal, r"\_?\s[1]\_?")], Same),
+    case(r"\_?abc", &[(Tag, r"\_?"), (Text, "abc")], Same),
+    case(r"\-", &[(Tag, r"\-")], Same),
+    case(r"\+", &[(Tag, r"\+")], Same),
+    case(r"\*", &[(Tag, r"\*")], Same),
+    case(r"\&[amp]", &[(Tag, r"\&[amp]")], Same),
     // 設計の TagPattern の表のその他の事例
-    case(r"\s3[x]", &[(Tag, r"\s3"), (Text, "[x]")], Same, CHG),
-    case(r"\_", &[(Text, r"\_")], ParseError, CHG),
-    case(r"\n!?", &[(Tag, r"\n"), (Text, "!?")], Same, CHG),
-    case(r"\_?\_?", &[(Literal, r"\_?\_?")], Same, CHG),
+    case(r"\s3[x]", &[(Tag, r"\s3"), (Text, "[x]")], Same),
+    case(r"\_", &[(Text, r"\_")], ParseError),
+    case(r"\n!?", &[(Tag, r"\n"), (Text, "!?")], Same),
+    case(r"\_?\_?", &[(Literal, r"\_?\_?")], Same),
     // 引用（引数の先頭の `"` だけが引用を開く）
-    case(r#"\q[5"x,OnX]"#, &[(Tag, r#"\q[5"x,OnX]"#)], Same, KEEP),
-    case(r#"\![raise,X,a"]b]"#, &[(Tag, r#"\![raise,X,a"]"#), (Text, "b]")], Same, KEEP),
-    case(r#"\q["a]b"c,X]z"#, &[(Tag, r#"\q["a]b"c,X]"#), (Text, "z")], Same, CHG),
-    case(r#"\q[a\,"b]c"]"#, &[(Tag, r#"\q[a\,"b]"#), (Text, r#"c"]"#)], Same, CHG),
-    case(r#"\![a,"b""c]d"]e"#, &[(Tag, r#"\![a,"b""c]d"]"#), (Text, "e")], Same, CHG),
-    case(r#"\![call,ghost,"the ""Name"""]"#, &[(Tag, r#"\![call,ghost,"the ""Name"""]"#)], Same, KEEP),
-    case(r#"\q["abc,OnX]y"#, &[(Tag, r"\q"), (Text, r#"["abc,OnX]y"#)], Same, CHG),
-    case(r#"\![a,"b""]"#, &[(Tag, r"\!"), (Text, r#"[a,"b""]"#)], Same, CHG),
+    case(r#"\q[5"x,OnX]"#, &[(Tag, r#"\q[5"x,OnX]"#)], Same),
+    case(r#"\![raise,X,a"]b]"#, &[(Tag, r#"\![raise,X,a"]"#), (Text, "b]")], Same),
+    case(r#"\q["a]b"c,X]z"#, &[(Tag, r#"\q["a]b"c,X]"#), (Text, "z")], Same),
+    case(r#"\q[a\,"b]c"]"#, &[(Tag, r#"\q[a\,"b]"#), (Text, r#"c"]"#)], Same),
+    case(r#"\![a,"b""c]d"]e"#, &[(Tag, r#"\![a,"b""c]d"]"#), (Text, "e")], Same),
+    case(r#"\![call,ghost,"the ""Name"""]"#, &[(Tag, r#"\![call,ghost,"the ""Name"""]"#)], Same),
+    case(r#"\q["abc,OnX]y"#, &[(Tag, r"\q"), (Text, r#"["abc,OnX]y"#)], Same),
+    case(r#"\![a,"b""]"#, &[(Tag, r"\!"), (Text, r#"[a,"b""]"#)], Same),
     // `\_?` と `\_!` の混在（同じ印でだけ閉じる）
-    case(r"\_?a\_!b\_?", &[(Literal, r"\_?a\_!b\_?")], Same, CHG),
-    case(r"\_!a\_?b\_!c", &[(Literal, r"\_!a\_?b\_!"), (Text, "c")], Same, CHG),
+    case(r"\_?a\_!b\_?", &[(Literal, r"\_?a\_!b\_?")], Same),
+    case(r"\_!a\_?b\_!c", &[(Literal, r"\_!a\_?b\_!"), (Text, "c")], Same),
     // エスケープ
-    case(r"C:\\new", &[(Text, "C:"), (Escape, r"\\"), (Text, "new")], Same, KEEP),
-    case(r"100\%です", &[(Text, "100"), (Escape, r"\%"), (Text, "です")], Same, CHG),
-    case(r"\\s[0]", &[(Escape, r"\\"), (Text, "s[0]")], Same, KEEP),
-    case(r"\\\s[0]", &[(Escape, r"\\"), (Tag, r"\s[0]")], Same, KEEP),
+    case(r"C:\\new", &[(Text, "C:"), (Escape, r"\\"), (Text, "new")], Same),
+    case(r"100\%です", &[(Text, "100"), (Escape, r"\%"), (Text, "です")], Same),
+    case(r"\\s[0]", &[(Escape, r"\\"), (Text, "s[0]")], Same),
+    case(r"\\\s[0]", &[(Escape, r"\\"), (Tag, r"\s[0]")], Same),
     // 既存のタグ列
     case(
         r"\h\s[0]\_w[500]\![open,inputbox]\-\+\*\_?\&[ID]\n\w8\e",
@@ -113,7 +97,6 @@ const CASES: &[Case] = &[
             (Tag, r"\n"), (Tag, r"\w8"), (Tag, r"\e"),
         ],
         Same,
-        KEEP,
     ),
 ];
 
@@ -139,16 +122,11 @@ fn expected(case: &Case, coarse: impl Fn(K) -> K) -> Units {
     units
 }
 
-/// 表の全事例を 1 つの読み取りに通す。`rewritten` が偽なら「読みが変わる事例」を飛ばす。
+/// 表の全事例を 1 つの読み取りに通す。
 /// `run` は事例ごとに (期待値, 読み取りの結果) を返す（`None` はパースエラー）。
-fn check(reader: &str, rewritten: bool, run: impl Fn(&Case) -> (Option<Units>, Option<Units>)) {
-    let mut skipped = 0;
+fn check(reader: &str, run: impl Fn(&Case) -> (Option<Units>, Option<Units>)) {
     let mut failures = Vec::new();
     for case in CASES {
-        if case.changes && !rewritten {
-            skipped += 1;
-            continue;
-        }
         let (want, got) = run(case);
         if want != got {
             failures.push(format!(
@@ -157,10 +135,6 @@ fn check(reader: &str, rewritten: bool, run: impl Fn(&Case) -> (Option<Units>, O
             ));
         }
     }
-    println!(
-        "conformance[{reader}]: {} run, {skipped} skipped (reading changes)",
-        CASES.len() - skipped
-    );
     assert!(
         failures.is_empty(),
         "conformance[{reader}] mismatches:\n{}",
@@ -172,7 +146,7 @@ fn check(reader: &str, rewritten: bool, run: impl Fn(&Case) -> (Option<Units>, O
 #[test]
 fn conformance_rust_tokenizer() {
     let tokenizer = Tokenizer::new(&TalkConfig::default()).unwrap();
-    check("rust", true, |case| {
+    check("rust", |case| {
         let mut got = Units::new();
         for token in tokenizer.tokenize(case.input) {
             let kind = if token.kind == TokenKind::SakuraScript {
@@ -220,7 +194,7 @@ fn conformance_lua_tag_at() -> LuaResult<()> {
             "#,
         )
         .eval()?;
-    check("lua", true, |case| {
+    check("lua", |case| {
         let mut got = Units::new();
         let out: LuaTable = read.call(case.input).unwrap();
         for unit in out.sequence_values::<LuaTable>() {
@@ -241,7 +215,7 @@ fn conformance_lua_tag_at() -> LuaResult<()> {
 /// DSL: アクション行 1 行をパースし、`SakuraScript` を単位、`Escape` をエスケープ、`Talk` を `Text` として並べる
 #[test]
 fn conformance_dsl_grammar() {
-    check("dsl", false, |case| {
+    check("dsl", |case| {
         let want = match case.dsl {
             Same => Some(expected(case, |k| if k == Literal { Tag } else { k })),
             ParseError => None,
