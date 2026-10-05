@@ -1,7 +1,7 @@
 //! Scope-level code generation: actors, global scenes, local scenes.
 
 use super::LuaCodeGenerator;
-use crate::context::TranspileContext;
+use crate::context::{TranspileContext, local_scene_counters};
 use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
 use pasta_core::registry::SceneRegistry;
@@ -143,7 +143,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Source-map scene recording (task 2.1, Requirements 3.1/3.3): flow the
         // global scene's deterministic join key + `.pasta` header span to the sink
         // so the finalize side (task 2.2) can reconstruct the scene index and join
-        // the runtime identity (e.g. `会話1`).
+        // the runtime identity (e.g. `会話_1`).
         //
         // JOIN-KEY ENCODING (consumed verbatim by task 2.2; keep in sync):
         //   global: "G:{base}#{counter}"
@@ -152,9 +152,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         //   - `base` / `parent_base` = `SceneRegistry::sanitize_name(name)` (NOT
         //     re-sanitized here — reuse the registry rule to avoid format drift,
         //     Requirement 3.3 / design.md:329,350).
-        //   - `counter` / `parent_counter` = the per-base occurrence order
-        //     (`scene_counter`), which equals the runtime `create_scene` per-base
-        //     counter order. This is the key that lets task 2.2 match `会話N`.
+        //   - `counter` / `parent_counter` = the per-base occurrence order within
+        //     this `.pasta` file (`scene_counter`). The join matches it against the
+        //     rank of the runtime `create_scene` counters of the same base within
+        //     the same file (`会話_N`; scene_join.rs).
         //   - `fn_name` = the code_gen-computed local fn name (`{sanitize}_{counter}`
         //     for named locals, `__start__` for the anonymous start scene), reusing
         //     the SAME per-name counter computed below (do not recompute differently).
@@ -174,17 +175,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             self.write_blank_line()?;
         }
 
-        // Generate local scenes with per-name counters
-        // Same-name scenes get incrementing numbers (_1, _2, ...)
-        let mut name_counters: HashMap<String, usize> = HashMap::new();
-        for local_scene in &scene.local_scenes {
-            let counter = if let Some(ref name) = local_scene.name {
-                let count = name_counters.entry(name.clone()).or_insert(0);
-                *count += 1;
-                *count
-            } else {
-                0 // start scene doesn't use counter
-            };
+        // ローカルシーンを照合用の名前ごとの通し番号（_1, _2, ...）で生成する。
+        // トランスパイル時のレジストリの登録と同じ local_scene_counters を使う（2.12）。
+        let counters = local_scene_counters(&scene.local_scenes);
+        for (local_scene, counter) in scene.local_scenes.iter().zip(counters) {
             // Parent reference for the local join key: "{base}#{counter}" identifies
             // the enclosing global occurrence (matches runtime per-base ordering).
             let parent_ref = format!("{}#{}", base_name, scene_counter);
@@ -220,7 +214,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// end
     /// ```
     ///
-    /// The `counter` parameter is the per-name counter (1, 2, 3... for same-name scenes).
+    /// `counter` は照合用の名前ごとの通し番号（`local_scene_counters` の値。1, 2, 3...）。
     /// For start scenes (name is None), counter is ignored.
     ///
     /// Note: Code blocks associated with local scenes are NOT generated here.
@@ -238,8 +232,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         parent_ref: &str,
     ) -> Result<(), TranspileError> {
         let fn_name = if let Some(ref name) = scene.name {
-            let sanitized = SceneRegistry::sanitize_name(name);
-            format!("{}_{}", sanitized, counter)
+            SceneRegistry::registered_name(name, counter)
         } else {
             "__start__".to_string()
         };

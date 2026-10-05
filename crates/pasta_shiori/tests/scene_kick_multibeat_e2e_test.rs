@@ -193,7 +193,8 @@ fn kick_multibeat_scene_delivers_one_beat_per_tick_in_order_end_to_end() {
     // --- フェーズ 3: 実 sink（lifecycle::kick_sink）でマルチビートシーンをキック注入 ---
     let sink = pasta::actor::lifecycle::kick_sink();
     sink(KickRequest {
-        scene: KICK_SCENE.to_string(),
+        // キックはシーン表の登録名に完全一致で引く（作者名・`_`・通し番号 `1` が登録名）。
+        scene: format!("{KICK_SCENE}_1"),
     });
 
     // --- フェーズ 4: tick 1 — 初回ビートが割り込み配信される（talking でも kick_force 突破） ---

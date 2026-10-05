@@ -97,14 +97,14 @@ fn transpile_step_fixture(file: &Path) -> String {
     String::from_utf8(out).expect("generated lua is valid utf-8")
 }
 
-/// `SCENE.get_start("あいさつ1")` を最小 act で駆動し、talk 本体（複数 `.lua` 行）を実行させる
+/// `SCENE.get_start("あいさつ_1")` を最小 act で駆動し、talk 本体（複数 `.lua` 行）を実行させる
 /// ドライバ。生成 `.lua` を `exec_named` で**定義**した後にこれを `exec` する（BP は定義実行では
 /// 張られておらず、本ドライバ実行中の talk 本体行ではじめてヒットする）。`さくら` アクターは
 /// `talk` がトークンへ格納するだけなので任意の非 nil 値でよい。
 const STEP_DRIVER: &str = r#"
     local SCENE = require("pasta.scene")
     local ACT = require("pasta.act")
-    local start = SCENE.get_start("あいさつ1")
+    local start = SCENE.get_start("あいさつ_1")
     if not start then error("scene entrypoint must be registered") end
     local act = ACT.new({ ["さくら"] = { name = "さくら" } })
     start(act)

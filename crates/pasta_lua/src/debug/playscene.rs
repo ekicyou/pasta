@@ -14,7 +14,7 @@
 //! 2. **解決**: ロード済み索引（`SourceMap::scene_at`）で `(scene_id, parent)` を確定。
 //!    包含（最内 local 優先）＞後方フォールバック＞未検出（[`SceneIdentityIndex`] が担う）。
 //! 3. **取次**: 確定時は composite-string 方式で `KickRequest.scene` を組み（global →
-//!    `会話1`、local → `:会話1:挨拶_1`）、`KickSink` を fire-and-forget で呼ぶ。
+//!    `会話_1`、local → `:会話_1:挨拶_1`）、`KickSink` を fire-and-forget で呼ぶ。
 //!    `KickRequest{scene:String}` 契約は不変（pasta_shiori 無改修・design「3.1 への波及」）。
 //!    未検出時は sink を呼ばず [`ResolveOutcome::NotFound`] を返す（caller=task 4.1 が
 //!    理由付きエラー応答へ変換する）。
@@ -39,7 +39,7 @@ use super::source_map::SourceMap;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResolveOutcome {
     /// 確定: `KickSink` を呼び済み。載せた `KickRequest.scene` 文字列を保持する
-    /// （global → `会話1`、local → `:会話1:挨拶_1`）。
+    /// （global → `会話_1`、local → `:会話_1:挨拶_1`）。
     Resolved(String),
     /// 未検出: sink は呼んでいない（caller がエラー応答に変換する）。
     NotFound,
@@ -48,8 +48,8 @@ pub enum ResolveOutcome {
 /// 確定 `(scene_id, parent)` から `KickRequest.scene` の search-key 文字列を組む
 /// （composite-string 方式・design「3.1 への波及」）。
 ///
-/// - global（`parent = None`）→ `scene_id` をそのまま（例 `会話1`）。
-/// - local（`parent = Some(p)`）→ `:{p}:{scene_id}`（例 `:会話1:挨拶_1`）。
+/// - global（`parent = None`）→ `scene_id` をそのまま（例 `会話_1`）。
+/// - local（`parent = Some(p)`）→ `:{p}:{scene_id}`（例 `:会話_1:挨拶_1`）。
 ///
 /// `:` 接頭辞は kick.lua `try_dispatch` が local-composite として分解する目印。global
 /// 実名は `SceneRegistry::sanitize_name` により `:` を決して含まないため衝突しない。

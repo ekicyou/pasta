@@ -91,7 +91,7 @@ TCP 127.0.0.1:<port> ── DAP クライアント（1 接続だけ）
 | 型 | `crates/pasta_lua/src/debug/types.rs` | `SessionCommand`・`SessionEvent`・`Breakpoint`・`FrameInfo`・`Variable`・`ThreadId` など、チャネルを渡る `Send` な型 |
 | ソースマップ | `crates/pasta_lua/src/debug/source_map/mod.rs` | `MapBuilderSink`・`ChunkSourceMap`・`SourceMap`・`canonicalize_chunk_name` |
 | シーン identity 索引 | `crates/pasta_lua/src/debug/source_map/scene_index.rs` | `.pasta` の（ファイル, 行）から `(scene_id, parent)` を引く `SceneIdentityIndex` |
-| シーンの突合 | `crates/pasta_lua/src/debug/source_map/scene_join.rs` | `build_scene_index`。トランスパイル時の記録と実行時のシーン名を突き合わせる |
+| シーンの突合 | `crates/pasta_lua/src/debug/source_map/scene_join.rs` | `build_scene_index`。トランスパイル時の記録と実行時の登録名を、定義元の `.pasta` ファイルごとに突き合わせる（`join_records`・`rank_globals`） |
 | サイドカー | `crates/pasta_lua/src/debug/source_map/sidecar.rs` | `write_sidecar`・`read_sidecar`・`SidecarFile` |
 | 位置の解決 | `crates/pasta_lua/src/debug/playscene.rs` | `resolve_and_kick`・`uri_to_pasta_path` |
 | `KickSink` | `crates/pasta_lua/src/debug/kick.rs` | `KickRequest { scene }` と、外側のホストが注入するクロージャの型 |
@@ -343,10 +343,12 @@ build_source_map_inner
 
 #### シーン identity 索引
 
-位置からのキックは、`.pasta` の（ファイル, 行）を、実行時のシーンの名前（`(scene_id, parent)`）に引く必要がある。実行時のシーン名は辞書確定（`finalize_scene`）で連番が付いて決まるため、トランスパイル時には決まらない。そこで、トランスパイル時に再現できる突合キーを記録し、辞書確定の後に突き合わせる。
+位置からのキックは、`.pasta` の（ファイル, 行）を、実行時のシーンの登録名（`(scene_id, parent)`）に引く必要がある。グローバルシーンの登録名は、照合用の名前（`sanitize_name` した名前）・`_`・通し番号からなる（`会話_1`。[シーンテーブル](internal-modules.md#シーンテーブル)）。通し番号はシーンモジュールの読み込み時に `create_scene` が全ファイルを通して振るため、1 つの `.pasta` ファイルのトランスパイルだけでは決まらない。そこで、トランスパイル時に再現できる突合キーを記録し、辞書確定の後に突き合わせる。
 
-- 生成器は `record_scene` で、グローバルシーンを `G:{サニタイズした名前}#{出現順}`、名前付きローカルシーンを `L:{親のサニタイズした名前}#{親の出現順}:{関数名}` として記録する（関数名は `挨拶_1` の形、または `__start__`）。出現順はサニタイズした名前ごとの順で、実行時の連番と一致する。
-- ランタイムの構築の最後（`scene_dic` の `require` の後）に、`build_scene_index` が `collect_scenes` で実行時の `(グローバル名, ローカル名)`（`(会話1, 挨拶_1)` の形）を集める。グローバル名は末尾の ASCII 数字を連番として名前と分け（`split_runtime_global`）、`G:` の記録と突き合わせる。`L:` の記録は、親を同じ方法で実行時のグローバル名にし、その配下に同じ関数名のローカルシーンがあるときだけ採る。`__start__` の記録は索引に入れない（グローバルシーンの本体の範囲はグローバルの項目が覆う）。突き合わなかった記録も索引に入れない。
+- 生成器は `record_scene` で、グローバルシーンを `G:{サニタイズした名前}#{出現順}`、名前付きローカルシーンを `L:{親のサニタイズした名前}#{親の出現順}:{関数名}` として記録する（関数名は生成コードの関数名と同じ `挨拶_1` の形の登録名、または `__start__`）。出現順は、その `.pasta` ファイルの中でのサニタイズした名前ごとの順（ファイルごとに 1 から）であり、実行時の通し番号とは一致しない。
+- ランタイムの構築の最後（`scene_dic` の `require` の後）に、`build_scene_index`（`crates/pasta_lua/src/debug/source_map/scene_join.rs`）が `get_all_scenes()` のシーン表を 1 度走査し、グローバルシーンの登録名ごとに、配下の関数名（`__start__`・`挨拶_1` など）と定義元の `.pasta` ファイルを集める。定義元は、シーンテーブルの関数（`__start__` を優先し、無ければ任意の関数）の `Function::info().source`（チャンク名）を `SourceMap::pasta_file_for_chunk` で引いたものである。引けないシーン（利用者の `.lua` で作ったシーン、関数を 1 つも持たないシーン）は突き合わせの対象にしない。
+- 突き合わせ（`join_records`）は定義元の `.pasta` ファイルごとに行う。`rank_globals` が、そのファイルの登録名を `SceneRegistry::split_registered_name` で（照合用の名前, 通し番号）に分け、名前ごとに通し番号の昇順で 1 から順位を振る。分けられない登録名は対象にしない。`G:{名前}#{k}` の記録は、そのファイルの `名前` の k 番目の登録名（たとえば `会話_3`）に突き合わせる。ファイルの中の定義順と実行時の通し番号の大小が一致することだけを使い、ファイルの読み込み順には頼らない。そのため、複数の `.pasta` ファイルに同名のグローバルシーンがあっても、2 つ目のファイルの記録が 1 つ目のファイルのシーンに突き合うことはない。登録名を分けるのは `split_registered_name` だけであり、`＊章` の 11 個目（`章_11`）と `＊章11` の 1 つ目（`章11_1`）は（`章`, 11）と（`章11`, 1）に分かれて取り違えない。
+- `L:` の記録は、親を同じ方法でそのファイルの登録名にし、その配下に同じ関数名のローカルシーンがあるときだけ採る。`__start__` の記録は索引に入れない（グローバルシーンの本体の範囲はグローバルの項目が覆う）。k 番目の登録名が無い記録など、突き合わなかった記録も索引に入れない。
 - 各シーンの範囲は、同じファイルの宣言行の昇順で「次の同レベル以上の宣言の前の行」まで（無ければファイルの末尾まで）とし、`SourceMap::set_scene_index` で書き込む。突合の失敗は警告だけで、起動は続く。
 
 `SceneIdentityIndex::scene_at(ファイル, 行)` は次の順で解決する。
@@ -365,8 +367,8 @@ resolve_and_kick(map, sink, uri, line)
                     → 先頭の /c: の / を除く → std::path::absolute（canonicalize は使わない）
  map.scene_at(パス, line)
    見つかった → KickRequest.scene を組む
-                  グローバル: scene_id（例 会話1）
-                  ローカル:   :parent:scene_id（例 :会話1:挨拶_1）
+                  グローバル: scene_id（例 会話_1）
+                  ローカル:   :parent:scene_id（例 :会話_1:挨拶_1）
                 → sink(KickRequest) を呼ぶ（結果を待たない）→ 成功の応答
    見つからない → sink を呼ばずにエラーの応答
 ```
@@ -391,14 +393,16 @@ KICK.try_dispatch(act)
  2. kick_pending を nil にする（解決できてもできなくても再発火させない）
  3. RELOAD_SENTINEL と完全一致なら、act:raw_script("\![reload,shiori]") と act:build() を行う
     コルーチンを返す（シーンは探さない）
- 4. ^:([^:]+):(.+)$ に一致すれば（ローカルの合成名）
-      SCENE.search(ローカル名, 親) の関数を、build を最後に呼ぶ関数で包んでコルーチンにする
-    一致しなければ（グローバル）
-      SCENE.co_exec(act, シーン名)
- 5. コルーチンが作れなければ log.warn（seam=kick.unresolved）を出して nil
+ 4. シーン表（STORE.scenes）から完全一致で引く
+    ^:([^:]+):(.+)$ に一致すれば（ローカルの合成名）
+      SCENE.get(親の登録名, ローカルの登録名)
+    一致しなければ（グローバルの登録名）
+      SCENE.get_start(シーン名)
+    得た値が関数なら、build を最後に呼ぶ関数で包んでコルーチンにする
+ 5. 関数が得られなければ log.warn（seam=kick.unresolved）を出して nil
 ```
 
-ローカルの合成名を `SCENE.co_exec` に渡さないのは、`co_exec` の検索（`act:find_scene`）が親のグローバル名を使わず、第 2 引数なしの検索ではローカル名が `__start__` になるためである。返したコルーチンは `EVENT.fire` が再開して応答にし、`STORE.co_scene` を置き換える。SHIORI リロードの場合は、その応答のさくらスクリプトでベースウェアが SHIORI を読み込み直し、`unload` でランタイムと `DebugHandle` が破棄されてポートが解放され、次の `load` で新しいバックエンドが同じポートを bind する。
+キックの解決は、シーン表のキーとの完全一致である。`act:find_scene`・`SCENE.search`・`SCENE.co_exec` を通らないため、ACT の検索の各段（ACT のメソッド・`GLOBAL` の関数・前方一致）は使わず、シーン表のシーンだけを再生する。前方一致を使わないので、`会話_1` のキックが `会話_10` を、`:会話_1:挨拶_1` のキックが `挨拶_10` を再生することはない。引数の `act` は解決に使わない。返したコルーチンは `EVENT.fire` が再開して応答にし、`STORE.co_scene` を置き換える。SHIORI リロードの場合は、その応答のさくらスクリプトでベースウェアが SHIORI を読み込み直し、`unload` でランタイムと `DebugHandle` が破棄されてポートが解放され、次の `load` で新しいバックエンドが同じポートを bind する。
 
 ## 境界の受け渡し
 

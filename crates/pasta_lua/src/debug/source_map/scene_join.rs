@@ -1,7 +1,7 @@
 //! finalize シーン突合（task 2.2・requirements 3.1/3.2/3.3/7.1）。
 //!
 //! ビルド側が蓄積した `(join_key, .pasta 宣言行)` 記録（[`super::SourceMap::scene_records`]）
-//! と、ランタイム実シーン識別子（`collect_scenes` の `(global_name, local_name)`）を、
+//! と、ランタイム実シーン識別子（シーン表の登録名を定義元 `.pasta` ファイルごとに分けたもの）を、
 //! **同一の突合キー**で突き合わせ、`.pasta` (ファイル, 行範囲) → (scene_id, parent) の
 //! [`SceneIdentityIndex`] を確定する。
 //!
@@ -11,22 +11,27 @@
 //! - local:  `L:{parent_base}#{parent_counter}:{fn_name}`（例 `L:会話#1:挨拶_1`）
 //!
 //! `base`/`parent_base` = `SceneRegistry::sanitize_name(name)`、`counter`/`parent_counter`
-//! = per-base 出現順（= ランタイム `create_scene` 連番）。`fn_name` = `{sanitize}_{counter}`
-//! または `__start__`。
+//! = その `.pasta` ファイルの中での per-base 出現順（ファイルごとに 1 から）。`fn_name` =
+//! `{sanitize}_{counter}` または `__start__`。
 //!
 //! # runtime identity（SSOT）
 //!
-//! `collect_scenes` が返す `(global_name, local_name)`（例 `(会話1, 挨拶_1)`）が
-//! 解決対象の SSOT。global_name は counter 連結形（`会話1`・アンダースコア無し）。
-//! `SceneRegistry` の別形式（`会話_1`）は SSOT にしない（task 2.2 / kick 決定）。
+//! シーン表（`STORE.scenes`）の登録名 `{名前}_{通し番号}`（例 `会話_1`）と、その配下の
+//! 関数名（例 `挨拶_1`）が解決対象の SSOT。実行時の通し番号は全ファイルを通して数える
+//! ため、記録の `counter` とは一致しない（scene-identity-format・4.5）。
 //!
-//! # join（global / local）
+//! # join（定義元ファイルごと・順位）
 //!
-//! 1. runtime global_name `会話1` を **(base, counter)** へ分解（末尾連番を剥がす）。
-//!    `G:会話#1` の (base=会話, counter=1) と突合 → scene_id=会話1, parent=None, level=0。
-//! 2. local join_key `L:会話#1:挨拶_1` の親参照 `会話#1` を runtime global `会話1` へ
-//!    対応付け、`collect_scenes` の `(会話1, 挨拶_1)` と fn_name 一致で突合 →
-//!    scene_id=挨拶_1, parent=会話1, level=1。
+//! 1. 実行時のグローバルシーンを、シーン表の関数（`__start__` を優先し、無ければ任意の
+//!    関数）の定義元チャンク（`Function::info().source`）から
+//!    [`SourceMap::pasta_file_for_chunk`] で `.pasta` ファイルに分ける。引けないシーン
+//!    （利用者の `.lua` で作ったシーン・関数を持たないシーン）は対象にしない。
+//! 2. ファイルの中で登録名を `SceneRegistry::split_registered_name` で（名前, 通し番号）に
+//!    分け、名前ごとに通し番号の昇順に並べる。`G:会話#k` は、そのファイルの `会話` の
+//!    k 番目の登録名（例 `会話_3`）へ突合 → scene_id=会話_3, parent=None, level=0。
+//!    k 番目が無い記録・分けられない登録名は索引へ入れない。
+//! 3. local join_key `L:会話#k:挨拶_1` は親を 2. と同じ方法で登録名にし、その配下に
+//!    `挨拶_1` があるときだけ採る → scene_id=挨拶_1, parent=会話_3, level=1。
 //!
 //! # end_line + level（builder 側算出）
 //!
@@ -37,10 +42,10 @@
 
 use std::collections::HashMap;
 
-use mlua::Lua;
+use mlua::{Function, Lua, Table, Value};
+use pasta_core::registry::SceneRegistry;
 
 use super::{SceneIdentityIndex, SourceMap};
-use crate::runtime::finalize::collect_scenes;
 
 /// 1 シーン記録のパース結果（join 用の中間表現）。
 struct ParsedRecord {
@@ -54,59 +59,81 @@ struct ParsedRecord {
     parent: Option<String>,
 }
 
-/// runtime global_name `会話1` を `(base, counter)` へ分解する。
-///
-/// 末尾の連続する ASCII 数字を counter とし、その手前を base とする（`会話1` →
-/// `("会話", 1)`、`メイン12` → `("メイン", 12)`）。末尾が数字でなければ `None`。
-/// base は非空でなければならない（純数字名は想定外として `None`）。
-fn split_runtime_global(global_name: &str) -> Option<(&str, u32)> {
-    let digits_start = global_name
-        .char_indices()
-        .rev()
-        .take_while(|(_, c)| c.is_ascii_digit())
-        .last()
-        .map(|(i, _)| i)?;
-    let (base, digits) = global_name.split_at(digits_start);
-    if base.is_empty() {
-        return None;
-    }
-    let counter: u32 = digits.parse().ok()?;
-    Some((base, counter))
-}
-
 /// finalize 後に呼び、runtime 実 identity と蓄積記録を突合して [`SceneIdentityIndex`] を
 /// 構築する（task 2.2 のコア）。
 ///
-/// 突合できなかった記録（runtime に対応 identity が無い等）は索引へ入れない（誤解決防止）。
-/// `collect_scenes` が空でも空索引を返す（`scene_at` は常に未検出）。
+/// シーン表から（登録名 → 定義元 `.pasta` ファイル）と（登録名 → 配下の関数名）を集め、
+/// [`join_records`] で突き合わせる。シーン表が空でも空索引を返す（`scene_at` は常に未検出）。
 pub(crate) fn build_scene_index(
     lua: &Lua,
     source_map: &SourceMap,
 ) -> mlua::Result<SceneIdentityIndex> {
-    // runtime 実シーン: (global_name, local_name) の列。
-    let runtime_scenes = collect_scenes(lua)?;
+    // SAFETY(injection): モジュール名はコンパイル時の文字列リテラル（collect_scenes と同じ）。
+    let scene_module: Table = lua.load("return require('pasta.scene')").eval()?;
+    let get_all_scenes: Function = scene_module.get("get_all_scenes")?;
+    let registry: Table = get_all_scenes.call(())?;
 
-    // (base, counter) → runtime global_name（例 (会話,1) → 会話1）。
-    let mut global_by_base_counter: HashMap<(String, u32), String> = HashMap::new();
-    // global_name → set of local_name（例 会話1 → {__start__, 挨拶_1}）。
+    // 定義元 `.pasta` ファイル → そのファイルの実行時グローバル登録名。
+    let mut globals_by_file: HashMap<String, Vec<String>> = HashMap::new();
+    // global_name → local_name の列（例 会話_1 → {__start__, 挨拶_1}）。
     let mut locals_by_global: HashMap<String, Vec<String>> = HashMap::new();
-    for (global_name, local_name) in &runtime_scenes {
-        if let Some((base, counter)) = split_runtime_global(global_name) {
-            global_by_base_counter
-                .entry((base.to_string(), counter))
-                .or_insert_with(|| global_name.clone());
+    for pair in registry.pairs::<String, Table>() {
+        let (global_name, scene_table) = pair?;
+        let mut locals = Vec::new();
+        // 定義元を引く関数: `__start__` を優先し、無ければ任意の関数。
+        let mut probe: Option<Function> = None;
+        for entry in scene_table.pairs::<String, Value>() {
+            let (local_name, value) = entry?;
+            if local_name == "__global_name__" {
+                continue;
+            }
+            if let Value::Function(f) = value
+                && (probe.is_none() || local_name == "__start__")
+            {
+                probe = Some(f);
+            }
+            locals.push(local_name);
         }
-        locals_by_global
-            .entry(global_name.clone())
-            .or_default()
-            .push(local_name.clone());
+        let pasta_file = probe
+            .and_then(|f| f.info().source)
+            .and_then(|chunk| source_map.pasta_file_for_chunk(&chunk));
+        if let Some(pasta_file) = pasta_file {
+            globals_by_file
+                .entry(pasta_file.to_string())
+                .or_default()
+                .push(global_name.clone());
+        }
+        locals_by_global.insert(global_name, locals);
     }
 
+    Ok(join_records(
+        source_map.scene_records(),
+        &globals_by_file,
+        &locals_by_global,
+    ))
+}
+
+/// 記録（`.pasta` ファイル → `(join_key, 宣言行)`）と、ファイルごとの実行時グローバル
+/// 登録名・グローバル配下の関数名を突き合わせて索引を作る（Lua に依存しない純関数）。
+///
+/// 突合できなかった記録（そのファイルの実行時に対応する登録名が無い等）は索引へ入れない
+/// （誤解決防止）。
+fn join_records(
+    scene_records: &HashMap<String, Vec<(String, u32)>>,
+    globals_by_file: &HashMap<String, Vec<String>>,
+    locals_by_global: &HashMap<String, Vec<String>>,
+) -> SceneIdentityIndex {
     let mut builder = SceneIdentityIndex::builder();
 
-    for (pasta_file, records) in source_map.scene_records() {
+    for (pasta_file, records) in scene_records {
         // このファイルは（シーンが空でも）索引に存在させる（未検出を正しく返すため）。
         builder.insert_file(pasta_file);
+
+        // (base, 順位) → このファイルの実行時グローバル登録名。
+        let globals = globals_by_file
+            .get(pasta_file)
+            .map(|names| rank_globals(names))
+            .unwrap_or_default();
 
         // 各記録をパース＋突合し、(start_line, level, scene_id, parent) を集める。
         let mut parsed: Vec<ParsedRecord> = Vec::with_capacity(records.len());
@@ -114,8 +141,8 @@ pub(crate) fn build_scene_index(
             parsed.push(parse_and_join(
                 join_key,
                 *start_line,
-                &global_by_base_counter,
-                &locals_by_global,
+                &globals,
+                locals_by_global,
             ));
         }
 
@@ -155,21 +182,20 @@ pub(crate) fn build_scene_index(
         }
     }
 
-    Ok(builder.finish())
+    builder.finish()
 }
 
 /// 1 つの `(join_key, start_line)` を level/scene_id/parent へパース＋突合する。
 fn parse_and_join(
     join_key: &str,
     start_line: u32,
-    global_by_base_counter: &HashMap<(String, u32), String>,
+    globals: &HashMap<(String, usize), String>,
     locals_by_global: &HashMap<String, Vec<String>>,
 ) -> ParsedRecord {
     if let Some(rest) = join_key.strip_prefix("G:") {
         // global: "G:{base}#{counter}"
         let (base, counter) = parse_base_counter(rest);
-        let scene_id =
-            counter.and_then(|c| global_by_base_counter.get(&(base.to_string(), c)).cloned());
+        let scene_id = counter.and_then(|c| globals.get(&(base.to_string(), c)).cloned());
         ParsedRecord {
             level: 0,
             start_line,
@@ -184,14 +210,13 @@ fn parse_and_join(
             None => (rest, ""),
         };
         let (pbase, pcounter) = parse_base_counter(parent_ref);
-        let parent =
-            pcounter.and_then(|c| global_by_base_counter.get(&(pbase.to_string(), c)).cloned());
+        let parent = pcounter.and_then(|c| globals.get(&(pbase.to_string(), c)).cloned());
 
         // `__start__` はグローバル本体そのもの（無名 start シーン）であり、その宣言行は
         // グローバルヘッダ行と一致する。索引には **別 level-1 エントリとして入れない**:
-        // グローバル本体領域へのクリックはグローバル identity `(会話1, None)` へ解決され、
-        // global kick（parent=None・global 分岐 `SCENE.search(name, nil)` が `__start__`
-        // を強制）でちょうど `__start__` が再生される（kick 決定ノート）。よって
+        // グローバル本体領域へのクリックはグローバル identity `(会話_1, None)` へ解決され、
+        // global kick（parent=None・global 分岐がシーン表から開始関数 `__start__`
+        // を引く）でちょうど `__start__` が再生される（kick 決定ノート）。よって
         // `__start__` を level-1 で持つとグローバル領域が誤って local 扱いされる。
         if fn_name == "__start__" {
             return ParsedRecord {
@@ -228,11 +253,33 @@ fn parse_and_join(
     }
 }
 
+/// 1 ファイルの実行時グローバル登録名を `(名前, 順位)` → 登録名にする。
+///
+/// 登録名は `SceneRegistry::split_registered_name` だけで分ける（末尾の数字を推測しない）。
+/// 分けられない名前は入れない。順位は名前ごとの通し番号の昇順で 1 から数える
+/// （ファイルの中の定義順と実行時の通し番号の大小が一致することだけを使う）。
+fn rank_globals(registered: &[String]) -> HashMap<(String, usize), String> {
+    let mut by_name: HashMap<&str, Vec<(usize, &String)>> = HashMap::new();
+    for name in registered {
+        if let (base, Some(counter)) = SceneRegistry::split_registered_name(name) {
+            by_name.entry(base).or_default().push((counter, name));
+        }
+    }
+    let mut ranked = HashMap::new();
+    for (base, mut list) in by_name {
+        list.sort();
+        for (rank, (_, name)) in list.into_iter().enumerate() {
+            ranked.insert((base.to_string(), rank + 1), name.clone());
+        }
+    }
+    ranked
+}
+
 /// `"{base}#{counter}"` を `(base, Some(counter))` へ分解する。`#` が無い／counter が
 /// 数値でないときは `(全体, None)`。
-fn parse_base_counter(s: &str) -> (&str, Option<u32>) {
+fn parse_base_counter(s: &str) -> (&str, Option<usize>) {
     match s.rsplit_once('#') {
-        Some((base, num)) => (base, num.parse::<u32>().ok()),
+        Some((base, num)) => (base, num.parse::<usize>().ok()),
         None => (s, None),
     }
 }

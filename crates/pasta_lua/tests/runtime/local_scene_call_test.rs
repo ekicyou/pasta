@@ -40,7 +40,7 @@ fn test_local_scene_call_simple() {
         .load(
             r#"
         local SCENE = require "pasta.scene"
-        local gn = SCENE.get_global_table("テスト1").__global_name__
+        local gn = SCENE.get_global_table("テスト_1").__global_name__
         local result = SCENE.search("サブシーン", gn)
         return result ~= nil and type(result.func) == "function"
     "#,
@@ -84,7 +84,7 @@ fn test_local_scene_call_duplicate_random_selection() {
         .load(
             r#"
         local SCENE = require "pasta.scene"
-        local gn = SCENE.get_global_table("テスト1").__global_name__
+        local gn = SCENE.get_global_table("テスト_1").__global_name__
         for i = 1, 10 do
             local result = SCENE.search("Head0", gn)
             if result == nil or type(result.func) ~= "function" then
@@ -133,7 +133,7 @@ fn test_local_scene_call_prefix_match() {
         .load(
             r#"
         local SCENE = require "pasta.scene"
-        local gn = SCENE.get_global_table("テスト1").__global_name__
+        local gn = SCENE.get_global_table("テスト_1").__global_name__
         local result = SCENE.search("Head", gn)
         if result == nil then
             return false

@@ -101,7 +101,7 @@ end
 --- シーンを登録し、グローバルシーンテーブルを返す
 ---
 --- カウンタ管理を使用してベース名から一意なグローバルシーン名を生成する。
---- 例: create_scene("メイン") → "メイン1", 2回目 → "メイン2"
+--- 例: create_scene("メイン") → "メイン_1", 2回目 → "メイン_2"
 ---
 --- @param base_name string ベース名（シーン名のベース）
 --- @param local_name string|nil ローカルシーン名（シーン関数名）
@@ -110,7 +110,7 @@ end
 function MOD.create_scene(base_name, local_name, scene_func)
     -- カウンタからグローバルシーン名を生成
     local counter = MOD.get_or_increment_counter(base_name)
-    local global_name = base_name .. counter
+    local global_name = base_name .. "_" .. counter
 
     if scene_func and local_name then
         MOD.register(global_name, local_name, scene_func)

@@ -140,13 +140,13 @@ fn test_scene_collection_local_scene_search() {
         .unwrap();
 
     // Search for local scene "グローバル単語呼び出し" within parent "メイン"
-    // Note: PASTA.create_scene("メイン") generates global_name "メイン1"
+    // Note: PASTA.create_scene("メイン") generates global_name "メイン_1"
     let result: (String, String) = lua
         .load(
             r#"
         local SEARCH = require "@pasta_search"
         local SCENE = require "pasta.scene"
-        local gn = SCENE.get_global_table("メイン1").__global_name__
+        local gn = SCENE.get_global_table("メイン_1").__global_name__
         return SEARCH:search_scene("グローバル単語呼び出し", gn)
     "#,
         )
@@ -182,13 +182,13 @@ fn test_scene_collection_local_scene_prefix_search() {
         .unwrap();
 
     // Prefix search "会話分岐" should find one of the local scenes (会話分岐_1 or 会話分岐_2)
-    // Note: PASTA.create_scene("メイン") generates global_name "メイン1"
+    // Note: PASTA.create_scene("メイン") generates global_name "メイン_1"
     let result: (String, String) = lua
         .load(
             r#"
         local SEARCH = require "@pasta_search"
         local SCENE = require "pasta.scene"
-        local gn = SCENE.get_global_table("メイン1").__global_name__
+        local gn = SCENE.get_global_table("メイン_1").__global_name__
         return SEARCH:search_scene("会話分岐", gn)
     "#,
         )

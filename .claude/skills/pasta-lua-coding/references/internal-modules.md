@@ -234,8 +234,8 @@ local SCENE = require("pasta.scene")
 
 ```text
 STORE.scenes = {
-  ["メイン1"] = {                         -- シーンテーブル
-    __global_name__ = "メイン1",
+  ["メイン_1"] = {                        -- シーンテーブル
+    __global_name__ = "メイン_1",
     __start__        = function(act, ...) … end,   -- グローバルシーンの本体
     ["選択肢_1"]     = function(act, ...) … end,   -- ローカルシーン
     -- メタテーブル: __index = SCENE_TABLE_IMPL（create_word を持つ）
@@ -243,7 +243,9 @@ STORE.scenes = {
 }
 ```
 
-- グローバルシーン名は、トランスパイラが渡す基本名（サニタイズ済みのシーン名）に、`create_scene` が振った番号を区切り無しで付けたものである（`メイン` → `メイン1`）。
+- グローバルシーン名（登録名）は、照合用の名前・区切りの `_`・通し番号の 3 つからなる（`base_name .. "_" .. 番号`）。照合用の名前はトランスパイラが渡す基本名（`sanitize_name` でサニタイズ済みのシーン名）で、通し番号は `create_scene` が照合用の名前ごとに 1 から振った番号である（1 つ目の `＊メイン` は `メイン_1`、1 つ目の `＊会話・朝` は `会話_朝_1`）。区切りがあるため、`＊A1` の 1 つ目（`A1_1`）と `＊A` の 11 個目（`A_11`）は別の登録名になる。Rust 側で同じ形を作るのは `pasta_core` の `SceneRegistry::registered_name` である。
+- ローカルシーンのキー（生成コードの関数名）も同じ形の登録名である。照合用の名前は `・` の後に書いたローカルシーン名をサニタイズしたもので、通し番号は同じグローバルシーンの中で照合用の名前ごとに 1 から数える（`・選択肢` の 1 つ目は `選択肢_1`。`・挨拶・1` と `・挨拶_1` はどちらも照合用の名前が `挨拶_1` なので `挨拶_1_1`・`挨拶_1_2`）。無名の開始シーンは `__start__` である。
+- 登録名を（名前, 通し番号）に分けるのは Rust の `SceneRegistry::split_registered_name` だけであり、Lua 側には分ける関数は無い。最後の `_` の後ろが 1 文字以上の半角数字（`0`〜`9`）で、`_` の前が空でないときだけ分ける（`会話_朝_1` → （`会話_朝`, 1））。それ以外（`__start__`・`加算ループ`・`_1`・全角数字で終わる名前・`usize` に収まらない数字列）は分けず、名前の全体を通し番号なしとして扱う。Lua ブロックで直接定義した関数も同じ規則で分けるため、`step_2` は（`step`, 2）になる。分けた結果を使うのは、検索キーの作成（[検索キーの形式](https://ekicyou.github.io/pasta/internals/registry-search.html#検索キーの形式)）、辞書確定の登録順（[辞書確定](https://ekicyou.github.io/pasta/internals/registry-search.html#辞書確定)）、デバッガの突き合わせ（[シーン identity 索引](https://ekicyou.github.io/pasta/internals/debug.html#シーン-identity-索引)）である。
 - `__global_name__` 以外のキーはすべてシーン関数として扱われ、辞書確定で `(グローバルシーン名, キー)` の組として集められる（[finalize_scene](#finalize_scene)）。
 - メタテーブルの `__index` が `SCENE_TABLE_IMPL` を指すため、`scene:create_word(キー)` は `WORD.create_local(scene.__global_name__, キー)` のビルダーを返す。生成コードの `SCENE:create_word(キー):entry(値, …)` がこれを使う。通常の添字参照（ACT の L1 の完全一致を含む）でも、キー `create_word` はこのメソッドに一致する。動的参照の L1 は `rawget` で引くため、シーンテーブル自身のキー（`__global_name__` とシーン関数）だけが対象になり、`create_word` には一致しない。
 
@@ -251,7 +253,7 @@ STORE.scenes = {
 
 | 関数 | 内容 |
 | ---- | ---- |
-| `create_scene(base_name, local_name, scene_func)` | `get_or_increment_counter(base_name)` で番号を得て、グローバルシーン名 `base_name .. 番号` を作る。`local_name` と `scene_func` が両方あれば `register` で登録する。そのグローバルシーン名のシーンテーブルを（無ければ作って）返す。`pasta` の `create_scene` はこの関数そのもの |
+| `create_scene(base_name, local_name, scene_func)` | `get_or_increment_counter(base_name)` で番号を得て、グローバルシーン名 `base_name .. "_" .. 番号` を作る。`local_name` と `scene_func` が両方あれば `register` で登録する。そのグローバルシーン名のシーンテーブルを（無ければ作って）返す。`pasta` の `create_scene` はこの関数そのもの |
 | `get_or_increment_counter(base_name)` | `STORE.counters[base_name]` を 1 増やして返す（最初は 1） |
 | `register(global_name, local_name, scene_func)` | シーンテーブルが無ければ作り、`[local_name] = scene_func` とする |
 | `create_global_table(global_name)` | シーンテーブルが無ければ作って返す |
@@ -355,8 +357,8 @@ Rust 側は `pasta.scene` の `get_all_scenes()` を呼び、`STORE.scenes` を�
 
 ```lua
 {
-  ["メイン1"] = {
-    __global_name__ = "メイン1",
+  ["メイン_1"] = {
+    __global_name__ = "メイン_1",
     __start__ = function(act, ...) … end,
     ["選択肢_1"] = function(act, ...) … end,
   },
@@ -376,7 +378,7 @@ Rust 側は `pasta.word` の `get_all_words()` を呼ぶ。この関数は、STO
     ["キー"] = { { "値1", "値2" }, { "値3" } },
   },
   ["local"] = {                    -- STORE.local_words
-    ["メイン1"] = {                -- グローバルシーン名
+    ["メイン_1"] = {               -- グローバルシーン名
       ["キー"] = { { "ローカル値" } },
     },
   },

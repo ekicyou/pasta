@@ -266,16 +266,16 @@ fn test_collect_scene_candidates_exclude_local_from_global() {
 
 #[test]
 fn test_fn_name_to_search_key_local_scene() {
-    // Local scene: "会話_1::選択肢_1" → ":会話_1:選択肢_1"
+    // Local scene: "会話_1::選択肢_1" → ":会話_1:選択肢"（親は登録名のまま、ローカルは名前の部分）
     let result = SceneTable::fn_name_to_search_key("会話_1::選択肢_1", true);
-    assert_eq!(result, ":会話_1:選択肢_1");
+    assert_eq!(result, ":会話_1:選択肢");
 }
 
 #[test]
 fn test_fn_name_to_search_key_global_scene() {
-    // Global scene: "会話_1::__start__" → "会話_1"
+    // Global scene: "会話_1::__start__" → "会話"（名前の部分）
     let result = SceneTable::fn_name_to_search_key("会話_1::__start__", false);
-    assert_eq!(result, "会話_1");
+    assert_eq!(result, "会話");
 }
 
 #[test]
@@ -569,6 +569,119 @@ fn test_resolve_scene_id_unified_cycling() {
     // 返却されたSceneIdが有効なローカルシーンであること
     let scene = table.get_scene(r3.unwrap()).unwrap();
     assert!(scene.parent.is_some(), "返却されたシーンがローカルでない");
+}
+
+// ======================================================================
+// 検索キーは通し番号を除いた照合用の名前（scene-identity-format 4.2）
+// ======================================================================
+
+/// 候補の fn_name を集めて返す（順序は問わない比較のため並べ替える）。
+fn candidate_fn_names(table: &SceneTable, module_name: &str, prefix: &str) -> Vec<String> {
+    let mut names: Vec<String> = table
+        .collect_scene_candidates(module_name, prefix)
+        .map(|ids| {
+            ids.iter()
+                .map(|&id| table.get_scene(id).unwrap().fn_name.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    names.sort();
+    names
+}
+
+fn table_from(registry: crate::registry::SceneRegistry) -> SceneTable {
+    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0]))).unwrap()
+}
+
+/// 2.2: `A`×11＋`A1` で、`A1` の検索の候補は `A1_1` だけ。
+#[test]
+fn test_search_key_a1_does_not_match_eleventh_a() {
+    use crate::registry::SceneRegistry;
+
+    let mut registry = SceneRegistry::new();
+    for _ in 0..11 {
+        registry.register_global("A", HashMap::new());
+    }
+    registry.register_global("A1", HashMap::new());
+    let table = table_from(registry);
+
+    assert_eq!(
+        candidate_fn_names(&table, "", "A1"),
+        vec!["A1_1::__start__".to_string()]
+    );
+}
+
+/// 2.4: `章`×2＋`章_1` で、`章_1` の検索の候補に `章` が入らない。
+#[test]
+fn test_search_key_underscore_digit_name_does_not_match_counter() {
+    use crate::registry::SceneRegistry;
+
+    let mut registry = SceneRegistry::new();
+    registry.register_global("章", HashMap::new());
+    registry.register_global("章", HashMap::new());
+    registry.register_global("章_1", HashMap::new());
+    let table = table_from(registry);
+
+    assert_eq!(
+        candidate_fn_names(&table, "", "章_1"),
+        vec!["章_1_1::__start__".to_string()]
+    );
+}
+
+/// 2.10: ローカル `挨拶`×10＋`挨拶_1` で、`挨拶_1` の検索の候補に `挨拶` が入らない。
+#[test]
+fn test_search_key_local_underscore_digit_name_does_not_match_counter() {
+    use crate::registry::SceneRegistry;
+
+    let mut registry = SceneRegistry::new();
+    let (_, counter) = registry.register_global("会話", HashMap::new());
+    for i in 1..=10 {
+        registry.register_local("挨拶", "会話", counter, i, HashMap::new());
+    }
+    registry.register_local("挨拶_1", "会話", counter, 1, HashMap::new());
+    let table = table_from(registry);
+
+    assert_eq!(
+        candidate_fn_names(&table, "会話_1", "挨拶_1"),
+        vec!["会話_1::挨拶_1_1".to_string()]
+    );
+    // 名前の部分で引けば前方一致で `挨拶`×10 と `挨拶_1` の 11 個（2.6）
+    assert_eq!(candidate_fn_names(&table, "会話_1", "挨拶").len(), 11);
+}
+
+/// 2.5: 登録名 `メイン_1` で検索しても、`メイン` の 1 つ目は候補にならない。
+#[test]
+fn test_search_key_registered_name_is_treated_as_name() {
+    use crate::registry::SceneRegistry;
+
+    let mut registry = SceneRegistry::new();
+    registry.register_global("メイン", HashMap::new());
+    registry.register_global("メイン", HashMap::new());
+    let table = table_from(registry);
+
+    assert!(candidate_fn_names(&table, "", "メイン_1").is_empty());
+    assert_eq!(candidate_fn_names(&table, "", "メイン").len(), 2);
+}
+
+/// 2.11: 分けられない名前はキーが名前の全体、`step_2` はキーが `step`。
+#[test]
+fn test_fn_name_to_search_key_lua_defined_scene_names() {
+    assert_eq!(
+        SceneTable::fn_name_to_search_key("加算ループ::__start__", false),
+        "加算ループ"
+    );
+    assert_eq!(
+        SceneTable::fn_name_to_search_key("step_2::__start__", false),
+        "step"
+    );
+    assert_eq!(
+        SceneTable::fn_name_to_search_key("会話_1::加算ループ", true),
+        ":会話_1:加算ループ"
+    );
+    assert_eq!(
+        SceneTable::fn_name_to_search_key("会話_1::step_2", true),
+        ":会話_1:step"
+    );
 }
 
 #[test]

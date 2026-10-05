@@ -75,7 +75,7 @@ impl SceneRegistry {
         let counter = self.increment_counter(name);
         let id = (self.scenes.len() + 1) as i64;
 
-        let fn_name = format!("{}_{}::__start__", Self::sanitize_name(name), counter);
+        let fn_name = format!("{}::__start__", Self::registered_name(name, counter));
         let fn_path = format!("crate::{}", fn_name);
 
         let entry = SceneEntry {
@@ -98,7 +98,7 @@ impl SceneRegistry {
     /// * `name` - Original scene name (without scope prefix)
     /// * `parent_name` - Parent global scene name
     /// * `parent_counter` - Parent's counter value
-    /// * `local_index` - Local scene index within parent (1-based, matches CodeGenerator)
+    /// * `local_counter` - 照合用の名前ごとの通し番号（1 から。生成器の関数名と同じ番号）
     /// * `attributes` - Attributes for filtering
     ///
     /// # Returns
@@ -109,20 +109,18 @@ impl SceneRegistry {
         name: &str,
         parent_name: &str,
         parent_counter: usize,
-        local_index: usize,
+        local_counter: usize,
         attributes: HashMap<String, String>,
     ) -> i64 {
         let id = (self.scenes.len() + 1) as i64;
 
         // Local scene function path: parent module + local function
         // Format: crate::親_番号::子_番号
-        // Use local_index to match CodeGenerator's generate_local_scene
+        // local_counter is the same number CodeGenerator's generate_local_scene uses
         let fn_name = format!(
-            "{}_{}::{}_{}",
-            Self::sanitize_name(parent_name),
-            parent_counter,
-            Self::sanitize_name(name),
-            local_index
+            "{}::{}",
+            Self::registered_name(parent_name, parent_counter),
+            Self::registered_name(name, local_counter)
         );
         let fn_path = format!("crate::{}", fn_name);
 
@@ -147,7 +145,7 @@ impl SceneRegistry {
     ///
     /// # Arguments
     ///
-    /// * `full_name` - Full scene name with counter (e.g., "OnBoot1")
+    /// * `full_name` - Full scene name with counter (e.g., "OnBoot_1")
     /// * `local_names` - List of local function names (e.g., ["__start__", "選択肢_1"])
     /// * `attributes` - Attributes for filtering (applied to the global and its locals)
     ///
@@ -245,6 +243,29 @@ impl SceneRegistry {
     /// registered from it. Registration and search must keep sharing this one rule.
     pub fn sanitize_name(name: &str) -> String {
         name.replace(|c: char| !c.is_alphanumeric() && c != '_', "_")
+    }
+
+    /// 登録名を作る: 照合用の名前（`sanitize_name`）・`_`・通し番号。
+    ///
+    /// 例: `registered_name("会話・朝", 1)` = `会話_朝_1`。結果に `:` は含まれない。
+    pub fn registered_name(name: &str, counter: usize) -> String {
+        format!("{}_{}", Self::sanitize_name(name), counter)
+    }
+
+    /// 登録名を（名前, 通し番号）に分ける。`registered_name` の逆。
+    ///
+    /// 最後の `_` の後ろが 1 文字以上の ASCII 数字で、前が空でないときだけ分ける。
+    /// それ以外（`__start__`・`加算ループ`・`_1`・usize に収まらない数字列）は（全体, None）。
+    pub fn split_registered_name(registered: &str) -> (&str, Option<usize>) {
+        if let Some((name, digits)) = registered.rsplit_once('_')
+            && !name.is_empty()
+            && !digits.is_empty()
+            && digits.bytes().all(|b| b.is_ascii_digit())
+            && let Ok(counter) = digits.parse()
+        {
+            return (name, Some(counter));
+        }
+        (registered, None)
     }
 
     /// Merge scenes and counters from another registry.
@@ -356,6 +377,52 @@ mod tests {
     }
 
     #[test]
+    fn test_registered_name_round_trip() {
+        // 末尾が数字・`_` と数字で終わる・記号を含む・`_` だけの名前で往復一致する
+        for name in ["メイン", "章11", "章_1", "会話・朝", "_", "__", "a_"] {
+            for counter in [1, 2, 11, usize::MAX] {
+                let registered = SceneRegistry::registered_name(name, counter);
+                assert!(!registered.contains(':'), "{registered}");
+                assert_eq!(
+                    SceneRegistry::split_registered_name(&registered),
+                    (SceneRegistry::sanitize_name(name).as_str(), Some(counter)),
+                    "{name} / {counter}"
+                );
+            }
+        }
+        assert_eq!(SceneRegistry::registered_name("会話・朝", 1), "会話_朝_1");
+        // `A1` の 1 つ目と `A` の 11 個目は別の登録名
+        assert_ne!(
+            SceneRegistry::registered_name("A1", 1),
+            SceneRegistry::registered_name("A", 11)
+        );
+    }
+
+    #[test]
+    fn test_split_registered_name() {
+        assert_eq!(
+            SceneRegistry::split_registered_name("章_1_1"),
+            ("章_1", Some(1))
+        );
+        assert_eq!(
+            SceneRegistry::split_registered_name("章_11"),
+            ("章", Some(11))
+        );
+        // 分けられない名前は（全体, 番号なし）
+        for whole in [
+            "__start__",
+            "加算ループ",
+            "_1",
+            "章_",
+            "章_1a",
+            "章_１",
+            "章_99999999999999999999999999",
+        ] {
+            assert_eq!(SceneRegistry::split_registered_name(whole), (whole, None));
+        }
+    }
+
+    #[test]
     fn test_get_scene_invalid_ids() {
         let mut registry = SceneRegistry::new();
         registry.register_global("会話", HashMap::new());
@@ -374,13 +441,13 @@ mod tests {
         let mut registry = SceneRegistry::new();
 
         // full_name already contains the counter; no auto-increment
-        let id = registry.register_global_raw("OnBoot1", &[], HashMap::new());
+        let id = registry.register_global_raw("OnBoot_1", &[], HashMap::new());
         assert_eq!(id, 1);
 
         let scene = registry.get_scene(id).unwrap();
-        assert_eq!(scene.name, "OnBoot1");
-        assert_eq!(scene.fn_name, "OnBoot1::__start__");
-        assert_eq!(scene.fn_path, "crate::OnBoot1::__start__");
+        assert_eq!(scene.name, "OnBoot_1");
+        assert_eq!(scene.fn_name, "OnBoot_1::__start__");
+        assert_eq!(scene.fn_path, "crate::OnBoot_1::__start__");
         assert_eq!(scene.parent, None);
     }
 
@@ -389,7 +456,7 @@ mod tests {
         let mut registry = SceneRegistry::new();
 
         let locals = vec!["__start__".to_string(), "__選択肢_1__".to_string()];
-        let global_id = registry.register_global_raw("会話1", &locals, HashMap::new());
+        let global_id = registry.register_global_raw("会話_1", &locals, HashMap::new());
 
         // Returns the GLOBAL scene's ID
         assert_eq!(global_id, 1);
@@ -400,9 +467,9 @@ mod tests {
 
         let local = registry.get_scene(2).unwrap();
         assert_eq!(local.name, "__選択肢_1__");
-        assert_eq!(local.fn_name, "会話1::__選択肢_1__");
-        assert_eq!(local.fn_path, "crate::会話1::__選択肢_1__");
-        assert_eq!(local.parent, Some("会話1".to_string()));
+        assert_eq!(local.fn_name, "会話_1::__選択肢_1__");
+        assert_eq!(local.fn_path, "crate::会話_1::__選択肢_1__");
+        assert_eq!(local.parent, Some("会話_1".to_string()));
     }
 
     #[test]
@@ -430,7 +497,7 @@ mod tests {
         let mut registry = SceneRegistry::new();
 
         // raw registration must not consume a counter for "会話"
-        registry.register_global_raw("会話1", &[], HashMap::new());
+        registry.register_global_raw("会話_1", &[], HashMap::new());
 
         // counter-based registration still starts at 1
         let (_, counter) = registry.register_global("会話", HashMap::new());
