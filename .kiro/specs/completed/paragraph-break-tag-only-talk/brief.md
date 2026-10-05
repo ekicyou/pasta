@@ -2,6 +2,8 @@
 
 > **ステータス**: 未着手（2026-10-05、areka セッション「emo2初回起動」からの申し送りで起票）。Phase 11 Wave 3（バグ修正。`call-execution-correctness` と並走可）。着手するときは `/kiro-start paragraph-break-tag-only-talk` で開始する。
 
+> **範囲の拡大（2026-10-05、設計ディスカッションで決定）**: タグの読み取りを SSP（UKADOC）にそろえる修正を本仕様に取り込んだ。対象は Rust のトークナイザ・Lua の外見の観測・DSL の文法の 3 か所と、VS Code の文法定義、マニュアルである。エスケープ `\%` と囲み `\_?…\_?` の読み方も決める。下の Scope・Out of Boundary・Constraints は拡大後の内容に改めた。Approach の節は起票時のまま残す（決定は `research.md` と `requirements.md` が正）。
+
 ## Problem
 
 段落区切りの改行（`\n[spot_newlines×100]`）は、同じスポットに字があるときだけ出す決まりである。しかし `sakura_builder` は、さくらスクリプトのタグしか含まない `talk` も「字あり」と数える。そのため、字の無い出力のあとに余分な改行が出る。
@@ -66,12 +68,17 @@
 - **In**:
   - `sakura_builder.lua` の段落区切りの判定（S3・S4 の振り分け）
   - 字の判定に使うタグの読み取り（`appearance.lua` との共有を含む）
-  - 修正を固定するテスト
-  - マニュアルの該当章の更新と、スキル `references/` の再生成
+  - タグの読み取りを SSP にそろえること（名前の規則、引数のエスケープと引用、エスケープ `\\`・`\%`、囲み `\_?…\_?`）。対象は `sakura_script/tokenizer.rs`・`appearance.lua`・`grammar.pest`・`pasta.tmLanguage.json`
+  - DSL で `\%` を受理すること（`element_gen.rs` の Escape の腕の 1 か所）
+  - 3 つの読み取りの一致を保つ適合テストと、修正を固定するテスト
+  - マニュアルの該当章（文法・Lua モジュール・内部設計・`pasta.toml`）の更新と、スキル `references/` の再生成
+  - 破壊的変更の告知
 - **Out**:
   - 段落区切りの規則そのもの（完全遅延方式・切替時の再評価）の変更
   - BudouX の改行と表示済みの字の再配置（areka 側の `areka-P0-budoux-reveal-reflow` が持つ）
-  - 外見の復旧（`appearance.lua` の observe・restore の挙動）
+  - 外見の観測・復旧の規則（何を記録し、いつ復旧するか）。変えるのはタグの切り出しと名前の判定だけ
+  - タグの意味の解釈、既知のタグ名の一覧
+  - Lua から囲みの開きと閉じを別々のトークンで積む書き方
 
 ## Boundary Candidates
 
@@ -81,8 +88,9 @@
 
 ## Out of Boundary
 
-- `act.lua` のトークン化とグループ化（`call-execution-correctness` が Wave 3 で `act.lua` を持つ）
-- Rust の `sakura_script/`（推奨案 (1) では触らない）
+- `pasta_scripts/pasta/act.lua` のトークン化とグループ化（`call-execution-correctness` が Wave 3 で持つ）
+- `element_gen.rs` の Call の腕（同上）
+- ウェイトの挿入と BudouX の改行の処理そのもの（`wait_inserter.rs`・`line_breaker.rs` のコード。正規表現を受け取って使うだけ）
 - areka（バルーンの描画）
 
 ## Upstream / Downstream
@@ -101,5 +109,6 @@
 ## Constraints
 
 - マニュアルが権威。挙動を変えたら同じ変更でマニュアルを更新し、生成スキルを再生成する。
-- 字のある `talk` だけのトークの出力は、バイト単位で変えない。既存の `sakura_builder_test.lua` が通ること。
-- 並走条件（Wave 3）: 編集するソースは `sakura_builder.lua`・`appearance.lua`（読み取りの共有だけ）・そのテストに限る。`act.lua`・`element_gen.rs` は `call-execution-correctness` が持つため触らない。
+- 読みの変わらないテキスト（`requirements.md` の用語）だけのトークの出力は、バイト単位で変えない。それ以外で出力やパース結果が変わる書き方は、破壊的変更として告知する。
+- タグの定義は Rust を正とし、Lua と pest は写しを持つ。同じ事例の表を 3 か所に通す適合テストで一致を保つ。`appearance.lua` は `@pasta_*` を `require` しない。
+- 並走条件（Wave 3）: 編集するソースは `sakura_builder.lua`・`appearance.lua`・`sakura_script/tokenizer.rs`・`grammar.pest`・`element_gen.rs` の Escape の腕・`pasta.tmLanguage.json` と、そのテストに限る。`pasta_scripts/pasta/act.lua` と `element_gen.rs` の Call の腕は `call-execution-correctness` が持つため触らない。

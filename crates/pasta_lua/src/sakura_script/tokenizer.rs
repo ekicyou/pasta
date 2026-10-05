@@ -106,25 +106,44 @@ pub struct Tokenizer {
     char_sets: CharSets,
 }
 
+/// タグの引数 1 つ分（ARG）。`SAKURA_TAG_PATTERN` の中に 2 回現れる（先頭の引数と `,` の後ろの引数）。
+/// 先頭の任意の引用 `"…"`（中の `""` は 1 文字）と、「`\` ＋ 1 文字の組・`]` `\` `,` 以外の 1 文字」の並び。
+/// 引用の直後と、引用の無い ARG の先頭は `"` で始まれない（引用は引数の先頭でだけ開く）。
+macro_rules! sakura_tag_arg {
+    () => {
+        r#"(?:"(?:[^"]|"")*")?(?:(?:\\.|[^\]\\,"])(?:\\.|[^\]\\,])*)?"#
+    };
+}
+
 impl Tokenizer {
-    /// Sakura script tag pattern.
-    /// Matches: `\\` (escaped backslash), \tag or \tag[param]
-    /// Examples: \h, \s[0], \_w[500], \![open,inputbox], \-, \+, \*, \_?, \&[ID]
+    /// 単位（タグ・エスケープ・囲み）に一致する正規表現。タグの読み取りの正。
+    /// 選択肢は左から優先する。
+    ///   1. 囲み       `\_?` … 次の `\_?`（最短一致）／ `\_!` … 次の `\_!`
+    ///   2. エスケープ `\\` `\%`
+    ///   3. タグ       `\` ＋（`[spb]` ＋ 数字 | `w` ＋ 1〜9 | `_` 0〜2 個 ＋ 名前の 1 文字 ＋ 任意の引数）
     ///
-    /// `\\` は分割できない 1 単位（`TokenKind::SakuraScript`）として読む。
-    /// 選択肢の先頭に置き左優先で一致させるため、`C:\\new` は `\\` ＋ `new`、
-    /// `\\s[0]` は `\\` ＋ 平文 `s[0]` になる（`\new`・`\s[0]` のタグにならない）。
-    /// タグ扱いなのでウェイトは付かず、改行推定では幅 0 として前の文字に付いて運ばれる。
+    /// 引数は `[` ARG (`,` ARG)* `]`（ARG は `sakura_tag_arg!`）。閉じなければ名前までがタグになる。
+    /// 名前の後ろの文字は一致に入らず、通常の文字として分類される（`\nHello` は `\n` ＋ `Hello`）。
+    /// 一致はすべて `TokenKind::SakuraScript` になるので、ウェイトは付かず、
+    /// 改行推定では幅 0 として前の文字に付いて運ばれる。
+    /// `(?s)` は `.` を改行にも一致させる（テキストに改行文字があっても囲みの読みが変わらない）。
     ///
     /// # ReDoS Safety
-    /// This pattern is safe from ReDoS (Regular expression Denial of Service):
-    /// - The Rust `regex` crate uses a Thompson NFA engine that guarantees
-    ///   linear-time matching — backtracking never occurs.
-    /// - Structurally, both quantifiers (`+` on a character class, `*` on a
-    ///   negated character class) operate on atomic character classes with no
-    ///   overlap, so even a backtracking engine would not exhibit exponential
-    ///   behavior.
-    pub const SAKURA_TAG_PATTERN: &'static str = r"\\\\|\\[0-9a-zA-Z_!+*?&-]+(?:\[[^\]]*\])?";
+    /// - 先読みも後方参照も使わない。Rust の `regex` クレートは線形時間で一致を求めるため、
+    ///   入力がどうであれ ReDoS は起きない。
+    /// - 後戻りの有無で結果が変わらない形にしてある。引用の無い ARG は `"` で始まれず、
+    ///   引用の直後も `"` で始まれないので、引数の先頭の `"` は引用として読むしかない。
+    ///   引用の中の `""` は「中の 1 文字」と読んでも「閉じて開き直す」と読んでも同じ状態になる。
+    ///   そのため左から 1 回読むだけの読み取り（Lua・pest の写し）と結果が一致する。
+    pub const SAKURA_TAG_PATTERN: &'static str = concat!(
+        r"(?s)\\_\?.*?\\_\?|\\_!.*?\\_!",
+        r"|\\[\\%]",
+        r"|\\(?:[spb][0-9]|w[1-9]|_{0,2}[0-9A-Za-z!+*?&-](?:\[",
+        sakura_tag_arg!(),
+        r"(?:,",
+        sakura_tag_arg!(),
+        r")*\])?)",
+    );
     /// Create a new Tokenizer from TalkConfig.
     ///
     /// # Arguments
@@ -501,5 +520,70 @@ mod tests {
                 sakura(r"\e"),
             ]
         );
+    }
+
+    // ====================================================================
+    // SSP にそろえたタグの読み取り（設計の TagPattern の表）
+    // Requirement: 7.1〜7.10, 8.1, 9.1, 9.4, 9.6
+    // ====================================================================
+
+    /// 一致（`SakuraScript`）を `〔〕` で囲み、それ以外の文字はそのまま並べる
+    fn read(input: &str) -> String {
+        let tokenizer = Tokenizer::new(&default_config()).unwrap();
+        tokenizer
+            .tokenize(input)
+            .into_iter()
+            .map(|t| match t.kind {
+                TokenKind::SakuraScript => format!("〔{}〕", t.text),
+                _ => t.text,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_tag_pattern_table() {
+        #[rustfmt::skip]
+        let cases: &[(&str, &str)] = &[
+            // 名前は `_` 0〜2 個 ＋ 1 文字、数字付きの形は引数を取らない（7.1〜7.4）
+            (r"\nHello", r"〔\n〕Hello"),
+            (r"\n!?", r"〔\n〕!?"),
+            (r"\w9OK", r"〔\w9〕OK"),
+            (r"\w0", r"〔\w〕0"),
+            (r"\s12", r"〔\s1〕2"),
+            (r"\s3[x]", r"〔\s3〕[x]"),
+            (r"\_w[100]", r"〔\_w[100]〕"),
+            (r"\__w[1]", r"〔\__w[1]〕"),
+            (r"\-\+\*", r"〔\-〕〔\+〕〔\*〕"),
+            (r"\&[amp]", r"〔\&[amp]〕"),
+            // 単位にならない `\`（7.10）
+            (r"\_", r"\_"),
+            (r"\___a", r"\___a"),
+            (r"\あ", r"\あ"),
+            (r"あ\", r"あ\"),
+            // 引数のエスケープと先頭の引用（7.5〜7.7）
+            (r#"\![raise,X,"a]b"]"#, r#"〔\![raise,X,"a]b"]〕"#),
+            (r"\q[a\]b,X]", r"〔\q[a\]b,X]〕"),
+            (r#"\![a,"b""c]d"]e"#, r#"〔\![a,"b""c]d"]〕e"#),
+            (r#"\![call,ghost,"the ""Name"""]"#, r#"〔\![call,ghost,"the ""Name"""]〕"#),
+            (r#"\q[5"x,OnX]"#, r#"〔\q[5"x,OnX]〕"#),
+            (r#"\![raise,X,a"]b]"#, r#"〔\![raise,X,a"]〕b]"#),
+            (r#"\q["a]b"c,X]z"#, r#"〔\q["a]b"c,X]〕z"#),
+            (r#"\q[a\,"b]c"]"#, r#"〔\q[a\,"b]〕c"]"#),
+            // 閉じない引数・引用は名前までがタグ（7.8）
+            (r"\s[0", r"〔\s〕[0"),
+            (r#"\q["abc,OnX]y"#, r#"〔\q〕["abc,OnX]y"#),
+            (r#"\![a,"b""]"#, r#"〔\!〕[a,"b""]"#),
+            // エスケープ（8.1）
+            (r"\\", r"〔\\〕"),
+            (r"100\%です", r"100〔\%〕です"),
+            // 囲み（9.1・9.4）
+            (r"\_?\s[1]\_?", r"〔\_?\s[1]\_?〕"),
+            (r"\_?\_?", r"〔\_?\_?〕"),
+            (r"\_?abc", r"〔\_?〕abc"),
+            (r"\_!a\_?b\_!c", r"〔\_!a\_?b\_!〕c"),
+        ];
+        for (input, want) in cases {
+            assert_eq!(read(input), *want, "input: {input:?}");
+        }
     }
 }

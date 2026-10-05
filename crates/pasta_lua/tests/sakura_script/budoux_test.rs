@@ -373,3 +373,49 @@ fn test_talk_to_script_budoux_last_value_repeats() {
         result_two, result_three
     );
 }
+
+// ============================================
+// SSP にそろえたタグの読み取り: 囲みとエスケープの途中に改行が入らない
+// （paragraph-break-tag-only-talk 6.5）
+// Requirement: 8.2, 9.2
+// ============================================
+
+/// budoux を設定したアクターで `talk_to_script` を呼ぶ（既定値: 通常の字のウェイトは出ない）
+fn talk_with_budoux(input: &str) -> String {
+    let lua = create_sakura_test_runtime();
+    let talk_to_script: mlua::Function = lua
+        .load(r#"return require("@pasta_sakura_script").talk_to_script"#)
+        .eval()
+        .unwrap();
+    let actor = lua.create_table().unwrap();
+    actor
+        .set("budoux", lua.create_sequence_from([4]).unwrap())
+        .unwrap();
+    talk_to_script.call((actor, input)).unwrap()
+}
+
+#[test]
+fn test_talk_to_script_budoux_no_break_inside_literal_region() {
+    // 囲みは幅 0 の 1 単位として前の字に付いて運ばれ、中の字の間に改行は入らない（9.2）
+    assert_eq!(
+        talk_with_budoux(r"今日は\_?いい天気ですね\_?明日も晴れるでしょう"),
+        r"今日は\_?いい天気ですね\_?\n明日も\n晴れるでしょう"
+    );
+}
+
+#[test]
+fn test_talk_to_script_budoux_no_break_right_after_non_unit_backslash() {
+    // 単位にならない `\` の直後に改行を挿むと `\\n` ができるので、改行は `\` の前に入れる（7.10）
+    let out = talk_with_budoux(r"今日は\いい天気ですね");
+    assert!(!out.contains(r"\\"), "`\\` が作られた: {out}");
+    assert_eq!(out.replace(r"\n", ""), r"今日は\いい天気ですね");
+}
+
+#[test]
+fn test_talk_to_script_budoux_no_break_inside_percent_escape() {
+    // `\%` は幅 0 の 1 単位として前の字に付いて運ばれ、`\%` の前にも間にも改行は入らない（8.2）
+    assert_eq!(
+        talk_with_budoux(r"今日は\%いい天気ですね"),
+        r"今日は\%\nいい\n天気ですね"
+    );
+}
