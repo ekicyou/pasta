@@ -287,7 +287,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 - [budoux-line-breaker](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/budoux-line-breaker) — budoux 改行
 - [actor-surface-restore](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/actor-surface-restore) — 外見の観測と復旧
 - [sakura-builder-string-buffer](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/sakura-builder-string-buffer) — 組立の文字列バッファ
-- [paragraph-break-tag-only-talk](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/paragraph-break-tag-only-talk/) — 字を出すトークンによる段落区切りの判定と、単位（タグ・エスケープ・囲み）の読み方を SSP にそろえる変更、3 つの読み取りの適合テスト
+- [paragraph-break-tag-only-talk](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/paragraph-break-tag-only-talk) — 字を出すトークンによる段落区切りの判定と、単位（タグ・エスケープ・囲み）の読み方を SSP にそろえる変更、3 つの読み取りの適合テスト
 
 ---
 
