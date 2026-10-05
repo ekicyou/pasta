@@ -141,6 +141,8 @@
 - **Follow-up**: マニュアルのモジュール表・境界表に `APPEARANCE.tag_at` を追記する。
 
 ### Decision: `sakura_script` は先頭のタグの名前だけで判定する
+
+> **注記（後の決定で置き換え）**: この決定は設計ディスカッション #1 で置き換えられた。トークン内のタグをすべて読み、文字を表示するタグか中身のある囲みが 1 つでもあれば字を出すとする（`design.md` の TextPredicate と Open Questions 5 が正）。
 - **Context**: 要件 1.9・3.4。
 - **Alternatives Considered**: `talk` と同じ走査をテキスト全体にかける。
 - **Selected Approach**: 先頭が `\` で、先頭のタグの名前が文字を表示するタグ（`_u`・`_m`・`&`）なら字を出すトークンとする。それ以外は従来どおり字を出さない。
