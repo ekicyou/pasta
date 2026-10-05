@@ -21,7 +21,6 @@
 - シーン検索アルゴリズム、Call の属性フィルター、アクション行・式のコード生成の形の変更。
 - Call 行以外の失敗をバルーンへ出すこと、既存の警告箇所の載せ替え（`failure-output-unification`）。
 - 文脈を字句的な引数として渡す全面的な作り替え（research 6.3 の案 D）。
-- `＠＊関数（…）`（`act:global_fn`）と、単語参照で見つかった関数（`act:word` の関数ハンドラ）の後の文脈の復元（要件に無い。Open Questions 4）。
 
 ## Boundary Commitments
 
@@ -250,7 +249,7 @@ sequenceDiagram
 | CallCodeGen | code_gen | Call の生成形を 4 通りに切り替える | 1.8, 4.9, 5.9, 6.5, 8.4 | `operand_desc`・`dynamic_ref_args` (P0) | Service |
 | ActCall | runtime | 既存の `act:call`。印の早期リターンと見つからないときの失敗表記だけ足す | 1.9, 4.1, 4.5, 4.6, 5.8, 5.10 | ActFailure (P0) | Service |
 | ActCallRestore | runtime | 呼んで文脈を戻す | 1.1–1.6, 1.10, 1.11, 4.3 | ActCall (P0) | Service, State |
-| ExprCallRestore | runtime | 式の関数呼び出しの前後で文脈を戻す | 3.1–3.3 | `act:restore_scene` (P0) | Service |
+| ExprCallRestore | runtime | 式の関数呼び出し・`＠＊関数`・単語の関数ハンドラの前後で文脈を戻す | 3.1–3.4 | `act:restore_scene` (P0) | Service |
 | DynamicCallKey | runtime | 動的コールの値を検索キーにする。使えない値は警告＋失敗表記 | 5.1–5.7, 5.11, 6.1–6.3, 6.6 | `WORD.dynamic_key` (P0), ActFailure (P0) | Service |
 | ActFailure | runtime | 失敗表記の唯一の出口 | 4.6, 5.1, 6.3 | `@pasta_log` (P1) | Service |
 | ChoiceScope | runtime / shiori | 選択肢に出したシーンを載せ、選択時に使う | 2.1–2.9, 3.2 | SSP の Reference2 (P0) | Event, State |
@@ -321,10 +320,11 @@ function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...) end
 | Field | Detail |
 |-------|--------|
 | Intent | 式の関数呼び出しが別のグローバルシーンを実行しても、戻った後の文脈を保つ |
-| Requirements | 3.1, 3.2, 3.3 |
+| Requirements | 3.1, 3.2, 3.3, 3.4 |
 
 - `act.lua` の `call_expr`: `return handler(self, ...)` を、`local scene = self.current_scene` の後の `return self:restore_scene(scene, handler(self, ...))` にする。
 - `actor.lua` の `call_expr`: `drop_self(self, handler(self.act, ...))` の内側を `self.act:restore_scene(scene, handler(self.act, ...))` にする（`scene` は `self.act.current_scene`）。
+- `＠＊関数（…）`（`act.lua` の `act:global_fn` の `f(self, ...)`）と、単語参照で見つかった関数ハンドラ（`act.lua` の `act:word` の `handler(self)`、`actor.lua` のプロキシの `word` の `handler(receiver)`）も、同じ形で `restore_scene` に通す（要件 3.4。関数の中から `act:call` で別のグローバルシーンを呼ぶと同じ取り違えが起きるため。設計ディスカッションで追加）。
 - 検索・引数・戻り値（複数の戻り値を含む）・`drop_self` の正規化は変えない。生成コードは変えない。
 
 #### DynamicCallKey
@@ -439,7 +439,7 @@ function ACT_IMPL.failure(self, text, warning) end
 1. `act:call_restore`: 呼ばれた関数が `init_scene(別シーン)` しても、戻った後の `current_scene` が呼び出し前の表である。見つからない・印・Lua の関数でも同じ。戻り値（複数）がそのまま返る（1.1–1.6, 1.10, 4.8）。
 2. `act:call_key`: 上の表の 8 行それぞれの戻り値・警告の文言と件数・積まれる `talk` トークン。文字列 `"nil"` はキーとして返る（5.1–5.7, 6.1–6.3）。
 3. `act:call`: 印で nil・警告なし。nil キーは現行の警告だけでトークンなし。見つからないと警告＋失敗表記トークン（4.6, 5.8, 5.10）。
-4. `call_expr`（act・proxy）: ハンドラが `init_scene(別シーン)` した後に `current_scene` が戻る。戻り値・`drop_self` は不変（3.1, 3.3）。
+4. `call_expr`（act・proxy）・`act:global_fn`・`word`（act・proxy）の関数ハンドラ: ハンドラが `init_scene(別シーン)` した後に `current_scene` が戻る。戻り値・`drop_self` は不変（3.1, 3.3, 3.4）。
 5. `act:choice` の `scope`、`sakura_builder` の `\q` 第 3 引数（`On`・`script:` 始まりと scope なしは 2 引数）、`choice_select` の Reference2 採用・未知の名前と欠落時の `last_global_scene` フォールバック（2.1–2.9）。
 6. `act:failure` のトークンを `group_by_actor` → `sakura_builder` に通し、発言の後・出力の先頭のどちらでも切替タグが増えずに文字が出る。
 
@@ -470,10 +470,15 @@ function ACT_IMPL.failure(self, text, warning) end
 
 ## Open Questions（設計ディスカッションで確定する）
 
-1. **選択肢の `\q` に第 3 引数を足す方式でよいか**。応答のさくらスクリプトが選択肢の分だけ現行と変わる（表示・動作は同じ）。要件 4.7「現行と同じ応答」・2.6・8.5 を「動作が同じ」と読む仮定を置いた。代案は `STORE` に選択 ID → シーンの表を持つ方式だが、破棄の時点と同じジャンプ先名の衝突を別に決める必要がある。また、手書きの `\q[タイトル,ID,任意の値]` は、第 3 引数が既知のグローバルシーン名と一致した場合だけ探索範囲として読まれる。
-2. **失敗表記と警告の文言**。`【Call失敗：「名前」が見つからない】`・`【Call失敗：var.x が nil】` ほか DynamicCallKey の表の案でよいか。関数・説明なしの場合の警告 `act:call - key is not a string or number: operand='…', value=…` でよいか。
-3. **Lua から `act:call` を直接呼んで見つからない場合も失敗表記を出す**でよいか（末尾の静的コールの生成コードと区別できないため）。nil キーの直接呼び出し（要件 5.10: 失敗表記なし）と扱いがそろわない。
-4. **`＠＊関数（…）`（`act:global_fn`）と、単語参照で見つかった関数の後の文脈**。関数の中から `act:call` で別のグローバルシーンを呼ぶと同じ取り違えが起きる。要件 1.3・3 は `＠関数（…）`・`＠＄変数（…）` だけを挙げているため対象外にした。含める場合は各 1 行の追加で済む。
-5. **`STORE.last_global_scene` を途中の Call の後に戻さない**でよいか（記録の無い選択 ID は「最後に `init_scene` したシーン」のまま。要件 2.9 の「現行の仕組み」をそう読んだ）。
-6. **失敗表記をアクター nil の `talk` トークンで積む**でよいか。直前のアクターのバルーンに続けて出るが、そのアクターの `budoux`・ウェイトの設定は失敗表記には適用されない（既定値で変換される）。
-7. **`On`・`script:` で始まるジャンプ先には scope を付けない**でよいか（SSP の `\q` の仕様に合わせた分岐）。
+1. **選択肢の `\q` に第 3 引数を足す方式でよいか**。応答のさくらスクリプトが選択肢の分だけ現行と変わる（表示・動作は同じ）。代案は `STORE` に選択 ID → シーンの表を持つ方式だが、破棄の時点と同じジャンプ先名の衝突を別に決める必要がある。手書きの `\q[タイトル,ID,任意の値]` は、第 3 引数が既知のグローバルシーン名と一致した場合だけ探索範囲として読まれる。
+2. **失敗表記の文言**。`【Call失敗：「名前」が見つからない】`・`【Call失敗：var.x が nil】` ほか DynamicCallKey の表の案でよいか。
+
+## 設計ディスカッションで議題にせず確定したもの（2026-10-05）
+
+- **Lua から `act:call` を直接呼んで見つからない場合も失敗表記を出す**。末尾の静的コールの生成コードは手書きの `act:call(nil, "名前", nil)` と区別できないため、こうなる。nil キーの直接呼び出しは要件 5.10 のとおり現行のまま（警告だけ）。`lua/script-api.md` に書く。
+- **`＠＊関数（…）` と単語参照で見つかった関数ハンドラの後も文脈を戻す**。要件ディスカッション #2（同じ原因の経路を残さない）に従い、要件 3.4 として足した。
+- **`STORE.last_global_scene` は途中の Call の後に戻さない**。`init_scene` だけが書く現行の仕組みのまま、出したシーンの記録が無い選択 ID の探索範囲としてだけ使う（要件 2.9）。
+- **失敗表記はアクター nil の `talk` トークンで積む**。直前のアクターのバルーンに続けて出る。そのアクターの `budoux`・ウェイトの設定は失敗表記には適用されない。
+- **`On`・`script:` で始まるジャンプ先には scope を付けない**。SSP の `\q` がこれらの ID で第 3 引数以降を別の意味に使うため。
+- **失敗表記はキーの式の評価時に積む**。引数の式がトークンを積む場合、失敗表記がその前に来る。
+- **公開メソッド名**: `act:call_restore`・`act:restore_scene`・`act:call_key`・`act:failure`。`call_restore` を Lua から使える「戻す呼び出し口」として `lua/script-api.md` に書く（要件 1.9）。既存の act のメソッドと同じく、5 段の検索のメソッドの段から名前で届く。
