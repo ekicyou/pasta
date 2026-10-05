@@ -88,7 +88,7 @@
   - 完了状態: 該当章が実装どおりで、旧記述の検索が 0 件になる
   - _Requirements: 7.1, 7.2, 7.7_
   - _Boundary: Manual_
-- [ ] 5.2 (P) Lua API・SHIORI イベント・内部設計の章を更新する
+- [x] 5.2 (P) Lua API・SHIORI イベント・内部設計の章を更新する
   - `lua/script-api.md`: `act:call`（nil キー、見つからない場合の失敗表記、戻った後の実行中のシーン）と、新しい口（呼んで戻す・文脈を戻す・キーの判定・失敗の出口）、選択肢トークン
   - `lua/shiori-events.md`: 選択時に最初に探すグローバルシーン
   - 内部設計（`internal-modules.md`・`transpiler.md`、記述が変わる場合は `shiori.md`・`execution-model.md`・`talk-output.md`・`registry-search.md`）: 文脈が戻る仕組み、Call の生成形、nil の判定の位置、末尾の Call の性質

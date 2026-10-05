@@ -316,7 +316,7 @@ pasta.shiori.entry
 | ハンドラ | 動作 |
 | -------- | ---- |
 | `REG.OnBoot` | `SCENE.co_exec(act, act.req.id)`。シーン関数フォールバックと同じ |
-| `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ `act.req.reference[1]`（選択 ID）を `SCENE.search(選択 ID, STORE.last_global_scene)` で探し、無ければ `SCENE.search(選択 ID, nil)` でグローバルシーンを探し、見つかった関数をコルーチンに包んで返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
+| `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ探索範囲の親を決める。`act.req.reference[2]`（`\q` の 3 番目の引数。選択肢を出したグローバルシーンの登録名）が文字列で `SCENE.get_global_table` で引けるグローバルシーンならそれを、そうでなければ `STORE.last_global_scene` を親にする。`act.req.reference[1]`（選択 ID）を `SCENE.search(選択 ID, 親)` で探し、無ければ `SCENE.search(選択 ID, nil)` でグローバルシーンを探し、見つかった関数をコルーチンに包んで返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
 | `REG.OnSecondChange` | `CALLBACK.sweep(os.time())` が応答を返せばそれを返し（その回は仮想イベントを出さない）、そうでなければ `virtual_dispatcher.dispatch(act)` の結果（コルーチンか `nil`）を返す。`sweep` の応答は、期限切れの待機を再開した結果（出力の 200、または理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す |
 
 ### 非同期トーク

@@ -209,7 +209,7 @@ end
 | 変数代入（ローカル・グローバル） | `var.名前 = 式`・`save.名前 = 式`。右辺が単語参照なら `act:word(名前)`、動的単語参照なら `act:word(var.変数名, "var.変数名")`、プロパティ参照だけなら `act:get_property(名前)` |
 | 変数代入（プロパティ） | `act:set_property(名前, 式)`。右辺が単語参照・動的単語参照なら、式の代わりに上と同じ `act:word(…)` を渡す |
 | 式文（`＄＝`） | 式をそのまま 1 文として出力する |
-| Call | `act:call(SCENE.__global_name__, "名前", {}, 明示した引数…, table.unpack(args))`。動的ターゲットは名前の代わりに `tostring(式)` |
+| Call | ローカルシーンの最後の項目なら `return act:call(SCENE.__global_name__, キー, {}, 明示した引数…, table.unpack(args))`、それ以外なら `act:call_restore(SCENE.__global_name__, キー, {}, 明示した引数…, table.unpack(args))`（[末尾呼び出し](#末尾呼び出し)）。キーは、静的ターゲットなら `"名前"`、動的ターゲットなら `act:call_key(…)`（[動的コールのキー](#動的コールのキー)） |
 | アクション行・継続行 | アクションごとに 1 文。アクターは `act:actor_proxy("アクター")` で得たプロキシで書く。発言は `act:actor_proxy("アクター"):talk(文字列)`、単語参照は `act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(名前))`、動的単語参照は `act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(var.変数名, "var.変数名"))`、さくらスクリプトは `act:actor_proxy("アクター"):sakura_script(文字列)` |
 | 選択肢行 | `act:choice(ジャンプ先, 表示テキスト)` |
 | キューコマンド行 | `!select` だけを `act:choice_timeout(秒数)`（引数が数値でなければ `nil`）に変換する。他のキューコマンドは出力しない |
@@ -230,12 +230,24 @@ end
 ＄表示＝「合計」＆＄n＆「個」 → var.表示 = act:concat(act:concat("合計", var.n, nil, "var.n"), "個")
 ＄s＝「合計」＆＄a＋＄b → var.s = act:concat("合計", act:arith("+", var.a, var.b, "var.a", "var.b"))
 ＄n＝（「1」＆「2」）＋1 → var.n = act:arith("+", (act:concat("1", "2")), 1)
-＞＄種類＆「_挨拶」  → return act:call(SCENE.__global_name__, tostring(act:concat(var.種類, "_挨拶", "var.種類")), {}, table.unpack(args))
+＞＄種類＆「_挨拶」  → return act:call(SCENE.__global_name__, act:call_key(act:concat(var.種類, "_挨拶", "var.種類")), {}, table.unpack(args))
 ```
 
 説明は、実行時の警告に被演算子の場所を出すための文字列リテラルである（`binary_operand` が `operand_desc` の結果を文字列リテラルにする）。変数参照は変数の経路（`"var.x"`・`"save.x"`・`"args[1]"`）、関数呼び出しは `"@名前()"`・`"@*名前()"`・`"@$変数の経路()"`、括弧は中身の説明になり、リテラルと入れ子の演算（算術・連結）には説明が無い。両方とも無ければ説明の引数を省き、右だけあるときは左に `nil` を置く。省き方は `act:arith` と `act:concat` で同じである。入れ子の演算に説明が無いため、内側が失敗して `nil` を返したとき、外側の演算は警告を重ねない。`act:arith`・`act:concat` の実行時の振る舞いは [arith](../lua/script-api.md#arithop-lhs-rhs-lhs_desc-rhs_desc)・[concat](../lua/script-api.md#concatlhs-rhs-lhs_desc-rhs_desc) が正である。
 
 動的参照の生成（`element_gen.rs` の `dynamic_ref_args`）は、変数の値を `tostring` せずにそのまま渡し、変数の経路（`var.変数名`・`save.変数名`・`args[番号+1]`）を文字列リテラルにして続けて渡す。値の検査と検索キーへの変換は実行時に行う（[Lua ランタイム内部モジュール](internal-modules.md#動的参照のキーworddynamic_key)）。ここで生成した `act` のメソッドが実行時に何をするかは、[ランタイム実行モデル](execution-model.md) と [Lua ランタイム内部モジュール](internal-modules.md) で扱う。
+
+#### 動的コールのキー
+
+動的ターゲットの Call（`＞＄名前`・`＞＠名前（）` など）のキーは、`element_gen.rs` の `call_key` が、式を括弧の内側まで見て次の 3 つの形にする。式の値は `tostring` しない。`nil` の判定と検索キーへの変換は実行時の `act:call_key` が行う（[Call のキーと失敗表記](internal-modules.md#call-のキーと失敗表記call_keyfailure)）。
+
+| 式 | キーの生成形 |
+| -- | ------------ |
+| 変数参照 1 つ（`＄x`・`＄＊x`・`＄０`） | `act:call_key(var.x, "var.x")`（引数は `dynamic_ref_args` と同じ） |
+| 関数呼び出し 1 つ（`＠f（）`・`＠＊f（）`・`＠＄v（）`） | `act:call_key(act:expr_fn("f"), nil, "@f()")`（説明は `operand_desc`） |
+| それ以外（文字列・数値・算術・連結） | `act:call_key(式)` |
+
+キーの式は呼び出しの第 2 引数のため、引数の式より先に評価される。静的ターゲットのキーは文字列リテラル `"名前"` で、`act:call_key` を通らない。
 
 ### 生成時最適化
 
@@ -243,16 +255,18 @@ end
 
 #### 末尾呼び出し
 
-ローカルシーン（暗黙の開始ブロックと名前付きローカルシーンの両方）の項目列の**最後の項目が Call** の場合に限り、その Call 文の先頭に `return` を付ける。判定は `scope_gen.rs` の `generate_local_scene_items` が行い（`is_callable_item` で Call かどうかを見る）、`element_gen.rs` の `generate_call_scene` が `is_tail_call` を受けて `return` を前置する。
+ローカルシーン（暗黙の開始ブロックと名前付きローカルシーンの両方）の項目列の**最後の項目が Call** の場合に限り、その Call 文を `return act:call(…)` にする。それ以外の Call（途中の Call）は `act:call_restore(…)` にする。判定は `scope_gen.rs` の `generate_local_scene_items` が行い（`is_callable_item` で Call かどうかを見る）、`element_gen.rs` の `generate_call_scene` が `is_tail_call` を受けて `return act:call` と `act:call_restore` を選ぶ。2 つの形は引数の並びが同じで、キーの形（静的・動的）とは独立している。
 
-Call の後にアクション行などが続く場合、および最後の項目が Call 以外の場合は `return` を付けない。
+Call の後にアクション行などが続く場合、および最後の項目が Call 以外の場合の Call は、途中の Call になる。
 
 ```text
 ＞サブ                 → return act:call(SCENE.__global_name__, "サブ", {}, table.unpack(args))
-＞サブ（Call の後に続きあり） → act:call(SCENE.__global_name__, "サブ", {}, table.unpack(args))
+＞サブ（Call の後に続きあり） → act:call_restore(SCENE.__global_name__, "サブ", {}, table.unpack(args))
 ```
 
-Lua は末尾位置の関数呼び出しで呼び出し元のスタックフレームを再利用する。`act:call` の実装も見つけたシーン関数を `return handler(self, ...)` の末尾位置で呼ぶため、シーンの末尾で次々に Call してもスタックは深くならない。`return` が付いた Call は呼び出し先の戻り値をそのまま返す。
+Lua は末尾位置の関数呼び出しで呼び出し元のスタックフレームを再利用する。`act:call` の実装も見つけたシーン関数を `return handler(self, ...)` の末尾位置で呼ぶため、シーンの末尾で次々に Call してもスタックは深くならない。`return` が付いた Call は呼び出し先の戻り値をそのまま返す。末尾の Call は戻る行が無いため、シーン文脈を戻さない。
+
+途中の Call の `act:call_restore` は、`act:call` から戻った後に `current_scene` を呼ぶ前の値に戻す（[シーン文脈の復元](internal-modules.md#シーン文脈の復元call_restorerestore_scene)）。戻った後に処理があるため、途中の Call は呼び出しの深さを 1 つ増やす。呼ばれた側の中の末尾の Call の連鎖は深くならない。
 
 #### 継続行の話者引継ぎ
 
@@ -330,7 +344,7 @@ AST の文字列（発言・単語の値・名前など）は `StringLiteralizer
 - ローカルシーンの関数名は Lua の識別子としてそのまま出力される（`SCENE.サブ_1`）。LuaJIT が 0x80 以上のバイトを識別子の文字として受け付けることを前提にしている。アクター名と `＠＊` の関数名は識別子にせず、文字列リテラルにして渡す（`act:actor_proxy("ぱすた")`・`act:global_fn("名前", …)`）。文法の識別子は `"` や `\` を含まないため、`"…"` の中にもそのまま埋め込む。
 - 名前付きローカルシーンの関数名には常に `_番号` が付くため、利用者のローカルシーン名が `SCENE.__start__`・`SCENE.__global_name__` と衝突することはない。
 - シンクを付けても付けなくても、`normalize_output` を通しても `normalize_output_with_shift` を通しても、書き出されるバイト列は同一である。出力の正規化は行の削除だけを行う。
-- 末尾呼び出しの `return` は、ローカルシーンの最後の項目が Call のときにだけ付く。
+- 末尾呼び出しの `return act:call(…)` は、ローカルシーンの最後の項目が Call のときにだけ出力する。それ以外の Call は `act:call_restore(…)` になる。どちらも Call 1 つにつき 1 行である。
 - 継続行には、同じローカルシーン内で先行するアクション行が必要である。親のグローバルシーンや別のローカルシーンからは引き継がない。
 - ロングブラケットの `=` は最大 10 個である。
 - トランスパイラは、参照先のシーン・単語の存在も、Lua ブロックの内容も検査しない。シーンと単語は実行時に検索で解決され、Lua ブロックの誤りはロード時の Lua エラーになる。`TranspileError` には未定義シーン・未定義単語を表す型も定義されているが、現行のコード生成はこれらを返さない。
