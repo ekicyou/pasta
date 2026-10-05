@@ -54,6 +54,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   ├── mod.rs          # コード生成エントリーポイント
 │       │   │   ├── scope_gen.rs    # スコープ生成（分割impl）
 │       │   │   ├── element_gen.rs  # 要素生成（分割impl）
+│       │   │   ├── expr_gen.rs     # 式生成（分割impl。値・関数呼び出し・引数・算術/連結の連鎖の組み直し）
 │       │   │   └── source_map.rs   # .pastaソースマップ記録シーム（SourceMapSink/PastaPos）
 │       │   ├── debug/      # VSCode Luaデバッグバックエンド（DAP・既定無効/ゼロコスト・SHIORI非依存）
 │       │   │   ├── mod.rs          # DebugConfig/enable()/DebugHandle/DebugError・有効化ゲート
