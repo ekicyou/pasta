@@ -1,6 +1,6 @@
 ---
 name: kiro-complete
-description: 'Kiro仕様駆動開発のSpec完了ワークフローを実行する。DoDゲート検証→コミット→completedフォルダ移動→spec.json更新→参照パス修正→ロードマップ更新→スキルドキュメント同期→最終コミット→PR作成→squashマージまでを中断なく完遂する。Use when: 実装完了を承認する, 承認してください, 完了を承認, spec承認, approve implementation, kiro承認完了。DO NOT USE when: 実装が完了したのみ（承認の明示がない場合）、タスクが終わっただけ'
+description: 'Kiro仕様駆動開発のSpec完了ワークフローを実行する。未解決問題の棚卸（軽微なものはその場で解決・既存specへの申し送りはbriefへ追記・残りは/kiro-discoveryで起票）→DoDゲート検証→コミット→completedフォルダ移動→spec.json更新→参照パス修正→ロードマップ更新→スキルドキュメント同期→最終コミット→PR作成→squashマージまでを中断なく完遂する。Use when: 実装完了を承認する, 承認してください, 完了を承認, spec承認, approve implementation, kiro承認完了。DO NOT USE when: 実装が完了したのみ（承認の明示がない場合）、タスクが終わっただけ'
 argument-hint: <feature-name>
 ---
 
@@ -41,6 +41,7 @@ argument-hint: <feature-name>
 - **VSCodeの変更ファイル確定挙動を回避** — spec.json編集は移動後に行う
 - **ステアリングが正** — DoD・コミット規約・禁止事項はすべて workflow.md に従う
 - **繰り返し仕様は移動しない** — `release-workflow` 等は常に `.kiro/specs/` 直下に留まる
+- **未解決問題を取りこぼさない** — アーカイブした後では拾い漏れに気付けない。DoD ゲートより前に棚卸しし、軽微なものはその場で直し、残りは起票・申し送りする（冒頭ステップ）
 
 ## 前提条件
 - `.kiro/specs/{feature}/tasks.md` の全タスクが完了
@@ -55,7 +56,7 @@ argument-hint: <feature-name>
 - `/kiro-spec-impl` のたびにタスクがリセットされる設計
 
 繰り返し仕様の場合:
-1. ステップ1（DoD検証）とステップ2（コミット）のみ実行
+1. 冒頭ステップ（棚卸）・ステップ1（DoD検証）・ステップ2（コミット）のみ実行
 2. ステップ3〜5（移動・パス更新・ロードマップ）をスキップ（`completed/` へは移動しない）
 3. ステップ8（リモート同期＝PR ベース）を実行
 4. tasks.md のチェックボックスをリセット（全 `[x]` → `[ ]`）
@@ -63,6 +64,32 @@ argument-hint: <feature-name>
 ---
 
 ## 手順
+
+### 冒頭ステップ: 未解決問題の棚卸（軽微はその場で解決・既存 spec へは申し送り・残りは `/kiro-discovery` で起票）
+
+DoD ゲートより前に、**実装中に発生した未解決問題のうち未起票のもの**を棚卸しし、**直ちに実施可能な軽微なものはこのブランチでその場で解決**し、残りを起票または申し送りする。完了してアーカイブした後では拾い漏れに気付けなくなるので、必ず最初に行う（繰り返し仕様でも行う）。その場の修正も Test Gate（ステップ1）の対象になるよう、DoD ゲートより前に済ませる。
+
+1. **未解決問題を洗い出す**。拾う元は次の通り。
+   - `tasks.md` の `## Implementation Notes`・`_Blocked:_` の付いたタスク
+   - `design.md` の Open Questions / Risks / Revalidation Triggers
+   - 実装・レビュー・最終検証（`/kiro-validate-impl`）の報告に残った未対応の指摘・先送り
+   - 会話の中で「別 spec で」「後で」と決めたもの
+2. **起票済みかを確かめる**。`.kiro/specs/`（`completed/` を含む）の brief.md と `.kiro/steering/roadmap.md` を検索する。本 spec の中で解決済みのものは除く。**「直さない」と裁定済みのものも除く**（触るコードのコメント・roadmap・完了 spec の台帳に取り下げの記録が無いかを確かめる）。
+3. **軽微なものはその場で解決する**。次の**すべて**を満たすものを「軽微・直ちに実施可能」とする（1 つでも外れれば手順 4・5 へ）。
+   - 開発者の裁定・設計判断・要件の追加や改訂を要しない（直し方が 1 通りに決まる）
+   - 変更が小さく閉じている（目安: 数ファイル・数十行。文言・doc・テストの穴・局所的なバグ修正など）
+   - 進行中の他 spec の担当範囲（brief・roadmap の行）と重ならない
+   - 公開 API・データ形式・依存（`Cargo.toml`）を変えない
+
+   解決の作法:
+   - バグ修正には、直す前に赤になる決定論テストを 1 本添える（doc・文言だけの修正は不要）。
+   - 修正は 1 件 1 コミット（`fix(<feature>): …` 等）で、ステップ1 の前に積む。コードを変えたときは Test Gate をセッション記録で省略しない。
+   - 着手して上の条件を外れると分かったら（裁定が要る・波及が広い・他のテストが赤になる）、その修正を戻して手順 4・5 へ回す。無理に押し込まない。
+   - 解決したものは `tasks.md` の `## Implementation Notes` に「完了時にその場で解決」として 1 行ずつ記録し、PR の body（ステップ8）にも載せる。
+4. **担当 spec が既にあるものは、その brief.md へ申し送る**（新しく起票しない）。本 spec で変えた契約・挙動（`design.md` の Revalidation Triggers に当たるもの、後続 spec が前提にしている実行経路・出力・警告の文言など）が、担当 spec の brief.md に反映されていなければ、その brief.md に「申し送り（{feature-name} より）」として追記する。書くのは、変わった事実・見直しが要る論点・参照先（本 spec の design.md の節など）。担当 spec の要件・設計を先回りで決めない（論点として渡すだけ）。担当 spec が要件フェーズ以降に進んでいる（requirements.md がある）場合は、brief.md への追記に加えて開発者に報告する。
+5. **担当の無いものを `/kiro-discovery` で起票する**。Skill ツールで `kiro-discovery` を起動する。1 件ずつでも、まとめて 1 回でもよい。
+   - **ハーネスの「別の作業として切り出す」チップ（`spawn_task`）は使わない。** チップは開発者が 1 件ずつ押して指示する手間を生み、roadmap の台帳にも載らない。出してしまっていたら `dismiss_task` で取り下げて起票し直す。
+6. 申し送り・起票した brief.md・roadmap.md の変更はステップ2でまとめてコミットする。**その場で解決した件数・申し送った件数・起票した件数をそれぞれ明示して記録する。0 件なら「0 件」と書く**（黙って飛ばさない）。
 
 ### ステップ0: 決定的解決（portable context）
 
@@ -299,6 +326,7 @@ PR の**作成またはマージ（API）が失敗**した場合（コンフリ�
 ## 完了チェックリスト
 
 ```
+- [ ] 冒頭ステップ: 実装中の未解決問題のうち未起票のものを棚卸し済み——軽微・直ちに実施可能なものはその場で解決（バグはテスト付き・1 件 1 コミット・Implementation Notes に記録）、担当 spec があるものはその brief.md へ申し送り、担当の無いものは `/kiro-discovery` で起票（解決件数・申し送り件数・起票件数をそれぞれ記録。0 件なら「0 件」）。DoD ゲートより前
 - [ ] DoD 全ゲート通過（workflow.md 準拠: Spec/Test/Doc/Steering/Soul）
 - [ ] cargo test --all 成功（またはセッション記録により省略）
 - [ ] Manual Sync Gate: 条件付き発火（book/・.claude/skills/pasta-ghost-authoring/・.claude/skills/pasta-lua-coding/ に触れる spec のみ `node book/tools/gen-skill-refs.mjs --check` と `node book/tools/link-check.mjs` を実行・非ゼロで中断／無関係変更はスキップ）
