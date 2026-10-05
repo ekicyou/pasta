@@ -2,56 +2,61 @@
 //!
 //! - `＊A1` と `＊A`×11 が 12 個の別々のシーンとして登録され、`A1_1` と `A_11` の両方が
 //!   実行できる（1.3・8.1）。旧形式（`A` ＋ `11` = `A11`）では `A1` の 1 本目と衝突する。
-//! - 実行時のシーン表のグローバルの登録名の集合が、定義から Rust の規則
-//!   （`SceneRegistry::registered_name`）で組み立てた集合と一致する（6.3）。グローバルの
-//!   登録名は Lua（`SCENE.create_scene`）が作るので、ここが Rust と Lua の形式の突き合わせになる。
-//!   ローカルの登録名は Rust の生成器が作って生成コードに埋め込むので Lua の形式とは関係しない
-//!   （辞書確定前のレジストリのローカルの通し番号を生成器にそろえるのは 4.3 で行う）。
+//! - 実行時のシーン表の関数名（`グローバル::ローカル`）の集合が、トランスパイル時のレジストリが
+//!   Rust の規則（`SceneRegistry::registered_name`）で組み立てた集合と一致する（6.3・2.12）。
+//!   グローバルの登録名は Lua（`SCENE.create_scene`）が、ローカルの関数名は Rust の生成器が作るので、
+//!   ここが Rust と Lua の形式、およびレジストリと生成器の通し番号の突き合わせになる。
+//! - 照合用の名前が重なるローカルシーン（`・挨拶・1` と `・挨拶_1`）が別々の関数になる（1.7）。
 
 use std::collections::BTreeSet;
 
 use crate::common;
 use common::e2e_helpers::create_runtime_with_finalize;
 use mlua::Lua;
+use pasta_core::registry::{SceneRegistry, WordDefRegistry};
 use pasta_dsl::parser::parse_str;
-use pasta_lua::LuaTranspiler;
+use pasta_lua::{LuaTranspiler, SearchContext};
 
 const FIXTURE: &str = include_str!("../fixtures/scene_identity_format.pasta");
 
 /// フィクスチャをトランスパイル→実行→`finalize_scene` し、ランタイムと、
-/// トランスパイル時のシーンレジストリから作ったグローバルの登録名の集合を返す。
-fn load_fixture() -> (Lua, BTreeSet<String>) {
+/// トランスパイル時のシーンレジストリを返す。
+fn load_fixture() -> (Lua, SceneRegistry) {
     load_source(FIXTURE)
 }
 
 /// `.pasta` のソースをトランスパイル→実行→`finalize_scene` する（`load_fixture` の本体）。
-fn load_source(source: &str) -> (Lua, BTreeSet<String>) {
+fn load_source(source: &str) -> (Lua, SceneRegistry) {
     let file = parse_str(source, "scene_identity_format.pasta").expect("fixture must parse");
     let mut out = Vec::new();
     let ctx = LuaTranspiler::default()
         .transpile(&file, &mut out)
         .expect("fixture must transpile");
-    // グローバルの fn_name（`登録名::__start__`）は registered_name（名前ごとの通し番号）で組み立てられる。
-    let expected = ctx
-        .scene_registry
-        .all_scenes()
-        .iter()
-        .filter(|s| s.parent.is_none())
-        .map(|s| {
-            s.fn_name
-                .split_once("::")
-                .expect("fn_name is global::local")
-                .0
-                .to_string()
-        })
-        .collect();
 
     let lua = create_runtime_with_finalize().unwrap();
     lua.load(String::from_utf8(out).unwrap()).exec().unwrap();
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
-    (lua, expected)
+    (lua, ctx.scene_registry)
+}
+
+/// トランスパイル時のレジストリの関数名（`登録名::__start__`・`親の登録名::ローカルの登録名`）の集合。
+fn registry_fn_names(registry: &SceneRegistry) -> BTreeSet<String> {
+    registry
+        .all_scenes()
+        .iter()
+        .map(|s| s.fn_name.clone())
+        .collect()
+}
+
+/// 確定後のシーン表（`collect_scenes`）の関数名の集合。
+fn runtime_fn_names(lua: &Lua) -> BTreeSet<String> {
+    pasta_lua::runtime::finalize::collect_scenes(lua)
+        .unwrap()
+        .into_iter()
+        .map(|(g, l)| format!("{g}::{l}"))
+        .collect()
 }
 
 /// シーン表から完全一致で引いたシーンを最小の act で実行し、トークの本文をつなげて返す。
@@ -94,18 +99,104 @@ fn a1_and_eleven_a_scenes_are_twelve_distinct_runnable_scenes() {
     assert!(run_scene(&lua, "A_11", "__start__").contains("A本体11"));
 }
 
-/// 6.3: 実行時のグローバルの登録名の集合が、定義から Rust の規則で組み立てた集合と一致する。
+/// 6.3: 実行時の関数名の集合（グローバル・ローカルとも）が、定義から Rust の規則で組み立てた
+/// トランスパイル時のレジストリの集合と一致する。
 #[test]
 fn runtime_registered_names_match_rust_registered_name_rule() {
-    let (lua, expected) = load_fixture();
-    let actual: BTreeSet<String> = pasta_lua::runtime::finalize::collect_scenes(&lua)
-        .unwrap()
-        .into_iter()
-        .map(|(g, _)| g)
-        .collect();
+    let (lua, registry) = load_fixture();
     assert_eq!(
-        actual, expected,
-        "Lua の登録名と Rust の registered_name の形式が一致する"
+        runtime_fn_names(&lua),
+        registry_fn_names(&registry),
+        "Lua の登録名・生成器の関数名と Rust の registered_name の形式が一致する"
+    );
+}
+
+/// 1.7・8.1: 同じグローバルシーンの中の `・挨拶・1` と `・挨拶_1` は照合用の名前（`挨拶_1`）が
+/// 重なるが、別々の関数（`挨拶_1_1`・`挨拶_1_2`）になり、どちらも実行できる。
+#[test]
+fn locals_with_overlapping_sanitized_names_are_distinct_runnable_functions() {
+    let source = [
+        "＊会話",
+        "　さくら：「会話本体」",
+        "",
+        "　・挨拶・1",
+        "　　さくら：「中黒本体」",
+        "",
+        "　・挨拶_1",
+        "　　さくら：「下線本体」",
+        "",
+    ]
+    .join("\n");
+    let (lua, registry) = load_source(&source);
+    assert!(run_scene(&lua, "会話_1", "挨拶_1_1").contains("中黒本体"));
+    assert!(run_scene(&lua, "会話_1", "挨拶_1_2").contains("下線本体"));
+    assert_eq!(runtime_fn_names(&lua), registry_fn_names(&registry));
+}
+
+/// 2.12・6.3: 開始シーン＋名前の異なるローカルシーン 2 つ＋同名のローカルシーン 2 つを持つ
+/// 1 ファイルで、辞書確定前のレジストリと確定後のシーン表の関数名の集合が一致し、
+/// 決まった順に選ぶ設定の下で検索の結果も同じになる。
+#[test]
+fn transpile_time_registry_matches_finalized_scene_table() {
+    let source = [
+        "＊会話",
+        "　さくら：「会話本体」",
+        "",
+        "　・選択A",
+        "　　さくら：「選択A本体」",
+        "",
+        "　・選択B",
+        "　　さくら：「選択B本体」",
+        "",
+        "　・挨拶",
+        "　　さくら：「挨拶本体1」",
+        "",
+        "　・挨拶",
+        "　　さくら：「挨拶本体2」",
+        "",
+    ]
+    .join("\n");
+    let (lua, registry) = load_source(&source);
+    assert_eq!(
+        runtime_fn_names(&lua),
+        registry_fn_names(&registry),
+        "辞書確定前と確定後の関数名の集合が一致する"
+    );
+
+    // (検索する名前, 親の登録名, 呼ぶ回数)
+    let queries: [(&str, Option<&str>, usize); 4] = [
+        ("会話", None, 1),
+        ("選択A", Some("会話_1"), 1),
+        ("選択", Some("会話_1"), 2),
+        ("挨拶", Some("会話_1"), 2),
+    ];
+
+    let mut transpiled = SearchContext::new(registry, WordDefRegistry::new()).unwrap();
+    transpiled.set_scene_selector(Some(vec![0])).unwrap();
+    let finalized: mlua::Function = lua
+        .load(
+            r#"
+            local SEARCH = require "@pasta_search"
+            SEARCH:set_scene_selector(0)
+            return function(name, parent) return SEARCH:search_scene(name, parent) end
+        "#,
+        )
+        .eval()
+        .unwrap();
+
+    let (mut before, mut after) = (Vec::new(), Vec::new());
+    for (name, parent, n) in queries {
+        for _ in 0..n {
+            before.push(transpiled.search_scene(name, parent).unwrap());
+            let (g, l): (Option<String>, Option<String>) = finalized.call((name, parent)).unwrap();
+            after.push(g.zip(l));
+        }
+    }
+
+    assert_eq!(after, before, "辞書確定前と確定後で検索の結果が同じ");
+    assert!(
+        before.iter().all(Option::is_some),
+        "どの検索も候補が見つかる: {before:?}"
     );
 }
 

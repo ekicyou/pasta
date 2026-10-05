@@ -9,7 +9,7 @@ use pasta_dsl::parser::{ActorScope, FileItem, GlobalSceneScope, KeyWords, PastaF
 use super::code_gen::LuaCodeGenerator;
 use super::code_gen::source_map::SourceMapSink;
 use super::config::TranspilerConfig;
-use super::context::TranspileContext;
+use super::context::{TranspileContext, local_scene_counters};
 use super::error::TranspileError;
 use super::normalize::{LineShift, normalize_output_with_shift};
 
@@ -217,9 +217,11 @@ impl LuaTranspiler {
         codegen.generate_global_scene(scene, counter, context, &merged_attrs)?;
 
         // Register named local scenes (start scene is part of global)
-        for (local_idx, local_scene) in scene.local_scenes.iter().enumerate() {
+        // 通し番号は生成器と同じ local_scene_counters（照合用の名前ごと）を使う（2.12）。
+        let local_counters = local_scene_counters(&scene.local_scenes);
+        for (local_scene, local_counter) in scene.local_scenes.iter().zip(local_counters) {
             if local_scene.name.is_some() {
-                context.register_local_scene(local_scene, &scene.name, counter, local_idx + 1);
+                context.register_local_scene(local_scene, &scene.name, counter, local_counter);
             }
         }
 

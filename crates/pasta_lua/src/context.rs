@@ -50,13 +50,15 @@ impl TranspileContext {
     /// Register a local scene (Task 3.1).
     ///
     /// Registers the local scene under the parent global scene.
+    /// `local_counter` は照合用の名前ごとの通し番号（[`local_scene_counters`] の値。
+    /// 生成器の関数名と同じ番号）。
     /// Returns the assigned scene ID.
     pub fn register_local_scene(
         &mut self,
         local_scene: &LocalSceneScope,
         parent_name: &str,
         parent_counter: usize,
-        local_index: usize,
+        local_counter: usize,
     ) -> i64 {
         let attrs: HashMap<String, String> = local_scene
             .attrs
@@ -68,7 +70,7 @@ impl TranspileContext {
         let name = local_scene.name.as_deref().unwrap_or("__start__");
 
         self.scene_registry
-            .register_local(name, parent_name, parent_counter, local_index, attrs)
+            .register_local(name, parent_name, parent_counter, local_counter, attrs)
     }
 
     // =========================================================================
@@ -116,6 +118,28 @@ impl TranspileContext {
         // Merge word registry
         self.word_registry.merge_from(other.word_registry);
     }
+}
+
+/// グローバルシーンの中のローカルシーンの通し番号を、定義順に返す。
+///
+/// 名前つきのローカルシーンは照合用の名前（`SceneRegistry::sanitize_name`）ごとに 1 から数える
+/// （`・挨拶・1` と `・挨拶_1` はどちらも `挨拶_1` なので 1・2）。無名の開始シーンは 0。
+/// 生成器の関数名とトランスパイル時のレジストリの登録の両方がこの番号を使う（1.7・2.12）。
+pub fn local_scene_counters(local_scenes: &[LocalSceneScope]) -> Vec<usize> {
+    let mut counters: HashMap<String, usize> = HashMap::new();
+    local_scenes
+        .iter()
+        .map(|local| match &local.name {
+            Some(name) => {
+                let count = counters
+                    .entry(SceneRegistry::sanitize_name(name))
+                    .or_insert(0);
+                *count += 1;
+                *count
+            }
+            None => 0,
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -182,6 +206,22 @@ mod tests {
         assert_eq!(id, 2);
         let scenes = ctx.scene_registry.all_scenes();
         assert_eq!(scenes.len(), 2);
+        // 第 4 引数は照合用の名前ごとの通し番号（生成器の関数名 `自己紹介_1` と同じ番号）
+        assert_eq!(scenes[1].fn_name, "メイン_1::自己紹介_1");
+    }
+
+    #[test]
+    fn test_local_scene_counters_count_per_sanitized_name() {
+        // 開始シーンは 0、名前つきは照合用の名前ごとに 1 から数える（1.7）
+        let locals: Vec<LocalSceneScope> =
+            [None, Some("A"), Some("挨拶・1"), Some("A"), Some("挨拶_1")]
+                .into_iter()
+                .map(|name| LocalSceneScope {
+                    name: name.map(str::to_string),
+                    ..create_test_local_scene("x")
+                })
+                .collect();
+        assert_eq!(local_scene_counters(&locals), vec![0, 1, 1, 2, 2]);
     }
 
     #[test]

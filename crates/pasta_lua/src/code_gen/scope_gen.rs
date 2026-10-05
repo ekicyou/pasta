@@ -1,7 +1,7 @@
 //! Scope-level code generation: actors, global scenes, local scenes.
 
 use super::LuaCodeGenerator;
-use crate::context::TranspileContext;
+use crate::context::{TranspileContext, local_scene_counters};
 use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
 use pasta_core::registry::SceneRegistry;
@@ -175,17 +175,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             self.write_blank_line()?;
         }
 
-        // Generate local scenes with per-name counters
-        // Same-name scenes get incrementing numbers (_1, _2, ...)
-        let mut name_counters: HashMap<String, usize> = HashMap::new();
-        for local_scene in &scene.local_scenes {
-            let counter = if let Some(ref name) = local_scene.name {
-                let count = name_counters.entry(name.clone()).or_insert(0);
-                *count += 1;
-                *count
-            } else {
-                0 // start scene doesn't use counter
-            };
+        // ローカルシーンを照合用の名前ごとの通し番号（_1, _2, ...）で生成する。
+        // トランスパイル時のレジストリの登録と同じ local_scene_counters を使う（2.12）。
+        let counters = local_scene_counters(&scene.local_scenes);
+        for (local_scene, counter) in scene.local_scenes.iter().zip(counters) {
             // Parent reference for the local join key: "{base}#{counter}" identifies
             // the enclosing global occurrence (matches runtime per-base ordering).
             let parent_ref = format!("{}#{}", base_name, scene_counter);
@@ -221,7 +214,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// end
     /// ```
     ///
-    /// The `counter` parameter is the per-name counter (1, 2, 3... for same-name scenes).
+    /// `counter` は照合用の名前ごとの通し番号（`local_scene_counters` の値。1, 2, 3...）。
     /// For start scenes (name is None), counter is ignored.
     ///
     /// Note: Code blocks associated with local scenes are NOT generated here.
@@ -239,8 +232,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         parent_ref: &str,
     ) -> Result<(), TranspileError> {
         let fn_name = if let Some(ref name) = scene.name {
-            let sanitized = SceneRegistry::sanitize_name(name);
-            format!("{}_{}", sanitized, counter)
+            SceneRegistry::registered_name(name, counter)
         } else {
             "__start__".to_string()
         };

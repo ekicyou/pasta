@@ -98,7 +98,7 @@ impl SceneRegistry {
     /// * `name` - Original scene name (without scope prefix)
     /// * `parent_name` - Parent global scene name
     /// * `parent_counter` - Parent's counter value
-    /// * `local_index` - Local scene index within parent (1-based, matches CodeGenerator)
+    /// * `local_counter` - 照合用の名前ごとの通し番号（1 から。生成器の関数名と同じ番号）
     /// * `attributes` - Attributes for filtering
     ///
     /// # Returns
@@ -109,18 +109,18 @@ impl SceneRegistry {
         name: &str,
         parent_name: &str,
         parent_counter: usize,
-        local_index: usize,
+        local_counter: usize,
         attributes: HashMap<String, String>,
     ) -> i64 {
         let id = (self.scenes.len() + 1) as i64;
 
         // Local scene function path: parent module + local function
         // Format: crate::親_番号::子_番号
-        // Use local_index to match CodeGenerator's generate_local_scene
+        // local_counter is the same number CodeGenerator's generate_local_scene uses
         let fn_name = format!(
             "{}::{}",
             Self::registered_name(parent_name, parent_counter),
-            Self::registered_name(name, local_index)
+            Self::registered_name(name, local_counter)
         );
         let fn_path = format!("crate::{}", fn_name);
 

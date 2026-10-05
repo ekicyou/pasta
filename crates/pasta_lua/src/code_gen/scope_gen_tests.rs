@@ -455,3 +455,22 @@ fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
         sink.scenes
     );
 }
+
+/// 1.7: 照合用の名前が重なるローカルシーン（`・挨拶・1` と `・挨拶_1`。どちらも `挨拶_1`）は
+/// 照合用の名前ごとに数えるので、別々の関数（`挨拶_1_1`・`挨拶_1_2`）になり上書きされない。
+#[test]
+fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
+    let ctx = TranspileContext::new();
+    let attrs = std::collections::HashMap::new();
+    let scene = global_scene_with(
+        "会話",
+        3,
+        vec![
+            named_local_with_span("挨拶・1", 5),
+            named_local_with_span("挨拶_1", 8),
+        ],
+    );
+    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, 1, &ctx, &attrs));
+    assert!(text.contains("function SCENE.挨拶_1_1(act, ...)"), "{text}");
+    assert!(text.contains("function SCENE.挨拶_1_2(act, ...)"), "{text}");
+}
