@@ -143,3 +143,39 @@
   - 途中の Call の生成形を変えたときの、デバッガのステップ動作（`pasta_lua/src/debug/`）への影響。
   - 呼ばれた側がエラーで抜けた場合に文脈が戻らないことの影響（コルーチンが失敗で終わる前提の確認）。
 - **並走条件**: Wave 3 は本 spec だけ。`element_gen.rs`・`act.lua` を先に触った `dsl-codegen-runtime-safety`・`act-token-grouping-fix`・`scene-identity-format` は main に入っている（本ワークツリーの HEAD で確認）。
+
+### 6. 重複セッションの検討内容の統合（2026-10-05）
+
+同じ spec を別セッション（ブランチ `claude/call-execution-correctness-6012ae`、コミット `ecf5ba40`）でも起草していた。そちらの要件・ギャップ分析から、本書に無かった事実と判断を取り込んだ。以後は本ブランチを正とする。
+
+#### 6.1 要件へ取り込んだもの
+
+- U28 の再現手順を受入基準にした（要件 1.11）。
+- Call のターゲットが Lua の関数で、その中から別のグローバルシーンが呼ばれる場合（要件 1.10）。
+- 呼ばれた側が選択肢を出して中断し、中断中に選ばれる場合は現行どおり呼ばれた側から探す（要件 2.7）。
+- 末尾の Call: 連鎖は少なくとも 10 万回、戻り値の透過、生成コードの不変（要件 4.1・4.8・4.9）。
+- 演算の結果が nil のときは Call の警告を重ねない（要件 5.6）。`act:talk`・`act:arith`・`act:concat` は、値が nil で説明も無いとき「内側の失敗の伝播」として黙る。この既存の慣行に合わせ、起草時の仮定 A6（重ねて出す）を取り下げた。
+- nil に関するどの場合も 500 を返さない（要件 5.11）。
+- 破壊的変更は `fix!` とリリースノートで扱う（Boundary Context）。
+
+#### 6.2 追加の事実
+
+- `act:call` の 4 番目以降の引数はすべて呼ばれた側へ渡る。警告用の説明を後ろに足す場所は無い（3.3 の案 N1-a を推す理由）。
+- `STORE.last_global_scene` は `STORE` のリセット（`store.lua` 103 行）でも書かれる。テストは `tests/lua_specs/store_last_global_scene_test.lua` にもある。
+- スナップショットの数: `act:call(` を含むもの 14 件、`tostring(` を含むもの 6 件、途中の Call（行頭が `act:call(`）を含むもの 3 件（`tail_call_optimization` 2 件と `fixture_sample`）。
+- マニュアルの追加の該当箇所: `grammar/call-jump.md` 34・38 行（「値を文字列に変換して検索キーにする」）、`internals/registry-search.md` 220 行（`init_scene` が `current_scene` を設定する）。
+- `crates/pasta_shiori/tests/support/scripts/pasta/act.lua` は古い形の別実装（テスト用の支援スクリプト）。変更の対象かどうかは設計で確認する。
+
+#### 6.3 実装の選択肢の追加
+
+- **案 D（3.1 への追加）: 文脈を字句的な引数に変える**。生成コードが名前解決のたびに自分の `SCENE` を渡し、ランタイムは `current_scene` でなく渡された値で 1・2 段目を引く（`act:call` の未使用の第 1 引数はこの形の名残り）。
+  - ✅ 上書きという原因そのものが無くなる。式の関数呼び出しの経路（要件 3）も同時に解ける。
+  - ❌ `act:word`・`act:expr_fn`・アクタープロキシなど、すべての生成コードと公開 API の引数が変わる。`dsl-codegen-runtime-safety` の領分に踏み込む。規模 L。選択肢の探索範囲は別に扱う必要がある。不採用の見込み。記録のために残す。
+- **案 N2 の補足**: 生成コードで nil を判定する形は、末尾の Call の生成形（`return act:call(…)`）を変えるため、要件 4.9 と衝突する。
+
+#### 6.4 Research Needed の追加
+
+- 動的コールの値が空文字列のとき、`SCENE.search("")` が前方一致で任意のシーンに当たる可能性（仮定 A7 の判断材料）。
+- 末尾の Call の 10 万回の連鎖を DSL だけで書くテストの形（動的コールと Lua の関数で終了条件を作る）。
+- `pasta_sample_ghost` などの同梱の辞書に、戻った後に呼ばれた側のローカルが見えることへ依存した書き方が無いか。
+- `crates/pasta_shiori/tests/support/scripts/pasta/act.lua` が Call の経路のテストに使われているか。
