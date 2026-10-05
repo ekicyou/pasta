@@ -108,24 +108,21 @@ local function next_tag(s, pos)
     end
 end
 
---- 名前の先頭 1 文字だけで決まるスコープ切替タグ（\0 \1 \h \u）
-local SCOPE_HEAD = { ["0"] = true, ["1"] = true, h = true, u = true }
+--- 名前だけで決まるスコープ切替タグ（\0 \1 \h \u）
+local SCOPE_NAMES = { ["0"] = true, ["1"] = true, h = true, u = true }
 
---- サーフェス変更なら ID を返す（\s[ID] / \sN）。空 ID は無視する
+--- サーフェス変更なら ID を返す（\s[ID] / \sN）。名前は正確な一致で判定し、空 ID は無視する
 local function surface_id(name, arg)
-    local id = (name == "s" and arg) or name:match("^s(%d)")
+    local id = (name == "s" and arg) or name:match("^s(%d)$")
     if id ~= "" then
         return id
     end
     return nil
 end
 
---- スコープ切替タグか（\0 \1 \h \u \p[N] \pN）
+--- スコープ切替タグか（\0 \1 \h \u \p[N] \pN）。名前は正確な一致で判定する
 local function is_scope(name, arg)
-    if SCOPE_HEAD[name:sub(1, 1)] then
-        return true
-    end
-    return (name == "p" and arg ~= nil) or name:match("^p%d") ~= nil
+    return SCOPE_NAMES[name] or (name == "p" and arg ~= nil) or name:match("^p%d$") ~= nil
 end
 
 --- bind タグか（\![bind,...] / \![bind-noevent,...]）
@@ -329,16 +326,16 @@ function APPEARANCE.observe(state, actor, spot, text)
 end
 
 --- 文字列の先頭タグ列を走査し、分類済みタグを found へ出現順に追加する
---- @return boolean 一般文字・スコープ切替タグに達したら true（先頭タグ列の終端）
+--- @return boolean 字（一般文字・エスケープ・中身のある囲み）・スコープ切替タグに達したら true（先頭タグ列の終端）
 local function scan_leading_text(s, found)
     local pos = 1
     while pos <= #s do
         if s:sub(pos, pos) ~= "\\" then
             return true
         end
-        local name, arg, next_pos = tag_at(s, pos)
-        if not name then
-            return true -- `\\` 等はタグでなく一般文字
+        local name, arg, next_pos, literal = tag_at(s, pos)
+        if not name or (literal and literal ~= "") then
+            return true -- エスケープ・単位にならない `\`・中身のある囲みは字
         end
         local kind, value = classify(name, arg)
         if kind == "scope" then
