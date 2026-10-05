@@ -357,7 +357,7 @@ function ACT_IMPL.call_key(self, value, var_path, desc) end
 - `var_path` があるときの警告は `WORD.dynamic_key(value, var_path, "act:call")` に任せる（動的単語参照と同じ分類・同じ文言。要件 5.4・6.3）。
 - `act:call`・`act:call_restore` は、キーが印なら検索も警告もせずに nil を返す。印は外へ公開しない一意の表で、文字列 `"nil"` や `false` と衝突しない。
 - 失敗表記は `call_key` の中で積む。キーの式は引数の式より先に評価されるため、引数の式がトークンを積む場合は失敗表記がその前に来る。
-- **仮定（Open Questions 2）**: 文言は上表の案。
+- 文言は上表のとおり（設計ディスカッション #2 で確定）。
 
 #### ActCall（既存 `act:call` への追加）
 
@@ -469,13 +469,11 @@ function ACT_IMPL.failure(self, text, warning) end
 - マニュアルは同じ変更で更新し、`node book/tools/gen-skill-refs.mjs --check` と `node book/tools/link-check.mjs` を完了条件にする。
 - 実装時の確認: `crates/pasta_sample_ghost` などの同梱の辞書に、戻った後に呼ばれた側のローカルが見えることへ依存した書き方と、「あれば呼ぶ」つもりの存在しないシーンへの Call が無いこと。
 
-## Open Questions（設計ディスカッションで確定する）
-
-1. **失敗表記の文言**。`【Call失敗：「名前」が見つからない】`・`【Call失敗：var.x が nil】` ほか DynamicCallKey の表の案でよいか。
-
 ## 設計ディスカッションの決定（2026-10-05）
 
 - **#1 選択肢の探索範囲は `\q` の第 3 引数に載せる**。ランタイムに記録を持たない。選択肢を含む応答のさくらスクリプトは第 3 引数の分だけ現行と変わる（表示・動作は同じ）。Reference2 が無い場合は現行の探し方に落ちる。`STORE` に表を持つ案は、破棄の時点と同じジャンプ先名の衝突を解けないため採らない。
+
+- **#2 失敗表記の文言**: `【Call失敗：…】` の枠と DynamicCallKey の表の言い回しで確定。変数・関数はログの警告と同じ表記（`var.x`・`save.x`・`args[1]`・`@名前()`）で書く。バルーンで見た表記でログを検索できる。DSL の表記（`＄x`・`＠名前（）`）に揃えるかは、ログの警告も含めて `failure-output-unification` で決める。
 
 ### 議題にせず確定したもの
 
