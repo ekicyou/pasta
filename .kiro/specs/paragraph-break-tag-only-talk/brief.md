@@ -15,6 +15,15 @@
 
 申し送り元は emo2（pasta.dll 0.3.7・埋め込み pasta_scripts）の `＊OnFirstBoot`。2026-10-05 に現行 main（b7379789）でも同じ分岐が残っていることをコード上で確認した。
 
+- **ベースウェアによらない**: areka に加え、SSP でも同じ空きが出ることを追報で確認した（開発版のゴースト・pasta.dll の版は未確認）。
+  - SSP が返した台本の原文には `\p[0]\n[150]\s[1000]\![bind,…]`（字なし）→ `\p[1]\n[150]\s[静観]僕は…` → `\p[0]\n[150]\s[1000]…つまり、、` とあり、むらさきの欄で `\n[150]` が 2 回効いている。
+  - エモの最初の台詞の前にも `\p[1]\n[150]\s[笑顔]僕はエモ。` が付く。冒頭のエモの出力は `\p[1]\s[静観]\1\![move,…]` で、字は無い。
+- **証拠**: areka のワークツリー `C:\home\maz\git\areka\.claude\worktrees\areka-p0-translate-pipeline-2cf68b\.kiro\specs\areka-P0-budoux-reveal-reflow\evidence\` に置かれている。
+  - 台本の原文 `ssp-onfirstboot-script.txt`
+  - SSP の画面 `12-ssp-pasta-blank-lines.jpg`
+  - areka の画面 `04-pasta-blank-lines.jpg`
+  - 要件フェーズでは、この台本の原文をテストの期待値の材料にできる。
+
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` の `BUILDER.build` には、内側のトークンを振り分ける分岐がある。
   - **S3**（184 行付近）: `inner.type == "talk" and inner.text ~= nil and inner.text ~= ""` のとき、保留中の改行を出力し、`spot_has_text[last_spot] = true` にする。本文がタグだけかどうかは見ない。
   - **S4**（195 行付近）: 状態を変えずに出力だけする。
