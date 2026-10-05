@@ -1,0 +1,23 @@
+{
+  "feature_name": "search-selector-indices",
+  "created_at": "2026-10-04T09:04:55Z",
+  "updated_at": "2026-10-04T23:30:18Z",
+  "completed_at": "2026-10-04T23:30:18Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": false
+}

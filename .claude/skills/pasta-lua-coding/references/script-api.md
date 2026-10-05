@@ -32,7 +32,7 @@ local save, var = act:init_scene(SCENE)
 - 戻り値の `save`・`var` は `act.save`・`act.var` と同じ表である。
 - 呼ぶと、そのシーンが実行中のシーンになる。名前の検索（[検索と呼び出し](#検索と呼び出し)）の 1・2 段目と、選択肢の行き先の検索（[OnChoiceSelectEx](shiori-events.md#onchoiceselectex)）は、実行中のシーンを基準にする。
 - シーン関数でない関数（`GLOBAL` の関数など）で `save`・`var` が必要なときは、`init_scene` を呼ばずに `act.save`・`act.var` を使う。
-- アクション行の `＠名前（…）`・`＠単語`・`＠＄変数名（…）`・`＠＄変数名` から呼ばれた関数は、第 1 引数に ACT ではなくアクタープロキシを受け取る（`＠＊名前（…）` は ACT を受け取る）。その場合の ACT はプロキシの `act` フィールドから取る（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
+- シーン関数は、アクション行の `＠名前（…）`・`＠単語`・`＠＄変数名（…）`・`＠＄変数名` から呼ばれた場合も、第 1 引数に ACT を受け取る。アクタープロキシを受け取るのは、アクション行のアクターの表の関数だけである（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
 
 ```lua
 function SCENE.カウント(act)
@@ -167,7 +167,8 @@ local name = act:get_property("sakura.name", 10, "name取得タイムアウト")
 
 - いずれも `act` を返し、続けて呼べる。
 - 表示制御のトークンは、直前に積まれた `talk`・`sakura_script` のアクターの出力の中に入る（そのアクターの立ち位置に効く）。
-- 1 回の出力（`yield` またはシーンの終了で区切られる範囲）の中で、まだ `talk` も `sakura_script` も積まれていないうちに積んだ表示制御は出力されない。`choice`・`choice_timeout` も同じである。`raw_script` はこの制約を受けない。
+- 1 回の出力（`yield` またはシーンの終了で区切られる範囲）の中で、まだ `talk` も `sakura_script` も積まれていないうちに積んだ表示制御は、どのアクターにも結び付かず、スコープ切替タグを付けずに、積んだ位置にそのまま出力される。`clear_spot` の後、まだ発言を積んでいないうちに積んだ表示制御も同じである。`choice`・`choice_timeout` も同じ規則に従う。
+- 発言者の表情は、発言の中か発言の後に書く。発言より前に積んだ `surface` は、次の発言者の表情にはならない。
 
 ```lua
 act:talk(act.さくら.actor, "えっ")
@@ -183,7 +184,8 @@ act:surface(5):wait(500):talk(act.さくら.actor, "驚いた！"):newline()
 
 - 立ち位置の変更は、応答を組み立てるときに積んだ順に反映され、以降の発言の `\p[番号]` が変わる。設定はイベントをまたいで保たれる。
 - 立ち位置が無いアクターは、スポット 0 で話す（警告ログが出る）。
-- 1 回の出力の中で、同じアクターの発言が `set_spot`・`clear_spot` の前後に続くと、後の発言も変更前の立ち位置で出力される（変更はそのアクターの続く発言の後に反映される）。
+- 1 回の出力の中で、同じアクターの発言が `set_spot` の前後に続くと、後の発言も変更前の立ち位置で出力される（変更はそのアクターの続く発言の後に反映される）。
+- `clear_spot` の後の発言は、前の発言と同じアクターでも、`clear_spot` とその後の `set_spot` を反映した立ち位置で出力される。
 - 戻り値が `nil` のため、続けて呼べない。
 - DSL の `％` 行は、シーンの先頭で `clear_spot()` と、並べたアクターごとの `set_spot(名前, 番号)` を生成する（[シーンスコープ内でのアクター指定](https://ekicyou.github.io/pasta/grammar/actor-dictionary.html#シーンスコープ内でのアクター指定)）。
 
@@ -195,12 +197,13 @@ act:surface(5):wait(500):talk(act.さくら.actor, "驚いた！"):newline()
 | ------ | ---- | ------ |
 | `act.さくら:talk(text)` | `act:talk(act.さくら.actor, text)` と同じ | `nil` |
 | `act.さくら:sakura_script(text)` | `act:sakura_script(act.さくら.actor, text)` と同じ | `nil` |
-| `act.さくら:word(name, var_path)` | アクター辞書を先に探してから単語を探す（[アクタースコープと単語参照の統合](https://ekicyou.github.io/pasta/grammar/actor-dictionary.html#アクタースコープと単語参照の統合)）。見つかった関数にはプロキシを渡す。`var_path` の扱いは `act:word` と同じで、動的参照のときアクターの表は、表自身のフィールド（`name` と pasta.toml の `[actor.名前]` で設定した値など。`create_word` などのメソッドは含まない）だけを探す | 単語、または `nil` |
-| `act.さくら:expr_fn(key, ...)` | `act:expr_fn` と同じ検索で関数を探して呼ぶ。関数の第 1 引数はプロキシ | 関数の戻り値、または `nil` |
-| `act.さくら:expr_fn_var(value, var_path, ...)` | `act:expr_fn_var` と同じ検索で関数を探して呼ぶ。関数の第 1 引数はプロキシ | 関数の戻り値、または `nil` |
+| `act.さくら:word(name, var_path)` | アクター辞書を先に探してから単語を探す（[アクタースコープと単語参照の統合](https://ekicyou.github.io/pasta/grammar/actor-dictionary.html#アクタースコープと単語参照の統合)）。見つかった関数には、アクターの表で見つかったときはプロキシを、それ以外の段で見つかったときは ACT を渡す。`var_path` の扱いは `act:word` と同じで、動的参照のときアクターの表は、表自身のフィールド（`name` と pasta.toml の `[actor.名前]` で設定した値など。`create_word` などのメソッドは含まない）だけを探す | 単語、関数の戻り値、または `nil` |
+| `act.さくら:expr_fn(key, ...)` | `act:expr_fn` と同じ検索で関数を探して呼ぶ（アクターの表は探さない）。関数の第 1 引数は ACT | 関数の戻り値、または `nil` |
+| `act.さくら:expr_fn_var(value, var_path, ...)` | `act:expr_fn_var` と同じ検索で関数を探して呼ぶ（アクターの表は探さない）。関数の第 1 引数は ACT | 関数の戻り値、または `nil` |
 | `act.さくら.actor` | アクターオブジェクト | — |
 | `act.さくら.act` | 元の ACT | — |
 
+- `word`・`expr_fn`・`expr_fn_var` は、呼んだ関数の先頭の戻り値が ACT またはそのプロキシそのものなら `nil` を返す。それ以外の戻り値は、複数の値も含めてそのまま返す。ACT の `word`・`expr_fn`・`expr_fn_var`・`global_fn` は戻り値を変えない（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
 - `talk`・`sakura_script` は `nil` を返すため、プロキシの呼び出しは続けて書けない。
 - メソッド名（`talk`・`wait`・`yield` など）やフィールド名（`save`・`var`・`actors` など）と同じ名前のアクターは、`act.名前` ではプロキシにならない。
 - 生成コードは、アクション行の発言とアクター付きの単語参照・関数呼び出しを、`act.名前` ではなく [actor_proxy](#actor_proxyname) で得たプロキシで書く（`ぱすた：こんにちは` は `act:actor_proxy("ぱすた"):talk("こんにちは")`）。名前を文字列で渡すため、メソッド名・フィールド名と同じ名前のアクターも、アクション行では話せる。
@@ -315,17 +318,18 @@ act:call(nil, "挨拶", nil)           -- 「挨拶」で前方一致するシ�
 local fn = act:find_scene("挨拶")    -- 呼ばずに関数だけを得る
 ```
 
-### アクター・グローバル関数・算術
+### アクター・グローバル関数・算術・連結
 
-アクション行のアクター、`＠＊名前（…）`、式の算術の生成コードは、次のメソッドを呼ぶ。どれも、アクターや関数が無いとき・値が数値にできないときに Lua のエラーにせず、警告ログを出して続ける。手書きの Lua からも呼べる。
+アクション行のアクター、`＠＊名前（…）`、式の算術と連結の生成コードは、次のメソッドを呼ぶ。どれも、アクターや関数が無いとき・値が数値や文字列にできないときに Lua のエラーにせず、警告ログを出して続ける。手書きの Lua からも呼べる。
 
 | メソッド | 内容 | 戻り値 |
 | -------- | ---- | ------ |
 | `act:actor_proxy(name)` | アクター `name` のアクタープロキシを得る | アクタープロキシ（常に `nil` でない） |
 | `act:global_fn(name, ...)` | `GLOBAL` の関数 `name` を呼ぶ | 関数の戻り値、または `nil` |
 | `act:arith(op, lhs, rhs, lhs_desc, rhs_desc)` | 数値の二項演算 | 演算結果、または `nil` |
+| `act:concat(lhs, rhs, lhs_desc, rhs_desc)` | 文字列の連結 | 連結した文字列、または `nil` |
 
-- 3 つの名前は act のメソッドのため、ほかの act のメソッド（`talk`・`wait` など）と同じ制限を受ける。手書き Lua の `act.actor_proxy`・`act.global_fn`・`act.arith` は、同じ名前のアクターがいてもプロキシにならない（[アクタープロキシ](#アクタープロキシ)）。また、`＠名前（…）`・`＠名前` の検索の 3 段目で見つかるため、`GLOBAL` に同じ名前の関数があっても `＠名前（…）` では届かない（`＠＊名前（…）` では届く）。1・2 段目（実行中のシーンのシーンテーブル、ローカル単語・ローカルシーン）にある同じ名前は、3 段目より先に見つかる（[検索と呼び出し](#検索と呼び出し)）。
+- 4 つの名前は act のメソッドのため、ほかの act のメソッド（`talk`・`wait` など）と同じ制限を受ける。手書き Lua の `act.actor_proxy`・`act.global_fn`・`act.arith`・`act.concat` は、同じ名前のアクターがいてもプロキシにならない（[アクタープロキシ](#アクタープロキシ)）。また、`＠名前（…）`・`＠名前` の検索の 3 段目で見つかるため、`GLOBAL` に同じ名前の関数があっても `＠名前（…）` では届かない（`＠＊名前（…）` では届く）。1・2 段目（実行中のシーンのシーンテーブル、ローカル単語・ローカルシーン）にある同じ名前は、3 段目より先に見つかる（[検索と呼び出し](#検索と呼び出し)）。
 
 #### actor_proxy(name)
 
@@ -361,10 +365,33 @@ act:arith(op, lhs, rhs, lhs_desc?, rhs_desc?) -> number | nil
 | `lhs_desc`・`rhs_desc` | string または nil | 警告ログに出す被演算子の説明（`"var.x"`・`"@f()"` など） |
 
 - 被演算子は、数値ならそのまま、文字列なら `tonumber` で数値にする。両方が数値になれば、演算の結果を返す。
-- 数値にできない被演算子（`nil`・数字でない文字列・真偽値・表など）があれば `nil` を返し、その被演算子ごとに警告ログ `act:arith - operand is not a number` を出す。ただし、値が `nil` で説明も `nil` の被演算子では警告しない（内側の `act:arith` が既に警告して `nil` を返した場合）。
+- 数値にできない被演算子（`nil`・数字でない文字列・真偽値・表など）があれば `nil` を返し、その被演算子ごとに警告ログ `act:arith - operand is not a number: op='+', operand='var.x', value=nil` を出す。`operand=` は説明があるときだけ付く。`value=` は値の種類を表し、`nil`・`'abc' (string)`・`true (boolean)`、それ以外は `(table)` のように型名だけになる（表の `__tostring` は呼ばない）。ただし、値が `nil` で説明も `nil` の被演算子では警告しない（内側の `act:arith`・`act:concat` が既に警告して `nil` を返した場合）。
 - 表の被演算子に `__add` などのメタメソッドがあっても呼ばない。
 - `op` が上のどれでもないときは、警告ログを出して `nil` を返す。
 - DSL の式の算術は、演算ごとに `act:arith` になる。優先順位と括弧は入れ子で表される（[算術の評価](https://ekicyou.github.io/pasta/grammar/variables.html#算術の評価)・[DSL と Lua の対応表](https://ekicyou.github.io/pasta/grammar/variables.html#dsl-と-lua-の対応表)）。
+
+#### concat(lhs, rhs, lhs_desc, rhs_desc)
+
+```lua
+act:concat(lhs, rhs, lhs_desc?, rhs_desc?) -> string | nil
+```
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `lhs`・`rhs` | any | 左と右の被演算子 |
+| `lhs_desc`・`rhs_desc` | string または nil | 警告ログに出す被演算子の説明（`"var.x"`・`"@f()"` など） |
+
+- 被演算子は、文字列ならそのまま、数値なら `tostring` で文字列にする（アクション行で表示したときと同じ表記）。両方が文字列になれば、左の直後に右をつないだ文字列を返す。区切りの文字は入れない。
+- 文字列と数値以外の被演算子（`nil`・真偽値・表・関数など）があれば `nil` を返し、その被演算子ごとに警告ログ `act:concat - operand is not a string or number: op='&', operand='var.x', value=nil` を出す。`op` は DSL で全角・半角のどちらを書いても `'&'` である。`operand=` は説明があるときだけ付き、`value=` の表記は [arith](#arithop-lhs-rhs-lhs_desc-rhs_desc) と同じである。
+- 値が `nil` で説明も `nil` の被演算子では警告しない（内側の `act:concat`・`act:arith` が既に警告して `nil` を返した場合）。外側の演算は黙って `nil` を返す。
+- 表の被演算子に `__concat`・`__tostring` などのメタメソッドがあっても呼ばない。
+- DSL の式の連結は、演算ごとに `act:concat` になる。連結の連鎖・算術との組み合わせ・括弧は `act:concat` と `act:arith` の入れ子で表される（[連結の評価](https://ekicyou.github.io/pasta/grammar/variables.html#連結の評価)・[DSL と Lua の対応表](https://ekicyou.github.io/pasta/grammar/variables.html#dsl-と-lua-の対応表)）。
+
+```lua
+act:concat("合計", 3)                -- "合計3"
+act:concat("a", nil, nil, "var.x")   -- nil（警告を 1 行出す）
+act:concat(nil, "個")                -- nil（警告しない）
+```
 
 ### yield
 
@@ -403,7 +430,7 @@ act:choice(target, display?) -> act
 
 - `\![*]\q[表示テキスト,ID]` を出力する選択肢を積む。表示テキストと ID の中の `\`・`]`・`,` は `\` でエスケープされる。
 - 選ばれると、OnChoiceSelectEx の既定の処理が、ID と前方一致するローカルシーンを、直前に実行したグローバルシーンの配下から探して実行する。見つからなければ、ID と前方一致するグローバルシーンを探す（[OnChoiceSelectEx](shiori-events.md#onchoiceselectex)）。
-- 表示制御と同じく、1 回の出力の中で `talk`・`sakura_script` より前に積むと出力されない（[表示制御](#表示制御)）。
+- 表示制御と同じく、1 回の出力の中で `talk`・`sakura_script` より前に積むと、どのアクターにも結び付かず、積んだ位置にそのまま出力される（[表示制御](#表示制御)）。
 - DSL の選択肢行 `＠？行き先` も同じ選択肢を出力する（[選択肢行](https://ekicyou.github.io/pasta/grammar/block-structure.html#選択肢行)）。
 
 ```lua
@@ -419,7 +446,7 @@ act:choice_timeout(seconds?) -> act
 ```
 
 - 選択肢のタイムアウトを設定するタグ `\![set,choicetimeout,ミリ秒]` を積む。ミリ秒は `seconds` の 1000 倍を切り捨てた整数で、`seconds` が `nil` なら 0（タイムアウトなし）である。
-- `choice` と同じく、1 回の出力の中で `talk`・`sakura_script` より前に積むと出力されない。
+- `choice` と同じく、1 回の出力の中で `talk`・`sakura_script` より前に積むと、どのアクターにも結び付かず、積んだ位置にそのまま出力される（[表示制御](#表示制御)）。
 
 ```lua
 act:choice_timeout(30)   -- 30 秒でタイムアウト
@@ -533,7 +560,7 @@ end
 戻り値を使わない呼び出し `＄＝式` は [式文](https://ekicyou.github.io/pasta/grammar/variables.html#式文exprstmt) で扱う。
 
 - DSL の `＠＊名前（引数…）` は `act:global_fn("名前", 引数…)` になり、`GLOBAL` の関数を `(act, 引数…)` で呼ぶ。5 段の検索は行わない。未定義の名前・関数でない値のときは、警告ログを出して `nil` になる（[global_fn](#global_fnname-)）。アクション行で呼んだ場合は戻り値が出力され（`nil` なら何も出力しない）、変数代入の右辺なら戻り値が代入される（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
-- `GLOBAL` は 5 段の検索の 4 段目（完全一致）でもある。`＠名前（…）`（ローカル呼び出し）・`＠名前`（単語参照）・`＞名前`（Call）は、1〜3 段目に無ければ `GLOBAL` の値を見つける（[検索と呼び出し](#検索と呼び出し)）。関数は `(act, 引数…)` で呼ばれる（アクション行の中の単語参照と関数呼び出しでは第 1 引数がアクタープロキシになる）。関数以外の値は、単語参照では文字列として出力される。
+- `GLOBAL` は 5 段の検索の 4 段目（完全一致）でもある。`＠名前（…）`（ローカル呼び出し）・`＠名前`（単語参照）・`＞名前`（Call）は、1〜3 段目に無ければ `GLOBAL` の値を見つける（[検索と呼び出し](#検索と呼び出し)）。関数は `(act, 引数…)` で呼ばれる（アクション行の中の単語参照と関数呼び出しでも第 1 引数は act である。[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。関数以外の値は、単語参照では文字列として出力される。
 - DSL の `＠名前（）` は `GLOBAL` の関数を直接は呼ばない。グローバル関数を確実に呼ぶには `＊` を付けた `＠＊名前（）` を使う。
 - 関数は、呼ばれる前であればいつ登録してもよい（`main.lua`・Lua ブロックなど）。
 

@@ -14,6 +14,6 @@ local SHIORI = {}
 --
 -- 注意: 本モジュールはリポジトリ内 require 0 件の空テーブルだが、
 -- pasta_scripts は zip 出荷物であり外部ゴーストが require しうる
--- 公開面のため維持する（3.47 ct.lua と同方針の既知負債）。
+-- 公開面のため維持する（既知負債）。
 
 return SHIORI

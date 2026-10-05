@@ -294,7 +294,7 @@ impl SceneTable {
             cached.next_index = 0;
             cached.history.clear();
             if self.shuffle_enabled {
-                let mut id_values: Vec<usize> = cached.candidates.iter().map(|id| id.0).collect();
+                let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
                 self.random_selector.shuffle_usize(&mut id_values);
                 cached.candidates = id_values.into_iter().map(SceneId).collect();
             }

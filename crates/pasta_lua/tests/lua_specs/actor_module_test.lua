@@ -100,7 +100,7 @@ describe("PROXY - word ポストプロセス", function()
 end)
 
 describe("PROXY - expr_fn ポストプロセス", function()
-    test("ハンドラー関数にプロキシと可変引数が伝搬し戻り値を返す", function()
+    test("シーンテーブルの関数に ACT と可変引数が伝搬し戻り値を返す", function()
         local actor = ACTOR.get_or_create("spec346_式者")
         local act = ACT.new({ spec346_式者 = actor })
         local received_self = nil
@@ -113,7 +113,7 @@ describe("PROXY - expr_fn ポストプロセス", function()
         local proxy = act.spec346_式者
 
         expect(proxy:expr_fn("加算", 2, 3)):toBe(5)
-        expect(received_self):toBe(proxy)
+        expect(received_self):toBe(act)
     end)
 
     test("ハンドラーが非関数のとき nil を返す（警告のみ）", function()

@@ -486,8 +486,9 @@ const DYNAMIC_REF_SOURCE: &str = r#"
   さくら：結果＝＠＄f（１）です。
 
 ```lua
-function SCENE.whoami(p, n)
-    return "proxy:" .. tostring(p.actor and p.actor.name) .. ":" .. tostring(n)
+function SCENE.whoami(a, n)
+    local kind = a.actors ~= nil and "act" or "proxy"
+    return kind .. ":" .. tostring(n)
 end
 ```
 
@@ -526,14 +527,42 @@ fn test_e2e_dynamic_word_ref_property_assignment() {
     );
 }
 
-/// R7.5: アクター付きの行の `＠＄f（１）` は、関数の第 1 引数にアクターのプロキシを渡す。
+/// R2.1: アクター付きの行の `＠＄f（１）` でも、シーンテーブルの関数は第 1 引数に ACT を受け取る。
 #[test]
-fn test_e2e_dynamic_fn_call_passes_actor_proxy() {
+fn test_e2e_dynamic_fn_call_scene_function_receives_act() {
     let out = fire_scenes(DYNAMIC_REF_SOURCE, &["プロキシ"]).remove(0);
     assert!(
-        out.contains("結果＝proxy:さくら:1です。"),
-        "dynamic call on an actor line must receive the actor proxy: {out}"
+        out.contains("結果＝act:1です。"),
+        "scene-table function called on an actor line must receive ACT: {out}"
     );
+}
+
+/// R2.4: アクション行の `＠話す（…）` で Lua ブロックのシーン関数を呼ぶと、
+/// 行の外（`＄r＝＠話す（…）`）と同じく実行される。
+#[test]
+fn test_e2e_action_line_calls_lua_scene_function() {
+    let source = r#"
+％さくら
+  ＠通常：\s[0]
+
+＊シーン関数
+  ＄r＝＠話す（「外」）
+  さくら：前＠話す（「中」）後。
+
+```lua
+function SCENE.話す(act, where)
+    local save, var = act:init_scene(SCENE)
+    act.さくら:talk(where .. "で実行")
+end
+```
+"#;
+    let out = fire_scenes(source, &["シーン関数"]).remove(0);
+    assert!(out.contains("外で実行"), "out-of-line call must run: {out}");
+    assert!(
+        out.contains("前中で実行後。"),
+        "action-line call must run the scene function like out-of-line: {out}"
+    );
+    assert!(!out.contains("table:"), "must not render a table: {out}");
 }
 
 /// R4.5: 未代入の `＠＄z` は空文字列になり、行の残りが出力される。

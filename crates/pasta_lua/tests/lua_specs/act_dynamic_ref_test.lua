@@ -525,7 +525,7 @@ describe("PROXY - word(値, 変数パス)", function()
 end)
 
 describe("PROXY - expr_fn_var(値, 変数パス, 引数…)", function()
-    test("関数はプロキシを第 1 引数に、同じ引数で呼ばれる", function()
+    test("シーンテーブルの関数は ACT を第 1 引数に、同じ引数で呼ばれる", function()
         with_proxy(nil, {}, function(proxy, act, _, warns)
             local received = nil
             act.current_scene = real_scene_table({
@@ -535,7 +535,7 @@ describe("PROXY - expr_fn_var(値, 変数パス, 引数…)", function()
                 end,
             })
             expect(proxy:expr_fn_var("加算", "var.f", 1, 2)):toBe(3)
-            expect(received):toBe(proxy)
+            expect(received):toBe(act)
             expect(#warns):toBe(0)
         end)
     end)
