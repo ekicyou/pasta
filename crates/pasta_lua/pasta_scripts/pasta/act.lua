@@ -504,6 +504,9 @@ local ARITH_OPS = {
     ["%"] = function(a, b) return a % b end,
 }
 
+--- 動的コールの「呼ばない」印（act:call_key が返し、act:call が検索せずに nil を返す）。外へ公開しない
+local SKIP_CALL = {}
+
 --- act:arith の警告に出す値の表記。table 等は tostring しない（__tostring を呼ばないため）
 --- @param v any
 --- @return string
@@ -644,7 +647,7 @@ end
 ---
 --- @param self Act アクションオブジェクト
 --- @param global_scene_name string|nil グローバルシーン名（互換性のため残す・未使用）
---- @param key string 検索キー
+--- @param key string|table 検索キー、または act:call_key が返した「呼ばない」印（検索せず nil）
 --- @param attrs table|nil 属性テーブル（互換性のため残す・未使用）
 --- @param ... any 可変長引数（ハンドラーに渡す）
 --- @return any ハンドラーの戻り値、またはnil
@@ -652,6 +655,10 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
     -- nil ガード: 式評価結果が nil の場合（未定義変数等）
     if key == nil then
         log.warn("act:call - nil key (undefined variable?), skipping scene search")
+        return nil
+    end
+    -- 「呼ばない」印: call_key が警告と失敗表記を出し済み
+    if key == SKIP_CALL then
         return nil
     end
 
@@ -662,9 +669,37 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
         return handler(self, ...)
     end
 
-    log.warn(string.format("act:call - handler not found: key='%s', mode='scene', via=act",
-        tostring(key)))
-    return nil
+    local warning = string.format("act:call - handler not found: key='%s', mode='scene', via=act",
+        tostring(key))
+    return self:failure(string.format("Call失敗：「%s」が見つからない", tostring(key)), warning)
+end
+
+--- 動的コールの式の値を検索キーにする（生成コードが act:call / act:call_restore のキーに渡す）
+---
+--- 空でない文字列（"nil" を含む）はそのまま、数値は tostring。それ以外（nil・空文字列・真偽値・表など）は
+--- 警告（var_path があれば WORD.dynamic_key と同じ文言、なければ被演算子の表記。値 nil で説明もなければ
+--- 内側の演算が警告済みとして黙る）と失敗表記を出し、「呼ばない」印を返す。
+--- @param self Act アクションオブジェクト
+--- @param value any 動的コールの式の値（生値）
+--- @param var_path string|nil 式が変数参照 1 つのときの Lua パス（"var.x" / "save.x" / "args[1]"）
+--- @param desc string|nil 式が関数呼び出し 1 つのときの表記（"@名前()" / "@*名前()" / "@$パス()"）
+--- @return string|table 検索キー、または「呼ばない」印
+function ACT_IMPL.call_key(self, value, var_path, desc)
+    local t = type(value)
+    if t == "number" then return tostring(value) end
+    if t == "string" and value ~= "" then return value end
+    local warning
+    if var_path then
+        WORD.dynamic_key(value, var_path, "act:call") -- 警告だけ出す（キーにできないことは判定済み）
+    elseif value ~= nil or desc ~= nil then
+        local operand = desc and string.format("operand='%s', ", desc) or ""
+        warning = string.format("act:call - key is not a string or number: %svalue=%s",
+            operand, arith_value_text(value))
+    end
+    local subject = var_path or desc
+    subject = subject and (subject .. " が") or "値が"
+    self:failure("Call失敗：" .. subject .. (value == "" and "空文字列" or (" " .. t)), warning)
+    return SKIP_CALL
 end
 
 --- 実行中のシーンを scene に戻し、残りの引数をそのまま返す
@@ -683,7 +718,7 @@ end
 --- 呼ばれた側がシーン・Lua の関数・見つからないのいずれでも戻す。STORE.last_global_scene は触らない。
 --- @param self Act アクションオブジェクト
 --- @param global_scene_name string|nil 未使用（act:call と同じ）
---- @param key string 検索キー
+--- @param key string|table 検索キー、または act:call_key が返した「呼ばない」印
 --- @param attrs table|nil act:call へそのまま渡す
 --- @param ... any 呼ばれた側へ渡す引数
 --- @return any ... 呼ばれた側の戻り値

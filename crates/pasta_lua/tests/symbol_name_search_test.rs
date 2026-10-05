@@ -200,7 +200,14 @@ return found and (found.global_name .. "|" .. found.local_name) or "nil""#,
 fn missing_symbol_call_warns_with_raw_name_and_continues() {
     let (_temp, runtime) = load_ghost(SYMBOL_SCENES_PASTA, ACTOR_TOML);
 
-    assert_ok_with(&fire(&runtime, "不明呼び出し"), "次の行です");
+    let response = fire(&runtime, "不明呼び出し");
+    assert_ok_with(&response, "次の行です");
+    // call-execution-correctness 4.6: 見つからない Call は Call 行の位置に失敗表記を出す
+    // （発言と同じく句読点のウェイトが入るため、ウェイトを除いて比べる）
+    assert_ok_with(
+        &response.replace("\\_w[150]", ""),
+        "【Call失敗：「存在しない・朝」が見つからない】\\p[0]次の行です",
+    );
     assert!(logs_contain("handler not found: key='存在しない・朝'"));
 }
 
