@@ -23,6 +23,7 @@ pasta を更新すると、次の書き方で出力やパース結果が変わ�
 - `\%` をアクション行に書けるようになる（パースエラーでなくなる）。台詞の中の `\%` の間にウェイトが入らなくなる。（[アクション行](https://ekicyou.github.io/pasta/grammar/action-line.html)・[さくらスクリプト](https://ekicyou.github.io/pasta/grammar/sakura-script.html)）
 - 閉じのある囲み（`\_?…\_?`・`\_!…\_!`）の中身に、ウェイトも改行も入らなくなり、外見の観測もされなくなる。アクション行では、中の `＠単語`・`＄変数` が展開されなくなる。（[さくらスクリプト](https://ekicyou.github.io/pasta/grammar/sakura-script.html)・[@pasta_sakura_script](https://ekicyou.github.io/pasta/lua/modules/pasta-sakura-script.html)・[スクリプト API](https://ekicyou.github.io/pasta/lua/script-api.html)）
 - タグだけの出力（`\q[…]` だけの `talk` を含む）が台詞に数えられなくなり、段落区切りの改行の出方が変わる。（[pasta.toml リファレンス（spot_newlines）](https://ekicyou.github.io/pasta/reference/pasta-toml.html)）
+- 文字を表示するタグ（`\_u[…]`・`\_m[…]`・`\&[…]`）や中身のある囲みをアクション行に直接書いたもの、`act:sakura_script` で積んだものは台詞に数えられるようになり、保留中の段落区切りの改行がその直前に出る（変更前は後ろの台詞の直前に出ていた）。（[さくらスクリプト](https://ekicyou.github.io/pasta/grammar/sakura-script.html)・[pasta.toml リファレンス（spot_newlines）](https://ekicyou.github.io/pasta/reference/pasta-toml.html)）
 ```
 
 プッシュ・PR 作成・マージは `kiro-complete` が行う（本タスクでは行わない）。
