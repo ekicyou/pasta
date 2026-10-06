@@ -57,7 +57,7 @@ job の構成（詳細は設計で決める）:
   - リリースノートの生成。
   - 一回限りの手動セットアップの手順書。1 回だけ手で行うので、ワークフローの外に置く。
     - crates.io: 5 クレートそれぞれに Trusted Publisher を設定する。
-    - Azure: ユーザー割り当てのマネージド ID と、GitHub 用のフェデレーション資格情報を作る。
+    - Azure: 従量課金のサブスクリプションと予算アラートを用意する。ユーザー割り当てのマネージド ID と、GitHub 用のフェデレーション資格情報を作る。
     - Marketplace: publisher（発行者）`ekicyou` にそのマネージド ID を Contributor として追加する。
     - GitHub: environment と variables（client・tenant・subscription の ID）を作る。
   - 利用者・開発者向け文書の更新（`crates/pasta_sample_ghost/RELEASE.md`、pasta-check スキルの release 手順の記述など）。
@@ -101,6 +101,11 @@ job の構成（詳細は設計で決める）:
 ## Constraints
 
 - **期限**: Marketplace の global PAT は 2026-12-01 に廃止される。それまでに Entra ID 連携による公開が動いている必要がある。
+- **Azure の費用（2026-10-06 調査）**: マネージド ID のために Azure サブスクリプションが要るが、実際には無料で運用できる。
+  - 従量課金のサブスクリプションには基本料金が無い。マネージド ID・フェデレーション資格情報・OIDC ログインにも課金されない。
+  - 登録には本人確認のためのクレジットカードと電話番号が要る。
+  - 無料試用版のサブスクリプションは、期限が切れると無効になり、公開が止まる。手順書では、従量課金への切り替え（無料）と、¥0 近くの予算アラートの設定を必須の手順にする。
+  - サブスクリプションの要らないアプリ登録（サービスプリンシパル）は採らない。この方法では `verify-pat` は通るのに `publish` が「corporate credentials」のエラーで失敗するという報告があり、未解決のまま閉じられている（microsoft/vscode-vsce#1023）。
 - **Windows 前提**: DLL・nar・VSIX のビルドは windows-latest で行う（VS 2026 のイメージ。壊れたら `windows-2022` に退避する）。npm の native addon が node-gyp 経由で VS 2026 を検出できない場合に注意する。
 - **公開順**: crates は依存順。GitHub Release の作成は crates の公開に成功した後にする（今の設計と同じ）。
 - **Trusted Publishing の一致条件**: crates.io の設定のワークフロー名・environment 名と、`release.yml` の実際の名前を一致させる。publish job には `id-token: write` を付ける。
