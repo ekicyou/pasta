@@ -45,7 +45,7 @@ pasta のマニュアルは初心者向けになっていない。入門ガイ�
 - 文法・API の新しい説明。ガイドに書く事実は、リファレンス章が権威として書いている事実の範囲に留める
 
 ## Upstream / Downstream
-- **Upstream**: emo2 開発（ghost_dev。ゴースト作りこみの知見の出どころ。Claudia が語るコツや注意は、ここから引く。要点と置き場所は `hello-pasta-tutorial-stages/brief.md` の「emo2 からの知見」）、`hello-pasta-tutorial-stages`（段階表・段階辞書）、`hello-pasta-shell-art`（スクリーンショットの絵）、`book/` の生成・検査ツール群
+- **Upstream**: emo2 開発（ghost_dev。ゴースト作りこみの知見の出どころ。Claudia が語るコツや注意は、ここから引く。要点と置き場所は `hello-pasta-tutorial-stages/brief.md` の「emo2 からの知見」）、`hello-pasta-tutorial-stages`（段階表・段階辞書）、`manual-claudia-theme`（Claudia の台詞の部品と、その記法の執筆規約。ガイドの全編の語りはこの部品で書く）、`hello-pasta-shell-art`（スクリーンショットの絵）、`book/` の生成・検査ツール群
 - **Downstream**: なし（後で他の章の初心者向け改訂を起票するなら、その手本になる）
 
 ## Existing Spec Touchpoints
