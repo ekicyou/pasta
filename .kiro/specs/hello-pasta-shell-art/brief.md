@@ -43,7 +43,7 @@
 
 ## Existing Spec Touchpoints
 - **Extends**: なし（hello-pasta のシェル生成は初期開発の spec の成果物）
-- **Adjacent**: `release-workflow`（ゴーストの `.nar` に画像を詰める手順）、`hello-pasta-tutorial-stages`（同じ `pasta_sample_ghost` クレートの辞書とテストを触る。画像と辞書でファイルは分かれる）
+- **Adjacent**: `release-ci`（先行する。同じ `crates/pasta_sample_ghost/release.ps1` を触り、生成物の git 追跡をやめる。本 spec は画像を「生成物」から「追跡する素材」に移すので、`release-ci` が決めた追跡の境界と `.gitignore` に合わせる）、`release-workflow`（ゴーストの `.nar` に画像を詰める手順）、`hello-pasta-tutorial-stages`（同じ `pasta_sample_ghost` クレートの辞書とテストを触る。画像と辞書でファイルは分かれる）
 
 ## Constraints
 - 要件定義の初めに、次の 3 点を決める。

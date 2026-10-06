@@ -127,12 +127,34 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 - **分割理由**: 持ち場で 3 つに分けた。シェルの画像（`crates/pasta_sample_ghost` の画像側）、段階表と段階辞書（同じクレートの辞書とテスト）、ガイドの本文（`book/`）。段階表が固まってから本文を書くので、物語と作例が食い違わない。
 - **共有接点**: 段階表と段階辞書の置き場所・形（`hello-pasta-tutorial-stages` → `getting-started-story-guide`）、`tutorial-check.mjs` の照合対象、スクリーンショットに使う絵（`hello-pasta-shell-art` → `getting-started-story-guide`）。
+- **`release-ci` との接点**: `hello-pasta-shell-art` は `release-ci` と同じ `crates/pasta_sample_ghost/release.ps1` を触る。生成物の git 追跡の扱いも共有する（`release-ci` は生成物の追跡をやめ、`hello-pasta-shell-art` は画像を生成物から追跡する素材に変える）。そのため `release-ci` の後に置く。
 
 | Wave | spec（並走可） | ソースの持ち場 |
 | ---- | -------------- | -------------- |
-| 1 | hello-pasta-shell-art | `pasta_sample_ghost` の画像生成・`shell/master/`・README・`release.ps1` |
+| 1（`release-ci` の後） | hello-pasta-shell-art | `pasta_sample_ghost` の画像生成・`shell/master/`・README・`release.ps1` |
 | 1 | hello-pasta-tutorial-stages | hello-pasta の `dic/`、段階辞書、`pasta_sample_ghost` のテスト |
 | 2 | getting-started-story-guide | `book/src/getting-started/`・`SUMMARY.md`・`introduction.md`・`AUTHORING.md`・`verify-content.mjs`・`tutorial-check.mjs` |
+
+## リリースの CI 化（2026-10-06 起票）
+
+タグの push だけでリリースが終わるようにする。
+
+- **方式**: 単一のワークフロー `release.yml` を置く。verify → build → crates.io・Marketplace への公開 → GitHub Release の順に進む。再試行は失敗した job の再実行で行う。下書きを人が承認する 2 段方式と、release-please などの bot は却下した。
+- **認証**: 長期のトークンを置かない。crates.io は Trusted Publishing、Marketplace は Entra ID のワークロード ID 連携を使う。
+- **成果物**: ビルドした成果物の git 追跡をやめ、CI がタグ時点のソースから作る。
+- **期限**: Marketplace の global PAT は 2026-12-01 に廃止されるので、それまでに完了させる。
+- **ソースの持ち場**: `.github/workflows/release.yml`、`release.ps1`、`build-wasm.ps1`、`.gitignore`、`release/`。Phase 11 の spec とソースが重ならないので、どのウェーブとも並走できる。
+
+### Existing Spec Updates
+
+- [ ] release-workflow -- エージェントの手順を「版の決定 → bump の PR のマージ → タグの push → CI の結果確認・失敗した job の再実行」へ縮める。次のものは CI 側へ移すか、要らなくなる。
+  - Resume
+  - ScheduleWakeup による再試行
+  - 公開の 2 トラック
+  - ローカルでのビルド
+  - main の CI が全部緑かの確認
+  - マージコミット方式で統合する理由（タグが指すコミットを main から到達できるようにするため）を、squash でよいか見直す。
+  - Dependencies: release-ci
 
 ## Specs (dependency order)
 
@@ -151,8 +173,8 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: dsl-literal-fixes, scene-identity-format, call-execution-correctness
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, scene-search-key-normalization, call-execution-correctness, string-concat-operator
 - [ ] failure-output-unification -- 実行時の失敗（未定義の参照・見つからない Call など）をログとさくらスクリプトの両方へ 1 つの仕組みから出す。`call-execution-correctness` が Call 行に入れる失敗表記を載せ替え、他の失敗へ広げる。Dependencies: call-execution-correctness, call-attribute-filter
-
-- [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。Dependencies: none
+- [ ] release-ci -- タグ `vX.Y.Z` の push を契機に、GitHub Actions で verify・成果物のビルド・crates.io と Marketplace への公開・GitHub Release までを冪等に行う。認証は OIDC（Trusted Publishing・Entra ID）。成果物の git 追跡を解除し、一回限りのセットアップの手順書を作る。Marketplace の global PAT が廃止される 2026-12-01 より前に完了させる。Dependencies: none
+- [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。Dependencies: release-ci
 - [ ] hello-pasta-tutorial-stages -- 「こんな表現をしたい」の段階表を確定し、段階ごとに起動できる辞書一式を CI で検証する。hello-pasta の辞書を教材として書き直し、最終段階と一致させる。Dependencies: none
 - [ ] getting-started-story-guide -- 入門ガイドを段階表に沿った物語に書き直し、全編を Claudia が語る（執筆規約に `getting-started` の例外を足す）。段階辞書との逐語照合と、新しいシェルのスクリーンショットを含む。Dependencies: hello-pasta-tutorial-stages, hello-pasta-shell-art
 
