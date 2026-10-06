@@ -112,6 +112,27 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 5 | call-attribute-filter | 機能 | フィルターの文法・Call のコード生成・検索 |
 | 6 | failure-output-unification | 機能 | `act.lua`・`actor.lua`・`word.lua` の警告箇所、失敗表記の出力（2026-10-05 起票。ウェーブは次の棚卸で見直す） |
 
+## リリースの CI 化（2026-10-06 起票）
+
+タグの push だけでリリースが終わるようにする。
+
+- **方式**: 単一のワークフロー `release.yml` を置く。verify → build → crates.io・Marketplace への公開 → GitHub Release の順に進む。再試行は失敗した job の再実行で行う。下書きを人が承認する 2 段方式と、release-please などの bot は却下した。
+- **認証**: 長期のトークンを置かない。crates.io は Trusted Publishing、Marketplace は Entra ID のワークロード ID 連携を使う。
+- **成果物**: ビルドした成果物の git 追跡をやめ、CI がタグ時点のソースから作る。
+- **期限**: Marketplace の global PAT は 2026-12-01 に廃止されるので、それまでに完了させる。
+- **ソースの持ち場**: `.github/workflows/release.yml`、`release.ps1`、`build-wasm.ps1`、`.gitignore`、`release/`。Phase 11 の spec とソースが重ならないので、どのウェーブとも並走できる。
+
+### Existing Spec Updates
+
+- [ ] release-workflow -- エージェントの手順を「版の決定 → bump の PR のマージ → タグの push → CI の結果確認・失敗した job の再実行」へ縮める。次のものは CI 側へ移すか、要らなくなる。
+  - Resume
+  - ScheduleWakeup による再試行
+  - 公開の 2 トラック
+  - ローカルでのビルド
+  - main の CI が全部緑かの確認
+  - マージコミット方式で統合する理由（タグが指すコミットを main から到達できるようにするため）を、squash でよいか見直す。
+  - Dependencies: release-ci
+
 ## Specs (dependency order)
 
 - [x] dsl-literal-fixes -- 改行を含む引用文字列・2 つ目の `""` で生成 Lua が壊れ起動不能になる不具合（U24）、単語値の `「」`・`""` が空にならない（U25）、引用なしの単語値の行末コメント（U06）。Dependencies: none
@@ -129,6 +150,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: dsl-literal-fixes, scene-identity-format, call-execution-correctness
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, scene-search-key-normalization, call-execution-correctness, string-concat-operator
 - [ ] failure-output-unification -- 実行時の失敗（未定義の参照・見つからない Call など）をログとさくらスクリプトの両方へ 1 つの仕組みから出す。`call-execution-correctness` が Call 行に入れる失敗表記を載せ替え、他の失敗へ広げる。Dependencies: call-execution-correctness, call-attribute-filter
+- [ ] release-ci -- タグ `vX.Y.Z` の push を契機に、GitHub Actions で verify・成果物のビルド・crates.io と Marketplace への公開・GitHub Release までを冪等に行う。認証は OIDC（Trusted Publishing・Entra ID）。成果物の git 追跡を解除し、一回限りのセットアップの手順書を作る。Marketplace の global PAT が廃止される 2026-12-01 より前に完了させる。Dependencies: none
 
 ## バックログ（brief なし・保留）
 
