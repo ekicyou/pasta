@@ -1,6 +1,6 @@
 //! レンダラ注入シーム（さくらスクリプト登録のアダプタ起点デカップリング）。
 //!
-//! 関連仕様: `.kiro/specs/pasta-actor-runtime/`
+//! 関連仕様: `.kiro/specs/completed/pasta-actor-runtime/`
 //! - 充足要件: R2.4, R3.1, R3.2, R3.3, R3.4, R3.5, R3.6
 //! - 設計: design.md の **SakuraRenderer（アダプタ注入）** コンポーネント、
 //!   Service Interface（`register_sakura_script_module(lua, config, renderer)` —

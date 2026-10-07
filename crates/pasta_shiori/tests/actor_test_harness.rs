@@ -1,6 +1,6 @@
 //! 本番アクター機構の **ホスト非依存・決定論テストハーネス**（ActorTestHarness・task 6.2）。
 //!
-//! 関連仕様: `.kiro/specs/pasta-actor-runtime/`
+//! 関連仕様: `.kiro/specs/completed/pasta-actor-runtime/`
 //! - 充足要件: R10.5（アクター機構の振る舞いを SSP 非依存に再現・検証できる決定論テスト
 //!   ハーネスで観測・デバッグ可能にする。PoC `actor_poc/` の `sim_driver`／`mailbox`／
 //!   `coroutine_probe` 検証等を本番化）／R10.7（データ競合・デッドロック・スレッド非決定性を

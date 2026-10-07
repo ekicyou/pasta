@@ -1,6 +1,6 @@
 //! 宿主非依存 presentation マーカーの最小集合型表現。
 //!
-//! 関連仕様: `.kiro/specs/pasta-actor-runtime/`
+//! 関連仕様: `.kiro/specs/completed/pasta-actor-runtime/`
 //! - 充足要件: R2.1（出力をマーカー列として表現）／R2.2（さくらスクリプト文字列でなく
 //!   宿主非依存マーカーとして載せる）／R2.5（UI 独立: Wait はマーカーのみ）／
 //!   R2.6（破壊的変更なしに拡張可能）／R2.7（実装は最小集合に限定）。

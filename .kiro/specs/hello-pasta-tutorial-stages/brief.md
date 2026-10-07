@@ -109,3 +109,18 @@ emo2 の辞書を作例や Claudia の語りに引用してよい（emo2 開発�
 - 現行の版で実装されている文法・API だけを使う（マニュアルの方針）。「書けるだけ」の書き方や、意図を推測して救済されるような書き方を作例にしない。
 - 時報など時刻やランダムに依存する段階も、検証では「読み込めて起動できる」ことを確かめる（決定的な出力の照合までは求めない）。
 - 配布物 hello-pasta の辞書が変わるので、サンプルゴーストのリリースで中身の変化が利用者に分かるようにする。
+
+## 2026-10-07 棚卸の再測定（main 2cbaf510）
+
+- **前提の変化**: 起票文の記述はそのまま正しい（`dic/` 5 ファイル・計 187 行。`＞transfer_req_to_var`・`＄ｒ０`・`＄＊pasta_talk_interval_min` はマニュアルの記述どおり）。シーン検索は `scene-search-key-normalization`・`scene-identity-format` の後も前方一致のまま（`grammar/call-jump.md` 119 行）。`paragraph-break-tag-only-talk` も完了している。
+- **触るファイル**: `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/*.pasta`、段階辞書（新規。置き場所は設計）、`tests/self_deploy_integration_test.rs`（333 行）か新しいテスト、`tests/integration_test.rs` の辞書のテスト（269〜365 行）、`tests/dist_src_validation_test.rs`、`src/scripts.rs`（辞書の単体テスト）。1,000 行に近いファイルは無い。
+- **規模**: 15〜18 タスク（段階表、13 前後の段階を 2〜3 段ずつ、検証の仕組み、hello-pasta の書き直し、既存テスト、マニュアルとの同期）。20 を超えそうなら段階をまとめる。
+- **先に要るもの**: 機能の依存は無い。
+- **ファイルの重なり**: `hello-pasta-shell-art`（`tests/integration_test.rs`。どちらもウェーブ 1 なので順序を決める）。
+- **もう一つの重なり**: hello-pasta の辞書を書き換えると、`tutorial-check.mjs` が `first-ghost.md` の ```pasta ブロックとの逐語一致で落ちる。しかも `manual.yml` の paths は `crates/pasta_sample_ghost/ghosts/**` を含まないので、本 spec の PR では検査が走らない。次に `book/` を触る別の PR（`manual-claudia-theme` など）で初めて赤くなる。本 spec の中で `first-ghost.md` の作例を新しい辞書に合わせる（`manual-claudia-theme` とは同じページの別の節）か、`manual.yml` の paths に辞書を足すかを要件で決める。
+- **種別**: 機能（教材としての段階辞書と、その CI 検証。作例の相手役 emo2 は開発者の指示）。
+- **要件定義のモデル**: Fable（段階表は後続のガイドが逐語で使う土台。扱うイベントや emo2 との作例に開発者の判断が要る）。
+- **分割の案**: なし（Phase 12 で一度切り分けている）。
+- **見つけた穴・古くなった記述**:
+  - `tests/dist_src_validation_test.rs:8-17` の必須ファイルに `dic/choice.pasta` が無い。
+  - 「Lua への入り口」の段で `scripts/` に Lua を置く場合、今は `release.ps1` が `crates/pasta_lua/scripts`（README だけ）を robocopy の `/MIR` で上書きする。段階辞書・hello-pasta に Lua を置くなら、`scripts/` の扱いを `release-ci` と合わせる。

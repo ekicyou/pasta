@@ -99,3 +99,19 @@
 - 現行実装を正として設計する。
 - `act.lua` は多くの spec が触る共有接点で、1 ウェーブに 1 spec だけが持つ。`call-attribute-filter` と同じウェーブに置かない。
 - リファクタリングは挙動を変えない抽出を先に行い、1 抽出 = 1 検証 = 1 コミットで進める。
+
+## 2026-10-07 棚卸の再測定（main 2cbaf510）
+
+- **前提の変化**: `call-execution-correctness` は完了し、失敗表記の出口 `act:failure(text, warning)`（`act.lua` 744〜750 行。`raw_script` トークンに `【…】` を積む）がある。呼び出し元は `act:call`（679 行）と `act:call_key`（706 行）の 2 か所で、申し送りどおり。
+- **触るファイル**: `pasta_scripts/pasta/act.lua`（774 行。1,000 行に近づいている）・`actor.lua`（272 行）・`word.lua`（185 行）。範囲しだいで `pasta_lua` の `loader/config/`（切り替えの設定）、`pasta_scripts/pasta/shiori/event/`・`shiori/res.lua`・`pasta_shiori/src/error.rs`（500 の経路）。マニュアル `grammar/action-line.md`・`grammar/call-jump.md`・`lua/script-api.md`・`internals/talk-output.md`・`internals/internal-modules.md`（失敗表記をすでに書いている 5 ページ）と生成スキル。
+- **規模**: Lua 側の一本化と載せ替えだけなら約 14〜16 タスク（出口の抽出 1、表記とエスケープの規則 2、`act.lua` の 9 か所・`actor.lua` の 2 か所・`word.lua` の 3 か所の載せ替え 5〜6、重ねない規則 1、マニュアルと生成 2、テスト 2〜3）。設定での切り替え（+2）と 500 のバルーン表示（+3〜4）まで入れると 20 を超える。
+- **先に要るもの**: 機能の前提は無い（`call-execution-correctness` は完了）。ロードマップの `call-attribute-filter` への依存は、`act.lua` の重なりによる順序だけである。`scene-attribute-store` が読み出しの口を `SCENE` 側に置き `act.lua` を触らなければ、ソースは重ならず同じウェーブで並走できる。Phase 12・`release-ci` とも重ならない。
+- **種別**: 機能（失敗をバルーンに見せる。空文字で展開する現行の方針を変える）。
+- **要件定義のモデル**: Fable（破壊的変更の扱い・配布ゴーストでの切り替え・500 をバルーンに出すかの、開発者の判断の分かれ道が多い。`pasta_shiori` をまたぐ）。
+- **分割の案**: 要件で 500 の経路まで含めると決めたら、`failure-output-unification`（Lua 側の出口と載せ替え）と、500 の実行時エラーをバルーンに出す spec（`shiori/event/`・`res.lua`・`error.rs`）に分ける。境目は「`act` のトークンに積めるか」。含めないなら分割は要らない。
+- **見つけた穴・古くなった記述**:
+  - Current State の「失敗をさくらスクリプトへ出す仕組みは無い」は古い。現在は 2 つある: `act:failure`（`raw_script`、Call だけ）と、`act:actor_proxy` の目印 `【未登録アクター：名前】`（`act.lua` 482 行。`talk` トークンにアクター付きで積む。`dsl-codegen-runtime-safety` が入れた）。形もトークン型も違う。この 2 つを 1 つにするのが最初の仕事になる。
+  - 警告一覧に `act:arith - unknown operator`（557 行）が無い。プロキシ側は `proxy:expr_fn`・`proxy:word`（`actor.lua` 195・249 行）。`act:call - nil key`（662 行）は失敗表記を伴わないが、生成コードは `act:call_key` を通すので、Lua から直接 `act:call` を nil で呼んだときだけ届く。
+  - `act:global_fn`（499 行）は関数が無いときに警告だけを出す。戻った後のシーンの復元（497 行）は `call-execution-correctness` が入れた。
+  - 再利用する部品の場所は現行と一致する: `operand_desc`（`expr_gen.rs` 207 行）・`dynamic_ref_args`（`element_gen.rs` 48 行）・`single_line`（`error.rs` 79 行）。
+- **順序の提案**: 本 spec を `call-attribute-filter` より先に置く（同 brief に記した）。フィルターの「候補なし」は、一本化した仕組みに直接載せる。
