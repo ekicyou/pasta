@@ -2,9 +2,9 @@
 
 ## 概要
 
-pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトランスパイルし、組込 LuaJIT で実行する「伺か」の SHIORI（`pasta.dll`）と、その周辺ツール（`pasta_check`・LSP・VSCode 拡張・利用者マニュアル）からなる。Phase 1〜10 で、プロパティアクセス・監査・マニュアル・ソースレベルデバッグ・アクターモデル駆動・配布物の形までを完了した（下の「完了フェーズ」）。
+pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトランスパイルし、組込 LuaJIT で実行する「伺か」の SHIORI（`pasta.dll`）と、その周辺ツール（`pasta_check`・LSP・VSCode 拡張・利用者マニュアル）からなる。Phase 1〜11 で、プロパティアクセス・監査・マニュアル・ソースレベルデバッグ・アクターモデル駆動・配布物の形・現行実装の不具合の一掃までを完了した（下の「完了フェーズ」）。
 
-現在の主題は **Phase 11: 現行実装の不具合の一掃**。マニュアル権威化（`manual-ssot-authority`）と内部設計の執筆（`pasta-runtime-internals-doc`）で現行実装を照合した際に見つかったバグ候補を、2026-10-04 の棚卸で現行 main と再照合し、spec 単位に束ねた。不具合を先に片付け、その後に属性セマンティクス（機能拡張）へ進む。
+現在の主題は **Phase 11 の残り: 属性セマンティクスと失敗の出力**。不具合の一掃（12 本）は 2026-10-05 までに完了した（下の「完了フェーズ」）。残るのは、シーン属性の保持と読み出し、Call の属性フィルター、実行時の失敗の出力の一本化の 3 本。
 
 並行して **Phase 12: 初心者向けの入門ガイド** を進める（2026-10-06 起票）。入門ガイドを「こんな表現をしたい」を順に叶えていく物語に作り直し、ガイドの間は Claudia が全編を語る。題材の hello-pasta は、段階ごとに起動できる辞書と、fal.ai で作った新しいシェルで育て直す。マニュアルの見た目も、Claudia が前に出る親しみやすいデザインに着せ替える。Phase 11 とは、ソースの持ち場が重ならない（`crates/pasta_sample_ghost` と `book/` だけを触る）。マニュアルの全章に触れるのは、導入と締めの台詞の記法の置き換えだけ。
 
@@ -37,6 +37,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 8 | バルーン表示品質（段落区切り改行・立ち絵の復旧） | sakura-script-newline, actor-surface-restore |
 | 9 | 起動堅牢性（長パス・非 ANSI パスのモジュール解決、ロード失敗の可視化） | lua-require-robustness |
 | 10 | 配布物の形（同梱バルーンの `updates.txt`） | pasta-check-bundled-balloon（v0.3.7 で公開） |
+| 11 | 現行実装の不具合の一掃（文字列リテラル・生成コードの安全性・コールバックの再開・検索キー・設定とログ・シーンの内部名・アクタープロキシ・グループ化・セレクター・連結演算子・Call の文脈・段落区切り） | dsl-literal-fixes, dsl-codegen-runtime-safety, callback-resume-unification, scene-search-key-normalization, pasta-toml-logging-consistency, scene-identity-format, actor-proxy-act-delegation, act-token-grouping-fix, search-selector-indices, string-concat-operator, call-execution-correctness, paragraph-break-tag-only-talk |
 | — | 動的単語参照 `＠＄`（旧文法仕様の将来項目 B2） | dynamic-word-reference |
 
 ロードマップを置く前の初期開発（DSL・トランスパイラ・ランタイム・SHIORI・alpha リリースなど）の spec も `.kiro/specs/completed/` にある。
@@ -56,63 +57,76 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - `sakura-script-newline` の Task 5.1（実機 SSP での目視確認）— 開発者の手動検証待ち。
 - `pasta-check-bundled-balloon` を v0.3.7 で公開したことの、emo2 開発セッションへの連絡 — 実施の有無はリポジトリから確認できない。
 
-## 棚卸（2026-10-04）
+## 棚卸（2026-10-07・main `2cbaf510`）
+
+Phase 11 の不具合 12 本が入ったあとで、未完了の 8 本を現行 main と再照合した（各 brief の末尾に「棚卸の再測定」の節がある）。進行中の spec は無かった。前回（2026-10-04）の棚卸の即時修正の一覧は、git の履歴にある。
 
 ### 即時修正（spec なし・本棚卸で実施して閉じた）
 
-設計判断を要さず、1 か所の修正とテストで閉じられるもの。各修正は、現行挙動を書いていたマニュアル（利用者章・内部設計章）も同じコミットで直した。
+- 完了済みの spec を指していたコードのコメントのパスを `.kiro/specs/completed/<name>/` に直した（`pasta-actor-runtime`・`sakura-script-newline`・`pasta-scene-kick`・`shiori-integration-test`・`pasta-vscode-lua-debug`・`pasta-source-map` の 6 spec、13 ファイル）。
+- `pasta_sample_ghost` の `main.rs` の案内文が、もう同梱しない `pasta_scripts/` のコピーを書いていたのを直した。
+- `steering/product.md` の古い記述（完了件数・現行バージョン・存在しない spec 名・現在地）を直し、進捗の正本がこの roadmap であることを書いた。
+- `steering/structure.md` の `sakura_script/` の一覧に `line_breaker.rs` を足した。
 
-- DSL・検索・選択肢
-  - 括弧式の中の演算（U12）— `（1＋2）＊3` の括弧内が最初の項しか残らなかった。
-  - BOM 付きの `.pasta`（旧 R5）— 先頭の UTF-8 BOM を読み飛ばす（`pasta_dsl::parse_str`）。
-  - 選択肢の自動ルーティングが表示ラベルで探す（U31）— 選択 ID を Reference1 から読む。
-  - 選択肢の自動ルーティングの探索範囲（U27）— ローカルに無ければグローバルシーンを探す（`choice-definition-dsl` 要件 3.4 どおり）。
-  - グローバルシーン検索がローカルのキーを除外しない — `:` で始まるキーを候補にしない。
-- ローダ・ログ
-  - 設置パスの glob メタ文字 — 基準ディレクトリをエスケープする。
-  - モジュール名に `.` を含むファイル名 — `.` を `_` にし、キャッシュ先をモジュール名から導く。
-  - `.pasta` と `.lua` の同名衝突の判定 — 実際のモジュール名で判定する。
-  - ログフィルタの再読み込み不整合（の一部）— `[logging]` の無い再読み込みで既定に戻り、不正な `file_path` でも `level`・`filter` が効く。既定ファイルへのフォールバックは `pasta-toml-logging-consistency` が扱う。
-- ランタイム・SHIORI・デバッグ
-  - ランダムトークの間隔が起動ごとに同じ — VM 作成直後に `math.randomseed` で種を与える。
-  - `unload` を経ないプロセス終了での 5 秒停滞 — プロセス終了による detach では teardown しない（その場合 `SHIORI.unload` と保存は走らない。内部設計に記載）。
-  - ANSI コードページが UTF-8（65001）の Windows での `@enc.to_ansi` — 65001 では UTF-8 のバイト列をそのまま返す（開発機では不具合を再現できず、API の制約に基づいて修正）。
-  - `encoding` の未使用の公開関数 — `to_ansi_bytes`・`path_from_lua` を削除。
-  - Windows で同じデバッグポートへの二重 bind — Windows では `SO_REUSEADDR` を立てない。
-  - C のフレームを挟むと下位フレームの変数がずれる — 論理レベルを実レベルへ直す処理を 1 か所にまとめる。
-- 利用者章の改訂 — `lua/patterns.md` の作例の誤り（末尾の不要な `act:yield()`・`WORD.create_local` のシーン名・`＠関数名（）` の検索段・`yield` 直後の表示制御）と、同じ作例のある `lua/dsl-vs-lua.md`・pasta-lua-coding スキル・`steering/tech.md`。`reference/pasta-toml.md` の `[loader] debug_mode`（孤立キャッシュの warn）。`debug/troubleshooting.md` の 1 起動 1 接続と `pasta.log` の待ち受けログ（`debug-startup-logging` の申し送りも同時に解消）。
+### spec へ申し送ったもの（各 brief の再測定の節）
 
-### 統合・分割・改名
+- `scene-attribute-store` — 宣言行の属性（`＊会話＆k：v`）を文法は受け付けるがパーサが捨てている。マニュアルの `grammar/block-structure.md` の「内部に記録される」はこの部分について誤り。グローバルの属性がローカルシーンへ写る処理、ファイルの属性の効く範囲（書いた位置から後ろか、先頭だけか）も要件で決める。
+- `failure-output-unification` — 失敗をさくらスクリプトへ出す仕組みが既に 2 つある（`act:failure` と未登録アクターの表記）。まずこの 2 つを 1 つにする。500 の経路まで広げると 20 タスクを超えるので、その場合は分ける。
+- `call-attribute-filter` — 属性が `act:call` の入口で捨てられ、検索まで届かない。シーン表を通らない検索段（現在のシーン・act のメソッド・GLOBAL）で、フィルター付きの Call をどう扱うかを要件で決める。
+- `release-ci` — 追跡をやめる生成物の一覧に、`scripts/README.md` が漏れていた。シェルの画像は追跡を続ける。`release-workflow` の手順の書き換えが、次のリリースより前に要る。
+- `hello-pasta-tutorial-stages` — 辞書を書き換えると `first-ghost.md` との逐語照合が後の PR で落ちる（Phase 12 の境界戦略）。
+- `manual-claudia-theme` — 顔アイコンを Markdown の画像で書くと、スキル references の生成（`gen-skill-refs.mjs`）が止まる。台詞の記法の制約にする。
 
-- `dynamic-call-nil-guard` → `call-execution-correctness` に統合（同じ `ACT_IMPL.call` と Call のコード生成を触るため）。
-- `scene-attribute-semantics` → `scene-attribute-store`（保持・継承・読み出し）と `call-attribute-filter`（Call の属性フィルター）に分割（約 26〜32 タスクで上限を超えるため）。
+### 統合・分割・起票
 
-## Phase 11: 現行実装の不具合の一掃（＋属性セマンティクス）
+- 分割: なし。20 タスクを超えそうなのは `failure-output-unification`（500 の経路を含める場合）だけで、要件定義で範囲を決めてから判断する。
+- 順序の入れ替え: `failure-output-unification` を `call-attribute-filter` の前にした。前者が後者に機能として依存しておらず、`act.lua` を触る順番だけの関係だったため。見つからない Call の失敗表記を、一本化した仕組みに直接載せられる。
+- 起票: `shiori-test-support-runtime`（完了 spec の実装メモに残っていた、結合テストが古いランタイムの写しを使う問題）。
+- バックログへ: 完了 spec の範囲外に残っていた項目を下の「バックログ」に足した。
+
+### ウェーブ（2026-10-07）
+
+依存の木の先頭は 6 本で、互いのソースが重ならないので全部を同じウェーブに置く。
+
+| spec | 子孫 | 種別 | 要件定義 |
+| ---- | ---- | ---- | -------- |
+| release-ci | 約 2（`hello-pasta-shell-art`・`getting-started-story-guide`） | 基盤（期限 2026-12-01） | Opus |
+| hello-pasta-tutorial-stages | 約 2（`hello-pasta-shell-art`・`getting-started-story-guide`） | 機能 | Fable |
+| scene-attribute-store | 約 1（`call-attribute-filter`） | 機能 | Fable |
+| failure-output-unification | 約 1（`call-attribute-filter`） | 機能 | Fable |
+| manual-claudia-theme | 約 1（`getting-started-story-guide`） | 機能 | Fable |
+| shiori-test-support-runtime | 0 | 基盤 | Opus |
+
+同じウェーブでの約束:
+
+- `scene-attribute-store` は、属性を読み出す API を `act.lua` に置かない（`SCENE` 側に置く）。`act.lua` はこのウェーブでは `failure-output-unification` が持つ。
+- `hello-pasta-tutorial-stages` は、`release.ps1`・`.gitignore`・`ghost/master/scripts/` を触らない（Lua の段階を作る場合も `scripts/` の外に置く）。`first-ghost.md` は pasta ブロックだけを触り、導入と締めの台詞は `manual-claudia-theme` に任せる。
+- `manual-claudia-theme` は `first-ghost.md` の pasta ブロックを触らない。マニュアルの同じページの別の節を、`scene-attribute-store`・`failure-output-unification` と分け合う。スキル references は後から入る側が再生成する。
+- `shiori-test-support-runtime` は `crates/pasta_shiori/tests/` だけを触る。
+
+次のウェーブの候補: `call-attribute-filter`（`scene-attribute-store`・`failure-output-unification` の後）、`hello-pasta-shell-art`（`release-ci`・`hello-pasta-tutorial-stages` の後）。`release-workflow` の手順の書き換えは `release-ci` の直後に行う。その次が `getting-started-story-guide`。
+
+### 開発者の判断が要るもの（ウェーブは止めない）
+
+- `pasta_core` の `resolve_scene_id` の整理 — 公開 API なので、消すと semver の破壊的変更になる（バックログ）。
+- `hello-pasta-shell-art` のライセンスの書き方・外部の画像ファイルの扱い・生成元の記録 — 要件定義の議題。
+
+## Phase 11 の残り: 属性セマンティクスと失敗の出力
 
 ### 境界戦略
 
-- **分割理由**: 不具合を「根が同じもの」で束ねた。生成コードが存在確認なしに Lua を直接触る（`dsl-codegen-runtime-safety`）、文字列リテラルの文法（`dsl-literal-fixes`）、コールバックが通常の再開経路を通らない（`callback-resume-unification`）、登録キーと検索キーの食い違い（`scene-search-key-normalization`）、ランタイムのシーン名の形式（`scene-identity-format`）など。
-- **共有接点**: `crates/pasta_lua/src/code_gen/element_gen.rs` と `crates/pasta_lua/pasta_scripts/pasta/act.lua` を触る spec が多い。これらは 1 ウェーブに 1 spec だけが持つ。トランスパイラのスナップショットを広く変える spec（`dsl-codegen-runtime-safety`・`scene-identity-format`・`call-execution-correctness`）も、別々のウェーブに置く。
+- **分割理由**: シーン属性を 2 つに分けた（2026-10-04）。保持・継承・読み出し（`scene-attribute-store`）と、Call の属性フィルター（`call-attribute-filter`）。実行時の失敗の出力の一本化（`failure-output-unification`）は、`call-execution-correctness` が Call 行に入れた失敗表記を土台にする。
+- **共有接点**: `crates/pasta_lua/pasta_scripts/pasta/act.lua` は 1 ウェーブに 1 spec だけが持つ。`failure-output-unification` と `call-attribute-filter` が触るので、この順に置く。`scene-attribute-store` と `call-attribute-filter` は `scene.lua` と `pasta_core` のシーン登録を共有するので、この順に置く。`crates/pasta_lua/src/code_gen/element_gen.rs` も 1 ウェーブに 1 spec だけ。
 
 ### ウェーブ構成
 
 | Wave | spec（並走可） | 種別 | ソースの持ち場 |
 | ---- | -------------- | ---- | -------------- |
-| 1 | dsl-literal-fixes | バグ（起動不能を含む） | `pasta_dsl` の文法・パーサ、`string_literalizer.rs` |
-| 1 | dsl-codegen-runtime-safety | バグ（500） | `element_gen.rs`、`act.lua`、`sakura_script/tokenizer.rs` |
-| 1 | callback-resume-unification | バグ（継続の消失・潜在 500） | `pasta_scripts/pasta/shiori/event/`（`choice_select.lua` 以外） |
-| 1 | scene-search-key-normalization | バグ | `search/`、`pasta_core` の registry（`random.rs` 以外）、`actor.lua` のアクター単語検索 |
-| 1 | pasta-toml-logging-consistency | バグ（設定・ログ） | `pasta_lua` の `loader/config/`・`logging/`、`pasta_shiori` |
-| 2 | scene-identity-format | バグ | `scene.lua`、`transpiler.rs`、`debug/source_map/`、`kick.lua` |
-| 2 | actor-proxy-act-delegation | バグ（500） | `actor.lua`、`global.lua`、`shiori/entry.lua` |
-| 2 | act-token-grouping-fix | バグ | `act.lua`（グループ化）、`sakura_builder.lua`、`ct.lua` |
-| 2 | search-selector-indices | バグ（テスト用 API） | `pasta_core` の `random.rs` |
-| 2 | string-concat-operator | 機能 | `pasta_dsl` の式の文法（演算子）、`element_gen.rs`（式の Binary）、`act.lua`（算術・連結ヘルパーの領域。グループ化は触らない） |
-| 3 | call-execution-correctness | バグ | `element_gen.rs`（Call）、`act.lua`（`init_scene`・`call`） |
-| 3 | paragraph-break-tag-only-talk | バグ（表示の空き） | `sakura_builder.lua`（段落区切りの判定）、`appearance.lua`（タグの読み取りの共有だけ） |
-| 4 | scene-attribute-store | 機能 | 属性の文法・コード生成・`scene.lua`・`finalize.rs` |
-| 5 | call-attribute-filter | 機能 | フィルターの文法・Call のコード生成・検索 |
-| 6 | failure-output-unification | 機能 | `act.lua`・`actor.lua`・`word.lua` の警告箇所、失敗表記の出力（2026-10-05 起票。ウェーブは次の棚卸で見直す） |
+| 4 | scene-attribute-store | 機能 | 宣言行の属性のパース（`parse_scene.rs`）、`scope_gen.rs`・`context.rs`・`transpiler.rs`、`scene.lua`、`finalize.rs`、`pasta_core` のシーン登録 |
+| 4 | failure-output-unification | 機能 | `act.lua`・`actor.lua`・`word.lua` の警告と失敗表記（範囲によっては `shiori/event/`・`res.lua`・`pasta_shiori` の `error.rs`） |
+| 5 | call-attribute-filter | 機能 | Call の文法（`grammar.pest`・`parse_action.rs`）、`element_gen.rs`（Call）、`act.lua`（`call`・`find_act_handler`）、`scene.lua`（`SCENE.search`）、`search/`、`pasta_core` の `scene_table.rs`、VSCode の文法定義 |
+
+Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）。
 
 ## Phase 12: 初心者向けの入門ガイド
 
@@ -129,14 +143,16 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - **分割理由**: 持ち場で 3 つに分けた。シェルの画像（`crates/pasta_sample_ghost` の画像側）、段階表と段階辞書（同じクレートの辞書とテスト）、ガイドの本文（`book/`）。段階表が固まってから本文を書くので、物語と作例が食い違わない。
 - **共有接点**: 段階表と段階辞書の置き場所・形（`hello-pasta-tutorial-stages` → `getting-started-story-guide`）、`tutorial-check.mjs` の照合対象、スクリーンショットに使う絵（`hello-pasta-shell-art` → `getting-started-story-guide`）。
 - **`manual-claudia-theme` との接点**: 台詞の部品の記法（`manual-claudia-theme` → `getting-started-story-guide`）。`AUTHORING.md` は両方が別の節を触るので、後から入る側が rebase で合わせる。`getting-started` の既存の台詞の記法の置き換えも `manual-claudia-theme` が行い、ガイドの書き直しはその上に乗る。
+- **`hello-pasta-tutorial-stages` との接点**: `hello-pasta-shell-art` と `hello-pasta-tutorial-stages` は、どちらも `crates/pasta_sample_ghost/tests/integration_test.rs` を触る（画像のテストと辞書のテスト）。段階表を先に固めるので、`hello-pasta-tutorial-stages` を先に置く（2026-10-07 棚卸）。
+- **`tutorial-check.mjs` の落とし穴**: hello-pasta の `dic/` を書き換えると、`first-ghost.md` の pasta ブロックとの逐語照合が崩れる。マニュアルの CI は `crates/pasta_sample_ghost/ghosts/**` の変更では走らないため、次に `book/` を触る PR で初めて落ちる。`hello-pasta-tutorial-stages` の要件で、`first-ghost.md` の pasta ブロックを同じ spec で合わせるか、CI の対象パスに辞書を足すかを決める。
 - **`release-ci` との接点**: `hello-pasta-shell-art` は `release-ci` と同じ `crates/pasta_sample_ghost/release.ps1` を触る。生成物の git 追跡の扱いも共有する（`release-ci` は生成物の追跡をやめ、`hello-pasta-shell-art` は画像を生成物から追跡する素材に変える）。そのため `release-ci` の後に置く。
 
 | Wave | spec（並走可） | ソースの持ち場 |
 | ---- | -------------- | -------------- |
-| 1（`release-ci` の後） | hello-pasta-shell-art | `pasta_sample_ghost` の画像生成・`shell/master/`・README・`release.ps1` |
-| 1 | hello-pasta-tutorial-stages | hello-pasta の `dic/`、段階辞書、`pasta_sample_ghost` のテスト |
+| 1 | hello-pasta-tutorial-stages | hello-pasta の `dic/`、段階辞書、`pasta_sample_ghost` のテスト（`integration_test.rs` の辞書のテスト）、`first-ghost.md` の pasta ブロック（同期する場合） |
 | 1 | manual-claudia-theme | `book/book.toml`・`book/theme/`（検索の tokenizer 以外）・追加の CSS と JS・画像、全章の導入と締めの台詞の記法、`AUTHORING.md` の台詞の節、検査・生成ツールの追従 |
-| 2 | getting-started-story-guide | `book/src/getting-started/`・`SUMMARY.md`・`introduction.md`・`AUTHORING.md`・`verify-content.mjs`・`tutorial-check.mjs` |
+| 2（`release-ci`・`hello-pasta-tutorial-stages` の後） | hello-pasta-shell-art | `pasta_sample_ghost` の画像生成・`shell/master/`・README・`release.ps1`・`integration_test.rs` の画像のテスト |
+| 3 | getting-started-story-guide | `book/src/getting-started/`・`SUMMARY.md`・`introduction.md`・`AUTHORING.md`・`verify-content.mjs`・`tutorial-check.mjs` |
 
 ## リリースの CI 化（2026-10-06 起票）
 
@@ -146,7 +162,8 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - **認証**: 長期のトークンを置かない。crates.io は Trusted Publishing、Marketplace は Entra ID のワークロード ID 連携を使う。
 - **成果物**: ビルドした成果物の git 追跡をやめ、CI がタグ時点のソースから作る。
 - **期限**: Marketplace の global PAT は 2026-12-01 に廃止されるので、それまでに完了させる。
-- **ソースの持ち場**: `.github/workflows/release.yml`、`release.ps1`、`build-wasm.ps1`、`.gitignore`、`release/`。Phase 11 の spec とソースが重ならないので、どのウェーブとも並走できる。
+- **ソースの持ち場**: `.github/workflows/release.yml`、`release.ps1`、`build-wasm.ps1`、`.gitignore`、`release/`、`crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/` の生成物（`pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`scripts/README.md`）。シェルの画像は `hello-pasta-shell-art` が追跡する素材に変えるので、追跡をやめない。Phase 11 の spec とソースが重ならないので、どのウェーブとも並走できる。
+- **`release-workflow` の追従**: `release-ci` が入ると、常駐 spec の手順（`release/hello-pasta.nar` を生成してコミットする段）がそのままでは動かない。次のリリースより前に、下の Existing Spec Updates を済ませる。
 
 ### Existing Spec Updates
 
@@ -161,26 +178,15 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 ## Specs (dependency order)
 
-- [x] dsl-literal-fixes -- 改行を含む引用文字列・2 つ目の `""` で生成 Lua が壊れ起動不能になる不具合（U24）、単語値の `「」`・`""` が空にならない（U25）、引用なしの単語値の行末コメント（U06）。Dependencies: none
-- [x] dsl-codegen-runtime-safety -- 未定義の `＠＊関数（）`（U18）・未登録アクター（U19）・act のメンバー名と同じアクター名（U20）・数値にできない算術（U22）で 500 になる不具合と、アクション行の `\\`（U08）。生成コードを存在確認付きのヘルパー経由にする。Dependencies: none
-- [x] callback-resume-unification -- コールバック再開後の継続の消失、タイムアウト掃引の結果の破棄と予約の残留、タイムアウト応答の二重包み、REG ハンドラの戻り値の二重包み（U23）。コールバックの再開を `EVENT.fire` の再開ループに一本化する。Dependencies: none
-- [x] scene-search-key-normalization -- 記号を含むシーン名（U30）・ローカルシーン名・アクター名が、登録キー（サニタイズ済み）と検索キー（元の名前）の食い違いで見つからない不具合。Dependencies: none
-- [x] pasta-toml-logging-consistency -- 使われない `[lua] libs`（U26）・`[logging] rotation_days`（U32）の扱い、FFI 入口スレッド（`request`・`unload`・detach）のログの破棄、不正な `file_path` のときの挙動とマニュアルの食い違い。Dependencies: none
-- [x] scene-identity-format -- 末尾が数字のシーン名で内部名が重なる不具合（U21）、デバッガのシーン identity の索引漏れ、位置からのキックの前方一致。ランタイム名に区切りを入れ、形式の関数を 1 つにする。Dependencies: scene-search-key-normalization, dsl-codegen-runtime-safety
-- [x] actor-proxy-act-delegation -- アクション行の `＠yield`・`＠ゴースト終了`・`＠＄x` などで、ACT を前提とする関数にアクタープロキシが渡って 500 になる不具合。Dependencies: dsl-codegen-runtime-safety, scene-search-key-normalization
-- [x] act-token-grouping-fix -- ACT のグループ化が最初の発言より前の表示制御を捨て、スポット変更でグループを閉じない不具合。LuaJIT で機能しない CT（`ct.lua`）の撤去または修正。Dependencies: dsl-codegen-runtime-safety
-- [x] search-selector-indices -- `set_scene_selector`・`set_word_selector` の整数が選択に使われない不具合（U29）。Dependencies: scene-search-key-normalization
-- [x] string-concat-operator -- 式の文字列連結演算子 `＆`／`&`（算術より低い優先順位・数値は文字列化）。`＋` は数値専用のまま。動的コールのターゲット式での `＆` と `call-attribute-filter` の切り分けを決めて申し送る。`dsl-codegen-runtime-safety` の完成を前提とし、調整は本 spec 側で行う。Dependencies: dsl-codegen-runtime-safety, dsl-literal-fixes
-- [x] call-execution-correctness -- Call から戻った後のシーン文脈が復元されない不具合（U28）と、動的コール `＞式` の値が nil のときの nil ガード（旧 `dynamic-call-nil-guard`）。Dependencies: dsl-codegen-runtime-safety, act-token-grouping-fix, scene-identity-format
-- [x] paragraph-break-tag-only-talk -- タグだけを返す `talk`（表情の単語 `＠通常` など）を `sakura_builder` が字ありと数え、余分な段落区切りの `\n[150]` が出る不具合（2026-10-05 areka「emo2初回起動」からの申し送り）。Dependencies: none
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: dsl-literal-fixes, scene-identity-format, call-execution-correctness
-- [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, scene-search-key-normalization, call-execution-correctness, string-concat-operator
-- [ ] failure-output-unification -- 実行時の失敗（未定義の参照・見つからない Call など）をログとさくらスクリプトの両方へ 1 つの仕組みから出す。`call-execution-correctness` が Call 行に入れる失敗表記を載せ替え、他の失敗へ広げる。Dependencies: call-execution-correctness, call-attribute-filter
+- [ ] failure-output-unification -- 実行時の失敗（未定義の参照・見つからない Call など）をログとさくらスクリプトの両方へ 1 つの仕組みから出す。`call-execution-correctness` が Call 行に入れる失敗表記を載せ替え、他の失敗へ広げる。Dependencies: none
+- [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
 - [ ] release-ci -- タグ `vX.Y.Z` の push を契機に、GitHub Actions で verify・成果物のビルド・crates.io と Marketplace への公開・GitHub Release までを冪等に行う。認証は OIDC（Trusted Publishing・Entra ID）。成果物の git 追跡を解除し、一回限りのセットアップの手順書を作る。Marketplace の global PAT が廃止される 2026-12-01 より前に完了させる。Dependencies: none
-- [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。Dependencies: release-ci
 - [ ] hello-pasta-tutorial-stages -- 「こんな表現をしたい」の段階表を確定し、段階ごとに起動できる辞書一式を CI で検証する。hello-pasta の辞書を教材として書き直し、最終段階と一致させる。Dependencies: none
 - [ ] manual-claudia-theme -- マニュアルを mdBook のまま「Claudia のマニュアル」に着せ替える。配色・字体・枠などの意匠は ponadocs の Claudia 紹介ページ（Unlicense）を手本にし、ダーク版と表紙の扉を用意する。顔アイコン付きの台詞の部品を作り、全章の導入と締めの台詞を書き換える。検索・着色・`file://` 閲覧・検査ツールは壊さない。Dependencies: none
+- [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。Dependencies: release-ci, hello-pasta-tutorial-stages
 - [ ] getting-started-story-guide -- 入門ガイドを段階表に沿った物語に書き直し、全編を Claudia が語る（執筆規約に `getting-started` の例外を足す）。段階辞書との逐語照合と、新しいシェルのスクリーンショットを含む。Dependencies: hello-pasta-tutorial-stages, hello-pasta-shell-art, manual-claudia-theme
+- [ ] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
 
 ## バックログ（brief なし・保留）
 
@@ -210,7 +216,14 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - モジュール名の衝突（即時修正で判明）— ファイル名の `-`・`.` はどちらも `_` になるため、`a-b.pasta`・`a.b.pasta`・`a_b.pasta` が同じモジュール名になる。`.pasta` 同士の衝突は検出しない（従来から `-` で起きていた）。
 - デバッグポートの他プロセスによる奪取（即時修正で判明）— 相手が `SO_REUSEADDR` を立てて bind する場合まで防ぐには、Windows の `SO_EXCLUSIVEADDRUSE` が要る。ゴースト同士の二重 bind は防いだ。
 - `pasta_core` の `resolve_scene_id`（即時修正で判明）— 本番の呼び出し元が無くなった公開 API。`find_scene`・`crates/pasta_core/README.md` の例・テストとあわせて整理するかを決める。
-- `pasta_shiori` の `util/hglobal/windows_api.rs` の `string_to_multibyte`（即時修正で判明）— `@enc` と同じ 65001 で不正になるフラグを渡すが、テストからしか呼ばれない。
+- `pasta_shiori` の `util/hglobal/windows_api.rs` の `string_to_multibyte`（即時修正で判明）— `@enc` と同じ 65001 で不正になるフラグを渡すが、テストからしか呼ばれない。`pasta_lua` の `encoding/windows.rs` と同じ先頭の分岐（65001 ならバイト列をそのまま返す）を足せば数行で直る。テスト専用なので、消す案もある。
+- `.pasta` を検査するコマンド（2026-10-07 棚卸、`dsl-codegen-runtime-safety` の申し送り）— `pasta_check` に `.pasta` を検証するサブコマンドが無い。同 spec は使い捨てのクレートで代用した。
+- 式の木の優先順位（2026-10-07 棚卸、`dsl-codegen-runtime-safety` の調査）— `pasta_dsl` の `parse_action.rs` の `build_left_assoc_expr` は優先順位なしで木を作り、コード生成（`expr_gen.rs`）が組み直している。AST を直接使う別の利用者が出たら直す。
+- 別ファイルの同名シーンのデバッガ索引（2026-10-07 棚卸、`scene-identity-format` の範囲外）— ファイルをまたぐ同名シーンの索引と通し番号は、既存の制約として残した。
+- サニタイズ後のシーン名の衝突の警告（2026-10-07 棚卸、`scene-search-key-normalization` の範囲外）— 記号を落とした名前が別のシーンと重なる場合に、読み込み時か `pasta_check` で警告する。上の「モジュール名の衝突」とは別の件。
+- タグの読み取りの制約（2026-10-07 棚卸、`paragraph-break-tag-only-talk` の範囲外）— `\nHello` をタグとして読む、`\_?…\_?` の中のタグも読む、引数の中の `\]` を扱わない、BudouX の行幅にエスケープと囲みを数えない。上の R4 と一部重なる。
+- 閉じていない 1 行の引用（2026-10-07 棚卸、`dsl-literal-fixes` の範囲外）— `＠w：「abc` と、行をまたげる `sakura_body` の規則はそのままにした。
+- 並列負荷で時々落ちる TCP のテスト（2026-10-07 棚卸、`act-token-grouping-fix`・`scene-identity-format` の実装メモ）— `runtime_toggle_e2e_*`・`hook_panic_*`。
 - budoux の自動改行の禁則（2026-10-05、ghost_dev「emo2 開発」からの申し送り）— `line_breaker.rs` の `break_lines_impl` は禁則を見ない。BudouX の語の区切りの直前で改行するだけである。
   - 方針は JIS X 4051 どおりとする。リーダー（`‥…`）は行頭に置いてよい。並びの途中では分けない。
   - この方針では、申し送りの実例「イイジャン！／‥‥ええと、」は正しい組版になる。

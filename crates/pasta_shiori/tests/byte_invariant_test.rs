@@ -1,6 +1,6 @@
 //! FFI 入口応答バイト列のゴールデン特性化テスト（ByteInvariantSuite）
 //!
-//! 関連仕様: `.kiro/specs/pasta-actor-runtime/`
+//! 関連仕様: `.kiro/specs/completed/pasta-actor-runtime/`
 //! - 充足要件: R1.1（外部 SHIORI 挙動バイト不変）／R1.2（全既存テスト回帰不変）／
 //!   R1.4（差分検出で revert 可能な回帰ガード）
 //! - 設計: design.md の **ByteInvariantSuite** コンポーネント
@@ -84,7 +84,7 @@ fn assert_golden_bytes(label: &str, actual: &str, expected: &str) {
 
 /// OnBoot（hello-pasta 単一 OnBoot シーン）の完全応答。
 ///
-/// 意図した変更（`.kiro/specs/sakura-script-newline` R3.1）: sakura(spot0)→kero(spot1) の
+/// 意図した変更（`.kiro/specs/completed/sakura-script-newline` R3.1）: sakura(spot0)→kero(spot1) の
 /// 単純切替は両スポットとも初テキストのため、完全遅延方式では段落区切り改行 `\n[150]` を
 /// 出力しない（先出し版は離脱側スコープ末尾にゴミ改行を残していた。本仕様はこれを排除する）。
 const GOLDEN_ONBOOT: &str = "SHIORI/3.0 200 OK\r\n\

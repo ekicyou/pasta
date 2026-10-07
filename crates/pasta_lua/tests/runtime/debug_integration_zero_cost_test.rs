@@ -15,7 +15,7 @@ use pasta_lua::{DebugConfig, PastaLuaRuntime, RuntimeConfig, TranspileContext};
 /// これらを暗黙に退行させられないよう、アサーションは可能な限り **直接的かつ強力**
 /// にする（4.2/5.1 が既に保証する内容の上に、より強い信号を積む）。
 ///
-/// 要件マッピング（`.kiro/specs/pasta-vscode-lua-debug/requirements.md`）:
+/// 要件マッピング（`.kiro/specs/completed/pasta-vscode-lua-debug/requirements.md`）:
 /// - **R5.2**: 無効時はデバッグ用フックを設置せず、本番実行に追加コストを与えない。
 ///   → [`r5_2_disabled_installs_no_hook_jit_stays_on`]
 /// - **R5.3**: 無効時は `debug`／`std_debug` をスクリプトへ露出せず、サンドボックスを維持する。

@@ -97,6 +97,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   └── log.rs              # ランタイムログ
 │       │   ├── sakura_script/ # さくらスクリプト処理
 │       │   │   ├── mod.rs           # さくらスクリプトAPI
+│       │   │   ├── line_breaker.rs  # BudouX による自動改行
 │       │   │   ├── tokenizer.rs     # トークナイザー
 │       │   │   └── wait_inserter.rs # ウェイト挿入
 │       │   ├── presentation/  # 宿主非依存 presentation マーカー契約（talk/actor切替/wait/choice・拡張可能）
