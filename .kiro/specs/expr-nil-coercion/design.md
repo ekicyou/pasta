@@ -30,7 +30,7 @@
 - 被演算子の変換の規則と、その実装 `ACT_IMPL.num`・`ACT_IMPL.str`（`act.lua`）。nil は黙って 0・`""`、変換できない値は従来の文言で警告して 0・`""`。
 - 二項演算の生成形（`expr_gen.rs` の `binary_node` まわり）。演算ごとに `(左 演算子 右)` を出し、被演算子を生成時に分かる種類に応じて `act:num`・`act:str` に通す。
 - 式文 `＄＝式` の生成形のうち、式が関数呼び出しそのものでないときの形（`do local _ = 式 end`）。二項演算の式文を Lua の文として正しくするために要る。
-- `ACT_IMPL.arith`・`ACT_IMPL.concat` と、その内部（`ARITH_OPS`・`arith_operand`・`concat_operand`）の撤去（【仮定】OPEN QUESTION 2）。
+- `ACT_IMPL.arith`・`ACT_IMPL.concat` と、その内部（`ARITH_OPS`・`arith_operand`・`concat_operand`）の撤去（設計ディスカッションで確定。呼び出し元が無くなるので手書きの Lua 向けにも残さない）。
 - 上記の挙動を固定するテストと、現行挙動を固定している既存テストの更新。
 - マニュアル（`grammar/variables.md`・`grammar/call-jump.md`・`lua/script-api.md`・`internals/internal-modules.md`・`internals/transpiler.md`）と、スキル（`pasta-ghost-authoring/SKILL.md`・`pasta-lua-coding/SKILL.md` の該当行、両スキルの `references/` の再生成）。
 
@@ -110,7 +110,7 @@ graph LR
 ### Modified Files
 
 ランタイム:
-- `crates/pasta_lua/pasta_scripts/pasta/act.lua` — `ACT_IMPL.num`・`ACT_IMPL.str` を足す（`arith_value_text` の直後）。`ACT_IMPL.arith`・`ACT_IMPL.concat`・`ARITH_OPS`・`arith_operand`・`concat_operand` を消す（OPEN QUESTION 2）。`ACT_IMPL.call_key` の注釈のうち「内側の演算が警告済み」の文言を「手書きの Lua から nil を渡したとき」に直す（振る舞いは変えない）。
+- `crates/pasta_lua/pasta_scripts/pasta/act.lua` — `ACT_IMPL.num`・`ACT_IMPL.str` を足す（`arith_value_text` の直後）。`ACT_IMPL.arith`・`ACT_IMPL.concat`・`ARITH_OPS`・`arith_operand`・`concat_operand` を消す。`ACT_IMPL.call_key` の注釈のうち「内側の演算が警告済み」の文言を「手書きの Lua から nil を渡したとき」に直す（振る舞いは変えない）。
 
 トランスパイラー:
 - `crates/pasta_lua/src/code_gen/expr_gen.rs` — 被演算子を `(コード, 説明, 種類)` で運び、`binary_node` が `(左 演算子 右)` を出す。被演算子を `act:num`・`act:str` に通すかを種類で決める。`flatten_binary`・`precedence`・`binary_to_string` の畳み方と `operand_desc` は変えない。
@@ -330,7 +330,7 @@ fn binary_node(op: BinOp, lhs: Operand, rhs: Operand) -> Operand;
 | 連結（`..`） | String | そのまま |
 | 〃 | Number・Unknown | `act:str(<code>)`、説明があれば `act:str(<code>, <desc>)` |
 
-- 連結の Number を `act:str` に通すのは、要件 4.5（連結の値は必ず文字列にしてから演算する）を文字どおりに守り、数値の表記を `str`（`tostring`）の 1 か所に寄せるため（【仮定】OPEN QUESTION 5）。
+- 連結の Number を `act:str` に通すのは、要件 4.5（連結の値は必ず文字列にしてから演算する）を文字どおりに守り、数値の表記を `str`（`tostring`）の 1 か所に寄せるため（設計ディスカッションで確定）。
 - 関数呼び出しの被演算子には必ず説明があるので、値は変換の呼び出しの最後の引数にならない。関数が複数の値を返しても、先頭の 1 つだけが渡る。
 
 生成形の例:
@@ -370,7 +370,7 @@ fn binary_node(op: BinOp, lhs: Operand, rhs: Operand) -> Operand;
 #### ArithConcatRetirement
 
 - 生成コードが `act:arith`・`act:concat` を呼ばなくなるため、`ACT_IMPL.arith`・`ACT_IMPL.concat`・`ARITH_OPS`・`arith_operand`・`concat_operand` を消す。`act:arith - unknown operator` の警告も消える（DSL からは届かない経路だった）。
-- 【仮定】手書きの Lua 向けに残さない（OPEN QUESTION 2）。
+- 手書きの Lua 向けにも残さない（設計ディスカッションで確定）。残すと、呼び出し元の無い公開 API とそのテスト・文書が残る。
 
 ### Tests・Docs
 
@@ -443,7 +443,7 @@ flowchart LR
 1. `ACT_IMPL.num`・`ACT_IMPL.str` を足し、lua_specs に単体テストを足す。既存の生成コード・`arith`・`concat` は触らない（追加だけで、挙動は変わらない）。
 2. 式文の `do local _ = … end`。この時点の二項演算は関数呼び出し（`act:concat(…)`）なので、二項演算の式文の生成形が変わるだけで挙動は変わらない。式文のスナップショット・生成形のテストを更新。
 3. 二項演算の生成形を切り替える（挙動が変わる手順）。先に新しい挙動のテスト（Integration・E2E）を足して失敗を確かめ、切り替えて通す。`ARITH_CASES`・`CONCAT_CASES` が組み直しの関門。既存の期待（スナップショット・生成形の文字列・警告・E2E）をここで更新する。
-4. `ACT_IMPL.arith`・`ACT_IMPL.concat` と内部を消し、対応する lua_specs の describe を消す（OPEN QUESTION 2 の決定に従う）。
+4. `ACT_IMPL.arith`・`ACT_IMPL.concat` と内部を消し、対応する lua_specs の describe を消す。
 5. マニュアル 5 ページ。
 6. スキルの手書き 3 行と references の再生成（`.claude/skills/**` の編集が分類器に止められたら、そこで止めて許可を求める）。
 
@@ -451,14 +451,14 @@ flowchart LR
 
 ## Open Questions / Risks
 
-設計ディスカッションで決める。各項の既定は本文に【仮定】として書いた内容。
+設計ディスカッションで決める。各項の既定は本文に【仮定】として書いた内容。1・2・5・6 は、開発者の案と要件の文言から決まるので、議題にせず確定した。
 
-1. **生成形（Architecture）**: 被演算子を `act:num`・`act:str` に通してネイティブ演算子で計算する形（採用。開発者の案）か、生成形を変えず `act:arith`・`act:concat` の中の変換だけを変える形か。後者は差分が小さい（スナップショット・生成形のテスト・transpiler.md・式文の修正が不要）が、演算ごとの関数と演算子の表が残る。brief の「`act:arith` の引数・戻り値を変えない」制約は、調べた結果 `actor-proxy-act-delegation` は `arith` に依存せず、`call-execution-correctness` は `arith_value_text` の表記にだけ依存していたので、外してよい。推奨: 採用案。
-2. **`act:arith`・`act:concat` の扱い（ArithConcatRetirement）**: 消す（既定）か、`num`・`str` の上の薄い関数として手書き Lua 向けに残すか。残すと呼び出し元の無い公開 API とそのテスト・文書が残る。推奨: 消す。
+1. **【確定】生成形（Architecture）**: 被演算子を `act:num`・`act:str` に通してネイティブ演算子で計算する形（採用。開発者の案）か、生成形を変えず `act:arith`・`act:concat` の中の変換だけを変える形か。後者は差分が小さい（スナップショット・生成形のテスト・transpiler.md・式文の修正が不要）が、演算ごとの関数と演算子の表が残る。brief の「`act:arith` の引数・戻り値を変えない」制約は、調べた結果 `actor-proxy-act-delegation` は `arith` に依存せず、`call-execution-correctness` は `arith_value_text` の表記にだけ依存していたので、外してよい。推奨: 採用案。→ 確定: 採用案（開発者が要件ディスカッションで示した形そのもの）。範囲が広がる（スナップショット 4 件・生成形のテスト・transpiler.md・式文）ことは File Structure Plan に棚卸し済み。
+2. **【確定】`act:arith`・`act:concat` の扱い（ArithConcatRetirement）**: 消す（既定）か、`num`・`str` の上の薄い関数として手書き Lua 向けに残すか。残すと呼び出し元の無い公開 API とそのテスト・文書が残る。推奨: 消す。→ 確定: 消す（1 の帰結。使われない公開 API を残さない）。
 3. **メソッド名（ActOperandConversion）**: `num`・`str`（既定。開発者の案で、`talk`・`word`・`call` などの既存の短い名前と揃う）か、衝突しにくい名前（`to_num`・`to_str` など）か。act のメソッドは `＠名前（…）` の検索の 3 段目で見つかるので、`GLOBAL.str` などを `＠str（）` で呼んでいたゴーストは act のメソッドに当たるようになる。推奨: `num`・`str`（script-api.md の「act のメソッド名と同じ名前」の注意に 2 つを足す）。
 4. **式文の形の範囲（ExprStmtEmitter）**: `do local _ = … end` を、関数呼び出しでない式文すべてに使う（既定。`＄＝１`・`＄＝＄x`・`＄＝（＠f（））` の潜在的な欠陥も直る）か、二項演算の式文だけに使うか。推奨: すべて（条件が「関数呼び出しそのものか」の 1 つで済む）。
-5. **連結の数値の被演算子（BinaryEmitter）**: 数値リテラル・算術の結果も `act:str` に通す（既定。4.5 の文言どおり、表記の出どころが `tostring` の 1 か所）か、Lua の `..` にそのまま渡すか（生成コードが短い。LuaJIT の `..` の数値の表記は `tostring` と同じことを実験で確認済み）。推奨: 既定どおり通す。
-6. **負の 0 の表記（ManualSync）**: `＄未代入＊－１` は `-0` になり、台詞では `-0` と表示される。マニュアルに書くか。推奨: 書かない（要件に無く、0 を負数倍する作例も無い）。
+5. **【確定】連結の数値の被演算子（BinaryEmitter）**: 数値リテラル・算術の結果も `act:str` に通す（既定。4.5 の文言どおり、表記の出どころが `tostring` の 1 か所）か、Lua の `..` にそのまま渡すか（生成コードが短い。LuaJIT の `..` の数値の表記は `tostring` と同じことを実験で確認済み）。推奨: 既定どおり通す。→ 確定: 通す（要件 4.5 の文言どおり）。
+6. **【確定】負の 0 の表記（ManualSync）**: `＄未代入＊－１` は `-0` になり、台詞では `-0` と表示される。マニュアルに書くか。推奨: 書かない（要件に無く、0 を負数倍する作例も無い）。→ 確定: 書かない。
 
 リスク:
 - 生成形を照合するテスト・文書の取りこぼし。File Structure Plan の棚卸し（ripgrep で `act:arith`・`act:concat` を全件確認）と、手順 3 の前後での全テストで防ぐ。
