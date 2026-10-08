@@ -39,7 +39,7 @@
 | 4 毎回ちがう | 同名グローバルシーン複数（`＊会話` の繰り返し・単独 `＊`） | `block-structure.md`（同名シーンの抽選・単独 `＊`） | 可。別名は完全一致なので `＊会話朝` は OnTalk にならない点を段階表に注意として書く |
 | 5 単語でちょこっと変える | `＠単語：a、b、c`、`＠単語` 参照 | `words.md` | 可（brief の 4 段目から独立） |
 | 6 時報 | `＊時報12`・`＊時報その他`、`＄時１２` | `shiori-events.md` OnHour フォールバック・`variables.md` 日時変数 | 可 |
-| 7 挨拶（イベント） | `＊OnGhostChanged`、`＞transfer_req_to_var`、`＄ｒ０` | `shiori-events.md` OnGhostChanged（Reference0＝直前ゴーストの本体側の名前）・`variables.md` リクエスト変数 | 可。`OnGhostChanging` は UKADOC 側のイベントで、同名シーンで応答できる（「ここに無いイベントも同名のシーンで応答できる」） |
+| 7 挨拶（イベント） | `＊OnGhostChanged`・`＊OnGhostChanging`、`＞transfer_req_to_var`、`＄ｒ０`、`＄％baseware.name`（プロパティ読み取り。`＊会話` 1 つ） | `shiori-events.md` OnGhostChanged（Reference0＝直前ゴーストの本体側の名前）・`variables.md` リクエスト変数・プロパティ変数・UKADOC OnGhostChanging / baseware.name | 可。`OnGhostChanging` は UKADOC 側のイベントで、同名シーンで応答できる（「ここに無いイベントも同名のシーンで応答できる」）。議題 7・8 で確定 |
 | 8 触ったら反応 | `＊OnMouseDoubleClick` + `＄ｒ４` | `shiori-events.md` OnMouseDoubleClick（Reference4＝当たり判定）・`variables.md` の作例そのもの | 可 |
 | 9 選択肢 | `＠？ジャンプ先「表示」`、`!select(秒)`、ローカル/グローバルシーンへのルーティング | `block-structure.md` 選択肢行・`shiori-events.md` OnChoiceSelectEx | 可 |
 | 10 覚えていてほしい | `＄＊名前＝…`、参照 | `variables.md` グローバル変数（JSON 保存） | 可。**Research Needed**: 未代入の `＄＊回数` に `＋１` したときの挙動（`dsl-codegen-runtime-safety` 後の数値化ヘルパーが nil をどう扱うか）。初期値の代入が要るなら作例の形が変わる |
@@ -61,7 +61,7 @@
 | G8 | `OnGhostChanged` 作例の「起動挨拶が二重にならない」注意 | Constraint | 作例は `OnGhostChanged` で挨拶し `OnBoot` は来ない前提。読者向けコメントで説明（辞書コメント）。Lua 側で 204 を返す道もあるが入門では使わない |
 | G9 | シーン名の前方一致衝突 | Constraint | 新シーン名（例: `挨拶` は choice.pasta に既存。`時報`・`OnTalk`・`OnMouse…` で始まる名前は候補に混ざる）。e2e テストが追加するシーン名との衝突も確認（`scene_kick_*` が追記するシーン名を設計で列挙） |
 | G10 | emo2 側の名前 | Constraint | `OnGhostChanged` の Reference0 は `むらさき`（配布版・DEBUG 版で共通）、Reference2 は `えも？？`/`えも2DEBUG`。作例は `＄ｒ０` を使う |
-| G11 | `＄％currentghost.name` 作例 | Unknown | get_property は非同期コールバック（`\![get,property,OnPastaCallBack{N}…]`）を挟む。入門の段階表に置くか削るか（[OPEN-6]）。`byte_invariant_test` は OnTalk を登録しない fixture を使っており、この作例に依存しない |
+| G11 | プロパティ読み取りの作例 | Resolved | get_property は非同期コールバック（`\![get,property,OnPastaCallBack{N}…]`）を挟むが読者からは 1 行で動く。議題 8: `＄％currentghost.name`（自分の名前を名乗る）は削り、7 段目のファイルに `＊会話` を 1 つ足して `＄％baseware.name` を読む（UKADOC で `baseware.name`・`baseware.version`・`ghostlist.count` の実在を確認。`username` プロパティは同時起動中の相手ゴーストの呼ばれ方で、自分のユーザー名ではない）。`byte_invariant_test` は OnTalk を登録しない fixture を使っており、この作例に依存しない |
 | G12 | 配布物の変化の周知 | Resolved | `crates/pasta_sample_ghost/RELEASE.md` はリリース**手順書**であり利用者向けの変更履歴ではない。リリースノートは `release-workflow`/`release-ci` が git log を Conventional Commits の種類で分類して生成する。したがって周知の経路は、本 spec のマージコミット（PR タイトル）を `feat(pasta_sample_ghost): …` の利用者向けの言葉で書くこと。あわせて `crates/pasta_sample_ghost/README.md` の辞書構成の節（`:125-146` のツリー）を追従させる。`.nar` 同梱の文書は増やさない（`release-ci` が成果物の追跡をやめる予定） |
 | G13 | 段階表の置き場所 | Missing | 下流が逐語参照する正本。候補: `crates/pasta_sample_ghost/ghosts/hello-pasta-stages/README.md`（段階辞書と同居）か `crates/pasta_sample_ghost/README.md` の節 |
 | G14 | 段階辞書の置き場所の制約 | Constraint | `release.ps1` は `ghosts\hello-pasta` を固定で対象にし、`pasta_check release` は対象ディレクトリ全体を無選別にコピーする（`pasta_check/src/release.rs:19`）→ **`ghosts/hello-pasta/` の下に段階辞書を置くと `.nar` に混入する**。`pasta_shiori` の e2e も `ghost/master` 全体を tempdir へコピーする。`pasta.toml` の `pasta_patterns = ["dic/*.pasta"]` は再帰しないので `dic/` の下にサブフォルダを置いても読み込まれない。`ghosts/` 直下の兄弟ディレクトリ（例: `ghosts/hello-pasta-stages/`）なら配布・e2e のどちらにも拾われない |
@@ -125,4 +125,4 @@
   2. `scene_kick_*_e2e_test.rs` が追記するシーン名の一覧（G9）。
   3. アクター辞書 `％女の子` を 2 つのファイルに分けて定義したときの挙動（宣言と表情の合流。Option D の前提）。
   4. アクター辞書なし（または表情なし）のアクター行が `\p[0]` を出力するか（1 段目の `OnBoot` と新ゴールデンの形）。
-- **要件ディスカッションへ**: `requirements.md` の [OPEN-4]・[OPEN-6]・[OPEN-7]・[OPEN-9]（[OPEN-1] は議題 1、[OPEN-11] は議題 2、[OPEN-5] は議題 3、[OPEN-2] は議題 4、[OPEN-8] は議題 5、[OPEN-3] は議題 7、[OPEN-10] は G12 で解消）。特に [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
+- **要件ディスカッションへ**: `requirements.md` の [OPEN-4]・[OPEN-7]・[OPEN-9]（[OPEN-1] は議題 1、[OPEN-11] は議題 2、[OPEN-5] は議題 3、[OPEN-2] は議題 4、[OPEN-8] は議題 5、[OPEN-3] は議題 7、[OPEN-6] は議題 8、[OPEN-10] は G12 で解消）。特に [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
