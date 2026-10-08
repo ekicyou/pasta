@@ -1,7 +1,9 @@
-# Brief: arith-unassigned-var-zero
+# Brief: expr-nil-coercion
 
-> **ステータス**: 未着手（2026-10-08、`hello-pasta-tutorial-stages` の設計ディスカッション #1 の決定を受けて起票）。決定の正本は同 spec の `design.md` の Q1 と `requirements.md` の Requirement 3.6（コミット `0e1f53a0`）。本 brief は、その決定を 1 つの spec に切り出したもの。着手するときは `/kiro-start arith-unassigned-var-zero` で開始する。
+> **ステータス**: 未着手（2026-10-08、`hello-pasta-tutorial-stages` の設計ディスカッション #1 の決定を受けて起票）。決定の正本は同 spec の `design.md` の Q1 と `requirements.md` の Requirement 3.6（コミット `0e1f53a0`）。本 brief は、その決定を 1 つの spec に切り出したもの。着手するときは `/kiro-start expr-nil-coercion` で開始する。
 
+> **改名（2026-10-08）**: 起票時の名前は `arith-unassigned-var-zero`。要件ディスカッションで範囲が算術の未代入の変数から式の中の nil 全般（連結を含む）に広がったため、`expr-nil-coercion` に改めた。
+>
 > **要件ディスカッションでの方針の組み替え（2026-10-08）**: 開発者の判断で、「未代入の変数だけを 0」から「式の中の nil は、算術の文脈なら 0、連結の文脈なら空文字列。ログなし」に組み替えた。下の Approach・Scope・Out of Boundary のうち、変数と関数の区別と、連結を範囲外とする記述は古い。正本は `requirements.md`。
 
 ## Problem

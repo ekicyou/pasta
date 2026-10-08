@@ -117,7 +117,7 @@
 
 #### Acceptance Criteria
 
-1. The pasta manual（`grammar/variables.md`「算術の評価」「連結の評価」） shall Requirement 1〜4 の規則を書き、作例（`＄x＝＄未代入＋1`・`＄y＝「合計」＆（＄未代入＋1）`・`＄x＝「合計」＆＄未代入＆「個」` など）を新しい結果に合わせて書き直す。除数が nil のとき（`inf`・非数）、変換できない値は警告を出して 0・`""` とみなすこと、空文字列は nil ではなく変換できない値であること、演算が値なしを作らなくなったこと（値なしの伝播が無くなったこと）を書く。
+1. The pasta manual（`grammar/variables.md`「算術の評価」「連結の評価」） shall Requirement 1〜4 の規則を書き、作例（`＄x＝＄未代入＋1`・`＄y＝「合計」＆（＄未代入＋1）`・`＄x＝「合計」＆＄未代入＆「個」` など）を新しい結果に合わせて書き直す。nil の扱いは変数の型ではなく書いた場所（算術の被演算子・連結の被演算子・台詞）で決まり、台詞は文字列の場所であること（変数には型の宣言が無く、同じ変数に数値も文字列も入るため）、除数が nil のとき（`inf`・非数）、変換できない値は警告を出して 0・`""` とみなすこと、空文字列は nil ではなく変換できない値であること、演算が値なしを作らなくなったこと（値なしの伝播が無くなったこと）を書く。
 2. The pasta manual（`grammar/call-jump.md` の Call の失敗の表） shall Requirement 5.2〜5.4 の確定内容に合わせて、連結・算術のターゲットの行を書き直す（「それ以外の式」が値なしになる行と、`＞＄未代入＆「_挨拶」` の補足は、演算が値なしを作らなくなったので消すか書き換える）。
 3. The pasta manual（`lua/script-api.md` の `act:arith`・`act:concat`、`internals/internal-modules.md`「生成コード用のメソッド」、生成形を変えるなら `internals/transpiler.md`） shall 確定した実装の形に合わせて書く。
 4. The pasta skill（`pasta-ghost-authoring/SKILL.md` の算術・連結の行と `references/`） shall マニュアルと同じ内容になる（`references/` は再生成し、鮮度照合とリンク検証が通る）。
