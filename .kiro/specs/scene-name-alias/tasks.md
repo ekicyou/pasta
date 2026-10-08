@@ -135,7 +135,7 @@
   - _Requirements: 9.5, 9.6_
   - _Boundary: Docs (lua api, internals)_
 
-- [ ] 7.4 スキル references を再生成し、鮮度照合とリンク検証に合格させる
+- [x] 7.4 スキル references を再生成し、鮮度照合とリンク検証に合格させる
   - マニュアルの変更から references 生成ツールで再生成する（手編集しない）
   - 鮮度照合（`--check`）とリンク検証の両方が成功する
   - _Requirements: 9.7_
