@@ -9,22 +9,29 @@ local GLOBAL = require("pasta.global")
 
 --- 警告を記録するログを差し込んだ pasta.act を新規ロードして body を実行し、
 --- 実行後に元のモジュールと GLOBAL のテスト用キーを戻す（他スイートを汚さない）
---- @param body fun(ACT: table, warns: string[])
+--- logs には全レベル（trace〜error）のログを "<レベル>: <文言>" で記録する
+--- @param body fun(ACT: table, warns: string[], logs: string[])
 local function with_captured_act(body)
     local saved_log = package.loaded["@pasta_log"]
     local saved_act = package.loaded["pasta.act"]
     local warns = {}
-    local noop = function() end
+    local logs = {}
+    local function record(level)
+        return function(msg)
+            table.insert(logs, level .. ": " .. tostring(msg))
+            if level == "warn" then table.insert(warns, msg) end
+        end
+    end
     package.loaded["@pasta_log"] = {
-        trace = noop,
-        debug = noop,
-        info = noop,
-        warn = function(msg) table.insert(warns, msg) end,
-        error = noop,
+        trace = record("trace"),
+        debug = record("debug"),
+        info = record("info"),
+        warn = record("warn"),
+        error = record("error"),
     }
     package.loaded["pasta.act"] = nil
     local ok, err = pcall(function()
-        body(require("pasta.act"), warns)
+        body(require("pasta.act"), warns, logs)
     end)
     package.loaded["@pasta_log"] = saved_log
     package.loaded["pasta.act"] = saved_act
@@ -401,12 +408,12 @@ end)
 -- PASTA.num・PASTA.str: 算術・連結の被演算子を必ず数値・文字列にする変換（生成コードが pasta モジュールから呼ぶ）
 
 --- with_captured_act と同じく警告を記録し、pasta（init.lua）も新規ロードして body に渡す
---- @param body fun(PASTA: table, warns: string[])
+--- @param body fun(PASTA: table, warns: string[], logs: string[])
 local function with_captured_pasta(body)
     local saved_pasta = package.loaded["pasta"]
     package.loaded["pasta"] = nil
-    local ok, err = pcall(with_captured_act, function(_, warns)
-        body(require("pasta"), warns)
+    local ok, err = pcall(with_captured_act, function(_, warns, logs)
+        body(require("pasta"), warns, logs)
     end)
     package.loaded["pasta"] = saved_pasta
     if not ok then error(err, 0) end
@@ -457,6 +464,130 @@ describe("PASTA.num・PASTA.str - 被演算子の変換（基本の契約）", f
             expect(warns[2]):toBe("act:concat - operand is not a string or number: op='&', value=(table)")
             expect(called):toBe(false)
             expect(#warns):toBe(2)
+        end)
+    end)
+end)
+
+--- 算術の 5 つの演算子
+local ARITH_OPS = { "+", "-", "*", "/", "%" }
+
+--- 数値化の範囲の表（数字だけの文字列・16 進・前後の空白・指数・全角数字・空文字列・数字でない文字列）
+local NUMERIC_INPUTS = {
+    "0", "12", "-3", "+3", ".5", "5.", "1.5", "0x10", "0XfF", "1e2", "1E-1", "2.5e+1",
+    " 1 ", "\t2\n", "  3", "4  ",
+    "１２", "１", "", "   ", "abc", "1a", "0x", "1e", "1 2", "inf", "nan",
+}
+
+describe("PASTA.num - 数値化の範囲（ネイティブの数値化と一致）", function()
+    test("文字列は、ネイティブの s + 0 と tonumber が数値にできるものだけを同じ値の数値にし、それ以外は 0＋警告 1 行", function()
+        with_captured_pasta(function(PASTA, warns, logs)
+            for _, s in ipairs(NUMERIC_INPUTS) do
+                local ok, want = pcall(function() return s + 0 end)
+                expect(tonumber(s) ~= nil):toBe(ok)
+                local before = #logs
+                local got = PASTA.num("+", s, "var.s")
+                expect(type(got)):toBe("number")
+                if ok and want ~= want then
+                    expect(got ~= got):toBe(true)
+                    expect(#logs):toBe(before)
+                elseif ok then
+                    expect(got):toBe(want)
+                    expect(#logs):toBe(before)
+                else
+                    expect(got):toBe(0)
+                    expect(#logs):toBe(before + 1)
+                    expect(warns[#warns]):toBe(string.format(
+                        "act:arith - operand is not a number: op='+', operand='var.s', value='%s' (string)", s))
+                end
+            end
+        end)
+    end)
+
+    test("16 進・前後の空白・指数は数値、全角数字・空文字列・数字でない文字列は 0（4.4）", function()
+        with_captured_pasta(function(PASTA, warns)
+            expect(PASTA.num("+", "0x10")):toBe(16)
+            expect(PASTA.num("+", " 1 ")):toBe(1)
+            expect(PASTA.num("+", "1e2")):toBe(100)
+            expect(#warns):toBe(0)
+            expect(PASTA.num("+", "１２")):toBe(0)
+            expect(PASTA.num("+", "")):toBe(0)
+            expect(PASTA.num("+", "abc")):toBe(0)
+            expect(#warns):toBe(3)
+            expect(warns[2]):toBe("act:arith - operand is not a number: op='+', value='' (string)")
+        end)
+    end)
+
+    test("数値はそのまま返し（inf・-0・大きな数を含む）、非数は非数のまま、ログなし", function()
+        with_captured_pasta(function(PASTA, _, logs)
+            for _, v in ipairs({ 0, 3, -5, 3.5, 1 / 3, 2 ^ 53, 1e100, 1 / 0, -1 / 0 }) do
+                expect(PASTA.num("*", v)):toBe(v)
+            end
+            expect(1 / PASTA.num("+", -0.0)):toBe(-1 / 0)
+            local nan = PASTA.num("+", 0 / 0)
+            expect(nan ~= nan):toBe(true)
+            expect(#logs):toBe(0)
+        end)
+    end)
+end)
+
+describe("PASTA.num - nil と変換できない値", function()
+    test("nil は説明の有無・演算子を問わず 0 で、どのレベルのログも出さない（3.1）", function()
+        with_captured_pasta(function(PASTA, _, logs)
+            for _, op in ipairs(ARITH_OPS) do
+                expect(PASTA.num(op, nil)):toBe(0)
+                expect(PASTA.num(op, nil, "var.x")):toBe(0)
+                expect(PASTA.num(op, nil, "@f()")):toBe(0)
+            end
+            expect(#logs):toBe(0)
+        end)
+    end)
+
+    test("真偽値・関数は 0＋従来の文言の警告 1 行（演算子と説明を含む）", function()
+        with_captured_pasta(function(PASTA, warns, logs)
+            expect(PASTA.num("*", true)):toBe(0)
+            expect(PASTA.num("-", false, "var.f")):toBe(0)
+            expect(PASTA.num("%", function() end, "@g()")):toBe(0)
+            expect(#logs):toBe(3)
+            expect(warns[1]):toBe("act:arith - operand is not a number: op='*', value=true (boolean)")
+            expect(warns[2]):toBe("act:arith - operand is not a number: op='-', operand='var.f', value=false (boolean)")
+            expect(warns[3]):toBe("act:arith - operand is not a number: op='%', operand='@g()', value=(function)")
+        end)
+    end)
+
+    test("表は 0＋警告 1 行で、算術・文字列化のメタメソッドを呼ばない", function()
+        with_captured_pasta(function(PASTA, warns, logs)
+            local called = {}
+            local mt = {}
+            for _, name in ipairs({ "__add", "__sub", "__mul", "__div", "__mod", "__unm", "__concat",
+                "__tostring", "__len", "__eq", "__lt", "__le", "__call", "__index" }) do
+                mt[name] = function() table.insert(called, name); return 1 end
+            end
+            local t = setmetatable({}, mt)
+            for _, op in ipairs(ARITH_OPS) do
+                expect(PASTA.num(op, t, "var.t")):toBe(0)
+            end
+            expect(#called):toBe(0)
+            expect(#logs):toBe(#ARITH_OPS)
+            expect(warns[1]):toBe("act:arith - operand is not a number: op='+', operand='var.t', value=(table)")
+            expect(warns[5]):toBe("act:arith - operand is not a number: op='%', operand='var.t', value=(table)")
+        end)
+    end)
+end)
+
+describe("PASTA.num・PASTA.str - 戻り値の型（4.5）", function()
+    test("どの値を渡しても num は数値、str は文字列を返す", function()
+        with_captured_pasta(function(PASTA)
+            local t = setmetatable({}, { __tostring = function() return "x" end })
+            local values = { 1, -0.5, 1 / 0, 0 / 0, "12", "0x10", "", "abc", "１２", true, false, t,
+                function() end, coroutine.create(function() end) }
+            for i = 0, #values do
+                local v = values[i] -- i = 0 は nil
+                for _, op in ipairs(ARITH_OPS) do
+                    expect(type(PASTA.num(op, v))):toBe("number")
+                end
+                expect(type(PASTA.str(v))):toBe("string")
+                expect(type(PASTA.str(v, "var.v"))):toBe("string")
+            end
         end)
     end)
 end)
