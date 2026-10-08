@@ -208,7 +208,7 @@ end
 | ---- | ---- |
 | 変数代入（ローカル・グローバル） | `var.名前 = 式`・`save.名前 = 式`。右辺が単語参照なら `act:word(名前)`、動的単語参照なら `act:word(var.変数名, "var.変数名")`、プロパティ参照だけなら `act:get_property(名前)` |
 | 変数代入（プロパティ） | `act:set_property(名前, 式)`。右辺が単語参照・動的単語参照なら、式の代わりに上と同じ `act:word(…)` を渡す |
-| 式文（`＄＝`） | 式をそのまま 1 文として出力する |
+| 式文（`＄＝`） | 式が関数呼び出しそのもの（`act:expr_fn(…)`・`act:global_fn(…)`・`act:expr_fn_var(…)`）なら、その呼び出しを 1 文として出力する。それ以外の式（演算・括弧・リテラル・変数参照）は Lua の文にならないため、`do local _ = 式 end` で値を捨てる（`element_gen.rs` の `generate_var_set`） |
 | Call | ローカルシーンの最後の項目なら `return act:call(SCENE.__global_name__, キー, {}, 明示した引数…, table.unpack(args))`、それ以外なら `act:call_restore(SCENE.__global_name__, キー, {}, 明示した引数…, table.unpack(args))`（[末尾呼び出し](#末尾呼び出し)）。キーは、静的ターゲットなら `"名前"`、動的ターゲットなら `act:call_key(…)`（[動的コールのキー](#動的コールのキー)） |
 | アクション行・継続行 | アクションごとに 1 文。アクターは `act:actor_proxy("アクター")` で得たプロキシで書く。発言は `act:actor_proxy("アクター"):talk(文字列)`、単語参照は `act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(名前))`、動的単語参照は `act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(var.変数名, "var.変数名"))`、さくらスクリプトは `act:actor_proxy("アクター"):sakura_script(文字列)` |
 | 選択肢行 | `act:choice(ジャンプ先, 表示テキスト)` |
@@ -220,20 +220,30 @@ end
 
 エスケープのアクションは `talk` で出力する。`＠＠`・`＄＄` は 2 文字目の 1 文字を、`\\`・`\%` は 2 文字のままを話す（`C:\\new` は `talk("C:")`・`talk([[\\]])`・`talk("new")` の 3 文になる）。`\\`・`\%` の 2 文字はさくらスクリプトの後処理で 1 つの単位として扱われ、間にウェイトなどが入らない（[さくらスクリプトの後処理](talk-output.md#さくらスクリプトの後処理)）。
 
-式の算術（`＋`・`－`・`＊`・`／`・`％`）は演算ごとに `act:arith("演算子", 左, 右, 左の説明, 右の説明)` の呼び出しに、連結（`＆`）は演算ごとに `act:concat(左, 右, 左の説明, 右の説明)` の呼び出しになる。パーサは優先順位を付けずに左結合の木を作る（`1＋2＊3` は `(1＋2)＊3`、`「x」＆1＋2` は `(「x」＆1)＋2` の形）ため、`expr_gen.rs` の `binary_to_string` が木を項と演算子の列に戻し、優先順位の高い段から順に、段ごとに左から畳んで入れ子にする。段は `＊`・`／`・`％` → `＋`・`－` → `＆` の 3 段で、段の高さは `precedence` だけが、演算ごとの生成形は `binary_node` だけが決める。算術の 2 段は Lua の優先順位・結合と同じである。括弧（`Paren`）は 1 つの項で、`( … )` で囲んだまま出力する。
+式の算術（`＋`・`－`・`＊`・`／`・`％`）と連結（`＆`）は、演算ごとに Lua の演算子（`+`・`-`・`*`・`/`・`%`・`..`）を括弧で囲んだ `(左 演算子 右)` になる。演算子の前後には必ず空白を 1 つ置く（`10－－3` は `(10 - -3)` になり、`--` が Lua のコメントにならない）。パーサは優先順位を付けずに左結合の木を作る（`1＋2＊3` は `(1＋2)＊3`、`「x」＆1＋2` は `(「x」＆1)＋2` の形）ため、`expr_gen.rs` の `binary_to_string` が木を項と演算子の列に戻し、優先順位の高い段から順に、段ごとに左から畳んで入れ子にする。段は `＊`・`／`・`％` → `＋`・`－` → `＆` の 3 段で、段の高さは `precedence` だけが、演算ごとの生成形は `binary_node` だけが決める。すべての演算を括弧で囲むため、生成形は Lua の優先順位・結合に頼らない。括弧（`Paren`）は 1 つの項で、`( … )` で囲んだまま出力する。
+
+被演算子は、`binary_operand` が Lua の式・説明・生成時に分かる種類（`StaticKind`）の組にして運ぶ。種類は、数値のリテラルと算術の演算が数値（`Number`）、文字列のリテラル・空文字列と連結を含む演算が文字列（`String`）、変数参照・関数呼び出し・動的関数呼び出しが不明（`Unknown`）で、括弧は中身の種類になる。`binary_node` は、演算の文脈と被演算子の種類から、変換の呼び出しを付けるかを決める。
+
+| 文脈 | 被演算子の種類 | 生成形 |
+| ---- | -------------- | ------ |
+| 算術 | 数値 | そのまま |
+| 算術 | 文字列・不明 | `PASTA.num("演算子", 式)`、説明があれば `PASTA.num("演算子", 式, 説明)` |
+| 連結 | 文字列 | そのまま |
+| 連結 | 数値・不明 | `PASTA.str(式)`、説明があれば `PASTA.str(式, 説明)` |
 
 ```text
-＄a＝＄x＋1         → var.a = act:arith("+", var.x, 1, "var.x")
-＄b＝1＋2＊＄y      → var.b = act:arith("+", 1, act:arith("*", 2, var.y, nil, "var.y"))
-＄c＝（＄x＋1）＊2  → var.c = act:arith("*", (act:arith("+", var.x, 1, "var.x")), 2)
-＄d＝＠＊f（1）＋＠g（） → var.d = act:arith("+", act:global_fn("f", 1), act:expr_fn("g"), "@*f()", "@g()")
-＄表示＝「合計」＆＄n＆「個」 → var.表示 = act:concat(act:concat("合計", var.n, nil, "var.n"), "個")
-＄s＝「合計」＆＄a＋＄b → var.s = act:concat("合計", act:arith("+", var.a, var.b, "var.a", "var.b"))
-＄n＝（「1」＆「2」）＋1 → var.n = act:arith("+", (act:concat("1", "2")), 1)
-＞＄種類＆「_挨拶」  → return act:call(SCENE.__global_name__, act:call_key(act:concat(var.種類, "_挨拶", "var.種類")), {}, table.unpack(args))
+＄a＝＄x＋1         → var.a = (PASTA.num("+", var.x, "var.x") + 1)
+＄b＝1＋2＊＄y      → var.b = (1 + (2 * PASTA.num("*", var.y, "var.y")))
+＄c＝（＄x＋1）＊2  → var.c = (((PASTA.num("+", var.x, "var.x") + 1)) * 2)
+＄d＝＠＊f（1）＋＠g（） → var.d = (PASTA.num("+", act:global_fn("f", 1), "@*f()") + PASTA.num("+", act:expr_fn("g"), "@g()"))
+＄表示＝「合計」＆＄n＆「個」 → var.表示 = (("合計" .. PASTA.str(var.n, "var.n")) .. "個")
+＄s＝「合計」＆＄a＋＄b → var.s = ("合計" .. PASTA.str((PASTA.num("+", var.a, "var.a") + PASTA.num("+", var.b, "var.b"))))
+＄n＝（「1」＆「2」）＋1 → var.n = (PASTA.num("+", (("1" .. "2"))) + 1)
+＞＄種類＆「_挨拶」  → return act:call(SCENE.__global_name__, act:call_key((PASTA.str(var.種類, "var.種類") .. "_挨拶")), {}, table.unpack(args))
+＄＝＄未代入＆「x」  → do local _ = (PASTA.str(var.未代入, "var.未代入") .. "x") end
 ```
 
-説明は、実行時の警告に被演算子の場所を出すための文字列リテラルである（`binary_operand` が `operand_desc` の結果を文字列リテラルにする）。変数参照は変数の経路（`"var.x"`・`"save.x"`・`"args[1]"`）、関数呼び出しは `"@名前()"`・`"@*名前()"`・`"@$変数の経路()"`、括弧は中身の説明になり、リテラルと入れ子の演算（算術・連結）には説明が無い。両方とも無ければ説明の引数を省き、右だけあるときは左に `nil` を置く。省き方は `act:arith` と `act:concat` で同じである。入れ子の演算に説明が無いため、内側が失敗して `nil` を返したとき、外側の演算は警告を重ねない。`act:arith`・`act:concat` の実行時の振る舞いは [arith](../lua/script-api.md#arithop-lhs-rhs-lhs_desc-rhs_desc)・[concat](../lua/script-api.md#concatlhs-rhs-lhs_desc-rhs_desc) が正である。
+説明は、実行時の警告に被演算子の場所を出すための文字列リテラルである（`binary_operand` が `operand_desc` の結果を文字列リテラルにする）。変数参照は変数の経路（`"var.x"`・`"save.x"`・`"args[1]"`）、関数呼び出しは `"@名前()"`・`"@*名前()"`・`"@$変数の経路()"`、括弧は中身の説明になり、リテラルと入れ子の演算（算術・連結）には説明が無い。説明が無ければ説明の引数を省く。関数呼び出しには必ず説明があるため、関数の戻り値が変換の呼び出しの最後の引数になることはなく、関数が複数の値を返しても先頭の 1 つだけが渡る。`PASTA.num`・`PASTA.str` の実行時の振る舞い（`nil` を 0・空文字列にすること、変換できない値の警告）は [PASTA.num](../lua/script-api.md#pastanumop-v-desc)・[PASTA.str](../lua/script-api.md#pastastrv-desc) が正である。
 
 動的参照の生成（`element_gen.rs` の `dynamic_ref_args`）は、変数の値を `tostring` せずにそのまま渡し、変数の経路（`var.変数名`・`save.変数名`・`args[番号+1]`）を文字列リテラルにして続けて渡す。値の検査と検索キーへの変換は実行時に行う（[Lua ランタイム内部モジュール](internal-modules.md#動的参照のキーworddynamic_key)）。ここで生成した `act` のメソッドが実行時に何をするかは、[ランタイム実行モデル](execution-model.md) と [Lua ランタイム内部モジュール](internal-modules.md) で扱う。
 
