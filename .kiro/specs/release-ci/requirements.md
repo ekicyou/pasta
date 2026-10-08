@@ -96,7 +96,7 @@
 1. When 公開前の関門が通ったとき, the Release CI shall タグのコミットのソースから `pasta.dll.zip`・`hello-pasta.nar`・VSIX の 3 つの配布物を作る。
 2. The Release CI shall `pasta.dll.zip` に、x86（32bit）向けのリリースビルドの `pasta.dll` と、その第三者ライセンス表示 `THIRD_PARTY_LICENSES.txt` の 2 つを、今の手順で作るものと同じ構成で入れる。
 3. The Release CI shall `hello-pasta.nar` を `pasta_check release` で作り、中身（ファイルの一覧と配置、`updates.txt` を含む）を今の手順で作るものと同じにする。
-4. The Release CI shall VSIX を、タグの版を持つ VSCode 拡張のパッケージとして作り、言語サーバーの WASM と、その第三者ライセンス表示を同梱する（【仮定】WASM のビルドの種類（デバッグ/リリース）は今の `npm run package` と同じにする。未決事項 6）。
+4. The Release CI shall VSIX を、タグの版を持つ VSCode 拡張のパッケージとして作り、言語サーバーの WASM（リリースビルド）と、その第三者ライセンス表示を同梱する。
 5. The Release CI shall 配布物のビルドに必要なツールを、ビルドのたびに同じ版になるよう版を固定して用意する。
 6. If いずれかの配布物のビルドに失敗したとき, the Release CI shall どの公開先への公開も行わずに失敗し、どの配布物のビルドが失敗したかを示す。
 7. The Release CI shall 配布物を Windows の環境でビルドする。
@@ -234,7 +234,7 @@
 3. ~~**関門の範囲**~~ → **確定（議題 2）**: `build.yml` が PR・main で行う検査（test・clippy の x86・x64、cargo-deny、luacheck、WASM ビルド）をすべて、タグのコミットで通す。検査の一覧を要件に書き写さず、`build.yml` に従わせる（R2.5・R2.6）。<br>旧: **関門の範囲**（R2.6）: `build.yml` は test・clippy のほかに cargo-deny・luacheck・WASM ビルドも回す。「main の CI が全部緑か」の確認を置き換えるなら、これらも関門に含めるか。仮定: test と clippy は x86・x64 の両方で回す。残りは未定。
 4. ~~**GitHub Release が待つもの**~~ → **確定（自明修正）**: crates だけを待つ。brief の Constraints「公開順」のとおり（R6.1）。<br>旧: **GitHub Release が待つもの**（R6.1）: GitHub Release の作成は crates の公開の成功だけを待つか、Marketplace の公開の成功も待つか。仮定: crates だけを待つ（今の設計と同じ）。VSIX は Marketplace の成否によらず添付する。
 5. ~~**依存の固定（再現性）**~~ → **確定（議題 3）**: `Cargo.lock` を追跡する（R3.9・R3.10）。依存の更新は `cargo update` のコミットとして明示的に行う。crates.io の利用者は自分の lock で解決し直すので、公開するクレートへの影響は無い。<br>旧: **依存の固定（再現性）**（R3.9）: `.gitignore` は `Cargo.lock` を無視している（「ライブラリクレートなので」）。タグのソースから成果物を再現する要件を、依存クレートの解決結果まで含めて満たすには `Cargo.lock` の追跡が要る。追跡するか、ビルドの構成の再現だけで足りるとするか。
-6. **VSIX の WASM のビルドの種類**（R3.4）: 今の `npm run package` は `build-wasm.ps1` を `-Release` なしで呼ぶため、VSIX に入る WASM はデバッグビルドになっている。今と同じにするか、リリースビルドに変えるか。
+6. ~~**VSIX の WASM のビルドの種類**~~ → **確定（議題 4）**: リリースビルドにする（R3.4）。今のデバッグビルドは意図しない状態で、`build.yml` が確かめている `--release` とも食い違う。手元の `npm run package` もそろえるかは設計で決める。<br>旧: **VSIX の WASM のビルドの種類**（R3.4）: 今の `npm run package` は `build-wasm.ps1` を `-Release` なしで呼ぶため、VSIX に入る WASM はデバッグビルドになっている。今と同じにするか、リリースビルドに変えるか。
 7. **シェルの画像の追跡**（R10.5）: `ghosts/hello-pasta/shell/master/surface*.png`・`surfaces.txt` は `cargo run -p pasta_sample_ghost` が作る生成物だが、git で追跡している。brief は追跡の解除の対象に挙げていない。後続の `hello-pasta-shell-art` が画像を「追跡する素材」に変えるため、本仕様では今のまま追跡を続ける、で良いか。同様に、`release.ps1` が `crates/pasta_lua/scripts` から写す `ghost/master/scripts/README.md` も追跡されている生成物である。これを追跡の解除の対象に含めるか。
 8. **→ 設計へ**: 要件は R6.5「配布物が欠けた Release を公開状態で残さない」とし、作成の順序（下書き → 添付 → 公開）は設計で決める。<br>旧: **GitHub Release の作成済み・添付漏れ**（R6.5）: Immutable Releases を有効にすると、公開後の Release に配布物を足せない。作成の途中で失敗して添付が欠けた Release が残った場合の扱い（作成と添付を一度に済ませる・下書きで作ってから公開する等）を、要件としてどこまで求めるか。
 9. **ワークフロー自体の不具合の修正**（R7.5）: 「失敗した job の再実行」は、タグのコミットにあるワークフローの定義で再実行する。ワークフローの定義そのものに不具合があった場合、再実行では直せない。その場合の回復の手段（同じタグで手動起動できる入口を設けるか、版を上げて出し直すか）を要件に含めるか。
