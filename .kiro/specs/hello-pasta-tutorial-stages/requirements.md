@@ -6,12 +6,12 @@
 
 ガイド本文の執筆（Claudia の語り・章の文章）は下流の `getting-started-story-guide` が持つ。本 spec は段階表と段階辞書を、下流が逐語で使える形で確定して申し送る。
 
-> 本書の「[OPEN-n]」は、ディスカバリ（`brief.md`）だけでは確定できず、要件ディスカッションで決める論点である。各論点には暫定の仮定を明記し、その仮定で要件を書いている。
+> 要件ディスカッション（2026-10-08、議題 1〜11）で、ディスカバリだけでは確定できなかった論点 [OPEN-1]〜[OPEN-11] はすべて解消した。本文中の「[OPEN-n] 解消」「議題 n で決定」は、その決定の出どころを示す。決定の背景は `research.md` の §2.2・§5 を参照。
 
 ## Boundary Context
 
 - **In scope**: 段階表の確定、段階辞書一式（全段階）、hello-pasta の辞書の書き直し（教材化・不足する表現の追加）、全段階を実際に読み込む検証、既存テスト・検査ツールの更新（辞書の変更に追従する範囲）、配布物の変化を利用者に知らせる記述
-- **Out of scope**: マニュアル本文の執筆と章立て（`getting-started-story-guide`）、`tutorial-check.mjs` の照合方式の変更（同 spec）、シェル画像（`hello-pasta-shell-art`）、DSL・ランタイムの機能追加（段階表は現行実装で書ける表現だけを使う）、emo2 側の辞書の変更（ghost_dev リポジトリ）
+- **Out of scope**: マニュアル本文の執筆と章立て（`getting-started-story-guide`）、`tutorial-check.mjs` の照合方式の変更（段階ごとの照合への拡張。同 spec。本 spec は照合対象のファイル名を実ファイルから導く追従だけを行う）、シェル画像（`hello-pasta-shell-art`）、DSL・ランタイムの機能追加（段階表は現行実装で書ける表現だけを使う）、emo2 側の辞書の変更（ghost_dev リポジトリ）
 - **Adjacent expectations**:
   - `getting-started-story-guide` は、本 spec が確定した段階表の順に 1 章ずつ対応させ、段階辞書を逐語で引用する。段階辞書の置き場所と形は本 spec が決めて申し送る。
   - `release-workflow` / `release-ci` は hello-pasta の `.nar` を作る。辞書の中身が変わるため、利用者に変化が分かる記述を本 spec が残す。
@@ -90,7 +90,9 @@
 1. The hello-pasta の辞書 shall `OnBoot` を単一シーンに保ち、その出力が決定的である（`pasta_shiori` のゴールデン応答テスト `byte_invariant_test.rs`・`kick_unused_byte_invariant_test.rs` と `shiori_sample_ghost_test.rs` が依存）。`OnBoot` は 1 段目「しゃべらせたい」で書いた形（女の子の一言）のまま配布辞書に残るため、`OnBoot` の台詞は現行（`起動したよ～。` / `さあ、始めようか。`）から変わる。本 spec はこれら 3 テストのゴールデン文字列と assert 条件を新しい `OnBoot` の決定的な出力に更新し、テストの意図（応答のバイト不変・単一シーン）は保つ（議題 5 で決定。[OPEN-8] 解消）。
 2. When 辞書が章ごとのファイルに組み替わる（Requirement 2.1・2.3）, the 本 spec shall ファイル名に依存する既存テスト（`dist_src_validation_test.rs` の必須ファイル一覧、`integration_test.rs`・`src/scripts.rs` のファイル単位の構造検査: `talk.pasta` の `OnTalk` 5〜10 個、`click.pasta` の `OnMouseDoubleClick` 7 個以上、`時報12`・`時報その他`・`＄時１２` の存在、イベント辞書にグローバルアクター辞書を置かない、シーン内の表情名がアクター辞書に定義済み）を、新しいファイル構成に合わせてテストの意図（必須ファイルの存在・構造の保証）を保ったまま更新する。
 3. While `pasta_shiori` の e2e テスト（`scene_kick_*_e2e_test.rs`）が hello-pasta を一時ディレクトリへコピーしてシーンを追加している, the hello-pasta の辞書 shall これらが追加するシーン名と衝突せず、`pasta.toml` の読み替え（talk 間隔の上書き）を妨げない。
-4. When hello-pasta の辞書が変わる, the `book/src/getting-started/first-ghost.md` の ```` ```pasta ```` ブロック shall 変更後の辞書と逐語一致する状態に保たれ、`node book/tools/tutorial-check.mjs` が exit 0 で終わる。**[OPEN-9]** 仮定: 本 spec は `first-ghost.md` のコードブロックだけを変更後の辞書に逐語で差し替える（文章・章立て・照合方式は変えない）。
+4. When hello-pasta の辞書が章ごとのファイルに組み替わる, the `book/src/getting-started/first-ghost.md` の ```` ```pasta ```` ブロック shall 変更後の全ファイルと逐語一致する状態に保たれ、`node book/tools/tutorial-check.mjs` が exit 0 で終わる。本 spec が行う追従は**機械的な範囲**に限る: pasta ブロックを新しいファイル群に差し替える、辞書の行を引用している本文（`起動したよ～`・`＄ゴースト名` など）と見出しのファイル名を直す。章立て・Claudia の語り・照合方式（完成形 1 か所との照合）は変えず、全面的な書き直しは `getting-started-story-guide` に残す（議題 11 で決定。[OPEN-9] 解消）。
+4a. When hello-pasta の辞書のファイル名が変わる, the `book/tools/tutorial-check.mjs` shall 固定で列挙しているファイル名（`DIC_FILES`）に依存せず、hello-pasta の `dic/` に実在する `.pasta` ファイル（または段階表）から照合対象を導く。照合方式そのもの（各ファイルがいずれかのブロックと逐語一致）は変えない。`tutorial-check-test.mjs` も同じ前提に合わせる。
+4b. The `.github/workflows/manual.yml` shall `paths` に hello-pasta の `dic/`（`crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**`）を加え、辞書だけを変える PR でも tutorial-check とチュートリアル構文検証（`cargo test -p pasta_sample_ghost`）が走るようにする。
 5. The 本 spec shall `cargo test --all` と `cargo clippy --all-targets --workspace -- -D warnings`、`node book/tools/tutorial-check.mjs` が完了時点で成功する状態で終わる。
 
 ### Requirement 6: 配布物の変化の周知

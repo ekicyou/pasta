@@ -57,7 +57,7 @@
 | G4 | 最終段階＝配布辞書の一致検証 | Resolved | Option D により構成で満たされる（最終段階＝全ファイル＝配布辞書）。代わりに「段階表が列挙するファイル集合 ＝ `dic/` の実ファイル集合」の一致検査が要る（Requirement 4.3） |
 | G5 | `OnBoot` ゴールデン | Constraint → 更新 | `pasta_shiori` の 3 テストが `OnBoot` 単一シーン・固定文を固定。ゴールデンは `actors.pasta` の `＠通常`→`\s[1]`/`\s[11]`、`pasta.toml` の `[talk]` 待ち時間と `[actor]` の spot にも依存する（Requirement 6.4 で不変）。議題 5 の「ファイル追加のみ」により `OnBoot` は 1 段目の形（女の子の一言）で固定され、配布辞書の `OnBoot` が変わる → 3 テストのゴールデン文字列・assert 条件を更新する（Requirement 5.1）。`OnBoot` を複数定義しない（単一シーン・決定性は保つ）。1 段目はアクター辞書の表情を使わないので、`OnBoot` の出力に `\s[n]` が含まれるかは 1 段目の作例の書き方次第（設計で決める。アクター宣言だけの辞書で `\p[0]` が出るかを確認） |
 | G6 | 構造テストの固定値 | Constraint | `OnTalk` 5〜10（`talk.pasta`）、`OnMouseDoubleClick` 7 以上（`click.pasta`。`choice.pasta` の 1 個を含めると現状 8 定義）、`時報12`・`時報その他`・`＄時１２`、`src/scripts.rs` のユニットテストが「シーン内で使う `＠表情` はすべて `actors.pasta` に定義あり」を検査、`choice.pasta` は dist_src の必須一覧に無い。`ontalk_probe_test.rs` が `OnTalk` シーンの存在を要求。教材化で件数を減らすならテスト更新（Requirement 5.2） |
-| G7 | `tutorial-check.mjs` の逐語一致 | Constraint | 辞書を変えた瞬間に `manual.yml` が赤くなる。`first-ghost.md` のコードブロック差し替え（[OPEN-9]）が同じ PR に要る。さらに本文も辞書の行を引用している（`:157`・`:182` が `起動したよ～`、`:235-236`・`:271` が `＄ゴースト名`、`:7`・`:435` と `getting-started/index.md:11` が「hello-pasta と同じになる」と明言）ため、コードブロックだけ差し替えると本文が食い違う。照合方式の拡張（段階ごと）は下流 spec の持ち場 |
+| G7 | `tutorial-check.mjs` の逐語一致 | Constraint → 追従 | `tutorial-check.mjs` は `DIC_FILES` に 5 ファイル名を固定で列挙（`:40-47`）しており、章別ファイルへの組み替えでファイル名の時点で `missing-source` になる。本文も辞書の行を引用している（`:157`・`:182` が `起動したよ～`、`:235-236`・`:271` が `＄ゴースト名`、`:7`・`:435` と `getting-started/index.md:11` が「hello-pasta と同じになる」と明言）。議題 11: 本 spec が機械的に追従する（`DIC_FILES` を `dic/` の実ファイルから導く、`first-ghost.md` の pasta ブロック差し替えと引用行・見出しの修正、`tutorial-check-test.mjs` の前提合わせ）。照合方式の拡張（段階ごと）と全面書き直しは下流 spec の持ち場 |
 | G8 | `OnGhostChanged` 作例の「起動挨拶が二重にならない」注意 | Constraint | 作例は `OnGhostChanged` で挨拶し `OnBoot` は来ない前提。読者向けコメントで説明（辞書コメント）。Lua 側で 204 を返す道もあるが入門では使わない |
 | G9 | シーン名の前方一致衝突 | Constraint | 新シーン名（例: `挨拶` は choice.pasta に既存。`時報`・`OnTalk`・`OnMouse…` で始まる名前は候補に混ざる）。e2e テストが追加するシーン名との衝突も確認（`scene_kick_*` が追記するシーン名を設計で列挙） |
 | G10 | emo2 側の名前 | Constraint | `OnGhostChanged` の Reference0 は `むらさき`（配布版・DEBUG 版で共通）、Reference2 は `えも？？`/`えも2DEBUG`。作例は `＄ｒ０` を使う |
@@ -66,7 +66,7 @@
 | G13 | 段階表の置き場所 | Missing | 下流が逐語参照する正本。候補: `crates/pasta_sample_ghost/ghosts/hello-pasta-stages/README.md`（段階辞書と同居）か `crates/pasta_sample_ghost/README.md` の節 |
 | G14 | 段階辞書の置き場所の制約 | Constraint | `release.ps1` は `ghosts\hello-pasta` を固定で対象にし、`pasta_check release` は対象ディレクトリ全体を無選別にコピーする（`pasta_check/src/release.rs:19`）→ **`ghosts/hello-pasta/` の下に段階辞書を置くと `.nar` に混入する**。`pasta_shiori` の e2e も `ghost/master` 全体を tempdir へコピーする。`pasta.toml` の `pasta_patterns = ["dic/*.pasta"]` は再帰しないので `dic/` の下にサブフォルダを置いても読み込まれない。`ghosts/` 直下の兄弟ディレクトリ（例: `ghosts/hello-pasta-stages/`）なら配布・e2e のどちらにも拾われない |
 | G16 | `＊会話` → `OnTalk` の別名（上流 spec `scene-name-alias`） | Blocking（実装） | 2026-10-08 確認。`pasta.toml` にシーン名別名表（既定「会話 → OnTalk」1 件、表を書けば既定を丸ごと置換）。置換は `SceneRegistry::sanitize_name` の前段で登録・検索の両方に効き、宣言・Call/Jump・選択肢・`SCENE.co_exec` すべてが対象。**完全一致のみ**（`＊会話・朝`・`＊会話朝` は別シーン）。仮想ディスパッチャは不変（候補名 "OnTalk" のみ）。`＊OnTalk` は後方互換で両方書けば同じ候補群。時報側は不変。マニュアル（block-structure・call-jump・shiori-events・pasta-toml）とスキル references は同 PR で更新。マニュアルが `＊会話` を汎用例題名として 21 か所で使っている件は向こうの要件で整理。brief のみ・PR 未着手。ロードマップ上は Phase 11 Wave 6 だがユーザーが最優先で PR を出させる方針。本 spec: 設計は待たず、**実装の着手をマージ後にゲート**（議題 6）。辞書ディスパッチャ案（`＊OnTalk` → `＞会話`）は不要になった |
-| G15 | `manual.yml` のトリガー | Constraint | `manual.yml` の `paths:` に `crates/pasta_sample_ghost/**` が無い。辞書だけを変える PR では tutorial-check が走らず（`build.yml` の `cargo test --all` だけ走る）、逐語一致の崩れが main への push まで見つからない。段階辞書の検証（Requirement 4.7）も同じ理由で `manual.yml` 側では PR 時に走らない |
+| G15 | `manual.yml` のトリガー | Constraint | `manual.yml` の `paths:` に `crates/pasta_sample_ghost/**` が無い。辞書だけを変える PR では tutorial-check が走らず（`build.yml` の `cargo test --all` だけ走る）、逐語一致の崩れが main への push まで見つからない。段階辞書の検証（Requirement 4.7）も同じ理由で `manual.yml` 側では PR 時に走らない。議題 11: 本 spec が `paths` に hello-pasta の `dic/**` を加える（Requirement 5.4b） |
 
 ### 2.3 複雑さの信号
 
@@ -125,4 +125,4 @@
   2. `scene_kick_*_e2e_test.rs` が追記するシーン名の一覧（G9）。
   3. アクター辞書 `％女の子` を 2 つのファイルに分けて定義したときの挙動（宣言と表情の合流。Option D の前提）。
   4. アクター辞書なし（または表情なし）のアクター行が `\p[0]` を出力するか（1 段目の `OnBoot` と新ゴールデンの形）。
-- **要件ディスカッションへ**: `requirements.md` の [OPEN-9]（[OPEN-7] は議題 10、[OPEN-1] は議題 1、[OPEN-11] は議題 2、[OPEN-5] は議題 3、[OPEN-2] は議題 4、[OPEN-8] は議題 5、[OPEN-3] は議題 7、[OPEN-6] は議題 8、[OPEN-4] は議題 9、[OPEN-10] は G12 で解消）。特に [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
+- **要件ディスカッション（2026-10-08 完了）**: [OPEN-1]〜[OPEN-11] はすべて解消（議題 1〜11 と G12）。決定は `requirements.md` 本文に反映済み。未解決の論点は残っていない。
