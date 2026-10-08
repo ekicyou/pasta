@@ -83,7 +83,7 @@
   - _Boundary: github-release.ps1_
 
 - [ ] 4. ワークフロー
-- [ ] 4.1 (P) `build.yml` を reusable workflow として呼べるようにする
+- [x] 4.1 (P) `build.yml` を reusable workflow として呼べるようにする
   - 起動条件に入力なしの `workflow_call` を足すだけにし、job・step・matrix・artifact 名・検査内容は変えない
   - 完了の状態: `actionlint` が通り、差分が `on:` の 1 項目だけで、push・PR・手動の起動条件が残っている（PR 上で従来どおり起動することは、実装 PR を作ったときに確かめる。C-1 の前提）
   - _Requirements: 2.5, 2.6, 2.8_
