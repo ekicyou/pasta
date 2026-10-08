@@ -173,5 +173,112 @@ brief の 6 論点に、調査で見つかった 2 点を足した。各項の�
 
 ### 5.4 Research Needed（設計へ）
 
+> 設計フェーズ（2026-10-08）で 2 件とも解消した（6.1）。
+
 - Windows（MSVC CRT）での `tostring(0/0)`・`tostring(-0)` の表記（論点 1 の判断材料。マニュアルに書くなら実機で確認）。
 - `luacheck` の複雑度しきい値に `arith_operand` の分岐追加が収まるか（手元で `luacheck` を走らせて確認）。
+
+## 6. 設計フェーズの調査と判断（2026-10-08、`/kiro-design` の非対話フェーズ）
+
+### 6.0 Summary
+
+- **Feature**: `expr-nil-coercion`
+- **Discovery Scope**: Extension（既存の二項演算の生成形とランタイムの変換の組み替え。外部依存なし。light discovery）
+- **Key Findings**:
+  - Windows の LuaJIT 2.1（mlua 0.11 vendored）で、`tostring(0/0)` は `nan`、`1/0` は `inf`、`-1/0` は `-inf`、`0*-1` は `-0`。`..` で数値をつないだ表記は `tostring` と一致する（5.4 の Research Needed を解消）。
+  - 式文 `＄＝式` は式をそのまま 1 行に書くため、二項演算をネイティブ演算子の形にすると Lua の文にならない。さらに `(` で始まる行は、LuaJIT では直前の行の続き（関数呼び出し）として読まれる。式文の生成形の手当てが num／str 案の前提になる。
+  - 生成形を照合している箇所は、ギャップ分析の表（1.2）より多い。pasta_shiori の E2E 2 ファイル（連結の nil の警告を期待）と、生成形の文字列を照合する Rust テスト 4 ファイル・`sample.expected.lua` が加わる（6.3）。
+
+### 6.1 Research Needed の解消
+
+- **非数・負の 0 の表記**（5.4）: 一時的な cargo テスト（実行後に削除）で実機確認した。
+
+  | 式 | `tostring` | `"" .. v` |
+  | -- | ---------- | --------- |
+  | `0/0`・`z/z`（z=0）・`5%z` | `nan` | `nan` |
+  | `1/z` | `inf` | `inf` |
+  | `-1/z` | `-inf` | `-inf` |
+  | `z*-1`・`0*-1`・`-z` | `-0` | `-0` |
+  | `0.1+0.2` | `0.3` | `0.3` |
+  | `1e15` | `1e+15` | `1e+15` |
+  | `2^53` | `9.007199254741e+15` | 同左 |
+
+  LuaJIT は数値の書式を自前で行う（`jit.version` = `LuaJIT 2.1.1767980792`）ため、MSVC CRT の `-nan(ind)` は出ない。マニュアルには `１／＄未代入` は `inf`、`１％＄未代入` は `nan` と書ける。`＄未代入＊－１` は `-0` と表示される（設計の OPEN QUESTION 6）。
+- **luacheck の複雑度**（5.4）: `crates/pasta_lua/.luacheckrc` の `max_cyclomatic_complexity = 15`。`num`・`str` の分岐はそれぞれ 4〜5 で収まる（実行はしていない。実装時に luacheck で確認）。
+
+### 6.2 式文の生成形の潜在的な欠陥
+
+- `element_gen.rs` の `generate_var_set` は、式文 `＄＝式` の式をそのまま 1 行に書く。実験（同じ一時テスト）の結果:
+
+  | DSL | 生成 | `lua.load` |
+  | --- | ---- | ---------- |
+  | `＄＝１` | `1` | 構文エラー（unexpected symbol near '1'） |
+  | `＄＝＄x` | `var.x` | 構文エラー（'=' expected） |
+  | `＄＝（＠f（））` | `(act:expr_fn("f"))` | 読み込めるが、直前の行 `local save, var = act:init_scene(SCENE)` の続きとして `act:init_scene(SCENE)(act:expr_fn("f"))` と読まれる |
+  | `＄＝＄x＆「a」` | `act:concat(var.x, "a", "var.x")` | 正しい |
+
+- 現行で正しく動くのは、式が関数呼び出しのとき（二項演算は `act:arith`・`act:concat` の呼び出し）だけ。num／str 案では二項演算の式文が `(… .. …)` になり、上の 3 行目と同じ誤読になる（`codegen_runtime_safety` の E2E の `＄＝＄未代入＆「x」` が壊れる）。
+- 手当て: 関数呼び出しそのものでない式文は `do local _ = 式 end` にする。`do` で始まるので直前の行に続かず、`local` は `do … end` の中に閉じる（シーン関数のローカル変数の上限 200 を消費しない）。`local _ =` を裸で並べる案と、グローバル `_` に代入する案は採らない。
+
+### 6.3 生成形を照合している箇所の棚卸し（ギャップ分析 1.2 の補足）
+
+`act:arith`・`act:concat` を含むファイル（`target` を除く）:
+
+| ファイル | 件数 | 内容 |
+| -------- | ---- | ---- |
+| `crates/pasta_lua/src/code_gen/expr_gen_tests.rs` | 30 | 生成形の期待 |
+| `crates/pasta_lua/src/code_gen/element_gen_tests.rs` | 1 | 動的コールのキー |
+| `crates/pasta_lua/tests/transpiler/runtime_safety_test.rs` | 6 | 警告の期待（生成形の文字列ではない） |
+| `crates/pasta_lua/tests/transpiler/dynamic_word_ref_test.rs` | 1 | 生成形 |
+| `crates/pasta_lua/tests/property_scope_codegen_test.rs` | 2 | 生成形 |
+| `crates/pasta_lua/tests/transpiler/source_map_seam_test.rs` | 2 | 生成行の検索文字列 |
+| `crates/pasta_lua/tests/fixtures/sample.expected.lua` | 1 | 生成形 |
+| スナップショット 4 件 | 5 | 生成形 |
+| `crates/pasta_shiori/tests/call_execution_correctness_e2e_test.rs` | 1 | `OnFcConcatMid` の連結の nil の警告 |
+| `crates/pasta_shiori/tests/codegen_runtime_safety_e2e_test.rs` | 1 | `CONCAT_NIL_WARNING`（`OnConcatUnassigned`・`OnConcatNilShow`）。ほかに `OnTypoCheck` の U22（`「abc」＊２` は値なし→空文字）も期待が変わる |
+| `crates/pasta_lua/tests/lua_specs/act_runtime_safety_test.lua`・`act_concat_test.lua` | 31・42 | ランタイムの単体テスト |
+| マニュアル 5 ページ・スキル references 4 ファイル・`pasta-lua-coding/SKILL.md` 110 行 | — | 文書 |
+
+- `crates/pasta_sample_ghost` の辞書は算術・連結に未代入の変数を使っていない（影響なし）。`pasta_lsp` は act のメソッド名を持たない。
+
+### 6.4 生成形の比較（num／str 案と現行の形）
+
+| 案 | 内容 | 長所 | 短所 |
+| -- | ---- | ---- | ---- |
+| A: 現行の形のまま | `act:arith`・`act:concat` の中の `arith_operand`・`concat_operand` で nil を 0・`""`、変換できない値を警告＋0・`""` にする | 差分が `act.lua` とテスト・文書だけ。スナップショット・生成形のテスト・transpiler.md・式文は不変 | 演算ごとの関数と演算子の表（`ARITH_OPS`・unknown operator の経路）が残る |
+| **B: num／str ＋ネイティブ演算子（採用）** | 被演算子を `act:num`・`act:str` に通し、演算は Lua の演算子 | 「文脈の値は必ず数値・文字列」が 2 つの関数の事後条件になる。生成コードが素直な Lua の式になる。演算子の表と unknown operator の経路が消える | 生成形を照合する箇所（6.3）が広く変わる。式文の手当て（6.2）が要る。act のメソッド名が変わる |
+
+- brief の制約「`ACT_IMPL.arith` の引数・戻り値を変えない（`actor-proxy-act-delegation`・`call-execution-correctness` が前提）」を確かめた。`actor-proxy-act-delegation` の文書と `actor.lua` は `arith` に触れていない。`call-execution-correctness` は警告の値の表記 `arith_value_text` にだけ依存している（同 design.md 355 行）。B でも `arith_value_text` は残るので、制約は外せる。
+- 開発者の案で、要件ディスカッションで議題 #4（変換できない値も 0・`""`）が決まったことで成り立つ（num／str が必ず数値・文字列を返せる）。採否は設計ディスカッションで最終確認する（design.md OPEN QUESTION 1）。
+
+### 6.5 act のメソッド名と検索
+
+- `find_act_handler` の L3 は `self[key]` が関数なら返す（`act.lua` 353 行付近）。act のメソッドは `＠名前（…）`・`＠名前` の検索の 3 段目で見つかる（script-api.md「アクター・グローバル関数・算術・連結」の注意書き）。
+- `num`・`str` を足し `arith`・`concat` を消すと、3 段目で見つかる名前が入れ替わる。`GLOBAL.str` を `＠str（）` で呼ぶゴーストは act のメソッドに当たるようになる（design.md OPEN QUESTION 3）。
+
+## 7. 設計の統合（Synthesis）
+
+### 7.1 Generalization
+
+- 要件 1（算術の nil）・2（連結の nil）・4（変換できない値）は、「文脈ごとに、被演算子を目的の型に必ず変換する」という 1 つの規則の 2 つの場合である。変換を `num`（算術）・`str`（連結）の 2 関数にまとめ、nil と変換できない値の違いは「警告を出すか」だけにした。
+- 要件 1.4・2.4（すべての位置）は、生成形を `binary_node` 1 か所で変えれば満たされる。位置ごとの分岐は作らない。ただし式文だけは、式が Lua の文として書かれる唯一の位置なので手当てが要る（6.2）。
+
+### 7.2 Build vs. Adopt
+
+- Lua のネイティブ演算子（`+`・`-`・`*`・`/`・`%`・`..`）をそのまま使う（`ARITH_OPS` の表を作らない）。演算子に届く値は `num`・`str` が数値・文字列に揃えるので、メタメソッドは呼ばれない。
+- 数値の表記は `tostring`（LuaJIT の書式）をそのまま使う。独自の書式は作らない。
+
+### 7.3 Simplification
+
+- 変数と関数を説明文字列で見分ける仕組み（ギャップ分析の選択肢 A〜C）は、規則の組み替えで不要になった。
+- 生成時の種類（Number・String・Unknown）は、包まなくてよい被演算子（リテラル・入れ子の演算）に呼び出しを付けないためだけに持つ。型推論はしない（変数・関数は常に Unknown）。
+- 呼び出し元の無くなる `act:arith`・`act:concat` は残さない（OPEN QUESTION 2）。互換のための薄い関数は作らない。
+- 式文の形は「関数呼び出しそのものか」の 1 条件で決める（OPEN QUESTION 4）。
+
+## 8. 設計のリスク
+
+- 生成形を照合する箇所の取りこぼし → 6.3 の棚卸しと、生成形を切り替える手順の前後での全テスト。
+- 演算子の字句の衝突（`- -3` が `--` のコメントになる、`1..2` が数値の字句になる）→ 演算子の前後に必ず空白を置く。連結の数値は `act:str` を通すので `数値 ..` は出ない。
+- `(` で始まる行の誤読 → 式文を `do local _ = … end` にする。代入の行は変数名で始まるので影響なし。
+- 未代入の変数名の書き間違いがログに出なくなる → 要件ディスカッションで受け入れ済み。関数名の書き間違いは呼び出し時点の警告が残る。
+- `failure-output-unification`・`call-attribute-filter` と `act.lua` が重なる → 本仕様を先に入れ、後から入る側が rebase する。
