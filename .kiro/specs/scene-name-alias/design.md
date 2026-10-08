@@ -68,7 +68,7 @@
 - `search::register` / `SearchContext::new` / `register_finalize_scene` / `TranspilerConfig` / `RuntimeConfig` の引数を変えたとき → 直接呼ぶテスト（`tests/common/e2e_helpers.rs`・`lua_unittest_runner.rs`・`tests/search/`）と `pasta_shiori` の起動経路。
 - `[scene]` セクションに `alias` 以外のキーを足すとき → `@pasta_config.scene` の見え方と pasta.toml リファレンスの 3 分類表。
 - キャッシュディレクトリのマーカーファイル（`.scene_alias`）の形を変えたとき → キャッシュ全破棄が起きる（互換の注記が要る）。
-- hello-pasta の辞書を `＊会話` に切り替えるとき（`hello-pasta-tutorial-stages`）→ 既定表に依存するため、上記 3 本のゴールデンテストと `first-ghost.md` の逐語照合はそちらで更新する。
+- hello-pasta の辞書を `＊会話` に切り替えるとき（`hello-pasta-tutorial-stages`。本 spec の main マージ後に着手と調整済み）→ 既定表に依存するため、上記 3 本のゴールデンテストと `first-ghost.md` の逐語照合はそちらで更新する。
 
 ## Architecture
 
@@ -420,7 +420,7 @@ pub enum SceneAliasError {
 **Responsibilities & Constraints**
 - 有効な表は `PastaConfig.scene_aliases`（型付き）に置く。出どころを `scene_alias_source`（`BuiltinDefault` / `PastaToml`）で持ち、2.7 のログに使う。
 - 「定義した」の判定は **`scene.alias` がテーブルとして存在すること**。`[scene.alias]` の見出しだけ（行なし）は作者定義の空の表（2.3）。`[scene]` に `alias` が無い、または `[scene]` 自体が無いときは既定（1.1・6.3）。
-- `[scene]` の `alias` 以外のキーは読まず、`custom_fields` にそのまま残す（R-7）。`[scene]` テーブル全体も `custom_fields` に残り、`@pasta_config.scene` に**書いたとおり**出る。既定の表は `@pasta_config` に補完しない（R-6。`[ghost]` の補完は Lua 側に消費者がある別の決定で、別名表には Lua の消費者が無い）。
+- `scene` キー自体はテーブルでなければならない（`scene = 1` のような値は `SceneProbe` の型不一致で読み込みエラー。従来は `custom_fields` に素通りしていた。`scene` を予約名にする代償として受け入れ、マニュアルの `[scene]` 節に書く）。`[scene]` の `alias` 以外のキーは読まず、`custom_fields` にそのまま残す（R-7）。`[scene]` テーブル全体も `custom_fields` に残り、`@pasta_config.scene` に**書いたとおり**出る。既定の表は `@pasta_config` に補完しない（R-6。`[ghost]` の補完は Lua 側に消費者がある別の決定で、別名表には Lua の消費者が無い）。
 - 位置情報: 既存の `parse` は `toml::Table` から `try_into` するため行番号が得られない。`[scene.alias]` は**同じ `content` 文字列から** `toml::from_str::<SceneProbe>` でもう 1 度読む（未知のキーは serde の既定で無視される）。型が合わない値は `toml::de::Error` が行・列つきで出る。要素は `toml::Spanned<String>` で受け、空文字列・重複・連鎖の文言に該当する別名の行番号を含める（キーの位置は取れないため、置き換え先はキー名で示す）。
 - エラーは既存の `LoaderError::Config(path, toml::de::Error)` に乗せる（`[loader]` と同じ経路）。意味上のエラーは `serde::de::Error::custom` で `toml::de::Error` にし、文言にキー名・別名・行番号を入れる。新しい `LoaderError` の種類は増やさない。
 
@@ -466,7 +466,7 @@ impl PastaConfig {
 **Implementation Notes**
 - Integration: `parse` の `[loader]` 取り出しの直後に `parse_scene_aliases(content)` を呼ぶ。`apply_shiori_defaults` は触らない（`[scene]` を補完しない）。
 - Validation: `config_tests.rs` に (1) `[scene]` なし → 既定、(2) `[scene.alias]` 見出しのみ → 空、(3) `OnTalk = ["会話","雑談"]` と `OnBoot = ["起動"]`、(4) `OnTalk = "会話"`（配列でない）→ Err に行番号、(5) `OnTalk = ["会話", 1]` → Err、(6) `OnTalk = [""]`・`"" = ["x"]` → Err、(7) 重複（配列内・配列間）→ Err に別名と両方の置き換え先、(8) 連鎖（`会話 = ["雑談"]`・`OnTalk = ["OnTalk"]`）→ Err、(9) `[scene] other = 1` は無視され `custom_fields` に残る、(10) `[scene] alias = "x"` は Err（予約キー）。
-- Risks: `toml::de::Error` の `custom` は位置情報を持たない → 文言に自前で行番号を入れる。`Spanned` のバイト範囲から行番号を数える小さな補助関数が要る（`content` は手元にある）。
+- Risks: `toml::de::Error` の `custom` は位置情報を持たない → 文言に自前で行番号を入れる。`Spanned` のバイト範囲から行番号を数える小さな補助関数が要る（`content` は手元にある）。最初の実装タスクで `toml::Spanned` と `serde::de::Error::custom` が現行の `toml` 版で使えることを確かめる。使えなければ、型不一致は toml の行・列つきのまま、意味エラー（空文字列・重複・連鎖）はキー名と別名だけの文言に落とす（2.5 の「原因の行」は型不一致側で満たす）。
 
 #### CacheAliasMarker（`CacheManager` の拡張）
 
@@ -499,7 +499,7 @@ impl CacheManager {
 **Implementation Notes**
 - Integration: `loader/mod.rs` Phase 2 で `cache_manager.prepare_cache_dir(&config.scene_aliases.fingerprint())`。不一致時は `info!(reason = "scene alias table changed", "Clearing all cache")`。
 - Validation: `scene_alias_cache_test.rs` で (1) `＊会話` の辞書を既定で読む → `OnTalk_1`、(2) pasta.toml に `[scene.alias]`（空）を足して `.pasta` を触らずに読み直す → `会話_1`、(3) `[scene.alias]` を消して読み直す → `OnTalk_1`。各段で `SEARCH:search_scene` と登録名の両方を見る（6.2）。
-- Risks: マーカー不在での初回全破棄（起動が 1 回遅くなる）。マニュアルの内部設計章に書く。
+- Risks: マーカー不在での初回全破棄。ただし `.cache_version` は `CARGO_PKG_VERSION` なので、版の上がるリリース更新では既に全破棄が起きており、マーカー不在が単独で効くのは同じ版での開発ビルドだけ。マニュアルの内部設計章には「別名表が変わると全破棄」だけを書く。
 
 #### LoaderWiring（`PastaLoader` の拡張）
 
@@ -717,13 +717,13 @@ OnBoot = ["起動"]
 | `crates/pasta_lua/tests/symbol_name_search_test.rs`・`runtime/scene_identity_format_test.rs`・`fixtures/sample.pasta`（`会話・朝`・`会話分岐`） | 完全一致しない | 変更不要 |
 | `pasta_core` のテスト・`tests/lua_specs/kick_*.lua`（`SCENE.register("会話_1")`） | 別名層より下 | 変更不要 |
 | `crates/pasta_shiori/tests/scene_kick_*_e2e_test.rs`（`ゲート前会話…`） | 完全一致しない | 変更不要 |
-| hello-pasta と `byte_invariant_test.rs`・`kick_unused_byte_invariant_test.rs`・`shiori_sample_ghost_test.rs` | `＊OnTalk` のまま | 本 spec では不変。`hello-pasta-tutorial-stages` が `＊会話` へ切り替えるときにそちらで更新する |
+| hello-pasta と `byte_invariant_test.rs`・`kick_unused_byte_invariant_test.rs`・`shiori_sample_ghost_test.rs` | `＊OnTalk` のまま | 本 spec では不変。`hello-pasta-tutorial-stages` が `＊会話` へ切り替えるときにそちらで更新する（調整済み: 相手は pasta.toml を変えず既定表に依存し、本 spec の main マージ後に着手） |
 
 ## 互換性と移行
 
 - **挙動が変わる範囲**: 別名表を定義していないゴーストで「会話」という名前のグローバルシーン（完全一致）だけが OnTalk の候補になる（5.5）。`＊会話・朝` などは変わらない。戻すには `[scene.alias]` の見出しだけを書く（5.6）。マニュアルの `[scene]` 節に書く（9.3）。
 - **キャッシュ**: 初回起動でマーカーが無いため 1 回だけ全破棄が起きる。以後は別名表を変えたときだけ。
-- **ライブラリ利用者**: `search::register`・`register_finalize_scene`・`TranspilerConfig`・`RuntimeConfig` に表の引数／フィールドが増える。`SearchContext::new`・`TranspilerConfig::default()`・`RuntimeConfig::new()` は空の表で、既存の呼び出しの挙動は変わらない。
+- **ライブラリ利用者**: `search::register`・`register_finalize_scene`・`TranspilerConfig`・`RuntimeConfig` に表の引数／フィールドが増える。`SearchContext::new`・`TranspilerConfig::default()`・`RuntimeConfig::new()` は空の表で、既存の呼び出しの挙動は変わらない。表の運び手が `TranspilerConfig` と `RuntimeConfig` の 2 つになるのは、既存の `with_debug` と同じ「ローダーが pasta.toml の値を載せる」形に揃えるため。`TranspileContext` に表を持たせて 1 本にする案は、`with_config_and_source_map` が context を消費するため `finalize` 用の clone が同じく要り、簡単にならないので採らない。両側の一致はローダーだけが保証し、`scene_alias_search_test.rs` の「既定・作者・空 × 宣言・検索」で守る。
 - **後続 spec への申し送り**: `search/context.rs` の `search_scene` に別名の分岐が入る（`call-attribute-filter` はこの後の `resolve_scene_id_unified` にフィルターを足す）。`scope_gen.rs` の `generate_global_scene` に `declared_name` 引数が増える（`scene-attribute-store` はこの関数の `file_attrs` を使い始める）。
 
 ## Open Questions / 設計ディスカッション用
@@ -731,6 +731,6 @@ OnBoot = ["起動"]
 1. **R-4 ログの重複**: 別名の Call が見つからないとき、Rust（両名・warn）と Lua `act:call`（書いた名前・warn）で 2 行出る。これを受け入れるか、`SEARCH:resolve_scene_alias(name)` を足して `act.lua` 側で 1 行に両名を出すか（`act.lua` は触らない方針・`failure-output-unification` の持ち場と重なる）。**本設計の仮定**: Rust 側の warn だけ足し、Lua は触らない。
 2. **R-5 expr モード**: `＠会話（）` は 5 段目で同じ `search_scene(key, nil)` を通るため OnTalk のシーン関数に解決される（単語モードの L5 は `search_word` なので対象外）。仕様として認め、マニュアルの別名小節に「5 段目に進んだ全ての検索」として含めるか、`＠名前（）` の例を明示するか。**仮定**: 明示せず、「グローバルシーンを探す段（5 段目）に進んだ全ての検索」で包含する。
 3. **R-6 `@pasta_config` の見え方**: `[ghost]` と違い既定の別名表を `@pasta_config.scene.alias` に補完しない（書いたとおりだけ）。Lua から有効な表を読む需要が出たら補完するか別 API にするか。**仮定**: 補完しない。
-4. **R-1 キャッシュの全破棄**: 別名表が変わったら全破棄（部分再トランスパイルはしない）。初回はマーカー不在で 1 回全破棄が起きる。許容できるか。**仮定**: 許容。
+4. **R-1 キャッシュの全破棄（解決済み・議論不要）**: 別名表が変わったら全破棄（部分再トランスパイルはしない）。マーカー不在の初回全破棄は、`.cache_version` が `CARGO_PKG_VERSION` なので版が上がるリリース更新ではもともと全破棄が起きるため、実際に効くのは同じ版での開発ビルドだけ。利用者に見える追加の遅延は無い。
 5. **10.5 の方針**: `scene_identity_index_test.rs` は fixture を変えず期待値を `OnTalk_N` に変える（既定表に依存するテストになるが 7.2 の検証を兼ねる）。fixture の名前を別名と無関係な名前に変えて独立させる案もある。**仮定**: 期待値の変更。
-6. **hello-pasta との順序**: `hello-pasta-tutorial-stages` が `＊OnTalk` → `＊会話` へ切り替えると、`pasta_shiori` のゴールデン 3 本（`byte_invariant_test.rs`・`kick_unused_byte_invariant_test.rs`・`shiori_sample_ghost_test.rs`）と `first-ghost.md` の逐語照合がそちらで変わる。本 spec はこれらに触れず独自 fixture で E2E を書くので、マージ順は自由だが、同時並行なら相手側に「既定表が入った後に切り替える」ことを申し送る。
+6. **hello-pasta との順序（解決済み・2026-10-08 に同セッションと調整）**: `hello-pasta-tutorial-stages` は hello-pasta の pasta.toml を変えず既定表 `OnTalk = ["会話"]` に依存し、段階辞書を `＊会話` の繰り返しと単独 `＊` で書く。登録名 `OnTalk_N` と失敗表記（書いた名前）は相手側の design.md に反映済み。相手の実装着手は**本 spec の main マージ後**。`pasta_shiori` のゴールデン 3 本（`byte_invariant_test.rs`・`kick_unused_byte_invariant_test.rs`・`shiori_sample_ghost_test.rs`）と `first-ghost.md` の逐語照合は相手側で更新し、本 spec は触らない。同じページを触ることになったら後から入る側が rebase する。
