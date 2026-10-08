@@ -101,7 +101,8 @@
 6. If いずれかの配布物のビルドに失敗したとき, the Release CI shall どの公開先への公開も行わずに失敗し、どの配布物のビルドが失敗したかを示す。
 7. The Release CI shall 配布物を Windows の環境でビルドする。
 8. The Release CI shall ビルドした配布物を、同じリリースの後続の公開の処理（再実行を含む）から使えるよう保持する。
-9. The Release CI shall 同じタグのソースから配布物を作り直したとき、同じ構成の配布物が得られるようにする（【仮定】依存クレートの解決結果まで固定するか（ロックファイルを追跡するか）は未決事項 5）。
+9. The Release CI shall 同じタグのソースから配布物を作り直したとき、依存クレートの版の解決結果まで同じ配布物が得られるようにする。
+10. The repository shall `Cargo.lock` を git で追跡し、main の CI・公開前の関門・配布物のビルドが同じ依存の解決結果で動くようにする。
 
 ### Requirement 4: crates.io への公開
 
@@ -232,7 +233,7 @@
 2. ~~**拡張の版の検査**~~ → **確定（自明修正）**: 検査する（R2.3）。<br>旧: **拡張の版の検査**（R2.3）: brief は「タグと `Cargo.toml` の版の一致」だけを挙げる。`editors/vscode/package.json` の版も一致を検査するか。仮定: 検査する（Marketplace に食い違った版が出るのを防ぐため）。
 3. ~~**関門の範囲**~~ → **確定（議題 2）**: `build.yml` が PR・main で行う検査（test・clippy の x86・x64、cargo-deny、luacheck、WASM ビルド）をすべて、タグのコミットで通す。検査の一覧を要件に書き写さず、`build.yml` に従わせる（R2.5・R2.6）。<br>旧: **関門の範囲**（R2.6）: `build.yml` は test・clippy のほかに cargo-deny・luacheck・WASM ビルドも回す。「main の CI が全部緑か」の確認を置き換えるなら、これらも関門に含めるか。仮定: test と clippy は x86・x64 の両方で回す。残りは未定。
 4. ~~**GitHub Release が待つもの**~~ → **確定（自明修正）**: crates だけを待つ。brief の Constraints「公開順」のとおり（R6.1）。<br>旧: **GitHub Release が待つもの**（R6.1）: GitHub Release の作成は crates の公開の成功だけを待つか、Marketplace の公開の成功も待つか。仮定: crates だけを待つ（今の設計と同じ）。VSIX は Marketplace の成否によらず添付する。
-5. **依存の固定（再現性）**（R3.9）: `.gitignore` は `Cargo.lock` を無視している（「ライブラリクレートなので」）。タグのソースから成果物を再現する要件を、依存クレートの解決結果まで含めて満たすには `Cargo.lock` の追跡が要る。追跡するか、ビルドの構成の再現だけで足りるとするか。
+5. ~~**依存の固定（再現性）**~~ → **確定（議題 3）**: `Cargo.lock` を追跡する（R3.9・R3.10）。依存の更新は `cargo update` のコミットとして明示的に行う。crates.io の利用者は自分の lock で解決し直すので、公開するクレートへの影響は無い。<br>旧: **依存の固定（再現性）**（R3.9）: `.gitignore` は `Cargo.lock` を無視している（「ライブラリクレートなので」）。タグのソースから成果物を再現する要件を、依存クレートの解決結果まで含めて満たすには `Cargo.lock` の追跡が要る。追跡するか、ビルドの構成の再現だけで足りるとするか。
 6. **VSIX の WASM のビルドの種類**（R3.4）: 今の `npm run package` は `build-wasm.ps1` を `-Release` なしで呼ぶため、VSIX に入る WASM はデバッグビルドになっている。今と同じにするか、リリースビルドに変えるか。
 7. **シェルの画像の追跡**（R10.5）: `ghosts/hello-pasta/shell/master/surface*.png`・`surfaces.txt` は `cargo run -p pasta_sample_ghost` が作る生成物だが、git で追跡している。brief は追跡の解除の対象に挙げていない。後続の `hello-pasta-shell-art` が画像を「追跡する素材」に変えるため、本仕様では今のまま追跡を続ける、で良いか。同様に、`release.ps1` が `crates/pasta_lua/scripts` から写す `ghost/master/scripts/README.md` も追跡されている生成物である。これを追跡の解除の対象に含めるか。
 8. **→ 設計へ**: 要件は R6.5「配布物が欠けた Release を公開状態で残さない」とし、作成の順序（下書き → 添付 → 公開）は設計で決める。<br>旧: **GitHub Release の作成済み・添付漏れ**（R6.5）: Immutable Releases を有効にすると、公開後の Release に配布物を足せない。作成の途中で失敗して添付が欠けた Release が残った場合の扱い（作成と添付を一度に済ませる・下書きで作ってから公開する等）を、要件としてどこまで求めるか。
