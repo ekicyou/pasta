@@ -41,7 +41,7 @@
   - 完了時: `07-greeting.pasta` が上記のシーンをすべて持ち、`cargo test -p pasta_sample_ghost` が緑のまま
   - _Requirements: 1.4, 3.2, 3.3, 3.4, 3.5, 3.8_
 
-- [ ] 2.3 8〜9 段目「触ったら反応」「選ばせたい」の辞書ファイルを足す
+- [x] 2.3 8〜9 段目「触ったら反応」「選ばせたい」の辞書ファイルを足す
   - `08-touch.pasta`: 先頭で `＞transfer_req_to_var` を呼び、`＄ｒ４`（部位名）を台詞に使う `＊OnMouseDoubleClick` を 3 つ程度。部位名は仮に `Head` を想定して書く
   - `09-choice.pasta`: `!select(秒)` を含む選択肢を出す `＊OnMouseDoubleClick` 1 つと、ジャンプ先のグローバルシーン 2 つ。ジャンプ先の名前は既存の名前・11 段目の前方一致の例と衝突しない名前（現行の `＊挨拶`・`＊天気` は使わない）にする
   - 決まったジャンプ先の名前と表示文字列で、段階表の検証イベント表の 9 段 `OnChoiceSelectEx` の Reference を埋める
@@ -155,3 +155,4 @@
 ## Implementation Notes
 
 - 2.8 で検討: 07 の送り出し `＄ｒ０　にバトンタッチ！` は宣言に読めるので `＄ｒ０　、バトンタッチだよ！` のように相手へ向ける。OnFirstBoot のコメントは「初めて起動したときは、OnBoot の代わりに OnFirstBoot が来る」と正確にする（2.2 レビューより）。
+- 3.2 で: 9 段目の Reference2 `OnMouseDoubleClick` は登録名（実機は `OnMouseDoubleClick_N`）でないため、last_global_scene → グローバル前方一致のフォールバックで `＊おやつの話` に届く（実測 200）。ジャンプ先が壊れると 204 で素通りするので、9 段目の `OnChoiceSelectEx` だけは 200 と空でない Value を必須にする（2.3 レビューより）。

@@ -35,13 +35,12 @@
 | 7 | `OnFirstBoot` | `0=0` |
 | 7 | `OnClose` | `0=user` |
 | 8 | `OnMouseDoubleClick` | `3=0, 4=Head` |
-| 9 | `OnChoiceSelectEx` | `0=〈表示文字列〉, 1=〈09 のジャンプ先シーン名〉, 2=OnMouseDoubleClick` |
+| 9 | `OnChoiceSelectEx` | `0=おやつの話をする, 1=おやつの話, 2=OnMouseDoubleClick` |
 
 - 検証は全段階で `OnBoot` を送ったうえで、この表の該当行のイベントを Reference 付きで 1 回ずつ送り、エラーにならずに応答が返ることを確かめる（応答の内容は照合しない）。`OnBoot` はこの表に載せない。
 - 載せるのはベースウェアから来る実イベントだけである。仮想イベント（ランダムトーク・時報）は載せない。
 - Reference は半角の `番号=値` を `, ` で区切って並べる。無ければ `—` と書く。
 - 8 段目の `Head` は仮の部位名である。`hello-pasta-shell-art` が当たり判定の部位名を確定したら、台詞とこの表を合わせる。
-- 9 段目の Reference は仮の値である。`09-choice.pasta` のジャンプ先の名前が決まったときに埋める。
 
 ## ファイル名の規則
 
