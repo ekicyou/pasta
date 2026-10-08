@@ -175,8 +175,17 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
   - main の CI が全部緑かの確認
   - マージコミット方式で統合する理由（タグが指すコミットを main から到達できるようにするため）を、squash でよいか見直す。
   - `release-ci` からの申し送り: CI での初回のリリースと、その前後の一回限りのセットアップは本更新の後の最初のリリースで行う。手順は `.github/release-ci-setup.md` の 6〜10 節。期限は 2026-12-01（global PAT の廃止）より前。
-    - 前提: 「Entra ID の登録」セッションによる setup-check の実行と Marketplace の Members への追加（6・7 節）、ユーザーによる crates.io の Trusted Publisher ×5（8 節）。
-    - 合格: 3 公開先が `published`、同じ run の再実行ですべて `skipped`。結果を「Entra ID の登録」セッションへ伝える。
+    - 前提（2026-10-08 に済んだ）: 1〜8 節の一回限りのセットアップはすべて完了。
+      - Azure（サブスクリプション・予算アラート・マネージド ID・フェデレーション資格情報 2 件）は `az` で読み戻して確認した。
+      - GitHub（environment 2 つ・リポジトリ variables 3 つ）は `gh api` で確認した。
+      - Marketplace の Members への追加は、setup-check の再実行で `verify-pat` が成功したことで確認した（run 37777674500）。
+      - crates.io の Trusted Publisher ×5 は、ユーザーが画面で設定した。setup-check は crates.io を確かめないので、**初回のリリースが最初の実地確認**になる。`publish-crates` が認証で失敗したら、8 節の値（owner・repo・`release.yml`・`release`）を設定画面と照合する。
+      - ID の値は書かない。値はリポジトリ variables とユーザーの手元の記録にある。
+    - 合格: 3 公開先が `published`、同じ run の再実行ですべて `skipped`。
+    - 運用の注意（セットアップで分かったこと）:
+      - Azure のリソースを `az` で作る・変えるには MFA が要る。WAM（Windows のサインイン窓）でログインすると `RequestDisallowedByAzure` で弾かれる。`az config set core.enable_broker_on_windows=false` にしてからブラウザーで `az login` し直す。ワークフローのマネージド ID には関係ない。
+      - Marketplace の Members の管理には、公式の CLI が無い（vsce・az・gh のどれも扱えない）。画面から行う。
+      - 小さな取りこぼし: setup-check の `verify-pat` が失敗すると、vsce のエラー文（`Access Denied: <ID> needs ...`）にマネージド ID の識別子が含まれ、ジョブのログに出る。「profile ID は summary にだけ書く」方針から漏れている。秘密の値ではないので実害は無い。直すかどうかは本更新で決める。
     - あわせて見直す（`release-ci` の design.md「Out of Boundary」が本更新へ回したもの）: `.claude/settings.json` の公開系コマンドの許可の整理、`build.yml` に `--locked` を足すか、bump 箇所に `package-lock.json` の版を含めること（release.yml の verify は検査しない）。
     - `VSCE_PAT` の失効（10 節）は、初回のリリースで Marketplace が Entra ID の経路で `published` になったのを確かめてから行う。値が `release-ci` の会話記録に出ているが、前倒しはしない（ユーザー決定 2026-10-08）。
   - Dependencies: release-ci
