@@ -45,30 +45,77 @@ fn precedence(op: BinOp) -> u8 {
     }
 }
 
-/// One operation: `act:arith("op", 左, 右, 左の説明, 右の説明)` or
-/// `act:concat(左, 右, 左の説明, 右の説明)`. Descriptions are omitted when
-/// both are absent, and `nil` fills a missing left one. The result is a
-/// nested operation, so it carries no description of its own.
-fn binary_node(
-    op: BinOp,
-    (lhs, lhs_desc): (String, Option<String>),
-    (rhs, rhs_desc): (String, Option<String>),
-) -> (String, Option<String>) {
-    let call = match op {
-        BinOp::Add => "act:arith(\"+\", ",
-        BinOp::Sub => "act:arith(\"-\", ",
-        BinOp::Mul => "act:arith(\"*\", ",
-        BinOp::Div => "act:arith(\"/\", ",
-        BinOp::Mod => "act:arith(\"%\", ",
-        BinOp::Concat => "act:concat(",
+/// Operand value kind known at generation time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StaticKind {
+    /// Number literal or arithmetic result (always a number)
+    Number,
+    /// String literal, blank string, or concat result (always a string)
+    String,
+    /// Variable reference or function call (unknown until run time)
+    Unknown,
+}
+
+/// One term of a binary chain: its Lua code, its warning description as a
+/// string literal, and its static kind (a paren takes its content's).
+struct Operand {
+    code: String,
+    desc: Option<String>,
+    kind: StaticKind,
+}
+
+/// Static kind of an operand expression. A binary chain is a string when it
+/// has a `＆` on its left spine (concat folds last), otherwise a number.
+fn static_kind(expr: &Expr) -> StaticKind {
+    match expr {
+        Expr::Integer(_) | Expr::Float(_) => StaticKind::Number,
+        Expr::String(_) | Expr::BlankString => StaticKind::String,
+        Expr::Paren(inner) => static_kind(inner),
+        Expr::Binary { .. } => {
+            let mut terms = Vec::new();
+            let mut ops = Vec::new();
+            flatten_binary(expr, &mut terms, &mut ops);
+            if ops.contains(&BinOp::Concat) {
+                StaticKind::String
+            } else {
+                StaticKind::Number
+            }
+        }
+        Expr::VarRef { .. } | Expr::FnCall { .. } | Expr::DynamicFnCall { .. } => {
+            StaticKind::Unknown
+        }
+    }
+}
+
+/// One operation: `(左 op 右)` with a space on both sides of the operator
+/// (`(10 - -3)` never becomes a `--` comment). Arithmetic passes operands that
+/// are not statically numbers through `PASTA.num("op", 値[, 説明])`; concat
+/// passes operands that are not statically strings through
+/// `PASTA.str(値[, 説明])`. The result carries no description of its own.
+fn binary_node(op: BinOp, lhs: Operand, rhs: Operand) -> Operand {
+    let (sym, kind) = match op {
+        BinOp::Add => ("+", StaticKind::Number),
+        BinOp::Sub => ("-", StaticKind::Number),
+        BinOp::Mul => ("*", StaticKind::Number),
+        BinOp::Div => ("/", StaticKind::Number),
+        BinOp::Mod => ("%", StaticKind::Number),
+        BinOp::Concat => ("..", StaticKind::String),
     };
-    let descs = match (lhs_desc, rhs_desc) {
-        (None, None) => String::new(),
-        (Some(l), None) => format!(", {}", l),
-        (None, Some(r)) => format!(", nil, {}", r),
-        (Some(l), Some(r)) => format!(", {}, {}", l, r),
+    let wrap = |o: Operand| {
+        let desc = o.desc.map(|d| format!(", {}", d)).unwrap_or_default();
+        if o.kind == kind {
+            o.code
+        } else if kind == StaticKind::Number {
+            format!("PASTA.num(\"{}\", {}{})", sym, o.code, desc)
+        } else {
+            format!("PASTA.str({}{})", o.code, desc)
+        }
     };
-    (format!("{}{}, {}{})", call, lhs, rhs, descs), None)
+    Operand {
+        code: format!("({} {} {})", wrap(lhs), sym, wrap(rhs)),
+        desc: None,
+        kind,
+    }
 }
 
 impl<'a, W: Write> LuaCodeGenerator<'a, W> {
@@ -157,7 +204,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Render a binary chain as nested `act:arith` / `act:concat` calls.
+    /// Render a binary chain as nested `(左 op 右)` operations.
     ///
     /// The parser builds a precedence-less left-assoc tree (`1＋2＆3` is
     /// `(1＋2)＆3`), so the chain is flattened back to terms and operators and
@@ -189,19 +236,20 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             terms = folded;
             ops = lower_ops;
         }
-        let (code, _) = terms.pop().expect("binary chain folds to one term");
-        Ok(code)
+        Ok(terms.pop().expect("binary chain folds to one term").code)
     }
 
-    /// One operand: its Lua code and its warning description as a string
-    /// literal (variable path, `@名前()`, `@*名前()`, `@$パス()`), or `None`
-    /// for literals and nested operations.
-    fn binary_operand(&self, expr: &Expr) -> Result<(String, Option<String>), TranspileError> {
-        let code = self.expr_to_string(expr)?;
-        let desc = Self::operand_desc(expr)?
-            .map(|d| StringLiteralizer::literalize(&d))
-            .transpose()?;
-        Ok((code, desc))
+    /// One operand: its Lua code, its warning description as a string
+    /// literal (variable path, `@名前()`, `@*名前()`, `@$パス()`) or `None`
+    /// for literals and nested operations, and its static kind.
+    fn binary_operand(&self, expr: &Expr) -> Result<Operand, TranspileError> {
+        Ok(Operand {
+            code: self.expr_to_string(expr)?,
+            desc: Self::operand_desc(expr)?
+                .map(|d| StringLiteralizer::literalize(&d))
+                .transpose()?,
+            kind: static_kind(expr),
+        })
     }
 
     pub(super) fn operand_desc(expr: &Expr) -> Result<Option<String>, TranspileError> {

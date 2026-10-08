@@ -13,20 +13,33 @@ use common::e2e_helpers::{create_runtime_with_finalize, transpile};
 use insta::assert_snapshot;
 use mlua::Lua;
 
-/// 警告を記録する `@pasta_log` を差し込んだランタイムで生成コードを読み込み、`メイン_1` を実行する。
+/// ログを記録する `@pasta_log` を差し込んだランタイムで生成コードを読み込み、`メイン_1` を実行する。
 ///
-/// 差し込みは pasta.act のロード前に行う（act.lua はロード時に `@pasta_log` を取り込むため）。
-/// 実行後の act は Lua のグローバル `RS_ACT`、警告は `RS_WARNS` に置く。
+/// `@pasta_log` の表そのものの関数を差し替えるので、先にロード済みのモジュール（pasta.word など）の
+/// ログも集まる。実行後の act は Lua のグローバル `RS_ACT`、警告は `RS_WARNS`、
+/// 全レベル（trace〜error）のログは `RS_LOGS` に `レベル|文言` で置く。値の表記には `RS_FMT` を使う。
 fn run_main_scene(lua_code: &str) -> Lua {
     let lua = create_runtime_with_finalize().unwrap();
     lua.load(
         r#"
-        assert(package.loaded["pasta.act"] == nil, "pasta.act must not be loaded before the log hook")
         RS_WARNS = {}
-        local real = package.loaded["@pasta_log"]
-        package.loaded["@pasta_log"] = setmetatable({
-            warn = function(msg) table.insert(RS_WARNS, msg) end,
-        }, { __index = real })
+        RS_LOGS = {}
+        local log = package.loaded["@pasta_log"]
+        for _, level in ipairs({ "trace", "debug", "info", "warn", "error" }) do
+            log[level] = function(msg)
+                table.insert(RS_LOGS, level .. "|" .. tostring(msg))
+                if level == "warn" then table.insert(RS_WARNS, msg) end
+            end
+        end
+
+        -- 値の表記: nil は nil、非数は nan、文字列は '…'、数値は tostring、それ以外は (型)
+        function RS_FMT(v)
+            local t = type(v)
+            if t == "nil" then return "nil" end
+            if t == "number" then return v ~= v and "nan" or tostring(v) end
+            if t == "string" then return "'" .. v .. "'" end
+            return "(" .. t .. ")"
+        end
         "#,
     )
     .exec()
@@ -52,6 +65,25 @@ fn run_main_scene(lua_code: &str) -> Lua {
 /// 実行後の Lua 式を評価して文字列で返す
 fn eval_str(lua: &Lua, chunk: &str) -> String {
     lua.load(chunk).eval::<String>().unwrap()
+}
+
+/// 全レベルのログを 1 行ずつ（`レベル|文言`）返す
+fn all_logs(lua: &Lua) -> Vec<String> {
+    lua.load("return RS_LOGS").eval::<Vec<String>>().unwrap()
+}
+
+/// `RS_ACT.var` の各変数を `名前=値` で空白区切りにして返す（値は `RS_FMT` の表記）
+fn vars(lua: &Lua, names: &[&str]) -> String {
+    names
+        .iter()
+        .map(|n| {
+            format!(
+                "{n}={}",
+                eval_str(lua, &format!("return RS_FMT(RS_ACT.var[\"{n}\"])"))
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 // ========================================================================
@@ -117,7 +149,8 @@ fn test_runtime_safety_tokens_vars_and_warnings() {
         // U20: act のメンバー名と同名の登録済みアクターが話せる
         "talk|talk|true|トークです",
         "talk|var|true|変数です",
-        // 3.4: 値なしの代入の後の参照は空文字（トークンを積まない）
+        // U22: 未代入の変数は算術の文脈で 0 とみなす（expr-nil-coercion 1.1）
+        "talk|さくら|true|1",
         // U08: \\ は 2 文字のまま 1 トークン
         "talk|さくら|true|C：",
         r"talk|さくら|true|\\",
@@ -128,7 +161,8 @@ fn test_runtime_safety_tokens_vars_and_warnings() {
     .join("\n");
     assert_eq!(tokens, expected_tokens);
 
-    // 変数状態: 値なしの代入は未代入（U18 の式・U22 の算術）
+    // 変数状態: 値なしの代入は未代入（U18 の式）。U22 の算術は nil を 0、「abc」を警告＋0 とみなす
+    // （expr-nil-coercion 1.1・4.1）
     let vars = eval_str(
         &lua,
         r#"
@@ -136,7 +170,7 @@ fn test_runtime_safety_tokens_vars_and_warnings() {
         return string.format("u18=%s x=%s y=%s", tostring(v.u18), tostring(v.x), tostring(v.y))
         "#,
     );
-    assert_eq!(vars, "u18=nil x=nil y=nil");
+    assert_eq!(vars, "u18=nil x=1 y=0");
 
     // 未登録アクターは登録されない・act のメンバーは上書きされない
     let state = eval_str(
@@ -154,9 +188,7 @@ fn test_runtime_safety_tokens_vars_and_warnings() {
         "act:global_fn - function not found: key='未定義関数'",
         "act:global_fn - function not found: key='未定義関数'",
         "act:actor_proxy - unregistered actor: name='未登録さん'",
-        "act:arith - operand is not a number: op='+', operand='var.未代入', value=nil",
         "act:arith - operand is not a number: op='*', value='abc' (string)",
-        "act:talk - undefined variable: 'var.x'",
     ]
     .join("\n");
     assert_eq!(warns, expected_warns);
@@ -268,11 +300,13 @@ fn assert_matches_flat_lua(cases: &[(&str, &str)], what: &str) {
 }
 
 // ========================================================================
-// 連結の失敗: 警告＋値なし、内側の失敗は外側で警告を足さない（3.3・3.5）
+// 連結の nil: 空文字列とみなし、連結も算術も値なしを作らない（expr-nil-coercion 2.1・2.2・4.1）
 // ========================================================================
 
+/// 連結の被演算子の nil は空文字列、括弧内の算術の nil は 0。内側の連結の結果（`x`）を算術に
+/// 使うと変換できない値の警告 1 行と 0。見つからない関数は呼び出しの時点の警告だけ
 #[test]
-fn test_concat_failures_warn_and_yield_nil() {
+fn test_concat_with_nil_operands_never_yields_nil() {
     let source = r#"
 ＊メイン
 　＄r1＝「合計」＆＄未代入＆「個」
@@ -282,26 +316,17 @@ fn test_concat_failures_warn_and_yield_nil() {
 "#;
     let lua = run_main_scene(&transpile(source));
 
-    let vars = eval_str(
-        &lua,
-        r#"
-        local v = RS_ACT.var
-        return string.format("r1=%s r2=%s r3=%s r4=%s",
-            tostring(v.r1), tostring(v.r2), tostring(v.r3), tostring(v.r4))
-        "#,
+    assert_eq!(
+        vars(&lua, &["r1", "r2", "r3", "r4"]),
+        "r1='合計個' r2='a1' r3=1 r4='a'"
     );
-    assert_eq!(vars, "r1=nil r2=nil r3=nil r4=nil");
-
-    let warns = eval_str(&lua, r#"return table.concat(RS_WARNS, "\n")"#);
-    let expected_warns = [
-        "act:concat - operand is not a string or number: op='&', operand='var.未代入', value=nil",
-        "act:arith - operand is not a number: op='+', operand='var.未代入', value=nil",
-        "act:concat - operand is not a string or number: op='&', operand='var.未代入', value=nil",
-        "act:global_fn - function not found: key='未定義関数'",
-        "act:concat - operand is not a string or number: op='&', operand='@*未定義関数()', value=nil",
-    ]
-    .join("\n");
-    assert_eq!(warns, expected_warns);
+    assert_eq!(
+        all_logs(&lua),
+        [
+            "warn|act:arith - operand is not a number: op='+', value='x' (string)",
+            "warn|act:global_fn - function not found: key='未定義関数'",
+        ]
+    );
 }
 
 // ========================================================================
@@ -331,4 +356,217 @@ end
         r#"return string.format("f=%s 後=%s", tostring(RS_F_COUNT), tostring(RS_ACT.var["後"]))"#,
     );
     assert_eq!(result, "f=1 後=続行");
+}
+
+// ========================================================================
+// 式の中の nil: 算術なら 0、連結なら空文字列、ログなし（expr-nil-coercion 1.x・2.x・3.x）
+// ========================================================================
+
+/// nil の出どころごとに、算術（`＋１`）と連結（`「a」＆`）の結果が 0・空文字列になり、
+/// 呼び出しの時点の既存の警告のほかにログが出ない（1.1・1.6・2.1・3.1・3.3・7.1）
+#[test]
+fn test_nil_sources_coerce_to_zero_and_empty_without_logs() {
+    let source = r#"
+＊メイン
+```lua
+function SCENE.無返却(act)
+end
+```
+　＄値なし＝＠無返却（）
+　＄a1＝＄未代入＋１
+　＄a2＝＄＊未代入nil＋１
+　＄a3＝＄ｒ０＋１
+　＄a4＝＠無返却（）＋１
+　＄a5＝＠＊未定義（）＋１
+　＄a6＝＠＄未代入（）＋１
+　＄a7＝＄値なし＋１
+　＄c1＝「a」＆＄未代入
+　＄c2＝「a」＆＄＊未代入nil
+　＄c3＝「a」＆＄ｒ０
+　＄c4＝「a」＆＠無返却（）
+　＄c5＝「a」＆＠＊未定義（）
+　＄c6＝「a」＆＠＄未代入（）
+　＄c7＝「a」＆＄値なし
+　＞引数なし
+
+　・引数なし
+　＄a8＝＄０＋１
+　＄c8＝「a」＆＄０
+"#;
+    let lua = run_main_scene(&transpile(source));
+
+    assert_eq!(
+        vars(
+            &lua,
+            &["値なし", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8"]
+        ),
+        "値なし=nil a1=1 a2=1 a3=1 a4=1 a5=1 a6=1 a7=1 a8=1"
+    );
+    assert_eq!(
+        vars(&lua, &["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"]),
+        "c1='a' c2='a' c3='a' c4='a' c5='a' c6='a' c7='a' c8='a'"
+    );
+    // 見つからない関数・未代入の変数での動的呼び出しは、呼び出しの時点の既存の警告だけ（3.3）
+    assert_eq!(
+        all_logs(&lua),
+        [
+            "warn|act:global_fn - function not found: key='未定義'",
+            "warn|act:expr_fn - undefined variable: 'var.未代入'",
+            "warn|act:global_fn - function not found: key='未定義'",
+            "warn|act:expr_fn - undefined variable: 'var.未代入'",
+        ]
+    );
+}
+
+/// 5 つの算術演算子の左右どちらの nil も 0。除数の nil は 0 による除算・剰余と同じ（1.2・1.3）
+#[test]
+fn test_nil_operand_on_either_side_of_each_arith_operator() {
+    let source = r#"
+＊メイン
+　＄o1＝１＋＄未代入
+　＄o2＝＄未代入＋１
+　＄o3＝１－＄未代入
+　＄o4＝＄未代入－１
+　＄o5＝２＊＄未代入
+　＄o6＝＄未代入＊２
+　＄o7＝１／＄未代入
+　＄o8＝＄未代入／２
+　＄o9＝１％＄未代入
+　＄o10＝＄未代入％３
+"#;
+    let lua = run_main_scene(&transpile(source));
+
+    assert_eq!(
+        vars(
+            &lua,
+            &["o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8", "o9", "o10"]
+        ),
+        "o1=1 o2=1 o3=1 o4=-1 o5=0 o6=0 o7=inf o8=0 o9=nan o10=0"
+    );
+    assert_eq!(all_logs(&lua), Vec::<String>::new());
+}
+
+/// 変数代入・式文・関数の引数・Call の引数・動的コールのターゲットで同じ結果（1.4・2.4）
+#[test]
+fn test_nil_coercion_is_the_same_in_every_expression_position() {
+    let source = r#"
+＊メイン
+```lua
+function SCENE.記録(act, v)
+    RS_REC = RS_REC or {}
+    table.insert(RS_REC, RS_FMT(v))
+end
+```
+　＄p1＝＄未代入＋１
+　＄p2＝「a」＆＄未代入
+　＄＝＄未代入＋１
+　＄＝「a」＆＄未代入
+　＄＝＠記録（＄未代入＋１）
+　＄＝＠記録（「a」＆＄未代入）
+　＞受け（＄未代入＋１、「a」＆＄未代入）
+　＞「数の行き先」＆（＄未代入＋１）
+　＞＄未代入＆「文字の行き先」
+　＄後＝「続行」
+
+　・受け
+　＄q1＝＄０
+　＄q2＝＄１
+
+＊数の行き先1
+　＄来た数＝１
+
+＊文字の行き先
+　＄来た文字＝１
+"#;
+    let lua = run_main_scene(&transpile(source));
+
+    assert_eq!(
+        vars(&lua, &["p1", "p2", "q1", "q2", "来た数", "来た文字", "後"]),
+        "p1=1 p2='a' q1=1 q2='a' 来た数=1 来た文字=1 後='続行'"
+    );
+    assert_eq!(
+        eval_str(&lua, r#"return table.concat(RS_REC or {}, " ")"#),
+        "1 'a'"
+    );
+    // 失敗表記を積まない
+    assert_eq!(eval_str(&lua, "return tostring(#RS_ACT.token)"), "0");
+    assert_eq!(all_logs(&lua), Vec::<String>::new());
+}
+
+/// 入れ子と境界: 内側の演算の結果を外側が使い、警告は変換できない値の 1 行だけ。
+/// 空文字列は nil ではない。表を返す関数の演算でメタメソッドが呼ばれない（1.5・2.2・2.3・4.1・4.2・4.4・4.5）
+#[test]
+fn test_nested_operations_and_non_convertible_values() {
+    let source = r#"
+＊メイン
+```lua
+function SCENE.真(act)
+    return true
+end
+function SCENE.表(act)
+    local hit = function() RS_META = "called" return 1 end
+    return setmetatable({}, { __add = hit, __concat = hit, __tostring = hit })
+end
+```
+　＄n1＝（「abc」＊２）＋１
+　＄n2＝（＄未代入＆「x」）＋1
+　＄n3＝「合計」＆（＄未代入＋１）
+　＄n4＝「a」＆（＠真（）＆「b」）
+　＄空＝「」
+　＄n5＝＄空＋１
+　＄n6＝＠表（）＋１
+　＄n7＝「a」＆＠表（）
+"#;
+    let lua = run_main_scene(&transpile(source));
+
+    assert_eq!(
+        vars(&lua, &["n1", "n2", "n3", "n4", "n5", "n6", "n7"]),
+        "n1=1 n2=1 n3='合計1' n4='ab' n5=1 n6=1 n7='a'"
+    );
+    assert_eq!(eval_str(&lua, "return tostring(RS_META)"), "nil");
+    assert_eq!(
+        all_logs(&lua),
+        [
+            "warn|act:arith - operand is not a number: op='*', value='abc' (string)",
+            "warn|act:arith - operand is not a number: op='+', value='x' (string)",
+            "warn|act:concat - operand is not a string or number: op='&', operand='@真()', value=true (boolean)",
+            "warn|act:arith - operand is not a number: op='+', operand='var.空', value='' (string)",
+            "warn|act:arith - operand is not a number: op='+', operand='@表()', value=(table)",
+            "warn|act:concat - operand is not a string or number: op='&', operand='@表()', value=(table)",
+        ]
+    );
+}
+
+/// 変えない規則: 台詞の未代入の変数は空文字＋既存の警告、関数の引数に nil を 1 つ渡すとそのまま nil が届く（5.1・5.5）
+#[test]
+fn test_nil_outside_operators_is_unchanged() {
+    let source = r##"
+％さくら
+　＠通常：\s[0]
+
+＊メイン
+```lua
+function SCENE.受取(act, ...)
+    RS_ARGS = string.format("n=%d v=%s", select("#", ...), RS_FMT((...)))
+end
+```
+　さくら：前＄未代入　後
+　＄＝＠受取（＄未代入）
+"##;
+    let lua = run_main_scene(&transpile(source));
+
+    let texts = eval_str(
+        &lua,
+        r#"
+        local out = {}
+        for _, t in ipairs(RS_ACT.token) do table.insert(out, tostring(t.text)) end
+        return table.concat(out, "|")
+        "#,
+    );
+    assert_eq!(texts, "前|後");
+    assert_eq!(eval_str(&lua, "return RS_ARGS"), "n=1 v=nil");
+    assert_eq!(
+        all_logs(&lua),
+        ["warn|act:talk - undefined variable: 'var.未代入'"]
+    );
 }

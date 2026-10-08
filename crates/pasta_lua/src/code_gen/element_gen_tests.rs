@@ -367,7 +367,7 @@ fn call_scene_dynamic_key_other_expr_passes_value_only() {
                 lhs: Box::new(Expr::String("a".to_string())),
                 rhs: Box::new(var_ref("x", VarScope::Local)),
             },
-            "act:call_key(act:concat(\"a\", var.x, nil, \"var.x\"))",
+            "act:call_key((\"a\" .. PASTA.str(var.x, \"var.x\")))",
         ),
     ];
     for (expr, key) in cases {
@@ -604,7 +604,7 @@ fn expr_statement_wraps_non_call_expressions_in_discard_block() {
                 lhs: Box::new(var_ref("未代入", VarScope::Local)),
                 rhs: Box::new(Expr::String("x".to_string())),
             },
-            "do local _ = act:concat(var.未代入, \"x\", \"var.未代入\") end",
+            "do local _ = (PASTA.str(var.未代入, \"var.未代入\") .. \"x\") end",
         ),
         // 括弧（中身が関数呼び出しでも括弧は呼び出しそのものではない）
         (
