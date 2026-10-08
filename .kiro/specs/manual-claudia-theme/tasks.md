@@ -338,7 +338,7 @@
   - _Boundary: ChapterDialogues（lua 前半）_
   - _Depends: 3.4, 4_
 
-- [ ] 5.5 (P) Lua API の後半 7 章の導入と締めを、掛け合いに書き換える
+- [x] 5.5 (P) Lua API の後半 7 章の導入と締めを、掛け合いに書き換える
   - 対象: enc・pasta-log・mlua-stdlib・shiori-events・script-api・patterns・dsl-vs-lua
   - 完了したとき、対象の 7 章が、全パート共通の条件をすべて満たしている。
   - _Requirements: 5.1, 5.2, 5.3, 5.5_
