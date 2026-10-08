@@ -2,6 +2,8 @@
 
 > **ステータス**: 未着手（2026-10-08、`hello-pasta-tutorial-stages` の設計ディスカッション #1 の決定を受けて起票）。決定の正本は同 spec の `design.md` の Q1 と `requirements.md` の Requirement 3.6（コミット `0e1f53a0`）。本 brief は、その決定を 1 つの spec に切り出したもの。着手するときは `/kiro-start arith-unassigned-var-zero` で開始する。
 
+> **要件ディスカッションでの方針の組み替え（2026-10-08）**: 開発者の判断で、「未代入の変数だけを 0」から「式の中の nil は、算術の文脈なら 0、連結の文脈なら空文字列。ログなし」に組み替えた。下の Approach・Scope・Out of Boundary のうち、変数と関数の区別と、連結を範囲外とする記述は古い。正本は `requirements.md`。
+
 ## Problem
 
 入門ガイドの 10 段目「覚えていてほしい（変数の保存）」で、読者に次の 1 行だけで回数を数えさせたい。
