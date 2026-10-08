@@ -13,6 +13,14 @@
 //       * サイドバーと上部バーの規則は色と字体だけを変える（幅・開閉・折りたたみ・切り替え点に触れない）。
 //       * highlight.js の兄弟クラス（mdBook の highlight.css の 6 群）を、light・navy・JS 無効の
 //         3 つの範囲で同じ群の --claudia-hl-* で塗る（実行時に着色する lua・toml・json 等の対比を守る）。
+//   - 台詞部品・扉・クレジット・狭い画面・印刷の層（タスク 2.4 / 要件 2.3, 3.1, 3.5, 3.8, 3.9, 3.10,
+//     6.4, 9.1, 9.2、design「ClaudiaTheme / State Management」の 4・6・7、「出力 HTML 契約」）:
+//       * 出力 HTML 契約と扉・クレジットのクラス契約のクラスを規則で使い、扉の契約を冒頭のコメントに書いている。
+//       * 台詞本文は --claudia-font-talk、名札は --claudia-font-latin。顔は 56px（扉は 84px）の円。
+//       * 話し手ごとのトークン（--talk-claudia-*・--talk-anthony-*）を部品に当てている。
+//       * 620px 以下で顔を小さくし、420px 以下で扉の案内を 1 列にする。吹き出しは長い語でも折り返す。
+//       * 印刷では、どのテーマでも light の値（全トークンを light ブロックと同じ値で再定義）を使い、
+//         台詞と扉の途中で改ページせず、区切り線は罫線で描き、コードの着色もどのテーマでも 6 群にそろえる。
 //   - Node 標準のみ・ビルド不要。問題は全件列挙してから exit 1。
 
 import { readFileSync } from 'node:fs';
@@ -69,6 +77,11 @@ export const CONTRAST_PAIRS = [
   ['--talk-claudia-name', '--talk-bubble'],
   ['--talk-anthony-ink', '--talk-bubble'],
   ['--talk-anthony-name', '--talk-bubble'],
+  // 吹き出し・扉・パート案内のカードに載る文字（タスク 2.4。リンク・案内の文字・欧文添え字）
+  ['--links', '--talk-bubble'],
+  ['--claudia-ink', '--talk-bubble'],
+  ['--claudia-ink2', '--talk-bubble'],
+  ['--claudia-ink2', '--claudia-paper2'],
   ...HL_TOKENS.map((t) => [t, '--claudia-code-bg']),
   ['--fg', '--claudia-code-bg'],
   ['--inline-code-color', '--claudia-code-bg'],
@@ -176,6 +189,18 @@ export const HLJS_GROUPS = {
 // 着色を上書きする範囲（light・navy と、JS 無効時の既定）
 export const HLJS_SCOPES = ['.light', '.navy', 'html:not(.js)'];
 
+// 出力 HTML 契約（design「データモデル / 出力 HTML 契約」）の台詞部品のクラス
+export const TALK_CLASSES = ['talk', 'talk-claudia', 'talk-anthony', 'talk-left', 'talk-right',
+  'talk-face', 'talk-bubble', 'talk-name'];
+// 扉とクレジットのクラス契約（タスク 2.4 で決め、タスク 5.1 の introduction.md が使う）
+export const HERO_CLASSES = ['claudia-hero', 'hero-corner', 'hero-corner-tl', 'hero-corner-tr',
+  'hero-corner-bl', 'hero-corner-br', 'hero-latin', 'hero-faces', 'hero-face', 'hero-face-anthony',
+  'hero-toc', 'claudia-credit'];
+// 話し手ごとのトークン（「テーマトークン契約」）
+export const SPEAKER_TOKENS = ['claudia', 'anthony'].flatMap((id) => ['ink', 'face', 'ring', 'name'].map((k) => `--talk-${id}-${k}`));
+// 印刷で light の値に置き換える範囲（mdBook はテーマのクラスを html に付ける。JS 無効時は html:not(.js)）
+export const PRINT_SCOPES = ['html.light', 'html.navy', 'html.rust', 'html.coal', 'html.ayu', 'html:not(.js)'];
+
 // サイドバーと上部バーの規則（色と字体だけ。要件 1.8・9.3）
 // サイドバーの開閉で本文を押し出す仕組み（.page-wrapper・#mdbook-body-container）も同じ扱い
 const CHROME_SELECTOR_RE = /\.sidebar|#mdbook-sidebar|\.chapter|#mdbook-menu-bar|\.menu-bar|\.menu-title|\.page-wrapper|#mdbook-page-wrapper|#mdbook-body-container/;
@@ -188,13 +213,14 @@ const COLOR_NAMES = ['white', 'black', 'red', 'green', 'blue', 'gray', 'grey', '
 const COLOR_LITERAL_RE = new RegExp(
   `#[0-9a-fA-F]{3,8}\\b|\\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\\(|\\b(${COLOR_NAMES.join('|')})\\b`, 'i');
 
-// @media 等の入れ子をたどり、葉の規則を { selector, decls: [[prop, value]], nested } で返す
+// @media 等の入れ子をたどり、葉の規則を { selector, decls: [[prop, value]], nested } で返す。
+// nested は最上位なら false、入れ子なら外側の前置き（例: "@media print"）
 export function leafRules(css) {
   const out = [];
   const walk = (src, nested) => {
     for (const b of topLevelBlocks(src)) {
       if (/^@(media|supports|layer)\b/.test(b.selector)) {
-        walk(b.body, true);
+        walk(b.body, b.selector);
         continue;
       }
       const decls = [];
@@ -272,6 +298,94 @@ export function checkComponents(css) {
   return results;
 }
 
+// --- 台詞部品・扉・クレジット・狭い画面・印刷の層の検査（タスク 2.4） ---
+
+// セレクタ（カンマ区切りの 1 つ）が、最後の複合セレクタでクラス cls を対象にしているか（疑似要素は除く）
+const targets = (sel, cls) => !sel.includes('::') && new RegExp(`\\.${cls}(?![\\w-])[^\\s>+~]*$`).test(sel.trim());
+const usesClass = (r, cls) => new RegExp(`\\.${cls}(?![\\w-])`).test(r.selector);
+const decl = (r, prop) => r.decls.find(([p]) => p === prop)?.[1];
+const px = (v) => (/^\d+(\.\d+)?px$/.test(v ?? '') ? parseFloat(v) : NaN);
+
+// CSS 全文の台詞部品・扉・クレジット・狭い画面・印刷の層を検査し、[{ ok, name, detail }] を返す
+export function checkTalk(css) {
+  const results = [];
+  const add = (ok, name, detail) => results.push({ ok, name, detail });
+  const rules = leafRules(css);
+  const top = rules.filter((r) => !r.nested);
+  const inMedia = (re) => rules.filter((r) => r.nested && re.test(r.nested));
+  // cls を対象にする規則のうち、prop の値が pred を満たすものがあるか
+  const has = (list, cls, prop, pred) => list.some((r) => r.selector.split(',').some((s) => targets(s, cls)) && pred(decl(r, prop)));
+
+  // クラス契約（出力 HTML 契約・扉・クレジット）
+  for (const cls of [...TALK_CLASSES, ...HERO_CLASSES]) {
+    add(top.some((r) => usesClass(r, cls)), `C-9 クラス .${cls} の規則がある`, '最上位の規則で使っていない');
+  }
+  const head = css.match(/^\s*\/\*[\s\S]*?\*\//)?.[0] ?? '';
+  for (const cls of HERO_CLASSES) {
+    add(new RegExp(`(^|[^\\w-])${cls}(?![\\w-])`).test(head), `C-10 扉の契約 ${cls} を冒頭のコメントに書いている`, '冒頭のコメントに無い');
+  }
+
+  // 字体（要件 1.4）と顔の大きさ（要件 3.1・6.1）
+  add(has(top, 'talk-bubble', 'font-family', (v) => v === 'var(--claudia-font-talk)'),
+    'C-11 台詞本文に --claudia-font-talk を当てている', '.talk-bubble の font-family が無い');
+  add(has(top, 'talk-name', 'font-family', (v) => v === 'var(--claudia-font-latin)'),
+    'C-11 名札に --claudia-font-latin を当てている', '.talk-name の font-family が無い');
+  for (const [cls, size] of [['talk-face', 56], ['hero-face', 84]]) {
+    const ok = ['width', 'height'].every((p) => has(top, cls, p, (v) => px(v) === size))
+      && has(top, cls, 'border-radius', (v) => v === '50%');
+    add(ok, `C-12 .${cls} は ${size}px の円`, `width・height が ${size}px、border-radius が 50% の規則が無い`);
+  }
+
+  // 話し手ごとのトークン（要件 3.5）
+  const used = top.flatMap((r) => r.decls.map(([, v]) => v)).join(' ');
+  for (const t of SPEAKER_TOKENS) add(used.includes(`var(${t})`), `C-13 ${t} を部品に当てている`, '参照が無い');
+
+  // 狭い画面（要件 6.4・9.1・9.2。mdBook の切り替え点 620px・420px）
+  const n620 = inMedia(/^@media\b.*\(max-width:\s*620px\)/);
+  const n420 = inMedia(/^@media\b.*\(max-width:\s*420px\)/);
+  add(has(n620, 'talk-face', 'width', (v) => px(v) < 56), 'N-1 620px 以下で台詞の顔を小さくする', '@media (max-width: 620px) に .talk-face の width が無い');
+  add(has(n620, 'hero-face', 'width', (v) => px(v) < 84), 'N-1 620px 以下で扉の顔を小さくする', '@media (max-width: 620px) に .hero-face の width が無い');
+  add(n420.some((r) => usesClass(r, 'hero-toc') && decl(r, 'grid-template-columns') === '1fr'),
+    'N-2 420px 以下で扉の案内を 1 列にする', '@media (max-width: 420px) に .hero-toc の grid-template-columns: 1fr が無い');
+  add(has(top, 'talk-bubble', 'overflow-wrap', (v) => v === 'anywhere'),
+    'N-3 吹き出しは長い語でも折り返す（ページの横スクロールを出さない）', '.talk-bubble に overflow-wrap: anywhere が無い');
+
+  // 印刷（要件 3.10。どのテーマでも light の値）
+  const print = inMedia(/^@media\s+print\b/);
+  const light = readTokens(css, THEME_SELECTORS.light) ?? new Map();
+  const tokenRule = print.find((r) => {
+    const sels = r.selector.split(',').map((s) => s.trim());
+    return PRINT_SCOPES.every((s) => sels.includes(s));
+  });
+  add(!!tokenRule, `P-1 印刷で ${PRINT_SCOPES.join('・')} のトークンを再定義する`, '@media print にその規則が無い');
+  if (tokenRule) {
+    const pt = new Map(tokenRule.decls.filter(([p]) => p.startsWith('--')));
+    const diff = [...light].filter(([k, v]) => pt.get(k) !== v).map(([k]) => k);
+    const extra = [...pt.keys()].filter((k) => !light.has(k));
+    add(light.size > 0 && diff.length === 0 && extra.length === 0, 'P-2 印刷のトークンは light ブロックと同じ値',
+      [...diff.map((k) => `${k} が違う`), ...extra.map((k) => `${k} は light に無い`)].join('、'));
+  }
+  for (const cls of ['talk', 'claudia-hero']) {
+    add(has(print, cls, 'break-inside', (v) => v === 'avoid'), `P-3 印刷で .${cls} の途中で改ページしない`, 'break-inside: avoid が無い');
+  }
+  add(print.some((r) => /(^|\s)hr$/.test(r.selector) && decl(r, 'background') === 'none'
+      && /solid var\(--claudia-gold\)/.test(decl(r, 'border-top') ?? '')),
+    'P-4 印刷の区切り線は罫線で描く', '@media print に hr の background: none と border-top が無い');
+  add(print.some((r) => r.selector === '.content' && decl(r, 'overflow') === 'visible'),
+    'P-6 印刷では本文の枠をスクロールの箱にしない', '@media print に .content { overflow: visible } が無い');
+  const painted = new Map();
+  for (const r of print) {
+    const hl = decl(r, 'color')?.match(/^var\(--claudia-hl-(\w+)\)$/);
+    if (hl) for (const sel of r.selector.split(',')) painted.set(sel.trim(), hl[1]);
+  }
+  for (const [group, classes] of Object.entries(HLJS_GROUPS)) {
+    const missing = classes.filter((cls) => painted.get(`html .hljs-${cls}`) !== group);
+    add(missing.length === 0, `P-5 印刷ではどのテーマでも ${group} 群を --claudia-hl-${group} で塗る`,
+      `html .hljs-${missing.join('・')} が無いか群が違う`);
+  }
+  return results;
+}
+
 // --- 実行 ---
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   let passed = 0;
@@ -318,6 +432,21 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     check('S-16 見出しの字体トークンが h1〜h6 の一部だけなら失敗', partial && !partial.ok);
     const push = comp('#mdbook-sidebar-toggle-anchor:checked ~ .page-wrapper { margin-inline-start: 0; }', 'C-7');
     check('S-17 本文を押し出す仕組みの上書きを失敗にする', push && !push.ok);
+    const talk = (src, prefix) => checkTalk(src).find((x) => x.name.startsWith(prefix));
+    const scopes = PRINT_SCOPES.join(', ');
+    const pr = talk(`.light, html:not(.js) { --fg: #111111; --bg: #222222; } @media print { ${scopes} { --fg: #111111; --bg: #333333; } }`, 'P-2');
+    check('S-18 印刷のトークンが light と違えば失敗', pr && !pr.ok && pr.detail.includes('--bg'));
+    const prok = talk(`.light, html:not(.js) { --fg: #111111; } @media print { ${scopes} { --fg: #111111; } }`, 'P-2');
+    check('S-19 印刷のトークンが light と同じなら合格', prok && prok.ok);
+    const face = talk('.talk-face { width: 48px; height: 56px; border-radius: 50%; }', 'C-12 .talk-face');
+    check('S-20 56px でない顔を失敗にする', face && !face.ok);
+    const faceok = talk('.talk .talk-face { width: 56px; height: 56px; border-radius: 50%; }', 'C-12 .talk-face');
+    check('S-21 56px の円の顔は合格', faceok && faceok.ok);
+    const narrow = talk('.talk-face { width: 40px; }', 'N-1 620px 以下で台詞');
+    check('S-22 @media の外の小さい顔は狭い画面の規則に数えない', narrow && !narrow.ok);
+    const headOk = talk('/* claudia-hero */ .x {}', 'C-10 扉の契約 claudia-hero ');
+    const headNg = talk('.x {} /* claudia-hero */', 'C-10 扉の契約 claudia-hero ');
+    check('S-23 扉の契約は冒頭のコメントだけを見る', headOk && headOk.ok && headNg && !headNg.ok);
   }
 
   let css = null;
@@ -333,6 +462,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     }
     console.log('\n== (C) 部品の層 ==');
     for (const r of checkComponents(css)) check(r.name, r.ok, r.detail);
+    console.log('\n== (C・N・P) 台詞部品・扉・クレジット・狭い画面・印刷 ==');
+    for (const r of checkTalk(css)) check(r.name, r.ok, r.detail);
   }
 
   console.log(`\n結果: ${passed} passed, ${failed} failed`);
