@@ -275,7 +275,7 @@ log('\n== (B-15) 台詞の引用ブロック内のリンク（manual-claudia-the
   const root = makeSandbox();
   try {
     writeFile(root, 'doc/spec/02-markers.md', '# 02\n');
-    writeFile(root, 'book/src/grammar/block-structure.md', '# block\n');
+    writeFile(root, 'book/src/grammar/block-structure.md', '# block\n\n## sec\n');
     writeFile(root, 'book/src/introduction.md', [
       '# はじめに',
       '',
