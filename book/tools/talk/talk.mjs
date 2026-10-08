@@ -101,6 +101,10 @@ export function faceFilePath(sp, face) {
 
 // 引用の行: 字下げ・リスト記号・引用記号の並び・内容に分ける。
 const QUOTE_RE = /^(\s*)((?:[-*+]|\d{1,9}[.)])\s+)?((?:>\s?)+)(.*)$/;
+// 行頭の字下げ・リスト記号・引用記号の並びをまとめて剥がす（入れ子の台詞の判定用）。
+// QUOTE_RE はリスト記号 1 つ・引用記号の間の空白 1 つまでなので、
+// 「>  > 【」「> - > 【」「1. - > 【」「> - 【」をここで拾う。
+const PREFIX_RE = /^\s*(?:(?:[-*+]|\d{1,9}[.)])\s+|>\s*)*/;
 const INNER_FENCE_RE = /^ {0,3}(`{3,}|~{3,})/;
 // 台詞の直前に空行が無くてもよい行（区切り・見出し）。
 const EDGE_RE = /^(-{3,}|#{1,6}(\s.*)?)\s*$/;
@@ -125,6 +129,15 @@ export function scanTalk(markdown) {
     const no = i + 1;
     if (text.trim() === '') { close(); return; }
     const q = text.match(QUOTE_RE);
+    // 引用記号を含む前置きの先が【で始まるのに、行頭 1 段の引用の台詞ではない行は、入れ子の台詞。
+    const prefix = text.match(PREFIX_RE)[0];
+    const simpleTag = q !== null && q[1] === '' && !q[2] && (q[3].match(/>/g) || []).length === 1
+      && q[4].trimStart().startsWith('【');
+    if (prefix.includes('>') && text.slice(prefix.length).startsWith('【') && !simpleTag) {
+      err('nested-talk', no, '台詞は字下げ・リスト・引用の中に置けません（行頭の引用ブロックだけ）');
+      if (!q) close();
+      return;
+    }
     if (!q) {
       // 台詞の直後の空行なしの行は遅延継続（引用に吸い込まれる）。
       if (cur) { err('missing-blank-line', no, '台詞の後ろに空行が必要です（遅延継続）'); close(); }

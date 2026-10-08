@@ -296,6 +296,30 @@ log('\n== (G) scanTalk 不正系（種類と行番号） ==');
   for (const line of [1, 3, 5, 7]) check(`G-16 nested-talk @${line}`, has(n, 'nested-talk', line), kinds(n));
   check('G-17 nested-talk だけ 4 件・ブロックなし', n.length === 4 && nest.blocks.length === 0, kinds(n));
 
+  // 完了時の棚卸しで見つかった取りこぼし: 引用記号の間の空白 2 つ・引用の中のリスト・リスト 2 段・引用の中のリスト項目の台詞。
+  const nest2 = scanTalk(md(
+    '>  > 【素】空白 2 つの入れ子', //   1
+    '', //                                2
+    '> - > 【素】引用の中のリスト', //    3
+    '', //                                4
+    '1. - > 【素】リスト 2 段', //        5
+    '', //                                6
+    '> - 【素】引用の中のリスト項目', //  7
+  ));
+  const n2 = nest2.errors;
+  for (const line of [1, 3, 5, 7]) check(`G-22 nested-talk @${line}（取りこぼしの形）`, has(n2, 'nested-talk', line), kinds(n2));
+  check('G-23 取りこぼしの形は nested-talk だけ 4 件・ブロックなし', n2.length === 4 && nest2.blocks.length === 0, kinds(n2));
+
+  // 台詞の中のリストと、引用でないリスト項目の【は、これまでどおり台詞の入れ子として扱わない。
+  const ok2 = scanTalk(md(
+    '> 【素】手順は次のとおりですわ。', // 1
+    '> - 一つ目', //                       2
+    '> - 二つ目', //                       3
+    '', //                                 4
+    '- 【参考】ただのリスト項目', //       5
+  ));
+  check('G-24 台詞の中のリストと、引用でないリスト項目はエラーにしない', ok2.errors.length === 0 && ok2.blocks.length === 1, kinds(ok2.errors));
+
   const unsup = scanTalk(md(
     '> 【素】説明します。', //  1
     '> ```text', //            2 unsupported-content（フェンス）
