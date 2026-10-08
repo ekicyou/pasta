@@ -145,7 +145,7 @@
   - _Requirements: 1.3, 1.6, 1.7, 2.1, 2.4, 2.5, 2.6, 8.1, 8.5_
 
 - [ ] 3. ビルド後の変換と、検査・生成ツールの追従
-- [ ] 3.1 (P) 出力 HTML の台詞を吹き出しに変換するツールを作る
+- [x] 3.1 (P) 出力 HTML の台詞を吹き出しに変換するツールを作る
   - 出力フォルダの HTML をすべて（`print.html` を含む）名前順に読む。
   - 引用ブロックのうち、最初の段落が `【` で始まるものだけを、出力 HTML 契約の構造に置き換える。それ以外の部分は 1 バイトも変えない。
   - 本文は、タグを取り除いた残りを mdBook の出力のまま移す。これで強調・インラインコード・リンクがそのまま残る。
@@ -412,3 +412,4 @@
 - 2.4: 扉とクレジットのクラス契約と HTML の骨組みは `claudia.css` の冒頭コメントにある（`claudia-hero`・`hero-corner hero-corner-{tl,tr,bl,br}`・`hero-latin`・`hero-faces`／`hero-face`／`hero-face-anthony`・`hero-toc`・`claudia-credit`）。5.1 はこれに従って書く。クレジットの `<p>` の中は Markdown にならないので、リンクは `<a href>` で書く。
 - 2.4: 印刷の層の light トークンは、2. の light ブロックの写し（theme-test の P-2 が一致を検査する）。light の値を変えるときは両方を直す。
 - 2.5: `claudia.js` に End キーの補正を足した（設計の ThemeMenu に追記済み）。`theme-menu-test.mjs` は jsdom の上で mdBook 0.5.4 の `book.js` の keydown 処理の写しを使う。mdBook を上げたら写しを追従させる。テーマのスクリプトを読まない出力は `lua/modules.html`（リダイレクト）と `toc.html`（JS 無効時の目次フレーム）だけで、どちらも章ではない（3.5 の検査の対象から外す）。
+- 3.1: talk-html は全ファイルを検査してから書き込む（不正が 1 件でもあれば何も書かない）。注記（`> [!NOTE]`）の中の `【` 段落は変換しないが、scanTalk が missing-blank-line で止める。台詞のタグ行の末尾に強制改行（空白 2 つ・バックスラッシュ）を書かないこと（本文が `<br />` から始まる）。
