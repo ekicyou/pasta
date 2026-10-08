@@ -6,8 +6,8 @@
  *   1. :root — 字体トークンと、部品トークンの既定値（mdBook 変数への参照。rust・coal・ayu でも部品が読める。要件 2.4）
  *   2. .light, html:not(.js) — mdBook のテーマ変数のすべてと Claudia トークンを light 値で再定義
  *   3. .navy — 同じ範囲を navy 値で再定義
- *   4. 部品のスタイル（トークンだけを参照し、色を直書きしない）— タスク 2.3・2.4
- *   5. pasta コードの着色 6 群の上書き（light・navy のみ）
+ *   4. 部品のスタイル（トークンだけを参照し、色を直書きしない。角丸 3 段・影 2 段）— タスク 2.3・2.4
+ *   5. コードの着色 6 群の上書き（pasta と実行時着色の兄弟クラス。light・navy・JS 無効時のみ）
  *   6. 狭い画面の規則 — タスク 2.4
  *   7. 印刷の規則 — タスク 2.4
  *
@@ -44,6 +44,10 @@
     --talk-anthony-face: var(--quote-bg);
     --talk-anthony-ring: var(--links);
     --talk-anthony-name: var(--fg);
+
+    /* 影の 2 段（1: コードの枠などの部品、2: 浮かぶもの）。rust・coal・ayu では無彩色の淡い影 */
+    --claudia-shadow-1: 0 1px 0 rgba(0, 0, 0, 0.06), 0 3px 10px rgba(0, 0, 0, 0.08);
+    --claudia-shadow-2: 0 1px 0 rgba(0, 0, 0, 0.05), 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
 /* ============================================================
@@ -130,6 +134,10 @@
     --talk-anthony-face: #EEF2FA;
     --talk-anthony-ring: #8FA3C8;
     --talk-anthony-name: #4A6290;
+
+    /* 影の 2 段（墨 #3A2419 の淡い影） */
+    --claudia-shadow-1: 0 1px 0 rgba(58, 36, 25, 0.06), 0 3px 10px rgba(58, 36, 25, 0.08);
+    --claudia-shadow-2: 0 1px 0 rgba(58, 36, 25, 0.05), 0 6px 18px rgba(58, 36, 25, 0.10);
 
     /* pasta コードの着色 6 群 */
     --claudia-hl-comment: #6B4E3D;
@@ -226,6 +234,10 @@
     --talk-anthony-ring: #6F86B8;
     --talk-anthony-name: #8FA6D8;
 
+    /* 影の 2 段（暗い地では墨の代わりに夜の底の色 #080A12 を濃いめに使う。明るい影は光って見えるため） */
+    --claudia-shadow-1: 0 1px 0 rgba(8, 10, 18, 0.25), 0 3px 10px rgba(8, 10, 18, 0.30);
+    --claudia-shadow-2: 0 1px 0 rgba(8, 10, 18, 0.25), 0 6px 18px rgba(8, 10, 18, 0.40);
+
     /* pasta コードの着色 6 群 */
     --claudia-hl-comment: #B8AE9C;
     --claudia-hl-variable: #BDB3F5;
@@ -236,8 +248,210 @@
 }
 
 /* ============================================================
- * 5. pasta コードの着色 6 群（light・navy のみ。rust・coal・ayu は mdBook の配色のまま）
- *    群は scope-map.mjs の hljs クラスに合わせる。クラスの写像は変えず、色だけを上書きする。
+ * 4. 部品のスタイル（トークンだけを参照し、色を直書きしない）
+ *    角丸は紙 14px・カード 10px・部品 4px の 3 段、影は --claudia-shadow-1（部品）と
+ *    --claudia-shadow-2（浮かぶもの）の 2 段（要件 1.2）。
+ *    台詞部品・扉・クレジットはタスク 2.4、テーマメニューの隠し規則はタスク 2.5 で足す。
+ * ============================================================ */
+
+/* --- 4-1. 本文: ゴシック・16px・行間 1.8（要件 1.4・9.4）。コードは mdBook の --mono-font のまま（要件 1.5） --- */
+html {
+    font-family: var(--claudia-font-body);
+}
+.content main {
+    font-size: 1.6rem;
+}
+.content p,
+.content ol,
+.content ul {
+    line-height: 1.8;
+}
+
+/* --- 4-2. 見出し: Shippori Mincho B1（要件 1.3）。h1 は金の下罫、h2 は差し色の左罫 --- */
+.content main h1,
+.content main h2,
+.content main h3,
+.content main h4,
+.content main h5,
+.content main h6 {
+    font-family: var(--claudia-font-heading);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+}
+.content main h1,
+.content main h2 {
+    font-weight: 800;
+}
+.content main h1 {
+    padding-block-end: 0.25em;
+    border-block-end: 2px solid var(--claudia-gold);
+}
+.content main h2 {
+    padding-inline-start: 0.6em;
+    border-inline-start: 4px solid var(--claudia-accent);
+}
+
+/* --- 4-3. 区切り線: 金の罫の中央に金の菱形（CSS だけで描く） --- */
+.content main hr {
+    position: relative;
+    height: 1px;
+    margin: 2.4em 0;
+    overflow: visible;
+    border: 0;
+    background: linear-gradient(to right,
+        transparent,
+        var(--claudia-gold) 12%,
+        var(--claudia-gold) calc(50% - 16px),
+        transparent calc(50% - 16px),
+        transparent calc(50% + 16px),
+        var(--claudia-gold) calc(50% + 16px),
+        var(--claudia-gold) 88%,
+        transparent);
+}
+.content main hr::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 9px;
+    height: 9px;
+    background: var(--claudia-gold);
+    transform: translate(-50%, -50%) rotate(45deg);
+}
+
+/* --- 4-4. 表: 縁色の罫と紙（濃）の見出し。幅の広い表は mdBook の .table-wrapper の内側で横に送る --- */
+.content main table {
+    font-size: 0.95em;
+}
+.content main table th,
+.content main table td {
+    padding: 6px 14px;
+    border: 1px solid var(--claudia-edge);
+}
+.content main table thead {
+    background: var(--claudia-paper2);
+}
+.content main table thead tr {
+    border: 1px solid var(--claudia-edge);
+}
+.content main table thead th {
+    font-weight: 700;
+    text-align: start;
+}
+
+/* --- 4-5. 通常の引用（「将来変更あり」の注意書きを含む）: 金の左罫と紙（濃）の面 ---
+ *   mdBook の注記（.blockquote-tag）は種類ごとの色の左罫を持つため対象から外す。 */
+.content main blockquote:not(.blockquote-tag) {
+    margin: 1.6em 0;
+    padding: 0.2em 1.2em;
+    color: var(--claudia-ink);
+    background-color: var(--claudia-paper2);
+    border: 0;
+    border-inline-start: 4px solid var(--claudia-gold);
+    border-radius: 0 10px 10px 0;
+}
+
+/* --- 4-6. コードブロックの枠（カード 10px・影 1 段目）とインラインコード（部品 4px） ---
+ *   枠の内側の横スクロールは mdBook の pre > code（.hljs の overflow-x）に任せる（要件 9.1）。 */
+.content main pre {
+    border: 1px solid var(--claudia-edge);
+    border-radius: 10px;
+    background-color: var(--claudia-code-bg);
+    box-shadow: var(--claudia-shadow-1);
+}
+.content main pre > code {
+    border-radius: inherit;
+    line-height: 1.6;
+}
+.content :not(pre) > code {
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+}
+/* 面の色は light・navy・JS 無効時だけ。rust・coal・ayu は mdBook の .hljs の面のまま（要件 2.4） */
+.light .content :not(pre) > code,
+.navy .content :not(pre) > code,
+html:not(.js) .content :not(pre) > code {
+    background-color: var(--claudia-code-bg);
+}
+
+/* --- 4-7. 目次サイドバー（要件 1.8・9.3）: 字体だけを変える。色は mdBook の --sidebar-* トークンで決まる。
+ *   幅・開閉・折りたたみ・画面幅の切り替え点の規則には触れない。 */
+.chapter li.part-title {
+    font-family: var(--claudia-font-heading);
+    letter-spacing: 0.04em;
+}
+.chapter li a.active {
+    font-weight: 700;
+}
+
+/* --- 4-8. 上部バー: 紙（濃）の面と縁色の下罫、題名は見出しの字体。高さ・配置・ボタンの規則には触れない --- */
+#mdbook-menu-bar {
+    background-color: var(--claudia-paper2);
+    border-block-end-color: var(--claudia-edge);
+}
+.menu-title {
+    font-family: var(--claudia-font-heading);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: var(--claudia-ink);
+}
+.theme-popup {
+    box-shadow: var(--claudia-shadow-2);
+}
+
+/* --- 4-9. 前後の章へのナビ --- */
+.nav-chapters:hover {
+    color: var(--claudia-accent);
+}
+.mobile-nav-chapters {
+    border: 1px solid var(--claudia-edge);
+    border-radius: 4px;
+    background-color: var(--claudia-paper2);
+}
+
+/* --- 4-10. 検索欄と検索結果: 選択中の結果に差し色の左罫 --- */
+#mdbook-searchbar {
+    border-radius: 4px;
+    font-family: var(--claudia-font-body);
+}
+.searchresults-header {
+    font-family: var(--claudia-font-heading);
+    letter-spacing: 0.04em;
+}
+ul#mdbook-searchresults li {
+    padding: 4px 10px;
+    border-inline-start: 3px solid transparent;
+    border-radius: 0 4px 4px 0;
+}
+ul#mdbook-searchresults li.focus {
+    border-inline-start-color: var(--claudia-accent);
+}
+mark {
+    border-radius: 4px;
+}
+
+/* --- 4-11. mdBook の小物の角丸と影を 3 段・2 段にそろえる（ヘルプ・コピー通知・脚注の強調） --- */
+#mdbook-help-popup {
+    border-radius: 10px;
+    box-shadow: var(--claudia-shadow-2);
+}
+.tooltiptext {
+    color: var(--claudia-paper);
+    background-color: var(--claudia-ink);
+    border-radius: 4px;
+}
+.footnote-definition > li:target::before,
+.footnote-reference:target {
+    border-radius: 4px;
+}
+
+/* ============================================================
+ * 5. コードの着色 6 群（light・navy・JS 無効時のみ。rust・coal・ayu は mdBook の配色のまま）
+ *    pasta は scope-map.mjs の hljs クラス、lua・toml・json などは実行時の highlight.js が付ける
+ *    クラスで塗られる。群は mdBook の highlight.css（light 用）の 6 群にそろえ、兄弟クラスも
+ *    同じ群の色で上書きする（mdBook の既定色は新しいコードの面で対比 4.5 を割るため）。
+ *    クラスの写像は変えず、色だけを上書きする。
  * ============================================================ */
 .light .hljs, .navy .hljs, html:not(.js) .hljs {
     background: var(--claudia-code-bg);
@@ -246,25 +460,47 @@
 .light pre > .hljs, .navy pre > .hljs, html:not(.js) pre > .hljs {
     color: var(--fg);
 }
-.light .hljs-comment, .navy .hljs-comment, html:not(.js) .hljs-comment {
+/* comment 群 */
+.light .hljs-comment, .navy .hljs-comment, html:not(.js) .hljs-comment,
+.light .hljs-quote, .navy .hljs-quote, html:not(.js) .hljs-quote {
     color: var(--claudia-hl-comment);
 }
+/* variable 群 */
 .light .hljs-variable, .navy .hljs-variable, html:not(.js) .hljs-variable,
+.light .hljs-template-variable, .navy .hljs-template-variable, html:not(.js) .hljs-template-variable,
+.light .hljs-attribute, .navy .hljs-attribute, html:not(.js) .hljs-attribute,
 .light .hljs-attr, .navy .hljs-attr, html:not(.js) .hljs-attr,
-.light .hljs-tag, .navy .hljs-tag, html:not(.js) .hljs-tag {
+.light .hljs-tag, .navy .hljs-tag, html:not(.js) .hljs-tag,
+.light .hljs-name, .navy .hljs-name, html:not(.js) .hljs-name,
+.light .hljs-regexp, .navy .hljs-regexp, html:not(.js) .hljs-regexp,
+.light .hljs-link, .navy .hljs-link, html:not(.js) .hljs-link,
+.light .hljs-selector-id, .navy .hljs-selector-id, html:not(.js) .hljs-selector-id,
+.light .hljs-selector-class, .navy .hljs-selector-class, html:not(.js) .hljs-selector-class {
     color: var(--claudia-hl-variable);
 }
+/* number 群 */
 .light .hljs-number, .navy .hljs-number, html:not(.js) .hljs-number,
+.light .hljs-meta, .navy .hljs-meta, html:not(.js) .hljs-meta,
 .light .hljs-built_in, .navy .hljs-built_in, html:not(.js) .hljs-built_in,
-.light .hljs-literal, .navy .hljs-literal, html:not(.js) .hljs-literal {
+.light .hljs-builtin-name, .navy .hljs-builtin-name, html:not(.js) .hljs-builtin-name,
+.light .hljs-literal, .navy .hljs-literal, html:not(.js) .hljs-literal,
+.light .hljs-type, .navy .hljs-type, html:not(.js) .hljs-type,
+.light .hljs-params, .navy .hljs-params, html:not(.js) .hljs-params {
     color: var(--claudia-hl-number);
 }
-.light .hljs-string, .navy .hljs-string, html:not(.js) .hljs-string {
+/* string 群 */
+.light .hljs-string, .navy .hljs-string, html:not(.js) .hljs-string,
+.light .hljs-symbol, .navy .hljs-symbol, html:not(.js) .hljs-symbol,
+.light .hljs-bullet, .navy .hljs-bullet, html:not(.js) .hljs-bullet {
     color: var(--claudia-hl-string);
 }
-.light .hljs-title, .navy .hljs-title, html:not(.js) .hljs-title {
+/* title 群 */
+.light .hljs-title, .navy .hljs-title, html:not(.js) .hljs-title,
+.light .hljs-section, .navy .hljs-section, html:not(.js) .hljs-section {
     color: var(--claudia-hl-title);
 }
-.light .hljs-keyword, .navy .hljs-keyword, html:not(.js) .hljs-keyword {
+/* keyword 群 */
+.light .hljs-keyword, .navy .hljs-keyword, html:not(.js) .hljs-keyword,
+.light .hljs-selector-tag, .navy .hljs-selector-tag, html:not(.js) .hljs-selector-tag {
     color: var(--claudia-hl-keyword);
 }

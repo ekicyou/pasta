@@ -6,6 +6,13 @@
 //   - 両ブロックに mdBook のテーマ変数 40 個と Claudia のトークンがすべてある（欠けたら失敗）。
 //   - 設計の「テーマトークン契約」で決めた文字色と背景色の組ごとに、WCAG の対比が 4.5 以上。
 //     対象のトークンが欠けている、または 16 進色（#rrggbb）でない場合も失敗。
+//   - 部品の層（タスク 2.3 / 要件 1.2, 1.4, 1.8, 9.3、design「ClaudiaTheme」の意匠）:
+//       * 色は直書きしない（カスタムプロパティの定義を除く宣言に 16 進色・rgb() 等・色名が無い）。
+//       * 角丸は 14px・10px・4px の 3 段（円の 50% と 0・inherit は可）。影は --claudia-shadow-1/-2 だけ。
+//       * 影のトークンが :root・light・navy にある。本文と見出しに字体トークンを当てている。
+//       * サイドバーと上部バーの規則は色と字体だけを変える（幅・開閉・折りたたみ・切り替え点に触れない）。
+//       * highlight.js の兄弟クラス（mdBook の highlight.css の 6 群）を、light・navy・JS 無効の
+//         3 つの範囲で同じ群の --claudia-hl-* で塗る（実行時に着色する lua・toml・json 等の対比を守る）。
 //   - Node 標準のみ・ビルド不要。問題は全件列挙してから exit 1。
 
 import { readFileSync } from 'node:fs';
@@ -147,6 +154,124 @@ export function checkTheme(css) {
   return results;
 }
 
+// --- 部品の層の検査（タスク 2.3） ---
+
+// 影のトークン（墨色の淡い 2 段）。:root（rust・coal・ayu 用の既定値）・light・navy の 3 か所に置く
+export const SHADOW_TOKENS = ['--claudia-shadow-1', '--claudia-shadow-2'];
+
+// 角丸の許容値（design「意匠」: 紙 14px・カード 10px・部品 4px。顔の円の 50%、角を立てる 0、継承）
+export const ALLOWED_RADII = new Set(['14px', '10px', '4px', '50%', '0', 'inherit']);
+
+// mdBook 0.5.x の highlight.css（light 用）の色の群。実行時に hljs 10.1.1 が付けるクラスのうち
+// 色が付くものはすべてここに入る。群の名前は --claudia-hl-<群> に対応する。
+export const HLJS_GROUPS = {
+  comment: ['comment', 'quote'],
+  variable: ['variable', 'template-variable', 'attribute', 'attr', 'tag', 'name', 'regexp', 'link',
+    'selector-id', 'selector-class'],
+  number: ['number', 'meta', 'built_in', 'builtin-name', 'literal', 'type', 'params'],
+  string: ['string', 'symbol', 'bullet'],
+  title: ['title', 'section'],
+  keyword: ['keyword', 'selector-tag'],
+};
+// 着色を上書きする範囲（light・navy と、JS 無効時の既定）
+export const HLJS_SCOPES = ['.light', '.navy', 'html:not(.js)'];
+
+// サイドバーと上部バーの規則（色と字体だけ。要件 1.8・9.3）
+// サイドバーの開閉で本文を押し出す仕組み（.page-wrapper・#mdbook-body-container）も同じ扱い
+const CHROME_SELECTOR_RE = /\.sidebar|#mdbook-sidebar|\.chapter|#mdbook-menu-bar|\.menu-bar|\.menu-title|\.page-wrapper|#mdbook-page-wrapper|#mdbook-body-container/;
+const CHROME_PROP_RE = /^(color|background-color|font-family|font-weight|font-style|letter-spacing|border(-block-end|-block-start|-inline-start|-inline-end)?-color)$/;
+
+// 色の直書きの検出（カスタムプロパティ名を取り除いてから見る。--claudia-gold の gold を拾わない）
+const COLOR_NAMES = ['white', 'black', 'red', 'green', 'blue', 'gray', 'grey', 'silver', 'maroon',
+  'purple', 'fuchsia', 'lime', 'olive', 'yellow', 'navy', 'teal', 'aqua', 'orange', 'brown', 'pink',
+  'gold', 'beige', 'ivory', 'tan', 'wheat', 'crimson', 'indigo', 'violet'];
+const COLOR_LITERAL_RE = new RegExp(
+  `#[0-9a-fA-F]{3,8}\\b|\\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\\(|\\b(${COLOR_NAMES.join('|')})\\b`, 'i');
+
+// @media 等の入れ子をたどり、葉の規則を { selector, decls: [[prop, value]], nested } で返す
+export function leafRules(css) {
+  const out = [];
+  const walk = (src, nested) => {
+    for (const b of topLevelBlocks(src)) {
+      if (/^@(media|supports|layer)\b/.test(b.selector)) {
+        walk(b.body, true);
+        continue;
+      }
+      const decls = [];
+      for (const part of b.body.split(';')) {
+        const i = part.indexOf(':');
+        if (i < 0) continue;
+        decls.push([part.slice(0, i).trim(), part.slice(i + 1).trim()]);
+      }
+      out.push({ selector: b.selector, decls, nested });
+    }
+  };
+  walk(css.replace(/\/\*[\s\S]*?\*\//g, ''), false);
+  return out;
+}
+
+// CSS 全文の部品の層を検査し、[{ ok, name, detail }] を返す
+export function checkComponents(css) {
+  const results = [];
+  const add = (ok, name, detail) => results.push({ ok, name, detail });
+  const rules = leafRules(css);
+  const each = function* (pred) {
+    for (const r of rules) for (const [prop, value] of r.decls) if (pred(prop, value, r)) yield `${r.selector} { ${prop}: ${value} }`;
+  };
+
+  // 色の直書き（カスタムプロパティの定義は除く）
+  const literal = [...each((p, v) => !p.startsWith('--') && COLOR_LITERAL_RE.test(v.replace(/--[\w-]+/g, '')))];
+  add(literal.length === 0, 'C-1 部品の層に色の直書きが無い', literal.join(' / '));
+
+  // 角丸の 3 段
+  const radii = [...each((p, v) => /^border(-[a-z-]+)?-radius$/.test(p) && v.split(/[\s/]+/).some((x) => !ALLOWED_RADII.has(x)))];
+  add(radii.length === 0, 'C-2 角丸は 14px・10px・4px の 3 段', radii.join(' / '));
+
+  // 影は 2 段のトークンだけ
+  const SHADOW_RE = /^var\(--claudia-shadow-[12]\)$/;
+  const shadows = [...each((p, v) => p === 'box-shadow' && v !== 'none' && !SHADOW_RE.test(v))];
+  add(shadows.length === 0, 'C-3 影は --claudia-shadow-1/-2 だけ', shadows.join(' / '));
+  const shadowUsed = [...each((p, v) => p === 'box-shadow' && SHADOW_RE.test(v))].length > 0;
+  add(shadowUsed, 'C-4 影のトークンを部品に当てている', '--claudia-shadow-1/-2 を参照する box-shadow が無い');
+
+  // 影のトークンの定義（:root・light・navy）
+  for (const [where, selector] of [[':root', ':root'], ['light', THEME_SELECTORS.light], ['navy', THEME_SELECTORS.navy]]) {
+    const tokens = readTokens(css, selector) ?? new Map();
+    for (const t of SHADOW_TOKENS) add(tokens.has(t), `C-5 ${where} にトークン ${t} がある`, '欠けている');
+  }
+
+  // 字体トークンの適用（本文ゴシック・見出し明朝。要件 1.3・1.4）。
+  // 本文は html か body の規則に、見出しは h1〜h6 をすべて含む規則に当てていること
+  const fontRule = (token, covers) => rules.some((r) => !r.nested
+    && r.decls.some(([p, v]) => p === 'font-family' && v === `var(${token})`)
+    && covers(r.selector.split(',').map((s) => s.trim())));
+  add(fontRule('--claudia-font-body', (sels) => sels.includes('html') || sels.includes('body')),
+    'C-6 本文の字体トークンを html か body に当てている', 'html・body の規則に font-family: var(--claudia-font-body) が無い');
+  add(fontRule('--claudia-font-heading', (sels) => [1, 2, 3, 4, 5, 6].every((n) => sels.some((s) => new RegExp(`(^|[\\s>])h${n}$`).test(s)))),
+    'C-6 見出しの字体トークンを h1〜h6 に当てている', 'h1〜h6 をすべて含む規則に font-family: var(--claudia-font-heading) が無い');
+
+  // サイドバーと上部バーは色と字体だけ
+  const chrome = [...each((p, _v, r) => CHROME_SELECTOR_RE.test(r.selector) && !CHROME_PROP_RE.test(p))];
+  add(chrome.length === 0, 'C-7 サイドバーと上部バーは色と字体だけを変える', chrome.join(' / '));
+
+  // highlight.js の兄弟クラス（最上位の規則だけを数える）
+  const painted = new Map(); // "<範囲> .hljs-<クラス>" -> 群
+  for (const r of rules) {
+    if (r.nested) continue;
+    const hl = r.decls.find(([p, v]) => p === 'color' && /^var\(--claudia-hl-\w+\)$/.test(v));
+    if (!hl) continue;
+    const group = hl[1].match(/--claudia-hl-(\w+)/)[1];
+    for (const sel of r.selector.split(',')) painted.set(sel.trim(), group);
+  }
+  for (const [group, classes] of Object.entries(HLJS_GROUPS)) {
+    for (const cls of classes) {
+      const missing = HLJS_SCOPES.filter((scope) => painted.get(`${scope} .hljs-${cls}`) !== group);
+      add(missing.length === 0, `C-8 .hljs-${cls} を --claudia-hl-${group} で塗る`, `範囲 ${missing.join('・')} で未設定または群が違う`);
+    }
+  }
+  return results;
+}
+
 // --- 実行 ---
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   let passed = 0;
@@ -172,6 +297,27 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     check('S-6 @media の中のブロックは数えない', nested && !nested.ok);
     const named = checkTheme('.light, html:not(.js) { --fg: black; }').find((x) => x.name === '対比 --fg / --bg');
     check('S-7 16 進色でない値を失敗にする', named && !named.ok && named.detail.includes('16 進色でない'));
+    const comp = (src, prefix) => checkComponents(src).find((x) => x.name.startsWith(prefix));
+    const lit = comp('.x { color: #fff; } .y { border-color: rgba(0,0,0,.1); }', 'C-1');
+    check('S-8 部品の色の直書きを失敗にする', lit && !lit.ok);
+    const tok = comp('.x { color: var(--claudia-gold); --y: #fff; }', 'C-1');
+    check('S-9 トークンの参照と定義は直書きに数えない', tok && tok.ok);
+    const rad = comp('.x { border-radius: 6px; }', 'C-2');
+    check('S-10 3 段以外の角丸を失敗にする', rad && !rad.ok);
+    const sh = comp('.x { box-shadow: 0 1px 2px var(--fg); }', 'C-3');
+    check('S-11 トークン以外の影を失敗にする', sh && !sh.ok);
+    const side = comp('.sidebar { width: 300px; color: var(--fg); }', 'C-7');
+    check('S-12 サイドバーの幅の上書きを失敗にする', side && !side.ok);
+    const hl = comp('@media print { .light .hljs-symbol, .navy .hljs-symbol, html:not(.js) .hljs-symbol { color: var(--claudia-hl-string); } }', 'C-8 .hljs-symbol');
+    check('S-13 @media の中の着色は数えない', hl && !hl.ok);
+    const hlok = comp('.light .hljs-symbol, .navy .hljs-symbol, html:not(.js) .hljs-symbol { color: var(--claudia-hl-string); }', 'C-8 .hljs-symbol');
+    check('S-14 3 つの範囲を同じ群で塗れば合格', hlok && hlok.ok);
+    const elsewhere = comp('.menu-title { font-family: var(--claudia-font-body); }', 'C-6 本文');
+    check('S-15 本文の字体トークンを html・body 以外にだけ当てても失敗', elsewhere && !elsewhere.ok);
+    const partial = comp('.content h1, .content h2 { font-family: var(--claudia-font-heading); }', 'C-6 見出し');
+    check('S-16 見出しの字体トークンが h1〜h6 の一部だけなら失敗', partial && !partial.ok);
+    const push = comp('#mdbook-sidebar-toggle-anchor:checked ~ .page-wrapper { margin-inline-start: 0; }', 'C-7');
+    check('S-17 本文を押し出す仕組みの上書きを失敗にする', push && !push.ok);
   }
 
   let css = null;
@@ -185,6 +331,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       console.log(`\n== (${theme}) トークンと対比 ==`);
       for (const r of checkTheme(css).filter((x) => x.theme === theme)) check(r.name, r.ok, r.detail);
     }
+    console.log('\n== (C) 部品の層 ==');
+    for (const r of checkComponents(css)) check(r.name, r.ok, r.detail);
   }
 
   console.log(`\n結果: ${passed} passed, ${failed} failed`);
