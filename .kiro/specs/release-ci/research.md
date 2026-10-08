@@ -178,6 +178,7 @@
 - Option C を基本にする。job の境界は brief の 5 つ（verify・build・publish-crates・publish-vsce・github-release）を出発点にする。
 - 関門（R2.5・R2.6）は `build.yml` の検査をすべて通す。定義を 1 か所に保つため、`build.yml` に `workflow_call` を足してリリース CI から呼ぶ案を第一候補にする（`build.yml` の検査の中身は変えない）。
 - `Cargo.lock` を追跡する（R3.10）。`.gitignore` の除外を外し、生成した lock をコミットする。CI で `--locked` を付けるかは設計で決める。
+- 公開を行う入口はタグの push だけ（R1.6）。environment の保護規則は `v*` タグに限ったままにする。セットアップを確かめる手動の起動（R11.7）は公開をしないので、公開用の environment の認証は使わない。ただし、Marketplace の profile ID を得るにはマネージド ID のフェデレーション資格情報（subject は environment）が要る。この矛盾の解き方は設計で決める（例: 確認用の environment を別に作り、フェデレーション資格情報をもう 1 つ足す）。
 - 配布物は build job で 1 度だけ作り、artifact で後続へ渡す。publish job は再ビルドしない（R3.8）。ただし `cargo publish` はクレートのソースから検証ビルドを行うので、crates の公開には artifact を使わない。
 - 公開済みの判定は、各公開の直前に公開先へ問い合わせる（R4.3・R5.3・R7.2）。問い合わせの一時的な失敗は「公開済み」と見なさない（R7.4）。
 - `vsce publish` は `--packagePath` で build job の VSIX を出す（`vscode:prepublish` が無いため）。
