@@ -41,7 +41,7 @@
 ### Allowed Dependencies
 - `pasta_lua`（既存 dev-dependency）: `PastaLoader::load` と `PastaLuaRuntime::exec` によるロードと SHIORI 疎通。**新しい依存（dev-dependency を含む）は追加しない**。`pasta_shiori` への依存も追加しない。
 - 標準ライブラリ・`tempfile`・`ctor`（既存 dev-dependency）。
-- 上流 spec `scene-name-alias` の別名「会話 → OnTalk」（実装着手のゲート）。
+- 上流 spec `scene-name-alias` の別名「会話 → OnTalk」（実装着手のゲート）。本 spec は `pasta.toml` を変えない（6.4）ので、別名表 `[scene.alias]` を書かずに既定（`OnTalk = ["会話"]` 相当）が効く。`＊会話` の登録名は `OnTalk_N`、Call 失敗の表記は書いた名前（「会話」）になる（上流の要件ディスカッション完了時点の共有。2026-10-08）。
 - マニュアル（`book/src/`）に記載のある文法・API だけ。
 
 ### Revalidation Triggers
