@@ -25,7 +25,7 @@
   - _Requirements: 2.6_
 
 - [ ] 2. 配布物のビルドの調整
-- [ ] 2.1 (P) 手元と CI で同じ `pasta.dll.zip` を作るよう `release.ps1` を調整する
+- [x] 2.1 (P) 手元と CI で同じ `pasta.dll.zip` を作るよう `release.ps1` を調整する
   - nar の作成の後に、x86 リリースビルドの DLL と第三者ライセンス表示の 2 エントリだけを入れた `pasta.dll.zip` を `release/` に作る段を足し、段の番号を 7 段にそろえる
   - zip の中身が 2 エントリだけであることをスクリプト自身が検査し、違えば止める
   - 最後の案内を「成果物はコミットしない。公開はリリースタグの push で CI が行う」に書き換え、`gh release create` の例と Windows PowerShell 前提の使い方の記述を外す。画像生成の段と既存の引数は変えない
@@ -188,3 +188,4 @@
 - 1.1: nar の基準（research.md）の `pasta.toml` は 2639 バイトだが、基準の nar の後に `f245ab1f`（#59）で正本が変わったため、作り直すと 2583 バイトになる。2.1 の比較ではパスの集合を比べ、この差は既知として扱う。
 - 1.2: lock はルートの `Cargo.lock` 1 つだけ（VSIX の WASM の `crates/pasta_lsp` もワークスペース内）。wasm-pack と `release.ps1` は `--locked` を付けないので、build job の `git diff --exit-code -- Cargo.lock` が lock 不変の唯一の検査になる。
 - 1.3: actionlint 1.7.12（winget・ユーザー領域）。検証は引数なしの `actionlint`（PowerShell では `*.yml` が展開されず exit 3）。shellcheck は無いので `run:` の中身はシェル検査されない（仕様の要求外）。現在のシェルの PATH に無ければ `%LOCALAPPDATA%\Microsoft\WinGet\Packages\rhysd.actionlint_Microsoft.Winget.Source_8wekyb3d8bbwe\actionlint.exe` を直接呼ぶ。
+- 2.1: `release.ps1` は 7 段になり、日本語の案内を含むため UTF-8（BOM 付き）にした（ルートの `release.bat` が powershell.exe 5.1 で呼ぶので BOM が要る）。`release.bat` のコメント「4-6」は古いままなので、5.3 で `release.bat` に触れるときに 7 段に合わせて直す。
