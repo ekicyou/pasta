@@ -500,19 +500,10 @@ function ACT_IMPL.global_fn(self, name, ...)
     return nil
 end
 
---- act:arith のネイティブ演算（メタメソッドに届く前に数値化済みの値だけを渡す）
-local ARITH_OPS = {
-    ["+"] = function(a, b) return a + b end,
-    ["-"] = function(a, b) return a - b end,
-    ["*"] = function(a, b) return a * b end,
-    ["/"] = function(a, b) return a / b end,
-    ["%"] = function(a, b) return a % b end,
-}
-
 --- 動的コールの「呼ばない」印（act:call_key が返し、act:call が検索せずに nil を返す）。外へ公開しない
 local SKIP_CALL = {}
 
---- act:arith の警告に出す値の表記。table 等は tostring しない（__tostring を呼ばないため）
+--- 被演算子・Call のキーの警告に出す値の表記。table 等は tostring しない（__tostring を呼ばないため）
 --- @param v any
 --- @return string
 local function arith_value_text(v)
@@ -523,81 +514,42 @@ local function arith_value_text(v)
     return string.format("(%s)", t)
 end
 
---- 被演算子を数値にする。number はそのまま、string は tonumber（変更前の暗黙変換と同じ範囲）、
---- それ以外は nil。数値にできないときは警告する（値も説明も nil なら内側の失敗の伝播として黙る）
---- @param op string 演算子
+--- 算術の被演算子を数値にする（算術式の生成コードが PASTA.num として呼ぶ）。
+--- number はそのまま、string は tonumber（変更前の暗黙変換と同じ範囲）、nil は黙って 0、
+--- それ以外は警告（act:arith - …、従来の算術の文言）を 1 行出して 0。メタメソッドは呼ばない。act のメソッドではない
+--- @param op string 警告に出す演算子（"+" | "-" | "*" | "/" | "%"）
 --- @param v any 被演算子
---- @param desc string|nil 被演算子の説明（変数パス・関数名）
---- @return number|nil
-local function arith_operand(op, v, desc)
+--- @param desc string|nil 警告に出す被演算子の説明（変数パス・関数名）
+--- @return number
+function ACT.num(op, v, desc)
     local t = type(v)
-    local n = (t == "number" and v) or (t == "string" and tonumber(v)) or nil
-    if n ~= nil or (v == nil and desc == nil) then
-        return n
+    if t == "number" then return v end
+    local n = t == "string" and tonumber(v) or nil
+    if n ~= nil then return n end
+    if v ~= nil then
+        local operand = desc and string.format("operand='%s', ", desc) or ""
+        log.warn(string.format("act:arith - operand is not a number: op='%s', %svalue=%s",
+            op, operand, arith_value_text(v)))
     end
-    local value = arith_value_text(v)
-    local operand = desc and string.format("operand='%s', ", desc) or ""
-    log.warn(string.format("act:arith - operand is not a number: op='%s', %svalue=%s", op, operand, value))
-    return nil
+    return 0
 end
 
---- 数値の二項演算（算術式の生成コードが呼ぶ）
---- 両方が数値にできれば Lua のネイティブ演算の結果、どちらかが数値にできなければ nil。
---- act の状態は読み書きしない
---- @param self Act アクションオブジェクト（未使用）
---- @param op string "+" | "-" | "*" | "/" | "%"
---- @param lhs any 左の被演算子
---- @param rhs any 右の被演算子
---- @param lhs_desc string|nil 左の説明（警告用）
---- @param rhs_desc string|nil 右の説明（警告用）
---- @return number|nil 演算結果
-function ACT_IMPL.arith(self, op, lhs, rhs, lhs_desc, rhs_desc) -- luacheck: ignore 212/self
-    local f = ARITH_OPS[op]
-    if not f then
-        log.warn(string.format("act:arith - unknown operator: op='%s'", tostring(op)))
-        return nil
-    end
-    local a = arith_operand(op, lhs, lhs_desc)
-    local b = arith_operand(op, rhs, rhs_desc)
-    if a == nil or b == nil then
-        return nil
-    end
-    return f(a, b)
-end
-
---- 被演算子を文字列にする。string はそのまま、number は tostring（アクション行の表示と同じ表記）、
---- それ以外は nil。文字列にできないときは警告する（値も説明も nil なら内側の失敗の伝播として黙る）
+--- 連結の被演算子を文字列にする（連結式の生成コードが PASTA.str として呼ぶ）。
+--- string はそのまま、number は tostring（アクション行の表示と同じ表記）、nil は黙って空文字列、
+--- それ以外は警告（act:concat - …、従来の連結の文言）を 1 行出して空文字列。メタメソッドは呼ばない。act のメソッドではない
 --- @param v any 被演算子
---- @param desc string|nil 被演算子の説明（変数パス・関数名）
---- @return string|nil
-local function concat_operand(v, desc)
+--- @param desc string|nil 警告に出す被演算子の説明（変数パス・関数名）
+--- @return string
+function ACT.str(v, desc)
     local t = type(v)
     if t == "string" then return v end
     if t == "number" then return tostring(v) end
-    if v ~= nil or desc ~= nil then
+    if v ~= nil then
         local operand = desc and string.format("operand='%s', ", desc) or ""
         log.warn(string.format("act:concat - operand is not a string or number: op='&', %svalue=%s",
             operand, arith_value_text(v)))
     end
-    return nil
-end
-
---- 文字列の二項連結（連結式の生成コードが呼ぶ）
---- 両方が文字列か数値なら区切りなしでつないだ文字列、どちらかがそうでなければ nil。
---- メタメソッドは呼ばない。act の状態は読み書きしない
---- @param self Act アクションオブジェクト（未使用）
---- @param lhs any 左の被演算子
---- @param rhs any 右の被演算子
---- @param lhs_desc string|nil 左の説明（警告用）
---- @param rhs_desc string|nil 右の説明（警告用）
---- @return string|nil 連結結果
-function ACT_IMPL.concat(self, lhs, rhs, lhs_desc, rhs_desc) -- luacheck: ignore 212/self
-    local a = concat_operand(lhs, lhs_desc)
-    local b = concat_operand(rhs, rhs_desc)
-    if a == nil or b == nil then
-        return nil
-    end
-    return a .. b
+    return ""
 end
 
 --- トークン取得とリセット（グループ化・統合済み）
@@ -683,7 +635,7 @@ end
 ---
 --- 空でない文字列（"nil" を含む）はそのまま、数値は tostring。それ以外（nil・空文字列・真偽値・表など）は
 --- 警告（var_path があれば WORD.dynamic_key と同じ文言、なければ被演算子の表記。値 nil で説明もなければ
---- 内側の演算が警告済みとして黙る）と失敗表記を出し、「呼ばない」印を返す。
+--- 黙る。手書きの Lua から nil を渡したときだけ起きる）と失敗表記を出し、「呼ばない」印を返す。
 --- @param self Act アクションオブジェクト
 --- @param value any 動的コールの式の値（生値）
 --- @param var_path string|nil 式が変数参照 1 つのときの Lua パス（"var.x" / "save.x" / "args[1]"）

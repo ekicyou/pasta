@@ -188,8 +188,8 @@ fn test_concat_line_maps_to_its_pasta_line_like_arith() {
             .map(|(_, span)| span.start_line)
             .collect()
     };
-    assert_eq!(pasta_line_of("var.x = act:arith("), vec![2]);
-    assert_eq!(pasta_line_of("var.y = act:concat("), vec![3]);
+    assert_eq!(pasta_line_of("var.x = (PASTA.num("), vec![2]);
+    assert_eq!(pasta_line_of("var.y = ((\"合計\" .. PASTA.str("), vec![3]);
     assert_eq!(pasta_line_of("act:call("), vec![4]);
 }
 

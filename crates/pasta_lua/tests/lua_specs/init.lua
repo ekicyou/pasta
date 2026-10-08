@@ -63,7 +63,7 @@ local specs = {
     "act_dynamic_ref_test",               -- 動的参照のキー解決・警告テスト (dynamic-word-reference 2.1)
     "act_runtime_safety_test",            -- 生成コードが呼ぶ存在確認付き act メソッドのテスト (dsl-codegen-runtime-safety 1.1)
     "actor_proxy_act_delegation_test",    -- プロキシが呼ぶ関数の第 1 引数（置き場所で決まる）と戻り値の正規化テスト (actor-proxy-act-delegation 1.2)
-    "act_concat_test",                    -- act:concat 文字列と数値の連結・警告＋値なし・伝播テスト (string-concat-operator 3)
+    "act_concat_test",                    -- PASTA.str 連結の被演算子の文字列化・警告テスト (expr-nil-coercion 1.2)
     "act_call_restore_test",              -- 途中の Call の文脈復元・失敗表記テスト (call-execution-correctness 2.1)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",

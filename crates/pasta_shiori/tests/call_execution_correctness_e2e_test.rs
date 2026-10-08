@@ -30,38 +30,45 @@ fn run_with_extra_dic(extra_dic: Option<&str>, requests: &[&str]) -> (Vec<String
     if let Some(extra) = extra_dic {
         std::fs::write(temp.path().join("dic/extra.pasta"), extra).expect("write extra dic");
     }
-    let values = {
-        let mut shiori = PastaShiori::default();
-        assert!(
-            shiori
-                .load(0, temp.path().as_os_str())
-                .expect("SHIORI load should not error"),
-            "SHIORI load should return true"
-        );
-        requests
-            .iter()
-            .map(|headers| {
-                let raw = shiori
-                    .request(format!(
-                        "GET SHIORI/3.0\r\nCharset: UTF-8\r\nSender: SSP\r\n{headers}\r\n\r\n"
-                    ))
-                    .expect("request should succeed");
-                let resp = ShioriResponse::parse(&raw).expect("response should parse");
-                if resp.status_code == 204 {
-                    return String::new();
-                }
-                assert_eq!(
-                    resp.status_code, 200,
-                    "{headers} must not be 500: {} {:?}",
-                    resp.status_text, resp.value
-                );
-                resp.value.expect("Value header must exist")
-            })
-            .collect()
-    };
-    let log = std::fs::read_to_string(temp.path().join("profile/pasta/logs/pasta.log"))
-        .unwrap_or_default();
-    (values, log)
+    let values = load_and_request(temp.path(), requests);
+    (values, read_log(temp.path()))
+}
+
+/// ゴーストのフォルダ `dir` を読み込み、順にリクエストを送って各応答の Value を返し、ゴーストを破棄する
+/// （破棄で永続化データが保存される）。応答の扱いは `run` と同じ。
+fn load_and_request(dir: &std::path::Path, requests: &[&str]) -> Vec<String> {
+    let mut shiori = PastaShiori::default();
+    assert!(
+        shiori
+            .load(0, dir.as_os_str())
+            .expect("SHIORI load should not error"),
+        "SHIORI load should return true"
+    );
+    requests
+        .iter()
+        .map(|headers| {
+            let raw = shiori
+                .request(format!(
+                    "GET SHIORI/3.0\r\nCharset: UTF-8\r\nSender: SSP\r\n{headers}\r\n\r\n"
+                ))
+                .expect("request should succeed");
+            let resp = ShioriResponse::parse(&raw).expect("response should parse");
+            if resp.status_code == 204 {
+                return String::new();
+            }
+            assert_eq!(
+                resp.status_code, 200,
+                "{headers} must not be 500: {} {:?}",
+                resp.status_text, resp.value
+            );
+            resp.value.expect("Value header must exist")
+        })
+        .collect()
+}
+
+/// ゴーストのログファイルの中身（ゴーストを破棄した後に読む）
+fn read_log(dir: &std::path::Path) -> String {
+    std::fs::read_to_string(dir.join("profile/pasta/logs/pasta.log")).unwrap_or_default()
 }
 
 /// イベント ID 1 つを送り、応答の Value とログを返す
@@ -487,15 +494,14 @@ fn test_failed_call_function_returning_nothing() {
     );
 }
 
-/// 5.6: `＞＄未代入＆「x」` は連結の警告 1 件だけで、Call の警告を重ねない
+/// 5.6（expr-nil-coercion 5.3）: `＞＄未代入＆「x」` は連結の nil を空文字列とみなした結果 `x` を探し、
+/// 見つからないので「見つからない」の失敗表記と警告 1 件を出し、次の行を呼び出し元で解決する
 #[test]
 fn test_failed_call_concat_with_nil_operand() {
     assert_failed_call(
         "OnFcConcatMid",
-        r"\p[0]前【Call失敗：値が nil】後元\e",
-        &[
-            "act:concat - operand is not a string or number: op='&', operand='var.未代入', value=nil",
-        ],
+        r"\p[0]前【Call失敗：「x」が見つからない】後元\e",
+        &["act:call - handler not found: key='x', mode='scene', via=act"],
     );
 }
 
@@ -567,5 +573,97 @@ fn test_failed_call_scene_not_found() {
             "act:call - handler not found: key='どこにも無いシーン', mode='scene', via=act",
             "act:call - handler not found: key='どこにも無い動的先', mode='scene', via=act",
         ],
+    );
+}
+
+// ---------------------------------------------------------------------------
+// 式の中の nil（expr-nil-coercion tasks 3.2）
+// 辞書: dic/expr_nil.pasta。算術の nil は 0、連結の nil は空文字列として、作例・再起動・Call の
+// ターゲットを SHIORI 経由で確かめる。演算子の無いターゲット（変数 1 つ・関数呼び出し 1 つ）は不変。
+// ---------------------------------------------------------------------------
+
+/// 仮想ディスパッチャの OnTalk の機会（X-Pasta-Time で時刻を固定した OnSecondChange）。
+/// `＊会話` は OnTalk の既定の別名（scene-name-alias）なので、入門ガイドと同じ経路で発火する。
+fn talk_chance(time: &str) -> String {
+    format!("ID: OnSecondChange\r\nStatus: idle\r\nReference0: 1\r\nX-Pasta-Time: {time}")
+}
+
+/// 6.5: 入門ガイドの回数の作例（`＄＊回数＝＄＊回数＋１`、初期化行も Lua も無し）が、OnTalk の
+/// 機会の 1 回目に 1、2 回目に 2 と話し、ログに警告が無い
+#[test]
+fn test_counter_example_counts_from_one_without_warning() {
+    let (values, log) = run(&[
+        // 次回トーク時刻を決めるだけ（話すことは無いので 204）
+        &talk_chance("2025-07-15T12:05:00Z"),
+        &talk_chance("2025-07-15T12:05:10Z"),
+        &talk_chance("2025-07-15T12:05:20Z"),
+    ]);
+    assert_eq!(
+        values,
+        [
+            "",
+            r"\p[0]この話をするのは1回目ですね\e",
+            r"\p[0]この話をするのは2回目ですね\e",
+        ]
+    );
+    assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
+}
+
+/// 1.7: 同じフォルダで読み込み → 2 回話す → 破棄（保存）→ 再読み込み → 話すで、保存された値から
+/// 数え続けて 3 と話す
+#[test]
+fn test_counter_continues_after_restart() {
+    let temp = copy_fixture_to_temp("call_execution_correctness");
+    load_and_request(
+        temp.path(),
+        &[
+            &talk_chance("2025-07-15T12:05:00Z"),
+            &talk_chance("2025-07-15T12:05:10Z"),
+            &talk_chance("2025-07-15T12:05:20Z"),
+        ],
+    );
+    let values = load_and_request(
+        temp.path(),
+        &[
+            &talk_chance("2025-07-15T12:06:00Z"),
+            &talk_chance("2025-07-15T12:06:10Z"),
+        ],
+    );
+    assert_eq!(values, ["", r"\p[0]この話をするのは3回目ですね\e"]);
+}
+
+/// 5.3: `＞＄時間帯＆「の挨拶」`（`＄時間帯` は未代入）は連結の結果 `の挨拶` を探して `＊の挨拶` を呼ぶ
+#[test]
+fn test_call_concat_target_with_nil_operand_searches_result() {
+    assert_failed_call("OnEnConcatTarget", r"\p[0]前挨拶後\e", &[]);
+}
+
+/// 5.4: `＞＄未代入＆＄未代入２` は連結の結果が空文字列なので、従来どおり空文字列の失敗表記と警告 1 件
+#[test]
+fn test_call_concat_target_empty_result_fails_as_empty_string() {
+    assert_failed_call(
+        "OnEnConcatEmpty",
+        r"\p[0]前【Call失敗：値が空文字列】後\e",
+        &["act:call - key is not a string or number: value='' (string)"],
+    );
+}
+
+/// 5.2: ターゲットが変数 1 つ（`＞＄未代入`）で nil なら、従来どおりの警告と失敗表記
+#[test]
+fn test_call_lone_variable_target_nil_unchanged() {
+    assert_failed_call(
+        "OnEnVarTarget",
+        r"\p[0]前【Call失敗：var.未代入 が nil】後\e",
+        &["act:call - undefined variable: 'var.未代入'"],
+    );
+}
+
+/// 5.2: ターゲットが関数呼び出し 1 つ（`＞＠何も返さない（）`）で nil なら、従来どおりの警告と失敗表記
+#[test]
+fn test_call_lone_function_target_nil_unchanged() {
+    assert_failed_call(
+        "OnEnFnTarget",
+        r"\p[0]前【Call失敗：@何も返さない() が nil】後\e",
+        &["act:call - key is not a string or number: operand='@何も返さない()', value=nil"],
     );
 }
