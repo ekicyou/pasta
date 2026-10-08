@@ -118,3 +118,4 @@
 - 4.1: 全体検索で設計の一覧に無い古い記述が 2 か所見つかった。`TEST_COVERAGE.md` の連結の行は 4.1 で直し、`book/src/lua/patterns.md` の act のメソッドの例（`arith`・`concat`）は 5.3 の持ち場に足した。
 - 3.2: E2E の新しいシーンは、設計の `codegen_runtime_safety` 側ではなく `call_execution_correctness` の fixture に新設した `dic/expr_nil.pasta` に置いた（再起動のテストで同じフォルダを 2 回読み込む補助がこちらにあるため）。5.3 で internal-modules.md の見出しが変わったため、`registry-search.md`・`talk-output.md` のアンカーを 1 か所ずつ直した。
 - 最終検証（kiro-validate-impl）: GO。要件 3.3 の `＠未定義（）＋１`・`「a」＆＠未定義（）`（呼び出しの時点の `act:expr_fn - handler not found` だけで 1・`a`）を `runtime_safety_test` に足した。OnTalk の別名が入ったら、回数の作例を OnTalk→`＊会話` の経路でも固定し直すこと（現在はイベント ID `会話` のフォールバックで確かめている）。`failure-output-unification` の brief に前提の変化を申し送った。
+- 完了時にその場で解決: main に入った scene-name-alias で `＊会話` が OnTalk の既定の別名になったため、回数の作例の E2E（6.5・1.7）を、イベント ID `会話` のフォールバックから OnTalk の機会（X-Pasta-Time を固定した OnSecondChange）で発火する形に改め、入門ガイドと同じ経路で固定した。

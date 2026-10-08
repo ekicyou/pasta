@@ -582,14 +582,26 @@ fn test_failed_call_scene_not_found() {
 // ターゲットを SHIORI 経由で確かめる。演算子の無いターゲット（変数 1 つ・関数呼び出し 1 つ）は不変。
 // ---------------------------------------------------------------------------
 
-/// 6.5: 入門ガイドの回数の作例（`＄＊回数＝＄＊回数＋１`、初期化行も Lua も無し）が 1 回目に 1、
-/// 2 回目に 2 と話し、ログに警告が無い
+/// 仮想ディスパッチャの OnTalk の機会（X-Pasta-Time で時刻を固定した OnSecondChange）。
+/// `＊会話` は OnTalk の既定の別名（scene-name-alias）なので、入門ガイドと同じ経路で発火する。
+fn talk_chance(time: &str) -> String {
+    format!("ID: OnSecondChange\r\nStatus: idle\r\nReference0: 1\r\nX-Pasta-Time: {time}")
+}
+
+/// 6.5: 入門ガイドの回数の作例（`＄＊回数＝＄＊回数＋１`、初期化行も Lua も無し）が、OnTalk の
+/// 機会の 1 回目に 1、2 回目に 2 と話し、ログに警告が無い
 #[test]
 fn test_counter_example_counts_from_one_without_warning() {
-    let (values, log) = run(&["ID: 会話", "ID: 会話"]);
+    let (values, log) = run(&[
+        // 次回トーク時刻を決めるだけ（話すことは無いので 204）
+        &talk_chance("2025-07-15T12:05:00Z"),
+        &talk_chance("2025-07-15T12:05:10Z"),
+        &talk_chance("2025-07-15T12:05:20Z"),
+    ]);
     assert_eq!(
         values,
         [
+            "",
             r"\p[0]この話をするのは1回目ですね\e",
             r"\p[0]この話をするのは2回目ですね\e",
         ]
@@ -597,14 +609,27 @@ fn test_counter_example_counts_from_one_without_warning() {
     assert!(lua_warnings(&log).is_empty(), "no warning expected:\n{log}");
 }
 
-/// 1.7: 同じフォルダで読み込み → 2 回発火 → 破棄（保存）→ 再読み込み → 発火で、保存された値から
+/// 1.7: 同じフォルダで読み込み → 2 回話す → 破棄（保存）→ 再読み込み → 話すで、保存された値から
 /// 数え続けて 3 と話す
 #[test]
 fn test_counter_continues_after_restart() {
     let temp = copy_fixture_to_temp("call_execution_correctness");
-    load_and_request(temp.path(), &["ID: 会話", "ID: 会話"]);
-    let values = load_and_request(temp.path(), &["ID: 会話"]);
-    assert_eq!(values, [r"\p[0]この話をするのは3回目ですね\e"]);
+    load_and_request(
+        temp.path(),
+        &[
+            &talk_chance("2025-07-15T12:05:00Z"),
+            &talk_chance("2025-07-15T12:05:10Z"),
+            &talk_chance("2025-07-15T12:05:20Z"),
+        ],
+    );
+    let values = load_and_request(
+        temp.path(),
+        &[
+            &talk_chance("2025-07-15T12:06:00Z"),
+            &talk_chance("2025-07-15T12:06:10Z"),
+        ],
+    );
+    assert_eq!(values, ["", r"\p[0]この話をするのは3回目ですね\e"]);
 }
 
 /// 5.3: `＞＄時間帯＆「の挨拶」`（`＄時間帯` は未代入）は連結の結果 `の挨拶` を探して `＊の挨拶` を呼ぶ
