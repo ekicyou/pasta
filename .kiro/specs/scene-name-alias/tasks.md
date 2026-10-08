@@ -86,7 +86,7 @@
   - _Boundary: Tests (search)_
   - _Depends: 5_
 
-- [ ] 6.3 (P) pasta.toml の別名表だけを変えて読み直すキャッシュの結合テスト
+- [x] 6.3 (P) pasta.toml の別名表だけを変えて読み直すキャッシュの結合テスト
   - `.pasta` を触らずに pasta.toml を「既定 → 空の `[scene.alias]` → 削除」と変えて読み直し、各段で登録名（`OnTalk_1` → `会話_1` → `OnTalk_1`）と `SEARCH:search_scene` の結果の両方が切り替わることを確かめる
   - 各段でキャッシュのマーカーが新しい指紋に更新されていることを確かめる
   - PASTA_DEBUG 中和のガードを入れ、ローダーのテスト群に登録した新テストが通る

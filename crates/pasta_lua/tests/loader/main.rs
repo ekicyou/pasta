@@ -14,6 +14,7 @@ mod config_test;
 mod lifecycle_test;
 mod lua_passthrough_test;
 mod path_robustness_test;
+mod scene_alias_cache_test;
 mod scene_alias_wiring_test;
 mod startup_fatal_test;
 mod startup_test;
