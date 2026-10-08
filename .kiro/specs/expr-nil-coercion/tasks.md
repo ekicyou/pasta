@@ -116,3 +116,5 @@
 - 3.1: 赤の記録 — 現行の生成形で `runtime_safety_test` の新しい 4 件（nil の出どころ・演算子の左右・式の位置・入れ子と変換できない値）が値 nil で失敗（transpiler 139 成功・4 失敗、他ターゲットは全緑）。変えない規則の 1 件は緑。ログの差し込みは `@pasta_log` の表をその場で書き換える形（先にロード済みの `pasta.word` の警告も拾うため）。
 - 3.2: 赤の記録 — `call_execution_correctness_e2e_test` の新しい 4 件（回数 1→2・再起動で 3・`＞＄時間帯＆「の挨拶」`・空文字列の失敗表記）が値なしで失敗（38 成功・4 失敗）。単独の変数・関数ターゲットの 2 件は緑。`＊会話` は OnTalk の別名が未実装のためイベント ID `会話` のフォールバックで起動。話者は登録済みの `さくら`（design.md の `女の子` は未登録アクターの警告が出るため）。
 - 4.1: 全体検索で設計の一覧に無い古い記述が 2 か所見つかった。`TEST_COVERAGE.md` の連結の行は 4.1 で直し、`book/src/lua/patterns.md` の act のメソッドの例（`arith`・`concat`）は 5.3 の持ち場に足した。
+- 3.2: E2E の新しいシーンは、設計の `codegen_runtime_safety` 側ではなく `call_execution_correctness` の fixture に新設した `dic/expr_nil.pasta` に置いた（再起動のテストで同じフォルダを 2 回読み込む補助がこちらにあるため）。5.3 で internal-modules.md の見出しが変わったため、`registry-search.md`・`talk-output.md` のアンカーを 1 か所ずつ直した。
+- 最終検証（kiro-validate-impl）: GO。要件 3.3 の `＠未定義（）＋１`・`「a」＆＠未定義（）`（呼び出しの時点の `act:expr_fn - handler not found` だけで 1・`a`）を `runtime_safety_test` に足した。OnTalk の別名が入ったら、回数の作例を OnTalk→`＊会話` の経路でも固定し直すこと（現在はイベント ID `会話` のフォールバックで確かめている）。`failure-output-unification` の brief に前提の変化を申し送った。

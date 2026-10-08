@@ -380,6 +380,7 @@ end
 　＄a5＝＠＊未定義（）＋１
 　＄a6＝＠＄未代入（）＋１
 　＄a7＝＄値なし＋１
+　＄a9＝＠未定義（）＋１
 　＄c1＝「a」＆＄未代入
 　＄c2＝「a」＆＄＊未代入nil
 　＄c3＝「a」＆＄ｒ０
@@ -387,6 +388,7 @@ end
 　＄c5＝「a」＆＠＊未定義（）
 　＄c6＝「a」＆＠＄未代入（）
 　＄c7＝「a」＆＄値なし
+　＄c9＝「a」＆＠未定義（）
 　＞引数なし
 
 　・引数なし
@@ -398,13 +400,27 @@ end
     assert_eq!(
         vars(
             &lua,
-            &["値なし", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8"]
+            &[
+                "値なし",
+                "a1",
+                "a2",
+                "a3",
+                "a4",
+                "a5",
+                "a6",
+                "a7",
+                "a8",
+                "a9"
+            ]
         ),
-        "値なし=nil a1=1 a2=1 a3=1 a4=1 a5=1 a6=1 a7=1 a8=1"
+        "値なし=nil a1=1 a2=1 a3=1 a4=1 a5=1 a6=1 a7=1 a8=1 a9=1"
     );
     assert_eq!(
-        vars(&lua, &["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"]),
-        "c1='a' c2='a' c3='a' c4='a' c5='a' c6='a' c7='a' c8='a'"
+        vars(
+            &lua,
+            &["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9"]
+        ),
+        "c1='a' c2='a' c3='a' c4='a' c5='a' c6='a' c7='a' c8='a' c9='a'"
     );
     // 見つからない関数・未代入の変数での動的呼び出しは、呼び出しの時点の既存の警告だけ（3.3）
     assert_eq!(
@@ -412,8 +428,10 @@ end
         [
             "warn|act:global_fn - function not found: key='未定義'",
             "warn|act:expr_fn - undefined variable: 'var.未代入'",
+            "warn|act:expr_fn - handler not found: key='未定義', mode='expr', via=act",
             "warn|act:global_fn - function not found: key='未定義'",
             "warn|act:expr_fn - undefined variable: 'var.未代入'",
+            "warn|act:expr_fn - handler not found: key='未定義', mode='expr', via=act",
         ]
     );
 }
