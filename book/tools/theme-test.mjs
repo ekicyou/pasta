@@ -28,6 +28,7 @@
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { SPEAKERS } from './talk/talk.mjs';
 
 export const CSS_PATH = fileURLToPath(new URL('../theme/claudia.css', import.meta.url));
 export const MIN_CONTRAST = 4.5;
@@ -58,12 +59,15 @@ export const HL_TOKENS = [
   '--claudia-hl-string', '--claudia-hl-title', '--claudia-hl-keyword',
 ];
 
+// 話し手ごとのトークン（「テーマトークン契約」）。話し手は登録簿（talk.mjs の SPEAKERS）から組み立てる。
+const SPEAKER_IDS = SPEAKERS.map((s) => s.id);
+export const SPEAKER_TOKENS = SPEAKER_IDS.flatMap((id) => ['ink', 'face', 'ring', 'name'].map((k) => `--talk-${id}-${k}`));
+
 // 「テーマトークン契約」の Claudia のトークン
 export const CLAUDIA_TOKENS = [
   '--claudia-paper', '--claudia-ink', '--claudia-ink2', '--claudia-paper2', '--claudia-edge',
   '--claudia-accent', '--claudia-gold', '--claudia-wax', '--claudia-code-bg', '--talk-bubble',
-  '--talk-claudia-ink', '--talk-claudia-face', '--talk-claudia-ring', '--talk-claudia-name',
-  '--talk-anthony-ink', '--talk-anthony-face', '--talk-anthony-ring', '--talk-anthony-name',
+  ...SPEAKER_TOKENS,
   ...HL_TOKENS,
 ];
 
@@ -76,10 +80,7 @@ export const CONTRAST_PAIRS = [
   ['--links', '--bg'],
   ['--links', '--claudia-paper2'],
   ['--claudia-ink2', '--bg'],
-  ['--talk-claudia-ink', '--talk-bubble'],
-  ['--talk-claudia-name', '--talk-bubble'],
-  ['--talk-anthony-ink', '--talk-bubble'],
-  ['--talk-anthony-name', '--talk-bubble'],
+  ...SPEAKER_IDS.flatMap((id) => [[`--talk-${id}-ink`, '--talk-bubble'], [`--talk-${id}-name`, '--talk-bubble']]),
   // 吹き出し・扉・パート案内のカードに載る文字（タスク 2.4。リンク・案内の文字・欧文添え字）
   ['--links', '--talk-bubble'],
   ['--claudia-ink', '--talk-bubble'],
@@ -193,14 +194,12 @@ export const HLJS_GROUPS = {
 export const HLJS_SCOPES = ['.light', '.navy', 'html:not(.js)'];
 
 // 出力 HTML 契約（design「データモデル / 出力 HTML 契約」）の台詞部品のクラス
-export const TALK_CLASSES = ['talk', 'talk-claudia', 'talk-anthony', 'talk-left', 'talk-right',
+export const TALK_CLASSES = ['talk', ...SPEAKER_IDS.map((id) => `talk-${id}`), 'talk-left', 'talk-right',
   'talk-face', 'talk-bubble', 'talk-name'];
 // 扉とクレジットのクラス契約（タスク 2.4 で決め、タスク 5.1 の introduction.md が使う）
 export const HERO_CLASSES = ['claudia-hero', 'hero-corner', 'hero-corner-tl', 'hero-corner-tr',
   'hero-corner-bl', 'hero-corner-br', 'hero-latin', 'hero-faces', 'hero-face', 'hero-face-anthony',
   'hero-toc', 'claudia-credit'];
-// 話し手ごとのトークン（「テーマトークン契約」）
-export const SPEAKER_TOKENS = ['claudia', 'anthony'].flatMap((id) => ['ink', 'face', 'ring', 'name'].map((k) => `--talk-${id}-${k}`));
 // 印刷で light の値に置き換える範囲（mdBook はテーマのクラスを html に付ける。JS 無効時は html:not(.js)）
 export const PRINT_SCOPES = ['html.light', 'html.navy', 'html.rust', 'html.coal', 'html.ayu', 'html:not(.js)'];
 

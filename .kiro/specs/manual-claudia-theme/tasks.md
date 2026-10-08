@@ -422,3 +422,4 @@
 - 6.2: ブラウザ確認 9 項目すべて PASS（CSS の修正なし）。rust の引用の中のリンク（対比 2.69）と ayu の Lua コメント（2.88）は mdBook 既定の配色のままで、旧版でも同じ値（要件 2.4 により対象外）。組み込みブラウザの read_page は aria-hidden を反映しないので、読み上げの構造は Edge のアクセシビリティツリーで判定した。
 - 検証（validate-impl, GO）: 残した既知の点。Markdown 側の scanTalk は `>  > 【`・`> - > 【`・`1. - > 【` を台詞と認めず（QUOTE_RE が 1 つのリスト記号と 1 つの空白しか許さない）、ビルド時に talk-html の入れ子検出で exit 1（元の行番号は出ない）。`> - 【素】…` はどの道具も台詞と見なさず普通の引用として出る。theme-test の SPEAKER_TOKENS・TALK_CLASSES は登録簿から組み立てていない。完了時（kiro-complete）に steering の structure.md へ claudia.css・claudia.js・book/tools/talk/ を足し、main の tech.md の変更と合わせること。
 - 完了時にその場で解決: scanTalk の入れ子の台詞の取りこぼし（`>  > 【`・`> - > 【`・`1. - > 【`・`> - 【`）を PREFIX_RE で拾い、nested-talk と gen-skill-refs の talk-in-body の両方で止めるようにした（talk-test G-22〜G-24）。
+- 完了時にその場で解決: theme-test の話し手のトークン・対比の組・台詞のクラスを、登録簿（talk.mjs の SPEAKERS）から組み立てるようにした（話し手を足すと、その配色も自動で対比の検査にかかる）。
