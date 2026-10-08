@@ -202,6 +202,25 @@ For tasks that add or change behavior, enforce RED → GREEN with a feature flag
 
 **Skip this protocol for**: refactoring, configuration, documentation, or tasks with no behavioral change.
 
+## Coordination with kiro-watch (only when the coordinator is running)
+
+When a session titled **kiro-watch** (not archived) appears in the session list (`mcp__ccd_session_mgmt__list_sessions`), this session takes part in its desk coordination (developer, 2026-10-08). If there is no such session, skip this whole section. Send to its `local_...` id with SendMessage (or `mcp__ccd_session_mgmt__send_message`). Message texts stay in Japanese exactly as below; `repo:` is always `pasta`.
+
+- **Join** once at the start of the run (Step 1, Preflight), before dispatching the first task — in both autonomous and manual mode:
+  ```
+  【kiro-watch】参加します
+  repo: pasta
+  ```
+- **Load tests**: before any step that needs the machine to itself (a quiet-CPU measurement, a deliberate CPU-load reproduction, a timing benchmark), request the load-test desk and do not start that step until "どうぞ" arrives. The ordinary `cargo test` / `cargo clippy` runs of a task are NOT load tests and need no request:
+  ```
+  【kiro-watch】テストしたい
+  repo: pasta
+  内容: <what will run and roughly how long>
+  ```
+  While waiting, continue with tasks that do not need the desk; if none remain, report "waiting for kiro-watch" and end the turn. When the measurement is done, send `【kiro-watch】済みました` at once — every other participant is stopped until then.
+- **Stop requests**: when kiro-watch asks this session to stop, finish the current task iteration through its commit (implementer → review → verify → mark `[x]` → commit). Never cut a running test or a subagent in the middle. Then send `【kiro-watch】停止しました`, report "stopped for kiro-watch" to the developer and end the turn. Continue from the next task only when `再開してよい` (or the cancel message) arrives. Do not start Step 4 (final validation, full `cargo test --all`) while stopped.
+- **Leaving without completing** (the run is abandoned or ends BLOCKED): send `【kiro-watch】抜けます`. Completion itself is coordinated by `/kiro-complete` (merge desk), which also ends the participation.
+
 ## Critical Constraints
 - **Strict Handoff Parsing**: Never infer implementer `STATUS` or reviewer `VERDICT` from surrounding prose; only the exact structured fields count
 - **No Destructive Reset**: Never use `git checkout .`, `git reset --hard`, or similar destructive rollback inside the implementation loop
