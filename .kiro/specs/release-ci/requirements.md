@@ -213,6 +213,7 @@
 7. The 手順書 shall セットアップが済んだことを、公開を行わずに確かめる方法を示す（確かめ方の具体は設計で決める。マネージド ID の Marketplace の profile ID を表示する役目も持たせる。research.md「一回限りのセットアップの進み具合」）。
 8. The 手順書 shall 新しいクレートを追加したときの初回の公開は手で行い、その後に Trusted Publisher を設定する必要があることを示す。
 9. The 手順書 shall リリース CI のワークフローの外に置き、リリースのたびに実行するものではないことを明記する。
+10. The 手順書 shall 初回のリリース CI が成功した後の必須の手順として、次の 3 つを示す。(1) 公開対象の 5 クレートそれぞれで crates.io の「Trusted Publishing のみ」の設定を有効にし、トークンでの公開を拒む。(2) 開発機の `CARGO_REGISTRY_TOKEN` を crates.io で失効させる。(3) `VSCE_PAT` を Azure DevOps で失効させる。あわせて、緊急のときは owner が「Trusted Publishing のみ」の設定を無効に戻せることを記す。
 
 ### Requirement 12: リリース手順の文書の更新
 
@@ -243,4 +244,4 @@
 10. **→ 設計へ**: 置き場所は設計で決める。<br>旧: **手順書の置き場所**（R11）: 一回限りのセットアップの手順書をどこに置くか（`crates/pasta_sample_ghost/RELEASE.md` の一節・リポジトリの開発者向け文書・spec 配下など）。仮定: 設計で決める。
 11. ~~**手元のスクリプトの扱い**~~ → **確定（自明修正）**: 残す。成果物の生成は `release.ps1` を CI からも呼ぶ形で流用するため（research.md Option C）。<br>旧: **手元のスクリプトの扱い**（R12.3）: `release.ps1`・`release.bat` を、CI が使う部品として残しつつ手元での動作確認用にも残すか。仮定: 残す。
 12. ~~**Marketplace の新しい OIDC 公開**~~ → **確定（議題 1）**: Entra ID のワークロード ID 連携を本線にする（R5・R9.2・R11 は今のまま）。`--oidc` は preview で Marketplace 側の手順書も無いため、本仕様では採らない。正式に提供されたら、その時に乗り換えを検討する。2 本の経路を並べて持つことはしない。<br>旧: **Marketplace の新しい OIDC 公開（`vsce publish --oidc`）**（R5・R9.2・R11）: brief の確定後の調査で、vsce に Marketplace 自身の Trusted Publishing（GitHub の OIDC トークンを Marketplace のセッショントークンに交換。Azure のサブスクリプションが要らない）が隠しオプションとして入ったことが分かった（PR microsoft/vscode-vsce#1291、2026-07 マージ、2026-09 に契約確定のコミット）。ただし preview 扱いで、Marketplace 側の設定の手順書が見当たらない。brief どおり Entra ID のワークロード ID 連携で進めるか、OIDC 公開を本線または予備にするか。仮定: brief どおり Entra ID で進め、OIDC 公開は設計で再評価する。
-13. **crates.io の「Trusted Publishing のみ」設定**（R9・R11）: crates.io にはクレートごとにトークンでの公開を拒む設定（`trustpub_only`）がある。手順書で、セットアップの確認後にこれを有効にする手順を必須にするか。有効にすると、新しいクレートの初回公開（手で行う）以外の手作業の公開ができなくなる。仮定: 任意の手順として載せる。
+13. ~~**crates.io の「Trusted Publishing のみ」設定**~~ → **確定（議題 7）**: 必須の手順にする。ただし有効にするのは、初回のリリース CI が成功した後とする。あわせて手元のトークン（`CARGO_REGISTRY_TOKEN`・`VSCE_PAT`）を失効させる（R11.10）。<br>旧: **crates.io の「Trusted Publishing のみ」設定**（R9・R11）: crates.io にはクレートごとにトークンでの公開を拒む設定（`trustpub_only`）がある。手順書で、セットアップの確認後にこれを有効にする手順を必須にするか。有効にすると、新しいクレートの初回公開（手で行う）以外の手作業の公開ができなくなる。仮定: 任意の手順として載せる。
