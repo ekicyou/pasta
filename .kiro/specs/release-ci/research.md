@@ -182,6 +182,7 @@
 - Marketplace の公開を、Trusted Publishing のトークンの期限から切り離す（別 job）。
 - publish-vsce の job には environment を必ず付ける（マネージド ID のフェデレーション資格情報の subject を固定するため。2.6）。publish-crates も同じ environment に属させ、crates.io の Trusted Publisher の設定に environment 名を入れる。
 - GitHub Release は「下書き → 添付 → 公開」の順で作り、Immutable Releases を有効にしても添付漏れの Release が公開されないようにする。
+- GitHub Release は配布物が欠けたまま公開状態で残さない（requirements R6.5）。作成の順序と、再実行で残った下書きから続ける方法は設計で決める（未決事項 8）。
 - リリースノートの「前のタグ」は、リリースタグより前の最新のリリースタグとして求める（`--sort=-version:refname` でリリースタグ自身を除く）。
 
 ### 要調査（Research Needed）
@@ -196,7 +197,8 @@
 6. **windows-latest（VS 2026 イメージ）**: `npm ci` の native addon（`keytar`・`@vscode/vsce-sign`）、`wasm-pack`・`cargo-about` の導入（版固定のバイナリ取得か `cargo install --locked` か）。退避先 `windows-2022` の提供期限。
 7. **実行ポリシー**: ランナー上で `powershell -File`（5.1）による `build-wasm.ps1` の呼び出しが通るか（開発機では AllSigned で失敗する既知の問題）。
 8. **公開を伴わないセットアップの確認**（R11.7）: crates.io のトークン交換だけを試す、`az rest .../profiles/me` で Marketplace 用の ID が引けることを確かめる、など。
-9. **リポジトリの公開範囲**: environment の保護規則は Free プランでは public リポジトリだけで使える。このリポジトリが public であることの確認。
+9. ~~**リポジトリの公開範囲**~~ → 解消（2026-10-08 要件ディスカッション）: `gh repo view` で `PUBLIC` を確認。environment の保護規則は使える。
+10. **一回限りのセットアップの手順書の置き場所**（requirements 未決事項 10）: `crates/pasta_sample_ghost/RELEASE.md` の一節・リポジトリの開発者向け文書・spec 配下などから選ぶ。
 
 ### 他 spec との接点
 

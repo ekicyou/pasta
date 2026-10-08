@@ -67,7 +67,7 @@
 #### Acceptance Criteria
 
 1. When リリースタグがリポジトリへ push されたとき, the Release CI shall そのタグのコミットを対象にリリースを開始する。
-2. When リリースタグの形に合わないタグ（例: `v0.3`・`test-1`。`v1.0.0-rc.1` のようなプレリリースの形を含む）が push されたとき, the Release CI shall リリースを開始しない（【仮定】プレリリースの版は扱わない。未決事項 1）。
+2. When リリースタグの形に合わないタグ（例: `v0.3`・`test-1`。`v1.0.0-rc.1` のようなプレリリースの形を含む）が push されたとき, the Release CI shall リリースを開始しない（プレリリースの版は扱わない。brief の `vX.Y.Z` のとおり）。
 3. When ブランチへの push や PR が行われたとき, the Release CI shall 起動しない。
 4. While あるリリースタグのリリースが実行中であるとき, the Release CI shall 同じタグのリリースをもう 1 つ並行して走らせない。
 5. The Release CI shall リポジトリへコミット・ブランチ・タグを書き戻さない（GitHub Release の作成に伴うものを除く）。
@@ -80,7 +80,7 @@
 
 1. When リリースが開始されたとき, the Release CI shall どの公開先への公開よりも先に、本要件の検査をすべて行う。
 2. If リリースタグの版（先頭の `v` を除いた部分）が、タグのコミットのワークスペースの版と一致しないとき, the Release CI shall 公開を一切行わずに失敗し、タグの版とワークスペースの版の両方を示す。
-3. If タグのコミットの VSCode 拡張の版（`editors/vscode/package.json`）がリリースタグの版と一致しないとき, the Release CI shall 公開を一切行わずに失敗し、食い違う版を示す（【仮定】brief はワークスペースの版だけを挙げる。拡張の版も検査に含める。未決事項 2）。
+3. If タグのコミットの VSCode 拡張の版（`editors/vscode/package.json`）がリリースタグの版と一致しないとき, the Release CI shall 公開を一切行わずに失敗し、食い違う版を示す（Marketplace にタグと食い違った版が出るのを防ぐため）。
 4. If タグのコミットがリポジトリの main ブランチから到達できないとき, the Release CI shall 公開を一切行わずに失敗し、その理由を示す。
 5. When 版と到達性の検査が通ったとき, the Release CI shall タグのコミットそのもので、全テストと lint（警告をエラーとして扱う）を、`build.yml` と同じツールチェーン構成と日本語ロケールで実行する。
 6. The Release CI shall テストと lint を、`build.yml` が PR・main で実行するのと同じターゲット（x86・x64）で実行する（【仮定】依存の監査・Lua の静的解析・WASM ビルドの検査をこの関門に含めるかは未決事項 3）。
@@ -136,11 +136,11 @@
 
 #### Acceptance Criteria
 
-1. When crates.io への 5 クレートの公開がすべて公開済みになったとき, the Release CI shall リリースタグの GitHub Release を作成する（【仮定】Marketplace への公開の成否は待たない。未決事項 4）。
+1. When crates.io への 5 クレートの公開がすべて公開済みになったとき, the Release CI shall リリースタグの GitHub Release を作成する。Marketplace への公開の成否は待たず、VSIX は Marketplace の成否によらず添付する（brief の Constraints「公開順」のとおり）。
 2. The Release CI shall GitHub Release に `pasta.dll.zip`・`hello-pasta.nar`・VSIX の 3 つの配布物を添付する。
 3. The Release CI shall GitHub Release の題名を `pasta vX.Y.Z` とする（今の手順と同じ）。
 4. When そのタグの GitHub Release が既に存在し、3 つの配布物がすべて添付済みであるとき, the Release CI shall 作成を飛ばし、失敗とせずに終える。
-5. If そのタグの GitHub Release が既に存在するが、添付されていない配布物があるとき, the Release CI shall 足りない配布物だけを添付する（【仮定】Immutable Releases が有効で添付できない場合の扱いは未決事項 8）。
+5. If そのタグの GitHub Release が既に存在するが、添付されていない配布物があるとき, the Release CI shall 足りない配布物だけを添付する。配布物が欠けた Release を公開状態で残さない（Immutable Releases が有効な場合の作成の順序は設計で決める。未決事項 8）。
 6. The Release CI shall リリースノートを、1 つ前のリリースタグからリリースタグまでのコミット（マージコミットを除く）から作る。1 つ前のリリースタグが無いときは、リリースタグまでの全コミットから作る。
 7. The Release CI shall リリースノートのコミットを Conventional Commits の種類で分類し、`feat`（✨ Features）・`fix`（🐛 Bug Fixes）・`refactor`（♻️ Refactoring）・`docs`（📝 Documentation）・`test`（🧪 Tests）・`chore`（🔧 Maintenance）の見出しの下に並べる。
 8. The Release CI shall スコープが `spec` のコミットをリリースノートから除き、コミットが 1 つも無い見出しを出さない。
@@ -228,16 +228,16 @@
 
 本文の **【仮定】** に対応する。brief.md だけでは決めきれなかったため、最善の仮定で要件を書いた。
 
-1. **プレリリースの版**（R1.2）: `v1.0.0-rc.1` のようなプレリリースのタグを扱うか。仮定: 扱わない（数字 3 つの形だけを起動の対象にする）。
-2. **拡張の版の検査**（R2.3）: brief は「タグと `Cargo.toml` の版の一致」だけを挙げる。`editors/vscode/package.json` の版も一致を検査するか。仮定: 検査する（Marketplace に食い違った版が出るのを防ぐため）。
+1. ~~**プレリリースの版**~~ → **確定（自明修正）**: 扱わない。brief の `vX.Y.Z` のとおり。<br>旧: **プレリリースの版**（R1.2）: `v1.0.0-rc.1` のようなプレリリースのタグを扱うか。仮定: 扱わない（数字 3 つの形だけを起動の対象にする）。
+2. ~~**拡張の版の検査**~~ → **確定（自明修正）**: 検査する（R2.3）。<br>旧: **拡張の版の検査**（R2.3）: brief は「タグと `Cargo.toml` の版の一致」だけを挙げる。`editors/vscode/package.json` の版も一致を検査するか。仮定: 検査する（Marketplace に食い違った版が出るのを防ぐため）。
 3. **関門の範囲**（R2.6）: `build.yml` は test・clippy のほかに cargo-deny・luacheck・WASM ビルドも回す。「main の CI が全部緑か」の確認を置き換えるなら、これらも関門に含めるか。仮定: test と clippy は x86・x64 の両方で回す。残りは未定。
-4. **GitHub Release が待つもの**（R6.1）: GitHub Release の作成は crates の公開の成功だけを待つか、Marketplace の公開の成功も待つか。仮定: crates だけを待つ（今の設計と同じ）。VSIX は Marketplace の成否によらず添付する。
+4. ~~**GitHub Release が待つもの**~~ → **確定（自明修正）**: crates だけを待つ。brief の Constraints「公開順」のとおり（R6.1）。<br>旧: **GitHub Release が待つもの**（R6.1）: GitHub Release の作成は crates の公開の成功だけを待つか、Marketplace の公開の成功も待つか。仮定: crates だけを待つ（今の設計と同じ）。VSIX は Marketplace の成否によらず添付する。
 5. **依存の固定（再現性）**（R3.9）: `.gitignore` は `Cargo.lock` を無視している（「ライブラリクレートなので」）。タグのソースから成果物を再現する要件を、依存クレートの解決結果まで含めて満たすには `Cargo.lock` の追跡が要る。追跡するか、ビルドの構成の再現だけで足りるとするか。
 6. **VSIX の WASM のビルドの種類**（R3.4）: 今の `npm run package` は `build-wasm.ps1` を `-Release` なしで呼ぶため、VSIX に入る WASM はデバッグビルドになっている。今と同じにするか、リリースビルドに変えるか。
 7. **シェルの画像の追跡**（R10.5）: `ghosts/hello-pasta/shell/master/surface*.png`・`surfaces.txt` は `cargo run -p pasta_sample_ghost` が作る生成物だが、git で追跡している。brief は追跡の解除の対象に挙げていない。後続の `hello-pasta-shell-art` が画像を「追跡する素材」に変えるため、本仕様では今のまま追跡を続ける、で良いか。同様に、`release.ps1` が `crates/pasta_lua/scripts` から写す `ghost/master/scripts/README.md` も追跡されている生成物である。これを追跡の解除の対象に含めるか。
-8. **GitHub Release の作成済み・添付漏れ**（R6.5）: Immutable Releases を有効にすると、公開後の Release に配布物を足せない。作成の途中で失敗して添付が欠けた Release が残った場合の扱い（作成と添付を一度に済ませる・下書きで作ってから公開する等）を、要件としてどこまで求めるか。
+8. **→ 設計へ**: 要件は R6.5「配布物が欠けた Release を公開状態で残さない」とし、作成の順序（下書き → 添付 → 公開）は設計で決める。<br>旧: **GitHub Release の作成済み・添付漏れ**（R6.5）: Immutable Releases を有効にすると、公開後の Release に配布物を足せない。作成の途中で失敗して添付が欠けた Release が残った場合の扱い（作成と添付を一度に済ませる・下書きで作ってから公開する等）を、要件としてどこまで求めるか。
 9. **ワークフロー自体の不具合の修正**（R7.5）: 「失敗した job の再実行」は、タグのコミットにあるワークフローの定義で再実行する。ワークフローの定義そのものに不具合があった場合、再実行では直せない。その場合の回復の手段（同じタグで手動起動できる入口を設けるか、版を上げて出し直すか）を要件に含めるか。
-10. **手順書の置き場所**（R11）: 一回限りのセットアップの手順書をどこに置くか（`crates/pasta_sample_ghost/RELEASE.md` の一節・リポジトリの開発者向け文書・spec 配下など）。仮定: 設計で決める。
-11. **手元のスクリプトの扱い**（R12.3）: `release.ps1`・`release.bat` を、CI が使う部品として残しつつ手元での動作確認用にも残すか。仮定: 残す。
+10. **→ 設計へ**: 置き場所は設計で決める。<br>旧: **手順書の置き場所**（R11）: 一回限りのセットアップの手順書をどこに置くか（`crates/pasta_sample_ghost/RELEASE.md` の一節・リポジトリの開発者向け文書・spec 配下など）。仮定: 設計で決める。
+11. ~~**手元のスクリプトの扱い**~~ → **確定（自明修正）**: 残す。成果物の生成は `release.ps1` を CI からも呼ぶ形で流用するため（research.md Option C）。<br>旧: **手元のスクリプトの扱い**（R12.3）: `release.ps1`・`release.bat` を、CI が使う部品として残しつつ手元での動作確認用にも残すか。仮定: 残す。
 12. **Marketplace の新しい OIDC 公開（`vsce publish --oidc`）**（R5・R9.2・R11）: brief の確定後の調査で、vsce に Marketplace 自身の Trusted Publishing（GitHub の OIDC トークンを Marketplace のセッショントークンに交換。Azure のサブスクリプションが要らない）が隠しオプションとして入ったことが分かった（PR microsoft/vscode-vsce#1291、2026-07 マージ、2026-09 に契約確定のコミット）。ただし preview 扱いで、Marketplace 側の設定の手順書が見当たらない。brief どおり Entra ID のワークロード ID 連携で進めるか、OIDC 公開を本線または予備にするか。仮定: brief どおり Entra ID で進め、OIDC 公開は設計で再評価する。
 13. **crates.io の「Trusted Publishing のみ」設定**（R9・R11）: crates.io にはクレートごとにトークンでの公開を拒む設定（`trustpub_only`）がある。手順書で、セットアップの確認後にこれを有効にする手順を必須にするか。有効にすると、新しいクレートの初回公開（手で行う）以外の手作業の公開ができなくなる。仮定: 任意の手順として載せる。
