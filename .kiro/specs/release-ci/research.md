@@ -191,7 +191,7 @@
 
 1. **トークン期限と公開時間**: Trusted Publishing のトークンは 30 分。`pasta_lua`・`pasta_shiori` は LuaJIT を含み、`cargo publish` の検証ビルドが長い。5 クレートが 30 分に収まるかを実測する。収まらなければクレートごとにトークンを取り直す（アクションを複数回呼ぶ）か、検証ビルドの扱いを決める。
 2. **Marketplace の経路の実地確認**: マネージド ID を publisher のメンバーに追加する UI での ID の指定方法、`azure/login` の後の `vsce publish --azure-credential` が Windows ランナーで通るか。期限（2026-12-01）があるので、設計の早い段階で試す（例: 公開を伴わない確認の方法の有無）。
-3. **`vsce publish --oidc` の成熟度**（未決事項 12）: Marketplace 側の trusted publishing policy の設定手順と、正式な提供の見込み。
+3. ~~**`vsce publish --oidc` の成熟度**~~ → 要件ディスカッションで Entra ID を本線と確定した。本仕様では調べない（参考に残す）: Marketplace 側の trusted publishing policy の設定手順と、正式な提供の見込み。
 4. **再実行と artifact**: github.com の現行の挙動として「失敗した job の再実行で、前の試行の artifact と成功した job の出力を使える」ことの確認。
 5. **Immutable Releases と再実行**（未決事項 8）: `gh release create` が下書きの段階で失敗したときに残る下書きを、再実行で見つけて続ける方法（`gh release view` は下書きを返すか）。
 6. **windows-latest（VS 2026 イメージ）**: `npm ci` の native addon（`keytar`・`@vscode/vsce-sign`）、`wasm-pack`・`cargo-about` の導入（版固定のバイナリ取得か `cargo install --locked` か）。退避先 `windows-2022` の提供期限。
