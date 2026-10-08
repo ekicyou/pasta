@@ -70,7 +70,7 @@
   - 完了時: `pasta.toml` の差分が talk 間隔の 2 行だけで、`cargo test -p pasta_sample_ghost` と上記 3 本の e2e が緑である
   - _Requirements: 1.1, 3.10, 5.2, 5.3, 6.4_
 
-- [ ] 2.7 OnTalk 探索と e2e テストが新しい辞書で通ることを確かめる
+- [x] 2.7 OnTalk 探索と e2e テストが新しい辞書で通ることを確かめる
   - `pasta_shiori` の `ontalk_probe_test.rs` と `scene_kick_*_e2e_test.rs` を流し、テスト側を変えずに緑であることを確かめる
   - 11 段目のチェイントークが talk 間隔を上書きした e2e と干渉した場合は、チェイントークを `＊会話` 以外から呼ぶ形に 11 段目を直す（台詞の確定とマニュアルの逐語一致より前に済ませるため、ここで行う）
   - 完了時: 上記のテストが緑で、`pasta_shiori` で赤なのは OnBoot 系 3 テストだけである
