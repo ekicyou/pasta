@@ -89,7 +89,7 @@
   - _Requirements: 2.5, 2.6, 2.8_
   - _Boundary: build.yml_
 
-- [ ] 4.2 (P) 公開しないセットアップ確認ワークフローを作る
+- [x] 4.2 (P) 公開しないセットアップ確認ワークフローを作る
   - 手動起動だけで動き、確認用 environment `release-setup-check` に属し、OIDC だけの権限で Azure にログインする（変数はリポジトリ variables の 3 つ）
   - マネージド ID の Marketplace の profile ID と表示名を job summary にだけ書き、publisher のメンバー確認（`verify-pat --azure-credential`。未追加でも続行）と拡張の存在確認の結果、名前の対応表（ワークフロー名・environment 名・リポジトリ・5 クレート）を summary に書く
   - crates.io のトークン交換は行わず、どの公開先にも公開しない
@@ -195,3 +195,4 @@
 - 3.3: `publish-vsix.ps1 -VsixPath -Version -Extension [-VsceCommand] [-DryRun]`。vsce 3.7.1 は `--pat` の既定値が `VSCE_PAT` で `--azure-credential` より優先されるため、スクリプトは値を読まずに `Env:VSCE_PAT` を消す。vsce は `editors/vscode` で `npx --no-install vsce`（publish-vsce job は事前に `npm ci --ignore-scripts`）。`-VsixPath` は呼び出し元基準で解決する。公開後の確認は最大 10 分（job の 20 分に収まる）。
 - 3.4: `release-notes.ps1 -Tag -Repo [-OutFile] [-WorkspaceRoot]`。範囲は `<前のタグ>..<Tag>`（タグのコミット自身を含む）、項目は type 付きの件名全体、除外は scope `spec` だけ（type `spec` は Maintenance）。github-release job の checkout は `fetch-depth: 0` と `fetch-tags: true` が要る（4.5 で確かめる）。
 - 3.5: `github-release.ps1 -Tag -NotesFile -AssetDir [-Title] [-DryRun]`。リポジトリは gh の既定（checkout の remote）で決まり、認証は `GH_TOKEN`。`gh release view <tag>` は下書きもタグ名で見つける。Immutable はエラー文の一致で判定（拒否されれば失敗はする）。
+- 4.2: 開発機の環境には `VSCE_PAT` が入っており、`vsce <cmd> --help` は `--pat` の既定値として PAT の値を表示する。手元で vsce を叩くときは必ず `VSCE_PAT` を外す（4.2 の実装中に会話記録へ値が出た。C-6 で失効させる PAT）。
