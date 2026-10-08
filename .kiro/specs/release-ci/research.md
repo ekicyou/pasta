@@ -176,6 +176,7 @@
 ### 推奨と主な判断
 
 - Option C を基本にする。job の境界は brief の 5 つ（verify・build・publish-crates・publish-vsce・github-release）を出発点にする。
+- 関門（R2.5・R2.6）は `build.yml` の検査をすべて通す。定義を 1 か所に保つため、`build.yml` に `workflow_call` を足してリリース CI から呼ぶ案を第一候補にする（`build.yml` の検査の中身は変えない）。
 - 配布物は build job で 1 度だけ作り、artifact で後続へ渡す。publish job は再ビルドしない（R3.8）。ただし `cargo publish` はクレートのソースから検証ビルドを行うので、crates の公開には artifact を使わない。
 - 公開済みの判定は、各公開の直前に公開先へ問い合わせる（R4.3・R5.3・R7.2）。問い合わせの一時的な失敗は「公開済み」と見なさない（R7.4）。
 - `vsce publish` は `--packagePath` で build job の VSIX を出す（`vscode:prepublish` が無いため）。

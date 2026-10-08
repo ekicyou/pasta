@@ -82,9 +82,9 @@
 2. If リリースタグの版（先頭の `v` を除いた部分）が、タグのコミットのワークスペースの版と一致しないとき, the Release CI shall 公開を一切行わずに失敗し、タグの版とワークスペースの版の両方を示す。
 3. If タグのコミットの VSCode 拡張の版（`editors/vscode/package.json`）がリリースタグの版と一致しないとき, the Release CI shall 公開を一切行わずに失敗し、食い違う版を示す（Marketplace にタグと食い違った版が出るのを防ぐため）。
 4. If タグのコミットがリポジトリの main ブランチから到達できないとき, the Release CI shall 公開を一切行わずに失敗し、その理由を示す。
-5. When 版と到達性の検査が通ったとき, the Release CI shall タグのコミットそのもので、全テストと lint（警告をエラーとして扱う）を、`build.yml` と同じツールチェーン構成と日本語ロケールで実行する。
-6. The Release CI shall テストと lint を、`build.yml` が PR・main で実行するのと同じターゲット（x86・x64）で実行する（【仮定】依存の監査・Lua の静的解析・WASM ビルドの検査をこの関門に含めるかは未決事項 3）。
-7. If テストまたは lint が失敗したとき, the Release CI shall 公開を一切行わずに失敗する。
+5. When 版と到達性の検査が通ったとき, the Release CI shall タグのコミットそのもので、`build.yml` が PR・main で行う検査をすべて、`build.yml` と同じ構成（ツールチェーン・ターゲット・日本語ロケール）で実行する。
+6. The Release CI shall 関門の検査の一覧を `build.yml` と別に持たない。`build.yml` に検査が足されたり変わったりしたとき、関門も同じ検査を行う（実現の方法は設計で決める。例: `build.yml` を呼び出す）。
+7. If 関門の検査のいずれかが失敗したとき, the Release CI shall 公開を一切行わずに失敗する。
 8. The Release CI shall 本要件の関門を、今のリリース手順の「main の CI がすべて緑か」の確認に代わるものとする。リリース CI は main の CI の結果を参照しない。
 
 ### Requirement 3: 配布物のビルド
@@ -230,7 +230,7 @@
 
 1. ~~**プレリリースの版**~~ → **確定（自明修正）**: 扱わない。brief の `vX.Y.Z` のとおり。<br>旧: **プレリリースの版**（R1.2）: `v1.0.0-rc.1` のようなプレリリースのタグを扱うか。仮定: 扱わない（数字 3 つの形だけを起動の対象にする）。
 2. ~~**拡張の版の検査**~~ → **確定（自明修正）**: 検査する（R2.3）。<br>旧: **拡張の版の検査**（R2.3）: brief は「タグと `Cargo.toml` の版の一致」だけを挙げる。`editors/vscode/package.json` の版も一致を検査するか。仮定: 検査する（Marketplace に食い違った版が出るのを防ぐため）。
-3. **関門の範囲**（R2.6）: `build.yml` は test・clippy のほかに cargo-deny・luacheck・WASM ビルドも回す。「main の CI が全部緑か」の確認を置き換えるなら、これらも関門に含めるか。仮定: test と clippy は x86・x64 の両方で回す。残りは未定。
+3. ~~**関門の範囲**~~ → **確定（議題 2）**: `build.yml` が PR・main で行う検査（test・clippy の x86・x64、cargo-deny、luacheck、WASM ビルド）をすべて、タグのコミットで通す。検査の一覧を要件に書き写さず、`build.yml` に従わせる（R2.5・R2.6）。<br>旧: **関門の範囲**（R2.6）: `build.yml` は test・clippy のほかに cargo-deny・luacheck・WASM ビルドも回す。「main の CI が全部緑か」の確認を置き換えるなら、これらも関門に含めるか。仮定: test と clippy は x86・x64 の両方で回す。残りは未定。
 4. ~~**GitHub Release が待つもの**~~ → **確定（自明修正）**: crates だけを待つ。brief の Constraints「公開順」のとおり（R6.1）。<br>旧: **GitHub Release が待つもの**（R6.1）: GitHub Release の作成は crates の公開の成功だけを待つか、Marketplace の公開の成功も待つか。仮定: crates だけを待つ（今の設計と同じ）。VSIX は Marketplace の成否によらず添付する。
 5. **依存の固定（再現性）**（R3.9）: `.gitignore` は `Cargo.lock` を無視している（「ライブラリクレートなので」）。タグのソースから成果物を再現する要件を、依存クレートの解決結果まで含めて満たすには `Cargo.lock` の追跡が要る。追跡するか、ビルドの構成の再現だけで足りるとするか。
 6. **VSIX の WASM のビルドの種類**（R3.4）: 今の `npm run package` は `build-wasm.ps1` を `-Release` なしで呼ぶため、VSIX に入る WASM はデバッグビルドになっている。今と同じにするか、リリースビルドに変えるか。
