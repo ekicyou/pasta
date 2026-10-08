@@ -14,7 +14,7 @@
   - 完了の状態: research.md に nar の基準があり、`git ls-files` に対象の生成物が出ず、正本とシェルの画像は出る。既存の `release.ps1` を手元で実行しても、無視の対象のパスに未追跡・変更のファイルが出ない
   - _Requirements: 10.1, 10.2, 10.4, 10.5, 10.6_
 
-- [ ] 1.2 `Cargo.lock` を追跡し、依存の解決を固定する
+- [x] 1.2 `Cargo.lock` を追跡し、依存の解決を固定する
   - 無視の設定から `Cargo.lock` の行（コメント含む）を外し、今の解決結果をコミットする
   - 完了の状態: `Cargo.lock` が追跡され、`cargo build --workspace --locked` と `cargo test --all --locked` が lock を書き換えずに通る
   - _Requirements: 3.9, 3.10_
@@ -183,3 +183,7 @@
 - [ ] C-6 初回成功後の必須手順の完了を確かめる
   - 前提: C-4 の成功。ユーザーが 5 クレートの「Trusted Publishing のみ」を有効にし、`CARGO_REGISTRY_TOKEN` と `VSCE_PAT` を失効させる（表の工程 8）
   - 完了の状態: 3 つの手順の完了を research.md に記録している
+
+## Implementation Notes
+- 1.1: nar の基準（research.md）の `pasta.toml` は 2639 バイトだが、基準の nar の後に `f245ab1f`（#59）で正本が変わったため、作り直すと 2583 バイトになる。2.1 の比較ではパスの集合を比べ、この差は既知として扱う。
+- 1.2: lock はルートの `Cargo.lock` 1 つだけ（VSIX の WASM の `crates/pasta_lsp` もワークスペース内）。wasm-pack と `release.ps1` は `--locked` を付けないので、build job の `git diff --exit-code -- Cargo.lock` が lock 不変の唯一の検査になる。
