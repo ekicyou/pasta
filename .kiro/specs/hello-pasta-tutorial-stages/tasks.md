@@ -55,7 +55,7 @@
   - 完了時: 3 ファイルが `dic/` にあり、12 ファイルが揃った状態で `cargo test -p pasta_sample_ghost` が緑のまま
   - _Requirements: 3.3, 3.6, 3.7_
 
-- [ ] 2.5 旧辞書を撤去し、辞書の構造検査を新しいファイル構成へ付け替える
+- [x] 2.5 旧辞書を撤去し、辞書の構造検査を新しいファイル構成へ付け替える
   - 旧辞書 5 ファイル（`actors`・`boot`・`talk`・`click`・`choice`）を削除する（内容は 2.1〜2.4 の新ファイルへ移っている）
   - 辞書の文字列構造の検査を、設計の付け替え表どおりに直す: アクター辞書 18 行の対応、`＊OnBoot` が全体で 1 つで `01-boot.pasta` にある、`07-greeting.pasta` の 4 イベント、`＊会話` の件数、時報の 3 要素、`08-touch.pasta` の `＊OnMouseDoubleClick` 件数と `＞transfer_req_to_var`・`＄ｒ４`、シーン内の表情名が `03-face.pasta` に定義済み、行頭のアクター辞書が `03-face.pasta` にだけある
   - 件数の下限は作例の実数に合わせて固定する
@@ -157,3 +157,5 @@
 - 2.8 で検討: 07 の送り出し `＄ｒ０　にバトンタッチ！` は宣言に読めるので `＄ｒ０　、バトンタッチだよ！` のように相手へ向ける。OnFirstBoot のコメントは「初めて起動したときは、OnBoot の代わりに OnFirstBoot が来る」と正確にする（2.2 レビューより）。
 - 3.2 で: 9 段目の Reference2 `OnMouseDoubleClick` は登録名（実機は `OnMouseDoubleClick_N`）でないため、last_global_scene → グローバル前方一致のフォールバックで `＊おやつの話` に届く（実測 200）。ジャンプ先が壊れると 204 で素通りするので、9 段目の `OnChoiceSelectEx` だけは 200 と空でない Value を必須にする（2.3 レビューより）。
 - 2.8 で: 12-lua.pasta のコメント「ブロックの行は字下げしない」は「フェンスの行（```lua と ```）は字下げしない」とする（2.4 レビューより）。11 段目のチェイントークの続きの再開は 2.7 で確かめる。
+- 2.5 で ＊会話 は下限 11（上限なし）・08 の OnMouseDoubleClick は下限 3 に固定。2.8 で件数が変わったら合わせる。`test_touch_pasta_contains_events` は `＃` 行を除いて検査すると強くなる（任意）。
+- 旧ファイル名が残る箇所（テスト以外）: `pasta_shiori` の `scene_kick_e2e_test.rs:94`・`scene_kick_preempt_e2e_test.rs:88` のコメント（2.7 で直す）、`.claude/skills/pasta-check/references/*.md`（完了時のスキル同期で扱う）。
