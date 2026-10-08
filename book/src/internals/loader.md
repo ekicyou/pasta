@@ -61,7 +61,8 @@ load_with_config(base_dir, runtime_config)
  0.   基準ディレクトリの存在確認                         … 無ければ DirectoryNotFound（致命）
  1.   PastaConfig::load                                   … pasta.toml の読込と既定値の補完（致命）
  1.5  インスタンスロガーの作成と登録・ログフィルタの更新   … 失敗は既定のログファイルへ切り替えて続行（継続）
- 2.   profile/ 配下のディレクトリの作成・キャッシュの版確認  … 致命
+      別名表の info ログ（Scene alias table）
+ 2.   profile/ 配下のディレクトリの作成・キャッシュの版と別名表の確認 … 致命
  2.5  sync_pasta_scripts（フレームワークスクリプトの自己展開） … 失敗は ERROR ログで続行（継続）
  3.   discover_all_files（.pasta と .lua の検出）           … glob の誤り・禁止ファイル名は致命
  4.   process_incremental（トランスパイルと .lua のコピー）  … 1 件でも失敗すれば致命
@@ -73,9 +74,11 @@ load_with_config(base_dir, runtime_config)
 
 - 0 の直後に、基準ディレクトリで `LoadDirGuard` を張り、`load_with_config` を抜けるまで保つ。組み込みで複数のゴーストを読んでも、ローダのログは自分のロガーへ届く（[ロギングとエンコーディング](logging-encoding.md#振り分けの規則)）。
 - 1.5 で `[logging]` の `file_path` からロガーを作れないとき（`profile/` ディレクトリの下にないなど）は、既定のログファイル `profile/pasta/logs/pasta.log` のロガーに切り替えて登録し、不正と判断した `file_path` を warn に残して続ける。`level`・`filter` は反映される（[ロギングとエンコーディング](logging-encoding.md#ロガーの-2-段階の初期化)）。
-- 2 で作るディレクトリは `profile/pasta/save`・`profile/pasta/save/lua`・`profile/pasta/cache` と `[loader] transpiled_output_dir` である。続けて `CacheManager::prepare_cache_dir` がキャッシュの版を確認する（[トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ)）。
+- 1 の `PastaConfig::load` が決めた別名表（[設定読込](#設定読込)）は、1.5 でロガーを登録した直後に info ログ `Scene alias table` として出す。`source` は表の出どころ（`BuiltinDefault` は既定の表、`PastaToml` は `[scene.alias]` に書いた表）、`table` は表の中身（`OnTalk <- 会話` の形。空の表は `(empty)`）である。ロガーの登録より後に出すため、ゴーストのログファイルに残る。
+- 2 で作るディレクトリは `profile/pasta/save`・`profile/pasta/save/lua`・`profile/pasta/cache` と `[loader] transpiled_output_dir` である。続けて `CacheManager::prepare_cache_dir` がキャッシュの版と別名表の指紋を確認し、どちらかが違えばキャッシュを全破棄する（[トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ)）。
 - 2.5 を 3 より前に置くのは、検出とトランスパイルより前、`package.path` を組む 6 より前に、フレームワークスクリプトをディスク上で最新にしておくためである。
 - 4 の統計（トランスパイル・省略・失敗・コピーの件数）は、`[loader] debug_mode` が `true` のときだけ info ログに出る。孤立キャッシュは `CacheManager::find_orphaned_caches` が `debug_mode` に関わらず件数と各パスを警告し、`debug_mode` が `true` のときはローダが各パスを重ねて警告する。キャッシュへの保存は `debug_mode` に関わらず行う。
+- 4 と 5.5 は、別名表を持たせた同じ 1 つのトランスパイラ（`transpiler_for`）を使う。キャッシュの `.lua` の宣言名と、ソースマップ・デバッグの突合キーの宣言名は、常に同じ別名表から決まる。6 では同じ表を `RuntimeConfig.scene_aliases` に入れて `@pasta_search` へ渡すため、宣言と検索にも同じ表が効く（[シーン・単語レジストリとシーン検索](registry-search.md#辞書確定)）。
 - 5.5 の要否は、6 で VM が使うのと同じ判定（`pasta.toml` の `[debug]` と環境変数を `DebugConfig::from_env` で解決した結果）で決める。無効なら何も作らない。
 - 6 の中で VM を作り、モジュールを登録し、`main`・`pasta.shiori.entry`・`pasta.scene_dic` を `require` する。その順序と失敗の扱いは [VM の構築とモジュール登録](execution-model.md#vm-の構築とモジュール登録) が書く。
 
@@ -89,8 +92,9 @@ load_with_config(base_dir, runtime_config)
 
 1. 全体を TOML の表として読む。
 2. `loader` キーを表から取り除き、`LoaderConfig` へ変換する。各キーは serde の既定値の関数で補われ、型の合わない値は解析エラーになる。`loader` キーが無ければ `LoaderConfig::default()` を使う。
-3. 残りの表をすべて `custom_fields` とする。`[loader]` 以外のセクションはこの段階では型付きの値にしない。
-4. `apply_shiori_defaults` で SHIORI 用の既定値を補完する。
+3. `[scene.alias]` を同じ内容から読み直し、有効な別名表（`scene_aliases`）とその出どころ（`scene_alias_source`）を決める。`[scene.alias]` が無ければ既定の表（`OnTalk = ["会話"]`）、あれば書いた表をそのまま使う（既定の表と合わせない）。型の合わない値・空の名前・別名の重複・置き換え先を別名にも書いた表は解析エラーになり、起動を止める（利用者向けの説明は [pasta.toml の `[scene]`](../reference/pasta-toml.md#sceneシーン名)）。
+4. 残りの表をすべて `custom_fields` とする。`[scene]` も書いたとおりに残り、既定の別名表は書き足さない。`[loader]` 以外のセクションはこの段階では型付きの値にしない。
+5. `apply_shiori_defaults` で SHIORI 用の既定値を補完する。
 
 `apply_shiori_defaults` は `custom_fields` の `[ghost]` に、書かれていないキー（`talk_interval_min`・`talk_interval_max`・`hour_margin`・`spot_newlines`）だけを `GhostConfig::default()` の値で書き足す。`[ghost]` が無ければ表を作って 4 キーとも入れる。書かれている値は上書きしないため、2 回適用しても結果は変わらない。あわせて `[actor]` が表として存在しなければ警告を 1 行出す（起動は止めない）。補完をここ 1 か所でだけ行うので、Rust 側の消費者と Lua 側（`@pasta_config`）は同じ補完後の値を見る。
 
@@ -245,7 +249,7 @@ Rust 側で登録するモジュール（`@pasta_config`・`@pasta_search` な�
 - 自己展開先は `profile/pasta/pasta_scripts` に固定されており、`lua_search_paths` からは独立している。検索パスからこのディレクトリを外すと、展開は行われてもフレームワークスクリプトは解決されない。
 - キャッシュの出力先（`transpiled_output_dir`）と検索パスも独立している。`pasta.scene.*` と `pasta.scene_dic` は検索パスを通して解決されるため、出力先を変えるときは検索パスにもそれを含める必要がある。また、検索パスで先に来るディレクトリに同じ相対パスのファイルがあれば、そちらが解決される。
 - ファイル検出は `profile/` 配下を常に除く。キャッシュや自己展開先が検出の対象になることはない。
-- `[loader]` の型の誤りだけが設定読込を失敗させる。ほかのセクションの型の誤りは、使う時点でそのセクションが既定値になるだけで、エラーにも警告にもならない。
+- 設定読込を失敗させるのは、`[loader]` の型の誤りと、不正な `[scene]`／`[scene.alias]` だけである。不正とは、型の合わない値（`scene`・`alias` が表でない、別名が文字列の配列でないなど）・空の名前・別名の重複・置き換え先を別名にも書いた表（連鎖）である。ほかのセクションの型の誤りは、使う時点でそのセクションが既定値になるだけで、エラーにも警告にもならない。
 - ランタイムの構築は `std` のワイド文字 API でモジュールを開くため、`require` の解決は設置パスの長さと文字種に依存しない。ゴースト作者のコードが直接呼ぶ `io.open` などは対象外である（[既知の制限](../reference/startup.md#3-既知の制限)）。
 
 ## ソースの所在
