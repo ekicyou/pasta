@@ -433,6 +433,32 @@
 
 - actionlint 1.7.12 を `winget install --id rhysd.actionlint --version 1.7.12 --exact --scope user` で導入し（実体は `%LOCALAPPDATA%\Microsoft\WinGet\Packages\rhysd.actionlint_Microsoft.Winget.Source_8wekyb3d8bbwe\actionlint.exe`、ユーザーの PATH に追加される）、リポジトリのルートで引数なしの `actionlint` を実行する（`.github/workflows/` の全ワークフローを検査する。シェルのワイルドカード展開に依存しない）。
 
+## 実装時の検証の記録
+
+### タスク 6.1: クリーンなチェックアウトでの検証（2026-10-08）
+
+- 対象: ブランチ `claude/kiro-start-release-ci-193155` の HEAD `b2308e6c`（コミット済みの状態）を `git worktree add --detach <パス> HEAD` で別の作業ツリーに取り出し、既存の `target/` を使わずに新しくビルドした。取り出した直後の `git status --porcelain --untracked-files=all` は 0 行。
+- 環境: 開発機（Windows 11）。cargo と `release.ps1` は `NoDefaultCurrentDirectoryInExePath` を外して実行し、`VSCE_PAT`・`CARGO_REGISTRY_TOKEN` も外した。
+
+| # | コマンド（作業ツリーのルートで実行） | 終了コード | 所要秒 | 結果 |
+|---|---|---|---|---|
+| 1 | `cargo test --all` | 0 | 454 | 109 個のテスト結果すべて成功（passed 2552・failed 0・ignored 9） |
+| 2 | `cargo clippy --all-targets --workspace --target i686-pc-windows-msvc -- -D warnings` | 0 | 144 | 警告なし |
+| 3 | `cargo clippy --all-targets --workspace --target x86_64-pc-windows-msvc -- -D warnings` | 0 | 98 | 警告なし |
+| 4 | `pwsh -NoProfile -File crates/pasta_sample_ghost/release.ps1` | 0 | 326 | `release/hello-pasta.nar`・`release/pasta.dll.zip` を作成（版 0.3.7） |
+| 5 | `npm ci`（`editors/vscode`） | 0 | 68 | — |
+| 6 | `npm run package`（`editors/vscode`） | 0 | 151 | `pasta-vscode-0.3.7.vsix`（18 ファイル。`wasm/pasta_lsp_wasm_bg.wasm` と `wasm/THIRD_PARTY_LICENSES.txt` を同梱） |
+| 7 | `git diff --exit-code -- Cargo.lock` | 0 | 0 | lock は不変 |
+| 8 | `actionlint`（引数なし。1.7.12） | 0 | — | `build.yml`・`manual.yml`・`release.yml`・`release-setup-check.yml` の 4 本を検査し指摘 0 件（release に関わる 3 本 `release.yml`・`release-setup-check.yml`・`build.yml` を含む） |
+
+- 1〜6 の後の `git status --porcelain --untracked-files=all`（無視されるファイルは出ない）に出たのは、追跡しているファイルの次の 2 件だけで、生成物（未追跡のファイル）は 0 件だった。
+  - ` M crates/pasta_lua/tests/fixtures/sample.generated.lua`（`cargo test` が書き直す。既知）
+  - ` M crates/pasta_sample_ghost/ghosts/hello-pasta/shell/master/surfaces.txt`（`release.ps1` の作成段が書き直す）
+  - どちらも改行コードだけの差分で、`git diff --ignore-cr-at-eol --exit-code` は 0。`git checkout --` で戻した後の `git status --porcelain --untracked-files=all` は 0 行。シェルの画像（`surface*.png`）には差分が出なかった。
+- 生成物はすべて `.gitignore` で無視されていた: `release/`、`ghost/master/` の `pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`scripts/`、`editors/vscode/` の `wasm/`・`out/`・`*.vsix`、`target/`・`node_modules/`。
+- 初回はクリーンなチェックアウトを長いパス（scratchpad の下。約 170 文字）に置いたため、`cargo test` のビルドスクリプトのリンクで `LNK1104`（出力ファイルを開けない）になった（終了コード 101）。出力パスが約 250 文字に達し、`link.exe` のパス長の上限に当たったもので、追跡解除とは関係しない（CI のランナーの作業ディレクトリは短い）。短いパス（`.claude/worktrees/` の下）に作り直して上の表の結果を得た。
+- 検証後、一時的な作業ツリーは `git worktree remove --force` で削除した。
+
 ## References（設計フェーズ）
 
 - https://docs.github.com/en/actions/how-tos/sharing-automations/reuse-workflows — reusable workflow の制約

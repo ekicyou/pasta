@@ -144,8 +144,8 @@
   - _Requirements: 12.2, 12.3, 12.4, 12.5_
   - _Boundary: リリース手順の文書群_
 
-- [ ] 6. 統合の検証とマージ前の調停
-- [ ] 6.1 クリーンなチェックアウトで、追跡解除後もビルド・テスト・配布物の作成が通ることを確かめる
+- [x] 6. 統合の検証とマージ前の調停
+- [x] 6.1 クリーンなチェックアウトで、追跡解除後もビルド・テスト・配布物の作成が通ることを確かめる
   - 別の作業ツリー（クリーンなチェックアウト）で `cargo test --all` と clippy（x86・x64 の `-D warnings`）を通す
   - 同じ作業ツリーで `release.ps1` と `npm run package` を実行し、`git status` に生成物が出ず `Cargo.lock` が変わらないことを確かめる
   - 3 つのワークフローを `actionlint` でまとめて検査する
@@ -200,3 +200,4 @@
 - 4.4: job outputs は publish-crates が `<crate>_status`・`<crate>_reason`（5 クレート分）、publish-vsce が `status`・`reason`。どちらも末尾の `if: always()` の集約 step（`id: result`）が steps の outcome から決める（auth/login の失敗 → failed/auth、出力なし → failed/publish、未実行 → not-run）。publish step に continue-on-error は無いので、失敗すれば job は failure のまま。
 - 4.5: report は `NEEDS_JSON: ${{ toJSON(needs) }}` を pwsh で解析する。skipped で outputs が空 → not-run、failure/cancelled で空 → 「job の summary を参照」。「どの公開先にも公開していない」は verify・gate・build のどれかが failure/cancelled のときだけ出す。
 - 5.1: Marketplace のアクセストークンは、同じマネージド ID の資格情報を持つ `release-setup-check`（main からの実行）でも得られる。タグに限られるのは crates.io のトークンだけで、main を PR 経由でしか変えられないこと（ブランチ保護）が前提になる。release.yml・publish-vsix.ps1 は手順書の表を「名前の表」と呼ぶが、見出しは「名前の対応表」（どちらも design の語）。
+- 6.1: Windows の link.exe はパス長の上限があり、scratchpad の深いパスに作業ツリーを作ると `cargo test` が LNK1104 で落ちる。クリーンなチェックアウトは `.claude/worktrees/` 直下など短いパスに作る。
