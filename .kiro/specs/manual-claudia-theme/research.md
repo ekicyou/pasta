@@ -193,7 +193,7 @@
 - **Findings**: 画像は手元に取り寄せていない（取得は実装時）。参考サイトの原寸は 120〜140px・15〜43KB、顔の背景色を CSS で与えているため透過 PNG と推定。`verify-static` は `.png`・`.webp`・`.txt` を許可済み。開発機に ffmpeg（ShareX 同梱）がある。
 - **Implications**: 112px の透過 PNG（必要なら減色）で 20KB 以下を目標にし、`verify-content` T-assets で容量を機械検査する。取り込みスクリプトは置かない（一回限り）。
 
-### RN6 mdBook 0.5 の CSS 変数一覧（テーマごと 41 変数）
+### RN6 mdBook 0.5 の CSS 変数一覧（テーマごと 40 変数）
 `--bg --fg --sidebar-bg --sidebar-fg --sidebar-non-existant --sidebar-active --sidebar-spacer --scrollbar --icons --icons-hover --links --inline-code-color --theme-popup-bg --theme-popup-border --theme-hover --quote-bg --quote-border --warning-border --table-border-color --table-header-bg --table-alternate-bg --searchbar-border-color --searchbar-bg --searchbar-fg --searchbar-shadow-color --searchresults-header-fg --searchresults-border-color --searchresults-li-bg --search-mark-bg --color-scheme --copy-button-filter --copy-button-filter-hover --footnote-highlight --overlay-bg --blockquote-note-color --blockquote-tip-color --blockquote-important-color --blockquote-warning-color --blockquote-caution-color --sidebar-header-border-color`
 
 `:root` 側に `--mono-font`・`--content-max-width`・`--menu-bar-height` 等のレイアウト変数。テーマは `.light, html:not(.js)`・`.navy`・`.rust`（`.light` より後ろ）・`.coal`・`.ayu` の同形ブロック。`html { font-family: "Open Sans" }` と `.content p { line-height: 1.45em }` は `general.css` が持つ。

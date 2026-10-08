@@ -47,7 +47,7 @@
 
 ### Allowed Dependencies
 
-- mdBook 0.5.3 の公開拡張点: `additional-css`・`additional-js`・`theme/head.hbs`・テーマ CSS 変数（`variables.css` の 41 変数）・テーマメニューの DOM id（`mdbook-theme-{light,rust,coal,navy,ayu}`）。
+- mdBook 0.5.3 の公開拡張点: `additional-css`・`additional-js`・`theme/head.hbs`・テーマ CSS 変数（`variables.css` の 40 変数）・テーマメニューの DOM id（`mdbook-theme-{light,rust,coal,navy,ayu}`）。
 - `book/tools/link-check.mjs` の `maskFences`（フェンス判定の規則を二重化しない）。
 - 依存方向（左は右を import しない）: `link-check.mjs` → `talk/talk.mjs` → `gen-skill-refs.mjs` → `verify-content.mjs`。`talk/talk-html.mjs` は `talk/talk.mjs` のみに依存する。
 - Google Fonts（`fonts.googleapis.com`・`fonts.gstatic.com`）を任意の外部通信として 1 経路だけ許す。それ以外の外部通信・npm 依存は追加しない（新規ツールは Node 標準のみ）。
@@ -557,7 +557,7 @@ declare function chapterRegions(chapterText: string, chapter: string): ChapterRe
 ##### State Management
 - 構成（ファイル内の順序が上書き順）:
   1. `:root` — 字体トークンと、部品トークンの既定値（mdBook 変数への参照。`rust`・`coal`・`ayu` で部品が読める状態を作る。R2.4）。
-  2. `.light, html:not(.js)` — mdBook のテーマ変数（41 変数）と Claudia トークンを light 値で再定義。
+  2. `.light, html:not(.js)` — mdBook のテーマ変数（40 変数）と Claudia トークンを light 値で再定義。
   3. `.navy` — 同じく navy 値。
   4. 部品のスタイル（トークンのみを参照し、色を直書きしない）: 本文・見出し・`hr`・表・通常の引用・コードの枠・インラインコード・サイドバー・上部バー・前後ナビ・検索結果・台詞部品・扉・クレジット・テーマメニュー隠し。
   5. hljs の色の上書き（`.light .hljs-*`・`.navy .hljs-*`、mdBook の 6 色群に対応）。
