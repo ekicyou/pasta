@@ -213,11 +213,11 @@
 - リソースグループ `rg-pasta-release`（Japan East）。
 - ユーザー割り当てのマネージド ID `id-pasta-release`。`rg-pasta-release` に「閲覧者」のロールを割り当てた。`allow-no-subscriptions` で足りると分かれば、設計の実地確認で外す。
 
-第 2 部は未着手。設計でワークフローのファイル名と environment の名前が決まってから行う。
-- フェデレーション資格情報（エンティティは「環境」にする）
-- GitHub の environment と variables
-- Marketplace の Members への追加
-- crates.io の Trusted Publisher の設定
+第 2 部は、設計ディスカッション（2026-10-08）で名前が確定したので着手できる。確定した名前は design.md「認証名の契約」が正本。同日、別セッション「Entra ID の登録」へ名前と段取り（design.md「セッション間の分担と調停」の表）を送った。進捗の返事が来たらここに追記する（ID 値は書かない）。
+- フェデレーション資格情報 2 件（エンティティ「環境」: `release`・`release-setup-check`）: 未着手（連絡済み）
+- GitHub の environment 2 つと variables 3 つ: 未着手（連絡済み）
+- Marketplace の Members への追加: 待ち（`release-setup-check.yml` が main に入り profile ID を得てから）
+- crates.io の Trusted Publisher ×5: 未着手（名前は確定。初回リリース前ならいつでも可）
 
 設計への申し送り:
 - Marketplace の Members に追加するには、マネージド ID としてログインした状態で `az rest .../_apis/profile/profiles/me` を叩き、profile ID を得る必要がある。マネージド ID としてログインできるのは GitHub Actions の中だけである。

@@ -815,6 +815,24 @@ flowchart TD
 - ロールバック: 初回リリースが公開前（verify・gate・build）で止まった場合は、定義を直してタグを付け直せる（何も公開していない）。公開の途中で定義の不具合が分かった場合は版を上げて出し直す（7.5・12.6）。
 - 移行中の整合: 追跡解除と `Cargo.lock` の追跡は、`release.yml` と同じ PR で入れる（タグのコミットに両方が含まれるようにする）。
 
+### セッション間の分担と調停（一回限りのセットアップ）
+
+Azure / Entra ID 側の作業とレクチャーは、別の Claude セッション「Entra ID の登録」がユーザーと行う。本 spec のセッション（release CI）は CI の設計・実装を持ち、名前の正本（「認証名の契約」）を管理する。やり取りはセッション間メッセージ（SendMessage）で行い、**名前や方式の変更は必ず本 spec 側で契約を更新してから相手へ伝える**。タスク分解では、下表の「待つ」工程を依存関係として tasks.md に入れ、連絡の送受信そのものをタスクにする。
+
+| # | 工程 | 担当 | 着手できる時期 | 連絡 |
+|---|------|------|----------------|------|
+| 1 | フェデレーション資格情報 2 件（`environment:release`・`environment:release-setup-check`） | Entra ID セッション | 今（名前は確定済み。2026-10-08 に送付済み） | 完了したら release CI へ「名前と完了」を返す（値は送らない） |
+| 2 | GitHub environment 2 つと保護規則、リポジトリ variables 3 つ | Entra ID セッション（ユーザーが GitHub で操作） | 今 | 同上 |
+| 3 | `release.yml`・`release-setup-check.yml` 等の実装 PR を main へ | release CI セッション | tasks 承認後 | マージしたら Entra ID セッションへ「setup-check を実行できる」と連絡 |
+| 4 | `release-setup-check.yml` の手動実行 → profile ID | Entra ID セッション | 3 の後 | — |
+| 5 | Marketplace Members に profile ID で追加（Contributor）→ setup-check 再実行で `verify-pat` 確認 | Entra ID セッション | 4 の後 | 通ったら release CI へ連絡（初回リリースの前提） |
+| 6 | crates.io Trusted Publisher ×5 | ユーザー（どちらのセッションでも案内可） | 今〜初回リリース前 | 完了を release CI へ連絡 |
+| 7 | 初回リリース（`release-workflow` の手順で版を上げてタグ push） | release CI セッション | 1・2・5・6 の後 | 結果を Entra ID セッションへ連絡 |
+| 8 | `trustpub_only` ×5、`CARGO_REGISTRY_TOKEN`・`VSCE_PAT` の失効 | ユーザー | 7 の成功後 | 完了を記録（11.10） |
+
+- 相手セッションから「environment 方式の subject が使えない」「`allow-no-subscriptions` で済むので閲覧者ロールを外したい」などの変更の提案が来たら、本 spec の「認証名の契約」「Technology Stack」を先に更新し、手順書（`release-ci-setup.md`）へ反映してから返答する。
+- 進捗の記録先は research.md「一回限りのセットアップの進み具合」（ID 値は書かない）。
+
 ## Open Questions（設計ディスカッションへの申し送り）
 
 設計時点の仮定の一覧。設計ディスカッション（議題 1〜8、2026-10-08）ですべて確定し、本文の記述も確定内容にそろえた。
