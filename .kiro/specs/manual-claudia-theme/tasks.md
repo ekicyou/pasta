@@ -129,7 +129,7 @@
     - 印刷プレビュー
   - _Requirements: 2.3, 3.1, 3.5, 3.8, 3.9, 3.10, 6.4, 9.1, 9.2_
 
-- [ ] 2.5 Web フォントの読み込み、テーマメニューの絞り込み、テーマ資材の登録をする
+- [x] 2.5 Web フォントの読み込み、テーマメニューの絞り込み、テーマ資材の登録をする
   - `head.hbs` の冒頭に、Google Fonts の preconnect を 2 本と stylesheet を 1 本足す。
     - 足す場所は、tokenizer の BEGIN/END マーカーの外にする。
     - 読み込みには display=swap を付ける。
@@ -411,3 +411,4 @@
 - 2.3: rust・coal・ayu では、インラインコードの面の色は mdBook の既定のまま（面を塗るのは `.light`・`.navy`・`html:not(.js)` だけ）。theme-test の C-6 は字体を当てる規則を、C-7 はサイドバーの押し出し（`.page-wrapper`・`#mdbook-body-container`）まで見る。
 - 2.4: 扉とクレジットのクラス契約と HTML の骨組みは `claudia.css` の冒頭コメントにある（`claudia-hero`・`hero-corner hero-corner-{tl,tr,bl,br}`・`hero-latin`・`hero-faces`／`hero-face`／`hero-face-anthony`・`hero-toc`・`claudia-credit`）。5.1 はこれに従って書く。クレジットの `<p>` の中は Markdown にならないので、リンクは `<a href>` で書く。
 - 2.4: 印刷の層の light トークンは、2. の light ブロックの写し（theme-test の P-2 が一致を検査する）。light の値を変えるときは両方を直す。
+- 2.5: `claudia.js` に End キーの補正を足した（設計の ThemeMenu に追記済み）。`theme-menu-test.mjs` は jsdom の上で mdBook 0.5.4 の `book.js` の keydown 処理の写しを使う。mdBook を上げたら写しを追従させる。テーマのスクリプトを読まない出力は `lua/modules.html`（リダイレクト）と `toc.html`（JS 無効時の目次フレーム）だけで、どちらも章ではない（3.5 の検査の対象から外す）。

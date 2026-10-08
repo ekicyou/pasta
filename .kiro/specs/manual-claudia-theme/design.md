@@ -585,6 +585,7 @@ declare function chapterRegions(chapterText: string, chapter: string): ChapterRe
 
 - CSS: `#mdbook-theme-rust, #mdbook-theme-coal, #mdbook-theme-ayu { display: none; }`（ボタンを隠すと空の `li` は高さ 0 になる）。
 - JS（`additional-js`、`book.js` の後に実行）: 上記 3 ボタンの親 `li` を `#mdbook-theme-list` の末尾へ移す。存在しなければ何もしない。外部通信・保存値の変更・他の DOM 操作をしない。理由: `book.js` の矢印キー操作は隣の `li` のボタンへ `focus()` するため、隠れた項目が間にあると Light から Navy へ進めない。末尾へ寄せれば Auto・Light・Navy の間を矢印で移動できる。
+- End キーの補正（2026-10-08、タスク 2.5 の実装で追加）: `book.js` は End で `li:last-child button` へフォーカスするため、隠した項目を末尾へ移すと End が効かなくなる。`claudia.js` は修飾キーなしの End がメニュー内で押されたときだけ、見えている最後の項目へフォーカスし直す。要素の追加・削除、通信、保存値への接触はしない。
 - 保存値（R2.4）: `book.js` はメニュー生成時の id 一覧で保存値を判定するため、`rust` 等の保存値はそのまま適用され mdBook の既定配色で読める（隠すだけで壊さない）。部品は `:root` の既定トークンで読める。
 - 保持と初回表示（R2.5・2.6）: `book.toml` の `default-theme`・`preferred-dark-theme` と `book.js` の保存の仕組みは不変。
 - Auto 項目（`mdbook-theme-default_theme`）は残す。OS の設定に従って light か navy を選ぶだけで、第三のテーマではない。メニューは Auto・Light・Navy の 3 項目になり、配色は 2 種類のまま（設計ディスカッション議題 1 で確定。R2.1 の「2 つに絞る」は配色の数を指す）。

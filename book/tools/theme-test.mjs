@@ -21,6 +21,9 @@
 //       * 620px 以下で顔を小さくし、420px 以下で扉の案内を 1 列にする。吹き出しは長い語でも折り返す。
 //       * 印刷では、どのテーマでも light の値（全トークンを light ブロックと同じ値で再定義）を使い、
 //         台詞と扉の途中で改ページせず、区切り線は罫線で描き、コードの着色もどのテーマでも 6 群にそろえる。
+//   - テーマメニューの隠し規則（タスク 2.5 / 要件 2.1、design「ThemeMenu」）:
+//       * 最上位の規則で #mdbook-theme-rust・-coal・-ayu のボタンを display: none にする。
+//       * Auto（#mdbook-theme-default_theme）・Light・Navy は隠さない。
 //   - Node 標準のみ・ビルド不要。問題は全件列挙してから exit 1。
 
 import { readFileSync } from 'node:fs';
@@ -386,6 +389,28 @@ export function checkTalk(css) {
   return results;
 }
 
+// --- テーマメニューの隠し規則の検査（タスク 2.5） ---
+
+// メニューに出さないテーマと、残すテーマ（mdBook 0.5.x のボタンの id。要件 2.1、design「ThemeMenu」）
+export const MENU_HIDDEN = ['rust', 'coal', 'ayu'];
+export const MENU_KEPT = ['default_theme', 'light', 'navy'];
+
+// CSS 全文のテーマメニューの隠し規則を検査し、[{ ok, name, detail }] を返す
+export function checkMenu(css) {
+  const results = [];
+  const add = (ok, name, detail) => results.push({ ok, name, detail });
+  const top = leafRules(css).filter((r) => !r.nested);
+  // id のボタンを display: none にする最上位の規則があるか（セレクタはカンマ区切りの 1 つが id だけのもの）
+  const hides = (name) => top.some((r) => r.decls.some(([p, v]) => p === 'display' && v === 'none')
+    && r.selector.split(',').some((s) => s.trim() === `#mdbook-theme-${name}`));
+  for (const name of MENU_HIDDEN) add(hides(name), `M-1 テーマメニューの ${name} を隠す`, `#mdbook-theme-${name} { display: none } が最上位に無い`);
+  // 残す項目は、どこでも（@media の中も含めて）隠さない
+  const hiddenKept = leafRules(css).filter((r) => r.decls.some(([p, v]) => (p === 'display' && v === 'none') || (p === 'visibility' && v === 'hidden'))
+    && MENU_KEPT.some((name) => new RegExp(`#mdbook-theme-${name}(?![\\w-])`).test(r.selector)));
+  add(hiddenKept.length === 0, 'M-2 テーマメニューの Auto・Light・Navy は隠さない', hiddenKept.map((r) => r.selector).join(' / '));
+  return results;
+}
+
 // --- 実行 ---
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   let passed = 0;
@@ -447,6 +472,15 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const headOk = talk('/* claudia-hero */ .x {}', 'C-10 扉の契約 claudia-hero ');
     const headNg = talk('.x {} /* claudia-hero */', 'C-10 扉の契約 claudia-hero ');
     check('S-23 扉の契約は冒頭のコメントだけを見る', headOk && headOk.ok && headNg && !headNg.ok);
+    const menu = (src, prefix) => checkMenu(src).find((x) => x.name.startsWith(prefix));
+    const m1 = menu('#mdbook-theme-rust, #mdbook-theme-coal { display: none; }', 'M-1 テーマメニューの ayu');
+    check('S-24 隠し規則に無いテーマを失敗にする', m1 && !m1.ok);
+    const m1media = menu('@media print { #mdbook-theme-ayu { display: none; } }', 'M-1 テーマメニューの ayu');
+    check('S-25 @media の中の隠し規則は数えない', m1media && !m1media.ok);
+    const m2 = menu('#mdbook-theme-rust, #mdbook-theme-navy { display: none; }', 'M-2');
+    check('S-26 Navy を隠せば失敗', m2 && !m2.ok);
+    const m2ok = menu('#mdbook-theme-navy { color: var(--fg); } #mdbook-theme-navyish { display: none; }', 'M-2');
+    check('S-27 残す項目の色の規則や似た id は隠したことに数えない', m2ok && m2ok.ok);
   }
 
   let css = null;
@@ -464,6 +498,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     for (const r of checkComponents(css)) check(r.name, r.ok, r.detail);
     console.log('\n== (C・N・P) 台詞部品・扉・クレジット・狭い画面・印刷 ==');
     for (const r of checkTalk(css)) check(r.name, r.ok, r.detail);
+    console.log('\n== (M) テーマメニュー ==');
+    for (const r of checkMenu(css)) check(r.name, r.ok, r.detail);
   }
 
   console.log(`\n結果: ${passed} passed, ${failed} failed`);

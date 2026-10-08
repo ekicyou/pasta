@@ -30,6 +30,15 @@
     必ず同期すること（関数本体は tokenize.mjs から `export` を除いた逐語コピー）。
   ============================================================================
 --}}
+{{!-- manual-claudia-theme タスク 2.5（要件 1.3・1.6・8.5、design「FontLoader」）:
+  Claudia テーマの Web フォントを Google Fonts から読む（公開物に同梱しない。マニュアル唯一の外部通信で任意）。
+  字体トークン（claudia.css の --claudia-font-*）が使う 4 書体の、CSS が使う太さだけを読む。
+  display=swap と claudia.css のフォールバック列で、読み込めないとき（オフライン等）もシステム字体で読める。
+  mdBook の CSS より前に展開されるので、additional-css の @import より早く取得が始まる。
+  下の tokenizer・neutralizer のブロックとは独立（BEGIN/END マーカーの外に置く）。 --}}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=BIZ+UDPMincho:wght@400;700&family=Cormorant+Garamond:ital,wght@1,500&family=Shippori+Mincho+B1:wght@600;800&display=swap">
 <script>
 (function () {
     'use strict';

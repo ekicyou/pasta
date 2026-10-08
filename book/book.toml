@@ -14,6 +14,7 @@ site-url = "/pasta/"
 git-repository-url = "https://github.com/ekicyou/pasta"
 # Claudia テーマ（manual-claudia-theme）。全章と print.html に読み込まれる。
 additional-css = ["theme/claudia.css"]
+additional-js = ["theme/claudia.js"]
 
 [output.html.redirect]
 "/lua/modules.html" = "modules/index.html"
