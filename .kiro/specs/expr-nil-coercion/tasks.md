@@ -65,8 +65,8 @@
   - _Depends: 3.3_
   - _Boundary: 既存のスナップショット・期待 Lua・生成形を照合する既存テスト・既存の E2E シーンとその期待_
 
-- [ ] 4. 呼び出し元の無くなった演算メソッドを撤去する
-- [ ] 4.1 算術・連結の演算メソッドと、その内部の演算子表・被演算子の数値化／文字列化を消す
+- [x] 4. 呼び出し元の無くなった演算メソッドを撤去する
+- [x] 4.1 算術・連結の演算メソッドと、その内部の演算子表・被演算子の数値化／文字列化を消す
   - 対応する Lua の単体テストの describe を消し、テスト登録の注釈と Call のキーの注釈（「内側の演算が警告済み」）を直す（振る舞いは変えない）
   - リポジトリ全体を検索し、生成コード・テスト・ランタイムに演算メソッドの呼び出しが残っていないことを確かめる（マニュアル・スキルは 5・6 で直す）
   - 完了時: luacheck とワークスペース全体のテストが通り、ランタイム・テスト・生成コードに演算メソッドへの参照が無い
@@ -91,7 +91,8 @@
   - 内部モジュールの「生成コード用のメソッド」の項と、トランスパイラーのページの生成形の例・説明を新しい形にする
   - 完了時: 3 ページに旧い演算メソッドの記述が残らず、リンク検証が通る
   - _Requirements: 6.3_
-  - _Boundary: book/src/lua/script-api.md, book/src/internals/internal-modules.md, book/src/internals/transpiler.md_
+  - パターン集の「act のメソッド」の例に挙がっている `arith`・`concat` を外す（4.1 の全体検索で見つかった、設計の一覧に無い箇所）
+  - _Boundary: book/src/lua/script-api.md, book/src/internals/internal-modules.md, book/src/internals/transpiler.md, book/src/lua/patterns.md_
   - _Depends: 4.1_
 
 - [ ] 6. スキルをマニュアルと同じ内容に揃える
@@ -114,3 +115,4 @@
 - 1.1: `init.lua` は `PASTA` の `__index` で `num`・`str` を初回参照時に `require("pasta.act")` から `rawset` で載せる。`require "pasta"` で即座に act.lua を読み込むと、`runtime_safety_test.rs` の「act のロード前に `@pasta_log` を差し替える」補助の前提（assert）が崩れ既存 4 テストが落ちるため。design.md の File Structure Plan を合わせて直した。
 - 3.1: 赤の記録 — 現行の生成形で `runtime_safety_test` の新しい 4 件（nil の出どころ・演算子の左右・式の位置・入れ子と変換できない値）が値 nil で失敗（transpiler 139 成功・4 失敗、他ターゲットは全緑）。変えない規則の 1 件は緑。ログの差し込みは `@pasta_log` の表をその場で書き換える形（先にロード済みの `pasta.word` の警告も拾うため）。
 - 3.2: 赤の記録 — `call_execution_correctness_e2e_test` の新しい 4 件（回数 1→2・再起動で 3・`＞＄時間帯＆「の挨拶」`・空文字列の失敗表記）が値なしで失敗（38 成功・4 失敗）。単独の変数・関数ターゲットの 2 件は緑。`＊会話` は OnTalk の別名が未実装のためイベント ID `会話` のフォールバックで起動。話者は登録済みの `さくら`（design.md の `女の子` は未登録アクターの警告が出るため）。
+- 4.1: 全体検索で設計の一覧に無い古い記述が 2 か所見つかった。`TEST_COVERAGE.md` の連結の行は 4.1 で直し、`book/src/lua/patterns.md` の act のメソッドの例（`arith`・`concat`）は 5.3 の持ち場に足した。
