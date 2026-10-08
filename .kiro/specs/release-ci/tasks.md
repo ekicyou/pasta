@@ -201,3 +201,4 @@
 - 4.5: report は `NEEDS_JSON: ${{ toJSON(needs) }}` を pwsh で解析する。skipped で outputs が空 → not-run、failure/cancelled で空 → 「job の summary を参照」。「どの公開先にも公開していない」は verify・gate・build のどれかが failure/cancelled のときだけ出す。
 - 5.1: Marketplace のアクセストークンは、同じマネージド ID の資格情報を持つ `release-setup-check`（main からの実行）でも得られる。タグに限られるのは crates.io のトークンだけで、main を PR 経由でしか変えられないこと（ブランチ保護）が前提になる。release.yml・publish-vsix.ps1 は手順書の表を「名前の表」と呼ぶが、見出しは「名前の対応表」（どちらも design の語）。
 - 6.1: Windows の link.exe はパス長の上限があり、scratchpad の深いパスに作業ツリーを作ると `cargo test` が LNK1104 で落ちる。クリーンなチェックアウトは `.claude/worktrees/` 直下など短いパスに作る。
+- 最終検証: `upload-artifact` に `overwrite: true` を足した（「Re-run all jobs」で build が同名の `release-assets` を再アップロードしても衝突しない）。design.md「Security Considerations」に、Members 追加後は `release-setup-check` でも Marketplace のトークンを得られる残存リスクを書き足した（main は保護なし。対策は C-2 の前にユーザーが決める）。

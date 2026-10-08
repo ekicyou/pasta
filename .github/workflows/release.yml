@@ -192,6 +192,8 @@ jobs:
             release/pasta-vscode-${{ needs.verify.outputs.version }}.vsix
           retention-days: 90
           if-no-files-found: error
+          # 「Re-run all jobs」で build が再実行されても、同じ run の同名 artifact と衝突しないよう置き換える
+          overwrite: true
 
   # crates.io への公開（5 クレートを依存順に 1 つずつ）。
   # 認証は Trusted Publishing（OIDC → 30 分のトークン）。トークンはクレートごとに auth step で取り直し、
