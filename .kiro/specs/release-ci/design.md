@@ -159,7 +159,7 @@ graph TB
 │       ├── publish-vsix.ps1          # 新規: Marketplace の公開済み判定と vsce publish
 │       ├── release-notes.ps1         # 新規: 前のリリースタグの決定とリリースノートの生成
 │       └── github-release.ps1        # 新規: GitHub Release の検索・下書き作成・添付の補完・公開
-└── release-ci-setup.md               # 新規: 一回限りのセットアップの手順書（【仮定】置き場所。Open Question 5）
+└── release-ci-setup.md               # 新規: 一回限りのセットアップの手順書（置き場所は議題 7 で確定）
 
 crates/pasta_sample_ghost/
 ├── release.ps1                       # 変更: [5/7] pasta.dll.zip の生成を取り込む・案内表示を新手順へ
@@ -823,8 +823,8 @@ flowchart TD
 2. ~~**セットアップ確認の方式**~~ → **確定（議題 1）**: 確認用 environment を別に作り、マネージド ID のフェデレーション資格情報を 2 件（`environment:release`・`environment:release-setup-check`）にする。確認ワークフローは crates.io のトークン交換を行わない。<br>旧: 確認用 environment を別に作り、フェデレーション資格情報を 2 件にする。crates.io のトークン交換は確認に含めない。候補: (a) 上記、(b) `release` environment の保護規則に `main` も加えて 1 つで済ます、(c) 確認用 environment にも crates.io Trusted Publisher を設定しトークン交換まで試す。推奨 (a): 公開できる認証をタグからの実行だけに限ったまま（1.6・9.4）、profile ID の表示と Members の確認ができる。
 3. ~~**Rust ツールチェーンの固定**~~ → **確定（議題 4）**: 固定しない。R3.5 の「ツール」は wasm-pack・cargo-about・vsce・Node を指し、Rust の再現性は R3.9 の範囲（依存の解決 = `Cargo.lock`）で満たす。stable の更新による失敗は関門・ビルドで公開前に止まり、タグの付け直しで回復できる。<br>旧: 固定しない（`dtolnay/rust-toolchain@stable` のまま。`Cargo.lock` と外部ツールの版固定で再現性を担う）。候補: (a) 上記、(b) `rust-toolchain.toml` を置いて開発機・build.yml・release.yml をそろえる、(c) release.yml だけ版を固定する。推奨 (a): (b) はリポジトリ全体の方針変更で本仕様の境界を越え、(c) は関門（build.yml）とビルドの構成がずれて 2.5 に反する。
 4. ~~**リリースノートの 6 種以外の扱い**~~ → **確定（議題 6）**: `perf`・`ci`・`build`・`style`・`revert` と Conventional Commits でない件名を「🔧 Maintenance」に入れる。コミットを黙って落とさず、6 見出し（6.7）も増やさない。<br>旧候補: (a) 上記、(b) 今の設計どおり黙って落とす、(c) 「その他」見出しを足す。推奨 (a): コミットが消えず、要件の 6 見出し（6.7）を増やさない。
-5. **手順書の置き場所**（File Structure Plan）: `.github/release-ci-setup.md`。候補: (a) 上記、(b) `crates/pasta_sample_ghost/RELEASE.md` の一節、(c) `docs/` を新設、(d) spec 配下。推奨 (a): ワークフローの隣にあり、ゴースト固有の文書に crates.io・Azure の手順を混ぜない。(d) は completed/ へ移ると参照が壊れる。
-6. **補助スクリプトの置き場所と言語**（File Structure Plan）: `.github/scripts/release/*.ps1`（pwsh 7、ubuntu でも動かす）。候補: (a) 上記、(b) ルート `scripts/` を新設、(c) bash と pwsh を使い分ける。推奨 (a): CI 専用の補助であることが場所から分かり、1 言語で手元（Windows）と両ランナーで同じものを実行できる。
+5. ~~**手順書の置き場所**~~ → **確定（議題 7）**: `.github/release-ci-setup.md`。ワークフローの隣に置き、ゴースト固有の文書に crates.io・Azure の手順を混ぜない。<br>旧候補: (a) 上記、(b) `crates/pasta_sample_ghost/RELEASE.md` の一節、(c) `docs/` を新設、(d) spec 配下。推奨 (a): ワークフローの隣にあり、ゴースト固有の文書に crates.io・Azure の手順を混ぜない。(d) は completed/ へ移ると参照が壊れる。
+6. ~~**補助スクリプトの置き場所と言語**~~ → **確定（議題 7）**: `.github/scripts/release/*.ps1`（pwsh 7。Windows・ubuntu の両ランナーと開発機で同じものを実行する）。<br>旧候補: (a) 上記、(b) ルート `scripts/` を新設、(c) bash と pwsh を使い分ける。推奨 (a): CI 専用の補助であることが場所から分かり、1 言語で手元（Windows）と両ランナーで同じものを実行できる。
 7. ~~**ubuntu で動かす job**~~ → **確定（議題 5）**: verify・publish-vsce・github-release・report は ubuntu-latest、gate（build.yml が決める）・build・publish-crates は windows-latest。<br>旧: verify・publish-vsce・github-release・report を ubuntu-latest に置く（Windows は gate・build・publish-crates だけ）。候補: (a) 上記、(b) すべて windows-latest。推奨 (a): 配布物のビルドは Windows の要件（3.7）だが、公開と Release は OS に依らず、ubuntu のほうが起動が速く native addon の問題も無い。publish-crates は `pasta_shiori` の検証ビルドのため Windows に残す。
 8. ~~**crates.io トークンの取り直し**~~ → **確定（議題 2）**: クレートごとに `crates-io-auth-action` を呼び直す（5 回）。拒否されたときの落とし先（1 回取得 + 再実行、版を上げて出し直す）を `release.yml` のコメントと手順書に明記し、初回リリースで所要時間を記録する。<br>旧: クレートごとに `crates-io-auth-action` を呼び直す（5 回）。候補: (a) 上記、(b) 1 回だけ取得し 30 分を超えたら再実行で続ける、(c) 実測してから決める。推奨 (a): 期限切れという予見できる失敗を設計で避けられる。ただし同一 job で複数回呼べることは公式文書に無い（research）。初回リリースで (a) が通らなければ (b) に落とす。
 10. ~~**status 契約の拡張と report の一次情報**~~（自動検証の指摘 2・3）→ **確定（議題 3）**: `status=failed` のときの `reason`（auth / publish / transient / not-registered / immutable）を output に足し、各 publish job の末尾に `if: always()` の集約 step を置いて job 自身の summary を一次情報にする。report は二次情報で、outputs が空なら推論せず「job の summary を参照」と出す。<br>旧: 4 値の `status` だけで、report が失敗 job の outputs から not-run / failed を推論していた。
