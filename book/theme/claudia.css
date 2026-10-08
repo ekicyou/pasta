@@ -1,0 +1,270 @@
+/*
+ * claudia.css — pasta マニュアルの Claudia テーマ（manual-claudia-theme）。
+ * mdBook の additional-css として全章と print.html に読み込まれる。
+ *
+ * 構成（ファイル内の順序が上書き順。design「ClaudiaTheme / State Management」）:
+ *   1. :root — 字体トークンと、部品トークンの既定値（mdBook 変数への参照。rust・coal・ayu でも部品が読める。要件 2.4）
+ *   2. .light, html:not(.js) — mdBook のテーマ変数のすべてと Claudia トークンを light 値で再定義
+ *   3. .navy — 同じ範囲を navy 値で再定義
+ *   4. 部品のスタイル（トークンだけを参照し、色を直書きしない）— タスク 2.3・2.4
+ *   5. pasta コードの着色 6 群の上書き（light・navy のみ）
+ *   6. 狭い画面の規則 — タスク 2.4
+ *   7. 印刷の規則 — タスク 2.4
+ *
+ * 値は design「データモデル / テーマトークン契約」の表に従う。
+ * 文字色と背景色の対比は book/tools/theme-test.mjs が検査する（各組 4.5 以上）。
+ */
+
+/* ============================================================
+ * 1. 字体トークンと部品トークンの既定値
+ * ============================================================ */
+:root {
+    /* 字体（要件 1.3・1.4）。コードは mdBook の --mono-font のまま変えない（要件 1.5） */
+    --claudia-font-body: "BIZ UDPGothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+    --claudia-font-talk: "BIZ UDPMincho", "Yu Mincho", "Hiragino Mincho ProN", serif;
+    --claudia-font-heading: "Shippori Mincho B1", "Yu Mincho", "Hiragino Mincho ProN", serif;
+    --claudia-font-latin: "Cormorant Garamond", Georgia, serif;
+
+    /* 部品トークンの既定値。rust・coal・ayu ではその配色の mdBook 変数で部品を描く */
+    --claudia-paper: var(--bg);
+    --claudia-ink: var(--fg);
+    --claudia-ink2: var(--fg);
+    --claudia-paper2: var(--quote-bg);
+    --claudia-edge: var(--quote-border);
+    --claudia-accent: var(--links);
+    --claudia-gold: var(--quote-border);
+    --claudia-wax: var(--inline-code-color);
+    --claudia-code-bg: var(--bg);
+    --talk-bubble: var(--quote-bg);
+    --talk-claudia-ink: var(--fg);
+    --talk-claudia-face: var(--quote-bg);
+    --talk-claudia-ring: var(--quote-border);
+    --talk-claudia-name: var(--fg);
+    --talk-anthony-ink: var(--fg);
+    --talk-anthony-face: var(--quote-bg);
+    --talk-anthony-ring: var(--links);
+    --talk-anthony-name: var(--fg);
+}
+
+/* ============================================================
+ * 2. light（JS 無効時もこの値）
+ * ============================================================ */
+.light, html:not(.js) {
+    /* --- mdBook のテーマ変数 --- */
+    --bg: #FAF5EA;
+    --fg: #3A2419;
+
+    --sidebar-bg: #F0E4CE;
+    --sidebar-fg: #3A2419;
+    --sidebar-non-existant: #A8927A;
+    --sidebar-active: #9C4426;
+    --sidebar-spacer: #E3D2B3;
+
+    --scrollbar: #C9B591;
+
+    --icons: #6B4E3D;
+    --icons-hover: #3A2419;
+
+    --links: #9C4426;
+
+    --inline-code-color: #6D1F2C;
+
+    --theme-popup-bg: #FFFDF6;
+    --theme-popup-border: #E3D2B3;
+    --theme-hover: #F0E4CE;
+
+    --quote-bg: #F0E4CE;
+    --quote-border: #B98D4A;
+
+    --warning-border: #B4532F;
+
+    --table-border-color: #E3D2B3;
+    --table-header-bg: #F0E4CE;
+    --table-alternate-bg: #F5ECDC;
+
+    --searchbar-border-color: #E3D2B3;
+    --searchbar-bg: #FFFDF6;
+    --searchbar-fg: #3A2419;
+    --searchbar-shadow-color: #E3D2B3;
+    --searchresults-header-fg: #6B4E3D;
+    --searchresults-border-color: #E3D2B3;
+    --searchresults-li-bg: #F0E4CE;
+    --search-mark-bg: #EBD39A;
+
+    --color-scheme: light;
+
+    /* --icons（#6B4E3D）に近づける */
+    --copy-button-filter: invert(23%) sepia(5%) saturate(1978%) hue-rotate(339deg) brightness(153%) contrast(115%);
+    /* --sidebar-active（#9C4426）に近づける */
+    --copy-button-filter-hover: invert(33%) sepia(18%) saturate(2681%) hue-rotate(334deg) brightness(91%) contrast(91%);
+
+    --footnote-highlight: #B4532F;
+
+    --overlay-bg: rgba(227, 210, 179, 0.4);
+
+    --blockquote-note-color: #2C5A8C;
+    --blockquote-tip-color: #2F6B4F;
+    --blockquote-important-color: #5A4FA0;
+    --blockquote-warning-color: #8A5A12;
+    --blockquote-caution-color: #A0342A;
+
+    --sidebar-header-border-color: #B98D4A;
+
+    /* --- Claudia のトークン --- */
+    --claudia-paper: #FAF5EA;
+    --claudia-ink: #3A2419;
+    --claudia-ink2: #6B4E3D;
+    --claudia-paper2: #F0E4CE;
+    --claudia-edge: #E3D2B3;
+    --claudia-accent: #B4532F;
+    --claudia-gold: #B98D4A;
+    --claudia-wax: #6D1F2C;
+    --claudia-code-bg: #F3EAD6;
+
+    --talk-bubble: #FFFDF6;
+    --talk-claudia-ink: #6A2A26;
+    --talk-claudia-face: #F0E4CE;
+    --talk-claudia-ring: #B98D4A;
+    --talk-claudia-name: #7F5F2A;
+    --talk-anthony-ink: #2C3E66;
+    --talk-anthony-face: #EEF2FA;
+    --talk-anthony-ring: #8FA3C8;
+    --talk-anthony-name: #4A6290;
+
+    /* pasta コードの着色 6 群 */
+    --claudia-hl-comment: #6B4E3D;
+    --claudia-hl-variable: #5A4FA0;
+    --claudia-hl-number: #8A5A12;
+    --claudia-hl-string: #2F6B4F;
+    --claudia-hl-title: #6D1F2C;
+    --claudia-hl-keyword: #8A3B1E;
+}
+
+/* ============================================================
+ * 3. navy
+ * ============================================================ */
+.navy {
+    /* --- mdBook のテーマ変数 --- */
+    --bg: #1A1E2B;
+    --fg: #E9E1D1;
+
+    --sidebar-bg: #141827;
+    --sidebar-fg: #E9E1D1;
+    --sidebar-non-existant: #6B6656;
+    --sidebar-active: #E0866A;
+    --sidebar-spacer: #3A4157;
+
+    --scrollbar: #5A6178;
+
+    --icons: #B8AE9C;
+    --icons-hover: #E9E1D1;
+
+    --links: #E0866A;
+
+    --inline-code-color: #E99AA8;
+
+    --theme-popup-bg: #232838;
+    --theme-popup-border: #3A4157;
+    --theme-hover: #2C3245;
+
+    --quote-bg: #232838;
+    --quote-border: #C9A467;
+
+    --warning-border: #E0866A;
+
+    --table-border-color: #3A4157;
+    --table-header-bg: #232838;
+    --table-alternate-bg: #1F2331;
+
+    --searchbar-border-color: #3A4157;
+    --searchbar-bg: #232838;
+    --searchbar-fg: #E9E1D1;
+    --searchbar-shadow-color: #3A4157;
+    --searchresults-header-fg: #B8AE9C;
+    --searchresults-border-color: #3A4157;
+    --searchresults-li-bg: #232838;
+    --search-mark-bg: #6B5428;
+
+    --color-scheme: dark;
+
+    /* --icons（#B8AE9C）に近づける */
+    --copy-button-filter: invert(81%) sepia(82%) saturate(1469%) hue-rotate(298deg) brightness(133%) contrast(44%);
+    /* --sidebar-active（#E0866A）に近づける */
+    --copy-button-filter-hover: invert(44%) sepia(12%) saturate(1567%) hue-rotate(328deg) brightness(133%) contrast(97%);
+
+    --footnote-highlight: #E0866A;
+
+    --overlay-bg: rgba(20, 24, 39, 0.5);
+
+    --blockquote-note-color: #8FB0E8;
+    --blockquote-tip-color: #9FD6B3;
+    --blockquote-important-color: #BDB3F5;
+    --blockquote-warning-color: #E8C27A;
+    --blockquote-caution-color: #F0A080;
+
+    --sidebar-header-border-color: #C9A467;
+
+    /* --- Claudia のトークン --- */
+    --claudia-paper: #1A1E2B;
+    --claudia-ink: #E9E1D1;
+    --claudia-ink2: #B8AE9C;
+    --claudia-paper2: #232838;
+    --claudia-edge: #3A4157;
+    --claudia-accent: #E0866A;
+    --claudia-gold: #C9A467;
+    --claudia-wax: #E99AA8;
+    --claudia-code-bg: #141827;
+
+    --talk-bubble: #242A3B;
+    /* 顔の面は暗い色にして、2 値の透過 PNG の縁が浮かないようにする（要件 2.3） */
+    --talk-claudia-ink: #F0B1A2;
+    --talk-claudia-face: #3A3040;
+    --talk-claudia-ring: #C9A467;
+    --talk-claudia-name: #C9A467;
+    --talk-anthony-ink: #AFC3F2;
+    --talk-anthony-face: #242F4A;
+    --talk-anthony-ring: #6F86B8;
+    --talk-anthony-name: #8FA6D8;
+
+    /* pasta コードの着色 6 群 */
+    --claudia-hl-comment: #B8AE9C;
+    --claudia-hl-variable: #BDB3F5;
+    --claudia-hl-number: #E8C27A;
+    --claudia-hl-string: #9FD6B3;
+    --claudia-hl-title: #E99AA8;
+    --claudia-hl-keyword: #F0A080;
+}
+
+/* ============================================================
+ * 5. pasta コードの着色 6 群（light・navy のみ。rust・coal・ayu は mdBook の配色のまま）
+ *    群は scope-map.mjs の hljs クラスに合わせる。クラスの写像は変えず、色だけを上書きする。
+ * ============================================================ */
+.light .hljs, .navy .hljs, html:not(.js) .hljs {
+    background: var(--claudia-code-bg);
+}
+/* ブロックの地の文字だけ。インラインコードは mdBook の --inline-code-color の規則に任せる */
+.light pre > .hljs, .navy pre > .hljs, html:not(.js) pre > .hljs {
+    color: var(--fg);
+}
+.light .hljs-comment, .navy .hljs-comment, html:not(.js) .hljs-comment {
+    color: var(--claudia-hl-comment);
+}
+.light .hljs-variable, .navy .hljs-variable, html:not(.js) .hljs-variable,
+.light .hljs-attr, .navy .hljs-attr, html:not(.js) .hljs-attr,
+.light .hljs-tag, .navy .hljs-tag, html:not(.js) .hljs-tag {
+    color: var(--claudia-hl-variable);
+}
+.light .hljs-number, .navy .hljs-number, html:not(.js) .hljs-number,
+.light .hljs-built_in, .navy .hljs-built_in, html:not(.js) .hljs-built_in,
+.light .hljs-literal, .navy .hljs-literal, html:not(.js) .hljs-literal {
+    color: var(--claudia-hl-number);
+}
+.light .hljs-string, .navy .hljs-string, html:not(.js) .hljs-string {
+    color: var(--claudia-hl-string);
+}
+.light .hljs-title, .navy .hljs-title, html:not(.js) .hljs-title {
+    color: var(--claudia-hl-title);
+}
+.light .hljs-keyword, .navy .hljs-keyword, html:not(.js) .hljs-keyword {
+    color: var(--claudia-hl-keyword);
+}

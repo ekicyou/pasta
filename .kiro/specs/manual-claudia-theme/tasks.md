@@ -63,7 +63,7 @@
   - _Requirements: 2.3, 7.1, 7.2, 7.3, 7.5_
   - _Boundary: FaceAssets_
 
-- [ ] 2.2 (P) Claudia の配色トークン（light と navy）と対比テストを作る
+- [x] 2.2 (P) Claudia の配色トークン（light と navy）と対比テストを作る
   - テーマの CSS を新しく作り、次の順にトークンを定義する。値は設計の「テーマトークン契約」の表に従う。
     1. 字体のトークン
     2. 部品のトークンの既定値。mdBook の変数を参照させ、rust・coal・ayu を選んでいても部品が読めるようにする。
@@ -402,3 +402,7 @@
 - 1.2: フェンスの判定は link-check.mjs の export 済み `maskFences` を使う。`talk.mjs --stats` の導入・締めの分割は、循環 import を避けるため gen-skill-refs の区切り規則を複製している。3.2 で chapterRegions の定義を変えるなら、ここも合わせる。
 - 1.2: 台詞の直後に空行なしで `---` が来ると missing-blank-line になる（`---` の直後の台詞は許す）。章の書き換え（タスク 5）では台詞と `---` の間に空行を入れる。
 - 2.1: 顔アイコンは ponapalt/claudia fdd585ca から取得。Claudia の 14 枚は 256 色パレット化でアルファが 2 値（しきい値 128）、f10・f11 は RGBA のまま。navy で縁が浮かないかは 2.2 以降のトークンで確かめる。
+- 2.2: 字体トークン（`--claudia-font-body`・`-talk`・`-heading`・`-latin`）は定義だけで、まだどの要素にも当てていない。要件 1.4 の適用は、2.3 で本文（ゴシック）と見出し（Shippori Mincho B1）、2.4 で台詞本文（明朝）と名札（欧文）が受け持つ。
+- 2.2: mdBook 0.5.x は追加 CSS・JS を `theme/claudia-<hash>.css` のようにハッシュ付きの名前で出力する。3.5 の資材検査は固定のファイル名で探さないこと。出力のうち `lua/modules.html` はリダイレクト専用のページで、テーマの CSS を読まない（章ではないので検査の対象から外す）。
+- 2.2: 着色の上書きは scope-map のクラスだけ。lua・toml・json などを実行時に着色する highlight.js の兄弟クラス（`hljs-symbol`・`hljs-bullet`・`hljs-name`・`hljs-regexp`・`hljs-template-variable`・`hljs-selector-*` など）は light で対比が 4.5 を割る。2.3 でコードブロックを整えるときに、同じ群の色でまとめて上書きする。
+- 2.2: mdBook のテーマ変数は 40 個（設計・research の「41」は誤記で、文書を直した）。手元の mdBook は 0.5.4、CI は 0.5.3。
