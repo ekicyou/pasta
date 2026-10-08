@@ -1,6 +1,6 @@
 ---
 name: pasta-check
-description: 'pasta_check CLIツールのリファレンス。ゴーストリリースビルド（release サブコマンド）、将来的なテスト・検証コマンドを含む。USE FOR: pasta_check, pasta check, ghost release, ゴーストリリース, NAR作成, release.bat, release.ps1, pasta_check release, .nar, リリースビルド, ゴースト配布, updates.txt, build ghost, deploy ghost, publish ghost, リリース手順, pasta_check test, ゴースト検証. DO NOT USE FOR: pasta DSL文法（pasta-ghost-authoringを使用）, Lua API（pasta-lua-codingを使用）, crates.ioパブリッシュ（release-workflow specを参照）.'
+description: 'pasta_check CLIツールのリファレンス。ゴーストリリースビルド（release サブコマンド）、将来的なテスト・検証コマンドを含む。USE FOR: pasta_check, pasta check, ghost release, ゴーストリリース, NAR作成, release.bat, release.ps1, pasta_check release, .nar, リリースビルド, ゴースト配布, updates.txt, build ghost, deploy ghost, publish ghost, リリース手順, pasta_check test, ゴースト検証. DO NOT USE FOR: pasta DSL文法（pasta-ghost-authoringを使用）, Lua API（pasta-lua-codingを使用）, crates.ioパブリッシュ（リリース CI。crates/pasta_sample_ghost/RELEASE.md を参照）.'
 argument-hint: 'サブコマンド名（release等）やゴースト名、オプションを指定'
 ---
 
@@ -84,21 +84,22 @@ pasta_check release `
 ```
 [Setup Phase]                      [Release Phase]
   1. SHIORI DLL ビルド               4. pasta_check release
-  2. ゴースト固有の成果物生成         5. バージョン確認
-  3. DLL/スクリプトを開発フォルダーへ  6. リリース案内表示
+  2. ゴースト固有の成果物生成         5. 追加の配布物の作成（hello-pasta は pasta.dll.zip）
+  3. DLL/スクリプトを開発フォルダーへ  6. バージョン確認
+                                     7. リリース案内表示
 ```
 
-- Setup Phase はゴースト固有の手順（release.ps1 等で実装）
-- Release Phase は pasta_check が汎用的に処理
+- 段 4 は pasta_check が汎用的に処理する
+- それ以外（Setup Phase と段 5〜7）はゴースト固有の手順（release.ps1 等で実装）
 
 ### ディレクトリ構成例
 
 > 以下はサンプルゴースト (hello-pasta) の例。実際のパスはゴーストごとに異なる。
 
 ```
-workspace/
-├── release.bat                          # ラッパースクリプト（任意）
-├── release/
+workspace/                               # ワークスペースルート
+├── release.bat                          # release.ps1 を呼ぶラッパースクリプト（任意・ワークスペースルートに置く）
+├── release/                             # 生成物の出力先（.gitignore で無視・コミットしない）
 │   ├── {ghost-name}/                    # --release 出力先
 │   │   ├── ghost/master/                # ゴースト本体
 │   │   ├── shell/master/                # シェル（画像等）
@@ -107,7 +108,8 @@ workspace/
 │   │   │   └── updates.txt              # 自動生成（バルーン用）
 │   │   ├── install.txt                  # UTF-8・1 行目は charset,UTF-8
 │   │   └── updates.txt                  # 自動生成（ゴースト用）
-│   └── {ghost-name}.nar                 # --nar 出力
+│   ├── {ghost-name}.nar                 # --nar 出力
+│   └── pasta.dll.zip                    # 追加の配布物（hello-pasta 固有・release.ps1 の段 5）
 └── crates/pasta_sample_ghost/
     ├── release.ps1                      # Setup + Release を統合したスクリプト
     └── ghosts/{ghost-name}/             # --target ゴースト開発フォルダー
@@ -122,15 +124,13 @@ SSP 仕様および NAR フォーマットの詳細:
 
 ## リリース後の手順
 
-NAR 作成後は GitHub Release で配布:
+`pasta_check release` が作った `.nar` をどう配布するかは、ゴーストごとに決める（各ゴーストの RELEASE.md 等を参照）。
 
-```powershell
-gh release create v{VERSION} "release/{ghost-name}.nar" `
-  --title "{ghost-name} v{VERSION}" `
-  --notes-file release-notes.md
-```
+### pasta リポジトリ（hello-pasta）の場合
 
-リリースノートのテンプレートは各ゴーストの RELEASE.md を参照。
+- 手元で `release.bat`・`release.ps1`（中で `pasta_check release` を呼ぶ）を実行して `release/` にできる成果物は、動作確認用である。コミットしない（`release/` は `.gitignore` で無視）。
+- 配布物（`pasta.dll.zip`・`hello-pasta.nar`・VSIX）の公開は、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）が行う。CI はタグのソースから配布物を作り直し、GitHub Release（題名 `pasta vX.Y.Z`・リリースノートはコミット履歴から生成）を作って添付する。
+- 手元で `gh release create` を実行しない。手順と失敗したときの回復は `crates/pasta_sample_ghost/RELEASE.md` を参照。
 
 ## トラブルシューティング
 

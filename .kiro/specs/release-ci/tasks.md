@@ -121,7 +121,7 @@
   - _Depends: 3.4, 3.5_
   - _Requirements: 6.1, 6.10, 7.1, 7.5, 8.1, 8.2, 8.3_
 
-- [ ] 5. 手順書とリリース手順の文書
+- [x] 5. 手順書とリリース手順の文書
 - [x] 5.1 (P) 一回限りのセットアップの手順書を作る
   - 節の順を実施の順（design.md の手順書の構成 1〜12）にそろえ、ワークフローの外で 1 度だけ行うこと、ID の値をリポジトリに書かず variables に置くことを冒頭に書く
   - Azure（従量課金・無料試用版を使わない理由・予算アラート・マネージド ID・サービスプリンシパルを採らない理由）、フェデレーション資格情報 2 件、GitHub の environment 2 つと variables、main へのマージ後の確認ワークフローの実行と Members 追加、crates.io の Trusted Publisher ×5、初回リリース、初回成功後の必須手順（`trustpub_only`・2 つのトークンの失効・緊急時の戻し方）、新しいクレートの初回公開、auth の取り直しが拒否されたときの落とし先、名前の対応表を載せる
@@ -136,7 +136,7 @@
   - _Requirements: 7.5, 12.1, 12.3, 12.4, 12.6_
   - _Boundary: RELEASE.md_
 
-- [ ] 5.3 (P) スキル・README・steering のリリース関連の記述をそろえる
+- [x] 5.3 (P) スキル・README・steering のリリース関連の記述をそろえる
   - pasta-check スキルの「リリース後の手順」をリリース CI が Release を作る前提に変え、`release.bat` の位置を直す
   - サンプルゴーストの README に、生成物（DLL・ライセンス表示・`scripts/`）はコミット対象でなく `release/` は無視されることを書く
   - steering の CI/CD の記述に `release.yml`（タグ契機・OIDC・成果物）を足し、`.github/` の構成と `release.bat` の位置の記述を直す。`release-workflow` spec の本体には触れない
