@@ -785,7 +785,7 @@ github-release.ps1 -Tag <vX.Y.Z> -Title <string> -NotesFile <path> -AssetDir <pa
 
 - 長期の認証情報を置かない: crates.io は OIDC → 30 分トークン（job 終了時に失効）、Marketplace は OIDC → Entra ID のアクセストークン（`az login` のセッションは job 終了時にログアウト）。GitHub の secrets は使わない（9.1・9.2・9.6）。
 - 最小権限: `id-token: write` は publish-crates・publish-vsce・setup-check だけ、`contents: write` は github-release だけ。ワークフロー既定は `contents: read`（9.3）。
-- environment による限定: 公開用 `release` はタグ `v*` からの実行だけ。確認用 `release-setup-check`（`main` からの実行だけ）は crates.io のトークンを発行しない。ただし同じマネージド ID の資格情報を持つので、Marketplace の Members に追加した後は、Marketplace へ公開できるアクセストークンを得られる（残存リスク。実装時の検証で判明）。前提は「main と `v*` タグを変えられるのは書き込み権限を持つ者だけで、main は PR 経由で変える」こと。main のブランチ保護・ruleset を入れるか、確認が済んだら `release-setup-check` の資格情報を外すかは、C-2（Members への追加）の前にユーザーが決める。
+- environment による限定: 公開用 `release` はタグ `v*` からの実行だけ。確認用 `release-setup-check`（`main` からの実行だけ）は crates.io のトークンを発行しない。ただし同じマネージド ID の資格情報を持つので、Marketplace の Members に追加した後は、Marketplace へ公開できるアクセストークンを得られる（残存リスク。実装時の検証で判明）。前提は「main と `v*` タグを変えられるのは書き込み権限を持つ者だけで、main は PR 経由で変える」こと。この前提を満たすため、2026-10-08 に main のブランチ保護を有効にした（PR 必須・承認 0 人・管理者にも適用・force push と削除を禁止・必須のステータスチェックなし）。
 - 公開リポジトリのため、Azure の各 ID・profile ID をファイルに書かない。variables に置き、ログには Azure/login がマスクする値以外を出さない。
 - `pull_request_target`・`workflow_run` は使わない（crates.io が拒否する起動種別でもある）。
 - 第三者アクションはメジャー版タグで固定（`@v1`・`@v3`・`@v4`・`@v6`）。SHA 固定は運用負担との兼ね合いで行わない（build.yml と同じ方針）。
