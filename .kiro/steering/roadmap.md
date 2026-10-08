@@ -219,7 +219,7 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
 - [ ] manual-claudia-theme -- マニュアルを mdBook のまま「Claudia のマニュアル」に着せ替える。配色・字体・枠などの意匠は ponadocs の Claudia 紹介ページ（Unlicense）を手本にし、ダーク版と表紙の扉を用意する。顔アイコン付きの台詞の部品を作り、全章の導入と締めの台詞を書き換える。検索・着色・`file://` 閲覧・検査ツールは壊さない。Dependencies: none
 - [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。Dependencies: release-ci, hello-pasta-tutorial-stages
 - [ ] getting-started-story-guide -- 入門ガイドを段階表に沿った物語に書き直し、全編を Claudia が語る（執筆規約に `getting-started` の例外を足す）。段階辞書との逐語照合と、新しいシェルのスクリーンショットを含む。Dependencies: hello-pasta-tutorial-stages, hello-pasta-shell-art, manual-claudia-theme
-- [ ] expr-nil-coercion -- 式の中の nil を、算術の文脈なら 0、連結の文脈なら空文字列とみなし、ログを出さない。nil 以外の変換できない値（数字でない文字列・真偽値など）は警告を出して 0・空文字列とみなす。`＄＊回数＝＄＊回数＋１` が初回から数え始める。マニュアルとスキル references を同じ PR で直す（2026-10-08、`hello-pasta-tutorial-stages` の設計ディスカッション #1 から起票。要件ディスカッションで規則を組み替えた）。Dependencies: none
+- [x] expr-nil-coercion -- 式の中の nil を、算術の文脈なら 0、連結の文脈なら空文字列とみなし、ログを出さない。nil 以外の変換できない値（数字でない文字列・真偽値など）は警告を出して 0・空文字列とみなす。`＄＊回数＝＄＊回数＋１` が初回から数え始める。マニュアルとスキル references を同じ PR で直す（2026-10-08、`hello-pasta-tutorial-stages` の設計ディスカッション #1 から起票。要件ディスカッションで規則を組み替えた）。Dependencies: none
 - [ ] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアルまで揃える（2026-10-08 起票）。Dependencies: failure-output-unification, call-attribute-filter
 
