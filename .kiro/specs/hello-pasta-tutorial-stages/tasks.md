@@ -63,7 +63,7 @@
   - 完了時: `dic/` が 12 ファイルだけになり、`cargo test -p pasta_sample_ghost` が緑で、旧ファイル名を参照するテストが残っていない（`pasta_shiori` の OnBoot 系 3 テストはタスク 4 まで赤のままでよい）
   - _Requirements: 2.1, 2.4, 3.2, 5.1, 5.2, 6.4_
 
-- [ ] 2.6 配布版のトーク間隔を 1 分前後にし、段階表の 2 段目に設定の書き方を記す
+- [x] 2.6 配布版のトーク間隔を 1 分前後にし、段階表の 2 段目に設定の書き方を記す
   - hello-pasta の `pasta.toml` の `[ghost]` を `talk_interval_min = 45`・`talk_interval_max = 75` に変える（行末のコメントの形は残し、他の行は変えない）
   - talk 間隔の行を文字列で置き換える `scene_kick_gate`・`scene_kick_multibeat`・`scene_kick_preempt` の e2e の置き換え元の文字列と、`integration_test.rs` の talk 間隔の値の検査を新しい行に合わせる（上書き後の値と、上書きが効いたことの assert は変えない）
   - `STAGES.md` の 2 段目に「すぐ確かめたいときは `[ghost]` で間隔を短くする（配布版は 45〜75 秒）」を加え、設定の段を独立させない理由を変更理由の節に足す

@@ -151,12 +151,12 @@ fn test_pasta_toml_content() {
 
     // [ghost] セクション内容確認 (Req 7.1)
     assert!(
-        content.contains("talk_interval_min = 180"),
-        "talk_interval_min = 180 がありません"
+        content.contains("talk_interval_min = 45"),
+        "talk_interval_min = 45 がありません"
     );
     assert!(
-        content.contains("talk_interval_max = 300"),
-        "talk_interval_max = 300 がありません"
+        content.contains("talk_interval_max = 75"),
+        "talk_interval_max = 75 がありません"
     );
 
     // 教育的コメント確認 (Req 7.3)

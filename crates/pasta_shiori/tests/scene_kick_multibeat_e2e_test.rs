@@ -117,11 +117,11 @@ fn build_multibeat_kick_ghost_dir() -> (PathBuf, TempDir) {
     let toml = std::fs::read_to_string(&toml_path).expect("read pasta.toml");
     let toml = toml
         .replace(
-            "talk_interval_min = 180  # 最小トーク間隔（デフォルト: 180）",
+            "talk_interval_min = 45   # 最小トーク間隔（デフォルト: 180）",
             &format!("talk_interval_min = {TALK_INTERVAL_SECS}"),
         )
         .replace(
-            "talk_interval_max = 300  # 最大トーク間隔（デフォルト: 300）",
+            "talk_interval_max = 75   # 最大トーク間隔（デフォルト: 300）",
             &format!("talk_interval_max = {TALK_INTERVAL_SECS}"),
         );
     assert!(
