@@ -429,6 +429,10 @@
 | `shell/master/surfaces.txt` | 897 |
 | `updates.txt` | 3165 |
 
+## ワークフローの検証手順（実装時）
+
+- actionlint 1.7.12 を `winget install --id rhysd.actionlint --version 1.7.12 --exact --scope user` で導入し（実体は `%LOCALAPPDATA%\Microsoft\WinGet\Packages\rhysd.actionlint_Microsoft.Winget.Source_8wekyb3d8bbwe\actionlint.exe`、ユーザーの PATH に追加される）、リポジトリのルートで引数なしの `actionlint` を実行する（`.github/workflows/` の全ワークフローを検査する。シェルのワイルドカード展開に依存しない）。
+
 ## References（設計フェーズ）
 
 - https://docs.github.com/en/actions/how-tos/sharing-automations/reuse-workflows — reusable workflow の制約

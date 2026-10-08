@@ -19,7 +19,7 @@
   - 完了の状態: `Cargo.lock` が追跡され、`cargo build --workspace --locked` と `cargo test --all --locked` が lock を書き換えずに通る
   - _Requirements: 3.9, 3.10_
 
-- [ ] 1.3 ワークフローの構文検査ツール actionlint を手元で使えるようにする
+- [x] 1.3 ワークフローの構文検査ツール actionlint を手元で使えるようにする
   - 版を固定した actionlint を、リポジトリを汚さない場所（ユーザーのツール置き場）へ導入し、導入の方法と版をワークフローの検証手順として research.md に 1 行記録する
   - 完了の状態: 手元で actionlint の版を表示でき、既存の `build.yml`・`manual.yml` を検査して結果が出る
   - _Requirements: 2.6_
@@ -187,3 +187,4 @@
 ## Implementation Notes
 - 1.1: nar の基準（research.md）の `pasta.toml` は 2639 バイトだが、基準の nar の後に `f245ab1f`（#59）で正本が変わったため、作り直すと 2583 バイトになる。2.1 の比較ではパスの集合を比べ、この差は既知として扱う。
 - 1.2: lock はルートの `Cargo.lock` 1 つだけ（VSIX の WASM の `crates/pasta_lsp` もワークスペース内）。wasm-pack と `release.ps1` は `--locked` を付けないので、build job の `git diff --exit-code -- Cargo.lock` が lock 不変の唯一の検査になる。
+- 1.3: actionlint 1.7.12（winget・ユーザー領域）。検証は引数なしの `actionlint`（PowerShell では `*.yml` が展開されず exit 3）。shellcheck は無いので `run:` の中身はシェル検査されない（仕様の要求外）。現在のシェルの PATH に無ければ `%LOCALAPPDATA%\Microsoft\WinGet\Packages\rhysd.actionlint_Microsoft.Winget.Source_8wekyb3d8bbwe\actionlint.exe` を直接呼ぶ。
