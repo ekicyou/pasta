@@ -72,3 +72,15 @@ pasta のマニュアルは初心者向けになっていない。入門ガイ�
 - **見つけた穴・古くなった記述**:
   - `first-ghost.md` の ```text ブロック（シェルの `descript.txt` など）は `tutorial-check.mjs` の照合の外にある。`hello-pasta-shell-art` でシェルが変わると黙って古くなる。照合の対象を広げるかを要件で決める。
   - `verify-content.mjs` には専用のテストが無く、`verify-scripts-test.mjs` が子プロセスで走らせるスモークだけ。Scope の「そのテスト」は、このスモークと `tutorial-check-test.mjs` を指すことになる。
+
+## 申し送り（manual-claudia-theme より、2026-10-09）
+
+`manual-claudia-theme` が完了し、ガイドの語りに使う台詞の部品と、その検査が入った。要件・設計を決めるときの前提として、変わった事実と見直しの論点だけを渡す（決めるのはこの spec）。参照先は `.kiro/specs/completed/manual-claudia-theme/design.md`。
+
+- **記法と登録簿**: 台詞は `> 【表情】本文`／`> 【話し手：表情】本文`（全角コロン、話し手名はカタカナ）。話し手と表情の唯一の定義は `book/tools/talk/talk.mjs` の `SPEAKERS`（クローディア 14 表情・アンソニー 2 表情）。書き方・表情の使いどころ・掛け合いの目安は `book/AUTHORING.md` 第 7 節「台詞部品（Claudia とアンソニー）」。ガイド向けの例外はこれとは別の節に書く（同じ節を書き換えない）。
+- **入門の章の今の導入・締め**: `getting-started/` の 3 章は、導入と締めが既に二人の掛け合いになっている（趣旨は元の Claudia の台詞のまま）。ガイドの全面書き直しはこれを置き換えてよい。
+- **全章にかかる検査**: SUMMARY に載る章はすべて、`verify-content` の T-syntax・T-intro・T-outro（導入と締めは台詞だけ・両方の話し手が要る）、`verify-static` の台詞部品の検査（全章と `print.html` に両方の話し手の部品がある）、`verify-search` の台詞の検索の検査（各章の最初の台詞の 4 文字以上の日本語片で、その章がヒットする。その語は本文に出ない語にする）にかかる。章を足すとそのまま対象になる。
+  - 論点: ガイドを「全編 Claudia が語る」形にすると、導入・締めの規則（両方の話し手が要る）と本文の扱いをどう両立させるか。`getting-started/` は生成対象章でも内部設計章でもないので、本文に台詞を置いても `talk-in-body` にはならない（T-syntax はかかる）。
+  - 論点: 章数 47 が自己テストに書かれている（`verify-scripts-test.mjs` の T 系の件数、`talk/talk-test.mjs` の J-9）。章を足すときは合わせて直す。
+- **表紙**: `introduction.md` の先頭は扉（`<section class="claudia-hero">`）になり、パート案内（`hero-toc`）が入門の最初の章 `getting-started/index.md` を指している。扉と締めのクラス契約は `book/theme/claudia.css` の冒頭のコメント。入門の案内を変えるときはこの契約に沿う。
+- **CI の段**: `manual.yml` は着色の後に台詞の変換（`talk/talk-html.mjs`）を挟み、verify-static/search は `--self-test` 付きで動く。最後に着せ替え前の版を `classic/` に作る段がある（新版の検査には混ざらない）。

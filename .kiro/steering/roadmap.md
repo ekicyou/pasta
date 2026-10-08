@@ -259,6 +259,9 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
 - タグの読み取りの制約（2026-10-07 棚卸、`paragraph-break-tag-only-talk` の範囲外）— `\nHello` をタグとして読む、`\_?…\_?` の中のタグも読む、引数の中の `\]` を扱わない、BudouX の行幅にエスケープと囲みを数えない。上の R4 と一部重なる。
 - 閉じていない 1 行の引用（2026-10-07 棚卸、`dsl-literal-fixes` の範囲外）— `＠w：「abc` と、行をまたげる `sakura_body` の規則はそのままにした。
 - 並列負荷で時々落ちる TCP のテスト（2026-10-07 棚卸、`act-token-grouping-fix`・`scene-identity-format` の実装メモ）— `runtime_toggle_e2e_*`・`hook_panic_*`。
+- print.html の動画の参照切れ（2026-10-09、`manual-claudia-theme` の完了時の棚卸し・spec なしで直せる小さな修正）— `book/src/debug/dev-actions.md` の生の HTML `<video src="media/dev-actions-demo.mp4">` と代わりの `<a href="media/dev-actions-demo.mp4">` は、章のページ（`debug/dev-actions.html`）では解決するが、出力の根にある `print.html` では `debug/media/` を指せない（mdBook は生の HTML の属性を書き換えない）。着せ替え前の版（`classic/`）にもある既存の不具合。`verify-static.mjs` は `print.html` のこの参照だけを例外として見逃している。
+  - 直し方は一通りでない（動画の置き場所を出力の根に移して章側を `../media/` にする・ビルド後の変換で `print.html` の参照を書き換える・絶対パスにするなど）。`file://` のオフライン閲覧と `site-url = "/pasta/"` を両立させる案を選ぶ。
+  - 完了の条件: 章のページと `print.html` の両方で動画と代わりのリンクが働く。`verify-static.mjs` の `print.html` の例外を外しても合格する。章の本文の変更は動画の参照だけにとどめ、`gen-skill-refs --check` とリンク検証に合格する。
 - budoux の自動改行の禁則（2026-10-05、ghost_dev「emo2 開発」からの申し送り）— `line_breaker.rs` の `break_lines_impl` は禁則を見ない。BudouX の語の区切りの直前で改行するだけである。
   - 方針は JIS X 4051 どおりとする。リーダー（`‥…`）は行頭に置いてよい。並びの途中では分けない。
   - この方針では、申し送りの実例「イイジャン！／‥‥ええと、」は正しい組版になる。
