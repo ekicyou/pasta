@@ -325,7 +325,7 @@
   - _Boundary: ChapterDialogues（getting-started, reference）_
   - _Depends: 3.4, 4_
 
-- [ ] 5.3 (P) Pasta DSL 文法（10 章）の導入と締めを、掛け合いに書き換える
+- [x] 5.3 (P) Pasta DSL 文法（10 章）の導入と締めを、掛け合いに書き換える
   - 完了したとき、文法の 10 章が、全パート共通の条件をすべて満たしている。
   - _Requirements: 5.1, 5.2, 5.3, 5.5_
   - _Boundary: ChapterDialogues（grammar）_
