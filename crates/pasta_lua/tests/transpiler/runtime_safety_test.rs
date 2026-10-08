@@ -303,3 +303,32 @@ fn test_concat_failures_warn_and_yield_nil() {
     .join("\n");
     assert_eq!(warns, expected_warns);
 }
+
+// ========================================================================
+// 式文: 関数呼び出しでない式も Lua の文として読み込め、副作用は 1 回（expr-nil-coercion 1.4・2.4）
+// ========================================================================
+
+#[test]
+fn test_non_call_expression_statements_load_and_run_once() {
+    let source = r#"
+＊メイン
+```lua
+function SCENE.f(act)
+    RS_F_COUNT = (RS_F_COUNT or 0) + 1
+end
+```
+　＄x＝２
+　＄＝１
+　＄＝＄x
+　＄＝（＠f（））
+　＄＝＄未代入＆「x」
+　＄後＝「続行」
+"#;
+    let lua = run_main_scene(&transpile(source));
+
+    let result = eval_str(
+        &lua,
+        r#"return string.format("f=%s 後=%s", tostring(RS_F_COUNT), tostring(RS_ACT.var["後"]))"#,
+    );
+    assert_eq!(result, "f=1 後=続行");
+}

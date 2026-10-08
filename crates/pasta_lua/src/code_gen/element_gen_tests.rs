@@ -553,3 +553,73 @@ fn action_arms_use_actor_proxy_with_string_name_for_any_actor() {
         assert_eq!(text, expected, "actor = {}", actor);
     }
 }
+
+// ------------------------------------------------------------------
+// 式文 `＄＝式`（VarSet name=None）の生成形（expr-nil-coercion 1.4・2.4）
+// ------------------------------------------------------------------
+
+/// 式が関数呼び出しそのもの（`FnCall`・`DynamicFnCall`）なら現行どおり 1 行に書き、
+/// それ以外（二項演算・括弧・リテラル・変数参照）は `do local _ = 式 end` で値を捨てる。
+/// 後者を素の式で書くと Lua の文にならない（読み込みエラー、または直前の行の続きの呼び出し）。
+#[test]
+fn expr_statement_wraps_non_call_expressions_in_discard_block() {
+    let stmt = |expr: Expr| {
+        gen_to_string(|cg| {
+            cg.generate_var_set(&VarSet {
+                name: None,
+                scope: VarScope::Local,
+                value: SetValue::Expr(expr),
+                span: Span::default(),
+            })
+        })
+    };
+    let f_call = || Expr::FnCall {
+        name: "f".to_string(),
+        args: Args::empty(),
+        scope: FnScope::Local,
+    };
+    let cases: Vec<(Expr, &str)> = vec![
+        // 関数呼び出し・動的関数呼び出しは 1 行のまま
+        (f_call(), "act:expr_fn(\"f\")"),
+        (
+            Expr::FnCall {
+                name: "g".to_string(),
+                args: Args::empty(),
+                scope: FnScope::Global,
+            },
+            "act:global_fn(\"g\")",
+        ),
+        (
+            Expr::DynamicFnCall {
+                var_name: "h".to_string(),
+                var_scope: VarScope::Local,
+                args: Args::empty(),
+            },
+            "act:expr_fn_var(var.h, \"var.h\")",
+        ),
+        // 二項演算
+        (
+            Expr::Binary {
+                op: BinOp::Concat,
+                lhs: Box::new(var_ref("未代入", VarScope::Local)),
+                rhs: Box::new(Expr::String("x".to_string())),
+            },
+            "do local _ = act:concat(var.未代入, \"x\", \"var.未代入\") end",
+        ),
+        // 括弧（中身が関数呼び出しでも括弧は呼び出しそのものではない）
+        (
+            Expr::Paren(Box::new(f_call())),
+            "do local _ = (act:expr_fn(\"f\")) end",
+        ),
+        // リテラル
+        (Expr::Integer(1), "do local _ = 1 end"),
+        (Expr::String("s".to_string()), "do local _ = \"s\" end"),
+        // 変数参照
+        (var_ref("x", VarScope::Local), "do local _ = var.x end"),
+        (var_ref("g", VarScope::Global), "do local _ = save.g end"),
+    ];
+    for (expr, expected) in cases {
+        let label = format!("{:?}", expr);
+        assert_eq!(stmt(expr), format!("{expected}\n"), "{label}");
+    }
+}

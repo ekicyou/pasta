@@ -15,7 +15,7 @@ where
 }
 
 // ------------------------------------------------------------------
-// Expression generation (via expression statements: VarSet name=None)
+// Expression generation (expr_text: expr_to_string; statements: VarSet name=None)
 // ------------------------------------------------------------------
 
 fn expr_stmt(expr: Expr) -> VarSet {
@@ -60,15 +60,15 @@ fn expr_renders_float_blank_string_paren_and_all_binary_ops() {
     let text = gen_to_string(|cg| cg.generate_var_set(&expr_stmt(expr)));
     assert_eq!(
         text,
-        "act:arith(\"+\", act:arith(\"%\", act:arith(\"/\", act:arith(\"*\", \
-         (act:arith(\"-\", 1, 2)), 3), 4), 5), var.x, nil, \"var.x\")\n"
+        "do local _ = act:arith(\"+\", act:arith(\"%\", act:arith(\"/\", act:arith(\"*\", \
+         (act:arith(\"-\", 1, 2)), 3), 4), 5), var.x, nil, \"var.x\") end\n"
     );
 
     let float_text = gen_to_string(|cg| cg.generate_var_set(&expr_stmt(Expr::Float(1.5))));
-    assert_eq!(float_text, "1.5\n");
+    assert_eq!(float_text, "do local _ = 1.5 end\n");
 
     let blank_text = gen_to_string(|cg| cg.generate_var_set(&expr_stmt(Expr::BlankString)));
-    assert_eq!(blank_text, "\"\"\n");
+    assert_eq!(blank_text, "do local _ = \"\" end\n");
 }
 
 /// Args-scope variable references convert 0-based AST index to 1-based
@@ -81,7 +81,7 @@ fn expr_args_var_ref_converts_to_one_based_lua_index() {
             scope: VarScope::Args(2),
         }))
     });
-    assert_eq!(text, "args[3]\n");
+    assert_eq!(text, "do local _ = args[3] end\n");
 }
 
 /// Local fn call in expression position uses `act:expr_fn("name", ...)`;
@@ -153,10 +153,11 @@ fn paren(e: Expr) -> Expr {
     Expr::Paren(Box::new(e))
 }
 
+/// Render the expression itself (not an expression statement).
 fn expr_text(expr: Expr) -> String {
-    gen_to_string(|cg| cg.generate_var_set(&expr_stmt(expr)))
-        .trim_end()
-        .to_string()
+    let mut output = Vec::new();
+    let cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+    cg.expr_to_string(&expr).unwrap()
 }
 
 /// `＊／％` fold before `＋－`, each left to right; parens are one term.
