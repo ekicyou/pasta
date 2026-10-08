@@ -31,7 +31,7 @@ SCENE["nil"] = function(act)
 end
 ```
 
-＃ 5.6: ＞＄未代入＆「x」（途中）。連結の警告だけで、Call の警告は重ねない
+＃ 5.6: ＞＄未代入＆「x」（途中）。連結の nil は空文字列なので x を探し、見つからない（expr-nil-coercion 5.3）
 ＊OnFcConcatMid
 　＠失話題：元
 　さくら：前

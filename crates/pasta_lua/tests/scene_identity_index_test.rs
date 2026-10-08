@@ -5,9 +5,9 @@
 //! 宣言行から **ランタイム実 identity** な (scene_id, parent) を返すことを観測する。
 //!
 //! 観測対象（requirements 3.1/3.2/3.3/7.1）:
-//! 1. グローバル本体領域の行 → `(会話_1, None)`（global・parent なし）。
-//! 2. 名前付き local 領域の行 → `(挨拶_1, Some(会話_1))`（local・parent あり）。
-//! 3. 同 base 2 本目のグローバル領域 → `(会話_2, None)`（per-base 出現順突合）。
+//! 1. グローバル本体領域の行 → `(OnTalk_1, None)`（global・parent なし）。
+//! 2. 名前付き local 領域の行 → `(挨拶_1, Some(OnTalk_1))`（local・parent あり）。
+//! 3. 同 base 2 本目のグローバル領域 → `(OnTalk_2, None)`（per-base 出現順突合）。
 //! 4. 索引が返す identity が `collect_scenes`（runtime SSOT）の値に一致する。
 //! 5. 通常モード（debug 無効）非破壊: 索引は構築されず、行マッピング双方向 resolve は不変。
 
@@ -40,21 +40,22 @@ fn neutralize_debug_env() {
 
 /// 統合フィクスチャ（global「会話」×2 ＋ 名前付き local「挨拶」）。行番号は本ファイルの
 /// アサーションが依存するため、フィクスチャ編集時は行も追従すること。
-///  7: ＊会話        → global 会話_1（本体 __start__ 領域）
+/// 既定の別名表（`OnTalk = ["会話"]`、scene-name-alias）により `＊会話` の登録名は `OnTalk_N`。
+///  7: ＊会話        → global OnTalk_1（本体 __start__ 領域）
 ///  8: さくら：「おはよう」
 ///  9: ＞挨拶
 /// 10:
-/// 11: ・挨拶          → local 挨拶_1（parent 会話_1）
+/// 11: ・挨拶          → local 挨拶_1（parent OnTalk_1）
 /// 12: さくら：「やあ」
 /// 13:
-/// 14: ＊会話         → global 会話_2（同 base 2 本目）
+/// 14: ＊会話         → global OnTalk_2（同 base 2 本目）
 /// 15: さくら：「また会話だよ」
 const FIXTURE: &str = include_str!("fixtures/scene_identity_index.pasta");
 
 /// `.pasta` 行（本ファイル中で意味を固定）。
-const LINE_GLOBAL1_BODY: u32 = 8; // 会話_1 本体（__start__ 領域）
+const LINE_GLOBAL1_BODY: u32 = 8; // OnTalk_1 本体（__start__ 領域）
 const LINE_LOCAL_BODY: u32 = 12; // 挨拶_1 本体
-const LINE_GLOBAL2_BODY: u32 = 15; // 会話_2 本体
+const LINE_GLOBAL2_BODY: u32 = 15; // OnTalk_2 本体
 
 fn ident(scene_id: &str, parent: Option<&str>) -> SceneIdentity {
     SceneIdentity {
@@ -129,43 +130,43 @@ fn finalize_join_resolves_runtime_identities_for_global_and_local() {
         .debug_source_map()
         .expect("enabled debug runtime must hold the aggregated source map");
 
-    // (1) グローバル本体領域 → (会話_1, None)。
+    // (1) グローバル本体領域 → (OnTalk_1, None)。
     assert_eq!(
         source_map.scene_at(&pasta_key, LINE_GLOBAL1_BODY),
-        Some(ident("会話_1", None)),
-        "global 本体行 {LINE_GLOBAL1_BODY} は (会話_1, None) へ解決する"
+        Some(ident("OnTalk_1", None)),
+        "global 本体行 {LINE_GLOBAL1_BODY} は (OnTalk_1, None) へ解決する"
     );
 
-    // (2) 名前付き local 本体領域 → (挨拶_1, Some(会話_1))。
+    // (2) 名前付き local 本体領域 → (挨拶_1, Some(OnTalk_1))。
     assert_eq!(
         source_map.scene_at(&pasta_key, LINE_LOCAL_BODY),
-        Some(ident("挨拶_1", Some("会話_1"))),
-        "local 本体行 {LINE_LOCAL_BODY} は (挨拶_1, Some(会話_1)) へ解決する"
+        Some(ident("挨拶_1", Some("OnTalk_1"))),
+        "local 本体行 {LINE_LOCAL_BODY} は (挨拶_1, Some(OnTalk_1)) へ解決する"
     );
 
-    // (3) 同 base 2 本目のグローバル → (会話_2, None)（per-base 出現順突合）。
+    // (3) 同 base 2 本目のグローバル → (OnTalk_2, None)（per-base 出現順突合）。
     assert_eq!(
         source_map.scene_at(&pasta_key, LINE_GLOBAL2_BODY),
-        Some(ident("会話_2", None)),
-        "2 本目 global 本体行 {LINE_GLOBAL2_BODY} は (会話_2, None) へ解決する"
+        Some(ident("OnTalk_2", None)),
+        "2 本目 global 本体行 {LINE_GLOBAL2_BODY} は (OnTalk_2, None) へ解決する"
     );
 
     // (4) 索引の identity が collect_scenes（runtime SSOT）に一致する。
     let scenes = pasta_lua::runtime::finalize::collect_scenes(runtime.lua())
         .expect("collect_scenes must succeed");
-    // global 会話_1 / 会話_2 が存在する。
+    // global OnTalk_1 / OnTalk_2 が存在する。
     assert!(
-        scenes.iter().any(|(g, _)| g == "会話_1"),
-        "runtime に 会話_1 が存在する: {scenes:?}"
+        scenes.iter().any(|(g, _)| g == "OnTalk_1"),
+        "runtime に OnTalk_1 が存在する: {scenes:?}"
     );
     assert!(
-        scenes.iter().any(|(g, _)| g == "会話_2"),
-        "runtime に 会話_2 が存在する: {scenes:?}"
+        scenes.iter().any(|(g, _)| g == "OnTalk_2"),
+        "runtime に OnTalk_2 が存在する: {scenes:?}"
     );
-    // local (会話_1, 挨拶_1) が存在し、索引の (挨拶_1, 会話_1) と一致する。
+    // local (OnTalk_1, 挨拶_1) が存在し、索引の (挨拶_1, OnTalk_1) と一致する。
     assert!(
-        scenes.iter().any(|(g, l)| g == "会話_1" && l == "挨拶_1"),
-        "runtime に (会話_1, 挨拶_1) が存在する: {scenes:?}"
+        scenes.iter().any(|(g, l)| g == "OnTalk_1" && l == "挨拶_1"),
+        "runtime に (OnTalk_1, 挨拶_1) が存在する: {scenes:?}"
     );
 }
 
@@ -229,7 +230,7 @@ fn normal_mode_builds_no_index_and_line_mapping_is_unchanged() {
 //
 // 本 6.1 は単一の **実ロード済みランタイム** 上で次のループを閉じる:
 //   位置 → `SourceMap::scene_at`（索引 identity）
-//        → kick 取次が組むキック名（global: `会話_1` / local: `:会話_1:挨拶_1`）
+//        → kick 取次が組むキック名（global: `OnTalk_1` / local: `:OnTalk_1:挨拶_1`）
 //        → シーン表（`STORE.scenes`）からの完全一致の引き当て（= kick.lua try_dispatch と同手順）
 //        → 着地した runtime (global_name, local_name) が `collect_scenes`（SSOT）に一致。
 // これにより「索引 identity == kick の解決対象 == runtime 実シーン」を実機で
@@ -286,8 +287,8 @@ fn kick_lookup_runtime(lua: &Lua, kick_name: &str) -> Option<(String, String)> {
 /// 6.1-(1) kick の引き当ての解決対象一致（requirements 3.1/3.3）。
 ///
 /// 実ロード済みランタイム上で、既知の global / local 宣言領域の行から `scene_at` で
-/// identity を確定し、その identity をキック名へ写像し（global → `会話_1`、
-/// local → `:会話_1:挨拶_1`）、シーン表から完全一致で引いた着地シーンが `collect_scenes`
+/// identity を確定し、その identity をキック名へ写像し（global → `OnTalk_1`、
+/// local → `:OnTalk_1:挨拶_1`）、シーン表から完全一致で引いた着地シーンが `collect_scenes`
 /// （runtime SSOT）に存在することを END-TO-END で固定する。
 ///
 /// 真正性（RED の論拠）: もし索引 identity と kick の引き当てが乖離すれば
@@ -312,23 +313,23 @@ fn index_identity_matches_runtime_kick_lookup_target() {
     let scenes =
         pasta_lua::runtime::finalize::collect_scenes(lua).expect("collect_scenes must succeed");
 
-    // --- global: 本体領域行 → identity (会話_1, None) → キック名 "会話_1" ---
+    // --- global: 本体領域行 → identity (OnTalk_1, None) → キック名 "OnTalk_1" ---
     let global_id = source_map
         .scene_at(&pasta_key, LINE_GLOBAL1_BODY)
         .expect("global 本体行は identity へ解決する");
     assert_eq!(
         global_id,
-        ident("会話_1", None),
+        ident("OnTalk_1", None),
         "scene_at は global identity を返す"
     );
     let global_key = kick_scene_key(&global_id);
-    assert_eq!(global_key, "会話_1", "global の キック名は素の scene_id");
+    assert_eq!(global_key, "OnTalk_1", "global の キック名は素の scene_id");
 
     let (g_global, g_local) =
         kick_lookup_runtime(lua, &global_key).expect("global キック名は runtime シーンへ着地する");
     // global kick は __start__（無名 start シーン）へ着地するのが kick 決定ノートの契約。
     assert_eq!(
-        g_global, "会話_1",
+        g_global, "OnTalk_1",
         "global kick の引き当ては索引 identity と同じ global へ着地する"
     );
     assert!(
@@ -341,18 +342,18 @@ fn index_identity_matches_runtime_kick_lookup_target() {
         "kick の引き当ての解決対象 global == 索引 identity の scene_id"
     );
 
-    // --- local: 名前付き local 本体行 → identity (挨拶_1, Some(会話_1)) → ":会話_1:挨拶_1" ---
+    // --- local: 名前付き local 本体行 → identity (挨拶_1, Some(OnTalk_1)) → ":OnTalk_1:挨拶_1" ---
     let local_id = source_map
         .scene_at(&pasta_key, LINE_LOCAL_BODY)
         .expect("local 本体行は identity へ解決する");
     assert_eq!(
         local_id,
-        ident("挨拶_1", Some("会話_1")),
+        ident("挨拶_1", Some("OnTalk_1")),
         "scene_at は local identity を返す"
     );
     let local_key = kick_scene_key(&local_id);
     assert_eq!(
-        local_key, ":会話_1:挨拶_1",
+        local_key, ":OnTalk_1:挨拶_1",
         "local の キック名は composite ':parent:local'"
     );
 
@@ -361,8 +362,8 @@ fn index_identity_matches_runtime_kick_lookup_target() {
     // local 分岐は __start__ へ潰さず local 同一性を保持する（kick 決定ノート）。
     assert_eq!(
         (l_global.as_str(), l_local.as_str()),
-        ("会話_1", "挨拶_1"),
-        "local kick の引き当ては索引 identity と同じ (会話_1, 挨拶_1) へ着地する"
+        ("OnTalk_1", "挨拶_1"),
+        "local kick の引き当ては索引 identity と同じ (OnTalk_1, 挨拶_1) へ着地する"
     );
     assert!(
         scenes.iter().any(|(g, l)| *g == l_global && *l == l_local),
@@ -711,4 +712,83 @@ fn same_named_scenes_in_two_files_resolve_to_their_own_file() {
         seen[0], seen[1],
         "2 ファイルの同名シーンは別の identity になる"
     );
+}
+
+// ===========================================================================
+// scene-name-alias task 6.1（requirements 7.1/7.2/7.3）。
+//
+// 同じファイルに別名 `＊会話` と本名 `＊OnTalk` が混在しても、既定の別名表
+// （`OnTalk = ["会話"]`）のもとで各宣言は同じ base `OnTalk` の出現順で採番され
+// （`OnTalk_1`〜`OnTalk_3`）、各行の identity・kick 名・シーン表から引くシーンが
+// その行の宣言のシーンになる。
+// ===========================================================================
+
+/// 別名と本名の混在フィクスチャ。行番号は下のケース表が依存する。
+///  2: ＊会話   → OnTalk_1（3: 本体 / 6: ・挨拶 → 7: 本体）
+///  9: ＊OnTalk → OnTalk_2（10: 本体）
+/// 12: ＊会話   → OnTalk_3（13: 本体）
+const ALIAS_MIXED_FIXTURE: &str = include_str!("fixtures/scene_alias_mixed.pasta");
+
+/// 7.1/7.2/7.3: 各宣言行・本体行が宣言どおりの identity に対応づき、その kick 名で
+/// シーン表から引いたシーンが同名の他候補ではなくその行のシーンであり、
+/// 本体行にブレークポイントを置ける（`.pasta`→`.lua`→`.pasta` が元の行へ戻る）。
+#[test]
+fn aliased_and_real_name_scenes_in_one_file_map_to_their_own_identities() {
+    let temp = tempfile::TempDir::new().expect("temp dir");
+    let paths = make_debug_base_dir(
+        temp.path(),
+        &[("scene_alias_mixed.pasta", ALIAS_MIXED_FIXTURE)],
+    );
+    let key = paths[0].to_string_lossy().to_string();
+    let runtime = PastaLoader::load_with_config(temp.path(), RuntimeConfig::new())
+        .expect("debug-enabled runtime must load");
+    let map = runtime
+        .debug_source_map()
+        .expect("enabled runtime holds map");
+    let lua = runtime.lua();
+
+    // (行, 期待 identity, 期待 kick 名, その行のシーンだけが持つ台詞)
+    let cases = [
+        (2, ident("OnTalk_1", None), "OnTalk_1", "「会話その1」"),
+        (3, ident("OnTalk_1", None), "OnTalk_1", "「会話その1」"),
+        (
+            7,
+            ident("挨拶_1", Some("OnTalk_1")),
+            ":OnTalk_1:挨拶_1",
+            "「会話1の挨拶」",
+        ),
+        (9, ident("OnTalk_2", None), "OnTalk_2", "「本名のOnTalk」"),
+        (10, ident("OnTalk_2", None), "OnTalk_2", "「本名のOnTalk」"),
+        (12, ident("OnTalk_3", None), "OnTalk_3", "「会話その3」"),
+        (13, ident("OnTalk_3", None), "OnTalk_3", "「会話その3」"),
+    ];
+    for (line, expected, kick, text) in cases {
+        let id = map.scene_at(&key, line);
+        assert_eq!(id.as_ref(), Some(&expected), "行 {line} の identity（7.3）");
+        assert_eq!(kick_scene_key(&expected), kick, "行 {line} の kick 名");
+        assert!(
+            kick_lookup_runtime(lua, kick).is_some(),
+            "kick 名 {kick} はシーン表から完全一致で引ける"
+        );
+        let played = run_identity(lua, &expected);
+        assert!(
+            played.starts_with(text),
+            "行 {line} の再生は宣言のシーン（{text}）を指す（7.2）: {played}"
+        );
+    }
+
+    // 7.1: 別名で宣言したシーン配下の本体行にブレークポイントを置ける。
+    for line in [3u32, 7, 13] {
+        let targets = map.resolve_pasta_to_lua(&key, line);
+        assert!(!targets.is_empty(), "行 {line} は `.lua` 行へ逆引きできる");
+        for (chunk, lua_line) in &targets {
+            let pos = map
+                .resolve_lua_to_pasta(chunk, *lua_line)
+                .expect("逆引きした `.lua` 行は `.pasta` へ戻る");
+            assert_eq!(
+                pos.line, line,
+                "行 {line} のブレークポイントはその行で止まる"
+            );
+        }
+    }
 }

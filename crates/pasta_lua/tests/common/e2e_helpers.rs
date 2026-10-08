@@ -75,7 +75,10 @@ pub fn create_runtime_with_finalize() -> mlua::Result<Lua> {
     loaded.set("@pasta_log", log_table)?;
 
     // Register finalize_scene binding
-    pasta_lua::runtime::finalize::register_finalize_scene(&lua)?;
+    pasta_lua::runtime::finalize::register_finalize_scene(
+        &lua,
+        pasta_core::registry::SceneAliasTable::empty(),
+    )?;
 
     Ok(lua)
 }
@@ -133,7 +136,10 @@ pub fn create_runtime_with_search(ctx: TranspileContext) -> mlua::Result<Lua> {
     loaded.set("@pasta_log", log_table)?;
 
     // Register finalize_scene binding
-    pasta_lua::runtime::finalize::register_finalize_scene(&lua)?;
+    pasta_lua::runtime::finalize::register_finalize_scene(
+        &lua,
+        pasta_core::registry::SceneAliasTable::empty(),
+    )?;
 
     Ok(lua)
 }

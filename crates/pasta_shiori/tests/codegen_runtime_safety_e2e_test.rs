@@ -73,8 +73,8 @@ fn test_typo_scene_returns_talk_with_default_results() {
         r"\p[0]【未登録アクター：未登録さん】こんにちは",
         // U20: act のメンバー名と同名のアクター talk が普通に話す
         r"\p[2]トークです",
-        // U22: 数値にできない算術は値なし → 参照は空文字
-        r"\p[1]\n[150]結果、\_w[450]終わり\e",
+        // U22: 数値にできない被演算子は警告を出して 0 とみなす（expr-nil-coercion 4.1）
+        r"\p[1]\n[150]結果0、\_w[450]終わり\e",
     );
     assert_eq!(value, expected);
 }
@@ -89,24 +89,34 @@ fn test_escaped_backslash_survives_wait_insertion() {
     );
 }
 
-/// 連結の警告（被演算子 `var.未代入` が nil）
-const CONCAT_NIL_WARNING: &str =
-    "act:concat - operand is not a string or number: op='&', operand='var.未代入', value=nil";
+/// ログに Lua 側の警告が無いことを確かめる（ログが取れていることも確かめ、空のログで通らないようにする）
+fn assert_no_lua_warning(log: &str) {
+    assert!(
+        log.contains("SHIORI.load called successfully"),
+        "log must be captured:\n{log}"
+    );
+    assert!(
+        !log.contains(" WARN pasta_lua::runtime::log:"),
+        "no warning expected:\n{log}"
+    );
+}
 
-/// 未代入の変数を連結する式文があっても 500 にならず、警告を出して続きの行を話す（string-concat-operator 6.4）
+/// 未代入の変数を連結する式文があっても 500 にならず、続きの行を話す（string-concat-operator 6.4）。
+/// 連結の nil は空文字列とみなすので警告は出ない（expr-nil-coercion 2.1・3.1）
 #[test]
 fn test_concat_with_unassigned_variable_does_not_500() {
     let (value, log) = fire_with_log("OnConcatUnassigned");
     assert_eq!(value, r"\p[1]続行\e");
-    assert!(log.contains(CONCAT_NIL_WARNING), "warning expected:\n{log}");
+    assert_no_lua_warning(&log);
 }
 
-/// 連結の結果が nil なら代入先は値なしで、参照は空文字になる（1.7, 1.8, 3.3, 3.6）
+/// 連結の被演算子の nil は空文字列とみなすので、代入先は残りの部分（`さん`）になり、警告は出ない
+/// （expr-nil-coercion 2.1・3.1）
 #[test]
-fn test_concat_nil_result_shows_as_empty() {
+fn test_concat_nil_operand_leaves_the_rest() {
     let (value, log) = fire_with_log("OnConcatNilShow");
-    assert_eq!(value, r"\p[1]前後\e");
-    assert!(log.contains(CONCAT_NIL_WARNING), "warning expected:\n{log}");
+    assert_eq!(value, r"\p[1]前さん後\e");
+    assert_no_lua_warning(&log);
 }
 
 /// 関数呼び出しと Call の引数に連結した文字列が渡る（算術が連結より先: 1＋2＆「個」→「3個」）（1.5, 1.6, 4.4, 6.6）

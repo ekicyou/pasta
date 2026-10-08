@@ -471,6 +471,21 @@ DSL で書いたシーンは、イベント名と同じ名前にするだけで�
 
 この例では、OnBoot のたびに 2 つのシーンのどちらかが実行される。
 
+イベント名に日本語の別名を付けると、別名で宣言したシーンもそのイベントに応答する。別名は pasta.toml の `[scene.alias]` に書く（[シーン名の別名](https://ekicyou.github.io/pasta/grammar/call-jump.html#シーン名の別名)・[pasta.toml リファレンス](https://ekicyou.github.io/pasta/reference/pasta-toml.html#sceneシーン名)）。
+
+```toml
+[scene.alias]
+OnTalk = ["会話"]
+OnBoot = ["起動"]
+```
+
+```pasta
+＊起動
+    ぱすた：こんにちは。
+```
+
+この例の `＊起動` は `OnBoot` という名前で登録され、OnBoot のシーンとして実行される。`[scene.alias]` を書くと既定の表（`OnTalk = ["会話"]`）は丸ごと置き換わるため、`＊会話` をランダムトークに使い続けるには `OnTalk = ["会話"]` も書く。
+
 ## エラーハンドリング
 
 イベントの処理全体（コールバックの再開・`REG` のハンドラ・シーンの実行）は、SHIORI のリクエスト処理関数の中で `xpcall` により保護されている。エラーが起きると 500 Internal Server Error を返し、`X-Error-Reason` ヘッダにエラーメッセージの最初の行を入れる。エラーの値が文字列でないときは `"Unknown error"` になる。
@@ -597,13 +612,14 @@ local co = dispatcher.check_hour(act)
 一定の間隔で、ランダムトークのシーン（`OnTalk`）を発行する。
 
 - 同名の `＊OnTalk` を複数定義すると、シャッフル＆順次消費で 1 つが選ばれる。前方一致で探すため、`OnTalk` で始まる名前のシーンも候補になる。
+- `＊会話` も候補になる。既定の別名表（`OnTalk = ["会話"]`）により、`＊会話` は `OnTalk` という名前で登録されるためである。`＊OnTalk` と `＊会話` を混ぜて書いても、すべてが同じ名前の候補になり、シャッフル＆順次消費で 1 つが選ばれる。`＊会話・朝` のように別名で始まるだけの名前は候補にならない（[シーン名の別名](https://ekicyou.github.io/pasta/grammar/call-jump.html#シーン名の別名)）。
 - 前のシーンがチェイントークで中断していれば、新しい OnTalk のシーンの代わりに、その続きを出力する（[チェイントーク](https://ekicyou.github.io/pasta/grammar/call-jump.html#チェイントーク)）。
 
 ```pasta
 ＊OnTalk
     ぱすた：今日はいい天気だね。
 
-＊OnTalk
+＊会話
     ぱすた：お腹がすいたな。
 ```
 

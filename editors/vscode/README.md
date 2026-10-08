@@ -44,6 +44,10 @@ Pasta は「伺か」のようなデスクトップマスコットなどを実�
 | 15| cueMarker   | キューコマンドマーカー (`！` / `!`) |
 | 16| cueCommand  | キューコマンド名               |
 
+## 開発
+
+- `npm run package` で VSIX を作るには、手元に `pwsh`（PowerShell 7）・`wasm-pack`・`cargo-about` が要ります（WASM はリリースビルドになります）。
+
 ## ライセンス
 
 MIT

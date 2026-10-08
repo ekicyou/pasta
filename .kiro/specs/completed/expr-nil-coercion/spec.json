@@ -1,0 +1,23 @@
+{
+  "feature_name": "expr-nil-coercion",
+  "created_at": "2026-10-08T05:41:45Z",
+  "updated_at": "2026-10-08T07:16:08Z",
+  "language": "ja",
+  "phase": "completed",
+  "completed_at": "2026-10-08T20:19:11Z",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": false
+}

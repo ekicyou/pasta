@@ -246,6 +246,7 @@ fn loop_revisit_yields_one_stop_per_iteration_over_tcp() {
         std::slice::from_ref(&pasta_file),
         &cache_manager,
         false,
+        &LuaTranspiler::default(),
     );
     let chunk_name = cache_manager
         .source_to_cache_path(&pasta_file)

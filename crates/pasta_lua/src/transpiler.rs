@@ -157,7 +157,7 @@ impl LuaTranspiler {
                     Self::process_global_word(&mut context, &mut codegen, word)?;
                 }
                 FileItem::GlobalSceneScope(scene) => {
-                    Self::process_global_scene(&mut context, &mut codegen, scene)?;
+                    self.process_global_scene(&mut context, &mut codegen, scene)?;
                 }
                 FileItem::ActorScope(actor) => {
                     Self::process_actor(&mut context, &mut codegen, actor)?;
@@ -195,15 +195,25 @@ impl LuaTranspiler {
     }
 
     /// Process GlobalSceneScope: register scene/words, merge attrs, generate code, register locals.
+    ///
+    /// 宣言名（別名表で置き換えた後の名前）をここで 1 回だけ決め、登録・単語のモジュール名・
+    /// 生成コード・ローカルの親名のすべてに同じ値を渡す。単独の `＊` 行はパーサが受け継いだ
+    /// `scene.name` を持つので同じ経路で置き換わる。
     fn process_global_scene<W: Write>(
+        &self,
         context: &mut TranspileContext,
         codegen: &mut LuaCodeGenerator<W>,
         scene: &GlobalSceneScope,
     ) -> Result<(), TranspileError> {
-        let (_, counter) = context.register_global_scene(scene);
+        let declared_name = self
+            .config
+            .scene_aliases
+            .resolve(&scene.name)
+            .unwrap_or(&scene.name);
+        let (_, counter) = context.register_global_scene_named(declared_name, &scene.attrs);
 
         // Register scene-level word definitions in WordDefRegistry
-        let module_name = SceneRegistry::registered_name(&scene.name, counter);
+        let module_name = SceneRegistry::registered_name(declared_name, counter);
         for kw in &scene.words {
             for name in &kw.names {
                 context
@@ -214,14 +224,14 @@ impl LuaTranspiler {
 
         // Merge file attrs with scene attrs, generate Lua code
         let merged_attrs = context.merge_attrs(&scene.attrs);
-        codegen.generate_global_scene(scene, counter, context, &merged_attrs)?;
+        codegen.generate_global_scene(scene, declared_name, counter, context, &merged_attrs)?;
 
         // Register named local scenes (start scene is part of global)
         // 通し番号は生成器と同じ local_scene_counters（照合用の名前ごと）を使う（2.12）。
         let local_counters = local_scene_counters(&scene.local_scenes);
         for (local_scene, local_counter) in scene.local_scenes.iter().zip(local_counters) {
             if local_scene.name.is_some() {
-                context.register_local_scene(local_scene, &scene.name, counter, local_counter);
+                context.register_local_scene(local_scene, declared_name, counter, local_counter);
             }
         }
 

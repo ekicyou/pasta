@@ -103,7 +103,7 @@ fn global_scene_header_records_definition_pasta_line() {
         let context = TranspileContext::new();
         let file_attrs = std::collections::HashMap::new();
         codegen
-            .generate_global_scene(&scene, 0, &context, &file_attrs)
+            .generate_global_scene(&scene, &scene.name, 0, &context, &file_attrs)
             .unwrap();
     }
 

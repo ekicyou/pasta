@@ -114,7 +114,7 @@ act[key]（ACT のフィールドに無いとき）
 
 - 解決の優先順はフィールド → メソッド → アクター名である。この優先順により、メソッド名やフィールド名と同じ名前のアクターがプロキシにならないこと（利用者から見た振る舞い）は [アクタープロキシ](script-api.md#アクタープロキシ) が正である。
 - アクタープロキシは参照のたびに新しく作られ、キャッシュされない（[PROXY パターン](#proxy-パターン)）。
-- 生成コードはアクターをこの経路で引かず、`act:actor_proxy("名前")` を呼ぶ（[生成コード用のメソッド](#生成コード用のメソッドactor_proxyglobal_fnarithconcat)）。`actor_proxy` は `act.actors[名前]` を直接引くため、メソッド名・フィールド名と同じ名前のアクターもプロキシになる。
+- 生成コードはアクターをこの経路で引かず、`act:actor_proxy("名前")` を呼ぶ（[生成コード用のメソッド](#生成コード用のメソッドactor_proxyglobal_fn)）。`actor_proxy` は `act.actors[名前]` を直接引くため、メソッド名・フィールド名と同じ名前のアクターもプロキシになる。
 - `SHIORI_ACT_IMPL` 自身にも `__index = ACT.IMPL` のメタテーブルが付いており、`SHIORI_ACT_IMPL.talk` のように実装表から直接引いても `ACT_IMPL` のメソッドが得られる。
 
 ### 継承（ACT.IMPL）
@@ -179,7 +179,7 @@ end
 
 - 動的コールの値の判定（`nil` の判定を含む）は、生成コードではなく実行時の `call_key` が行う。生成コードは式の値を `tostring` せずにそのまま渡す（[生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形)）。キーの式は `act:call`・`act:call_restore` の第 2 引数のため、引数の式より先に評価される。
 - 検索キーにできない値のとき、`call_key` は警告と失敗表記を出してから、`pasta.act` の局所の表 `SKIP_CALL`（「呼ばない」印）を返す。`ACT_IMPL.call` は `key == SKIP_CALL` なら検索も警告もせずに `nil` を返す。印はモジュールの外へ公開されず、文字列や `false` と一致しない。
-- `var_path` があるときの警告は、`WORD.dynamic_key(value, var_path, "act:call")` を呼んで出させる（戻り値は使わない）。`var_path` が無いときの警告の `value=` の表記は、`arith`・`concat` と同じ局所関数 `arith_value_text` が作る。
+- `var_path` があるときの警告は、`WORD.dynamic_key(value, var_path, "act:call")` を呼んで出させる（戻り値は使わない）。`var_path` が無いときの警告の `value=` の表記は、`ACT.num`・`ACT.str` と同じ局所関数 `arith_value_text` が作る。
 - `ACT_IMPL.call` の `key == nil` の分岐は、Lua から直接呼んだ場合のためのもので、警告だけを出して `nil` を返し、`failure` を呼ばない。生成コードの動的コールは `call_key` を通るため、`nil` のキーで `act:call` を呼ぶことはない。
 - `ACT_IMPL.call` は、見つかった値が関数でないとき（見つからないときを含む）、`handler not found` の警告文を組み立てて `failure` に渡し、その戻り値の `nil` を返す。
 - `failure(self, text, warning)` は、`warning` があれば `log.warn` で出し、`{ type = "raw_script", text = "【" .. text .. "】" }` を `self.token` に積んで `nil` を返す。新しいトークン型は作らない。`raw_script` は `talk_to_script` を通らないため、失敗表記には句読点のウェイトも budoux の改行も入らない（`text` はエスケープしない）。`raw_script` のグループ化と組立（保留中の段落区切りの改行が失敗表記の前には出ないことを含む）は [グループ化トークン](https://ekicyou.github.io/pasta/internals/talk-output.html#グループ化トークン)・[さくらスクリプトの組立](https://ekicyou.github.io/pasta/internals/talk-output.html#さくらスクリプトの組立) で扱う。失敗表記を出すのは `call` と `call_key` の 2 か所だけである。
@@ -191,15 +191,20 @@ ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call`・`call_resto
 - `expr_fn(self, key, ...)` と `expr_fn_var(self, value, var_path, ...)` は、`pasta.act` の局所関数 `call_expr(self, key, skip_methods, ...)` を共有する。`expr_fn` は `call_expr(self, key, nil, ...)`、`expr_fn_var` はキーに直した後に `call_expr(self, キー, true, ...)` を呼ぶ。`call_expr` は `find_handler("expr", key, skip_methods)` が関数なら、`h(self, ...)` を呼んで `restore_scene` で `current_scene` を呼ぶ前の値に戻してから戻り値を返し、それ以外は接頭辞 `act:expr_fn` の警告ログ（`handler not found`）を出して `nil` を返す。アクタープロキシは `pasta.actor` に同じ形の別の局所関数を持つ（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
 - `skip_methods` を真にするのは、`var_path` を受け取った `word` と `expr_fn_var`（生成コードの動的参照）だけである。`find_scene`・`call` と、`var_path` の無い `word`・`expr_fn` は `skip_methods` を渡さない。`find_handler` は `find_act_handler` に引数をそのまま渡す。
 
-### 生成コード用のメソッド（actor_proxy・global_fn・arith・concat）
+### 生成コード用のメソッド（actor_proxy・global_fn）
 
-アクション行のアクター（`act:actor_proxy("名前")`）、`＠＊名前（…）`（`act:global_fn("名前", …)`）、式の算術（`act:arith(…)`）と連結（`act:concat(…)`）の生成コードが呼ぶメソッドである。引数・戻り値・警告の文言は [アクター・グローバル関数・算術・連結](script-api.md#アクターグローバル関数算術連結) が、生成コードの形は [生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形) が正である。ここでは実装の内部の構成だけを扱う。
+アクション行のアクター（`act:actor_proxy("名前")`）と `＠＊名前（…）`（`act:global_fn("名前", …)`）の生成コードが呼ぶメソッドである。引数・戻り値・警告の文言は [アクター・グローバル関数](script-api.md#アクターグローバル関数) が、生成コードの形は [生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形) が正である。ここでは実装の内部の構成だけを扱う。
 
 - `actor_proxy(self, name)` は、`self.actors[name]` があれば `ACTOR.create_proxy(アクター, self)` を返す。無ければ `self.token` を末尾から見て、最初に当たる `talk`・`sakura_script` のトークンの `actor.name` が `name` と同じならその `actor` の表を再利用してプロキシを作る。そうでなければ `{ name = name }`（メタテーブルなし）を作り、警告ログを出し、目印の `talk` トークン（`text` は `【未登録アクター：名前】`）を積んでからプロキシを作る。再利用によって同じ未登録の名前の連続する発言は同じ表を持ち、`build` のグループ化（表の同一性で判定する）で 1 つのグループになる（[グループ化トークン](https://ekicyou.github.io/pasta/internals/talk-output.html#グループ化トークン)）。
 - その場限りのアクターは `STORE.actors`・`self.actors`・`STORE.actor_spots` のどれにも書かれず、ACT にもフィールドを足さない。状態は `self.token` の中にしか無いため、`build`・`yield` でトークンが空になると、次の発言で目印がまた付く。`name` だけの表のため、プロキシの検索の A1 は `name` にしか一致せず、A2 のアクター単語も無い（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
 - `global_fn(self, name, ...)` は `GLOBAL[name]` が関数なら、`f(self, ...)` を呼んで `restore_scene` で `current_scene` を戻してから戻り値をすべて返し、関数でなければ警告ログを出して `nil` を返す。名前の解決の 5 段の検索（`find_act_handler`）は通らない。関数の中で起きたエラーは捕まえない。
-- `arith(self, op, lhs, rhs, lhs_desc, rhs_desc)` は、局所関数 `arith_operand` で被演算子を数値にし（`number` はそのまま、`string` は `tonumber`、それ以外は数値にできない）、両方が数値になったときだけ局所の表 `ARITH_OPS` の関数で Lua の演算子を適用する。演算子に渡るのは数値だけのため、表の `__add` などのメタメソッドは呼ばれない。数値にできない被演算子ごとに警告ログを出すが、値も説明も `nil` の被演算子（内側の `arith`・`concat` が既に失敗したもの）では出さない。`self` は使わず、ACT の状態を読み書きしない。
-- `concat(self, lhs, rhs, lhs_desc, rhs_desc)` は `ACT_IMPL.arith` の直後に置かれ、局所関数 `concat_operand` で被演算子を文字列にする（`string` はそのまま、`number` は `tostring`、それ以外は文字列にできない）。両方が文字列になったときだけ Lua の `..` でつなぐ。`..` に渡るのは文字列だけのため、表の `__concat`・`__tostring` などのメタメソッドは呼ばれない。文字列にできない被演算子ごとに警告ログを出すが、値も説明も `nil` の被演算子（内側の `concat`・`arith` が既に失敗したもの）では出さない。警告の `value=` の表記は `arith` と同じ局所関数 `arith_value_text` が作る。`self` は使わず、ACT の状態を読み書きしない。
+### 被演算子の変換（ACT.num・ACT.str）
+
+式の算術と連結の生成コードが被演算子に使う `PASTA.num`・`PASTA.str` の実体である。引数・戻り値・警告の文言は [PASTA.num](script-api.md#pastanumop-v-desc)・[PASTA.str](script-api.md#pastastrv-desc) が、生成コードの形は [生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形) が正である。ここでは実装の内部の構成だけを扱う。
+
+- `num(op, v, desc)`・`str(v, desc)` は `pasta.act` のモジュールの関数（`ACT.num`・`ACT.str`）で、`ACT_IMPL` には置かれない。そのため ACT の `__index` と `find_act_handler` の 3 段目には現れない（[メソッドとアクタープロキシの解決](#メソッドとアクタープロキシの解決__index)）。`self` を取らず、ACT の状態を読み書きしない。
+- 値の判定は `type` で行う。`num` は `number` をそのまま、`string` を `tonumber` で、`str` は `string` をそのまま、`number` を `tostring` で変換する。`nil` は警告せずに `0`・`""` を返し、それ以外の値（`num` では `tonumber` で数値にできない文字列も含む）は `log.warn` で警告を 1 行出して `0`・`""` を返す。表に `tostring` しないため、`__tostring` などのメタメソッドは呼ばれない。警告の `value=` の表記は、`call_key` と同じ局所関数 `arith_value_text` が作る。
+- `pasta`（`pasta` モジュール）は、`PASTA` のメタテーブルの `__index` で `num`・`str` を初めて参照したときに `require("pasta.act")` し、参照したキーの関数（`ACT.num` か `ACT.str`）を `rawset` で `PASTA` に載せる。以後の参照はメタテーブルを通らず、`PASTA.num` と `ACT.num` は同じ関数である。`require "pasta"` の時点では `pasta.act` を読み込まないため、`pasta` を読み込んでも `pasta.act` の読み込みの順序は変わらない。
 
 ### 動的参照のキー（WORD.dynamic_key）
 
@@ -233,7 +238,7 @@ act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(var.x, "var.
 
 ### プロキシの構造と生成
 
-`ACTOR.create_proxy(actor, act)` は `{ actor = アクター, act = ACT }` にメタテーブル `PROXY_IMPL`（`__index` は `PROXY_IMPL` 自身）を付けて返す。ACT の `actor_proxy` と `__index` が、呼び出し・参照のたびにこの関数を呼ぶ（[生成コード用のメソッド](#生成コード用のメソッドactor_proxyglobal_fnarithconcat)・[メソッドとアクタープロキシの解決](#メソッドとアクタープロキシの解決__index)）。プロキシは状態を持たず、同じアクターのプロキシを何度作っても振る舞いは変わらない。
+`ACTOR.create_proxy(actor, act)` は `{ actor = アクター, act = ACT }` にメタテーブル `PROXY_IMPL`（`__index` は `PROXY_IMPL` 自身）を付けて返す。ACT の `actor_proxy` と `__index` が、呼び出し・参照のたびにこの関数を呼ぶ（[生成コード用のメソッド](#生成コード用のメソッドactor_proxyglobal_fn)・[メソッドとアクタープロキシの解決](#メソッドとアクタープロキシの解決__index)）。プロキシは状態を持たず、同じアクターのプロキシを何度作っても振る舞いは変わらない。
 
 ### PROXY_IMPL のメソッド
 
@@ -277,9 +282,9 @@ STORE.scenes = {
 }
 ```
 
-- グローバルシーン名（登録名）は、照合用の名前・区切りの `_`・通し番号の 3 つからなる（`base_name .. "_" .. 番号`）。照合用の名前はトランスパイラが渡す基本名（`sanitize_name` でサニタイズ済みのシーン名）で、通し番号は `create_scene` が照合用の名前ごとに 1 から振った番号である（1 つ目の `＊メイン` は `メイン_1`、1 つ目の `＊会話・朝` は `会話_朝_1`）。区切りがあるため、`＊A1` の 1 つ目（`A1_1`）と `＊A` の 11 個目（`A_11`）は別の登録名になる。Rust 側で同じ形を作るのは `pasta_core` の `SceneRegistry::registered_name` である。
+- グローバルシーン名（登録名）は、照合用の名前・区切りの `_`・通し番号の 3 つからなる（`base_name .. "_" .. 番号`）。照合用の名前はトランスパイラが渡す基本名（`sanitize_name` でサニタイズ済みのシーン名）で、通し番号は `create_scene` が照合用の名前ごとに 1 から振った番号である（1 つ目の `＊メイン` は `メイン_1`、1 つ目の `＊挨拶・朝` は `挨拶_朝_1`）。基本名は宣言名（pasta.toml の別名表で置き換えた後の名前）から作られるため、既定の別名表のもとで `＊OnTalk` の無いゴーストの 1 つ目の `＊会話` は `OnTalk_1` になる（[登録と生成](https://ekicyou.github.io/pasta/internals/transpiler.html#登録と生成単一走査)）。区切りがあるため、`＊A1` の 1 つ目（`A1_1`）と `＊A` の 11 個目（`A_11`）は別の登録名になる。Rust 側で同じ形を作るのは `pasta_core` の `SceneRegistry::registered_name` である。
 - ローカルシーンのキー（生成コードの関数名）も同じ形の登録名である。照合用の名前は `・` の後に書いたローカルシーン名をサニタイズしたもので、通し番号は同じグローバルシーンの中で照合用の名前ごとに 1 から数える（`・選択肢` の 1 つ目は `選択肢_1`。`・挨拶・1` と `・挨拶_1` はどちらも照合用の名前が `挨拶_1` なので `挨拶_1_1`・`挨拶_1_2`）。無名の開始シーンは `__start__` である。
-- 登録名を（名前, 通し番号）に分けるのは Rust の `SceneRegistry::split_registered_name` だけであり、Lua 側には分ける関数は無い。最後の `_` の後ろが 1 文字以上の半角数字（`0`〜`9`）で、`_` の前が空でないときだけ分ける（`会話_朝_1` → （`会話_朝`, 1））。それ以外（`__start__`・`加算ループ`・`_1`・全角数字で終わる名前・`usize` に収まらない数字列）は分けず、名前の全体を通し番号なしとして扱う。Lua ブロックで直接定義した関数も同じ規則で分けるため、`step_2` は（`step`, 2）になる。分けた結果を使うのは、検索キーの作成（[検索キーの形式](https://ekicyou.github.io/pasta/internals/registry-search.html#検索キーの形式)）、辞書確定の登録順（[辞書確定](https://ekicyou.github.io/pasta/internals/registry-search.html#辞書確定)）、デバッガの突き合わせ（[シーン identity 索引](https://ekicyou.github.io/pasta/internals/debug.html#シーン-identity-索引)）である。
+- 登録名を（名前, 通し番号）に分けるのは Rust の `SceneRegistry::split_registered_name` だけであり、Lua 側には分ける関数は無い。最後の `_` の後ろが 1 文字以上の半角数字（`0`〜`9`）で、`_` の前が空でないときだけ分ける（`挨拶_朝_1` → （`挨拶_朝`, 1））。それ以外（`__start__`・`加算ループ`・`_1`・全角数字で終わる名前・`usize` に収まらない数字列）は分けず、名前の全体を通し番号なしとして扱う。Lua ブロックで直接定義した関数も同じ規則で分けるため、`step_2` は（`step`, 2）になる。分けた結果を使うのは、検索キーの作成（[検索キーの形式](https://ekicyou.github.io/pasta/internals/registry-search.html#検索キーの形式)）、辞書確定の登録順（[辞書確定](https://ekicyou.github.io/pasta/internals/registry-search.html#辞書確定)）、デバッガの突き合わせ（[シーン identity 索引](https://ekicyou.github.io/pasta/internals/debug.html#シーン-identity-索引)）である。
 - `__global_name__` 以外のキーはすべてシーン関数として扱われ、辞書確定で `(グローバルシーン名, キー)` の組として集められる（[finalize_scene](#finalize_scene)）。
 - メタテーブルの `__index` が `SCENE_TABLE_IMPL` を指すため、`scene:create_word(キー)` は `WORD.create_local(scene.__global_name__, キー)` のビルダーを返す。生成コードの `SCENE:create_word(キー):entry(値, …)` がこれを使う。通常の添字参照（ACT の L1 の完全一致を含む）でも、キー `create_word` はこのメソッドに一致する。動的参照の L1 は `rawget` で引くため、シーンテーブル自身のキー（`__global_name__` とシーン関数）だけが対象になり、`create_word` には一致しない。
 

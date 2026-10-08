@@ -27,6 +27,22 @@ PASTA.create_scene = SCENE.create_scene
 --- @type fun(key: string): WordBuilder
 PASTA.create_word = WORD.create_word
 
+--- 算術・連結の被演算子の変換（生成コードが呼ぶ）。pasta.act の ACT.num・ACT.str と同一関数
+---   PASTA.num(op, v, desc?) -> number : nil は 0、変換できない値は警告して 0
+---   PASTA.str(v, desc?) -> string     : nil は ""、変換できない値は警告して ""
+--- pasta.act は初めて参照したときに読み込む（この init.lua の読み込みで act.lua のロード順を変えない）
+--- @see pasta.act.num
+--- @see pasta.act.str
+local ACT_REDIRECTS = { num = true, str = true }
+setmetatable(PASTA, {
+    __index = function(t, key)
+        if not ACT_REDIRECTS[key] then return nil end
+        local f = require("pasta.act")[key]
+        rawset(t, key, f)
+        return f
+    end,
+})
+
 --- シーン辞書を最終化する（スタブ実装）
 ---
 --- scene_dic.lua から呼び出される。現在はスタブ実装。

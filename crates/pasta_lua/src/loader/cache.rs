@@ -13,6 +13,9 @@ use tracing::{debug, info, warn};
 /// Cache version file name.
 const CACHE_VERSION_FILE: &str = ".cache_version";
 
+/// Scene alias table fingerprint marker file name.
+const SCENE_ALIAS_MARKER_FILE: &str = ".scene_alias";
+
 /// Current cache version from Cargo.toml.
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -47,24 +50,39 @@ impl CacheManager {
         }
     }
 
-    /// Prepare the cache directory with version checking.
+    /// Prepare the cache directory with version and scene alias table checking.
     ///
-    /// If the pasta_lua version has changed, all cache files are cleared.
-    /// Otherwise, existing cache is preserved for incremental updates.
+    /// If the pasta_lua version or the scene alias table fingerprint has changed
+    /// (a missing `.scene_alias` marker counts as changed), all cache files are
+    /// cleared and both markers are rewritten. Otherwise, existing cache is
+    /// preserved for incremental updates.
+    ///
+    /// # Arguments
+    /// * `alias_fingerprint` - `SceneAliasTable::fingerprint()` of the effective table
     ///
     /// # Returns
     /// * `Ok(())` - Directory prepared successfully
     /// * `Err(LoaderError::CacheDirectoryError)` - Directory operation failed
-    pub fn prepare_cache_dir(&self) -> Result<(), LoaderError> {
+    pub fn prepare_cache_dir(&self, alias_fingerprint: &str) -> Result<(), LoaderError> {
         let version_file = self.cache_dir.join(CACHE_VERSION_FILE);
+        let marker_file = self.cache_dir.join(SCENE_ALIAS_MARKER_FILE);
 
-        // Check version if cache directory exists
+        // Check version and alias fingerprint if cache directory exists
         if version_file.exists() {
             let cached_version = fs::read_to_string(&version_file)
                 .map_err(|e| LoaderError::cache_directory(&version_file, e))?;
 
-            if cached_version.trim() == CURRENT_VERSION {
-                debug!(version = %CURRENT_VERSION, "Cache version matches, preserving cache");
+            if cached_version.trim() != CURRENT_VERSION {
+                info!(
+                    reason = "pasta_lua version changed",
+                    old_version = %cached_version.trim(),
+                    new_version = %CURRENT_VERSION,
+                    "Cache version mismatch, clearing all cache"
+                );
+            } else if Self::read_alias_marker(&marker_file)?.as_deref() != Some(alias_fingerprint) {
+                info!(reason = "scene alias table changed", "Clearing all cache");
+            } else {
+                debug!(version = %CURRENT_VERSION, "Cache version and scene alias table match, preserving cache");
                 // Ensure scene directory exists (idempotent)
                 let scene_dir = self.cache_dir.join("pasta/scene");
                 fs::create_dir_all(&scene_dir)
@@ -72,12 +90,6 @@ impl CacheManager {
                 return Ok(());
             }
 
-            // Version mismatch → clear all cache
-            info!(
-                old_version = %cached_version.trim(),
-                new_version = %CURRENT_VERSION,
-                "Cache version mismatch, clearing all cache"
-            );
             if self.cache_dir.exists() {
                 fs::remove_dir_all(&self.cache_dir)
                     .map_err(|e| LoaderError::cache_directory(&self.cache_dir, e))?;
@@ -88,12 +100,24 @@ impl CacheManager {
         let scene_dir = self.cache_dir.join("pasta/scene");
         fs::create_dir_all(&scene_dir).map_err(|e| LoaderError::cache_directory(&scene_dir, e))?;
 
-        // Write version file
+        // Write version file and scene alias marker
         fs::write(&version_file, CURRENT_VERSION)
             .map_err(|e| LoaderError::cache_directory(&version_file, e))?;
+        fs::write(&marker_file, alias_fingerprint)
+            .map_err(|e| LoaderError::cache_directory(&marker_file, e))?;
 
-        debug!(version = %CURRENT_VERSION, "Created cache directory with version file");
+        debug!(version = %CURRENT_VERSION, "Created cache directory with version file and scene alias marker");
         Ok(())
+    }
+
+    /// Read the scene alias marker. `Ok(None)` when the marker does not exist.
+    fn read_alias_marker(marker_file: &Path) -> Result<Option<String>, LoaderError> {
+        if !marker_file.exists() {
+            return Ok(None);
+        }
+        fs::read_to_string(marker_file)
+            .map(Some)
+            .map_err(|e| LoaderError::cache_directory(marker_file, e))
     }
 
     /// Check if a source file needs transpilation.

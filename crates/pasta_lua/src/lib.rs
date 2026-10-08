@@ -67,4 +67,5 @@ pub use string_literalizer::StringLiteralizer;
 
 // Re-export mlua types needed by pasta_shiori
 pub use mlua;
+pub use pasta_core::SceneAliasTable;
 pub use transpiler::LuaTranspiler;

@@ -496,7 +496,7 @@ fn test_cache_manager_orphan_with_lua_source() {
     let temp = TempDir::new().unwrap();
     let base_dir = temp.path();
     let manager = CacheManager::new(base_dir.to_path_buf(), "profile/pasta/cache/lua");
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir("").unwrap();
 
     // Create cache files
     let scene_dir = base_dir.join("profile/pasta/cache/lua/pasta/scene");

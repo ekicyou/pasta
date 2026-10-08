@@ -1,0 +1,122 @@
+# .github/workflows/release-setup-check.yml
+# リリース CI の一回限りのセットアップを、公開を一切行わずに確かめる（release-ci 要件 1.6, 11.5, 11.7）。
+#   - Azure へ OIDC でログインし、マネージド ID の Marketplace の profile ID と表示名を job summary に書く
+#     （Marketplace の publisher の Members へ追加するための値。ログには出さない）
+#   - publisher のメンバー確認（Members に未追加の段階では失敗してよい）と拡張の存在確認
+#   - 名前の対応表を summary に書き、crates.io の Trusted Publisher・Azure のフェデレーション資格情報の
+#     設定画面と目で照合させる
+# crates.io のトークン交換は行わない（公開できる認証を確認用に発行しない）。どの公開先にも公開しない。
+# 手動起動だけ。environment `release-setup-check` は main からの実行に限る（保護規則）。
+name: Release setup check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  check:
+    name: release-setup-check
+    runs-on: ubuntu-latest
+    environment: release-setup-check
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # vsce の版は editors/vscode/package-lock.json で固定する。
+      - name: Install vsce (npm ci)
+        working-directory: editors/vscode
+        run: npm ci --ignore-scripts
+
+      - name: Azure login (OIDC)
+        uses: Azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # 499b84ac-1321-427f-aa17-267ca6975798 は Azure DevOps（Marketplace）のリソース ID（公開の既知値）。
+      # profile ID は秘密ではないが、ログではなく summary にだけ書く（標準出力に出さない）。
+      - name: Write Marketplace profile to summary
+        run: |
+          $json = az rest -u 'https://app.vssps.visualstudio.com/_apis/profile/profiles/me' --resource 499b84ac-1321-427f-aa17-267ca6975798 --only-show-errors
+          if ($LASTEXITCODE -ne 0) { throw "az rest で Marketplace の profile を取得できない（exit $LASTEXITCODE）" }
+          $me = ($json -join "`n") | ConvertFrom-Json
+          @(
+            '## Marketplace の profile（マネージド ID）'
+            ''
+            '| 項目 | 値 |'
+            '|------|----|'
+            "| profile ID | ``$($me.id)`` |"
+            "| 表示名 | $($me.displayName) |"
+            ''
+            'publisher `ekicyou` の Members に、この profile ID を Contributor として追加する。'
+            ''
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          Write-Host 'profile ID と表示名を job summary に書いた。'
+
+      # Members に未追加の段階では失敗する。失敗しても後続の確認を続ける。
+      - name: Check publisher membership (vsce verify-pat)
+        continue-on-error: true
+        working-directory: editors/vscode
+        run: |
+          npx --no-install vsce verify-pat ekicyou --azure-credential
+          $code = $LASTEXITCODE
+          $result = if ($code -eq 0) { '成功（Members に追加済み）' } else { "失敗（exit $code。Members に未追加なら想定どおり）" }
+          @(
+            '## publisher `ekicyou` のメンバー確認'
+            ''
+            "- ``vsce verify-pat ekicyou --azure-credential``: $result"
+            ''
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          exit $code
+
+      # 認証なしで拡張の情報が返ることを確かめる。
+      - name: Check extension exists (vsce show)
+        working-directory: editors/vscode
+        run: |
+          $out = npx --no-install vsce show ekicyou.pasta-vscode --json
+          $code = $LASTEXITCODE
+          $result = if ($code -eq 0) {
+            $versions = @((($out -join "`n") | ConvertFrom-Json).versions | ForEach-Object { [string]$_.version })
+            $latest = $versions | Sort-Object { [version]$_ } | Select-Object -Last 1
+            "成功（版 $($versions.Count) 件。最新 $latest）"
+          } else { "失敗（exit $code）" }
+          @(
+            '## 拡張 `ekicyou.pasta-vscode` の存在確認'
+            ''
+            "- ``vsce show ekicyou.pasta-vscode --json``: $result"
+            ''
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          exit $code
+
+      # design.md「認証名の契約」の値。前の step が失敗しても照合できるよう常に書く。
+      - name: Write name table to summary
+        if: always()
+        run: |
+          @(
+            '## 名前の対応表（設定画面と照合する）'
+            ''
+            '| 項目 | 値 | 照合先 |'
+            '|------|----|--------|'
+            '| リポジトリ | `ekicyou/pasta` | crates.io Trusted Publisher・Azure FIC の subject |'
+            '| 公開ワークフロー | `release.yml` | crates.io Trusted Publisher（完全一致） |'
+            '| 確認ワークフロー | `release-setup-check.yml` | — |'
+            '| 公開用 environment | `release` | crates.io の environment 欄・Azure FIC subject `repo:ekicyou/pasta:environment:release` |'
+            '| 確認用 environment | `release-setup-check` | Azure FIC subject `repo:ekicyou/pasta:environment:release-setup-check` |'
+            '| Marketplace | publisher `ekicyou`・拡張 `ekicyou.pasta-vscode` | Marketplace の Members |'
+            '| crates（公開順） | `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check` | crates.io Trusted Publisher（5 件） |'
+            ''
+            'このワークフローは crates.io のトークン交換を行わず、どの公開先にも公開していない。'
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
