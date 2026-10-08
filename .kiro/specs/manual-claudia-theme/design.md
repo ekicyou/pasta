@@ -581,7 +581,7 @@ declare function chapterRegions(chapterText: string, chapter: string): ChapterRe
 - JS（`additional-js`、`book.js` の後に実行）: 上記 3 ボタンの親 `li` を `#mdbook-theme-list` の末尾へ移す。存在しなければ何もしない。外部通信・保存値の変更・他の DOM 操作をしない。理由: `book.js` の矢印キー操作は隣の `li` のボタンへ `focus()` するため、隠れた項目が間にあると Light から Navy へ進めない。末尾へ寄せれば Auto・Light・Navy の間を矢印で移動できる。
 - 保存値（R2.4）: `book.js` はメニュー生成時の id 一覧で保存値を判定するため、`rust` 等の保存値はそのまま適用され mdBook の既定配色で読める（隠すだけで壊さない）。部品は `:root` の既定トークンで読める。
 - 保持と初回表示（R2.5・2.6）: `book.toml` の `default-theme`・`preferred-dark-theme` と `book.js` の保存の仕組みは不変。
-- Auto 項目（`mdbook-theme-default_theme`）は残す。OS の設定に従って light か navy を選ぶだけで、第三のテーマではない（「未解決事項」2）。
+- Auto 項目（`mdbook-theme-default_theme`）は残す。OS の設定に従って light か navy を選ぶだけで、第三のテーマではない。メニューは Auto・Light・Navy の 3 項目になり、配色は 2 種類のまま（設計ディスカッション議題 1 で確定。R2.1 の「2 つに絞る」は配色の数を指す）。
 
 #### FontLoader（`book/theme/head.hbs` の追記）
 
@@ -778,8 +778,8 @@ flowchart LR
 各項目は暫定の想定で設計を書いている。
 
 1. ~~**表のスマートフォン幅での扱い**~~ → 解決（自明修正）: R9.1 を「ページ全体の横スクロールなし、表・コードは内側スクロール可」に合わせた。
-2. **テーマメニューの Auto 項目**: 想定: 残す（OS の設定で light か navy を選ぶだけ）。R2.1 の「2 つに絞る」を Auto も消す意味に取るなら、CSS で隠す項目に加える。
-3. **メニューの絞り方**: 想定: CSS で隠し、`claudia.js` で末尾へ寄せる（`index.hbs` を上書きしない）。代わりの案は `index.hbs` の上書き（mdBook の版上げで手動追従が要る）、または CSS だけ（Tab では移動できるが矢印キーで Navy へ進めない）。
+2. ~~**テーマメニューの Auto 項目**~~ → 確定（議題 1）: 残す。メニューは Auto・Light・Navy の 3 項目。
+3. ~~**メニューの絞り方**~~ → 確定（議題 1 に付随）: CSS で隠し、`claudia.js` で末尾へ寄せる（`index.hbs` を上書きしない。CSS だけでは矢印キーで Navy へ進めない）。
 4. **記法の字面**: 想定: `> 【表情】`／`> 【話し手：表情】`、全角の `【】` と `：`、話し手名は「クローディア」「アンソニー」だけ（「Claudia」などの別名は受け付けない）。
 5. ~~**索引に入るタグ文字列**~~ → 解決（自明修正）: 仕組みを変えずに受け入れる。検索の仕組みの変更は要件で対象外（Out of Boundary にも明記済み）。
 6. ~~**R5.3 の読み方**~~ → 解決（自明修正）: 要件の字面どおり、台詞には説明本体に無い技術情報を新しく書かない（ChapterDialogues の書き換え契約に記載済み）。
