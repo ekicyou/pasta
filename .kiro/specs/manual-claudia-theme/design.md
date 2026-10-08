@@ -34,6 +34,7 @@
 - **素材**: `book/src/img/claudia/` の顔アイコン 16 枚と `LICENSE.txt`（出典・Unlicense 原文）。
 - **章の導入・締め**: 全 47 章の導入・締めの掛け合いと、表紙（`introduction.md`）の扉・クレジット。
 - **規約と検査の追従**: `book/AUTHORING.md` の台詞部品の節と基準ボイスサンプル、`verify-content`（T 系）・`verify-static`・`verify-search`・`gen-skill-refs`（`chapterRegions`・`talk-in-body`）の追従、各自己テスト、`manual.yml` の変換ステップ。
+- **旧版の保存**: `manual.yml` の旧版生成段（着せ替え前の固定コミットを `classic/` の下に生成する。要件 11）。
 
 ### Out of Boundary
 
@@ -308,6 +309,11 @@ flowchart TD
 | 10.6 | 台詞中のリンクを従来規則で | LinkCheck（不変）, LinkCheckTest | 既存 `LINK_RE` | CI |
 | 10.7 | 自己テストで正常系と不正系 | TalkTest, TalkHtmlTest, GenTest, LinkCheckTest | 各テスト | CI |
 | 10.8 | 警告で続行せず exit 1 | 全ツール | 終了コード規約 | CI |
+| 11.1 | 旧版を `classic/` に生成 | ClassicSnapshot | 旧版生成段 | CI |
+| 11.2 | 固定コミット・旧版のツールで生成 | ClassicSnapshot | `CLASSIC_REF` | CI |
+| 11.3 | 新版の検査の後に生成 | ClassicSnapshot | 段の位置 | CI |
+| 11.4 | 失敗で公開を止める | ClassicSnapshot | `set -euo pipefail`・実在確認 | CI |
+| 11.5 | 旧版の中で参照が閉じる | ClassicSnapshot | mdBook 既定の相対リンク | 目視 |
 
 ## Components and Interfaces
 
@@ -632,6 +638,21 @@ declare function chapterRegions(chapterText: string, chapter: string): ChapterRe
 - 追加ステップ `Render talk components`: `node book/tools/talk/talk-html.mjs book/book`。位置は `Highlight pasta code blocks` の直後、`Rebuild bigram search index` の前。
 - 自己テストの段は `find book/tools -name '*-test.mjs'` のため、新しいテスト（`talk/*-test.mjs`・`theme-test.mjs`）は追加設定なしで実行される。
 - 出荷（R5.6）: テーマ・台詞部品・47 章・表紙・素材・ツール追従を 1 つの PR で main に入れる。タスクはブランチ上の複数コミットに分けてよい。
+
+#### ClassicSnapshot（`manual.yml` の旧版生成段。要件 11。2026-10-08 追加）
+
+- 位置: 自己テストの段の後、`Setup Pages` の前。PR でも実行し、旧版を生成できることを PR の段階で確かめる（公開は従来どおり main push 時のみ）。
+- 固定コミット: ワークフローの環境変数 `CLASSIC_REF: 6d4e868d799abb619f7db67611511f3196cd1ace` の 1 か所で定義する。このコミットの `book/` は着せ替え前の最後の公開物を作った版で、本 spec の分岐点 `2cbaf510` と `book/` の内容が同じである。
+- 手順（`bash`・`set -euo pipefail`。どの手順の失敗も exit 1 で公開を止める。R11.4）:
+  1. `git fetch --no-tags --depth=1 origin "$CLASSIC_REF"` と `git worktree add --detach "$RUNNER_TEMP/classic" "$CLASSIC_REF"`。
+  2. 旧版の `book/` で `npm ci`（旧版の着色ツールは旧版の lockfile の依存で動かす）。
+  3. `mdbook build "$RUNNER_TEMP/classic/book" -d "$GITHUB_WORKSPACE/book/book/classic"`。
+  4. 旧版の `highlight/highlight-html.mjs` と `bigram-index/build-index.mjs` を、旧版の場所から `book/book/classic` に対して実行する。新版のツールは使わない（R11.2）。
+  5. `book/book/classic/index.html`・`print.html`・検索索引（`searchindex*.js`）の実在を確かめる。欠けていれば exit 1。
+- 新版の検査は、すべてこの段より前に終わる。このため旧版は新版の検査の対象に入らない（R11.3）。手元の通し検証（タスク 6.1）でも、この段を最後に流す。
+- 旧版の中の参照は mdBook 既定の相対リンクのため、`classic/` の下で閉じる。`file://` でも閲覧できる（R11.5）。旧版の `book.toml` の `site-url = "/pasta/"` は 404 ページの資材参照にだけ効き、旧版の本文には影響しない。旧版には手を加えないので、この挙動もそのまま残す。
+- 新版から旧版へのリンクは置かない（依頼の範囲外）。旧版の URL は公開の案内で伝える。
+
 
 ## Data Models
 
