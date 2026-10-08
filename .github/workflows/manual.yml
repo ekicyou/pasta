@@ -5,11 +5,13 @@
 # マニュアル URL の実在検査のため。pasta-runtime-internals-doc 要件 7.8）の変更時のみ起動する。
 # PR では検証（ビルド・検証スクリプト群）までを行い、Pages への公開は main push 時のみ。
 #
-# パイプライン（manual-ssot-authority design「CI と公開」/ 要件 7.1, 7.2, 7.5, 7.6, 8.2, 10.4）:
+# パイプライン（manual-ssot-authority design「CI と公開」/ 要件 7.1, 7.2, 7.5, 7.6, 8.2, 10.4、
+# manual-claudia-theme 要件 8.7, 8.8）:
 #   node book/tools/gen-skill-refs.mjs --check（スキル生成物の鮮度照合。不一致で中断）
-#     -> mdbook build book -> 着色 -> 日本語 bigram 索引を再生成
+#     -> mdbook build book -> 着色 -> 台詞部品の変換（talk-html）-> 日本語 bigram 索引を再生成
 #     -> node book/tools/link-check.mjs（マニュアル内リンク・README のマニュアル URL・スキル自己完結の検証。失敗で中断）
-#     -> チュートリアル・静的性・検索・コンテンツ検証・ツール自己テスト
+#     -> チュートリアル・静的性・検索（静的性・検索の 2 つは --self-test で検査ロジック自身の自己テストも実行）
+#        ・コンテンツ検証・ツール自己テスト
 #     -> Pages artifact（./book/book）をアップロード -> deploy-pages で公開。
 # すべて build ジョブ内で検証するため、失敗時は deploy（needs: build）が走らず公開されない。
 name: Manual
@@ -84,6 +86,12 @@ jobs:
       - name: Highlight pasta code blocks
         run: node book/tools/highlight/highlight-html.mjs book/book
 
+      # 着色の直後・索引再生成の前に、台詞の引用（> 【タグ】…）を台詞部品の HTML へ変換する
+      # （manual-claudia-theme 要件 8.7 / design「Pipeline」）。未知のタグ・入れ子の台詞は
+      # 出力ファイルとタグを表示して exit 1＝公開前に止まる。出力先は book/book（mdBook 既定）。
+      - name: Render talk components
+        run: node book/tools/talk/talk-html.mjs book/book
+
       # mdbook build の後段で検索インデックスを日本語 bigram へ再生成する（要件 1.4）。
       # 失敗時 exit 1 でビルド中断。出力先は book/book（mdBook 既定）。
       - name: Rebuild bigram search index
@@ -120,11 +128,13 @@ jobs:
         run: cargo test -p pasta_sample_ghost
 
       # 出力の静的性・検索・コンテンツ受入基準の検証（ビルド済み book/book を対象に --no-build）。
+      # verify-static / verify-search の --self-test は本検査を行ったうえで、検査ロジック自身の
+      # 自己テストも実行する（manual-claudia-theme 要件 8.8）。
       - name: Verify static output
-        run: node book/tools/verify-static.mjs --no-build
+        run: node book/tools/verify-static.mjs --no-build --self-test
 
       - name: Verify search index
-        run: node book/tools/verify-search.mjs --no-build
+        run: node book/tools/verify-search.mjs --no-build --self-test
 
       - name: Verify content
         run: node book/tools/verify-content.mjs

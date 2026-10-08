@@ -198,7 +198,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
   - Rust キャッシュ: `Swatinem/rust-cache@v2`
   - アーティファクト: `pasta-dll-x86`, `pasta-dll-x64`（7日間保持）
 - **GitHub Actions**: `.github/workflows/manual.yml`（利用者マニュアル公開・build.yml と独立）
-  - `book/**`・`.claude/skills/pasta-ghost-authoring/**`・`.claude/skills/pasta-lua-coding/**` 変更時に起動。スキル references 鮮度照合（`gen-skill-refs.mjs --check`）→ npm ci(book) → mdbook build → pasta 構文ハイライト → bigram 索引再生成 → リンク検証（`link-check.mjs`）→ tutorial-check → cargo test 構文ガード → verify-static/search/content → GitHub Pages デプロイ
+  - `book/**`・`.claude/skills/pasta-ghost-authoring/**`・`.claude/skills/pasta-lua-coding/**` 変更時に起動。スキル references 鮮度照合（`gen-skill-refs.mjs --check`）→ npm ci(book) → mdbook build → pasta 構文ハイライト → 台詞部品の変換（`talk/talk-html.mjs`）→ bigram 索引再生成 → リンク検証（`link-check.mjs`）→ tutorial-check → cargo test 構文ガード → verify-static/search（`--self-test` 付き）/content → ツール自己テスト（`book/tools` の `*-test.mjs` 全件）→ GitHub Pages デプロイ
   - permissions: `pages: write` / `id-token: write` / `contents: read`。Pages 初回は repo Settings で手動有効化が必要
 
 ## 利用者マニュアル（ドキュメントサイト `book/`）
