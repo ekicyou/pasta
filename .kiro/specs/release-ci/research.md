@@ -385,6 +385,50 @@
 - 追跡解除で test が壊れる — クリーンなチェックアウトで `cargo test --all`・clippy を確認（R10.3）。
 - 初回リリースが最初の E2E になる — 公開前（verify・gate・build）で止まった場合はタグを付け直せる。公開の途中なら版を上げて出し直す。
 
+## nar の基準（追跡解除前）
+
+タスク 1.1 で `release/` の追跡を外す前に、追跡していた `release/hello-pasta.nar`（最終更新のコミット `4f8e52a4`・2026-10-03、SHA-256 `F71753A7A26E6A076E5CDFE530CCC62A87BEFF6580F53C4D56061D1EF76970FC`、2,005,071 バイト）のエントリ一覧を記録する。タスク 2.1 で `release.ps1` が作り直した nar のエントリ一覧をこれと比べ、3.3 の「今と同じ」の証拠にする。
+
+- 比べるのはエントリのパスの集合（33 件）。サイズは参考として記す。`pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`updates.txt`（2 か所）はビルドと依存の解決で、シェルの画像は画像生成の段で、サイズが変わりうる。手書きの正本（`descript.txt`・`pasta.toml`・`dic/`・`install.txt`、および `crates/pasta_lua/scripts/README.md` の写しの `scripts/README.md`）は、正本を変えない限りサイズも一致する（作業ツリーの改行コードの値。開発機は `core.autocrlf=true` で CRLF）。ただし `pasta.toml` はこの nar の後に `f245ab1f`（#59）で変わったため、作り直すと 2583 バイトになる。
+- 1.1 の作業中に既存の `release.ps1` で作り直した nar と比べた結果: パスの集合は 33 件とも一致。サイズの差は `pasta.dll`（3886592）と `pasta.toml`（2583、上記の理由）だけ。
+- 一覧の取り方: `[IO.Compression.ZipFile]::OpenRead(...)` の `Entries` の `FullName` と `Length`（展開後のサイズ）。
+
+| エントリ | サイズ（バイト） |
+|----------|------------------|
+| `ghost/master/descript.txt` | 212 |
+| `ghost/master/dic/actors.pasta` | 782 |
+| `ghost/master/dic/boot.pasta` | 1274 |
+| `ghost/master/dic/choice.pasta` | 902 |
+| `ghost/master/dic/click.pasta` | 1450 |
+| `ghost/master/dic/talk.pasta` | 2786 |
+| `ghost/master/pasta.dll` | 3848192 |
+| `ghost/master/pasta.toml` | 2639 |
+| `ghost/master/scripts/README.md` | 465 |
+| `ghost/master/THIRD_PARTY_LICENSES.txt` | 287325 |
+| `ghost/master/updates.txt` | 3165 |
+| `install.txt` | 77 |
+| `shell/master/descript.txt` | 230 |
+| `shell/master/surface0.png` | 3117 |
+| `shell/master/surface1.png` | 2714 |
+| `shell/master/surface10.png` | 2408 |
+| `shell/master/surface11.png` | 2166 |
+| `shell/master/surface12.png` | 2378 |
+| `shell/master/surface13.png` | 2333 |
+| `shell/master/surface14.png` | 2328 |
+| `shell/master/surface15.png` | 2544 |
+| `shell/master/surface16.png` | 2568 |
+| `shell/master/surface17.png` | 2181 |
+| `shell/master/surface18.png` | 2286 |
+| `shell/master/surface2.png` | 3068 |
+| `shell/master/surface3.png` | 2990 |
+| `shell/master/surface4.png` | 2984 |
+| `shell/master/surface5.png` | 3344 |
+| `shell/master/surface6.png` | 3381 |
+| `shell/master/surface7.png` | 2739 |
+| `shell/master/surface8.png` | 2913 |
+| `shell/master/surfaces.txt` | 897 |
+| `updates.txt` | 3165 |
+
 ## References（設計フェーズ）
 
 - https://docs.github.com/en/actions/how-tos/sharing-automations/reuse-workflows — reusable workflow の制約
