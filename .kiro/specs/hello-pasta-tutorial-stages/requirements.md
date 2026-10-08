@@ -27,7 +27,7 @@
 #### Acceptance Criteria
 
 1. The 段階表 shall リポジトリ内の 1 か所に置かれ、段階ごとに「叶えたい表現（願い）」「新しく覚える表現」「使う文法要素」「その段階で初めて扱うベースウェアのイベント（あれば）」「前段階からの差分の種別（書き足しのみ／書き換えあり）」を持つ。
-2. The 段階表 shall `brief.md` の段階のたたき台（1. しゃべらせたい → 2. 二人で掛け合い → 3. 表情 → 4. 毎回ちがうこと → 5. ランダムトーク → 6. 時報 → 7. 挨拶（ベースウェアのイベント） → 8. 触ったら反応 → 9. 選択肢 → 10. 覚えていてほしい（変数の保存） → 11. 話を続ける・分岐 → 12. Lua への入り口 → 13. 配布）の順を基本とし、順を変える場合はその理由を段階表に記す。
+2. The 段階表 shall `brief.md` の段階のたたき台（1. しゃべらせたい → 2. 二人で掛け合い → 3. 表情 → 4. 毎回ちがうこと → 5. ランダムトーク → 6. 時報 → 7. 挨拶（ベースウェアのイベント） → 8. 触ったら反応 → 9. 選択肢 → 10. 覚えていてほしい（変数の保存） → 11. 話を続ける・分岐 → 12. Lua への入り口 → 13. 配布）の順を基本とし、順を変える場合はその理由を段階表に記す。**[OPEN-11]** 仮定: DSL 単体には条件分岐が無いため、11 段目は Call・ローカルシーン・チェイントークによる「話の続き」とし、条件による分岐は 12 段目の Lua で扱う。
 3. The 段階表 shall 各段階で使う文法要素と API を、現行の版のマニュアル（`book/src/`）に書かれているものだけから選ぶ。マニュアルに無い書き方、「書けるだけ」の書き方、意図の推測で救済される書き方は作例に使わない。
 4. The 段階表 shall 「挨拶したい」の段階で、シーン名＝イベント名で呼ばれること、イベントの付加情報を `＞transfer_req_to_var` で `＄ｒ０`〜`＄ｒ９` に取り出す書き方、`OnGhostChanged` に応答すると `OnBoot` は来ないこと（204 を返したときだけ `OnBoot` へ回る）を、初めて扱う内容として位置づける。
 5. The 段階表 shall 「触ったら反応してほしい」の段階で、前段で覚えた `＞transfer_req_to_var` を使って `OnMouseDoubleClick` の部位（`＄ｒ４`）を読む形を採る。
@@ -96,5 +96,7 @@
 
 #### Acceptance Criteria
 
-1. When hello-pasta の辞書が書き直される, the 本 spec shall サンプルゴーストのリリース情報（クレートの `RELEASE.md` または README）に、辞書が教材として書き直されたこと・新しく入った表現・emo2 との切り替えの作例が入ったことを利用者向けに記す。**[OPEN-10]** 仮定: 記述先は `crates/pasta_sample_ghost/RELEASE.md` とし、`.nar` の中の `install.txt`・`descript.txt` は変えない。
-2. The hello-pasta の配布物 shall 辞書以外のファイル（`install.txt`・`descript.txt`・`pasta.toml`・シェル）を本 spec では変えない。
+1. When hello-pasta の辞書が書き直される, the 本 spec shall 書き直しを取り込むマージコミット（PR タイトル）を、リリースノートの生成（git log を Conventional Commits の種類で分類する `release-workflow` の方式）に拾われる `feat(pasta_sample_ghost): …` の形で、辞書が教材として書き直されたこと・emo2 との切り替えの作例が入ったことが利用者に分かる言葉で記す。
+2. When hello-pasta の辞書が書き直される, the `crates/pasta_sample_ghost/README.md` shall 辞書の構成（ファイル一覧と各ファイルの役割）の記述を変更後の辞書に合わせる。
+3. The 本 spec shall `.nar` に同梱する文書を増やさない（`install.txt`・`descript.txt` は変えず、`RELEASE.md` はリリース手順書のまま利用者向けの変更履歴を持たせない）。
+4. The hello-pasta の配布物 shall 辞書以外のファイル（`install.txt`・`descript.txt`・`pasta.toml`・シェル）を本 spec では変えない。

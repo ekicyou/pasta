@@ -53,17 +53,19 @@
 | - | ---- | ---- | ---- |
 | G1 | 段階辞書の置き場所と形 | Missing | 現行には完成形 1 つしかない。段階ごとのディレクトリ（例: `ghosts/hello-pasta-stages/NN-*/dic/`、または `tests/fixtures/stages/NN/`）が要る。段階数 12（[OPEN-1]）× 1〜5 ファイル |
 | G2 | 全段階を実ローダーで読み込むテスト | Missing | `self_deploy_integration_test.rs` の tempdir コピー＋`PastaLoader::load` を、段階ディレクトリをループする形へ拡張または新規テストに。設定・シェルは hello-pasta から合成する必要がある（[OPEN-2]） |
-| G3 | `OnBoot` 疎通の確認手段（Requirement 4.2） | Unknown | `pasta_sample_ghost` の dev-deps は `pasta_lua` のみ。`PastaLuaRuntime` から SHIORI リクエストを送る公開 API があるか（`pasta_lua/tests/shiori/event_dispatch_test.rs` が参考）。無ければ `pasta_shiori` を dev-dep に足して `TestEnv` 相当を使う。**Research Needed** |
+| G3 | `OnBoot` 疎通の確認手段（Requirement 4.2） | Resolved | `pasta_sample_ghost` の dev-deps は `pasta_lua` のみだが、`PastaLoader::load` が返すランタイムの `exec(&str)`（`pasta_lua/src/runtime/exec.rs:31`）で `require "pasta.shiori.entry"` → `SHIORI.request({id="OnBoot", method="get", version=30})` を実行すると SHIORI 応答文字列が返る（`pasta_lua/tests/shiori/event_handler_test.rs:170-186` の方式）。dev-dep 追加なしで C2 が成立する。`pasta_shiori` 経由（`PastaShiori::load`/`request`、`shiori_sample_ghost_test.rs:37-54`）は C3 の予備 |
 | G4 | 最終段階＝配布辞書の一致検証 | Missing | バイト一致の比較テスト。もしくは**シンボリックリンクや生成ではなく**「最終段階ディレクトリを配布辞書そのものとする」構成（G1 の選択で消える） |
-| G5 | `OnBoot` ゴールデン | Constraint | `pasta_shiori` の 3 テストが `OnBoot` 単一シーン・固定文を固定。段階 1〜2 で `OnBoot` を 1 人→2 人へ育てるのは可（最終形が同じなら）。段階 4「毎回ちがう」で `OnBoot` を複数化する作例は不可（[OPEN-8]）。`OnFirstBoot`/`OnClose` は自由 |
-| G6 | 構造テストの固定値 | Constraint | `OnTalk` 5〜10、`OnMouseDoubleClick` 7 以上、`時報12`・`時報その他`・`＄時１２`、`choice.pasta` は dist_src の必須一覧に無い。教材化で件数を減らすならテスト更新（Requirement 5.2） |
-| G7 | `tutorial-check.mjs` の逐語一致 | Constraint | 辞書を変えた瞬間に `manual.yml` が赤くなる。`first-ghost.md` のコードブロック差し替え（[OPEN-9]）が同じ PR に要る。照合方式の拡張（段階ごと）は下流 spec の持ち場 |
+| G5 | `OnBoot` ゴールデン | Constraint | `pasta_shiori` の 3 テストが `OnBoot` 単一シーン・固定文を固定。ゴールデンは `actors.pasta` の `＠通常`→`\s[1]`/`\s[11]`、`pasta.toml` の `[talk]` 待ち時間と `[actor]` の spot にも依存する（Requirement 6.2 で不変）。段階 1〜2 で `OnBoot` を 1 人→2 人へ育てるのは可（最終形が同じなら）。段階 4「毎回ちがう」で `OnBoot` を複数化する作例は不可（[OPEN-8]）。`OnFirstBoot`/`OnClose` は自由 |
+| G6 | 構造テストの固定値 | Constraint | `OnTalk` 5〜10（`talk.pasta`）、`OnMouseDoubleClick` 7 以上（`click.pasta`。`choice.pasta` の 1 個を含めると現状 8 定義）、`時報12`・`時報その他`・`＄時１２`、`src/scripts.rs` のユニットテストが「シーン内で使う `＠表情` はすべて `actors.pasta` に定義あり」を検査、`choice.pasta` は dist_src の必須一覧に無い。`ontalk_probe_test.rs` が `OnTalk` シーンの存在を要求。教材化で件数を減らすならテスト更新（Requirement 5.2） |
+| G7 | `tutorial-check.mjs` の逐語一致 | Constraint | 辞書を変えた瞬間に `manual.yml` が赤くなる。`first-ghost.md` のコードブロック差し替え（[OPEN-9]）が同じ PR に要る。さらに本文も辞書の行を引用している（`:157`・`:182` が `起動したよ～`、`:235-236`・`:271` が `＄ゴースト名`、`:7`・`:435` と `getting-started/index.md:11` が「hello-pasta と同じになる」と明言）ため、コードブロックだけ差し替えると本文が食い違う。照合方式の拡張（段階ごと）は下流 spec の持ち場 |
 | G8 | `OnGhostChanged` 作例の「起動挨拶が二重にならない」注意 | Constraint | 作例は `OnGhostChanged` で挨拶し `OnBoot` は来ない前提。読者向けコメントで説明（辞書コメント）。Lua 側で 204 を返す道もあるが入門では使わない |
 | G9 | シーン名の前方一致衝突 | Constraint | 新シーン名（例: `挨拶` は choice.pasta に既存。`時報`・`OnTalk`・`OnMouse…` で始まる名前は候補に混ざる）。e2e テストが追加するシーン名との衝突も確認（`scene_kick_*` が追記するシーン名を設計で列挙） |
 | G10 | emo2 側の名前 | Constraint | `OnGhostChanged` の Reference0 は `むらさき`（配布版・DEBUG 版で共通）、Reference2 は `えも？？`/`えも2DEBUG`。作例は `＄ｒ０` を使う |
 | G11 | `＄％currentghost.name` 作例 | Unknown | get_property は非同期コールバック（`\![get,property,OnPastaCallBack{N}…]`）を挟む。入門の段階表に置くか削るか（[OPEN-6]）。`byte_invariant_test` は OnTalk を登録しない fixture を使っており、この作例に依存しない |
-| G12 | 配布物の変化の周知 | Missing | `crates/pasta_sample_ghost/RELEASE.md` に追記（[OPEN-10]）。`release-ci` が成果物の追跡をやめる予定のため、`.nar` 同梱の文書は増やさない |
+| G12 | 配布物の変化の周知 | Resolved | `crates/pasta_sample_ghost/RELEASE.md` はリリース**手順書**であり利用者向けの変更履歴ではない。リリースノートは `release-workflow`/`release-ci` が git log を Conventional Commits の種類で分類して生成する。したがって周知の経路は、本 spec のマージコミット（PR タイトル）を `feat(pasta_sample_ghost): …` の利用者向けの言葉で書くこと。あわせて `crates/pasta_sample_ghost/README.md` の辞書構成の節（`:125-146` のツリー）を追従させる。`.nar` 同梱の文書は増やさない（`release-ci` が成果物の追跡をやめる予定） |
 | G13 | 段階表の置き場所 | Missing | 下流が逐語参照する正本。候補: `crates/pasta_sample_ghost/ghosts/hello-pasta-stages/README.md`（段階辞書と同居）か `crates/pasta_sample_ghost/README.md` の節 |
+| G14 | 段階辞書の置き場所の制約 | Constraint | `release.ps1` は `ghosts\hello-pasta` を固定で対象にし、`pasta_check release` は対象ディレクトリ全体を無選別にコピーする（`pasta_check/src/release.rs:19`）→ **`ghosts/hello-pasta/` の下に段階辞書を置くと `.nar` に混入する**。`pasta_shiori` の e2e も `ghost/master` 全体を tempdir へコピーする。`pasta.toml` の `pasta_patterns = ["dic/*.pasta"]` は再帰しないので `dic/` の下にサブフォルダを置いても読み込まれない。`ghosts/` 直下の兄弟ディレクトリ（例: `ghosts/hello-pasta-stages/`）なら配布・e2e のどちらにも拾われない |
+| G15 | `manual.yml` のトリガー | Constraint | `manual.yml` の `paths:` に `crates/pasta_sample_ghost/**` が無い。辞書だけを変える PR では tutorial-check が走らず（`build.yml` の `cargo test --all` だけ走る）、逐語一致の崩れが main への push まで見つからない。段階辞書の検証（Requirement 4.7）も同じ理由で `manual.yml` 側では PR 時に走らない |
 
 ### 2.3 複雑さの信号
 
@@ -77,7 +79,7 @@
 
 - `crates/pasta_sample_ghost/ghosts/hello-pasta-stages/01-…/dic/` のように段階ディレクトリを並べ、最終段階は配布辞書と同一内容の複製（G4 の一致テストで守る）。
 - `self_deploy_integration_test.rs` に「段階ディレクトリを列挙 → hello-pasta の設定・シェルと合成して tempdir へ → `PastaLoader::load`」のループテストを追加。
-- トレードオフ: ✅ 既存の tempdir/ctor パターンをそのまま使える、下流が参照するパスが配布物のすぐ隣で分かりやすい。❌ 最終段階の複製が二重管理になる（一致テストで補う）。`ghosts/` 配下に置くと `release.ps1`/`pasta_check` が拾わないことの確認が要る（Research Needed）。
+- トレードオフ: ✅ 既存の tempdir/ctor パターンをそのまま使える、下流が参照するパスが配布物のすぐ隣で分かりやすい。`ghosts/hello-pasta/` の**外**（兄弟ディレクトリ）に置けば `release.ps1`/`pasta_check`/`pasta_shiori` e2e のどれにも拾われない（G14 で確認済み）。❌ 最終段階の複製が二重管理になる（一致テストで補う）。
 
 ### Option B: 新規コンポーネント（テスト専用フィクスチャ ＋ 新テストファイル）
 
@@ -92,24 +94,22 @@
 ### 検証手段の選択肢（G3）
 
 - **C1**: `PastaLoader::load` のみ（読み込み・トランスパイル・Lua 起動まで）。最小。`OnBoot` 疎通（Requirement 4.2）は満たさない。
-- **C2**: `pasta_lua` のランタイム API から `OnBoot` を発火（`pasta_lua/tests/shiori/event_dispatch_test.rs` の方式を調査）。dev-dep 追加なし。
+- **C2**: `pasta_lua` のランタイム API から `OnBoot` を発火（`runtime.exec` で `SHIORI.request({id="OnBoot", …})`。G3 で成立を確認済み）。dev-dep 追加なし。
 - **C3**: `pasta_shiori` を dev-dep に足し `TestEnv` 相当で SHIORI/3.0 リクエストを送る。実配布に最も近い。❌ dev-dep が増え、`pasta_shiori` → `pasta_sample_ghost` → … の循環は無いか確認（現在は `pasta_shiori/tests` が `pasta_sample_ghost/ghosts` をパスで参照しているだけで Cargo 依存は無い）。
 
 ## 4. 工数とリスク
 
 | 項目 | 見積 | 根拠 |
 | ---- | ---- | ---- |
-| 工数 | **M（3〜7 日）** | 作例 12 段の執筆と教材化、ループテスト 1 本、既存テスト・`first-ghost.md`・RELEASE.md の追従。新しい技術要素は無い |
+| 工数 | **M（3〜7 日）** | 作例 12 段の執筆と教材化、ループテスト 1 本、既存テスト・`first-ghost.md`・README の追従。新しい技術要素は無い |
 | リスク | **Medium** | 技術は既知だが、ゴールデン（G5）・構造テスト（G6）・tutorial-check（G7）の 3 系統を同時に揃える必要があり、emo2 の台詞制約と前方一致（G9）で作例の自由度が狭い |
 
 ## 5. 設計フェーズへの推奨と申し送り
 
-- **推奨**: Option A または C（配布物のすぐ隣に段階辞書を置く）＋ 検証は C2（取れなければ C3）。Option B は下流の逐語引用の正本としては弱い。
-- **キーとなる決定**: 段階辞書のディレクトリ規則（番号・名前）、最終段階の扱い（複製＋一致テスト／直接参照）、段階表の正本の置き場所（G13）、`OnBoot` 疎通の手段（G3）。
+- **推奨**: Option A または C（配布物のすぐ隣、ただし `ghosts/hello-pasta/` の外に段階辞書を置く。G14）＋ 検証は C2（G3 で成立確認済み）。Option B は下流の逐語引用の正本としては弱い。
+- **キーとなる決定**: 段階辞書のディレクトリ規則（番号・名前）、最終段階の扱い（複製＋一致テスト／直接参照）、段階表の正本の置き場所（G13）、ループテストの形（既存テストの拡張か新規ファイルか。「複数ゴーストディレクトリをループで読み込む」テストは現行に無く、最も近いのは `pasta_lua/tests/transpiler/final_regression_test.rs` の `broad_fixtures()`）、`manual.yml` のトリガー追加の要否（G15）。
 - **Research Needed（設計で調べる）**:
   1. `＄＊回数＝＄＊回数＋１` の初回（nil）挙動（G2.1 段階 10）。
-  2. `PastaLuaRuntime` からイベントを発火する公開 API の有無（G3）。
-  3. `release.ps1` / `pasta_check release` が `ghosts/` 配下の追加ディレクトリを拾わないこと（Option A/C）。
-  4. `scene_kick_*_e2e_test.rs` が追記するシーン名の一覧（G9）。
-  5. `pasta_lua/tests/fixtures/e2e` の走査方法（ループテストの手本）。
-- **要件ディスカッションへ**: `requirements.md` の [OPEN-1]〜[OPEN-10]。特に [OPEN-8]（`OnBoot` ゴールデンを守るか更新するか）と [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
+  2. `scene_kick_*_e2e_test.rs` が追記するシーン名の一覧（G9）。
+  3. 「Lua への入り口」で `scripts/*.lua` を置く場合（[OPEN-5] の代替案）、`release.ps1` が `crates/pasta_lua/scripts` を `master/scripts` へ robocopy で再同期する処理（`release.ps1:153-162`）が利用者スクリプトを残すか消すか。
+- **要件ディスカッションへ**: `requirements.md` の [OPEN-1]〜[OPEN-9]・[OPEN-11]（[OPEN-10] は G12 で解消）。特に [OPEN-8]（`OnBoot` ゴールデンを守るか更新するか）と [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
