@@ -278,7 +278,7 @@ flowchart TD
 | 5.5 | D-voice・G-voice・コード内口調に合格 | ContentVerifier | 既存 D/G 系 | CI |
 | 5.6 | 部分出荷しない | Pipeline | 単一 PR の完成形 | 移行戦略 |
 | 6.1 | 二人の顔と挨拶の掛け合いの扉 | CoverPage | 扉の構造契約 | — |
-| 6.2 | 題名とパート案内 | CoverPage | 案内リスト | — |
+| 6.2 | 題名は扉の直上の H1、扉にパート案内 | CoverPage | H1・案内リスト | — |
 | 6.3 | 既存情報と F 系の維持 | CoverPage, ContentVerifier | 本文不変・F 系 | — |
 | 6.4 | 375px で縦並び | CoverPage, ClaudiaTheme | 狭幅規則 | — |
 | 6.5 | 画像欠落でも題名・案内・台詞 | CoverPage | 文字は画像に依存しない | — |
@@ -600,7 +600,7 @@ declare function chapterRegions(chapterText: string, chapter: string): ChapterRe
 
 #### CoverPage（`book/src/introduction.md`）
 
-- 構造（上から）: H1「はじめに」 → 扉 `<section class="claudia-hero" aria-label="扉">`（角飾り 4 つ・題名「pasta マニュアル」・欧文添え字・二人の顔 84px（装飾として `alt=""`）・台詞部品の挨拶の掛け合い（Claudia とアンソニーが各 1 つ以上）・パート案内 `<nav class="hero-toc">` 内の Markdown リスト 6 項目） → `---` → 既存の本文（不変） → `---` → 締めの掛け合い → クレジット `<p class="claudia-credit">`（ponapalt/claudia・Unlicense・参考サイト URL）。
+- 構造（上から）: H1「pasta マニュアル」（先頭行を `# はじめに` から改める。題名は扉の外・直上に 1 回だけ出す。設計ディスカッション議題 3 で確定。目次の表記「はじめに」は `SUMMARY.md` 側なので不変） → 扉 `<section class="claudia-hero" aria-label="扉">`（角飾り 4 つ・欧文添え字（扉の中に題名は置かない）・二人の顔 84px（装飾として `alt=""`）・台詞部品の挨拶の掛け合い（Claudia とアンソニーが各 1 つ以上）・パート案内 `<nav class="hero-toc">` 内の Markdown リスト 6 項目） → `---` → 既存の本文（不変） → `---` → 締めの掛け合い → クレジット `<p class="claudia-credit">`（ponapalt/claudia・Unlicense・参考サイト URL）。
 - パート案内のリンク先: `getting-started/index.md`・`grammar/index.md`・`lua/index.md`・`debug/index.md`・`reference/startup.md`・`internals/index.md`。Markdown リンクなので mdBook が `.html` に書き換え、`link-check` が検査する。
 - HTML ブロックの内側に空行を挟んで Markdown（台詞の引用ブロック・リスト）を置く（mdBook で描画されることを実測済み）。扉の台詞も検索索引に入る。
 - 画像が欠けても題名・案内・台詞は文字で残る（R6.5）。375px では顔・台詞・案内が縦に並ぶ（R6.4）。
@@ -784,4 +784,6 @@ flowchart LR
 5. ~~**索引に入るタグ文字列**~~ → 解決（自明修正）: 仕組みを変えずに受け入れる。検索の仕組みの変更は要件で対象外（Out of Boundary にも明記済み）。
 6. ~~**R5.3 の読み方**~~ → 解決（自明修正）: 要件の字面どおり、台詞には説明本体に無い技術情報を新しく書かない（ChapterDialogues の書き換え契約に記載済み）。
 7. ~~**画像の形式と大きさ**~~ → 解決（自明修正）: 112px の透過 PNG（減色で 20KB 以下）。WebP は道具と確認が増えるだけで要件上の利点が無い。
-8. **表紙の H1 と扉の題名の重複**: 想定: 章構造の規則（先頭行 H1）を守るため H1「はじめに」を残し、扉の題名「pasta マニュアル」を別に置く。H1 を見た目だけ隠す案もある。
+8. ~~**表紙の H1 と扉の題名の重複**~~ → 確定（議題 3）: H1 を「pasta マニュアル」に改めて題名とし、扉の中の題名は省く。見出しは 1 つ、章構造の規則も維持。`:has()` には頼らない。
+
+すべての未解決事項は確定済み。
