@@ -7,6 +7,8 @@
 ガイド本文の執筆（Claudia の語り・章の文章）は下流の `getting-started-story-guide` が持つ。本 spec は段階表と段階辞書を、下流が逐語で使える形で確定して申し送る。
 
 > 要件ディスカッション（2026-10-08、議題 1〜11）で、ディスカバリだけでは確定できなかった論点 [OPEN-1]〜[OPEN-11] はすべて解消した。本文中の「[OPEN-n] 解消」「議題 n で決定」は、その決定の出どころを示す。決定の背景は `research.md` の §2.2・§5 を参照。
+>
+> 実装中の見直し（2026-10-09、ユーザー指示）で、配布版のランダムトーク間隔を 1 分前後に短くし（3.10）、設定ファイルを触る段は独立させず 2 段目で扱うことにした。これに伴い 5.2・5.3・6.4 を改めた。
 
 ## Boundary Context
 
@@ -65,6 +67,7 @@
 7. The Lua との連携の作例 shall 「少し紹介する程度」の最小の形に留め、シーン内の Lua ブロックに小さな関数を 1 つ書いて `＞＠関数（）` で呼ぶ、マニュアルの記述パターンに従う。`scripts/` にファイルを置かず、12 段目の辞書も `dic/` だけで完結する。
 8. The hello-pasta の辞書 shall プロパティの読み取り（`＄％プロパティ名`）の作例を、ゴースト自身が知りえない情報を読む形で 1 つ持つ: 7 段目「挨拶したい」のファイルに `＊会話` を 1 つ足し、`＄％baseware.name`（必要なら `＄％baseware.version` も）を台詞に使う（例: 「わたしたち、`＄％baseware.name` の上で動いてるんだね」）。現行の `＄％currentghost.name` で自分のゴースト名を名乗る作例は削る（ゴーストが自分の名前を知らないのは不自然。議題 8 で決定）。根拠は UKADOC プロパティシステム <https://ssp.shillest.net/ukadoc/manual/list_propertysystem.html#baseware.name> とマニュアル `variables.md` のプロパティ変数。
 9. The hello-pasta の辞書 shall 現行の版の文法・API だけで書かれ、`cargo test -p pasta_sample_ghost` の実ローダーによる読み込みを通る。
+10. The hello-pasta の `pasta.toml` shall ランダムトークの間隔を 1 分前後（`talk_interval_min = 45`・`talk_interval_max = 75`）にし、2 段目以降の `＊会話` を数分待たずに確かめられるようにする。設定ファイルを触る段は独立させず、ランダムトークを初めて書く 2 段目で「すぐ確かめたいときは `pasta.toml` の `[ghost]` で間隔を短くする」書き方として段階表に記す（設定の段を足すと辞書ファイルを持たない段ができ、1 段 1 ファイルの組み立て方が崩れるため。2026-10-09 決定）。
 
 ### Requirement 4: 全段階の検証
 
@@ -88,8 +91,8 @@
 #### Acceptance Criteria
 
 1. The hello-pasta の辞書 shall `OnBoot` を単一シーンに保ち、その出力が決定的である（`pasta_shiori` のゴールデン応答テスト `byte_invariant_test.rs`・`kick_unused_byte_invariant_test.rs` と `shiori_sample_ghost_test.rs` が依存）。`OnBoot` は 1 段目「しゃべらせたい」で書いた形（女の子の一言）のまま配布辞書に残るため、`OnBoot` の台詞は現行（`起動したよ～。` / `さあ、始めようか。`）から変わる。本 spec はこれら 3 テストのゴールデン文字列と assert 条件を新しい `OnBoot` の決定的な出力に更新し、テストの意図（応答のバイト不変・単一シーン）は保つ（議題 5 で決定。[OPEN-8] 解消）。
-2. When 辞書が章ごとのファイルに組み替わる（Requirement 2.1・2.3）, the 本 spec shall ファイル名に依存する既存テスト（`dist_src_validation_test.rs` の必須ファイル一覧、`integration_test.rs`・`src/scripts.rs` のファイル単位の構造検査: `talk.pasta` の `OnTalk` 5〜10 個、`click.pasta` の `OnMouseDoubleClick` 7 個以上、`時報12`・`時報その他`・`＄時１２` の存在、イベント辞書にグローバルアクター辞書を置かない、シーン内の表情名がアクター辞書に定義済み）を、新しいファイル構成に合わせてテストの意図（必須ファイルの存在・構造の保証）を保ったまま更新する。
-3. While `pasta_shiori` の e2e テスト（`scene_kick_*_e2e_test.rs`）が hello-pasta を一時ディレクトリへコピーしてシーンを追加している, the hello-pasta の辞書 shall これらが追加するシーン名と衝突せず、`pasta.toml` の読み替え（talk 間隔の上書き）を妨げない。
+2. When 辞書が章ごとのファイルに組み替わる（Requirement 2.1・2.3）, the 本 spec shall ファイル名に依存する既存テスト（`dist_src_validation_test.rs` の必須ファイル一覧、`integration_test.rs`・`src/scripts.rs` のファイル単位の構造検査: `talk.pasta` の `OnTalk` 5〜10 個、`click.pasta` の `OnMouseDoubleClick` 7 個以上、`時報12`・`時報その他`・`＄時１２` の存在、イベント辞書にグローバルアクター辞書を置かない、シーン内の表情名がアクター辞書に定義済み）を、新しいファイル構成に合わせてテストの意図（必須ファイルの存在・構造の保証）を保ったまま更新する。`integration_test.rs` の `pasta.toml` の検査にある talk 間隔の値（`180`・`300`）も 3.10 の値に合わせる。
+3. While `pasta_shiori` の e2e テスト（`scene_kick_*_e2e_test.rs`）が hello-pasta を一時ディレクトリへコピーしてシーンを追加している, the hello-pasta の辞書 shall これらが追加するシーン名と衝突せず、`pasta.toml` の読み替え（talk 間隔の上書き）を妨げない。3 本の e2e（`scene_kick_gate`・`scene_kick_multibeat`・`scene_kick_preempt`）は hello-pasta の `pasta.toml` の talk 間隔の行を文字列で置き換えて上書きするので、本 spec は 3.10 で変えた行に合わせて置き換え元の文字列を直し、テストの意図（固定間隔への上書き）は保つ。
 4. When hello-pasta の辞書が章ごとのファイルに組み替わる, the `book/src/getting-started/first-ghost.md` の ```` ```pasta ```` ブロック shall 変更後の全ファイルと逐語一致する状態に保たれ、`node book/tools/tutorial-check.mjs` が exit 0 で終わる。本 spec が行う追従は**機械的な範囲**に限る: pasta ブロックを新しいファイル群に差し替える、辞書の行を引用している本文（`起動したよ～`・`＄ゴースト名` など）と見出しのファイル名を直す。章立て・Claudia の語り・照合方式（完成形 1 か所との照合）は変えず、全面的な書き直しは `getting-started-story-guide` に残す（議題 11 で決定。[OPEN-9] 解消）。
 4a. When hello-pasta の辞書のファイル名が変わる, the `book/tools/tutorial-check.mjs` shall 固定で列挙しているファイル名（`DIC_FILES`）に依存せず、hello-pasta の `dic/` に実在する `.pasta` ファイル（または段階表）から照合対象を導く。照合方式そのもの（各ファイルがいずれかのブロックと逐語一致）は変えない。`tutorial-check-test.mjs` も同じ前提に合わせる。
 4b. The `.github/workflows/manual.yml` shall `paths` に hello-pasta の `dic/`（`crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**`）を加え、辞書だけを変える PR でも tutorial-check とチュートリアル構文検証（`cargo test -p pasta_sample_ghost`）が走るようにする。
@@ -104,4 +107,4 @@
 1. When hello-pasta の辞書が書き直される, the 本 spec shall 書き直しを取り込むマージコミット（PR タイトル）を、リリースノートの生成（git log を Conventional Commits の種類で分類する `release-workflow` の方式）に拾われる `feat(pasta_sample_ghost): …` の形で、辞書が教材として書き直されたこと・emo2 との切り替えの作例が入ったことが利用者に分かる言葉で記す。
 2. When hello-pasta の辞書が書き直される, the `crates/pasta_sample_ghost/README.md` shall 辞書の構成（ファイル一覧と各ファイルの役割）の記述を変更後の辞書に合わせる。
 3. The 本 spec shall `.nar` に同梱する文書を増やさない（`install.txt`・`descript.txt` は変えず、`RELEASE.md` はリリース手順書のまま利用者向けの変更履歴を持たせない）。
-4. The hello-pasta の配布物 shall 辞書以外のファイル（`install.txt`・`descript.txt`・`pasta.toml`・シェル）を本 spec では変えない。
+4. The hello-pasta の配布物 shall 辞書以外のファイル（`install.txt`・`descript.txt`・シェル）を本 spec では変えない。`pasta.toml` は 3.10 の talk 間隔の 2 行だけを変える。

@@ -28,12 +28,14 @@
 - **段階表**（`crates/pasta_sample_ghost/STAGES.md`）: 段階の順、各段の願い・新しく覚える表現・文法要素・初めて扱うイベント・追加ファイル・検証イベント、ファイル名規則、段階 N の組み立て方。下流が逐語参照する正本。
 - **段階辞書 ＝ hello-pasta 配布辞書**（`ghosts/hello-pasta/ghost/master/dic/NN-*.pasta` の 12 ファイル）とそのコメント。
 - **全段階の検証**（`crates/pasta_sample_ghost/tests/tutorial_stages_test.rs`）: 段階の組み立て・読み込み・イベント疎通・段階表とファイル集合の一致・シーン名の前方一致衝突の検査。
+- **配布版のトーク間隔**: hello-pasta の `pasta.toml` の `[ghost]` `talk_interval_min`・`talk_interval_max` の 2 行（45・75 秒。3.10）。
 - 辞書の組み替えに追従する既存テスト・検査ツール・文書の更新（下記 File Structure Plan の Modified Files）。
 
 ### Out of Boundary
 - `first-ghost.md` の章立て・語り・全面書き直し、段階ごとの照合（`getting-started-story-guide`）。
 - `surfaces.txt` の当たり判定（collision）の追加を含むシェル側の変更（`hello-pasta-shell-art` へ申し送り。設計ディスカッション #2）。当たり判定は本 spec の実装ゲートにしない。入門ガイドの公開（`getting-started-story-guide`）までに入っていればよい依存とする。
-- `pasta.toml`・`descript.txt`・`install.txt`・シェル・`scripts/` の変更（Requirement 6.4）。
+- `descript.txt`・`install.txt`・シェル・`scripts/` の変更、および `pasta.toml` の talk 間隔 2 行以外の変更（Requirement 6.4）。
+- 読者が自分で書く `pasta.toml`（`first-ghost.md` ステップ 7 の最小構成）に talk 間隔を書き足す案内の本文（`getting-started-story-guide`。段階表の 2 段目にはその書き方を記す）。
 - シーン名別名表（`＊会話` → `OnTalk`）の実装とそのマニュアル記述（上流 `scene-name-alias`）。
 - スキル `pasta-ghost-authoring` の `references/authoring-patterns.md` 等にある `actors.pasta`・`talk.pasta` という**汎用の分割例**（hello-pasta を指していないため追従しない）。
 - `release.ps1`・`pasta_check release`（`.nar` の中身が変わるだけで手順は変えない）。
@@ -42,12 +44,13 @@
 - `pasta_lua`（既存 dev-dependency）: `PastaLoader::load` と `PastaLuaRuntime::exec` によるロードと SHIORI 疎通。**新しい依存（dev-dependency を含む）は追加しない**。`pasta_shiori` への依存も追加しない。
 - 標準ライブラリ・`tempfile`・`ctor`（既存 dev-dependency）。
 - 上流 spec `expr-nil-coercion`（式の中の nil を算術では 0 とみなす。実装着手のゲート。10 段目が依存。規則の正本は同 spec の requirements.md（PR #77 のブランチ））。
-- 上流 spec `scene-name-alias` の別名「会話 → OnTalk」（実装着手のゲート）。本 spec は `pasta.toml` を変えない（6.4）ので、別名表 `[scene.alias]` を書かずに既定（`OnTalk = ["会話"]` 相当）が効く。`＊会話` の登録名は `OnTalk_N`、Call 失敗の表記は書いた名前（「会話」）になる（上流の要件ディスカッション完了時点の共有。2026-10-08）。
+- 上流 spec `scene-name-alias` の別名「会話 → OnTalk」（実装着手のゲート）。本 spec は `pasta.toml` の別名表を書かない（talk 間隔 2 行だけを変える。6.4）ので、別名表 `[scene.alias]` を書かずに既定（`OnTalk = ["会話"]` 相当）が効く。`＊会話` の登録名は `OnTalk_N`、Call 失敗の表記は書いた名前（「会話」）になる（上流の要件ディスカッション完了時点の共有。2026-10-08）。
 - マニュアル（`book/src/`）に記載のある文法・API だけ。
 
 ### Revalidation Triggers
 - 段階表の列・行の形（`STAGES.md` の表の見出し名、ファイル名規則 `NN-name.pasta`）を変えたとき → `getting-started-story-guide` と本 spec のテストの再確認。
 - `OnBoot` の台詞・`pasta.toml` の `[talk]` 待ち時間・`[actor]` spot を変えたとき → `pasta_shiori` のゴールデン 3 本。
+- `pasta.toml` の talk 間隔の行の書き方を変えたとき → `scene_kick_gate`・`scene_kick_multibeat`・`scene_kick_preempt` の e2e の置き換え元の文字列、`integration_test.rs` の talk 間隔の検査。
 - `scene-name-alias` の別名の挙動（完全一致・登録側への適用）が変わったとき → 2〜5・7・10〜12 段の `＊会話`、`ontalk_probe_test.rs`。
 - 上流 spec `expr-nil-coercion`の 0 扱いの範囲（対象の演算子・警告の有無）が変わったとき → 10 段目の作例。
 - `hello-pasta-shell-art` が `surfaces.txt` の当たり判定の名前を決めた／変えたとき → 8 段目の検証 Reference4 と台詞。
@@ -132,7 +135,9 @@ crates/pasta_sample_ghost/
 
 ### Modified Files
 - `crates/pasta_sample_ghost/src/scripts.rs` — 文字列構造テストを新ファイル構成へ付け替える（Components「DicStructureTests」）。
-- `crates/pasta_sample_ghost/tests/integration_test.rs` — `test_pasta_scripts`・`test_random_talk_patterns`・`test_hour_chime_patterns`（`src/scripts.rs` と重複する辞書の文字列検査）を削除し、辞書の構造検査を `src/scripts.rs` に一本化する。画像・設定ファイルのテストは不変。
+- `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.toml` — `[ghost]` の `talk_interval_min = 45`・`talk_interval_max = 75` に変える（行末のコメントの形 `# 最小トーク間隔（デフォルト: 180）` は残す）。他の行は変えない（3.10・6.4）。
+- `crates/pasta_sample_ghost/tests/integration_test.rs` — `test_pasta_scripts`・`test_random_talk_patterns`・`test_hour_chime_patterns`（`src/scripts.rs` と重複する辞書の文字列検査）を削除し、辞書の構造検査を `src/scripts.rs` に一本化する。`pasta.toml` の検査の talk 間隔の値を `45`・`75` に直す（5.2）。画像のテストと、設定ファイルのその他の検査は不変。
+- `crates/pasta_shiori/tests/scene_kick_gate_e2e_test.rs`・`scene_kick_multibeat_e2e_test.rs`・`scene_kick_preempt_e2e_test.rs` — talk 間隔を上書きするときの置き換え元の文字列を新しい行に合わせる。上書き後の値と、上書きが効いたことの assert は変えない（5.3）。
 - `crates/pasta_sample_ghost/tests/dist_src_validation_test.rs` — 必須ファイル一覧から旧 `dic/*.pasta` 4 件を外す（`dic/` の集合は `tutorial_stages_test.rs` が段階表との一致で保証する）。非辞書ファイルの一覧は不変。
 - `crates/pasta_sample_ghost/README.md` — 「配布物の構成」のツリーを 12 ファイルに更新し、段階表 `STAGES.md` への参照を足す（6.2）。
 - `crates/pasta_shiori/tests/byte_invariant_test.rs`・`kick_unused_byte_invariant_test.rs` — `GOLDEN_ONBOOT` を新しい `OnBoot` の完全応答に差し替える（特性化採取。5.1）。
@@ -200,6 +205,7 @@ sequenceDiagram
 | 3.7 | Lua の最小作例 | StageDictionaries（12）, TutorialCheck | 12 の内容要件・長いフェンスの抽出 | — |
 | 3.8 | `＄％baseware.name` の ＊会話 | StageDictionaries（07） | 07 の内容要件 | — |
 | 3.9 | 実ローダーで読み込みを通る | StageVerificationTest | 段階 12 のロード | 段階検証フロー |
+| 3.10 | 配布版のトーク間隔 1 分前後・設定は 2 段目で扱う | SampleConfig, StageTable | `[ghost]` の 2 行・段階表 2 段目 | — |
 | 4.1 | 全段階のロード | StageVerificationTest | `load_stage(n)` | 段階検証フロー |
 | 4.2 | OnBoot の疎通 | StageVerificationTest | `shiori_request`・`assert_responds` | 段階検証フロー |
 | 4.2a | 実イベントの疎通 | StageVerificationTest, StageTable | 検証イベント表 | 段階検証フロー |
@@ -209,8 +215,8 @@ sequenceDiagram
 | 4.6 | tempdir コピーで検証 | StageVerificationTest | `assemble_stage` | 段階検証フロー |
 | 4.7 | 同じ cargo test で実行 | StageVerificationTest | `crates/pasta_sample_ghost/tests/` 配置 | — |
 | 5.1 | OnBoot 単一・決定的、ゴールデン更新 | StageDictionaries（01）, ShioriGoldenUpdate | `GOLDEN_ONBOOT`・assert | — |
-| 5.2 | ファイル名依存テストの更新 | DicStructureTests | 新しい検査項目 | — |
-| 5.3 | e2e テストのシーン名・pasta.toml と衝突しない | StageDictionaries, StageVerificationTest | シーン名規則（`Kick`・`Gate` で始めない） | — |
+| 5.2 | ファイル名依存テストの更新 | DicStructureTests, SampleConfig | 新しい検査項目・talk 間隔の値 | — |
+| 5.3 | e2e テストのシーン名・pasta.toml と衝突しない | StageDictionaries, StageVerificationTest, SampleConfig | シーン名規則（`Kick`・`Gate` で始めない）・置き換え元の文字列 | — |
 | 5.4 | first-ghost.md の逐語一致 | FirstGhostSync, TutorialCheck | pasta ブロック差し替え | — |
 | 5.4a | tutorial-check をファイル列挙から | TutorialCheck | `listDicFiles()` | — |
 | 5.4b | manual.yml の paths | ManualWorkflowPaths | `paths` 追加 | — |
@@ -218,7 +224,7 @@ sequenceDiagram
 | 6.1 | `feat(pasta_sample_ghost): …` の PR タイトル | ReleaseNotice | PR タイトル規約 | — |
 | 6.2 | README の辞書構成を更新 | ReleaseNotice | README のツリー | — |
 | 6.3 | `.nar` 同梱文書を増やさない | ReleaseNotice | `STAGES.md` は `ghosts/` の外 | — |
-| 6.4 | 辞書以外の配布ファイルを変えない | StageDictionaries | 変更対象は `dic/` だけ | — |
+| 6.4 | 辞書以外の配布ファイルを変えない | StageDictionaries, SampleConfig | 変更対象は `dic/` と `pasta.toml` の talk 間隔 2 行だけ | — |
 
 ## Components and Interfaces
 
@@ -226,6 +232,7 @@ sequenceDiagram
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | StageTable | データ（文書） | 段階表の正本 | 1.1–1.8, 2.3, 2.7, 4.2a | — | State |
 | StageDictionaries | データ（辞書） | 段階ごとの作例 12 ファイル | 1.2–1.6, 2.1–2.5, 3.1–3.9, 5.1, 5.3, 6.4 | scene-name-alias (P0), emo2 開発 (P1) | State |
+| SampleConfig | データ（設定） | 配布版のトーク間隔を 1 分前後にする | 3.10, 5.2, 5.3, 6.4 | — | State |
 | StageVerificationTest | テスト | 全段階の組み立て・ロード・疎通・一致 | 1.6, 2.5, 2.6, 3.9, 4.1–4.7, 5.3 | pasta_lua (P0), StageTable (P0) | Batch |
 | DicStructureTests | テスト | 辞書の文字列構造の検査 | 2.4, 3.2, 5.2 | StageDictionaries (P0) | — |
 | ShioriGoldenUpdate | テスト（他クレート） | OnBoot ゴールデンの追従 | 5.1 | 01-boot.pasta (P0) | — |
@@ -281,7 +288,7 @@ sequenceDiagram
 | 段階 | 願い | 新しく覚える表現 | 使う文法要素 | 初めて扱うイベント | 追加するファイル |
 |------|------|------------------|--------------|--------------------|------------------|
 | 1 | しゃべらせたい | 起動したら一言しゃべる | `＊OnBoot`、アクション行 `アクター：台詞`、pasta.toml の `[actor]` | `OnBoot` | `01-boot.pasta` |
-| 2 | 二人で掛け合いさせたい | 暇なときに 2 人でおしゃべりする | `＊会話`（暇なときに pasta が呼ぶシーンの名前）、2 人のアクション行、`：` の位置合わせ、`talk_interval_min/max` | — | `02-talk.pasta` |
+| 2 | 二人で掛け合いさせたい | 暇なときに 2 人でおしゃべりする | `＊会話`（暇なときに pasta が呼ぶシーンの名前）、2 人のアクション行、`：` の位置合わせ、`talk_interval_min/max`（すぐ確かめたいときは `[ghost]` で間隔を短くする。配布版は 45〜75 秒） | — | `02-talk.pasta` |
 | 3 | 表情を変えたい | 台詞ごとに表情を付ける | アクター辞書 `％女の子`・`＠表情：\s[n]`、台詞頭の `＠表情`、表情チェイン | — | `03-face.pasta` |
 | 4 | 毎回ちがうことを言わせたい | 同じ名前のシーンから 1 つ選ばれる | 同名 `＊会話` の繰り返し、単独 `＊`（同名の別シーン。ファイル先頭は不可）。別名は完全一致なので `＊会話朝` は別シーン | — | `04-variety.pasta` |
 | 5 | 単語でちょこっと変えたい | 単語のランダム選択 | `＠単語：a、b、c`、台詞中の `＠単語` | — | `05-words.pasta` |
@@ -373,6 +380,20 @@ sequenceDiagram
 - Integration: 実装は `scene-name-alias` と上流 spec `expr-nil-coercion`の両方が main に入ってから着手する（ブランチに main を取り込み、`＊会話` が OnTalk として登録されること、未代入の `＄＊回数＋１` が 1 になることを確認してから辞書を書く）。
 - Validation: StageVerificationTest・DicStructureTests・tutorial-check。
 - Risks: 2〜5・10〜12 段の `＊会話` の中身はテストで実行されない（4.5 によりロードのみ）。Lua ブロック内の実行時エラーや `＞＠関数（）` の戻り値の誤りはロードでは検出されない。→ 実装時に SSP/areka で 12 段目を手で確かめる（Testing Strategy）。
+
+#### SampleConfig（`ghosts/hello-pasta/ghost/master/pasta.toml` の `[ghost]`）
+
+| Field | Detail |
+|-------|--------|
+| Intent | 配布版のランダムトークを 1 分前後で発生させ、2 段目以降の `＊会話` をすぐ確かめられるようにする |
+| Requirements | 3.10, 5.2, 5.3, 6.4 |
+
+**Responsibilities & Constraints**
+- 変えるのは `talk_interval_min = 45`・`talk_interval_max = 75` の 2 行だけ。行末のコメントの形（`# 最小トーク間隔（デフォルト: 180）`）は既定値の説明として残す。
+- 段階 1〜12 で共通の 1 ファイル。段階ごとに設定を変えない（段階の組み立ては `dic/` のファイルの集まりだけで定義する）。
+- 設定を触る段は独立させず、段階表の 2 段目「新しく覚える表現」で `[ghost]` の 2 行を短くする書き方を示す（Q9）。
+- この行を文字列で置き換える既存テスト（`scene_kick_gate`・`scene_kick_multibeat`・`scene_kick_preempt` の e2e、`integration_test.rs` の値の検査）を同じ変更で直す。置き換え後の値（10 秒など）と上書きが効いたことの assert は変えない。
+- 本番の OnTalk の発生間隔だけが変わり、`OnBoot` の応答（ゴールデン 3 本）と全段階の検証（仮想イベントを送らない）には影響しない。
 
 ### テスト層
 
@@ -581,3 +602,4 @@ export function extractPastaBlocks(markdown: string): string[];
 | Q6 | 11 段目のチェイントークが `＊会話` に入ると、`pasta_shiori` の e2e（talk 間隔を 10 秒に上書き）で進行中会話が生じうる | **決定（自明修正）**: 実装時の確認事項とする。`scene_kick_*_e2e_test.rs` を流し、干渉したらチェイントークを `＊会話` 以外（ダブルクリックの続きなど）から呼ぶ形にする（5.3 の範囲内の調整） |
 | Q7 | `DicStructureTests` の件数の下限（`＊会話` 5〜10、`OnMouseDoubleClick` 3 以上） | **決定（自明修正）**: 表の値を暫定値として実装し、作例の件数が確定したタスクで実数に合わせて固定する（検査の意図は「必須の表現が揃っている」こと。5.2） |
 | Q8 | Lua から組む `SHIORI.request` の req に `date` が無い | **決定（自明修正）**: 仮定 A6 のまま省き、実装時に失敗したら `date` を足す（テスト内の補助関数だけの変更） |
+| Q9 | 配布版のトーク間隔（180〜300 秒）では 2 段目の `＊会話` を確かめるのに数分待つ。設定ファイルを編集する段を独立させるか | **決定（2026-10-09、ユーザー指示による見直し）**: 配布版を 45〜75 秒（平均 1 分）にする。設定の段は独立させない。`pasta.toml` は 1 段目から全段で共通の 1 ファイルで、設定の段は辞書ファイルを持たず 1 段 1 ファイルの組み立て方と検査を崩す。間隔はランダムトークを初めて書く 2 段目の「新しく覚える表現」で扱う（3.10） |
