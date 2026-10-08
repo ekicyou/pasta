@@ -28,7 +28,7 @@
 - 新しいクレートの初回公開（Trusted Publishing では作れない。手で行う）。
 - GitHub のブランチ保護・Immutable Releases の設定そのもの（設計は Immutable Releases 有効時にも成立する形にする）。
 - `vsce publish --oidc`（Marketplace 自身の Trusted Publishing）の採用（議題 1 で Entra ID 経路を本線と確定。正式提供後に別途検討）。
-- Rust ツールチェーンの版固定（`rust-toolchain.toml`）。リポジトリ全体の方針変更になるため本仕様では行わない（【仮定】Open Question 3）。
+- Rust ツールチェーンの版固定（`rust-toolchain.toml`）。リポジトリ全体の方針変更になるため本仕様では行わない（議題 4 で確定。stable の更新で壊れた場合は関門・ビルドが公開前に止めるため、公開済みの状態を損なわない）。
 
 ## Boundary Commitments
 
@@ -137,7 +137,7 @@ graph TB
 | CI ランナー | `windows-latest`（Windows Server 2025）・`ubuntu-latest` | gate（`build.yml` が決める）・build・publish-crates は Windows。verify・publish-vsce・github-release・report は ubuntu | `windows-latest` が壊れたら `windows-2022` に退避（提供中）。wasm-pack・cargo-about はプリインストールされていない |
 | ワークフロー | GitHub Actions `on: push: tags`、reusable workflow（`workflow_call`）、`concurrency`、`environment`、job summary | 起動・関門・順序・権限・結果の報告 | environment 名 `release` / `release-setup-check`（議題 1 で確定） |
 | スクリプト | PowerShell 7（`pwsh`）。Windows・ubuntu の両ランナーに同梱 | 検査・判定・公開・ノート生成。手元でも同じスクリプトを実行できる | `shell: pwsh` を明示。Windows PowerShell 5.1 は使わない |
-| Rust | `dtolnay/rust-toolchain@stable` + ターゲット `i686-pc-windows-msvc`、`Swatinem/rust-cache@v2`、`cargo publish --locked` | 配布物のビルド・クレートの公開（検証ビルド） | `Cargo.lock` を追跡して依存の解決を固定（3.9・3.10）。ツールチェーン自体は固定しない（【仮定】Open Question 3） |
+| Rust | `dtolnay/rust-toolchain@stable` + ターゲット `i686-pc-windows-msvc`、`Swatinem/rust-cache@v2`、`cargo publish --locked` | 配布物のビルド・クレートの公開（検証ビルド） | `Cargo.lock` を追跡して依存の解決を固定（3.9・3.10）。ツールチェーン自体は固定しない（議題 4 で確定） |
 | ビルドツール | `wasm-pack`・`cargo-about`（版を固定して導入）、Node 20（`actions/setup-node@v4`）、`@vscode/vsce`（`package-lock.json` の版） | WASM・第三者ライセンス表示・VSIX | 版の固定値は `release.yml` の `env` にまとめる（`WASM_PACK_VERSION`・`CARGO_ABOUT_VERSION`）。導入はビルド済みバイナリの取得を第一候補とし、無ければ `cargo install --locked --version` |
 | 認証 | `rust-lang/crates-io-auth-action@v1`（crates.io Trusted Publishing。トークン 30 分・job 終了時に自動失効）、`Azure/login@v3`（OIDC → `az login`） | publish job だけが OIDC トークンを交換 | subject は `repo:ekicyou/pasta:environment:release`。variables: `AZURE_CLIENT_ID`・`AZURE_TENANT_ID`・`AZURE_SUBSCRIPTION_ID` |
 | 公開先 API | crates.io API / スパース索引、`vsce show` / `vsce publish --azure-credential --packagePath --skip-duplicate`、`gh release view/create/upload/edit` | 公開済み判定と公開 | crates.io API は User-Agent 必須。`gh release view <tag>` は下書きも見つける（GraphQL 併用） |
@@ -821,7 +821,7 @@ flowchart TD
 
 1. ~~**environment 名と変数の置き場所**~~ → **確定（議題 1）**: 公開用 `release`（タグ `v*` のみ）・確認用 `release-setup-check`（`main` のみ）の 2 environment。Azure の 3 つの ID はリポジトリ variables に 1 組だけ置く。<br>旧: 公開用 environment を `release`、確認用を `release-setup-check`、Azure の ID をリポジトリ variables（環境 variables ではなく）に置く。候補: (a) 上記、(b) `production` 等の汎用名、(c) ID を各 environment の variables に重複登録。推奨 (a): crates.io・Azure の設定に写す名前が短く、2 つの environment で同じ値を使うため重複登録を避けられる。
 2. ~~**セットアップ確認の方式**~~ → **確定（議題 1）**: 確認用 environment を別に作り、マネージド ID のフェデレーション資格情報を 2 件（`environment:release`・`environment:release-setup-check`）にする。確認ワークフローは crates.io のトークン交換を行わない。<br>旧: 確認用 environment を別に作り、フェデレーション資格情報を 2 件にする。crates.io のトークン交換は確認に含めない。候補: (a) 上記、(b) `release` environment の保護規則に `main` も加えて 1 つで済ます、(c) 確認用 environment にも crates.io Trusted Publisher を設定しトークン交換まで試す。推奨 (a): 公開できる認証をタグからの実行だけに限ったまま（1.6・9.4）、profile ID の表示と Members の確認ができる。
-3. **Rust ツールチェーンの固定**（Technology Stack）: 固定しない（`dtolnay/rust-toolchain@stable` のまま。`Cargo.lock` と外部ツールの版固定で再現性を担う）。候補: (a) 上記、(b) `rust-toolchain.toml` を置いて開発機・build.yml・release.yml をそろえる、(c) release.yml だけ版を固定する。推奨 (a): (b) はリポジトリ全体の方針変更で本仕様の境界を越え、(c) は関門（build.yml）とビルドの構成がずれて 2.5 に反する。
+3. ~~**Rust ツールチェーンの固定**~~ → **確定（議題 4）**: 固定しない。R3.5 の「ツール」は wasm-pack・cargo-about・vsce・Node を指し、Rust の再現性は R3.9 の範囲（依存の解決 = `Cargo.lock`）で満たす。stable の更新による失敗は関門・ビルドで公開前に止まり、タグの付け直しで回復できる。<br>旧: 固定しない（`dtolnay/rust-toolchain@stable` のまま。`Cargo.lock` と外部ツールの版固定で再現性を担う）。候補: (a) 上記、(b) `rust-toolchain.toml` を置いて開発機・build.yml・release.yml をそろえる、(c) release.yml だけ版を固定する。推奨 (a): (b) はリポジトリ全体の方針変更で本仕様の境界を越え、(c) は関門（build.yml）とビルドの構成がずれて 2.5 に反する。
 4. **リリースノートの 6 種以外の扱い**（release-notes.ps1）: `perf`・`ci`・`build`・`style`・`revert` と Conventional Commits でない件名を「🔧 Maintenance」に入れる。候補: (a) 上記、(b) 今の設計どおり黙って落とす、(c) 「その他」見出しを足す。推奨 (a): コミットが消えず、要件の 6 見出し（6.7）を増やさない。
 5. **手順書の置き場所**（File Structure Plan）: `.github/release-ci-setup.md`。候補: (a) 上記、(b) `crates/pasta_sample_ghost/RELEASE.md` の一節、(c) `docs/` を新設、(d) spec 配下。推奨 (a): ワークフローの隣にあり、ゴースト固有の文書に crates.io・Azure の手順を混ぜない。(d) は completed/ へ移ると参照が壊れる。
 6. **補助スクリプトの置き場所と言語**（File Structure Plan）: `.github/scripts/release/*.ps1`（pwsh 7、ubuntu でも動かす）。候補: (a) 上記、(b) ルート `scripts/` を新設、(c) bash と pwsh を使い分ける。推奨 (a): CI 専用の補助であることが場所から分かり、1 言語で手元（Windows）と両ランナーで同じものを実行できる。
