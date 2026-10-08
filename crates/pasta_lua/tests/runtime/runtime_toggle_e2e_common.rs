@@ -252,8 +252,12 @@ pub(crate) fn resolve_session(base: &Path, present_as: Option<&str>) -> SessionC
         .to_string();
     let pasta_file_key = pasta_file.to_string_lossy().to_string();
 
-    let expect_map =
-        PastaLoader::build_source_map(std::slice::from_ref(&pasta_file), &cache_manager, false);
+    let expect_map = PastaLoader::build_source_map(
+        std::slice::from_ref(&pasta_file),
+        &cache_manager,
+        false,
+        &LuaTranspiler::default(),
+    );
     let bp_lua_coords = expect_map.resolve_pasta_to_lua(&pasta_file_key, BP_PASTA_LINE);
     assert_eq!(
         bp_lua_coords.len(),

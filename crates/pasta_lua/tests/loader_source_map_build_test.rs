@@ -68,8 +68,12 @@ fn loader_builds_and_aggregates_multi_chunk_source_map() {
 
     // --- ローダのマップ構築経路（デバッグ有効時のみローダが呼ぶ） ---
     // sidecar=false: メモリ既定経路のみ（このテストはサイドカーを検証しない）。
-    let source_map =
-        PastaLoader::build_source_map(&[file_a.clone(), file_b.clone()], &cache_manager, false);
+    let source_map = PastaLoader::build_source_map(
+        &[file_a.clone(), file_b.clone()],
+        &cache_manager,
+        false,
+        &LuaTranspiler::default(),
+    );
 
     // チャンク名キー = source_to_cache_path 由来（task 1.1 の確定戦略）。
     let chunk_a = cache_manager
@@ -219,7 +223,8 @@ fn no_map_built_when_no_files_passed() {
     let cache_manager = CacheManager::new(base_dir, "profile/pasta/cache/lua");
 
     // デバッグ無効経路の模擬: 構築経路へ何も渡さない（ローダが呼ばない状況の極限）。
-    let source_map = PastaLoader::build_source_map(&[], &cache_manager, false);
+    let source_map =
+        PastaLoader::build_source_map(&[], &cache_manager, false, &LuaTranspiler::default());
 
     // チャンクが無いので前方解決は常に None、逆引きは常に空。
     assert!(source_map.resolve_lua_to_pasta("any-chunk", 1).is_none());
@@ -245,8 +250,12 @@ fn loader_writes_sidecar_when_enabled_and_round_trips() {
         .expect("prepare cache dir");
 
     // sidecar=true でマップ構築（ローダのデバッグ有効＋サイドカー有効経路）。
-    let source_map =
-        PastaLoader::build_source_map(&[file_a.clone(), file_b.clone()], &cache_manager, true);
+    let source_map = PastaLoader::build_source_map(
+        &[file_a.clone(), file_b.clone()],
+        &cache_manager,
+        true,
+        &LuaTranspiler::default(),
+    );
 
     for file in [&file_a, &file_b] {
         let lua_path = cache_manager.source_to_cache_path(file);
@@ -301,8 +310,12 @@ fn loader_writes_no_sidecar_when_disabled() {
         .expect("prepare cache dir");
 
     // sidecar=false（既定）: メモリだけ。`.lua.map` は書かれない。
-    let _source_map =
-        PastaLoader::build_source_map(std::slice::from_ref(&file_a), &cache_manager, false);
+    let _source_map = PastaLoader::build_source_map(
+        std::slice::from_ref(&file_a),
+        &cache_manager,
+        false,
+        &LuaTranspiler::default(),
+    );
 
     let lua_path = cache_manager.source_to_cache_path(&file_a);
     let sidecar = sidecar_path_for_lua(&lua_path);
