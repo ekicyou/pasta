@@ -160,30 +160,9 @@
   - _Depends: 4.2, 4.4, 5.1_
   - _Requirements: 9.5, 11.1, 11.6_
 
-## マージ後の工程（セッション間の調停。`/kiro-impl` の対象外）
+## マージ後の工程（本 spec の外へ申し送り）
 
-上の 1〜6 を含む PR が main に入った後、design.md「セッション間の分担と調停」の表に従って進める。連絡はセッション間メッセージで行い、ID の値は送らず記録しない。各工程を終えたら research.md「一回限りのセットアップの進み具合」に記録する。期限: 2026-12-01（Azure DevOps の global PAT の廃止）より前に、工程 C-4 で Marketplace へ 1 度公開できていること。
-
-- [ ] C-1 「Entra ID の登録」セッションへ、`release-setup-check.yml` を実行できるようになったことを連絡する
-  - 前提: 実装 PR 上で `build.yml` が従来どおり起動したこと（`workflow_call` の追加の影響が無いこと）、実装 PR の main へのマージ、表の工程 1（フェデレーション資格情報 2 件）・工程 2（environment と variables）の完了の返事
-  - 完了の状態: 連絡を送り、research.md に送付日を記録している
-- [ ] C-2 profile ID の取得と Marketplace の Members への追加の完了を受け取る
-  - 前提: C-1。相手セッションが setup-check を実行し、Members に Contributor で追加し、再実行で `verify-pat` が通る（表の工程 4・5）
-  - 完了の状態: 相手セッションから完了の返事を受け、research.md に記録している
-- [ ] C-3 crates.io の Trusted Publisher ×5 の設定の完了を確かめる
-  - 前提: なし（初回リリース前ならいつでも可。表の工程 6）。ユーザーへ手順書の該当節を案内する
-  - 完了の状態: 5 クレートの設定値が名前の対応表と一致することをユーザーが確かめ、research.md に記録している
-- [ ] C-4 初回のリリースを行う
-  - 前提: C-2・C-3（表の工程 1・2・5・6 の完了）。版の決定と bump は `release-workflow` の手順で行い、リリースタグを push する
-  - publish-crates の 2 回目以降の auth が拒否されたら、手順書の落とし先に従う。クレートごとの所要時間を確かめる
-  - 完了の状態: 3 公開先が `published` になり、report に表と Release の URL が出て、同じ run の再実行ですべて `skipped` になることを確かめている
-- [ ] C-5 初回リリースの結果を「Entra ID の登録」セッションへ連絡する
-  - 前提: C-4
-  - 完了の状態: 結果（Marketplace の Entra ID 経路での公開の成否）を送り、research.md に記録している
-- [ ] C-6 初回成功後の必須手順の完了を確かめる
-  - 前提: C-4 の成功。ユーザーが 5 クレートの「Trusted Publishing のみ」を有効にし、`CARGO_REGISTRY_TOKEN` と `VSCE_PAT` を失効させる（表の工程 8）
-  - `VSCE_PAT` は会話記録に値が出た（Implementation Notes 4.2）が、前倒しで失効させない。C-4 で Marketplace が Entra ID の経路で `published` になり、移行できたと確かめてから失効させる（ユーザー決定 2026-10-08）
-  - 完了の状態: 3 つの手順の完了を research.md に記録している
+CI での初回のリリースと、その前後の一回限りのセットアップは本 spec では行わない。roadmap の Existing Spec Updates「release-workflow」へ申し送った（2026-10-08、ユーザー決定）。手順は `.github/release-ci-setup.md` の 6〜10 節。本 spec が持つのは、実装 PR のマージ後に「Entra ID の登録」セッションへ `release-setup-check.yml` が main に入ったことを伝えることだけで、`/kiro-complete` のマージの後に行う。
 
 ## Implementation Notes
 - 1.1: nar の基準（research.md）の `pasta.toml` は 2639 バイトだが、基準の nar の後に `f245ab1f`（#59）で正本が変わったため、作り直すと 2583 バイトになる。2.1 の比較ではパスの集合を比べ、この差は既知として扱う。
