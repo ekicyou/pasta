@@ -18,6 +18,8 @@
 //   F. バージョン（R9.1, R9.3, R9.4） — introduction の対象バージョンが Cargo.toml と一致・LuaJIT 2.1・将来変更注記
 //   I. 内部設計パート（pasta-runtime-internals-doc 1.2, 1.8, 2.7, 2.10, 2.11） — 10 章の存在・本文・
 //      章構造（extractBody）、題材章 8 章の必須 H2 7 種（この順）、機構語の網羅、概要章の対象外ツールと読者
+//   T. 台詞部品（manual-claudia-theme 4.7, 5.2, 7.1–7.3, 10.2, 10.3, 10.8） — 全 47 章（D 系の章＋debug/）の
+//      記法（T-syntax）・導入と締めが二人の台詞だけ（T-intro・T-outro）、顔画像（T-assets）、執筆規約の追従（T-authoring）
 //
 // 成功で exit 0、失敗（1 件でも）で exit 1。
 
@@ -25,7 +27,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runTutorialCheck } from './tutorial-check.mjs';
-import { GENERATION_MAP, findVoice, extractBody } from './gen-skill-refs.mjs';
+import { GENERATION_MAP, findVoice, extractBody, chapterRegions } from './gen-skill-refs.mjs';
+import { maskFences } from './link-check.mjs';
+import { SPEAKERS, FACE_DIR, MAX_FACE_BYTES, scanTalk, checkRegion } from './talk/talk.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(here, '../..');
@@ -246,16 +250,23 @@ const LUA_MODULES = [
 // ============================================================
 // D. ボイス（R7.1 導入/締めキャラ口調 / R7.2 本体普通文体 / R7.4 コード内に口調なし）
 // ============================================================
-{
-  const contentFiles = [];
-  for (const dir of ['', 'grammar', 'lua', 'lua/modules', 'getting-started', 'reference', 'internals']) {
+// 章の一覧（各フォルダは非再帰・SUMMARY.md を除く）。D 系はこのフォルダ群、T 系はこれに debug/ を足す。
+const VOICE_DIRS = ['', 'grammar', 'lua', 'lua/modules', 'getting-started', 'reference', 'internals'];
+function listChapters(dirs) {
+  const out = [];
+  for (const dir of dirs) {
     const d = dir ? `${SRC}/${dir}` : SRC;
     for (const f of fs.readdirSync(abs(d))) {
       if (f === 'SUMMARY.md') continue;
       const rel = `${d}/${f}`;
-      if (fs.statSync(abs(rel)).isFile() && f.endsWith('.md')) contentFiles.push(rel);
+      if (fs.statSync(abs(rel)).isFile() && f.endsWith('.md')) out.push(rel);
     }
   }
+  return out;
+}
+
+{
+  const contentFiles = listChapters(VOICE_DIRS);
 
   for (const rel of contentFiles) {
     const md = read(rel);
@@ -507,6 +518,86 @@ for (const ch of INTERNALS_CHAPTERS) {
     `概要章に対象外ツールと読者の語が登場する (${INDEX_FACTS.join(', ')})`,
     `概要章に未登場の語: ${missingIdx.join(', ')}`,
   );
+}
+
+// ============================================================
+// T. 台詞部品（4.7 未知の名前 / 5.2 地の文・単独話者なし / 7.1–7.3 素材 / 10.2・10.3 記法 / 10.8 失敗で止める）
+// ============================================================
+{
+  const where = (rel, e) => `${rel}:${e.line} ${e.kind} ${e.detail}`;
+  const report = (id, rel, errors, passMsg) => assert(
+    id, errors.length === 0, passMsg, errors.map((e) => where(rel, e)).join(' / '),
+  );
+  for (const rel of listChapters([...VOICE_DIRS, 'debug'])) {
+    const ch = rel.slice(SRC.length + 1);
+    const md = read(rel);
+    const { blocks, errors } = scanTalk(md);
+    // T-syntax: 記法の不正を全件（章パス・行番号・種類・詳細）。
+    report(`T-syntax:${ch}`, rel, errors, `${rel} の台詞部品の記法に不正なし`);
+    // T-intro・T-outro: 導入・締めが両話し手の台詞だけでできている（表紙だけ扉とクレジットを許す）。
+    let regions;
+    try {
+      regions = chapterRegions(md, ch);
+    } catch (e) {
+      fail(`T-intro:${ch}`, `${rel} の章構造不備: ${e.message}`);
+      fail(`T-outro:${ch}`, `${rel} の章構造不備: ${e.message}`);
+      continue;
+    }
+    const cover = ch === 'introduction.md';
+    report(`T-intro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.intro, { cover }),
+      `${rel} の導入が二人の台詞だけでできている`);
+    report(`T-outro:${ch}`, rel, checkRegion(blocks, regions.lines, regions.outro, { cover }),
+      `${rel} の締めが二人の台詞だけでできている`);
+  }
+
+  // T-assets: 顔画像フォルダが登録簿の画像＋LICENSE.txt と完全一致（立ち絵の混入なし）し、各画像が上限以下。
+  {
+    const dir = `${SRC}/${FACE_DIR}`;
+    const want = new Set([...SPEAKERS.flatMap((sp) => Object.values(sp.faces).map((f) => `${f}.png`)), 'LICENSE.txt']);
+    const have = exists(dir) ? fs.readdirSync(abs(dir)) : [];
+    const problems = [
+      ...[...want].filter((f) => !have.includes(f)).map((f) => `欠落 ${f}`),
+      ...have.filter((f) => !want.has(f)).map((f) => `余分 ${f}`),
+      ...have.filter((f) => want.has(f) && f.endsWith('.png'))
+        .map((f) => [f, fs.statSync(abs(`${dir}/${f}`)).size])
+        .filter(([, size]) => size > MAX_FACE_BYTES)
+        .map(([f, size]) => `容量超過 ${f} ${size} バイト（上限 ${MAX_FACE_BYTES}）`),
+    ];
+    assert(
+      'T-assets',
+      problems.length === 0,
+      `${dir} が登録簿の画像 ${want.size - 1} 枚と LICENSE.txt に一致し、各画像が ${MAX_FACE_BYTES} バイト以下`,
+      `${dir} の不備: ${problems.join(', ')}`,
+    );
+  }
+
+  // T-authoring: 執筆規約の台詞部品の節（見出しに「台詞部品」を含む H2、次の H1・H2 まで。フェンス外）の
+  // 表のセルに、登録簿の全話し手名と全表情名が載っている（規約と登録簿のずれの検出）。
+  // 照合はセルの完全一致（1 セル 1 名）。部分一致だと「素」が「要素」に、「照れ」が「照れ怒り」に当たる。
+  {
+    const rel = 'book/AUTHORING.md';
+    const md = read(rel);
+    const masked = maskFences(md).split('\n');
+    const head = masked.findIndex((l) => /^## .*台詞部品/.test(l));
+    const cells = new Set();
+    if (head >= 0) {
+      const next = masked.findIndex((l, i) => i > head && /^##? /.test(l));
+      for (const l of masked.slice(head, next < 0 ? masked.length : next)) {
+        if (!/^\s*\|/.test(l)) continue;
+        for (const c of l.trim().replace(/^\||\|$/g, '').split('|')) cells.add(c.trim());
+      }
+    }
+    const names = [...new Set(SPEAKERS.flatMap((sp) => [sp.name, ...Object.keys(sp.faces)]))];
+    const missing = names.filter((n) => !cells.has(n));
+    assert(
+      'T-authoring',
+      head >= 0 && missing.length === 0,
+      `${rel} の台詞部品の節に全話し手名と全表情名が載っている`,
+      head < 0
+        ? `${rel} に台詞部品の節（見出しに「台詞部品」を含む H2）が無い`
+        : `${rel} の台詞部品の節に載っていない名前: ${missing.join('・')}`,
+    );
+  }
 }
 
 // ============================================================

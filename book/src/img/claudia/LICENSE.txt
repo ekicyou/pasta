@@ -1,0 +1,71 @@
+顔アイコンの出典とライセンス
+============================
+
+このフォルダの顔アイコン 16 枚は、ponapalt さんのゴースト「悪役令嬢クローディア」の
+リポジトリから取り込んだ素材を縮小したものです。素材は Unlicense で公開されています
+（原文は末尾に載せます）。
+
+出典
+----
+
+- リポジトリ: https://github.com/ponapalt/claudia
+- 取り込んだ場所: site/img/
+- 取り込んだコミット: fdd585ca2625d0186832bd35ab813e668ea0f0d6（2026-10-05）
+- ライセンス: Unlicense（リポジトリの LICENSE）
+
+取り込んだファイル（ファイル名は元のまま）
+------------------------------------------
+
+- クローディア（14 枚）: f0.png f1.png f2.png f3.png f4.png f5.png f6.png f7.png
+  f8.png f9.png f25.png f26.png f27.png f28.png
+- アンソニー（2 枚）: f10.png f11.png
+
+立ち絵（site/img/ の s*.png、シェルの surface*.png）は取り込んでいません。
+
+縮小の手順
+----------
+
+取り込みは一回限りの手作業です。道具は ffmpeg（ShareX 同梱、n8.1.1）を使いました。
+
+1. 元画像（120〜140px の透過 PNG）を 112×112px に縮小する。縁の色がにじまないよう、
+   アルファを乗算してから縮小し、縮小後に戻す。
+
+     format=gbrap,premultiply=inplace=1,scale=112:112:flags=lanczos,unpremultiply=inplace=1,format=rgba
+
+   出力時に -compression_level 9 を付ける。
+
+2. 縮小後の PNG が 20KB（20480 バイト）を超えた画像だけ、256 色のパレット画像に減色する。
+   透明色をパレットに 1 色取り置き、アルファが 128 未満の画素を透明にする。
+
+     （1 の縮小）,split[a][b];[a]palettegen=max_colors=256:reserve_transparent=1:stats_mode=single[p];[b][p]paletteuse=dither=sierra2_4a:alpha_threshold=128
+
+   減色したのは f0〜f9 と f25〜f28 の 14 枚です。f10.png と f11.png は縮小だけで
+   20KB 以下に収まったため、減色せず半透明の縁を残しています。
+
+The Unlicense（原文）
+---------------------
+
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <https://unlicense.org>

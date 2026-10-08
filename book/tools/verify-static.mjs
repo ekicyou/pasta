@@ -18,7 +18,7 @@
 // 依存ゼロ（Node 標準ライブラリのみ）。検証成功で exit 0、失敗で exit 1。
 //
 // 使い方:
-//   node book/tools/verify-static.mjs            # book/book を検証（必要ならビルド）
+//   node book/tools/verify-static.mjs            # mdbook build → talk-html の変換をしてから book/book を検証
 //   node book/tools/verify-static.mjs --no-build # 既存出力をそのまま検証
 //   node book/tools/verify-static.mjs --self-test # 検証ロジック自身の健全性テストも実行
 
@@ -27,6 +27,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { transformDir } from './talk/talk-html.mjs';
+import { SPEAKERS } from './talk/talk.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const bookDir = path.resolve(here, '..'); // .../book
@@ -89,11 +91,14 @@ const SERVER_EXTS = new Set([
 ]);
 
 // 出力配下の全ファイルを列挙（rel は POSIX 区切りで返す）。
+// 旧版（classic/。manual.yml の旧版生成段が新版の検査の後に作る）は列挙しない。
+// 旧版は着せ替え前の版を手を加えずに残したもので、その実在は旧版生成段が確かめる（要件 11.3・11.4）。
 function listFiles(root) {
   const out = [];
   function walk(dir) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, e.name);
+      if (e.isDirectory() && dir === root && e.name === 'classic') continue;
       if (e.isDirectory()) walk(full);
       else if (e.isFile()) out.push(full);
     }
@@ -191,6 +196,16 @@ function ensureBuilt() {
     log('FATAL: mdbook build に失敗しました:', e.message);
     process.exit(1);
   }
+  // 台詞の吹き出し変換（CI の build → highlight → talk → index の talk に当たる）。
+  // 台詞部品の検査は変換後の出力を見るため、ビルドモードではここで変換しておく。
+  log('Running talk-html.mjs to render talk components...');
+  try {
+    const { converted, filesChanged } = transformDir(outDir);
+    log(`talk-html: converted ${converted} talk block(s) across ${filesChanged} file(s)`);
+  } catch (e) {
+    log('FATAL: talk-html の変換に失敗しました:', e.message);
+    process.exit(1);
+  }
 }
 
 // =========================================================================
@@ -274,6 +289,92 @@ function analyze(root) {
 }
 
 // =========================================================================
+// テーマ資材・台詞出力・外部参照・メニュー id の検査（manual-claudia-theme タスク 3.5 /
+// 要件 1.7, 8.4, 8.5, 8.6, 8.9, 10.4 / design「StaticVerifier」）。
+//   pages は SUMMARY 全章と print.html（出力根からの相対）。lua/modules.html（リダイレクト）と
+//   toc.html（JS 無効時の目次フレーム）は章ではなくテーマ資材を読まないので pages に含めない。
+//   mdBook 0.5.x は追加 CSS・JS を theme/claudia-<hash>.css のようにハッシュ付きで出すため、
+//   固定のファイル名では探さない。参照先の実在は analyze() の相対参照検査が見る。
+// =========================================================================
+const ALLOWED_EXTERNAL_ORIGINS = new Set(['https://fonts.googleapis.com', 'https://fonts.gstatic.com']);
+const MENU_IDS = ['light', 'rust', 'coal', 'navy', 'ayu'].map((t) => `mdbook-theme-${t}`);
+const THEME_CSS_RE = /(^|\/)theme\/claudia-[^/]*\.css$/;
+const THEME_JS_RE = /(^|\/)theme\/claudia-[^/]*\.js$/;
+// 外部参照の検査対象は link・script・img だけ（<a href> は通信しないので対象外）。
+const ASSET_TAG_RE = /<(?:link|script|img)\b[^>]*>/gi;
+// 未変換の台詞: 属性の無い <blockquote> の直後の最初の <p> が「【」で始まる（talk-html の判定と同じ形）。
+const UNTRANSFORMED_TALK_RE = /<blockquote>\s*<p>【/;
+
+// link・script・img の中の href・src・srcset の値。extractRefs（二重引用符だけ）とは別に、
+// 単引用符・引用符なしの値と srcset の各候補も拾う（外部参照の取りこぼしを防ぐ）。
+const ASSET_ATTR_RE = /\b(href|src|srcset)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi;
+function assetRefs(html) {
+  const refs = [];
+  for (const tag of html.match(ASSET_TAG_RE) || []) {
+    for (const m of tag.matchAll(ASSET_ATTR_RE)) {
+      const value = m[2] ?? m[3] ?? m[4];
+      if (m[1].toLowerCase() === 'srcset') {
+        // 候補は「URL 記述子」をコンマで区切ったもの。URL 部分だけを取る。
+        for (const c of value.split(',')) {
+          const url = c.trim().split(/\s+/)[0];
+          if (url) refs.push(url);
+        }
+      } else {
+        refs.push(value);
+      }
+    }
+  }
+  return refs;
+}
+const isAbsoluteUrl = (ref) => /^[a-z][a-z0-9+.-]*:/i.test(ref.trim()) || ref.trim().startsWith('//');
+function externalOrigin(ref) {
+  try {
+    return new URL(ref.trim(), 'https://invalid.invalid/').origin;
+  } catch {
+    return null;
+  }
+}
+
+function analyzeTheme(root, pages) {
+  const files = listFiles(root);
+  const themeCss = files.filter((f) => /^theme\/claudia-[^/]*\.css$/.test(f.rel)).map((f) => f.rel);
+  const themeJs = files.filter((f) => /^theme\/claudia-[^/]*\.js$/.test(f.rel)).map((f) => f.rel);
+
+  const noCssRef = [];
+  const noJsRef = [];
+  const missingTalk = []; // { page, speakers: 欠けている話し手 id }
+  const missingMenuIds = []; // { page, ids: 欠けている id }
+  for (const page of pages) {
+    const abs = path.join(root, page);
+    if (!fs.existsSync(abs)) continue; // 章の欠落そのものは「全章の生成」の検査が報告する
+    const html = fs.readFileSync(abs, 'utf8');
+    // refPath は decodeURIComponent するので、壊れた % を含み得る絶対 URL には使わない。
+    const refs = assetRefs(html).filter(isLocalRef).map(refPath);
+    if (!refs.some((r) => THEME_CSS_RE.test(r))) noCssRef.push(page);
+    if (!refs.some((r) => THEME_JS_RE.test(r))) noJsRef.push(page);
+    const speakers = SPEAKERS.map((s) => s.id).filter((id) => !html.includes(`class="talk talk-${id} `));
+    if (speakers.length > 0) missingTalk.push({ page, speakers });
+    const ids = MENU_IDS.filter((id) => !html.includes(`id="${id}"`));
+    if (ids.length > 0) missingMenuIds.push({ page, ids });
+  }
+
+  // 未変換の台詞と外部参照は、章に限らず出力のすべての HTML を見る（404.html なども外部へ通信し得る）。
+  const untransformedTalk = [];
+  const externalRefs = []; // { from, ref }
+  for (const f of files.filter((x) => x.rel.endsWith('.html'))) {
+    const html = fs.readFileSync(f.abs, 'utf8');
+    if (UNTRANSFORMED_TALK_RE.test(html)) untransformedTalk.push(f.rel);
+    for (const ref of assetRefs(html)) {
+      if (isAbsoluteUrl(ref) && !ALLOWED_EXTERNAL_ORIGINS.has(externalOrigin(ref))) {
+        externalRefs.push({ from: f.rel, ref });
+      }
+    }
+  }
+
+  return { themeCss, themeJs, noCssRef, noJsRef, missingTalk, untransformedTalk, externalRefs, missingMenuIds };
+}
+
+// =========================================================================
 // 自己テスト: 検証ロジックが「本物」であることを保証する。
 //   実出力を一時ディレクトリへコピーし、故意にリンクを壊して analyze() が
 //   それを検出すること、無傷ならクリーンであることを確認する。
@@ -295,6 +396,27 @@ function runSelfTest() {
     check('self-test: 参照を実際に解析している (>50件)', clean.checkedRefCount > 50,
       `checked=${clean.checkedRefCount}`);
 
+    // (a2) 旧版（classic/）は検査しない。旧版の 404.html の /pasta/ や本文の参照は旧版の生成段が扱う（要件 11.3）
+    const classicDir = path.join(tmp, 'classic');
+    fs.mkdirSync(classicDir, { recursive: true });
+    fs.writeFileSync(path.join(classicDir, '404.html'),
+      '<a href="/pasta/">top</a><img src="https://example.com/x.png"><blockquote>\n<p>【得意】未変換</p>\n</blockquote>');
+    fs.writeFileSync(path.join(classicDir, 'print.html'),
+      '<video src="missing.mp4"></video><img src="missing.png"><script src="https://example.com/x.js"></script>');
+    fs.writeFileSync(path.join(classicDir, 'evil.php'), '<?php echo 1; ?>');
+    const withClassic = analyze(tmp);
+    const themeWithClassic = analyzeTheme(tmp, [...summaryChapters(), 'print.html']);
+    const classicHits = [
+      ...withClassic.brokenRefs.map((b) => JSON.stringify(b)),
+      ...withClassic.absoluteRefsInContent.map((b) => JSON.stringify(b)),
+      ...withClassic.nonStatic,
+      ...themeWithClassic.externalRefs.map((b) => JSON.stringify(b)),
+      ...themeWithClassic.untransformedTalk,
+    ];
+    check('self-test: classic/ の下の壊れた参照・外部参照・未変換の台詞は報告しない',
+      classicHits.length === 0, classicHits.slice(0, 5).join(' / '));
+    fs.rmSync(classicDir, { recursive: true, force: true });
+
     // (b) リンクを壊すと検出されるべき
     const idx = path.join(tmp, 'index.html');
     let html = fs.readFileSync(idx, 'utf8');
@@ -313,6 +435,93 @@ function runSelfTest() {
       withServer.nonStatic.includes('evil.php') &&
         withServer.serverFiles.includes('evil.php'),
       JSON.stringify(withServer.nonStatic.slice(0, 5)));
+
+    // (d) テーマ資材・台詞出力・外部参照・メニュー id の検査（manual-claudia-theme タスク 3.5）。
+    //   無傷コピーで資材・外部参照・メニュー id・未変換の台詞が合格し、
+    //   1 か所ずつ壊すと、壊したページと中身を正しく報告することを確かめる。
+    const pages = [...summaryChapters(), 'print.html'];
+    const target = 'grammar/index.html';
+    const themeClean = analyzeTheme(tmp, pages);
+    check('self-test: 無傷コピーにテーマ CSS・JS が 1 つずつある',
+      themeClean.themeCss.length === 1 && themeClean.themeJs.length === 1,
+      JSON.stringify({ css: themeClean.themeCss, js: themeClean.themeJs }));
+    check('self-test: 無傷コピーは全章と print.html がテーマ資材を参照している',
+      themeClean.noCssRef.length === 0 && themeClean.noJsRef.length === 0,
+      JSON.stringify({ css: themeClean.noCssRef, js: themeClean.noJsRef }));
+    check('self-test: 無傷コピーは外部参照が Google Fonts だけ',
+      themeClean.externalRefs.length === 0, JSON.stringify(themeClean.externalRefs.slice(0, 3)));
+    check('self-test: 無傷コピーはメニュー id がすべてある',
+      themeClean.missingMenuIds.length === 0, JSON.stringify(themeClean.missingMenuIds.slice(0, 3)));
+    check('self-test: 無傷コピーに未変換の台詞が無い',
+      themeClean.untransformedTalk.length === 0, JSON.stringify(themeClean.untransformedTalk));
+
+    const targetFile = path.join(tmp, target);
+    const original = fs.readFileSync(targetFile, 'utf8')
+      .replace(/class="talk talk-/g, 'class="x-talk x-talk-'); // 既存の台詞部品を無効化して起点をそろえる
+    const withTarget = (mutated) => {
+      fs.writeFileSync(targetFile, mutated);
+      return analyzeTheme(tmp, pages);
+    };
+    const talkOf = (r) => r.missingTalk.find((m) => m.page === target);
+
+    // 期待値は登録簿（talk.mjs の SPEAKERS）から組み立てる。
+    const ids = SPEAKERS.map((s) => s.id);
+    const talkDiv = (s) => `<div class="talk talk-${s.id} talk-${s.side}"></div>`;
+    let r = withTarget(original);
+    check('self-test: 台詞部品の無い章を、全話し手の欠落として報告する',
+      JSON.stringify(talkOf(r)?.speakers) === JSON.stringify(ids), JSON.stringify(talkOf(r)));
+    r = withTarget(original.replace('<main>', `<main>${talkDiv(SPEAKERS[0])}`));
+    check(`self-test: ${ids[0]} だけの章を、残りの話し手の欠落として報告する`,
+      JSON.stringify(talkOf(r)?.speakers) === JSON.stringify(ids.slice(1)), JSON.stringify(talkOf(r)));
+    r = withTarget(original.replace('<main>', `<main>${SPEAKERS.map(talkDiv).join('')}`));
+    check('self-test: 全話し手がいる章は報告しない', talkOf(r) === undefined, JSON.stringify(talkOf(r)));
+
+    r = withTarget(original.replace('</head>', '<script src="https://example.com/x.js"></script></head>'));
+    check('self-test: Google Fonts 以外の外部 script を検出する',
+      r.externalRefs.some((e) => e.from === target && e.ref === 'https://example.com/x.js'),
+      JSON.stringify(r.externalRefs.slice(0, 3)));
+    r = withTarget(original.replace('</head>', '<img src="//cdn.example.com/a.png"></head>'));
+    check('self-test: プロトコル相対の外部 img を検出する',
+      r.externalRefs.some((e) => e.from === target && e.ref === '//cdn.example.com/a.png'),
+      JSON.stringify(r.externalRefs.slice(0, 3)));
+    // 引用符の形と srcset の違いで取りこぼさないこと。
+    for (const [label, tag, ref] of [
+      ['単引用符の img src', `<img src='https://evil.example/a.png'>`, 'https://evil.example/a.png'],
+      ['引用符なしの script src', '<script src=https://evil.example/b.js></script>', 'https://evil.example/b.js'],
+      ['img srcset の 2 つめの候補', '<img src="img/x.png" srcset="img/x.png 1x, https://evil.example/c.png 2x">',
+        'https://evil.example/c.png'],
+    ]) {
+      r = withTarget(original.replace('</head>', `${tag}</head>`));
+      check(`self-test: ${label} の外部 URL を検出する`,
+        r.externalRefs.some((e) => e.from === target && e.ref === ref),
+        JSON.stringify(r.externalRefs.slice(0, 3)));
+    }
+    r = withTarget(original.replace('</head>', '<script src="https://evil.example/%E0%A4%A.js"></script></head>'));
+    check('self-test: 壊れた % を含む外部 URL でも落ちずに検出する',
+      r.externalRefs.some((e) => e.from === target && e.ref.includes('%E0%A4%A')),
+      JSON.stringify(r.externalRefs.slice(0, 3)));
+    r = withTarget(original + '<a href="https://example.com/">ok</a>');
+    check('self-test: <a href> の外部 URL は検査の対象外', r.externalRefs.length === 0,
+      JSON.stringify(r.externalRefs.slice(0, 3)));
+
+    r = withTarget(original.replace('id="mdbook-theme-ayu"', 'id="mdbook-theme-ayu2"'));
+    check('self-test: 欠けたメニュー id を検出する',
+      r.missingMenuIds.some((m) => m.page === target && m.ids.join() === 'mdbook-theme-ayu'),
+      JSON.stringify(r.missingMenuIds.slice(0, 3)));
+
+    r = withTarget(original.replace(/<link rel="stylesheet" href="[^"]*theme\/claudia-[^"]*\.css">/, ''));
+    check('self-test: テーマ CSS を読まない章を検出する', r.noCssRef.includes(target),
+      JSON.stringify(r.noCssRef));
+    r = withTarget(original.replace(/<script src="[^"]*theme\/claudia-[^"]*\.js"><\/script>/, ''));
+    check('self-test: テーマ JS を読まない章を検出する', r.noJsRef.includes(target),
+      JSON.stringify(r.noJsRef));
+
+    r = withTarget(original.replace('<main>', '<main><blockquote>\n<p>【得意】未変換です。</p>\n</blockquote>'));
+    check('self-test: 未変換の台詞を検出する', r.untransformedTalk.includes(target),
+      JSON.stringify(r.untransformedTalk));
+    r = withTarget(original.replace('<main>', '<main><blockquote>\n<p>ふつうの引用【注】</p>\n</blockquote>'));
+    check('self-test: 【で始まらない引用は未変換の台詞としない', r.untransformedTalk.length === 0,
+      JSON.stringify(r.untransformedTalk));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -451,6 +660,29 @@ function run() {
   log('--- (補強) オフライン同梱アセット ---');
   const hasFont = a.files.some((f) => /\.woff2?$/.test(f.rel));
   check('R3.4: Web フォント (woff/woff2) が同梱されている（外部依存なし表示）', hasFont);
+
+  // --- (7) テーマ資材・台詞出力・外部参照・メニュー id（manual-claudia-theme） ---
+  log('');
+  log('--- (1.7/8.4–8.6/8.9/10.4) テーマ資材・台詞出力・外部参照・メニュー id ---');
+  const pages = [...chapters, 'print.html'];
+  const t = analyzeTheme(outDir, pages);
+  check('10.4: テーマ CSS (theme/claudia-*.css) が出力にある', t.themeCss.length > 0,
+    JSON.stringify(t.themeCss));
+  check('10.4: テーマ JS (theme/claudia-*.js) が出力にある', t.themeJs.length > 0,
+    JSON.stringify(t.themeJs));
+  check(`1.7: 全章と print.html（${pages.length} ページ）がテーマ CSS を参照している`,
+    t.noCssRef.length === 0, `missing=${JSON.stringify(t.noCssRef)}`);
+  check(`1.7: 全章と print.html（${pages.length} ページ）がテーマ JS を参照している`,
+    t.noJsRef.length === 0, `missing=${JSON.stringify(t.noJsRef)}`);
+  check(`8.4/8.6: 全章と print.html に両方の話し手の台詞部品がある（欠落 ${t.missingTalk.length} ページ）`,
+    t.missingTalk.length === 0);
+  for (const m of t.missingTalk) log(`        ${m.page}: 台詞部品が無い話し手 ${m.speakers.join(', ')}`);
+  check('8.4: 変換されずに残った台詞（<blockquote> 直後の <p>【）が無い',
+    t.untransformedTalk.length === 0, `files=${JSON.stringify(t.untransformedTalk)}`);
+  check('8.5: link・script・img の絶対 URL が Google Fonts の 2 オリジンだけ',
+    t.externalRefs.length === 0, JSON.stringify(t.externalRefs.slice(0, 6)));
+  check(`8.4: テーマメニューの id（${MENU_IDS.join(', ')}）が全章と print.html にある`,
+    t.missingMenuIds.length === 0, JSON.stringify(t.missingMenuIds.slice(0, 6)));
 
   if (SELF_TEST) runSelfTest();
 

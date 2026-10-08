@@ -15,6 +15,11 @@
 //   - CLI（サンドボックスへツールを複製）: 書き出し直後の --check が exit 0、STALE/ORPHAN 報告と exit 1、
 //     GenError で exit 1。
 //   - 実リポジトリ: 23 章すべてが抽出・口調判定・リンク書き換えを通る（メモリ上のみ）。
+//   manual-claudia-theme タスク 3.2（要件 4.3, 4.4, 5.4, 10.1, 10.7）:
+//   - chapterRegions: 導入・本文・締めの範囲、本文の範囲が extractBody の本文と一致（実リポジトリの全章でも
+//     タスク 3.2 以前の判定と一致）、bad-structure、本文の台詞・口調では投げない。
+//   - talk-in-body: 本文（フェンス外）の台詞の開始行（行頭・字下げ・入れ子の引用・リストの中・タグの不正を含む）を
+//     行番号付きで全件返す。導入・締めの台詞は生成物に出ない。CLI は exit 1。
 //   実リポジトリの book/src・スキルには書き込まない。
 
 import fs from 'node:fs';
@@ -30,6 +35,7 @@ import {
   outName,
   findVoice,
   extractBody,
+  chapterRegions,
   readChapter,
   rewriteLinks,
   renderEntry,
@@ -37,7 +43,7 @@ import {
   writeAll,
   checkAll,
 } from './gen-skill-refs.mjs';
-import { REPO_ROOT, LINK_RE, maskFences } from './link-check.mjs';
+import { REPO_ROOT, LINK_RE, maskFences, listMarkdownFiles } from './link-check.mjs';
 
 // --- 最小 assert ハーネス（依存ゼロ） ---
 let passed = 0;
@@ -343,7 +349,8 @@ function makeSandbox({ withTools = false } = {}) {
   if (withTools) {
     const toolsDir = path.dirname(fileURLToPath(import.meta.url));
     fs.mkdirSync(path.join(root, 'book/tools'), { recursive: true });
-    for (const f of ['gen-skill-refs.mjs', 'link-check.mjs']) {
+    fs.mkdirSync(path.join(root, 'book/tools/talk'), { recursive: true });
+    for (const f of ['gen-skill-refs.mjs', 'link-check.mjs', 'talk/talk.mjs']) {
       fs.copyFileSync(path.join(toolsDir, f), path.join(root, 'book/tools', f));
     }
   }
@@ -544,6 +551,217 @@ log('\n[J] 実リポジトリ: 23 章のメモリ上全生成（書き出さな�
       }
       check(`J ${entry.chapter} のリンクはスキル内で閉じる`, bad.length === 0, bad.join(', '));
     }
+  }
+}
+
+// ============================================================
+// manual-claudia-theme タスク 3.2（要件 4.3, 4.4, 5.4, 10.1, 10.7 / design「ChapterStructure」）
+log('\n[K] chapterRegions（導入・本文・締めの領域）');
+// タスク 3.2 以前の extractBody の本文範囲の判定の写し（領域分けへの移設で範囲が変わらないことの基準）。
+function legacyBodyRange(text) {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  const masked = maskFences(text).split('\n');
+  const seps = [];
+  masked.forEach((l, i) => { if (l === '---') seps.push(i); });
+  let start = seps[0] + 1;
+  let end = seps[seps.length - 1];
+  while (start < end && lines[start].trim() === '') start++;
+  while (end > start && lines[end - 1].trim() === '') end--;
+  return { start, end };
+}
+{
+  const r = chapterRegions(GOOD, 'grammar/x.md');
+  check('K-1 lines は LF の全行', Array.isArray(r.lines) && r.lines.length === GOOD.split('\n').length && r.lines[0] === '# 章タイトル');
+  check('K-2 導入 = H1 の次行〜最初の ---（end 排他）', JSON.stringify(r.intro) === JSON.stringify({ start: 1, end: 4 }), JSON.stringify(r.intro));
+  check('K-3 本文 = 前後の空行を除いた最初と最後の --- の間', JSON.stringify(r.body) === JSON.stringify({ start: 6, end: 13 }), JSON.stringify(r.body));
+  check('K-4 締め = 最後の --- の次行〜末尾', JSON.stringify(r.outro) === JSON.stringify({ start: 15, end: r.lines.length }), JSON.stringify(r.outro));
+  check('K-5 本文の範囲の行 = extractBody の本文',
+    r.lines.slice(r.body.start, r.body.end).join('\n') === extractBody(GOOD, 'grammar/x.md').body);
+  const c = chapterRegions(GOOD.replace(/\n/g, '\r\n'), 'grammar/x.md');
+  check('K-6 CRLF 入力は LF に直した行・同じ範囲',
+    c.lines.every((l) => !l.includes('\r')) && JSON.stringify([c.intro, c.body, c.outro]) === JSON.stringify([r.intro, r.body, r.outro]));
+}
+{
+  const e = thrown(() => chapterRegions('# T\n\n導入\n\n---\n\n本文のみ\n', 'grammar/one.md'));
+  check('K-7 区切り 1 本 → bad-structure', e instanceof GenError && e.kind === 'bad-structure' && e.chapter === 'grammar/one.md', String(e));
+  const e2 = thrown(() => chapterRegions('導入\n\n---\n\n本文\n\n---\n\n締め\n', 'grammar/noh1.md'));
+  check('K-8 先頭行が H1 でない → bad-structure', e2 instanceof GenError && e2.kind === 'bad-structure', String(e2));
+  // 領域分けは構造だけを見る（非生成章は本文に台詞・口調を置けるため、T 系の検査からも使う）。
+  const free = '# T\n\n導入\n\n---\n\n> 【驚き】本文の台詞ですわ。\n\nわたくしの本文。\n\n---\n\n締め\n';
+  const e3 = thrown(() => chapterRegions(free, 'getting-started/x.md'));
+  check('K-9 本文の台詞・口調では投げない', e3 === null, e3 && e3.message);
+}
+{
+  // 実リポジトリの全章（SUMMARY.md を除く）で、本文の範囲がタスク 3.2 以前の判定と一致する。
+  const src = path.join(REPO_ROOT, 'book/src');
+  const chapters = listMarkdownFiles(src).map((f) => path.relative(src, f).split(path.sep).join('/'))
+    .filter((c) => c !== 'SUMMARY.md').sort();
+  check('K-10 実リポジトリの章を 47 章見つける', chapters.length === 47, String(chapters.length));
+  for (const ch of chapters) {
+    const text = fs.readFileSync(path.join(src, ch), 'utf8');
+    const e = thrown(() => chapterRegions(text, ch));
+    const r = e ? null : chapterRegions(text, ch);
+    check(`K ${ch} の本文の範囲が既存の判定と一致`,
+      r !== null && JSON.stringify(r.body) === JSON.stringify(legacyBodyRange(text)), e ? e.message : JSON.stringify(r && r.body));
+  }
+  // 生成対象章と内部設計章では、本文の範囲の行が extractBody の本文そのもの。
+  const internals = chapters.filter((c) => c.startsWith('internals/'));
+  for (const ch of [...new Set([...GENERATION_MAP.map((x) => x.chapter), ...internals])]) {
+    const text = fs.readFileSync(path.join(src, ch), 'utf8');
+    const e = thrown(() => {
+      const r = chapterRegions(text, ch);
+      if (r.lines.slice(r.body.start, r.body.end).join('\n') !== extractBody(text, ch).body) throw new Error('本文が不一致');
+    });
+    check(`K ${ch} の本文の範囲 = extractBody の本文`, e === null, e && e.message);
+  }
+}
+
+// ============================================================
+log('\n[L] talk-in-body（生成対象章・内部設計章の本文に台詞を置かせない）');
+// 9 行目に本文の行を差し込む章（導入・締めは台詞の掛け合い）。
+const talkChapter = (bodyLine) => [
+  '# T',                            // 1
+  '',                               // 2
+  '> 【アンソニー】導入でございます。', // 3
+  '',                               // 4
+  '---',                            // 5
+  '',                               // 6
+  '本文の一行目。',                 // 7
+  '',                               // 8
+  bodyLine,                         // 9
+  '',                               // 10
+  '---',                            // 11
+  '',                               // 12
+  '> 【にっこり】締めの台詞。',     // 13
+  '',
+].join('\n');
+{
+  const forms = [
+    ['行頭の引用', '> 【驚き】本文の台詞。'],
+    ['空白なしの引用', '>【驚き】本文の台詞。'],
+    ['字下げ', '  > 【驚き】本文の台詞。'],
+    ['入れ子の引用', '> > 【驚き】本文の台詞。'],
+    ['空白なしの入れ子の引用', '>> 【驚き】本文の台詞。'],
+    ['リストの中', '- > 【驚き】本文の台詞。'],
+    ['番号付きリストの中', '1. > 【驚き】本文の台詞。'],
+    ['未知の話し手', '> 【だれか：驚き】本文の台詞。'],
+    ['閉じ括弧の欠落', '> 【驚き 本文の台詞。'],
+    ['口調を含む台詞', '> 【高笑い】おほほ、本文ですわ。'],
+  ];
+  for (const [name, line] of forms) {
+    const e = thrown(() => extractBody(talkChapter(line), 'grammar/talk.md'));
+    check(`L-1 ${name} → talk-in-body（L9）`,
+      e instanceof GenError && e.kind === 'talk-in-body' && e.chapter === 'grammar/talk.md'
+        && JSON.stringify(e.hits) === JSON.stringify([{ line: 9 }]),
+      e ? `${e.kind} ${JSON.stringify(e.hits)} ${e.message}` : 'no error');
+  }
+  const e = thrown(() => extractBody(talkChapter('> 【驚き】本文の台詞。'), 'grammar/talk.md'));
+  check('L-2 メッセージに種類・章パス・行番号', e && e.message.startsWith('talk-in-body: grammar/talk.md: L9'), e && e.message);
+  const ei = thrown(() => extractBody(talkChapter('> 【驚き】本文の台詞。'), 'internals/x.md'));
+  check('L-3 内部設計章（I-structure の入口）にも効く', ei instanceof GenError && ei.kind === 'talk-in-body' && ei.chapter === 'internals/x.md', String(ei));
+}
+{
+  const src = [
+    '# T',                      // 1
+    '---',                      // 2
+    '> 【驚き】一つ目。',       // 3
+    '',                         // 4
+    '本文。',                   // 5
+    '',                         // 6
+    '- 項目',                   // 7
+    '  > 【アンソニー：刮目】二つ目。', // 8
+    '',                         // 9
+    '> 普通の引用。',           // 10
+    '> 【不安】三つ目。',       // 11
+    '---',                      // 12
+    '締め',                     // 13
+  ].join('\n');
+  const e = thrown(() => extractBody(src, 'grammar/many.md'));
+  check('L-4 本文の台詞の行をすべて行番号付きで返す',
+    e instanceof GenError && e.kind === 'talk-in-body' && JSON.stringify(e.hits) === JSON.stringify([{ line: 3 }, { line: 8 }, { line: 11 }]),
+    e ? `${e.kind} ${JSON.stringify(e.hits)}` : 'no error');
+  check('L-5 メッセージに全行番号', e && /L3/.test(e.message) && /L8/.test(e.message) && /L11/.test(e.message), e && e.message);
+  const ec = thrown(() => extractBody(src.replace(/\n/g, '\r\n'), 'grammar/many.md'));
+  check('L-6 CRLF 入力でも同じ行番号', ec && ec.kind === 'talk-in-body' && JSON.stringify(ec.hits) === JSON.stringify(e && e.hits));
+}
+{
+  const src = [
+    '# T',
+    '',
+    '> 【アンソニー】導入でございます。',
+    '',
+    '> 【驚き】導入の二つ目。',
+    '',
+    '---',
+    '',
+    '記法の例:',
+    '',
+    '```markdown',
+    '> 【驚き】フェンスの中の例。',
+    '> > 【驚き】入れ子の例。',
+    '```',
+    '',
+    '````text',
+    '```',
+    '- > 【驚き】4 連フェンスの中の例。',
+    '```',
+    '````',
+    '',
+    '> 将来変更あり: 普通の引用。',
+    '> 引用の途中の 【括弧】 は台詞でない。',
+    '',
+    '本文の 【括弧】 と `> 【驚き】` のインラインコード。',
+    '',
+    '---',
+    '',
+    '> 【にっこり】締めの台詞。',
+    '',
+    '> 【アンソニー：刮目】締めの二つ目。',
+  ].join('\n');
+  const e = thrown(() => extractBody(src, 'grammar/ok-talk.md'));
+  check('L-7 導入・締めの台詞・フェンス内・行頭でない 【 は talk-in-body にならない', e === null, e && e.message);
+  const r = e ? null : extractBody(src, 'grammar/ok-talk.md');
+  check('L-8 導入・締めの台詞は本文に含まれない',
+    r !== null && !r.body.includes('導入') && !r.body.includes('締め') && r.body.startsWith('記法の例:'), r && JSON.stringify(r.body));
+}
+{
+  // 生成物: 導入・締めを台詞の掛け合いにしても、生成物は地の文のときとバイト一致し、台詞を含まない。
+  const root = makeSandbox();
+  try {
+    const entry = GENERATION_MAP[0];
+    const rel = relOut(entry);
+    const before = generateAll(root).get(rel);
+    const f = path.join(root, 'book/src', entry.chapter);
+    fs.writeFileSync(f, fs.readFileSync(f, 'utf8')
+      .replace('ごきげんよう、導入ですわ。', '> 【お辞儀】ごきげんよう、導入ですわ。\n\n> 【アンソニー】お嬢様、お手柔らかに。')
+      .replace('締めですわ。', '> 【したり顔】締めですわ。\n\n> 【アンソニー：刮目】さようでございますか。'));
+    const after = generateAll(root).get(rel);
+    check('L-9 導入・締めの台詞は生成物に出ない（生成物不変）', after === before, JSON.stringify(after));
+    check('L-10 生成物に台詞の記法・話し手名がない', !/【|アンソニー|ですわ/.test(after), JSON.stringify(after));
+  } finally {
+    rmrf(root);
+  }
+}
+{
+  // CLI: 本文の台詞は --check でも書き出しでも exit 1・標準エラーに talk-in-body・章パス・行番号。
+  const root = makeSandbox({ withTools: true });
+  try {
+    const run = (...args) => {
+      const r = spawnSync(process.execPath, [path.join(root, 'book/tools/gen-skill-refs.mjs'), ...args], { encoding: 'utf8' });
+      return { code: r.status, out: r.stdout, err: r.stderr };
+    };
+    const w0 = run();
+    check('L-11 台詞の検査を足しても書き出しは成功', w0.code === 0, `${w0.code} ${w0.err}`);
+    const entry = GENERATION_MAP[1];
+    const f = path.join(root, 'book/src', entry.chapter);
+    fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/(## 規則 \d+\n)/, '$1\n> 【驚き】本文の台詞。\n'));
+    const c = run('--check');
+    check('L-12 --check: 本文の台詞で exit 1・talk-in-body・章パス・行番号',
+      c.code === 1 && c.err.includes(`talk-in-body: ${entry.chapter}: L9`), `${c.code} ${c.err}`);
+    const w = run();
+    check('L-13 書き出し: 本文の台詞で exit 1', w.code === 1 && w.err.includes('talk-in-body'), `${w.code} ${w.err}`);
+  } finally {
+    rmrf(root);
   }
 }
 

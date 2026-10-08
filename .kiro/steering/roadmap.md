@@ -216,7 +216,7 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
 - [x] scene-name-alias -- シーン名のエイリアス表を pasta.toml で持ち、未定義なら「会話 → OnTalk」の 1 件を既定にする。完全一致のみ、キー正規化の前段で登録・検索の両側に効かせる（`＊会話` の宣言も `＞会話` の Call も OnTalk になる）。Dependencies: none（2026-10-08 に最優先で先行。`scene-attribute-store`・`call-attribute-filter` はこの後に rebase する）
 - [x] release-ci -- タグ `vX.Y.Z` の push を契機に、GitHub Actions で verify・成果物のビルド・crates.io と Marketplace への公開・GitHub Release までを冪等に行う。認証は OIDC（Trusted Publishing・Entra ID）。成果物の git 追跡を解除し、一回限りのセットアップの手順書を作る。Marketplace の global PAT が廃止される 2026-12-01 より前に完了させる。Dependencies: none
 - [ ] hello-pasta-tutorial-stages -- 「こんな表現をしたい」の段階表を確定し、段階ごとに起動できる辞書一式を CI で検証する。hello-pasta の辞書を教材として書き直し、最終段階と一致させる。Dependencies: none
-- [ ] manual-claudia-theme -- マニュアルを mdBook のまま「Claudia のマニュアル」に着せ替える。配色・字体・枠などの意匠は ponadocs の Claudia 紹介ページ（Unlicense）を手本にし、ダーク版と表紙の扉を用意する。顔アイコン付きの台詞の部品を作り、全章の導入と締めの台詞を書き換える。検索・着色・`file://` 閲覧・検査ツールは壊さない。Dependencies: none
+- [x] manual-claudia-theme -- マニュアルを mdBook のまま「Claudia のマニュアル」に着せ替える。配色・字体・枠などの意匠は ponadocs の Claudia 紹介ページ（Unlicense）を手本にし、ダーク版と表紙の扉を用意する。顔アイコン付きの台詞の部品を作り、全章の導入と締めの台詞を書き換える。検索・着色・`file://` 閲覧・検査ツールは壊さない。Dependencies: none
 - [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。Dependencies: release-ci, hello-pasta-tutorial-stages
 - [ ] getting-started-story-guide -- 入門ガイドを段階表に沿った物語に書き直し、全編を Claudia が語る（執筆規約に `getting-started` の例外を足す）。段階辞書との逐語照合と、新しいシェルのスクリーンショットを含む。Dependencies: hello-pasta-tutorial-stages, hello-pasta-shell-art, manual-claudia-theme
 - [x] expr-nil-coercion -- 式の中の nil を、算術の文脈なら 0、連結の文脈なら空文字列とみなし、ログを出さない。nil 以外の変換できない値（数字でない文字列・真偽値など）は警告を出して 0・空文字列とみなす。`＄＊回数＝＄＊回数＋１` が初回から数え始める。マニュアルとスキル references を同じ PR で直す（2026-10-08、`hello-pasta-tutorial-stages` の設計ディスカッション #1 から起票。要件ディスカッションで規則を組み替えた）。Dependencies: none
@@ -259,6 +259,9 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
 - タグの読み取りの制約（2026-10-07 棚卸、`paragraph-break-tag-only-talk` の範囲外）— `\nHello` をタグとして読む、`\_?…\_?` の中のタグも読む、引数の中の `\]` を扱わない、BudouX の行幅にエスケープと囲みを数えない。上の R4 と一部重なる。
 - 閉じていない 1 行の引用（2026-10-07 棚卸、`dsl-literal-fixes` の範囲外）— `＠w：「abc` と、行をまたげる `sakura_body` の規則はそのままにした。
 - 並列負荷で時々落ちる TCP のテスト（2026-10-07 棚卸、`act-token-grouping-fix`・`scene-identity-format` の実装メモ）— `runtime_toggle_e2e_*`・`hook_panic_*`。
+- print.html の動画の参照切れ（2026-10-09、`manual-claudia-theme` の完了時の棚卸し・spec なしで直せる小さな修正）— `book/src/debug/dev-actions.md` の生の HTML `<video src="media/dev-actions-demo.mp4">` と代わりの `<a href="media/dev-actions-demo.mp4">` は、章のページ（`debug/dev-actions.html`）では解決するが、出力の根にある `print.html` では `debug/media/` を指せない（mdBook は生の HTML の属性を書き換えない）。着せ替え前の版（`classic/`）にもある既存の不具合。`verify-static.mjs` は `print.html` のこの参照だけを例外として見逃している。
+  - 直し方は一通りでない（動画の置き場所を出力の根に移して章側を `../media/` にする・ビルド後の変換で `print.html` の参照を書き換える・絶対パスにするなど）。`file://` のオフライン閲覧と `site-url = "/pasta/"` を両立させる案を選ぶ。
+  - 完了の条件: 章のページと `print.html` の両方で動画と代わりのリンクが働く。`verify-static.mjs` の `print.html` の例外を外しても合格する。章の本文の変更は動画の参照だけにとどめ、`gen-skill-refs --check` とリンク検証に合格する。
 - budoux の自動改行の禁則（2026-10-05、ghost_dev「emo2 開発」からの申し送り）— `line_breaker.rs` の `break_lines_impl` は禁則を見ない。BudouX の語の区切りの直前で改行するだけである。
   - 方針は JIS X 4051 どおりとする。リーダー（`‥…`）は行頭に置いてよい。並びの途中では分けない。
   - この方針では、申し送りの実例「イイジャン！／‥‥ええと、」は正しい組版になる。
