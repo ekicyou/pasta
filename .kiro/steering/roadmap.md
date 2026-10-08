@@ -4,7 +4,7 @@
 
 pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトランスパイルし、組込 LuaJIT で実行する「伺か」の SHIORI（`pasta.dll`）と、その周辺ツール（`pasta_check`・LSP・VSCode 拡張・利用者マニュアル）からなる。Phase 1〜11 で、プロパティアクセス・監査・マニュアル・ソースレベルデバッグ・アクターモデル駆動・配布物の形・現行実装の不具合の一掃までを完了した（下の「完了フェーズ」）。
 
-現在の主題は **Phase 11 の残り: 属性セマンティクスと失敗の出力**。不具合の一掃（12 本）は 2026-10-05 までに完了した（下の「完了フェーズ」）。残るのは、シーン属性の保持と読み出し、Call の属性フィルター、実行時の失敗の出力の一本化の 3 本。
+現在の主題は **Phase 11 の残り: 属性セマンティクスと失敗の出力**。不具合の一掃（12 本）は 2026-10-05 までに完了した（下の「完了フェーズ」）。残るのは、シーン属性の保持と読み出し、Call の属性フィルター、実行時の失敗の出力の一本化の 3 本と、2026-10-08 に起票したシーン名のエイリアス（`scene-name-alias`。`＊会話` を OnTalk の既定の別名にする）。
 
 並行して **Phase 12: 初心者向けの入門ガイド** を進める（2026-10-06 起票）。入門ガイドを「こんな表現をしたい」を順に叶えていく物語に作り直し、ガイドの間は Claudia が全編を語る。題材の hello-pasta は、段階ごとに起動できる辞書と、fal.ai で作った新しいシェルで育て直す。マニュアルの見た目も、Claudia が前に出る親しみやすいデザインに着せ替える。Phase 11 とは、ソースの持ち場が重ならない（`crates/pasta_sample_ghost` と `book/` だけを触る）。マニュアルの全章に触れるのは、導入と締めの台詞の記法の置き換えだけ。
 
@@ -117,6 +117,7 @@ Phase 11 の不具合 12 本が入ったあとで、未完了の 8 本を現行 
 
 - **分割理由**: シーン属性を 2 つに分けた（2026-10-04）。保持・継承・読み出し（`scene-attribute-store`）と、Call の属性フィルター（`call-attribute-filter`）。実行時の失敗の出力の一本化（`failure-output-unification`）は、`call-execution-correctness` が Call 行に入れた失敗表記を土台にする。
 - **共有接点**: `crates/pasta_lua/pasta_scripts/pasta/act.lua` は 1 ウェーブに 1 spec だけが持つ。`failure-output-unification` と `call-attribute-filter` が触るので、この順に置く。`scene-attribute-store` と `call-attribute-filter` は `scene.lua` と `pasta_core` のシーン登録を共有するので、この順に置く。`crates/pasta_lua/src/code_gen/element_gen.rs` も 1 ウェーブに 1 spec だけ。
+- **シーン名のエイリアス**（2026-10-08 起票）: `scene-name-alias` は `＊会話` を OnTalk の既定の別名にし、pasta.toml で表を定義できるようにする。別名はキー正規化（`sanitize_name`）の前段に置き、登録・検索の両側に効かせる。`pasta_core` のシーン登録を `scene-attribute-store` と、`search/`・`scene_table.rs` を `call-attribute-filter` と共有するが、入門ガイド（Phase 12）が依存するため 2026-10-08 に最優先で先行させた。Wave 4 以降の 2 本は未着手なので、この spec の後に rebase する。hello-pasta の辞書の書き換えは Phase 12 の `hello-pasta-tutorial-stages` に任せる。
 
 ### ウェーブ構成
 
@@ -125,6 +126,7 @@ Phase 11 の不具合 12 本が入ったあとで、未完了の 8 本を現行 
 | 4 | scene-attribute-store | 機能 | 宣言行の属性のパース（`parse_scene.rs`）、`scope_gen.rs`・`context.rs`・`transpiler.rs`、`scene.lua`、`finalize.rs`、`pasta_core` のシーン登録 |
 | 4 | failure-output-unification | 機能 | `act.lua`・`actor.lua`・`word.lua` の警告と失敗表記（範囲によっては `shiori/event/`・`res.lua`・`pasta_shiori` の `error.rs`） |
 | 5 | call-attribute-filter | 機能 | Call の文法（`grammar.pest`・`parse_action.rs`）、`element_gen.rs`（Call）、`act.lua`（`call`・`find_act_handler`）、`scene.lua`（`SCENE.search`）、`search/`、`pasta_core` の `scene_table.rs`、VSCode の文法定義 |
+| 3.5（最優先・先行） | scene-name-alias | 機能 | pasta.toml の別名表（`config.rs`・`reference/pasta-toml.md`）、`pasta_core` の `sanitize_name` とその呼び出し元（`scope_gen.rs`・`search/context.rs`・`debug/source_map/`）、マニュアル（`block-structure.md`・`call-jump.md`・`shiori-events.md`）とスキル references |
 
 Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）。
 
@@ -181,6 +183,7 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: dsl-literal-fixes, scene-identity-format, call-execution-correctness
 - [ ] failure-output-unification -- 実行時の失敗（未定義の参照・見つからない Call など）をログとさくらスクリプトの両方へ 1 つの仕組みから出す。`call-execution-correctness` が Call 行に入れる失敗表記を載せ替え、他の失敗へ広げる。Dependencies: none
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
+- [ ] scene-name-alias -- シーン名のエイリアス表を pasta.toml で持ち、未定義なら「会話 → OnTalk」の 1 件を既定にする。完全一致のみ、キー正規化の前段で登録・検索の両側に効かせる（`＊会話` の宣言も `＞会話` の Call も OnTalk になる）。Dependencies: none（2026-10-08 に最優先で先行。`scene-attribute-store`・`call-attribute-filter` はこの後に rebase する）
 - [ ] release-ci -- タグ `vX.Y.Z` の push を契機に、GitHub Actions で verify・成果物のビルド・crates.io と Marketplace への公開・GitHub Release までを冪等に行う。認証は OIDC（Trusted Publishing・Entra ID）。成果物の git 追跡を解除し、一回限りのセットアップの手順書を作る。Marketplace の global PAT が廃止される 2026-12-01 より前に完了させる。Dependencies: none
 - [ ] hello-pasta-tutorial-stages -- 「こんな表現をしたい」の段階表を確定し、段階ごとに起動できる辞書一式を CI で検証する。hello-pasta の辞書を教材として書き直し、最終段階と一致させる。Dependencies: none
 - [ ] manual-claudia-theme -- マニュアルを mdBook のまま「Claudia のマニュアル」に着せ替える。配色・字体・枠などの意匠は ponadocs の Claudia 紹介ページ（Unlicense）を手本にし、ダーク版と表紙の扉を用意する。顔アイコン付きの台詞の部品を作り、全章の導入と締めの台詞を書き換える。検索・着色・`file://` 閲覧・検査ツールは壊さない。Dependencies: none
