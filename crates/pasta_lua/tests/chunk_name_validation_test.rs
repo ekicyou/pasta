@@ -125,7 +125,7 @@ fn run_round_trip(base_dir: &Path) -> RoundTrip {
     // --- 2. ローダのキャッシュ構築コードを *再利用* してキャッシュへ保存 ----------
     //     （キーをでっち上げず、本番ローダと同一の path 構築を共有する: design 438）
     let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
-    cache_manager.prepare_cache_dir().expect("prepare cache");
+    cache_manager.prepare_cache_dir("").expect("prepare cache");
 
     // ローダ由来チャンク名キー（= source_to_cache_path の絶対パス）。
     let loader_cache_path = cache_manager.source_to_cache_path(&source_path);

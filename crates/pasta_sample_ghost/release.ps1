@@ -1,10 +1,11 @@
-# release.ps1 - hello-pasta Build, Setup & Release Script
-# Builds ghost distribution and creates .nar release package
+﻿# release.ps1 - hello-pasta Build, Setup & Release Script
+# Builds ghost distribution and creates .nar and pasta.dll.zip release packages
+# (also run by the release CI: .github/workflows/release.yml)
 #
-# Usage:
-#   powershell -ExecutionPolicy Bypass -File release.ps1
-#   powershell -ExecutionPolicy Bypass -File release.ps1 -SkipSetup
-#   powershell -ExecutionPolicy Bypass -File release.ps1 -SkipDllBuild
+# Usage (PowerShell 7):
+#   pwsh -File release.ps1
+#   pwsh -File release.ps1 -SkipSetup
+#   pwsh -File release.ps1 -SkipDllBuild
 #
 # Parameters:
 #   -SkipSetup     Skip setup phase (steps 1-3), run release steps only
@@ -23,6 +24,7 @@ $WorkspaceRoot = Resolve-Path (Join-Path $ScriptDir "..\..") | Select-Object -Ex
 $GhostDir = Join-Path $ScriptDir "ghosts\hello-pasta"
 $ReleaseDir = Join-Path $WorkspaceRoot "release\hello-pasta"
 $NarFilePath = Join-Path $WorkspaceRoot "release\hello-pasta.nar"
+$DllZipPath = Join-Path $WorkspaceRoot "release\pasta.dll.zip"
 
 Write-Host "========================================"
 Write-Host "  hello-pasta Build & Release"
@@ -32,6 +34,7 @@ Write-Host "Workspace:   $WorkspaceRoot"
 Write-Host "Ghost Dir:   $GhostDir"
 Write-Host "Release Dir: $ReleaseDir"
 Write-Host "NAR File:    $NarFilePath"
+Write-Host "DLL Zip:     $DllZipPath"
 if ($SkipSetup) {
     Write-Host "Mode:        Release only (setup skipped)"
 }
@@ -47,18 +50,18 @@ Write-Host ""
 # Setup Phase (Steps 1-3)
 # ============================================================
 if ($SkipSetup) {
-    Write-Host "[1/6] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[2/6] Generating images .................. SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[3/6] Copying DLL and scripts ............ SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[1/7] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[2/7] Generating images .................. SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[3/7] Copying DLL and scripts ............ SKIPPED" -ForegroundColor DarkGray
     Write-Host ""
 }
 else {
     # --- Step 1: Build pasta.dll (32bit) ---
     if ($SkipDllBuild) {
-        Write-Host "[1/6] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+        Write-Host "[1/7] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
     }
     else {
-        Write-Host "[1/6] Building pasta.dll (32bit release)..."
+        Write-Host "[1/7] Building pasta.dll (32bit release)..."
         Write-Host "  Target: i686-pc-windows-msvc"
 
         Push-Location $WorkspaceRoot
@@ -81,7 +84,7 @@ else {
     Write-Host ""
 
     # --- Step 2: Generate images (surface*.png + surfaces.txt) ---
-    Write-Host "[2/6] Generating images..."
+    Write-Host "[2/7] Generating images..."
 
     Push-Location $WorkspaceRoot
     try {
@@ -99,7 +102,7 @@ else {
     Write-Host ""
 
     # --- Step 3: Copy pasta.dll and scripts/ ---
-    Write-Host "[3/6] Copying files..."
+    Write-Host "[3/7] Copying files..."
 
     $MasterDir = Join-Path $GhostDir "ghost\master"
     if (-not (Test-Path $MasterDir)) {
@@ -172,11 +175,11 @@ else {
 }
 
 # ============================================================
-# Release Phase (Steps 4-6)
+# Release Phase (Steps 4-7)
 # ============================================================
 
 # --- Step 4: Run pasta_check release ---
-Write-Host "[4/6] Running pasta_check release..."
+Write-Host "[4/7] Running pasta_check release..."
 
 Push-Location $WorkspaceRoot
 try {
@@ -193,8 +196,35 @@ finally {
 Write-Host "  Release package created" -ForegroundColor Green
 Write-Host ""
 
-# --- Step 5: Version Check ---
-Write-Host "[5/6] Checking version..."
+# --- Step 5: Create pasta.dll.zip (pasta.dll + THIRD_PARTY_LICENSES.txt) ---
+Write-Host "[5/7] Creating pasta.dll.zip..."
+
+$ZipSources = @(
+    (Join-Path $WorkspaceRoot "target\i686-pc-windows-msvc\release\pasta.dll"),
+    (Join-Path $GhostDir "ghost\master\THIRD_PARTY_LICENSES.txt")
+)
+Compress-Archive -Path $ZipSources -DestinationPath $DllZipPath -Force
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [System.IO.Compression.ZipFile]::OpenRead($DllZipPath)
+try {
+    $zipEntries = @($zip.Entries | ForEach-Object { $_.FullName } | Sort-Object)
+}
+finally {
+    $zip.Dispose()
+}
+$expectedEntries = @("pasta.dll", "THIRD_PARTY_LICENSES.txt") | Sort-Object
+if (($zipEntries -join "|") -ne ($expectedEntries -join "|")) {
+    Write-Host ""
+    Write-Host "ERROR: pasta.dll.zip must contain exactly: $($expectedEntries -join ', ')" -ForegroundColor Red
+    Write-Host "  Actual: $($zipEntries -join ', ')"
+    exit 1
+}
+Write-Host "  Created pasta.dll.zip ($($zipEntries -join ', '))" -ForegroundColor Green
+Write-Host ""
+
+# --- Step 6: Version Check ---
+Write-Host "[6/7] Checking version..."
 
 $CargoToml = Join-Path $WorkspaceRoot "Cargo.toml"
 if (-not (Test-Path $CargoToml)) {
@@ -219,35 +249,27 @@ Write-Host "  Version: $Version"
 Write-Host "  Tag:     $TagName"
 Write-Host ""
 
-# --- Step 6: Show Release Instructions ---
+# --- Step 7: Show Release Instructions ---
 $narSize = (Get-Item $NarFilePath).Length
 $narSizeMB = [math]::Round($narSize / 1MB, 2)
 
-Write-Host "[6/6] Release instructions"
+Write-Host "[7/7] Release instructions"
 Write-Host ""
 Write-Host "========================================"
-Write-Host "  .nar Package Ready!"
+Write-Host "  Release Packages Ready!"
 Write-Host "========================================"
 Write-Host ""
-Write-Host "  File:    $NarFilePath"
+Write-Host "  NAR:     $NarFilePath ($narSizeMB MB)"
+Write-Host "  DLL Zip: $DllZipPath"
 Write-Host "  Version: $Version"
 Write-Host "  Tag:     $TagName"
-Write-Host "  Size:    $narSizeMB MB"
 Write-Host ""
 Write-Host "----------------------------------------"
 Write-Host "  Next Steps"
 Write-Host "----------------------------------------"
 Write-Host ""
-Write-Host "  1. Review RELEASE.md for full instructions:"
+Write-Host "  release/ の成果物は動作確認用で、コミットしない。"
+Write-Host "  公開はリリースタグ（$TagName）の push で CI（.github/workflows/release.yml）が行う。"
+Write-Host "  詳細は RELEASE.md:"
 Write-Host "     $ScriptDir\RELEASE.md"
-Write-Host ""
-Write-Host "  2. Create GitHub Release:"
-Write-Host ""
-Write-Host "     gh release create $TagName `"$NarFilePath`" --title `"hello-pasta $TagName`" --notes-file release-notes.md" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "  3. Or with inline notes:"
-Write-Host ""
-Write-Host "     gh release create $TagName `"$NarFilePath`" --title `"hello-pasta $TagName`" --notes `"hello-pasta $Version alpha release`"" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "  Tip: Consult AI with RELEASE.md template for detailed release notes."
 Write-Host ""

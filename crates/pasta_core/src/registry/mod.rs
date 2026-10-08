@@ -14,6 +14,7 @@
 //! - RandomSelector: Language-agnostic random selection trait
 
 pub mod random;
+mod scene_alias;
 mod scene_registry;
 mod scene_table;
 mod scene_types;
@@ -21,6 +22,7 @@ mod word_registry;
 mod word_table;
 
 pub use random::{DefaultRandomSelector, MockRandomSelector, RandomSelector};
+pub use scene_alias::SceneAliasTable;
 pub use scene_registry::{SceneEntry, SceneRegistry};
 pub use scene_table::SceneTable;
 pub use scene_types::{SceneId, SceneInfo, SceneScope};

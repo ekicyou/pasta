@@ -161,6 +161,9 @@ impl PastaLuaRuntime {
         // default and `source_map` is `None` (R5.2 / R5.5 / 7.1).
         let debug_file = pasta_config.as_ref().and_then(|c| c.debug());
         let runtime_config = runtime_config.with_debug_from_file_and_env(debug_file.as_ref());
+        // finalize_scene must re-register @pasta_search with the SAME alias table
+        // as the initial registration inside `with_config_and_source_map`.
+        let scene_aliases = runtime_config.scene_aliases.clone();
 
         // Create base runtime (installs the debug hook exactly once iff enabled,
         // and holds + forwards the source map to enable when present).
@@ -202,7 +205,7 @@ impl PastaLuaRuntime {
 
         // Register finalize_scene Rust binding to overwrite Lua stub (Requirement 4.3)
         // This must be done before loading scene_dic.lua which calls finalize_scene()
-        register_finalize_scene(&runtime.lua)?;
+        register_finalize_scene(&runtime.lua, scene_aliases)?;
 
         // ========================================
         // Module Loading Phase (all require-based)

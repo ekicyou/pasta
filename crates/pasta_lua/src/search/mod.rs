@@ -11,7 +11,7 @@
 //! use pasta_lua::search;
 //!
 //! let lua = mlua::Lua::new();
-//! search::register(&lua, scene_registry, word_registry)?;
+//! search::register(&lua, scene_registry, word_registry, SceneAliasTable::empty())?;
 //!
 //! // Now Lua scripts can use:
 //! // local SEARCH = require "@pasta_search"
@@ -25,7 +25,7 @@ pub use context::SearchContext;
 pub use error::SearchError;
 
 use mlua::{Lua, Result as LuaResult, Table};
-use pasta_core::registry::{SceneRegistry, WordDefRegistry};
+use pasta_core::registry::{SceneAliasTable, SceneRegistry, WordDefRegistry};
 
 /// Create the `@pasta_search` module table.
 ///
@@ -36,6 +36,7 @@ use pasta_core::registry::{SceneRegistry, WordDefRegistry};
 /// * `lua` - The Lua instance
 /// * `scene_registry` - SceneRegistry (from transpilation, or rebuilt by `finalize_scene`)
 /// * `word_registry` - WordDefRegistry (from transpilation, or rebuilt by `finalize_scene`)
+/// * `aliases` - Global scene name alias table (empty = no aliases)
 ///
 /// # Returns
 /// A Lua UserData representing the `@pasta_search` module
@@ -43,9 +44,10 @@ pub fn loader(
     lua: &Lua,
     scene_registry: SceneRegistry,
     word_registry: WordDefRegistry,
+    aliases: SceneAliasTable,
 ) -> LuaResult<mlua::AnyUserData> {
     // Create SearchContext from registries
-    let context = SearchContext::new(scene_registry, word_registry)?;
+    let context = SearchContext::with_aliases(scene_registry, word_registry, aliases)?;
 
     // Return the SearchContext directly as UserData
     // This allows SEARCH:method() calls to work correctly
@@ -61,6 +63,7 @@ pub fn loader(
 /// * `lua` - The Lua instance
 /// * `scene_registry` - SceneRegistry (from transpilation, or rebuilt by `finalize_scene`)
 /// * `word_registry` - WordDefRegistry (from transpilation, or rebuilt by `finalize_scene`)
+/// * `aliases` - Global scene name alias table (empty = no aliases)
 ///
 /// # Returns
 /// The registered module (UserData)
@@ -68,8 +71,9 @@ pub fn register(
     lua: &Lua,
     scene_registry: SceneRegistry,
     word_registry: WordDefRegistry,
+    aliases: SceneAliasTable,
 ) -> LuaResult<mlua::AnyUserData> {
-    let module = loader(lua, scene_registry, word_registry)?;
+    let module = loader(lua, scene_registry, word_registry, aliases)?;
 
     // Register in package.loaded for require "@pasta_search"
     let package: Table = lua.globals().get("package")?;

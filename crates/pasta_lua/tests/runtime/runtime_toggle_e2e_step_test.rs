@@ -144,8 +144,12 @@ fn resolve_step_session(base: &Path) -> StepCoords {
         .to_string();
     let pasta_file_key = pasta_file.to_string_lossy().to_string();
 
-    let map =
-        PastaLoader::build_source_map(std::slice::from_ref(&pasta_file), &cache_manager, false);
+    let map = PastaLoader::build_source_map(
+        std::slice::from_ref(&pasta_file),
+        &cache_manager,
+        false,
+        &LuaTranspiler::default(),
+    );
     let generated_lua = transpile_step_fixture(&pasta_file);
     let header_lua_line = generated_lua
         .lines()

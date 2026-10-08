@@ -68,6 +68,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - ✅ **choice-definition-dsl** - 選択肢定義DSL
 - ✅ **handler-resolution-fallback** - ハンドラ名前解決フォールバック
 - ✅ **ontalk-block-condition** - OnTalkブロック条件
+- ✅ **scene-name-alias** - グローバルシーン名の別名表（pasta.toml `[scene.alias]`、既定 `OnTalk = ["会話"]`。完全一致 1 段で宣言と検索の両側に効く）
 
 **ドキュメント整備**:
 - ✅ **pasta-user-manual** - 利用者（ゴースト作者）向けマニュアル。Pasta DSL 文法・Lua API/コーディング・入門チュートリアルを mdBook 製の静的サイトへ統合し、GitHub Pages で公開（[https://ekicyou.github.io/pasta/](https://ekicyou.github.io/pasta/)）。日本語 bigram 検索を含む。マニュアル（`book/src/`）が利用者向け仕様の唯一の権威で、スキル references はマニュアル章から生成する（`gen-skill-refs.mjs`）

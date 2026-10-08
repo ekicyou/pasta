@@ -1,0 +1,570 @@
+# .github/workflows/release.yml
+# リリース CI（release-ci）。リリースタグ vX.Y.Z の push だけで起動し、
+# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（3 つの配布物）の順に進める。
+# 上流の job が失敗したら後続は needs の既定で止まり、どの公開先にも公開しない。
+name: Release
+
+on:
+  push:
+    # 数字 3 つの形だけ（v0.3・v1.0.0-rc.1・test-1 は合わない）。verify-tag.ps1 でも同じ形を二重に検査する。
+    # tags だけを指定しているので、ブランチへの push では起動しない。PR などの他のトリガーは持たない。
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+
+# 同じタグの実行は直列にし、実行中のものを取り消さない。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# ビルドツールの版の固定値（gate が呼ぶ build.yml には伝わらない）。
+env:
+  WASM_PACK_VERSION: '0.15.0'
+  CARGO_ABOUT_VERSION: '0.9.2'
+  NODE_VERSION: '20'
+  RELEASE_ENVIRONMENT: release
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: pwsh
+    outputs:
+      version: ${{ steps.verify.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch main
+        run: git fetch origin main
+
+      # タグ名・SHA は既定の環境変数 GITHUB_REF_NAME・GITHUB_SHA（github.ref_name・github.sha と同じ値）で渡す。
+      - name: Verify tag and versions
+        id: verify
+        run: ./.github/scripts/release/verify-tag.ps1 -Tag $env:GITHUB_REF_NAME -Sha $env:GITHUB_SHA -MainRef origin/main
+
+  # 関門: タグのコミットで build.yml の検査をすべて行う（reusable workflow なので steps・runs-on を持てない）。
+  gate:
+    needs: verify
+    uses: ./.github/workflows/build.yml
+
+  build:
+    name: build
+    needs: [verify, gate]
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: i686-pc-windows-msvc
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: i686-pc-windows-msvc
+
+      - name: Set Japanese locale for Shift-JIS support
+        run: |
+          Set-WinSystemLocale ja-JP
+          Set-Culture ja-JP
+        shell: powershell
+
+      # ビルド済みバイナリを版固定で取得する（ランナーにはプリインストールされていない）。
+      - name: Install wasm-pack and cargo-about
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $tools = @(
+            @{ Name = 'wasm-pack'; Version = $env:WASM_PACK_VERSION
+               Url = "https://github.com/rustwasm/wasm-pack/releases/download/v$env:WASM_PACK_VERSION/wasm-pack-v$env:WASM_PACK_VERSION-x86_64-pc-windows-msvc.tar.gz" }
+            @{ Name = 'cargo-about'; Version = $env:CARGO_ABOUT_VERSION
+               Url = "https://github.com/EmbarkStudios/cargo-about/releases/download/$env:CARGO_ABOUT_VERSION/cargo-about-$env:CARGO_ABOUT_VERSION-x86_64-pc-windows-msvc.tar.gz" }
+          )
+          foreach ($t in $tools) {
+            $dir = Join-Path $env:RUNNER_TEMP "tools/$($t.Name)"
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
+            $archive = "$dir.tar.gz"
+            Invoke-WebRequest -Uri $t.Url -OutFile $archive
+            & "$env:SystemRoot\System32\tar.exe" -xzf $archive -C $dir
+            $exe = Get-ChildItem -LiteralPath $dir -Recurse -Filter "$($t.Name).exe" | Select-Object -First 1
+            if (-not $exe) { throw "$($t.Name).exe が $($t.Url) の中に無い" }
+            $reported = & $exe.FullName --version
+            if ("$reported" -notmatch "\b$([regex]::Escape($t.Version))\b") { throw "$($t.Name) の版が $($t.Version) でない: $reported" }
+            Write-Output "$($t.Name): $reported"
+            Add-Content -LiteralPath $env:GITHUB_PATH -Value $exe.DirectoryName
+          }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+
+      # release.ps1 の cargo は --locked を持たないため、後段の Cargo.lock の不変検査で同等にする。
+      - name: Build pasta.dll.zip and hello-pasta.nar
+        run: pwsh -NoProfile -File crates/pasta_sample_ghost/release.ps1
+
+      - name: Build VSIX
+        working-directory: editors/vscode
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci
+          npm run package
+          Move-Item -LiteralPath "pasta-vscode-$env:VERSION.vsix" -Destination ../../release/ -Force
+
+      - name: Verify release assets
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          function Get-ZipEntries([string]$Path) {
+            if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "配布物が無い: $Path" }
+            $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Path).Path)
+            try { @($zip.Entries | ForEach-Object FullName) } finally { $zip.Dispose() }
+          }
+          $errors = [System.Collections.Generic.List[string]]::new()
+
+          # pasta.dll.zip: pasta.dll と THIRD_PARTY_LICENSES.txt の 2 つだけ
+          $dllZip = @(Get-ZipEntries 'release/pasta.dll.zip' | Sort-Object)
+          if (($dllZip -join '|') -ne 'pasta.dll|THIRD_PARTY_LICENSES.txt') {
+            $errors.Add("pasta.dll.zip の中身が pasta.dll・THIRD_PARTY_LICENSES.txt の 2 つでない: $($dllZip -join ', ')")
+          }
+
+          # hello-pasta.nar: 配置の要のファイル
+          $nar = Get-ZipEntries 'release/hello-pasta.nar'
+          foreach ($e in 'install.txt', 'updates.txt', 'ghost/master/descript.txt', 'ghost/master/pasta.dll', 'ghost/master/THIRD_PARTY_LICENSES.txt') {
+            if ($nar -cnotcontains $e) { $errors.Add("hello-pasta.nar に $e が無い") }
+          }
+
+          # VSIX: 1 つだけ・名前と package.json の版がタグの版・WASM とそのライセンス表示を同梱
+          $vsixes = @(Get-ChildItem -Path 'release' -Filter '*.vsix' -File)
+          $expected = "pasta-vscode-$env:VERSION.vsix"
+          if ($vsixes.Count -ne 1 -or $vsixes[0].Name -cne $expected) {
+            $errors.Add("release/ の VSIX が $expected の 1 つでない: $(($vsixes | ForEach-Object Name) -join ', ')")
+          }
+          else {
+            $vsixPath = $vsixes[0].FullName
+            $entries = Get-ZipEntries $vsixPath
+            foreach ($e in 'extension/package.json', 'extension/wasm/pasta_lsp_wasm_bg.wasm', 'extension/wasm/THIRD_PARTY_LICENSES.txt') {
+              if ($entries -cnotcontains $e) { $errors.Add("$expected に $e が無い") }
+            }
+            if ($entries -ccontains 'extension/package.json') {
+              $zip = [System.IO.Compression.ZipFile]::OpenRead($vsixPath)
+              try {
+                $reader = [System.IO.StreamReader]::new($zip.GetEntry('extension/package.json').Open())
+                try { $pkgVersion = ($reader.ReadToEnd() | ConvertFrom-Json).version } finally { $reader.Dispose() }
+              }
+              finally { $zip.Dispose() }
+              if ($pkgVersion -cne $env:VERSION) { $errors.Add("$expected の package.json の版が $env:VERSION でない: $pkgVersion") }
+            }
+          }
+
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Output "::error::$_" }
+            exit 1
+          }
+          Write-Output "配布物の検査: 成功（版 $env:VERSION）"
+
+      # release.ps1・wasm-pack は --locked を付けないため、lock が書き換わっていないことをここで確かめる。
+      - name: Check Cargo.lock is unchanged
+        run: git diff --exit-code -- Cargo.lock
+
+      - name: Upload release-assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: |
+            release/pasta.dll.zip
+            release/hello-pasta.nar
+            release/pasta-vscode-${{ needs.verify.outputs.version }}.vsix
+          retention-days: 90
+          if-no-files-found: error
+          # 「Re-run all jobs」で build が再実行されても、同じ run の同名 artifact と衝突しないよう置き換える
+          overwrite: true
+
+  # crates.io への公開（5 クレートを依存順に 1 つずつ）。
+  # 認証は Trusted Publishing（OIDC → 30 分のトークン）。トークンはクレートごとに auth step で取り直し、
+  # 直後の publish step だけに環境変数 CARGO_REGISTRY_TOKEN で渡す。
+  # 落とし先: 同一 job で crates-io-auth-action を複数回呼べることは公式文書に無い。2 回目以降の auth step が
+  # 拒否されたら、auth step を先頭の 1 回だけにして全 publish step にそのトークンを渡す形へ落とし、
+  # 版を上げて出し直す（その時点で pasta_core は公開済みのため、同じタグは使えない）。1 回取得の形で
+  # 30 分を超えて失敗したら「失敗した job の再実行」で続く（公開済みのクレートは飛ばされる）。
+  # クレートごとの所要時間は publish-crate.ps1 が summary の各行に書く（トークン期限の判断材料）。
+  # step が失敗すると後続のクレートは既定どおり走らない（4.4）。末尾の集約 step だけは常に動き、
+  # クレートごとの status・reason を summary と job outputs（<crate>_status・<crate>_reason）に書く。
+  # 集約 step は成功で終わるが、失敗した step があるので job 自体は失敗のまま（再実行の対象になる）。
+  publish-crates:
+    name: publish-crates
+    needs: [verify, build]
+    runs-on: windows-latest
+    timeout-minutes: 90
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    outputs:
+      pasta_core_status: ${{ steps.result.outputs.pasta_core_status }}
+      pasta_core_reason: ${{ steps.result.outputs.pasta_core_reason }}
+      pasta_dsl_status: ${{ steps.result.outputs.pasta_dsl_status }}
+      pasta_dsl_reason: ${{ steps.result.outputs.pasta_dsl_reason }}
+      pasta_lua_status: ${{ steps.result.outputs.pasta_lua_status }}
+      pasta_lua_reason: ${{ steps.result.outputs.pasta_lua_reason }}
+      pasta_shiori_status: ${{ steps.result.outputs.pasta_shiori_status }}
+      pasta_shiori_reason: ${{ steps.result.outputs.pasta_shiori_reason }}
+      pasta_check_status: ${{ steps.result.outputs.pasta_check_status }}
+      pasta_check_reason: ${{ steps.result.outputs.pasta_check_reason }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # cargo publish の検証ビルド（ホストのターゲット）に使う。
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: publish
+
+      - name: Auth crates.io (pasta_core)
+        id: auth_core
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Publish pasta_core
+        id: pub_core
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth_core.outputs.token }}
+        run: ./.github/scripts/release/publish-crate.ps1 -Crate pasta_core -Version $env:VERSION
+
+      - name: Auth crates.io (pasta_dsl)
+        id: auth_dsl
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Publish pasta_dsl
+        id: pub_dsl
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth_dsl.outputs.token }}
+        run: ./.github/scripts/release/publish-crate.ps1 -Crate pasta_dsl -Version $env:VERSION -DependsOn pasta_core
+
+      - name: Auth crates.io (pasta_lua)
+        id: auth_lua
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Publish pasta_lua
+        id: pub_lua
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth_lua.outputs.token }}
+        run: ./.github/scripts/release/publish-crate.ps1 -Crate pasta_lua -Version $env:VERSION -DependsOn pasta_core,pasta_dsl
+
+      - name: Auth crates.io (pasta_shiori)
+        id: auth_shiori
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Publish pasta_shiori
+        id: pub_shiori
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth_shiori.outputs.token }}
+        run: ./.github/scripts/release/publish-crate.ps1 -Crate pasta_shiori -Version $env:VERSION -DependsOn pasta_lua
+
+      - name: Auth crates.io (pasta_check)
+        id: auth_check
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Publish pasta_check
+        id: pub_check
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth_check.outputs.token }}
+        run: ./.github/scripts/release/publish-crate.ps1 -Crate pasta_check -Version $env:VERSION
+
+      # status 契約: publish step が書いた値を使う。書いていなければ、auth の失敗 → failed/auth、
+      # auth は通ったのに値が無い（スクリプトの異常終了・時間切れ）→ failed/publish、どちらも走っていない → not-run。
+      - name: Summarize crates.io results
+        id: result
+        if: always()
+        env:
+          PASTA_CORE_AUTH: ${{ steps.auth_core.outcome }}
+          PASTA_CORE_STATUS: ${{ steps.pub_core.outputs.status }}
+          PASTA_CORE_REASON: ${{ steps.pub_core.outputs.reason }}
+          PASTA_DSL_AUTH: ${{ steps.auth_dsl.outcome }}
+          PASTA_DSL_STATUS: ${{ steps.pub_dsl.outputs.status }}
+          PASTA_DSL_REASON: ${{ steps.pub_dsl.outputs.reason }}
+          PASTA_LUA_AUTH: ${{ steps.auth_lua.outcome }}
+          PASTA_LUA_STATUS: ${{ steps.pub_lua.outputs.status }}
+          PASTA_LUA_REASON: ${{ steps.pub_lua.outputs.reason }}
+          PASTA_SHIORI_AUTH: ${{ steps.auth_shiori.outcome }}
+          PASTA_SHIORI_STATUS: ${{ steps.pub_shiori.outputs.status }}
+          PASTA_SHIORI_REASON: ${{ steps.pub_shiori.outputs.reason }}
+          PASTA_CHECK_AUTH: ${{ steps.auth_check.outcome }}
+          PASTA_CHECK_STATUS: ${{ steps.pub_check.outputs.status }}
+          PASTA_CHECK_REASON: ${{ steps.pub_check.outputs.reason }}
+        run: |
+          $next = @{
+            auth             = 'Trusted Publisher の設定を手順書 `.github/release-ci-setup.md` の名前の表と照合する'
+            publish          = 'ログを読む'
+            transient        = '失敗した job を再実行する'
+            'not-registered' = '初回の公開は手で行う（手順書）'
+          }
+          $rows = foreach ($crate in 'pasta_core', 'pasta_dsl', 'pasta_lua', 'pasta_shiori', 'pasta_check') {
+            $key = $crate.ToUpperInvariant()
+            $status = [Environment]::GetEnvironmentVariable("${key}_STATUS")
+            $reason = [Environment]::GetEnvironmentVariable("${key}_REASON")
+            $auth = [Environment]::GetEnvironmentVariable("${key}_AUTH")
+            if (-not $status) {
+              if ($auth -eq 'failure') { $status, $reason = 'failed', 'auth' }
+              elseif ($auth -eq 'success') { $status, $reason = 'failed', 'publish' }
+              else { $status, $reason = 'not-run', '' }
+            }
+            if ($status -ne 'failed') { $reason = '' }
+            "${crate}_status=$status", "${crate}_reason=$reason" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8
+            $hint = if ($status -eq 'not-run') { '前の step の失敗で行わなかった' } elseif ($reason) { $next[$reason] } else { '' }
+            "| ``$crate`` | $status | $reason | $hint |"
+          }
+          @(
+            "## crates.io の公開結果（$env:VERSION）"
+            ''
+            '| クレート | status | reason | 次の手 |'
+            '|----------|--------|--------|--------|'
+            $rows
+            ''
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # VSCode Marketplace への公開。crates.io の公開とは互いを待たない（5.4・5.6）。
+  # 認証は Entra ID のワークロード ID 連携（Azure/login の OIDC → vsce の --azure-credential）。PAT は使わない。
+  # 末尾の集約 step は常に動き、status・reason を summary と job outputs（status・reason）に書く。
+  publish-vsce:
+    name: publish-vsce
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+      reason: ${{ steps.result.outputs.reason }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download release-assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: release-assets
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # vsce の版は editors/vscode/package-lock.json で固定する（ビルドはしないので scripts は走らせない）。
+      - name: Install vsce (npm ci)
+        working-directory: editors/vscode
+        run: npm ci --ignore-scripts
+
+      - name: Azure login (OIDC)
+        id: login
+        uses: Azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Publish VSIX to Marketplace
+        id: pub_vsix
+        run: ./.github/scripts/release/publish-vsix.ps1 -VsixPath 'release-assets/*.vsix' -Version $env:VERSION -Extension ekicyou.pasta-vscode
+
+      # status 契約: publish step が書いた値を使う。書いていなければ、login の失敗 → failed/auth、
+      # login は通ったのに値が無い（スクリプトの異常終了・時間切れ）→ failed/publish、どちらも走っていない → not-run。
+      - name: Summarize Marketplace result
+        id: result
+        if: always()
+        env:
+          LOGIN: ${{ steps.login.outcome }}
+          STATUS: ${{ steps.pub_vsix.outputs.status }}
+          REASON: ${{ steps.pub_vsix.outputs.reason }}
+        run: |
+          $next = @{
+            auth      = 'Azure のフェデレーション資格情報・publisher の Members を手順書 `.github/release-ci-setup.md` の名前の表と照合する'
+            publish   = 'ログを読む'
+            transient = '失敗した job を再実行する'
+          }
+          $status, $reason = $env:STATUS, $env:REASON
+          if (-not $status) {
+            if ($env:LOGIN -eq 'failure') { $status, $reason = 'failed', 'auth' }
+            elseif ($env:LOGIN -eq 'success') { $status, $reason = 'failed', 'publish' }
+            else { $status, $reason = 'not-run', '' }
+          }
+          if ($status -ne 'failed') { $reason = '' }
+          "status=$status", "reason=$reason" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8
+          $hint = if ($status -eq 'not-run') { '前の step の失敗で行わなかった' } elseif ($reason) { $next[$reason] } else { '' }
+          @(
+            "## Marketplace の公開結果（$env:VERSION）"
+            ''
+            '| 拡張 | status | reason | 次の手 |'
+            '|------|--------|--------|--------|'
+            "| ``ekicyou.pasta-vscode`` | $status | $reason | $hint |"
+            ''
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # GitHub Release の作成（下書き → 添付 → 公開）。crates.io の 5 クレートがすべて公開済み（published か skipped）に
+  # なってから作る（6.1）。publish-crates が失敗すれば needs の既定でこの job は走らず、Release は作られない（6.10）。
+  # Marketplace の成否は待たず、VSIX は常に添付する。書き込み権限を持つのはこの job だけ。
+  # 末尾の集約 step は常に動き、status・reason・url を summary と job outputs に書く。
+  github-release:
+    name: github-release
+    needs: [verify, build, publish-crates]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+      reason: ${{ steps.result.outputs.reason }}
+      url: ${{ steps.result.outputs.url }}
+    steps:
+      # リリースノートは前のタグからの差分で作るので、全履歴とタグが要る。
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Download release-assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: release-assets
+
+      - name: Generate release notes
+        id: notes
+        run: ./.github/scripts/release/release-notes.ps1 -Tag $env:GITHUB_REF_NAME -Repo $env:GITHUB_REPOSITORY -OutFile "$env:RUNNER_TEMP/release-notes.md"
+
+      # 対象のリポジトリは gh の既定（checkout の remote）で決まる。
+      - name: Create GitHub Release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./.github/scripts/release/github-release.ps1 -Tag $env:GITHUB_REF_NAME -Title "pasta $env:GITHUB_REF_NAME" -NotesFile "$env:RUNNER_TEMP/release-notes.md" -AssetDir release-assets
+
+      # status 契約: Release の step が書いた値を使う。書いていなければ（ノートの生成・配布物の取得の失敗、
+      # スクリプトの異常終了・時間切れ）この job の失敗なので failed/publish。
+      - name: Summarize GitHub Release result
+        id: result
+        if: always()
+        env:
+          STATUS: ${{ steps.release.outputs.status }}
+          REASON: ${{ steps.release.outputs.reason }}
+          URL: ${{ steps.release.outputs.url }}
+        run: |
+          $next = @{
+            publish   = 'ログを読む'
+            transient = '失敗した job を再実行する'
+            immutable = '公開済みの Release に足りない配布物を手で添付する'
+          }
+          $status, $reason = $env:STATUS, $env:REASON
+          if (-not $status) { $status, $reason = 'failed', 'publish' }
+          if ($status -ne 'failed') { $reason = '' }
+          "status=$status", "reason=$reason", "url=$env:URL" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8
+          $hint = if ($reason) { $next[$reason] } else { '' }
+          @(
+            "## GitHub Release の結果（$env:VERSION）"
+            ''
+            '| Release | status | reason | 次の手 |'
+            '|---------|--------|--------|--------|'
+            "| ``$env:GITHUB_REF_NAME`` | $status | $reason | $hint |"
+            ''
+            $(if ($env:URL) { "URL: $env:URL" } else { 'URL: なし' })
+            ''
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # 結果の報告（二次情報）。常に動き、各 job の outputs と結果を 1 枚の表にまとめる。
+  # 一次情報は各 job の summary。outputs が空のときは、job が走らなかった（skipped）ものだけを not-run とし、
+  # それ以外は推論せず「job の summary を参照」と出す。report 自体は結果に依らず成功で終える。
+  report:
+    name: report
+    needs: [verify, gate, build, publish-crates, publish-vsce, github-release]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Report release results
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          $needs = $env:NEEDS_JSON | ConvertFrom-Json -AsHashtable
+          $label = @{
+            published = '今回公開した'
+            skipped   = '公開済みのため飛ばした'
+            failed    = '失敗した'
+            'not-run' = '前の段の失敗で行わなかった'
+          }
+          # 公開先 1 つ分の行。outputs の status が空なら、job が skipped のときだけ not-run とし、他は推論しない。
+          function Row([string]$Target, [string]$Job, [string]$Prefix) {
+            $outputs = $needs[$Job].outputs
+            $status = if ($outputs) { $outputs["${Prefix}status"] }
+            $reason = if ($outputs) { $outputs["${Prefix}reason"] }
+            if (-not $status) {
+              if ($needs[$Job].result -eq 'skipped') { $status, $reason = 'not-run', '' }
+              else { return "| $Target | job の summary を参照（$Job の結果: $($needs[$Job].result)） | |" }
+            }
+            "| $Target | $status（$($label[$status])） | $reason |"
+          }
+          # 関門の段（verify・gate・build）で失敗・取り消しになった job。後続の skipped は数えない。
+          $gateFailed = @('verify', 'gate', 'build' | Where-Object { $needs[$_].result -notin 'success', 'skipped' })
+          $release = $needs['github-release']
+          $url = if ($release.outputs) { $release.outputs['url'] }
+          $lines = @(
+            "## リリースの結果（$env:GITHUB_REF_NAME）"
+            ''
+          )
+          if ($gateFailed) {
+            $lines += "公開前の段で失敗した job: $(($gateFailed | ForEach-Object { "``$_``（$($needs[$_].result)）" }) -join '、')。どの検査で失敗したかはその job のログと summary を参照"
+            $lines += ''
+            $lines += '**どの公開先にも公開していない**'
+            $lines += ''
+          }
+          $lines += '| 公開先 | status | reason |'
+          $lines += '|--------|--------|--------|'
+          foreach ($crate in 'pasta_core', 'pasta_dsl', 'pasta_lua', 'pasta_shiori', 'pasta_check') {
+            $lines += Row "crates.io ``$crate``" 'publish-crates' "${crate}_"
+          }
+          $lines += Row 'Marketplace `ekicyou.pasta-vscode`' 'publish-vsce' ''
+          $lines += Row 'GitHub Release' 'github-release' ''
+          $lines += ''
+          $lines += if ($url) { "GitHub Release の URL: $url" } else { 'GitHub Release の URL: なし' }
+          $lines += ''
+          $lines += '次の手は各 job の summary を参照'
+          $lines | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8

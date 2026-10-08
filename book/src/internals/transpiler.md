@@ -93,16 +93,16 @@ AST ノードは `Span`（開始・終了の行と桁、バイトオフセット
 | ソースマップのシンク | `crates/pasta_lua/src/code_gen/source_map.rs` | 生成器が対応を記録する先の `SourceMapSink` トレイト |
 | 出力の正規化 | `crates/pasta_lua/src/normalize.rs` | `normalize_output`・`normalize_output_with_shift` と、削除行の記録 `LineShift` |
 | 文字列リテラル化 | `crates/pasta_lua/src/string_literalizer.rs` | `StringLiteralizer`。文字列を Lua のリテラル表記に変換する |
-| 設定 | `crates/pasta_lua/src/config.rs` | `TranspilerConfig`（`comment_mode`・`line_ending`）と `LineEnding` |
+| 設定 | `crates/pasta_lua/src/config.rs` | `TranspilerConfig`（`comment_mode`・`line_ending`・`scene_aliases`）と `LineEnding` |
 | エラー | `crates/pasta_lua/src/error.rs` | `TranspileError` |
 
-`TranspilerConfig` の `line_ending` は中間バッファの改行にだけ効き、出力の正規化で LF に統一されるため、書き出されるバイト列には影響しない。`comment_mode` は現行のコード生成からは参照されない。
+`TranspilerConfig` の `line_ending` は中間バッファの改行にだけ効き、出力の正規化で LF に統一されるため、書き出されるバイト列には影響しない。`comment_mode` は現行のコード生成からは参照されない。`scene_aliases` はグローバルシーン名の別名表で、既定は空の表（置き換えない）である。ローダは pasta.toml から決めた別名表を渡す（[登録と生成](#登録と生成単一走査)）。
 
 ### キャッシュ
 
 | 要素 | 所在 | 役割 |
 | ---- | ---- | ---- |
-| `CacheManager` | `crates/pasta_lua/src/loader/cache.rs` | キャッシュディレクトリの版管理、更新判定、キャッシュ先とモジュール名の導出、`scene_dic.lua` の生成、孤立キャッシュの検出 |
+| `CacheManager` | `crates/pasta_lua/src/loader/cache.rs` | キャッシュディレクトリの版と別名表の指紋の管理、更新判定、キャッシュ先とモジュール名の導出、`scene_dic.lua` の生成、孤立キャッシュの検出 |
 | 増分処理 | `crates/pasta_lua/src/loader/process.rs` | ローダの増分処理。ファイルごとに更新判定・パース・トランスパイル・キャッシュ保存を行い、`TranspileContext` を統合する |
 
 ## 処理とデータの流れ
@@ -155,7 +155,9 @@ AST ノードは `Span`（開始・終了の行と桁、バイトオフセット
 | `FileAttr` | ファイル属性に累積する。同じキーは後の値で上書きする | なし |
 | `GlobalWord` | 名前ごとにグローバル単語として登録する | `PASTA.create_word(名前):entry(値, …)` をファイルの最上位に出力する |
 | `ActorScope` | 名前ごとにアクター単語として登録する | アクターごとの `do` 〜 `end` ブロック |
-| `GlobalSceneScope` | グローバルシーンを登録し、同名の出現順の番号を得る。シーンレベルの単語をそのシーンのローカル単語として登録する | ファイル属性とシーン属性を統合（シーンが優先）したうえで、シーンごとの `do` 〜 `end` ブロックを出力する。生成後、名前付きローカルシーンを、生成器と同じ `local_scene_counters` の通し番号で登録する |
+| `GlobalSceneScope` | 宣言名を決め、その名前でグローバルシーンを登録し、同名の出現順の番号を得る。シーンレベルの単語をそのシーンのローカル単語として登録する | ファイル属性とシーン属性を統合（シーンが優先）したうえで、シーンごとの `do` 〜 `end` ブロックを出力する。生成後、名前付きローカルシーンを、生成器と同じ `local_scene_counters` の通し番号で登録する |
+
+グローバルシーンの宣言名は、`process_global_scene` の冒頭で 1 回だけ決める。書いた名前（単独の `＊` 行ではパーサが引き継いだ名前）が `TranspilerConfig.scene_aliases` の別名に完全一致すれば置き換え先の名前、そうでなければ書いた名前である。登録・シーンレベルの単語のモジュール名・生成コードの `create_scene` の名前・名前付きローカルシーンの親の名前は、すべてこの宣言名から作る。そのため既定の表のもとで `＊会話` は `OnTalk` のシーンとして登録され、生成コードも `OnTalk` で `create_scene` を呼ぶ（規則は [シーン名の別名](../grammar/call-jump.md#シーン名の別名)）。
 
 ファイル属性はファイルごとの状態であり、別のファイルへは持ち越さない。統合した属性は生成器へ渡されるが、現行のコード生成は属性を出力に使わない。
 
@@ -311,7 +313,7 @@ AST の文字列（発言・単語の値・名前など）は `StringLiteralizer
 
 トランスパイル結果は、ゴーストのディレクトリ内のキャッシュ（既定は `profile/pasta/cache/lua`。設定は [pasta.toml リファレンス](../reference/pasta-toml.md)）へ書き出し、次回の起動で再利用する。ローダの増分処理は次の順に進む。
 
-1. **版の確認**（`CacheManager::prepare_cache_dir`）: キャッシュ内の `.cache_version` に記録した版が `pasta_lua` クレートの版と異なれば、キャッシュディレクトリを丸ごと削除して作り直し、現在の版を書き込む。
+1. **版と別名表の確認**（`CacheManager::prepare_cache_dir`）: キャッシュ内の `.cache_version` に記録した版が `pasta_lua` クレートの版と異なるか、`.scene_alias` に記録した別名表の指紋（`SceneAliasTable::fingerprint`）が今回の別名表の指紋と異なれば、キャッシュディレクトリを丸ごと削除して作り直し、現在の版と指紋を書き込む。`.scene_alias` が無い場合も、指紋が異なるものとして全破棄する。キャッシュの `.lua` には別名で置き換えた宣言名が書かれているため、`.pasta` を変えずに pasta.toml の別名表だけを変えても、古い宣言名のキャッシュは使われない。
 2. **更新判定**（`needs_transpile`）: 対象ファイルのキャッシュが無いか、ソースの更新時刻がキャッシュより新しければトランスパイルする。更新時刻を取得できない場合もトランスパイルする。最新のファイルはパースもせずに省く。
 3. **パースとトランスパイル**: `.pasta` を読み込んでパースし、`LuaTranspiler::transpile` で生成する。得られた `TranspileContext` は全ファイル分を統合する（`TranspileContext::merge_from`。ファイル属性は統合しない）。
 4. **キャッシュへの保存**（`save_cache`）: 生成した Lua を UTF-8 で書き出す。基準ディレクトリの外にあるソースや、相対パスに `..` を含むソースは拒否する。`.pasta` の保存失敗は警告にとどめて続行する。
@@ -335,7 +337,7 @@ AST の文字列（発言・単語の値・名前など）は `StringLiteralizer
 
 `LuaCodeGenerator` は、出力した行数を `out_line` で数え、シンクが付いていれば、`Span` を持つ構文要素（スコープの見出し・アクション・変数代入・Call・選択肢・キューコマンド・グローバルとシーンの単語定義）を出力した直後に「生成した Lua の行 → `.pasta` の位置」の対応を記録する。Lua ブロックは内容の行ごとに `.pasta` の行と対応づける。シンクが付いていなければ記録は何もしない。
 
-シンクの有無で出力のバイト列は変わらない。デバッグが有効なとき、ローダはトランスパイルの後に全 `.pasta` をもう一度パースし、シンクを付けて `transpile_with_source_map` で生成し直し、返された `LineShift` で記録を最終的な行番号へ写す。ソースマップの構造・サイドカー・解決は [デバッグ基盤とシーンキック](debug.md) で扱う。
+シンクの有無で出力のバイト列は変わらない。デバッグが有効なとき、ローダはトランスパイルの後に全 `.pasta` をもう一度パースし、シンクを付けて `transpile_with_source_map` で生成し直し、返された `LineShift` で記録を最終的な行番号へ写す。生成し直しには、増分処理と同じ 1 つのトランスパイラ（同じ別名表を持つ）を使うため、ソースマップとデバッグの突合キーの宣言名はキャッシュの `.lua` と一致する。ソースマップの構造・サイドカー・解決は [デバッグ基盤とシーンキック](debug.md) で扱う。
 
 ## 境界の受け渡し
 
@@ -358,7 +360,7 @@ AST の文字列（発言・単語の値・名前など）は `StringLiteralizer
 - 継続行には、同じローカルシーン内で先行するアクション行が必要である。親のグローバルシーンや別のローカルシーンからは引き継がない。
 - ロングブラケットの `=` は最大 10 個である。
 - トランスパイラは、参照先のシーン・単語の存在も、Lua ブロックの内容も検査しない。シーンと単語は実行時に検索で解決され、Lua ブロックの誤りはロード時の Lua エラーになる。`TranspileError` には未定義シーン・未定義単語を表す型も定義されているが、現行のコード生成はこれらを返さない。
-- キャッシュの無効化は、クレートの版の変化とソースの更新時刻だけで判断する。同じ版のままコード生成を変えた場合、ソースが更新されない限り既存のキャッシュが使われる。
+- キャッシュの無効化は、クレートの版の変化・別名表の指紋（`.scene_alias`。指紋が違うときと、ファイルが無いときは全破棄）・ソースの更新時刻だけで判断する。同じ版のままコード生成を変えた場合、ソースが更新されない限り既存のキャッシュが使われる。
 - 第 1 段の `TranspileContext` のレジストリは検索の権威ではない。検索に使うレジストリは第 2 段の `finalize_scene` が作り直したものである。
 
 ## ソースの所在

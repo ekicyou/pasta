@@ -39,12 +39,18 @@ impl TranspileContext {
     ///
     /// Registers the scene in SceneRegistry and returns (id, counter).
     pub fn register_global_scene(&mut self, scene: &GlobalSceneScope) -> (i64, usize) {
-        let attrs: HashMap<String, String> = scene
-            .attrs
+        self.register_global_scene_named(&scene.name, &scene.attrs)
+    }
+
+    /// 宣言名（別名を置き換えた後の名前）でグローバルシーンを登録する。
+    ///
+    /// 通し番号は照合用の名前ごとに採番される。Returns (id, counter).
+    pub fn register_global_scene_named(&mut self, name: &str, attrs: &[Attr]) -> (i64, usize) {
+        let attrs: HashMap<String, String> = attrs
             .iter()
             .map(|a| (a.key.clone(), a.value.to_string()))
             .collect();
-        self.scene_registry.register_global(&scene.name, attrs)
+        self.scene_registry.register_global(name, attrs)
     }
 
     /// Register a local scene (Task 3.1).
