@@ -200,6 +200,28 @@
 9. ~~**リポジトリの公開範囲**~~ → 解消（2026-10-08 要件ディスカッション）: `gh repo view` で `PUBLIC` を確認。environment の保護規則は使える。
 10. **一回限りのセットアップの手順書の置き場所**（requirements 未決事項 10）: `crates/pasta_sample_ghost/RELEASE.md` の一節・リポジトリの開発者向け文書・spec 配下などから選ぶ。
 
+### 一回限りのセットアップの進み具合（2026-10-08 時点）
+
+第 1 部（Azure 側）は、ユーザーがポータルで済ませた。ID の値はリポジトリに書かない（GitHub の variables に登録する）。
+
+- Azure アカウント: Marketplace の publisher `ekicyou` の Owner と同じ Microsoft アカウントで登録した。
+- サブスクリプション: 「Azure プラン」（従量課金）。同じテナントの「Visual Studio Professional with MSDN」は使わない。VS の契約が切れるとサブスクリプションも無効になり、規約で用途が開発・テストに限られるため。手順書にもこの注意を書く。
+- 予算アラート `budget-pasta`: ¥100/月。実績が 1% に達したらメールで知らせる。有効期限は 2036-12-31 なので、手順書に「予算の期限を延長する」項目は要らない。
+- リソースグループ `rg-pasta-release`（Japan East）。
+- ユーザー割り当てのマネージド ID `id-pasta-release`。`rg-pasta-release` に「閲覧者」のロールを割り当てた。`allow-no-subscriptions` で足りると分かれば、設計の実地確認で外す。
+
+第 2 部は未着手。設計でワークフローのファイル名と environment の名前が決まってから行う。
+- フェデレーション資格情報（エンティティは「環境」にする）
+- GitHub の environment と variables
+- Marketplace の Members への追加
+- crates.io の Trusted Publisher の設定
+
+設計への申し送り:
+- Marketplace の Members に追加するには、マネージド ID としてログインした状態で `az rest .../_apis/profile/profiles/me` を叩き、profile ID を得る必要がある。マネージド ID としてログインできるのは GitHub Actions の中だけである。
+  - そこで、R11.7 の「公開せずにセットアップを確かめる仕組み」（例: environment 付きの `workflow_dispatch`）に、この ID を表示する役目を持たせる。
+- `workflow_dispatch` は、default ブランチにそのワークフローが無いと起動できない。したがって Members への追加は、`release.yml`（または確認用のワークフロー）が main に入った後になる。
+  - これは、初回のリリースより前に main へのマージが 1 度要るということである。この順序を手順書とタスクの順に反映する。
+
 ### 他 spec との接点
 
 - `hello-pasta-shell-art`（後続）: `release.ps1` と、シェルの画像の追跡の扱いを共有する。本仕様は画像の追跡を変えない前提（未決事項 7）。
