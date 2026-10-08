@@ -1,6 +1,6 @@
 //! Task 7.4 — 後方互換・ゼロコスト最終回帰ゲート（要件 7.1 / 7.2 / 7.3）。
 //!
-//! 仕様参照（`.kiro/specs/pasta-source-map/`）:
+//! 仕様参照（`.kiro/specs/completed/pasta-source-map/`）:
 //! - requirements.md **7.1**:
 //!   「While ソースマップ生成が無効である, the ソースマップ生成器 shall 生成 `.lua` の
 //!   出力内容を従来と完全に一致させる（バイト不変）」

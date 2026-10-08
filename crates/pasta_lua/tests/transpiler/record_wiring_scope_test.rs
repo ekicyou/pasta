@@ -35,7 +35,7 @@ fn span_at(line: usize) -> Span {
 // ============================================================================
 // Task 2.5 — スコープ定義ヘッダの record 配線（RecordWiring / scope_gen）
 //
-// 仕様参照（`.kiro/specs/pasta-source-map/`）:
+// 仕様参照（`.kiro/specs/completed/pasta-source-map/`）:
 // - requirements.md **1.1**: 生成 `.lua` 行に由来 `.pasta` 位置を記録する。
 // - requirements.md **1.4**: 主要構文種別（スコープ・分岐を含む）を網羅して記録する。
 // - requirements.md **1.5**: scope定義（アクター/グローバルシーン/ローカルシーン）が `.lua` へ

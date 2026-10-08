@@ -76,3 +76,17 @@ mdBook のまま着せ替える（2026-10-06 決定。サイト生成器の移�
 - 生成対象章（`GENERATION_MAP`）のスキル `references/` に、台詞の部品の HTML や画像参照が漏れないこと。
 - 画像の容量を抑える（顔アイコンは小さく、立ち絵は表紙など限られた所だけ）。
 - 完成度を優先する。一部の章だけ新しい見た目にする、といった部分出荷はしない。
+
+## 2026-10-07 棚卸の再測定（main 2cbaf510）
+
+- **前提の変化**: 無い。`book.toml`（24 行）は既定テーマのままで、`book/theme/` は `head.hbs`（269 行）だけ。ただし口調の判定（`VOICE_MARKERS`・`findVoice`・`extractBody`）の実体は `gen-skill-refs.mjs` にあり、`verify-content.mjs` はそれを import している。
+- **触るファイル**: `book/book.toml`、`book/theme/` への追加（CSS・JS・画像。新規）、`book/src/**/*.md`（48 ファイル）の導入と締め、`book/AUTHORING.md`（§1〜3 と §5 の台詞の節）、`book/tools/` の `gen-skill-refs.mjs`（281 行）・`verify-content.mjs`（531 行）・`verify-static.mjs`（462 行）・`link-check.mjs`（479 行。画像や部品の参照を検査する場合）・`highlight/`（配色を合わせる場合）と各テスト、`.claude/skills/*/references/`（再生成）。1,000 行に近いファイルは無い。
+- **規模**: 16〜19 タスク（テーマ・ダーク版・字体・表紙・部品と記法・`AUTHORING.md`・章の書き換えをパートごとに 5〜6 本・検査ツール 3〜4 本・スマートフォン幅・出典）。
+- **先に要るもの**: 機能の依存は無い。
+- **ファイルの重なり**: `getting-started-story-guide`（`AUTHORING.md`・`introduction.md`・`getting-started/*`・`verify-content.mjs`。相手はウェーブ 2 なので順序で解決している）。`hello-pasta-tutorial-stages` が `first-ghost.md` の作例を同期する場合は同じページの別の節（許容）。Phase 11 の `scene-attribute-store`・`call-attribute-filter`・`failure-output-unification` とは文法章・Lua 章の同じページの別の節（許容）。生成対象章を触るので、後から入る側が `gen-skill-refs.mjs` で再生成して合わせる。
+- **種別**: 機能（マニュアルの見た目と台詞の部品）。
+- **要件定義のモデル**: Fable（台詞の記法は `getting-started-story-guide` がそのまま使う土台。本文の字体にも開発者の判断が要る）。
+- **分割の案**: なし。
+- **見つけた穴・古くなった記述**:
+  - `gen-skill-refs.mjs` の `rewriteLinks` は、画像への参照を `unresolvable-link` として止める。生成対象 23 章の導入と締めで顔アイコンを Markdown の画像として書くと、生成が失敗する。記法を決めるときの制約に加える。
+  - Current State の「`verify-content.mjs` が散文部の口調マーカーで判定」は、マーカーの持ち主が `gen-skill-refs.mjs` に移っている。記法の追従は両方のファイルにまたがる。
