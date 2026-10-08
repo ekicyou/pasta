@@ -1,8 +1,28 @@
-# はじめに
+# pasta マニュアル
 
-ようこそ、pasta の世界へ。わたくし Claudia が、このマニュアルの案内役を務めますわ。
-ゴーストづくりは初めて？ ……フンッ、心配なさらなくてよろしくてよ。手順から文法、Lua の書き方まで、
-最後まできっちりお付き合いいたしますから。さあ、肩の力を抜いて、最初の一歩を踏み出しましょう。
+<section class="claudia-hero" aria-label="扉">
+<i class="hero-corner hero-corner-tl" aria-hidden="true"></i><i class="hero-corner hero-corner-tr" aria-hidden="true"></i><i class="hero-corner hero-corner-bl" aria-hidden="true"></i><i class="hero-corner hero-corner-br" aria-hidden="true"></i>
+<p class="hero-latin">Claudia et Anthony — à votre service</p>
+<div class="hero-faces"><img class="hero-face" src="img/claudia/f25.png" alt="" width="84" height="84"><img class="hero-face hero-face-anthony" src="img/claudia/f10.png" alt="" width="84" height="84"></div>
+
+> 【お辞儀】pasta のマニュアルへ、ようこそいらっしゃいまし。わたくし Claudia が、このマニュアルの案内役を務めますわ。
+
+> 【アンソニー】お嬢様にお仕えしております、執事のアンソニーでございます。失礼ながらお嬢様、ゴーストづくりが初めての方でも、読み通せるものでございましょうか。
+
+> 【したり顔】ふふん、心配なさらなくてよろしくてよ。手順から文法、Lua の書き方まで、わたくしが最後まできっちりお付き合いいたしますもの。さあ、肩の力を抜いて、最初の一歩を踏み出しましょう。
+
+<nav class="hero-toc">
+
+- [入門／チュートリアル <small>Getting started</small>](getting-started/index.md)
+- [Pasta DSL 文法 <small>Grammar</small>](grammar/index.md)
+- [Lua API／コーディング <small>Lua API</small>](lua/index.md)
+- [デバッグ <small>Debugging</small>](debug/index.md)
+- [リファレンス <small>Reference</small>](reference/startup.md)
+- [内部設計 <small>Internals</small>](internals/index.md)
+
+</nav>
+
+</section>
 
 ---
 
@@ -63,6 +83,10 @@ Pasta DSL の文法・公開 Lua API・`pasta.toml` の設定について、利�
 
 ---
 
-準備はよろしくて？ どこから読み始めても構いませんけれど、ゴーストづくりが初めてなら、
-まずは入門ガイドから順に。……別に、あなたのためを思って言っているわけではありませんわよ。
-さあ、熱く参りましょう！
+> 【クローディア】準備はよろしくて？ どこから読み始めても構いませんけれど、ゴーストづくりが初めてなら、まずは入門ガイドから順にお読みなさいな。
+
+> 【アンソニー】お嬢様は、皆さまが迷わぬようにと、昨晩から目次を何度も見直しておいででした。
+
+> 【照れ怒り】な、なにを言っていますの！ フンッ、別に、あなたのためを思って言っているわけではありませんわよ！ ……さ、さあ、熱く参りましょう！
+
+<p class="claudia-credit">顔アイコン・意匠: <a href="https://github.com/ponapalt/claudia">ponapalt/claudia</a>（Unlicense）／ 参考: <a href="https://ponadocs.shillest.net/claudia/">ponadocs.shillest.net/claudia</a></p>

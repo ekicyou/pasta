@@ -152,3 +152,9 @@ Call ターゲットの後ろに `＆key＝value` 形式のフィルターを付
   - 登録表の属性は `HashMap<String, String>`（`AttrValue` の表示文字列）で、型が失われる。トランスパイル時の登録（`context.rs` の `register_global_scene`）はファイル属性を統合しない。統合は `context.rs` の `merge_attrs`（brief の「transpiler の」は不正確）。
   - ファイル属性は記述順に累積する（シーンの間に置いた `＆` は後のシーンにだけ効き、同じキーは後の値で上書き。`internals/transpiler.md` 155 行）。旧 §8.3 の「ファイル冒頭だけ」とは違う。どちらを正とするかを要件で決める。
   - マニュアル `grammar/block-structure.md` 235 行の「内部に記録される」は、宣言行の付記では成り立たない（上の 1 点目）。
+
+## 申し送り（scene-name-alias より）
+
+- `transpiler.rs` の `process_global_scene` はメソッドになり、冒頭で**宣言名**（`scene_aliases.resolve(&scene.name)` で別名を置き換えた名前）を 1 回だけ決める。登録・通し番号・単語のモジュール名・生成コード・突合キー・ローカルの親名はすべてこの宣言名から作る。属性を登録・生成に足すときも、シーン名は宣言名を使う。
+- `code_gen/scope_gen.rs` の `generate_global_scene(scene, declared_name, scene_counter, context, file_attrs)` に `declared_name` 引数が増えた。`context.rs` に `register_global_scene_named(name, attrs)` が増え、`register_global_scene(scene)` はそれに委譲する。`finalize.rs` の `finalize_scene_impl(lua, &aliases)` も署名が変わった。
+- 参照: `.kiro/specs/completed/scene-name-alias/design.md`「DeclaredNameResolver」「Revalidation Triggers」。

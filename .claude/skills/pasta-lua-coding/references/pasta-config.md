@@ -45,6 +45,8 @@ version = "1.0.0"
 - **`[ghost]`**: 書かなくても必ず存在する。`talk_interval_min`・`talk_interval_max`・`hour_margin`・`spot_newlines` のうち書かなかったキーには、実装の既定値が入る（書いたキーはそのまま）。
 - **`[actor]`**: `[actor."名前"]` の各サブテーブルに、キー名と同じ値の `name` フィールドが入る（`config.actor["さくら"].name` は `"さくら"`）。`name` を書いていても、キー名で上書きされる。
 
+`[scene]` には何も補われない。`pasta.toml` に書いたとおりに現れ、書かなければ `config.scene` は `nil` になる。`[scene.alias]` を書かなかったときに使われる既定の別名表（`OnTalk = ["会話"]`）も補完されない。そのため `config.scene` からは、実際に使われている別名表を読み取れないことがある（[[scene]](https://ekicyou.github.io/pasta/reference/pasta-toml.html#sceneシーン名)）。
+
 `[ghost]`・`[actor]` に書けるキーと既定値は、[pasta.toml リファレンス](https://ekicyou.github.io/pasta/reference/pasta-toml.html) の [[ghost]](https://ekicyou.github.io/pasta/reference/pasta-toml.html#ghostゴースト動作)・[[actor."名前"]](https://ekicyou.github.io/pasta/reference/pasta-toml.html#actor名前アクター設定) を参照する。
 
 `[loader]` 以外のセクションを 1 つも書かなかった場合、表は `ghost` だけを持つ。

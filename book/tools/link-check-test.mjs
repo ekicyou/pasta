@@ -267,6 +267,52 @@ log('\n== (B-14) パストラバーサル拒否（repoRoot 外を指すリンク
 }
 
 // ============================================================
+log('\n== (B-15) 台詞の引用ブロック内のリンク（manual-claudia-theme タスク 3.3 / 要件 10.6, 10.7） ==');
+// 台詞部品（`> 【話し手：表情】本文`）の本文中のリンクも、地の文と同じ規則で検証される。
+// 壊れた相対 .md は internal-md、存在しない blob URL は github-repo-path で検出し、
+// 実在するリンク（アンカー付きを含む）は台詞の中でも誤検出しない。
+{
+  const root = makeSandbox();
+  try {
+    writeFile(root, 'doc/spec/02-markers.md', '# 02\n');
+    writeFile(root, 'book/src/grammar/block-structure.md', '# block\n\n## sec\n');
+    writeFile(root, 'book/src/introduction.md', [
+      '# はじめに',
+      '',
+      // (a) アンソニーの 1 行の台詞に、壊れた相対リンク。
+      '> 【アンソニー：刮目】詳しくは [文法](grammar/missing.md) を。',
+      '',
+      // (b) クローディアの複数行の台詞。継続行に存在しない blob URL。
+      '> 【クローディア：したり顔】仕様はこちら。',
+      `> [仕様](https://github.com/${REPO_SLUG}/blob/main/doc/spec/99-nope.md) をどうぞ。`,
+      '',
+      // (c) 健全なリンクだけを含む台詞（相対・アンカー付き・実在 blob URL）。
+      '> 【クローディア】[ブロック](grammar/block-structure.md#sec) と '
+        + `[仕様](https://github.com/${REPO_SLUG}/blob/main/doc/spec/02-markers.md) は大丈夫。`,
+      '',
+    ].join('\n'));
+
+    const result = runLinkCheck(root);
+    const talkMd = result.broken.find((b) => b.kind === 'internal-md'
+      && b.file === 'book/src/introduction.md' && b.target === 'grammar/missing.md');
+    const talkBlob = result.broken.find((b) => b.kind === 'github-repo-path'
+      && b.file === 'book/src/introduction.md' && /99-nope\.md$/.test(b.target));
+    check('台詞内の壊れた相対 .md を internal-md で検出', !!talkMd, JSON.stringify(result.broken));
+    check('internal-md の詳細は従来の文言', !!talkMd && /book 内リンク先が存在しない: grammar\/missing\.md/.test(talkMd.detail),
+      JSON.stringify(talkMd));
+    check('台詞の継続行の壊れた blob URL を github-repo-path で検出', !!talkBlob,
+      JSON.stringify(result.broken));
+    check('台詞内の健全リンクは誤検出しない（検出は 2 件のみ）', result.broken.length === 2,
+      JSON.stringify(result.broken));
+    check('台詞内のリンク切れで failed=true（exit 1 相当）', result.failed === true);
+    check('失敗レポートに台詞の章の BROKEN 行',
+      reportLinkCheck(result).includes('BROKEN  book/src/introduction.md'), reportLinkCheck(result));
+  } finally {
+    rmrf(root);
+  }
+}
+
+// ============================================================
 log('\n== (C) maskFences（CommonMark 準拠のフェンス判定・行数保持） ==');
 {
   const lines = (s) => s.split('\n');

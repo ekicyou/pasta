@@ -114,4 +114,11 @@
   - 警告一覧に `act:arith - unknown operator`（557 行）が無い。プロキシ側は `proxy:expr_fn`・`proxy:word`（`actor.lua` 195・249 行）。`act:call - nil key`（662 行）は失敗表記を伴わないが、生成コードは `act:call_key` を通すので、Lua から直接 `act:call` を nil で呼んだときだけ届く。
   - `act:global_fn`（499 行）は関数が無いときに警告だけを出す。戻った後のシーンの復元（497 行）は `call-execution-correctness` が入れた。
   - 再利用する部品の場所は現行と一致する: `operand_desc`（`expr_gen.rs` 207 行）・`dynamic_ref_args`（`element_gen.rs` 48 行）・`single_line`（`error.rs` 79 行）。
+  - `expr-nil-coercion`（2026-10-08）で前提が変わった: `act:arith`・`act:concat`（と `act:arith - unknown operator`）は撤去された。生成コードは被演算子を `PASTA.num`・`PASTA.str`（実体は `act.lua` の `ACT.num`・`ACT.str`）に通してネイティブ演算子で計算する。nil の被演算子は黙って 0・空文字列になり、演算は値なしを作らない。警告の文言 `act:arith - operand is not a number`・`act:concat - operand is not a string or number` は `ACT.num`・`ACT.str` に残り、nil 以外の変換できない値だけが警告を出す。「内側が警告済みなら重ねない」慣行のうち算術・連結の分は無くなった（`act:talk` と `call_key` の分は残る）。
 - **順序の提案**: 本 spec を `call-attribute-filter` より先に置く（同 brief に記した）。フィルターの「候補なし」は、一本化した仕組みに直接載せる。
+
+## 申し送り（scene-name-alias より）
+
+- 別名（`[scene.alias]`。既定 `OnTalk = ["会話"]`）で置き換えた名前の Call が見つからないとき、失敗表記は**書いた名前**（`【Call失敗：「会話」が見つからない】`）を出す。これは `scene-name-alias` の要件 8.1 の決定で、一本化でも引き継ぐ。
+- ログには 2 行出る: Lua `act:call - handler not found`（書いた名前）と、Rust `search/context.rs` `search_scene` の `warn!(name, resolved, "Scene not found (alias applied)")`（書いた名前と置き換え後の名前）。後者は要件 8.2 の唯一の両名ログなので、一本化で落とさない（Lua 側の 1 行に両名を含める形へ移すなら、その時点で Rust 側を落としてよい）。
+- 参照: `.kiro/specs/completed/scene-name-alias/design.md`「互換性と移行 > 後続 spec への申し送り」・Open Questions 1。

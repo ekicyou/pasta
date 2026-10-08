@@ -1,6 +1,7 @@
 //! Error types for Pasta Core registry layer.
 //!
-//! This module defines registry-related errors (SceneTableError, WordTableError).
+//! This module defines registry-related errors (SceneTableError, WordTableError,
+//! SceneAliasError).
 //! Parse-related errors (ParseError) are defined in the `pasta_dsl` crate.
 
 use std::collections::HashMap;
@@ -56,6 +57,21 @@ pub enum WordTableError {
     /// Word not found.
     #[error("Word not found: @{key}")]
     WordNotFound { key: String },
+}
+
+/// Scene alias table construction errors (`[scene.alias]` in pasta.toml).
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum SceneAliasError {
+    #[error("scene alias: empty name is not allowed (target '{target}')")]
+    EmptyName { target: String },
+
+    #[error("scene alias: alias '{alias}' is defined more than once (targets: {targets:?})")]
+    DuplicateAlias { alias: String, targets: Vec<String> },
+
+    #[error(
+        "scene alias: '{name}' is both a target and an alias (chained aliases are not allowed)"
+    )]
+    Chain { name: String },
 }
 
 #[cfg(test)]

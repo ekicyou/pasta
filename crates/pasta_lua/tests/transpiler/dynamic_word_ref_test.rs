@@ -98,7 +98,7 @@ fn test_expr_dynamic_fn_call() {
     );
     assert_has_line(
         "＄y＝＠＄f（）＋１",
-        r#"var.y = act:arith("+", act:expr_fn_var(var.f, "var.f"), 1, "@$var.f()")"#,
+        r#"var.y = (PASTA.num("+", act:expr_fn_var(var.f, "var.f"), "@$var.f()") + 1)"#,
     );
     // 静的関数呼び出しの引数の中
     assert_has_line(

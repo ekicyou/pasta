@@ -178,3 +178,157 @@ fn parse_materializes_ghost_section_with_defaults() {
     assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
     assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
 }
+
+// ---------------------------------------------------------------------------
+// [scene.alias]（scene-name-alias task 2.1）
+// ---------------------------------------------------------------------------
+
+/// テスト補助: 読み込みエラーの文言を取り出す。
+fn scene_alias_err(toml: &str) -> String {
+    PastaConfig::from_str(toml)
+        .expect_err("invalid [scene.alias] must be a config error")
+        .to_string()
+}
+
+/// `[scene]` が無ければ内蔵の既定表（1.1・6.3）。`default()` と同じ表になる。
+#[test]
+fn scene_alias_absent_uses_builtin_default() {
+    let config = PastaConfig::from_str("[actor]\nname = \"sakura\"\n").unwrap();
+    assert_eq!(config.scene_aliases, SceneAliasTable::builtin_default());
+    assert_eq!(config.scene_alias_source, SceneAliasSource::BuiltinDefault);
+
+    let default = PastaConfig::default();
+    assert_eq!(default.scene_aliases, config.scene_aliases);
+    assert_eq!(default.scene_alias_source, config.scene_alias_source);
+}
+
+/// `[scene]` に `alias` が無いときも既定表（1.1）。
+#[test]
+fn scene_section_without_alias_uses_builtin_default() {
+    let config = PastaConfig::from_str("[scene]\nother = 1\n").unwrap();
+    assert_eq!(config.scene_aliases, SceneAliasTable::builtin_default());
+    assert_eq!(config.scene_alias_source, SceneAliasSource::BuiltinDefault);
+}
+
+/// `[scene.alias]` の見出しだけなら空の表（2.3・5.6）。
+#[test]
+fn scene_alias_header_only_is_empty_table() {
+    let config = PastaConfig::from_str("[scene.alias]\n").unwrap();
+    assert!(config.scene_aliases.is_empty());
+    assert_eq!(config.scene_alias_source, SceneAliasSource::PastaToml);
+}
+
+/// 書いた行だけが有効（既定とマージしない。2.1・2.2・2.4）。
+#[test]
+fn scene_alias_author_table_replaces_default() {
+    let config = PastaConfig::from_str(
+        "[scene.alias]\nOnTalk = [\"会話\", \"雑談\"]\nOnBoot = [\"起動\"]\n",
+    )
+    .unwrap();
+    assert_eq!(config.scene_alias_source, SceneAliasSource::PastaToml);
+    assert_eq!(config.scene_aliases.resolve("会話"), Some("OnTalk"));
+    assert_eq!(config.scene_aliases.resolve("雑談"), Some("OnTalk"));
+    assert_eq!(config.scene_aliases.resolve("起動"), Some("OnBoot"));
+
+    // 既定とマージしない: OnBoot だけを書けば「会話」は置き換わらない。
+    let only_boot = PastaConfig::from_str("[scene.alias]\nOnBoot = [\"起動\"]\n").unwrap();
+    assert_eq!(only_boot.scene_aliases.resolve("会話"), None);
+    assert_eq!(only_boot.scene_aliases.resolve("起動"), Some("OnBoot"));
+}
+
+/// 配列でない値は型不一致の読み込みエラー（toml の行・列つき。2.5）。
+#[test]
+fn scene_alias_non_array_value_is_error_with_line() {
+    let msg = scene_alias_err("[actor]\nname = \"a\"\n\n[scene.alias]\nOnTalk = \"会話\"\n");
+    assert!(msg.contains("line 5"), "{msg}");
+}
+
+/// 配列の中の文字列でない要素は読み込みエラー（2.5）。
+#[test]
+fn scene_alias_non_string_element_is_error_with_line() {
+    let msg = scene_alias_err("[scene.alias]\nOnTalk = [\"会話\", 1]\n");
+    assert!(msg.contains("line 2"), "{msg}");
+}
+
+/// 空文字列の別名・キーは読み込みエラー。キー名と行番号を含む（2.5）。
+#[test]
+fn scene_alias_empty_name_is_error() {
+    let msg = scene_alias_err("[scene.alias]\nOnBoot = [\"起動\"]\nOnTalk = [\"\"]\n");
+    assert!(msg.contains("empty name"), "{msg}");
+    assert!(msg.contains("OnTalk"), "{msg}");
+    assert!(msg.contains("line 3"), "{msg}");
+
+    let msg = scene_alias_err("[scene.alias]\n\"\" = [\"x\"]\n");
+    assert!(msg.contains("empty name"), "{msg}");
+    assert!(msg.contains("line 2"), "{msg}");
+}
+
+/// 重複（配列間・配列内）は読み込みエラー。別名・両方の置き換え先・行番号を含む（2.6）。
+#[test]
+fn scene_alias_duplicate_is_error() {
+    let msg = scene_alias_err("[scene.alias]\nOnTalk = [\"会話\"]\nOnBoot = [\"会話\"]\n");
+    assert!(msg.contains("more than once"), "{msg}");
+    assert!(msg.contains("会話"), "{msg}");
+    assert!(msg.contains("OnTalk"), "{msg}");
+    assert!(msg.contains("OnBoot"), "{msg}");
+    assert!(msg.contains("line 2"), "{msg}");
+    assert!(msg.contains("line 3"), "{msg}");
+
+    let msg = scene_alias_err("[scene.alias]\nOnTalk = [\n  \"会話\",\n  \"会話\",\n]\n");
+    assert!(msg.contains("more than once"), "{msg}");
+    assert!(msg.contains("会話"), "{msg}");
+    assert!(msg.contains("line 3"), "{msg}");
+    assert!(msg.contains("line 4"), "{msg}");
+}
+
+/// 連鎖（自己参照を含む）は読み込みエラー。連鎖した名前と行番号を含む（3.5 / 10.3）。
+#[test]
+fn scene_alias_chain_is_error() {
+    // 日本語のキーは toml の裸のキーにできないため引用符で書く。
+    let msg = scene_alias_err("[scene.alias]\nOnTalk = [\"会話\"]\n\"会話\" = [\"雑談\"]\n");
+    assert!(msg.contains("chained"), "{msg}");
+    assert!(msg.contains("会話"), "{msg}");
+    assert!(msg.contains("OnTalk"), "{msg}");
+    assert!(msg.contains("line 2"), "{msg}");
+
+    let msg = scene_alias_err("[scene.alias]\nOnTalk = [\"OnTalk\"]\n");
+    assert!(msg.contains("chained"), "{msg}");
+    assert!(msg.contains("OnTalk"), "{msg}");
+    assert!(msg.contains("line 2"), "{msg}");
+}
+
+/// `[scene]` の `alias` 以外のキーは読まずに `custom_fields` に残り、
+/// `[scene]` は書いたとおり出る（既定の表は補完しない）。
+#[test]
+fn scene_section_other_keys_are_preserved_in_custom_fields() {
+    let config = PastaConfig::from_str("[scene]\nother = 1\n").unwrap();
+    let scene = config
+        .custom_fields
+        .get("scene")
+        .and_then(|v| v.as_table())
+        .unwrap();
+    assert_eq!(scene.get("other").and_then(|v| v.as_integer()), Some(1));
+    assert!(
+        scene.get("alias").is_none(),
+        "builtin default must not be filled in"
+    );
+
+    let config = PastaConfig::from_str("[scene.alias]\nOnBoot = [\"起動\"]\n").unwrap();
+    let scene = config
+        .custom_fields
+        .get("scene")
+        .and_then(|v| v.as_table())
+        .unwrap();
+    let alias = scene.get("alias").and_then(|v| v.as_table()).unwrap();
+    assert!(alias.contains_key("OnBoot"));
+    assert!(!alias.contains_key("OnTalk"));
+}
+
+/// `alias` がテーブルでない・`scene` がテーブルでないと読み込みエラー（予約キー）。
+#[test]
+fn scene_alias_or_scene_not_table_is_error() {
+    let msg = scene_alias_err("[scene]\nalias = \"x\"\n");
+    assert!(msg.contains("line 2"), "{msg}");
+    let msg = scene_alias_err("scene = 1\n");
+    assert!(msg.contains("line 1"), "{msg}");
+}

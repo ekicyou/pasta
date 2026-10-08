@@ -126,9 +126,18 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             None => {
                 // Expression statement: evaluate expression without assignment
                 match &var_set.value {
-                    SetValue::Expr(expr) => {
+                    SetValue::Expr(expr @ (Expr::FnCall { .. } | Expr::DynamicFnCall { .. })) => {
                         self.write_indent()?;
                         self.generate_expr(expr)?;
+                        self.write_line_terminator()?;
+                    }
+                    SetValue::Expr(expr) => {
+                        // 関数呼び出しでない式は Lua の文にならないので、ブロック内の
+                        // ローカルに代入して捨てる（`local` はブロックに閉じる）
+                        self.write_indent()?;
+                        self.write_raw("do local _ = ")?;
+                        self.generate_expr(expr)?;
+                        self.write_raw(" end")?;
                         self.write_line_terminator()?;
                     }
                     SetValue::WordRef { name } => {

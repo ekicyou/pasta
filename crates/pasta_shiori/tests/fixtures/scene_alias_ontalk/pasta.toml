@@ -1,0 +1,26 @@
+# scene_alias_ontalk E2E 用フィクスチャ（scene-name-alias task 6.4）
+#
+# [scene.alias] を書かない（既定の別名表「会話 → OnTalk」が効く）。空の表の版は
+# テスト側が一時コピーの pasta.toml に `[scene.alias]` を書き足して作る。
+#
+# lua_search_paths から "scripts" を外し、埋め込みの pasta 標準ランタイムと本番の entry.lua を通す
+# （理由は fixtures/actor_proxy_act_delegation/pasta.toml と同じ）。
+
+[loader]
+pasta_patterns = ["dic/*.pasta"]
+lua_search_paths = [
+    "profile/pasta/save/lua",
+    "profile/pasta/pasta_scripts",
+    "profile/pasta/cache/lua",
+    "scriptlibs",
+]
+transpiled_output_dir = "profile/pasta/cache/lua"
+
+# OnTalk の機会を決定論化するため、トーク間隔を固定する
+# （OnSecondChange に X-Pasta-Time を載せて 10 秒ずつ進める）。
+[ghost]
+talk_interval_min = 10
+talk_interval_max = 10
+
+[actor."さくら"]
+spot = 0

@@ -6,8 +6,8 @@
 use super::SearchError;
 use mlua::{IntoLuaMulti, MultiValue, UserData, UserDataMethods};
 use pasta_core::registry::{
-    DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneRegistry, SceneTable,
-    WordDefRegistry, WordTable,
+    DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable, SceneRegistry,
+    SceneTable, WordDefRegistry, WordTable,
 };
 use std::collections::HashMap;
 
@@ -19,16 +19,28 @@ use std::collections::HashMap;
 pub struct SearchContext {
     scene_table: SceneTable,
     word_table: WordTable,
+    scene_aliases: SceneAliasTable,
 }
 
 impl SearchContext {
-    /// Create a new SearchContext from registries.
+    /// Create a new SearchContext from registries, with an empty scene
+    /// alias table (no alias is applied).
     ///
     /// Converts SceneRegistry and WordDefRegistry into runtime tables
     /// with default random selectors.
     pub fn new(
         scene_registry: SceneRegistry,
         word_registry: WordDefRegistry,
+    ) -> Result<Self, SearchError> {
+        Self::with_aliases(scene_registry, word_registry, SceneAliasTable::empty())
+    }
+
+    /// Create a new SearchContext whose global scene search replaces a
+    /// written name that exactly matches an alias in `aliases`.
+    pub fn with_aliases(
+        scene_registry: SceneRegistry,
+        word_registry: WordDefRegistry,
+        scene_aliases: SceneAliasTable,
     ) -> Result<Self, SearchError> {
         let scene_table = SceneTable::from_scene_registry(
             scene_registry,
@@ -42,6 +54,7 @@ impl SearchContext {
         Ok(Self {
             scene_table,
             word_table,
+            scene_aliases,
         })
     }
 
@@ -55,6 +68,11 @@ impl SearchContext {
     /// (`SceneRegistry::sanitize_name`), so `会話・朝` finds the scene
     /// registered from `＊会話・朝`. `global_scene_name` is a registered name
     /// and is passed through unchanged.
+    ///
+    /// In the global search only, a `name` that exactly matches an alias is
+    /// first replaced by its target (e.g. `会話` → `OnTalk`), then sanitized
+    /// and prefix-matched as usual. A miss after replacement is logged at
+    /// warn level with both names.
     ///
     /// # Arguments
     /// * `name` - Search prefix (sanitized before matching)
@@ -76,10 +94,10 @@ impl SearchContext {
         global_scene_name: Option<&str>,
     ) -> Result<Option<(String, String)>, SearchError> {
         let filters = HashMap::new();
-        let name = &SceneRegistry::sanitize_name(name);
 
         // Determine search strategy based on global_scene_name
         if let Some(parent) = global_scene_name {
+            let name = &SceneRegistry::sanitize_name(name);
             // Local-only search within the parent scope (no global fallback)
             match self
                 .scene_table
@@ -103,10 +121,13 @@ impl SearchContext {
                 Err(e) => Err(SearchError::SceneTableError(e)),
             }
         } else {
-            // Global search only (local keys starting with ':' are excluded)
+            // Global search only (local keys starting with ':' are excluded).
+            // An exact alias match is replaced before sanitizing.
+            let alias = self.scene_aliases.resolve(name);
+            let key = SceneRegistry::sanitize_name(alias.unwrap_or(name));
             match self
                 .scene_table
-                .resolve_scene_id_unified("", name, &filters)
+                .resolve_scene_id_unified("", &key, &filters)
             {
                 Ok(scene_id) => {
                     let scene = self.scene_table.get_scene(scene_id).ok_or_else(|| {
@@ -121,7 +142,16 @@ impl SearchContext {
                     pasta_core::SceneTableError::SceneNotFound { .. }
                     | pasta_core::SceneTableError::NoMatchingScene { .. }
                     | pasta_core::SceneTableError::NoMoreScenes { .. },
-                ) => Ok(None),
+                ) => {
+                    if let Some(target) = alias {
+                        tracing::warn!(
+                            name = %name,
+                            resolved = %target,
+                            "Scene not found (alias applied)"
+                        );
+                    }
+                    Ok(None)
+                }
                 Err(e) => Err(SearchError::SceneTableError(e)),
             }
         }
@@ -596,6 +626,114 @@ mod tests {
                 "actor word not found: sym={sym:?}"
             );
         }
+    }
+
+    /// Build a context with the given alias table holding global scenes
+    /// `OnTalk`, `OnTalk朝`, `会話・朝` and `メイン` (with local `会話`),
+    /// global word `会話`, mock selectors.
+    fn create_alias_context(aliases: SceneAliasTable) -> SearchContext {
+        let mut scenes = SceneRegistry::new();
+        scenes.register_global("OnTalk", HashMap::new());
+        scenes.register_global("OnTalk朝", HashMap::new());
+        scenes.register_global("会話・朝", HashMap::new());
+        let (_, counter) = scenes.register_global("メイン", HashMap::new());
+        scenes.register_local("会話", "メイン", counter, 1, HashMap::new());
+        let mut words = WordDefRegistry::new();
+        words.register_global("会話", vec!["こんにちは".to_string()]);
+
+        let mut ctx = SearchContext::with_aliases(scenes, words, aliases).unwrap();
+        ctx.set_scene_selector(Some(vec![0])).unwrap();
+        ctx.set_word_selector(Some(vec![0])).unwrap();
+        ctx
+    }
+
+    /// Global names returned by `n` consecutive global searches, deduplicated.
+    fn global_hits(ctx: &mut SearchContext, name: &str, n: usize) -> Vec<String> {
+        let mut got: Vec<String> = (0..n)
+            .filter_map(|_| ctx.search_scene(name, None).unwrap().map(|(g, _)| g))
+            .collect();
+        got.sort();
+        got.dedup();
+        got
+    }
+
+    #[test]
+    fn test_alias_global_search_replaces_written_name() {
+        // 3.1・3.6: `会話` is searched as `OnTalk` by prefix, so both `OnTalk`
+        // and `OnTalk朝` are candidates; 3.7: `会話・朝` is not.
+        let mut ctx = create_alias_context(SceneAliasTable::builtin_default());
+        assert_eq!(global_hits(&mut ctx, "会話", 4), ["OnTalk_1", "OnTalk朝_1"]);
+
+        // Same candidates as searching the target name directly.
+        let mut ctx = create_alias_context(SceneAliasTable::builtin_default());
+        assert_eq!(
+            global_hits(&mut ctx, "OnTalk", 4),
+            ["OnTalk_1", "OnTalk朝_1"]
+        );
+    }
+
+    #[test]
+    fn test_alias_not_applied_to_longer_written_name() {
+        // 3.7: `会話・朝` is not an exact alias match; only its own scene hits.
+        let mut ctx = create_alias_context(SceneAliasTable::builtin_default());
+        assert_eq!(global_hits(&mut ctx, "会話・朝", 3), ["会話_朝_1"]);
+    }
+
+    #[test]
+    fn test_alias_not_applied_to_local_search_or_words() {
+        // 4.7: a parent scope or a word search ignores the alias table.
+        let mut ctx = create_alias_context(SceneAliasTable::builtin_default());
+        assert_eq!(
+            ctx.search_scene("会話", Some("メイン_1")).unwrap(),
+            Some(("メイン_1".to_string(), "会話_1".to_string()))
+        );
+        assert_eq!(
+            ctx.search_word("会話", None).unwrap(),
+            Some("こんにちは".to_string())
+        );
+    }
+
+    #[test]
+    fn test_empty_alias_table_keeps_written_name() {
+        // `new` and an explicit empty table both search the written name.
+        let mut ctx = create_alias_context(SceneAliasTable::empty());
+        assert_eq!(global_hits(&mut ctx, "会話", 3), ["会話_朝_1"]);
+
+        let mut scenes = SceneRegistry::new();
+        scenes.register_global("OnTalk", HashMap::new());
+        let mut ctx = SearchContext::new(scenes, WordDefRegistry::new()).unwrap();
+        assert_eq!(ctx.search_scene("会話", None).unwrap(), None);
+        assert!(ctx.search_scene("OnTalk", None).unwrap().is_some());
+    }
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn test_alias_miss_logs_both_names() {
+        // 8.2: a miss after replacement records the written and resolved names.
+        let mut ctx = SearchContext::with_aliases(
+            SceneRegistry::new(),
+            WordDefRegistry::new(),
+            SceneAliasTable::builtin_default(),
+        )
+        .unwrap();
+        assert_eq!(ctx.search_scene("会話", None).unwrap(), None);
+        assert!(logs_contain("Scene not found (alias applied)"));
+        assert!(logs_contain("name=会話"));
+        assert!(logs_contain("resolved=OnTalk"));
+    }
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn test_plain_miss_does_not_log() {
+        // Without a replacement, a miss stays silent as before.
+        let mut ctx = SearchContext::with_aliases(
+            SceneRegistry::new(),
+            WordDefRegistry::new(),
+            SceneAliasTable::builtin_default(),
+        )
+        .unwrap();
+        assert_eq!(ctx.search_scene("存在しない", None).unwrap(), None);
+        assert!(!logs_contain("alias applied"));
     }
 
     #[test]

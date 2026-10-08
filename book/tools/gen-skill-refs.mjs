@@ -6,9 +6,11 @@
 //   outName         … 章パス → references/ 内の出力名（index.md は直近の親ディレクトリ名付き）。
 //   VOICE_MARKERS   … 口調マーカー（verify-content.mjs から移設）。普通文体と衝突する 3 語だけ否定先読み。
 //   findVoice       … 一致したマーカーの語を返す（空なら口調なし）。
-//   extractBody     … 章テキスト → { title, body }。構造違反・本文散文の口調で GenError を投げる。
+//   chapterRegions  … 章テキスト → { lines, intro, body, outro }（0 始まり・end 排他）。構造違反で bad-structure。
+//                     （manual-claudia-theme タスク 3.2・要件 4.3）
+//   extractBody     … 章テキスト → { title, body }。構造違反・本文の台詞・本文散文の口調で GenError を投げる。
 //   readChapter     … book/src から章を読む。無ければ missing-chapter。
-//   GenError        … kind: missing-chapter / bad-structure / voice-in-body / unresolvable-link。
+//   GenError        … kind: missing-chapter / bad-structure / talk-in-body / voice-in-body / unresolvable-link。
 // タスク 3.4（要件 5.3–5.7, 7.1–7.4, 7.7）:
 //   rewriteLinks    … フェンス外・インラインコード外のインラインリンクを書き換える（同一スキル宛て → 兄弟ファイル名、
 //                     非生成章・別スキル宛て → 公開 URL、絶対 URL・#anchor 不変、画像・非 .md・book/src 外 → unresolvable-link）。
@@ -21,12 +23,14 @@
 //      node book/tools/gen-skill-refs.mjs --check … 照合（不一致・孤立を全件列挙して exit 1／一致で exit 0）
 //      GenError → 標準エラーへ章パス付きで exit 1 ／ 予期しない例外・不明な引数 → exit 2。
 //
-// 依存: link-check.mjs の LINK_RE・maskFences（規則を二重化しない）と Node 標準のみ。
+// 依存: link-check.mjs の LINK_RE・maskFences（規則を二重化しない）、talk/talk.mjs の TALK_LINE_RE・scanTalk
+// （台詞の判定を二重化しない。talk.mjs は本ファイルを import しない）と Node 標準のみ。
 // import しただけでは何も実行しない。
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { LINK_RE, REPO_ROOT, maskFences } from './link-check.mjs';
+import { TALK_LINE_RE, scanTalk } from './talk/talk.mjs';
 
 export const MANUAL_BASE_URL = 'https://ekicyou.github.io/pasta/';
 
@@ -107,7 +111,14 @@ export function readChapter(chapter, repoRoot) {
 // インラインコード `…`（同数のバッククォートで閉じる）。
 const INLINE_CODE_RE = /(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g;
 
-export function extractBody(chapterText, chapter) {
+// 章を導入・本文・締めの領域に分ける（manual-claudia-theme タスク 3.2 / design「ChapterStructure」）。
+// 範囲はすべて 0 始まり・end 排他の行番号。lines は LF に直した全行。
+//   intro … H1 の次行〜最初のフェンス外の `---`
+//   body  … 最初と最後のフェンス外の `---` の間から、前後の空行を除いた範囲（extractBody の本文）
+//   outro … 最後のフェンス外の `---` の次行〜末尾
+// 構造（H1・区切り 2 本以上）だけを見て bad-structure を投げる。台詞・口調は見ない（非生成章にも使うため）。
+// 区切りの規則を変えるときは、talk/talk.mjs の --stats にある複製（循環 import 回避）も合わせる。
+export function chapterRegions(chapterText, chapter) {
   const lines = chapterText.replace(/\r\n?/g, '\n').split('\n');
   const masked = maskFences(chapterText).split('\n');
   const bad = (detail) => new GenError('bad-structure', chapter, { detail }, detail);
@@ -117,10 +128,37 @@ export function extractBody(chapterText, chapter) {
   masked.forEach((l, i) => { if (l === '---') seps.push(i); });
   if (seps.length < 2) throw bad(`フェンス外の区切り行 \`---\` が 2 本未満（${seps.length} 本）`);
 
+  const last = seps[seps.length - 1];
   let start = seps[0] + 1;
-  let end = seps[seps.length - 1]; // 排他
+  let end = last; // 排他
   while (start < end && lines[start].trim() === '') start++;
   while (end > start && lines[end - 1].trim() === '') end--;
+  return {
+    lines,
+    intro: { start: 1, end: seps[0] },
+    body: { start, end },
+    outro: { start: last + 1, end: lines.length },
+  };
+}
+
+export function extractBody(chapterText, chapter) {
+  const { lines, body: { start, end } } = chapterRegions(chapterText, chapter);
+  const masked = maskFences(chapterText).split('\n');
+
+  // 本文（フェンス外）の台詞の開始行（manual-claudia-theme タスク 3.2 / 要件 4.4）。生成対象章と内部設計章
+  // （verify-content の I-structure）は、台詞を導入・締めにだけ置ける。口調より先に見る（台詞は口調を含むため）。
+  // TALK_LINE_RE は行頭・字下げの台詞だけを拾い、入れ子の引用・リストの中（`> > 【`・`- > 【`）は拾わない。
+  // そこは scanTalk の nested-talk（字下げ・リスト・入れ子の台詞の開始行で必ず出る）で補う。
+  const talk = new Set();
+  for (let i = start; i < end; i++) if (TALK_LINE_RE.test(masked[i])) talk.add(i + 1);
+  for (const e of scanTalk(chapterText).errors) {
+    if (e.kind === 'nested-talk' && e.line - 1 >= start && e.line - 1 < end) talk.add(e.line);
+  }
+  if (talk.size > 0) {
+    const talkHits = [...talk].sort((a, b) => a - b).map((line) => ({ line }));
+    throw new GenError('talk-in-body', chapter, { hits: talkHits },
+      `${talkHits.map((h) => `L${h.line}`).join(', ')}（生成対象章・内部設計章の台詞は導入・締めにだけ置ける）`);
+  }
 
   // 散文部 = フェンス・表の行・インラインコードを除いた残り（見出し・引用は含む）。
   const hits = [];

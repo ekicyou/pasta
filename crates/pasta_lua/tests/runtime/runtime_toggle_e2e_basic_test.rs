@@ -59,8 +59,12 @@ fn pasta_breakpoint_toggle_lua_then_pasta_over_tcp() {
     let pasta_file_key = pasta_file.to_string_lossy().to_string();
 
     // ローダと同一経路で構築した集約マップから BP `.pasta` 行の `.lua` 実行座標を解決する。
-    let expect_map =
-        PastaLoader::build_source_map(std::slice::from_ref(&pasta_file), &cache_manager, false);
+    let expect_map = PastaLoader::build_source_map(
+        std::slice::from_ref(&pasta_file),
+        &cache_manager,
+        false,
+        &pasta_lua::LuaTranspiler::default(),
+    );
     let bp_lua_coords = expect_map.resolve_pasta_to_lua(&pasta_file_key, BP_PASTA_LINE);
     assert_eq!(
         bp_lua_coords.len(),

@@ -1,7 +1,8 @@
 # スクリプト用ランタイム API
 
-ごきげんよう。`scripts/` から呼べるランタイムの道具――ACT、WORD、GLOBAL、SAVE を、ここで一望にいたしますわ。
-どの道具で何ができるのか、手元に置いておけば迷うことはございませんの。さあ、参りましょう。
+> 【クローディア】ランタイムの道具を一望にする頁ですわ。ACT、WORD、GLOBAL、SAVE、PASTA――`scripts/` から呼べる道具を、ここにまとめて並べましたの。
+
+> 【アンソニー】どの道具で何ができるのか、ここを開けば分かるわけでございますね。
 
 ---
 
@@ -230,6 +231,7 @@ act:surface(5):wait(500):talk(act.さくら.actor, "驚いた！"):newline()
 
 - 1 段目（実行中のシーンのシーンテーブル）・3 段目（act のメソッド。関数の値だけ）・4 段目（`GLOBAL` テーブル）は、どのモードでも同じである。
 - `@pasta_search` を読み込めない環境（テストなど）では、2 段目と 5 段目を飛ばす。
+- 5 段目でグローバルシーンを探すときは、範囲を指定しない [search_scene](modules/pasta-search.md#search_scenename-global_scene_name) を使うため、検索キーが pasta.toml の別名表の別名と完全に一致すると、置き換え先の名前で探す（[シーン名の別名](../grammar/call-jump.md#シーン名の別名)）。既定の別名表のもとでは、`act:call(nil, "会話", nil)` は `act:call(nil, "OnTalk", nil)` と同じ候補（`＊OnTalk` と `＊会話` で宣言したシーンを含む）から選ぶ。2 段目（ローカルシーン）と単語の検索は置き換えない。
 - `word`・`expr_fn`・`expr_fn_var`・`call_restore` と、アクタープロキシの `word`・`expr_fn`・`expr_fn_var` は、見つけた関数から戻った後、実行中のシーンを呼ぶ前のシーンに戻す。関数の中で別のシーンが `init_scene` を呼んでも、戻った後の名前の検索は呼び出し元のシーンを基準にする。`call` は戻さない（[call](#callglobal_scene_name-key-attrs-)）。
 - 変数の値を名前にする動的参照（`var_path` を渡した `word` と `expr_fn_var`。DSL の [動的単語参照](../grammar/words.md#動的単語参照)）は、3 段目を探さず、1 段目はシーンテーブル自身のキー（`__global_name__`・シーン関数・Lua ブロックで定義した関数）だけを探す。4 段目の `GLOBAL` は探すため、値が `GLOBAL` に登録された名前（ランタイムが登録する `yield`・`チェイントーク` を含む）と同じなら、その関数が見つかって呼ばれる。
 
@@ -360,7 +362,7 @@ act:call_key(value, var_path?, desc?) -> string | 「呼ばない」印
 
 - 空でない文字列（文字列 `"nil"` を含む）はそのまま、数値は `tostring(value)` を検索キーとして返す。
 - それ以外の値（`nil`・空文字列・真偽値・表など）では、警告ログと失敗表記（[failure](#failuretext-warning)）を出し、「呼ばない」印を返す。印を受け取った `act:call`・`act:call_restore` は、検索せずに `nil` を返す。印は外から作れない値で、文字列 `"nil"` とも `false` とも区別される。
-- 警告ログは、`var_path` があれば `WORD.dynamic_key(value, var_path, "act:call")` の警告（[WORD.dynamic_key](#worddynamic_keyvalue-var_path-via)）、無ければ `act:call - key is not a string or number: operand='@名前()', value=nil` の形である。`operand=` は `desc` があるときだけ付き、`value=` の表記は [arith](#arithop-lhs-rhs-lhs_desc-rhs_desc) と同じである。値が `nil` で `var_path` も `desc` も無いとき（内側の `act:arith`・`act:concat` が警告して `nil` を返した場合）は警告しない。
+- 警告ログは、`var_path` があれば `WORD.dynamic_key(value, var_path, "act:call")` の警告（[WORD.dynamic_key](#worddynamic_keyvalue-var_path-via)）、無ければ `act:call - key is not a string or number: operand='@名前()', value=nil` の形である。`operand=` は `desc` があるときだけ付き、`value=` の表記は [PASTA.num](#pastanumop-v-desc) と同じである。値が `nil` で `var_path` も `desc` も無いとき（手書きの Lua から `nil` を渡した場合。DSL の動的ターゲットでは起きない）は警告しない。
 - 失敗表記の文言は [動的ターゲットの値](../grammar/call-jump.md#動的ターゲットの値) の表のとおりである。
 - DSL の動的ターゲットは、`＞＄x` が `act:call_key(var.x, "var.x")`、`＞＠f（）` が `act:call_key(act:expr_fn("f"), nil, "@f()")`、それ以外の式が `act:call_key(式)` になる。
 
@@ -386,18 +388,17 @@ act:failure(text, warning?) -> nil
 
 `call_restore`・`call_key`・`restore_scene`・`failure` は act のメソッドのため、ほかの act のメソッドと同じく、`＠名前（…）`・`＠名前`・`＞名前` の検索の 3 段目で名前から見つかる（[検索と呼び出し](#検索と呼び出し)）。
 
-### アクター・グローバル関数・算術・連結
+### アクター・グローバル関数
 
-アクション行のアクター、`＠＊名前（…）`、式の算術と連結の生成コードは、次のメソッドを呼ぶ。どれも、アクターや関数が無いとき・値が数値や文字列にできないときに Lua のエラーにせず、警告ログを出して続ける。手書きの Lua からも呼べる。
+アクション行のアクターと `＠＊名前（…）` の生成コードは、次のメソッドを呼ぶ。どちらも、アクターや関数が無いときに Lua のエラーにせず、警告ログを出して続ける。手書きの Lua からも呼べる。
 
 | メソッド | 内容 | 戻り値 |
 | -------- | ---- | ------ |
 | `act:actor_proxy(name)` | アクター `name` のアクタープロキシを得る | アクタープロキシ（常に `nil` でない） |
 | `act:global_fn(name, ...)` | `GLOBAL` の関数 `name` を呼ぶ | 関数の戻り値、または `nil` |
-| `act:arith(op, lhs, rhs, lhs_desc, rhs_desc)` | 数値の二項演算 | 演算結果、または `nil` |
-| `act:concat(lhs, rhs, lhs_desc, rhs_desc)` | 文字列の連結 | 連結した文字列、または `nil` |
 
-- 4 つの名前は act のメソッドのため、ほかの act のメソッド（`talk`・`wait` など）と同じ制限を受ける。手書き Lua の `act.actor_proxy`・`act.global_fn`・`act.arith`・`act.concat` は、同じ名前のアクターがいてもプロキシにならない（[アクタープロキシ](#アクタープロキシ)）。また、`＠名前（…）`・`＠名前` の検索の 3 段目で見つかるため、`GLOBAL` に同じ名前の関数があっても `＠名前（…）` では届かない（`＠＊名前（…）` では届く）。1・2 段目（実行中のシーンのシーンテーブル、ローカル単語・ローカルシーン）にある同じ名前は、3 段目より先に見つかる（[検索と呼び出し](#検索と呼び出し)）。
+- 2 つの名前は act のメソッドのため、ほかの act のメソッド（`talk`・`wait` など）と同じ制限を受ける。手書き Lua の `act.actor_proxy`・`act.global_fn` は、同じ名前のアクターがいてもプロキシにならない（[アクタープロキシ](#アクタープロキシ)）。また、`＠名前（…）`・`＠名前` の検索の 3 段目で見つかるため、`GLOBAL` に同じ名前の関数があっても `＠名前（…）` では届かない（`＠＊名前（…）` では届く）。1・2 段目（実行中のシーンのシーンテーブル、ローカル単語・ローカルシーン）にある同じ名前は、3 段目より先に見つかる（[検索と呼び出し](#検索と呼び出し)）。
+- 式の算術と連結の生成コードが被演算子に使う関数は、act のメソッドではなく `pasta` モジュールの関数である（[PASTA](#pasta)）。
 
 #### actor_proxy(name)
 
@@ -420,47 +421,6 @@ act:global_fn(name, ...) -> any
 - 5 段の検索は行わず、`GLOBAL` だけを見る。
 - 関数から戻った後、実行中のシーンを呼ぶ前のシーンに戻す（[検索と呼び出し](#検索と呼び出し)）。
 - DSL の `＠＊名前（…）` は `act:global_fn("名前", …)` になる。アクション行の中でも、関数の第 1 引数は act である（[関数スコープの展開先](../grammar/variables.md#関数スコープの展開先)）。
-
-#### arith(op, lhs, rhs, lhs_desc, rhs_desc)
-
-```lua
-act:arith(op, lhs, rhs, lhs_desc?, rhs_desc?) -> number | nil
-```
-
-| パラメータ | 型 | 説明 |
-| ---------- | -- | ---- |
-| `op` | string | `"+"`・`"-"`・`"*"`・`"/"`・`"%"` |
-| `lhs`・`rhs` | any | 左と右の被演算子 |
-| `lhs_desc`・`rhs_desc` | string または nil | 警告ログに出す被演算子の説明（`"var.x"`・`"@f()"` など） |
-
-- 被演算子は、数値ならそのまま、文字列なら `tonumber` で数値にする。両方が数値になれば、演算の結果を返す。
-- 数値にできない被演算子（`nil`・数字でない文字列・真偽値・表など）があれば `nil` を返し、その被演算子ごとに警告ログ `act:arith - operand is not a number: op='+', operand='var.x', value=nil` を出す。`operand=` は説明があるときだけ付く。`value=` は値の種類を表し、`nil`・`'abc' (string)`・`true (boolean)`、それ以外は `(table)` のように型名だけになる（表の `__tostring` は呼ばない）。ただし、値が `nil` で説明も `nil` の被演算子では警告しない（内側の `act:arith`・`act:concat` が既に警告して `nil` を返した場合）。
-- 表の被演算子に `__add` などのメタメソッドがあっても呼ばない。
-- `op` が上のどれでもないときは、警告ログを出して `nil` を返す。
-- DSL の式の算術は、演算ごとに `act:arith` になる。優先順位と括弧は入れ子で表される（[算術の評価](../grammar/variables.md#算術の評価)・[DSL と Lua の対応表](../grammar/variables.md#dsl-と-lua-の対応表)）。
-
-#### concat(lhs, rhs, lhs_desc, rhs_desc)
-
-```lua
-act:concat(lhs, rhs, lhs_desc?, rhs_desc?) -> string | nil
-```
-
-| パラメータ | 型 | 説明 |
-| ---------- | -- | ---- |
-| `lhs`・`rhs` | any | 左と右の被演算子 |
-| `lhs_desc`・`rhs_desc` | string または nil | 警告ログに出す被演算子の説明（`"var.x"`・`"@f()"` など） |
-
-- 被演算子は、文字列ならそのまま、数値なら `tostring` で文字列にする（アクション行で表示したときと同じ表記）。両方が文字列になれば、左の直後に右をつないだ文字列を返す。区切りの文字は入れない。
-- 文字列と数値以外の被演算子（`nil`・真偽値・表・関数など）があれば `nil` を返し、その被演算子ごとに警告ログ `act:concat - operand is not a string or number: op='&', operand='var.x', value=nil` を出す。`op` は DSL で全角・半角のどちらを書いても `'&'` である。`operand=` は説明があるときだけ付き、`value=` の表記は [arith](#arithop-lhs-rhs-lhs_desc-rhs_desc) と同じである。
-- 値が `nil` で説明も `nil` の被演算子では警告しない（内側の `act:concat`・`act:arith` が既に警告して `nil` を返した場合）。外側の演算は黙って `nil` を返す。
-- 表の被演算子に `__concat`・`__tostring` などのメタメソッドがあっても呼ばない。
-- DSL の式の連結は、演算ごとに `act:concat` になる。連結の連鎖・算術との組み合わせ・括弧は `act:concat` と `act:arith` の入れ子で表される（[連結の評価](../grammar/variables.md#連結の評価)・[DSL と Lua の対応表](../grammar/variables.md#dsl-と-lua-の対応表)）。
-
-```lua
-act:concat("合計", 3)                -- "合計3"
-act:concat("a", nil, nil, "var.x")   -- nil（警告を 1 行出す）
-act:concat(nil, "個")                -- nil（警告しない）
-```
 
 ### yield
 
@@ -541,7 +501,7 @@ local WORD = require("pasta.word")
 | `WORD.create_word(key)` | グローバル単語（`create_global` の別名） | 単語参照の 5 段目 |
 
 - `require("pasta").create_word(key)` も `WORD.create_global(key)` と同じである。
-- `scene_name` には、グローバルシーンの登録名（シーン名の照合用の名前の後ろに `_` と、照合用の名前が同じシーンの通し番号を付けた名前。1 つ目の `＊メイン` なら `"メイン_1"`、1 つ目の `＊会話・朝` なら `"会話_朝_1"`）を渡す（[search_scene](modules/pasta-search.md#search_scenename-global_scene_name)）。
+- `scene_name` には、グローバルシーンの登録名（シーン名の照合用の名前の後ろに `_` と、照合用の名前が同じシーンの通し番号を付けた名前。1 つ目の `＊メイン` なら `"メイン_1"`、1 つ目の `＊挨拶・朝` なら `"挨拶_朝_1"`。別名で宣言したシーンは置き換え後の名前から作られ、既定の別名表のもとで `＊OnTalk` の無いゴーストの 1 つ目の `＊会話` なら `"OnTalk_1"`）を渡す（[search_scene](modules/pasta-search.md#search_scenename-global_scene_name)）。
 - どの関数もビルダーを返す。値はビルダーの `entry` で足す。
 - 単語の検索対象は、シーン辞書の読み込みの最後に確定する（[利用できる時期](modules/pasta-search.md#利用できる時期)）。`main.lua` や Lua ブロックのトップレベルで登録した単語は検索できる。シーン関数やイベントハンドラの実行中に登録した単語は、検索の対象にならない。
 
@@ -673,7 +633,71 @@ save.talk_count = (save.talk_count or 0) + 1
 
 `require("pasta.save")` が返す表は、`act.save`・`init_scene` の戻り値の `save` と同じ表である。ACT を受け取らない場所（`main.lua` のトップレベルなど）から永続化データを読み書きするときに使う。
 
+## PASTA
+
+`pasta` モジュール（`require "pasta"`）の関数のうち、式の算術と連結の生成コードが使う 2 つを扱う。DSL の式の算術と連結は、演算ごとに Lua の演算子を括弧で囲んだ `(左 演算子 右)` になり、被演算子はこの 2 つの関数で数値・文字列にしてから演算子に渡される（[DSL と Lua の対応表](../grammar/variables.md#dsl-と-lua-の対応表)）。
+
+- 2 つとも act のメソッドではない（`self` を取らず、ACT の状態を読み書きしない）。そのため、`＠名前（…）`・`＠名前` の検索の 3 段目では見つからない（[検索と呼び出し](#検索と呼び出し)）。
+- 被演算子の表に `__add`・`__concat`・`__tostring` などのメタメソッドがあっても呼ばない。
+- Lua のエラーを投げない。手書きの Lua からも呼べる。
+
+### PASTA.num(op, v, desc)
+
+```lua
+PASTA.num(op, v, desc?) -> number
+```
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `op` | string | 警告ログに出す演算子（`"+"`・`"-"`・`"*"`・`"/"`・`"%"`） |
+| `v` | any | 被演算子の値 |
+| `desc` | string または nil | 警告ログに出す被演算子の説明（`"var.x"`・`"@f()"` など） |
+
+| 値 | 戻り値 | 警告ログ |
+| -- | ------ | -------- |
+| 数値 | そのまま | なし |
+| 文字列で、`tonumber` が数値を返すもの（`"12"`・`"1.5"` など） | その数値 | なし |
+| `nil` | `0` | なし |
+| それ以外（数字でない文字列・空文字列・全角数字だけの文字列・真偽値・表・関数） | `0` | 1 行 |
+
+- 警告ログは `act:arith - operand is not a number: op='*', operand='var.x', value='abc' (string)` の形である。接頭辞の `act:arith` は算術の警告であることを表す（関数の名前ではない）。`operand=` は `desc` があるときだけ付く。`value=` は値の種類を表し、`'abc' (string)`・`true (boolean)`、それ以外は `(table)` のように型名だけになる（表の `__tostring` は呼ばない）。
+- `op` は警告ログに出すだけで、演算はしない。演算は生成コードの Lua の演算子が行う。
+- DSL の式の算術では、数値のリテラルと算術の演算の結果を除く被演算子が `PASTA.num` を通る（[算術の評価](../grammar/variables.md#算術の評価)）。
+
+### PASTA.str(v, desc)
+
+```lua
+PASTA.str(v, desc?) -> string
+```
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `v` | any | 被演算子の値 |
+| `desc` | string または nil | 警告ログに出す被演算子の説明（`"var.x"`・`"@f()"` など） |
+
+| 値 | 戻り値 | 警告ログ |
+| -- | ------ | -------- |
+| 文字列 | そのまま | なし |
+| 数値 | `tostring(v)`（アクション行で表示したときと同じ表記） | なし |
+| `nil` | `""` | なし |
+| それ以外（真偽値・表・関数） | `""` | 1 行 |
+
+- 警告ログは `act:concat - operand is not a string or number: op='&', operand='@真()', value=true (boolean)` の形である。接頭辞の `act:concat` は連結の警告であることを表す。`op` は DSL で全角・半角のどちらを書いても `'&'` である。`operand=` は `desc` があるときだけ付き、`value=` の表記は [PASTA.num](#pastanumop-v-desc) と同じである。
+- DSL の式の連結では、文字列のリテラルと連結の演算の結果を除く被演算子（数値のリテラルを含む）が `PASTA.str` を通る（[連結の評価](../grammar/variables.md#連結の評価)）。
+
+```lua
+local PASTA = require "pasta"
+
+PASTA.num("+", "12")             -- 12
+PASTA.num("+", nil, "var.x")     -- 0（警告しない）
+PASTA.num("*", "abc", "var.x")   -- 0（警告を 1 行出す）
+PASTA.str(3)                     -- "3"
+PASTA.str(nil, "var.x")          -- ""（警告しない）
+PASTA.str(true, "@真()")         -- ""（警告を 1 行出す）
+```
+
 ---
 
-道具の一覧は手に入りましたわね。フンッ、あとは使いこなすだけですわよ。
-さあ、あなたのゴーストに存分に働いてもらいましょう！
+> 【にっこり】道具の一覧は手に入りましたわね。あとは使いこなすだけ――さあ、あなたのゴーストに存分に働いてもらいましょう！
+
+> 【アンソニー】お嬢様、一度に全部を働かせては、ゴーストも息切れいたします。

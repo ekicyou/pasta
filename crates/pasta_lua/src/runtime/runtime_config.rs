@@ -7,6 +7,7 @@ use crate::debug::kick::KickSink;
 use crate::debug::{DebugConfig, DebugFileConfig};
 use crate::error::ConfigError;
 use mlua::{Function, Lua, Result as LuaResult, StdLib, Value};
+use pasta_core::registry::SceneAliasTable;
 
 /// Default libs configuration used by [`RuntimeConfig::new`].
 ///
@@ -104,6 +105,16 @@ pub struct RuntimeConfig {
     /// (R2.6). Wiring the sink through `enable` into the socket-bridge is a later
     /// task (2.x); this field is only the injection slot.
     pub kick_sink: Option<KickSink>,
+
+    /// Global scene name alias table (scene-name-alias).
+    ///
+    /// The runtime hands this ONE table to both `@pasta_search` registration
+    /// points: the initial registration at VM init and the re-registration by
+    /// `finalize_scene`. Defaults to the **empty** table (no aliases), so every
+    /// existing constructor keeps the pre-alias search behavior. It must match
+    /// the table the transpiler used for the same dictionary (the loader
+    /// guarantees this).
+    pub scene_aliases: SceneAliasTable,
 }
 
 impl std::fmt::Debug for RuntimeConfig {
@@ -115,6 +126,7 @@ impl std::fmt::Debug for RuntimeConfig {
             .field("libs", &self.libs)
             .field("debug", &self.debug)
             .field("kick_sink", &self.kick_sink.as_ref().map(|_| "<sink>"))
+            .field("scene_aliases", &self.scene_aliases)
             .finish()
     }
 }
@@ -130,6 +142,7 @@ impl RuntimeConfig {
             libs: default_libs(),
             debug: DebugConfig::default(),
             kick_sink: None,
+            scene_aliases: SceneAliasTable::empty(),
         }
     }
 
@@ -149,6 +162,7 @@ impl RuntimeConfig {
             ],
             debug: DebugConfig::default(),
             kick_sink: None,
+            scene_aliases: SceneAliasTable::empty(),
         }
     }
 
@@ -162,6 +176,7 @@ impl RuntimeConfig {
             libs: vec!["std_all".into()],
             debug: DebugConfig::default(),
             kick_sink: None,
+            scene_aliases: SceneAliasTable::empty(),
         }
     }
 
@@ -175,6 +190,7 @@ impl RuntimeConfig {
             libs,
             debug: DebugConfig::default(),
             kick_sink: None,
+            scene_aliases: SceneAliasTable::empty(),
         }
     }
 
@@ -199,6 +215,15 @@ impl RuntimeConfig {
     /// `self` for chaining.
     pub fn with_kick_sink(mut self, kick_sink: Option<KickSink>) -> Self {
         self.kick_sink = kick_sink;
+        self
+    }
+
+    /// Set the global scene name alias table (builder).
+    ///
+    /// The same table is passed to both `@pasta_search` registrations (VM init
+    /// and `finalize_scene`). Returns `self` for chaining.
+    pub fn with_scene_aliases(mut self, scene_aliases: SceneAliasTable) -> Self {
+        self.scene_aliases = scene_aliases;
         self
     }
 

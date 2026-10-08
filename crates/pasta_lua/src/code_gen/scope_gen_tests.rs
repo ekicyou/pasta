@@ -411,7 +411,8 @@ fn global_and_local_scenes_record_join_keys_and_header_lines() {
         let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
         cg.set_source_map(&mut sink);
         // counter == 1: first occurrence of base 会話 (matches runtime 会話_1).
-        cg.generate_global_scene(&scene, 1, &ctx, &attrs).unwrap();
+        cg.generate_global_scene(&scene, &scene.name, 1, &ctx, &attrs)
+            .unwrap();
     }
 
     // Global header recorded first, then locals in source order.
@@ -444,8 +445,10 @@ fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
         let mut output = Vec::new();
         let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
         cg.set_source_map(&mut sink);
-        cg.generate_global_scene(&first, 1, &ctx, &attrs).unwrap();
-        cg.generate_global_scene(&second, 2, &ctx, &attrs).unwrap();
+        cg.generate_global_scene(&first, &first.name, 1, &ctx, &attrs)
+            .unwrap();
+        cg.generate_global_scene(&second, &second.name, 2, &ctx, &attrs)
+            .unwrap();
     }
 
     assert_eq!(
@@ -470,7 +473,7 @@ fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
             named_local_with_span("挨拶_1", 8),
         ],
     );
-    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, 1, &ctx, &attrs));
+    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, &scene.name, 1, &ctx, &attrs));
     assert!(text.contains("function SCENE.挨拶_1_1(act, ...)"), "{text}");
     assert!(text.contains("function SCENE.挨拶_1_2(act, ...)"), "{text}");
 }

@@ -15,7 +15,7 @@
 //! - Req 7: 将来拡張への備え
 
 use mlua::{Function, Lua, Result as LuaResult, Table, Value};
-use pasta_core::registry::{SceneRegistry, WordDefRegistry};
+use pasta_core::registry::{SceneAliasTable, SceneRegistry, WordDefRegistry};
 use std::collections::HashMap;
 
 /// Entry for collected word information.
@@ -218,11 +218,12 @@ fn build_word_registry(entries: &[WordCollectionEntry]) -> WordDefRegistry {
 ///
 /// # Arguments
 /// * `lua` - Lua instance reference
+/// * `aliases` - Global scene name alias table handed to `@pasta_search`
 ///
 /// # Returns
 /// * `Ok(true)` - Success
 /// * `Err(LuaError)` - Failure
-pub fn finalize_scene_impl(lua: &Lua) -> LuaResult<bool> {
+pub fn finalize_scene_impl(lua: &Lua, aliases: &SceneAliasTable) -> LuaResult<bool> {
     // Collect scenes from Lua registry
     let scenes = collect_scenes(lua)?;
     tracing::debug!(
@@ -242,7 +243,7 @@ pub fn finalize_scene_impl(lua: &Lua) -> LuaResult<bool> {
     let word_registry = build_word_registry(&word_entries);
 
     // Register @pasta_search module (Requirement 3.3, 3.4, 5.4)
-    crate::search::register(lua, scene_registry, word_registry)?;
+    crate::search::register(lua, scene_registry, word_registry, aliases.clone())?;
 
     tracing::info!(
         scenes = scenes.len(),
@@ -259,13 +260,15 @@ pub fn finalize_scene_impl(lua: &Lua) -> LuaResult<bool> {
 ///
 /// # Arguments
 /// * `lua` - Lua instance reference
+/// * `aliases` - Global scene name alias table; the closure keeps it so the
+///   re-registered `@pasta_search` uses the same table as the initial one
 ///
 /// # Returns
 /// * `Ok(())` - Success
 /// * `Err(e)` - Registration failed
-pub fn register_finalize_scene(lua: &Lua) -> LuaResult<()> {
+pub fn register_finalize_scene(lua: &Lua, aliases: SceneAliasTable) -> LuaResult<()> {
     // Create Rust function
-    let finalize_fn = lua.create_function(|lua, ()| finalize_scene_impl(lua))?;
+    let finalize_fn = lua.create_function(move |lua, ()| finalize_scene_impl(lua, &aliases))?;
 
     // Get pasta module from package.loaded
     let package: Table = lua.globals().get("package")?;

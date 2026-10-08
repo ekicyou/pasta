@@ -15,7 +15,7 @@ where
 }
 
 // ------------------------------------------------------------------
-// Expression generation (via expression statements: VarSet name=None)
+// Expression generation (expr_text: expr_to_string; statements: VarSet name=None)
 // ------------------------------------------------------------------
 
 fn expr_stmt(expr: Expr) -> VarSet {
@@ -28,7 +28,8 @@ fn expr_stmt(expr: Expr) -> VarSet {
 }
 
 /// Float, blank-string, paren, and all five binary operators render with
-/// the exact Lua spellings (` + `, ` - `, ` * `, ` / `, ` % `).
+/// the exact Lua spellings (` + `, ` - `, ` * `, ` / `, ` % `), each
+/// operation wrapped in its own parentheses.
 #[test]
 fn expr_renders_float_blank_string_paren_and_all_binary_ops() {
     use pasta_dsl::parser::BinOp;
@@ -60,15 +61,14 @@ fn expr_renders_float_blank_string_paren_and_all_binary_ops() {
     let text = gen_to_string(|cg| cg.generate_var_set(&expr_stmt(expr)));
     assert_eq!(
         text,
-        "act:arith(\"+\", act:arith(\"%\", act:arith(\"/\", act:arith(\"*\", \
-         (act:arith(\"-\", 1, 2)), 3), 4), 5), var.x, nil, \"var.x\")\n"
+        "do local _ = ((((((1 - 2)) * 3) / 4) % 5) + PASTA.num(\"+\", var.x, \"var.x\")) end\n"
     );
 
     let float_text = gen_to_string(|cg| cg.generate_var_set(&expr_stmt(Expr::Float(1.5))));
-    assert_eq!(float_text, "1.5\n");
+    assert_eq!(float_text, "do local _ = 1.5 end\n");
 
     let blank_text = gen_to_string(|cg| cg.generate_var_set(&expr_stmt(Expr::BlankString)));
-    assert_eq!(blank_text, "\"\"\n");
+    assert_eq!(blank_text, "do local _ = \"\" end\n");
 }
 
 /// Args-scope variable references convert 0-based AST index to 1-based
@@ -81,7 +81,7 @@ fn expr_args_var_ref_converts_to_one_based_lua_index() {
             scope: VarScope::Args(2),
         }))
     });
-    assert_eq!(text, "args[3]\n");
+    assert_eq!(text, "do local _ = args[3] end\n");
 }
 
 /// Local fn call in expression position uses `act:expr_fn("name", ...)`;
@@ -125,7 +125,7 @@ fn expr_global_fn_call_uses_act_global_fn() {
 }
 
 // ------------------------------------------------------------------
-// Arithmetic: precedence regrouping into nested act:arith (Req 3.1, 3.2, 3.6)
+// Arithmetic: precedence regrouping into nested `(L op R)` (Req 1.2, 1.4, 4.5)
 // ------------------------------------------------------------------
 
 /// Build a left-associative chain exactly like the parser's
@@ -153,10 +153,11 @@ fn paren(e: Expr) -> Expr {
     Expr::Paren(Box::new(e))
 }
 
+/// Render the expression itself (not an expression statement).
 fn expr_text(expr: Expr) -> String {
-    gen_to_string(|cg| cg.generate_var_set(&expr_stmt(expr)))
-        .trim_end()
-        .to_string()
+    let mut output = Vec::new();
+    let cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+    cg.expr_to_string(&expr).unwrap()
 }
 
 /// `＊／％` fold before `＋－`, each left to right; parens are one term.
@@ -167,12 +168,12 @@ fn arith_regroups_left_assoc_tree_by_lua_precedence() {
         // 1＋2＊3
         (
             left_assoc(int(1), vec![(Add, int(2)), (Mul, int(3))]),
-            r#"act:arith("+", 1, act:arith("*", 2, 3))"#,
+            r#"(1 + (2 * 3))"#,
         ),
         // 1－2－3
         (
             left_assoc(int(1), vec![(Sub, int(2)), (Sub, int(3))]),
-            r#"act:arith("-", act:arith("-", 1, 2), 3)"#,
+            r#"((1 - 2) - 3)"#,
         ),
         // （1＋2）＊3
         (
@@ -180,17 +181,17 @@ fn arith_regroups_left_assoc_tree_by_lua_precedence() {
                 paren(left_assoc(int(1), vec![(Add, int(2))])),
                 vec![(Mul, int(3))],
             ),
-            r#"act:arith("*", (act:arith("+", 1, 2)), 3)"#,
+            r#"(((1 + 2)) * 3)"#,
         ),
         // 1－2＊3－4
         (
             left_assoc(int(1), vec![(Sub, int(2)), (Mul, int(3)), (Sub, int(4))]),
-            r#"act:arith("-", act:arith("-", 1, act:arith("*", 2, 3)), 4)"#,
+            r#"((1 - (2 * 3)) - 4)"#,
         ),
         // 8／2／2
         (
             left_assoc(int(8), vec![(Div, int(2)), (Div, int(2))]),
-            r#"act:arith("/", act:arith("/", 8, 2), 2)"#,
+            r#"((8 / 2) / 2)"#,
         ),
         // 1＋2＊3＋4＊5
         (
@@ -198,7 +199,7 @@ fn arith_regroups_left_assoc_tree_by_lua_precedence() {
                 int(1),
                 vec![(Add, int(2)), (Mul, int(3)), (Add, int(4)), (Mul, int(5))],
             ),
-            r#"act:arith("+", act:arith("+", 1, act:arith("*", 2, 3)), act:arith("*", 4, 5))"#,
+            r#"((1 + (2 * 3)) + (4 * 5))"#,
         ),
         // 2＊（3＋4）％5
         (
@@ -209,21 +210,18 @@ fn arith_regroups_left_assoc_tree_by_lua_precedence() {
                     (Mod, int(5)),
                 ],
             ),
-            r#"act:arith("%", act:arith("*", 2, (act:arith("+", 3, 4))), 5)"#,
+            r#"((2 * ((3 + 4))) % 5)"#,
         ),
-        // 10－－3 (negative literal stays a plain term)
-        (
-            left_assoc(int(10), vec![(Sub, int(-3))]),
-            r#"act:arith("-", 10, -3)"#,
-        ),
+        // 10－－3 (negative literal stays a plain term; spaces keep `--` from becoming a comment)
+        (left_assoc(int(10), vec![(Sub, int(-3))]), r#"(10 - -3)"#),
     ];
     for (expr, expected) in cases {
         assert_eq!(expr_text(expr), expected);
     }
 }
 
-/// Operand descriptions: emitted as string literals, omitted when both are
-/// absent, and `nil` stands in for a missing left description.
+/// Operand descriptions: the third argument of `PASTA.num` as a string
+/// literal, only when the operand has one (a paren passes its inner one through).
 #[test]
 fn arith_operand_descriptions() {
     use pasta_dsl::parser::BinOp::{Add, Mul};
@@ -237,12 +235,12 @@ fn arith_operand_descriptions() {
         // ＄x＋＠f（）＊2
         (
             left_assoc(local_x(), vec![(Add, f_call.clone()), (Mul, int(2))]),
-            r#"act:arith("+", var.x, act:arith("*", act:expr_fn("f"), 2, "@f()"), "var.x")"#,
+            r#"(PASTA.num("+", var.x, "var.x") + (PASTA.num("*", act:expr_fn("f"), "@f()") * 2))"#,
         ),
         // ＄x＋1
         (
             left_assoc(local_x(), vec![(Add, int(1))]),
-            r#"act:arith("+", var.x, 1, "var.x")"#,
+            r#"(PASTA.num("+", var.x, "var.x") + 1)"#,
         ),
         // 1＋2＊＄y
         (
@@ -250,7 +248,7 @@ fn arith_operand_descriptions() {
                 int(1),
                 vec![(Add, int(2)), (Mul, var("y", VarScope::Local))],
             ),
-            r#"act:arith("+", 1, act:arith("*", 2, var.y, nil, "var.y"))"#,
+            r#"(1 + (2 * PASTA.num("*", var.y, "var.y")))"#,
         ),
         // （＄x＋1）＊2
         (
@@ -258,7 +256,7 @@ fn arith_operand_descriptions() {
                 paren(left_assoc(local_x(), vec![(Add, int(1))])),
                 vec![(Mul, int(2))],
             ),
-            r#"act:arith("*", (act:arith("+", var.x, 1, "var.x")), 2)"#,
+            r#"(((PASTA.num("+", var.x, "var.x") + 1)) * 2)"#,
         ),
         // ＄＊s＋＄1 (global / scene argument)
         (
@@ -266,7 +264,7 @@ fn arith_operand_descriptions() {
                 var("s", VarScope::Global),
                 vec![(Add, var("1", VarScope::Args(1)))],
             ),
-            r#"act:arith("+", save.s, args[2], "save.s", "args[2]")"#,
+            r#"(PASTA.num("+", save.s, "save.s") + PASTA.num("+", args[2], "args[2]"))"#,
         ),
         // ＠＊g（1）＊＠＄h（）
         (
@@ -288,12 +286,12 @@ fn arith_operand_descriptions() {
                     },
                 )],
             ),
-            r#"act:arith("*", act:global_fn("g", 1), act:expr_fn_var(var.h, "var.h"), "@*g()", "@$var.h()")"#,
+            r#"(PASTA.num("*", act:global_fn("g", 1), "@*g()") * PASTA.num("*", act:expr_fn_var(var.h, "var.h"), "@$var.h()"))"#,
         ),
         // （＄x）＋「a」: paren passes the inner description through; literal has none
         (
             left_assoc(paren(local_x()), vec![(Add, Expr::String("a".to_string()))]),
-            r#"act:arith("+", (var.x), "a", "var.x")"#,
+            r#"(PASTA.num("+", (var.x), "var.x") + PASTA.num("+", "a"))"#,
         ),
     ];
     for (expr, expected) in cases {
@@ -317,13 +315,11 @@ fn arith_in_function_argument_uses_same_generator() {
         },
         scope: FnScope::Local,
     };
-    assert_eq!(
-        expr_text(expr),
-        r#"act:expr_fn("f", act:arith("+", 1, act:arith("*", 2, 3)))"#
-    );
+    assert_eq!(expr_text(expr), r#"act:expr_fn("f", (1 + (2 * 3)))"#);
 }
 
-/// A right-hand Binary (never produced by the parser) is one term.
+/// A right-hand Binary (never produced by the parser) is one term; its kind is
+/// the kind of its regrouped top operation.
 #[test]
 fn arith_right_hand_binary_is_one_term() {
     use pasta_dsl::parser::BinOp::{Add, Mul};
@@ -332,10 +328,53 @@ fn arith_right_hand_binary_is_one_term() {
         lhs: Box::new(int(2)),
         rhs: Box::new(left_assoc(int(3), vec![(Add, int(4))])),
     };
+    assert_eq!(expr_text(expr), r#"(2 * (3 + 4))"#);
+
+    // 2＊（「a」＆1＋2）as a right-hand term: concat folds last, so it is a string
+    let expr = Expr::Binary {
+        op: Mul,
+        lhs: Box::new(int(2)),
+        rhs: Box::new(left_assoc(
+            Expr::String("a".to_string()),
+            vec![(pasta_dsl::parser::BinOp::Concat, int(1)), (Add, int(2))],
+        )),
+    };
     assert_eq!(
         expr_text(expr),
-        r#"act:arith("*", 2, act:arith("+", 3, 4))"#
+        r#"(2 * PASTA.num("*", ("a" .. PASTA.str((1 + 2)))))"#
     );
+}
+
+/// Arithmetic wraps every operand that is not statically a number with
+/// `PASTA.num` (string literals, blank strings, concats, variables, calls);
+/// number literals and arithmetic results stay bare (Req 1.2, 4.5).
+#[test]
+fn arith_wraps_operands_by_static_kind() {
+    use pasta_dsl::parser::BinOp::{Add, Concat, Sub};
+    let s = |t: &str| Expr::String(t.to_string());
+    let cases: Vec<(Expr, &str)> = vec![
+        // 1.5－2
+        (
+            left_assoc(Expr::Float(1.5), vec![(Sub, int(2))]),
+            r#"(1.5 - 2)"#,
+        ),
+        // 「1」＋「」
+        (
+            left_assoc(s("1"), vec![(Add, Expr::BlankString)]),
+            r#"(PASTA.num("+", "1") + PASTA.num("+", ""))"#,
+        ),
+        // （1＆2）－（3－4）: paren takes the kind of its content
+        (
+            left_assoc(
+                paren(left_assoc(int(1), vec![(Concat, int(2))])),
+                vec![(Sub, paren(left_assoc(int(3), vec![(Sub, int(4))])))],
+            ),
+            r#"(PASTA.num("-", ((PASTA.str(1) .. PASTA.str(2)))) - ((3 - 4)))"#,
+        ),
+    ];
+    for (expr, expected) in cases {
+        assert_eq!(expr_text(expr), expected);
+    }
 }
 
 // ------------------------------------------------------------------
@@ -361,25 +400,55 @@ fn scene_line(line: &str) -> String {
         .to_string()
 }
 
-/// The design's generated forms, from DSL text through the parser.
+/// The design's generated forms, from DSL text through the parser
+/// (assignment, Call target, and property-assignment right-hand sides).
 #[test]
 fn concat_generated_forms_from_dsl() {
     let cases = [
         (
             "＄表示＝「合計」＆＄n＆「個」",
-            r#"var.表示 = act:concat(act:concat("合計", var.n, nil, "var.n"), "個")"#,
+            r#"var.表示 = (("合計" .. PASTA.str(var.n, "var.n")) .. "個")"#,
         ),
         (
             "＄s＝「合計」＆＄a＋＄b",
-            r#"var.s = act:concat("合計", act:arith("+", var.a, var.b, "var.a", "var.b"))"#,
+            r#"var.s = ("合計" .. PASTA.str((PASTA.num("+", var.a, "var.a") + PASTA.num("+", var.b, "var.b"))))"#,
         ),
         (
             "＄n＝（「1」＆「2」）＋1",
-            r#"var.n = act:arith("+", (act:concat("1", "2")), 1)"#,
+            r#"var.n = (PASTA.num("+", (("1" .. "2"))) + 1)"#,
         ),
         (
             "＞＄種類＆「_挨拶」",
-            r#"return act:call(SCENE.__global_name__, act:call_key(act:concat(var.種類, "_挨拶", "var.種類")), {}, table.unpack(args))"#,
+            r#"return act:call(SCENE.__global_name__, act:call_key((PASTA.str(var.種類, "var.種類") .. "_挨拶")), {}, table.unpack(args))"#,
+        ),
+        (
+            "＄＊回数＝＄＊回数＋1",
+            r#"save.回数 = (PASTA.num("+", save.回数, "save.回数") + 1)"#,
+        ),
+        (
+            "＄b＝1＋2＊＄y",
+            r#"var.b = (1 + (2 * PASTA.num("*", var.y, "var.y")))"#,
+        ),
+        (
+            "＄c＝（＄x＋1）＊2",
+            r#"var.c = (((PASTA.num("+", var.x, "var.x") + 1)) * 2)"#,
+        ),
+        ("＄n＝「1」＋2", r#"var.n = (PASTA.num("+", "1") + 2)"#),
+        (
+            "＄z＝＠＄f（）＋1",
+            r#"var.z = (PASTA.num("+", act:expr_fn_var(var.f, "var.f"), "@$var.f()") + 1)"#,
+        ),
+        (
+            "＄＊g＝＠関数（2＋1）",
+            r#"save.g = act:expr_fn("関数", (2 + 1))"#,
+        ),
+        (
+            "＄％p＝＄x＋1",
+            r#"act:set_property("p", (PASTA.num("+", var.x, "var.x") + 1))"#,
+        ),
+        (
+            "＄％p＝「a」＆＄x",
+            r#"act:set_property("p", ("a" .. PASTA.str(var.x, "var.x")))"#,
         ),
     ];
     for (dsl, expected) in cases {
@@ -396,17 +465,17 @@ fn concat_regroups_below_arithmetic() {
         // 「x」＆1＋2＊3
         (
             left_assoc(s("x"), vec![(Concat, int(1)), (Add, int(2)), (Mul, int(3))]),
-            r#"act:concat("x", act:arith("+", 1, act:arith("*", 2, 3)))"#,
+            r#"("x" .. PASTA.str((1 + (2 * 3))))"#,
         ),
         // 1＋2＆3＊4
         (
             left_assoc(int(1), vec![(Add, int(2)), (Concat, int(3)), (Mul, int(4))]),
-            r#"act:concat(act:arith("+", 1, 2), act:arith("*", 3, 4))"#,
+            r#"(PASTA.str((1 + 2)) .. PASTA.str((3 * 4)))"#,
         ),
         // 「a」＆「b」＆「c」
         (
             left_assoc(s("a"), vec![(Concat, s("b")), (Concat, s("c"))]),
-            r#"act:concat(act:concat("a", "b"), "c")"#,
+            r#"(("a" .. "b") .. "c")"#,
         ),
     ];
     for (expr, expected) in cases {
@@ -414,8 +483,10 @@ fn concat_regroups_below_arithmetic() {
     }
 }
 
-/// Descriptions follow the arithmetic rules: `nil` fills a missing left one,
-/// a parenthesized variable keeps its description, nested operations have none.
+/// Concat leaves string literals, blank strings, and concat results bare and
+/// wraps numbers, arithmetic results, variables, and calls with `PASTA.str`;
+/// the description is the second argument, only when there is one
+/// (a parenthesized variable keeps it, nested operations have none).
 #[test]
 fn concat_operand_descriptions() {
     use pasta_dsl::parser::BinOp::{Add, Concat};
@@ -424,12 +495,12 @@ fn concat_operand_descriptions() {
         // 「a」＆＄x
         (
             left_assoc(s("a"), vec![(Concat, var("x", VarScope::Local))]),
-            r#"act:concat("a", var.x, nil, "var.x")"#,
+            r#"("a" .. PASTA.str(var.x, "var.x"))"#,
         ),
         // （＄＊g）＆「a」
         (
             left_assoc(paren(var("g", VarScope::Global)), vec![(Concat, s("a"))]),
-            r#"act:concat((save.g), "a", "save.g")"#,
+            r#"(PASTA.str((save.g), "save.g") .. "a")"#,
         ),
         // ＄x＋1＆（＄y＆「a」）
         (
@@ -446,7 +517,27 @@ fn concat_operand_descriptions() {
                     ),
                 ],
             ),
-            r#"act:concat(act:arith("+", var.x, 1, "var.x"), (act:concat(var.y, "a", "var.y")))"#,
+            r#"(PASTA.str((PASTA.num("+", var.x, "var.x") + 1)) .. ((PASTA.str(var.y, "var.y") .. "a")))"#,
+        ),
+        // 「a」＆1＆「」
+        (
+            left_assoc(s("a"), vec![(Concat, int(1)), (Concat, Expr::BlankString)]),
+            r#"(("a" .. PASTA.str(1)) .. "")"#,
+        ),
+        // 1.5＆＠f（）
+        (
+            left_assoc(
+                Expr::Float(1.5),
+                vec![(
+                    Concat,
+                    Expr::FnCall {
+                        name: "f".to_string(),
+                        args: Args::empty(),
+                        scope: FnScope::Local,
+                    },
+                )],
+            ),
+            r#"(PASTA.str(1.5) .. PASTA.str(act:expr_fn("f"), "@f()"))"#,
         ),
     ];
     for (expr, expected) in cases {

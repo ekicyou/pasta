@@ -1,0 +1,512 @@
+// theme-test.mjs — Claudia テーマ（book/theme/claudia.css）の配色トークンの対比テスト
+// （manual-claudia-theme タスク 2.2 / 要件 1.1, 2.2, 2.4, 3.5, 8.3、design「ThemeTest」「テーマトークン契約」）。
+//
+// 観測する完了条件:
+//   - claudia.css の最上位ブロック `.light, html:not(.js)` と `.navy` から `--name: #rrggbb;` を読む。
+//   - 両ブロックに mdBook のテーマ変数 40 個と Claudia のトークンがすべてある（欠けたら失敗）。
+//   - 設計の「テーマトークン契約」で決めた文字色と背景色の組ごとに、WCAG の対比が 4.5 以上。
+//     対象のトークンが欠けている、または 16 進色（#rrggbb）でない場合も失敗。
+//   - 部品の層（タスク 2.3 / 要件 1.2, 1.4, 1.8, 9.3、design「ClaudiaTheme」の意匠）:
+//       * 色は直書きしない（カスタムプロパティの定義を除く宣言に 16 進色・rgb() 等・色名が無い）。
+//       * 角丸は 14px・10px・4px の 3 段（円の 50% と 0・inherit は可）。影は --claudia-shadow-1/-2 だけ。
+//       * 影のトークンが :root・light・navy にある。本文と見出しに字体トークンを当てている。
+//       * サイドバーと上部バーの規則は色と字体だけを変える（幅・開閉・折りたたみ・切り替え点に触れない）。
+//       * highlight.js の兄弟クラス（mdBook の highlight.css の 6 群）を、light・navy・JS 無効の
+//         3 つの範囲で同じ群の --claudia-hl-* で塗る（実行時に着色する lua・toml・json 等の対比を守る）。
+//   - 台詞部品・扉・クレジット・狭い画面・印刷の層（タスク 2.4 / 要件 2.3, 3.1, 3.5, 3.8, 3.9, 3.10,
+//     6.4, 9.1, 9.2、design「ClaudiaTheme / State Management」の 4・6・7、「出力 HTML 契約」）:
+//       * 出力 HTML 契約と扉・クレジットのクラス契約のクラスを規則で使い、扉の契約を冒頭のコメントに書いている。
+//       * 台詞本文は --claudia-font-talk、名札は --claudia-font-latin。顔は 56px（扉は 84px）の円。
+//       * 話し手ごとのトークン（--talk-claudia-*・--talk-anthony-*）を部品に当てている。
+//       * 620px 以下で顔を小さくし、420px 以下で扉の案内を 1 列にする。吹き出しは長い語でも折り返す。
+//       * 印刷では、どのテーマでも light の値（全トークンを light ブロックと同じ値で再定義）を使い、
+//         台詞と扉の途中で改ページせず、区切り線は罫線で描き、コードの着色もどのテーマでも 6 群にそろえる。
+//   - テーマメニューの隠し規則（タスク 2.5 / 要件 2.1、design「ThemeMenu」）:
+//       * 最上位の規則で #mdbook-theme-rust・-coal・-ayu のボタンを display: none にする。
+//       * Auto（#mdbook-theme-default_theme）・Light・Navy は隠さない。
+//   - Node 標準のみ・ビルド不要。問題は全件列挙してから exit 1。
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { SPEAKERS } from './talk/talk.mjs';
+
+export const CSS_PATH = fileURLToPath(new URL('../theme/claudia.css', import.meta.url));
+export const MIN_CONTRAST = 4.5;
+
+// テーマごとのブロックのセレクタ（design「ClaudiaTheme / State Management」の 2・3）
+export const THEME_SELECTORS = {
+  light: '.light, html:not(.js)',
+  navy: '.navy',
+};
+
+// mdBook 0.5 の variables.css がテーマごとに持つ 40 変数（research.md RN6 の一覧。0.5.4 の出力で実測）
+export const MDBOOK_VARS = [
+  '--bg', '--fg', '--sidebar-bg', '--sidebar-fg', '--sidebar-non-existant', '--sidebar-active',
+  '--sidebar-spacer', '--scrollbar', '--icons', '--icons-hover', '--links', '--inline-code-color',
+  '--theme-popup-bg', '--theme-popup-border', '--theme-hover', '--quote-bg', '--quote-border',
+  '--warning-border', '--table-border-color', '--table-header-bg', '--table-alternate-bg',
+  '--searchbar-border-color', '--searchbar-bg', '--searchbar-fg', '--searchbar-shadow-color',
+  '--searchresults-header-fg', '--searchresults-border-color', '--searchresults-li-bg',
+  '--search-mark-bg', '--color-scheme', '--copy-button-filter', '--copy-button-filter-hover',
+  '--footnote-highlight', '--overlay-bg', '--blockquote-note-color', '--blockquote-tip-color',
+  '--blockquote-important-color', '--blockquote-warning-color', '--blockquote-caution-color',
+  '--sidebar-header-border-color',
+];
+
+// pasta コードの着色 6 群（scope-map.mjs の hljs クラスの群ごとに 1 トークン）
+export const HL_TOKENS = [
+  '--claudia-hl-comment', '--claudia-hl-variable', '--claudia-hl-number',
+  '--claudia-hl-string', '--claudia-hl-title', '--claudia-hl-keyword',
+];
+
+// 話し手ごとのトークン（「テーマトークン契約」）。話し手は登録簿（talk.mjs の SPEAKERS）から組み立てる。
+const SPEAKER_IDS = SPEAKERS.map((s) => s.id);
+export const SPEAKER_TOKENS = SPEAKER_IDS.flatMap((id) => ['ink', 'face', 'ring', 'name'].map((k) => `--talk-${id}-${k}`));
+
+// 「テーマトークン契約」の Claudia のトークン
+export const CLAUDIA_TOKENS = [
+  '--claudia-paper', '--claudia-ink', '--claudia-ink2', '--claudia-paper2', '--claudia-edge',
+  '--claudia-accent', '--claudia-gold', '--claudia-wax', '--claudia-code-bg', '--talk-bubble',
+  ...SPEAKER_TOKENS,
+  ...HL_TOKENS,
+];
+
+// 対比 4.5 以上を検査する [文字色, 背景色] の組（「テーマトークン契約」の箇条）
+export const CONTRAST_PAIRS = [
+  ['--fg', '--bg'],
+  ['--fg', '--claudia-paper2'],
+  ['--sidebar-fg', '--sidebar-bg'],
+  ['--sidebar-active', '--sidebar-bg'],
+  ['--links', '--bg'],
+  ['--links', '--claudia-paper2'],
+  ['--claudia-ink2', '--bg'],
+  ...SPEAKER_IDS.flatMap((id) => [[`--talk-${id}-ink`, '--talk-bubble'], [`--talk-${id}-name`, '--talk-bubble']]),
+  // 吹き出し・扉・パート案内のカードに載る文字（タスク 2.4。リンク・案内の文字・欧文添え字）
+  ['--links', '--talk-bubble'],
+  ['--claudia-ink', '--talk-bubble'],
+  ['--claudia-ink2', '--talk-bubble'],
+  ['--claudia-ink2', '--claudia-paper2'],
+  ...HL_TOKENS.map((t) => [t, '--claudia-code-bg']),
+  ['--fg', '--claudia-code-bg'],
+  ['--inline-code-color', '--claudia-code-bg'],
+];
+
+// --- CSS の最上位ブロックを読む（@media 等の入れ子の中は対象外） ---
+export function topLevelBlocks(css) {
+  const src = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const blocks = [];
+  let depth = 0;
+  let head = 0;
+  let selector = '';
+  let bodyStart = 0;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (c === '{') {
+      if (depth === 0) {
+        selector = src.slice(head, i).trim().replace(/\s+/g, ' ');
+        bodyStart = i + 1;
+      }
+      depth++;
+    } else if (c === '}') {
+      depth--;
+      if (depth === 0) {
+        blocks.push({ selector, body: src.slice(bodyStart, i) });
+        head = i + 1;
+      }
+    }
+  }
+  return blocks;
+}
+
+// セレクタが一致する最上位ブロックの宣言を Map にする（同じセレクタが複数あれば後勝ち）
+export function readTokens(css, selector) {
+  const tokens = new Map();
+  let found = false;
+  for (const b of topLevelBlocks(css)) {
+    if (b.selector !== selector) continue;
+    found = true;
+    for (const m of b.body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) tokens.set(m[1], m[2].trim());
+  }
+  return found ? tokens : null;
+}
+
+// --- WCAG 2.x の相対輝度と対比 ---
+function luminance(hex) {
+  const ch = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+}
+export function contrast(a, b) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+// CSS 全文を検査し、[{ theme, ok, name, detail }] を返す
+export function checkTheme(css) {
+  const results = [];
+  const add = (theme, ok, name, detail) => results.push({ theme, ok, name, detail });
+  for (const [theme, selector] of Object.entries(THEME_SELECTORS)) {
+    const tokens = readTokens(css, selector);
+    if (!tokens) {
+      add(theme, false, `ブロック ${selector} がある`, 'claudia.css の最上位に見つからない');
+      continue;
+    }
+    for (const name of [...MDBOOK_VARS, ...CLAUDIA_TOKENS]) {
+      add(theme, tokens.has(name), `トークン ${name} がある`, '欠けている');
+    }
+    for (const [fg, bg] of CONTRAST_PAIRS) {
+      const name = `対比 ${fg} / ${bg}`;
+      const a = tokens.get(fg);
+      const b = tokens.get(bg);
+      const bad = [[fg, a], [bg, b]].filter(([, v]) => !HEX_RE.test(v ?? ''));
+      if (bad.length) {
+        add(theme, false, name, bad.map(([n, v]) => `${n} が 16 進色でない（${v ?? '欠落'}）`).join('、'));
+        continue;
+      }
+      const r = contrast(a, b);
+      add(theme, r >= MIN_CONTRAST, name, `${a} / ${b} = ${r.toFixed(2)}（${MIN_CONTRAST} 未満）`);
+    }
+  }
+  return results;
+}
+
+// --- 部品の層の検査（タスク 2.3） ---
+
+// 影のトークン（墨色の淡い 2 段）。:root（rust・coal・ayu 用の既定値）・light・navy の 3 か所に置く
+export const SHADOW_TOKENS = ['--claudia-shadow-1', '--claudia-shadow-2'];
+
+// 角丸の許容値（design「意匠」: 紙 14px・カード 10px・部品 4px。顔の円の 50%、角を立てる 0、継承）
+export const ALLOWED_RADII = new Set(['14px', '10px', '4px', '50%', '0', 'inherit']);
+
+// mdBook 0.5.x の highlight.css（light 用）の色の群。実行時に hljs 10.1.1 が付けるクラスのうち
+// 色が付くものはすべてここに入る。群の名前は --claudia-hl-<群> に対応する。
+export const HLJS_GROUPS = {
+  comment: ['comment', 'quote'],
+  variable: ['variable', 'template-variable', 'attribute', 'attr', 'tag', 'name', 'regexp', 'link',
+    'selector-id', 'selector-class'],
+  number: ['number', 'meta', 'built_in', 'builtin-name', 'literal', 'type', 'params'],
+  string: ['string', 'symbol', 'bullet'],
+  title: ['title', 'section'],
+  keyword: ['keyword', 'selector-tag'],
+};
+// 着色を上書きする範囲（light・navy と、JS 無効時の既定）
+export const HLJS_SCOPES = ['.light', '.navy', 'html:not(.js)'];
+
+// 出力 HTML 契約（design「データモデル / 出力 HTML 契約」）の台詞部品のクラス
+export const TALK_CLASSES = ['talk', ...SPEAKER_IDS.map((id) => `talk-${id}`), 'talk-left', 'talk-right',
+  'talk-face', 'talk-bubble', 'talk-name'];
+// 扉とクレジットのクラス契約（タスク 2.4 で決め、タスク 5.1 の introduction.md が使う）
+export const HERO_CLASSES = ['claudia-hero', 'hero-corner', 'hero-corner-tl', 'hero-corner-tr',
+  'hero-corner-bl', 'hero-corner-br', 'hero-latin', 'hero-faces', 'hero-face', 'hero-face-anthony',
+  'hero-toc', 'claudia-credit'];
+// 印刷で light の値に置き換える範囲（mdBook はテーマのクラスを html に付ける。JS 無効時は html:not(.js)）
+export const PRINT_SCOPES = ['html.light', 'html.navy', 'html.rust', 'html.coal', 'html.ayu', 'html:not(.js)'];
+
+// サイドバーと上部バーの規則（色と字体だけ。要件 1.8・9.3）
+// サイドバーの開閉で本文を押し出す仕組み（.page-wrapper・#mdbook-body-container）も同じ扱い
+const CHROME_SELECTOR_RE = /\.sidebar|#mdbook-sidebar|\.chapter|#mdbook-menu-bar|\.menu-bar|\.menu-title|\.page-wrapper|#mdbook-page-wrapper|#mdbook-body-container/;
+const CHROME_PROP_RE = /^(color|background-color|font-family|font-weight|font-style|letter-spacing|border(-block-end|-block-start|-inline-start|-inline-end)?-color)$/;
+
+// 色の直書きの検出（カスタムプロパティ名を取り除いてから見る。--claudia-gold の gold を拾わない）
+const COLOR_NAMES = ['white', 'black', 'red', 'green', 'blue', 'gray', 'grey', 'silver', 'maroon',
+  'purple', 'fuchsia', 'lime', 'olive', 'yellow', 'navy', 'teal', 'aqua', 'orange', 'brown', 'pink',
+  'gold', 'beige', 'ivory', 'tan', 'wheat', 'crimson', 'indigo', 'violet'];
+const COLOR_LITERAL_RE = new RegExp(
+  `#[0-9a-fA-F]{3,8}\\b|\\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\\(|\\b(${COLOR_NAMES.join('|')})\\b`, 'i');
+
+// @media 等の入れ子をたどり、葉の規則を { selector, decls: [[prop, value]], nested } で返す。
+// nested は最上位なら false、入れ子なら外側の前置き（例: "@media print"）
+export function leafRules(css) {
+  const out = [];
+  const walk = (src, nested) => {
+    for (const b of topLevelBlocks(src)) {
+      if (/^@(media|supports|layer)\b/.test(b.selector)) {
+        walk(b.body, b.selector);
+        continue;
+      }
+      const decls = [];
+      for (const part of b.body.split(';')) {
+        const i = part.indexOf(':');
+        if (i < 0) continue;
+        decls.push([part.slice(0, i).trim(), part.slice(i + 1).trim()]);
+      }
+      out.push({ selector: b.selector, decls, nested });
+    }
+  };
+  walk(css.replace(/\/\*[\s\S]*?\*\//g, ''), false);
+  return out;
+}
+
+// CSS 全文の部品の層を検査し、[{ ok, name, detail }] を返す
+export function checkComponents(css) {
+  const results = [];
+  const add = (ok, name, detail) => results.push({ ok, name, detail });
+  const rules = leafRules(css);
+  const each = function* (pred) {
+    for (const r of rules) for (const [prop, value] of r.decls) if (pred(prop, value, r)) yield `${r.selector} { ${prop}: ${value} }`;
+  };
+
+  // 色の直書き（カスタムプロパティの定義は除く）
+  const literal = [...each((p, v) => !p.startsWith('--') && COLOR_LITERAL_RE.test(v.replace(/--[\w-]+/g, '')))];
+  add(literal.length === 0, 'C-1 部品の層に色の直書きが無い', literal.join(' / '));
+
+  // 角丸の 3 段
+  const radii = [...each((p, v) => /^border(-[a-z-]+)?-radius$/.test(p) && v.split(/[\s/]+/).some((x) => !ALLOWED_RADII.has(x)))];
+  add(radii.length === 0, 'C-2 角丸は 14px・10px・4px の 3 段', radii.join(' / '));
+
+  // 影は 2 段のトークンだけ
+  const SHADOW_RE = /^var\(--claudia-shadow-[12]\)$/;
+  const shadows = [...each((p, v) => p === 'box-shadow' && v !== 'none' && !SHADOW_RE.test(v))];
+  add(shadows.length === 0, 'C-3 影は --claudia-shadow-1/-2 だけ', shadows.join(' / '));
+  const shadowUsed = [...each((p, v) => p === 'box-shadow' && SHADOW_RE.test(v))].length > 0;
+  add(shadowUsed, 'C-4 影のトークンを部品に当てている', '--claudia-shadow-1/-2 を参照する box-shadow が無い');
+
+  // 影のトークンの定義（:root・light・navy）
+  for (const [where, selector] of [[':root', ':root'], ['light', THEME_SELECTORS.light], ['navy', THEME_SELECTORS.navy]]) {
+    const tokens = readTokens(css, selector) ?? new Map();
+    for (const t of SHADOW_TOKENS) add(tokens.has(t), `C-5 ${where} にトークン ${t} がある`, '欠けている');
+  }
+
+  // 字体トークンの適用（本文ゴシック・見出し明朝。要件 1.3・1.4）。
+  // 本文は html か body の規則に、見出しは h1〜h6 をすべて含む規則に当てていること
+  const fontRule = (token, covers) => rules.some((r) => !r.nested
+    && r.decls.some(([p, v]) => p === 'font-family' && v === `var(${token})`)
+    && covers(r.selector.split(',').map((s) => s.trim())));
+  add(fontRule('--claudia-font-body', (sels) => sels.includes('html') || sels.includes('body')),
+    'C-6 本文の字体トークンを html か body に当てている', 'html・body の規則に font-family: var(--claudia-font-body) が無い');
+  add(fontRule('--claudia-font-heading', (sels) => [1, 2, 3, 4, 5, 6].every((n) => sels.some((s) => new RegExp(`(^|[\\s>])h${n}$`).test(s)))),
+    'C-6 見出しの字体トークンを h1〜h6 に当てている', 'h1〜h6 をすべて含む規則に font-family: var(--claudia-font-heading) が無い');
+
+  // サイドバーと上部バーは色と字体だけ
+  const chrome = [...each((p, _v, r) => CHROME_SELECTOR_RE.test(r.selector) && !CHROME_PROP_RE.test(p))];
+  add(chrome.length === 0, 'C-7 サイドバーと上部バーは色と字体だけを変える', chrome.join(' / '));
+
+  // highlight.js の兄弟クラス（最上位の規則だけを数える）
+  const painted = new Map(); // "<範囲> .hljs-<クラス>" -> 群
+  for (const r of rules) {
+    if (r.nested) continue;
+    const hl = r.decls.find(([p, v]) => p === 'color' && /^var\(--claudia-hl-\w+\)$/.test(v));
+    if (!hl) continue;
+    const group = hl[1].match(/--claudia-hl-(\w+)/)[1];
+    for (const sel of r.selector.split(',')) painted.set(sel.trim(), group);
+  }
+  for (const [group, classes] of Object.entries(HLJS_GROUPS)) {
+    for (const cls of classes) {
+      const missing = HLJS_SCOPES.filter((scope) => painted.get(`${scope} .hljs-${cls}`) !== group);
+      add(missing.length === 0, `C-8 .hljs-${cls} を --claudia-hl-${group} で塗る`, `範囲 ${missing.join('・')} で未設定または群が違う`);
+    }
+  }
+  return results;
+}
+
+// --- 台詞部品・扉・クレジット・狭い画面・印刷の層の検査（タスク 2.4） ---
+
+// セレクタ（カンマ区切りの 1 つ）が、最後の複合セレクタでクラス cls を対象にしているか（疑似要素は除く）
+const targets = (sel, cls) => !sel.includes('::') && new RegExp(`\\.${cls}(?![\\w-])[^\\s>+~]*$`).test(sel.trim());
+const usesClass = (r, cls) => new RegExp(`\\.${cls}(?![\\w-])`).test(r.selector);
+const decl = (r, prop) => r.decls.find(([p]) => p === prop)?.[1];
+const px = (v) => (/^\d+(\.\d+)?px$/.test(v ?? '') ? parseFloat(v) : NaN);
+
+// CSS 全文の台詞部品・扉・クレジット・狭い画面・印刷の層を検査し、[{ ok, name, detail }] を返す
+export function checkTalk(css) {
+  const results = [];
+  const add = (ok, name, detail) => results.push({ ok, name, detail });
+  const rules = leafRules(css);
+  const top = rules.filter((r) => !r.nested);
+  const inMedia = (re) => rules.filter((r) => r.nested && re.test(r.nested));
+  // cls を対象にする規則のうち、prop の値が pred を満たすものがあるか
+  const has = (list, cls, prop, pred) => list.some((r) => r.selector.split(',').some((s) => targets(s, cls)) && pred(decl(r, prop)));
+
+  // クラス契約（出力 HTML 契約・扉・クレジット）
+  for (const cls of [...TALK_CLASSES, ...HERO_CLASSES]) {
+    add(top.some((r) => usesClass(r, cls)), `C-9 クラス .${cls} の規則がある`, '最上位の規則で使っていない');
+  }
+  const head = css.match(/^\s*\/\*[\s\S]*?\*\//)?.[0] ?? '';
+  for (const cls of HERO_CLASSES) {
+    add(new RegExp(`(^|[^\\w-])${cls}(?![\\w-])`).test(head), `C-10 扉の契約 ${cls} を冒頭のコメントに書いている`, '冒頭のコメントに無い');
+  }
+
+  // 字体（要件 1.4）と顔の大きさ（要件 3.1・6.1）
+  add(has(top, 'talk-bubble', 'font-family', (v) => v === 'var(--claudia-font-talk)'),
+    'C-11 台詞本文に --claudia-font-talk を当てている', '.talk-bubble の font-family が無い');
+  add(has(top, 'talk-name', 'font-family', (v) => v === 'var(--claudia-font-latin)'),
+    'C-11 名札に --claudia-font-latin を当てている', '.talk-name の font-family が無い');
+  for (const [cls, size] of [['talk-face', 56], ['hero-face', 84]]) {
+    const ok = ['width', 'height'].every((p) => has(top, cls, p, (v) => px(v) === size))
+      && has(top, cls, 'border-radius', (v) => v === '50%');
+    add(ok, `C-12 .${cls} は ${size}px の円`, `width・height が ${size}px、border-radius が 50% の規則が無い`);
+  }
+
+  // 話し手ごとのトークン（要件 3.5）
+  const used = top.flatMap((r) => r.decls.map(([, v]) => v)).join(' ');
+  for (const t of SPEAKER_TOKENS) add(used.includes(`var(${t})`), `C-13 ${t} を部品に当てている`, '参照が無い');
+  // 新しい話し手（.talk-<id>）は CSS を足さなくてもクラウディア相当の既定色で描かれる（design「台詞部品」）
+  const base = top.filter((r) => r.selector.split(',').some((s) => s.trim() === '.talk'));
+  for (const k of ['ink', 'face', 'ring', 'name']) {
+    add(base.some((r) => decl(r, `--talk-speaker-${k}`) === `var(--talk-claudia-${k})`),
+      `C-14 .talk が既定の --talk-speaker-${k} をクラウディアの値で持つ`, '.talk の規則に無い');
+  }
+
+  // 狭い画面（要件 6.4・9.1・9.2。mdBook の切り替え点 620px・420px）
+  const n620 = inMedia(/^@media\b.*\(max-width:\s*620px\)/);
+  const n420 = inMedia(/^@media\b.*\(max-width:\s*420px\)/);
+  add(has(n620, 'talk-face', 'width', (v) => px(v) < 56), 'N-1 620px 以下で台詞の顔を小さくする', '@media (max-width: 620px) に .talk-face の width が無い');
+  add(has(n620, 'hero-face', 'width', (v) => px(v) < 84), 'N-1 620px 以下で扉の顔を小さくする', '@media (max-width: 620px) に .hero-face の width が無い');
+  add(n420.some((r) => usesClass(r, 'hero-toc') && decl(r, 'grid-template-columns') === '1fr'),
+    'N-2 420px 以下で扉の案内を 1 列にする', '@media (max-width: 420px) に .hero-toc の grid-template-columns: 1fr が無い');
+  add(has(top, 'talk-bubble', 'overflow-wrap', (v) => v === 'anywhere'),
+    'N-3 吹き出しは長い語でも折り返す（ページの横スクロールを出さない）', '.talk-bubble に overflow-wrap: anywhere が無い');
+
+  // 印刷（要件 3.10。どのテーマでも light の値）
+  const print = inMedia(/^@media\s+print\b/);
+  const light = readTokens(css, THEME_SELECTORS.light) ?? new Map();
+  const tokenRule = print.find((r) => {
+    const sels = r.selector.split(',').map((s) => s.trim());
+    return PRINT_SCOPES.every((s) => sels.includes(s));
+  });
+  add(!!tokenRule, `P-1 印刷で ${PRINT_SCOPES.join('・')} のトークンを再定義する`, '@media print にその規則が無い');
+  if (tokenRule) {
+    const pt = new Map(tokenRule.decls.filter(([p]) => p.startsWith('--')));
+    const diff = [...light].filter(([k, v]) => pt.get(k) !== v).map(([k]) => k);
+    const extra = [...pt.keys()].filter((k) => !light.has(k));
+    add(light.size > 0 && diff.length === 0 && extra.length === 0, 'P-2 印刷のトークンは light ブロックと同じ値',
+      [...diff.map((k) => `${k} が違う`), ...extra.map((k) => `${k} は light に無い`)].join('、'));
+  }
+  for (const cls of ['talk', 'claudia-hero']) {
+    add(has(print, cls, 'break-inside', (v) => v === 'avoid'), `P-3 印刷で .${cls} の途中で改ページしない`, 'break-inside: avoid が無い');
+  }
+  add(print.some((r) => /(^|\s)hr$/.test(r.selector) && decl(r, 'background') === 'none'
+      && /solid var\(--claudia-gold\)/.test(decl(r, 'border-top') ?? '')),
+    'P-4 印刷の区切り線は罫線で描く', '@media print に hr の background: none と border-top が無い');
+  add(print.some((r) => r.selector === '.content' && decl(r, 'overflow') === 'visible'),
+    'P-6 印刷では本文の枠をスクロールの箱にしない', '@media print に .content { overflow: visible } が無い');
+  const painted = new Map();
+  for (const r of print) {
+    const hl = decl(r, 'color')?.match(/^var\(--claudia-hl-(\w+)\)$/);
+    if (hl) for (const sel of r.selector.split(',')) painted.set(sel.trim(), hl[1]);
+  }
+  for (const [group, classes] of Object.entries(HLJS_GROUPS)) {
+    const missing = classes.filter((cls) => painted.get(`html .hljs-${cls}`) !== group);
+    add(missing.length === 0, `P-5 印刷ではどのテーマでも ${group} 群を --claudia-hl-${group} で塗る`,
+      `html .hljs-${missing.join('・')} が無いか群が違う`);
+  }
+  return results;
+}
+
+// --- テーマメニューの隠し規則の検査（タスク 2.5） ---
+
+// メニューに出さないテーマと、残すテーマ（mdBook 0.5.x のボタンの id。要件 2.1、design「ThemeMenu」）
+export const MENU_HIDDEN = ['rust', 'coal', 'ayu'];
+export const MENU_KEPT = ['default_theme', 'light', 'navy'];
+
+// CSS 全文のテーマメニューの隠し規則を検査し、[{ ok, name, detail }] を返す
+export function checkMenu(css) {
+  const results = [];
+  const add = (ok, name, detail) => results.push({ ok, name, detail });
+  const top = leafRules(css).filter((r) => !r.nested);
+  // id のボタンを display: none にする最上位の規則があるか（セレクタはカンマ区切りの 1 つが id だけのもの）
+  const hides = (name) => top.some((r) => r.decls.some(([p, v]) => p === 'display' && v === 'none')
+    && r.selector.split(',').some((s) => s.trim() === `#mdbook-theme-${name}`));
+  for (const name of MENU_HIDDEN) add(hides(name), `M-1 テーマメニューの ${name} を隠す`, `#mdbook-theme-${name} { display: none } が最上位に無い`);
+  // 残す項目は、どこでも（@media の中も含めて）隠さない
+  const hiddenKept = leafRules(css).filter((r) => r.decls.some(([p, v]) => (p === 'display' && v === 'none') || (p === 'visibility' && v === 'hidden'))
+    && MENU_KEPT.some((name) => new RegExp(`#mdbook-theme-${name}(?![\\w-])`).test(r.selector)));
+  add(hiddenKept.length === 0, 'M-2 テーマメニューの Auto・Light・Navy は隠さない', hiddenKept.map((r) => r.selector).join(' / '));
+  return results;
+}
+
+// --- 実行 ---
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  let passed = 0;
+  let failed = 0;
+  const check = (name, ok, detail) => {
+    if (ok) passed++;
+    else failed++;
+    console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !detail ? '' : '  -- ' + detail}`);
+  };
+
+  console.log('\n== (S) 検査器の自己確認 ==');
+  check('S-1 黒と白の対比は 21', Math.abs(contrast('#000000', '#ffffff') - 21) < 1e-9);
+  check('S-2 同色の対比は 1', contrast('#FAF5EA', '#FAF5EA') === 1);
+  {
+    const r = checkTheme('.light, html:not(.js) { --fg: #777777; --bg: #888888; }');
+    const miss = r.find((x) => x.name === 'トークン --links がある');
+    const low = r.find((x) => x.name === '対比 --fg / --bg');
+    const absent = r.find((x) => x.theme === 'navy');
+    check('S-3 欠けたトークンを失敗にする', miss && !miss.ok);
+    check('S-4 対比の不足を失敗にする', low && !low.ok);
+    check('S-5 ブロックが無いテーマを失敗にする', absent && !absent.ok);
+    const nested = checkTheme('@media print { .navy { --fg: #000000; } }').find((x) => x.theme === 'navy');
+    check('S-6 @media の中のブロックは数えない', nested && !nested.ok);
+    const named = checkTheme('.light, html:not(.js) { --fg: black; }').find((x) => x.name === '対比 --fg / --bg');
+    check('S-7 16 進色でない値を失敗にする', named && !named.ok && named.detail.includes('16 進色でない'));
+    const comp = (src, prefix) => checkComponents(src).find((x) => x.name.startsWith(prefix));
+    const lit = comp('.x { color: #fff; } .y { border-color: rgba(0,0,0,.1); }', 'C-1');
+    check('S-8 部品の色の直書きを失敗にする', lit && !lit.ok);
+    const tok = comp('.x { color: var(--claudia-gold); --y: #fff; }', 'C-1');
+    check('S-9 トークンの参照と定義は直書きに数えない', tok && tok.ok);
+    const rad = comp('.x { border-radius: 6px; }', 'C-2');
+    check('S-10 3 段以外の角丸を失敗にする', rad && !rad.ok);
+    const sh = comp('.x { box-shadow: 0 1px 2px var(--fg); }', 'C-3');
+    check('S-11 トークン以外の影を失敗にする', sh && !sh.ok);
+    const side = comp('.sidebar { width: 300px; color: var(--fg); }', 'C-7');
+    check('S-12 サイドバーの幅の上書きを失敗にする', side && !side.ok);
+    const hl = comp('@media print { .light .hljs-symbol, .navy .hljs-symbol, html:not(.js) .hljs-symbol { color: var(--claudia-hl-string); } }', 'C-8 .hljs-symbol');
+    check('S-13 @media の中の着色は数えない', hl && !hl.ok);
+    const hlok = comp('.light .hljs-symbol, .navy .hljs-symbol, html:not(.js) .hljs-symbol { color: var(--claudia-hl-string); }', 'C-8 .hljs-symbol');
+    check('S-14 3 つの範囲を同じ群で塗れば合格', hlok && hlok.ok);
+    const elsewhere = comp('.menu-title { font-family: var(--claudia-font-body); }', 'C-6 本文');
+    check('S-15 本文の字体トークンを html・body 以外にだけ当てても失敗', elsewhere && !elsewhere.ok);
+    const partial = comp('.content h1, .content h2 { font-family: var(--claudia-font-heading); }', 'C-6 見出し');
+    check('S-16 見出しの字体トークンが h1〜h6 の一部だけなら失敗', partial && !partial.ok);
+    const push = comp('#mdbook-sidebar-toggle-anchor:checked ~ .page-wrapper { margin-inline-start: 0; }', 'C-7');
+    check('S-17 本文を押し出す仕組みの上書きを失敗にする', push && !push.ok);
+    const talk = (src, prefix) => checkTalk(src).find((x) => x.name.startsWith(prefix));
+    const scopes = PRINT_SCOPES.join(', ');
+    const pr = talk(`.light, html:not(.js) { --fg: #111111; --bg: #222222; } @media print { ${scopes} { --fg: #111111; --bg: #333333; } }`, 'P-2');
+    check('S-18 印刷のトークンが light と違えば失敗', pr && !pr.ok && pr.detail.includes('--bg'));
+    const prok = talk(`.light, html:not(.js) { --fg: #111111; } @media print { ${scopes} { --fg: #111111; } }`, 'P-2');
+    check('S-19 印刷のトークンが light と同じなら合格', prok && prok.ok);
+    const face = talk('.talk-face { width: 48px; height: 56px; border-radius: 50%; }', 'C-12 .talk-face');
+    check('S-20 56px でない顔を失敗にする', face && !face.ok);
+    const faceok = talk('.talk .talk-face { width: 56px; height: 56px; border-radius: 50%; }', 'C-12 .talk-face');
+    check('S-21 56px の円の顔は合格', faceok && faceok.ok);
+    const narrow = talk('.talk-face { width: 40px; }', 'N-1 620px 以下で台詞');
+    check('S-22 @media の外の小さい顔は狭い画面の規則に数えない', narrow && !narrow.ok);
+    const headOk = talk('/* claudia-hero */ .x {}', 'C-10 扉の契約 claudia-hero ');
+    const headNg = talk('.x {} /* claudia-hero */', 'C-10 扉の契約 claudia-hero ');
+    check('S-23 扉の契約は冒頭のコメントだけを見る', headOk && headOk.ok && headNg && !headNg.ok);
+    const menu = (src, prefix) => checkMenu(src).find((x) => x.name.startsWith(prefix));
+    const m1 = menu('#mdbook-theme-rust, #mdbook-theme-coal { display: none; }', 'M-1 テーマメニューの ayu');
+    check('S-24 隠し規則に無いテーマを失敗にする', m1 && !m1.ok);
+    const m1media = menu('@media print { #mdbook-theme-ayu { display: none; } }', 'M-1 テーマメニューの ayu');
+    check('S-25 @media の中の隠し規則は数えない', m1media && !m1media.ok);
+    const m2 = menu('#mdbook-theme-rust, #mdbook-theme-navy { display: none; }', 'M-2');
+    check('S-26 Navy を隠せば失敗', m2 && !m2.ok);
+    const m2ok = menu('#mdbook-theme-navy { color: var(--fg); } #mdbook-theme-navyish { display: none; }', 'M-2');
+    check('S-27 残す項目の色の規則や似た id は隠したことに数えない', m2ok && m2ok.ok);
+  }
+
+  let css = null;
+  try {
+    css = readFileSync(CSS_PATH, 'utf8');
+  } catch (e) {
+    check('T-0 claudia.css を読める', false, `${CSS_PATH}: ${e.code ?? e.message}`);
+  }
+  if (css !== null) {
+    for (const theme of Object.keys(THEME_SELECTORS)) {
+      console.log(`\n== (${theme}) トークンと対比 ==`);
+      for (const r of checkTheme(css).filter((x) => x.theme === theme)) check(r.name, r.ok, r.detail);
+    }
+    console.log('\n== (C) 部品の層 ==');
+    for (const r of checkComponents(css)) check(r.name, r.ok, r.detail);
+    console.log('\n== (C・N・P) 台詞部品・扉・クレジット・狭い画面・印刷 ==');
+    for (const r of checkTalk(css)) check(r.name, r.ok, r.detail);
+    console.log('\n== (M) テーマメニュー ==');
+    for (const r of checkMenu(css)) check(r.name, r.ok, r.detail);
+  }
+
+  console.log(`\n結果: ${passed} passed, ${failed} failed`);
+  process.exit(failed === 0 ? 0 : 1);
+}

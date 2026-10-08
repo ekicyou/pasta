@@ -107,7 +107,7 @@ metadata:
 | `pasta.word`                  | 単語ビルダー           | `WORD.create_global()`, `WORD.create_local()`, `WORD.create_actor()` |
 | `pasta.global`                | ユーザー定義関数       | `GLOBAL.関数名 = function(act) ... end`                              |
 | `pasta.save`                  | 永続化データ           | `require("pasta.save")`                                              |
-| `pasta.act`                   | シーン実行コンテキスト | `act:init_scene()`, `act:talk()`, `act:yield()`, `act:choice()`, `act:choice_timeout()`, `act:actor_proxy()`, `act:global_fn()`, `act:arith()`, `act:concat()` |
+| `pasta.act`                   | シーン実行コンテキスト | `act:init_scene()`, `act:talk()`, `act:yield()`, `act:choice()`, `act:choice_timeout()`, `act:actor_proxy()`, `act:global_fn()` |
 | `pasta.shiori.event.register` | イベントハンドラ登録   | `REG.EventName = function(act) ... end`                              |
 | `pasta.shiori.res`            | SHIORIレスポンス       | `RES.ok()`, `RES.no_content()`                                       |
 

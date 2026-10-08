@@ -3,6 +3,7 @@
 //! This module provides configuration file parsing and default values
 //! for the pasta loader startup sequence.
 
+use pasta_core::{SceneAliasError, SceneAliasTable};
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;
@@ -19,7 +20,14 @@ pub struct PastaConfig {
 
     /// All other fields/sections (custom user configuration)
     /// Note: The [loader] section is explicitly excluded.
+    /// `[scene]` stays here as written (the alias table is NOT filled in).
     pub custom_fields: toml::Table,
+
+    /// Effective scene alias table (`[scene.alias]`, or the builtin default).
+    pub scene_aliases: SceneAliasTable,
+
+    /// Where `scene_aliases` came from (for the load-time log).
+    pub scene_alias_source: SceneAliasSource,
 }
 
 impl Default for PastaConfig {
@@ -27,6 +35,8 @@ impl Default for PastaConfig {
         Self {
             loader: LoaderConfig::default(),
             custom_fields: toml::Table::new(),
+            scene_aliases: SceneAliasTable::builtin_default(),
+            scene_alias_source: SceneAliasSource::BuiltinDefault,
         }
     }
 }
@@ -67,6 +77,10 @@ impl PastaConfig {
             LoaderConfig::default()
         };
 
+        // [scene.alias] is read from the same content again for span info;
+        // [scene] itself stays in custom_fields as written.
+        let (scene_aliases, scene_alias_source) = Self::parse_scene_aliases(content)?;
+
         // Everything else becomes custom_fields
         let custom_fields = table;
 
@@ -74,6 +88,8 @@ impl PastaConfig {
         let mut config = Self {
             loader,
             custom_fields,
+            scene_aliases,
+            scene_alias_source,
         };
 
         // Single SHIORI-defaults completion choke point: applied exactly once,
@@ -84,6 +100,58 @@ impl PastaConfig {
         config.apply_shiori_defaults();
 
         Ok(config)
+    }
+
+    /// Read `[scene.alias]` into the effective alias table and its source.
+    ///
+    /// No `alias` table → builtin default. A present `alias` table (even with
+    /// no rows) is the author's table, used as written (never merged with the
+    /// default). Type mismatches come from toml with line/column; semantic
+    /// errors (empty name, duplicate, chain) get the target key, the alias and
+    /// the alias's line number appended.
+    fn parse_scene_aliases(
+        content: &str,
+    ) -> Result<(SceneAliasTable, SceneAliasSource), toml::de::Error> {
+        let probe: SceneProbe = toml::from_str(content)?;
+        let Some(map) = probe.scene.and_then(|s| s.alias) else {
+            return Ok((
+                SceneAliasTable::builtin_default(),
+                SceneAliasSource::BuiltinDefault,
+            ));
+        };
+
+        let entries = map.iter().map(|(target, aliases)| {
+            (
+                target.clone(),
+                aliases
+                    .iter()
+                    .map(|a| a.get_ref().clone())
+                    .collect::<Vec<_>>(),
+            )
+        });
+        let table = SceneAliasTable::from_entries(entries).map_err(|e| {
+            // Locate the aliases the error is about, with their line numbers.
+            let hit = |target: &str, alias: &str| match &e {
+                SceneAliasError::EmptyName { .. } => target.is_empty() || alias.is_empty(),
+                SceneAliasError::DuplicateAlias { alias: dup, .. } => alias == dup,
+                SceneAliasError::Chain { name } => alias == name,
+            };
+            let locations: Vec<String> = map
+                .iter()
+                .flat_map(|(target, aliases)| aliases.iter().map(move |a| (target, a)))
+                .filter(|(target, a)| hit(target, a.get_ref()))
+                .map(|(target, a)| {
+                    let line = content[..a.span().start].matches('\n').count() + 1;
+                    format!("[scene.alias] {target} = \"{}\" (line {line})", a.get_ref())
+                })
+                .collect();
+            if locations.is_empty() {
+                serde::de::Error::custom(e)
+            } else {
+                serde::de::Error::custom(format!("{e}; at {}", locations.join(", ")))
+            }
+        })?;
+        Ok((table, SceneAliasSource::PastaToml))
     }
 
     /// Fill missing SHIORI-profile defaults into `custom_fields`.

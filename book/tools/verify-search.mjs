@@ -19,6 +19,9 @@
 //   あることを、実ビルド HTML から抽出した tokenizer を実行して逐語照合で確認する。
 //   不一致＝索引とクエリの分割規則がずれ検索が破綻する回帰を検出する。
 //
+//   manual-claudia-theme タスク 3.6（要件 8.1, 8.2, 10.5）: SUMMARY 全章について、最初の台詞の
+//   本文から切り出した日本語片で検索し、その章がヒットする（台詞の本文が索引に入る）ことを確かめる。
+//
 // 設計参照: design.md「Bigram Search」「Testing Strategy / 日本語検索」。
 //
 // 依存ゼロ（Node 標準ライブラリ ＋ 同梱 elasticlunr のみ）。成功で exit 0、失敗で exit 1。
@@ -26,6 +29,7 @@
 // 使い方:
 //   node book/tools/verify-search.mjs            # 必要ならビルド＋bigram再生成して検証
 //   node book/tools/verify-search.mjs --no-build # 既存出力をそのまま検証（再生成のみ実施）
+//   node book/tools/verify-search.mjs --self-test # 台詞の検索の検査ロジック自身の自己テストも実行
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,9 +38,11 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { tokenize } from './bigram-index/tokenize.mjs';
+import { scanTalk } from './talk/talk.mjs';
 import {
   resolveHashed,
   readSearchIndex,
+  rebuildBigramIndex,
   SIZE_WARN_THRESHOLD_BYTES,
 } from './bigram-index/build-index.mjs';
 
@@ -49,6 +55,7 @@ const buildIndexScript = path.resolve(here, 'bigram-index/build-index.mjs');
 
 const args = new Set(process.argv.slice(2));
 const NO_BUILD = args.has('--no-build');
+const SELF_TEST = args.has('--self-test');
 
 // --- 最小 assert ハーネス（依存ゼロ） ---
 let passed = 0;
@@ -112,6 +119,27 @@ function corpusOf(indexObj) {
   return Object.values(docs)
     .map((d) => `${d.title || ''} ${d.body || ''} ${d.breadcrumbs || ''}`)
     .join(' ');
+}
+
+// 台詞の検索語（要件 8.2 / 10.5）: 章の最初の台詞の本文から、インライン記法（コード・画像・
+// リンク記法・HTML タグ・強調）を除き、先頭の連続 4 文字以上の日本語片を返す。無ければ null。
+// 記法の跡は空白に置き換えて日本語片を切る（索引側で要素の境目が繋がるかに頼らない）。
+function talkQuery(markdown) {
+  const first = scanTalk(markdown).blocks[0];
+  if (!first) return null;
+  const plain = first.body
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, ' $1 ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[*_~]/g, ' ');
+  const m = plain.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]{4,}/);
+  return m ? m[0] : null;
+}
+
+// 検索結果の doc_url（アンカー付き）に、その章の HTML が含まれるか。
+function talkHit(urls, chapterHtml) {
+  return urls.some((u) => (u || '').split('#')[0] === chapterHtml);
 }
 
 // =========================================================================
@@ -215,6 +243,32 @@ for (const w of ['ゑゐ', 'をゎ', 'ヿヶ']) {
   const r = searchResults(elasticlunr, indexObj, w);
   check(`無関係語「${w}」は 0 ヒット（コーパス不在=${!present}）`,
     !present && r.urls.length === 0, `urls=${JSON.stringify(r.urls.slice(0, 5))}`);
+}
+log('');
+
+// =========================================================================
+// 8.2 / 10.5: 台詞部品の本文が索引に入り、台詞の語でその章がヒットする。
+//   SUMMARY 全章について、最初の台詞の本文から切り出した語（talkQuery）で検索し、
+//   結果にその章の HTML（アンカー違いを含む）が含まれることを確かめる。
+//   台詞の無い章・4 文字以上の日本語片が無い章は、その章の失敗として報告する。
+// =========================================================================
+log('--- 8.2/10.5 台詞の本文が索引に入る（台詞の語で章がヒット）---');
+{
+  const srcDir = path.join(bookDir, 'src');
+  const summary = fs.readFileSync(path.join(srcDir, 'SUMMARY.md'), 'utf8');
+  const chapters = [...new Set([...summary.matchAll(/\]\(([^)]+\.md)\)/g)].map((m) => m[1].trim()))];
+  for (const md of chapters) {
+    const q = talkQuery(fs.readFileSync(path.join(srcDir, md), 'utf8'));
+    if (q === null) {
+      check(`8.2: ${md} の最初の台詞の語で章がヒットする`, false,
+        '台詞が無い（または最初の台詞に 4 文字以上の日本語片が無い）');
+      continue;
+    }
+    const html = md.replace(/\.md$/, '.html');
+    const r = searchResults(elasticlunr, indexObj, q);
+    check(`8.2: ${md} の最初の台詞の語「${q}」で章がヒットする`, talkHit(r.urls, html),
+      `urls=${JSON.stringify(r.urls.slice(0, 5))}`);
+  }
 }
 log('');
 
@@ -352,6 +406,42 @@ log('--- 回帰防止: クエリ tokenizer が索引 tokenize.mjs と一致 ---'
   }
 }
 log('');
+
+// =========================================================================
+// 自己テスト（--self-test）: 台詞の検索語の切り出しとヒット判定が本物であることを確かめる。
+//   合成の 2 章を検査本体と同じ bigram 索引の経路（rebuildBigramIndex → searchResults）で引く。
+// =========================================================================
+if (SELF_TEST) {
+  log('=== SELF-TEST（台詞の検索の検査ロジック）===');
+  const mdA = '# A\n\n> 【にっこり】**強調**と`コード`と[リンクの文字](x.md)、それから台詞の語です。\n\n---\n\n> 【アンソニー】二つ目の台詞です。\n';
+  const mdB = '# B\n\n> 普通の引用です。\n\n```text\n> 【素】フェンスの中は台詞でない\n```\n';
+  check('self-test: 記法を除いた最初の 4 文字以上の日本語片を切り出す',
+    talkQuery(mdA) === 'リンクの文字', `got=${talkQuery(mdA)}`);
+  check('self-test: 台詞の無い章（引用・フェンスの中だけ）は検索語なし', talkQuery(mdB) === null,
+    `got=${talkQuery(mdB)}`);
+  check('self-test: 4 文字以上の日本語片が無い台詞は検索語なし',
+    talkQuery('# C\n\n> 【素】`ああああ` は **いい** OK\n') === null);
+
+  const fake = {
+    doc_urls: ['a.html#a', 'b.html#b'],
+    index: {
+      ref: 'id',
+      fields: ['title', 'body', 'breadcrumbs'],
+      documentStore: {
+        docs: {
+          0: { id: '0', title: 'A', body: '強調とコードとリンクの文字、それから台詞の語です。', breadcrumbs: 'A' },
+          1: { id: '1', title: 'B', body: '普通の引用です。', breadcrumbs: 'B' },
+        },
+      },
+    },
+  };
+  const fakeIdx = rebuildBigramIndex(elasticlunr, fake);
+  const urls = searchResults(elasticlunr, fakeIdx, talkQuery(mdA)).urls;
+  check('self-test: 台詞の語で、その章（アンカー違い）がヒットする', talkHit(urls, 'a.html'),
+    JSON.stringify(urls));
+  check('self-test: 台詞の語で、別の章はヒットとしない', !talkHit(urls, 'b.html'), JSON.stringify(urls));
+  log('');
+}
 
 log(`RESULT: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

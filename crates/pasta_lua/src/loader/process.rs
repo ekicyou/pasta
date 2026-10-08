@@ -106,8 +106,8 @@ impl PastaLoader {
         pasta_files: &[std::path::PathBuf],
         lua_files: &[std::path::PathBuf],
         cache_manager: &CacheManager,
+        transpiler: &LuaTranspiler,
     ) -> Result<(TranspileContext, Vec<String>, ProcessStats), LoaderError> {
-        let transpiler = LuaTranspiler::default();
         let mut combined_context = TranspileContext::new();
         let total_count = pasta_files.len() + lua_files.len();
         let mut module_names = Vec::with_capacity(total_count);

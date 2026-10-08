@@ -36,9 +36,9 @@ crates/pasta_sample_ghost/
 ├── ghosts/                 # サンプルゴースト本体（SSOT・配布物）
 │   └── hello-pasta/        # ゴーストID
 │       ├── install.txt
-│       ├── ghost/master/   # descript.txt, pasta.toml, dic/*.pasta（手書きSSOT）＋ pasta.dll, scripts/（生成物）
+│       ├── ghost/master/   # descript.txt, pasta.toml, dic/*.pasta（手書きSSOT）＋ pasta.dll, THIRD_PARTY_LICENSES.txt, scripts/（生成物・コミットしない）
 │       └── shell/master/   # descript.txt（手書き）＋ surfaces.txt, surface*.png（生成物）
-├── release.ps1             # ビルド＋セットアップ＋.nar パッケージ作成
+├── release.ps1             # ビルド＋セットアップ＋.nar・pasta.dll.zip 作成（動作確認用）
 ├── build.rs                # ビルドスクリプト
 └── tests/
     ├── common/mod.rs                 # テストヘルパー
@@ -65,16 +65,19 @@ crates/pasta_sample_ghost/
 .\release.ps1 -SkipSetup
 ```
 
-このスクリプトは以下の 6 ステップを実行します:
+このスクリプトは以下の 7 ステップを実行します:
 
 1. `pasta_shiori` DLL（32bit Windows）をビルド
 2. ゴースト画像を生成（`cargo run` → surface*.png + surfaces.txt）
-3. `pasta.dll` と Lua ランタイム（`scripts/`）を `ghosts/hello-pasta/ghost/master/` に配置
-4. `pasta_check release` を実行（updates.txt / `.nar` パッケージ作成）
-5. バージョン整合チェック
-6. リリース手順の表示
+3. `pasta.dll`・第三者ライセンス表示（`THIRD_PARTY_LICENSES.txt`）・Lua ランタイム（`scripts/`）を `ghosts/hello-pasta/ghost/master/` に配置
+4. `pasta_check release` を実行（updates.txt / `release/hello-pasta.nar` 作成）
+5. `release/pasta.dll.zip` を作成（`pasta.dll` と `THIRD_PARTY_LICENSES.txt`）
+6. バージョン整合チェック
+7. リリース手順の表示
 
 **注**: テキスト系配布ファイル（`descript.txt` / `pasta.toml` / `dic/*.pasta` / `install.txt`）は `ghosts/hello-pasta/` に手書きで配置済みのため、コピー工程はありません。`release.ps1` は生成物（画像・DLL・ランタイム）の配置とパッケージングのみを担います。
+
+**注**: `release.ps1` の成果物は手元の動作確認用で、コミットの対象ではありません。手順 3 で `ghost/master/` に置く `pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`scripts/` と、出力先の `release/` は `.gitignore` で無視されます（シェルの画像 `surface*.png`・`surfaces.txt` は従来どおり追跡します）。配布物の公開は、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）がソースから作り直して行います。手順は [RELEASE.md](RELEASE.md) を参照してください。
 
 ### 配布物の確認
 
@@ -137,8 +140,9 @@ hello-pasta/
 │       │   ├── choice.pasta
 │       │   ├── click.pasta
 │       │   └── talk.pasta
-│       ├── pasta.dll           # [gen] SHIORI DLL（cargo build）
-│       └── scripts/            # [gen] Lua ランタイム（pasta_lua/scripts/）
+│       ├── pasta.dll           # [gen] SHIORI DLL（cargo build・コミットしない）
+│       ├── THIRD_PARTY_LICENSES.txt # [gen] 第三者ライセンス表示（cargo about・コミットしない）
+│       └── scripts/            # [gen] Lua ランタイム（pasta_lua/scripts/ の写し・コミットしない）
 └── shell/
     └── master/
         ├── descript.txt        # [SSOT]

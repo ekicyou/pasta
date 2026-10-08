@@ -1,7 +1,10 @@
 # ランタイム実行モデル
 
-ごきげんよう。シーンが途中で止まり、次のイベントで続きから話し出す――あの不思議な振る舞いの種明かしをいたしますわ。
-VM の組み立てからコルーチンの回し方、永続化まで、わたくしについていらっしゃい。さあ、参りましょう。
+> 【したり顔】シーンが途中で言葉を止め、次のイベントで続きから話し出す――あの不思議な振る舞いの種明かしをいたしますわ。
+
+> 【アンソニー】黙っている間、話の続きはどこにしまってあるのでございましょう。
+
+> 【クローディア】それを追いかけるのが、この章の道のりですの。VM の組み立てからコルーチンの回し方、永続化まで、わたくしについていらっしゃい。
 
 ---
 
@@ -115,14 +118,14 @@ from_loader_with_scene_dic
        std_package を欠けば ConfigError::MissingRequiredLibrary で失敗（VM を作らない）
     b. libs を mlua の StdLib に変換し、Lua::unsafe_new_with で VM を作る
        math があれば、時刻とプロセス ID から作った種で math.randomseed を呼ぶ
-    c. @pasta_search を登録（トランスパイル時の TranspileContext のレジストリから）
+    c. @pasta_search を登録（トランスパイル時の TranspileContext のレジストリと、RuntimeConfig の別名表から）
     d. libs に応じて @assertions・@testing・@env・@regex・@json・@yaml を登録
     e. @pasta_log を登録（libs に依らず常に）
     f. debug::enable を 1 回だけ呼ぶ（無効なら何もしない）
  2. ロガー・PastaConfig・ベースディレクトリを構造体に保持
  3. package.path を設定し、require の searcher を差し替える
  4. @pasta_config・@enc・@pasta_persistence・@pasta_log・@pasta_sakura_script を登録
- 5. pasta.finalize_scene を Rust の実装で上書き
+ 5. pasta.finalize_scene を Rust の実装で上書き（同じ別名表をクロージャに保持する）
  6. require("main")
  7. require("pasta.shiori.entry")
  8. require("pasta.scene_dic")   … 全シーンモジュールの require と finalize_scene()
@@ -387,5 +390,8 @@ VM の構築      register_persistence_module → persistence::register
 
 ---
 
-止まっては動き、動いては止まる――コルーチンとは、なかなか健気なものでございましょう？
-次は、内部モジュールの一つひとつを手に取って確かめて参りますわよ！
+> 【落胆】止まっては動き、動いては止まる――そんな健気なコルーチンなのに、LuaJIT 2.1 には `coroutine.close` がございませんの。閉じてあげることすらできませんのよ……。
+
+> 【アンソニー】参照を外して、GC に静かに引き取ってもらうのでございますね。
+
+> 【お辞儀】おやすみなさいまし、と見送るのも務めのうちですわ。次は、内部モジュールを一つひとつ手に取って確かめて参りましょう。

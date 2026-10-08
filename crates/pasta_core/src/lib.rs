@@ -22,8 +22,11 @@ pub mod error;
 pub mod registry;
 
 // Convenience re-exports
-pub use error::{SceneTableError, SceneTableResult, WordTableError, WordTableResult};
+pub use error::{
+    SceneAliasError, SceneTableError, SceneTableResult, WordTableError, WordTableResult,
+};
 pub use registry::{
-    DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneEntry, SceneId, SceneInfo,
-    SceneRegistry, SceneScope, SceneTable, WordCacheKey, WordDefRegistry, WordEntry, WordTable,
+    DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable, SceneEntry,
+    SceneId, SceneInfo, SceneRegistry, SceneScope, SceneTable, WordCacheKey, WordDefRegistry,
+    WordEntry, WordTable,
 };
