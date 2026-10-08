@@ -91,7 +91,7 @@
 | **B. `theme/css/*.css` を丸ごと上書き** | mdBook の `variables.css`・`general.css`・`chrome.css`・`print.css` をコピーして編集 | 完全な制御 | mdBook のバージョン更新ごとに手動マージ。差分が大きい |
 | **C. A ＋必要箇所だけ `index.hbs`** | 基本は A。扉や上部バーに構造の変更が必要なら `index.hbs` を上書き | 構造変更の自由 | `index.hbs` 上書きは mdBook 更新との競合リスク。扉は `introduction.md` 内の HTML で足りる見込み |
 
-**テーマメニューの 2 択化（議題 3 で確定）**: `rust`・`coal`・`ayu` をメニューから隠す方法は設計判断。候補は (a) `additional-css` で `#theme-list li[role=menuitem]` の該当 `id`（`#rust`・`#coal`・`#ayu`）を `display:none`（最小。`index.hbs` 不要）、(b) `index.hbs` を上書きしてメニュー項目を削る（mdBook 更新との競合リスク）。保存値が `rust` 等の読者には既定 CSS 変数のまま表示されるため、要件 2.4 の「読める」は mdBook 既定テーマの可読性で満たす。
+**テーマメニューの 2 択化（議題 3 で確定）**: `rust`・`coal`・`ayu` をメニューから隠す方法は設計判断。候補は (a) `additional-css` で該当ボタンの `id`（0.5 系の実 id は `#mdbook-theme-rust`・`#mdbook-theme-coal`・`#mdbook-theme-ayu`。設計フェーズで実測・訂正）を `display:none`（最小。`index.hbs` 不要）、(b) `index.hbs` を上書きしてメニュー項目を削る（mdBook 更新との競合リスク）。保存値が `rust` 等の読者には既定 CSS 変数のまま表示されるため、要件 2.4 の「読める」は mdBook 既定テーマの可読性で満たす。
 
 **所見**: A を基本にする。扉は `introduction.md` に HTML を直接書けば `index.hbs` は不要（非生成章・`verify-content` F 系は Markdown の表を見るので共存可）。
 
