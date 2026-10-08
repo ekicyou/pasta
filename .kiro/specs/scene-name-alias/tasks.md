@@ -94,7 +94,7 @@
   - _Boundary: Tests (cache)_
   - _Depends: 5_
 
-- [ ] 6.4 (P) `＊会話` だけのゴーストがランダムトークを発行する SHIORI E2E
+- [x] 6.4 (P) `＊会話` だけのゴーストがランダムトークを発行する SHIORI E2E
   - `＊会話` を 2 つだけ持ち `＊OnTalk` の無い独自の最小 fixture ゴーストを用意する（hello-pasta とそのゴールデンテストには触れない）
   - SHIORI として読み込み、OnBoot の後に既存の OnTalk 発行テストと同じ手順で仮想ディスパッチャの状態を進めて OnSecondChange を送り、応答に `＊会話` の台詞が含まれることを確かめる
   - 同じゴーストに空の `[scene.alias]` を書いた版では OnTalk が発行されないことを確かめる
