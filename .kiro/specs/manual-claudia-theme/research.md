@@ -37,7 +37,8 @@
 - **顔アイコン**: `site/img/f0.png`〜`f9.png`・`f25.png`〜`f28.png`（Claudia 14 種、各 15〜43KB）、`f10.png`・`f11.png`（アンソニー）。番号はシェルの `surfacetable.txt` のサーフェス ID と一致し、表情名が確定できる:
   `0 素／1 照れ／2 驚き／3 不安／4 落胆／5 高笑い／6 目閉じ／7 不機嫌／8 冷笑／9 照れ怒り／25 にっこり／26 したり顔／27 考え中／28 お辞儀（カーテシー）`
 - **アンソニー（相方の執事。要件ディスカッションで話し手に追加）**: `surfacetable.txt` の `group,アンソニー` は `10,素`・`11,刮目`（＋ドラッグ中）。参考サイトは `.talk.anthony .f { background: #EEF2FA; }` で顔アイコンの背景だけを青みに変え、台詞は執事の丁寧語（「〜でございます」「お嬢様」）。マニュアルでは文字色の色味（Claudia 赤み・アンソニー青み）を話し手ごとの CSS クラスで切り替える。
-- **立ち絵**: `site/img/s0.png`（172KB）・`s5.png`（166KB）・`s10.png`（44KB・アンソニー）が合成済みの立ち絵。`shell/master/surface*.png` は要素合成前のパーツ（`surface0.png` は 509 バイト、`surfaces.txt` で合成）のため、表紙にはサイト側の `s*.png` を使うのが簡単。
+- **立ち絵は使わない（議題 2 で決定）**: `site/img/s0.png`（172KB）等の合成済み立ち絵は取り込まない。表紙も顔アイコン 2 枚で構成する。
+- **承認済みモックアップ**: `mockup.mjs`（本フォルダ。顔アイコンを取り寄せたディレクトリを渡すと単一 HTML を生成）。CSS 変数の初期値（ライト／navy）、台詞部品の構造（`.talk.claudia`／`.talk.anthony`、左右振り分け、顔 56px、名札は Cormorant 斜体）、扉の構造はここが出発点。
 - **ライセンス**: GitHub API で `spdx_id: Unlicense` を確認。
 - **意匠の部品**: `.paper.hero`（角飾り `.corner tl/tr/bl/br`）・`.divider`（金の菱形）・`.card`・`.steps`・`.paper.letter`（`.seal` 封蝋）・`.note`・`.caption`・`.latin`（Cormorant 斜体の添え字）。
 
@@ -50,13 +51,13 @@
 | R1 テーマ（ライト） | mdBook 既定 `light` の CSS 変数（`variables.css`）・`general.css`・`chrome.css` | Claudia 配色・字体・角丸・区切り・枠の CSS 一式が無い。`additional-css` で変数と部品を上書きする経路は mdBook が提供済み | Missing |
 | R1.3–1.6 字体 | mdBook 同梱の Open Sans／Source Code Pro（`theme/fonts/fonts.css`・woff2 同梱。`verify-static` R3.4 が woff2 の存在を見る） | 日本語 Web フォントの読み込み経路（Google Fonts `<link>` か同梱）が無い。フォールバック字体の指定も無い | Missing／未確定事項 3・8 |
 | R1.7 全ページ適用 | `index.hbs` が全章・`print.html`・検索結果に共通 | `additional-css` は全ページに入る。問題なし | — |
-| R2 ダーク | mdBook の `.navy`・`.coal`・`.rust`・`.ayu` クラスに CSS 変数が定義済み | テーマごとの Claudia 配色の変数上書きが無い。顔アイコン・立ち絵の縁の処理が無い | Missing |
+| R2 ダーク | mdBook の `.navy`・`.coal`・`.rust`・`.ayu` クラスに CSS 変数が定義済み | テーマごとの Claudia 配色の変数上書きが無い。顔アイコンの縁の処理が無い | Missing |
 | R3 台詞部品（表示） | なし。参考サイトの `.talk` は画像方式 | 文字の吹き出し＋円形顔アイコンの部品を新規に作る。表情→画像の対応表が要る（1.3 で確定） | Missing |
 | R4 記法 | Markdown のみ。mdBook は生 HTML をそのまま通す | 「HTML を直接書かない」記法と、それを HTML に変える変換が無い。変換の置き場所が設計の中心論点（§3） | Missing |
 | R4.4–4.5 執筆規約 | `AUTHORING.md` 第 1〜6 節・チェックリスト | 台詞部品の節と、基準ボイスサンプルの置き換えが無い。`getting-started-story-guide` と別の節を触る（rebase 前提） | Missing |
 | R5 全章置き換え | 47 章すべてが「導入 → `---` → 本文 → `---` → 締め」で統一されている | 置き換えは機械的に進められる。表情の付与基準が無い（未確定事項 7） | Constraint |
 | R5.4 生成物不変 | `extractBody` が導入・締めを捨てる | 記法が `---` の外側に収まる限り生成物は不変。記法が `---` を含むと `bad-structure` になる（記法設計の制約） | Constraint |
-| R6 表紙の扉 | `introduction.md` の冒頭段落と F 系検査 | 扉の HTML（角飾り紙枠・立ち絵）が無い。`introduction.md` は非生成章なので HTML を直接置いてよい（`link-check` は HTML タグのリンクを検査しないため、画像参照は `verify-static` の `src` 実在検査が担う） | Missing |
+| R6 表紙の扉 | `introduction.md` の冒頭段落と F 系検査 | 扉の HTML（角飾り紙枠・顔アイコン 2 枚・掛け合い）が無い。`introduction.md` は非生成章なので HTML を直接置いてよい（`link-check` は HTML タグのリンクを検査しないため、画像参照は `verify-static` の `src` 実在検査が担う） | Missing |
 | R7 素材 | `book/src` に画像なし。`verify-static` は `.png`・`.webp` を許可 | 画像の置き場所（`book/src/img/` など）、縮小・形式（PNG→WebP の可否）、ライセンス文の置き場所が未決 | Missing／未確定事項 5・6 |
 | R8.1 検索 | `head.hbs` tokenizer・`verify-search.mjs` | `head.hbs` に追記しても `BEGIN/END` マーカー内を変えなければ照合は通る。tokenizer 本体には触らない | Constraint |
 | R8.2 台詞が索引に入る | mdBook の検索索引は章の描画結果からテキストを抽出 | 生 HTML ブロック内のテキストが mdBook 0.5.3 の索引に入るかは **未確認**（§5 Research Needed）。入らない場合はビルド後加工（`build-index.mjs`）側で補う余地がある | Unknown |
