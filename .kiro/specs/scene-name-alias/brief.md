@@ -43,7 +43,7 @@
 ## Scope
 
 - **In**:
-  - pasta.toml の別名表の読み込み（セクション名・形は要件で決める。候補: `[scene.alias]` の下に `"会話" = "OnTalk"`）。未定義なら既定の 1 件。
+  - pasta.toml の別名表の読み込み（セクション名・形は要件で決める。要件で `[scene.alias]` の下に `OnTalk = ["会話"]` の形と確定）。未定義なら既定の 1 件。
   - キー正規化への別名の組み込み（登録・検索の両側。`pasta_core` の `sanitize_name` と、それに表を渡す経路）。
   - ソースマップ・デバッグ（`debug/source_map/scene_join.rs`・`playscene.rs`・`dap/decode.rs` など `sanitize_name` を使う箇所）が `＊会話` のブレークポイントと再生で壊れないこと。
   - ログ・失敗表記で、作者が書いた名前と置き換え後の名前のどちらを出すかの決定と実装。
