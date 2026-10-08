@@ -122,7 +122,7 @@
   - _Requirements: 6.1, 6.10, 7.1, 7.5, 8.1, 8.2, 8.3_
 
 - [ ] 5. 手順書とリリース手順の文書
-- [ ] 5.1 (P) 一回限りのセットアップの手順書を作る
+- [x] 5.1 (P) 一回限りのセットアップの手順書を作る
   - 節の順を実施の順（design.md の手順書の構成 1〜12）にそろえ、ワークフローの外で 1 度だけ行うこと、ID の値をリポジトリに書かず variables に置くことを冒頭に書く
   - Azure（従量課金・無料試用版を使わない理由・予算アラート・マネージド ID・サービスプリンシパルを採らない理由）、フェデレーション資格情報 2 件、GitHub の environment 2 つと variables、main へのマージ後の確認ワークフローの実行と Members 追加、crates.io の Trusted Publisher ×5、初回リリース、初回成功後の必須手順（`trustpub_only`・2 つのトークンの失効・緊急時の戻し方）、新しいクレートの初回公開、auth の取り直しが拒否されたときの落とし先、名前の対応表を載せる
   - 完了の状態: 手順書の名前の対応表が design.md「認証名の契約」と一字一句一致し、要件 11 の 10 項目それぞれに対応する節がある
@@ -199,3 +199,4 @@
 - 4.3: release.yml は env に `WASM_PACK_VERSION`・`CARGO_ABOUT_VERSION`・`NODE_VERSION`・`RELEASE_ENVIRONMENT`（表示用。`jobs.<id>.environment` は `env` を参照できないので 4.4 では `environment: release` を直書きする）。run には `${{ }}` を埋め込まず既定の環境変数で渡す。build の artifact `release-assets` は `release/` 直下の 3 ファイル（平らに入る）。
 - 4.4: job outputs は publish-crates が `<crate>_status`・`<crate>_reason`（5 クレート分）、publish-vsce が `status`・`reason`。どちらも末尾の `if: always()` の集約 step（`id: result`）が steps の outcome から決める（auth/login の失敗 → failed/auth、出力なし → failed/publish、未実行 → not-run）。publish step に continue-on-error は無いので、失敗すれば job は failure のまま。
 - 4.5: report は `NEEDS_JSON: ${{ toJSON(needs) }}` を pwsh で解析する。skipped で outputs が空 → not-run、failure/cancelled で空 → 「job の summary を参照」。「どの公開先にも公開していない」は verify・gate・build のどれかが failure/cancelled のときだけ出す。
+- 5.1: Marketplace のアクセストークンは、同じマネージド ID の資格情報を持つ `release-setup-check`（main からの実行）でも得られる。タグに限られるのは crates.io のトークンだけで、main を PR 経由でしか変えられないこと（ブランチ保護）が前提になる。release.yml・publish-vsix.ps1 は手順書の表を「名前の表」と呼ぶが、見出しは「名前の対応表」（どちらも design の語）。
