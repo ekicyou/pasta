@@ -41,6 +41,7 @@
 ### Allowed Dependencies
 - `pasta_lua`（既存 dev-dependency）: `PastaLoader::load` と `PastaLuaRuntime::exec` によるロードと SHIORI 疎通。**新しい依存（dev-dependency を含む）は追加しない**。`pasta_shiori` への依存も追加しない。
 - 標準ライブラリ・`tempfile`・`ctor`（既存 dev-dependency）。
+- 上流 spec「算術での未代入変数の 0 扱い」（名前は起票時に確定）（算術の被演算子の未代入変数を 0 とみなす。実装着手のゲート。10 段目が依存）。
 - 上流 spec `scene-name-alias` の別名「会話 → OnTalk」（実装着手のゲート）。本 spec は `pasta.toml` を変えない（6.4）ので、別名表 `[scene.alias]` を書かずに既定（`OnTalk = ["会話"]` 相当）が効く。`＊会話` の登録名は `OnTalk_N`、Call 失敗の表記は書いた名前（「会話」）になる（上流の要件ディスカッション完了時点の共有。2026-10-08）。
 - マニュアル（`book/src/`）に記載のある文法・API だけ。
 
@@ -48,6 +49,7 @@
 - 段階表の列・行の形（`STAGES.md` の表の見出し名、ファイル名規則 `NN-name.pasta`）を変えたとき → `getting-started-story-guide` と本 spec のテストの再確認。
 - `OnBoot` の台詞・`pasta.toml` の `[talk]` 待ち時間・`[actor]` spot を変えたとき → `pasta_shiori` のゴールデン 3 本。
 - `scene-name-alias` の別名の挙動（完全一致・登録側への適用）が変わったとき → 2〜5・7・10〜12 段の `＊会話`、`ontalk_probe_test.rs`。
+- 上流 spec「算術での未代入変数の 0 扱い」（名前は起票時に確定）の 0 扱いの範囲（対象の演算子・警告の有無）が変わったとき → 10 段目の作例。
 - `hello-pasta-shell-art` が `surfaces.txt` の当たり判定の名前を決めた／変えたとき → 8 段目の検証 Reference4 と台詞。
 - `tutorial-check.mjs` の抽出規則（コードフェンス）を下流が変えたとき → 12 段目（Lua ブロック入り）の逐語照合。
 
@@ -194,7 +196,7 @@ sequenceDiagram
 | 3.3 | 新しい表現を含む | StageDictionaries（07〜12） | 各ファイルの内容要件 | — |
 | 3.4 | 切り替えの作例（迎え入れ・送り出し） | StageDictionaries（07） | 07 の内容要件 | — |
 | 3.5 | emo2 の台詞の制約 | StageDictionaries（07） | 台詞の要件・emo2 開発への相談 | — |
-| 3.6 | 自分の回数を数える保存の作例 | StageDictionaries（10） | 10 の内容要件（初期値の扱いは Q1） | — |
+| 3.6 | 自分の回数を数える保存の作例 | StageDictionaries（10） | 10 の内容要件（`＄＊回数＝＄＊回数＋１`。Q1 で決定） | — |
 | 3.7 | Lua の最小作例 | StageDictionaries（12）, TutorialCheck | 12 の内容要件・長いフェンスの抽出 | — |
 | 3.8 | `＄％baseware.name` の ＊会話 | StageDictionaries（07） | 07 の内容要件 | — |
 | 3.9 | 実ローダーで読み込みを通る | StageVerificationTest | 段階 12 のロード | 段階検証フロー |
@@ -287,7 +289,7 @@ sequenceDiagram
 | 7 | 挨拶したい | ベースウェアのイベントに応える・付加情報を読む・ベースウェアに聞く | シーン名＝イベント名、`＞transfer_req_to_var`、`＄ｒ０`、`＄％baseware.name`、OnGhostChanged/Changing に応答すると OnBoot/OnClose は来ない、一覧に無いイベントも同名シーンで応答できる（UKADOC `OnGhostChanging` へリンク） | `OnGhostChanged`・`OnGhostChanging`（＋`OnFirstBoot`・`OnClose`。仮定 A3） | `07-greeting.pasta` |
 | 8 | 触ったら反応してほしい | 触られた部位で台詞を変える | `＊OnMouseDoubleClick`、`＞transfer_req_to_var`、`＄ｒ４` | `OnMouseDoubleClick` | `08-touch.pasta` |
 | 9 | 選ばせたい | 選択肢を出して選ばれた先へ進む | `＠？ジャンプ先「表示」`、`!select(秒)`、選ばれた ID のシーンへの自動ルーティング | `OnChoiceSelectEx` | `09-choice.pasta` |
-| 10 | 覚えていてほしい | 終了しても残る値 | `＄＊回数`、関数呼び出しの式 `＄＊回数＝＠名前（）`（初回の扱いは仮定 A1・Q1） | — | `10-save.pasta` |
+| 10 | 覚えていてほしい | 終了しても残る値 | `＄＊回数`、算術の代入 `＄＊回数＝＄＊回数＋１`（未代入の変数は算術で 0 とみなされる。上流 spec「算術での未代入変数の 0 扱い」（名前は起票時に確定）。Q1） | — | `10-save.pasta` |
 | 11 | 話を続けたい・分岐させたい | 話の続き・ランダムジャンプ | `＞シーン名`（Call）、同名・前方一致の候補からのランダム選択、ローカルシーン `・`、`＞チェイントーク`、ローカル優先のスコープ解決 | — | `11-jump.pasta` |
 | 12 | もっと凝ったことをしたい | Lua の関数を呼ぶ | シーン内の ```` ```lua ```` ブロック、`function SCENE.名前(act)`、`＞＠名前（）` | — | `12-lua.pasta` |
 | 13 | 配布したい | `.nar` にする | SSP の NAR 作成機能（開発者用機能を有効化 → 「ディレクトリをドロップした際に更新ファイルや NAR を作成」を ON → フォルダをドロップ） | — | — |
@@ -341,7 +343,7 @@ sequenceDiagram
 | `07-greeting.pasta` | `＊OnGhostChanged`・`＊OnGhostChanging`（各 1〜3）、`＊OnFirstBoot` 1、`＊OnClose` 2、`＄％baseware.name` を使う `＊会話` 1 | — | `＞transfer_req_to_var` → `＄ｒ０　` を台詞に使う。送り出しは `＄ｒ０` に向けて一言。204 と OnBoot/OnClose の関係をコメントで説明。台詞は emo2 の制約（3.5）に従い emo2 開発と相談 |
 | `08-touch.pasta` | `＊OnMouseDoubleClick` | 3 程度 | 先頭で `＞transfer_req_to_var`、`＄ｒ４` を台詞に使う。部位名の前提は Q2 |
 | `09-choice.pasta` | 選択肢を出す `＊OnMouseDoubleClick` 1、ジャンプ先のグローバルシーン 2 | 3 | ジャンプ先の名前は既存・11 段目の名前と前方一致しない名前（例: `＊おやつの話`・`＊おでかけの話`。最終名は作例確定時）。`!select(秒)` を含む |
-| `10-save.pasta` | `＄＊回数` を 1 増やして回数を言う `＊会話` 1 | 1 | 未代入の `＄＊回数＋１` は値なしのまま回数が始まらない（マニュアル `variables.md`「算術の評価」・`act.lua` の `arith_operand`）。仮定 A1: シーン内の ```` ```lua ```` ブロックに「未代入なら 0 として 1 足す」関数を 1 つ置き、`＄＊回数＝＠回数を進める（）` で代入する。Lua を 12 段目より前に出すため、要件 3.6・3.7 の調整が要る（Q1） |
+| `10-save.pasta` | `＄＊回数` を 1 増やして回数を言う `＊会話` 1 | 1 | `＄＊回数＝＄＊回数＋１` の 1 行で 1 増やし、次の行で `＄＊回数　` を台詞に使う。初期値の代入行・Lua は書かない。初回（未代入）でも 1 になることは上流 spec「算術での未代入変数の 0 扱い」（名前は起票時に確定）が保証する（Q1） |
 | `11-jump.pasta` | Call で続ける `＊会話`、前方一致で候補が集まる呼び先（例: `＊雑学・…` ではなく同じ接頭辞の複数シーン）、ローカルシーン `・`、`＞チェイントーク` | 数シーン | ローカル優先の解決を示す例を 1 つ。チェイントークの影響は Risks 参照 |
 | `12-lua.pasta` | ```` ```lua ```` ブロックで `function SCENE.名前(act)` を 1 つ定義し `＞＠名前（）` で呼ぶ `＊会話` 1 | 1 | `scripts/` を使わない。条件分岐の作り込みはしない（3.7） |
 
@@ -359,7 +361,7 @@ sequenceDiagram
 | `choice.pasta` | `09-choice.pasta`（ジャンプ先の名前を変更） |
 
 **Implementation Notes**
-- Integration: 実装は `scene-name-alias` が main に入ってから着手する（ブランチに main を取り込み、`＊会話` が OnTalk として登録されることを確認してから辞書を書く）。
+- Integration: 実装は `scene-name-alias` と上流 spec「算術での未代入変数の 0 扱い」（名前は起票時に確定）の両方が main に入ってから着手する（ブランチに main を取り込み、`＊会話` が OnTalk として登録されること、未代入の `＄＊回数＋１` が 1 になることを確認してから辞書を書く）。
 - Validation: StageVerificationTest・DicStructureTests・tutorial-check。
 - Risks: 2〜5・10〜12 段の `＊会話` の中身はテストで実行されない（4.5 によりロードのみ）。Lua ブロック内の実行時エラーや `＞＠関数（）` の戻り値の誤りはロードでは検出されない。→ 実装時に SSP/areka で 12 段目を手で確かめる（Testing Strategy）。
 
@@ -502,7 +504,7 @@ export function extractPastaBlocks(markdown: string): string[];
 #### FirstGhostSync（`book/src/getting-started/first-ghost.md`）
 - 「ステップ 2〜6」（辞書ファイルごとの見出し）を、12 ファイルの小見出し（`### 01-boot.pasta` …）に機械的に並べ替え、各ブロックを新ファイルと逐語一致させる。既存の説明の箇条書きは対応するファイルの下へ移す。Claudia の語りと章立ては変えない（5.4）。
 - 本文中の辞書の引用（`起動したよ～`・`＄ゴースト名`・`boot.pasta` などのファイル名）を新しい内容に直す。
-- Lua ブロックを含むファイル（12 段目。仮定 A1 では 10 段目も）は ````` ````pasta ````` で囲む（マニュアル `call-jump.md` と同じ書き方）。
+- Lua ブロックを含むファイル（12 段目だけ）は ````` ````pasta ````` で囲む（マニュアル `call-jump.md` と同じ書き方）。
 
 #### ManualWorkflowPaths（`.github/workflows/manual.yml`）
 - `push` と `pull_request` の `paths` に `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**` を足す（5.4b）。`STAGES.md` は tutorial-check の入力ではないため足さない（段階表の検証は `build.yml` の `cargo test --all` でも走る）。
@@ -562,7 +564,7 @@ export function extractPastaBlocks(markdown: string): string[];
 
 | ID | 論点 | 本設計の仮定 |
 |----|------|--------------|
-| Q1 | 未代入の `＄＊回数＋１` は値なし（警告）で、回数が永久に始まらない。DSL に条件分岐が無いので Lua 抜きでは初回の初期化を書けない | A1: 10 段目に「未代入なら 0 として 1 足す」小さな Lua 関数を置き、`＄＊回数＝＠回数を進める（）` で代入する（要件 3.6・3.7 の調整が前提） |
+| Q1 | 未代入の `＄＊回数＋１` は値なし（警告）で、回数が永久に始まらない。DSL に条件分岐が無いので初回の初期化を書けない | **決定（設計ディスカッション #1）**: この程度で Lua を出させるのは DSL の問題として扱う。上流 spec「算術での未代入変数の 0 扱い」（名前は起票時に確定）を起こし、算術の被演算子が**未代入の変数**なら 0 とみなす（関数呼び出しが値を返さないときは従来どおり値なしと警告。トランスパイラーが渡す被演算子の説明 `var.x`／`@f()` で区別できる）。10 段目は `＄＊回数＝＄＊回数＋１` とだけ書く。上流 spec は本 spec の実装着手ゲートに加わる |
 | Q2 | hello-pasta の `surfaces.txt` に当たり判定が無く、ダブルクリックの `Reference4` は空になる。`＄ｒ４` の作例が実機で空文字を言う | A5: `hello-pasta-shell-art` が当たり判定（例: `Head`・`Bust`）を足す前提で、8 段目の検証は `4=Head` を送る |
 | Q3 | 新しい `OnBoot` の固定文 | A2: 女の子の一言・句点を含む。文言は emo2 開発に相談して確定し、ゴールデンは実装時に採取 |
 | Q4 | `OnFirstBoot`・`OnClose` を置く段 | A3: 7 段目。ただし読者は 1 段目で初回起動を済ませているので、7 段目で足した `OnFirstBoot` は読者の手元では呼ばれない |
