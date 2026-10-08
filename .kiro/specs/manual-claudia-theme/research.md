@@ -36,6 +36,7 @@
 - **台詞（`.talk`）は画像**: `<div class="talk"><img class="b" src="img/cc-*.png"><img class="f" src="img/f7.png"></div>` の形で、吹き出し本体は PNG（文言は `alt`）、顔は `.f`（72px 円形・`background: var(--paper)`）。**文字の吹き出し部品は参考サイトに存在しない**。マニュアルの台詞部品（本文はテキスト・検索対象）は、配色と顔アイコンの扱いだけを参考にして新規に作る。
 - **顔アイコン**: `site/img/f0.png`〜`f9.png`・`f25.png`〜`f28.png`（Claudia 14 種、各 15〜43KB）、`f10.png`・`f11.png`（アンソニー）。番号はシェルの `surfacetable.txt` のサーフェス ID と一致し、表情名が確定できる:
   `0 素／1 照れ／2 驚き／3 不安／4 落胆／5 高笑い／6 目閉じ／7 不機嫌／8 冷笑／9 照れ怒り／25 にっこり／26 したり顔／27 考え中／28 お辞儀（カーテシー）`
+- **アンソニー（相方の執事。要件ディスカッションで話し手に追加）**: `surfacetable.txt` の `group,アンソニー` は `10,素`・`11,刮目`（＋ドラッグ中）。参考サイトは `.talk.anthony .f { background: #EEF2FA; }` で顔アイコンの背景だけを青みに変え、台詞は執事の丁寧語（「〜でございます」「お嬢様」）。マニュアルでは文字色の色味（Claudia 赤み・アンソニー青み）を話し手ごとの CSS クラスで切り替える。
 - **立ち絵**: `site/img/s0.png`（172KB）・`s5.png`（166KB）・`s10.png`（44KB・アンソニー）が合成済みの立ち絵。`shell/master/surface*.png` は要素合成前のパーツ（`surface0.png` は 509 バイト、`surfaces.txt` で合成）のため、表紙にはサイト側の `s*.png` を使うのが簡単。
 - **ライセンス**: GitHub API で `spdx_id: Unlicense` を確認。
 - **意匠の部品**: `.paper.hero`（角飾り `.corner tl/tr/bl/br`）・`.divider`（金の菱形）・`.card`・`.steps`・`.paper.letter`（`.seal` 封蝋）・`.note`・`.caption`・`.latin`（Cormorant 斜体の添え字）。
