@@ -42,7 +42,7 @@
   - _Boundary: VSIX ビルド（package.json）_
 
 - [ ] 3. リリース CI の補助スクリプト（pwsh 7・引数と環境変数だけで動き、手元で試せる）
-- [ ] 3.1 (P) タグと版の検査スクリプトを作る
+- [x] 3.1 (P) タグと版の検査スクリプトを作る
   - タグの形（`v` + 数字 3 つ）、ワークスペースの版、拡張の `package.json` の版、タグのコミットの main からの到達性を検査し、版（`X.Y.Z`）を出力する
   - 失敗時は、どの検査で失敗したかと食い違う両方の値、「どの公開先にも公開していない」を summary（未設定なら標準出力）に書いて非 0 で終える
   - 完了の状態: v0.3.7 のコミットで成功して `version=0.3.7` を出し、`v9.9.9`（版不一致）・`v0.3`・`v1.0.0-rc.1`（形式）・main から到達できない SHA でそれぞれ失敗理由を示して失敗する
@@ -190,3 +190,4 @@
 - 1.3: actionlint 1.7.12（winget・ユーザー領域）。検証は引数なしの `actionlint`（PowerShell では `*.yml` が展開されず exit 3）。shellcheck は無いので `run:` の中身はシェル検査されない（仕様の要求外）。現在のシェルの PATH に無ければ `%LOCALAPPDATA%\Microsoft\WinGet\Packages\rhysd.actionlint_Microsoft.Winget.Source_8wekyb3d8bbwe\actionlint.exe` を直接呼ぶ。
 - 2.1: `release.ps1` は 7 段になり、日本語の案内を含むため UTF-8（BOM 付き）にした（ルートの `release.bat` が powershell.exe 5.1 で呼ぶので BOM が要る）。`release.bat` のコメント「4-6」は古いままなので、5.3 で `release.bat` に触れるときに 7 段に合わせて直す。
 - 2.2: CI の build job は `npm ci` の後に `npm run package` を呼べばよい（build:wasm は pwsh 7 経由・`-Release`）。`scripts/build-wasm.bat` と `build-wasm.ps1` の Usage コメントは今も `powershell` 前提だが、設計で変更不要とした範囲。
+- 3.x: 補助スクリプトは `#Requires -Version 7`・StrictMode・BOM なし UTF-8。出力は `$GITHUB_OUTPUT`／`$GITHUB_STEP_SUMMARY`（未設定なら標準出力）へ書く関数をスクリプトごとに持つ（共通モジュールはどのタスクにも無いので作らない）。タグの形は `-cmatch` で大文字小文字を区別し ASCII 数字と `\z` で判定する（`-match` は V0.3.7 を通す）。検証ドライバーは scratchpad に置きリポジトリに入れない。
