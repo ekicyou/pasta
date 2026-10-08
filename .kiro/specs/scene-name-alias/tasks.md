@@ -119,7 +119,7 @@
   - _Requirements: 9.1, 9.2, 9.6_
   - _Boundary: Docs (grammar, shiori-events)_
 
-- [ ] 7.2 (P) pasta.toml リファレンスと `@pasta_config` の章に `[scene]` を書く
+- [x] 7.2 (P) pasta.toml リファレンスと `@pasta_config` の章に `[scene]` を書く
   - 値の型が合わないときの表・3 分類表・フルリファレンステンプレートに `[scene]`／`[scene.alias]` を加える
   - 詳細節に、形・既定・丸ごと置き換え・空の表・エラーになる書き方・「会話」を別の目的で使っていたゴーストの挙動の変化と空の表での戻し方・読み込み時にだけ効き LSP と pasta_check は読まないこと・`scene` が予約名で `alias` 以外のキーは読まれないことを書く
   - `@pasta_config` の章に `[scene]` は書いたとおり見え、既定の別名表は補完されないことを書く
@@ -150,3 +150,4 @@
 - 4.2: factory.rs が `runtime_config.scene_aliases` を clone して finalize へ渡す配線は、5 の PastaLoader 経由テスト（`＊会話` → `search_scene("会話")` が `OnTalk_1`）が初めて守る。
 - 7.1: grammar/・shiori-events.md は `../reference/pasta-toml.md#sceneシーン名` へリンクしている → 7.2 の見出しは正確に `### [scene]（シーン名）` にする。7.2 の例の表に `雑談` を入れるときは call-jump.md の `＊雑談` の例と混同させない。
 - 6.5: `cargo test --all` 1 回目は rustc 自体の異常（std メタデータ不在・STATUS_STACK_BUFFER_OVERRUN）で落ちたが再実行で 111 結果行・2606 passed・0 failed。clippy（workspace・-D warnings）clean。境界外ファイル（Lua スクリプト・パーサ・scene_registry/scene_table・debug 突合・hello-pasta・ゴールデン 3 本・LSP・pasta_check）は merge-base から差分なし。
+- 7.2: pasta-toml.md で例に `おしゃべり`・`"天気の話" = ["お天気"]` を使った。7.3 の付け替え先はこれらとも衝突させない。
