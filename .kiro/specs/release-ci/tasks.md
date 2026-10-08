@@ -74,7 +74,7 @@
   - _Requirements: 6.6, 6.7, 6.8, 6.9_
   - _Boundary: release-notes.ps1_
 
-- [ ] 3.5 (P) GitHub Release の作成スクリプトを作る
+- [x] 3.5 (P) GitHub Release の作成スクリプトを作る
   - 3 つの配布物がそろっていることを先に検査し、Release を検索して、無ければ下書き → 添付 → 公開、下書きなら未完了の添付を整えて足りないものを添付して公開、公開済みで添付がそろっていれば飛ばす
   - 公開済みで添付が足りなければ足りないものだけを添付し、拒否（Immutable）されたら `reason=immutable` で失敗する。公開済みの添付を削除・上書きせず、タグを作らない
   - 題名を `pasta vX.Y.Z` とし、`status`・`reason`・`url` を出力する
@@ -194,3 +194,4 @@
 - 3.2: `publish-crate.ps1 -Crate -Version [-DependsOn] [-DryRun] [-ApiBase]`。索引待ちの上限 5 分は依存先 1 つごと（pasta_lua は最悪 10 分）、公開後の確認も最大 5 分。トークン（30 分）はクレートごとに auth の直後に取り直すので収まる。summary 行に所要秒を書く。試験は scratchpad\t32 の偽 cargo（PATH 先頭）と偽 API で行い、本物の公開はしない。
 - 3.3: `publish-vsix.ps1 -VsixPath -Version -Extension [-VsceCommand] [-DryRun]`。vsce 3.7.1 は `--pat` の既定値が `VSCE_PAT` で `--azure-credential` より優先されるため、スクリプトは値を読まずに `Env:VSCE_PAT` を消す。vsce は `editors/vscode` で `npx --no-install vsce`（publish-vsce job は事前に `npm ci --ignore-scripts`）。`-VsixPath` は呼び出し元基準で解決する。公開後の確認は最大 10 分（job の 20 分に収まる）。
 - 3.4: `release-notes.ps1 -Tag -Repo [-OutFile] [-WorkspaceRoot]`。範囲は `<前のタグ>..<Tag>`（タグのコミット自身を含む）、項目は type 付きの件名全体、除外は scope `spec` だけ（type `spec` は Maintenance）。github-release job の checkout は `fetch-depth: 0` と `fetch-tags: true` が要る（4.5 で確かめる）。
+- 3.5: `github-release.ps1 -Tag -NotesFile -AssetDir [-Title] [-DryRun]`。リポジトリは gh の既定（checkout の remote）で決まり、認証は `GH_TOKEN`。`gh release view <tag>` は下書きもタグ名で見つける。Immutable はエラー文の一致で判定（拒否されれば失敗はする）。
