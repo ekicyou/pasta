@@ -571,21 +571,24 @@ for (const ch of INTERNALS_CHAPTERS) {
     );
   }
 
-  // T-authoring: 執筆規約の台詞部品の節（見出しに「台詞部品」を含む H2、次の H1・H2 まで。フェンス外）に
-  // 登録簿の全話し手名と全表情名が載っている（規約と登録簿のずれの検出）。
+  // T-authoring: 執筆規約の台詞部品の節（見出しに「台詞部品」を含む H2、次の H1・H2 まで。フェンス外）の
+  // 表のセルに、登録簿の全話し手名と全表情名が載っている（規約と登録簿のずれの検出）。
+  // 照合はセルの完全一致（1 セル 1 名）。部分一致だと「素」が「要素」に、「照れ」が「照れ怒り」に当たる。
   {
     const rel = 'book/AUTHORING.md';
     const md = read(rel);
-    const lines = md.replace(/\r\n?/g, '\n').split('\n');
     const masked = maskFences(md).split('\n');
     const head = masked.findIndex((l) => /^## .*台詞部品/.test(l));
-    let section = '';
+    const cells = new Set();
     if (head >= 0) {
       const next = masked.findIndex((l, i) => i > head && /^##? /.test(l));
-      section = lines.slice(head, next < 0 ? lines.length : next).join('\n');
+      for (const l of masked.slice(head, next < 0 ? masked.length : next)) {
+        if (!/^\s*\|/.test(l)) continue;
+        for (const c of l.trim().replace(/^\||\|$/g, '').split('|')) cells.add(c.trim());
+      }
     }
     const names = [...new Set(SPEAKERS.flatMap((sp) => [sp.name, ...Object.keys(sp.faces)]))];
-    const missing = names.filter((n) => !section.includes(n));
+    const missing = names.filter((n) => !cells.has(n));
     assert(
       'T-authoring',
       head >= 0 && missing.length === 0,
