@@ -41,7 +41,7 @@
 ### Allowed Dependencies
 - `pasta_lua`（既存 dev-dependency）: `PastaLoader::load` と `PastaLuaRuntime::exec` によるロードと SHIORI 疎通。**新しい依存（dev-dependency を含む）は追加しない**。`pasta_shiori` への依存も追加しない。
 - 標準ライブラリ・`tempfile`・`ctor`（既存 dev-dependency）。
-- 上流 spec `arith-unassigned-var-zero`（算術の被演算子の未代入変数を 0 とみなす。実装着手のゲート。10 段目が依存）。
+- 上流 spec `arith-unassigned-var-zero`（式の中の nil を算術では 0 とみなす。実装着手のゲート。10 段目が依存。規則の正本は同 spec の requirements.md（PR #77 のブランチ））。
 - 上流 spec `scene-name-alias` の別名「会話 → OnTalk」（実装着手のゲート）。本 spec は `pasta.toml` を変えない（6.4）ので、別名表 `[scene.alias]` を書かずに既定（`OnTalk = ["会話"]` 相当）が効く。`＊会話` の登録名は `OnTalk_N`、Call 失敗の表記は書いた名前（「会話」）になる（上流の要件ディスカッション完了時点の共有。2026-10-08）。
 - マニュアル（`book/src/`）に記載のある文法・API だけ。
 
@@ -564,7 +564,7 @@ export function extractPastaBlocks(markdown: string): string[];
 
 | ID | 論点 | 本設計の仮定 |
 |----|------|--------------|
-| Q1 | 未代入の `＄＊回数＋１` は値なし（警告）で、回数が永久に始まらない。DSL に条件分岐が無いので初回の初期化を書けない | **決定（設計ディスカッション #1）**: この程度で Lua を出させるのは DSL の問題として扱う。上流 spec `arith-unassigned-var-zero`を起こし、算術の被演算子が**未代入の変数**なら 0 とみなす（関数呼び出しが値を返さないときは従来どおり値なしと警告。トランスパイラーが渡す被演算子の説明 `var.x`／`@f()` で区別できる）。10 段目は `＄＊回数＝＄＊回数＋１` とだけ書く。上流 spec は本 spec の実装着手ゲートに加わる |
+| Q1 | 未代入の `＄＊回数＋１` は値なし（警告）で、回数が永久に始まらない。DSL に条件分岐が無いので初回の初期化を書けない | **決定（設計ディスカッション #1）**: この程度で Lua を出させるのは DSL の問題として扱う。上流 spec `arith-unassigned-var-zero` を起こし、未代入の変数を算術で 0 とみなせるようにする（nil の出どころの扱い・警告の有無などの規則は規則の正本は同 spec の requirements.md（PR #77 のブランチ）に従う。本 spec が依存するのは「未代入の `＄＊回数＋１` が 1 になる」ことだけ）。10 段目は `＄＊回数＝＄＊回数＋１` とだけ書く。上流 spec は本 spec の実装着手ゲートに加わる |
 | Q2 | hello-pasta の `surfaces.txt` に当たり判定が無く、ダブルクリックの `Reference4` は空になる。`＄ｒ４` の作例が実機で空文字を言う | **決定（設計ディスカッション #2）**: `hello-pasta-shell-art` に当たり判定の追加と部位名の確定を申し送る（同 spec の brief に追記済み）。座標は絵に合わせて決めるものなので絵の spec が持つ。本 spec は仮の部位名 `Head` で進め、確定時に台詞と検証イベント表を合わせる。本 spec の実装ゲートにはせず、入門ガイドの公開までに入っていればよい依存とする |
 | Q3 | 新しい `OnBoot` の固定文 | **決定（設計ディスカッション #3）**: 設計では形（女の子の一言・表情なし・句点を含む）だけを固める。文言は実装時に 12 段の台詞と一括で emo2 開発（ghost_dev）に相談して決め、口調をそろえる。ゴールデンは文言確定後に 1 回だけ特性化採取する |
 | Q4 | `OnFirstBoot`・`OnClose` を置く段 | A3: 7 段目。ただし読者は 1 段目で初回起動を済ませているので、7 段目で足した `OnFirstBoot` は読者の手元では呼ばれない |
