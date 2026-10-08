@@ -186,7 +186,7 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: dsl-literal-fixes, scene-identity-format, call-execution-correctness
 - [ ] failure-output-unification -- 実行時の失敗（未定義の参照・見つからない Call など）をログとさくらスクリプトの両方へ 1 つの仕組みから出す。`call-execution-correctness` が Call 行に入れる失敗表記を載せ替え、他の失敗へ広げる。Dependencies: none
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
-- [ ] release-ci -- タグ `vX.Y.Z` の push を契機に、GitHub Actions で verify・成果物のビルド・crates.io と Marketplace への公開・GitHub Release までを冪等に行う。認証は OIDC（Trusted Publishing・Entra ID）。成果物の git 追跡を解除し、一回限りのセットアップの手順書を作る。Marketplace の global PAT が廃止される 2026-12-01 より前に完了させる。Dependencies: none
+- [x] release-ci -- タグ `vX.Y.Z` の push を契機に、GitHub Actions で verify・成果物のビルド・crates.io と Marketplace への公開・GitHub Release までを冪等に行う。認証は OIDC（Trusted Publishing・Entra ID）。成果物の git 追跡を解除し、一回限りのセットアップの手順書を作る。Marketplace の global PAT が廃止される 2026-12-01 より前に完了させる。Dependencies: none
 - [ ] hello-pasta-tutorial-stages -- 「こんな表現をしたい」の段階表を確定し、段階ごとに起動できる辞書一式を CI で検証する。hello-pasta の辞書を教材として書き直し、最終段階と一致させる。Dependencies: none
 - [ ] manual-claudia-theme -- マニュアルを mdBook のまま「Claudia のマニュアル」に着せ替える。配色・字体・枠などの意匠は ponadocs の Claudia 紹介ページ（Unlicense）を手本にし、ダーク版と表紙の扉を用意する。顔アイコン付きの台詞の部品を作り、全章の導入と締めの台詞を書き換える。検索・着色・`file://` 閲覧・検査ツールは壊さない。Dependencies: none
 - [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。Dependencies: release-ci, hello-pasta-tutorial-stages
