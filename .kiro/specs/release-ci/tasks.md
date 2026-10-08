@@ -59,7 +59,7 @@
   - _Requirements: 4.2, 4.3, 4.4, 4.5, 4.6, 7.2, 7.3, 7.4, 7.6, 9.6_
   - _Boundary: publish-crate.ps1_
 
-- [ ] 3.3 (P) Marketplace の公開済み判定と公開のスクリプトを作る
+- [x] 3.3 (P) Marketplace の公開済み判定と公開のスクリプトを作る
   - `vsce show` の版一覧で公開済みを判定し、無ければ Azure の資格情報（`--azure-credential`）で VSIX を公開し、公開後に版の存在を確かめる。重複公開の保険に `--skip-duplicate` を付ける
   - `show` の失敗は公開済みと見なさず失敗する。PAT を参照せず、unpublish をしない。認証エラーは `reason=auth` に分類する
   - 手元の検証の前提: `editors/vscode` で `npm ci` を済ませ、lock の版の vsce を使える状態にする
@@ -192,3 +192,4 @@
 - 2.2: CI の build job は `npm ci` の後に `npm run package` を呼べばよい（build:wasm は pwsh 7 経由・`-Release`）。`scripts/build-wasm.bat` と `build-wasm.ps1` の Usage コメントは今も `powershell` 前提だが、設計で変更不要とした範囲。
 - 3.x: 補助スクリプトは `#Requires -Version 7`・StrictMode・BOM なし UTF-8。出力は `$GITHUB_OUTPUT`／`$GITHUB_STEP_SUMMARY`（未設定なら標準出力）へ書く関数をスクリプトごとに持つ（共通モジュールはどのタスクにも無いので作らない）。タグの形は `-cmatch` で大文字小文字を区別し ASCII 数字と `\z` で判定する（`-match` は V0.3.7 を通す）。検証ドライバーは scratchpad に置きリポジトリに入れない。
 - 3.2: `publish-crate.ps1 -Crate -Version [-DependsOn] [-DryRun] [-ApiBase]`。索引待ちの上限 5 分は依存先 1 つごと（pasta_lua は最悪 10 分）、公開後の確認も最大 5 分。トークン（30 分）はクレートごとに auth の直後に取り直すので収まる。summary 行に所要秒を書く。試験は scratchpad\t32 の偽 cargo（PATH 先頭）と偽 API で行い、本物の公開はしない。
+- 3.3: `publish-vsix.ps1 -VsixPath -Version -Extension [-VsceCommand] [-DryRun]`。vsce 3.7.1 は `--pat` の既定値が `VSCE_PAT` で `--azure-credential` より優先されるため、スクリプトは値を読まずに `Env:VSCE_PAT` を消す。vsce は `editors/vscode` で `npx --no-install vsce`（publish-vsce job は事前に `npm ci --ignore-scripts`）。`-VsixPath` は呼び出し元基準で解決する。公開後の確認は最大 10 分（job の 20 分に収まる）。
