@@ -51,11 +51,11 @@
 
 | # | 項目 | 種別 | 内容 |
 | - | ---- | ---- | ---- |
-| G1 | 段階辞書の置き場所と形 | Missing | 現行には完成形 1 つしかない。段階ごとのディレクトリ（例: `ghosts/hello-pasta-stages/NN-*/dic/`、または `tests/fixtures/stages/NN/`）が要る。段階数 12（議題 1 で確定）× 1〜5 ファイル |
-| G2 | 全段階を実ローダーで読み込むテスト | Missing | `self_deploy_integration_test.rs` の tempdir コピー＋`PastaLoader::load` を、段階ディレクトリをループする形へ拡張または新規テストに。設定・シェルは hello-pasta から合成する（段階辞書は `dic/` のみ。議題 4 で確定） |
+| G1 | 段階辞書の置き場所と形 | Resolved | 議題 5 で「配布辞書 `dic/` そのものが正本、章 N の辞書 ＝ 章 1〜N で追加されたファイルの集まり」に確定（Option D）。別置きの段階ディレクトリは持たない。ファイル名は段階番号を接頭にしたテーマ別（例: `01-boot.pasta`）。現行の 5 ファイル構成（`actors/boot/talk/click/choice`）は章ごとの 12 ファイル前後に組み替わる |
+| G2 | 全段階を実ローダーで読み込むテスト | Missing | hello-pasta の `master/` を tempdir へコピーし、`dic/` を「段階 1〜N のファイルだけ」に絞って `PastaLoader::load`（＋`OnBoot` 疎通）を N = 1〜12 でループ。既存の `self_deploy_integration_test.rs` の tempdir/ctor パターンを流用できる。段階表（ファイル→段階の対応）をテストが読める形で持つ必要がある（G13） |
 | G3 | `OnBoot` 疎通の確認手段（Requirement 4.2） | Resolved | `pasta_sample_ghost` の dev-deps は `pasta_lua` のみだが、`PastaLoader::load` が返すランタイムの `exec(&str)`（`pasta_lua/src/runtime/exec.rs:31`）で `require "pasta.shiori.entry"` → `SHIORI.request({id="OnBoot", method="get", version=30})` を実行すると SHIORI 応答文字列が返る（`pasta_lua/tests/shiori/event_handler_test.rs:170-186` の方式）。dev-dep 追加なしで C2 が成立する。`pasta_shiori` 経由（`PastaShiori::load`/`request`、`shiori_sample_ghost_test.rs:37-54`）は C3 の予備 |
-| G4 | 最終段階＝配布辞書の一致検証 | Missing | バイト一致の比較テスト。もしくは**シンボリックリンクや生成ではなく**「最終段階ディレクトリを配布辞書そのものとする」構成（G1 の選択で消える） |
-| G5 | `OnBoot` ゴールデン | Constraint | `pasta_shiori` の 3 テストが `OnBoot` 単一シーン・固定文を固定。ゴールデンは `actors.pasta` の `＠通常`→`\s[1]`/`\s[11]`、`pasta.toml` の `[talk]` 待ち時間と `[actor]` の spot にも依存する（Requirement 6.2 で不変）。段階 1〜2 で `OnBoot` を 1 人→2 人へ育てるのは可（最終形が同じなら）。段階 4「毎回ちがう」で `OnBoot` を複数化する作例は不可（[OPEN-8]）。`OnFirstBoot`/`OnClose` は自由 |
+| G4 | 最終段階＝配布辞書の一致検証 | Resolved | Option D により構成で満たされる（最終段階＝全ファイル＝配布辞書）。代わりに「段階表が列挙するファイル集合 ＝ `dic/` の実ファイル集合」の一致検査が要る（Requirement 4.3） |
+| G5 | `OnBoot` ゴールデン | Constraint → 更新 | `pasta_shiori` の 3 テストが `OnBoot` 単一シーン・固定文を固定。ゴールデンは `actors.pasta` の `＠通常`→`\s[1]`/`\s[11]`、`pasta.toml` の `[talk]` 待ち時間と `[actor]` の spot にも依存する（Requirement 6.4 で不変）。議題 5 の「ファイル追加のみ」により `OnBoot` は 1 段目の形（女の子の一言）で固定され、配布辞書の `OnBoot` が変わる → 3 テストのゴールデン文字列・assert 条件を更新する（Requirement 5.1）。`OnBoot` を複数定義しない（単一シーン・決定性は保つ）。1 段目はアクター辞書の表情を使わないので、`OnBoot` の出力に `\s[n]` が含まれるかは 1 段目の作例の書き方次第（設計で決める。アクター宣言だけの辞書で `\p[0]` が出るかを確認） |
 | G6 | 構造テストの固定値 | Constraint | `OnTalk` 5〜10（`talk.pasta`）、`OnMouseDoubleClick` 7 以上（`click.pasta`。`choice.pasta` の 1 個を含めると現状 8 定義）、`時報12`・`時報その他`・`＄時１２`、`src/scripts.rs` のユニットテストが「シーン内で使う `＠表情` はすべて `actors.pasta` に定義あり」を検査、`choice.pasta` は dist_src の必須一覧に無い。`ontalk_probe_test.rs` が `OnTalk` シーンの存在を要求。教材化で件数を減らすならテスト更新（Requirement 5.2） |
 | G7 | `tutorial-check.mjs` の逐語一致 | Constraint | 辞書を変えた瞬間に `manual.yml` が赤くなる。`first-ghost.md` のコードブロック差し替え（[OPEN-9]）が同じ PR に要る。さらに本文も辞書の行を引用している（`:157`・`:182` が `起動したよ～`、`:235-236`・`:271` が `＄ゴースト名`、`:7`・`:435` と `getting-started/index.md:11` が「hello-pasta と同じになる」と明言）ため、コードブロックだけ差し替えると本文が食い違う。照合方式の拡張（段階ごと）は下流 spec の持ち場 |
 | G8 | `OnGhostChanged` 作例の「起動挨拶が二重にならない」注意 | Constraint | 作例は `OnGhostChanged` で挨拶し `OnBoot` は来ない前提。読者向けコメントで説明（辞書コメント）。Lua 側で 204 を返す道もあるが入門では使わない |
@@ -74,6 +74,16 @@
 - 既存テストとの整合（G5〜G7）が最大のリスク。辞書の変更と `first-ghost.md` 差し替えとテスト更新を 1 PR で揃える必要がある。
 
 ## 3. 実装アプローチの選択肢
+
+### Option D（採用。議題 5）: 配布辞書そのものを章ごとのファイルに分け、段階 N ＝ 先頭 N ファイル
+
+- `ghosts/hello-pasta/ghost/master/dic/` のファイルを章ごとに分割し、段階番号を接頭にしたテーマ別の名前にする（例: `01-boot.pasta`・`02-…pasta`）。段階 N の辞書は段階 1〜N で追加されたファイルの集まり。別置きの段階ディレクトリも最終段階の複製も持たない。
+- 検証は hello-pasta の `master/` を tempdir にコピーし、`dic/` を段階 1〜N のファイルに絞って読み込み＋`OnBoot` 疎通を N = 1〜12 でループ。段階表（ファイル→段階）とディレクトリの実ファイルの一致も検査。
+- 前提: すべての段階が「ファイルを足すだけ」で成立する（Requirement 1.6）。`OnBoot` は 1 段目の形で固定、ゴールデンは更新（G5）。
+- トレードオフ: ✅ 正本が 1 つ、二重管理なし、下流の tutorial-check が「章 N のコードブロック ＝ ファイル N」で 1 対 1 に照合できる、読者も「ファイルを足すだけ」。❌ 序盤の作例を「`OnBoot` を育てない」形に組み替える必要がある。配布辞書のファイル数が 5 → 12 前後に増える（`dist_src_validation_test.rs`・`integration_test.rs` の file 単位の検査は更新）。
+- 設計で確認: アクターの宣言（1〜2 段目）と表情の定義（3 段目）を別ファイルに分けて同じアクターに合流できるか（アクター辞書 `％女の子` を 2 ファイルで定義したときの挙動）。できなければ、2 段目で宣言と表情を一度に書くか、1〜2 段目をアクター辞書なしで成立させる。
+
+以下 A〜C は議題 5 以前の候補（記録として残す）。
 
 ### Option A: 既存クレートの拡張（段階辞書を `ghosts/` 配下へ、既存テストを拡張）
 
@@ -106,9 +116,11 @@
 
 ## 5. 設計フェーズへの推奨と申し送り
 
-- **推奨**: Option A または C（配布物のすぐ隣、ただし `ghosts/hello-pasta/` の外に段階辞書を置く。G14）＋ 検証は C2（G3 で成立確認済み）。Option B は下流の逐語引用の正本としては弱い。
-- **キーとなる決定**: 段階辞書のディレクトリ規則（番号・名前）、最終段階の扱い（複製＋一致テスト／直接参照）、段階表の正本の置き場所（G13）、ループテストの形（既存テストの拡張か新規ファイルか。「複数ゴーストディレクトリをループで読み込む」テストは現行に無く、最も近いのは `pasta_lua/tests/transpiler/final_regression_test.rs` の `broad_fixtures()`）、`manual.yml` のトリガー追加の要否（G15）。
+- **採用**: Option D（配布辞書を章ごとのファイルに分け、段階 N ＝ 先頭 N ファイル。議題 5）＋ 検証は C2（G3 で成立確認済み）。A〜C は不採用。
+- **キーとなる決定**: ファイル名の規則（番号の桁数・区切り・テーマ名）、段階表の正本の置き場所とテストから読める形（G13。例: 段階表 Markdown の表をテストがパースする／ファイル名の番号を段階とみなす）、ループテストの形（既存テストの拡張か新規ファイルか。最も近い手本は `pasta_lua/tests/transpiler/final_regression_test.rs` の `broad_fixtures()`）、`OnBoot` の新しい固定文、`manual.yml` のトリガー追加の要否（G15）。
 - **Research Needed（設計で調べる）**:
   1. `＄＊回数＝＄＊回数＋１` の初回（nil）挙動（G2.1 段階 10）。
   2. `scene_kick_*_e2e_test.rs` が追記するシーン名の一覧（G9）。
-- **要件ディスカッションへ**: `requirements.md` の [OPEN-3]・[OPEN-4]・[OPEN-6]〜[OPEN-9]（[OPEN-1] は議題 1、[OPEN-11] は議題 2、[OPEN-5] は議題 3、[OPEN-2] は議題 4、[OPEN-10] は G12 で解消）。特に [OPEN-8]（`OnBoot` ゴールデンを守るか更新するか）と [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
+  3. アクター辞書 `％女の子` を 2 つのファイルに分けて定義したときの挙動（宣言と表情の合流。Option D の前提）。
+  4. アクター辞書なし（または表情なし）のアクター行が `\p[0]` を出力するか（1 段目の `OnBoot` と新ゴールデンの形）。
+- **要件ディスカッションへ**: `requirements.md` の [OPEN-3]・[OPEN-4]・[OPEN-6]・[OPEN-7]・[OPEN-9]（[OPEN-1] は議題 1、[OPEN-11] は議題 2、[OPEN-5] は議題 3、[OPEN-2] は議題 4、[OPEN-8] は議題 5、[OPEN-10] は G12 で解消）。特に [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
