@@ -97,7 +97,7 @@
   - _Requirements: 1.6, 11.5, 11.7_
   - _Boundary: release-setup-check.yml_
 
-- [ ] 4.3 リリース CI の起動・関門・ビルドの job を作る
+- [x] 4.3 リリース CI の起動・関門・ビルドの job を作る
   - リリースタグ（数字 3 つの形）の push だけを起動条件にし、既定の権限を読み取りだけにし、タグごとの同時実行を抑止する。ツールの版（wasm-pack・cargo-about・Node）を `env` にまとめて固定する
   - verify（ubuntu）は 3.1 のスクリプトで版を job outputs に出し、gate は `needs: verify` で `build.yml` を呼び、build（windows、`needs: [verify, gate]`。版を読むため verify も並べる）は日本語ロケール・ツール導入の後に `release.ps1` と VSIX のビルドを配布物名の step で行う
   - build は 3 つの配布物の中身と版、`Cargo.lock` が変わっていないことを検査してから、artifact `release-assets`（90 日・ファイルが無ければエラー）に保存する。job ごとのタイムアウトを設ける
@@ -196,3 +196,4 @@
 - 3.4: `release-notes.ps1 -Tag -Repo [-OutFile] [-WorkspaceRoot]`。範囲は `<前のタグ>..<Tag>`（タグのコミット自身を含む）、項目は type 付きの件名全体、除外は scope `spec` だけ（type `spec` は Maintenance）。github-release job の checkout は `fetch-depth: 0` と `fetch-tags: true` が要る（4.5 で確かめる）。
 - 3.5: `github-release.ps1 -Tag -NotesFile -AssetDir [-Title] [-DryRun]`。リポジトリは gh の既定（checkout の remote）で決まり、認証は `GH_TOKEN`。`gh release view <tag>` は下書きもタグ名で見つける。Immutable はエラー文の一致で判定（拒否されれば失敗はする）。
 - 4.2: 開発機の環境には `VSCE_PAT` が入っており、`vsce <cmd> --help` は `--pat` の既定値として PAT の値を表示する。手元で vsce を叩くときは必ず `VSCE_PAT` を外す（4.2 の実装中に会話記録へ値が出た。C-6 で失効させる PAT）。
+- 4.3: release.yml は env に `WASM_PACK_VERSION`・`CARGO_ABOUT_VERSION`・`NODE_VERSION`・`RELEASE_ENVIRONMENT`（表示用。`jobs.<id>.environment` は `env` を参照できないので 4.4 では `environment: release` を直書きする）。run には `${{ }}` を埋め込まず既定の環境変数で渡す。build の artifact `release-assets` は `release/` 直下の 3 ファイル（平らに入る）。

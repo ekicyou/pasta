@@ -1,0 +1,194 @@
+# .github/workflows/release.yml
+# リリース CI（release-ci）。リリースタグ vX.Y.Z の push だけで起動し、
+# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（3 つの配布物）の順に進める。
+# 上流の job が失敗したら後続は needs の既定で止まり、どの公開先にも公開しない。
+name: Release
+
+on:
+  push:
+    # 数字 3 つの形だけ（v0.3・v1.0.0-rc.1・test-1 は合わない）。verify-tag.ps1 でも同じ形を二重に検査する。
+    # tags だけを指定しているので、ブランチへの push では起動しない。PR などの他のトリガーは持たない。
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+
+# 同じタグの実行は直列にし、実行中のものを取り消さない。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# ビルドツールの版の固定値（gate が呼ぶ build.yml には伝わらない）。
+env:
+  WASM_PACK_VERSION: '0.15.0'
+  CARGO_ABOUT_VERSION: '0.9.2'
+  NODE_VERSION: '20'
+  RELEASE_ENVIRONMENT: release
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: pwsh
+    outputs:
+      version: ${{ steps.verify.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch main
+        run: git fetch origin main
+
+      # タグ名・SHA は既定の環境変数 GITHUB_REF_NAME・GITHUB_SHA（github.ref_name・github.sha と同じ値）で渡す。
+      - name: Verify tag and versions
+        id: verify
+        run: ./.github/scripts/release/verify-tag.ps1 -Tag $env:GITHUB_REF_NAME -Sha $env:GITHUB_SHA -MainRef origin/main
+
+  # 関門: タグのコミットで build.yml の検査をすべて行う（reusable workflow なので steps・runs-on を持てない）。
+  gate:
+    needs: verify
+    uses: ./.github/workflows/build.yml
+
+  build:
+    name: build
+    needs: [verify, gate]
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: i686-pc-windows-msvc
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: i686-pc-windows-msvc
+
+      - name: Set Japanese locale for Shift-JIS support
+        run: |
+          Set-WinSystemLocale ja-JP
+          Set-Culture ja-JP
+        shell: powershell
+
+      # ビルド済みバイナリを版固定で取得する（ランナーにはプリインストールされていない）。
+      - name: Install wasm-pack and cargo-about
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $tools = @(
+            @{ Name = 'wasm-pack'; Version = $env:WASM_PACK_VERSION
+               Url = "https://github.com/rustwasm/wasm-pack/releases/download/v$env:WASM_PACK_VERSION/wasm-pack-v$env:WASM_PACK_VERSION-x86_64-pc-windows-msvc.tar.gz" }
+            @{ Name = 'cargo-about'; Version = $env:CARGO_ABOUT_VERSION
+               Url = "https://github.com/EmbarkStudios/cargo-about/releases/download/$env:CARGO_ABOUT_VERSION/cargo-about-$env:CARGO_ABOUT_VERSION-x86_64-pc-windows-msvc.tar.gz" }
+          )
+          foreach ($t in $tools) {
+            $dir = Join-Path $env:RUNNER_TEMP "tools/$($t.Name)"
+            New-Item -ItemType Directory -Force -Path $dir | Out-Null
+            $archive = "$dir.tar.gz"
+            Invoke-WebRequest -Uri $t.Url -OutFile $archive
+            & "$env:SystemRoot\System32\tar.exe" -xzf $archive -C $dir
+            $exe = Get-ChildItem -LiteralPath $dir -Recurse -Filter "$($t.Name).exe" | Select-Object -First 1
+            if (-not $exe) { throw "$($t.Name).exe が $($t.Url) の中に無い" }
+            $reported = & $exe.FullName --version
+            if ("$reported" -notmatch "\b$([regex]::Escape($t.Version))\b") { throw "$($t.Name) の版が $($t.Version) でない: $reported" }
+            Write-Output "$($t.Name): $reported"
+            Add-Content -LiteralPath $env:GITHUB_PATH -Value $exe.DirectoryName
+          }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+
+      # release.ps1 の cargo は --locked を持たないため、後段の Cargo.lock の不変検査で同等にする。
+      - name: Build pasta.dll.zip and hello-pasta.nar
+        run: pwsh -NoProfile -File crates/pasta_sample_ghost/release.ps1
+
+      - name: Build VSIX
+        working-directory: editors/vscode
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci
+          npm run package
+          Move-Item -LiteralPath "pasta-vscode-$env:VERSION.vsix" -Destination ../../release/ -Force
+
+      - name: Verify release assets
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          function Get-ZipEntries([string]$Path) {
+            if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "配布物が無い: $Path" }
+            $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Path).Path)
+            try { @($zip.Entries | ForEach-Object FullName) } finally { $zip.Dispose() }
+          }
+          $errors = [System.Collections.Generic.List[string]]::new()
+
+          # pasta.dll.zip: pasta.dll と THIRD_PARTY_LICENSES.txt の 2 つだけ
+          $dllZip = @(Get-ZipEntries 'release/pasta.dll.zip' | Sort-Object)
+          if (($dllZip -join '|') -ne 'pasta.dll|THIRD_PARTY_LICENSES.txt') {
+            $errors.Add("pasta.dll.zip の中身が pasta.dll・THIRD_PARTY_LICENSES.txt の 2 つでない: $($dllZip -join ', ')")
+          }
+
+          # hello-pasta.nar: 配置の要のファイル
+          $nar = Get-ZipEntries 'release/hello-pasta.nar'
+          foreach ($e in 'install.txt', 'updates.txt', 'ghost/master/descript.txt', 'ghost/master/pasta.dll', 'ghost/master/THIRD_PARTY_LICENSES.txt') {
+            if ($nar -cnotcontains $e) { $errors.Add("hello-pasta.nar に $e が無い") }
+          }
+
+          # VSIX: 1 つだけ・名前と package.json の版がタグの版・WASM とそのライセンス表示を同梱
+          $vsixes = @(Get-ChildItem -Path 'release' -Filter '*.vsix' -File)
+          $expected = "pasta-vscode-$env:VERSION.vsix"
+          if ($vsixes.Count -ne 1 -or $vsixes[0].Name -cne $expected) {
+            $errors.Add("release/ の VSIX が $expected の 1 つでない: $(($vsixes | ForEach-Object Name) -join ', ')")
+          }
+          else {
+            $vsixPath = $vsixes[0].FullName
+            $entries = Get-ZipEntries $vsixPath
+            foreach ($e in 'extension/package.json', 'extension/wasm/pasta_lsp_wasm_bg.wasm', 'extension/wasm/THIRD_PARTY_LICENSES.txt') {
+              if ($entries -cnotcontains $e) { $errors.Add("$expected に $e が無い") }
+            }
+            if ($entries -ccontains 'extension/package.json') {
+              $zip = [System.IO.Compression.ZipFile]::OpenRead($vsixPath)
+              try {
+                $reader = [System.IO.StreamReader]::new($zip.GetEntry('extension/package.json').Open())
+                try { $pkgVersion = ($reader.ReadToEnd() | ConvertFrom-Json).version } finally { $reader.Dispose() }
+              }
+              finally { $zip.Dispose() }
+              if ($pkgVersion -cne $env:VERSION) { $errors.Add("$expected の package.json の版が $env:VERSION でない: $pkgVersion") }
+            }
+          }
+
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Output "::error::$_" }
+            exit 1
+          }
+          Write-Output "配布物の検査: 成功（版 $env:VERSION）"
+
+      # release.ps1・wasm-pack は --locked を付けないため、lock が書き換わっていないことをここで確かめる。
+      - name: Check Cargo.lock is unchanged
+        run: git diff --exit-code -- Cargo.lock
+
+      - name: Upload release-assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: |
+            release/pasta.dll.zip
+            release/hello-pasta.nar
+            release/pasta-vscode-${{ needs.verify.outputs.version }}.vsix
+          retention-days: 90
+          if-no-files-found: error
