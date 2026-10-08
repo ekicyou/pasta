@@ -724,11 +724,11 @@ OnBoot = ["起動"]
 - **挙動が変わる範囲**: 別名表を定義していないゴーストで「会話」という名前のグローバルシーン（完全一致）だけが OnTalk の候補になる（5.5）。`＊会話・朝` などは変わらない。戻すには `[scene.alias]` の見出しだけを書く（5.6）。マニュアルの `[scene]` 節に書く（9.3）。
 - **キャッシュ**: 初回起動でマーカーが無いため 1 回だけ全破棄が起きる。以後は別名表を変えたときだけ。
 - **ライブラリ利用者**: `search::register`・`register_finalize_scene`・`TranspilerConfig`・`RuntimeConfig` に表の引数／フィールドが増える。`SearchContext::new`・`TranspilerConfig::default()`・`RuntimeConfig::new()` は空の表で、既存の呼び出しの挙動は変わらない。表の運び手が `TranspilerConfig` と `RuntimeConfig` の 2 つになるのは、既存の `with_debug` と同じ「ローダーが pasta.toml の値を載せる」形に揃えるため。`TranspileContext` に表を持たせて 1 本にする案は、`with_config_and_source_map` が context を消費するため `finalize` 用の clone が同じく要り、簡単にならないので採らない。両側の一致はローダーだけが保証し、`scene_alias_search_test.rs` の「既定・作者・空 × 宣言・検索」で守る。
-- **後続 spec への申し送り**: `search/context.rs` の `search_scene` に別名の分岐が入る（`call-attribute-filter` はこの後の `resolve_scene_id_unified` にフィルターを足す）。`scope_gen.rs` の `generate_global_scene` に `declared_name` 引数が増える（`scene-attribute-store` はこの関数の `file_attrs` を使い始める）。
+- **後続 spec への申し送り**: `failure-output-unification` が失敗表記と警告の出口を一本化するとき、Rust 側 `search_scene` の両名 warn（`name`・`resolved`）は 8.2 の唯一の両名ログなので残すこと（Lua 側の 1 行に両名を含める形へ移すなら、その時点で Rust 側を落としてよい）。`search/context.rs` の `search_scene` に別名の分岐が入る（`call-attribute-filter` はこの後の `resolve_scene_id_unified` にフィルターを足す）。`scope_gen.rs` の `generate_global_scene` に `declared_name` 引数が増える（`scene-attribute-store` はこの関数の `file_attrs` を使い始める）。
 
 ## Open Questions / 設計ディスカッション用
 
-1. **R-4 ログの重複**: 別名の Call が見つからないとき、Rust（両名・warn）と Lua `act:call`（書いた名前・warn）で 2 行出る。これを受け入れるか、`SEARCH:resolve_scene_alias(name)` を足して `act.lua` 側で 1 行に両名を出すか（`act.lua` は触らない方針・`failure-output-unification` の持ち場と重なる）。**本設計の仮定**: Rust 側の warn だけ足し、Lua は触らない。
+1. **R-4 ログの重複（決定・2026-10-08）**: 別名の Call が見つからないとき、Rust（両名・warn）と Lua `act:call`（書いた名前・warn）で 2 行出ることを**受け入れる**。`SEARCH:resolve_scene_alias(name)` を足して `act.lua` で 1 行にする案は、brief の「`act.lua` は触らない」と `failure-output-unification` の持ち場を破るため採らない。別名の Call 失敗は作者の書き損じを直すときにだけ出るもので、2 行でも原因は分かる。
 2. **R-5 expr モード**: `＠会話（）` は 5 段目で同じ `search_scene(key, nil)` を通るため OnTalk のシーン関数に解決される（単語モードの L5 は `search_word` なので対象外）。仕様として認め、マニュアルの別名小節に「5 段目に進んだ全ての検索」として含めるか、`＠名前（）` の例を明示するか。**仮定**: 明示せず、「グローバルシーンを探す段（5 段目）に進んだ全ての検索」で包含する。
 3. **R-6 `@pasta_config` の見え方**: `[ghost]` と違い既定の別名表を `@pasta_config.scene.alias` に補完しない（書いたとおりだけ）。Lua から有効な表を読む需要が出たら補完するか別 API にするか。**仮定**: 補完しない。
 4. **R-1 キャッシュの全破棄（解決済み・議論不要）**: 別名表が変わったら全破棄（部分再トランスパイルはしない）。マーカー不在の初回全破棄は、`.cache_version` が `CARGO_PKG_VERSION` なので版が上がるリリース更新ではもともと全破棄が起きるため、実際に効くのは同じ版での開発ビルドだけ。利用者に見える追加の遅延は無い。
