@@ -151,3 +151,122 @@
 - **先に確定すべき判断**（要件ディスカッション）: 本文の字体（未確定事項 1）、ダークテーマの範囲（2）、Web フォントの配信元（3）、話し手の拡張性（4）。これらは CSS の量と記法の形を左右する。
 - **機械的に証明できる完了条件**（設計で検査に落とす）: `gen-skill-refs.mjs --check` が再生成なしで通る（R5.4）、`verify-content` が全章の台詞部品を確認する（R10.2）、`verify-static` が追加資材の実在を確認する（R10.4）、`verify-search` が台詞語で該当章を返す（R10.5）、CI `manual.yml` が全段通る（R8.7）。
 - **部分出荷の禁止**（brief.md 制約）: テーマ・台詞部品・47 章の置き換え・表紙・素材・ツール追従を 1 つの完成形で main に入れる。タスク分割は許すが、公開（main マージ）は完成形で行う。
+
+
+---
+
+# 設計フェーズの調査と決定（2026-10-08 `/kiro-spec-design -y`）
+
+§5 Research Needed の 8 項目は、本節の RN1〜RN8 で解決した（RN1・RN2 は実ビルドで確認、RN3 は対比の試算、RN4・RN6・RN7・RN10 は mdBook 出力の読解、RN5 は実装時の取り込みで最終確認、RN8 は要件ディスカッションで確定済み）。
+
+## Summary
+
+- **Feature**: `manual-claudia-theme`
+- **Discovery Scope**: Extension（既存の mdBook マニュアルと `book/tools` への拡張。軽量ディスカバリ＋実ビルドによる検証）
+- **Key Findings**:
+  - mdBook（ローカル 0.5.4）は、引用ブロックの本文と、HTML ブロック内に空行を挟んで書いた Markdown の本文を検索索引に入れる。台詞部品を「引用ブロック記法＋build-time 変換」にすれば、索引側に手を入れずに R8.2 を満たせる。
+  - `print.html` では章内 HTML の `<img src="../img/...">` が根基準の `img/...` へ書き換わる。`additional-css`／`additional-js` はハッシュ付きの相対パスで全ページと `print.html` に入る。
+  - mdBook 既定の着色色は、Claudia のコード面（`#F3EAD6`）の上で赤 4.48・緑 4.19 と WCAG 4.5 を割る。着色の配色の上書きは必須。
+  - テーマメニューの DOM id は 0.5 系で `mdbook-theme-{default_theme,light,rust,coal,navy,ayu}`（§3.2 の `#rust` 表記は誤り）。`book.js` の矢印キー操作は隣の `li` へ `focus()` するため、CSS で隠すだけだと Light から Navy へ矢印で進めない。
+
+## Research Log
+
+### RN1 検索索引への台詞本文の取り込み
+- **Context**: R8.2・R10.5。記法の選択の前提。
+- **Sources Consulted**: `book/` を scratchpad へ複製し、`grammar/markers.md` の導入に `> 【照れ怒り】…`・`> 【アンソニー：刮目】…`、`introduction.md` に `<section>` で包んだ扉（中に台詞の引用ブロックとリスト）を加えて `mdbook build`（v0.5.4）。生成された `searchindex-*.js` を検索した（`book/` 自体は無変更）。
+- **Findings**: 引用ブロックの本文（継続行・強調・コード・リンクの文字を含む）と、`<section>` 内の Markdown の本文がすべて索引に入る。タグ文字列 `【照れ怒り】` も本文として入る。描画は `<blockquote>\n<p>【…】…</p>\n</blockquote>`。
+- **Implications**: 索引の仕組み（`build-index.mjs`・tokenizer）を変えずに台詞が検索できる。タグ文字列が索引に入る副作用は受け入れる（design「未解決事項」5）。CI の mdBook は 0.5.3 のため、`verify-search` に台詞語の検査を加えて CI 上でも機械確認する。
+
+### RN2 `print.html` と追加資材のパス
+- **Findings**: `print.html` は根にあり、章内 HTML の `<img src="../img/claudia/f5.png">` は `img/claudia/f5.png` に書き換わる。`additional-css = ["theme/claudia.css"]` は `theme/claudia-<hash>.css` として出力され、`grammar/markers.html` からは `../theme/...`、`print.html` からは `theme/...` で参照される。`additional-js` は `book.js` の後に読み込まれる。`head.hbs` の内容は mdBook の CSS より前に展開される。
+- **Implications**: 変換は出力ファイルの深さから相対パスを組み立てれば、章・`print.html` の両方で `file://` と Pages の両方に解決する。CSS 背景画像は印刷で既定では出ないため、顔は `<img>` で出す（R3.10）。
+
+### RN3 着色の配色と対比
+- **Findings**（WCAG 対比、背景 `#F3EAD6`）: mdBook `highlight.css` の comment 6.04・red 4.48・orange 5.70・green 4.19・blue 6.49・purple 4.82。モックアップの色は keyword 6.44・string 5.26・variable 5.73・comment 6.31・scene name 9.32。navy（背景 `#141827`）はモックアップ色がすべて 4.9 以上。モックアップの名札（金 `#B98D4A` 2.96・青 `#8FA3C8` 2.50）とサイドバー上の差し色（`#B4532F` on `#F0E4CE` 3.96）は 4.5 を割るため、名札は `#7F5F2A`（5.78）・`#4A6290`（6.00）、文字の差し色は `#9C4426`（紙（濃）上で 5.11）に調整した。
+- **Implications**: hljs の 6 色群を light・navy で上書きし、対比は `theme-test.mjs` で機械検査する。
+
+### RN4 Web フォントの読み込み経路
+- **Findings**: `head.hbs` は mdBook の CSS より前に展開される。`verify-search.mjs` は `BEGIN/END canonical bigram tokenize` の位置と直前の `<script>` で切り出すため、マーカーより前に `<link>` を足しても照合に影響しない。`@import` を `additional-css` に書くと、CSS の取得後に字体 CSS を取りに行く直列になる。
+- **Implications**: `head.hbs` 冒頭に `preconnect` 2 本＋`stylesheet` 1 本（`display=swap`）を置く。
+
+### RN5 画像形式と縮小
+- **Findings**: 画像は手元に取り寄せていない（取得は実装時）。参考サイトの原寸は 120〜140px・15〜43KB、顔の背景色を CSS で与えているため透過 PNG と推定。`verify-static` は `.png`・`.webp`・`.txt` を許可済み。開発機に ffmpeg（ShareX 同梱）がある。
+- **Implications**: 112px の透過 PNG（必要なら減色）で 20KB 以下を目標にし、`verify-content` T-assets で容量を機械検査する。取り込みスクリプトは置かない（一回限り）。
+
+### RN6 mdBook 0.5 の CSS 変数一覧（テーマごと 41 変数）
+`--bg --fg --sidebar-bg --sidebar-fg --sidebar-non-existant --sidebar-active --sidebar-spacer --scrollbar --icons --icons-hover --links --inline-code-color --theme-popup-bg --theme-popup-border --theme-hover --quote-bg --quote-border --warning-border --table-border-color --table-header-bg --table-alternate-bg --searchbar-border-color --searchbar-bg --searchbar-fg --searchbar-shadow-color --searchresults-header-fg --searchresults-border-color --searchresults-li-bg --search-mark-bg --color-scheme --copy-button-filter --copy-button-filter-hover --footnote-highlight --overlay-bg --blockquote-note-color --blockquote-tip-color --blockquote-important-color --blockquote-warning-color --blockquote-caution-color --sidebar-header-border-color`
+
+`:root` 側に `--mono-font`・`--content-max-width`・`--menu-bar-height` 等のレイアウト変数。テーマは `.light, html:not(.js)`・`.navy`・`.rust`（`.light` より後ろ）・`.coal`・`.ayu` の同形ブロック。`html { font-family: "Open Sans" }` と `.content p { line-height: 1.45em }` は `general.css` が持つ。
+
+### RN7 ブレークポイント
+- **Findings**: `chrome.css` の `max-width: 420px`（上部バー）・`min-width: 620px`・`max-width: 1080px`（サイドバーの重ね表示）・`1380px`。インラインスクリプトは幅 1080px 以上でサイドバーを開く。表は `.table-wrapper { overflow-x: auto }` で包まれる。
+- **Implications**: 台詞・扉の狭幅規則は 620px と 420px に合わせる。表は内側スクロールに任せる（design「未解決事項」1）。
+
+### RN8 表情の付与基準
+- 要件ディスカッション議題 5 で「規約に例文付きの目安＋人のレビュー」に確定済み。設計では `talk.mjs --stats`（表情の集計表示）を人のレビューの補助として置く。
+
+### RN9 現行の章と記法の衝突
+- **Findings**: 47 章すべてが区切り 2 本以上で、導入は 1〜4 行・締めは 1〜3 行の段落。導入・締めに引用ブロック・HTML を含む章は 0。`【` で始まる引用ブロックは 0（本文中の `【Call失敗：…】` 等はインラインコードか地の文）。
+- **Implications**: 「`【` で始まる引用ブロックは台詞部品専用」と定めても既存章と衝突しない。
+
+### RN10 テーマメニューと保存値（`book.js`）
+- **Findings**: `book.js` は読み込み時にメニューのボタン id 一覧を作り、保存値がその一覧に無いときだけ既定（light／navy）に落とす。`showThemes` は現在のテーマのボタンへ `focus()` し、要素が無いと例外になる。矢印キーは `li.previousElementSibling`／`nextElementSibling` のボタンへ `focus()` する。`additional-js` は `book.js` の後に実行される。
+- **Implications**: 項目を DOM から消すと、保存値が `rust` の読者がメニューを開くと例外になる。CSS で隠し、`additional-js` で末尾へ寄せるのが、保存値を壊さずに矢印キー操作を保つ最小の方法（`index.hbs` 上書きは不要）。`index.hbs` を上書きして項目を削る案は、保存値 `rust` の読者で `html` に `rust` と `light` の 2 クラスが残る問題もある。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| 引用ブロック記法＋build-time 変換（採用） | `> 【表情】本文` を mdBook が描画し、後段の Node が吹き出し HTML へ置換 | 純 Markdown・索引と link-check と生成器に無改修で噛み合う・印刷も同じ HTML | `mdbook serve` では素の引用ブロックに見える | `highlight-html.mjs` と同型 |
+| 生 HTML | `<div class="talk">` を章に直接書く | 変換不要 | R4.1 違反・HTML 内の Markdown が描画されない | 不採用 |
+| クライアント JS 変換 | `additional-js` が読み込み時に置換 | 加工段不要 | JS 依存・ちらつき・印刷前の実行保証が薄い | 不採用 |
+| mdBook preprocessor | Markdown 段階で HTML を埋め込む | `serve` でも効く | HTML ブロック内の Markdown 問題・`mdbook` 単体が Node 依存に | 不採用 |
+| テーマ: `additional-css` 1 枚（採用） | 変数の再定義＋部品スタイル | 版上げに強い・差分が 1 か所 | 詳細度の調整が要る | — |
+| メニュー: CSS 隠し＋JS 並べ替え（採用） | ボタンを隠し、親 `li` を末尾へ | 保存値を壊さない・矢印キー維持・`index.hbs` 不要 | `book.js` の DOM 構造に依存 | `verify-static` が id の存在を検査 |
+| メニュー: `index.hbs` 上書き | 3 項目を削除 | 確実に出ない | 版上げで手動マージ・保存値で 2 クラス残り | 不採用 |
+| メニュー: CSS だけ | ボタンを隠すだけ | 最小 | 矢印キーで Navy へ進めない（Tab は可） | 不採用（代替案として未解決事項 3） |
+
+## Design Decisions
+
+### Decision: 台詞部品の記法は `> 【話し手：表情】本文`
+- **Context**: R4.1（HTML を書かない）・R4.2（日本語名・話し手省略は Claudia）・R3.7（連続する台詞は別の吹き出し）。
+- **Alternatives Considered**: (1) `> **クローディア**（高笑い）: …`（強調記法と紛れて解析が曖昧）、(2) GFM 警告風 `> [!高笑い]`（mdBook 0.5 の警告記法と衝突）、(3) 採用案。
+- **Selected Approach**: 行頭の引用ブロックの先頭に `【…】`。中身は「表情」「話し手」「話し手：表情」の 3 形。区切りは全角コロン。pasta 自身の目印（`【未登録アクター：名前】`）と同じ字面の約束にそろう。
+- **Rationale**: 1 行目の先頭だけで判定でき、Markdown 側（検査）と HTML 側（変換）で同じ解析関数を使える。
+- **Trade-offs**: タグ文字列が索引に入る。`【` で始まる通常の引用ブロックを書けなくなる（既存章に該当なし）。
+- **Follow-up**: 字面の最終確認（design「未解決事項」4）。
+
+### Decision: 話し手と表情は `talk.mjs` の `SPEAKERS` 1 か所（汎化）
+- **Context**: R4.8。
+- **Selected Approach**: 話し手を「名前・名札・配置・表情→画像」のデータとして持ち、変換・検査・規約の照合（T-authoring）がすべてここから読む。CSS は既定トークンで新しい話し手も表示でき、色分けは任意の追加。
+- **Rationale**: Claudia とアンソニーは同じ「話し手」の 2 例であり、特別扱いのコードを作らない（汎化はインターフェースだけで、実装は現要件の 2 名分）。
+
+### Decision: 領域分割を `gen-skill-refs.mjs` の `chapterRegions` に一本化
+- **Context**: R4.3・R4.4・R10.1。`extractBody` の区切り判定を他のツールでも使う必要がある。
+- **Selected Approach**: `chapterRegions` を export し、`extractBody`・`verify-content` T 系が共用する。本文の台詞禁止（`talk-in-body`）は `extractBody` に置き、生成対象章（生成時）と内部設計章（I-structure）の両方に 1 か所で効かせる。
+- **Trade-offs**: `gen-skill-refs.mjs` が `talk.mjs` を import する（依存方向 `link-check → talk → gen → verify-content` は一方向で循環なし）。
+
+### Decision: 顔は `<img>`、印刷とダークの両立は `@media print` で light トークンへ戻す
+- **Context**: R3.10・R2.2・R3.9。CSS 背景画像は印刷で既定では出ず、代替テキストも持てない。navy のまま印刷すると淡色の文字が白い紙に残る。
+- **Selected Approach**: 変換が `<img>`（`alt`＝話し手と表情）を出し、`@media print` で全テーマのトークンを light 値に置き換える。
+
+### Synthesis（汎化・採用か自作か・単純化）
+- **汎化**: 話し手を登録簿のデータに、領域検査を「両話し手が揃う・台詞以外を置かない」の 1 関数にまとめた（表紙だけ `cover` 指定で HTML を許す）。
+- **採用**: mdBook の `additional-css/js`・テーマ変数・検索索引・`print.html` の書き換え、Google Fonts、既存の `maskFences`・`LINK_RE`・build-time 加工の型を採用。自作は記法の解析・変換・対比テストだけ（いずれも既存に相当品なし）。
+- **単純化**: 取り込みスクリプト・Web フォント同梱・`index.hbs` 上書き・preprocessor・設定ファイルを作らない。検査は既存ツールへの追加で済ませ、新しい CLI は変換 1 本（と情報表示の `--stats`）に限る。
+
+## Risks & Mitigations
+
+- **mdBook 0.5.3 と 0.5.4 の差** — ローカル実測は 0.5.4。CI（0.5.3）上で `verify-search`（台詞語）・`verify-static`（台詞出力・相対参照・メニュー id）が同じ前提を機械確認する。
+- **`book.js` の DOM 構造への依存（メニュー）** — `verify-static` がメニュー id の存在を検査。版上げ時は design の Revalidation Triggers に従い再確認。
+- **47 章の書き換えの品質（機械検査は構造まで）** — 規約の目安・チェックリスト・`--stats`・パート単位のレビューで担保。
+- **顔画像が 20KB に収まらない** — 減色で対処。それでも超える場合は WebP を検討（design「未解決事項」7）。
+- **Google Fonts の取得が遅い環境での描画待ち** — `display=swap` と `preconnect`。オフラインでは即時に失敗してシステム字体になる。
+- **タグ文字列による検索結果の雑音** — 受け入れ（design「未解決事項」5）。
+
+## References
+
+- mdBook 0.5.4 の実ビルド出力（scratchpad で `book/` を複製して検証。`book/` 自体は無変更）
+- ponapalt/claudia（Unlicense）`site/index.html`・`site/img/`・`shell/master/surfacetable.txt` — §1.3 の調査結果
+- WCAG 2.x のコントラスト比の定義（相対輝度の式）— `theme-test.mjs` の判定式
+- Google Fonts CSS2 API（`display=swap`・`preconnect`）
