@@ -8,7 +8,7 @@
 
 **Impact**: 現状の「手元の Windows で `release-workflow` の Stage A〜D をたどり、長期の PAT・トークンで公開し、成果物を git にコミットする」運用を、タグ契機の GitHub Actions ワークフロー `.github/workflows/release.yml` に置き換える。公開前の関門は `build.yml` の検査を reusable workflow として呼ぶことで 1 か所に保ち、認証は実行のたびに短期で発行される（crates.io Trusted Publishing・Entra ID ワークロード ID 連携）。ビルドした成果物（`release/**`・サンプルゴーストの `pasta.dll` 等）は git 追跡を解除し、タグのソースから CI が毎回作る。
 
-本文書の **【仮定】** は、要件と research.md だけでは一意に決められなかった前提を示す。対応する論点は末尾の「Open Questions（設計ディスカッションへの申し送り）」に番号付きでまとめた。
+設計時点で要件と research.md だけでは一意に決められなかった前提は、末尾の「Open Questions（設計ディスカッションへの申し送り）」に番号付きでまとめ、設計ディスカッション（議題 1〜8）ですべて確定した。
 
 ### Goals
 
@@ -181,7 +181,7 @@ Cargo.lock                            # 新規追跡
 
 - `.github/workflows/build.yml` — `on:` に `workflow_call: {}` を足す。job・step・検査内容・artifact 名は変えない（2.5・2.6）。
 - `crates/pasta_sample_ghost/release.ps1` — Step 4 の後に **[5/7] `pasta.dll.zip` の生成**（`release/pasta.dll.zip`。中身は `target/i686-pc-windows-msvc/release/pasta.dll` と `ghost/master/THIRD_PARTY_LICENSES.txt` の 2 つ。`Compress-Archive -Force`）を足し、版の表示を [6/7]、案内表示を [7/7] にする。案内は「成果物はコミットしない。公開はリリースタグの push で CI が行う」に書き換える（3.2・12.3）。画像生成（Step 2）は触らない（`hello-pasta-shell-art` との接点）。
-- `editors/vscode/package.json` — `"build:wasm": "pwsh -NoProfile -File scripts/build-wasm.ps1 -Release"`（3.4。手元の `npm run package` もリリースビルドにそろえる。【仮定】Open Question 9）。
+- `editors/vscode/package.json` — `"build:wasm": "pwsh -NoProfile -File scripts/build-wasm.ps1 -Release"`（3.4。手元の `npm run package` もリリースビルドにそろえる。議題 8 で確定。開発機には pwsh 7 が要る）。
 - `.gitignore` — `Cargo.lock` の行を削除。追加: `/release/`、`crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.dll`、同 `THIRD_PARTY_LICENSES.txt`、同 `scripts/`（10.1・10.2）。
 - 追跡解除（`git rm --cached`）: `release/hello-pasta.nar`、`release/hello-pasta/**`、`crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/{pasta.dll,THIRD_PARTY_LICENSES.txt,scripts/README.md}`（10.1）。シェルの画像は触らない（10.5）。
 - `Cargo.lock` — `cargo generate-lockfile` 相当の現状の解決結果をコミット（3.10）。
@@ -817,7 +817,7 @@ flowchart TD
 
 ## Open Questions（設計ディスカッションへの申し送り）
 
-本文の **【仮定】** に対応する。いずれも設計を進めるための最善の仮定で書いた。
+設計時点の仮定の一覧。設計ディスカッション（議題 1〜8、2026-10-08）ですべて確定し、本文の記述も確定内容にそろえた。
 
 1. ~~**environment 名と変数の置き場所**~~ → **確定（議題 1）**: 公開用 `release`（タグ `v*` のみ）・確認用 `release-setup-check`（`main` のみ）の 2 environment。Azure の 3 つの ID はリポジトリ variables に 1 組だけ置く。<br>旧: 公開用 environment を `release`、確認用を `release-setup-check`、Azure の ID をリポジトリ variables（環境 variables ではなく）に置く。候補: (a) 上記、(b) `production` 等の汎用名、(c) ID を各 environment の variables に重複登録。推奨 (a): crates.io・Azure の設定に写す名前が短く、2 つの environment で同じ値を使うため重複登録を避けられる。
 2. ~~**セットアップ確認の方式**~~ → **確定（議題 1）**: 確認用 environment を別に作り、マネージド ID のフェデレーション資格情報を 2 件（`environment:release`・`environment:release-setup-check`）にする。確認ワークフローは crates.io のトークン交換を行わない。<br>旧: 確認用 environment を別に作り、フェデレーション資格情報を 2 件にする。crates.io のトークン交換は確認に含めない。候補: (a) 上記、(b) `release` environment の保護規則に `main` も加えて 1 つで済ます、(c) 確認用 environment にも crates.io Trusted Publisher を設定しトークン交換まで試す。推奨 (a): 公開できる認証をタグからの実行だけに限ったまま（1.6・9.4）、profile ID の表示と Members の確認ができる。
@@ -828,4 +828,4 @@ flowchart TD
 7. ~~**ubuntu で動かす job**~~ → **確定（議題 5）**: verify・publish-vsce・github-release・report は ubuntu-latest、gate（build.yml が決める）・build・publish-crates は windows-latest。<br>旧: verify・publish-vsce・github-release・report を ubuntu-latest に置く（Windows は gate・build・publish-crates だけ）。候補: (a) 上記、(b) すべて windows-latest。推奨 (a): 配布物のビルドは Windows の要件（3.7）だが、公開と Release は OS に依らず、ubuntu のほうが起動が速く native addon の問題も無い。publish-crates は `pasta_shiori` の検証ビルドのため Windows に残す。
 8. ~~**crates.io トークンの取り直し**~~ → **確定（議題 2）**: クレートごとに `crates-io-auth-action` を呼び直す（5 回）。拒否されたときの落とし先（1 回取得 + 再実行、版を上げて出し直す）を `release.yml` のコメントと手順書に明記し、初回リリースで所要時間を記録する。<br>旧: クレートごとに `crates-io-auth-action` を呼び直す（5 回）。候補: (a) 上記、(b) 1 回だけ取得し 30 分を超えたら再実行で続ける、(c) 実測してから決める。推奨 (a): 期限切れという予見できる失敗を設計で避けられる。ただし同一 job で複数回呼べることは公式文書に無い（research）。初回リリースで (a) が通らなければ (b) に落とす。
 10. ~~**status 契約の拡張と report の一次情報**~~（自動検証の指摘 2・3）→ **確定（議題 3）**: `status=failed` のときの `reason`（auth / publish / transient / not-registered / immutable）を output に足し、各 publish job の末尾に `if: always()` の集約 step を置いて job 自身の summary を一次情報にする。report は二次情報で、outputs が空なら推論せず「job の summary を参照」と出す。<br>旧: 4 値の `status` だけで、report が失敗 job の outputs から not-run / failed を推論していた。
-9. **`build:wasm` の変更**（VSIX ビルド）: `pwsh -NoProfile -File scripts/build-wasm.ps1 -Release` にし、手元の `npm run package` もリリースビルドにそろえる。候補: (a) 上記、(b) CI だけ `-Release`（手元は dev のまま）、(c) `powershell` のまま `-Release` だけ足す。推奨 (a): 議題 4 の趣旨（意図しない dev ビルドをやめる）と、開発機の AllSigned で `powershell -File` が失敗する既知の問題を同時に解く。開発機には pwsh 7 が要る。
+9. ~~**`build:wasm` の変更**~~ → **確定（議題 8）**: `pwsh -NoProfile -File scripts/build-wasm.ps1 -Release`。手元の `npm run package` もリリースビルドになり、開発機の AllSigned で `powershell -File` が失敗する既知の問題も同時に解ける。開発機には pwsh 7 が要る（確認済み: 7.6）。<br>旧候補: (a) 上記、(b) CI だけ `-Release`（手元は dev のまま）、(c) `powershell` のまま `-Release` だけ足す。推奨 (a): 議題 4 の趣旨（意図しない dev ビルドをやめる）と、開発機の AllSigned で `powershell -File` が失敗する既知の問題を同時に解く。開発機には pwsh 7 が要る。
