@@ -83,3 +83,20 @@ Call の属性フィルター（`＞シーン＆k＝v`）は、旧文法仕様�
   - 生成形が 4 通りになった。末尾の Call は `return act:call(SCENE.__global_name__, <キー>, {}, <引数>)`、途中の Call は `act:call_restore(…同じ並び…)`。`attrs` はどちらも第 3 引数で、`call_restore` は `act:call` へそのまま渡す。フィルターを出すときは両方の形に同じ位置で出せる。
   - 動的コールのキーは `act:call_key(値, 変数の経路, 説明)` が判定する。値が nil・空文字列・使えない型なら「呼ばない」印を返し、`act:call` は検索の前（フィルターより前）に nil を返す。
   - ターゲットが見つからないとき、`act:call` は現行の警告に加えて失敗表記 `【Call失敗：「名前」が見つからない】` を出して次の行へ進むようになった（同 spec の要件 4.6）。「一致する候補が無いとき」をこれと同じ扱いにするか、フィルター条件を表記に含めるかを決める。
+
+## 2026-10-07 棚卸の再測定（main 2cbaf510）
+
+- **前提の変化**: `scene-search-key-normalization`・`call-execution-correctness`・`string-concat-operator` は完了した（申し送りは上の Constraints のとおりで、現行の main と一致する）。未完了の前提は `scene-attribute-store` だけ。
+- **触るファイル**: `pasta_dsl` の `parser/grammar.pest`（272 行。`call_scene` 170 行）・`parse_action.rs`（456 行）・AST、`pasta_lua` の `code_gen/element_gen.rs`（555 行。Call の生成は 196 行付近）、`pasta_scripts/pasta/act.lua`（774 行。`call`・`find_act_handler`）、`scene.lua`（`SCENE.search`）、`search/context.rs`（614 行）・`search/mod.rs`、`pasta_core` の `registry/scene_table.rs`（434 行）、`editors/vscode/syntaxes/pasta.tmLanguage.json`、マニュアル `grammar/call-jump.md`・`lua/script-api.md`・`internals/registry-search.md` と生成スキル。`act.lua` は 774 行で、1,000 行に近づいている。
+- **規模**: 約 16〜19 タスク（文法・パーサ・AST 3、生成 2、`act.lua`→`scene.lua`→`search_scene` の受け渡し 3、`pasta_core` の型付き比較と候補キャッシュのキー 3、候補なしの扱い 1、ハイライト 1、マニュアルと生成 2、テスト 2〜3）。上限の 20 に近いが、一度分割した spec なので再分割はしない。
+- **先に要るもの**: `scene-attribute-store`（保持と型の解釈）。ファイルの重なり: `failure-output-unification`（`act.lua`）、`scene-attribute-store`（`scene.lua`・`pasta_core` の registry）。どちらとも同じウェーブに置けない。Phase 12・`release-ci` とはソースが重ならない（マニュアルは別の節）。
+- **種別**: 機能（現在 `＞X＆k＝v` はパースエラー）。
+- **要件定義のモデル**: Fable（新しい構文と意味。式の `＆`（連結）との切り分け、比較演算子、AND/OR の決定がある）。
+- **分割の案**: なし。
+- **見つけた穴・古くなった記述**:
+  - `attrs` は `act:call` の中で捨てられる。`self:find_handler("scene", key)`（`act.lua` 670 行）は `attrs` を受けず、`search_dictionary` の `SCENE.search(key, scene_name)`（307 行）も渡さない。`SCENE.search` は `attrs` を受けるが `SEARCH:search_scene(name, global_scene_name)`（`scene.lua` 160 行）に渡さず、`search_scene` にはフィルターの引数が無い（`context.rs` 73〜78 行）。Current State の「途中で `attrs` 引数は受け取る」は、`act:call` の入口までの話である。
+  - `find_act_handler` の 5 段の検索のうち、L1（実行中のシーン表の完全一致）・L3（`act` のメソッド）・L4（`GLOBAL`）はシーンの登録表を通らないので、属性で絞り込めない。フィルター付きの Call がこれらに当たったときの扱い（L2・L5 だけを探すか）を要件で決める。
+  - 動的コールでは `act:call_key` の「呼ばない」印が先に返るので、フィルターは評価されない（申し送りどおり）。
+  - `register_global_raw` がグローバルの属性をローカルシーンに複製する件は `scene-attribute-store` の brief に記した。その結論が、ローカルシーンを絞り込むときの前提になる。
+  - マニュアル `lua/script-api.md` 304・317 行は「`attrs` は使わない」と書いている。本 spec で書き換える対象。
+- **順序の提案**: 本 spec を `failure-output-unification` の後に置く。そうすれば「一致する候補が無い」の失敗表記を、最初から一本化した仕組みに載せられる（現在のロードマップは逆順）。

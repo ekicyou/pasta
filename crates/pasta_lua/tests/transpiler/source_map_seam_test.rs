@@ -200,7 +200,7 @@ fn test_concat_line_maps_to_its_pasta_line_like_arith() {
 /// 条件は `tests/runtime/debug_integration_test.rs` の同名モジュールが受け持つ（ランタイム
 /// アクセスが要るため分割。本モジュールは code_gen 本番 API に届く transpiler ターゲット側）。
 ///
-/// 要件マッピング（`.kiro/specs/pasta-vscode-lua-debug/requirements.md`）:
+/// 要件マッピング（`.kiro/specs/completed/pasta-vscode-lua-debug/requirements.md`）:
 /// - **R4.6**: スライス無効時、実証スライスのコード経路を本番動作へ露出せず追加コストを与えない。
 ///   → 本番 transpile（sink=None）は出力にゼロバイトも追加しない。
 /// - **R5.2**: 無効時、本番実行の挙動に追加コストを与えない（出力バイト一致＝回帰なし）。

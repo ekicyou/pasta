@@ -111,3 +111,19 @@ job の構成（詳細は設計で決める）:
 - **Trusted Publishing の一致条件**: crates.io の設定のワークフロー名・environment 名と、`release.yml` の実際の名前を一致させる。publish job には `id-token: write` を付ける。
 - **成果物の中身は今と同じ**: dll.zip は `pasta.dll` と `THIRD_PARTY_LICENSES.txt`。nar の中身も `pasta_check release` が作るものと同じにする。
 - 再実行は冪等にする。公開済みかどうかは、記憶でなく各公開先の実際の状態で判定する。
+
+## 2026-10-07 棚卸の再測定（main 2cbaf510）
+
+- **前提の変化**: 起票時（2026-10-06）から変わっていない。`.github/workflows/` は `build.yml`・`manual.yml` だけで、`release.yml` はまだ無い。Phase 11 の完了 spec は本 spec のファイルに触れていない。
+- **触るファイル**: `.github/workflows/release.yml`（新規）、`crates/pasta_sample_ghost/release.ps1`（253 行）、`editors/vscode/scripts/build-wasm.ps1`（129 行）、ルートの `.gitignore`、`crates/pasta_sample_ghost/RELEASE.md`、`.claude/skills/pasta-check/SKILL.md`、セットアップの手順書（新規）。追跡を外すのは `release/hello-pasta/**`・`release/hello-pasta.nar`・`crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/` の `pasta.dll`・`THIRD_PARTY_LICENSES.txt`。1,000 行に近いファイルは無い。
+- **規模**: 14 タスク前後（verify・build・crates・vsce・Release の各 job、公開済みかの判定、ノートの生成、追跡の解除、`release.ps1`・`build-wasm.ps1` の調整、手順書、文書、通しの確認）。
+- **先に要るもの**: 機能の依存は無い。ファイルが重なるのは `hello-pasta-shell-art`（`release.ps1` の画像生成の段・`.gitignore`・シェル画像の追跡）だけで、roadmap どおり本 spec が先。`hello-pasta-tutorial-stages`・`manual-claudia-theme`・`getting-started-story-guide`・Phase 11 の 3 spec とは重ならない。
+- **種別**: 基盤（タグを契機に動くリリースの CI。Marketplace の global PAT が 2026-12-01 に廃止される）。
+- **要件定義のモデル**: Opus（方式・認証・job の構成は起票時に決まっている。残る判断は追跡の境界くらい）。
+- **分割の案**: なし。
+- **見つけた穴・古くなった記述**:
+  - Current State の `ghosts/hello-pasta/ghost/master/pasta.dll` は、正しくは `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.dll`（`THIRD_PARTY_LICENSES.txt` も同じ）。
+  - 追跡している生成物の一覧に漏れがある。`crates/pasta_sample_ghost/ghosts/hello-pasta/shell/master/` の `surface*.png`・`surfaces.txt`（`cargo run -p pasta_sample_ghost` が書く）と、`ghost/master/scripts/README.md`（`release.ps1` が `crates/pasta_lua/scripts` から robocopy する）も生成物で、git に入っている。シェル画像は `hello-pasta-shell-art` が「追跡する素材」に変えるので、本 spec では追跡を外さないと要件に書く（外すと次の spec がすぐ戻すことになる）。
+  - roadmap の「ソースの持ち場」は `release/` だけを挙げるが、`crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/` の生成物も持ち場に入る。
+  - 本 spec が終わると、`release-workflow` の今の手順（design.md の「`release/hello-pasta.nar` を再生成してコミット」「`Test-Path release/hello-pasta.nar`」）は使えなくなる。`release-workflow` の更新は本 spec の直後、次のリリースより前に行う。
+  - `crates/pasta_sample_ghost/src/main.rs:60` の案内「copy pasta.dll, pasta_scripts/」は古い（`pasta_scripts` はもう同梱しない。`release.ps1:144`）。

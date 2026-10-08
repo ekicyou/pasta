@@ -1,6 +1,6 @@
 //! Task 2.4 — 要素生成の全 record 配線（RecordWiring / element_gen）。
 //!
-//! 仕様参照（`.kiro/specs/pasta-source-map/`）:
+//! 仕様参照（`.kiro/specs/completed/pasta-source-map/`）:
 //! - requirements.md **1.1**: ソースマップ生成が有効である時、生成 `.lua` 行に由来
 //!   `.pasta` 位置を記録する。
 //! - requirements.md **1.3**: 単一の `.pasta` 要素が複数の `.lua` 行を生成する時、その

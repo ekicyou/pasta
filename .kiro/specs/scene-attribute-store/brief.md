@@ -134,3 +134,21 @@ Call ターゲットの後ろに `＆key＝value` 形式のフィルターを付
 - マニュアルが文法の唯一の権威。挙動を変えたら同じ変更でマニュアルを更新し、`node book/tools/gen-skill-refs.mjs` で生成スキルを再生成する（`--check` が CI で鮮度を見る）。
 - 現在、属性はどこでも受理され無視される。保持と読み出しを足しても候補の選択は変わらないため、既存の辞書に対して非互換は生まれない（属性行の配置を広げる場合を除く）。
 - 現行実装（`grammar.pest`・トランスパイラ・ランタイム）を正として設計する。旧仕様の記述は材料であり規範ではない（旧 §8.2 のように現行と食い違う記述がある）。
+
+## 2026-10-07 棚卸の再測定（main 2cbaf510）
+
+- **前提の変化**: 上流の 3 spec（`dsl-literal-fixes`・`scene-identity-format`・`call-execution-correctness`）はすべて完了した。未完了の前提は無く、今すぐ着手できる。シーンの登録名は「名前_番号」（`SceneRegistry::registered_name`、Lua 側は `scene.lua` の `create_scene`）。空の引用の属性値は `AttrValue::String("")` になった。
+- **触るファイル**: `pasta_dsl` の `parser/parse_scene.rs`（426 行）・`parser/ast/scene.rs`、`pasta_lua` の `code_gen/scope_gen.rs`（407 行）・`context.rs`・`transpiler.rs`、`pasta_scripts/pasta/scene.lua`（216 行）、`runtime/finalize.rs`（355 行）、`pasta_core` の `registry/scene_registry.rs`（576 行）・`scene_types.rs`、マニュアル `grammar/block-structure.md`・`lua/script-api.md`・`internals/registry-search.md`・`internals/transpiler.md` と生成スキル。1,000 行に近いファイルは無い。
+- **規模**: 約 14〜18 タスク（宣言行の属性をパーサで拾う 1〜2、属性があるシーンだけ Lua に出す 2〜3、`scene.lua` の保持と読み出しの口 2、`finalize` で登録表へ渡す 2〜3、型の扱い 1〜2、マニュアルと生成 2、テスト 2）。上限の 20 に収まる。
+- **先に要るもの**: なし。ほかの未完了 spec とソースは重ならない。Phase 12 の `manual-claudia-theme` とは同じマニュアルのページ（各章の導入と締め）と生成スキルを触るが、別の節なので並走できる（後から入る側が再生成で合わせる）。
+- **種別**: 機能（実行時に属性が残らないものを、保持して読めるようにする）。
+- **要件定義のモデル**: Fable（読み出しの口の形・型の解釈・ローカルシーンの属性の置き場所は、後続の `call-attribute-filter` が土台にする意味の決定で、開発者の判断の分かれ道が多い）。
+- **分割の案**: 不要。読み出しの口を `act` ではなく `SCENE`（`scene.lua`）側に置けば `act.lua` を触らずに済み、`failure-output-unification` と同じウェーブで並走できる。
+- **見つけた穴・古くなった記述**:
+  - 宣言行への付記（`＊会話＆作者：Alice`・`・選択肢＆優先：3`）は文法では受理されるが、パーサが名前だけを拾って捨てる（`parse_scene.rs` の `parse_global_scene_start` 84 行・`parse_local_scene_scope` 202〜205 行）。`LocalSceneScope.attrs` は常に空。Current State の「置ける場所」は文法の話で、AST には残らない。
+  - 登録表を作り直す場所は `finalize.rs` 182 行（174 行付近から移動）。
+  - `register_global_raw` は渡した属性をローカルシーンにも同じ値で複製する（`scene_registry.rs` 150〜189 行）。「ローカルシーンには継承しない」「ローカルは自分の属性を持つ」とするなら、この API を変える必要がある。
+  - `collect_scenes`（`finalize.rs` 61〜69 行）は、シーン表の `__global_name__` 以外のキーをすべてローカルシーンとして数える。属性をシーン表のフィールドに置くと、偽のローカルシーンが登録される。
+  - 登録表の属性は `HashMap<String, String>`（`AttrValue` の表示文字列）で、型が失われる。トランスパイル時の登録（`context.rs` の `register_global_scene`）はファイル属性を統合しない。統合は `context.rs` の `merge_attrs`（brief の「transpiler の」は不正確）。
+  - ファイル属性は記述順に累積する（シーンの間に置いた `＆` は後のシーンにだけ効き、同じキーは後の値で上書き。`internals/transpiler.md` 155 行）。旧 §8.3 の「ファイル冒頭だけ」とは違う。どちらを正とするかを要件で決める。
+  - マニュアル `grammar/block-structure.md` 235 行の「内部に記録される」は、宣言行の付記では成り立たない（上の 1 点目）。

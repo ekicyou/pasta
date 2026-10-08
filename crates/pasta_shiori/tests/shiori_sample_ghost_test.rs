@@ -3,7 +3,7 @@
 //! These tests verify the complete SHIORI load/request pipeline
 //! using the actual hello-pasta ghost from pasta_sample_ghost.
 //!
-//! Related specification: `.kiro/specs/shiori-integration-test/`
+//! Related specification: `.kiro/specs/completed/shiori-integration-test/`
 
 mod common;
 

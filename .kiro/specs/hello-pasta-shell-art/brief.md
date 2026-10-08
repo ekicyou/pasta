@@ -53,3 +53,19 @@
 - 生成した画像には、著作権が認められない可能性が高い（USCO の AI 報告書 Part 2）。再配布の妨げにはならない。日本法での扱いは未確認。
 - FLUX.1 Kontext [dev] 系は、重みのライセンスが非商用で、出力の扱いも曖昧なので使わない。
 - 配布物の `.nar` のサイズが過大にならないこと（立ち絵は 150〜300px 幅程度を想定する）。
+
+## 2026-10-07 棚卸の再測定（main 2cbaf510）
+
+- **前提の変化**: 無い。画像は `image_generator.rs`（572 行）が描き、`generate_ghost()`（`lib.rs`）が `ghosts/hello-pasta/shell/master/` に 18 枚と `surfaces.txt` を書く。`release.ps1` の Step 2 が `cargo run -p pasta_sample_ghost` で毎回上書きする。
+- **触るファイル**: `crates/pasta_sample_ghost/` の `src/image_generator.rs`（削るか縮める）・`src/lib.rs`・`src/main.rs`・`src/config_templates.rs`（`surfaces.txt`）・`build.rs`・`README.md`・`release.ps1`（Step 2）・`ghosts/hello-pasta/shell/master/`（png 18 枚・`surfaces.txt`・`descript.txt` のバルーン位置）・`tests/integration_test.rs`（画像のテスト。14〜65 行・367〜385 行）、生成手順の記録（新規）、場合によりライセンスのファイル（新規）。1,000 行に近いファイルは無い。
+- **規模**: 10〜12 タスク（試作・基準画像・表情 9 種 × 2 人・切り抜き・ずれの対策・`surfaces.txt`・クレートの整理・`release.ps1`・README と出典・テスト）。
+- **先に要るもの**: `release-ci`（`release.ps1`・`.gitignore`・追跡の境界）。
+- **ファイルの重なり**: `hello-pasta-tutorial-stages` と `tests/integration_test.rs` を共有する（本 spec は画像のテスト、相手は辞書のテスト 269〜365 行）。どちらもウェーブ 1 なので、運用ルールでは並走できない。関数が分かれているので rebase で済む見込みだが、どちらを先にするか、画像のテストを別のファイルへ移すかを決める。
+- **種別**: 機能（見た目の差し替えと、生成物から素材への切り替え）。
+- **要件定義のモデル**: Fable（要件の初めに開発者が決める 3 点がある。ライセンス表記・外部素材の方針・生成元の記録）。
+- **分割の案**: なし。
+- **見つけた穴・古くなった記述**:
+  - `shell/master/descript.txt` のバルーン位置（`sakura.balloon.offsetx,64` など）は、幅 128px の今の絵が前提。寸法が変われば直す。
+  - `book/src/getting-started/first-ghost.md`（60 行目あたり）がこの `descript.txt` を ```text で転記している。`tutorial-check.mjs` は ```pasta しか照合しないので、食い違っても CI は気づかない（`getting-started-story-guide` の書き直しで拾う）。
+  - `release-ci` の起票文の「追跡を外す一覧」にシェル画像は入っていない。`release-ci` の要件で「シェル画像は追跡したまま」と明記してもらうと、本 spec が戻す手間が要らない。
+  - 胴体と顔を重ねる構成にするなら、`lib.rs` のテスト（生成ファイル数 19）と `config_templates.rs` のテスト（18 ブロック）も直す。

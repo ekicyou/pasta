@@ -57,7 +57,7 @@ fn run_generate_mode(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("  Files:    {}", file_count);
     println!();
     println!("Next steps:");
-    println!("  1. Run release.ps1 to copy pasta.dll, pasta_scripts/, and create .nar");
+    println!("  1. Run release.ps1 to copy pasta.dll and create .nar");
     println!("  2. Or run: release.ps1 -SkipDllBuild (if DLL already built)");
     println!();
 
