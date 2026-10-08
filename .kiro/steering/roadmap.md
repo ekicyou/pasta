@@ -177,6 +177,7 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
   - `release-ci` からの申し送り: CI での初回のリリースと、その前後の一回限りのセットアップは本更新の後の最初のリリースで行う。手順は `.github/release-ci-setup.md` の 6〜10 節。期限は 2026-12-01（global PAT の廃止）より前。
     - 前提: 「Entra ID の登録」セッションによる setup-check の実行と Marketplace の Members への追加（6・7 節）、ユーザーによる crates.io の Trusted Publisher ×5（8 節）。
     - 合格: 3 公開先が `published`、同じ run の再実行ですべて `skipped`。結果を「Entra ID の登録」セッションへ伝える。
+    - あわせて見直す（`release-ci` の design.md「Out of Boundary」が本更新へ回したもの）: `.claude/settings.json` の公開系コマンドの許可の整理、`build.yml` に `--locked` を足すか、bump 箇所に `package-lock.json` の版を含めること（release.yml の verify は検査しない）。
     - `VSCE_PAT` の失効（10 節）は、初回のリリースで Marketplace が Entra ID の経路で `published` になったのを確かめてから行う。値が `release-ci` の会話記録に出ているが、前倒しはしない（ユーザー決定 2026-10-08）。
   - Dependencies: release-ci
 
