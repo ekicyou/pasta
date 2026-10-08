@@ -331,7 +331,7 @@
   - _Boundary: ChapterDialogues（grammar）_
   - _Depends: 3.4, 4_
 
-- [ ] 5.4 (P) Lua API の前半 7 章の導入と締めを、掛け合いに書き換える
+- [x] 5.4 (P) Lua API の前半 7 章の導入と締めを、掛け合いに書き換える
   - 対象: index・basics・modules/index・pasta-search・pasta-persistence・pasta-config・pasta-sakura-script
   - 完了したとき、対象の 7 章が、全パート共通の条件をすべて満たしている。
   - _Requirements: 5.1, 5.2, 5.3, 5.5_
