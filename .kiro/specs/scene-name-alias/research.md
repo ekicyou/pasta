@@ -168,3 +168,129 @@
 | OQ-6 | 8.1〜8.3 | 失敗表記・ログ・登録名に出す名前 | (a) 失敗表記は書いた名前、ログは両方、登録名は置き換え後 (b) すべて書いた名前 (c) すべて置き換え後 | (a) | 失敗表記は作者が辞書の該当行を探す手がかりなので書いた名前。登録名はシーンの同一性そのもので、`OnTalk` の候補と同じ集まりに入るため置き換え後が一貫する。ログは両方あれば追える（実現方法は R-4） |
 | OQ-7 | 9.6 | マニュアルの `＊会話` 例題 21 か所の整理 | (a) 照合の説明で使う `会話・朝` 系だけ別の例題名へ付け替え、ランダムトークとして読める `＊会話` の例は残す (b) すべて別の例題名へ付け替え (c) すべて別名を明示する例へ書き換え | (a) | `＊会話` の例の多くは「ひと続きのトーク」で、OnTalk の意味で読んでも食い違わない。紛らわしいのは「`会話・朝` は別名の対象外」と並ぶ照合の説明なので、そこだけ付け替えれば改稿量が小さい |
 | OQ-8 | 2.6 | 有効な別名表を読み込み時にログへ出すか | (a) info で 1 回出す (b) 出さない (c) 既定と違うときだけ出す | (a) | `＊会話` がなぜ OnTalk になったか／ならなかったかをログで確かめられる。1 回だけなので負荷は無い |
+
+---
+
+## 7. 設計フェーズの調査（2026-10-08）
+
+- 基準: worktree `claude/ontalk-scene-name-a0749f`（`d9541dac`）。要件ディスカッションの確定（OQ-1〜8）を前提に、R-1〜R-7 をコードで確かめた。
+- Discovery の種別: **Extension（軽量）**。新しい外部依存は無く（`toml`・`serde`・`tracing` は既存）、外部調査は行っていない。調査対象は 1 章の経路に加え、`loader/source_map_build.rs`・`runtime/mod.rs`・`runtime/factory.rs`・`loader/config/*`・`loader/cache.rs`・`pasta_shiori/src/shiori.rs` の読み込み経路。
+
+### 7.1 要点（設計に効いた発見）
+
+- **トランスパイラはローダーの中で 2 回作られる**。`process.rs` `process_incremental` と `source_map_build.rs` `build_source_map_inner` がそれぞれ `LuaTranspiler::default()` を作る。別名表を増分トランスパイルにだけ渡すと、デバッグ有効時に突合キー `G:会話#k` と実行時の登録名 `OnTalk_N` が食い違い、カーソル位置の再生が壊れる。→ ローダーが `transpiler_for(&config)` で 1 個作り、両方に同じ参照を渡す（6.2・7.x）。
+- **`@pasta_search` は 2 回登録される**。`runtime/mod.rs` `with_config_and_source_map` が `TranspileContext` の登録表から 1 回、`finalize_scene_impl` が Lua 側の登録表から 1 回（本番ではこちらが有効）。→ 表は `RuntimeConfig.scene_aliases` の 1 か所に持ち、両方に同じ値を渡す（R-2）。
+- **`PastaConfig::parse` は `toml::Table` から `try_into` する**ため、`[loader]` の型エラーにも行番号は付かない。要件 2.5 の「原因の行が分かる」を満たすには、同じ文字列を `toml::from_str::<SceneProbe>` でもう 1 度読む（未知のキーは無視される）。要素を `toml::Spanned<String>` で受ければ、空文字列・重複・連鎖の文言に別名の行番号を入れられる（キーの位置は取れない）。
+- **SHIORI のリロードは `PastaLoader::load_with_config` の再実行**（`pasta_shiori/src/shiori.rs`）。pasta.toml・キャッシュ判定・ログは毎回やり直されるので、6.1 の「読み込み直し」に追加の仕組みは要らない。
+- **pasta_check と pasta_lsp は `pasta_lua` を使わない**（`pasta_check/Cargo.toml` に `pasta_` 依存なし、`pasta_lsp` は `pasta_dsl` だけ）。9.4 の注記は予防的な記述で、コードの変更は無い。
+- **`act.lua` の 5 段探索は mode（word/scene/expr）を `search_dictionary` で振り分ける**が、scene と expr はどちらも `SCENE.search(key, nil)` に落ちる。expr モード（`＠会話（）`）も L5 で別名の対象になる（R-5）。word モードは `search_word` なので対象外。
+- **`PastaConfig::default()` はテストで使われる**（`LoaderContext::from_config` のテストなど）。「`[scene]` の無い pasta.toml」と同じ表（内蔵既定）にそろえる。
+
+### 7.2 Research Log（R-1〜R-7 の決着）
+
+#### R-1 キャッシュ無効化の方式
+- **Context**: `CacheManager` は `.cache_version`（クレートの版）とファイルごとの更新時刻しか見ない。
+- **Sources**: `crates/pasta_lua/src/loader/cache.rs`（`prepare_cache_dir`・`needs_transpile`）、`loader/mod.rs` Phase 2。
+- **Findings**: 設定は Phase 1 で読まれ、Phase 2 の `prepare_cache_dir` の時点で表が分かる。pasta.toml の更新時刻を全 `.pasta` の判定に加える案は、別名と無関係なキーの変更でも全再トランスパイルになる。`.cache_version` に指紋を混ぜる案は版ファイルの意味を変え、既存の比較（`cached_version.trim() == CURRENT_VERSION`）を壊す。
+- **Implications**: 別ファイル `<cache_dir>/.scene_alias` に `SceneAliasTable::fingerprint()` を記録し、不一致・不在なら版の不一致と同じく**全破棄**する。部分的な再トランスパイルは、どのファイルが別名を含むかを知るのに全ファイルのパースが要るため採らない。初回はマーカー不在で 1 回だけ全破棄が起きる。
+
+#### R-2 実行時へ表を渡す経路
+- **Context**: `finalize_scene_impl(lua)` は `lua` しか受け取らない。
+- **Sources**: `runtime/finalize.rs`、`runtime/factory.rs` `from_loader_with_scene_dic`、`runtime/mod.rs`、`runtime/runtime_config.rs`。
+- **Findings**: `RuntimeConfig` には `with_debug`・`with_kick_sink` のビルダーがあり、ローダーが pasta.toml の値を載せる前例がある。`register_finalize_scene` は `lua.create_function` でクロージャを作っており、表を捕捉させれば app data は不要。
+- **Implications**: `RuntimeConfig.scene_aliases`（既定は空）＋`with_scene_aliases`。`from_loader_with_scene_dic` が `pasta_config.scene_aliases` を載せ、初回の `search::register` と `register_finalize_scene(lua, aliases)` の両方へ渡す。Lua の app data・新しいグローバル状態は作らない。
+
+#### R-3 デバッグの突合
+- **Context**: `＊会話` と `＊OnTalk` が混在したときの `scene_join.rs` の突合。
+- **Sources**: `debug/source_map/scene_join.rs`、`code_gen/scope_gen.rs`、`pasta_core` `increment_counter`（sanitize 後の名前で採番）。
+- **Findings**: 突合キーの base は `sanitize_name(基本名)`、`scene_counter` は `register_global` の通し番号（sanitize 後の名前ごと）。宣言側で置き換えれば `＊会話` も `＊OnTalk` も base `OnTalk` で同じカウンタに乗り、ファイル内の出現順＝実行時の通し番号の順位になる。`scene_join.rs`・`playscene.rs`・`kick.lua` は登録名を受け取るだけなので変更不要（4.8）。
+- **Implications**: デバッグ側のコード変更は無し。混在 fixture（`scene_alias_mixed.pasta`）で identity を検証する。R-1/6.2 のとおりソースマップ構築側のトランスパイラにも同じ表を渡すことが前提。
+
+#### R-4 ログに両方の名前を出す方法
+- **Context**: 置き換えは Rust の `search_scene` で起き、警告は Lua の `ACT_IMPL.call` が出す（`act:call - handler not found: key=会話`）。
+- **Sources**: `pasta_scripts/pasta/act.lua`（`find_act_handler`・`call`・`failure`）、`search/context.rs`。
+- **Findings**: `SEARCH:search_scene` の戻りの形を変える案は Lua 側の全呼び出し元に波及する。`act.lua` に `SEARCH:resolve_scene_alias` を呼ばせる案は「`act.lua` は触らない」（brief の Constraints）と `failure-output-unification` の持ち場に重なる。Rust 側で warn を出す案は Lua に手を入れず、`tracing` の既定レベル（info）でも記録される。
+- **Implications**: `search_scene` のグローバル分岐で「置き換えが起き、かつ見つからなかった」ときだけ `warn!(name, resolved)` を出す。Lua の警告は変えないため 2 行になる（design.md Open Question 1）。置き換えが起きなかった不一致にはログを足さない（仮想ディスパッチャの `時報HH` 候補の空振りなどを騒がせない）。
+
+#### R-5 expr モードと `GLOBAL`
+- **Context**: `＠会話（）` が OnTalk のシーン関数に解決されるか。L4 の `GLOBAL` は置き換えないか。
+- **Sources**: `act.lua` `find_act_handler`・`search_dictionary`。
+- **Findings**: L4 は `GLOBAL[key]` の完全一致で `SEARCH` を通らないため置き換わらない（4.7 どおり）。L5 は scene/expr とも `SCENE.search(key, nil)` → `search_scene(key, None)` なので、expr モードも構造上の帰結として別名の対象になる。
+- **Implications**: モードごとの分岐は足さない（`SCENE.search` の引数にモードが無く、足すと Lua を触る）。マニュアルでは「5 段目に進んだ全ての検索」として包含する（design.md Open Question 2）。
+
+#### R-6 `@pasta_config` への見え方
+- **Context**: `[ghost]` は `apply_shiori_defaults` が欠けたキーを補完して Lua に見せている。
+- **Sources**: `loader/config/mod.rs` `apply_shiori_defaults`、`runtime/module_registry.rs` `register_config_module`、`virtual_dispatcher.lua` `get_config`（`[ghost]` の Lua 側消費者）。
+- **Findings**: `[ghost]` の補完は Lua 側に消費者（`get_config`）があるための決定。別名表の消費者は Rust 側（トランスパイラ・検索）だけで、Lua から読む需要は要件に無い。既定を補完すると「作者が書いた表だけが有効」という 2.2 の読みと `@pasta_config` の見え方がずれる。
+- **Implications**: 補完しない。`[scene]` は `custom_fields` に残り、書いたとおりに `@pasta_config.scene` へ出る。有効な表はログ（2.7）で確かめる。
+
+#### R-7 既存の独自 `[scene]` セクションとの衝突
+- **Context**: 作者が `[scene]` を独自用途に使っている可能性。
+- **Sources**: `loader/config/mod.rs` `parse`（`[loader]` 以外は `custom_fields`）、serde の未知フィールドの既定（無視）。
+- **Findings**: `SceneProbe { scene: Option<SceneSection { alias: Option<..> }> }` で読めば、`[scene]` の `alias` 以外のキーは無視され、`custom_fields` 経由で Lua にも残る。`alias` を別の型で使っていた場合だけ型エラー（予約キー）になる。
+- **Implications**: `alias` だけを予約する。マニュアルの `[scene]` 節に「他のキーは将来の予約」と書く。
+
+### 7.3 アーキテクチャパターンの評価（再確認）
+
+3 章の案 A〜C を設計フェーズで再確認した。結論は変わらず**案 C**。
+
+| Option | 設計フェーズでの追加の所見 |
+|--------|---------------------------|
+| 案 A（`sanitize_name` 拡張） | `local_scene_counters`・`search_word`・`WordDefRegistry` も `sanitize_name` を呼ぶため、4.7 を守るには呼び出し元ごとの分岐が要る。却下のまま |
+| 案 B（実行時だけ） | `create_scene` に渡る基本名は sanitize 後で、OQ-4（書いた名前で完全一致）を満たせない。突合キーもずれる。却下のまま |
+| 案 C（共有の値型＋宣言・検索の両側） | 配線が 3 か所（キャッシュ・トランスパイラ×2・ランタイム）だが、トランスパイラは 1 個を共有、ランタイムは `RuntimeConfig` の 1 か所で済む。採用 |
+
+### 7.4 Design Synthesis
+
+- **一般化**: 「会話 → OnTalk」の特殊扱いではなく、任意のグローバルシーン名の別名表として設計した。`OnBoot = ["起動"]` のようなイベント名の別名も同じ 1 つの仕組みで動く（4.5）。既定表は 1 件のデータにすぎない。実装の範囲は要件どおり完全一致・1 段に留める。
+- **Build vs Adopt**: 新しい依存は無し。設定の読み込みは `toml`＋`serde`（`Spanned` を含む）、ログは `tracing`、キャッシュの判定は既存 `CacheManager` の方式を拡張。
+- **単純化**: (1) Lua スクリプトは触らない（`act.lua`・`scene.lua`・`virtual_dispatcher.lua`・`choice_select.lua`）。(2) Lua app data・グローバル状態・新しいトレイトは作らない。(3) 新しい `LoaderError` の種類を増やさず `Config` に乗せる。(4) `SearchContext::new`・`TranspilerConfig::default()`・`RuntimeConfig::new()` は空の表のままにし、既存テストの互換を保つ。(5) 部分再トランスパイルは作らず全破棄にする。
+
+### 7.5 Design Decisions
+
+#### Decision: 別名表の型は `pasta_core` に置き、ライブラリ層の既定は空にする
+- **Alternatives**: `pasta_lua::loader::config` に置く／`Default` を内蔵既定にする。
+- **Selected**: `pasta_core::registry::scene_alias::SceneAliasTable`。`Default` は空、`builtin_default()` は 1 件の表を返すだけで、使う判断はローダーが行う。
+- **Rationale**: トランスパイラと検索（`pasta_lua` の別々のモジュール）が同じ型を共有でき、`pasta_core` の単体テストとトランスパイラ直叩きのテストが別名の導入で変わらない。
+- **Trade-offs**: ライブラリを直接使う側は、トランスパイラと `RuntimeConfig` に同じ表を渡す責務を負う（ローダー経由なら保証される）。
+
+#### Decision: `[scene.alias]` は位置情報つきで別に読む
+- **Alternatives**: `custom_fields` の `toml::Value` から `try_into`（既存の `[loader]` 流。行番号なし）／`parse` 全体を型付き構造体に書き換える。
+- **Selected**: 同じ `content` を `toml::from_str::<SceneProbe>` で読み、要素は `toml::Spanned<String>`。意味エラーは `serde::de::Error::custom` で `toml::de::Error` にし、文言に行番号を入れて `LoaderError::Config` に乗せる。
+- **Rationale**: 2.5 の「原因の行」を満たしつつ、既存の `parse`・`apply_shiori_defaults`・`custom_fields` の流れを変えない。
+- **Trade-offs**: pasta.toml を 2 回パースする（起動時 1 回・無視できる）。キーの行番号は取れない（置き換え先はキー名で示す）。
+
+#### Decision: 置き換えは「宣言名」として 1 回だけ決める
+- **Selected**: `process_global_scene` が `declared_name` を決め、`register_global_scene_named`・`registered_name`・`generate_global_scene(scene, declared_name, ..)`・`register_local_scene` の親名へ渡す。
+- **Rationale**: 名前を使う 4 か所が 1 つの値から派生することで、登録名・突合キー・単語モジュール名・ローカル関数名の一致を構造的に保つ（1.3・7.x・8.3）。
+- **Follow-up**: `generate_global_scene` の中で `base_name` を 1 回作って以降すべてそれを使う現行の形を維持する。
+
+#### Decision: 検索側の置き換えはグローバル分岐だけ、warn は Rust 側
+- **Selected**: `search_scene(name, None)` でだけ `resolve`。置き換えが起きて見つからなければ `warn!(name, resolved)`。
+- **Rationale**: 4.3〜4.6 の全入口が 1 点に集まる。8.2 を Lua に触れずに満たす。
+- **Trade-offs**: Lua の warn と合わせて 2 行（design.md Open Question 1）。
+
+#### Decision: キャッシュは指紋マーカーで全破棄
+- 7.2 R-1 のとおり。
+
+#### Decision: `@pasta_config` に既定表を補完しない
+- 7.2 R-6 のとおり。
+
+### 7.6 Risks & Mitigations（設計フェーズで更新）
+
+- 宣言側と検索側で違う表が効く → ローダーが 1 回取り出した値を全消費点に渡す。トランスパイラは 1 個を共有。`scene_alias_search_test.rs` の「既定・定義・空 × 宣言・検索」で守る。
+- ソースマップ構築側のトランスパイラに表を渡し忘れる → `build_source_map` の引数にトランスパイラを取り、`LuaTranspiler::default()` をローダー内から無くす。混在 fixture の identity テストで検出する。
+- `toml::de::Error::custom` に行番号が付かない → `Spanned` のバイト範囲から行番号を計算して文言に入れる。
+- 既定表の導入で既存ゴースト・既存テストの「会話」の意味が変わる → マニュアルの `[scene]` 節に互換の注記（5.5・9.3）。既存テストの影響は `scene_identity_index_test.rs` に限られる見込み（`会話・朝`・`会話分岐`・`ゲート前会話…` は完全一致しない）。
+- 初回のキャッシュ全破棄 → 起動 1 回分の遅延。内部設計章に書く。
+- hello-pasta の切り替え（別 spec）とゴールデンテストの重なり → 本 spec は独自 fixture を使い、hello-pasta とゴールデン 3 本（`byte_invariant_test.rs`・`kick_unused_byte_invariant_test.rs`・`shiori_sample_ghost_test.rs`）に触れない。
+
+### 7.7 References（コード）
+
+- `crates/pasta_core/src/registry/scene_registry.rs`（`sanitize_name`・`registered_name`・`increment_counter`）
+- `crates/pasta_lua/src/transpiler.rs`・`context.rs`・`code_gen/scope_gen.rs`（宣言側）
+- `crates/pasta_lua/src/search/context.rs`・`search/mod.rs`・`runtime/finalize.rs`・`runtime/mod.rs`・`runtime/factory.rs`・`runtime/runtime_config.rs`（検索側と配線）
+- `crates/pasta_lua/src/loader/mod.rs`・`process.rs`・`source_map_build.rs`・`cache.rs`・`config/mod.rs`・`config/sections.rs`（ローダー）
+- `crates/pasta_lua/pasta_scripts/pasta/act.lua`・`scene.lua`・`shiori/event/virtual_dispatcher.lua`・`shiori/event/choice_select.lua`（不変の Lua 側の経路）
+- `crates/pasta_lua/src/debug/source_map/scene_join.rs`（突合キーの契約）
+- `crates/pasta_shiori/src/shiori.rs`（リロード経路）、`crates/pasta_shiori/tests/ontalk_probe_test.rs`（E2E の雛形）
