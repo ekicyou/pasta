@@ -38,6 +38,12 @@ fn test_cache_incremental_update() {
     // Write current version to .cache_version (otherwise it will be cleared)
     let version = env!("CARGO_PKG_VERSION");
     std::fs::write(cache_dir.join(".cache_version"), version).unwrap();
+    // Write the default scene alias table fingerprint too (otherwise it will be cleared)
+    std::fs::write(
+        cache_dir.join(".scene_alias"),
+        pasta_core::SceneAliasTable::builtin_default().fingerprint(),
+    )
+    .unwrap();
 
     // Create pasta/scene subdirectory for cache files
     std::fs::create_dir_all(cache_dir.join("pasta/scene")).unwrap();
@@ -336,6 +342,12 @@ fn test_scene_dic_old_path_cleanup() {
     // Write current version to avoid cache clear
     let version = env!("CARGO_PKG_VERSION");
     std::fs::write(cache_dir.join(".cache_version"), version).unwrap();
+    // Write the default scene alias table fingerprint too (otherwise it will be cleared)
+    std::fs::write(
+        cache_dir.join(".scene_alias"),
+        pasta_core::SceneAliasTable::builtin_default().fingerprint(),
+    )
+    .unwrap();
 
     // Create old scene_dic.lua at deprecated path
     std::fs::write(

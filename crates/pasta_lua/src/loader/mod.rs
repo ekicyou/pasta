@@ -118,7 +118,7 @@ impl PastaLoader {
         Self::prepare_directories(base_dir, &config.loader)?;
         let cache_manager =
             CacheManager::new(base_dir.to_path_buf(), &config.loader.transpiled_output_dir);
-        cache_manager.prepare_cache_dir()?;
+        cache_manager.prepare_cache_dir(&config.scene_aliases.fingerprint())?;
 
         // Phase 2.5: Self-deploy framework scripts (non-fatal)
         // base_dir is finalized by Phase 2; sync the embedded canonical pasta_scripts

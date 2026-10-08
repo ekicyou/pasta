@@ -241,7 +241,7 @@ fn loader_writes_sidecar_when_enabled_and_round_trips() {
     let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
     // サイドカーは生成 `.lua` の隣（cache 配下 pasta/scene/...）へ書くので親が要る。
     cache_manager
-        .prepare_cache_dir()
+        .prepare_cache_dir("")
         .expect("prepare cache dir");
 
     // sidecar=true でマップ構築（ローダのデバッグ有効＋サイドカー有効経路）。
@@ -297,7 +297,7 @@ fn loader_writes_no_sidecar_when_disabled() {
     let file_a = write_pasta(&base_dir, "dic/baseware/a.pasta", PASTA_A);
     let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
     cache_manager
-        .prepare_cache_dir()
+        .prepare_cache_dir("")
         .expect("prepare cache dir");
 
     // sidecar=false（既定）: メモリだけ。`.lua.map` は書かれない。
