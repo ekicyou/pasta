@@ -103,7 +103,7 @@
   - _Boundary: Tests (shiori e2e)_
   - _Depends: 5_
 
-- [ ] 6.5 全体の回帰確認
+- [x] 6.5 全体の回帰確認
   - ワークスペース全体のテストと clippy を通す（LuaJIT のビルド環境変数の注意を守り、テストが書き換える `sample.generated.lua` の改行差分はコミットに混ぜない）
   - Lua スクリプト・パーサ・`sanitize_name`・シーンテーブル・デバッグ突合・hello-pasta とそのゴールデンテストに差分が無いことを差分一覧で確かめる（単独 `＊` の意味・前方一致とシャッフル＆順次消費・OnHour の探し方・発行条件が不変であることの裏付け）
   - 全テストが通り、境界外のファイルに差分が無い
@@ -149,3 +149,4 @@
 - 4.1: 「会話」と「OnTalk」の順次消費の共有は構造上保証（候補キャッシュのキーが置き換え後の名前）。単体テストは無いので 6.2 で 1 本足す。
 - 4.2: factory.rs が `runtime_config.scene_aliases` を clone して finalize へ渡す配線は、5 の PastaLoader 経由テスト（`＊会話` → `search_scene("会話")` が `OnTalk_1`）が初めて守る。
 - 7.1: grammar/・shiori-events.md は `../reference/pasta-toml.md#sceneシーン名` へリンクしている → 7.2 の見出しは正確に `### [scene]（シーン名）` にする。7.2 の例の表に `雑談` を入れるときは call-jump.md の `＊雑談` の例と混同させない。
+- 6.5: `cargo test --all` 1 回目は rustc 自体の異常（std メタデータ不在・STATUS_STACK_BUFFER_OVERRUN）で落ちたが再実行で 111 結果行・2606 passed・0 failed。clippy（workspace・-D warnings）clean。境界外ファイル（Lua スクリプト・パーサ・scene_registry/scene_table・debug 突合・hello-pasta・ゴールデン 3 本・LSP・pasta_check）は merge-base から差分なし。
