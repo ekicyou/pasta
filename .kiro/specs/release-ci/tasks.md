@@ -67,7 +67,7 @@
   - _Requirements: 5.1, 5.2, 5.3, 5.5, 7.2, 7.3, 7.4, 7.6, 9.6_
   - _Boundary: publish-vsix.ps1_
 
-- [ ] 3.4 (P) リリースノートの生成スクリプトを作る
+- [x] 3.4 (P) リリースノートの生成スクリプトを作る
   - 前のリリースタグ（形の合うタグのうち版で並べて直前のもの。無ければ全履歴）からタグまでの、マージを除くコミットを集める
   - 6 種の見出しに分類し、`spec` スコープを除き、空の見出しを出さない。6 種以外の type と Conventional Commits でない件名は Maintenance に入れる。末尾に Full Changelog のリンクを付ける（前のタグが無ければ省く）
   - 完了の状態: `-Tag v0.3.7` で前のタグが v0.3.6 に決まり、生成したノートの見出しと件数が v0.3.7 の Release のノートと説明のつく形で一致する。前のタグが無い場合の分岐も擬似タグで確かめる
@@ -193,3 +193,4 @@
 - 3.x: 補助スクリプトは `#Requires -Version 7`・StrictMode・BOM なし UTF-8。出力は `$GITHUB_OUTPUT`／`$GITHUB_STEP_SUMMARY`（未設定なら標準出力）へ書く関数をスクリプトごとに持つ（共通モジュールはどのタスクにも無いので作らない）。タグの形は `-cmatch` で大文字小文字を区別し ASCII 数字と `\z` で判定する（`-match` は V0.3.7 を通す）。検証ドライバーは scratchpad に置きリポジトリに入れない。
 - 3.2: `publish-crate.ps1 -Crate -Version [-DependsOn] [-DryRun] [-ApiBase]`。索引待ちの上限 5 分は依存先 1 つごと（pasta_lua は最悪 10 分）、公開後の確認も最大 5 分。トークン（30 分）はクレートごとに auth の直後に取り直すので収まる。summary 行に所要秒を書く。試験は scratchpad\t32 の偽 cargo（PATH 先頭）と偽 API で行い、本物の公開はしない。
 - 3.3: `publish-vsix.ps1 -VsixPath -Version -Extension [-VsceCommand] [-DryRun]`。vsce 3.7.1 は `--pat` の既定値が `VSCE_PAT` で `--azure-credential` より優先されるため、スクリプトは値を読まずに `Env:VSCE_PAT` を消す。vsce は `editors/vscode` で `npx --no-install vsce`（publish-vsce job は事前に `npm ci --ignore-scripts`）。`-VsixPath` は呼び出し元基準で解決する。公開後の確認は最大 10 分（job の 20 分に収まる）。
+- 3.4: `release-notes.ps1 -Tag -Repo [-OutFile] [-WorkspaceRoot]`。範囲は `<前のタグ>..<Tag>`（タグのコミット自身を含む）、項目は type 付きの件名全体、除外は scope `spec` だけ（type `spec` は Maintenance）。github-release job の checkout は `fetch-depth: 0` と `fetch-tags: true` が要る（4.5 で確かめる）。
