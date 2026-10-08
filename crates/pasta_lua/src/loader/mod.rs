@@ -86,6 +86,8 @@ impl PastaLoader {
     /// # Arguments
     /// * `base_dir` - Startup directory path
     /// * `runtime_config` - Custom runtime configuration
+    ///   (`scene_aliases` is always replaced by the table read from pasta.toml,
+    ///   so that declarations and searches use the same alias table)
     ///
     /// # Returns
     /// * `Ok(PastaLuaRuntime)` - Initialized runtime

@@ -151,3 +151,4 @@
 - 7.1: grammar/・shiori-events.md は `../reference/pasta-toml.md#sceneシーン名` へリンクしている → 7.2 の見出しは正確に `### [scene]（シーン名）` にする。7.2 の例の表に `雑談` を入れるときは call-jump.md の `＊雑談` の例と混同させない。
 - 6.5: `cargo test --all` 1 回目は rustc 自体の異常（std メタデータ不在・STATUS_STACK_BUFFER_OVERRUN）で落ちたが再実行で 111 結果行・2606 passed・0 failed。clippy（workspace・-D warnings）clean。境界外ファイル（Lua スクリプト・パーサ・scene_registry/scene_table・debug 突合・hello-pasta・ゴールデン 3 本・LSP・pasta_check）は merge-base から差分なし。
 - 7.2: pasta-toml.md で例に `おしゃべり`・`"天気の話" = ["お天気"]` を使った。7.3 の付け替え先はこれらとも衝突させない。
+- 完了時にその場で解決: `PastaLoader::load_with_config` の doc に、呼び出し側の `runtime_config.scene_aliases` は pasta.toml の表で必ず置き換わることを追記（最終検証の Minor 指摘）。
