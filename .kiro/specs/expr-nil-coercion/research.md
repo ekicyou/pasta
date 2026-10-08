@@ -282,3 +282,7 @@ brief の 6 論点に、調査で見つかった 2 点を足した。各項の�
 - `(` で始まる行の誤読 → 式文を `do local _ = … end` にする。代入の行は変数名で始まるので影響なし。
 - 未代入の変数名の書き間違いがログに出なくなる → 要件ディスカッションで受け入れ済み。関数名の書き間違いは呼び出し時点の警告が残る。
 - `failure-output-unification`・`call-attribute-filter` と `act.lua` が重なる → 本仕様を先に入れ、後から入る側が rebase する。
+
+## 9. 設計ディスカッションでの決定
+
+- **議題 #1（変換関数の置き場所と名前）**: `num`・`str` を act のメソッドにすると、`＠名前` の検索の 3 段目で見つかり、作者が `GLOBAL.str` などを `＠str（）` で呼んでいたら当たりが変わる。Python の `str()`・JavaScript の `String()`・Lua の `tostring()` は nil の扱いがどれも違い（`"None"`・`"undefined"`・`"nil"`）、ありふれた名前は誤解と衝突を招く。最も近い前例は ECMAScript 仕様書の ToNumber／ToString（演算子の種類で変換が決まり、利用者が名前で呼ぶ関数ではない）。そこで変換関数は act のメソッドにせず、`pasta` モジュールの `PASTA.num`・`PASTA.str` に置く（実体は `act.lua` のモジュール関数 `ACT.num`・`ACT.str`。`ACT_IMPL.__index` は `ACT_IMPL` だけを見るので act から届かない）。生成ファイルの先頭の `local PASTA = require "pasta"` はシーン関数の中からも見える。`PASTA` の設計権は pasta 側にあるので、名前は短い `num`・`str` でよい（開発者の判断）。
