@@ -95,8 +95,8 @@
   - _Boundary: book/src/lua/script-api.md, book/src/internals/internal-modules.md, book/src/internals/transpiler.md, book/src/lua/patterns.md_
   - _Depends: 4.1_
 
-- [ ] 6. スキルをマニュアルと同じ内容に揃える
-- [ ] 6.1 スキルの手書きの行を直し、references を再生成する
+- [x] 6. スキルをマニュアルと同じ内容に揃える
+- [x] 6.1 スキルの手書きの行を直し、references を再生成する
   - ゴースト作成スキルの算術・連結の 2 行と、Lua コーディングスキルの演算メソッドの行を新しい規則・形に直す
   - references は生成スクリプトで再生成する（手で直さない）
   - スキルの編集が自動モードの分類器に止められたら、そこで止めて入った分と残りを示し、開発者の許可を求める
