@@ -34,10 +34,10 @@
 | 段階 | 必要な表現 | マニュアルの根拠 | 判定 |
 | ---- | ---------- | ---------------- | ---- |
 | 1 しゃべらせたい | `＊OnBoot` + アクター行 | `lua/shiori-events.md` OnBoot（同名シーン実行） | 可 |
-| 2 掛け合い | 2 アクター、`％` アクター辞書、`：` の位置合わせ | `grammar/actor-dictionary.md`・`action-line.md` | 可 |
+| 2 掛け合い（＋ランダムトーク） | `＊会話`（scene-name-alias で OnTalk の別名）、2 アクター、`％` アクター辞書、`：` の位置合わせ、`pasta.toml` の `talk_interval_*` | `grammar/actor-dictionary.md`・`action-line.md`・`shiori-events.md` 仮想ディスパッチャ・`reference/pasta-toml.md`（別名の記述は scene-name-alias の PR で追加される） | 可（議題 6 で 2 段目へ繰り上げ）。`＊会話` の動作は上流 `scene-name-alias` のマージ後（G16） |
 | 3 表情 | `＠表情名：\s[n]`（アクター辞書）、台詞頭 `＠表情` | `actor-dictionary.md`・`words.md` | 可 |
-| 4 毎回ちがう | 同名グローバルシーン複数、`＠単語：a、b、c` | `block-structure.md`（同名シーンの抽選）・`words.md` | 可 |
-| 5 ランダムトーク | `＊OnTalk`（または上流 spec 後の `＊会話`）、単独 `＊` 行で候補を増やす、`pasta.toml` の `talk_interval_*` | `shiori-events.md` 仮想ディスパッチャ・`block-structure.md` 単独 `＊`・`reference/pasta-toml.md` | 可。**議題 6 で順と名前を再編中**: 議題 5（`OnBoot` を育てない）により掛け合いの受け皿としてランダムトークが 2 段目へ繰り上がる見込み。読者が書くシーン名（`OnTalk` か `会話`）は上流セッション「OnTalk シーン名の扱い」の変更に依存（G16） |
+| 4 毎回ちがう | 同名グローバルシーン複数（`＊会話` の繰り返し・単独 `＊`） | `block-structure.md`（同名シーンの抽選・単独 `＊`） | 可。別名は完全一致なので `＊会話朝` は OnTalk にならない点を段階表に注意として書く |
+| 5 単語でちょこっと変える | `＠単語：a、b、c`、`＠単語` 参照 | `words.md` | 可（brief の 4 段目から独立） |
 | 6 時報 | `＊時報12`・`＊時報その他`、`＄時１２` | `shiori-events.md` OnHour フォールバック・`variables.md` 日時変数 | 可 |
 | 7 挨拶（イベント） | `＊OnGhostChanged`、`＞transfer_req_to_var`、`＄ｒ０` | `shiori-events.md` OnGhostChanged（Reference0＝直前ゴーストの本体側の名前）・`variables.md` リクエスト変数 | 可。`OnGhostChanging` は UKADOC 側のイベントで、同名シーンで応答できる（「ここに無いイベントも同名のシーンで応答できる」） |
 | 8 触ったら反応 | `＊OnMouseDoubleClick` + `＄ｒ４` | `shiori-events.md` OnMouseDoubleClick（Reference4＝当たり判定）・`variables.md` の作例そのもの | 可 |
@@ -65,7 +65,7 @@
 | G12 | 配布物の変化の周知 | Resolved | `crates/pasta_sample_ghost/RELEASE.md` はリリース**手順書**であり利用者向けの変更履歴ではない。リリースノートは `release-workflow`/`release-ci` が git log を Conventional Commits の種類で分類して生成する。したがって周知の経路は、本 spec のマージコミット（PR タイトル）を `feat(pasta_sample_ghost): …` の利用者向けの言葉で書くこと。あわせて `crates/pasta_sample_ghost/README.md` の辞書構成の節（`:125-146` のツリー）を追従させる。`.nar` 同梱の文書は増やさない（`release-ci` が成果物の追跡をやめる予定） |
 | G13 | 段階表の置き場所 | Missing | 下流が逐語参照する正本。候補: `crates/pasta_sample_ghost/ghosts/hello-pasta-stages/README.md`（段階辞書と同居）か `crates/pasta_sample_ghost/README.md` の節 |
 | G14 | 段階辞書の置き場所の制約 | Constraint | `release.ps1` は `ghosts\hello-pasta` を固定で対象にし、`pasta_check release` は対象ディレクトリ全体を無選別にコピーする（`pasta_check/src/release.rs:19`）→ **`ghosts/hello-pasta/` の下に段階辞書を置くと `.nar` に混入する**。`pasta_shiori` の e2e も `ghost/master` 全体を tempdir へコピーする。`pasta.toml` の `pasta_patterns = ["dic/*.pasta"]` は再帰しないので `dic/` の下にサブフォルダを置いても読み込まれない。`ghosts/` 直下の兄弟ディレクトリ（例: `ghosts/hello-pasta-stages/`）なら配布・e2e のどちらにも拾われない |
-| G16 | `＊会話` → `OnTalk` のランタイム変更（上流） | Blocking | 別セッション「OnTalk シーン名の扱い」が「`＊会話` を `＊OnTalk` として扱う」変更を進めている。本 spec は現行ランタイムに日本語名が無いことを前提に辞書ディスパッチャ案（`＊OnTalk` → `＞会話`）を検討していたが、ランタイム側で解決されるなら不要。設計に入る前にその PR を main に取り込む。確認中: エイリアスかトランスパイル時置換か、フォールバック順、後方互換、前方一致、マニュアル更新の有無、PR 番号・時期 |
+| G16 | `＊会話` → `OnTalk` の別名（上流 spec `scene-name-alias`） | Blocking（実装） | 2026-10-08 確認。`pasta.toml` にシーン名別名表（既定「会話 → OnTalk」1 件、表を書けば既定を丸ごと置換）。置換は `SceneRegistry::sanitize_name` の前段で登録・検索の両方に効き、宣言・Call/Jump・選択肢・`SCENE.co_exec` すべてが対象。**完全一致のみ**（`＊会話・朝`・`＊会話朝` は別シーン）。仮想ディスパッチャは不変（候補名 "OnTalk" のみ）。`＊OnTalk` は後方互換で両方書けば同じ候補群。時報側は不変。マニュアル（block-structure・call-jump・shiori-events・pasta-toml）とスキル references は同 PR で更新。マニュアルが `＊会話` を汎用例題名として 21 か所で使っている件は向こうの要件で整理。brief のみ・PR 未着手。ロードマップ上は Phase 11 Wave 6 だがユーザーが最優先で PR を出させる方針。本 spec: 設計は待たず、**実装の着手をマージ後にゲート**（議題 6）。辞書ディスパッチャ案（`＊OnTalk` → `＞会話`）は不要になった |
 | G15 | `manual.yml` のトリガー | Constraint | `manual.yml` の `paths:` に `crates/pasta_sample_ghost/**` が無い。辞書だけを変える PR では tutorial-check が走らず（`build.yml` の `cargo test --all` だけ走る）、逐語一致の崩れが main への push まで見つからない。段階辞書の検証（Requirement 4.7）も同じ理由で `manual.yml` 側では PR 時に走らない |
 
 ### 2.3 複雑さの信号
@@ -119,7 +119,7 @@
 
 - **採用**: Option D（配布辞書を章ごとのファイルに分け、段階 N ＝ 先頭 N ファイル。議題 5）＋ 検証は C2（G3 で成立確認済み）。A〜C は不採用。
 - **キーとなる決定**: ファイル名の規則（番号の桁数・区切り・テーマ名）、段階表の正本の置き場所とテストから読める形（G13。例: 段階表 Markdown の表をテストがパースする／ファイル名の番号を段階とみなす）、ループテストの形（既存テストの拡張か新規ファイルか。最も近い手本は `pasta_lua/tests/transpiler/final_regression_test.rs` の `broad_fixtures()`）、`OnBoot` の新しい固定文、`manual.yml` のトリガー追加の要否（G15）。
-- **設計前の前提（ブロッキング）**: 上流「OnTalk シーン名の扱い」の PR が main に入っていること（G16）。入った後に本 spec のブランチへ main を取り込み、段階表の 2 段目以降のシーン名とマニュアル根拠を確定する。
+- **実装前の前提（ゲート）**: 上流 `scene-name-alias` の PR が main に入っていること（G16）。設計は `＊会話` 前提で先に進める。実装着手時に本 spec のブランチへ main を取り込み、`＊会話` の動作と `pasta.toml` の別名表の記述（マニュアル）を確認してから辞書を書く。段階表の 2 段目のマニュアル根拠（別名の節）は、その PR で追加されるページを指す。
 - **Research Needed（設計で調べる）**:
   1. `＄＊回数＝＄＊回数＋１` の初回（nil）挙動（G2.1 段階 10）。
   2. `scene_kick_*_e2e_test.rs` が追記するシーン名の一覧（G9）。
