@@ -86,8 +86,12 @@ fn fixture_target_pasta_line_maps_to_multiple_lua_lines() {
 
     // フィクスチャがトランスパイル・マップ構築できること（＝「ロードできる」観測可能 done）。
     let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
-    let source_map =
-        PastaLoader::build_source_map(std::slice::from_ref(&file), &cache_manager, false);
+    let source_map = PastaLoader::build_source_map(
+        std::slice::from_ref(&file),
+        &cache_manager,
+        false,
+        &LuaTranspiler::default(),
+    );
 
     let chunk = cache_manager
         .source_to_cache_path(&file)
@@ -135,8 +139,12 @@ fn fixture_loop_revisits_the_same_pasta_line() {
     let file = write_fixture(&base_dir);
 
     let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
-    let source_map =
-        PastaLoader::build_source_map(std::slice::from_ref(&file), &cache_manager, false);
+    let source_map = PastaLoader::build_source_map(
+        std::slice::from_ref(&file),
+        &cache_manager,
+        false,
+        &LuaTranspiler::default(),
+    );
     let chunk = cache_manager
         .source_to_cache_path(&file)
         .to_string_lossy()

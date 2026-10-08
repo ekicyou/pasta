@@ -2,6 +2,8 @@
 //!
 //! This module provides configuration options for the transpilation process.
 
+use pasta_core::SceneAliasTable;
+
 /// Line ending style for generated code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineEnding {
@@ -53,6 +55,8 @@ pub struct TranspilerConfig {
     /// step, so the transpiled bytes are always LF-only regardless of this
     /// setting. See `LuaTranspiler::transpile` post-processing.
     pub line_ending: LineEnding,
+    /// グローバルシーン名の別名表（既定は空の表で、宣言名を置き換えない）。
+    pub scene_aliases: SceneAliasTable,
 }
 
 impl Default for TranspilerConfig {
@@ -60,6 +64,7 @@ impl Default for TranspilerConfig {
         Self {
             comment_mode: true,
             line_ending: LineEnding::default(),
+            scene_aliases: SceneAliasTable::empty(),
         }
     }
 }
@@ -87,6 +92,12 @@ impl TranspilerConfig {
         self.line_ending = line_ending;
         self
     }
+
+    /// グローバルシーンの宣言名を置き換える別名表を設定する。
+    pub fn with_scene_aliases(mut self, aliases: SceneAliasTable) -> Self {
+        self.scene_aliases = aliases;
+        self
+    }
 }
 
 #[cfg(test)]
@@ -103,6 +114,13 @@ mod tests {
     fn test_without_comments() {
         let config = TranspilerConfig::without_comments();
         assert!(!config.comment_mode);
+    }
+
+    #[test]
+    fn test_default_scene_aliases_is_empty() {
+        assert!(TranspilerConfig::default().scene_aliases.is_empty());
+        let config = TranspilerConfig::new().with_scene_aliases(SceneAliasTable::builtin_default());
+        assert_eq!(config.scene_aliases, SceneAliasTable::builtin_default());
     }
 
     #[test]

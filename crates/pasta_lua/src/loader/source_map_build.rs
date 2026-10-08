@@ -62,12 +62,21 @@ impl PastaLoader {
     /// via `tracing::warn!` and the in-memory `SourceMap` build continues unaffected.
     /// When `sidecar` is `false` (default) no `.map` file is written and the
     /// in-memory map is the sole path.
+    ///
+    /// `transpiler` must be the one used for the generated `.lua` (the loader
+    /// shares a single instance), so the scene join keys use the same alias table.
     pub fn build_source_map(
         pasta_files: &[std::path::PathBuf],
         cache_manager: &CacheManager,
         sidecar: bool,
+        transpiler: &LuaTranspiler,
     ) -> Arc<SourceMap> {
-        Arc::new(build_source_map_inner(pasta_files, cache_manager, sidecar))
+        Arc::new(build_source_map_inner(
+            pasta_files,
+            cache_manager,
+            sidecar,
+            transpiler,
+        ))
     }
 }
 
@@ -80,8 +89,8 @@ fn build_source_map_inner(
     pasta_files: &[std::path::PathBuf],
     cache_manager: &CacheManager,
     sidecar: bool,
+    transpiler: &LuaTranspiler,
 ) -> SourceMap {
-    let transpiler = LuaTranspiler::default();
     let mut source_map = SourceMap::new();
     let mut chunk_count = 0usize;
 

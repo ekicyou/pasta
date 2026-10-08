@@ -204,6 +204,7 @@ fn build_fixture() -> Fixture {
         std::slice::from_ref(&pasta_file),
         &cache_manager,
         false,
+        &LuaTranspiler::default(),
     );
 
     // チャンク名キー = ローダ由来 `source_to_cache_path`（map のキーと同一）。

@@ -196,8 +196,14 @@ impl PastaLuaRuntime {
         let scene_registry = context.scene_registry;
         let word_registry = context.word_registry;
 
-        // Register @pasta_search module
-        crate::search::register(&lua, scene_registry, word_registry)?;
+        // Register @pasta_search module (the same alias table is handed to the
+        // finalize_scene re-registration via `register_finalize_scene`)
+        crate::search::register(
+            &lua,
+            scene_registry,
+            word_registry,
+            config.scene_aliases.clone(),
+        )?;
 
         // Register mlua-stdlib modules based on configuration
         if config.should_enable_module("assertions") {

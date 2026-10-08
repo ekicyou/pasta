@@ -6,6 +6,11 @@ use pasta_lua::loader::{CURRENT_VERSION, CacheManager};
 use std::fs;
 use tempfile::TempDir;
 
+/// 別名表の指紋（テスト用の固定値）。
+const FP: &str = "scene_alias/1
+6:OnTalk 6:会話
+";
+
 fn create_test_cache_manager() -> (TempDir, CacheManager) {
     let temp = TempDir::new().unwrap();
     let manager = CacheManager::new(temp.path().to_path_buf(), "profile/pasta/cache/lua");
@@ -21,7 +26,7 @@ fn test_prepare_cache_dir_creates_version_file() {
     let (temp, manager) = create_test_cache_manager();
 
     // First call should create version file
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     let version_file = temp.path().join("profile/pasta/cache/lua/.cache_version");
     assert!(version_file.exists());
@@ -33,7 +38,7 @@ fn test_prepare_cache_dir_preserves_cache_on_version_match() {
     let (temp, manager) = create_test_cache_manager();
 
     // Create initial cache
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     // Create a test file in cache
     let test_file = temp
@@ -42,7 +47,7 @@ fn test_prepare_cache_dir_preserves_cache_on_version_match() {
     fs::write(&test_file, "-- test content").unwrap();
 
     // Call again - should preserve
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     // Test file should still exist
     assert!(test_file.exists());
@@ -63,7 +68,7 @@ fn test_prepare_cache_dir_clears_on_version_mismatch() {
     fs::write(&test_file, "-- old content").unwrap();
 
     // Call prepare - should clear
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     // Test file should be deleted
     assert!(!test_file.exists());
@@ -74,13 +79,117 @@ fn test_prepare_cache_dir_clears_on_version_mismatch() {
 }
 
 // ========================================================================
+// Scene Alias Marker Tests (scene-name-alias task 2.2)
+// ========================================================================
+
+#[test]
+fn test_prepare_cache_dir_writes_scene_alias_marker() {
+    let (temp, manager) = create_test_cache_manager();
+
+    manager.prepare_cache_dir(FP).unwrap();
+
+    let marker = temp.path().join("profile/pasta/cache/lua/.scene_alias");
+    assert_eq!(fs::read_to_string(&marker).unwrap(), FP);
+}
+
+#[test]
+fn test_prepare_cache_dir_preserves_cache_on_same_fingerprint() {
+    let (temp, manager) = create_test_cache_manager();
+    manager.prepare_cache_dir(FP).unwrap();
+
+    let test_file = temp
+        .path()
+        .join("profile/pasta/cache/lua/pasta/scene/test.lua");
+    fs::write(&test_file, "-- test content").unwrap();
+
+    manager.prepare_cache_dir(FP).unwrap();
+
+    assert!(test_file.exists(), "same fingerprint must preserve cache");
+    assert_eq!(fs::read_to_string(&test_file).unwrap(), "-- test content");
+}
+
+#[test]
+fn test_prepare_cache_dir_clears_on_fingerprint_change() {
+    let (temp, manager) = create_test_cache_manager();
+    manager.prepare_cache_dir(FP).unwrap();
+
+    let cache_dir = temp.path().join("profile/pasta/cache/lua");
+    let test_file = cache_dir.join("pasta/scene/test.lua");
+    fs::write(&test_file, "-- old content").unwrap();
+
+    let new_fp = "scene_alias/1
+";
+    manager.prepare_cache_dir(new_fp).unwrap();
+
+    assert!(!test_file.exists(), "changed fingerprint must clear cache");
+    assert!(cache_dir.join("pasta/scene").is_dir());
+    assert_eq!(
+        fs::read_to_string(cache_dir.join(".scene_alias")).unwrap(),
+        new_fp
+    );
+    assert_eq!(
+        fs::read_to_string(cache_dir.join(".cache_version")).unwrap(),
+        CURRENT_VERSION
+    );
+}
+
+#[test]
+fn test_prepare_cache_dir_clears_on_missing_marker() {
+    let (temp, manager) = create_test_cache_manager();
+
+    // 版は一致するがマーカーが無い（別名表導入前のキャッシュ）
+    let cache_dir = temp.path().join("profile/pasta/cache/lua");
+    fs::create_dir_all(cache_dir.join("pasta/scene")).unwrap();
+    fs::write(cache_dir.join(".cache_version"), CURRENT_VERSION).unwrap();
+    let test_file = cache_dir.join("pasta/scene/test.lua");
+    fs::write(&test_file, "-- old content").unwrap();
+
+    manager.prepare_cache_dir(FP).unwrap();
+
+    assert!(!test_file.exists(), "missing marker must clear cache");
+    assert_eq!(
+        fs::read_to_string(cache_dir.join(".scene_alias")).unwrap(),
+        FP
+    );
+    assert_eq!(
+        fs::read_to_string(cache_dir.join(".cache_version")).unwrap(),
+        CURRENT_VERSION
+    );
+}
+
+#[test]
+fn test_prepare_cache_dir_version_mismatch_rewrites_marker() {
+    let (temp, manager) = create_test_cache_manager();
+
+    // 指紋は一致するが版が古い → 版で全破棄し、両方を書き直す
+    let cache_dir = temp.path().join("profile/pasta/cache/lua");
+    fs::create_dir_all(cache_dir.join("pasta/scene")).unwrap();
+    fs::write(cache_dir.join(".cache_version"), "0.0.0-old").unwrap();
+    fs::write(cache_dir.join(".scene_alias"), FP).unwrap();
+    let test_file = cache_dir.join("pasta/scene/test.lua");
+    fs::write(&test_file, "-- old content").unwrap();
+
+    manager.prepare_cache_dir(FP).unwrap();
+
+    assert!(!test_file.exists());
+    assert_eq!(
+        fs::read_to_string(cache_dir.join(".scene_alias")).unwrap(),
+        FP
+    );
+    assert_eq!(
+        fs::read_to_string(cache_dir.join(".cache_version")).unwrap(),
+        CURRENT_VERSION
+    );
+}
+
+// ========================================================================
 // Change Detection Tests (Task 2.2)
 // ========================================================================
 
 #[test]
 fn test_needs_transpile_no_cache() {
     let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     // Create source file
     let dic_dir = temp.path().join("dic");
@@ -95,7 +204,7 @@ fn test_needs_transpile_no_cache() {
 #[test]
 fn test_needs_transpile_cache_older() {
     let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     // Create source file
     let dic_dir = temp.path().join("dic");
@@ -118,7 +227,7 @@ fn test_needs_transpile_cache_older() {
 #[test]
 fn test_needs_transpile_cache_newer() {
     let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     // Create source file first
     let dic_dir = temp.path().join("dic");
@@ -231,7 +340,7 @@ fn test_source_to_cache_path_nested() {
 #[test]
 fn test_save_cache_creates_file() {
     let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     let source = temp.path().join("dic/test.pasta");
     let lua_code = "-- generated lua code";
@@ -248,7 +357,7 @@ fn test_save_cache_creates_file() {
 #[test]
 fn test_save_cache_creates_nested_dirs() {
     let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     let source = temp.path().join("dic/deep/nested/path/scene.pasta");
     let lua_code = "-- nested lua";
@@ -266,7 +375,7 @@ fn test_save_cache_creates_nested_dirs() {
 #[test]
 fn test_generate_scene_dic() {
     let (_temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     let modules = vec![
         "pasta.scene.system".to_string(),
@@ -297,7 +406,7 @@ fn test_generate_scene_dic() {
 #[test]
 fn test_generate_scene_dic_empty() {
     let (_temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     let modules: Vec<String> = vec![];
     let path = manager.generate_scene_dic(&modules).unwrap();
@@ -331,11 +440,12 @@ fn test_prepare_cache_dir_version_match_with_whitespace() {
         format!("  {}\n", CURRENT_VERSION),
     )
     .unwrap();
+    fs::write(cache_dir.join(".scene_alias"), FP).unwrap();
 
     let test_file = cache_dir.join("pasta/scene/keep.lua");
     fs::write(&test_file, "-- keep me").unwrap();
 
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     // trim 一致なのでキャッシュクリアは発生しない
     assert!(
@@ -350,7 +460,7 @@ fn test_prepare_cache_dir_version_match_with_whitespace() {
 #[test]
 fn test_needs_transpile_missing_source_errors() {
     let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     // ソースは作らず、対応するキャッシュだけ作る
     let source = temp.path().join("dic/ghost.pasta");
@@ -370,7 +480,7 @@ fn test_needs_transpile_missing_source_errors() {
 #[test]
 fn test_save_cache_rejects_source_outside_base_dir() {
     let (_temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     // base_dir と無関係な絶対パス（strip_prefix 失敗 → 絶対パス join → 境界外）
     let outside = TempDir::new().unwrap();
@@ -394,7 +504,7 @@ fn test_save_cache_rejects_source_outside_base_dir() {
 #[test]
 fn test_save_cache_overwrites_existing() {
     let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     let source = temp.path().join("dic/test.pasta");
     manager.save_cache(&source, "-- version 1").unwrap();
@@ -444,7 +554,7 @@ fn test_find_orphaned_caches_empty_when_no_scene_dir() {
 #[test]
 fn test_find_orphaned_caches_skips_scene_dic_and_non_lua() {
     let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     let scene_dir = temp.path().join("profile/pasta/cache/lua/pasta/scene");
     fs::write(scene_dir.join("scene_dic.lua"), "-- generated").unwrap();
@@ -468,7 +578,7 @@ fn test_find_orphaned_caches_skips_scene_dic_and_non_lua() {
 #[test]
 fn test_generate_scene_dic_removes_legacy_location() {
     let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     let cache_dir = temp.path().join("profile/pasta/cache/lua");
     let legacy = cache_dir.join("scene_dic.lua");
@@ -504,7 +614,7 @@ fn test_cache_dir_accessor() {
 #[test]
 fn test_save_cache_rejects_parent_traversal_in_relative_source() {
     let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     let evil_source = std::path::Path::new("dic/../../../evil.pasta");
     let result = manager.save_cache(evil_source, "-- evil");
@@ -563,7 +673,7 @@ fn test_source_to_cache_path_dic_like_file_not_stripped() {
 #[test]
 fn test_find_orphaned_caches() {
     let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir().unwrap();
+    manager.prepare_cache_dir(FP).unwrap();
 
     // Create some cache files
     let scene_dir = temp.path().join("profile/pasta/cache/lua/pasta/scene");

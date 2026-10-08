@@ -178,6 +178,7 @@ mod tests {
         let config = PastaConfig {
             loader: super::super::config::LoaderConfig::default(),
             custom_fields: custom.clone(),
+            ..PastaConfig::default()
         };
 
         let ctx = LoaderContext::from_config(Path::new("/ghost/master"), &config);

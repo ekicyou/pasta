@@ -115,3 +115,9 @@
   - `act:global_fn`（499 行）は関数が無いときに警告だけを出す。戻った後のシーンの復元（497 行）は `call-execution-correctness` が入れた。
   - 再利用する部品の場所は現行と一致する: `operand_desc`（`expr_gen.rs` 207 行）・`dynamic_ref_args`（`element_gen.rs` 48 行）・`single_line`（`error.rs` 79 行）。
 - **順序の提案**: 本 spec を `call-attribute-filter` より先に置く（同 brief に記した）。フィルターの「候補なし」は、一本化した仕組みに直接載せる。
+
+## 申し送り（scene-name-alias より）
+
+- 別名（`[scene.alias]`。既定 `OnTalk = ["会話"]`）で置き換えた名前の Call が見つからないとき、失敗表記は**書いた名前**（`【Call失敗：「会話」が見つからない】`）を出す。これは `scene-name-alias` の要件 8.1 の決定で、一本化でも引き継ぐ。
+- ログには 2 行出る: Lua `act:call - handler not found`（書いた名前）と、Rust `search/context.rs` `search_scene` の `warn!(name, resolved, "Scene not found (alias applied)")`（書いた名前と置き換え後の名前）。後者は要件 8.2 の唯一の両名ログなので、一本化で落とさない（Lua 側の 1 行に両名を含める形へ移すなら、その時点で Rust 側を落としてよい）。
+- 参照: `.kiro/specs/completed/scene-name-alias/design.md`「互換性と移行 > 後続 spec への申し送り」・Open Questions 1。

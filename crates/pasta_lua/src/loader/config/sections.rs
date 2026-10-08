@@ -308,3 +308,26 @@ impl Default for DebugFileConfig {
 pub const fn default_debug_port() -> u16 {
     9276
 }
+
+/// `[scene]` の読み取り専用プローブ。`alias` 以外のキーは無視する
+/// （`custom_fields` に書いたとおり残る）。要素は位置つきで受け、
+/// 意味エラーの文言に行番号を入れる。
+#[derive(Debug, Deserialize)]
+pub(crate) struct SceneSection {
+    pub alias: Option<std::collections::BTreeMap<String, Vec<toml::Spanned<String>>>>,
+}
+
+/// pasta.toml 全体から `[scene]` だけを読むプローブ。
+#[derive(Debug, Deserialize)]
+pub(crate) struct SceneProbe {
+    pub scene: Option<SceneSection>,
+}
+
+/// 有効な別名表の出どころ（読み込み時のログ用）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SceneAliasSource {
+    /// pasta.toml に `[scene.alias]` が無く、内蔵の既定表を使う。
+    BuiltinDefault,
+    /// pasta.toml の `[scene.alias]` に書かれた表を使う。
+    PastaToml,
+}
