@@ -49,7 +49,7 @@
   - _Requirements: 1.2, 2.2, 2.3, 2.4, 8.3_
   - _Boundary: verify-tag.ps1_
 
-- [ ] 3.2 (P) 1 クレートの公開済み判定と公開のスクリプトを作る
+- [x] 3.2 (P) 1 クレートの公開済み判定と公開のスクリプトを作る
   - 公開の直前に crates.io API（User-Agent 付き）で、クレート自体の有無と版の有無を問い合わせる。クレートが無ければ「初回は手で公開する」を案内して失敗、版があれば飛ばす
   - 依存先の同じ版がスパース索引に現れるまで待ち、`cargo publish --locked` を行う。索引反映待ちの時間切れは成功とみなし、依存の未解決による失敗は間隔を空けて再試行する
   - 問い合わせが 200・404 以外なら公開済みと見なさず失敗する。yank・`--no-verify` は使わない。トークンは環境変数で受け取り、`-DryRun` では判定だけを行う
@@ -191,3 +191,4 @@
 - 2.1: `release.ps1` は 7 段になり、日本語の案内を含むため UTF-8（BOM 付き）にした（ルートの `release.bat` が powershell.exe 5.1 で呼ぶので BOM が要る）。`release.bat` のコメント「4-6」は古いままなので、5.3 で `release.bat` に触れるときに 7 段に合わせて直す。
 - 2.2: CI の build job は `npm ci` の後に `npm run package` を呼べばよい（build:wasm は pwsh 7 経由・`-Release`）。`scripts/build-wasm.bat` と `build-wasm.ps1` の Usage コメントは今も `powershell` 前提だが、設計で変更不要とした範囲。
 - 3.x: 補助スクリプトは `#Requires -Version 7`・StrictMode・BOM なし UTF-8。出力は `$GITHUB_OUTPUT`／`$GITHUB_STEP_SUMMARY`（未設定なら標準出力）へ書く関数をスクリプトごとに持つ（共通モジュールはどのタスクにも無いので作らない）。タグの形は `-cmatch` で大文字小文字を区別し ASCII 数字と `\z` で判定する（`-match` は V0.3.7 を通す）。検証ドライバーは scratchpad に置きリポジトリに入れない。
+- 3.2: `publish-crate.ps1 -Crate -Version [-DependsOn] [-DryRun] [-ApiBase]`。索引待ちの上限 5 分は依存先 1 つごと（pasta_lua は最悪 10 分）、公開後の確認も最大 5 分。トークン（30 分）はクレートごとに auth の直後に取り直すので収まる。summary 行に所要秒を書く。試験は scratchpad\t32 の偽 cargo（PATH 先頭）と偽 API で行い、本物の公開はしない。
