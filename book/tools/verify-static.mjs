@@ -91,11 +91,14 @@ const SERVER_EXTS = new Set([
 ]);
 
 // 出力配下の全ファイルを列挙（rel は POSIX 区切りで返す）。
+// 旧版（classic/。manual.yml の旧版生成段が新版の検査の後に作る）は列挙しない。
+// 旧版は着せ替え前の版を手を加えずに残したもので、その実在は旧版生成段が確かめる（要件 11.3・11.4）。
 function listFiles(root) {
   const out = [];
   function walk(dir) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, e.name);
+      if (e.isDirectory() && dir === root && e.name === 'classic') continue;
       if (e.isDirectory()) walk(full);
       else if (e.isFile()) out.push(full);
     }
@@ -392,6 +395,27 @@ function runSelfTest() {
       JSON.stringify(clean.brokenRefs.slice(0, 3)));
     check('self-test: 参照を実際に解析している (>50件)', clean.checkedRefCount > 50,
       `checked=${clean.checkedRefCount}`);
+
+    // (a2) 旧版（classic/）は検査しない。旧版の 404.html の /pasta/ や本文の参照は旧版の生成段が扱う（要件 11.3）
+    const classicDir = path.join(tmp, 'classic');
+    fs.mkdirSync(classicDir, { recursive: true });
+    fs.writeFileSync(path.join(classicDir, '404.html'),
+      '<a href="/pasta/">top</a><img src="https://example.com/x.png"><blockquote>\n<p>【得意】未変換</p>\n</blockquote>');
+    fs.writeFileSync(path.join(classicDir, 'print.html'),
+      '<video src="missing.mp4"></video><img src="missing.png"><script src="https://example.com/x.js"></script>');
+    fs.writeFileSync(path.join(classicDir, 'evil.php'), '<?php echo 1; ?>');
+    const withClassic = analyze(tmp);
+    const themeWithClassic = analyzeTheme(tmp, [...summaryChapters(), 'print.html']);
+    const classicHits = [
+      ...withClassic.brokenRefs.map((b) => JSON.stringify(b)),
+      ...withClassic.absoluteRefsInContent.map((b) => JSON.stringify(b)),
+      ...withClassic.nonStatic,
+      ...themeWithClassic.externalRefs.map((b) => JSON.stringify(b)),
+      ...themeWithClassic.untransformedTalk,
+    ];
+    check('self-test: classic/ の下の壊れた参照・外部参照・未変換の台詞は報告しない',
+      classicHits.length === 0, classicHits.slice(0, 5).join(' / '));
+    fs.rmSync(classicDir, { recursive: true, force: true });
 
     // (b) リンクを壊すと検出されるべき
     const idx = path.join(tmp, 'index.html');

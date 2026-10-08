@@ -123,6 +123,9 @@ log('\n== (E) 不正（未知のタグ・入れ子） ==');
   check('E-7 リストの中の台詞は nested-talk', li.errors.length === 1 && li.errors[0].kind === 'nested-talk', show(li.errors));
   const two = transformHtml(`<blockquote>\n<p>【大笑い】x</p>\n</blockquote>\n${TALK_SIMPLE}\n<blockquote>\n<p>【泣き】y</p>\n</blockquote>`, '');
   check('E-8 不正は最初の 1 件で止めず全件返す', two.errors.length === 2 && two.errors.map((x) => x.tag).join() === '大笑い,泣き', show(two.errors));
+  const EMPTY_TALK = '<blockquote>\n<p>【驚き】</p>\n</blockquote>';
+  const empty = transformHtml(EMPTY_TALK, '');
+  check('E-9 タグの後の本文が空なら empty-body・変換しない', empty.errors.length === 1 && empty.errors[0].kind === 'empty-body' && empty.errors[0].tag === '驚き' && empty.converted === 0, show(empty.errors));
 }
 
 // ============================================================
@@ -201,6 +204,13 @@ try {
   const ng = spawnSync(process.execPath, [cli, bad], { encoding: 'utf8' });
   check('D-15 CLI 失敗は exit 1・ファイルとタグを stderr に出す・書き込みなし',
     ng.status === 1 && /sub\/b\.html/.test(ng.stderr) && /【大笑い】/.test(ng.stderr) && JSON.stringify(snapshot(bad)) === JSON.stringify(badBefore), ng.stdout + ng.stderr);
+  const emptyDir = path.join(tmpRoot, 'empty');
+  write(emptyDir, 'a.html', page(TALK_SIMPLE));
+  write(emptyDir, 'b.html', page('<blockquote>\n<p>【驚き】</p>\n</blockquote>'));
+  const emptyBefore = snapshot(emptyDir);
+  const eb = spawnSync(process.execPath, [cli, emptyDir], { encoding: 'utf8' });
+  check('D-16 本文が空の台詞は CLI が exit 1・empty-body を示す・書き込みなし',
+    eb.status === 1 && /b\.html: empty-body 【驚き】/.test(eb.stderr) && JSON.stringify(snapshot(emptyDir)) === JSON.stringify(emptyBefore), eb.stdout + eb.stderr);
 } finally {
   fs.rmSync(tmpRoot, { recursive: true, force: true });
 }

@@ -500,7 +500,8 @@ mark {
     margin: 8px 0 14px;
     padding-block-start: 11px;
 }
-.talk-claudia {
+/* .talk にも当てて、色の規則を持たない新しい話し手（.talk-<id>）をクラウディアの既定色で描く */
+.talk, .talk-claudia {
     --talk-speaker-ink: var(--talk-claudia-ink);
     --talk-speaker-face: var(--talk-claudia-face);
     --talk-speaker-ring: var(--talk-claudia-ring);

@@ -166,7 +166,8 @@ book/
     │   ├── talk-html.mjs           # 新規: 出力 HTML の台詞引用ブロックを吹き出し HTML へ変換（CLI）
     │   ├── talk-test.mjs           # 新規: 登録簿の不変条件・解析・走査・領域検査の正常系と不正系
     │   └── talk-html-test.mjs      # 新規: 変換の構造・相対パス・冪等・非対象不変・不正タグ
-    └── theme-test.mjs              # 新規: claudia.css のトークンを読み、文字と背景の対比（WCAG）を検査
+    ├── theme-test.mjs              # 新規: claudia.css のトークンを読み、文字と背景の対比（WCAG）を検査
+    └── theme-menu-test.mjs         # 新規: claudia.js の jsdom テスト（メニューの並び・矢印キー・End・通信なし）
 ```
 
 ### Modified Files
@@ -411,7 +412,10 @@ declare function checkRegion(
   opts: { cover: boolean },
 ): TalkError[];
 declare function faceFilePath(speaker: Speaker, face: string): string; // 'img/claudia/f5.png'
-declare function faceStats(blocksByChapter: ReadonlyMap<string, readonly TalkBlock[]>): string; // --stats の表
+declare function faceStats(
+  blocksByChapter: ReadonlyMap<string, readonly TalkBlock[]>,
+  regionsByChapter?: ReadonlyMap<string, { intro: { start: number; end: number }; outro: { start: number; end: number } }>, // 既定は空の Map
+): string; // --stats の表
 ```
 
 - Preconditions: `markdown` は章ファイル全文（CRLF 可。内部で LF 正規化）。
@@ -493,7 +497,7 @@ declare function chapterRegions(chapterText: string, chapter: string): ChapterRe
   - `T-syntax:<rel>` — `scanTalk` のエラーが 0。失敗メッセージは `book/src/<rel>:<line> <kind> <detail>` を全件。
   - `T-intro:<rel>`・`T-outro:<rel>` — `chapterRegions` の導入・締めに `checkRegion` を適用しエラー 0（`cover` は `introduction.md` のみ true）。
   - `T-assets` — `book/src/img/claudia/` の内容が登録簿の画像 16 枚＋`LICENSE.txt` と完全一致し（余分な画像＝立ち絵の混入を失敗にする）、各画像が `MAX_FACE_BYTES` 以下。
-  - `T-authoring` — `AUTHORING.md` の台詞部品の節に、登録簿の全話し手名と全表情名が載っている（規約と登録簿のずれの検出）。
+  - `T-authoring` — `AUTHORING.md` の台詞部品の節（見出しに「台詞部品」を含む H2 から次の H1・H2 まで。フェンス外）の表のセルに、登録簿の全話し手名と全表情名が載っている（規約と登録簿のずれの検出）。照合はセルの完全一致（1 セル 1 名。部分一致だと「素」が「要素」に当たる）。
 - 既存の D-voice・G-voice・D-codevoice・F 系は不変（Claudia の台詞が口調マーカーを持つため D-voice は台詞で満たされる）。
 - 1 件でも FAIL なら exit 1（既存規約）。
 
@@ -511,8 +515,9 @@ declare function chapterRegions(chapterText: string, chapter: string): ChapterRe
   - `theme/claudia-*.css`・`theme/claudia-*.js` が出力にあり、SUMMARY 全章と `print.html` が参照している（相対参照の実在は既存の検査が見る）。
   - SUMMARY 全章の HTML と `print.html` に `class="talk talk-claudia` と `class="talk talk-anthony` がある。
   - どの HTML にも未変換の台詞（`<blockquote>` 直後の `<p>【`）が残っていない。
-  - 本文ページの `<link href>`・`<script src>`・`<img src>` の絶対 URL は、オリジンが `https://fonts.googleapis.com` か `https://fonts.gstatic.com` のものだけ（`<a href>` は対象外）。
+  - 出力のすべての HTML（`404.html` を含む）の `<link href>`・`<script src>`・`<img src>` の絶対 URL は、オリジンが `https://fonts.googleapis.com` か `https://fonts.gstatic.com` のものだけ（`<a href>` は対象外）。
   - テーマメニューに `mdbook-theme-light`・`mdbook-theme-navy`・`mdbook-theme-rust`・`mdbook-theme-coal`・`mdbook-theme-ayu` の id がすべてある（mdBook の版上げで id が変わると隠し規則が黙って効かなくなるため、隠す側の id も検出する）。
+- 未変換の台詞と外部参照の検査は章に限らず出力のすべての HTML を見る。ただし旧版の `classic/` の下はすべての検査で列挙しない（旧版は手を加えずに残すもので、その実在は ClassicSnapshot の段が確かめる。CI では新版の検査の後に生成されるが、ローカルで旧版を作った後に実行しても落ちないようにする）。
 - 既存の相対参照実在・ルート絶対参照なし・全章生成・目次網羅・前後ナビ・着色資材・woff2 同梱の検査は不変。画像 `.png`・`.txt` は既に許可拡張子。
 
 #### SearchVerifier（`book/tools/verify-search.mjs` の追加分）
@@ -537,6 +542,7 @@ declare function chapterRegions(chapterText: string, chapter: string): ChapterRe
 **Contracts**: Batch [x]
 
 - `claudia.css` の `.light, html:not(.js)` ブロックと `.navy` ブロックから `--name: #rrggbb;` を読み、「データモデル / テーマトークン契約」の対の対比が 4.5 以上であることを検査する。対象トークンが欠けている、または 16 進色でない場合も失敗。Node 標準のみ・ビルド不要。
+- テーマメニューのスクリプトは別の `theme-menu-test.mjs` で検査する。jsdom（既存の devDependency）上で `claudia.js` を実行し、mdBook 0.5.x の `book.js` の keydown 処理の写しを使って、Auto・Light・Navy の間の矢印キー移動・End・通信なしを確かめる（ThemeMenu）。ビルド不要。
 
 #### LinkCheck（不変）と自己テストの追加（LinkCheckTest・GenTest）
 
@@ -637,7 +643,8 @@ declare function chapterRegions(chapterText: string, chapter: string): ChapterRe
 #### Pipeline（`.github/workflows/manual.yml`）
 
 - 追加ステップ `Render talk components`: `node book/tools/talk/talk-html.mjs book/book`。位置は `Highlight pasta code blocks` の直後、`Rebuild bigram search index` の前。
-- 自己テストの段は `find book/tools -name '*-test.mjs'` のため、新しいテスト（`talk/*-test.mjs`・`theme-test.mjs`）は追加設定なしで実行される。
+- 静的性と検索の検証は `verify-static.mjs --no-build --self-test`・`verify-search.mjs --no-build --self-test` で実行する（本検査に加えて、検査ロジック自身の自己テストも走らせる）。
+- 自己テストの段は `find book/tools -name '*-test.mjs'` のため、新しいテスト（`talk/*-test.mjs`・`theme-test.mjs`・`theme-menu-test.mjs`）は追加設定なしで実行される。
 - 出荷（R5.6）: テーマ・台詞部品・47 章・表紙・素材・ツール追従を 1 つの PR で main に入れる。タスクはブランチ上の複数コミットに分けてよい。
 
 #### ClassicSnapshot（`manual.yml` の旧版生成段。要件 11。2026-10-08 追加）

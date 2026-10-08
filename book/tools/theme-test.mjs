@@ -342,6 +342,12 @@ export function checkTalk(css) {
   // 話し手ごとのトークン（要件 3.5）
   const used = top.flatMap((r) => r.decls.map(([, v]) => v)).join(' ');
   for (const t of SPEAKER_TOKENS) add(used.includes(`var(${t})`), `C-13 ${t} を部品に当てている`, '参照が無い');
+  // 新しい話し手（.talk-<id>）は CSS を足さなくてもクラウディア相当の既定色で描かれる（design「台詞部品」）
+  const base = top.filter((r) => r.selector.split(',').some((s) => s.trim() === '.talk'));
+  for (const k of ['ink', 'face', 'ring', 'name']) {
+    add(base.some((r) => decl(r, `--talk-speaker-${k}`) === `var(--talk-claudia-${k})`),
+      `C-14 .talk が既定の --talk-speaker-${k} をクラウディアの値で持つ`, '.talk の規則に無い');
+  }
 
   // 狭い画面（要件 6.4・9.1・9.2。mdBook の切り替え点 620px・420px）
   const n620 = inMedia(/^@media\b.*\(max-width:\s*620px\)/);
