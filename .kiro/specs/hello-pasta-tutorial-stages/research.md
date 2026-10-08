@@ -126,3 +126,104 @@
   3. アクター辞書 `％女の子` を 2 つのファイルに分けて定義したときの挙動（宣言と表情の合流。Option D の前提）。
   4. アクター辞書なし（または表情なし）のアクター行が `\p[0]` を出力するか（1 段目の `OnBoot` と新ゴールデンの形）。
 - **要件ディスカッション（2026-10-08 完了）**: [OPEN-1]〜[OPEN-11] はすべて解消（議題 1〜11 と G12）。決定は `requirements.md` 本文に反映済み。未解決の論点は残っていない。
+
+---
+
+# 設計フェーズの調査と決定（2026-10-08 `/kiro-spec-design -y`）
+
+## Summary
+- **Feature**: `hello-pasta-tutorial-stages`
+- **Discovery Scope**: Extension（既存の配布辞書・テスト・マニュアル CI の組み替え。新しい外部依存なし）→ light discovery ＋ コード調査
+- **Key Findings**:
+  - 未代入の `＄＊回数＋１` は値なし（`act.lua` `arith_operand` が nil を返し警告）で、回数が永久に始まらない。DSL には比較・条件分岐が無く（`markers.md`「演算子」）、Lua 抜きでは初回の初期化を書けない → 要件 3.6 の作例は現行実装のままでは成立しない（設計 Q1）。
+  - hello-pasta の `surfaces.txt` には当たり判定（collision）が無いため、ダブルクリックの `Reference4`（当たり判定の識別子。UKADOC）は空になる → 8 段目の `＄ｒ４` の作例は実機で空文字を言う（設計 Q2。シェルは `hello-pasta-shell-art` の持ち場）。
+  - `tutorial-check.mjs` の抽出正規表現は最初の ```` ``` ```` でブロックを閉じるため、```` ```lua ```` を内側に持つ辞書（12 段目）は途中で切れて逐語一致しない → 抽出を CommonMark のフェンス長規則に合わせる修正が要る（設計 Q5）。
+
+## Research Log
+
+### R1: `＄＊回数＝＄＊回数＋１` の初回（nil）挙動
+- **Sources**: `crates/pasta_lua/pasta_scripts/pasta/act.lua` `arith_operand`・`ACT_IMPL.arith`、`book/src/grammar/variables.md`「算術の評価」（`＄x＝＄未代入＋1` の例）、`markers.md`「演算子」、`pasta_lua/pasta_scripts/pasta/save.lua`、`book/src/reference/pasta-toml.md` `[persistence]`
+- **Findings**: 被演算子が nil なら警告 `act:arith - operand is not a number` を出して結果は nil。代入先 `save.回数` は nil のまま。`＆` 連結も nil で値なし。既定値を与える構文・設定（pasta.toml）・標準の GLOBAL 関数は無い。`OnFirstBoot` は SSP では初回だけ（204 なら OnBoot へ続く。UKADOC）で、読者は 1 段目で初回起動を済ませている。
+- **Implications**: 初期化には (a) Lua 関数、(b) 前段のファイル（`OnFirstBoot` 等）への初期化行の追加、(c) ランタイムの機能追加 のいずれかが要る。(b) は要件 1.6（前のファイルを書き換えない）と読者の起動順で破綻、(c) は本 spec の範囲外。設計は (a) を仮定 A1 として草案を書き、要件 3.6・3.7 の調整を設計ディスカッションへ送る。
+
+### R2: `scene_kick_*_e2e_test.rs` が追加するシーン名
+- **Sources**: `crates/pasta_shiori/tests/scene_kick_e2e_test.rs`・`scene_kick_gate_e2e_test.rs`・`scene_kick_multibeat_e2e_test.rs`・`scene_kick_preempt_e2e_test.rs`
+- **Findings**: 追加するシーンは `KickE2EProbe`・`GatePrevScene`・`GateUnresolvedSceneDoesNotExist`・`GateDropSceneAfterTeardown`・`KickMultiBeat`・`KickPreemptPrev`・`KickPreemptNew`・`KickForceOneShot`・`KickLastWinsA`・`KickLastWinsB`。追加ファイルは `dic/kick_e2e.pasta`・`kick_gate.pasta`・`kick_multibeat.pasta`・`kick_preempt.pasta`。`pasta.toml` の `talk_interval_min = 180  # …`・`talk_interval_max = 300  # …` の行を文字列置換する（`pasta.toml` は本 spec で変えないので影響なし）。
+- **Implications**: 新しいシーン名を `Kick`・`Gate` で始めない（テストで検査）。ファイル名は `NN-` 接頭なので衝突しない。e2e は talk 間隔を 10 秒にするため、11 段目のチェイントークが `＊会話` に入ると進行中会話が生じうる（設計 Q6。実装時に e2e を流して確認）。
+
+### R3: 同じアクター辞書を 2 ファイルで宣言したとき
+- **Sources**: `book/src/grammar/actor-dictionary.md`「グローバルアクター辞書定義」、`words.md`
+- **Findings**: 同名の `％アクター名` は別ファイルでも 1 つのアクターにまとまり単語は合算される。グローバル単語も同様。アクター名は pasta.toml の `[actor."名前"]` だけでもアクション行に使える。
+- **Implications**: アクター辞書は 3 段目のファイルに 1 回だけ書けば十分で、1〜2 段目はアクター辞書なしで成立する。分割宣言は不要なので使わない（単純さ優先）。
+
+### R4: 表情なしのアクター行と `\p[0]`
+- **Sources**: `pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` `emit_actor_switch`・`spot_to_tag`、`actor-dictionary.md`「バルーン連携」、`pasta_shiori/tests/byte_invariant_test.rs` の現行ゴールデン
+- **Findings**: 話者が切り替わるたびに `\p[spot]` を出す。spot は pasta.toml の `spot`（`％` 行が無ければそのまま）。表情の有無には依存しない。表情が無ければ `\s[n]` は出ない。句読点のウェイト `\_w[...]` は `[talk]` 設定で付く。
+- **Implications**: 新しい OnBoot（女の子の一言・表情なし）の応答は `\p[0]〈台詞＋ウェイト〉\e` の形になる見込み。正確なバイト列は実装時に特性化採取する。`shiori_sample_ghost_test.rs` の `\s[` の assert は外す。
+
+### R5: 段階の SHIORI 疎通の経路
+- **Sources**: `pasta_lua/pasta_scripts/pasta/shiori/entry.lua` `SHIORI.request`、`event/init.lua` `EVENT.fire`、`event/choice_select.lua`、`pasta_shiori/src/lua_request.rs` `parse_request`
+- **Findings**: `SHIORI.request(req)` は `EVENT.fire` の結果を 200/204、例外を 500 の応答文字列にする。`req` は `id`・`method`・`version`・`charset`・`sender`・`reference`（0 始まり）・`dic`・`date`。`OnChoiceSelectEx` は Reference1 を選択 ID、Reference2 をスコープとして前方一致検索し、見つからなければ 204。
+- **Implications**: `pasta_lua` だけで（`pasta_shiori` への依存なしに）疎通できる。`date` は OnHour 系でのみ使うので、OnBoot・実イベントの検証では省ける見込み（仮定 A6。実装時に確認）。
+
+### R6: ローダーの読み込み順・フェンス・その他
+- **Findings**:
+  - `pasta_lua/src/loader/discovery.rs` は `glob` で列挙し、辞書順に読む → `NN-` 接頭で段階順と一致。
+  - `OnHour` の候補は `時報%02d` → `OnHour%02d` → `時報その他` → `OnHourOther`（`virtual_dispatcher.lua`）。`時報12` と `時報その他` は互いの前方一致にならない。
+  - `OnGhostChanging` の Reference0 は切り替わる先のゴーストの本体側の名前、Reference1 は `manual`/`automatic`、Reference2 は名前（UKADOC）。204 なら続けて OnClose。
+  - `pasta.dll`（約 3.8 MB）は `master/` に追跡されているが、ローダーには不要 → 段階ごとのコピーから外す。
+  - `book/tools/tutorial-check.mjs` の `/```pasta[^\S\r\n]*\r?\n([\s\S]*?)```/g` は ````` ````pasta ````` の 2 文字目から一致し、内側の ```` ```lua ```` で閉じてしまう。
+  - スキル `pasta-ghost-authoring` の `actors.pasta`・`talk.pasta` 等は汎用の分割例で、hello-pasta を指していない → 追従不要。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| 段階表を Markdown 1 本（人とテストが共有） | `STAGES.md` の GFM 表をテストが行単位でパース | 正本が 1 つ。新規依存なし。下流が逐語参照しやすい | 見出し名の改名でテストが壊れる | **採用** |
+| Markdown（人向け）＋ TOML（テスト向け） | 2 ファイル | パースが堅い | 二重管理。`toml` の dev-dep 追加 | 不採用 |
+| ファイル名の番号だけを正本にする | 表はテストが読まない | 最小 | 要件 1.1・4.3（表と実ファイルの一致・検証イベントの保持）を満たさない | 不採用 |
+| 疎通を `pasta_shiori` 経由（C3） | dev-dep に `pasta_shiori` | 実配布に最も近い | 依存追加 | 不採用（C2 で足りる） |
+
+## Design Decisions
+
+### Decision: 1 段 1 ファイル・`NN-name.pasta`（ASCII）
+- **Context**: 要件 2.3（番号の桁数と区切りは設計で決める）。
+- **Alternatives**: 1 桁番号／日本語のテーマ名／1 段に複数ファイル。
+- **Selected**: 2 桁ゼロ埋め・半角ハイフン・ASCII 小文字の英単語。1 段 1 ファイル。
+- **Rationale**: ローダーの辞書順で段階順になる。ASCII は `.nar`・URL・読者環境でのファイル名の扱いが単純。1 段 1 ファイルなら下流が「章 N ＝ ファイル N」で照合できる。
+- **Trade-offs**: 1 段に作例を分けたくなっても 1 ファイルに収める。
+
+### Decision: 段階表は `crates/pasta_sample_ghost/STAGES.md`（`ghosts/` の外）
+- **Context**: 要件 1.1・2.7・6.3、G13・G14。
+- **Selected**: クレート直下の Markdown。`ghosts/hello-pasta/` の下に置かない（`.nar` に入るため）。
+- **Follow-up**: 見出し `## 段階表`・`## 検証イベント表` と列見出しを固定し、改名は Revalidation Trigger とする。
+
+### Decision: 検証は新規 `tests/tutorial_stages_test.rs`（C2 経路）
+- **Context**: 要件 4。既存 `self_deploy_integration_test.rs` は自己展開の検証が責務。
+- **Selected**: 専用ファイルに段階の組み立て・ロード・`SHIORI.request` 疎通・一致・前方一致衝突をまとめる。コピー関数はファイル内に持つ（`tests/common` に移すと他バイナリで dead_code 警告）。
+- **Trade-offs**: 15 行ほどのコピー関数が 2 か所に並ぶ。
+
+### Decision: 辞書の文字列構造の検査は `src/scripts.rs` に一本化
+- **Context**: 要件 5.2。`integration_test.rs` と `src/scripts.rs` が同じ検査を重複して持つ。
+- **Selected**: `src/scripts.rs` を新ファイル構成に付け替え、`integration_test.rs` の重複 3 本は削除する。
+- **Rationale**: 更新箇所を 1 つにする（意図は保つ）。
+
+### Decision: シーンの `％女の子、男の子` 行を書かない
+- **Context**: 現行は各シーンに `％` 行を書いている。立ち位置は pasta.toml の spot で決まる（R4）。
+- **Selected**: 作例では書かない。1〜2 段目をアクター辞書・`％` 行なしで成立させ、作例を短くする。
+
+### Synthesis（一般化・採用か自作か・単純化）
+- **一般化**: 「段階 N の辞書」は「ファイル集合の前方 N 個」という 1 つの規則に落ちる。段階ごとのディレクトリや設定差し替えは持たない。
+- **採用か自作か**: 疎通は既存の `SHIORI.request`（Lua）を使い、`pasta_shiori` を足さない。Markdown パーサのクレートは足さず行単位で読む（表の形を固定するので十分）。`tutorial-check` のフェンス抽出は CommonMark の規則に合わせる（新しい規則を作らない）。
+- **単純化**: 前方一致の衝突検査は「全グローバルシーン名の対で前方一致しない」1 本に絞る。段階ごとの出力内容の照合はしない（要件 4.5）。`profile/` の使い回しなどの高速化は入れない。
+
+## Risks & Mitigations
+- 10 段目の作例が要件どおりには成立しない（R1）— 仮定 A1（Lua 関数）で草案を書き、設計ディスカッションで要件を調整する。
+- 8 段目の `＄ｒ４` が実機で空（R6・UKADOC）— `hello-pasta-shell-art` へ当たり判定の追加を申し送る案を設計ディスカッションで決める。
+- ロードだけでは `＊会話` の中身（10・11・12 段目の Call・Lua）が実行されない — 実装の最後に SSP/areka で目視確認する。
+- 11 段目のチェイントークと `pasta_shiori` e2e の干渉（R2）— 実装時に e2e を流して確認。
+- 上流 `scene-name-alias` が未マージ — 実装の着手をゲートする。`ontalk_probe_test.rs` も別名が前提。
+
+## References
+- UKADOC SHIORI Event: OnFirstBoot・OnGhostChanging・OnMouseDoubleClick（<https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html>）— 204 時の後続イベントと Reference の内容
+- マニュアル `book/src/grammar/variables.md`・`markers.md`・`actor-dictionary.md`・`call-jump.md`・`block-structure.md`、`book/src/lua/shiori-events.md`
