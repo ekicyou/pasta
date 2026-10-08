@@ -43,8 +43,8 @@
 | 8 触ったら反応 | `＊OnMouseDoubleClick` + `＄ｒ４` | `shiori-events.md` OnMouseDoubleClick（Reference4＝当たり判定）・`variables.md` の作例そのもの | 可 |
 | 9 選択肢 | `＠？ジャンプ先「表示」`、`!select(秒)`、ローカル/グローバルシーンへのルーティング | `block-structure.md` 選択肢行・`shiori-events.md` OnChoiceSelectEx | 可 |
 | 10 覚えていてほしい | `＄＊名前＝…`、参照 | `variables.md` グローバル変数（JSON 保存） | 可。**Research Needed**: 未代入の `＄＊回数` に `＋１` したときの挙動（`dsl-codegen-runtime-safety` 後の数値化ヘルパーが nil をどう扱うか）。初期値の代入が要るなら作例の形が変わる |
-| 11 続き・分岐 | `＞シーン`（Call）、同名シーン複数＋前方一致の候補からのランダム選択（＝pasta の「分岐」）、ローカルシーン `・`、`＞チェイントーク` | `call-jump.md`「前方一致によるターゲット解決」「候補の選択」（候補をシャッフルし一巡するまで同じシーンを繰り返さない）・`block-structure.md` 同名グローバルシーン | 可。pasta の分岐は IF ではなくランダムジャンプが基本（議題 2 で確認）。条件分岐は Lua 拡張で、作例では深入りしない |
-| 12 Lua への入り口 | 「少し紹介する程度」の最小作例: シーン内 Lua ブロックの関数を `＞＠関数（）` で呼ぶ、または `scripts/*.lua` | `call-jump.md` 条件分岐の実現・`block-structure.md` Lua ブロック・`lua/patterns.md` | 可（[OPEN-5]。形は要確認） |
+| 11 続き・分岐 | `＞シーン`（Call）、同名シーン複数＋前方一致の候補からのランダム選択（＝pasta の「分岐」）、ローカルシーン `・`、`＞チェイントーク`、ローカル／グローバルのジャンプの違い（ローカルが先・ローカル候補があればグローバルは候補外） | `call-jump.md`「前方一致によるターゲット解決」「スコープ解決アルゴリズム」「候補の選択」（候補をシャッフルし一巡するまで同じシーンを繰り返さない）・`block-structure.md` 同名グローバルシーン | 可。pasta の分岐は IF ではなくランダムジャンプが基本（議題 2 で確認）。条件分岐は Lua 拡張で、作例では深入りしない |
+| 12 Lua への入り口 | 「少し紹介する程度」の最小作例: シーン内 Lua ブロックに小さな関数を 1 つ書き `＞＠関数（）` で呼ぶ。`scripts/` は使わない | `call-jump.md` 条件分岐の実現・`block-structure.md` Lua ブロック・`lua/patterns.md` | 可（議題 3 で確定） |
 | 13 配布 | SSP の nar 作成機能（開発者用機能を有効化 → 「ディレクトリをドロップした際に更新ファイルや NAR を作成」ON → ゴーストフォルダを SSP にドロップ） | UKADOC SSP ヘルプ `ssphelp/dev.html`・`ssphelp/config-dev.html`（`OnNarCreating`/`OnNarCreated` が発生） | 辞書差分なし。12 段目と同じ中身を `.nar` にする。`pasta_check release`/`release.ps1` は内製ツールのため案内しない（議題 1 で決定） |
 
 ### 2.2 ギャップ（Missing / Unknown / Constraint）
@@ -111,5 +111,4 @@
 - **Research Needed（設計で調べる）**:
   1. `＄＊回数＝＄＊回数＋１` の初回（nil）挙動（G2.1 段階 10）。
   2. `scene_kick_*_e2e_test.rs` が追記するシーン名の一覧（G9）。
-  3. 「Lua への入り口」で `scripts/*.lua` を置く場合（[OPEN-5] の代替案）、`release.ps1` が `crates/pasta_lua/scripts` を `master/scripts` へ robocopy で再同期する処理（`release.ps1:153-162`）が利用者スクリプトを残すか消すか。
-- **要件ディスカッションへ**: `requirements.md` の [OPEN-2]〜[OPEN-9]（[OPEN-1] は議題 1、[OPEN-11] は議題 2、[OPEN-10] は G12 で解消）。特に [OPEN-8]（`OnBoot` ゴールデンを守るか更新するか）と [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
+- **要件ディスカッションへ**: `requirements.md` の [OPEN-2]〜[OPEN-4]・[OPEN-6]〜[OPEN-9]（[OPEN-1] は議題 1、[OPEN-11] は議題 2、[OPEN-5] は議題 3、[OPEN-10] は G12 で解消）。特に [OPEN-8]（`OnBoot` ゴールデンを守るか更新するか）と [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
