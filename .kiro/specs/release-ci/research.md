@@ -214,8 +214,10 @@
 - ユーザー割り当てのマネージド ID `id-pasta-release`。`rg-pasta-release` に「閲覧者」のロールを割り当てた。`allow-no-subscriptions` で足りると分かれば、設計の実地確認で外す。
 
 第 2 部は、設計ディスカッション（2026-10-08）で名前が確定したので着手できる。確定した名前は design.md「認証名の契約」が正本。同日、別セッション「Entra ID の登録」へ名前と段取り（design.md「セッション間の分担と調停」の表）を送った。進捗の返事が来たらここに追記する（ID 値は書かない）。
-- フェデレーション資格情報 2 件（エンティティ「環境」: `release`・`release-setup-check`）: 未着手（連絡済み）
-- GitHub の environment 2 つと variables 3 つ: 未着手（連絡済み）
+- フェデレーション資格情報 2 件（エンティティ「環境」: `release`・`release-setup-check`）: 完了（2026-10-08、Entra セッションから報告。subject・issuer・audience が契約どおりであることを az で読み戻して確認済み）
+- GitHub の environment 2 つと variables 3 つ: 完了（2026-10-08、同上。`release` はタグ `v*` のみ・`release-setup-check` は `main` のみを gh api で確認。variables はリポジトリレベル）
+- 名前・方式の変更: なし。`rg-pasta-release` の「閲覧者」ロールは残している。
+- 参考: ユーザーのアカウントで az CLI の作成系を使うには MFA が要る（WAM ログインだと `RequestDisallowedByAzure`）。ワークフローのマネージド ID には関係しない。
 - Marketplace の Members への追加: 待ち（`release-setup-check.yml` が main に入り profile ID を得てから）
 - crates.io の Trusted Publisher ×5: 未着手（名前は確定。初回リリース前ならいつでも可）
 
