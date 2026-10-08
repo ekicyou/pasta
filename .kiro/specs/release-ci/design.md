@@ -403,9 +403,11 @@ flowchart TD
 
 #### status 契約（公開先ごとの結果）
 
-- 値: `published`（今回公開した）/ `skipped`（公開済みのため飛ばした）/ `failed`（失敗した）/ `not-run`（前の段の失敗で行わなかった）。
-- 各公開 step は終了前に `status=<値>` を `$GITHUB_OUTPUT` へ書く（失敗時も `failed` を書いてから非 0 で終える）。job は `outputs` で公開する: publish-crates は `pasta_core`・`pasta_dsl`・`pasta_lua`・`pasta_shiori`・`pasta_check`、publish-vsce は `status`、github-release は `status` と `url`。
-- report job は、output が空のものを `needs.<job>.result` から補う（job が `skipped`/`failure` で output 空 → `not-run`。job が `failure` でその step の output 空 → `not-run`。step に到達して失敗 → `failed`）。
+- `status` の値: `published`（今回公開した）/ `skipped`（公開済みのため飛ばした）/ `failed`（失敗した）/ `not-run`（前の段の失敗で行わなかった）。
+- `reason` の値（`status=failed` のときだけ。議題 3 で確定）: `auth`（認証の失敗。Trusted Publisher・フェデレーション資格情報・Members の名前の不一致。手順書の名前の表を見直す）/ `publish`（公開そのものの失敗。ログを読む）/ `transient`（問い合わせ・公開先の一時障害。再実行で続く）/ `not-registered`（クレートが crates.io に無い。初回は手で公開する）/ `immutable`（公開済み Release の添付を変えられない。手で対応する）。認証アクションの失敗は、直後の step（`if: failure()`）が `status=failed`・`reason=auth` を書く。
+- 各公開 step は終了前に `status=<値>`（と `reason=<値>`）を `$GITHUB_OUTPUT` へ書く（失敗時も `failed` を書いてから非 0 で終える）。job は `outputs` で公開する: publish-crates は `pasta_core`・`pasta_dsl`・`pasta_lua`・`pasta_shiori`・`pasta_check`（それぞれ `status` と `reason`）、publish-vsce は `status`・`reason`、github-release は `status`・`reason`・`url`。
+- **一次情報は各 job の summary**: publish-crates・publish-vsce・github-release の末尾に `if: always()` の集約 step を置き、その job 自身の `$GITHUB_STEP_SUMMARY` にクレート／公開先ごとの `status`・`reason` を書く。report job が動かなくても、job のページだけで結果と次の手が分かる。
+- report job は二次情報として各 job の outputs を束ねる。output が空のものは `needs.<job>.result` から補う（job が `skipped`/`failure` で output 空 → `not-run`）が、失敗した job の outputs が読めない場合に備え、空のときは推論せず「job の summary を参照」と表に出す。
 
 #### 権限表（job ごとの `permissions`）
 
@@ -444,7 +446,7 @@ flowchart TD
   - **publish-crates**（windows-latest、`needs: build`、`environment: release`、`permissions: id-token: write, contents: read`）: checkout → rust-toolchain → rust-cache → クレートごとに 2 step（`id: auth_core` `uses: rust-lang/crates-io-auth-action@v1` → `id: pub_core` `run: publish-crate.ps1 -Crate pasta_core -Version ...` with `env: CARGO_REGISTRY_TOKEN: ${{ steps.auth_core.outputs.token }}`）× 5。step は既定の「失敗したら後続を走らせない」で 4.4 を満たす。`outputs`: 5 クレート分。トークンはクレートごとに取り直す（議題 2 で確定）。同一 job での複数回の呼び出しは公式文書に無いため、`release.yml` の publish-crates 冒頭のコメントと手順書に「2 回目以降の auth step が拒否されたら、auth step を 1 回だけにする形へ落とし、版を上げて出し直す」と明記する。初回リリースでは publish-crates の所要時間（クレートごと）を job summary に記録し、次の判断材料にする。
   - **publish-vsce**（ubuntu-latest、`needs: build`、`environment: release`、`permissions: id-token: write, contents: read`）: checkout（`editors/vscode` の lock を使うため）→ download `release-assets` → setup-node 20 → `npm ci --ignore-scripts`（`editors/vscode`。vsce の版を lock で固定）→ `Azure/login@v3`（`client-id: ${{ vars.AZURE_CLIENT_ID }}`・`tenant-id`・`subscription-id`）→ `publish-vsix.ps1 -VsixPath release-assets/*.vsix -Version ... -Extension ekicyou.pasta-vscode`（`npx vsce` を呼ぶ）。`outputs.status`。
   - **github-release**（ubuntu-latest、`needs: [build, publish-crates]`、`permissions: contents: write`）: checkout（`fetch-depth: 0`、`fetch-tags: true`）→ download `release-assets` → `release-notes.ps1 -Tag ... -Repo ekicyou/pasta -OutFile notes.md` → `github-release.ps1 -Tag ... -Title "pasta vX.Y.Z" -NotesFile notes.md -AssetDir release-assets`（`GH_TOKEN: ${{ github.token }}`）。`outputs.status`・`outputs.url`。
-  - **report**（ubuntu-latest、`needs: [verify, gate, build, publish-crates, publish-vsce, github-release]`、`if: always()`）: `pwsh` の inline step で status 契約に従い表を `$GITHUB_STEP_SUMMARY` へ書く（公開先ごとの結果・Release の URL・関門で失敗した job 名・「どの公開先にも公開していない」の明示）。report 自体は結果に依らず成功で終える（ワークフロー全体の成否は他 job が決める）。
+  - **report**（ubuntu-latest、`needs: [verify, gate, build, publish-crates, publish-vsce, github-release]`、`if: always()`）: `pwsh` の inline step で status 契約に従い表を `$GITHUB_STEP_SUMMARY` へ書く（公開先ごとの `status`・`reason`・Release の URL・関門で失敗した job 名・「どの公開先にも公開していない」の明示）。各 publish job の summary が一次情報で、report はそれを 1 枚にまとめる二次情報（outputs が空なら「job の summary を参照」）。report 自体は結果に依らず成功で終える（ワークフロー全体の成否は他 job が決める）。
 
 **Dependencies**
 - Inbound: タグの push（GitHub）。
@@ -553,7 +555,7 @@ verify-tag.ps1 -Tag <string> -Sha <string> -MainRef <string> [-WorkspaceRoot <pa
 ```text
 publish-crate.ps1 -Crate <name> -Version <X.Y.Z> [-DependsOn <name[]>] [-DryRun]
   env   : CARGO_REGISTRY_TOKEN（アクションの出力。DryRun では不要）
-  outputs: status=published|skipped|failed
+  outputs: status=published|skipped|failed, reason=publish|transient|not-registered（failed のとき）
   exit 0  : published または skipped
   exit 1  : failed（理由を summary に書く）
 ```
@@ -579,7 +581,7 @@ publish-crate.ps1 -Crate <name> -Version <X.Y.Z> [-DependsOn <name[]>] [-DryRun]
 ##### Service Interface
 ```text
 publish-vsix.ps1 -VsixPath <path> -Version <X.Y.Z> -Extension <publisher.name> [-VsceCommand <string>] [-DryRun]
-  outputs: status=published|skipped|failed
+  outputs: status=published|skipped|failed, reason=auth|publish|transient（failed のとき。vsce の認証エラーは auth）
   exit 0  : published または skipped
   exit 1  : failed
 ```
@@ -627,7 +629,7 @@ release-notes.ps1 -Tag <vX.Y.Z> -Repo <owner/name> -OutFile <path>
 ```text
 github-release.ps1 -Tag <vX.Y.Z> -Title <string> -NotesFile <path> -AssetDir <path> [-DryRun]
   env    : GH_TOKEN
-  outputs: status=published|skipped|failed, url=<release url>
+  outputs: status=published|skipped|failed, reason=publish|transient|immutable（failed のとき）, url=<release url>
   exit 0 : published または skipped
   exit 1 : failed
 ```
@@ -723,7 +725,7 @@ github-release.ps1 -Tag <vX.Y.Z> -Title <string> -NotesFile <path> -AssetDir <pa
 
 ### Data Contracts & Integration
 
-- **job outputs**: status 契約のとおり。値は文字列（4 値の列挙）。`url` は Release の HTML URL。
+- **job outputs**: status 契約のとおり。`status` は 4 値、`reason` は 5 値の列挙（文字列）。`url` は Release の HTML URL。
 - **リリースノート**: Markdown。見出し `## <絵文字> <名前>`、項目 `- <件名>`、末尾に Full Changelog の行。
 - **外部 API**: crates.io `GET /api/v1/crates/<crate>`・`/<version>`（200/404 だけを使う）、スパース索引 `GET https://index.crates.io/<2>/<2>/<name>`（JSON Lines、`vers` 欄）、`vsce show --json`（`versions[].version`）、`gh release view --json isDraft,assets,url,name`（`assets[].name`・`assets[].state`）。
 
@@ -743,7 +745,7 @@ github-release.ps1 -Tag <vX.Y.Z> -Title <string> -NotesFile <path> -AssetDir <pa
 | 検査の失敗（verify） | 版の不一致・到達不能・タグ形式 | 失敗。summary に検査名と両方の値、「未公開」を明記（8.3） |
 | 関門の失敗（gate） | test・clippy・deny・luacheck・WASM | build.yml の job が失敗。report が「関門で失敗・未公開」を表示 |
 | ビルドの失敗（build） | wasm-pack 導入失敗・`npm ci`・`release.ps1` | step 名で配布物を特定。公開は行われない（3.6） |
-| 認証の失敗（publish） | Trusted Publisher の名前不一致・FIC の subject 不一致・Members 未追加 | 認証アクション／`vsce publish` が失敗し、公開は行われない。summary に「認証で失敗」。手順書の名前の表を参照（9.5） |
+| 認証の失敗（publish） | Trusted Publisher の名前不一致・FIC の subject 不一致・Members 未追加 | 認証アクション／`vsce publish` が失敗し、公開は行われない。`reason=auth` を summary と report に出す。手順書の名前の表を参照（9.5） |
 | 公開先の一時障害 | API 5xx・ネットワーク | `failed`。再実行で続行（7.4） |
 | 初回未公開のクレート | API が crate 自体を 404 | `failed`。「手で初回公開」を案内（4.6） |
 | 索引の反映遅延 | `cargo publish` の 60 秒待ちの時間切れ・依存未解決 | 失敗とせず次へ。依存未解決は再試行（4.5） |
@@ -825,4 +827,5 @@ flowchart TD
 6. **補助スクリプトの置き場所と言語**（File Structure Plan）: `.github/scripts/release/*.ps1`（pwsh 7、ubuntu でも動かす）。候補: (a) 上記、(b) ルート `scripts/` を新設、(c) bash と pwsh を使い分ける。推奨 (a): CI 専用の補助であることが場所から分かり、1 言語で手元（Windows）と両ランナーで同じものを実行できる。
 7. **ubuntu で動かす job**（Architecture）: verify・publish-vsce・github-release・report を ubuntu-latest に置く（Windows は gate・build・publish-crates だけ）。候補: (a) 上記、(b) すべて windows-latest。推奨 (a): 配布物のビルドは Windows の要件（3.7）だが、公開と Release は OS に依らず、ubuntu のほうが起動が速く native addon の問題も無い。publish-crates は `pasta_shiori` の検証ビルドのため Windows に残す。
 8. ~~**crates.io トークンの取り直し**~~ → **確定（議題 2）**: クレートごとに `crates-io-auth-action` を呼び直す（5 回）。拒否されたときの落とし先（1 回取得 + 再実行、版を上げて出し直す）を `release.yml` のコメントと手順書に明記し、初回リリースで所要時間を記録する。<br>旧: クレートごとに `crates-io-auth-action` を呼び直す（5 回）。候補: (a) 上記、(b) 1 回だけ取得し 30 分を超えたら再実行で続ける、(c) 実測してから決める。推奨 (a): 期限切れという予見できる失敗を設計で避けられる。ただし同一 job で複数回呼べることは公式文書に無い（research）。初回リリースで (a) が通らなければ (b) に落とす。
+10. ~~**status 契約の拡張と report の一次情報**~~（自動検証の指摘 2・3）→ **確定（議題 3）**: `status=failed` のときの `reason`（auth / publish / transient / not-registered / immutable）を output に足し、各 publish job の末尾に `if: always()` の集約 step を置いて job 自身の summary を一次情報にする。report は二次情報で、outputs が空なら推論せず「job の summary を参照」と出す。<br>旧: 4 値の `status` だけで、report が失敗 job の outputs から not-run / failed を推論していた。
 9. **`build:wasm` の変更**（VSIX ビルド）: `pwsh -NoProfile -File scripts/build-wasm.ps1 -Release` にし、手元の `npm run package` もリリースビルドにそろえる。候補: (a) 上記、(b) CI だけ `-Release`（手元は dev のまま）、(c) `powershell` のまま `-Release` だけ足す。推奨 (a): 議題 4 の趣旨（意図しない dev ビルドをやめる）と、開発機の AllSigned で `powershell -File` が失敗する既知の問題を同時に解く。開発機には pwsh 7 が要る。
