@@ -713,3 +713,82 @@ fn same_named_scenes_in_two_files_resolve_to_their_own_file() {
         "2 ファイルの同名シーンは別の identity になる"
     );
 }
+
+// ===========================================================================
+// scene-name-alias task 6.1（requirements 7.1/7.2/7.3）。
+//
+// 同じファイルに別名 `＊会話` と本名 `＊OnTalk` が混在しても、既定の別名表
+// （`OnTalk = ["会話"]`）のもとで各宣言は同じ base `OnTalk` の出現順で採番され
+// （`OnTalk_1`〜`OnTalk_3`）、各行の identity・kick 名・シーン表から引くシーンが
+// その行の宣言のシーンになる。
+// ===========================================================================
+
+/// 別名と本名の混在フィクスチャ。行番号は下のケース表が依存する。
+///  2: ＊会話   → OnTalk_1（3: 本体 / 6: ・挨拶 → 7: 本体）
+///  9: ＊OnTalk → OnTalk_2（10: 本体）
+/// 12: ＊会話   → OnTalk_3（13: 本体）
+const ALIAS_MIXED_FIXTURE: &str = include_str!("fixtures/scene_alias_mixed.pasta");
+
+/// 7.1/7.2/7.3: 各宣言行・本体行が宣言どおりの identity に対応づき、その kick 名で
+/// シーン表から引いたシーンが同名の他候補ではなくその行のシーンであり、
+/// 本体行にブレークポイントを置ける（`.pasta`→`.lua`→`.pasta` が元の行へ戻る）。
+#[test]
+fn aliased_and_real_name_scenes_in_one_file_map_to_their_own_identities() {
+    let temp = tempfile::TempDir::new().expect("temp dir");
+    let paths = make_debug_base_dir(
+        temp.path(),
+        &[("scene_alias_mixed.pasta", ALIAS_MIXED_FIXTURE)],
+    );
+    let key = paths[0].to_string_lossy().to_string();
+    let runtime = PastaLoader::load_with_config(temp.path(), RuntimeConfig::new())
+        .expect("debug-enabled runtime must load");
+    let map = runtime
+        .debug_source_map()
+        .expect("enabled runtime holds map");
+    let lua = runtime.lua();
+
+    // (行, 期待 identity, 期待 kick 名, その行のシーンだけが持つ台詞)
+    let cases = [
+        (2, ident("OnTalk_1", None), "OnTalk_1", "「会話その1」"),
+        (3, ident("OnTalk_1", None), "OnTalk_1", "「会話その1」"),
+        (
+            7,
+            ident("挨拶_1", Some("OnTalk_1")),
+            ":OnTalk_1:挨拶_1",
+            "「会話1の挨拶」",
+        ),
+        (9, ident("OnTalk_2", None), "OnTalk_2", "「本名のOnTalk」"),
+        (10, ident("OnTalk_2", None), "OnTalk_2", "「本名のOnTalk」"),
+        (12, ident("OnTalk_3", None), "OnTalk_3", "「会話その3」"),
+        (13, ident("OnTalk_3", None), "OnTalk_3", "「会話その3」"),
+    ];
+    for (line, expected, kick, text) in cases {
+        let id = map.scene_at(&key, line);
+        assert_eq!(id.as_ref(), Some(&expected), "行 {line} の identity（7.3）");
+        assert_eq!(kick_scene_key(&expected), kick, "行 {line} の kick 名");
+        assert!(
+            kick_lookup_runtime(lua, kick).is_some(),
+            "kick 名 {kick} はシーン表から完全一致で引ける"
+        );
+        let played = run_identity(lua, &expected);
+        assert!(
+            played.starts_with(text),
+            "行 {line} の再生は宣言のシーン（{text}）を指す（7.2）: {played}"
+        );
+    }
+
+    // 7.1: 別名で宣言したシーン配下の本体行にブレークポイントを置ける。
+    for line in [3u32, 7, 13] {
+        let targets = map.resolve_pasta_to_lua(&key, line);
+        assert!(!targets.is_empty(), "行 {line} は `.lua` 行へ逆引きできる");
+        for (chunk, lua_line) in &targets {
+            let pos = map
+                .resolve_lua_to_pasta(chunk, *lua_line)
+                .expect("逆引きした `.lua` 行は `.pasta` へ戻る");
+            assert_eq!(
+                pos.line, line,
+                "行 {line} のブレークポイントはその行で止まる"
+            );
+        }
+    }
+}
