@@ -56,7 +56,7 @@
   - `build.yml`: ツールチェーンの構成（`.cargo/config.toml` の crt-static、mlua の vendored LuaJIT、日本語ロケールの設定）を前提として引き継ぐ。`build.yml` の検査内容は変えない。
   - `pasta_check release`: nar の作成と `updates.txt` の生成は、今の `pasta_check release` の挙動のまま使う。
   - `release-workflow` design.md: 公開順（core → dsl → lua → shiori → check）、公開済みの判定の考え方、リリースノートの分類方式は、そこに書かれたものを引き継ぐ。
-  - `hello-pasta-shell-art`（後続）: 同じ `release.ps1` と生成物の追跡の扱いを触る。本仕様はシェルの画像の追跡の扱いを変えない（【仮定】未決事項 7）。
+  - `hello-pasta-shell-art`（後続）: 同じ `release.ps1` と生成物の追跡の扱いを触る。本仕様はシェルの画像の追跡の扱いを変えない（議題 5 で確定）。
 
 ## Requirements
 
@@ -129,7 +129,7 @@
 3. The Release CI shall 公開済みかどうかを、Marketplace へ問い合わせた結果で判定する。
 4. If Marketplace への公開に失敗したとき, the Release CI shall 失敗を示し、crates.io への公開の結果には影響を与えない。
 5. The Release CI shall Marketplace への公開に Azure DevOps の PAT を使わない。2026-12-01 の global PAT の廃止の後も公開が続けられることを完了の条件とする。
-6. The Release CI shall Marketplace への公開と crates.io への公開を、互いの成否を待たずに進められるようにする（【仮定】今の設計の「2 トラックを互いにブロックしない」を引き継ぐ）。
+6. The Release CI shall Marketplace への公開と crates.io への公開を、互いの成否を待たずに進められるようにする（今の設計の「2 トラックを互いにブロックしない」を引き継ぐ）。
 
 ### Requirement 6: GitHub Release とリリースノート
 
@@ -190,11 +190,11 @@
 
 #### Acceptance Criteria
 
-1. The repository shall `release/` 配下（`release/hello-pasta/**`・`release/hello-pasta.nar`）と、サンプルゴーストの `ghost/master/pasta.dll`・`ghost/master/THIRD_PARTY_LICENSES.txt` を git で追跡しない。
+1. The repository shall `release/` 配下（`release/hello-pasta/**`・`release/hello-pasta.nar`）と、サンプルゴーストの `ghost/master/pasta.dll`・`ghost/master/THIRD_PARTY_LICENSES.txt`・`ghost/master/scripts/README.md`（`crates/pasta_lua/scripts/README.md` の写し）を git で追跡しない。
 2. When 開発者が手元で配布物を作るスクリプトを実行したとき, the repository shall 作られた成果物を git の未追跡の変更として示さない（無視の設定に含まれる）。
 3. The repository shall 成果物の追跡を解除した後も、`cargo test --all` と clippy がクリーンなチェックアウトで成功する状態を保つ。
 4. The repository shall サンプルゴーストの手書きの正本（`descript.txt`・`pasta.toml`・`dic/`・`install.txt` など）の追跡を続ける。
-5. The repository shall サンプルゴーストのシェルの画像（`surface*.png`・`surfaces.txt`）の追跡の扱いを変えない（【仮定】未決事項 7）。
+5. The repository shall サンプルゴーストのシェルの画像（`surface*.png`・`surfaces.txt`）の追跡の扱いを変えない（後続の `hello-pasta-shell-art` が画像を追跡する素材に移すため）。
 6. The Release CI shall 配布物を、git で追跡している成果物からではなく、タグのソースからのビルドだけで作る。
 
 ### Requirement 11: 一回限りのセットアップの手順書
@@ -209,7 +209,7 @@
 4. The 手順書 shall サブスクリプションの要らないアプリ登録（サービスプリンシパル）による方法を採らない理由（公開が「corporate credentials」のエラーで失敗する報告があること）を記す。
 5. The 手順書 shall Marketplace の publisher `ekicyou` に、作ったマネージド ID を Contributor として追加する手順を示す。
 6. The 手順書 shall GitHub で environment を作り、リリースタグからの実行に限る設定と、variables（client・tenant・subscription の ID）を登録する手順を示す。
-7. The 手順書 shall セットアップが済んだことを、公開を行わずに確かめる方法を示す（【仮定】確かめ方の具体は設計で決める）。
+7. The 手順書 shall セットアップが済んだことを、公開を行わずに確かめる方法を示す（確かめ方の具体は設計で決める。マネージド ID の Marketplace の profile ID を表示する役目も持たせる。research.md「一回限りのセットアップの進み具合」）。
 8. The 手順書 shall 新しいクレートを追加したときの初回の公開は手で行い、その後に Trusted Publisher を設定する必要があることを示す。
 9. The 手順書 shall リリース CI のワークフローの外に置き、リリースのたびに実行するものではないことを明記する。
 
@@ -235,7 +235,7 @@
 4. ~~**GitHub Release が待つもの**~~ → **確定（自明修正）**: crates だけを待つ。brief の Constraints「公開順」のとおり（R6.1）。<br>旧: **GitHub Release が待つもの**（R6.1）: GitHub Release の作成は crates の公開の成功だけを待つか、Marketplace の公開の成功も待つか。仮定: crates だけを待つ（今の設計と同じ）。VSIX は Marketplace の成否によらず添付する。
 5. ~~**依存の固定（再現性）**~~ → **確定（議題 3）**: `Cargo.lock` を追跡する（R3.9・R3.10）。依存の更新は `cargo update` のコミットとして明示的に行う。crates.io の利用者は自分の lock で解決し直すので、公開するクレートへの影響は無い。<br>旧: **依存の固定（再現性）**（R3.9）: `.gitignore` は `Cargo.lock` を無視している（「ライブラリクレートなので」）。タグのソースから成果物を再現する要件を、依存クレートの解決結果まで含めて満たすには `Cargo.lock` の追跡が要る。追跡するか、ビルドの構成の再現だけで足りるとするか。
 6. ~~**VSIX の WASM のビルドの種類**~~ → **確定（議題 4）**: リリースビルドにする（R3.4）。今のデバッグビルドは意図しない状態で、`build.yml` が確かめている `--release` とも食い違う。手元の `npm run package` もそろえるかは設計で決める。<br>旧: **VSIX の WASM のビルドの種類**（R3.4）: 今の `npm run package` は `build-wasm.ps1` を `-Release` なしで呼ぶため、VSIX に入る WASM はデバッグビルドになっている。今と同じにするか、リリースビルドに変えるか。
-7. **シェルの画像の追跡**（R10.5）: `ghosts/hello-pasta/shell/master/surface*.png`・`surfaces.txt` は `cargo run -p pasta_sample_ghost` が作る生成物だが、git で追跡している。brief は追跡の解除の対象に挙げていない。後続の `hello-pasta-shell-art` が画像を「追跡する素材」に変えるため、本仕様では今のまま追跡を続ける、で良いか。同様に、`release.ps1` が `crates/pasta_lua/scripts` から写す `ghost/master/scripts/README.md` も追跡されている生成物である。これを追跡の解除の対象に含めるか。
+7. ~~**シェルの画像の追跡**~~ → **確定（議題 5）**: シェルの画像は今のまま追跡を続ける（brief が対象に挙げておらず、`hello-pasta-shell-art` が素材に移すため）。`ghost/master/scripts/README.md` は `release.ps1` が置く写しなので、追跡を解除する（R10.1）。<br>旧: **シェルの画像の追跡**（R10.5）: `ghosts/hello-pasta/shell/master/surface*.png`・`surfaces.txt` は `cargo run -p pasta_sample_ghost` が作る生成物だが、git で追跡している。brief は追跡の解除の対象に挙げていない。後続の `hello-pasta-shell-art` が画像を「追跡する素材」に変えるため、本仕様では今のまま追跡を続ける、で良いか。同様に、`release.ps1` が `crates/pasta_lua/scripts` から写す `ghost/master/scripts/README.md` も追跡されている生成物である。これを追跡の解除の対象に含めるか。
 8. **→ 設計へ**: 要件は R6.5「配布物が欠けた Release を公開状態で残さない」とし、作成の順序（下書き → 添付 → 公開）は設計で決める。<br>旧: **GitHub Release の作成済み・添付漏れ**（R6.5）: Immutable Releases を有効にすると、公開後の Release に配布物を足せない。作成の途中で失敗して添付が欠けた Release が残った場合の扱い（作成と添付を一度に済ませる・下書きで作ってから公開する等）を、要件としてどこまで求めるか。
 9. **ワークフロー自体の不具合の修正**（R7.5）: 「失敗した job の再実行」は、タグのコミットにあるワークフローの定義で再実行する。ワークフローの定義そのものに不具合があった場合、再実行では直せない。その場合の回復の手段（同じタグで手動起動できる入口を設けるか、版を上げて出し直すか）を要件に含めるか。
 10. **→ 設計へ**: 置き場所は設計で決める。<br>旧: **手順書の置き場所**（R11）: 一回限りのセットアップの手順書をどこに置くか（`crates/pasta_sample_ghost/RELEASE.md` の一節・リポジトリの開発者向け文書・spec 配下など）。仮定: 設計で決める。
