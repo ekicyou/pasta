@@ -192,7 +192,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
 
 ### CI/CD
 - **GitHub Actions**: `.github/workflows/build.yml`（Rust/WASM）
-  - push/PR/手動実行トリガー
+  - push/PR/手動実行トリガー＋`workflow_call`（`release.yml` の gate から同じ検査を呼ぶ）
   - **DLLビルド**: マトリックスビルド: x86 (`i686-pc-windows-msvc`) + x64 (`x86_64-pc-windows-msvc`)
   - **WASMビルド**: `pasta_lsp` を `wasm32-unknown-unknown` ターゲットでビルド（10MBサイズ上限チェック付き）
   - Rust キャッシュ: `Swatinem/rust-cache@v2`
@@ -200,6 +200,13 @@ cargo test -p pasta_lua     # pasta_luaテスト
 - **GitHub Actions**: `.github/workflows/manual.yml`（利用者マニュアル公開・build.yml と独立）
   - `book/**`・`.claude/skills/pasta-ghost-authoring/**`・`.claude/skills/pasta-lua-coding/**` 変更時に起動。スキル references 鮮度照合（`gen-skill-refs.mjs --check`）→ npm ci(book) → mdbook build → pasta 構文ハイライト → bigram 索引再生成 → リンク検証（`link-check.mjs`）→ tutorial-check → cargo test 構文ガード → verify-static/search/content → GitHub Pages デプロイ
   - permissions: `pages: write` / `id-token: write` / `contents: read`。Pages 初回は repo Settings で手動有効化が必要
+- **GitHub Actions**: `.github/workflows/release.yml`（リリース CI・release-ci）
+  - リリースタグ `vX.Y.Z`（数字 3 つ）の push だけで起動。job は verify（タグ・ワークスペース版・`package.json` 版の一致と main からの到達性）→ gate（`build.yml` を `workflow_call`）→ build → publish-crates／publish-vsce → github-release → report
+  - **成果物**: build が CI 上でソースから `pasta.dll.zip`（`pasta.dll`＋`THIRD_PARTY_LICENSES.txt`）・`hello-pasta.nar`・`pasta-vscode-X.Y.Z.vsix` を作り、artifact `release-assets` で後続 job に渡す。github-release が GitHub Release（題名 `pasta vX.Y.Z`・リリースノートはコミット履歴から生成）を作って 3 つを添付する
+  - **認証は OIDC**: crates.io は Trusted Publishing、Marketplace は Azure のマネージド ID（フェデレーション資格情報）。長期のトークン（crates.io の API トークン・Marketplace の PAT）は使わず、開発機（`CARGO_REGISTRY_TOKEN`・`VSCE_PAT`）にも GitHub の secret にも置かない。crates.io の短命トークンは job の中で auth の直後に発行し、直後の publish step だけに渡す。crates.io・Marketplace の公開 job（publish-crates・publish-vsce）は environment `release` で走る
+  - 公開先ごとに「公開済みなら飛ばす」冪等な処理で、失敗した job の再実行で続きから回復する。job の補助スクリプトは `.github/scripts/release/*.ps1`（pwsh 7）
+  - 一回限りのセットアップ手順は `.github/release-ci-setup.md`、その確認は `.github/workflows/release-setup-check.yml`（手動起動・公開しない）。リリース手順は `crates/pasta_sample_ghost/RELEASE.md`
+  - 手元の `release.ps1`・`npm run package` の成果物は動作確認用で、コミットしない（`release/` とサンプルゴーストの生成物は `.gitignore` 済み）。`Cargo.lock` はコミットする
 
 ## 利用者マニュアル（ドキュメントサイト `book/`）
 

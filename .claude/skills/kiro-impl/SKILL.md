@@ -3,7 +3,7 @@ name: kiro-impl
 description: Implement approved tasks using TDD with native subagent dispatch. Runs all pending tasks autonomously or selected tasks manually.
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, MultiEdit, Bash, Glob, Grep, Agent, WebSearch, WebFetch
-argument-hint: <feature-name> [task-numbers]
+argument-hint: <feature-name> [task-numbers] [--review required|inline|off]
 ---
 
 # kiro-impl Skill
@@ -19,7 +19,13 @@ You operate in two modes:
   - Code passes all tests with no regressions
   - Tasks marked as completed in tasks.md
   - Implementation aligns with design and requirements
-  - Independent reviewer approves each task before completion
+  - Task completion follows the selected review mode
+
+## Review Mode
+- Default review mode is `required`
+- Accept explicit forms: `--review required|inline|off`
+- Also accept clear natural-language opt-outs such as `skip review` or `without review` as `off`
+- If the request is ambiguous, keep `required`
 
 > **Branch & commit model (compatibility note):** kiro-impl operates on the single feature working branch supplied by the Claude Code harness worktree. It **only commits to the current branch** and does NOT create branches or push — branch creation is the harness's responsibility, and push happens later in the kiro-complete PR flow. This note documents existing behavior; it introduces no new branch/push logic.
 >
@@ -29,20 +35,13 @@ You operate in two modes:
 
 ### Step 1: Gather Context
 
-If steering/spec context is already available from conversation, skip redundant file reads.
-Otherwise, load all necessary context:
-- `.kiro/specs/{feature}/spec.json`, `requirements.md`, `design.md`, `tasks.md`
+Reuse steering/spec context already available from conversation; load missing context below.
+Select skills for the current task even when steering/spec context is already available:
+- `.kiro/specs/{feature}/spec.json` and `tasks.md` for approvals, task selection, and dependencies
+- Referenced sections of `requirements.md` and `design.md`, expanding to related contracts as needed for the selected task
 - Core steering context: `product.md`, `tech.md`, `structure.md`
 - Additional steering files only when directly relevant to the selected task's boundary, runtime prerequisites, integrations, domain rules, security/performance constraints, or team conventions that affect implementation or validation
-- Relevant local agent skills or playbooks only when they clearly match the task's host environment or use case; read the specific artifact(s) you need, not entire directories
-
-#### Parallel Research
-
-The following research areas are independent and can be executed in parallel:
-1. **Spec context loading**: spec.json, requirements.md, design.md, tasks.md
-2. **Steering, playbooks, & patterns**: Core steering, task-relevant extra steering, matching local agent skills/playbooks, and existing code patterns
-
-After all parallel research completes, synthesize implementation brief before starting.
+- Use explicitly requested skills and task-relevant local skills/playbooks, including design, accessibility, and UX. Select by description and read only needed guidance, even for small tasks; preserve required checks and host/project rules.
 
 #### Preflight
 
@@ -65,6 +64,10 @@ After all parallel research completes, synthesize implementation brief before st
 - Extract feature name from first argument
 - If task numbers provided (e.g., "1.1" or "1,2,3"): **manual mode**
 - If no task numbers: **autonomous mode** (all pending tasks)
+- Determine review mode from the invocation:
+  - `--review required` or omitted → `required`
+  - `--review inline` → `inline`
+  - `--review off`, `skip review`, or `without review` → `off`
 
 **Build task queue**:
 - Read tasks.md, identify actionable sub-tasks (X.Y numbering like 1.1, 2.3)
@@ -80,7 +83,9 @@ After all parallel research completes, synthesize implementation brief before st
 
 **Iteration discipline**: Process exactly ONE sub-task (e.g., 1.1) per iteration. Do NOT batch multiple sub-tasks into a single subagent dispatch. Each iteration follows the full cycle: dispatch implementer → review → commit → re-read tasks.md → next.
 
-**Context management**: At the start of each iteration, re-read `tasks.md` to determine the next actionable sub-task. Do NOT rely on accumulated memory of previous iterations. After completing each iteration, retain only a one-line summary (e.g., "1.1: READY_FOR_REVIEW, 3 files changed") and discard the full status report and reviewer details.
+**Context management**: Re-read `tasks.md` before each iteration. Carry forward the task outcome, commit/evidence references, unresolved constraints, and relevant Implementation Notes; do not repeat completed worker transcripts in later handoffs.
+
+**Delegation scope**: Use native subagents for these task-local steps, passing the focused inputs below rather than the full parent conversation. Independent feature/PR chats and their worktrees are managed through the host; do not create a standalone chat for each implementation or review step.
 
 For each task (one at a time):
 
@@ -91,9 +96,11 @@ For each task (one at a time):
   - Paths to spec files: requirements.md, design.md, tasks.md
   - Exact requirement and design section numbers this task must satisfy (using source numbering, NOT invented `REQ-*` aliases)
   - Task-relevant steering context and parent-discovered validation commands (tests/build/smoke as relevant)
+  - Selected skill/playbook paths and concise task-relevant guidance, including required checks; inline necessary guidance when the worker cannot access those paths
   - Whether the task is behavioral (Feature Flag Protocol) or non-behavioral
   - **Previous learnings**: Include any `## Implementation Notes` entries from tasks.md that are relevant to this task's boundary or dependencies (e.g., "better-sqlite3 requires separate rebuild for Electron"). This prevents the same mistakes from recurring.
 - The implementer subagent will read the spec files and build its own Task Brief (acceptance criteria, completion definition, design constraints, verification method) before implementation
+- Preserve this task context, including selected skill guidance, on every implementer re-dispatch (context requests, review remediation, and debug retries); append the new context or feedback.
 - Dispatch via **Agent tool** as a fresh subagent
 
 **b) Handle implementer status**:
@@ -103,23 +110,34 @@ For each task (one at a time):
 - **BLOCKED** → dispatch debug subagent (see section below); do NOT immediately skip
 - **NEEDS_CONTEXT** → re-dispatch once with the requested additional context; if still unresolved → dispatch debug subagent
 
-**c) Dispatch reviewer**:
-- Read `templates/reviewer-prompt.md` from this skill's directory
-- Construct a review prompt with:
-  - The task description and relevant spec section numbers
-  - Paths to spec files (requirements.md, design.md) so the reviewer can read them directly
-  - The implementer's status report (for reference only — reviewer must verify independently)
-- The reviewer must apply the `kiro-review` protocol to this task-local review.
-- Preserve the existing task-specific context: task text, spec refs, `_Boundary:_` scope, validation commands, implementer report, and the actual `git diff` as the primary source of truth.
-- The reviewer subagent will run `git diff` itself to read the actual code changes and verify against the spec
-- Dispatch via **Agent tool** as a fresh subagent
+**c) Review the task**:
+- If review mode is `required`:
+  - Read `templates/reviewer-prompt.md` from this skill's directory
+  - Resolve `../kiro-review/SKILL.md` relative to this skill's directory and pass its absolute path as `REVIEW_PROTOCOL_PATH`
+  - Construct a review prompt with:
+    - The task description and relevant spec section numbers
+    - Paths to spec files (requirements.md, design.md) so the reviewer can read them directly
+    - The implementer's status report (for reference only — reviewer must verify independently)
+  - The reviewer must apply the `kiro-review` protocol to this task-local review.
+  - Preserve the existing task-specific context: task text, spec refs, `_Boundary:_` scope, validation commands, implementer report, and the actual `git diff` as the primary source of truth.
+  - The reviewer subagent will run `git diff` itself to read the actual code changes and verify against the spec
+  - Dispatch via **Agent tool** as a fresh subagent
+- If review mode is `inline`:
+  - Apply `kiro-review` in the parent context using the same task evidence and the actual `git diff`
+- If review mode is `off`:
+  - Skip task-local review
+  - Record in the parent context that task-local review was skipped for this task
 
 **d) Handle reviewer verdict**:
-- Parse reviewer verdict only from the exact `## Review Verdict` block and `- VERDICT:` field.
-- If `VERDICT` is missing, ambiguous, or replaced with prose, re-dispatch the reviewer once requesting the exact structured verdict only. Do NOT mark the task complete, commit, or continue to the next task without a parseable `APPROVED | REJECTED` value.
-- **APPROVED** → before marking the task `[x]` or making any success claim, apply `kiro-verify-completion` using fresh evidence from the current code state; then mark task `[x]` in tasks.md and perform selective git commit
-- **REJECTED (round 1-2)** → re-dispatch implementer with review feedback
-- **REJECTED (round 3)** → dispatch debug subagent (see section below)
+- If review mode is `off`:
+  - Do not fabricate a reviewer verdict
+  - Before marking the task `[x]` or making any success claim, apply `kiro-verify-completion` using fresh evidence from the current code state; then mark task `[x]` in tasks.md and perform selective git commit
+- Otherwise:
+  - Parse reviewer verdict only from the exact `## Review Verdict` block and `- VERDICT:` field.
+  - If `VERDICT` is missing, ambiguous, or replaced with prose, re-dispatch the reviewer once requesting the exact structured verdict only. Do NOT mark the task complete, commit, or continue to the next task without a parseable `APPROVED | REJECTED` value.
+  - **APPROVED** → before marking the task `[x]` or making any success claim, apply `kiro-verify-completion` using fresh evidence from the current code state; then mark task `[x]` in tasks.md and perform selective git commit
+  - **REJECTED (round 1-2)** → re-dispatch implementer with review feedback
+  - **REJECTED (round 3)** → dispatch debug subagent (see section below)
 
 **e) Commit** (parent-only, selective staging):
 - Stage only the files actually changed for this task, plus tasks.md
@@ -132,24 +150,17 @@ For each task (one at a time):
 
 **g) Debug subagent** (triggered by BLOCKED, NEEDS_CONTEXT unresolved, or REJECTED after 2 remediation rounds):
 
-The debug subagent runs in a **fresh context** — it receives only the error information, not the failed implementation history. This avoids the context pollution that causes infinite retry loops.
-
 - Read `templates/debugger-prompt.md` from this skill's directory
-- Construct a debug prompt with:
-  - The error description / blocker reason / reviewer rejection findings
-  - `git diff` of the current uncommitted changes
-  - The task description and relevant spec section numbers
-  - Paths to spec files so the debugger can read them
-- The debugger must apply the `kiro-debug` protocol to this failure investigation.
-- Preserve rich failure context: error output, reviewer findings, current `git diff`, task/spec refs, and any relevant Implementation Notes.
-- When available, the debugger should inspect runtime/config state and use web or official documentation research to validate root-cause hypotheses before proposing a fix plan.
-- Dispatch via **Agent tool** as a fresh subagent
+- Resolve `../kiro-debug/SKILL.md` relative to this skill's directory and pass its absolute path as `DEBUG_PROTOCOL_PATH`
+- Supply the task brief/boundary, exact spec references, failure output, reviewer findings, current changed files/diff, and relevant Implementation Notes/runtime constraints
+- Include attempted fixes and their observed results concisely, without copying the failed workers' conversation history
+- Dispatch via **Agent tool** as a fresh subagent; it reads the canonical `kiro-debug` procedure itself
 
 **Handle debug report**:
-- Parse `NEXT_ACTION` from the debug report's exact structured field.
+- Require a `## Debug Report` and parse its exact `- NEXT_ACTION:` field (`RETRY_TASK | BLOCK_TASK | STOP_FOR_HUMAN`). If the protocol or a valid report is missing, stop this feature and report the missing input; do not guess a next action or dispatch another implementer.
 - If `NEXT_ACTION: STOP_FOR_HUMAN` → append `_Blocked: <ROOT_CAUSE>_` to tasks.md, stop the feature run, and report that human review is required before continuing
 - If `NEXT_ACTION: BLOCK_TASK` → append `_Blocked: <ROOT_CAUSE>_` to tasks.md, skip to next task
-- If `NEXT_ACTION: RETRY_TASK` → preserve the current worktree; do NOT reset or discard unrelated changes. Spawn a **new** implementer subagent with the debug report's `FIX_PLAN`, `NOTES`, and the current `git diff`, and require it to repair the task with explicit edits only
+- If `NEXT_ACTION: RETRY_TASK` → preserve the current worktree; do NOT reset or discard unrelated changes. Spawn a **new** implementer subagent with the original task context (including selected skill guidance), the debug report's `FIX_PLAN`, `NOTES`, and the current `git diff`, and require it to repair the task with explicit edits only
   - If the new implementer succeeds (READY_FOR_REVIEW → reviewer APPROVED) → normal flow
   - If the new implementer also fails → repeat debug cycle (max 2 debug rounds total). After 2 failed debug rounds → append `_Blocked: debug attempted twice, still failing — <ROOT_CAUSE>_` to tasks.md, skip
 - **Max 2 debug rounds per task**. Each round: fresh debug subagent → fresh implementer. If still failing after 2 rounds, the task is blocked.
@@ -175,8 +186,13 @@ Before writing any code, read the relevant sections of requirements.md and desig
 - **GREEN**: Implement simplest solution to make test pass, following the design constraints.
 - **REFACTOR**: Improve code structure, remove duplication. All tests must still pass.
 - **VERIFY**: All tests pass (new and existing), no regressions. Confirm verification method passes.
-- **REVIEW**: Apply `kiro-review` before marking the task complete. If the host supports fresh subagents in manual mode, use a fresh reviewer; otherwise perform the review in the main context using the `kiro-review` protocol. Do NOT continue until the verdict is parseably `APPROVED`.
-- **MARK COMPLETE**: Only after review returns `APPROVED`, apply `kiro-verify-completion`, then update the checkbox from `- [ ]` to `- [x]` in tasks.md.
+- **REVIEW**:
+  - `required`: Apply `kiro-review` before marking the task complete. If the host supports fresh subagents in manual mode, use a fresh reviewer; otherwise perform the review in the main context using the `kiro-review` protocol. Do NOT continue until the verdict is parseably `APPROVED`.
+  - `inline`: Apply `kiro-review` in the main context before marking the task complete.
+  - `off`: Skip task-local review, but note that `kiro-validate-impl` becomes the primary quality gate before any feature-level completion claim.
+- **MARK COMPLETE**:
+  - `required|inline`: Only after review returns `APPROVED`, apply `kiro-verify-completion`, then update the checkbox from `- [ ]` to `- [x]` in tasks.md.
+  - `off`: Apply `kiro-verify-completion`, then update the checkbox from `- [ ]` to `- [x]` in tasks.md.
 
 ### Step 4: Final Validation
 
@@ -190,6 +206,7 @@ Before writing any code, read the relevant sections of requirements.md and desig
 
 **Manual mode**:
 - Suggest running `/kiro-validate-impl {feature}` but do not auto-execute
+- If review mode is `off`, treat `/kiro-validate-impl {feature}` as mandatory before any feature-level success claim
 
 ## Feature Flag Protocol
 

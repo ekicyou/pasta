@@ -176,7 +176,33 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
   - ローカルでのビルド
   - main の CI が全部緑かの確認
   - マージコミット方式で統合する理由（タグが指すコミットを main から到達できるようにするため）を、squash でよいか見直す。
+  - `release-ci` からの申し送り: CI での初回のリリースと、その前後の一回限りのセットアップは本更新の後の最初のリリースで行う。手順は `.github/release-ci-setup.md` の 6〜10 節。期限は 2026-12-01（global PAT の廃止）より前。
+    - 前提（2026-10-08 に済んだ）: 1〜8 節の一回限りのセットアップはすべて完了。
+      - Azure（サブスクリプション・予算アラート・マネージド ID・フェデレーション資格情報 2 件）は `az` で読み戻して確認した。
+      - GitHub（environment 2 つ・リポジトリ variables 3 つ）は `gh api` で確認した。
+      - Marketplace の Members への追加は、setup-check の再実行で `verify-pat` が成功したことで確認した（run 37777674500）。
+      - crates.io の Trusted Publisher ×5 は、ユーザーが画面で設定した。setup-check は crates.io を確かめないので、**初回のリリースが最初の実地確認**になる。`publish-crates` が認証で失敗したら、8 節の値（owner・repo・`release.yml`・`release`）を設定画面と照合する。
+      - ID の値は書かない。値はリポジトリ variables とユーザーの手元の記録にある。
+    - 合格: 3 公開先が `published`、同じ run の再実行ですべて `skipped`。
+    - 運用の注意（セットアップで分かったこと）:
+      - Azure のリソースを `az` で作る・変えるには MFA が要る。WAM（Windows のサインイン窓）でログインすると `RequestDisallowedByAzure` で弾かれる。`az config set core.enable_broker_on_windows=false` にしてからブラウザーで `az login` し直す。ワークフローのマネージド ID には関係ない。
+      - Marketplace の Members の管理には、公式の CLI が無い（vsce・az・gh のどれも扱えない）。画面から行う。
+      - 小さな取りこぼし: setup-check の `verify-pat` が失敗すると、vsce のエラー文（`Access Denied: <ID> needs ...`）にマネージド ID の識別子が含まれ、ジョブのログに出る。「profile ID は summary にだけ書く」方針から漏れている。秘密の値ではないので実害は無い。直すかどうかは本更新で決める。
+    - あわせて見直す（`release-ci` の design.md「Out of Boundary」が本更新へ回したもの）: `.claude/settings.json` の公開系コマンドの許可の整理、`build.yml` に `--locked` を足すか、bump 箇所に `package-lock.json` の版を含めること（release.yml の verify は検査しない）。
+    - `VSCE_PAT` の失効（10 節）は、初回のリリースで Marketplace が Entra ID の経路で `published` になったのを確かめてから行う。値が `release-ci` の会話記録に出ているが、前倒しはしない（ユーザー決定 2026-10-08）。
   - Dependencies: release-ci
+
+## 文中のシーンリンク（2026-10-08 起票）
+
+台詞の中の語を Wikipedia のリンクのようにし、クリックでそのシーンへ飛べるようにする（`scene-anchor-link`）。
+
+- **方式**:
+  - 記法は `＠？シーン名`（`＠単語　` と同じく、空白か改行で終える）と `＠？シーン名「表示名」`。
+  - 出力はさくらスクリプトの `\_a`（アンカー）で、`\q` ではない。`\q` だと、トーク全体が選択肢待ちになるため。
+  - クリックは `OnAnchorSelectEx` を、選択肢の振り分け（`choice_select.lua`）と同じ規則で受ける。
+  - `【】` で囲む案は、文法として唐突なので採らなかった。
+- **飛び先が無いとき**: 選択肢と同じく 204 を返す。失敗の見せ方は `failure-output-unification` に乗せる。読み込み時の検出は、バックログの「`.pasta` を検査するコマンド」に任せる。
+- **ウェーブ**: `grammar.pest`・`parse_action.rs`・`element_gen.rs`・`act.lua`・VSCode の文法定義を、`call-attribute-filter` と共有する。そのため、その後に置く（Phase 11 の Wave 6 相当）。
 
 ## Specs (dependency order)
 
@@ -184,12 +210,13 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
 - [ ] failure-output-unification -- 実行時の失敗（未定義の参照・見つからない Call など）をログとさくらスクリプトの両方へ 1 つの仕組みから出す。`call-execution-correctness` が Call 行に入れる失敗表記を載せ替え、他の失敗へ広げる。Dependencies: none
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
 - [ ] scene-name-alias -- シーン名のエイリアス表を pasta.toml で持ち、未定義なら「会話 → OnTalk」の 1 件を既定にする。完全一致のみ、キー正規化の前段で登録・検索の両側に効かせる（`＊会話` の宣言も `＞会話` の Call も OnTalk になる）。Dependencies: none（2026-10-08 に最優先で先行。`scene-attribute-store`・`call-attribute-filter` はこの後に rebase する）
-- [ ] release-ci -- タグ `vX.Y.Z` の push を契機に、GitHub Actions で verify・成果物のビルド・crates.io と Marketplace への公開・GitHub Release までを冪等に行う。認証は OIDC（Trusted Publishing・Entra ID）。成果物の git 追跡を解除し、一回限りのセットアップの手順書を作る。Marketplace の global PAT が廃止される 2026-12-01 より前に完了させる。Dependencies: none
+- [x] release-ci -- タグ `vX.Y.Z` の push を契機に、GitHub Actions で verify・成果物のビルド・crates.io と Marketplace への公開・GitHub Release までを冪等に行う。認証は OIDC（Trusted Publishing・Entra ID）。成果物の git 追跡を解除し、一回限りのセットアップの手順書を作る。Marketplace の global PAT が廃止される 2026-12-01 より前に完了させる。Dependencies: none
 - [ ] hello-pasta-tutorial-stages -- 「こんな表現をしたい」の段階表を確定し、段階ごとに起動できる辞書一式を CI で検証する。hello-pasta の辞書を教材として書き直し、最終段階と一致させる。Dependencies: none
 - [ ] manual-claudia-theme -- マニュアルを mdBook のまま「Claudia のマニュアル」に着せ替える。配色・字体・枠などの意匠は ponadocs の Claudia 紹介ページ（Unlicense）を手本にし、ダーク版と表紙の扉を用意する。顔アイコン付きの台詞の部品を作り、全章の導入と締めの台詞を書き換える。検索・着色・`file://` 閲覧・検査ツールは壊さない。Dependencies: none
 - [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。Dependencies: release-ci, hello-pasta-tutorial-stages
 - [ ] getting-started-story-guide -- 入門ガイドを段階表に沿った物語に書き直し、全編を Claudia が語る（執筆規約に `getting-started` の例外を足す）。段階辞書との逐語照合と、新しいシェルのスクリーンショットを含む。Dependencies: hello-pasta-tutorial-stages, hello-pasta-shell-art, manual-claudia-theme
 - [ ] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
+- [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアルまで揃える（2026-10-08 起票）。Dependencies: failure-output-unification, call-attribute-filter
 
 ## バックログ（brief なし・保留）
 

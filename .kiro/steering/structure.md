@@ -197,8 +197,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       ├── Cargo.toml       # 画像生成・配布物作成用依存
 │       ├── README.md        # クレート概要
 │       ├── RELEASE.md       # リリース手順
-│       ├── release.ps1      # ビルド＋配布パッケージ生成スクリプト
-│       ├── release.bat      # release.ps1のバッチラッパー
+│       ├── release.ps1      # ビルド＋配布パッケージ生成スクリプト（手元では動作確認用・リリース CI の build job も呼ぶ）
 │       ├── build.rs         # ビルドスクリプト
 │       ├── src/
 │       │   ├── lib.rs              # 公開API（画像＋surfaces.txt生成）
@@ -207,7 +206,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── config_templates.rs # surfaces.txt生成
 │       │   └── scripts.rs          # ghosts/hello-pasta 辞書(.pasta)の検証テスト
 │       ├── ghosts/           # サンプルゴースト本体（SSOT・配布物一式）
-│       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/install)＋生成物(dll/画像)
+│       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/install)＋生成物(dll/ライセンス表示/scripts は .gitignore 済み・画像は追跡)
 │       └── tests/            # 統合テスト・配布ファイル構成検証
 ├── benches/                  # ベンチマークコード
 ├── editors/                  # エディタ拡張
@@ -239,7 +238,17 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       ├── completed/       # 完了仕様（アーカイブ）
 │       └── <spec-name>/     # 進行中仕様
 ├── .vscode/                 # VS Code 設定
-├── .github/                 # GitHub Actions, PR テンプレート
+├── .github/                 # GitHub Actions
+│   ├── workflows/
+│   │   ├── build.yml        # Rust/WASM ビルド・検査（push/PR・release.yml から workflow_call）
+│   │   ├── manual.yml       # 利用者マニュアルの検査と GitHub Pages 公開
+│   │   ├── release.yml      # リリース CI（vX.Y.Z タグ契機・OIDC で crates.io/Marketplace へ公開・GitHub Release 作成）
+│   │   └── release-setup-check.yml # リリース CI のセットアップ確認（手動起動・公開しない）
+│   ├── scripts/release/     # リリース CI の job 補助スクリプト（verify-tag/publish-crate/publish-vsix/release-notes/github-release の .ps1）
+│   └── release-ci-setup.md  # リリース CI の一回限りのセットアップ手順書
+├── release.bat              # crates/pasta_sample_ghost/release.ps1 のバッチラッパー（ダブルクリック用）
+├── release/                 # release.ps1 の出力先（.nar・pasta.dll.zip。.gitignore 済み・コミットしない）
+├── Cargo.lock               # 依存の解決結果（コミット対象・リリース CI の build で不変を検査）
 ├── README.md                # プロジェクト概要
 ├── LICENSE                  # ライセンス
 └── CLAUDE.md                # AI開発支援（プロジェクト指示・Kiro ワークフロー・コマンド一覧）
@@ -249,7 +258,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 - ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
 - ルートレベルの `tests/` と `examples/` も削除済み（Pure Virtual Workspace移行完了）
 - 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_dsl, pasta_core, pasta_lua, pasta_lsp, pasta_sample_ghost, pasta_shiori）
-- pasta_sample_ghost のサンプルゴースト hello-pasta は `ghosts/hello-pasta/` に完全な一式として直接配置（SSOT）。テキスト系（descript/pasta.toml/dic/install）は手書き正本、画像・DLL は生成物。`release.ps1` は生成物の配置と `.nar` パッケージングを担う（旧 dist-src/robocopy 方式は廃止）
+- pasta_sample_ghost のサンプルゴースト hello-pasta は `ghosts/hello-pasta/` に完全な一式として直接配置（SSOT）。テキスト系（descript/pasta.toml/dic/install）は手書き正本、画像・DLL は生成物。`release.ps1` は生成物の配置と `.nar`・`pasta.dll.zip` のパッケージングを担う（旧 dist-src/robocopy 方式は廃止）。生成物のうち DLL・ライセンス表示・`scripts/` と `release/` はコミットしない。配布物の公開はリリースタグの push で `release.yml` が行う
 - `CLAUDE.md` が AI 開発支援の指示（プロジェクト指示・Kiro 仕様駆動ワークフロー・コマンド一覧）を担う
 
 ## ファイル命名規則
