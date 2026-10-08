@@ -546,3 +546,99 @@ fn test_full_e2e_flow() {
 
     assert!(all_ok, "All scenes and words should be searchable");
 }
+
+// ============================================================================
+// scene-name-alias task 4.2: 別名表がランタイムの 2 つの登録点へ渡る
+// ============================================================================
+
+/// `SEARCH:search_scene(name)`（範囲指定なし）が返すグローバルの登録名。見つからなければ `None`。
+fn search_global(lua: &mlua::Lua, name: &str) -> Option<String> {
+    lua.load(
+        r#"
+        local SEARCH = require "@pasta_search"
+        local g = SEARCH:search_scene(...)
+        return g
+    "#,
+    )
+    .call(name)
+    .unwrap()
+}
+
+/// `＊OnTalk` だけの辞書から、`aliases` を持つ `RuntimeConfig` でランタイムを作り、
+/// 初回登録の `@pasta_search` と、`finalize_scene` が再登録した `@pasta_search` の
+/// それぞれで `search_scene("会話")` を引く。戻りは (確定前, 確定後)。
+fn search_kaiwa_before_and_after_finalize(
+    aliases: pasta_core::registry::SceneAliasTable,
+) -> (Option<String>, Option<String>) {
+    use pasta_lua::runtime::{PastaLuaRuntime, RuntimeConfig};
+
+    let file = pasta_dsl::parser::parse_str("＊OnTalk\n  さくら：やあ\n", "alias_runtime.pasta")
+        .expect("source must parse");
+    let mut out = Vec::new();
+    let ctx = pasta_lua::LuaTranspiler::default()
+        .transpile(&file, &mut out)
+        .expect("source must transpile");
+
+    let runtime = PastaLuaRuntime::with_config(
+        ctx,
+        RuntimeConfig::new().with_scene_aliases(aliases.clone()),
+    )
+    .expect("runtime must build");
+    let lua = runtime.lua();
+
+    // 初回登録（with_config_and_source_map）の @pasta_search
+    let before = search_global(lua, "会話");
+
+    // finalize_scene を動かすための最小環境（create_runtime_with_finalize と同じ）
+    let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("pasta_scripts")
+        .to_string_lossy()
+        .replace('\\', "/");
+    lua.load(format!(
+        r#"package.path = "{scripts_dir}/?.lua;{scripts_dir}/?/init.lua;" .. package.path"#
+    ))
+    .exec()
+    .unwrap();
+    let persistence = pasta_lua::runtime::persistence::register(
+        lua,
+        &pasta_lua::loader::PersistenceConfig::default(),
+        &std::env::temp_dir(),
+    )
+    .unwrap();
+    let loaded: mlua::Table = lua
+        .globals()
+        .get::<mlua::Table>("package")
+        .unwrap()
+        .get("loaded")
+        .unwrap();
+    loaded.set("@pasta_persistence", persistence).unwrap();
+    pasta_lua::runtime::finalize::register_finalize_scene(lua, aliases).unwrap();
+
+    lua.load(String::from_utf8(out).unwrap()).exec().unwrap();
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+
+    // finalize_scene が再登録した @pasta_search
+    let after = search_global(lua, "会話");
+    (before, after)
+}
+
+/// 既定表を持つ設定のランタイムでは、確定の前後どちらでも「会話」が OnTalk に解決される（4.3〜4.6・6.2）。
+#[test]
+fn test_scene_alias_table_reaches_both_search_registrations() {
+    let (before, after) = search_kaiwa_before_and_after_finalize(
+        pasta_core::registry::SceneAliasTable::builtin_default(),
+    );
+    assert_eq!(before.as_deref(), Some("OnTalk_1"), "before finalize_scene");
+    assert_eq!(after.as_deref(), Some("OnTalk_1"), "after finalize_scene");
+}
+
+/// 空の表では従来どおり「会話」は OnTalk に当たらない。
+#[test]
+fn test_empty_scene_alias_table_keeps_search_unchanged() {
+    let (before, after) =
+        search_kaiwa_before_and_after_finalize(pasta_core::registry::SceneAliasTable::empty());
+    assert_eq!(before, None, "before finalize_scene");
+    assert_eq!(after, None, "after finalize_scene");
+}
