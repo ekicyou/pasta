@@ -1,0 +1,22 @@
+{
+  "feature_name": "release-ci",
+  "created_at": "2026-10-08T00:50:09Z",
+  "updated_at": "2026-10-08T01:04:18Z",
+  "language": "ja",
+  "phase": "requirements-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": false
+    },
+    "design": {
+      "generated": false,
+      "approved": false
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": false
+}
