@@ -397,3 +397,66 @@ describe("act:arith - 数値にできない被演算子", function()
         end)
     end)
 end)
+
+-- PASTA.num・PASTA.str: 算術・連結の被演算子を必ず数値・文字列にする変換（生成コードが pasta モジュールから呼ぶ）
+
+--- with_captured_act と同じく警告を記録し、pasta（init.lua）も新規ロードして body に渡す
+--- @param body fun(PASTA: table, warns: string[])
+local function with_captured_pasta(body)
+    local saved_pasta = package.loaded["pasta"]
+    package.loaded["pasta"] = nil
+    local ok, err = pcall(with_captured_act, function(_, warns)
+        body(require("pasta"), warns)
+    end)
+    package.loaded["pasta"] = saved_pasta
+    if not ok then error(err, 0) end
+end
+
+describe("PASTA.num・PASTA.str - 被演算子の変換（基本の契約）", function()
+    test("pasta.act の ACT.num・ACT.str と同一関数として公開される", function()
+        with_captured_pasta(function(PASTA)
+            local ACT = require("pasta.act")
+            expect(PASTA.num):toBe(ACT.num)
+            expect(PASTA.str):toBe(ACT.str)
+        end)
+    end)
+
+    test("num: 数値・数字だけの文字列は数値、nil は黙って 0、変換できない値は従来の警告 1 行で 0", function()
+        with_captured_pasta(function(PASTA, warns)
+            expect(PASTA.num("+", 3)):toBe(3)
+            expect(PASTA.num("+", "0x10")):toBe(16)
+            expect(PASTA.num("+", nil)):toBe(0)
+            expect(PASTA.num("-", nil, "var.x")):toBe(0)
+            expect(#warns):toBe(0)
+            expect(PASTA.num("*", "abc", "var.y")):toBe(0)
+            expect(warns[1]):toBe("act:arith - operand is not a number: op='*', operand='var.y', value='abc' (string)")
+            local called = false
+            local mt = { __add = function() called = true end, __tostring = function() called = true end }
+            local t = setmetatable({}, mt)
+            expect(PASTA.num("+", t)):toBe(0)
+            expect(warns[2]):toBe("act:arith - operand is not a number: op='+', value=(table)")
+            expect(called):toBe(false)
+            expect(#warns):toBe(2)
+        end)
+    end)
+
+    test("str: 文字列・数値は文字列、nil は黙って空文字列、変換できない値は従来の警告 1 行で空文字列", function()
+        with_captured_pasta(function(PASTA, warns)
+            expect(PASTA.str("合計")):toBe("合計")
+            expect(PASTA.str(3.5)):toBe("3.5")
+            expect(PASTA.str(nil)):toBe("")
+            expect(PASTA.str(nil, "var.x")):toBe("")
+            expect(#warns):toBe(0)
+            expect(PASTA.str(true, "var.b")):toBe("")
+            expect(warns[1]):toBe(
+                "act:concat - operand is not a string or number: op='&', operand='var.b', value=true (boolean)")
+            local called = false
+            local mt = { __concat = function() called = true end, __tostring = function() called = true end }
+            local t = setmetatable({}, mt)
+            expect(PASTA.str(t)):toBe("")
+            expect(warns[2]):toBe("act:concat - operand is not a string or number: op='&', value=(table)")
+            expect(called):toBe(false)
+            expect(#warns):toBe(2)
+        end)
+    end)
+end)

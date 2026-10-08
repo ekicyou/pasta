@@ -523,6 +523,44 @@ local function arith_value_text(v)
     return string.format("(%s)", t)
 end
 
+--- 算術の被演算子を数値にする（算術式の生成コードが PASTA.num として呼ぶ）。
+--- number はそのまま、string は tonumber（変更前の暗黙変換と同じ範囲）、nil は黙って 0、
+--- それ以外は act:arith と同じ文言の警告を 1 行出して 0。メタメソッドは呼ばない。act のメソッドではない
+--- @param op string 警告に出す演算子（"+" | "-" | "*" | "/" | "%"）
+--- @param v any 被演算子
+--- @param desc string|nil 警告に出す被演算子の説明（変数パス・関数名）
+--- @return number
+function ACT.num(op, v, desc)
+    local t = type(v)
+    if t == "number" then return v end
+    local n = t == "string" and tonumber(v) or nil
+    if n ~= nil then return n end
+    if v ~= nil then
+        local operand = desc and string.format("operand='%s', ", desc) or ""
+        log.warn(string.format("act:arith - operand is not a number: op='%s', %svalue=%s",
+            op, operand, arith_value_text(v)))
+    end
+    return 0
+end
+
+--- 連結の被演算子を文字列にする（連結式の生成コードが PASTA.str として呼ぶ）。
+--- string はそのまま、number は tostring（アクション行の表示と同じ表記）、nil は黙って空文字列、
+--- それ以外は act:concat と同じ文言の警告を 1 行出して空文字列。メタメソッドは呼ばない。act のメソッドではない
+--- @param v any 被演算子
+--- @param desc string|nil 警告に出す被演算子の説明（変数パス・関数名）
+--- @return string
+function ACT.str(v, desc)
+    local t = type(v)
+    if t == "string" then return v end
+    if t == "number" then return tostring(v) end
+    if v ~= nil then
+        local operand = desc and string.format("operand='%s', ", desc) or ""
+        log.warn(string.format("act:concat - operand is not a string or number: op='&', %svalue=%s",
+            operand, arith_value_text(v)))
+    end
+    return ""
+end
+
 --- 被演算子を数値にする。number はそのまま、string は tonumber（変更前の暗黙変換と同じ範囲）、
 --- それ以外は nil。数値にできないときは警告する（値も説明も nil なら内側の失敗の伝播として黙る）
 --- @param op string 演算子

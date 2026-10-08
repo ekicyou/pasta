@@ -46,7 +46,7 @@
 
 ### Allowed Dependencies
 
-- ランタイム: `act.lua` の既存の局所関数 `arith_value_text` と `@pasta_log`（`log.warn` だけ）。`init.lua`（`pasta`）が `pasta.act` を require する（`pasta.act` は `pasta` を require しないので循環しない）。新しいモジュール・新しいログの出口は作らない（3.2）。
+- ランタイム: `act.lua` の既存の局所関数 `arith_value_text` と `@pasta_log`（`log.warn` だけ）。`init.lua`（`pasta`）が `pasta.act` を require する（`pasta.act` は `pasta` を require しないので循環しない）。require は `PASTA.num`・`PASTA.str` を初めて参照したときに行い、`require "pasta"` だけでは `pasta.act` を読み込まない（act.lua の読み込み順を変えない。実装時に確定、tasks.md の Implementation Notes）。新しいモジュール・新しいログの出口は作らない（3.2）。
 - 生成コード: 生成ファイルの先頭の `local PASTA = require "pasta"`（既存。シーン関数の中からも見える）。先頭の行は変えない。
 - トランスパイラー: 既存の `operand_desc`（説明の生成）・`resolve_var_path`・`StringLiteralizer`。
 - テスト: 既存の `run_main_scene`（`runtime_safety_test.rs`）・`with_captured_act`（lua_specs）・`ShioriTestEnv`／`copy_fixture_to_temp`（pasta_shiori）。
@@ -112,7 +112,7 @@ graph LR
 ランタイム:
 - `crates/pasta_lua/pasta_scripts/pasta/act.lua` — モジュール関数 `ACT.num`・`ACT.str` を足す（`arith_value_text` の直後。`ACT_IMPL` には置かない）。`ACT_IMPL.arith`・`ACT_IMPL.concat`・`ARITH_OPS`・`arith_operand`・`concat_operand` を消す。`ACT_IMPL.call_key` の注釈のうち「内側の演算が警告済み」の文言を「手書きの Lua から nil を渡したとき」に直す（振る舞いは変えない）。
 
-- `crates/pasta_lua/pasta_scripts/pasta/init.lua` — `pasta.act` を require し、`PASTA.num = ACT.num`・`PASTA.str = ACT.str` を公開する（`create_actor` などと同じリダイレクトの形）。
+- `crates/pasta_lua/pasta_scripts/pasta/init.lua` — `PASTA.num`・`PASTA.str` を公開する。`PASTA` の `__index` で初めて参照したときに `pasta.act` を require し、`ACT.num`・`ACT.str` を `rawset` で載せる（以後は `PASTA.num == ACT.num`）。`require "pasta"` の時点で act.lua を読み込むと、act.lua の読み込み前に `@pasta_log` を差し替える既存のテスト補助の前提が崩れるため。
 
 トランスパイラー:
 - `crates/pasta_lua/src/code_gen/expr_gen.rs` — 被演算子を `(コード, 説明, 種類)` で運び、`binary_node` が `(左 演算子 右)` を出す。被演算子を `PASTA.num`・`PASTA.str` に通すかを種類で決める。`flatten_binary`・`precedence`・`binary_to_string` の畳み方と `operand_desc` は変えない。
