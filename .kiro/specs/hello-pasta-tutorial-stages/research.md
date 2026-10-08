@@ -125,4 +125,4 @@
   2. `scene_kick_*_e2e_test.rs` が追記するシーン名の一覧（G9）。
   3. アクター辞書 `％女の子` を 2 つのファイルに分けて定義したときの挙動（宣言と表情の合流。Option D の前提）。
   4. アクター辞書なし（または表情なし）のアクター行が `\p[0]` を出力するか（1 段目の `OnBoot` と新ゴールデンの形）。
-- **要件ディスカッションへ**: `requirements.md` の [OPEN-3]・[OPEN-4]・[OPEN-6]・[OPEN-7]・[OPEN-9]（[OPEN-1] は議題 1、[OPEN-11] は議題 2、[OPEN-5] は議題 3、[OPEN-2] は議題 4、[OPEN-8] は議題 5、[OPEN-10] は G12 で解消）。特に [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
+- **要件ディスカッションへ**: `requirements.md` の [OPEN-4]・[OPEN-6]・[OPEN-7]・[OPEN-9]（[OPEN-1] は議題 1、[OPEN-11] は議題 2、[OPEN-5] は議題 3、[OPEN-2] は議題 4、[OPEN-8] は議題 5、[OPEN-3] は議題 7、[OPEN-10] は G12 で解消）。特に [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
