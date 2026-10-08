@@ -126,7 +126,7 @@ Phase 11 の不具合 12 本が入ったあとで、未完了の 8 本を現行 
 | 4 | scene-attribute-store | 機能 | 宣言行の属性のパース（`parse_scene.rs`）、`scope_gen.rs`・`context.rs`・`transpiler.rs`、`scene.lua`、`finalize.rs`、`pasta_core` のシーン登録 |
 | 4 | failure-output-unification | 機能 | `act.lua`・`actor.lua`・`word.lua` の警告と失敗表記（範囲によっては `shiori/event/`・`res.lua`・`pasta_shiori` の `error.rs`） |
 | 5 | call-attribute-filter | 機能 | Call の文法（`grammar.pest`・`parse_action.rs`）、`element_gen.rs`（Call）、`act.lua`（`call`・`find_act_handler`）、`scene.lua`（`SCENE.search`）、`search/`、`pasta_core` の `scene_table.rs`、VSCode の文法定義 |
-| 3.5（最優先・先行） | scene-name-alias | 機能 | pasta.toml の別名表（`config.rs`・`reference/pasta-toml.md`）、`pasta_core` の `sanitize_name` とその呼び出し元（`scope_gen.rs`・`search/context.rs`・`debug/source_map/`）、マニュアル（`block-structure.md`・`call-jump.md`・`shiori-events.md`）とスキル references |
+| 3.5（最優先・先行・2026-10-09 完了） | scene-name-alias | 機能 | pasta.toml の別名表（`config.rs`・`reference/pasta-toml.md`）、`pasta_core` の `sanitize_name` とその呼び出し元（`scope_gen.rs`・`search/context.rs`・`debug/source_map/`）、マニュアル（`block-structure.md`・`call-jump.md`・`shiori-events.md`）とスキル references |
 
 Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）。
 
@@ -209,7 +209,7 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: dsl-literal-fixes, scene-identity-format, call-execution-correctness
 - [ ] failure-output-unification -- 実行時の失敗（未定義の参照・見つからない Call など）をログとさくらスクリプトの両方へ 1 つの仕組みから出す。`call-execution-correctness` が Call 行に入れる失敗表記を載せ替え、他の失敗へ広げる。Dependencies: none
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
-- [ ] scene-name-alias -- シーン名のエイリアス表を pasta.toml で持ち、未定義なら「会話 → OnTalk」の 1 件を既定にする。完全一致のみ、キー正規化の前段で登録・検索の両側に効かせる（`＊会話` の宣言も `＞会話` の Call も OnTalk になる）。Dependencies: none（2026-10-08 に最優先で先行。`scene-attribute-store`・`call-attribute-filter` はこの後に rebase する）
+- [x] scene-name-alias -- シーン名のエイリアス表を pasta.toml で持ち、未定義なら「会話 → OnTalk」の 1 件を既定にする。完全一致のみ、キー正規化の前段で登録・検索の両側に効かせる（`＊会話` の宣言も `＞会話` の Call も OnTalk になる）。Dependencies: none（2026-10-08 に最優先で先行。`scene-attribute-store`・`call-attribute-filter` はこの後に rebase する）
 - [x] release-ci -- タグ `vX.Y.Z` の push を契機に、GitHub Actions で verify・成果物のビルド・crates.io と Marketplace への公開・GitHub Release までを冪等に行う。認証は OIDC（Trusted Publishing・Entra ID）。成果物の git 追跡を解除し、一回限りのセットアップの手順書を作る。Marketplace の global PAT が廃止される 2026-12-01 より前に完了させる。Dependencies: none
 - [ ] hello-pasta-tutorial-stages -- 「こんな表現をしたい」の段階表を確定し、段階ごとに起動できる辞書一式を CI で検証する。hello-pasta の辞書を教材として書き直し、最終段階と一致させる。Dependencies: none
 - [ ] manual-claudia-theme -- マニュアルを mdBook のまま「Claudia のマニュアル」に着せ替える。配色・字体・枠などの意匠は ponadocs の Claudia 紹介ページ（Unlicense）を手本にし、ダーク版と表紙の扉を用意する。顔アイコン付きの台詞の部品を作り、全章の導入と締めの台詞を書き換える。検索・着色・`file://` 閲覧・検査ツールは壊さない。Dependencies: none
