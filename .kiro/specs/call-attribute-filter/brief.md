@@ -100,3 +100,9 @@ Call の属性フィルター（`＞シーン＆k＝v`）は、旧文法仕様�
   - `register_global_raw` がグローバルの属性をローカルシーンに複製する件は `scene-attribute-store` の brief に記した。その結論が、ローカルシーンを絞り込むときの前提になる。
   - マニュアル `lua/script-api.md` 304・317 行は「`attrs` は使わない」と書いている。本 spec で書き換える対象。
 - **順序の提案**: 本 spec を `failure-output-unification` の後に置く。そうすれば「一致する候補が無い」の失敗表記を、最初から一本化した仕組みに載せられる（現在のロードマップは逆順）。
+
+## 申し送り（scene-name-alias より）
+
+- `search/context.rs` の `SearchContext::search_scene` のグローバル分岐（第 2 引数 `None`）に、別名の置き換え（`scene_aliases.resolve(name)` → `sanitize_name`）が入った。フィルターはこの後の `resolve_scene_id_unified` に足すことになる。候補キャッシュのキーは**置き換え後**の名前なので、フィルターをキーに含めるときも置き換え後の名前で揃える。
+- `SearchContext` は別名表を持ち（`with_aliases`）、`search::register(lua, scene_reg, word_reg, aliases)` と `register_finalize_scene(lua, aliases)` の引数が増えた。rebase で署名を合わせる。
+- 参照: `.kiro/specs/completed/scene-name-alias/design.md`「SearchAlias」「Revalidation Triggers」。
