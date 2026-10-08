@@ -428,3 +428,141 @@ jobs:
             "| ``ekicyou.pasta-vscode`` | $status | $reason | $hint |"
             ''
           ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # GitHub Release の作成（下書き → 添付 → 公開）。crates.io の 5 クレートがすべて公開済み（published か skipped）に
+  # なってから作る（6.1）。publish-crates が失敗すれば needs の既定でこの job は走らず、Release は作られない（6.10）。
+  # Marketplace の成否は待たず、VSIX は常に添付する。書き込み権限を持つのはこの job だけ。
+  # 末尾の集約 step は常に動き、status・reason・url を summary と job outputs に書く。
+  github-release:
+    name: github-release
+    needs: [verify, build, publish-crates]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+      reason: ${{ steps.result.outputs.reason }}
+      url: ${{ steps.result.outputs.url }}
+    steps:
+      # リリースノートは前のタグからの差分で作るので、全履歴とタグが要る。
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Download release-assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: release-assets
+
+      - name: Generate release notes
+        id: notes
+        run: ./.github/scripts/release/release-notes.ps1 -Tag $env:GITHUB_REF_NAME -Repo $env:GITHUB_REPOSITORY -OutFile "$env:RUNNER_TEMP/release-notes.md"
+
+      # 対象のリポジトリは gh の既定（checkout の remote）で決まる。
+      - name: Create GitHub Release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./.github/scripts/release/github-release.ps1 -Tag $env:GITHUB_REF_NAME -Title "pasta $env:GITHUB_REF_NAME" -NotesFile "$env:RUNNER_TEMP/release-notes.md" -AssetDir release-assets
+
+      # status 契約: Release の step が書いた値を使う。書いていなければ（ノートの生成・配布物の取得の失敗、
+      # スクリプトの異常終了・時間切れ）この job の失敗なので failed/publish。
+      - name: Summarize GitHub Release result
+        id: result
+        if: always()
+        env:
+          STATUS: ${{ steps.release.outputs.status }}
+          REASON: ${{ steps.release.outputs.reason }}
+          URL: ${{ steps.release.outputs.url }}
+        run: |
+          $next = @{
+            publish   = 'ログを読む'
+            transient = '失敗した job を再実行する'
+            immutable = '公開済みの Release に足りない配布物を手で添付する'
+          }
+          $status, $reason = $env:STATUS, $env:REASON
+          if (-not $status) { $status, $reason = 'failed', 'publish' }
+          if ($status -ne 'failed') { $reason = '' }
+          "status=$status", "reason=$reason", "url=$env:URL" | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8
+          $hint = if ($reason) { $next[$reason] } else { '' }
+          @(
+            "## GitHub Release の結果（$env:VERSION）"
+            ''
+            '| Release | status | reason | 次の手 |'
+            '|---------|--------|--------|--------|'
+            "| ``$env:GITHUB_REF_NAME`` | $status | $reason | $hint |"
+            ''
+            $(if ($env:URL) { "URL: $env:URL" } else { 'URL: なし' })
+            ''
+          ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # 結果の報告（二次情報）。常に動き、各 job の outputs と結果を 1 枚の表にまとめる。
+  # 一次情報は各 job の summary。outputs が空のときは、job が走らなかった（skipped）ものだけを not-run とし、
+  # それ以外は推論せず「job の summary を参照」と出す。report 自体は結果に依らず成功で終える。
+  report:
+    name: report
+    needs: [verify, gate, build, publish-crates, publish-vsce, github-release]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Report release results
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          $needs = $env:NEEDS_JSON | ConvertFrom-Json -AsHashtable
+          $label = @{
+            published = '今回公開した'
+            skipped   = '公開済みのため飛ばした'
+            failed    = '失敗した'
+            'not-run' = '前の段の失敗で行わなかった'
+          }
+          # 公開先 1 つ分の行。outputs の status が空なら、job が skipped のときだけ not-run とし、他は推論しない。
+          function Row([string]$Target, [string]$Job, [string]$Prefix) {
+            $outputs = $needs[$Job].outputs
+            $status = if ($outputs) { $outputs["${Prefix}status"] }
+            $reason = if ($outputs) { $outputs["${Prefix}reason"] }
+            if (-not $status) {
+              if ($needs[$Job].result -eq 'skipped') { $status, $reason = 'not-run', '' }
+              else { return "| $Target | job の summary を参照（$Job の結果: $($needs[$Job].result)） | |" }
+            }
+            "| $Target | $status（$($label[$status])） | $reason |"
+          }
+          # 関門の段（verify・gate・build）で失敗・取り消しになった job。後続の skipped は数えない。
+          $gateFailed = @('verify', 'gate', 'build' | Where-Object { $needs[$_].result -notin 'success', 'skipped' })
+          $release = $needs['github-release']
+          $url = if ($release.outputs) { $release.outputs['url'] }
+          $lines = @(
+            "## リリースの結果（$env:GITHUB_REF_NAME）"
+            ''
+          )
+          if ($gateFailed) {
+            $lines += "公開前の段で失敗した job: $(($gateFailed | ForEach-Object { "``$_``（$($needs[$_].result)）" }) -join '、')。どの検査で失敗したかはその job のログと summary を参照"
+            $lines += ''
+            $lines += '**どの公開先にも公開していない**'
+            $lines += ''
+          }
+          $lines += '| 公開先 | status | reason |'
+          $lines += '|--------|--------|--------|'
+          foreach ($crate in 'pasta_core', 'pasta_dsl', 'pasta_lua', 'pasta_shiori', 'pasta_check') {
+            $lines += Row "crates.io ``$crate``" 'publish-crates' "${crate}_"
+          }
+          $lines += Row 'Marketplace `ekicyou.pasta-vscode`' 'publish-vsce' ''
+          $lines += Row 'GitHub Release' 'github-release' ''
+          $lines += ''
+          $lines += if ($url) { "GitHub Release の URL: $url" } else { 'GitHub Release の URL: なし' }
+          $lines += ''
+          $lines += '次の手は各 job の summary を参照'
+          $lines | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8

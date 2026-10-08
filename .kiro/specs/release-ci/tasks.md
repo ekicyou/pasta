@@ -6,7 +6,7 @@
 - cargo を使う検証（ビルド・テスト・`release.ps1`）の前に、開発機の環境変数 `NoDefaultCurrentDirectoryInExePath` を外す（外さないと LuaJIT のビルドが exit 101 で失敗する）。
 - 「生成物が `git status` に出ない」の検査は、無視の対象のパス（`release/`・サンプルゴーストの DLL・第三者ライセンス表示・`scripts/`）に未追跡・変更のファイルが無いことを指す。追跡中のシェルの画像（`release.ps1` の画像生成の段が作り直す）と `sample.generated.lua`（`cargo test` が改行だけ書き換える）の差分は既知のものとして `git checkout --` で戻し、コミットに混ぜない。
 
-- [ ] 1. 基盤: 成果物の追跡解除・依存の固定・検証ツール
+- [x] 1. 基盤: 成果物の追跡解除・依存の固定・検証ツール
 - [x] 1.1 ビルドした成果物の git 追跡を解除し、無視の設定に加える
   - 解除の前に、追跡中の `hello-pasta.nar` のエントリ一覧（パスとサイズ）を research.md に「nar の基準（追跡解除前）」の節として記録する（2.1 で作り直した nar と比べる基準。3.3 の「今と同じ」の証拠）
   - `release/` 配下と、サンプルゴーストの DLL・第三者ライセンス表示・`scripts/` の写しを追跡から外し、無視の設定にコメント付きで加える
@@ -24,7 +24,7 @@
   - 完了の状態: 手元で actionlint の版を表示でき、既存の `build.yml`・`manual.yml` を検査して結果が出る
   - _Requirements: 2.6_
 
-- [ ] 2. 配布物のビルドの調整
+- [x] 2. 配布物のビルドの調整
 - [x] 2.1 (P) 手元と CI で同じ `pasta.dll.zip` を作るよう `release.ps1` を調整する
   - nar の作成の後に、x86 リリースビルドの DLL と第三者ライセンス表示の 2 エントリだけを入れた `pasta.dll.zip` を `release/` に作る段を足し、段の番号を 7 段にそろえる
   - zip の中身が 2 エントリだけであることをスクリプト自身が検査し、違えば止める
@@ -41,7 +41,7 @@
   - _Requirements: 3.4_
   - _Boundary: VSIX ビルド（package.json）_
 
-- [ ] 3. リリース CI の補助スクリプト（pwsh 7・引数と環境変数だけで動き、手元で試せる）
+- [x] 3. リリース CI の補助スクリプト（pwsh 7・引数と環境変数だけで動き、手元で試せる）
 - [x] 3.1 (P) タグと版の検査スクリプトを作る
   - タグの形（`v` + 数字 3 つ）、ワークスペースの版、拡張の `package.json` の版、タグのコミットの main からの到達性を検査し、版（`X.Y.Z`）を出力する
   - 失敗時は、どの検査で失敗したかと食い違う両方の値、「どの公開先にも公開していない」を summary（未設定なら標準出力）に書いて非 0 で終える
@@ -82,7 +82,7 @@
   - _Requirements: 6.2, 6.3, 6.4, 6.5, 7.2, 7.3, 7.6, 8.2_
   - _Boundary: github-release.ps1_
 
-- [ ] 4. ワークフロー
+- [x] 4. ワークフロー
 - [x] 4.1 (P) `build.yml` を reusable workflow として呼べるようにする
   - 起動条件に入力なしの `workflow_call` を足すだけにし、job・step・matrix・artifact 名・検査内容は変えない
   - 完了の状態: `actionlint` が通り、差分が `on:` の 1 項目だけで、push・PR・手動の起動条件が残っている（PR 上で従来どおり起動することは、実装 PR を作ったときに確かめる。C-1 の前提）
@@ -114,7 +114,7 @@
   - _Depends: 3.2, 3.3_
   - _Requirements: 4.1, 4.4, 4.7, 5.4, 5.5, 5.6, 7.1, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6_
 
-- [ ] 4.5 GitHub Release と結果の報告の job を作る
+- [x] 4.5 GitHub Release と結果の報告の job を作る
   - github-release（ubuntu）は `needs: [verify, build, publish-crates]` で待ち（Marketplace は待たない。verify は版を読むため）、書き込み権限をこの job だけに与え、3.4 でノートを作って 3.5 で Release を作る。末尾の集約 step で自身の summary に結果と URL を書く
   - report（ubuntu）は常に動き、各 job の outputs と結果から公開先ごと（クレートごと）の 4 状態と理由・Release の URL・関門で失敗した job・「どの公開先にも公開していない」を 1 枚の表にする。outputs が空のものは推論せず「job の summary を参照」と出し、report 自体は成功で終える
   - 完了の状態: `actionlint` が通り、`contents: write` を持つ job が github-release だけで、report が全 job を `needs` に持ち `if: always()` で動く定義になっている
@@ -198,3 +198,4 @@
 - 4.2: 開発機の環境には `VSCE_PAT` が入っており、`vsce <cmd> --help` は `--pat` の既定値として PAT の値を表示する。手元で vsce を叩くときは必ず `VSCE_PAT` を外す（4.2 の実装中に会話記録へ値が出た。C-6 で失効させる PAT）。
 - 4.3: release.yml は env に `WASM_PACK_VERSION`・`CARGO_ABOUT_VERSION`・`NODE_VERSION`・`RELEASE_ENVIRONMENT`（表示用。`jobs.<id>.environment` は `env` を参照できないので 4.4 では `environment: release` を直書きする）。run には `${{ }}` を埋め込まず既定の環境変数で渡す。build の artifact `release-assets` は `release/` 直下の 3 ファイル（平らに入る）。
 - 4.4: job outputs は publish-crates が `<crate>_status`・`<crate>_reason`（5 クレート分）、publish-vsce が `status`・`reason`。どちらも末尾の `if: always()` の集約 step（`id: result`）が steps の outcome から決める（auth/login の失敗 → failed/auth、出力なし → failed/publish、未実行 → not-run）。publish step に continue-on-error は無いので、失敗すれば job は failure のまま。
+- 4.5: report は `NEEDS_JSON: ${{ toJSON(needs) }}` を pwsh で解析する。skipped で outputs が空 → not-run、failure/cancelled で空 → 「job の summary を参照」。「どの公開先にも公開していない」は verify・gate・build のどれかが failure/cancelled のときだけ出す。
