@@ -135,7 +135,7 @@ graph TB
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
 | CI ランナー | `windows-latest`（Windows Server 2025）・`ubuntu-latest` | gate（`build.yml` が決める）・build・publish-crates は Windows。verify・publish-vsce・github-release・report は ubuntu | `windows-latest` が壊れたら `windows-2022` に退避（提供中）。wasm-pack・cargo-about はプリインストールされていない |
-| ワークフロー | GitHub Actions `on: push: tags`、reusable workflow（`workflow_call`）、`concurrency`、`environment`、job summary | 起動・関門・順序・権限・結果の報告 | 【仮定】environment 名 `release` / `release-setup-check`（Open Question 1） |
+| ワークフロー | GitHub Actions `on: push: tags`、reusable workflow（`workflow_call`）、`concurrency`、`environment`、job summary | 起動・関門・順序・権限・結果の報告 | environment 名 `release` / `release-setup-check`（議題 1 で確定） |
 | スクリプト | PowerShell 7（`pwsh`）。Windows・ubuntu の両ランナーに同梱 | 検査・判定・公開・ノート生成。手元でも同じスクリプトを実行できる | `shell: pwsh` を明示。Windows PowerShell 5.1 は使わない |
 | Rust | `dtolnay/rust-toolchain@stable` + ターゲット `i686-pc-windows-msvc`、`Swatinem/rust-cache@v2`、`cargo publish --locked` | 配布物のビルド・クレートの公開（検証ビルド） | `Cargo.lock` を追跡して依存の解決を固定（3.9・3.10）。ツールチェーン自体は固定しない（【仮定】Open Question 3） |
 | ビルドツール | `wasm-pack`・`cargo-about`（版を固定して導入）、Node 20（`actions/setup-node@v4`）、`@vscode/vsce`（`package-lock.json` の版） | WASM・第三者ライセンス表示・VSIX | 版の固定値は `release.yml` の `env` にまとめる（`WASM_PACK_VERSION`・`CARGO_ABOUT_VERSION`）。導入はビルド済みバイナリの取得を第一候補とし、無ければ `cargo install --locked --version` |
@@ -395,7 +395,7 @@ flowchart TD
 | リポジトリ | owner `ekicyou`・name `pasta` | crates.io Trusted Publisher、Azure フェデレーション資格情報の subject |
 | ワークフローのファイル名 | `release.yml` | crates.io Trusted Publisher（完全一致） |
 | 公開用 environment | `release`（保護規則: Selected branches and tags → タグ `v*`） | publish-crates・publish-vsce の `environment:`、crates.io の environment 欄、Azure FIC subject `repo:ekicyou/pasta:environment:release` |
-| 確認用 environment | `release-setup-check`（保護規則: ブランチ `main` のみ）【仮定】 | release-setup-check.yml の `environment:`、Azure FIC subject `repo:ekicyou/pasta:environment:release-setup-check` |
+| 確認用 environment | `release-setup-check`（保護規則: ブランチ `main` のみ） | release-setup-check.yml の `environment:`、Azure FIC subject `repo:ekicyou/pasta:environment:release-setup-check` |
 | Azure の ID | リポジトリ variables `AZURE_CLIENT_ID`・`AZURE_TENANT_ID`・`AZURE_SUBSCRIPTION_ID`（値はリポジトリに書かない） | `Azure/login@v3` の `client-id`・`tenant-id`・`subscription-id` |
 | OIDC audience | `api://AzureADTokenExchange`（Azure/login の既定） | FIC の Audience 欄 |
 | Marketplace | publisher `ekicyou`・拡張 `pasta-vscode`（`ekicyou.pasta-vscode`） | `vsce show`・`vsce publish` |
@@ -501,7 +501,7 @@ flowchart TD
 - `on: workflow_dispatch`（入力なし）。既定ブランチ（main）に入って初めて起動できる。
 - 1 job（ubuntu-latest）、`environment: release-setup-check`、`permissions: contents: read, id-token: write`。
 - step: checkout → setup-node 20 → `npm ci --ignore-scripts`（`editors/vscode`）→ `Azure/login@v3`（同じ variables）→ `az rest -u https://app.vssps.visualstudio.com/_apis/profile/profiles/me --resource 499b84ac-1321-427f-aa17-267ca6975798` の `id`・`displayName` を job summary に書く → `npx vsce verify-pat ekicyou --azure-credential`（publisher のメンバーに入っているかの確認。未追加の段階では失敗してよく、`continue-on-error: true` で結果を summary に書く）→ `npx vsce show ekicyou.pasta-vscode --json` が返ることの確認（認証なし）→ 名前の表（ワークフロー名・environment 名・リポジトリ・5 クレート）を summary に書き、crates.io の Trusted Publisher 設定画面と目で照合させる。
-- crates.io のトークン交換は行わない（公開できる認証を確認用に発行しない。1.6 の趣旨）。crates.io 側の設定の確認は、設定画面の値の照合と初回のリリースで行う（手順書に明記）。【仮定】Open Question 2。
+- crates.io のトークン交換は行わない（公開できる認証を確認用に発行しない。1.6 の趣旨）。crates.io 側の設定の確認は、設定画面の値の照合と初回のリリースで行う（手順書に明記。議題 1 で確定）。
 - profile ID は identity の識別子であり秘密ではないが、ログではなく summary にだけ出す。
 
 **Contracts**: Batch [x]
@@ -817,8 +817,8 @@ flowchart TD
 
 本文の **【仮定】** に対応する。いずれも設計を進めるための最善の仮定で書いた。
 
-1. **environment 名と変数の置き場所**（認証名の契約・release.yml）: 公開用 environment を `release`、確認用を `release-setup-check`、Azure の ID をリポジトリ variables（環境 variables ではなく）に置く。候補: (a) 上記、(b) `production` 等の汎用名、(c) ID を各 environment の variables に重複登録。推奨 (a): crates.io・Azure の設定に写す名前が短く、2 つの environment で同じ値を使うため重複登録を避けられる。
-2. **セットアップ確認の方式**（release-setup-check.yml）: 確認用 environment を別に作り、フェデレーション資格情報を 2 件にする。crates.io のトークン交換は確認に含めない。候補: (a) 上記、(b) `release` environment の保護規則に `main` も加えて 1 つで済ます、(c) 確認用 environment にも crates.io Trusted Publisher を設定しトークン交換まで試す。推奨 (a): 公開できる認証をタグからの実行だけに限ったまま（1.6・9.4）、profile ID の表示と Members の確認ができる。
+1. ~~**environment 名と変数の置き場所**~~ → **確定（議題 1）**: 公開用 `release`（タグ `v*` のみ）・確認用 `release-setup-check`（`main` のみ）の 2 environment。Azure の 3 つの ID はリポジトリ variables に 1 組だけ置く。<br>旧: 公開用 environment を `release`、確認用を `release-setup-check`、Azure の ID をリポジトリ variables（環境 variables ではなく）に置く。候補: (a) 上記、(b) `production` 等の汎用名、(c) ID を各 environment の variables に重複登録。推奨 (a): crates.io・Azure の設定に写す名前が短く、2 つの environment で同じ値を使うため重複登録を避けられる。
+2. ~~**セットアップ確認の方式**~~ → **確定（議題 1）**: 確認用 environment を別に作り、マネージド ID のフェデレーション資格情報を 2 件（`environment:release`・`environment:release-setup-check`）にする。確認ワークフローは crates.io のトークン交換を行わない。<br>旧: 確認用 environment を別に作り、フェデレーション資格情報を 2 件にする。crates.io のトークン交換は確認に含めない。候補: (a) 上記、(b) `release` environment の保護規則に `main` も加えて 1 つで済ます、(c) 確認用 environment にも crates.io Trusted Publisher を設定しトークン交換まで試す。推奨 (a): 公開できる認証をタグからの実行だけに限ったまま（1.6・9.4）、profile ID の表示と Members の確認ができる。
 3. **Rust ツールチェーンの固定**（Technology Stack）: 固定しない（`dtolnay/rust-toolchain@stable` のまま。`Cargo.lock` と外部ツールの版固定で再現性を担う）。候補: (a) 上記、(b) `rust-toolchain.toml` を置いて開発機・build.yml・release.yml をそろえる、(c) release.yml だけ版を固定する。推奨 (a): (b) はリポジトリ全体の方針変更で本仕様の境界を越え、(c) は関門（build.yml）とビルドの構成がずれて 2.5 に反する。
 4. **リリースノートの 6 種以外の扱い**（release-notes.ps1）: `perf`・`ci`・`build`・`style`・`revert` と Conventional Commits でない件名を「🔧 Maintenance」に入れる。候補: (a) 上記、(b) 今の設計どおり黙って落とす、(c) 「その他」見出しを足す。推奨 (a): コミットが消えず、要件の 6 見出し（6.7）を増やさない。
 5. **手順書の置き場所**（File Structure Plan）: `.github/release-ci-setup.md`。候補: (a) 上記、(b) `crates/pasta_sample_ghost/RELEASE.md` の一節、(c) `docs/` を新設、(d) spec 配下。推奨 (a): ワークフローの隣にあり、ゴースト固有の文書に crates.io・Azure の手順を混ぜない。(d) は completed/ へ移ると参照が壊れる。
