@@ -32,7 +32,7 @@
 
 ### Out of Boundary
 - `first-ghost.md` の章立て・語り・全面書き直し、段階ごとの照合（`getting-started-story-guide`）。
-- `surfaces.txt` の当たり判定（collision）の追加を含むシェル側の変更（`hello-pasta-shell-art`。→ OPEN QUESTION Q2）。
+- `surfaces.txt` の当たり判定（collision）の追加を含むシェル側の変更（`hello-pasta-shell-art` へ申し送り。設計ディスカッション #2）。当たり判定は本 spec の実装ゲートにしない。入門ガイドの公開（`getting-started-story-guide`）までに入っていればよい依存とする。
 - `pasta.toml`・`descript.txt`・`install.txt`・シェル・`scripts/` の変更（Requirement 6.4）。
 - シーン名別名表（`＊会話` → `OnTalk`）の実装とそのマニュアル記述（上流 `scene-name-alias`）。
 - スキル `pasta-ghost-authoring` の `references/authoring-patterns.md` 等にある `actors.pasta`・`talk.pasta` という**汎用の分割例**（hello-pasta を指していないため追従しない）。
@@ -300,7 +300,7 @@ sequenceDiagram
 |------|----------|-----------|
 | 7 | `OnGhostChanged` | `0=むらさき, 2=えも？？` |
 | 7 | `OnGhostChanging` | `0=むらさき, 1=manual, 2=えも？？` |
-| 8 | `OnMouseDoubleClick` | `3=0, 4=Head`（部位名は仮定 A5・Q2） |
+| 8 | `OnMouseDoubleClick` | `3=0, 4=Head`（`Head` は仮の部位名。`hello-pasta-shell-art` が名前を確定したら合わせる） |
 | 9 | `OnChoiceSelectEx` | `0=〈表示文字列〉, 1=〈09 のジャンプ先シーン名〉, 2=OnMouseDoubleClick`（値は 09 の作例確定時に埋める） |
 
 > 仮定 A3: `OnFirstBoot`・`OnClose` は 7 段目（イベントを本格的に扱う段）に置き、検証イベントには載せない（`OnClose` は `＞ゴースト終了（３００）` を含む既存形を保つ）。→ Q4。
@@ -341,7 +341,7 @@ sequenceDiagram
 | `05-words.pasta` | グローバル単語 1〜2 個（例: 雑談の言い出し・終了の挨拶）、それを使う `＊会話` | 会話 1〜2 | 単語名は既存単語と別名。`＠終了挨拶` は 07 の `OnClose` が使う（仮定 A3） |
 | `06-hour.pasta` | `＊時報12` 1、`＊時報その他` 3 | 4 | `＄時１２` を使う（変数の直後に空白） |
 | `07-greeting.pasta` | `＊OnGhostChanged`・`＊OnGhostChanging`（各 1〜3）、`＊OnFirstBoot` 1、`＊OnClose` 2、`＄％baseware.name` を使う `＊会話` 1 | — | `＞transfer_req_to_var` → `＄ｒ０　` を台詞に使う。送り出しは `＄ｒ０` に向けて一言。204 と OnBoot/OnClose の関係をコメントで説明。台詞は emo2 の制約（3.5）に従い emo2 開発と相談 |
-| `08-touch.pasta` | `＊OnMouseDoubleClick` | 3 程度 | 先頭で `＞transfer_req_to_var`、`＄ｒ４` を台詞に使う。部位名の前提は Q2 |
+| `08-touch.pasta` | `＊OnMouseDoubleClick` | 3 程度 | 先頭で `＞transfer_req_to_var`、`＄ｒ４` を台詞に使う。部位名は `hello-pasta-shell-art` が足す当たり判定の名前に従う（確定までは仮に `Head` で書き、確定時に台詞と検証イベント表を合わせる） |
 | `09-choice.pasta` | 選択肢を出す `＊OnMouseDoubleClick` 1、ジャンプ先のグローバルシーン 2 | 3 | ジャンプ先の名前は既存・11 段目の名前と前方一致しない名前（例: `＊おやつの話`・`＊おでかけの話`。最終名は作例確定時）。`!select(秒)` を含む |
 | `10-save.pasta` | `＄＊回数` を 1 増やして回数を言う `＊会話` 1 | 1 | `＄＊回数＝＄＊回数＋１` の 1 行で 1 増やし、次の行で `＄＊回数　` を台詞に使う。初期値の代入行・Lua は書かない。初回（未代入）でも 1 になることは上流 spec「算術での未代入変数の 0 扱い」（名前は起票時に確定）が保証する（Q1） |
 | `11-jump.pasta` | Call で続ける `＊会話`、前方一致で候補が集まる呼び先（例: `＊雑学・…` ではなく同じ接頭辞の複数シーン）、ローカルシーン `・`、`＞チェイントーク` | 数シーン | ローカル優先の解決を示す例を 1 つ。チェイントークの影響は Risks 参照 |
@@ -565,7 +565,7 @@ export function extractPastaBlocks(markdown: string): string[];
 | ID | 論点 | 本設計の仮定 |
 |----|------|--------------|
 | Q1 | 未代入の `＄＊回数＋１` は値なし（警告）で、回数が永久に始まらない。DSL に条件分岐が無いので初回の初期化を書けない | **決定（設計ディスカッション #1）**: この程度で Lua を出させるのは DSL の問題として扱う。上流 spec「算術での未代入変数の 0 扱い」（名前は起票時に確定）を起こし、算術の被演算子が**未代入の変数**なら 0 とみなす（関数呼び出しが値を返さないときは従来どおり値なしと警告。トランスパイラーが渡す被演算子の説明 `var.x`／`@f()` で区別できる）。10 段目は `＄＊回数＝＄＊回数＋１` とだけ書く。上流 spec は本 spec の実装着手ゲートに加わる |
-| Q2 | hello-pasta の `surfaces.txt` に当たり判定が無く、ダブルクリックの `Reference4` は空になる。`＄ｒ４` の作例が実機で空文字を言う | A5: `hello-pasta-shell-art` が当たり判定（例: `Head`・`Bust`）を足す前提で、8 段目の検証は `4=Head` を送る |
+| Q2 | hello-pasta の `surfaces.txt` に当たり判定が無く、ダブルクリックの `Reference4` は空になる。`＄ｒ４` の作例が実機で空文字を言う | **決定（設計ディスカッション #2）**: `hello-pasta-shell-art` に当たり判定の追加と部位名の確定を申し送る（同 spec の brief に追記済み）。座標は絵に合わせて決めるものなので絵の spec が持つ。本 spec は仮の部位名 `Head` で進め、確定時に台詞と検証イベント表を合わせる。本 spec の実装ゲートにはせず、入門ガイドの公開までに入っていればよい依存とする |
 | Q3 | 新しい `OnBoot` の固定文 | A2: 女の子の一言・句点を含む。文言は emo2 開発に相談して確定し、ゴールデンは実装時に採取 |
 | Q4 | `OnFirstBoot`・`OnClose` を置く段 | A3: 7 段目。ただし読者は 1 段目で初回起動を済ませているので、7 段目で足した `OnFirstBoot` は読者の手元では呼ばれない |
 | Q5 | `tutorial-check.mjs` の抽出規則の修正（長いフェンス対応）を本 spec が行ってよいか | **決定（自明修正）**: 本 spec が行う。CommonMark のフェンス規則に合わせる抽出の修正は、要件 5.4a が保つ「照合方式（各ファイルがいずれかのブロックと逐語一致）」を変えず、Lua ブロック入りの辞書を逐語一致させる（5.4）ための機械的な追従である |
