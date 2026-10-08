@@ -308,7 +308,7 @@
         "test": "npm run test:grammar && npm run test:unit && npm run test:e2e",
         "prepackage": "npm run build:wasm && npm run compile",
         "package": "vsce package",
-        "build:wasm": "powershell -File scripts/build-wasm.ps1"
+        "build:wasm": "pwsh -NoProfile -File scripts/build-wasm.ps1 -Release"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",

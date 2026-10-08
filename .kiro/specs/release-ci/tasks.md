@@ -34,7 +34,7 @@
   - _Boundary: release.ps1_
   - _Depends: 1.1_
 
-- [ ] 2.2 (P) VSIX の WASM をリリースビルドにし、PowerShell 7 で動かす
+- [x] 2.2 (P) VSIX の WASM をリリースビルドにし、PowerShell 7 で動かす
   - VSCode 拡張の WASM ビルドのコマンドを、pwsh 経由でリリースビルドの引数を渡す形に変える（ビルドスクリプト本体は変えない）
   - 拡張の開発手順の説明に、手元で pwsh 7・wasm-pack・cargo-about が要ることを 1 行足す
   - 完了の状態: `npm run package` が非対話で成功し、できた VSIX にリリースビルドの WASM と第三者ライセンス表示が入り、ファイル名の版が `package.json` の版と一致する
@@ -189,3 +189,4 @@
 - 1.2: lock はルートの `Cargo.lock` 1 つだけ（VSIX の WASM の `crates/pasta_lsp` もワークスペース内）。wasm-pack と `release.ps1` は `--locked` を付けないので、build job の `git diff --exit-code -- Cargo.lock` が lock 不変の唯一の検査になる。
 - 1.3: actionlint 1.7.12（winget・ユーザー領域）。検証は引数なしの `actionlint`（PowerShell では `*.yml` が展開されず exit 3）。shellcheck は無いので `run:` の中身はシェル検査されない（仕様の要求外）。現在のシェルの PATH に無ければ `%LOCALAPPDATA%\Microsoft\WinGet\Packages\rhysd.actionlint_Microsoft.Winget.Source_8wekyb3d8bbwe\actionlint.exe` を直接呼ぶ。
 - 2.1: `release.ps1` は 7 段になり、日本語の案内を含むため UTF-8（BOM 付き）にした（ルートの `release.bat` が powershell.exe 5.1 で呼ぶので BOM が要る）。`release.bat` のコメント「4-6」は古いままなので、5.3 で `release.bat` に触れるときに 7 段に合わせて直す。
+- 2.2: CI の build job は `npm ci` の後に `npm run package` を呼べばよい（build:wasm は pwsh 7 経由・`-Release`）。`scripts/build-wasm.bat` と `build-wasm.ps1` の Usage コメントは今も `powershell` 前提だが、設計で変更不要とした範囲。
