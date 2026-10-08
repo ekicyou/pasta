@@ -32,7 +32,8 @@
 4. The 段階表 shall 「挨拶したい」の段階で、シーン名＝イベント名で呼ばれること、イベントの付加情報を `＞transfer_req_to_var` で `＄ｒ０`〜`＄ｒ９` に取り出す書き方、`OnGhostChanged` に応答すると `OnBoot` は来ないこと（204 を返したときだけ `OnBoot` へ回る）を、初めて扱う内容として位置づける。
 5. The 段階表 shall 「触ったら反応してほしい」の段階で、前段で覚えた `＞transfer_req_to_var` を使って `OnMouseDoubleClick` の部位（`＄ｒ４`）を読む形を採る。
 6. When ある段階が前段階の辞書への書き足しだけでは成立せず既存の行の書き換えを要する場合, the 段階表 shall その段階と書き換える箇所を明示する。
-7. The 段階表 shall 「配布したい」の段階を、辞書の差分を持たない段階（手順のみ）として扱う。**[OPEN-1]** 仮定: 段階辞書は「配布したい」を除く 12 段とし、12 段目（Lua への入り口）の辞書が hello-pasta と一致する。
+7. The 段階表 shall 「配布したい」の段階（13 段目）を、辞書の差分を持たない段階（手順のみ）として扱う。段階辞書は 1〜12 段目の 12 個とし、12 段目の辞書が hello-pasta の配布辞書と一致する（13 段目で `.nar` にする中身は 12 段目と同じ）。
+8. The 段階表 shall 「配布したい」の段階で案内する `.nar` の作り方を、SSP の nar 作成機能（本体設定「一般」で開発者用機能を有効にし、「開発/その他」の「ディレクトリをドロップした際に更新ファイルや NAR を作成」を ON にして、ゴーストのフォルダを SSP にドロップする）とし、手順の正本として UKADOC の SSP ヘルプ（開発者向けヘルプ <https://ssp.shillest.net/ukadoc/ssphelp/dev.html>・設定：開発/その他 <https://ssp.shillest.net/ukadoc/ssphelp/config-dev.html>）へのリンクを持つ。内製ツール（`pasta_check release`・`release.ps1`）は読者に案内しない。
 
 ### Requirement 2: 段階辞書一式
 

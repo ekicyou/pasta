@@ -45,13 +45,13 @@
 | 10 覚えていてほしい | `＄＊名前＝…`、参照 | `variables.md` グローバル変数（JSON 保存） | 可。**Research Needed**: 未代入の `＄＊回数` に `＋１` したときの挙動（`dsl-codegen-runtime-safety` 後の数値化ヘルパーが nil をどう扱うか）。初期値の代入が要るなら作例の形が変わる |
 | 11 続き・分岐 | `＞シーン`、ローカルシーン `・`、`＞チェイントーク` | `call-jump.md` | 可。DSL だけの条件分岐は無く（if/while/for なし）、「分岐」は選択肢か Lua に頼る。段階 11 は「続き（Call・ローカルシーン・チェイントーク）」、段階 12 で Lua による分岐、という切り分けが自然 |
 | 12 Lua への入り口 | シーン内 Lua ブロック + `＞＠関数（）`、または `scripts/*.lua` の `REG`/`SCENE` | `call-jump.md` 条件分岐の実現・`block-structure.md` Lua ブロック・`lua/patterns.md` | 可（[OPEN-5]） |
-| 13 配布 | `pasta_check release` / `release.ps1` | スキル `pasta-check` | 辞書差分なし（[OPEN-1]） |
+| 13 配布 | SSP の nar 作成機能（開発者用機能を有効化 → 「ディレクトリをドロップした際に更新ファイルや NAR を作成」ON → ゴーストフォルダを SSP にドロップ） | UKADOC SSP ヘルプ `ssphelp/dev.html`・`ssphelp/config-dev.html`（`OnNarCreating`/`OnNarCreated` が発生） | 辞書差分なし。12 段目と同じ中身を `.nar` にする。`pasta_check release`/`release.ps1` は内製ツールのため案内しない（議題 1 で決定） |
 
 ### 2.2 ギャップ（Missing / Unknown / Constraint）
 
 | # | 項目 | 種別 | 内容 |
 | - | ---- | ---- | ---- |
-| G1 | 段階辞書の置き場所と形 | Missing | 現行には完成形 1 つしかない。段階ごとのディレクトリ（例: `ghosts/hello-pasta-stages/NN-*/dic/`、または `tests/fixtures/stages/NN/`）が要る。段階数 12（[OPEN-1]）× 1〜5 ファイル |
+| G1 | 段階辞書の置き場所と形 | Missing | 現行には完成形 1 つしかない。段階ごとのディレクトリ（例: `ghosts/hello-pasta-stages/NN-*/dic/`、または `tests/fixtures/stages/NN/`）が要る。段階数 12（議題 1 で確定）× 1〜5 ファイル |
 | G2 | 全段階を実ローダーで読み込むテスト | Missing | `self_deploy_integration_test.rs` の tempdir コピー＋`PastaLoader::load` を、段階ディレクトリをループする形へ拡張または新規テストに。設定・シェルは hello-pasta から合成する必要がある（[OPEN-2]） |
 | G3 | `OnBoot` 疎通の確認手段（Requirement 4.2） | Resolved | `pasta_sample_ghost` の dev-deps は `pasta_lua` のみだが、`PastaLoader::load` が返すランタイムの `exec(&str)`（`pasta_lua/src/runtime/exec.rs:31`）で `require "pasta.shiori.entry"` → `SHIORI.request({id="OnBoot", method="get", version=30})` を実行すると SHIORI 応答文字列が返る（`pasta_lua/tests/shiori/event_handler_test.rs:170-186` の方式）。dev-dep 追加なしで C2 が成立する。`pasta_shiori` 経由（`PastaShiori::load`/`request`、`shiori_sample_ghost_test.rs:37-54`）は C3 の予備 |
 | G4 | 最終段階＝配布辞書の一致検証 | Missing | バイト一致の比較テスト。もしくは**シンボリックリンクや生成ではなく**「最終段階ディレクトリを配布辞書そのものとする」構成（G1 の選択で消える） |
@@ -112,4 +112,4 @@
   1. `＄＊回数＝＄＊回数＋１` の初回（nil）挙動（G2.1 段階 10）。
   2. `scene_kick_*_e2e_test.rs` が追記するシーン名の一覧（G9）。
   3. 「Lua への入り口」で `scripts/*.lua` を置く場合（[OPEN-5] の代替案）、`release.ps1` が `crates/pasta_lua/scripts` を `master/scripts` へ robocopy で再同期する処理（`release.ps1:153-162`）が利用者スクリプトを残すか消すか。
-- **要件ディスカッションへ**: `requirements.md` の [OPEN-1]〜[OPEN-9]・[OPEN-11]（[OPEN-10] は G12 で解消）。特に [OPEN-8]（`OnBoot` ゴールデンを守るか更新するか）と [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
+- **要件ディスカッションへ**: `requirements.md` の [OPEN-2]〜[OPEN-9]・[OPEN-11]（[OPEN-1] は議題 1、[OPEN-10] は G12 で解消）。特に [OPEN-8]（`OnBoot` ゴールデンを守るか更新するか）と [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
