@@ -246,7 +246,7 @@ sequenceDiagram
 **Responsibilities & Constraints**
 - 置き場所は `ghosts/` の**外**（`ghosts/hello-pasta/` の下に置くと `pasta_check release` が `.nar` に詰めるため。research G14・6.3）。
 - 人が読む説明とテストが読む表を同じファイルに持つ（二重管理しない）。
-- 次の節を持つ: 「段階表」（GFM 表）、「検証イベント表」（GFM 表）、「ファイル名の規則」、「段階 N の辞書の組み立て方」、「brief のたたき台からの変更理由」（1.2）、「13 段目：配布したい」（SSP の NAR 作成機能の手順と UKADOC SSP ヘルプ `ssphelp/dev.html`・`ssphelp/config-dev.html` へのリンク。内製ツールは案内しない。1.8）。
+- 次の節を持つ: 「段階表」（GFM 表）、「検証イベント表」（GFM 表）、「ファイル名の規則」、「段階 N の辞書の組み立て方」、「brief のたたき台からの変更理由」（1.2）、「13 段目：配布したい」（SSP の NAR 作成機能の手順と UKADOC SSP ヘルプ `ssphelp/dev.html`・`ssphelp/config-dev.html` へのリンク。内製ツールは案内しない。1.8）、「確かめるための道具」（下記。設計ディスカッション #4）。
 
 ##### State Management（表の契約）
 
@@ -286,13 +286,13 @@ sequenceDiagram
 | 4 | 毎回ちがうことを言わせたい | 同じ名前のシーンから 1 つ選ばれる | 同名 `＊会話` の繰り返し、単独 `＊`（同名の別シーン。ファイル先頭は不可）。別名は完全一致なので `＊会話朝` は別シーン | — | `04-variety.pasta` |
 | 5 | 単語でちょこっと変えたい | 単語のランダム選択 | `＠単語：a、b、c`、台詞中の `＠単語` | — | `05-words.pasta` |
 | 6 | 時刻を知らせたい | 正時に時報 | `＊時報12`・`＊時報その他`、日時変数 `＄時１２`、4 段のフォールバック | — | `06-hour.pasta` |
-| 7 | 挨拶したい | ベースウェアのイベントに応える・付加情報を読む・ベースウェアに聞く | シーン名＝イベント名、`＞transfer_req_to_var`、`＄ｒ０`、`＄％baseware.name`、OnGhostChanged/Changing に応答すると OnBoot/OnClose は来ない、一覧に無いイベントも同名シーンで応答できる（UKADOC `OnGhostChanging` へリンク） | `OnGhostChanged`・`OnGhostChanging`（＋`OnFirstBoot`・`OnClose`。仮定 A3） | `07-greeting.pasta` |
+| 7 | 挨拶したい | ベースウェアのイベントに応える・付加情報を読む・ベースウェアに聞く | シーン名＝イベント名、`＞transfer_req_to_var`、`＄ｒ０`、`＄％baseware.name`、OnGhostChanged/Changing に応答すると OnBoot/OnClose は来ない、一覧に無いイベントも同名シーンで応答できる（UKADOC `OnGhostChanging` へリンク） | `OnGhostChanged`・`OnGhostChanging`・`OnFirstBoot`・`OnClose` | `07-greeting.pasta` |
 | 8 | 触ったら反応してほしい | 触られた部位で台詞を変える | `＊OnMouseDoubleClick`、`＞transfer_req_to_var`、`＄ｒ４` | `OnMouseDoubleClick` | `08-touch.pasta` |
 | 9 | 選ばせたい | 選択肢を出して選ばれた先へ進む | `＠？ジャンプ先「表示」`、`!select(秒)`、選ばれた ID のシーンへの自動ルーティング | `OnChoiceSelectEx` | `09-choice.pasta` |
 | 10 | 覚えていてほしい | 終了しても残る値 | `＄＊回数`、算術の代入 `＄＊回数＝＄＊回数＋１`（未代入の変数は算術で 0 とみなされる。上流 spec `expr-nil-coercion`。Q1） | — | `10-save.pasta` |
 | 11 | 話を続けたい・分岐させたい | 話の続き・ランダムジャンプ | `＞シーン名`（Call）、同名・前方一致の候補からのランダム選択、ローカルシーン `・`、`＞チェイントーク`、ローカル優先のスコープ解決 | — | `11-jump.pasta` |
 | 12 | もっと凝ったことをしたい | Lua の関数を呼ぶ | シーン内の ```` ```lua ```` ブロック、`function SCENE.名前(act)`、`＞＠名前（）` | — | `12-lua.pasta` |
-| 13 | 配布したい | `.nar` にする | SSP の NAR 作成機能（開発者用機能を有効化 → 「ディレクトリをドロップした際に更新ファイルや NAR を作成」を ON → フォルダをドロップ） | — | — |
+| 13 | 配布したい | `.nar` にする | SSP の NAR 作成機能（6 段目で有効にした開発者用機能の「ディレクトリをドロップした際に更新ファイルや NAR を作成」を ON → フォルダをドロップ） | — | — |
 
 **検証イベント表の内容（草案）**
 
@@ -300,10 +300,19 @@ sequenceDiagram
 |------|----------|-----------|
 | 7 | `OnGhostChanged` | `0=むらさき, 2=えも？？` |
 | 7 | `OnGhostChanging` | `0=むらさき, 1=manual, 2=えも？？` |
+| 7 | `OnFirstBoot` | `0=0` |
+| 7 | `OnClose` | `0=user` |
 | 8 | `OnMouseDoubleClick` | `3=0, 4=Head`（`Head` は仮の部位名。`hello-pasta-shell-art` が名前を確定したら合わせる） |
 | 9 | `OnChoiceSelectEx` | `0=〈表示文字列〉, 1=〈09 のジャンプ先シーン名〉, 2=OnMouseDoubleClick`（値は 09 の作例確定時に埋める） |
 
-> 仮定 A3: `OnFirstBoot`・`OnClose` は 7 段目（イベントを本格的に扱う段）に置き、検証イベントには載せない（`OnClose` は `＞ゴースト終了（３００）` を含む既存形を保つ）。→ Q4。
+> 決定（設計ディスカッション #4）: `OnFirstBoot`・`OnClose` は 7 段目に置く。`OnFirstBoot` は「応答しなければ（204）SSP が続けて `OnBoot` を起こす」ので、`OnGhostChanged` → `OnBoot` と同じ規則で教えられる。`OnClose` は「応答したら台詞の最後に `＞ゴースト終了` が要る（無いと閉じない）。応答しなければ SSP がそのまま閉じる」ことをコメントで説明し、`＞ゴースト終了（３００）` を含む既存形を保つ。どちらも実イベントなので検証イベント表に載せる。
+
+**確かめるための道具**（`STAGES.md` の節。設計ディスカッション #4）
+- 読者は 1 段目で初回起動を済ませるので、7 段目で足した `OnFirstBoot` は自然には呼ばれない。`profile/` を消して初期状態に戻す方法は案内しない（`profile/pasta/save/save.json` に入っている 10 段目の `＄＊回数` も消え、pasta の本質から外れるため）。
+- 代わりに SSP の開発用パレット（UKADOC SSP ヘルプ `ssphelp/dev-palette.html`）を「辞書を確かめる道具」として使う。`STAGES.md` には「どの段でどの道具を使うか」だけを書き、操作の文章はガイド本文（`getting-started-story-guide`）に任せる。
+  - 6 段目: 本体設定「一般」で開発者用機能を有効にする（初出。13 段目の NAR 作成もこの設定を使う）。開発用パレット（`Ctrl+Shift+D`）の「現在時刻の仮想的変更」で、正時を待たずに時報を確かめる。
+  - 7 段目: 「スクリプト入力」に `\![raise,イベント名,Reference0,…]` を入れてイベントを起こす（`OnFirstBoot`・`OnGhostChanged` など。emo2 が手元に無くても切り替えを試せる）。`OnClose` は「`\-` タグで終了しない」を ON にして繰り返し試す。
+- SSP の MCP など、エージェント開発向けの手段には触れない。
 
 **Implementation Notes**
 - Integration: 下流 `getting-started-story-guide` は段階表の 1〜13 行に 1 章ずつ対応させる。
@@ -338,7 +347,7 @@ sequenceDiagram
 | `02-talk.pasta` | `＊会話` | 1〜2 | 女の子と男の子の掛け合い。表情なし |
 | `03-face.pasta` | `％女の子`（`＠笑顔：\s[0]`〜`＠怒り：\s[8]`）、`％男の子`（`\s[10]`〜`\s[18]`）、表情を使う `＊会話` | 辞書 2・会話 1〜2 | 表情名と surface の対応は現行と同一（2.4）。表情チェインの例を 1 つ |
 | `04-variety.pasta` | 同名 `＊会話` の繰り返しと単独 `＊` | 3 程度 | 単独 `＊` はファイル先頭に置かない |
-| `05-words.pasta` | グローバル単語 1〜2 個（例: 雑談の言い出し・終了の挨拶）、それを使う `＊会話` | 会話 1〜2 | 単語名は既存単語と別名。`＠終了挨拶` は 07 の `OnClose` が使う（仮定 A3） |
+| `05-words.pasta` | グローバル単語 1〜2 個（例: 雑談の言い出し・終了の挨拶）、それを使う `＊会話` | 会話 1〜2 | 単語名は既存単語と別名。`＠終了挨拶` は 07 の `OnClose` が使う |
 | `06-hour.pasta` | `＊時報12` 1、`＊時報その他` 3 | 4 | `＄時１２` を使う（変数の直後に空白） |
 | `07-greeting.pasta` | `＊OnGhostChanged`・`＊OnGhostChanging`（各 1〜3）、`＊OnFirstBoot` 1、`＊OnClose` 2、`＄％baseware.name` を使う `＊会話` 1 | — | `＞transfer_req_to_var` → `＄ｒ０　` を台詞に使う。送り出しは `＄ｒ０` に向けて一言。204 と OnBoot/OnClose の関係をコメントで説明。台詞は emo2 の制約（3.5）に従い emo2 開発と相談 |
 | `08-touch.pasta` | `＊OnMouseDoubleClick` | 3 程度 | 先頭で `＞transfer_req_to_var`、`＄ｒ４` を台詞に使う。部位名は `hello-pasta-shell-art` が足す当たり判定の名前に従う（確定までは仮に `Head` で書き、確定時に台詞と検証イベント表を合わせる） |
@@ -353,7 +362,7 @@ sequenceDiagram
 |------|--------|
 | `actors.pasta` のアクター辞書 | `03-face.pasta`（同一の対応） |
 | `boot.pasta` の `OnBoot` | `01-boot.pasta`（台詞は新しい一言に変わる。5.1） |
-| `boot.pasta` の `OnFirstBoot`・`OnClose`・`＠終了挨拶` | `07-greeting.pasta`・`05-words.pasta`（仮定 A3） |
+| `boot.pasta` の `OnFirstBoot`・`OnClose`・`＠終了挨拶` | `07-greeting.pasta`・`05-words.pasta` |
 | `talk.pasta` の `OnTalk` 6 個 | `＊会話` として 02〜05 に分配（台詞は作例として作り直す） |
 | `talk.pasta` の `＄％currentghost.name` の `OnTalk` | 削除し、07 の `＄％baseware.name` に置き換え（3.8） |
 | `talk.pasta` の時報 | `06-hour.pasta` |
@@ -454,7 +463,7 @@ fn assert_responds(stage: u8, file: &str, id: &str, response: &str);
 | 現行の検査 | 新しい検査 |
 |-----------|-----------|
 | `actors.pasta` に `％女の子`・`％男の子`・`＠笑顔`・`＠通常`・`＠怒り` | `03-face.pasta` に同じ。加えて `＠笑顔：\s[0]`〜`＠怒り：\s[8]`・`\s[10]`〜`\s[18]` の 18 行が現行と同じ対応で揃う（2.4） |
-| `boot.pasta` に `＊OnBoot`・`＊OnFirstBoot`・`＊OnClose` | `01-boot.pasta` に `＊OnBoot` がちょうど 1 つ、全 `dic/` で `＊OnBoot` がちょうど 1 つ（5.1）。`07-greeting.pasta` に `＊OnFirstBoot`・`＊OnClose`・`＊OnGhostChanged`・`＊OnGhostChanging`（仮定 A3） |
+| `boot.pasta` に `＊OnBoot`・`＊OnFirstBoot`・`＊OnClose` | `01-boot.pasta` に `＊OnBoot` がちょうど 1 つ、全 `dic/` で `＊OnBoot` がちょうど 1 つ（5.1）。`07-greeting.pasta` に `＊OnFirstBoot`・`＊OnClose`・`＊OnGhostChanged`・`＊OnGhostChanging` |
 | `talk.pasta` の `＊OnTalk` 5〜10 個 | 全 `dic/` の `＊会話` 行（完全一致）が 5〜10 個 |
 | `talk.pasta` に `＊時報12`・`＊時報その他`・`＄時１２` | `06-hour.pasta` に同じ |
 | `click.pasta` の `＊OnMouseDoubleClick` 7 個以上 | `08-touch.pasta` に `＊OnMouseDoubleClick` が 3 個以上、`＞transfer_req_to_var` と `＄ｒ４` を含む（件数は作例確定時に合わせる） |
@@ -544,7 +553,7 @@ export function extractPastaBlocks(markdown: string): string[];
 - `extractPastaBlocks`（`tutorial-check-test.mjs`）: 3 バッククォートと 4 バッククォート（内側に ```` ```lua ````）の両方を正しく抽出する。
 
 ### Integration Tests
-- `every_stage_loads_and_responds`: N = 1〜12 の全段階でロード成功・`OnBoot` 応答・検証イベント応答（7 段 `OnGhostChanged`・`OnGhostChanging`、8 段 `OnMouseDoubleClick`、9 段 `OnChoiceSelectEx`）。1 段目でアクター辞書が無くても起動すること、12 段目（＝配布辞書）が読めることを含む。
+- `every_stage_loads_and_responds`: N = 1〜12 の全段階でロード成功・`OnBoot` 応答・検証イベント応答（7 段 `OnGhostChanged`・`OnGhostChanging`・`OnFirstBoot`・`OnClose`、8 段 `OnMouseDoubleClick`、9 段 `OnChoiceSelectEx`）。1 段目でアクター辞書が無くても起動すること、12 段目（＝配布辞書）が読めることを含む。
 - `stage_table_matches_dic_files`: 段階表と `dic/` の集合一致。
 - `scene_names_do_not_prefix_collide`: 前方一致の衝突なし。
 - `src/scripts.rs` の構造検査（DicStructureTests の表）。
@@ -567,7 +576,7 @@ export function extractPastaBlocks(markdown: string): string[];
 | Q1 | 未代入の `＄＊回数＋１` は値なし（警告）で、回数が永久に始まらない。DSL に条件分岐が無いので初回の初期化を書けない | **決定（設計ディスカッション #1）**: この程度で Lua を出させるのは DSL の問題として扱う。上流 spec `expr-nil-coercion` を起こし、未代入の変数を算術で 0 とみなせるようにする（nil の出どころの扱い・警告の有無などの規則は規則の正本は同 spec の requirements.md（PR #77 のブランチ）に従う。本 spec が依存するのは「未代入の `＄＊回数＋１` が 1 になる」ことだけ）。10 段目は `＄＊回数＝＄＊回数＋１` とだけ書く。上流 spec は本 spec の実装着手ゲートに加わる |
 | Q2 | hello-pasta の `surfaces.txt` に当たり判定が無く、ダブルクリックの `Reference4` は空になる。`＄ｒ４` の作例が実機で空文字を言う | **決定（設計ディスカッション #2）**: `hello-pasta-shell-art` に当たり判定の追加と部位名の確定を申し送る（同 spec の brief に追記済み）。座標は絵に合わせて決めるものなので絵の spec が持つ。本 spec は仮の部位名 `Head` で進め、確定時に台詞と検証イベント表を合わせる。本 spec の実装ゲートにはせず、入門ガイドの公開までに入っていればよい依存とする |
 | Q3 | 新しい `OnBoot` の固定文 | **決定（設計ディスカッション #3）**: 設計では形（女の子の一言・表情なし・句点を含む）だけを固める。文言は実装時に 12 段の台詞と一括で emo2 開発（ghost_dev）に相談して決め、口調をそろえる。ゴールデンは文言確定後に 1 回だけ特性化採取する |
-| Q4 | `OnFirstBoot`・`OnClose` を置く段 | A3: 7 段目。ただし読者は 1 段目で初回起動を済ませているので、7 段目で足した `OnFirstBoot` は読者の手元では呼ばれない |
+| Q4 | `OnFirstBoot`・`OnClose` を置く段 | **決定（設計ディスカッション #4）**: 7 段目。読者の手元での確かめ方は `profile/` の削除ではなく、SSP 開発用パレットの「スクリプト入力」（`\![raise,OnFirstBoot,0]`）。開発者用機能の有効化は 6 段目に前倒しし（時報を「現在時刻の仮想的変更」で確かめる）、13 段目はその設定を使う。検証イベント表に `OnFirstBoot`・`OnClose` を加える。MCP には触れない |
 | Q5 | `tutorial-check.mjs` の抽出規則の修正（長いフェンス対応）を本 spec が行ってよいか | **決定（自明修正）**: 本 spec が行う。CommonMark のフェンス規則に合わせる抽出の修正は、要件 5.4a が保つ「照合方式（各ファイルがいずれかのブロックと逐語一致）」を変えず、Lua ブロック入りの辞書を逐語一致させる（5.4）ための機械的な追従である |
 | Q6 | 11 段目のチェイントークが `＊会話` に入ると、`pasta_shiori` の e2e（talk 間隔を 10 秒に上書き）で進行中会話が生じうる | **決定（自明修正）**: 実装時の確認事項とする。`scene_kick_*_e2e_test.rs` を流し、干渉したらチェイントークを `＊会話` 以外（ダブルクリックの続きなど）から呼ぶ形にする（5.3 の範囲内の調整） |
 | Q7 | `DicStructureTests` の件数の下限（`＊会話` 5〜10、`OnMouseDoubleClick` 3 以上） | **決定（自明修正）**: 表の値を暫定値として実装し、作例の件数が確定したタスクで実数に合わせて固定する（検査の意図は「必須の表現が揃っている」こと。5.2） |

@@ -34,7 +34,7 @@
 5. The 段階表 shall 「触ったら反応してほしい」の段階で、前段で覚えた `＞transfer_req_to_var` を使って `OnMouseDoubleClick` の部位（`＄ｒ４`）を読む形を採る。
 6. The 段階表 shall 辞書を持つすべての段階を「新しい `.pasta` ファイルを `dic/` に足すだけ」で成立させ、前の段階で書いたファイルを書き換える段階を置かない。とくに 1 段目で書く `OnBoot` のシーンは以後の段階で変えず、掛け合い（2 段目）・表情（3 段目）は `OnBoot` ではなく新しいファイルの別のシーンで教える（議題 5 で決定。pasta は `dic/*.pasta` を全部読み込むため、章 N の辞書は章 1〜N のファイルの集まりとして定義できる）。
 7. The 段階表 shall 「配布したい」の段階（13 段目）を、辞書の差分を持たない段階（手順のみ）として扱う。辞書を持つ段階は 1〜12 段目で、12 段目の辞書（＝全ファイル）が hello-pasta の配布辞書そのものである（13 段目で `.nar` にする中身は 12 段目と同じ）。
-8. The 段階表 shall 「配布したい」の段階で案内する `.nar` の作り方を、SSP の nar 作成機能（本体設定「一般」で開発者用機能を有効にし、「開発/その他」の「ディレクトリをドロップした際に更新ファイルや NAR を作成」を ON にして、ゴーストのフォルダを SSP にドロップする）とし、手順の正本として UKADOC の SSP ヘルプ（開発者向けヘルプ <https://ssp.shillest.net/ukadoc/ssphelp/dev.html>・設定：開発/その他 <https://ssp.shillest.net/ukadoc/ssphelp/config-dev.html>）へのリンクを持つ。内製ツール（`pasta_check release`・`release.ps1`）は読者に案内しない。
+8. The 段階表 shall 「配布したい」の段階で案内する `.nar` の作り方を、SSP の nar 作成機能（本体設定「一般」で開発者用機能を有効にし（有効化は 6 段目で時報を確かめる道具として先に案内する。設計ディスカッション #4）、「開発/その他」の「ディレクトリをドロップした際に更新ファイルや NAR を作成」を ON にして、ゴーストのフォルダを SSP にドロップする）とし、手順の正本として UKADOC の SSP ヘルプ（開発者向けヘルプ <https://ssp.shillest.net/ukadoc/ssphelp/dev.html>・設定：開発/その他 <https://ssp.shillest.net/ukadoc/ssphelp/config-dev.html>）へのリンクを持つ。内製ツール（`pasta_check release`・`release.ps1`）は読者に案内しない。
 
 ### Requirement 2: 段階辞書一式
 
