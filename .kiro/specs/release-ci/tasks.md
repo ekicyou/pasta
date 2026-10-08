@@ -182,6 +182,7 @@
   - 完了の状態: 結果（Marketplace の Entra ID 経路での公開の成否）を送り、research.md に記録している
 - [ ] C-6 初回成功後の必須手順の完了を確かめる
   - 前提: C-4 の成功。ユーザーが 5 クレートの「Trusted Publishing のみ」を有効にし、`CARGO_REGISTRY_TOKEN` と `VSCE_PAT` を失効させる（表の工程 8）
+  - `VSCE_PAT` は会話記録に値が出た（Implementation Notes 4.2）が、前倒しで失効させない。C-4 で Marketplace が Entra ID の経路で `published` になり、移行できたと確かめてから失効させる（ユーザー決定 2026-10-08）
   - 完了の状態: 3 つの手順の完了を research.md に記録している
 
 ## Implementation Notes
