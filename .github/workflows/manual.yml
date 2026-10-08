@@ -12,6 +12,8 @@
 #     -> node book/tools/link-check.mjs（マニュアル内リンク・README のマニュアル URL・スキル自己完結の検証。失敗で中断）
 #     -> チュートリアル・静的性・検索（静的性・検索の 2 つは --self-test で検査ロジック自身の自己テストも実行）
 #        ・コンテンツ検証・ツール自己テスト
+#     -> 旧版の生成（固定コミット CLASSIC_REF の book/ を旧版のツールで book/book/classic へ。
+#        新版の検査の後に置き、検査の対象に含めない。失敗で中断。manual-claudia-theme 要件 11）
 #     -> Pages artifact（./book/book）をアップロード -> deploy-pages で公開。
 # すべて build ジョブ内で検証するため、失敗時は deploy（needs: build）が走らず公開されない。
 name: Manual
@@ -50,6 +52,9 @@ jobs:
   build:
     name: build-manual
     runs-on: ubuntu-latest
+    env:
+      # 着せ替え前の版（classic/）を作る固定コミット（manual-claudia-theme 要件 11.1, 11.2）。定義はここ 1 か所。
+      CLASSIC_REF: 6d4e868d799abb619f7db67611511f3196cd1ace
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -149,6 +154,27 @@ jobs:
             node "$t"
             echo "::endgroup::"
           done
+
+      # 着せ替え前の版（旧版）を book/book/classic に生成する（manual-claudia-theme 要件 11 /
+      # design「ClassicSnapshot」）。固定コミット CLASSIC_REF の book/ を、その版の lockfile の依存と
+      # その版のツール（ビルド -> 着色 -> 索引再生成）でそのまま生成し、新版のツールは使わない（要件 11.2）。
+      # 新版の検査はすべてこの段より前に終わるため、旧版は検査の対象に入らない（要件 11.3）。
+      # PR でも実行して生成できることを確かめる。どの手順の失敗も exit 1 で公開を止める（要件 11.4）。
+      - name: Build classic manual snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$CLASSIC_REF"
+          git worktree add --detach "$RUNNER_TEMP/classic" "$CLASSIC_REF"
+          (cd "$RUNNER_TEMP/classic/book" && npm ci)
+          out="$GITHUB_WORKSPACE/book/book/classic"
+          mdbook build "$RUNNER_TEMP/classic/book" -d "$out"
+          node "$RUNNER_TEMP/classic/book/tools/highlight/highlight-html.mjs" "$out"
+          node "$RUNNER_TEMP/classic/book/tools/bigram-index/build-index.mjs" "$out"
+          for f in index.html print.html; do
+            [ -f "$out/$f" ] || { echo "::error::classic snapshot is missing $f"; exit 1; }
+          done
+          compgen -G "$out/searchindex*.js" > /dev/null || { echo "::error::classic snapshot is missing searchindex*.js"; exit 1; }
 
       # enablement: true — リポジトリで Pages が未設定でも API 経由で
       # 自動有効化を試みる（Source=GitHub Actions）。初回公開を手動設定なしで通す。
