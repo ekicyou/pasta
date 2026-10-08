@@ -313,7 +313,7 @@ flowchart TD
 | 4.4 | 失敗で後続を止め、公開済み/未公開を示す | publish-crates job（step の既定の停止）・report | status 契約 | 判定フロー |
 | 4.5 | 索引待ちの時間切れは次へ・依存未反映は再試行 | publish-crate.ps1（索引の待ちと再試行） | publish-crate 契約 | 判定フロー |
 | 4.6 | 未登録クレートは失敗・手動を案内 | publish-crate.ps1（crate 自体が 404） | publish-crate 契約 | 判定フロー |
-| 4.7 | sample_ghost・lsp を公開しない | publish-crates job（step は 5 クレートだけ。`publish = false` も維持） | — | — |
+| 4.7 | sample_ghost・lsp を公開しない | publish-crates job（step は 5 クレートだけ。`pasta_sample_ghost` の `publish = false` も維持。`pasta_lsp` は step を持たないことで担保） | — | — |
 | 5.1 | VSIX を Marketplace へ | publish-vsix.ps1（`vsce publish --azure-credential --packagePath`） | publish-vsix 契約 | 主経路 |
 | 5.2 | 公開済みは飛ばす | publish-vsix.ps1（`vsce show` → skipped。`--skip-duplicate` を保険に） | publish-vsix 契約 | — |
 | 5.3 | Marketplace に問い合わせ | publish-vsix.ps1（`vsce show <publisher>.<name> --json`） | publish-vsix 契約 | — |
@@ -821,8 +821,8 @@ Azure / Entra ID 側の作業とレクチャーは、別の Claude セッショ�
 
 | # | 工程 | 担当 | 着手できる時期 | 連絡 |
 |---|------|------|----------------|------|
-| 1 | フェデレーション資格情報 2 件（`environment:release`・`environment:release-setup-check`） | Entra ID セッション | 今（名前は確定済み。2026-10-08 に送付済み） | 完了したら release CI へ「名前と完了」を返す（値は送らない） |
-| 2 | GitHub environment 2 つと保護規則、リポジトリ variables 3 つ | Entra ID セッション（ユーザーが GitHub で操作） | 今 | 同上 |
+| 1 | フェデレーション資格情報 2 件（`environment:release`・`environment:release-setup-check`） | Entra ID セッション | 完了（2026-10-08。Entra ID セッションから報告。research.md「一回限りのセットアップの進み具合」に記録） | 完了したら release CI へ「名前と完了」を返す（値は送らない） |
+| 2 | GitHub environment 2 つと保護規則、リポジトリ variables 3 つ | Entra ID セッション（ユーザーが GitHub で操作） | 完了（2026-10-08。同上。environment 名・保護規則 `v*`／`main`・variables 3 つの名前を gh api で確認） | 同上 |
 | 3 | `release.yml`・`release-setup-check.yml` 等の実装 PR を main へ | release CI セッション | tasks 承認後 | マージしたら Entra ID セッションへ「setup-check を実行できる」と連絡 |
 | 4 | `release-setup-check.yml` の手動実行 → profile ID | Entra ID セッション | 3 の後 | — |
 | 5 | Marketplace Members に profile ID で追加（Contributor）→ setup-check 再実行で `verify-pat` 確認 | Entra ID セッション | 4 の後 | 通ったら release CI へ連絡（初回リリースの前提） |
