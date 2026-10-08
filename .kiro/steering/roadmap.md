@@ -190,6 +190,18 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
     - `VSCE_PAT` の失効（10 節）は、初回のリリースで Marketplace が Entra ID の経路で `published` になったのを確かめてから行う。値が `release-ci` の会話記録に出ているが、前倒しはしない（ユーザー決定 2026-10-08）。
   - Dependencies: release-ci
 
+## 文中のシーンリンク（2026-10-08 起票）
+
+台詞の中の語を Wikipedia のリンクのようにし、クリックでそのシーンへ飛べるようにする（`scene-anchor-link`）。
+
+- **方式**:
+  - 記法は `＠？シーン名`（`＠単語　` と同じく、空白か改行で終える）と `＠？シーン名「表示名」`。
+  - 出力はさくらスクリプトの `\_a`（アンカー）で、`\q` ではない。`\q` だと、トーク全体が選択肢待ちになるため。
+  - クリックは `OnAnchorSelectEx` を、選択肢の振り分け（`choice_select.lua`）と同じ規則で受ける。
+  - `【】` で囲む案は、文法として唐突なので採らなかった。
+- **飛び先が無いとき**: 選択肢と同じく 204 を返す。失敗の見せ方は `failure-output-unification` に乗せる。読み込み時の検出は、バックログの「`.pasta` を検査するコマンド」に任せる。
+- **ウェーブ**: `grammar.pest`・`parse_action.rs`・`element_gen.rs`・`act.lua`・VSCode の文法定義を、`call-attribute-filter` と共有する。そのため、その後に置く（Phase 11 の Wave 6 相当）。
+
 ## Specs (dependency order)
 
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: dsl-literal-fixes, scene-identity-format, call-execution-correctness
@@ -201,6 +213,7 @@ Wave 1〜3 の 12 本は完了した（「完了フェーズ」の Phase 11）�
 - [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。Dependencies: release-ci, hello-pasta-tutorial-stages
 - [ ] getting-started-story-guide -- 入門ガイドを段階表に沿った物語に書き直し、全編を Claudia が語る（執筆規約に `getting-started` の例外を足す）。段階辞書との逐語照合と、新しいシェルのスクリーンショットを含む。Dependencies: hello-pasta-tutorial-stages, hello-pasta-shell-art, manual-claudia-theme
 - [ ] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
+- [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアルまで揃える（2026-10-08 起票）。Dependencies: failure-output-unification, call-attribute-filter
 
 ## バックログ（brief なし・保留）
 
