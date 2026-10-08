@@ -8,7 +8,7 @@ argument-hint: <feature-name> [task-numbers]
 # kiro-validate-impl Skill
 
 ## Role
-Individual tasks have already been reviewed by the per-task reviewer during implementation. Your job is to catch problems that only become visible when looking across all tasks together.
+Individual tasks are usually reviewed during implementation. Your job is to catch problems that only become visible when looking across all tasks together.
 
 Boundary terminology continuity:
 - discovery identifies `Boundary Candidates`
@@ -26,7 +26,7 @@ Boundary terminology continuity:
   - No orphaned code, conflicting implementations, integration seams, or boundary spillover
 
 ## What This Skill Does NOT Do
-Per-task checks are the reviewer's responsibility during `/kiro-impl`. This skill does **not** re-check:
+This skill is not a full replacement for task-local review during `/kiro-impl`. This skill does **not** re-check:
 - Individual task acceptance criteria
 - Per-file reality checks (mock/stub detection)
 - Single-task spec alignment
@@ -51,14 +51,15 @@ This skill's main question is: when the completed tasks are viewed together, do 
 
 ### Step 2: Gather Context
 
-If steering/spec context is already available from conversation, skip redundant file reads.
-Otherwise, for each detected feature:
+Reuse steering/spec context already available from conversation; load missing context below for each detected feature.
+Select skills for the current task even when steering/spec context is already available:
 - Read `.kiro/specs/<feature>/spec.json` for metadata
 - Read `.kiro/specs/<feature>/requirements.md` for requirements
 - Read `.kiro/specs/<feature>/design.md` for design structure
 - Read `.kiro/specs/<feature>/tasks.md` for task list and Implementation Notes
 - Core steering context: `product.md`, `tech.md`, `structure.md`
 - Additional steering files only when directly relevant to the validated boundaries, runtime prerequisites, integrations, domain rules, security/performance constraints, or team conventions that affect the GO/NO-GO call
+- Use explicitly requested skills and task-relevant local skills/playbooks, including design, accessibility, and UX. Select by description and read only needed guidance, even for small tasks; preserve required checks and host/project rules.
 
 **Discover canonical validation commands**:
 - Inspect repository-local sources of truth in this order: project scripts/manifests (`package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, app manifests), task runners (`Makefile`, `justfile`), CI/workflow files, existing e2e/integration configs, then `README*`
@@ -80,6 +81,8 @@ The following validation dimensions are independent and can be dispatched as **s
 - **Cross-task integration**: Verify data flows, API contracts, shared state consistency
 
 For simple features (few tasks, small scope), run checks in main context without subagent dispatch.
+
+If the implementation run explicitly skipped task-local review (for example `--review off`), tighten scrutiny on obvious task-level gaps that surface during integration validation and call out that reduced review coverage in the report.
 
 #### Mechanical Checks (run commands, use results)
 

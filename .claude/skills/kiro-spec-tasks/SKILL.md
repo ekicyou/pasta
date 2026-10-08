@@ -21,12 +21,13 @@ metadata:
 
 ### Step 1: Gather Context
 
-If steering/spec context is already available from conversation, skip redundant file reads.
-Otherwise, load all necessary context:
+Reuse steering/spec context already available from conversation; load missing context below.
+Select skills for the current task even when steering/spec context is already available:
 - `.kiro/specs/{feature}/spec.json`, `requirements.md`, `design.md`
 - `.kiro/specs/{feature}/tasks.md` (if exists, for merge mode)
 - Core steering context: `product.md`, `tech.md`, `structure.md`
 - Additional steering files only when directly relevant to requirements coverage, design boundaries, runtime prerequisites, or team conventions that affect task executability
+- Use explicitly requested skills and task-relevant local skills/playbooks, including design, accessibility, and UX. Select by description and read only needed guidance, even for small tasks; preserve required checks and host/project rules.
 
 - Determine execution mode:
   - `sequential = (sequential flag is true)`
@@ -82,7 +83,7 @@ After all parallel research completes, synthesize findings before generating tas
 
 Before writing `tasks.md`, run one lightweight independent sanity review of the task graph.
 
-- If fresh subagent dispatch is available, spawn one fresh review subagent for this step. Otherwise perform the same review in the current context.
+- If fresh subagent dispatch is available, spawn one fresh review subagent for this step and record the review mode as `independent`. Otherwise perform the same review in the current context and record the mode as `inline`.
 - Provide only file paths, the draft task plan, and merge context if an existing `tasks.md` is being updated. The reviewer should read `requirements.md`, `design.md`, and the task-generation rules directly instead of relying on a parent-synthesized coverage summary.
 - Check only:
   - hidden prerequisites or missing setup tasks
@@ -95,10 +96,13 @@ Before writing `tasks.md`, run one lightweight independent sanity review of the 
   - `NEEDS_FIXES`
   - `RETURN_TO_DESIGN`
 - If `NEEDS_FIXES`, repair the draft once and re-run the sanity review one time.
+- If the second verdict is not `PASS`, stop without writing `tasks.md` or approving the task plan. Report the remaining findings; do not retry again or advance to Finalize.
 - If `RETURN_TO_DESIGN`, stop without writing `tasks.md` and point back to the exact gap in requirements/design.
 - Keep this bounded. Do not turn it into a second full planning cycle.
 
 ### Step 4: Finalize
+
+Proceed only when the Task Plan Review Gate is satisfied and the latest task-graph sanity verdict is `PASS`. The `-y` flag never bypasses these review gates.
 
 **Write tasks.md**:
 - Create/update `.kiro/specs/{feature}/tasks.md`
@@ -146,7 +150,7 @@ Provide brief summary in the language specified in spec.json:
    - Design coverage and runtime prerequisites reviewed
    - Task dependencies verified
    - Task plan review gate passed
-   - Independent task-graph sanity review passed
+   - Task-graph sanity review: `PASS`; report the actual mode (`independent` or `inline`)
    - Testing tasks included
 4. **Next Action**: Review tasks and proceed when ready
 
