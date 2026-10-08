@@ -58,3 +58,17 @@ pasta のマニュアルは初心者向けになっていない。入門ガイ�
 - マニュアルは利用者向けの唯一の権威である。ガイドの記述がリファレンス章と食い違ってはならない。
 - スクリーンショットの撮影手段（実機の SSP で手動か、自動化か）は設計で決める。撮影できない環境でも CI は通ること。
 - 完成度を優先する。一部の章だけ物語化して残りを旧形式のまま出す、といった部分出荷はしない。
+
+## 2026-10-07 棚卸の再測定（main 2cbaf510）
+
+- **前提の変化**: 無い。`getting-started/` は `index.md`・`prerequisites.md`・`first-ghost.md`（447 行）の 3 ファイル。`tutorial-check.mjs` は `first-ghost.md` 1 か所と hello-pasta の `dic/` を照合し（`TUTORIAL_REL`・`HELLO_DIC_REL`）、`verify-content.mjs` もそれを import して使う。口調の判定の実体は `gen-skill-refs.mjs` の `findVoice`。
+- **触るファイル**: `book/src/getting-started/`（全面の書き直しと新しい章）、`book/src/SUMMARY.md`、`book/src/introduction.md`、`book/AUTHORING.md`、`book/tools/` の `verify-content.mjs`（531 行）・`tutorial-check.mjs`（152 行）・`tutorial-check-test.mjs`・`verify-scripts-test.mjs`、スクリーンショット（新規）。起票文に無いが、口調の例外を判定に入れるなら `gen-skill-refs.mjs` の `findVoice` の周りも、段階辞書の照合を CI で確実に走らせるなら `.github/workflows/manual.yml` の paths も触る。
+- **規模**: 18〜20 タスク（規約の例外・検査ツール 2 本・準備の章・13 前後の段階の章を 1〜2 章ずつ・目次と案内・スクリーンショット・通しの確認）。超えそうなら章をまとめる。
+- **先に要るもの**: `hello-pasta-tutorial-stages`・`hello-pasta-shell-art`・`manual-claudia-theme`（すべて未完了）。`hello-pasta-shell-art` が `release-ci` の後なので、`release-ci` も間接の前提になる。
+- **ファイルの重なり**: `manual-claudia-theme`（`AUTHORING.md`・`introduction.md`・`getting-started/*`・`verify-content.mjs`）、`hello-pasta-tutorial-stages`（`first-ghost.md` の作例を同期した場合）。どちらも先のウェーブなので順序で解決している。
+- **種別**: 文書（入門ガイドの書き直し。emo2 の扱いなどは開発者の確認済み）。
+- **要件定義のモデル**: Opus（段階表・記法・絵は上流の spec が決める。残る判断は表のセルの口調と撮影の手段くらい）。
+- **分割の案**: なし。仮に 20 を大きく超えたら、「規約の例外・検査ツール・準備の章・前半の段階」と「後半の段階・スクリーンショット・目次と案内」に分ける。
+- **見つけた穴・古くなった記述**:
+  - `first-ghost.md` の ```text ブロック（シェルの `descript.txt` など）は `tutorial-check.mjs` の照合の外にある。`hello-pasta-shell-art` でシェルが変わると黙って古くなる。照合の対象を広げるかを要件で決める。
+  - `verify-content.mjs` には専用のテストが無く、`verify-scripts-test.mjs` が子プロセスで走らせるスモークだけ。Scope の「そのテスト」は、このスモークと `tutorial-check-test.mjs` を指すことになる。

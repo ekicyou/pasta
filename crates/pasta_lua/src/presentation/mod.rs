@@ -1,6 +1,6 @@
 //! 宿主非依存 presentation マーカー契約（コア出力の薄い層）。
 //!
-//! 関連仕様: `.kiro/specs/pasta-actor-runtime/`
+//! 関連仕様: `.kiro/specs/completed/pasta-actor-runtime/`
 //! - 充足要件: R2.1, R2.2, R2.3, R2.5, R2.6, R2.7, R2.8
 //! - 設計: design.md の **PresentationMarker** コンポーネント（pasta_lua / Core）、
 //!   File Structure Plan（`crates/pasta_lua/src/presentation/` mod.rs + marker.rs）。

@@ -1,6 +1,6 @@
 //! アクター/marshaling/teardown シームの観測ログ点（tracing）検証（task 6.2・R10.4）。
 //!
-//! 関連仕様: `.kiro/specs/pasta-actor-runtime/`
+//! 関連仕様: `.kiro/specs/completed/pasta-actor-runtime/`
 //! - 充足要件: R10.4（アクタースレッド・単一直列キュー・marshaling〈GET/NOTIFY/drop→204〉・
 //!   teardown の主要シーム〈enqueue/dispatch/応答/drop・spawn/stop/done〉に `@pasta_log`／
 //!   `tracing` の観測可能なログ点を備える。**無効時はゼロコスト維持**）。
