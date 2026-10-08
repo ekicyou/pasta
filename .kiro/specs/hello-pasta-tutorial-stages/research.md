@@ -52,7 +52,7 @@
 | # | 項目 | 種別 | 内容 |
 | - | ---- | ---- | ---- |
 | G1 | 段階辞書の置き場所と形 | Missing | 現行には完成形 1 つしかない。段階ごとのディレクトリ（例: `ghosts/hello-pasta-stages/NN-*/dic/`、または `tests/fixtures/stages/NN/`）が要る。段階数 12（議題 1 で確定）× 1〜5 ファイル |
-| G2 | 全段階を実ローダーで読み込むテスト | Missing | `self_deploy_integration_test.rs` の tempdir コピー＋`PastaLoader::load` を、段階ディレクトリをループする形へ拡張または新規テストに。設定・シェルは hello-pasta から合成する必要がある（[OPEN-2]） |
+| G2 | 全段階を実ローダーで読み込むテスト | Missing | `self_deploy_integration_test.rs` の tempdir コピー＋`PastaLoader::load` を、段階ディレクトリをループする形へ拡張または新規テストに。設定・シェルは hello-pasta から合成する（段階辞書は `dic/` のみ。議題 4 で確定） |
 | G3 | `OnBoot` 疎通の確認手段（Requirement 4.2） | Resolved | `pasta_sample_ghost` の dev-deps は `pasta_lua` のみだが、`PastaLoader::load` が返すランタイムの `exec(&str)`（`pasta_lua/src/runtime/exec.rs:31`）で `require "pasta.shiori.entry"` → `SHIORI.request({id="OnBoot", method="get", version=30})` を実行すると SHIORI 応答文字列が返る（`pasta_lua/tests/shiori/event_handler_test.rs:170-186` の方式）。dev-dep 追加なしで C2 が成立する。`pasta_shiori` 経由（`PastaShiori::load`/`request`、`shiori_sample_ghost_test.rs:37-54`）は C3 の予備 |
 | G4 | 最終段階＝配布辞書の一致検証 | Missing | バイト一致の比較テスト。もしくは**シンボリックリンクや生成ではなく**「最終段階ディレクトリを配布辞書そのものとする」構成（G1 の選択で消える） |
 | G5 | `OnBoot` ゴールデン | Constraint | `pasta_shiori` の 3 テストが `OnBoot` 単一シーン・固定文を固定。ゴールデンは `actors.pasta` の `＠通常`→`\s[1]`/`\s[11]`、`pasta.toml` の `[talk]` 待ち時間と `[actor]` の spot にも依存する（Requirement 6.2 で不変）。段階 1〜2 で `OnBoot` を 1 人→2 人へ育てるのは可（最終形が同じなら）。段階 4「毎回ちがう」で `OnBoot` を複数化する作例は不可（[OPEN-8]）。`OnFirstBoot`/`OnClose` は自由 |
@@ -111,4 +111,4 @@
 - **Research Needed（設計で調べる）**:
   1. `＄＊回数＝＄＊回数＋１` の初回（nil）挙動（G2.1 段階 10）。
   2. `scene_kick_*_e2e_test.rs` が追記するシーン名の一覧（G9）。
-- **要件ディスカッションへ**: `requirements.md` の [OPEN-2]〜[OPEN-4]・[OPEN-6]〜[OPEN-9]（[OPEN-1] は議題 1、[OPEN-11] は議題 2、[OPEN-5] は議題 3、[OPEN-10] は G12 で解消）。特に [OPEN-8]（`OnBoot` ゴールデンを守るか更新するか）と [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。
+- **要件ディスカッションへ**: `requirements.md` の [OPEN-3]・[OPEN-4]・[OPEN-6]〜[OPEN-9]（[OPEN-1] は議題 1、[OPEN-11] は議題 2、[OPEN-5] は議題 3、[OPEN-2] は議題 4、[OPEN-10] は G12 で解消）。特に [OPEN-8]（`OnBoot` ゴールデンを守るか更新するか）と [OPEN-9]（`first-ghost.md` のコードブロック差し替えを本 spec が持つか）は、本 spec の完了条件（Requirement 5.5）に直結する。

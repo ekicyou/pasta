@@ -46,7 +46,7 @@
 3. The 最終段階の段階辞書 shall hello-pasta の配布辞書（`ghosts/hello-pasta/ghost/master/dic/*.pasta`）と、ファイル構成・ファイル名・内容のすべてにおいて一致する。
 4. The 段階辞書 shall 各段階で、アクター辞書の表情名と surface 番号の対応（`女の子`: `\s[0]`〜`\s[8]`、`男の子`: `\s[10]`〜`\s[18]`）を hello-pasta と同じに保つ。
 5. The 段階辞書 shall 新しく付けるシーン名を、既存のシーン名で始まる名前（前方一致で既存の呼び出しの候補に混ざる名前）にしない。
-6. While 段階辞書が 1 段階ずつ育つ, the 各段階の辞書 shall hello-pasta の `pasta.toml`・`descript.txt`・`install.txt`・シェルをそのまま使って起動できる（段階ごとに設定ファイルの差し替えを要しない）。**[OPEN-2]** 仮定: 段階辞書は辞書（`dic/`）だけを持ち、設定・シェルは hello-pasta のものを共用する（12 段目の Lua もシーン内ブロックなので `scripts/` は不要。議題 3）。
+6. While 段階辞書が 1 段階ずつ育つ, the 各段階の辞書 shall hello-pasta の `pasta.toml`・`descript.txt`・`install.txt`・シェルをそのまま使って起動できる（段階ごとに設定ファイルの差し替えを要しない）。段階辞書は辞書（`dic/` の `.pasta` 群）だけを持ち、設定・シェル・`scripts/` は hello-pasta のものを共用する。検証（Requirement 4）は hello-pasta の設定・シェルと段階の `dic/` を一時ディレクトリで合成して起動する。
 7. The 段階辞書の置き場所と形（ディレクトリ構成・段階番号の付け方・各段階の差分の読み取り方） shall 下流の `getting-started-story-guide` が逐語で参照できるよう、クレート内の説明ファイルに記される。
 
 ### Requirement 3: hello-pasta 辞書の教材化
