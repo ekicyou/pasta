@@ -105,7 +105,7 @@
   - _Depends: 1.3, 2.1, 2.2, 3.1, 4.1_
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.7, 3.1, 3.5, 3.6, 3.7, 3.8, 10.6_
 
-- [ ] 4.4 crates.io と Marketplace の公開 job を作る
+- [x] 4.4 crates.io と Marketplace の公開 job を作る
   - publish-crates（windows）と publish-vsce（ubuntu）を `needs: [verify, build]`（版を読むため verify も並べる）で互いを待たずに並べ、どちらも environment `release` に属させ、OIDC の権限をこの 2 job だけに与える
   - publish-crates は依存順の 5 クレートそれぞれで Trusted Publishing のトークンを取り直してから 3.2 のスクリプトを呼ぶ。auth step の失敗は `reason=auth` として記録する。2 回目以降の auth が拒否されたときの落とし先（1 回取得 + 再実行）を定義の冒頭のコメントに書き、クレートごとの所要時間を summary に残す
   - publish-vsce は配布物を受け取り、拡張の lock で vsce を固定し、Azure にログインしてから 3.3 のスクリプトを呼ぶ
@@ -197,3 +197,4 @@
 - 3.5: `github-release.ps1 -Tag -NotesFile -AssetDir [-Title] [-DryRun]`。リポジトリは gh の既定（checkout の remote）で決まり、認証は `GH_TOKEN`。`gh release view <tag>` は下書きもタグ名で見つける。Immutable はエラー文の一致で判定（拒否されれば失敗はする）。
 - 4.2: 開発機の環境には `VSCE_PAT` が入っており、`vsce <cmd> --help` は `--pat` の既定値として PAT の値を表示する。手元で vsce を叩くときは必ず `VSCE_PAT` を外す（4.2 の実装中に会話記録へ値が出た。C-6 で失効させる PAT）。
 - 4.3: release.yml は env に `WASM_PACK_VERSION`・`CARGO_ABOUT_VERSION`・`NODE_VERSION`・`RELEASE_ENVIRONMENT`（表示用。`jobs.<id>.environment` は `env` を参照できないので 4.4 では `environment: release` を直書きする）。run には `${{ }}` を埋め込まず既定の環境変数で渡す。build の artifact `release-assets` は `release/` 直下の 3 ファイル（平らに入る）。
+- 4.4: job outputs は publish-crates が `<crate>_status`・`<crate>_reason`（5 クレート分）、publish-vsce が `status`・`reason`。どちらも末尾の `if: always()` の集約 step（`id: result`）が steps の outcome から決める（auth/login の失敗 → failed/auth、出力なし → failed/publish、未実行 → not-run）。publish step に continue-on-error は無いので、失敗すれば job は failure のまま。
