@@ -229,3 +229,175 @@
 
 - `hello-pasta-shell-art`（後続）: `release.ps1` と、シェルの画像の追跡の扱いを共有する。本仕様は画像の追跡を変えない前提（未決事項 7）。
 - `release-workflow`（後続の更新）: 版の bump 箇所の一覧に `package-lock.json` を足すこと、タグのコミットを main から到達させる統合方式（マージコミット/squash）の見直し、`.claude/settings.json` の公開系コマンドの許可の整理、`workflow.md` L143 の「main の CI 全緑」の関門の記述の更新は、`release-workflow` の更新で扱うのが自然。
+
+---
+
+# 設計フェーズの調査と決定（2026-10-08）
+
+- **Feature**: `release-ci`
+- **Discovery Scope**: Complex Integration（新設のワークフロー + 既存スクリプトの流用 + 3 つの外部サービスの認証）
+- **方法**: 上のギャップ分析（2.6）を前提に、設計で使う外部仕様を公式文書・ソースで再確認した（研究サブエージェント）。確証の度合いを「確認」「おそらく」「未確認」で記す。
+- **Key Findings**:
+  - reusable workflow（`workflow_call`）で呼んだ `build.yml` の中の `github.ref`・`github.sha` は caller と同じ（タグ ref・タグのコミット）。関門を `build.yml` の呼び出しで実現できる（確認）。
+  - `gh release view <tag>` は下書きも tag 名で見つける（REST の `releases/tags` と GraphQL `repository.release(tagName:)` を併用）。「下書き → 添付 → 公開」の再実行を `view` から復元できる（確認・gh のソース）。
+  - 「失敗した job の再実行」では、成功した job の outputs と初回の実行の artifact が使える。初回の実行から 30 日・50 回まで（確認）。
+  - `vsce publish --azure-credential` は `ChainedTokenCredential(Environment, AzureCli, ManagedIdentity, AzurePowerShell, azd)` で、`Azure/login` 後の Azure CLI のセッションを拾う。`--packagePath` では `vscode:prepublish` を呼ばない。`verify-pat` も `--azure-credential` を受ける（確認・vsce のソース）。
+  - `@vscode/vsce` の `latest` は 4.0.0（Node 22 以上、keytar 不使用）。リポジトリの `package-lock.json` は 3.x を固定しており Node 20 で動く。
+  - `windows-latest` は Windows Server 2025。`windows-2022` は提供中。wasm-pack・cargo-about はプリインストールされていない（確認）。
+  - environment の保護規則「Selected branches and tags」は public リポジトリで使え、`GITHUB_REF` と照合される。合わない ref（`workflow_dispatch` のブランチ）からの実行は失敗する（確認／おそらく）。
+  - `rust-lang/crates-io-auth-action@v1` を同一 job で複数回呼べるかは文書に無い（未確認）。
+
+## Research Log（設計で参照した外部仕様）
+
+### reusable workflow（`workflow_call`）で関門を実現できるか
+- **Context**: R2.5・R2.6（検査の一覧を `build.yml` と別に持たない）。
+- **Sources Consulted**: docs.github.com「Reuse workflows」「Events that trigger workflows」「Reusing workflow configurations」、actions/checkout README。
+- **Findings**: 1 ファイルに `workflow_call` と他のトリガーを併記できる（文書は「`on` に `workflow_call` を含むこと」とだけ言う。おそらく）。called workflow の `github` コンテキストは常に caller のもの。`GITHUB_SHA`・`GITHUB_REF` も caller と同じ。`actions/checkout` の既定 `ref` はイベントの ref なので、タグのコミットを取り出す。calling job に置けるキーは `name/uses/with/secrets/needs/if/permissions/strategy/concurrency` だけで、`environment` は置けない。`permissions` は caller の範囲内に限られ、caller の `env` は伝わらない。入れ子は 10 段まで。
+- **Implications**: `gate` job は `needs: verify` + `uses: ./.github/workflows/build.yml` だけで済む。`build.yml` は `on:` に `workflow_call: {}` を足すだけ。関門に environment は不要（公開しない）。
+
+### GitHub Release の作成の原子性と再実行
+- **Context**: R6.4・R6.5（添付が欠けた公開状態を残さない）、未決事項 8。
+- **Sources Consulted**: cli.github.com（`gh release create/view/upload/edit`）、cli/cli `pkg/cmd/release/shared/fetch.go`、docs.github.com「Immutable releases」。
+- **Findings**: `--draft`・`--verify-tag`・`--notes-file`・`--title` がある。`gh release view <tag>` は下書きも見つけ、`--json` に `isDraft`・`isImmutable`・`assets` がある。`gh release upload --clobber` は既存の添付を先に削除する（失敗すると元が失われる）。`gh release edit <tag> --draft=false` で公開。Immutable Releases は公開の時点から添付の変更・削除・追加を禁じ、題名・ノートは編集できる。削除した immutable な Release のタグ名は二度と使えない。
+- **Implications**: 「下書きで作る → 添付 → `--draft=false`」を基本経路にし、再実行は `view` で状態（無し / 下書き / 公開）を復元して続ける。公開済みの添付に `--clobber` を使わない。
+
+### crates.io Trusted Publishing と `cargo publish`
+- **Context**: R4・R9.1、要調査 1。
+- **Sources Consulted**: rust-lang/crates-io-auth-action（action.yml・README）、forge.rust-lang.org「Trusted Publishing」、rust-lang/crates.io PR #12346、doc.rust-lang.org（`cargo publish`・unstable `publish-timeout`）、cargo testsuite（publish.rs）。
+- **Findings**: 入力 `url`、出力 `token`。`runs.using: node24`（Windows ランナーで動く。おそらく）。post step で job 終了時にトークンを失効。トークンは 30 分。設定欄は owner・repo・workflow filename・environment（任意。設定したら一致が要る）。`cargo publish --locked` は lock が変わるなら失敗。索引の反映待ちは既定 60 秒で、時間切れは警告（アップロードには影響しない。exit 0 はおそらく）。同じ版は `already exists on crates.io index` で exit 101。依存クレートを別コマンドで公開するときは、依存先の版が索引で解決できる必要がある。同一 job で action を複数回呼ぶことは文書に無い（未確認）。
+- **Implications**: クレートごとに auth step + publish step を置き、トークン期限に当たりにくくする（Open Question 8）。依存先の反映はスパース索引で待ち、それでも失敗したら再試行する。
+
+### Azure/login と Entra ID の OIDC subject
+- **Context**: R5.5・R9.2・R11.2・R11.6。
+- **Sources Consulted**: Azure/login README（v3）、docs.github.com「OpenID Connect」「Configuring OpenID Connect in Azure」。
+- **Findings**: 現行メジャーは v3。入力 `client-id`・`tenant-id`・`subscription-id`・`allow-no-subscriptions`・`audience`（既定 `api://AzureADTokenExchange`）。内部で `az login` を行い、後続の `az` と `AzureCliCredential` が使える。post step でログアウト。subject は大文字小文字を区別して完全一致。job が environment を参照すると subject は `repo:O/R:environment:NAME`。
+- **Implications**: publish-vsce と release-setup-check は environment が異なるので、マネージド ID にフェデレーション資格情報を 2 件作る。
+
+### `@vscode/vsce` の経路
+- **Context**: R5、要調査 2・7。
+- **Sources Consulted**: npm registry（`@vscode/vsce@latest`）、microsoft/vscode-vsce `src/main.ts`・`src/publish.ts`・`src/auth.ts`、code.visualstudio.com「Publishing Extensions」。
+- **Findings**: `publish --azure-credential --packagePath --skip-duplicate` は併用できる。`--oidc` は `--pat`/`--azure-credential` と併用不可で、本仕様では採らない（議題 1）。`show --json` は JSON を出す（`versions` 配列の形は未確認）。公式文書の手順: `az rest .../profiles/me --resource 499b84ac-...` の `id` を Members に追加し Contributor にする。GitHub Actions 向けの公式手順は無い（Azure DevOps のサービス接続向けの記述）。
+- **Implications**: 公開 job は `npm ci --ignore-scripts` で lock の版の vsce を使い、`npx vsce` で呼ぶ（版固定 R3.5 を `package-lock.json` に委ねる）。profile ID の取得は確認ワークフローで行う。
+
+### 再実行・artifact・environment の保護規則
+- **Context**: R3.8・R7.1・R9.4、要調査 4。
+- **Sources Consulted**: docs.github.com「Re-run workflows and jobs」「Deployments and environments」、actions/upload-artifact・download-artifact README、github.blog（2021-02-17）。
+- **Findings**: 再実行は同じ `GITHUB_SHA`/`GITHUB_REF`。失敗した job と後続だけを走らせ、成功 job の outputs と初回の artifact を使う。通過済みの保護規則は自動で通る。`retention-days` は 1〜90。`download-artifact@v4` に `merge-multiple`・`pattern`。保護規則の「Selected branches and tags」は public リポジトリで使え、タグのパターン `v*` を個別に設定できる。合わない ref からの実行は失敗する（おそらく）。
+- **Implications**: artifact は 90 日。確認ワークフローは別 environment（`main` だけに限る）で動かす。
+
+### Windows ランナーのイメージ
+- **Context**: brief の制約（VS 2026・node-gyp）、要調査 6。
+- **Sources Consulted**: actions/runner-images README。
+- **Findings**: `windows-latest` = Windows Server 2025（ラベル `windows-2025`・`windows-2025-vs2026` もある。`windows-latest` がどちらの VS を持つかは表が曖昧。未確認）。`windows-2022` は提供中、`windows-2019` は終了。Rust はプリインストール（版は変わる）。wasm-pack・cargo-about は無い。vsce 4.x は keytar/node-gyp を使わない。
+- **Implications**: wasm-pack・cargo-about は版固定で導入する。壊れたら `windows-2022` へ退避。
+
+### 要調査（ギャップ分析 §6）の解消状況
+
+| # | 項目 | 状況 |
+|---|------|------|
+| 1 | トークン期限と公開時間 | 設計で「クレートごとにトークンを取り直す」を採り、所要時間に依存しない形にした。複数回呼べるかは初回リリースで確認（Open Question 8） |
+| 2 | Marketplace の経路の実地確認 | `release-setup-check.yml`（`verify-pat --azure-credential`）で初回リリース前に確かめる。Members への ID の指定は profile ID（`id` 欄） |
+| 3 | `--oidc` | 採らない（議題 1）。参考のみ |
+| 4 | 再実行と artifact | 解消（公式文書で確認） |
+| 5 | Immutable Releases と再実行 | 解消（`gh release view` が下書きを見つける。下書き → 添付 → 公開） |
+| 6 | windows-latest | Server 2025。wasm-pack・cargo-about は導入が要る。退避先 `windows-2022` あり |
+| 7 | 実行ポリシー | ランナーでは `pwsh` を使うため問題にならない。`build:wasm` も `pwsh` 経由に変える（Open Question 9） |
+| 8 | 公開を伴わないセットアップの確認 | `release-setup-check.yml`（Azure/login → profile ID → `verify-pat`）。crates.io はトークン交換を行わず、名前の照合と初回リリースで確認（Open Question 2） |
+| 9 | リポジトリの公開範囲 | 解消済み（PUBLIC） |
+| 10 | 手順書の置き場所 | `.github/release-ci-setup.md`（Open Question 5） |
+
+## Architecture Pattern Evaluation（設計フェーズ）
+
+ギャップ分析 §4 の Option C を採用した。設計で追加に比較した点:
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| 関門 = `build.yml` を `workflow_call` で呼ぶ | gate job が reusable workflow として build.yml を実行 | 検査の一覧が 1 か所。タグのコミットで同じ構成 | calling job に environment を置けない（不要）。build.yml の `workflow_call` 互換を保つ必要 | 採用 |
+| 関門 = release.yml に検査を写す | test/clippy 等を release.yml に再記述 | 独立 | R2.6 に反する。乖離する | 却下 |
+| 公開 job をすべて Windows | 全 job を windows-latest | OS が 1 種 | 起動が遅い。node native addon の影響範囲が広がる | 却下（Open Question 7） |
+| 公開・Release を ubuntu | verify/publish-vsce/github-release/report を ubuntu | 速い。pwsh・gh・az・node が同梱 | OS が 2 種 | 採用 |
+| publish-crates を ubuntu | 検証ビルドを Linux で | 速い | `pasta_shiori`（cdylib・windows-sys）が Linux で検証ビルドできる保証が無い | 却下。Windows に残す |
+| セットアップ確認 = 別 environment + 別ワークフロー | `release-setup-check` | 公開用 environment をタグに限ったまま profile ID を出せる | FIC が 2 件 | 採用（Open Question 2） |
+| セットアップ確認 = `release` に main も許可 | 1 environment | 設定が少ない | 9.4 を弱める | 却下 |
+
+## Design Decisions（設計フェーズ）
+
+### Decision: job の分割と権限の単位
+- **Context**: R7.1（失敗した job の再実行で続行）、R9.3（権限を公開の処理だけに）。
+- **Alternatives Considered**: 1 job に全部 / 公開先ごとに job / クレートごとに job。
+- **Selected Approach**: verify / gate / build / publish-crates / publish-vsce / github-release / report の 7 job。クレートは publish-crates の中の step 列（auth + publish × 5）。
+- **Rationale**: 再実行の単位と権限の単位を一致させる。クレートごとの job にすると rust-cache の復元と checkout が 5 回になり時間が増える。
+- **Trade-offs**: publish-crates の途中で失敗すると、再実行は公開済みのクレートの判定（API）からやり直す（判定は数秒）。
+- **Follow-up**: 初回リリースで所要時間を記録する。
+
+### Decision: 公開済みの判定をスクリプトに閉じ、ワークフローに状態を持たない
+- **Context**: R7.2（実際の状態で判定）、R7.4。
+- **Selected Approach**: `publish-crate.ps1`・`publish-vsix.ps1`・`github-release.ps1` が各公開先に問い合わせて `published/skipped/failed` を返す。`-DryRun` で手元から試せる。
+- **Rationale**: ワークフロー側の記録（前回の outputs 等）に頼ると、手動の公開や失敗の取りこぼしと食い違う。
+- **Trade-offs**: 公開先 API の形（`vsce show --json`）に依存する。
+
+### Decision: GitHub Release は下書き → 添付 → 公開
+- **Context**: R6.5、未決事項 8、Immutable Releases。
+- **Selected Approach**: `gh release create --draft --verify-tag` → upload → `gh release edit --draft=false`。再実行は `gh release view` で状態を復元。
+- **Rationale**: 公開の瞬間に 3 つの添付がそろう。Immutable Releases を有効にしても動く。
+- **Trade-offs**: `gh release create TAG files...` の 1 コマンドより手順が増える。
+
+### Decision: crates.io トークンはクレートごとに取り直す
+- **Context**: トークン 30 分、LuaJIT を含む検証ビルド。
+- **Selected Approach**: `crates-io-auth-action` を 5 回（クレートごと）呼ぶ。
+- **Rationale**: 所要時間の実測に依存しない。
+- **Trade-offs**: 同一 job で複数回呼べることは未確認（Open Question 8）。通らなければ 1 回取得 + 再実行に落とす。
+
+### Decision: Rust ツールチェーンは固定しない
+- **Context**: R3.5（ツールの版固定）と R2.5（関門と同じ構成）。
+- **Selected Approach**: `dtolnay/rust-toolchain@stable` のまま。`Cargo.lock` と外部ツール（wasm-pack・cargo-about・vsce・Node）だけ固定。
+- **Rationale**: `rust-toolchain.toml` はリポジトリ全体の方針。release.yml だけ固定すると関門（build.yml）とずれる。
+- **Trade-offs**: stable の更新で配布物のバイナリが変わりうる（R3.9 の「依存の解決」までは満たす）。Open Question 3。
+
+### Decision: `build:wasm` を `pwsh` 経由・`-Release` に
+- **Context**: 議題 4（リリースビルド）、開発機の AllSigned で `powershell -File` が失敗する既知の問題。
+- **Selected Approach**: `package.json` の `build:wasm` を `pwsh -NoProfile -File scripts/build-wasm.ps1 -Release`。`build-wasm.ps1` は変更しない。
+- **Trade-offs**: 開発機に pwsh 7 が要る。Open Question 9。
+
+### Decision: 補助スクリプトは `.github/scripts/release/` に pwsh で置く
+- **Context**: Option C の「小さなスクリプトの置き場所」。
+- **Rationale**: CI 専用であることが場所から分かる。pwsh は Windows・ubuntu の両ランナーと開発機で同じ。
+- **Trade-offs**: ルート `scripts/` を好む流儀もある。Open Question 6。
+
+### Decision: 手順書は `.github/release-ci-setup.md`
+- **Context**: 未決事項 10。
+- **Rationale**: ワークフローの隣。ゴースト固有の文書（RELEASE.md）に crates.io・Azure の手順を混ぜない。spec 配下は completed/ へ移ると参照が壊れる。Open Question 5。
+
+## Synthesis Outcomes
+
+- **Generalization**: 3 公開先の「判定 → 公開 → 状態の出力」を同じ契約（`status` の 4 値・`-DryRun`・200/404 だけを判定に使う）にそろえた。report job はこの契約だけを見る。将来の公開先（Open VSX 等）も同じ契約で足せる（実装は足さない）。
+- **Build vs. Adopt**: 認証は公式アクション（`crates-io-auth-action`・`Azure/login`）を採用。公開済み判定は各公開先の公式 CLI/API を直接使い、独自の状態管理を作らない。リリースノートは既存の分類規則をスクリプト化（bot・release-please は brief で却下済み）。関門は `build.yml` を呼ぶ（再記述しない）。
+- **Simplification**: 「失敗したクレートから再開する」ための記録を持たない（API の判定で十分）。VSIX の公開は `--packagePath` で再ビルドしない。手動のリリース起動を設けない（議題 6）。確認ワークフローに crates.io のトークン交換を含めない。クレートごとの job 分割をしない（step 列で足りる）。
+
+## Risks & Mitigations（設計フェーズ）
+
+- Marketplace の Entra ID 経路が実地で通らない（vscode-vsce#1023 類似）— `release-setup-check.yml` の `verify-pat --azure-credential` で初回リリース前に確かめる。期限（2026-12-01）前に必ず 1 度公開する。
+- `crates-io-auth-action` の複数回呼び出しが拒否される — 1 回取得 + 再実行に落とす（Open Question 8）。
+- `windows-latest` のイメージ変化（VS・Node・native addon）— `windows-2022` へ退避。vsce は `package-lock.json` の版（3.x）を使い、Node 20 を固定。
+- `vsce show --json` の出力形が想定と違う — `--skip-duplicate` を保険に持つ。実地で形を確かめる。
+- 追跡解除で test が壊れる — クリーンなチェックアウトで `cargo test --all`・clippy を確認（R10.3）。
+- 初回リリースが最初の E2E になる — 公開前（verify・gate・build）で止まった場合はタグを付け直せる。公開の途中なら版を上げて出し直す。
+
+## References（設計フェーズ）
+
+- https://docs.github.com/en/actions/how-tos/sharing-automations/reuse-workflows — reusable workflow の制約
+- https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows — `workflow_call` の `GITHUB_SHA`/`GITHUB_REF`
+- https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs — 再実行と artifact・outputs
+- https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments — 保護規則（ブランチ・タグ）
+- https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases — Immutable Releases
+- https://cli.github.com/manual/gh_release_create — `--draft`・`--verify-tag`
+- https://github.com/cli/cli/blob/trunk/pkg/cmd/release/shared/fetch.go — 下書きの検索
+- https://github.com/rust-lang/crates-io-auth-action — トークン交換アクション
+- https://forge.rust-lang.org/infra/docs/trusted-publishing.html — Trusted Publishing の設定
+- https://doc.rust-lang.org/cargo/commands/cargo-publish.html — `--locked`・索引待ち
+- https://github.com/Azure/login — v3 の入力と OIDC
+- https://docs.github.com/en/actions/reference/security/oidc — subject の形
+- https://github.com/microsoft/vscode-vsce — `--azure-credential`・`--packagePath`・`--skip-duplicate`・`verify-pat`
+- https://code.visualstudio.com/api/working-with-extensions/publishing-extension — マネージド ID の Members 追加
+- https://github.com/actions/runner-images — `windows-latest` の内容
+- https://github.com/actions/upload-artifact — `retention-days`
