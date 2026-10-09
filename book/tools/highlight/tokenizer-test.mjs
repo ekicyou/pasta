@@ -76,7 +76,7 @@ function hasAnyScope(spans, scopePrefix) {
 }
 
 // =========================================================================
-// 実在 pasta 構文の fixture（crates/pasta_sample_ghost の boot.pasta/talk.pasta 由来）。
+// 実在 pasta 構文の fixture（crates/pasta_sample_ghost の旧 boot.pasta/talk.pasta 由来。現在の辞書は dic/NN-*.pasta）。
 // コメント・グローバルシーン・アクター・アクション行（単語参照）・Call を含む。
 // =========================================================================
 const PASTA_FIXTURE = [
