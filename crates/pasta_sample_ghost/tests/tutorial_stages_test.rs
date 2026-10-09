@@ -5,9 +5,16 @@
 //!
 //! 表は見出しの行で探し、列見出しの名前で列を引く。見出しが無い・列が足りない・
 //! 段階番号が数値でないなど形が崩れていれば、0 件として素通りせず panic（テストの失敗）にする。
+//!
+//! 段階 N の検証は `master/` を tempdir へコピーしてから行い、コミット済みのゴーストを
+//! その場では読み込まない（自己展開の `profile/` は tempdir の中にだけできる）。
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+use pasta_lua::PastaLuaRuntime;
+use pasta_lua::loader::PastaLoader;
+use tempfile::TempDir;
 
 /// Neutralize ambient DAP debug env vars before any test thread starts.
 ///
@@ -159,16 +166,111 @@ fn crate_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
+fn master_dir() -> PathBuf {
+    crate_dir().join("ghosts/hello-pasta/ghost/master")
+}
+
 fn dic_dir() -> PathBuf {
-    crate_dir().join("ghosts/hello-pasta/ghost/master/dic")
+    master_dir().join("dic")
+}
+
+fn read_stages_md() -> String {
+    std::fs::read_to_string(crate_dir().join("STAGES.md")).expect("STAGES.md を読めない")
+}
+
+/// `src` を `dst` へ再帰コピーする。`profile/`（自己展開先・保存データ）と `pasta.dll`
+/// （ローダーに不要）は持ち越さない。`self_deploy_integration_test.rs` の
+/// `copy_tree_skip_profile` と同じ処理に `pasta.dll` の除外を足したもの。
+fn copy_master(src: &Path, dst: &Path) {
+    std::fs::create_dir_all(dst).expect("create dst dir");
+    for entry in std::fs::read_dir(src).expect("read src dir").flatten() {
+        let path = entry.path();
+        let name = entry.file_name();
+        if entry.metadata().expect("metadata").is_dir() {
+            if name != "profile" {
+                copy_master(&path, &dst.join(&name));
+            }
+        } else if name != "pasta.dll" {
+            std::fs::copy(&path, dst.join(&name)).expect("copy file");
+        }
+    }
+}
+
+/// master/ を tempdir へコピーし（profile/ と pasta.dll を除く）、
+/// dic/ から段階 n より後のファイルを消す
+fn assemble_stage(rows: &[StageRow], n: u8) -> TempDir {
+    let temp = TempDir::new().expect("tempdir");
+    copy_master(&master_dir(), temp.path());
+    for row in rows.iter().filter(|r| r.stage > n) {
+        if let Some(file) = &row.file {
+            std::fs::remove_file(temp.path().join("dic").join(file))
+                .unwrap_or_else(|e| panic!("stage {n}: dic/{file} を消せない: {e}"));
+        }
+    }
+    temp
+}
+
+/// SHIORI.request を Lua から呼び、応答文字列を返す
+fn shiori_request(runtime: &PastaLuaRuntime, id: &str, references: &[(u8, String)]) -> String {
+    // 値は長括弧で埋め込む（引用符が入っても壊れない）。閉じ括弧が入る値は表に書かない。
+    let lua_str = |v: &str| {
+        assert!(!v.contains("]=]"), "Reference の値 `{v}` に `]=]` がある");
+        format!("[=[{v}]=]")
+    };
+    let reference: String = references
+        .iter()
+        .map(|(n, v)| format!("[{n}] = {}, ", lua_str(v)))
+        .collect();
+    let script = format!(
+        r#"local SHIORI = require("pasta.shiori.entry")
+return SHIORI.request({{ id = {id}, method = "get", version = 30, charset = "UTF-8",
+    sender = "SSP", reference = {{ {reference}}}, dic = {{}} }})"#,
+        id = lua_str(id),
+    );
+    match runtime.exec(&script) {
+        Ok(v) => v
+            .as_string()
+            .and_then(|s| s.to_str().ok().map(|s| s.to_string()))
+            .unwrap_or_else(|| panic!("{id}: SHIORI.request が文字列を返さない: {v:?}")),
+        Err(e) => format!("(Lua error) {e}"),
+    }
+}
+
+/// 204 では素通りさせないイベント。9 段目の OnChoiceSelectEx は Reference2 が登録名でない
+/// `OnMouseDoubleClick` で、グローバル前方一致のフォールバックで `＊おやつの話` に届いて
+/// 200 になる。ジャンプ先が壊れると 204 に落ちて検査を素通りするので、ここだけ 200 と
+/// 空でない Value を必須にする（tasks.md Implementation Notes「3.2 で」）。
+const MUST_SPEAK: &[&str] = &["OnChoiceSelectEx"];
+
+/// 200 OK かつ空でない Value 行、または 204 No Content であることを確かめる。
+/// 違えば panic（メッセージに stage・file・id・応答全文を含める）
+fn assert_responds(stage: u8, file: &str, id: &str, response: &str) {
+    let status = response.lines().next().unwrap_or("");
+    let has_value = response.lines().any(|l| {
+        l.strip_prefix("Value:")
+            .is_some_and(|v| !v.trim().is_empty())
+    });
+    let ok = match status {
+        "SHIORI/3.0 200 OK" => has_value,
+        "SHIORI/3.0 204 No Content" => !MUST_SPEAK.contains(&id),
+        _ => false,
+    };
+    let expected = if MUST_SPEAK.contains(&id) {
+        "200 with Value"
+    } else {
+        "200 with Value or 204"
+    };
+    assert!(
+        ok,
+        "stage {stage} ({file}): {id} returned `{status}` (expected {expected}):\n{response}"
+    );
 }
 
 /// 段階表の「追加するファイル」の集合 ＝ `dic/*.pasta` の集合、各ファイル名の番号 ＝ 段階、
 /// 1 段 1 ファイルで 13 段目だけファイルが無い（Req 2.3・4.3）。
 #[test]
 fn stage_table_matches_dic_files() {
-    let markdown =
-        std::fs::read_to_string(crate_dir().join("STAGES.md")).expect("STAGES.md を読めない");
+    let markdown = read_stages_md();
     let rows = parse_stage_table(&markdown);
 
     let stages: Vec<u8> = rows.iter().map(|r| r.stage).collect();
@@ -228,5 +330,32 @@ fn stage_table_matches_dic_files() {
             "{} の Reference に空の値がある",
             e.id
         );
+    }
+}
+
+/// N = 1〜12 で段階の辞書を組み立てて実ローダーで読み込み、OnBoot と検証イベント表の
+/// 該当行を送って応答を確かめる（Req 1.6・2.1・2.6・3.9・4.1・4.2・4.2a・4.4・4.5・4.6）。
+/// 仮想イベント（ランダムトーク・時報）は送らない。
+#[test]
+fn every_stage_loads_and_responds() {
+    let markdown = read_stages_md();
+    let rows = parse_stage_table(&markdown);
+    let events = parse_verify_events(&markdown);
+
+    // 13 段目は辞書の差分を持たない（手順だけの段階）ので、ファイルのある 1〜12 段目を回す
+    for (n, file) in rows
+        .iter()
+        .filter_map(|r| Some((r.stage, r.file.as_deref()?)))
+    {
+        let ghost = assemble_stage(&rows, n);
+        let runtime = PastaLoader::load(ghost.path())
+            .unwrap_or_else(|e| panic!("stage {n} ({file}): load failed: {e}"));
+
+        let response = shiori_request(&runtime, "OnBoot", &[]);
+        assert_responds(n, file, "OnBoot", &response);
+        for e in events.iter().filter(|e| e.stage == n) {
+            let response = shiori_request(&runtime, &e.id, &e.references);
+            assert_responds(n, file, &e.id, &response);
+        }
     }
 }
