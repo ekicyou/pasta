@@ -38,22 +38,41 @@ export const TUTORIAL_REL = 'book/src/getting-started/first-ghost.md';
 
 // hello-pasta の SSOT（dist-src は廃止）。チュートリアルが逐語転記している dic 群。
 export const HELLO_DIC_REL = 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic';
-export const DIC_FILES = [
-  'actors.pasta',
-  'boot.pasta',
-  'talk.pasta',
-  'click.pasta',
-  'choice.pasta',
-];
+
+// ---- 照合対象: HELLO_DIC_REL 直下の *.pasta を辞書順に（ファイル名のみ） ----
+// 固定一覧を持たないので、dic を足せば自動で照合対象に入る。dic/ が無ければ空配列。
+export function listDicFiles(repoRoot = REPO_ROOT) {
+  const dir = path.resolve(repoRoot, HELLO_DIC_REL);
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith('.pasta'))
+    .map((e) => e.name)
+    .sort();
+}
 
 // ---- ```pasta フェンス内コードブロックを全抽出 ----
+// 言語注記 `pasta`（行末まで他の語が無い）の、3 つ以上のバッククォートで始まるフェンスのみ対象。
+// 閉じは開きと同じ長さ以上のバッククォートだけの行（CommonMark のフェンス規則）。
+// よって ````pasta の中の ```lua … ``` は閉じにならず中身として残る。未閉鎖のフェンスは捨てる。
 export function extractPastaBlocks(markdown) {
   const blocks = [];
-  // 言語注記 `pasta`（行末まで他の語が無い）のフェンスのみ対象。
-  const re = /```pasta[^\S\r\n]*\r?\n([\s\S]*?)```/g;
-  let m;
-  while ((m = re.exec(markdown)) !== null) {
-    blocks.push(m[1]);
+  let fence = null; // 開いているフェンスのバッククォート列
+  let body = [];
+  for (const line of markdown.split('\n')) {
+    const text = line.replace(/\r$/, '');
+    if (fence === null) {
+      const open = /^(`{3,})pasta[^\S\r\n]*$/.exec(text);
+      if (open) {
+        fence = open[1];
+        body = [];
+      }
+    } else if (/^`+[^\S\r\n]*$/.test(text) && text.trimEnd().length >= fence.length) {
+      blocks.push(body.map((l) => l + '\n').join(''));
+      fence = null;
+    } else {
+      body.push(line);
+    }
   }
   return blocks;
 }
@@ -91,14 +110,21 @@ export function runTutorialCheck(repoRoot = REPO_ROOT) {
   const markdown = fs.readFileSync(tutorialAbs, 'utf8');
   const blocks = extractPastaBlocks(markdown);
 
+  const names = listDicFiles(repoRoot);
+  if (names.length === 0) {
+    // 空集合で every() が真になり素通りするのを防ぐ。
+    return {
+      ok: false,
+      fatal: `照合対象の dic ファイルが無い: ${HELLO_DIC_REL}/*.pasta`,
+      blocks,
+      results: [],
+    };
+  }
+
   const results = [];
-  for (const name of DIC_FILES) {
+  for (const name of names) {
     const rel = `${HELLO_DIC_REL}/${name}`;
     const abs = path.resolve(repoRoot, HELLO_DIC_REL, name);
-    if (!fs.existsSync(abs)) {
-      results.push({ file: rel, matched: false, reason: 'missing-source' });
-      continue;
-    }
     const content = fs.readFileSync(abs, 'utf8');
     const matched = matchDicFile(content, blocks);
     results.push({

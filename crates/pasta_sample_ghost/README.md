@@ -134,12 +134,19 @@ hello-pasta/
 │   └── master/
 │       ├── descript.txt        # [SSOT]
 │       ├── pasta.toml          # [SSOT]
-│       ├── dic/                # pasta DSL 辞書 [SSOT]
-│       │   ├── actors.pasta
-│       │   ├── boot.pasta
-│       │   ├── choice.pasta
-│       │   ├── click.pasta
-│       │   └── talk.pasta
+│       ├── dic/                # pasta DSL 辞書 [SSOT]（段階ごとに 1 ファイル。STAGES.md 参照）
+│       │   ├── 01-boot.pasta     # 1 段: 起動の一言（OnBoot）
+│       │   ├── 02-talk.pasta     # 2 段: 2 人の掛け合い（＊会話 ＝ ランダムトーク）
+│       │   ├── 03-face.pasta     # 3 段: アクター辞書と表情
+│       │   ├── 04-variety.pasta  # 4 段: 同名シーン・単独 ＊ で毎回ちがう話
+│       │   ├── 05-words.pasta    # 5 段: 単語の定義と参照
+│       │   ├── 06-hour.pasta     # 6 段: 時報
+│       │   ├── 07-greeting.pasta # 7 段: 挨拶（OnGhostChanged/Changing・OnFirstBoot・OnClose）
+│       │   ├── 08-touch.pasta    # 8 段: ダブルクリックへの反応（＄ｒ４）
+│       │   ├── 09-choice.pasta   # 9 段: 選択肢
+│       │   ├── 10-save.pasta     # 10 段: 保存される変数（＄＊回数）
+│       │   ├── 11-jump.pasta     # 11 段: Call・前方一致・ローカルシーン・チェイントーク
+│       │   └── 12-lua.pasta      # 12 段: Lua ブロックの関数を呼ぶ
 │       ├── pasta.dll           # [gen] SHIORI DLL（cargo build・コミットしない）
 │       ├── THIRD_PARTY_LICENSES.txt # [gen] 第三者ライセンス表示（cargo about・コミットしない）
 │       └── scripts/            # [gen] Lua ランタイム（pasta_lua/scripts/ の写し・コミットしない）
@@ -149,6 +156,8 @@ hello-pasta/
         ├── surfaces.txt        # [gen] cargo run（generate_ghost）
         └── surface*.png        # [gen] cargo run（generate_ghost）
 ```
+
+段階表（各段で教える表現・追加するファイル・検証するイベント）は [`STAGES.md`](STAGES.md) にあります。段階 N の辞書は `01`〜`NN` のファイルの集まりで、12 段目（全ファイル）が配布版の辞書です。
 
 ## ライセンス
 

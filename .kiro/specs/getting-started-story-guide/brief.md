@@ -84,3 +84,8 @@ pasta のマニュアルは初心者向けになっていない。入門ガイ�
   - 論点: 章数 47 が自己テストに書かれている（`verify-scripts-test.mjs` の T 系の件数、`talk/talk-test.mjs` の J-9）。章を足すときは合わせて直す。
 - **表紙**: `introduction.md` の先頭は扉（`<section class="claudia-hero">`）になり、パート案内（`hero-toc`）が入門の最初の章 `getting-started/index.md` を指している。扉と締めのクラス契約は `book/theme/claudia.css` の冒頭のコメント。入門の案内を変えるときはこの契約に沿う。
 - **CI の段**: `manual.yml` は着色の後に台詞の変換（`talk/talk-html.mjs`）を挟み、verify-static/search は `--self-test` 付きで動く。最後に着せ替え前の版を `classic/` に作る段がある（新版の検査には混ざらない）。
+
+## 申し送り（hello-pasta-tutorial-stages より、2026-10-09）
+
+- **ランダムトークの間隔**: 配布版 hello-pasta の `pasta.toml` は `[ghost]` の `talk_interval_min = 45`・`talk_interval_max = 75`（平均 1 分）になる。読者が `first-ghost.md` ステップ 7 の最小構成（`[actor]` だけ）で作ると既定の 180〜300 秒のままで、2 段目の `＊会話` を確かめるのに数分待つ。段階表（`crates/pasta_sample_ghost/STAGES.md`）の 2 段目は「すぐ確かめたいときは `[ghost]` で間隔を短くする」を新しく覚える表現に含めている。設定の段は独立させていない（設定の段は辞書ファイルを持たず、1 段 1 ファイルの組み立て方が崩れるため）。ガイド本文では 2 段目で `[ghost]` の 2 行を書き足させるのが自然。
+- **起動時の台詞の説明**: `first-ghost.md` ステップ 8-3 の「起動すると `OnBoot`（初回は `OnFirstBoot`）のセリフが表示される」は、7 段目の `＊OnGhostChanged` が応答するため、別のゴーストから切り替えたときは OnBoot ではなく OnGhostChanged の台詞が出る。5.2 は機械的な追従に限ったので直していない。本文を書き直すときに合わせる。

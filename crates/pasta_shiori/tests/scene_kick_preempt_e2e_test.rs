@@ -85,7 +85,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 /// 1 行のマルチビート `.pasta` シーンを `＞チェイントーク` で組む。各ビートは固定文字列のみを
-/// talk（女の子＝spot0・actors.pasta 共通定義を流用）。全角空白始まりの行はリテラル継続を避け
+/// talk（女の子＝spot0・03-face.pasta の定義を流用）。全角空白始まりの行はリテラル継続を避け
 /// join で組む（写経元 6.1/7.2 と同方針）。
 fn scene_block(name: &str, beats: &[&str]) -> String {
     let mut lines = vec![format!("＊{name}")];
@@ -134,11 +134,11 @@ fn build_preempt_kick_ghost_dir() -> (PathBuf, TempDir) {
     let toml = std::fs::read_to_string(&toml_path).expect("read pasta.toml");
     let toml = toml
         .replace(
-            "talk_interval_min = 180  # 最小トーク間隔（デフォルト: 180）",
+            "talk_interval_min = 45   # 最小トーク間隔（デフォルト: 180）",
             &format!("talk_interval_min = {TALK_INTERVAL_SECS}"),
         )
         .replace(
-            "talk_interval_max = 300  # 最大トーク間隔（デフォルト: 300）",
+            "talk_interval_max = 75   # 最大トーク間隔（デフォルト: 300）",
             &format!("talk_interval_max = {TALK_INTERVAL_SECS}"),
         );
     assert!(

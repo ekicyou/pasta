@@ -91,7 +91,7 @@ fn build_kick_ghost_dir() -> (PathBuf, TempDir) {
     copy_dir_recursive(&sample_ghost_dir, temp.path()).expect("copy hello-pasta ghost");
 
     // 決定論的なキック対象シーンを追加（dic/*.pasta は loader が自動読み込み）。
-    // アクター辞書（女の子＝spot0）は actors.pasta で共通定義済みのため流用する。
+    // アクター辞書（女の子＝spot0）は 03-face.pasta で定義済みのため流用する。
     // 単一アクター・単一行＝初回ビートが固定文字列のみで構成される。
     // 行を明示連結する（Rust の `\<改行>` 継続は全角空白 '\u{3000}' を非スキップ警告にするため、
     // 全角空白で始まる .pasta 行はリテラル継続を使わず join で組む）。

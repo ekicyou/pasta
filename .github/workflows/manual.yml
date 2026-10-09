@@ -27,6 +27,7 @@ on:
       - '.claude/skills/pasta-ghost-authoring/**'
       - '.claude/skills/pasta-lua-coding/**'
       - 'crates/*/README.md'
+      - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
   pull_request:
     branches: [main]
     paths:
@@ -35,6 +36,7 @@ on:
       - '.claude/skills/pasta-ghost-authoring/**'
       - '.claude/skills/pasta-lua-coding/**'
       - 'crates/*/README.md'
+      - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
   workflow_dispatch:  # 手動実行
 
 # Pages の同時デプロイを直列化（実行中のデプロイはキャンセルしない）。

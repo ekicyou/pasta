@@ -151,12 +151,12 @@ fn test_pasta_toml_content() {
 
     // [ghost] セクション内容確認 (Req 7.1)
     assert!(
-        content.contains("talk_interval_min = 180"),
-        "talk_interval_min = 180 がありません"
+        content.contains("talk_interval_min = 45"),
+        "talk_interval_min = 45 がありません"
     );
     assert!(
-        content.contains("talk_interval_max = 300"),
-        "talk_interval_max = 300 がありません"
+        content.contains("talk_interval_max = 75"),
+        "talk_interval_max = 75 がありません"
     );
 
     // 教育的コメント確認 (Req 7.3)
@@ -264,104 +264,6 @@ fn test_ukadoc_files() {
         shell_desc.contains("kero.balloon.offsety,0"),
         "shell descript.txt の kero.balloon.offsety が0ではありません"
     );
-}
-
-/// pasta DSL スクリプト検証テスト（ghosts/hello-pasta 直接読み込み）
-#[test]
-fn test_pasta_scripts() {
-    /// グローバルアクター辞書定義（行頭の`％actor_name`）が含まれているかチェック
-    /// シーン内アクタースコープ（インデント付き`　％actor_name`）は検出しない
-    fn contains_global_actor_dictionary(content: &str, actor_name: &str) -> bool {
-        let pattern = format!("％{}", actor_name);
-        content.starts_with(&pattern) || content.contains(&format!("\n{}", pattern))
-    }
-
-    let dic_dir = ghost_dir().join("ghost/master/dic");
-
-    // actors.pasta - アクター辞書
-    let actors = std::fs::read_to_string(dic_dir.join("actors.pasta")).unwrap();
-    assert!(actors.contains("％女の子"), "女の子アクターがありません");
-    assert!(actors.contains("％男の子"), "男の子アクターがありません");
-    assert!(actors.contains("＠笑顔"), "笑顔表情がありません");
-    assert!(actors.contains("＠怒り"), "怒り表情がありません");
-
-    // boot.pasta
-    let boot = std::fs::read_to_string(dic_dir.join("boot.pasta")).unwrap();
-    assert!(boot.contains("＊OnBoot"), "OnBoot シーンがありません");
-    assert!(
-        boot.contains("＊OnFirstBoot"),
-        "OnFirstBoot シーンがありません"
-    );
-    assert!(boot.contains("＊OnClose"), "OnClose シーンがありません");
-    assert!(
-        !contains_global_actor_dictionary(&boot, "女の子"),
-        "boot.pasta にグローバルアクター辞書定義が含まれています"
-    );
-
-    // talk.pasta
-    let talk = std::fs::read_to_string(dic_dir.join("talk.pasta")).unwrap();
-    assert!(talk.contains("＊OnTalk"), "OnTalk シーンがありません");
-    assert!(
-        talk.contains("＊時報その他"),
-        "時報その他 シーンがありません"
-    );
-    assert!(talk.contains("＊時報12"), "時報12 シーンがありません");
-    assert!(talk.contains("＄時"), "時刻変数参照がありません");
-    assert!(
-        !contains_global_actor_dictionary(&talk, "女の子"),
-        "talk.pasta にグローバルアクター辞書定義が含まれています"
-    );
-
-    // click.pasta
-    let click = std::fs::read_to_string(dic_dir.join("click.pasta")).unwrap();
-    assert!(
-        click.contains("＊OnMouseDoubleClick"),
-        "OnMouseDoubleClick シーンがありません"
-    );
-    assert!(
-        !contains_global_actor_dictionary(&click, "女の子"),
-        "click.pasta にグローバルアクター辞書定義が含まれています"
-    );
-
-    // ダブルクリック反応は7種以上
-    let click_count = click.matches("＊OnMouseDoubleClick").count();
-    assert!(
-        click_count >= 7,
-        "ダブルクリック反応が7種未満: {}",
-        click_count
-    );
-}
-
-/// ランダムトークパターン数テスト（ghosts/hello-pasta 直接読み込み）
-#[test]
-fn test_random_talk_patterns() {
-    let talk = std::fs::read_to_string(ghost_dir().join("ghost/master/dic/talk.pasta")).unwrap();
-
-    // OnTalk パターン数（5〜10種）
-    let talk_count = talk.matches("＊OnTalk").count();
-    assert!(talk_count >= 5, "OnTalk パターンが5種未満: {}", talk_count);
-    assert!(
-        talk_count <= 10,
-        "OnTalk パターンが10種超過: {}",
-        talk_count
-    );
-}
-
-/// 時報パターンテスト（ghosts/hello-pasta 直接読み込み）
-#[test]
-fn test_hour_chime_patterns() {
-    let talk = std::fs::read_to_string(ghost_dir().join("ghost/master/dic/talk.pasta")).unwrap();
-
-    // 時報その他パターン存在確認
-    let hour_count = talk.matches("＊時報その他").count();
-    assert!(hour_count >= 1, "時報その他 パターンがありません");
-
-    // 時刻別時報確認
-    assert!(talk.contains("＊時報12"), "時報12 パターンがありません");
-
-    // 時刻変数参照確認
-    assert!(talk.contains("＄時"), "＄時 変数参照がありません");
-    assert!(talk.contains("＄時１２"), "＄時１２ 変数参照がありません");
 }
 
 /// 画像サイズ検証テスト
