@@ -29,8 +29,8 @@ ghost/master/descript.txt
 ghost/master/pasta.dll
 ghost/master/pasta.toml
 ghost/master/updates.txt
-ghost/master/dic/boot.pasta
-ghost/master/dic/talk.pasta
+ghost/master/dic/01-boot.pasta
+ghost/master/dic/02-talk.pasta
 ghost/master/scripts/README.md
 shell/master/descript.txt
 shell/master/surface0.png
