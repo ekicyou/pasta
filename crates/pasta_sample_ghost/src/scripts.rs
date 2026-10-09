@@ -146,11 +146,17 @@ mod tests {
         let touch = read_pasta_script("08-touch.pasta");
         let count = count_lines(&touch, "＊OnMouseDoubleClick");
         assert!(count >= 3, "ダブルクリック反応は 3 種以上必要: {}", count);
+        // コメント行（＃）の説明ではなく、シーンの本文に書かれていることを確かめる
+        let body: String = touch
+            .lines()
+            .filter(|l| !l.starts_with('＃'))
+            .collect::<Vec<_>>()
+            .join("\n");
         assert!(
-            touch.contains("＞transfer_req_to_var"),
+            body.contains("＞transfer_req_to_var"),
             "＞transfer_req_to_var がありません"
         );
-        assert!(touch.contains("＄ｒ４"), "＄ｒ４ 変数参照がありません");
+        assert!(body.contains("＄ｒ４"), "＄ｒ４ 変数参照がありません");
     }
 
     #[test]
