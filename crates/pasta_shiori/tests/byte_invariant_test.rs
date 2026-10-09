@@ -84,14 +84,13 @@ fn assert_golden_bytes(label: &str, actual: &str, expected: &str) {
 
 /// OnBoot（hello-pasta 単一 OnBoot シーン）の完全応答。
 ///
-/// 意図した変更（`.kiro/specs/completed/sakura-script-newline` R3.1）: sakura(spot0)→kero(spot1) の
-/// 単純切替は両スポットとも初テキストのため、完全遅延方式では段落区切り改行 `\n[150]` を
-/// 出力しない（先出し版は離脱側スコープ末尾にゴミ改行を残していた。本仕様はこれを排除する）。
+/// 出どころは `dic/01-boot.pasta` の 1 行（`女の子：やっほー、今日もよろしくね。`・表情なし）。
+/// 表情指定が無いので `\s[n]` は出ず、`[talk]` 設定の句読点ウェイト `\_w[n]` が入る。
 const GOLDEN_ONBOOT: &str = "SHIORI/3.0 200 OK\r\n\
 Charset: UTF-8\r\n\
 Sender: Pasta\r\n\
 SecurityLevel: local\r\n\
-Value: \\p[0]\\s[1]起動したよ～。\\_w[950]\\p[1]\\s[11]さあ、\\_w[450]始めようか。\\_w[950]\\e\r\n\
+Value: \\p[0]やっほー、\\_w[450]今日もよろしくね。\\_w[950]\\e\r\n\
 \r\n";
 
 /// GET property コルーチン継続 Round1: get_property が get タグを yield。

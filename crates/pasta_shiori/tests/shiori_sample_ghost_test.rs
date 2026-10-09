@@ -72,35 +72,25 @@ fn test_onboot_response() {
         response
     );
 
-    // 5.3: Verify spot switching tags (\p[0] or \p[1])
-    // Note: pasta uses \p[n] format instead of \0/\1
-    let has_spot_tag = response.contains("\\p[0]") || response.contains("\\p[1]");
+    // 5.3: Verify spot switching tag \p[0] (女の子 = spot 0)
+    // Note: pasta uses \p[n] format instead of \0/\1.
+    // OnBoot (dic/01-boot.pasta) has no expression, so \s[n] is not emitted.
     assert!(
-        has_spot_tag,
-        "Response should contain spot switching tags (\\p[0] or \\p[1]), got: {}",
+        response.contains("\\p[0]"),
+        "Response should contain spot switching tag '\\p[0]', got: {}",
         response
     );
 
-    // 5.4: Verify expression tag (\s[n])
-    // Note: pasta uses \s[n] format with surface ID numbers
-    assert!(
-        response.contains("\\s["),
-        "Response should contain expression tag '\\s[', got: {}",
-        response
-    );
-
-    // 5.5: Verify wait tag (\_w[) from pasta.toml [talk] section
+    // 5.4: Verify wait tag (\_w[) from pasta.toml [talk] section
     assert!(
         response.contains("\\_w["),
         "Response should contain wait tag '\\_w[', got: {}",
         response
     );
 
-    // 5.6: Verify text content from OnBoot scene
+    // 5.5: Verify text content from OnBoot scene (dic/01-boot.pasta)
     assert!(
-        response.contains("起動したよ")
-            || response.contains("起動挨拶")
-            || response.contains("おはよう"),
+        response.contains("今日もよろしくね"),
         "Response should contain OnBoot greeting text, got: {}",
         response
     );
