@@ -130,7 +130,7 @@
   - _Requirements: 5.4_
   - _Depends: 2.8, 5.1_
 
-- [ ] 5.3 (P) マニュアル CI の起動条件に hello-pasta の辞書を加える
+- [x] 5.3 (P) マニュアル CI の起動条件に hello-pasta の辞書を加える
   - `manual.yml` の `push` と `pull_request` の `paths` に hello-pasta の `dic/**` を足す（段階表ファイルは足さない）
   - 完了時: `manual.yml` の両方の `paths` に辞書のパスがあり、YAML として読み込める
   - _Requirements: 5.4b_
