@@ -12,7 +12,8 @@
 //   - 実リポジトリ: 全 dic がチュートリアルと逐語一致 → ok=true。
 //   - 一致サンドボックス → ok=true。
 //   - 1 文字でも改変注入 → MISMATCH 検出＆ ok=false（exit 1 相当）。
-//   - dic 欠落注入 → missing-source 検出＆ ok=false。
+//   - チュートリアルに無い dic を dic/ に追加 → 列挙で拾われ no-matching-block＆ ok=false。
+//   - 照合対象は dic/ 直下の *.pasta の列挙（listDicFiles）から導く（固定一覧なし）。
 //   - ユニット: extractPastaBlocks / normalizeForCompare / matchDicFile。
 
 import fs from 'node:fs';
@@ -24,7 +25,7 @@ import {
   REPO_ROOT,
   TUTORIAL_REL,
   HELLO_DIC_REL,
-  DIC_FILES,
+  listDicFiles,
   extractPastaBlocks,
   normalizeForCompare,
   matchDicFile,
@@ -59,11 +60,14 @@ function rmrf(root) {
 
 // 実リポジトリの dic 内容から、チュートリアル本文を機械生成して最小フィクスチャを作る。
 // （逐語転記そのものを再現するため、本物の dic をコードブロックに埋め込む）。
-function makeSandbox({ corruptFile = null, dropFile = null } = {}) {
+// 中に ``` を含む dic（12 段目の ```lua）は ````pasta で囲む（first-ghost.md と同じ書き方）。
+// extraFile: dic/ にだけ置き、チュートリアルには載せない dic（列挙で拾われることの確認用）。
+const DIC = listDicFiles();
+function makeSandbox({ corruptFile = null, extraFile = null } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-check-'));
   const tutorialParts = ['# サンドボックス チュートリアル\n\n本文。\n'];
-  for (const name of DIC_FILES) {
-    if (name === dropFile) continue; // dic ファイル自体を配置しない（欠落注入）
+  if (extraFile) writeFile(root, `${HELLO_DIC_REL}/${extraFile}`, '＊追加\n　チュートリアルに無い辞書。\n');
+  for (const name of DIC) {
     const realAbs = path.resolve(REPO_ROOT, HELLO_DIC_REL, name);
     let content = fs.readFileSync(realAbs, 'utf8');
     writeFile(root, `${HELLO_DIC_REL}/${name}`, content);
@@ -74,7 +78,8 @@ function makeSandbox({ corruptFile = null, dropFile = null } = {}) {
       // チュートリアル側ブロックだけを改変（実ファイルとずれる → MISMATCH）。
       blockBody = blockBody + '＃ チュートリアル側にだけ混入した余計な行\n';
     }
-    tutorialParts.push('```pasta\n' + blockBody + '```\n');
+    const fence = content.includes('```') ? '````' : '```';
+    tutorialParts.push(fence + 'pasta\n' + blockBody + fence + '\n');
   }
   writeFile(root, TUTORIAL_REL, tutorialParts.join('\n'));
   return root;
@@ -86,7 +91,9 @@ log('\n== (A) 実リポジトリ現状: 全 dic 逐語一致 ==');
   const result = runTutorialCheck(REPO_ROOT);
   check('実リポジトリで ok=true（exit 0 相当）', result.ok === true,
     JSON.stringify(result.results));
-  check('5 件の dic を検証', result.results.length === DIC_FILES.length);
+  check(`列挙した ${DIC.length} 件の dic を検証`,
+    DIC.length > 0 && result.results.length === DIC.length,
+    `listed=${DIC.length} checked=${result.results.length}`);
   check('全 dic が verbatim-match',
     result.results.every((r) => r.matched && r.reason === 'verbatim-match'),
     JSON.stringify(result.results.filter((r) => !r.matched)));
@@ -109,32 +116,34 @@ log('\n== (B-1) 一致サンドボックス ==');
 // ============================================================
 log('\n== (B-2) 改変注入（チュートリアル側ブロックを 1 行追加） ==');
 {
-  const root = makeSandbox({ corruptFile: 'boot.pasta' });
+  const root = makeSandbox({ corruptFile: '01-boot.pasta' });
   try {
     const result = runTutorialCheck(root);
     check('改変で ok=false（exit 1 相当）', result.ok === false);
-    const bad = result.results.find((r) => r.file.endsWith('boot.pasta'));
-    check('boot.pasta が no-matching-block',
+    const bad = result.results.find((r) => r.file.endsWith('/01-boot.pasta'));
+    check('01-boot.pasta が no-matching-block',
       bad && bad.matched === false && bad.reason === 'no-matching-block',
       JSON.stringify(bad));
     check('他の dic は依然 match',
-      result.results.filter((r) => !r.file.endsWith('boot.pasta')).every((r) => r.matched));
+      result.results.filter((r) => !r.file.endsWith('/01-boot.pasta')).every((r) => r.matched));
   } finally {
     rmrf(root);
   }
 }
 
 // ============================================================
-log('\n== (B-3) dic 欠落注入 ==');
+log('\n== (B-3) チュートリアルに無い dic の追加（列挙で拾われる） ==');
 {
-  const root = makeSandbox({ dropFile: 'choice.pasta' });
+  const root = makeSandbox({ extraFile: '13-extra.pasta' });
   try {
     const result = runTutorialCheck(root);
-    check('欠落で ok=false', result.ok === false);
-    const miss = result.results.find((r) => r.file.endsWith('choice.pasta'));
-    check('choice.pasta が missing-source',
-      miss && miss.matched === false && miss.reason === 'missing-source',
-      JSON.stringify(miss));
+    check('追加 dic で ok=false', result.ok === false);
+    check('追加 dic も検証対象に入る', result.results.length === DIC.length + 1,
+      `checked=${result.results.length}`);
+    const extra = result.results.find((r) => r.file.endsWith('/13-extra.pasta'));
+    check('13-extra.pasta が no-matching-block',
+      extra && extra.matched === false && extra.reason === 'no-matching-block',
+      JSON.stringify(extra));
   } finally {
     rmrf(root);
   }
@@ -201,17 +210,17 @@ log('\n== (B-6) fatal 経路（チュートリアル不在） ==');
 // ============================================================
 log('\n== (B-7) レポート分岐（MISMATCH 表示・対処ガイダンス / OK 表示） ==');
 {
-  const bad = makeSandbox({ corruptFile: 'talk.pasta' });
+  const bad = makeSandbox({ corruptFile: '02-talk.pasta' });
   const good = makeSandbox();
   try {
     const repBad = reportTutorialCheck(runTutorialCheck(bad));
-    check('MISMATCH 行に対象 dic を表示', /MISMATCH\s+\S*talk\.pasta/.test(repBad), repBad);
+    check('MISMATCH 行に対象 dic を表示', /MISMATCH\s+\S*02-talk\.pasta/.test(repBad), repBad);
     check('失敗レポートに RESULT: FAIL と対処ガイダンス',
       repBad.includes('RESULT: FAIL') && repBad.includes('対処'));
 
     const repGood = reportTutorialCheck(runTutorialCheck(good));
     check('一致レポートに RESULT: OK', repGood.includes('RESULT: OK'));
-    check('一致レポートに MATCH 行', /MATCH\s+\S*boot\.pasta/.test(repGood));
+    check('一致レポートに MATCH 行', /MATCH\s+\S*01-boot\.pasta/.test(repGood));
   } finally {
     rmrf(bad);
     rmrf(good);
@@ -229,6 +238,46 @@ log('\n== (B-8) extractPastaBlocks 端ケース（CRLF / 行内空白 / 類似�
     extractPastaBlocks('```pastalang\n＃ Z\n```\n').length === 0);
   check('未閉鎖フェンスは抽出しない',
     extractPastaBlocks('```pasta\n＃ W\n').length === 0);
+
+  // 4 バッククォートのフェンス: 内側の ```lua … ``` は閉じにならず中身として残る。
+  const lua = ['＊会話', '```lua', 'function SCENE.f(act)', 'end', '```', '　＠f（）'].join('\n');
+  const four = extractPastaBlocks('````pasta\n' + lua + '\n````\n\n```pasta\n＃ 次\n```\n');
+  check('````pasta: 内側の ```lua を中身として残し 2 件抽出',
+    four.length === 2 && normalizeForCompare(four[0]) === lua
+      && normalizeForCompare(four[1]) === '＃ 次',
+    JSON.stringify(four));
+  check('開きより長いバッククォート行でも閉じる',
+    extractPastaBlocks('```pasta\n＃ L\n`````\n').length === 1);
+}
+
+// ============================================================
+log('\n== (B-8b) listDicFiles（dic/ 直下の *.pasta を辞書順・空なら fatal） ==');
+{
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-check-'));
+  try {
+    writeFile(root, `${HELLO_DIC_REL}/b.pasta`, '＃ b\n');
+    writeFile(root, `${HELLO_DIC_REL}/a.pasta`, '＃ a\n');
+    writeFile(root, `${HELLO_DIC_REL}/note.txt`, 'x\n');
+    writeFile(root, `${HELLO_DIC_REL}/sub/c.pasta`, '＃ c\n');
+    const names = listDicFiles(root);
+    check('*.pasta だけを辞書順に返す（サブディレクトリ・他拡張子は除外）',
+      JSON.stringify(names) === JSON.stringify(['a.pasta', 'b.pasta']), JSON.stringify(names));
+    check('実リポジトリの列挙は辞書順',
+      JSON.stringify(DIC) === JSON.stringify([...DIC].sort()), JSON.stringify(DIC));
+  } finally {
+    rmrf(root);
+  }
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-check-'));
+  try {
+    writeFile(empty, TUTORIAL_REL, '```pasta\n＃ x\n```\n');
+    const result = runTutorialCheck(empty);
+    check('dic が 1 件も無ければ fatal で ok=false（空集合で素通りしない）',
+      result.ok === false && typeof result.fatal === 'string'
+        && result.fatal.includes(HELLO_DIC_REL),
+      String(result.fatal));
+  } finally {
+    rmrf(empty);
+  }
 }
 
 // ============================================================
