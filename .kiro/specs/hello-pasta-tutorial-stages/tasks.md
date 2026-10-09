@@ -144,7 +144,7 @@
   - _Depends: 2.5_
 
 - [ ] 6. 完了確認
-- [ ] 6.1 全体の検証と実機での確認を行う
+- [x] 6.1 全体の検証と実機での確認を行う
   - 環境変数 `NoDefaultCurrentDirectoryInExePath` を外したうえで、`cargo test --all`・`cargo clippy --all-targets --workspace -- -D warnings`・`node book/tools/tutorial-check.mjs` を走らせ、すべて成功させる
   - 配布辞書（12 段目）を SSP または areka で起動し、ランダムトーク、7 段目の emo2 との切り替えの往復、12 段目の Lua 呼び出しを目視で確かめる（ロードだけのテストでは通らない経路）
   - 配布物の辞書以外のファイル（`install.txt`・`descript.txt`・シェル・`scripts/`）に差分が無く、`pasta.toml` の差分が talk 間隔の 2 行だけであることを確かめる
@@ -161,3 +161,4 @@
 - 旧ファイル名が残る箇所（テスト以外）: `pasta_shiori` の `scene_kick_e2e_test.rs:94`・`scene_kick_preempt_e2e_test.rs:88` のコメント（2.7 で直す）、`.claude/skills/pasta-check/references/*.md`（完了時のスキル同期で扱う）。
 - 5.1 の自己テストは、実リポジトリの first-ghost.md を見る 4 件（(A)×2・(B-9)×2）だけ 5.2 まで赤。サンドボックスとユニットは全 PASS。
 - 2.8 で emo2 開発の確定案（15 行）を反映。OnBoot は「やっほー、今日もよろしくね。」。emo2 からの申し送り: 1 場面 3 通りは今のシーン数（構造固定）ではできないので、配布版でバリエーションを足すときの指針として残す。
+- 6.1 実機確認（2026-10-09、SSP `--ghost <hello-pasta> --option readonly`、release.ps1 で配置した pasta.dll）: 起動後 75 秒以内にランダムトークが出た。SSP MCP の raise_event で OnTalk を回し、12 段目の Lua 会話・10 段目の回数・7 段目の baseware.name（「SSPの上で動いてるんだね」）を確認。OnGhostChanged（むらさき）・OnGhostChanging（むらさき）・OnMouseDoubleClick（Head）も応答。実際に emo2（えも？）へ切り替えて送り出しの台詞を確認し、戻すと readonly 起動のため OnGhostChanged ではなく OnFirstBoot が来た（SSP 側の初回扱い。辞書の不具合ではない）。SSP のエラーログ・pasta.log の ERROR はともに 0 件。
