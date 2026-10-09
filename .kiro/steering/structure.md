@@ -197,6 +197,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       ├── Cargo.toml       # 画像生成・配布物作成用依存
 │       ├── README.md        # クレート概要
 │       ├── RELEASE.md       # リリース手順
+│       ├── STAGES.md        # 入門ガイドの段階表（段階 N の辞書 = dic/01〜NN。.nar には入らない）
 │       ├── release.ps1      # ビルド＋配布パッケージ生成スクリプト（手元では動作確認用・リリース CI の build job も呼ぶ）
 │       ├── build.rs         # ビルドスクリプト
 │       ├── src/
@@ -206,8 +207,8 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── config_templates.rs # surfaces.txt生成
 │       │   └── scripts.rs          # ghosts/hello-pasta 辞書(.pasta)の検証テスト
 │       ├── ghosts/           # サンプルゴースト本体（SSOT・配布物一式）
-│       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/install)＋生成物(dll/ライセンス表示/scripts は .gitignore 済み・画像は追跡)
-│       └── tests/            # 統合テスト・配布ファイル構成検証
+│       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/NN-*.pasta 12 段/install)＋生成物(dll/ライセンス表示/scripts は .gitignore 済み・画像は追跡)
+│       └── tests/            # 統合テスト・配布ファイル構成検証・全段階の検証（tutorial_stages_test.rs）
 ├── benches/                  # ベンチマークコード
 ├── editors/                  # エディタ拡張
 │   └── vscode/              # VSCode拡張（TypeScript + WASM統合）
