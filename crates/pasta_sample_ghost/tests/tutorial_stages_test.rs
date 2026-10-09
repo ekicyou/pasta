@@ -359,3 +359,87 @@ fn every_stage_loads_and_responds() {
         }
     }
 }
+
+/// `GLOBAL` のキー。Call は GLOBAL を先に引くので、同じ名前のシーンは呼べない
+/// （`pasta_lua` の `pasta/global.lua`・`pasta/shiori/entry.lua` が定義する）。
+const GLOBAL_KEYS: &[&str] = &["yield", "チェイントーク", "ゴースト終了", "close_ghost"];
+
+/// `pasta_shiori` の e2e が足すシーン（`KickE2EProbe`・`GatePrevScene` など）の接頭辞
+const E2E_PREFIXES: &[&str] = &["Kick", "Gate"];
+
+/// 行頭の `＊名前` / `*名前` の名前を集める。単独の `＊` と Lua ブロックの中は除く。
+/// 名前は宣言行への属性の付記（`＆`）・行末コメント（`＃`）・空白の手前まで。
+fn global_scene_names(source: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut fence = 0; // 開いている Lua ブロックのフェンスの本数（0 は外）
+    for line in source.lines() {
+        let ticks = line.chars().take_while(|&c| c == '`').count();
+        if ticks >= 3 && (fence == 0 || ticks == fence) {
+            fence = if fence == 0 { ticks } else { 0 };
+            continue;
+        }
+        if fence > 0 {
+            continue;
+        }
+        let Some(rest) = line.strip_prefix('＊').or_else(|| line.strip_prefix('*')) else {
+            continue;
+        };
+        let name = rest
+            .split(|c: char| c.is_whitespace() || matches!(c, '＆' | '&' | '＃' | '#'))
+            .next()
+            .unwrap_or("");
+        if !name.is_empty() {
+            names.push(name.to_string());
+        }
+    }
+    assert_eq!(fence, 0, "Lua ブロックが閉じていない");
+    names
+}
+
+#[test]
+fn global_scene_names_skip_lua_and_trailers() {
+    let source = "＊A＆作者：x\r\n＊\r\n*B ＃c\r\n```lua\r\n＊C\r\n```\r\n＊D\r\n````\r\n```\r\n＊E\r\n````\r\n    ・F\r\n";
+    assert_eq!(global_scene_names(source), ["A", "B", "D"]);
+}
+
+/// 全 `dic/*.pasta` のグローバルシーン名について、異なる 2 つの名前のどちらも他方で始まらず、
+/// `Kick`・`Gate` で始まらず、`GLOBAL` のキーと同じでないことを確かめる（Req 2.5・5.3）。
+/// `＊会話` は別名で OnTalk になるが、書いた名前 `会話` のまま検査する。
+#[test]
+fn scene_names_do_not_prefix_collide() {
+    let mut names = BTreeSet::new();
+    for entry in std::fs::read_dir(dic_dir()).expect("dic/ を読めない") {
+        let path = entry.expect("dic/ の項目を読めない").path();
+        if path.extension().is_some_and(|e| e == "pasta") {
+            let source = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("{} を読めない: {e}", path.display()));
+            names.extend(global_scene_names(&source));
+        }
+    }
+    assert!(!names.is_empty(), "dic/ にグローバルシーンが無い");
+
+    let mut problems = Vec::new();
+    for a in &names {
+        for b in names
+            .iter()
+            .filter(|b| *b != a && b.starts_with(a.as_str()))
+        {
+            problems.push(format!(
+                "`＊{b}` が `＊{a}` で始まる（前方一致の候補に混ざる）"
+            ));
+        }
+        if let Some(p) = E2E_PREFIXES.iter().find(|p| a.starts_with(*p)) {
+            problems.push(format!(
+                "`＊{a}` が `{p}` で始まる（pasta_shiori の e2e と衝突）"
+            ));
+        }
+        if GLOBAL_KEYS.contains(&a.as_str()) {
+            problems.push(format!("`＊{a}` が GLOBAL のキーと同じ"));
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "シーン名の衝突（シーン名: {names:?}）:\n{}",
+        problems.join("\n")
+    );
+}
