@@ -123,7 +123,7 @@
   - _Requirements: 3.7, 5.4a_
   - _Boundary: TutorialCheck_
 
-- [ ] 5.2 first-ghost.md の pasta ブロックを新しい辞書に機械的に合わせる
+- [x] 5.2 first-ghost.md の pasta ブロックを新しい辞書に機械的に合わせる
   - 辞書ファイルごとのステップを 12 ファイルの小見出しに並べ替え、各 `pasta` ブロックを新ファイルと逐語一致させる。Lua ブロックを含む 12 段目だけ 4 バッククォートで囲む
   - 本文中の辞書の引用（`起動したよ～`・`＄ゴースト名`・旧ファイル名など）を新しい内容に直す。章立て・Claudia の語り・照合方式は変えない
   - 完了時: `node book/tools/tutorial-check.mjs` が exit 0 で終わる
