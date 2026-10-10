@@ -89,3 +89,56 @@ pasta のマニュアルは初心者向けになっていない。入門ガイ�
 
 - **ランダムトークの間隔**: 配布版 hello-pasta の `pasta.toml` は `[ghost]` の `talk_interval_min = 45`・`talk_interval_max = 75`（平均 1 分）になる。読者が `first-ghost.md` ステップ 7 の最小構成（`[actor]` だけ）で作ると既定の 180〜300 秒のままで、2 段目の `＊会話` を確かめるのに数分待つ。段階表（`crates/pasta_sample_ghost/STAGES.md`）の 2 段目は「すぐ確かめたいときは `[ghost]` で間隔を短くする」を新しく覚える表現に含めている。設定の段は独立させていない（設定の段は辞書ファイルを持たず、1 段 1 ファイルの組み立て方が崩れるため）。ガイド本文では 2 段目で `[ghost]` の 2 行を書き足させるのが自然。
 - **起動時の台詞の説明**: `first-ghost.md` ステップ 8-3 の「起動すると `OnBoot`（初回は `OnFirstBoot`）のセリフが表示される」は、7 段目の `＊OnGhostChanged` が応答するため、別のゴーストから切り替えたときは OnBoot ではなく OnGhostChanged の台詞が出る。5.2 は機械的な追従に限ったので直していない。本文を書き直すときに合わせる。
+
+## 2026-10-10 棚卸の再測定（main add05022）
+
+- **前提の変化**: 先に要る 3 本のうち、`manual-claudia-theme` と `hello-pasta-tutorial-stages` が main に入った。残るのは `hello-pasta-shell-art` だけ。
+  - 段階表は `crates/pasta_sample_ghost/STAGES.md`（13 段。辞書を持つのは 1〜12 段目で、13 段目は手順だけ）。段階の辞書は配布版の辞書そのもの（`ghosts/hello-pasta/ghost/master/dic/` の `01-boot.pasta`〜`12-lua.pasta`、1 段 1 ファイル）で、全段が起動することをテスト（`tests/tutorial_stages_test.rs`）が確かめている。
+  - `first-ghost.md` は 589 行になり、12 ファイルを順に貼る形へ機械的に直してある。語りと説明は古いまま。
+  - 作例の照合（`book/tools/tutorial-check.mjs`、178 行）は、今も「`first-ghost.md` 1 枚のどこかに、辞書の各ファイルと同じ中身のブロックがあるか」だけを見る。段階と章の対応は見ない。
+  - マニュアルの自動検査（`.github/workflows/manual.yml`）は、辞書の変更でも走るようになった。roadmap の「照合の落とし穴」は解消した。
+  - 入門の章では、本文に台詞の部品を置いてよい（`book/AUTHORING.md` 第 7 節「置ける場所」）。本文の口調を禁じる機械検査は、入門の章にはかかっていない。規約の例外は主に `AUTHORING.md` の第 1・2・5 節の文章の話になり、検査（`book/tools/verify-content.mjs`、622 行）の直しは小さい（`first-ghost.md` を名指しする検査と、章の数）。
+- **触るファイル**: `book/src/getting-started/`（3 枚を 16 枚前後に）、`book/src/SUMMARY.md`・`introduction.md`、`book/AUTHORING.md`、`book/tools/` の `tutorial-check.mjs`・`tutorial-check-test.mjs`・`verify-content.mjs`・`verify-scripts-test.mjs`・`talk/talk-test.mjs`（後ろの 2 つは章数 47 を決め打ちしている）、`book/book.toml`（古いページからの転送）、`crates/pasta_lua/README.md`・`crates/pasta_shiori/README.md`（`first-ghost.html` へのリンク）、スクリーンショット（新規）。段階表を照合に使うなら `manual.yml` の対象パスも。1,000 行に近いファイルは無い。
+- **規模**: 22〜24 タスク（規約 1、検査ツールと自己テスト 4、目次・案内・転送 2、準備の章 2、段階の章 13 段で 9〜11、スクリーンショット 2〜3、通しの確認 1）。20 を超える。
+- **先に要るもの**: 本文は今すぐ始められる。`hello-pasta-shell-art` を待つのは、スクリーンショットと 8 段目の実機の動き（今のシェルには当たり判定が無く、触った部位の名前が空になる）。他の未完了 spec とファイルは重ならない（`hello-pasta-shell-art` が辞書と `book/` を触らない場合）。
+- **種別**: 文書（入門ガイドの書き直し。方針は開発者が 2026-10-06 に決めた）。
+- **要件定義のモデル**: 本文の側は Fable（前回は Opus）。「全編を Claudia が語る」を、台詞の部品だけで書くか、地の文も Claudia の口調にするかで、16 枚全部の形と執筆規約が決まる。導入と締めに二人とも要る規則との折り合いも、開発者の判断になる。スクリーンショットの側は Opus。
+- **分割の案**: 本文と絵の 2 つに分ける。
+  - `getting-started-story-guide`（本文。今のウェーブ）: 規約の例外、検査ツール、全章の文章、目次と案内。18〜20 タスク。シェルのファイルの中身は本文に書き写さず（「hello-pasta のシェルをそのまま使う」とだけ書く）、画像は置かない。
+  - `getting-started-screenshots`（新規。`hello-pasta-shell-art` と本文の後）: 撮影の手順、画像、各章への画像の行、新しいシェルでの 8 段目の実機確認。4〜6 タスク。
+  - 本文を main に入れるのは `hello-pasta-shell-art` の後にする（8 段目が書いたとおりに動くため）。絵の無いガイドを先に公開してよいかは、開発者に確かめる（Constraints の「部分出荷はしない」との兼ね合い）。
+- **見つけた穴・古くなった記述**:
+  - 「途中の段階では起動しないことがある」（`first-ghost.md` 13 行目、`index.md` 15 行目）は、もう正しくない。
+  - `first-ghost.md` 559 行目の「Lua ランタイム（`scripts/` 配下）も配置する」は誤り。ランタイムは `pasta.dll` の中にあり、`scripts/` は利用者が自分のスクリプトを置く場所。
+  - `first-ghost.md` 378 行目は 8 段目を「書き方はこれまでと変わらない」と説明するが、今の作例は付加情報（`＄ｒ４`）を使う。
+  - 前回の再測定の行数（`first-ghost.md` 447 行・`verify-content.mjs` 531 行・`tutorial-check.mjs` 152 行）と「先に要るものはすべて未完了」は古い。
+
+## 2026-10-10 棚卸の分割
+
+上の「分割の案」のとおり、本文と絵の 2 つに分けた。この spec は名前をそのままにして本文を持ち、絵は新しい `getting-started-screenshots` が持つ。上の Scope・Desired Outcome・Upstream のうち、絵にかかわる記述は、この節の内容で読み替える。
+
+- **分割後の In**:
+  - 執筆規約（`book/AUTHORING.md`）への、入門ガイドに限った例外
+  - 本文の検査（`book/tools/verify-content.mjs`）の追従
+  - 作例の照合（`book/tools/tutorial-check.mjs`）を、段階ごとの照合に広げることと、そのテスト（`book/tools/tutorial-check-test.mjs`）
+  - 章の数を決め打ちしている自己テストの追従（`book/tools/verify-scripts-test.mjs` 72 行・`book/tools/talk/talk-test.mjs` 454 行。どちらも 47 章と書いている）。再測定の節に無かったものが、もう 1 か所ある。スキル用の文書を生成する道具の自己テスト（`book/tools/gen-skill-refs-test.mjs` 599 行）も、`book/src` の章を 47 と数えている。章を足すと 3 か所とも落ちる。
+  - 全部の章の文章（`book/src/getting-started/` の入口の章・準備の章・13 段の章）
+  - 目次（`book/src/SUMMARY.md`）、表紙の案内（`book/src/introduction.md`）、古いページからの転送（`book/book.toml`）、`first-ghost.html` を指している 2 つのリンク（`crates/pasta_lua/README.md`・`crates/pasta_shiori/README.md`）
+- **分割後の Out**（これまでの Out に足す）:
+  - スクリーンショットの撮影と掲載、画像ファイル、章への画像の行（`getting-started-screenshots` へ）
+  - 新しいシェルでの 8 段目の実機の確かめ（同上）
+- **移したもの**: Scope の「スクリーンショットの撮影と掲載」、Desired Outcome の「新しいシェルで、ゴーストが実際にしゃべる様子をスクリーンショットで示す」、Constraints の「スクリーンショットの撮影手段」。先に要るものから `hello-pasta-shell-art` が外れ、未完了の前提は無くなった。
+- **境界の決まり**:
+  - シェルのファイル（`descript.txt`・`surfaces.txt`）の中身を、本文に書き写さない。「hello-pasta のシェルをそのまま使う」と書いて、置き場所へ案内する。今の `first-ghost.md` は 69 行目と 84 行目から書き写しているので、書き直しで消す。
+  - 本文に画像を置かない。
+  - 触った部位の名前は、段階表（`crates/pasta_sample_ghost/STAGES.md`）から取る。`hello-pasta-shell-art` は、頭の部位名を今の `Head` のまま確定し、hello-pasta の辞書（`dic/`）と `book/` を触らない。
+  - このウェーブでは、マニュアルの自動検査の定義（`.github/workflows/manual.yml`）と、出力の検査（`book/tools/verify-static.mjs`）を触らない。この 2 つは、同じウェーブの `manual-print-media-refs` が持つ。段階表を照合に使うために自動検査の対象を広げたくなったら、次のウェーブへ回す。
+- **順番**: 本文は今のウェーブで始める。`hello-pasta-shell-art` と同じ時期に進められる（上の境界の決まりを守れば、ファイルは重ならない）。絵は、新しいシェルと本文の両方が main に入った後に `getting-started-screenshots` が足す。本文が新しいシェルより先に main に入ると、それまでの間、8 段目は当たり判定の無い今のシェルで動く。触った部位の名前は空になるが、8 段目の辞書（`dic/08-touch.pasta`）は空でも読めるように書いてある。
+- **規模**: 本文が 18〜20 タスク（規約 1、検査ツールと自己テスト 4、目次・案内・転送 2、準備の章 2、段階の章 9〜11、通しの確認 1）。絵が 4〜6 タスク。
+- **触るファイル**:
+  - 本文（この spec）: `book/src/getting-started/`（3 枚を 16 枚前後に）、`book/src/SUMMARY.md`、`book/src/introduction.md`、`book/AUTHORING.md`、`book/book.toml`、`book/tools/` の `verify-content.mjs`・`tutorial-check.mjs`・`tutorial-check-test.mjs`・`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`（章の数の 1 行だけ）、`crates/pasta_lua/README.md`、`crates/pasta_shiori/README.md`。
+  - 絵（`getting-started-screenshots`）: 画像ファイル（新規）、撮影の手順の記録（新規）、`book/src/getting-started/` の各章の画像の行。
+- **要件定義のモデル**: 本文は Fable、絵は Opus（再測定の節のとおり）。
+- **開発者の決定（2026-10-10）**: 絵の無い入門ガイドを先に公開してよい。本文は、`hello-pasta-shell-art` と絵を待たずに main へ入れる。この spec はマニュアルのサイトの作り直しとして最優先で進める。以下は、決定の前に書いた問いの記録。
+- **開発者に確かめること（決定済み）**: 絵の無い入門ガイドを、先に公開してよいか。Constraints は「部分出荷はしない」と決めている。分割の後は、本文が先に main に入り、絵が後から付く。本文は全部の章が物語の形になっていて、旧形式のまま残る章は無い。今の入門ガイドにも絵は無い。これを部分出荷と見るなら、本文を main に入れるのを、`hello-pasta-shell-art` と絵の後まで待つ。
+- **申し送り（完了した `hello-pasta-tutorial-stages` の実機の確かめから）**: ゴースト自身がさくらスクリプトの `\![change,ghost]` で切り替えたときは、`OnGhostChanging` が届かない。SSP のメニューから切り替えたときは届く（`.kiro/specs/completed/hello-pasta-tutorial-stages/tasks.md` の実装メモ 6.1 の追記）。切り替えを説明する 7 段目「挨拶したい」の章で、読者に試してもらう手順は、メニューからの切り替えで書く。

@@ -34,6 +34,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │       └── registry/    # 型管理レイヤー（独立）
 │   │           ├── mod.rs   # Registry API
 │   │           ├── scene_registry.rs  # SceneRegistry - シーン管理
+│   │           ├── scene_alias.rs     # SceneAliasTable - シーン名の別名表（完全一致 1 段）
 │   │           ├── word_registry.rs   # WordDefRegistry - 単語辞書
 │   │           ├── scene_table.rs     # SceneTable - シーン検索
 │   │           ├── scene_table_candidate_tests.rs      # シーンテーブルテスト（候補収集/解決・#[path]パターン）
@@ -79,7 +80,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── loader/      # スクリプトローダー（ディレクトリモジュール）
 │       │   │   ├── mod.rs           # ローダーAPI
 │       │   │   ├── cache.rs         # キャッシュ管理
-│       │   │   ├── config.rs        # ローダー設定
+│       │   │   ├── config/          # ローダー設定（mod.rs・sections.rs。pasta.toml の [scene.alias] の読み込みを含む）
 │       │   │   ├── context.rs       # ローダーコンテキスト
 │       │   │   ├── discovery.rs     # スクリプト検出
 │       │   │   ├── extract.rs       # 起動時自己展開（内蔵zip解凍・MD5マーカー比較・準アトミック展開）
@@ -185,7 +186,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │       ├── server.rs    # PastaLangServer (tower-lsp trait実装)
 │   │       └── transport.rs # WASM/Nativeプラットフォーム抽象化
 │   ├── pasta_check/         # リリースCLIツール
-│   │   ├── Cargo.toml       # pasta_check設定（lexopt, md5, zip, pasta_lua依存）
+│   │   ├── Cargo.toml       # pasta_check設定（lexopt, md5, zip 依存）
 │   │   └── src/
 │   │       ├── main.rs          # CLIエントリーポイント
 │   │       ├── release.rs       # リリースビルドオーケストレーション
@@ -303,7 +304,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 - 共有テストヘルパ: `<feature>_test_support.rs`（複数の `*_tests.rs` から `#[path]` 等で共有されるモック/ビルダ/フィクスチャ。テスト関数は置かない）
 
 ### 文法定義
-- Pest文法: `src/parser/pasta.pest`
+- Pest文法: `crates/pasta_dsl/src/parser/grammar.pest`
 
 ### ファイルサイズ方針（俯瞰可能性）
 

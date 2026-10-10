@@ -122,3 +122,45 @@
 - 別名（`[scene.alias]`。既定 `OnTalk = ["会話"]`）で置き換えた名前の Call が見つからないとき、失敗表記は**書いた名前**（`【Call失敗：「会話」が見つからない】`）を出す。これは `scene-name-alias` の要件 8.1 の決定で、一本化でも引き継ぐ。
 - ログには 2 行出る: Lua `act:call - handler not found`（書いた名前）と、Rust `search/context.rs` `search_scene` の `warn!(name, resolved, "Scene not found (alias applied)")`（書いた名前と置き換え後の名前）。後者は要件 8.2 の唯一の両名ログなので、一本化で落とさない（Lua 側の 1 行に両名を含める形へ移すなら、その時点で Rust 側を落としてよい）。
 - 参照: `.kiro/specs/completed/scene-name-alias/design.md`「互換性と移行 > 後続 spec への申し送り」・Open Questions 1。
+
+## 2026-10-10 棚卸の再測定（main add05022）
+
+- **前提の変化**: 式の中の値なしの扱い（`expr-nil-coercion`）で、`crates/pasta_lua/pasta_scripts/pasta/act.lua` は 774 行から 726 行に減った。失敗をバルーンへ出す仕組みが 2 つある、という前回の指摘は今も正しい。1 つは `act:failure`（696〜702 行。呼ぶのは `act:call` の 631 行と `act:call_key` の 658 行だけ）、もう 1 つは未登録アクターの目印（482 行）で、形も積み方も違う。別名（`scene-name-alias`）の申し送りも現在のコードと一致する（両方の名前を出す警告は `crates/pasta_lua/src/search/context.rs` 147 行）。
+- **今ある警告の場所**: `act.lua` は 208（未代入の変数）・405（単語が無い）・428（関数が無い）・481（未登録アクター）・499（グローバル関数が無い）・531（数にできない値）・549（文字列にできない値）・614（キーが nil）・629（Call が見つからない）・653（キーにできない値）。`actor.lua` は 195・249、`word.lua` は 176・178・180。
+- **触るファイル**: `act.lua` 726、`actor.lua` 272、`word.lua` 185。切り替えの設定を入れるなら `crates/pasta_lua/src/loader/config/sections.rs` 333 と `mod.rs` 326。マニュアルは前回の 5 ページ。1,000 行に近いものは無い。
+- **規模**: Lua 側の一本化と載せ替えで約 15〜17 タスク、設定での切り替えを足して約 17〜19 タスク。500 の応答になる実行時エラーまで入れると、さらに 8〜10 タスク増えて 20 を超える。
+- **先に要るもの**: なし。`scene-attribute-store` とは同じ時期に進められる（向こうは `act.lua` を触らない）。`call-attribute-filter` と `scene-anchor-link` は `act.lua` が重なるので、この spec の後にする。
+- **種別**: 機能（辞書の書き間違いが、ログにしか出ない）。
+- **要件定義のモデル**: Fable（空文字で続ける今の方針を変えるか、配るゴーストでも出すか、開発者の判断の分かれ道が多い）。
+- **分割の案**: 500 の応答になる実行時エラーは、この spec に入れずに別の spec に分ける。
+  - この spec（名前はそのまま）: 失敗を報告する関数を 1 つにし、`act.lua`・`actor.lua`・`word.lua` の警告を載せ替える。切り替えの設定とマニュアルまで。境目は「実行中のシーンが生きていて、バルーンに続きを書けるか」。
+  - 新しい spec（仮の名前 `runtime-error-balloon`）: シーンや要求そのものが止まるエラーを、バルーンにも見せる。触るのは `pasta_scripts/pasta/shiori/entry.lua` 120・`shiori/event/init.lua` 254・`shiori/event/callback.lua` 213・`shiori/res.lua` 141、`crates/pasta_shiori/src/error.rs` 406・`shiori.rs` 397・`actor/thread.rs` 272 と、`pasta_shiori` の結合テスト。この spec の後、`shiori-test-support-runtime` の後に置く。要るかどうかは開発者が決める。
+- **見つけた穴・古くなった記述**:
+  - 数にする関数 `ACT.num`（524 行）・文字列にする関数 `ACT.str`（543 行）と、`word.lua` の `WORD.dynamic_key` は、`act` を受け取らずに呼ばれる。今のままでは、ここからバルーンへ失敗を出せない。生成する Lua の形を変えて `act` を渡す（`crates/pasta_lua/src/code_gen/expr_gen.rs` 297 行を触る）か、報告する関数が実行中の `act` を覚えておくかを、要件で決める。
+  - 警告に出す名前（`var.x`・`@名前()`）は、Lua を生成するときに作っている（`expr_gen.rs` 255 行の `operand_desc`、`crates/pasta_lua/src/code_gen/element_gen.rs` 48 行の `dynamic_ref_args`）。DSL の書き方（`＄x`）に揃えるなら、Lua 側で出すときに直す。そうすれば `element_gen.rs` を触らずに済む。
+  - 未登録アクターは、ログが 2 行出る。`act.lua` 481 行のほかに、立ち位置が決まらないときの警告（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` 75 行）も出る。「重ねて出さない」規則の対象に入れるかを決める。
+  - 「Current State」の警告一覧は、`act:arith`・`act:concat` を `act` の関数として書いたままである。前回の節の行番号は、`act:failure` が 744→696、呼び出し元が 679・706→631・658、`act:call - nil key` が 662→614、`operand_desc` が 207→255 に動いた。
+
+## 2026-10-10 棚卸の分割
+
+上の「分割の案」のとおり、2 つに分けた。500 の応答になる実行時エラーまで入れると 25〜29 タスクになり、20 を超えるためである。この spec は名前をそのままにして、シーンが生きている失敗を持つ。シーンや要求そのものが止まるエラーは、新しい `runtime-error-balloon` が持つ。上の Problem・Approach・Boundary Candidates のうち、500 の応答にかかわる記述は、この節の内容で読み替える。
+
+- **境目**: 失敗した後も実行中のシーンが生きていて、バルーンに続きを積めるか。積める失敗がこの spec、積めない（シーンや要求が止まる）エラーが `runtime-error-balloon`。
+- **分割後の In**:
+  - 失敗を報告する関数を 1 つにすること（ログの警告と、バルーンに見える失敗表記の両方をそこから出す）
+  - `crates/pasta_lua/pasta_scripts/pasta/` の `act.lua`・`actor.lua`・`word.lua` にある警告と失敗の目印の載せ替え
+  - 失敗表記の形と、重ねて出さない決まり
+  - pasta.toml の切り替え（配るゴーストで出すか出さないか）
+  - マニュアルの該当するページの更新と、スキル用の文書の再生成、テスト
+- **分割後の Out**（これまでの Out に足す）:
+  - 500 の応答になる実行時エラーをバルーンに見せること（`runtime-error-balloon` へ）
+  - `crates/pasta_lua/pasta_scripts/pasta/shiori/` の下（`entry.lua`・`res.lua`・`event/init.lua`・`event/callback.lua`）と、`crates/pasta_shiori/` のソースと結合テスト
+- **移したもの**: Problem の 3 つ目（500 の応答の理由がバルーンに出ない）、Approach の論点「500 になる実行時エラーもバルーンに出すか。出す場合、応答コードをどうするか」、Boundary Candidates の「500 応答の経路」。
+- **`runtime-error-balloon` に渡すもの**: 報告の関数・失敗表記の形・pasta.toml の切り替え。向こうは、これを使う側になる。シーンが止まった後の出口（要求を受ける関数 `SHIORI.request`）には、実行中の `act` が無い。報告の関数を `act` 無しでも呼べる形にするかを、この spec の要件で決めておくと、向こうが作り直さずに済む。
+- **順番**: この spec は今のウェーブで進める。`runtime-error-balloon` は、この spec と `shiori-test-support-runtime`（`crates/pasta_shiori/tests/` の片付け）の両方が main に入った後に置く。`call-attribute-filter` と `scene-anchor-link` は `act.lua` が重なるので、これまでどおりこの spec の後にする。
+- **規模**: この spec が 15〜19 タスク（Lua の側の一本化と載せ替えで 15〜17、切り替えの設定を足して 17〜19）。`runtime-error-balloon` が 8〜10 タスク。
+- **触るファイル**:
+  - この spec: `act.lua` 726・`actor.lua` 272・`word.lua` 185、切り替えの設定（`crates/pasta_lua/src/loader/config/sections.rs` 333・`mod.rs` 326）、マニュアルの 5 ページ（2026-10-07 の再測定の節に挙げたもの）と pasta.toml の説明（`book/src/reference/pasta-toml.md`）、生成するスキル用の文書。
+  - `runtime-error-balloon`: `shiori/entry.lua`・`shiori/res.lua`・`shiori/event/init.lua`・`shiori/event/callback.lua`、`crates/pasta_shiori/src/` の `error.rs`・`shiori.rs`・`actor/thread.rs`、`pasta_shiori` の結合テスト。
+- **同じウェーブでの約束**: この spec は、生成する Lua の形を変えない。触らないのは、式の Lua を出す `crates/pasta_lua/src/code_gen/expr_gen.rs`、台詞と Call の Lua を出す `crates/pasta_lua/src/code_gen/element_gen.rs`、見本の期待値のファイル（`crates/pasta_lua/tests/fixtures/` の `sample.generated.lua`・`sample.expected.lua`）である。期待値のファイルは、同じウェーブの `scene-attribute-store` が作り直す。再測定の節に書いた「数にする関数・文字列にする関数に `act` を渡すか」は、まず生成する Lua を変えない側（報告の関数が実行中の `act` を覚えておく）で考える。要件で「生成する Lua を変える」と決めた場合は、`scene-attribute-store` を先に main に入れ、この spec が rebase で合わせる。
+- **要件定義のモデル**: Fable（再測定の節のとおり）。
