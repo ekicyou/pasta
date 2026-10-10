@@ -196,20 +196,20 @@ fn test_ukadoc_files() {
         "shell descript.txt に seriko.use_self_alpha がありません"
     );
     assert!(
-        shell_desc.contains("sakura.balloon.offsetx,64"),
-        "shell descript.txt の sakura.balloon.offsetx が64ではありません"
+        shell_desc.contains("sakura.balloon.offsetx,100"),
+        "shell descript.txt の sakura.balloon.offsetx が100ではありません"
     );
     assert!(
-        shell_desc.contains("sakura.balloon.offsety,0"),
-        "shell descript.txt の sakura.balloon.offsety が0ではありません"
+        shell_desc.contains("sakura.balloon.offsety,-105"),
+        "shell descript.txt の sakura.balloon.offsety が-105ではありません"
     );
     assert!(
-        shell_desc.contains("kero.balloon.offsetx,64"),
-        "shell descript.txt の kero.balloon.offsetx が64ではありません"
+        shell_desc.contains("kero.balloon.offsetx,50"),
+        "shell descript.txt の kero.balloon.offsetx が50ではありません"
     );
     assert!(
-        shell_desc.contains("kero.balloon.offsety,0"),
-        "shell descript.txt の kero.balloon.offsety が0ではありません"
+        shell_desc.contains("kero.balloon.offsety,120"),
+        "shell descript.txt の kero.balloon.offsety が120ではありません"
     );
 }
 

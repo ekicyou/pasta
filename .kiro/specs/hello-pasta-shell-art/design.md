@@ -437,7 +437,7 @@ flowchart LR
 | Requirements | 1.1, 1.3, 1.5, 3.1, 3.2, 5.1, 9.1, 9.3, 9.4 |
 
 - PNG は RGBA8（減色した場合は tRNS 付きパレット）。333×500。ファイル名は現行どおり `surface0.png`〜`surface8.png`・`surface10.png`〜`surface18.png`。`surface9.png` は置かない。
-- `descript.txt` は吹き出しの 4 行だけ変える。初期値（**【実機で確定】**。手本の `sakura.balloon.offsetx,50`・`offsety,15` を起点に、2 人とも同じ背丈なので `kero` も同程度）: `sakura.balloon.offsetx,50`・`sakura.balloon.offsety,20`・`kero.balloon.offsetx,50`・`kero.balloon.offsety,20`。SSP で台詞を出し、吹き出しが顔に重ならない値に直してから `integration_test.rs` の決め打ちを合わせる（R9.2・R9.3）。`charset`・`type`・`name`・`craftman`・`craftmanw`・`seriko.use_self_alpha,1` は変えない。
+- `descript.txt` は吹き出しの 4 行だけ変える。初期値（**【実機で確定】**。手本の `sakura.balloon.offsetx,50`・`offsety,15` を起点に、2 人とも同じ背丈なので `kero` も同程度）: `sakura.balloon.offsetx,50`・`sakura.balloon.offsety,20`・`kero.balloon.offsetx,50`・`kero.balloon.offsety,20`。SSP で台詞を出し、吹き出しが顔に重ならない値に直してから `integration_test.rs` の決め打ちを合わせる（R9.2・R9.3）。**実機で確定した値（2026-10-10）**: `sakura.balloon.offsetx,100`・`sakura.balloon.offsety,-105`・`kero.balloon.offsetx,50`・`kero.balloon.offsety,120`。初期値 50/20 は、2 人が同じ背丈なので女の子の吹き出しが男の子の帽子と顔を覆った（手本は相方が小さいので頭上を通る）。女の子の吹き出しは男の子の帽子より上へ、男の子の吹き出しは目の高さへ置いた。`charset`・`type`・`name`・`craftman`・`craftmanw`・`seriko.use_self_alpha,1` は変えない。
 
 #### surfaces.txt の当たり判定
 
