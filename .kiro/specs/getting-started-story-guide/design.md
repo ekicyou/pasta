@@ -37,7 +37,7 @@
 - `book/tools/verify-content.mjs` の C 系の検査のうち、入門ガイドを名指しするもの（`C-steps`・`C-order`・`C-sections`・`C-prose`・`C-tutorial-check` のメッセージ）。
 - 章の数を決め打ちしている 3 つの自己テストの数字。
 - 目次の入門パート（`SUMMARY.md`）、表紙の「このマニュアルの歩き方」（`introduction.md`）、`first-ghost.html` の転送（`book.toml`）、2 つの README の入門ガイドへのリンク。
-- `book/theme/claudia.js` の目次の持ち越しの関数（`claudiaSidebarKeep`）と、その自己テスト（`book/tools/theme-sidebar-test.mjs`）。同じファイルのテーマメニューの関数（`manual-claudia-theme`）は変えない。
+- `book/theme/claudia.js` の目次の持ち越しの関数（`claudiaSidebarKeep`）と、その自己テスト（`book/tools/theme-sidebar-test.mjs`）。同じファイルのテーマメニューの関数（`manual-claudia-theme`）は変えない。`book/tools/theme-menu-test.mjs` は、N-4（禁止する名前から `localStorage` を外す・検査名）と、冒頭のコメントだけを直す。
 
 ### Out of Boundary
 
@@ -166,6 +166,7 @@ book/
     ├── verify-scripts-test.mjs       # 変更: T 系の件数 47 → 60・C-sections と C-prose の件数
     ├── gen-skill-refs-test.mjs       # 変更: K-10 の章数 47 → 60
     ├── talk/talk-test.mjs            # 変更: J-9 の章数 47 → 60
+    ├── theme-menu-test.mjs           # 変更: N-4（禁止する名前から localStorage を外す・検査名）・冒頭のコメント
     └── theme-sidebar-test.mjs        # 新規: 目次の持ち越しの jsdom テスト（CI は *-test.mjs を自動で拾う）
 crates/
 ├── pasta_lua/README.md               # 変更: フォルダ構成へのリンク 1 か所
@@ -694,7 +695,8 @@ interface TutorialCheckResult {
   4. 保存値 `mdbook-sidebar` が `visible` である（読めないときは何もしない）。
 - 開く手順は `book.js` に任せる。`#mdbook-sidebar` の `style.display` を空に戻し、チェックボックスを入れて `change` イベントを送る（`book.js` の `showSidebar` が、クラス・ARIA 属性・リンクの `tabIndex`・保存値をそろえる）。
 - 開くときのアニメーションは出さない。`html` に `sidebar-resizing` を一時的に付けて外す（`chrome.css` は `html:not(.sidebar-resizing)` のときだけ目次を動かす）。
-- 保存値は読むだけで、自分では書かない。外部への通信・要素の追加と削除をしない。条件 1 の判定は保存値を読むより前に行う（目次の無いページでは保存値に触れない。テーマメニューの既存の自己テスト `theme-menu-test.mjs` は直さずに通る）。
+- 保存値は読むだけで、自分では書かない。外部への通信・要素の追加と削除をしない。条件 1 の判定は保存値を読むより前に行う（目次の無いページでは保存値に触れない。テーマメニューの既存の自己テスト `theme-menu-test.mjs` の、実行して確かめる検査 N-1・E-3 は直さずに通る）。
+- `theme-menu-test.mjs` の N-4（ソースに保存値の API の名前が無いこと）は、禁止する名前から `localStorage` だけを外す（`sessionStorage`・`setItem`・`removeItem`・通信の名前は残す）。保存値を読むには、この名前がソースに要るためである。`localStorage` に触れるのが `localStorage.getItem('mdbook-sidebar')` の 1 か所だけであることは、`theme-sidebar-test.mjs` の SRC-2 が確かめる。同じファイルの冒頭のコメントも合わせて直す（実装中の訂正。2026-10-10。当初は「直さずに通る」と書いたが、N-4 を見落としていた）。
 - `claudia.js` の冒頭のコメントの「してはいけないこと」を、「保存値は目次の `mdbook-sidebar` を読むだけで、書かない」に合わせて直す。
 
 **State Management**
