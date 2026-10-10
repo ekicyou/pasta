@@ -239,6 +239,7 @@
 6. The 文書 shall steering の `product.md`・`roadmap.md` の本仕様の説明と、「リリース手順の書き換え」の進み具合を、書き換えた手順に合わせる。`product.md` の最終更新の行（現行の版）も、今の版に直す。
 7. The repository shall 本要件の変更の後も、`cargo test --all` と clippy が通る状態を保つ。
 8. The 文書 shall `kiro-complete` スキルの「main の CI 全緑は `release-workflow` が crates.io 公開の前に課す」の記述を、公開前の検査をリリース CI が行う形に改める。
+9. The 文書 shall リポジトリの `README.md` の冒頭に、main の CI（Build）とリリース CI（Release）の状況を示すバッジを置く。
 
 ---
 

@@ -156,7 +156,7 @@ graph LR
 
 ### Modified Files（一回限りの整合で変えるもの）
 
-「一回限りの整合（Requirement 12）」の表の 9 項目のファイルである（`.claude/settings.json`・steering の `workflow.md`・`product.md`・`roadmap.md`・`RELEASE.md`・`publish-vsix.ps1`・`release.yml`・`gap-analysis.md`・`kiro-complete` の `SKILL.md`）。
+「一回限りの整合（Requirement 12）」の表の 10 項目のファイルである（`.claude/settings.json`・steering の `workflow.md`・`product.md`・`roadmap.md`・`RELEASE.md`・`publish-vsix.ps1`・`release.yml`・`gap-analysis.md`・`kiro-complete` の `SKILL.md`・リポジトリ直下の `README.md`）。
 
 ## System Flows
 
@@ -264,6 +264,7 @@ flowchart TD
 | 12.6 | `product.md`・`roadmap.md` | 一回限りの整合 | 項目 6 |
 | 12.7 | `cargo test --all` と clippy | 一回限りの整合 | 項目 7 |
 | 12.8 | `kiro-complete` スキルの「main の CI 全緑」 | 一回限りの整合 | 項目 9 |
+| 12.9 | `README.md` の CI のバッジ | 一回限りの整合 | 項目 10 |
 
 ## Components and Interfaces
 
@@ -280,7 +281,7 @@ flowchart TD
 | 段 8 失敗への対応 | 判定表に従う再実行・案内・タグの付け直し | 7.1–7.9, 11.6 | gh・定型コマンド A | 実行の再実行・タグ（承認の後） |
 | 段 9 完了の報告 | 報告 | 9.1, 9.2 | — | — |
 | 段 10 初回の確認と後片付け | 冪等性の確認・所要時間・案内・記録 | 11.1–11.5 | gh・定型コマンド B | `first-ci-release.md`（PR） |
-| 一回限りの整合 | 文書・設定を手順に合わせる | 12.1–12.8 | — | 上の「一回限りの整合で変えるもの」 |
+| 一回限りの整合 | 文書・設定を手順に合わせる | 12.1–12.9 | — | 上の「一回限りの整合で変えるもの」 |
 
 ### 実行変数
 
@@ -781,7 +782,7 @@ gh run view {RUN} --log-failed | tail -n 60
 | Field | Detail |
 |-------|--------|
 | Intent | 文書と設定を、書き換えた手順に 1 度だけ合わせる |
-| Requirements | 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8 |
+| Requirements | 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9 |
 
 **行う場所と順**: `tasks.md` に入れない（リリースのたびに繰り返さないため）。`/kiro-impl` を使わない（リリースが始まるため）。本書き直しの作業ブランチの上で、`/kiro-spec-tasks` でタスクが承認された後、開発者の直接の指示で、下の一覧を上から行う。要件・設計・タスクの書き直しと同じ PR（squash）で main に入れる。次のリリースより前に済ませる。済んだことは、項目 6 の `roadmap.md` のチェックで記録する。
 
@@ -796,6 +797,14 @@ gh run view {RUN} --log-failed | tail -n 60
 | 7 | 12.7 | — | `cargo test --all` と `cargo clippy --all-targets --workspace -- -D warnings` が通ることを確かめる（先に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す。テストが書き換える `sample.generated.lua` の改行だけの差分は `git restore` で戻し、コミットに混ぜない） |
 | 8 | —【仮定】 | `.kiro/specs/release-workflow/gap-analysis.md` | 削除する（v0.1.2 の頃の記録で、今の手順と合わない。履歴は git に残る） |
 | 9 | 12.8 | `.claude/skills/kiro-complete/SKILL.md`（「CI の完了を待たない。」の項の最後の文） | 「「main の CI 全緑」は `release-workflow` が crates.io 公開の前に課す（workflow.md「3. リモート同期」）。」を、「取り消せない公開の前の検査は、リリース CI がタグのコミットで行う（workflow.md「3. リモート同期」）。」に改める。編集が拒否されたときは、項目 1 と同じに扱う |
+| 10 | 12.9 | `README.md`（リポジトリ直下。タグラインの行の下、`<br clear="both">` の前） | 下の「CI のバッジ」の 2 行を足す |
+
+**CI のバッジ**（項目 10）。Build は main の状況を、Release は最も新しい実行の状況を示す。リンク先は、それぞれのワークフローの実行の一覧である。Release のバッジは、リリースタグで起動した実行が 1 つできるまで「no status」と出る。初回のリリースの後に、表示を目で確かめる。
+
+```markdown
+[![Build](https://github.com/ekicyou/pasta/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/ekicyou/pasta/actions/workflows/build.yml)
+[![Release](https://github.com/ekicyou/pasta/actions/workflows/release.yml/badge.svg)](https://github.com/ekicyou/pasta/actions/workflows/release.yml)
+```
 
 **許可の一覧**（項目 1）。`permissions.allow` を次にする。外すのは `Bash(cargo publish:*)`・`PowerShell(vsce publish:*)`・`Bash(gh release create:*)` の 3 つ、足すのは `Bash(git push -u origin HEAD)` と `gh run` の 3 つである。`hooks` は変えない。
 
