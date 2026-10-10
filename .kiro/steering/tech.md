@@ -14,7 +14,7 @@
 - **pasta_shiori**: SHIORI DLLインターフェース層
 - **pasta_lsp**: LSP実装層（tower-lsp, WASM/Native対応）
 - **pasta_check**: リリースCLIツール（ゴーストパッケージング・NAR生成）
-- **pasta_sample_ghost**: サンプルゴースト「hello-pasta」（publish=false, 画像生成・配布物作成）
+- **pasta_sample_ghost**: サンプルゴースト「hello-pasta」（publish=false, 配布物作成。立ち絵はコミットした素材）
 
 ### 主要依存関係
 
@@ -74,7 +74,7 @@
 - **zip 8.6**: NAR（ZIP）アーカイブ作成
 
 **pasta_sample_ghost:**
-- **image 0.25 / imageproc 0.26**: ピクトグラム画像生成
+- **png 0.18**（dev-dependency）: 立ち絵の検証テスト（大きさ・透過・表情間の画素一致）
 
 ### 開発環境
 - **tempfile 3**: テスト用一時ファイル生成
@@ -117,7 +117,7 @@ pasta (workspace)
 | pasta_shiori       | SHIORI       | DLLエクスポート、リクエスト処理 |
 | pasta_lsp          | LSP          | 構文ハイライト、診断、WASM対応  |
 | pasta_check        | CLI          | リリースパッケージング・NAR生成 |
-| pasta_sample_ghost | Distribution | サンプルゴースト画像生成・配布  |
+| pasta_sample_ghost | Distribution | サンプルゴーストの素材・配布    |
 
 ### 設計哲学
 
@@ -162,7 +162,7 @@ pasta (workspace)
 - 依存ライブラリ: メジャーバージョン指定
 
 ### ライセンス
-- **MIT OR Apache-2.0**: デュアルライセンス
+- **MIT**
 - 依存関係ライセンス: 互換性確認済み
 
 ### 公開ポリシー

@@ -103,4 +103,4 @@ pwsh -File release.ps1
 ```
 
 - `cargo-about` がインストール済みであること（`cargo install cargo-about`）。`release.ps1` が第三者ライセンス表示 `THIRD_PARTY_LICENSES.txt` を `pasta.dll` の隣に生成します
-- ビルド、ゴースト生成、バリデーション、`pasta.dll.zip`・`.nar` ファイルの作成まで一括実行されます
+- `pasta.dll` のビルド、DLL と `scripts/` のコピー、`pasta_check release`（検査と `.nar` の作成）、`pasta.dll.zip` の作成、版の確認、`.nar` の大きさの検査までを一括で実行します

@@ -143,9 +143,12 @@ jobs:
             $errors.Add("pasta.dll.zip の中身が pasta.dll・THIRD_PARTY_LICENSES.txt の 2 つでない: $($dllZip -join ', ')")
           }
 
-          # hello-pasta.nar: 配置の要のファイル
+          # hello-pasta.nar: 配置の要のファイルと、シェル一式（descript.txt・surfaces.txt・立ち絵 18 枚）
           $nar = Get-ZipEntries 'release/hello-pasta.nar'
-          foreach ($e in 'install.txt', 'updates.txt', 'ghost/master/descript.txt', 'ghost/master/pasta.dll', 'ghost/master/THIRD_PARTY_LICENSES.txt') {
+          $narRequired = @('install.txt', 'updates.txt', 'ghost/master/descript.txt', 'ghost/master/pasta.dll', 'ghost/master/THIRD_PARTY_LICENSES.txt', 'shell/master/descript.txt', 'shell/master/surfaces.txt')
+          # 立ち絵は surface0〜8 と surface10〜18（9 は無い）
+          foreach ($n in (0..8) + (10..18)) { $narRequired += "shell/master/surface$n.png" }
+          foreach ($e in $narRequired) {
             if ($nar -cnotcontains $e) { $errors.Add("hello-pasta.nar に $e が無い") }
           }
 

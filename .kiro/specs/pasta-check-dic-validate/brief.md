@@ -155,3 +155,10 @@
 - `call-attribute-filter` が足す見込み: 条件つきの Call で、条件に合う場面が 1 つも無い・2 つ以上残る、を知らせる。
 - `novel-talk-flow` が足す見込み: ノベル向けの設定（場面の名前を完全一致で選ぶ）のとき、同じ名前の場面が複数あることを知らせる。
 - 参照: `.kiro/steering/roadmap.md` の「Phase 13」。
+
+## 申し送り（hello-pasta-shell-art より・2026-10-11）
+
+`hello-pasta-shell-art` が完了した。Constraints の「`Cargo.lock` は 1 ウェーブに 1 spec」の席が空いたので、この spec を始められる。
+
+- `Cargo.lock` は 364 パッケージから 252 パッケージに減った（`image`・`imageproc` とその依存を外し、`pasta_sample_ghost` の dev-dependency に `png 0.18` を足した）。
+- ルートの `Cargo.toml` の `[workspace.dependencies]` から `image`・`imageproc` が消えた。

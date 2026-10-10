@@ -5,11 +5,11 @@ REM Outputs in release/ are for local checks only (not committed). Publishing is
 REM the release CI (.github/workflows/release.yml) when a vX.Y.Z tag is pushed.
 REM
 REM Workflow:
-REM   1-3. Build pasta.dll, generate images, copy DLL/scripts
-REM   4-7. pasta_check release, create pasta.dll.zip, version check, release instructions
+REM   1-2. Build pasta.dll, copy DLL/scripts
+REM   3-6. pasta_check release, create pasta.dll.zip, version check, size check and release instructions
 REM
 REM Options (passed through to release.ps1):
-REM   -SkipSetup     Skip setup phase (steps 1-3)
+REM   -SkipSetup     Skip setup phase (steps 1-2)
 REM   -SkipDllBuild  Skip DLL build step only
 
 setlocal

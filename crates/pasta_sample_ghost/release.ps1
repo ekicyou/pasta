@@ -8,7 +8,7 @@
 #   pwsh -File release.ps1 -SkipDllBuild
 #
 # Parameters:
-#   -SkipSetup     Skip setup phase (steps 1-3), run release steps only
+#   -SkipSetup     Skip setup phase (steps 1-2), run release steps only
 #   -SkipDllBuild  Skip DLL build step only (use existing pasta.dll)
 
 param(
@@ -47,21 +47,20 @@ else {
 Write-Host ""
 
 # ============================================================
-# Setup Phase (Steps 1-3)
+# Setup Phase (Steps 1-2)
 # ============================================================
 if ($SkipSetup) {
-    Write-Host "[1/7] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[2/7] Generating images .................. SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[3/7] Copying DLL and scripts ............ SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[1/6] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[2/6] Copying DLL and scripts ............ SKIPPED" -ForegroundColor DarkGray
     Write-Host ""
 }
 else {
     # --- Step 1: Build pasta.dll (32bit) ---
     if ($SkipDllBuild) {
-        Write-Host "[1/7] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+        Write-Host "[1/6] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
     }
     else {
-        Write-Host "[1/7] Building pasta.dll (32bit release)..."
+        Write-Host "[1/6] Building pasta.dll (32bit release)..."
         Write-Host "  Target: i686-pc-windows-msvc"
 
         Push-Location $WorkspaceRoot
@@ -83,26 +82,8 @@ else {
     }
     Write-Host ""
 
-    # --- Step 2: Generate images (surface*.png + surfaces.txt) ---
-    Write-Host "[2/7] Generating images..."
-
-    Push-Location $WorkspaceRoot
-    try {
-        & cargo run -p pasta_sample_ghost --quiet
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host ""
-            Write-Host "ERROR: Image generation failed" -ForegroundColor Red
-            exit 1
-        }
-    }
-    finally {
-        Pop-Location
-    }
-    Write-Host "  Images generated" -ForegroundColor Green
-    Write-Host ""
-
-    # --- Step 3: Copy pasta.dll and scripts/ ---
-    Write-Host "[3/7] Copying files..."
+    # --- Step 2: Copy pasta.dll and scripts/ ---
+    Write-Host "[2/6] Copying files..."
 
     $MasterDir = Join-Path $GhostDir "ghost\master"
     if (-not (Test-Path $MasterDir)) {
@@ -175,11 +156,11 @@ else {
 }
 
 # ============================================================
-# Release Phase (Steps 4-7)
+# Release Phase (Steps 3-6)
 # ============================================================
 
-# --- Step 4: Run pasta_check release ---
-Write-Host "[4/7] Running pasta_check release..."
+# --- Step 3: Run pasta_check release ---
+Write-Host "[3/6] Running pasta_check release..."
 
 Push-Location $WorkspaceRoot
 try {
@@ -196,8 +177,8 @@ finally {
 Write-Host "  Release package created" -ForegroundColor Green
 Write-Host ""
 
-# --- Step 5: Create pasta.dll.zip (pasta.dll + THIRD_PARTY_LICENSES.txt) ---
-Write-Host "[5/7] Creating pasta.dll.zip..."
+# --- Step 4: Create pasta.dll.zip (pasta.dll + THIRD_PARTY_LICENSES.txt) ---
+Write-Host "[4/6] Creating pasta.dll.zip..."
 
 $ZipSources = @(
     (Join-Path $WorkspaceRoot "target\i686-pc-windows-msvc\release\pasta.dll"),
@@ -223,8 +204,8 @@ if (($zipEntries -join "|") -ne ($expectedEntries -join "|")) {
 Write-Host "  Created pasta.dll.zip ($($zipEntries -join ', '))" -ForegroundColor Green
 Write-Host ""
 
-# --- Step 6: Version Check ---
-Write-Host "[6/7] Checking version..."
+# --- Step 5: Version Check ---
+Write-Host "[5/6] Checking version..."
 
 $CargoToml = Join-Path $WorkspaceRoot "Cargo.toml"
 if (-not (Test-Path $CargoToml)) {
@@ -249,11 +230,18 @@ Write-Host "  Version: $Version"
 Write-Host "  Tag:     $TagName"
 Write-Host ""
 
-# --- Step 7: Show Release Instructions ---
+# --- Step 6: Size Check & Release Instructions ---
 $narSize = (Get-Item $NarFilePath).Length
 $narSizeMB = [math]::Round($narSize / 1MB, 2)
 
-Write-Host "[7/7] Release instructions"
+Write-Host "[6/6] Size check and release instructions"
+
+$NarMaxBytes = 7MB  # 7,340,032 bytes
+if ($narSize -gt $NarMaxBytes) {
+    Write-Host ""
+    Write-Host "ERROR: hello-pasta.nar is $narSizeMB MB ($narSize bytes), over the 7 MB limit ($NarMaxBytes bytes)" -ForegroundColor Red
+    exit 1
+}
 Write-Host ""
 Write-Host "========================================"
 Write-Host "  Release Packages Ready!"
