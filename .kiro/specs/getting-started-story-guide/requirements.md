@@ -21,7 +21,7 @@ pasta の利用者マニュアル（`book/`）の入門ガイド（`book/src/get
   - 目次（`SUMMARY.md`）、表紙の案内（`introduction.md`）、旧ページからの転送（`book.toml`）、`first-ghost.html` を指す 2 つの README のリンク
 - **Out of scope**:
   - スクリーンショットの撮影と掲載、画像ファイル、章への画像の行、新しいシェルでの 8 段目の実機の確かめ（`getting-started-screenshots`）
-  - 段階表の内容（どの表現をどの順で教えるか）と段階辞書の中身（`hello-pasta-tutorial-stages` が確定済み。本 spec はそれに従う）
+  - 段階表の内容（どの表現をどの順で教えるか）と段階辞書の中身（`hello-pasta-tutorial-stages` が確定済み。本 spec はそれに従う。「確かめるための道具」の 6 段目・7 段目の記述と、開発者用機能を有効にする段の番号の参照だけは、2026-10-10 の実機確認に合わせて開発者の承認のうえ訂正した）
   - 文法リファレンス・Lua 章・リファレンス・内部設計パートの書き直し（リンク先として使うだけ）
   - 文法・API の新しい説明。ガイドに書く事実は、リファレンス章が権威として書いている事実の範囲に留める
   - シェルのファイル（`shell/master/descript.txt`・`surfaces.txt`）の中身の転記と、シェル画像（`hello-pasta-shell-art`）

@@ -41,7 +41,7 @@
 
 ### Out of Boundary
 
-- 段階表・段階辞書・`pasta.toml` の配布版・シェルのファイル（読むだけ）。
+- 段階表・段階辞書・`pasta.toml` の配布版・シェルのファイル（読むだけ。ただし、段階表の「確かめるための道具」の節と、開発者用機能を有効にする段の番号の参照だけは、実機確認の結果に合わせて開発者の承認のうえ訂正した。2026-10-10）。
 - 台詞部品の記法・登録簿・検査（`book/tools/talk/talk.mjs`・`AUTHORING.md` 第 7 節。変えずに使う）。
 - 生成対象章・内部設計章の規則（`AUTHORING.md` 第 4・6 節）と、スキル `references/` の生成（`gen-skill-refs.mjs`）。
 - `manual.yml`・`verify-static.mjs`・`verify-search.mjs`・`link-check.mjs`（変えない。通ることだけを確かめる）。
@@ -116,7 +116,7 @@ graph TB
 - Selected pattern: 既存の構成の拡張（研究書の Option C）。ツールは既存の 2 本を直し、本文は新しく書く。
 - 依存の向き: 上流（段階表・段階辞書・台詞部品・リファレンス章）→ 執筆規約 → 本文 → 導線。ツールは本文と辞書を読むだけで、本文はツールを知らない。逆向きの依存は作らない。
 - Existing patterns preserved: 章の構造（H1・`---` 2 本・導入と締めは二人の台詞）、照合の正規化（改行と末尾の空白行だけ）、辞書の列挙（固定の一覧なし）、転送の書き方、自己テストのサンドボックス方式。
-- New components rationale: 新しい検査ツールは作らない（足すのはテーマのスクリプトの関数 1 つと、その自己テスト 1 本）。新しい文書は章 15 枚と執筆規約の 1 節だけである。
+- New components rationale: 新しい検査ツールは作らない（足すのはテーマのスクリプトの関数 1 つと、その自己テスト 1 本）。新しい文書は章 14 枚（ほかに 2 枚を書き直す）と執筆規約の 1 節だけである。
 - Steering compliance: マニュアルが利用者向け情報の唯一の権威（`tech.md`）。ガイドは事実をリファレンス章の範囲に留める。
 
 ### Technology Stack
@@ -183,7 +183,7 @@ crates/
 
 - `book/src/getting-started/first-ghost.md` — 削除する。技術的な内容のうち、フォルダ構成・設定ファイル・起動・トラブルシュートは `setup.md` へ、辞書の節は各段の章へ移る（文章は書き直す）。シェルのファイルの転記は移さない。
 - `book/AUTHORING.md` — 第 7 節は書き換えない。
-- 触らないファイル: `.github/workflows/manual.yml`・`book/tools/verify-static.mjs`・`verify-search.mjs`・`link-check.mjs`・`talk/talk.mjs`・`gen-skill-refs.mjs`・`crates/pasta_sample_ghost/` 配下・`.claude/skills/` 配下。
+- 触らないファイル: `.github/workflows/manual.yml`・`book/tools/verify-static.mjs`・`verify-search.mjs`・`link-check.mjs`・`talk/talk.mjs`・`gen-skill-refs.mjs`・`crates/pasta_sample_ghost/` 配下（`STAGES.md` の「確かめるための道具」の節と段の番号の参照は、実機確認の結果に合わせて開発者の承認のうえ訂正した。2026-10-10）・`.claude/skills/` 配下。
 
 ## System Flows
 
