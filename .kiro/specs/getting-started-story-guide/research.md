@@ -164,3 +164,141 @@
 - `book/AUTHORING.md` 第 7 節 — 台詞部品の記法と検査
 - [UKADOC SHIORI イベント一覧](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html) — イベントの出典
 - [UKADOC SSP ヘルプ 開発用パレット](https://ssp.shillest.net/ukadoc/ssphelp/dev-palette.html) — 試す手順の出典
+
+---
+
+# 設計フェーズの追補（2026-10-10）
+
+ここから下は `/kiro-design` の設計フェーズで足した記録である。上の節（要件フェーズのギャップ分析）は書き換えていない。
+
+## 設計フェーズの Summary
+- **Discovery Scope**: Extension（Light Discovery）。新しい依存・外部サービスは無い。既存のツール 2 本（`tutorial-check.mjs`・`verify-content.mjs`）の拡張と、文章の新規執筆である。
+- **Key Findings**:
+  - 段と章の対応は「辞書と章を同じ名前にする」だけで決まる（`dic/07-greeting.pasta` ↔ `getting-started/07-greeting.md`）。段階番号を切り出す正規表現も、固定の対応表も、章の中の印も要らない。
+  - 転送ページは既存の `/lua/modules.html` と同じ形（相対の転送先）にすれば、触れない `verify-static.mjs` をそのまま通る。
+  - 読者が開発者用機能を有効にするのは 6 段目である。1〜5 段目では開発用パレットの「リロード」を使えないので、章末の確かめ方の共通操作は「SSP を終了して起動し直す」になる。
+  - 辞書が 1 つも無い状態でも読み込みは成功する（`crates/pasta_lua/tests/loader/startup_test.rs` の `test_load_empty_dic`。警告 `No .pasta or .lua files found` を出して続行）。準備の章の終わりの状態（要件 2.6）は、読み込みの段では成り立つ。
+
+## 参照したスキルと指針
+- `kiro-spec-design` の `rules/`（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）。境界を先に決める・要件 ID の対応表・ファイル構成の計画に使った。
+- `ponytail`（最小の設計）。新しい抽象を足さず、既存の関数とパターンを使い回す判断に使った。
+- UKADOC・SSP ヘルプの検索（伺かドキュメントの MCP）。イベントの項のアンカーと、開発用パレットの操作名の確認に使った。
+- `pasta-ghost-authoring`・`pasta-lua-coding` は読んでいない（辞書と Lua を変えないため）。
+
+## Research Log（設計フェーズ）
+
+### UKADOC のイベントの項のアンカー
+- **Context**: 要件 5.1。各イベントの UKADOC の項へリンクし、説明と `Reference` を短く引用する。
+- **Sources Consulted**: UKADOC `list_shiori_event.html`（`OnBoot`・`OnFirstBoot`・`OnClose`・`OnGhostChanged`・`OnGhostChanging`・`OnMouseDoubleClick`・`OnChoiceSelectEx` の 7 項を確認）、`list_sakura_script.html`（`\![change,ghost,…]`）、SSP ヘルプ `config-dev.html`（「ディレクトリをドロップした際に更新ファイルやNARを作成」）
+- **Findings**:
+  - アンカーはイベント名そのまま（`https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnGhostChanged`）。
+  - `OnGhostChanged`・`OnFirstBoot` の項は「スクリプトが返されなかった（204）場合、続けて OnBoot が発生する」、`OnGhostChanging` の項は「続けて OnClose が発生する」と書いている。要件 4.4 の根拠はここにある。
+  - `OnGhostChanging` の Reference0 は「切り替わるゴーストの本体側の名前」、`OnGhostChanged` の Reference0 は「直前のゴーストの本体側の名前」、`OnMouseDoubleClick` の Reference4 は「当たり判定の識別子」、`OnChoiceSelectEx` の Reference0・1 は「選択肢のテキスト（ラベル）」「選択肢の ID」。
+  - `\![change,ghost,ゴースト名]` は `--option=raise-event` を付けない限り `OnGhostChanging` を通知しない、と UKADOC に書いてある。上流の申し送り（ゴースト自身の切り替えでは届かない）と一致する。
+- **Implications**: 引用は「イベントの説明の 1 文」と「その段で使う Reference の説明」だけにする。引用の置き場所は表のセル（要件 7.3 が台詞以外に許すのは指示の一文・箇条書き・表・コードブロック・見出しだけで、ふつうの引用ブロックは入っていない）。`OnBoot` の項は「OnGhostChanged、OnGhostCalled、OnFirstBoot、OnVanished に対してスクリプトが返されなかった（204）場合、続けてこのイベントが発生する」と書いており、7 段目の説明の根拠にもなる。
+
+### SSP の開発用パレットと再読み込み
+- **Context**: 要件 3.4・3.5・4.2・4.6。章末の「起動して確かめる」の共通操作。
+- **Sources Consulted**: SSP ヘルプ `dev.html`・`dev-palette.html`・`shortcut.html`、`book/src/debug/dev-actions.md`
+- **Findings**:
+  - 開発用パレットは本体設定「一般」の「開発者用機能を有効にする」が ON のときだけ開ける（`Ctrl+Shift+D`）。項目名は「スクリプト入力」「現在時刻の仮想的変更」「`\-`タグで終了しない」「リロード」。
+  - 「リロード」はメニューから選んだ内容を読み込み直す。`\![reload,shiori]` でも SHIORI が読み込み直される（`debug/dev-actions.md`）。
+  - 段階表は開発者用機能の有効化を 6 段目で初めて扱う。1〜5 段目の読者は開発用パレットを使えない。
+- **Implications**: 全段で使える確かめ方は「SSP を終了して起動し直す」だけである。これを共通操作にする。速い再読み込み（6 段目以降の「リロード」）を案内するかは設計ディスカッションで決める。
+
+### 辞書が 1 つも無い起動
+- **Context**: 要件 2.6。準備の終わりは「辞書が無いので起動してもしゃべらない」。
+- **Sources Consulted**: `crates/pasta_lua/src/loader/mod.rs`、`crates/pasta_lua/tests/loader/startup_test.rs`、`crates/pasta_sample_ghost/tests/tutorial_stages_test.rs`
+- **Findings**: 読み込みは警告を出して成功する（`test_load_empty_dic`）。段階の検証（`tutorial_stages_test.rs`）は 1〜13 段目を見ており、辞書が無い段は見ていない。SSP の上で「立ち絵は出るがしゃべらない」になることは、機械検査では確かめていない。
+- **Implications**: 準備の章の終わりの状態は、実装の通しの確認（実機の SSP）で 1 回確かめる。
+
+### 転送ページと出力の検査
+- **Context**: 要件 11.3。`verify-static.mjs` は触れない。
+- **Sources Consulted**: `book/book.toml`、`book/tools/verify-static.mjs`（`listFiles`・相対参照の検査）
+- **Findings**: 既存の転送は `"/lua/modules.html" = "modules/index.html"` で、転送先を転送元のフォルダからの相対で書いている。`verify-static` は全 HTML の相対参照が解決することと、ルート絶対（`/…`）の参照が無いことを見る。転送ページは章の一覧（SUMMARY 由来）に入らない。
+- **Implications**: `"/getting-started/first-ghost.html" = "index.html"` と相対で書けば、既存の転送と同じ形になる。転送先を `/pasta/…` のように絶対で書くと落ちる。実際に通ることは、実装でビルドして確かめる。
+
+### 口調の検査のフェンスの数え方
+- **Context**: 12 段目の辞書は ```` ```lua ```` を含むので、章では 4 本のバッククォートで囲む。
+- **Sources Consulted**: `book/tools/verify-content.mjs`（`extractCodeFences`・`stripCodeFences`）、`book/tools/link-check.mjs`（`maskFences`）
+- **Findings**: `verify-content` の口調の検査（`D-codevoice`）は、3 本のバッククォートを単純に 2 つずつ対にして「フェンスの中」を決める。4 本のフェンスの中に ```` ```lua ```` と ```` ``` ```` が 1 組あれば数は偶数で、対はずれない（今の `first-ghost.md` が通っている理由）。抜き出しが ```` ```lua ```` の開きだけ、または閉じだけを含むと数が奇数になり、その後ろの台詞が「フェンスの中」と見なされて `わたくし` などが誤検出される。台詞部品の検査（`scanTalk`）と章構造（`chapterRegions`）は CommonMark どおりの `maskFences` を使うので、この問題は無い。
+- **Implications**: 検査を直さず、執筆規約に「```` ```lua ```` を含む抜き出しは、開きと閉じの両方を含める」と書く。全 60 章にかかる検査の判定を変えるより安全である。
+
+### 章の数の検算
+- **Findings**: 今は 47 章（うち入門 3 章）。入門を 16 章（入口 1・準備 2・段 13）にすると 47 − 3 ＋ 16 ＝ 60 章。3 つの自己テストはどれも同じ集合（`book/src` の章、`debug/` を含む）を数えている。
+
+### `manual.yml` に残る古いコメント
+- **Findings**: `.github/workflows/manual.yml` 114 行目のコメントが `first-ghost.md` を名指ししている。実行される行（`node book/tools/tutorial-check.mjs`）は変わらない。このウェーブでは `manual.yml` を触れない。
+- **Implications**: コメントの直しは `manual-print-media-refs`（`manual.yml` を持つ spec）へ申し送る。
+
+## Design Decisions
+
+### Decision: 準備の章は 2 章にする
+- **Context**: 要件 1.1・2。設計で決める項目 (1)。
+- **Alternatives Considered**:
+  1. 1 章にまとめる — `prerequisites.md` に最小一式の配置まで入れる。
+  2. 2 章に分ける — `prerequisites.md`（道具と約束）と `setup.md`（最小一式を置く）。
+- **Selected Approach**: 2 章。`prerequisites.md` はファイル名を変えずに残し、`setup.md` を足す。
+- **Rationale**: 準備の要件は 8 項目あり、台詞部品で語ると 1 章では長すぎる。「読むだけの章」と「手を動かす章」で分かれる。要件の前提（16 章）とも一致する。
+- **Trade-offs**: 1 段目までに 3 章を読むことになる。入口の章の一覧で「準備は 2 章」と先に見せて補う。
+
+### Decision: 段と章は同じ名前で対応させる
+- **Context**: 要件 9.2・9.4・9.7。設計で決める項目 (3)。
+- **Alternatives Considered**:
+  1. 章のファイル名の先頭 2 桁（`NN`）だけを見る — 章の `name` は自由。
+  2. 辞書と章を同じ名前にする — `dic/NN-name.pasta` ↔ `getting-started/NN-name.md`。
+  3. 章の中の印（見出しやコメント）で辞書を指す。
+  4. ツールの中の固定の対応表。
+- **Selected Approach**: 2。照合は「辞書の名前の拡張子を `.md` に替えた章があるか」を見るだけになる。
+- **Rationale**: 対応を引く処理が 1 行で済み、同じ番号の章が 2 つある・番号の無い辞書がある、といった場合分けが要らない。固定の一覧を持たない今の性質（9.7）も保てる。段階表の「ファイル名の規則」（ASCII・`NN-name`）とそろう。
+- **Trade-offs**: 辞書の名前を変えると章の名前（＝URL）も変わる。段階表は名前を確定済みなので、頻度は低い。
+- **Follow-up**: 13 段目は辞書が無いので、章の名前だけを決める（`13-nar.md`）。
+
+### Decision: 入門の全章の `pasta` ブロックを同じ規則で照合する
+- **Context**: 要件 9.10・9.11・8.5。段の章でない章（入口・準備）に `pasta` ブロックを置いた場合の扱いは、要件が明示していない。
+- **Alternatives Considered**:
+  1. 段の章だけを照合し、入口・準備の章は見ない（規約で「置かない」と書くだけ）。
+  2. 入門の全章を同じ規則で見る — 章と同じ名前の辞書が無ければ、その章の `pasta` ブロックはすべて失敗。
+- **Selected Approach**: 2。「章の `pasta` ブロックは、その章と同じ名前の辞書の全体か連続した抜き出しである」という 1 つの規則を、入門の全章にかける。辞書の無い章（入口・準備・13 段目）は、結果として `pasta` ブロックを置けない。
+- **Rationale**: 1 だと、照合されない作例を入口や準備の章に置く抜け道が残る（8.5 の「作例は辞書と一致」に穴が開く）。2 は場合分けが無く、実装も 1 より短い。入口・準備・13 段目に `pasta` の作例を置く必要は、要件のどこにも無い。
+- **Trade-offs**: 9.10 の文面（「段の章にある」）より広くかける。設計ディスカッションで確かめる。
+
+### Decision: 廃止ページは入口の章へ転送する
+- **Context**: 要件 11.3。設計で決める項目 (2)。
+- **Alternatives Considered**: 入口の章 `index.html`／最小一式の章 `setup.html`／1 段目 `01-boot.html`。
+- **Selected Approach**: `"/getting-started/first-ghost.html" = "index.html"`。
+- **Rationale**: 旧ページは「最初から最後まで」の 1 枚だった。新しいガイドでそれに当たるのは、進め方と 13 章の一覧を持つ入口の章である。README の深いリンク（`#ゴーストのフォルダ構成`）は転送に頼らず、`setup.html` の見出しへ直接向け直す。
+
+### Decision: 章の数は数字を直す
+- **Context**: 要件 10.4。設計で決める項目 (4)。
+- **Alternatives Considered**: 3 か所の `47` を `60` に直す／目次から数える。
+- **Selected Approach**: 数字を直す。
+- **Rationale**: 差分が最小で、検査の強さが変わらない（章が消えたら落ちる）。ロードマップも「章を足す spec が数を直す」前提で書かれている。目次から数える形は、3 つの自己テストで数え方を共有する仕組みが要り、章の消失を見逃す。
+
+### Decision: 章末の確かめ方の共通操作は「SSP を終了して起動し直す」
+- **Context**: 要件 3.4。
+- **Alternatives Considered**: 起動し直す／開発用パレットの「リロード」／スクリプト入力の `\![reload,shiori]`。
+- **Selected Approach**: 全段で「SSP を終了して起動し直す」を共通の手順にする。
+- **Rationale**: 開発者用機能を有効にする前（1〜5 段目）でも使え、道具が要らない。段階表の「確かめるための道具」に無い操作を足さずに済む。
+- **Trade-offs**: 6 段目以降は「リロード」のほうが速い。案内するかは設計ディスカッションで決める。
+
+### Decision: UKADOC の引用と用語の説明は、表と箇条書きに置く
+- **Context**: 要件 5.1・5.2・7.3。
+- **Selected Approach**: イベントの出典は「イベント（UKADOC へのリンク）・説明の引用・この段で使う Reference の引用」の表にする。用語の説明は箇条書きにする。今の `prerequisites.md` にある `> **用語**:` の引用ブロックは使わない。
+- **Rationale**: 要件 7.3 が台詞以外に許すのは、指示の一文・箇条書き・表・コードブロック・見出しだけである。入門の章では、引用ブロックは台詞部品だけに使う、とすれば見分けがつく。
+
+### Decision: 段の章の見出しの型を固定し、機械検査はしない
+- **Context**: 要件 3・8.2。
+- **Selected Approach**: 段の章の本体は H2 を 5 つ、この順で持つ（叶えたいこと → 新しく覚える表現 → 辞書ファイルを足す → 起動して確かめる → もっと詳しく）。執筆規約の第 8 節に雛形を載せる。検査は足さない。
+- **Rationale**: 要件 10 は既存の検査の追従だけを求めている。内部設計パートのような見出しの検査（`I-sections`）を足す要件は無い。13 枚は 1 つの spec で書くので、雛形と通し読みで足りる。
+
+## Synthesis（設計の統合）
+- **一般化**: 「段ごとの照合」（9.1〜9.5）と「抜き出しの照合」（9.10・9.11）は、同じ 1 つの規則の 2 つの向きである。辞書から章へ（辞書の全体と一致するブロックが章にある）と、章から辞書へ（章のどのブロックも辞書の全体か抜き出しである）。全体の一致は抜き出しの特別な場合なので、ブロックの側の判定は関数 1 つ（`isExcerptOf`）で済む。
+- **作るか使うか**: 新しいツールは作らない。`listDicFiles`・`extractPastaBlocks`・`normalizeForCompare`・`matchDicFile` はそのまま使う。足すのは `listGuideChapters`・`isExcerptOf` の 2 つと、`runTutorialCheck` の中身の入れ替えだけである。CLI の名前と終了コードは変えない（`manual.yml` を触らずに済む）。
+- **単純化**: 段階表（`STAGES.md`）を照合で読まない（`manual.yml` の起動条件に無いため）。章の数は導出しない。見出しの型・地の文の有無は機械検査しない。`verify-content.mjs` のフェンスの数え方は直さず、規約で避ける。
+
+## Risks & Mitigations（設計フェーズで足した分）
+- 章のファイルを足した時点で、章の数の自己テスト 3 本が落ちる — 切り替え（`first-ghost.md` の削除・目次・数字・照合の入れ替え）を 1 つのタスクにまとめ、全検査の合否は最後の通しの確認で判定する。
+- 地の文の段落を置かない規則（7.1）と、台詞を読み飛ばしても追える規則（7.3）は機械検査されない — 第 8 節のチェックリストと、章ごとのレビューで見る。
+- 開発用パレットの項目名・NAR 作成の手順は SSP の版で変わりうる — 章は UKADOC の該当ページへリンクし（12.3）、通しの確認で実機の表示と突き合わせる。
+- 16 章の最初の台詞の語が互いに、または他の章の本文と重なると検索の検査が弱まる — 章ごとに固有の 4 文字以上の語で始め、`verify-search.mjs --self-test` で確かめる。
