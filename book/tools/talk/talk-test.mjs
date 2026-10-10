@@ -450,8 +450,8 @@ log('\n== (J) 表情の集計 ==');
   check('J-8 --stats は出現数と章ごとの表を出す',
     cli.stdout.includes('表情の出現数') && cli.stdout.includes('| 章 | 導入 | 締め |'), cli.stdout.slice(0, 200));
   const chapterRows = cli.stdout.split('\n').filter((l) => /^\| \S+\.md \|/.test(l));
-  check('J-9 --stats は全 47 章（debug を含む）を並べる',
-    chapterRows.length === 47 && chapterRows.some((l) => l.startsWith('| debug/')), String(chapterRows.length));
+  check('J-9 --stats は全 60 章（debug を含む）を並べる',
+    chapterRows.length === 60 && chapterRows.some((l) => l.startsWith('| debug/')), String(chapterRows.length));
 }
 
 // ============================================================

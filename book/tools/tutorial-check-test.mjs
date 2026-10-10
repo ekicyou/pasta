@@ -1,20 +1,26 @@
-// tutorial-check-test.mjs — tutorial-check 本実装の自動検証（タスク 5.2 / 要件 6.2）。
+// tutorial-check-test.mjs — tutorial-check の自動検証（要件 9.8 / design「ツール層 > TutorialCheck」）。
 //
 // 検証方針:
 //   book/src・crates を恒久変更しないため、検証は
-//   (A) 実リポジトリ現状でのクリーン判定（exit 0 相当・全 dic 逐語一致）と、
-//   (B) 一時サンドボックス（tmp）へ最小フィクスチャを構築し、逐語転記の崩れを
-//       注入して MISMATCH→failed を確認、で行う。
+//   (A) 実リポジトリ現状でのクリーン判定（exit 0 相当・全 dic が同じ名前の章と逐語一致）と、
+//   (B) 一時サンドボックス（tmp）へ「辞書 1 つにつき章 1 枚」のフィクスチャを構築し、
+//       食い違いを注入して失敗を確認、で行う。
 //   サンドボックスは runTutorialCheck(repoRoot) の repoRoot を差し替えて使う
 //   （本物の book/src・crates には一切書き込まない）。
+//   実リポジトリの場合（A・B-9）は、入門の章と辞書がそろっていることが前提（そろう前は落ちる）。
 //
-// 観測する完了条件（design「Testing/コンテンツ整合」）:
-//   - 実リポジトリ: 全 dic がチュートリアルと逐語一致 → ok=true。
-//   - 一致サンドボックス → ok=true。
-//   - 1 文字でも改変注入 → MISMATCH 検出＆ ok=false（exit 1 相当）。
-//   - チュートリアルに無い dic を dic/ に追加 → 列挙で拾われ no-matching-block＆ ok=false。
-//   - 照合対象は dic/ 直下の *.pasta の列挙（listDicFiles）から導く（固定一覧なし）。
-//   - ユニット: extractPastaBlocks / normalizeForCompare / matchDicFile。
+// 観測する完了条件（design「自己テスト」の表）:
+//   - 実リポジトリ: 全 dic が verbatim-match・problems が空 → ok=true。
+//   - 段ごとの照合の成功 → ok=true。
+//   - 章の作例の不一致 → その辞書が no-matching-block・そのブロックが not-in-dic。
+//   - 章の欠落（章の無い辞書）→ 列挙で拾われ no-chapter。
+//   - 辞書の欠落（辞書の無い章のブロック）→ no-dic。
+//   - 旧方式（全部のブロックを 1 枚の章に集める）→ ほかの辞書が no-chapter・余分なブロックが not-in-dic。
+//   - 抜き出しの一致 → ok=true ／ 抜き出しの不一致 → not-in-dic。
+//   - 字下げ・引用の中のフェンス → indented-fence。
+//   - 致命的な失敗（入門のフォルダ無し・辞書 0 件）→ fatal。
+//   - ユニット: extractPastaBlocks / normalizeForCompare / matchDicFile / listDicFiles
+//               / listGuideChapters / isExcerptOf / findProseParagraphs。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -23,12 +29,15 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   REPO_ROOT,
-  TUTORIAL_REL,
+  GUIDE_REL,
   HELLO_DIC_REL,
   listDicFiles,
+  listGuideChapters,
   extractPastaBlocks,
   normalizeForCompare,
   matchDicFile,
+  isExcerptOf,
+  findProseParagraphs,
   runTutorialCheck,
   reportTutorialCheck,
 } from './tutorial-check.mjs';
@@ -58,96 +67,249 @@ function rmrf(root) {
   fs.rmSync(root, { recursive: true, force: true });
 }
 
-// 実リポジトリの dic 内容から、チュートリアル本文を機械生成して最小フィクスチャを作る。
-// （逐語転記そのものを再現するため、本物の dic をコードブロックに埋め込む）。
-// 中に ``` を含む dic（12 段目の ```lua）は ````pasta で囲む（first-ghost.md と同じ書き方）。
-// extraFile: dic/ にだけ置き、チュートリアルには載せない dic（列挙で拾われることの確認用）。
-const DIC = listDicFiles();
-function makeSandbox({ corruptFile = null, extraFile = null } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-check-'));
-  const tutorialParts = ['# サンドボックス チュートリアル\n\n本文。\n'];
-  if (extraFile) writeFile(root, `${HELLO_DIC_REL}/${extraFile}`, '＊追加\n　チュートリアルに無い辞書。\n');
-  for (const name of DIC) {
-    const realAbs = path.resolve(REPO_ROOT, HELLO_DIC_REL, name);
-    let content = fs.readFileSync(realAbs, 'utf8');
-    writeFile(root, `${HELLO_DIC_REL}/${name}`, content);
+// 辞書のファイル名から、辞書と章のパス（リポジトリルートからの相対）を作る。
+const dicRel = (name) => `${HELLO_DIC_REL}/${name}`;
+const chapterRel = (name) => `${GUIDE_REL}/${name.replace(/\.pasta$/, '.md')}`;
+const realDic = (name) => fs.readFileSync(path.resolve(REPO_ROOT, HELLO_DIC_REL, name), 'utf8');
 
-    let blockBody = content.replace(/\r\n/g, '\n');
-    if (!blockBody.endsWith('\n')) blockBody += '\n';
-    if (name === corruptFile) {
-      // チュートリアル側ブロックだけを改変（実ファイルとずれる → MISMATCH）。
-      blockBody = blockBody + '＃ チュートリアル側にだけ混入した余計な行\n';
-    }
-    const fence = content.includes('```') ? '````' : '```';
-    tutorialParts.push(fence + 'pasta\n' + blockBody + fence + '\n');
+// 中身を ```pasta フェンスで包む。
+// 中に ``` を含むとき（12 段目の ```lua）は ````pasta で包む（章と同じ書き方）。
+function fenced(body) {
+  let text = body.replace(/\r\n/g, '\n');
+  if (!text.endsWith('\n')) text += '\n';
+  const fence = text.includes('```') ? '````' : '```';
+  return fence + 'pasta\n' + text + fence + '\n';
+}
+
+// 実リポジトリの dic 内容から「辞書 1 つにつき章 1 枚」を機械生成して最小フィクスチャを作る。
+// （逐語転記そのものを再現するため、本物の dic を章のコードブロックに埋め込む）。
+// 辞書の無い章（index.md・13-nar.md）も pasta ブロック無しで置く。
+// 食い違いは、返したサンドボックスのファイルを各場合が書き換えて注入する。
+const DIC = listDicFiles();
+function makeSandbox() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-check-'));
+  writeFile(root, `${GUIDE_REL}/index.md`, '# 入口\n\n辞書を持たない章。\n');
+  writeFile(root, `${GUIDE_REL}/13-nar.md`, '# 13 段目\n\n辞書を足さない段。\n');
+  for (const name of DIC) {
+    const content = realDic(name);
+    writeFile(root, dicRel(name), content);
+    writeFile(root, chapterRel(name), `# ${name} の章\n\n本文。\n\n` + fenced(content));
   }
-  writeFile(root, TUTORIAL_REL, tutorialParts.join('\n'));
   return root;
 }
 
-// ============================================================
-log('\n== (A) 実リポジトリ現状: 全 dic 逐語一致 ==');
-{
-  const result = runTutorialCheck(REPO_ROOT);
-  check('実リポジトリで ok=true（exit 0 相当）', result.ok === true,
-    JSON.stringify(result.results));
-  check(`列挙した ${DIC.length} 件の dic を検証`,
-    DIC.length > 0 && result.results.length === DIC.length,
-    `listed=${DIC.length} checked=${result.results.length}`);
-  check('全 dic が verbatim-match',
-    result.results.every((r) => r.matched && r.reason === 'verbatim-match'),
-    JSON.stringify(result.results.filter((r) => !r.matched)));
-  check('reportTutorialCheck が文字列を返す', typeof reportTutorialCheck(result) === 'string');
-}
-
-// ============================================================
-log('\n== (B-1) 一致サンドボックス ==');
-{
+// サンドボックスを作って fn に渡し、終わったら消す。
+function inSandbox(fn) {
   const root = makeSandbox();
   try {
-    const result = runTutorialCheck(root);
-    check('一致: ok=true', result.ok === true, JSON.stringify(result.results));
-    check('一致: 全 dic match', result.results.every((r) => r.matched));
+    fn(root);
   } finally {
     rmrf(root);
   }
 }
 
+// 章の末尾に追記する（空行を 1 つ挟む）。
+function append(root, rel, text) {
+  fs.appendFileSync(path.join(root, rel), '\n' + text, 'utf8');
+}
+
+// 抜き出しの場合で使う、1 段目の辞書の行（正規化後）。
+const BOOT = '01-boot.pasta';
+const BOOT_LINES = normalizeForCompare(realDic(BOOT)).split('\n');
+
 // ============================================================
-log('\n== (B-2) 改変注入（チュートリアル側ブロックを 1 行追加） ==');
+log('\n== (A) 実リポジトリ現状: 全 dic が同じ名前の章と逐語一致 ==');
 {
-  const root = makeSandbox({ corruptFile: '01-boot.pasta' });
-  try {
-    const result = runTutorialCheck(root);
-    check('改変で ok=false（exit 1 相当）', result.ok === false);
-    const bad = result.results.find((r) => r.file.endsWith('/01-boot.pasta'));
-    check('01-boot.pasta が no-matching-block',
-      bad && bad.matched === false && bad.reason === 'no-matching-block',
-      JSON.stringify(bad));
-    check('他の dic は依然 match',
-      result.results.filter((r) => !r.file.endsWith('/01-boot.pasta')).every((r) => r.matched));
-  } finally {
-    rmrf(root);
-  }
+  const result = runTutorialCheck(REPO_ROOT);
+  check('実リポジトリ: ok=true（exit 0 相当）', result.ok === true,
+    JSON.stringify(result.results.filter((r) => !r.matched)));
+  check(`実リポジトリ: 列挙した ${DIC.length} 件の dic を検証`,
+    DIC.length > 0 && result.results.length === DIC.length,
+    `listed=${DIC.length} checked=${result.results.length}`);
+  check('実リポジトリ: 全 dic が verbatim-match',
+    result.results.every((r) => r.matched && r.reason === 'verbatim-match'),
+    JSON.stringify(result.results.filter((r) => !r.matched)));
+  check('実リポジトリ: problems が空', result.problems.length === 0,
+    JSON.stringify(result.problems));
+  check('実リポジトリ: reportTutorialCheck が文字列を返す',
+    typeof reportTutorialCheck(result) === 'string');
 }
 
 // ============================================================
-log('\n== (B-3) チュートリアルに無い dic の追加（列挙で拾われる） ==');
-{
-  const root = makeSandbox({ extraFile: '13-extra.pasta' });
-  try {
-    const result = runTutorialCheck(root);
-    check('追加 dic で ok=false', result.ok === false);
-    check('追加 dic も検証対象に入る', result.results.length === DIC.length + 1,
-      `checked=${result.results.length}`);
-    const extra = result.results.find((r) => r.file.endsWith('/13-extra.pasta'));
-    check('13-extra.pasta が no-matching-block',
-      extra && extra.matched === false && extra.reason === 'no-matching-block',
-      JSON.stringify(extra));
-  } finally {
-    rmrf(root);
-  }
-}
+log('\n== (B-1) 段ごとの照合の成功（サンドボックスのまま） ==');
+inSandbox((root) => {
+  const result = runTutorialCheck(root);
+  check('一致: ok=true', result.ok === true,
+    JSON.stringify([result.fatal, result.results, result.problems]));
+  check('一致: 全 dic が verbatim-match',
+    result.results.length === DIC.length
+      && result.results.every((r) => r.matched && r.reason === 'verbatim-match'));
+  check('一致: 各 dic の章は同じ名前の .md',
+    result.results.every((r, i) => r.file === dicRel(DIC[i]) && r.chapter === chapterRel(DIC[i])),
+    JSON.stringify(result.results));
+  check('一致: 辞書の無い章（index.md・13-nar.md）は pasta ブロックが無ければ記録されない',
+    result.problems.length === 0, JSON.stringify(result.problems));
+  check('一致: 見た章と pasta ブロックの数',
+    result.chapters === DIC.length + 2 && result.blocks === DIC.length,
+    `chapters=${result.chapters} blocks=${result.blocks}`);
+});
+
+// ============================================================
+log('\n== (B-2) 章の作例の不一致（1 章の全体ブロックに 1 行足す） ==');
+inSandbox((root) => {
+  writeFile(root, chapterRel(BOOT), '# 章\n\n'
+    + fenced(BOOT_LINES.join('\n') + '\n＃ 章の側にだけ混入した余計な行\n'));
+  const result = runTutorialCheck(root);
+  check('改変で ok=false（exit 1 相当）', result.ok === false);
+  const bad = result.results.find((r) => r.file === dicRel(BOOT));
+  check('01-boot.pasta が no-matching-block',
+    bad && bad.matched === false && bad.reason === 'no-matching-block'
+      && bad.chapter === chapterRel(BOOT),
+    JSON.stringify(bad));
+  check('そのブロックが not-in-dic（章と先頭行を名指し）',
+    result.problems.length === 1 && result.problems[0].reason === 'not-in-dic'
+      && result.problems[0].chapter === chapterRel(BOOT)
+      && result.problems[0].head === BOOT_LINES[0],
+    JSON.stringify(result.problems));
+  check('他の dic は依然 match',
+    result.results.filter((r) => r.file !== dicRel(BOOT)).every((r) => r.matched));
+});
+
+// ============================================================
+log('\n== (B-2b) 全体ブロックの欠落（章に辞書の先頭 2 行の抜き出ししか無い） ==');
+inSandbox((root) => {
+  // 抜き出しは章から辞書への向きでは通る。辞書から章への向きは全体のブロックが要る。
+  writeFile(root, chapterRel(BOOT), '# 章\n\n' + fenced(BOOT_LINES.slice(0, 2).join('\n')));
+  const result = runTutorialCheck(root);
+  check('抜き出しだけの章は ok=false', result.ok === false);
+  const bad = result.results.find((r) => r.file === dicRel(BOOT));
+  check('抜き出しだけ: 01-boot.pasta が no-matching-block',
+    bad && bad.matched === false && bad.reason === 'no-matching-block',
+    JSON.stringify(bad));
+  check('抜き出しだけ: 抜き出しそのものは問題にしない（problems は空）',
+    result.problems.length === 0, JSON.stringify(result.problems));
+});
+
+// ============================================================
+log('\n== (B-3)章の欠落（章の無い辞書を dic/ に足す・列挙で拾われる） ==');
+inSandbox((root) => {
+  writeFile(root, dicRel('14-extra.pasta'), '＊追加\n　章の無い辞書。\n');
+  const result = runTutorialCheck(root);
+  check('追加 dic で ok=false', result.ok === false);
+  check('追加 dic も検証対象に入る', result.results.length === DIC.length + 1,
+    `checked=${result.results.length}`);
+  const extra = result.results.find((r) => r.file === dicRel('14-extra.pasta'));
+  check('14-extra.pasta が no-chapter（期待する章のパス付き）',
+    extra && extra.matched === false && extra.reason === 'no-chapter'
+      && extra.chapter === `${GUIDE_REL}/14-extra.md`,
+    JSON.stringify(extra));
+  check('他の dic は依然 match・problems は空',
+    result.results.filter((r) => r !== extra).every((r) => r.matched)
+      && result.problems.length === 0);
+});
+
+// ============================================================
+log('\n== (B-3b) 辞書の欠落（章を残して辞書を 1 つ消す） ==');
+inSandbox((root) => {
+  fs.rmSync(path.join(root, dicRel('02-talk.pasta')));
+  const result = runTutorialCheck(root);
+  check('辞書の欠落で ok=false', result.ok === false);
+  check('残った dic は全件 match',
+    result.results.length === DIC.length - 1 && result.results.every((r) => r.matched),
+    JSON.stringify(result.results.filter((r) => !r.matched)));
+  check('その章のブロックが no-dic',
+    result.problems.length === 1 && result.problems[0].reason === 'no-dic'
+      && result.problems[0].chapter === chapterRel('02-talk.pasta'),
+    JSON.stringify(result.problems));
+});
+
+// ============================================================
+log('\n== (B-3c) 旧方式（全部の辞書のブロックを 1 枚の章に集める） ==');
+inSandbox((root) => {
+  for (const name of DIC) fs.rmSync(path.join(root, chapterRel(name)));
+  writeFile(root, chapterRel(BOOT), '# 旧方式\n\n' + DIC.map((n) => fenced(realDic(n))).join('\n'));
+  const result = runTutorialCheck(root);
+  check('旧方式で ok=false', result.ok === false);
+  check('集めた章と同じ名前の辞書だけ verbatim-match・ほかの辞書は no-chapter',
+    result.results.every((r) => (r.file === dicRel(BOOT)
+      ? r.reason === 'verbatim-match'
+      : r.matched === false && r.reason === 'no-chapter')),
+    JSON.stringify(result.results));
+  check('集めた章の余分なブロックが not-in-dic',
+    result.problems.length === DIC.length - 1
+      && result.problems.every((p) => p.reason === 'not-in-dic' && p.chapter === chapterRel(BOOT)),
+    JSON.stringify(result.problems));
+});
+
+// ============================================================
+log('\n== (B-3d) 抜き出しの一致（章に辞書の連続した 2 行のブロックを足す） ==');
+inSandbox((root) => {
+  append(root, chapterRel(BOOT), fenced(BOOT_LINES.slice(1, 3).join('\n')));
+  const result = runTutorialCheck(root);
+  check('連続した 2 行の抜き出しは ok=true', result.ok === true,
+    JSON.stringify(result.problems));
+  check('抜き出しのブロックも数に入る', result.blocks === DIC.length + 1,
+    `blocks=${result.blocks}`);
+});
+
+// ============================================================
+log('\n== (B-3e) 抜き出しの不一致（飛び飛びの 2 行・1 文字違い） ==');
+inSandbox((root) => {
+  append(root, chapterRel(BOOT), fenced([BOOT_LINES[0], BOOT_LINES[2]].join('\n')));
+  append(root, chapterRel(BOOT), fenced([BOOT_LINES[1], BOOT_LINES[2] + '！'].join('\n')));
+  const result = runTutorialCheck(root);
+  check('抜き出しの不一致で ok=false', result.ok === false);
+  check('辞書の全体のブロックは残っているので全 dic は match',
+    result.results.every((r) => r.matched));
+  check('飛び飛びの 2 行・1 文字違いがどちらも not-in-dic',
+    result.problems.length === 2
+      && result.problems.every((p) => p.reason === 'not-in-dic' && p.chapter === chapterRel(BOOT))
+      && result.problems[0].head === BOOT_LINES[0] && result.problems[1].head === BOOT_LINES[1],
+    JSON.stringify(result.problems));
+  const rep = reportTutorialCheck(result);
+  check('レポートに章と先頭行',
+    rep.includes(chapterRel(BOOT)) && rep.includes(BOOT_LINES[0]) && rep.includes(BOOT_LINES[1]),
+    rep);
+});
+
+// ============================================================
+log('\n== (B-3f) 辞書の無い章のブロック（index.md に pasta ブロックを置く） ==');
+inSandbox((root) => {
+  append(root, `${GUIDE_REL}/index.md`, fenced('＊OnBoot\n　女の子：やっほー。\n'));
+  const result = runTutorialCheck(root);
+  check('辞書の無い章のブロックで ok=false', result.ok === false);
+  check('index.md のブロックが no-dic（章と先頭行を名指し）',
+    result.problems.length === 1 && result.problems[0].reason === 'no-dic'
+      && result.problems[0].chapter === `${GUIDE_REL}/index.md`
+      && result.problems[0].head === '＊OnBoot',
+    JSON.stringify(result.problems));
+});
+
+// ============================================================
+log('\n== (B-3g) 字下げのフェンス（リスト・引用の中の pasta フェンス） ==');
+inSandbox((root) => {
+  append(root, chapterRel(BOOT), '- 項目\n\n  ```pasta\n  ＊OnBoot\n  ```\n');
+  append(root, chapterRel('02-talk.pasta'), '> ```pasta\n> ＊会話\n> ```\n');
+  append(root, chapterRel('04-variety.pasta'), '- ```pasta\n  ＊会話\n  ```\n');
+  // ```text の中に書いた字下げの ```pasta は例示であり、フェンスの開きではない。
+  append(root, chapterRel('03-face.pasta'), '```text\n  ```pasta\n  例\n  ```\n```\n');
+  const result = runTutorialCheck(root);
+  check('字下げのフェンスで ok=false', result.ok === false);
+  check('リストの中のフェンスが indented-fence（章とその行を名指し）',
+    result.problems.some((p) => p.reason === 'indented-fence'
+      && p.chapter === chapterRel(BOOT) && p.head === '  ```pasta'),
+    JSON.stringify(result.problems));
+  check('引用の中のフェンスが indented-fence',
+    result.problems.some((p) => p.reason === 'indented-fence'
+      && p.chapter === chapterRel('02-talk.pasta') && p.head === '> ```pasta'),
+    JSON.stringify(result.problems));
+  check('リストの印の直後のフェンスが indented-fence',
+    result.problems.some((p) => p.reason === 'indented-fence'
+      && p.chapter === chapterRel('04-variety.pasta') && p.head === '- ```pasta'),
+    JSON.stringify(result.problems));
+  check('別の言語のフェンスの中の字下げ ```pasta は記録しない',
+    result.problems.length === 3, JSON.stringify(result.problems));
+});
 
 // ============================================================
 log('\n== (B-4) ユニット: extractPastaBlocks ==');
@@ -189,16 +351,18 @@ log('\n== (B-5) ユニット: normalizeForCompare / matchDicFile ==');
 }
 
 // ============================================================
-log('\n== (B-6) fatal 経路（チュートリアル不在） ==');
+log('\n== (B-6) fatal 経路（入門の章のフォルダ不在） ==');
 {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-check-'));
   try {
+    writeFile(root, dicRel('01-boot.pasta'), '＊OnBoot\n');
     const result = runTutorialCheck(root);
-    check('チュートリアル不在で ok=false', result.ok === false);
-    check('fatal メッセージにチュートリアルパスを含む',
-      typeof result.fatal === 'string' && result.fatal.includes(TUTORIAL_REL),
+    check('入門のフォルダ不在で ok=false', result.ok === false);
+    check('fatal メッセージに入門のフォルダのパスを含む',
+      typeof result.fatal === 'string' && result.fatal.includes(GUIDE_REL),
       String(result.fatal));
-    check('fatal 時は results が空', result.results.length === 0);
+    check('fatal 時は results・problems が空',
+      result.results.length === 0 && result.problems.length === 0);
     const rep = reportTutorialCheck(result);
     check('レポートに FATAL 行', rep.includes('FATAL'));
     check('レポートが RESULT: FAIL', rep.includes('RESULT: FAIL'));
@@ -209,23 +373,35 @@ log('\n== (B-6) fatal 経路（チュートリアル不在） ==');
 
 // ============================================================
 log('\n== (B-7) レポート分岐（MISMATCH 表示・対処ガイダンス / OK 表示） ==');
-{
-  const bad = makeSandbox({ corruptFile: '02-talk.pasta' });
-  const good = makeSandbox();
-  try {
-    const repBad = reportTutorialCheck(runTutorialCheck(bad));
-    check('MISMATCH 行に対象 dic を表示', /MISMATCH\s+\S*02-talk\.pasta/.test(repBad), repBad);
-    check('失敗レポートに RESULT: FAIL と対処ガイダンス',
-      repBad.includes('RESULT: FAIL') && repBad.includes('対処'));
+inSandbox((root) => {
+  const repGood = reportTutorialCheck(runTutorialCheck(root));
+  check('一致レポートに RESULT: OK', repGood.includes('RESULT: OK'));
+  check('一致レポートの MATCH 行に辞書と章',
+    /MATCH\s+\S*01-boot\.pasta\s.*01-boot\.md/.test(repGood), repGood);
 
-    const repGood = reportTutorialCheck(runTutorialCheck(good));
-    check('一致レポートに RESULT: OK', repGood.includes('RESULT: OK'));
-    check('一致レポートに MATCH 行', /MATCH\s+\S*01-boot\.pasta/.test(repGood));
-  } finally {
-    rmrf(bad);
-    rmrf(good);
-  }
-}
+  const talkLines = normalizeForCompare(realDic('02-talk.pasta')).split('\n');
+  writeFile(root, chapterRel('02-talk.pasta'), '# 章\n\n'
+    + fenced(talkLines.join('\n') + '\n＃ 章の側にだけ混入した余計な行\n'));
+  writeFile(root, dicRel('14-extra.pasta'), '＊追加\n　章の無い辞書。\n');
+  const repBad = reportTutorialCheck(runTutorialCheck(root));
+  check('MISMATCH 行に対象 dic と章と理由',
+    /MISMATCH\s+\S*02-talk\.pasta\s.*02-talk\.md\s.*no-matching-block/.test(repBad), repBad);
+  check('ブロックの問題の行に章・先頭行・理由',
+    repBad.split('\n').some((l) => l.includes(chapterRel('02-talk.pasta'))
+      && l.includes(talkLines[0]) && l.includes('not-in-dic')),
+    repBad);
+  check('章の無い辞書の行に、期待する章のパスと no-chapter',
+    repBad.split('\n').some((l) => l.includes(dicRel('14-extra.pasta'))
+      && l.includes(`${GUIDE_REL}/14-extra.md`) && l.includes('no-chapter')),
+    repBad);
+  check('失敗レポートに RESULT: FAIL と対処ガイダンス（章の作例を直す・章を書く）',
+    repBad.includes('RESULT: FAIL') && repBad.includes('対処')
+      && repBad.includes('連続した行の抜き出し')
+      && repBad.includes(`${GUIDE_REL}/<辞書の名前>.md`),
+    repBad);
+  check('レポートに first-ghost.md の名指しが無い',
+    !repGood.includes('first-ghost') && !repBad.includes('first-ghost'));
+});
 
 // ============================================================
 log('\n== (B-8) extractPastaBlocks 端ケース（CRLF / 行内空白 / 類似言語名 / 未閉鎖） ==');
@@ -269,15 +445,164 @@ log('\n== (B-8b) listDicFiles（dic/ 直下の *.pasta を辞書順・空なら 
   }
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-check-'));
   try {
-    writeFile(empty, TUTORIAL_REL, '```pasta\n＃ x\n```\n');
+    writeFile(empty, `${GUIDE_REL}/01-boot.md`, '```pasta\n＃ x\n```\n');
     const result = runTutorialCheck(empty);
     check('dic が 1 件も無ければ fatal で ok=false（空集合で素通りしない）',
       result.ok === false && typeof result.fatal === 'string'
         && result.fatal.includes(HELLO_DIC_REL),
       String(result.fatal));
+    check('dic 0 件のレポートに FATAL 行', reportTutorialCheck(result).includes('FATAL'));
   } finally {
     rmrf(empty);
   }
+}
+
+// ============================================================
+log('\n== (B-8c) listGuideChapters（入門のフォルダ直下の *.md を辞書順） ==');
+{
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-check-'));
+  try {
+    check('入門のフォルダが無ければ空配列', listGuideChapters(root).length === 0);
+    writeFile(root, `${GUIDE_REL}/index.md`, '# i\n');
+    writeFile(root, `${GUIDE_REL}/01-boot.md`, '# 1\n');
+    writeFile(root, `${GUIDE_REL}/note.txt`, 'x\n');
+    writeFile(root, `${GUIDE_REL}/sub/02-talk.md`, '# 2\n');
+    const names = listGuideChapters(root);
+    check('*.md だけを辞書順に返す（サブフォルダ・他拡張子は除外）',
+      JSON.stringify(names) === JSON.stringify(['01-boot.md', 'index.md']), JSON.stringify(names));
+  } finally {
+    rmrf(root);
+  }
+}
+
+// ============================================================
+log('\n== (B-8d) ユニット: isExcerptOf（辞書の連続した行の抜き出し） ==');
+{
+  const dic = '＃ 見出し\n＊会話\n　女の子：やあ。\n　男の子：おう。\n';
+  check('連続した 2 行は一致', isExcerptOf(dic, '＊会話\n　女の子：やあ。\n') === true);
+  check('1 行だけでも一致', isExcerptOf(dic, '　女の子：やあ。\n') === true);
+  check('辞書の全体は一致', isExcerptOf(dic, dic) === true);
+  check('飛び飛びの行は不一致', isExcerptOf(dic, '＊会話\n　男の子：おう。\n') === false);
+  check('順序の入れ替えは不一致', isExcerptOf(dic, '　女の子：やあ。\n＊会話\n') === false);
+  check('行の途中からは不一致', isExcerptOf(dic, '会話\n　女の子：やあ。\n') === false);
+  check('行の途中までは不一致', isExcerptOf(dic, '＊会話\n　女の子：やあ\n') === false);
+  check('1 文字違いは不一致', isExcerptOf(dic, '＊会話\n　女の子：やあ！\n') === false);
+  check('空のブロックは不一致', isExcerptOf(dic, '') === false && isExcerptOf(dic, '\n\n') === false);
+  // 実際の辞書は空行を含む。空行のある辞書でも、空のブロックはその空行の抜き出しにしない。
+  const blankDic = 'a\n\nb\n';
+  check('空行を含む辞書でも空のブロックは不一致', isExcerptOf(blankDic, '') === false);
+  check('空行を含む辞書でも空白行だけのブロックは不一致', isExcerptOf(blankDic, '\n\n') === false);
+  check('CRLF のブロックでも一致', isExcerptOf(dic, '＊会話\r\n　女の子：やあ。\r\n') === true);
+  check('単独 CR の辞書でも一致',
+    isExcerptOf(dic.replace(/\n/g, '\r'), '＊会話\n　女の子：やあ。\n') === true);
+  check('ブロックの末尾の空白行を無視', isExcerptOf(dic, '＊会話\n　女の子：やあ。\n\n\n') === true);
+
+  // 4 本フェンスで囲んだ、```lua を含む抜き出し（12 段目の形）。
+  const luaDic = ['＊会話', '```lua', 'function SCENE.f(act)', 'end', '```', '　＠f（）', ''].join('\n');
+  const [luaBlock] = extractPastaBlocks('````pasta\n```lua\nfunction SCENE.f(act)\nend\n```\n````\n');
+  check('````pasta で囲んだ ```lua を含む抜き出しが一致', isExcerptOf(luaDic, luaBlock) === true,
+    JSON.stringify(luaBlock));
+}
+
+// ============================================================
+log('\n== (B-8e) ユニット: findProseParagraphs（台詞以外の段落が指示の一文か） ==');
+{
+  // 返り値を「行番号:先頭行」の並びにして比べる。
+  const same = (name, markdown, want) => {
+    const got = JSON.stringify(findProseParagraphs(markdown).map((p) => `${p.line}:${p.head}`));
+    check(name, got === JSON.stringify(want), got);
+  };
+  // 二文の地の文。対象の段落に置けば必ず返るので、除外の規則が外れると件数が変わる。
+  const BAD = '地の文である。二文目である。';
+
+  // --- 指示の一文の 3 つの条件（1 行だけ・末尾が句点・インラインコードの外の句点が 1 つ） ---
+  same('指示の一文は返さない', '`dic/02-talk.pasta` を作り、次の内容を貼る。\n', []);
+  check('返り値は { line, head } の並び',
+    JSON.stringify(findProseParagraphs('# 題\n\n辞書を作る。内容を貼る。\n'))
+      === JSON.stringify([{ line: 3, head: '辞書を作る。内容を貼る。' }]),
+    JSON.stringify(findProseParagraphs('# 題\n\n辞書を作る。内容を貼る。\n')));
+  same('二文の段落を返す', '辞書を作る。\n\n辞書を作る。内容を貼る。\n', ['3:辞書を作る。内容を貼る。']);
+  same('複数行の段落を返す（先頭行だけなら指示の一文）',
+    '辞書を作る。\n続きの行\n', ['1:辞書を作る。']);
+  same('複数行の段落を返す（つなげば句点が末尾に 1 つ）',
+    '辞書を作り、\n次の内容を貼る。\n', ['1:辞書を作り、']);
+  same('句点なしの段落を返す', '辞書を作る\n', ['1:辞書を作る']);
+  same('句点が末尾に無い段落を返す（句点は 1 つ）',
+    '辞書を作る。（UTF-8 で）\n', ['1:辞書を作る。（UTF-8 で）']);
+  same('インラインコードの中の句点は数えない', '`。` を `、。` に書き換えて保存する。\n', []);
+  same('2 本のバッククォートのインラインコードの中の句点も数えない',
+    '``。`。`` と書いて保存する。\n', []);
+  same('インラインコードの外の句点は数える',
+    '`a` を作る。`b` を貼る。\n', ['1:`a` を作る。`b` を貼る。']);
+  same('行末の空白は見ない', '辞書を作る。  \n', []);
+  same('空白だけの行は段落を区切る', '辞書を作る。\n  \n内容を貼る。\n', []);
+  same('CRLF でも同じ（先頭行に CR を残さない）',
+    `辞書を作る。\r\n\r\n${BAD}\r\n\r\n\`\`\`text\r\n${BAD}\r\n\`\`\`\r\n`, [`3:${BAD}`]);
+
+  // --- コードフェンスの中 ---
+  same('フェンスの中の文は見ない（空行の後ろも）', `\`\`\`text\n${BAD}\n\n${BAD}\n\`\`\`\n`, []);
+  same('情報文字列の無いフェンスの中も見ない', `\`\`\`\n${BAD}\n\`\`\`\n`, []);
+  same('フェンスが閉じた後の段落は見る', `\`\`\`text\n${BAD}\n\`\`\`\n\n${BAD}\n`, [`5:${BAD}`]);
+  same('開きより長いバッククォート行でも閉じる',
+    `\`\`\`text\n${BAD}\n\`\`\`\`\`\n\n${BAD}\n`, [`5:${BAD}`]);
+  same('4 本フェンスの中の ``` は閉じにならない',
+    `\`\`\`\`markdown\n\`\`\`pasta\n＊OnBoot\n\`\`\`\n\n${BAD}\n\`\`\`\`\n\n${BAD}\n`, [`9:${BAD}`]);
+  same('フェンスは前後の段落を区切る（空行が無くても）',
+    '辞書を作る。\n```text\nx\n```\n内容を貼る。\n', []);
+
+  // --- 見出し・区切り（1 行で終わる。直後の行は別の段落） ---
+  same('見出しは見ない', '# 題\n\n## 叶えたいこと\n\n###### 小見出し\n', []);
+  same('見出しの直後の行は別の段落として見る', `## 見出し\n${BAD}\n`, [`2:${BAD}`]);
+  same('# の後ろに空白が無い行は見出しではない', '#1 の辞書を作る\n', ['1:#1 の辞書を作る']);
+  same('区切りは見ない', '---\n\n-----\n', []);
+  same('区切りの直後の行は別の段落として見る', `---\n${BAD}\n`, [`2:${BAD}`]);
+
+  // --- 引用（台詞）・箇条書き・表・字下げ（先頭行で決まる。続きの行も見ない） ---
+  same('引用（台詞）は見ない',
+    `> 【にっこり】${BAD}\n\n> 【アンソニー】一行目、\n> 二行目\n`, []);
+  same('箇条書きは見ない（- * +）', `- ${BAD}\n\n* ${BAD}\n\n+ ${BAD}\n`, []);
+  same('番号付きの箇条書きは見ない', `1. ${BAD}\n2. ${BAD}\n\n10. ${BAD}\n`, []);
+  same('箇条書きの続きの行（字下げなし）も見ない', `- 項目\n${BAD}\n`, []);
+  same('印の後ろに空白が無い行は箇条書きではない',
+    `**太字**${BAD}\n\n-${BAD}\n\n2.5 倍にする\n`,
+    [`1:**太字**${BAD}`, `3:-${BAD}`, '5:2.5 倍にする']);
+  same('表は見ない', `| 列 | 説明 |\n| -- | ---- |\n| a | ${BAD} |\n`, []);
+  same('字下げの段落（箇条書きの続き）は見ない', `- 項目\n\n  ${BAD}\n\n\t${BAD}\n`, []);
+  same('全角空白で始まる段落は字下げではない', `　${BAD}\n`, [`1:　${BAD}`]);
+
+  // --- 章の形（1 段目の章の縮図） ---
+  const chapter = [
+    '# 1 段目：しゃべらせたい',
+    '',
+    '> 【にっこり】産声をあげる瞬間ですわ。最初のひとことを授けましょう。',
+    '',
+    '---',
+    '',
+    '## 辞書ファイルを足す',
+    '',
+    '`ghost/master/dic/01-boot.pasta` を作り、次の内容を UTF-8 で保存する。',
+    '',
+    '```pasta',
+    '＊OnBoot',
+    '',
+    '　女の子：やっほー。今日もよろしくね。',
+    '```',
+    '',
+    '- `＃` で始まる行はコメントで、処理されない',
+    '',
+    '| イベント | いつ来るか |',
+    '| -------- | ---------- |',
+    '| `OnBoot` | 「起動した際に発生。」 |',
+    '',
+    '1. SSP を終了し、もう一度起動する。',
+    '',
+  ];
+  same('章の形（台詞・区切り・見出し・指示の一文・フェンス・箇条書き・表）は 0 件',
+    chapter.join('\n'), []);
+  same('章に地の文を足すと、その行番号と先頭行を返す',
+    [...chapter, 'イベントは知らせである。', '起動の知らせは `OnBoot` である。', '',
+      'シーンを書く。シーンを呼ぶ。', ''].join('\n'),
+    ['25:イベントは知らせである。', '28:シーンを書く。シーンを呼ぶ。']);
 }
 
 // ============================================================

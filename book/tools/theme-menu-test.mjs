@@ -9,7 +9,8 @@
 //     Home は Auto、End は Navy へ移る。
 //   - 対照として、claudia.js が無いと Light から Navy へ矢印キーで進めない（テストが問題を検出できる）。
 //   - 外部への通信（fetch・XMLHttpRequest・WebSocket・EventSource・sendBeacon）をしない。
-//     保存してある設定値（localStorage・sessionStorage）を読み書きしない。要素を足さず、html のテーマのクラスも変えない。
+//     テーマメニューの関数は、保存してある設定値（localStorage・sessionStorage）を読み書きしない。要素を足さず、html のテーマのクラスも変えない。
+//     同じファイルの目次の持ち越し（claudiaSidebarKeep）は、目次のあるページで localStorage の mdbook-sidebar を読むだけで、書かない（検査は theme-sidebar-test.mjs。このテストの模型には目次の要素が無いので、保存値に触れない）。
 //   - メニューが無いページでは何もしない（例外を出さない）。2 回実行しても並びは変わらない。
 //
 // テストの模型:
@@ -212,9 +213,9 @@ if (css !== null) {
     check('N-2 要素を足さない', win.document.getElementsByTagName('*').length === before, `前 ${before} → 後 ${win.document.getElementsByTagName('*').length}`);
     check('N-3 html のテーマのクラスを変えない', win.document.documentElement.className === htmlClass, `実際: ${win.document.documentElement.className}`);
     const src = js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-    const banned = ['localStorage', 'sessionStorage', 'fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'sendBeacon', 'http:', 'https:', 'import(', 'setItem', 'removeItem']
+    const banned = ['sessionStorage', 'fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'sendBeacon', 'http:', 'https:', 'import(', 'setItem', 'removeItem']
       .filter((w) => src.includes(w));
-    check('N-4 ソースに通信・保存値の API の名前が無い（コメントを除く）', banned.length === 0, banned.join(','));
+    check('N-4 ソースに通信・保存値の書き込みの API の名前が無い（コメントを除く。localStorage を読む箇所は theme-sidebar-test.mjs の SRC-2 が検査する）', banned.length === 0, banned.join(','));
 
     console.log('\n== (E) 冪等・メニューが無いページ ==');
     win.eval(js);
