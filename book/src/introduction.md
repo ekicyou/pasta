@@ -35,13 +35,13 @@
 | リンク | 内容 |
 | ------ | ---- |
 | [GitHub リポジトリ（ekicyou/pasta）](https://github.com/ekicyou/pasta) | ソースコード・ビルド方法などの開発者向け情報。[README](https://github.com/ekicyou/pasta/blob/main/README.md) も参照 |
-| [リリースページ](https://github.com/ekicyou/pasta/releases) | 各版の配布物（`pasta.dll.zip`・サンプルゴースト `hello-pasta.nar`・VSCode 拡張）と変更点 |
+| [リリースページ](https://github.com/ekicyou/pasta/releases) | 各版の配布物（[`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip)・サンプルゴースト [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)・VSCode 拡張）と変更点。ファイル名のリンクは、最新版を直接ダウンロードする |
 
 ## このマニュアルが対象とするバージョン
 
 | 項目 | 内容 |
 | ---- | ---- |
-| 対象 pasta バージョン | **v0.3.7** |
+| 対象 pasta バージョン | **v0.3.8** |
 | Lua 方言（ランタイム） | **LuaJIT 2.1**（Lua 5.1 系＋有効化された拡張） |
 | 対象プラットフォーム | Windows |
 
@@ -71,9 +71,9 @@ LuaJIT 独自の拡張（`goto`/ラベルや一部の 5.2 互換機能など）�
 
 目的に応じて、以下の各章へ進むとよい。
 
-- **[入門ガイド](getting-started/index.md)** — pasta を初めて触る人向け。前提環境の準備から、最初の動くゴーストを作るまでを手順で示す。
-- **[文法リファレンス概要](grammar/index.md)** — Pasta DSL の文法。シーン定義、アクション行、変数、単語定義などを章ごとに解説する。
-- **[Lua マニュアル概要](lua/index.md)** — ランタイムが公開する Lua API とコーディングパターン。DSL では足りない複雑なロジックを書くときに参照する。
+- **[入門ガイド](getting-started/index.md)** — pasta を初めて触る人向けの、物語で導くガイド。13 の「こんな表現をしたい」を 1 章ずつ叶えながら、自分のゴーストを育てていく。
+- **[文法リファレンス概要](grammar/index.md)** — Pasta DSL の文法のリファレンス。シーン定義、アクション行、変数、単語定義などを章ごとに解説する。入門ガイドで出会った書き方を詳しく調べるときに引く。
+- **[Lua マニュアル概要](lua/index.md)** — ランタイムが公開する Lua API とコーディングパターンのリファレンス。DSL では足りない複雑なロジックを書くときに参照する。
 - **[外部リンク集](reference/external-links.md)** — Lua 言語リファレンスなど、本マニュアル外の参照先をまとめている。
 
 目次末尾の「内部設計（コントリビュータ向け）」パートは、pasta 本体のコードを読み・直す開発者向けの解説である。ゴーストを作るだけなら読む必要はない。

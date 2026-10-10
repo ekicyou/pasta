@@ -12,13 +12,15 @@
 //   A. 文法網羅・権威（R4.1 / ssot 1.5, 4.2, 9.7） — grammar 全実装章の存在・本文、
 //      book/src に doc/spec・GRAMMAR.md の記述なし（A-nospec）、生成対象章が SUMMARY から到達可能（A-summary）
 //   B. Lua 網羅（R5.1, R5.5）   — 公開モジュール名の登場・LuaJIT 2.1 明示
-//   C. チュートリアル（R6.1, R6.2） — 前提環境/手順/UTF-8 注意・tutorial-check 逐語一致
+//   C. チュートリアル（R6.1, R6.2 / getting-started-story-guide 1.2, 1.4, 7.1, 10.1, 10.7, 10.8） — 前提環境/UTF-8 注意・
+//      段の章の本文（C-steps）、目次の並び（C-order）、tutorial-check 逐語一致、
+//      段の章の H2 5 種（C-sections）、台詞以外の段落は指示の一文だけ（C-prose）
 //   D. ボイス（R7.1, R7.2, R7.4 / ssot 1.7） — 導入/締めのキャラ口調（判定は findVoice）・コードフェンス内に口調なし
 //   E. 外部参照（R8.2, R8.3）   — milkpot(lua51/lua52)＋luajit.org 絶対 URL・lua55 不採用明記
 //   F. バージョン（R9.1, R9.3, R9.4） — introduction の対象バージョンが Cargo.toml と一致・LuaJIT 2.1・将来変更注記
 //   I. 内部設計パート（pasta-runtime-internals-doc 1.2, 1.8, 2.7, 2.10, 2.11） — 10 章の存在・本文・
 //      章構造（extractBody）、題材章 8 章の必須 H2 7 種（この順）、機構語の網羅、概要章の対象外ツールと読者
-//   T. 台詞部品（manual-claudia-theme 4.7, 5.2, 7.1–7.3, 10.2, 10.3, 10.8） — 全 47 章（D 系の章＋debug/）の
+//   T. 台詞部品（manual-claudia-theme 4.7, 5.2, 7.1–7.3, 10.2, 10.3, 10.8） — 全 60 章（D 系の章＋debug/）の
 //      記法（T-syntax）・導入と締めが二人の台詞だけ（T-intro・T-outro）、顔画像（T-assets）、執筆規約の追従（T-authoring）
 //
 // 成功で exit 0、失敗（1 件でも）で exit 1。
@@ -26,7 +28,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runTutorialCheck } from './tutorial-check.mjs';
+import { runTutorialCheck, listGuideChapters, findProseParagraphs } from './tutorial-check.mjs';
 import { GENERATION_MAP, findVoice, extractBody, chapterRegions } from './gen-skill-refs.mjs';
 import { maskFences } from './link-check.mjs';
 import { SPEAKERS, FACE_DIR, MAX_FACE_BYTES, scanTalk, checkRegion } from './talk/talk.mjs';
@@ -209,9 +211,11 @@ const LUA_MODULES = [
 // ============================================================
 // C. チュートリアル（R6.1 前提環境/手順/UTF-8 / R6.2 起動可能な最小一式に一致）
 // ============================================================
+// 段の章（ファイル名が 2 桁の数字とハイフンで始まる章）が持つ H2。この順で現れること。
+const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞書ファイルを足す', '起動して確かめる', 'もっと詳しく'];
 {
   const gsDir = `${SRC}/getting-started`;
-  const gsFiles = fs.readdirSync(abs(gsDir)).filter((f) => f.endsWith('.md'));
+  const gsFiles = listGuideChapters(REPO_ROOT);
   const allGs = gsFiles.map((f) => read(`${gsDir}/${f}`)).join('\n');
   assert(
     'C-utf8',
@@ -231,19 +235,80 @@ const LUA_MODULES = [
     `チュートリアルに前提環境（Windows / SSP）の記載がある`,
     `チュートリアルに前提環境（Windows / SSP）の記載が無い`,
   );
+  // C-steps: 段の章が 1 枚以上あり、どれも本文を持つ（10.1）。不足した章を名指しする。
+  const stageFiles = gsFiles.filter((f) => /^\d{2}-/.test(f));
+  const thin = stageFiles.filter((f) => !isSubstantive(read(`${gsDir}/${f}`)));
   assert(
     'C-steps',
-    exists(`${gsDir}/first-ghost.md`) && isSubstantive(read(`${gsDir}/first-ghost.md`), 3000),
-    `first-ghost.md が完結した手順本文を持つ`,
-    `first-ghost.md の手順本文が不足`,
+    stageFiles.length > 0 && thin.length === 0,
+    `段の章 ${stageFiles.length} 枚がどれも本文を持つ`,
+    stageFiles.length === 0
+      ? `段の章（2 桁の数字とハイフンで始まる .md）が ${gsDir} に 1 枚も無い`
+      : `段の章が本文不足/プレースホルダ: ${thin.join(', ')}`,
   );
+  // C-order: 目次の入門の並びが、入口・準備 2 章・段の章（ファイル名の昇順）と一致する（1.2, 1.4）。
+  {
+    const want = ['index.md', 'prerequisites.md', 'setup.md', ...stageFiles];
+    const have = [...read(`${SRC}/SUMMARY.md`).matchAll(/\]\((?:\.\/)?getting-started\/([^)\s#]+\.md)(?:#[^)]*)?\)/g)]
+      .map((m) => m[1]);
+    const missing = want.filter((f) => !have.includes(f));
+    const extra = have.filter((f) => !want.includes(f));
+    const at = have.findIndex((f, i) => f !== want[i]);
+    assert(
+      'C-order',
+      have.length === want.length && at < 0,
+      `SUMMARY.md の入門の並びが、入口・準備 2 章・段の章 ${stageFiles.length} 枚の昇順と一致する`,
+      missing.length > 0 || extra.length > 0
+        ? `SUMMARY.md の入門の章が章立てと違う: ${[
+          ...missing.map((f) => `目次に無い章 ${f}`),
+          ...extra.map((f) => `章立てに無いリンク ${f}`),
+        ].join(', ')}`
+        : `SUMMARY.md の入門の並びが違う: ${at + 1} 番目は ${want[at] ?? '（なし）'} のはずが ${have[at]}`
+          + `（期待: ${want.join(' → ')}／実際: ${have.join(' → ')}）`,
+    );
+  }
+  for (const f of gsFiles) {
+    const rel = `${gsDir}/${f}`;
+    const md = read(rel);
+    // C-sections: 段の章が H2 5 種をこの順で持つ（10.7。I-sections と同じ判定。フェンス内の行は見出しとみなさない）。
+    if (stageFiles.includes(f)) {
+      const h2s = stripCodeFences(md)
+        .split(/\r?\n/)
+        .filter((l) => l.startsWith('## '))
+        .map((l) => l.slice(3).trim());
+      const idx = GUIDE_SECTIONS.map((h) => h2s.indexOf(h));
+      const missing = GUIDE_SECTIONS.filter((_, i) => idx[i] < 0);
+      const ordered = idx.every((v, i) => i === 0 || v > idx[i - 1]);
+      assert(
+        `C-sections:${f}`,
+        missing.length === 0 && ordered,
+        `段の章 ${f} が H2 5 種をこの順で持つ`,
+        missing.length > 0
+          ? `段の章 ${f} に H2 が無い: ${missing.join(', ')}`
+          : `段の章 ${f} の H2 の順序が違う（期待: ${GUIDE_SECTIONS.join(' → ')}／実際: ${h2s.filter((h) => GUIDE_SECTIONS.includes(h)).join(' → ')}）`,
+      );
+    }
+    // C-prose: 台詞以外の段落が指示の一文だけ（7.1, 10.8）。判定は findProseParagraphs。
+    const prose = findProseParagraphs(md);
+    assert(
+      `C-prose:${f}`,
+      prose.length === 0,
+      `${rel} の台詞以外の段落が指示の一文だけ`,
+      `指示の一文でない段落: ${prose.map((p) => `${rel}:${p.line}「${p.head}」`).join(' / ')}`
+        + ` → 対処: 台詞にする・箇条書きにする・一文にまとめる`,
+    );
+  }
   // 起動可能な最小一式に一致 = tutorial-check 逐語一致が成立すること（実走査）。
+  // 失敗のときは、辞書の不一致「章 ← 辞書 [理由]」とブロックの問題「章「先頭行」[理由]」を並べる。
   const tut = runTutorialCheck(REPO_ROOT);
   assert(
     'C-tutorial-check',
     tut.ok,
     `tutorial-check が成立（チュートリアル末成果物が hello-pasta 最小一式と逐語一致）`,
-    `tutorial-check が失敗: ${tut.fatal || tut.results.filter((r) => !r.matched).map((r) => r.file).join(', ')}`,
+    `tutorial-check が失敗: ${tut.fatal || [
+      ...tut.results.filter((r) => !r.matched).map((r) => `${r.chapter} ← ${r.file} [${r.reason}]`),
+      ...tut.problems.map((p) => `${p.chapter}「${p.head}」[${p.reason}]`),
+    ].join(' / ')}`,
   );
 }
 

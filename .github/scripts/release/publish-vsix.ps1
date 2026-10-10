@@ -99,7 +99,7 @@ try {
     $r = Invoke-Vsce $publishArgs -Echo
     if ($r.Code -ne 0) {
         if ($r.Text -match $AuthPattern) {
-            Complete failed auth "``vsce publish`` が認証で失敗した（終了コード $($r.Code)）。Azure のフェデレーション資格情報の subject・publisher の Members を手順書 ``.github/release-ci-setup.md`` の名前の表と照合する"
+            Complete failed auth "``vsce publish`` が認証で失敗した（終了コード $($r.Code)）。Azure のフェデレーション資格情報の subject・publisher の Members を手順書 ``.github/release-ci-setup.md`` の名前の対応表と照合する"
         }
         Complete failed publish "``vsce publish`` が失敗した（終了コード $($r.Code)）。ログを読む"
     }

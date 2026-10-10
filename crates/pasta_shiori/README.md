@@ -74,7 +74,7 @@ println!("Response: {}", response);
 
 `load_dir` にはゴーストの `ghost/master/` を渡します。必須なのは設定ファイル `pasta.toml` で、辞書は `dic/`、ゴースト作者の Lua スクリプトは `scripts/` に置きます。SHIORI のエントリ（`pasta.shiori.entry`）は pasta.dll に同梱されており、ゴースト側に置く必要はありません。実行時には `profile/pasta/` に同梱スクリプトの展開先・キャッシュ・保存データ・ログが作られます。
 
-フォルダ構成は [最初のゴーストを作る](https://ekicyou.github.io/pasta/getting-started/first-ghost.html#ゴーストのフォルダ構成)、起動の流れとモジュール検索パスは [起動シーケンスとモジュール解決](https://ekicyou.github.io/pasta/reference/startup.html) を参照してください。
+フォルダ構成は [ゴーストの最小一式を置く](https://ekicyou.github.io/pasta/getting-started/setup.html#ゴーストのフォルダ構成)、起動の流れとモジュール検索パスは [起動シーケンスとモジュール解決](https://ekicyou.github.io/pasta/reference/startup.html) を参照してください。
 
 ## 依存関係
 

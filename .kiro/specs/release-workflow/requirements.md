@@ -2,236 +2,269 @@
 
 ## Project Description (Input)
 
-### リリース仕様（cc-sdd 3.0 書き直し版）
+### リリース仕様（リリース CI に合わせた書き直し版）
 
-本仕様は、リリースのための手順を設計し、「実装」（`/kiro-impl release-workflow`）を実行するたびにリリース作業を行う、**繰り返しタスク**の仕様です。本仕様は実装完了しません。新たに「実装」が指示されるたび、タスクの実行状況は初期化され、新たな「リリース作業」を繰り返し行います。
+本仕様は、リリースのための手順を定め、「実装」（`/kiro-impl release-workflow`）を実行するたびにリリース作業を行う、**繰り返しタスク**の仕様である。本仕様は実装完了しない。新たに「実装」が指示されるたび、タスクの実行状況は初期化され、新たなリリース作業を行う。
 
-本書き直しの主眼は **並行作業性（concurrency）の見直し** です。旧仕様は全工程を単一の Sequential Pipeline として直列実行していましたが、各処理が要求する**共有リソース**（cargo ターゲットロック、git ワークツリー、ネットワーク）を分析した結果、いくつかの処理は安全に並行実行でき、また旧仕様には**偽の依存関係**（crates.io 公開 → サンプルゴーストビルド）が存在することが判明しました。本仕様ではこれらを是正します。
+リリースの CI 化（`release-ci`）が完了し、リリースタグ `vX.Y.Z` の push だけで、公開前の検査・配布物のビルド・crates.io（5 クレート）・VSCode Marketplace・GitHub Release への公開まで進むようになった。手元でビルドして公開し、成果物をコミットする旧手順は、そのままでは動かない。
 
-**リリース対象**:
+本書き直しでは、エージェントの手順を次の 4 段へ縮める（steering `roadmap.md`「リリース手順の書き換え」）。
 
-| 対象                                                        | 公開先             | 備考                               |
-| ----------------------------------------------------------- | ------------------ | ---------------------------------- |
-| pasta_core, pasta_dsl, pasta_lua, pasta_shiori, pasta_check | crates.io          | 依存関係順に公開（クリティカル）   |
-| pasta-vscode (VSCode 拡張)                                  | VSCode Marketplace | 隔離されるが完遂必須（Req 11 のスケジュール再試行で粘る） |
-| hello-pasta.nar, pasta.dll.zip                              | GitHub Release     | リリースアセット                   |
-| VSIX ファイル                                               | GitHub Release     | 存在する場合のみ添付               |
+1. 版を決める
+2. 版を上げたコミットを PR で main に入れる
+3. リリースタグを push する
+4. リリース CI の結果を確かめ、失敗した job を再実行する
 
-**開発者提供の手順概要**:
+次のものはリリース CI へ移ったので、本仕様から取り除く: 手元でのビルド、公開の 2 トラック、Resume、スケジュールによる再試行、main の CI が全部緑かの確認。マージコミット方式で統合する理由（タグが指すコミットを main から到達できるようにするため）も見直す。
 
-1. バージョン（1.2.0など）を開発者に確認する
-2. Cargo.toml のバージョン表記、editors/vscode/package.json、およびマニュアル（book/src/introduction.md）の対象バージョン行を更新し、build とマニュアルの内容検証が通ることを確認してコミット
-3. cargo publish する（依存関係順）
-4. VSCode 拡張をビルド・公開する（非クリティカル）
-5. サンプルゴーストをビルド（release.ps1 の実行）してコミット
-6. バージョンタグをつける
-7. git push
-8. gh でリリースを作る。チェンジログは git の履歴からサルベージ。リリース時公開ファイルは pasta.dll.zip、hello-pasta.nar、および VSIX（存在する場合）
+あわせて、`release-ci` から申し送られた「CI での初回のリリースと、その後の後片付け」を扱う。期限は 2026-12-01（Marketplace の global PAT の廃止）より前である。
 
 ---
 
 ## Introduction
 
-本ドキュメントは pasta プロジェクトのリリースワークフローに関する要件を定義する。このワークフローは LLM エージェントが開発者の指示のもとで繰り返し実行するリリース作業手順であり、crates.io への公開、VSCode 拡張の Marketplace 公開、サンプルゴーストのビルド、GitHub Release の作成までを一貫して行う。
+本ドキュメントは、pasta プロジェクトのリリース手順に関する要件を定義する。この手順は、LLM エージェントが開発者の指示のもとで繰り返し実行する。エージェントは版を決め、版を上げたコミットを main に入れ、リリースタグを push し、リリース CI の結果を確かめる。検査・ビルド・公開そのものはリリース CI（`.github/workflows/release.yml`）が行い、本仕様は受け持たない。
 
-本仕様では、上記の各処理を「**何を**達成するか」（本要件書）と「**どの順序・どの並行度で**実行するか」（design.md の実行モデル）に分離して扱う。並行作業性に関する振る舞い（並行実行可否、失敗隔離、順序保証）は Requirement 8 に集約する。
+要件定義の時点で仮定で書いた箇所は、設計ディスカッション（2026-10-10）ですべて確定した。経緯は末尾の「未決事項」に残す。
+
+用語:
+
+- **リリース CI**: リリースタグの push を契機に動く GitHub Actions のワークフロー（`release-ci` の成果物）。
+- **リリースタグ**: `v` の後に `X.Y.Z`（数字 3 つ）が続くタグ。例: `v0.3.8`。
+- **公開先**: crates.io（`pasta_core`・`pasta_dsl`・`pasta_lua`・`pasta_shiori`・`pasta_check` の 5 クレート）・VSCode Marketplace・GitHub Release。
+- **公開済み**: その版が公開先に実際に存在する状態。
+- **版の更新**: リポジトリ内の版の表記を新しい版へそろえる変更（Requirement 3）。
+- **作業ブランチ**: Claude Code ハーネスが供給するワークツリーの、デフォルトではないブランチ。
 
 ### 仕様の特殊性
 
-本仕様は通常の機能仕様と異なり、以下の特性を持つ：
-
-- **繰り返し実行型**: `/kiro-impl release-workflow` が実行されるたびにタスク状態はリセットされ、新たなリリース作業として実行される
-- **永続的未完了**: 本仕様は `completed` に移行しない。常に `ready_for_implementation` 状態を維持する
-- **パラメータ依存**: 各実行時にバージョン番号が開発者から提供される
-- **オペレーション仕様**: コードの新規作成・変更を伴わず、既存ツール群（cargo / git / gh / npm / release.ps1）の組み合わせで実現する
-- **ワークツリー実行型**: Claude Code ハーネスが供給するワークツリー（非デフォルトの作業ブランチ）上で起動される。生成したリリースコミットとタグは、spec 完了で用いる squash-PR フローではなく、**PR のマージコミット方式（`--merge`）** で main へ統合し、コミット SHA とタグ参照の整合を保つ。main への直接 push は行わない（将来の GitHub ブランチ保護に前方互換）（Requirement 10）
+- **繰り返し実行型**: `/kiro-impl release-workflow` が実行されるたびにタスクの状態はリセットされ、新たなリリース作業として実行される。
+- **永続的未完了**: 本仕様は `completed` に移行しない。
+- **パラメータ依存**: 実行のたびに、版が開発者から与えられるか、調査の結果から自動で決まる。
+- **オペレーション仕様**: 製品コードの新規作成・変更を伴わない。変えるのは版の表記だけである。
 
 ## Boundary Context
 
-- **In scope**: Cargo.toml / package.json / マニュアルの対象バージョン行（`book/src/introduction.md`）のバージョン更新、crates.io 公開（5クレート）、VSCode Marketplace 公開、サンプルゴーストビルド、Git タグ・プッシュ、GitHub Release 作成、これらの**実行順序と並行スケジューリング**、ならびに**ワークツリー（非デフォルトブランチ）上での実行と、リリースコミット・タグの PR マージコミット方式（非 squash）による main 統合**
-- **Out of scope**: CI/CD パイプライン統合、クロスプラットフォーム対応、認証トークンの自動設定、pasta_lsp の独立リリース管理、release.ps1 スクリプト自体の修正、**spec 完了の squash-PR 統合フロー**（リリースは別系統のため対象外）、**GitHub ブランチ保護設定そのものの構成**（本仕様は保護下でも成立する手順を定めるが、保護ルールの設定作業は対象外）、**マニュアルの対象バージョン行以外の改訂とマニュアルの公開**（公開は main への統合を契機にマニュアル側の既存 CI が行い、本仕様は関与しない）
-- **Adjacent expectations**: `release.ps1` は既存の成熟スクリプトとしてそのまま利用する。マニュアルの内容検証（対象バージョン行と `Cargo.toml` の照合を含む）はマニュアル側の既存ツールをそのまま利用し、対象バージョン行の書式はマニュアル側が維持する。`gh` CLI および `cargo` / `vsce` の認証は事前に設定済みであることを前提とする。フィーチャーブランチ／ワークツリーは Claude Code ハーネスが供給する。リリースの main 統合は **PR ベース**（マージコミット方式 `--merge`、squash を行わない）で行い、将来 GitHub 側で main への直接 push を禁止しても成立させる。なお steering `workflow.md` のリリースカーブアウト改訂、`.claude/settings.json` のタグ push 許可追加・`git push origin main` 許可の縮退、および repo の merge-commit 有効化（必要時）は、**繰り返し実行されるリリース手順には含めない一回限りのセットアップ**として扱い、本 spec の設計確定後（タスク分解の前後）に**手動で実施**する（ワークツリー隔離のため別セッションへは委譲しない）。整合は Steering Gate でも確認する
+- **In scope**:
+  - 版の決定（調査・自動の決定・重複の検査）。
+  - 版の更新と、その整合の確認。
+  - 版の更新の main への統合（PR 経由）。
+  - リリースタグの作成と push。
+  - リリース CI の結果の確認、失敗した job の再実行、失敗の種類ごとの対応の案内。
+  - 途中で止まったリリースの再開（実際の状態からの判定）。
+  - CI での初回のリリースの確認と、その後の後片付けの案内。
+  - 本書き直しに伴う、文書・設定の一回限りの整合（Requirement 12）。
+- **Out of scope**:
+  - 公開前の検査、配布物のビルド、crates.io・Marketplace への公開、GitHub Release の作成、リリースノートの生成（リリース CI が行う）。
+  - リリース CI の定義（`release.yml`・`.github/scripts/release/`）と `release.ps1` の機能の変更。
+  - 失敗の原因になったコードやワークフロー定義の修正そのもの（別の PR で行う。本仕様は原因を報告し、修正の後に続きを行う）。
+  - 一回限りのセットアップのうち、公開先の画面で行う設定と認証情報の失効の実施（開発者が行う。本仕様は案内する）。
+  - マニュアルの対象バージョン行以外の改訂と、マニュアルの公開（main への統合を契機に、マニュアル側の既存の CI が行う）。
+  - プレリリースの版、pasta_lsp の独立リリース、新しいクレートの初回公開。
+  - 確認ワークフロー（`release-setup-check.yml`）のログにマネージド ID の識別子が出る件の修正（秘密の値ではなく実害が無い。セットアップは済んでいる）。
+- **Adjacent expectations**:
+  - リリース CI: リリースタグの push で起動し、タグの形・版の一致・main からの到達を検査し、`build.yml` の検査をタグのコミットで行い、公開先ごとの結果（`published`・`skipped`・`failed`・`not-run`）と GitHub Release の URL を報告する。再実行では公開済みのものを飛ばす。本仕様はこの挙動を前提にする。
+  - `crates/pasta_sample_ghost/RELEASE.md`: 人が読むリリース手順書。本仕様の手順と食い違わない。
+  - `.github/release-ci-setup.md`: 一回限りのセットアップの手順書。認証の失敗の対応と、初回のリリースの後片付けの内容は、この手順書を正とする。
+  - main のブランチ保護: main への変更は PR だけが通る。リリースタグの push は保護の対象外である。
+  - PR の統合: PR の CI の完了を待たずに統合する運用（steering `workflow.md`）に従う。
+  - 作業ブランチ: Claude Code ハーネスが供給する。
+  - 席: リリースの実行中は、`release.ps1`・`release.yml` を触る変更を main に入れない（開発者の運用）。
+  - 手元の `gh` は認証済みである。`CARGO_REGISTRY_TOKEN`・`VSCE_PAT` は要らない。
 
 ---
 
 ## Requirements
 
-### Requirement 1: バージョン確認と事前検証
+### Requirement 1: 版の決定
 
-**Objective:** As a 開発者, I want リリース前にバージョン番号を確定し、ワークツリーとテストの健全性を保証したい, so that リリース作業が一貫した状態から開始される
-
-#### Acceptance Criteria
-
-1. When リリース作業が開始される and バージョン番号が指定されている, the Release Workflow shall 指定されたバージョン番号を使用する
-2. When リリース作業が開始される and バージョン番号が指定されていない, the Release Workflow shall 全バージョンソース（Cargo.toml、package.json、Git タグ、crates.io、GitHub Releases、VSCode Marketplace）を調査し、最大バージョンの PATCH を +1 した値を提案バージョンとして算出する
-3. When 提案バージョンが算出される, the Release Workflow shall 全ソースの調査結果と提案バージョンを開発者に報告し承認を求める
-4. If 開発者が提案バージョンを承認しない, the Release Workflow shall 開発者に希望するバージョン番号の入力を求める
-5. When バージョン番号が提供される, the Release Workflow shall semver 形式（例: `1.2.0`）として妥当性を検証する
-6. If バージョン番号が semver 形式でない, the Release Workflow shall エラーを報告し再入力を求める
-7. When バージョン番号が確定する, the Release Workflow shall 全バージョンソースに対して重複チェックを行い、同一バージョンが既に存在する場合はエラーを報告し別のバージョン番号の入力を求める。If 当該バージョンが本ワークフローの統合済み未完了リリース（main 統合済みだが完全公開に至っていない）である, the Release Workflow shall エラーとせず Requirement 9.5 の resume モードに従って再開する
-8. When リリース作業が開始される, the Release Workflow shall ワークツリーに未コミットの変更があるか確認する
-9. If 未コミットの変更が存在する, the Release Workflow shall すべての変更をリリース準備コミットとしてコミットする
-10. When リリース作業が開始される, the Release Workflow shall 全テストを実行し通過を確認する
-11. If テストが失敗する, the Release Workflow shall リリース作業を中止し失敗内容を報告する
-
-### Requirement 2: バージョン更新
-
-**Objective:** As a 開発者, I want ワークスペース全体と関連プロジェクト、およびマニュアルの対象バージョン表記を一括更新したい, so that 全クレート・VSCode 拡張・マニュアルが示すバージョンが同期され、公開マニュアルの対象バージョンが古いまま残らない
+**Objective:** As a 開発者, I want リリースする版を、すでに出ている版と重ならないように確定したい, so that 取り消せない公開を誤った版で始めない
 
 #### Acceptance Criteria
 
-1. When バージョン番号が確定する, the Release Workflow shall `Cargo.toml`（ワークスペースルート）の `[workspace.package].version` フィールドを新バージョンに更新する
-2. When ワークスペースバージョンが更新される, the Release Workflow shall `[workspace.dependencies]` セクション内の内部クレート参照（`pasta_core`, `pasta_dsl`, `pasta_lua`, `pasta_shiori`, `pasta_check`）の `version` フィールドも同じバージョンに更新する
-3. When Cargo.toml が更新される, the Release Workflow shall `editors/vscode/package.json` の `version` フィールドも同じバージョンに更新する
-4. When Cargo.toml が更新される, the Release Workflow shall マニュアルのトップページ（`book/src/introduction.md`）の対象バージョン行 `| 対象 pasta バージョン | **vX.Y.Z** |` を同じバージョン（`v` 接頭辞付き）に更新し、それ以外のマニュアル本文は変更しない
-5. When バージョン更新が完了する, the Release Workflow shall ワークスペース全体のビルドと、マニュアルの内容検証（対象バージョン行が `Cargo.toml` のバージョンと一致することの照合を含む）を実行し、両方が成功することを確認する
-6. If ビルドまたはマニュアルの内容検証が失敗する（対象バージョン行が見つからず更新できなかった場合を含む）, the Release Workflow shall バージョン変更（`Cargo.toml`・`package.json`・マニュアル）をファイル単位でロールバックし、エラーを報告してリリース作業を中止する
-7. When ビルドとマニュアルの内容検証が成功する, the Release Workflow shall マニュアルの対象バージョン更新を含むバージョン更新を 1 つのコミットにまとめる
+1. When リリース作業が開始され、版が指定されているとき, the Release Workflow shall 指定された版を使う。
+2. When リリース作業が開始され、版が指定されていないとき, the Release Workflow shall すべての版の出どころ（`Cargo.toml`・`editors/vscode/package.json`・Git のタグ・crates.io・GitHub Releases・VSCode Marketplace）を調べ、最大の版の PATCH を 1 つ上げた値を、リリースする版にする。
+3. When 版を自動で決めたとき, the Release Workflow shall 出どころごとの調査結果と決めた版を開発者に示し、承認を求めずに先へ進む。
+4. The Release Workflow shall 版が指定されていないとき、MINOR・MAJOR を自動では上げない（上げるときは、開発者が版を指定して実行する）。
+5. When 版が与えられたとき, the Release Workflow shall `X.Y.Z`（数字 3 つ）の形かを検査する。
+6. If 版が `X.Y.Z` の形でないとき（プレリリースの形を含む）, the Release Workflow shall エラーを示し、入力し直しを求める。
+7. If 確定しようとする版が、Git のタグ・crates.io・GitHub Releases・VSCode Marketplace のいずれかにすでにあるとき, the Release Workflow shall エラーを示し、別の版の入力を求める。ただし Requirement 8 の「途中からの再開」にあたる場合を除く。
+8. If 公開先への問い合わせが失敗し、版があるかどうかを確かめられないとき, the Release Workflow shall 「無い」と見なさず、確かめられなかった出どころを示して作業を止める。
 
-### Requirement 3: crates.io 公開
+### Requirement 2: 作業の開始条件
 
-**Objective:** As a 開発者, I want 依存関係の順序を考慮して全公開クレートを crates.io に公開したい, so that 下流ユーザーが最新版を利用できる
-
-#### Acceptance Criteria
-
-1. When ローカルビルドが完了しワークツリーがクリーンで、かつ main 統合（タグ作成・PR マージ）が成功している, the Release Workflow shall クレートを依存関係順（`pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`）に公開する
-2. When クレートを公開する, the Release Workflow shall 各クレートの公開成功を確認してから次のクレートに進む
-3. If クレートの公開が失敗する, the Release Workflow shall 段階的バックオフでリトライを試みる（待機時間を1分から1分ずつ増加し最大10分まで、最大10回リトライ）
-4. If セッション内の段階的バックオフを使い切っても失敗する, the Release Workflow shall 既に公開されたクレートはそのまま残し、一時障害なら Requirement 11 のスケジュール再試行へ、非一時障害なら原因を報告する。いずれの場合もリリースを完了済みとしない（未公開クレートを残したまま完了しない）
-5. While `pasta_sample_ghost` は `publish = false` である, the Release Workflow shall このクレートの公開をスキップする
-6. When 前のクレートを公開した直後, the Release Workflow shall crates.io のインデックス更新を待つため待機時間を設ける
-
-### Requirement 4: VSCode 拡張公開
-
-**Objective:** As a 開発者, I want VSCode 拡張を Marketplace に公開し、リリースに VSIX を含めたい, so that ユーザーが最新の拡張機能を利用できる
+**Objective:** As a 開発者, I want リリース作業が、リリースと関係のない変更を巻き込まない状態から始まってほしい, so that 版の更新だけが main に入り、リリースの中身が意図したとおりになる
 
 #### Acceptance Criteria
 
-1. When ローカルビルドステージが実行される, the Release Workflow shall VSCode 拡張のビルド（パッケージング）を実行する
-2. When パッケージングが成功する, the Release Workflow shall VSIX ファイルが生成されたことを確認しパスを記録する
-3. When VSIX ファイルが存在する, the Release Workflow shall VSCode Marketplace への公開を実行する
-4. If Marketplace 公開が失敗する, the Release Workflow shall まずセッション内の段階的バックオフでリトライを試みる
-5. If セッション内の段階的バックオフを使い切っても Marketplace 公開が失敗する, the Release Workflow shall リリースを完了とせず、Requirement 11 のスケジュール再試行に委ねて未完了として扱う（他トラックの進行は妨げない＝隔離は維持するが完遂は必須）
-6. If VSCode 拡張のビルドが失敗する, the Release Workflow shall 一時障害なら Requirement 11 のスケジュール再試行へ、非一時障害（ビルドエラー等）なら未完了として原因を報告する。いずれの場合もリリースを完了済みとしない（VSIX 未生成のまま完了しない）
-7. When Marketplace 公開が成功する, the Release Workflow shall 公開結果（Marketplace URL）を記録する
+1. When リリース作業が開始されたとき, the Release Workflow shall 作業ブランチの上で動き、main の上での実行や main への直接の push を前提にしない。
+2. If 現在のブランチがデフォルトブランチであるとき, the Release Workflow shall 何も変更せずに止まり、ハーネスのワークツリーでの再実行を求める。
+3. If 作業ブランチに未コミットの変更、または main に無い内容があるとき, the Release Workflow shall それらをリリースに含めず、内容を示して止まる。ただし、main に無い内容が版の更新のコミットだけである場合（Requirement 8.6）を除く。
+4. When 作業ブランチが main より遅れているとき, the Release Workflow shall 版の更新より前に、main の内容を作業ブランチへ履歴を書き換えずに取り込む。
+5. If main の取り込みで衝突が起きたとき, the Release Workflow shall 作業を止め、開発者に解消を求める。
+6. When リリース作業が開始されたとき, the Release Workflow shall リポジトリへの必要な操作（PR の作成と統合・リリースタグの push・リリース CI の結果の閲覧と再実行）ができることを確かめる。
+7. If 必要な操作ができないとき, the Release Workflow shall 何も変更せずに止まり、できない操作を示す。
+8. The Release Workflow shall 手元でのテスト・配布物のビルド・公開を行わず、main の CI の結果を公開の条件にしない（公開前の検査はリリース CI が行う）。
 
-### Requirement 5: サンプルゴーストビルド
+### Requirement 3: 版の更新
 
-**Objective:** As a 開発者, I want リリースバージョンの pasta.dll を使ってサンプルゴーストをビルドしたい, so that リリースに最新の .nar ファイルを含められる
-
-#### Acceptance Criteria
-
-1. When バージョン更新コミットが完了する, the Release Workflow shall サンプルゴーストのビルドスクリプトを実行する
-2. When ビルドスクリプトが成功する, the Release Workflow shall .nar ファイルが生成されたことを確認する
-3. When ビルドスクリプトが成功する, the Release Workflow shall 32bit リリースビルドの DLL が存在することを確認する
-4. If ビルドスクリプトが失敗する, the Release Workflow shall エラーを報告しリリース作業を中断する
-5. When DLL の存在が確認される, the Release Workflow shall DLL を zip 圧縮する
-6. When zip 圧縮が完了する, the Release Workflow shall zip ファイルの存在を確認する
-7. If zip 圧縮が失敗する, the Release Workflow shall エラーを報告しリリース作業を中断する
-8. When ゴーストビルドが成功する, the Release Workflow shall 変更をコミットする
-9. While サンプルゴーストビルドはローカルソースから pasta.dll をビルドする, the Release Workflow shall このビルドを crates.io 公開（Requirement 3）の完了に依存させない
-
-### Requirement 6: バージョンタグとプッシュ
-
-**Objective:** As a 開発者, I want Git タグでリリースポイントを記録し、リモートに反映したい, so that リリースのトレーサビリティが確保される
+**Objective:** As a 開発者, I want リポジトリ内の版の表記を 1 度でそろえたい, so that リリース CI の検査を通り、クレート・拡張・マニュアルが同じ版を示す
 
 #### Acceptance Criteria
 
-1. When 全ローカルビルド・コミットが完了し、作業ブランチが main へマージ可能である, the Release Workflow shall `vX.Y.Z` 形式のアノテーションタグを作成する
-2. When タグが作成される, the Release Workflow shall タグメッセージに `Release vX.Y.Z` を設定する
-3. If 同名のタグが既に存在する, the Release Workflow shall エラーを報告し開発者に対応方法を確認する（既存タグの削除は自動実行しない）
-4. When タグが作成される, the Release Workflow shall 作業ブランチのリリースコミットを、squash を行わず PR のマージコミット方式でデフォルトブランチ（main）へ統合する。注釈タグの push は crates.io 公開成功後に行い、リモートのタグが常に公開済みを含意するようにする（統合方式は Requirement 10 に従う）
-5. If プッシュが失敗する, the Release Workflow shall エラーを報告し手動での対応を開発者に促す
+1. When 版が確定したとき, the Release Workflow shall 次の表記をすべて同じ版に更新する。
+   - `Cargo.toml` の `[workspace.package]` の `version`
+   - `Cargo.toml` の `[workspace.dependencies]` にある内部クレート（`pasta_core`・`pasta_dsl`・`pasta_lua`・`pasta_shiori`・`pasta_check`）の `version`
+   - `Cargo.lock` の中の、ワークスペースのクレートの版
+   - `editors/vscode/package.json` の `version`
+   - `editors/vscode/package-lock.json` の中の、拡張自身の版
+   - マニュアルのトップページ（`book/src/introduction.md`）の対象バージョン行 `| 対象 pasta バージョン | **vX.Y.Z** |`（`v` を付ける）
+2. The Release Workflow shall 版の更新で、上の表記以外を変えない（外部の依存クレート・npm パッケージの版、マニュアルの他の本文を含む）。
+3. When 版の表記を更新したとき, the Release Workflow shall 次の 3 つを確かめる。(1) すべての表記が同じ版を示す。(2) `Cargo.lock` が `Cargo.toml` と食い違わない（ビルドで書き換わらない）。(3) マニュアルの内容検証（対象バージョン行と `Cargo.toml` の版の照合を含む）が通る。
+4. If 確認のいずれかが失敗したとき（対象バージョン行が見つからない場合を含む）, the Release Workflow shall 版の更新を取り消し、失敗した確認を示して作業を止める。
+5. When 確認がすべて通ったとき, the Release Workflow shall 版の更新だけを含む 1 つのコミットを作る。
 
-### Requirement 7: GitHub Release 作成
+### Requirement 4: 版の更新の main への統合
 
-**Objective:** As a 開発者, I want チェンジログ付きの GitHub Release を自動作成し、ビルド成果物を添付したい, so that ユーザーがリリースを容易に取得できる
-
-#### Acceptance Criteria
-
-1. When タグのプッシュが完了する, the Release Workflow shall 前回リリースから今回までのコミット履歴を取得する
-2. When コミット履歴が取得される, the Release Workflow shall Conventional Commits 形式に基づいてコミットを種別ごとに分類・グループ化する
-3. When チェンジログを整形する, the Release Workflow shall 各グループを見出し配下に箇条書きで配置する
-4. When GitHub Release を作成する, the Release Workflow shall タイトルを `pasta vX.Y.Z` に設定する
-5. When GitHub Release を作成する, the Release Workflow shall 整形済みチェンジログをリリースノートとして含める
-6. When GitHub Release を作成する, the Release Workflow shall DLL zip ファイルおよび .nar ファイルをリリースアセットとして添付する
-7. Where VSIX ファイルが存在する, the Release Workflow shall VSIX ファイルもリリースアセットとして添付する
-8. If GitHub Release の作成が失敗する, the Release Workflow shall エラーを報告し手動での Release 作成手順を案内する
-9. If 前回リリースタグが存在しない（初回リリース）, the Release Workflow shall 全コミット履歴をチェンジログとして使用する
-
-### Requirement 8: 実行モデルと並行作業性
-
-**Objective:** As a 開発者, I want リリース作業が共有リソースの制約を尊重しつつ、安全に並行化されて実行されたい, so that リリース全体の所要時間が短縮され、非クリティカルな失敗が全体を止めず、不可逆な処理の順序安全性が保たれる
-
-> **背景**: 各処理は 3 種の共有リソースを要求する — **R1: cargo ターゲットロック**（`cargo build/publish/run`、VSCode の `build:wasm` が保持）、**R2: git ワークツリー＋index**（ファイル生成・add/commit/restore/tag が保持）、**R3: ネットワーク**（crates.io / Marketplace / GitHub、実質無制限の並行可能）。R1・R2 は単一保持の排他リソースであり、これを共有する処理は真の並行実行ができない。
+**Objective:** As a 開発者, I want 版を上げたコミットを、ほかの変更と同じ PR の流れで main に入れたい, so that main のブランチ保護のもとでリリースが成り立ち、リリースだけの特別な統合方式を覚えなくて済む
 
 #### Acceptance Criteria
 
-1. When リリース作業をスケジュールする, the Release Workflow shall 各処理を要求リソース（R1 cargo ロック / R2 ワークツリー / R3 ネットワーク）で分類し、排他リソースを共有する処理を直列化する
-2. While ワークツリーを変更するローカルビルド（バージョン更新ビルド、サンプルゴーストビルド、VSCode 拡張パッケージング）が R1・R2 を共有する, the Release Workflow shall これら全ローカルビルドとコミットを完了しワークツリーをクリーン化してから main 統合（タグ作成・PR マージ）および crates.io 公開（R3 を要し R2 のクリーン状態を前提とする）を開始する
-3. Where crates.io 公開・Marketplace 公開・チェンジログ生成は互いに独立しワークツリーを変更しない, the Release Workflow shall これらを並行（concurrent）に実行してよい
-4. If Marketplace 公開が失敗する, the Release Workflow shall 他の処理（crates.io 公開、タグ・プッシュ、GitHub Release）の進行を妨げず継続する（失敗隔離）。ただし Marketplace 公開はリリース完遂の必須要素であり、未完了のまま全体を完了済みとせず Requirement 11 のスケジュール再試行で完遂する
-5. While main 統合（タグ作成・PR マージ）は revert で可逆だが crates.io 公開は不可逆である, the Release Workflow shall 「main 統合 → crates.io 公開 → GitHub Release 作成」の順で実行し、不可逆な crates.io 公開を可逆な main 統合の後段に置く。If main 統合が失敗する, the Release Workflow shall crates.io 公開および GitHub Release を実行しない。If main 統合の成功後に crates.io 公開が失敗する, the Release Workflow shall 統合済み main 状態（コミット・タグ）を保持したまま公開をリトライまたは中断して報告し、GitHub Release は crates.io 公開成功まで作成しない（安全順序保証。統合方式は Requirement 10 に従う）
-6. The Release Workflow shall 独立した処理を不要に直列化しない（偽の依存関係の排除）。特にサンプルゴーストビルドを crates.io 公開の後段に配置しない
-7. When 並行実行する処理のいずれかがバックグラウンドで進行する, the Release Workflow shall 各並行トラックの完了・失敗を個別に検証し、結果をサマリーに反映する
+1. When 版の更新のコミットを作ったとき, the Release Workflow shall PR を作り、PR 経由で main へ統合する。
+2. The Release Workflow shall 版の更新を、spec の完了と同じ統合方式（squash）で main へ入れ、main の上で 1 つのコミットにする。マージコミット方式を使わない（リリースタグは統合の後に main のコミットへ付けるので、統合前のコミットを main から到達させる必要が無い）。
+3. The Release Workflow shall main へ直接 push しない。
+4. If PR の作成または統合が失敗したとき（衝突・統合できない状態・権限の不足など）, the Release Workflow shall リリースタグを作らず、強制 push・履歴の書き換え・統合の成功より前のブランチの削除を行わずに止まり、開発者に解消を求める。
+5. When PR を統合したとき, the Release Workflow shall main の版の表記が確定した版になっていることを確かめてから、リリースタグの作成へ進む。
 
-### Requirement 9: 繰り返し実行の仕様特性
+### Requirement 5: リリースタグの作成と push
 
-**Objective:** As a 開発者, I want この仕様を何度でも再実行してリリース作業を行いたい, so that 毎回のリリースで同じ品質の手順が保証される
+**Objective:** As a 開発者, I want 版を上げた main のコミットにリリースタグを付けて push したい, so that リリース CI が起動し、タグがその版のソースを正しく指す
 
 #### Acceptance Criteria
 
-1. The Release Workflow shall `/kiro-impl release-workflow` が実行されるたびにタスク状態を初期化（全タスクを未完了に戻す）する
-2. The Release Workflow shall spec.json の `phase` を `completed` に変更しない（常に `ready_for_implementation` を維持する）
-3. The Release Workflow shall 各実行が前回の実行状態に依存しない独立した作業として動作する
-4. When リリース作業が完了する（全ターゲット完遂時）, the Release Workflow shall 実行結果のサマリー（バージョン、公開クレート、Release URL、Marketplace 公開結果、各並行トラックの成否）を開発者に報告する。While 未完了ターゲットが残る, the Release Workflow shall 「未完了（再試行待ち）」として残作業とスケジュール状態を報告する（完了済みと報告しない）
-5. When 再実行時に main の現行バージョンが完全公開（全公開クレートが crates.io に存在・タグ push 済み・GitHub Release 作成済み）に至っていないことを検出する, the Release Workflow shall バージョン再決定・バージョン更新・main 統合をスキップし、未完了の crates.io 公開・Marketplace 公開・タグ push・GitHub Release 作成を冪等に再開する（resume モード）
+1. When 版の更新が main に入ったことを確かめたとき, the Release Workflow shall 版の更新を main へ統合した結果のコミットに、注釈付きのリリースタグ `vX.Y.Z` を、メッセージ `Release vX.Y.Z` で作る。
+2. The Release Workflow shall リリースタグを、main から到達でき、かつ `Cargo.toml` と `editors/vscode/package.json` の版がタグの版と一致するコミットにだけ付ける（リリース CI が検査する条件を、push の前に満たす）。
+3. If 同じ名前のタグがすでにあるとき, the Release Workflow shall エラーを示し、開発者に扱いを確かめる。既存のタグの削除・付け替えを自動では行わない（Requirement 7.6 の、承認を得た付け直しを除く）。
+4. When リリースタグを作ったとき, the Release Workflow shall タグだけをリモートへ push する。
+5. If リリースタグの push が失敗したとき, the Release Workflow shall 失敗の内容と、main には版の更新が入っていてタグだけが無い状態であることを示して止まる（Requirement 8 で再開できる）。
 
-### Requirement 10: ワークツリー実行と PR ベース main 統合
+### Requirement 6: リリース CI の結果の確認
 
-**Objective:** As a 開発者, I want リリースワークフローを Claude Code のワークツリー（非デフォルトの作業ブランチ）上で起動し、生成されたリリースコミットとタグを PR 経由で main に統合したい, so that ハーネスのワークツリー隔離環境でリリースを実行でき、将来 main への直接 push を禁止してもリリースが成立し、かつタグと公開物の参照整合性が保たれる
-
-> **背景**: Claude Code ハーネスはリリース作業を非デフォルトのワークツリーブランチ上で起動する。一方、リリースは複数のコミット（prepare / bump / ghost build）と、特定コミットを指す注釈タグ `vX.Y.Z` を生成する。これらを spec 完了用の squash-PR（`--squash`）や rebase でマージするとコミット SHA が書き換わり、タグが main から到達不能な孤児コミットを指し（`git describe`・Release のコミットリンク・チェンジログ compare URL が破綻）、不可逆な crates.io 公開内容のアンカーも失われる。本要件はこれを **PR のマージコミット方式（`--merge`）** で回避し、将来の GitHub ブランチ保護（main 直接 push 禁止）にも前方互換とする。
+**Objective:** As a 開発者, I want タグを push した後、公開が最後まで進んだかをエージェントに見届けてほしい, so that 自分で Actions の画面を見張らなくても、公開先ごとの結果が分かる
 
 #### Acceptance Criteria
 
-1. When リリース作業が開始される, the Release Workflow shall ハーネスが供給する現在の作業ブランチ（ワークツリーブランチ）上で動作し、main ブランチ上での実行や main への直接 push を前提条件としない
-2. While リリースコミット（prepare / bump / ghost build）が作業ブランチ上に作成される, the Release Workflow shall これらを作業ブランチに保持し、main への統合を統合フェーズ（全ローカルビルド完了後・crates.io 公開前）でのみ行う
-3. When 作業ブランチのコミットを main へ統合する, the Release Workflow shall PR を作成し、マージコミット方式（`--squash` でも `--rebase` でもない）でマージして、各リリースコミットの SHA を保持したまま main から到達可能にする
-4. The Release Workflow shall spec 完了で用いる squash-PR フロー（`--squash`）を使用せず、main への直接 push も行わない
-5. When 注釈タグを作成する, the Release Workflow shall タグが統合後の main から到達可能なコミット（リリース HEAD コミット）を指すことを保証し、タグ参照の push は crates.io 公開成功後（GitHub Release 作成の直前）に行う
-6. When main への統合（タグ作成・PR マージ）が完了する, the Release Workflow shall その成功を確認してから不可逆な crates.io 公開を開始する
-7. If main への統合（PR の作成またはマージ）が失敗する（コンフリクト・mergeable でない・権限不足等）, the Release Workflow shall crates.io 公開を実行せず、force push・リモート履歴の書き換え・マージ成功前のブランチ削除を行わずに中断し、開発者に解消を求める
-8. If main 統合の成功後に crates.io 公開が失敗する, the Release Workflow shall 統合済みの main 状態（コミット反映済み・タグはローカル保持）を維持したまま、セッション内バックオフ → Requirement 11 のスケジュール再試行で未公開分を完遂まで再試行する（既公開クレートは残す）
-9. When ローカルビルドの前に作業ブランチが main より遅れている（main が先行している）ことを検出する, the Release Workflow shall main を作業ブランチへ非破壊マージで取り込み、更新後のツリー上でビルドと公開を行う。If 取り込みでコンフリクトが生じる, the Release Workflow shall リリース作業を中止し開発者に解消を求める
+1. When リリースタグを push したとき, the Release Workflow shall そのタグで起動したリリース CI の実行を特定する。
+2. If リリース CI の起動を確かめられないとき, the Release Workflow shall 完了と報告せず、起動していないことを示して止まる。
+3. While リリース CI が実行中のとき, the Release Workflow shall 実行が終わるまで結果を追い、完了と報告しない。
+4. When リリース CI の実行が終わったとき, the Release Workflow shall 公開先ごと（crates.io はクレートごと）の結果（`published`・`skipped`・`failed`・`not-run`）と、GitHub Release の URL を読み取る。
+5. When すべての公開先の結果が `published` か `skipped` で、GitHub Release の URL が示されているとき, the Release Workflow shall リリースを完了と判定する。
+6. If 公開先の結果が示されていないとき（job が結果を書く前に失敗した場合）, the Release Workflow shall その公開先を失敗として扱い、その job の実行結果から原因を調べる。
 
-### Requirement 11: 完遂保証とスケジュール永続リトライ
+### Requirement 7: 失敗への対応
 
-**Objective:** As a 開発者, I want 相手側サーバーのビジー等で失敗しやすい手順（特に Marketplace 公開）を、時間がかかってもスケジュール再試行で完遂まで自動的に粘ってほしい, so that 中途半端な状態でリリースが「完了」することが決して起きない
-
-> **背景**: リリースの各公開先（crates.io / VSCode Marketplace / GitHub）は相手側サーバーのビジー・レート制限・一時的ネットワーク障害で失敗し得る。基本方針は「時間はいくらでもかかってよいが、中途半端な状態での完了は避ける」。よって有限回で打ち切って一部未公開のまま完了する従来方針を改め、**全ターゲット完遂まで（短期バックオフ→スケジュール再試行の二段で）粘る**。
+**Objective:** As a 開発者, I want リリース CI が失敗したとき、失敗の種類に合った対応をエージェントに取ってほしい, so that 一時的な失敗は人手なしで先へ進み、人の判断が要る失敗は取り返しのつかない操作の前に止まる
 
 #### Acceptance Criteria
 
-1. The Release Workflow shall すべてのリリースターゲット（全公開クレートの crates.io 公開、VSCode Marketplace 公開、タグ push、GitHub Release 作成）が成功するまで、リリースを「完了」と報告しない（完遂保証 / no half-done）
-2. When 外部サービス通信が一時障害（サーバービジー・レート制限・ネットワーク等）で失敗する, the Release Workflow shall まずセッション内で段階的バックオフによる短期リトライを行う
-3. If 短期バックオフの一巡で未完了ターゲットが残る, the Release Workflow shall 同一セッション内で ScheduleWakeup により次回再試行時刻まで待機し、再開して未完了分の続行を全ターゲット完遂まで繰り返す（セッションを開いている限り継続。完遂前にセッションが終了した場合は手動再実行が Requirement 9.5 の resume モードで続行する）
-4. When 待機から再開する, the Release Workflow shall 各ターゲットの実状態を確認して未完了分のみを冪等に再試行し、全ターゲット完遂で待機ループを終了する
-5. While 未完了ターゲットが残る, the Release Workflow shall リリースを「未完了（再試行待ち）」状態として報告し、完了済みと誤認させない
-6. If 失敗が非一時的（認証無効・権限不足・ビルドエラー等、リトライで解消しない種別）である, the Release Workflow shall リリースを完了とせず、原因と必要な対応を開発者に報告し、対応後に resume で完遂できる状態を保つ
-7. The Release Workflow shall リトライ回数・累計時間に固定上限を設けず、全ターゲット完遂または開発者の明示的中止まで再試行を継続する（所要時間は完了条件としない）。While 自律継続は同一セッション／ScheduleWakeup ループの寿命（約7日）に律速される, the Release Workflow shall それを超える場合は手動再実行の resume モード（Requirement 9.5）で継続できる状態を保つ
-8. While 第2段スケジュール再試行が継続中である, the Release Workflow shall 一定回数または一定経過ごとに開発者へ進捗（失敗継続中である旨・累計試行回数・最終エラー・障害分類）を通知し、試行履歴を記録する（無限リトライを可観測にし「完遂待ち」と「実質詰み」を判別可能にする）
+1. If 公開先が一時的な原因（公開先の障害・ネットワーク・時間切れ）で失敗したとき, the Release Workflow shall 同じ実行の失敗した job を再実行し、Requirement 6 に従って結果を確かめ直す。
+2. If 一時的な原因の失敗が、1 回のリリース作業の中で 3 回の再実行の後も残るとき, the Release Workflow shall 自動の再実行をやめ、未完了として報告する。
+3. If 失敗の原因が一回限りのセットアップにあるとき（認証の失敗・クレートが crates.io に未登録）, the Release Workflow shall 再実行せず、原因とセットアップの手順書の該当する節を示して止まる。
+4. When 開発者がセットアップの設定を直したと伝えたとき, the Release Workflow shall 失敗した job の再実行から続ける。
+5. If リリース CI が公開より前の段（タグの検査・関門・配布物のビルド）で失敗し、どの公開先にもその版が出ていないとき, the Release Workflow shall 原因と、何も公開していないことを報告して止まる。
+6. When 公開より前の段の失敗の修正が main に入り、開発者がタグの付け直しを承認したとき, the Release Workflow shall どの公開先にもその版が無いことを確かめ直したうえで、同じ版のリリースタグを修正後の main のコミットへ付け直して push する。
+7. If 再実行では直らない失敗があり、いずれかの公開先にその版がすでに出ているとき, the Release Workflow shall リリースタグを付け直さず、公開済みの公開先と未公開の公開先を示し、版を上げて出し直す必要があることを報告する。
+8. The Release Workflow shall 公開済みのものを取り消したり、上書きしたりしない。
+9. The Release Workflow shall 失敗の回避のために、手元から crates.io・Marketplace へ公開したり、GitHub Release を作ったりしない。リリース CI が手作業を求める場合（公開済みの Release への配布物の添付など）は、その内容を開発者に案内する。
+
+### Requirement 8: 途中からの再開
+
+**Objective:** As a 開発者, I want 途中で止まったリリースを、もう 1 度 `/kiro-impl release-workflow` を実行するだけで続きから進めたい, so that セッションが切れても、版を飛ばしたり二重に作業したりしない
+
+#### Acceptance Criteria
+
+1. When リリース作業が開始され、main の版にリリースタグが無く、どの公開先にもその版が出ておらず、版の指定が無いかその版と一致するとき, the Release Workflow shall 版の決定と版の更新を飛ばし、再開する版を開発者に示したうえで、リリースタグの作成（Requirement 5）から続ける。
+2. When リリース作業が開始され、main の版のリリースタグが push 済みで、リリースが完了していないとき（リリース CI が実行中、または未完了で終わっている）, the Release Workflow shall 版の決定・版の更新・タグの作成を飛ばし、結果の確認（Requirement 6）と失敗への対応（Requirement 7）から続ける。
+3. If 確定した版への版の更新の PR が、統合されないまま残っているとき, the Release Workflow shall 新しい PR を作らず、その PR を示して開発者に扱いを確かめる。
+4. The Release Workflow shall 再開の位置を、前回の実行の記録ではなく、実際の状態（main の内容・リモートのタグ・公開先・リリース CI の実行）で判定する。
+5. When main の版のリリースが完了しているとき, the Release Workflow shall 新しいリリースとして、版の決定（Requirement 1）から始める。
+6. When リリース作業が開始され、作業ブランチの main に無い内容が版の更新のコミット（Requirement 3.5）だけであるとき, the Release Workflow shall 版の決定と版の更新を飛ばし、再開する版を開発者に示し、その版の重複の検査（Requirement 1.7）と版の更新の確認（Requirement 3.3）をやり直したうえで、main への統合（Requirement 4）から続ける。
+
+### Requirement 9: 完了の判定と報告
+
+**Objective:** As a 開発者, I want リリースが終わったのか、途中なのかを、取り違えようのない形で知りたい, so that 一部だけ公開された状態を「完了」と思い込まない
+
+#### Acceptance Criteria
+
+1. The Release Workflow shall すべての公開先が公開済みになり、GitHub Release が作成されるまで、リリースを完了と報告しない。
+2. When リリースが完了したとき, the Release Workflow shall 版・クレートごとの結果・Marketplace の結果・GitHub Release の URL・リリース CI の実行の URL・再実行の回数を開発者に報告する。
+3. While 未完了の公開先が残ったまま作業を止めるとき, the Release Workflow shall 「未完了」として、残っている公開先・原因の種類・次に誰が何をするか・再開の方法を報告する。
+4. When 公開より前の段で止めたとき, the Release Workflow shall どの公開先にも公開していないことを報告に含める。
+
+### Requirement 10: 繰り返し実行の仕様特性
+
+**Objective:** As a 開発者, I want この仕様を何度でも実行してリリースを行いたい, so that 毎回のリリースで同じ手順が保証される
+
+#### Acceptance Criteria
+
+1. The Release Workflow shall `/kiro-impl release-workflow` が実行されるたびに、タスクの状態を初期化する（すべてのタスクを未完了に戻す）。
+2. The Release Workflow shall 本仕様を完了済みにせず、`completed/` へ移さない。
+3. The Release Workflow shall 各実行を、前回の実行が残したタスクの完了印に依存しない作業として行う（途中からの再開は Requirement 8.4 の実際の状態だけに基づく）。
+
+### Requirement 11: CI での初回のリリースの確認と後片付け
+
+**Objective:** As a メンテナー, I want リリース CI での初回のリリースで、認証の配線と再実行の冪等性を実地で確かめ、手元に残った長期の認証情報の経路を閉じたい, so that 2026-12-01 の global PAT の廃止の後もリリースを続けられ、古い認証情報が残らない
+
+#### Acceptance Criteria
+
+1. While CI での初回のリリースの確認が済んだ記録が無いとき, when リリースが完了したとき, the Release Workflow shall 同じ実行のすべての job を再実行し、すべての公開先の結果が `skipped` になることを確かめる。
+2. While CI での初回のリリースの確認が済んだ記録が無いとき, when リリースが完了したとき, the Release Workflow shall クレートごとの公開の所要時間を、認証の有効期限（30 分）に対する余裕とあわせて報告する。
+3. When 初回のリリースの確認が通ったとき, the Release Workflow shall セットアップの手順書が定める必須の後片付け（5 クレートの「Trusted Publishing のみ」の有効化・`CARGO_REGISTRY_TOKEN` の失効・`VSCE_PAT` の失効）を開発者に案内する。自分では行わない。
+4. The Release Workflow shall `VSCE_PAT` の失効を、Marketplace の結果が今回の実行で `published` になったことを確かめた後にだけ案内する。
+5. When 開発者が後片付けの完了を伝えたとき, the Release Workflow shall 初回のリリースの確認と後片付けが済んだことをリポジトリに記録し、以後の実行で本要件の手順を行わない。
+6. If 初回のリリースで、2 つ目以降のクレートの認証だけが失敗したとき, the Release Workflow shall セットアップの手順書の「auth の取り直しが拒否されたとき」にあたることを示し、Requirement 7.7 に従って報告する。
+
+### Requirement 12: 手順の書き換えに伴う一回限りの整合
+
+**Objective:** As a 開発者・エージェント, I want リリースに関わる文書と設定が、書き換えた手順と一致していてほしい, so that 古い手順（手元での公開・マージコミット方式・main の CI の確認）に従って誤った操作をしない
+
+本要件は、本書き直しと同じ流れの中で 1 度だけ行う。繰り返し実行するリリースのタスクには含めない（行う場所と順は設計で決める）。
+
+#### Acceptance Criteria
+
+1. The repository shall エージェントへの操作の許可（`.claude/settings.json`）を、書き換えた手順が使う操作（PR の作成と統合・リリースタグの push・リリース CI の結果の閲覧と再実行）に合わせ、手元からの公開（crates.io・Marketplace・GitHub Release の作成）の許可とその説明を外す。
+2. The 文書 shall steering `workflow.md` の「取り消せない公開の前に main の CI 全緑を確かめる」の記述を、公開前の検査をリリース CI が行う形に改める。
+3. The 文書 shall steering `workflow.md` のリリースの例外の記述を、統合は squash で行い、リリースタグの push だけが直接 push の禁止の対象外である形に改める。
+4. The 文書 shall `crates/pasta_sample_ghost/RELEASE.md` の版の更新の一覧に `Cargo.lock` と `editors/vscode/package-lock.json` を加え、タグを付けるコミットの説明を Requirement 5 に合わせる。前提条件の「`main` へ push できる」を、PR の統合とリリースタグの push ができる形に改める（main へは直接 push できない）。
+5. The repository shall 認証の失敗の案内文が指す手順書の見出しを、実際の見出し「名前の対応表」に合わせる（`.github/scripts/release/publish-vsix.ps1` の 1 か所と `release.yml` の 2 か所。案内文だけを変え、挙動を変えない）。
+6. The 文書 shall steering の `product.md`・`roadmap.md` の本仕様の説明と、「リリース手順の書き換え」の進み具合を、書き換えた手順に合わせる。`product.md` の最終更新の行（現行の版）も、今の版に直す。
+7. The repository shall 本要件の変更の後も、`cargo test --all` と clippy が通る状態を保つ。
+8. The 文書 shall `kiro-complete` スキルの「main の CI 全緑は `release-workflow` が crates.io 公開の前に課す」の記述を、公開前の検査をリリース CI が行う形に改める。
+9. The 文書 shall リポジトリの `README.md` の冒頭に、main の CI（Build）とリリース CI（Release）の状況を示すバッジを置く。
 
 ---
 
-## 旧仕様（直列 Pipeline 版）からの変更点
+## 旧仕様（手元でビルド・公開する版）からの変更点
 
-1. **実行モデルの再設計（Req 8 新設）**: 全工程を Sequential Pipeline として直列実行していた旧設計を、共有リソース（R1 cargo ロック / R2 ワークツリー / R3 ネットワーク）に基づく **リソース認識型ステージ並行モデル** へ書き直し。並行実行可否・失敗隔離・順序安全性を要件として明文化
-2. **偽の依存関係の排除（Req 5.9, Req 8.6）**: 旧設計はサンプルゴーストビルドを crates.io 公開の後段（Phase 3 → Phase 5）に置いていたが、`release.ps1` はローカルソースから pasta.dll をビルドしており crates.io 公開に依存しない。この偽の依存を排除し、ゴーストビルドをバージョン更新直後のローカルビルドステージへ移動
-3. **公開トラックの並行化（Req 8.3）**: crates.io 公開・Marketplace 公開・チェンジログ生成は互いに独立しワークツリーを変更しないため、並行実行を許可。特に非クリティカルな Marketplace 公開を crates.io 公開のネットワーク待機に重ねることで wall-clock を短縮
-4. **VSCode ビルドと公開の分離（Req 4.1–4.2 vs 4.3–4.7）**: `build:wasm` は cargo（R1）を要するためローカルビルドステージで実施し、Marketplace への upload（R3 のみ）は並行公開ステージへ分離
-5. **安全順序保証の明文化（Req 8.5）**: 不可逆な crates.io 公開をタグ・プッシュ／GitHub Release より前に完了させ、crates.io 公開中断時はタグ・プッシュを行わないことを要件化
-6. **cc-sdd 3.0 タスク注釈の採用**: tasks.md に `(P)` 並行マーカー、`_Depends:_`、`_Boundary:_` を導入し、並行実行可能なタスクと依存関係を明示
-7. **番号体系**: 旧 Req 8（繰り返し実行）→ Req 9 に繰り下げ（Req 8 を実行モデルに割当）
-8. **ワークツリー実行と PR ベース main 統合の追加（Req 10 新設）**: Claude Code ハーネスのワークツリー（非デフォルトブランチ）上での起動を前提とし、リリースコミット・タグを **PR のマージコミット方式（`--merge`）** で main へ統合する要件を新設。spec 完了用の squash-PR や直接 push を排除し、コミット SHA とタグの参照整合性を保ちつつ将来の GitHub ブランチ保護に前方互換とする。これに伴い Req 6.4（タグ・プッシュ）の統合方式を更新し、Boundary Context に統合方針を明記。さらに**安全順序を「main 統合 → crates.io 公開 → GitHub Release」へ反転**し、不可逆な crates.io 公開を可逆な main 統合の後段に配置（Req 8.5・8.2・6.1・3.1・10 AC6–8 を更新。旧仕様は crates.io 公開を先行させていた）
-9. **マニュアルの対象バージョン行を版の同期対象に追加（Req 2.4–2.7）**: マニュアルのトップページが示す対象バージョンが古いまま公開されていた（v0.3.7 時点で「v0.2 系列」）。版上げの同期対象に `book/src/introduction.md` の対象バージョン行を加え（2.4）、ビルド検証にマニュアルの内容検証を加え（2.5）、ロールバック（2.6）とバージョン更新コミット（2.7）の対象にもマニュアルを含める。これに伴い旧 2.4–2.6 は 2.5–2.7 へ繰り下げ
+1. **手順を 4 段へ縮めた**: 版の決定 → 版の更新の統合 → リリースタグの push → リリース CI の結果の確認と再実行。旧 Requirement 3（crates.io 公開）・4（VSCode 拡張公開）・5（サンプルゴーストビルド）・7（GitHub Release 作成）はリリース CI へ移り、本仕様から外した。
+2. **実行モデルと並行作業性（旧 Requirement 8）を廃止**: 手元のビルドと公開の 2 トラックが無くなり、共有リソースの調停が要らなくなった。
+3. **統合方式をマージコミットから squash へ**: 旧仕様は、統合の前に作ったタグが指すコミットを main から到達させるために、マージコミット方式を必須にしていた。新しい手順はタグを統合の後に main のコミットへ付けるので、理由が無くなった（旧 Requirement 10 → Requirement 4・5）。
+4. **順序の反転**: 旧仕様はタグの push を crates.io の公開の後に置いた。新しい手順ではタグの push が公開の入口である。
+5. **完遂保証とスケジュール再試行（旧 Requirement 11）を縮小**: 公開の再試行と冪等性はリリース CI が持つ。エージェントは失敗した job の再実行と、未完了の報告だけを受け持つ（Requirement 7・9）。「一部だけ公開された状態を完了と報告しない」は引き継ぐ。
+6. **Resume を「途中からの再開」へ縮小**: 公開の再開はリリース CI の再実行が担う。エージェントは、版の更新・タグ・リリース CI のどこまで進んだかを実際の状態で見分けるだけになった（旧 Requirement 9.5 → Requirement 8）。
+7. **事前検証の縮小**: 手元での全テストの実行（旧 1.10）と main の CI が全部緑かの確認は、リリース CI の関門に置き換わった（Requirement 2.8）。未コミットの変更を「リリース準備コミット」にする挙動（旧 1.9）は、止まって示す挙動に改めた（Requirement 2.3）。
+8. **版の更新の対象を追加**: `Cargo.lock`（`release-ci` で追跡を始めた。更新しないと配布物のビルドの段で検査に落ちる）と `editors/vscode/package-lock.json`（v0.3.7 では追いかけのコミットで直した）を加えた。手元でのビルドによる確認は、整合の確認に置き換えた（Requirement 3）。
+9. **CI での初回のリリースを追加**: `release-ci` からの申し送り（Requirement 11）。
+10. **一回限りの整合を要件にした**: 旧仕様は Boundary Context の注記で扱っていた（Requirement 12）。
+
+## 未決事項
+
+要件定義の時点の仮定と、設計への申し送り。すべて設計ディスカッション（2026-10-10）で確定した。
+
+1. **未コミットの変更・main に無いコミットの扱い**（2.3）→ **確定（設計ディスカッション 議題 4）**: 含めずに止まる。ただし、main に無い内容が版の更新のコミットだけなら、統合から自動で続ける（8.6）。<br>旧: 旧仕様はすべてを「リリース準備コミット」にしてリリースに含めた。仮定: 含めずに止まる（squash で版の更新のコミットに混ざり、リリースノートから見えなくなるため）。
+2. **一時的な失敗の自動の再実行の回数**（7.2）→ **確定（設計ディスカッション 議題 5）**: 3 回まで。<br>旧: 仮定: 1 回のリリース作業の中で 3 回まで。それを超えたら未完了として報告し、開発者の指示か再度の実行（Requirement 8）で続ける。
+3. **確認ワークフローのログに出る識別子**（Out of scope）→ **確定**: 直さない。
+4. **→ 設計で確定**（足さない。design.md「段 4」）: `build.yml` に `--locked` を足すか（版の更新で `Cargo.lock` を更新し忘れた場合を、関門の段で検出するか、今のまま配布物のビルドの段で検出するか）。
+5. **→ 設計で反映**: 実行するモデルの前提（開発者の方針 2026-10-10）。初回（CI での初回のリリース）は Opus で実行し、実行が安定したら Sonnet で実行する。設計とタスクは、実行するコマンドと判定の表（リリース CI の結果 → 次の手）を明記し、モデルの推論に任せる箇所を残さない粒度で書く。
+6. **→ 設計で確定**: リリース CI の実行が終わるのを待つ方法、初回のリリースの確認が済んだ記録の置き場所、Requirement 12 を行う場所と順、古い `research.md`・`gap-analysis.md` の扱い。
+7. **版の指定が無いときの承認**（1.2〜1.4）→ **確定（開発者の指示 2026-10-10）**: 承認を求めない。最大の版の PATCH を 1 つ上げた版で、そのままリリースする。<br>旧: 提案の版を示して承認を求め、承認されなければ希望の版の入力を求めた。

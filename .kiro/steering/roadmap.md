@@ -9,7 +9,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - **Phase 11 の残り: 属性セマンティクスと失敗の出力**。シーン属性の保持と読み出し、実行時の失敗の出力の一本化、Call の属性フィルター、文中のシーンリンク、スクリプトが止まるエラーのバルーン表示が残る。
 - **Phase 12: 初心者向けの入門ガイド**。段階辞書とマニュアルの着せ替えは済んだ。残るのは、hello-pasta の新しいシェル、入門ガイドの本文の書き直し、スクリーンショット。
 
-このほか、リリース手順（常駐 spec `release-workflow`）を CI に合わせて書き換える作業と、CI での初回のリリースが残る（期限は 2026-12-01）。
+このほか、リリース手順（常駐 spec `release-workflow`）の CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ（2026-10-10）。
 
 **優先順位（開発者の方針 2026-10-10）**: トークンの予算のため、当面はマニュアルのサイトの作り直し（入門ガイドの本文）を最優先とし、CI とリリース、急いで直す不具合だけを進める。それ以外は見送る（下の「棚卸」のウェーブ）。
 
@@ -50,6 +50,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 11 | 現行実装の不具合の一掃（文字列リテラル・生成コードの安全性・コールバックの再開・検索キー・設定とログ・シーンの内部名・アクタープロキシ・グループ化・セレクター・連結演算子・Call の文脈・段落区切り） | dsl-literal-fixes, dsl-codegen-runtime-safety, callback-resume-unification, scene-search-key-normalization, pasta-toml-logging-consistency, scene-identity-format, actor-proxy-act-delegation, act-token-grouping-fix, search-selector-indices, string-concat-operator, call-execution-correctness, paragraph-break-tag-only-talk |
 | 11 | シーン名の別名（`＊会話` を OnTalk の既定の別名にする）、式の中の値なしの扱い（算術なら 0・連結なら空文字列） | scene-name-alias, expr-nil-coercion |
 | 12（前半） | 段階ごとに起動できる hello-pasta の辞書と段階表、マニュアルの「Claudia のマニュアル」への着せ替えと台詞の部品 | hello-pasta-tutorial-stages, manual-claudia-theme |
+| 12（本文） | 入門ガイドの本文を、段階表に沿った 16 章（入口・準備 2・段の章 13）の物語に書き直した。段の章と辞書の逐語の照合、本文の検査、目次の開閉の持ち越しを足した | getting-started-story-guide |
 | — | リリースの CI 化（タグの push で crates.io・Marketplace・GitHub Release へ公開。認証は OIDC、成果物の git 追跡を解除） | release-ci |
 | — | 動的単語参照 `＠＄`（旧文法仕様の将来項目 B2） | dynamic-word-reference |
 
@@ -57,7 +58,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 ### 常駐 spec（再実行型・`completed/` へ移さない）
 
-- `release-workflow` — crates.io・VSIX・ゴーストのリリース手順（CI に合わせた書き換えが残る。下の「リリース手順の書き換え」）
+- `release-workflow` — crates.io・VSIX・ゴーストのリリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認。CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ。下の「リリース手順の書き換え」）
 - `review-improvement-loop` — レビュー領域 × 7 次元の改善ループ
 
 ### 却下（2026-10-01）
@@ -69,7 +70,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 - `sakura-script-newline` の Task 5.1（実機 SSP での目視確認）— SSP を操作するツール（SSP MCP）で実機の確認ができるようになった（2026-10-09 に `hello-pasta-tutorial-stages` が使った）。`getting-started-screenshots` の実機の確認のついでに済ませるかを、同 spec の要件で決める。
 - `pasta-check-bundled-balloon` を v0.3.7 で公開したことの、emo2 開発セッションへの連絡 — 実施の有無はリポジトリから確認できない。
-- CI での初回のリリース — crates.io の Trusted Publishing は、初回のリリースが最初の実地確認になる（下の「リリース手順の書き換え」）。
+- `getting-started-story-guide` の公開後の確認 4 点（2026-10-10。実装では、SSP を `--ghost` で一時起動して全 13 段をたどった。次の操作は試していない）— (1) 準備の章: ゴーストのフォルダを SSP の `ghost/` の下へ置いて切り替え、立ち絵が無い状態でタスクバーの SSP のアイコンからメニューを開いて終了できるか（最初に確かめる。違っていると読者が 1 段目へ進めない） (2) 目次: 実際のブラウザーで幅を狭めて開き、項目をクリックしても開いたままか (3) 7 段目: メニューから emo2 そのもの（`えも？？`）と切り替えて挨拶が出るか (4) 13 段目: フォルダのドロップで `.nar` ができるか（読者の `profile/` が入るかも見る）。`getting-started-screenshots` の実機の作業のついでに済ませるかを、同 spec の要件で決める。
 
 ## 棚卸（2026-10-10・main `add05022`）
 
@@ -147,7 +148,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - 見送った spec をいつ始めるか — 予算の都合で、Phase 11 の残りと `hello-pasta-shell-art`・`shiori-test-support-runtime`・`manual-print-media-refs` を見送った。`shiori-test-support-runtime` は、Phase 11 の spec より先に入れるほど後片付けが減る。
 - スクリプトが止まるエラーをバルーンに出すか — `runtime-error-balloon` の要件の最初の議題。要らなければ却下する。
 - `call-attribute-filter` と `scene-anchor-link` のどちらを先にするか — 台帳は前者を先にしている。後者を先にすると、`scene-attribute-store` を待たずに始められる。
-- リリース手順の書き換えと初回の CI リリースの時期 — `hello-pasta-shell-art` が `release.ps1` を変える前に済ませると、失敗の原因を認証の設定だけに絞れる。期限は 2026-12-01。
+- リリース手順の書き換えと初回の CI リリースの時期 — `hello-pasta-shell-art` が `release.ps1` を変える前に済ませると、失敗の原因を認証の設定だけに絞れる。期限は 2026-12-01。→ 済んだ（2026-10-10。v0.3.8）。
 - `steering/structure.md` の作り直し — `pasta_shiori` の木が無い、`pasta_lua/tests` の一覧が古い、など。`/kiro-steering` で直す。
 
 ## Phase 11 の残り: 属性セマンティクスと失敗の出力
@@ -213,14 +214,16 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）は完了し�
 
 ## リリース手順の書き換え（`release-ci` の後）
 
-リリースの CI 化（`release-ci`）は完了し、タグの push だけで公開まで進む。常駐 spec の手順（`release/hello-pasta.nar` を生成してコミットする段・手元でのビルドと公開）は、そのままでは動かない。**次のリリースより前に**、下の Existing Spec Updates を済ませる。Marketplace の global PAT は 2026-12-01 に廃止されるので、初回の CI リリースと後片付けもそれまでに終える。
+リリースの CI 化（`release-ci`）は完了し、タグの push だけで公開まで進む。常駐 spec の旧手順（`release/hello-pasta.nar` を生成してコミットする段・手元でのビルドと公開）は、そのままでは動かないので、下の Existing Spec Updates で書き換えた（2026-10-10 に済んだ。要件・設計・タスクの書き直しと、文書・設定の一回限りの整合）。CI での初回のリリース（v0.3.8）と後片付けも済んだ（2026-10-10。記録は `.kiro/specs/release-workflow/first-ci-release.md`）。記録の「手順との食い違い」も、`design.md` と手順書に反映した（2026-10-10）。**残るのは、失敗した job の再実行の読み方の確認である**（失敗が起きなかったので未確認。起きたリリースで確かめる）。
 
-- **進め方**: brief を足さず、常駐 spec をその場で書き換える（`/kiro-spec-requirements release-workflow` → `/kiro-design release-workflow` → `/kiro-spec-tasks release-workflow`）。`/kiro-impl` は使わない（走らせるとリリースが始まる）。規模は 7〜9 タスク、要件定義は Opus。`research.md`・`gap-analysis.md` は古い設計の記録として扱う。
+- **進め方（済んだ）**: brief を足さず、常駐 spec をその場で書き換えた（`/kiro-spec-requirements release-workflow` → `/kiro-design release-workflow` → `/kiro-spec-tasks release-workflow`）。古い `research.md` は書き直し、`gap-analysis.md` は削除した。
+- **初回のリリース（済んだ）**: v0.3.8 を Opus で実行した（2026-10-10）。7 つの公開先が最初の実行ですべて `published` になり、全 job の再実行ですべて `skipped` になった。後片付け（5 クレートの「Trusted Publishing のみ」・`CARGO_REGISTRY_TOKEN` と `VSCE_PAT` の失効）も済んだ。
+- **以後のリリース**: 新しい作業ブランチ（ハーネスのワークツリー）で `/kiro-impl release-workflow` を実行する。失敗した job の再実行の読み方（`design.md`「CI での初回のリリースで確かめること」の 3）を確かめるまでは Opus で実行し、確かめたら Sonnet で実行する（開発者決定 2026-10-10）。
 - **席**: リリースの実行中は、`release.ps1`・`release.yml` を触る spec を main へ入れない。
 
 ### Existing Spec Updates
 
-- [ ] release-workflow -- エージェントの手順を「版の決定 → bump の PR のマージ → タグの push → CI の結果確認・失敗した job の再実行」へ縮める。次のものは CI 側へ移すか、要らなくなる。
+- [x] release-workflow -- エージェントの手順を「版の決定 → bump の PR のマージ → タグの push → CI の結果確認・失敗した job の再実行」へ縮める。次のものは CI 側へ移すか、要らなくなる。
   - Resume
   - ScheduleWakeup による再試行
   - 公開の 2 トラック
@@ -238,8 +241,8 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）は完了し�
     - 運用の注意（セットアップで分かったこと）:
       - Azure のリソースを `az` で作る・変えるには MFA が要る。WAM（Windows のサインイン窓）でログインすると `RequestDisallowedByAzure` で弾かれる。`az config set core.enable_broker_on_windows=false` にしてからブラウザーで `az login` し直す。ワークフローのマネージド ID には関係ない。
       - Marketplace の Members の管理には、公式の CLI が無い（vsce・az・gh のどれも扱えない）。画面から行う。
-      - 小さな取りこぼし: setup-check の `verify-pat` が失敗すると、vsce のエラー文（`Access Denied: <ID> needs ...`）にマネージド ID の識別子が含まれ、ジョブのログに出る。「profile ID は summary にだけ書く」方針から漏れている。秘密の値ではないので実害は無い。直すかどうかは本更新で決める。
-    - あわせて見直す（`release-ci` の design.md「Out of Boundary」が本更新へ回したもの）: `.claude/settings.json` の公開系コマンドの許可の整理、`build.yml` に `--locked` を足すか、bump 箇所に `package-lock.json` の版を含めること（release.yml の verify は検査しない。`crates/pasta_sample_ghost/RELEASE.md` の bump の一覧にも無い）。
+      - 小さな取りこぼし: setup-check の `verify-pat` が失敗すると、vsce のエラー文（`Access Denied: <ID> needs ...`）にマネージド ID の識別子が含まれ、ジョブのログに出る。「profile ID は summary にだけ書く」方針から漏れている。秘密の値ではないので実害は無い。直さない（2026-10-10 決定）。
+    - あわせて見直す（`release-ci` の design.md「Out of Boundary」が本更新へ回したもの）: `.claude/settings.json` の公開系コマンドの許可の整理、`build.yml` に `--locked` を足すか、bump 箇所に `package-lock.json` の版を含めること（release.yml の verify は検査しない。`crates/pasta_sample_ghost/RELEASE.md` の bump の一覧にも無い）。→ 済んだ（2026-10-10）: 手元からの公開の許可を外した。`--locked` は足さない。版の更新に `Cargo.lock` と `package-lock.json` を含めた。
     - `VSCE_PAT` の失効（10 節）は、初回のリリースで Marketplace が Entra ID の経路で `published` になったのを確かめてから行う。値が `release-ci` の会話記録に出ているが、前倒しはしない（ユーザー決定 2026-10-08）。
     - 2026-10-10 の棚卸で足したもの:
       - `steering/workflow.md` の「main の CI 全緑」の確認とマージコミットの例外の記述を、書き換えた手順に合わせる。
@@ -251,6 +254,18 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）は完了し�
 
 - `pasta-check-dic-validate` — SSP を起動せずに、ゴーストの `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い Call・選択肢・文中のシーンリンク、モジュール名の衝突、記号を落とした後のシーン名の衝突などを見る。何をエラーにして何を警告にするか、`pasta_check release` の関門にするか、依存の重さ（`pasta_lua` に依存すると、`cargo install pasta_check` が LuaJIT をビルドする）を要件で決める。依存を足すと `Cargo.lock` が変わるので、`hello-pasta-shell-art` の後に置く。マニュアルに章を足す場合は、章の数を決め打ちする検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）と `SUMMARY.md` を `getting-started-story-guide` と共有するので、その後に置く。内部クレートに依存させる場合は、公開の手順（`release.yml` の `pasta_check` の公開の段）も触るので、リリースの実行中は入れない。
 - `manual-print-media-refs` — マニュアルの印刷用ページ（`print.html`）で、デバッグの章の動画が再生できない。ビルドの後に `print.html` の参照だけを書き換え、検査（`verify-static.mjs`）の例外を外す。
+- `manual-shell-guide`（2026-10-10 追加・優先度は低い）— 入門ガイドはシェルを「hello-pasta からフォルダごと写す」と教え、中身の説明は `setup.md` の節「シェルの中身」（ファイルの種類と、辞書との接点がサーフェス番号であること）までである。自分の絵に差し替える所から先を、入門の外に章を置いて書く。急がない。
+
+## 入門ガイドの実機確認で見つかったもの（2026-10-10 起票）
+
+`getting-started-story-guide` の完了時の棚卸で起票した。どれも 2026-10-10 のウェーブには入れていない（次の棚卸で順番を決める）。
+
+- `manual-link-anchor-check` — リンク検証は、本の中のリンクの見出しを見ない。入門ガイドは見出しへのリンクを 44 本持つ。見出しを作る関数は `link-check.mjs` にもうある（サイト・CI）。
+- `choice-line-layout` — 9 段目の 1 つ目の選択肢「おやつの話をする」が、問いかけと同じ行に続いて右端で切れる。入門の読者が書いたとおりに動かして踏む（バグ・見え方）。`getting-started-screenshots` より先に直すと、撮り直しが要らない。
+- `baseware-virtual-time` — SSP の仮想の時刻は pasta に届かない（pasta は OS の時計で正時を判定する）。入門ガイド 6 段目は「次の正時を待つ」と教えている。
+- `boot-surface-without-dic` — 辞書が無い間は何も表示されない。入門ガイドの準備の章は「何も表示されないのが正しい」と教えている。
+
+隣の spec への申し送り（各 brief の「申し送り（getting-started-story-guide より）」の節）: `getting-started-screenshots`（章の形・画像の行が本文の検査に落ちること・撮るときの制約・開発者の確認 4 点）、`hello-pasta-shell-art`（`first-ghost.md` の読み替え・段階表の訂正・7 段目の表に `＞ゴースト終了` が無いこと）、`manual-print-media-refs`（`manual.yml` の古いコメント・`AUTHORING.md` が空いたこと）。
 
 ## Specs (dependency order)
 
@@ -258,13 +273,18 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）は完了し�
 - [ ] failure-output-unification -- シーンが生きている間の実行時の失敗（未定義の参照・見つからない Call など）を、ログとさくらスクリプトの両方へ 1 つの仕組みから出す。既にある 2 つの失敗表記を 1 つにし、`act.lua`・`actor.lua`・`word.lua` の警告を載せ替える（2026-10-10 の棚卸で、スクリプトが止まるエラーを `runtime-error-balloon` へ分けた）。Dependencies: none
 - [ ] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
 - [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。当たり判定を足し、絵を描くプログラムと配布スクリプトの生成の段を外す。Dependencies: none
-- [ ] getting-started-story-guide -- 入門ガイドの本文を段階表に沿った物語に書き直し、全編を Claudia が語る（執筆規約に `getting-started` の例外を足す）。段階辞書との逐語照合を章ごとに合わせる（2026-10-10 の棚卸で、スクリーンショットを `getting-started-screenshots` へ分けた）。Dependencies: none
+- [x] getting-started-story-guide -- 入門ガイドの本文を段階表に沿った物語に書き直し、全編を Claudia が語る（執筆規約に `getting-started` の例外を足す）。段階辞書との逐語照合を章ごとに合わせる（2026-10-10 の棚卸で、スクリーンショットを `getting-started-screenshots` へ分けた）。Dependencies: none
 - [ ] manual-print-media-refs -- マニュアルの印刷用ページ（`print.html`）で動画の参照が切れているのを、ビルド後の書き換えで直し、検査の例外を外す（2026-10-10 棚卸で起票）。Dependencies: none
 - [ ] pasta-check-dic-validate -- SSP を起動せずに `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い参照・モジュール名とシーン名の衝突などを見る（2026-10-10 棚卸で起票）。Dependencies: hello-pasta-shell-art（`Cargo.lock` を触る順番）, getting-started-story-guide（マニュアルに章を足す場合。章の数を決め打ちする検査と `SUMMARY.md` を共有する）
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
 - [ ] runtime-error-balloon -- スクリプトが止まる実行時エラー（500 の応答）を、辞書を書く人に見えるようバルーンにも出す。やるかどうかを要件の最初に決める（2026-10-10 の棚卸で `failure-output-unification` から分割）。Dependencies: failure-output-unification, shiori-test-support-runtime
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアルまで揃える（2026-10-08 起票）。Dependencies: failure-output-unification, call-attribute-filter
 - [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: hello-pasta-shell-art, getting-started-story-guide
+- [ ] manual-link-anchor-check -- マニュアルのリンク検証（`link-check.mjs`）が、本の中のリンクと公開 URL の見出し（`#…`）の実在も見るようにする（2026-10-10 `getting-started-story-guide` の完了時に起票）。Dependencies: none
+- [ ] choice-line-layout -- hello-pasta の 9 段目で、1 つ目の選択肢が問いかけと同じ行に続き、吹き出しの右端で切れて見えるのを直す。原因（選択肢の前の改行・辞書・バルーン）の特定から（2026-10-10 同上）。Dependencies: none（`scene-anchor-link` と `sakura_builder.lua` を触る順番に注意）
+- [ ] baseware-virtual-time -- SSP の「現在時刻の仮想的変更」を pasta の時報に効かせ、正時を待たずに確かめられるようにする。SSP が仮想の時刻を SHIORI に伝えているかの調査から。外から起こした `OnTalk` でチェイントークが続かない件も扱う（2026-10-10 同上）。Dependencies: none
+- [ ] boot-surface-without-dic -- 辞書や `＊OnBoot` が無いゴーストは起動しても立ち絵が出ない。既定で立ち絵を出すかどうかを、やるかどうかから決める（2026-10-10 同上）。Dependencies: none
+- [ ] manual-shell-guide -- マニュアルに、シェル（見た目）の説明を足す。見本のシェルを自分の絵に差し替える・表情を足す・当たり判定を足す・バルーンの扱いを、辞書と噛み合う所を中心に書く。優先度は低い（2026-10-10 開発者の指示で起票）。Dependencies: hello-pasta-shell-art（新しいシェルと当たり判定を題材にする）
 
 ## バックログ（brief なし・保留）
 

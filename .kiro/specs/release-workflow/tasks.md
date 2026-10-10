@@ -1,211 +1,162 @@
 # Implementation Plan
 
-<!-- 本仕様は繰り返し実行型オペレーション仕様です。
-     /kiro-impl release-workflow を実行するたびに全タスクが初期化され、
-     新たなリリース作業として実行されます。仕様は completed になりません。(Req 9.1-9.3)
+本仕様は、繰り返し実行するリリースの手順である。`/kiro-impl release-workflow` を実行するたびに、下のタスクを 1 から順に行い、実際のリリース（版の更新・PR・リリースタグの push・リリース CI の見届け）を行う。本仕様は完了済みにならない。
 
-     実行モデル: Resource-Aware Staged Concurrency（design.md 参照）
-       Stage A (Task 1-3): ローカル・直列（R1 cargo ロック + R2 ワークツリー 排他）
-                           ＋ ビルド前に main を非破壊マージで取り込み（自動更新 / Req 10.9）
-       Stage B (Task 4):   main 統合（タグ作成ローカル → PR マージコミット方式）＝安全ゲート
-       Stage C (Task 5):   公開（crates.io ∥ Marketplace、R2 不変・並行2トラック）
-       Stage D (Task 6):   タグ push（公開後）＋ GitHub Release ＋ 完了サマリー
-       Task 7:             完遂保証・二段リトライ・Resume・エスカレーション（Stage B-D を統べる横断ポリシー）
+タスク 1〜10 は、`design.md` の「段 1」〜「段 10」と 1 対 1 で対応する。実行するコマンド・合否の基準・判定表は `design.md` にだけ置く。タスクは、段と手順の番号でそれを指す。タスク 11 だけは、対応する段が無い。
 
-     安全順序（Req 8.5）: main 統合 → crates.io 公開 → タグ push → GitHub Release
-       （可逆な統合を先・不可逆な公開を後・タグ公開は最後）
-     完遂保証（Req 11）: 全ターゲット成功までリリースを「完了」としない。
-       失敗しやすい手順は 二段リトライ（短期バックオフ→ScheduleWakeup）で完遂まで粘る。
-     (P) は並行実行可能を示す。R1/R2 を共有する Stage A 内タスクは非並行。Stage C の2トラックのみ並行可能。 -->
+## 実行の約束
 
-## Task 1: 事前検証と Resume 検知（Stage A / 直列）
+`/kiro-impl release-workflow` は、次の約束で実行する。`kiro-impl` の一般の手順と食い違うところは、この約束を優先する（`design.md`「実行の約束」の写し）。
 
-- [ ] 1. 事前検証と Resume 検知
-- [ ] 1.1 認証・merge-commit 許可・ワークツリーを確認する
-  - `gh auth status` で ekicyou アカウントの認証を確認する（未認証なら `gh auth login` を案内）
-  - `gh repo view --json mergeCommitAllowed` が `true` であることを確認する（`false` なら一回限りセットアップ `gh repo edit --enable-merge-commit` の未実施を報告し中止）
-  - 現在ブランチが非デフォルトブランチ（ハーネス供給のワークツリー）であることを確認する（`main` 上ならワークツリー上での再実行を促す）
-  - main の CI が全緑であることを確認する。`git fetch origin main` のあと `gh run list --branch main --workflow build.yml --limit 1 --json headSha,status,conclusion` の `headSha` が `origin/main` と一致し、`status: completed`・`conclusion: success` であること。実行中なら完了後の再実行を案内して中止し、失敗なら main を直してからリリースするよう報告して中止する（spec 完了の squash マージは CI を待たないため、取り消せない公開の前にここで課す）
-  - 第2段リトライは ScheduleWakeup（同一セッション内待機→再開）で行うため、完遂までセッションを開いておく運用である旨を周知する
-  - 完了条件: 認証済み・`mergeCommitAllowed: true`・非デフォルトブランチ・main の CI 全緑であることが確認された
-  - _Requirements: 8.1, 10.1, 10.3, 11.2, 11.3, 11.4_
-- [ ] 1.2 リリースバージョンを決定し Resume を検知する
-  - main の現行 Cargo.toml バージョン V を取得し、V が完全公開（全公開クレートが crates.io に存在 かつ タグ `vV` が push 済み かつ GitHub Release が存在）かを確認する
-  - **V が完全公開に至っていない場合**: V について Resume Mode へ分岐し、バージョン提案・更新・main 統合（Task 2・4）をスキップして未完了分の続行（Task 5・6）へ進む
-  - 完全公開済み（通常の新規リリース）の場合: 指定があればそのバージョン、なければ全ソース（Cargo.toml / package.json / git タグ / crates.io / GitHub Releases / Marketplace）を調査し最大バージョンの PATCH を +1 して提案・承認を求める。拒否時は希望入力を求め semver 形式（X.Y.Z）を検証し、全ソースに重複がないことを確認する
-  - 完了条件: バージョン `vX.Y.Z` が確定し、通常リリースか Resume かが判定された
-  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 9.5_
-- [ ] 1.3 ワークツリーを整理する
-  - `git status --porcelain` で未コミット変更の有無を確認する
-  - 変更があれば `git add -A; git commit -m "chore(release): prepare release vX.Y.Z"`
-  - 完了条件: `git status --porcelain` が空出力（ワークツリーがクリーン）
-  - _Requirements: 1.8, 1.9, 10.2_
-- [ ] 1.4 ブランチ現在性を確保する（ビルド前の自動更新）
-  - `git fetch origin {default-branch}` を実行する
-  - `origin/{default-branch}` が HEAD の祖先でなければ（main が先行）、`git merge origin/{default-branch}` で非破壊マージにより取り込む（`reset`/`rebase` は使わない）
-  - コンフリクト時: `git merge --abort` で復帰し、リリース作業を中止して開発者に解消を求める
-  - 完了条件: main が HEAD の祖先（ff 相当）であり、以降のビルド・公開が統合後 main と同一ツリー上で行われることが保証された
-  - _Requirements: 10.9_
-- [ ] 1.5 全テストを実行してリリース前の健全性を確認する
-  - `cargo test --all` を実行する（失敗時はエラーを報告して中止）
-  - 完了条件: `cargo test --all` がゼロ終了コードで完了する
-  - _Requirements: 1.10, 1.11_
+1. タスクはメインの文脈で、番号の順に 1 つずつ行う。サブエージェントへ任せない（開発者への確認があり、値を次のタスクへ渡すため）。
+2. テストを書かない。タスクの完了は、段が定める確認のコマンドの結果で判定する。
+3. レビュー・デバッグのサブエージェントと、最後の `/kiro-validate-impl` を使わない。失敗は判定表で扱う。
+4. コミットしてよいのは、段 4 の版の更新（5 ファイル）と、段 10 の記録だけである。`git add` には必ずファイルのパスを並べる（`git add -A`・`git add .` を使わない）。`tasks.md` と spec のファイルをコミットしない。
+5. `tasks.md` の完了印（`[x]`）は、作業ツリーの中だけで付ける。完了印のほかは書き足さない（Implementation Notes を含む）。段 1 が開始時にすべて `[ ]` に戻す。再開の位置は完了印でなく、段 2 の判定表で決める。
+6. main へ直接 push しない。push するのは、作業ブランチ（PR のため）とリリースタグだけである。
+7. 手元で `cargo build`・`cargo test`・`release.ps1`・`npm run package` を実行しない。main の CI の結果を見ない。
+8. 手元から `cargo publish`・`vsce publish`・`gh release create`・`gh release upload` を実行しない。公開済みのものに `cargo yank`・`vsce unpublish`・`gh release delete` を実行しない。
+9. 本仕様を完了済みにしない。`/kiro-complete` を実行しない。`completed/` へ移さない。
+10. 判定表・手順に無い状態に当たったら、推測で進めず、「止まり方」に従って止まる。
+11. 版の指定は、`0.3.8` か `v0.3.8` の形（数字 3 つ）で受け取る。数字 3 つの引数は、タスク番号ではなく版として読む。
+12. コマンドは、1 回のツールの呼び出しに 1 行ずつ実行する。`design.md` の 1 つのブロックに複数の行が並んでいても、1 行ずつ分けて実行する。複数の行を `;`・`&&` でつながない。終了コードを見るための `echo` などを足さない。つなぐと許可の規則（`Bash(gh pr merge:*)` など）に合わなくなり、許可の判定に拒否される。`design.md` がパイプを含めて 1 行に書いている行と、`powershell` のブロックの複数行にわたる 1 つの文（`foreach` など）は、そのまま 1 回で実行する。許可の判定に拒否されたら、言い直して実行し直さず、「止まり方」に従って止まる。
 
-## Task 2: バージョン更新とビルド検証（Stage A / 直列）
+### 止まり方
 
-> Resume Mode の場合は Task 2 をスキップする（main は既に V へ更新・統合済み）。
+「止まる」は、残りのタスクを行わず、次の形の報告を出して終えることである。`tasks.md` に `_Blocked:_` を書かない。残りのタスクは `[ ]` のままにする。
 
-- [ ] 2. バージョン更新とビルド検証
-- [ ] 2.1 Cargo.toml・package.json・マニュアルの対象バージョン行を更新する
-  - `[workspace.package].version` と `[workspace.dependencies]` の5クレート（pasta_core, pasta_dsl, pasta_lua, pasta_shiori, pasta_check）の `version` を新バージョンへ更新する（計6箇所）
-  - `editors/vscode/package.json` の `version` を同期する
-  - `book/src/introduction.md` で `^\| 対象 pasta バージョン \| \*\*v[^*]+\*\* \|` に一致する**ちょうど 1 行**を `| 対象 pasta バージョン | **vX.Y.Z** |` に置換する。この行以外・改行コードは変更しない。一致が 0 行または 2 行以上なら置換せず、2.2 の失敗時処理（ロールバック・中止）へ進む
-  - 完了条件: Cargo.toml の6箇所・package.json の version・introduction.md の対象バージョン行すべてに新バージョンが反映され、`git diff --stat` の変更が introduction.md では 1 行のみである
-  - _Requirements: 2.1, 2.2, 2.3, 2.4_
-  - _Boundary: Phase 2: VersionBump_
-- [ ] 2.2 ビルドとマニュアル内容検証を行いバージョン更新をコミットする
-  - `cargo build --workspace` でビルド成功を確認し、続けて `node book/tools/verify-content.mjs` を実行して exit 0（`F-version` が PASS＝対象バージョン行が Cargo.toml の版と一致）を確認する（`npm install` 不要）
-  - 失敗時（ビルド失敗・verify-content 非ゼロ終了・2.1 の一致行数異常）: `git restore Cargo.toml editors/vscode/package.json book/src/introduction.md` でファイル単位ロールバックし、エラーを報告してリリース作業を中止する（破壊的 Git 操作は禁止）
-  - 成功時: `git add Cargo.toml editors/vscode/package.json book/src/introduction.md; git commit -m "chore(release): bump version to vX.Y.Z"`（3 ファイルを 1 コミット）
-  - 完了条件: ビルドと verify-content がともに成功し、3 ファイルを含むバージョン更新コミットが git ログに記録されている（`git show --stat HEAD` に 3 ファイルが並ぶ）
-  - _Requirements: 2.5, 2.6, 2.7_
-  - _Depends: 2.1_
-  - _Boundary: Phase 2: VersionBump_
+```
+リリース未完了: v{V}（止まった段: 段 N・理由）
+- 公開済みの公開先: <定型コマンド A の「あり」の行。無ければ「なし」>
+- 残っている公開先: <公開先と status・reason。無ければ「なし」>
+- 原因の区分: <判定表の行の名前>
+- 公開前の段で止めた場合: どの公開先にも公開していない
+- 次に誰が何をするか: <開発者 / エージェント と、その内容>
+- 再開の方法: /kiro-impl release-workflow をもう 1 度実行する（状態から続きを判定する）
+```
 
-## Task 3: ローカル成果物のビルド（Stage A / 直列・R1+R2 共有のため非並行）
+版が決まる前（段 1〜3）に止まるときは、1 行目を「リリースを開始できない（止まった段: 段 N・理由）」とし、何も公開していないことを書く。
 
-> Resume Mode かつ新セッションの場合は、Release 添付用に成果物のみ再生成する（バージョンは V で確定済み・再 bump/統合はしない）。
-> Task 3.1（ゴースト）と 3.2（VSCode）はともに R1 cargo ロックを共有するため真の並行はできない。両者ともバージョン更新コミット（Task 2）にのみ依存し crates.io 公開には依存しない（偽の依存関係の排除 / Req 5.9, 8.6）。
+## タスクの進め方
 
-- [ ] 3. ローカル成果物のビルド
-- [ ] 3.1 サンプルゴーストをビルドし成果物を確認・コミットする
-  - `Push-Location crates/pasta_sample_ghost; PowerShell -ExecutionPolicy Bypass -File release.ps1; Pop-Location`（ローカルソースから pasta.dll をビルド）。失敗時はエラーを報告し中断
-  - `Test-Path "release/hello-pasta.nar"` と `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll"` を確認する（いずれか不在なら中断）
-  - `Compress-Archive -Path "target/i686-pc-windows-msvc/release/pasta.dll","crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/THIRD_PARTY_LICENSES.txt" -DestinationPath "target/i686-pc-windows-msvc/release/pasta.dll.zip" -Force` → `Test-Path` で確認（失敗時中断）
-  - `git add -A; git commit -m "chore(release): build hello-pasta vX.Y.Z"`（このコミットが Stage A HEAD＝タグ対象）
-  - 完了条件: hello-pasta.nar・pasta.dll・pasta.dll.zip が存在し、ゴーストビルドコミットが git ログに記録されている
-  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 8.6_
-  - _Boundary: Phase 5 GhostBuild（release.ps1 / target/i686-pc-windows-msvc/release/ / release/）_
-  - _Depends: 2.2_
-- [ ] 3.2 VSCode 拡張をビルドして VSIX を生成する
-  - `cd editors/vscode; npm install` → `npm run package` を実行する（prepackage の `build:wasm` は R1 を保持するため Stage A で実施）
-  - 生成された VSIX パスを `$env:VSIX_PATH` に記録する
-  - 失敗時: 一時障害なら Task 7 のリトライへ、非一時障害（ビルドエラー等）なら未完了として原因を報告する。**いずれもリリースを完了済みとしない**（VSIX 未生成のまま完了しない / Req 11）
-  - 完了条件: VSIX（`pasta-vscode-X.Y.Z.vsix`）が生成され `$env:VSIX_PATH` に記録されている
-  - _Requirements: 4.1, 4.2, 4.6_
-  - _Boundary: Phase 4a VsixPackage（editors/vscode/）_
-  - _Depends: 2.2_
-- [ ] 3.3 コミット履歴からチェンジログを整形する（読み取り専用・先行生成）
-  - `git tag -l "v*" --sort=-version:refname` で前回タグを特定する
-  - 前回タグがあれば `git log <前回タグ>..HEAD --oneline --no-merges`、なければ（初回）`git log --oneline --no-merges`
-  - Conventional Commits で分類・グループ化する（feat/fix/refactor/docs/test/chore）。スコープ `spec` のコミットは除外し、空グループは省略する
-  - 整形済みチェンジログを一時ファイル `release-notes-vX.Y.Z.md` に書き出す（compare URL は `<前回タグ>...vX.Y.Z`）
-  - 完了条件: `release-notes-vX.Y.Z.md` が作成され整形済みチェンジログを含む
-  - _Requirements: 7.1, 7.2, 7.3, 7.9_
-  - _Boundary: Phase Z Changelog（git log 読み取り専用 / release-notes-vX.Y.Z.md）_
-  - _Depends: 3.1_
+1. 毎回、タスク 1 から始める。`tasks.md` に前回の完了印が残っていても、タスク 1 から行う（タスク 1 が完了印を消す）。
+2. タスク N（1〜10）を始める前に、`design.md` の「段 N」を読み直す。コマンドは、`design.md` に書いてあるものを、波かっこ（`{V}` など）だけ置き換えて実行する。記憶で書かない。足さない。
+3. 定型コマンド A・B・C は、`design.md`「定型コマンドの呼び出し方」の 1 行で呼ぶ。スクリプトの中身を写して実行しない。
+4. 判定の結果、行わないと決まったタスクは、行わずに完了印を付けて次へ進む（下の各タスクの「飛ばす」）。
+5. タスクを終えるたびに、確定した実行変数（`design.md`「実行変数」の `VREQ`・`V`・`BRANCH`・`PR`・`TARGET`・`RUN`・`ATTEMPT`・`N_AUTO`・`F7_DONE`）を開発者に 1 行で示す。`N_AUTO` は 0、`F7_DONE` は「いいえ」から始める。
+6. すべてのタスクは直列である。並行に行えるタスク（`(P)`）は無い。
 
-## Task 4: main 統合（Stage B / 安全ゲート）
+## タスク
 
-> Resume Mode の場合は Task 4 をスキップする（統合済み）。Stage A 完了（ワークツリークリーン・全成果物生成済み）が前提（Req 8.2）。
+- [ ] 1. 開始の確認を行う（段 1）
+  - 最初に `VREQ` を決める。開発者の指示に版の指定があれば、先頭の `v` を外したものを `VREQ` とする。無ければ `VREQ` は無しとする。`VREQ` が数字 3 つの形でなければ（段 3 の手順 3 のコマンドで確かめる）、エラーを示し、入力し直しを求める。
+  - 手順 1（ブランチ）と手順 2（必要な操作）は、何も変えない。どちらかが不合格なら、何も変えずに止まる。
+  - 手順 3 で、`tasks.md` の完了印をすべて消す。このタスクの完了印は、手順 5 が済むまで付けない（手順 4 が、作業ツリーに変更が無いことを求めるため）。
+  - 手順 4 で、未コミットの変更か main に無い内容があれば、内容を示して止まる。
+  - 手順 4 の「版の更新のコミットだけが残っている場合」にあたるときは、止まらずに手順 4 の「続け方」に従う（以下「統合からの再開」と呼ぶ）。コミットの件名の版を `V` として開発者に示す。`VREQ` があって `V` と違うときは止まる。手順 5 の後、タスク 2 を飛ばし、タスク 3・4 は、それぞれの「統合からの再開のとき」の箇条だけを行い、タスク 5 から続ける。
+  - 手順 5 で、main を履歴を書き換えずに取り込む。衝突したら取り込みを中止して止まる。
+  - 完了の状態: `VREQ` と `BRANCH` が決まり、手順 2 の 4 つのコマンドが終了コード 0 で、権限の出力が合格の 3 つのどれかであり、手順 4 が合格し（または「統合からの再開」に入り）、`git merge-base --is-ancestor origin/main HEAD` が終了コード 0 である。
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 8.6, 10.1_
 
-- [ ] 4. main 統合（タグ作成 → PR マージコミット）
-- [ ] 4.1 最終 ff 検証とアノテーションタグ作成（ローカル）
-  - `git fetch origin {default-branch}` で `origin/{default-branch}` が HEAD の祖先であることを再確認する。Task 1.4 後に main が再度先行した稀ケースはリビルドループ回避のため中止し再実行を促す
-  - `git tag -l "vX.Y.Z"` で既存タグ競合を確認する（あれば開発者に対応確認。自動削除はしない）
-  - `git tag -a vX.Y.Z -m "Release vX.Y.Z"`（作業ブランチ HEAD＝Phase 5 コミットを指す。**push はしない／Stage D で push**）
-  - 完了条件: ff 相当が再確認され、ローカルタグ `vX.Y.Z` が作成されている（リモート未反映）
-  - _Requirements: 6.1, 6.2, 6.3, 10.6, 10.9_
-  - _Boundary: Phase 6 Integrate（git ローカル）_
-  - _Depends: 3.1, 3.3_
-- [ ] 4.2 PR を作成しマージコミット方式で main へ統合する
-  - `gh pr create --base {default-branch} --head <作業ブランチ> --title "release: vX.Y.Z" --body <merge-base..HEAD 履歴＋意図の要約>`
-  - `gh pr merge --merge --delete-branch`（**`--squash`/`--rebase` を使わず**コミット SHA を保持。マージ成否は API 結果のみで判定し、`--delete-branch` のローカル削除警告は非致命として無視）
-  - 失敗時: 一時障害なら Task 7 のリトライへ、非一時障害（コンフリクト・mergeable でない・権限不足等）なら **force push・履歴書き換え・マージ成功前のブランチ削除を行わず**中断して開発者に解消を求める。**統合成功まで Stage C/D（公開・タグ push・Release）を実行しない**（安全ゲート / Req 8.5, 10.6, 10.7）
-  - 完了条件: PR がマージコミット方式で main へマージされ、リリースコミットが SHA 保持のまま main から到達可能になっている
-  - _Requirements: 6.4, 8.5, 10.2, 10.3, 10.4, 10.6, 10.7_
-  - _Boundary: Phase 6 Integrate（gh pr / GitHub remote）_
-  - _Depends: 4.1_
+- [ ] 2. 実際の状態から、始める位置を判定する（段 2）
+  - 定型コマンド A を版の指定なしで実行し、出力を判定表 S0〜S9 に上から当て、最初に当てはまった行に従う。`main` の行の版を `V_MAIN` とする。
+  - 前回の完了印・会話の記録を、判定に使わない。
+  - 止まる行（S0・S6・S8・S9）: 判定表の「次の手」の内容を示し、「止まり方」で止まる。
+  - 開発者の答えを待つ行（S1・S2）: S1 は、エラーを示して別の版の入力を求め、入力されたらタスク 3 を段 3 の手順 3 から行う。S2 は、初回の確認の続きか、新しいリリースかを確かめる。続きならタスク 3〜9 を飛ばしてタスク 10 へ、新しいリリースならタスク 3 へ進む。
+  - 進む行（S3・S4・S5・S7）: S3 はタスク 3 へ進む。S7 はタスク 3〜5 を飛ばし、タスク 6 へ進む。S4 はタスク 3〜6 を飛ばし、タスク 7 を段 7 の手順 2 から行う。S5 はタスク 3〜6 を飛ばし、タスク 7 を段 7 の手順 3 から行う。S4・S5 で `VREQ` が `V_MAIN` と違うときは、`V_MAIN` のリリースが未完了なので先に続きを行うことと、`VREQ` は始めていないことを開発者に示す。
+  - タスク 3 を飛ばす行（S2 の続き・S4・S5・S7）では、`V` を `V_MAIN` とし、開発者に示す。タスク 6 も飛ばす行（S2 の続き・S4・S5）では、`RUN` と `ATTEMPT` を、定型コマンド A の `run` の行の ID と `attempt` から取る。
+  - 飛ばす: タスク 1 が「統合からの再開」に入ったとき。
+  - 完了の状態: 当てはまった行の番号（S0〜S9）、`V_MAIN`、次に行うタスクの番号を、定型コマンド A の出力の該当の行とともに開発者に示してある。
+  - _Requirements: 1.7, 1.8, 8.1, 8.2, 8.4, 8.5, 10.3_
 
-## Task 5: 公開（Stage C / ネットワーク・並行2トラック）
+- [ ] 3. リリースする版を決める（段 3）
+  - 手順 1〜5 を順に行う。版の指定が無いときは、定型コマンド A の `提案` の行の版（最大の版の PATCH + 1）を候補にし、出どころごとの最大の版とともに開発者に示す。承認を求めない。答えを待たずに手順 3 へ進む。MINOR・MAJOR を自動では上げない。
+  - 候補の形（数字 3 つ）を手順 3 のコマンドで確かめる。形が違えばエラーを示し、入力し直しを求める。
+  - 手順 4 の定型コマンド A（`-Version {候補}`）で、`不明` が 0、`tag` が `無し`、公開済みが 0/7、`GitHub Release` が `無し`、`PR` が `無し` であることを確かめる。満たさないときの扱いは、手順 4 の 3 つの箇条のとおりにする。
+  - 統合からの再開のとき: 手順 4 だけを、候補を `V` として行う。条件を 1 つでも満たさなければ、別の版の入力を求めずに止まる。
+  - 飛ばす: タスク 2 の判定が S2 の続き・S4・S5・S7 のとき。
+  - 完了の状態: `V` が確定して開発者に示してあり、そのときの定型コマンド A の出力が手順 4 の条件をすべて満たしている。
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 8.3_
 
-> 前提: Task 4 統合成功（Req 8.2, 10.6）。公開はローカル作業ブランチ（＝統合後 main と同一ツリー）から行うため公開内容は main・タグと一致する（Req 10.9）。
-> 5.1（X）と 5.2（Y）は R2 を変更せず独立するため並行実行する（Req 8.3）。各通信は Task 7 の二段リトライ（短期バックオフ→ScheduleWakeup）で完遂まで粘る。
+- [ ] 4. 版の表記を更新し、1 つのコミットにする（段 4）
+  - 手順 1（事前の確認）が不合格なら、何も変えずに止まる。
+  - 手順 2〜5 で、5 ファイルの版の表記を `V` にそろえる。`Cargo.lock` は `cargo update --workspace` だけで更新し、文字列の置換で直さない。
+  - 手順 6 の 5 つの確認が、すべて合格の基準を満たすことを確かめる。1 つでも不合格なら、手順 7 で 5 ファイルを元に戻し、不合格の確認を示して止まる。
+  - 手順 8 で、5 ファイルだけをパスを並べてコミットする。`tasks.md` を含めない。
+  - 手元でビルド・テスト・配布物の作成を行わない。
+  - 統合からの再開のとき: 手順 6 の (3) と (4) のコマンドだけを行う（ほかの手順は行わない。新しいコミットを作らない）。どちらかが不合格なら、ファイルを戻さずに止まる。完了の状態は、(3) と (4) がどちらも終了コード 0 であること。
+  - 飛ばす: タスク 2 の判定が S2 の続き・S4・S5・S7 のとき。
+  - 完了の状態（統合からの再開でないとき）: `git show --stat --format=%s HEAD` の出力が、件名 `chore(release): v{V}` と 5 ファイルだけである。
+  - _Requirements: 2.8, 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 5. 公開（並行2トラック）
-- [ ] 5.1 (P) crates.io へ依存関係順にクレートを公開する（Track X / クリティカル）
-  - 順序固定: `cargo publish -p pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`（pasta_check は最後）。`pasta_sample_ghost`（`publish = false`）はスキップ
-  - 各公開前に crates.io index（`https://crates.io/api/v1/crates/<crate>/<version>`）で公開済みか確認し、済みならスキップ（冪等 / Resume 対応）。`cargo publish` が「already exists」で失敗した場合も成功扱い
-  - 各公開後 `Start-Sleep -Seconds 10`（最後は不要）。成功を確認してから次へ
-  - 失敗時: Task 7 の二段リトライ。未公開分のみ再試行し、既公開クレートは残す。main 統合状態は保持する（Req 10.8）。**全クレート公開成功まで Stage D を実行しない**
-  - 完了条件: 5クレートすべてが crates.io に新バージョンで存在する
-  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 8.2, 8.3, 10.8_
-  - _Boundary: Track X CratesPublish（crates.io）_
-  - _Depends: 4.2_
-- [ ] 5.2 (P) VSIX を VSCode Marketplace に公開する（Track Y / 隔離・完遂必須）
-  - `vsce show <publisher>.<extension> --json` の versions に当該バージョンがあればスキップ（冪等）。なければ `cd editors/vscode; vsce publish`
-  - 他トラックをブロックしない（失敗隔離 / Req 8.4）が、**未公開のまま完了としない**（完遂必須 / Req 11）
-  - 失敗時: 一時障害なら Task 7 の二段リトライで完遂まで、非一時障害（`VSCE_PAT` 無効等）なら未完了報告
-  - 成功時: Marketplace URL を記録する
-  - 完了条件: Marketplace に当該バージョンが公開され URL が記録されている
-  - _Requirements: 4.3, 4.4, 4.5, 4.7, 8.3, 8.4_
-  - _Boundary: Track Y VsixPublish（VSCode Marketplace）_
-  - _Depends: 4.2_
+- [ ] 5. 版の更新を PR で main に統合する（段 5）
+  - 手順 1 で、PR に入る変更が 5 ファイルだけであることを確かめてから、作業ブランチを push する。5 ファイルだけでなければ、push せずに止まる。main へは直接 push しない。
+  - 手順 2・3 で、PR を作り、PR の CI を待たずに squash で統合する。
+  - 統合の成否は、手順 3 の 2 つ目のコマンドの出力（`MERGED <SHA>`）だけで判定する。そのコマンドを実行できなかったときだけ、手順 3 の代わりの判定（`git log`）を使う。ローカルブランチの削除の警告は、失敗ではない。
+  - 手順 1〜3 のどれかが失敗したら、リリースタグを作らず、強制 push・履歴の書き換え・ブランチの削除を行わずに止まる（手順 4）。
+  - 飛ばす: タスク 2 の判定が S2 の続き・S4・S5・S7 のとき。
+  - 完了の状態: 手順 3 の出力が `MERGED <SHA>`（代わりの判定では、SHA の 1 行）で、その SHA を `TARGET` とし、手順 5 の定型コマンド C（`-Version {V} -Target {TARGET}`）の 4 行がすべて `合格` である。
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-## Task 6: タグ push・GitHub Release・完了サマリー（Stage D）
+- [ ] 6. リリースタグを作り、タグだけを push する（段 6）
+  - このタスクのタグの push が、取り消せない公開の入口である。手順 2 と手順 3 が合格するまで、タグを作らない。
+  - 手順 1 で `TARGET` を決める（タスク 5 から来たときはタスク 5 の値、S7 から来たときは手順 1 のコマンド）。見つからなければ止まる。
+  - 手順 2 で、定型コマンド C の 4 行がすべて `合格` であることを確かめる。不合格なら、タグを作らずに止まる。
+  - 手順 3 で、同じ名前のタグがリモートにもローカルにも無いことを確かめる。あるときの扱いは、手順 3 の 2 つの箇条のとおりにする。既存のタグを削除しない。付け替えない。
+  - 手順 4 で注釈付きのタグを作り、手順 5 でタグだけを push する。push が失敗したら、手順 5 のとおりに示して止まる。
+  - 飛ばす: タスク 2 の判定が S2 の続き・S4・S5 のとき。
+  - 完了の状態: `git ls-remote --tags origin refs/tags/v{V}` の出力が空でない。
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-> 前提: Task 5.1（crates.io 全公開）成功。タグ push は公開後に行い、リモートのタグが常に crates.io 公開済みを含意する（議題3）。
+- [ ] 7. リリース CI の実行を最後まで追い、公開先ごとの結果を読む（段 7）
+  - 手順 1 で、タグの名前とタグのコミットの両方が一致する実行を特定し、`RUN` とする。`ATTEMPT` は 1 とする。出力が `run | 無し` なら、完了と報告せずに止まる。S4・S5 から来たときは、手順 1 を行わず、タスク 2 で取った `RUN` と `ATTEMPT` を使う。
+  - 手順 2 のコマンドを、ツールのタイムアウトを 10 分にして、出力が `completed` になるまで繰り返す。20 回繰り返しても終わらなければ、「リリース CI が実行中」として止まる。実行中は、完了と報告しない。
+  - 手順 3 で、定型コマンド B の出力と「結果表の作り方」の規則 1〜4 から、7 つの公開先（5 クレート・Marketplace・GitHub Release）の `status`・`reason` と、GitHub Release の URL を決める。規則は上から当て、最初に当てはまったものを使う。
+  - 手順 4 の 3 つの条件（実行の結論が `success`・7 つがすべて `published` か `skipped`・定型コマンド A が公開済み 7/7 で `不明` 0）をすべて満たしたときだけ、完了と判定する。満たしたらタスク 8 を飛ばしてタスク 9 へ、満たさなければタスク 8 へ進む（3 つ目だけ満たさないときの扱いは、手順 4 の最後の段落のとおりにする）。
+  - 飛ばす: タスク 2 の判定が S2 の続きのとき。
+  - 完了の状態: 7 つの公開先の結果表（`status`・`reason`）と実行の URL を開発者に示し、完了か未完了かの判定と、次に行うタスクの番号を示してある。
+  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 9.1_
 
-- [ ] 6. タグ push・GitHub Release・完了サマリー
-- [ ] 6.1 タグをリモートに push する（公開後）
-  - `git ls-remote --tags origin vX.Y.Z` で未 push を確認し、未 push なら `git push origin vX.Y.Z`（Task 4.1 で作成済みのローカルタグ ref。Task 4.2 の `--merge` で対象コミットは main から到達可能）
-  - 失敗時: Task 7 の二段リトライ。それでも失敗なら手動再実行手順を案内する
-  - 完了条件: リモートにタグ `vX.Y.Z` が存在し、main 履歴から到達可能（`git describe` が解決）
-  - _Requirements: 6.4, 6.5, 10.5_
-  - _Boundary: Phase 7 TagPush（git / GitHub remote）_
-  - _Depends: 5.1_
-- [ ] 6.2 GitHub Release を作成しアセットを添付する
-  - `gh release view vX.Y.Z` で既存を確認する（あればアセット添付の不足のみ補完／冪等）
-  - `$env:VSIX_PATH` かつ `Test-Path` なら VSIX をアセットへ追加する（非ブロッキング: 未生成でも dll.zip + .nar で作成し、後刻 Resume で添付補完）
-  - `gh release create vX.Y.Z "target/i686-pc-windows-msvc/release/pasta.dll.zip" "release/hello-pasta.nar" [<VSIX>] --title "pasta vX.Y.Z" --notes-file release-notes-vX.Y.Z.md`
-  - 失敗時: Task 7 の二段リトライ。成功後 `Remove-Item release-notes-vX.Y.Z.md`
-  - 完了条件: `ekicyou/pasta` にリリースページが作成され、アセット（dll.zip + .nar [+ VSIX]）が添付されている
-  - _Requirements: 7.4, 7.5, 7.6, 7.7, 7.8_
-  - _Boundary: Phase 7 Release（gh CLI）_
-  - _Depends: 6.1, 3.3_
-- [ ] 6.3 完了判定と完了サマリーを報告する
-  - 全ターゲット（crates.io 全クレート・Marketplace・タグ push・GitHub Release）成功を確認する
-  - **全完遂時のみ「完了」**として報告する: バージョン `vX.Y.Z`／公開クレート／GitHub Release URL（`https://github.com/ekicyou/pasta/releases/tag/vX.Y.Z`）／Marketplace 結果／各トラック成否
-  - 未完了が残る場合は「未完了（再試行待ち）」として残作業・障害分類・次回 ScheduleWakeup 予定を報告する（完了済みと報告しない）
-  - 完了条件: 完遂状況に応じた報告（完了 or 未完了）が開発者へ提示されている
-  - _Requirements: 9.4, 11.1, 11.5_
-  - _Depends: 6.2_
+- [ ] 8. 失敗に、判定表に従って対応する（段 8。未完了のときだけ）
+  - タスク 7 の結果表と定型コマンド B の `job` の行を、判定表 F0〜F7 に上から当て、最初に当てはまった行に従う。
+  - 自動で再実行するのは F6 と F7 だけで、コマンドは「失敗した job の再実行」のものだけを使う。`N_AUTO` が 3 になったら、自動の再実行をやめて止まる。F7 の切り分けの再実行は 1 度だけである。
+  - 再実行のコマンドが終了コード 0 なら、`ATTEMPT` を 1 増やし、段 7 の手順 2・3・4 をやり直す。`N_AUTO` の増やし方は「失敗した job の再実行」と「公開前の段の失敗の続き」のとおりにする（開発者の指示による「そのまま再実行」では増やさない）。完了の判定を満たさなければ、もう 1 度この判定表に当てる。
+  - F0〜F5 は自動では再実行せず、判定表の「次の手」のとおりに示して止まる。開発者が「直した」「そのまま再実行」「タグを付け直してよい」と指示したときの続きは、「セットアップを直した後の続き」「公開前の段の失敗の続き」のとおりにする。
+  - タグの付け直しは、開発者の承認が明示されているときだけ、「タグの付け直し」の手順 1〜4 で行う。公開済みが 0/7 でなければ、付け直さない。
+  - 手元から公開しない。GitHub Release を作らない。公開済みのものを取り消さない。上書きしない。手作業が要るとき（F5）は、内容を開発者に案内する。
+  - 止まるときは、「止まり方」の形で、公開済みの公開先・残っている公開先・原因の区分・次に誰が何をするか・再開の方法を報告する。公開より前の段で止めたとき（F1）は、定型コマンド A で 0/7 を確かめたうえで「どの公開先にも公開していない」を含める。
+  - 飛ばす: タスク 7 が完了と判定したとき。タスク 2 の判定が S2 の続きのとき。
+  - 完了の状態: 再実行の後に、段 7 の手順 4 の 3 つの条件をすべて満たしている。満たすまで完了印を付けない。満たさずに止まるときは、未完了の報告が出ている。
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 9.3, 9.4, 11.6_
 
-## Task 7: 完遂保証・二段リトライ・Resume オーケストレーション（横断ポリシー）
+- [ ] 9. リリースの完了を報告する（段 9）
+  - 段 7 の手順 4 の 3 つの条件を満たしているときだけ行う。1 つでも満たさないときは、完了と報告しない。
+  - 段 9 の報告の形（版・クレートごとの結果・Marketplace の結果・GitHub Release の URL・リリース CI の実行の URL・再実行の回数・手順との食い違い）を、結果表と定型コマンド B の出力から埋めて出す。
+  - 報告の後、定型コマンド A の `初回の記録` が `あり` なら、タスク 10 を飛ばす。
+  - 飛ばす: タスク 2 の判定が S2 の続きのとき。
+  - 完了の状態: 「リリース完了: v{V}」で始まる報告が、すべての項目を埋めて開発者に出ている。
+  - _Requirements: 9.1, 9.2_
 
-> Task 4-6 の各外部通信に適用される横断ポリシー。Stage 実行と並行して常時適用し、全ターゲット完遂まで「完了」としない（no half-done）。
+- [ ] 10. CI での初回のリリースを確かめ、後片付けを案内して記録する（段 10。初回の記録が無いときだけ）
+  - 手順 1 で、全 job の再実行より前に、5 クレートの公開の所要秒と「期限まで」の秒を控えて報告する。
+  - 手順 2 で、同じ実行のすべての job を再実行し、実行の結論が `success` で、最新の attempt の `line` の行が 7 行すべて `status=skipped` であることを確かめる。満たさなければ、内容を報告して止まる（記録を作らない）。
+  - 手順 3 で、手順書 10 節の後片付けを開発者に案内する。エージェントは行わない。
+  - `VSCE_PAT` の失効は、全 job の再実行より前の attempt に `publish-vsce` の `status=published` の `line` があるときだけ案内する。無いときは、`VSCE_PAT` の失効を案内せず、その旨と、記録を作らずに次のリリースで確かめ直すことを伝えて、このタスクを終える。ほかの 2 つの完了の連絡を受けても、手順 4 を行わない。
+  - 手順 4 は、3 つの後片付けを案内してあり、開発者がその完了を伝えた後にだけ行う。記録（`first-ci-release.md`）と `roadmap.md` の 2 ファイルだけをコミットし、PR（squash）で main に入れる。ID の値・トークンの値を書かない。
+  - S2 の続きから入ったときは、段 10 の最後の段落のとおりに、済んでいる手順をもう 1 度は行わない。
+  - 飛ばす: 定型コマンド A の `初回の記録` が `あり` のとき。
+  - 完了の状態: 記録の PR の状態が `MERGED` である。または、記録を作らない場合（`VSCE_PAT` を案内しない場合）にあたることを開発者に伝えてある。開発者の完了の連絡を待つ間は、完了印を付けない。
+  - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
 
-- [ ] 7. 完遂保証・リトライ・エスカレーション
-- [ ] 7.1 二段リトライを各外部通信に適用する
-  - 第1段: 短期バックオフ（1→10分、計約55分）。待機は ScheduleWakeup を基本とし、ごく短い待機（〜1分）のみ Start-Sleep。前景の長時間 sleep は使わない
-  - 第2段: 第1段で未完了が残れば ScheduleWakeup（既定 30〜60 分間隔）で同一セッションが待機→再開し、未完了分のみ冪等に続行する。回数・累計時間に固定上限を設けない
-  - 適用対象: PR マージ（4.2）・crates.io（5.1）・Marketplace（5.2）・タグ push（6.1）・Release（6.2）
-  - 完了条件: 一時障害の各通信が完遂まで自動再試行され、ScheduleWakeup の待機→再開が実際に機能する
-  - _Requirements: 8.1, 11.2, 11.3, 11.4, 11.7_
-- [ ] 7.2 一時/非一時障害を判別し非一時を即時報告する
-  - ビジー/レート制限/タイムアウト/5xx 等は一時障害として第2段リトライへ回す
-  - 認証無効・権限不足・ビルドエラー・マージコンフリクト等は非一時障害としてリトライに載せず、原因と必要対応を即時報告し、開発者対応後に Resume で完遂できる状態を保つ
-  - 完了条件: 障害が一時/非一時に分類され、非一時は即時に「未完了・要対応」として通知される
-  - _Requirements: 11.6_
-- [ ] 7.3 定期エスカレーション通知と試行履歴を出す
-  - 待機ループ中、5 回ごと または 24 時間経過ごとに開発者へプッシュ通知する（未完遂・継続中・累計試行回数・最終エラー・分類）
-  - 試行履歴（累計回数・初回/最終試行時刻・各ターゲット状態）をセッション内で保持する
-  - 完了条件: 長時間の待機中も定期通知が発火し、「完遂待ち」と「実質詰み」を開発者が判別できる
-  - _Requirements: 11.8_
-- [ ] 7.4 完遂保証と Resume 継続を統括する
-  - 完遂判定は crates.io / Marketplace / Release / タグの実状態を都度確認して行う（タスク状態に依存しない / 9.3 と両立）
-  - 各並行トラックの完了・失敗を個別に検証しサマリーへ反映する（Req 8.7）
-  - セッションが完遂前に終了した場合は、次回の手動 `/kiro-impl` 再実行が Task 1.2 の Resume 検知で未完了分から続行する（自律継続の実寿命は ScheduleWakeup ループ／セッション寿命に律速。無人完遂は Non-Goal）
-  - 本仕様は `/kiro-impl` 実行のたびにタスク状態を初期化し、`completed` に遷移せず、各実行を前回非依存の独立作業として動作させる
-  - 完了条件: 全ターゲット完遂で「完了」が確定し、未完了時はセッション継続またはセッション終了後の手動 Resume で必ず完遂へ収束する
-  - _Requirements: 8.7, 9.1, 9.2, 9.3, 9.5, 11.1_
+- [ ] 11. ドキュメント整合性を確かめる（最終タスク）
+  - このタスクは、`design.md` に対応する段が無い。コマンドを実行しない。
+  - リリースの実行は、文書を変えない。コミットに入るのが版の更新の 5 ファイルと、初回の記録の 2 ファイルだけであることは、行ったタスクの中（タスク 4 の手順 8・タスク 5 の手順 1・タスク 10 の手順 4）で確かめてある。飛ばしたタスクは、コミットを作っていない。
+  - steering `workflow.md` の最終タスクの確認先（`SOUL.md`・`book/src/`・`TEST_COVERAGE.md`・クレートの README・steering・スキル）は、版の表記のほかに変更が無いので、更新しない。マニュアルの対象バージョン行は、タスク 4 を行ったときに、その内容検証で確かめてある。
+  - 手順の文書（`design.md`・`crates/pasta_sample_ghost/RELEASE.md`・`.github/release-ci-setup.md`）と、実際の挙動が食い違ったところ（タスク 10 で見つけたものを含む）があれば、この実行では文書を直さず、内容を開発者に示す。直すのは別の PR で行う。
+  - 本仕様を完了済みにしない。`/kiro-complete` を実行しない。`completed/` へ移さない。`tasks.md` の完了印をコミットしない。
+  - 完了の状態: このタスクが最後に、「ドキュメント整合性: 文書の変更なし」か「手順との食い違い: <内容>」の 1 行を開発者に出している。
+  - _Requirements: 10.2_
+
+## タスクに含めない要件
+
+Requirement 12（12.1〜12.9。手順の書き換えに伴う一回限りの整合）は、タスクに含めない。リリースのたびに繰り返さないためである（`requirements.md` の Requirement 12 の前書き）。`design.md`「一回限りの整合（Requirement 12）」の一覧を、開発者の直接の指示で 1 度だけ行う。`/kiro-impl` では行わない。

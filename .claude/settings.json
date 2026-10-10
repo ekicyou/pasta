@@ -2,22 +2,23 @@
   "permissions": {
     "allow": [
       "mcp__github__merge_pull_request",
-      "Bash(cargo publish:*)",
-      "PowerShell(vsce publish:*)",
-      "Bash(git push origin v*)",
-      "Bash(gh release create:*)",
       "Bash(git fetch:*)",
       "Bash(git merge origin/main:*)",
       "Bash(git merge --abort)",
+      "Bash(git push -u origin HEAD)",
+      "Bash(git push origin v*)",
       "Bash(git push origin v*:*)",
       "Bash(gh pr create:*)",
-      "Bash(gh pr merge:*)"
+      "Bash(gh pr merge:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run rerun:*)"
     ]
   },
   "autoMode": {
     "allow": [
       "$defaults",
-      "release-workflow（/kiro-impl release-workflow）での release PR のマージコミット方式マージ、cargo publish による crates.io 公開、vsce publish による VSCode Marketplace 公開、リリースタグ push、gh release create を許可する。",
+      "release-workflow（/kiro-impl release-workflow）での、版の更新の PR の作成と squash マージ、リリースタグ（vX.Y.Z）の push、リリース CI（release.yml）の実行の閲覧と失敗した job の再実行（gh run rerun）を許可する。手元からの cargo publish・vsce publish・gh release create は行わない。",
       "gh pr merge による pull request の default ブランチ（main 等）への squash マージを許可する。self-created PR を含み、kiro-complete の完了フローでの自動マージを想定する。"
     ]
   },
