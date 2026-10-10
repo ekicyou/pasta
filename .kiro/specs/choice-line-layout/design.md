@@ -49,7 +49,7 @@
 - 字の定義（`emits_text`）と、話し手の切り替えの段落の区切りの判定（`spot_has_text`・`pending_break` の決め方）。読むだけで、決め方は変えない。
 - `BUILDER.build` の分割（リファクタ）。
 - 9 段目の辞書（`dic/09-choice.pasta`）・章（`book/src/getting-started/09-choice.md`）・段階表（`STAGES.md`）・`tests/tutorial_stages_test.rs`。
-- 作者が書いた改行の検出、台詞の行に書いた `\c` の検出（「未決の事項」の 2）。
+- 作者が書いた改行の検出、台詞の行に書いた `\c` の検出（「未決の事項」の 1）。
 - 台詞の中に作者が手で書いた `\q[…]`・`\__q[…]` の配置。
 - 1 行に収まらない長い表示の選択肢の折り返し。
 - シェルのファイル、`tests/integration_test.rs`、`book/tools/`。
@@ -400,7 +400,7 @@ pub const fn default_choice_newlines() -> f64; // 1.5
 
 - Integration: `spot_newlines` を足している場所に、同じ形で 1 行ずつ足す。`apply_shiori_defaults` が補うキーは 4 つから 5 つになる。
 - Validation: `config_defaults_test.rs` の「最小の構成と、既定値を全部書いた構成が同じになる」テストは、全部書いた側の文字列に `choice_newlines = 1.5` を足さないと落ちる。
-- Risks: 持ち場が Rust の loader と `pasta/shiori/act.lua` に広がる（「未決の事項」の 3・4）。
+- Risks: 持ち場が Rust の loader と `pasta/shiori/act.lua` に広がる（「決定の記録」の「設計ディスカッションで確かめて閉じたこと」）。
 
 ### 検証層
 
@@ -528,18 +528,23 @@ pub const fn default_choice_newlines() -> f64; // 1.5
 あわせて決めたこと。
 
 - 幅つきの改行のタグを作る式を、局所関数 1 つにまとめて両方が使う。換算が同じであること（2.8）が、作りから言える。
-- 吹き出しを消したことは、今の規則と同じく `clear` のトークン（`act:clear()`）で数える（「未決の事項」の 2）。
+- 吹き出しを消したことは、今の規則と同じく `clear` のトークン（`act:clear()`）で数える（「未決の事項」の 1）。
 - `tutorial_stages_test.rs` に 9 段目の出力の照合は足さない。同じ並び（字 → 選択肢 → 選択肢）は `pasta_shiori` の結合テストが完全一致で見ており、見え方は実機でしか確かめられない。
+
+### 設計ディスカッションで確かめて閉じたこと（2026-10-10）
+
+下書きで仮定にしていた 4 つを、根拠を確かめて確定した。
+
+- **話し手の切り替えの区切りと重なるとき**: 区切りは 1 つだけにし、字の前は今も出ている `\n[spot_newlines × 100]` を残す。`\n` を重ねない。選択肢は保留に触らない。理由: その場所の区切りは、選択肢が無くても今も出ている段落の区切りである。`\n` に替えると、話し手が戻ったときの段落の空きが、選択肢のある吹き出しでだけ狭くなる。要件の Requirement 2 の 11 に、この場合を書き足した。
+- **`pasta/shiori/act.lua` を触ること**: 触る（読む 1 行、渡す 1 行）。理由: ロードマップの「共有接点」は `crates/pasta_lua/pasta_scripts/pasta/act.lua` を名指ししており、約束の `act.lua` は選択肢を積む側である。同じウェーブの他の 3 本（`hello-pasta-shell-art`・`manual-print-media-refs`・`manual-link-anchor-check`）は、`pasta_lua` の Lua と loader を触らない。
+- **持ち場を Rust の loader まで広げること**: 広げる。理由: `[ghost]` の既定値は Rust に 1 つという決まり（SSOT）と、それを守る検査（`config_defaults_test.rs`）がある。Lua の既定値だけにすると、`@pasta_config.ghost.choice_newlines` が書かなければ `nil` になり、リファレンスの `[ghost]` の説明とこのキーだけ食い違う。同じウェーブと重なるファイルは `book/AUTHORING.md` だけで、触る行が違う（こちらはキーの一覧の 1 行、`manual-print-media-refs` は「CI と同じ順」の一覧）。
+- **話し手なしの選択肢をスポット 0 として数えること**: 数える（決定の (c)）。理由: 数えないと、選択肢行だけのシーンで選択肢どうしが同じ行に並び、Requirement 2 の 2 を満たせない。
 
 ## 未決の事項（設計ディスカッションで決める）
 
 設計は、下の「仮定」で書いてある。
 
-1. **話し手の切り替えの区切りと重なるとき**。選択肢を出した吹き出しへ、別の話し手の後で戻って台詞を出す並びで、要件 2.5・2.11 の文面は `\n` だが、今の規則は同じ場所に `\n[spot_newlines × 100]` を出している。**仮定**: 区切りは 1 つだけにし、字の前は今の `\n[spot_newlines × 100]` を残す（保留の扱いは 1 行も変えない）。戻った直後が選択肢で、その後に台詞が続く並びでは、選択肢の前に `\n[choice_newlines × 100]`、台詞の前に今も出ている `\n[spot_newlines × 100]` が出る。別の案: 最後が選択肢なら、いつも `\n` にする（要件の文面どおり。今 `\n[150]` が出ている場所が `\n` に変わる）。
-2. **台詞の行に書いた `\c`**。台詞の行の `\c` は `sakura_script` のトークンになり、組み立ては吹き出しの消去として数えない（今の段落の区切りも同じで、`pasta-toml.md` の「`\c` でバルーンを消去した後…改行を出さない」は `act:clear()` にしか当たらない）。台詞 → `\c` → 選択肢行と書くと、消した吹き出しの最初に `\n[150]` が出る。要件 2.3 の「吹き出しを消した直後」を、DSL の書き方では満たせない。**仮定**: 本 spec は今の規則にそろえ（`act:clear()` だけ）、台詞の行の `\c` を両方の規則で数える修正は別の spec にする。別の案: 本 spec で、字を表示しない `sakura_script` の中の `\c` を、選択肢の状態についてだけ数える（段落の区切りの規則とずれる）。
-3. **`pasta/shiori/act.lua` を触ること**。ロードマップの同じウェーブの約束は「`act.lua` を触らない」と書いている。同じ roadmap の「共有接点」は `crates/pasta_lua/pasta_scripts/pasta/act.lua` を名指ししているので、約束は選択肢を積む側の `pasta/act.lua` を指すと読んだ。**仮定**: `pasta/shiori/act.lua` に 2 行足す（読む 1 行、渡す 1 行）。別の案: 組み立てが `pasta.config` を直接読む（`act.lua` という名前のファイルを一切触らないが、組み立てに設定への依存が増える）。
-4. **持ち場の広がり**。ロードマップは本 spec の持ち場を「`sakura_builder.lua` とそのテスト」と書いている。`choice_newlines` を `spot_newlines` と同じ形にすると、Rust の loader（`config/sections.rs`・`config/mod.rs`・`mod.rs`）、loader のテスト 4 ファイルとフィクスチャ 1 枚、マニュアルの内部のページ（`talk-output.md`・`internal-modules.md`・`loader.md`・`pasta-config.md`）、`book/AUTHORING.md` の 1 行まで広がる。`AUTHORING.md` は、同じウェーブの `manual-print-media-refs` が別の節（「CI と同じ順」の一覧）を持っている。**仮定**: 広げる（既定値の出どころを 1 つにする決まりと、その検査に乗る）。別の案: Lua の既定値だけにする（Rust を触らない。`@pasta_config.ghost.choice_newlines` は書かなければ `nil` になり、リファレンスの `[ghost]` の説明と、このキーだけ食い違う）。
-5. **話し手なしの選択肢をスポット 0 として数えること**。`shiori_act_test.lua` の 751 行の期待値が `…\![set,choicetimeout,30000]\p[0]\nA\e` に変わる。**仮定**: 数える（決定の (c)）。`clear_spot` を出力の途中で通った後は当たらないことがあるが、救済しない。
+1. **台詞の行に書いた `\c`**。台詞の行の `\c` は `sakura_script` のトークンになり、組み立ては吹き出しの消去として数えない（今の段落の区切りも同じで、`pasta-toml.md` の「`\c` でバルーンを消去した後…改行を出さない」は `act:clear()` にしか当たらない）。台詞 → `\c` → 選択肢行と書くと、消した吹き出しの最初に `\n[150]` が出る。要件 2.3 の「吹き出しを消した直後」を、DSL の書き方では満たせない。**仮定**: 本 spec は今の規則にそろえ（`act:clear()` だけ）、台詞の行の `\c` を両方の規則で数える修正は別の spec にする。別の案: 本 spec で、字を表示しない `sakura_script` の中の `\c` を、選択肢の状態についてだけ数える（段落の区切りの規則とずれる）。
 
 ## Supporting References
 

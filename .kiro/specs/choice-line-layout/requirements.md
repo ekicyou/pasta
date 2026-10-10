@@ -102,7 +102,7 @@
 8. The pasta shall 1 で入れる行の区切り（字の後の選択肢の前）を、`pasta.toml` の `[ghost]` の `choice_newlines` で決めた幅の改行にする。値は行の高さに対する倍率で、`spot_newlines` と同じ換算（100 倍して小数点以下を切り捨て、`\n[N]`）にする。
 9. Where `pasta.toml` に `choice_newlines` が書かれていない, the pasta shall 既定の `1.5`（`\n[150]`）を使う。
 10. The pasta shall `choice_newlines` の値の扱い（数値でない値など）を、`spot_newlines` と同じにする。
-11. The pasta shall 2・5 で入れる行の区切り（選択肢の後の選択肢の前・選択肢の後の台詞の前）を、台詞の中に書く改行 1 つと同じ行送りにする。
+11. The pasta shall 2・5 で入れる行の区切り（選択肢の後の選択肢の前・選択肢の後の台詞の前）を、台詞の中に書く改行 1 つと同じ行送りにする。ただし、話し手が切り替わって戻った直後の台詞の前で、今も `spot_newlines` の幅の区切りが出ている場所では、その区切りだけを出し、重ねない。
 
 ### Requirement 3: 変えない範囲
 
