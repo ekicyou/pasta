@@ -29,7 +29,6 @@
 - 失敗の原因になったコードやワークフロー定義の修正（別の PR で行う）。
 - 公開先の画面で行う設定と、認証情報の失効の実施（開発者が行う）。
 - プレリリースの版、pasta_lsp の独立リリース、新しいクレートの初回公開。
-- 補助スクリプトの新設（定型コマンドは本書に置く。Open Questions 2）。
 
 ## Boundary Commitments
 
@@ -38,6 +37,7 @@
 - リリースの手順: 段 1〜10 の順序・コマンド・合否の基準・判定表（開始時の状態 → 再開の位置、リリース CI の結果 → 次の手）。
 - `/kiro-impl release-workflow` での実行の約束（タスクの進め方・コミットしてよいもの・止まり方）。
 - 版の更新の対象（5 ファイル）と、その更新・確認の方法。
+- 定型コマンドのスクリプト 3 本（`.kiro/specs/release-workflow/scripts/`）。本仕様だけが使う。
 - 版の更新の PR の題名・コミットの件名 `chore(release): vX.Y.Z`（再開の判定と、タグを付けるコミットの特定に使う）。
 - 完了・未完了の報告の形。
 - 初回の CI リリースの記録 `.kiro/specs/release-workflow/first-ci-release.md`。
@@ -111,7 +111,7 @@ graph LR
 - **状態は外にだけある**: 進み具合を spec のファイルに書かない。毎回、定型コマンド A で読み直す（8.4・10.3）。
 - **書き込みは 4 種類だけ**: 作業ブランチへのコミットと push、PR の作成と統合、タグの push、リリース CI の再実行。公開先へは書き込まない。
 - **照会は 1 か所**: 版の重複の検査（1.7）・再開の判定（8）・タグの付け直しの前の確認（7.6）・完了の確認（9.1）は、同じ定型コマンド A を使う。
-- **新しい部品を足さない理由**: 補助スクリプト・状態ファイル・スケジュールは要件に無い。定型コマンドは本書に置き、エージェントは写して実行する。
+- **足す部品は定型コマンドのスクリプト 3 本だけ**: 本仕様だけが使うので、spec のフォルダ（`scripts/`）に置く。エージェントは 1 行の呼び出しで実行し、中身を写さない（写し間違いを防ぐ）。状態ファイル・スケジュールは足さない。
 - **Steering 準拠**: PR の squash マージ・CI を待たない運用・main への直接 push をしないこと（`workflow.md`）、破壊的な Git 操作をしないこと（`git reset --hard`・`git checkout -- <file>` を使わない）。
 
 ### Technology Stack
@@ -137,6 +137,10 @@ graph LR
 ├── tasks.md                # リリースのタスク（/kiro-spec-tasks が作り直す。完了印はコミットしない）
 ├── spec.json               # フェーズの記録
 ├── first-ci-release.md     # 初回の CI リリースの記録（段 10 が 1 度だけ作る）
+├── scripts/
+│   ├── release-state.ps1   # 定型コマンド A: 状態の照会
+│   ├── ci-result.ps1       # 定型コマンド B: リリース CI の結果の読み取り
+│   └── pretag-check.ps1    # 定型コマンド C: タグを付ける前の検査
 └── gap-analysis.md         # 旧設計（v0.1.2 の頃）の記録。一回限りの整合で削除する【仮定】
 ```
 
@@ -397,7 +401,7 @@ flowchart TD
 | Intent | 実際の状態から、どの段から始めるかを決める |
 | Requirements | 1.7, 1.8, 8.1, 8.2, 8.4, 8.5, 10.3 |
 
-定型コマンド A を `$V = ''`（`origin/main` の版を調べる）で実行し、出力を次の表に上から当てる。最初に当てはまった行に従う。
+定型コマンド A を、版を指定せずに（`origin/main` の版を調べる）実行し、出力を次の表に上から当てる。最初に当てはまった行に従う。
 
 | # | `tag` | `集計` の公開済み | `run` | ほかの条件 | 判定 | 次の手 |
 |---|-------|-------------------|-------|------------|------|--------|
@@ -430,7 +434,7 @@ flowchart TD
    '{候補}' -cmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z'
    ```
 
-4. 定型コマンド A を `$V = '{候補}'` で実行し、次のすべてを満たすことを確かめる。
+4. 定型コマンド A を `-Version {候補}` で実行し、次のすべてを満たすことを確かめる。
    - `集計` の `不明` が 0（満たさなければ、`不明` の行を示して止まる。1.8）
    - `tag` が `無し`、`集計` の公開済みが 0/7、`GitHub Release` が `無し`（満たさなければ、すでにある出どころを示し、別の版の入力を求めて手順 3 へ戻る。1.7）
    - `PR` が `無し`（`未統合` の行があれば、新しい PR を作らず、その PR を示して開発者に扱いを確かめる。8.3）
@@ -542,7 +546,7 @@ flowchart TD
 
 4. **失敗のとき**（4.4）。手順 1〜3 のどれかが失敗した、または手順 3 の出力が `MERGED` で始まらないときは、止まる。リリースタグを作らない。`git push --force`・履歴の書き換え・ブランチの削除を行わない。PR の URL と失敗の内容を示し、開発者に解消を求める。
 
-5. **main の確認**（4.5）。`git fetch origin main` の後、定型コマンド C を `{V}`・`{TARGET}` で実行する。4 行とも `合格` であること。不合格なら止まる。
+5. **main の確認**（4.5）。`git fetch origin main` の後、定型コマンド C を `-Version {V} -Target {TARGET}` で実行する。4 行とも `合格` であること。不合格なら止まる。
 
 ### 段 6: リリースタグの作成と push
 
@@ -560,7 +564,7 @@ flowchart TD
 
    出力が 1 行ならそれを `TARGET` とする。空なら止まり、版の更新のコミットが見つからないことと、`git log origin/main -5 --oneline -- Cargo.toml` の出力を示して、開発者にコミットを確かめる。
 
-2. **タグを付ける前の検査**（5.2）。定型コマンド C を `{V}`・`{TARGET}` で実行する。4 行とも `合格` であること。不合格なら、タグを作らずに止まる。
+2. **タグを付ける前の検査**（5.2）。定型コマンド C を `-Version {V} -Target {TARGET}` で実行する。4 行とも `合格` であること。不合格なら、タグを作らずに止まる。
 
 3. **同名のタグ**（5.3）。2 つとも出力が空であること。
 
@@ -621,12 +625,12 @@ flowchart TD
    "run | $RUN | $(if ($s.attempt -ge $ATTEMPT) { $s.status } else { 'waiting' }) | attempt $($s.attempt)"
    ```
 
-3. **読み取り**（6.4・6.6）。定型コマンド B を `{RUN}` で実行し、下の「結果表の作り方」で、7 つの公開先（5 クレート・Marketplace・GitHub Release）の `status`・`reason` と、GitHub Release の URL（`url=` の値）を決める。
+3. **読み取り**（6.4・6.6）。定型コマンド B を `-Run {RUN}` で実行し、下の「結果表の作り方」で、7 つの公開先（5 クレート・Marketplace・GitHub Release）の `status`・`reason` と、GitHub Release の URL（`url=` の値）を決める。
 
 4. **完了の判定**（6.5・9.1）。次のすべてを満たせば完了で、段 9 へ進む。
    - 定型コマンド B の `run` の行の結論が `success`
    - 結果表の 7 つがすべて `published` か `skipped`
-   - 定型コマンド A（`$V = '{V}'`）の `集計` が、公開済み 7/7・`不明` 0（`GitHub Release` の行の URL を、報告の URL とする）
+   - 定型コマンド A（`-Version {V}`）の `集計` が、公開済み 7/7・`不明` 0（`GitHub Release` の行の URL を、報告の URL とする）
 
    1 つ目と 2 つ目を満たすのに 3 つ目が 7/7 でないときは、1 分後に定型コマンド A を 1 度だけ実行し直す。それでも 7/7 でなければ、未完了として止まる。1 つ目か 2 つ目を満たさないときは、段 8 へ進む。
 
@@ -686,7 +690,7 @@ gh run rerun {RUN} --failed
 gh run view {RUN} --log-failed | tail -n 60
 ```
 
-**再実行では直らない失敗**（F7 の 2 度目）。定型コマンド A（`$V = '{V}'`）を実行する。
+**再実行では直らない失敗**（F7 の 2 度目）。定型コマンド A（`-Version {V}`）を実行する。
 
 - 公開済みが 0/7 で、`GitHub Release` が `無し`: F1 と同じ報告をして止まる（何も公開していない。修正の後にタグを付け直せる）。
 - それ以外: タグを付け直さない。公開済みの公開先と未公開の公開先を示し、版を上げて出し直す必要があることを報告して止まる（7.7）。
@@ -700,8 +704,8 @@ gh run view {RUN} --log-failed | tail -n 60
 
 **タグの付け直し**（7.6）。開発者の承認が明示されているときだけ行う。
 
-1. 定型コマンド A（`$V = '{V}'`）で、公開済みが 0/7・`不明` が 0・`GitHub Release` が `無し` であることを確かめる。満たさなければ、付け直さずに止まる（7.7）。
-2. `git fetch origin main` の後、`git rev-parse origin/main` の出力を `TARGET` とする。定型コマンド C を `{V}`・`{TARGET}` で実行し、4 行とも `合格` であることを確かめる。
+1. 定型コマンド A（`-Version {V}`）で、公開済みが 0/7・`不明` が 0・`GitHub Release` が `無し` であることを確かめる。満たさなければ、付け直さずに止まる（7.7）。
+2. `git fetch origin main` の後、`git rev-parse origin/main` の出力を `TARGET` とする。定型コマンド C を `-Version {V} -Target {TARGET}` で実行し、4 行とも `合格` であることを確かめる。
 3. タグを付け直して push する。この 2 つは許可の一覧に入れない。実行のたびに、開発者が許可の確認に答える。
 
    ```bash
@@ -900,6 +904,7 @@ ID の値・トークンの値を書かない。このファイルが `origin/ma
 - `node book/tools/verify-content.mjs` は、ビルドなしで動き、作業ツリーを変えない。
 - 定型コマンド A は、`0.3.7`（7/7・提案 `0.3.8`）と `0.3.8`（0/7）で、期待どおりの出力になる。
 - 定型コマンド B は、実在の実行（`build.yml`）で `run`・`job` の行が出て、合成したログの行から `line` の行が正しく取れる。
+- 定型コマンドを `scripts/` のスクリプトへ移した後も、1 行の呼び出しで同じ出力になる（A: 版の指定なし → `0.3.7`・7/7・提案 `0.3.8`、`-Version 0.3.8` → 0/7。C: `0.3.7` と `v0.3.7` のコミット → 4 行とも `合格`、`v0.3.8` と `origin/main` → 版の 2 行が `不合格`。B: `build.yml` の実行で `run`・`job` の行）。
 - `git merge-tree --write-tree origin/main HEAD` と `origin/main^{tree}` の比較で、main に無い内容を持つブランチを見分けられる。
 
 ### CI での初回のリリース（Opus）で確かめること
@@ -947,161 +952,28 @@ flowchart TD
 
 ## Supporting References
 
-### 定型コマンド A: 状態の照会
+### 定型コマンドの呼び出し方
 
-読むだけで、何も変えない。1 行目の `$V` を置き換えて、PowerShell でそのまま実行する。`$V = ''` なら `origin/main` の版を調べる。
+定型コマンドは、`.kiro/specs/release-workflow/scripts/` のスクリプトである。3 本とも読むだけで、何も変えない。リポジトリのルートを作業ディレクトリにして、PowerShell ツールで次の 1 行をそのまま実行する（波かっこだけを置き換える）。スクリプトの中身を写して実行しない。
 
-```powershell
-$V = '{V}'
-git fetch origin main --quiet
-$fetch = if ($LASTEXITCODE -eq 0) { '成功' } else { '不明' }
-"fetch | origin/main | $fetch"
-$found = 0; $unknown = 0; $all = [System.Collections.Generic.List[version]]::new()
-if ($fetch -ne '成功') { $unknown++ }
-function Add-Ver([string]$s) { if ($s -cmatch '^[0-9]+\.[0-9]+\.[0-9]+\z') { $all.Add([version]$s) } }
-function Max-Ver([string[]]$list) {
-    $v = @($list | Where-Object { $_ -cmatch '^[0-9]+\.[0-9]+\.[0-9]+\z' } | ForEach-Object { [version]$_ } | Sort-Object)
-    if ($v.Count) { "$($v[-1])" } else { '無し' }
-}
-# main の版（verify-tag.ps1 と同じ読み方）
-$cargo = (git show origin/main:Cargo.toml) -join "`n"
-$vMain = if ($cargo -match '(?ms)^\[workspace\.package\][ \t]*\r?$(.*?)(?=^\[|\z)' -and $Matches[1] -match '(?m)^[ \t]*version[ \t]*=[ \t]*"([^"]*)"') { $Matches[1] } else { '不明' }
-$vExt = try { [string]((git show origin/main:editors/vscode/package.json) -join "`n" | ConvertFrom-Json).version } catch { '不明' }
-"main | Cargo.toml | $vMain"
-"main | package.json | $vExt"
-Add-Ver $vMain; Add-Ver $vExt
-if ($vMain -eq '不明' -or $vExt -eq '不明') { $unknown++ }
-if (-not $V) { $V = $vMain }
-"照会する版 | $V"
-# Git のタグ（リモート）
-$ls = @(git ls-remote --tags origin 'refs/tags/v*')
-$sha = ''
-if ($LASTEXITCODE -ne 0) { $unknown++; 'tag | 不明' }
-else {
-    $names = @($ls | ForEach-Object { ($_ -split "`t")[1] -replace '^refs/tags/v', '' -replace '\^\{\}\z', '' } | Select-Object -Unique)
-    $names | ForEach-Object { Add-Ver $_ }
-    $mine = @($ls | Where-Object { ($_ -split "`t")[1] -in "refs/tags/v$V", "refs/tags/v$V^{}" })
-    if ($mine.Count) { $sha = ($mine[-1] -split "`t")[0] }
-    "tag | 最大 $(Max-Ver $names) | v$V $(if ($sha) { "あり $sha" } else { '無し' })"
-}
-# crates.io（User-Agent 必須。200 = あり、404 = 無し、それ以外 = 不明）
-$ua = 'pasta-release-workflow (https://github.com/ekicyou/pasta)'
-function Get-Http([string]$Url) {
-    try { $r = Invoke-WebRequest -Uri $Url -UserAgent $ua -SkipHttpErrorCheck -TimeoutSec 30 -MaximumRetryCount 0; @{ Code = [int]$r.StatusCode; Body = [string]$r.Content } }
-    catch { @{ Code = 0; Body = '' } }
-}
-foreach ($c in 'pasta_core', 'pasta_dsl', 'pasta_lua', 'pasta_shiori', 'pasta_check') {
-    $top = Get-Http "https://crates.io/api/v1/crates/$c"
-    $max = if ($top.Code -eq 200) { [string]($top.Body | ConvertFrom-Json).crate.max_version } else { '不明' }
-    Add-Ver $max
-    $one = Get-Http "https://crates.io/api/v1/crates/$c/$V"
-    $state = switch ($one.Code) { 200 { $found++; 'あり' } 404 { '無し' } default { "不明（HTTP $($one.Code)）" } }
-    if ($max -eq '不明' -or $state -like '不明*') { $unknown++ }
-    "crates.io | $c | 最大 $max | $V $state"
-}
-# VSCode Marketplace（vsce show。ECONNRESET を避けるため IPv4 を優先する）
-$env:NODE_OPTIONS = '--dns-result-order=ipv4first'
-try {
-    $json = vsce show ekicyou.pasta-vscode --json 2>$null
-    if ($LASTEXITCODE -ne 0) { throw 'vsce' }
-    $vs = @(($json -join "`n" | ConvertFrom-Json).versions | ForEach-Object { [string]$_.version })
-    if (-not $vs.Count) { throw 'empty' }
-    $vs | ForEach-Object { Add-Ver $_ }
-    $state = if ($vs -contains $V) { $found++; 'あり' } else { '無し' }
-    "Marketplace | ekicyou.pasta-vscode | 最大 $(Max-Ver $vs) | $V $state"
-}
-catch { $unknown++; 'Marketplace | ekicyou.pasta-vscode | 不明' }
-# GitHub Releases
-$list = gh release list --limit 100 --json tagName 2>$null
-if ($LASTEXITCODE -ne 0) { $unknown++; 'GitHub Release | 不明' }
-else {
-    $tags = @(($list -join "`n" | ConvertFrom-Json) | ForEach-Object { $_.tagName -replace '^v', '' })
-    $tags | ForEach-Object { Add-Ver $_ }
-    $out = gh release view "v$V" --json isDraft,url,assets 2>&1
-    $state = if ($LASTEXITCODE -eq 0) {
-        $j = ($out -join "`n") | ConvertFrom-Json
-        $have = @($j.assets | Where-Object state -eq 'uploaded' | ForEach-Object name)
-        $n = @('pasta.dll.zip', 'hello-pasta.nar', "pasta-vscode-$V.vsix" | Where-Object { $have -contains $_ }).Count
-        if ($j.isDraft) { "下書き（添付 $n/3）" }
-        elseif ($n -eq 3) { $found++; "あり（公開・添付 3/3） $($j.url)" }
-        else { "添付不足（公開・添付 $n/3） $($j.url)" }
-    }
-    elseif (($out -join ' ') -match 'release not found') { '無し' }
-    else { $unknown++; '不明' }
-    "GitHub Release | 最大 $(Max-Ver $tags) | v$V $state"
-}
-# リリース CI の実行（タグ名とタグのコミットが一致するもののうち、最も新しいもの）
-$runs = gh run list --workflow release.yml --limit 30 --json databaseId,headBranch,headSha,status,conclusion,attempt,url,createdAt 2>$null
-if ($LASTEXITCODE -ne 0) { $unknown++; 'run | 不明' }
-else {
-    $run = @(($runs -join "`n" | ConvertFrom-Json) | Where-Object { $_.headBranch -eq "v$V" -and $sha -and $_.headSha -eq $sha } | Sort-Object createdAt -Descending)
-    if ($run.Count) { $r = $run[0]; "run | $($r.databaseId) | $($r.status) | $(if ($r.conclusion) { $r.conclusion } else { '-' }) | attempt $($r.attempt) | $($r.url)" }
-    else { 'run | 無し' }
-}
-# 版の更新の PR（統合されていないもの）
-$prs = gh pr list --state open --base main --limit 100 --json number,title,headRefName,url 2>$null
-if ($LASTEXITCODE -ne 0) { $unknown++; 'PR | 不明' }
-else {
-    $pr = @(($prs -join "`n" | ConvertFrom-Json) | Where-Object { $_.title -ceq "chore(release): v$V" })
-    if ($pr.Count) { $pr | ForEach-Object { "PR | 未統合 | #$($_.number) | $($_.headRefName) | $($_.url)" } } else { 'PR | 無し' }
-}
-# 初回の CI リリースの記録
-$rec = git ls-tree origin/main --name-only -- .kiro/specs/release-workflow/first-ci-release.md
-"初回の記録 | $(if ($rec) { 'あり' } else { '無し' })"
-$maxAll = if ($all.Count) { ($all | Sort-Object)[-1] } else { $null }
-"集計 | $V の公開済み $found/7 | 不明 $unknown"
-if ($maxAll -and $unknown -eq 0) { "提案 | $($maxAll.Major).$($maxAll.Minor).$($maxAll.Build + 1)（すべての出どころの最大 $maxAll の PATCH + 1）" } else { '提案 | 出せない（不明がある）' }
-```
+| 定型コマンド | 呼び出し | 出力の形 |
+|--------------|----------|----------|
+| A: 状態の照会 | `& "$PWD/.kiro/specs/release-workflow/scripts/release-state.ps1" -Version {V}` | Data Models「定型コマンド A の出力」 |
+| A（`origin/main` の版を調べる） | `& "$PWD/.kiro/specs/release-workflow/scripts/release-state.ps1"` | 同上 |
+| B: リリース CI の結果の読み取り | `& "$PWD/.kiro/specs/release-workflow/scripts/ci-result.ps1" -Run {RUN}` | Data Models「定型コマンド B の出力」 |
+| C: タグを付ける前の検査 | `& "$PWD/.kiro/specs/release-workflow/scripts/pretag-check.ps1" -Version {V} -Target {TARGET}` | 4 行（タグの形・`Cargo.toml` の版・`package.json` の版・main からの到達）。それぞれ `合格` か `不合格` |
 
-### 定型コマンド B: リリース CI の結果の読み取り
-
-読むだけで、何も変えない。実行が `completed` になってから使う。1 行目の `$RUN` を置き換えて、PowerShell でそのまま実行する。
-
-```powershell
-$RUN = '{RUN}'
-$r = (gh run view $RUN --json status,conclusion,attempt,url,headSha,jobs) -join "`n" | ConvertFrom-Json
-"run | $RUN | $($r.status) | $(if ($r.conclusion) { $r.conclusion } else { '-' }) | attempt $($r.attempt) | $($r.url)"
-$r.jobs | ForEach-Object { "job | $($_.name) | $($_.conclusion)" }
-$r.jobs | Where-Object { $_.name -in 'publish-crates', 'publish-vsce', 'github-release' } | ForEach-Object {
-    $job = $_.name
-    $_.steps | Where-Object { $_.name -match '^(Auth crates\.io|Publish |Azure login|Create GitHub Release)' } | ForEach-Object {
-        $sec = if ($_.startedAt -and $_.completedAt) { [int](([datetime]$_.completedAt) - ([datetime]$_.startedAt)).TotalSeconds } else { 0 }
-        "step | $job | $($_.name) | $($_.conclusion) | $sec 秒$(if ($_.name -like 'Publish pasta_*') { " | 期限まで $(1800 - $sec) 秒" })"
-    }
-}
-$pattern = '^(publish-crates|publish-vsce|github-release)\t(Publish [^\t]*|Create GitHub Release)\t\S+ (status=(published|skipped|failed)\b.*)$'
-1..$r.attempt | ForEach-Object {
-    $a = $_
-    gh run view $RUN --attempt $a --log 2>$null | Select-String -Pattern $pattern | ForEach-Object {
-        $g = $_.Matches[0].Groups
-        "line | attempt $a | $($g[1].Value) | $($g[2].Value) | $($g[3].Value.Trim())"
-    }
-}
-```
-
-### 定型コマンド C: タグを付ける前の検査
-
-`verify-tag.ps1` と同じ 4 つの条件を、タグを付けるコミットの中身で確かめる。読むだけで、何も変えない。
-
-```powershell
-$V = '{V}'; $TARGET = '{TARGET}'
-$cargo = (git show "${TARGET}:Cargo.toml") -join "`n"
-$ws = if ($cargo -match '(?ms)^\[workspace\.package\][ \t]*\r?$(.*?)(?=^\[|\z)' -and $Matches[1] -match '(?m)^[ \t]*version[ \t]*=[ \t]*"([^"]*)"') { $Matches[1] } else { '' }
-$ext = try { [string]((git show "${TARGET}:editors/vscode/package.json") -join "`n" | ConvertFrom-Json).version } catch { '' }
-git merge-base --is-ancestor $TARGET origin/main
-$reach = $LASTEXITCODE
-"タグの形 | v$V | $(if ("v$V" -cmatch '^v[0-9]+\.[0-9]+\.[0-9]+\z') { '合格' } else { '不合格' })"
-"Cargo.toml の版 | $ws | $(if ($ws -ceq $V) { '合格' } else { '不合格' })"
-"package.json の版 | $ext | $(if ($ext -ceq $V) { '合格' } else { '不合格' })"
-"main からの到達 | $TARGET | $(if ($reach -eq 0) { '合格' } else { '不合格' })"
-```
+- A は、crates.io の照会に User-Agent を付け、Marketplace の照会（`vsce show`）で IPv4 を優先する。200・404 以外の応答と、コマンドの失敗を `不明` にする。
+- B は、実行が `completed` になってから使う。
+- C は、`.github/scripts/release/verify-tag.ps1` と同じ 4 つの条件を、タグを付けるコミットの中身（`git show`）で確かめる。先に `git fetch origin main` を済ませる。
+- 段 7 の手順 1・2 の待機のコマンドは短いので、本書に置いたままにする。
 
 ## Open Questions（設計ディスカッションへの申し送り）
 
 設計の時点の仮定と、決めきれなかった点。本文は、それぞれの「草案」で書いてある。
 
 1. **`kiro-impl` の一般の手順との食い違いの埋め方**（実行の約束）→ **確定（議題 1）**: (a)。約束を `tasks.md` の冒頭に写す。別の常駐 spec でも同じ形で回っている。初回の実行で約束どおりに進むかを確かめる（「CI での初回のリリースで確かめること」の 6）。<br>旧草案: (a) 本書の「実行の約束」を `tasks.md` の冒頭に写し、`kiro-impl` の手順より優先する。ほかの案: (b) タスク番号を並べる手動モード（`/kiro-impl release-workflow 1,2,… --review off`）を正規の起動にする、(c) `kiro-impl` の SKILL.md に常駐 spec の節を足す。推奨 (a): スキルを変えず（スキルの編集は拒否されやすく、cc-sdd の更新で消える）、起動の形 `/kiro-impl release-workflow` を保てる。
-2. **定型コマンド A・B・C の置き場所**（Supporting References）。草案: 本書に置き、エージェントが写して実行する（補助スクリプトを足さない方針に従った）。ほかの案: `.kiro/specs/release-workflow/scripts/` か `.github/scripts/release/` に、スクリプトとして置く。スクリプトにすると、実行が 1 行の呼び出しになり、写し間違いが起きず、許可の規則も 1 行で書け、本書が約 140 行短くなる。代わりにファイルが 3 つ増え、作る手順（一回限りの整合と同じ PR）が要る。`.github/scripts/release/` に置く場合は `release-ci` の持ち場に入る。中身は設計の時点で動かして確かめてあるので、どちらにしても書き直しは要らない。
+2. **定型コマンド A・B・C の置き場所**（Supporting References）→ **確定（議題 2）**: `.kiro/specs/release-workflow/scripts/` にスクリプトとして置く（本仕様だけが使うので spec のフォルダ。Sonnet が写し間違えないよう、1 行の呼び出しにする）。スクリプトは設計ディスカッションの中で作り、設計の時点の中身をそのまま移した。<br>旧草案: 本書に置き、エージェントが写して実行する（補助スクリプトを足さない方針に従った）。ほかの案: `.kiro/specs/release-workflow/scripts/` か `.github/scripts/release/` に、スクリプトとして置く。スクリプトにすると、実行が 1 行の呼び出しになり、写し間違いが起きず、許可の規則も 1 行で書け、本書が約 140 行短くなる。代わりにファイルが 3 つ増え、作る手順（一回限りの整合と同じ PR）が要る。`.github/scripts/release/` に置く場合は `release-ci` の持ち場に入る。中身は設計の時点で動かして確かめてあるので、どちらにしても書き直しは要らない。
 3. **リリース CI の結果の読み方**（段 7・結果表の作り方）。job summary と job outputs は `gh` から読めない。草案: step の結論とログの `status=` の行から組み立て、公開先の実際の状態で完了を確かめる。ほかの案: `release.yml` の report job に、結果を 1 行ずつログへ出す step を足す（`release-ci` 側の変更で、別の PR になる）。推奨: 草案のまま初回で確かめ、読みにくければ後者を起票する。
 4. **リリース CI が終わるのを待つ方法**（段 7 の手順 2）。草案: 会話の中で 30 秒おきに照会する（1 回の呼び出しは 8 分半、最大 20 回 = 約 3 時間）。ほかの案: バックグラウンドのコマンドと通知、いったん終えて `/kiro-impl` の再実行で続ける（段 2 の S4）。推奨: 草案。上限の回数は決めの問題である。
 5. **`build.yml` に `--locked` を足すか**（段 4）。草案: 足さない。版の更新での食い違いと、main に前からある食い違いは、段 4 が PR の前に検出する。足すと、ふだんの PR の CI の挙動が変わる。
