@@ -38,7 +38,7 @@
 
 - 入手先: [リリースページ](https://github.com/ekicyou/pasta/releases) の `hello-pasta.nar`
 - `hello-pasta.nar` — 完成版のゴースト一式。`pasta.dll`・`THIRD_PARTY_LICENSES.txt`・シェル（ゴーストの見た目）を含む
-- `hello-pasta.nar` から自分のゴーストへファイルを写す手順は、次の章で行う
+- `hello-pasta.nar` から自分のゴーストへファイルを写す手順は、次の章の [hello-pasta から写す](setup.md#hello-pasta-から写す) で行う
 - `pasta.dll` だけを入れ替えるときは、同じリリースページの `pasta.dll.zip` を使う
 
 > 【クローディア】`scripts/` というフォルダを見かけても、慌てることはありませんわ。Lua を動かす仕組みは `pasta.dll` の中に入っていますの。`scripts/` は、あなたが自分で書いたスクリプトを置く場所ですのよ。
@@ -76,4 +76,4 @@
 
 > 【アンソニー】次はいよいよ、最初のゴーストを組み上げる番でございます。
 
-> 【高笑い】その通りですわ！ さあ、熱く参りますわよ！
+> 【考え中】さて、あの子にはどんな名前がふさわしいかしら……。次の章までに、あなたも考えておいてくださいまし。
