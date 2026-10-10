@@ -58,10 +58,6 @@ tower-lsp = { version = "0.20", default-features = false, features = ["runtime-a
 wasm-bindgen = "0.2"
 serde-wasm-bindgen = "0.6"
 
-# pasta_sample_ghost dependencies
-image = "0.25"
-imageproc = "0.26"
-
 # Time dependencies
 time = { version = "0.3", features = ["local-offset", "parsing"] }
 

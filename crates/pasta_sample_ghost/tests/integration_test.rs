@@ -2,65 +2,12 @@
 
 mod common;
 
-use pasta_sample_ghost::generate_ghost;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// ghosts/hello-pasta ディレクトリのパスを取得
 fn ghost_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ghosts/hello-pasta")
-}
-
-/// 画像生成テスト: generate_ghost() 経由で surface*.png 18ファイル＋surfaces.txt が生成されることを確認
-#[test]
-fn test_generated_images_structure() {
-    let temp = TempDir::new().unwrap();
-    let ghost_root = temp.path().join("hello-pasta");
-
-    generate_ghost(&ghost_root).unwrap();
-
-    let shell_dir = ghost_root.join("shell/master");
-
-    // surfaces.txt
-    assert!(
-        shell_dir.join("surfaces.txt").exists(),
-        "surfaces.txt が存在しません"
-    );
-
-    // sakura サーフェス (0-8)
-    for i in 0..=8 {
-        let path = shell_dir.join(format!("surface{}.png", i));
-        assert!(path.exists(), "surface{}.png が存在しません", i);
-    }
-
-    // kero サーフェス (10-18)
-    for i in 10..=18 {
-        let path = shell_dir.join(format!("surface{}.png", i));
-        assert!(path.exists(), "surface{}.png が存在しません", i);
-    }
-}
-
-/// シェル画像生成テスト
-#[test]
-fn test_shell_images() {
-    let temp = TempDir::new().unwrap();
-    let ghost_root = temp.path().join("hello-pasta");
-
-    generate_ghost(&ghost_root).unwrap();
-
-    let shell_dir = ghost_root.join("shell/master");
-
-    // sakura サーフェス (0-8)
-    for i in 0..=8 {
-        let path = shell_dir.join(format!("surface{}.png", i));
-        assert!(path.exists(), "surface{}.png が存在しません", i);
-    }
-
-    // kero サーフェス (10-18)
-    for i in 10..=18 {
-        let path = shell_dir.join(format!("surface{}.png", i));
-        assert!(path.exists(), "surface{}.png が存在しません", i);
-    }
 }
 
 /// pasta.toml 内容検証テスト（ghosts/hello-pasta 直接読み込み）
@@ -264,25 +211,6 @@ fn test_ukadoc_files() {
         shell_desc.contains("kero.balloon.offsety,0"),
         "shell descript.txt の kero.balloon.offsety が0ではありません"
     );
-}
-
-/// 画像サイズ検証テスト
-#[test]
-fn test_image_dimensions() {
-    use pasta_sample_ghost::image_generator::{Character, Expression, generate_surface};
-
-    let img = generate_surface(Character::Sakura, Expression::Happy);
-    assert_eq!(img.width(), 128, "画像幅が128pxではありません");
-    assert_eq!(img.height(), 256, "画像高さが256pxではありません");
-}
-
-/// 表情バリエーションテスト
-#[test]
-fn test_expression_variations() {
-    use pasta_sample_ghost::image_generator::Expression;
-
-    let expressions = Expression::all();
-    assert_eq!(expressions.len(), 9, "表情は9種類必要です");
 }
 
 /// DLL コピーヘルパーテスト（DLL存在時のみ成功）
