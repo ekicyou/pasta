@@ -1,6 +1,6 @@
 # 設計書: hello-pasta-shell-art
 
-作成: 2026-10-10（要件 `requirements.md` R1〜R11・`research.md` §6 を入力とする）。本書で「【設計ディスカッションで確定】」と記した値は、この後の設計ディスカッション（モデルの選定・試作・設定画像の承認）で決める。それ以外は本書で確定する。
+作成: 2026-10-10（要件 `requirements.md` R1〜R11・`research.md` §6 を入力とする）。設計ディスカッション #1〜#5（2026-10-10）でモデルの選定・試作・設定画像の承認・出力の変換・当たり判定の形まで確定済み。「【実装で確定】」と記した値（当たり判定の座標・吹き出しの offset・男の子の `Y_CUT`・顔の矩形）だけを実装で決める。
 
 ## Overview
 
@@ -370,7 +370,7 @@ flowchart LR
   怒り: angry eyebrows pulled down, puffed cheeks, frowning mouth
   ```
 
-  その他のパラメータ（採用モデル。試作と同じ）: `image_size={width:1024,height:1536}`・`quality=high`・`background=transparent`・`output_format=png`・`num_images=1`。seed は無い。予備（qwen）: `image_size={width:1024,height:1536}`・`num_inference_steps=28`・`guidance_scale=4.5`・`seed=`**【設計ディスカッションで確定】**（最初の採用結果の seed を記録し、以後固定）・背景は指示文で「plain flat #00FF00 background」として `birefnet/v2`（`model=Matting`, `operating_resolution=2048x2048`）で切り抜く。
+  その他のパラメータ（採用モデル。試作と同じ）: `image_size={width:1024,height:1536}`・`quality=high`・`background=transparent`・`output_format=png`・`num_images=1`。seed は無い。予備（qwen）: `image_size={width:1024,height:1536}`・`num_inference_steps=28`・`guidance_scale=4.5`・`seed=`（予備を使うことになった場合は、最初の採用結果の seed を記録して以後固定する）・背景は指示文で「plain flat #00FF00 background」として `birefnet/v2`（`model=Matting`, `operating_resolution=2048x2048`）で切り抜く。
 - **Output / destination**: 1 人につき full-res の層 = 頭 1（通常の顔）・顔の矩形 8・体 3。貼り合わせ → 9 枚 → 縮小 → `shell/master/surfaceN.png`。縮小は **290×435 に縮めて 333×500 の下寄せ中央に置く**（設計ディスカッション #3。モデルが人物をキャンバスの 93〜97% で描くため、この縮小で人物の高さが手本の 85%（女の子 405 px）・87%（男の子 415 px・帽子込み）になり、要件 Q5 の 8〜9 割に入る。18 枚とも同じ変換なので画素一致は保たれる）。ffmpeg（`claudia/LICENSE.txt` と同じ考え方）:
 
   ```text
