@@ -8,7 +8,7 @@
 - `.gitignore`（L38-42）は「シェルの画像は追跡を続ける」と明記済みで、`shell/master/` の 20 ファイルは追跡中。追跡の変更は不要（`release-ci` R10.5）。
 - `surfaces.txt` は `element0,overlay,surfaceN.png,0,0` の 18 ブロックのみで、`collision` が無い。UKADOC の書式は `collisionN,始点X,始点Y,終点X,終点Y,ID`（矩形）と `collisionexN,ID,タイプ,座標...`（rect/ellipse/circle/polygon）。8 段目（`dic/08-touch.pasta` L11・L15・L20）は `＄ｒ４` を台詞にそのまま差し込む。`STAGES.md` L37 の検証の表 `4=Head` を `tests/tutorial_stages_test.rs` が読んで `Reference4=Head` を送る。
 - 絵の生成を前提にしたテストは 4 箇所に散る: `tests/integration_test.rs`（L14-65・L271-286・吹き出し位置の決め打ち L251-266）、`src/lib.rs`（19 ファイル）、`src/config_templates.rs`（18 ブロック逐語一致）、`src/image_generator.rs`（L399-572）。コミットした実ファイルの PNG 寸法や `surfaces.txt` の書式を検証するテストは**無い**。
-- ライセンス表記は 3 系統に割れている: ルート `LICENSE`（MIT 全文のみ）、`Cargo.toml` L12 と 4 クレートの README・`tech.md` L165（MIT OR Apache-2.0）、`about.hbs` L4/L8 と `editors/vscode/package.json` L7（MIT 単独）。`LICENSE-APACHE`・`LICENSE-MIT` は無い。素材の出どころの記録の先例は `book/src/img/claudia/LICENSE.txt`（Unlicense の顔アイコン 16 枚の出典）。
+- ライセンス表記は 3 系統に割れている: ルート `LICENSE`（MIT 全文のみ）、`Cargo.toml` L12 と 4 クレートの README・`tech.md` L165（MIT OR Apache-2.0）、`about.hbs` L4/L8 と `editors/vscode/package.json` L7（MIT 単独）。`LICENSE-APACHE` は無い。**2026-10-10 の議論で MIT 単独に確定**（このリポジトリの開発物は MIT。`Cargo.toml`・README 4 つ・`tech.md` を「MIT」に直す）。素材の出どころの記録の先例は `book/src/img/claudia/LICENSE.txt`（Unlicense の顔アイコン 16 枚の出典）。
 - 推奨: **Option C（ハイブリッド）**。絵・`surfaces.txt`・`descript.txt` は素材として手で置く（生成コードは削除）。検証は既存の `tests/integration_test.rs` の絵のテストを素材検証に置き換え、`release.ps1`・`release.yml` の検査は最小の差分で足す。規模 M・リスク Medium（未知は fal.ai の出力品質とドリフト。コード側は既知）。
 
 ## 2. 現状の調査
@@ -36,7 +36,7 @@
 | `tests/tutorial_stages_test.rs` | `STAGES.md` の表から `Reference4=Head` を送る | 部位名が `Head` のままなら変更なし |
 | `.github/workflows/release.yml` L119-120・L130-179 | `release.ps1` をそのまま呼ぶ。検査は `.nar` の 5 エントリのみ（シェルの検査無し・大きさの検査無し） | 検査に `shell/master/surfaces.txt` と絵を足す（R6.4）。リリース実行中は触らない（R6.6） |
 | `.github/workflows/manual.yml` L135 | `cargo test -p pasta_sample_ghost` を実行 | 置き換え後のテストが CI で走る |
-| `LICENSE`・`Cargo.toml` L12・`about.hbs`・`editors/vscode/package.json` | 表記の食い違い（§1） | R8.4（Q1） |
+| `LICENSE`・`Cargo.toml` L12・`about.hbs`・`editors/vscode/package.json` | 表記の食い違い（§1） | R8.4（Q1 確定: MIT 単独。`about.hbs`・`package.json` は既に MIT） |
 | `.kiro/steering/tech.md` L17・L77・L120、`structure.md` L198・L207・L264 | 「画像生成」「image/imageproc」 | 完了処理で同期（R5.8） |
 
 ### 2.2 既存の慣例
@@ -67,7 +67,7 @@
 | R5 素材へ切り替え | `.gitignore` 済み | **Constraint**: `generate_ghost` を消すと `lib.rs`・`main.rs`・`config_templates.rs`・`image_generator.rs`・テスト 4 箇所・README・`build.rs` が連動。`Cargo.lock` の更新を同じ変更に含める |
 | R6 配布スクリプト | `release.ps1`・`release.yml`・`release.bat`・README | **Missing**: Step 2 除去と段の番号振り直し、CI の検査にシェルを足す。**Constraint**: リリース実行中は触らない（`release-workflow` の席） |
 | R7 大きさ | `release.ps1` L253-262 が MB 表示、`pasta_check` が KB 表示。上限の検査は無し | **Missing**: 上限の数字（Q5）と、それを確かめる場所（テスト／`release.ps1`／CI）。現行 `.nar` 2,055,580 B（v0.3.8）、絵は約 50 KB |
-| R8 記録・ライセンス | `claudia/LICENSE.txt` の先例。`LICENSE` は MIT のみ | **Missing**: 生成の記録（新規）、`LICENSE-APACHE`。**Unknown**: 日本法での AI 生成物の扱い（brief で未確認）。**Constraint**: `about.hbs`・`package.json` の MIT 単独表記の扱い（Q1） |
+| R8 記録・ライセンス | `claudia/LICENSE.txt` の先例。`LICENSE` は MIT のみ | **Missing**: 生成の記録（新規）、表記を MIT に揃える修正（`Cargo.toml`・README 4 つ・`tech.md`）。**Unknown**: 日本法での AI 生成物の扱い（brief で未確認） |
 | R9 吹き出し | `descript.txt` offsetx 64（幅 128 の半分）、テストが決め打ち | **Missing**: 新寸法に合わせた値。**Unknown**: 実機で自然に見える位置（絵が決まってから） |
 | R10 テスト | 生成前提のテストのみ。PNG を読む部品 `image` は外す予定 | **Constraint**: PNG の寸法・アルファ・四隅の透明の検証に `image` を使うなら dev-dependency として残す。使わないなら PNG ヘッダ（IHDR: 幅・高さ・color type）を手で読む最小の実装（数十行）で足りる。四隅の透明までは IHDR だけでは分からない |
 
@@ -100,7 +100,7 @@
 
 `image_generator.rs`・`config_templates.rs`・`main.rs`・`generate_ghost`・`GhostError` を削除。`surfaces.txt`・PNG・`descript.txt` は手書き／手置きの正本。素材検証テストと生成の記録を新設。
 
-- 変更: 上の削除 ＋ `Cargo.toml` ×2 ＋ `Cargo.lock` ＋ `release.ps1` ＋ `release.bat` ＋ README ＋ `build.rs` ＋ テスト ＋ `release.yml` の検査 ＋ 記録文書 ＋ `LICENSE-APACHE`。
+- 変更: 上の削除 ＋ `Cargo.toml` ×2 ＋ `Cargo.lock` ＋ `release.ps1` ＋ `release.bat` ＋ README ＋ `build.rs` ＋ テスト ＋ `release.yml` の検査 ＋ 記録文書 ＋ ライセンス表記を MIT に揃える修正。
 - ✅ 正本が 1 つ。クレートは「辞書と配布物の検証テストの置き場」に純化（`scripts.rs`・`tests/`）。依存が減る。
 - ❌ 触るファイルが多い（ただし各ファイルの変更は単純）。PNG を読む部品が無くなるので、検証テストは PNG ヘッダの手読みか `image` の dev-dependency 化のどちらかを選ぶ。
 - 評価: brief と一致。
@@ -113,7 +113,7 @@ B の内容を、独立に検証・revert できる段に分ける。
 2. **シェルの更新**: PNG 18 枚・`surfaces.txt`（collision 付き）・`descript.txt`（吹き出し）。実機で表情・当たり判定・吹き出しを確認。
 3. **クレートの整理**: 生成コードの削除・依存の除去・`Cargo.lock`・テストの置き換え・README・`build.rs`。
 4. **配布の整理**: `release.ps1`・`release.bat`・`release.yml` の検査・大きさの確認。リリースの実行と重ならない時期にまとめて入れる。
-5. **ライセンスと steering**: `LICENSE-APACHE`・表記の統一・`tech.md`/`structure.md` の同期。
+5. **ライセンスと steering**: 表記を MIT に統一・`tech.md`/`structure.md` の同期。
 
 - ✅ 2 と 3 の順序を入れ替えられる（絵が先に無くても 3 は進む。ただし 3 のテストは 2 の素材を読むので、同じ PR か 2 を先に）。4 はタイミングの制約を単独で管理できる。
 - ❌ 段の間は「新しい絵 ＋ 旧生成コード」の中間状態がありうる。`release.ps1` を実行すると絵が戻るので、2 と 4（Step 2 の除去）を離さない、または 3 を 2 に含める。
@@ -142,7 +142,7 @@ B の内容を、独立に検証・revert できる段に分ける。
 2. 試作の実測: 表情の編集で髪・服・輪郭が何 px 動くか、`birefnet/v2` の切り抜き後に 150〜300 px へ縮小したときの縁（ハロー・ジャギー）。
 3. PNG の最適化で 1 枚 100 KB 以下に入るか（寸法 × 色数）。入らなければ Q5 の数字を見直す。
 4. 日本法での AI 生成物の著作権の扱い（記録に書く注記の文面）。
-5. `about.hbs`「pasta 自体は MIT License」・`editors/vscode/package.json`「MIT」を本仕様で揃えるか、別途か（Q1 の範囲）。
+5. （解決）`about.hbs`・`package.json` は既に MIT。Q1 は MIT 単独で確定。
 6. `build.rs` の `pasta_shiori/src` 監視は、生成を消した後も意味があるか（無ければ `build.rs` ごと削除できる）。
 
 ### 6.2b 要件ディスカッションから設計へ持ち越した判断（2026-10-10）
@@ -158,7 +158,7 @@ B の内容を、独立に検証・revert できる段に分ける。
 
 ### 6.3 要件ディスカッションで決める事項（requirements.md の Q1〜Q14 と対応）
 
-- Q1 ライセンス表記の解消方法（`LICENSE-APACHE` 追加＋`LICENSE-MIT` 改名を仮定）
+- Q1 ライセンス表記の解消方法 → **確定: MIT 単独**（2026-10-10）
 - Q2 外部素材への方針転換（転換を仮定）
 - Q3 生成元を同梱物に記録するか（リポジトリのみを仮定）
 - Q4 部位名（`Head` 固定。`Face`・`Bust` は台詞で読んで不自然でないか）
@@ -171,4 +171,4 @@ B の内容を、独立に検証・revert できる段に分ける。
 - Q11 寸法（幅 150〜300 px・2 人同寸を仮定）
 - Q12 費用の上限（試作 1 ドル未満・全体 20 ドルを仮定）
 - Q13 `STAGES.md` 7 段目の `＞ゴースト終了`（触らないを仮定）
-- Q14 絵のライセンス（MIT OR Apache-2.0・AI 生成の明記を仮定）
+- Q14 絵のライセンス（MIT・AI 生成の明記を仮定。Q1 に従う）
