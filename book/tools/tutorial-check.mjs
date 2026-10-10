@@ -145,7 +145,51 @@ function findIndentedFences(markdown) {
   return heads;
 }
 
+// ---- 台詞以外の段落のうち、指示の一文でないもの（説明の地の文）を拾う ----
+// 本文検査（verify-content.mjs）の C-prose の判定（要件 10.8）。本文検査は import した時点で
+// 検査が走り、中の関数を単体テストできないので、純粋な関数としてここに置く。
+// 行頭のフェンスの中は見ない。段落は空行・フェンス・見出し・区切りで区切る
+// （見出しと区切りは 1 行で終わるので、直後の行は別の段落として見る）。
+// 先頭行が引用（台詞部品）・箇条書き・表・字下げ（箇条書きの続き）で始まる段落は対象にしない。
+// 残った段落のうち「1 行だけ・末尾が句点・インラインコードの外の句点が 1 つ」でないものを返す。
+/** @returns {ProseProblem[]} */
+export function findProseParagraphs(markdown) {
+  const paragraphs = []; // { line, lines }
+  let fence = null; // 開いている行頭のフェンスのバッククォート列
+  let current = null; // 行を足している段落
+  markdown.split(/\r?\n/).forEach((text, i) => {
+    if (fence !== null) {
+      if (/^`+\s*$/.test(text) && text.trimEnd().length >= fence.length) fence = null;
+      return;
+    }
+    const open = /^(`{3,})[^`]*$/.exec(text);
+    if (open) fence = open[1];
+    if (open || text.trim() === '' || /^#+\s/.test(text) || /^-{3,}\s*$/.test(text)) {
+      current = null;
+      return;
+    }
+    if (current === null) {
+      current = { line: i + 1, lines: [] };
+      paragraphs.push(current);
+    }
+    current.lines.push(text);
+  });
+  const isInstruction = (lines) => {
+    const text = lines[0].trimEnd();
+    // インラインコード（同じ本数のバッククォートで挟んだ範囲）を除いて句点を数える。
+    const outside = text.replace(/(`+).*?\1/g, '');
+    return lines.length === 1 && text.endsWith('。') && outside.split('。').length === 2;
+  };
+  return paragraphs
+    .filter(({ lines }) => !/^(?:>|\||[ \t]|[-*+]\s|\d+\.\s)/.test(lines[0]) && !isInstruction(lines))
+    .map(({ line, lines }) => ({ line, head: lines[0] }));
+}
+
 /**
+ * @typedef {object} ProseProblem 指示の一文でない段落（説明の地の文）
+ * @property {number} line 段落の先頭行（1 始まり）
+ * @property {string} head 段落の先頭行の文字列（名指し用）
+ *
  * @typedef {object} DicResult 辞書 1 ファイルの結果（辞書から章へ）
  * @property {string} file 辞書（リポジトリルートからの相対）
  * @property {string} chapter 対応する章（同上。無くても期待するパスを入れる）
