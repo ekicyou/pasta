@@ -15,6 +15,7 @@
 - 各段の章の作例が、その段の辞書ファイルと逐語で一致することを CI が確かめる。
 - 章を 16 枚に増やした後も、マニュアルの検査一式がすべて通る。
 - 古い URL・README・表紙から、新しいガイドへ迷わず入れる。
+- 幅 620〜1080px のウィンドウでも、開いた目次がページを移っても開いたままになる。
 
 ### Non-Goals
 
@@ -24,6 +25,7 @@
 - `.github/workflows/manual.yml`・`book/tools/verify-static.mjs` の変更（`manual-print-media-refs`）。
 - 要件に無い種類の機械検査の追加。リファレンス章との事実の一致と、「台詞を読み飛ばしても事実が追える」ことは機械検査しない（執筆規約のチェックリストとレビューで見る）。検査の側で足すのは、作例の照合の拡張、`first-ghost.md` を名指しする検査の置き換え（`C-steps`・`C-order`）、語りの形と章の型の検査（`C-sections`・`C-prose`）だけである。
 - 段階表（`STAGES.md`）を照合ツールで読むこと（`manual.yml` の起動条件に無いため）。
+- 目次の中の折りたたみ（パートの開閉）の持ち越しと、mdBook のテンプレート（`index.hbs`）の差し替え。
 
 ## Boundary Commitments
 
@@ -35,6 +37,7 @@
 - `book/tools/verify-content.mjs` の C 系の検査のうち、入門ガイドを名指しするもの（`C-steps`・`C-order`・`C-sections`・`C-prose`・`C-tutorial-check` のメッセージ）。
 - 章の数を決め打ちしている 3 つの自己テストの数字。
 - 目次の入門パート（`SUMMARY.md`）、表紙の「このマニュアルの歩き方」（`introduction.md`）、`first-ghost.html` の転送（`book.toml`）、2 つの README の入門ガイドへのリンク。
+- `book/theme/claudia.js` の目次の持ち越しの関数（`claudiaSidebarKeep`）と、その自己テスト（`book/tools/theme-sidebar-test.mjs`）。同じファイルのテーマメニューの関数（`manual-claudia-theme`）は変えない。
 
 ### Out of Boundary
 
@@ -113,7 +116,7 @@ graph TB
 - Selected pattern: 既存の構成の拡張（研究書の Option C）。ツールは既存の 2 本を直し、本文は新しく書く。
 - 依存の向き: 上流（段階表・段階辞書・台詞部品・リファレンス章）→ 執筆規約 → 本文 → 導線。ツールは本文と辞書を読むだけで、本文はツールを知らない。逆向きの依存は作らない。
 - Existing patterns preserved: 章の構造（H1・`---` 2 本・導入と締めは二人の台詞）、照合の正規化（改行と末尾の空白行だけ）、辞書の列挙（固定の一覧なし）、転送の書き方、自己テストのサンドボックス方式。
-- New components rationale: 新しいツールは作らない。新しい文書は章 15 枚と執筆規約の 1 節だけである。
+- New components rationale: 新しい検査ツールは作らない（足すのはテーマのスクリプトの関数 1 つと、その自己テスト 1 本）。新しい文書は章 15 枚と執筆規約の 1 節だけである。
 - Steering compliance: マニュアルが利用者向け情報の唯一の権威（`tech.md`）。ガイドは事実をリファレンス章の範囲に留める。
 
 ### Technology Stack
@@ -121,6 +124,7 @@ graph TB
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
 | 文書 | mdBook 0.5.3（CI）・Markdown | 入門の 16 章・目次・転送 | 新しいプラグイン・前処理は足さない |
+| テーマ | `book/theme/claudia.js`（`additional-js`・依存なし） | 目次の持ち越し | `book.js` の後に実行される。自己テストは導入済みの jsdom を使う |
 | 検査ツール | Node.js（ES モジュール・依存なし） | 作例の照合・本文の検査・自己テスト | 新しい npm 依存は足さない |
 | CI | `.github/workflows/manual.yml` | 既存の段をそのまま使う | 変更しない |
 
@@ -153,13 +157,16 @@ book/
 │       ├── 12-lua.md                 # 新規: 12 段目
 │       ├── 13-nar.md                 # 新規: 13 段目（辞書なし）
 │       └── first-ghost.md            # 削除
+├── theme/
+│   └── claudia.js                    # 変更: 目次の持ち越しの関数を足す・冒頭のコメント
 └── tools/
     ├── tutorial-check.mjs            # 変更: 辞書 ↔ 同じ名前の章の照合・抜き出しの判定・地の文の段落の判定
     ├── tutorial-check-test.mjs       # 変更: サンドボックスを章ごとに作り直す
     ├── verify-content.mjs            # 変更: C-steps の置き換え・C-order・C-sections・C-prose の追加・コメントの章数
     ├── verify-scripts-test.mjs       # 変更: T 系の件数 47 → 60・C-sections と C-prose の件数
     ├── gen-skill-refs-test.mjs       # 変更: K-10 の章数 47 → 60
-    └── talk/talk-test.mjs            # 変更: J-9 の章数 47 → 60
+    ├── talk/talk-test.mjs            # 変更: J-9 の章数 47 → 60
+    └── theme-sidebar-test.mjs        # 新規: 目次の持ち越しの jsdom テスト（CI は *-test.mjs を自動で拾う）
 crates/
 ├── pasta_lua/README.md               # 変更: フォルダ構成へのリンク 1 か所
 └── pasta_shiori/README.md            # 変更: フォルダ構成へのリンク 1 か所
@@ -302,6 +309,10 @@ flowchart TB
 | 12.3 | ベースウェアの規則は UKADOC へリンク | StageChapters | `06`・`07`・`13` の章のリンク |
 | 12.4 | 画像を置かない | 全章 | 章に画像の行を書かない |
 | 12.5 | 全章を新しい型でそろえる | 全章 | 16 章を 1 つの変更で出す |
+| 13.1 | 幅 620〜1080px で、開いた目次を次のページへ持ち越す | SidebarKeeper | `claudiaSidebarKeep`、`theme-sidebar-test.mjs` |
+| 13.2 | 自分で閉じた目次は閉じたまま | SidebarKeeper | 保存値が `visible` のときだけ開く |
+| 13.3 | ほかの幅と初回の表示を変えない | SidebarKeeper | 幅と保存値の判定、`theme-sidebar-test.mjs` |
+| 13.4 | テーマのスクリプトだけで行う | SidebarKeeper | `claudia.js` だけを変える |
 
 ## Components and Interfaces
 
@@ -315,6 +326,7 @@ flowchart TB
 | TutorialCheck | ツール | 辞書と同じ名前の章の作例を照合 | 1.6, 3.2, 3.9, 6.2, 9.1–9.11, 10.8 | 段階辞書・入門の章（P0） | Service, Batch |
 | ContentVerifier | ツール | 入門を名指しする検査の追従と、語りの形・章の型の検査 | 1.2, 1.4, 2.1, 7.1, 10.1–10.3, 10.7, 10.8 | TutorialCheck（P0） | Batch |
 | ChapterCountTests | ツール | 章の数の決め打ちを直す | 1.1, 10.4 | ContentVerifier（P1） | Batch |
+| SidebarKeeper | テーマ | 開いた目次を次のページへ持ち越す | 13.1–13.4 | mdBook の `book.js`（P0） | State |
 
 7.2・7.6・7.7・10.5・10.6・11.5・12.2・12.4・12.5 は全章にかかる（本文の 3 コンポーネントが共通に満たす）。
 
@@ -657,6 +669,62 @@ interface TutorialCheckResult {
 - `verify-scripts-test.mjs` に、`C-sections` の PASS が 13 件・`C-prose` の PASS が 16 件であることの確認を足す（`I-sections` の件数の確認と同じ形）。
 - K-10 は件数のほかに、全章で「本文の範囲が旧来の判定と一致する」ことも見る。新しい章は本体に `---` を置かない（第 8 節「章の型」）ので、範囲は一意に決まる。
 
+### テーマ層
+
+#### SidebarKeeper（`book/theme/claudia.js`・`book/tools/theme-sidebar-test.mjs`）
+
+| Field | Detail |
+|-------|--------|
+| Intent | 幅 620〜1080px のウィンドウで、読者が開いた目次を次のページでも開いたままにする |
+| Requirements | 13.1, 13.2, 13.3, 13.4 |
+
+**原因（mdBook 0.5.x の挙動）**
+
+- ページの先頭のインラインスクリプトは、`document.body.clientWidth >= 1080` のときだけ保存値（`localStorage` の `mdbook-sidebar`）を読む。1080px 未満では保存値を見ずに、毎回閉じた状態で始める。
+- 目次を開閉すると、`book.js` は幅に関係なく保存値を `visible`／`hidden` に書く。つまり 1080px 未満でも「読者が最後にどうしたか」は保存されている。読まれていないだけである。
+- 620px 未満では、開いた目次が本文を画面の外へ押し出す（`chrome.css` の `min-width: 620px` の境目）。この幅で毎回閉じるのは理にかなっているので、変えない。
+
+**Responsibilities & Constraints**
+
+- `claudia.js` に、テーマメニューの関数とは別の即時関数 `claudiaSidebarKeep` を足す。
+- 次の条件をすべて満たすときだけ目次を開く。どれかが外れたら何もしない。
+  1. 目次の要素（`#mdbook-sidebar-toggle-anchor`・`#mdbook-sidebar`）がある。
+  2. 目次がいま閉じている（チェックボックスが外れている）。
+  3. `document.body.clientWidth` が 620 以上 1080 未満である。
+  4. 保存値 `mdbook-sidebar` が `visible` である（読めないときは何もしない）。
+- 開く手順は `book.js` に任せる。`#mdbook-sidebar` の `style.display` を空に戻し、チェックボックスを入れて `change` イベントを送る（`book.js` の `showSidebar` が、クラス・ARIA 属性・リンクの `tabIndex`・保存値をそろえる）。
+- 開くときのアニメーションは出さない。`html` に `sidebar-resizing` を一時的に付けて外す（`chrome.css` は `html:not(.sidebar-resizing)` のときだけ目次を動かす）。
+- 保存値は読むだけで、自分では書かない。外部への通信・要素の追加と削除をしない。条件 1 の判定は保存値を読むより前に行う（目次の無いページでは保存値に触れない。テーマメニューの既存の自己テスト `theme-menu-test.mjs` は直さずに通る）。
+- `claudia.js` の冒頭のコメントの「してはいけないこと」を、「保存値は目次の `mdbook-sidebar` を読むだけで、書かない」に合わせて直す。
+
+**State Management**
+
+| 幅 | 保存値 | 今 | この変更の後 |
+|----|--------|----|--------------|
+| 1080px 以上 | どれでも | 保存値どおり（無ければ開く） | 変わらない |
+| 620〜1080px | `visible` | 閉じて始まる | 開いて始まる |
+| 620〜1080px | `hidden`・無し | 閉じて始まる | 変わらない |
+| 620px 未満 | どれでも | 閉じて始まる | 変わらない |
+
+- 広い幅で目次を開いたままにしていた読者がウィンドウを 620〜1080px に狭めて開き直すと、目次は開いて始まる（保存値が `visible` のため）。「開いたら開いたまま」の範囲として受け入れる。
+
+**自己テスト（`theme-sidebar-test.mjs`。jsdom・ビルド不要・`theme-menu-test.mjs` と同じ作り）**
+
+| 場合 | 期待 |
+|------|------|
+| 幅 800・保存値 `visible`・閉じている | チェックボックスが入り、`change` が 1 回送られ、`display` が空になる |
+| 幅 800・保存値 `hidden`／無し | 何もしない |
+| 幅 1200・幅 500（保存値 `visible`） | 何もしない |
+| すでに開いている | 何もしない |
+| 目次の要素が無いページ | 保存値を読まない・例外を出さない |
+| 保存値を読むと例外になる | 何もしない・例外を外へ出さない |
+| 全部の場合 | 保存値を書かない・通信しない・`sidebar-resizing` が残らない |
+
+**Implementation Notes**
+
+- Risks: jsdom は描画も `book.js` も動かさないので、実際のブラウザで目次が開いて見えることまでは確かめられない。ビルドした出力をブラウザで開いて確かめ（Testing Strategy）、最後に公開して開発者に確かめてもらう（Migration Strategy）。
+- Risks: mdBook を上げると、インラインスクリプトの閾値・要素の id・`sidebar-resizing` の規則が変わりうる。自己テストの模型は mdBook 0.5.x の出力の写しなので、上げるときに見直す。
+
 ## Error Handling
 
 ### Error Strategy
@@ -710,16 +778,18 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 - 語りの形: 章ごとに、台詞を全部隠しても手順と事実が追えるかを読む（7.3）。地の文の段落が無いこと（7.1）は `C-prose` が見る。
 - 古い記述: 入門の全章を「途中の段階」「Lua ランタイム」「変わらない」「自動生成」で検索し、要件 1.7 の 4 つが残っていないことを確かめる。
 - 表情の偏り: `node book/tools/talk/talk.mjs --stats` で 16 章の導入と締めの組み合わせを見る。
+- 目次の持ち越し（13.1〜13.3）: ビルドした出力をブラウザで開き、幅 800px で「目次を開く → 項目をクリック → 移った先でも開いている」「閉じる → クリック → 閉じたまま」を、幅 1200px と 500px で今と変わらないことを確かめる。
 
 ## Migration Strategy
 
 切り替えの順序（タスク分解の前提）:
 
 1. **規約を先に固める**: `AUTHORING.md` 第 8 節と雛形。章の量産より前に、1 段目の章を雛形どおりに 1 枚書いて形を確かめる。
-2. **検査ツールを直す**: `tutorial-check.mjs` と自己テスト、`verify-content.mjs` の `C-sections`・`C-prose`。サンドボックスの場合はこの時点で通る。実リポジトリの場合は、章がそろうまで落ちる。
+2. **検査ツールを直す**: `tutorial-check.mjs` と自己テスト、`verify-content.mjs` の `C-sections`・`C-prose`。目次の持ち越し（`claudia.js` と `theme-sidebar-test.mjs`）もここで足す（章とは独立で、足した時点で自己テストが通る）。サンドボックスの場合はこの時点で通る。実リポジトリの場合は、章がそろうまで落ちる。
 3. **章を書く**: 準備の 2 章、13 段の章、入口の章。章どうしはファイルが分かれているので並行して書ける。
 4. **切り替える**: `first-ghost.md` の削除、`SUMMARY.md`、`introduction.md`、`book.toml` の転送、README、`verify-content.mjs` の `C-steps`・`C-order`、章の数の 3 か所。
 5. **通しの確認**: 検査一式とビルド、手動の確認。
+6. **公開して確かめてもらう**: マージしてマニュアルが公開された後、公開サイトで目次の持ち越しを開発者に確かめてもらい、結果を聞く（開発者の指示）。足りないと分かったら、この spec では追わずに別の spec を起票する。
 
 - 2〜4 の間は、実リポジトリの検査が落ちる状態を許す（章のファイルを足した時点で章の数の自己テストが落ち、`first-ghost.md` を消すまで旧い照合は通らない）。合否は 5 で判定する。main へは squash マージで 1 つの変更として入るので、途中の状態は公開されない（12.5）。
 
@@ -733,7 +803,7 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 | 4 切り替え・5 通し | 検査一式・自己テスト全件・ビルド後の検査がすべて成功（落ちてよいものは無い） | なし |
 
 - `verify-content.mjs` の D 系・T 系はフォルダを直接走査する（目次を見ない）ので、目次に載せる前の章にも章ごとの結果が出る。
-- 戻し方: この spec の変更は文書とツールだけで、実行時のコードを変えない。問題が出たら PR 全体を revert する。
+- 戻し方: この spec の変更は文書・検査ツール・マニュアルのテーマのスクリプトだけで、pasta の実行時のコードを変えない。問題が出たら PR 全体を revert する。
 
 ## 決定の記録
 
@@ -747,6 +817,7 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 - **語りの形と章の型を機械で検査する**（議題 1） — 段の章の 5 つの H2（`C-sections`）と、台詞以外の段落が指示の一文だけであること（`C-prose`）を `verify-content.mjs` で確かめる。要件 10.7・10.8 を足した。「台詞を読み飛ばしても事実が追える」（7.3）はレビューで見る。
 - **`pasta.dll` とシェルは `hello-pasta.nar` から写す**（議題 2） — `hello-pasta.nar` を SSP に入れ、`ghost/hello-pasta/` から `pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`shell/master/` を写す。入手先が 1 つで済み、完成版が見本として手元で動く。最小一式に `THIRD_PARTY_LICENSES.txt` を足した（要件 2.3・2.9）。nar を展開して写す案、`pasta.dll.zip` とリポジトリから別々に取る案は採らない。
 - **段の章の題は「N 段目：願い」**（議題 3） — 「7 段目：挨拶したい」の形にする。目次では通し番号と並ぶ（「1.9. 7 段目：挨拶したい」）が、13 段のどこにいるかが目次・検索結果・ブラウザのタブで分かる。願いだけの題は採らない。
+- **開いた目次を次のページへ持ち越す**（議題 4。開発者の要望） — 幅 620〜1080px で、保存値が `visible` のときだけ `claudia.js` が目次を開き直す（要件 13）。目次の中の折りたたみの開閉は持ち越さない。効き目は公開後に開発者が確かめ、足りなければ別の spec にする。
 
 要件が設計に委ねた 4 項目は、次のとおり決めた（理由は `research.md` の Design Decisions）。
 
