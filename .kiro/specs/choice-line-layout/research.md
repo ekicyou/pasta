@@ -131,7 +131,15 @@
 - **Alternatives Considered**:
   1. `\n`（台詞の中の改行と同じ）。
   2. `\n[half]` や `\n[150]` のような幅付き。問いかけと選択肢の間だけ広くする。
-- **Selected Approach**: 未定（要件の未決事項 1。下書きは 1）。
+- **Selected Approach**: 要件で決まった（2026-10-10 開発者の判断）。字の後の選択肢の前は `\n[N]`（`pasta.toml` の `[ghost]` の `choice_newlines` × 100。既定 `1.5` → `\n[150]`）、選択肢の後の選択肢の前と、選択肢の後の台詞の前は `\n`。
+
+### Decision: `choice_newlines` の読み込みと受け渡し
+- **Context**: Requirement 2 の 8〜10。`spot_newlines` は、`pasta/shiori/act.lua` の `SHIORI_ACT.new` が `CONFIG.get("ghost", "spot_newlines", 1.5)` で読み、`BUILDER.build` の設定の表に入れて渡している。
+- **Alternatives Considered**:
+  1. 同じ経路に足す（`pasta/shiori/act.lua` に 2 行）。`spot_newlines` と扱いがそろう。
+  2. 組み立て（`sakura_builder.lua`）の側で設定を直接読む。`act.lua` を触らないが、組み立てが設定のモジュールに依存する。
+- **Selected Approach**: 未定。
+- **Follow-up**: ロードマップの同じウェーブの約束は「`act.lua` を触らない」と書いている。選択肢を積む `pasta/act.lua` を指すとみられるが、文面は `pasta/shiori/act.lua` と区別していない。同じウェーブの他の spec は Lua を持ち場にしていないので、1 を採っても衝突はしない。数値でない値の扱いは、`spot_newlines` の今の動きを先に確かめてそろえる。`pasta.toml` のリファレンス（`book/src/reference/pasta-toml.md`）は、設定の一覧の表・記述例・キーの説明の 3 か所に `spot_newlines` があり、同じ 3 か所に足す。
 
 ### Decision: 選択肢を「字」に数えるか
 - **Context**: 選択肢だけを出した吹き出しへ話し手が戻るとき、段落の区切り（`\n[150]`）を出すか。今は選択肢を字に数えない。
@@ -153,7 +161,7 @@
 ## 設計フェーズへの申し送り
 
 - **進め方**: Option A（原因は実機で確かめた）。
-- **決めること**: 上の Design Decisions。要件の側は、未決事項 1 件（行の区切りの幅）を残して決まった。
+- **決めること**: 上の Design Decisions。要件の側は、要件ディスカッション（2026-10-10）ですべて決まった。
 - **Research Needed**: 残っていない。実機のさくらスクリプト、2 つ目の選択肢が次の行に出る理由、`\n` を入れたときの見え方、既定のバルーンに収まるかは、2026-10-10 に確かめた（Research Log の「実機での確認」）。既存のゴーストへの影響は、要件の「決めたこと」に書いた。
 
 ## Risks & Mitigations
