@@ -203,6 +203,9 @@ publish-crates は、トークンの期限（30 分）に当たらないよう�
 1. **「Trusted Publishing のみ」を有効にする。** 5 クレートそれぞれの crates.io の設定画面（Trusted Publishing の項）で、Trusted Publishing だけで公開を受け付け、トークンでの公開を拒む設定（`trustpub_only`）を有効にする。
 2. **`CARGO_REGISTRY_TOKEN` を失効させる。** 開発機に置いていた crates.io の API トークンを、crates.io の「Account Settings」→「API Tokens」で失効（Revoke）させる。あわせて開発機の環境変数 `CARGO_REGISTRY_TOKEN` を消し、`cargo login` で保存していたなら `cargo logout` で消す。
 3. **`VSCE_PAT` を失効させる。** 開発機に置いていた Marketplace 用の Personal Access Token を、Azure DevOps の「User settings」→「Personal access tokens」で失効（Revoke）させ、開発機の環境変数 `VSCE_PAT` を消す（この PAT は Azure DevOps の global PAT にあたり、2026-12-01 以降は使えなくなる見込み）。
+   - 「User settings」は、組織の中に入らないと出ない。組織名は `https://aex.dev.azure.com/me` の一覧で調べ、`https://dev.azure.com/<組織名>/_usersSettings/tokens` を開く。
+   - 全組織向けの PAT は、一覧の「Access scope」の絞り込みを「All accessible organizations」にしないと出ない。
+   - 画面が「接続がリセットされました」で開かないときは、別の回線（スマートフォンなど）から行う。失効はアカウントの側の操作なので、開発機から行わなくてよい（開発機の回線で、Azure DevOps に IPv6 でつながらないことがあった）。
 
 **緊急のとき**（CI が長く使えず、手で公開するしかないとき）は、クレートの owner が crates.io の設定画面で「Trusted Publishing のみ」を無効に戻せる。その場合は新しい API トークンを作って手で公開し、済んだらトークンを失効させ、「Trusted Publishing のみ」を有効に戻す。
 
