@@ -105,7 +105,7 @@ graph TB
 |-------|------------------|-----------------|-------|
 | 画像生成（編集） | `openai/gpt-image-2.5/flare/edit`（確定。設計ディスカッション #1・2026-10-10 の試作で採用）。`fal-ai/qwen-image-edit-2511` は費用が合わないときの予備 | 設定画像・ポーズ 2 種・表情 8 種の編集 | 候補の比較は「生成パイプライン」節と `research.md` §7.1 |
 | 切り抜き | （使わない。確定モデルが透過 PNG を直接出す） | — | 予備の qwen に切り替えた場合だけ `fal-ai/birefnet/v2`（`model=Matting`）を使う |
-| 貼り合わせ | Node スクリプト（`pngjs`。一回限り・コミットしない） | 顔の矩形の貼り替え・頭と体の結合 | 手順と本文は `art/README.md` に記録する |
+| 貼り合わせ | Node スクリプト（依存なし。PNG は ffmpeg で raw RGBA に展開して読む。一回限り・コミットしない。当初案の `pngjs` は使わなかった） | 顔の矩形の貼り替え・頭と体の結合 | 手順と本文は `art/README.md` に記録する |
 | 縮小・最適化 | ffmpeg（ShareX 同梱 n8.1.1） | 1024×1536 → 333×500 の lanczos 縮小（アルファ乗算）・PNG 圧縮・必要なら減色 | `book/src/img/claudia/LICENSE.txt` の手順を踏襲 |
 | 検証（Rust） | `png` 0.18（dev-dependency） | PNG の寸法・色型・画素の読み出し | `image`/`imageproc` は外す。`png` は `Cargo.lock` に既にある |
 | 配布 | `release.ps1`（pwsh 7）・`pasta_check release`・`release.yml` | 段の整理・`.nar` の大きさと中身の検査 | 既存の段の動作は変えない（R6.5） |
@@ -216,7 +216,7 @@ flowchart LR
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
-| 生成パイプライン | 生成（リポジトリ外） | 設定画像 → 体 3 × 顔 9 → 18 枚の 333×500 透過 PNG | 1, 2.1〜2.6, 7.1, 8.1 | fal.ai（P0）, ffmpeg（P0）, Node pngjs（P1） | Batch |
+| 生成パイプライン | 生成（リポジトリ外） | 設定画像 → 体 3 × 顔 9 → 18 枚の 333×500 透過 PNG | 1, 2.1〜2.6, 7.1, 8.1 | fal.ai（P0）, ffmpeg（P0）, Node（P1） | Batch |
 | art/（記録と設定画像） | 生成 | 手順・費用・ライセンスの正本と、作り直しの起点 | 8.1〜8.3, 8.5, 8.8〜8.11 | 生成パイプライン（P0） | State |
 | shell/master（素材） | 素材 | 配布するシェル。PNG 18 枚・`surfaces.txt`・`descript.txt` | 1, 3, 4, 9 | 生成パイプライン（P0） | State |
 | surfaces.txt の当たり判定 | 素材 | `Head`・`Face`・`Body` の矩形。テストの領域定義の正本も兼ねる | 4.1〜4.5, 4.8, 2.1, 2.2 | shell/master（P0） | State |
@@ -245,7 +245,7 @@ flowchart LR
 
 **Dependencies**
 - External: fal.ai `openai/gpt-image-2.5/flare/edit`／`fal-ai/qwen-image-edit-2511`／`fal-ai/birefnet/v2` — 生成・切り抜き（P0）。詳細は `research.md` §7.1。
-- External: ffmpeg（縮小・最適化・減色）（P0）。Node + `pngjs`（貼り合わせ）（P1）。
+- External: ffmpeg（縮小・最適化・減色）（P0）。Node（貼り合わせ。依存なし・raw RGBA）（P1）。
 
 **Contracts**: Batch [x]
 
@@ -262,7 +262,7 @@ flowchart LR
 訂正（実装 6.2・2026-10-10）: 採用モデルの出力にも、C2PA のメタデータに加えて不可視の透かし（SynthID）が入ると OpenAI のヘルプ記事が述べている。設定画像の原本の C2PA マニフェストにも `c2pa.watermarked.unbound` の記録があった。上の表の「C2PA だけ」という見立ては誤りで、この点で nano-banana との差は無かった。要件 1.6 が禁じるのは目に見える透かしなので、要件には反しない。詳細と出典は `art/README.md` 3 節。
 
 - **Trigger**: 設計ディスカッション（試作・設定画像の承認）と実装（残りの絵の生成）で、開発者が MCP で手で呼ぶ。
-- **Input / validation**: 参照画像は手本の `surface0.png`（女の子用）・`surface10.png`（男の子用）（`https://raw.githubusercontent.com/ponapalt/claudia/02cbd4f5/shell/master/` から fal の CDN へアップロードして渡す）と、承認済みの自分の設定画像。生成寸法は **1024×1536**（333:500 と同じ 2:3。縮小率 ≈ 1/3.07）。設定画像は**承認済み**（設計ディスカッション #3・2026-10-10）で `art/` にコミットしてある。実装は作り直さない。以下は記録（`art/README.md` へ写す）:
+- **Input / validation**: 参照画像は手本の `surface0.png`（女の子用。男の子は手本の `surface0.png` と女の子の設定画像を参照にした。手本の `surface10.png` は不採用の試行でだけ使った）（`https://raw.githubusercontent.com/ponapalt/claudia/02cbd4f5/shell/master/` から fal の CDN へアップロードして渡す）と、承認済みの自分の設定画像。生成寸法は **1024×1536**（333:500 と同じ 2:3。縮小率 ≈ 1/3.07）。設定画像は**承認済み**（設計ディスカッション #3・2026-10-10）で `art/` にコミットしてある。実装は作り直さない。以下は記録（`art/README.md` へ写す）:
 
   ```text
   女の子（設定画像・基本ポーズ・通常の顔。試作 request_id 01a12595-936e-70f0-a9ce-3c2aaf6513e8 の全文）
@@ -373,7 +373,7 @@ flowchart LR
   ```
 
   その他のパラメータ（採用モデル。試作と同じ）: `image_size={width:1024,height:1536}`・`quality=high`・`background=transparent`・`output_format=png`・`num_images=1`。seed は無い。予備（qwen）: `image_size={width:1024,height:1536}`・`num_inference_steps=28`・`guidance_scale=4.5`・`seed=`（予備を使うことになった場合は、最初の採用結果の seed を記録して以後固定する）・背景は指示文で「plain flat #00FF00 background」として `birefnet/v2`（`model=Matting`, `operating_resolution=2048x2048`）で切り抜く。
-- **Output / destination**: 1 人につき full-res の層 = 頭 1（通常の顔）・顔の矩形 8・体 3。貼り合わせ → 9 枚 → 縮小 → `shell/master/surfaceN.png`。縮小は **290×435 に縮めて 333×500 の下寄せ中央に置く**（設計ディスカッション #3。モデルが人物をキャンバスの 93〜97% で描くため、この縮小で人物の高さが手本の 85%（女の子 405 px）・87%（男の子 415 px・帽子込み）になり、要件 Q5 の 8〜9 割に入る。18 枚とも同じ変換なので画素一致は保たれる）。ffmpeg（`claudia/LICENSE.txt` と同じ考え方）:
+- **Output / destination**: 1 人につき full-res の層 = 頭 1（通常の顔）・顔の矩形 8・体 3。貼り合わせ → 9 枚 → 縮小 → `shell/master/surfaceN.png`。縮小は **290×435 に縮めて 333×500 の下寄せ中央に置く**（設計ディスカッション #3。モデルが人物をキャンバスの 93〜97% で描くため、この縮小で人物の高さが手本の 85%（女の子 405 px）・87%（男の子 415 px・帽子込み）になり、要件 Q11 の 8〜9 割に入る。18 枚とも同じ変換なので画素一致は保たれる）。ffmpeg（`claudia/LICENSE.txt` と同じ考え方）:
 
   ```text
   縮小: format=gbrap,premultiply=inplace=1,scale=290:435:flags=lanczos,unpremultiply=inplace=1,format=rgba,pad=333:500:21:64:color=0x00000000
@@ -686,7 +686,7 @@ fn pixels_equal_outside(a: &Rgba8, b: &Rgba8, within: &Rect, except: &[Rect]) ->
 ## Performance & Scalability
 
 - テストは 18 + 2 枚の PNG 復号と画素比較（333×500×4 バイト × 18）で 1 秒以内に収まる。
-- `.nar` は現行 2.0 MB + 絵 約 4 MB 以下 ≈ 6 MB 見込み。上限 7 MB との差が小さいので、減色の手順を用意しておく。
+- `.nar` は現行 2.0 MB + 絵 約 4 MB 以下 ≈ 6 MB 見込み。上限 7 MB との差が小さいので、減色の手順を用意しておく。（実測 2026-10-11: 絵 18 枚で 1.65 MB、`.nar` は 3.57 MB。減色は不要だった）
 
 ## Open Questions / Risks（設計ディスカッションへ）
 
