@@ -535,7 +535,7 @@ node book/tools/verify-search.mjs --no-build            # 検索の検査
 | 章 | 題（H1） | 本体の H2（この順） |
 | -- | -------- | ------------------- |
 | `prerequisites.md` | 前提環境と準備 | 動作環境 → 必要なもの → 文字コードは必ず UTF-8 |
-| `setup.md` | ゴーストの最小一式を置く | ゴーストのフォルダ構成 → 名前を決める → install.txt を書く → descript.txt を書く → pasta.toml を書く → hello-pasta から写す → SSP に入れて起動する → うまく起動しないときは |
+| `setup.md` | ゴーストの最小一式を置く | ゴーストのフォルダ構成 → 名前を決める → install.txt を書く → descript.txt を書く → pasta.toml を書く → hello-pasta から写す → シェルの中身 → SSP に入れて起動する → うまく起動しないときは |
 
 - `setup.md` の見出し「ゴーストのフォルダ構成」は文言を変えない（クレートの README がこの見出しを指す。「章を足す・名前を変えるとき」を参照）。
 - `prerequisites.md` から `UTF-8`・`Shift_JIS`・`Windows`・`SSP` の語を落とさない（`verify-content.mjs` の `C-utf8`・`C-sjis`・`C-env` が、入門の全章からこれらの語を探す）。
