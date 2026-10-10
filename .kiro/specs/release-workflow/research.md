@@ -1,320 +1,165 @@
 # Research & Design Decisions: release-workflow
 
+> 本書は、リリース CI に合わせて書き直した設計（2026-10-10）の調査と判断の記録である。手元でビルドして公開する旧設計（Stage A〜D・公開の 2 トラック・Resume・スケジュールによる再試行・マージコミット方式）の調査記録は、本書で置き換えた。旧版は git の履歴（コミット `7b0d6c99` より前）にある。
+
 ## Summary
+
 - **Feature**: `release-workflow`
-- **Discovery Scope**: Extension（既存ツール群の組み合わせによるオペレーション仕様）
+- **Discovery Scope**: Extension（完成したリリース CI の契約の上に、エージェントの手順を載せる。新しい依存は無い）
 - **Key Findings**:
-  - `cargo publish` の認証は環境変数で有効であり、前提条件チェックは不要（`gh auth status` のみ確認すれば十分）
-  - ルート `Cargo.toml` の5箇所のみでバージョン管理が完結する構造が確認済み
-  - 既存リリース `v0.1.2` が完全な参照モデルとして利用可能（タイトル形式、アセット構成）
+  - リリース CI の公開先ごとの `status`・`reason` は、job summary と job outputs にだけ書かれ、`gh` からは読めない。手元から読めるのは、step の結論と時刻（`gh run view --json jobs`）、ログ（公開の step が `status=...` の行を書く）、公開先そのものの状態である。
+  - `Cargo.lock` には外部のクレート `fdeflate` が版 `0.3.7` で載っている。版の文字列の置換で `Cargo.lock` を更新すると壊す。`cargo update --workspace` は、ワークスペースの 7 クレートの `version` の行だけを変える。
+  - `kiro-impl` はタスクごとに `tasks.md` を含むコミットを作る。そのままだと、版の更新のコミットに完了印が混ざり、次の実行で未完了のタスクが無くなる。実行の約束が要る。
+  - リリースタグで起動した実行は、まだ 1 つも無い（v0.3.7 までは手元で公開した）。実行の特定とログの読み取りは、CI での初回のリリースが最初の実地確認になる。
+  - Requirement 12 の一覧に無い古い参照が 3 つある（`kiro-complete` の SKILL.md・`RELEASE.md` の前提条件・`product.md` の現行バージョン）。
 
 ## Research Log
 
-### cargo publish 認証トークン
-- **Context**: gap-analysis.md で「未確認」としていた認証トークンの有無を実際に確認
-- **Sources Consulted**: ローカルファイルシステム確認（`~/.cargo/credentials.toml`, `~/.cargo/credentials`）、環境変数
+### 参照したスキルと規則
+
+- `kiro-spec-design` の `rules/design-principles.md`（境界を先に決める・要件 ID は数字だけ）、`design-discovery-light.md`（既存の契約と統合点の確認）、`design-synthesis.md`（一般化・既存の採用・単純化）、`design-review-gate.md`（要件 ID の機械的な照合・境界の節・File Structure Plan）。
+- 完了済みの `release-ci` の design.md（status 契約、Out of Boundary の申し送り）を、文体と契約の正として読んだ。
+
+### リリース CI の結果を手元から読む方法
+
+- **Context**: 要件 6.4 は、公開先ごとの結果（`published`・`skipped`・`failed`・`not-run`）と Release の URL の読み取りを求める。
+- **Sources Consulted**: `.github/workflows/release.yml`、`.github/scripts/release/publish-crate.ps1`・`publish-vsix.ps1`・`github-release.ps1`、`gh run view --help`、実在の実行（`build.yml` の run 38010614540）。
 - **Findings**:
-  - ファイルベースの credentials は存在しないが、環境変数 `CARGO_REGISTRY_TOKEN` による認証が有効
-  - 過去のリリースで `cargo publish` が正常に動作していることを確認済み
-  - cargo は環境変数とファイルの両方をサポートしている
-- **Implications**: cargo publish の認証チェックは不要。環境変数による認証が既に有効であり、Phase 0 での前提条件確認は `gh auth status` のみで十分
+  - 集約の step（`Summarize ...`）と report job は、`$GITHUB_OUTPUT` と `$GITHUB_STEP_SUMMARY` にだけ書く。ログには出さない。job summary を返す API は無い。
+  - 3 つの公開スクリプトの `Complete` は、`$GITHUB_OUTPUT` があるとき `Write-Host "status=<値> [reason=<値>] [url=<値>]"` も行う。この行はログに残る。
+  - スクリプトが `status` を書かずに終わった場合（認証の step の失敗・異常終了・時間切れ）、集約の step は step の結論から `failed`・`auth`／`failed`・`publish`／`not-run` を導く。この導き方は、`gh run view --json jobs` の step の結論から手元で再現できる。
+  - `gh run view --json jobs` は、step ごとの `name`・`conclusion`・`startedAt`・`completedAt` を返す。所要時間は、ここから計算できる（summary に書かれる「所要 N 秒」は読めない）。
+  - `gh run view --log` の 1 行は `<job 名><TAB><step 名><TAB><時刻> <内容>` の形である。
+- **Implications**: 結果は「step の結論 + ログの `status=` の行」から組み立て、完了は公開先の実際の状態（定型コマンド A）で確かめる。区分を取り違えても再実行の回数が変わるだけになるよう、判定表を組む。`--failed` の再実行の後に、再実行しなかった job の step とログがどう見えるかは、実地で確かめる。
 
-### Cargo.toml バージョン更新箇所
-- **Context**: gap-analysis.md で確認済みだが、設計のための正確な行番号を再確認
-- **Sources Consulted**: `Cargo.toml` 直接読み取り
-- **Findings**:
-  - Line 9: `version = "0.1.2"` — `[workspace.package]` セクション
-  - Line 47: `pasta_core = { path = "crates/pasta_core", version = "0.1.2" }`
-  - Line 48: `pasta_lua = { path = "crates/pasta_lua", version = "0.1.2" }`
-  - Line 49: `pasta_shiori = { path = "crates/pasta_shiori", version = "0.1.2" }`
-  - 個別クレートの `Cargo.toml` は `version.workspace = true` で継承（更新不要）
-- **Implications**: `replace_string_in_file` で旧バージョン文字列を新バージョンに4回置換すれば完了
+### タグで起動した実行の特定
 
-### 既存リリース構造（v0.1.2）
-- **Context**: GitHub Release 作成時のコマンドとパラメータの参照モデル
-- **Sources Consulted**: gap-analysis.md の記録、RELEASE.md のテンプレート
-- **Findings**:
-  - タイトル形式: `pasta vX.Y.Z`
-  - アセット: `pasta.dll` (2.59 MiB), `hello-pasta.nar` (1.29 MiB)
-  - DLL パス: `target/i686-pc-windows-msvc/release/pasta.dll`
-  - NAR パス: `release/hello-pasta.nar`（release.ps1 が WorkspaceRoot の release/hello-pasta.nar に出力）
-- **Implications**: `gh release create` のコマンド構築時にこれらのパスとタイトル形式を使用
+- **Context**: 要件 6.1・6.2。タグを付け直すと、同じタグ名の実行が 2 つになる。
+- **Findings**: `gh run list --workflow release.yml --json` は `headBranch`・`headSha`・`attempt`・`status`・`conclusion` を返す。タグの push で起動した実行の `headBranch` はタグ名になる（GitHub の仕様。本リポジトリでは未確認）。`gh run list --workflow release.yml` は、今は 0 件を返す。
+- **Implications**: `headBranch` がタグ名で、`headSha` がタグのコミットと一致するもののうち、最も新しいものを採る。サーバー側の `--branch` の絞り込みに頼らず、手元で絞る。
 
-### チェンジログ生成パターン
-- **Context**: 議題1で決定済み — `git log` + LLM 手動整形方式
-- **Sources Consulted**: Conventional Commits 仕様、`git log` 出力のサンプル
-- **Findings**:
-  - プロジェクトのコミットメッセージは `type(scope): summary` 形式に従っている
-  - 分類カテゴリ: `feat`, `fix`, `refactor`, `docs`, `chore`, `test`
-  - グループ見出し: `### ✨ Features`, `### 🐛 Bug Fixes`, `### 📝 Documentation` 等
-  - `chore(spec):` や `docs(spec):` のような仕様管理コミットはリリースノートから除外が望ましい
-- **Implications**: LLM がコミット履歴を読み取り、ユーザー向けに有意義なエントリのみを整形する
+### `Cargo.lock` と `package-lock.json` の更新
 
-### release.ps1 実行フロー
-- **Context**: gap-analysis.md の分析に基づく実行手順の確認
-- **Sources Consulted**: gap-analysis.md（387行スクリプト、8ステップ構成）
-- **Findings**:
-  - 実行ディレクトリ: `crates/pasta_sample_ghost/`
-  - 実行コマンド: `PowerShell -ExecutionPolicy Bypass -File release.ps1`
-  - 出力: `hello-pasta.nar` + `target/i686-pc-windows-msvc/release/pasta.dll`
-  - 前提: `i686-pc-windows-msvc` ターゲットがインストール済み（✅確認済み）
-- **Implications**: ステップ4で `Push-Location` + `release.ps1` 実行 + `Pop-Location` の流れ
+- **Context**: 要件 3.1・3.2。外部の依存の版を動かさずに、ワークスペースの版だけを更新する。
+- **Findings**（開発機の写しで確かめた。cargo 1.99・npm 12）:
+  - `cargo update --workspace` の後の差分は、`version = "0.3.7"` → `version = "0.3.8"` の 7 行だけ（`pasta_check`・`pasta_core`・`pasta_dsl`・`pasta_lsp`・`pasta_lua`・`pasta_sample_ghost`・`pasta_shiori`）。`--offline` の有無で結果は同じ。
+  - cargo は `Cargo.lock` を LF で書き直す。作業ツリーは CRLF（`core.autocrlf=true`）だが、`git diff --numstat` は `7 7 Cargo.lock` になる。
+  - `cargo metadata --locked --format-version 1` は、食い違いがあると終了コード 101（`cannot update the lock file ... because --locked was passed`）、無ければ 0。コンパイルしないので、`NoDefaultCurrentDirectoryInExePath` の影響を受けない。
+  - `npm --prefix editors/vscode version 0.3.8 --no-git-tag-version` は、`package.json` の 5 行目と、`package-lock.json` の 3 行目・9 行目だけを変える。
+- **Implications**: `Cargo.lock` は `cargo update --workspace`、npm の 2 ファイルは `npm version` で更新する。確認は `git diff --numstat` の行数と、`Cargo.lock` の変更行の形で行う。
 
-## 並行作業性の分析（cc-sdd 3.0 書き直しで追加）
+### マニュアルの内容検証
 
-### Context
-旧設計は全工程を単一の Sequential Pipeline として直列実行していた。本書き直しでは、各処理が要求する共有リソースを実コードから確認し、安全に並行化できる箇所と偽の依存関係を特定した。
+- **Findings**: `node book/tools/verify-content.mjs` は、`book/src/introduction.md` の対象バージョン行と `Cargo.toml` の最初の `version = ` の行を照合する（検証 `F-version`）。ビルドも `npm ci` も要らず、作業ツリーを変えない。今の main で `RESULT: OK`。
+- **Implications**: 要件 3.3 の (3) は、このコマンドの終了コードで判定する。
 
-### Sources Consulted
-- `crates/pasta_sample_ghost/release.ps1`（Step 1: `cargo build --release --target i686-pc-windows-msvc -p pasta_shiori`）
-- `editors/vscode/package.json`（`prepackage` = `build:wasm` → `compile`、`build:wasm` = `powershell -File scripts/build-wasm.ps1`）
-- `Cargo.toml`（workspace 構造、6箇所のバージョン参照）
-- `cargo publish` の挙動（既定で検証ビルド + クリーンワークツリー要求）
+### main に無い内容の見分け方
 
-### Findings — 共有リソースモデル
-| リソース | 種別 | 保持する処理 |
-| --- | --- | --- |
-| R1: cargo ターゲットロック | 排他 | `cargo build/test/run/publish`、VSCode `build:wasm` |
-| R2: git ワークツリー＋index | 排他 | ファイル生成、`git add/commit/restore/tag`、`release.ps1` |
-| R3: ネットワーク | 非排他 | `cargo publish` upload/index待機、`vsce publish`、`gh release create` |
+- **Context**: 要件 2.3。squash で統合した後の作業ブランチは、コミットとしては main に無いが、内容は main にある。コミットの有無（`git log origin/main..HEAD`）で判定すると、同じワークツリーでの再開（8.1）が止まってしまう。
+- **Findings**: `git merge-tree --write-tree origin/main HEAD` は、取り込んだ結果のツリーの ID を、作業ツリーも ref も変えずに返す（git 2.38 以上）。`origin/main^{tree}` と同じなら、作業ブランチは main に無い内容を持たない。要件を書いたブランチ（main に無い 1 コミットを持つ）で、違う ID になることを確かめた。
+- **Implications**: 段 1 は内容で判定する。
 
-### Findings — 偽の依存関係
-- 旧設計は「crates.io 公開（Phase 3）→ ゴーストビルド（Phase 5）」と直列化していたが、`release.ps1` は **ローカルソースから** pasta.dll をビルドしており crates.io 公開済みクレートに依存しない。よってゴーストビルドは crates.io 公開に**非依存**であり、バージョン更新コミットにのみ依存する。
+### 公開先の照会
 
-### Implications — スケジューリング決定
-- R1・R2 を共有する全ローカルビルドは真の並行ができないため、1つの直列ステージ（Stage A）に集約し、ワークツリーをクリーン化してから crates.io 公開を開始する。
-- crates.io 公開（Track X）・Marketplace 公開（Track Y）・チェンジログ生成（Track Z）は R2 を変更せず互いに独立するため Stage B として**並行実行可能**。特に非クリティカルな `vsce publish`（R3 のみ）を Track X の長いインデックス待機に重ねることで wall-clock を短縮する。
-- 不可逆な crates.io 公開（Track X）の成功を Stage C（タグ・プッシュ）の前提とし、安全順序を保証する。
-- VSCode は `build:wasm`（R1）を要するため**ビルドは Stage A**、Marketplace への **upload（R3 のみ）は Stage B Track Y** に分離する。
+- **Findings**: crates.io API は User-Agent が無いと 403。`/api/v1/crates/<crate>` の `crate.max_version` と、`/api/v1/crates/<crate>/<version>` の 200・404 が使える。`vsce show ekicyou.pasta-vscode --json` の `versions[].version` が使える（開発機の vsce は 4.0.0。`NODE_OPTIONS=--dns-result-order=ipv4first` で ECONNRESET を避ける）。`gh release view vX.Y.Z --json isDraft,url,assets` は、無いとき `release not found` を返す。
+- **Implications**: リリース CI のスクリプトと同じ読み方（200・404 だけを判定に使い、ほかは不明）にそろえる。
 
-### Decision: Resource-Aware Staged Concurrency（採用）
-- **Selected Approach**: Stage A（ローカル直列）→ Stage B（並行3トラック X∥Y∥Z）→ Stage C（タグ・プッシュ）→ Stage D（GitHub Release）
-- **Rationale**: 排他リソース制約を尊重しつつ、独立したネットワークトラックを並行化して所要時間を短縮し、非クリティカル失敗を隔離する。
-- **Trade-offs**: 並行トラックの完了個別検証が必要（Req 8.7）。逐次環境ではインターリーブ近似となる。
+### 現在の状態（2026-10-10）
+
+- `origin/main` の版は 0.3.7。タグ `v0.3.7` があり、5 クレート・Marketplace・GitHub Release（添付 3/3）がすべて公開済み。リリース CI の実行は無い。
+- リポジトリは `squashMergeAllowed: true`、手元の `gh` の権限は `ADMIN`。
+- 定型コマンド A は、`0.3.7` で「公開済み 7/7・提案 0.3.8」、`0.3.8` で「公開済み 0/7」を返した。
+
+### 一回限りの整合の対象の現物
+
+- `.claude/settings.json`: `permissions.allow` に `Bash(cargo publish:*)`・`PowerShell(vsce publish:*)`・`Bash(gh release create:*)` がある。`autoMode.allow` の 2 つ目の文が、マージコミット方式と手元からの公開を許可している。
+- `.kiro/steering/workflow.md`: 「CI を待たない」の段落の最後の文（main の CI 全緑・`release-workflow` Task 1.1）と、「release タグ公開のカーブアウト」の段落（`gh pr merge --merge`）。
+- 「名前の表」: `publish-vsix.ps1` の 102 行目、`release.yml` の 320 行目と 412 行目。手順書の見出しは「12. 名前の対応表」。
+- 要件 12 の一覧に無い古い参照: `.claude/skills/kiro-complete/SKILL.md` の 321 行目（「main の CI 全緑」は `release-workflow` が課す）、`RELEASE.md` の前提条件（`main` へ push）、`product.md` の「現行バージョン v0.2.4」。
 
 ## Architecture Pattern Evaluation
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
-| A: 完全インタラクティブ | LLM が各ステップを逐次実行 | 柔軟なエラー対応、結果確認、チェンジログ整形が自然 | セッション切断リスク、実行時間 | **採用** — 仕様の趣旨に最適 |
-| B: ラッパースクリプト | 全工程を自動化スクリプト化 | 再現性、実行速度 | 対話要素の処理困難、保守コスト | 不採用 — 仕様の趣旨と矛盾 |
-| C: ハイブリッド | 部分スクリプト化 | チェンジログ品質安定 | 境界管理の煩雑さ | 不採用 — 不要な複雑性 |
+| 状態を読んで判定表で進む直列の手順 | 進み具合を持たず、毎回 main・タグ・公開先・実行を読み直す | 会話が切れても再開できる。記録と実際がずれない | 照会のコマンドが長くなる | 採用。要件 8.4・10.3 がこの形を求める |
+| 進み具合を spec のファイルに書く | 段ごとに完了を記録し、続きを記録から決める | 照会が少ない | 記録をコミットすると版の更新に混ざる。記録と実際がずれる | 不採用（8.4 に反する） |
+| 手順をスクリプトやワークフローにまとめる | 版の更新からタグまでを 1 つのスクリプトにする | 実行が 1 行になる | 開発者の承認・判断の点がスクリプトの中に入る。新しい部品が増える | 不採用（要件に無い） |
 
 ## Design Decisions
 
-### Decision: 完全インタラクティブ実行（Option A）
-- **Context**: 本仕様は LLM が繰り返しリリース作業を実行するオペレーション仕様
+### Decision: 結果は step の結論とログから組み立て、完了は公開先の状態で確かめる
+
+- **Context**: job summary と job outputs を `gh` から読めない。
 - **Alternatives Considered**:
-  1. Option A — LLM が各ステップをターミナルで逐次実行
-  2. Option B — ラッパースクリプト作成
-  3. Option C — 部分スクリプト化
-- **Selected Approach**: Option A — LLM が `run_in_terminal` と `replace_string_in_file` を組み合わせて実行
-- **Rationale**: 仕様の趣旨（LLM による繰り返し実行）に最適。エラー時の柔軟な判断、チェンジログの知的な整形が可能
-- **Trade-offs**: 実行時間は長いが、品質と柔軟性を優先
-- **Follow-up**: セッション切断時の中間状態からの復旧手順を設計に含める
+  1. ログの `status=` の行だけで判定する — 行が無い場合（認証の失敗・異常終了）を扱えない
+  2. 公開先の状態だけで判定する — `published` と `skipped` を区別できず、`reason` が分からない
+  3. `release.yml` の report job に、ログへの出力を足す — `release-ci` の持ち場の変更になる
+- **Selected Approach**: step の結論（最新の状態）を先に見て、`status`・`reason` の値をログの行で補う。完了は、実行の結論 `success` と、定型コマンド A の 7/7 の両方で判定する。
+- **Rationale**: リリース CI を変えずに、要件 6.4〜6.6 と 9.1 を満たせる。取り違えの影響が再実行の回数に限られる。
+- **Trade-offs**: ログの形（step 名・`status=` の行）に依存する。Revalidation Triggers に入れた。
+- **Follow-up**: CI での初回のリリースで、設計の「確かめること」の 1〜4 を確かめる。
 
+### Decision: `Cargo.lock` は `cargo update --workspace` で更新し、`build.yml` に `--locked` を足さない
 
+- **Context**: 要件の未決事項 4。
+- **Alternatives Considered**:
+  1. `build.yml` の cargo に `--locked` を足す — 食い違いを PR の CI と関門で検出できるが、ふだんの PR の CI の挙動が変わる
+  2. 足さず、版の更新の段で検出する
+- **Selected Approach**: 2。段 4 の手順 1（更新の前）と手順 6（更新の後）で `cargo metadata --locked` を実行する。
+- **Rationale**: 版の更新での更新し忘れも、main に前からある食い違いも、PR を作る前に検出できる。リリース CI の build の段の検査は、最後の守りとして残る。
+- **Trade-offs**: リリース以外の PR が `Cargo.lock` を更新し忘れても、次のリリースの段 4 まで見つからない。
 
-### Decision: チェンジログの仕様管理コミット除外
-- **Context**: `docs(spec):` や `chore(spec):` のコミットはリリースノートに不要
-- **Selected Approach**: LLM が Conventional Commits のプレフィックスとスコープを判定し、仕様管理（spec）スコープのコミットを除外
-- **Rationale**: ユーザー向けリリースノートに内部仕様管理の変更は不要
-- **Trade-offs**: LLM の判断に依存するが、コンテキスト理解力で十分対応可能
+### Decision: タグは squash でできたコミットに付ける
+
+- **Context**: 要件 5.1。今の `RELEASE.md` は `origin/main` の先頭に付けると書いている。
+- **Selected Approach**: `gh pr view --json mergeCommit` の SHA に付ける。再開のときは、件名 `chore(release): vX.Y.Z` で探す。
+- **Rationale**: 統合の直後に別の PR が入っても、その変更がリリースに混ざらない。
+- **Trade-offs**: 作業ツリーがタグのコミットと同じとは限らないので、`verify-tag.ps1` をそのまま手元では使えない。同じ条件を `git show <SHA>:<path>` で確かめる（定型コマンド C）。
+
+### Decision: 定型コマンドを本書に置き、補助スクリプトを足さない
+
+- **Context**: 照会（約 100 行）と結果の読み取り（約 20 行）は、判定を含む定型の処理である。
+- **Alternatives Considered**: spec の下か `.github/scripts/release/` にスクリプトとして置く。
+- **Selected Approach**: 設計の Supporting References に置く。設計の時点で、本書の中の 3 つのブロックをそのまま取り出して実行し、動作を確かめた。
+- **Trade-offs**: 設計書が長くなる（約 1100 行のうち約 140 行）。実行のたびに写す。Open Questions 2 に送った。
+
+### Decision: `kiro-impl` との食い違いは「実行の約束」で埋める
+
+- **Context**: `kiro-impl` は、タスクごとのサブエージェント・レビュー・`tasks.md` を含むコミット・最後の `/kiro-validate-impl` を行う。
+- **Selected Approach**: 設計に約束を置き、タスク生成が `tasks.md` の冒頭に写す。完了印は作業ツリーの中だけで付け、開始時に戻す。
+- **Rationale**: スキルを変えずに済む（スキルの編集は拒否されやすく、cc-sdd の更新で消える）。
+- **Trade-offs**: 約束が守られることに頼る。Open Questions 1 に送った。
+
+### Decision: 初回の記録は spec の下のファイルにする
+
+- **Context**: 要件 11.5 と未決事項 6。
+- **Selected Approach**: `.kiro/specs/release-workflow/first-ci-release.md` が `origin/main` にあることを記録とする。
+- **Rationale**: 有無を 1 つのコマンド（`git ls-tree`）で判定できる。`spec.json` は kiro のコマンドが書き換えるので、独自の項目を置かない。
+
+### Decision: Requirement 12 は書き直しと同じ PR で行う
+
+- **Context**: `/kiro-impl` を使うとリリースが始まる。`tasks.md` は実行のたびに初期化される。
+- **Selected Approach**: 設計に変更の一覧を置き、タスクの承認の後、開発者の直接の指示で行う。済んだことは `roadmap.md` のチェックで記録する。
+
+### 統合（Synthesis）の結果
+
+- **一般化**: 版の重複の検査・再開の判定・タグの付け直しの前の確認・完了の確認は、同じ「公開先とタグと実行の状態を読む」問題である。定型コマンド A の 1 つにまとめた。
+- **既存の採用**: `verify-tag.ps1` の検査の条件、`verify-content.mjs`、`cargo update --workspace`、`npm version`、`gh run rerun --failed` を使う。新しい依存は無い。
+- **単純化**: 進み具合のファイル・スケジュールによる再試行・補助スクリプト・公開の並行トラックを持たない。
 
 ## Risks & Mitigations
-- **Risk 1**: セッション切断時の中間状態 → 各ステップでコミットを行うため、`git log` で進捗を把握し再開可能
-- **Risk 2**: crates.io インデックス更新遅延 → 10秒待機＋確認で対処。不足時は追加待機
-- **Risk 3**: `gh` CLI 認証切れ → Phase 0 で `gh auth status` を確認し、未認証ならガイダンス提示
+
+- リリース CI のログの形（step 名・`status=` の行）が変わると、結果を読めなくなる — Revalidation Triggers に入れた。読めないときは「区別できない」「不明」に倒れ、判定表は止まる側に進む。
+- タグで起動した実行の `headBranch` がタグ名でない場合、実行を特定できない — CI での初回のリリースで確かめる。特定できなければ、段 7 が「起動していない」として止まる（公開は CI の中で進む）。
+- `tasks.md` の完了印がコミットに混ざる — `git add` に 5 ファイルのパスを並べる。段 4 の手順 8 が、コミットの中身を確かめる。
+- 設計書の中のコマンドを写し間違える — 出力の形（行の先頭の語）を固定し、判定表が読む値を限った。Open Questions 2。
+- `.claude/settings.json` の編集が拒否される — 回避せず、変更を開発者に示す（一回限りの整合）。
 
 ## References
-- [Conventional Commits](https://www.conventionalcommits.org/) — コミットメッセージ分類基準
-- [cargo publish](https://doc.rust-lang.org/cargo/commands/cargo-publish.html) — crates.io 公開コマンド
-- [gh release create](https://cli.github.com/manual/gh_release_create) — GitHub Release 作成コマンド
-- gap-analysis.md — 既存アセットとギャップの詳細分析
 
----
-
-# ギャップ分析（Req 10 追加: ワークツリー実行・PR ベース main 統合）
-
-> 2026-06-14 追記。本セクションは新設 **Requirement 10**（ワークツリー実行と PR マージコミット方式での main 統合）に限定したギャップ分析である。旧仕様（v0.1.2 基準）の Req 1–9 のギャップは上記既存セクションおよび `gap-analysis.md` を参照。
-
-## 1. 現状調査（Req 10 関連アセット）
-
-| 要件領域 | 既存アセット | 状態 |
-|----------|-------------|------|
-| ワークツリー供給 | Claude Code ハーネスが非デフォルトブランチを供給（kiro-complete と同一前提） | ✅ 既に成立 |
-| PR 作成・マージ機構 | `kiro-complete` SKILL.md「PR 可否判定 / PR 作成→マージ→ブランチ削除 / 中断条件 / エラー回避」 | ✅ **ほぼ完全な参照実装**（`--squash` 版） |
-| PR 可否ゲート | 非デフォルトブランチ＋`{remote}`あり＋`gh` 認証（kiro-complete） | ✅ そのまま流用可 |
-| ブランチ削除 | `gh pr merge --delete-branch`（repo `deleteBranchOnMerge: false` のため API 削除に依存） | ✅ 流用可 |
-| 失敗時セマンティクス | 「ブランチを残し中断」「ローカル削除警告は非致命」（kiro-complete） | ✅ 流用可 |
-| push 許可 | `.claude/settings.json` L4 `Bash(git push origin main:*)`（カーブアウト用直 push 許可） | ⚠️ PR 化で**不要化**、別途タグ push 許可が**未整備** |
-| ステアリング | `workflow.md` §3（PR squash）＋ L113 リリースカーブアウト（直 push 容認・settings 許可保持） | ⚠️ Req 10 と**整合せず要改訂** |
-| 現行設計/タスク | `design.md` L130/227/493・`tasks.md` L128 が `git push origin main --tags`（直 push 前提） | ⚠️ Stage C を**全面書き換え対象** |
-
-## 2. Requirement-to-Asset Map（Req 10）
-
-| AC | 必要機能 | 既存アセット | ギャップ |
-|----|---------|-------------|---------|
-| 10.1 ワークツリー上で動作 | 現在ブランチ上で実行 | ハーネス供給（kiro-complete 同様） | **なし**（前提が既に成立） |
-| 10.2 コミットを作業ブランチに保持 | `git commit`（Stage A） | 既存 | **なし** |
-| 10.3 PR マージコミット統合・SHA 保持 | `gh pr create` + `gh pr merge --merge` | kiro-complete の PR 機構（`--squash`） | **Constraint**: `--merge` へ変更／**repo の merge-commit 許可が要確認** |
-| 10.4 squash-PR・直 push 禁止 | フロー選択・経路撤去 | settings.json 直 push 許可 | **Constraint**: 直 push 経路撤去、許可エントリ見直し |
-| 10.5 タグ到達性・タグ push | タグ ref の push | `git tag -a` / `git push`（既存手順） | **Missing**: settings.json に**タグ push 許可なし**（`git push origin main:*` はタグ ref を被覆しない） |
-| 10.6 / 10.7 公開前のマージ可能性検証 | `gh pr view --json mergeable` or `git fetch`+dry-run | なし | **Missing**: 不可逆 crates.io 公開前の**マージ可能性プローブ**が未設計 |
-| 10.8 失敗時は非破壊で中断 | ブランチ非削除・中断 | kiro-complete の中断セマンティクス | **なし**（パターン流用） |
-
-## 3. 重大な落とし穴（Critical Findings）
-
-### ⚠️ 落とし穴1: repo が merge-commit を許可しているか未確認（最優先）
-`gh pr merge --merge`（マージコミット方式）は repo 設定 `mergeCommitAllowed: true` を要する。本 repo は spec 完了で `--squash` を常用しており、**merge-commit が有効かは不明**。無効の場合 Req 10 の中核が成立しない。
-
-> **【確認結果 2026-06-14・設計フェーズ】** `gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed,deleteBranchOnMerge` 実行: `mergeCommitAllowed=false`, `squashMergeAllowed=true`, `rebaseMergeAllowed=false`, `deleteBranchOnMerge=true`（`ekicyou/pasta`, default=`main`）。**→ merge-commit は現状無効。`gh pr merge --merge` は今のままでは失敗する。** Req 10 成立には一回限りで `gh repo edit --enable-merge-commit` を実施（squash は spec 完了フローで使用中のため**併存維持**＝両方有効）。なお `deleteBranchOnMerge=true`（旧 kiro-gitflow 記録の `false` から変化済み）のため `--delete-branch` は冗長だが無害。**Research Needed #1 解決済み**。
-
-### ⚠️ 落とし穴2: 不可逆な crates.io 公開とマージ失敗の順序リスク
-現行設計は Stage B（crates.io 公開＝不可逆）→ Stage C（タグ・統合）。PR マージはこれより後段になるため、「公開済みだが PR マージ失敗（コンフリクト等）」の窓が生じる。Req 10 AC6/7 はこれを「**不可逆公開の前に**マージ可能性を検証」で緩和する設計意図だが、**検証手段とタイミングが未設計**。→ **Research Needed #2**（PR 早期作成＋`mergeable` ポーリング vs `git fetch origin {default} && git merge-tree`/dry-run マージ）。残余リスク（検証〜マージ間の main 移動）は既存 Req 3.4「既公開クレートは残し開発者指示待ち」の許容範囲内。
->
-> **【議題1 決定 2026-06-14】**: **Option 2「統合先・公開後」を採用**。安全順序を「main 統合（タグ・PR マージ）→ crates.io 公開 → GitHub Release」へ反転し、不可逆な公開を可逆な統合の後段に置く。これにより「公開済みだが統合不能」の窓が消滅（統合が先・ゲートになる）。統合成功後に公開が失敗した場合は main は既に正しいリリース状態であり、公開リトライ／中断で回復（Req 8.5・10 AC8）。要件側は Req 8.5・8.2・6.1・3.1・10 AC2/6–8 を更新済み。設計フェーズは Stage 順序を「Stage A 準備・ビルド → Stage B 統合（tag+PR merge）→ Stage C 公開（crates.io ∥ Marketplace）→ Stage D GitHub Release」へ再構成すること。
-
-### ⚠️ 落とし穴3: settings.json／steering がカーブアウト（直 push）前提のまま
-`.claude/settings.json` の `Bash(git push origin main:*)` と `workflow.md` L113 カーブアウト（DD5, kiro-gitflow-worktree-pr 由来）は**リリース直 push を許容する設計**で、Req 10（PR ベース・直 push 禁止）と矛盾する。Req 10 では (a) **タグ push 許可**（例 `Bash(git push origin v*:*)` 等）を追加し、(b) 直 push 許可とカーブアウトを**タグ公開限定に縮退 or 撤去**する必要がある。
->
-> **【議題2 決定 2026-06-14】**: これら周辺設定変更（settings.json 許可・workflow.md カーブアウト改訂・repo merge-commit 有効化）は **release-workflow の繰り返しタスクには含めない一回限りのセットアップ**として扱う。`spawn_task`（チップス）等での別セッション委譲はワークツリー隔離のため不可（別セッションは独自ワークツリーで起動し本ブランチの未コミット状態を継承できない）。よって**本セッション内で、設計確定後（タスク分解の前後）にエージェントが手動で実施**する。Steering Gate でも整合確認。
-
-## 4. 実装アプローチ評価
-
-### Option A: 既存 Stage C を PR 化＋kiro-complete パターン流用（推奨）
-Stage C を「タグ作成 → `gh pr create` → `gh pr merge --merge --delete-branch` → タグ push」へ置換し、PR 可否ゲート・中断セマンティクス・ローカル削除警告の非致命扱いを kiro-complete から流用。Stage B 直前にマージ可能性プローブ（AC6/7）を追加。settings.json／workflow.md を更新。
-- ✅ 検証済み PR パターンの再利用で設計・実装コスト最小／挙動の一貫性
-- ✅ コード新規作成ゼロ（オペレーション仕様の性質を維持）
-- ❌ Stage 順序にマージ可能性プローブを挿入する調整が必要
-
-### Option B: リリース専用 PR ヘルパー部品を新設
-- ❌ 対話的 LLM 実行の趣旨に反し、新部品は過剰。不採用
-
-### Option C: ハイブリッド（流用＋専用プローブ）
-Option A に対しマージ可能性プローブのみ独立サブステップ化。実質 A の一形態。プローブ手段が確定するまでの暫定整理として有効。
-
-## 5. 複雑度・リスク評価
-
-- **Effort: S（1–3日）** — オペレーション仕様の手順差し替え。PR 機構は kiro-complete から流用、新規コードなし。主作業は design/tasks の Stage C 改訂＋settings.json＋workflow.md 更新。
-- **Risk: Medium** — 単独では Low だが、(1) repo の merge-commit 許可状態が未確認（中核を左右）、(2) 不可逆公開×PR マージの順序リスク、の2点が Medium 要因。落とし穴1の確認で High/Low が確定する。
-
-## 6. 設計フェーズへの推奨事項
-
-1. **推奨アプローチ**: Option A。Stage C を PR マージコミット方式へ置換し kiro-complete パターンを流用。
-2. **着手前に Research Needed #1（merge-commit 許可）を解消**してから設計確定すること。
-3. Stage B 直前に **マージ可能性プローブ**（Req 10 AC6/7）を新ステップとして配置し、不可逆公開前ゲートとする。
-4. **タグはタグ ref push**（`git push origin vX.Y.Z`）とし、`--merge` 後に main から到達可能化。Stage D（Release 作成）はマージ後に実行。
-5. **settings.json／workflow.md の整合更新**を設計の File Structure Plan ＋ Steering Gate に明記（タグ push 許可追加、直 push 許可・カーブアウトの縮退）。
-
-### Research Needed（設計フェーズで調査）
-1. **【最優先】** repo の merge-commit 許可状態（`gh repo view --json mergeCommitAllowed,squashMergeAllowed,deleteBranchOnMerge`）。無効なら有効化要否を判断。
-2. （議題1で方針確定）マージ可能性は **PR マージ実行そのものがゲート**となる（統合先・公開後 = Option 2 採用）。事前の読み取り専用プローブは安全ゲートとしては不要化。残る検討は「ビルド前に早期 fast-fail させるための任意の事前チェックを置くか」のみ（任意・最適化）。
-3. 将来の GitHub ブランチ保護／タグ保護と本フローの相互作用（main 保護はタグ push を妨げないが、必須ステータスチェック有効化時は `gh pr merge` 即時マージがブロックされ得る）。
-4. settings.json 許可エントリの最終形（タグ push 許可の具体パターン、`git push origin main` 撤去可否）。
-5. タグ push と PR マージの実行順序（タグ ref を merge 前に push するか後にするか）と、Release 作成（Stage D）のマージ後実行の確定。
-6. リリース PR の title/body 生成方針（`--merge` のマージコミットメッセージは自動付与のため、PR 本文の供給方法を決める。kiro-complete の squash メッセージ生成方針（`merge-base..HEAD` 履歴要約）を流用するか）。
-
-## Design Synthesis（Req 10 設計フェーズ 2026-06-14）
-
-### Build vs Adopt
-- **Adopt**: PR 統合の制御ロジック（PR 可否判定・中断セマンティクス・`--delete-branch` ローカル削除警告の非致命扱い・メッセージ生成方針）は `kiro-complete` SKILL.md に検証済み実装がある。**新規構築せず流用**し、`--squash` を `--merge` に置換するのみ。リリース固有差分（マージコミット方式・タグ ref push・統合をゲートとする安全順序）だけを上乗せする。
-
-### Simplification
-- 議題1の Option 2（統合先・公開後）採用により、当初検討した「不可逆公開前の読み取り専用マージ可能性プローブ」は**不要化**。**PR マージ実行そのものが安全ゲート**となる（統合が先・失敗したら公開しない）。これにより別手段のプローブ設計（Research Needed #2）を削減し、Stage 構成を単純化。
-- 早期 fast-fail のための任意事前チェックは設計に含めない（過剰）。Phase 0 で merge-commit 許可と非デフォルトブランチを確認するのみ。
-
-### Generalization
-- Stage モデルを「準備 → **統合** → 公開 → Release」の 4 段に一般化。統合フェーズ（Stage B）を独立の安全ゲートとして切り出し、将来 main 直 push 禁止（ブランチ保護）が有効化されても同一フローで成立する構造とした。
-
-### Decision: 4-Stage Resource-Aware Staged Concurrency（改訂版・採用）
-- **Selected**: Stage A（ローカル直列）→ Stage B（統合 = tag + PR merge --merge、安全ゲート）→ Stage C（公開 crates.io ∥ Marketplace）→ Stage D（GitHub Release）
-- **Rationale**: 不可逆な crates.io 公開を可逆な main 統合の後段に置き、「公開済みだが統合不能」を排除。PR マージコミット方式で SHA・タグの参照整合性を保ち、直 push を廃して将来のブランチ保護に前方互換。
-- **Trade-offs**: main にマージコミットが 1 つ増える（squash の単一コミットより履歴は冗長）。repo の merge-commit 有効化（一回限りセットアップ）が前提。
-
-### Decision: ブランチ現在性は「ビルド前の自動非破壊マージ」（設計議題1 2026-06-14）
-- **Context**: `gh pr merge --merge` は main 分岐時に 3-way マージとなり、(a) ローカル HEAD と統合後 main の乖離、(b) ローカル HEAD から実行する `cargo publish` の公開内容が main と不一致、という二重リスクがある（レビュー Critical Issue 1・2）。
-- **Selected**: main 先行を検出したら **Phase 1（ビルド前）で `git merge origin/{default}` により非破壊で取り込む**（自動更新）。`reset`/`rebase` は使わず steering の危険 git 操作禁止に準拠。コンフリクト時は `git merge --abort` で中止・報告。Stage B Phase 6 で**最終 ff 再検証**し、Phase 1 後に main が再先行した稀ケースはリビルドループ回避のため中止・再実行誘導。
-- **Rationale**: ビルド前取り込みにより成果物（crates/ghost/VSIX）が更新後ツリーを反映し、公開内容＝main＝タグの整合が保証される（Req 10.9）。取り込みを Stage B に置くと成果物が陳腐化し再ビルドが必要になるため前倒し。
-- **Trade-offs**: main 先行時にマージコミットが作業ブランチに増える（rebase の線形性より保守的だが安全）。再ビルドコストは「先行検出時のみ」に限定。
-- **Impact**: design.md Phase 1 step3・Phase 6 step0・Track X 前提・Req 10.9 を追加。settings.json 一回限りセットアップに `git fetch`/`git merge` 許可を追加。
-
-### Decision: 部分公開からの自動回復（Resume Mode）（設計議題2 2026-06-14）
-- **Context**: Track X 部分公開後、新規 `/kiro-impl`（Req 9.1 リセット）+ 重複チェック(1.7)+ 統合済み main/タグ、により再実行が不能になる（レビュー Critical Issue 3）。
-- **Selected**: Phase 1 で「タグ存在かつ crates.io 一部公開」を検知し **Resume Mode** へ分岐。バージョン再決定・bump・統合をスキップし、成果物は再ビルド、未公開クレートのみ公開、Marketplace/Release は実状態を確認して不足のみ補完。冪等性は外部実状態（crates.io/Marketplace/GitHub）の都度確認で担保（タスク状態非依存 = Req 9.3 と両立）。
-- **Rationale**: 不可逆な部分公開を新規セッションでも完遂できる（ユーザーの完成度志向）。Req 9.5 新設・1.7 に resume 例外節を追加。
-- **Trade-offs**: 検知ロジックと冪等公開判定の複雑性増。新ワークツリーでの成果物再ビルドコスト（回復時のみ）。
-- **Impact**: design.md Phase 1 Resume 検知・「Resume Mode」節・Req 9.5 行を追加。Req 9.5 / 1.7 を更新。
-
-### Decision: タグ push を Stage D（公開後）へ遅延（設計議題3 2026-06-14）
-- **Context**: タグを Stage B（公開前）で push すると「タグはあるが crates.io 未公開」の窓が生じる。機能上タグを消費するのは Stage D（Release 作成）のみ。
-- **Selected**: タグ**作成**は Stage B（ローカル）のまま、タグ**push**を Track X 成功後の Stage D（Phase 7a）へ遅延。PR マージ（main 更新）は先（統合先の方針維持）。リモートのタグは常に crates.io 公開済みを含意する。
-- **無矛盾化**: 議題2の Resume 検知シグナルを「タグ存在」から「**main の現行バージョンが完全公開（全クレート公開・タグ push・Release）に至っているか**」へ変更。タグ未 push でも統合シグナル（main の bump 反映）で resume を検知できる。
-- **基本方針（ユーザー指示・恒久）**: 「時間はかかってもよい、なるべく自律的に解決し完遂できる手順であること。実行中、一時的に外部から変な状態が観測されることは許容する」。本方針を design.md Goals に明記。タグ遅延はこの方針下での品質向上（必須ではないが望ましい）。
-- **Impact**: design.md Stage B/D 記述・mermaid（graph/sequence）・Phase 6/7・Resume Mode・トレーサビリティ（6.4/6.5/10.5）を更新。Req 6.4/9.5/10.5 と 1.7 resume 節を更新。
-
-### Decision: 完遂保証とスケジュール永続リトライ（議題4 2026-06-14）
-- **Context**: ユーザー確認により、現行仕様の重大ギャップが判明。(1) リトライは有限バックオフ（約55分）で打ち切り、スケジュール再試行なし。(2) Marketplace 公開は「非クリティカル＝失敗時警告のみで完了」= **中途半端な完了を許容**しており、ユーザー方針「中途半端な完了は避ける／時間は無制限」と真っ向から矛盾。
-- **Selected（ハイブリッド: 短バックオフ → スケジュール再開）**: Req 11 を新設。完遂保証（no half-done）= 全ターゲット成功まで「完了」としない。失敗しやすい手順は第1段（セッション内バックオフ約55分）→ 第2段（スケジュールタスクで後刻再起動 → Resume Mode で未完了分続行、完遂で自己解除、固定上限なし）。一時障害のみスケジュール再試行、非一時障害（認証/権限/ビルド/コンフリクト）は未完了報告。
-- **Marketplace 再分類**: 「非クリティカル・スキップ可」→「**隔離されるが完遂必須**」。他トラックはブロックしないが未公開のまま完了しない。
-- **Rationale**: ユーザー基本方針（[[release-autonomy-over-transient-state]]）の徹底。セッション跨ぎのスケジュールで長期サーバー障害でも現在セッションを拘束せず完遂。
-- **Trade-offs**: スケジュールタスクのライフサイクル管理（作成・重複回避・自己解除）と一時/非一時の判別ロジックが必要。完遂まで時間を要し得る（要件として許容）。
-- **Impact**: requirements に Req 11 新設＋ Req 3.4/4.5/4.6/8.4/9.4/10.8・リリース対象表を更新。design に「共通リトライ戦略（二段）」「完遂保証とスケジュール永続リトライ」節・Track Y 再分類・エラー処理表・トレーサビリティ・完了サマリーを更新。Allowed Dependencies にスケジュール機構を追加。
-
-### Decision: 第2段は完全自律 cron（設計議題1-再 2026-06-14）
-- **Context**: 再レビュー Critical Issue 1。第2段スケジュール再試行の実行環境（ワークツリー/認証/ツール）が前提のままだった。
-- **Selected**: **完全自律 cron のみ**。cron 系機構で `/kiro-impl` をヘッドレス自律再起動。元ワークツリーは PR マージで削除済みのため **main の clean checkout** を基点（feature ブランチ不要）。認証は env ベース（`CARGO_REGISTRY_TOKEN`/`VSCE_PAT`/`gh`）がヘッドレスで有効である前提。通知フォールバックは持たない。
-- **安全網**: 前提（cron/env 認証/checkout）が欠ける場合は**非一時障害**として未完了報告＋エスカレーション（議題2）に回し、黙って消えない。Phase 0 で前提を事前検証。
-- **Impact**: design.md スケジュール機構・Phase 0（手順4 追加）・Allowed Dependencies（cron を P0・ヘッドレス前提明記）・コンポーネント表 Phase 0 行を更新。
-
-### Decision: 永続リトライは定期通知＋無限継続（設計議題2-再 2026-06-14）
-- **Context**: 再レビュー Critical Issue 2。上限なし自律リトライに可観測性がなく、恒久障害の誤分類で静かに無限ループするリスク。
-- **Selected**: 無限自律リトライを継続しつつ、**5 回ごと/24 時間経過ごとにプッシュ通知**で「未完遂・継続中・累計試行・最終エラー・分類」を報告。試行履歴は gitignore 対象の機械可読 status ファイル（`release/.release-retry-status-vX.Y.Z.json`）に保持し cron 起動を跨いで更新、完遂で削除。非一時障害は即時通知。
-- **Rationale**: 完全自律（議題1）・時間無制限を保ったまま「完遂待ち vs 実質詰み」を判別可能にし、開発者が手動中止・再分類できる。
-- **Impact**: Req 11.8 新設。design.md エスカレーション節・traceability 11.8・Allowed Dependencies（通知機構）・File Structure（status ファイル）を更新。
-
-### Decision: 第2段は ScheduleWakeup のみ（同一セッション）— cron/Desktop 案を上書き（設計議題3-再 2026-06-14）
-- **Context**: claude-code-guide で Claude Code のスケジュール機構を事実確認: (1) Routines=クラウドLinux（Windows MSVC ビルド不可）、(2) Desktop Scheduled Tasks=ローカル実行・OS非依存・セッション跨ぎ生存だが**Desktopアプリ常時起動が必須**、(3) `/loop`/ScheduleWakeup=同一セッション内待機→再開・セッション終了で消滅。さらに `mcp__ccd_session_mgmt__send_message`（別セッション→現セッション通知）は「対象セッション起動中・常にユーザー確認・unsupervised モード不可」のため自律完遂に使えないことも確認。
-- **Selected（ユーザー決定: ScheduleWakeup のみ／セッション維持）**: 第2段は **ScheduleWakeup**（同一セッション内で待機→再開）で実装。第1段（短期バックオフ約55分）→ 第2段（ScheduleWakeup 30〜60分間隔で完遂まで）。**同一セッション継続のため多重実行が原理的に起きず single-flight ロック不要**。cron / Desktop Scheduled Tasks / 別セッション起動・通知ハンドオフは**すべて不採用**。
-- **トレードオフ（明示的に許容）**: 完遂まで**セッションを開いておく前提**。完遂前にセッションを閉じた／マシンを落とした場合は停止 → 手動 `/kiro-impl` 再実行で Resume Mode（Req 9.5）が外部実状態から続行。**無人（セッション閉・マシンオフ）自動完遂は Non-Goal**。
-- **上書き**: 本決定は同ラウンドの「完全自律 cron」決定（コミット 8608807）を**上書き**する。エスカレーション（議題2・コミット 039fd94）はセッション内プッシュ通知として存続。
-- **Impact**: design.md 共通リトライ戦略・完遂保証節（ScheduleWakeup 全面書換）・Non-Goals（無人完遂を除外）・Phase 0 step4（cron 前提撤去）・Allowed Dependencies（cron→ScheduleWakeup）・File Structure（status ファイル撤去）・エラー処理表・コンポーネント表・トレーサビリティを更新。Req 11.3/11.4 を ScheduleWakeup へ。
-
-### Clarifications: 最終バリデーション round の文言補足（2026-06-14）
-- **Issue 1（Req 11.7 律速）**: 「固定上限なし」はリトライ論理の話であり、自律継続の実寿命は ScheduleWakeup ループ TTL（約7日）／セッション寿命に律速される。超過時は手動 resume で継続（Non-Goal の無人完遂と整合）。Req 11.7・design 完遂保証節に明記。
-- **Issue 2（待機機構）**: 待機は ScheduleWakeup を基本とし、前景の長時間 Start-Sleep は使わない（〜1分のみ Start-Sleep 可）。design 共通リトライ戦略に明記。
-- **Issue 3（状態クエリ）**: 冪等な完遂/Resume 判定の状態確認手段を具体化（crates.io index HTTP、`vsce show --json`、`gh release view`、`git ls-remote --tags`）。design Resume Mode 冪等性に明記。
-- いずれも振る舞い変更なしの明確化（カテゴリA）。
-
-## References（追加）
-- Claude Code スケジュール機構: [Desktop Scheduled Tasks](https://code.claude.com/docs/en/desktop-scheduled-tasks.md) / [Routines](https://code.claude.com/docs/en/routines.md) / [/loop scheduled-tasks](https://code.claude.com/docs/en/scheduled-tasks.md)
-- `.claude/skills/kiro-complete/SKILL.md` — PR 可否判定・PR 作成/マージ・中断条件・エラー回避（流用元の参照実装）
-- `.kiro/steering/workflow.md` L83–113 — リモート同期（PR squash）＋リリースタグ公開カーブアウト
-- `.claude/settings.json` — `git push origin main` 許可（カーブアウト用、要見直し）
-- `.kiro/specs/completed/kiro-gitflow-worktree-pr/` — PR 化の設計判断（DD5 カーブアウト、`deleteBranchOnMerge: false` 等）
-
----
-
-# 追補: マニュアルの対象バージョン行を版の同期対象に加える（Req 2.4–2.7）
-
-> 2026-10-03 追記。ディスカバリー種別: Extension（Light）。既存 Phase 2: VersionBump への統合のみで、新規アーキテクチャ要素は無い。
-
-## Context
-- v0.3.7 公開時点で、マニュアルのトップページ `book/src/introduction.md` が「v0.2 系列」を対象バージョンと表示していた。版上げの同期対象に含まれていなかったことが原因。
-- 同日の直接修正（コミット `64ca4075`）で表記を v0.3.7 に直し、`verify-content.mjs` の `F-version` を「対象バージョン行が `Cargo.toml` の `version` と一致する」照合に強化済み。本追補はこれをリリース手順に組み込む。
-
-## Findings
-- **置換対象は 1 行**: `| 対象 pasta バージョン | **vX.Y.Z** |`（Markdown 表のセル）。`verify-content.mjs` の照合正規表現は `^\| 対象 pasta バージョン \| \*\*v([^*]+)\*\* \|\r?$`（行末 CRLF 許容）。Phase 2 の置換パターンはこの書式を正とする。
-- **検証ツールの依存**: `verify-content.mjs` → `tutorial-check.mjs` / `gen-skill-refs.mjs` / `link-check.mjs` を import するが、いずれも `node:fs` / `node:path` / `node:url` のみ。`book/node_modules` は不要（`npm install` 無しで実行可）。
-- **Manual Sync Gate（steering workflow.md Gate 6）との関係**: 当該ゲートは `kiro-complete` の完了承認時に発火するもので、`completed` に遷移しない本 spec には適用されない。`introduction.md` は `gen-skill-refs.mjs` の `GENERATION_MAP`（grammar/lua 章）に含まれず、スキル生成物の鮮度にも影響しない。よって Phase 2 で追加するのは `verify-content.mjs` のみでよい。
-- **公開側の防御**: `manual.yml`（main への push で起動）が `verify-content.mjs` を build ジョブで実行し、失敗時は deploy を走らせない。Phase 2 の検証はこれを統合前に前倒しする二重防御となる。
-- **確認済み**: 対象バージョン行を意図的に v0.3.6 にずらすと `F-version` が FAIL し exit 1、戻すと PASS（159/159）。
-
-## Decision
-- Phase 2 の手順に「対象バージョン行の置換（ちょうど 1 行一致を要求）→ `cargo build` → `verify-content.mjs` → 3 ファイルを `git add` して 1 コミット」を組み込む。失敗時の `git restore` 対象に `book/src/introduction.md` を加える。
-- 置換は専用スクリプトを作らず、エージェントが正規表現置換（Edit 相当）で行う。一致行数が 1 でなければ置換せず中止する（書式変更の検知）。
-- マニュアル本文のその他の改訂・公開・`book/tools/` の修正は本 spec の対象外（マニュアル側 spec の責務）。
-
-## Risks
-- `introduction.md` の表の書式が変わると置換が 0 件になる → 置換せず中止するため、黙って古い版が残ることはない（Revalidation Trigger に登録）。
-- 旧 2.4–2.6 → 新 2.5–2.7 への番号繰り下げ: design.md の traceability・Phase 2・Error Categories・Testing Strategy を同時更新済み。tasks.md のタスク 2.1/2.2 は `/kiro-spec-tasks` で追従する。
+- `.github/workflows/release.yml`・`.github/scripts/release/*.ps1` — リリース CI の定義と status 契約の実装
+- `.kiro/specs/completed/release-ci/design.md` — status 契約・Out of Boundary の申し送り
+- `.github/release-ci-setup.md` — 一回限りのセットアップ（9 節: 初回のリリース、10 節: 必須の後片付け、11 節: 新しいクレート、12 節: 名前の対応表）
+- `crates/pasta_sample_ghost/RELEASE.md` — 人が読むリリース手順書
+- `.kiro/steering/workflow.md` — PR の squash マージ・CI を待たない運用
+- `.kiro/steering/roadmap.md` 「リリース手順の書き換え（`release-ci` の後）」 — 申し送りの一覧
