@@ -40,13 +40,13 @@
 
 - **繰り返し実行型**: `/kiro-impl release-workflow` が実行されるたびにタスクの状態はリセットされ、新たなリリース作業として実行される。
 - **永続的未完了**: 本仕様は `completed` に移行しない。
-- **パラメータ依存**: 実行のたびに、版が開発者から与えられるか、調査の結果から提案される。
+- **パラメータ依存**: 実行のたびに、版が開発者から与えられるか、調査の結果から自動で決まる。
 - **オペレーション仕様**: 製品コードの新規作成・変更を伴わない。変えるのは版の表記だけである。
 
 ## Boundary Context
 
 - **In scope**:
-  - 版の決定（調査・提案・承認・重複の検査）。
+  - 版の決定（調査・自動の決定・重複の検査）。
   - 版の更新と、その整合の確認。
   - 版の更新の main への統合（PR 経由）。
   - リリースタグの作成と push。
@@ -83,9 +83,9 @@
 #### Acceptance Criteria
 
 1. When リリース作業が開始され、版が指定されているとき, the Release Workflow shall 指定された版を使う。
-2. When リリース作業が開始され、版が指定されていないとき, the Release Workflow shall すべての版の出どころ（`Cargo.toml`・`editors/vscode/package.json`・Git のタグ・crates.io・GitHub Releases・VSCode Marketplace）を調べ、最大の版の PATCH を 1 つ上げた値を提案する。
-3. When 提案する版を算出したとき, the Release Workflow shall 出どころごとの調査結果と提案する版を開発者に示し、承認を求める。
-4. If 開発者が提案する版を承認しないとき, the Release Workflow shall 希望する版の入力を求める。
+2. When リリース作業が開始され、版が指定されていないとき, the Release Workflow shall すべての版の出どころ（`Cargo.toml`・`editors/vscode/package.json`・Git のタグ・crates.io・GitHub Releases・VSCode Marketplace）を調べ、最大の版の PATCH を 1 つ上げた値を、リリースする版にする。
+3. When 版を自動で決めたとき, the Release Workflow shall 出どころごとの調査結果と決めた版を開発者に示し、承認を求めずに先へ進む。
+4. The Release Workflow shall 版が指定されていないとき、MINOR・MAJOR を自動では上げない（上げるときは、開発者が版を指定して実行する）。
 5. When 版が与えられたとき, the Release Workflow shall `X.Y.Z`（数字 3 つ）の形かを検査する。
 6. If 版が `X.Y.Z` の形でないとき（プレリリースの形を含む）, the Release Workflow shall エラーを示し、入力し直しを求める。
 7. If 確定しようとする版が、Git のタグ・crates.io・GitHub Releases・VSCode Marketplace のいずれかにすでにあるとき, the Release Workflow shall エラーを示し、別の版の入力を求める。ただし Requirement 8 の「途中からの再開」にあたる場合を除く。
@@ -267,3 +267,4 @@
 4. **→ 設計で確定**（足さない。design.md「段 4」）: `build.yml` に `--locked` を足すか（版の更新で `Cargo.lock` を更新し忘れた場合を、関門の段で検出するか、今のまま配布物のビルドの段で検出するか）。
 5. **→ 設計で反映**: 実行するモデルの前提（開発者の方針 2026-10-10）。初回（CI での初回のリリース）は Opus で実行し、実行が安定したら Sonnet で実行する。設計とタスクは、実行するコマンドと判定の表（リリース CI の結果 → 次の手）を明記し、モデルの推論に任せる箇所を残さない粒度で書く。
 6. **→ 設計で確定**: リリース CI の実行が終わるのを待つ方法、初回のリリースの確認が済んだ記録の置き場所、Requirement 12 を行う場所と順、古い `research.md`・`gap-analysis.md` の扱い。
+7. **版の指定が無いときの承認**（1.2〜1.4）→ **確定（開発者の指示 2026-10-10）**: 承認を求めない。最大の版の PATCH を 1 つ上げた版で、そのままリリースする。<br>旧: 提案の版を示して承認を求め、承認されなければ希望の版の入力を求めた。
