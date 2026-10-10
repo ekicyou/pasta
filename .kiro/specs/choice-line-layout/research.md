@@ -10,8 +10,26 @@
   - 組み立ての状態機械は「その吹き出しに字を出したか」（`spot_has_text`）を既に持っている。選択肢の前に行の区切りを入れるかの判定は、この状態の上に足せる。
   - 実機のさくらスクリプトを採った（2026-10-10。下の「実機での確認」）。コードから導いた形と合い、原因は候補 1 に決まった。SSP の MCP の `raise_event` が、返ったスクリプトをそのまま返すので、ログを読むより早い。
   - emo2（`ghost_dev`）は選択肢行を使わず、台詞の中に `\q[…]`・`\n`・`\_l[…]` を手で書いている。選択肢のトークンだけを直す限り、emo2 の出力は変わらない。
+  - （設計フェーズ）`[ghost]` の既定値は Rust の `GhostConfig` が 1 か所で持ち、Lua の既定値のリテラルとマニュアルのリファレンスが食い違わないことをテストが検査している。`choice_newlines` を `spot_newlines` と同じ形にするには、`pasta/shiori/act.lua` だけでなく Rust の loader にも足す（下の「設計フェーズの調査」）。
+  - （設計フェーズ）台詞の行に書いた `\c` は `sakura_script` のトークンになり、組み立ては吹き出しの消去として数えない。数えるのは `act:clear()` が積む `clear` のトークンだけである。今の段落の区切りも同じである。
 
 ## Research Log
+
+### 設計フェーズの調査（2026-10-10）
+- **Context**: 「Design Decisions」の 5 つを決めるための、既存のコードの読み直し（Extension 向けの軽い調査）。
+- **Sources Consulted**: `sakura_builder.lua`、`pasta/act.lua`（`group_by_actor`）、`pasta/shiori/act.lua`、`pasta/config.lua`、`crates/pasta_lua/src/loader/config/sections.rs`・`config/mod.rs`・`mod.rs`、`crates/pasta_lua/tests/loader/`（`config_defaults_test.rs`・`config_sections_test.rs`・`startup_test.rs`）、`crates/pasta_lua/.luacheckrc`、同梱の luacheck の複雑度の数え方（`stages/detect_cyclomatic_complexity.lua`）、`crates/pasta_lua/src/code_gen/element_gen.rs`・`scope_gen.rs`、`book/src/internals/talk-output.md`、`book/tools/gen-skill-refs.mjs`、`.kiro/steering/roadmap.md`
+- **Findings**:
+  1. **設定の既定値の持ち方**。`spot_newlines` の既定値は `GhostConfig`（`config/sections.rs`）が持ち、`apply_shiori_defaults`（`config/mod.rs`）が `[ghost]` に書かれていないキーだけを補う。`config_defaults_test.rs` が、Rust の既定値、`pasta/shiori/act.lua` の既定値のリテラル（`"spot_newlines", 1.5` の文字列を探す）、`book/src/reference/pasta-toml.md` の表とテンプレートの 3 つを照合している。補うキーを 4 つと数えている文書は、`book/src/internals/loader.md`・`book/src/lua/modules/pasta-config.md`・`book/AUTHORING.md` にある。
+  2. **数値でない値の扱い**。`spot_newlines` は、Rust でも Lua でも検査・丸め・範囲の制限をしていない。`CONFIG.get` は `nil` のときだけ既定値を返し、`BUILDER.build` は `config.spot_newlines or 1.5` を 100 倍して切り捨てる。数値として計算できない値は、区切りを出す時点で Lua のエラーになるとみられる（コードの読み。走らせてはいない）。
+  3. **話し手なしのグループ**。`group_by_actor` が話し手なしのグループを開くのは、出力の先頭と `clear_spot` の後だけである。どちらでも、組み立ての `last_spot` は `nil` である。選択肢だけのシーン（選択肢行だけを書いたシーン）は、このグループになる。
+  4. **吹き出しの消去**。`clear` のトークンを積むのは `ACT_IMPL.clear`（`act:clear()`）だけである。台詞の行の `\c` は `Action::SakuraScript` として `sakura_script(…)` に変わる（`element_gen.rs`）。組み立ては `inner.type == "clear"` だけで状態を戻す。
+  5. **`clear_spot`**。話し手を宣言したシーンの先頭で `act:clear_spot()` が出る（`scope_gen.rs`）。組み立ては、ここで状態を全部戻す。同じ出力の途中で通ると、吹き出しに既に出ているものを組み立ては知らない。
+  6. **複雑度の例外**。`.luacheckrc` は `max_cyclomatic_complexity = 15` だけを持ち、ファイルや関数ごとの例外は書いていない。`BUILDER.build` は、関数の行の `-- luacheck: ignore 561` で許している。luacheck は CI（`build.yml` の `luacheck` のジョブ）で `pasta_scripts` と `tests` に走る。複雑度は、`if`・`elseif`・ループ・`and`・`or` を 1 つずつ数える。
+  7. **期待値の数**。完全一致で選択肢を照合しているのは、`call_execution_correctness_e2e_test.rs` の 8 件（317・335・346・360・373・384・397・408 行）と `shiori_act_test.lua` の 751 行の 1 件で、合わせて 9 件である（grep で数え直した）。`sakura_builder_test.lua` の選択肢のテストは部分一致と、2 種類のバッファの出力の一致で、区切りが増えても落ちない。
+  8. **生成元のページ**。`gen-skill-refs.mjs` の `GENERATION_MAP` にあるのは、本 spec が触るページのうち `grammar/block-structure.md`・`reference/pasta-toml.md`・`lua/script-api.md`・`lua/modules/pasta-config.md`・`internals/internal-modules.md` の 5 つである。`internals/talk-output.md`・`internals/loader.md` は生成元ではない。
+  9. **ロードマップの「`act.lua`」**。同じウェーブの約束（108 行）は「`act.lua`・`element_gen.rs`…を触らない」と書き、「共有接点」（146 行）は `crates/pasta_lua/pasta_scripts/pasta/act.lua` を名指しして「1 ウェーブに 1 spec だけが持つ」と書いている。約束の `act.lua` は、選択肢を積む側の `pasta/act.lua` と読める。`pasta/shiori/act.lua` を触る spec は、同じウェーブに無い。
+- **Implications**: 設計の決定（下の Design Decisions）と、設計ディスカッションへ送る未決の事項（`design.md` の「未決の事項」）。
+- **参照した手引き**: `kiro-spec-design` の規則（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）。変更は最小にし、既にある型（`spot_newlines` の読み方・換算・テスト・文書）を写す方針で決めた。
 
 ### 実機での確認（2026-10-10・要件ディスカッションの最初）
 - **Context**: brief の議題 1（原因はどれか）。Requirement 1 の記録。
@@ -115,7 +133,7 @@
 
 ## Design Decisions
 
-設計で決めること（ここでは決めない。選択肢だけを並べる）。
+設計フェーズ（2026-10-10）で決めた。開発者の判断が要るものは、仮定を置いて `design.md` の「未決の事項」へ送った。
 
 ### Decision: 行の区切りを入れる場所
 - **Context**: Requirement 2 の 1〜5。
@@ -123,8 +141,20 @@
   1. 組み立て（`sakura_builder.lua`）— 吹き出しの状態を見て出す。
   2. `act:choice`（`act.lua`）で改行のトークンを積む — 吹き出しの状態を知らないので、最初の選択肢でも改行が出る。ロードマップの約束で `act.lua` は触れない。
   3. 生成（`scope_gen.rs`）で `act:newline()` を足す — `act:choice` を直接呼ぶ Lua には効かない。吹き出しの状態も知らない。
-- **Selected Approach**: 未定（1 が有力）。
-- **Follow-up**: `build` の複雑度を上げない形（補助関数への切り出し）にするかを決める。切り出すなら、先に今の出力を固定するテスト（特性化テスト）を置く。
+- **Selected Approach**: 1。`BUILDER.build` の内側のトークンのループに、選択肢のための枝を 1 つ足し、字の枝に「最後が選択肢なら `\n`」を足す。区切りの文字列は局所関数が決める。
+- **Rationale**: 吹き出しの状態（字を出したか・消したか・話し手が切り替わったか）を知っているのは組み立てだけである。2 と 3 は、吹き出しの最初の選択肢にも改行が出る。
+- **Trade-offs**: `build` の複雑度が上がる（下の「`BUILDER.build` の複雑度」）。
+- **Follow-up**: 区切りは `\![*]` の前、`\p[N]` と外見の復旧タグの後ろに入る（今の段落の区切りと同じ位置）。実機でマーカーが行の先頭に出ることを確かめる。
+
+### Decision: `BUILDER.build` の複雑度
+- **Context**: luacheck の上限は 15、今は 22。枝を足すとさらに上がる。
+- **Alternatives Considered**:
+  1. 今の例外（関数の行の `-- luacheck: ignore 561` と `ponytail:` のコメント）のまま、判定を局所関数に出して増分を小さくする。
+  2. `build` を分割して上限に収める。
+  3. `.luacheckrc` の上限を上げる。
+- **Selected Approach**: 1。コメントの数字は、luacheck で測った値に直す（26 前後の見込み）。
+- **Rationale**: 2 は特性化テストを先に置く別の作業で、この修正に要らない。3 は他のファイルの検査が緩む。
+- **Follow-up**: 実装のときに luacheck を手元で走らせ、警告が出ないことと数字を確かめる。
 
 ### Decision: 区切りのタグと幅
 - **Context**: Requirement 2 の 8。
@@ -138,24 +168,47 @@
 - **Alternatives Considered**:
   1. 同じ経路に足す（`pasta/shiori/act.lua` に 2 行）。`spot_newlines` と扱いがそろう。
   2. 組み立て（`sakura_builder.lua`）の側で設定を直接読む。`act.lua` を触らないが、組み立てが設定のモジュールに依存する。
-- **Selected Approach**: 未定。
-- **Follow-up**: ロードマップの同じウェーブの約束は「`act.lua` を触らない」と書いている。選択肢を積む `pasta/act.lua` を指すとみられるが、文面は `pasta/shiori/act.lua` と区別していない。同じウェーブの他の spec は Lua を持ち場にしていないので、1 を採っても衝突はしない。数値でない値の扱いは、`spot_newlines` の今の動きを先に確かめてそろえる。`pasta.toml` のリファレンス（`book/src/reference/pasta-toml.md`）は、設定の一覧の表・記述例・キーの説明の 3 か所に `spot_newlines` があり、同じ 3 か所に足す。
+- **Selected Approach**: 1。`GhostConfig` の既定値 → `apply_shiori_defaults` の補完 → `SHIORI_ACT.new` が `CONFIG.get("ghost", "choice_newlines", 1.5)` で読む → `BUILDER.build` の設定の表、の順に届ける。Rust の loader にも足す（要件フェーズでは `pasta/shiori/act.lua` の 2 行だけを見込んでいた）。
+- **Rationale**: 組み立てが設定のモジュールを読まない今の形を保てる。`[ghost]` の既定値は Rust に 1 つという決まりと、その検査に乗れる。リファレンスの「`[ghost]` は書かなくても必ず `@pasta_config` に現れる」が、新しいキーでも成り立つ。
+- **Trade-offs**: 持ち場が Rust の loader・loader のテスト・マニュアルの内部のページ・`book/AUTHORING.md` の 1 行まで広がる。ロードマップの持ち場の文面（「`sakura_builder.lua` とそのテスト」）より広い（`design.md` の「未決の事項」の 3・4）。
+- **Follow-up（要件フェーズの記録）**: ロードマップの同じウェーブの約束は「`act.lua` を触らない」と書いている。選択肢を積む `pasta/act.lua` を指すとみられるが、文面は `pasta/shiori/act.lua` と区別していない。同じウェーブの他の spec は Lua を持ち場にしていないので、1 を採っても衝突はしない。数値でない値の扱いは、`spot_newlines` の今の動きを先に確かめてそろえる。`pasta.toml` のリファレンス（`book/src/reference/pasta-toml.md`）は、設定の一覧の表・記述例・キーの説明の 3 か所に `spot_newlines` があり、同じ 3 か所に足す。
 
 ### Decision: 選択肢を「字」に数えるか
 - **Context**: 選択肢だけを出した吹き出しへ話し手が戻るとき、段落の区切り（`\n[150]`）を出すか。今は選択肢を字に数えない。
 - **Alternatives Considered**:
   1. 今のまま数えない。選択肢の後の台詞の区切り（Requirement 2 の 5）だけで分ける。
   2. 選択肢を字に数える。`pasta.toml` の `spot_newlines` の説明（「すでに台詞を出したスポット」）も変わる。
-- **Selected Approach**: 未定。
-- **Follow-up**: 保留中の `\n[150]` と、選択肢の後の `\n` が同じ場所に重なるときに、どちらを出すか。
+- **Selected Approach**: 1。選択肢は字に数えない。`emits_text`・`spot_has_text` と、保留を立てる条件は変えない。吹き出しごとの「最後に表示したもの」（無し・字・選択肢）を、別の状態として 1 つ足す。
+- **重なるときの扱い**: 区切りは 1 つだけ出す。字の前では、保留があれば今も出ている `\n[spot_newlines × 100]` をそのまま出し、`\n` を重ねない。選択肢の前では、選択肢の規則（最後が字なら `\n[choice_newlines × 100]`、選択肢なら `\n`）で出し、保留には触らない（保留は、今までどおり次の字の直前で出る）。
+- **Rationale**: 今の出力に区切りを足すだけになり、既に出ている区切りは場所も幅も変わらない。選択肢の無い出力では「最後が選択肢」にならないので、出力が変わらないことが状態の持ち方から言える。`spot_newlines` の説明も変えずに済む。
+- **Trade-offs**: 選択肢を出した吹き出しへ、別の話し手の後で戻って台詞を出すと、要件 2.11 の文面（`\n`）ではなく `\n[spot_newlines × 100]` になる（`design.md` の「未決の事項」の 1）。選択肢だけを出した吹き出しへ戻るときは、保留が立たないので `\n` になる。
+- **採らなかった形**: 「最後に表示したもの」1 つに `spot_has_text` をまとめる形。状態は 1 つ減るが、今 `\n[150]` が出ている場所を保つには選択肢を字に数えることになり、`spot_newlines` の説明と既存の変数の意味が変わる。
 
 ### Decision: 話し手なしのグループの選択肢
 - **Context**: `shiori_act_test.lua:751` の形（出力の先頭で、話し手なしのまま選択肢を出し、その後で話し手が話す）。話し手なしのグループはスポットが未解決（`nil`）で、後の話し手のスポット 0 と、状態機械の上では別の吹き出しになる。
-- **Selected Approach**: 未定。実機では同じ吹き出し（スコープ 0）に出るので、Requirement 2 の 5 を当てるなら、未解決のスポットを 0 と同じに扱うかを決める。
+- **Selected Approach**: 新しい状態（最後に表示したもの）については、未解決のスポットを 0 として数える。`shiori_act_test.lua:751` の期待値は `\s[5]\_w[500]\n\c\![*]\q[d,t]\![set,choicetimeout,30000]\p[0]\nA\e` になる（`\p[0]` と `A` の間に `\n` が入る）。
+- **Rationale**: 選択肢行だけを書いたシーンは話し手なしのグループになる。ここで数えないと、選択肢どうしが同じ行に並び、Requirement 2 の 2 を満たせない。さくらスクリプトは、スコープを切り替えるタグが出るまでスコープ 0 の吹き出しに出る。
+- **Trade-offs**: 既存の `spot_has_text` は、今までどおり未解決のスポットを数えない（数えると、選択肢の無い出力で `\n[150]` が増える場合があり、Requirement 3 の 5 に反する）。`clear_spot` を出力の途中で通った後の話し手なしの選択肢は、実際のスコープが 0 でないことがある。救済しない。
+
+### Decision: 吹き出しの消去の数え方
+- **Context**: Requirement 2 の 3 の「吹き出しを消した直後」。台詞の行の `\c` は `sakura_script` のトークンで、組み立ては消去として数えない（「設計フェーズの調査」の 4）。
+- **Alternatives Considered**:
+  1. 今の規則と同じく、`clear` のトークン（`act:clear()`）だけを数える。
+  2. 字を表示しない `sakura_script` の中の `\c` を、新しい状態についてだけ数える。
+  3. 段落の区切りの規則も含めて、台詞の行の `\c` を数える。
+- **Selected Approach**: 1（仮定）。3 は選択肢の無い出力を変えるので、本 spec の Requirement 3 の 5 に反する。2 は 2 つの規則がずれる。
+- **Follow-up**: 設計ディスカッションで決める（`design.md` の「未決の事項」の 2）。台詞 → `\c` → 選択肢行と書くと、消した吹き出しの最初に `\n[150]` が出る。
+
+## 設計のまとめ（Synthesis・2026-10-10）
+
+- **まとめられたもの**: Requirement 2 の 1・2・3・5 は、吹き出しごとの「最後に表示したもの」（無し・字・選択肢）という 1 つの状態の遷移として書ける。選択肢行と `act:choice` は同じトークンなので、組み立ての 1 か所で両方に効く。幅つきの改行のタグを作る式は、`spot_newlines` と `choice_newlines` で 1 つの局所関数を使う。
+- **作らずに使うもの**: 設定の受け渡しは `spot_newlines` の経路をそのまま写す。既定値の検査は `config_defaults_test.rs` の既存の検査に 1 キー足す。新しいモジュール・依存・設定の仕組みは作らない。
+- **削ったもの**: 選択肢のタグの形の変更（`\__q`）、作者の改行の検出、台詞の行の `\c` の検出、`build` の分割、`.luacheckrc` の変更、組み立てからの設定の直接読み込み、9 段目の出力を照合するテストの追加（同じ並びは `pasta_shiori` の結合テストが見ている）。
+- **持ち場の広がり**: 要件フェーズの見込み（`sakura_builder.lua`・`pasta/shiori/act.lua`・期待値 9 件・マニュアル 3 ページ）に、Rust の loader 3 ファイル、loader のテスト 4 ファイルとフィクスチャ 1 枚、マニュアルの内部のページ 4 つ、`book/AUTHORING.md` の 1 行が加わった。
 
 ## 規模とリスク
 
-- **Effort**: S（1〜3 日）。既にある状態機械への枝の追加と、テスト・マニュアルの追従である。brief の見積もり（2〜4 タスク）と合う。
+- **Effort**: S（1〜3 日）。既にある状態機械への枝の追加と、テスト・マニュアルの追従である。brief の見積もり（2〜4 タスク）と合う。設計で持ち場が広がったので（上の「設計のまとめ」）、タスクは 5〜7 になる見込みである。
 - **Risk**: Low〜Medium。直す場所は 1 ファイルで、やり方は既存の改行の規則と同じ型である。一方で、選択肢行を使う既存のゴーストの見え方が変わること、実機でしか確かめられない点（行の配置・マーカーの位置）があること、同じファイルを `scene-anchor-link` も触ることが、Low に留まらない理由である。
 
 ## 設計フェーズへの申し送り
@@ -164,7 +217,19 @@
 - **決めること**: 上の Design Decisions。要件の側は、要件ディスカッション（2026-10-10）ですべて決まった。
 - **Research Needed**: 残っていない。実機のさくらスクリプト、2 つ目の選択肢が次の行に出る理由、`\n` を入れたときの見え方、既定のバルーンに収まるかは、2026-10-10 に確かめた（Research Log の「実機での確認」）。既存のゴーストへの影響は、要件の「決めたこと」に書いた。
 
+## 設計ディスカッションへの申し送り
+
+`design.md` の「未決の事項」の 5 つ。どれも仮定を置いて設計してある。
+
+1. 話し手の切り替えの区切りと重なるとき（`\n[spot_newlines × 100]` を残すか、要件の文面どおり `\n` にするか）。
+2. 台詞の行に書いた `\c` を、吹き出しの消去として数えるか（Requirement 2 の 3）。
+3. `pasta/shiori/act.lua` を触ること（ロードマップの「`act.lua` を触らない」の読み方）。
+4. `choice_newlines` を Rust の既定値の補完に足して、持ち場を広げること。
+5. 話し手なしの選択肢をスポット 0 として数えること（`shiori_act_test.lua:751` の期待値が変わる）。
+
 ## Risks & Mitigations
+- 持ち場がロードマップの文面より広い — 同じウェーブの他の spec が触るファイルと重なるのは `book/AUTHORING.md` だけで、節が違う（`manual-print-media-refs` は「CI と同じ順」の一覧）。後から入る側が rebase する。広げるかどうかは設計ディスカッションで決める。
+- 区切りの規則を取り違えて期待値を書く — 新しい期待値は `design.md` の「Supporting References」の表に書いてある。走らせた出力と表を比べる。
 - 完全一致の期待値（9 件）の直し漏れ — `pasta_shiori` と `pasta_lua` のテストを両方走らせる。期待値は、新しい規則を手で当てて書く（出力を写すだけにしない）。
 - `scene-anchor-link` との衝突（同じ `sakura_builder.lua`） — ロードマップの順番どおり、本 spec を先に入れる。アンカーは台詞の中の `＠？` で、本 spec の選択肢行とは別のトークンである。
 - スキルの参照資料の再生成が止まる — `.claude/skills/` への書き込みは開発者の許可が要る。マニュアルを直すタスクで、再生成の前に許可を求める。
