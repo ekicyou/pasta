@@ -318,7 +318,7 @@ gh pr create --base {default-branch} --head $branch --title "<subject>" --body "
 gh pr merge --squash --delete-branch --subject "<subject>" --body "<body>"
 ```
 
-- **CI の完了を待たない。** PR を作ったらすぐ squash マージする。マージ前の関門はステップ1の Test Gate（ローカルの `cargo test --all`。clippy `-D warnings` も通しておく）であり、CI の緑を見張らない。main が CI で赤くなったら次の作業より先に追いかけの修正で直す。「main の CI 全緑」は `release-workflow` が crates.io 公開の前に課す（workflow.md「3. リモート同期」）。
+- **CI の完了を待たない。** PR を作ったらすぐ squash マージする。マージ前の関門はステップ1の Test Gate（ローカルの `cargo test --all`。clippy `-D warnings` も通しておく）であり、CI の緑を見張らない。main が CI で赤くなったら次の作業より先に追いかけの修正で直す。取り消せない公開の前の検査は、リリース CI がタグのコミットで行う（workflow.md「3. リモート同期」）。
 - **マージ成否はマージ API の結果のみで判定する。** `gh pr merge` の成否がマージ成否であり、それ以外の警告でマージ成功を覆さない。
 - **リモートブランチ削除**: `gh pr merge --delete-branch` が **PR マージ成功後に** API でリモート feature ブランチを削除する。
 - **ローカル後始末警告は非致命**: `--delete-branch` のローカル削除試行は、カレントワークツリーでブランチがチェックアウト中のため**ブロックされ警告を出す**ことがある。これは**非致命**でありマージ成功（API 結果）を覆さない。リモートブランチは API により削除済みである。
