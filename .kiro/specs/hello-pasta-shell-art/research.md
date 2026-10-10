@@ -145,6 +145,22 @@ B の内容を、独立に検証・revert できる段に分ける。
 5. （解決）`about.hbs`・`package.json` は既に MIT。Q1 は MIT 単独で確定。
 6. `build.rs` の `pasta_shiori/src` 監視は、生成を消した後も意味があるか（無ければ `build.rs` ごと削除できる）。
 
+### 6.2a 画風の手本の調査（2026-10-10・要件ディスカッション）
+
+画風と構図は「悪役令嬢クローディア」のシェルに揃えると決めた（Q15）。手本のリポジトリ（`https://github.com/ponapalt/claudia`、確認したコミット `02cbd4f5`）で確かめた事実。
+
+- **構図と寸法**: 全身・正面・約 3 頭身のちびキャラ。`shell/master/surface0.png`（令嬢）と `surface10.png`（執事）はどちらも 333×500 px。紹介ページ用の `site/img/s0.png` は 256×477 px・168 KB。
+- **絵の作り方**: 制作後記（`https://ponadocs.shillest.net/claudia/`）に「シェル画像の生成: ponapalt（Claudia と相談しながら gpt-image-2.5-flare で生成）」とある。brief の本線（`fal-ai/qwen-image-edit-2511`）とは別のモデル。
+- **表情の作り方**: 同じポーズの表情は `element0,base,surface0.png` に目だけの画像（`claudia_eyes_N.png`）を `element1,overlay` で重ねる。ポーズが違う表情（扇を上げるなど）だけ別の 1 枚絵を持つ。brief のドリフト対策の 2 案目（element で重ねる）の実例で、ずれが構造上起きず、ファイルも小さい。
+- **当たり判定**: `collisionexN,ID,rect|ellipse|polygon,...` の形。令嬢は `Head`・`Face`・`Bust`・`Hair`・`Foot`・`Skirt`・`Fan`、執事は `Head`・`Face`・`Body`・`Foot`・`Tray`。全サーフェスに同じ名前を置き、ポーズが違う絵だけ座標を変えている。
+- **吹き出し**: `sakura.balloon.offsetx,50`・`offsety,15`、`kero.balloon.offsetx,70`・`offsety,220`、`balloon.alignment,none`。
+- **ライセンス**: 辞書・シェル画像を含めすべて Unlicense。画風の参照画像として生成に渡せる。
+
+設計で調べること:
+
+1. 手本と同じモデル（gpt-image-2.5-flare）が使えるか、出力の利用条件と透かしの有無。使えない場合に、brief の本線のモデルで手本の画風をどこまで再現できるか（手本の絵を参照画像として渡す）。
+2. 大きさ: 手本と同じ 333×500 px で 18 枚を 1 枚絵で持つと約 3 MB（168 KB × 18）になり、Q5 の仮定（合計 1.5 MB）を超える。目だけ重ねる構成なら大幅に減る。寸法と上限は Q5・Q11 の議論で決める。
+
 ### 6.2b 要件ディスカッションから設計へ持ち越した判断（2026-10-10）
 
 要件では結果だけを定め、方式は設計で選ぶと決めた項目。
