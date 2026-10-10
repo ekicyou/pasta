@@ -7,11 +7,11 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 現在の主題は 2 つある。
 
 - **Phase 11 の残り: 属性セマンティクスと失敗の出力**。シーン属性の保持と読み出し、実行時の失敗の出力の一本化、Call の属性フィルター、文中のシーンリンク、スクリプトが止まるエラーのバルーン表示が残る。
-- **Phase 12: 初心者向けの入門ガイド**。段階辞書とマニュアルの着せ替えは済んだ。残るのは、hello-pasta の新しいシェル、入門ガイドの本文の書き直し、スクリーンショット。
+- **Phase 12: 初心者向けの入門ガイド**。段階辞書・マニュアルの着せ替え・入門ガイドの本文は済んだ。残るのは、hello-pasta の新しいシェル、スクリーンショット、本文の実機確認で見つかった見え方の不具合と検査の穴。
 
 このほか、リリース手順（常駐 spec `release-workflow`）の CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ（2026-10-10）。
 
-**優先順位（開発者の方針 2026-10-10）**: トークンの予算のため、当面はマニュアルのサイトの作り直し（入門ガイドの本文）を最優先とし、CI とリリース、急いで直す不具合だけを進める。それ以外は見送る（下の「棚卸」のウェーブ）。
+**優先順位（開発者の方針 2026-10-10）**: トークンの予算のため、当面はマニュアル・見本のゴースト（hello-pasta）・CI を最優先とし、次に致命的な不具合だけを進める。それ以外は見送る（下の「棚卸」のウェーブ）。
 
 ## 運用ルール
 
@@ -58,7 +58,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 ### 常駐 spec（再実行型・`completed/` へ移さない）
 
-- `release-workflow` — crates.io・VSIX・ゴーストのリリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認。CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ。下の「リリース手順の書き換え」）
+- `release-workflow` — crates.io・VSIX・ゴーストのリリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認。CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ。下の「リリース」）
 - `review-improvement-loop` — レビュー領域 × 7 次元の改善ループ
 
 ### 却下（2026-10-01）
@@ -72,83 +72,70 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - `pasta-check-bundled-balloon` を v0.3.7 で公開したことの、emo2 開発セッションへの連絡 — 実施の有無はリポジトリから確認できない。
 - `getting-started-story-guide` の公開後の確認 4 点（2026-10-10。実装では、SSP を `--ghost` で一時起動して全 13 段をたどった。次の操作は試していない）— (1) 準備の章: ゴーストのフォルダを SSP の `ghost/` の下へ置いて切り替え、立ち絵が無い状態でタスクバーの SSP のアイコンからメニューを開いて終了できるか（最初に確かめる。違っていると読者が 1 段目へ進めない） (2) 目次: 実際のブラウザーで幅を狭めて開き、項目をクリックしても開いたままか (3) 7 段目: メニューから emo2 そのもの（`えも？？`）と切り替えて挨拶が出るか (4) 13 段目: フォルダのドロップで `.nar` ができるか（読者の `profile/` が入るかも見る）。`getting-started-screenshots` の実機の作業のついでに済ませるかを、同 spec の要件で決める。
 
-## 棚卸（2026-10-10・main `add05022`）
+## 棚卸（2026-10-10 の 2 回目・main `a59438c6`）
 
-前回（2026-10-07）の後に 5 本が入った（`release-ci`・`scene-name-alias`・`expr-nil-coercion`・`manual-claudia-theme`・`hello-pasta-tutorial-stages`）。未完了の 7 本を現行 main と再照合した（各 brief の末尾に「2026-10-10 棚卸の再測定」の節がある）。進行中の spec は無かった。前回までの棚卸の記録は、git の履歴にある。
+同じ日の 1 回目（main `add05022`）の後に、次のものが入った。入門ガイドの本文（`getting-started-story-guide`）、リリース手順の書き換えと CI での初回のリリース（v0.3.8）、配布物への直接リンクと README の見直し、入門ガイドの節「シェルの中身」。brief が 5 本増えた（`manual-link-anchor-check`・`choice-line-layout`・`baseware-virtual-time`・`boot-surface-without-dic`・`manual-shell-guide`）。未完了は 15 本で、進行中の spec は無い。1 回目の記録は git の履歴にある。
+
+再測定は絞った（トークンの予算のため）。
+
+- 1 回目の後、エンジンのソース（各クレートの `src/` と `pasta_scripts/`）は版の番号のほかに変わっていない。Phase 11 の残り 5 本と `pasta-check-dic-validate`・`shiori-test-support-runtime` は、1 回目の測定（各 brief の「2026-10-10 棚卸の再測定」の節）をそのまま使う。
+- マニュアルと見本のゴーストに関わる 8 本は、各 brief の測定と申し送りの節を読み直した。どれも 2026-10-10 の main で書かれていて、直す所は無かった。
 
 ### 即時修正（spec なし・本棚卸で実施して閉じた）
 
-- `steering/product.md` — `SOUL.md` へのリンク切れ 2 か所、完了件数（156）、存在しないコマンド名（`/kiro-spec-impl` → `/kiro-impl`）、現在地。
-- `steering/structure.md` — シーン名の別名表（`scene_alias.rs`）の追加、ローダー設定がフォルダ（`config/`）になったこと、`pasta_check` の依存の一覧、文法定義ファイルのパス。
-- `steering/tech.md` — 文法定義ファイルの名前、公開ポリシー（公開済み・リリース CI が公開する）、マニュアルの CI が起動する条件。
-- `steering/workflow.md` — 存在しないコマンド名 2 か所。
-- `TEST_COVERAGE.md` — 完了した spec へのリンクを `completed/` に直した。
-- `crates/pasta_shiori/tests/shiori_lifecycle_test.rs` — もう存在しない spec フォルダを指すコメントを消した。
-- `editors/vscode/scripts/build-wasm.ps1` — 使い方のコメントを今の呼び出し方に直した。
-- この roadmap — 完了した 5 本を「完了フェーズ」へ畳んだ。バックログの「print.html の動画の参照切れ」の説明の誤り（壊れているのは動画だけで、代わりのリンクは働いている）は、起票した brief で正した。
+- `steering/product.md` — 現行の版（v0.3.8）と現在地。
+- この roadmap — 完了した `getting-started-story-guide` の行を消し、済んだ「リリース手順の書き換え」のチェックリストを「リリース」の節へ畳んだ。
 
-### spec へ申し送ったもの（各 brief の再測定・申し送りの節）
+### spec へ申し送ったもの
 
-- `scene-attribute-store` — 見本の辞書（`sample.pasta`）にファイルの属性があるので、属性を出力すると期待値のファイルが変わる。宣言行の属性と属性行の両方に同じキーがあるときの優先を決める。別名で同じ名前になるシーン（`＊会話` と `＊OnTalk`）があるので、属性は宣言ごとに持つ。
-- `failure-output-unification` — 数値化・文字列化の関数（`act.lua` の `ACT.num`・`ACT.str`）と動的な単語キーは `act` を受け取らないので、今のままではバルーンへ出せない。生成コードの形を変えるか、出口の側が「今の act」を持つかを要件で決める。未登録のアクターは、今も 2 回ログに出る。
-- `call-attribute-filter` — `pasta_core` の `resolve_scene_id`（本番の呼び出し元が無い公開 API）を消すか残すか。LSP の Call の読み取り（`visit_action.rs`）も触る。フィルターで外れたときも「シーンが見つからない」と出る。イベントの入口（`act:find_scene`・`SCENE.co_exec`）も絞るか。
-- `scene-anchor-link` — hello-pasta への作例は Scope から外す（段階表と重なり、20 タスクを超える）。`OnAnchorSelectEx` が何も返さないと SSP は続けて `OnAnchorSelect` を送る。VSCode 拡張の単語参照の枠（`wordRefDecorator.ts`）が `＠？名前` も囲む。
-- `hello-pasta-shell-art` — 配布物を作るスクリプト（`release.ps1`）の絵を生成する段を外さないと、リリース CI がコミットした絵を上書きする。8 段目の台詞は当たり判定の部位名をそのまま声に出すので、読んでおかしくない名前にする。配布物の大きさの上限を数字にする。`crates/pasta_sample_ghost/README.md` の `scripts/` の説明が古い。
-- `getting-started-story-guide` — 今の入門ガイドの古い説明 4 か所（途中の段階では起動しないことがある・`scripts/` に Lua ランタイムを置く・8 段目の「書き方は変わらない」・画像を自動生成する仕組み）。書き直しで消える。ゴースト自身の切り替えでは `OnGhostChanging` が届かない。
-- `shiori-test-support-runtime` — 回避の設定が 4 か所に増えた（`scene-name-alias` の結合テストが写した）。テスト用ライブラリの写し（`tests/support/scriptlibs/`）も古い。別のコピー処理が今の読み込み先に効いているかを確かめる。
-- `release-workflow` の書き換え — 下の「リリース手順の書き換え」に項目を足した。
-- 次の `review-improvement-loop` — `pasta_shiori` の `string_to_multibyte`（テスト専用）を消すか、3 行の分岐を足すか。
+- `manual-print-media-refs` — `.github/workflows/manual.yml` の 114 行目あたりのコメントが、消えた章（`first-ghost.md`）を指している。brief に申し送り済み。
+- `getting-started-screenshots` — 先に要るものに `choice-line-layout` を足した（9 段目の絵に、切れた選択肢が写らないようにする）。
 
-### 統合・分割・起票
+### ウェーブ（2026-10-10 の 2 回目）
 
-- 分割: `getting-started-story-guide` を本文と絵に分けた（22〜24 タスクで 20 を超えた。本文は今始められ、新しいシェルを待つのは絵だけ）。本文は元の名前のまま、絵は `getting-started-screenshots`。
-- 分割: `failure-output-unification` から、スクリプトが止まるエラー（500 の応答）のバルーン表示を `runtime-error-balloon` へ出した（含めると 25〜29 タスク）。境目は「シーンがまだ生きていて、`act` に積めるか」。
-- 起票: `pasta-check-dic-validate`（バックログの「`.pasta` を検査するコマンド」。`scene-anchor-link`・`failure-output-unification` が読み込み時の検出をここへ任せており、手作りの検査と回避の注記が 3 か所にある）。バックログの「モジュール名の衝突」「サニタイズ後のシーン名の衝突の警告」と、`scene-name-alias` が範囲外にした「`pasta_check` に pasta.toml を読ませる」を検査の項目として引き取る。
-- 起票: `manual-print-media-refs`（バックログの「print.html の動画の参照切れ」。コードと CI を変えるので spec にした）。
-- 順序: `hello-pasta-shell-art` の先に要る 2 本は完了した。`scene-anchor-link` と `call-attribute-filter` は同じファイルを触る順番だけの関係で、どちらを先にしてもよい（下の「開発者の判断が要るもの」）。
-- バックログに残したもの: 文法の将来項目・最適化の候補（動機なし）、デバッグポートの奪取（守りの方針の判断）、式の木の優先順位・デバッガ索引・タグの読み取り・閉じていない引用（利用者なし）、時々落ちる TCP のテスト（新しい発生の記録なし）、BudouX の禁則（実例待ち）。完了 spec に残っていた 3 件を足した。
+開発者の方針（2026-10-10 の 2 回目）: **マニュアル・見本のゴースト・CI を最優先**とし、次に致命的な不具合だけを進める。それ以外は見送る（トークンの予算のため）。致命的な不具合は無かった。依存の木の先頭は 9 本あり、そのうち方針に合う 4 本を始める。互いのソースは下の約束で重ならない。
 
-### ウェーブ（2026-10-10）
+| spec | 子孫 | 種別 | 規模 | 要件定義 |
+| ---- | ---- | ---- | ---- | -------- |
+| hello-pasta-shell-art | 約 3（`getting-started-screenshots`・`manual-shell-guide`・`pasta-check-dic-validate`） | 機能（見本のゴースト） | 12〜14 | Fable |
+| choice-line-layout | 約 1（`getting-started-screenshots`） | バグ（見本のゴースト・入門の 9 段目の見え方） | 2〜4 | Opus |
+| manual-print-media-refs | 0 | バグ（マニュアル・CI） | 2〜3 | Opus |
+| manual-link-anchor-check | 0 | 検査の穴（マニュアル・CI） | 2〜4 | Opus |
 
-依存の木の先頭は 7 本ある。ただし開発者の方針（2026-10-10）で、このウェーブは**マニュアルのサイトの作り直し・CI とリリース・急いで直す不具合**に絞る（トークンの予算のため）。急いで直す不具合は無かった。始めるのは次の 2 つ。
+同じウェーブに置くときの約束:
 
-| 対象 | 種別 | 規模 | 要件定義 |
-| ---- | ---- | ---- | -------- |
-| getting-started-story-guide（本文） | 文書（サイトの作り直し・最優先） | 18〜20 | Fable |
-| `release-workflow` の書き換え（常駐 spec。下の「リリース手順の書き換え」） | 基盤（リリース・期限 2026-12-01） | 7〜9 | Opus |
+- `hello-pasta-shell-art` は、頭の部位名を今の `Head` のままにする。辞書と `book/` は、部位名の都合で変えるときに限り、8 段目（`dic/08-touch.pasta`・`book/src/getting-started/08-touch.md`）だけを触る。段階表（`STAGES.md`）は、部位名の注記と 8 段目の行だけを触る。`book/tools/` を触らない。`Cargo.lock`・ルートの `Cargo.toml`・`release.ps1` は、このウェーブではこの spec だけが触る。リリースの実行中は、`release.ps1` の変更を main へ入れない。
+- `choice-line-layout` が触るのは、選択肢の出力（`sakura_builder.lua` とそのテスト）か、9 段目の辞書（`dic/09-choice.pasta`）・章（`09-choice.md`）・段階表の 9 段目の行・`tests/tutorial_stages_test.rs` のどちらかである。`act.lua`・`element_gen.rs`・シェルのファイル・`tests/integration_test.rs` を触らない。
+- `manual-print-media-refs` は、`manual.yml`・`book/tools/verify-static.mjs`・`book/AUTHORING.md` の「CI と同じ順」の一覧を持つ。`link-check.mjs` を触らない。
+- `manual-link-anchor-check` が触るのは、`link-check.mjs` とその自己テスト、切れたリンクの行だけである。`manual.yml`・`verify-static.mjs`・`AUTHORING.md` を触らない。
+- スキル references は、後から入る側が再生成する。
 
-絵の無い入門ガイドを先に公開してよい（開発者決定 2026-10-10）。本文は、新しいシェルとスクリーンショットを待たずに main へ入れる。
+次点（開発者が「やる」と決めたら足せる）: `boot-surface-without-dic`（Fable・やる場合で 3〜5）。辞書が無い間に立ち絵を出すかどうかを決める spec で、エンジンの既定の動きを変える。入門の準備の章に載せる絵が変わるので、やるなら `getting-started-screenshots` より前に入れる。
 
-見送った先頭（予算が戻ったら、この順に取る。互いのソースは下の約束で重ならない）:
+見送った先頭（予算が戻ったら、この順に取る）:
 
 | spec | 子孫 | 種別 | 規模 | 要件定義 |
 | ---- | ---- | ---- | ---- | -------- |
 | failure-output-unification | 約 3（`call-attribute-filter`・`scene-anchor-link`・`runtime-error-balloon`） | 機能 | 15〜19 | Fable |
 | scene-attribute-store | 約 2（`call-attribute-filter`・`scene-anchor-link`） | 機能 | 15〜18 | Fable |
-| hello-pasta-shell-art | 約 1（`getting-started-screenshots`） | 機能（開発者の方針） | 12〜14 | Fable |
 | shiori-test-support-runtime | 約 1（`runtime-error-balloon`） | 基盤 | 6〜8 | Opus |
-| manual-print-media-refs | 0 | バグ | 2〜3 | Opus |
+| baseware-virtual-time | 約 1（`getting-started-screenshots` の 6 段目の撮り方） | 作成支援（調査から） | 調査による | Fable |
 
-同じウェーブに置くときの約束（見送った spec を後から始めるときも、そのまま使う）:
+見送った spec を後から始めるときの約束（1 回目の棚卸から引き継ぐ）:
 
-- `failure-output-unification` は、生成コードの形（`expr_gen.rs`・`element_gen.rs`・見本の期待値ファイル）を変えない。期待値ファイルはこのウェーブでは `scene-attribute-store` が作り直す。要件で生成コードを変えると決めた場合は、`scene-attribute-store` を先に入れて rebase する。
-- `scene-attribute-store` は、属性を読み出す API を `act.lua` に置かない（`scene.lua` の `SCENE` 側に置く）。`act.lua` はこのウェーブでは `failure-output-unification` が持つ。
-- `hello-pasta-shell-art` は、頭の部位名を今の `Head` のままにし、hello-pasta の辞書（`dic/`）と `book/` を触らない。`Cargo.lock` とルートの `Cargo.toml`（絵を描く部品の取り外し）は、このウェーブではこの spec だけが触る。
-- `getting-started-story-guide` は、シェルのファイルの中身を本文に書き写さず、画像を置かない。部位名は段階表（`STAGES.md`）から取る。`.github/workflows/manual.yml` を触らない。
-- `manual-print-media-refs` は、`manual.yml` と `book/tools/verify-static.mjs` をこのウェーブで持つ。入門の章と、本文の検査（`verify-content.mjs`・`tutorial-check.mjs`）を触らない。
+- `failure-output-unification` は、生成コードの形（`expr_gen.rs`・`element_gen.rs`・見本の期待値ファイル）を変えない。期待値ファイルは `scene-attribute-store` が作り直す。要件で生成コードを変えると決めた場合は、`scene-attribute-store` を先に入れて rebase する。
+- `scene-attribute-store` は、属性を読み出す API を `act.lua` に置かない（`scene.lua` の `SCENE` 側に置く）。`act.lua` は `failure-output-unification` が持つ。
 - `shiori-test-support-runtime` は `crates/pasta_shiori/tests/` だけを触る。Phase 11 の spec が結合テストを足す前に入れるほど、回避の写しが増えない。
-- マニュアルの同じページの別の節（`lua/script-api.md` など）は、`scene-attribute-store` と `failure-output-unification` が分け合う。スキル references は後から入る側が再生成する。
+- マニュアルの同じページの別の節（`lua/script-api.md` など）は、`scene-attribute-store` と `failure-output-unification` が分け合う。
 
-見送った先頭の後に置くもの: `pasta-check-dic-validate`（子孫 0。依存を足すと `Cargo.lock` が変わり、このウェーブでは `hello-pasta-shell-art` がその席を持つ。マニュアルに章を足すと、章の数の検査を `getting-started-story-guide` と共有する）。
-
-その次の候補: `call-attribute-filter`（または `scene-anchor-link`。同じファイルを触るので 1 本ずつ）、`runtime-error-balloon`、`pasta-check-dic-validate`、`getting-started-screenshots`。互いのソースは重ならない。
+その次の候補: `getting-started-screenshots`（`hello-pasta-shell-art` と `choice-line-layout` の後）、`manual-shell-guide`（`hello-pasta-shell-art` の後。優先度は低い）、`pasta-check-dic-validate`（`Cargo.lock` の席が空いてから）、`call-attribute-filter`（または `scene-anchor-link`。同じファイルを触るので 1 本ずつ）、`runtime-error-balloon`。
 
 ### 開発者の判断が要るもの（ウェーブは止めない）
 
-- 見送った spec をいつ始めるか — 予算の都合で、Phase 11 の残りと `hello-pasta-shell-art`・`shiori-test-support-runtime`・`manual-print-media-refs` を見送った。`shiori-test-support-runtime` は、Phase 11 の spec より先に入れるほど後片付けが減る。
+- 辞書が無い間に立ち絵を出すか — `boot-surface-without-dic` の要件の最初の議題。やらないなら却下する。
 - スクリプトが止まるエラーをバルーンに出すか — `runtime-error-balloon` の要件の最初の議題。要らなければ却下する。
 - `call-attribute-filter` と `scene-anchor-link` のどちらを先にするか — 台帳は前者を先にしている。後者を先にすると、`scene-attribute-store` を待たずに始められる。
-- リリース手順の書き換えと初回の CI リリースの時期 — `hello-pasta-shell-art` が `release.ps1` を変える前に済ませると、失敗の原因を認証の設定だけに絞れる。期限は 2026-12-01。→ 済んだ（2026-10-10。v0.3.8）。
+- 見送った spec をいつ始めるか — `shiori-test-support-runtime` は、Phase 11 の spec より先に入れるほど後片付けが減る。
 - `steering/structure.md` の作り直し — `pasta_shiori` の木が無い、`pasta_lua/tests` の一覧が古い、など。`/kiro-steering` で直す。
 
 ## Phase 11 の残り: 属性セマンティクスと失敗の出力
@@ -156,7 +143,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 ### 境界戦略
 
 - **分割理由**: シーン属性を 2 つに分けた（2026-10-04）。保持・継承・読み出し（`scene-attribute-store`）と、Call の属性フィルター（`call-attribute-filter`）。実行時の失敗の出力も 2 つに分けた（2026-10-10）。シーンが生きている間の失敗の出口の一本化（`failure-output-unification`）と、スクリプトが止まるエラーのバルーン表示（`runtime-error-balloon`）。
-- **共有接点**: `crates/pasta_lua/pasta_scripts/pasta/act.lua` は 1 ウェーブに 1 spec だけが持つ。`failure-output-unification`・`call-attribute-filter`・`scene-anchor-link` が触る。`crates/pasta_lua/src/code_gen/element_gen.rs` も 1 ウェーブに 1 spec だけで、`call-attribute-filter` と `scene-anchor-link` が触る。`scene-attribute-store` と `call-attribute-filter` は、`scene.lua` と `pasta_core` のシーン登録（`scene_registry.rs`・`scene_types.rs`）を共有するので、この順に置く。
+- **共有接点**: `crates/pasta_lua/pasta_scripts/pasta/act.lua` は 1 ウェーブに 1 spec だけが持つ。`failure-output-unification`・`call-attribute-filter`・`scene-anchor-link` が触る。`crates/pasta_lua/src/code_gen/element_gen.rs` も 1 ウェーブに 1 spec だけで、`call-attribute-filter` と `scene-anchor-link` が触る。`scene-attribute-store` と `call-attribute-filter` は、`scene.lua` と `pasta_core` のシーン登録（`scene_registry.rs`・`scene_types.rs`）を共有するので、この順に置く。 選択肢の出力（`pasta_scripts/pasta/shiori/sakura_builder.lua`）は `choice-line-layout` と `scene-anchor-link` が触るので、この順に置く。
 - **シーン名の別名との関係**: 別名の解決は検索の入口（`search/context.rs`）でキー正規化の前に行う。`scene-attribute-store`・`call-attribute-filter` は、別名を当てた後の名前で属性を扱う。
 - **結合テスト**: `pasta_shiori` の結合テストは、`shiori-test-support-runtime` が入るまで古いランタイムの写しへの回避を写して増える。`runtime-error-balloon` は同じ `crates/pasta_shiori/tests/` を触るので、その後に置く。
 
@@ -197,7 +184,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 ### 境界戦略
 
-- **分割理由**: 持ち場で分けた。シェルの画像（`crates/pasta_sample_ghost` の画像側。`hello-pasta-shell-art`）、ガイドの本文（`book/`。`getting-started-story-guide`）、スクリーンショット（新しいシェルと本文の両方が要る。`getting-started-screenshots`）。段階表と段階辞書、台詞の部品は完了している。
+- **分割理由**: 持ち場で分けた。シェルの画像（`crates/pasta_sample_ghost` の画像側。`hello-pasta-shell-art`）、スクリーンショット（新しいシェルが要る。`getting-started-screenshots`）、入門の外に置くシェルの説明の章（`manual-shell-guide`）。段階表と段階辞書、台詞の部品、ガイドの本文は完了している。本文の実機確認で見つかった 9 段目の見え方の不具合は、`choice-line-layout` が直す。
 - **共有接点**: 段階表（`crates/pasta_sample_ghost/STAGES.md`）と段階辞書（`dic/01-boot.pasta`〜`12-lua.pasta`）を、本文が逐語で照合する（`book/tools/tutorial-check.mjs`）。辞書を変える spec は、同じ変更で入門の章の作例を直す。マニュアルの CI は辞書の変更でも走る。
 - **シェルと本文の接点**: 8 段目（触られたときの反応）は、当たり判定の部位名を台詞に出す。部位名は `hello-pasta-shell-art` が要件で決め、本文は段階表から取る。頭は `Head` のまま変えない。
 - **リリースとの接点**: `hello-pasta-shell-art` は、配布物を作るスクリプト（`release.ps1`）の絵を生成する段を外す。リリースの実行中は `release.ps1` を変えない。
@@ -206,59 +193,33 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 | Wave | spec（並走可） | ソースの持ち場 |
 | ---- | -------------- | -------------- |
-| 2（見送り中） | hello-pasta-shell-art | `crates/pasta_sample_ghost` の絵を描くプログラム（`src/image_generator.rs` ほか。消す）・`Cargo.toml`、ルートの `Cargo.toml`・`Cargo.lock`、`shell/master/`、`README.md`、`release.ps1`、`STAGES.md` の部位名の注記、`tests/integration_test.rs` の画像のテスト、生成の手順と出どころの記録 |
-| 2（2026-10-10 のウェーブ・最優先） | getting-started-story-guide（本文） | `book/src/getting-started/`・`SUMMARY.md`・`introduction.md`・`AUTHORING.md`・`book.toml`（転送）、`book/tools/` の `verify-content.mjs`・`tutorial-check.mjs` と自己テスト（章の数を決め打ちする `verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs` を含む）、`crates/pasta_lua/README.md`・`crates/pasta_shiori/README.md` のリンク |
-| 3 | getting-started-screenshots | 撮影の手順、画像、各章への画像の行、新しいシェルでの 8 段目の実機の確認 |
+| 2（2026-10-10 のウェーブ） | hello-pasta-shell-art | `crates/pasta_sample_ghost` の絵を描くプログラム（`src/image_generator.rs` ほか。消す）・`Cargo.toml`、ルートの `Cargo.toml`・`Cargo.lock`、`shell/master/`、`README.md`、`release.ps1`、`STAGES.md` の部位名の注記、`tests/integration_test.rs` の画像のテスト、生成の手順と出どころの記録。部位名の都合があるときだけ 8 段目の辞書と章 |
+| 2（同上） | choice-line-layout | 選択肢の出力（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` とそのテスト）、または 9 段目の辞書（`dic/09-choice.pasta`）・章（`book/src/getting-started/09-choice.md`）・`STAGES.md` の 9 段目の行・`tests/tutorial_stages_test.rs` |
+| 3 | getting-started-screenshots | 撮影の手順、画像、各章への画像の行、新しいシェルでの 8 段目の実機の確認。`choice-line-layout` の後に撮る |
+| 4（優先度は低い） | manual-shell-guide | シェルの説明の新しい章、入門の章（`setup.md`・`03-face.md`・`08-touch.md`）からのリンク、`SUMMARY.md` と章の数を決め打ちする検査 |
 
-Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）は完了した。
+Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）と、ガイドの本文（`getting-started-story-guide`）は完了した。
 
-## リリース手順の書き換え（`release-ci` の後）
+## リリース（常駐 spec `release-workflow`）
 
-リリースの CI 化（`release-ci`）は完了し、タグの push だけで公開まで進む。常駐 spec の旧手順（`release/hello-pasta.nar` を生成してコミットする段・手元でのビルドと公開）は、そのままでは動かないので、下の Existing Spec Updates で書き換えた（2026-10-10 に済んだ。要件・設計・タスクの書き直しと、文書・設定の一回限りの整合）。CI での初回のリリース（v0.3.8）と後片付けも済んだ（2026-10-10。記録は `.kiro/specs/release-workflow/first-ci-release.md`）。記録の「手順との食い違い」も、`design.md` と手順書に反映した（2026-10-10）。**残るのは、失敗した job の再実行の読み方の確認である**（失敗が起きなかったので未確認。起きたリリースで確かめる）。
+リリースの CI 化（`release-ci`）、常駐 spec の手順の書き換え、CI での初回のリリース（v0.3.8）とその後片付けは、2026-10-10 までにすべて済んだ。タグ `vX.Y.Z` の push だけで公開まで進む。記録は `.kiro/specs/release-workflow/first-ci-release.md` と、同じフォルダの `design.md` にある。**残るのは、失敗した job の再実行の読み方の確認である**（初回は失敗が起きなかったので未確認。失敗が起きたリリースで確かめる）。
 
-- **進め方（済んだ）**: brief を足さず、常駐 spec をその場で書き換えた（`/kiro-spec-requirements release-workflow` → `/kiro-design release-workflow` → `/kiro-spec-tasks release-workflow`）。古い `research.md` は書き直し、`gap-analysis.md` は削除した。
-- **初回のリリース（済んだ）**: v0.3.8 を Opus で実行した（2026-10-10）。7 つの公開先が最初の実行ですべて `published` になり、全 job の再実行ですべて `skipped` になった。後片付け（5 クレートの「Trusted Publishing のみ」・`CARGO_REGISTRY_TOKEN` と `VSCE_PAT` の失効）も済んだ。
 - **以後のリリース**: 新しい作業ブランチ（ハーネスのワークツリー）で `/kiro-impl release-workflow` を実行する。失敗した job の再実行の読み方（`design.md`「CI での初回のリリースで確かめること」の 3）を確かめるまでは Opus で実行し、確かめたら Sonnet で実行する（開発者決定 2026-10-10）。
 - **席**: リリースの実行中は、`release.ps1`・`release.yml` を触る spec を main へ入れない。
-
-### Existing Spec Updates
-
-- [x] release-workflow -- エージェントの手順を「版の決定 → bump の PR のマージ → タグの push → CI の結果確認・失敗した job の再実行」へ縮める。次のものは CI 側へ移すか、要らなくなる。
-  - Resume
-  - ScheduleWakeup による再試行
-  - 公開の 2 トラック
-  - ローカルでのビルド
-  - main の CI が全部緑かの確認
-  - マージコミット方式で統合する理由（タグが指すコミットを main から到達できるようにするため）を、squash でよいか見直す。
-  - `release-ci` からの申し送り: CI での初回のリリースと、その前後の一回限りのセットアップは本更新の後の最初のリリースで行う。手順は `.github/release-ci-setup.md` の 6〜10 節。期限は 2026-12-01（global PAT の廃止）より前。
-    - 前提（2026-10-08 に済んだ）: 1〜8 節の一回限りのセットアップはすべて完了。
-      - Azure（サブスクリプション・予算アラート・マネージド ID・フェデレーション資格情報 2 件）は `az` で読み戻して確認した。
-      - GitHub（environment 2 つ・リポジトリ variables 3 つ）は `gh api` で確認した。
-      - Marketplace の Members への追加は、setup-check の再実行で `verify-pat` が成功したことで確認した（run 37777674500）。
-      - crates.io の Trusted Publisher ×5 は、ユーザーが画面で設定した。setup-check は crates.io を確かめないので、**初回のリリースが最初の実地確認**になる。`publish-crates` が認証で失敗したら、8 節の値（owner・repo・`release.yml`・`release`）を設定画面と照合する。
-      - ID の値は書かない。値はリポジトリ variables とユーザーの手元の記録にある。
-    - 合格: 3 公開先が `published`、同じ run の再実行ですべて `skipped`。
-    - 運用の注意（セットアップで分かったこと）:
-      - Azure のリソースを `az` で作る・変えるには MFA が要る。WAM（Windows のサインイン窓）でログインすると `RequestDisallowedByAzure` で弾かれる。`az config set core.enable_broker_on_windows=false` にしてからブラウザーで `az login` し直す。ワークフローのマネージド ID には関係ない。
-      - Marketplace の Members の管理には、公式の CLI が無い（vsce・az・gh のどれも扱えない）。画面から行う。
-      - 小さな取りこぼし: setup-check の `verify-pat` が失敗すると、vsce のエラー文（`Access Denied: <ID> needs ...`）にマネージド ID の識別子が含まれ、ジョブのログに出る。「profile ID は summary にだけ書く」方針から漏れている。秘密の値ではないので実害は無い。直さない（2026-10-10 決定）。
-    - あわせて見直す（`release-ci` の design.md「Out of Boundary」が本更新へ回したもの）: `.claude/settings.json` の公開系コマンドの許可の整理、`build.yml` に `--locked` を足すか、bump 箇所に `package-lock.json` の版を含めること（release.yml の verify は検査しない。`crates/pasta_sample_ghost/RELEASE.md` の bump の一覧にも無い）。→ 済んだ（2026-10-10）: 手元からの公開の許可を外した。`--locked` は足さない。版の更新に `Cargo.lock` と `package-lock.json` を含めた。
-    - `VSCE_PAT` の失効（10 節）は、初回のリリースで Marketplace が Entra ID の経路で `published` になったのを確かめてから行う。値が `release-ci` の会話記録に出ているが、前倒しはしない（ユーザー決定 2026-10-08）。
-    - 2026-10-10 の棚卸で足したもの:
-      - `steering/workflow.md` の「main の CI 全緑」の確認とマージコミットの例外の記述を、書き換えた手順に合わせる。
-      - 認証の失敗の案内文が手順書の見出しを「名前の表」と書いている（正しくは「名前の対応表」）。`.github/scripts/release/publish-vsix.ps1` の 1 か所と `release.yml` の 2 か所。
-      - 初回の CI リリースは、`hello-pasta-shell-art` が `release.ps1` を変える前に行うのが望ましい。
-  - Dependencies: release-ci（完了）
+- **運用の注意**（一回限りのセットアップで分かったこと）:
+  - Azure のリソースを `az` で作る・変えるには MFA が要る。WAM（Windows のサインイン窓）でログインすると `RequestDisallowedByAzure` で弾かれる。`az config set core.enable_broker_on_windows=false` にしてからブラウザーで `az login` し直す。ワークフローのマネージド ID には関係ない。
+  - Marketplace の Members の管理には、公式の CLI が無い（vsce・az・gh のどれも扱えない）。画面から行う。
+  - setup-check の `verify-pat` が失敗すると、vsce のエラー文にマネージド ID の識別子が含まれ、ジョブのログに出る。秘密の値ではないので直さない（2026-10-10 決定）。
 
 ## 作成支援とマニュアルの保守（2026-10-10 起票）
 
-- `pasta-check-dic-validate` — SSP を起動せずに、ゴーストの `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い Call・選択肢・文中のシーンリンク、モジュール名の衝突、記号を落とした後のシーン名の衝突などを見る。何をエラーにして何を警告にするか、`pasta_check release` の関門にするか、依存の重さ（`pasta_lua` に依存すると、`cargo install pasta_check` が LuaJIT をビルドする）を要件で決める。依存を足すと `Cargo.lock` が変わるので、`hello-pasta-shell-art` の後に置く。マニュアルに章を足す場合は、章の数を決め打ちする検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）と `SUMMARY.md` を `getting-started-story-guide` と共有するので、その後に置く。内部クレートに依存させる場合は、公開の手順（`release.yml` の `pasta_check` の公開の段）も触るので、リリースの実行中は入れない。
+- `pasta-check-dic-validate` — SSP を起動せずに、ゴーストの `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い Call・選択肢・文中のシーンリンク、モジュール名の衝突、記号を落とした後のシーン名の衝突などを見る。何をエラーにして何を警告にするか、`pasta_check release` の関門にするか、依存の重さ（`pasta_lua` に依存すると、`cargo install pasta_check` が LuaJIT をビルドする）を要件で決める。依存を足すと `Cargo.lock` が変わるので、`hello-pasta-shell-art` の後に置く。マニュアルに章を足す場合は、章の数を決め打ちする検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）と `SUMMARY.md` を、章を足すほかの spec（`manual-shell-guide` など）と共有する。内部クレートに依存させる場合は、公開の手順（`release.yml` の `pasta_check` の公開の段）も触るので、リリースの実行中は入れない。
 - `manual-print-media-refs` — マニュアルの印刷用ページ（`print.html`）で、デバッグの章の動画が再生できない。ビルドの後に `print.html` の参照だけを書き換え、検査（`verify-static.mjs`）の例外を外す。
 - `manual-shell-guide`（2026-10-10 追加・優先度は低い）— 入門ガイドはシェルを「hello-pasta からフォルダごと写す」と教え、中身の説明は `setup.md` の節「シェルの中身」（ファイルの種類と、辞書との接点がサーフェス番号であること）までである。自分の絵に差し替える所から先を、入門の外に章を置いて書く。急がない。
 
 ## 入門ガイドの実機確認で見つかったもの（2026-10-10 起票）
 
-`getting-started-story-guide` の完了時の棚卸で起票した。どれも 2026-10-10 のウェーブには入れていない（次の棚卸で順番を決める）。
+`getting-started-story-guide` の完了時の棚卸で起票した。2 回目の棚卸（2026-10-10）で、`manual-link-anchor-check` と `choice-line-layout` をウェーブに入れた。`boot-surface-without-dic` は次点、`baseware-virtual-time` は見送った。
 
 - `manual-link-anchor-check` — リンク検証は、本の中のリンクの見出しを見ない。入門ガイドは見出しへのリンクを 44 本持つ。見出しを作る関数は `link-check.mjs` にもうある（サイト・CI）。
 - `choice-line-layout` — 9 段目の 1 つ目の選択肢「おやつの話をする」が、問いかけと同じ行に続いて右端で切れる。入門の読者が書いたとおりに動かして踏む（バグ・見え方）。`getting-started-screenshots` より先に直すと、撮り直しが要らない。
@@ -273,13 +234,12 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）は完了し�
 - [ ] failure-output-unification -- シーンが生きている間の実行時の失敗（未定義の参照・見つからない Call など）を、ログとさくらスクリプトの両方へ 1 つの仕組みから出す。既にある 2 つの失敗表記を 1 つにし、`act.lua`・`actor.lua`・`word.lua` の警告を載せ替える（2026-10-10 の棚卸で、スクリプトが止まるエラーを `runtime-error-balloon` へ分けた）。Dependencies: none
 - [ ] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
 - [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。当たり判定を足し、絵を描くプログラムと配布スクリプトの生成の段を外す。Dependencies: none
-- [x] getting-started-story-guide -- 入門ガイドの本文を段階表に沿った物語に書き直し、全編を Claudia が語る（執筆規約に `getting-started` の例外を足す）。段階辞書との逐語照合を章ごとに合わせる（2026-10-10 の棚卸で、スクリーンショットを `getting-started-screenshots` へ分けた）。Dependencies: none
 - [ ] manual-print-media-refs -- マニュアルの印刷用ページ（`print.html`）で動画の参照が切れているのを、ビルド後の書き換えで直し、検査の例外を外す（2026-10-10 棚卸で起票）。Dependencies: none
-- [ ] pasta-check-dic-validate -- SSP を起動せずに `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い参照・モジュール名とシーン名の衝突などを見る（2026-10-10 棚卸で起票）。Dependencies: hello-pasta-shell-art（`Cargo.lock` を触る順番）, getting-started-story-guide（マニュアルに章を足す場合。章の数を決め打ちする検査と `SUMMARY.md` を共有する）
+- [ ] pasta-check-dic-validate -- SSP を起動せずに `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い参照・モジュール名とシーン名の衝突などを見る（2026-10-10 棚卸で起票）。Dependencies: hello-pasta-shell-art（`Cargo.lock` を触る順番）
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
 - [ ] runtime-error-balloon -- スクリプトが止まる実行時エラー（500 の応答）を、辞書を書く人に見えるようバルーンにも出す。やるかどうかを要件の最初に決める（2026-10-10 の棚卸で `failure-output-unification` から分割）。Dependencies: failure-output-unification, shiori-test-support-runtime
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアルまで揃える（2026-10-08 起票）。Dependencies: failure-output-unification, call-attribute-filter
-- [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: hello-pasta-shell-art, getting-started-story-guide
+- [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: hello-pasta-shell-art, choice-line-layout（9 段目の絵に切れた選択肢が写らないよう、先に直す）
 - [ ] manual-link-anchor-check -- マニュアルのリンク検証（`link-check.mjs`）が、本の中のリンクと公開 URL の見出し（`#…`）の実在も見るようにする（2026-10-10 `getting-started-story-guide` の完了時に起票）。Dependencies: none
 - [ ] choice-line-layout -- hello-pasta の 9 段目で、1 つ目の選択肢が問いかけと同じ行に続き、吹き出しの右端で切れて見えるのを直す。原因（選択肢の前の改行・辞書・バルーン）の特定から（2026-10-10 同上）。Dependencies: none（`scene-anchor-link` と `sakura_builder.lua` を触る順番に注意）
 - [ ] baseware-virtual-time -- SSP の「現在時刻の仮想的変更」を pasta の時報に効かせ、正時を待たずに確かめられるようにする。SSP が仮想の時刻を SHIORI に伝えているかの調査から。外から起こした `OnTalk` でチェイントークが続かない件も扱う（2026-10-10 同上）。Dependencies: none
