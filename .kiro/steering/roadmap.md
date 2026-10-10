@@ -11,6 +11,8 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 このほか、リリース手順（常駐 spec `release-workflow`）を CI に合わせて書き換える作業と、CI での初回のリリースが残る（期限は 2026-12-01）。
 
+**優先順位（開発者の方針 2026-10-10）**: トークンの予算のため、当面はマニュアルのサイトの作り直し（入門ガイドの本文）を最優先とし、CI とリリース、急いで直す不具合だけを進める。それ以外は見送る（下の「棚卸」のウェーブ）。
+
 ## 運用ルール
 
 - `## Specs (dependency order)` は未完了の spec 専用（`/kiro-spec-batch`・`/kiro-spec-status` が読む）。完了したら `[x]` にし、次の棚卸で「完了フェーズ」へ畳む。
@@ -107,18 +109,26 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 ### ウェーブ（2026-10-10）
 
-依存の木の先頭は 7 本。子孫の多い順に取り、`Cargo.lock` の席が重なる 1 本を次へ回して、6 本を同じウェーブに置く。
+依存の木の先頭は 7 本ある。ただし開発者の方針（2026-10-10）で、このウェーブは**マニュアルのサイトの作り直し・CI とリリース・急いで直す不具合**に絞る（トークンの予算のため）。急いで直す不具合は無かった。始めるのは次の 2 つ。
+
+| 対象 | 種別 | 規模 | 要件定義 |
+| ---- | ---- | ---- | -------- |
+| getting-started-story-guide（本文） | 文書（サイトの作り直し・最優先） | 18〜20 | Fable |
+| `release-workflow` の書き換え（常駐 spec。下の「リリース手順の書き換え」） | 基盤（リリース・期限 2026-12-01） | 7〜9 | Opus |
+
+絵の無い入門ガイドを先に公開してよい（開発者決定 2026-10-10）。本文は、新しいシェルとスクリーンショットを待たずに main へ入れる。
+
+見送った先頭（予算が戻ったら、この順に取る。互いのソースは下の約束で重ならない）:
 
 | spec | 子孫 | 種別 | 規模 | 要件定義 |
 | ---- | ---- | ---- | ---- | -------- |
 | failure-output-unification | 約 3（`call-attribute-filter`・`scene-anchor-link`・`runtime-error-balloon`） | 機能 | 15〜19 | Fable |
 | scene-attribute-store | 約 2（`call-attribute-filter`・`scene-anchor-link`） | 機能 | 15〜18 | Fable |
 | hello-pasta-shell-art | 約 1（`getting-started-screenshots`） | 機能（開発者の方針） | 12〜14 | Fable |
-| getting-started-story-guide（本文） | 約 1（`getting-started-screenshots`） | 文書（開発者の方針） | 18〜20 | Fable |
 | shiori-test-support-runtime | 約 1（`runtime-error-balloon`） | 基盤 | 6〜8 | Opus |
 | manual-print-media-refs | 0 | バグ | 2〜3 | Opus |
 
-同じウェーブでの約束:
+同じウェーブに置くときの約束（見送った spec を後から始めるときも、そのまま使う）:
 
 - `failure-output-unification` は、生成コードの形（`expr_gen.rs`・`element_gen.rs`・見本の期待値ファイル）を変えない。期待値ファイルはこのウェーブでは `scene-attribute-store` が作り直す。要件で生成コードを変えると決めた場合は、`scene-attribute-store` を先に入れて rebase する。
 - `scene-attribute-store` は、属性を読み出す API を `act.lua` に置かない（`scene.lua` の `SCENE` 側に置く）。`act.lua` はこのウェーブでは `failure-output-unification` が持つ。
@@ -128,13 +138,13 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - `shiori-test-support-runtime` は `crates/pasta_shiori/tests/` だけを触る。Phase 11 の spec が結合テストを足す前に入れるほど、回避の写しが増えない。
 - マニュアルの同じページの別の節（`lua/script-api.md` など）は、`scene-attribute-store` と `failure-output-unification` が分け合う。スキル references は後から入る側が再生成する。
 
-選ばなかった先頭: `pasta-check-dic-validate`（子孫 0。依存を足すと `Cargo.lock` が変わり、このウェーブでは `hello-pasta-shell-art` がその席を持つ。マニュアルに章を足すと、章の数の検査を `getting-started-story-guide` と共有する）。
+見送った先頭の後に置くもの: `pasta-check-dic-validate`（子孫 0。依存を足すと `Cargo.lock` が変わり、このウェーブでは `hello-pasta-shell-art` がその席を持つ。マニュアルに章を足すと、章の数の検査を `getting-started-story-guide` と共有する）。
 
-次のウェーブの候補: `call-attribute-filter`（または `scene-anchor-link`。同じファイルを触るので 1 本ずつ）、`runtime-error-balloon`、`pasta-check-dic-validate`、`getting-started-screenshots`。互いのソースは重ならない。
+その次の候補: `call-attribute-filter`（または `scene-anchor-link`。同じファイルを触るので 1 本ずつ）、`runtime-error-balloon`、`pasta-check-dic-validate`、`getting-started-screenshots`。互いのソースは重ならない。
 
 ### 開発者の判断が要るもの（ウェーブは止めない）
 
-- 絵の無い入門ガイドを先に公開してよいか — 分割で、本文が先に main へ入り、スクリーンショットが後から付く。全章が物語の形になっていて、今のガイドにも絵は無い。「部分出荷はしない」に当たると見るなら、本文のマージを `hello-pasta-shell-art` と絵の後まで待つ。
+- 見送った spec をいつ始めるか — 予算の都合で、Phase 11 の残りと `hello-pasta-shell-art`・`shiori-test-support-runtime`・`manual-print-media-refs` を見送った。`shiori-test-support-runtime` は、Phase 11 の spec より先に入れるほど後片付けが減る。
 - スクリプトが止まるエラーをバルーンに出すか — `runtime-error-balloon` の要件の最初の議題。要らなければ却下する。
 - `call-attribute-filter` と `scene-anchor-link` のどちらを先にするか — 台帳は前者を先にしている。後者を先にすると、`scene-attribute-store` を待たずに始められる。
 - リリース手順の書き換えと初回の CI リリースの時期 — `hello-pasta-shell-art` が `release.ps1` を変える前に済ませると、失敗の原因を認証の設定だけに絞れる。期限は 2026-12-01。
@@ -153,7 +163,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 | Wave | spec（並走可） | 種別 | ソースの持ち場 |
 | ---- | -------------- | ---- | -------------- |
-| 4（2026-10-10 のウェーブ） | scene-attribute-store | 機能 | 宣言行の属性のパース（`parse_scene.rs`・`ast/scene.rs`）、`scope_gen.rs`・`context.rs`・`transpiler.rs`、`scene.lua`、`finalize.rs`、`pasta_core` のシーン登録（`scene_registry.rs`・`scene_types.rs`）、見本の期待値ファイル、マニュアル（`block-structure.md`・`script-api.md`・`registry-search.md`・`transpiler.md`） |
+| 4（見送り中） | scene-attribute-store | 機能 | 宣言行の属性のパース（`parse_scene.rs`・`ast/scene.rs`）、`scope_gen.rs`・`context.rs`・`transpiler.rs`、`scene.lua`、`finalize.rs`、`pasta_core` のシーン登録（`scene_registry.rs`・`scene_types.rs`）、見本の期待値ファイル、マニュアル（`block-structure.md`・`script-api.md`・`registry-search.md`・`transpiler.md`） |
 | 4（同上） | failure-output-unification | 機能 | `act.lua`・`actor.lua`・`word.lua` の警告と失敗表記、pasta.toml の切り替え（`loader/config/`）、マニュアル（`action-line.md`・`call-jump.md`・`script-api.md`・`talk-output.md`・`internal-modules.md`） |
 | 4（同上） | shiori-test-support-runtime | 基盤 | `crates/pasta_shiori/tests/`（古いランタイムの写しの撤去・共通部品・回避の設定 4 か所） |
 | 5 | call-attribute-filter | 機能 | Call の文法（`grammar.pest`・`parse_action.rs`・`ast/action.rs`・`partial.rs`）、`element_gen.rs`（Call）、`act.lua`（`call`・`find_handler`）、`scene.lua`（`SCENE.search`）、`search/`、`pasta_core` の `scene_table.rs`・`scene_types.rs`、LSP（`visit_action.rs`）、VSCode の文法定義 |
@@ -195,8 +205,8 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 | Wave | spec（並走可） | ソースの持ち場 |
 | ---- | -------------- | -------------- |
-| 2（2026-10-10 のウェーブ） | hello-pasta-shell-art | `crates/pasta_sample_ghost` の絵を描くプログラム（`src/image_generator.rs` ほか。消す）・`Cargo.toml`、ルートの `Cargo.toml`・`Cargo.lock`、`shell/master/`、`README.md`、`release.ps1`、`STAGES.md` の部位名の注記、`tests/integration_test.rs` の画像のテスト、生成の手順と出どころの記録 |
-| 2（同上） | getting-started-story-guide（本文） | `book/src/getting-started/`・`SUMMARY.md`・`introduction.md`・`AUTHORING.md`・`book.toml`（転送）、`book/tools/` の `verify-content.mjs`・`tutorial-check.mjs` と自己テスト（章の数を決め打ちする `verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs` を含む）、`crates/pasta_lua/README.md`・`crates/pasta_shiori/README.md` のリンク |
+| 2（見送り中） | hello-pasta-shell-art | `crates/pasta_sample_ghost` の絵を描くプログラム（`src/image_generator.rs` ほか。消す）・`Cargo.toml`、ルートの `Cargo.toml`・`Cargo.lock`、`shell/master/`、`README.md`、`release.ps1`、`STAGES.md` の部位名の注記、`tests/integration_test.rs` の画像のテスト、生成の手順と出どころの記録 |
+| 2（2026-10-10 のウェーブ・最優先） | getting-started-story-guide（本文） | `book/src/getting-started/`・`SUMMARY.md`・`introduction.md`・`AUTHORING.md`・`book.toml`（転送）、`book/tools/` の `verify-content.mjs`・`tutorial-check.mjs` と自己テスト（章の数を決め打ちする `verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs` を含む）、`crates/pasta_lua/README.md`・`crates/pasta_shiori/README.md` のリンク |
 | 3 | getting-started-screenshots | 撮影の手順、画像、各章への画像の行、新しいシェルでの 8 段目の実機の確認 |
 
 Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）は完了した。

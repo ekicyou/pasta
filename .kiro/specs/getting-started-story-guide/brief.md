@@ -139,5 +139,6 @@ pasta のマニュアルは初心者向けになっていない。入門ガイ�
   - 本文（この spec）: `book/src/getting-started/`（3 枚を 16 枚前後に）、`book/src/SUMMARY.md`、`book/src/introduction.md`、`book/AUTHORING.md`、`book/book.toml`、`book/tools/` の `verify-content.mjs`・`tutorial-check.mjs`・`tutorial-check-test.mjs`・`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`（章の数の 1 行だけ）、`crates/pasta_lua/README.md`、`crates/pasta_shiori/README.md`。
   - 絵（`getting-started-screenshots`）: 画像ファイル（新規）、撮影の手順の記録（新規）、`book/src/getting-started/` の各章の画像の行。
 - **要件定義のモデル**: 本文は Fable、絵は Opus（再測定の節のとおり）。
-- **開発者に確かめること**: 絵の無い入門ガイドを、先に公開してよいか。Constraints は「部分出荷はしない」と決めている。分割の後は、本文が先に main に入り、絵が後から付く。本文は全部の章が物語の形になっていて、旧形式のまま残る章は無い。今の入門ガイドにも絵は無い。これを部分出荷と見るなら、本文を main に入れるのを、`hello-pasta-shell-art` と絵の後まで待つ。
+- **開発者の決定（2026-10-10）**: 絵の無い入門ガイドを先に公開してよい。本文は、`hello-pasta-shell-art` と絵を待たずに main へ入れる。この spec はマニュアルのサイトの作り直しとして最優先で進める。以下は、決定の前に書いた問いの記録。
+- **開発者に確かめること（決定済み）**: 絵の無い入門ガイドを、先に公開してよいか。Constraints は「部分出荷はしない」と決めている。分割の後は、本文が先に main に入り、絵が後から付く。本文は全部の章が物語の形になっていて、旧形式のまま残る章は無い。今の入門ガイドにも絵は無い。これを部分出荷と見るなら、本文を main に入れるのを、`hello-pasta-shell-art` と絵の後まで待つ。
 - **申し送り（完了した `hello-pasta-tutorial-stages` の実機の確かめから）**: ゴースト自身がさくらスクリプトの `\![change,ghost]` で切り替えたときは、`OnGhostChanging` が届かない。SSP のメニューから切り替えたときは届く（`.kiro/specs/completed/hello-pasta-tutorial-stages/tasks.md` の実装メモ 6.1 の追記）。切り替えを説明する 7 段目「挨拶したい」の章で、読者に試してもらう手順は、メニューからの切り替えで書く。
