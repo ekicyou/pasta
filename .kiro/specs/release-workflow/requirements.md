@@ -234,10 +234,11 @@
 1. The repository shall エージェントへの操作の許可（`.claude/settings.json`）を、書き換えた手順が使う操作（PR の作成と統合・リリースタグの push・リリース CI の結果の閲覧と再実行）に合わせ、手元からの公開（crates.io・Marketplace・GitHub Release の作成）の許可とその説明を外す。
 2. The 文書 shall steering `workflow.md` の「取り消せない公開の前に main の CI 全緑を確かめる」の記述を、公開前の検査をリリース CI が行う形に改める。
 3. The 文書 shall steering `workflow.md` のリリースの例外の記述を、統合は squash で行い、リリースタグの push だけが直接 push の禁止の対象外である形に改める。
-4. The 文書 shall `crates/pasta_sample_ghost/RELEASE.md` の版の更新の一覧に `Cargo.lock` と `editors/vscode/package-lock.json` を加え、タグを付けるコミットの説明を Requirement 5 に合わせる。
+4. The 文書 shall `crates/pasta_sample_ghost/RELEASE.md` の版の更新の一覧に `Cargo.lock` と `editors/vscode/package-lock.json` を加え、タグを付けるコミットの説明を Requirement 5 に合わせる。前提条件の「`main` へ push できる」を、PR の統合とリリースタグの push ができる形に改める（main へは直接 push できない）。
 5. The repository shall 認証の失敗の案内文が指す手順書の見出しを、実際の見出し「名前の対応表」に合わせる（`.github/scripts/release/publish-vsix.ps1` の 1 か所と `release.yml` の 2 か所。案内文だけを変え、挙動を変えない）。
-6. The 文書 shall steering の `product.md`・`roadmap.md` の本仕様の説明と、「リリース手順の書き換え」の進み具合を、書き換えた手順に合わせる。
+6. The 文書 shall steering の `product.md`・`roadmap.md` の本仕様の説明と、「リリース手順の書き換え」の進み具合を、書き換えた手順に合わせる。`product.md` の最終更新の行（現行の版）も、今の版に直す。
 7. The repository shall 本要件の変更の後も、`cargo test --all` と clippy が通る状態を保つ。
+8. The 文書 shall `kiro-complete` スキルの「main の CI 全緑は `release-workflow` が crates.io 公開の前に課す」の記述を、公開前の検査をリリース CI が行う形に改める。
 
 ---
 
