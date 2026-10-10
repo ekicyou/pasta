@@ -455,16 +455,16 @@ flowchart LR
   surface0
   {
   element0,overlay,surface0.png,0,0
-  collisionex0,Head,rect,X1,Y1,X2,Y2
-  collisionex1,Face,rect,X1,Y1,X2,Y2
+  collisionex0,Face,rect,X1,Y1,X2,Y2
+  collisionex1,Head,rect,X1,Y1,X2,Y2
   collisionex2,Body,rect,X1,Y1,X2,Y2
   }
   ```
 
 - 形はすべて **rect**（楕円・多角形は使わない。座標が読めて、テストの領域計算が単純で、入門ガイドの読者が真似しやすい）。
-- **3 つの矩形は重ねない**（UKADOC は重なったときの優先順位を定めていないため。`research.md` §7.3）。`Head` = 頭のうち顔より上と横（髪・帽子の帯。下端 = 顔の矩形の上端 − 1）、`Face` = 顔の矩形、`Body` = 首から胴の下端まで（足元は含めない。R4.7）。頬の横の髪は `Face` に入るが「おおむね一致」（R4.8）の範囲とする。**仮定**: 重ねる形（手本のように `Head` が `Face` を含む）が望ましければ、SSP の `\![enter,collisionmode]` で優先順位を確かめてから採る（Open Question）。
+- **`Face` を `Head` の内側に重ねる。書く順は `Face` → `Head` → `Body`**（設計ディスカッション #5 で確定）。根拠は UKADOC `collision-sort` の既定（none）「ID によらず先に書かれている方が手前」。先に書いた `Face` が勝ち、残りの頭はすべて `Head` になるので、頬の横の髪や帽子を触っても部位名が空にならない（`research.md` §7.3）。`Face` = 眉の上から口の下・頬の端から端、`Head` = 頭全体（髪・帽子・頬の横・おさげの付け根まで。顔の矩形を含む）、`Body` = 首から胴の下端まで（足元は含めない。R4.7）。`Body` は `Head` とも `Face` とも重ねない。手本クローディアは `Head` と `Face` を重ねず、頬の横の髪を別 ID `Hair` で補っているが、本仕様は部位名を 3 つに決めたので重ねる形で同じ効果を得る。
 - 同じキャラクターの 9 ブロックで `Head`・`Face` の座標は同一。`Body` はポーズ（R1.9 の表）ごとに同一。座標はキャンバス内（0 ≤ X1 < X2 ≤ 333、0 ≤ Y1 < Y2 ≤ 500）。具体値は絵が決まってから決める（**【実装で確定】**）。
-- テストとの契約: `shell_assets_test` は `Face` の矩形を `MARGIN` だけ外へ広げた領域を「顔の領域」、`Head` の矩形から「顔の領域」を除いた画素を「頭の領域」として読む。したがって `Head` の矩形は、貼り合わせの切り線（`Y_CUT` を出力座標にしたもの）より `MARGIN` 以上、上で終わらせる。`Body` の矩形は切り線より `MARGIN` 以上、下から始める。
+- テストとの契約: `shell_assets_test` は `Face` の矩形を `MARGIN` だけ外へ広げた領域を「顔の領域」、`Head` の矩形から「顔の領域」を除いた画素を「頭の領域」として読む。したがって `Head` の矩形は、貼り合わせの切り線（`Y_CUT` を出力座標にしたもの）より `MARGIN` 以上、上で終わらせる。`Body` の矩形は切り線より `MARGIN` 以上、下から始める。順序の約束もテストが見る: 各ブロックの `collisionex0` が `Face`、`collisionex1` が `Head`、`collisionex2` が `Body`。`Face` は `Head` に完全に含まれ、`Body` はどちらとも交わらない。
 - `surface9` と 19 以上は定義しない。`animation` は書かない（R2.7）。
 
 ### 検証
@@ -515,7 +515,7 @@ fn pixels_equal_outside(a: &Rgba8, b: &Rgba8, within: &Rect, except: &[Rect]) ->
 #[test] fn surfaces_txt_has_18_defs_matching_pngs_with_head_face_body()  // 10.3, 4.1, 4.2, 4.5
 #[test] fn head_and_face_rects_are_identical_within_a_character()        // 4.4
 #[test] fn body_rect_is_identical_within_a_pose()                        // 4.4
-#[test] fn collision_rects_are_inside_canvas_and_do_not_overlap()        // 4.8（重ねない方針）
+#[test] fn collision_rects_are_face_inside_head_and_body_apart()         // 4.8（Face ⊂ Head・Body は交わらない・順序 Face→Head→Body）
 #[test] fn head_pixels_outside_face_are_identical_across_nine_surfaces()  // 10.8, 2.1
 #[test] fn pixels_outside_face_are_identical_within_a_pose()             // 10.8, 2.2
 #[test] fn book_sample_images_are_byte_identical_to_shell()              // 11.3
@@ -634,7 +634,7 @@ fn pixels_equal_outside(a: &Rgba8, b: &Rgba8, within: &Rect, except: &[Rect]) ->
 |------|----------|------|
 | PNG の欠け・余分（`surface9.png`）・寸法違い・アルファ無し・四隅が不透明 | `shell_assets_test` | 失敗（ファイル名・実測） |
 | 1 枚 > 250 KB／合計 > 4.5 MB | `shell_assets_test` | 失敗（バイト数）。対処は減色（共有パレット・bayer） |
-| `surfaces.txt` の形の崩れ・番号と PNG の不一致・部位の欠け・座標の重なりやキャンバス外 | `shell_assets_test` | 失敗（サーフェス番号・行） |
+| `surfaces.txt` の形の崩れ・番号と PNG の不一致・部位の欠け・順序違い・`Face` が `Head` からはみ出す・`Body` が重なる・キャンバス外 | `shell_assets_test` | 失敗（サーフェス番号・行） |
 | 頭／体の画素の不一致 | `shell_assets_test` | 失敗（2 つのサーフェス番号・最初に食い違った座標） |
 | 本の写しとシェルの食い違い | `shell_assets_test` | 失敗（ファイル名） |
 | `.nar` > 7 MB | `release.ps1` 段 6 | `ERROR` と `exit 1` |
@@ -650,7 +650,7 @@ fn pixels_equal_outside(a: &Rgba8, b: &Rgba8, within: &Rect, except: &[Rect]) ->
 - 18 枚の存在と `surface9.png` の不在（10.1）。
 - 各 PNG が 333×500・アルファ付き・四隅のアルファ 0（10.2）。
 - 1 枚 ≤ 250 KB・合計 ≤ 4.5 MB（10.4・7.1）。
-- `surfaces.txt`: 先頭行・18 ブロック・`element0` が同じ番号の PNG・`Head`/`Face`/`Body` が各ブロックに 1 つずつ・rect がキャンバス内で重ならない（10.3・4.1・4.2・4.8）。
+- `surfaces.txt`: 先頭行・18 ブロック・`element0` が同じ番号の PNG・`Head`/`Face`/`Body` が各ブロックに 1 つずつ・順序は `Face`→`Head`→`Body`・rect はキャンバス内・`Face` ⊂ `Head`・`Body` は交わらない（10.3・4.1・4.2・4.8）。
 - `Head`/`Face` がキャラクター内で同一、`Body` がポーズ内で同一（4.4）。
 - 頭の領域（`Head` − 広げた `Face`）の画素が 9 枚で一致、ポーズ内で広げた `Face` の外が一致（10.8・2.1・2.2）。
 - `book/src/img/hello-pasta/` の 2 枚がシェルとバイト一致（11.3）。
@@ -661,7 +661,7 @@ fn pixels_equal_outside(a: &Rgba8, b: &Rgba8, within: &Rect, except: &[Rect]) ->
 
 ### E2E / 実機（SSP・MCP）
 - 表情 18 種を `\s[N]` で順に出し、名前どおりに読めるか・切り替えでガタつかないか（1.7・2.1・2.3）。
-- `\![enter,collisionmode]` で当たり判定の枠を見て、`Head`/`Face`/`Body` が描画範囲に合うか（4.8）。ダブルクリックで 8 段目の台詞に部位名が入り、足元では空になるか（4.6・4.7）。
+- 開発用パレットの「当たり判定を表示」で枠と上下関係を見て、`Head`/`Face`/`Body` が描画範囲に合うか（4.8）。ダブルクリックで 8 段目の台詞に部位名が入るか: 顔の中央 → `Face`、頬の横の髪・帽子 → `Head`、胴 → `Body`、足元 → 空（4.6・4.7。`Face` が `Head` に勝つことの実機確認）。
 - 台詞を出して吹き出しが顔に重ならないか（9.2）。
 
 ### 配布
@@ -682,7 +682,7 @@ fn pixels_equal_outside(a: &Rgba8, b: &Rgba8, within: &Rect, except: &[Rect]) ->
 
 1. ~~**モデルの選定**~~ — 解決（#1）: `openai/gpt-image-2.5/flare/edit` を採用。実額は fal のダッシュボードで確認し、1 枚 0.5 ドル超なら qwen へ。
 2. ~~**seed の無いモデルと再現性**~~ — 解決（#4）: 設定画像 2 枚だけをコミット。縮小前の体・顔は残さない。記録に「seed 無し・作り直しはポーズ単位」と書く。
-3. **当たり判定を重ねるか**（「surfaces.txt の当たり判定」）— 仮定: 重ねない 3 矩形。手本のように `Head` が `Face` を含む形にするなら SSP の優先順位を実機で確かめる。
+3. ~~**当たり判定を重ねるか**~~ — 解決（#5）: `Face` を先に書いて `Head` の内側に重ねる。UKADOC `collision-sort` の既定「先に書いた方が手前」が根拠。実装の実機確認で裏を取る。
 4. ~~**`MARGIN`・`FEATHER`・`Y_CUT`・顔の矩形の実値**~~ — 解決（#2）: `MARGIN=8`・`FEATHER=12`・女の子の `Y_CUT=500`。顔の矩形と男の子の `Y_CUT` は実装で設定画像から決める。ポーズ 3 種で確定。
 5. ~~**透かし・利用条件の一次資料**~~ — 解決（#4・実装の作業に落とす）: OpenAI の出力の C2PA と利用条件は、実装で `art/README.md` を書く前に一次資料で確かめる。取得できなければ日付と URL を添えて未確認と書く。Qwen は使わないので記録に載せない。
 

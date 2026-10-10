@@ -230,8 +230,9 @@ Discovery の種別: Extension（既存クレートの整理）＋外部統合�
 ### 7.3 UKADOC の当たり判定（MCP ukadoc `collisionex*`、2026-10-10）
 
 - `collisionex*,ID,タイプ,座標...`。`rect`・`ellipse` は始点 XY・終点 XY の 4 つ（楕円は外接する長方形）。`circle` は中心と半径、`polygon` は頂点列、`region` は画像の指定色（SSP 2.5.19〜）。`*` は同じ surface 内で重複しない通し番号。
-- **重なったときの優先順位は UKADOC に記述が無い**。手本（`claudia/shell/master/surfaces.txt`、コミット `02cbd4f5`）は `Head` の rect の中に `Face` の rect を置き、`Head` を先に定義している（surface0: `Fan`・`Head`・`Face`・`Bust`・`Hair`×2・`Foot`×2・`Skirt`。surface10: `Tray`・`Head`・`Face`・`Foot`×2・`Body`）。手本の surface0・surface10 のブロックには `element` 行が無い（`surface0.png` が暗黙の基準の絵）。
-- 設計書の判断: 3 つの rect を**重ねない**（優先順位に依存しない。テストの領域計算も単純）。重ねる形にするなら `\![enter,collisionmode]` で実機の優先順位を確かめてから。
+- **重なったときの優先順位**（設計ディスカッション #5 で訂正・2026-10-10）: UKADOC `collision-sort,ソート順序` に「none（既定）: ID によらず先に書かれている方が手前」とある。`ascend`/`descend` を指定しなければ、重なった領域は先に書いた定義が勝つ。
+- 手本（`claudia/shell/master/surfaces.txt`、コミット `02cbd4f5`）の surface0 は `Fan`(polygon)・`Head`(rect 106,31,225,108)・`Face`(rect 125,110,206,165)・`Bust`・`Hair`×2(rect 左右)・`Foot`×2(ellipse)・`Skirt`(polygon)。**`Head` と `Face` は重なっておらず**、頬の横の髪は別 ID `Hair` の矩形 2 つで補っている（下書きの「`Head` の中に `Face`」は誤り）。surface10 は `Tray`・`Head`・`Face`・`Foot`×2・`Body`。どちらのブロックにも `element` 行は無い（`surfaceN.png` が暗黙の基準の絵）。
+- 設計書の判断（#5）: 部位名を 3 つに決めた本仕様では、`Face` を先に書いて `Head`（頭全体）の内側に重ねる。先に書いた `Face` が手前になり、頬の横の髪や帽子は `Head` に落ちる。`Body` は重ねない。実装の実機確認（開発用パレット「当たり判定を表示」は上下関係も見える）で裏を取る。
 
 ### 7.4 画素一致の実現方法（設計の核）
 
@@ -248,7 +249,7 @@ Discovery の種別: Extension（既存クレートの整理）＋外部統合�
 - **大きさの上限の場所**: 1 枚・合計はテスト（`manual.yml` と main CI の両方で走る）。`.nar` は `release.ps1` の最終段（CI も同じスクリプトを呼ぶので 1 箇所で足りる）。`release.yml` にはエントリ一覧だけ足す。
 - **`build.rs`**: 削除。`pasta_shiori/src` の `rerun-if-changed` はこのクレートのビルド成果物に影響せず、`ghosts/` 不在の案内は `ghosts/` がコミット済みで空振り。
 - **設定画像の置き場所**: `crates/pasta_sample_ghost/art/`（`ghosts/` の外 → `.nar` に入らない。`publish = false` → crates.io にも出ない）。記録は同じ場所の `README.md`（GitHub でフォルダを開くと表示される）。
-- **当たり判定の形**: `collisionex` の `rect` のみ。
+- **当たり判定の形**: `collisionex` の `rect` のみ。順序は `Face` → `Head` → `Body`（#5）。
 - **`release.ps1`**: 6 段。`-SkipSetup` は 1〜2。`.nar` > 7 MB はエラー停止（警告続行にしない）。
 - **`setup.md` の見本**: 既存の表の直後に 2 セルの表。内容は alt 文で伝える（`findProseParagraphs` は `|` 始まりを地の文に数えない。`verify-static.mjs` が参照先の実在と外部参照の不在を見る）。写しは `book/src/img/hello-pasta/surface0.png`・`surface10.png`（同名）。食い違いの検査は `shell_assets_test`（バイト一致）。
 
@@ -256,7 +257,7 @@ Discovery の種別: Extension（既存クレートの整理）＋外部統合�
 
 - 一般化: 「同じ元画素から作った出力画素は一致する」構造にしたので、将来まばたき（目だけの差分）を足すときも、同じ切り方（顔の矩形の中の差し替え）で画素一致の検査がそのまま使える。
 - 採用: `png`（復号）、ffmpeg（縮小・減色。手順は `claudia/LICENSE.txt` の先例）、`collisionex rect`（UKADOC）。自作は `surfaces.txt` の小さなパーサと画素比較だけ。
-- 単純化: 当たり判定は矩形 3 つで重ねない。`.nar` の上限は 1 箇所。再実行スクリプトは作らず記録のみ。`build.rs` ごと削除。`thiserror` も不要になる。
+- 単純化: 当たり判定は矩形 3 つ（`Face` を `Head` に重ね、順序で優先を決める）。`.nar` の上限は 1 箇所。再実行スクリプトは作らず記録のみ。`build.rs` ごと削除。`thiserror` も不要になる。
 
 ### 7.7 リスクと緩和
 
