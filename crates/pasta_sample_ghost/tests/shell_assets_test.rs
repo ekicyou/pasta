@@ -2,11 +2,16 @@
 //!
 //! コミットした素材 `ghosts/hello-pasta/shell/master/`（立ち絵 18 枚と `surfaces.txt`）を
 //! 実ファイルのまま読み、枚数・寸法・透過・大きさ・サーフェス定義・当たり判定・画素の一致を検査する。
+//! 入門ガイドに載せる見本（`book/src/img/hello-pasta/` の写し 2 枚）がシェルの絵と同じかも見る。
 //! ネットワーク・一時ディレクトリ・DLL は使わず、素材を書き換えない。
 //!
 //! `surfaces.txt` は小さなパーサで読む。行が足りない・順序が違う・座標が整数でないなど
 //! 形が崩れていれば、0 件として素通りせず panic（テストの失敗）にする
 //! （`tutorial_stages_test.rs` と同じ流儀）。
+
+// このファイルが使うのは `workspace_root` だけ（DLL を写すヘルパーは使わない）
+#[allow(dead_code)]
+mod common;
 
 use std::collections::BTreeSet;
 use std::fs::File;
@@ -449,5 +454,25 @@ fn pixels_outside_face_are_identical_within_a_pose() {
                 );
             }
         }
+    }
+}
+
+/// 入門ガイドの見本（`book/src/img/hello-pasta/`）は、シェルの同じ名前の絵とバイト単位で同じ。
+#[test]
+fn book_sample_images_are_byte_identical_to_shell() {
+    let book_dir = common::workspace_root().join("book/src/img/hello-pasta");
+    for id in [0, 10] {
+        let name = png_name(id);
+        let read = |path: PathBuf| {
+            std::fs::read(&path).unwrap_or_else(|e| panic!("{}: 読めない: {e}", path.display()))
+        };
+        let book = read(book_dir.join(&name));
+        let shell = read(shell_dir().join(&name));
+        assert!(
+            book == shell,
+            "{name}: 本の写し（{} バイト）がシェルの絵（{} バイト）とバイト単位で一致しない。shell/master から写し直す",
+            book.len(),
+            shell.len()
+        );
     }
 }
