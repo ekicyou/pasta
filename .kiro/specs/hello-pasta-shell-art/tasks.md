@@ -147,3 +147,8 @@
 - `.claude/skills/pasta-check/SKILL.md` のリリースの段の図と番号を 6 段に合わせた（開発者の許可を得て 2026-10-11 に編集。`pasta.dll.zip` は段 4）。
 - 開発者の決定（2026-10-11）: 不可視の透かし（SynthID）は受け入れる（AI 生成であることを隠す意図は無い）。出力の帰属と利用条件は問題なしと判断する（要件 8.7 に反しない）。
 - 完了処理（`kiro-complete`）で行うこと: 5.8 の steering の同期（`structure.md`・`tech.md` の「画像生成」「image/imageproc」）、`roadmap.md` の「本線は qwen・切り抜きは BiRefNet」の記述、`spec.json` の phase、`getting-started-screenshots`・`manual-shell-guide` への申し送り（絵の表の書き方・表がくっついて見える点・Unlicense の説明・顔の中央は `Face` が返ること）。
+- 完了時の棚卸（2026-10-11）: その場で解決 2 件・申し送り 5 件・起票 0 件。
+- 完了時にその場で解決: steering の同期（`structure.md` のクレートの木から絵を描くプログラムを外し `art/`・`shell_assets_test.rs` を足した。`tech.md` の `image`/`imageproc` を `png 0.18` の dev-dependency に直した。要件 5.8）。
+- 完了時にその場で解決: `roadmap.md` の Phase 12 の方針の行（「本線は qwen・切り抜きは BiRefNet」）を、実際に使ったモデルに直した。
+- 完了時の申し送り: `getting-started-screenshots`（8 段目の実機の結果・`Face` が返ること・吹き出しの位置と未確認の 2 つの場合・絵の表の書き方）、`manual-shell-guide`（当たり判定の重ね方・吹き出しの位置・絵のライセンス）、`pasta-check-dic-validate`（`Cargo.lock` の席が空いた）、`hello-novel-sample`（絵の作り方と素材の扱いの前例）の各 brief に節を足した。リリース CI の配布物の検査が実 CI で未実行であることは、`roadmap.md` の「人手の確認が残っている項目」に足した。
+- 起票しなかったもの: 男の子を女の子に寄せる位置の調整は、簡単な設定では出来ないので見送る（開発者の指示・2026-10-10）。首の隙間に当たり判定が無いのは設計どおり。

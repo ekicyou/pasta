@@ -70,6 +70,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 ### 人手の確認が残っている項目
 
 - `sakura-script-newline` の Task 5.1（実機 SSP での目視確認）— SSP を操作するツール（SSP MCP）で実機の確認ができるようになった（2026-10-09 に `hello-pasta-tutorial-stages` が使った）。`getting-started-screenshots` の実機の確認のついでに済ませるかを、同 spec の要件で決める。
+- `hello-pasta-shell-art` が変えたリリース CI の配布物の検査（`.github/workflows/release.yml`。`.nar` にシェルの絵 18 枚・`surfaces.txt`・`descript.txt` があることを求める）は、実 CI ではまだ走っていない（2026-10-11）。次のリリースで、この検査が通ることを確かめる。手元では `release.ps1` の完走と `.nar` の中身（40 エントリ・3.57 MB）を確かめてある。
 - `pasta-check-bundled-balloon` を v0.3.7 で公開したことの、emo2 開発セッションへの連絡 — 実施の有無はリポジトリから確認できない。
 - `getting-started-story-guide` の公開後の確認 4 点（2026-10-10。実装では、SSP を `--ghost` で一時起動して全 13 段をたどった。次の操作は試していない）— (1) 準備の章: ゴーストのフォルダを SSP の `ghost/` の下へ置いて切り替え、立ち絵が無い状態でタスクバーの SSP のアイコンからメニューを開いて終了できるか（最初に確かめる。違っていると読者が 1 段目へ進めない） (2) 目次: 実際のブラウザーで幅を狭めて開き、項目をクリックしても開いたままか (3) 7 段目: メニューから emo2 そのもの（`えも？？`）と切り替えて挨拶が出るか (4) 13 段目: フォルダのドロップで `.nar` ができるか（読者の `profile/` が入るかも見る）。`getting-started-screenshots` の実機の作業のついでに済ませるかを、同 spec の要件で決める。
 
@@ -79,13 +80,13 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 | 順 | spec | 要件定義 | 規模 | 始められる時期 |
 | -- | ---- | -------- | ---- | -------------- |
-| 開発中 | hello-pasta-shell-art | Fable | 12〜14 | 始めている |
+| 完了 | hello-pasta-shell-art | Fable | 13（実績） | 2026-10-11 に完了 |
 | 開発中 | choice-line-layout、manual-print-media-refs、manual-link-anchor-check | Opus | 各 2〜4 | 始めている |
 | 1 | boot-surface-without-dic | Fable | 3〜5（やる場合） | 今すぐ |
 | 2 | failure-output-unification | Fable | 15〜19 | 今すぐ |
-| 3 | pasta-check-dic-validate | Fable | 10〜14 | `hello-pasta-shell-art` の後（`Cargo.lock` の席） |
-| 4 | manual-shell-guide | Opus | 5〜8 | `hello-pasta-shell-art` の後 |
-| 5 | getting-started-screenshots | Opus | 4〜6 | `hello-pasta-shell-art`・`choice-line-layout`・`boot-surface-without-dic` の後（最後に撮る） |
+| 3 | pasta-check-dic-validate | Fable | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
+| 4 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
+| 5 | getting-started-screenshots | Opus | 4〜6 | `choice-line-layout`・`boot-surface-without-dic` の後（最後に撮る。`hello-pasta-shell-art` は完了した） |
 | 6 | 0.4.0 のリリース（常駐 spec `release-workflow`） | Opus | — | 上の全部の後 |
 
 並走するときの約束（「棚卸」のウェーブの約束に足す）:
@@ -209,7 +210,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - 文法リファレンス（`grammar/`）と Lua 章（`lua/`）は、リファレンスのまま残す。入門ガイドが「こんな表現をしたい」を順に叶える物語で導き、各章から詳しい文法へリンクで送り出す。
 - ガイドの間は Claudia が全編を語る（説明本体も Claudia の語り）。これは `getting-started` に限った執筆規約の例外とする。コードブロック内・構文定義・コマンド例には口調を持ち込まない。
 - 題材は hello-pasta のまま（Claudia ゴーストは別に存在するので、ガイドの題材にはしない）。各章の終わりで読者のゴーストが起動できるようにし、最終章の辞書を hello-pasta と一致させる。
-- hello-pasta のシェルは fal.ai の画像生成で作り直す。本線は `qwen-image-edit-2511`、切り抜きは BiRefNet。
+- hello-pasta のシェルは fal.ai の画像生成で作り直した（`hello-pasta-shell-art`・完了）。使ったモデルは `openai/gpt-image-2.5/flare/edit` だけで、切り抜きのモデルは使っていない（生成の記録は `crates/pasta_sample_ghost/art/README.md`）。
 - マニュアルの見た目は、mdBook のまま「Claudia のマニュアル」に着せ替える（完了）。手本は ponapalt さんの「悪役令嬢クローディア」紹介ページ（<https://ponadocs.shillest.net/claudia/>、ponapalt/claudia、Unlicense）。サイト生成器の移行は採らない。
 
 ### 境界戦略
@@ -338,7 +339,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）と、ガイ�
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: none
 - [ ] failure-output-unification -- シーンが生きている間の実行時の失敗（未定義の参照・見つからない Call など）を、ログとさくらスクリプトの両方へ 1 つの仕組みから出す。既にある 2 つの失敗表記を 1 つにし、`act.lua`・`actor.lua`・`word.lua` の警告を載せ替える（2026-10-10 の棚卸で、スクリプトが止まるエラーを `runtime-error-balloon` へ分けた）。Dependencies: none
 - [ ] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
-- [ ] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。当たり判定を足し、絵を描くプログラムと配布スクリプトの生成の段を外す。Dependencies: none
+- [x] hello-pasta-shell-art -- hello-pasta の女の子・男の子の立ち絵を、fal.ai で作ったイラスト（表情 9 種ずつ・透過 PNG・表情間でずれない）に置き換え、生成物から素材の扱いに切り替える。当たり判定を足し、絵を描くプログラムと配布スクリプトの生成の段を外す。Dependencies: none
 - [ ] manual-print-media-refs -- マニュアルの印刷用ページ（`print.html`）で動画の参照が切れているのを、ビルド後の書き換えで直し、検査の例外を外す（2026-10-10 棚卸で起票）。Dependencies: none
 - [ ] pasta-check-dic-validate -- SSP を起動せずに `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い参照・モジュール名とシーン名の衝突などを見る（2026-10-10 棚卸で起票）。Dependencies: hello-pasta-shell-art（`Cargo.lock` を触る順番）
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
