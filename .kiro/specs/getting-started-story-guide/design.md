@@ -446,21 +446,21 @@ flowchart TB
 
 | 段 | 章 | 題（H1・目次） | 辞書 | 初めて扱うイベント（出典の表） |
 |----|----|----------------|------|--------------------------------|
-| 1 | `01-boot.md` | しゃべらせたい | `01-boot.pasta` | `OnBoot` |
-| 2 | `02-talk.md` | 二人で掛け合いさせたい | `02-talk.pasta` | — |
-| 3 | `03-face.md` | 表情を変えたい | `03-face.pasta` | — |
-| 4 | `04-variety.md` | 毎回ちがうことを言わせたい | `04-variety.pasta` | — |
-| 5 | `05-words.md` | 単語でちょこっと変えたい | `05-words.pasta` | — |
-| 6 | `06-hour.md` | 時刻を知らせたい | `06-hour.pasta` | — |
-| 7 | `07-greeting.md` | 挨拶したい | `07-greeting.pasta` | `OnGhostChanged`・`OnGhostChanging`・`OnFirstBoot`・`OnClose` |
-| 8 | `08-touch.md` | 触ったら反応してほしい | `08-touch.pasta` | `OnMouseDoubleClick` |
-| 9 | `09-choice.md` | 選ばせたい | `09-choice.pasta` | `OnChoiceSelectEx` |
-| 10 | `10-save.md` | 覚えていてほしい | `10-save.pasta` | — |
-| 11 | `11-jump.md` | 話を続けたい・分岐させたい | `11-jump.pasta` | — |
-| 12 | `12-lua.md` | もっと凝ったことをしたい | `12-lua.pasta` | — |
-| 13 | `13-nar.md` | 配布したい | — | — |
+| 1 | `01-boot.md` | 1 段目：しゃべらせたい | `01-boot.pasta` | `OnBoot` |
+| 2 | `02-talk.md` | 2 段目：二人で掛け合いさせたい | `02-talk.pasta` | — |
+| 3 | `03-face.md` | 3 段目：表情を変えたい | `03-face.pasta` | — |
+| 4 | `04-variety.md` | 4 段目：毎回ちがうことを言わせたい | `04-variety.pasta` | — |
+| 5 | `05-words.md` | 5 段目：単語でちょこっと変えたい | `05-words.pasta` | — |
+| 6 | `06-hour.md` | 6 段目：時刻を知らせたい | `06-hour.pasta` | — |
+| 7 | `07-greeting.md` | 7 段目：挨拶したい | `07-greeting.pasta` | `OnGhostChanged`・`OnGhostChanging`・`OnFirstBoot`・`OnClose` |
+| 8 | `08-touch.md` | 8 段目：触ったら反応してほしい | `08-touch.pasta` | `OnMouseDoubleClick` |
+| 9 | `09-choice.md` | 9 段目：選ばせたい | `09-choice.pasta` | `OnChoiceSelectEx` |
+| 10 | `10-save.md` | 10 段目：覚えていてほしい | `10-save.pasta` | — |
+| 11 | `11-jump.md` | 11 段目：話を続けたい・分岐させたい | `11-jump.pasta` | — |
+| 12 | `12-lua.md` | 12 段目：もっと凝ったことをしたい | `12-lua.pasta` | — |
+| 13 | `13-nar.md` | 13 段目：配布したい | — | — |
 
-題は段階表の `願い` をそのまま使う（1.3）。UKADOC の項の URL は `https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#<イベント名>` である。
+題は「N 段目：」に段階表の `願い` を続けた形にする（1.3）。辞書の先頭のコメント行（`＃ 7 段目：挨拶したい`）と同じ文言になる。目次の通し番号（1.9 など）は段の番号とずれるので、題で段の番号を示す。UKADOC の項の URL は `https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#<イベント名>` である。
 
 **段ごとの固有の内容**（共通の型に足すもの）
 
@@ -746,6 +746,7 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 - **辞書のコメント行は 1 段目で 1 行だけ示す** — 「`＃` で始まる行はコメントで、処理されない」と示し、文法章の「コメント」へ送る。要件 3.7 にただし書きを足した。段階表は変えない。
 - **語りの形と章の型を機械で検査する**（議題 1） — 段の章の 5 つの H2（`C-sections`）と、台詞以外の段落が指示の一文だけであること（`C-prose`）を `verify-content.mjs` で確かめる。要件 10.7・10.8 を足した。「台詞を読み飛ばしても事実が追える」（7.3）はレビューで見る。
 - **`pasta.dll` とシェルは `hello-pasta.nar` から写す**（議題 2） — `hello-pasta.nar` を SSP に入れ、`ghost/hello-pasta/` から `pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`shell/master/` を写す。入手先が 1 つで済み、完成版が見本として手元で動く。最小一式に `THIRD_PARTY_LICENSES.txt` を足した（要件 2.3・2.9）。nar を展開して写す案、`pasta.dll.zip` とリポジトリから別々に取る案は採らない。
+- **段の章の題は「N 段目：願い」**（議題 3） — 「7 段目：挨拶したい」の形にする。目次では通し番号と並ぶ（「1.9. 7 段目：挨拶したい」）が、13 段のどこにいるかが目次・検索結果・ブラウザのタブで分かる。願いだけの題は採らない。
 
 要件が設計に委ねた 4 項目は、次のとおり決めた（理由は `research.md` の Design Decisions）。
 
@@ -760,7 +761,6 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 
 下書きは、それぞれ「前提」のほうで書いてある。
 
-1. **段の章の題に段の番号を入れるか** — 前提: 題は願いだけ（「しゃべらせたい」）。段の番号は入口の章の一覧と辞書のファイル名（`01-boot.pasta`）で示す。別案: 「1 段目：しゃべらせたい」。mdBook の目次は章に通し番号（1.3 など）を自動で振るので、題に段の番号を入れると番号が 2 つ並ぶ。
 9. **実機の通し読みの範囲** — 前提: 全 13 段を実機の SSP で 1 回たどる。別案: 道具を使う段（6・7・13）と準備の終わりだけを実機で確かめ、ほかは `cargo test -p pasta_sample_ghost` の保証に任せる。
 
 ## Supporting References
@@ -770,7 +770,7 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 `AUTHORING.md` 第 8 節に載せる雛形の下書きである。語りの形（台詞部品だけで語り、台詞以外だけで事実が追える）を、実物で示す。
 
 ````markdown
-# しゃべらせたい
+# 1 段目：しゃべらせたい
 
 > 【にっこり】産声をあげる瞬間ですわ。準備で組み上げたあの子に、最初のひとことを授けましょう。
 
