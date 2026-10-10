@@ -15,7 +15,7 @@
 ## Boundary Context
 
 - **In scope**:
-  - 立ち絵 18 枚（または胴体＋顔パーツの構成）の生成・後処理・コミット
+  - 立ち絵 18 枚（1 枚絵。サーフェス番号 1 つに PNG 1 枚）と設定画像 2 枚の生成・後処理・コミット
   - `shell/master/surfaces.txt`（当たり判定を含む）と `shell/master/descript.txt`（吹き出しの位置）の更新
   - `crates/pasta_sample_ghost` の「生成物」から「素材」への切り替え（絵を描くプログラム・生成 API・CLI・依存部品・ビルドスクリプト・README・テスト）
   - 配布スクリプト `release.ps1`（絵を生成する段の除去と段の番号）、ルートの `release.bat` の説明、`STAGES.md` の部位名の注記と 8 段目の検証の表
@@ -37,23 +37,23 @@
 
 ## 未確定事項（要件ディスカッションで開発者が決める。確定したものは「【確定】」と記す）
 
-brief の Constraints が「要件定義の初めに決める」と定めた 4 点と、起草中に見つかった事項。各項目は下の要件に【仮定】として織り込んである。決定が変われば、該当する受け入れ基準を書き換える。
+brief の Constraints が「要件定義の初めに決める」と定めた 4 点と、起草中に見つかった事項。2026-10-10 の要件ディスカッションで、すべての項目を確定するか、設計へ送った。確定した内容は下の要件に織り込んである。
 
 | # | 事項 | 本書の仮定 |
 | --- | --- | --- |
 | Q1 | ライセンス表記の食い違い（ルートの `LICENSE` は MIT の全文のみ。`Cargo.toml`・4 つのクレート README・`tech.md` は「MIT OR Apache-2.0」。一方 `about.hbs` の「pasta 自体は MIT License」・`editors/vscode/package.json` の `"license": "MIT"` は MIT 単独） | **【確定 2026-10-10】** このリポジトリで開発したものは MIT 単独。表記を MIT に揃える（ルートの `Cargo.toml` L12・`pasta_check`/`pasta_dsl`/`pasta_lsp`/`pasta_sample_ghost` の README・`tech.md` L165 の「MIT OR Apache-2.0」を直す）。`LICENSE`（MIT）はそのまま。`LICENSE-APACHE` は作らない。`about.hbs`・`package.json` は既に MIT なので触らない。公開済みの版が持つ「MIT OR Apache-2.0」は取り消せない（過去の版の許諾はそのまま） |
-| Q2 | 「Rust で生成・外部素材不要」の方針をやめ、外部素材（コミットした絵）を持つ方針に変える | 変える。絵を描くプログラム・生成 API・CLI・`image`/`imageproc` は取り外す |
+| Q2 | 「Rust で生成・外部素材不要」の方針をやめ、外部素材（コミットした絵）を持つ方針に変える | **【確定】** 変える（brief の Desired Outcome と 2026-10-10 の再測定が定めている。議題にしていない）。絵を描くプログラム・生成 API・CLI は取り外す |
 | Q3 | 生成元（モデル名・手順）を同梱物に記録するか | **【確定 2026-10-10】** リポジトリ内の記録（クレート README と生成の記録）に置き、配布物 `.nar` には入れない。絵を Unlicense にしたので（Q14）、配布物に表示を入れる必要が無い |
 | Q4 | 当たり判定の部位名 | **【確定 2026-10-10】** `Head`・`Face`・`Body` の 3 つ。2 人とも同じ名前の組にする。足元には当たり判定を置かない（足を触ると部位名が空になり、入門ガイドが教える「当たり判定の外では空になる」を実機で確かめられる）。子どもの絵なので、手本の `Bust` は使わない。8 段目の辞書は名前を差し込むだけで分岐しないので、辞書・入門ガイドの章は変えない |
 | Q5 | 配布物の大きさの上限の数字 | **【確定 2026-10-10】** 絵 1 枚 ≤ 250 KB・シェルの絵の合計 ≤ 4.5 MB・`.nar` ≤ 7 MB（現行 `.nar` は約 2.0 MB、うち絵は約 50 KB。手本の紹介ページ用の絵は 256×477 px で 168 KB）。切り詰めた予算ではなく、置き間違いや無圧縮の絵を捕まえる歯止めとして置く |
 | Q6 | ドリフト（表情で髪・服・輪郭がずれる）対策の方式 | **【確定 2026-10-10】** 1 枚絵 18 枚を保つ（サーフェス番号 1 つに PNG 1 枚）。ずれは作る段階で消す: 基準の絵に、表情ごとの顔の部分だけを貼り合わせてから書き出す。顔以外は、同じ人物の 9 枚で画素まで一致させる。手本のように基準の絵へ顔の部品を重ねる構成は採らない（入門ガイドの準備の章が「`surface0.png`〜`surface8.png` は女の子の立ち絵（表情 9 種）」「同じ番号の画像を差し替えるところから始められる」と教えているため） |
 | Q7 | 生成の手順を再現できる形で残すか、成果物だけ残すか | **【確定 2026-10-10】** 手順（モデル・指示文の全文・seed・参照画像・切り抜きと縮小のコマンド）を文書として残す。再実行スクリプトは作らず、コミットした絵を正本とする。加えて、生成の元になる設定画像（2 人それぞれの基準の絵。縮小前）をリポジトリにコミットする（表情を足す・作り直すときの起点になるため）。表情ごとの縮小前の原画はコミットしない |
-| Q8 | `image`・`imageproc` の依存を外すか | 外す（このクレートしか使っておらず、ルートの `Cargo.toml`・`Cargo.lock` からも消える） |
-| Q9 | 絵のテストの置き場所 | `tests/integration_test.rs` の既存の絵のテストを、コミットした素材を検証するテストに置き換える（別ファイルへ移さない） |
-| Q10 | `cargo run -p pasta_sample_ghost`（CLI）と `generate_ghost()` の扱い | 両方とも削除する。クレートは辞書・配布物の検証テストを持つライブラリとして残す |
+| Q8 | `image`・`imageproc` の依存を外すか | **【確定】** 絵を描くための依存としては外す（brief の再測定が定めている）。テストが PNG の画素を読むための開発時の依存を置くかは設計で決める |
+| Q9 | 絵のテストの置き場所 | 設計で決める（`tests/integration_test.rs` の置き換えを起点にする。`research.md` 6.2b） |
+| Q10 | `cargo run -p pasta_sample_ghost`（CLI）と `generate_ghost()` の扱い | **【確定】** 両方とも削除する（brief が「消す」と定めている）。クレートは辞書・配布物の検証テストを持つライブラリとして残す |
 | Q11 | 立ち絵の寸法 | **【確定 2026-10-10】** キャンバスは手本と同じ 333×500 px（2 人とも同じ）。描く細かさ（頭・瞳の大きさ、線の太さ）は手本に合わせる。人物の背丈は手本の 8〜9 割にして、頭の大きさは保ったまま胴と脚を少し短くする（令嬢の隣で子どもに見え、2 人組が占める面積も抑えられる） |
 | Q12 | 生成の費用の上限 | **【確定 2026-10-10】** 試作 3 ドル以内・全体 40 ドル以内。この範囲なら、実装のときに都度の確認なしで生成を進めてよい。上限に近づいたら止めて開発者に相談する。生成サービスの残高は前払いで、開発者が全体の上限と同じ 40 ドルを先に入れる（残高が尽きることも歯止めとして働く）。使った額は生成の記録に残す |
-| Q13 | `STAGES.md` 7 段目の「使う文法要素」に `＞ゴースト終了` を足すか（`getting-started-story-guide` からの申し送り） | 本仕様では足さない（ウェーブの約束で `STAGES.md` は部位名の注記と 8 段目の行だけ触る） |
+| Q13 | `STAGES.md` 7 段目の「使う文法要素」に `＞ゴースト終了` を足すか（`getting-started-story-guide` からの申し送り） | **【確定】** 本仕様では足さない（ウェーブの約束で `STAGES.md` は部位名の注記と 8 段目の行だけ触る） |
 | Q14 | 生成した絵のライセンス表示 | **【確定 2026-10-10】** 絵（シェルの立ち絵と設定画像）だけ Unlicense にする。手本と同じ扱い。入門ガイドは読者に「見本の絵をそのまま借りて進めばよい」と教えるので、借りた読者に表示の義務を残さない（MIT は複製に著作権表示と許諾文を求める）。絵以外（`surfaces.txt`・`descript.txt`・辞書・コード）は MIT のまま。記録とクレート README に「絵は Unlicense・AI 生成・画風の手本はクローディア」と書く。`THIRD_PARTY_LICENSES.txt`（`pasta.dll` の依存の表示）には載せない。ライセンスの説明を本に足すことはしない |
 | Q15 | 画風と構図（2026-10-10 の議論で追加。どんな絵にするかは要件で決める） | **【確定 2026-10-10】** ponapalt さんのゴースト「悪役令嬢クローディア」（`https://github.com/ponapalt/claudia`、Unlicense。マニュアルの顔アイコンの出典と同じ）のシェルに画風と構図を揃える。全身・正面・約 3 頭身のちびキャラ、アニメ調（大きな瞳・柔らかい塗り・細い茶色の主線）。「同じ作者が、同じ画風で別の題材のシェルを頼まれて描いた」という想定で方向づける。手本のキャンバスは 333×500 px（2 人とも同じ）。題材（誰を・どんな服で描くか）は Q16 で決める |
 | Q16 | 題材とキャラクターの見た目（2026-10-10 の議論で追加） | **【確定 2026-10-10】** パスタ屋さんの見習い 2 人。女の子（本体側）は赤いエプロンドレスの給仕見習いで、栗色のおさげにトマト色のリボン。男の子（相方側）は青いネッカチーフに白いコック服の見習い料理人で、短い黒髪に小さなコック帽。2 人とも人間の子ども（手本の相方はマスコットだが、台詞に合わせて人間の男の子にする）。赤と青の色分けは現行のまま引き継ぐ。手には何も持たせず、両腕を下ろした立ち姿にする（表情の差し替えでずれにくく、当たり判定が単純になる） |
@@ -122,11 +122,11 @@ brief の Constraints が「要件定義の初めに決める」と定めた 4 �
 
 #### Acceptance Criteria
 
-1. The リポジトリ shall `crates/pasta_sample_ghost/ghosts/hello-pasta/shell/master/` の立ち絵 18 枚・`surfaces.txt`・`descript.txt` を git で追跡する素材として持つ（`release-ci` が定めた境界のまま。【仮定 Q2】）。
-2. The pasta_sample_ghost クレート shall 立ち絵と `surfaces.txt` を生成するプログラム（`image_generator.rs`・`generate_ghost()`・`config_templates.rs` の生成）を持たない（【仮定 Q10】CLI `cargo run -p pasta_sample_ghost` も削除する）。
+1. The リポジトリ shall `crates/pasta_sample_ghost/ghosts/hello-pasta/shell/master/` の立ち絵 18 枚・`surfaces.txt`・`descript.txt` を git で追跡する素材として持つ（`release-ci` が定めた境界のまま。Q2 確定）。
+2. The pasta_sample_ghost クレート shall 立ち絵と `surfaces.txt` を生成するプログラム（`image_generator.rs`・`generate_ghost()`・`config_templates.rs` の生成）を持たない（Q10 確定。CLI `cargo run -p pasta_sample_ghost` も削除する）。
 3. When 開発者が `cargo test -p pasta_sample_ghost` を実行したとき, the pasta_sample_ghost クレート shall `shell/master/` のファイルを書き換えない。
 4. When 開発者またはリリース CI が `release.ps1` を実行したとき, the 配布スクリプト shall `shell/master/` のファイルを書き換えず、コミットした絵と `surfaces.txt` をそのまま配布物に詰める。
-5. The pasta_sample_ghost クレート shall 画像を描く部品（`image`・`imageproc`）に依存せず、ワークスペースのルートの `Cargo.toml`・`Cargo.lock` からもそれらが消える（【仮定 Q8】）。
+5. The pasta_sample_ghost クレート shall 画像を描く部品（`image`・`imageproc`）を通常の依存として持たず、絵を描くためだけに使っていた部品をワークスペースのルートの `Cargo.toml`・`Cargo.lock` から外す（Q8 確定。テストが PNG の画素を読むための開発時の依存を置くかは設計で決める）。
 6. The pasta_sample_ghost クレート shall `build.rs` の「`cargo run` で生成する」案内と README の「シェル画像を Rust で自動生成（外部素材不要）」「`[gen] cargo run`」の記述を、素材として管理する記述に改める。
 7. The pasta_sample_ghost クレート shall README の `scripts/` の説明「Lua ランタイム」を、「利用者向けの説明 1 枚（README.md）だけ。ランタイムは `pasta.dll` の中にある」に直す（brief の指摘）。
 8. The リポジトリ shall `.kiro/steering/structure.md`・`tech.md` の「画像生成」「image/imageproc」の記述を、本仕様の完了時に素材の管理に合わせる（完了処理の範囲）。
@@ -140,7 +140,7 @@ brief の Constraints が「要件定義の初めに決める」と定めた 4 �
 1. The 配布スクリプト（`release.ps1`）shall 「絵を生成する段（現行の Step 2 `cargo run -p pasta_sample_ghost`）」を持たず、段の番号・`-SkipSetup`／`-SkipDllBuild` の説明・進捗表示（`[n/N]`）を新しい段の数に合わせる。
 2. The リポジトリ shall `release.bat`・クレート README・`RELEASE.md` の段の説明（「7 ステップ」「1-3. ... generate images」など）を、新しい段の構成に合わせる。
 3. When `release.ps1` が完了したとき, the 配布物 `hello-pasta.nar` shall `shell/master/` の立ち絵 18 枚・`surfaces.txt`・`descript.txt` を含む。
-4. When リリース CI の「配布物の検査」が実行されたとき, the リリース CI shall `hello-pasta.nar` に `shell/master/surfaces.txt` と立ち絵 18 枚が揃っていることを確かめ、欠けていれば失敗する（【仮定】検査の対象に絵を足す。現行は `install.txt`・`updates.txt`・`descript.txt`・`pasta.dll`・ライセンス表示だけを見る）。
+4. When リリース CI の「配布物の検査」が実行されたとき, the リリース CI shall `hello-pasta.nar` に `shell/master/surfaces.txt` と立ち絵 18 枚が揃っていることを確かめ、欠けていれば失敗する（確定。壊れた配布物は止めるのが原則。検査の対象に絵を足す。現行は `install.txt`・`updates.txt`・`descript.txt`・`pasta.dll`・ライセンス表示だけを見る）。
 5. The 配布スクリプト shall 既存の段（DLL のビルド・`THIRD_PARTY_LICENSES.txt` の生成・`scripts/` の同期・`pasta_check release`・`pasta.dll.zip`・版の確認）の動作を変えない。
 6. While リリースが実行中である, the 開発者 shall `release.ps1` の変更を main に入れない（ウェーブの約束）。
 
@@ -195,7 +195,7 @@ brief の Constraints が「要件定義の初めに決める」と定めた 4 �
 3. When 開発者が `cargo test -p pasta_sample_ghost` を実行したとき, the pasta_sample_ghost クレート shall `surfaces.txt` が `charset,UTF-8` で始まり、18 のサーフェス定義を持ち、各定義が同じ番号の PNG を参照し、各定義に `Head` を含む当たり判定があることを確かめる。
 4. When 開発者が `cargo test -p pasta_sample_ghost` を実行したとき, the pasta_sample_ghost クレート shall 立ち絵 1 枚と 18 枚の合計の大きさが Requirement 7 の上限内であることを確かめる。
 5. The pasta_sample_ghost クレート shall これらの検証を、ネットワークや画像生成サービスに接続せずに行う。
-6. The pasta_sample_ghost クレート shall 現行の絵の生成を前提にしたテスト（`test_generated_images_structure`・`test_shell_images`・`test_image_dimensions`・`test_expression_variations`・`lib.rs`・`config_templates.rs`・`image_generator.rs` の単体テスト）を、素材の検証のテストに置き換える（【仮定 Q9】置き場所は `tests/integration_test.rs`）。
+6. The pasta_sample_ghost クレート shall 現行の絵の生成を前提にしたテスト（`test_generated_images_structure`・`test_shell_images`・`test_image_dimensions`・`test_expression_variations`・`lib.rs`・`config_templates.rs`・`image_generator.rs` の単体テスト）を、素材の検証のテストに置き換える（置き場所は設計で決める。Q9）。
 7. The リポジトリ shall 本仕様の変更後も、ワークスペースの `cargo test --all` と clippy がクリーンなチェックアウトで成功する。
 8. When 開発者が `cargo test -p pasta_sample_ghost` を実行したとき, the pasta_sample_ghost クレート shall 同じキャラクターの 9 枚について、顔の領域の外の画素がすべて一致することを確かめる（Requirement 2 の 1）。
 
