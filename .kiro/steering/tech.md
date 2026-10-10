@@ -5,7 +5,7 @@
 ### 言語・ランタイム
 - **Rust 2024 edition**: メインコンパイラ言語
 - **LuaJIT 2.1 (mlua 0.11)**: Luaバックエンドスクリプト実行
-- **Pest 2.8.6**: PEGパーサー生成器（`pasta.pest`文法定義）
+- **Pest 2.8.6**: PEGパーサー生成器（`grammar.pest`文法定義）
 
 ### ワークスペース構成
 - **pasta_dsl**: DSLパーサー層（Pest PEG → AST変換）
@@ -166,9 +166,9 @@ pasta (workspace)
 - 依存関係ライセンス: 互換性確認済み
 
 ### 公開ポリシー
-- `publish = true` in Cargo.toml
-- crates.io公開予定
-- API安定化後にリリース
+- `publish = true` in Cargo.toml（`pasta_sample_ghost` は `publish = false`）
+- crates.io へ公開済み
+- 公開はリリースタグ `vX.Y.Z` の push で `release.yml` が Trusted Publishing で行う
 
 ## デプロイメント
 
@@ -198,7 +198,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
   - Rust キャッシュ: `Swatinem/rust-cache@v2`
   - アーティファクト: `pasta-dll-x86`, `pasta-dll-x64`（7日間保持）
 - **GitHub Actions**: `.github/workflows/manual.yml`（利用者マニュアル公開・build.yml と独立）
-  - `book/**`・`.claude/skills/pasta-ghost-authoring/**`・`.claude/skills/pasta-lua-coding/**` 変更時に起動。スキル references 鮮度照合（`gen-skill-refs.mjs --check`）→ npm ci(book) → mdbook build → pasta 構文ハイライト → 台詞部品の変換（`talk/talk-html.mjs`）→ bigram 索引再生成 → リンク検証（`link-check.mjs`）→ tutorial-check → cargo test 構文ガード → verify-static/search（`--self-test` 付き）/content → ツール自己テスト（`book/tools` の `*-test.mjs` 全件）→ 旧版の生成（固定コミット `CLASSIC_REF` の `book/` を旧版のツールで `book/book/classic/` へ。新版の検査の後・失敗で中断。PR でも実行）→ GitHub Pages デプロイ（旧版は `https://ekicyou.github.io/pasta/classic/`）
+  - `book/**`・`.github/workflows/manual.yml`・`.claude/skills/pasta-ghost-authoring/**`・`.claude/skills/pasta-lua-coding/**`・`crates/*/README.md`・`crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**` の変更時に起動。スキル references 鮮度照合（`gen-skill-refs.mjs --check`）→ npm ci(book) → mdbook build → pasta 構文ハイライト → 台詞部品の変換（`talk/talk-html.mjs`）→ bigram 索引再生成 → リンク検証（`link-check.mjs`）→ tutorial-check → cargo test 構文ガード → verify-static/search（`--self-test` 付き）/content → ツール自己テスト（`book/tools` の `*-test.mjs` 全件）→ 旧版の生成（固定コミット `CLASSIC_REF` の `book/` を旧版のツールで `book/book/classic/` へ。新版の検査の後・失敗で中断。PR でも実行）→ GitHub Pages デプロイ（旧版は `https://ekicyou.github.io/pasta/classic/`）
   - permissions: `pages: write` / `id-token: write` / `contents: read`。Pages 初回は repo Settings で手動有効化が必要
 - **GitHub Actions**: `.github/workflows/release.yml`（リリース CI・release-ci）
   - リリースタグ `vX.Y.Z`（数字 3 つ）の push だけで起動。job は verify（タグ・ワークスペース版・`package.json` 版の一致と main からの到達性）→ gate（`build.yml` を `workflow_call`）→ build → publish-crates／publish-vsce → github-release → report

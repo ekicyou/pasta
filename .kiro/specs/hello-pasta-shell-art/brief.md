@@ -70,3 +70,28 @@
   - `book/src/getting-started/first-ghost.md`（60 行目あたり）がこの `descript.txt` を ```text で転記している。`tutorial-check.mjs` は ```pasta しか照合しないので、食い違っても CI は気づかない（`getting-started-story-guide` の書き直しで拾う）。
   - `release-ci` の起票文の「追跡を外す一覧」にシェル画像は入っていない。`release-ci` の要件で「シェル画像は追跡したまま」と明記してもらうと、本 spec が戻す手間が要らない。
   - 胴体と顔を重ねる構成にするなら、`lib.rs` のテスト（生成ファイル数 19）と `config_templates.rs` のテスト（18 ブロック）も直す。
+
+## 2026-10-10 棚卸の再測定（main add05022）
+
+- **前提の変化**: 先に要る 2 本（`release-ci`・`hello-pasta-tutorial-stages`）は、どちらも main に入った。
+  - `release-ci` は、絵を作る段に手を付けていない。配布物を作るスクリプト（`crates/pasta_sample_ghost/release.ps1`）の 2 番目の段は、今も `cargo run -p pasta_sample_ghost` で絵 18 枚と `surfaces.txt` を毎回上書きする。リリースの自動実行（`.github/workflows/release.yml`）もこのスクリプトを呼ぶ。この段を外さないと、コミットした絵が配布物を作るたびに丸と三角の絵へ戻る。
+  - `.gitignore` に「シェルの画像は追跡を続ける」と書かれた。`shell/master/` の 20 ファイル（絵 18 枚・`surfaces.txt`・`descript.txt`）は今も git に入っている。追跡を戻す作業は要らない。
+  - 表情とサーフェス番号の対応は、`actors.pasta` から 3 段目の辞書（`ghosts/hello-pasta/ghost/master/dic/03-face.pasta`）へ移った。中身は同じ（1 人 9 表情、0〜8 と 10〜18）。emo2 との切り替えの作例（`07-greeting.pasta`）は、表情もサーフェス番号も増やしていない。描くのは 18 枚のまま。
+  - 辞書のテストは別のファイル（`tests/tutorial_stages_test.rs`）へ出た。`tests/integration_test.rs`（306 行）を触る未完了の spec は、本 spec だけになった。
+- **触るファイル**: `crates/pasta_sample_ghost/` の次のもの。1,000 行に近いファイルは無い。
+  - 絵を描くプログラム `src/image_generator.rs`（572 行。消す）、`src/lib.rs`・`src/main.rs`・`src/config_templates.rs`・`build.rs`・`Cargo.toml`。絵を描く部品 `image`・`imageproc` はこのクレートしか使っていないので、ルートの `Cargo.toml`（62〜63 行）と `Cargo.lock` からも外れる。
+  - `README.md`、`release.ps1`（2 番目の段と段の番号）、ルートの `release.bat` の説明、段階表 `STAGES.md`（部位名が「仮」という注記）。
+  - `ghosts/hello-pasta/shell/master/`（絵 18 枚・`surfaces.txt`・`descript.txt`）。
+  - `tests/integration_test.rs`（絵のテストは 14〜64 行と 269〜286 行。吹き出しの位置を決め打ちで確かめる 251〜266 行も）。前回の再測定の行番号は古い。
+  - 新しく作るもの: 生成の手順と出どころの記録、場合によりライセンスのファイル。
+- **規模**: 12〜14 タスク（前回の 10〜12 に、当たり判定と部位名、絵を描く部品の取り外し、配布物の中身と大きさの確認を足した）。
+- **先に要るもの**: 無い。ファイルが重なりうる未完了の spec は `getting-started-story-guide` だけで、条件つき。8 段目の辞書（`dic/08-touch.pasta`）を変えると、入門ガイド（`book/src/getting-started/first-ghost.md`）の同じ作例も同時に直さないと照合が落ちる。頭の部位名を今の `Head` のまま確定し、辞書と `book/` を触らなければ、ガイドの本文と同じ時期に進められる。`release-workflow` の手順の書き換えとはファイルが重ならないが、リリースの実行中は `release.ps1` を変えない。
+- **種別**: 機能（見た目の差し替え、生成物から素材への切り替え、当たり判定の追加）。
+- **要件定義のモデル**: Fable（開発者が決めることが、ライセンス表記・外部素材の方針・生成元の記録の 3 点に加えて、部位名がある）。
+- **分割の案**: なし。
+- **見つけた穴・古くなった記述**:
+  - Current State の「対応は `actors.pasta` が持つ」は古い。今は `03-face.pasta`。
+  - 「部位名を確定・変更したら同 spec に知らせる」は、相手の spec が完了したので成り立たない。名前を変えるなら、本 spec が辞書・`STAGES.md` の検証の表（`4=Head`）・入門ガイドの作例を直す。
+  - 8 段目の台詞は、部位名をそのまま声に出す（「えへへ……Head なでなで？」）。頭以外に付けた名前もそのまま読まれる。台詞として読んでおかしくない名前にする。
+  - 今の絵は 1 枚 2〜3KB（18 枚で約 50KB）。新しい絵は桁が上がるので、配布物の大きさの上限を要件で数字にする。
+  - `README.md` 72 行目は `scripts/` を「Lua ランタイム」と書くが、置くのは利用者向けの説明 1 枚だけ（ランタイムは `pasta.dll` の中にある）。README を書き直すときに直す。

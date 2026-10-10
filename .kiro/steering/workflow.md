@@ -19,7 +19,7 @@ requirements → design → tasks → implementation → implementation-complete
 | `/kiro-spec-requirements {feature}` | 要件定義   |
 | `/kiro-spec-design {feature} [-y]`  | 設計生成   |
 | `/kiro-spec-tasks {feature} [-y]`   | タスク分解 |
-| `/kiro-spec-impl {feature} [tasks]` | 実装       |
+| `/kiro-impl {feature} [tasks]`      | 実装       |
 | `/kiro-spec-status {feature}`       | 進捗確認   |
 
 ---
@@ -165,7 +165,7 @@ gh pr merge --squash --delete-branch --subject "<subject>" --body "<body>"
 
 **重要**: spec.json更新は仕様移動の**直後**に実行（移動前に更新するとVSCode仕様でファイルが復活する場合がある）
 
-**例外: 繰り返し仕様**: `release-workflow` のような繰り返し実行型仕様は `completed/` に移動しない。`/kiro-spec-impl` 実行のたびにタスクがリセットされ、常に `.kiro/specs/` 直下に留まる。
+**例外: 繰り返し仕様**: `release-workflow` のような繰り返し実行型仕様は `completed/` に移動しない。`/kiro-impl` 実行のたびにタスクがリセットされ、常に `.kiro/specs/` 直下に留まる。
 
 ```powershell
 # 1. 仕様ディレクトリを移動

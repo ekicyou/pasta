@@ -106,3 +106,31 @@ Call の属性フィルター（`＞シーン＆k＝v`）は、旧文法仕様�
 - `search/context.rs` の `SearchContext::search_scene` のグローバル分岐（第 2 引数 `None`）に、別名の置き換え（`scene_aliases.resolve(name)` → `sanitize_name`）が入った。フィルターはこの後の `resolve_scene_id_unified` に足すことになる。候補キャッシュのキーは**置き換え後**の名前なので、フィルターをキーに含めるときも置き換え後の名前で揃える。
 - `SearchContext` は別名表を持ち（`with_aliases`）、`search::register(lua, scene_reg, word_reg, aliases)` と `register_finalize_scene(lua, aliases)` の引数が増えた。rebase で署名を合わせる。
 - 参照: `.kiro/specs/completed/scene-name-alias/design.md`「SearchAlias」「Revalidation Triggers」。
+
+## 2026-10-10 棚卸の再測定（main add05022）
+
+- **前提の変化**: シーン名の別名（`scene-name-alias`）が、シーンを探す関数 `search_scene`（`crates/pasta_lua/src/search/context.rs` 91 行）に入った。上の「申し送り（scene-name-alias より）」は現在のコードと一致する（別名の置き換えは 126〜127 行、空の絞り込み条件は 96 行、登録の関数 `search::register` は `crates/pasta_lua/src/search/mod.rs` 70 行）。式の中の値なしの扱い（`expr-nil-coercion`）で `act.lua` は 726 行に減ったが、Call の経路は変わっていない。未完了の前提は `scene-attribute-store` と `failure-output-unification` の 2 本。
+- **触るファイル**: 文法 `crates/pasta_dsl/src/parser/grammar.pest` 272（Call の規則は 170 行）、Call を読む `parse_action.rs` 456、構文木 `ast/action.rs` 323、位置をずらす `crates/pasta_dsl/src/partial.rs` 477、Call の Lua を出す `crates/pasta_lua/src/code_gen/element_gen.rs` 564（205〜255 行）、`crates/pasta_lua/pasta_scripts/pasta/act.lua` 726（`call` 611 行）、`scene.lua` 216（`SCENE.search` 150 行）、`search/context.rs` 752、`crates/pasta_core/src/registry/scene_table.rs` 434、VSCode の文法定義 `editors/vscode/syntaxes/pasta.tmLanguage.json` 272、エディタ向けの色付け `crates/pasta_lsp/src/analysis/visit_action.rs` 431（Call は 199 行）、マニュアルと生成スキル。1,000 行に近いものは無い。
+- **規模**: 約 17〜20 タスク。前回の見積もりに、エディタ向けの色付けの 1 タスクを足した。上限ぎりぎりだが、一度分けた spec なので、もう分けない。
+- **先に要るもの**: `scene-attribute-store`（属性の保持と値の型）と `failure-output-unification`（「条件に合う候補が無い」の見せ方を載せる先）。ファイルの重なり: `failure-output-unification`（`act.lua`）、`scene-attribute-store`（`scene.lua`・`pasta_core` の登録表）、`scene-anchor-link`（`grammar.pest`・`parse_action.rs`・`ast/action.rs`・`partial.rs`・`element_gen.rs`・`act.lua`・VSCode の文法定義・`visit_action.rs`）。この 3 本とは同じ時期に進められない。
+- **種別**: 機能（`＞シーン＆k＝v` は今は構文エラー）。
+- **要件定義のモデル**: Fable（新しい書き方と意味。連結の `＆` との見分け、比べる記号、条件のつなぎ方を決める）。
+- **分割の案**: なし。
+- **見つけた穴・古くなった記述**:
+  - `search_scene` は、「名前が見つからない」と「絞り込みで候補が無くなった」を同じ扱いにしている（`search/context.rs` 141〜153 行）。別名を使った Call では、絞り込みが原因でも「Scene not found (alias applied)」という警告が出る。警告の文言を分けるかを決める。
+  - エディタ向けの色付け（`visit_action.rs` の Call）が Scope に無い。絞り込みの部分にも色を付けるなら Scope に足す。
+  - マニュアルのコードの色付けは、VSCode の文法定義をそのまま読む（`book/tools/highlight/highlight-html.mjs` 39 行）。文法定義を変えると、マニュアルの表示と `book/tools/highlight/tokenizer-test.mjs` にも効く。
+  - `act:find_scene`（`act.lua` 596 行）も `attrs` を受け取って捨てている。イベントからシーンを起こす `SCENE.co_exec`（`scene.lua` 193 行）がこれを呼ぶ。Call だけを絞り込むのか、こちらも通すのかを決める。
+  - 行番号が動いた: 「Current State」の `search_scene` は 73→91 行。前回の節の `find_handler("scene", key)` は `act.lua` 670→622 行、`search/context.rs` は 614→752 行、`element_gen.rs` は 555→564 行。マニュアル `book/src/lua/script-api.md` の「`attrs` は使わない」は 306 行と 319 行。
+
+## 2026-10-10 棚卸の申し送り
+
+roadmap のバックログにあった「`pasta_core` の `resolve_scene_id` の整理」を、この spec の要件へ渡す。
+
+- **事実**（main `add05022` で確かめた）:
+  - `resolve_scene_id` は、親のシーンを指定せずに名前と絞り込みの条件からシーンを 1 つ選ぶ関数である（`crates/pasta_core/src/registry/scene_table.rs` 171 行）。シーン表 `SceneTable` の公開の関数で、`pasta_core` は crates.io に公開している。
+  - 本番のコードからは呼ばれていない。呼んでいるのは、同じファイルの `find_scene`（404 行。410 行で呼ぶ）、`crates/pasta_core/README.md` の使い方の例（64 行）、テスト（`crates/pasta_core/src/registry/` の `scene_table_resolve_filter_tests.rs`・`scene_table_candidate_tests.rs`）だけである。`find_scene` も、呼んでいるのはテストだけである。
+  - 本番の検索が使うのは、親のシーンも受け取る `resolve_scene_id_unified`（同じファイルの 218 行）で、呼び出し元は `crates/pasta_lua/src/search/context.rs` の 104 行と 130 行である。
+  - 3 つの関数は、どれも絞り込みの条件を同じ形（文字列から文字列への表 `filters`）で受け取る。
+- **この spec との関係**: この spec は、ちょうどこの絞り込みの条件（`filters`）の形と比べ方を作り直す。`resolve_scene_id` と `find_scene` を残すなら、使われていない 2 つの関数とそのテストも、新しい形に合わせて直すことになる。
+- **要件で決めること**: `resolve_scene_id`（と `find_scene`）を消すか、残すか。消すと、公開している関数が無くなるので、版の付け方の決まり（semver）では互換性を壊す変更になる。絞り込みの条件の形を変えるなら、本番で使う `resolve_scene_id_unified` の引数も変わるので、どちらにしても互換性を壊す変更になる見込みである。消すなら、README の例を `resolve_scene_id_unified` を使う形に書き直す。

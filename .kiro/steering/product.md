@@ -1,13 +1,13 @@
 # Product Steering
 Memories of pasta twine together—now and then a knot, yet always a delight.
 
-> **📖 プロジェクトビジョン・設計原則**: [SOUL.md](../../../SOUL.md) を参照してください。  
+> **📖 プロジェクトビジョン・設計原則**: [SOUL.md](../../SOUL.md) を参照してください。  
 > このドキュメントは開発ロードマップと進捗管理に特化しています。
 
 ## プロジェクト概要
 **pasta**は、「伺か」のようなデスクトップマスコットなどを実現するための対話スクリプトエンジンです。Pasta DSLをLuaにトランスパイルし、「ゴースト」基盤として機能します。
 
-**ビジョン・コアバリュー・設計原則**: [SOUL.md](../../../SOUL.md) 参照
+**ビジョン・コアバリュー・設計原則**: [SOUL.md](../../SOUL.md) 参照
 
 ## 機能の優先順位
 
@@ -21,7 +21,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
 - [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
 
-**完了仕様**: 151件（2026-10-07 時点・`.kiro/specs/completed/` に格納）
+**完了仕様**: 156件（2026-10-10 時点・`.kiro/specs/completed/` に格納）
 
 **主要成果**:
 - ✅ **act-impl-call** - `ACT_IMPL.call` 4段階優先順位検索実装
@@ -46,7 +46,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 **最終更新**: 2026-06-19（現行バージョン v0.2.4）
 
 **繰り返し仕様**:
-- 🔁 **release-workflow** - リリース作業手順（`/kiro-spec-impl` 実行のたびにタスクリセット、永続的に未完了）
+- 🔁 **release-workflow** - リリース作業手順（`/kiro-impl` 実行のたびにタスクリセット、永続的に未完了）
 
 **完了仕様**:
 - ✅ **pasta-cue-dsl-extension** - キューコマンド行(`!`)のDSLパース機能追加
@@ -106,4 +106,4 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [ ] arekaへの投入（`ukagaka-desktop-mascot`メタ仕様）
 - [ ] MCPまたはLLMとの連携
 
-**現在地**: 現行バージョン v0.3.7。現在の主題は [roadmap.md](roadmap.md) の Phase 11（属性セマンティクス）・Phase 12（入門ガイド）・リリースの CI 化
+**現在地**: 現行バージョン v0.3.7。現在の主題は [roadmap.md](roadmap.md) の Phase 11 の残り（属性セマンティクスと失敗の出力）・Phase 12（入門ガイド）。リリースの CI 化は完了し、CI での初回リリースが残る

@@ -2,8 +2,6 @@
 //!
 //! These tests verify that the SHIORI load/request/unload lifecycle
 //! actually executes Lua code with observable side effects.
-//!
-//! Related specification: `.kiro/specs/shiori-lifecycle-lua-execution-test/`
 
 mod common;
 

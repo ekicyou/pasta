@@ -109,3 +109,20 @@
 
 - 選択肢の飛び先は、範囲つきの検索で見つからなければ範囲なしの `SCENE.search(id, nil)` で探し直す（`choice_select.lua`）。この範囲なしの検索には別名表（既定 `OnTalk = ["会話"]`）が効くので、`＠？会話` の飛び先は OnTalk のシーンになる。アンカーで選択肢の振り分けを共有するなら、同じ挙動を引き継ぐ（意図して変えるなら要件で決める）。
 - 参照: `.kiro/specs/completed/scene-name-alias/design.md`「SearchAlias」、マニュアル `grammar/call-jump.md#シーン名の別名`。
+
+## 2026-10-10 棚卸の再測定（main add05022）
+
+- **前提の変化**: 起票してから初めての再測定。「Current State」に書いた場所は、1 か所を除いて現在のコードと一致する（選択肢の文法は `crates/pasta_dsl/src/parser/grammar.pest` 221〜223 行、`act:choice` は `crates/pasta_lua/pasta_scripts/pasta/act.lua` 276〜281 行、`\q` への変換は `shiori/sakura_builder.lua` 29〜37 行、クリックの受け口は `shiori/event/choice_select.lua` 41〜78 行）。ずれていたのは、選択肢の Lua を出す場所で、`crates/pasta_lua/src/code_gen/scope_gen.rs` の 355〜371 行に動いた。「申し送り（scene-name-alias より）」も合っている（範囲なしの探し直しは `choice_select.lua` 71〜72 行）。
+- **伺かの仕様の確認**（SSP の公式の仕様書 UKADOC で確かめた）: `\_a[ID,追加の引数]表示\_a` をクリックすると `OnAnchorSelectEx` が来て、Reference0 が表示、Reference1 が ID、Reference2 以降が追加の引数になる。選択肢の制限時間は掛からず、普通の台詞と同じにバルーンが閉じる。ID が `On` で始まると、その名前のイベントが直接起きる。ここまでは brief のとおり。`script:` で始まる ID を `\_a` がどう扱うかは、確かめられなかった。
+- **触るファイル**: `grammar.pest` 272、台詞の要素を読む `crates/pasta_dsl/src/parser/parse_action.rs` 456、構文木 `ast/action.rs` 323、位置をずらす `crates/pasta_dsl/src/partial.rs` 477、台詞の Lua を出す `crates/pasta_lua/src/code_gen/element_gen.rs` 564、`act.lua` 726、`sakura_builder.lua` 288、`choice_select.lua` 80、ウェイトと改行を入れる `crates/pasta_lua/src/sakura_script/`（`mod.rs` 247 ほか）、エディタ向けの色付け `crates/pasta_lsp/src/analysis/visit_action.rs` 431、VSCode の文法定義 `editors/vscode/syntaxes/pasta.tmLanguage.json` 272 と単語参照の枠の表示 `editors/vscode/src/wordRefDecorator.ts`、マニュアルと生成スキル。1,000 行に近いものは無い。
+- **規模**: 約 17〜20 タスク（文法と読み取り 3、Lua の生成と `act` の関数 2、`\_a` の出力 2、ウェイトと改行 2、クリックの受け口 2、エディタ 3、マニュアル 2、テスト 2）。hello-pasta への作例まで入れると 20 を超える。
+- **先に要るもの**: 機能として要るのは `failure-output-unification` だけで、それも弱い（飛び先が無いときは何も起きない、と決まっている）。`call-attribute-filter` とは同じファイルを触る順番だけの関係なので、どちらを先にしてもよい。ファイルの重なり: `call-attribute-filter`（`grammar.pest`・`parse_action.rs`・`ast/action.rs`・`partial.rs`・`element_gen.rs`・`act.lua`・VSCode の文法定義・`visit_action.rs`）、`failure-output-unification`（`act.lua`）。`scene-attribute-store` とは重ならない。
+- **種別**: 機能（台詞の途中の `＠？` は今は構文エラー）。起票のときに開発者が決めたことが 3 つ記録されている（`\_a` にする・記法は `＠？`・飛び先が無ければ何も起きない）。
+- **要件定義のモデル**: Fable（新しい書き方。伺かの仕様の読み方、台詞が途中で割れるときのウェイトと改行、クリックと続きのトークの順番を決める）。
+- **分割の案**: 分けない。hello-pasta への作例は Scope から外す。hello-pasta の辞書は入門ガイドの段階表と照らし合わせて検査しているので（`crates/pasta_sample_ghost/tests/tutorial_stages_test.rs`）、作例を足すと段階表・`getting-started-story-guide`・`hello-pasta-shell-art` と重なる。
+- **見つけた穴・古くなった記述**:
+  - `OnAnchorSelectEx` に何も返さないと、SSP は続けて `OnAnchorSelect` を送る（UKADOC）。飛び先が無くて 204 を返すと、この 2 つ目が来る。今の受け口は同じ名前のシーンを探して、無ければ 204 を返すだけなので害は無い。要件に書いておく。
+  - VSCode の単語参照の枠（`wordRefDecorator.ts` 6 行の正規表現）は、`＠？名前` も単語参照として囲む。Scope に足す。
+  - マニュアルのコードの色付けは、VSCode の文法定義をそのまま読む（`book/tools/highlight/highlight-html.mjs` 39 行）。文法定義を変えると、マニュアルの表示にも効く。
+  - アンカーを選択肢と同じ形のトークンにすると、`act.lua` の続いた台詞を 1 つにまとめる処理（85 行の `merge_consecutive_talks`）で、前後の台詞が別々のままになる。Constraints の「折り返しとウェイト」はここで起きる。アンカーを台詞の文字の中に入れる形にするかを、設計で決める。
+  - 選択肢のテストは `pasta_lua` 側にある（`crates/pasta_lua/tests/lua_specs/choice_select_test.lua`・`tests/shiori/event_dispatch_test.rs`）。アンカーのテストも同じ場所に置けば、`shiori-test-support-runtime` と重ならない。

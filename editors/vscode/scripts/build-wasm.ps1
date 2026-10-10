@@ -1,5 +1,5 @@
 # Build WASM module for pasta_lsp
-# Usage: powershell -File scripts/build-wasm.ps1
+# Usage: pwsh -NoProfile -File scripts/build-wasm.ps1 [-Release] [-Clean]
 #
 # This script builds the pasta_lsp crate as a WASM module using wasm-pack
 # and places the output in editors/vscode/wasm/ for bundling into the VSIX.

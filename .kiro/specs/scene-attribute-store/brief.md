@@ -158,3 +158,20 @@ Call ターゲットの後ろに `＆key＝value` 形式のフィルターを付
 - `transpiler.rs` の `process_global_scene` はメソッドになり、冒頭で**宣言名**（`scene_aliases.resolve(&scene.name)` で別名を置き換えた名前）を 1 回だけ決める。登録・通し番号・単語のモジュール名・生成コード・突合キー・ローカルの親名はすべてこの宣言名から作る。属性を登録・生成に足すときも、シーン名は宣言名を使う。
 - `code_gen/scope_gen.rs` の `generate_global_scene(scene, declared_name, scene_counter, context, file_attrs)` に `declared_name` 引数が増えた。`context.rs` に `register_global_scene_named(name, attrs)` が増え、`register_global_scene(scene)` はそれに委譲する。`finalize.rs` の `finalize_scene_impl(lua, &aliases)` も署名が変わった。
 - 参照: `.kiro/specs/completed/scene-name-alias/design.md`「DeclaredNameResolver」「Revalidation Triggers」。
+
+## 2026-10-10 棚卸の再測定（main add05022）
+
+- **前提の変化**: シーン名の別名（`scene-name-alias`）と、式の中の値なしの扱い（`expr-nil-coercion`）が入った。この spec で変わるのは、シーンを登録するときに使う名前だけである。上の「申し送り（scene-name-alias より）」は現在のコードと一致する（シーン 1 つを処理する `process_global_scene` は `crates/pasta_lua/src/transpiler.rs` 202 行、名前を受け取って登録する `register_global_scene_named` は `crates/pasta_lua/src/context.rs` 48 行、実行時の登録表を作る `finalize_scene_impl` は `crates/pasta_lua/src/runtime/finalize.rs` 226 行）。未完了の前提は無い。
+- **触るファイル**: 前回と同じ。現在の行数は、宣言行を読む `crates/pasta_dsl/src/parser/parse_scene.rs` 426、シーンの Lua を出す `crates/pasta_lua/src/code_gen/scope_gen.rs` 410、`context.rs` 454、`transpiler.rs` 266、Lua 側のシーン表 `crates/pasta_lua/pasta_scripts/pasta/scene.lua` 216、`finalize.rs` 358、登録表 `crates/pasta_core/src/registry/scene_registry.rs` 576。1,000 行に近いものは無い。宣言行の属性を拾うなら、編集中の解析で位置をずらす処理（`crates/pasta_dsl/src/partial.rs` 477 行）と、エディタ向けの色付け（`crates/pasta_lsp/src/analysis/visit_scope.rs` 194 行）も確かめる。
+- **規模**: 約 15〜18 タスク。前回の見積もりに、下の「テスト用の見本の作り直し」と「エディタ向けの確認」で 1 タスクを足した。上限の 20 に収まる。
+- **先に要るもの**: なし。失敗の出力の一本化（`failure-output-unification`）と同じ時期に進められる。条件は、属性を読む口を `scene.lua` だけに置き、`crates/pasta_lua/pasta_scripts/pasta/act.lua` と、台詞と Call の Lua を出す `crates/pasta_lua/src/code_gen/element_gen.rs` を触らないこと。実行中のシーンの表は今でも `act.current_scene` で取れるので、それを `scene.lua` の関数に渡せば読める。`act.lua` を変える必要は無いと確かめた。
+- **種別**: 機能（書いた属性が、実行時にはどこにも残らない）。
+- **要件定義のモデル**: Fable（読み出しの口の形・値の型・ローカルシーンの属性の置き場所を決める。後の `call-attribute-filter` がその上に乗る）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**:
+  - 「Current State」の「`search_scene`（73 行付近）」は、別名の処理が入って `crates/pasta_lua/src/search/context.rs` の 91 行に動いた。空の絞り込み条件を作るのは 96 行。
+  - テスト用の見本 `crates/pasta_lua/tests/fixtures/sample.pasta` の 14 行に、ファイルの属性 `＆天気：晴れ` がある。属性を Lua に出すと、この見本から作る `sample.generated.lua` と、比べる相手の `sample.expected.lua` が変わる。「属性の無いシーンの出力は変えない」という約束では守られないので、作り直しをタスクに入れる。
+  - 宣言行の属性を拾うと、グローバルシーンでは「宣言行」と「次の行からの属性行」の 2 か所に同じ名前を書ける。どちらを優先するかを要件で決める。
+  - 別名があると、`＊会話` と `＊OnTalk` の 2 つの宣言が同じ名前のシーンになる。属性は宣言ごと（通し番号ごと）に持つことを、要件に書く。
+  - `pasta_shiori` の結合テストは、古いランタイムの写し（`crates/pasta_shiori/tests/support/scripts/pasta/scene.lua`）を読む。この spec の確認用のテストは `pasta_lua` 側に置く。写しは直さない（`shiori-test-support-runtime` の持ち場）。
+  - 前回の節の行番号のうち、登録表を作り直す場所（`finalize.rs` 182 行）と、属性をローカルシーンへ写す処理（`scene_registry.rs` 155〜189 行）は今も合っている。マニュアルの「内部に記録される」は `book/src/grammar/block-structure.md` の 248 行と 280 行に、ファイルの属性の説明は `book/src/internals/transpiler.md` の 158 行と 165 行に動いた。
