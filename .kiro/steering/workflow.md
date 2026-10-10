@@ -140,7 +140,7 @@ gh pr create --base {default-branch} --head $branch --title "<subject>" --body "
 gh pr merge --squash --delete-branch --subject "<subject>" --body "<body>"
 ```
 
-**CI を待たない**: squash マージは PR の CI 完了を待たずに行う。マージ前の関門は DoD の Test Gate（ローカルの `cargo test --all` と `cargo clippy --all-targets --workspace -- -D warnings`）であり、CI の緑を人や AI が見張る運用はしない。CI にしか見えない失敗（x86 ターゲット・ランナー固有のパス・cargo-deny・クリーンチェックアウト）で main が赤くなった場合は、次の作業より先に追いかけの修正で直す。取り消せない crates.io 公開の前にだけ「main の CI 全緑」を関門として課す（`release-workflow` Task 1.1）。
+**CI を待たない**: squash マージは PR の CI 完了を待たずに行う。マージ前の関門は DoD の Test Gate（ローカルの `cargo test --all` と `cargo clippy --all-targets --workspace -- -D warnings`）であり、CI の緑を人や AI が見張る運用はしない。CI にしか見えない失敗（x86 ターゲット・ランナー固有のパス・cargo-deny・クリーンチェックアウト）で main が赤くなった場合は、次の作業より先に追いかけの修正で直す。取り消せない公開の前の検査は、リリース CI（`release.yml`）がタグのコミットで行う（verify と、`build.yml` の検査をすべて行う gate）。エージェントは main の CI の結果を公開の条件にしない。
 
 **ブランチ削除のタイミング**: リモートの feature ブランチは `gh pr merge --delete-branch` が **PR マージ成功後に** API で削除する。**マージ成功前にブランチを削除しない**（復旧可能性を確保するため）。ローカルブランチおよびワークツリーは、カレントワークツリーで実行中のため構造的に削除できない。これらの後始末はハーネスのワークツリー teardown に委ねる（`--delete-branch` のローカル削除試行がブロックされて警告を出しても、これは非致命でありマージ成功を覆さない）。
 
@@ -148,7 +148,7 @@ gh pr merge --squash --delete-branch --subject "<subject>" --body "<body>"
 
 **中断条件**: PR の作成またはマージ（API）が失敗した（コンフリクト / mergeable でない / 権限不足等）場合は、**ブランチを削除せず**処理を中断し開発者へ報告する（復旧可能性を確保するため）。マージ成否の判定はマージ API の結果のみに基づき、`--delete-branch` のローカル削除警告とは区別する。
 
-> **release タグ公開のカーブアウト**: `release-workflow` のリリース手順は、コミットの main 反映を **PR のマージコミット方式**（`gh pr merge --merge`、spec 完了の `--squash` とは別系統）で行い、**デフォルトブランチへの直接 push は行わない**。リリースが行う **タグ ref の push**（`git push origin vX.Y.Z`。ブランチ push ではない）のみが本セクションの直接 push 禁止の対象外であり、将来 main のブランチ保護を有効化しても成立する。`.claude/settings.json` はタグ push 許可（`git push origin v*`）を保持し、`git push origin main` の直接 push 許可は撤去する。
+> **release タグ公開のカーブアウト**: `release-workflow` のリリース手順は、版の更新の main 反映を、spec 完了と同じ **PR の squash マージ**（`gh pr merge --squash`）で行い、**デフォルトブランチへの直接 push は行わない**。リリースタグは、統合の後に main のコミット（squash マージでできたコミット）へ付ける。リリースが行う **タグ ref の push**（`git push origin vX.Y.Z`。ブランチ push ではない）のみが本セクションの直接 push 禁止の対象外であり、main のブランチ保護のもとでも成立する。`.claude/settings.json` はタグ push の許可（`git push origin v*`）を持ち、main への push の許可を持たない。
 
 #### squash コミットメッセージの生成方針
 

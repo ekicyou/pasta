@@ -3,6 +3,9 @@
 # pasta
 Memories of pasta twine together—now and then a knot, yet always a delight.
 
+[![Build](https://github.com/ekicyou/pasta/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/ekicyou/pasta/actions/workflows/build.yml)
+[![Release](https://github.com/ekicyou/pasta/actions/workflows/release.yml/badge.svg)](https://github.com/ekicyou/pasta/actions/workflows/release.yml)
+
 <br clear="both">
 
 **pasta** は「伺か」などのデスクトップマスコット、あるいはノベルゲーム向けの対話スクリプトエンジン／SHIORI.DLL です。

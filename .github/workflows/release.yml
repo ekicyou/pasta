@@ -317,7 +317,7 @@ jobs:
           PASTA_CHECK_REASON: ${{ steps.pub_check.outputs.reason }}
         run: |
           $next = @{
-            auth             = 'Trusted Publisher の設定を手順書 `.github/release-ci-setup.md` の名前の表と照合する'
+            auth             = 'Trusted Publisher の設定を手順書 `.github/release-ci-setup.md` の名前の対応表と照合する'
             publish          = 'ログを読む'
             transient        = '失敗した job を再実行する'
             'not-registered' = '初回の公開は手で行う（手順書）'
@@ -409,7 +409,7 @@ jobs:
           REASON: ${{ steps.pub_vsix.outputs.reason }}
         run: |
           $next = @{
-            auth      = 'Azure のフェデレーション資格情報・publisher の Members を手順書 `.github/release-ci-setup.md` の名前の表と照合する'
+            auth      = 'Azure のフェデレーション資格情報・publisher の Members を手順書 `.github/release-ci-setup.md` の名前の対応表と照合する'
             publish   = 'ログを読む'
             transient = '失敗した job を再実行する'
           }

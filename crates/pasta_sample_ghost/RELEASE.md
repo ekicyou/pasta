@@ -8,19 +8,19 @@
 ## 前提条件
 
 - [x] リリース CI の一回限りのセットアップが済んでいる（[`.github/release-ci-setup.md`](../../.github/release-ci-setup.md)）
-- [x] リポジトリの `main` へ push・PR のマージができ、リリースタグを push できる
+- [x] PR を `main` へマージでき、リリースタグを push できる（`main` へは直接 push できない）
 
 ## リリース手順
 
 ### Step 1: 版を上げたコミットを main に入れる
 
-- 版の決定と版を上げるコミットは、`release-workflow` の手順で行います（`Cargo.toml`・`editors/vscode/package.json`・`book/src/introduction.md` の版をそろえて 1 コミットにする）。
-- そのコミットを PR で `main` へマージします。
+- 版の決定と版を上げるコミットは、`release-workflow` の手順で行います（`Cargo.toml`・`Cargo.lock`・`editors/vscode/package.json`・`editors/vscode/package-lock.json`・`book/src/introduction.md` の版をそろえて 1 コミットにする）。
+- そのコミットを PR で `main` へ squash マージします。
 - タグと `Cargo.toml`・`package.json` の版が一致し、タグのコミットが `main` から到達できることを、CI の verify job が検査します。
 
 ### Step 2: リリースタグを push する
 
-`origin/main` の先頭が版を上げたコミット（またはそのマージコミット）であることを確かめてから、そこにタグを付けて push します。
+版の更新を `main` へ統合した結果のコミット（squash マージでできたコミット。ふつうは `origin/main` の先頭）に、注釈付きのタグを付けて push します。先頭が別のコミットなら、下の `origin/main` の代わりに、そのコミットの SHA を指定します。
 
 ```bash
 git fetch origin main
