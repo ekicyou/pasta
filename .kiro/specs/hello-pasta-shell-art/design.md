@@ -103,8 +103,8 @@ graph TB
 
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| 画像生成（編集） | 【設計ディスカッションで確定】`openai/gpt-image-2.5/flare/edit`（第一候補）／`fal-ai/qwen-image-edit-2511`（本線の予備）／`fal-ai/nano-banana-pro/edit`（比較のみ） | 設定画像・ポーズ 2 種・表情 8 種の編集 | 候補の比較は「生成パイプライン」節と `research.md` §7.1 |
-| 切り抜き | `fal-ai/birefnet/v2`（`model=Matting`） | 単色背景で生成した場合の透過化 | 透過出力ができるモデルなら省く。約 $0.002/枚 |
+| 画像生成（編集） | `openai/gpt-image-2.5/flare/edit`（確定。設計ディスカッション #1・2026-10-10 の試作で採用）。`fal-ai/qwen-image-edit-2511` は費用が合わないときの予備 | 設定画像・ポーズ 2 種・表情 8 種の編集 | 候補の比較は「生成パイプライン」節と `research.md` §7.1 |
+| 切り抜き | （使わない。確定モデルが透過 PNG を直接出す） | — | 予備の qwen に切り替えた場合だけ `fal-ai/birefnet/v2`（`model=Matting`）を使う |
 | 貼り合わせ | Node スクリプト（`pngjs`。一回限り・コミットしない） | 顔の矩形の貼り替え・頭と体の結合 | 手順と本文は `art/README.md` に記録する |
 | 縮小・最適化 | ffmpeg（ShareX 同梱 n8.1.1） | 1024×1536 → 333×500 の lanczos 縮小（アルファ乗算）・PNG 圧縮・必要なら減色 | `book/src/img/claudia/LICENSE.txt` の手順を踏襲 |
 | 検証（Rust） | `png` 0.18（dev-dependency） | PNG の寸法・色型・画素の読み出し | `image`/`imageproc` は外す。`png` は `Cargo.lock` に既にある |
@@ -251,44 +251,62 @@ flowchart LR
 
 ##### Batch / Job Contract（生成の手順＝レシピ）
 
-モデルの候補（**【設計ディスカッションで確定】**。試作は 1 人 × 3 ポーズ・3 ドル以内。費用の単価は `research.md` §7.1 の 2026-10-10 時点の値）:
+採用モデル: **`openai/gpt-image-2.5/flare/edit`**（設計ディスカッション #1 で確定。試作 3 枚＝女の子の基本・びっくり・わくわくを 2026-10-10 に生成し、画風・透過出力・ポーズ間の一貫性を確認した。実額は fal のダッシュボードで確認し、1 枚 0.5 ドルを超えるなら予備の qwen へ切り替える）。候補の比較は記録として残す:
 
 | 候補 | 役割 | 利点 | 懸念 |
 |------|------|------|------|
-| `openai/gpt-image-2.5/flare/edit` | **第一候補**（手本と同じ系統のモデル。試作の最初に試す） | 手本の画風に最も近づきやすい。参照画像を最大 16 枚渡せる（手本の絵 + 自分の設定画像）。`background: transparent` で切り抜きが要らない。`image_size` を 1024×1536 に指定できる | seed が無く同じ結果を再現できない。fal の価格表示が「1 unit」で実額が不明（OpenAI の定価は high 品質 1024×1536 で 1 枚 0.25 ドル前後と見込む）。出力に C2PA メタデータが入る（可視の透かしではなく、再エンコードで消える） |
-| `fal-ai/qwen-image-edit-2511` | brief の本線。第一候補が費用か品質で合わなければこちら | 0.03 ドル/MP（1024×1536 ≈ 0.05 ドル/枚）。seed・寸法を固定できる。重みは Apache-2.0。透かしの記述なし | 透過出力が無いので単色背景 + `birefnet/v2` の切り抜きが要る。画風の再現は参照画像頼み |
+| `openai/gpt-image-2.5/flare/edit` | **採用**（手本と同じ系統のモデル） | 手本の画風に最も近づきやすい。参照画像を最大 16 枚渡せる（手本の絵 + 自分の設定画像）。`background: transparent` で切り抜きが要らない。`image_size` を 1024×1536 に指定できる | seed が無く同じ結果を再現できない。fal の価格表示が「1 unit」で実額が不明（OpenAI の定価は high 品質 1024×1536 で 1 枚 0.25 ドル前後と見込む）。出力に C2PA メタデータが入る（可視の透かしではなく、再エンコードで消える） |
+| `fal-ai/qwen-image-edit-2511` | 予備。採用モデルの実額が合わないときだけ | 0.03 ドル/MP（1024×1536 ≈ 0.05 ドル/枚）。seed・寸法を固定できる。重みは Apache-2.0。透かしの記述なし | 透過出力が無いので単色背景 + `birefnet/v2` の切り抜きが要る。画風の再現は参照画像頼み |
 | `fal-ai/nano-banana-pro/edit` | 比較だけ | 高い一貫性 | 全出力に SynthID。0.15 ドル/枚 |
 
 - **Trigger**: 設計ディスカッション（試作・設定画像の承認）と実装（残りの絵の生成）で、開発者が MCP で手で呼ぶ。
-- **Input / validation**: 参照画像は手本の `surface0.png`（女の子用）・`surface10.png`（男の子用）と、承認済みの自分の設定画像。生成寸法は **1024×1536**（333:500 と同じ 2:3。縮小率 ≈ 1/3.07）。設定画像の指示文（英語。**【設計ディスカッションで確定】** 試作で直す）:
+- **Input / validation**: 参照画像は手本の `surface0.png`（女の子用）・`surface10.png`（男の子用）（`https://raw.githubusercontent.com/ponapalt/claudia/02cbd4f5/shell/master/` から fal の CDN へアップロードして渡す）と、承認済みの自分の設定画像。生成寸法は **1024×1536**（333:500 と同じ 2:3。縮小率 ≈ 1/3.07）。設定画像の指示文（英語。女の子は試作で使った全文。男の子は同じ骨組みで衣装だけ替える。背丈の指定は設計ディスカッション #3 で確定）:
 
   ```text
-  女の子（設定画像・基本ポーズ・通常の顔）
-  Full-body front view of a little girl, chibi anime style about 3 heads tall, matching the art
-  style of the reference image exactly (large round eyes, soft cel shading, thin brown outlines,
-  same line weight and head size). She stands straight, both arms relaxed at her sides, calm
-  neutral expression with a closed mouth. Chestnut-brown hair in two braids with tomato-red
-  ribbons; a red apron dress over a white blouse, a waitress apprentice at a pasta restaurant.
-  Hands empty, not touching her face or hair. The character is centered and fills about 85% of
-  the image height with a small margin under the feet. Transparent background, no shadow, no
-  text, no logo, no watermark.
+  女の子（設定画像・基本ポーズ・通常の顔。試作 request_id 01a12595-936e-70f0-a9ce-3c2aaf6513e8 の全文）
+  Draw a NEW character in exactly the same art style as the reference image: chibi anime style
+  about 3 heads tall, large round eyes, soft cel shading, thin brown outlines, same line weight,
+  same head size and same overall body proportions as the reference. Do not copy the reference
+  character's clothes, hair or colors.
 
-  男の子（設定画像・基本ポーズ・通常の顔）
-  Full-body front view of a little boy, chibi anime style about 3 heads tall, matching the art
-  style of the reference image exactly (...same as above...). He stands straight, both arms
-  relaxed at his sides, calm neutral expression. Short black hair under a small white chef's
-  hat, a white cook's jacket with a blue neckerchief, an apprentice cook at a pasta restaurant.
-  Hands empty, not touching his face or hair. (...composition and background as above...)
+  The new character: full-body front view of a little girl, a waitress apprentice at a pasta
+  restaurant. Chestnut-brown hair in two braids tied with tomato-red ribbons. She wears a red
+  apron dress over a white blouse with short puffy sleeves, white socks and brown shoes. She
+  stands straight facing the viewer, both arms relaxed and hanging at her sides, calm neutral
+  expression with a small closed mouth, eyes looking at the viewer. Hands empty, not touching
+  her face or hair; nothing overlaps the face or hair.
+
+  Composition: the character is centered and fills about 85% of the image height, with a small
+  margin under the feet and above the head. Fully transparent background, no ground shadow, no
+  text, no logo, no watermark, no frame.
+
+  男の子（設定画像・基本ポーズ・通常の顔）: 上と同じ骨組みで、2 段落目だけ次に替える。
+  The new character: full-body front view of a little boy, an apprentice cook at a pasta
+  restaurant. Short black hair under a small white chef's hat, a white cook's jacket with a blue
+  neckerchief, dark trousers and brown shoes. He stands straight facing the viewer, both arms
+  relaxed and hanging at his sides, calm neutral expression with a small closed mouth, eyes
+  looking at the viewer. Hands empty, not touching his face or hair; nothing overlaps the face
+  or hair.
   ```
 
-  ポーズの編集（設定画像を入力に。1 人 2 回）:
+  ポーズの編集（設定画像を入力に。1 人 2 回。試作で使った全文。`{POSE}` を差し替える）:
 
   ```text
-  Change only the pose. Keep the head, face, hair, braids, hat and their position and size
-  exactly the same; keep the feet at the same place and the character the same height.
-  びっくり: Both arms raised and spread outward at shoulder height with open palms, in surprise.
-  女の子の決めポーズ: Both hands clasped together in front of the chest, excited and bouncy.
-  男の子の決めポーズ: Arms folded across the chest, exasperated.
+  Edit this character image. Change ONLY the pose of the arms: {POSE}. Keep everything else
+  exactly identical: the same character, same art style, same head, face, facial expression,
+  hair, braids, ribbons, dress, colors and line weight. Keep the head at exactly the same
+  position and size, keep the feet at exactly the same place and keep the character exactly the
+  same height. Hands must not touch or overlap the face or hair. Transparent background, no
+  shadow, no text.
+
+  びっくり {POSE} = both arms are raised and spread outward at shoulder height with open palms
+    facing the viewer, as if startled in surprise
+    （試作 request_id 01a12596-a6a6-7dc1-8f6c-7cad30b2a98d）
+  女の子の決めポーズ {POSE} = both hands are clasped together in front of her chest, fingers
+    interlaced, elbows bent, an excited and bouncy 'can't wait' pose. Hands must stay below the chin
+    （試作 request_id 01a12597-0fb7-7cc1-80a1-2c8ecdfcdeb4）
+  男の子の決めポーズ {POSE} = arms folded across the chest, an exasperated 'oh dear' pose
+    （男の子は hair, braids, ribbons, dress を hair, chef's hat, neckerchief, jacket に読み替える）
   ```
 
   表情の編集（設定画像を入力に。1 人 8 回。`通常` は設定画像そのもの）:
@@ -307,7 +325,7 @@ flowchart LR
   怒り: angry eyebrows pulled down, puffed cheeks, frowning mouth
   ```
 
-  その他のパラメータ（第一候補）: `quality=high`・`background=transparent`・`output_format=png`・`num_images=1`。予備（qwen）: `image_size={width:1024,height:1536}`・`num_inference_steps=28`・`guidance_scale=4.5`・`seed=`**【設計ディスカッションで確定】**（最初の採用結果の seed を記録し、以後固定）・背景は指示文で「plain flat #00FF00 background」として `birefnet/v2`（`model=Matting`, `operating_resolution=2048x2048`）で切り抜く。
+  その他のパラメータ（採用モデル。試作と同じ）: `image_size={width:1024,height:1536}`・`quality=high`・`background=transparent`・`output_format=png`・`num_images=1`。seed は無い。予備（qwen）: `image_size={width:1024,height:1536}`・`num_inference_steps=28`・`guidance_scale=4.5`・`seed=`**【設計ディスカッションで確定】**（最初の採用結果の seed を記録し、以後固定）・背景は指示文で「plain flat #00FF00 background」として `birefnet/v2`（`model=Matting`, `operating_resolution=2048x2048`）で切り抜く。
 - **Output / destination**: 1 人につき full-res の層 = 頭 1（通常の顔）・顔の矩形 8・体 3。貼り合わせ → 9 枚 → 縮小 → `shell/master/surfaceN.png`。縮小と最適化の ffmpeg（`claudia/LICENSE.txt` と同じ考え方）:
 
   ```text
@@ -324,6 +342,13 @@ flowchart LR
 **Implementation Notes**
 - Integration: 設定画像の承認は設計ディスカッションで開発者が目で見て決める（R2.8）。実装では承認済みの設定画像だけを入力に使い、都度の確認なしで進めてよい（Q12）。
 - Validation: 縮小後の 3 ポーズを並べた比較画像を試作で作り、別ポーズで人物が揃うか・切り線の継ぎ目・縁のハローを見る（R2.5）。結果（ずれの px・継ぎ目の見え方・1 枚の KB）を `art/README.md` の「試作の実測」に書く。
+- 試作の実測（2026-10-10・女の子・基本／びっくり／わくわく。設計ディスカッション #1）:
+  - 3 枚とも不透明画素の外接矩形が上端 71・下端 1498（1024×1536）で一致 → 背丈と足元は編集で動かなかった。人物の高さはキャンバスの 93%（指示文の 85% より大きい）。
+  - 頭の位置ずれ: 基本に対し、びっくり・わくわくとも最良の平行移動が (dx=1, dy=0) px（1024 幅）→ 出力では 1 px 未満。位置合わせの工程は不要。
+  - 貼り合わせ `Y_CUT=500`・`FEATHER=12`（顎の下、襟の上）で合成し、333×500 に縮小した結果: 基本との差分が 0 の行は 0〜157、切り線は 162.8 行目 → 切り線の上 5 px まで一致した。`MARGIN=8` は余裕を持って成り立つ。
+  - 継ぎ目: 333×500 でも 3 倍拡大でも、首・襟・おさげに段差や色の縁は見えなかった。
+  - 1 枚の大きさ: 縮小後 133〜139 KB（RGBA8・`-compression_level 9 -pred mixed`）。減色は不要の見込み。
+  - 判断: ポーズ 3 種で進める（R2.6 の戻り先は使わない）。
 - Risks: 表情の編集で頭の位置が数 px ずれる → 顔の矩形を貼る前に、頭の輪郭で位置合わせ（平行移動）してから貼る。ずれが 1024 px 幅で 6 px（出力 2 px）を超える編集はやり直す。ポーズの編集で切り線付近の首・襟・おさげの輪郭がずれる → ぼかし帯でなじませ、見えるなら切り線を 10〜20 px 上下に動かして再合成する。それでも消えなければ R2.6 の戻り先へ。
 
 ### 生成の記録
@@ -607,7 +632,7 @@ fn pixels_equal_outside(a: &Rgba8, b: &Rgba8, within: &Rect, except: &[Rect]) ->
 
 ## Open Questions / Risks（設計ディスカッションへ）
 
-1. **モデルの選定**（「生成パイプライン」）— 仮定: 第一候補 `openai/gpt-image-2.5/flare/edit`、予備 `fal-ai/qwen-image-edit-2511`。試作の最初に第一候補を 1 人 × 3 ポーズで試し、fal 上の実額（「1 unit」の意味）を 1 枚目で確かめてから続ける。
+1. ~~**モデルの選定**~~ — 解決（#1）: `openai/gpt-image-2.5/flare/edit` を採用。実額は fal のダッシュボードで確認し、1 枚 0.5 ドル超なら qwen へ。
 2. **seed の無いモデルと再現性**（「art/」）— 仮定: 設定画像 2 枚だけをコミットし、記録に「同じ絵は再現できない」と書く。体 3 種の縮小前も残すかを判断。
 3. **当たり判定を重ねるか**（「surfaces.txt の当たり判定」）— 仮定: 重ねない 3 矩形。手本のように `Head` が `Face` を含む形にするなら SSP の優先順位を実機で確かめる。
 4. **`MARGIN`・`FEATHER`・`Y_CUT`・顔の矩形の実値** — 試作の実測で決める。仮定: `MARGIN=8`、`FEATHER=12`。
