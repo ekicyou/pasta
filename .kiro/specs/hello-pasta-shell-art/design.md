@@ -52,7 +52,7 @@
 - 手元の道具: ffmpeg（ShareX 同梱 `C:\Program Files\ShareX\ffmpeg.exe`。縮小・最適化）、Node（貼り合わせの一回限りのスクリプト。リポジトリにはコミットしない）。
 - Rust: `png` 0.18 を `pasta_sample_ghost` の dev-dependency に置く（`Cargo.lock` に既に入っている版。`image` は使わない。R5.5・Q8）。
 - 既存の慣例: `tests/common/mod.rs`（`workspace_root()`）、`tests/tutorial_stages_test.rs` の「表を読んで照合する」型、`book/src/img/claudia/LICENSE.txt` の記録の書式。
-- 画風の手本: `https://github.com/ponapalt/claudia`（コミット `02cbd4f5`、Unlicense）の `shell/master/surface0.png`・`surface10.png` を参照画像として生成に渡す。
+- 画風の手本: `https://github.com/ponapalt/claudia`（コミット `02cbd4f5`、Unlicense）の `shell/master/surface0.png` を参照画像として生成に渡す（`surface10.png` のケロは 2 頭身のマスコットで、参照にすると男の子もマスコットになる。設計ディスカッション #3 で確認済み。使わない）。
 
 ### Revalidation Triggers
 
@@ -122,8 +122,8 @@ crates/pasta_sample_ghost/
 ├── release.ps1                        # Step 2 を外して 6 段に。最終段で .nar の大きさ上限（7 MB）を検査しエラー停止
 ├── art/                               # 新設。生成の記録と設定画像（.nar には入らない）
 │   ├── README.md                      # 生成の記録（モデル・指示文・seed・寸法・後処理・試作の実測・費用・日付・ライセンス・Unlicense 原文・著作権の注記）
-│   ├── reference-girl.png             # 女の子の設定画像（基本ポーズ・通常の顔・縮小前 1024×1536）
-│   └── reference-boy.png              # 男の子の設定画像（同上）
+│   ├── reference-girl.png             # 女の子の設定画像（基本ポーズ・通常の顔・縮小前 1024×1536。設計 #3 で承認・コミット済み。1.49 MB）
+│   └── reference-boy.png              # 男の子の設定画像（同上。1.37 MB）
 ├── src/
 │   ├── lib.rs                         # ドキュメントコメントと `mod scripts;` だけ（generate_ghost・GhostError を削除）
 │   └── scripts.rs                     # 変更なし（辞書の検証テスト）
@@ -260,7 +260,7 @@ flowchart LR
 | `fal-ai/nano-banana-pro/edit` | 比較だけ | 高い一貫性 | 全出力に SynthID。0.15 ドル/枚 |
 
 - **Trigger**: 設計ディスカッション（試作・設定画像の承認）と実装（残りの絵の生成）で、開発者が MCP で手で呼ぶ。
-- **Input / validation**: 参照画像は手本の `surface0.png`（女の子用）・`surface10.png`（男の子用）（`https://raw.githubusercontent.com/ponapalt/claudia/02cbd4f5/shell/master/` から fal の CDN へアップロードして渡す）と、承認済みの自分の設定画像。生成寸法は **1024×1536**（333:500 と同じ 2:3。縮小率 ≈ 1/3.07）。設定画像の指示文（英語。女の子は試作で使った全文。男の子は同じ骨組みで衣装だけ替える。背丈の指定は設計ディスカッション #3 で確定）:
+- **Input / validation**: 参照画像は手本の `surface0.png`（女の子用）・`surface10.png`（男の子用）（`https://raw.githubusercontent.com/ponapalt/claudia/02cbd4f5/shell/master/` から fal の CDN へアップロードして渡す）と、承認済みの自分の設定画像。生成寸法は **1024×1536**（333:500 と同じ 2:3。縮小率 ≈ 1/3.07）。設定画像は**承認済み**（設計ディスカッション #3・2026-10-10）で `art/` にコミットしてある。実装は作り直さない。以下は記録（`art/README.md` へ写す）:
 
   ```text
   女の子（設定画像・基本ポーズ・通常の顔。試作 request_id 01a12595-936e-70f0-a9ce-3c2aaf6513e8 の全文）
@@ -280,13 +280,58 @@ flowchart LR
   margin under the feet and above the head. Fully transparent background, no ground shadow, no
   text, no logo, no watermark, no frame.
 
-  男の子（設定画像・基本ポーズ・通常の顔）: 上と同じ骨組みで、2 段落目だけ次に替える。
+  男の子（設定画像）は 3 段階で作った。採用の系譜だけ全文を残す。
+  段階 1（request_id 01a1259d-3c95-7ee3-9b13-229f1eaef5b6。参照 = 手本 surface0 + 女の子の設定画像）
+  Two reference images are given: the first is a blonde princess, the second is a girl in a red
+  apron dress. Draw a NEW character in exactly the same art style as these two references: chibi
+  anime style about 3 heads tall, large round detailed eyes with highlights, soft cel shading,
+  thin brown outlines, same line weight, same head size and the SAME body proportions and figure
+  height as the second reference (the girl in the red apron dress) so that the two could stand
+  side by side as a pair. Do not copy the references' clothes, hair or colors.
+
   The new character: full-body front view of a little boy, an apprentice cook at a pasta
-  restaurant. Short black hair under a small white chef's hat, a white cook's jacket with a blue
-  neckerchief, dark trousers and brown shoes. He stands straight facing the viewer, both arms
-  relaxed and hanging at his sides, calm neutral expression with a small closed mouth, eyes
-  looking at the viewer. Hands empty, not touching his face or hair; nothing overlaps the face
-  or hair.
+  restaurant. Short black hair under a small white chef's hat, a white double-breasted cook's
+  jacket with a blue neckerchief, dark trousers, white socks and brown shoes. He stands straight
+  facing the viewer, both arms relaxed and hanging at his sides, calm neutral expression with a
+  small closed mouth, eyes looking at the viewer. Hands empty, not touching his face or hair;
+  nothing overlaps the face or hair.
+
+  Composition: the character is centered and fills about 85% of the image height, with a small
+  margin under the feet and above the hat. Fully transparent background, no ground shadow, no
+  text, no logo, no watermark, no frame.
+
+  段階 2（request_id 01a125a5-9260-7c60-843c-65e02ab357bb。参照 = 女の子 + 段階 1 系の男の子
+  01a125a4-2dab-7b40-89e6-8701a3058e22。帽子を外して体の釣り合いを女の子に合わせる）
+  Two reference images: the first is a girl in a red apron dress, the second is a boy cook
+  wearing a chef's hat. Redraw the BOY WITHOUT the chef's hat: bare head, short slightly messy
+  black hair fully visible. His body proportions must match the GIRL in the first image: the
+  same chibi head-to-body ratio (about 3 heads tall), the same shoulder width as hers, the same
+  head size as hers, arms of similar thickness; torso and legs slim and straight, not chubby.
+  Keep his face design, eyes, hair color, white double-breasted cook's jacket with rolled
+  sleeves, blue neckerchief, white apron, dark trousers, white socks and brown shoes, and keep
+  the same art style, line weight and colors as the references. Pose: standing straight facing
+  the viewer, both arms relaxed and hanging at his sides, calm neutral expression with a small
+  closed mouth. Hands empty, not touching his face or hair.
+
+  Composition: the character is centered; his feet are near the bottom with a small margin, and
+  the top of his hair is at about 22% from the top of the image, leaving empty space above the
+  head (a hat will be added later). Fully transparent background, no ground shadow, no text, no
+  logo, no watermark, no frame.
+
+  段階 3（request_id 01a125a8-92e0-7e90-a326-ccba87020b0e。参照 = 段階 2。帽子を載せる。これが設定画像）
+  Edit this character image. Add ONLY a white chef's hat (a classic pleated toque) sitting
+  squarely on top of his head: its height is about half of his head's height, its width is
+  about the width of his head, with his black bangs and side hair still visible below the band.
+  Keep everything else exactly identical: the same character, same art style, same face, eyes,
+  expression, hair, jacket, neckerchief, apron, trousers, shoes, colors and line weight. Do not
+  move or resize the body or the head; keep the feet at exactly the same place. The hat must not
+  cover the face or the eyebrows. Transparent background, no shadow, no text.
+
+  不採用の試行（記録用）: 01a1259c-09ef-74a0-9c8f-fac87e4a1ca4（参照に手本の surface10 を使い 2 頭身の
+  マスコットになった）、01a125a1-7e83-7661-8839-9ea4b04b766f（丸く太りすぎ）、01a125a4-2dab-7b40-89e6-
+  8701a3058e22（肩幅は中間になったが帽子込みでは釣り合いが決めにくい）、01a125a7-eb1f-7130-aee3-
+  0013ebb8ee20（小さな帽子を斜めに載せた案。正統なコック帽でないため不採用）。
+  教訓: 帽子など頭の上の小物は、体の釣り合いを帽子なしで確定してから編集で載せる。
   ```
 
   ポーズの編集（設定画像を入力に。1 人 2 回。試作で使った全文。`{POSE}` を差し替える）:
@@ -306,7 +351,7 @@ flowchart LR
     interlaced, elbows bent, an excited and bouncy 'can't wait' pose. Hands must stay below the chin
     （試作 request_id 01a12597-0fb7-7cc1-80a1-2c8ecdfcdeb4）
   男の子の決めポーズ {POSE} = arms folded across the chest, an exasperated 'oh dear' pose
-    （男の子は hair, braids, ribbons, dress を hair, chef's hat, neckerchief, jacket に読み替える）
+    （男の子は hair, braids, ribbons, dress を hair, chef's hat, neckerchief, jacket, apron に読み替える）
   ```
 
   表情の編集（設定画像を入力に。1 人 8 回。`通常` は設定画像そのもの）:
@@ -326,11 +371,12 @@ flowchart LR
   ```
 
   その他のパラメータ（採用モデル。試作と同じ）: `image_size={width:1024,height:1536}`・`quality=high`・`background=transparent`・`output_format=png`・`num_images=1`。seed は無い。予備（qwen）: `image_size={width:1024,height:1536}`・`num_inference_steps=28`・`guidance_scale=4.5`・`seed=`**【設計ディスカッションで確定】**（最初の採用結果の seed を記録し、以後固定）・背景は指示文で「plain flat #00FF00 background」として `birefnet/v2`（`model=Matting`, `operating_resolution=2048x2048`）で切り抜く。
-- **Output / destination**: 1 人につき full-res の層 = 頭 1（通常の顔）・顔の矩形 8・体 3。貼り合わせ → 9 枚 → 縮小 → `shell/master/surfaceN.png`。縮小と最適化の ffmpeg（`claudia/LICENSE.txt` と同じ考え方）:
+- **Output / destination**: 1 人につき full-res の層 = 頭 1（通常の顔）・顔の矩形 8・体 3。貼り合わせ → 9 枚 → 縮小 → `shell/master/surfaceN.png`。縮小は **290×435 に縮めて 333×500 の下寄せ中央に置く**（設計ディスカッション #3。モデルが人物をキャンバスの 93〜97% で描くため、この縮小で人物の高さが手本の 85%（女の子 405 px）・87%（男の子 415 px・帽子込み）になり、要件 Q5 の 8〜9 割に入る。18 枚とも同じ変換なので画素一致は保たれる）。ffmpeg（`claudia/LICENSE.txt` と同じ考え方）:
 
   ```text
-  縮小: format=gbrap,premultiply=inplace=1,scale=333:500:flags=lanczos,unpremultiply=inplace=1,format=rgba
+  縮小: format=gbrap,premultiply=inplace=1,scale=290:435:flags=lanczos,unpremultiply=inplace=1,format=rgba,pad=333:500:21:64:color=0x00000000
         出力オプション -compression_level 9 -pred mixed
+        （縮小率 435/1536 = 0.2832。full-res の行 y は出力の round(y × 0.2832) + 64 行目になる。女の子の切り線 500 → 205.6）
   減色（1 枚でも 250 KB を超えたときだけ・同じキャラクターの 9 枚で 1 つのパレットを共有）:
         palettegen=max_colors=256:reserve_transparent=1:stats_mode=full（9 枚をまとめて入力）
         paletteuse=dither=bayer:alpha_threshold=128（誤差拡散ディザは使わない。画素一致を壊すため）
@@ -349,6 +395,7 @@ flowchart LR
   - 継ぎ目: 333×500 でも 3 倍拡大でも、首・襟・おさげに段差や色の縁は見えなかった。
   - 1 枚の大きさ: 縮小後 133〜139 KB（RGBA8・`-compression_level 9 -pred mixed`）。減色は不要の見込み。
   - 判断: ポーズ 3 種で進める（R2.6 の戻り先は使わない）。
+  - 最終の縮小（290×435 + pad）で測り直し（#3）: 基本との差分が 0 の行は 0〜201、切り線は 205.6 行目 → 切り線の上 3.6 px まで一致。`MARGIN=8` は 2 倍の余裕で成り立つ。1 枚 106〜111 KB。
 - Risks: 表情の編集で頭の位置が数 px ずれる → 顔の矩形を貼る前に、頭の輪郭で位置合わせ（平行移動）してから貼る。ずれが 1024 px 幅で 6 px（出力 2 px）を超える編集はやり直す。ポーズの編集で切り線付近の首・襟・おさげの輪郭がずれる → ぼかし帯でなじませ、見えるなら切り線を 10〜20 px 上下に動かして再合成する。それでも消えなければ R2.6 の戻り先へ。
 
 ### 生成の記録
@@ -362,7 +409,7 @@ flowchart LR
 
 **Responsibilities & Constraints**
 - 置き場所は `crates/pasta_sample_ghost/art/`。`ghosts/hello-pasta/` の外なので `pasta_check release` の対象にならず、`.nar` に入らない（R8.10）。クレートは `publish = false` なので crates.io にも出ない。
-- 設定画像は 1 人 1 枚（基本ポーズ・通常の顔・縮小前・透過 PNG）。ポーズ 2 種の体と表情 8 種の原画はコミットしない（R8.11）。**仮定**: 第一候補のモデルに seed が無いため、体 3 種の縮小前も残したくなるが、要件（R8.9「2 人それぞれの設定画像」）に従い 2 枚に限る。設計ディスカッションで判断を仰ぐ（Open Question）。
+- 設定画像は 1 人 1 枚（基本ポーズ・通常の顔・縮小前・透過 PNG）。**2 枚とも設計ディスカッション #3 で開発者が承認し、ffmpeg で可逆に再エンコード（メタデータ除去・画素は同一）してコミット済み**。ポーズ 2 種の体と表情 8 種の原画はコミットしない（R8.11）。**仮定**: 第一候補のモデルに seed が無いため、体 3 種の縮小前も残したくなるが、要件（R8.9「2 人それぞれの設定画像」）に従い 2 枚に限る。設計ディスカッションで判断を仰ぐ（Open Question）。
 
 **Contracts**: State [x]
 
@@ -568,8 +615,9 @@ fn pixels_equal_outside(a: &Rgba8, b: &Rgba8, within: &Rect, except: &[Rect]) ->
 | `Head`/`Face`/`Body` rect | 333×500 | 当たり判定。テストの領域の正本 | `surfaces.txt`、`shell_assets_test` |
 | `MARGIN` | 333×500 | 顔の矩形と切り線から除く余白 **8**（確定。試作では切り線の上 5 px まで一致した） | `shell_assets_test` |
 | 吹き出し offset ×4 | 333×500 | `descript.txt` | `descript.txt`、`integration_test.rs` |
+| 出力の変換 | 1024×1536 → 333×500 | `scale=290:435` + `pad=333:500:21:64`（確定 #3。2 人とも同じ） | 縮小、`art/README.md` |
 
-制約: `Face.y1 − MARGIN ≥ Head.y1`、`Head.y2 + MARGIN ≤ round(Y_CUT / 3.072) − FEATHER/3`、`Body.y1 ≥ round(Y_CUT / 3.072) + FEATHER/3 + MARGIN`。これにより、テストが「一致」を求める画素は構造上同じ元画素から作られる。
+制約: `Face.y1 − MARGIN ≥ Head.y1`、`Head.y2 + MARGIN ≤ round(Y_CUT × 0.2832) + 64 − FEATHER × 0.2832`、`Body.y1 ≥ round(Y_CUT × 0.2832) + 64 + FEATHER × 0.2832 + MARGIN`。これにより、テストが「一致」を求める画素は構造上同じ元画素から作られる。
 
 ## Error Handling
 
@@ -623,7 +671,7 @@ fn pixels_equal_outside(a: &Rgba8, b: &Rgba8, within: &Rect, except: &[Rect]) ->
 ## Security Considerations
 
 - 生成サービスに渡すのは手本（Unlicense）と自分の生成物だけ。個人情報・秘密は含まない。
-- 配布する PNG から C2PA 等のメタデータは縮小・再エンコードで消える。配布物に生成サービスの識別子を残さない（R1.6 の精神）。
+- 配布する PNG から C2PA 等のメタデータは縮小・再エンコードで消える。設定画像も ffmpeg の可逆再エンコードでメタデータを落としてからコミットした（確認済み: 2026-10-10）。配布物に生成サービスの識別子を残さない（R1.6 の精神）。
 
 ## Performance & Scalability
 
@@ -638,4 +686,4 @@ fn pixels_equal_outside(a: &Rgba8, b: &Rgba8, within: &Rect, except: &[Rect]) ->
 4. ~~**`MARGIN`・`FEATHER`・`Y_CUT`・顔の矩形の実値**~~ — 解決（#2）: `MARGIN=8`・`FEATHER=12`・女の子の `Y_CUT=500`。顔の矩形と男の子の `Y_CUT` は実装で設定画像から決める。ポーズ 3 種で確定。
 5. **透かし・利用条件の一次資料** — Qwen のモデルカードは Apache-2.0 で透かしの記述なし（2026-10-10 確認）。OpenAI の出力の C2PA と利用条件は、記録に書く前に一次資料で確かめる（本書は一般知識の範囲）。
 
-設計で決めた項目（ディスカッションに回さない）: 吹き出しの offset は実装の実機確認で確定する（初期値は「shell/master」節）。見本の行は 2 セルの表（「入門ガイドの見本」節）。貼り合わせの一回限りのスクリプトは本文ごと `art/README.md` に載せる（記録であって再実行スクリプトではない）。大きさの上限は KB・MB とも 1024 進で数える。
+設計で決めた項目（ディスカッションに回さない）: 設定画像 2 枚は #3 で承認・コミット済み（女の子 = 試作 1 枚目、男の子 = 帽子なしで体を合わせてから正統なコック帽を載せた 3 段階目）。出力の変換は `scale=290:435` + `pad=333:500:21:64`。吹き出しの offset は実装の実機確認で確定する（初期値は「shell/master」節）。見本の行は 2 セルの表（「入門ガイドの見本」節）。貼り合わせの一回限りのスクリプトは本文ごと `art/README.md` に載せる（記録であって再実行スクリプトではない）。大きさの上限は KB・MB とも 1024 進で数える。
