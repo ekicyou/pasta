@@ -35,7 +35,7 @@
 | リンク | 内容 |
 | ------ | ---- |
 | [GitHub リポジトリ（ekicyou/pasta）](https://github.com/ekicyou/pasta) | ソースコード・ビルド方法などの開発者向け情報。[README](https://github.com/ekicyou/pasta/blob/main/README.md) も参照 |
-| [リリースページ](https://github.com/ekicyou/pasta/releases) | 各版の配布物（`pasta.dll.zip`・サンプルゴースト `hello-pasta.nar`・VSCode 拡張）と変更点 |
+| [リリースページ](https://github.com/ekicyou/pasta/releases) | 各版の配布物（[`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip)・サンプルゴースト [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)・VSCode 拡張）と変更点。ファイル名のリンクは、最新版を直接ダウンロードする |
 
 ## このマニュアルが対象とするバージョン
 
