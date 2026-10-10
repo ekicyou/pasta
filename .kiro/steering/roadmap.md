@@ -9,7 +9,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - **Phase 11 の残り: 属性セマンティクスと失敗の出力**。シーン属性の保持と読み出し、実行時の失敗の出力の一本化、Call の属性フィルター、文中のシーンリンク、スクリプトが止まるエラーのバルーン表示が残る。
 - **Phase 12: 初心者向けの入門ガイド**。段階辞書とマニュアルの着せ替えは済んだ。残るのは、hello-pasta の新しいシェル、入門ガイドの本文の書き直し、スクリーンショット。
 
-このほか、リリース手順（常駐 spec `release-workflow`）を CI に合わせて書き換える作業と、CI での初回のリリースが残る（期限は 2026-12-01）。
+このほか、リリース手順（常駐 spec `release-workflow`）の CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ（2026-10-10）。
 
 **優先順位（開発者の方針 2026-10-10）**: トークンの予算のため、当面はマニュアルのサイトの作り直し（入門ガイドの本文）を最優先とし、CI とリリース、急いで直す不具合だけを進める。それ以外は見送る（下の「棚卸」のウェーブ）。
 
@@ -57,7 +57,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 ### 常駐 spec（再実行型・`completed/` へ移さない）
 
-- `release-workflow` — crates.io・VSIX・ゴーストのリリース手順（CI に合わせた書き換えが残る。下の「リリース手順の書き換え」）
+- `release-workflow` — crates.io・VSIX・ゴーストのリリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認。CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ。下の「リリース手順の書き換え」）
 - `review-improvement-loop` — レビュー領域 × 7 次元の改善ループ
 
 ### 却下（2026-10-01）
@@ -69,7 +69,6 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 - `sakura-script-newline` の Task 5.1（実機 SSP での目視確認）— SSP を操作するツール（SSP MCP）で実機の確認ができるようになった（2026-10-09 に `hello-pasta-tutorial-stages` が使った）。`getting-started-screenshots` の実機の確認のついでに済ませるかを、同 spec の要件で決める。
 - `pasta-check-bundled-balloon` を v0.3.7 で公開したことの、emo2 開発セッションへの連絡 — 実施の有無はリポジトリから確認できない。
-- CI での初回のリリース — crates.io の Trusted Publishing は、初回のリリースが最初の実地確認になる（下の「リリース手順の書き換え」）。
 
 ## 棚卸（2026-10-10・main `add05022`）
 
@@ -147,7 +146,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - 見送った spec をいつ始めるか — 予算の都合で、Phase 11 の残りと `hello-pasta-shell-art`・`shiori-test-support-runtime`・`manual-print-media-refs` を見送った。`shiori-test-support-runtime` は、Phase 11 の spec より先に入れるほど後片付けが減る。
 - スクリプトが止まるエラーをバルーンに出すか — `runtime-error-balloon` の要件の最初の議題。要らなければ却下する。
 - `call-attribute-filter` と `scene-anchor-link` のどちらを先にするか — 台帳は前者を先にしている。後者を先にすると、`scene-attribute-store` を待たずに始められる。
-- リリース手順の書き換えと初回の CI リリースの時期 — `hello-pasta-shell-art` が `release.ps1` を変える前に済ませると、失敗の原因を認証の設定だけに絞れる。期限は 2026-12-01。
+- リリース手順の書き換えと初回の CI リリースの時期 — `hello-pasta-shell-art` が `release.ps1` を変える前に済ませると、失敗の原因を認証の設定だけに絞れる。期限は 2026-12-01。→ 済んだ（2026-10-10。v0.3.8）。
 - `steering/structure.md` の作り直し — `pasta_shiori` の木が無い、`pasta_lua/tests` の一覧が古い、など。`/kiro-steering` で直す。
 
 ## Phase 11 の残り: 属性セマンティクスと失敗の出力
@@ -213,14 +212,16 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）は完了し�
 
 ## リリース手順の書き換え（`release-ci` の後）
 
-リリースの CI 化（`release-ci`）は完了し、タグの push だけで公開まで進む。常駐 spec の手順（`release/hello-pasta.nar` を生成してコミットする段・手元でのビルドと公開）は、そのままでは動かない。**次のリリースより前に**、下の Existing Spec Updates を済ませる。Marketplace の global PAT は 2026-12-01 に廃止されるので、初回の CI リリースと後片付けもそれまでに終える。
+リリースの CI 化（`release-ci`）は完了し、タグの push だけで公開まで進む。常駐 spec の旧手順（`release/hello-pasta.nar` を生成してコミットする段・手元でのビルドと公開）は、そのままでは動かないので、下の Existing Spec Updates で書き換えた（2026-10-10 に済んだ。要件・設計・タスクの書き直しと、文書・設定の一回限りの整合）。CI での初回のリリース（v0.3.8）と後片付けも済んだ（2026-10-10。記録は `.kiro/specs/release-workflow/first-ci-release.md`）。**残るのは、記録の「手順との食い違い」を `design.md` と手順書に反映することである**（Sonnet で実行する条件）。
 
-- **進め方**: brief を足さず、常駐 spec をその場で書き換える（`/kiro-spec-requirements release-workflow` → `/kiro-design release-workflow` → `/kiro-spec-tasks release-workflow`）。`/kiro-impl` は使わない（走らせるとリリースが始まる）。規模は 7〜9 タスク、要件定義は Opus。`research.md`・`gap-analysis.md` は古い設計の記録として扱う。
+- **進め方（済んだ）**: brief を足さず、常駐 spec をその場で書き換えた（`/kiro-spec-requirements release-workflow` → `/kiro-design release-workflow` → `/kiro-spec-tasks release-workflow`）。古い `research.md` は書き直し、`gap-analysis.md` は削除した。
+- **初回のリリース（済んだ）**: v0.3.8 を Opus で実行した（2026-10-10）。7 つの公開先が最初の実行ですべて `published` になり、全 job の再実行ですべて `skipped` になった。後片付け（5 クレートの「Trusted Publishing のみ」・`CARGO_REGISTRY_TOKEN` と `VSCE_PAT` の失効）も済んだ。
+- **以後のリリース**: 新しい作業ブランチ（ハーネスのワークツリー）で `/kiro-impl release-workflow` を実行する。記録の「手順との食い違い」を `design.md` に反映するまでは Opus で実行し、反映したら Sonnet で実行する。
 - **席**: リリースの実行中は、`release.ps1`・`release.yml` を触る spec を main へ入れない。
 
 ### Existing Spec Updates
 
-- [ ] release-workflow -- エージェントの手順を「版の決定 → bump の PR のマージ → タグの push → CI の結果確認・失敗した job の再実行」へ縮める。次のものは CI 側へ移すか、要らなくなる。
+- [x] release-workflow -- エージェントの手順を「版の決定 → bump の PR のマージ → タグの push → CI の結果確認・失敗した job の再実行」へ縮める。次のものは CI 側へ移すか、要らなくなる。
   - Resume
   - ScheduleWakeup による再試行
   - 公開の 2 トラック
@@ -238,8 +239,8 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）は完了し�
     - 運用の注意（セットアップで分かったこと）:
       - Azure のリソースを `az` で作る・変えるには MFA が要る。WAM（Windows のサインイン窓）でログインすると `RequestDisallowedByAzure` で弾かれる。`az config set core.enable_broker_on_windows=false` にしてからブラウザーで `az login` し直す。ワークフローのマネージド ID には関係ない。
       - Marketplace の Members の管理には、公式の CLI が無い（vsce・az・gh のどれも扱えない）。画面から行う。
-      - 小さな取りこぼし: setup-check の `verify-pat` が失敗すると、vsce のエラー文（`Access Denied: <ID> needs ...`）にマネージド ID の識別子が含まれ、ジョブのログに出る。「profile ID は summary にだけ書く」方針から漏れている。秘密の値ではないので実害は無い。直すかどうかは本更新で決める。
-    - あわせて見直す（`release-ci` の design.md「Out of Boundary」が本更新へ回したもの）: `.claude/settings.json` の公開系コマンドの許可の整理、`build.yml` に `--locked` を足すか、bump 箇所に `package-lock.json` の版を含めること（release.yml の verify は検査しない。`crates/pasta_sample_ghost/RELEASE.md` の bump の一覧にも無い）。
+      - 小さな取りこぼし: setup-check の `verify-pat` が失敗すると、vsce のエラー文（`Access Denied: <ID> needs ...`）にマネージド ID の識別子が含まれ、ジョブのログに出る。「profile ID は summary にだけ書く」方針から漏れている。秘密の値ではないので実害は無い。直さない（2026-10-10 決定）。
+    - あわせて見直す（`release-ci` の design.md「Out of Boundary」が本更新へ回したもの）: `.claude/settings.json` の公開系コマンドの許可の整理、`build.yml` に `--locked` を足すか、bump 箇所に `package-lock.json` の版を含めること（release.yml の verify は検査しない。`crates/pasta_sample_ghost/RELEASE.md` の bump の一覧にも無い）。→ 済んだ（2026-10-10）: 手元からの公開の許可を外した。`--locked` は足さない。版の更新に `Cargo.lock` と `package-lock.json` を含めた。
     - `VSCE_PAT` の失効（10 節）は、初回のリリースで Marketplace が Entra ID の経路で `published` になったのを確かめてから行う。値が `release-ci` の会話記録に出ているが、前倒しはしない（ユーザー決定 2026-10-08）。
     - 2026-10-10 の棚卸で足したもの:
       - `steering/workflow.md` の「main の CI 全緑」の確認とマージコミットの例外の記述を、書き換えた手順に合わせる。
