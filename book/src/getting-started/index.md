@@ -40,7 +40,7 @@
 | 段 | 章 | 叶うこと | 足すファイル |
 | -- | -- | -------- | ------------ |
 | 準備 | [前提環境と準備](prerequisites.md) | 動作環境（Windows・SSP）と必要なもの（テキストエディタ・`pasta.dll`）、UTF-8 で保存する約束が分かる | 無い |
-| 準備 | [ゴーストの最小一式を置く](setup.md) | ゴーストの最小一式がそろう。起動すると立ち絵は出るが、辞書が無いのでしゃべらない | `install.txt`・`ghost/master/descript.txt`・`ghost/master/pasta.toml`・`ghost/master/pasta.dll`・`ghost/master/THIRD_PARTY_LICENSES.txt`・`shell/master/` |
+| 準備 | [ゴーストの最小一式を置く](setup.md) | ゴーストの最小一式がそろう。辞書が無いので、起動しても何も表示されず、しゃべらない（立ち絵は、1 段目で最初の台詞と一緒に出る） | `install.txt`・`ghost/master/descript.txt`・`ghost/master/pasta.toml`・`ghost/master/pasta.dll`・`ghost/master/THIRD_PARTY_LICENSES.txt`・`shell/master/` |
 | 1 | [1 段目：しゃべらせたい](01-boot.md) | 起動したら一言しゃべる | `01-boot.pasta` |
 | 2 | [2 段目：二人で掛け合いさせたい](02-talk.md) | 暇なときに 2 人でおしゃべりする | `02-talk.pasta`（`pasta.toml` に `[ghost]` の 2 行も書き足す） |
 | 3 | [3 段目：表情を変えたい](03-face.md) | 台詞ごとに表情を付ける | `03-face.pasta` |
