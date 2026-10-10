@@ -26,7 +26,7 @@
 
 ## 手順との食い違い
 
-`design.md` と手順書（`.github/release-ci-setup.md`）に、まだ反映していない。反映は別の PR で行う。
+1 と 2 は、本記録の後の PR で `design.md` と手順書（`.github/release-ci-setup.md`）に反映した（2026-10-10）。3 と 4 は事実の記録で、反映するものは無い。
 
 1. **段 5 手順 3（統合）**: エージェントが 2 行を `;` と `echo` でつないで 1 回で実行したところ、許可の規則（`Bash(gh pr merge:*)`）に合わず、許可の判定に拒否された。`gh pr merge` を 1 行だけで実行し直すと統合された。その直後の `gh pr view {PR} --json state,mergeCommit` が同じ理由で拒否され、`MERGED <SHA>` の出力は取れなかった。統合は `git fetch origin main` と `git log origin/main` で確かめ、開発者の指示で段 5 手順 5 から続けた。
    - 直す案: コマンドは 1 回の呼び出しに 1 行ずつ実行すると明記する。統合の成否を `git log origin/main -1 --format=%H -F --grep="chore(release): v{V}"` でも判定できるようにする。

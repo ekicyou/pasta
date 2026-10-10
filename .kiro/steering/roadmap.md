@@ -214,11 +214,11 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）は完了し�
 
 ## リリース手順の書き換え（`release-ci` の後）
 
-リリースの CI 化（`release-ci`）は完了し、タグの push だけで公開まで進む。常駐 spec の旧手順（`release/hello-pasta.nar` を生成してコミットする段・手元でのビルドと公開）は、そのままでは動かないので、下の Existing Spec Updates で書き換えた（2026-10-10 に済んだ。要件・設計・タスクの書き直しと、文書・設定の一回限りの整合）。CI での初回のリリース（v0.3.8）と後片付けも済んだ（2026-10-10。記録は `.kiro/specs/release-workflow/first-ci-release.md`）。**残るのは、記録の「手順との食い違い」を `design.md` と手順書に反映することである**（Sonnet で実行する条件）。
+リリースの CI 化（`release-ci`）は完了し、タグの push だけで公開まで進む。常駐 spec の旧手順（`release/hello-pasta.nar` を生成してコミットする段・手元でのビルドと公開）は、そのままでは動かないので、下の Existing Spec Updates で書き換えた（2026-10-10 に済んだ。要件・設計・タスクの書き直しと、文書・設定の一回限りの整合）。CI での初回のリリース（v0.3.8）と後片付けも済んだ（2026-10-10。記録は `.kiro/specs/release-workflow/first-ci-release.md`）。記録の「手順との食い違い」も、`design.md` と手順書に反映した（2026-10-10）。**残るのは、失敗した job の再実行の読み方の確認である**（失敗が起きなかったので未確認。起きたリリースで確かめる）。
 
 - **進め方（済んだ）**: brief を足さず、常駐 spec をその場で書き換えた（`/kiro-spec-requirements release-workflow` → `/kiro-design release-workflow` → `/kiro-spec-tasks release-workflow`）。古い `research.md` は書き直し、`gap-analysis.md` は削除した。
 - **初回のリリース（済んだ）**: v0.3.8 を Opus で実行した（2026-10-10）。7 つの公開先が最初の実行ですべて `published` になり、全 job の再実行ですべて `skipped` になった。後片付け（5 クレートの「Trusted Publishing のみ」・`CARGO_REGISTRY_TOKEN` と `VSCE_PAT` の失効）も済んだ。
-- **以後のリリース**: 新しい作業ブランチ（ハーネスのワークツリー）で `/kiro-impl release-workflow` を実行する。記録の「手順との食い違い」を `design.md` に反映するまでは Opus で実行し、反映したら Sonnet で実行する。
+- **以後のリリース**: 新しい作業ブランチ（ハーネスのワークツリー）で `/kiro-impl release-workflow` を実行する。失敗した job の再実行の読み方（`design.md`「CI での初回のリリースで確かめること」の 3）を確かめるまでは Opus で実行し、確かめたら Sonnet で実行する（開発者決定 2026-10-10）。
 - **席**: リリースの実行中は、`release.ps1`・`release.yml` を触る spec を main へ入れない。
 
 ### Existing Spec Updates
