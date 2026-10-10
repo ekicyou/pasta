@@ -152,7 +152,7 @@ graph LR
 
 ### Modified Files（一回限りの整合で変えるもの）
 
-「一回限りの整合（Requirement 12）」の表の 8 項目のファイルである（`.claude/settings.json`・steering の `workflow.md`・`product.md`・`roadmap.md`・`RELEASE.md`・`publish-vsix.ps1`・`release.yml`・`gap-analysis.md`）。
+「一回限りの整合（Requirement 12）」の表の 9 項目のファイルである（`.claude/settings.json`・steering の `workflow.md`・`product.md`・`roadmap.md`・`RELEASE.md`・`publish-vsix.ps1`・`release.yml`・`gap-analysis.md`・`kiro-complete` の `SKILL.md`）。
 
 ## System Flows
 
@@ -259,6 +259,7 @@ flowchart TD
 | 12.5 | 案内文の見出し名 | 一回限りの整合 | 項目 5 |
 | 12.6 | `product.md`・`roadmap.md` | 一回限りの整合 | 項目 6 |
 | 12.7 | `cargo test --all` と clippy | 一回限りの整合 | 項目 7 |
+| 12.8 | `kiro-complete` スキルの「main の CI 全緑」 | 一回限りの整合 | 項目 9 |
 
 ## Components and Interfaces
 
@@ -275,7 +276,7 @@ flowchart TD
 | 段 8 失敗への対応 | 判定表に従う再実行・案内・タグの付け直し | 7.1–7.9, 11.6 | gh・定型コマンド A | 実行の再実行・タグ（承認の後） |
 | 段 9 完了の報告 | 報告 | 9.1, 9.2 | — | — |
 | 段 10 初回の確認と後片付け | 冪等性の確認・所要時間・案内・記録 | 11.1–11.5 | gh・定型コマンド B | `first-ci-release.md`（PR） |
-| 一回限りの整合 | 文書・設定を手順に合わせる | 12.1–12.7 | — | 上の「一回限りの整合で変えるもの」 |
+| 一回限りの整合 | 文書・設定を手順に合わせる | 12.1–12.8 | — | 上の「一回限りの整合で変えるもの」 |
 
 ### 実行変数
 
@@ -776,7 +777,7 @@ gh run view {RUN} --log-failed | tail -n 60
 | Field | Detail |
 |-------|--------|
 | Intent | 文書と設定を、書き換えた手順に 1 度だけ合わせる |
-| Requirements | 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7 |
+| Requirements | 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8 |
 
 **行う場所と順**: `tasks.md` に入れない（リリースのたびに繰り返さないため）。`/kiro-impl` を使わない（リリースが始まるため）。本書き直しの作業ブランチの上で、`/kiro-spec-tasks` でタスクが承認された後、開発者の直接の指示で、下の一覧を上から行う。要件・設計・タスクの書き直しと同じ PR（squash）で main に入れる。次のリリースより前に済ませる。済んだことは、項目 6 の `roadmap.md` のチェックで記録する。
 
@@ -785,11 +786,12 @@ gh run view {RUN} --log-failed | tail -n 60
 | 1 | 12.1 | `.claude/settings.json` | 下の「許可の一覧」のとおりにする |
 | 2 | 12.2 | `.kiro/steering/workflow.md`（「CI を待たない」の段落の最後の文） | 「取り消せない crates.io 公開の前にだけ…課す（`release-workflow` Task 1.1）。」を、「取り消せない公開の前の検査は、リリース CI（`release.yml`）がタグのコミットで行う（verify と、`build.yml` の検査をすべて行う gate）。エージェントは main の CI の結果を公開の条件にしない。」に改める |
 | 3 | 12.3 | `.kiro/steering/workflow.md`（「release タグ公開のカーブアウト」の段落） | 統合を PR の squash マージ（`gh pr merge --squash`）と書き、マージコミット方式の記述を外す。リリースタグは統合の後に main のコミットへ付けること、タグ ref の push（`git push origin vX.Y.Z`）だけが直接 push の禁止の対象外であること、`.claude/settings.json` がタグ push の許可を持ち main への push の許可を持たないことを書く |
-| 4 | 12.4 | `crates/pasta_sample_ghost/RELEASE.md` | Step 1 の版の更新の一覧を、`Cargo.toml`・`Cargo.lock`・`editors/vscode/package.json`・`editors/vscode/package-lock.json`・`book/src/introduction.md` にする。「PR で `main` へマージ」を「PR で `main` へ squash マージ」にする。Step 2 の説明を、「版の更新を `main` へ統合した結果のコミット（squash マージでできたコミット。ふつうは `origin/main` の先頭）に、注釈付きのタグを付けて push する。先頭が別のコミットなら、そのコミットの SHA を指定する」にする（「またはそのマージコミット」を外す） |
+| 4 | 12.4 | `crates/pasta_sample_ghost/RELEASE.md` | Step 1 の版の更新の一覧を、`Cargo.toml`・`Cargo.lock`・`editors/vscode/package.json`・`editors/vscode/package-lock.json`・`book/src/introduction.md` にする。「PR で `main` へマージ」を「PR で `main` へ squash マージ」にする。Step 2 の説明を、「版の更新を `main` へ統合した結果のコミット（squash マージでできたコミット。ふつうは `origin/main` の先頭）に、注釈付きのタグを付けて push する。先頭が別のコミットなら、そのコミットの SHA を指定する」にする（「またはそのマージコミット」を外す）。前提条件の「リポジトリの `main` へ push・PR のマージができ、リリースタグを push できる」を、「PR を `main` へマージでき、リリースタグを push できる（`main` へは直接 push できない）」にする |
 | 5 | 12.5 | `.github/scripts/release/publish-vsix.ps1`（1 か所）・`.github/workflows/release.yml`（2 か所） | 案内文の「名前の表と照合する」を「名前の対応表と照合する」にする。ほかは変えない |
-| 6 | 12.6 | `.kiro/steering/product.md`・`.kiro/steering/roadmap.md` | `product.md` の本仕様の説明を、「リリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認。`/kiro-impl` 実行のたびにタスクリセット、永続的に未完了）」にする。`roadmap.md` は、冒頭の「書き換える作業…が残る」と常駐 spec の一覧の「書き換えが残る」を、書き換えが済んで CI での初回のリリースが残る形に直し、「リリース手順の書き換え」の `- [ ] release-workflow` にチェックを入れ、「次のリリースより前に…済ませる」を済んだ形に直す。初回のリリースのための申し送り（前提・合格・運用の注意）は残す |
+| 6 | 12.6 | `.kiro/steering/product.md`・`.kiro/steering/roadmap.md` | `product.md` の本仕様の説明を、「リリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認。`/kiro-impl` 実行のたびにタスクリセット、永続的に未完了）」にする。最終更新の行の「現行バージョン v0.2.4」を、整合を行った日と今の版に直す。`roadmap.md` は、冒頭の「書き換える作業…が残る」と常駐 spec の一覧の「書き換えが残る」を、書き換えが済んで CI での初回のリリースが残る形に直し、「リリース手順の書き換え」の `- [ ] release-workflow` にチェックを入れ、「次のリリースより前に…済ませる」を済んだ形に直す。初回のリリースのための申し送り（前提・合格・運用の注意）は残す |
 | 7 | 12.7 | — | `cargo test --all` と `cargo clippy --all-targets --workspace -- -D warnings` が通ることを確かめる（先に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す。テストが書き換える `sample.generated.lua` の改行だけの差分は `git restore` で戻し、コミットに混ぜない） |
 | 8 | —【仮定】 | `.kiro/specs/release-workflow/gap-analysis.md` | 削除する（v0.1.2 の頃の記録で、今の手順と合わない。履歴は git に残る） |
+| 9 | 12.8 | `.claude/skills/kiro-complete/SKILL.md`（「CI の完了を待たない。」の項の最後の文） | 「「main の CI 全緑」は `release-workflow` が crates.io 公開の前に課す（workflow.md「3. リモート同期」）。」を、「取り消せない公開の前の検査は、リリース CI がタグのコミットで行う（workflow.md「3. リモート同期」）。」に改める。編集が拒否されたときは、項目 1 と同じに扱う |
 
 **許可の一覧**（項目 1）。`permissions.allow` を次にする。外すのは `Bash(cargo publish:*)`・`PowerShell(vsce publish:*)`・`Bash(gh release create:*)` の 3 つ、足すのは `Bash(git push -u origin HEAD)` と `gh run` の 3 つである。`hooks` は変えない。
 
@@ -818,7 +820,7 @@ release-workflow（/kiro-impl release-workflow）での、版の更新の PR の
 
 タグの付け直し（`git tag -f`・`git push -f origin vX.Y.Z`）は、許可の一覧に入れない。
 
-**`.claude/settings.json` の編集が拒否されたとき**: ハーネスの許可の判定が、エージェントによる自分の設定の編集を拒むことがある。そのときは、回避の方法を探さない。入った変更と残った変更を、上の JSON と文のまま開発者に示し、開発者が自分で直すか、編集を許可するのを待つ。ほかの項目は先に進めてよい。
+**`.claude/settings.json`・スキルの編集が拒否されたとき**（項目 1・9）: ハーネスの許可の判定が、エージェントによる自分の設定・スキルの編集を拒むことがある。そのときは、回避の方法を探さない。入った変更と残った変更を、上の JSON と文（項目 9 は表の文）のまま開発者に示し、開発者が自分で直すか、編集を許可するのを待つ。ほかの項目は先に進めてよい。
 
 ## Data Models
 
@@ -1110,6 +1112,6 @@ $reach = $LASTEXITCODE
 11. **タグを付けるコミット**（段 6 の手順 1）。草案: 要件 5.1 のとおり、squash でできたコミット。ほかの案: `origin/main` の先頭（今の `RELEASE.md` の書き方。`verify-tag.ps1` をそのまま手元で使える。統合の直後に別の PR が入ると、その変更もリリースに入る）。推奨: 草案。
 12. **main に未リリースの版があるのに別の版が指定された場合**（判定表 S8）【仮定】。草案: 止まって開発者に確かめる。
 13. **要件の【仮定】**。本設計は次の 2 つに依存する: 未コミットの変更・main に無い内容があれば止まる（2.3。段 1 の手順 4）、自動の再実行は 3 回まで（7.2。`N_AUTO`）。確認ワークフローのログの識別子（直さない）には依存しない。2.3 の「main に無いコミット」は、コミットの有無でなく内容（main に取り込んだ結果が main と同じか）で判定した。コミットの有無で判定すると、squash で統合した後の同じワークツリーでの再開（8.1）が止まるためである。2.3 の帰結として、版の更新のコミットを作った後・PR を作る前に会話が終わると、再実行だけでは続かず、開発者の指示（「段 5 から続ける」）が要る。この場合を自動で続けるかを決める。
-14. **Requirement 12 に無い古い参照**。次の 3 つが、書き換えた手順と食い違う。要件 12 に足すかを決める。(1) `.claude/skills/kiro-complete/SKILL.md` の「『main の CI 全緑』は `release-workflow` が crates.io 公開の前に課す」（スキルの編集は拒否されることがあり、開発者の許可が要る）、(2) `RELEASE.md` の前提条件の「`main` へ push・PR のマージができ」（main へは push できない）、(3) `product.md` の「現行バージョン v0.2.4」。推奨: (1)(2) を足す。
+14. **Requirement 12 に無い古い参照**。次の 3 つが、書き換えた手順と食い違う。→ **確定（自明修正）**: 3 つとも足した（要件 12.4・12.6・12.8、一回限りの整合の項目 4・6・9）。(1) `.claude/skills/kiro-complete/SKILL.md` の「『main の CI 全緑』は `release-workflow` が crates.io 公開の前に課す」（スキルの編集は拒否されることがあり、開発者の許可が要る）、(2) `RELEASE.md` の前提条件の「`main` へ push・PR のマージができ」（main へは push できない）、(3) `product.md` の「現行バージョン v0.2.4」。
 15. **Sonnet へ切り替える条件**（Migration Strategy）【仮定】。草案: 初回の記録が main にあり、「CI での初回のリリースで確かめること」の 5 つが確認済みであること。
 16. **必須の最終タスク「ドキュメント整合性の確認」の中身**（steering `workflow.md` のタスク生成ルール）。リリースでは、文書を変えない。草案: 段 9 の報告の「手順との食い違い」の欄で代える（タスク生成で扱う）。
