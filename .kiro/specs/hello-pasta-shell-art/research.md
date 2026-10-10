@@ -1,6 +1,6 @@
 # ギャップ分析: hello-pasta-shell-art
 
-作成: 2026-10-10（main `a59438c6`・ブランチ `claude/hello-pasta-shell-art-b407df`）。対象: `requirements.md`（R1〜R10）と既存のコードベースの差。方針は示すが、最終判断は要件ディスカッションと設計に委ねる。
+作成: 2026-10-10（main `ea40c363`・ブランチ `claude/hello-pasta-shell-art-b407df`）。対象: `requirements.md`（R1〜R10）と既存のコードベースの差。方針は示すが、最終判断は要件ディスカッションと設計に委ねる。
 
 ## 1. 分析の要約
 
@@ -144,6 +144,17 @@ B の内容を、独立に検証・revert できる段に分ける。
 4. 日本法での AI 生成物の著作権の扱い（記録に書く注記の文面）。
 5. `about.hbs`「pasta 自体は MIT License」・`editors/vscode/package.json`「MIT」を本仕様で揃えるか、別途か（Q1 の範囲）。
 6. `build.rs` の `pasta_shiori/src` 監視は、生成を消した後も意味があるか（無ければ `build.rs` ごと削除できる）。
+
+### 6.2b 要件ディスカッションから設計へ持ち越した判断（2026-10-10）
+
+要件では結果だけを定め、方式は設計で選ぶと決めた項目。
+
+1. ドリフト対策の方式（Q6）: 顔以外を基準画像から合成し直す／`surfaces.txt` の element で胴体と顔を重ねる。試作の実測（R2.4）で選ぶ。R2.1 の許容値 2 px も同じ実測で見直す。
+2. 立ち絵の寸法の具体値（Q11）: 幅 150〜300 px の範囲で、試作の縮小後の縁の品質と大きさの上限（R7）から決める。
+3. 絵の検証テストの置き場所と PNG の読み方（Q9）: `tests/integration_test.rs` の置き換えを仮定。PNG の寸法・アルファ・四隅の透明の検証に `image`（または `png`）を dev-dependency で残すか、IHDR を手で読むか。
+4. 大きさの上限を確かめる場所（R7・R10.4）: テスト／`release.ps1`／`release.yml` の検査のどこで見るか。
+5. 当たり判定の形と座標（R4）: `collision`（矩形）か `collisionex`（ellipse など）か。重なる部位の優先順位（UKADOC の定義順の扱い）を確かめる。
+6. `build.rs` の扱い（6.2 の 6 と同じ）。
 
 ### 6.3 要件ディスカッションで決める事項（requirements.md の Q1〜Q14 と対応）
 
