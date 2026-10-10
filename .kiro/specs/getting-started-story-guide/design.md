@@ -22,7 +22,7 @@
 - 段階表と段階辞書の内容の変更（`hello-pasta-tutorial-stages` が確定済み）。
 - 文法リファレンス・Lua 章・リファレンス・内部設計パートの書き直し。
 - `.github/workflows/manual.yml`・`book/tools/verify-static.mjs` の変更（`manual-print-media-refs`）。
-- 要件に無い種類の機械検査の追加。段の章の見出しの型、説明の地の文が無いこと、リファレンス章との事実の一致は機械検査しない（執筆規約のチェックリストとレビューで見る）。検査の側で足すのは、作例の照合の拡張と、`first-ghost.md` を名指しする検査の置き換え（`C-steps`・`C-order`）だけである。
+- 要件に無い種類の機械検査の追加。リファレンス章との事実の一致と、「台詞を読み飛ばしても事実が追える」ことは機械検査しない（執筆規約のチェックリストとレビューで見る）。検査の側で足すのは、作例の照合の拡張、`first-ghost.md` を名指しする検査の置き換え（`C-steps`・`C-order`）、語りの形と章の型の検査（`C-sections`・`C-prose`）だけである。
 - 段階表（`STAGES.md`）を照合ツールで読むこと（`manual.yml` の起動条件に無いため）。
 
 ## Boundary Commitments
@@ -32,7 +32,7 @@
 - `book/src/getting-started/` の全章の文章と、章のファイル名。
 - `book/AUTHORING.md` の第 8 節「入門ガイドの執筆規約」と、第 1・2・3・5 節からの案内。
 - `book/tools/tutorial-check.mjs` の照合の規則（辞書と章の対応・抜き出しの判定）と、その自己テスト。
-- `book/tools/verify-content.mjs` の C 系の検査のうち、入門ガイドを名指しするもの（`C-steps`・`C-order`・`C-tutorial-check` のメッセージ）。
+- `book/tools/verify-content.mjs` の C 系の検査のうち、入門ガイドを名指しするもの（`C-steps`・`C-order`・`C-sections`・`C-prose`・`C-tutorial-check` のメッセージ）。
 - 章の数を決め打ちしている 3 つの自己テストの数字。
 - 目次の入門パート（`SUMMARY.md`）、表紙の「このマニュアルの歩き方」（`introduction.md`）、`first-ghost.html` の転送（`book.toml`）、2 つの README の入門ガイドへのリンク。
 
@@ -154,10 +154,10 @@ book/
 │       ├── 13-nar.md                 # 新規: 13 段目（辞書なし）
 │       └── first-ghost.md            # 削除
 └── tools/
-    ├── tutorial-check.mjs            # 変更: 辞書 ↔ 同じ名前の章の照合・抜き出しの判定
+    ├── tutorial-check.mjs            # 変更: 辞書 ↔ 同じ名前の章の照合・抜き出しの判定・地の文の段落の判定
     ├── tutorial-check-test.mjs       # 変更: サンドボックスを章ごとに作り直す
-    ├── verify-content.mjs            # 変更: C-steps の置き換え・C-order の追加・コメントの章数
-    ├── verify-scripts-test.mjs       # 変更: T 系の件数 47 → 60
+    ├── verify-content.mjs            # 変更: C-steps の置き換え・C-order・C-sections・C-prose の追加・コメントの章数
+    ├── verify-scripts-test.mjs       # 変更: T 系の件数 47 → 60・C-sections と C-prose の件数
     ├── gen-skill-refs-test.mjs       # 変更: K-10 の章数 47 → 60
     └── talk/talk-test.mjs            # 変更: J-9 の章数 47 → 60
 crates/
@@ -257,7 +257,7 @@ flowchart TB
 | 6.1 | emo2 をショーケースとして紹介・7 段目の相手役 | GuideIndex, StageChapters | `index.md`・`07-greeting.md` |
 | 6.2 | 作例は hello-pasta・emo2 の辞書は照合しない | StageChapters, TutorialCheck | emo2 の辞書は `pasta` ブロックに置けない（`not-in-dic`） |
 | 6.3 | emo2 の事実は記録された範囲に留める | AuthoringGuide, StageChapters | 第 8 節「事実の範囲」 |
-| 7.1 | 説明本体は台詞部品だけで語る | AuthoringGuide, 全章 | 第 8 節「語りの形」 |
+| 7.1 | 説明本体は台詞部品だけで語る | AuthoringGuide, 全章 | 第 8 節「語りの形」、`C-prose` |
 | 7.2 | 導入と締めは二人の掛け合い | 全章 | `T-intro`・`T-outro` |
 | 7.3 | 事実は台詞以外だけで追える | AuthoringGuide, 全章 | 第 8 節「語りの形」、章ごとのレビュー |
 | 7.4 | コード・表のセルなどに口調を入れない | AuthoringGuide, 全章 | `D-codevoice`、第 8 節 |
@@ -266,7 +266,7 @@ flowchart TB
 | 7.7 | 台詞部品の記法を守る | 全章 | `T-syntax`・`T-intro`・`T-outro` |
 | 7.8 | アンソニーは本体に出てよいが事実を独占しない | AuthoringGuide, 全章 | 第 8 節「語りの形」 |
 | 8.1 | 例外を第 7 節とは別の節に書く | AuthoringGuide | 第 8 節 |
-| 8.2 | 語りの形・台詞以外に置けるもの・章の型 | AuthoringGuide | 第 8 節「語りの形」「章の型」 |
+| 8.2 | 語りの形・台詞以外に置けるもの・章の型 | AuthoringGuide | 第 8 節「語りの形」「章の型」、`C-sections` |
 | 8.3 | 口調を持ち込まない場所と鉄則を維持 | AuthoringGuide | 第 8 節「変えない規則」 |
 | 8.4 | 第 2 節・第 5 節から案内 | AuthoringGuide | 第 2・5 節の追記 |
 | 8.5 | 作例は辞書と逐語一致・抜き出しは連続・同じ変更で直す | AuthoringGuide | 第 8 節「作例の規則」 |
@@ -289,6 +289,8 @@ flowchart TB
 | 10.4 | 章の数の自己テストが新しい数で通る | ChapterCountTests | 47 → 60 |
 | 10.5 | 検査一式がすべて成功 | 全コンポーネント | Testing Strategy「通しの確認」 |
 | 10.6 | 最初の台詞の語で章が検索できる | 全章 | `verify-search.mjs --self-test` |
+| 10.7 | 段の章が 5 つの見出しをこの順で持つ | ContentVerifier | `C-sections` |
+| 10.8 | 台詞以外の段落は指示の一文だけ | ContentVerifier, TutorialCheck | `C-prose`、`findProseParagraphs` |
 | 11.1 | 表紙の歩き方の位置づけ | Navigation | `introduction.md` |
 | 11.2 | 扉のパート案内は入口の章を指す | Navigation | `index.md` の名前を変えない |
 | 11.3 | 廃止ページの URL を転送 | Navigation | `book.toml` の転送 |
@@ -309,8 +311,8 @@ flowchart TB
 | PrepChapters | 本文 | 道具と約束、最小一式の配置 | 1.1, 1.7, 2.1–2.8, 11.4 | AuthoringGuide（P0）、`reference/pasta-toml.md`（P1） | 文書 |
 | StageChapters | 本文 | 13 段の章 | 1.1–1.3, 1.6, 1.7, 3.1–3.9, 4.1–4.12, 5.1–5.3, 6.1, 6.2, 12.3 | 段階表・段階辞書（P0）、AuthoringGuide（P0） | 文書 |
 | Navigation | 導線 | 目次・表紙・転送・README | 1.2, 1.4, 11.1–11.4 | GuideIndex・PrepChapters（P0） | 設定 |
-| TutorialCheck | ツール | 辞書と同じ名前の章の作例を照合 | 1.6, 3.2, 3.9, 6.2, 9.1–9.11 | 段階辞書・入門の章（P0） | Service, Batch |
-| ContentVerifier | ツール | 入門を名指しする検査の追従 | 1.2, 1.4, 2.1, 10.1–10.3 | TutorialCheck（P0） | Batch |
+| TutorialCheck | ツール | 辞書と同じ名前の章の作例を照合 | 1.6, 3.2, 3.9, 6.2, 9.1–9.11, 10.8 | 段階辞書・入門の章（P0） | Service, Batch |
+| ContentVerifier | ツール | 入門を名指しする検査の追従と、語りの形・章の型の検査 | 1.2, 1.4, 2.1, 7.1, 10.1–10.3, 10.7, 10.8 | TutorialCheck（P0） | Batch |
 | ChapterCountTests | ツール | 章の数の決め打ちを直す | 1.1, 10.4 | ContentVerifier（P1） | Batch |
 
 7.2・7.6・7.7・10.5・10.6・11.5・12.2・12.4・12.5 は全章にかかる（本文の 3 コンポーネントが共通に満たす）。
@@ -340,9 +342,9 @@ flowchart TB
 | 小見出し | 書く内容 | 要件 |
 |----------|----------|------|
 | 対象 | `book/src/getting-started/` の章だけに適用する。第 1〜5・7 節に加えて守る。本節が上書きするのは説明本体の文体だけ | 8.1 |
-| 語りの形 | 説明本体の語りは台詞部品だけで書く。説明の地の文の段落を置かない。台詞以外に置けるのは、操作を指す普通文体の指示の一文・箇条書き（番号付きを含む）・表・コードブロック・見出しだけ。引用ブロックは台詞部品だけに使い、用語の説明や出典の引用は箇条書きか表に置く。台詞が語る技術的な事実は、同じ章の台詞以外の部分にも必ず置く（台詞にしか無い事実を作らない）。アンソニーは本体で読者の疑問を代わりに尋ねてよいが、事実の説明をアンソニーの台詞にだけ置かない。導入と締めは第 7 節のまま（両方の話し手・台詞だけ・技術情報を載せない） | 7.1, 7.3, 7.8, 8.2 |
+| 語りの形 | 説明本体の語りは台詞部品だけで書く。説明の地の文の段落を置かない。台詞以外に置けるのは、操作を指す普通文体の指示の一文・箇条書き（番号付きを含む）・表・コードブロック・見出しだけ。指示の一文は 1 行で句点を 1 つにし、二文以上になるときは箇条書きにする（`C-prose` が確かめる）。引用ブロックは台詞部品だけに使い、用語の説明や出典の引用は箇条書きか表に置く。台詞が語る技術的な事実は、同じ章の台詞以外の部分にも必ず置く（台詞にしか無い事実を作らない）。アンソニーは本体で読者の疑問を代わりに尋ねてよいが、事実の説明をアンソニーの台詞にだけ置かない。導入と締めは第 7 節のまま（両方の話し手・台詞だけ・技術情報を載せない） | 7.1, 7.3, 7.8, 8.2 |
 | 変えない規則 | コードブロック内・構文定義・コマンド例・サンプルコード・表のセルに口調を持ち込まない。技術的正確さを最優先し、語りで誤読の余地が生まれるなら台詞以外の部分で言い切る | 7.4, 7.5, 8.3 |
-| 章の型 | 入口・準備・段の章の見出し構成（下の各コンポーネントの表）と、段の章の雛形（Supporting References の雛形を載せる）。本体に区切り `---` を置かない（区切りは導入の後と締めの前の 2 本だけ）。最初の台詞は章に固有の 4 文字以上の日本語で始める | 8.2 |
+| 章の型 | 入口・準備・段の章の見出し構成（下の各コンポーネントの表）と、段の章の雛形（Supporting References の雛形を載せる）。段の章の 5 つの H2 は文言と順序を変えない（`C-sections` が確かめる）。本体に区切り `---` を置かない（区切りは導入の後と締めの前の 2 本だけ）。最初の台詞は章に固有の 4 文字以上の日本語で始める | 8.2 |
 | 作例の規則 | 情報文字列 `pasta` のブロックは、章と同じ名前の辞書の全体か、連続した行の抜き出しに限る。辞書の全体は「辞書ファイルを足す」に 1 つ置く。辞書に無い形の例示は `pasta` で書かない。フェンスは行頭に置き、リスト・引用の中に置かない。辞書が ```` ``` ```` を含むときは 4 本のバッククォートで囲み、```` ```lua ```` を含む抜き出しは開きと閉じの両方を含める。辞書を変えるときは同じ変更で章の作例を直す。確かめるコマンドは `node book/tools/tutorial-check.mjs` | 8.5 |
 | 辞書以外の転記 | `install.txt`・`descript.txt`・`pasta.toml` の断片とスクリプト入力の例は、情報文字列 `text`・`toml` で書く。照合されないので、項目名と既定値をリファレンス章（`reference/`）と突き合わせる。シェルのファイルの中身は書き写さない | 8.7 |
 | 出典 | 初めて扱うイベントは、UKADOC の項へのリンク・説明の 1 文の引用・その段で使う `Reference` の説明の引用を表に置く。`Reference` の一覧を丸ごと写さない | 5.2 |
@@ -502,7 +504,7 @@ flowchart TB
 | Field | Detail |
 |-------|--------|
 | Intent | 入門の各章の `pasta` ブロックが、章と同じ名前の辞書と逐語で一致することを確かめる |
-| Requirements | 1.6, 3.2, 3.9, 6.2, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11 |
+| Requirements | 1.6, 3.2, 3.9, 6.2, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 10.8 |
 
 **Responsibilities & Constraints**
 
@@ -536,6 +538,7 @@ export function extractPastaBlocks(markdown: string): string[];  // 変更なし
 export function normalizeForCompare(text: string): string;       // 変更なし
 export function matchDicFile(dicContent: string, blocks: string[]): boolean; // 変更なし（全体の一致）
 export function isExcerptOf(dicContent: string, block: string): boolean;     // 新規
+export function findProseParagraphs(markdown: string): ProseProblem[];      // 新規。C-prose の判定（純粋な関数）
 export function runTutorialCheck(repoRoot?: string): TutorialCheckResult;
 export function reportTutorialCheck(result: TutorialCheckResult): string;
 
@@ -553,6 +556,10 @@ interface BlockProblem {
   head: string;      // ブロックの先頭行（名指し用）
   reason: BlockReason;
 }
+interface ProseProblem {
+  line: number;     // 段落の先頭行（1 始まり）
+  head: string;     // 段落の先頭行の文字列（名指し用）
+}
 interface TutorialCheckResult {
   ok: boolean;             // fatal が無く、results がすべて matched で、problems が空
   fatal: string | null;    // 入門の章のフォルダが無い・辞書が 1 件も無い
@@ -567,6 +574,10 @@ interface TutorialCheckResult {
   - Preconditions: どちらも文字列。
   - Postconditions: 両方を `normalizeForCompare` して行に分け、ブロックの行の並びが辞書の行の並びのどこかに、連続して・行ごとの完全一致で現れれば `true`。正規化後のブロックが空なら `false`。
   - Invariants: 行の途中からの一致・飛び飛びの行・順序の入れ替えは `false`。辞書の全体は `true`。
+- `findProseParagraphs(markdown)`
+  - 置き場所の理由: `verify-content.mjs` は import した時点で検査を走らせるので、中の関数を単体テストできない。`tutorial-check.mjs` は `verify-content.mjs` がすでに import しており、サンドボックスの自己テストを持つ。
+  - Postconditions: コードフェンスの中を除き、空行で区切った段落ごとに見る。先頭行が見出し（`#`）・引用（`>`。台詞部品）・箇条書き（`-`・`*`・`+`・数字と `.`）・表（`|`）・区切り（`---`）で始まる段落と、字下げで始まる段落（箇条書きの続き）は対象にしない。残った段落のうち、「1 行だけ・末尾が `。`・インラインコード（バッククォートの中）を除いた `。` が 1 つ」を満たさないものを返す。
+  - Invariants: 指示の一文（「`dic/02-talk.pasta` を作り、次の内容を貼る。」）は返さない。二文の段落・複数行の段落・句点で終わらない段落は返す。
 - `runTutorialCheck(repoRoot)`
   - Postconditions: System Flows の図のとおりに `results` と `problems` を埋める。`no-dic` は同じ名前の辞書が無い章の `pasta` ブロック、`not-in-dic` は辞書の全体でも抜き出しでもないブロック、`indented-fence` は字下げ・引用の中にある `pasta` フェンスの開き行（`extractPastaBlocks` が拾わないので、照合をすり抜けないよう失敗にする）。
   - 空の集合で素通りしない（辞書 0 件は `fatal`）。
@@ -596,6 +607,7 @@ interface TutorialCheckResult {
 | 抜き出しの不一致 | 章に飛び飛びの 2 行・1 文字違いのブロックを足す | `not-in-dic`。レポートに章と先頭行 |
 | 辞書の無い章のブロック | `index.md` に `pasta` ブロックを置く | `no-dic` |
 | 字下げのフェンス | リストの中に `pasta` フェンスを置く | `indented-fence` |
+| `findProseParagraphs` の単体 | 指示の一文・二文の段落・複数行の段落・句点なしの段落・インラインコードの中の `。`・フェンスの中の文・台詞・箇条書き・表 | 仕様どおり |
 | `isExcerptOf` の単体 | CRLF・単独 CR・末尾の空白行・空のブロック・4 本フェンスの ```` ```lua ```` を含む抜き出し | 仕様どおり |
 | 致命的な失敗 | 入門のフォルダ無し・辞書 0 件 | `fatal`、レポートに `FATAL` |
 | CLI | 実リポジトリで起動 | 終了コード 0・`RESULT: OK` |
@@ -612,13 +624,15 @@ interface TutorialCheckResult {
 | Field | Detail |
 |-------|--------|
 | Intent | `first-ghost.md` を名指しする検査を、新しい章立てに合わせる |
-| Requirements | 1.2, 1.4, 2.1, 10.1, 10.2, 10.3 |
+| Requirements | 1.2, 1.4, 2.1, 7.1, 10.1, 10.2, 10.3, 10.7, 10.8 |
 
 | 検査 | 変更 | 判定 |
 |------|------|------|
 | `C-utf8`・`C-sjis`・`C-env` | なし | 入門の全章を連結して語を探す（今のまま） |
 | `C-steps` | 置き換え | 段の章（`getting-started/` のうちファイル名が 2 桁の数字とハイフンで始まる `.md`）が 1 枚以上あり、どれも本文を持つ（`isSubstantive` の既定の 800 文字以上・プレースホルダの語なし）。不足した章を名指しする |
 | `C-order` | 新規 | `SUMMARY.md` の `getting-started/` へのリンクの並びが、`index.md`・`prerequisites.md`・`setup.md`・段の章（ファイル名の昇順）と一致する。目次に無い章・順序の違いを名指しする |
+| `C-sections` | 新規 | 段の章のそれぞれが、H2「叶えたいこと」「新しく覚える表現」「辞書ファイルを足す」「起動して確かめる」「もっと詳しく」をこの順で持つ（`I-sections` と同じ判定。フェンス内の行は見出しとみなさない）。章ごとに 1 件。欠けた見出し・順序の違いを名指しする |
+| `C-prose` | 新規 | 入門の各章で `findProseParagraphs` が 0 件を返す。章ごとに 1 件。失敗のときは章・行番号・段落の先頭行と、対処（台詞にする・箇条書きにする・一文にまとめる）を出す |
 | `C-tutorial-check` | メッセージ | 失敗のとき、`results` の不一致と `problems` を「章 ← 辞書 [理由]」「章「先頭行」[理由]」の形で並べる |
 | `D-voice`・`D-codevoice`・`T-syntax`・`T-intro`・`T-outro` | なし | 走査の対象は今のまま（`getting-started` を含む）。章が増える分だけ件数が増える |
 
@@ -640,6 +654,7 @@ interface TutorialCheckResult {
 | `book/tools/gen-skill-refs-test.mjs` | K-10（599 行目） | 47 → 60 |
 
 - 検算: 47 − 3（今の入門）＋ 16（新しい入門）＝ 60。
+- `verify-scripts-test.mjs` に、`C-sections` の PASS が 13 件・`C-prose` の PASS が 16 件であることの確認を足す（`I-sections` の件数の確認と同じ形）。
 - K-10 は件数のほかに、全章で「本文の範囲が旧来の判定と一致する」ことも見る。新しい章は本体に `---` を置かない（第 8 節「章の型」）ので、範囲は一意に決まる。
 
 ## Error Handling
@@ -657,6 +672,7 @@ interface TutorialCheckResult {
 | 辞書の無い章に `pasta` ブロックがある | `no-dic` | 章とブロックの先頭行 | 1 |
 | 字下げ・引用の中の `pasta` フェンス | `indented-fence` | 章とその行 | 1 |
 | 段の章の本文が足りない・目次の並びが違う | `C-steps`・`C-order` | 章の名指し | 1 |
+| 段の章の見出しが欠けている・順序が違う、台詞以外の段落が指示の一文でない | `C-sections`・`C-prose` | 章・見出し、章・行番号・段落の先頭行 | 1 |
 | ツールの例外 | CLI の `catch` | スタック | 2 |
 
 失敗のレポートは、どのファイルをどう直すかを 1〜2 行で示す（9.3）。
@@ -676,7 +692,7 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 
 ### Integration Tests
 
-- `node book/tools/verify-content.mjs`: 新しい 16 章で FAIL 0 件。`C-steps`・`C-order`・`C-tutorial-check` が PASS。本体に台詞がある章で `T-syntax`・`T-intro`・`T-outro` が PASS（10.1・10.2・10.3）。
+- `node book/tools/verify-content.mjs`: 新しい 16 章で FAIL 0 件。`C-steps`・`C-order`・`C-tutorial-check` が PASS。`C-sections` が 13 件、`C-prose` が 16 件 PASS（`verify-scripts-test.mjs` が件数を確かめる。10.7・10.8）。本体に台詞がある章で `T-syntax`・`T-intro`・`T-outro` が PASS（10.1・10.2・10.3）。
 - `node book/tools/verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`: 章の数 60 で通る（10.4）。
 - `node book/tools/link-check.mjs`: 章のリンクとアンカー、README のリンク（`setup.md` の見出し「ゴーストのフォルダ構成」の実在）が通る（11.4・11.5）。
 - `node book/tools/gen-skill-refs.mjs --check`: 生成物に差分が出ない（入門は生成対象でない）。
@@ -691,7 +707,7 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 
 - 通し読み: 準備の章から 13 段目まで、章の指示だけで新しいゴースト（`hello-pasta` でない名前）を作り、実機の SSP で各章の「成功の目印」を確かめる。準備の終わり（辞書なし）でしゃべらないこと、6 段目の時刻の仮想変更、7 段目の emo2 との切り替えと `\![raise,…]`、13 段目の `.nar` の作成を含む（2.6・3.4・4.2・4.5・4.6・4.12）。8 段目の部位名は、新しいシェルが入るまで空になる（`getting-started-screenshots` が確かめる）。
 - 事実の突き合わせ: 章ごとに、段階表の行・辞書のコメント・リンク先のリファレンス章と読み比べる（3.7・3.8・12.1・12.2）。
-- 語りの形: 章ごとに、台詞を全部隠しても手順と事実が追えるかを読む（7.3）。地の文の段落が無いこと（7.1）。
+- 語りの形: 章ごとに、台詞を全部隠しても手順と事実が追えるかを読む（7.3）。地の文の段落が無いこと（7.1）は `C-prose` が見る。
 - 古い記述: 入門の全章を「途中の段階」「Lua ランタイム」「変わらない」「自動生成」で検索し、要件 1.7 の 4 つが残っていないことを確かめる。
 - 表情の偏り: `node book/tools/talk/talk.mjs --stats` で 16 章の導入と締めの組み合わせを見る。
 
@@ -700,7 +716,7 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 切り替えの順序（タスク分解の前提）:
 
 1. **規約を先に固める**: `AUTHORING.md` 第 8 節と雛形。章の量産より前に、1 段目の章を雛形どおりに 1 枚書いて形を確かめる。
-2. **照合ツールを直す**: `tutorial-check.mjs` と自己テスト。サンドボックスの場合はこの時点で通る。実リポジトリの場合は、章がそろうまで落ちる。
+2. **検査ツールを直す**: `tutorial-check.mjs` と自己テスト、`verify-content.mjs` の `C-sections`・`C-prose`。サンドボックスの場合はこの時点で通る。実リポジトリの場合は、章がそろうまで落ちる。
 3. **章を書く**: 準備の 2 章、13 段の章、入口の章。章どうしはファイルが分かれているので並行して書ける。
 4. **切り替える**: `first-ghost.md` の削除、`SUMMARY.md`、`introduction.md`、`book.toml` の転送、README、`verify-content.mjs` の `C-steps`・`C-order`、章の数の 3 か所。
 5. **通しの確認**: 検査一式とビルド、手動の確認。
@@ -712,8 +728,8 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 | 手順 | 合格とする証拠 | この時点で落ちてよいもの |
 |------|----------------|--------------------------|
 | 1 規約 | `node book/tools/verify-content.mjs` の `T-authoring` が PASS | なし |
-| 2 照合ツール | `node book/tools/tutorial-check-test.mjs` のサンドボックスの場合と単体テストが全件 PASS | 同じ自己テストの「実リポジトリ」「CLI」の場合、`tutorial-check.mjs` の実行、`C-tutorial-check` |
-| 3 章（1 枚ごと） | `tutorial-check.mjs` のレポートで、その章の辞書が `MATCH` でその章の問題が 0 件。`verify-content.mjs` の `T-syntax`・`T-intro`・`T-outro`・`D-codevoice` にその章の FAIL が無い。`link-check.mjs` にその章の失敗が無い | ほかの章の `no-chapter`、章の数の 3 つの自己テスト |
+| 2 検査ツール | `node book/tools/tutorial-check-test.mjs` のサンドボックスの場合と単体テストが全件 PASS | 同じ自己テストの「実リポジトリ」「CLI」の場合、`tutorial-check.mjs` の実行、`C-tutorial-check`、まだ書き直していない章の `C-sections`・`C-prose` |
+| 3 章（1 枚ごと） | `tutorial-check.mjs` のレポートで、その章の辞書が `MATCH` でその章の問題が 0 件。`verify-content.mjs` の `T-syntax`・`T-intro`・`T-outro`・`D-codevoice`・`C-sections`・`C-prose` にその章の FAIL が無い。`link-check.mjs` にその章の失敗が無い | ほかの章の `no-chapter`、章の数の 3 つの自己テスト |
 | 4 切り替え・5 通し | 検査一式・自己テスト全件・ビルド後の検査がすべて成功（落ちてよいものは無い） | なし |
 
 - `verify-content.mjs` の D 系・T 系はフォルダを直接走査する（目次を見ない）ので、目次に載せる前の章にも章ごとの結果が出る。
@@ -728,6 +744,7 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 - **確かめる操作は「SSP を終了して起動し直す」で統一する** — 開発者用機能を有効にする前（1〜5 段目）でも使え、段階表の「確かめるための道具」に無い操作を足さない。
 - **例の名前は `my-ghost`** — フォルダ名と `name` を `my-ghost` で統一し、「自分の名前に置き換える」と指示する。空欄の形では、そのまま保存しても起動しない。
 - **辞書のコメント行は 1 段目で 1 行だけ示す** — 「`＃` で始まる行はコメントで、処理されない」と示し、文法章の「コメント」へ送る。要件 3.7 にただし書きを足した。段階表は変えない。
+- **語りの形と章の型を機械で検査する**（議題 1） — 段の章の 5 つの H2（`C-sections`）と、台詞以外の段落が指示の一文だけであること（`C-prose`）を `verify-content.mjs` で確かめる。要件 10.7・10.8 を足した。「台詞を読み飛ばしても事実が追える」（7.3）はレビューで見る。
 
 要件が設計に委ねた 4 項目は、次のとおり決めた（理由は `research.md` の Design Decisions）。
 
@@ -742,7 +759,6 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 
 下書きは、それぞれ「前提」のほうで書いてある。
 
-7. **見出しの型と地の文の機械検査** — 前提: 足さない（雛形・チェックリスト・レビューで見る）。別案: 段の章の H2 の 5 つを `verify-content.mjs` で検査する（内部設計パートの `I-sections` と同じ形）。
 5. **`pasta.dll` とシェルの入手の案内** — 前提: リリースページの `hello-pasta.nar` を SSP に入れ、そこから `pasta.dll` と `shell/master/` を自分のゴーストへ写す（`pasta.dll.zip` も入手先として併記）。別案: `pasta.dll` は `pasta.dll.zip` から、シェルは GitHub のリポジトリのフォルダから取る。
 1. **段の章の題に段の番号を入れるか** — 前提: 題は願いだけ（「しゃべらせたい」）。段の番号は入口の章の一覧と辞書のファイル名（`01-boot.pasta`）で示す。別案: 「1 段目：しゃべらせたい」。mdBook の目次は章に通し番号（1.3 など）を自動で振るので、題に段の番号を入れると番号が 2 つ並ぶ。
 9. **実機の通し読みの範囲** — 前提: 全 13 段を実機の SSP で 1 回たどる。別案: 道具を使う段（6・7・13）と準備の終わりだけを実機で確かめ、ほかは `cargo test -p pasta_sample_ghost` の保証に任せる。
