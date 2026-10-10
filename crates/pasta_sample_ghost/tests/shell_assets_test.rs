@@ -1,7 +1,7 @@
 //! シェルの素材の検証（hello-pasta-shell-art）。
 //!
 //! コミットした素材 `ghosts/hello-pasta/shell/master/`（立ち絵 18 枚と `surfaces.txt`）を
-//! 実ファイルのまま読み、枚数・寸法・透過・大きさ・サーフェス定義・当たり判定を検査する。
+//! 実ファイルのまま読み、枚数・寸法・透過・大きさ・サーフェス定義・当たり判定・画素の一致を検査する。
 //! ネットワーク・一時ディレクトリ・DLL は使わず、素材を書き換えない。
 //!
 //! `surfaces.txt` は小さなパーサで読む。行が足りない・順序が違う・座標が整数でないなど
@@ -19,6 +19,8 @@ const CANVAS: (u32, u32) = (333, 500);
 const MAX_PNG_BYTES: u64 = 250 * 1024;
 /// 立ち絵 18 枚の合計の上限（4.5 MB。KB・MB は 1024 進）
 const MAX_TOTAL_BYTES: u64 = 4_718_592;
+/// 顔の矩形を外へ広げる余白（ぼかし帯 + 縮小フィルタ）
+const MARGIN: u32 = 8;
 /// 女の子のサーフェス番号
 const SAKURA: [u32; 9] = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 /// 男の子のサーフェス番号
@@ -214,6 +216,44 @@ fn def(defs: &[SurfaceDef], id: u32) -> &SurfaceDef {
         .unwrap_or_else(|| panic!("surfaces.txt: surface{id} の定義が無い"))
 }
 
+/// 顔の領域（`Face` を `MARGIN` だけ外へ広げ、キャンバスに収めた矩形）
+fn face_area(face: &Rect) -> Rect {
+    Rect {
+        x1: face.x1.saturating_sub(MARGIN),
+        y1: face.y1.saturating_sub(MARGIN),
+        x2: (face.x2 + MARGIN).min(CANVAS.0 - 1),
+        y2: (face.y2 + MARGIN).min(CANVAS.1 - 1),
+    }
+}
+
+/// `within` の中で `except` のどれにも入らない画素（色とアルファ）を `a` と `b` で比べる。
+/// 違えば、最初に食い違った座標 `(x, y)` を返す。
+fn pixels_equal_outside(
+    a: &Rgba8,
+    b: &Rgba8,
+    within: &Rect,
+    except: &[Rect],
+) -> Result<(), (u32, u32)> {
+    for y in within.y1..=within.y2 {
+        for x in within.x1..=within.x2 {
+            let point = Rect {
+                x1: x,
+                y1: y,
+                x2: x,
+                y2: y,
+            };
+            if except.iter().any(|r| r.contains(&point)) {
+                continue;
+            }
+            let at = |img: &Rgba8| ((y * img.width + x) * 4) as usize;
+            if a.data[at(a)..at(a) + 4] != b.data[at(b)..at(b) + 4] {
+                return Err((x, y));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// 立ち絵は 0〜8・10〜18 の 18 枚だけ。欠番の `surface9.png` は「余分」として捕まえる。
 #[test]
 fn shell_has_exactly_18_surface_pngs_and_no_surface9() {
@@ -336,7 +376,7 @@ fn body_rect_is_identical_within_a_pose() {
     }
 }
 
-/// 矩形はキャンバス内（0 ≤ X1 < X2 ≤ 333、0 ≤ Y1 < Y2 ≤ 500）。`Face` は `Head` に含まれ、
+/// 矩形はキャンバス内（0 ≤ X1 < X2 ≤ 332、0 ≤ Y1 < Y2 ≤ 499。終点も画素の添字に使える）。`Face` は `Head` に含まれ、
 /// `Body` はどちらとも交わらない。
 #[test]
 fn collision_rects_are_face_inside_head_and_body_apart() {
@@ -344,7 +384,7 @@ fn collision_rects_are_face_inside_head_and_body_apart() {
         let id = d.id;
         for (name, r) in [("Face", d.face), ("Head", d.head), ("Body", d.body)] {
             assert!(
-                r.x1 < r.x2 && r.x2 <= CANVAS.0 && r.y1 < r.y2 && r.y2 <= CANVAS.1,
+                r.x1 < r.x2 && r.x2 < CANVAS.0 && r.y1 < r.y2 && r.y2 < CANVAS.1,
                 "surface{id} の {name} がキャンバス内の矩形でない: {r:?}"
             );
         }
@@ -366,5 +406,48 @@ fn collision_rects_are_face_inside_head_and_body_apart() {
             d.body,
             d.face
         );
+    }
+}
+
+/// 同じ人物の 9 枚は、`Head` の中で顔の領域の外の画素が「通常」（1・11）と同じ。
+#[test]
+fn head_pixels_outside_face_are_identical_across_nine_surfaces() {
+    let defs = load_defs();
+    for (ids, normal) in [(SAKURA, 1), (KERO, 11)] {
+        let d = def(&defs, normal);
+        let base = load_rgba(&shell_dir().join(png_name(normal)));
+        for id in ids {
+            let img = load_rgba(&shell_dir().join(png_name(id)));
+            if let Err((x, y)) = pixels_equal_outside(&img, &base, &d.head, &[face_area(&d.face)]) {
+                panic!(
+                    "surface{id} と surface{normal} で、頭（顔の領域の外）の画素が ({x},{y}) で食い違う"
+                );
+            }
+        }
+    }
+}
+
+/// 同じポーズの絵は、キャンバス全体で顔の領域の外の画素が、組の先頭の絵と同じ。
+#[test]
+fn pixels_outside_face_are_identical_within_a_pose() {
+    let defs = load_defs();
+    let canvas = Rect {
+        x1: 0,
+        y1: 0,
+        x2: CANVAS.0 - 1,
+        y2: CANVAS.1 - 1,
+    };
+    for pose in SAKURA_POSES.into_iter().chain(KERO_POSES) {
+        let first = pose[0];
+        let face = face_area(&def(&defs, first).face);
+        let base = load_rgba(&shell_dir().join(png_name(first)));
+        for &id in pose {
+            let img = load_rgba(&shell_dir().join(png_name(id)));
+            if let Err((x, y)) = pixels_equal_outside(&img, &base, &canvas, &[face]) {
+                panic!(
+                    "surface{id} と surface{first} で、顔の領域の外の画素が ({x},{y}) で食い違う"
+                );
+            }
+        }
     }
 }
