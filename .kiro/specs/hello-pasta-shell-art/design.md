@@ -464,7 +464,7 @@ flowchart LR
 - 形はすべて **rect**（楕円・多角形は使わない。座標が読めて、テストの領域計算が単純で、入門ガイドの読者が真似しやすい）。
 - **`Face` を `Head` の内側に重ねる。書く順は `Face` → `Head` → `Body`**（設計ディスカッション #5 で確定）。根拠は UKADOC `collision-sort` の既定（none）「ID によらず先に書かれている方が手前」。先に書いた `Face` が勝ち、残りの頭はすべて `Head` になるので、頬の横の髪や帽子を触っても部位名が空にならない（`research.md` §7.3）。`Face` = 眉の上から口の下・頬の端から端、`Head` = 頭全体（髪・帽子・頬の横・おさげの付け根まで。顔の矩形を含む）、`Body` = 首から胴の下端まで（足元は含めない。R4.7）。`Body` は `Head` とも `Face` とも重ねない。手本クローディアは `Head` と `Face` を重ねず、頬の横の髪を別 ID `Hair` で補っているが、本仕様は部位名を 3 つに決めたので重ねる形で同じ効果を得る。
 - 同じキャラクターの 9 ブロックで `Head`・`Face` の座標は同一。`Body` はポーズ（R1.9 の表）ごとに同一。座標はキャンバス内（0 ≤ X1 < X2 ≤ 333、0 ≤ Y1 < Y2 ≤ 500）。具体値は絵が決まってから決める（**【実装で確定】**）。
-- テストとの契約: `shell_assets_test` は `Face` の矩形を `MARGIN` だけ外へ広げた領域を「顔の領域」、`Head` の矩形から「顔の領域」を除いた画素を「頭の領域」として読む。したがって `Head` の矩形は、貼り合わせの切り線（`Y_CUT` を出力座標にしたもの）より `MARGIN` 以上、上で終わらせる。`Body` の矩形は切り線より `MARGIN` 以上、下から始める。順序の約束もテストが見る: 各ブロックの `collisionex0` が `Face`、`collisionex1` が `Head`、`collisionex2` が `Body`。`Face` は `Head` に完全に含まれ、`Body` はどちらとも交わらない。
+- テストとの契約: `shell_assets_test` は `Face` の矩形を `MARGIN` だけ外へ広げた領域を「顔の領域」、`Head` の矩形から「顔の領域」を除いた画素を「頭の領域」として読む。したがって `Head` の矩形は、体がポーズで違い始める行より上で終わらせ、`Face` を `MARGIN` 広げた範囲は、表情で実際に変わる画素をすべて覆う（実装の実測で訂正。下の「制約」）。`Body` の矩形は切り線より `MARGIN` 以上、下から始める。順序の約束もテストが見る: 各ブロックの `collisionex0` が `Face`、`collisionex1` が `Head`、`collisionex2` が `Body`。`Face` は `Head` に完全に含まれ、`Body` はどちらとも交わらない。
 - `surface9` と 19 以上は定義しない。`animation` は書かない（R2.7）。
 
 ### 検証
@@ -617,7 +617,14 @@ fn pixels_equal_outside(a: &Rgba8, b: &Rgba8, within: &Rect, except: &[Rect]) ->
 | 吹き出し offset ×4 | 333×500 | `descript.txt` | `descript.txt`、`integration_test.rs` |
 | 出力の変換 | 1024×1536 → 333×500 | `scale=290:435` + `pad=333:500:21:64`（確定 #3。2 人とも同じ） | 縮小、`art/README.md` |
 
-制約: `Face.y1 − MARGIN ≥ Head.y1`、`Head.y2 + MARGIN ≤ round(Y_CUT × 0.2832) + 64 − FEATHER × 0.2832`、`Body.y1 ≥ round(Y_CUT × 0.2832) + 64 + FEATHER × 0.2832 + MARGIN`。これにより、テストが「一致」を求める画素は構造上同じ元画素から作られる。
+制約（実装の実測で訂正・2026-10-10）: `Face.y1 − MARGIN ≥ Head.y1`、`Head.y2 ≤ 体がポーズで違い始める行 − 1`、`Face` を `MARGIN` 広げた範囲が「同じポーズの中で表情によって違う画素」の外接矩形を覆う、`Body.y1 ≥ round(Y_CUT × 0.2832) + 64 + FEATHER × 0.2832 + MARGIN`。これにより、テストが「一致」を求める画素は構造上同じ元画素から作られる。
+
+当初の式 `Head.y2 + MARGIN ≤ 切り線 − FEATHER × 0.2832` は安全側に倒しすぎで、口が顎のすぐ上にあるこの絵では `Face ⊂ Head` と両立しなかった。実測の値:
+
+| | 体が違い始める行 | 表情で違う画素の外接矩形 | 帰結 |
+|---|---|---|---|
+| 女の子 | 202 | x 118〜210・y 123〜206 | `Head.y2 ≤ 201`、`Face.x1 ≤ 126`・`Face.x2 ≥ 202`・`Face.y1 ≤ 131`・`Face.y2 ≥ 198` |
+| 男の子（`Y_CUT=556`） | 217 | x 122〜215・y 153〜221 | `Head.y2 ≤ 216`、`Face.x1 ≤ 130`・`Face.x2 ≥ 207`・`Face.y1 ≤ 161`・`Face.y2 ≥ 213` |
 
 ## Error Handling
 
