@@ -223,13 +223,14 @@ flowchart TB
 | 1.6 | 辞書の無い 13 段目も 1 章 | StageChapters | `13-nar.md`、TutorialCheck（ブロック無しを失敗にしない） |
 | 1.7 | 現状と食い違う記述を残さない | PrepChapters, StageChapters | `first-ghost.md` の削除、通しの確認 |
 | 2.1 | 動作環境・エディタ・UTF-8 | PrepChapters | `prerequisites.md`、`C-utf8`・`C-sjis`・`C-env` |
-| 2.2 | `pasta.dll` の入手先と `scripts/` の正しい説明 | PrepChapters | `prerequisites.md`・`setup.md` |
+| 2.2 | `pasta.dll` の入手先と `scripts/` の正しい説明 | PrepChapters | `prerequisites.md`・`setup.md`「hello-pasta から写す」 |
 | 2.3 | フォルダ構成と最小一式 | PrepChapters | `setup.md`「ゴーストのフォルダ構成」 |
-| 2.4 | シェルはそのまま使い、中身を転記しない | PrepChapters | `setup.md`「シェルを置く」 |
+| 2.4 | シェルはそのまま使い、中身を転記しない | PrepChapters | `setup.md`「hello-pasta から写す」 |
 | 2.5 | `pasta.toml` は `[actor]` だけが必須・`spot` の意味 | PrepChapters | `setup.md`「pasta.toml を書く」 |
 | 2.6 | 準備の終わりはしゃべらない・1 段目へ送る | PrepChapters | `setup.md`「SSP に入れて起動する」、実機の確認 |
 | 2.7 | 名前は読者が決める・`hello-pasta` は衝突する | PrepChapters | `setup.md`「名前を決める」 |
 | 2.8 | `sakura.name` は表示名・アクター名は `[actor]` | PrepChapters | `setup.md`「descript.txt を書く」 |
+| 2.9 | `hello-pasta.nar` から写す手順・ライセンス表示を一緒に置く | PrepChapters | `setup.md`「hello-pasta から写す」 |
 | 3.1 | 願いから起こし、新しい表現を説明 | StageChapters | 見出し「叶えたいこと」「新しく覚える表現」 |
 | 3.2 | 辞書 1 ファイルを 1 ブロックで逐語 | StageChapters, TutorialCheck | 見出し「辞書ファイルを足す」、`no-matching-block` |
 | 3.3 | 置き場所とファイル名・足すだけで次の段 | StageChapters | 見出し「辞書ファイルを足す」 |
@@ -308,7 +309,7 @@ flowchart TB
 |-----------|-------|--------|--------------|------------------|-----------|
 | AuthoringGuide | 規約 | 入門ガイドだけの書き方を第 8 節に定める | 3.7, 5.2, 6.3, 7.1, 7.3, 7.4, 7.5, 7.8, 8.1–8.7, 12.1 | 第 7 節（P0） | 文書 |
 | GuideIndex | 本文 | 進め方と 13 章の一覧、emo2 の紹介 | 1.1, 1.5, 6.1 | AuthoringGuide（P0） | 文書 |
-| PrepChapters | 本文 | 道具と約束、最小一式の配置 | 1.1, 1.7, 2.1–2.8, 11.4 | AuthoringGuide（P0）、`reference/pasta-toml.md`（P1） | 文書 |
+| PrepChapters | 本文 | 道具と約束、最小一式の配置 | 1.1, 1.7, 2.1–2.9, 11.4 | AuthoringGuide（P0）、`reference/pasta-toml.md`（P1） | 文書 |
 | StageChapters | 本文 | 13 段の章 | 1.1–1.3, 1.6, 1.7, 3.1–3.9, 4.1–4.12, 5.1–5.3, 6.1, 6.2, 12.3 | 段階表・段階辞書（P0）、AuthoringGuide（P0） | 文書 |
 | Navigation | 導線 | 目次・表紙・転送・README | 1.2, 1.4, 11.1–11.4 | GuideIndex・PrepChapters（P0） | 設定 |
 | TutorialCheck | ツール | 辞書と同じ名前の章の作例を照合 | 1.6, 3.2, 3.9, 6.2, 9.1–9.11, 10.8 | 段階辞書・入門の章（P0） | Service, Batch |
@@ -391,14 +392,14 @@ flowchart TB
 | Field | Detail |
 |-------|--------|
 | Intent | 1 段目の辞書を 1 ファイル足すだけで起動する状態まで、読者を連れていく |
-| Requirements | 1.1, 1.7, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 11.4 |
+| Requirements | 1.1, 1.7, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 11.4 |
 
 `prerequisites.md`（題「前提環境と準備」。今の技術的内容を落とさない）:
 
 | H2 | 内容 | 要件 |
 |----|------|------|
 | 動作環境 | Windows・SSP（表）。用語（ベースウェア）は箇条書き | 2.1 |
-| 必要なもの | テキストエディタ、`pasta.dll`。入手先はリリースページ（<https://github.com/ekicyou/pasta/releases>）。Lua ランタイムは `pasta.dll` の中にあり、`scripts/` は自分のスクリプトを置く場所である | 2.1, 2.2 |
+| 必要なもの | テキストエディタ、`pasta.dll`。入手先はリリースページ（<https://github.com/ekicyou/pasta/releases>）の `hello-pasta.nar`（完成版のゴースト一式。`pasta.dll`・`THIRD_PARTY_LICENSES.txt`・シェルを含む）。`pasta.dll` だけを入れ替えるときの入手先として `pasta.dll.zip` を 1 行添える。Lua ランタイムは `pasta.dll` の中にあり、`scripts/` は自分のスクリプトを置く場所である | 2.1, 2.2 |
 | 文字コードは必ず UTF-8 | UTF-8 の約束、BOM、Shift_JIS の辞書から移すときの注意 | 2.1 |
 
 - `C-utf8`・`C-sjis`・`C-env` は入門の全章を連結して `UTF-8`・`Shift_JIS`・`Windows`・`SSP` の語を探す。この章がそれを満たし続ける。
@@ -407,13 +408,12 @@ flowchart TB
 
 | H2 | 内容 | 要件 |
 |----|------|------|
-| ゴーストのフォルダ構成 | フォルダの図（`text`）と役割の表。最小一式は `install.txt`・`ghost/master/descript.txt`・`ghost/master/pasta.toml`・`ghost/master/pasta.dll`・`shell/master/`。`dic/` はまだ空。**見出しの文言を変えない**（README が `#ゴーストのフォルダ構成` を指す） | 2.3, 11.4 |
+| ゴーストのフォルダ構成 | フォルダの図（`text`）と役割の表。最小一式は `install.txt`・`ghost/master/descript.txt`・`ghost/master/pasta.toml`・`ghost/master/pasta.dll`・`ghost/master/THIRD_PARTY_LICENSES.txt`・`shell/master/`。`dic/` はまだ空。**見出しの文言を変えない**（README が `#ゴーストのフォルダ構成` を指す） | 2.3, 11.4 |
 | 名前を決める | フォルダ名・`install.txt` の `name`・`directory`・`descript.txt` の `name` を読者が決める。`hello-pasta` を使うと、配布版と同じ SSP に入れたとき衝突する。`craftman`・`craftmanw` も読者のものにする | 2.7 |
 | install.txt を書く | 転記（`text`）。名前の行は例の名前で示し、置き換えを指示する | 2.3, 2.7 |
 | descript.txt を書く | 転記（`text`）。`shiori,pasta.dll`。`sakura.name`・`kero.name` は表示名で、辞書で呼ぶアクター名は `pasta.toml` の `[actor]` で決まる | 2.3, 2.8 |
 | pasta.toml を書く | `[actor]` だけの最小構成（`toml`）。起動に必須なのは `[actor]` だけ。`spot` の意味。アクター名は辞書と合わせて `女の子`・`男の子` のままにする。詳しくは `reference/pasta-toml.md` へ | 2.5 |
-| pasta.dll を置く | `ghost/master/` に置く。`scripts/` は作らなくてよい | 2.2 |
-| シェルを置く | hello-pasta のシェル（`shell/master/`）をフォルダごとそのまま使う。置き場所へ案内し、`descript.txt`・`surfaces.txt` の中身は書き写さない | 2.4 |
+| hello-pasta から写す | 番号付きの手順: (1) リリースページの `hello-pasta.nar` を SSP のウィンドウへドロップして入れる (2) SSP の `ghost/hello-pasta/` を開く (3) `ghost/master/pasta.dll`・`ghost/master/THIRD_PARTY_LICENSES.txt`・`shell/master/`（フォルダごと）を、自分のゴーストの同じ場所へ写す。`THIRD_PARTY_LICENSES.txt` は `pasta.dll` が含むソフトウェアのライセンス表示で、ゴーストを配布するとき一緒に配る。`scripts/` は作らなくてよい。シェルの `descript.txt`・`surfaces.txt` の中身は書き写さない。入れた hello-pasta は完成版の見本としてそのまま残す | 2.2, 2.4, 2.9 |
 | SSP に入れて起動する | SSP のゴーストのフォルダへ置き、切り替える。辞書が無いので、立ち絵は出るがしゃべらない。これが準備の終わりの状態で、次は 1 段目 | 2.6 |
 | うまく起動しないときは | 文字化け・何も表示されない・辞書が反映されない、の 3 つ（今の `first-ghost.md` の内容を移す） | 1.7 |
 
@@ -745,6 +745,7 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 - **例の名前は `my-ghost`** — フォルダ名と `name` を `my-ghost` で統一し、「自分の名前に置き換える」と指示する。空欄の形では、そのまま保存しても起動しない。
 - **辞書のコメント行は 1 段目で 1 行だけ示す** — 「`＃` で始まる行はコメントで、処理されない」と示し、文法章の「コメント」へ送る。要件 3.7 にただし書きを足した。段階表は変えない。
 - **語りの形と章の型を機械で検査する**（議題 1） — 段の章の 5 つの H2（`C-sections`）と、台詞以外の段落が指示の一文だけであること（`C-prose`）を `verify-content.mjs` で確かめる。要件 10.7・10.8 を足した。「台詞を読み飛ばしても事実が追える」（7.3）はレビューで見る。
+- **`pasta.dll` とシェルは `hello-pasta.nar` から写す**（議題 2） — `hello-pasta.nar` を SSP に入れ、`ghost/hello-pasta/` から `pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`shell/master/` を写す。入手先が 1 つで済み、完成版が見本として手元で動く。最小一式に `THIRD_PARTY_LICENSES.txt` を足した（要件 2.3・2.9）。nar を展開して写す案、`pasta.dll.zip` とリポジトリから別々に取る案は採らない。
 
 要件が設計に委ねた 4 項目は、次のとおり決めた（理由は `research.md` の Design Decisions）。
 
@@ -759,7 +760,6 @@ CI（`manual.yml`）の既存の段が、失敗で公開を止める。新しい
 
 下書きは、それぞれ「前提」のほうで書いてある。
 
-5. **`pasta.dll` とシェルの入手の案内** — 前提: リリースページの `hello-pasta.nar` を SSP に入れ、そこから `pasta.dll` と `shell/master/` を自分のゴーストへ写す（`pasta.dll.zip` も入手先として併記）。別案: `pasta.dll` は `pasta.dll.zip` から、シェルは GitHub のリポジトリのフォルダから取る。
 1. **段の章の題に段の番号を入れるか** — 前提: 題は願いだけ（「しゃべらせたい」）。段の番号は入口の章の一覧と辞書のファイル名（`01-boot.pasta`）で示す。別案: 「1 段目：しゃべらせたい」。mdBook の目次は章に通し番号（1.3 など）を自動で振るので、題に段の番号を入れると番号が 2 つ並ぶ。
 9. **実機の通し読みの範囲** — 前提: 全 13 段を実機の SSP で 1 回たどる。別案: 道具を使う段（6・7・13）と準備の終わりだけを実機で確かめ、ほかは `cargo test -p pasta_sample_ghost` の保証に任せる。
 

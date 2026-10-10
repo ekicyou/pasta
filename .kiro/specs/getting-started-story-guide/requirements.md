@@ -55,12 +55,13 @@ pasta の利用者マニュアル（`book/`）の入門ガイド（`book/src/get
 #### Acceptance Criteria
 1. The 準備の章 shall 動作環境（Windows・SSP）・テキストエディタ・UTF-8 の約束を、今の `prerequisites.md` の技術的内容を落とさずに示す。
 2. The 準備の章 shall `pasta.dll` の入手先を案内し、Lua ランタイムが `pasta.dll` の中にあって `scripts/` は利用者が自分のスクリプトを置く場所であることを正しく示す。
-3. The 準備の章 shall ゴーストのフォルダ構成と、1 段目より前に置く最小一式（`install.txt`・`ghost/master/descript.txt`・`ghost/master/pasta.toml`・`pasta.dll`・シェル）を示す。
+3. The 準備の章 shall ゴーストのフォルダ構成と、1 段目より前に置く最小一式（`install.txt`・`ghost/master/descript.txt`・`ghost/master/pasta.toml`・`pasta.dll`・`THIRD_PARTY_LICENSES.txt`・シェル）を示す。
 4. The 準備の章 shall シェルについて「hello-pasta のシェルをそのまま使う」と案内して置き場所へ送り、`shell/master/descript.txt`・`surfaces.txt` の中身を本文に書き写さない。
 5. The 準備の章 shall `pasta.toml` について、起動に必須なのが `[actor]` だけであることと、各アクターの `spot` の意味を示す。
 6. The 準備の章 shall 準備の終わりの状態（辞書が無いので起動してもしゃべらないこと）を読者に伝え、1 段目へ送る。
 7. The 準備の章 shall `install.txt`・`ghost/master/descript.txt` の `name` を読者自身が決めた名前にさせ（`craftman`・`craftmanw` も読者のものに置き換えさせ）、`hello-pasta` を使うと配布版と同じ SSP に入れたとき名前が衝突することを伝える。
 8. The 準備の章 shall `sakura.name`・`kero.name` が表示名であり、辞書の中で呼ぶアクター名は `pasta.toml` の `[actor]` で決まることを示す。
+9. The 準備の章 shall `pasta.dll`・`THIRD_PARTY_LICENSES.txt`・シェルの入手を、リリースページの `hello-pasta.nar` を SSP に入れてそのフォルダから写す手順で案内し、`THIRD_PARTY_LICENSES.txt` は `pasta.dll` と同じ場所に置いてゴーストを配布するとき一緒に配るものであることを伝える。
 
 ### Requirement 3: 段の章の共通の型
 
@@ -198,6 +199,8 @@ pasta の利用者マニュアル（`book/`）の入門ガイド（`book/src/get
 brief.md で決めきれなかった点は、2026-10-10 の要件ディスカッションで「閉じた項目」のとおり決めた。設計フェーズに委ねた項目も、設計書（`design.md`）で決めた。
 
 ### 閉じた項目
+
+- **`pasta.dll` とシェルの入手**（Requirement 2.3・2.9、設計の議題 2）: `hello-pasta.nar` を SSP に入れ、そこから `pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`shell/master/` を写す手順に決定（2026-10-10）。`pasta.dll.zip` は `pasta.dll` だけを入れ替えるときの入手先として添える。
 
 - **語りの形と章の型の機械検査**（Requirement 10.7・10.8、設計の議題 1）: 見出しの型と地の文の段落の両方を本文検査で確かめると決定（2026-10-10）。指示を二文以上で書きたいときは箇条書きにする。「台詞を読み飛ばしても事実が追える」（7.3）は機械では見ず、レビューで見る。
 
