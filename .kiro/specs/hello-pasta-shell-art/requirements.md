@@ -33,13 +33,13 @@
   - `hello-pasta-tutorial-stages`（完了）・`getting-started-story-guide`（完了）: 8 段目の辞書（`dic/08-touch.pasta`）と章（`book/src/getting-started/08-touch.md`）は逐語で照合される。頭の部位名を `Head` のまま確定すれば、辞書・章・`book/tools/` は触らない。
   - `getting-started-screenshots`（後続）: 新しい立ち絵が入った後にスクリーンショットを撮る。本仕様はスクリーンショットを撮らない。
 
-## 未確定事項（要件ディスカッションで開発者が決める）
+## 未確定事項（要件ディスカッションで開発者が決める。確定したものは「【確定】」と記す）
 
 brief の Constraints が「要件定義の初めに決める」と定めた 4 点と、起草中に見つかった事項。各項目は下の要件に【仮定】として織り込んである。決定が変われば、該当する受け入れ基準を書き換える。
 
 | # | 事項 | 本書の仮定 |
 | --- | --- | --- |
-| Q1 | ライセンス表記の食い違い（ルートの `LICENSE` は MIT の全文のみ。`Cargo.toml`・4 つのクレート README・`tech.md` は「MIT OR Apache-2.0」。一方 `about.hbs` の「pasta 自体は MIT License」・`editors/vscode/package.json` の `"license": "MIT"` は MIT 単独） | Apache-2.0 の全文を `LICENSE-APACHE` として足し、既存の `LICENSE`（MIT）は `LICENSE-MIT` に改名して、表記「MIT OR Apache-2.0」を正とする（crates.io に公開済みのメタデータを変えない）。`about.hbs`・`package.json` の MIT 単独表記は本仕様では触らず、議論で扱いを決める |
+| Q1 | ライセンス表記の食い違い（ルートの `LICENSE` は MIT の全文のみ。`Cargo.toml`・4 つのクレート README・`tech.md` は「MIT OR Apache-2.0」。一方 `about.hbs` の「pasta 自体は MIT License」・`editors/vscode/package.json` の `"license": "MIT"` は MIT 単独） | **【確定 2026-10-10】** このリポジトリで開発したものは MIT 単独。表記を MIT に揃える（ルートの `Cargo.toml` L12・`pasta_check`/`pasta_dsl`/`pasta_lsp`/`pasta_sample_ghost` の README・`tech.md` L165 の「MIT OR Apache-2.0」を直す）。`LICENSE`（MIT）はそのまま。`LICENSE-APACHE` は作らない。`about.hbs`・`package.json` は既に MIT なので触らない。公開済みの版が持つ「MIT OR Apache-2.0」は取り消せない（過去の版の許諾はそのまま） |
 | Q2 | 「Rust で生成・外部素材不要」の方針をやめ、外部素材（コミットした絵）を持つ方針に変える | 変える。絵を描くプログラム・生成 API・CLI・`image`/`imageproc` は取り外す |
 | Q3 | 生成元（モデル名・手順）を同梱物に記録するか | リポジトリ内の記録（クレート README と生成の記録）に置き、配布物 `.nar` には入れない |
 | Q4 | 当たり判定の部位名 | 頭は `Head` で確定（ウェーブの約束）。それ以外は `Face`・`Bust` を候補とするが、8 段目の台詞がそのまま読み上げる（「えへへ……Bust なでなで？」）ので、台詞として不自然でない名前にする。候補の確定は議論で行う |
@@ -52,7 +52,7 @@ brief の Constraints が「要件定義の初めに決める」と定めた 4 �
 | Q11 | 立ち絵の寸法 | 幅 150〜300 px の範囲で、2 人とも同じ幅・高さにする。具体値は試作の結果で設計が決める |
 | Q12 | 生成の費用の上限 | 試作 1 ドル未満・全体 20 ドル以内 |
 | Q13 | `STAGES.md` 7 段目の「使う文法要素」に `＞ゴースト終了` を足すか（`getting-started-story-guide` からの申し送り） | 本仕様では足さない（ウェーブの約束で `STAGES.md` は部位名の注記と 8 段目の行だけ触る） |
-| Q14 | 生成した絵のライセンス表示 | 絵はリポジトリと同じ「MIT OR Apache-2.0」で配布し、AI 生成物であることとモデル名を記録に明記する。`THIRD_PARTY_LICENSES.txt`（`pasta.dll` の依存の表示）には載せない |
+| Q14 | 生成した絵のライセンス表示 | 絵はリポジトリと同じ MIT で配布する（Q1 確定に従う）。AI 生成物であることとモデル名を記録に明記する。`THIRD_PARTY_LICENSES.txt`（`pasta.dll` の依存の表示）には載せない |
 
 ## Requirements
 
@@ -156,8 +156,8 @@ brief の Constraints が「要件定義の初めに決める」と定めた 4 �
 
 1. The リポジトリ shall 立ち絵の生成の記録（使ったサービスとモデル名、基準画像の作り方、表情ごとの編集の指示、seed と寸法、切り抜きと縮小の後処理、試作の実測の結果、生成した日付、費用）を、`crates/pasta_sample_ghost/` 配下の文書として持つ（【仮定 Q7】文書として残し、再実行スクリプトは作らない）。
 2. The リポジトリ shall 生成の記録に、絵が AI 生成物であることと、著作権の扱いに関する注記（USCO の報告書 Part 2 の見解・日本法での扱いは未確認）を記す。
-3. The リポジトリ shall 立ち絵のライセンスを、リポジトリと同じ「MIT OR Apache-2.0」として生成の記録とクレート README に記す（【仮定 Q14】）。
-4. The リポジトリ shall ルートに Apache-2.0 の全文（`LICENSE-APACHE`）を持ち、`Cargo.toml`・各クレートの README・`tech.md` の表記「MIT OR Apache-2.0」と、ルートのライセンスのファイルの中身を一致させる（【仮定 Q1】既存の MIT の全文は `LICENSE-MIT` に改名する）。
+3. The リポジトリ shall 立ち絵のライセンスを、リポジトリと同じ MIT として生成の記録とクレート README に記す（Q14。Q1 の確定に従う）。
+4. The リポジトリ shall ライセンスの表記を MIT 単独に揃える。具体的には、ルートの `Cargo.toml` の `license`・`pasta_check`/`pasta_dsl`/`pasta_lsp`/`pasta_sample_ghost` の README・`tech.md` の「MIT OR Apache-2.0」を「MIT」に改め、ルートの `LICENSE`（MIT の全文）と食い違わないようにする（Q1 確定。`LICENSE-APACHE` は作らない）。
 5. The リポジトリ shall 生成に使ったモデルの重みのライセンスと、出力の利用条件（透かしの有無を含む）を、生成の記録に出典付きで記す。
 6. The 配布物 `hello-pasta.nar` shall 生成の記録を含めない（【仮定 Q3】記録はリポジトリに置く）。
 7. The 開発者 shall 重みのライセンスが非商用、または出力の扱いが曖昧なモデル（FLUX.1 Kontext [dev] 系など）を使わない。
