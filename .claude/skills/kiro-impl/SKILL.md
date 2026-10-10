@@ -219,7 +219,9 @@ For tasks that add or change behavior, enforce RED → GREEN with a feature flag
 
 **Skip this protocol for**: refactoring, configuration, documentation, or tasks with no behavioral change.
 
-## Coordination with kiro-watch (only when the coordinator is running)
+## Coordination with kiro-watch (SUSPENDED)
+
+> **SUSPENDED (developer, 2026-10-10)**: kiro-watch operation is paused. Skip this whole section even if a session titled `kiro-watch` is running: do not look for the coordinator, do not send it any message (no join, no load-test request, no leave), and do not wait for or act on its messages. Run load tests without requesting the desk. The text below is kept only for when operation resumes; do not execute it until this notice is removed.
 
 When a session titled **kiro-watch** (not archived) appears in the session list (`mcp__ccd_session_mgmt__list_sessions`), this session takes part in its desk coordination (developer, 2026-10-08). If there is no such session, skip this whole section. Send to its `local_...` id with SendMessage (or `mcp__ccd_session_mgmt__send_message`). Message texts stay in Japanese exactly as below; `repo:` is always `pasta`.
 
