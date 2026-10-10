@@ -144,5 +144,6 @@
 - 6.3 の実測: `hello-pasta.nar` は 3,744,206 バイト（表示 3.57 MB。上限 7 MB）、エントリ 40 個。シェルの絵 18 枚の合計は 1,732,591 バイト（上限 4.5 MB）、最大の 1 枚は `surface3.png` の 111,273 バイト（上限 250 KB）。`.nar` に `art/` のファイル・設定画像・絵のライセンス表示は入っていない。
 - 6.3 の補足: `.nar` に入る `surfaces.txt`・`descript.txt` の改行は、チェックアウトの設定で決まる（`core.autocrlf=true` の手元では CRLF。既存の挙動）。`cargo test` は `crates/pasta_lua/tests/fixtures/sample.generated.lua` を改行だけ書き換えるので、そのファイルだけ戻す。
 - 最終検証（2026-10-11）: 判定は GO（Critical 0）。指摘を受けて、設計書の古い記述（貼り合わせの `pngjs`・男の子の参照画像・Q5→Q11・`.nar` の見込み）と、クレート README の「小さなコック帽」（絵は設計 #3 で決めた正統なコック帽）を直した。
-- 残り（開発者の許可が要る）: `.claude/skills/pasta-check/SKILL.md` の 86〜93 行と 112 行が旧 7 段の番号のまま（「2. ゴースト固有の成果物生成」「release.ps1 の段 5」。今は 6 段で、`pasta.dll.zip` は段 4）。スキルの編集は許可が要るので未対応。
+- `.claude/skills/pasta-check/SKILL.md` のリリースの段の図と番号を 6 段に合わせた（開発者の許可を得て 2026-10-11 に編集。`pasta.dll.zip` は段 4）。
+- 開発者の決定（2026-10-11）: 不可視の透かし（SynthID）は受け入れる（AI 生成であることを隠す意図は無い）。出力の帰属と利用条件は問題なしと判断する（要件 8.7 に反しない）。
 - 完了処理（`kiro-complete`）で行うこと: 5.8 の steering の同期（`structure.md`・`tech.md` の「画像生成」「image/imageproc」）、`roadmap.md` の「本線は qwen・切り抜きは BiRefNet」の記述、`spec.json` の phase、`getting-started-screenshots`・`manual-shell-guide` への申し送り（絵の表の書き方・表がくっついて見える点・Unlicense の説明・顔の中央は `Face` が返ること）。
