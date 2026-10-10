@@ -29,7 +29,7 @@ Pasta DSL を Lua にトランスパイルし、Lua VM 上で実行するため�
 - `scriptlibs/` — 外部 Lua ライブラリ
 - `profile/pasta/` — 実行時に作られる領域（同梱スクリプトの自己展開先、トランスパイル結果のキャッシュ、保存データ、ログ）
 
-ゴーストのフォルダ構成は [最初のゴーストを作る](https://ekicyou.github.io/pasta/getting-started/first-ghost.html#ゴーストのフォルダ構成)、辞書ファイルの検出パターンと `.lua` の扱いは [pasta_patterns](https://ekicyou.github.io/pasta/reference/pasta-toml.html#pasta_patterns) を参照してください。検出とモジュール名の生成の仕組みは [内部設計: ファイル検出](https://ekicyou.github.io/pasta/internals/loader.html#ファイル検出)・[モジュール名の生成](https://ekicyou.github.io/pasta/internals/loader.html#モジュール名の生成) にあります。
+ゴーストのフォルダ構成は [ゴーストの最小一式を置く](https://ekicyou.github.io/pasta/getting-started/setup.html#ゴーストのフォルダ構成)、辞書ファイルの検出パターンと `.lua` の扱いは [pasta_patterns](https://ekicyou.github.io/pasta/reference/pasta-toml.html#pasta_patterns) を参照してください。検出とモジュール名の生成の仕組みは [内部設計: ファイル検出](https://ekicyou.github.io/pasta/internals/loader.html#ファイル検出)・[モジュール名の生成](https://ekicyou.github.io/pasta/internals/loader.html#モジュール名の生成) にあります。
 
 ## 設定ファイル（pasta.toml）
 

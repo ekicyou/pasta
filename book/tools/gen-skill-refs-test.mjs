@@ -596,7 +596,7 @@ function legacyBodyRange(text) {
   const src = path.join(REPO_ROOT, 'book/src');
   const chapters = listMarkdownFiles(src).map((f) => path.relative(src, f).split(path.sep).join('/'))
     .filter((c) => c !== 'SUMMARY.md').sort();
-  check('K-10 実リポジトリの章を 47 章見つける', chapters.length === 47, String(chapters.length));
+  check('K-10 実リポジトリの章を 60 章見つける', chapters.length === 60, String(chapters.length));
   for (const ch of chapters) {
     const text = fs.readFileSync(path.join(src, ch), 'utf8');
     const e = thrown(() => chapterRegions(text, ch));

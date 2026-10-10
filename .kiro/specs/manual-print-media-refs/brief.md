@@ -115,3 +115,11 @@
   - ロードマップのバックログの項目は、代わりのリンクも壊れていると書いているが、壊れているのは `<video>` の `src` だけである（上の Current State）。
   - `verify-static.mjs` の例外のコメント（248 行）は「印刷ビューで動画は用途外」と書いている。このspecはその判断を改め、`print.html` でも動画が働くことを条件にする。
   - `book/src/introduction.md` 6 行にも生の HTML の `<img>` があるが、出力の根にあるページなので、`print.html` と同じ場所から参照が解決する。対象にしない。
+
+## 申し送り（getting-started-story-guide より・2026-10-10）
+
+本文の spec が完了した。
+
+- **`manual.yml` のコメントが古い**: 114 行目あたりの「`book/src/getting-started/first-ghost.md` の ```pasta 成果物ブロックが…」は、もう合わない。`first-ghost.md` は消え、`tutorial-check.mjs` は段の章 12 枚（`01-boot.md`〜`12-lua.md`）を、同じ名前の辞書とそれぞれ照合する。`manual.yml` はこのウェーブでこの spec が持つので、触るついでにコメントを直す（手順そのものは変えなくてよい）。
+- **`book/AUTHORING.md` はもう空いている**: 議題 2 の「`AUTHORING.md` はこのウェーブでは触れない」は、本文の spec の完了で外れた。行番号はずれた（第 8 節が足された。「CI と同じ順」の記述は 463 行目あたり）。
+- **`link-check.mjs` は、本の中のリンクの見出し（`#…`）を見ない**: 別に起票した。この spec の範囲ではない。

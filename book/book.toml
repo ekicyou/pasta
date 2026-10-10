@@ -18,6 +18,7 @@ additional-js = ["theme/claudia.js"]
 
 [output.html.redirect]
 "/lua/modules.html" = "modules/index.html"
+"/getting-started/first-ghost.html" = "index.html"
 
 [output.html.search]
 enable = true

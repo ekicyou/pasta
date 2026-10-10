@@ -9,11 +9,12 @@
  *   book.js の End は最後の li のボタンへ移るが、末尾は隠れた項目なので、見えている最後の項目（Navy）へ移し直す。
  *
  * してはいけないこと（design「Security Considerations」）:
- *   外部への通信、保存してある設定値（テーマの保存値を含む）の読み書き、要素の追加や削除をしない。
+ *   外部への通信、保存してある設定値（テーマの保存値を含む）の書き込み、要素の追加や削除をしない。
+ *   保存値は、目次の持ち越し（末尾の claudiaSidebarKeep）が目次の mdbook-sidebar を読むだけで、書かない。
  *   項目は消さずに移すだけなので、保存値が rust・coal・ayu でも book.js はそのまま適用する（要件 2.4）。
  *   テーマの保持と初回表示は book.js と book.toml のまま（要件 2.5・2.6）。
  *
- * 検査: book/tools/theme-menu-test.mjs（jsdom）。
+ * 検査: book/tools/theme-menu-test.mjs・book/tools/theme-sidebar-test.mjs（jsdom）。
  */
 (function claudiaThemeMenu() {
     'use strict';
@@ -54,4 +55,48 @@
             }
         }
     });
+})();
+
+/*
+ * 目次の持ち越し（getting-started-story-guide タスク 2.4、要件 13、design「SidebarKeeper」）。
+ *
+ * mdBook 0.5.x は、幅 1080px 未満では保存値（localStorage の mdbook-sidebar）を見ずに、毎回目次を閉じて始める。
+ * 一方で book.js は、幅に関係なく開閉のたびに保存値を visible／hidden に書く。
+ * そこで、幅 620px 以上 1080px 未満で保存値が visible のときだけ、閉じて始まった目次を開き直す。
+ * 620px 未満（開いた目次が本文を画面の外へ押し出す幅）と 1080px 以上（mdBook が保存値どおりにする幅）には触れない。
+ *
+ * 開く手順は book.js に任せる（チェックボックスの change で、クラス・ARIA 属性・リンクの tabIndex・保存値がそろう）。
+ * 目次の要素の判定は保存値を読むより前に行う（目次の無いページでは保存値に触れない）。
+ */
+(function claudiaSidebarKeep() {
+    'use strict';
+
+    var checkbox = document.getElementById('mdbook-sidebar-toggle-anchor');
+    var sidebar = document.getElementById('mdbook-sidebar');
+    if (!checkbox || !sidebar || checkbox.checked) {
+        return;
+    }
+    var width = document.body.clientWidth;
+    if (width < 620 || width >= 1080) {
+        return;
+    }
+    var stored;
+    try {
+        stored = localStorage.getItem('mdbook-sidebar');
+    } catch (e) {
+        return;
+    }
+    if (stored !== 'visible') {
+        return;
+    }
+
+    // 開くときのアニメーションを出さない（chrome.css は html:not(.sidebar-resizing) のときだけ目次を動かす）
+    var html = document.documentElement;
+    html.classList.add('sidebar-resizing');
+    sidebar.style.display = '';
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event('change'));
+    // 開いた位置を確定させてから外す（確定の前に外すと、外した後の描画でアニメーションが出る）
+    void sidebar.offsetHeight;
+    html.classList.remove('sidebar-resizing');
 })();
