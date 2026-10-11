@@ -2637,3 +2637,246 @@ describe("SAKURA_BUILDER - paragraph-break-tag-only-talk: 字の無いトーク�
         expect(result):toBe("\\p[0]A1\\p[1]B1\\p[0]\\s[5]\\p[1]\\n[150]B2\\p[0]\\n[150]A2\\e")
     end)
 end)
+
+-- ============================================================================
+-- choice-line-layout: 選択肢の行の配置（Task 2.1）
+-- 選択肢の前と、選択肢の後の台詞の前に出す行の区切りを完全一致で固定する。
+-- 既定設定（script_wait_normal=50 → 実効ウェイト 0）で句読点の無いテキストを使い、ウェイトを入れない。
+-- スポットは さくら=0・うにゅう=1 を明示する（スポット共有の復旧タグを出さない）。
+-- ============================================================================
+
+describe("SAKURA_BUILDER - choice-line-layout: 選択肢の行の配置（Task 2.1）", function()
+    local function group(actor, inner_tokens)
+        return { type = "actor", actor = actor, tokens = inner_tokens }
+    end
+    local function talk(actor, text)
+        return { type = "talk", actor = actor, text = text }
+    end
+    local function spots()
+        return { ["さくら"] = 0, ["うにゅう"] = 1 }
+    end
+
+    -- 本体を直す前に置いた特性化（台詞の中の \q は talk として通り、選択肢の区切りの対象にならない）
+    test("3.4: 台詞の中に手で書いた \\q[…]・\\__q[…] だけの出力は変わらない", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local result = BUILDER.build({
+            group(a, {
+                talk(a, "どれ"),
+                talk(a, "\\q[はい,OnYes]"),
+                talk(a, "\\q[いいえ,OnNo]"),
+                talk(a, "つづき"),
+            }),
+        }, {}, spots())
+        expect(result):toBe("\\p[0]どれ\\q[はい,OnYes]\\q[いいえ,OnNo]つづき\\e")
+
+        -- 1 つの台詞に改行つきで書く形と、\__q の形
+        local inline = BUILDER.build({
+            group(a, { talk(a, "どれ\\n\\q[はい,OnYes]\\n\\__q[OnNo]いいえ\\__q") }),
+        }, {}, spots())
+        expect(inline):toBe("\\p[0]どれ\\n\\q[はい,OnYes]\\n\\__q[OnNo]いいえ\\__q\\e")
+    end)
+
+    -- 選択肢のトークンと、その出力（タグの中身は変えない。3.1）
+    local function choice(display)
+        return { type = "choice", display = display, target = display .. "先" }
+    end
+    local Q1 = "\\![*]\\q[甲,甲先]"
+    local Q2 = "\\![*]\\q[乙,乙先]"
+
+    test("2.1/2.2/2.9/2.11: 字 → 選択肢 → 選択肢で \\n[150] と \\n が選択肢の直前に 1 つずつ出る", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local result = BUILDER.build({
+            group(a, { talk(a, "どれ"), choice("甲"), choice("乙") }),
+        }, {}, spots())
+        expect(result):toBe("\\p[0]どれ\\n[150]" .. Q1 .. "\\n" .. Q2 .. "\\e")
+    end)
+
+    test("2.3: 吹き出しの最初の選択肢は区切らない（選択肢だけ・clear の直後・別の吹き出しにだけ字）", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+
+        local only = BUILDER.build({ group(a, { choice("甲") }) }, {}, spots())
+        expect(only):toBe("\\p[0]" .. Q1 .. "\\e")
+
+        local cleared = BUILDER.build({
+            group(a, { talk(a, "どれ"), { type = "clear" }, choice("甲") }),
+        }, {}, spots())
+        expect(cleared):toBe("\\p[0]どれ\\c" .. Q1 .. "\\e")
+
+        local other = BUILDER.build({
+            group(b, { talk(b, "はい") }),
+            group(a, { choice("甲") }),
+        }, {}, spots())
+        expect(other):toBe("\\p[1]はい\\p[0]" .. Q1 .. "\\e")
+    end)
+
+    test("2.4: 表情・ウェイト・choice_timeout・raw_script が挟まっても区切りの数と幅は変わらない", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local function noise()
+            return { type = "surface", id = 5 }, { type = "wait", ms = 100 },
+                { type = "choice_timeout", seconds = 10 }, { type = "raw_script", text = "\\![open,notepad]" }
+        end
+        local NOISE = "\\s[5]\\_w[100]\\![set,choicetimeout,10000]\\![open,notepad]"
+
+        local tokens = { talk(a, "どれ") }
+        for _, t in ipairs({ noise() }) do tokens[#tokens + 1] = t end
+        tokens[#tokens + 1] = choice("甲")
+        for _, t in ipairs({ noise() }) do tokens[#tokens + 1] = t end
+        tokens[#tokens + 1] = choice("乙")
+
+        local result = BUILDER.build({ group(a, tokens) }, {}, spots())
+        expect(result):toBe("\\p[0]どれ" .. NOISE .. "\\n[150]" .. Q1 .. NOISE .. "\\n" .. Q2 .. "\\e")
+    end)
+
+    test("2.5/2.11: 選択肢の後の字の直前に \\n が 1 つ出て、続く字の前には出ない", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local result = BUILDER.build({
+            group(a, { talk(a, "選んで"), choice("甲"), talk(a, "つづき"), talk(a, "おわり") }),
+        }, {}, spots())
+        expect(result):toBe("\\p[0]選んで\\n[150]" .. Q1 .. "\\nつづきおわり\\e")
+    end)
+
+    test("2.8: 字の後の選択肢の前の幅は choice_newlines で決まり、spot_newlines と互いに影響しない", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+
+        local wide = BUILDER.build({
+            group(a, { talk(a, "どれ"), choice("甲"), choice("乙") }),
+        }, { choice_newlines = 2.0 }, spots())
+        expect(wide):toBe("\\p[0]どれ\\n[200]" .. Q1 .. "\\n" .. Q2 .. "\\e")
+
+        -- 換算は spot_newlines と同じ（100 倍して切り捨て）
+        local floored = BUILDER.build({
+            group(a, { talk(a, "どれ"), choice("甲") }),
+        }, { choice_newlines = 1.239 }, spots())
+        expect(floored):toBe("\\p[0]どれ\\n[123]" .. Q1 .. "\\e")
+
+        -- 話し手が戻った吹き出しで、選択肢の前（choice_newlines）と字の前（spot_newlines）が並ぶ並び
+        local function returning()
+            return {
+                group(a, { talk(a, "やあ") }),
+                group(b, { talk(b, "はい") }),
+                group(a, { choice("甲"), talk(a, "どう") }),
+            }
+        end
+        local spot_only = BUILDER.build(returning(), { spot_newlines = 3.0 }, spots())
+        expect(spot_only):toBe("\\p[0]やあ\\p[1]はい\\p[0]\\n[150]" .. Q1 .. "\\n[300]どう\\e")
+        local choice_only = BUILDER.build(returning(), { choice_newlines = 3.0 }, spots())
+        expect(choice_only):toBe("\\p[0]やあ\\p[1]はい\\p[0]\\n[300]" .. Q1 .. "\\n[150]どう\\e")
+    end)
+
+    test("2.7: 台詞の末尾の \\n と newline のトークンは、区切りと並んで両方出る", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local result = BUILDER.build({
+            group(a, { talk(a, "どれ\\n"), choice("甲"), { type = "newline", n = 1 }, choice("乙") }),
+        }, {}, spots())
+        expect(result):toBe("\\p[0]どれ\\n\\n[150]" .. Q1 .. "\\n\\n" .. Q2 .. "\\e")
+    end)
+
+    test("2.5/2.11: 話し手の切り替えと重なっても区切りは 1 か所に 1 つだけ出る", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+
+        -- 字・選択肢 → 別の話し手 → 戻った字（字の前は spot_newlines の区切りだけ）
+        local back_to_text = BUILDER.build({
+            group(a, { talk(a, "どれ"), choice("甲") }),
+            group(b, { talk(b, "はやく") }),
+            group(a, { talk(a, "うーん") }),
+        }, {}, spots())
+        expect(back_to_text):toBe("\\p[0]どれ\\n[150]" .. Q1 .. "\\p[1]はやく\\p[0]\\n[150]うーん\\e")
+
+        -- 字 → 別の話し手 → 戻った選択肢・字（選択肢は保留に触らず、保留は次の字の直前で出る）
+        local back_to_choice = BUILDER.build({
+            group(a, { talk(a, "やあ") }),
+            group(b, { talk(b, "はい") }),
+            group(a, { choice("甲"), talk(a, "どう") }),
+        }, {}, spots())
+        expect(back_to_choice):toBe("\\p[0]やあ\\p[1]はい\\p[0]\\n[150]" .. Q1 .. "\\n[150]どう\\e")
+
+        -- 選択肢だけ → 別の話し手 → 戻った字（字が無かった吹き出しなので保留は立たず、\n が出る）
+        local choice_only = BUILDER.build({
+            group(a, { choice("甲") }),
+            group(b, { talk(b, "はやく") }),
+            group(a, { talk(a, "うーん") }),
+        }, {}, spots())
+        expect(choice_only):toBe("\\p[0]" .. Q1 .. "\\p[1]はやく\\p[0]\\nうーん\\e")
+    end)
+
+    test("2.2/2.5: 話し手なしのグループの選択肢はスポット 0 の吹き出しに出たものとして数える", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+
+        local two = BUILDER.build({ group(nil, { choice("甲"), choice("乙") }) }, {}, spots())
+        expect(two):toBe(Q1 .. "\\n" .. Q2 .. "\\e")
+
+        local then_spot0 = BUILDER.build({
+            group(nil, { choice("甲") }),
+            group(a, { talk(a, "つづき") }),
+        }, {}, spots())
+        expect(then_spot0):toBe(Q1 .. "\\p[0]\\nつづき\\e")
+
+        -- スポット 1 は別の吹き出しなので区切らない
+        local then_spot1 = BUILDER.build({
+            group(nil, { choice("甲") }),
+            group(b, { talk(b, "つづき") }),
+        }, {}, spots())
+        expect(then_spot1):toBe(Q1 .. "\\p[1]つづき\\e")
+    end)
+
+    test("2.10: choice_newlines に数値でない値を渡した結果は spot_newlines に渡したときと同じ", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        -- 幅つきの改行を 1 つだけ出す並びを、設定ごとに 1 つずつ用意する
+        local function build_with(key, value)
+            local tokens
+            if key == "choice_newlines" then
+                tokens = { group(a, { talk(a, "どれ"), choice("甲") }) }
+            else
+                tokens = { group(a, { talk(a, "A1") }), group(b, { talk(b, "B1") }), group(a, { talk(a, "A2") }) }
+            end
+            local ok, result = pcall(BUILDER.build, tokens, { [key] = value }, spots())
+            return ok, ok and result:match("\\n%[%d+%]") or nil
+        end
+
+        local expected = {
+            { "abc", false, nil },       -- 計算できない文字列は Lua のエラー
+            { true, false, nil },
+            { "2", true, "\\n[200]" },   -- 数値に読める文字列は Lua が数値として計算する
+            { false, true, "\\n[150]" }, -- 偽は既定の 1.5
+        }
+        for _, e in ipairs(expected) do
+            local value, want_ok, want_tag = e[1], e[2], e[3]
+            local spot_ok, spot_tag = build_with("spot_newlines", value)
+            local choice_ok, choice_tag = build_with("choice_newlines", value)
+            expect(spot_ok):toBe(want_ok)
+            expect(spot_tag):toBe(want_tag)
+            expect(choice_ok):toBe(spot_ok)
+            expect(choice_tag):toBe(spot_tag)
+        end
+    end)
+
+    test("選択肢を含む並びで、既定のバッファと buf.new_fallback の出力が一致する", function()
+        local BUILDER, actors = setup()
+        local buf = require("pasta.buf")
+        local a, b = actors.sakura, actors.kero
+        local function make_tokens()
+            return {
+                group(a, { talk(a, "どれ"), choice("甲"), choice("乙"), talk(a, "つづき") }),
+                group(b, { talk(b, "はやく"), choice("甲") }),
+                group(a, { talk(a, "うーん") }),
+            }
+        end
+
+        local native = BUILDER.build(make_tokens(), {}, spots())
+        local fallback = BUILDER.build(make_tokens(), { buffer_factory = buf.new_fallback }, spots())
+
+        expect(native):toBe("\\p[0]どれ\\n[150]" .. Q1 .. "\\n" .. Q2 .. "\\nつづき"
+            .. "\\p[1]はやく\\n[150]" .. Q1 .. "\\p[0]\\n[150]うーん\\e")
+        expect(fallback):toBe(native)
+    end)
+end)

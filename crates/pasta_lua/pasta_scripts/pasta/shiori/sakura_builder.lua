@@ -188,8 +188,29 @@ local function emit_inner_token(buffer, actor, inner, appearance, spot)
     APPEARANCE.observe(appearance, speaker, spot, s)
 end
 
+--- 幅つきの改行のタグ。spot_newlines と choice_newlines の両方がこれを使う
+--- @param ratio number 行の高さに対する倍率
+--- @return string `\n[N]`（N は ratio を 100 倍して小数点以下を切り捨てた整数）
+local function newline_tag(ratio)
+    return string.format("\\n[%d]", math.floor(ratio * 100))
+end
+
+--- 選択肢の直前に出す区切り
+--- @param tail "text"|"choice"|nil その吹き出しに最後に表示したもの
+--- @param choice_newlines number 字の後の選択肢の前の改行幅
+--- @return string 空文字列（最初の選択肢）、`\n[N]`（字の後）、`\n`（選択肢の後）のどれか
+local function choice_break(tail, choice_newlines)
+    if tail == "text" then
+        return newline_tag(choice_newlines)
+    elseif tail == "choice" then
+        return "\\n"
+    end
+    return ""
+end
+
 --- @class BuildConfig
---- @field spot_newlines number スポット変更時の改行量（デフォルト1.5）
+--- @field spot_newlines number|nil スポット変更時の改行量（デフォルト1.5）
+--- @field choice_newlines number|nil 字の後の選択肢の前の改行量（デフォルト1.5）
 --- @field buffer_factory (fun(): table)|nil 出力バッファの生成関数（デフォルト pasta.buf.new。テスト用）
 
 --- グループ化されたトークン配列をさくらスクリプト文字列に変換
@@ -202,6 +223,7 @@ end
 function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) -- luacheck: ignore 561
     config = config or {}
     local spot_newlines = config.spot_newlines or 1.5
+    local choice_newlines = config.choice_newlines or 1.5
     local buffer = (config.buffer_factory or buf.new)()
 
     -- input_actor_spots を直接変更する（nilの場合は内部で空テーブルを作成）
@@ -217,6 +239,10 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
     -- 現在スコープ（last_spot）に対する段落区切り改行の保留フラグ。
     -- 切替のたびに破棄→切替先の has-text で再評価されるため単一 boolean で表現できる。
     local pending_break = false
+    -- スポットIDごとに、その吹き出しに最後に表示したもの（"text"・"choice"。無ければ未表示）。
+    -- 選択肢の前と、選択肢の後の字の前の区切りの判定材料。
+    -- 話し手なしのグループの中（last_spot が nil の間）はスポット 0 として数える。
+    local spot_tail = {}      -- table<integer, "text"|"choice">
 
     for _, token in ipairs(grouped_tokens) do
         local t = token.type
@@ -227,11 +253,12 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                 actor_spots[token.actor.name] = token.spot
             end
         elseif t == "clear_spot" then
-            -- S5: clear_spotトークン処理（has-text 全体と pending もリセット）
+            -- S5: clear_spotトークン処理（has-text 全体・最後に表示したもの全体と pending もリセット）
             clear_spots(actor_spots)
             last_actor = nil
             last_spot = nil
             spot_has_text = {}
+            spot_tail = {}
             pending_break = false
         elseif t == "actor" then
             -- actorトークン処理: アクター切り替え検出後、グループ内のトークンを順次処理
@@ -247,30 +274,43 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                 last_actor = actor
             end
 
+            local tail_spot = last_spot or 0 -- 話し手なしのグループはスポット 0 の吹き出しに出る
             for _, inner in ipairs(token.tokens) do
                 if inner.type == "clear" then
                     -- S4b: `\c` を従来どおり出力（emit_inner_token 経由で不変）したうえで、
                     -- 現在スポットの has-text を偽へリセットし pending を破棄する。
                     -- クリアで区切るべき先行テキストが消えるため、後続テキスト直前に改行を出さない。
+                    -- 最後に表示したものも消す（消した吹き出しの最初の選択肢を区切らない）。
                     emit_inner_token(buffer, actor, inner, appearance, last_spot)
                     pending_break = false
                     if last_spot ~= nil then
                         spot_has_text[last_spot] = false
                     end
+                    spot_tail[tail_spot] = nil
+                elseif inner.type == "choice" then
+                    -- S4c: 選択肢。直前に区切り（字の後は choice_newlines の幅、選択肢の後は `\n`）を出す。
+                    -- 字には数えない（has-text・pending 不変。保留は次の字の直前で出る）。
+                    buffer:put(choice_break(spot_tail[tail_spot], choice_newlines))
+                    spot_tail[tail_spot] = "choice"
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
                 elseif emits_text(inner) then
                     -- S3: 字を出すトークン（字のある talk・字を表示する sakura_script）。
                     -- 改行 → has-text 設定 → 本文 の順を厳守。
+                    -- 区切りは 1 つだけ出す（保留があればそれだけ。無くて選択肢の後なら `\n`）。
                     if pending_break then
-                        buffer:put(string.format("\\n[%d]", math.floor(spot_newlines * 100)))
+                        buffer:put(newline_tag(spot_newlines))
                         pending_break = false
+                    elseif spot_tail[tail_spot] == "choice" then
+                        buffer:put("\\n")
                     end
                     if last_spot ~= nil then
                         spot_has_text[last_spot] = true
                     end
+                    spot_tail[tail_spot] = "text"
                     emit_inner_token(buffer, actor, inner, appearance, last_spot)
                 else
                     -- S4: 字の無い talk・字を表示しない sakura_script・surface・wait・newline・
-                    -- choice・choice_timeout・raw_script。変換出力のみ（has-text・pending 不変）。
+                    -- choice_timeout・raw_script。変換出力のみ（has-text・pending・最後に表示したもの不変）。
                     emit_inner_token(buffer, actor, inner, appearance, last_spot)
                 end
             end

@@ -748,7 +748,7 @@ describe("SHIORI_ACT - 先頭の表示制御のバイト比較 (act-token-groupi
         act:choice("t", "d")
         act:choice_timeout(30)
         act:talk(sakura, "A")
-        expect(act:build()):toBe("\\s[5]\\_w[500]\\n\\c\\![*]\\q[d,t]\\![set,choicetimeout,30000]\\p[0]A\\e")
+        expect(act:build()):toBe("\\s[5]\\_w[500]\\n\\c\\![*]\\q[d,t]\\![set,choicetimeout,30000]\\p[0]\\nA\\e")
         STORE.reset()
     end)
 
