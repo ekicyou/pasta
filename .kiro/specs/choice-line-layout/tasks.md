@@ -58,7 +58,7 @@
   - _Depends: 1.2, 2.1_
   - _Boundary: ChoiceNewlinesConfig, ChoiceLineLayout_
 
-- [ ] 3. マニュアルとスキルの参照資料を追従させる
+- [x] 3. マニュアルとスキルの参照資料を追従させる
 - [x] 3.1 (P) `pasta.toml` のリファレンスに `choice_newlines` を書く
   - `spot_newlines` がある 3 か所（分類の表・記述例・`[ghost]` のキーの表）に足し、節「choice_newlines」を `spot_newlines` の後ろに足す（型・既定・単位・効く場所・出力の例）。キーの名前を含む表の行すべてに既定値を書く
   - `spot_newlines` の節の「`\c` でバルーンを消去した後」の文は変えず、引数つきの `\c[…]` と `\x` は数えないことを 1 文足す
@@ -86,7 +86,7 @@
   - _Depends: 2.3, 3.1_
   - _Boundary: ManualPages（block-structure.md・script-api.md）_
 
-- [ ] 3.4 スキルの参照資料をマニュアルから再生成する
+- [x] 3.4 スキルの参照資料をマニュアルから再生成する
   - `.claude/skills/` への書き込みは開発者の許可が要る。許可が出るまでこのタスクは止め、食い違いを残したまま完了にしない。生成物は手で編集しない
   - 同じウェーブの他の spec が先に main へ入っていれば、取り込んでから再生成する
   - 完了の状態: 生成の `--check` が通り、生成先の 5 ファイルがマニュアルと同じ内容である
