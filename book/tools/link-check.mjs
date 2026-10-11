@@ -7,13 +7,24 @@
 //       ローカルに実在するか（オフラインでローカル照合）、
 //   (c) (a)(b) とも repoRoot 外へ脱出するパス（トラバーサル）は実在しても違反。
 //
+// 本の中のリンクの見出しの照合（manual-link-anchor-check タスク 2.1・2.2・要件 1.1〜1.5, 2.1, 2.2, 3.1〜3.6, 5.1〜5.5）:
+//   (a) のリンクのうち見出しを指すもの（`章.md#見出し`・同じ章の中の `#見出し`）を detectBrokenLinks で
+//   リンク先の章のアンカーの集合（フェンス外の見出しの slug ∪ `<a id|name>` の明示アンカー）と照合し、
+//   無ければ [1] の区分に internal-anchor として報告する（行番号は付けない）。
+//   フラグメントはパーセントエンコードを復号して比べる。空（`章.md#`）なら章の実在だけを見る。
+//   章のファイルが無いときは internal-md の 1 件だけで、見出しの違反を重ねない。
+//   集合は、スキル・公開 URL の検査と同じ読み手（anchorReader）から取る（照合の規則は 1 つ）。
+//
 // 内部設計章のパス実在検査（pasta-runtime-internals-doc タスク 1.1・要件 3.7）:
 //   book/src/internals/**/*.md のフェンス外インラインコードに書いたリポジトリ内パスを
 //   checkInternalsPaths で検査し、[1] の区分に internals-path として報告する。
 //
-// クレート README のマニュアル URL 実在検査（同タスク 1.2・要件 7.5, 7.8）:
-//   crates/*/README.md のフェンス外のリンクと裸の URL のうち公開マニュアル（MANUAL_URL）を指すものを
-//   checkReadmeManualLinks で book/src の章・見出しへ写像して照合し、[1] の区分に readme-manual-url として報告する。
+// 読者に届く文書のマニュアル URL 実在検査（同タスク 1.2・要件 7.5, 7.8 /
+// manual-link-anchor-check タスク 3.1・3.2・要件 4.1〜4.7）:
+//   crates/*/README.md → ルートの README.md → SOUL.md → 2 スキルの Markdown（生成ファイルも含む）の順に、
+//   フェンス外のリンクと裸の URL のうち公開マニュアル（MANUAL_URL）を指すものを
+//   checkReadmeManualLinks で book/src の章・見出しへ写像して照合し、[1] の区分に readme-manual-url として報告する
+//   （区分と文面は、どの文書でも同じ）。裸の URL は、空白・半角の括弧のほか、全角の括弧と句読点でも終わる。
 //
 // スキル自己完結検査（タスク 3.2・要件 5.3, 6.1, 6.4, 6.5, 10.2, 2.4）:
 //   .claude/skills/{pasta-ghost-authoring,pasta-lua-coding}/**/*.md を checkSkillSelfContained で
@@ -24,6 +35,11 @@
 // 共用 export（gen-skill-refs.mjs が import する）:
 //   LINK_RE    … インラインリンク `[text](target)` の正規表現（先頭キャプチャ=リンク先）
 //   maskFences … CommonMark 準拠でコードフェンス内の行を空行に置換（行数は保つ）
+// 共用 export（自己テスト link-check-test.mjs が import する）:
+//   BOOK_KINDS … 報告の [1]（リンク切れ）に入る種別の一覧
+//
+// ビルドした出力（book/book/）は読まない。出力の有無で結果は変わらない（manual-link-anchor-check 要件 6.2）。
+// 見出しの id を出力と突き合わせる確かめは、自己テスト（link-check-test.mjs の節 I）が持つ（同 要件 3.7, 7.6〜7.8）。
 //
 // 終了コード: 違反あり → exit 1 / 無し → exit 0 / 予期しない例外 → exit 2。
 // 冪等・決定論的（同一入力 → 同一結果）。book/src は読み取りのみ。
@@ -447,7 +463,7 @@ export function checkReadmeManualLinks(repoRoot = REPO_ROOT) {
     maskFences(fs.readFileSync(file, 'utf8')).split('\n').forEach((line, i) => {
       const noCode = line.replace(CODE_SPAN_RE, '');
       const links = extractLinks(noCode).map((t) => t.trim());
-      // インラインリンクの行き先を除いた残りから裸の URL（自動リンク `<…>` を含む）を拾う。末尾の句読点は URL に含めない。
+      // インラインリンクの行き先を除いた残りから裸の URL（自動リンク `<…>` を含む）を拾う。末尾の半角の句読点は URL に含めない（全角の括弧・句読点は正規表現が URL の外にする）。
       const bare = [...noCode.replace(LINK_RE, '](').matchAll(BARE_MANUAL_URL_RE)]
         .map((m) => m[0].replace(/[.,;:!?]+$/, ''));
       for (const url of new Set([...links, ...bare])) {
@@ -474,7 +490,7 @@ export function runLinkCheck(repoRoot = REPO_ROOT) {
   return { broken, failed: broken.length > 0 };
 }
 
-// 結果を標準出力へ分類表示する（[1] book 内リンク切れ・[2] スキル自己完結を種別ごと）。
+// 結果を標準出力へ分類表示する（[1] リンク切れ＝BOOK_KINDS の種別・[2] スキル自己完結を種別ごと）。
 export function reportLinkCheck(result) {
   const { broken } = result;
   const book = broken.filter((b) => BOOK_KINDS.has(b.kind));
