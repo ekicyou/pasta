@@ -454,7 +454,8 @@ export function checkReadmeManualLinks(repoRoot = REPO_ROOT) {
 }
 
 // ---- オーケストレーション ----
-const BOOK_KINDS = new Set(['internal-md', 'github-repo-path', 'internals-path', 'readme-manual-url']);
+// 報告の [1]（リンク切れ）に入る種別。自己テストもここから読む。
+export const BOOK_KINDS = new Set(['internal-md', 'internal-anchor', 'github-repo-path', 'internals-path', 'readme-manual-url']);
 
 export function runLinkCheck(repoRoot = REPO_ROOT) {
   const broken = [
@@ -480,7 +481,7 @@ export function reportLinkCheck(result) {
   };
   out.push('link-check (git 非依存)');
   out.push('');
-  out.push(`[1] リンク切れ（book 内 .md / リポジトリ内 GitHub URL / 内部設計章のパス / README のマニュアル URL）: ${book.length} 件`);
+  out.push(`[1] リンク切れ（book 内 .md・見出し / リポジトリ内 GitHub URL / 内部設計章のパス / マニュアルの公開 URL）: ${book.length} 件`);
   list(book);
   out.push('');
   out.push(`[2] スキル自己完結（${CHECKED_SKILLS.join(', ')}）: ${skill.length} 件`);

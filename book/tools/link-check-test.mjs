@@ -53,6 +53,7 @@ import {
   REPO_PATH_PREFIXES,
   CHECKED_SKILLS,
   FORBIDDEN_SKILL_TOKENS,
+  BOOK_KINDS,
   githubUrlToRepoPath,
   runLinkCheck,
   reportLinkCheck,
@@ -95,7 +96,6 @@ function rmrf(root) {
 
 // ============================================================
 log('\n== (A) 実リポジトリ現状: クリーン判定 ==');
-const BOOK_KINDS = new Set(['internal-md', 'github-repo-path', 'internals-path', 'readme-manual-url']);
 {
   const result = runLinkCheck(REPO_ROOT);
   const bookBroken = result.broken.filter((b) => BOOK_KINDS.has(b.kind));
@@ -855,6 +855,14 @@ log('\n== (H) 本の中のリンクの見出し（internal-anchor） ==');
       check('H-2 違反は 8 件・リンクの出現順（在る見出しは出ない）',
         JSON.stringify(broken.map((b) => [b.kind, b.target])) === JSON.stringify(want), dump);
       check('H-2 2 回走らせて同じ結果', JSON.stringify(runLinkCheck(root).broken) === dump);
+
+      // 報告: 見出しの違反は [1]（リンク切れ）に数えられて行が出る。[2] には回らない。
+      const rep = reportLinkCheck(result);
+      check('H-2 レポートの [1] 区分に 8 件（internal-anchor 7 行・internal-md 1 行）が出て、[2] は 0 件',
+        /\[1\][^\n]*: 8 件/.test(rep) && /\[2\][^\n]*: 0 件/.test(rep)
+        && rep.split('[internal-anchor]').length - 1 === 7 && rep.split('[internal-md]').length - 1 === 1, rep);
+      check('H-2 failed=true（終了コード 1）で、レポートの結びも FAIL',
+        result.failed === true && rep.includes('RESULT: FAIL'), rep);
 
       // 見本の章に見出しを足すと、その 1 件だけが消える（前の走りの集合を持ち越さない）。
       writeFile(root, DST, [...target, '## 無い見出し', ''].join('\n'));
