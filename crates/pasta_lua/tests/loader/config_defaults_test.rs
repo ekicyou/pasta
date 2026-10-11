@@ -311,6 +311,8 @@ fn config_reference_doc_matches_ssot() {
     expect_row("hour_margin", d.hour_margin.to_string());
     // spot_newlines は浮動小数（"1.5"）。
     expect_row("spot_newlines", format!("{:?}", d.spot_newlines));
+    // choice_newlines も浮動小数（"1.5"）。choice-line-layout 5.5。
+    expect_row("choice_newlines", format!("{:?}", d.choice_newlines));
 }
 
 /// Lua フォールバックリテラルが SSOT と一致すること（R5.5）。

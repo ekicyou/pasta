@@ -59,7 +59,7 @@
   - _Boundary: ChoiceNewlinesConfig, ChoiceLineLayout_
 
 - [ ] 3. マニュアルとスキルの参照資料を追従させる
-- [ ] 3.1 (P) `pasta.toml` のリファレンスに `choice_newlines` を書く
+- [x] 3.1 (P) `pasta.toml` のリファレンスに `choice_newlines` を書く
   - `spot_newlines` がある 3 か所（分類の表・記述例・`[ghost]` のキーの表）に足し、節「choice_newlines」を `spot_newlines` の後ろに足す（型・既定・単位・効く場所・出力の例）。キーの名前を含む表の行すべてに既定値を書く
   - `spot_newlines` の節の「`\c` でバルーンを消去した後」の文は変えず、引数つきの `\c[…]` と `\x` は数えないことを 1 文足す
   - 補うキーの一覧（4 キー → 5 キー）を、設定のモジュールの説明・loader の内部の説明・執筆の決まりの一覧で直す
