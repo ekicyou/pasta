@@ -81,7 +81,8 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 順 | spec | 要件定義 | 規模 | 始められる時期 |
 | -- | ---- | -------- | ---- | -------------- |
 | 完了 | hello-pasta-shell-art | Fable | 13（実績） | 2026-10-11 に完了 |
-| 開発中 | choice-line-layout、manual-print-media-refs、manual-link-anchor-check | Opus | 各 2〜4 | 始めている |
+| 完了 | manual-link-anchor-check | Opus | 8（実績） | 2026-10-11 に完了 |
+| 開発中 | choice-line-layout、manual-print-media-refs | Opus | 各 2〜4 | 始めている |
 | 1 | boot-surface-without-dic | Fable | 3〜5（やる場合） | 今すぐ |
 | 2 | failure-output-unification | Fable | 15〜19 | 今すぐ |
 | 3 | pasta-check-dic-validate | Fable | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
@@ -346,7 +347,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）と、ガイ�
 - [ ] runtime-error-balloon -- スクリプトが止まる実行時エラー（500 の応答）を、辞書を書く人に見えるようバルーンにも出す。やるかどうかを要件の最初に決める（2026-10-10 の棚卸で `failure-output-unification` から分割）。Dependencies: failure-output-unification, shiori-test-support-runtime
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアルまで揃える（2026-10-08 起票）。Dependencies: failure-output-unification, call-attribute-filter
 - [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: hello-pasta-shell-art, choice-line-layout（9 段目の絵に切れた選択肢が写らないよう、先に直す）, boot-surface-without-dic（準備の章に写る絵が変わる。却下なら外す）
-- [ ] manual-link-anchor-check -- マニュアルのリンク検証（`link-check.mjs`）が、本の中のリンクと公開 URL の見出し（`#…`）の実在も見るようにする（2026-10-10 `getting-started-story-guide` の完了時に起票）。Dependencies: none
+- [x] manual-link-anchor-check -- マニュアルのリンク検証（`link-check.mjs`）が、本の中のリンクと公開 URL の見出し（`#…`）の実在も見るようにする（2026-10-10 `getting-started-story-guide` の完了時に起票）。Dependencies: none
 - [ ] choice-line-layout -- hello-pasta の 9 段目で、1 つ目の選択肢が問いかけと同じ行に続き、吹き出しの右端で切れて見えるのを直す。原因（選択肢の前の改行・辞書・バルーン）の特定から（2026-10-10 同上）。Dependencies: none（`scene-anchor-link` と `sakura_builder.lua` を触る順番に注意）
 - [ ] baseware-virtual-time -- SSP の「現在時刻の仮想的変更」を pasta の時報に効かせ、正時を待たずに確かめられるようにする。SSP が仮想の時刻を SHIORI に伝えているかの調査から。外から起こした `OnTalk` でチェイントークが続かない件も扱う（2026-10-10 同上）。Dependencies: none
 - [ ] boot-surface-without-dic -- 辞書や `＊OnBoot` が無いゴーストは起動しても立ち絵が出ない。既定で立ち絵を出すかどうかを、やるかどうかから決める（2026-10-10 同上）。Dependencies: none
