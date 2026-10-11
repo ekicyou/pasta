@@ -88,7 +88,8 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 3 | pasta-check-dic-validate | Fable | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
 | 4 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
 | 5 | getting-started-screenshots | Opus | 4〜6 | `choice-line-layout`・`boot-surface-without-dic` の後（最後に撮る。`hello-pasta-shell-art` は完了した） |
-| 6 | 0.4.0 のリリース（常駐 spec `release-workflow`） | Opus | — | 上の全部の後 |
+| 6 | release-notes-highlights | Opus | 5〜8 | 今すぐ（2026-10-11 開発者の依頼で足した。リリースの実行中は main へ入れない） |
+| 7 | 0.4.0 のリリース（常駐 spec `release-workflow`） | Opus | — | 上の全部の後 |
 
 並走するときの約束（「棚卸」のウェーブの約束に足す）:
 
@@ -96,7 +97,8 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - `failure-output-unification` は、選択肢の出力（`sakura_builder.lua`。立ち位置が決まらないときの警告がある）を、`choice-line-layout` が入るまで触らない。生成コードの形を変えない約束と、スクリプトが止まるエラーを扱わない線引き（`runtime-error-balloon`）は、そのまま守る。
 - `pasta-check-dic-validate` と `manual-shell-guide` は、どちらもマニュアルに章を足すと、目次（`SUMMARY.md`）と章の数を決め打ちする検査が重なる。後から入る側が数を合わせる。
 - `getting-started-screenshots` は、6 段目（時報）の撮り方を `baseware-virtual-time` に頼らない。失敗の表記を絵に写すなら、`failure-output-unification` の後に撮る。
-- 0.4.0 のリリースノートに、失敗の表記が変わったことを書く。
+- 0.4.0 のリリースノートに、失敗の表記が変わったことを書く。`release-notes-highlights` が入っていれば、本文の見どころに書く。
+- `release-notes-highlights` は、`release.yml` の verify と github-release の段、`release-workflow` の手順の文書を触る。`pasta-check-dic-validate` が `release.yml` の `pasta_check` の公開の段を触る場合は、段が別なので、後から入る側が合わせる。
 
 0.4.0 の後（この順）: `scene-attribute-store`（Fable）、`shiori-test-support-runtime`（Opus）、`runtime-error-balloon`、`call-attribute-filter`、`scene-anchor-link`、`baseware-virtual-time`。このうち `scene-attribute-store` と `call-attribute-filter` は、0.5.0 の道筋に入った（下の「Phase 13」）。残りの 4 本をどこに挟むかは、0.4.0 を出した後の棚卸で決める。
 
@@ -313,6 +315,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）と、ガイ�
 
 - **以後のリリース**: 新しい作業ブランチ（ハーネスのワークツリー）で `/kiro-impl release-workflow` を実行する。失敗した job の再実行の読み方（`design.md`「CI での初回のリリースで確かめること」の 3）を確かめるまでは Opus で実行し、確かめたら Sonnet で実行する（開発者決定 2026-10-10）。
 - **席**: リリースの実行中は、`release.ps1`・`release.yml` を触る spec を main へ入れない。
+- **リリースの本文の作り直し**（2026-10-11 起票 `release-notes-highlights`）: 今の本文は、コミットの件名を全件並べた一覧で、何が良くなったのかを読み取れない（v0.3.8 は 57 行）。本文を、注目に値するいくつかの内容を Claudia（令嬢）の口調で紹介する文章にし、全件の一覧は Assets に添付する。spec 名は載せない。見どころは、版を上げるコミットでリポジトリのファイルとして書き、リリース CI が本文に使う（開発者の決定。公開の後で書き換える案と、機械だけで短くする案は採らない）。この spec は、`release-workflow` の段 4 の「5 ファイルだけ」を変える。見出しには元になった PR の番号を付ける。公開済みの v0.3.8 の 1 本も、同じ形に直す（それより前は触らない）。areka のリポジトリの `areka-P0-release-notes-highlights` と、決定と議題をそろえてある。
 - **運用の注意**（一回限りのセットアップで分かったこと）:
   - Azure のリソースを `az` で作る・変えるには MFA が要る。WAM（Windows のサインイン窓）でログインすると `RequestDisallowedByAzure` で弾かれる。`az config set core.enable_broker_on_windows=false` にしてからブラウザーで `az login` し直す。ワークフローのマネージド ID には関係ない。
   - Marketplace の Members の管理には、公式の CLI が無い（vsce・az・gh のどれも扱えない）。画面から行う。
@@ -361,6 +364,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）と、ガイ�
 - [ ] shell-element-click -- エレメントのクリック（名前つき）を、選択肢と同じ振り分けで場面へ届ける。シェルとして組んだシステム画面を、場面が動かせるようにする。Dependencies: novel-areka-contract, novel-talk-flow（`scene-anchor-link` と `choice_select.lua` を触る順番に注意）
 - [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, scene-stage-attributes, novel-talk-flow, novel-checkpoint-rollback, novel-save-slots, shell-element-click, call-attribute-filter（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
+- [ ] release-notes-highlights -- リリースの本文を、注目に値する内容を Claudia（令嬢）の口調で紹介する文章にし、全件の詳しいリリースノートを Assets に添付する。見どころは版を上げるコミットで書き、無ければリリース CI が公開の前に止まる。spec 名を載せない（2026-10-11 の discovery で起票）。Dependencies: none（リリースの実行中は main へ入れない）
 
 ## Existing Spec Updates
 
