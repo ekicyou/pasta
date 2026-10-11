@@ -14,7 +14,7 @@
 
 ### Step 1: 版を上げたコミットを main に入れる
 
-- 版の決定と版を上げるコミットは、`release-workflow` の手順で行います（`Cargo.toml`・`Cargo.lock`・`editors/vscode/package.json`・`editors/vscode/package-lock.json`・`book/src/introduction.md` の版をそろえて 1 コミットにする）。
+- 版の決定と版を上げるコミットは、`release` スキル（`/release`）の手順で行います（`Cargo.toml`・`Cargo.lock`・`editors/vscode/package.json`・`editors/vscode/package-lock.json`・`book/src/introduction.md` の版をそろえて 1 コミットにする）。
 - そのコミットを PR で `main` へ squash マージします。
 - タグと `Cargo.toml`・`package.json` の版が一致し、タグのコミットが `main` から到達できることを、CI の verify job が検査します。
 

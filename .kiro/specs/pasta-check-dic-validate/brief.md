@@ -96,7 +96,7 @@
 - **Downstream**:
   - scene-anchor-link: 飛び先の無いリンクの検出
   - failure-output-unification: 実行する前に見つける側の受け皿
-  - リリースの手順: 常駐の release-workflow と、hello-pasta の `crates/pasta_sample_ghost/release.ps1`（181〜189 行が `pasta_check release` を呼ぶ）
+  - リリースの手順: `release` スキル（`.claude/skills/release/`）と、hello-pasta の `crates/pasta_sample_ghost/release.ps1`（181〜189 行が `pasta_check release` を呼ぶ）
   - 代用品の後片付け（`manual.yml`・`tutorial_stages_test.rs`）
 
 ## Existing Spec Touchpoints

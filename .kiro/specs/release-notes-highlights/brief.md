@@ -21,7 +21,7 @@
 - **添付**: `github-release.ps1`（133 行）は、添付の名前を 3 つに決め打ちしている（72 行。`pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-X.Y.Z.vsix`）。「公開済みで 3 つがそろっていれば飛ばす」「足りないものだけを添付する」の判定も、この 3 つで行う。ノートは添付しない。
 - **公開済みの Release**: 題名とノートを触らない（`github-release.ps1` 88〜89 行。`release-ci` の要件 6.4・7.3）。
 - **タグの検査**: verify の job（`release.yml` 29〜50 行）が `.github/scripts/release/verify-tag.ps1` で、タグの形・版の一致・main からの到達性を見る。ここで落ちれば、後ろの job は何も公開しない。
-- **リリースの手順**: 常駐 spec `release-workflow` の段 4（`tasks.md` 81〜90 行）が、版の表記の 5 ファイルだけを 1 つのコミットにする。「5 ファイルだけ」は、段 4 の確認・段 5 の PR の確認・再開の判定など、`requirements.md`・`design.md`・`tasks.md` の多くの場所に出てくる。
+- **リリースの手順**: `release` スキル（`.claude/skills/release/`。2026-10-11 に、常駐 spec `release-workflow` の手順を移した）の段 4 が、版の表記の 5 ファイルだけを 1 つのコミットにする。「5 ファイルだけ」は、段 4 の確認・段 5 の PR の確認・再開の判定など、スキルの `SKILL.md`・`procedure.md` の多くの場所に出てくる。
 - **自動テスト**: `release-notes.ps1`・`github-release.ps1` を動かすテストは、リポジトリに無い。
 - **今の方式を書いている文書**: `.kiro/steering/tech.md` 205 行（「リリースノートはコミット履歴から生成」）、`.claude/skills/pasta-check/SKILL.md` 133 行（同じ）、`crates/pasta_sample_ghost/RELEASE.md` 44 行、完了した `release-ci` の要件 6.6〜6.9。
 - **令嬢の口調の定義**: マニュアルの執筆規約（`book/AUTHORING.md` 第 1 節「Claudia 令嬢ボイスの定義」）に、一人称・語尾・人物像がある。
@@ -35,7 +35,7 @@
 - すべての変更を並べた詳しいリリースノートは、Assets にドキュメントとして添付する。本文から、その添付へたどれる。詳しいリリースノートにも spec 名を載せない。
 - 本文の文章は、公開する前に PR で読めて、git に残る。
 - 見どころの無いリリースタグでは、リリース CI が何も公開する前に止まる。
-- リリースの手順（`release-workflow`）が、見どころを書く段と、その確かめ方を持つ。
+- リリースの手順（`release` スキル）が、見どころを書く段と、その確かめ方を持つ。
 - 公開済みの v0.3.8 のページも、同じ形（見どころの本文と、詳しいリリースノートの添付）になっている。それより前の版は、今のままである。
 
 ## Approach
@@ -76,7 +76,7 @@
   - 見どころのファイルの置き場所・名前・形の決まり
   - リリース CI の変更（見どころの有無の検査、詳しいリリースノートの添付、本文の組み立て）。`release-notes.ps1`・`github-release.ps1`・`verify-tag.ps1`（または検査の段）・`release.yml`
   - 詳しいリリースノートから spec 名を外すことと、内部の作業の扱い
-  - 常駐 spec `release-workflow` の `requirements.md`・`design.md`・`tasks.md` への、見どころを書く段の追加（版の更新のコミットに入るファイルが 1 つ増える）
+  - `release` スキルの `SKILL.md`・`procedure.md` への、見どころを書く段の追加（版の更新のコミットに入るファイルが 1 つ増える）
   - 今の方式を書いている文書の更新（`tech.md`・`RELEASE.md`・`pasta-check` のスキル）
   - ノートを作るスクリプトの、動かして確かめられる検査を 1 つ
   - 公開済みの v0.3.8 の本文の差し替えと、詳しいリリースノートの添付（1 回きり。配布物とタグは変えない）
@@ -103,12 +103,12 @@
 
 ## Upstream / Downstream
 
-- **Upstream**: 完了した `release-ci`（リリース CI とその補助スクリプト）、常駐 spec `release-workflow`（リリースの手順）、`book/AUTHORING.md`（令嬢の口調の定義）。
+- **Upstream**: 完了した `release-ci`（リリース CI とその補助スクリプト）、`release` スキル（リリースの手順。もとは spec `release-workflow`）、`book/AUTHORING.md`（令嬢の口調の定義）。
 - **Downstream**: 0.4.0 のリリース。ロードマップの「0.4.0 のリリースノートに、失敗の表記が変わったことを書く」は、この仕組みの見どころに書く。
 
 ## Existing Spec Touchpoints
 
-- **Extends**: 常駐 spec `release-workflow`。段 4 の「5 ファイルだけ」が「5 ファイルと見どころのファイル」に変わる。同じ数は、段 5 の PR の確認、再開の判定（main に無い内容が版の更新のコミットだけなら続ける。要件 8.6）、`scripts/` の補助スクリプトにも効いている見込みなので、要件定義で全部を洗う。
+- **Extends**: `release` スキル（`.claude/skills/release/`）。完了した spec `release-workflow`（`.kiro/specs/completed/release-workflow/`）の要件・設計は記録なので、直さない。段 4 の「5 ファイルだけ」が「5 ファイルと見どころのファイル」に変わる。同じ数は、段 5 の PR の確認、再開の判定（main に無い内容が版の更新のコミットだけなら続ける。段 1 の手順 3）、`scripts/` の補助スクリプトにも効いている見込みなので、要件定義で全部を洗う。
 - **Adjacent**:
   - 完了した `release-ci`: 要件 6.6〜6.9（ノートの作り方）と 6.2・6.4（添付が 3 つであること・公開済みのノートを触らないこと）を、この spec が上書きする。完了した spec の文書は書き換えない。
   - `pasta-check-dic-validate`: 内部クレートに依存させる場合に、`release.yml` の `pasta_check` の公開の段を触る。この spec が触るのは verify と github-release の段なので、段は重ならない。後から入る側が合わせる。
@@ -130,7 +130,7 @@
   - `.github/scripts/release/github-release.ps1`（133 行）
   - `.github/scripts/release/verify-tag.ps1`、または verify の job に足す新しい段
   - `.github/workflows/release.yml`（verify の 29〜50 行、github-release の 441〜480 行あたり）
-  - `.kiro/specs/release-workflow/` の `requirements.md`・`design.md`・`tasks.md`、必要なら `scripts/`
+  - `.claude/skills/release/` の `SKILL.md`・`procedure.md`、必要なら `scripts/`
   - `.kiro/steering/tech.md`・`crates/pasta_sample_ghost/RELEASE.md`・`.claude/skills/pasta-check/SKILL.md`
   - 見どころのファイルの置き場所（新しいフォルダ）
 - **規模**: 5〜8 タスク。
@@ -155,7 +155,7 @@
   5. 内部の作業（`spec(…)`・`docs(roadmap)`・`docs(skills)`・`chore(release)` など）を、詳しいリリースノートから除くか、末尾の別の見出しに分けるか。
   6. 添付の名前（`release-notes-vX.Y.Z.md` を仮に置いた）と形式。Markdown の添付は、ブラウザーで開くと表示されずにダウンロードになる。
   7. 見どころの検査を、どこまで行うか（在ること・空でないこと・spec 名が入っていないこと）。
-  8. `release-workflow` の「5 ファイルだけ」に効いている場所の洗い出しと、再開の判定への影響。
+  8. `release` スキルの「5 ファイルだけ」に効いている場所の洗い出しと、再開の判定への影響。
   9. 見どころを書くときの材料の集め方。`release-notes.ps1` はタグが在ることを求めるので、タグを打つ前に手元で一覧を出す方法が要る。
   10. 公開済みのリリースの本文を書き直すか。**areka の側の決定（2026-10-11・areka のセッションから伝えられた）**: 開発者は「公開済みの項は『直す』で。あちらのセッションにも伝えておいて」と答えた。areka は公開済みの v0.0.2 を同じ形に直す。**pasta の範囲（2026-10-11・開発者がこのセッションで決めた）: v0.3.8 の 1 本だけを直す。** それより前の 34 本は触らない。要件定義に残るのは、進め方だけである。
       - 測定（2026-10-11）: 公開済みは 35 本（v0.1.2〜v0.3.8）。本文が長いのは v0.3.8（57 行・3,842 字）だけで、次が v0.2.4（23 行）・v0.2.1（16 行）・v0.1.5（15 行）。0.3 系は 9 本で、v0.3.8 のほかは 3〜11 行。
