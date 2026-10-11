@@ -225,7 +225,7 @@ fn test_loader_config_default_includes_user_scripts() {
 
 /// `[ghost]` の SHIORI デフォルト値の単一供給源（SSOT）。
 /// `GhostConfig::default()` が現行 Lua リテラルと同値の
-/// `180 / 300 / 30 / 1.5` をそのまま返すことを固定する（要件 1.2 / 1.3 / 3.3）。
+/// `180 / 300 / 30 / 1.5 / 1.5` をそのまま返すことを固定する（要件 1.2 / 1.3 / 3.3）。
 #[test]
 fn test_ghost_config_default_values() {
     let config = GhostConfig::default();
@@ -233,6 +233,7 @@ fn test_ghost_config_default_values() {
     assert_eq!(config.talk_interval_max, 300);
     assert_eq!(config.hour_margin, 30);
     assert_eq!(config.spot_newlines, 1.5);
+    assert_eq!(config.choice_newlines, 1.5);
 }
 
 // ----- [ghost] 実体化（補完後形状）の公開API検証 -----
@@ -255,8 +256,8 @@ fn materialized_ghost_table(config: &PastaConfig) -> &toml::Table {
 }
 
 /// `[ghost]` を一切書かない設定を **公開API** `PastaConfig::from_str` でパースすると、
-/// 補完後の `custom_fields` に `ghost` テーブルが実体化し、4つの SSOT 既定値
-/// （180 / 300 / 30 / 1.5）が揃うこと。
+/// 補完後の `custom_fields` に `ghost` テーブルが実体化し、5つの SSOT 既定値
+/// （180 / 300 / 30 / 1.5 / 1.5）が揃うこと。
 ///
 /// もし補完（apply_shiori_defaults）が parse 経路から外れれば、`ghost` キー自体が
 /// 欠落して `materialized_ghost_table` の expect が失敗するため、このテストは
@@ -290,6 +291,11 @@ fn test_from_str_materializes_ghost_defaults_when_section_omitted() {
         ghost.get("spot_newlines").and_then(toml::Value::as_float),
         Some(1.5),
         "6.3/3.3: omitted [ghost] must materialize spot_newlines=1.5 at the public API"
+    );
+    assert_eq!(
+        ghost.get("choice_newlines").and_then(toml::Value::as_float),
+        Some(1.5),
+        "omitted [ghost] must materialize choice_newlines=1.5 at the public API"
     );
 }
 
@@ -349,6 +355,10 @@ key1 = "value1"
     );
     assert_eq!(
         ghost.get("spot_newlines").and_then(toml::Value::as_float),
+        Some(1.5)
+    );
+    assert_eq!(
+        ghost.get("choice_newlines").and_then(toml::Value::as_float),
         Some(1.5)
     );
 }
