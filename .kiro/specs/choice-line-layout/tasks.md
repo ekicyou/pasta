@@ -69,7 +69,7 @@
   - _Depends: 1.1_
   - _Boundary: ManualPages（pasta-toml.md・pasta-config.md・loader.md・AUTHORING.md）_
 
-- [ ] 3.2 (P) 組み立ての内部の説明を直す
+- [x] 3.2 (P) 組み立ての内部の説明を直す
   - 組み立ての状態の表に「最後に表示したもの」を足し、区切りの表と、`talk`・`sakura_script` の中の `\c` の扱いを書く。「それ以外のトークンは状態を変えない」「`choice` の出力には改行も入らない」の文を、直した後の動きに合わせる
   - 組み立ての設定と、SHIORI の act が足すフィールドに `choice_newlines` を足す
   - 完了の状態: 内部の説明の 2 ページが、実装した状態の名前・区切りの表と食い違わない
@@ -117,3 +117,4 @@
 - `lua_unittest_runner` は、最初に落ちたスイートで止まる。`tests/lua_specs/init.lua` で後ろに並ぶスイートは走らない。後ろのスイートの失敗を見るときは `-- --nocapture` で describe ごとの結果を読む。
 - `cargo test -p pasta_lua` は、`tests/fixtures/sample.generated.lua`（改行だけ）と、まれに `profile/pasta/save/save.json`（並列の競合で壊れた JSON）を書き換える。コミットの前に、その 2 つだけを `git checkout --` で戻す。
 - `\c[]`（空の括弧）は引数つきとして読まれて消去に数えない。閉じない `\c[` は引数の無い `\c` として数える（`APPEARANCE.tag_at` の読みのまま）。
+- 完了時（spec を `completed/` へ移した後）に、`book/src/internals/talk-output.md` の「経緯」へ choice-line-layout を 1 行足す。今は `completed/choice-line-layout` が無く、足すと `link-check.mjs` が落ちる。

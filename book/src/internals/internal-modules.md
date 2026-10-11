@@ -99,7 +99,7 @@ ACT は、シーン関数が第 1 引数で受け取るオブジェクトであ�
 | `token` | 積んだトークンの配列。`build` が新しい空の配列に置き換える |
 | `current_scene` | 実行中のシーンテーブル。初期値は `nil` で、`init_scene` が設定し、`restore_scene` が呼ぶ前の値に戻す（[シーン文脈の復元](#シーン文脈の復元call_restorerestore_scene)） |
 
-`SHIORI_ACT.new(actors, req)` は `ACT.new(actors)` で作った表に、`_spot_newlines`（`pasta.config` から読む `[ghost]` の `spot_newlines`。既定 1.5）と `req`（SHIORI のリクエストの表）を足し、メタテーブルを `SHIORI_ACT_IMPL` に付け替える。`act.req` のフィールドは [act.req](../lua/shiori-events.md#actreq) が正である。
+`SHIORI_ACT.new(actors, req)` は `ACT.new(actors)` で作った表に、`_spot_newlines`・`_choice_newlines`（`pasta.config` から読む `[ghost]` の `spot_newlines`・`choice_newlines`。既定はどちらも 1.5）と `req`（SHIORI のリクエストの表）を足し、メタテーブルを `SHIORI_ACT_IMPL` に付け替える。`act.req` のフィールドは [act.req](../lua/shiori-events.md#actreq) が正である。
 
 シーンのコルーチンに渡った ACT は、そのコルーチンが終わるまで使われ続ける（[再開のループ](execution-model.md#再開のループresume_until_valid)）。Call で呼んだ先のシーン関数も同じ ACT を受け取るため、`var` と `token` は呼び出しの連鎖の全体で共有される。
 
