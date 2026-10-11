@@ -40,7 +40,7 @@ argument-hint: <feature-name>
 - **中断せず一連で完遂する** — 全ステップを止めずに実行
 - **VSCodeの変更ファイル確定挙動を回避** — spec.json編集は移動後に行う
 - **ステアリングが正** — DoD・コミット規約・禁止事項はすべて workflow.md に従う
-- **繰り返し仕様は移動しない** — `release-workflow` 等は常に `.kiro/specs/` 直下に留まる
+- **繰り返し仕様は移動しない** — `review-improvement-loop` 等は常に `.kiro/specs/` 直下に留まる
 - **未解決問題を取りこぼさない** — アーカイブした後では拾い漏れに気付けない。DoD ゲートより前に棚卸しし、軽微なものはその場で直し、残りは起票・申し送りする（冒頭ステップ）
 
 ## 前提条件
@@ -49,7 +49,7 @@ argument-hint: <feature-name>
 
 ## 例外: 繰り返し仕様
 
-`release-workflow` のような繰り返し実行型仕様は `completed/` に**移動しない**。
+`review-improvement-loop` のような繰り返し実行型仕様は `completed/` に**移動しない**。
 
 判定基準:
 - spec.json や requirements.md に「繰り返し」「repeatable」「定期実行」等の記述がある

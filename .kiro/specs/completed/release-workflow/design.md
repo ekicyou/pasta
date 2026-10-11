@@ -1,5 +1,7 @@
 # Technical Design: release-workflow
 
+> **完了（2026-10-11）**: 段 1〜9・判定表・定型コマンドは、`release` スキル（`.claude/skills/release/` の `SKILL.md`・`procedure.md`・`scripts/`）へ移した。手順を直すときは、スキルを直す。本書は設計の経緯の記録で、`scripts/` などのパスは移す前のものである。済んだ一回限りの部分（段 10・判定表 S2・F2）は、スキルへ移していない。
+
 ## Overview
 
 **Purpose**: 本設計は、pasta のリリース手順を、エージェントが開発者の指示のもとで繰り返し実行できる形に定める。エージェントは版を決め、版を上げたコミットを PR で main に入れ、リリースタグを push し、リリース CI の結果を確かめる。検査・ビルド・公開はリリース CI（`.github/workflows/release.yml`）が行う。

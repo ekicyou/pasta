@@ -1,5 +1,7 @@
 # Requirements Document
 
+> **完了（2026-10-11）**: 本仕様の手順は `release` スキル（`.claude/skills/release/`）へ移し、本仕様は完了にした（開発者の指示）。「繰り返し実行型」「永続的未完了」（Requirement 10）と `/kiro-impl release-workflow` での実行は、スキルの `/release` に置き換わった。Requirement 11・12 は済んでいる。本書は記録である。
+
 ## Project Description (Input)
 
 ### リリース仕様（リリース CI に合わせた書き直し版）

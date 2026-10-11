@@ -1,7 +1,7 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-  定型コマンド C: タグを付ける前の検査（release-workflow の段 5・6・8）。読むだけで、何も変えない。
+  定型コマンド C: タグを付ける前の検査（release スキルの段 5・6・8）。読むだけで、何も変えない。
 .DESCRIPTION
   .github/scripts/release/verify-tag.ps1 と同じ 4 つの条件を、タグを付けるコミットの中身で確かめる。
   4 行とも「合格」であること。先に git fetch origin main を済ませ、リポジトリのルートを作業ディレクトリにして実行する。
@@ -10,7 +10,7 @@
 .PARAMETER Target
   タグを付けるコミットの SHA。
 .EXAMPLE
-  & "$PWD/.kiro/specs/release-workflow/scripts/pretag-check.ps1" -Version 0.3.8 -Target <SHA>
+  & "$PWD/.claude/skills/release/scripts/pretag-check.ps1" -Version 0.3.8 -Target <SHA>
 #>
 param([Parameter(Mandatory)][string]$Version, [Parameter(Mandatory)][string]$Target)
 $V = $Version -replace '^v', ''

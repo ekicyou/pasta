@@ -1,14 +1,14 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-  定型コマンド B: リリース CI の結果の読み取り（release-workflow の段 7・10）。読むだけで、何も変えない。
+  定型コマンド B: リリース CI の結果の読み取り（release スキルの段 7）。読むだけで、何も変えない。
 .DESCRIPTION
   実行・job・公開の step の結論と、公開の step がログに書いた status= の行を出す。実行が completed になってから使う。
-  出力の形は design.md の Data Models。リポジトリのルートを作業ディレクトリにして実行する。
+  出力の形は procedure.md の「定型コマンド B の出力」。リポジトリのルートを作業ディレクトリにして実行する。
 .PARAMETER Run
   リリース CI の実行の ID。
 .EXAMPLE
-  & "$PWD/.kiro/specs/release-workflow/scripts/ci-result.ps1" -Run 1234567890
+  & "$PWD/.claude/skills/release/scripts/ci-result.ps1" -Run 1234567890
 #>
 param([Parameter(Mandatory)][string]$Run)
 $r = (gh run view $RUN --json status,conclusion,attempt,url,headSha,jobs) -join "`n" | ConvertFrom-Json

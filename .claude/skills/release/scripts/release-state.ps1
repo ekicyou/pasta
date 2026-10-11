@@ -1,15 +1,15 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-  定型コマンド A: リリースの状態の照会（release-workflow の段 2・3・7・8）。読むだけで、何も変えない。
+  定型コマンド A: リリースの状態の照会（release スキルの段 2・3・7・8）。読むだけで、何も変えない。
 .DESCRIPTION
   main の版・リモートのタグ・公開先（crates.io・VSCode Marketplace・GitHub Release）・リリース CI の実行・
-  版の更新の PR・初回の記録を調べ、1 行に 1 つの事実を「 | 」区切りで出す。出力の形は design.md の Data Models。
+  版の更新の PR を調べ、1 行に 1 つの事実を「 | 」区切りで出す。出力の形は procedure.md の「定型コマンド A の出力」。
   リポジトリのルートを作業ディレクトリにして実行する。
 .PARAMETER Version
   調べる版（X.Y.Z）。省略すると origin/main の版を調べる。
 .EXAMPLE
-  & "$PWD/.kiro/specs/release-workflow/scripts/release-state.ps1" -Version 0.3.8
+  & "$PWD/.claude/skills/release/scripts/release-state.ps1" -Version 0.3.8
 #>
 param([string]$Version = '')
 $V = $Version -replace '^v', ''
@@ -105,9 +105,6 @@ else {
     $pr = @(($prs -join "`n" | ConvertFrom-Json) | Where-Object { $_.title -ceq "chore(release): v$V" })
     if ($pr.Count) { $pr | ForEach-Object { "PR | 未統合 | #$($_.number) | $($_.headRefName) | $($_.url)" } } else { 'PR | 無し' }
 }
-# 初回の CI リリースの記録
-$rec = git ls-tree origin/main --name-only -- .kiro/specs/release-workflow/first-ci-release.md
-"初回の記録 | $(if ($rec) { 'あり' } else { '無し' })"
 $maxAll = if ($all.Count) { ($all | Sort-Object)[-1] } else { $null }
 "集計 | $V の公開済み $found/7 | 不明 $unknown"
 if ($maxAll -and $unknown -eq 0) { "提案 | $($maxAll.Major).$($maxAll.Minor).$($maxAll.Build + 1)（すべての出どころの最大 $maxAll の PATCH + 1）" } else { '提案 | 出せない（不明がある）' }

@@ -205,7 +205,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
   - **成果物**: build が CI 上でソースから `pasta.dll.zip`（`pasta.dll`＋`THIRD_PARTY_LICENSES.txt`）・`hello-pasta.nar`・`pasta-vscode-X.Y.Z.vsix` を作り、artifact `release-assets` で後続 job に渡す。github-release が GitHub Release（題名 `pasta vX.Y.Z`・リリースノートはコミット履歴から生成）を作って 3 つを添付する
   - **認証は OIDC**: crates.io は Trusted Publishing、Marketplace は Azure のマネージド ID（フェデレーション資格情報）。長期のトークン（crates.io の API トークン・Marketplace の PAT）は使わず、開発機（`CARGO_REGISTRY_TOKEN`・`VSCE_PAT`）にも GitHub の secret にも置かない。crates.io の短命トークンは job の中で auth の直後に発行し、直後の publish step だけに渡す。crates.io・Marketplace の公開 job（publish-crates・publish-vsce）は environment `release` で走る
   - 公開先ごとに「公開済みなら飛ばす」冪等な処理で、失敗した job の再実行で続きから回復する。job の補助スクリプトは `.github/scripts/release/*.ps1`（pwsh 7）
-  - 一回限りのセットアップ手順は `.github/release-ci-setup.md`、その確認は `.github/workflows/release-setup-check.yml`（手動起動・公開しない）。リリース手順は `crates/pasta_sample_ghost/RELEASE.md`
+  - 一回限りのセットアップ手順は `.github/release-ci-setup.md`、その確認は `.github/workflows/release-setup-check.yml`（手動起動・公開しない）。人が読むリリース手順書は `crates/pasta_sample_ghost/RELEASE.md`。エージェントが実行する手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認）は `release` スキル（`/release [X.Y.Z]`）にあり、手順を直すときはスキルを直す
   - 手元の `release.ps1`・`npm run package` の成果物は動作確認用で、コミットしない（`release/` とサンプルゴーストの生成物は `.gitignore` 済み）。`Cargo.lock` はコミットする
 
 ## 利用者マニュアル（ドキュメントサイト `book/`）

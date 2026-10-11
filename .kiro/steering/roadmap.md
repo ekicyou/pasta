@@ -10,7 +10,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - **Phase 12: 初心者向けの入門ガイド**。段階辞書・マニュアルの着せ替え・入門ガイドの本文は済んだ。残るのは、hello-pasta の新しいシェル、スクリーンショット、本文の実機確認で見つかった見え方の不具合と検査の穴。
 - **Phase 13: areka でノベルゲーム（0.5.0）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を 9 本起こした。areka への依頼（`novel-areka-contract`）だけは、0.4.0 と並べて先に進める。
 
-このほか、リリース手順（常駐 spec `release-workflow`）の CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ（2026-10-10）。
+このほか、リリース手順（spec `release-workflow`）の CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ（2026-10-10）。リリース手順は `release` スキル（`/release`）へ移し、spec `release-workflow` は完了にした（2026-10-11）。
 
 **優先順位（開発者の方針 2026-10-10）**: 次の節目は 0.4.0 で、主題は「入門者にやさしく」である（下の「0.4.0 までの道筋」）。その次の 0.5.0 の目標は、areka でノベルゲームが作れるようになること。そこに入れた spec を先に進め、ほかは 0.4.0 の後に回す（トークンの予算のため）。致命的な不具合は、見つかりしだい割り込ませる。2026-10-11 に、撫で・つつきの反応のショートカット（`touch-poke-shortcuts`）を高優先度に置いた。0.4.0 の残りの spec より先に始める。
 
@@ -53,13 +53,13 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 12（前半） | 段階ごとに起動できる hello-pasta の辞書と段階表、マニュアルの「Claudia のマニュアル」への着せ替えと台詞の部品 | hello-pasta-tutorial-stages, manual-claudia-theme |
 | 12（本文） | 入門ガイドの本文を、段階表に沿った 16 章（入口・準備 2・段の章 13）の物語に書き直した。段の章と辞書の逐語の照合、本文の検査、目次の開閉の持ち越しを足した | getting-started-story-guide |
 | — | リリースの CI 化（タグの push で crates.io・Marketplace・GitHub Release へ公開。認証は OIDC、成果物の git 追跡を解除） | release-ci |
+| — | リリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認）。リリース CI に合わせて書き換え、CI での初回のリリース（v0.3.8）を済ませ、手順を `release` スキル（`.claude/skills/release/`）へ移した | release-workflow |
 | — | 動的単語参照 `＠＄`（旧文法仕様の将来項目 B2） | dynamic-word-reference |
 
 ロードマップを置く前の初期開発（DSL・トランスパイラ・ランタイム・SHIORI・alpha リリースなど）の spec も `.kiro/specs/completed/` にある。
 
 ### 常駐 spec（再実行型・`completed/` へ移さない）
 
-- `release-workflow` — crates.io・VSIX・ゴーストのリリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認。CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ。下の「リリース」）
 - `review-improvement-loop` — レビュー領域 × 7 次元の改善ループ
 
 ### 却下（2026-10-01）
@@ -91,7 +91,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 5 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
 | 6 | getting-started-screenshots | Opus | 4〜6 | `boot-surface-without-dic` と `touch-poke-shortcuts` の後（最後に撮る。`hello-pasta-shell-art` と `choice-line-layout` は完了した） |
 | 7 | release-notes-highlights | Opus | 5〜8 | 今すぐ（2026-10-11 開発者の依頼で足した。リリースの実行中は main へ入れない） |
-| 8 | 0.4.0 のリリース（常駐 spec `release-workflow`） | Opus | — | 上の全部の後 |
+| 8 | 0.4.0 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
 並走するときの約束（「棚卸」のウェーブの約束に足す）:
 
@@ -101,7 +101,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - `getting-started-screenshots` は、6 段目（時報）の撮り方を `baseware-virtual-time` に頼らない。失敗の表記を絵に写すなら、`failure-output-unification` の後に撮る。
 - 0.4.0 のリリースノートに、失敗の表記が変わったことを書く。`release-notes-highlights` が入っていれば、本文の見どころに書く。
 - `touch-poke-shortcuts` が触るのは、イベント層の新しいファイル（`pasta_scripts/pasta/shiori/event/`。`init.lua` には `require` を 1 行足すだけ）、hello-pasta の 8・9 段目（`dic/08-touch.pasta`・`dic/09-choice.pasta`・`STAGES.md`・`src/scripts.rs`・`tests/tutorial_stages_test.rs`）、入門の章（`08-touch.md`・`09-choice.md`）とリファレンスである。`act.lua`・`sakura_builder.lua`・`choice_select.lua`・文法・トランスパイラを触らない。設定を足す場合は、設定の読み込み（`loader/config/`）が `failure-output-unification`・`boot-surface-without-dic` と重なるので、後から入る側が合わせる。`manual-shell-guide` は `08-touch.md` にリンクを足すので、後から入る側が合わせる。`getting-started-screenshots` は、この spec の後に 8・9 段目を撮る。
-- `release-notes-highlights` は、`release.yml` の verify と github-release の段、`release-workflow` の手順の文書を触る。`pasta-check-dic-validate` が `release.yml` の `pasta_check` の公開の段を触る場合は、段が別なので、後から入る側が合わせる。
+- `release-notes-highlights` は、`release.yml` の verify と github-release の段、`release` スキルの手順の文書（`.claude/skills/release/`）を触る。`pasta-check-dic-validate` が `release.yml` の `pasta_check` の公開の段を触る場合は、段が別なので、後から入る側が合わせる。
 
 0.4.0 の後（この順）: `scene-attribute-store`（Fable）、`shiori-test-support-runtime`（Opus）、`runtime-error-balloon`、`call-attribute-filter`、`scene-anchor-link`、`baseware-virtual-time`。このうち `scene-attribute-store` と `call-attribute-filter` は、0.5.0 の道筋に入った（下の「Phase 13」）。残りの 4 本をどこに挟むかは、0.4.0 を出した後の棚卸で決める。
 
@@ -290,7 +290,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）と、ガイ�
 | 9 | novel-save-slots | Opus | 8〜12 | `novel-checkpoint-rollback` |
 | 10 | hello-novel-sample | Opus | 15〜18 | 2〜9 の全部と、areka の側の実装 |
 | 11 | manual-novel-guide | Opus | 8〜12 | `hello-novel-sample` |
-| 12 | 0.5.0 のリリース（常駐 spec `release-workflow`） | Opus | — | 上の全部 |
+| 12 | 0.5.0 のリリース（`release` スキル） | Opus | — | 上の全部 |
 
 どれとどれを同じウェーブに並べられるかは、0.4.0 を出した後の棚卸で、ソースの持ち場を測って決める。
 
@@ -312,13 +312,13 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）と、ガイ�
 - ノベルを 1 本の配布物としてどう起動するか、動画が要るか — `novel-areka-contract` の要件。
 - 数のしきい値（好感度が 50 以上、など）の書き方 — `call-attribute-filter` の要件。
 
-## リリース（常駐 spec `release-workflow`）
+## リリース（`release` スキル）
 
-リリースの CI 化（`release-ci`）、常駐 spec の手順の書き換え、CI での初回のリリース（v0.3.8）とその後片付けは、2026-10-10 までにすべて済んだ。タグ `vX.Y.Z` の push だけで公開まで進む。記録は `.kiro/specs/release-workflow/first-ci-release.md` と、同じフォルダの `design.md` にある。**残るのは、失敗した job の再実行の読み方の確認である**（初回は失敗が起きなかったので未確認。失敗が起きたリリースで確かめる）。
+リリースの CI 化（`release-ci`）、リリース手順（spec `release-workflow`）の書き換え、CI での初回のリリース（v0.3.8）とその後片付けは、2026-10-10 までにすべて済んだ。タグ `vX.Y.Z` の push だけで公開まで進む。記録は `.kiro/specs/completed/release-workflow/first-ci-release.md` と、同じフォルダの `design.md` にある。手順は 2026-10-11 に `release` スキル（`.claude/skills/release/`）へ移し、spec は完了にした。手順を直すときは、スキルを直す。**残るのは、失敗した job の再実行の読み方の確認である**（初回は失敗が起きなかったので未確認。失敗が起きたリリースで確かめる）。
 
-- **以後のリリース**: 新しい作業ブランチ（ハーネスのワークツリー）で `/kiro-impl release-workflow` を実行する。失敗した job の再実行の読み方（`design.md`「CI での初回のリリースで確かめること」の 3）を確かめるまでは Opus で実行し、確かめたら Sonnet で実行する（開発者決定 2026-10-10）。
+- **以後のリリース**: 新しい作業ブランチ（ハーネスのワークツリー）で `/release` を実行する（版を指定するときは `/release 0.4.0`）。失敗した job の再実行の読み方（スキルの `SKILL.md`「まだ実地で確かめていない読み方」）を確かめるまでは Opus で実行し、確かめたら Sonnet で実行する（開発者決定 2026-10-10）。
 - **席**: リリースの実行中は、`release.ps1`・`release.yml` を触る spec を main へ入れない。
-- **リリースの本文の作り直し**（2026-10-11 起票 `release-notes-highlights`）: 今の本文は、コミットの件名を全件並べた一覧で、何が良くなったのかを読み取れない（v0.3.8 は 57 行）。本文を、注目に値するいくつかの内容を Claudia（令嬢）の口調で紹介する文章にし、全件の一覧は Assets に添付する。spec 名は載せない。見どころは、版を上げるコミットでリポジトリのファイルとして書き、リリース CI が本文に使う（開発者の決定。公開の後で書き換える案と、機械だけで短くする案は採らない）。この spec は、`release-workflow` の段 4 の「5 ファイルだけ」を変える。見出しには元になった PR の番号を付ける。公開済みの v0.3.8 の 1 本も、同じ形に直す（それより前は触らない）。areka のリポジトリの `areka-P0-release-notes-highlights` と、決定と議題をそろえてある。
+- **リリースの本文の作り直し**（2026-10-11 起票 `release-notes-highlights`）: 今の本文は、コミットの件名を全件並べた一覧で、何が良くなったのかを読み取れない（v0.3.8 は 57 行）。本文を、注目に値するいくつかの内容を Claudia（令嬢）の口調で紹介する文章にし、全件の一覧は Assets に添付する。spec 名は載せない。見どころは、版を上げるコミットでリポジトリのファイルとして書き、リリース CI が本文に使う（開発者の決定。公開の後で書き換える案と、機械だけで短くする案は採らない）。この spec は、`release` スキルの段 4 の「5 ファイルだけ」を変える。見出しには元になった PR の番号を付ける。公開済みの v0.3.8 の 1 本も、同じ形に直す（それより前は触らない）。areka のリポジトリの `areka-P0-release-notes-highlights` と、決定と議題をそろえてある。
 - **運用の注意**（一回限りのセットアップで分かったこと）:
   - Azure のリソースを `az` で作る・変えるには MFA が要る。WAM（Windows のサインイン窓）でログインすると `RequestDisallowedByAzure` で弾かれる。`az config set core.enable_broker_on_windows=false` にしてからブラウザーで `az login` し直す。ワークフローのマネージド ID には関係ない。
   - Marketplace の Members の管理には、公式の CLI が無い（vsce・az・gh のどれも扱えない）。画面から行う。
