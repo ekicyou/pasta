@@ -142,6 +142,48 @@ local function emits_text(inner)
     return false -- それ以外の型は字を出さない（3.4）
 end
 
+--- テキストの中の、引数の無い `\c` の場所（字の判定と同じく APPEARANCE.tag_at で読む。
+--- エスケープと囲みの中はタグとして読まない）
+--- @param s string
+--- @return integer|nil first 最初の `\c` の位置（無ければ nil）
+--- @return integer|nil after 最後の `\c` の直後の位置
+local function clear_span(s)
+    local first, after
+    local pos = 1
+    while true do
+        local i = s:find("\\", pos, true)
+        if not i then
+            return first, after
+        end
+        local name, arg, next_pos = APPEARANCE.tag_at(s, i)
+        if name == "c" and arg == nil then
+            first = first or i
+            after = next_pos
+        end
+        pos = next_pos
+    end
+end
+
+--- 内側トークンの字と、台詞に書いた `\c`（吹き出しの消去）を読む。
+--- `\c` を読むのは talk・sakura_script のテキストだけ（raw_script・選択肢の表示は読まない）
+--- @param inner table 内側トークン
+--- @return boolean lead 最初の `\c` より前に字があるか（`\c` が無ければ emits_text と同じ）
+--- @return boolean cleared 引数の無い `\c` があるか
+--- @return boolean trail 最後の `\c` より後ろに字があるか
+local function text_parts(inner)
+    local t = inner.type
+    if inner.text == nil or (t ~= "talk" and t ~= "sakura_script") then
+        return false, false, false
+    end
+    local text = tostring(inner.text)
+    local first, after = clear_span(text)
+    if not first then
+        return emits_text(inner), false, false
+    end
+    return emits_text({ type = t, text = text:sub(1, first - 1) }), true,
+        emits_text({ type = t, text = text:sub(after) })
+end
+
 --- actorグループ内の単一トークンをさくらスクリプト文字列へ変換する
 --- @param actor table|nil グループの発言アクター
 --- @param inner table グループ内トークン
@@ -219,7 +261,7 @@ end
 --- @param input_actor_spots table<string, integer>|nil アクターごとのスポット位置マップ（直接変更される）
 --- @param appearance table|nil 外見状態（直接変更される。nil ならビルドローカルの空状態）
 --- @return string さくらスクリプト文字列（\e終端）
--- ponytail: トークン種別の分岐が集まるため複雑度 22 > 15 を許容。分割はリファクタ時に（特性化テスト先行）。
+-- ponytail: トークン種別の分岐が集まるため複雑度 28 > 15 を許容。分割はリファクタ時に（特性化テスト先行）。
 function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) -- luacheck: ignore 561
     config = config or {}
     local spot_newlines = config.spot_newlines or 1.5
@@ -276,6 +318,8 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
 
             local tail_spot = last_spot or 0 -- 話し手なしのグループはスポット 0 の吹き出しに出る
             for _, inner in ipairs(token.tokens) do
+                -- lead: 字を出すトークンか（台詞に書いた `\c` があれば、最初の `\c` より前の字だけを見る）
+                local lead, cleared, trail = text_parts(inner)
                 if inner.type == "clear" then
                     -- S4b: `\c` を従来どおり出力（emit_inner_token 経由で不変）したうえで、
                     -- 現在スポットの has-text を偽へリセットし pending を破棄する。
@@ -293,7 +337,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                     buffer:put(choice_break(spot_tail[tail_spot], choice_newlines))
                     spot_tail[tail_spot] = "choice"
                     emit_inner_token(buffer, actor, inner, appearance, last_spot)
-                elseif emits_text(inner) then
+                elseif lead then
                     -- S3: 字を出すトークン（字のある talk・字を表示する sakura_script）。
                     -- 改行 → has-text 設定 → 本文 の順を厳守。
                     -- 区切りは 1 つだけ出す（保留があればそれだけ。無くて選択肢の後なら `\n`）。
@@ -312,6 +356,16 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                     -- S4: 字の無い talk・字を表示しない sakura_script・surface・wait・newline・
                     -- choice_timeout・raw_script。変換出力のみ（has-text・pending・最後に表示したもの不変）。
                     emit_inner_token(buffer, actor, inner, appearance, last_spot)
+                end
+                if cleared then
+                    -- S4d: 台詞に書いた `\c`（S3・S4 のどちらを通ったトークンにも当てる）。
+                    -- clear のトークン（S4b）と同じに状態を戻す。最後の `\c` より後ろの字は、
+                    -- 消した吹き出しの最初の字として記録する（区切りは出さない）。
+                    pending_break = false
+                    if last_spot ~= nil then
+                        spot_has_text[last_spot] = trail
+                    end
+                    spot_tail[tail_spot] = trail and "text" or nil
                 end
             end
         elseif t == "raw_script" then

@@ -62,7 +62,7 @@
 
 - `GhostConfig`（`crates/pasta_lua/src/loader/config/sections.rs`）— `[ghost]` の既定値の出どころ（SSOT）。`choice_newlines` の既定値はここに 1 つだけ置く。
 - `pasta.config`（`@pasta_config`）— `pasta/shiori/act.lua` からだけ読む。`sakura_builder.lua` は設定を読まず、引数の表（`BuildConfig`）で受け取る。
-- `pasta.shiori.appearance` の `tag_at` — 既にある `emits_text` を通してだけ使う。新しい呼び出しは足さない。
+- `pasta.shiori.appearance` の `tag_at` — 既にある `emits_text` と、`\c` を探す局所関数（`clear_span`）から使う。ほかの呼び出しは足さない。
 - 依存の向きは `pasta.shiori.act` → `pasta.shiori.sakura_builder` のままにする。逆向きの依存、新しい Lua モジュール、新しいクレート、外部ライブラリを足さない。
 - 実機の確認は SSP と SSP の MCP を使う（`research.md` の「実機での確認」と同じ手順）。
 

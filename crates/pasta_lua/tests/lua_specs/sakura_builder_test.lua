@@ -2639,13 +2639,13 @@ describe("SAKURA_BUILDER - paragraph-break-tag-only-talk: 字の無いトーク�
 end)
 
 -- ============================================================================
--- choice-line-layout: 選択肢の行の配置（Task 2.1）
+-- choice-line-layout: 選択肢の行の配置
 -- 選択肢の前と、選択肢の後の台詞の前に出す行の区切りを完全一致で固定する。
 -- 既定設定（script_wait_normal=50 → 実効ウェイト 0）で句読点の無いテキストを使い、ウェイトを入れない。
 -- スポットは さくら=0・うにゅう=1 を明示する（スポット共有の復旧タグを出さない）。
 -- ============================================================================
 
-describe("SAKURA_BUILDER - choice-line-layout: 選択肢の行の配置（Task 2.1）", function()
+describe("SAKURA_BUILDER - choice-line-layout: 選択肢の行の配置", function()
     local function group(actor, inner_tokens)
         return { type = "actor", actor = actor, tokens = inner_tokens }
     end
@@ -2878,5 +2878,144 @@ describe("SAKURA_BUILDER - choice-line-layout: 選択肢の行の配置（Task 2
         expect(native):toBe("\\p[0]どれ\\n[150]" .. Q1 .. "\\n" .. Q2 .. "\\nつづき"
             .. "\\p[1]はやく\\n[150]" .. Q1 .. "\\p[0]\\n[150]うーん\\e")
         expect(fallback):toBe(native)
+    end)
+
+    -- ------------------------------------------------------------------------
+    -- Task 2.3: 台詞に書いた \c を吹き出しの消去として数える（7.1〜7.4）
+    -- DSL の台詞の行に書いた \c は、テキストが \c だけの sakura_script になる。
+    -- ------------------------------------------------------------------------
+    local function script(actor, text)
+        return { type = "sakura_script", actor = actor, text = text }
+    end
+
+    test("2.3/7.1: 字 → 台詞に書いた \\c → 選択肢 → 選択肢で、最初の選択肢は区切らず 2 つ目の前に \\n が出る", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local result = BUILDER.build({
+            group(a, { talk(a, "まえおき"), script(a, "\\c"), choice("甲"), choice("乙") }),
+        }, {}, spots())
+        expect(result):toBe("\\p[0]まえおき\\c" .. Q1 .. "\\n" .. Q2 .. "\\e")
+    end)
+
+    -- 既存の「\c は保留改行を破棄し…has-text を偽へリセットする」の並びを、clear の代わりに \c で書く
+    test("7.2: 台詞に書いた \\c は保留を捨て、その吹き出しの字の記録を消す（\\n[150] が出ない）", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+
+        -- 話し手が戻った直後に \c と台詞（保留を捨てる）
+        local discard = BUILDER.build({
+            group(a, { talk(a, "やあ") }),
+            group(b, { talk(b, "はい") }),
+            group(a, { script(a, "\\c"), talk(a, "つぎ") }),
+        }, {}, spots())
+        expect(discard):toBe("\\p[0]やあ\\p[1]はい\\p[0]\\cつぎ\\e")
+
+        -- 戻った吹き出しを \c で消し、字を表示しない別の話し手を挟んで、もう一度戻る（字の記録を消す）
+        local revisit = BUILDER.build({
+            group(a, { talk(a, "やあ") }),
+            group(b, { talk(b, "はい") }),
+            group(a, { script(a, "\\c") }),
+            group(b, { { type = "surface", id = 6 } }),
+            group(a, { talk(a, "つぎ") }),
+        }, {}, spots())
+        expect(revisit):toBe("\\p[0]やあ\\p[1]はい\\p[0]\\c\\p[1]\\s[6]\\p[0]つぎ\\e")
+
+        -- 字の後に \c で消した吹き出しへ、別の話し手の後で戻る
+        local reset = BUILDER.build({
+            group(a, { talk(a, "やあ"), script(a, "\\c") }),
+            group(b, { talk(b, "はい") }),
+            group(a, { talk(a, "つぎ") }),
+        }, {}, spots())
+        expect(reset):toBe("\\p[0]やあ\\c\\p[1]はい\\p[0]つぎ\\e")
+    end)
+
+    test("7.3: 引数つきの \\c・\\x・\\C・エスケープ・囲みの中・raw_script の \\c は状態を変えない", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        -- { 型, テキスト, そのトークンが字を出すか（字の判定は今のまま） }
+        local cases = {
+            { "sakura_script", "\\c[char,1]", false },
+            { "sakura_script", "\\c[line,1]", false },
+            { "sakura_script", "\\x", false },
+            { "sakura_script", "\\C", false },
+            { "sakura_script", "\\\\c", false },      -- エスケープ `\\` と c（sakura_script はタグだけを字に数える）
+            { "sakura_script", "\\_?\\c\\_?", true }, -- 囲みの中（中身のある囲みは字）
+            { "talk", "\\c[char,1]", false },
+            { "talk", "\\\\c", true },
+            { "raw_script", "\\c", false },
+        }
+        for _, case in ipairs(cases) do
+            local text, shows_text = case[2], case[3]
+            local function x()
+                return { type = case[1], actor = a, text = text }
+            end
+
+            -- 選択肢の配置: 字の後のままなので、選択肢の前に \n[150] が出る
+            local before_choice = BUILDER.build({
+                group(a, { talk(a, "どれ"), x(), choice("甲") }),
+            }, {}, spots())
+            expect(before_choice):toBe("\\p[0]どれ" .. text .. "\\n[150]" .. Q1 .. "\\e")
+
+            -- 話し手の切り替えの区切り: 保留は捨てられず、次の字の直前に \n[150] が出る
+            local returned = BUILDER.build({
+                group(a, { talk(a, "やあ") }),
+                group(b, { talk(b, "はい") }),
+                group(a, { x(), talk(a, "つぎ") }),
+            }, {}, spots())
+            local tail = shows_text and ("\\n[150]" .. text .. "つぎ") or (text .. "\\n[150]つぎ")
+            expect(returned):toBe("\\p[0]やあ\\p[1]はい\\p[0]" .. tail .. "\\e")
+        end
+
+        -- グループの外の raw_script も数えない
+        local top = BUILDER.build({
+            group(a, { talk(a, "どれ") }),
+            { type = "raw_script", text = "\\c" },
+            group(a, { choice("甲") }),
+        }, {}, spots())
+        expect(top):toBe("\\p[0]どれ\\c\\n[150]" .. Q1 .. "\\e")
+    end)
+
+    test("7.4: talk の「まえ \\c あと」は、まえに今までどおりの区切りを当て、あとを消した吹き出しの最初の字に数える", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+
+        -- 保留があれば「まえ」の前（トークンの前）に \n[150] が出る。出力する文字列は切らない
+        local pending = BUILDER.build({
+            group(a, { talk(a, "やあ") }),
+            group(b, { talk(b, "はい") }),
+            group(a, { talk(a, "まえ\\cあと") }),
+        }, {}, spots())
+        expect(pending):toBe("\\p[0]やあ\\p[1]はい\\p[0]\\n[150]まえ\\cあと\\e")
+
+        -- 別の話し手の後で戻ると、最後の \c より後ろに字があるときだけ \n[150] が出る
+        local function returning(text)
+            return BUILDER.build({
+                group(a, { talk(a, text) }),
+                group(b, { talk(b, "はい") }),
+                group(a, { talk(a, "つぎ") }),
+            }, {}, spots())
+        end
+        expect(returning("まえ\\cあと")):toBe("\\p[0]まえ\\cあと\\p[1]はい\\p[0]\\n[150]つぎ\\e")
+        expect(returning("まえ\\c")):toBe("\\p[0]まえ\\c\\p[1]はい\\p[0]つぎ\\e")
+        expect(returning("まえ\\cなか\\c")):toBe("\\p[0]まえ\\cなか\\c\\p[1]はい\\p[0]つぎ\\e")
+        expect(returning("\\c\\cあと")):toBe("\\p[0]\\c\\cあと\\p[1]はい\\p[0]\\n[150]つぎ\\e")
+
+        -- 選択肢の後: 「まえ」の前に \n が出る。「あと」は字なので、次の選択肢の前は \n[150]
+        local after_choice = BUILDER.build({
+            group(a, { choice("甲"), talk(a, "まえ\\cあと"), choice("乙") }),
+        }, {}, spots())
+        expect(after_choice):toBe("\\p[0]" .. Q1 .. "\\nまえ\\cあと\\n[150]" .. Q2 .. "\\e")
+
+        -- \c より前に字が無ければ、選択肢の後でも区切りを出さない
+        local no_lead = BUILDER.build({
+            group(a, { choice("甲"), talk(a, "\\cあと"), choice("乙") }),
+        }, {}, spots())
+        expect(no_lead):toBe("\\p[0]" .. Q1 .. "\\cあと\\n[150]" .. Q2 .. "\\e")
+
+        -- \c より後ろに字が無ければ、次の選択肢は消した吹き出しの最初の選択肢
+        local no_trail = BUILDER.build({
+            group(a, { talk(a, "まえ\\c"), choice("甲") }),
+        }, {}, spots())
+        expect(no_trail):toBe("\\p[0]まえ\\c" .. Q1 .. "\\e")
     end)
 end)

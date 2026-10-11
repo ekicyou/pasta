@@ -886,4 +886,21 @@ describe("SHIORI_ACT - choice-line-layout: act:choice の行の配置", function
         expect(act:build()):toBe("\\p[0]どれ\\n[150]\\![*]\\q[甲,甲先]\\n\\![*]\\q[乙,乙先]\\e")
         STORE.reset()
     end)
+
+    -- Task 2.3: act:sakura_script(話し手, "\\c") は、DSL の台詞の行に書いた \c が生成する呼び出し
+    test("7.1/7.2: 台詞に書いた \\c の後は、act:choice の前にも、話し手が戻った後の talk の前にも区切りが出ない", function()
+        local act, sakura, kero, STORE = new_bytes_act()
+        act:talk(sakura, "まえおき")
+        act:sakura_script(sakura, "\\c")
+        act:choice("甲先", "甲")
+        act:choice("乙先", "乙")
+        expect(act:build()):toBe("\\p[0]まえおき\\c\\![*]\\q[甲,甲先]\\n\\![*]\\q[乙,乙先]\\e")
+
+        act:talk(sakura, "やあ")
+        act:talk(kero, "はい")
+        act:sakura_script(sakura, "\\c")
+        act:talk(sakura, "つぎ")
+        expect(act:build()):toBe("\\p[0]やあ\\p[1]はい\\p[0]\\cつぎ\\e")
+        STORE.reset()
+    end)
 end)

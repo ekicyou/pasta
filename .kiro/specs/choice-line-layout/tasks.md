@@ -40,7 +40,7 @@
   - _Requirements: 2.6, 3.1, 3.2, 3.3_
   - _Boundary: ExpectationUpdates_
 
-- [ ] 2.3 台詞に書いた `\c` を吹き出しの消去として数える
+- [x] 2.3 台詞に書いた `\c` を吹き出しの消去として数える
   - `talk` と `sakura_script` のテキストの中の、引数の無い `\c` を、字の判定と同じ読み方（エスケープと囲みの中はタグとして読まない）で探す
   - `\c` があるトークンは、設計書「台詞に書いた `\c`」の順で扱う: 最初の `\c` より前の字は今までどおり（区切りをトークンの前に出す）、`\c` の場所で `clear` と同じに 3 つの状態を戻す、最後の `\c` より後ろの字は消した吹き出しの最初の字として記録する（区切りは出さない）。出力する文字列は切らずにそのまま出す
   - 数えないもの: 引数つきの `\c[char,…]`・`\c[line,…]`、`\x`、`\C`、`raw_script` のテキスト、選択肢の表示の文字
@@ -111,3 +111,9 @@
   - 完了の状態: `research.md` に、直した後のさくらスクリプトの文字列・見え方・クリックと時間切れの結果・洗い出しの結果が残っている
   - _Requirements: 1.1, 1.2, 1.3, 4.1, 4.2, 4.6, 6.1, 6.2, 6.3, 6.4, 6.5_
   - _Boundary: FieldVerification, FieldRecord_
+
+## Implementation Notes
+
+- `lua_unittest_runner` は、最初に落ちたスイートで止まる。`tests/lua_specs/init.lua` で後ろに並ぶスイートは走らない。後ろのスイートの失敗を見るときは `-- --nocapture` で describe ごとの結果を読む。
+- `cargo test -p pasta_lua` は、`tests/fixtures/sample.generated.lua`（改行だけ）と、まれに `profile/pasta/save/save.json`（並列の競合で壊れた JSON）を書き換える。コミットの前に、その 2 つだけを `git checkout --` で戻す。
+- `\c[]`（空の括弧）は引数つきとして読まれて消去に数えない。閉じない `\c[` は引数の無い `\c` として数える（`APPEARANCE.tag_at` の読みのまま）。
