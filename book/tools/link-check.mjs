@@ -398,16 +398,17 @@ export function checkInternalsPaths(repoRoot = REPO_ROOT) {
   return broken;
 }
 
-// ---- クレート README の公開マニュアル URL 実在検査（readme-manual-url） ----
-// pasta-runtime-internals-doc タスク 1.2（要件 7.5, 7.8, 1.6）。
-// crates/*/README.md のフェンス外・インラインコード外のインラインリンクと裸の URL のうち MANUAL_URL で始まるものを
+// ---- 読者に届く文書の公開マニュアル URL 実在検査（readme-manual-url） ----
+// pasta-runtime-internals-doc タスク 1.2（要件 7.5, 7.8, 1.6）・manual-link-anchor-check タスク 3.2（要件 4.4〜4.6）。
+// 対象: crates/*/README.md（名前順）・ルートの README.md・SOUL.md・2 スキル（CHECKED_SKILLS）の Markdown（パス順。生成ファイルも含む）。
+// 対象のフェンス外・インラインコード外のインラインリンクと裸の URL のうち MANUAL_URL で始まるものを
 // 写像する: 残りが空・index.html → 合格（末尾 `/` は index.html を補う）。`<path>.html[#anchor]` → book/src/<path>.md が
 // 実在し、アンカーがあればその章の見出し slug ∪ 明示アンカーに含まれること（パーセントエンコードはデコードして照合）。
 // 違反: .html 以外で章に写像できない、book/src 外へ解決される（トラバーサル）、章が無い、見出しが無い。
 export const MANUAL_URL = 'https://ekicyou.github.io/pasta/'; // gen-skill-refs の MANUAL_BASE_URL と同値（import しない）
 const BARE_MANUAL_URL_RE = new RegExp(MANUAL_URL.replace(/\./g, '\\.') + '[^\\s<>()\\[\\]`"\'、。（）「」『』【】]*', 'g');
 
-function manualUrlProblem(repoRoot, url) {
+function manualUrlProblem(repoRoot, url, anchorsOf) {
   const rest = url.slice(MANUAL_URL.length);
   const h = rest.indexOf('#');
   const anchor = h >= 0 ? decodeAnchor(rest.slice(h + 1)) : '';
@@ -420,7 +421,7 @@ function manualUrlProblem(repoRoot, url) {
   const chapter = path.relative(repoRoot, abs).split(path.sep).join('/');
   if (!isWithinRoot(srcDir, abs)) return `マニュアル外を指すパス（トラバーサル）: ${page}`;
   if (!fs.existsSync(abs)) return `写像先の章が存在しない: ${chapter}`;
-  if (anchor !== '' && !anchorSet(fs.readFileSync(abs, 'utf8')).has(anchor)) {
+  if (anchor !== '' && !anchorsOf(abs).has(anchor)) {
     return `写像先 ${chapter} に見出し／明示アンカー "${anchor}" が無い`;
   }
   return null;
@@ -428,14 +429,20 @@ function manualUrlProblem(repoRoot, url) {
 
 export function checkReadmeManualLinks(repoRoot = REPO_ROOT) {
   const cratesDir = path.resolve(repoRoot, 'crates');
-  if (!fs.existsSync(cratesDir)) return [];
-  const readmes = fs.readdirSync(cratesDir, { withFileTypes: true })
+  const readmes = !fs.existsSync(cratesDir) ? [] : fs.readdirSync(cratesDir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => path.join(cratesDir, d.name, 'README.md'))
-    .filter((f) => fs.existsSync(f))
     .sort();
+  // 対象の順は固定（同じ入力に同じ順）。無いファイルは飛ばす。
+  const targets = [
+    ...readmes,
+    path.resolve(repoRoot, 'README.md'),
+    path.resolve(repoRoot, 'SOUL.md'),
+    ...CHECKED_SKILLS.flatMap((skill) => listMarkdownFiles(path.resolve(repoRoot, '.claude/skills', skill)).sort()),
+  ].filter((f) => fs.existsSync(f));
+  const anchorsOf = anchorReader();
   const broken = [];
-  for (const file of readmes) {
+  for (const file of targets) {
     const relFile = path.relative(repoRoot, file).split(path.sep).join('/');
     maskFences(fs.readFileSync(file, 'utf8')).split('\n').forEach((line, i) => {
       const noCode = line.replace(CODE_SPAN_RE, '');
@@ -445,7 +452,7 @@ export function checkReadmeManualLinks(repoRoot = REPO_ROOT) {
         .map((m) => m[0].replace(/[.,;:!?]+$/, ''));
       for (const url of new Set([...links, ...bare])) {
         if (!url.startsWith(MANUAL_URL)) continue;
-        const problem = manualUrlProblem(repoRoot, url);
+        const problem = manualUrlProblem(repoRoot, url, anchorsOf);
         if (problem) broken.push({ file: relFile, target: url, kind: 'readme-manual-url', detail: `L${i + 1}: ${problem}` });
       }
     });

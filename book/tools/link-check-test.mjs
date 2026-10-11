@@ -26,11 +26,14 @@
 //   - checkReadmeManualLinks が crates/*/README.md のフェンス外のリンクと裸の URL のうち公開マニュアルを
 //     指すものについて、写像先の章・見出し（日本語見出し・パーセントエンコード・明示アンカー）の実在を照合し、
 //     存在しない章・アンカー・トラバーサル・章に写像できない URL を readme-manual-url として行番号付きで検出する。
-//     インラインコード内・crates/*/README.md 以外は対象外。manual.yml は crates/*/README.md の変更でも起動する
+//     インラインコード内は対象外（対象の文書は下のタスク 3.2 の項）。manual.yml は crates/*/README.md の変更でも起動する
 //     （pasta-runtime-internals-doc タスク 1.2 / 要件 7.5, 7.8, 1.6）。
 //   - detectBrokenLinks が本の中のリンク（`章.md#見出し`・`#見出し`）の見出しをリンク先の章のアンカーの集合と照合し、
 //     無ければ internal-anchor として報告する（行番号なし）。章のファイルが無いときは internal-md の 1 件だけ
 //     （manual-link-anchor-check タスク 2.1 / 要件 1.1〜1.5, 2.1, 2.2, 3.1〜3.6, 5.1, 5.5, 7.1〜7.3）。
+//   - checkReadmeManualLinks がクレートの README に加えて、ルートの README.md・SOUL.md・2 スキルの Markdown の
+//     公開マニュアルの URL も、同じ区分（readme-manual-url）・同じ文面で検出する。対象の順は固定。
+//     .kiro/steering/roadmap.md は対象外（manual-link-anchor-check タスク 3.2 / 要件 4.4〜4.6, 5.5, 7.1）。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -460,6 +463,8 @@ log('\n== (E) checkSkillSelfContained（規則 a〜d） ==');
       ].join('\n'));
       writeFile(root, `${G}/references/patterns.md`, '# P\n\n<a id="s6-6"></a>\n### 6.6 x\n');
       writeFile(root, `${L}/SKILL.md`, '# lua\n');
+      // [ext] の公開 URL が指す章。スキルの Markdown も公開 URL の検査の対象なので、章と見出しを見本に置く。
+      writeFile(root, 'book/src/grammar/index.md', '# 文法\n\n## x\n');
       const broken = checkSkillSelfContained(root);
       check('E-1 許可ケース（https・実在アンカー・重複付番・#s6-6・フェンス内）: 違反 0',
         broken.length === 0, JSON.stringify(broken));
@@ -675,9 +680,8 @@ log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュア
         '',
       ].join('\n'));
       writeFile(root, 'crates/pasta_core/README.md', `# core\n\n[欠落アンカー](${U}debug/index.html#無い見出し)\n`);
-      // 対象外: book/src・リポジトリ直下の README・入れ子の README・README 以外。
+      // 対象外: book/src・入れ子の README・README 以外（リポジトリ直下の README は対象。G-6 で確かめる）。
       writeFile(root, 'book/src/grammar/markers.md', `[x](${U}book-nope.html)\n`);
-      writeFile(root, 'README.md', `[x](${U}root-nope.html)\n`);
       writeFile(root, 'crates/pasta_lua/docs/README.md', `[x](${U}nested-nope.html)\n`);
       writeFile(root, 'crates/pasta_lua/OTHER.md', `[x](${U}other-nope.html)\n`);
 
@@ -707,7 +711,7 @@ log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュア
         && byTarget(`${U}debug/index.html#無い見出し`).file === 'crates/pasta_core/README.md',
         JSON.stringify(broken));
       check('G-2 インラインコード内・フェンス内・他サイト・README 以外は対象外',
-        !broken.some((b) => /code-nope|fenced-nope|example\.com|book-nope|root-nope|nested-nope|other-nope/.test(b.target)),
+        !broken.some((b) => /code-nope|fenced-nope|example\.com|book-nope|nested-nope|other-nope/.test(b.target)),
         JSON.stringify(broken));
 
       const result = runLinkCheck(root);
@@ -779,6 +783,88 @@ log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュア
     const yml = fs.readFileSync(path.join(REPO_ROOT, '.github/workflows/manual.yml'), 'utf8');
     const n = (yml.match(/^\s*-\s*'crates\/\*\/README\.md'\s*$/gm) || []).length;
     check('G-5 manual.yml の paths（push・pull_request）に crates/*/README.md', n === 2, `count=${n}`);
+  }
+
+  // G-6: 広げた対象（ルートの README・SOUL.md・2 スキルの Markdown）の公開 URL
+  // （manual-link-anchor-check タスク 3.2 / 要件 4.4〜4.6, 5.5, 7.1）。
+  {
+    const root = makeSandbox();
+    try {
+      const SK = '.claude/skills';
+      writeFile(root, 'book/src/lua/index.md', '# Lua\n\n## 起動の流れ\n');
+      // どの対象にも同じ本文を置き、行番号と文面をクレートの README のときと比べる。
+      const body = [
+        '# doc', // L1
+        `欠落章 [x](${U}nope.html)。`, // L2
+        `裸の欠落見出し ${U}lua/index.html#no-such。`, // L3
+        `在る章と見出し [ok](${U}lua/index.html#起動の流れ)。`, // L4
+        `マニュアル（公開: ${U}）を参照。`, // L5
+        `<!-- このファイルは pasta マニュアル「Lua」（${U}lua/index.html）から自動生成されたものです。手で編集しないでください。 -->`, // L6
+        '',
+      ].join('\n');
+      const CRATE = 'crates/pasta_core/README.md';
+      // 対象の順（固定）: クレートの README（名前順）→ ルートの README → SOUL.md → 2 スキル（CHECKED_SKILLS の順・パス順）。
+      const order = [
+        CRATE,
+        'crates/pasta_lua/README.md',
+        'README.md',
+        'SOUL.md',
+        `${SK}/pasta-ghost-authoring/SKILL.md`,
+        `${SK}/pasta-ghost-authoring/references/dsl.md`,
+        `${SK}/pasta-lua-coding/SKILL.md`,
+        `${SK}/pasta-lua-coding/references/api.md`,
+      ];
+      for (const f of [...order].reverse()) writeFile(root, f, body);
+      // 対象外: 内部の作業メモ・2 スキルのほかのスキル。
+      writeFile(root, '.kiro/steering/roadmap.md', `[x](${U}roadmap-nope.html)\n`);
+      writeFile(root, `${SK}/other-skill/SKILL.md`, `[x](${U}other-skill-nope.html)\n`);
+
+      const broken = checkReadmeManualLinks(root);
+      const of = (f) => JSON.stringify(broken.filter((b) => b.file === f)
+        .map(({ target, kind, detail }) => ({ target, kind, detail })));
+      const want = JSON.stringify([
+        { target: `${U}nope.html`, kind: 'readme-manual-url', detail: 'L2: 写像先の章が存在しない: book/src/nope.md' },
+        { target: `${U}lua/index.html#no-such`, kind: 'readme-manual-url',
+          detail: 'L3: 写像先 book/src/lua/index.md に見出し／明示アンカー "no-such" が無い' },
+      ]);
+      check('G-6 クレートの README: 無い章（L2）・無い見出し（L3）の 2 件', of(CRATE) === want, of(CRATE));
+      for (const f of order.slice(2)) {
+        check(`G-6 ${f}: 無い章・無い見出しが readme-manual-url で行番号つき、文面はクレートの README と同じ`,
+          of(f) === want && of(f) === of(CRATE), of(f));
+      }
+      check('G-6 違反の並びは対象の順・行の順（2 回走らせて同じ）',
+        JSON.stringify(broken.map((b) => b.file)) === JSON.stringify(order.flatMap((f) => [f, f]))
+        && JSON.stringify(checkReadmeManualLinks(root)) === JSON.stringify(broken),
+        JSON.stringify(broken.map((b) => b.file)));
+      check('G-6 全角の括弧で囲んだ裸の URL（（公開: URL）・（URL）から自動生成…）は違反にならない',
+        broken.length === order.length * 2 && !broken.some((b) => /[（）]/.test(b.target)),
+        JSON.stringify(broken.map((b) => b.target)));
+      check('G-6 .kiro/steering/roadmap.md・2 スキルのほかのスキルは対象外',
+        !broken.some((b) => /roadmap-nope|other-skill-nope/.test(b.target)), JSON.stringify(broken));
+
+      const result = runLinkCheck(root);
+      const rep = reportLinkCheck(result);
+      check('G-6 runLinkCheck に結合され、レポートの [1] 区分に 16 件が出る',
+        result.broken.filter((b) => b.kind === 'readme-manual-url').length === 16
+        && /\[1\][^\n]*: 16 件/.test(rep) && rep.includes('BROKEN  SOUL.md'), rep);
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // G-6: crates/ が無くても、ルートの README だけで検査する（無い対象は飛ばす）。
+  {
+    const root = makeSandbox();
+    try {
+      writeFile(root, 'README.md', `# root\n\n[x](${U}nope.html)\n`);
+      const broken = checkReadmeManualLinks(root);
+      check('G-6 crates/ が無くてもルートの README を検査する',
+        broken.length === 1 && broken[0].file === 'README.md' && broken[0].kind === 'readme-manual-url'
+        && broken[0].detail === 'L3: 写像先の章が存在しない: book/src/nope.md',
+        JSON.stringify(broken));
+    } finally {
+      rmrf(root);
+    }
   }
 }
 
