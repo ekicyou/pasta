@@ -38,6 +38,10 @@
 //     見出しの id の並びを順番まで比べる。出力のフォルダが無ければ null、出力が無い章・出力が章より古い章は飛ばす。
 //     見本は一時フォルダに置く（I-1）。link-check.mjs は book/book/ を読まず、出力の有無で結果が変わらない
 //     （manual-link-anchor-check タスク 4.1 / 要件 6.2, 7.5, 7.6, 7.7）。
+//   - I-2 が、実リポジトリに compareHeadingIds をかける。CI の外では、出力が無ければ飛ばして確かめの数に入れず、
+//     在れば食い違い 0 を確かめて、突き合わせた章の数と飛ばした章を表示する。CI の中（環境変数 CI）では、
+//     出力が無いか、飛ばした章が 1 つでも在れば失敗にする。食い違いはどちらでも失敗。判定の枝は見本の結果で確かめる
+//     （manual-link-anchor-check タスク 4.2 / 要件 3.7, 7.6, 7.7, 7.8）。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -1041,6 +1045,32 @@ function compareHeadingIds(repoRoot) {
   return report;
 }
 
+// I-2 の判定。突き合わせの結果（compareHeadingIds の戻り値）と、CI の中かどうかから、合否・表題・続けて出す行を決める。
+// ok が null のときは、確かめの数に入れない（CI の外で、ビルドした出力が無い）。
+// CI の中では、出力が在り、飛ばした章が 0 であることまで求める（出力が無いときの N は 0。飛ばした章は無く、理由は次の行に出す）。
+// 食い違いは、CI の中でも外でも失敗にする。環境変数は見ない（見本でも同じ判定を通すため、呼ぶ側が渡す）。
+function judgeHeadingIds(report, inCI) {
+  if (!report) {
+    return inCI
+      ? { ok: false, name: 'I-2 CI では全章の突き合わせが要る（出力が無い、または飛ばし 0 章）',
+        lines: ['        book/book が無い（ビルドした出力が無い）'] }
+      : { ok: null, name: 'I-2 ビルドした出力が無いので飛ばす', lines: [] };
+  }
+  const { checked, skipped, mismatches } = report;
+  const id = (v) => v ?? '（無し）';
+  const lines = [
+    ...mismatches.map((m) => `        DIFF  ${m.chapter} の ${m.index} 番目の見出し: 導いた id ${id(m.expected)} / 出力の id ${id(m.actual)}`),
+    ...skipped.map((c) => `        SKIP  ${c}（出力が無いか、章より古い）`),
+  ];
+  if (inCI && skipped.length > 0) {
+    return { ok: false, name: `I-2 CI では全章の突き合わせが要る（出力が無い、または飛ばし ${skipped.length} 章）`, lines };
+  }
+  return {
+    ok: mismatches.length === 0,
+    name: `I-2 実リポジトリ: 食い違い ${mismatches.length}（突き合わせ ${checked} 章・飛ばし ${skipped.length} 章）`,
+    lines,
+  };
+}
 
 log('\n== (I) 見出しの id の突き合わせ（ビルドした出力が在るときだけ） ==');
 {
@@ -1156,6 +1186,60 @@ log('\n== (I) 見出しの id の突き合わせ（ビルドした出力が在�
     } finally {
       rmrf(root);
     }
+  }
+
+  // I-2: 判定の枝（見本の結果 × CI の外・中）。環境変数 CI には頼らない。
+  {
+    const clean = { checked: 60, skipped: [], mismatches: [] };
+    const stale = { checked: 59, skipped: ['book/src/getting-started/09-choice.md'], mismatches: [] };
+    const diff = {
+      checked: 60,
+      skipped: [],
+      mismatches: [
+        { chapter: 'book/src/grammar/space.md', index: 2, expected: '全角空白', actual: '全角-空白' },
+        { chapter: 'book/src/more.md', index: 3, expected: undefined, actual: '余分' },
+      ],
+    };
+    const skipLine = '        SKIP  book/src/getting-started/09-choice.md（出力が無いか、章より古い）';
+    const diffLines = [
+      '        DIFF  book/src/grammar/space.md の 2 番目の見出し: 導いた id 全角空白 / 出力の id 全角-空白',
+      '        DIFF  book/src/more.md の 3 番目の見出し: 導いた id （無し） / 出力の id 余分',
+    ];
+    const ciName = (n) => `I-2 CI では全章の突き合わせが要る（出力が無い、または飛ばし ${n} 章）`;
+    const cases = [
+      ['CI の外・出力が無い: 飛ばす（確かめの数に入れない）', null, false,
+        { ok: null, name: 'I-2 ビルドした出力が無いので飛ばす', lines: [] }],
+      ['CI の中・出力が無い: 失敗', null, true,
+        { ok: false, name: ciName(0), lines: ['        book/book が無い（ビルドした出力が無い）'] }],
+      ['CI の外・飛ばし 1 章: 通して、飛ばした章を出す', stale, false,
+        { ok: true, name: 'I-2 実リポジトリ: 食い違い 0（突き合わせ 59 章・飛ばし 1 章）', lines: [skipLine] }],
+      ['CI の中・飛ばし 1 章: 失敗', stale, true, { ok: false, name: ciName(1), lines: [skipLine] }],
+      ['CI の外・食い違い 2: 失敗（章・何番目の見出しか・導いた id・出力の id）', diff, false,
+        { ok: false, name: 'I-2 実リポジトリ: 食い違い 2（突き合わせ 60 章・飛ばし 0 章）', lines: diffLines }],
+      ['CI の中・食い違い 2: 失敗', diff, true,
+        { ok: false, name: 'I-2 実リポジトリ: 食い違い 2（突き合わせ 60 章・飛ばし 0 章）', lines: diffLines }],
+      ['CI の外・全章が合う: 通す', clean, false,
+        { ok: true, name: 'I-2 実リポジトリ: 食い違い 0（突き合わせ 60 章・飛ばし 0 章）', lines: [] }],
+      ['CI の中・全章が合う: 通す', clean, true,
+        { ok: true, name: 'I-2 実リポジトリ: 食い違い 0（突き合わせ 60 章・飛ばし 0 章）', lines: [] }],
+    ];
+    for (const [name, report, inCI, want] of cases) {
+      const got = judgeHeadingIds(report, inCI);
+      check(`I-2 判定 ${name}`, JSON.stringify(got) === JSON.stringify(want), JSON.stringify(got));
+    }
+    // CI の中で、飛ばしと食い違いが重なったら、CI の表題で失敗にし、食い違いの行も出す。
+    const both = judgeHeadingIds({ ...diff, checked: 59, skipped: stale.skipped }, true);
+    check('I-2 判定 CI の中・飛ばし 1 章と食い違い 2: CI の表題で失敗し、食い違いと飛ばした章の行を出す',
+      both.ok === false && both.name === ciName(1)
+      && JSON.stringify(both.lines) === JSON.stringify([...diffLines, skipLine]), JSON.stringify(both));
+  }
+
+  // I-2: 実リポジトリ。CI の中かどうか（環境変数 CI）を見るのは、ここだけ。
+  {
+    const { ok, name, lines } = judgeHeadingIds(compareHeadingIds(REPO_ROOT), Boolean(process.env.CI));
+    if (ok === null) log(`  SKIP  ${name}`);
+    else check(name, ok);
+    for (const line of lines) log(line);
   }
 }
 
