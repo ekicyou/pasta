@@ -175,3 +175,13 @@ Call ターゲットの後ろに `＆key＝value` 形式のフィルターを付
   - 別名があると、`＊会話` と `＊OnTalk` の 2 つの宣言が同じ名前のシーンになる。属性は宣言ごと（通し番号ごと）に持つことを、要件に書く。
   - `pasta_shiori` の結合テストは、古いランタイムの写し（`crates/pasta_shiori/tests/support/scripts/pasta/scene.lua`）を読む。この spec の確認用のテストは `pasta_lua` 側に置く。写しは直さない（`shiori-test-support-runtime` の持ち場）。
   - 前回の節の行番号のうち、登録表を作り直す場所（`finalize.rs` 182 行）と、属性をローカルシーンへ写す処理（`scene_registry.rs` 155〜189 行）は今も合っている。マニュアルの「内部に記録される」は `book/src/grammar/block-structure.md` の 248 行と 280 行に、ファイルの属性の説明は `book/src/internals/transpiler.md` の 158 行と 165 行に動いた。
+
+## 申し送り（2026-10-10 の discovery・0.5.0 のノベルゲームより）
+
+0.5.0 の目標（areka でノベルゲームが作れる）の道筋に、この spec が入った。0.4.0 の後、先頭に置く。
+
+- **読み手が 1 人増える**: 属性の倉は 1 つで、読み手が 2 人になる。Call の絞り込み（`call-attribute-filter`）は場面を選ぶときに読み、演出（`scene-stage-attributes`）は場面に入るときに読む。演出は、語彙の表にある名前の属性だけを、台本へ流す。モードの切り替えは作らない（開発者の決定）。
+- **順番を保つ**: 演出は、属性を書いた順に流したい。今は、統合した属性が順番を持たない表（`HashMap`）に入る（`crates/pasta_lua/src/context.rs` 19・106〜114 行）。倉の形を決めるときに、順番を保てる形にする。
+- **ローカルシーンと名前なしの `＊`**: 演出の側は、ファイルの属性と親の属性を、ローカルシーンへも受け継がせたい（旧仕様は「ローカルシーンには影響しない」だった）。名前なしの `＊` は、今は属性を受け継がない（`crates/pasta_dsl/src/parser/parse_scene.rs` 88〜91 行）。受け継ぎの決まりを決めるときに、この使い方を材料にする。受け継ぐかどうかの最終の決定は、この spec の要件で行う。
+- **値は 1 つ**: `＆背景：教室、夕方` は、`教室、夕方` という 1 つの文字列になる（`grammar.pest` 164〜166 行）。値を複数持たせる必要が出たら、演出の側の spec が言い出す。この spec では変えない。
+- 参照: `.kiro/specs/scene-stage-attributes/brief.md`、`.kiro/steering/roadmap.md` の「Phase 13」。

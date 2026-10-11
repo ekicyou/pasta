@@ -125,4 +125,4 @@ cargo build -p pasta_lsp --target wasm32-unknown-unknown --release
 
 ## ライセンス
 
-MIT OR Apache-2.0（ワークスペース共通）
+MIT（ワークスペース共通）

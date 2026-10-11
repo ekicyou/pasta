@@ -4,7 +4,7 @@ name,master
 craftman,ekicyou
 craftmanw,どっとステーション駅長
 seriko.use_self_alpha,1
-sakura.balloon.offsetx,64
-sakura.balloon.offsety,0
-kero.balloon.offsetx,64
-kero.balloon.offsety,0
+sakura.balloon.offsetx,100
+sakura.balloon.offsety,-105
+kero.balloon.offsetx,50
+kero.balloon.offsety,120
