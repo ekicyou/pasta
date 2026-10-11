@@ -88,3 +88,4 @@
 - `compareHeadingIds` の `index` は 1 始まり。出力の `id` は `<h1>`〜`<h6>` の開始タグの二重引用符の `id` だけを読む（`id` の無い枠の見出しは並びに入らない）
 - I-2 の「CI の中」は、環境変数 `CI` が空でないこと（`CI=false` も中の扱い）。ビルドしていない作業ツリーで `CI` を立てて自己テストを走らせると、I-2 で落ちる（7.8 のとおり）
 - 完了時の申し送り（`manual.yml` の持ち主へ。本 spec は触っていない）: `paths` に `README.md` と `SOUL.md` を足す（design「完了時の申し送り」）。あわせて、12 行目のコメント「README のマニュアル URL」が、対象を広げた今は古い
+- 完了時の棚卸（2026-10-11）: その場で解決 0 件・申し送り 1 件（`manual-print-media-refs` の brief へ、`manual.yml` の 3 点: `paths` に `README.md`・`SOUL.md`、先頭のコメントの古い言い回し、自己テストの段を `mdbook build` より前へ動かさないこと）・起票 0 件。完了の前に main（`54565d34`。`hello-pasta-shell-art` ほか）を取り込み、リンク検証 0 件・ビルドの後の `CI=true` の自己テスト 155 passed・I-2 は 60 章・飛ばし 0 章・食い違い 0 を確かめ直した。着色まで通した出力でも、見出し 764 個の `id` が一致した（スクラッチへのビルドに、main 側の `highlight-html.mjs` をかけて確認）
