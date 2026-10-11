@@ -83,3 +83,10 @@
 - `！select` と選択肢の出力を変えない。
 - 既にある辞書で、`！` 行が「何もしない」ことに頼っているものがあれば、挙動が変わる。見本（`cue.pasta`）とテストの期待値を確かめる。
 - マニュアルが文法の唯一の権威である。挙動を変えたら、同じ変更でマニュアルを直し、スキル references を再生成する。
+
+## 申し送り（choice-line-layout より）
+
+2026-10-11 に `choice-line-layout` が完了し、`sakura_builder.lua` の `BUILDER.build` が、吹き出しごとに「最後に表示したもの」（`spot_tail`。`"text"` か `"choice"`）を持つようになった。選択肢の前後の改行は、この状態で決まる。詳細は `.kiro/specs/completed/choice-line-layout/design.md` の「出力層」、マニュアルの `book/src/internals/talk-output.md`。
+
+- **見直しが要る論点**: 足すトークンを、台詞にも選択肢にも数えないもの（今の `！select` と同じ扱い）にするかどうか。数えないなら、選択肢の前後の改行は変わらず、上の Constraints の「選択肢の出力を変えない」をそのまま守れる。
+- **複雑度**: `BUILDER.build` の循環的複雑度は 28 になった（`-- luacheck: ignore 561` を付けている）。分岐を足すなら、分割するかどうかも論点になる。

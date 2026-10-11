@@ -126,3 +126,12 @@
   - マニュアルのコードの色付けは、VSCode の文法定義をそのまま読む（`book/tools/highlight/highlight-html.mjs` 39 行）。文法定義を変えると、マニュアルの表示にも効く。
   - アンカーを選択肢と同じ形のトークンにすると、`act.lua` の続いた台詞を 1 つにまとめる処理（85 行の `merge_consecutive_talks`）で、前後の台詞が別々のままになる。Constraints の「折り返しとウェイト」はここで起きる。アンカーを台詞の文字の中に入れる形にするかを、設計で決める。
   - 選択肢のテストは `pasta_lua` 側にある（`crates/pasta_lua/tests/lua_specs/choice_select_test.lua`・`tests/shiori/event_dispatch_test.rs`）。アンカーのテストも同じ場所に置けば、`shiori-test-support-runtime` と重ならない。
+
+## 申し送り（choice-line-layout より）
+
+2026-10-11 に `choice-line-layout` が完了し、選択肢の出力のまわりが次のように変わった。詳細は `.kiro/specs/completed/choice-line-layout/design.md` の「出力層」と「Revalidation Triggers」、マニュアルの `book/src/internals/talk-output.md`。
+
+- **変わった事実**: `BUILDER.build`（`sakura_builder.lua`）が、吹き出しごとに「最後に表示したもの」（`spot_tail`。`"text"` か `"choice"`）を持つようになった。選択肢のトークンの前には、台詞の後なら `\n[choice_newlines×100]`、選択肢の後なら `\n` を出す。選択肢の後の台詞の前には `\n` を出す。台詞・`sakura_script` に書いた引数の無い `\c` は、吹き出しの消去として数える。
+- **行番号がずれた**: `\q` への変換（`choice_to_script`）と `BUILDER.build` の場所は、上の「前提の変化」「触るファイル」に書いた行から動いている。
+- **見直しが要る論点**: アンカーを選択肢と同じ形のトークンにすると、`spot_tail` の分岐を通るかどうかを決めることになる（選択肢として数えれば前後に改行が入り、台詞の途中の 1 語が行を分ける）。アンカーを台詞の文字の中に入れる形にすれば、字の判定（`emits_text`）が `\_a` をどう読むかだけになる。上の「見つけた穴」の `merge_consecutive_talks` の論点と合わせて、設計で決める。
+- **複雑度**: `BUILDER.build` の循環的複雑度は 28 になった（`-- luacheck: ignore 561` を付けている。`choice-line-layout` は分割を範囲の外にした）。分岐を足すなら、分割するかどうかも論点になる。

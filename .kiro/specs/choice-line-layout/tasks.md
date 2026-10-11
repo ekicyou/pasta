@@ -119,3 +119,8 @@
 - `\c[]`（空の括弧）は引数つきとして読まれて消去に数えない。閉じない `\c[` は引数の無い `\c` として数える（`APPEARANCE.tag_at` の読みのまま）。
 - 完了時（spec を `completed/` へ移した後）に、`book/src/internals/talk-output.md` の「経緯」へ choice-line-layout を 1 行足す。今は `completed/choice-line-layout` が無く、足すと `link-check.mjs` が落ちる。
 - 最終の検証（2026-10-11・GO）で残った、完了時に拾うもの: (1) `pasta-toml.md` の節「spot_newlines」の「改行を出さない」は `spot_newlines` の `\n[N]` を指す。選択肢の後の台詞の前の `\n`（`block-structure.md` の表）と、文だけ読むと食い違って見える並びがある。(2) `block-structure.md` の「どのアクション行よりも前に出力される選択肢」は、`％` 行の後で発言より前の選択肢も同じ扱いであることを書いていない。(3) `TEST_COVERAGE.md` の `sakura_builder_test.lua` の件数が古い。(4) `GhostConfig` に公開フィールドが 1 つ増えた（構造体リテラルで作る外部の利用者には破壊的）。(5) `.kiro/steering/roadmap.md` の本 spec の持ち場の文面が、実際の広がり（`pasta/shiori/act.lua`・loader・マニュアル）より狭い。(6) 設計書に無い局所関数 `text_parts` を 1 つ足した（`talk-output.md` には記載済み）。
+- 完了時にその場で解決（2026-10-11）: `pasta-toml.md` の節「spot_newlines」の 3 つの箇条書きを「この改行 `\n[N]` を出力しない場合」として書き直し、選択肢の後の台詞の前の `\n` は別の規則で決まることを 1 文で足した（上の (1)）。
+- 完了時にその場で解決（2026-10-11）: `block-structure.md` に、`％` 行の後でどのアクション行よりも前に出力される選択肢も、スポット 0 のバルーンに表示したものとして数えることを足した（上の (2)）。
+- 完了時にその場で解決（2026-10-11）: `TEST_COVERAGE.md` の件数を実測に直し（`sakura_builder_test.lua` 121 件・`shiori_act_test.lua` 61 件）、本 spec の行を足した（上の (3)）。
+- 完了時にその場で解決（2026-10-11）: `design.md` の出力層の Service Interface に、局所関数 `text_parts` を足した（上の (6)）。
+- 完了時の申し送り（2026-10-11）: `scene-anchor-link`・`novel-talk-flow`・`cue-command-runtime` の brief.md へ「申し送り（choice-line-layout より）」を足した。上の (5) は、完了時のロードマップの更新で直した。上の (4)（`GhostConfig` の公開フィールド）は、コードを変えずに PR の本文へ載せた。起票は 0 件。
