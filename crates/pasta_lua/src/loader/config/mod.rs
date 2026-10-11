@@ -161,7 +161,7 @@ impl PastaConfig {
     /// filling **only the missing keys** from [`GhostConfig::default()`] (the
     /// SSOT) without ever overwriting values the author wrote explicitly
     /// (requirements 3.1/3.2/3.4). If the `[ghost]` table is absent it is
-    /// created and all four keys are filled (so `@pasta_config.ghost.*` always
+    /// created and all five keys are filled (so `@pasta_config.ghost.*` always
     /// exists — requirement 3.3).
     ///
     /// The operation is **idempotent**: applying it twice yields the same
@@ -196,6 +196,9 @@ impl PastaConfig {
             ghost
                 .entry("spot_newlines")
                 .or_insert_with(|| toml::Value::Float(defaults.spot_newlines));
+            ghost
+                .entry("choice_newlines")
+                .or_insert_with(|| toml::Value::Float(defaults.choice_newlines));
         }
 
         // `[actor]` is the single SHIORI-required section (requirement 2.1). Its

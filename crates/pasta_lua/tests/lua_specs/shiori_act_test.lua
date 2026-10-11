@@ -748,7 +748,7 @@ describe("SHIORI_ACT - 先頭の表示制御のバイト比較 (act-token-groupi
         act:choice("t", "d")
         act:choice_timeout(30)
         act:talk(sakura, "A")
-        expect(act:build()):toBe("\\s[5]\\_w[500]\\n\\c\\![*]\\q[d,t]\\![set,choicetimeout,30000]\\p[0]A\\e")
+        expect(act:build()):toBe("\\s[5]\\_w[500]\\n\\c\\![*]\\q[d,t]\\![set,choicetimeout,30000]\\p[0]\\nA\\e")
         STORE.reset()
     end)
 
@@ -867,6 +867,40 @@ describe("SHIORI_ACT - clear_spot を挟む出力のバイト比較 (act-token-g
         act:set_spot("さくら", 1)
         act:talk(sakura, "B")
         expect(act:build()):toBe("\\p[0]AB\\e")
+        STORE.reset()
+    end)
+end)
+
+-- ============================================================================
+-- choice-line-layout: act:choice の行の配置（Task 2.2）
+-- act:choice で積んだ選択肢にも、選択肢行と同じ配置が当たる（2.6）。
+-- 期待値は sakura_builder_test.lua の「字 → 選択肢 → 選択肢」と同じ並びである。
+-- ============================================================================
+
+describe("SHIORI_ACT - choice-line-layout: act:choice の行の配置", function()
+    test("2.6: 台詞 → act:choice → act:choice で \\n[150] と \\n が選択肢の直前に 1 つずつ出る", function()
+        local act, sakura, _, STORE = new_bytes_act()
+        act:talk(sakura, "どれ")
+        act:choice("甲先", "甲")
+        act:choice("乙先", "乙")
+        expect(act:build()):toBe("\\p[0]どれ\\n[150]\\![*]\\q[甲,甲先]\\n\\![*]\\q[乙,乙先]\\e")
+        STORE.reset()
+    end)
+
+    -- Task 2.3: act:sakura_script(話し手, "\\c") は、DSL の台詞の行に書いた \c が生成する呼び出し
+    test("7.1/7.2: 台詞に書いた \\c の後は、act:choice の前にも、話し手が戻った後の talk の前にも区切りが出ない", function()
+        local act, sakura, kero, STORE = new_bytes_act()
+        act:talk(sakura, "まえおき")
+        act:sakura_script(sakura, "\\c")
+        act:choice("甲先", "甲")
+        act:choice("乙先", "乙")
+        expect(act:build()):toBe("\\p[0]まえおき\\c\\![*]\\q[甲,甲先]\\n\\![*]\\q[乙,乙先]\\e")
+
+        act:talk(sakura, "やあ")
+        act:talk(kero, "はい")
+        act:sakura_script(sakura, "\\c")
+        act:talk(sakura, "つぎ")
+        expect(act:build()):toBe("\\p[0]やあ\\p[1]はい\\p[0]\\cつぎ\\e")
         STORE.reset()
     end)
 end)

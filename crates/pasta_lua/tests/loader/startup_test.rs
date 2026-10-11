@@ -177,6 +177,42 @@ fn test_shiori_act_uses_config_spot_newlines() {
     );
 }
 
+#[test]
+fn test_shiori_act_uses_config_choice_newlines() {
+    let temp = copy_fixture_to_temp("with_ghost_config");
+    let runtime = PastaLoader::load(temp.path()).unwrap();
+
+    // with_ghost_config/pasta.toml has spot_newlines = 2.0 and choice_newlines = 2.5.
+    // 往復の戻り手番の字の前は spot_newlines の \n[200]、字の後の選択肢の前は
+    // choice_newlines の \n[250]。互いの幅に影響しないことを完全一致で見る。
+    // ウェイトのタグが入らないよう、台詞には句読点を含めない。
+    let result = runtime
+        .exec(
+            r#"
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = {
+            sakura = { name = "さくら" },
+            kero = { name = "うにゅう" },
+        }
+        local act = SHIORI_ACT.new(actors)
+        act:set_spot("sakura", 0)
+        act:set_spot("kero", 1)
+        act:talk(actors.sakura, "Hello")
+        act:talk(actors.kero, "Hi")
+        act:talk(actors.sakura, "Back")
+        act:choice("t1", "d1")
+        act:choice("t2", "d2")
+        return act:build()
+    "#,
+        )
+        .unwrap();
+
+    assert_eq!(
+        value_as_str(&result).as_deref(),
+        Some(r"\p[0]Hello\p[1]Hi\p[0]\n[200]Back\n[250]\![*]\q[d1,t1]\n\![*]\q[d2,t2]\e")
+    );
+}
+
 // ============================================================================
 // Package Path Tests
 // ============================================================================
