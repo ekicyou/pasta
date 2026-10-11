@@ -405,7 +405,7 @@ export function checkInternalsPaths(repoRoot = REPO_ROOT) {
 // 実在し、アンカーがあればその章の見出し slug ∪ 明示アンカーに含まれること（パーセントエンコードはデコードして照合）。
 // 違反: .html 以外で章に写像できない、book/src 外へ解決される（トラバーサル）、章が無い、見出しが無い。
 export const MANUAL_URL = 'https://ekicyou.github.io/pasta/'; // gen-skill-refs の MANUAL_BASE_URL と同値（import しない）
-const BARE_MANUAL_URL_RE = new RegExp(MANUAL_URL.replace(/\./g, '\\.') + '[^\\s<>()\\[\\]`"\'、。]*', 'g');
+const BARE_MANUAL_URL_RE = new RegExp(MANUAL_URL.replace(/\./g, '\\.') + '[^\\s<>()\\[\\]`"\'、。（）「」『』【】]*', 'g');
 
 function manualUrlProblem(repoRoot, url) {
   const rest = url.slice(MANUAL_URL.length);

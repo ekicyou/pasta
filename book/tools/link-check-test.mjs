@@ -738,6 +738,36 @@ log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュア
     }
   }
 
+  // G-3b: 全角の括弧で囲んだ裸の URL は、括弧の手前で終える（括弧を URL に含めない）。
+  {
+    const root = makeSandbox();
+    try {
+      writeFile(root, 'book/src/introduction.md', '# はじめに\n');
+      writeFile(root, 'book/src/lua/index.md', '# Lua\n\n## 起動の流れ\n');
+      const enc = encodeURIComponent('起動の流れ');
+      writeFile(root, 'crates/pasta_shiori/README.md', [
+        '# shiori', // L1
+        `マニュアル（公開: ${U}）を参照。`, // L2
+        `<!-- このファイルは pasta マニュアル「Lua」（${U}lua/index.html）から自動生成されたものです。手で編集しないでください。 -->`, // L3
+        `この節は（${U}lua/index.html#起動の流れ）から自動生成されたものです`, // L4
+        `「${U}lua/index.html」『${U}lua/index.html#${enc}』【${U}index.html】`, // L5
+        '',
+      ].join('\n'));
+      const broken = checkReadmeManualLinks(root);
+      check('G-3b 全角の括弧で囲んだ裸の URL（（公開: URL）・（URL）から自動生成…・「」『』【】）: 違反 0',
+        broken.length === 0, JSON.stringify(broken));
+      // 切れた URL は、括弧を含まない URL のまま報告する（括弧の手前で終えている）。
+      writeFile(root, 'crates/pasta_core/README.md',
+        `# core\n\n（${U}lua/index.html#no-such）と「${U}nope.html」\n`);
+      const targets = checkReadmeManualLinks(root).map((b) => b.target).sort();
+      check('G-3b 全角の括弧で囲んだ切れた URL は括弧を含めずに報告',
+        JSON.stringify(targets) === JSON.stringify([`${U}lua/index.html#no-such`, `${U}nope.html`]),
+        JSON.stringify(targets));
+    } finally {
+      rmrf(root);
+    }
+  }
+
   // G-4: 実リポジトリで readme-manual-url 0 件。
   {
     const broken = checkReadmeManualLinks(REPO_ROOT);
