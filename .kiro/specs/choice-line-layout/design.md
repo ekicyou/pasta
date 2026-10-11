@@ -362,6 +362,14 @@ local function choice_break(tail, choice_newlines) end
 --- @return integer|nil first 最初の `\c` の位置（無ければ nil）
 --- @return integer|nil after 最後の `\c` の直後の位置
 local function clear_span(s) end
+
+--- `talk`・`sakura_script` のテキストを、`\c` の前と後に分けて字の有無を返す
+--- （実装で足した。`clear_span` と `emits_text` を 1 か所で呼ぶためのまとめ）
+--- @param inner table グループの中のトークン
+--- @return boolean lead `\c` より前（`\c` が無ければ全体）に字がある
+--- @return boolean cleared 引数の無い `\c` がある
+--- @return boolean trail 最後の `\c` より後ろに字がある
+local function text_parts(inner) end
 ```
 
 - Preconditions: 引数の形は今と同じ。`config.choice_newlines` が `nil`（または偽）なら `1.5` を使う（`spot_newlines` と同じ式）。
