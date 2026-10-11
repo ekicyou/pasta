@@ -118,3 +118,4 @@
 - `cargo test -p pasta_lua` は、`tests/fixtures/sample.generated.lua`（改行だけ）と、まれに `profile/pasta/save/save.json`（並列の競合で壊れた JSON）を書き換える。コミットの前に、その 2 つだけを `git checkout --` で戻す。
 - `\c[]`（空の括弧）は引数つきとして読まれて消去に数えない。閉じない `\c[` は引数の無い `\c` として数える（`APPEARANCE.tag_at` の読みのまま）。
 - 完了時（spec を `completed/` へ移した後）に、`book/src/internals/talk-output.md` の「経緯」へ choice-line-layout を 1 行足す。今は `completed/choice-line-layout` が無く、足すと `link-check.mjs` が落ちる。
+- 最終の検証（2026-10-11・GO）で残った、完了時に拾うもの: (1) `pasta-toml.md` の節「spot_newlines」の「改行を出さない」は `spot_newlines` の `\n[N]` を指す。選択肢の後の台詞の前の `\n`（`block-structure.md` の表）と、文だけ読むと食い違って見える並びがある。(2) `block-structure.md` の「どのアクション行よりも前に出力される選択肢」は、`％` 行の後で発言より前の選択肢も同じ扱いであることを書いていない。(3) `TEST_COVERAGE.md` の `sakura_builder_test.lua` の件数が古い。(4) `GhostConfig` に公開フィールドが 1 つ増えた（構造体リテラルで作る外部の利用者には破壊的）。(5) `.kiro/steering/roadmap.md` の本 spec の持ち場の文面が、実際の広がり（`pasta/shiori/act.lua`・loader・マニュアル）より狭い。(6) 設計書に無い局所関数 `text_parts` を 1 つ足した（`talk-output.md` には記載済み）。
