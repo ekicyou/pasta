@@ -34,6 +34,10 @@
 //   - checkReadmeManualLinks がクレートの README に加えて、ルートの README.md・SOUL.md・2 スキルの Markdown の
 //     公開マニュアルの URL も、同じ区分（readme-manual-url）・同じ文面で検出する。対象の順は固定。
 //     .kiro/steering/roadmap.md は対象外（manual-link-anchor-check タスク 3.2 / 要件 4.4〜4.6, 5.5, 7.1）。
+//   - 自己テストの中の compareHeadingIds が、章ごとに headingSlugs の導く id の並びと、ビルドした出力（book/book/）の
+//     見出しの id の並びを順番まで比べる。出力のフォルダが無ければ null、出力が無い章・出力が章より古い章は飛ばす。
+//     見本は一時フォルダに置く（I-1）。link-check.mjs は book/book/ を読まず、出力の有無で結果が変わらない
+//     （manual-link-anchor-check タスク 4.1 / 要件 6.2, 7.5, 7.6, 7.7）。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -45,6 +49,7 @@ import {
   REPO_SLUG,
   LINK_RE,
   maskFences,
+  listMarkdownFiles,
   extractLinks,
   headingSlug,
   headingSlugs,
@@ -994,6 +999,163 @@ log('\n== (H) 本の中のリンクの見出し（internal-anchor） ==');
   {
     const broken = runLinkCheck(REPO_ROOT).broken.filter((b) => b.kind === 'internal-anchor');
     check('H-3 実リポジトリで internal-anchor 0 件', broken.length === 0, JSON.stringify(broken));
+  }
+}
+
+// ============================================================
+// 見出しの id の突き合わせ（置き場所は自己テストの中だけ。link-check.mjs は book/book/ を読まない）。
+// 章（book/src/**/*.md から SUMMARY.md を除いたもの・パス順）ごとに、headingSlugs が導く id の並びと、
+// ビルドした出力（book/book/ の下の同じ相対パスの .html）の <h1>〜<h6> の開始タグの id の並びを、順番まで比べる。
+// 章から写像して読むので、print.html・classic/・リダイレクトのページ・先頭章の写し（index.html）は読まない。
+// id の無い見出しのタグ（枠の本の題）は、出力の並びに入れない。
+// book/book が無ければ null。出力が無い章・出力の更新時刻が章より古い章は、飛ばして名前を残す。
+// 食い違いの index は、その章の何番目の見出しか（1 始まり）。並びの長さが違えば、足りない側は undefined。
+// 読むだけで、何も書かない。環境変数も見ない（CI の中での判定は I-2 の側に置く）。
+const HEADING_ID_RE = /<h[1-6]\b[^>]*?\sid="([^"]*)"/g;
+function compareHeadingIds(repoRoot) {
+  const srcDir = path.join(repoRoot, 'book', 'src');
+  const outDir = path.join(repoRoot, 'book', 'book');
+  if (!fs.existsSync(outDir)) return null;
+  const report = { checked: 0, skipped: [], mismatches: [] };
+  const rels = listMarkdownFiles(srcDir)
+    .map((f) => path.relative(srcDir, f).split(path.sep).join('/'))
+    .filter((rel) => rel !== 'SUMMARY.md')
+    .sort();
+  for (const rel of rels) {
+    const chapter = `book/src/${rel}`;
+    const src = path.join(srcDir, rel);
+    const out = path.join(outDir, rel.replace(/\.md$/, '.html'));
+    if (!fs.existsSync(out) || fs.statSync(out).mtimeMs < fs.statSync(src).mtimeMs) {
+      report.skipped.push(chapter);
+      continue;
+    }
+    report.checked++;
+    const expected = headingSlugs(fs.readFileSync(src, 'utf8'));
+    const actual = [...fs.readFileSync(out, 'utf8').matchAll(HEADING_ID_RE)].map((m) => m[1]);
+    for (let i = 0; i < Math.max(expected.length, actual.length); i++) {
+      if (expected[i] !== actual[i]) {
+        report.mismatches.push({ chapter, index: i + 1, expected: expected[i], actual: actual[i] });
+      }
+    }
+  }
+  return report;
+}
+
+
+log('\n== (I) 見出しの id の突き合わせ（ビルドした出力が在るときだけ） ==');
+{
+  // 見本の更新時刻は utimesSync で決める（書いた順や時計の粒度に頼らない）。T は章の時刻（秒）。
+  const T = 1700000000;
+  const put = (root, rel, content, t) => fs.utimesSync(writeFile(root, rel, content), t, t);
+  // mdBook の出力に似せたページ。本文の見出しは id つき。枠の <header> と、id の無い見出し（本の題）は並びに入らない。
+  const h = (n, id) => `<h${n} id="${id}"><a class="header" href="#${id}">${id}</a></h${n}>\n`;
+  const page = (body) => '<!DOCTYPE HTML>\n<html><head><title>t</title></head><body>\n'
+    + `<header id="mdbook-menu-bar"><h1 class="menu-title">本</h1></header>\n<main>\n${body}</main>\n</body></html>\n`;
+
+  // I-1: id が合う出力。目次・印刷用ページ・classic/・先頭章の写し・章に無いページは読まない。
+  {
+    const root = makeSandbox();
+    try {
+      put(root, 'book/src/SUMMARY.md', '# Summary\n\n- [はじめに](introduction.md)\n', T);
+      put(root, 'book/src/introduction.md',
+        '# はじめに\n\n## 例\n\n## 例\n\n### `ACT:talk(text)` の使い方\n\n#### 四\n\n##### 五\n\n###### 六\n', T);
+      put(root, 'book/book/introduction.html', page(h(1, 'はじめに') + h(2, '例') + h(2, '例-1')
+        + h(3, 'acttalktext-の使い方') + h(4, '四') + h(5, '五') + h(6, '六')), T + 10);
+      put(root, 'book/src/grammar/markers.md', '# マーカー\n\n```markdown\n## フェンスの中\n```\n\n## 節\n', T);
+      // 更新時刻が章と同じ出力は、古くない（突き合わせる）。
+      put(root, 'book/book/grammar/markers.html', page(h(1, 'マーカー') + h(2, '節')), T);
+      for (const stray of ['print.html', 'index.html', '404.html', 'classic/introduction.html']) {
+        put(root, `book/book/${stray}`, page(h(1, '読まないページ')), T + 10);
+      }
+
+      const r = compareHeadingIds(root);
+      check('I-1 id が合う出力（重複の付番・インラインコード・フェンスの中・h1〜h6）: 食い違い 0',
+        r.mismatches.length === 0, JSON.stringify(r));
+      check('I-1 突き合わせは 2 章・飛ばし 0（目次は章に数えない。印刷用ページ・classic/・先頭章の写しは読まない）',
+        r.checked === 2 && r.skipped.length === 0, JSON.stringify(r));
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // I-1: id が合わない出力。全角の空白は、headingSlug は落とし、mdBook は `-` にする。
+  {
+    const root = makeSandbox();
+    try {
+      put(root, 'book/src/grammar/space.md', '# 空白\n\n## 全角　空白\n', T);
+      put(root, 'book/book/grammar/space.html', page(h(1, '空白') + h(2, '全角-空白')), T + 10);
+      const r = compareHeadingIds(root);
+      const want = [{ chapter: 'book/src/grammar/space.md', index: 2, expected: '全角空白', actual: '全角-空白' }];
+      check('I-1 合わない出力（## 全角　空白 に id 全角-空白）: 章・何番目の見出しか・導いた id・出力の id つきで食い違い 1',
+        r.checked === 1 && JSON.stringify(r.mismatches) === JSON.stringify(want), JSON.stringify(r));
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // I-1: 見出しの数が違う出力。短いほうに合わせて切らず、足りない側を undefined にして食い違いに数える。
+  {
+    const root = makeSandbox();
+    try {
+      put(root, 'book/src/fewer.md', '# 章\n\n## 節\n', T);
+      put(root, 'book/book/fewer.html', page(h(1, '章')), T + 10);
+      put(root, 'book/src/more.md', '# 章\n', T);
+      put(root, 'book/book/more.html', page(h(1, '章') + h(2, '余分')), T + 10);
+      const r = compareHeadingIds(root);
+      const [fewer, more] = r.mismatches;
+      check('I-1 出力の見出しが少ない・多い: 章ごとに食い違い 1（足りない側は undefined）',
+        r.checked === 2 && r.mismatches.length === 2
+        && fewer.chapter === 'book/src/fewer.md' && fewer.index === 2
+        && fewer.expected === '節' && fewer.actual === undefined
+        && more.chapter === 'book/src/more.md' && more.index === 2
+        && more.expected === undefined && more.actual === '余分', JSON.stringify(r));
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // I-1: 章より古い出力・出力の無い章は、飛ばして名前を残す（id が合わなくても比べない）。
+  {
+    const root = makeSandbox();
+    try {
+      put(root, 'book/src/fresh.md', '# 新しい\n', T);
+      put(root, 'book/book/fresh.html', page(h(1, '新しい')), T + 10);
+      put(root, 'book/src/stale.md', '# 直した見出し\n', T);
+      put(root, 'book/book/stale.html', page(h(1, '直す前の見出し')), T - 10);
+      put(root, 'book/src/grammar/missing.md', '# 出力なし\n', T);
+      const r = compareHeadingIds(root);
+      check('I-1 章より古い出力・出力の無い章: 飛ばして名前を残す（パス順）。ほかの章は突き合わせる',
+        r.checked === 1 && r.mismatches.length === 0
+        && JSON.stringify(r.skipped) === JSON.stringify(['book/src/grammar/missing.md', 'book/src/stale.md']),
+        JSON.stringify(r));
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // I-1: 出力のフォルダが無ければ null。出力のフォルダの有無で、リンク検証の結果は変わらない（6.2）。
+  {
+    const root = makeSandbox();
+    try {
+      put(root, 'book/src/grammar/source.md', '# 元\n\n[無い見出し](#無い節)\n', T);
+      check('I-1 book/book が無い: null', compareHeadingIds(root) === null, JSON.stringify(compareHeadingIds(root)));
+      const before = runLinkCheck(root);
+
+      fs.mkdirSync(path.join(root, 'book', 'book'));
+      check('I-1 book/book が空: null でなく、全章を飛ばす',
+        JSON.stringify(compareHeadingIds(root))
+        === JSON.stringify({ checked: 0, skipped: ['book/src/grammar/source.md'], mismatches: [] }),
+        JSON.stringify(compareHeadingIds(root)));
+
+      // 出力の側に、id の合わないページと、切れたリンクを持つ Markdown を置く。リンク検証はどちらも読まない。
+      put(root, 'book/book/grammar/source.html', page(h(1, '別の見出し')), T + 10);
+      put(root, 'book/book/grammar/stray.md', '[x](nope.md)\n', T + 10);
+      check('I-1 book/book の有無で runLinkCheck の結果が変わらない（違反は章の 1 件のまま）',
+        before.broken.length === 1 && JSON.stringify(runLinkCheck(root)) === JSON.stringify(before),
+        JSON.stringify(runLinkCheck(root)));
+    } finally {
+      rmrf(root);
+    }
   }
 }
 
