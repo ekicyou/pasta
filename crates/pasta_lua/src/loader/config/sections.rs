@@ -186,9 +186,10 @@ impl Default for TalkConfig {
 ///
 /// Acts as the single source of truth (SSOT) for the SHIORI default values of
 /// the `[ghost]` section. The defaults (`talk_interval_min = 180`,
-/// `talk_interval_max = 300`, `hour_margin = 30`, `spot_newlines = 1.5`) match
-/// the current Lua literal fallbacks so that omitting `[ghost]` keeps the
-/// historical behavior (requirements 1.2 / 1.3 / 3.3).
+/// `talk_interval_max = 300`, `hour_margin = 30`, `spot_newlines = 1.5`,
+/// `choice_newlines = 1.5`) match the current Lua literal fallbacks so that
+/// omitting `[ghost]` keeps the historical behavior (requirements 1.2 / 1.3 /
+/// 3.3).
 ///
 /// This struct is a **value supply source only**: it provides the default
 /// values for the later `apply_shiori_defaults` completion step. It is
@@ -214,6 +215,10 @@ pub struct GhostConfig {
     /// Number of blank lines inserted on actor/spot switch (as a ratio).
     /// Default: 1.5
     pub spot_newlines: f64,
+
+    /// Width of the line break before a choice that follows text (as a ratio).
+    /// Default: 1.5
+    pub choice_newlines: f64,
 }
 
 impl Default for GhostConfig {
@@ -223,6 +228,7 @@ impl Default for GhostConfig {
             talk_interval_max: default_talk_interval_max(),
             hour_margin: default_hour_margin(),
             spot_newlines: default_spot_newlines(),
+            choice_newlines: default_choice_newlines(),
         }
     }
 }
@@ -244,6 +250,11 @@ pub const fn default_hour_margin() -> i64 {
 
 /// Default spot/actor switch blank-line ratio (`1.5`).
 pub const fn default_spot_newlines() -> f64 {
+    1.5
+}
+
+/// Default `choice_newlines` (`1.5`).
+pub const fn default_choice_newlines() -> f64 {
     1.5
 }
 

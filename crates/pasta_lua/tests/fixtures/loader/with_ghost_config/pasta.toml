@@ -6,3 +6,4 @@ debug_mode = true
 
 [ghost]
 spot_newlines = 2.0
+choice_newlines = 2.5

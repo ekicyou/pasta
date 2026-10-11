@@ -25,8 +25,8 @@ fn ghost_table(config: &PastaConfig) -> &toml::Table {
         .expect("ghost section should exist after apply_shiori_defaults")
 }
 
-/// `[ghost]` セクションを完全に省略した場合、補完後に全4キーが
-/// SSOT 既定値（180/300/30/1.5）で埋まる（Requirement 3.1/3.2/3.3）。
+/// `[ghost]` セクションを完全に省略した場合、補完後に全5キーが
+/// SSOT 既定値（180/300/30/1.5/1.5）で埋まる（Requirement 3.1/3.2/3.3）。
 #[test]
 fn apply_shiori_defaults_fills_all_ghost_keys_when_section_omitted() {
     // Construct a ghost-absent config WITHOUT routing through `from_str`,
@@ -61,6 +61,7 @@ fn apply_shiori_defaults_fills_all_ghost_keys_when_section_omitted() {
     );
     assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
     assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
+    assert_eq!(ghost.get("choice_newlines").unwrap().as_float(), Some(1.5));
 }
 
 /// 部分的に書かれた `[ghost]`（明示値 `talk_interval_min=120`）は不変で、
@@ -84,6 +85,7 @@ fn apply_shiori_defaults_preserves_explicit_ghost_values() {
     );
     assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
     assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
+    assert_eq!(ghost.get("choice_newlines").unwrap().as_float(), Some(1.5));
 }
 
 /// 補完は冪等: 二重適用しても結果が変わらない（Service Interface invariant）。
@@ -159,7 +161,7 @@ fn apply_shiori_defaults_does_not_warn_when_actor_section_present() {
 
 /// `[ghost]` を一切書かない設定を `parse`（`from_str`）するだけで、補完
 /// チョークポイント（`apply_shiori_defaults`）が経路上で1回適用され、結果の
-/// `custom_fields` に `ghost` セクションが実体化し既定値（180/300/30/1.5）が
+/// `custom_fields` に `ghost` セクションが実体化し既定値（180/300/30/1.5/1.5）が
 /// 入る（Requirement 3.1/3.3, Design: parse 戻り直前の単一補完）。
 #[test]
 fn parse_materializes_ghost_section_with_defaults() {
@@ -177,6 +179,7 @@ fn parse_materializes_ghost_section_with_defaults() {
     );
     assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
     assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
+    assert_eq!(ghost.get("choice_newlines").unwrap().as_float(), Some(1.5));
 }
 
 // ---------------------------------------------------------------------------

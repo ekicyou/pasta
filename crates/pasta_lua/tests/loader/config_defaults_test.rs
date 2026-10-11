@@ -11,8 +11,9 @@ use crate::common;
 
 use common::copy_fixture_to_temp;
 use pasta_lua::loader::{
-    GhostConfig, LoaderError, PastaConfig, PastaLoader, default_hour_margin, default_spot_newlines,
-    default_talk_interval_max, default_talk_interval_min,
+    GhostConfig, LoaderError, PastaConfig, PastaLoader, default_choice_newlines,
+    default_hour_margin, default_spot_newlines, default_talk_interval_max,
+    default_talk_interval_min,
 };
 use std::path::PathBuf;
 
@@ -78,7 +79,8 @@ fn minimal_and_full_ghost_are_equivalent_in_rust() {
          talk_interval_min = 180\n\
          talk_interval_max = 300\n\
          hour_margin = 30\n\
-         spot_newlines = 1.5\n",
+         spot_newlines = 1.5\n\
+         choice_newlines = 1.5\n",
     )
     .unwrap();
 
@@ -114,6 +116,10 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
         default_spot_newlines(),
     );
     assert_eq!(
+        read_pasta_config_ghost_number(&minimal_runtime, "choice_newlines"),
+        default_choice_newlines(),
+    );
+    assert_eq!(
         read_pasta_config_ghost_number(&minimal_runtime, "talk_interval_min"),
         default_talk_interval_min() as f64,
     );
@@ -136,7 +142,8 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
          talk_interval_min = 180\n\
          talk_interval_max = 300\n\
          hour_margin = 30\n\
-         spot_newlines = 1.5\n",
+         spot_newlines = 1.5\n\
+         choice_newlines = 1.5\n",
     )
     .unwrap();
     let full_runtime = PastaLoader::load(full_temp.path()).unwrap();
@@ -144,6 +151,7 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
     // 最小/フルで Lua 露出値が一致すること（最小=補完値 == フル=明示値）。
     for key in [
         "spot_newlines",
+        "choice_newlines",
         "talk_interval_min",
         "talk_interval_max",
         "hour_margin",
@@ -154,6 +162,34 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
             "最小/フルで @pasta_config.ghost.{key} が一致しない",
         );
     }
+}
+
+/// `choice_newlines` だけを省いた `[ghost]`（ほかの 4 キーは既定と違う値を明示）で
+/// **実ランタイムを起動** し、Lua から読み出した `@pasta_config.ghost.choice_newlines` が
+/// 既定値で補われ、書いたキーはそのまま届くこと（choice-line-layout 2.9）。
+#[test]
+fn choice_newlines_alone_omitted_is_filled_for_lua() {
+    let temp = copy_fixture_to_temp("minimal_actor_only");
+    std::fs::write(
+        temp.path().join("pasta.toml"),
+        "[actor.\"女の子\"]\nspot = 0\n\
+         [ghost]\n\
+         talk_interval_min = 90\n\
+         talk_interval_max = 200\n\
+         hour_margin = 15\n\
+         spot_newlines = 2.5\n",
+    )
+    .unwrap();
+    let runtime = PastaLoader::load(temp.path()).unwrap();
+
+    assert_eq!(
+        read_pasta_config_ghost_number(&runtime, "choice_newlines"),
+        default_choice_newlines(),
+    );
+    assert_eq!(
+        read_pasta_config_ghost_number(&runtime, "spot_newlines"),
+        2.5,
+    );
 }
 
 // ============================================================================
@@ -191,7 +227,7 @@ fn actor_absence_warns_without_halting_startup() {
 // 4. SSOT ガード: ドキュメント・Lua リテラルと SSOT の一致 (R5.4 / R5.5)
 // ============================================================================
 
-/// SSOT アンカー: `GhostConfig::default()` が確定既定値（180/300/30/1.5）で
+/// SSOT アンカー: `GhostConfig::default()` が確定既定値（180/300/30/1.5/1.5）で
 /// あること。これがドリフト検出の基準点となる。
 #[test]
 fn ghost_config_default_is_ssot_anchor() {
@@ -200,12 +236,14 @@ fn ghost_config_default_is_ssot_anchor() {
     assert_eq!(d.talk_interval_max, 300);
     assert_eq!(d.hour_margin, 30);
     assert_eq!(d.spot_newlines, 1.5);
+    assert_eq!(d.choice_newlines, 1.5);
 
     // const default_*() 関数も同じ SSOT を返すこと（Lua 比較で利用するため）。
     assert_eq!(default_talk_interval_min(), d.talk_interval_min);
     assert_eq!(default_talk_interval_max(), d.talk_interval_max);
     assert_eq!(default_hour_margin(), d.hour_margin);
     assert_eq!(default_spot_newlines(), d.spot_newlines);
+    assert_eq!(default_choice_newlines(), d.choice_newlines);
 }
 
 /// リポジトリルートを `CARGO_MANIFEST_DIR`（crates/pasta_lua）から2階層上に解決。
@@ -273,10 +311,12 @@ fn config_reference_doc_matches_ssot() {
     expect_row("hour_margin", d.hour_margin.to_string());
     // spot_newlines は浮動小数（"1.5"）。
     expect_row("spot_newlines", format!("{:?}", d.spot_newlines));
+    // choice_newlines も浮動小数（"1.5"）。choice-line-layout 5.5。
+    expect_row("choice_newlines", format!("{:?}", d.choice_newlines));
 }
 
 /// Lua フォールバックリテラルが SSOT と一致すること（R5.5）。
-/// `act.lua`（spot_newlines = 1.5）および `virtual_dispatcher.lua`
+/// `act.lua`（spot_newlines = 1.5、choice_newlines = 1.5）および `virtual_dispatcher.lua`
 /// （180/300/30）のハードコード既定を SSOT と突き合わせ、将来の乖離を捕捉する。
 #[test]
 fn lua_fallback_literals_match_ssot() {
@@ -290,6 +330,12 @@ fn lua_fallback_literals_match_ssot() {
     assert!(
         act_lua.contains(&format!("\"spot_newlines\", {spot_default}")),
         "act.lua の spot_newlines フォールバックリテラルが SSOT ({spot_default}) と不一致 (R5.5)"
+    );
+    // act.lua: choice_newlines の Lua 側フォールバックリテラル（choice-line-layout 2.9）。
+    let choice_default = format!("{:?}", d.choice_newlines); // "1.5"
+    assert!(
+        act_lua.contains(&format!("\"choice_newlines\", {choice_default}")),
+        "act.lua の choice_newlines フォールバックリテラルが SSOT ({choice_default}) と不一致 (choice-line-layout 2.9)"
     );
 
     // virtual_dispatcher.lua: talk_interval_min/max/hour_margin のフォールバックリテラル。
@@ -345,6 +391,7 @@ talk_interval_min = 90\n\
 talk_interval_max = 200\n\
 hour_margin = 15\n\
 spot_newlines = 2.5\n\
+choice_newlines = 3.5\n\
 \n\
 [loader]\n\
 debug_mode = true\n\
@@ -385,7 +432,7 @@ fn legacy_full_config_with_package_loads_cleanly() {
     );
 
     // 明示 `[ghost]` 値は補完で上書きされない（no-clobber, R6.1）。SSOT 既定
-    // （180/300/30/1.5）ではなく、作者の書いた値（90/200/15/2.5）が残ること。
+    // （180/300/30/1.5/1.5）ではなく、作者の書いた値（90/200/15/2.5/3.5）が残ること。
     let ghost = config
         .custom_fields
         .get("ghost")
@@ -411,6 +458,10 @@ fn legacy_full_config_with_package_loads_cleanly() {
     assert_eq!(
         ghost.get("spot_newlines").and_then(toml::Value::as_float),
         Some(2.5),
+    );
+    assert_eq!(
+        ghost.get("choice_newlines").and_then(toml::Value::as_float),
+        Some(3.5),
     );
 
     // `[actor]` を含むので不在警告は発火しない（無警告起動の確認, R6.2）。
@@ -445,6 +496,10 @@ fn legacy_full_config_starts_runtime_without_warning() {
     assert_eq!(
         read_pasta_config_ghost_number(&runtime, "spot_newlines"),
         2.5,
+    );
+    assert_eq!(
+        read_pasta_config_ghost_number(&runtime, "choice_newlines"),
+        3.5,
     );
 
     // フル記述（`[actor]` あり）の実起動で actor 不在警告が出ないこと（無警告起動）。

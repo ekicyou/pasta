@@ -82,18 +82,19 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | -- | ---- | -------- | ---- | -------------- |
 | 完了 | hello-pasta-shell-art | Fable | 13（実績） | 2026-10-11 に完了 |
 | 完了 | manual-link-anchor-check | Opus | 8（実績） | 2026-10-11 に完了 |
-| 開発中 | choice-line-layout、manual-print-media-refs | Opus | 各 2〜4 | 始めている |
+| 完了 | choice-line-layout | Opus | 12（実績） | 2026-10-11 に完了 |
+| 開発中 | manual-print-media-refs | Opus | 2〜4 | 始めている |
 | 1 | boot-surface-without-dic | Fable | 3〜5（やる場合） | 今すぐ |
 | 2 | failure-output-unification | Fable | 15〜19 | 今すぐ |
 | 3 | pasta-check-dic-validate | Fable | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
 | 4 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
-| 5 | getting-started-screenshots | Opus | 4〜6 | `choice-line-layout`・`boot-surface-without-dic` の後（最後に撮る。`hello-pasta-shell-art` は完了した） |
+| 5 | getting-started-screenshots | Opus | 4〜6 | `boot-surface-without-dic` の後（最後に撮る。`hello-pasta-shell-art` と `choice-line-layout` は完了した） |
 | 6 | 0.4.0 のリリース（常駐 spec `release-workflow`） | Opus | — | 上の全部の後 |
 
 並走するときの約束（「棚卸」のウェーブの約束に足す）:
 
 - `boot-surface-without-dic` が触るのは、起動のイベント（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/boot.lua`）と準備の章（`book/src/getting-started/setup.md`）である。pasta.toml に設定を足す場合は、設定の読み込み（`crates/pasta_lua/src/loader/config/`）が `failure-output-unification` と重なるので、後から入る側が合わせる。やらないと決めたら却下し、0.4.0 の条件と `getting-started-screenshots` の前提から外す。
-- `failure-output-unification` は、選択肢の出力（`sakura_builder.lua`。立ち位置が決まらないときの警告がある）を、`choice-line-layout` が入るまで触らない。生成コードの形を変えない約束と、スクリプトが止まるエラーを扱わない線引き（`runtime-error-balloon`）は、そのまま守る。
+- `failure-output-unification` は、選択肢の出力（`sakura_builder.lua`。立ち位置が決まらないときの警告がある）を、`choice-line-layout` が入るまで触らない（`choice-line-layout` は 2026-10-11 に完了したので、もう触れる）。生成コードの形を変えない約束と、スクリプトが止まるエラーを扱わない線引き（`runtime-error-balloon`）は、そのまま守る。
 - `pasta-check-dic-validate` と `manual-shell-guide` は、どちらもマニュアルに章を足すと、目次（`SUMMARY.md`）と章の数を決め打ちする検査が重なる。後から入る側が数を合わせる。
 - `getting-started-screenshots` は、6 段目（時報）の撮り方を `baseware-virtual-time` に頼らない。失敗の表記を絵に写すなら、`failure-output-unification` の後に撮る。
 - 0.4.0 のリリースノートに、失敗の表記が変わったことを書く。
@@ -137,7 +138,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 同じウェーブに置くときの約束:
 
 - `hello-pasta-shell-art` は、頭の部位名を今の `Head` のままにする。辞書と `book/` は、部位名の都合で変えるときに限り、8 段目（`dic/08-touch.pasta`・`book/src/getting-started/08-touch.md`）だけを触る。段階表（`STAGES.md`）は、部位名の注記と 8 段目の行だけを触る。`book/tools/` を触らない。`Cargo.lock`・ルートの `Cargo.toml`・`release.ps1` は、このウェーブではこの spec だけが触る。リリースの実行中は、`release.ps1` の変更を main へ入れない。
-- `choice-line-layout` が触るのは、選択肢の出力（`sakura_builder.lua` とそのテスト）か、9 段目の辞書（`dic/09-choice.pasta`）・章（`09-choice.md`）・段階表の 9 段目の行・`tests/tutorial_stages_test.rs` のどちらかである。`act.lua`・`element_gen.rs`・シェルのファイル・`tests/integration_test.rs` を触らない。
+- `choice-line-layout` が触るのは、選択肢の出力（`sakura_builder.lua` とそのテスト）か、9 段目の辞書（`dic/09-choice.pasta`）・章（`09-choice.md`）・段階表の 9 段目の行・`tests/tutorial_stages_test.rs` のどちらかである。`act.lua`・`element_gen.rs`・シェルのファイル・`tests/integration_test.rs` を触らない。実績（2026-10-11 に完了）: 選択肢の出力のほうを直した。設定 `choice_newlines` を足したので、SHIORI 用の ACT（`pasta/shiori/act.lua`）・設定の読み込み（`crates/pasta_lua/src/loader/config/`）・マニュアルと生成スキルにも触れた。`pasta/act.lua`・`element_gen.rs`・9 段目の辞書と章は触っていない。
 - `manual-print-media-refs` は、`manual.yml`・`book/tools/verify-static.mjs`・`book/AUTHORING.md` の「CI と同じ順」の一覧を持つ。`link-check.mjs` を触らない。
 - `manual-link-anchor-check` が触るのは、`link-check.mjs` とその自己テスト、切れたリンクの行だけである。`manual.yml`・`verify-static.mjs`・`AUTHORING.md` を触らない。
 - スキル references は、後から入る側が再生成する。
@@ -226,7 +227,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 | Wave | spec（並走可） | ソースの持ち場 |
 | ---- | -------------- | -------------- |
 | 2（2026-10-10 のウェーブ） | hello-pasta-shell-art | `crates/pasta_sample_ghost` の絵を描くプログラム（`src/image_generator.rs` ほか。消す）・`Cargo.toml`、ルートの `Cargo.toml`・`Cargo.lock`、`shell/master/`、`README.md`、`release.ps1`、`STAGES.md` の部位名の注記、`tests/integration_test.rs` の画像のテスト、生成の手順と出どころの記録。部位名の都合があるときだけ 8 段目の辞書と章 |
-| 2（同上） | choice-line-layout | 選択肢の出力（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` とそのテスト）、または 9 段目の辞書（`dic/09-choice.pasta`）・章（`book/src/getting-started/09-choice.md`）・`STAGES.md` の 9 段目の行・`tests/tutorial_stages_test.rs` |
+| 2（同上。完了） | choice-line-layout | 選択肢の出力（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`・`pasta/shiori/act.lua` とそのテスト）、設定 `choice_newlines`（`crates/pasta_lua/src/loader/config/`）、マニュアル（`grammar/block-structure.md`・`reference/pasta-toml.md`・`lua/script-api.md`・`internals/talk-output.md` ほか）と生成スキル。9 段目の辞書・章・`STAGES.md`・`tests/tutorial_stages_test.rs` は触らなかった |
 | 3 | getting-started-screenshots | 撮影の手順、画像、各章への画像の行、新しいシェルでの 8 段目の実機の確認。`choice-line-layout` と `boot-surface-without-dic` の後に撮る |
 | 4（0.4.0 に入れた） | manual-shell-guide | シェルの説明の新しい章、入門の章（`setup.md`・`03-face.md`・`08-touch.md`）からのリンク、`SUMMARY.md` と章の数を決め打ちする検査 |
 
@@ -348,7 +349,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）と、ガイ�
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアルまで揃える（2026-10-08 起票）。Dependencies: failure-output-unification, call-attribute-filter
 - [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: hello-pasta-shell-art, choice-line-layout（9 段目の絵に切れた選択肢が写らないよう、先に直す）, boot-surface-without-dic（準備の章に写る絵が変わる。却下なら外す）
 - [x] manual-link-anchor-check -- マニュアルのリンク検証（`link-check.mjs`）が、本の中のリンクと公開 URL の見出し（`#…`）の実在も見るようにする（2026-10-10 `getting-started-story-guide` の完了時に起票）。Dependencies: none
-- [ ] choice-line-layout -- hello-pasta の 9 段目で、1 つ目の選択肢が問いかけと同じ行に続き、吹き出しの右端で切れて見えるのを直す。原因（選択肢の前の改行・辞書・バルーン）の特定から（2026-10-10 同上）。Dependencies: none（`scene-anchor-link` と `sakura_builder.lua` を触る順番に注意）
+- [x] choice-line-layout -- hello-pasta の 9 段目で、1 つ目の選択肢が問いかけと同じ行に続き、吹き出しの右端で切れて見えるのを直す。原因（選択肢の前の改行・辞書・バルーン）の特定から（2026-10-10 同上）。選択肢を 1 行に 1 つずつ出すよう組み立てを直し、`[ghost]` の `choice_newlines` を足した（2026-10-11 完了）。Dependencies: none（`scene-anchor-link` と `sakura_builder.lua` を触る順番に注意）
 - [ ] baseware-virtual-time -- SSP の「現在時刻の仮想的変更」を pasta の時報に効かせ、正時を待たずに確かめられるようにする。SSP が仮想の時刻を SHIORI に伝えているかの調査から。外から起こした `OnTalk` でチェイントークが続かない件も扱う（2026-10-10 同上）。Dependencies: none
 - [ ] boot-surface-without-dic -- 辞書や `＊OnBoot` が無いゴーストは起動しても立ち絵が出ない。既定で立ち絵を出すかどうかを、やるかどうかから決める（2026-10-10 同上）。Dependencies: none
 - [ ] manual-shell-guide -- マニュアルに、シェル（見た目）の説明を足す。見本のシェルを自分の絵に差し替える・表情を足す・当たり判定を足す・バルーンの扱いを、辞書と噛み合う所を中心に書く。0.4.0 に入れた（2026-10-10 開発者の指示で起票）。Dependencies: hello-pasta-shell-art（新しいシェルと当たり判定を題材にする）
