@@ -29,6 +29,11 @@
 - **NOTIFY には台本を返せない**: クリックの通知は GET で送ってもらう必要がある。
 - areka は、今は `OnMouseClick` を SHIORI へ送っていない（areka に brief がある: `areka-P0-mouse-click-wheel-events`）。
 
+### 申し送り（2026-10-11 の discovery・touch-poke-shortcuts より）
+
+- 触られたときの反応には、`touch-poke-shortcuts` が既定のハンドラを足す（`REG.OnMouseDoubleClick`・`REG.OnMouseMove`。`＊つっつき反応女の子Head` → `＊つっつき反応Head` → `＊つっつき反応その他` → `＊OnMouseDoubleClick` の順に探す。各段の次に、英字の名前 `OnPoke…` も探す）。それが入った後は、上の「作者が場面の中で振り分ける」は、ショートカットを書かない場合の話になる。
+- 下の「触られたときの反応との関係」は、その既定のハンドラの挙動を変えない、と読み替える。
+
 ## Desired Outcome
 
 - エレメントがクリックされると、その名前の場面が動く。飛び先の探し方は、選択肢と同じである。

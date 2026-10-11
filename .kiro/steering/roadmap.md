@@ -12,7 +12,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 このほか、リリース手順（常駐 spec `release-workflow`）の CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ（2026-10-10）。
 
-**優先順位（開発者の方針 2026-10-10）**: 次の節目は 0.4.0 で、主題は「入門者にやさしく」である（下の「0.4.0 までの道筋」）。その次の 0.5.0 の目標は、areka でノベルゲームが作れるようになること。そこに入れた spec を先に進め、ほかは 0.4.0 の後に回す（トークンの予算のため）。致命的な不具合は、見つかりしだい割り込ませる。
+**優先順位（開発者の方針 2026-10-10）**: 次の節目は 0.4.0 で、主題は「入門者にやさしく」である（下の「0.4.0 までの道筋」）。その次の 0.5.0 の目標は、areka でノベルゲームが作れるようになること。そこに入れた spec を先に進め、ほかは 0.4.0 の後に回す（トークンの予算のため）。致命的な不具合は、見つかりしだい割り込ませる。2026-10-11 に、撫で・つつきの反応のショートカット（`touch-poke-shortcuts`）を高優先度に置いた。0.4.0 の残りの spec より先に始める。
 
 ## 運用ルール
 
@@ -84,13 +84,14 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 完了 | manual-link-anchor-check | Opus | 8（実績） | 2026-10-11 に完了 |
 | 完了 | choice-line-layout | Opus | 12（実績） | 2026-10-11 に完了 |
 | 開発中 | manual-print-media-refs | Opus | 2〜4 | 始めている |
-| 1 | boot-surface-without-dic | Fable | 3〜5（やる場合） | 今すぐ |
-| 2 | failure-output-unification | Fable | 15〜19 | 今すぐ |
-| 3 | pasta-check-dic-validate | Fable | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
-| 4 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
-| 5 | getting-started-screenshots | Opus | 4〜6 | `boot-surface-without-dic` の後（最後に撮る。`hello-pasta-shell-art` と `choice-line-layout` は完了した） |
-| 6 | release-notes-highlights | Opus | 5〜8 | 今すぐ（2026-10-11 開発者の依頼で足した。リリースの実行中は main へ入れない） |
-| 7 | 0.4.0 のリリース（常駐 spec `release-workflow`） | Opus | — | 上の全部の後 |
+| 1（高優先度） | touch-poke-shortcuts | Opus | 10〜13 | 今すぐ（2026-10-11 開発者の依頼で足し、高優先度に置いた。残りの spec より先に始める） |
+| 2 | boot-surface-without-dic | Fable | 3〜5（やる場合） | 今すぐ |
+| 3 | failure-output-unification | Fable | 15〜19 | 今すぐ |
+| 4 | pasta-check-dic-validate | Fable | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
+| 5 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
+| 6 | getting-started-screenshots | Opus | 4〜6 | `boot-surface-without-dic` と `touch-poke-shortcuts` の後（最後に撮る。`hello-pasta-shell-art` と `choice-line-layout` は完了した） |
+| 7 | release-notes-highlights | Opus | 5〜8 | 今すぐ（2026-10-11 開発者の依頼で足した。リリースの実行中は main へ入れない） |
+| 8 | 0.4.0 のリリース（常駐 spec `release-workflow`） | Opus | — | 上の全部の後 |
 
 並走するときの約束（「棚卸」のウェーブの約束に足す）:
 
@@ -99,6 +100,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - `pasta-check-dic-validate` と `manual-shell-guide` は、どちらもマニュアルに章を足すと、目次（`SUMMARY.md`）と章の数を決め打ちする検査が重なる。後から入る側が数を合わせる。
 - `getting-started-screenshots` は、6 段目（時報）の撮り方を `baseware-virtual-time` に頼らない。失敗の表記を絵に写すなら、`failure-output-unification` の後に撮る。
 - 0.4.0 のリリースノートに、失敗の表記が変わったことを書く。`release-notes-highlights` が入っていれば、本文の見どころに書く。
+- `touch-poke-shortcuts` が触るのは、イベント層の新しいファイル（`pasta_scripts/pasta/shiori/event/`。`init.lua` には `require` を 1 行足すだけ）、hello-pasta の 8・9 段目（`dic/08-touch.pasta`・`dic/09-choice.pasta`・`STAGES.md`・`src/scripts.rs`・`tests/tutorial_stages_test.rs`）、入門の章（`08-touch.md`・`09-choice.md`）とリファレンスである。`act.lua`・`sakura_builder.lua`・`choice_select.lua`・文法・トランスパイラを触らない。設定を足す場合は、設定の読み込み（`loader/config/`）が `failure-output-unification`・`boot-surface-without-dic` と重なるので、後から入る側が合わせる。`manual-shell-guide` は `08-touch.md` にリンクを足すので、後から入る側が合わせる。`getting-started-screenshots` は、この spec の後に 8・9 段目を撮る。
 - `release-notes-highlights` は、`release.yml` の verify と github-release の段、`release-workflow` の手順の文書を触る。`pasta-check-dic-validate` が `release.yml` の `pasta_check` の公開の段を触る場合は、段が別なので、後から入る側が合わせる。
 
 0.4.0 の後（この順）: `scene-attribute-store`（Fable）、`shiori-test-support-runtime`（Opus）、`runtime-error-balloon`、`call-attribute-filter`、`scene-anchor-link`、`baseware-virtual-time`。このうち `scene-attribute-store` と `call-attribute-filter` は、0.5.0 の道筋に入った（下の「Phase 13」）。残りの 4 本をどこに挟むかは、0.4.0 を出した後の棚卸で決める。
@@ -350,7 +352,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）と、ガイ�
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
 - [ ] runtime-error-balloon -- スクリプトが止まる実行時エラー（500 の応答）を、辞書を書く人に見えるようバルーンにも出す。やるかどうかを要件の最初に決める（2026-10-10 の棚卸で `failure-output-unification` から分割）。Dependencies: failure-output-unification, shiori-test-support-runtime
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアルまで揃える（2026-10-08 起票）。Dependencies: failure-output-unification, call-attribute-filter
-- [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: hello-pasta-shell-art, choice-line-layout（9 段目の絵に切れた選択肢が写らないよう、先に直す）, boot-surface-without-dic（準備の章に写る絵が変わる。却下なら外す）
+- [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: hello-pasta-shell-art, choice-line-layout（9 段目の絵に切れた選択肢が写らないよう、先に直す）, boot-surface-without-dic（準備の章に写る絵が変わる。却下なら外す）, touch-poke-shortcuts（8・9 段目の辞書と章が変わる）
 - [x] manual-link-anchor-check -- マニュアルのリンク検証（`link-check.mjs`）が、本の中のリンクと公開 URL の見出し（`#…`）の実在も見るようにする（2026-10-10 `getting-started-story-guide` の完了時に起票）。Dependencies: none
 - [x] choice-line-layout -- hello-pasta の 9 段目で、1 つ目の選択肢が問いかけと同じ行に続き、吹き出しの右端で切れて見えるのを直す。原因（選択肢の前の改行・辞書・バルーン）の特定から（2026-10-10 同上）。選択肢を 1 行に 1 つずつ出すよう組み立てを直し、`[ghost]` の `choice_newlines` を足した（2026-10-11 完了）。Dependencies: none（`scene-anchor-link` と `sakura_builder.lua` を触る順番に注意）
 - [ ] baseware-virtual-time -- SSP の「現在時刻の仮想的変更」を pasta の時報に効かせ、正時を待たずに確かめられるようにする。SSP が仮想の時刻を SHIORI に伝えているかの調査から。外から起こした `OnTalk` でチェイントークが続かない件も扱う（2026-10-10 同上）。Dependencies: none
@@ -365,6 +367,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）と、ガイ�
 - [ ] shell-element-click -- エレメントのクリック（名前つき）を、選択肢と同じ振り分けで場面へ届ける。シェルとして組んだシステム画面を、場面が動かせるようにする。Dependencies: novel-areka-contract, novel-talk-flow（`scene-anchor-link` と `choice_select.lua` を触る順番に注意）
 - [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, scene-stage-attributes, novel-talk-flow, novel-checkpoint-rollback, novel-save-slots, shell-element-click, call-attribute-filter（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
+- [ ] touch-poke-shortcuts -- 撫で・つつきの反応を、決まった名前のシーン（`＊さわり反応女の子Head` → `＊さわり反応Head` → `＊さわり反応その他`。つつきは `つっつき反応`）で書けるようにする。時報と同じ段々のフォールバックで、各段の次に英字の名前（`OnTouch…`・`OnPoke…`・`…Other`）も探し、最後は今までどおり `＊OnMouseMove`・`＊OnMouseDoubleClick` を呼ぶ。撫での判定（トーク中は反応しない）を pasta が持つ。入門ガイドの 8・9 段目と hello-pasta の辞書を書き直す（2026-10-11 の discovery で起票。emo2 の実装を調べた。**高優先度**）。Dependencies: none（`getting-started-screenshots` は、この後に撮る）
 - [ ] release-notes-highlights -- リリースの本文を、注目に値する内容を Claudia（令嬢）の口調で紹介する文章にし、全件の詳しいリリースノートを Assets に添付する。見どころは版を上げるコミットで書き、無ければリリース CI が公開の前に止まる。spec 名を載せない（2026-10-11 の discovery で起票）。Dependencies: none（リリースの実行中は main へ入れない）
 
 ## Existing Spec Updates
