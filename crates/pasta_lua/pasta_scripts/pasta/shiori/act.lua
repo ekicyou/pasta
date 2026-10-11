@@ -12,6 +12,7 @@ local STORE = require("pasta.store")
 
 --- @class ShioriAct : Act SHIORI専用アクションオブジェクト
 --- @field _spot_newlines number スポット切り替え時の改行数（デフォルト1.5）
+--- @field _choice_newlines number 字の後の選択肢の前の改行幅（デフォルト1.5）
 --- @field req ShioriRequest|nil SHIORIリクエストオブジェクト（読み取り専用として扱うこと）
 local SHIORI_ACT = {}
 
@@ -46,6 +47,8 @@ function SHIORI_ACT.new(actors, req)
     local base = ACT.new(actors)
     -- pasta.tomlの[ghost]セクションからspot_newlinesを読み込み（デフォルト1.5）
     base._spot_newlines = CONFIG.get("ghost", "spot_newlines", 1.5)
+    -- 同じく[ghost]セクションからchoice_newlinesを読み込み（デフォルト1.5）
+    base._choice_newlines = CONFIG.get("ghost", "choice_newlines", 1.5)
     -- SHIORIリクエストオブジェクトを設定（任意）
     base.req = req
     return setmetatable(base, SHIORI_ACT_IMPL)
@@ -67,7 +70,8 @@ function SHIORI_ACT_IMPL.build(self)
     -- STORE.actor_spots・STORE.appearanceを直接BUILDER.build()に渡す（直接変更方式）
     -- STORE.appearanceがnil（旧ストア）ならビルダーがビルドローカル状態を使う
     local script = BUILDER.build(token, {
-        spot_newlines = self._spot_newlines
+        spot_newlines = self._spot_newlines,
+        choice_newlines = self._choice_newlines
     }, STORE.actor_spots, STORE.appearance)
 
     return script

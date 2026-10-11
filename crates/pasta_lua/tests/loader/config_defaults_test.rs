@@ -314,7 +314,7 @@ fn config_reference_doc_matches_ssot() {
 }
 
 /// Lua フォールバックリテラルが SSOT と一致すること（R5.5）。
-/// `act.lua`（spot_newlines = 1.5）および `virtual_dispatcher.lua`
+/// `act.lua`（spot_newlines = 1.5、choice_newlines = 1.5）および `virtual_dispatcher.lua`
 /// （180/300/30）のハードコード既定を SSOT と突き合わせ、将来の乖離を捕捉する。
 #[test]
 fn lua_fallback_literals_match_ssot() {
@@ -328,6 +328,12 @@ fn lua_fallback_literals_match_ssot() {
     assert!(
         act_lua.contains(&format!("\"spot_newlines\", {spot_default}")),
         "act.lua の spot_newlines フォールバックリテラルが SSOT ({spot_default}) と不一致 (R5.5)"
+    );
+    // act.lua: choice_newlines の Lua 側フォールバックリテラル（choice-line-layout 2.9）。
+    let choice_default = format!("{:?}", d.choice_newlines); // "1.5"
+    assert!(
+        act_lua.contains(&format!("\"choice_newlines\", {choice_default}")),
+        "act.lua の choice_newlines フォールバックリテラルが SSOT ({choice_default}) と不一致 (choice-line-layout 2.9)"
     );
 
     // virtual_dispatcher.lua: talk_interval_min/max/hour_margin のフォールバックリテラル。

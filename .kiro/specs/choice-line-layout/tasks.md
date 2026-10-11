@@ -11,7 +11,7 @@
   - _Requirements: 2.9, 2.10_
   - _Boundary: ChoiceNewlinesConfig_
 
-- [ ] 1.2 SHIORI の act が `choice_newlines` を読み、組み立ての設定に入れて渡す
+- [x] 1.2 SHIORI の act が `choice_newlines` を読み、組み立ての設定に入れて渡す
   - `spot_newlines` を読む場所と渡す場所に、同じ形で 1 行ずつ足す（既定値のリテラルは `1.5`）
   - さくらスクリプトの組み立ては設定のモジュールを読まない。値は引数の表で受け取る
   - 既定値の一致の検査（Rust の既定値と、Lua の既定値のリテラル）に `choice_newlines` を足す
