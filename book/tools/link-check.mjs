@@ -131,13 +131,33 @@ export function detectBrokenLinks(repoRoot = REPO_ROOT) {
   const srcDir = path.resolve(repoRoot, 'book/src');
   const files = listMarkdownFiles(srcDir);
   const broken = [];
+  const rel = (abs) => path.relative(repoRoot, abs).split(path.sep).join('/');
+  const anchorsOf = anchorReader();
 
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
-    const relFile = path.relative(repoRoot, file).split(path.sep).join('/');
+    const relFile = rel(file);
     for (const rawTarget of extractLinks(text)) {
       const target = stripFragment(rawTarget).trim();
-      if (target === '') continue;
+      // フラグメントは、書かれたリンク先の最初の `#` より後ろを復号したもの。
+      const h = rawTarget.indexOf('#');
+      const anchor = h >= 0 ? decodeAnchor(rawTarget.slice(h + 1)) : '';
+      // 見出しの照合: 実在を確かめた章のアンカーの集合に無ければ報告する（行番号は付けない）。
+      const checkAnchor = (abs) => {
+        if (anchor === '' || anchorsOf(abs).has(anchor)) return;
+        broken.push({
+          file: relFile,
+          target: rawTarget,
+          kind: 'internal-anchor',
+          detail: `リンク先 ${rel(abs)} に見出し／明示アンカー "${anchor}" が無い`,
+        });
+      };
+
+      // 同じ章の中を指すリンク（`#見出し`）は、自分の章と照合する。
+      if (target === '') {
+        checkAnchor(file);
+        continue;
+      }
 
       // (b) このリポジトリ内を指す GitHub blob/tree URL → ローカル照合。
       const repoPath = githubUrlToRepoPath(target);
@@ -194,7 +214,10 @@ export function detectBrokenLinks(repoRoot = REPO_ROOT) {
             kind: 'internal-md',
             detail: `book 内リンク先が存在しない: ${target}`,
           });
+          continue;
         }
+        // 他の章の見出しを指すリンク（`章.md#見出し`）は、リンク先の章と照合する。
+        checkAnchor(abs);
       }
     }
   }

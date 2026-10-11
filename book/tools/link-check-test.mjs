@@ -28,6 +28,9 @@
 //     存在しない章・アンカー・トラバーサル・章に写像できない URL を readme-manual-url として行番号付きで検出する。
 //     インラインコード内・crates/*/README.md 以外は対象外。manual.yml は crates/*/README.md の変更でも起動する
 //     （pasta-runtime-internals-doc タスク 1.2 / 要件 7.5, 7.8, 1.6）。
+//   - detectBrokenLinks が本の中のリンク（`章.md#見出し`・`#見出し`）の見出しをリンク先の章のアンカーの集合と照合し、
+//     無ければ internal-anchor として報告する（行番号なし）。章のファイルが無いときは internal-md の 1 件だけ
+//     （manual-link-anchor-check タスク 2.1 / 要件 1.1〜1.5, 2.1, 2.2, 3.1〜3.6, 5.1, 5.5, 7.1〜7.3）。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -195,7 +198,7 @@ log('\n== (B-11) リンクのフラグメント/クエリ許容（誤検出な�
       'アンカー付き [a](block-structure.md#sec) '
       + 'クエリ付き [b](block-structure.md?x=1) '
       + `blob フラグメント [c](https://github.com/${REPO_SLUG}/blob/main/doc/spec/02-markers.md#L10)\n`);
-    writeFile(root, 'book/src/grammar/block-structure.md', '# block\n');
+    writeFile(root, 'book/src/grammar/block-structure.md', '# block\n\n## sec\n');
 
     const result = runLinkCheck(root);
     check('フラグメント/クエリ付き実在リンクは壊れ扱いしない',
@@ -746,6 +749,127 @@ log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュア
     const yml = fs.readFileSync(path.join(REPO_ROOT, '.github/workflows/manual.yml'), 'utf8');
     const n = (yml.match(/^\s*-\s*'crates\/\*\/README\.md'\s*$/gm) || []).length;
     check('G-5 manual.yml の paths（push・pull_request）に crates/*/README.md', n === 2, `count=${n}`);
+  }
+}
+
+// ============================================================
+log('\n== (H) 本の中のリンクの見出し（internal-anchor） ==');
+{
+  const SRC = 'book/src/grammar/source.md';
+  const DST = 'book/src/grammar/target.md';
+  const noAnchor = (chapter, heading) => `リンク先 ${chapter} に見出し／明示アンカー "${heading}" が無い`;
+
+  // H-1: 在る見出しを指すリンクだけなら違反 0（誤検出なし）。
+  {
+    const root = makeSandbox();
+    try {
+      writeFile(root, DST, [
+        '# 対象',
+        '## 単語定義',
+        '## [package] 予約注記',
+        '### `ACT:talk(text)` の使い方',
+        '## 例',
+        '## 例',
+        '<a id="s6-6"></a>',
+        '### 6.6 永続化',
+        '',
+      ].join('\n'));
+      writeFile(root, SRC, [
+        '# 元',
+        '## 節 A',
+        '[日本語](target.md#単語定義) [記号](target.md#package-予約注記)',
+        '[インラインコード](target.md#acttalktext-の使い方) [重複の付番](target.md#例-1)',
+        `[パーセントエンコード](target.md#${encodeURIComponent('単語定義')}) [明示のアンカー](target.md#s6-6)`,
+        '[空のフラグメント](target.md#) [クエリつき](target.md?x=1#例) [同じ章の中](#節-a)',
+        '',
+        '> 【クローディア：したり顔】[他の章](target.md#単語定義) も [同じ章](#節-a) も在りますわ。',
+        '',
+      ].join('\n'));
+      const result = runLinkCheck(root);
+      check('H-1 在る見出し（日本語・記号・インラインコード・重複の付番・パーセントエンコード・明示のアンカー・'
+        + '空のフラグメント・クエリつき・同じ章の中・台詞部品の中）: 違反 0',
+        result.broken.length === 0, JSON.stringify(result.broken));
+      check('H-1 failed=false', result.failed === false);
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // H-2: 無い見出しの検出。違反はリンクの出現順に並ぶ。
+  {
+    const root = makeSandbox();
+    try {
+      const target = ['# 対象', '## Overview', '```markdown', '## フェンスの中だけ', '```', ''];
+      writeFile(root, DST, target.join('\n'));
+      const enc = encodeURIComponent('無い');
+      writeFile(root, SRC, [
+        '# 元',
+        '[他の章](target.md#無い見出し) [同じ章](#無い節)',
+        '[大文字と小文字](target.md#Overview) [フェンスの中](target.md#フェンスの中だけ)',
+        '',
+        '> 【アンソニー：刮目】詳しくは [台詞](target.md#台詞の無い見出し) を。',
+        '',
+        `[無いファイル](missing.md#sec) [エンコード](target.md#${enc}) [復号できない](target.md#%E3%8)`,
+        '[在る見出し](target.md#overview) [在る同じ章](#元)',
+        '',
+      ].join('\n'));
+
+      const result = runLinkCheck(root);
+      const broken = result.broken;
+      const anchorOf = (t) => broken.filter((b) => b.kind === 'internal-anchor' && b.target === t);
+      const dump = JSON.stringify(broken);
+      check('H-2 他の章の無い見出し → internal-anchor', anchorOf('target.md#無い見出し').length === 1, dump);
+      check('H-2 同じ章の無い見出し → internal-anchor', anchorOf('#無い節').length === 1, dump);
+      check('H-2 大文字と小文字の違い（## Overview に #Overview）→ internal-anchor',
+        anchorOf('target.md#Overview').length === 1, dump);
+      check('H-2 フェンスの中にしか無い見出し → internal-anchor',
+        anchorOf('target.md#フェンスの中だけ').length === 1, dump);
+      check('H-2 台詞部品の中の無い見出し → internal-anchor',
+        anchorOf('target.md#台詞の無い見出し').length === 1, dump);
+      check('H-2 復号できないフラグメントは例外にせず internal-anchor（見出しは書かれたとおり）',
+        anchorOf('target.md#%E3%8').length === 1
+        && anchorOf('target.md#%E3%8')[0].detail === noAnchor(DST, '%E3%8'), dump);
+
+      const missing = broken.filter((b) => b.target === 'missing.md#sec');
+      check('H-2 無いファイルにフラグメントが付いたリンクは internal-md の 1 件だけ（文面は今のまま）',
+        missing.length === 1 && missing[0].kind === 'internal-md'
+        && missing[0].detail === 'book 内リンク先が存在しない: missing.md', JSON.stringify(missing));
+
+      const encoded = anchorOf(`target.md#${enc}`)[0] || {};
+      check('H-2 違反の欄: file はリンク元・target は書かれたとおり（復号しない）・detail は章のパスと復号した見出し',
+        encoded.file === SRC && encoded.target === `target.md#${enc}` && encoded.detail === noAnchor(DST, '無い'),
+        JSON.stringify(encoded));
+      check('H-2 同じ章の中のリンクは、detail の章がリンク元と同じパス',
+        (anchorOf('#無い節')[0] || {}).detail === noAnchor(SRC, '無い節'), dump);
+
+      const want = [
+        ['internal-anchor', 'target.md#無い見出し'],
+        ['internal-anchor', '#無い節'],
+        ['internal-anchor', 'target.md#Overview'],
+        ['internal-anchor', 'target.md#フェンスの中だけ'],
+        ['internal-anchor', 'target.md#台詞の無い見出し'],
+        ['internal-md', 'missing.md#sec'],
+        ['internal-anchor', `target.md#${enc}`],
+        ['internal-anchor', 'target.md#%E3%8'],
+      ];
+      check('H-2 違反は 8 件・リンクの出現順（在る見出しは出ない）',
+        JSON.stringify(broken.map((b) => [b.kind, b.target])) === JSON.stringify(want), dump);
+      check('H-2 2 回走らせて同じ結果', JSON.stringify(runLinkCheck(root).broken) === dump);
+
+      // 見本の章に見出しを足すと、その 1 件だけが消える（前の走りの集合を持ち越さない）。
+      writeFile(root, DST, [...target, '## 無い見出し', ''].join('\n'));
+      const after = runLinkCheck(root).broken;
+      check('H-2 見本を書き換えた後の走りは、今の章と照合する',
+        after.length === 7 && !after.some((b) => b.target === 'target.md#無い見出し'), JSON.stringify(after));
+    } finally {
+      rmrf(root);
+    }
+  }
+
+  // H-3: 実リポジトリで internal-anchor 0 件。
+  {
+    const broken = runLinkCheck(REPO_ROOT).broken.filter((b) => b.kind === 'internal-anchor');
+    check('H-3 実リポジトリで internal-anchor 0 件', broken.length === 0, JSON.stringify(broken));
   }
 }
 
