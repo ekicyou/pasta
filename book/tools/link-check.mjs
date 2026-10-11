@@ -249,6 +249,16 @@ function anchorSet(markdown) {
   return set;
 }
 
+// アンカー集合の読み手: 同じファイルは 1 度だけ読む。覚えは返した読み手の中だけに持つ
+// （モジュールの変数に置かない。自己テストは同じプロセスで見本を書き換えて何度も走らせる）。
+function anchorReader() {
+  const cache = new Map();
+  return (abs) => {
+    if (!cache.has(abs)) cache.set(abs, anchorSet(fs.readFileSync(abs, 'utf8')));
+    return cache.get(abs);
+  };
+}
+
 function decodeAnchor(a) {
   try {
     return decodeURIComponent(a);
@@ -266,11 +276,7 @@ function decodeAnchor(a) {
 export function checkSkillSelfContained(repoRoot = REPO_ROOT) {
   const broken = [];
   const rel = (abs) => path.relative(repoRoot, abs).split(path.sep).join('/');
-  const anchorCache = new Map();
-  const anchorsOf = (abs) => {
-    if (!anchorCache.has(abs)) anchorCache.set(abs, anchorSet(fs.readFileSync(abs, 'utf8')));
-    return anchorCache.get(abs);
-  };
+  const anchorsOf = anchorReader();
 
   for (const skill of CHECKED_SKILLS) {
     const skillDir = path.resolve(repoRoot, '.claude/skills', skill);
