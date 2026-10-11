@@ -148,7 +148,7 @@ gh pr merge --squash --delete-branch --subject "<subject>" --body "<body>"
 
 **中断条件**: PR の作成またはマージ（API）が失敗した（コンフリクト / mergeable でない / 権限不足等）場合は、**ブランチを削除せず**処理を中断し開発者へ報告する（復旧可能性を確保するため）。マージ成否の判定はマージ API の結果のみに基づき、`--delete-branch` のローカル削除警告とは区別する。
 
-> **release タグ公開のカーブアウト**: リリース手順（`release` スキル）は、版の更新の main 反映を、spec 完了と同じ **PR の squash マージ**（`gh pr merge --squash`）で行い、**デフォルトブランチへの直接 push は行わない**。リリースタグは、統合の後に main のコミット（squash マージでできたコミット）へ付ける。リリースが行う **タグ ref の push**（`git push origin vX.Y.Z`。ブランチ push ではない）のみが本セクションの直接 push 禁止の対象外であり、main のブランチ保護のもとでも成立する。`.claude/settings.json` はタグ push の許可（`git push origin v*`）を持ち、main への push の許可を持たない。
+> **release タグ公開のカーブアウト**: リリース手順（`release` スキル。`/release [X.Y.Z]` で実行する）は、版の更新の main 反映を、spec 完了と同じ **PR の squash マージ**（`gh pr merge --squash`）で行い、**デフォルトブランチへの直接 push は行わない**。リリースタグは、統合の後に main のコミット（squash マージでできたコミット）へ付ける。リリースが行う **タグ ref の push**（`git push origin vX.Y.Z`。ブランチ push ではない）のみが本セクションの直接 push 禁止の対象外であり、main のブランチ保護のもとでも成立する。`.claude/settings.json` はタグ push の許可（`git push origin v*`）を持ち、main への push の許可を持たない。
 
 #### squash コミットメッセージの生成方針
 

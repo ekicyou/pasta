@@ -43,7 +43,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] SHIORI インターフェース（pasta_shiori）- DLL エクスポート
 
 ### Phase 2: コア機能拡張（進行中）🔄
-**最終更新**: 2026-10-10（現行バージョン v0.3.8）
+**最終更新**: 2026-10-11（現行バージョン v0.3.8）
 
 **完了仕様**:
 - ✅ **release-workflow** - リリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認）。手順は `release` スキル（`/release`）へ移した
