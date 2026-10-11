@@ -870,3 +870,20 @@ describe("SHIORI_ACT - clear_spot を挟む出力のバイト比較 (act-token-g
         STORE.reset()
     end)
 end)
+
+-- ============================================================================
+-- choice-line-layout: act:choice の行の配置（Task 2.2）
+-- act:choice で積んだ選択肢にも、選択肢行と同じ配置が当たる（2.6）。
+-- 期待値は sakura_builder_test.lua の「字 → 選択肢 → 選択肢」と同じ並びである。
+-- ============================================================================
+
+describe("SHIORI_ACT - choice-line-layout: act:choice の行の配置", function()
+    test("2.6: 台詞 → act:choice → act:choice で \\n[150] と \\n が選択肢の直前に 1 つずつ出る", function()
+        local act, sakura, _, STORE = new_bytes_act()
+        act:talk(sakura, "どれ")
+        act:choice("甲先", "甲")
+        act:choice("乙先", "乙")
+        expect(act:build()):toBe("\\p[0]どれ\\n[150]\\![*]\\q[甲,甲先]\\n\\![*]\\q[乙,乙先]\\e")
+        STORE.reset()
+    end)
+end)
