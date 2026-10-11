@@ -7,13 +7,24 @@
 //       ローカルに実在するか（オフラインでローカル照合）、
 //   (c) (a)(b) とも repoRoot 外へ脱出するパス（トラバーサル）は実在しても違反。
 //
+// 本の中のリンクの見出しの照合（manual-link-anchor-check タスク 2.1・2.2・要件 1.1〜1.5, 2.1, 2.2, 3.1〜3.6, 5.1〜5.5）:
+//   (a) のリンクのうち見出しを指すもの（`章.md#見出し`・同じ章の中の `#見出し`）を detectBrokenLinks で
+//   リンク先の章のアンカーの集合（フェンス外の見出しの slug ∪ `<a id|name>` の明示アンカー）と照合し、
+//   無ければ [1] の区分に internal-anchor として報告する（行番号は付けない）。
+//   フラグメントはパーセントエンコードを復号して比べる。空（`章.md#`）なら章の実在だけを見る。
+//   章のファイルが無いときは internal-md の 1 件だけで、見出しの違反を重ねない。
+//   集合は、スキル・公開 URL の検査と同じ読み手（anchorReader）から取る（照合の規則は 1 つ）。
+//
 // 内部設計章のパス実在検査（pasta-runtime-internals-doc タスク 1.1・要件 3.7）:
 //   book/src/internals/**/*.md のフェンス外インラインコードに書いたリポジトリ内パスを
 //   checkInternalsPaths で検査し、[1] の区分に internals-path として報告する。
 //
-// クレート README のマニュアル URL 実在検査（同タスク 1.2・要件 7.5, 7.8）:
-//   crates/*/README.md のフェンス外のリンクと裸の URL のうち公開マニュアル（MANUAL_URL）を指すものを
-//   checkReadmeManualLinks で book/src の章・見出しへ写像して照合し、[1] の区分に readme-manual-url として報告する。
+// 読者に届く文書のマニュアル URL 実在検査（同タスク 1.2・要件 7.5, 7.8 /
+// manual-link-anchor-check タスク 3.1・3.2・要件 4.1〜4.7）:
+//   crates/*/README.md → ルートの README.md → SOUL.md → 2 スキルの Markdown（生成ファイルも含む）の順に、
+//   フェンス外のリンクと裸の URL のうち公開マニュアル（MANUAL_URL）を指すものを
+//   checkReadmeManualLinks で book/src の章・見出しへ写像して照合し、[1] の区分に readme-manual-url として報告する
+//   （区分と文面は、どの文書でも同じ）。裸の URL は、空白・半角の括弧のほか、全角の括弧と句読点でも終わる。
 //
 // スキル自己完結検査（タスク 3.2・要件 5.3, 6.1, 6.4, 6.5, 10.2, 2.4）:
 //   .claude/skills/{pasta-ghost-authoring,pasta-lua-coding}/**/*.md を checkSkillSelfContained で
@@ -24,6 +35,11 @@
 // 共用 export（gen-skill-refs.mjs が import する）:
 //   LINK_RE    … インラインリンク `[text](target)` の正規表現（先頭キャプチャ=リンク先）
 //   maskFences … CommonMark 準拠でコードフェンス内の行を空行に置換（行数は保つ）
+// 共用 export（自己テスト link-check-test.mjs が import する）:
+//   BOOK_KINDS … 報告の [1]（リンク切れ）に入る種別の一覧
+//
+// ビルドした出力（book/book/）は読まない。出力の有無で結果は変わらない（manual-link-anchor-check 要件 6.2）。
+// 見出しの id を出力と突き合わせる確かめは、自己テスト（link-check-test.mjs の節 I）が持つ（同 要件 3.7, 7.6〜7.8）。
 //
 // 終了コード: 違反あり → exit 1 / 無し → exit 0 / 予期しない例外 → exit 2。
 // 冪等・決定論的（同一入力 → 同一結果）。book/src は読み取りのみ。
@@ -131,13 +147,33 @@ export function detectBrokenLinks(repoRoot = REPO_ROOT) {
   const srcDir = path.resolve(repoRoot, 'book/src');
   const files = listMarkdownFiles(srcDir);
   const broken = [];
+  const rel = (abs) => path.relative(repoRoot, abs).split(path.sep).join('/');
+  const anchorsOf = anchorReader();
 
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
-    const relFile = path.relative(repoRoot, file).split(path.sep).join('/');
+    const relFile = rel(file);
     for (const rawTarget of extractLinks(text)) {
       const target = stripFragment(rawTarget).trim();
-      if (target === '') continue;
+      // フラグメントは、書かれたリンク先の最初の `#` より後ろを復号したもの。
+      const h = rawTarget.indexOf('#');
+      const anchor = h >= 0 ? decodeAnchor(rawTarget.slice(h + 1)) : '';
+      // 見出しの照合: 実在を確かめた章のアンカーの集合に無ければ報告する（行番号は付けない）。
+      const checkAnchor = (abs) => {
+        if (anchor === '' || anchorsOf(abs).has(anchor)) return;
+        broken.push({
+          file: relFile,
+          target: rawTarget,
+          kind: 'internal-anchor',
+          detail: `リンク先 ${rel(abs)} に見出し／明示アンカー "${anchor}" が無い`,
+        });
+      };
+
+      // 同じ章の中を指すリンク（`#見出し`）は、自分の章と照合する。
+      if (target === '') {
+        checkAnchor(file);
+        continue;
+      }
 
       // (b) このリポジトリ内を指す GitHub blob/tree URL → ローカル照合。
       const repoPath = githubUrlToRepoPath(target);
@@ -194,7 +230,10 @@ export function detectBrokenLinks(repoRoot = REPO_ROOT) {
             kind: 'internal-md',
             detail: `book 内リンク先が存在しない: ${target}`,
           });
+          continue;
         }
+        // 他の章の見出しを指すリンク（`章.md#見出し`）は、リンク先の章と照合する。
+        checkAnchor(abs);
       }
     }
   }
@@ -249,6 +288,16 @@ function anchorSet(markdown) {
   return set;
 }
 
+// アンカー集合の読み手: 同じファイルは 1 度だけ読む。覚えは返した読み手の中だけに持つ
+// （モジュールの変数に置かない。自己テストは同じプロセスで見本を書き換えて何度も走らせる）。
+function anchorReader() {
+  const cache = new Map();
+  return (abs) => {
+    if (!cache.has(abs)) cache.set(abs, anchorSet(fs.readFileSync(abs, 'utf8')));
+    return cache.get(abs);
+  };
+}
+
 function decodeAnchor(a) {
   try {
     return decodeURIComponent(a);
@@ -266,11 +315,7 @@ function decodeAnchor(a) {
 export function checkSkillSelfContained(repoRoot = REPO_ROOT) {
   const broken = [];
   const rel = (abs) => path.relative(repoRoot, abs).split(path.sep).join('/');
-  const anchorCache = new Map();
-  const anchorsOf = (abs) => {
-    if (!anchorCache.has(abs)) anchorCache.set(abs, anchorSet(fs.readFileSync(abs, 'utf8')));
-    return anchorCache.get(abs);
-  };
+  const anchorsOf = anchorReader();
 
   for (const skill of CHECKED_SKILLS) {
     const skillDir = path.resolve(repoRoot, '.claude/skills', skill);
@@ -369,16 +414,17 @@ export function checkInternalsPaths(repoRoot = REPO_ROOT) {
   return broken;
 }
 
-// ---- クレート README の公開マニュアル URL 実在検査（readme-manual-url） ----
-// pasta-runtime-internals-doc タスク 1.2（要件 7.5, 7.8, 1.6）。
-// crates/*/README.md のフェンス外・インラインコード外のインラインリンクと裸の URL のうち MANUAL_URL で始まるものを
+// ---- 読者に届く文書の公開マニュアル URL 実在検査（readme-manual-url） ----
+// pasta-runtime-internals-doc タスク 1.2（要件 7.5, 7.8, 1.6）・manual-link-anchor-check タスク 3.2（要件 4.4〜4.6）。
+// 対象: crates/*/README.md（名前順）・ルートの README.md・SOUL.md・2 スキル（CHECKED_SKILLS）の Markdown（パス順。生成ファイルも含む）。
+// 対象のフェンス外・インラインコード外のインラインリンクと裸の URL のうち MANUAL_URL で始まるものを
 // 写像する: 残りが空・index.html → 合格（末尾 `/` は index.html を補う）。`<path>.html[#anchor]` → book/src/<path>.md が
 // 実在し、アンカーがあればその章の見出し slug ∪ 明示アンカーに含まれること（パーセントエンコードはデコードして照合）。
 // 違反: .html 以外で章に写像できない、book/src 外へ解決される（トラバーサル）、章が無い、見出しが無い。
 export const MANUAL_URL = 'https://ekicyou.github.io/pasta/'; // gen-skill-refs の MANUAL_BASE_URL と同値（import しない）
-const BARE_MANUAL_URL_RE = new RegExp(MANUAL_URL.replace(/\./g, '\\.') + '[^\\s<>()\\[\\]`"\'、。]*', 'g');
+const BARE_MANUAL_URL_RE = new RegExp(MANUAL_URL.replace(/\./g, '\\.') + '[^\\s<>()\\[\\]`"\'、。（）「」『』【】]*', 'g');
 
-function manualUrlProblem(repoRoot, url) {
+function manualUrlProblem(repoRoot, url, anchorsOf) {
   const rest = url.slice(MANUAL_URL.length);
   const h = rest.indexOf('#');
   const anchor = h >= 0 ? decodeAnchor(rest.slice(h + 1)) : '';
@@ -391,7 +437,7 @@ function manualUrlProblem(repoRoot, url) {
   const chapter = path.relative(repoRoot, abs).split(path.sep).join('/');
   if (!isWithinRoot(srcDir, abs)) return `マニュアル外を指すパス（トラバーサル）: ${page}`;
   if (!fs.existsSync(abs)) return `写像先の章が存在しない: ${chapter}`;
-  if (anchor !== '' && !anchorSet(fs.readFileSync(abs, 'utf8')).has(anchor)) {
+  if (anchor !== '' && !anchorsOf(abs).has(anchor)) {
     return `写像先 ${chapter} に見出し／明示アンカー "${anchor}" が無い`;
   }
   return null;
@@ -399,24 +445,30 @@ function manualUrlProblem(repoRoot, url) {
 
 export function checkReadmeManualLinks(repoRoot = REPO_ROOT) {
   const cratesDir = path.resolve(repoRoot, 'crates');
-  if (!fs.existsSync(cratesDir)) return [];
-  const readmes = fs.readdirSync(cratesDir, { withFileTypes: true })
+  const readmes = !fs.existsSync(cratesDir) ? [] : fs.readdirSync(cratesDir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => path.join(cratesDir, d.name, 'README.md'))
-    .filter((f) => fs.existsSync(f))
     .sort();
+  // 対象の順は固定（同じ入力に同じ順）。無いファイルは飛ばす。
+  const targets = [
+    ...readmes,
+    path.resolve(repoRoot, 'README.md'),
+    path.resolve(repoRoot, 'SOUL.md'),
+    ...CHECKED_SKILLS.flatMap((skill) => listMarkdownFiles(path.resolve(repoRoot, '.claude/skills', skill)).sort()),
+  ].filter((f) => fs.existsSync(f));
+  const anchorsOf = anchorReader();
   const broken = [];
-  for (const file of readmes) {
+  for (const file of targets) {
     const relFile = path.relative(repoRoot, file).split(path.sep).join('/');
     maskFences(fs.readFileSync(file, 'utf8')).split('\n').forEach((line, i) => {
       const noCode = line.replace(CODE_SPAN_RE, '');
       const links = extractLinks(noCode).map((t) => t.trim());
-      // インラインリンクの行き先を除いた残りから裸の URL（自動リンク `<…>` を含む）を拾う。末尾の句読点は URL に含めない。
+      // インラインリンクの行き先を除いた残りから裸の URL（自動リンク `<…>` を含む）を拾う。末尾の半角の句読点は URL に含めない（全角の括弧・句読点は正規表現が URL の外にする）。
       const bare = [...noCode.replace(LINK_RE, '](').matchAll(BARE_MANUAL_URL_RE)]
         .map((m) => m[0].replace(/[.,;:!?]+$/, ''));
       for (const url of new Set([...links, ...bare])) {
         if (!url.startsWith(MANUAL_URL)) continue;
-        const problem = manualUrlProblem(repoRoot, url);
+        const problem = manualUrlProblem(repoRoot, url, anchorsOf);
         if (problem) broken.push({ file: relFile, target: url, kind: 'readme-manual-url', detail: `L${i + 1}: ${problem}` });
       }
     });
@@ -425,7 +477,8 @@ export function checkReadmeManualLinks(repoRoot = REPO_ROOT) {
 }
 
 // ---- オーケストレーション ----
-const BOOK_KINDS = new Set(['internal-md', 'github-repo-path', 'internals-path', 'readme-manual-url']);
+// 報告の [1]（リンク切れ）に入る種別。自己テストもここから読む。
+export const BOOK_KINDS = new Set(['internal-md', 'internal-anchor', 'github-repo-path', 'internals-path', 'readme-manual-url']);
 
 export function runLinkCheck(repoRoot = REPO_ROOT) {
   const broken = [
@@ -437,7 +490,7 @@ export function runLinkCheck(repoRoot = REPO_ROOT) {
   return { broken, failed: broken.length > 0 };
 }
 
-// 結果を標準出力へ分類表示する（[1] book 内リンク切れ・[2] スキル自己完結を種別ごと）。
+// 結果を標準出力へ分類表示する（[1] リンク切れ＝BOOK_KINDS の種別・[2] スキル自己完結を種別ごと）。
 export function reportLinkCheck(result) {
   const { broken } = result;
   const book = broken.filter((b) => BOOK_KINDS.has(b.kind));
@@ -451,7 +504,7 @@ export function reportLinkCheck(result) {
   };
   out.push('link-check (git 非依存)');
   out.push('');
-  out.push(`[1] リンク切れ（book 内 .md / リポジトリ内 GitHub URL / 内部設計章のパス / README のマニュアル URL）: ${book.length} 件`);
+  out.push(`[1] リンク切れ（book 内 .md・見出し / リポジトリ内 GitHub URL / 内部設計章のパス / マニュアルの公開 URL）: ${book.length} 件`);
   list(book);
   out.push('');
   out.push(`[2] スキル自己完結（${CHECKED_SKILLS.join(', ')}）: ${skill.length} 件`);

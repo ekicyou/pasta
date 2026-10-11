@@ -123,3 +123,11 @@
 - **`manual.yml` のコメントが古い**: 114 行目あたりの「`book/src/getting-started/first-ghost.md` の ```pasta 成果物ブロックが…」は、もう合わない。`first-ghost.md` は消え、`tutorial-check.mjs` は段の章 12 枚（`01-boot.md`〜`12-lua.md`）を、同じ名前の辞書とそれぞれ照合する。`manual.yml` はこのウェーブでこの spec が持つので、触るついでにコメントを直す（手順そのものは変えなくてよい）。
 - **`book/AUTHORING.md` はもう空いている**: 議題 2 の「`AUTHORING.md` はこのウェーブでは触れない」は、本文の spec の完了で外れた。行番号はずれた（第 8 節が足された。「CI と同じ順」の記述は 463 行目あたり）。
 - **`link-check.mjs` は、本の中のリンクの見出し（`#…`）を見ない**: 別に起票した。この spec の範囲ではない。
+
+## 申し送り（manual-link-anchor-check より・2026-10-11）
+
+リンク検証の spec が完了した。`manual.yml` はこのウェーブでこの spec が持つので、触るついでに次の 3 点を見る（`manual.yml` のほかは変えなくてよい）。参照先は `.kiro/specs/completed/manual-link-anchor-check/design.md` の「完了時の申し送り」と「Revalidation Triggers」。
+
+- **`paths` に `README.md` と `SOUL.md` を足す**（`push` と `pull_request` の 2 か所）: 公開マニュアルの URL の検査（`link-check.mjs` の `readme-manual-url`）は、クレートの README に加えて、ルートの `README.md`・`SOUL.md`・2 スキルの Markdown も見るようになった。今の `paths` にはこの 2 つが無いので、この 2 つだけを変えた PR では検査が走らない。切れた URL は、次に `book/` かスキルを触った無関係な PR で初めて落ちる。
+- **先頭の流れの説明のコメントが古い**: 12 行目あたりの「マニュアル内リンク・README のマニュアル URL・スキル自己完結の検証」は、今の検査（本の中のリンクの見出し `#…`、読者に届く文書の公開 URL）と合わない。4〜5 行目の「クレート README（…マニュアル URL の実在検査のため）」も、`paths` を足すときに合わせる。
+- **「Book tools self-tests」の段を `mdbook build` より前へ動かさない**: リンク検証の自己テスト（`link-check-test.mjs` の節 I）は、CI の中（環境変数 `CI`）では、ビルドした出力（`book/book/`）が在り、全章の見出しの `id` を 1 章も飛ばさずに突き合わせたことまで求める。自己テストの段がビルドより前に来ると、ここで落ちる（黙って飛ぶことは無い）。ビルドの後に足す段が、章のページ（`print.html` のほか）の見出しのタグや `id` を書き換える場合も、同じ所で落ちる。`print.html`・`classic/` は読まないので、`print.html` だけを書き換える今の方針なら当たらない。
