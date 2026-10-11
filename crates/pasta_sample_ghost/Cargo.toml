@@ -11,20 +11,9 @@ repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
 
-# メインバイナリ：ゴースト配布物生成ツール
-[[bin]]
-name = "pasta_sample_ghost"
-path = "src/main.rs"
-
-[dependencies]
-# 画像生成
-image.workspace = true
-imageproc.workspace = true
-
-# エラー処理
-thiserror.workspace = true
-
 [dev-dependencies]
+# 素材の検証: PNG の寸法・色型・画素を読む
+png = "0.18"
 # テスト用一時ディレクトリ
 tempfile.workspace = true
 # 統合テスト: 実ローダーを駆動して自己展開（self-deploy）を検証する

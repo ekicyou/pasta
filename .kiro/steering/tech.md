@@ -14,7 +14,7 @@
 - **pasta_shiori**: SHIORI DLLインターフェース層
 - **pasta_lsp**: LSP実装層（tower-lsp, WASM/Native対応）
 - **pasta_check**: リリースCLIツール（ゴーストパッケージング・NAR生成）
-- **pasta_sample_ghost**: サンプルゴースト「hello-pasta」（publish=false, 画像生成・配布物作成）
+- **pasta_sample_ghost**: サンプルゴースト「hello-pasta」（publish=false, 配布物作成。立ち絵はコミットした素材）
 
 ### 主要依存関係
 
@@ -74,7 +74,7 @@
 - **zip 8.6**: NAR（ZIP）アーカイブ作成
 
 **pasta_sample_ghost:**
-- **image 0.25 / imageproc 0.26**: ピクトグラム画像生成
+- **png 0.18**（dev-dependency）: 立ち絵の検証テスト（大きさ・透過・表情間の画素一致）
 
 ### 開発環境
 - **tempfile 3**: テスト用一時ファイル生成
@@ -117,7 +117,7 @@ pasta (workspace)
 | pasta_shiori       | SHIORI       | DLLエクスポート、リクエスト処理 |
 | pasta_lsp          | LSP          | 構文ハイライト、診断、WASM対応  |
 | pasta_check        | CLI          | リリースパッケージング・NAR生成 |
-| pasta_sample_ghost | Distribution | サンプルゴースト画像生成・配布  |
+| pasta_sample_ghost | Distribution | サンプルゴーストの素材・配布    |
 
 ### 設計哲学
 
@@ -162,7 +162,7 @@ pasta (workspace)
 - 依存ライブラリ: メジャーバージョン指定
 
 ### ライセンス
-- **MIT OR Apache-2.0**: デュアルライセンス
+- **MIT**
 - 依存関係ライセンス: 互換性確認済み
 
 ### 公開ポリシー
@@ -215,7 +215,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
 - **mdBook v0.5.3**: Markdown → 静的 HTML/CSS/JS。生成物 `book/book/` は `.gitignore` 済み（CI で再生成）
 - **日本語 bigram 検索**: build-time Node スクリプト（`book/tools/bigram-index/`）が mdBook 同梱 elasticlunr 索引を 2-gram で再生成。索引ビルダとクエリ側（`theme/head.hbs`）が単一 `tokenize.mjs` を共有（不一致は検索破綻）
 - **スキル references 生成**: `book/tools/gen-skill-refs.mjs` が対応表（`GENERATION_MAP`）に従い `book/src/` の章から 2 スキル（`pasta-ghost-authoring`・`pasta-lua-coding`）の `references/` 生成ファイルを書き出す（先頭行に生成マーカー・手編集禁止）。`--check` は書き込まずに鮮度を照合し、古ければ exit 1（**改行 LF 正規化**で比較）
-- **リンク検証**: `book/tools/link-check.mjs` がマニュアル章と 2 スキルの相対リンク・アンカーを検証する。鮮度照合とあわせて `workflow.md` DoD の条件付き「Manual Sync Gate」と結線し、失敗で完了を中断
+- **リンク検証**: `book/tools/link-check.mjs` がマニュアル章のリンク（章のファイルと見出し `#…` の実在）、2 スキルの相対リンク・アンカー、読者に届く文書（クレートの README・ルートの `README.md`・`SOUL.md`・2 スキル）にある公開マニュアルの URL を検証する。見出しの `id` が mdBook の出力と合うことは、自己テスト（`link-check-test.mjs`）が CI でビルドの後に全章を突き合わせる。鮮度照合とあわせて `workflow.md` DoD の条件付き「Manual Sync Gate」と結線し、失敗で完了を中断
 - **pasta 構文ハイライト**: build-time Node スクリプト（`book/tools/highlight/`）が VSCode TextMate 文法（`editors/vscode` の SSOT・読み取り再利用）で `language-pasta` ブロックをトークナイズし highlight.js 互換クラスの span を静的 HTML へ焼き込む（決定論・冪等・入れ子 lua は vendor 文法で二段トークナイズ）。`theme/head.hbs` が book.js の無条件再ハイライトを中和し事前 span を保持（正準 `neutralizer.mjs` の逐語ミラー）。`book/` 初の npm devDependency（`vscode-textmate`/`vscode-oniguruma`/`jsdom`・`package-lock.json` コミット・`node_modules` 非コミット・CI は `npm ci`）。WASM は build-time のみで公開成果物にランタイム依存を持ち込まない
 - **正の分離**: 利用者向け仕様（文法・公開 Lua API・`pasta.toml`）の唯一の権威はマニュアル（`book/src/`）。スキルの規範部分はマニュアルからの生成物、README は開発者向けの入口
 - **内部設計パート**（`book/src/internals/`）: コントリビュータ向け・権威は実装＋本パート

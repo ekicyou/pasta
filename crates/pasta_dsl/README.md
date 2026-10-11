@@ -80,4 +80,4 @@ See [Internals: Parser and AST](https://ekicyou.github.io/pasta/internals/transp
 
 ## License
 
-MIT OR Apache-2.0
+MIT

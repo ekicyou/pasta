@@ -146,3 +146,19 @@
   - 手作りの検査（`tutorial_stages_test.rs`）には、hello-pasta に固有の規則が混ざっている（結合テストが足すシーンの接頭辞 `Kick`・`Gate`）。そのままコマンドの規則にはできない。`GLOBAL` と同じ名前（`yield`・`チェイントーク`・`ゴースト終了`・`close_ghost`。同じファイルの 363〜365 行）は、どのゴーストにも当てはまる。
   - `pasta_dsl`・`pasta_core`・`toml` はどれも、ほかのクレートがすでに使っている。足しても `Cargo.lock` に新しい部品は入らず、`pasta_check` の依存の一覧が変わるだけになる見込みである（ビルドでは確かめていない）。
   - スキル（`.claude/skills/`）の編集は、実装のときに開発者の許可が要ることがある。
+
+## 申し送り（2026-10-10 の discovery・0.5.0 のノベルゲームより）
+
+0.5.0 の目標（areka でノベルゲームが作れる）で、辞書の検査に見てほしい物が増える。**この spec の範囲には入れない**（0.4.0 を膨らませない）。後から入る spec が、検査を足す。この spec では、検査を後から足せる作りにしておく。
+
+- `cue-command-runtime` が足す見込み: `！` 行の命令の名前を、語彙の一覧（pasta.toml の別名表と、areka との取り決め）と照らす。書き間違いを見つける。
+- `call-attribute-filter` が足す見込み: 条件つきの Call で、条件に合う場面が 1 つも無い・2 つ以上残る、を知らせる。
+- `novel-talk-flow` が足す見込み: ノベル向けの設定（場面の名前を完全一致で選ぶ）のとき、同じ名前の場面が複数あることを知らせる。
+- 参照: `.kiro/steering/roadmap.md` の「Phase 13」。
+
+## 申し送り（hello-pasta-shell-art より・2026-10-11）
+
+`hello-pasta-shell-art` が完了した。Constraints の「`Cargo.lock` は 1 ウェーブに 1 spec」の席が空いたので、この spec を始められる。
+
+- `Cargo.lock` は 364 パッケージから 252 パッケージに減った（`image`・`imageproc` とその依存を外し、`pasta_sample_ghost` の dev-dependency に `png 0.18` を足した）。
+- ルートの `Cargo.toml` の `[workspace.dependencies]` から `image`・`imageproc` が消えた。
