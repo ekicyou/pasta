@@ -49,6 +49,68 @@
   6. 行の先頭から出した長い選択肢（31 文字）は、`\q[…]` では右端で切れ、`\![*]\__q[ID]…\__q` では 2 行に折り返される。
 - **Implications**: 原因は brief の候補 1（選択肢の前に改行が出ていない）である。候補 2 は、改行が出ていないので成り立たない。候補 3（バルーンの幅）は、`\n` を入れれば既定のバルーンで収まるので、直す場所ではない。直す場所は出力で、選択肢ごとに行の区切りが要る（1 つ目の前だけでは、短い選択肢が同じ行に並ぶ）。選択肢の後ろの台詞の前にも要る。
 
+### 直した後の実機での確認（2026-10-11・タスク 4.2）
+- **Context**: Requirement 6 の 1〜5、Requirement 4 の 1・2・6。直した `pasta.dll` を、配布している形の hello-pasta に入れて確かめる。Requirement 1 の 3 つが記録済みであることの読み合わせも、ここで行う。
+- **やり方**:
+  - ビルド: コミット `2ef7de6d`（タスク 1.1〜3.3 と `origin/main` のマージが入った状態）で、`crates/pasta_sample_ghost/release.ps1` を引数なしで走らせた。`cargo build --release --target i686-pc-windows-msvc -p pasta_shiori` が `pasta.dll` を作り（3,950,080 バイト、SHA-256 `398504642a471d130a4d0df088058f19b39dab2af15ccd58f0f8e0fedf69c6d5`）、`pasta_check release` が配布の形（`release/hello-pasta/`）と `hello-pasta.nar` を作る。配布の形の `dic/09-choice.pasta` は、リポジトリの辞書と同じである（`diff` で差が無い）。`pasta.toml` に `choice_newlines` は書いていない（既定の `1.5`）。
+  - 起動: `release/hello-pasta/` を作業用のフォルダへ複製し、`ghost/master/descript.txt` の `name` だけを `hello-pasta-wt` に変えた（開発機の SSP に、同じ名前の hello-pasta が登録されているため）。SSP 2.9.11 を `--option readonly --ghost <複製の絶対パス>` で起動した。バルーンは SSP の既定（プロパティ `currentghost.balloon.name` は「SSPデフォルト+」）である。
+  - 操作: SSP の MCP の `raise_event` で `OnMouseDoubleClick`（Reference0〜5 は `100`・`100`・`0`・`0`・`Head`・`0`）を、選択肢のシーンが返るまで繰り返した。返ったスクリプトは `raise_event` の結果と、`get_log`（`script`）、ゴーストの `profile/pasta/logs/pasta.log` の 3 か所で読んだ。吹き出しの絵は `dump_balloon`（スコープ 0）、状態は `get_status` で見た。最後に `\-\e` を送って SSP を終了した（プロセスが残っていないことを確かめた）。選択肢のクリックは、同じ複製を 13:32 に起動し直して、マウスで行った（下の 4）。
+- **Findings**:
+  1. 9 段目の選択肢のシーンが返したさくらスクリプト（そのまま）:
+
+     ```text
+     \p[0]\s[0]ねえ、\_w[450]ユーザーさん。\_w[950]なんの話をしよっか？\_w[450]\n[150]\![*]\q[おやつの話をする,おやつの話,OnMouseDoubleClick_4]\n\![*]\q[おでかけの話,おでかけの話,OnMouseDoubleClick_4]\![set,choicetimeout,10000]\e
+     ```
+
+     選択肢のシーンは 5 回返り、5 回とも同じ文字列だった。`design.md` の Overview の「直す:」の行と、1 バイトも違わない（`pasta.log` の `Value:` の行と `cmp` で比べた）。直す前の記録（上の「実機での確認」の 1）から増えたのは、`\n[150]` と `\n` の 2 つだけである。
+  2. 吹き出しの絵（`dump_balloon`。335 × 169 ピクセル）。問いかけ「ねえ、ユーザーさん。なんの話をしよっか？」、「●おやつの話をする」、「●おでかけの話」が、3 行に分かれて出る。
+     - 字のある行の縦の位置は、上から 14〜24・35〜45・49〜59 ピクセルである。行の送りは、1 行目から 2 行目が 21 ピクセル、2 行目から 3 行目が 14 ピクセルで、問いかけと 1 つ目の選択肢の間が半行ぶん広い（`\n[150]` と `\n` のとおり）。
+     - 各行の字の右端は、258・126・103 ピクセルである。吹き出しの幅（335）の手前で終わっており、どの行も切れていない。
+     - マーカーは、2 行目と 3 行目の先頭（左から 25〜33 ピクセル。問いかけの字の左端は 23 ピクセル）に出る。
+     - 直す前は、1 行目が右端に届いて「をする」が切れ、2 行目のマーカーが見えなかった（上の「実機での確認」の 2）。どちらも無くなった。
+  3. 章（`book/src/getting-started/09-choice.md`）の「成功の目印」と読み合わせた。手順 3 の「女の子の吹き出しに『ねえ、ユーザーさん。なんの話をしよっか？』と出て、続けて選択肢『おやつの話をする』と『おでかけの話』が出る」は、2 の見え方と食い違わない。手順 4・5・6 の後の目印の台詞と動きは、下の 4・5 の結果と同じである。
+  4. 選択肢を選んだ後。吹き出しの選択肢を、画面の上で実際にマウスでクリックした（同じ日の 13:40〜13:41。開発者の許可を得て、Claude が computer-use で SSP を操作した。ビルドと複製したゴーストは上と同じ。選択肢のシーンを出すところは `raise_event` の `OnMouseDoubleClick` で、クリックだけがマウスである）。
+     - 2 行目の「おやつの話をする」をクリック → `pasta.log` に、13:40:50.9 の要求 `OnChoiceSelectEx`（`Sender: SSP`・`SenderType: internal`・`Status: choosing,balloon(0=0)`。Reference0〜2 は `おやつの話をする`・`おやつの話`・`OnMouseDoubleClick_4`）と、応答 `\p[0]\s[6]今日のおやつは、\_w[450]プリンがいいな！\_w[450]\p[1]\s[15]きのうもプリンだったよね。\_w[950]\e` が残った。画面でも、女の子と男の子の吹き出しにこの掛け合いが出た（章の手順 4 の目印）。
+     - 3 行目の「おでかけの話」をクリック → 13:41:20.0 の要求 `OnChoiceSelectEx`（同じく `Sender: SSP`・`SenderType: internal`。Reference0〜2 は `おでかけの話`・`おでかけの話`・`OnMouseDoubleClick_4`）と、応答 `\p[0]\s[0]晴れたら、\_w[450]お弁当を持って出かけたいな。\_w[950]\p[1]\s[11]ユーザーさんの分も作ろうか。\_w[950]\e`（章の手順 5 の目印）。
+     - 3 行に分かれた選択肢は、2 行目も 3 行目もクリックできる。マウスが載っている選択肢の行は、反転して表示される（2 行目で見た）。SSP が送る Reference は、返ったスクリプトの `\q[…]` の 3 つの引数（表示・ジャンプ先・グローバルシーン名）と同じで、pasta はジャンプ先のシーン（`＊おやつの話`・`＊おでかけの話`）へ進む。
+     - クリックの前（12 時台）に、デスクトップを操作する許可が出ていなかった間の代わりの確認として、選択肢が出ている間に同じ Reference の `OnChoiceSelectEx` を `raise_event` で起こしていた（`Sender: MCP`）。応答は、上の 2 つとそれぞれ同じ文字列だった。
+  5. 時間切れ。選択肢を出して何も選ばずに待ち、`get_status` を読んだ（時刻は、`pasta.log` の応答の時刻と、待ちの前後に採った時計）。
+
+     | 回 | 選択肢の応答 | 途中 | 待った後 | その間に再生されたスクリプト |
+     | -- | ------------ | ---- | -------- | ---------------------------- |
+     | 1 | 12:25:18.9 | 直後に `choosing,balloon(0=0)` | 12:25:39 に空（選択中でない。吹き出しも閉じている） | 無い |
+     | 2 | 12:31:46.3 | 12:31:55 に `choosing,balloon(0=0)` | 12:32:08 に `balloon(0=0/1=0)`（選択中でない） | 12:31 台に `OnSecondChange` のランダムトークが 1 つ |
+     | 3 | 12:32:30.7 | 12:32:40 に `choosing,balloon(0=0)` | 12:32:49 に空 | 無い |
+
+     - 3 回とも、選んでいないのに選択中の状態が終わり、「おやつの話」「おでかけの話」のどちらの掛け合いも出なかった。章の手順 6 の目印（「選択肢が時間切れになり、どちらの掛け合いも出ない」）と合う。3 回目では、応答から 9.5 秒の時点でまだ選択中で、18.3 秒の時点では終わっていた（応答の時刻は、台詞を表示し終える前である）。
+     - `OnChoiceTimeout` のイベントそのものは見ていない。`pasta.log` は 204 でない応答だけを書き、選択肢の応答の後に `OnChoiceTimeout` への応答は 1 件も無い（9 段目の辞書に受けるシーンが無いので、204 を返したとみられる）。SSP の MCP には、イベントの記録を読む道具が無い。時間切れは、状態の変化と、掛け合いが出ないことから読んだ。
+     - 2 回目のランダムトークは、`pasta.log` では 12:31:59.4 の応答である（選択肢の応答の 13.1 秒後。12:31:55 の時点では、まだ選択中だった）。この `OnSecondChange` は Reference3 が `1`（トークできる状態）で来ており、選択中の状態が終わった後のトークである。選択肢の制限時間と、トークの間隔（この見本は 45〜75 秒）が重なった回で、選択肢の配置とは関係が無い。
+  6. エラーは出ていない。SSP のエラーログ（`get_log` の `error`）は空で、`pasta.log` に `ERROR` は無い（`WARN` は、初回起動の「保存ファイルが無い」の 1 件だけ）。
+  7. 洗い出し（Requirement 6 の 5）。リポジトリの中を、選択肢行（`＠？`・`@?`）と `act:choice`（`:choice(`）で検索し直した。
+     - 選択肢行を使う辞書（`*.pasta`）は 3 枚で、下の「既存のゴーストへの影響」の一覧と変わらない: `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/09-choice.pasta`、`crates/pasta_shiori/tests/fixtures/call_execution_correctness/dic/choice_scope.pasta`、同 `characterization.pasta`。どの選択肢行も、直前の行は台詞の行（末尾に `\n` が無い）か、別の選択肢行である。
+     - マニュアルの作例: `book/src/grammar/block-structure.md`（2 つ）、`book/src/lua/shiori-events.md`、`book/src/reference/pasta-toml.md`（本 spec が足した `choice_newlines` の例）、`book/src/getting-started/09-choice.md`（辞書の写し）。スキルの `authoring-patterns.md`・`SKILL.md` と、生成物の参照資料も同じ形である。どれも「台詞の行 → 選択肢行」で、選択肢の直前に改行を書いていない。
+     - `act:choice` を使う作例: `book/src/lua/script-api.md`・`book/src/lua/patterns.md`（どちらも `act:talk(…)` の直後に `act:choice` を並べる。改行は積んでいない）。
+     - テスト: `pasta_dsl`・`pasta_lua` のテストの中の DSL と Lua も、選択肢の直前に改行を書いていない。例外は、作者の改行と区切りが並んで出ることを固定するテスト 1 件（`sakura_builder_test.lua` の「2.7: 台詞の末尾の `\n` と newline のトークンは、区切りと並んで両方出る」）で、意図して書いたものである。`shiori_act_test.lua` の 748 行は `act:newline()` → `act:clear()` → `act:choice` の順で、間に消去が入る。
+     - 直した後に見え方が壊れる辞書と作例は、見つからなかった。
+  8. Requirement 1 の読み合わせ。3 つとも、上の「実機での確認（2026-10-10）」と「ベースウェアの仕様」に記録済みである（書き足していない）。1.1 は Findings の 1（v0.3.8 が返したさくらスクリプト）、1.2 は Implications と「ベースウェアの仕様」の `\q` の記述、1.3 は Findings の 2・3（1 つ目が右端を越えたので 2 つ目が次の行に出たこと、短い選択肢どうしは同じ行に並ぶこと）である。
+- **Implications**:
+  - **直した場所**（Requirement 6 の 3）。出力である（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` の `BUILDER.build`。幅は `pasta.toml` の `[ghost]` の `choice_newlines`）。辞書（`09-choice.pasta`）・章・段階表・バルーンは変えていない。今回の確認でも、辞書はリポジトリのまま、バルーンは SSP の既定のままで、3 行に収まった。
+  - **辞書で直さなかった理由**。回避の書き方を見本にも入門ガイドにも載せない方針である。辞書に改行を足しても、選択肢と選択肢の間は直らず、作例どおりに書いた他の作者も直らない（下の Architecture Pattern Evaluation の B）。
+  - **バルーンで直さなかった理由**。既定のバルーンで収まる。幅を広げても、台詞の後ろに選択肢が続く並びは変わらず、長い問いかけで再発する（同 D。`design.md` の「記録層」の 6.3）。
+  - **既存のゴーストで区切りが増える場所**（Requirement 6 の 4。`design.md` の「既存のゴーストでの見え方の変化」）。選択肢行または `act:choice` を使うゴーストで、pasta を更新すると次の 3 か所に区切りが増える。
+
+    | 場所 | 増えるもの | 見え方 |
+    | ---- | ---------- | ------ |
+    | 字の後の選択肢の前 | `\n[150]`（`choice_newlines` で変えられる） | 選択肢が、台詞から半行ぶん空けた次の行から出る |
+    | 選択肢の後の選択肢の前 | `\n` | 選択肢が 1 行に 1 つになる |
+    | 選択肢の後の台詞の前 | `\n`（話し手が切り替わって戻った直後なら、今も出ている `\n[spot_newlines × 100]` のまま） | 台詞が選択肢の次の行から出る |
+
+    - 選択肢の直前や直後に自分で改行を書いていたゴーストは、空の行が 1 行増える。
+    - 台詞に `\c` を書いているゴーストは、選択肢を使っていなくても、`\c` で消した吹き出しの最初に出ていた `\n[spot_newlines × 100]` が出なくなる（Requirement 7 の 2）。
+    - 台詞の中に `\q[…]` を手で書いているゴースト（emo2 など）と、選択肢を使わないトークは、変わらない。
+    - 元の見え方へ戻す設定は無い（`choice_newlines` は幅だけを変える）。
+  - 今回の実機で見たのは、表の 1 行目と 2 行目（9 段目の並び）だけである。3 行目（選択肢の後の台詞）と `\c` の後の並びは、実機では見ていない（テストの完全一致と、2026-10-10 の手書きのさくらスクリプトでの見え方による）。
+
 ### 選択肢の出力の経路
 - **Context**: brief の「1 つ目の選択肢の前に改行を入れているかは調べていない」。
 - **Sources Consulted**: `crates/pasta_lua/src/code_gen/scope_gen.rs`（`generate_choice`・`generate_choice_timeout`）、`crates/pasta_lua/pasta_scripts/pasta/act.lua`（`ACT_IMPL.choice`・`group_by_actor`・`merge_consecutive_talks`）、`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`
