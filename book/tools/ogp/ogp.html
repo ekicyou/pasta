@@ -1,0 +1,26 @@
+<!doctype html>
+<!--
+  SNS でマニュアルの URL を貼ったときに出る画像（og:image）の元。1200x630。
+  描き直すとき（リポジトリルートで。Edge か Chrome のヘッドレスで撮る）:
+    msedge --headless --hide-scrollbars --force-device-scale-factor=1 --virtual-time-budget=8000 \
+      --window-size=1200,630 --screenshot=<絶対パス>/book/src/img/ogp.png file:///<絶対パス>/book/tools/ogp/ogp.html
+  字体は Google Fonts から読むので、撮るときだけネットワークが要る。
+-->
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&display=block">
+<style>
+html,body{margin:0}
+body{width:1200px;height:630px;overflow:hidden;position:relative;background:#F6E5C9;font-family:"Shippori Mincho B1",serif;color:#7A5C45}
+.frame{position:absolute;inset:22px;border:3px solid #DDA43F;border-radius:36px;opacity:.55}
+.logo{position:absolute;left:62px;top:112px;width:600px}
+h1{position:absolute;left:100px;top:348px;margin:0;font-size:80px;font-weight:800;letter-spacing:.02em}
+p{position:absolute;left:104px;top:478px;margin:0;font-size:31px;font-weight:600;letter-spacing:.04em;color:#B4532F}
+.girl,.boy{position:absolute;bottom:26px;height:560px;filter:drop-shadow(0 6px 10px rgba(122,92,69,.25))}
+.girl{right:222px}.boy{right:-4px}
+</style>
+<div class="frame"></div>
+<img class="logo" src="../../../img/pasta-banner.svg">
+<h1>マニュアル</h1>
+<p>日本語で書ける、ゴーストの台本</p>
+<img class="girl" src="../../src/img/hello-pasta/surface0.png">
+<img class="boy" src="../../src/img/hello-pasta/surface10.png">
