@@ -7,8 +7,10 @@
   範囲の終わりは -Head があればそれ、無ければ -Tag。-Head を指定すると、タグが在ることを求めない（タグを打つ前の手元の確認用）。
   マージコミットは除く。件名から種類・スコープ・`!` の接頭辞を外し、内部の作業は載せない。
   -OutFile を省くとノートを標準出力へ書く。
+  -BodyFile を指定すると、見どころのファイル（doc/release-notes/{Tag}.md）の後に、詳しいリリースノートへのリンクと件数の行を足して、リリースの本文として書く。
+  失敗したときは、どのファイルも書かない。
 .EXAMPLE
-  pwsh -NoProfile -File .github/scripts/release/release-notes.ps1 -Tag v0.3.7 -Repo ekicyou/pasta -OutFile notes.md
+  pwsh -NoProfile -File .github/scripts/release/release-notes.ps1 -Tag v0.3.7 -Repo ekicyou/pasta -OutFile notes.md -BodyFile body.md
 .EXAMPLE
   pwsh -NoProfile -File .github/scripts/release/release-notes.ps1 -Tag v0.3.9 -Repo ekicyou/pasta -Head origin/main
 #>
@@ -17,6 +19,7 @@ param(
     [Parameter(Mandatory)][string]$Repo,
     [string]$Head,
     [string]$OutFile,
+    [string]$BodyFile,
     [string]$WorkspaceRoot = (Join-Path $PSScriptRoot '../../..')
 )
 Set-StrictMode -Version Latest
@@ -51,6 +54,15 @@ function Test-Internal([string]$Type, [string]$Scope) {
 if ($Tag -cnotmatch $TagShape) { Fail "タグ ``$Tag`` は ``vX.Y.Z``（数字 3 つ）の形ではない" }
 $version = [version]$Matches[1]
 $end = if ($Head) { $Head } else { $Tag }
+
+# 見どころのファイル（-BodyFile のときだけ）。何かを書き出す前に確かめる。
+if ($BodyFile) {
+    $hlPath = Join-Path $WorkspaceRoot "doc/release-notes/$Tag.md"
+    if (-not (Test-Path -LiteralPath $hlPath -PathType Leaf)) { Fail "見どころのファイル ``doc/release-notes/$Tag.md`` が無い" }
+    # 末尾の空白だけを落とす。改行は LF にそろえる（ほかは書き換えない）
+    $highlights = ([IO.File]::ReadAllText($hlPath) -replace "`r`n", "`n").TrimEnd()
+    if (-not $highlights) { Fail "見どころのファイル ``doc/release-notes/$Tag.md`` が空" }
+}
 
 # git の出力（日本語・絵文字の件名）を UTF-8 で読む。コンソールのコードページは終了時に戻す。
 $savedEncoding = [Console]::OutputEncoding
@@ -115,9 +127,25 @@ foreach ($key in $Headings.Keys) {
 if ($prev) { $lines.Add("**Full Changelog**: https://github.com/$Repo/compare/$prev...$Tag") }
 $notes = ($lines -join "`n").TrimEnd() + "`n"
 
+$utf8 = [Text.UTF8Encoding]::new($false)
+if ($BodyFile) {
+    $asset = "release-notes-$Tag.md"
+    $body = "$highlights`n`n---`n`nすべての変更（$counted 件）は、Assets の [$asset](https://github.com/$Repo/releases/download/$Tag/$asset) にまとめてありますわ。`n"
+    $bodyPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($BodyFile)
+}
 if ($OutFile) {
     $path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
-    [IO.File]::WriteAllText($path, $notes, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($path, $notes, $utf8)
+}
+if ($BodyFile) {
+    # 本文を書けなければ、書いたノートも消す（片方だけを残さない）
+    try { [IO.File]::WriteAllText($bodyPath, $body, $utf8) }
+    catch {
+        if ($OutFile) { Remove-Item -LiteralPath $path -ErrorAction SilentlyContinue }
+        Fail "本文を書けない: $($_.Exception.Message)"
+    }
+}
+if ($OutFile) {
     Write-Output "release-notes: $Tag の前のタグ = $(if ($prev) { $prev } else { '(無し: 全履歴)' })、$counted 件 → $path"
 }
 else {
