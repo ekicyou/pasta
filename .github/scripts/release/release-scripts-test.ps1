@@ -1,7 +1,7 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1）を、一時の git リポジトリで実際に動かして確かめる。
+  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1・定型コマンド D の highlights-check.ps1）を、一時の git リポジトリで実際に動かして確かめる。
 .DESCRIPTION
   一時のフォルダに git リポジトリを作り、決まった件名のコミットとタグ（v0.0.1・v0.0.2）を積んで、スクリプトを子の pwsh で呼ぶ。
   ネットワークと gh を使わない。一時のフォルダは終わりに消し、リポジトリの作業ツリーを変えない。
@@ -203,6 +203,30 @@ try {
         Write-Utf8 $hlPath " `n`t`n  `n"
         $r = Invoke-Script verify-tag.ps1 $vt
         if ($r.Exit -ne 1) { "空白だけ: 終了コード $($r.Exit)（1 のはず）" }
+        Write-Utf8 $hlPath $Highlights
+    }
+
+    Test-Item 9 '定型コマンド D が、決まりどおりで 5 行とも合格、材料に無い番号で 3 行目が不合格、リンクの前の素の Claudia で 2 行目が不合格' {
+        $d = Join-Path $PSScriptRoot '../../../.claude/skills/release/scripts/highlights-check.ps1'
+        New-Item -ItemType Directory -Force -Path (Join-Path $repoDir '.kiro/specs/demo-spec') | Out-Null
+        $link = '[Claudia](https://github.com/ponapalt/claudia)'
+        $tail = "### 別名が書けますの (#1)`n`nこれは見本ですわ。`n`n### ご注意あそばせ`n`n- 戻り先の文脈が変わります。 (#2)`n"
+        $cases = @(
+            @{ Name = '決まりどおり'; Text = "おほほ。$link ですわ。`n`n$tail"; Expect = @('合格', '合格', '合格', '合格', '合格') }
+            @{ Name = '材料に無い番号'; Text = "おほほ。$link ですわ。`n`n$tail`n### 無い変更 (#99)`n"; Expect = @('合格', '合格', '不合格', '合格', '合格') }
+            @{ Name = 'リンクの前の Claudia'; Text = "## Claudia の見どころ`n`nおほほ。$link ですわ。`n`n$tail"; Expect = @('合格', '不合格', '合格', '合格', '合格') }
+            @{ Name = '動きが変わる点の抜け'; Text = "おほほ。$link ですわ。`n`n### 別名が書けますの (#1)`n"; Expect = @('合格', '合格', '合格', '不合格', '合格') }
+            @{ Name = 'spec 名'; Text = "おほほ。$link ですわ。`n`n$tail`ndemo-spec で作りましたの。`n"; Expect = @('合格', '合格', '合格', '合格', '不合格') }
+            @{ Name = '空白だけ'; Text = " `n`n"; Expect = @('不合格', '不合格', '不合格', '不合格', '不合格') }
+        )
+        foreach ($c in $cases) {
+            Write-Utf8 $hlPath $c.Text
+            Push-Location $repoDir
+            try { $out = @(& $Pwsh -NoProfile -File $d -Version 0.0.2 2>&1 | ForEach-Object { "$_" }) }
+            finally { Pop-Location }
+            $got = @($out | ForEach-Object { ($_ -split ' \| ')[-1] })
+            if (($got -join ',') -cne ($c.Expect -join ',')) { "$($c.Name): $($out -join ' ／ ')" }
+        }
         Write-Utf8 $hlPath $Highlights
     }
 }
