@@ -1,0 +1,22 @@
+{
+  "feature_name": "release-notes-highlights",
+  "created_at": "2026-10-11T05:35:47Z",
+  "updated_at": "2026-10-11T10:49:38Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
