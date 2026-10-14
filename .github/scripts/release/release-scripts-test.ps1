@@ -27,7 +27,7 @@ $Headings = @(
 )
 # v0.0.1..v0.0.2 で載る件数（別名・戻り先・落ちる不具合・手引き・接頭辞の無い件名）
 $ListedCount = 5
-$Highlights = "## Claudia の見どころ紹介`n`nおほほ、ごきげんよう。[Claudia](https://github.com/ponapalt/claudia) ですわ。`n`n### 別名が書けますの (#1)`n`nこれは見本ですわ。`n`n`n"
+$Highlights = "## 今回の見どころ`n`nおほほ、ごきげんよう。[Claudia](https://github.com/ponapalt/claudia) ですわ。`n`n### 別名が書けますの (#1)`n`nこれは見本ですわ。`n`n`n"
 
 # 子のスクリプトが GitHub Actions の出力先へ書かないようにする（この処理の中だけで効く）
 Remove-Item Env:GITHUB_OUTPUT, Env:GITHUB_STEP_SUMMARY -ErrorAction SilentlyContinue
