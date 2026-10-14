@@ -74,9 +74,9 @@
    ```
 
    - 1 つ目が 1 行だけで、`chore(release): vX.Y.Z`（`X.Y.Z` は数字 3 つ）の形である。
-   - 2 つ目が、段 4 の 5 ファイルだけである。
+   - 2 つ目が、段 4 の 6 ファイル（版の表記の 5 ファイルと、見どころのファイル `doc/release-notes/v{V}.md`）だけである。
 
-   続け方: 件名の `X.Y.Z` を `V` として開発者に示す。`VREQ` があって `V` と違うときは、止まって開発者に確かめる。手順 4（main の取り込み）を行い、段 2 を飛ばして、段 3 の手順 4（重複の検査）と、段 4 の手順 6 の (3)(4)（`cargo metadata --locked` と `verify-content.mjs`）を行う。どれも合格なら、段 5 から続ける。不合格なら止まる。
+   続け方: 件名の `X.Y.Z` を `V` として開発者に示す。`VREQ` があって `V` と違うときは、止まって開発者に確かめる。手順 4（main の取り込み）を行い、段 2 を飛ばして、段 3 の手順 4（重複の検査）と、段 4 の手順 6 の (3)(4)（`cargo metadata --locked` と `verify-content.mjs`）と、定型コマンド D（`-Version {V} -Head origin/main`）を行う。どれも合格（定型コマンド D は 5 行とも `合格`）なら、段 5 から続ける。不合格なら止まる。
 
 4. **main の取り込み**（2.4・2.5）
 
@@ -142,7 +142,7 @@
 
 | Field | Detail |
 |-------|--------|
-| Intent | 5 ファイルの版の表記を 1 度でそろえ、1 つのコミットにする |
+| Intent | 版の表記の 5 ファイルをそろえ、見どころを書き、1 つのコミットにする |
 | Requirements | 3.1, 3.2, 3.3, 3.4, 3.5 |
 
 `V_OLD` は更新の前の版（= `V_MAIN`）である。
@@ -174,6 +174,18 @@
 
    ワークスペースのクレートの版だけを書き換える。外部のクレートの版は動かない。`Cargo.lock` を文字列の置換で直さない（外部のクレートに同じ版の文字列がある）。
 
+**見どころを書く**（手順 5 の後、手順 6 の前に行う）。リリースの本文になる見どころのファイル `doc/release-notes/v{V}.md` を書く。書き方の決まりは `doc/release-notes/README.md` である。
+
+- **H1 材料の一覧**。出力の最後の行が `**Full Changelog**: https://github.com/ekicyou/pasta/compare/v{V_OLD}...v{V}` であること。違えば、前のタグを読めていないので止まる。
+
+  ```powershell
+  & "$PWD/.github/scripts/release/release-notes.ps1" -Tag v{V} -Repo ekicyou/pasta -Head origin/main
+  ```
+
+- **H2 見どころのファイルを書く**。`doc/release-notes/README.md` の「書き方」に従い、H1 の一覧から見どころを選んで、`doc/release-notes/v{V}.md` を Write で作る。「動きが変わる変更」の見出しの下の項目は、すべて動きが変わる点として載せる。一覧の件名だけで足りないときは、`gh pr view {番号} --json title,body` と、マニュアル（`book/src/`）を読んでよい。読むだけである。
+- **H3 確認**。定型コマンド D を `-Version {V} -Head origin/main` で実行する。5 行とも `合格` であること。合格なら、手順 6 へ進む。
+- **H4 不合格のとき**。`不合格` の行の値（材料に無い番号・載っていない番号・見つかった spec 名など）を直して、H3 をやり直す。直すのは 3 回までである。3 回直しても `合格` にならなければ、手順 7（取り消し）を行い、`不合格` の行を示して止まる。H3 が合格するまで、手順 8（コミット）を行わない。
+
 6. **確認**（3.2・3.3）。次の 5 つをすべて満たすこと。
 
    ```bash
@@ -190,23 +202,24 @@
    | (2) | `Cargo.lock` の変更が版の行だけ | 2 つ目の出力が 2 行だけ: `N +version = "{V}"` と `N -version = "{V_OLD}"`（`N` は (1) と同じ） |
    | (3) | `Cargo.lock` が `Cargo.toml` と食い違わない | `cargo metadata --locked` が終了コード 0 |
    | (4) | マニュアルの内容検証 | `verify-content.mjs` が終了コード 0（`RESULT: OK`） |
-   | (5) | 他のファイルを変えていない | `git status --porcelain` に出るのが、上の 5 ファイルだけ |
+   | (5) | 他のファイルを変えていない | `git status --porcelain` に出るのが、版の表記の 5 ファイルと、`?? doc/release-notes/v{V}.md` だけ |
 
-7. **不合格のとき**（3.4）。5 ファイルを元に戻し、不合格の確認を示して止まる。
+7. **不合格のとき**（3.4）。6 ファイルを元に戻し、不合格の確認を示して止まる。
 
    ```bash
    git restore -- Cargo.toml Cargo.lock editors/vscode/package.json editors/vscode/package-lock.json book/src/introduction.md
+   git clean -f -- doc/release-notes/v{V}.md
    ```
 
 8. **コミット**（3.5）
 
    ```bash
-   git add Cargo.toml Cargo.lock editors/vscode/package.json editors/vscode/package-lock.json book/src/introduction.md
+   git add Cargo.toml Cargo.lock editors/vscode/package.json editors/vscode/package-lock.json book/src/introduction.md doc/release-notes/v{V}.md
    git commit -m "chore(release): v{V}"
    git show --stat --format=%s HEAD
    ```
 
-   最後の出力が、件名 `chore(release): v{V}` と 5 ファイルであること。
+   最後の出力が、件名 `chore(release): v{V}` と 6 ファイルであること。その後、`doc/release-notes/v{V}.md` の全文を開発者に示す。承認を求めない。開発者の答えを待たずに、段 5 へ進む。
 
 **`build.yml` に `--locked` を足さない理由**: 版の更新での更新し忘れは手順 6 の (3) が、main に前からある食い違いは手順 1 が、PR を作る前に検出する。リリース CI の build の段の検査（`git diff --exit-code -- Cargo.lock`）は、そのまま最後の守りとして残る。`build.yml` を変えると、ふだんの PR の CI の挙動まで変わる。
 
@@ -217,7 +230,7 @@
 | Intent | 版の更新を、ほかの変更と同じ PR の流れ（squash）で main に入れる |
 | Requirements | 4.1, 4.2, 4.3, 4.4, 4.5 |
 
-1. PR に入る変更が、段 4 の 5 ファイルだけであることを確かめてから、作業ブランチを push する（main ではない）。1 つ目の出力が 5 ファイルだけでなければ、push せずに止まる（ほかのファイルがコミットに混ざっている）。
+1. PR に入る変更が、段 4 の 6 ファイルだけであることを確かめてから、作業ブランチを push する（main ではない）。1 つ目の出力が 6 ファイルだけでなければ、push せずに止まる（ほかのファイルがコミットに混ざっている）。
 
    ```bash
    git diff --name-only origin/main...HEAD
@@ -253,7 +266,7 @@
 
 4. **失敗のとき**（4.4）。手順 1〜3 のどれかが失敗した、または手順 3 の出力が `MERGED` で始まらない（代わりの判定では、出力が空の）ときは、止まる。リリースタグを作らない。`git push --force`・履歴の書き換え・ブランチの削除を行わない。PR の URL と失敗の内容を示し、開発者に解消を求める。
 
-5. **main の確認**（4.5）。`git fetch origin main` の後、定型コマンド C を `-Version {V} -Target {TARGET}` で実行する。4 行とも `合格` であること。不合格なら止まる。
+5. **main の確認**（4.5）。`git fetch origin main` の後、定型コマンド C を `-Version {V} -Target {TARGET}` で実行する。5 行とも `合格` であること。不合格なら止まる。
 
 ## 段 6: リリースタグの作成と push
 
@@ -271,7 +284,9 @@
 
    出力が 1 行ならそれを `TARGET` とする。空なら止まり、版の更新のコミットが見つからないことと、`git log origin/main -5 --oneline -- Cargo.toml` の出力を示して、開発者にコミットを確かめる。
 
-2. **タグを付ける前の検査**（5.2）。定型コマンド C を `-Version {V} -Target {TARGET}` で実行する。4 行とも `合格` であること。不合格なら、タグを作らずに止まる。
+   **S7 で見どころが無いとき**。S7 から来て、手順 2 で定型コマンド C の 5 行目（見どころ）だけが `不合格` のときは、`git rev-parse origin/main` の出力を `TARGET` にして、定型コマンド C をやり直す。5 行とも `合格` なら、その `TARGET` で続ける（見どころのファイルが、後の PR で main に入っている）。なお `不合格` なら、リリースタグを作らずに止まり、`doc/release-notes/v{V}.md` を PR で main に入れることを開発者に求める。
+
+2. **タグを付ける前の検査**（5.2）。定型コマンド C を `-Version {V} -Target {TARGET}` で実行する。5 行とも `合格` であること。不合格なら、タグを作らずに止まる。
 
 3. **同名のタグ**（5.3）。2 つとも出力が空であること。
 
@@ -413,7 +428,7 @@ gh run view {RUN} --log-failed | tail -n 60
 **タグの付け直し**（7.6）。開発者の承認が明示されているときだけ行う。
 
 1. 定型コマンド A（`-Version {V}`）で、公開済みが 0/7・`不明` が 0・`GitHub Release` が `無し` であることを確かめる。満たさなければ、付け直さずに止まる（7.7）。
-2. `git fetch origin main` の後、`git rev-parse origin/main` の出力を `TARGET` とする。定型コマンド C を `-Version {V} -Target {TARGET}` で実行し、4 行とも `合格` であることを確かめる。
+2. `git fetch origin main` の後、`git rev-parse origin/main` の出力を `TARGET` とする。定型コマンド C を `-Version {V} -Target {TARGET}` で実行し、5 行とも `合格` であることを確かめる。
 3. タグを付け直して push する。この 2 つは許可の一覧に入れない。実行のたびに、開発者が許可の確認に答える。
 
    ```bash
@@ -472,16 +487,18 @@ gh run view {RUN} --log-failed | tail -n 60
 
 ## 定型コマンドの呼び出し方
 
-定型コマンドは、`.claude/skills/release/scripts/` のスクリプトである。3 本とも読むだけで、何も変えない。リポジトリのルートを作業ディレクトリにして、PowerShell ツールで次の 1 行をそのまま実行する（波かっこだけを置き換える）。スクリプトの中身を写して実行しない。
+定型コマンドは、`.claude/skills/release/scripts/` のスクリプトである。4 本とも読むだけで、何も変えない。リポジトリのルートを作業ディレクトリにして、PowerShell ツールで次の 1 行をそのまま実行する（波かっこだけを置き換える）。スクリプトの中身を写して実行しない。
 
 | 定型コマンド | 呼び出し | 出力の形 |
 |--------------|----------|----------|
 | A: 状態の照会 | `& "$PWD/.claude/skills/release/scripts/release-state.ps1" -Version {V}` | 上の「定型コマンド A の出力」 |
 | A（`origin/main` の版を調べる） | `& "$PWD/.claude/skills/release/scripts/release-state.ps1"` | 同上 |
 | B: リリース CI の結果の読み取り | `& "$PWD/.claude/skills/release/scripts/ci-result.ps1" -Run {RUN}` | 上の「定型コマンド B の出力」 |
-| C: タグを付ける前の検査 | `& "$PWD/.claude/skills/release/scripts/pretag-check.ps1" -Version {V} -Target {TARGET}` | 4 行（タグの形・`Cargo.toml` の版・`package.json` の版・main からの到達）。それぞれ `合格` か `不合格` |
+| C: タグを付ける前の検査 | `& "$PWD/.claude/skills/release/scripts/pretag-check.ps1" -Version {V} -Target {TARGET}` | 5 行（タグの形・`Cargo.toml` の版・`package.json` の版・main からの到達・見どころ）。それぞれ `合格` か `不合格` |
+| D: 見どころの確認 | `& "$PWD/.claude/skills/release/scripts/highlights-check.ps1" -Version {V} -Head origin/main` | 5 行（見どころのファイル・Claudia の出典リンク・PR の番号・動きが変わる点・spec 名）。それぞれ `合格` か `不合格` |
 
 - A は、crates.io の照会に User-Agent を付け、Marketplace の照会（`vsce show`）で IPv4 を優先する。200・404 以外の応答と、コマンドの失敗を `不明` にする。
 - B は、実行が `completed` になってから使う。
-- C は、`.github/scripts/release/verify-tag.ps1` と同じ 4 つの条件を、タグを付けるコミットの中身（`git show`）で確かめる。先に `git fetch origin main` を済ませる。
+- C は、`.github/scripts/release/verify-tag.ps1` と同じ 5 つの条件を、タグを付けるコミットの中身（`git show`）で確かめる。先に `git fetch origin main` を済ませる。
+- D は、作業ディレクトリの `doc/release-notes/v{V}.md` を、`.github/scripts/release/release-notes.ps1` の出力（材料）と `.kiro/specs/` のフォルダの名前に照らして確かめる。タグの在る版を確かめるときは、`-Head origin/main` を省く。
 - 段 7 の手順 1・2 の待機のコマンドは短いので、段 7 に置いたままにする。
