@@ -45,7 +45,8 @@ jobs:
         run: git fetch origin main
 
       # タグ名・SHA は既定の環境変数 GITHUB_REF_NAME・GITHUB_SHA（github.ref_name・github.sha と同じ値）で渡す。
-      - name: Verify tag and versions
+      # タグの版の見どころのファイル（doc/release-notes/vX.Y.Z.md）が在り空でないことも、同じスクリプトで検査する。
+      - name: Verify tag, versions and highlights
         id: verify
         run: ./.github/scripts/release/verify-tag.ps1 -Tag $env:GITHUB_REF_NAME -Sha $env:GITHUB_SHA -MainRef origin/main
 
@@ -470,14 +471,14 @@ jobs:
 
       - name: Generate release notes
         id: notes
-        run: ./.github/scripts/release/release-notes.ps1 -Tag $env:GITHUB_REF_NAME -Repo $env:GITHUB_REPOSITORY -OutFile "$env:RUNNER_TEMP/release-notes.md"
+        run: ./.github/scripts/release/release-notes.ps1 -Tag $env:GITHUB_REF_NAME -Repo $env:GITHUB_REPOSITORY -OutFile "release-assets/release-notes-$env:GITHUB_REF_NAME.md" -BodyFile "$env:RUNNER_TEMP/release-body.md"
 
       # 対象のリポジトリは gh の既定（checkout の remote）で決まる。
       - name: Create GitHub Release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./.github/scripts/release/github-release.ps1 -Tag $env:GITHUB_REF_NAME -Title "pasta $env:GITHUB_REF_NAME" -NotesFile "$env:RUNNER_TEMP/release-notes.md" -AssetDir release-assets
+        run: ./.github/scripts/release/github-release.ps1 -Tag $env:GITHUB_REF_NAME -Title "pasta $env:GITHUB_REF_NAME" -NotesFile "$env:RUNNER_TEMP/release-body.md" -AssetDir release-assets
 
       # status 契約: Release の step が書いた値を使う。書いていなければ（ノートの生成・配布物の取得の失敗、
       # スクリプトの異常終了・時間切れ）この job の失敗なので failed/publish。
