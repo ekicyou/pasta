@@ -299,6 +299,7 @@
 - **ビルド成功**: 両アーキテクチャで pasta.dll 生成
 - **テスト全パス**: x64 環境で全テスト実行
 - **アーティファクト保存**: 7日間保持
+- **リリースの補助スクリプト**: job `release-scripts` が `.github/scripts/release/release-scripts-test.ps1` を実行する（一時の git リポジトリで `release-notes.ps1`・`verify-tag.ps1`・定型コマンド D を動かす 9 項目。手元でも `pwsh -NoProfile -File` の 1 行で動く）（release-notes-highlights）
 
 ---
 
