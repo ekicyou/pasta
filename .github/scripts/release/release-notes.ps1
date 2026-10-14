@@ -1,33 +1,40 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-  1 つ前のリリースタグからリリースタグまでのコミットを分類し、リリースノート（Markdown）を作る。
+  1 つ前のリリースタグからリリースタグまでのコミットを分類し、詳しいリリースノート（Markdown）を作る。
 .DESCRIPTION
   前のタグは、形の合うタグ（vX.Y.Z）のうち版で並べて -Tag より小さい最大のもの。無ければ全履歴を使う。
-  マージコミットは除く。HEAD ではなくタグを基準にする。
+  範囲の終わりは -Head があればそれ、無ければ -Tag。-Head を指定すると、タグが在ることを求めない（タグを打つ前の手元の確認用）。
+  マージコミットは除く。件名から種類・スコープ・`!` の接頭辞を外し、内部の作業は載せない。
   -OutFile を省くとノートを標準出力へ書く。
 .EXAMPLE
   pwsh -NoProfile -File .github/scripts/release/release-notes.ps1 -Tag v0.3.7 -Repo ekicyou/pasta -OutFile notes.md
+.EXAMPLE
+  pwsh -NoProfile -File .github/scripts/release/release-notes.ps1 -Tag v0.3.9 -Repo ekicyou/pasta -Head origin/main
 #>
 param(
     [Parameter(Mandatory)][string]$Tag,
     [Parameter(Mandatory)][string]$Repo,
+    [string]$Head,
     [string]$OutFile,
     [string]$WorkspaceRoot = (Join-Path $PSScriptRoot '../../..')
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# 見出しの並び。type → 見出し。6 種以外の type と Conventional Commits でない件名は Maintenance へ入れる（黙って落とさない）。
+# 見出しの並び。breaking は `!` の付いた件名、other は 5 種以外の種類と決まった形でない件名（黙って落とさない）。
 $Headings = [ordered]@{
-    feat     = '✨ Features'
-    fix      = '🐛 Bug Fixes'
-    refactor = '♻️ Refactoring'
-    docs     = '📝 Documentation'
-    test     = '🧪 Tests'
-    chore    = '🔧 Maintenance'
+    breaking = '⚠️ 動きが変わる変更'
+    feat     = '✨ 新機能'
+    fix      = '🐛 不具合の修正'
+    refactor = '♻️ リファクタリング'
+    docs     = '📝 ドキュメント'
+    test     = '🧪 テスト'
+    other    = '🔧 そのほか'
 }
-$Fallback = 'chore'
+# 内部の作業のスコープ（種類は問わない）。ほかに `kiro-` で始まるスコープ・種類 spec・chore(release) も内部の作業。
+# 決まりを変えるときは doc/release-notes/README.md の「内部の作業」と合わせる。
+$InternalScopes = @('spec', 'discovery', 'roadmap', 'steering', 'skills', 'cc-sdd', 'release-workflow')
 # 形の合うタグ: 大文字小文字を区別し ASCII 数字だけ、末尾は \z。
 $TagShape = '^v([0-9]+\.[0-9]+\.[0-9]+)\z'
 
@@ -36,15 +43,23 @@ function Fail([string]$Message) {
     exit 1
 }
 
+# 内部の作業か（種類とスコープは大文字小文字を区別しない。-eq・-in・-like は既定で区別しない）
+function Test-Internal([string]$Type, [string]$Scope) {
+    ($Type -eq 'spec') -or ($Scope -in $InternalScopes) -or ($Scope -like 'kiro-*') -or ($Type -eq 'chore' -and $Scope -eq 'release')
+}
+
 if ($Tag -cnotmatch $TagShape) { Fail "タグ ``$Tag`` は ``vX.Y.Z``（数字 3 つ）の形ではない" }
 $version = [version]$Matches[1]
+$end = if ($Head) { $Head } else { $Tag }
 
 # git の出力（日本語・絵文字の件名）を UTF-8 で読む。コンソールのコードページは終了時に戻す。
 $savedEncoding = [Console]::OutputEncoding
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 try {
-    git -C $WorkspaceRoot rev-parse --verify --quiet "refs/tags/$Tag" *> $null
-    if ($LASTEXITCODE -ne 0) { Fail "タグ ``$Tag`` が見つからない" }
+    if (-not $Head) {
+        git -C $WorkspaceRoot rev-parse --verify --quiet "refs/tags/$Tag" *> $null
+        if ($LASTEXITCODE -ne 0) { Fail "タグ ``$Tag`` が見つからない" }
+    }
 
     # 1 つ前のリリースタグ
     $prev = $null
@@ -57,41 +72,52 @@ try {
         if ($v -lt $version -and ($null -eq $prevVersion -or $v -gt $prevVersion)) { $prev = $t; $prevVersion = $v }
     }
 
-    $range = if ($prev) { "$prev..$Tag" } else { $Tag }
-    $subjects = @(git -C $WorkspaceRoot log $range --no-merges --format=%s)
+    $range = if ($prev) { "$prev..$end" } else { $end }
+    $subjects = @(git -C $WorkspaceRoot log $range --no-merges --format=%s --)
     if ($LASTEXITCODE -ne 0) { Fail "``git log $range`` が失敗した" }
 }
 finally {
     [Console]::OutputEncoding = $savedEncoding
 }
 
-# 分類（git log の順 = 新しい順のまま）
+# 件名の扱い（git log の順 = 新しい順のまま）。件名ごとに上から当てる。
 $groups = @{}
 foreach ($key in $Headings.Keys) { $groups[$key] = [System.Collections.Generic.List[string]]::new() }
-# type と scope は大文字小文字を区別しない（Conventional Commits の規定）。
 foreach ($s in $subjects) {
-    $key = $Fallback
-    if ($s -match '^(\w+)(?:\(([^)]*)\))?!?:\s') {
-        if ($Matches[2] -eq 'spec') { continue }   # spec スコープは除く
-        if ($Headings.Contains($Matches[1])) { $key = $Matches[1].ToLowerInvariant() }
-    }
-    $groups[$key].Add($s)
+    # 1. 決まった形でない → そのまま「そのほか」
+    if ($s -notmatch '^(\w+)(?:\(([^)]*)\))?(!)?:\s+(.+)$') { $groups['other'].Add($s); continue }
+    $type = $Matches[1].ToLowerInvariant()
+    $scope = $Matches[2]
+    $breaking = [bool]$Matches[3]
+    $text = $Matches[4]   # 本文だけを載せる。末尾の (#83) は本文の一部なので残る
+    # 2. 内部の作業 → 載せない
+    if (Test-Internal $type $scope) { continue }
+    # 3. `!` → 動きが変わる変更、4. 種類の見出し（5 種以外は「そのほか」）
+    $key = if ($breaking) { 'breaking' } elseif ($type -in 'feat', 'fix', 'refactor', 'docs', 'test') { $type } else { 'other' }
+    $groups[$key].Add($text)
 }
+$counted = ($Headings.Keys | ForEach-Object { $groups[$_].Count } | Measure-Object -Sum).Sum
 
 $lines = [System.Collections.Generic.List[string]]::new()
+$lines.Add("# pasta $Tag の詳しいリリースノート")
+$lines.Add('')
+if ($counted -eq 0) {
+    $lines.Add('載せる変更はありません。')
+    $lines.Add('')
+}
 foreach ($key in $Headings.Keys) {
     if ($groups[$key].Count -eq 0) { continue }   # 空の見出しは出さない
     $lines.Add("## $($Headings[$key])")
     foreach ($s in $groups[$key]) { $lines.Add("- $s") }
     $lines.Add('')
 }
+# -Head を指定しても、リンクの終わりは -Tag と書く
 if ($prev) { $lines.Add("**Full Changelog**: https://github.com/$Repo/compare/$prev...$Tag") }
 $notes = ($lines -join "`n").TrimEnd() + "`n"
 
 if ($OutFile) {
     $path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
     [IO.File]::WriteAllText($path, $notes, [Text.UTF8Encoding]::new($false))
-    $counted = ($Headings.Keys | ForEach-Object { $groups[$_].Count } | Measure-Object -Sum).Sum
     Write-Output "release-notes: $Tag の前のタグ = $(if ($prev) { $prev } else { '(無し: 全履歴)' })、$counted 件 → $path"
 }
 else {
