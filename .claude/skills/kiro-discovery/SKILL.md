@@ -1,7 +1,7 @@
 ---
 name: kiro-discovery
 description: Entry point for new work. Determines the best action path or work decomposition (update existing spec, create new spec, mixed decomposition, or no spec needed) and refines ideas through structured dialogue.
-allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion
+allowed-tools: Bash, Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion
 argument-hint: <idea-or-request>
 ---
 
