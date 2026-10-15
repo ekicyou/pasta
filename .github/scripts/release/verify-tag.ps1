@@ -1,7 +1,7 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-  リリースタグの形式・版の一致・main からの到達性を検査し、版を出力する。
+  リリースタグの形式・版の一致・main からの到達性と、タグの版の見どころのファイル（doc/release-notes/vX.Y.Z.md）が在り空でないことを検査し、版を出力する。
 .EXAMPLE
   pwsh -NoProfile -File .github/scripts/release/verify-tag.ps1 -Tag v0.3.7 -Sha (git rev-parse 'v0.3.7^{commit}') -MainRef origin/main
 #>
@@ -64,6 +64,14 @@ switch ($LASTEXITCODE) {
     default { $failures.Add("main からの到達性: コミット ``$Sha`` と ``$MainRef`` を git で比べられない（終了コード $LASTEXITCODE`: $(($gitErr | Out-String).Trim())）") }
 }
 
+# 5. 見どころのファイル（在ること・空でないことだけ。文章の中身は見ない）
+$hlRel = "doc/release-notes/v$version.md"
+if ($version) {
+    $hlPath = Join-Path $WorkspaceRoot $hlRel
+    if (-not (Test-Path -LiteralPath $hlPath -PathType Leaf)) { $failures.Add("見どころのファイル: ``$hlRel`` が無い") }
+    elseif ([string]::IsNullOrWhiteSpace((Get-Content -Raw -LiteralPath $hlPath))) { $failures.Add("見どころのファイル: ``$hlRel`` が空である") }
+}
+
 if ($failures.Count -gt 0) {
     Write-To GITHUB_STEP_SUMMARY (@(
             "## タグの検査: 失敗（``$Tag``）"
@@ -77,5 +85,5 @@ if ($failures.Count -gt 0) {
 
 Write-To GITHUB_OUTPUT "version=$version"
 if ($env:GITHUB_OUTPUT) { Write-Output "version=$version" }
-Write-To GITHUB_STEP_SUMMARY "## タグの検査: 成功（``$Tag`` → 版 ``$version``、``$MainRef`` から到達可能）"
+Write-To GITHUB_STEP_SUMMARY "## タグの検査: 成功（``$Tag`` → 版 ``$version``、``$MainRef`` から到達可能、見どころ ``$hlRel``）"
 exit 0

@@ -177,7 +177,7 @@ crates.io のトークン交換は行わない（確認のために公開でき�
 
 2〜8 節がすべて済んだら、初回のリリースを行う。
 
-1. いつものリリースの手順（`release-workflow` の手順）で版を上げ、そのコミットを main へ入れて、リリースタグ `vX.Y.Z` を push する。
+1. いつものリリースの手順（`release` スキルの手順）で版を上げ、そのコミットを main へ入れて、リリースタグ `vX.Y.Z` を push する。
 2. GitHub の「Actions」→「Release」の実行を開き、report job の Summary を見る。crates.io の 5 クレート・Marketplace・GitHub Release がすべて `published` になり、GitHub Release の URL が出ていれば成功である。
 3. publish-crates の Summary で、クレートごとの所要秒を確かめる（トークンの期限 30 分に対する余裕の判断材料）。
 4. 同じ実行を再実行（Re-run all jobs）し、すべての公開先が `skipped`（公開済みのため飛ばした）になることを確かめる。

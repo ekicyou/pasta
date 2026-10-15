@@ -169,7 +169,7 @@ Provide brief summary in the language specified in spec.json:
 **Requirements Not Approved**:
 - **Stop Execution**: Cannot proceed without approved requirements
 - **User Message**: "Requirements not yet approved. Approval required before design generation."
-- **Suggested Action**: "Run `/kiro-spec-design {feature} -y` to auto-approve requirements and proceed"
+- **Suggested Action**: "Run `/kiro-design {feature}` (auto-approves requirements) to proceed"
 
 **Missing Requirements**:
 - **Stop Execution**: Requirements document must exist
@@ -191,7 +191,7 @@ Provide brief summary in the language specified in spec.json:
 **Spec Gap Found During Design Review**:
 - **Stop Execution**: Do not write a patched-over `design.md`
 - **User Message**: "Design review found a real spec gap or ambiguity that must be resolved before design can be finalized."
-- **Suggested Action**: Clarify or fix `requirements.md`, then re-run `/kiro-spec-design {feature}`
+- **Suggested Action**: Clarify or fix `requirements.md`, then re-run `/kiro-design {feature}`
 
 ### Next Phase: Task Generation
 
@@ -201,5 +201,5 @@ Provide brief summary in the language specified in spec.json:
 - Or `/kiro-spec-tasks {feature} -y` to auto-approve and proceed directly
 
 **If Modifications Needed**:
-- Provide feedback and re-run `/kiro-spec-design {feature}`
+- Provide feedback and re-run `/kiro-design {feature}`
 - Existing design used as reference (merge mode)

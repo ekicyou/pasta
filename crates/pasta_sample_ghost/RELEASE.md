@@ -14,9 +14,10 @@
 
 ### Step 1: 版を上げたコミットを main に入れる
 
-- 版の決定と版を上げるコミットは、`release-workflow` の手順で行います（`Cargo.toml`・`Cargo.lock`・`editors/vscode/package.json`・`editors/vscode/package-lock.json`・`book/src/introduction.md` の版をそろえて 1 コミットにする）。
+- 版の決定と版を上げるコミットは、`release` スキル（`/release`）の手順で行います（`Cargo.toml`・`Cargo.lock`・`editors/vscode/package.json`・`editors/vscode/package-lock.json`・`book/src/introduction.md` の版をそろえ、その版の見どころのファイル `doc/release-notes/vX.Y.Z.md` を書いて 1 コミットにする）。見どころの書き方は `doc/release-notes/README.md` にあります。
 - そのコミットを PR で `main` へ squash マージします。
 - タグと `Cargo.toml`・`package.json` の版が一致し、タグのコミットが `main` から到達できることを、CI の verify job が検査します。
+- タグを打つ前に、タグのコミットにその版の見どころのファイルが要ります。無いとき、または中身が空白と改行だけのときは、verify job で止まり、どこにも公開しません。
 
 ### Step 2: リリースタグを push する
 
@@ -36,12 +37,12 @@ GitHub の「Actions」→「Release」の実行を開きます。job は次の�
 
 | job | 内容 |
 |-----|------|
-| verify | タグの形・版の一致・`main` からの到達を検査 |
+| verify | タグの形・版の一致・`main` からの到達・見どころのファイルの有無を検査 |
 | gate | `build.yml` の検査（test・clippy・deny・luacheck・WASM）をタグのコミットで実行 |
 | build | `pasta.dll.zip`・`hello-pasta.nar`・VSIX を作る |
 | publish-crates | crates.io へ 5 クレートを公開 |
 | publish-vsce | VSCode Marketplace へ拡張を公開 |
-| github-release | リリースノートを生成し、GitHub Release `pasta vX.Y.Z` を作成 |
+| github-release | 詳しいリリースノートを作り、見どころを本文とする GitHub Release `pasta vX.Y.Z` を作成して、配布物 3 つと詳しいリリースノートを添付 |
 | report | 公開先ごとの結果と Release の URL を表にまとめる |
 
 report job の Summary の表で、公開先ごとの結果を確かめます。
@@ -52,7 +53,7 @@ report job の Summary の表で、公開先ごとの結果を確かめます。
 - `not-run`: 前の段の失敗で行わなかった
 - 「job の summary を参照（… の結果: failure）」: その job が結果を書く前に失敗した。その job の Summary とログを見る
 
-すべての公開先が `published` か `skipped` になり、GitHub Release の URL が出ていれば完了です。リリースノートは前のリリースタグからのコミットの件名から自動で生成されます。
+すべての公開先が `published` か `skipped` になり、GitHub Release の URL が出ていれば完了です。Release の本文は、見どころのファイルの中身に、詳しいリリースノートへのリンクと件数の行を足したものです。詳しいリリースノート（`release-notes-vX.Y.Z.md`）は、前のリリースタグからのコミットの件名から作られ、添付されます。
 
 ### Step 4: 失敗したら、失敗した job を再実行する
 
@@ -103,4 +104,4 @@ pwsh -File release.ps1
 ```
 
 - `cargo-about` がインストール済みであること（`cargo install cargo-about`）。`release.ps1` が第三者ライセンス表示 `THIRD_PARTY_LICENSES.txt` を `pasta.dll` の隣に生成します
-- ビルド、ゴースト生成、バリデーション、`pasta.dll.zip`・`.nar` ファイルの作成まで一括実行されます
+- `pasta.dll` のビルド、DLL と `scripts/` のコピー、`pasta_check release`（検査と `.nar` の作成）、`pasta.dll.zip` の作成、版の確認、`.nar` の大きさの検査までを一括で実行します

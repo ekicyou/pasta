@@ -6,7 +6,7 @@
 
 1回の実装指示（`/kiro-impl review-improvement-loop`）で、(1) レビュー領域の自己発見（ギャップ分析）と `レビュー領域 × レビュー内容（7次元）` マトリクスの動的生成、(2) 各セルのサブエージェント委譲による改善実行、(3) サイクルごとの破壊検知とコミット、(4) デバッグ不能セルの巻き戻しとスキップによる全完走保証、(5) 完走後の改善内容レポート生成、を中断なく完走する。
 
-`release-workflow` と同様の再実行型 spec として `.kiro/specs/` 直下に留まり、別プロジェクトへ spec ディレクトリをコピーして再実行するだけで、そのプロジェクトの領域を自動再発見し同等の効果が得られる移植性を持つ。
+再実行型 spec として `.kiro/specs/` 直下に留まり、別プロジェクトへ spec ディレクトリをコピーして再実行するだけで、そのプロジェクトの領域を自動再発見し同等の効果が得られる移植性を持つ。
 
 （詳細は `.kiro/specs/review-improvement-loop/brief.md` を参照）
 
@@ -27,7 +27,7 @@
 ## Boundary Context
 
 - **In scope**: 全レビュー領域（Rust クレート・Lua ランタイム資産・VSCode 拡張・`book/tools` を含む全ソース資産）× 全 7 次元のマトリクス改善を 1 実装指示で完走するループ。領域の自己発見（ギャップ分析）、サブエージェント委譲、サイクル毎コミット、破壊検知、巻き戻し、最終レポート。既存の品質検証インフラ（本リポジトリでは Rust=`cargo test`/`cargo clippy`/`cargo-audit`/`cargo-deny`/`insta`、Lua=`luacheck`/`lua_test`、TypeScript/JS=型検査・lint・`npm` テスト、横断=`TEST_COVERAGE.md`・`book` link-check・tutorial-check・スキル生成同期検査 `gen-skill-refs --check`）の活用と必要に応じた追加
-- **Out of scope**: 新機能の追加・外部仕様の変更（挙動保存が前提）。完了済み `audit-pasta-*` spec の改変・再オープン。性能チューニングを主目的とする作業（簡素化の副次効果は可）。CI 設定そのものの再設計（既存ワークフローとの整合確認は可）。Kiro ワークフロー自体（spec/skill 群）の改修。pasta DSL 文法・Lua API の仕様変更。リリース・配布フロー（`release-workflow` の領分）。マニュアル `book/` の内容拡充（ドキュメント整合次元での同期確認は In）
+- **Out of scope**: 新機能の追加・外部仕様の変更（挙動保存が前提）。完了済み `audit-pasta-*` spec の改変・再オープン。性能チューニングを主目的とする作業（簡素化の副次効果は可）。CI 設定そのものの再設計（既存ワークフローとの整合確認は可）。Kiro ワークフロー自体（spec/skill 群）の改修。pasta DSL 文法・Lua API の仕様変更。リリース・配布フロー（`release` スキルの領分）。マニュアル `book/` の内容拡充（ドキュメント整合次元での同期確認は In）
 - **Adjacent expectations**: 既存スキル `karpathy-guidelines`（簡素化基準）・`kiro-review`（敵対的レビュー）・`kiro-debug`（根本原因デバッグ）・`kiro-verify-completion`（完了前検証）が利用可能であることを前提とする。`workflow.md` の DoD・回帰責任・危険 Git 操作禁止・MVP 禁止ルールに整合する。本リポジトリでは `cargo` 実行前に環境変数 `NoDefaultCurrentDirectoryInExePath` の解除が必要（既知のビルド環境制約）
 
 ---

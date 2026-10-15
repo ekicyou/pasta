@@ -195,21 +195,18 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │       ├── nar.rs           # NAR（ZIP）アーカイブ作成
 │   │       └── copy.rs          # ファイルコピーユーティリティ
 │   └── pasta_sample_ghost/  # サンプルゴースト「hello-pasta」（publish=false）
-│       ├── Cargo.toml       # 画像生成・配布物作成用依存
+│       ├── Cargo.toml       # テスト用の依存だけ（絵を描くプログラムは持たない）
 │       ├── README.md        # クレート概要
 │       ├── RELEASE.md       # リリース手順
 │       ├── STAGES.md        # 入門ガイドの段階表（段階 N の辞書 = dic/01〜NN。.nar には入らない）
-│       ├── release.ps1      # ビルド＋配布パッケージ生成スクリプト（手元では動作確認用・リリース CI の build job も呼ぶ）
-│       ├── build.rs         # ビルドスクリプト
+│       ├── release.ps1      # ビルド＋配布パッケージ生成スクリプト（6 段。絵を生成する段は無い。手元では動作確認用・リリース CI の build job も呼ぶ）
+│       ├── art/             # 立ち絵の生成の記録（README.md）と設定画像 2 枚（.nar には入らない）
 │       ├── src/
-│       │   ├── lib.rs              # 公開API（画像＋surfaces.txt生成）
-│       │   ├── main.rs             # 配布物生成CLIエントリーポイント
-│       │   ├── image_generator.rs  # ピクトグラム画像生成
-│       │   ├── config_templates.rs # surfaces.txt生成
+│       │   ├── lib.rs              # テスト用モジュールの宣言だけ
 │       │   └── scripts.rs          # ghosts/hello-pasta 辞書(.pasta)の検証テスト
 │       ├── ghosts/           # サンプルゴースト本体（SSOT・配布物一式）
-│       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/NN-*.pasta 12 段/install)＋生成物(dll/ライセンス表示/scripts は .gitignore 済み・画像は追跡)
-│       └── tests/            # 統合テスト・配布ファイル構成検証・全段階の検証（tutorial_stages_test.rs）
+│       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/NN-*.pasta 12 段/install/shell/master の立ち絵 18 枚・surfaces.txt)＋生成物(dll/ライセンス表示/scripts は .gitignore 済み)
+│       └── tests/            # 統合テスト・配布ファイル構成検証・全段階の検証（tutorial_stages_test.rs）・立ち絵と当たり判定の検証（shell_assets_test.rs）
 ├── benches/                  # ベンチマークコード
 ├── editors/                  # エディタ拡張
 │   └── vscode/              # VSCode拡張（TypeScript + WASM統合）
@@ -234,6 +231,8 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   ├── theme/               # head.hbs（日本語 bigram 検索 tokenizer ＋ pasta ハイライト中和の override ＋ Web フォント）・claudia.css（Claudia テーマ: light/navy の配色・部品・台詞・扉・狭幅・印刷）・claudia.js（テーマメニューを Auto/Light/Navy に絞る・中間の幅で目次の開閉を次のページへ持ち越す）
 │   ├── tools/               # build-time Node（スキル references 生成 gen-skill-refs・リンク検証 link-check・bigram 索引再生成・pasta 構文ハイライト・台詞部品 talk/（話し手と表情の登録簿 talk.mjs・ビルド後の吹き出し変換 talk-html.mjs）・検証 verify-*・テーマの対比テスト theme-test 等）
 │   └── book/                # mdbook build 生成物（.gitignore 済み・CI で再生成）
+├── doc/
+│   └── release-notes/       # 版ごとのリリースノートの見どころ vX.Y.Z.md（GitHub Release の本文・版の更新と同じコミットで書く）と、書き方・内部の作業の決まり README.md
 ├── .kiro/                    # Kiro Spec-Driven設定
 │   ├── steering/            # ステアリング規約
 │   ├── settings/            # テンプレート・ルール
@@ -247,7 +246,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │   ├── manual.yml       # 利用者マニュアルの検査と GitHub Pages 公開
 │   │   ├── release.yml      # リリース CI（vX.Y.Z タグ契機・OIDC で crates.io/Marketplace へ公開・GitHub Release 作成）
 │   │   └── release-setup-check.yml # リリース CI のセットアップ確認（手動起動・公開しない）
-│   ├── scripts/release/     # リリース CI の job 補助スクリプト（verify-tag/publish-crate/publish-vsix/release-notes/github-release の .ps1）
+│   ├── scripts/release/     # リリース CI の job 補助スクリプト（verify-tag/publish-crate/publish-vsix/release-notes/github-release の .ps1）と、その検査 release-scripts-test.ps1（build.yml の release-scripts job で実行）
 │   └── release-ci-setup.md  # リリース CI の一回限りのセットアップ手順書
 ├── release.bat              # crates/pasta_sample_ghost/release.ps1 のバッチラッパー（ダブルクリック用）
 ├── release/                 # release.ps1 の出力先（.nar・pasta.dll.zip。.gitignore 済み・コミットしない）

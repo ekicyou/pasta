@@ -122,3 +122,15 @@ jobs:
             echo "ERROR: WASM artifact exceeds 10MB threshold"
             exit 1
           fi
+
+  # リリースの補助スクリプト（.github/scripts/release/）を一時の git リポジトリで動かして確かめる。
+  # ネットワークと gh を使わない。リリース CI の関門（gate）でもあるので、公開の前にも動く。
+  release-scripts:
+    name: release-scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Release scripts test
+        run: pwsh -NoProfile -File .github/scripts/release/release-scripts-test.ps1

@@ -314,7 +314,7 @@ fn assert_choice_jumps(event: &str, response: &str, choices: &[(&str, &str, &str
 fn test_choice_after_mid_call_routes_to_emitter() {
     assert_choice_jumps(
         "OnCsAfterMid",
-        r"\p[0]Ｂ通過選んで\![*]\q[後,後選先,OnCsAfterMid_1]\![*]\q[外,後選外,OnCsAfterMid_1]\e",
+        r"\p[0]Ｂ通過選んで\n[150]\![*]\q[後,後選先,OnCsAfterMid_1]\n\![*]\q[外,後選外,OnCsAfterMid_1]\e",
         &[
             ("後", "後選先", "OnCsAfterMid_1", r"\p[0]Ａの後選先\e"),
             (
@@ -332,7 +332,7 @@ fn test_choice_after_mid_call_routes_to_emitter() {
 fn test_choice_before_mid_call_routes_to_emitter() {
     assert_choice_jumps(
         "OnCsBeforeMid",
-        r"\p[0]選んで\![*]\q[前,前選先,OnCsBeforeMid_1]Ｂ通過Ａ再開\e",
+        r"\p[0]選んで\n[150]\![*]\q[前,前選先,OnCsBeforeMid_1]\nＢ通過Ａ再開\e",
         &[("前", "前選先", "OnCsBeforeMid_1", r"\p[0]Ａの前選先\e")],
     );
 }
@@ -343,7 +343,7 @@ fn test_choice_before_mid_call_routes_to_emitter() {
 fn test_choice_from_callee_routes_to_callee() {
     assert_choice_jumps(
         "OnCsFromCallee",
-        r"\p[0]選んで\![*]\q[出,出選先,出選Ｂ_1]\![*]\q[外,出選外,出選Ｂ_1]Ａ通過\e",
+        r"\p[0]選んで\n[150]\![*]\q[出,出選先,出選Ｂ_1]\n\![*]\q[外,出選外,出選Ｂ_1]\nＡ通過\e",
         &[
             ("出", "出選先", "出選Ｂ_1", r"\p[0]Ｂの出選先\e"),
             ("外", "出選外", "出選Ｂ_1", r"\p[0]グローバルの出選外\e"),
@@ -357,7 +357,7 @@ fn test_choice_from_callee_routes_to_callee() {
 fn test_choices_from_both_scenes_in_one_response() {
     assert_choice_jumps(
         "OnCsBoth",
-        r"\p[0]Ａから\![*]\q[Ａの,両選先,OnCsBoth_1]Ｂから\![*]\q[Ｂの,両選先,両選Ｂ_1]Ａ再開\e",
+        r"\p[0]Ａから\n[150]\![*]\q[Ａの,両選先,OnCsBoth_1]\nＢから\n[150]\![*]\q[Ｂの,両選先,両選Ｂ_1]\nＡ再開\e",
         &[
             ("Ａの", "両選先", "OnCsBoth_1", r"\p[0]Ａの両選先\e"),
             ("Ｂの", "両選先", "両選Ｂ_1", r"\p[0]Ｂの両選先\e"),
@@ -370,7 +370,7 @@ fn test_choices_from_both_scenes_in_one_response() {
 fn test_choice_after_tail_call_routes_to_callee() {
     assert_choice_jumps(
         "OnCsTail",
-        r"\p[0]Ａ通過選んで\![*]\q[末,末選先,末選Ｂ_1]\e",
+        r"\p[0]Ａ通過選んで\n[150]\![*]\q[末,末選先,末選Ｂ_1]\e",
         &[("末", "末選先", "末選Ｂ_1", r"\p[0]Ｂの末選先\e")],
     );
 }
@@ -381,7 +381,7 @@ fn test_choice_after_tail_call_routes_to_callee() {
 fn test_choice_without_mid_call_carries_scope() {
     assert_choice_jumps(
         "OnChoiceMenu",
-        r"\p[0]どれ？\_w[450]\![*]\q[甲,選択肢甲,OnChoiceMenu_1]\![*]\q[乙,選択肢乙,OnChoiceMenu_1]\e",
+        r"\p[0]どれ？\_w[450]\n[150]\![*]\q[甲,選択肢甲,OnChoiceMenu_1]\n\![*]\q[乙,選択肢乙,OnChoiceMenu_1]\e",
         &[
             ("甲", "選択肢甲", "OnChoiceMenu_1", r"\p[0]メニューの甲\e"),
             ("乙", "選択肢乙", "OnChoiceMenu_1", r"\p[0]グローバルの乙\e"),
@@ -394,7 +394,7 @@ fn test_choice_without_mid_call_carries_scope() {
 fn test_choice_during_chain_talk_suspension_routes_to_callee() {
     assert_choice_jumps(
         "OnCsSuspend",
-        r"\p[0]選んで\![*]\q[止,止選先,止選Ｂ_1]\e",
+        r"\p[0]選んで\n[150]\![*]\q[止,止選先,止選Ｂ_1]\e",
         &[("止", "止選先", "止選Ｂ_1", r"\p[0]Ｂの止選先\e")],
     );
 }
@@ -405,7 +405,7 @@ fn test_choice_during_chain_talk_suspension_routes_to_callee() {
 fn test_choices_after_expr_fn_global_scene_route_to_emitters() {
     assert_choice_jumps(
         "OnCsExpr",
-        r"\p[0]Ｂから\![*]\q[Ｂの,式選先,式選Ｂ_1]Ａから\![*]\q[Ａの,式選先,OnCsExpr_1]\e",
+        r"\p[0]Ｂから\n[150]\![*]\q[Ｂの,式選先,式選Ｂ_1]\nＡから\n[150]\![*]\q[Ａの,式選先,OnCsExpr_1]\e",
         &[
             ("Ｂの", "式選先", "式選Ｂ_1", r"\p[0]Ｂの式選先\e"),
             ("Ａの", "式選先", "OnCsExpr_1", r"\p[0]Ａの式選先\e"),

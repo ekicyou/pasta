@@ -45,7 +45,8 @@ jobs:
         run: git fetch origin main
 
       # タグ名・SHA は既定の環境変数 GITHUB_REF_NAME・GITHUB_SHA（github.ref_name・github.sha と同じ値）で渡す。
-      - name: Verify tag and versions
+      # タグの版の見どころのファイル（doc/release-notes/vX.Y.Z.md）が在り空でないことも、同じスクリプトで検査する。
+      - name: Verify tag, versions and highlights
         id: verify
         run: ./.github/scripts/release/verify-tag.ps1 -Tag $env:GITHUB_REF_NAME -Sha $env:GITHUB_SHA -MainRef origin/main
 
@@ -143,9 +144,12 @@ jobs:
             $errors.Add("pasta.dll.zip の中身が pasta.dll・THIRD_PARTY_LICENSES.txt の 2 つでない: $($dllZip -join ', ')")
           }
 
-          # hello-pasta.nar: 配置の要のファイル
+          # hello-pasta.nar: 配置の要のファイルと、シェル一式（descript.txt・surfaces.txt・立ち絵 18 枚）
           $nar = Get-ZipEntries 'release/hello-pasta.nar'
-          foreach ($e in 'install.txt', 'updates.txt', 'ghost/master/descript.txt', 'ghost/master/pasta.dll', 'ghost/master/THIRD_PARTY_LICENSES.txt') {
+          $narRequired = @('install.txt', 'updates.txt', 'ghost/master/descript.txt', 'ghost/master/pasta.dll', 'ghost/master/THIRD_PARTY_LICENSES.txt', 'shell/master/descript.txt', 'shell/master/surfaces.txt')
+          # 立ち絵は surface0〜8 と surface10〜18（9 は無い）
+          foreach ($n in (0..8) + (10..18)) { $narRequired += "shell/master/surface$n.png" }
+          foreach ($e in $narRequired) {
             if ($nar -cnotcontains $e) { $errors.Add("hello-pasta.nar に $e が無い") }
           }
 
@@ -467,14 +471,14 @@ jobs:
 
       - name: Generate release notes
         id: notes
-        run: ./.github/scripts/release/release-notes.ps1 -Tag $env:GITHUB_REF_NAME -Repo $env:GITHUB_REPOSITORY -OutFile "$env:RUNNER_TEMP/release-notes.md"
+        run: ./.github/scripts/release/release-notes.ps1 -Tag $env:GITHUB_REF_NAME -Repo $env:GITHUB_REPOSITORY -OutFile "release-assets/release-notes-$env:GITHUB_REF_NAME.md" -BodyFile "$env:RUNNER_TEMP/release-body.md"
 
       # 対象のリポジトリは gh の既定（checkout の remote）で決まる。
       - name: Create GitHub Release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./.github/scripts/release/github-release.ps1 -Tag $env:GITHUB_REF_NAME -Title "pasta $env:GITHUB_REF_NAME" -NotesFile "$env:RUNNER_TEMP/release-notes.md" -AssetDir release-assets
+        run: ./.github/scripts/release/github-release.ps1 -Tag $env:GITHUB_REF_NAME -Title "pasta $env:GITHUB_REF_NAME" -NotesFile "$env:RUNNER_TEMP/release-body.md" -AssetDir release-assets
 
       # status 契約: Release の step が書いた値を使う。書いていなければ（ノートの生成・配布物の取得の失敗、
       # スクリプトの異常終了・時間切れ）この job の失敗なので failed/publish。

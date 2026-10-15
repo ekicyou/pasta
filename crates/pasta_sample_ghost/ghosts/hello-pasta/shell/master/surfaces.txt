@@ -3,90 +3,144 @@ charset,UTF-8
 surface0
 {
 element0,overlay,surface0.png,0,0
+collisionex0,Face,rect,124,130,204,200
+collisionex1,Head,rect,96,84,233,201
+collisionex2,Body,rect,110,218,221,403
 }
 
 surface1
 {
 element0,overlay,surface1.png,0,0
+collisionex0,Face,rect,124,130,204,200
+collisionex1,Head,rect,96,84,233,201
+collisionex2,Body,rect,110,218,221,403
 }
 
 surface2
 {
 element0,overlay,surface2.png,0,0
+collisionex0,Face,rect,124,130,204,200
+collisionex1,Head,rect,96,84,233,201
+collisionex2,Body,rect,110,218,221,403
 }
 
 surface3
 {
 element0,overlay,surface3.png,0,0
+collisionex0,Face,rect,124,130,204,200
+collisionex1,Head,rect,96,84,233,201
+collisionex2,Body,rect,110,218,221,403
 }
 
 surface4
 {
 element0,overlay,surface4.png,0,0
+collisionex0,Face,rect,124,130,204,200
+collisionex1,Head,rect,96,84,233,201
+collisionex2,Body,rect,110,218,221,403
 }
 
 surface5
 {
 element0,overlay,surface5.png,0,0
+collisionex0,Face,rect,124,130,204,200
+collisionex1,Head,rect,96,84,233,201
+collisionex2,Body,rect,110,218,221,403
 }
 
 surface6
 {
 element0,overlay,surface6.png,0,0
+collisionex0,Face,rect,124,130,204,200
+collisionex1,Head,rect,96,84,233,201
+collisionex2,Body,rect,110,218,221,403
 }
 
 surface7
 {
 element0,overlay,surface7.png,0,0
+collisionex0,Face,rect,124,130,204,200
+collisionex1,Head,rect,96,84,233,201
+collisionex2,Body,rect,110,218,221,403
 }
 
 surface8
 {
 element0,overlay,surface8.png,0,0
+collisionex0,Face,rect,124,130,204,200
+collisionex1,Head,rect,96,84,233,201
+collisionex2,Body,rect,110,218,221,403
 }
 
 surface10
 {
 element0,overlay,surface10.png,0,0
+collisionex0,Face,rect,126,160,208,215
+collisionex1,Head,rect,105,75,227,216
+collisionex2,Body,rect,124,233,207,394
 }
 
 surface11
 {
 element0,overlay,surface11.png,0,0
+collisionex0,Face,rect,126,160,208,215
+collisionex1,Head,rect,105,75,227,216
+collisionex2,Body,rect,124,233,207,394
 }
 
 surface12
 {
 element0,overlay,surface12.png,0,0
+collisionex0,Face,rect,126,160,208,215
+collisionex1,Head,rect,105,75,227,216
+collisionex2,Body,rect,124,233,207,394
 }
 
 surface13
 {
 element0,overlay,surface13.png,0,0
+collisionex0,Face,rect,126,160,208,215
+collisionex1,Head,rect,105,75,227,216
+collisionex2,Body,rect,124,233,207,394
 }
 
 surface14
 {
 element0,overlay,surface14.png,0,0
+collisionex0,Face,rect,126,160,208,215
+collisionex1,Head,rect,105,75,227,216
+collisionex2,Body,rect,124,233,207,394
 }
 
 surface15
 {
 element0,overlay,surface15.png,0,0
+collisionex0,Face,rect,126,160,208,215
+collisionex1,Head,rect,105,75,227,216
+collisionex2,Body,rect,124,233,207,394
 }
 
 surface16
 {
 element0,overlay,surface16.png,0,0
+collisionex0,Face,rect,126,160,208,215
+collisionex1,Head,rect,105,75,227,216
+collisionex2,Body,rect,124,233,207,394
 }
 
 surface17
 {
 element0,overlay,surface17.png,0,0
+collisionex0,Face,rect,126,160,208,215
+collisionex1,Head,rect,105,75,227,216
+collisionex2,Body,rect,124,233,207,394
 }
 
 surface18
 {
 element0,overlay,surface18.png,0,0
+collisionex0,Face,rect,126,160,208,215
+collisionex1,Head,rect,105,75,227,216
+collisionex2,Body,rect,124,233,207,394
 }
 

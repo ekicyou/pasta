@@ -83,14 +83,15 @@ pasta_check release `
 
 ```
 [Setup Phase]                      [Release Phase]
-  1. SHIORI DLL ビルド               4. pasta_check release
-  2. ゴースト固有の成果物生成         5. 追加の配布物の作成（hello-pasta は pasta.dll.zip）
-  3. DLL/スクリプトを開発フォルダーへ  6. バージョン確認
-                                     7. リリース案内表示
+  1. SHIORI DLL ビルド               3. pasta_check release
+  2. DLL/スクリプトを開発フォルダーへ  4. 追加の配布物の作成（hello-pasta は pasta.dll.zip）
+                                     5. バージョン確認
+                                     6. 大きさの検査とリリース案内表示
 ```
 
-- 段 4 は pasta_check が汎用的に処理する
-- それ以外（Setup Phase と段 5〜7）はゴースト固有の手順（release.ps1 等で実装）
+- 段 3 は pasta_check が汎用的に処理する
+- それ以外（Setup Phase と段 4〜6）はゴースト固有の手順（release.ps1 等で実装）
+- 段の番号は hello-pasta の `release.ps1` のもの。立ち絵などの素材はコミットしたものをそのまま詰めるので、成果物を生成する段は無い
 
 ### ディレクトリ構成例
 
@@ -109,7 +110,7 @@ workspace/                               # ワークスペースルート
 │   │   ├── install.txt                  # UTF-8・1 行目は charset,UTF-8
 │   │   └── updates.txt                  # 自動生成（ゴースト用）
 │   ├── {ghost-name}.nar                 # --nar 出力
-│   └── pasta.dll.zip                    # 追加の配布物（hello-pasta 固有・release.ps1 の段 5）
+│   └── pasta.dll.zip                    # 追加の配布物（hello-pasta 固有・release.ps1 の段 4）
 └── crates/pasta_sample_ghost/
     ├── release.ps1                      # Setup + Release を統合したスクリプト
     └── ghosts/{ghost-name}/             # --target ゴースト開発フォルダー
@@ -129,7 +130,7 @@ SSP 仕様および NAR フォーマットの詳細:
 ### pasta リポジトリ（hello-pasta）の場合
 
 - 手元で `release.bat`・`release.ps1`（中で `pasta_check release` を呼ぶ）を実行して `release/` にできる成果物は、動作確認用である。コミットしない（`release/` は `.gitignore` で無視）。
-- 配布物（`pasta.dll.zip`・`hello-pasta.nar`・VSIX）の公開は、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）が行う。CI はタグのソースから配布物を作り直し、GitHub Release（題名 `pasta vX.Y.Z`・リリースノートはコミット履歴から生成）を作って添付する。
+- 配布物（`pasta.dll.zip`・`hello-pasta.nar`・VSIX）の公開は、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）が行う。CI はタグのソースから配布物を作り直し、GitHub Release（題名 `pasta vX.Y.Z`。本文は `doc/release-notes/vX.Y.Z.md` の見どころ）を作って、配布物と詳しいリリースノート（`release-notes-vX.Y.Z.md`）を添付する。
 - 手元で `gh release create` を実行しない。手順と失敗したときの回復は `crates/pasta_sample_ghost/RELEASE.md` を参照。
 
 ## トラブルシューティング

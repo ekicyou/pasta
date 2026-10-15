@@ -9,14 +9,14 @@ argument-hint: <feature-name>
 
 <instructions>
 ## Core Task
-Start a single specification end-to-end **after `/kiro-discovery`**, taking it from init through requirements, gap analysis, and an interactive requirements discussion. Discovery has already created `{specs-root}/{feature-name}/brief.md`, so the **feature name is already confirmed and equals `$ARGUMENTS`**. This skill does **not** create branches or worktrees: feature branches are supplied by the Claude Code (harness) worktree feature. When the current branch is the repository's default branch, **STOP** and ask the developer to re-run inside the harness worktree (a non-default working branch). Otherwise (already on a non-default branch), it:
+Start a single specification end-to-end **after `/kiro-discovery`**, taking it from init through requirements, gap analysis, and an interactive requirements discussion. Discovery has already created `{specs-root}/{feature-name}/brief.md`, so the **feature name is already confirmed and equals `$ARGUMENTS`**. This skill does **not** create branches or worktrees: feature branches are supplied by the Claude Code (harness) worktree feature. When the current branch is the repository's default branch, **STOP** and ask the developer to re-run inside the harness worktree (a non-default working branch). Before anything else it merges the latest remote default branch into the current branch (Step 0.5). Otherwise (already on a non-default branch), it:
 1. Initializes the spec via `kiro-spec-init` (consumes the existing brief.md, skips clarification),
 2. Runs `kiro-spec-requirements` (best-effort draft; never blocks on user input),
 3. Runs `kiro-validate-gap` (gap analysis written to `research.md`),
 4. Commits the generated spec to the current branch **without pushing**, and
 5. Runs `kiro-requirements-discussion` **interactively** to refine the requirements.
 
-For multi-spec generation, use `/kiro-spec-batch`. This skill stops **before** design (`/kiro-spec-design`).
+For multi-spec generation, use `/kiro-spec-batch`. This skill stops **before** design (`/kiro-design`).
 
 This skill acts as an **orchestrator**. The controller (main context) performs deterministic, state-sensitive orchestration that cannot be safely delegated — portable-context resolution, the precondition gate, the default-branch guard, the initial commit — **plus** the interactive requirements discussion, which is inherently conversational and therefore runs inline in the controller (a subagent cannot talk to the developer). All other heavy work (spec initialization, requirements research and review gate, and gap analysis) is **delegated to a single non-interactive subagent** via the Agent tool so the controller context stays small. That subagent never interacts with the user; any genuine clarification is recorded as an OPEN QUESTION and **carried forward to the discussion phase** — it is never asked before then.
 
@@ -27,7 +27,7 @@ This skill is designed to be **portable across repositories**. It does not hard-
 - **Resolve the report language** from `{specs-root}/{feature-name}/spec.json` (`language` field). If `spec.json` does not exist yet (before Step 3), fall back to the language of the user's input (default `ja` for this repository). Use this same language for the discussion phase and the final Output Description.
 - This applies to ALL developer-facing text emitted by the controller: orchestration progress narration ("dispatching subagent", "verifying outputs", "committing spec"), warnings, and the entire interactive discussion in Step 6.
 - The Step 3 **subagent prompt itself stays in English** (it is internal instruction, not user-facing). Translate only the controller's own narration and the discussion you conduct with the developer.
-- **No questions before the discussion phase.** The controller does NOT ask the developer any question during Steps 0–5. The first (and only) interactive phase is Step 6 (requirements discussion). Conduct Step 6 as **free-form conversational chat** (自由応答) — present one topic at a time and await the developer's natural-language reply; prefer plain conversational turns over structured `AskUserQuestion` widgets, reserving the latter only for a strictly constrained either/or choice.
+- **No questions before the discussion phase.** The controller does NOT ask the developer any question during Steps 0–5. The first (and only) interactive phase is Step 6 (requirements discussion). Conduct Step 6 as **free-form conversational chat** (自由応答) — present the spec's purpose with a concrete example plus ALL agenda topics at once, each with a recommended option and rationale; then await the developer's natural-language reply (bulk approval confirms every topic as recommended; naming specific topics confirms the rest as recommended and discusses only the named ones, one at a time); prefer plain conversational turns over structured `AskUserQuestion` widgets, reserving the latter only for a strictly constrained either/or choice.
 - `$ARGUMENTS` is the **confirmed kiro feature name** produced by `/kiro-discovery` (it matches the existing directory `{specs-root}/{feature-name}/`, which already contains `brief.md`). Pass it **verbatim** as the first parameter of `kiro-spec-init`, `kiro-spec-requirements`, `kiro-validate-gap`, and `kiro-requirements-discussion`. Do NOT ask clarifying questions or re-derive a name in this wrapper.
 - This skill does not derive, create, or switch branches. It operates on whatever branch the harness worktree provides; the only branch-related decision is the default-branch guard in Step 2 (STOP vs. proceed).
 
@@ -59,6 +59,15 @@ Resolve these four values once, in order. Each has a single deterministic outcom
 
    Record `{default-branch}` as a single concrete name before proceeding. Do not re-evaluate it later.
 
+### Step 0.5: Sync with the remote default branch (before anything else)
+Merge the latest `{remote}/{default-branch}` into the current branch first, so the precondition gate and every later phase see what other sessions have already merged (prevents "forgot to pull" accidents such as a missing `brief.md` or a stale spec inventory).
+1. If `{remote}` is none, warn once and skip this step.
+2. `git fetch {remote}`. If it fails, STOP and report the error (do not continue on a possibly stale base).
+3. If the current branch equals `{default-branch}`: `git merge --ff-only {remote}/{default-branch}` (Step 2 will STOP afterwards anyway).
+   Otherwise: `git merge --no-edit {remote}/{default-branch}`.
+4. If the merge fails (conflict, diverged default branch, or uncommitted changes in the way): run `git merge --abort` when a merge is in progress, then STOP and report the cause and the conflicting files. Never resolve conflicts silently or discard local changes.
+5. Report the result in one line (already up to date / merged N commits), then proceed.
+
 ### Step 1: Verify post-discovery precondition (hard gate)
 This skill is deterministic about its precondition: the spec folder created by `/kiro-discovery` MUST already exist.
 1. Treat `$ARGUMENTS` as the confirmed feature name. Verify the spec folder and discovery brief exist:
@@ -81,7 +90,7 @@ This skill never creates branches or worktrees — the feature branch is supplie
    - Do NOT create a branch, do NOT run init/requirements/gap/discussion, do NOT commit, do NOT push.
    - Report that `/kiro-start` does not run on the default branch (`{default-branch}`): spec initialization must happen on a non-default working branch. Ask the developer to re-run `/kiro-start {feature-name}` inside the Claude Code harness worktree (a non-default working branch). The discovery artifacts (`brief.md`) remain intact for the re-run.
 3. **If `$branch` does NOT equal `{default-branch}`:**
-   - Proceed directly to the spec initialization phase (Step 3) on the current branch. Do not create or switch branches, do not pull, do not push.
+   - Proceed directly to the spec initialization phase (Step 3) on the current branch. Do not create or switch branches, do not push (the remote default branch was already merged in Step 0.5).
 
 ### Step 3: Delegate spec init + requirements + gap analysis to a subagent (orchestration)
 Dispatch **one** non-interactive subagent via the Agent tool to perform the entire heavy phase (init → requirements → gap analysis) so the controller context stays lightweight. Pass the resolved values from Step 0 (`{specs-root}`, `{skill-base}`, `{feature-name}` = `$ARGUMENTS`) into the prompt. If `kiro-validate-gap` was reported missing in Step 0, drop step 4 from the prompt and note that gap analysis is skipped.
@@ -141,7 +150,7 @@ This is the **only** interactive phase. Run `kiro-requirements-discussion` **inl
 1. Read `{skill-base}/kiro-requirements-discussion/SKILL.md` and follow it, passing `{feature-name}` (= `$ARGUMENTS`) verbatim.
 2. **Gap-analysis source mapping:** `kiro-validate-gap` wrote the gap analysis to `{specs-root}/{feature-name}/research.md`. `kiro-requirements-discussion` refers to the gap analysis as `gap-analysis.md`; treat **`research.md` as that gap-analysis input**. Load `research.md` for the discussion's context (Phase 1) instead of failing on a missing `gap-analysis.md`. If `research.md` is also absent (gap skipped), proceed with requirements only, per the discussion skill's fallback.
 3. **Seed the discussion with the OPEN QUESTIONS** retained from Step 4 — add them as Category C (developer-confirmation) topics so the assumptions drafted by the subagent are explicitly confirmed or revised.
-4. **Conduct it as free-form conversational chat** in the spec's language: present one topic at a time (per the discussion skill's Phase 6 — topic number/total, the referenced requirement, the problem, options, and a recommendation), then await the developer's natural-language reply. Prefer plain conversation over `AskUserQuestion` widgets.
+4. **Conduct it as free-form conversational chat** in the spec's language: first present the spec's purpose (with a concrete example or code) and the full agenda list, every topic carrying a recommended option and rationale (per the discussion skill's Phase 3); then await the developer's natural-language reply and confirm per its Phase 4 — bulk approval confirms all topics as recommended, and naming specific topics confirms the unnamed ones as recommended and discusses only the named ones, one at a time. Prefer plain conversation over `AskUserQuestion` widgets.
 5. Let the discussion skill apply its own edits and commits per its commit conventions (`docs({feature}): ...`). Do **not** push.
 6. When the discussion completes (all issues processed), proceed to the Output Description.
 
@@ -171,7 +180,7 @@ Provide output in the language specified in `spec.json` with the following struc
 5. **Requirements Status**: Confirm `requirements.md` was generated for `{feature-name}` and the subagent's automated review gate passed
 6. **Gap Analysis Status**: Confirm `research.md` was produced (or note it was skipped)
 7. **Discussion Status**: Summarize the requirements discussion outcome — counts of obvious fixes applied (Category A), items deferred to design (Category B), and developer-confirmed resolutions (Category C); or note the discussion was skipped
-8. **Next Step**: Command block showing `/kiro-spec-design <feature-name>` (or `/kiro-spec-design <feature-name> -y` to auto-approve requirements). Gap analysis and the requirements discussion are already complete.
+8. **Next Step**: Command block showing `/kiro-design <feature-name>`. Gap analysis and the requirements discussion are already complete.
 
 **Format Requirements**:
 - Use Markdown headings (##, ###)

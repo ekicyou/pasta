@@ -99,10 +99,10 @@
 | CONFIG.actor→STORE.actors初期化       | `config_actors_initialization_test.rs`                            | ✅ 完了 | 8テスト（pasta.tomlアクター設定）                                |
 | SHIORIレスポンスビルダー              | `shiori_res_test.rs`                                              | ✅ 完了 | 14テスト                                                         |
 | SHIORIイベントディスパッチ            | `shiori_event_dispatch_test.rs`<br>`shiori_event_handler_test.rs` | ✅ 完了 | 27テスト（2ファイルに分割）                                      |
-| SHIORI_ACT さくらスクリプト生成       | `shiori_act_test.lua`                                             | ✅ 完了 | 58テスト（ファイル全体実測。act-token-grouping-fix のバイト比較 13 件を含む） |
+| SHIORI_ACT さくらスクリプト生成       | `shiori_act_test.lua`                                             | ✅ 完了 | 61テスト（ファイル全体実測。act-token-grouping-fix のバイト比較 13 件を含む） |
 | ACT トークンバッファ（親クラス）      | `act_test.lua`                                                    | ✅ 完了 | 37テスト（act-token-buffer-refactor、未登録アクターの set_spot 無視を追加）                            |
 | ACT トークングループ化                | `act_grouping_test.lua`                                           | ✅ 完了 | 29テスト（actor-talk-grouping、sakura_script grouping、act-token-grouping-fix のグループの開閉 4 件） |
-| sakura_builder トークン変換           | `sakura_builder_test.lua`                                         | ✅ 完了 | 52テスト（ファイル全体実測 — スポット/sakura_script/choice/string-buffer 系を含む） |
+| sakura_builder トークン変換           | `sakura_builder_test.lua`                                         | ✅ 完了 | 121テスト（ファイル全体実測 — スポット/sakura_script/choice/string-buffer 系、選択肢の行の配置を含む） |
 | RuntimeConfig libs配列                | `runtime_test.rs`（外部化）                                       | ✅ 完了 | 17テスト（外部化済み）                                           |
 | LuaConfig TOML設定                    | `loader_config_test.rs`（外部化）                                 | ✅ 完了 | 6テスト（外部化済み）                                            |
 | さくらスクリプトウェイト挿入          | `sakura_script_basic_test.rs`<br>`sakura_script_output_test.rs`   | ✅ 完了 | 22テスト（2ファイルに分割）                                      |
@@ -131,9 +131,9 @@
 | PastaLuaRuntime 公開 API・@pasta_log 境界 | `runtime_api_test.rs`                                         | ✅ 完了 | 20+2+2テスト（review-improvement-loop 3.16〜3.18 — exec_file/exec_named/register_module/from_loader/@pasta_config 変換・深さゲート回帰・深さ境界ペア） |
 | @pasta_log スタックレベル検証         | `log_stack_level_test.rs`                                         | ✅ 完了 | 2テスト（lua-logging）                                           |
 | スポット位置永続化（STORE連携）       | `persist_spot_position_test.lua`                                  | ✅ 完了 | 8テスト（persist-spot-position）                                 |
-| sakura_builder スポット処理           | `sakura_builder_test.lua`                                         | ✅ 完了 | スポット切替検証（上記 52 テストに含む）                         |
-| sakura_builder sakura_script処理      | `sakura_builder_test.lua`                                         | ✅ 完了 | act-sakura-script-method 検証（上記 52 テストに含む）            |
-| 選択肢さくらスクリプト変換            | `sakura_builder_test.lua`                                         | ✅ 完了 | choice/choice_timeoutトークン→\q[],\![set,choicetimeout]変換（上記 52 テストに含む） |
+| sakura_builder スポット処理           | `sakura_builder_test.lua`                                         | ✅ 完了 | スポット切替検証（上記 121 テストに含む）                         |
+| sakura_builder sakura_script処理      | `sakura_builder_test.lua`                                         | ✅ 完了 | act-sakura-script-method 検証（上記 121 テストに含む）            |
+| 選択肢さくらスクリプト変換            | `sakura_builder_test.lua`                                         | ✅ 完了 | choice/choice_timeoutトークン→\q[],\![set,choicetimeout]変換（上記 121 テストに含む） |
 | Action::SakuraScript アクター紐付け   | `snapshot_test.rs`                                                | ✅ 完了 | 1スナップショット（act-sakura-script-method）                    |
 | Luaパススルー（init.*拒否）           | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（lua-passthrough）                                       |
 | Luaパススルー（.lua検出・コピー）     | `lua_passthrough_test.rs`                                         | ✅ 完了 | 3テスト（lua-passthrough）                                       |
@@ -148,6 +148,7 @@
 | OnChoiceSelectEx 自動ルーティング     | `choice_select_test.lua`（Luaテストスイート）                     | ✅ 完了 | 選択肢コールバック→シーン自動解決（Reference2 を最初の探索範囲に使い、不明・無しは直前のグローバルシーンへ。call-execution-correctness 追加3） |
 | Call の文脈の復元・失敗表記・動的キー | `act_call_restore_test.lua`                                       | ✅ 完了 | 36テスト（`act:restore_scene`・`act:call_restore`・`act:failure` とさくらスクリプトまでの出力（スコープ切替をはさむ位置と段落区切りの改行の位置を含む。失敗表記にウェイトが入らないこと）・`act:call_key` の値ごとの判定・`act:call` の失敗の分岐・式の関数呼び出し／`＠＊関数`／単語の関数ハンドラの後の文脈）（call-execution-correctness） |
 | 選択肢の探索範囲（`\q` 第 3 引数）   | `act_choice_test.lua`<br>`sakura_builder_test.lua`                | ✅ 完了 | 3＋5テスト（選択肢トークンに出したグローバルシーン名を載せる・`\q[表示,ジャンプ先,探索範囲]` の出力とエスケープ・On／script: では付けない）（call-execution-correctness） |
+| 選択肢の行の配置と `choice_newlines`   | `sakura_builder_test.lua`<br>`shiori_act_test.lua`<br>`loader/config_defaults_test.rs`<br>`loader/startup_test.rs` | ✅ 完了 | 15＋2＋Rust 側（選択肢の前後の区切りの完全一致・`act:choice`・台詞に書いた `\c` を消去に数える・既定値の 3 者一致・`pasta.toml` の値が出力へ届く）（choice-line-layout） |
 
 ### 2.5 LSP層テスト（Language Server）
 
@@ -298,6 +299,7 @@
 - **ビルド成功**: 両アーキテクチャで pasta.dll 生成
 - **テスト全パス**: x64 環境で全テスト実行
 - **アーティファクト保存**: 7日間保持
+- **リリースの補助スクリプト**: job `release-scripts` が `.github/scripts/release/release-scripts-test.ps1` を実行する（一時の git リポジトリで `release-notes.ps1`・`verify-tag.ps1`・定型コマンド D を動かす 9 項目。手元でも `pwsh -NoProfile -File` の 1 行で動く）（release-notes-highlights）
 
 ---
 
