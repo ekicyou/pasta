@@ -16,7 +16,7 @@ Start a single specification end-to-end **after `/kiro-discovery`**, taking it f
 4. Commits the generated spec to the current branch **without pushing**, and
 5. Runs `kiro-requirements-discussion` **interactively** to refine the requirements.
 
-For multi-spec generation, use `/kiro-spec-batch`. This skill stops **before** design (`/kiro-spec-design`).
+For multi-spec generation, use `/kiro-spec-batch`. This skill stops **before** design (`/kiro-design`).
 
 This skill acts as an **orchestrator**. The controller (main context) performs deterministic, state-sensitive orchestration that cannot be safely delegated — portable-context resolution, the precondition gate, the default-branch guard, the initial commit — **plus** the interactive requirements discussion, which is inherently conversational and therefore runs inline in the controller (a subagent cannot talk to the developer). All other heavy work (spec initialization, requirements research and review gate, and gap analysis) is **delegated to a single non-interactive subagent** via the Agent tool so the controller context stays small. That subagent never interacts with the user; any genuine clarification is recorded as an OPEN QUESTION and **carried forward to the discussion phase** — it is never asked before then.
 
@@ -180,7 +180,7 @@ Provide output in the language specified in `spec.json` with the following struc
 5. **Requirements Status**: Confirm `requirements.md` was generated for `{feature-name}` and the subagent's automated review gate passed
 6. **Gap Analysis Status**: Confirm `research.md` was produced (or note it was skipped)
 7. **Discussion Status**: Summarize the requirements discussion outcome — counts of obvious fixes applied (Category A), items deferred to design (Category B), and developer-confirmed resolutions (Category C); or note the discussion was skipped
-8. **Next Step**: Command block showing `/kiro-spec-design <feature-name>` (or `/kiro-spec-design <feature-name> -y` to auto-approve requirements). Gap analysis and the requirements discussion are already complete.
+8. **Next Step**: Command block showing `/kiro-design <feature-name>`. Gap analysis and the requirements discussion are already complete.
 
 **Format Requirements**:
 - Use Markdown headings (##, ###)

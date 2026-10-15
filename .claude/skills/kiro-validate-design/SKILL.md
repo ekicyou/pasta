@@ -82,7 +82,7 @@ Provide output in the language specified in spec.json with:
 ## Safety & Fallback
 
 ### Error Scenarios
-- **Missing Design**: If design.md doesn't exist, stop with message: "Run `/kiro-spec-design {feature}` first to generate design document"
+- **Missing Design**: If design.md doesn't exist, stop with message: "Run `/kiro-design {feature}` first to generate design document"
 - **Design Not Generated**: If design phase not marked as generated in spec.json, warn but proceed with review
 - **Empty Steering Directory**: Warn user that project context is missing and may affect review quality
 - **Language Undefined**: Default to English (`en`) if spec.json doesn't specify language
@@ -96,7 +96,7 @@ Provide output in the language specified in spec.json with:
 
 **If Design Needs Revision (NO-GO Decision)**:
 - Address critical issues identified in review
-- Re-run `/kiro-spec-design {feature}` with improvements
+- Re-run `/kiro-design {feature}` with improvements
 - Re-validate with `/kiro-validate-design {feature}`
 
 **Note**: Design validation is recommended but optional. Quality review helps catch issues early.

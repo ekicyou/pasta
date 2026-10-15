@@ -1,6 +1,6 @@
 ---
 name: kiro-design-discussion
-description: 'Kiroワークフローの設計フェーズ完了後に、設計＋設計分析レポートを精査してイシューを収集・分類し、仕様の目的を具体例付きで説明したうえで全議案を推奨案付きで一括提示し、一括承認または指定議題の個別ディスカッションで設計を完成させるディスカッションスキル。USE FOR: 設計ディスカッション, design discussion, 設計レビュー, 設計分析レビュー, 設計精査, kiro design discussion, kiro review design, design review discussion, 設計確認, 設計修正, 設計フィードバック, discuss design, review design validation, design clarification. DO NOT USE FOR: 設計生成（kiro-spec-designを使用）, 設計バリデーション実行（kiro-validate-designを使用）, 要件ディスカッション（kiro-requirements-discussionを使用）, タスク生成（kiro-spec-tasksを使用）, 実装（kiro-spec-implを使用）.'
+description: 'Kiroワークフローの設計フェーズ完了後に、設計＋設計分析レポートを精査してイシューを収集・分類し、仕様の目的を具体例付きで説明したうえで全議案を推奨案付きで一括提示し、一括承認または指定議題の個別ディスカッションで設計を完成させるディスカッションスキル。USE FOR: 設計ディスカッション, design discussion, 設計レビュー, 設計分析レビュー, 設計精査, kiro design discussion, kiro review design, design review discussion, 設計確認, 設計修正, 設計フィードバック, discuss design, review design validation, design clarification. DO NOT USE FOR: 設計生成（kiro-designを使用）, 設計バリデーション実行（kiro-validate-designを使用）, 要件ディスカッション（kiro-requirements-discussionを使用）, タスク生成（kiro-spec-tasksを使用）, 実装（kiro-spec-implを使用）.'
 argument-hint: '<feature-name> — .kiro/specs/ 配下のフィーチャー名'
 ---
 
@@ -160,7 +160,7 @@ design.md を中心に、関連ドキュメントとの整合性も含めて精�
 
 ## エラーハンドリング
 
-- **design.md 未生成**: 「先に `/kiro-spec-design {feature}` を実行してください」と案内して停止
+- **design.md 未生成**: 「先に `/kiro-design {feature}` を実行してください」と案内して停止
 - **requirements.md 未生成**: 警告を出しつつ design.md のみで続行
 - **イシューなし**: Phase 3 の仕様の目的を提示したうえで「精査の結果、修正すべき点は見つかりませんでした。タスク分解に進めます」と即座に案内
 
