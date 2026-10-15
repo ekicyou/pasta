@@ -1,7 +1,7 @@
 ---
 name: kiro-discovery
 description: Entry point for new work. Determines the best action path or work decomposition (update existing spec, create new spec, mixed decomposition, or no spec needed) and refines ideas through structured dialogue.
-allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion
+allowed-tools: Bash, Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion
 argument-hint: <idea-or-request>
 ---
 
@@ -14,6 +14,17 @@ argument-hint: <idea-or-request>
   - Output is an actionable next step (not just a description)
 
 ## Execution Steps
+
+### Step 0: Sync with the Remote Default Branch
+
+Before scanning, merge the latest remote default branch into the current branch so the specs inventory and roadmap reflect what other sessions have already merged (prevents "forgot to pull" accidents).
+
+1. **Remote**: `origin` if present, else the only remote. If there is no remote (or several without `origin`), warn once and skip this step.
+2. **Default branch**: `git symbolic-ref --quiet --short refs/remotes/{remote}/HEAD` minus the `{remote}/` prefix; if empty, `main`.
+3. `git fetch {remote}`. If it fails, STOP and report the error (do not run discovery on a possibly stale base).
+4. If the current branch is the default branch: `git merge --ff-only {remote}/{default-branch}`. Otherwise: `git merge --no-edit {remote}/{default-branch}`.
+5. If the merge fails (conflict, diverged default branch, or uncommitted changes in the way): run `git merge --abort` when a merge is in progress, then STOP and report the cause and the conflicting files. Never resolve conflicts silently or discard local changes.
+6. Report the result in one line (already up to date / merged N commits), then proceed.
 
 ### Step 1: Lightweight Scan
 

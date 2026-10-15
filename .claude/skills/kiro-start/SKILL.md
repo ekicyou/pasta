@@ -9,7 +9,7 @@ argument-hint: <feature-name>
 
 <instructions>
 ## Core Task
-Start a single specification end-to-end **after `/kiro-discovery`**, taking it from init through requirements, gap analysis, and an interactive requirements discussion. Discovery has already created `{specs-root}/{feature-name}/brief.md`, so the **feature name is already confirmed and equals `$ARGUMENTS`**. This skill does **not** create branches or worktrees: feature branches are supplied by the Claude Code (harness) worktree feature. When the current branch is the repository's default branch, **STOP** and ask the developer to re-run inside the harness worktree (a non-default working branch). Otherwise (already on a non-default branch), it:
+Start a single specification end-to-end **after `/kiro-discovery`**, taking it from init through requirements, gap analysis, and an interactive requirements discussion. Discovery has already created `{specs-root}/{feature-name}/brief.md`, so the **feature name is already confirmed and equals `$ARGUMENTS`**. This skill does **not** create branches or worktrees: feature branches are supplied by the Claude Code (harness) worktree feature. When the current branch is the repository's default branch, **STOP** and ask the developer to re-run inside the harness worktree (a non-default working branch). Before anything else it merges the latest remote default branch into the current branch (Step 0.5). Otherwise (already on a non-default branch), it:
 1. Initializes the spec via `kiro-spec-init` (consumes the existing brief.md, skips clarification),
 2. Runs `kiro-spec-requirements` (best-effort draft; never blocks on user input),
 3. Runs `kiro-validate-gap` (gap analysis written to `research.md`),
@@ -59,6 +59,15 @@ Resolve these four values once, in order. Each has a single deterministic outcom
 
    Record `{default-branch}` as a single concrete name before proceeding. Do not re-evaluate it later.
 
+### Step 0.5: Sync with the remote default branch (before anything else)
+Merge the latest `{remote}/{default-branch}` into the current branch first, so the precondition gate and every later phase see what other sessions have already merged (prevents "forgot to pull" accidents such as a missing `brief.md` or a stale spec inventory).
+1. If `{remote}` is none, warn once and skip this step.
+2. `git fetch {remote}`. If it fails, STOP and report the error (do not continue on a possibly stale base).
+3. If the current branch equals `{default-branch}`: `git merge --ff-only {remote}/{default-branch}` (Step 2 will STOP afterwards anyway).
+   Otherwise: `git merge --no-edit {remote}/{default-branch}`.
+4. If the merge fails (conflict, diverged default branch, or uncommitted changes in the way): run `git merge --abort` when a merge is in progress, then STOP and report the cause and the conflicting files. Never resolve conflicts silently or discard local changes.
+5. Report the result in one line (already up to date / merged N commits), then proceed.
+
 ### Step 1: Verify post-discovery precondition (hard gate)
 This skill is deterministic about its precondition: the spec folder created by `/kiro-discovery` MUST already exist.
 1. Treat `$ARGUMENTS` as the confirmed feature name. Verify the spec folder and discovery brief exist:
@@ -81,7 +90,7 @@ This skill never creates branches or worktrees — the feature branch is supplie
    - Do NOT create a branch, do NOT run init/requirements/gap/discussion, do NOT commit, do NOT push.
    - Report that `/kiro-start` does not run on the default branch (`{default-branch}`): spec initialization must happen on a non-default working branch. Ask the developer to re-run `/kiro-start {feature-name}` inside the Claude Code harness worktree (a non-default working branch). The discovery artifacts (`brief.md`) remain intact for the re-run.
 3. **If `$branch` does NOT equal `{default-branch}`:**
-   - Proceed directly to the spec initialization phase (Step 3) on the current branch. Do not create or switch branches, do not pull, do not push.
+   - Proceed directly to the spec initialization phase (Step 3) on the current branch. Do not create or switch branches, do not push (the remote default branch was already merged in Step 0.5).
 
 ### Step 3: Delegate spec init + requirements + gap analysis to a subagent (orchestration)
 Dispatch **one** non-interactive subagent via the Agent tool to perform the entire heavy phase (init → requirements → gap analysis) so the controller context stays lightweight. Pass the resolved values from Step 0 (`{specs-root}`, `{skill-base}`, `{feature-name}` = `$ARGUMENTS`) into the prompt. If `kiro-validate-gap` was reported missing in Step 0, drop step 4 from the prompt and note that gap analysis is skipped.
