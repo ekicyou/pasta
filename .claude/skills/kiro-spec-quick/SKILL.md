@@ -247,7 +247,7 @@ Next Steps:
 **Sanity Review Failed**:
 - Stop workflow
 - Report the exact contradiction, missing prerequisite, or task-plan issue
-- Suggest targeted follow-up with `/kiro-spec-design {feature}`, `/kiro-spec-tasks {feature}`, or manual edits depending on the finding
+- Suggest targeted follow-up with `/kiro-design {feature}`, `/kiro-spec-tasks {feature}`, or manual edits depending on the finding
 
 **User Cancellation** (Interactive Mode):
 - Stop gracefully

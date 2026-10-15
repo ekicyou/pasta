@@ -1,6 +1,6 @@
 ---
 name: kiro-requirements-discussion
-description: 'Kiroワークフローの要件定義フェーズ完了後に、要件＋ギャップ分析を精査してイシューを収集・分類し、仕様の目的を具体例付きで説明したうえで全議案を推奨案付きで一括提示し、一括承認または指定議題の個別ディスカッションで要件を完成させるディスカッションスキル。USE FOR: 要件ディスカッション, requirements discussion, 要件レビュー, ギャップ分析レビュー, 要件精査, 設計判断収集, kiro discussion, kiro review requirements, spec review, 要件確認, 要件修正, 要件フィードバック, discuss requirements, review gap analysis, requirement clarification. DO NOT USE FOR: 要件生成（kiro-spec-requirementsを使用）, ギャップ分析実行（kiro-validate-gapを使用）, 設計ドキュメント生成（kiro-spec-designを使用）, 実装（kiro-spec-implを使用）.'
+description: 'Kiroワークフローの要件定義フェーズ完了後に、要件＋ギャップ分析を精査してイシューを収集・分類し、仕様の目的を具体例付きで説明したうえで全議案を推奨案付きで一括提示し、一括承認または指定議題の個別ディスカッションで要件を完成させるディスカッションスキル。USE FOR: 要件ディスカッション, requirements discussion, 要件レビュー, ギャップ分析レビュー, 要件精査, 設計判断収集, kiro discussion, kiro review requirements, spec review, 要件確認, 要件修正, 要件フィードバック, discuss requirements, review gap analysis, requirement clarification. DO NOT USE FOR: 要件生成（kiro-spec-requirementsを使用）, ギャップ分析実行（kiro-validate-gapを使用）, 設計ドキュメント生成（kiro-designを使用）, 実装（kiro-spec-implを使用）.'
 argument-hint: '<feature-name> — .kiro/specs/ 配下のフィーチャー名'
 ---
 

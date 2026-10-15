@@ -267,7 +267,7 @@ When a session titled **kiro-watch** (not archived) appears in the session list 
 
 **Tasks Not Approved or Missing Spec Files**:
 - **Stop Execution**: All spec files must exist and tasks must be approved
-- **Suggested Action**: "Complete previous phases: `/kiro-spec-requirements`, `/kiro-spec-design`, `/kiro-spec-tasks`"
+- **Suggested Action**: "Complete previous phases: `/kiro-spec-requirements`, `/kiro-design`, `/kiro-spec-tasks`"
 
 **Test Failures**:
 - **Stop Implementation**: Fix failing tests before continuing
