@@ -83,6 +83,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 完了 | hello-pasta-shell-art | Fable | 13（実績） | 2026-10-11 に完了 |
 | 完了 | manual-link-anchor-check | Opus | 8（実績） | 2026-10-11 に完了 |
 | 完了 | choice-line-layout | Opus | 12（実績） | 2026-10-11 に完了 |
+| 完了 | release-notes-highlights | Opus | 17（実績） | 2026-10-15 に完了（v0.3.8 のページも見どころの本文と 4 つの添付に直した） |
 | 開発中 | manual-print-media-refs | Opus | 2〜4 | 始めている |
 | 1（高優先度） | touch-poke-shortcuts | Opus | 10〜13 | 今すぐ（2026-10-11 開発者の依頼で足し、高優先度に置いた。残りの spec より先に始める） |
 | 2 | boot-surface-without-dic | Fable | 3〜5（やる場合） | 今すぐ |
@@ -90,8 +91,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 4 | pasta-check-dic-validate | Fable | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
 | 5 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
 | 6 | getting-started-screenshots | Opus | 4〜6 | `boot-surface-without-dic` と `touch-poke-shortcuts` の後（最後に撮る。`hello-pasta-shell-art` と `choice-line-layout` は完了した） |
-| 7 | release-notes-highlights | Opus | 5〜8 | 今すぐ（2026-10-11 開発者の依頼で足した。リリースの実行中は main へ入れない） |
-| 8 | 0.4.0 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
+| 7 | 0.4.0 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
 並走するときの約束（「棚卸」のウェーブの約束に足す）:
 
@@ -368,7 +368,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）と、ガイ�
 - [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, scene-stage-attributes, novel-talk-flow, novel-checkpoint-rollback, novel-save-slots, shell-element-click, call-attribute-filter（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
 - [ ] touch-poke-shortcuts -- 撫で・つつきの反応を、決まった名前のシーン（`＊さわり反応女の子Head` → `＊さわり反応Head` → `＊さわり反応その他`。つつきは `つっつき反応`）で書けるようにする。時報と同じ段々のフォールバックで、各段の次に英字の名前（`OnTouch…`・`OnPoke…`・`…Other`）も探し、最後は今までどおり `＊OnMouseMove`・`＊OnMouseDoubleClick` を呼ぶ。撫での判定（トーク中は反応しない）を pasta が持つ。入門ガイドの 8・9 段目と hello-pasta の辞書を書き直す（2026-10-11 の discovery で起票。emo2 の実装を調べた。**高優先度**）。Dependencies: none（`getting-started-screenshots` は、この後に撮る）
-- [ ] release-notes-highlights -- リリースの本文を、注目に値する内容を Claudia（令嬢）の口調で紹介する文章にし、全件の詳しいリリースノートを Assets に添付する。見どころは版を上げるコミットで書き、無ければリリース CI が公開の前に止まる。spec 名を載せない（2026-10-11 の discovery で起票）。Dependencies: none（リリースの実行中は main へ入れない）
+- [x] release-notes-highlights -- リリースの本文を、注目に値する内容を Claudia（令嬢）の口調で紹介する文章にし、全件の詳しいリリースノートを Assets に添付する。見どころは版を上げるコミットで書き、無ければリリース CI が公開の前に止まる。spec 名を載せない（2026-10-11 の discovery で起票。2026-10-15 完了）。Dependencies: none（リリースの実行中は main へ入れない）
 
 ## Existing Spec Updates
 

@@ -47,6 +47,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 **完了仕様**:
 - ✅ **release-workflow** - リリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認）。手順は `release` スキル（`/release`）へ移した
+- ✅ **release-notes-highlights** - リリースの本文を、見どころ（`doc/release-notes/vX.Y.Z.md`）を Claudia の口調で紹介する文章にし、全件の詳しいリリースノートを Assets に添付する
 - ✅ **pasta-cue-dsl-extension** - キューコマンド行(`!`)のDSLパース機能追加
 - ✅ **release-workflow-dll-zip-fix** - リリースワークフローDLL ZIP修正
 - ✅ **yield-continuation-token** - `＞チェイントーク` / `＞yield` 継続トーク機能（GLOBAL テーブル L3 登録）
