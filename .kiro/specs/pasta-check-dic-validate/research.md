@@ -132,6 +132,7 @@
 ## 6. 規模とリスク
 
 - **規模: M（3〜7 日）〜 L 寄り**。新しいモジュール（入口・集め方・構文・モジュール名・シーン名・飛び先・出力）に `release` の段の追加、一致テスト、文書 4 か所と steering。brief の見積もり 10〜14 タスクと合う。トランスパイルの 3 つの誤りを範囲に入れる・機械向けの出力を足すと上の端を超える。
+- **規模の見直し（2026-10-16、OQ-6 で VSCode 拡張の診断を範囲に入れた後）: L**。共有の部品への切り出し・WASM の入口・`pasta_core` の WASM ビルド・拡張の側のファイル集めと診断の更新・VSIX のテスト・拡張の README で 5〜7 タスク増え、全体で 15〜20 タスクの見込み。
 - **リスク: 中**。技術は既知（`pasta_dsl`・`pasta_core` の再利用）。リスクは規則の一致（案 C のテストで抑える）と、飛び先の検査の注意の多さ（hello-pasta で `transfer_req_to_var` 9 件。組み込みの名前に SHIORI 用の act のメソッドを含めれば 0 件の見込み）、`release` の関門がリリース CI を止める可能性。
 
 ## 7. 設計への申し送り（Research Needed）
@@ -149,6 +150,12 @@
    - 組み込みの名前の一覧に SHIORI 用の act のメソッド（`pasta_scripts/pasta/shiori/act.lua`）を含める。
    - `pasta.toml` の `[loader]`・`[scene]` 以外のセクションは、`pasta.dll` が読み込みに失敗する誤りを誤りにする方針の中で、どこまで当てはまるかを列挙する（6 と同じ）。
    - 日本語の報告の文言と、マニュアルの「デバッグ」の部に足す章の、各報告の意味と直し方の対応。
+10. OQ-6 を「含める」に改めた結果、設計で決めること:
+   - 共有の検査の部品の置き場所（新しいクレートか、`pasta_dsl`・`pasta_core` の側か）と、`pasta_check`・`pasta_lsp` からの依存の向き。新しいクレートなら `release.yml` の公開の順と `-DependsOn` も。
+   - `pasta_core` を WASM にビルドできるようにする方法（`rand` の feature による切り離しか、`getrandom` の `wasm_js` か）。シーンのランダム選択の挙動は変えない。
+   - 拡張の側でのファイルの集め方。`pasta_patterns` の照合は Rust の側に置き、TypeScript に規則を写さない（拡張はファイルの一覧と中身を渡すだけにする、など）。
+   - 診断を更新するタイミング（保存・ファイルの増減・`pasta.toml` の保存）と、入力のたびの構文の診断との重複の消し方（Requirement 11.9）。
+   - 共有の部品の WASM ビルドを CI で確かめる方法と、VSIX のテスト（`editors/vscode/src/test/`）。
 
 ## 8. 未決事項の根拠（要件ディスカッションへ）
 
@@ -209,7 +216,13 @@
 
 ### OQ-6 エディタ（LSP）との共有
 
-- 仮置き: この spec ではエディタに診断を足さず、共有も要件にしない。
+- **確定（2026-10-16、個別に議論）**: 含める。検査を WASM にビルドできる共有の部品に置き、`pasta_check` と VSCode 拡張の両方から使う。拡張は保存のたびにゴースト全体を検査して診断を出す（requirements.md Requirement 11）。
+- **前の推奨の根拠の訂正**: 「規則を `pasta_core` へ移すとウェーブの約束（`loader/config/` に触らない）にぶつかる」は言い過ぎだった。共有の部品の中に規則を写し、案 C と同じく一致テストで守れば、`loader/config/` には触らない。roadmap の約束にも `pasta_lsp`・`editors/vscode` を触らないという項目は無い。
+- **議論のときに調べたこと**:
+  - `pasta_core` は今、WASM にビルドできない。`cargo check -p pasta_core --target wasm32-unknown-unknown` は、`rand` が引き込む `getrandom 0.4.3` の `compile_error!`（`wasm_js` の feature が要る）で失敗する。直し方は、`rand` を feature で切り離すか、WASM のときだけ `getrandom` の `wasm_js` を有効にするか。
+  - VSCode 拡張は LSP クライアントではなく、開いた文書の本文を WASM の `analyze(text)` に渡しているだけ（`editors/vscode/src/documentSync.ts` 133 行、`wasmBridge.ts`）。ゴースト全体の検査には、拡張の側で `pasta.toml` と辞書を集めて WASM に渡す新しい経路と、開いていないファイルの診断を更新する仕組みが要る。
+  - `pasta_lsp` のネイティブの経路（`server.rs`、tower-lsp）は今回の範囲の外。
+- 前の仮置き（参考）: この spec ではエディタに診断を足さず、共有も要件にしない。
 - 根拠:
   - `pasta_lsp` は `pasta_dsl` だけに依存し、WASM にビルドする（`crates/pasta_lsp/Cargo.toml`）。
   - 診断は構文だけ（`crates/pasta_lsp/src/analysis/mod.rs` 57〜77 行）。

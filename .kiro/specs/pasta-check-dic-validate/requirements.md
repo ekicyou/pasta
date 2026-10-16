@@ -9,7 +9,7 @@
 
 ## Introduction
 
-ゴーストの作者が、SSP を起動せずに、`pasta_check` のコマンド 1 つでゴーストの辞書（`.pasta`）を検査できるようにする。検査は、ゴーストを読み込んだときに `pasta.dll` が失敗する書き方（構文エラー・`pasta.toml` の誤りなど）を先に見つけることと、読み込みは通るが作者の意図とずれやすい書き方（名前の重なり・飛び先の無い参照）を知らせることの 2 つを受け持つ。見つけたものは「誤り」と「注意」に分け、誤りが 1 つでもあれば失敗の終了コードで終わる（作成ツールは問題があれば止める）。想定していない書き方を意図の推測で救う規則は足さず、読むだけでは決まらないものは決まらないものとして扱う（書いたとおりに読む）。
+ゴーストの作者が、SSP を起動せずに、`pasta_check` のコマンド 1 つでゴーストの辞書（`.pasta`）を検査できるようにする。検査は、ゴーストを読み込んだときに `pasta.dll` が失敗する書き方（構文エラー・`pasta.toml` の誤りなど）を先に見つけることと、読み込みは通るが作者の意図とずれやすい書き方（名前の重なり・飛び先の無い参照）を知らせることの 2 つを受け持つ。見つけたものは「誤り」と「注意」に分け、誤りが 1 つでもあれば失敗の終了コードで終わる（作成ツールは問題があれば止める）。同じ検査を VSCode 拡張にも載せ、作者が辞書を保存するたびに、同じ誤りと注意をエディタの診断として示す。想定していない書き方を意図の推測で救う規則は足さず、読むだけでは決まらないものは決まらないものとして扱う（書いたとおりに読む）。
 
 各要件の注記「確定（OQ-n）」は、要件ディスカッション（2026-10-16）で確定した事項である。確定した事項の一覧は末尾にある。
 
@@ -35,15 +35,18 @@
   - 辞書の集め方（`pasta.toml` の `[loader]` `pasta_patterns`）と、別名表（`[scene.alias]`）を読むこと
   - 検査の項目: 構文エラー、モジュール名の重なり、照合用の名前に揃えた後のシーン名の重なり、静的な飛び先の無い Call・選択肢行
   - `pasta_check release` との関係（`release` が配布する内容を検査し、誤りがあれば nar を作らない。OQ-3）
-  - テスト（項目ごとのテストと、コマンドを実際に走らせるテスト）
-  - 文書: マニュアルの新しいページ、`reference/pasta-toml.md` の「pasta_check は別名表を読まない」の書き換えとスキル references の再生成、`crates/pasta_check/README.md`、スキル `pasta-check`、steering
+  - 検査を WASM にビルドできる共有の部品に置き、`pasta_check` と VSCode 拡張の両方から使うこと（OQ-6）
+  - VSCode 拡張への診断（ゴースト全体の検査の結果を、保存のたびに表示する。OQ-6）
+  - テスト（項目ごとのテストと、コマンドを実際に走らせるテスト、共有の部品の WASM ビルド、VSCode 拡張の診断のテスト）
+  - 文書: マニュアルの新しいページ、`reference/pasta-toml.md` の「pasta_check は別名表を読まない」の書き換えとスキル references の再生成、`crates/pasta_check/README.md`、VSCode 拡張の README、スキル `pasta-check`、steering
 - **Out of scope**:
   - 実行時の失敗の見せ方（`failure-output-unification` が持つ）
   - `pasta.dll` が読み込みのときに出す警告を足すこと。知らせるのは検査コマンドの側だけ
   - 台詞の中のシーンリンク `＠？シーン名` の記法とその検査（`scene-anchor-link` と、後から入る側が足す）
   - Lua のスクリプト（`scripts/`・辞書の Lua ブロック・辞書モジュールの `.lua`）の中身の検査
   - 単語参照（`＠単語`）の参照先の検査（brief の範囲に無い）
-  - エディタ（LSP・VSCode 拡張）に診断を足すこと、検査の規則をエディタと共有できる形（WASM にビルドできる部品）に置くこと（OQ-6）
+  - VSCode 拡張以外のエディタへの診断と、`pasta_lsp` のネイティブの言語サーバー（tower-lsp の経路）へのゴースト全体の診断の追加（VSCode 拡張は WASM の経路を使う。OQ-6）
+  - 入力のたびに更新する、今の構文の診断の挙動を変えること
   - 機械向けの出力の形（JSON など）（OQ-5）
   - 代用品の置き換え（`.github/workflows/manual.yml` の回避、`tutorial_stages_test.rs` の手作りの検査）。コマンドが入った後の後片付けにする
   - `release` の 5 段の中身（同梱バルーン・`updates.txt`・nar の作り方）
@@ -53,7 +56,7 @@
   - 後から入る spec（`scene-anchor-link`・`cue-command-runtime`・`call-attribute-filter`・`novel-talk-flow`）が、検査の項目を足す。この spec は、項目を足しても既存の項目の報告・誤りと注意の区別・終了コードの規則が変わらない作りにしておく。
   - `failure-output-unification` は実行時の失敗を受け持ち、この spec は実行する前に見つける側を受け持つ。実行時の失敗表記・ログの形には依存しない。
   - hello-pasta の配布物（`crates/pasta_sample_ghost/release.ps1`・リリース CI）は `pasta_check release` を通るので、`release` が検査を関門にすると、hello-pasta の辞書が誤りなしで通ることが前提になる。
-  - 今のウェーブの約束（`.kiro/steering/roadmap.md`）により、`pasta_lua` の `loader/config/`・`pasta/act.lua`・`actor.lua`・`word.lua` は触らない。`Cargo.lock`・ルートの `Cargo.toml`・`release.yml` の `pasta_check` の公開の段は、この spec だけが触る。
+  - 今のウェーブの約束（`.kiro/steering/roadmap.md`）により、`pasta_lua` の `loader/config/`・`pasta/act.lua`・`actor.lua`・`word.lua` は触らない。`Cargo.lock`・ルートの `Cargo.toml`・`release.yml` の `pasta_check` の公開の段は、この spec だけが触る。共有の部品を WASM にビルドできるようにするため、`pasta_core` の依存（`rand` が引き込む `getrandom`）の扱いを変える場合も、シーンのランダム選択の挙動は変えない。
 
 ## Requirements
 
@@ -203,21 +206,43 @@
 1. The documentation shall 利用者マニュアル（`book/src/`）の「デバッグ」の部に、検査コマンドの使い方・検査の項目・誤りと注意の区別・各報告の意味と直し方・読むだけでは決まらない範囲・終了コード・`release` との関係を載せたページを持つ。
 2. When 検査コマンドが入った, the documentation shall マニュアル `reference/pasta-toml.md` の「pasta_check は別名表を読まない」という記述を、検査コマンドが別名表と `pasta_patterns` を読むことに合わせて直し、スキル references を再生成する。
 3. When 検査コマンドが入った, the documentation shall `crates/pasta_check/README.md` とスキル `pasta-check` に、検査コマンドの使い方と `release` が検査を関門にすることを載せる。
-4. When 検査コマンドが入った, the documentation shall steering（`tech.md`・`structure.md` の `pasta_check` の役割と依存）を実態に合わせる。
+4. When 検査コマンドが入った, the documentation shall steering（`tech.md`・`structure.md` の `pasta_check`・共有の検査の部品・`pasta_lsp`・VSCode 拡張の役割と依存）を実態に合わせる。
+6. When エディタの診断が入った, the documentation shall VSCode 拡張の README（`editors/vscode/README.md`）と、マニュアルの「デバッグ」の部の検査コマンドの章に、エディタで誤りと注意が表示されることと、表示される時（保存のとき）を載せる。
 5. When マニュアルに章を足した, the documentation shall 目次（`SUMMARY.md`）と、章の数を決め打ちしている検査（今は 60 章）を合わせて直す。
 
 > 確定（OQ-8）: マニュアルには「デバッグ」の部に検査コマンドの章を 1 つ足す（書き間違いに困った作者が開く部のため）。`release` の詳しい説明は README とスキルに残し、章からはリンクだけにする。
 
+### Requirement 11: エディタの診断
+
+**Objective:** As a ゴーストの作者, I want VSCode で辞書を書いているときに、検査コマンドと同じ誤りと注意をその場で見たい, so that SSP を起動せず、コマンドも打たずに、保存するたびに書き間違いに気付ける
+
+#### Acceptance Criteria
+
+1. The 共有の検査の部品 shall WASM（`wasm32-unknown-unknown`）とネイティブの両方にビルドでき、`pasta_check` と VSCode 拡張の両方から使われる。
+2. The VSCode 拡張 shall 同じゴーストに対して、検査コマンドと同じ規則で、同じ誤りと注意を、同じ文言で報告する。
+3. When 作者が VSCode で `ghost/master` の配下の辞書ファイルを保存した, the VSCode 拡張 shall そのゴーストの全体を検査し、誤りと注意を、該当するファイル・行の診断として表示する。
+4. The VSCode 拡張 shall 誤りを Error、注意を Warning の重さで表示する。
+5. The VSCode 拡張 shall 開いていない辞書ファイル・`pasta.toml` の誤りと注意も、問題パネルに表示する。
+6. When 辞書ファイルの追加・削除・名前の変更、または `pasta.toml` の保存があった, the VSCode 拡張 shall そのゴーストの検査をやり直して診断を更新する。
+7. When 前の検査で報告した問題が、やり直した検査で報告されなくなった, the VSCode 拡張 shall その問題の診断を消す。
+8. The VSCode 拡張 shall 検査コマンドと同じ辞書ファイルの集合（`pasta.toml` の `pasta_patterns` に従う。Requirement 2）を検査する。
+9. The VSCode 拡張 shall 同じ問題を、入力のたびの構文の診断とゴースト全体の検査の診断とで二重に表示しない。
+10. If 保存した辞書ファイルが `ghost/master` の配下に無い, the VSCode 拡張 shall ゴースト全体の検査をせず、今の構文の診断だけを続ける。
+11. The VSCode 拡張 shall 検査に、`pasta_check` のインストール・SSP の起動・ネットワークへの接続を要しない。
+12. While 拡張の WASM が読み込めていない（今の TextMate だけの動作）, the VSCode 拡張 shall ゴースト全体の検査をせず、拡張の起動を失敗させない。
+
+> 確定（OQ-6）: 検査を WASM にビルドできる共有の部品に置き、`pasta_check` と VSCode 拡張が同じ部品を呼ぶ。規則が CLI とエディタの 2 か所に分かれて食い違うことを、最初から防ぐため。表示は保存のときに限り、入力のたびの更新は今の構文の診断に任せる。共有の部品の置き場所（新しいクレートか、既存のクレートか）、`pasta_core` を WASM にビルドできるようにする方法、拡張の側でのファイルの集め方（照合の規則を TypeScript に写さない）は設計で決める。
+
 ## 確定事項（要件ディスカッション 2026-10-16）
 
-各項目の根拠（ファイル・行）は `research.md` の「未決事項の根拠」にある。OQ-3・OQ-7 は原則と Requirement 9.2 から決まるため議題にせず確定し、残りは全議題を推奨案で確定した。
+各項目の根拠（ファイル・行）は `research.md` の「未決事項の根拠」にある。OQ-3・OQ-7 は原則と Requirement 9.2 から決まるため議題にせず確定した。OQ-6 は個別に議論して、推奨案（共有しない）から「含める」に改めた。残りは推奨案で確定した。
 
 - **OQ-1 誤りと注意の線引き**: `pasta.dll` が読み込みに失敗するもの（構文・トランスパイルの 3 つ・`pasta.toml`・`init.pasta`）と、`pasta.dll` が検出せずに内容を失うもの（`.pasta` どうし・`.lua` どうしのモジュール名の重なり）を誤りにする。決まった挙動で動くが意図とずれやすいもの（照合用の名前の重なり・組み込みの名前と同じシーン・`.pasta` と `.lua` の重なり・飛び先の無い参照）を注意にする。
 - **OQ-2 読むだけでどこまで飛び先を決められるか**: 辞書の中のシーンと組み込みの名前（`GLOBAL`・act のメソッド・SHIORI 用の act のメソッド）だけで探し、見つからなければ注意。Lua の中身は読まない。動的な飛び先は数だけを示す。
 - **OQ-3 `release` の関門**（原則で確定）: 上書きコピーの後・更新ファイルの前に既定で検査し、誤りがあれば nar を作らない。省くオプションは持たない。
 - **OQ-4 依存の重さ**: `pasta_dsl`・`pasta_core`（と `toml` など）だけにして LuaJIT を持ち込まない。トランスパイルで初めて分かる 3 つの誤りは、検査コマンドの側で同じ規則で判定して誤りにする。
 - **OQ-5 出力の形と文言**: 1 行 1 件の人が読む形とまとめの行だけ。日本語。終了コードは 0 と 1。機械向けの形は付けない。
-- **OQ-6 エディタ（LSP）との共有**: この spec では要件にしない。
+- **OQ-6 エディタ（LSP）との共有**（個別に議論して確定）: 検査を WASM にビルドできる共有の部品に置き、`pasta_check` と VSCode 拡張の両方から使う。VSCode 拡張は保存のたびにゴースト全体を検査し、誤りと注意を診断として表示する（Requirement 11）。ネイティブの言語サーバーと VSCode 以外のエディタは範囲の外。
 - **OQ-7 辞書の集め方**（Requirement 9.2 の帰結で確定）: `pasta.toml` の `pasta_patterns` に従う。
 - **OQ-8 マニュアルの章**: 「デバッグ」の部に検査コマンドの章を 1 つ足し、`release` の説明は README とスキルに残す。
 - **OQ-9 コマンドの名前と引数**: `pasta_check validate --target <ゴーストのフォルダ>`。
