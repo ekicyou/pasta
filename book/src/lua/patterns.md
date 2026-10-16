@@ -100,6 +100,8 @@ REG.OnMouseDoubleClick = function(act)
 end
 ```
 
+`REG.OnMouseDoubleClick` を登録すると、つつきのショートカットのシーン（`＊つっつき反応…`）は呼ばれなくなる（[自前のハンドラの優先](shiori-events.md#自前のハンドラの優先)）。
+
 ハンドラの戻り値は、エンジンが SHIORI の応答にする。
 
 | 戻り値 | 応答 |

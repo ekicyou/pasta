@@ -180,6 +180,21 @@ function SCENE.search(name, global_scene_name, attrs)
     }, scene_result_mt)
 end
 
+--- シーン関数をコルーチンで包む（最後に必ず act:build() を呼び、その結果を返す）。
+--- @param fn function シーン関数
+--- @return thread シーンコルーチン
+local function wrap_scene(fn)
+    -- coroutine.resume 経由で渡される act を受ける
+    local function wrapped_fn(resumed_act, ...)
+        fn(resumed_act, ...)
+        local result = resumed_act:build()
+        if result ~= nil then
+            return result
+        end
+    end
+    return coroutine.create(wrapped_fn)
+end
+
 --- シーン実行コルーチンを作成してコルーチンを返す。
 ---
 --- act:find_scene() を使用してシーンを検索し、見つかった場合はシーン関数を
@@ -200,17 +215,26 @@ function SCENE.co_exec(act, name, global_scene_name, attrs)
         return nil
     end
 
-    -- 必ず最後にbuildを呼び出す関数
-    -- 引数名は外側の act（名前解決用）と区別する（coroutine.resume 経由で渡される act を受ける）
-    local function wrapped_fn(resumed_act, ...)
-        fn(resumed_act, ...)
-        local result = resumed_act:build()
-        if result ~= nil then
-            return result
-        end
-    end
+    return wrap_scene(fn)
+end
 
-    return coroutine.create(wrapped_fn)
+--- 完全一致でグローバルシーンを探し、コルーチンを返す（実行しない）。
+---
+--- グローバルシーンだけを探す。今のシーン・act のメソッド・GLOBAL の関数は見ない。
+---
+--- @param name string 候補の名前（例: "つっつき反応女の子Head"）
+--- @return thread|nil シーンコルーチン。見つからなければ nil
+function SCENE.co_exec_exact(name)
+    local SEARCH = require("@pasta_search")
+    local global_name, local_name = SEARCH:search_scene_exact(name, nil)
+    if not global_name then
+        return nil
+    end
+    local fn = SCENE.get(global_name, local_name)
+    if type(fn) ~= "function" then
+        return nil
+    end
+    return wrap_scene(fn)
 end
 
 return SCENE

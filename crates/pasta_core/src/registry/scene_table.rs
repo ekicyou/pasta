@@ -9,7 +9,7 @@ use crate::registry::random::RandomSelector;
 use fast_radix_trie::RadixMap;
 use std::collections::HashMap;
 
-/// Cache key for scene resolution (module_name + search_key + sorted filters).
+/// Cache key for scene resolution (module_name + search_key + sorted filters + exact).
 /// Extended to support unified scope search with module context.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct SceneCacheKey {
@@ -20,10 +20,17 @@ struct SceneCacheKey {
     search_key: String,
     /// Sorted filters
     filters: Vec<(String, String)>,
+    /// Exact-match search (kept apart from the prefix search's cache)
+    exact: bool,
 }
 
 impl SceneCacheKey {
-    fn new(module_name: &str, search_key: &str, filters: &HashMap<String, String>) -> Self {
+    fn new(
+        module_name: &str,
+        search_key: &str,
+        filters: &HashMap<String, String>,
+        exact: bool,
+    ) -> Self {
         let mut filter_vec: Vec<_> = filters
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
@@ -33,6 +40,7 @@ impl SceneCacheKey {
             module_name: module_name.to_string(),
             search_key: search_key.to_string(),
             filters: filter_vec,
+            exact,
         }
     }
 }
@@ -196,7 +204,7 @@ impl SceneTable {
         let filtered_ids = self.filter_by_attributes(candidate_ids, search_key, filters)?;
 
         // Phase 3-5: Cache-based sequential selection
-        let cache_key = SceneCacheKey::new("", search_key, filters);
+        let cache_key = SceneCacheKey::new("", search_key, filters, false);
         self.select_from_cache(cache_key, filtered_ids)
     }
 
@@ -228,7 +236,48 @@ impl SceneTable {
         let filtered_ids = self.filter_by_attributes(candidate_ids, search_key, filters)?;
 
         // Phase 3-5: Cache-based sequential selection
-        let cache_key = SceneCacheKey::new(module_name, search_key, filters);
+        let cache_key = SceneCacheKey::new(module_name, search_key, filters, false);
+        self.select_from_cache(cache_key, filtered_ids)
+    }
+
+    /// Resolve scene ID by exact name match within one scope.
+    ///
+    /// The scope is the same as `collect_scene_candidates` (global when
+    /// `module_name` is empty, excluding keys starting with `:`; otherwise
+    /// `:module_name:name` locals only, no fallback), but only scenes whose
+    /// key equals the search key are candidates. Attribute filtering and the
+    /// no-repeat sequential selection are shared with the prefix search; the
+    /// cache is kept separate from it (`SceneCacheKey::exact`).
+    pub fn resolve_scene_id_exact(
+        &mut self,
+        module_name: &str,
+        name: &str,
+        filters: &HashMap<String, String>,
+    ) -> Result<SceneId, SceneTableError> {
+        if name.is_empty() {
+            return Err(SceneTableError::InvalidScene {
+                scene: name.to_string(),
+            });
+        }
+
+        let key = if module_name.is_empty() {
+            name.to_string()
+        } else {
+            format!(":{}:{}", module_name, name)
+        };
+        // グローバルの範囲は `:` で始まるキー（ローカル）を含めない
+        let candidate_ids = match self.prefix_index.get(key.as_bytes()) {
+            Some(ids) if !(module_name.is_empty() && key.starts_with(':')) => ids.clone(),
+            _ => Vec::new(),
+        };
+        if candidate_ids.is_empty() {
+            return Err(SceneTableError::SceneNotFound {
+                scene: name.to_string(),
+            });
+        }
+
+        let filtered_ids = self.filter_by_attributes(candidate_ids, name, filters)?;
+        let cache_key = SceneCacheKey::new(module_name, name, filters, true);
         self.select_from_cache(cache_key, filtered_ids)
     }
 

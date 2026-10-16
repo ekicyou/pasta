@@ -136,3 +136,7 @@
 - `crates/pasta_shiori/tests/support/`（古いランタイムの写し）は無くなった。結合テストの一時ゴーストは、`pasta.dll` が `profile/pasta/pasta_scripts/` へ自己展開した本物の標準ランタイムだけを読む。
 - 新しい結合テストのフィクスチャは、差し替えるファイル（例: `scripts/pasta/shiori/entry.lua`）と `pasta.toml` だけを持てばよい。`pasta.toml` に `lua_search_paths` の回避を書かない。`scripts/` は標準ランタイムより先に読まれる（本番と同じ）。
 - 共通部品は `crates/pasta_shiori/tests/common/mod.rs` の `copy_fixture_to_temp`。ゴーストの直下の `pasta_scripts/` へ本物をコピーする手順も全部消えたので、写さないこと。参照: `.kiro/specs/completed/shiori-test-support-runtime/design.md` の「ファイルの計画」。
+
+## 申し送り（touch-poke-shortcuts より、2026-10-16）
+- `event/init.lua` の既定ハンドラの `require` に `pasta.shiori.event.mouse` が 1 行増えた（行番号が 1 つずれる）。`EVENT.fire`・`EVENT.drive` の本体は変えていない。
+- `OnMouseDoubleClick`・`OnMouseMove` は既定ハンドラ（`mouse.lua`）を通るようになった。見つかったシーンのコルーチンは今までどおり `EVENT.fire` → `EVENT.drive` で再開するので、シーンの途中のエラーの出口は同じ。

@@ -69,3 +69,7 @@
 - 入門の体験は、エンジンの既定の動きではなく、ガイドの側で手当てする方向で考える。開発者の見方では、入門の最初の段から `＊OnBoot` を書かせてもよかった（今は、準備の章では何も出ず、1 段目（`01-boot.md`）で最初の辞書を足す）。
 - `getting-started-screenshots` の「先に要るもの」から外した。
 - やるかどうかは、0.4.0 を出した後の棚卸で見直す。
+
+## 申し送り（touch-poke-shortcuts より、2026-10-16）
+- `boot.lua` の登録が `REG.OnBoot = REG.OnBoot or function(act) … end` になった（中身は変えていない）。`choice_select.lua`・`second_change.lua`・新しい `mouse.lua` も同じ形で、既定ハンドラはゴーストが先に登録したハンドラを上書きしない（要件 8.7）。
+- `boot.lua` を触るときは、この 1 行の形を保つこと。マニュアル `lua/shiori-events.md` の「既定ハンドラと上書き」は 5 つ共通の決まりとして書いてある。参照: `.kiro/specs/completed/touch-poke-shortcuts/design.md` の MouseRegistration。

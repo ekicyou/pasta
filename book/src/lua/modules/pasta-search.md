@@ -101,6 +101,27 @@ if not result then
 end
 ```
 
+### search_scene_exact(name, global_scene_name?)
+
+シーンを完全一致で検索する。
+
+```lua
+SEARCH:search_scene_exact(name, global_scene_name?) -> global_name, local_name | nil
+```
+
+引数、照合用の名前への揃え方、別名表での置き換え、戻り値は [search_scene](#search_scenename-global_scene_name) と同じである。違うのは候補だけで、照合用の名前が `name`（揃えた後）と完全に等しいシーンだけが候補になる。`search_scene_exact("つっつき反応女")` は `＊つっつき反応女の子Head` を選ばない。候補が複数あれば `search_scene` と同じくシャッフル＆順次消費で 1 つを選ぶ。並び順の記録は `search_scene` とは別に持つ。
+
+つつき・撫での既定ハンドラは、この関数でショートカットのシーンを探す（[つつき・撫でのショートカット](../shiori-events.md#つつき撫でのショートカット)）。
+
+```lua
+local SEARCH = require "@pasta_search"
+
+local g, l = SEARCH:search_scene_exact("つっつき反応Head")
+if g then
+    print(g, l)  -- "つっつき反応Head_1", "__start__"
+end
+```
+
 ### search_word(name, global_scene_name?)
 
 単語を前方一致で検索し、候補の値を 1 つ返す。

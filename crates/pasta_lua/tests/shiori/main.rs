@@ -8,6 +8,7 @@ mod common;
 
 mod event_dispatch_test;
 mod event_handler_test;
+mod mouse_event_test;
 mod res_test;
 mod virtual_event_config_resolution_test;
 mod virtual_event_dispatch_test;

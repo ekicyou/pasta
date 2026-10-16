@@ -161,3 +161,6 @@ roadmap のバックログにあった「`pasta_core` の `resolve_scene_id` の
 - **候補が 2 つ以上残るとき**: ノベルでは、条件に合う場面が複数残って、どれかが気まぐれに選ばれると困る。実行時の挙動は今のまま（並べ替えて順に使う）とし、辞書の検査（`pasta-check-dic-validate`）で知らせる案。
 - **演出の属性とぶつからないこと**: 同じ場面に、演出が読む属性（`＆曲：夕焼け`）と、絞り込みが読む属性（`＆好感度：高`）が並ぶ。呼ぶ側が条件に挙げない属性は、選ばれ方に影響しない。この性質を、要件に書いて守る。
 - 参照: `.kiro/specs/scene-stage-attributes/brief.md`、`.kiro/steering/roadmap.md` の「Phase 13」。
+
+## 申し送り（touch-poke-shortcuts より、2026-10-16）
+- `search_scene` の本体は私的な関数 `search_scene_by(name, global_scene_name, exact)`（`crates/pasta_lua/src/search/context.rs` 115 行付近）に移り、`search_scene`（91 行付近）は `exact=false` で、新しい `search_scene_exact` は `true` で呼ぶ。空の `filters` で検索する点は変わらない。フィルターを通すときは、完全一致の道（`SceneTable::resolve_scene_id_exact`）も同じ `filters` を受け取る形になっている。参照: `.kiro/specs/completed/touch-poke-shortcuts/design.md` の SearchExact。

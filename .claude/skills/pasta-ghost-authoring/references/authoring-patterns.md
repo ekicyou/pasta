@@ -119,13 +119,21 @@ end
 ````
 
 <a id="s6-5"></a>
-## 6.5 クリック反応（click.pasta）
+## 6.5 つつき・撫での反応（click.pasta）
+
+ダブルクリック（つつく）は `つっつき反応`、2 秒撫でるのは `さわり反応` に続けて、アクター名・部位（シェルの当たり判定の名前）・`その他` を付けたシーンが呼ばれる。アクター＋部位 → アクターその他 → 部位だけ → その他 の順に探し、最初に見つかったシーンを実行する。探す順の全体・撫での判定・抑止は [SHIORI イベントとハンドラ](https://ekicyou.github.io/pasta/lua/shiori-events.html#つつき撫でのショートカット) を参照。
 
 ```pasta
-＊OnMouseDoubleClick
+＊つっつき反応女の子Head
+　女の子：＠照れ　頭をつつかれると、くすぐったいよ。
+
+＊つっつき反応その他
 　％女の子、男の子
 　女の子：＠驚き　わっ、びっくりした！
 　男の子：＠笑顔　どうしたの？
+
+＊さわり反応女の子Head
+　女の子：＠照れ　えへへ……なでなでされちゃった。
 ```
 
 <a id="s6-6"></a>
@@ -174,7 +182,7 @@ end
 | `actors.pasta` | アクター辞書定義（`％名前` + `＠表情：\s[ID]`）。全ファイルで共有 |
 | `boot.pasta` | 起動/終了イベント（OnBoot, OnFirstBoot, OnClose） |
 | `talk.pasta` | ランダムトーク（OnTalk）、時報（時報その他 / 時報{HH}） |
-| `click.pasta` | マウス反応（OnMouseDoubleClick 等） |
+| `click.pasta` | マウス反応（`＊つっつき反応…`・`＊さわり反応…`） |
 
 アクター辞書は `actors.pasta` に集約し、他ファイルから参照する構成を推奨する。どのファイルが読み込まれるかは [pasta-toml.md](pasta-toml.md#pasta_patterns) を参照。
 
@@ -250,7 +258,7 @@ end
 選択肢を出して、選ばれた項目のローカルシーンへ進む作例。構文は [block-structure.md](block-structure.md#選択肢行)、`!select(秒数)` は [block-structure.md](block-structure.md#キューコマンド行)、選択後に実行されるシーンの決まり方は [SHIORI イベントとハンドラ](https://ekicyou.github.io/pasta/lua/shiori-events.html#onchoiceselectex) を参照。
 
 ```pasta
-＊OnMouseDoubleClick
+＊つっつき反応その他
 　％女の子、男の子
 　女の子：＠通常　何をしますか？
 　＠？挨拶「挨拶する」

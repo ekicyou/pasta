@@ -547,7 +547,9 @@ fn text_blocks(chapter: &str) -> Vec<(usize, Vec<&str>)> {
         }
     }
     if let Some((start, _)) = open {
-        panic!("book/src/reference/shell.md:{start}: フェンスが閉じられていない。見本のシェルから写し直す");
+        panic!(
+            "book/src/reference/shell.md:{start}: フェンスが閉じられていない。見本のシェルから写し直す"
+        );
     }
     blocks
 }
