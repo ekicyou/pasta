@@ -130,3 +130,103 @@ fn module_name_uses_pasta_dll_path() {
         found[0].2
     );
 }
+
+/// 構文・読めないファイルの問題だけを返す
+fn syntax_findings(files: Vec<(&str, FileText)>) -> Vec<pasta_check::validate::Finding> {
+    let input = GhostInput {
+        pasta_toml: TomlSource::Text { text: TOML.into() },
+        entries: files.iter().map(|(p, _)| p.to_string()).collect(),
+    };
+    let files: BTreeMap<_, _> = files.into_iter().map(|(p, t)| (p.to_string(), t)).collect();
+    validate_ghost(&input, &files)
+        .findings
+        .into_iter()
+        .filter(|f| {
+            matches!(
+                f.code,
+                FindingKind::Syntax | FindingKind::FileNotUtf8 | FindingKind::FileUnreadable
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn syntax_errors_in_two_files_both_reported_at_parser_position() {
+    let bad_a = "＊挨拶\n  さくら：こんにちは。\n  {{{{壊れた}}}}\n";
+    let bad_b = "＊会話\n  さくら：やあ。\n＊\n  ＠＠＠\n";
+    let good = "＊場面\n  さくら：こんにちは。\n";
+    let found = syntax_findings(vec![
+        ("dic/a.pasta", FileText::Text { text: bad_a.into() }),
+        ("dic/b.pasta", FileText::Text { text: bad_b.into() }),
+        ("dic/c.pasta", FileText::Text { text: good.into() }),
+    ]);
+    assert_eq!(found.len(), 2, "{found:?}");
+    for (f, (path, src)) in found
+        .iter()
+        .zip([("dic/a.pasta", bad_a), ("dic/b.pasta", bad_b)])
+    {
+        let Err(pasta_dsl::ParseError::SyntaxError {
+            line,
+            column,
+            message,
+            ..
+        }) = pasta_dsl::parse_str(src, path)
+        else {
+            panic!("{path} は構文エラーになるはず");
+        };
+        assert_eq!(f.code, FindingKind::Syntax);
+        assert_eq!(f.severity, Severity::Error);
+        assert_eq!(f.path, path);
+        assert_eq!(f.line, Some(line as u32));
+        assert_eq!(f.column, Some(column as u32));
+        // 解析器が前に付ける位置の文言を外し、残りを「構文エラー: 」の後ろに付ける
+        let prefix = format!("Parse error in {path} at {line}:{column}: ");
+        let rest = message.strip_prefix(&prefix).expect("前置きがある");
+        assert_eq!(f.message, format!("構文エラー: {rest}"));
+        assert!(!f.message.contains("Parse error in"), "{}", f.message);
+    }
+}
+
+#[test]
+fn not_utf8_and_unreadable_are_errors_and_others_continue() {
+    let found = syntax_findings(vec![
+        ("dic/a.pasta", FileText::NotUtf8),
+        (
+            "dic/b.pasta",
+            FileText::Unreadable {
+                reason: "アクセスが拒否されました".into(),
+            },
+        ),
+        (
+            "dic/c.pasta",
+            FileText::Text {
+                text: "＊会話\n  {{{{壊れた}}}}\n".into(),
+            },
+        ),
+    ]);
+    let got: Vec<_> = found
+        .iter()
+        .map(|f| (f.path.as_str(), f.code, f.severity, f.message.as_str()))
+        .collect();
+    assert_eq!(got.len(), 3, "{got:?}");
+    assert_eq!(
+        got[0],
+        (
+            "dic/a.pasta",
+            FindingKind::FileNotUtf8,
+            Severity::Error,
+            "UTF-8 として読めません"
+        )
+    );
+    assert_eq!(
+        got[1],
+        (
+            "dic/b.pasta",
+            FindingKind::FileUnreadable,
+            Severity::Error,
+            "ファイルを読めません: アクセスが拒否されました"
+        )
+    );
+    assert_eq!((got[2].0, got[2].1), ("dic/c.pasta", FindingKind::Syntax));
+    assert!(found[0].line.is_none() && found[1].line.is_none());
+}

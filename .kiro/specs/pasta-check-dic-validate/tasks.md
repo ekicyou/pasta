@@ -51,7 +51,7 @@
   - 完了の状態: 規則のテストで、`a-b`・`a.b`・`a_b` が誤り 3 件、`.lua` と `.pasta` が注意、`.lua` どうしが誤り、`dic/` の外と階層の違いの例が期待どおりになる
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 2.4 各辞書ファイルの構文を pasta.dll と同じ関数で読む
+- [x] 2.4 各辞書ファイルの構文を pasta.dll と同じ関数で読む
   - 本文を pasta.dll と同じ構文解析で読み、最初の構文エラーを行・列つきで誤りにする。理由は解析器が前に付ける位置の文言を外した残りにする
   - UTF-8 で読めないもの・読めないものを誤りにする。どのファイルで失敗しても残りを続け、読めた構文木を次の段に渡す
   - 完了の状態: 規則のテストで、構文エラーのある 2 ファイルの両方が報告され、位置が解析器の結果と同じで、UTF-8 で読めないファイルが誤りになる
@@ -198,3 +198,4 @@
 - 1.3: 各段の関数は crate 内の骨組み。2.1 で design の `read_config(src) -> (GhostConfig, Vec<Finding>)` に切り替え、GhostConfig を discovery と scenes に渡す（TOML を 2 度読まない）。参照を省くかは Syntax の Finding の有無で決める。
 - 2.1: `PastaConfig::from_str` は純粋な文字列の解析で PASTA_DEBUG のガードは要らない（ガードは `PastaLoader::load` を呼ぶテストだけ）。読めない pasta.toml は `file-unreadable`（パス pasta.toml）。
 - 2.2: pasta_lua の `discover_files` はソートも重複除去もしない（パターンごとに glob の順で連結）。3.1 (b) の一致テストは集合（並べ替え・重複除去の後）で比べる。`pasta_dll_paths(input) -> (Vec<String>, Vec<String>)` が .pasta と .lua の pasta.dll が見るパス。
+- 2.4: 読めた構文木は `Vec<(String, PastaFile)>`（相対パスと組）で 2.5・2.6 へ渡る。飛び先の検査を省くのは要件 6.8 どおり `Syntax` があるときだけ（NotUtf8・Unreadable では省かないので、そのファイルのシーンへの Call が「見つからない」注意になり得る。どちらにせよ誤りで終わる）。
