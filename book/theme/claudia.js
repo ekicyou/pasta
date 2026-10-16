@@ -1,6 +1,6 @@
 /*
  * claudia.js — pasta マニュアルの Claudia テーマのテーマメニュー（manual-claudia-theme タスク 2.5）。
- * mdBook の additional-js として全章と print.html に読み込まれ、book.js の後に実行される。
+ * mdBook の additional-js として全章に読み込まれ、book.js の後に実行される。
  *
  * 役割（要件 2.1、design「ThemeMenu」）:
  *   claudia.css が隠す rust・coal・ayu の項目（の li）を、テーマメニューの末尾へ移す。
