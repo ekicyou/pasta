@@ -469,6 +469,7 @@ node book/tools/link-check.mjs                          # リンク検証
 mdbook build book                                       # 出力の生成
 node book/tools/highlight/highlight-html.mjs book/book  # コードの着色
 node book/tools/talk/talk-html.mjs book/book            # 台詞部品の変換
+node book/tools/print-media-refs.mjs book/book          # 印刷用ページの動画の参照の直し
 node book/tools/bigram-index/build-index.mjs book/book  # 検索索引の再生成
 node book/tools/verify-static.mjs --no-build            # 出力の検査
 node book/tools/verify-search.mjs --no-build            # 検索の検査
