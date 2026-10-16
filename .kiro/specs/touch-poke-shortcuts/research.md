@@ -300,3 +300,11 @@
 - `kiro-spec-design` の規則（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）と、`.kiro/settings/templates/specs/design.md`・`research.md`。
 - steering の `structure.md`（レイヤー分離・テストの置き場所・ファイルの大きさの目安）と `tech.md`（LuaJIT 2.1・依存の一覧）。
 - `pasta-lua-coding` スキルの §6（REG・既定ハンドラ）と §7（Lua のテストは `*_test.lua` を作り `init.lua` の `specs` に登録する）。
+
+## 設計ディスカッションの結果（2026-10-16）
+
+- 議題 2〜7 を推奨案で確定した（design.md「設計ディスカッションの決定」）。根拠の要点:
+  - 既存の 3 つの既定ハンドラを `or` 登録にそろえるのは、要件 8.2 と根が同じで、マニュアルの決まりを 1 本にするため（「起票に安易に逃がさない」）。挙動が変わるのは、`main.lua` で `require` せずに登録していて、今は上書きされて動いていないゴーストだけ。
+  - 要件 2.6 は、イベント駆動の判定では「しきい値を過ぎた後の最初の移動」より早く決められないため、文言を実際の意味に合わせた。
+  - 本文の無いシーンが登録されない場合も、回避の書き方をマニュアルに載せず、この spec で登録されるように直す（「マニュアルに回避レシピを載せない」）。
+- 議題 1（完全一致の作り方）は個別に議論する。

@@ -30,22 +30,24 @@
 ### This Spec Owns
 
 - `OnMouseDoubleClick`・`OnMouseMove` の既定のハンドラ（`REG` への登録のしかたを含む）。
+- 既存の既定ハンドラ（`OnBoot`・`OnChoiceSelectEx`・`OnSecondChange`）の登録のしかた。5 つとも `REG.X = REG.X or 既定` にそろえる（要件 8.7。設計ディスカッション議題 2）。ハンドラの中身は変えない。
 - 候補の名前の組み立て（接頭辞・アクター名・部位・`その他`/`Other` の並べ方と、段を飛ばす決まり）。
 - スコープ番号からアクター名を引く決まり。
 - 撫での判定の状態機械（状態 1 つ・保存しない）と、抑止の当てはめ方。
 - シーンの完全一致の検索: `SceneTable::resolve_scene_id_exact`・`SearchContext::search_scene_exact`・`@pasta_search` の `search_scene_exact`・`SCENE.co_exec_exact`。この 4 つの契約はこの spec が定める。
 - hello-pasta の `dic/08-touch.pasta`・`dic/09-choice.pasta`、それを検査するテスト、`STAGES.md` の 8・9 段目の行と検証イベント表、`README.md` の辞書の一覧。
 - マニュアルの該当の章（入門 8・9 段目、SHIORI イベント、`@pasta_search`、内部モジュール、文法の章からの案内）と、生成するスキル references。
+- 手書きのスキルのうち、つつき・撫での手本を挙げている所（`pasta-ghost-authoring/SKILL.md`・`pasta-ghost-authoring/references/authoring-patterns.md`・`pasta-lua-coding/SKILL.md`）。新しい書き方を手本にする（設計ディスカッション議題 4）。
 
 ### Out of Boundary
 
 - 前方一致の検索（`search_scene`・`resolve_scene_id_unified`・`SCENE.search`・`SCENE.co_exec`）の挙動。触らない。
 - `EVENT.fire`・`EVENT.drive`・チェイントークの扱い。`init.lua` には `require` を 1 行足すだけで、振り分けの本体は変えない。
 - 仮想イベント（`OnTalk`・`OnHour`）と、その抑止の語の一覧（`virtual_dispatcher` の `BLOCKED_STATUSES`）。この spec は `is_blocked` を呼ぶだけで、一覧を変えない。
-- 既存の既定ハンドラ（`OnBoot`・`OnChoiceSelectEx`・`OnSecondChange`）の登録のしかた（下の「未決の論点」2 を参照。今の設計は変えない前提）。
+- 既存の既定ハンドラ（`OnBoot`・`OnChoiceSelectEx`・`OnSecondChange`）の中身。登録の 1 行だけを変える。
 - 失敗の見せ方（`failure-output-unification`）。飛び先が無ければ今までどおり 204。
 - 接頭辞だけのシーン（`＊さわり反応`・`＊つっつき反応`）を見つける検査（`pasta-check-dic-validate` が後から足す）。
-- 手書きのスキル（`.claude/skills/*/SKILL.md`・`authoring-patterns.md`）。生成でない文書の扱いは「未決の論点」4。
+- 手書きのスキルのうち、つつき・撫でに関わらない所。
 - emo2・pasta-in-windows の辞書の載せ替え。
 
 ### Allowed Dependencies
@@ -134,6 +136,7 @@ crates/pasta_sample_ghost/
 - `crates/pasta_lua/tests/search/scene_search_test.rs` — 束縛のテスト（Lua から `SEARCH:search_scene_exact` を呼ぶ・別名の置き換え・`sanitize_name` での照合）。
 - `crates/pasta_lua/pasta_scripts/pasta/scene.lua` — `SCENE.co_exec_exact(name)` を足す。コルーチンへ包む処理は `co_exec` と同じ私的な関数を使う。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua` — 既定ハンドラの読み込みに `require("pasta.shiori.event.mouse")` を 1 行足す。
+- `crates/pasta_lua/pasta_scripts/pasta/shiori/event/boot.lua`・`choice_select.lua`・`second_change.lua` — `REG.X = function…` を `REG.X = REG.X or function…` に変える（各 1 行。要件 8.7）。`boot.lua` は `boot-surface-without-dic` も触るので、マージのときに突き合わせる。
 - `crates/pasta_lua/tests/lua_specs/init.lua` — `specs` に `"mouse_test"` を足す。
 - `crates/pasta_lua/tests/shiori/main.rs` — `mod mouse_event_test;` を足す。
 - `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/08-touch.pasta` — ショートカットのシーンで書き直す（下の「hello-pasta の 8・9 段目」）。
@@ -148,6 +151,7 @@ crates/pasta_sample_ghost/
 - `book/src/internals/internal-modules.md` — `SCENE.co_exec_exact` の行と説明。
 - `book/src/grammar/variables.md`・`book/src/lua/patterns.md` — `OnMouseDoubleClick` の例から新しい書き方への案内。
 - `.claude/skills/pasta-lua-coding/references/`・`.claude/skills/pasta-ghost-authoring/references/` — `node book/tools/gen-skill-refs.mjs` の生成物（手で編集しない）。
+- `.claude/skills/pasta-ghost-authoring/SKILL.md`・`.claude/skills/pasta-ghost-authoring/references/authoring-patterns.md`・`.claude/skills/pasta-lua-coding/SKILL.md` — 手書き。`＊OnMouseDoubleClick`＋`＄ｒ４` や Lua の振り分けを挙げている手本を、ショートカットのシーンに替える。SKILL.md の編集は分類器が止めるので、実装のときに開発者の許可を得る。
 
 ## System Flows
 
@@ -228,7 +232,7 @@ stateDiagram-v2
 | 2.3 | 所が変わったら数え直す | StrokeDetector | 「所」の比較 | 判定の状態 |
 | 2.4 | 2 秒より長い途切れで数え直す | StrokeDetector | `now - last > GAP` | 判定の状態 |
 | 2.5 | 部位が空で数え直す | StrokeDetector | 部位が空 → Off | 判定の状態 |
-| 2.6 | 1 秒未満のずれ | StrokeDetector・MouseHandlers | `req.date.unix + req.date.ns / 1e9` | — |
+| 2.6 | 1 秒より細かい時刻で測る | StrokeDetector・MouseHandlers | `req.date.unix + req.date.ns / 1e9` | — |
 | 2.7 | 状態 1 つ・保存しない | StrokeDetector | モジュールのローカル変数 | — |
 | 2.8 | 設定で変えない | StrokeDetector | 定数 `THRESHOLD = 2`・`GAP = 2` | — |
 | 3.1 | 撫での 9 段 | MouseHandlers・CandidateNames | `M.candidates("touch", …)` | 撫で |
@@ -261,6 +265,7 @@ stateDiagram-v2
 | 8.4 | 移動ごとに既定の水準でログを出さない | MouseHandlers | per-event は trace だけ | — |
 | 8.5 | 決めなかった移動は 1 回だけ探す | MouseHandlers | 同 3.3 | 撫で |
 | 8.6 | 前後の両方をテストする | Tests | `mouse_event_test.rs` | — |
+| 8.7 | 既存の既定ハンドラも上書きしない | MouseRegistration | `boot.lua`・`choice_select.lua`・`second_change.lua` の `REG.X = REG.X or …` | — |
 | 9.1 | 8 段目のつつきは 4 種の段 | SampleDic | `08-touch.pasta` | — |
 | 9.2 | 8 段目の撫で | SampleDic | `08-touch.pasta` | — |
 | 9.3 | 8 段目で旧い書き方を使わない | SampleDic・SampleTests | `scripts.rs` の検査 | — |
@@ -281,7 +286,7 @@ stateDiagram-v2
 | SearchExact | pasta_lua search | 完全一致の検索を Lua へ出す | 6.2 | SceneTableExact（P0） | Service |
 | CoExecExact | Lua `pasta.scene` | 完全一致で見つけたグローバルシーンをコルーチンにする | 6.2 | SearchExact（P0） | Service |
 | MouseHandlers | Lua `event/mouse.lua` | 2 つの既定ハンドラ。段々に探す | 1.x, 3.x, 5.5, 6.3, 7.x, 8.1, 8.4, 8.5 | CoExecExact（P0）・CoExec（P0）・IsBlocked（P1） | Service |
-| MouseRegistration | Lua `event/mouse.lua` | 自前のハンドラを上書きしない登録 | 8.2, 8.3 | REG（P0） | State |
+| MouseRegistration | Lua `event/mouse.lua`・`boot.lua`・`choice_select.lua`・`second_change.lua` | 自前のハンドラを上書きしない登録（5 つの既定ハンドラで同じ形） | 8.2, 8.3, 8.7 | REG（P0） | State |
 | CandidateNames | Lua `event/mouse.lua` | 候補の名前の配列を作る（純粋関数） | 1.1, 1.4–1.6, 3.1, 3.4, 3.5, 4.4, 4.5, 6.1, 6.4 | なし | Service |
 | ActorResolver | Lua `event/mouse.lua` | スコープ番号 → アクター名 | 4.1–4.3, 1.5, 3.4 | `@pasta_config`（P0）・`STORE.appearance`（P1） | Service |
 | StrokeDetector | Lua `event/mouse.lua` | 撫での判定（状態 1 つ） | 2.x, 3.6, 5.1, 5.2 | なし（時刻は引数） | Service, State |
@@ -482,6 +487,7 @@ function M._get_state() end
   - ゴーストが先に登録した（`scripts/main.lua`。起動の順で `entry` より前）とき: 既定は代入されない。
   - ゴーストが後に登録した（辞書の Lua ブロック。`scene_dic` で評価される）とき: ゴーストの代入が既定を置き換える。
   - どちらでも `REG[req.id]` はゴーストのハンドラなので、既定のハンドラは呼ばれず、撫での判定も回らない（要件 8.3）。
+  - 既存の 3 つ（`OnBoot`・`OnChoiceSelectEx`・`OnSecondChange`）も同じ形にそろえる（要件 8.7）。既定を包みたいゴーストは、今までどおり先に `require("pasta.shiori.event")` を呼んでから `local default = REG.OnSecondChange` と取っておけばよい。
 
 **Dependencies**
 - Outbound: `SCENE.co_exec_exact`（P0）・`SCENE.co_exec`（P0）・`virtual_dispatcher.is_blocked`（P1）・`@pasta_log`（P2）
@@ -534,7 +540,7 @@ local function on_touch(act) end
 |--------|----------|
 | `getting-started/08-touch.md` | ショートカットのシーンの作例（辞書と逐語で一致）。段々の順を、上の表の操作で説明する。撫では 2 秒・トーク中は反応しない、だけを書き、詳細はリファレンスへ |
 | `getting-started/09-choice.md` | 選択肢のシーンが `＊つっつき反応その他` になったこと、8 段目の `その他` と一緒に抽選されること |
-| `lua/shiori-events.md` | 主要イベントの表（`OnMouseDoubleClick`・`OnMouseMove` を「あり」）、既定ハンドラの表に 2 行と「この 2 つは先に登録したゴーストのハンドラも上書きしない」、`### OnMouseDoubleClick` の書き直し、`### OnMouseMove` の新設、新しい節「つつき・撫でのショートカット」（9 段の順・アクター名の決め方・撫での判定・抑止・完全一致・`その他`/`Other` の部位・接頭辞だけの名前は呼ばれない・自前のハンドラの優先・空のシーンで反応を止める書き方） |
+| `lua/shiori-events.md` | 主要イベントの表（`OnMouseDoubleClick`・`OnMouseMove` を「あり」）、既定ハンドラの表に 2 行、「既定ハンドラと上書き」を「既定はゴーストの登録を上書きしない。`main.lua` でも辞書の Lua ブロックでもよい。既定を包むときだけ先に `require("pasta.shiori.event")`」の 1 本の決まりに書き直す（5 つ共通）、`### OnMouseDoubleClick` の書き直し、`### OnMouseMove` の新設、新しい節「つつき・撫でのショートカット」（9 段の順・アクター名の決め方・撫での判定・抑止・完全一致・`その他`/`Other` の部位・接頭辞だけの名前は呼ばれない・自前のハンドラの優先・空のシーンで反応を止める書き方） |
 | `lua/modules/pasta-search.md` | `search_scene_exact(name, global_scene_name?)` の節 |
 | `internals/internal-modules.md` | `SCENE.co_exec_exact` の行と説明 |
 | `grammar/variables.md` | `＄ｒ４` の例の後に、部位ごとの反応はショートカットのシーンで書ける、という案内 |
@@ -571,6 +577,8 @@ local function on_touch(act) end
 - 撫で: `date` 表の時刻を進めた `OnMouseMove` を送り、2 秒で `さわり反応…` が返る／Status `talking,balloon(0=0)` の間は返らず、`OnMouseMove` のシーンは返る（要件 5.5）／`balloon(0=0)` だけなら返る（要件 5.4）。
 - 空のシーン: 本文の無い `＊つっつき反応Head` があると、部位 `Head` のつつきは 204 で、`＊つっつき反応その他` は呼ばれない（要件 7.1。文法上、本文の無いグローバルシーンも `__start__` を持つことをここで確かめる）。
 - 自前のハンドラ（要件 8.6）: (a) `scripts/main.lua` で `REG.OnMouseDoubleClick`・`REG.OnMouseMove` を登録したゴースト、(b) 辞書の Lua ブロックで登録したゴースト。どちらにもショートカットのシーンを置き、自前のハンドラの応答が返ること、ショートカットのシーンが選ばれないこと、`M._get_state()` が初期のまま（判定が回っていない）ことを確かめる。
+- 既存の既定ハンドラ（要件 8.7）: `scripts/main.lua` で `REG.OnBoot` を（`require` せずに）登録したゴーストで、ゴーストのハンドラの応答が返る。`OnSecondChange`・`OnChoiceSelectEx` も同じ。辞書の Lua ブロックで登録した場合と、`require` してから包む場合が今までどおり動く。
+- 空のシーン（要件 7.1）の確認は、タスクの最初の群に置く。本文の無いグローバルシーンが登録されないと分かったら、登録されるようにこの spec の中で直す（マニュアルに代わりの書き方は載せない）。
 - チェイントーク: ショートカットのシーンの応答の後の継続の扱いが、`＊OnMouseDoubleClick` のときと同じ（`STORE.co_scene` の状態が同じ）。
 
 ### Sample Ghost Tests（`crates/pasta_sample_ghost/tests/touch_shortcuts_test.rs`。12 段目の辞書＝配布辞書を読み込む）
@@ -590,13 +598,14 @@ local function on_touch(act) end
 - 決めなかった `OnMouseMove`（ほぼ全部）では、今の処理（`co_exec` 1 回）に、状態の比較数回と `is_blocked` の部分文字列探し 9 回が加わるだけ。アクター名の引きと完全一致の検索は「撫でた」と決めたとき・つつきのときだけ（最大 8 回の完全一致検索）。
 - 完全一致の候補集めは RadixMap のキーの比較で、前方一致と同じ規模。
 
-## 未決の論点（設計ディスカッションへ）
+## 設計ディスカッションの決定（2026-10-16）
 
-設計は下の仮定で書いた。どれも設計ディスカッションで確かめる。
+議題 2〜7 は推奨案で確定した。議題 1 は個別に議論中。
 
-1. **完全一致の作り方（C-1 を採った）**: Rust の検索に完全一致の道を足す（C-1）。Lua でシーン表を走査する案（C-2）は、同じ名前の抽選（使い切るまで繰り返さない）を作り直すことになり、要件 1.2・3.2 を満たさないので採らない。brief の「Rust の検索は触らない」は要件ディスカッションで外れている。
-2. **既存の 3 つの既定ハンドラの登録**: `OnBoot`・`OnChoiceSelectEx`・`OnSecondChange` は今も無条件に代入しており、`main.lua` で先に登録したゴーストのハンドラを上書きする（マニュアルは「先に `require("pasta.shiori.event")` を呼ぶ」回避を書いている）。設計は「この spec では変えない」前提で書いた。
-3. **要件 2.6 の読み方**: 「撫でた」と決めるのは 2 秒を過ぎた後の最初の `OnMouseMove` を受けたときなので、マウスの動きが止まり気味なら遅れは 1 秒を超えうる（途切れは 2 秒まで許すため）。設計は、要件 2.6 を「判定に使う時刻の分解能を 1 秒より細かくする」と読んだ。
-4. **手書きのスキル**: `pasta-ghost-authoring/SKILL.md`・`references/authoring-patterns.md`・`pasta-lua-coding/SKILL.md` は `＊OnMouseDoubleClick`＋`＄ｒ４` の書き方を手本に挙げている（誤りではないが古い）。設計は Out of Boundary に置いた。
-5. **9 段目の選択肢の置き場所**: `＊つっつき反応その他`（女の子の体・足元のつつきで出会う）とした。
-6. **ショートカットの段で `GLOBAL` の関数を見ないこと**: 9 段目と時報は `GLOBAL` の関数や `act` のメソッドにも当たるが、1〜8 段はシーンだけを探す。
+1. **完全一致の作り方**: 議論中（設計は C-1＝Rust の検索に完全一致の道を足す、で書いてある）。
+2. **既存の 3 つの既定ハンドラ**: `OnBoot`・`OnChoiceSelectEx`・`OnSecondChange` も `REG.X = REG.X or 既定` にそろえる。要件 8.7 を足した。マニュアルの決まりは 1 本になる。
+3. **要件 2.6**: 「1 秒より細かい時刻で測り、しきい値を過ぎた後の最初の移動で決める」に文言を直した。マニュアルには「撫で始めて 2 秒たった後の、最初のマウスの動きで反応する」と書く。
+4. **手書きのスキル**: つつき・撫での手本を新しい書き方に替える（範囲に入れた）。SKILL.md の編集は実装のときに開発者の許可を得る。
+5. **9 段目の選択肢**: `＊つっつき反応その他` に置く。
+6. **1〜8 段で見るもの**: シーンだけ。`GLOBAL` の関数・`act` のメソッドは見ない。
+7. **反応させない部位**: 本文の無いシーンで書く。統合テストを最初のタスク群に置き、登録されないならこの spec で直す。
