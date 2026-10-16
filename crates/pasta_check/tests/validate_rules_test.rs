@@ -230,3 +230,128 @@ fn not_utf8_and_unreadable_are_errors_and_others_continue() {
     assert_eq!((got[2].0, got[2].1), ("dic/c.pasta", FindingKind::Syntax));
     assert!(found[0].line.is_none() && found[1].line.is_none());
 }
+
+/// 1 つの辞書ファイルを検査し、トランスパイルの 3 つの問題だけを (種類, 行, 列, 理由) で返す。
+/// あわせて pasta_lua のトランスパイルの成否と食い違わないことを確かめる
+fn transpile_findings(text: &str) -> Vec<(FindingKind, Option<u32>, Option<u32>, String)> {
+    let path = "dic/a.pasta";
+    let input = GhostInput {
+        pasta_toml: TomlSource::Text { text: TOML.into() },
+        entries: vec![path.into()],
+    };
+    let files = BTreeMap::from([(path.to_string(), FileText::Text { text: text.into() })]);
+    let found: Vec<_> = validate_ghost(&input, &files)
+        .findings
+        .into_iter()
+        .filter(|f| {
+            matches!(
+                f.code,
+                FindingKind::TranspileArgAssign
+                    | FindingKind::TranspilePropertyInExpr
+                    | FindingKind::TranspileContinuationWithoutActor
+            )
+        })
+        .inspect(|f| {
+            assert_eq!(f.severity, Severity::Error);
+            assert_eq!(f.path, path);
+        })
+        .map(|f| (f.code, f.line, f.column, f.message))
+        .collect();
+
+    let ast = pasta_dsl::parse_str(text, path).expect("構文としては読める");
+    let lua_failed = pasta_lua::LuaTranspiler::default()
+        .transpile(&ast, &mut Vec::new())
+        .is_err();
+    assert_eq!(
+        !found.is_empty(),
+        lua_failed,
+        "pasta_lua と食い違う: {text}"
+    );
+    found
+}
+
+#[test]
+fn property_reference_inside_expressions_is_error() {
+    let msg = "プロパティ参照（＄％名前）は式の中で使えません。先に変数へ代入してください";
+    // (書き方, 誤りの列)。どれも 3 行目
+    for (line, col) in [
+        ("  ＄x＝＄％p＋1", 3),        // 式の一部
+        ("  ＄x＝（＄％p）", 3),       // 括弧で包むとそのままではない
+        ("  ＄＝＄％p", 3),            // 代入先の無い式
+        ("  ＄％a＝＄％b", 3),         // プロパティへの代入の右辺
+        ("  さくら：＠f（＄％p）", 7), // 台詞の中でも関数の引数は式（位置はアクション）
+        ("  ＞場面（＄％p）", 3),      // Call の引数
+        ("  ＞＄％p", 3),              // 動的な Call のキー
+    ] {
+        let text = format!("＊場面\n  さくら：はい。\n{line}\n");
+        let found = transpile_findings(&text);
+        assert_eq!(
+            found,
+            vec![(
+                FindingKind::TranspilePropertyInExpr,
+                Some(3),
+                Some(col),
+                msg.to_string()
+            )],
+            "{line}"
+        );
+    }
+}
+
+#[test]
+fn property_reference_allowed_forms_are_not_errors() {
+    for line in [
+        "  ＄x＝＄％p",            // ローカル変数への代入の右辺がそのまま
+        "  ＄＊g＝＄％p",          // グローバル変数への代入の右辺がそのまま
+        "  さくら：値は＄％pです", // 台詞の中
+        "  ＄％a＝1",              // プロパティへの代入の左辺
+        "  ＄％a＝＄x＋1",         // 左辺がプロパティで右辺に参照が無い
+    ] {
+        let text = format!("＊場面\n  さくら：はい。\n{line}\n");
+        assert!(transpile_findings(&text).is_empty(), "{line}");
+    }
+}
+
+#[test]
+fn continuation_without_actor_is_error_per_local_scene() {
+    let msg = "アクターの無い継続行です。前の行にアクター行が必要です";
+    // 開始のブロックの最初の行が継続行
+    assert_eq!(
+        transpile_findings("＊場面\n  ：続き\n"),
+        vec![(
+            FindingKind::TranspileContinuationWithoutActor,
+            Some(2),
+            Some(1),
+            msg.to_string()
+        )]
+    );
+    // 前のローカルシーンのアクター行は引き継がない
+    assert_eq!(
+        transpile_findings("＊場面\n  さくら：はい。\n  ・次\n  ＄x＝1\n  ：続き\n"),
+        vec![(
+            FindingKind::TranspileContinuationWithoutActor,
+            Some(5),
+            Some(1),
+            msg.to_string()
+        )]
+    );
+    // 間に代入や Call があっても、同じローカルシーンの前のアクター行を引き継ぐ
+    assert!(transpile_findings("＊場面\n  さくら：はい。\n  ＄x＝1\n  ：続き\n").is_empty());
+}
+
+#[test]
+fn transpile_errors_found_in_every_file_and_occurrence() {
+    let text = "＊一\n  ：続き\n  ＄x＝＄％p＋1\n＊二\n  ：また\n";
+    let codes: Vec<_> = transpile_findings(text)
+        .into_iter()
+        .map(|(c, l, _, _)| (c, l))
+        .collect();
+    assert_eq!(
+        codes,
+        vec![
+            (FindingKind::TranspileContinuationWithoutActor, Some(2)),
+            (FindingKind::TranspilePropertyInExpr, Some(3)),
+            (FindingKind::TranspileContinuationWithoutActor, Some(5)),
+        ]
+    );
+}
