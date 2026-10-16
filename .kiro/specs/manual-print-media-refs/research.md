@@ -105,3 +105,88 @@
   - 改ページの印の数が、SUMMARY の書き方（部の見出し・区切り線・下書きの章）でどう変わるか（3.1-b を採る場合）。
   - CI の mdBook v0.5.3 と手元の v0.5.4 で、`print.html` のメディア要素の扱いが同じか（v0.5.3 の出力は CI で確かめる）。
 - **完了時の同期**: `.kiro/steering/tech.md` 201 行のパイプラインの並びに、新しい段を足す。
+
+---
+
+# 設計の調べ（2026-10-16・kiro-spec-design）
+
+## Summary
+
+- **Feature**: `manual-print-media-refs`
+- **Discovery Scope**: Extension（既存のビルド後の段の並びに、小さなツールを 1 本足す）。light discovery で行った
+- **Key Findings**:
+  - `print.html` の `<main>` の中は、改ページの `<div>` で 60 個に区切れ、その i 番目は目次（`toc.html`）の i 番目の章のリンクと 1 対 1 に対応する（手元の v0.5.4 の出力で 60 章すべてを確かめた）
+  - mdBook v0.5.3 の `print.rs` は v0.5.4 と同じ（違いはコメントの 1 語だけ）。改ページの印は「章と章の間に 1 つ」、書き換えるのは `a`・`img` の `href`・`src`・`xlink:href` だけ。CI と手元で出力の形は変わらない
+  - 見出しの `id` は `print.html` で重ならないように付け直される（`アクター辞書` → `アクター辞書-1`）。要素の `id` 属性も同じく付け直されうるので、章のページとの突き合わせは、タグの全体ではなく、直す対象の属性の値だけで比べる
+
+## Research Log
+
+### print.html の章の区切りと目次の対応
+- **Context**: 前提 A4（要素を書いた章の場所から直す）を満たすには、`print.html` の中の各要素がどの章のものかを知る必要がある
+- **Sources Consulted**: 手元の mdBook v0.5.4 で `book/` をスクラッチへビルドした出力（`print.html`・`toc.html`・章のページ）。mdBook の `crates/mdbook-html/src/html/print.rs`（v0.5.3 のタグ）と、v0.5.3...v0.5.4 の差分（GitHub API）
+- **Findings**:
+  - `render_print_page` は、章の木を順に直列化し、2 章目からは前に `<div style="break-before: page; page-break-before: always;"></div>` を 1 つ足す。区切りは章の数 − 1 個（今は 59 個・60 章）
+  - `toc.html` の `<a href="….html">` は 60 本で、SUMMARY の順（下書きの章・区切り線・部の見出しはリンクを持たない）。`print.html` の区切りで分けた i 番目の部分の最初の `<h1 id>` は、`toc.html` の i 番目の章のページの最初の `<h1 id>` と、`id` の付け直し 1 件（`grammar/actor-dictionary.html`）を除いて一致した
+  - 章のページの `<main>` と、`print.html` の対応する部分とで、直す対象（`video` の `src`・`poster`、`audio`・`source`・`track` の `src`）の値の並びを比べると、60 章すべてで一致した（今は `debug/dev-actions.html` の 1 件だけ）
+  - mdBook は、章に `<h1>` が無いとき `print.html` の側にだけ `<h1>` を足し、`id` 属性を重ならないように付け直す。メディア要素の `src`・`poster` は変えない
+  - mdBook 0.5 は生の HTML を解析して出し直すので、属性の値は二重引用符で出る（`controls=""`）
+  - v0.5.3 の `print.rs` と v0.5.4 の差分はコメントの「an string」→「a string」だけ。`toc.html` は v0.5.3 の CI でも出ている（出力の検査の「目次 (toc) が SUMMARY 全章へのリンクを含む」が CI で合格している）
+- **Implications**: 区切りと目次の並びで章を決め（案 3.1-b）、章のページとの値の並びの一致で確かめる（案 3.1-c の軽い形）組み合わせが、同じ名前のファイルが別の章にあっても正しく直せ、mdBook の形が変わったら黙らずに止まる
+
+### 既存の段の型
+- **Context**: 書き換えの段は `talk-html.mjs` と同じ型にする（requirements の前提 A3）
+- **Sources Consulted**: `book/tools/talk/talk-html.mjs`・`talk-html-test.mjs`・`verify-static.mjs`・`.github/workflows/manual.yml`・`book/AUTHORING.md`
+- **Findings**: `transformDir(outDir, { write })` を export し、全ファイルを確かめてから書く。失敗は `Error` を投げ、CLI が `process.exitCode = 1`。自己テストは依存ゼロの `check()` と一時フォルダのフィクスチャ。`verify-static.mjs` は `talk-html` の関数を取り込み、`ensureBuilt` の中で呼ぶ
+- **Implications**: 同じ形の関数 1 つ（`fixPrintMediaRefs`）と CLI を持つ 1 ファイルにする。下位のフォルダは作らない（`link-check.mjs`・`tutorial-check.mjs` と同じく `book/tools/` 直下）
+
+### 出力の検査の影響
+- **Findings**: 今の出力に `poster=`・`data-src=` などは 1 つも無い（スクラッチの出力で確かめた）。`extractRefs` に `poster` を足しても、今の出力で検査の結果は変わらない。例外（247〜249 行）を外すと、書き換えの前の出力では `print.html` の `media/dev-actions-demo.mp4` で必ず落ちる
+- **Implications**: CI・`ensureBuilt`・`AUTHORING.md` の一覧の 3 か所に同時に書き換えを入れる
+
+## Architecture Pattern Evaluation
+
+| 案 | 中身 | 強み | 弱み | 判断 |
+| -- | ---- | ---- | ---- | ---- |
+| 3.1-b だけ | 区切りの数と目次の章の数が合えば、i 番目の部分を i 番目の章とする | 単純 | 数が偶然合ったまま並びがずれると、同じ名前の別の章のファイルを黙って指す（出力の検査も気づかない） | 単独では採らない |
+| 3.1-c だけ | 対象の値が同じ章のページを探す | 構造に頼らない | 同じ名前の動画を 2 つの章に書くと決まらない（要件 2.10 の場合を落とす） | 採らない |
+| 3.1-b ＋ 値の並びの照合 | 3.1-b で決め、その章のページの `<main>` の対象の値の並びと一致することを確かめる | 同じ名前でも正しく直る。並びのずれ・mdBook の形の変化で止まる。2 回目の実行も見分けられる | 章のページを 1 枚ずつ読む（60 枚・一瞬） | **採る** |
+
+## Design Decisions
+
+### Decision: 章の決め方
+- **Context**: 要件 2.4・2.10、前提 A4
+- **Alternatives Considered**: 上の表
+- **Selected Approach**: `print.html` の `<main>` を改ページの印で分け、`toc.html` の章のリンクの並びと対応させる。数が違えば失敗。各部分の対象の値の並びが、対応する章のページの `<main>` の並び（そのままの値か、直した後の値）と一致しなければ失敗
+- **Rationale**: 出力のフォルダだけを入力にでき（`talk-html` と同じ引数）、mdBook の出力の形の変化は数か並びの食い違いとして必ず表に出る
+- **Trade-offs**: `toc.html` の形（`<a href="….html">`）に頼る。代わりに SUMMARY.md を読むと、ツールが `book/src` の場所も知る必要があり、フィクスチャも増える
+- **Follow-up**: 章の並びの出どころ（`toc.html` か SUMMARY.md か）は設計ディスカッションで確かめる（design.md の未決事項 1）
+
+### Decision: 2 回目の実行の扱い
+- **Selected Approach**: 部分の値が、章のページの値そのもの（未修正）か、それを直した値（修正済み）なら一致とみなす。修正済みなら変えない
+- **Rationale**: 要件 2.7 の冪等を、別の印を足さずに満たす。根の章では両者が同じなので区別は要らない
+
+### Decision: 写し先の実在の確かめ
+- **Selected Approach**: 直す・直さないにかかわらず、外部 URL・見出しだけ・根からの絶対パスを除く対象すべてで、直した後のパスのファイルが出力に在ることを確かめる（`classic/` は対象外にしない。写し先が `classic/` を指すことは無い）
+- **Rationale**: 要件 2.4。出力の根から外へ出るパスも「無い」とする
+
+### Decision: 0 件のとき
+- **Selected Approach**: `print.html` に対象が 1 つも無ければ、`toc.html` や章のページを読まずに 0 件で成功する（前提 A2）。`print.html` そのものが無いのは失敗（要件 2.5）
+
+### Synthesis
+- **Generalization**: 対象の要素と属性を 1 つの表（`video: src・poster` ほか）にまとめ、書き換えと照合の両方がこの表だけを見る。要素を足すときは表に 1 行足すだけ
+- **Build vs. Adopt**: HTML の構文解析器（parse5 など）は採らない。`book/tools` は依存ゼロの決まりがあり、mdBook 0.5 が属性を二重引用符に正規化して出すので、タグと属性の正規表現で足りる（`talk-html`・`verify-static` と同じ判断）
+- **Simplification**: 純関数と出力フォルダの関数を分けない（`talk-html` は分けているが、本ツールは複数のファイルを突き合わせるので、1 ファイルだけの純関数に意味が薄い）。export は 1 つ。設定・オプションは `write` だけ
+
+## Risks & Mitigations
+- mdBook の版の上げで `print.html` の区切りの形・`toc.html` の形が変わる — 数か並びの食い違いで失敗し、CI が公開前に止まる（黙って壊れない）
+- 章の本文に改ページの `<div>` と同じ文字列を生の HTML で書く — 区切りの数が合わなくなって失敗する（黙って壊れない）
+- 属性の値に `>` を含む（正規表現がタグの終わりを誤る） — 今の書き方には無い。照合が食い違えば失敗する
+- `extractRefs` の `\bposter` が `data-poster=` にも当たる — 既存の `data-src` と同じ性質。今の出力には無い
+
+## References
+- mdBook `crates/mdbook-html/src/html/print.rs`（v0.5.3）— 改ページの印と書き換えの範囲
+- mdBook compare v0.5.3...v0.5.4 — `print.rs` はコメントだけの違い
+
+## 使ったスキル・指針（設計のフェーズ）
+- `kiro-spec-design`（rules: design-principles・design-discovery-light・design-synthesis・design-review-gate）
+- `ponytail`（作り込みを避ける。依存を足さない・ファイルを増やさない）
