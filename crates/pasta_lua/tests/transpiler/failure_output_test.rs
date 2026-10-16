@@ -257,7 +257,8 @@ fn site_06_global_fn_not_found() {
 }
 
 /// #7 `WORD.dynamic_key`: 動的参照の値が名前にならない（値なし・空文字列・型）。
-/// 名前にならないときは外側の単語・関数・Call の検索をしない（見つからない警告を重ねない）
+/// 参照の位置に表記 1 つ・警告 1 行。名前にならないときは外側の単語・関数・Call の検索をせず、
+/// `＞＠＄名前（）` も `call_key` が重ねて出さない（重ねない規則）
 #[test]
 fn site_07_dynamic_key_not_a_name() {
     run_case(&Case {
@@ -271,11 +272,17 @@ fn site_07_dynamic_key_not_a_name() {
             "　＄d＝＠＄真\n",
             "　＄e＝＠＄未代入（）\n",
             "　＞＄行き先\n",
+            "　＞＠＄未代入（）\n",
         ),
         tokens: &[
             "talk|さくら|前",
+            "raw_script|-|【名前にならない値：＄未代入（値なし）】",
             "talk|さくら|。後",
+            "raw_script|-|【名前にならない値：＄空（空文字列）】",
+            "raw_script|-|【名前にならない値：＄真（真偽値）】",
+            "raw_script|-|【名前にならない値：＄未代入（値なし）】",
             "raw_script|-|【名前にならない値：＄行き先（値なし）】",
+            "raw_script|-|【名前にならない値：＄未代入（値なし）】",
         ],
         warns: &[
             "proxy:word - undefined variable: 'var.未代入'",
@@ -283,6 +290,7 @@ fn site_07_dynamic_key_not_a_name() {
             "act:word - unsupported value type: 'var.真' (boolean)",
             "act:expr_fn - undefined variable: 'var.未代入'",
             "act:call - undefined variable: 'var.行き先'",
+            "act:expr_fn - undefined variable: 'var.未代入'",
         ],
         vars: &["d=nil", "e=nil"],
     });

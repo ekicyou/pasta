@@ -399,7 +399,7 @@ end
 function ACT_IMPL.word(self, name, var_path)
     local skip_methods = nil
     if var_path ~= nil then
-        name = WORD.dynamic_key(name, var_path, "act:word")
+        name = WORD.dynamic_key(name, var_path, "act:word", self)
         if name == nil then return nil end
         skip_methods = true
     elseif not name or name == "" then
@@ -473,9 +473,9 @@ end
 --- @param ... any 可変引数（ハンドラーに伝搬）
 --- @return any ハンドラーの戻り値、またはnil
 function ACT_IMPL.expr_fn_var(self, value, var_path, ...)
-    local key = WORD.dynamic_key(value, var_path, "act:expr_fn")
+    local key = WORD.dynamic_key(value, var_path, "act:expr_fn", self)
     if key == nil then
-        FAILURE.set_fn_failed(self, false) -- 直前の別の参照の印を残さない（call_key は現行どおり報告する）
+        FAILURE.set_fn_failed(self, true) -- dynamic_key が報告済み（call_key は重ねない）
         return nil
     end
     return call_expr(self, key, true, ...)
@@ -687,17 +687,19 @@ function ACT_IMPL.call_key(self, value, var_path, desc)
     if t == "string" and value ~= "" then return value end
     -- 式が関数 1 つでその関数が見つからないとき、関数の参照が報告済みなので重ねない
     if desc ~= nil and var_path == nil and FAILURE.take_fn_failed(self) then return SKIP_CALL end
-    local record = { label = FAILURE.LABEL.BAD_NAME, detail = FAILURE.kind_of(value) }
     if var_path then
-        WORD.dynamic_key(value, var_path, "act:call") -- 警告だけ出す（キーにできないことは判定済み）
-        record.subject = FAILURE.var(var_path)
-    else
-        record.subject = desc and FAILURE.fn(desc)
-        if value ~= nil or desc ~= nil then
-            local operand = desc and string.format("operand='%s', ", desc) or ""
-            record.warning = string.format("act:call - key is not a string or number: %svalue=%s",
-                operand, arith_value_text(value))
-        end
+        WORD.dynamic_key(value, var_path, "act:call", self) -- 報告だけ（キーにできないことは判定済み）
+        return SKIP_CALL
+    end
+    local record = {
+        label = FAILURE.LABEL.BAD_NAME,
+        subject = desc and FAILURE.fn(desc),
+        detail = FAILURE.kind_of(value),
+    }
+    if value ~= nil or desc ~= nil then
+        local operand = desc and string.format("operand='%s', ", desc) or ""
+        record.warning = string.format("act:call - key is not a string or number: %svalue=%s",
+            operand, arith_value_text(value))
     end
     FAILURE.report(self, record)
     return SKIP_CALL

@@ -227,9 +227,9 @@ end
 --- @param ... any 可変引数（ハンドラーに伝搬。第 1 引数は ACT）
 --- @return any|nil ハンドラー戻り値、またはnil
 function PROXY_IMPL.expr_fn_var(self, value, var_path, ...)
-    local key = WORD.dynamic_key(value, var_path, "proxy:expr_fn")
+    local key = WORD.dynamic_key(value, var_path, "proxy:expr_fn", self.act)
     if key == nil then
-        FAILURE.set_fn_failed(self.act, false) -- 直前の別の参照の印を残さない
+        FAILURE.set_fn_failed(self.act, true) -- dynamic_key が報告済み（call_key は重ねない）
         return nil
     end
     return call_expr(self, key, true, ...)
@@ -251,7 +251,7 @@ end
 function PROXY_IMPL.word(self, name, var_path)
     local skip_methods = nil
     if var_path ~= nil then
-        name = WORD.dynamic_key(name, var_path, "proxy:word")
+        name = WORD.dynamic_key(name, var_path, "proxy:word", self.act)
         if name == nil then return nil end
         skip_methods = true
     elseif not name or name == "" then

@@ -146,7 +146,28 @@ describe("失敗の対応表 #7 WORD.dynamic_key（動的参照の値が名前�
         end)
     end)
 
-    test("act・proxy の動的参照は警告 1 行だけで、外側の検索の「見つからない」を重ねない", function()
+    test("act を渡すと表記を 1 つ積み、戻り値と警告の文言は act なしと同じ", function()
+        with_sites(function(ACT, WORD, warns)
+            local act = new_act(ACT)
+            expect(WORD.dynamic_key(nil, "var.x", "act:word", act)):toBeNil()
+            expect(WORD.dynamic_key("", "save.x", "act:word", act)):toBeNil()
+            expect(WORD.dynamic_key(true, "args[1]", "act:word", act)):toBeNil()
+            expect(WORD.dynamic_key("名前", "var.x", "act:word", act)):toBe("名前")
+            expect(WORD.dynamic_key(1, "var.x", "act:word", act)):toBe("1")
+            expect(dump(act)):toBe(table.concat({
+                "raw_script|-|【名前にならない値：＄x（値なし）】",
+                "raw_script|-|【名前にならない値：＄＊x（空文字列）】",
+                "raw_script|-|【名前にならない値：＄０（真偽値）】",
+            }, "\n"))
+            expect(table.concat(warns, "\n")):toBe(table.concat({
+                "act:word - undefined variable: 'var.x'",
+                "act:word - empty variable: 'save.x'",
+                "act:word - unsupported value type: 'args[1]' (boolean)",
+            }, "\n"))
+        end)
+    end)
+
+    test("act・proxy の動的参照は表記 1 つ・警告 1 行で、外側の検索の「見つからない」を重ねない", function()
         with_sites(function(ACT, _, warns)
             local act = new_act(ACT)
             local proxy = act:actor_proxy(ACTOR_NAME)
@@ -154,7 +175,12 @@ describe("失敗の対応表 #7 WORD.dynamic_key（動的参照の値が名前�
             expect(act:expr_fn_var("", "var.x")):toBeNil()
             expect(proxy:word(true, "var.x")):toBeNil()
             expect(proxy:expr_fn_var(nil, "args[2]")):toBeNil()
-            expect(dump(act)):toBe("")
+            expect(dump(act)):toBe(table.concat({
+                "raw_script|-|【名前にならない値：＄x（値なし）】",
+                "raw_script|-|【名前にならない値：＄x（空文字列）】",
+                "raw_script|-|【名前にならない値：＄x（真偽値）】",
+                "raw_script|-|【名前にならない値：＄１（値なし）】",
+            }, "\n"))
             expect(table.concat(warns, "\n")):toBe(table.concat({
                 "act:word - undefined variable: 'var.x'",
                 "act:expr_fn - empty variable: 'var.x'",
@@ -173,6 +199,23 @@ describe("失敗の対応表 #7 WORD.dynamic_key（動的参照の値が名前�
             expect(dump(act)):toBe("raw_script|-|【名前にならない値：＄行き先（値なし）】")
             expect(#warns):toBe(1)
             expect(warns[1]):toBe("act:call - undefined variable: 'var.行き先'")
+        end)
+    end)
+
+    test("動的な関数の参照が名前にならないとき（＞＠＄名前（））は call_key が重ねて出さない", function()
+        with_sites(function(ACT, _, warns)
+            local act = new_act(ACT)
+            local proxy = act:actor_proxy(ACTOR_NAME)
+            expect(type(act:call_key(act:expr_fn_var(nil, "var.x"), nil, "@$var.x()"))):toBe("table")
+            expect(type(act:call_key(proxy:expr_fn_var(true, "var.y"), nil, "@$var.y()"))):toBe("table")
+            expect(dump(act)):toBe(table.concat({
+                "raw_script|-|【名前にならない値：＄x（値なし）】",
+                "raw_script|-|【名前にならない値：＄y（真偽値）】",
+            }, "\n"))
+            expect(table.concat(warns, "\n")):toBe(table.concat({
+                "act:expr_fn - undefined variable: 'var.x'",
+                "proxy:expr_fn - unsupported value type: 'var.y' (boolean)",
+            }, "\n"))
         end)
     end)
 end)

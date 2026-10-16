@@ -568,14 +568,14 @@ end
     assert!(!out.contains("table:"), "must not render a table: {out}");
 }
 
-/// R4.5: 未代入の `＠＄z` は空文字列になり、行の残りが出力される。
+/// R4.5: 未代入の `＠＄z` はその位置に失敗表記が出て、行の残りが出力される。
 #[test]
 fn test_e2e_dynamic_word_ref_unassigned_keeps_rest_of_line() {
     let out = fire_scenes(DYNAMIC_REF_SOURCE, &["未代入"]).remove(0);
     assert!(!out.contains("nil"), "must not render 'nil': {out}");
     assert!(
-        out.contains("前後。"),
-        "unassigned dynamic ref must render empty and keep the rest: {out}"
+        out.contains("前【名前にならない値：＄z（値なし）】後。"),
+        "unassigned dynamic ref must render the failure notation and keep the rest: {out}"
     );
 }
 
