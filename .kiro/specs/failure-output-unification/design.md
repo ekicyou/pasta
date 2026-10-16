@@ -52,6 +52,7 @@
 - 失敗表記の枠・種類の名前・説明の並びを変えたとき（マニュアル・結合テストの期待値・後続 spec）。
 - pasta.toml のキーの名前・既定値・置き場所を変えたとき（`runtime-error-balloon` が同じ切り替えに従う）。
 - 生成する Lua が `act:init_scene` をシーン関数の先頭で呼ばなくなったとき（実行中の act の対応表の前提）。
+- 生成する Lua の動的コール `act:call_key(act:expr_fn(…), nil, "@名前()")` で、関数の参照を `call_key` の直前に評価する順序（`code_gen/element_gen.rs` の `call_key`）が変わったとき（FnResultFlag の前提。`failure_output_test.rs` の `＞＠無い関数（）` で固定する）。
 - `raw_script` のグループ化・`sakura_builder` の has-text の判定を変えたとき（4.6 の前提）。
 
 ## Architecture
@@ -374,7 +375,7 @@ function FAILURE.report(act, record) end
 **形の規則（3.1）**: `【label：subject（detail）】`。`detail` が無ければ `（…）` を付けない。`subject` が無ければ `【label：detail】`。両方無ければ `【label】`（`act:failure(text)` の互換）。エスケープは中身全体（label・subject・detail を並べたもの）にかけ、枠はその後で付ける。
 
 ##### State Management
-- `RUNNING`（RunningActRegistry）: `setmetatable({}, { __mode = "k" })`。キーはスレッド、値は act。`FAILURE.bind(act)` が `coroutine.running()` のスレッドに対応させ（nil なら何もしない）、`FAILURE.running_act()` が引く。シーン関数を抜けても消さない（同じコルーチンの続きのため）。メインスレッドのキーは次の `init_scene` で上書きされる。
+- `RUNNING`（RunningActRegistry）: `setmetatable({}, { __mode = "k" })`。キーはスレッド、値は act。`FAILURE.bind(act)` が `coroutine.running()` のスレッドに対応させ（nil なら何もしない）、`FAILURE.running_act()` が引く。シーン関数を抜けても消さない（同じコルーチンの続きのため）。メインスレッドのキーは次の `init_scene` で上書きされる。`act:call` で別のシーンへ入っても同じ act を渡すので対応は変わらない。同じコルーチンの中で Lua が**別の act** でシーン関数を呼んだ場合は、戻った後も内側の act が対応に残る（制限。`init_scene` に対になる終わりの呼び出しが無く、生成コードの経路では起きないため戻す仕組みは持たない。マニュアルの Lua の節に書く）。
 - `FN_FAILED`（FnResultFlag）: `setmetatable({}, { __mode = "k" })`。キーは act、値は真偽値。`FAILURE.set_fn_failed(act, failed)` を関数呼び出しの参照（`call_expr`・`global_fn`・`expr_fn_var`）が成功・失敗のたびに書き、`FAILURE.take_fn_failed(act)` が読んで偽に戻す。
 - `UNREGISTERED`（UnregisteredActorMark）: `setmetatable({}, { __mode = "k" })`。`FAILURE.mark_unregistered_actor(actor)`・`FAILURE.is_unregistered_actor(actor)`。印はアクターの表のフィールドに書かない（辞書の単語名と衝突させないため。`find_actor_handler` の A1 は `actor[key]` を引く）。
 
@@ -450,11 +451,11 @@ function FAILURE.is_unregistered_actor(actor) end
 | 未登録アクター | 立ち位置の警告 | SpotFallbackGuard（新規） |
 
 - `call_key` の新しい規則: 生成コードは `act:call_key(act:expr_fn(…), nil, "@名前()")` の形で、関数の参照を `call_key` の直前に評価する。関数の引数の中の関数はそれより先に評価されるので、`FN_FAILED[act]` は「`call_key` に渡した値を作った関数呼び出し」の結果を指す。関数が見つかって nil を返したときは偽なので、現行どおり `名前にならない値` を報告する。成功の偽は、呼んだ関数が戻った後に書く（関数の中で別の参照が失敗して真にしても、戻った時点で偽に戻す）。`expr_fn_var` は `dynamic_key` が nil を返したときも真を書く。
-- 値なしを代入した変数を後で展開した場合（`＄x＝＠無い単語` の後の `＄x`）は、代入の行と展開の行で別々に報告する（**仮定**。OPEN QUESTION 3）。
+- 値なしを代入した変数を後で展開した場合（`＄x＝＠無い単語` の後の `＄x`）は、代入の行と展開の行で別々に報告する（要件 2.1 が「値なしを代入した変数」を対象に挙げているため。どの変数が失敗から来たかは追わない）。
 
 #### ActSites: `act:failure`（8.1・8.3）
 - 署名は今のまま `act:failure(text, warning) -> nil`。`FAILURE.report(self, { label = text, warning = warning })` を呼ぶだけにする。表記は `【text】`（エスケープ済み）になり、切り替えに従う。
-- **仮定**: `text` もエスケープする（3.7 の一貫性）。今 `text` にタグを入れて呼んでいる Lua はタグが文字として出るようになる（OPEN QUESTION 5）。
+- `text` もエスケープする（要件 3.7 はすべての失敗表記の中身に及ぶ）。今 `text` にタグを入れて呼んでいる Lua はタグが文字として出るようになる。この変化はリリースノートの破壊的変更に書く（10.6）。
 
 ### Lua ランタイム: ActGrouping（`act.lua`）
 
@@ -519,6 +520,8 @@ function FAILURE.is_unregistered_actor(actor) end
 ### Integration Tests（Lua spec・Rust の DSL → 実行）
 - 対応表 #1〜#13 の各箇所が、警告 1 行（現行の文言）と表記 1 つを出し、戻り値が現行どおり（2.1〜2.10・3.5・6.1・6.2）。`failure_output_test.rs` で DSL から通す。
 - 位置: 発言の途中・代入行・Call 行の引数・式の中・Lua ブロックから呼んだ `act:word`・出力の先頭・チェイントークの再開後の `PASTA.num`（2.12・4.1〜4.4）。
+- `coroutine.running()`: シーンのコルーチンの中とメインスレッドの両方で `bind`/`running_act` を通し、`luajit52` での戻り値の想定を確かめる。
+- 生成コードの順序の固定: `＞＠無い関数（）` が表記 1 つ・警告 1 行になること（FnResultFlag の前提を codegen の変更から守る）。
 - 重ねない規則の表の 6 行それぞれで、表記 1 つ・警告 1 行（5.1〜5.4）。同じ書き間違いを 2 回通ると 2 回出る（5.5）。
 - 未登録アクター: 目印がそのアクターの `\p[…]` の直後に出て、ウェイト・改行が入らず、続く台詞の段落区切りが目印の無い場合と同じ（3.6・4.2・4.6）。継続行で 1 回だけ（5.3）。
 - 切り替え: 出さない設定の出力が、出す設定の出力から表記を除いたものと一致し、ログは同じ（6.4・7.3・7.4）。
@@ -555,9 +558,7 @@ graph LR
 
 - **OPEN QUESTION 1**: 切り替えのキーの名前と置き場所（仮定: `[ghost] failure_notation`）。
 - **OPEN QUESTION 2**: 名前にならない値の型の名前（仮定: 日本語 `真偽値`・`表`・`関数`、それ以外は Lua の型名）。
-- **OPEN QUESTION 3**: 値なしを代入した変数を後で展開したとき（仮定: 代入と展開の両方で出す）。
 - **OPEN QUESTION 4**: 出さない設定での未登録アクターの空の目印（仮定: 積む）。
-- **OPEN QUESTION 5**: `act:failure(text)` の `text` のエスケープ（仮定: する）。
 - **OPEN QUESTION 6**: 1 か所の説明の置き場所（仮定: 新ページ `reference/runtime-failures.md`、スキル `pasta-ghost-authoring` の生成対象に足す）。
 - **OPEN QUESTION 7**: 対象が分からないときの表記（仮定: 説明を対象の位置に出す。`【数にできない値："abc"】`・`【名前にならない値：値なし】`）。
 - **Risk**: `tutorial_stages_test.rs` は同じ時期の `touch-poke-shortcuts` も触る。後から入る側が rebase で合わせる（足すのは `assert_responds` の 1 条件）。
