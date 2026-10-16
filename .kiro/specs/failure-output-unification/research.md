@@ -153,3 +153,107 @@
   - `WORD.dynamic_key` を「理由を返す」形に変えるときの、Lua から直接呼んでいる箇所（マニュアル `lua/script-api.md` 558〜567 に公開の関数として載っている）との互換。
   - マニュアルの 1 か所の置き場所（新しいページなら GENERATION_MAP に足すか）。候補は `reference/` の下の新しいページ、または `reference/startup.md` §4 の隣の節。
 - **持ち越す調べ**: R1〜R7。
+
+---
+
+# 設計フェーズの調査と決定（2026-10-16）
+
+## Summary
+- **Feature**: `failure-output-unification`
+- **Discovery Scope**: Extension（既存の Lua ランタイムへの統合。軽い調査 `design-discovery-light.md` を適用。新しい外部依存は無い）
+- **Key Findings**:
+  - 生成するシーン関数はすべて先頭で `act:init_scene(SCENE)` を呼ぶ（`code_gen/scope_gen.rs` 268 行）。ここで「コルーチン → act」を弱参照の表に登録すれば、生成する Lua も、コルーチンを作る側（`scene.lua`・`choice_select.lua`・`kick.lua`）も触らずに、`PASTA.num`・`PASTA.str` から実行中の act を引ける（R1 の解決）。
+  - `raw_script` に `actor` を持たせ、`group_by_actor` で `talk` と同じ分岐に入れるだけで、未登録アクターの目印を「そのアクターの発言の先頭・ウェイトと改行なし・字のある発言に数えない」にできる。`sakura_builder` の変換は変えずに済む（R2 の解決）。
+  - マニュアルは台詞の外のエスケープとして `\`（`\`）と `\%`（`%`）を既に定めている（`grammar/sakura-script.md`「タグの外のエスケープ」）。失敗表記のエスケープはこの 2 つと、SHIORI 応答を壊さないための CR・LF → 空白で足りる（R3 の解決）。
+
+## Research Log
+
+### R1 実行中の act の見つけ方
+- **Context**: `ACT.num`・`ACT.str` は act を受け取らない。生成する Lua を変えない約束（要件 10.1）。
+- **Sources Consulted**: `act.lua`（`init_scene`・`num`・`str`）、`scene.lua` `SCENE.co_exec`、`shiori/event/init.lua` `EVENT.fire`・`resume_until_valid`、`shiori/event/choice_select.lua`・`kick.lua` の `coroutine.create`、`code_gen/scope_gen.rs`、`tests/fixtures/sample.generated.lua`。
+- **Findings**:
+  - コルーチンを作るのは `scene.lua`（範囲内）と `choice_select.lua`・`kick.lua`（範囲の外ではないが触りたくない）の 3 か所。どれもシーン関数を呼び、シーン関数は必ず `init_scene` を呼ぶ。
+  - チェイントークの再開は同じコルーチン・同じ act（`EVENT.fire` が新しく作る act は使われない）。「最後に作った act」案（b）はここで誤る。
+  - 「保留して次の act のメソッドで流す」案（c）は、式だけの代入行の後に発言が無いと位置がずれる。
+  - `PASTA.num` を呼ぶのは生成コードの式だけで、シーン関数の中に限られる（アクター辞書・単語の定義からは呼ばない）。
+- **Implications**: `init_scene` で `FAILURE.bind(self)`、`ACT.num`・`ACT.str` は `FAILURE.running_act()`。対応が無ければログだけ。`coroutine.running()` の戻り（`luajit52` ではメインスレッドでも thread の想定）は nil も確かめる。
+
+### R2 未登録アクターの目印のトークン
+- **Context**: 要件 3.6・4.2・4.6（ウェイト・改行なし、そのアクターの発言の先頭、前後の判定を変えない）。
+- **Sources Consulted**: `act.lua` `group_by_actor`・`merge_consecutive_talks`・`actor_proxy`、`shiori/sakura_builder.lua` `inner_token_to_string`・`emits_text`・`emit_actor_switch`。
+- **Findings**:
+  - `sakura_script` トークンは `talk_to_script` を通るので句読点のウェイトが入る。使えない。
+  - グループの中の `raw_script` は文字のまま出て、`emits_text` は偽（has-text・段落区切りに効かない）。
+  - アクター付きの `raw_script` を `talk` と同じ分岐でグループ化すれば、`emit_actor_switch` が `\p[…]` を出し、目印はその直後に出る。
+- **Implications**: 変更は `group_by_actor` の条件 1 つと `actor_proxy` の遡りの条件 1 つ。`sakura_builder` は 5.4 の警告の条件だけ。
+
+### R3 失敗表記のエスケープ
+- **Sources Consulted**: UKADOC `\_?`・環境変数の記述例、Pasta マニュアル `grammar/sakura-script.md`「タグの外のエスケープ」、`grammar/action-line.md`（`\`・`\%` のエスケープ）。
+- **Findings**: `\` と `\%` で `\` と `%` を 1 文字として表示できる。`\_?` で囲む案もあるが、中に `\_?` が入ると閉じてしまい、マニュアルの既存の決まりとも揃わない。SHIORI 応答の Value は 1 行なので、CR・LF は表記に入れられない。
+- **Implications**: `FAILURE.escape`: `\` → `\`、`%` → `\%`、CR・LF → 空白。中身全体にかけて、枠は後で付ける。`runtime-error-balloon`（複数行のエラー文）もこれで 1 行に収まる。
+
+### R4 設定の置き場所
+- **Sources Consulted**: `loader/config/sections.rs` `GhostConfig`、`mod.rs` `apply_shiori_defaults`、`pasta/config.lua`、`shiori/act.lua`（`spot_newlines`・`choice_newlines` の読み方）、マニュアル `reference/pasta-toml.md`。
+- **Findings**: `[ghost]` は書かれていないキーだけを Rust が既定値で補い、Lua は `pasta.config.get` で読む。型は確かめていない。`[debug]` は DAP の設定で、型が合わないとセクション全体が既定値に戻る（別の意味の設定と混ぜたくない）。
+- **Implications**: `[ghost] failure_notation`（真偽値・既定 true）。型の検査は Lua 側でキー単位（真偽値でなければ true）。マニュアルの「値の型が合わないとき」に行を足す。キーの名前は OPEN QUESTION 1。
+
+### R5 既定で表記を出すことのテストへの影響
+- **Findings**: 警告・表記の文字列を確かめているテストは research.md 1.7 のとおり。加えて、`talk` の nil でトークンが積まれないこと・`word` の nil を確かめる Lua spec（`act_runtime_safety_test.lua`・`act_test.lua`・`act_dynamic_ref_test.lua`・`actor_proxy_act_delegation_test.lua`）の期待値が変わる。`pasta_shiori/tests/` で変わるのは、本物のランタイムを読む 2 本（`call_execution_correctness_e2e_test.rs`・`codegen_runtime_safety_e2e_test.rs`）の期待値だけで、`shiori-test-support-runtime` が触る共通部品・写し・`pasta.toml` とは重ならない。
+- **Implications**: 載せ替え 1 種類 = 1 コミットで、その種類の期待値だけを更新する。
+
+### R6 名前の変換の網羅
+- **Sources Consulted**: `expr_gen.rs` `operand_desc`・`binary_node`、`element_gen.rs` `resolve_var_path`・`dynamic_ref_args`・`generate_action`・`call_key`。
+- **Findings**: 変数パスは `var.名前`・`save.名前`・`args[N]`（N = DSL の番号 + 1）の 3 形。説明は `@名前()`・`@*名前()`・`@$<変数パス>()` と、変数パスそのもの。括弧で包んだ式は中身の説明を引き継ぐ。プロパティ参照（`＄％名前`）は式に入らず（`property_in_expression` エラー）、アクション行では `tostring(act:get_property(…))` になり失敗の報告を通らない。
+- **Implications**: `FAILURE.var`・`FAILURE.fn` の変換規則は 6 形と「知らない形はそのまま」で閉じる。
+
+### R7 毎秒・通知のイベントでの表記だけの出力
+- **Findings**: 要件ディスカッション Q10 で「空の出力として扱わずに返す」と決まった。`act:build` は 1 トークンでも非 nil を返すので、変更は要らない。出さない設定では積まない（未登録アクターの空の目印を除く。OPEN QUESTION 4）。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A `act.lua` を広げる | `act:failure` を出口に | ファイルが増えない | `act.lua` が大きくなる。`word.lua`・`sakura_builder.lua` から使うと循環に近づく | 不採用 |
+| B 新モジュール | `pasta/failure.lua` に出口・形・切り替え・対応表 | 形と規則が 1 ファイル。後続 spec がそのまま使える。`act.lua` の差分が小さい | ファイルが 1 つ増える | 採用（到達点） |
+| C 段階的 | 抽出 → 形 → 種類ごとの載せ替え | 1 抽出 = 1 検証 = 1 コミット | タスクが多い | 採用（進め方） |
+
+## Design Decisions
+
+### Decision: 失敗レコードを 1 つの表で渡す
+- **Context**: 要件 1.2（種類が持つのは内容だけ）・3.2（形は 1 か所）。
+- **Alternatives Considered**: 1. 種類ごとの関数（`FAILURE.undefined_var(act, path)` など 8 個）　2. 位置引数 6 個の 1 関数　3. レコードの表 1 個
+- **Selected Approach**: 3。`{ label, subject, detail, warning, actor }`。種類の名前は `FAILURE.LABEL` の定数。
+- **Rationale**: 後続 spec が種類を足しても関数を増やさずに済む。nil の飛び石の位置引数より読みやすい。
+- **Trade-offs**: 名前の変換は呼び出し元が `FAILURE.var` などを使って行う（変換の規則自体は 1 か所）。
+
+### Decision: 重ねない規則は「内側が報告し外側は黙る」を保ち、新規は 1 つだけ
+- **Context**: 要件 5.1・5.2。動的コールの式が関数 1 つで、その関数が見つからないと、今は 2 行の警告が出る。
+- **Alternatives Considered**: 1. 最後の報告の対象名で比べる（動的関数で名前が食い違う）　2. 関数由来の nil では `call_key` は常に黙る（見つかって nil を返した関数の警告が消え、3.5 に反する）　3. 「直前の関数呼び出しが失敗したか」の印を act ごとに持つ
+- **Selected Approach**: 3（`FN_FAILED`）。
+- **Rationale**: 生成コードの評価順（`call_key` の直前に関数の参照）に基づき、正確で小さい。
+
+### Decision: 未登録アクターの印はアクターの表に書かない
+- **Context**: 要件 5.4。`sakura_builder` が未登録かを知る必要がある。
+- **Alternatives Considered**: 1. アクターの表にフィールド（`find_actor_handler` の A1 が辞書の単語名で引くので衝突しうる）　2. `STORE.actors` に無いかで判定（テストのアクターで誤判定）　3. spot トークンを積む（立ち位置を変え 6.3 に反する）　4. `failure.lua` の弱参照の集合
+- **Selected Approach**: 4。
+
+### Decision: 出さない設定でも未登録アクターの空の目印は積む（仮定）
+- **Context**: 要件 6.4（表記を除いて同じ出力）・7.4（ログは同じ）。
+- **Rationale**: 目印のトークンはグループの開始と直前の話者の遡りを担う。積まないと、目印以外に何も積まない行の後で警告の回数が変わる。
+- **Trade-offs**: その行が他に何も積まないとき、出力が nil でなく `\p[0]\e` になる（OPEN QUESTION 4）。
+
+### Synthesis
+- **一般化**: 14 か所は「種類・対象・説明・警告」の 4 つの値の違いでしかない。出口はレコード 1 種で全部を受け、`runtime-error-balloon`・`call-attribute-filter` も種類の名前を足すだけで使える（インターフェースだけを一般化し、実装は今の要件の分だけ）。
+- **Build vs Adopt**: さくらスクリプトのエスケープは既存のマニュアルの決まり（`\`・`\%`）を採る。`\_?` の囲みは採らない。設定は既存の `[ghost]` と `pasta.config.get` を採り、新しいセクション・Rust の型検査を作らない。
+- **Simplification**: 種類ごとの関数・失敗のクラス階層・抑止の記憶（同じ名前を黙らせる）を作らない。実行中の act の対応表は `init_scene` の 1 行で済ませ、コルーチンを作る 3 か所を触らない。`sakura_builder` の変換は変えない。
+
+## Risks & Mitigations
+- `coroutine.running()` の戻りの違い — nil を確かめ、メインスレッドとコルーチンの両方をテストで通す。
+- 既定で表記が出ることによる期待値の更新の広さ — 1 種類 = 1 コミットで期待値の更新を局所化する。テストの意図は変えない。
+- `tutorial_stages_test.rs` が `touch-poke-shortcuts` と重なる — 足すのは 1 条件。後から入る側が rebase で合わせる。
+- `GENERATION_MAP` の件数（23）を前提にしたテスト・説明 — 新ページを足すコミットで同時に更新する。
+
+## 参照したスキル・規則
+- `kiro-spec-design`（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）、`kiro-validate-design`（`design-review.md`）。
+- ゴースト作者向けの判断（直せばよい表記を見せる、回避の書き方を載せない）はプロジェクトの方針（要件 9.5）に従った。
+- UKADOC（伺か技術文書検索）でさくらスクリプトのエスケープと環境変数の展開を確かめた。
