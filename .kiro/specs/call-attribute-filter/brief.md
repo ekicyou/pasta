@@ -164,3 +164,10 @@ roadmap のバックログにあった「`pasta_core` の `resolve_scene_id` の
 
 ## 申し送り（touch-poke-shortcuts より、2026-10-16）
 - `search_scene` の本体は私的な関数 `search_scene_by(name, global_scene_name, exact)`（`crates/pasta_lua/src/search/context.rs` 115 行付近）に移り、`search_scene`（91 行付近）は `exact=false` で、新しい `search_scene_exact` は `true` で呼ぶ。空の `filters` で検索する点は変わらない。フィルターを通すときは、完全一致の道（`SceneTable::resolve_scene_id_exact`）も同じ `filters` を受け取る形になっている。参照: `.kiro/specs/completed/touch-poke-shortcuts/design.md` の SearchExact。
+
+## 申し送り（pasta-check-dic-validate より）
+
+- 辞書の検査は `pasta_check validate`（と `release` の段 4 の関門、VSCode 拡張のゴースト全体の診断）として入った。核は `crates/pasta_check/src/validate/`（ファイルシステムに触れないライブラリ・WASM でも動く）。
+- 検査を足すときに触る所: 報告の種類 `FindingKind`（`report.rs`。誤り／注意の分類と kebab-case の code・文言の `msg` を 1 か所で持つ）、検査の段（`validate/mod.rs` の `validate_ghost` が段の順に呼ぶ）、マニュアルの章 `book/src/debug/validate.md` の報告の表。
+- 種類の追加・分類・出力の 1 行の形を変えるのは本 spec の design.md の Revalidation Triggers に当たる（CI・作者のスクリプト・マニュアル・`wasmBridge.ts` の形の検査に効く）。実行時と同じことを守る一致テスト `crates/pasta_check/tests/validate_parity_test.rs` も合わせて見直す。
+- どちらの spec が検査を足すか・誤りか注意かは、この spec の要件で決める論点として渡す（本 spec では決めていない）。

@@ -2,7 +2,7 @@
 name = "pasta_check"
 workspace = "../.."
 version.workspace = true
-description = "CLI tool for ghost release packaging - generates update files and NAR archives"
+description = "CLI tool for ghost dictionary validation and release packaging - validates dictionaries, generates update files and NAR archives"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -11,19 +11,43 @@ repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
 
+[lib]
+path = "src/lib.rs"
+
 [[bin]]
 name = "pasta_check"
 path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = ["cli"]
+# バイナリだけが使う依存（ライブラリは WASM でも使うので含めない）
+cli = ["dep:lexopt", "dep:md5", "dep:zip"]
 
 [dependencies]
+# 検査の核（ライブラリ）
+pasta_dsl.workspace = true
+pasta_core.workspace = true
+toml.workspace = true
+serde.workspace = true
+glob.workspace = true
+
 # CLI パーサー
-lexopt.workspace = true
+lexopt = { workspace = true, optional = true }
 
 # 更新ファイル生成
-md5.workspace = true
+md5 = { workspace = true, optional = true }
 
 # NAR (ZIP) 作成
-zip.workspace = true
+zip = { workspace = true, optional = true }
+
+# rand の依存を wasm32-unknown でビルドできるようにする（実行中は乱数源を呼ばない）
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.4", features = ["wasm_js"] }
 
 [dev-dependencies]
 tempfile.workspace = true
+# 一致テスト用。版を書かないので cargo publish では外れる
+pasta_lua = { path = "../pasta_lua" }
+# 一致テストで PASTA_DEBUG を main の前に外す（pasta_lua のテストと同じガード）
+ctor = "0.2"

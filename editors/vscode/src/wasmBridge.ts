@@ -30,9 +30,82 @@ export interface WasmAnalysisResult {
   diagnostics: ReadonlyArray<DiagnosticData>;
 }
 
+// --- ゴースト全体の検査（pasta_check::validate の serde 形と同じ） ---
+
+export type TomlSource =
+  | { kind: 'missing' }
+  | { kind: 'text'; text: string }
+  | { kind: 'unreadable'; reason: string };
+export type FileText =
+  | { kind: 'text'; text: string }
+  | { kind: 'notUtf8' }
+  | { kind: 'unreadable'; reason: string };
+export interface GhostInput {
+  pastaToml: TomlSource;
+  entries: ReadonlyArray<string>;
+}
+export type GhostSeverity = 'error' | 'warning';
+export interface GhostFinding {
+  code: string;
+  severity: GhostSeverity;
+  path: string;
+  line: number | null;
+  column: number | null;
+  message: string;
+}
+export interface GhostStats {
+  dictionaryFiles: number;
+  errors: number;
+  warnings: number;
+  uncheckedDynamicCalls: number;
+  referencesSkipped: boolean;
+}
+export interface GhostReport {
+  findings: ReadonlyArray<GhostFinding>;
+  stats: GhostStats;
+}
+
 /** Shape of the wasm-bindgen CJS bindings module loaded by {@link WasmBridge}. */
 interface WasmBindings {
   wasm_analyze(text: string): unknown;
+  wasm_select_ghost_files(input: unknown): unknown;
+  wasm_validate_ghost(input: unknown, files: unknown): unknown;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+}
+
+function isNumberOrNull(value: unknown): value is number | null {
+  return value === null || typeof value === 'number';
+}
+
+function isGhostFinding(value: unknown): value is GhostFinding {
+  if (typeof value !== 'object' || value === null) return false;
+  const f = value as Record<string, unknown>;
+  return (
+    typeof f.code === 'string' &&
+    (f.severity === 'error' || f.severity === 'warning') &&
+    typeof f.path === 'string' &&
+    isNumberOrNull(f.line) &&
+    isNumberOrNull(f.column) &&
+    typeof f.message === 'string'
+  );
+}
+
+function isGhostReport(value: unknown): value is GhostReport {
+  if (typeof value !== 'object' || value === null) return false;
+  const r = value as { findings?: unknown; stats?: unknown };
+  if (!Array.isArray(r.findings) || !r.findings.every(isGhostFinding)) return false;
+  if (typeof r.stats !== 'object' || r.stats === null) return false;
+  const s = r.stats as Record<string, unknown>;
+  return (
+    typeof s.dictionaryFiles === 'number' &&
+    typeof s.errors === 'number' &&
+    typeof s.warnings === 'number' &&
+    typeof s.uncheckedDynamicCalls === 'number' &&
+    typeof s.referencesSkipped === 'boolean'
+  );
 }
 
 /**
@@ -114,6 +187,39 @@ export class WasmBridge {
     } catch (error) {
       throw new Error(`WASM analysis failed: ${error}`);
     }
+  }
+
+  /**
+   * pasta.toml の pasta_patterns に従って検査する辞書ファイルを選ぶ（11.8）。
+   * @throws Error if WASM is not initialized or the result is not a string[]
+   */
+  selectGhostFiles(input: GhostInput): string[] {
+    const wasm = this.requireModule();
+    const result = wasm.wasm_select_ghost_files(input);
+    if (!isStringArray(result)) {
+      throw new Error('WASM selectGhostFiles failed: malformed result (expected string[])');
+    }
+    return result;
+  }
+
+  /**
+   * ゴースト全体を検査し、核の報告をそのまま返す（11.2）。
+   * @throws Error if WASM is not initialized or the result is not a GhostReport
+   */
+  validateGhost(input: GhostInput, files: Readonly<Record<string, FileText>>): GhostReport {
+    const wasm = this.requireModule();
+    const result = wasm.wasm_validate_ghost(input, files);
+    if (!isGhostReport(result)) {
+      throw new Error('WASM validateGhost failed: malformed result (expected GhostReport)');
+    }
+    return result;
+  }
+
+  private requireModule(): WasmBindings {
+    if (!this.ready || !this.wasmModule) {
+      throw new Error('WASM module is not initialized');
+    }
+    return this.wasmModule;
   }
 
   /** Check if the WASM module is ready for use */
