@@ -61,7 +61,7 @@
   - 着せ替え前の版（`classic/`）の同じ不具合。固定のコミットから作るので直さない
   - mdBook そのものの変更・上流への報告
   - 動画の撮り直し・形式の変更
-  - 手元での確かめ方の一覧（`book/AUTHORING.md` 459〜468 行）の書き換え。下の Constraints
+  - ~~手元での確かめ方の一覧（`book/AUTHORING.md` 459〜468 行）の書き換え。下の Constraints~~ → 2026-10-16 の要件ディスカッションで In に移した（下の「申し送り（getting-started-story-guide より）」で `AUTHORING.md` が空いたため。requirements.md の前提 A3）
 
 ## Boundary Candidates
 
