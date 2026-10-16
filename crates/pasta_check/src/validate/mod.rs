@@ -20,8 +20,21 @@ pub use report::{Finding, FindingKind, Report, Severity, Stats, msg};
 
 /// 辞書ファイルとして読むべきパス（.pasta のパターンに一致したもの）を、決まった順で返す。
 pub fn select_dictionary_files(input: &GhostInput) -> Vec<String> {
+    let (found, _) = discover(input);
+    found.pasta.into_iter().map(|f| f.path).collect()
+}
+
+/// 一致テスト用: pasta.dll が見るパスの（.pasta の一覧, .lua の一覧）。実物の相対パスの昇順
+#[doc(hidden)]
+pub fn pasta_dll_paths(input: &GhostInput) -> (Vec<String>, Vec<String>) {
+    let (found, _) = discover(input);
+    let dll = |files: Vec<discovery::DictFile>| files.into_iter().map(|f| f.dll_path).collect();
+    (dll(found.pasta), dll(found.lua))
+}
+
+fn discover(input: &GhostInput) -> (discovery::Discovered, Vec<Finding>) {
     let (config, _) = config::read_config(&input.pasta_toml);
-    discovery::discover(input, &config).0
+    discovery::discover(input, &config)
 }
 
 /// ゴースト全体を検査する。`files` には select_dictionary_files が返した全パスの中身を入れる。
@@ -31,9 +44,10 @@ pub fn select_dictionary_files(input: &GhostInput) -> Vec<String> {
 pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) -> Report {
     let (config, mut findings) = config::read_config(&input.pasta_toml);
 
-    let (dictionary_files, found) = discovery::discover(input, &config);
+    let (discovered, found) = discovery::discover(input, &config);
     findings.extend(found);
-    findings.extend(module_name::check(&dictionary_files));
+    findings.extend(module_name::check(&discovered));
+    let dictionary_files: Vec<String> = discovered.pasta.into_iter().map(|f| f.path).collect();
 
     let texts: Vec<(String, FileText)> = dictionary_files
         .iter()

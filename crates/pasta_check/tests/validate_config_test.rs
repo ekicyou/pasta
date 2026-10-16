@@ -76,7 +76,8 @@ use pasta_check::validate::{Finding, FindingKind};
 fn config_findings(src: TomlSource) -> Vec<Finding> {
     let input = GhostInput {
         pasta_toml: src,
-        entries: vec![],
+        // 辞書が無いことの注意（no-dictionary-files）を混ぜない
+        entries: vec!["dic/a.pasta".into()],
     };
     validate_ghost(&input, &BTreeMap::new())
         .findings
@@ -287,4 +288,205 @@ fn same_strictness_as_pasta_dll() {
                 .all(|f| f.severity == pasta_check::validate::Severity::Error)
         );
     }
+}
+
+// ---- 辞書ファイルと辞書モジュールの選び出し（2.1・2.3・2.6・2.7・2.8・11.8） ----
+
+use pasta_check::validate::pasta_dll_paths;
+
+fn input_with(patterns: &[&str], entries: &[&str]) -> GhostInput {
+    let list = patterns
+        .iter()
+        .map(|p| format!("{p:?}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    GhostInput {
+        pasta_toml: TomlSource::Text {
+            text: format!("[loader]\npasta_patterns = [{list}]\n"),
+        },
+        entries: entries.iter().map(|e| e.to_string()).collect(),
+    }
+}
+
+fn default_input(entries: &[&str]) -> GhostInput {
+    input_with(&["dic/**/*.pasta"], entries)
+}
+
+/// 選び出しの段の報告だけ（code・パス）
+fn discovery_findings(input: &GhostInput) -> Vec<(FindingKind, String)> {
+    validate_ghost(input, &BTreeMap::new())
+        .findings
+        .into_iter()
+        .filter(|f| {
+            matches!(
+                f.code,
+                FindingKind::ConfigPatternInvalid
+                    | FindingKind::PatternIgnored
+                    | FindingKind::PatternNotPasta
+                    | FindingKind::NoDictionaryFiles
+                    | FindingKind::InitFileName
+            )
+        })
+        .map(|f| (f.code, f.path))
+        .collect()
+}
+
+#[test]
+fn literal_component_ignores_case_and_dll_path_uses_pattern_spelling() {
+    let input = default_input(&["Dic/talk.pasta", "DIC/sub/a.lua", "pasta.toml"]);
+    // 報告のパスは実物の綴り
+    assert_eq!(select_dictionary_files(&input), vec!["Dic/talk.pasta"]);
+    // pasta.dll が見るパスは、ワイルドカードの無い成分がパターンの綴り
+    let (pasta, lua) = pasta_dll_paths(&input);
+    assert_eq!(pasta, vec!["dic/talk.pasta"]);
+    assert_eq!(lua, vec!["dic/sub/a.lua"]);
+}
+
+#[test]
+fn wildcard_component_is_case_sensitive() {
+    let input = default_input(&["dic/X.PASTA", "dic/y.pasta"]);
+    assert_eq!(select_dictionary_files(&input), vec!["dic/y.pasta"]);
+    let input = input_with(&["d?c/*.pasta"], &["Dic/a.pasta", "dic/b.pasta"]);
+    assert_eq!(select_dictionary_files(&input), vec!["dic/b.pasta"]);
+}
+
+#[test]
+fn double_star_matches_zero_or_more_components() {
+    let input = default_input(&[
+        "dic/a.pasta",
+        "dic/x/b.pasta",
+        "dic/x/y/c.pasta",
+        "other/d.pasta",
+        "dic.pasta",
+    ]);
+    assert_eq!(
+        select_dictionary_files(&input),
+        vec!["dic/a.pasta", "dic/x/b.pasta", "dic/x/y/c.pasta"]
+    );
+    // 最後の ** はフォルダにしか一致しない
+    let input = input_with(&["dic/**"], &["dic/a.pasta"]);
+    assert!(select_dictionary_files(&input).is_empty());
+}
+
+#[test]
+fn profile_is_excluded_and_duplicates_merged_in_ascending_order() {
+    let input = input_with(
+        &["**/*.pasta", "dic/*.pasta"],
+        &["profile/p.pasta", "dic/b.pasta", "a.pasta", "dic/a.pasta"],
+    );
+    assert_eq!(
+        select_dictionary_files(&input),
+        vec!["a.pasta", "dic/a.pasta", "dic/b.pasta"]
+    );
+}
+
+#[test]
+fn lua_modules_are_collected_from_pasta_patterns() {
+    let input = default_input(&["dic/a.pasta", "dic/m.lua", "profile/x.lua", "m.lua"]);
+    let (pasta, lua) = pasta_dll_paths(&input);
+    assert_eq!(pasta, vec!["dic/a.pasta"]);
+    assert_eq!(lua, vec!["dic/m.lua"]);
+    // .lua は辞書ファイルとしては数えない
+    assert_eq!(select_dictionary_files(&input), vec!["dic/a.pasta"]);
+}
+
+#[test]
+fn traversal_and_root_patterns_are_ignored_with_warning() {
+    for pattern in [
+        "../x/*.pasta",
+        "dic/../*.pasta",
+        "/abs/*.pasta",
+        "C:/x/*.pasta",
+        "dic\\..\\*.pasta",
+    ] {
+        let input = input_with(&[pattern, "dic/*.pasta"], &["dic/a.pasta", "x/b.pasta"]);
+        assert_eq!(
+            discovery_findings(&input),
+            vec![(FindingKind::PatternIgnored, "pasta.toml".to_string())],
+            "{pattern}"
+        );
+        assert_eq!(
+            select_dictionary_files(&input),
+            vec!["dic/a.pasta"],
+            "{pattern}"
+        );
+    }
+    let input = input_with(&["../x/*.pasta"], &[]);
+    let found = validate_ghost(&input, &BTreeMap::new());
+    let f = found
+        .findings
+        .iter()
+        .find(|f| f.code == FindingKind::PatternIgnored)
+        .unwrap();
+    assert_eq!(
+        f.message,
+        pasta_check::validate::msg::pattern_ignored("../x/*.pasta")
+    );
+}
+
+#[test]
+fn non_pasta_pattern_searches_pasta_but_not_lua() {
+    let input = input_with(&["dic/*.txt"], &["dic/a.txt", "dic/a.lua"]);
+    assert_eq!(
+        discovery_findings(&input),
+        vec![(FindingKind::PatternNotPasta, "pasta.toml".to_string())]
+    );
+    assert_eq!(select_dictionary_files(&input), vec!["dic/a.txt"]);
+    assert_eq!(pasta_dll_paths(&input).1, Vec::<String>::new());
+}
+
+#[test]
+fn unreadable_pattern_is_config_pattern_invalid_error() {
+    let input = input_with(&["dic/[*.pasta", "dic/*.pasta"], &["dic/a.pasta"]);
+    let report = validate_ghost(&input, &BTreeMap::new());
+    let f = report
+        .findings
+        .iter()
+        .find(|f| f.code == FindingKind::ConfigPatternInvalid)
+        .expect("config-pattern-invalid");
+    assert_eq!(f.path, "pasta.toml");
+    assert_eq!(f.severity, pasta_check::validate::Severity::Error);
+    assert!(
+        f.message
+            .starts_with("pasta_patterns の「dic/[*.pasta」はパターンとして読めません: "),
+        "{}",
+        f.message
+    );
+    // 読めるパターンでは集め続ける
+    assert_eq!(select_dictionary_files(&input), vec!["dic/a.pasta"]);
+}
+
+#[test]
+fn init_file_names_are_errors() {
+    let input = default_input(&[
+        "dic/init.pasta",
+        "dic/sub/init.lua",
+        "dic/a.pasta",
+        "dic/init.txt",
+    ]);
+    assert_eq!(
+        discovery_findings(&input),
+        vec![
+            (FindingKind::InitFileName, "dic/init.pasta".to_string()),
+            (FindingKind::InitFileName, "dic/sub/init.lua".to_string()),
+        ]
+    );
+    // 名前はパターンの綴り（pasta.dll が見るパス）で判定し、報告は実物の綴り
+    let input = input_with(&["dic/init.pasta"], &["dic/INIT.pasta"]);
+    assert_eq!(
+        discovery_findings(&input),
+        vec![(FindingKind::InitFileName, "dic/INIT.pasta".to_string())]
+    );
+}
+
+#[test]
+fn no_dictionary_files_is_warning_on_pasta_toml() {
+    let input = default_input(&["pasta.toml", "dic/X.PASTA", "profile/dic/a.pasta"]);
+    assert_eq!(
+        discovery_findings(&input),
+        vec![(FindingKind::NoDictionaryFiles, "pasta.toml".to_string())]
+    );
+    let report = validate_ghost(&input, &BTreeMap::new());
+    assert_eq!(report.stats.dictionary_files, 0);
+    assert!(!report.has_errors(), "{:?}", report.lines());
 }

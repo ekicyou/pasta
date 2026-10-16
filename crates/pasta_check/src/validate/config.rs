@@ -78,7 +78,7 @@ pub(crate) fn read_config(src: &TomlSource) -> (GhostConfig, Vec<Finding>) {
     (config, findings)
 }
 
-const PATH: &str = "pasta.toml";
+pub(super) const PATH: &str = "pasta.toml";
 
 /// [loader] の 4 つのキー。pasta.dll の LoaderConfig と同じ型で読む（知らないキーは無視）
 #[derive(Deserialize)]

@@ -35,7 +35,7 @@
   - 完了の状態: 設定のテストで、上の各誤りの code・行と、無いときの `config-missing`、既定値で検査が続くことが確かめられる
   - _Requirements: 2.2, 2.4, 2.5, 2.10_
 
-- [ ] 2.2 pasta.dll と同じ辞書ファイルと辞書モジュールを選び出す
+- [x] 2.2 pasta.dll と同じ辞書ファイルと辞書モジュールを選び出す
   - パターンを成分に分け、Windows の `glob::glob` を写す: ワイルドカードの無い成分は大文字・小文字を区別せず、ある成分は区別し、`**` は 0 個以上の成分に一致する。パターンとして読めなければ `config-pattern-invalid`（誤り）
   - 一致したファイルごとに「pasta.dll が見るパス」（ワイルドカードの無い成分はパターンの綴り）を作り、報告のパスは実物の綴りにする
   - `..`・ルートを含むパターンは使わず注意、`.pasta` で終わらないパターンは `.lua` を作らず注意。`.pasta` のパターンから `.lua` のパターンを作って辞書モジュールを集める
@@ -197,3 +197,4 @@
 - 1.2: 理由の文言は `validate::msg` の関数にまとめた。`config-scene-alias` は重複の文言だけ用意済み（空の名前・連鎖・型の違いは 2.1 で足す）。並び順の code は FindingKind の宣言の順。serde の kebab-case と `code()` が同じことは 6.1 の JSON の形のテストで 1 行確かめる。
 - 1.3: 各段の関数は crate 内の骨組み。2.1 で design の `read_config(src) -> (GhostConfig, Vec<Finding>)` に切り替え、GhostConfig を discovery と scenes に渡す（TOML を 2 度読まない）。参照を省くかは Syntax の Finding の有無で決める。
 - 2.1: `PastaConfig::from_str` は純粋な文字列の解析で PASTA_DEBUG のガードは要らない（ガードは `PastaLoader::load` を呼ぶテストだけ）。読めない pasta.toml は `file-unreadable`（パス pasta.toml）。
+- 2.2: pasta_lua の `discover_files` はソートも重複除去もしない（パターンごとに glob の順で連結）。3.1 (b) の一致テストは集合（並べ替え・重複除去の後）で比べる。`pasta_dll_paths(input) -> (Vec<String>, Vec<String>)` が .pasta と .lua の pasta.dll が見るパス。
