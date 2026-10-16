@@ -394,8 +394,8 @@ fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
 }
 
 /// 未定義の変数・単語・関数をアクション行で参照すると、"nil" を出さず
-/// 空文字として展開される（マニュアル book/src/grammar/words.md「未定義単語の参照」と同じ扱い）。
-/// 値の無い変数・見つからない単語・関数はその位置に失敗表記を出す（failure-output-unification 対応表 #1・#3・#5）。
+/// その位置に失敗表記を出す（failure-output-unification 対応表 #1・#3・#5、
+/// マニュアル book/src/reference/runtime-failures.md と同じ扱い）。
 /// 前後に文字がある単語参照が nil 連結で実行時エラーにならないことも確認する。
 #[test]
 fn test_e2e_undefined_refs_in_action_line_render_empty() {

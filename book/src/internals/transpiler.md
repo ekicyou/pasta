@@ -248,7 +248,7 @@ end
 ＄＝＄未代入＆「x」  → do local _ = (PASTA.str(var.未代入, "var.未代入") .. "x") end
 ```
 
-説明は、実行時の警告に被演算子の場所を出すための文字列リテラルである（`binary_operand` が `operand_desc` の結果を文字列リテラルにする）。変数参照は変数の経路（`"var.x"`・`"save.x"`・`"args[1]"`）、関数呼び出しは `"@名前()"`・`"@*名前()"`・`"@$変数の経路()"`、括弧は中身の説明になり、リテラルと入れ子の演算（算術・連結）には説明が無い。説明が無ければ説明の引数を省く。関数呼び出しには必ず説明があるため、関数の戻り値が変換の呼び出しの最後の引数になることはなく、関数が複数の値を返しても先頭の 1 つだけが渡る。`PASTA.num`・`PASTA.str` の実行時の振る舞い（`nil` を 0・空文字列にすること、変換できない値の警告）は [PASTA.num](../lua/script-api.md#pastanumop-v-desc)・[PASTA.str](../lua/script-api.md#pastastrv-desc) が正である。
+説明は、実行時の警告と失敗表記に被演算子の場所を出すための文字列リテラルである（`binary_operand` が `operand_desc` の結果を文字列リテラルにする）。変数参照は変数の経路（`"var.x"`・`"save.x"`・`"args[1]"`）、関数呼び出しは `"@名前()"`・`"@*名前()"`・`"@$変数の経路()"`、括弧は中身の説明になり、リテラルと入れ子の演算（算術・連結）には説明が無い。説明が無ければ説明の引数を省く。関数呼び出しには必ず説明があるため、関数の戻り値が変換の呼び出しの最後の引数になることはなく、関数が複数の値を返しても先頭の 1 つだけが渡る。`PASTA.num`・`PASTA.str` の実行時の振る舞い（`nil` を 0・空文字列にすること、変換できない値の報告）は [PASTA.num](../lua/script-api.md#pastanumop-v-desc)・[PASTA.str](../lua/script-api.md#pastastrv-desc) が正である。
 
 動的参照の生成（`element_gen.rs` の `dynamic_ref_args`）は、変数の値を `tostring` せずにそのまま渡し、変数の経路（`var.変数名`・`save.変数名`・`args[番号+1]`）を文字列リテラルにして続けて渡す。値の検査と検索キーへの変換は実行時に行う（[Lua ランタイム内部モジュール](internal-modules.md#動的参照のキーworddynamic_key)）。ここで生成した `act` のメソッドが実行時に何をするかは、[ランタイム実行モデル](execution-model.md) と [Lua ランタイム内部モジュール](internal-modules.md) で扱う。
 

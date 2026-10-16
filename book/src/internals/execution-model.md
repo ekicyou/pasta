@@ -59,14 +59,14 @@
 ```text
 生成コード（pasta.scene.…）
   └→ pasta（init.lua。生成コードが呼ぶ公開 API）
-        ├→ pasta.actor ──→ pasta.store, pasta.word
+        ├→ pasta.actor ──→ pasta.store, pasta.word, pasta.failure
         ├→ pasta.scene ──→ pasta.store, pasta.word, @pasta_search（search の呼び出し時）
-        └→ pasta.word  ──→ pasta.store
+        └→ pasta.word  ──→ pasta.store, pasta.failure
 
 pasta.shiori.entry（SHIORI.load / request / unload / kick）
   └→ pasta.shiori.event（EVENT.fire・EVENT.drive）
         ├→ pasta.shiori.act ──→ pasta.act ──→ pasta.actor, pasta.scene, pasta.global,
-        │                                     pasta.store, pasta.word,
+        │                                     pasta.store, pasta.word, pasta.failure,
         │                                     pasta.save（ACT.new の呼び出し時）
         ├→ pasta.shiori.event.callback ──→ pasta.store,
         │                                  pasta.shiori.event（再開の呼び出し時）
@@ -74,6 +74,7 @@ pasta.shiori.entry（SHIORI.load / request / unload / kick）
 
 pasta.store ──→ （@pasta_config だけを pcall で読む。他の pasta.* を require しない）
 pasta.save  ──→ @pasta_persistence
+pasta.failure ──→ （@pasta_log・pasta.config を報告の時点で読む。他の pasta.* を読み込みの時点では require しない）
 ```
 
 この図ではログ出力の `@pasta_log` を省いている（`pasta.act`・`pasta.actor`・`pasta.word` などがモジュールの読み込み時に `require` する）。
@@ -84,6 +85,7 @@ pasta.save  ──→ @pasta_persistence
 | `pasta.store` | ランタイムの共有状態の置き場。アクター・シーン・単語の Lua 側の登録表、外見の状態、継続中のコルーチン（`co_scene`）、選択肢とキックのための状態を持つ。他の `pasta.*` を `require` しないため、どのモジュールからも循環なく参照できる |
 | `pasta.scene` | シーン関数の登録と、検索結果からシーン関数を引く `SCENE.search`、シーン関数をコルーチンで包む `SCENE.co_exec` |
 | `pasta.word`・`pasta.actor` | 単語とアクターの登録。アクターのプロキシ（`act.アクター名`）は `pasta.actor` が作る |
+| `pasta.failure` | 実行時の失敗の報告の出口。ログの警告と失敗表記のトークンを作る（[実行時の失敗の出力](../reference/runtime-failures.md)・[失敗の報告（pasta.failure）](internal-modules.md#失敗の報告pastafailure)） |
 | `pasta.act`・`pasta.shiori.act` | シーン関数が第 1 引数で受け取る ACT。トークの蓄積、名前の解決（`call`・`word` など）、`yield`。`pasta.shiori.act` は `pasta.act` を継承し、`build` をさくらスクリプトの生成に差し替え、`get_property` などの SHIORI 固有のメソッドを加える |
 | `pasta.global` | 利用者が関数を足すグローバル関数の表。`yield` と `チェイントーク` を最初から持つ |
 | `pasta.save` | 永続化データの表。`require` された時点で 1 回だけ `@pasta_persistence.load()` を呼び、その結果を返す |
@@ -374,7 +376,7 @@ VM の構築      register_persistence_module → persistence::register
 - `crates/pasta_lua/src/runtime/`
 - `crates/pasta_lua/pasta_scripts/pasta/`
 
-本文で参照した主なファイルは次のとおりである。VM の構築は `crates/pasta_lua/src/runtime/mod.rs`・`crates/pasta_lua/src/runtime/factory.rs`・`crates/pasta_lua/src/runtime/module_registry.rs`、永続化は `crates/pasta_lua/src/runtime/persistence.rs`・`crates/pasta_lua/src/runtime/lifecycle.rs`・`crates/pasta_lua/pasta_scripts/pasta/save.lua`、イベントとコルーチンは `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/callback.lua`・`crates/pasta_lua/pasta_scripts/pasta/scene.lua`・`crates/pasta_lua/pasta_scripts/pasta/act.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua` にある。`SHIORI.request` を呼ぶ側は `crates/pasta_shiori/src/shiori.rs`、構築を呼ぶローダは `crates/pasta_lua/src/loader/mod.rs` である。
+本文で参照した主なファイルは次のとおりである。VM の構築は `crates/pasta_lua/src/runtime/mod.rs`・`crates/pasta_lua/src/runtime/factory.rs`・`crates/pasta_lua/src/runtime/module_registry.rs`、永続化は `crates/pasta_lua/src/runtime/persistence.rs`・`crates/pasta_lua/src/runtime/lifecycle.rs`・`crates/pasta_lua/pasta_scripts/pasta/save.lua`、イベントとコルーチンは `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/callback.lua`・`crates/pasta_lua/pasta_scripts/pasta/scene.lua`・`crates/pasta_lua/pasta_scripts/pasta/act.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`、失敗の報告は `crates/pasta_lua/pasta_scripts/pasta/failure.lua` にある。`SHIORI.request` を呼ぶ側は `crates/pasta_shiori/src/shiori.rs`、構築を呼ぶローダは `crates/pasta_lua/src/loader/mod.rs` である。
 
 ## 経緯
 

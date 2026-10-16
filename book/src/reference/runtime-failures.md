@@ -173,7 +173,7 @@ Lua から直接呼ぶ場合は、次の制限がある。
 - シーンを始めていないコルーチンの中で呼ぶと、ログの警告だけが出て、失敗表記は出ない。
 - コルーチンの外（メインスレッド）で呼ぶと、失敗表記は、そこで最後に `init_scene` を呼んだ act に積まれる。この対応は、次に `init_scene` を呼ぶと上書きされる。
 - Lua から `act:call` を値の無いキーで呼ぶと、`【名前にならない値：値なし】` が出て、ログに `act:call - nil key (undefined variable?), skipping scene search` が出る。
-- `WORD.dynamic_key` を act を渡さずに呼んだときは、ログの警告だけが出て、失敗表記は出ない（[WORD.dynamic_key(value, var_path, via)](../lua/script-api.md#worddynamic_keyvalue-var_path-via)）。
+- `WORD.dynamic_key` を act を渡さずに呼んだときは、ログの警告だけが出て、失敗表記は出ない（[WORD.dynamic_key(value, var_path, via, act)](../lua/script-api.md#worddynamic_keyvalue-var_path-via-act)）。
 
 ---
 
