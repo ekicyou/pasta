@@ -64,7 +64,7 @@ act:talk(actor, text) -> act
 
 - 台詞は、応答を組み立てるときに、アクターの表を使って `@pasta_sakura_script` の `talk_to_script` でウェイト付きのさくらスクリプトに変換される（[act:talk との関係](pasta-sakura-script.md#acttalk-との関係)）。
 - 発言するアクターが替わると、そのアクターの立ち位置を示す `\p[番号]` が台詞の前に出力される（[スポット操作](#スポット操作)）。同じアクターの続けての台詞は 1 つにつながる。
-- 第 3 引数は生成コードが使う（変数参照の値が `nil` のときに警告ログへ出す変数名）。
+- 第 3 引数は生成コードが使う（変数参照の値が `nil` のとき、値の無い変数の失敗として報告する変数名。[実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html)）。
 
 ```lua
 act:talk(act.さくら.actor, "こんにちは")
@@ -191,7 +191,7 @@ act:surface(5):wait(500):talk(act.さくら.actor, "驚いた！"):newline()
 | `act:clear_spot()` | すべてのアクターの立ち位置を消す | `nil` |
 
 - 立ち位置の変更は、応答を組み立てるときに積んだ順に反映され、以降の発言の `\p[番号]` が変わる。設定はイベントをまたいで保たれる。
-- 立ち位置が無いアクターは、スポット 0 で話す（警告ログが出る）。
+- 立ち位置が無いアクターは、スポット 0 で話す（警告ログが出る。[actor_proxy](#actor_proxyname) が作るその場限りのアクターでは出ない）。
 - 1 回の出力の中で、同じアクターの発言が `set_spot` の前後に続くと、後の発言も変更前の立ち位置で出力される（変更はそのアクターの続く発言の後に反映される）。
 - `clear_spot` の後の発言は、前の発言と同じアクターでも、`clear_spot` とその後の `set_spot` を反映した立ち位置で出力される。
 - 戻り値が `nil` のため、続けて呼べない。
@@ -226,6 +226,7 @@ act:surface(5):wait(500):talk(act.さくら.actor, "驚いた！"):newline()
 | `"scene"` | 実行中のシーンのローカルシーン | グローバルシーン | `find_scene`・`call`・`call_restore` |
 | `"expr"` | 実行中のシーンのローカルシーン | グローバルシーン | `expr_fn`・`expr_fn_var` |
 
+- 以下のメソッドが「失敗を報告する」とは、ログに警告を 1 行出し、失敗表記を act に積むことである（[実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html)）。
 - 1 段目（実行中のシーンのシーンテーブル）・3 段目（act のメソッド。関数の値だけ）・4 段目（`GLOBAL` テーブル）は、どのモードでも同じである。
 - `@pasta_search` を読み込めない環境（テストなど）では、2 段目と 5 段目を飛ばす。
 - 5 段目でグローバルシーンを探すときは、範囲を指定しない [search_scene](pasta-search.md#search_scenename-global_scene_name) を使うため、検索キーが pasta.toml の別名表の別名と完全に一致すると、置き換え先の名前で探す（[シーン名の別名](https://ekicyou.github.io/pasta/grammar/call-jump.html#シーン名の別名)）。既定の別名表のもとでは、`act:call(nil, "会話", nil)` は `act:call(nil, "OnTalk", nil)` と同じ候補（`＊OnTalk` と `＊会話` で宣言したシーンを含む）から選ぶ。2 段目（ローカルシーン）と単語の検索は置き換えない。
@@ -241,12 +242,12 @@ act:word(name, var_path?) -> string | nil
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
 | `name` | string（`var_path` があるときは任意の値） | 単語名。`var_path` があるときは変数の値 |
-| `var_path` | string または nil | 動的参照のときの変数の場所（`"var.x"`・`"save.x"`・`"args[1]"`）。警告ログに使う |
+| `var_path` | string または nil | 動的参照のときの変数の場所（`"var.x"`・`"save.x"`・`"args[1]"`）。警告ログと失敗表記に使う |
 
 - `var_path` が `nil` のとき、`name` が `nil` か空文字列なら、何もせずに `nil` を返す。
-- `var_path` があるときは、`name` を `WORD.dynamic_key` で単語名に直してから探す（[WORD.dynamic_key](#worddynamic_keyvalue-var_path-via)）。直せない値なら、警告ログを出して探さずに `nil` を返す。探すときは動的参照の探し方（[検索と呼び出し](#検索と呼び出し)）になる。
+- `var_path` があるときは、`name` を `WORD.dynamic_key` で単語名に直してから探す（[WORD.dynamic_key](#worddynamic_keyvalue-var_path-via-act)）。直せない値なら、失敗を報告して探さずに `nil` を返す。探すときは動的参照の探し方（[検索と呼び出し](#検索と呼び出し)）になる。
 - `"word"` モードで探し、見つかったのが関数なら `関数(act)` を呼んでその戻り値をそのまま返す。関数以外の値なら `tostring` した文字列を返す。
-- 見つからなければ警告ログを出して `nil` を返す。
+- 見つからなければ失敗を報告して `nil` を返す。
 - DSL の `＄x＝＠単語` は `var.x = act:word("単語")`、`＄x＝＠＄y` は `var.x = act:word(var.y, "var.y")` になる。アクション行の `＠単語`・`＠＄y` はアクタープロキシの `word` を使う（[DSL と Lua の対応表](https://ekicyou.github.io/pasta/grammar/variables.html#dsl-と-lua-の対応表)）。
 
 #### find_handler(mode, key, skip_methods) と find_act_handler(mode, key, skip_methods)
@@ -262,7 +263,7 @@ act:find_act_handler(mode, key, skip_methods?) -> any | nil
 | `key` | string | 検索する名前 |
 | `skip_methods` | boolean または nil | 真なら動的参照の探し方（3 段目を探さず、1 段目はシーンテーブル自身のキーだけ）にする。省略時は通常の探し方 |
 
-- 5 段で探し、最初に見つかった値（関数・文字列など）を、呼ばずにそのまま返す。見つからなければ `nil` を返す（警告ログは出さない）。
+- 5 段で探し、最初に見つかった値（関数・文字列など）を、呼ばずにそのまま返す。見つからなければ `nil` を返す（失敗は報告しない）。
 - ACT の `find_handler` は `find_act_handler` と同じ結果を返す。アクタープロキシの `find_handler` は、`"word"` モードのときアクター辞書を先に探す。
 - `"word"` モードの 2・5 段目は、単語辞書から候補の値（文字列）を 1 つ返す。候補のシャッフル＆順次消費はこの呼び出しでも 1 つ進む（[シャッフル＆順次消費](https://ekicyou.github.io/pasta/grammar/words.html#シャッフル順次消費)）。
 - `"scene"`・`"expr"` モードの 2・5 段目は、見つかったシーンのシーン関数を返す。
@@ -274,7 +275,7 @@ act:expr_fn(key, ...) -> any
 ```
 
 - `"expr"` モードで探し、見つかったのが関数なら `関数(act, ...)` を呼んでその戻り値を返す。2・5 段目でシーンが見つかった場合も、そのシーン関数を同じく呼ぶ。
-- 関数以外の値が見つかったとき、または見つからないときは、警告ログを出して `nil` を返す。
+- 関数以外の値が見つかったとき、または見つからないときは、失敗を報告して `nil` を返す。
 - DSL の式の中の `＠関数（…）` は `act:expr_fn("関数", …)` になる。アクション行の中ではアクタープロキシの `expr_fn` を使う（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
 
 #### expr_fn_var(value, var_path, ...)
@@ -286,11 +287,11 @@ act:expr_fn_var(value, var_path, ...) -> any
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
 | `value` | any | 関数名にする変数の値 |
-| `var_path` | string | 変数の場所（`"var.f"` など）。警告ログに使う |
+| `var_path` | string | 変数の場所（`"var.f"` など）。警告ログと失敗表記に使う |
 | `...` | any | 呼び出す関数に渡す引数 |
 
-- `value` を `WORD.dynamic_key` で関数名に直し（[WORD.dynamic_key](#worddynamic_keyvalue-var_path-via)）、動的参照の探し方（[検索と呼び出し](#検索と呼び出し)）で `"expr"` モードで探す。見つかった後の扱いは `expr_fn` と同じである。
-- `value` を関数名に直せないときは、警告ログを出して探さずに `nil` を返す。
+- `value` を `WORD.dynamic_key` で関数名に直し（[WORD.dynamic_key](#worddynamic_keyvalue-var_path-via-act)）、動的参照の探し方（[検索と呼び出し](#検索と呼び出し)）で `"expr"` モードで探す。見つかった後の扱いは `expr_fn` と同じである。
+- `value` を関数名に直せないときは、失敗を報告して探さずに `nil` を返す。
 - DSL の式の中の `＠＄f（…）` は `act:expr_fn_var(var.f, "var.f", …)` になる。アクション行の中ではアクタープロキシの `expr_fn_var` を使う（[動的関数呼び出し](https://ekicyou.github.io/pasta/grammar/words.html#動的関数呼び出し)）。
 
 #### find_scene(key)
@@ -317,8 +318,8 @@ act:call(global_scene_name, key, attrs, ...) -> any
 | `...` | any | 呼び出す関数に渡す引数 |
 
 - `"scene"` モードで `key` を探し、見つかったのが関数なら `関数(act, ...)` を呼んでその戻り値を返す。関数は末尾位置で呼ぶ（`return 関数(act, ...)`）ため、`return act:call(…)` の形で呼び出しをつないでも、呼び出しは深くならない。
-- 関数以外の値が見つかったとき、または見つからないときは、警告ログ `act:call - handler not found: key='名前', mode='scene', via=act` を出し、失敗表記 `【Call失敗：「名前」が見つからない】` を積んで（[failure](#failuretext-warning)）、`nil` を返す。Lua から直接呼んだ場合も、DSL の Call 行と同じく失敗表記を積む。
-- `key` が `nil` のときは、検索せずに警告ログ `act:call - nil key (undefined variable?), skipping scene search` を出して `nil` を返す。失敗表記は積まない。
+- 関数以外の値が見つかったとき、または見つからないときは、警告ログ `act:call - handler not found: key='名前', mode='scene', via=act` とともにシーンが見つからない失敗を報告して、`nil` を返す。Lua から直接呼んだ場合も、DSL の Call 行と同じく失敗表記を積む。
+- `key` が `nil` のときは、検索せずに警告ログ `act:call - nil key (undefined variable?), skipping scene search` とともに名前にならない値の失敗を報告して `nil` を返す。
 - `key` が `call_key` の返した「呼ばない」印のときは、検索も警告もせずに `nil` を返す（警告と失敗表記は `call_key` が出している）。
 - 呼び出しはコルーチンを新しく作らず、実行中のシーンのコルーチンの中で行う。呼んだ先で `yield` すると、呼び出し元のシーンごと中断する。
 - 実行中のシーンは戻さない。呼んだ先のシーン関数が `init_scene` を呼ぶと、戻った後も実行中のシーンは呼んだ先のシーンのままになる。戻った後に呼ぶ前のシーンへ戻す呼び出しは [call_restore](#call_restoreglobal_scene_name-key-attrs-) である。
@@ -358,9 +359,10 @@ act:call_key(value, var_path?, desc?) -> string | 「呼ばない」印
 | `desc` | string または nil | 式が関数呼び出し 1 つのときの表記（`"@名前()"`・`"@*名前()"`・`"@$var.名前()"`）。警告ログと失敗表記に使う |
 
 - 空でない文字列（文字列 `"nil"` を含む）はそのまま、数値は `tostring(value)` を検索キーとして返す。
-- それ以外の値（`nil`・空文字列・真偽値・表など）では、警告ログと失敗表記（[failure](#failuretext-warning)）を出し、「呼ばない」印を返す。印を受け取った `act:call`・`act:call_restore` は、検索せずに `nil` を返す。印は外から作れない値で、文字列 `"nil"` とも `false` とも区別される。
-- 警告ログは、`var_path` があれば `WORD.dynamic_key(value, var_path, "act:call")` の警告（[WORD.dynamic_key](#worddynamic_keyvalue-var_path-via)）、無ければ `act:call - key is not a string or number: operand='@名前()', value=nil` の形である。`operand=` は `desc` があるときだけ付き、`value=` の表記は [PASTA.num](#pastanumop-v-desc) と同じである。値が `nil` で `var_path` も `desc` も無いとき（手書きの Lua から `nil` を渡した場合。DSL の動的ターゲットでは起きない）は警告しない。
-- 失敗表記の文言は [動的ターゲットの値](https://ekicyou.github.io/pasta/grammar/call-jump.html#動的ターゲットの値) の表のとおりである。
+- それ以外の値（`nil`・空文字列・真偽値・表など）では、失敗を報告し、「呼ばない」印を返す。印を受け取った `act:call`・`act:call_restore` は、検索せずに `nil` を返す。印は外から作れない値で、文字列 `"nil"` とも `false` とも区別される。
+- 警告ログは、`var_path` があれば `WORD.dynamic_key(value, var_path, "act:call")` の警告（[WORD.dynamic_key](#worddynamic_keyvalue-var_path-via-act)）、無ければ `act:call - key is not a string or number: operand='@名前()', value=nil` の形である。`operand=` は `desc` があるときだけ付き、`value=` の表記は [PASTA.num](#pastanumop-v-desc) と同じである。値が `nil` で `var_path` も `desc` も無いとき（手書きの Lua から `nil` を渡した場合。DSL の動的ターゲットでは起きない）は警告しない。
+- `desc` があり `var_path` が無く、式の関数呼び出しがすでに失敗を報告していた（関数が見つからない・動的参照の値が名前にならない）ときは、重ねて報告せずに「呼ばない」印を返す。
+- 失敗表記の文言は [実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html) のとおりである。
 - DSL の動的ターゲットは、`＞＄x` が `act:call_key(var.x, "var.x")`、`＞＠f（）` が `act:call_key(act:expr_fn("f"), nil, "@f()")`、それ以外の式が `act:call_key(式)` になる。
 
 #### restore_scene(scene, ...)
@@ -379,15 +381,14 @@ act:restore_scene(scene, ...) -> ...
 act:failure(text, warning?) -> nil
 ```
 
-- `warning` があれば警告ログに出し、`【text】` を生のさくらスクリプト（`act:raw_script` と同じトークン）として積む。句読点のウェイトも budoux の改行も入らず、`text` はエスケープしない。
-- スコープ切替タグを付けずに積んだ位置へ出力される。直前に話したアクターのバルーンに続けて出て、次に同じアクターが話してもスコープ切替タグは増えない。出力の先頭では、その時点のスコープのバルーンに出る（[Call が失敗したとき](https://ekicyou.github.io/pasta/grammar/call-jump.html#call-が失敗したとき)）。
-- `act:call`（見つからないとき）と `act:call_key`（検索キーにならない値のとき）が、Call の失敗表記を出すのに使う。
+- 辞書の失敗と同じ出口から失敗を報告する。`【text】` を失敗表記として積み、`warning` があれば警告ログに出す（`nil` ならログには出さない）。`text` は他の失敗表記と同じくエスケープされ、表記は `[logging] balloon_warning` に従う。
+- 表記の出る位置と形は [実行時の失敗の出力の act:failure](https://ekicyou.github.io/pasta/reference/runtime-failures.html#actfailure) を参照する。
 
 `call_restore`・`call_key`・`restore_scene`・`failure` は act のメソッドのため、ほかの act のメソッドと同じく、`＠名前（…）`・`＠名前`・`＞名前` の検索の 3 段目で名前から見つかる（[検索と呼び出し](#検索と呼び出し)）。
 
 ### アクター・グローバル関数
 
-アクション行のアクターと `＠＊名前（…）` の生成コードは、次のメソッドを呼ぶ。どちらも、アクターや関数が無いときに Lua のエラーにせず、警告ログを出して続ける。手書きの Lua からも呼べる。
+アクション行のアクターと `＠＊名前（…）` の生成コードは、次のメソッドを呼ぶ。どちらも、アクターや関数が無いときに Lua のエラーにせず、失敗を報告して続ける（[実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html)）。手書きの Lua からも呼べる。
 
 | メソッド | 内容 | 戻り値 |
 | -------- | ---- | ------ |
@@ -404,7 +405,7 @@ act:actor_proxy(name) -> ActorProxy
 ```
 
 - `act.actors` に `name` があれば、`act.名前` と同じアクタープロキシを返す。ログもトークンも出さない。名前を文字列で受け取るため、メソッド名・フィールド名と同じ名前のアクターでもプロキシになる。
-- 無ければ、名前だけを持つその場限りのアクターのプロキシを返す。このアクターは登録されず、`act.actors` にも立ち位置にも書かれない（立ち位置が無いため、スポット 0 で話す）。直前に積まれた `talk`・`sakura_script` が同じ名前のその場限りのアクターのものでなければ、目印の台詞 `【未登録アクター：名前】` を積み、警告ログ `act:actor_proxy - unregistered actor: name='名前'` を出す。
+- 無ければ、名前だけを持つその場限りのアクターのプロキシを返す。このアクターは登録されず、`act.actors` にも立ち位置にも書かれない（立ち位置が無いため、スポット 0 で話す）。直前の話者（直前に積まれた `talk`・`sakura_script`・目印）が同じ名前のその場限りのアクターでなければ、警告ログ `act:actor_proxy - unregistered actor: name='名前'` とともに未登録アクターの失敗を報告し、目印をそのアクターの発言として積む。
 - アクション行の生成コードは、アクターをこの形で参照する。DSL での見え方は [登録していないアクター名](https://ekicyou.github.io/pasta/grammar/action-line.html#登録していないアクター名) を参照する。
 
 #### global_fn(name, ...)
@@ -414,7 +415,7 @@ act:global_fn(name, ...) -> any
 ```
 
 - `GLOBAL[name]` が関数なら `関数(act, ...)` を呼び、その戻り値をすべて返す。関数の中で起きたエラーは、そのまま伝わる。
-- 無いとき、関数でない値のときは、警告ログ `act:global_fn - function not found: key='名前'` を出して `nil` を返す。
+- 無いとき、関数でない値のときは、警告ログ `act:global_fn - function not found: key='名前'` とともに関数が見つからない失敗を報告して `nil` を返す。
 - 5 段の検索は行わず、`GLOBAL` だけを見る。
 - 関数から戻った後、実行中のシーンを呼ぶ前のシーンに戻す（[検索と呼び出し](#検索と呼び出し)）。
 - DSL の `＠＊名前（…）` は `act:global_fn("名前", …)` になる。アクション行の中でも、関数の第 1 引数は act である（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
@@ -546,22 +547,23 @@ WORD.create_actor("さくら", "一人称")
     :entry("あたし")
 ```
 
-### WORD.dynamic_key(value, var_path, via)
+### WORD.dynamic_key(value, var_path, via, act)
 
 ```lua
-WORD.dynamic_key(value, var_path, via) -> string | nil
+WORD.dynamic_key(value, var_path, via, act?) -> string | nil
 ```
 
-動的参照の変数の値を、単語名・関数名に直す補助関数である。`act:word`（`var_path` を渡したとき）と `act:expr_fn_var` が使う。`act:call_key`（`var_path` を渡したとき）は、値を検索キーにできないときの警告にだけ使う。
+動的参照の変数の値を、単語名・関数名に直す補助関数である。`act:word`（`var_path` を渡したとき）と `act:expr_fn_var` が使う。`act:call_key`（`var_path` を渡したとき）は、値を検索キーにできないときの報告にだけ使う。
 
 | `value` | 戻り値 |
 | ------- | ------ |
 | 空でない文字列 | その文字列 |
 | 数値 | `tostring(value)`（`3` なら `"3"`） |
-| `nil`・空文字列・それ以外の型 | `nil`（警告ログを出す） |
+| `nil`・空文字列・それ以外の型 | `nil`（名前にならない値の失敗を報告する） |
 
 - 文字列は DSL として読み直さない。`__tostring` を持つ表も文字列にしない。
 - 警告ログは `{via} - undefined variable: '{var_path}'`（`nil`）・`{via} - empty variable: '{var_path}'`（空文字列）・`{via} - unsupported value type: '{var_path}' ({型名})`（それ以外の型）である。ランタイムは `via` に `"act:word"`・`"act:expr_fn"`・`"act:call"`・`"proxy:word"`・`"proxy:expr_fn"` を渡す。
+- `act` を渡すと、失敗表記をその act に積む。省略すると警告ログだけを出し、失敗表記は出さない（[実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html)）。ランタイムは実行中の act を渡す。
 
 ### WORD.resolve_value(value, act)
 
@@ -589,7 +591,7 @@ end
 
 戻り値を使わない呼び出し `＄＝式` は [式文](https://ekicyou.github.io/pasta/grammar/variables.html#式文exprstmt) で扱う。
 
-- DSL の `＠＊名前（引数…）` は `act:global_fn("名前", 引数…)` になり、`GLOBAL` の関数を `(act, 引数…)` で呼ぶ。5 段の検索は行わない。未定義の名前・関数でない値のときは、警告ログを出して `nil` になる（[global_fn](#global_fnname-)）。アクション行で呼んだ場合は戻り値が出力され（`nil` なら何も出力しない）、変数代入の右辺なら戻り値が代入される（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
+- DSL の `＠＊名前（引数…）` は `act:global_fn("名前", 引数…)` になり、`GLOBAL` の関数を `(act, 引数…)` で呼ぶ。5 段の検索は行わない。未定義の名前・関数でない値のときは、失敗を報告して `nil` になる（[global_fn](#global_fnname-)）。アクション行で呼んだ場合は戻り値が出力され（`nil` なら何も出力しない）、変数代入の右辺なら戻り値が代入される（[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。
 - `GLOBAL` は 5 段の検索の 4 段目（完全一致）でもある。`＠名前（…）`（ローカル呼び出し）・`＠名前`（単語参照）・`＞名前`（Call）は、1〜3 段目に無ければ `GLOBAL` の値を見つける（[検索と呼び出し](#検索と呼び出し)）。関数は `(act, 引数…)` で呼ばれる（アクション行の中の単語参照と関数呼び出しでも第 1 引数は act である。[関数スコープの展開先](https://ekicyou.github.io/pasta/grammar/variables.html#関数スコープの展開先)）。関数以外の値は、単語参照では文字列として出力される。
 - DSL の `＠名前（）` は `GLOBAL` の関数を直接は呼ばない。グローバル関数を確実に呼ぶには `＊` を付けた `＠＊名前（）` を使う。
 - 関数は、呼ばれる前であればいつ登録してもよい（`main.lua`・Lua ブロックなど）。
@@ -637,7 +639,7 @@ save.talk_count = (save.talk_count or 0) + 1
 
 `pasta` モジュール（`require "pasta"`）の関数のうち、式の算術と連結の生成コードが使う 2 つを扱う。DSL の式の算術と連結は、演算ごとに Lua の演算子を括弧で囲んだ `(左 演算子 右)` になり、被演算子はこの 2 つの関数で数値・文字列にしてから演算子に渡される（[DSL と Lua の対応表](https://ekicyou.github.io/pasta/grammar/variables.html#dsl-と-lua-の対応表)）。
 
-- 2 つとも act のメソッドではない（`self` を取らず、ACT の状態を読み書きしない）。そのため、`＠名前（…）`・`＠名前` の検索の 3 段目では見つからない（[検索と呼び出し](#検索と呼び出し)）。
+- 2 つとも act のメソッドではない（`self` を取らない）。そのため、`＠名前（…）`・`＠名前` の検索の 3 段目では見つからない（[検索と呼び出し](#検索と呼び出し)）。
 - 被演算子の表に `__add`・`__concat`・`__tostring` などのメタメソッドがあっても呼ばない。
 - Lua のエラーを投げない。手書きの Lua からも呼べる。
 
@@ -651,16 +653,17 @@ PASTA.num(op, v, desc?) -> number
 | ---------- | -- | ---- |
 | `op` | string | 警告ログに出す演算子（`"+"`・`"-"`・`"*"`・`"/"`・`"%"`） |
 | `v` | any | 被演算子の値 |
-| `desc` | string または nil | 警告ログに出す被演算子の説明（`"var.x"`・`"@f()"` など） |
+| `desc` | string または nil | 警告ログと失敗表記に出す被演算子の説明（`"var.x"`・`"@f()"` など） |
 
 | 値 | 戻り値 | 警告ログ |
 | -- | ------ | -------- |
 | 数値 | そのまま | なし |
 | 文字列で、`tonumber` が数値を返すもの（`"12"`・`"1.5"` など） | その数値 | なし |
 | `nil` | `0` | なし |
-| それ以外（数字でない文字列・空文字列・全角数字だけの文字列・真偽値・表・関数） | `0` | 1 行 |
+| それ以外（数字でない文字列・空文字列・全角数字だけの文字列・真偽値・表・関数） | `0` | 1 行（失敗表記も出す） |
 
 - 警告ログは `act:arith - operand is not a number: op='*', operand='var.x', value='abc' (string)` の形である。接頭辞の `act:arith` は算術の警告であることを表す（関数の名前ではない）。`operand=` は `desc` があるときだけ付く。`value=` は値の種類を表し、`'abc' (string)`・`true (boolean)`、それ以外は `(table)` のように型名だけになる（表の `__tostring` は呼ばない）。
+- 警告ログを出すときは、数にできない値の失敗表記を実行中の act に積む（[実行中の act の制限](https://ekicyou.github.io/pasta/reference/runtime-failures.html#実行中の-act-の制限)）。
 - `op` は警告ログに出すだけで、演算はしない。演算は生成コードの Lua の演算子が行う。
 - DSL の式の算術では、数値のリテラルと算術の演算の結果を除く被演算子が `PASTA.num` を通る（[算術の評価](https://ekicyou.github.io/pasta/grammar/variables.html#算術の評価)）。
 
@@ -673,16 +676,17 @@ PASTA.str(v, desc?) -> string
 | パラメータ | 型 | 説明 |
 | ---------- | -- | ---- |
 | `v` | any | 被演算子の値 |
-| `desc` | string または nil | 警告ログに出す被演算子の説明（`"var.x"`・`"@f()"` など） |
+| `desc` | string または nil | 警告ログと失敗表記に出す被演算子の説明（`"var.x"`・`"@f()"` など） |
 
 | 値 | 戻り値 | 警告ログ |
 | -- | ------ | -------- |
 | 文字列 | そのまま | なし |
 | 数値 | `tostring(v)`（アクション行で表示したときと同じ表記） | なし |
 | `nil` | `""` | なし |
-| それ以外（真偽値・表・関数） | `""` | 1 行 |
+| それ以外（真偽値・表・関数） | `""` | 1 行（失敗表記も出す） |
 
 - 警告ログは `act:concat - operand is not a string or number: op='&', operand='@真()', value=true (boolean)` の形である。接頭辞の `act:concat` は連結の警告であることを表す。`op` は DSL で全角・半角のどちらを書いても `'&'` である。`operand=` は `desc` があるときだけ付き、`value=` の表記は [PASTA.num](#pastanumop-v-desc) と同じである。
+- 警告ログを出すときは、文字列にできない値の失敗表記を実行中の act に積む（[実行中の act の制限](https://ekicyou.github.io/pasta/reference/runtime-failures.html#実行中の-act-の制限)）。
 - DSL の式の連結では、文字列のリテラルと連結の演算の結果を除く被演算子（数値のリテラルを含む）が `PASTA.str` を通る（[連結の評価](https://ekicyou.github.io/pasta/grammar/variables.html#連結の評価)）。
 
 ```lua
@@ -690,8 +694,8 @@ local PASTA = require "pasta"
 
 PASTA.num("+", "12")             -- 12
 PASTA.num("+", nil, "var.x")     -- 0（警告しない）
-PASTA.num("*", "abc", "var.x")   -- 0（警告を 1 行出す）
+PASTA.num("*", "abc", "var.x")   -- 0（警告を 1 行出し、失敗表記を積む）
 PASTA.str(3)                     -- "3"
 PASTA.str(nil, "var.x")          -- ""（警告しない）
-PASTA.str(true, "@真()")         -- ""（警告を 1 行出す）
+PASTA.str(true, "@真()")         -- ""（警告を 1 行出し、失敗表記を積む）
 ```

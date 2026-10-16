@@ -54,6 +54,7 @@ metadata:
 | [words.md](references/words.md) | 生成（マニュアルから） | [単語定義](https://ekicyou.github.io/pasta/grammar/words.html) | 単語定義・参照・シャッフル＆順次消費・スコープと優先順位 |
 | [actor-dictionary.md](references/actor-dictionary.md) | 生成（マニュアルから） | [アクター辞書](https://ekicyou.github.io/pasta/grammar/actor-dictionary.html) | アクター辞書・`％` 行による立ち位置・バルーン連携・外見の復旧・コードブロック |
 | [pasta-toml.md](references/pasta-toml.md) | 生成（マニュアルから） | [pasta.toml リファレンス](https://ekicyou.github.io/pasta/reference/pasta-toml.html) | `pasta.toml` の全セクション・全キー・既定値 |
+| [runtime-failures.md](references/runtime-failures.md) | 生成（マニュアルから） | [実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html) | 書き間違いが実行時に出す表記とログの警告・出る位置・重ねない規則・切り替えの設定・Lua からの報告（`act:failure`） |
 | [authoring-patterns.md](references/authoring-patterns.md) | 手書き（スキルが権威） | — | 辞書制作の作例・ファイル分割指針・自然言語→シーン変換の手順 |
 
 ---
