@@ -1,0 +1,22 @@
+{
+  "feature_name": "manual-print-page-removal",
+  "created_at": "2026-10-16T12:14:26Z",
+  "updated_at": "2026-10-16T12:22:27Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
