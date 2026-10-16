@@ -304,6 +304,34 @@ test('開いていないファイルと pasta.toml に Error・Warning を sourc
   gv.dispose();
 });
 
+test('列はコードポイントから UTF-16 の位置に直す（同じ行の手前のサロゲートペアの分ずれない）', async () => {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  mock.setFakeFile('/ws/ghost/master/pasta.toml', '[loader]\n😀x = 1\n');
+  mock.setFakeFile('/ws/ghost/master/dic/a.pasta', '＊会話\n  😀＠＠＠\n');
+  const bridge = new FakeBridge();
+  bridge.selected = ['dic/a.pasta'];
+  bridge.report = {
+    findings: [
+      // 核の列は 1 始まりのコードポイント: `＠` は 4 列目、`x` は 2 列目
+      finding('syntax', 'error', 'dic/a.pasta', 2, 4, '構文の誤り'),
+      finding('config-invalid', 'error', 'pasta.toml', 2, 2, '設定の誤り'),
+    ],
+    stats: { ...EMPTY_STATS, errors: 2 },
+  };
+  const { gv, col } = newValidator(bridge);
+
+  await gv.validate(MASTER);
+
+  const a = col.get(uriOf('dic/a.pasta'));
+  assert.ok(a);
+  assert.deepStrictEqual([a[0].range.start.line, a[0].range.start.character], [1, 4]);
+  const t = col.get(uriOf('pasta.toml'));
+  assert.ok(t);
+  assert.deepStrictEqual([t[0].range.start.line, t[0].range.start.character], [1, 2]);
+  gv.dispose();
+});
+
 test('前回あって今回無い URI の診断を消す', async () => {
   mock.resetFakeFs();
   setOpenDocuments([]);

@@ -34,6 +34,8 @@ interface OpenChange {
 interface GhostState {
   master: vscode.Uri;
   report: GhostReport;
+  /** 読めた中身（キーは相対パス）。列を UTF-16 に直すのに使う */
+  texts: Map<string, string>;
   /** いま集合に出している URI（キーは toString） */
   shown: Map<string, vscode.Uri>;
 }
@@ -142,8 +144,18 @@ export class GhostValidator implements vscode.Disposable {
       if (this.disposed) {
         return;
       }
-      const state = this.ghosts.get(key) ?? { master, report, shown: new Map<string, vscode.Uri>() };
+      const texts = new Map<string, string>();
+      for (const [rel, f] of Object.entries(files)) {
+        if (f.kind === 'text') {
+          texts.set(rel, f.text);
+        }
+      }
+      if (input.pastaToml.kind === 'text') {
+        texts.set('pasta.toml', input.pastaToml.text);
+      }
+      const state = this.ghosts.get(key) ?? { master, report, texts, shown: new Map<string, vscode.Uri>() };
       state.report = report;
+      state.texts = texts;
       this.ghosts.set(key, state);
       this.render(state);
     } catch (error) {
@@ -201,7 +213,8 @@ export class GhostValidator implements vscode.Disposable {
       if (f.code === SYNTAX_CODE && open.has(key)) {
         continue;
       }
-      const pos = new vscode.Position(Math.max((f.line ?? 1) - 1, 0), Math.max((f.column ?? 1) - 1, 0));
+      const line = Math.max((f.line ?? 1) - 1, 0);
+      const pos = new vscode.Position(line, utf16Column(state.texts.get(f.path), line, Math.max((f.column ?? 1) - 1, 0)));
       const d = new vscode.Diagnostic(
         new vscode.Range(pos, pos),
         f.message,
@@ -224,6 +237,26 @@ export class GhostValidator implements vscode.Disposable {
       state.shown.set(key, uri);
     }
   }
+}
+
+/**
+ * 核の列（0 始まりのコードポイント）を VSCode の列（UTF-16）に直す。
+ * その行の中身が無ければコードポイントのまま返す
+ */
+function utf16Column(text: string | undefined, line: number, column: number): number {
+  const lineText = text?.split(/\r?\n/)[line];
+  if (lineText === undefined) {
+    return column;
+  }
+  let utf16 = 0;
+  let n = 0;
+  for (const ch of lineText) {
+    if (n++ >= column) {
+      break;
+    }
+    utf16 += ch.length;
+  }
+  return utf16;
 }
 
 /** 再帰で '/' 区切りの相対パスを集める。最上位の profile に入らず、リンクは含めない */
