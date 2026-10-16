@@ -180,3 +180,9 @@
 - 同じファイルの `copy_shiori_lifecycle_fixture` は、フィクスチャを丸ごとコピーした（464 行）後に、フィクスチャの `scripts/` をもう一度コピーしている（486〜491 行）。二度目は要らないが、動きに影響せず要件の範囲外なので残し、コメントの読み込み先だけ直す。
 - 説明の直しが要るのは、`async_callback_support.rs`（18〜20・42〜43 行）、`actor_thread_vm_test.rs`（39 行）、`byte_invariant_test.rs`（130 行）、`ffi_extern_session_e2e_test.rs`（203 行）、`debug_preservation_test.rs`（59 行）、`actor_kick_test.rs`（52〜53・78 行）、`src/shiori_request_tests.rs`（38・466・486 行）。ほかのファイルの説明は直下の `pasta_scripts/` に触れていない。
 - `pasta_shiori` の `Cargo.toml`・steering・スキルの文書は `tests/support` を指していない。今も写しを指しているのは、過去の記録（触らない）と `scene-attribute-store/brief.md` 176 行（申し送り）と `roadmap.md` 346 行（完了の手順で直す）だけ。
+
+## 10. 設計のディスカッションで決めたこと（2026-10-16、全部推す答えのとおりに確定）
+
+- **`test_path_helpers_test.rs`**: `scriptlibs` の確かめだけを消す。`pasta.toml` を読む確かめと `scripts` の確かめで、「深いパス・ANSI で表せないパスの下に置けて読める」という意図は保てる。差分がいちばん小さい。
+- **共通部品の説明の言葉**: 日本語。すぐ下の `copy_fixture_into` と、その下の節の説明が日本語なので、隣り合う関数で言葉を混ぜない。
+- **`src/shiori_request_tests.rs` の二度目のコピー**: 消す。直下の `pasta_scripts/` を置いた後に差し替えを重ねるための手順で、根が同じ。コメントを書き直して残すより差分が小さく、読む人が「なぜ二度コピーするのか」と迷わない。

@@ -183,7 +183,7 @@ transpiled_output_dir = "profile/pasta/cache/lua"
 | `tests/ffi_extern_session_e2e_test.rs` | 210〜218 | 203 行 | 残す（220 行） |
 | `tests/debug_preservation_test.rs` | 66〜74 | 59 行 | 残す（76 行） |
 | `tests/actor_kick_test.rs` | 59〜70（`manifest_dir` の行を含む） | 52〜53 行・78 行 | **消す**（31〜50 行と後ろの空行）。13 行の `use std::path::{Path, PathBuf};` を `use std::path::PathBuf;` にする |
-| `src/shiori_request_tests.rs` | 43〜48・471〜476 と、それぞれのすぐ上のコメント 38 行・466 行 | 486 行 | 残す（36・464・483・491 行） |
+| `src/shiori_request_tests.rs` | 43〜48・471〜476 と、それぞれのすぐ上のコメント 38 行・466 行。486〜491 行（フィクスチャの `scripts/` の二度目のコピー）とその前の空行 | なし（486 行のコメントはかたまりごと消える） | 残す（36・464・483 行） |
 
 - `tests/actor_kick_test.rs` だけは、`copy_dir_recursive` を直下へのコピーにしか使っていない（フィクスチャは `pasta.toml` と `entry.lua` をその場で書く）。コピーを消すと関数・`Path` の `use`・`manifest_dir` が使われなくなり、clippy の `-D warnings` で落ちるので、まとめて消す。ほかの 10 ファイルは、フィクスチャのコピーに同じ関数を使い続けるので残す。
 - `src/shiori_request_tests.rs` の `crate_root` は、`scriptlibs` のコピー（50〜56 行・478〜484 行）が使い続けるので残す。38 行・466 行のコメントは `// pasta_lua の scriptlibs をコピーする（標準ランタイムは自己展開されるのでコピーしない）` に書き換え、50 行・478 行の `// Copy scriptlibs directory` は重なるので消す。
@@ -200,7 +200,6 @@ transpiled_output_dir = "profile/pasta/cache/lua"
 | `debug_preservation_test.rs` 59 行 | `/// デバッグ保全フィクスチャ（`[debug]` 有効 entry.lua の差し替え。標準ランタイムは自己展開される）を` |
 | `actor_kick_test.rs` 52〜53 行 | `/// `pasta.toml` と、`scripts/pasta/shiori/entry.lua` の **ユーザーオーバーライド** を temp に書く。`<br>`/// 実 `SHIORI.kick` / `KICK.install` / `STORE` は、自己展開した標準ランタイム（`profile/pasta/pasta_scripts/`）から読まれる。`（54〜56 行はそのまま） |
 | `actor_kick_test.rs` 78 行 | `// ユーザーオーバーライド entry.lua（scripts/ は自己展開した profile/pasta/pasta_scripts/ より先に検索される）。` |
-| `src/shiori_request_tests.rs` 486 行 | `// Copy fixture's scripts/ as user override (searched before the self-deployed profile/pasta/pasta_scripts/)` |
 
 - ファイルの中の説明の言葉（英語か日本語か）は、そのファイルの近くの説明に合わせる。
 
@@ -285,9 +284,9 @@ pub fn copy_fixture_into(fixture: &str, dest: &Path);
 - `.kiro/specs/scene-attribute-store/brief.md` 176 行の「`pasta_shiori` の結合テストは、古いランタイムの写し（…`scene.lua`）を読む。…写しは直さない（`shiori-test-support-runtime` の持ち場）」を、写しが無くなったことに合わせて直す（kiro-complete の申し送り）。
 - `.kiro/steering/roadmap.md` 346 行の `shiori-test-support-runtime` の行は、kiro-complete の通常の手順で完了にする。
 
-## 前提と未決の点
+## 前提と決めたこと
 
-- **前提 1**: `test_path_helpers_test.rs` は `scriptlibs` の確かめ（50〜53 行）だけを消し、`scripts` の確かめは残す。`scripts` は写しではなくフィクスチャ自身の差し替えで置かれる。ディスカッションで確かめる（未決 1）。
-- **前提 2**: 共通部品の説明は日本語で書く（すぐ下の `copy_fixture_into` の説明に合わせる）。今の説明は英語なので、言葉をそろえるかはディスカッションで確かめる（未決 2）。
-- **前提 3**: `src/shiori_request_tests.rs` の、本物の `scriptlibs` のコピーと、フィクスチャの `scripts/` の二度目のコピー（486〜491 行。直前の 464 行で既にコピー済み）は残す。どちらも本物を使う手順で、要件の範囲外。説明だけ直す（未決 3）。
+- **決めたこと 1**（2026-10-16 確定）: `test_path_helpers_test.rs` は `scriptlibs` の確かめ（50〜53 行）だけを消し、`scripts` の確かめは残す。`scripts` は写しではなくフィクスチャ自身の差し替えで置かれる。
+- **決めたこと 2**（2026-10-16 確定）: 共通部品の `copy_fixture_to_temp` の説明は日本語で書く（すぐ下の `copy_fixture_into` の説明に合わせる）。
+- **決めたこと 3**（2026-10-16 確定）: `src/shiori_request_tests.rs` の `copy_shiori_lifecycle_fixture` にある、フィクスチャの `scripts/` の二度目のコピー（486〜491 行。直前の 464 行で既にコピー済み）は消す。直下の `pasta_scripts/` を置いた後に差し替えを重ねるための手順で、直下へのコピーを消すと意味が無くなる（要件 5 の「実際に効く手順だけで書く」）。本物の `scriptlibs` のコピー（478〜484 行）は、検索パスに入る本物を置く手順なので残す。
 - この設計の変更そのものは、まだ走らせていない（設計の段では手元のファイルを書き換えなかった）。根拠はギャップ分析の実験（2026-10-16、同じ基点）。clippy は実験で走らせていないので、使われなくなる関数・`use` の洗い出し（`actor_kick_test.rs` だけ）は読んで確かめた結果である。
