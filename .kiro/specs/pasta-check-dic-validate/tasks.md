@@ -111,8 +111,8 @@
   - 完了の状態: CLI のテストが通り、hello-pasta（`crates/pasta_sample_ghost/ghosts/hello-pasta`）が誤り 0 で終了コード 0 になる
   - _Requirements: 1.1, 1.3, 1.4, 1.6, 7.2, 7.5, 7.6, 9.5_
 
-- [ ] 5. release の関門
-- [ ] 5.1 release に検査の段を足し、誤りがあれば更新ファイルと nar の前で止める
+- [x] 5. release の関門
+- [x] 5.1 release に検査の段を足し、誤りがあれば更新ファイルと nar の前で止める
   - 上書きコピーの後に `[4/6] Validating dictionaries...` を足し、配布フォルダの `ghost/master` を validate と同じ殻で検査して同じ行を出す
   - 誤りがあれば英語の文言（`dictionary validation found N error(s); update files and NAR were not created`）で失敗させ、既存の `Error:` と終了コード 1 の処理に任せる。注意だけなら続ける
   - 段の表示を `[1/6]`〜`[6/6]` に振り直す（既存の段の中身とオプションは変えない）
@@ -205,3 +205,4 @@
 - 3.1: 名前が `.pasta` で終わるフォルダ（`dic/x.pasta/`）は既定のパターンに一致し pasta.dll は読み込みに失敗するが、核の入力はファイルだけなので報告しない（要件 9.4 の範囲外として受け入れ）。一致テスト (b) は `is_file()` で絞る。`.lua` パターンの読み替えはテストに写した（`discover_all_files` は pub(super)）。
 - 3.2: (f) は design の「SCENE.search の有無」でなく、実際の Call と同じ `find_act_handler`（current_scene をそのグローバルシーンの表にした SHIORI 用の act）で照らす（組み込みも含めて照らせるので強い）。
 - 4.1: 殻は `validate_cmd::run(target: &Path)` と `run_on_master(master) -> Result<ValidateOutcome, String>`（サブフォルダが読めないときは Err。5.1 では io のエラーに写す）。main.rs の `mod validate_cmd;` の `#[allow(dead_code)]` は 4.2 で外す。`--target` が無いときは 4.2 の解析で扱う。
+- 5.1: `ghost/master` の無い配布フォルダは段 4 で失敗する（理由は validate と同じ日本語）。前回の nar は既存の段 1 で消えるので、関門で止まると nar は残らない。

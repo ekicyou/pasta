@@ -96,7 +96,7 @@ fn test_release_end_to_end_via_binary() {
     let temp = TempDir::new().unwrap();
 
     let target = temp.path().join("target_ghost");
-    fs::create_dir_all(target.join("ghost/master")).unwrap();
+    write_min_ghost(&target);
     fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
     fs::write(
         target.join("install.txt"),
@@ -125,8 +125,12 @@ fn test_release_end_to_end_via_binary() {
 
     assert!(output.status.success(), "stderr: {}", stderr_of(&output));
     let stdout = stdout_of(&output);
-    assert!(stdout.contains("[1/5]"));
-    assert!(stdout.contains("[5/5]"));
+    // 段の表示は [1/6]〜[6/6]（段 4 が辞書の検査・Req 8.1・8.5）
+    for n in 1..=6 {
+        assert!(stdout.contains(&format!("[{n}/6]")), "stdout: {stdout:?}");
+    }
+    assert!(stdout.contains("[4/6] Validating dictionaries..."));
+    assert!(!stdout.contains("/5]"), "stdout: {stdout:?}");
     assert!(stdout.contains("Release complete!"));
 
     // 成果物の実在検証
@@ -145,6 +149,69 @@ fn test_release_end_to_end_via_binary() {
 
     // target は無変更（updates.txt が混入しない）
     assert!(!Path::new(&target).join("updates.txt").exists());
+}
+
+/// 段 4 の検査を通る最小のゴースト（空の pasta.toml と正しい .pasta）を target に書く
+fn write_min_ghost(target: &Path) {
+    let master = target.join("ghost/master");
+    fs::create_dir_all(master.join("dic")).unwrap();
+    fs::write(master.join("pasta.toml"), "").unwrap();
+    fs::write(
+        master.join("dic/a.pasta"),
+        "＊挨拶
+  さくら：こんにちは
+",
+    )
+    .unwrap();
+}
+
+/// 辞書に誤りがあれば validate と同じ行を出し、`Error:` と終了コード 1 で、
+/// 更新ファイルと nar を作らない（Req 8.2）
+#[test]
+fn test_release_dictionary_errors_fail_without_update_files() {
+    let temp = TempDir::new().unwrap();
+    let target = temp.path().join("target_ghost");
+    write_min_ghost(&target);
+    fs::write(
+        target.join("ghost/master/dic/a.pasta"),
+        "＊
+  ＠＠＠
+",
+    )
+    .unwrap();
+    fs::write(
+        target.join("install.txt"),
+        "charset,UTF-8
+type,ghost
+",
+    )
+    .unwrap();
+
+    let output = run_release(&temp, &target);
+
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = stdout_of(&output);
+    assert!(
+        stdout.contains("[4/6] Validating dictionaries..."),
+        "{stdout}"
+    );
+    assert!(
+        stdout
+            .lines()
+            .any(|l| l.starts_with("ghost/master/dic/a.pasta:") && l.contains(": 誤り: ")),
+        "{stdout}"
+    );
+    assert!(stdout.contains("誤り 1 件"), "{stdout}");
+    assert!(!stdout.contains("[5/6]"), "{stdout}");
+    let stderr = stderr_of(&output);
+    assert!(
+        stderr.contains(
+            "Error: dictionary validation found 1 error(s); update files and NAR were not created"
+        ),
+        "stderr: {stderr:?}"
+    );
+    assert!(!temp.path().join("release_out/updates.txt").exists());
+    assert!(!temp.path().join("out.nar").exists());
 }
 
 /// release を target / release_out / out.nar の配置で実行する
@@ -166,7 +233,7 @@ fn run_release(temp: &TempDir, target: &Path) -> Output {
 fn test_release_bundled_balloon_without_homeurl_warns_and_succeeds() {
     let temp = TempDir::new().unwrap();
     let target = temp.path().join("target_ghost");
-    fs::create_dir_all(target.join("ghost/master")).unwrap();
+    write_min_ghost(&target);
     fs::create_dir_all(target.join("bal")).unwrap();
     fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
     fs::write(
@@ -204,7 +271,7 @@ fn test_release_bundled_balloon_without_homeurl_warns_and_succeeds() {
 fn test_release_install_txt_without_charset_fails_without_nar() {
     let temp = TempDir::new().unwrap();
     let target = temp.path().join("target_ghost");
-    fs::create_dir_all(target.join("ghost/master")).unwrap();
+    write_min_ghost(&target);
     fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
     fs::write(target.join("install.txt"), "type,ghost\r\n").unwrap();
 
