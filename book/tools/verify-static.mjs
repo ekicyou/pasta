@@ -5,8 +5,8 @@
 //   であることを機械的に検証する。具体的には次を立証する。
 //     R1.1 / R1.2 / R1.5 静的出力のみ・オフライン閲覧成立
 //       - 出力配下の全ファイルが静的アセット拡張子のみ（サーバー実行物が無い）
-//       - すべてのページ間リンク／アセット参照が相対パスで、参照先が出力配下に実在する
-//         （= file:// で解決可能）
+//       - すべてのページ間リンク／アセット参照（href・src・poster。print.html のメディア要素も含む）が
+//         相対パスで、参照先が出力配下に実在する（= file:// で解決可能）
 //       - SUMMARY 由来の全章 HTML が生成され、相互リンク（next/prev・章間）が解決する
 //       - 目次 (toc) が全章を含む
 //     R3.2 / R3.3 / R3.4 表示要素
@@ -18,7 +18,7 @@
 // 依存ゼロ（Node 標準ライブラリのみ）。検証成功で exit 0、失敗で exit 1。
 //
 // 使い方:
-//   node book/tools/verify-static.mjs            # mdbook build → talk-html の変換をしてから book/book を検証
+//   node book/tools/verify-static.mjs            # mdbook build → talk-html の変換 → print-media-refs の書き換えをしてから book/book を検証
 //   node book/tools/verify-static.mjs --no-build # 既存出力をそのまま検証
 //   node book/tools/verify-static.mjs --self-test # 検証ロジック自身の健全性テストも実行
 
@@ -28,6 +28,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { transformDir } from './talk/talk-html.mjs';
+import { fixPrintMediaRefs } from './print-media-refs.mjs';
 import { SPEAKERS } from './talk/talk.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -110,10 +111,10 @@ function listFiles(root) {
   }));
 }
 
-// HTML から href / src 参照を抽出する（単純だが実 mdBook 出力に十分な正規表現ベース）。
+// HTML から href / src / poster 参照を抽出する（単純だが実 mdBook 出力に十分な正規表現ベース）。
 function extractRefs(html) {
   const refs = [];
-  const re = /\b(?:href|src)\s*=\s*"([^"]*)"/gi;
+  const re = /\b(?:href|src|poster)\s*=\s*"([^"]*)"/gi;
   let m;
   while ((m = re.exec(html)) !== null) {
     refs.push(m[1]);
@@ -206,6 +207,15 @@ function ensureBuilt() {
     log('FATAL: talk-html の変換に失敗しました:', e.message);
     process.exit(1);
   }
+  // print.html のメディア要素の参照の直し（CI の talk の直後の print-media-refs に当たる）。
+  log('Running print-media-refs.mjs to fix media references in print.html...');
+  try {
+    const { targets, fixed } = fixPrintMediaRefs(outDir);
+    log(`print-media-refs: fixed ${fixed} media reference(s) in print.html (${targets} target(s))`);
+  } catch (e) {
+    log('FATAL: print-media-refs の書き換えに失敗しました:', e.message);
+    process.exit(1);
+  }
 }
 
 // =========================================================================
@@ -243,10 +253,9 @@ function analyze(root) {
   const absoluteRefsInContent = []; // file:// で解決不能なルート絶対参照（本文ページ）
   let checkedRefCount = 0;
   for (const hf of contentHtml) {
-    let html = fs.readFileSync(hf.abs, 'utf8');
-    // print.html: mdBook は <a href> を章基準へ書き換えるが <video>/<source> の src は
-    // 書き換えない（既知制約）。印刷ビューで動画は用途外のため、これらのタグの参照のみ対象外とする。
-    if (hf.rel === 'print.html') html = html.replace(/<(?:video|source)\b[^>]*>/gi, '');
+    // print.html のメディア要素（<video>/<source> の src・poster）も例外なく見る。
+    // mdBook が書き換えない分は print-media-refs.mjs が台詞の変換の後に直す。
+    const html = fs.readFileSync(hf.abs, 'utf8');
     const fromDir = path.posix.dirname(hf.rel) === '.' ? '' : path.posix.dirname(hf.rel);
     for (const ref of extractRefs(html)) {
       if (!isLocalRef(ref)) continue;
@@ -402,7 +411,7 @@ function runSelfTest() {
     fs.writeFileSync(path.join(classicDir, '404.html'),
       '<a href="/pasta/">top</a><img src="https://example.com/x.png"><blockquote>\n<p>【得意】未変換</p>\n</blockquote>');
     fs.writeFileSync(path.join(classicDir, 'print.html'),
-      '<video src="missing.mp4"></video><img src="missing.png"><script src="https://example.com/x.js"></script>');
+      '<video src="missing.mp4" poster="missing.png"></video><img src="missing.png"><script src="https://example.com/x.js"></script>');
     fs.writeFileSync(path.join(classicDir, 'evil.php'), '<?php echo 1; ?>');
     const withClassic = analyze(tmp);
     const themeWithClassic = analyzeTheme(tmp, [...summaryChapters(), 'print.html']);
@@ -522,6 +531,26 @@ function runSelfTest() {
     r = withTarget(original.replace('<main>', '<main><blockquote>\n<p>ふつうの引用【注】</p>\n</blockquote>'));
     check('self-test: 【で始まらない引用は未変換の台詞としない', r.untransformedTalk.length === 0,
       JSON.stringify(r.untransformedTalk));
+
+    // (e) print.html のメディア要素（src・poster）の壊れた参照を検出するべき（要件 3.1・3.2・3.5）。
+    //   実出力の動画の有無に頼らず、架空の <video> を差し込む。
+    const printFile = path.join(tmp, 'print.html');
+    const printOriginal = fs.readFileSync(printFile, 'utf8');
+    fs.writeFileSync(printFile, printOriginal.replace('<main>',
+      '<main><video src="media/__missing__.mp4" poster="media/__missing__.png"></video>'));
+    const brokenPrint = analyze(tmp).brokenRefs.filter((b) => b.from === 'print.html' && b.ref.includes('__missing__'));
+    check('self-test: print.html の壊れた動画の src・poster を 2 件とも検出する',
+      brokenPrint.length === 2, JSON.stringify(brokenPrint));
+    fs.writeFileSync(printFile, printOriginal);
+
+    // (f) 章のページの poster の壊れた参照も検出するべき（要件 3.3）。
+    const chapterFile = path.join(tmp, 'grammar', 'index.html');
+    const chapterOriginal = fs.readFileSync(chapterFile, 'utf8');
+    fs.writeFileSync(chapterFile, chapterOriginal.replace('<main>', '<main><video poster="__missing__.png"></video>'));
+    const brokenPoster = analyze(tmp).brokenRefs.filter((b) => b.from === 'grammar/index.html' && b.ref === '__missing__.png');
+    check('self-test: 章のページの壊れた poster を検出する', brokenPoster.length === 1,
+      JSON.stringify(brokenPoster));
+    fs.writeFileSync(chapterFile, chapterOriginal);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -563,7 +592,7 @@ function run() {
   // --- (2) オフライン参照の健全性 ---
   log('');
   log('--- (R1) file:// で解決可能な相対参照・リンク健全性 ---');
-  check(`R1.2/R1.5: 本文ページの相対 href/src がすべて出力配下に実在する（解析${a.checkedRefCount}件）`,
+  check(`R1.2/R1.5: 本文ページの相対 href/src/poster がすべて出力配下に実在する（解析${a.checkedRefCount}件）`,
     a.brokenRefs.length === 0,
     JSON.stringify(a.brokenRefs.slice(0, 6)));
   check('R1.2: 本文ページに file:// で解決不能なルート絶対参照が無い',

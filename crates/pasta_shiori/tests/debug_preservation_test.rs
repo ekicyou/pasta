@@ -56,21 +56,12 @@ fn neutralize_debug_env() {
     }
 }
 
-/// デバッグ保全フィクスチャ（本番 pasta_scripts + `[debug]` 有効 entry.lua override）を
+/// デバッグ保全フィクスチャ（`[debug]` 有効 entry.lua の差し替え。標準ランタイムは自己展開される）を
 /// temp へ展開し、`load_dir` を返す。`TempDir` は返り値で寿命保持する。
 /// 写経元: `actor_thread_vm_test.rs::build_async_callback_dir`。
 fn build_debug_dir() -> (PathBuf, TempDir) {
     let temp = TempDir::new().expect("create temp dir");
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-    let pasta_scripts_src = manifest_dir
-        .parent()
-        .expect("parent dir")
-        .join("pasta_lua")
-        .join("pasta_scripts");
-    let pasta_scripts_dst = temp.path().join("pasta_scripts");
-    std::fs::create_dir_all(&pasta_scripts_dst).expect("create pasta_scripts dir");
-    copy_dir_recursive(&pasta_scripts_src, &pasta_scripts_dst).expect("copy pasta_scripts");
 
     let fixture_src = manifest_dir.join("tests/fixtures/debug_preservation");
     copy_dir_recursive(&fixture_src, temp.path()).expect("copy fixture");

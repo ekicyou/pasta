@@ -162,3 +162,8 @@
 
 - `Cargo.lock` は 364 パッケージから 252 パッケージに減った（`image`・`imageproc` とその依存を外し、`pasta_sample_ghost` の dev-dependency に `png 0.18` を足した）。
 - ルートの `Cargo.toml` の `[workspace.dependencies]` から `image`・`imageproc` が消えた。
+
+## 申し送り（manual-print-media-refs より）
+
+- `manual-print-media-refs` は完了したが、同じ日に起票した `manual-print-page-removal`（`print.html` をやめる）が `.github/workflows/manual.yml` の席を引き継いだ。Constraints の「`manual.yml`」のとおり、この spec が入るまで `manual.yml` は触らない。
+- `manual.yml` に段が 1 つ増え（台詞の変換の直後の「Fix print page media references」）、先頭の説明も書き直したので、行の位置がずれた。Current State の「`manual.yml` 128〜135 行」は、今は 145〜152 行（チュートリアルの照合 その2「Tutorial syntax validation (hello-pasta real files)」の段とそのコメント）に当たる。段の中身は変えていない。
