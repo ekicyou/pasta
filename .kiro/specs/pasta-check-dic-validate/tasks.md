@@ -99,7 +99,7 @@
   - 完了の状態: 殻の関数が、誤りあり・誤りなし・フォルダの誤りの 3 通りを区別して返す
   - _Requirements: 1.1, 1.2, 1.3, 1.6, 3.4, 7.5, 7.6_
 
-- [ ] 4.2 サブコマンド validate を引数の解析と使い方に足す
+- [x] 4.2 サブコマンド validate を引数の解析と使い方に足す
   - `validate --target <path>` を受け付け、`--release`・`--nar`・`--copy` などは理由と使い方を出して失敗にする
   - 使い方に `validate` とそのオプションを `release` と並べる。`release` に検査を省くオプションは足さない
   - 完了の状態: `pasta_check --help` に validate が並び、`pasta_check validate --target <ゴースト>` が 4.1 の殻を通って終了コードを返す
