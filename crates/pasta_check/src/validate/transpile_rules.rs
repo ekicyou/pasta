@@ -8,9 +8,10 @@ use pasta_dsl::parser::{
     Action, Args, CallTarget, Expr, FileItem, LocalSceneItem, SetValue, Span, VarScope, VarSet,
 };
 
-use super::{Finding, FindingKind, msg};
+use super::{FileText, Finding, FindingKind, col_after_indent, msg};
 
-pub(crate) fn check(parsed: &[(String, PastaFile)]) -> Vec<Finding> {
+/// `texts` は継続行の列を求めるのに使う
+pub(crate) fn check(parsed: &[(String, PastaFile)], texts: &[(String, FileText)]) -> Vec<Finding> {
     let mut findings = Vec::new();
     for (path, file) in parsed {
         let mut found = |kind: FindingKind, span: Span| {
@@ -59,7 +60,10 @@ pub(crate) fn check(parsed: &[(String, PastaFile)]) -> Vec<Finding> {
                     }
                     LocalSceneItem::ContinueAction(cont) => {
                         if !has_actor {
-                            found(FindingKind::TranspileContinuationWithoutActor, cont.span);
+                            // 継続行の span は字下げから始まるので、`：` の列にする
+                            let mut span = cont.span;
+                            span.start_col = col_after_indent(texts, path, span);
+                            found(FindingKind::TranspileContinuationWithoutActor, span);
                         }
                         cont.actions
                             .iter()
@@ -175,7 +179,7 @@ mod tests {
             panic!("グローバルシーン");
         };
         scene.local_scenes[0].items = vec![LocalSceneItem::VarSet(var_set)];
-        let found = check(&[("dic/a.pasta".into(), file)]);
+        let found = check(&[("dic/a.pasta".into(), file)], &[]);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].code, FindingKind::TranspileArgAssign);
         assert_eq!((found[0].line, found[0].column), (Some(4), Some(3)));

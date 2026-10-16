@@ -363,6 +363,31 @@ fn choice_finds_local_then_global_and_skips_on() {
     );
 }
 
+/// 選択肢の列は字下げの後ろの `＠？` の位置。Call と同じく行の頭ではない（7.1）
+#[test]
+fn choice_column_is_at_choice_marker_like_call() {
+    let text = "＊会話\n  ＞無いシーン\n  ＠？無い選択\n\u{3000}＠？無い選択２\n";
+    let got: Vec<_> = report_of(TOML, &[("dic/talk.pasta", text)])
+        .findings
+        .into_iter()
+        .filter(|f| {
+            matches!(
+                f.code,
+                FindingKind::CallTargetMissing | FindingKind::ChoiceTargetMissing
+            )
+        })
+        .map(|f| (f.line, f.column, f.code))
+        .collect();
+    assert_eq!(
+        got,
+        vec![
+            (Some(2), Some(3), FindingKind::CallTargetMissing),
+            (Some(3), Some(3), FindingKind::ChoiceTargetMissing),
+            (Some(4), Some(2), FindingKind::ChoiceTargetMissing),
+        ]
+    );
+}
+
 #[test]
 fn choice_does_not_use_builtin_names() {
     let text = "＊会話\n  ＠？yield\n";

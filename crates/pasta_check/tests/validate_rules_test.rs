@@ -179,12 +179,30 @@ fn syntax_errors_in_two_files_both_reported_at_parser_position() {
         assert_eq!(f.path, path);
         assert_eq!(f.line, Some(line as u32));
         assert_eq!(f.column, Some(column as u32));
-        // 解析器が前に付ける位置の文言を外し、残りを「構文エラー: 」の後ろに付ける
-        let prefix = format!("Parse error in {path} at {line}:{column}: ");
-        let rest = message.strip_prefix(&prefix).expect("前置きがある");
-        assert_eq!(f.message, format!("構文エラー: {rest}"));
+        // 解析器の文言の位置と枠を外し、末尾の `= …` の説明だけを「構文エラー: 」の後ろに付ける（7.1 の 1 行）
+        let (_, short) = message
+            .rsplit_once("\n  = ")
+            .expect("pest の説明の行がある");
+        assert_eq!(f.message, format!("構文エラー: {short}"));
+        assert!(!f.message.contains('\n'), "{}", f.message);
         assert!(!f.message.contains("Parse error in"), "{}", f.message);
     }
+}
+
+/// 構文エラーは pest の短い説明だけの 1 行（7.1。design.md の例 `構文エラー: expected action_line` と同じ形）
+#[test]
+fn syntax_error_is_one_line_with_short_pest_description() {
+    let found = syntax_findings(vec![(
+        "dic/b-x.pasta",
+        FileText::Text {
+            text: "＊会話\n  ＠＠＠\n".into(),
+        },
+    )]);
+    let lines: Vec<String> = found.iter().map(|f| f.line_text()).collect();
+    assert_eq!(
+        lines,
+        vec!["ghost/master/dic/b-x.pasta:2:4: 誤り: 構文エラー: expected id".to_string()]
+    );
 }
 
 #[test]
@@ -315,13 +333,23 @@ fn property_reference_allowed_forms_are_not_errors() {
 #[test]
 fn continuation_without_actor_is_error_per_local_scene() {
     let msg = "アクターの無い継続行です。前の行にアクター行が必要です";
-    // 開始のブロックの最初の行が継続行
+    // 開始のブロックの最初の行が継続行。列は字下げの後ろの `：` の位置（7.1。Call・選択肢と同じ）
     assert_eq!(
         transpile_findings("＊場面\n  ：続き\n"),
         vec![(
             FindingKind::TranspileContinuationWithoutActor,
             Some(2),
-            Some(1),
+            Some(3),
+            msg.to_string()
+        )]
+    );
+    // 全角空白 1 つの字下げなら列 2
+    assert_eq!(
+        transpile_findings("＊場面\n\u{3000}：続き\n"),
+        vec![(
+            FindingKind::TranspileContinuationWithoutActor,
+            Some(2),
+            Some(2),
             msg.to_string()
         )]
     );
@@ -331,7 +359,7 @@ fn continuation_without_actor_is_error_per_local_scene() {
         vec![(
             FindingKind::TranspileContinuationWithoutActor,
             Some(5),
-            Some(1),
+            Some(3),
             msg.to_string()
         )]
     );

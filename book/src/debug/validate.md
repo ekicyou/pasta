@@ -47,13 +47,8 @@ pasta_check validate --target ghosts/hello-pasta
 ```text
 ghost/master/dic/a-b.pasta: 誤り: モジュール名 pasta.scene.a_b が ghost/master/dic/a_b.pasta と同じです。どちらかの辞書の内容が失われます
 ghost/master/dic/a_b.pasta: 誤り: モジュール名 pasta.scene.a_b が ghost/master/dic/a-b.pasta と同じです。どちらかの辞書の内容が失われます
-ghost/master/dic/c.pasta:2:1: 誤り: アクターの無い継続行です。前の行にアクター行が必要です
-ghost/master/dic/d.pasta:2:4: 誤り: 構文エラー:  --> 2:4
-  |
-2 |   ＠＠＠
-  |    ^---
-  |
-  = expected id
+ghost/master/dic/c.pasta:2:3: 誤り: アクターの無い継続行です。前の行にアクター行が必要です
+ghost/master/dic/d.pasta:2:4: 誤り: 構文エラー: expected id
 ghost/master/pasta.toml:5: 誤り: [scene.alias] の別名「会話」が OnBoot・OnTalk に重複しています
 ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot・OnTalk に重複しています
 構文エラーがあるため、飛び先の検査をしていません。
@@ -61,7 +56,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 ```
 
 - 1 行の形は `パス:行:列: 誤り|注意: 理由` である。パスはゴーストの開発フォルダからの相対パスで、`ghost/master/` から始まる。行と列は、取れないときは省く（ファイル全体・`pasta.toml` 全体についての報告）。列は 1 文字を 1 と数える（全角文字も 1）。
-- 構文エラーの理由は、問題の行を示す数行の図に続く。図の `^` が、構文が読めなくなった位置である。
+- 構文エラーの行と列は、構文が読めなくなった位置である。理由の `expected …` は、その位置に来られる書き方である。
 - 並び順はファイルのパスの順、同じファイルの中では行・列の順で、何度走らせても同じ順になる。
 - 最後の行は、検査した辞書ファイルの数・誤りの数・注意の数をまとめた行である。最後の項「飛び先を検査しなかった Call」は、読むだけでは飛び先が決まらない Call の数である（[読むだけでは決まらない範囲](#読むだけでは決まらない範囲)）。
 - 構文エラーが 1 つでもあると、飛び先の検査をまるごと省き、まとめの行の前に「構文エラーがあるため、飛び先の検査をしていません。」と出す。このときまとめの行に最後の項は出ない。
@@ -120,7 +115,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 
 | code | 分類 | 意味 | 直し方 |
 | ---- | ---- | ---- | ------ |
-| `syntax` | 誤り | 構文エラー。理由に、読めなくなった位置の図と、そこに来られる書き方（`expected …`）が続く | 示された位置の書き方を [文法リファレンス](../grammar/index.md) に合わせる |
+| `syntax` | 誤り | 構文エラー。理由に、読めなくなった位置に来られる書き方（`expected …`）が続く | 示された位置の書き方を [文法リファレンス](../grammar/index.md) に合わせる |
 | `transpile-arg-assign` | 誤り | シーンの引数（`＄０` など）に代入している | 引数への代入をやめる。今の文法では `＄０＝…` は構文エラー（`syntax`）として報告される |
 | `transpile-property-in-expr` | 誤り | プロパティ参照（`＄％名前`）を式の中で使っている。使えるのは、変数への代入の右辺にそのまま置くときと、台詞の中だけである | 理由の文のとおり、先に変数へ代入してから式で使う |
 | `transpile-continuation-without-actor` | 誤り | 継続行（`：` で始まる行）の前に、同じローカルシーンのアクター行が無い。前のローカルシーンのアクター行は引き継がない | 継続行の前にアクター行を置く |

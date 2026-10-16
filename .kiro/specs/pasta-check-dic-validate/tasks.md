@@ -205,7 +205,7 @@
 - 3.1: 名前が `.pasta` で終わるフォルダ（`dic/x.pasta/`）は既定のパターンに一致し pasta.dll は読み込みに失敗するが、核の入力はファイルだけなので報告しない（要件 9.4 の範囲外として受け入れ）。一致テスト (b) は `is_file()` で絞る。`.lua` パターンの読み替えはテストに写した（`discover_all_files` は pub(super)）。
 - 3.2: (f) は design の「SCENE.search の有無」でなく、実際の Call と同じ `find_act_handler`（current_scene をそのグローバルシーンの表にした SHIORI 用の act）で照らす（組み込みも含めて照らせるので強い）。
 - 4.1: 殻は `validate_cmd::run(target: &Path)` と `run_on_master(master) -> Result<ValidateOutcome, String>`（サブフォルダが読めないときは Err。5.1 では io のエラーに写す）。main.rs の `mod validate_cmd;` の `#[allow(dead_code)]` は 4.2 で外す。`--target` が無いときは 4.2 の解析で扱う。
-- 5.1: `ghost/master` の無い配布フォルダは段 4 で失敗する（理由は validate と同じ日本語）。前回の nar は既存の段 1 で消えるので、関門で止まると nar は残らない。
+- 5.1: `ghost/master` の無い配布フォルダは段 4 で失敗する（理由は `run()` の「`ghost/master` がありません」ではなく、`run_on_master` の walk の「{path} を読めません: {OS のエラー}」）。前回の nar は既存の段 1 で消えるので、関門で止まると nar は残らない。
 - 6.1: WASM の入口の戻り値は `Serializer::json_compatible()`（None を null にするため。既存の wasm_analyze は既定のまま）。
 - 7.1: vscodeModules のテストは事前の WASM のビルド（`pwsh -NoProfile -File scripts/build-wasm.ps1 -Release`）が要る（既存の activate のテストも同じ）。
 - 7.2: モックの `createDiagnosticCollection` は作った集合を記録しない。`outputLines`・`createdFileSystemWatchers` を空に戻す関数も無い（7.3 で集合を外から渡すか記録を足す）。

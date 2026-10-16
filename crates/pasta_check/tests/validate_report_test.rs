@@ -52,6 +52,23 @@ fn one_line_with_column_without_column_and_without_line() {
     assert_eq!(lines[2], "ghost/master/pasta.toml: 注意: y");
 }
 
+/// どの理由も 1 件 1 行。改行を含む説明（toml・pest など）は空白 1 つでつなぐ（7.1）
+#[test]
+fn message_with_newlines_is_one_line() {
+    let f = finding(
+        FindingKind::ConfigSyntax,
+        "pasta.toml",
+        Some(3),
+        Some(5),
+        "pasta.toml を TOML として読めません: a\r\n  b\n\nc",
+    );
+    assert_eq!(f.message, "pasta.toml を TOML として読めません: a b c");
+    assert_eq!(
+        f.line_text(),
+        "ghost/master/pasta.toml:3:5: 誤り: pasta.toml を TOML として読めません: a b c"
+    );
+}
+
 #[test]
 fn findings_are_sorted_by_path_line_column_code_message() {
     let report = Report::new(

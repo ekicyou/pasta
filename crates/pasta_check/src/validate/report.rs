@@ -142,7 +142,7 @@ pub struct Finding {
 }
 
 impl Finding {
-    /// 分類は種類から決める（7.7）
+    /// 分類は種類から決める（7.7）。理由に改行があれば各行を空白 1 つでつなぎ、1 件 1 行にする（7.1）
     pub fn new(
         code: FindingKind,
         path: impl Into<String>,
@@ -156,7 +156,7 @@ impl Finding {
             path: path.into(),
             line,
             column,
-            message: message.into(),
+            message: one_line(message.into()),
         }
     }
 
@@ -228,6 +228,19 @@ impl Report {
         lines.push(summary);
         lines
     }
+}
+
+/// toml・pest などの説明は改行を含むことがある
+fn one_line(message: String) -> String {
+    if !message.contains(['\n', '\r']) {
+        return message;
+    }
+    message
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn ghost_path(path: &str) -> String {

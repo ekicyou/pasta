@@ -45,6 +45,12 @@ fn test_help_flag_prints_usage_and_exits_zero() {
     let stderr = stderr_of(&output);
     assert!(stderr.contains("Usage: pasta_check"));
     assert!(stderr.contains("release"));
+    // validate と、その --target も一覧に出る（Req 1.5）
+    assert!(stderr.contains("  validate "), "stderr: {stderr:?}");
+    let (_, validate_opts) = stderr
+        .split_once("Options for 'validate':")
+        .expect("validate のオプションの節がある");
+    assert!(validate_opts.contains("--target"), "stderr: {stderr:?}");
 }
 
 /// 引数なしはエラー報告＋Usage を stderr へ出力し終了コード 1

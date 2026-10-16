@@ -33,7 +33,7 @@ pub(crate) fn check(files: &[(String, FileText)]) -> (Vec<(String, PastaFile)>, 
     (parsed, findings)
 }
 
-/// 位置は行の頭に出すので、parse_str が前に付ける `Parse error in {file} at {l}:{c}: ` を外す
+/// 位置は行の頭に出すので、parse_str の文言から pest の短い説明（末尾の `  = expected id` の行）だけを取る（7.1 の 1 行）
 fn syntax_finding(path: &str, e: ParseError) -> Finding {
     match e {
         ParseError::SyntaxError {
@@ -44,6 +44,8 @@ fn syntax_finding(path: &str, e: ParseError) -> Finding {
         } => {
             let prefix = format!("Parse error in {file} at {line}:{column}: ");
             let desc = message.strip_prefix(&prefix).unwrap_or(&message);
+            // pest の文言は ` --> 行:列`・該当行・`^---` の枠の後ろに `  = 説明` が来る
+            let desc = desc.rsplit_once("\n  = ").map_or(desc, |(_, short)| short);
             Finding::new(
                 FindingKind::Syntax,
                 path,

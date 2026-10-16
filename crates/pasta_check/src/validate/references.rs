@@ -7,13 +7,14 @@ use pasta_dsl::PastaFile;
 use pasta_dsl::parser::{CallTarget, Expr, FileItem, LocalSceneItem, Span};
 
 use super::scenes::SceneModel;
-use super::{Finding, FindingKind, builtins, msg};
+use super::{FileText, Finding, FindingKind, builtins, col_after_indent, msg};
 
-/// 飛び先の注意と、飛び先を検査しなかった動的な Call の数を返す
+/// 飛び先の注意と、飛び先を検査しなかった動的な Call の数を返す。`texts` は選択肢の列を求めるのに使う
 pub(crate) fn check(
     model: &SceneModel,
     aliases: &SceneAliasTable,
     parsed: &[(String, PastaFile)],
+    texts: &[(String, FileText)],
 ) -> (Vec<Finding>, usize) {
     let mut findings = Vec::new();
     let mut dynamic = 0;
@@ -60,10 +61,13 @@ pub(crate) fn check(
                     if !(found_local(&model.table, &global.registered, target)
                         || found_global(&model.table, aliases, target))
                     {
+                        // 選択肢の行の span は字下げから始まるので、Call と同じく `＠？` の列にする
+                        let mut span = choice.span;
+                        span.start_col = col_after_indent(texts, path, span);
                         findings.push(finding(
                             FindingKind::ChoiceTargetMissing,
                             path,
-                            choice.span,
+                            span,
                             msg::choice_target_missing(target),
                         ));
                     }

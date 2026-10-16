@@ -16,6 +16,8 @@ mod transpile_rules;
 
 use std::collections::BTreeMap;
 
+use pasta_dsl::parser::Span;
+
 pub use input::{FileText, GhostInput, TomlSource};
 pub use report::{Finding, FindingKind, Report, Severity, Stats, msg};
 
@@ -65,14 +67,14 @@ pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) ->
     let (parsed, found) = syntax::check(&texts);
     findings.extend(found);
 
-    findings.extend(transpile_rules::check(&parsed));
+    findings.extend(transpile_rules::check(&parsed, &texts));
     let (scenes, found) = scenes::check(&parsed, &config.aliases);
     findings.extend(found);
 
     let references_skipped = findings.iter().any(|f| f.code == FindingKind::Syntax);
     let mut unchecked_dynamic_calls = 0;
     if !references_skipped {
-        let (found, dynamic) = references::check(&scenes, &config.aliases, &parsed);
+        let (found, dynamic) = references::check(&scenes, &config.aliases, &parsed, &texts);
         findings.extend(found);
         unchecked_dynamic_calls = dynamic;
     }
@@ -86,6 +88,17 @@ pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) ->
             ..Stats::default()
         },
     )
+}
+
+/// 字下げから始まる行の span（選択肢・継続行）の列を、字下げの後ろの中身の列にする（7.1）。
+/// 字下げ（文法の pad）の文字はどれも Unicode の空白
+fn col_after_indent(texts: &[(String, FileText)], path: &str, span: Span) -> usize {
+    let line = texts.iter().find_map(|(p, t)| match t {
+        FileText::Text { text } if p == path => text.lines().nth(span.start_line - 1),
+        _ => None,
+    });
+    let pad = line.map_or(0, |l| l.chars().take_while(|c| c.is_whitespace()).count());
+    span.start_col + pad
 }
 
 /// 殻が渡し忘れたファイルは黙って通さず、読めないファイルとして扱う

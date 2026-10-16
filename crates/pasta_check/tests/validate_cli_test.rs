@@ -73,6 +73,46 @@ fn test_validate_errors_exit_one() {
     assert!(stdout.contains("誤り 1 件"), "{stdout}");
 }
 
+/// 構文エラーも 1 件 1 行。標準出力のどの行も `ghost/master/…:行:列: 誤り|注意: ` か、案内・まとめの行（Req 7.1）
+#[test]
+fn test_validate_each_finding_is_one_line() {
+    let (_t, target, master) = ghost();
+    fs::write(master.join("dic/a.pasta"), "＊\n  ＠＠＠\n").unwrap();
+    fs::write(master.join("dic/b.pasta"), "＊会話\n  ＄＄＄\n").unwrap();
+    let output = validate(&target);
+    let stdout = stdout_of(&output);
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 4, "{stdout}");
+    for line in &lines[..2] {
+        // `ghost/master/{path}:{行}:{列}: {誤り|注意}: {理由}` の形を前から順に確かめる
+        let rest = line.strip_prefix("ghost/master/dic/").expect(line);
+        let (_, rest) = rest.split_once(".pasta:").expect(line);
+        let mut parts = rest.splitn(3, ':');
+        let (l, c) = (parts.next().unwrap(), parts.next().unwrap());
+        assert!(
+            l.chars().all(|ch| ch.is_ascii_digit()) && !l.is_empty(),
+            "{line}"
+        );
+        assert!(
+            c.chars().all(|ch| ch.is_ascii_digit()) && !c.is_empty(),
+            "{line}"
+        );
+        let rest = parts.next().unwrap();
+        assert!(
+            rest.starts_with(" 誤り: 構文エラー: ") && !rest.contains("-->"),
+            "{line}"
+        );
+    }
+    assert_eq!(
+        lines[2],
+        "構文エラーがあるため、飛び先の検査をしていません。"
+    );
+    assert!(
+        lines[3].starts_with("検査した辞書ファイル 2 個: "),
+        "{stdout}"
+    );
+}
+
 /// 誤りなし（注意あり）→ 終了コード 0（Req 7.6）
 #[test]
 fn test_validate_warnings_only_exit_zero() {
