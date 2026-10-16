@@ -16,6 +16,15 @@ local log = require "@pasta_log"
 -- グループ化ローカル関数（actor-talk-grouping feature）
 -- ============================================================================
 
+--- 話者のトークンか（talk・sakura_script・アクター付きの raw_script＝未登録アクターの目印）。
+--- グループ化と actor_proxy の「直前の話者」の遡りが同じ判定を使う
+--- @param token table トークン
+--- @return boolean
+local function is_speaker_token(token)
+    local t = token.type
+    return t == "talk" or t == "sakura_script" or (t == "raw_script" and token.actor ~= nil)
+end
+
 --- トークン配列をアクター切り替え境界でグループ化
 --- @param tokens table[] フラットなトークン配列
 --- @return table[] グループ化されたトークン配列
@@ -40,7 +49,7 @@ local function group_by_actor(tokens)
             table.insert(result, token)
             current_actor_token = nil
             current_actor = nil
-        elseif t == "talk" or t == "sakura_script" then
+        elseif is_speaker_token(token) then
             local talk_actor = token.actor
             -- アクター変更検出（最初のtalkまたはアクター変更時）
             if current_actor_token == nil or talk_actor ~= current_actor then
@@ -55,7 +64,7 @@ local function group_by_actor(tokens)
             end
             table.insert(current_actor_token.tokens, token)
         elseif t == "raw_script" then
-            -- raw_script: ハイブリッド分類
+            -- アクターの無い raw_script: ハイブリッド分類
             -- アクターグループ存在時はグループ内に追加、不在時はresultに直接追加
             if current_actor_token then
                 table.insert(current_actor_token.tokens, token)
@@ -485,8 +494,10 @@ end
 --- 登録済み（self.actors[name]）なら act.名前 と同じプロキシを返す。名前を文字列で受けるため
 --- act のメンバー名と同名のアクターでも __index を通らない。
 --- 未登録なら名前だけのその場限りのアクター（{ name = name }・メタテーブルなし）のプロキシを返す。
---- 直前の話者（self.token を末尾から見て最初の talk／sakura_script の actor）が同じ未登録名ならそれを再利用し、
---- そうでなければ警告を 1 行出して目印の talk トークンを積む。登録状態・立ち位置・act のフィールドには書かない
+--- 直前の話者（self.token を末尾から見て最初の話者のトークン＝talk／sakura_script／目印の actor。
+--- アクターの無い失敗表記は飛ばす）が同じ未登録名ならそれを再利用し、
+--- そうでなければ未登録の印を付けて、警告 1 行と目印（アクター付きの raw_script）を報告する。
+--- 登録状態・立ち位置・act のフィールドには書かない
 --- @param self Act アクションオブジェクト
 --- @param name string アクター名
 --- @return ActorProxy プロキシ（常に非 nil）
@@ -497,7 +508,7 @@ function ACT_IMPL.actor_proxy(self, name)
     end
     for i = #self.token, 1, -1 do
         local t = self.token[i]
-        if t.type == "talk" or t.type == "sakura_script" then
+        if is_speaker_token(t) then
             if t.actor and t.actor.name == name then
                 return ACTOR.create_proxy(t.actor, self)
             end
@@ -505,8 +516,13 @@ function ACT_IMPL.actor_proxy(self, name)
         end
     end
     actor = { name = name }
-    log.warn(string.format("act:actor_proxy - unregistered actor: name='%s'", tostring(name)))
-    table.insert(self.token, { type = "talk", actor = actor, text = "【未登録アクター：" .. tostring(name) .. "】" })
+    FAILURE.mark_unregistered_actor(actor)
+    FAILURE.report(self, {
+        label = FAILURE.LABEL.UNREGISTERED_ACTOR,
+        subject = tostring(name),
+        warning = string.format("act:actor_proxy - unregistered actor: name='%s'", tostring(name)),
+        actor = actor,
+    })
     return ACTOR.create_proxy(actor, self)
 end
 

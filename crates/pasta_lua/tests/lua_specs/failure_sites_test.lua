@@ -221,8 +221,9 @@ describe("失敗の対応表 #7 WORD.dynamic_key（動的参照の値が名前�
 end)
 
 describe("失敗の対応表 #8 act:actor_proxy（未登録アクター）", function()
-    test("話者がその名前に切り替わるたびに目印の talk 1 つと警告 1 行", function()
+    test("話者がその名前に切り替わるたびにアクター付きの目印の raw_script 1 つと警告 1 行", function()
         with_sites(function(ACT, _, warns)
+            local FAILURE = require("pasta.failure")
             local act = new_act(ACT)
             local p1 = act:actor_proxy("fs_ぱすたー")
             p1:talk("こんにちは")
@@ -230,16 +231,34 @@ describe("失敗の対応表 #8 act:actor_proxy（未登録アクター）", fun
             act:actor_proxy(ACTOR_NAME):talk("やあ")
             act:actor_proxy("fs_ぱすたー")
             expect(dump(act)):toBe(table.concat({
-                "talk|fs_ぱすたー|【未登録アクター：fs_ぱすたー】",
+                "raw_script|fs_ぱすたー|【未登録アクター：fs_ぱすたー】",
                 "talk|fs_ぱすたー|こんにちは",
                 "talk|fs_ぱすたー|続き",
                 "talk|fs_さくら|やあ",
-                "talk|fs_ぱすたー|【未登録アクター：fs_ぱすたー】",
+                "raw_script|fs_ぱすたー|【未登録アクター：fs_ぱすたー】",
             }, "\n"))
             expect(#warns):toBe(2)
             expect(warns[1]):toBe("act:actor_proxy - unregistered actor: name='fs_ぱすたー'")
             expect(warns[2]):toBe("act:actor_proxy - unregistered actor: name='fs_ぱすたー'")
             expect(act.actors["fs_ぱすたー"]):toBeNil()
+            -- その場限りのアクターには未登録の印が付き、登録済みのアクターには付かない
+            expect(FAILURE.is_unregistered_actor(act.token[1].actor)):toBe(true)
+            expect(FAILURE.is_unregistered_actor(act.token[4].actor)):toBe(false)
+        end)
+    end)
+
+    test("遡りは目印を話者として数え、アクターの無い失敗表記では止まらない", function()
+        with_sites(function(ACT, _, warns)
+            local act = new_act(ACT)
+            act:actor_proxy("fs_ぱすたー"):word("fs_無い単語")
+            act:actor_proxy("fs_ぱすたー"):talk("続き")
+            expect(dump(act)):toBe(table.concat({
+                "raw_script|fs_ぱすたー|【未登録アクター：fs_ぱすたー】",
+                "raw_script|-|【単語が見つからない：＠fs_無い単語】",
+                "talk|fs_ぱすたー|続き",
+            }, "\n"))
+            expect(act.token[3].actor):toBe(act.token[1].actor)
+            expect(#warns):toBe(2)
         end)
     end)
 end)

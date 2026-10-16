@@ -146,7 +146,8 @@ fn test_runtime_safety_tokens_vars_and_warnings() {
         "talk|さくら|true|です",
         "raw_script|-|false|【関数が見つからない：＠＊未定義関数（）】",
         // U19: 未登録アクターは目印を 1 回だけ積み、続く行も同じアクターで話す
-        "talk|未登録さん|false|【未登録アクター：未登録さん】",
+        // （目印はアクター付きの raw_script。failure-output-unification 対応表 #8）
+        "raw_script|未登録さん|false|【未登録アクター：未登録さん】",
         "talk|未登録さん|false|こんにちは",
         "talk|未登録さん|false|続きです",
         // U20: act のメンバー名と同名の登録済みアクターが話せる

@@ -175,7 +175,7 @@ describe("act:actor_proxy - 未登録アクター", function()
             act:actor_proxy("rs_謎"):talk("さよなら")
             expect(#act.token):toBe(4)
             local adhoc = act.token[1].actor
-            expect(act.token[1].type):toBe("talk")
+            expect(act.token[1].type):toBe("raw_script")
             expect(act.token[1].text):toBe("【未登録アクター：rs_謎】")
             expect(act.token[2].text):toBe("こんにちは")
             expect(act.token[3].type):toBe("sakura_script")

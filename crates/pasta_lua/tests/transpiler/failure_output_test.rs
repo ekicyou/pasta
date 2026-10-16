@@ -61,7 +61,21 @@ end
 /// `@pasta_log` の表そのものの関数を差し替えるので、先にロード済みのモジュール（pasta.word など）の
 /// ログも集まる。実行後の act は Lua のグローバル `RS_ACT`、警告は `RS_WARNS` に置く。
 fn run_main_scene(lua_code: &str) -> Lua {
+    run_main_scene_with(lua_code, "pasta.act")
+}
+
+/// `run_main_scene` と同じだが、act を `act_module`（`pasta.act`・`pasta.shiori.act`）で作る
+fn run_main_scene_with(lua_code: &str, act_module: &str) -> Lua {
     let lua = create_runtime_with_finalize().unwrap();
+    // pasta.shiori.sakura_builder が使う（既定の会話設定。ウェイトは既定値で入る）
+    let sakura = pasta_lua::sakura_script::register(&lua, None).unwrap();
+    let loaded: mlua::Table = lua
+        .globals()
+        .get::<mlua::Table>("package")
+        .unwrap()
+        .get("loaded")
+        .unwrap();
+    loaded.set("@pasta_sakura_script", sakura).unwrap();
     lua.load(
         r#"
         RS_WARNS = {}
@@ -88,15 +102,15 @@ fn run_main_scene(lua_code: &str) -> Lua {
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
-    lua.load(
+    lua.load(format!(
         r#"
         local SCENE = require "pasta.scene"
         local STORE = require "pasta.store"
-        local ACT = require "pasta.act"
+        local ACT = require "{act_module}"
         RS_ACT = ACT.new(STORE.actors)
         SCENE.get_start("メイン_1")(RS_ACT)
-        "#,
-    )
+        "#
+    ))
     .exec()
     .expect("scene must run without a runtime error");
     lua
@@ -296,24 +310,34 @@ fn site_07_dynamic_key_not_a_name() {
     });
 }
 
-/// #8 `act:actor_proxy`: 未登録アクター。話者がその名前に切り替わるたびに目印と警告を 1 回
+/// #8 `act:actor_proxy`: 未登録アクター。話者がその名前に切り替わるたびに目印と警告を 1 回。
+/// 目印はアクター付きの `raw_script`。直前の話者の遡りは目印を発言と同じに数え、
+/// アクターの無い失敗表記では止まらない（目印と失敗表記だけの行の次の継続行でも 1 回だけ）
 #[test]
 fn site_08_unregistered_actor() {
     run_case(&Case {
         name: "#8 act:actor_proxy",
         lua: false,
-        body: "　ぱすたー：こんにちは\n　ぱすたー：続き\n　さくら：やあ\n　ぱすたー：また\n",
+        body: concat!(
+            "　ぱすたー：こんにちは\n",
+            "　ぱすたー：続き\n",
+            "　さくら：やあ\n",
+            "　ぱすたー：＠無い単語\n",
+            "　ぱすたー：また\n",
+        ),
         tokens: &[
-            "talk|ぱすたー|【未登録アクター：ぱすたー】",
+            "raw_script|ぱすたー|【未登録アクター：ぱすたー】",
             "talk|ぱすたー|こんにちは",
             "talk|ぱすたー|続き",
             "talk|さくら|やあ",
-            "talk|ぱすたー|【未登録アクター：ぱすたー】",
+            "raw_script|ぱすたー|【未登録アクター：ぱすたー】",
+            "raw_script|-|【単語が見つからない：＠無い単語】",
             "talk|ぱすたー|また",
         ],
         warns: &[
             "act:actor_proxy - unregistered actor: name='ぱすたー'",
             "act:actor_proxy - unregistered actor: name='ぱすたー'",
+            "proxy:word - handler not found: key='無い単語', mode='word', via=proxy(ぱすたー)",
         ],
         vars: &[],
     });
@@ -501,4 +525,98 @@ fn silent_empty_static_word_name() {
         .unwrap();
     assert_eq!(got, "nil nil 0");
     assert_eq!(warns(&lua), Vec::<String>::new());
+}
+
+// ========================================================================
+// さくらスクリプトの出力の位置（sakura_builder を通した後）
+// ========================================================================
+
+/// 未登録アクター ぱすたー の目印
+const PASTA_MARK: &str = "【未登録アクター：ぱすたー】";
+
+/// `pasta.shiori.act` で `＊メイン` を実行し、さくらスクリプトの出力とログの警告を返す。
+/// 話者は さくら（立ち位置 0）・うにゅう（立ち位置 1）。`actors` は追加のアクター定義。
+/// `％` の登録だけでは立ち位置が決まらないので、`STORE.actor_spots` へ直接置く
+fn run_sakura(actors: &str, body: &str) -> (String, Vec<String>) {
+    let source = format!("{SAKURA}％うにゅう\n　＠通常：\\s[10]\n{actors}\n＊メイン\n{body}");
+    let lua = run_main_scene_with(&transpile(&source), "pasta.shiori.act");
+    let script = lua
+        .load(
+            r#"
+            local STORE = require "pasta.store"
+            STORE.actor_spots["さくら"] = 0
+            STORE.actor_spots["うにゅう"] = 1
+            if STORE.actors["ぱすたー"] then STORE.actor_spots["ぱすたー"] = 0 end
+            return RS_ACT:build()
+            "#,
+        )
+        .eval::<String>()
+        .unwrap();
+    (script, warns(&lua))
+}
+
+/// 目印はそのアクターの `\p[…]` の直後に出て、続く台詞の段落区切り・ウェイトは目印の無い場合
+/// （同じ名前を登録して立ち位置 0 に置いた場合）と同じ。継続行では出ず、ログは 1 原因 1 行
+/// （立ち位置の警告 `actor_spots fallback` を重ねない）
+#[test]
+fn unregistered_actor_mark_in_sakura_output() {
+    let body = concat!(
+        "　さくら：やあ、元気？\n",
+        "　ぱすたー：こんにちは、元気です。\n",
+        "　ぱすたー：続きです。\n",
+        "　うにゅう：ふむ\n",
+        "　ぱすたー：また、ね\n",
+    );
+    let (unregistered, unregistered_warns) = run_sakura("", body);
+    let (registered, registered_warns) = run_sakura("％ぱすたー\n　＠口癖：だよ\n", body);
+
+    assert_eq!(registered_warns, Vec::<String>::new(), "baseline warns");
+    assert_eq!(unregistered.replace(PASTA_MARK, ""), registered);
+    assert_eq!(
+        unregistered.matches(PASTA_MARK).count(),
+        2,
+        "{unregistered}"
+    );
+    assert_eq!(
+        unregistered.matches(&format!(r"\p[0]{PASTA_MARK}")).count(),
+        2,
+        "{unregistered}"
+    );
+    assert_eq!(
+        unregistered_warns,
+        [
+            "act:actor_proxy - unregistered actor: name='ぱすたー'",
+            "act:actor_proxy - unregistered actor: name='ぱすたー'",
+        ]
+    );
+}
+
+/// 目印以外の失敗表記は直前の話者のバルーンに続けて出し、出力の先頭ではスコープを切り替えない。
+/// 未登録アクターの行の先頭の失敗は目印の後に出る
+#[test]
+fn failure_notation_position_in_sakura_output() {
+    let (script, _) = run_sakura(
+        "",
+        "　さくら：＠無い単語、です\n　うにゅう：＄未定義、だね\n",
+    );
+    assert_eq!(
+        script,
+        concat!(
+            r"【単語が見つからない：＠無い単語】\p[0]、\_w[450]です",
+            r"【値の無い変数：＄未定義】\p[1]、\_w[450]だね\e",
+        )
+    );
+
+    let (script, warns) = run_sakura("", "　ぱすたー：＠無い単語、だよ\n");
+    assert_eq!(
+        script,
+        format!(r"\p[0]{PASTA_MARK}【単語が見つからない：＠無い単語】、\_w[450]だよ\e")
+    );
+    assert_eq!(
+        warns,
+        [
+            "act:actor_proxy - unregistered actor: name='ぱすたー'",
+            "proxy:word - handler not found: key='無い単語', mode='word', via=proxy(ぱすたー)",
+        ]
+    );
 }

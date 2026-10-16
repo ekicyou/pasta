@@ -10,6 +10,7 @@ local SAKURA_SCRIPT = require "@pasta_sakura_script"
 local log = require "@pasta_log"
 local buf = require("pasta.buf")
 local APPEARANCE = require("pasta.shiori.appearance")
+local FAILURE = require("pasta.failure")
 
 --- \q[display,target] 内のデリミタ文字をエスケープ
 --- @param s string エスケープ対象の文字列
@@ -57,7 +58,7 @@ local function appearance_or_new(appearance)
 end
 
 --- アクター切り替え時にスポットタグ `\p[spot]` を出力し、直後に外見の復旧タグを出力する。
---- スポット解決（未設定→0＋警告）・`\p[spot]` 出力・復旧タグ出力のみを行い、
+--- スポット解決（未設定→0＋警告。未登録アクターは目印で報告済みなので警告しない）・`\p[spot]` 出力・復旧タグ出力のみを行い、
 --- 段落区切り改行の判定・出力・保留（pending）はすべて呼び出し側（BUILDER.build ループ）が担う。
 --- 復旧タグは talk 経路を通らないため has-text・pending に影響しない。
 --- @param buffer table 出力バッファ（pasta.buf 互換）
@@ -71,7 +72,7 @@ local function emit_actor_switch(buffer, actor_spots, actor, appearance, tokens)
     local spot = actor_spots[actor_name]
     if spot == nil then
         spot = 0
-        if actor_name then
+        if actor_name and not FAILURE.is_unregistered_actor(actor) then
             log.warn(string.format("actor_spots fallback: '%s' -> spot=0", actor_name))
         end
     end
