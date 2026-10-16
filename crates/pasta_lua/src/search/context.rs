@@ -93,16 +93,43 @@ impl SearchContext {
         name: &str,
         global_scene_name: Option<&str>,
     ) -> Result<Option<(String, String)>, SearchError> {
+        self.search_scene_by(name, global_scene_name, false)
+    }
+
+    /// Exact-match version of [`Self::search_scene`].
+    ///
+    /// Sanitizing, alias replacement (global search only) and the return
+    /// shape are the same as `search_scene`; only the candidates differ:
+    /// a scene is a candidate only when its key equals the sanitized name
+    /// (so `つっつき反応女` does not hit `つっつき反応女の子Head`).
+    pub fn search_scene_exact(
+        &mut self,
+        name: &str,
+        global_scene_name: Option<&str>,
+    ) -> Result<Option<(String, String)>, SearchError> {
+        self.search_scene_by(name, global_scene_name, true)
+    }
+
+    /// Shared body of `search_scene` (`exact = false`, prefix match) and
+    /// `search_scene_exact` (`exact = true`).
+    fn search_scene_by(
+        &mut self,
+        name: &str,
+        global_scene_name: Option<&str>,
+        exact: bool,
+    ) -> Result<Option<(String, String)>, SearchError> {
         let filters = HashMap::new();
+        let resolve = if exact {
+            SceneTable::resolve_scene_id_exact
+        } else {
+            SceneTable::resolve_scene_id_unified
+        };
 
         // Determine search strategy based on global_scene_name
         if let Some(parent) = global_scene_name {
             let name = &SceneRegistry::sanitize_name(name);
             // Local-only search within the parent scope (no global fallback)
-            match self
-                .scene_table
-                .resolve_scene_id_unified(parent, name, &filters)
-            {
+            match resolve(&mut self.scene_table, parent, name, &filters) {
                 Ok(scene_id) => {
                     let scene = self.scene_table.get_scene(scene_id).ok_or_else(|| {
                         SearchError::InvalidArgument("Scene ID not found".to_string())
@@ -125,10 +152,7 @@ impl SearchContext {
             // An exact alias match is replaced before sanitizing.
             let alias = self.scene_aliases.resolve(name);
             let key = SceneRegistry::sanitize_name(alias.unwrap_or(name));
-            match self
-                .scene_table
-                .resolve_scene_id_unified("", &key, &filters)
-            {
+            match resolve(&mut self.scene_table, "", &key, &filters) {
                 Ok(scene_id) => {
                     let scene = self.scene_table.get_scene(scene_id).ok_or_else(|| {
                         SearchError::InvalidArgument("Scene ID not found".to_string())
@@ -268,6 +292,18 @@ impl UserData for SearchContext {
             "search_scene",
             |lua, this, (name, global_scene_name): (String, Option<String>)| match this
                 .search_scene(&name, global_scene_name.as_deref())
+            {
+                Ok(Some((global, local))) => (global, local).into_lua_multi(lua),
+                Ok(None) => Ok(MultiValue::new()),
+                Err(e) => Err(mlua::Error::from(e)),
+            },
+        );
+
+        // search_scene_exact(name, global_scene_name?) -> (global_name, local_name) or nil
+        methods.add_method_mut(
+            "search_scene_exact",
+            |lua, this, (name, global_scene_name): (String, Option<String>)| match this
+                .search_scene_exact(&name, global_scene_name.as_deref())
             {
                 Ok(Some((global, local))) => (global, local).into_lua_multi(lua),
                 Ok(None) => Ok(MultiValue::new()),

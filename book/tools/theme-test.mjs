@@ -21,6 +21,8 @@
 //       * 620px 以下で顔を小さくし、420px 以下で扉の案内を 1 列にする。吹き出しは長い語でも折り返す。
 //       * 印刷では、どのテーマでも light の値（全トークンを light ブロックと同じ値で再定義）を使い、
 //         台詞と扉の途中で改ページせず、区切り線は罫線で描き、コードの着色もどのテーマでも 6 群にそろえる。
+//       * 印刷では mdBook の目次・メニュー・前後の矢印を隠し、本文の枠を紙幅に広げる（P-7・P-8。
+//         manual-print-page-removal 要件 1.3。mdBook の印刷用の CSS を読み込まなくなったので、テーマが受け持つ）。
 //   - テーマメニューの隠し規則（タスク 2.5 / 要件 2.1、design「ThemeMenu」）:
 //       * 最上位の規則で #mdbook-theme-rust・-coal・-ayu のボタンを display: none にする。
 //       * Auto（#mdbook-theme-default_theme）・Light・Navy は隠さない。
@@ -202,6 +204,8 @@ export const HERO_CLASSES = ['claudia-hero', 'hero-corner', 'hero-corner-tl', 'h
   'hero-toc', 'claudia-credit'];
 // 印刷で light の値に置き換える範囲（mdBook はテーマのクラスを html に付ける。JS 無効時は html:not(.js)）
 export const PRINT_SCOPES = ['html.light', 'html.navy', 'html.rust', 'html.coal', 'html.ayu', 'html:not(.js)'];
+// 印刷で隠す mdBook の要素（目次・メニュー・前後の矢印の PC 用と携帯用。manual-print-page-removal 要件 1.3）
+export const PRINT_HIDDEN = ['#mdbook-sidebar', '#mdbook-menu-bar', '.nav-chapters', '.mobile-nav-chapters'];
 
 // サイドバーと上部バーの規則（色と字体だけ。要件 1.8・9.3）
 // サイドバーの開閉で本文を押し出す仕組み（.page-wrapper・#mdbook-body-container）も同じ扱い
@@ -278,8 +282,9 @@ export function checkComponents(css) {
   add(fontRule('--claudia-font-heading', (sels) => [1, 2, 3, 4, 5, 6].every((n) => sels.some((s) => new RegExp(`(^|[\\s>])h${n}$`).test(s)))),
     'C-6 見出しの字体トークンを h1〜h6 に当てている', 'h1〜h6 をすべて含む規則に font-family: var(--claudia-font-heading) が無い');
 
-  // サイドバーと上部バーは色と字体だけ
-  const chrome = [...each((p, _v, r) => CHROME_SELECTOR_RE.test(r.selector) && !CHROME_PROP_RE.test(p))];
+  // サイドバーと上部バーは色と字体だけ（画面の規則。印刷で隠し本文を広げる規則は P-7・P-8 が見る）
+  const chrome = [...each((p, _v, r) => CHROME_SELECTOR_RE.test(r.selector) && !/^@media\s+print\b/.test(r.nested || '')
+    && !CHROME_PROP_RE.test(p))];
   add(chrome.length === 0, 'C-7 サイドバーと上部バーは色と字体だけを変える', chrome.join(' / '));
 
   // highlight.js の兄弟クラス（最上位の規則だけを数える）
@@ -381,6 +386,17 @@ export function checkTalk(css) {
     'P-4 印刷の区切り線は罫線で描く', '@media print に hr の background: none と border-top が無い');
   add(print.some((r) => r.selector === '.content' && decl(r, 'overflow') === 'visible'),
     'P-6 印刷では本文の枠をスクロールの箱にしない', '@media print に .content { overflow: visible } が無い');
+  // 章の印刷で mdBook の枠を隠し、本文を紙幅に広げる（manual-print-page-removal 要件 1.3）
+  const hidden = print.filter((r) => decl(r, 'display') === 'none').flatMap((r) => r.selector.split(',').map((s) => s.trim()));
+  const shown = PRINT_HIDDEN.filter((name) => !hidden.includes(name));
+  add(shown.length === 0, 'P-7 印刷では mdBook の目次・メニュー・前後の矢印を隠す', `@media print に ${shown.join('・')} の display: none が無い`);
+  const about = (r, name) => new RegExp(`${name}(?![\\w-])`).test(r.selector);
+  const flush = print.some((r) => about(r, '#mdbook-page-wrapper') && /^0(px)?$/.test(decl(r, 'margin-inline-start') ?? ''));
+  const wide = print.some((r) => about(r, '#mdbook-content') && decl(r, 'max-width') === 'none');
+  add(flush && wide, 'P-8 印刷では本文の枠を紙幅に広げる', [
+    !flush && '#mdbook-page-wrapper の margin-inline-start: 0 が無い',
+    !wide && '#mdbook-content の max-width: none が無い',
+  ].filter(Boolean).join('、'));
   const painted = new Map();
   for (const r of print) {
     const hl = decl(r, 'color')?.match(/^var\(--claudia-hl-(\w+)\)$/);
@@ -486,6 +502,17 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     check('S-26 Navy を隠せば失敗', m2 && !m2.ok);
     const m2ok = menu('#mdbook-theme-navy { color: var(--fg); } #mdbook-theme-navyish { display: none; }', 'M-2');
     check('S-27 残す項目の色の規則や似た id は隠したことに数えない', m2ok && m2ok.ok);
+    const hide = (names) => `@media print { ${names.join(', ')} { display: none; } }`;
+    const p7 = talk(hide(PRINT_HIDDEN.filter((n) => n !== '.mobile-nav-chapters')), 'P-7');
+    check('S-28 印刷で隠す 4 つのうち 1 つが欠ければ P-7 はその名前を出して失敗', p7 && !p7.ok && p7.detail.includes('.mobile-nav-chapters'));
+    const p7ok = talk(hide(PRINT_HIDDEN), 'P-7');
+    const c7 = comp(hide(PRINT_HIDDEN), 'C-7');
+    check('S-29 4 つを隠せば P-7 は合格し、印刷の隠し規則は C-7 に数えない', p7ok && p7ok.ok && c7 && c7.ok);
+    const page = '#mdbook-page-wrapper.page-wrapper { margin-inline-start: 0; }';
+    const p8 = talk(`@media print { ${page} #mdbook-content { max-width: 50em; } }`, 'P-8');
+    check('S-30 本文の幅の上限を外さなければ P-8 は失敗', p8 && !p8.ok && p8.detail.includes('max-width'));
+    const p8ok = talk(`@media print { ${page} #mdbook-content { max-width: none; } }`, 'P-8');
+    check('S-31 左の余白を 0 にし幅の上限を外せば P-8 は合格', p8ok && p8ok.ok);
   }
 
   let css = null;

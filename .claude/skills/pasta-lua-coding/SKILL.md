@@ -17,7 +17,7 @@ description: >-
   汎用Luaプログラミング, SHIORIプロトコル実装.
 metadata:
   author: ekicyou
-  version: "1.13.0"
+  version: "1.14.0"
 ---
 
 # Pasta Lua Coding Skill
@@ -171,7 +171,7 @@ pasta.*名前空間の内部Luaモジュール。`STORE`（一元データ管理
 
 ## §6 SHIORI Handlers
 
-SHIORIイベントハンドラの登録と応答。`REG`テーブルに `function(act)` 形式のハンドラを登録し、リクエストは `act.req` で読む。ハンドラは `Value` にする文字列（またはシーンのコルーチン、`nil`）を返し、エンジンがそれを応答にする（`RES` はエンジンが応答文字列を作るモジュール）。主要イベント（OnBoot, OnClose, OnMouseDoubleClick, OnChoiceSelectEx等）のReference仕様。`OnTalk`/`OnHour`を自動発行する仮想ディスパッチャ。`OnChoiceSelectEx`選択肢自動ルーティング。REG未登録時のシーン関数フォールバック。
+SHIORIイベントハンドラの登録と応答。`REG`テーブルに `function(act)` 形式のハンドラを登録し、リクエストは `act.req` で読む。ハンドラは `Value` にする文字列（またはシーンのコルーチン、`nil`）を返し、エンジンがそれを応答にする（`RES` はエンジンが応答文字列を作るモジュール）。主要イベント（OnBoot, OnClose, OnMouseDoubleClick, OnMouseMove, OnChoiceSelectEx等）のReference仕様。つつき・撫でのショートカット（`つっつき反応…`・`さわり反応…` を段々に探す既定ハンドラ）。`OnTalk`/`OnHour`を自動発行する仮想ディスパッチャ。`OnChoiceSelectEx`選択肢自動ルーティング。REG未登録時のシーン関数フォールバック。
 
 > 📖 詳細: [references/shiori-events.md](references/shiori-events.md)
 

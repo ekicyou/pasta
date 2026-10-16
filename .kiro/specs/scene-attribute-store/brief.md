@@ -173,7 +173,7 @@ Call ターゲットの後ろに `＆key＝value` 形式のフィルターを付
   - テスト用の見本 `crates/pasta_lua/tests/fixtures/sample.pasta` の 14 行に、ファイルの属性 `＆天気：晴れ` がある。属性を Lua に出すと、この見本から作る `sample.generated.lua` と、比べる相手の `sample.expected.lua` が変わる。「属性の無いシーンの出力は変えない」という約束では守られないので、作り直しをタスクに入れる。
   - 宣言行の属性を拾うと、グローバルシーンでは「宣言行」と「次の行からの属性行」の 2 か所に同じ名前を書ける。どちらを優先するかを要件で決める。
   - 別名があると、`＊会話` と `＊OnTalk` の 2 つの宣言が同じ名前のシーンになる。属性は宣言ごと（通し番号ごと）に持つことを、要件に書く。
-  - `pasta_shiori` の結合テストは、古いランタイムの写し（`crates/pasta_shiori/tests/support/scripts/pasta/scene.lua`）を読む。この spec の確認用のテストは `pasta_lua` 側に置く。写しは直さない（`shiori-test-support-runtime` の持ち場）。
+  - `pasta_shiori` の結合テストが読んでいた古いランタイムの写し（`crates/pasta_shiori/tests/support/scripts/pasta/scene.lua`）は、`shiori-test-support-runtime`（2026-10-16 完了）で無くなった。今は結合テストも、`pasta.dll` が `profile/pasta/pasta_scripts/` へ自己展開した本物の `scene.lua` を読む（申し送り: `shiori-test-support-runtime` より）。確認用のテストを `pasta_lua` 側と `pasta_shiori` 側のどちらに置くかは、要件・設計で決める。
   - 前回の節の行番号のうち、登録表を作り直す場所（`finalize.rs` 182 行）と、属性をローカルシーンへ写す処理（`scene_registry.rs` 155〜189 行）は今も合っている。マニュアルの「内部に記録される」は `book/src/grammar/block-structure.md` の 248 行と 280 行に、ファイルの属性の説明は `book/src/internals/transpiler.md` の 158 行と 165 行に動いた。
 
 ## 申し送り（2026-10-10 の discovery・0.5.0 のノベルゲームより）

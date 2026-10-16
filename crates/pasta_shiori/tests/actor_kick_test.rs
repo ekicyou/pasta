@@ -10,7 +10,7 @@
 //!   投入順に処理され、最後の scene が `kick_pending` に残る。
 //! - **ベストエフォート**: `SHIORI.kick` 不在でもアクタースレッドが落ちない（protected call）。
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
@@ -28,46 +28,13 @@ fn neutralize_debug_env() {
     }
 }
 
-fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
-    if !src.exists() {
-        return Ok(());
-    }
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let path = entry.path();
-        let dest_path = dst.join(entry.file_name());
-        if path.is_dir() {
-            if entry.file_name() == "profile" {
-                continue;
-            }
-            std::fs::create_dir_all(&dest_path)?;
-            copy_dir_recursive(&path, &dest_path)?;
-        } else {
-            std::fs::copy(&path, &dest_path)?;
-        }
-    }
-    Ok(())
-}
-
-/// 本番 `pasta_scripts`（実 `SHIORI.kick` / `KICK.install` / `STORE` を含む）を temp へ
-/// 展開し、`scripts/pasta/shiori/entry.lua` を **ユーザーオーバーライド**で上書きする。
+/// `pasta.toml` と、`scripts/pasta/shiori/entry.lua` の **ユーザーオーバーライド** を temp に書く。
+/// 実 `SHIORI.kick` / `KICK.install` / `STORE` は、自己展開した標準ランタイム（`profile/pasta/pasta_scripts/`）から読まれる。
 /// オーバーライド entry.lua は実 `pasta.shiori.event.kick` へ委譲する `SHIORI.kick` を
 /// 公開しつつ、`SHIORI.request` で `STORE.kick_pending`/`STORE.kick_force` を Value
 /// ヘッダにエコーして読み戻せるようにする（kick 設置の観測点）。
 fn build_kick_dir() -> (PathBuf, TempDir) {
     let temp = TempDir::new().expect("create temp dir");
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-    // 本番 pasta_scripts（store.lua / event/kick.lua 等の実体）を展開。
-    let pasta_scripts_src = manifest_dir
-        .parent()
-        .expect("parent dir")
-        .join("pasta_lua")
-        .join("pasta_scripts");
-    let pasta_scripts_dst = temp.path().join("pasta_scripts");
-    std::fs::create_dir_all(&pasta_scripts_dst).expect("create pasta_scripts dir");
-    copy_dir_recursive(&pasta_scripts_src, &pasta_scripts_dst).expect("copy pasta_scripts");
-
     // ローダが要求する pasta.toml（async_callback フィクスチャに倣う最小 [loader]）。
     std::fs::write(
         temp.path().join("pasta.toml"),
@@ -75,7 +42,7 @@ fn build_kick_dir() -> (PathBuf, TempDir) {
     )
     .expect("write pasta.toml");
 
-    // ユーザーオーバーライド entry.lua（scripts/ は pasta_scripts/ より先に検索される）。
+    // ユーザーオーバーライド entry.lua（scripts/ は自己展開した profile/pasta/pasta_scripts/ より先に検索される）。
     // 実 KICK モジュールへ委譲しつつ、request で STORE 状態をエコーする。
     let entry_dir = temp.path().join("scripts/pasta/shiori");
     std::fs::create_dir_all(&entry_dir).expect("create scripts/pasta/shiori dir");

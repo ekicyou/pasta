@@ -233,3 +233,155 @@ fn test_resolve_scene_id_unified_cache_key_includes_module() {
     let scene_b = table.get_scene(result_b.unwrap()).unwrap();
     assert_ne!(scene_a.fn_name, scene_b.fn_name);
 }
+
+// ======================================================================
+// Tests for resolve_scene_id_exact（完全一致で 1 つ選ぶ）
+// ======================================================================
+
+fn build_table(globals: &[&str], selector: Vec<usize>) -> SceneTable {
+    use crate::registry::SceneRegistry;
+
+    let mut registry = SceneRegistry::new();
+    for name in globals {
+        registry.register_global(name, HashMap::new());
+    }
+    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(selector))).unwrap()
+}
+
+fn scene_name(table: &SceneTable, id: SceneId) -> String {
+    table.get_scene(id).unwrap().name.clone()
+}
+
+#[test]
+fn test_resolve_scene_id_exact_ignores_longer_names_with_same_head() {
+    // 「つっつき反応胸」で「つっつき反応胸右」を選ばない
+    let mut table = build_table(&["つっつき反応胸右", "つっつき反応胸"], vec![0]);
+    for _ in 0..4 {
+        let id = table
+            .resolve_scene_id_exact("", "つっつき反応胸", &HashMap::new())
+            .unwrap();
+        assert_eq!(scene_name(&table, id), "つっつき反応胸");
+    }
+
+    // 頭だけの名前では見つからない（前方一致しない）
+    let result = table.resolve_scene_id_exact("", "つっつき反応", &HashMap::new());
+    match result {
+        Err(SceneTableError::SceneNotFound { scene }) => assert_eq!(scene, "つっつき反応"),
+        other => panic!("Expected SceneNotFound, got {:?}", other.map(|_| ())),
+    }
+}
+
+#[test]
+fn test_resolve_scene_id_exact_consumes_same_name_scenes_per_cycle() {
+    // 同じ名前 3 つ（＋頭が同じ別の名前 1 つ）。一巡で 1 回ずつ、その後また一巡する
+    let mut table = build_table(
+        &["撫で反応頭", "撫で反応頭右", "撫で反応頭", "撫で反応頭"],
+        vec![2, 0, 1],
+    );
+    let expected: Vec<SceneId> = table
+        .labels_iter()
+        .filter(|s| s.name == "撫で反応頭")
+        .map(|s| s.id)
+        .collect();
+    assert_eq!(expected.len(), 3);
+
+    for _cycle in 0..2 {
+        let mut picked: Vec<SceneId> = (0..3)
+            .map(|_| {
+                table
+                    .resolve_scene_id_exact("", "撫で反応頭", &HashMap::new())
+                    .unwrap()
+            })
+            .collect();
+        // MockRandomSelector の並べ替え（位置 2,0,1）に従う
+        assert_eq!(picked, vec![expected[2], expected[0], expected[1]]);
+        picked.sort_by_key(|id| id.0);
+        assert_eq!(picked, expected, "一巡で 3 つが 1 回ずつ選ばれる");
+    }
+}
+
+#[test]
+fn test_resolve_scene_id_exact_cache_does_not_mix_with_prefix() {
+    // 同じ文字列「会話」でも、前方一致（会話・会話続き）と完全一致（会話）のキャッシュは別
+    let mut table = build_table(&["会話", "会話続き"], vec![0]);
+    table.set_shuffle_enabled(false);
+    let empty = HashMap::new();
+
+    let first = table.resolve_scene_id_unified("", "会話", &empty).unwrap();
+    assert_eq!(scene_name(&table, first), "会話");
+
+    for _ in 0..2 {
+        let id = table.resolve_scene_id_exact("", "会話", &empty).unwrap();
+        assert_eq!(scene_name(&table, id), "会話");
+    }
+
+    // 完全一致の呼び出しが前方一致の巡回を進めていない
+    let second = table.resolve_scene_id_unified("", "会話", &empty).unwrap();
+    assert_eq!(scene_name(&table, second), "会話続き");
+}
+
+#[test]
+fn test_resolve_scene_id_exact_local_scope() {
+    use crate::registry::SceneRegistry;
+
+    let mut registry = SceneRegistry::new();
+    let (_, counter) = registry.register_global("会話", HashMap::new());
+    registry.register_local("選択肢続き", "会話", counter, 1, HashMap::new());
+    registry.register_local("選択肢", "会話", counter, 2, HashMap::new());
+    registry.register_global("選択肢", HashMap::new());
+    let mut table =
+        SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0])))
+            .unwrap();
+    let empty = HashMap::new();
+
+    // ローカルの範囲: 頭が同じローカルも、同じ名前のグローバルも選ばない
+    for _ in 0..3 {
+        let id = table
+            .resolve_scene_id_exact("会話_1", "選択肢", &empty)
+            .unwrap();
+        let scene = table.get_scene(id).unwrap();
+        assert_eq!(scene.name, "選択肢");
+        assert_eq!(scene.scope, SceneScope::Local);
+    }
+
+    // グローバルの範囲: ローカルを選ばない
+    let id = table.resolve_scene_id_exact("", "選択肢", &empty).unwrap();
+    assert_eq!(table.get_scene(id).unwrap().scope, SceneScope::Global);
+
+    // ローカルに無い名前はグローバルへ落ちない
+    let result = table.resolve_scene_id_exact("会話_1", "会話", &empty);
+    assert!(matches!(result, Err(SceneTableError::SceneNotFound { .. })));
+}
+
+#[test]
+fn test_resolve_scene_id_exact_empty_name_is_invalid_scene() {
+    let mut table = build_table(&["会話"], vec![0]);
+    for module in ["", "会話_1"] {
+        let result = table.resolve_scene_id_exact(module, "", &HashMap::new());
+        match result {
+            Err(SceneTableError::InvalidScene { scene }) => assert_eq!(scene, ""),
+            other => panic!("Expected InvalidScene, got {:?}", other.map(|_| ())),
+        }
+    }
+}
+
+#[test]
+fn test_resolve_scene_id_exact_attribute_filter() {
+    let mut table = build_filtered_table();
+
+    let mut winter = HashMap::new();
+    winter.insert("季節".to_string(), "冬".to_string());
+    let id = table.resolve_scene_id_exact("", "挨拶", &winter).unwrap();
+    assert_eq!(
+        table.get_scene(id).unwrap().attributes.get("季節"),
+        Some(&"冬".to_string())
+    );
+
+    let mut summer = HashMap::new();
+    summer.insert("季節".to_string(), "夏".to_string());
+    let result = table.resolve_scene_id_exact("", "挨拶", &summer);
+    assert!(matches!(
+        result,
+        Err(SceneTableError::NoMatchingScene { .. })
+    ));
+}

@@ -469,3 +469,115 @@ fn test_scene_search_from_event_handler_pattern() {
 
     assert_eq!(get_string_result(result), "success");
 }
+
+// =============================================================================
+// touch-poke-shortcuts 2.2: Lua から完全一致で探す（SEARCH:search_scene_exact）
+// =============================================================================
+
+/// グローバルシーンを `names` の順に登録し、`aliases` を持つ SearchContext を
+/// `SEARCH` という Lua のグローバルに置く。
+fn create_exact_search_lua(
+    names: &[&str],
+    aliases: pasta_core::registry::SceneAliasTable,
+) -> mlua::Lua {
+    let mut ctx = TranspileContext::new();
+    for name in names {
+        ctx.scene_registry.register_global(name, HashMap::new());
+    }
+    let search = pasta_lua::search::SearchContext::with_aliases(
+        ctx.scene_registry,
+        ctx.word_registry,
+        aliases,
+    )
+    .unwrap();
+    let lua = mlua::Lua::new();
+    lua.globals()
+        .set("SEARCH", lua.create_userdata(search).unwrap())
+        .unwrap();
+    lua
+}
+
+/// `SEARCH:search_scene_exact(name, nil)` を `n` 回呼び、当たった
+/// `global_name/local_name` を並べる（当たらなければ "nil"）。
+fn exact_hits(lua: &mlua::Lua, name: &str, n: usize) -> Vec<String> {
+    lua.load(
+        r#"
+        local name, n = ...
+        local hits = {}
+        for i = 1, n do
+            local g, l = SEARCH:search_scene_exact(name, nil)
+            hits[i] = g and (g .. "/" .. l) or "nil"
+        end
+        return table.concat(hits, ",")
+        "#,
+    )
+    .call::<String>((name, n))
+    .unwrap()
+    .split(',')
+    .map(str::to_string)
+    .collect()
+}
+
+#[test]
+fn test_search_scene_exact_does_not_hit_longer_name() {
+    use pasta_core::registry::SceneAliasTable;
+
+    let lua = create_exact_search_lua(&["つっつき反応女の子Head"], SceneAliasTable::empty());
+    assert_eq!(exact_hits(&lua, "つっつき反応女", 1), ["nil"]);
+    // 前方一致なら当たる（違いは候補の集め方だけ）
+    let prefix: Option<String> = lua
+        .load(r#"return (SEARCH:search_scene("つっつき反応女", nil))"#)
+        .eval()
+        .unwrap();
+    assert_eq!(prefix.as_deref(), Some("つっつき反応女の子Head_1"));
+
+    // 同じ名前があればそれだけに当たる
+    let lua = create_exact_search_lua(
+        &["つっつき反応女の子Head", "つっつき反応女"],
+        SceneAliasTable::empty(),
+    );
+    assert_eq!(
+        exact_hits(&lua, "つっつき反応女", 6),
+        vec!["つっつき反応女_1/__start__"; 6]
+    );
+}
+
+#[test]
+fn test_search_scene_exact_sanitizes_like_registration() {
+    use pasta_core::registry::SceneAliasTable;
+
+    let lua = create_exact_search_lua(&["会話・朝", "会話・朝食"], SceneAliasTable::empty());
+    assert_eq!(
+        exact_hits(&lua, "会話・朝", 4),
+        vec!["会話_朝_1/__start__"; 4]
+    );
+    assert_eq!(exact_hits(&lua, "会話・", 1), ["nil"]);
+}
+
+#[test]
+fn test_search_scene_exact_applies_alias_like_prefix_search() {
+    use pasta_core::registry::SceneAliasTable;
+
+    let lua = create_exact_search_lua(
+        &["OnTalk", "OnTalk追加"],
+        SceneAliasTable::builtin_default(),
+    );
+    assert_eq!(exact_hits(&lua, "会話", 4), vec!["OnTalk_1/__start__"; 4]);
+    // 別名は書いた名前と完全に同じときだけ置き換わる
+    assert_eq!(exact_hits(&lua, "会話追加", 1), ["nil"]);
+
+    let lua = create_exact_search_lua(&["OnTalk"], SceneAliasTable::empty());
+    assert_eq!(exact_hits(&lua, "会話", 1), ["nil"]);
+}
+
+#[test]
+fn test_search_scene_exact_empty_name_is_lua_error() {
+    use pasta_core::registry::SceneAliasTable;
+
+    let lua = create_exact_search_lua(&["メイン"], SceneAliasTable::empty());
+    let err = lua
+        .load(r#"return SEARCH:search_scene_exact("", nil)"#)
+        .exec()
+        .unwrap_err();
+    assert!(err.to_string().contains("Invalid scene name"), "{err}");
+}

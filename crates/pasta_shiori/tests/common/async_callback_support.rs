@@ -15,9 +15,9 @@ use tempfile::TempDir;
 
 /// 非同期コールバックテスト用の環境構築
 ///
-/// `copy_fixture_to_temp` でサポート＋フィクスチャをコピーした後、
-/// production の `pasta_scripts/` を `pasta_lua` クレートからコピーする。
-/// これにより EVENT, CALLBACK, SHIORI_ACT 等の本番モジュールが利用可能になる。
+/// async_callback フィクスチャ（`entry.lua` の差し替えと `pasta.toml`）を一時ディレクトリへコピーする。
+/// EVENT・CALLBACK・SHIORI_ACT などの本番モジュールは、`pasta.dll` が
+/// `profile/pasta/pasta_scripts/` へ自己展開した標準ランタイムから読まれる。
 pub(crate) struct AsyncCallbackEnv {
     shiori: PastaShiori,
     _temp_dir: TempDir,
@@ -28,19 +28,8 @@ impl AsyncCallbackEnv {
         let temp_dir = TempDir::new().expect("create temp dir");
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-        // 1. Copy production pasta_scripts/ from pasta_lua crate
-        //    These provide EVENT, CALLBACK, SHIORI_ACT, etc.
-        let pasta_scripts_src = manifest_dir
-            .parent()
-            .expect("parent dir")
-            .join("pasta_lua")
-            .join("pasta_scripts");
-        let pasta_scripts_dst = temp_dir.path().join("pasta_scripts");
-        std::fs::create_dir_all(&pasta_scripts_dst).expect("create pasta_scripts dir");
-        copy_dir_recursive(&pasta_scripts_src, &pasta_scripts_dst).expect("copy pasta_scripts");
-
-        // 2. Copy fixture files (entry.lua override + pasta.toml)
-        //    These go into scripts/ which takes priority over pasta_scripts/
+        // Copy fixture files (entry.lua override + pasta.toml).
+        // scripts/ is searched before the self-deployed profile/pasta/pasta_scripts/.
         let fixture_src = manifest_dir.join("tests/fixtures/async_callback");
         copy_dir_recursive(&fixture_src, temp_dir.path()).expect("copy fixture");
 

@@ -14,7 +14,7 @@ description: >-
   SHIORIプロトコル実装, Luaランタイム開発, pasta言語仕様の設計変更.
 metadata:
   author: ekicyou
-  version: "1.8.0"
+  version: "1.9.0"
 ---
 
 # Pasta Ghost Authoring Skill
@@ -318,7 +318,7 @@ end
 
 #### 使用例
 ```pasta
-＊OnMouseDoubleClick
+＊つっつき反応その他
 　％女の子、男の子
 　女の子：＠通常　何をしますか？
 　＠？挨拶「挨拶する」
@@ -390,7 +390,7 @@ end
 | ランダムトーク     | `＊OnTalk`             | 仮想イベント。同名複数定義でランダム選択。継続トーク（[authoring-patterns.md §6.7](references/authoring-patterns.md#s6-7)）対応       |
 | 汎用時報           | `＊時報その他`         | 仮想イベント。日時変数が自動設定される（[variables.md](references/variables.md#日時変数)、作例は [authoring-patterns.md §6.4](references/authoring-patterns.md#s6-4)）。`＊OnHourOther` も同等 |
 | 時刻別時報         | `＊時報{HH}`           | 特定時刻専用（例: `＊時報12` で正午専用）。日時変数が自動設定される。`＊OnHour{HH}` も同等                                            |
-| ダブルクリック反応 | `＊OnMouseDoubleClick` | 同名複数定義でランダム選択                                                                                                            |
+| つつき・撫で反応   | `＊つっつき反応その他` など | アクター名・部位で段々に探す。撫では `＊さわり反応…`（[authoring-patterns.md §6.5](references/authoring-patterns.md#s6-5)） |
 
 **仮想イベント**: OnTalk と OnHour は内部タイマーにより自動ディスパッチされる。トーク間隔は `pasta.toml` の `[ghost]` セクションで設定可能。
 
@@ -414,7 +414,7 @@ end
 | §6.2 イベントハンドラ     | OnBoot / OnFirstBoot / OnClose | `boot.pasta`   |
 | §6.3 ランダムトーク       | 同名 `＊OnTalk` の複数定義     | `talk.pasta`   |
 | §6.4 時報                 | 4段階フォールバック + 日時変数 | `hour.pasta`   |
-| §6.5 クリック反応         | OnMouseDoubleClick             | `click.pasta`  |
+| §6.5 つつき・撫で反応     | `つっつき反応…`・`さわり反応…` | `click.pasta`  |
 | §6.6 シャッフル＆順次消費 | 単語・シーンの選択アルゴリズム | —              |
 | §6.7 継続トーク           | `＞チェイントーク` / `＞yield` | `talk.pasta`   |
 | §6.8 ファイル分割ガイド   | 責務別ファイル構成             | —              |

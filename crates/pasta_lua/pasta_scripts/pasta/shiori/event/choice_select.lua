@@ -38,7 +38,7 @@ end
 ---明示シーン優先 → 選択ID前方一致検索 → 非マッチ時 nil（204 委譲）
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス可能）
 ---@return thread|nil シーンコルーチン、またはnil
-REG.OnChoiceSelectEx = function(act)
+REG.OnChoiceSelectEx = REG.OnChoiceSelectEx or function(act)
     -- 1. 明示的 ＊OnChoiceSelectEx シーンが存在すれば優先実行（3.5）
     local explicit = SCENE.co_exec(act, "OnChoiceSelectEx", nil, nil)
     if explicit then
