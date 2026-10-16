@@ -120,7 +120,7 @@
   - 完了の状態: release のテストで、誤りのある辞書では終了コード 1・`updates.txt` と nar が無い・出力に問題の行があり、注意だけでは nar ができ、表示が `[1/6]`〜`[6/6]` になり、既存の release のテストが通る
   - _Requirements: 7.5, 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 6. WASM の入口と CI
+- [x] 6. WASM の入口と CI
 - [x] 6.1 (P) pasta_lsp に核を呼ぶ WASM の入口 2 つを足す
   - `pasta_lsp` に `pasta_check`（既定の feature 無し）を依存に足す
   - 辞書ファイルの選び出しと検査の入口を、既存の解析の入口と同じく panic を捕まえて `null` を返す形で足す。核の結果をそのまま返し、文言を作り直さない
@@ -129,7 +129,7 @@
   - _Depends: 2.7_
   - _Requirements: 11.1, 11.2, 11.8_
 
-- [ ] 6.2 (P) CI の WASM の確認とリリースの公開の依存を足す
+- [x] 6.2 (P) CI の WASM の確認とリリースの公開の依存を足す
   - `build.yml` の wasm の job に、ライブラリだけを feature 無しで wasm32-unknown-unknown に向けた `cargo check` を足す
   - `release.yml` の `pasta_check` の公開の段に `-DependsOn pasta_core,pasta_dsl` を足す
   - 完了の状態: 2 つのワークフローの差分がこの 2 か所だけで、YAML として読める
