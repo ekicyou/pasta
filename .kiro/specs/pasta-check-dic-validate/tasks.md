@@ -138,7 +138,7 @@
   - _Requirements: 9.1, 11.1_
 
 - [ ] 7. VSCode 拡張のゴースト全体の診断
-- [ ] 7.1 WasmBridge に型つきの呼び出し 2 つと形の検査を足す
+- [x] 7.1 WasmBridge に型つきの呼び出し 2 つと形の検査を足す
   - 入力・ファイルの中身・報告の型を足し、2 つの呼び出しが WASM の結果の形を確かめて、違えば throw する
   - 完了の状態: 既存の bridge のテストと同じやり方で、正しい形を返し、形が違えば throw することが確かめられる
   - _Depends: 6.1_
@@ -207,3 +207,4 @@
 - 4.1: 殻は `validate_cmd::run(target: &Path)` と `run_on_master(master) -> Result<ValidateOutcome, String>`（サブフォルダが読めないときは Err。5.1 では io のエラーに写す）。main.rs の `mod validate_cmd;` の `#[allow(dead_code)]` は 4.2 で外す。`--target` が無いときは 4.2 の解析で扱う。
 - 5.1: `ghost/master` の無い配布フォルダは段 4 で失敗する（理由は validate と同じ日本語）。前回の nar は既存の段 1 で消えるので、関門で止まると nar は残らない。
 - 6.1: WASM の入口の戻り値は `Serializer::json_compatible()`（None を null にするため。既存の wasm_analyze は既定のまま）。
+- 7.1: vscodeModules のテストは事前の WASM のビルド（`pwsh -NoProfile -File scripts/build-wasm.ps1 -Release`）が要る（既存の activate のテストも同じ）。
