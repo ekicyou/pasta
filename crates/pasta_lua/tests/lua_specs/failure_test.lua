@@ -1,4 +1,4 @@
--- pasta.failure（失敗の報告の唯一の出口）の単体テスト (failure-output-unification 1.2)
+-- pasta.failure（失敗の報告の唯一の出口）の単体テスト (failure-output-unification 1.2・2.1〜2.3)
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -21,17 +21,52 @@ local function with_log(body)
     if not ok then error(err, 0) end
 end
 
-describe("FAILURE.report", function()
-    test("警告をログへ 1 回出し、【label】を raw_script として積み、nil を返す", function()
+describe("FAILURE.report（act を通じた報告）", function()
+    local REC = { label = "数にできない値", subject = "＄y", detail = '"abc"', warning = "w1" }
+
+    test("act あり・actor なし: 警告 1 回、表記を raw_script として 1 つ積み、nil を返す", function()
         with_log(function(FAILURE, warns)
             local act = { token = {} }
-            local ret = FAILURE.report(act, { label = "Call失敗：x", warning = "w1" })
+            local ret = FAILURE.report(act, REC)
             expect(ret):toBe(nil)
             expect(#warns):toBe(1)
             expect(warns[1]):toBe("w1")
             expect(#act.token):toBe(1)
             expect(act.token[1].type):toBe("raw_script")
-            expect(act.token[1].text):toBe("【Call失敗：x】")
+            expect(act.token[1].text):toBe('【数にできない値：＄y（"abc"）】')
+            expect(act.token[1].actor):toBe(nil)
+        end)
+    end)
+
+    test("act あり・actor あり: 目印のトークンに actor を付ける", function()
+        with_log(function(FAILURE, warns)
+            local act = { token = {} }
+            local actor = { name = "ぱすたー" }
+            FAILURE.report(act, {
+                label = FAILURE.LABEL.UNREGISTERED_ACTOR, subject = "ぱすたー", warning = "w", actor = actor,
+            })
+            expect(#warns):toBe(1)
+            expect(#act.token):toBe(1)
+            expect(act.token[1].type):toBe("raw_script")
+            expect(act.token[1].text):toBe("【未登録アクター：ぱすたー】")
+            expect(act.token[1].actor):toBe(actor)
+        end)
+    end)
+
+    test("act なし（actor の有無にかかわらず）: 警告 1 回だけで、nil を返しエラーにしない", function()
+        with_log(function(FAILURE, warns)
+            expect(FAILURE.report(nil, REC)):toBe(nil)
+            expect(FAILURE.report(nil, { label = "x", warning = "w2", actor = {} })):toBe(nil)
+            expect(#warns):toBe(2)
+            expect(warns[2]):toBe("w2")
+        end)
+    end)
+
+    test("表記はエスケープしてから枠を付ける", function()
+        with_log(function(FAILURE)
+            local act = { token = {} }
+            FAILURE.report(act, { label = FAILURE.LABEL.WORD_NOT_FOUND, subject = "＠%x" })
+            expect(act.token[1].text):toBe([[【単語が見つからない：＠\%x】]])
         end)
     end)
 
@@ -44,10 +79,22 @@ describe("FAILURE.report", function()
         end)
     end)
 
-    test("act が nil なら警告だけ出し、エラーにしない", function()
+    test("label 以外が文字列でなくても形を作り、例外を投げない", function()
         with_log(function(FAILURE, warns)
-            expect(FAILURE.report(nil, { label = "x", warning = "w" })):toBe(nil)
-            expect(#warns):toBe(1)
+            local act = { token = {} }
+            FAILURE.report(act, { label = "x", subject = 1, detail = false, warning = 2 })
+            expect(act.token[1].text):toBe("【x：1（false）】")
+            expect(warns[1]):toBe("2")
+        end)
+    end)
+
+    test("同じ失敗を 2 回報告すると 2 回出る（抑止しない）", function()
+        with_log(function(FAILURE, warns)
+            local act = { token = {} }
+            FAILURE.report(act, REC)
+            FAILURE.report(act, REC)
+            expect(#warns):toBe(2)
+            expect(#act.token):toBe(2)
         end)
     end)
 
@@ -60,26 +107,150 @@ describe("FAILURE.report", function()
     end)
 end)
 
-describe("act:failure は FAILURE.report へ委ねる", function()
-    test("act:failure(text, warning) が同じ警告とトークンを出す", function()
+describe("FAILURE.notation（act の無い場所からの報告）", function()
+    test("actor なし: 警告 1 回、表記の文字列を返す", function()
         with_log(function(FAILURE, warns)
-            local saved = FAILURE.report
-            local seen
-            FAILURE.report = function(act, record)
-                seen = record
-                return saved(act, record)
-            end
-            local ok, err = pcall(function()
-                local act = require("pasta.act").new({})
-                expect(act:failure("t", "w")):toBe(nil)
-                expect(seen.label):toBe("t")
-                expect(seen.warning):toBe("w")
-                expect(warns[1]):toBe("w")
-                expect(act.token[#act.token].text):toBe("【t】")
-            end)
-            FAILURE.report = saved
-            if not ok then error(err, 0) end
+            expect(FAILURE.notation({ label = "値の無い変数", subject = "＄x", warning = "w" }))
+                :toBe("【値の無い変数：＄x】")
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe("w")
         end)
+    end)
+
+    test("actor あり: 積む先が無いので文字列を返すだけ", function()
+        with_log(function(FAILURE, warns)
+            local actor = {}
+            expect(FAILURE.notation({ label = "未登録アクター", subject = "a", warning = "w", actor = actor }))
+                :toBe("【未登録アクター：a】")
+            expect(#warns):toBe(1)
+        end)
+    end)
+
+    test("warning が nil ならログを出さない", function()
+        with_log(function(FAILURE, warns)
+            expect(FAILURE.notation({ label = "x" })):toBe("【x】")
+            expect(#warns):toBe(0)
+        end)
+    end)
+end)
+
+describe("act:failure は従来の経路のまま（3.1 で切り替える）", function()
+    test("act:failure(text, warning) が警告 1 回と【text】をエスケープせずに積む", function()
+        with_log(function(_, warns)
+            local act = require("pasta.act").new({})
+            expect(act:failure([[t\%]], "w")):toBe(nil)
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe("w")
+            local token = act.token[#act.token]
+            expect(token.type):toBe("raw_script")
+            expect(token.text):toBe([[【t\%】]])
+        end)
+    end)
+end)
+
+describe("FAILURE.bind / running_act（実行中の act の対応表）", function()
+    local FAILURE = require("pasta.failure")
+
+    test("シーンのコルーチンの中で bind した act を、同じコルーチンの続きで引ける", function()
+        local act = {}
+        local co = coroutine.create(function()
+            FAILURE.bind(act)
+            coroutine.yield(FAILURE.running_act())
+            return FAILURE.running_act()
+        end)
+        local _, first = coroutine.resume(co)
+        expect(first):toBe(act)
+        local _, after_resume = coroutine.resume(co)
+        expect(after_resume):toBe(act)
+    end)
+
+    test("別のコルーチンでは別の act、対応の無いコルーチンでは nil", function()
+        local a, b = {}, {}
+        local function bound(act)
+            return coroutine.create(function()
+                if act then FAILURE.bind(act) end
+                coroutine.yield()
+                return FAILURE.running_act()
+            end)
+        end
+        local ca, cb, cn = bound(a), bound(b), bound(nil)
+        coroutine.resume(ca)
+        coroutine.resume(cb)
+        coroutine.resume(cn)
+        expect(select(2, coroutine.resume(ca))):toBe(a)
+        expect(select(2, coroutine.resume(cb))):toBe(b)
+        expect(select(2, coroutine.resume(cn))):toBe(nil)
+    end)
+
+    test("コルーチンの外（メインスレッド）: running() が thread なら引け、次の bind で上書きされる", function()
+        local co = coroutine.running()
+        local a, b = {}, {}
+        FAILURE.bind(a)
+        if co == nil then
+            -- running() が nil の環境ではログだけ（対応を作らない）
+            expect(FAILURE.running_act()):toBe(nil)
+        else
+            expect(FAILURE.running_act()):toBe(a)
+            FAILURE.bind(b)
+            expect(FAILURE.running_act()):toBe(b)
+        end
+    end)
+
+    test("coroutine.running() が nil を返すとき、bind は何もせず running_act は nil", function()
+        local saved = coroutine.running
+        local saved_act = FAILURE.running_act()
+        coroutine.running = function() return nil end -- luacheck: ignore 122
+        local ok, err = pcall(function()
+            FAILURE.bind({})
+            expect(FAILURE.running_act()):toBe(nil)
+        end)
+        coroutine.running = saved -- luacheck: ignore 122
+        if not ok then error(err, 0) end
+        -- 差し替え中の bind は実際のスレッドの対応を変えていない
+        expect(FAILURE.running_act()):toBe(saved_act)
+    end)
+end)
+
+describe("FAILURE.set_fn_failed / take_fn_failed（報告済みの印）", function()
+    local FAILURE = require("pasta.failure")
+
+    test("書いた印を読み、読んだら偽に戻る", function()
+        local act = {}
+        expect(FAILURE.take_fn_failed(act)):toBe(false)
+        FAILURE.set_fn_failed(act, true)
+        expect(FAILURE.take_fn_failed(act)):toBe(true)
+        expect(FAILURE.take_fn_failed(act)):toBe(false)
+    end)
+
+    test("偽を書けば偽、act ごとに独立", function()
+        local a, b = {}, {}
+        FAILURE.set_fn_failed(a, true)
+        FAILURE.set_fn_failed(a, false)
+        FAILURE.set_fn_failed(b, true)
+        expect(FAILURE.take_fn_failed(a)):toBe(false)
+        expect(FAILURE.take_fn_failed(b)):toBe(true)
+    end)
+end)
+
+describe("FAILURE.mark_unregistered_actor / is_unregistered_actor（未登録アクターの印）", function()
+    local FAILURE = require("pasta.failure")
+
+    test("印を付けたアクターだけが真、nil は偽", function()
+        local marked, other = { name = "a" }, { name = "b" }
+        FAILURE.mark_unregistered_actor(marked)
+        expect(FAILURE.is_unregistered_actor(marked)):toBe(true)
+        expect(FAILURE.is_unregistered_actor(other)):toBe(false)
+        expect(FAILURE.is_unregistered_actor(nil)):toBe(false)
+    end)
+
+    test("印はアクターの表のフィールドに書かない", function()
+        local actor = { name = "a" }
+        FAILURE.mark_unregistered_actor(actor)
+        local keys = {}
+        for k in pairs(actor) do table.insert(keys, k) end
+        expect(#keys):toBe(1)
+        expect(keys[1]):toBe("name")
+        expect(getmetatable(actor)):toBe(nil)
     end)
 end)
 

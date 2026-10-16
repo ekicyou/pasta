@@ -111,26 +111,102 @@ function FAILURE.value_of(v)
 end
 
 ---@class FailureRecord
----@field label string        表記の中身（【】はこのモジュールが付ける）
----@field warning string|nil  ログの警告文。nil ならログを出さない
+---@field label string        種類の名前（FAILURE.LABEL の値。後続 spec は自分の名前を足す）
+---@field subject string|nil  対象（辞書の書き方に変換済み。無ければ説明を対象の位置に出す）
+---@field detail string|nil   説明（値なし・空文字列・型の名前・値）
+---@field warning string|nil  ログの警告文（現行の文言のまま。nil ならログを出さない）
+---@field actor table|nil     未登録アクターの目印のとき、そのアクター
 
---- act を通じた報告: 警告を出し、【label】を act.token に raw_script として積む
+--- 警告を 1 回出す（nil なら出さない）
+---@param warning any
+local function warn(warning)
+    if warning ~= nil then
+        -- 呼んだ時点で引く: テストがログを差し替えて act を読み直しても、その差し替えに出す
+        require("@pasta_log").warn(tostring(warning))
+    end
+end
+
+--- act の無い場所からの報告: 警告を出し、表記の文字列を返す。トークンに積まない
+---@param record FailureRecord
+---@return string
+function FAILURE.notation(record)
+    warn(record.warning)
+    return FAILURE.format(record.label, record.subject, record.detail)
+end
+
+--- act を通じた報告: 警告を出し、表記を act.token に raw_script として積む。act が nil なら notation と同じ
 ---
 --- raw_script はそのまま出力される（句読点ウェイト・分かち書き改行は入らない）。
 --- 切替タグを出さずに積んだ位置（直前に話したアクターのバルーン、
---- または出力の先頭なら現在のスコープ）へ文字を出す。act が nil なら警告だけ出す。
---- @param act table|nil アクションオブジェクト
---- @param record FailureRecord
---- @return nil
+--- または出力の先頭なら現在のスコープ）へ文字を出す。
+---@param act table|nil
+---@param record FailureRecord
+---@return nil
 function FAILURE.report(act, record)
-    if record.warning then
-        -- 呼んだ時点で引く: テストがログを差し替えて act を読み直しても、その差し替えに出す
-        require("@pasta_log").warn(record.warning)
-    end
+    local text = FAILURE.notation(record)
     if act then
-        table.insert(act.token, { type = "raw_script", text = "【" .. record.label .. "】" })
+        table.insert(act.token, { type = "raw_script", text = text, actor = record.actor })
     end
     return nil
+end
+
+--- act:failure(text, warning) の従来の経路: 警告を出し、【text】をエスケープせずに積む
+--- （3.1 で act:failure を report へ切り替えたら消す）
+---@param act table
+---@param text string
+---@param warning string|nil
+---@return nil
+function FAILURE.report_text(act, text, warning)
+    warn(warning)
+    table.insert(act.token, { type = "raw_script", text = "【" .. text .. "】" })
+    return nil
+end
+
+--- 実行中の act の対応表（スレッド → act）
+local RUNNING = setmetatable({}, { __mode = "k" })
+--- 直前の関数呼び出しが報告済みか（act → 真偽値）
+local FN_FAILED = setmetatable({}, { __mode = "k" })
+--- 未登録アクターの印（アクター → true）。アクターの表のフィールドには書かない
+local UNREGISTERED = setmetatable({}, { __mode = "k" })
+
+--- 実行中のスレッドに act を対応させる（coroutine.running() が nil なら何もしない）
+---@param act table
+function FAILURE.bind(act)
+    local co = coroutine.running()
+    if co then RUNNING[co] = act end
+end
+
+--- 実行中のスレッドに対応する act（無ければ nil）
+---@return table|nil
+function FAILURE.running_act()
+    local co = coroutine.running()
+    return co and RUNNING[co] or nil
+end
+
+---@param act table
+---@param failed boolean
+function FAILURE.set_fn_failed(act, failed)
+    FN_FAILED[act] = failed and true or nil
+end
+
+--- 印を読んで偽に戻す
+---@param act table
+---@return boolean
+function FAILURE.take_fn_failed(act)
+    local failed = FN_FAILED[act] == true
+    FN_FAILED[act] = nil
+    return failed
+end
+
+---@param actor table
+function FAILURE.mark_unregistered_actor(actor)
+    UNREGISTERED[actor] = true
+end
+
+---@param actor table|nil
+---@return boolean
+function FAILURE.is_unregistered_actor(actor)
+    return actor ~= nil and UNREGISTERED[actor] == true
 end
 
 return FAILURE

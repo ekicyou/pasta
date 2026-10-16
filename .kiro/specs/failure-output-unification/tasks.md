@@ -31,7 +31,7 @@
   - _Boundary: NameConversion_
   - _Requirements: 3.3, 3.4_
 
-- [ ] 2.3 報告の契約と 3 つの対応表を仕上げる
+- [x] 2.3 報告の契約と 3 つの対応表を仕上げる
   - act を通じた報告（警告を必ず 1 回出し、表記を `raw_script` として 1 つ積む。未登録アクターの目印は `actor` を付ける）と、act の無い場所からの報告（警告を出し表記の文字列を返す。積まない）を設計の事後条件どおりにする
   - 実行中の act の対応表（コルーチン → act、弱参照）、直前の関数呼び出しが報告済みかの印、未登録アクターの印（アクターの表のフィールドに書かない）を用意する
   - `act:failure` はこのタスクでは従来の経路のままにし、新しい形・エスケープへの切り替えは 3.1 で行う
@@ -131,3 +131,4 @@
 
 ## Implementation Notes
 - 1.2: `pasta/failure.lua` はログを呼んだ時点で `require("@pasta_log")` する（spec がログを差し替えて act を読み直す慣行のため）。module-level の `local log` に変えない。暫定で `record.label` に表記の中身全文が入っており、2.x で design の FailureRecord（label＝種類の名前）に合わせ直す
+- 2.3: `act:failure` は一時的に `FAILURE.report_text`（エスケープしない従来の経路）を通る。3.1 で `report` へ切り替えたら `report_text` を消す。`notation` の「出さない設定なら nil」と `report` の「目印だけ空で積む」は 4.1 で足し、注釈とテストも合わせる。この LuaJIT ではメインスレッドの `coroutine.running()` は thread＋ismain を返す

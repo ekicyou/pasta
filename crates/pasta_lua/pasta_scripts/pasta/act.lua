@@ -691,7 +691,7 @@ end
 --- @param warning string|nil ログに出す警告文。nil なら出さない
 --- @return nil
 function ACT_IMPL.failure(self, text, warning)
-    return FAILURE.report(self, { label = text, warning = warning })
+    return FAILURE.report_text(self, text, warning)
 end
 
 --- スポット設定トークン生成（状態レス化）
