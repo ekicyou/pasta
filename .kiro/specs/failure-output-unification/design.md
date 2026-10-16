@@ -125,7 +125,7 @@ book/src/reference/
 ```
 
 ### Modified Files
-- `crates/pasta_lua/pasta_scripts/pasta/act.lua` — `talk`・`word`・`call_expr`・`global_fn`・`actor_proxy`・`num`・`str`・`call`・`call_key`・`failure` の報告を `FAILURE.report` へ置き換える。`init_scene` で `FAILURE.bind(self)`。`group_by_actor` の `raw_script` の分岐と、`actor_proxy` の遡りが、アクター付きの `raw_script` を発言と同じに扱う。`WORD.dynamic_key` へ `self` を渡す。
+- `crates/pasta_lua/pasta_scripts/pasta/act.lua` — `talk`・`word`・`call_expr`・`global_fn`・`actor_proxy`・`num`・`str`・`call`・`call_key`・`failure` の報告を `FAILURE.report` へ置き換える。`init_scene` で `FAILURE.bind(self)`。`group_by_actor` の `raw_script` の分岐と、`actor_proxy` の遡りが、アクター付きの `raw_script` を発言と同じに扱う。`build` は、トークンがすべて空文字列の `raw_script`（出さない設定の未登録アクターの目印だけ）のとき nil を返す。`WORD.dynamic_key` へ `self` を渡す。
 - `crates/pasta_lua/pasta_scripts/pasta/actor.lua` — `proxy:word`・`proxy:expr_fn` の警告を `FAILURE.report(self.act, …)` に置き換え、`WORD.dynamic_key` へ `self.act` を渡す。
 - `crates/pasta_lua/pasta_scripts/pasta/word.lua` — `WORD.dynamic_key(value, var_path, via, act)` の 4 番目の引数（省略可）を足し、警告を `FAILURE.report`（act 無しならログだけ）から出す。戻り値は変えない。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` — `emit_actor_switch` が `FAILURE.is_unregistered_actor(actor)` のとき `actor_spots fallback` を出さない（1 行の条件）。
@@ -163,6 +163,7 @@ sequenceDiagram
 
 - 警告は切り替えにかかわらず必ず出す（7.4）。積むのは act があるときだけで、act が無ければログだけになる。
 - 出さない設定で未登録アクターの目印だけ空文字列で積む理由: 目印のトークンはグループの開始と「直前の話者」の遡りを担う。空で積めば、グループ化・`\p[…]` の切り替え・警告の回数が出す設定と同じになり、6.4（表記を除いて同じ出力）と 7.4（ログは同じ）を両方満たす。
+- 出さない設定で、積んだトークンが空の目印だけになったとき、`act:build` は nil を返す（表記を除けば何も残らないので空の出力。204）。出す設定では表記だけでも返す（4.5）。
 
 ### 実行中の act の見つけ方（`PASTA.num`・`PASTA.str`）
 
@@ -219,7 +220,7 @@ sequenceDiagram
 | 4.2 | 直前の話者のバルーンに続けて・目印は先頭 | ActGrouping | トークンの形 | — |
 | 4.3 | 出力の先頭ではスコープを切り替えない | ActGrouping（既存の `raw_script` の性質） | — | — |
 | 4.4 | チェイントークの再開後 | RunningActRegistry, FailureReporter | `FAILURE.bind` | 実行中の act |
-| 4.5 | 表記だけの出力を返す | 既存の `act:build` | — | — |
+| 4.5 | 表記だけの出力を返す | `act:build`（空の目印だけなら nil） | — | — |
 | 4.6 | 前後の判定を変えない | ActGrouping, SpotFallbackGuard | トークンの形 | — |
 | 5.1 | 1 原因に 1 表記・1 警告 | 報告箇所, FnResultFlag | 重ねない規則の表 | — |
 | 5.2 | 内側が報告したら外側は黙る | 報告箇所, FnResultFlag | 重ねない規則の表 | — |
@@ -339,7 +340,7 @@ function FAILURE.var(var_path) end
 ---@return string
 function FAILURE.fn(desc) end
 
---- 名前にならない値の説明: nil → "値なし"、"" → "空文字列"、それ以外 → 型の名前（OPEN QUESTION 2）
+--- 名前にならない値の説明: nil → "値なし"、"" → "空文字列"、真偽値 → "真偽値"、表 → "表"、関数 → "関数"、それ以外 → Lua の型の名前（読み手は DSL の作者のため日本語にする）
 ---@param v any
 ---@return string
 function FAILURE.kind_of(v) end
@@ -424,6 +425,7 @@ function FAILURE.is_unregistered_actor(actor) end
 
 - 変数パスがある `call_key` は `WORD.dynamic_key(value, var_path, "act:call", self)` だけが報告する（#7。今の「警告だけ出す」呼び出しに act を渡す）。
 - `ACT.num`・`ACT.str` は `FAILURE.report(FAILURE.running_act(), record)` を呼ぶ。
+- 対象が分からないとき（#11、#9・#10・#13 で `desc` が無いとき）は説明を対象の位置に出す（形の規則の「`subject` が無ければ `【label：detail】`」）。例: `act:call(nil)` → `【名前にならない値：値なし】`、`＄y＝（＄a＆＄b）＋１` → `【数にできない値："xy"】`。空の括弧の形は作らない。
 - `WORD.dynamic_key(value, var_path, via, act)`: `act` を省略したとき（Lua から直接呼んだとき）は `FAILURE.report(nil, …)` でログだけ出す。戻り値・警告の文言は今と同じ（マニュアルに載った公開の関数の互換）。
 - 表示の例:
 
@@ -432,7 +434,7 @@ function FAILURE.is_unregistered_actor(actor) end
 | `さくら：今日は＄話題の話` （話題が未代入） | `今日は【値の無い変数：＄話題】の話` |
 | `さくら：＠挨拶` （単語が無い） | `【単語が見つからない：＠挨拶】` |
 | `さくら：＠＊計算（１）` | `【関数が見つからない：＠＊計算（）】` |
-| `さくら：＠＄名前` （名前＝真偽値） | `【名前にならない値：＄名前（真偽値）】`（型の名前は OPEN QUESTION 2） |
+| `さくら：＠＄名前` （名前＝真偽値） | `【名前にならない値：＄名前（真偽値）】` |
 | `ぱすたー：こんにちは` （未登録） | `\p[0]【未登録アクター：ぱすたー】こんにちは` |
 | `＄y＝＄x＋１` （x＝"abc"） | `【数にできない値：＄x（"abc"）】` |
 | `＞会話２` （シーンが無い） | `【シーンが見つからない：＞会話２】` |
@@ -471,9 +473,11 @@ function FAILURE.is_unregistered_actor(actor) end
 - `sakura_builder`: 変えない。グループの切り替えで `\p[…]` を出し、`raw_script` は文字のまま出して字のある発言に数えない（段落区切り・has-text を変えない。4.6）。
 - `actor_proxy` の遡り: 末尾から見て最初の「`talk`・`sakura_script`・`actor` を持つ `raw_script`」の話者が同じ名前なら目印を出さない。`actor` の無い失敗表記では止まらない（現行の性質を引き継ぐ）。
 - `actor_proxy` はその場限りのアクター `{ name = name }` を作ったとき `FAILURE.mark_unregistered_actor(actor)` を呼ぶ。
+- `act:build`: トークン 0 件に加え、すべてが `text == ""` の `raw_script` のときも nil を返す（出さない設定の空の目印だけの出力を 204 にする）。
+- 要件 4.2 の帰結: 他のアクターの行の先頭で起きた失敗（目印を除く）は、直前の話者のバルーンに出る。例: `さくら：やあ` の次の `うにゅう：＄未定義だね` は `\p[0]やあ【値の無い変数：＄未定義】\p[1]だね`。表記でアクターを切り替えないことで 4.6 の判定を保つ（現行の Call の失敗表記と同じ）。設計議論で受け入れを確定した。
 
 **Implementation Notes**
-- Risks: 出さない設定で、未登録アクターの行が他に何も積まないとき（`ぱすたー：＄未定義` だけ）、空の目印 1 つで出力が `\p[0]\e` になり、nil（204）にならない（OPEN QUESTION 4）。
+- 出さない設定で未登録アクターの行が他に何も積まないとき（`ぱすたー：＄未定義` だけ）は、空の目印だけになるので `build` が nil を返す（204）。警告は出す設定と同じ 1 回ずつ。
 
 ### Lua ランタイム: SpotFallbackGuard（`sakura_builder.lua`）
 - `emit_actor_switch` の警告の条件を `if actor_name and not FAILURE.is_unregistered_actor(actor) then` にする。spot 0 で出す挙動と `actor_spots` は変えない（6.3）。切り替えにかかわらず効く（7.4 のとおり、ログは表記の有無で変わらない）。
@@ -487,7 +491,7 @@ function FAILURE.is_unregistered_actor(actor) end
 
 ### マニュアル: ManualPage・SkillRefs
 
-- 新ページ `book/src/reference/runtime-failures.md`「実行時の失敗の出力」: 種類ごとの表記とログの警告の対応表、出る位置（発言の途中・直前の話者のバルーン・出力の先頭・チェイントーク）、重ねない規則、表記だけの出力、切り替えの設定、Lua からの報告（`act:failure`）。章の構造（冒頭・末尾の台詞、本文に台詞を置かない）は既存の生成対象の章と同じ決まりに従う。置き場所は **仮定**（OPEN QUESTION 6）。
+- 新ページ `book/src/reference/runtime-failures.md`「実行時の失敗の出力」: 種類ごとの表記とログの警告の対応表、出る位置（発言の途中・直前の話者のバルーン・出力の先頭・チェイントーク）、重ねない規則、表記だけの出力、切り替えの設定、Lua からの報告（`act:failure`）。章の構造（冒頭・末尾の台詞、本文に台詞を置かない）は既存の生成対象の章と同じ決まりに従う。失敗は文法・Lua・pasta.toml にまたがるので reference に 1 ページで置き、作者向けスキルの生成対象に足す。
 - 各章は挙動を 1 文で述べ、表記の説明は新ページへリンクする。回避の書き方（Lua の関数など）を載せない（9.5）。
 - `GENERATION_MAP` に `['reference/runtime-failures.md', GA]` を足し、`node book/tools/gen-skill-refs.mjs` で再生成、`--check` とリンク検証を通す（9.4）。
 
@@ -524,7 +528,7 @@ function FAILURE.is_unregistered_actor(actor) end
 - 生成コードの順序の固定: `＞＠無い関数（）` が表記 1 つ・警告 1 行になること（FnResultFlag の前提を codegen の変更から守る）。
 - 重ねない規則の表の 6 行それぞれで、表記 1 つ・警告 1 行（5.1〜5.4）。同じ書き間違いを 2 回通ると 2 回出る（5.5）。
 - 未登録アクター: 目印がそのアクターの `\p[…]` の直後に出て、ウェイト・改行が入らず、続く台詞の段落区切りが目印の無い場合と同じ（3.6・4.2・4.6）。継続行で 1 回だけ（5.3）。
-- 切り替え: 出さない設定の出力が、出す設定の出力から表記を除いたものと一致し、ログは同じ（6.4・7.3・7.4）。
+- 切り替え: 出さない設定の出力が、出す設定の出力から表記を除いたものと一致し、ログは同じ（6.4・7.3・7.4）。出さない設定で `ぱすたー：＄未定義` だけのシーンが nil（204）を返す。
 
 ### E2E Tests
 - `pasta_shiori` の既存 2 本（`call_execution_correctness_e2e_test.rs`・`codegen_runtime_safety_e2e_test.rs`）の期待値を新しい文言に合わせる（10.3）。表記だけのシーンが 200 で返る（4.5）。
@@ -557,10 +561,6 @@ graph LR
 ## Open Questions / Risks
 
 - **OPEN QUESTION 1**: 切り替えのキーの名前と置き場所（仮定: `[ghost] failure_notation`）。
-- **OPEN QUESTION 2**: 名前にならない値の型の名前（仮定: 日本語 `真偽値`・`表`・`関数`、それ以外は Lua の型名）。
-- **OPEN QUESTION 4**: 出さない設定での未登録アクターの空の目印（仮定: 積む）。
-- **OPEN QUESTION 6**: 1 か所の説明の置き場所（仮定: 新ページ `reference/runtime-failures.md`、スキル `pasta-ghost-authoring` の生成対象に足す）。
-- **OPEN QUESTION 7**: 対象が分からないときの表記（仮定: 説明を対象の位置に出す。`【数にできない値："abc"】`・`【名前にならない値：値なし】`）。
 - **Risk**: `tutorial_stages_test.rs` は同じ時期の `touch-poke-shortcuts` も触る。後から入る側が rebase で合わせる（足すのは `assert_responds` の 1 条件）。
 - **Risk**: OnTalk のように無作為に選ぶシーンは、hello-pasta のテストで全部を通らない。全段の全イベントを通すことで網羅に近づける。
 - **Risk**: シーンの外（Lua で作ったコルーチン・メインスレッドの古い対応）での `PASTA.num` は表記を出さずログだけになる。生成コードの経路では起きない。
