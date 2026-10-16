@@ -51,7 +51,8 @@
   - 名前の規則（照合用の名前・別名の置き換え・モジュール名・辞書の集め方）は、同じ版の `pasta.dll` と同じ結果になる。検査コマンドは独自の規則を持たない。
   - 後から入る spec（`scene-anchor-link`・`cue-command-runtime`・`call-attribute-filter`・`novel-talk-flow`）が、検査の項目を足す。この spec は、項目を足しても既存の項目の報告・誤りと注意の区別・終了コードの規則が変わらない作りにしておく。
   - `failure-output-unification` は実行時の失敗を受け持ち、この spec は実行する前に見つける側を受け持つ。実行時の失敗表記・ログの形には依存しない。
-  - hello-pasta の配布物（`crates/pasta_sample_ghost/release.ps1`・リリース CI）は `pasta_check release` を通るので、仮置きどおり `release` が検査を関門にすると、hello-pasta の辞書が誤りなしで通ることが前提になる。
+  - hello-pasta の配布物（`crates/pasta_sample_ghost/release.ps1`・リリース CI）は `pasta_check release` を通るので、`release` が検査を関門にすると、hello-pasta の辞書が誤りなしで通ることが前提になる。
+  - 今のウェーブの約束（`.kiro/steering/roadmap.md`）により、`pasta_lua` の `loader/config/`・`pasta/act.lua`・`actor.lua`・`word.lua` は触らない。`Cargo.lock`・ルートの `Cargo.toml`・`release.yml` の `pasta_check` の公開の段は、この spec だけが触る。
 
 ## Requirements
 
@@ -87,7 +88,7 @@
 8. If `pasta_patterns` に `..` を含むパターン、または `.pasta` で終わらないパターンがある, the pasta_check shall `pasta.dll` が無視・警告するのと同じく、注意として報告する。
 9. The pasta_check shall 検査の結果に、検査した辞書ファイルの数を示す。
 
-> 仮置き: 辞書は `pasta_patterns` に従って集め、既定の場所だけを見る方式にはしない（OQ-7）。`pasta.toml` の項目のうち、読むのは `[loader]` の `pasta_patterns` と `[scene]` だけで、ほかのセクションの検査はこの spec の範囲に入れない。
+> 確定（OQ-7）: 辞書は `pasta_patterns` に従って集め、既定の場所だけを見る方式にはしない。既定の場所だけを見ると、`pasta_patterns` を変えたゴーストで検査と起動の結果が食い違い、Requirement 9.2 を守れないため。`pasta.toml` の項目のうち、読むのは `[loader]` の `pasta_patterns` と `[scene]` だけで、ほかのセクションの検査はこの spec の範囲に入れない。
 
 ### Requirement 3: 構文の検査
 
@@ -174,7 +175,7 @@
 4. The pasta_check shall `release` の中の検査を省くオプションを持たない。
 5. The pasta_check shall `release` の既存の段（配布フォルダの準備・コピー・上書きコピー・更新ファイル・nar）の中身と、`release` の既存のオプションの意味を変えない。
 
-> 仮置き: `release` は既定で検査を関門にし、省く手段は持たない（作成ツールは問題があれば止める）。段の表示（`[n/5]`）に検査の段を足すかどうか、段 1 で消した前回の nar が残らないことの扱いは設計で決める（OQ-3）。
+> 確定（OQ-3）: `release` は既定で検査を関門にし、省く手段は持たない。作成ツールは問題があれば止める（壊れた配布物を警告だけで通さない）という原則から決まる。段の表示（`[n/5]`）に検査の段を足すかどうか、段 1 で消した前回の nar が残らないことの扱いは設計で決める。
 
 ### Requirement 9: 配り方と規則の一致
 
@@ -210,10 +211,10 @@
 
 - **OQ-1 誤りと注意の線引き**: 仮置きは、`pasta.dll` が読み込みに失敗するもの（構文・`pasta.toml`・`init.pasta`）と、`pasta.dll` が検出せずに内容を失うもの（`.pasta` どうしのモジュール名の重なり）を誤り、決まった挙動で動くが意図とずれやすいもの（照合用の名前の重なり・組み込みの名前と同じシーン・`.pasta` と `.lua` の重なり・飛び先の無い参照）を注意にする。
 - **OQ-2 読むだけでどこまで飛び先を決められるか**: 仮置きは、辞書の中のシーンと組み込みの名前だけで探し、見つからなければ注意。Lua の中身は読まない。動的な飛び先は 1 件ずつは報告せず数だけを示す。
-- **OQ-3 `release` の関門**: 仮置きは、上書きコピーの後・更新ファイルの前に既定で検査し、誤りがあれば nar を作らない。省くオプションは持たない。
+- **OQ-3 `release` の関門**（原則で確定）: 上書きコピーの後・更新ファイルの前に既定で検査し、誤りがあれば nar を作らない。省くオプションは持たない。
 - **OQ-4 依存の重さ**: 仮置きは、`pasta_dsl`・`pasta_core`（と `toml`）だけにして LuaJIT を持ち込まない。トランスパイルで初めて分かる 3 つの誤りの扱いは未決。
 - **OQ-5 出力の形と文言**: 仮置きは、1 行 1 件の人が読む形だけ（機械向けの JSON は付けない）。文言の言語と終了コードの細分は未決。
 - **OQ-6 エディタ（LSP）との共有**: 仮置きは、この spec ではエディタに診断を足さず、共有も要件にしない。
-- **OQ-7 辞書の集め方**: 仮置きは、`pasta.toml` の `pasta_patterns` に従う。
+- **OQ-7 辞書の集め方**（Requirement 9.2 の帰結で確定）: `pasta.toml` の `pasta_patterns` に従う。
 - **OQ-8 マニュアルの章**: 仮置きは、検査コマンドの章を 1 つ足し、`release` の説明は README とスキルに残す。
 - **OQ-9 コマンドの名前と引数**: 仮置きは、`pasta_check check --target <path>`。
