@@ -176,3 +176,127 @@
 - `pasta-check-dic-validate`: 接頭辞だけの `＊さわり反応`・`＊つっつき反応` の検査を、後から足す。
 - `getting-started-screenshots`: 8・9 段目の絵と実機の確認は、この spec の後に行う。
 - `shell-element-click`: 「触られたときの反応の受け方を変えない」としている。この spec が受け方を足すので、その brief の Current State を読み替える。
+
+---
+
+# 設計フェーズの調査と決定（2026-10-16・`/kiro-spec-design -y`）
+
+## Summary
+
+- **Feature**: `touch-poke-shortcuts`
+- **Discovery Scope**: Extension（既存のイベント層と検索に足す）。light discovery。外部ライブラリは足さないので Web の調査はしていない。
+- **Key Findings**:
+  - 起動の順は `main` → `pasta.shiori.entry`（ここで既定ハンドラが登録される）→ `pasta.scene_dic`（辞書の Lua ブロック）。`scripts/main.lua` で先に `REG.OnMouseDoubleClick` を登録したゴーストは、既定ハンドラを無条件に代入すると上書きされる。マニュアルは「既定ハンドラを持たないイベントは、どちらに書いてもよい」と書いているので、`REG.X = REG.X or 既定` で登録する。
+  - シーンの検索の RadixMap のキーは「登録名から通し番号を外した名前」なので、同じ名前のシーンは 1 つのキーの下に並ぶ。完全一致は「キーが等しいものだけを候補にする」だけで作れ、抽選は既存のキャッシュ（`select_from_cache`）をそのまま使える。C-1 の追加は小さい。
+  - SSP の実ログで、トーク中の `OnMouseMove` に `talking,balloon(0=0)` が付くこと、当たり判定の外では Reference4 が空で届くことを確かめた（Research Needed 3・4 は解決）。
+
+## Research Log
+
+### ゴーストの Lua が走る時点（Research Needed 2・要件 8.2）
+
+- **Sources**: `crates/pasta_lua/src/runtime/factory.rs` 214〜225 行、`pasta_scripts/pasta/shiori/event/init.lua` 70〜73 行、`book/src/lua/shiori-events.md`「既定ハンドラと上書き」。
+- **Findings**:
+  - `require("main")` → `require("pasta.shiori.entry")`（`entry.lua` が `pasta.shiori.event` を require し、`init.lua` が `boot`・`choice_select`・`second_change` を require して `REG.X = function…` と代入）→ `require("pasta.scene_dic")`（辞書のモジュールが読まれ、モジュールの直下に置かれた Lua ブロックがこの時点で評価される）。
+  - マニュアルは、既定ハンドラのある 3 つについて「`main.lua` で上書きするときは、先に `require("pasta.shiori.event")` を呼ぶ」と回避を書き、「既定ハンドラを持たないイベントのハンドラは、どちらに書いてもよい」と書いている。`register.lua` のドキュメントも `REG.OnMouseDoubleClick = function(act)` を作例に挙げている。
+- **Implications**: `OnMouseDoubleClick`・`OnMouseMove` の既定は `REG.X = REG.X or 既定` で登録する。先に登録したゴースト（`main.lua`）では代入されず、後に登録したゴースト（辞書の Lua ブロック）では置き換わる。どちらでも `REG[req.id]` はゴーストのハンドラになり、既定は一切動かない（要件 8.3）。
+
+### シーンの検索の中身（Research Needed 1・要件 6.2）
+
+- **Sources**: `crates/pasta_core/src/registry/scene_table.rs`（`from_scene_registry`・`fn_name_to_search_key`・`collect_scene_candidates`・`select_from_cache`・`SceneCacheKey`）、`crates/pasta_lua/src/search/context.rs`（`search_scene`・束縛）、`pasta_scripts/pasta/scene.lua`、`pasta_scripts/pasta/act.lua`（`find_act_handler` の 5 段）。
+- **Findings**:
+  - RadixMap のキーは、グローバルなら「登録名から通し番号を外した名前」、ローカルなら `:親の登録名:名前`。同じ名前のシーンは 1 つのキーの `Vec<SceneId>` に入る。
+  - 抽選は `(module_name, search_key, filters)` をキーにしたキャッシュで、候補を並べ替えて使い切るまで順に使う。
+  - 同じ文字列で前方一致と完全一致を探すと候補が違うので、キャッシュのキーに「完全一致か」を足さないと混ざる。
+  - `search_scene` はグローバルのときだけ別名（`[scene.alias]`）の完全一致を先に置き換える。
+  - イベントのハンドラの `act` は今のシーンを持たないので、`co_exec` は L3（`act` のメソッド）・L4（`GLOBAL`）・L5（グローバルの前方一致）を順に見る。
+- **Implications**: C-1 を採る。`SceneTable::resolve_scene_id_exact`（候補集めだけ違い、絞り込みとキャッシュは共通。キャッシュのキーに `exact` を足す）、`SearchContext::search_scene_exact` と束縛、`SCENE.co_exec_exact`（グローバルだけ・シーンだけ）。前方一致の関数は変えない。`novel-talk-flow` は同じ部品（ローカルの範囲も使える）を使える。
+- `@pasta_search` は公開モジュールなので、`book/src/lua/modules/pasta-search.md`（生成でスキル references に入る）に新しいメソッドを書く。`SCENE.co_exec_exact` は `book/src/internals/internal-modules.md` に書く。
+
+### Status の出方と空の部位（Research Needed 3・4）
+
+- **Sources**: `crates/pasta_shiori/doc/shiori-sample.log`。
+- **Findings**: `OnMouseMove` 108 件の Status は `balloon(0=0)` 36・`talking,balloon(0=0)` 30・`choosing,balloon(0=2,1=0)` 16・`talking,choosing,…` 24。Reference4 は空が 41 件（ほかは `Face`・`Bust`・`Image` など）。Status ヘッダーは ID の前に来る。
+- **Implications**: トーク中の `OnMouseMove` に `talking` が付くので、撫での反応の再生中は抑止され、2 回目は再生の後になる（要件 5.2 の見込みが成り立つ）。当たり判定の外では空の Reference4 が届くので、要件 2.5 の数え直しはそのイベントで起きる。
+
+### 本文の無いシーン（Research Needed 6・要件 7.1）
+
+- **Sources**: `crates/pasta_dsl/src/parser/grammar.pest` 259〜263 行、`crates/pasta_lua/src/code_gen/scope_gen.rs`。
+- **Findings**: `global_scene_scope` は `local_start_scene_scope` を必ず持ち、これは 0 行を許す。名前の無い開始シーンは `__start__` として生成される。本文が無くても `__start__` が生成される見込み。`act:build()` はトークンが 0 件なら nil を返し、`RES.ok(nil)` は 204。
+- **Implications**: `＊つっつき反応閉じる` を本文なしで書けば、その部位では反応しない。統合テストで確かめる（設計のテスト計画に入れた）。
+
+### 部位の名前の整え方（Research Needed 7・要件 6.1）
+
+- **Sources**: `SceneRegistry::sanitize_name`（`c.is_alphanumeric() || c == '_'` 以外を `_` にする）、`split_registered_name`。
+- **Findings**: 日本語の文字は `is_alphanumeric` に入るので変わらない。`・`・空白・`-` などの記号は `_` になる。辞書の側の登録も検索の側も同じ関数で整えるので、照合はずれない。`胸・右` と `胸_右` は同じ名前とみなされる（頭が同じ別の名前を拾うことは無い）。
+- **Implications**: 部位の名前は加工せずに候補へ入れ、整えは検索に任せる。特別な処理は足さない。
+
+### 最後に話したアクター（Research Needed 5・要件 4.3）
+
+- **Sources**: `pasta_scripts/pasta/shiori/appearance.lua` 551〜565 行、`sakura_builder.lua` 69〜81 行、`store.lua` 108〜121 行、`crates/pasta_lua/src/runtime/module_registry.rs` 93 行（`actor` の各表に `name` を入れる）。
+- **Findings**: `owners[spot]` は出力を組み立てたとき（`\p[spot]` を出すとき）に、実行中のスポットで更新される。`％` 行でスポットを入れ替えると、設定の `spot` と違うスポットのアクターが入ることがある。
+- **Implications**: 共有のスポットでは `owners[番号]` を見るが、それが「設定の `spot` がその番号のアクター」の中にいるときだけ採る。組み立ての時点（再生の前）で更新されることは、要件 4.3 の「最後に話した」と読んで差し支えない。
+
+### 時刻
+
+- **Sources**: `crates/pasta_shiori/src/lua_request.rs` 11〜72 行。
+- **Findings**: `req.date` は `OffsetDateTime::now_local()` から作り、`unix` と `ns` を持つ。`X-Pasta-Time`（RFC3339・小数秒可）で上書きできる。LuaJIT の数は倍精度で、`unix + ns / 1e9` はマイクロ秒程度の分解能を持つ。
+- **Implications**: 判定の時刻は `unix + ns / 1e9`。時計が戻ったときは数え直す。`req.date` の無いリクエスト（Lua で組み立てたテスト用のもの。`tutorial_stages_test.rs` の `shiori_request` もそう）では判定しない。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| C-1 Rust に完全一致 | `resolve_scene_id_exact`＋束縛＋`SCENE.co_exec_exact` | 抽選の決まりが今と同じ（要件 1.2・3.2）。`novel-talk-flow` と部品を共有できる | `pasta_core`・`pasta_lua/src/search`・マニュアル（`@pasta_search`）まで触る | **採用** |
+| C-2 Lua で走査 | `STORE.scenes` を走査して同名を集め Lua で抽選 | Rust を触らない | 抽選が今と変わる（要件 1.2・3.2 を満たさない）。作り直すなら同じものを Lua に持つことになる | 不採用 |
+| C-3 引き直し | `SCENE.search` の結果を見て外れを捨てて引き直す | 小さい | 外れでキャッシュを消費する。何度も引く | 不採用 |
+| 登録 A（or） | `REG.X = REG.X or 既定` | 1 行。先でも後でもゴーストが勝つ | 既存の 3 つと登録のしかたが分かれる | **採用** |
+| 登録 B（既定表） | `EVENT.fire` を `REG[id] or DEFAULTS[id] or no_entry` に | 順に一切依存しない | `init.lua` の振り分けを変える（`runtime-error-balloon` と衝突・境界の「require 1 行」を越える） | 不採用 |
+
+## Design Decisions
+
+### Decision: 1〜8 段は完全一致・グローバルシーンだけ
+
+- **Context**: 要件 6.2（その名前と完全に同じ名前のシーンだけを候補にする）、要件 1.2・3.2（抽選は今と同じ）。
+- **Alternatives Considered**: C-1・C-2・C-3（上の表）。1〜8 段で `co_exec` と同じく `GLOBAL` の関数や `act` のメソッドも見る案。
+- **Selected Approach**: C-1。`SCENE.co_exec_exact(name)` はグローバルシーンだけを見る。9 段目だけ今の `co_exec`。
+- **Rationale**: 抽選の決まりを保てるのは C-1 だけ。`GLOBAL` の関数は「シーン」ではなく、要件 6.2 の文面に合わせた。
+- **Trade-offs**: Rust とマニュアル（`@pasta_search`・内部モジュール）の変更が増える（3〜4 タスク）。
+- **Follow-up**: 前方一致と完全一致のキャッシュが混ざらないことを `pasta_core` のテストで固定する。
+
+### Decision: 撫での判定は時刻を引数に取る状態機械（emo2 の 3 状態を引き継ぐ）
+
+- **Context**: 要件 2・5。emo2 のはまりどころ 2〜5。
+- **Selected Approach**: 状態 1 つ（所・始め・前回・発火済み）。抑止・空の部位・時刻なしで Off。所の変化・2 秒より長い途切れ・時計の戻りで数え直し。2 秒以上で 1 回だけ true。
+- **Rationale**: 時刻を引数にすると、テストで時刻を自由に進められる。抑止を Off に戻すと、emo-gs の「抑止の間は撫でていない」と同じになり、2 回目が反応の再生の後に出る。
+- **Trade-offs**: emo-gs は抑止の最後のイベントから数え始めていた。こちらは解けた後の最初のイベントから数える。差はイベントの間隔 1 つ分。
+
+### Decision: 候補の名前・アクター名・判定・ハンドラを 1 ファイルにまとめる
+
+- **Context**: Option B の「1 つにまとめるか分けるか」。
+- **Selected Approach**: `event/mouse.lua` 1 ファイル。テスト用に `M.candidates`・`M.resolve_actor`・`M.check_stroke`・`M._reset`・`M._get_state` を出す。
+- **Rationale**: どれも 2 つのハンドラだけが使い、別々に差し替える理由が無い（Simplification）。時報の `virtual_dispatcher` も判定と探し方を 1 ファイルに持つ。
+
+### Decision: hello-pasta の 8・9 段目の名前の割り当て
+
+- **Selected Approach**: `＊つっつき反応女の子Head`・`＊つっつき反応男の子その他`・`＊つっつき反応Face`・`＊つっつき反応その他`・`＊さわり反応女の子Head`・`＊さわり反応その他`。9 段目の選択肢は `＊つっつき反応その他`。
+- **Rationale**: 4 種の段が 1 つずつあり、どの段も実際の操作で出会える（男の子の顔は 3 段目で止まるので、5 段目の `Face` は女の子の顔で出会う。この「上の段が先」の例をそのまま入門で説明できる）。名前どうしは前方一致で重ならない。
+
+## Synthesis
+
+- **Generalization**: 「完全一致で、同じ名前の中から今と同じ決まりで選ぶ」は、`novel-talk-flow` の完全一致の場面選びと同じ問題である。インターフェースは範囲（グローバル・ローカル）を取れる形にし（`resolve_scene_id_exact(module_name, …)`・`search_scene_exact(name, global_scene_name?)`）、実装は既存の範囲の決まりを使うだけにした。切り替えの仕組みは作らない。
+- **Build vs. Adopt**: 抽選・属性の絞り込み・名前の整え・別名の置き換えは既存のものを使う。抑止は `virtual_dispatcher.is_blocked` を使い、語の一覧を 2 つ持たない。新しく作るのは、候補の集め方（キーの等しさ）と撫での判定だけ。
+- **Simplification**: 戦略オブジェクト・設定・シーン実行の差し替え口（時報の `_set_scene_executor` に当たるもの）は作らない。ハンドラの探し方は実ローダーの統合テストで確かめ、純粋な部分（候補・判定・アクター名）だけを単体テストする。
+
+## Risks & Mitigations
+
+- 前方一致と完全一致のキャッシュが混ざる — キャッシュのキーに `exact` を足し、`pasta_core` のテストで固定する。
+- 実機の届き方（頻度・空の部位・Status）が想定と違う — SSP の実ログで確かめた範囲で設計した。実機の手触りは `getting-started-screenshots` で確かめる。areka は確かめていない。
+- 本文の無いシーンが登録されない — 文法上は登録される見込み。統合テストで確かめ、違えばマニュアルの書き方を変える。
+- `context.rs`（752 行）が 600 行の目安を超えたまま大きくなる — 足すのは 40 行程度。目安のために責務をまたぐ分割はしない（steering の方針）。
+- 手書きのスキルが古い書き方のまま残る — 設計ディスカッションで扱う（設計書の未決の論点 4）。
+
+## 参照したスキル・規約
+
+- `kiro-spec-design` の規則（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）と、`.kiro/settings/templates/specs/design.md`・`research.md`。
+- steering の `structure.md`（レイヤー分離・テストの置き場所・ファイルの大きさの目安）と `tech.md`（LuaJIT 2.1・依存の一覧）。
+- `pasta-lua-coding` スキルの §6（REG・既定ハンドラ）と §7（Lua のテストは `*_test.lua` を作り `init.lua` の `specs` に登録する）。
