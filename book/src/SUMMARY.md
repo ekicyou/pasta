@@ -64,6 +64,7 @@
 
 - [起動シーケンスとモジュール解決](reference/startup.md)
 - [pasta.toml リファレンス](reference/pasta-toml.md)
+- [実行時の失敗の出力](reference/runtime-failures.md)
 - [外部リンク集](reference/external-links.md)
 
 # 内部設計（コントリビュータ向け）

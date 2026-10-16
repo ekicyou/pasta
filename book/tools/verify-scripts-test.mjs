@@ -75,10 +75,10 @@ log('\n== verify-content.mjs（コンテンツ整合・網羅レビュー検証�
   for (const id of ['C-steps', 'C-order', 'C-tutorial-check']) {
     check(`${id} が PASS`, out.includes(`PASS  [${id}]`));
   }
-  // 台詞部品（T 系）が空回りしていない: 全 60 章（debug/ を含む）の記法・導入・締めと、素材・規約が走る。
+  // 台詞部品（T 系）が空回りしていない: 全 61 章（debug/ を含む）の記法・導入・締めと、素材・規約が走る。
   // 件数は PASS・FAIL を問わず数える（合否は上の「FAIL 0 件」が見る）。
   const tcount = (id) => count(new RegExp(`(?:PASS|FAIL) {2}\\[${id}[:\\]]`, 'g'));
-  for (const [id, n] of [['T-syntax', 60], ['T-intro', 60], ['T-outro', 60], ['T-assets', 1], ['T-authoring', 1]]) {
+  for (const [id, n] of [['T-syntax', 61], ['T-intro', 61], ['T-outro', 61], ['T-assets', 1], ['T-authoring', 1]]) {
     check(`${id} を ${n} 件実行`, tcount(id) === n, `${id}=${tcount(id)}`);
   }
   check('台詞部品の検査の走査対象にデバッグパートを含む', /\[T-syntax:debug\//.test(out));

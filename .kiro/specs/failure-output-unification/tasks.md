@@ -101,7 +101,7 @@
   - _Requirements: 10.1, 10.4, 10.5_
 
 - [ ] 6. マニュアルとスキル
-- [ ] 6.1 「実行時の失敗の出力」の 1 ページを新しく書く
+- [x] 6.1 「実行時の失敗の出力」の 1 ページを新しく書く
   - 種類ごとの表記とログの警告の対応、出る位置、重ねない規則、表記だけの出力、切り替えの設定、Lua からの報告と実行中の act の制限を、既存の生成対象の章と同じ構造で書く。回避の書き方は載せない
   - 完了: 目次に新しいページが載り、mdBook のビルドが通る
   - _Requirements: 9.1, 9.5_
@@ -135,3 +135,4 @@
 - 3.1: `report_text` は削除済み。変数パス付きの `call_key`（`＞＄行き先`）は暫定で `call_key` 自身が表記を積み、警告は `WORD.dynamic_key` が出す。3.4 で `dynamic_key` に act を渡したら `ACT_IMPL.call_key` の var_path 分岐の `FAILURE.report` を外す（外さないと表記が 2 つ）。`act:call(nil)` は 2.10 により表記を 1 つ積む
 - 3.3: 関数の参照は成功時に `fn_succeeded`（act.lua・actor.lua）で呼んだ関数が戻った後に印を偽にする。`expr_fn_var` は `dynamic_key` が nil のとき暫定で印を偽にしている。3.4 で `dynamic_key` に act を渡すのと同時に真へ変える（片方だけだと表記が消えるか 2 つになる）
 - 4.1: `act:raw_script("")` だけを積んだシーンも build が nil を返し 204 になる（design どおり。リリースノートに書く候補）
+- 6.1: 章を足すと book のセルフテスト（verify-scripts-test.mjs の T-syntax/T-intro/T-outro の章数、gen-skill-refs-test.mjs の K-10）の決め打ちの章数も直す。runtime-failures.md の `WORD.dynamic_key` へのアンカーは 6.3 で script-api.md の見出しを変えたら直す
