@@ -1,6 +1,6 @@
 //! 実行時の失敗の出力（failure-output-unification）の DSL → 実行テスト
 //!
-//! Requirements: 2.11, 3.5, 6.1, 10.2, 10.5
+//! Requirements: 2.11, 2.12, 3.5, 4.1, 4.3, 4.4, 5.1, 5.2, 5.5, 6.1, 10.2, 10.5
 //!
 //! 失敗の対応表（design.md「報告箇所」）#1〜#13 と `act:failure` の各箇所を、`.pasta` から
 //! トランスパイルして実ランタイム（pasta_scripts の act.lua）で実行し、積んだトークン・
@@ -588,6 +588,74 @@ fn site_02_act_word_from_lua_block() {
         ],
         warns: &["act:word - handler not found: key='無い単語', mode='word', via=act"],
         vars: &[],
+    });
+}
+
+// ========================================================================
+// 重ねない規則（5.1・5.2・5.5）
+//
+// 表の 6 行のうち、1 行目（単語・関数・グローバル関数 → talk）は #3・#5・#6、2 行目（動的参照
+// → 検索）と 3 行目（動的コールの変数 → Call）は #7、4 行目（動的コールの関数 → call_key）は
+// #13、6 行目（未登録アクター → 立ち位置の警告）は unregistered_actor_mark_in_sakura_output が
+// 確かめる。ここでは 5 行目と、回ごとに報告すること（5.5）を確かめる。
+// ========================================================================
+
+/// 5 行目: 被演算子の関数が見つからないとき、関数だけが報告し `ACT.num`・`ACT.str` は黙る
+#[test]
+fn no_overlap_operand_fn_not_found() {
+    run_case(&Case {
+        name: "no-overlap: operand fn",
+        lua: false,
+        body: "　＄a＝＠無い関数（）＋１\n　＄b＝＠無い関数（）＆「x」\n　＄c＝＠＊無い関数（）＊２\n",
+        tokens: &[
+            "raw_script|-|【関数が見つからない：＠無い関数（）】",
+            "raw_script|-|【関数が見つからない：＠無い関数（）】",
+            "raw_script|-|【関数が見つからない：＠＊無い関数（）】",
+        ],
+        warns: &[
+            "act:expr_fn - handler not found: key='無い関数', mode='expr', via=act",
+            "act:expr_fn - handler not found: key='無い関数', mode='expr', via=act",
+            "act:global_fn - function not found: key='無い関数'",
+        ],
+        vars: &["a=1", "b='x'", "c=0"],
+    });
+}
+
+/// 5.5: 同じ書き間違いを 2 回通ると 2 回出る（同じシーンを 2 回呼ぶ）
+#[test]
+fn reported_each_time_passed() {
+    run_case(&Case {
+        name: "each time",
+        lua: false,
+        body: "　＞サブ\n　＞サブ\n\n＊サブ\n　さくら：＠挨拶\n",
+        tokens: &[
+            "raw_script|-|【単語が見つからない：＠挨拶】",
+            "raw_script|-|【単語が見つからない：＠挨拶】",
+        ],
+        warns: &[
+            "proxy:word - handler not found: key='挨拶', mode='word', via=proxy(さくら)",
+            "proxy:word - handler not found: key='挨拶', mode='word', via=proxy(さくら)",
+        ],
+        vars: &[],
+    });
+}
+
+/// 値なしを代入した変数を後で展開すると、代入の行と展開の行で別々に報告する（design の注記）
+#[test]
+fn nil_assigned_then_expanded_reported_separately() {
+    run_case(&Case {
+        name: "assigned nil then expanded",
+        lua: false,
+        body: "　＄x＝＠挨拶\n　さくら：＄x\n",
+        tokens: &[
+            "raw_script|-|【単語が見つからない：＠挨拶】",
+            "raw_script|-|【値の無い変数：＄x】",
+        ],
+        warns: &[
+            "act:word - handler not found: key='挨拶', mode='word', via=act",
+            "act:talk - undefined variable: 'var.x'",
+        ],
+        vars: &["x=nil"],
     });
 }
 
