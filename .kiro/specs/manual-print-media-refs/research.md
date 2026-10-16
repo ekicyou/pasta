@@ -190,3 +190,7 @@
 ## 使ったスキル・指針（設計のフェーズ）
 - `kiro-spec-design`（rules: design-principles・design-discovery-light・design-synthesis・design-review-gate）
 - `ponytail`（作り込みを避ける。依存を足さない・ファイルを増やさない）
+
+## 設計の決定（2026-10-16・設計ディスカッション）
+
+- 章の並びは、出力の `toc.html` の章のリンクから取る（推奨案で確定）。入力が出力のフォルダだけで済み、`print.html` と同じビルドの並びになるため

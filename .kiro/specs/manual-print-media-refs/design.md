@@ -383,14 +383,6 @@ export function fixPrintMediaRefs(outDir: string, options?: { write?: boolean })
 - **段の位置【確定】**: 台詞の変換の直後で、索引の再生成の前（brief と `AUTHORING.md` の一覧の並びに合わせる）
 - **ツールの名前と置き場所【確定】**: `book/tools/print-media-refs.mjs` に置く。モジュールは 1 つなので、`link-check.mjs`・`tutorial-check.mjs` と同じく直下にする
 - **`verify-static.mjs` の自己テストの壊し方【確定】**: 架空の `<video src poster>` を差し込む。今の不具合そのもの（書き換える前の出力で失敗すること）は、Integration Tests の 4 で確かめる
-
-## 未決事項（設計ディスカッションで確かめる）
-
-1. **章の並びの出どころ**: 次の 3 案から選ぶ。
-   - (a) 出力の `toc.html` の章のリンク【推奨】
-   - (b) `book/src/SUMMARY.md`（`verify-static.mjs` の `summaryChapters` と同じ読み方）
-   - (c) 章のページの前後のリンクをたどる
-
-   推奨の理由: 入力が出力のフォルダだけで済み（`talk-html` と同じ引数）、mdBook が `print.html` に入れた章とそのまま同じ並びになる。(b) では、ツールが `book/src` の場所を知る必要があり、下書きの章の扱いも自分で真似る必要がある
+- **章の並びの出どころ【確定】**: 出力の `toc.html` の章のリンクから取る。こうすると入力は出力のフォルダだけで済み、`talk-html` と同じ引数になる。並びも、mdBook が `print.html` に入れた章とそのまま同じになる。`book/src/SUMMARY.md` から取る案は採らない。ツールがソースの場所を知る必要があり、下書きの章の扱いも自分で真似ることになるためである。章のページの前後のリンクをたどる案も採らない。読むファイルが増えるのに、確かさは変わらないためである
 
 **仮定（明示）**: mdBook v0.5.3 の `print.html` の形は、v0.5.4 と同じとした。根拠は 2 つある。v0.5.3 の `print.rs` を読むと、改ページの印と書き換えの範囲が同じであること。CI の出力の検査が、`toc.html` の章のリンクで合格していること。CI の初回の実行で本ツールが `fixed 1` を出せば、これが確かめられる。形が違えば本ツールが失敗して止まる（黙って壊れない）
