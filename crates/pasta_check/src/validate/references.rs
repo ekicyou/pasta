@@ -32,11 +32,13 @@ pub(crate) fn check(
                 LocalSceneItem::CallScene(call) => {
                     let key = match &call.target {
                         CallTarget::Static(key) => key.as_str(),
-                        CallTarget::Dynamic(Expr::String(key)) => key.as_str(),
-                        CallTarget::Dynamic(_) => {
-                            dynamic += 1;
-                            continue;
-                        }
+                        CallTarget::Dynamic(expr) => match string_literal(expr) {
+                            Some(key) => key,
+                            None => {
+                                dynamic += 1;
+                                continue;
+                            }
+                        },
                     };
                     // act.lua find_act_handler の L2（ローカル）・L3/L4（組み込み）・L5（グローバル）。
                     // L1（current_scene の完全一致）は Lua の表なので見ない
@@ -92,6 +94,15 @@ fn found_global(table: &SceneTable, aliases: &SceneAliasTable, key: &str) -> boo
     table
         .collect_scene_candidates("", &SceneRegistry::sanitize_name(key))
         .is_ok()
+}
+
+/// 文字列リテラルだけの式（括弧で囲んだものも）。実行時は書いた名前で `act:call_key` になる（6.2）
+fn string_literal(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::String(key) => Some(key),
+        Expr::Paren(inner) => string_literal(inner),
+        _ => None,
+    }
 }
 
 /// `On`・`script:` で始まるジャンプ先は SSP が別の意味で使うので見ない（6.5。sakura_builder.lua と同じ判定）

@@ -210,3 +210,6 @@
 - 7.1: vscodeModules のテストは事前の WASM のビルド（`pwsh -NoProfile -File scripts/build-wasm.ps1 -Release`）が要る（既存の activate のテストも同じ）。
 - 7.2: モックの `createDiagnosticCollection` は作った集合を記録しない。`outputLines`・`createdFileSystemWatchers` を空に戻す関数も無い（7.3 で集合を外から渡すか記録を足す）。
 - 7.3: `GhostValidator(bridge, outputChannel)`、公開は `register()`（今は開く・閉じるだけ）・`validate(master)`・`dispose()`。7.4 で保存・見張り・300ms の束ね（design の `requestValidation`）を足し、extension.ts から出力チャンネルを渡す。列は核のコードポイント単位を -1 しただけ（design どおり）。
+- 完了時にその場で解決: エディタの診断の列をコードポイントから UTF-16 に換算（同じ行の手前の絵文字などでずれない）。
+- 完了時にその場で解決: `＞（「X」）`（括弧で囲んだ文字列リテラル）を静的な Call として探す（実行時の call_key と同じ）。
+- 完了時に残した端のケース（裁定が要るので直していない）: (1) UTF-8 で読めない・読めない辞書があっても飛び先の検査は省かない（要件 6.8 は構文エラーだけ）。(2) 名前が `.pasta` で終わるフォルダは報告しない（核の入力はファイルだけ）。(3) VSCode 拡張は小文字の `ghost/master` だけを探す（CLI は Windows で大文字・小文字を区別しない）。

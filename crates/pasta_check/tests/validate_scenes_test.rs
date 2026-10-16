@@ -348,6 +348,23 @@ fn string_literal_dynamic_call_is_checked_as_static() {
     );
 }
 
+/// 括弧で囲んだ文字列リテラルも実行時は `act:call_key("…")` になるので静的に探し、動的に数えない（6.2）
+#[test]
+fn parenthesized_string_literal_call_is_checked_as_static() {
+    let text = "＊会話\n  ＞（「無い」）\n  ＞（（「会話」））\n";
+    let report = report_of(TOML, &[("dic/talk.pasta", text)]);
+    assert_eq!(
+        reference_findings(TOML, text),
+        vec![(
+            2,
+            FindingKind::CallTargetMissing,
+            "Call の飛び先「無い」が辞書のシーンにありません（Lua で定義していれば問題ありません）"
+                .into()
+        )]
+    );
+    assert_eq!(report.stats.unchecked_dynamic_calls, 0);
+}
+
 #[test]
 fn choice_finds_local_then_global_and_skips_on() {
     // `＠？script:…` は DSL の id に `:` が書けず構文エラーになるので、references.rs の単体テストで確かめる
