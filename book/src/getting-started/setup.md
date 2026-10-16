@@ -186,6 +186,7 @@ spot = 1
 - 吹き出し（バルーン）は、hello-pasta に入っていない。SSP で選ばれているバルーンが使われる
 - このガイドは、シェルを作り替えない。自分の絵にしたくなったら、同じ番号の画像を差し替えるところから始められる
 - シェルのファイルの書き方は、UKADOC の [シェルの descript.txt](https://ssp.shillest.net/ukadoc/manual/descript_shell.html) と [surfaces.txt](https://ssp.shillest.net/ukadoc/manual/descript_shell_surfaces.html) にある
+- 絵の差し替え・表情の追加・当たり判定・吹き出しの位置は、[シェルを自分の絵にする](../reference/shell.md) にまとめてある
 
 > 【アンソニー】お嬢様、絵を描けない者は、ここで行き止まりでございましょうか。
 

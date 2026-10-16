@@ -87,11 +87,11 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 完了 | choice-line-layout | Opus | 12（実績） | 2026-10-11 に完了 |
 | 完了 | release-notes-highlights | Opus | 17（実績） | 2026-10-15 に完了（v0.3.8 のページも見どころの本文と 4 つの添付に直した） |
 | 完了 | manual-print-media-refs | Opus | 7（実績） | 2026-10-16 に完了（公開サイトの `print.html` は開くと固まると分かり、確かめは `manual-print-page-removal` で対象が無くなる） |
+| 完了 | manual-shell-guide | Opus | 8（実績） | 2026-10-16 に完了（リファレンスに章「シェルを自分の絵にする」を足し、61 章になった。章を足す後の spec は 3 つの数を 62 に合わせる） |
 | 並走 | manual-print-page-removal | Opus | 4〜6 | 今すぐ（2026-10-16 起票。公開サイトの `print.html` を開くとブラウザが固まる） |
 | 1（高優先度） | touch-poke-shortcuts | Opus | 10〜13 | 今すぐ（2026-10-11 開発者の依頼で足し、高優先度に置いた。残りの spec より先に始める） |
 | 2 | failure-output-unification | Opus（2026-10-16 に見直し） | 15〜19 | 今すぐ |
 | 3 | pasta-check-dic-validate | Opus（2026-10-16 に見直し） | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
-| 4 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
 | 5 | getting-started-screenshots | Opus | 4〜6 | `touch-poke-shortcuts` の後（最後に撮る。`hello-pasta-shell-art` と `choice-line-layout` は完了した） |
 | 完了 | shiori-test-support-runtime | Opus | 7（実績） | 2026-10-16 に完了（`runtime-error-balloon` の前段） |
 | 7 | runtime-error-balloon | Opus（2026-10-16 に見直し） | 8〜10 | `failure-output-unification` の後（`shiori-test-support-runtime` は 2026-10-16 に完了。2026-10-16 開発者の決定で 0.4.0 に入れた。やると決まった） |
@@ -356,7 +356,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 - [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: touch-poke-shortcuts（8・9 段目の辞書と章が変わる）
 - [ ] baseware-virtual-time -- SSP の「現在時刻の仮想的変更」を pasta の時報に効かせ、正時を待たずに確かめられるようにする。SSP が仮想の時刻を SHIORI に伝えているかの調査から。外から起こした `OnTalk` でチェイントークが続かない件も扱う（2026-10-10 同上）。Dependencies: none
 - [ ] boot-surface-without-dic -- 辞書や `＊OnBoot` が無いゴーストは起動しても立ち絵が出ない。既定で立ち絵を出すかどうかを、やるかどうかから決める（2026-10-10 同上）。2026-10-16 開発者の決定で優先度を下げ、0.4.0 から外した（何も書かなければ何も表示しないのが既定の動き）。Dependencies: none
-- [ ] manual-shell-guide -- マニュアルに、シェル（見た目）の説明を足す。見本のシェルを自分の絵に差し替える・表情を足す・当たり判定を足す・バルーンの扱いを、辞書と噛み合う所を中心に書く。0.4.0 に入れた（2026-10-10 開発者の指示で起票）。Dependencies: none（題材の新しいシェルと当たり判定は、`hello-pasta-shell-art` で入った）
+- [x] manual-shell-guide -- マニュアルに、シェル（見た目）の説明を足す。見本のシェルを自分の絵に差し替える・表情を足す・当たり判定を足す・バルーンの扱いを、辞書と噛み合う所を中心に書く。0.4.0 に入れた（2026-10-10 開発者の指示で起票）。Dependencies: none（題材の新しいシェルと当たり判定は、`hello-pasta-shell-art` で入った）
 - [ ] novel-areka-contract -- pasta と areka の取り決め（台本に載せる語彙・目印・イベント・設定の値）を 1 つの文書にし、areka への依頼書として出す。コードは書かない。areka に依頼を出すための spec（2026-10-10 の discovery で起票。以下 9 本は同じ）。Dependencies: none
 - [ ] cue-command-runtime -- キューコマンド行 `！命令＠対象（引数）` を、実行時に `\![…]` として台本へ流す。日本語の名前の別名表、引数の穴（数字で始まる引数など）の手当て。Dependencies: failure-output-unification（`act.lua` を触る順番）
 - [ ] scene-stage-attributes -- 柱に書いた `＆属性` とアクター指定行を、場面に入ったときに台本へ流す。受け継ぎと、Call から戻ったときの打ち直し。Dependencies: scene-attribute-store, cue-command-runtime
