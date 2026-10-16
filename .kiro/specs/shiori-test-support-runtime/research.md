@@ -155,3 +155,28 @@
 3. **回避している 4 つの `pasta.toml` の、`lua_search_paths` 以外の `[loader]` の行（`transpiled_output_dir`・`pasta_patterns`）をどうするか**。推す答え: 残す。`transpiled_output_dir` は既定と同じ値、`pasta_patterns` は結果が同じで、どちらも写しを避けるための設定ではない。外すと「回避の取り外し」を超えて、テストの前提を変えることになる。
 4. **重複したコピー関数（`tests/` に 15 個）をまとめるか（案 B）**。推す答え: まとめない。ふるまいの不具合ではなく、この spec の目的（本物だけで動かす）にも要らない。直下へのコピーを消すと、それぞれのコピー関数はフィクスチャのコピーにだけ使われ、役目ははっきりする。
 5. **写しがまた置かれないための見張り（テストや検査）を足すか**。推す答え: 足さない。写しを消して、共通部品の説明に「本物は自己展開されたものを使う。フィクスチャは差し替えるファイルだけを持つ」と書けば足りる。
+
+## 9. 設計の記録（2026-10-16、kiro-spec-design）
+
+- 調べ方: 既存のしくみを広げる変更として、軽い調べ（design-discovery-light）にした。外の依存は増えないので、外部の調べは要らない。使ったスキル・決まり: `kiro-spec-design`（design-principles・design-discovery-light・design-synthesis・design-review-gate）。
+- 実験の扱い: 設計の段で、設計どおりの変更を手元で当てて clippy とテストを走らせようとしたが、操作が許可されず、ファイルは書き換えていない。根拠は 3 節の実験（同じ基点）。使われなくなる関数・`use` は読んで洗った。
+
+### 9.1 まとめ方（design-synthesis）
+
+- 一般化: 「標準ランタイムをテストが自分で置く」手順が 2 種類（`scripts/` への写し・直下の `pasta_scripts/` への本物のコピー）あるが、根は同じで、どちらも自己展開に任せれば要らない。新しい部品は作らず、両方を消す。
+- 作るか使うか: 自己展開（`sync_pasta_scripts`）という既にある仕組みを使う。写しを本物から作る案（案 C）は取らない（5 節）。
+- 削れるもの: 案 B（準備の部品をまとめる）・見張りのテストは足さない（8 節の確定 4・5）。
+
+### 9.2 7 節の持ち越しの決め
+
+- (a) `test_path_helpers_test.rs`: 50〜53 行（`scriptlibs` の確かめ）だけを消す。`scripts` の確かめ（46〜49 行）は、フィクスチャ `shiori_lifecycle` 自身の `scripts/pasta/shiori/entry.lua` で成り立つので残す。`pasta.toml` が置かれて読めることの確かめ（38〜45 行）と合わせて、「深いパス・ANSI で表せないパスの下に一時ゴーストを置けて読める」という意図を確かめられる。
+- (b) `tests/common/mod.rs`: `copy_fixture_to_temp` の説明（36〜48 行）を、「コピーするのはフィクスチャ自身のファイルだけ。標準ランタイムは `pasta.dll` が `profile/pasta/pasta_scripts/` へ自己展開した本物を使う。フィクスチャには差し替えるファイルだけ置く（例: `scripts/pasta/shiori/entry.lua`）。`scripts/` は標準ランタイムより先に読まれる。`lua_search_paths` を書き換える必要はない」という文にする（文面は design.md）。62〜67 行の写しのコピーとコメント（`main.lua` の例を含む）と、154〜172 行の `copy_support_dirs` を消す。
+- (c) `copy_dir_recursive` をファイルごとに洗った結果: 直下へのコピーを消すと呼び出しが無くなるのは `tests/actor_kick_test.rs` だけ（フィクスチャを書き出すだけで、コピーしない）。関数（31〜50 行）、`use` の `Path`（13 行）、`manifest_dir`（59 行）を消す。ほかの 9 ファイルと `src/shiori_request_tests.rs`、`tests/common/mod.rs` は、フィクスチャ（またはサンプルゴースト）のコピーに使い続けるので残す。`src/shiori_request_tests.rs` の `crate_root` も `scriptlibs` のコピーに使い続けるので残す。
+- (d) 申し送り: `.kiro/specs/scene-attribute-store/brief.md` 176 行を、完了のときに直す（design.md の申し送り）。
+
+### 9.3 新しく分かったこと
+
+- `src/shiori_request_tests.rs` は、`crates/pasta_lua/scriptlibs/`（本物の `lua_test`）も一時ゴーストの `scriptlibs/` へコピーしている。写しではなく本物で、`scriptlibs` は検索パスに入っているので、効いていない手順ではない。範囲外として残す。
+- 同じファイルの `copy_shiori_lifecycle_fixture` は、フィクスチャを丸ごとコピーした（464 行）後に、フィクスチャの `scripts/` をもう一度コピーしている（486〜491 行）。二度目は要らないが、動きに影響せず要件の範囲外なので残し、コメントの読み込み先だけ直す。
+- 説明の直しが要るのは、`async_callback_support.rs`（18〜20・42〜43 行）、`actor_thread_vm_test.rs`（39 行）、`byte_invariant_test.rs`（130 行）、`ffi_extern_session_e2e_test.rs`（203 行）、`debug_preservation_test.rs`（59 行）、`actor_kick_test.rs`（52〜53・78 行）、`src/shiori_request_tests.rs`（38・466・486 行）。ほかのファイルの説明は直下の `pasta_scripts/` に触れていない。
+- `pasta_shiori` の `Cargo.toml`・steering・スキルの文書は `tests/support` を指していない。今も写しを指しているのは、過去の記録（触らない）と `scene-attribute-store/brief.md` 176 行（申し送り）と `roadmap.md` 346 行（完了の手順で直す）だけ。
