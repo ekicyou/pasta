@@ -48,8 +48,8 @@
   - _Boundary: 別のコピー処理（src/shiori_request_tests.rs）_
   - _Requirements: 5.2, 5.3_
 
-- [ ] 4. 全体を確かめる
-- [ ] 4.1 grep と、ワークスペースのテスト・clippy で全体を確かめる
+- [x] 4. 全体を確かめる
+- [x] 4.1 grep と、ワークスペースのテスト・clippy で全体を確かめる
   - 走らせる前に `NoDefaultCurrentDirectoryInExePath` と `PASTA_DEBUG` を外す
   - grep で確かめる: `crates/pasta_shiori/tests/support/` が無い、4 つの `pasta.toml` に回避の設定と文言が無い、`crates/pasta_shiori/` の `.rs` に `.join("pasta_scripts")` が無い、`crates/pasta_lua/` と `pasta_shiori` の本番のコードに差分が無い
   - `cargo test --all` と `cargo clippy --all-targets --workspace -- -D warnings` を走らせる
