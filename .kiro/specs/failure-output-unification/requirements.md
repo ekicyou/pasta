@@ -174,7 +174,7 @@
 #### Acceptance Criteria
 
 1. The pasta shall マニュアルに、実行時の失敗の出力（失敗の種類ごとの失敗表記とログの警告、出る位置、重ねない規則、切り替えの設定）を説明する 1 か所を置く。
-2. The pasta shall 失敗時の挙動を書いている各章（`grammar/action-line.md`・`grammar/call-jump.md`・`grammar/variables.md`・`grammar/words.md`・`lua/script-api.md`・`internals/talk-output.md`・`internals/internal-modules.md` ほか）を、新しい挙動に合わせて直し、失敗表記の説明は 1 か所を参照する形にする。
+2. The pasta shall 失敗時の挙動を書いている各章（`grammar/action-line.md`・`grammar/call-jump.md`・`grammar/variables.md`・`grammar/words.md`・`grammar/actor-dictionary.md`・`lua/script-api.md`・`internals/talk-output.md`・`internals/internal-modules.md` ほか）を、新しい挙動に合わせて直し、失敗表記の説明は 1 か所を参照する形にする。
 3. The pasta shall pasta.toml の説明（`reference/pasta-toml.md`）に、切り替えの設定（名前・型・既定値・分類）を載せる。
 4. The pasta shall マニュアルの変更と同じ変更で、スキル `references/` を再生成し、生成物の鮮度照合（`--check`）とリンク検証を通す。1 か所を新しいページにする場合は、スキルの生成対象に加えるかを設計で決める。
 5. The pasta shall マニュアルに、失敗表記を避けるための代わりの書き方（Lua の回避関数など）を載せない。
