@@ -54,6 +54,7 @@ metadata:
 | [words.md](references/words.md) | 生成（マニュアルから） | [単語定義](https://ekicyou.github.io/pasta/grammar/words.html) | 単語定義・参照・シャッフル＆順次消費・スコープと優先順位 |
 | [actor-dictionary.md](references/actor-dictionary.md) | 生成（マニュアルから） | [アクター辞書](https://ekicyou.github.io/pasta/grammar/actor-dictionary.html) | アクター辞書・`％` 行による立ち位置・バルーン連携・外見の復旧・コードブロック |
 | [pasta-toml.md](references/pasta-toml.md) | 生成（マニュアルから） | [pasta.toml リファレンス](https://ekicyou.github.io/pasta/reference/pasta-toml.html) | `pasta.toml` の全セクション・全キー・既定値 |
+| [runtime-failures.md](references/runtime-failures.md) | 生成（マニュアルから） | [実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html) | 書き間違いが実行時に出す表記とログの警告・出る位置・重ねない規則・切り替えの設定・Lua からの報告（`act:failure`） |
 | [authoring-patterns.md](references/authoring-patterns.md) | 手書き（スキルが権威） | — | 辞書制作の作例・ファイル分割指針・自然言語→シーン変換の手順 |
 
 ---
@@ -174,9 +175,9 @@ metadata:
 - **グローバル変数** `＄＊変数名`: Lua の `save` テーブルに入り、ゴーストを終了しても JSON ファイルに保存されて次の起動時に戻る
 - **プロパティ変数** `＄％prop.path`: SSP共有プロパティの読み書き。SET（`＄％prop＝「値」`）、GET代入（`＄var＝＄％prop`）、インラインGET（`アクター：＄％prop`）が可能
 - 代入: `＄変数名＝値`（代入は `＝` のみ。`＄変数名：値` はパースエラー）。値にはリテラル値・単語参照・変数参照・式・関数呼び出しが使用可能
-- **グローバル関数代入**: `＄result＝＠＊func()` → `GLOBAL` テーブルの関数 `func` の戻り値を代入（生成コードは `act:global_fn("func")`。関数が無いときはエラーにならず、警告ログを出して値なし）
-- **算術**: `＋` `－` `＊` `／` `％` はすべて数値の演算（文字列の連結にはならない）。値の無い被演算子（未代入の変数・値を返さない関数など）は 0 とみなし、ログは出ない（`＄＊回数＝＄＊回数＋１` は初回から 1）。数字でない文字列・真偽値など変換できない値は警告ログを出して 0 とみなす。演算の結果は必ず数値で、値なしにはならない（詳細は [variables.md](references/variables.md#算術の評価)）
-- **連結**: `＆` は左右の被演算子を文字列にしてつなぐ（`＄表示＝「合計」＆＄n＆「個」`）。算術より後に計算される。式の中（代入の右辺・式文・関数呼び出しの引数・Call の引数・動的ターゲット）だけで連結になり、台詞に書いた `＆` は文字のまま出力される。値の無い被演算子は空文字列とみなし、ログは出ない。真偽値など変換できない値は警告ログを出して空文字列とみなす。結果は必ず文字列（詳細は [variables.md](references/variables.md#連結の評価)）
+- **グローバル関数代入**: `＄result＝＠＊func()` → `GLOBAL` テーブルの関数 `func` の戻り値を代入（生成コードは `act:global_fn("func")`。関数が無いときはエラーにならず、失敗を報告して値なし。詳細は [runtime-failures.md](references/runtime-failures.md)）
+- **算術**: `＋` `－` `＊` `／` `％` はすべて数値の演算（文字列の連結にはならない）。値の無い被演算子（未代入の変数・値を返さない関数など）は 0 とみなし、ログは出ない（`＄＊回数＝＄＊回数＋１` は初回から 1）。数字でない文字列・真偽値など変換できない値は失敗を報告して（警告ログと失敗表記 `【数にできない値：…】`）0 とみなす。演算の結果は必ず数値で、値なしにはならない（詳細は [variables.md](references/variables.md#算術の評価)）
+- **連結**: `＆` は左右の被演算子を文字列にしてつなぐ（`＄表示＝「合計」＆＄n＆「個」`）。算術より後に計算される。式の中（代入の右辺・式文・関数呼び出しの引数・Call の引数・動的ターゲット）だけで連結になり、台詞に書いた `＆` は文字のまま出力される。値の無い被演算子は空文字列とみなし、ログは出ない。真偽値など変換できない値は失敗を報告して（警告ログと失敗表記 `【文字列にできない値：…】`）空文字列とみなす。結果は必ず文字列（詳細は [variables.md](references/variables.md#連結の評価)）
 - **式文（副作用のみ）**: `＄＝expr` — 戻り値を使わず式を実行するだけ
 - 参照: アクション行内で `＄変数名` と記述
 
@@ -201,7 +202,7 @@ metadata:
 
 - 構文: `＞シーン名` — 指定シーンを呼び出し、実行後に復帰。戻った後の行は、別のグローバルシーンを呼んだ後でも呼び出し元のグローバルシーンで名前を解決する（詳細は [call-jump.md](references/call-jump.md#call-から戻った後の名前解決)）
 - 動的ターゲット: `＞式` — 式（`＞＄変数名`・`＞＠関数（）`・`＞「文字列」` など）の値を検索キーにしてシーン名として解決（文字列はそのまま、数値は文字列にする。値なし・空文字列・真偽値などは呼ばない）
-- Call の失敗: 見つからない・動的ターゲットの値が検索キーにならないときは、警告ログを出し、Call 行の位置に失敗表記（`【Call失敗：「名前」が見つからない】` など）を出力して次の行へ進む（詳細は [call-jump.md](references/call-jump.md#call-が失敗したとき)）
+- Call の失敗: 見つからない・動的ターゲットの値が検索キーにならないときは、警告ログを出し、Call 行の位置に失敗表記（`【シーンが見つからない：＞名前】`・`【名前にならない値：＄行き先（値なし）】` など）を出力して次の行へ進む（詳細は [call-jump.md](references/call-jump.md#call-が失敗したとき)・[runtime-failures.md](references/runtime-failures.md)）
 - 前方一致で候補が複数ある場合はシャッフル＆順次消費で1つ選ぶ
 - 特殊Call: `＞ゴースト終了（ミリ秒）` — ゴーストを終了させる
 - 特殊Call: `＞チェイントーク` / `＞yield` — シーン出力を分割し、次回 OnTalk の機会に残りを出力する（詳細は [call-jump.md](references/call-jump.md#チェイントーク)、作例は [authoring-patterns.md §6.7](references/authoring-patterns.md#s6-7)）

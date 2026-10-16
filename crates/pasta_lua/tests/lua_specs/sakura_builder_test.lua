@@ -3019,3 +3019,53 @@ describe("SAKURA_BUILDER - choice-line-layout: 選択肢の行の配置", functi
         expect(no_trail):toBe("\\p[0]まえ\\c" .. Q1 .. "\\e")
     end)
 end)
+
+-- ============================================================================
+-- 立ち位置の警告を未登録アクターで重ねない（failure-output-unification 5.4・6.3）
+-- ============================================================================
+
+describe("SAKURA_BUILDER - 未登録アクターの actor_spots fallback", function()
+    --- 警告を記録するログを差し込んで sakura_builder を読み直し、body を実行する（後で元に戻す）
+    local function with_warns(body)
+        local saved_log = package.loaded["@pasta_log"]
+        local saved_builder = package.loaded["pasta.shiori.sakura_builder"]
+        local warns = {}
+        local noop = function() end
+        package.loaded["@pasta_log"] = {
+            trace = noop, debug = noop, info = noop, error = noop,
+            warn = function(msg) table.insert(warns, msg) end,
+        }
+        package.loaded["pasta.shiori.sakura_builder"] = nil
+        local ok, err = pcall(body, require("pasta.shiori.sakura_builder"), warns)
+        package.loaded["@pasta_log"] = saved_log
+        package.loaded["pasta.shiori.sakura_builder"] = saved_builder
+        if not ok then error(err, 0) end
+    end
+
+    local function group(actor)
+        return {
+            type = "actor",
+            actor = actor,
+            tokens = { { type = "talk", actor = actor, text = "A" } },
+        }
+    end
+
+    test("未登録の印のアクターは立ち位置 0 で、警告を出さない", function()
+        with_warns(function(BUILDER, warns)
+            local FAILURE = require("pasta.failure")
+            local adhoc = { name = "sb_ぱすたー" }
+            FAILURE.mark_unregistered_actor(adhoc)
+            expect(BUILDER.build({ group(adhoc) }, {}, {})):toBe("\\p[0]A\\e")
+            expect(#warns):toBe(0)
+        end)
+    end)
+
+    test("印の無いアクターは立ち位置が無ければ従来どおり 0 で、警告を 1 行出す", function()
+        with_warns(function(BUILDER, warns)
+            local actor = { name = "sb_さくら" }
+            expect(BUILDER.build({ group(actor) }, {}, {})):toBe("\\p[0]A\\e")
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe("actor_spots fallback: 'sb_さくら' -> spot=0")
+        end)
+    end)
+end)

@@ -229,14 +229,14 @@ PROXY_IMPL.find_handler(mode, key, skip_methods)     act:actor_proxy("アクタ�
 - L2 のグローバル名は、実行中のシーンテーブルの `__global_name__`（`メイン_1` の形の登録名）である。`ACT_IMPL.init_scene` がシーン関数の先頭で `current_scene` を設定し、途中の Call（`act:call_restore`）と関数を呼ぶメソッドが、戻った後に呼ぶ前の値へ戻す（[シーン文脈の復元](internal-modules.md#シーン文脈の復元call_restorerestore_scene)）。これがローカルキー `:メイン_1:…` の前方一致になる。
 - A2 のスコープ名 `__actor_アクター名__` は、`search_word` の入口でサニタイズされてから `:__actor_サニタイズしたアクター名__:キー` の前方一致になり、`register_actor` のキーの形式と対応する（[照合規則の共有](#照合規則の共有)）。
 - `@pasta_search` の取得は、`find_act_handler`・`find_actor_handler` とも呼び出しごとの `pcall(require, "@pasta_search")` で行う。
-- 見つかった値の後処理（関数なら呼ぶ、それ以外は文字列にする、見つからなければ警告ログ）は `ACT_IMPL.word`・`ACT_IMPL.call`・`ACT_IMPL.expr_fn`・`ACT_IMPL.expr_fn_var` と、PROXY 側の `word`・`expr_fn`・`expr_fn_var` が行う（[名前の解決のメソッド](internal-modules.md#名前の解決のメソッド)）。
+- 見つかった値の後処理（関数なら呼ぶ、それ以外は文字列にする、見つからなければ失敗の報告）は `ACT_IMPL.word`・`ACT_IMPL.call`・`ACT_IMPL.expr_fn`・`ACT_IMPL.expr_fn_var` と、PROXY 側の `word`・`expr_fn`・`expr_fn_var` が行う（[名前の解決のメソッド](internal-modules.md#名前の解決のメソッド)）。
 - グローバル関数の呼び出し（`＠＊名前（…）`）の生成コード `act:global_fn("名前", …)` は、この検索手順を通らず `GLOBAL[名前]` だけを引く（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fn)）。
 
 `ACT_IMPL.find_scene` は第 2 引数のグローバル名を使わず `find_handler("scene", key)` に委ねる。そのため、親を指定してローカルシーンを引く必要がある選択肢イベント（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`）は、`SCENE.search(名前, 親)` を直接呼んでコルーチンを作る。親は、選択肢を出したグローバルシーン（Reference2）か `STORE.last_global_scene` である（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)）。シーンキック（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`）は検索を使わず、シーン表のキーとの完全一致（`SCENE.get`・`SCENE.get_start`）で引く（[キックの保留と起動](debug.md#キックの保留と起動kicklua)）。
 
 ### 動的参照の検索
 
-動的参照（`＠＄変数名`・`＠＄変数名（…）`）では、変数の値が検索キーになる。生成コードは `word(値, "変数の経路")`・`expr_fn_var(値, "変数の経路", 引数…)` を呼び、値は `WORD.dynamic_key` が検索キーに変換する（変換規則は [WORD.dynamic_key(value, var_path, via)](../lua/script-api.md#worddynamic_keyvalue-var_path-via)、置き場所は [動的参照のキー](internal-modules.md#動的参照のキーworddynamic_key)）。キーに変換した後は、`skip_methods` を真にして同じ検索手順を通る。
+動的参照（`＠＄変数名`・`＠＄変数名（…）`）では、変数の値が検索キーになる。生成コードは `word(値, "変数の経路")`・`expr_fn_var(値, "変数の経路", 引数…)` を呼び、値は `WORD.dynamic_key` が検索キーに変換する（変換規則は [WORD.dynamic_key(value, var_path, via, act)](../lua/script-api.md#worddynamic_keyvalue-var_path-via-act)、置き場所は [動的参照のキー](internal-modules.md#動的参照のキーworddynamic_key)）。キーに変換した後は、`skip_methods` を真にして同じ検索手順を通る。
 
 ```text
 skip_methods が真のとき（動的参照）

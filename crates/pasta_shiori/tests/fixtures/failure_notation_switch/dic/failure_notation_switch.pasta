@@ -1,0 +1,14 @@
+＃ failure_notation_switch.pasta - [logging] balloon_warning の切り替えの E2E 用シーン
+＃ シーン名を SHIORI イベント ID と一致させ、シーン関数フォールバックで起動する。
+
+％さくら
+　＠通常：\s[0]
+
+＊OnFailureMix
+　さくら：前＠＊未定義関数（）後＄未定義
+　未登録さん：こんにちは
+　＄y＝「abc」＊２
+　さくら：結果＄y、終わり
+
+＊OnFailureOnly
+　ぱすたー：＄未定義

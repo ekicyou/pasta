@@ -333,8 +333,42 @@ fn stage_table_matches_dic_files() {
     }
 }
 
+/// 失敗表記の種類の名前（`pasta/failure.lua` の `FAILURE.LABEL` の値）を読み込んだ
+/// ランタイムから引く。表に種類が足されても追随する。
+fn failure_labels(runtime: &PastaLuaRuntime) -> Vec<String> {
+    let script = r#"local t = {}
+for _, v in pairs(require("pasta.failure").LABEL) do t[#t + 1] = v end
+return table.concat(t, "\n")"#;
+    let v = runtime
+        .exec(script)
+        .unwrap_or_else(|e| panic!("FAILURE.LABEL を読めない: {e}"));
+    let labels: Vec<String> = v
+        .as_string()
+        .and_then(|s| s.to_str().ok().map(|s| s.to_string()))
+        .unwrap_or_default()
+        .lines()
+        .map(str::to_string)
+        .collect();
+    assert!(!labels.is_empty(), "FAILURE.LABEL が空");
+    labels
+}
+
+/// 応答に失敗表記の種類の名前が 1 つも含まれないことを確かめる（要件 10.4）
+fn assert_no_failure_notation(stage: u8, file: &str, id: &str, response: &str, labels: &[String]) {
+    let found: Vec<&str> = labels
+        .iter()
+        .map(String::as_str)
+        .filter(|l| response.contains(l))
+        .collect();
+    assert!(
+        found.is_empty(),
+        "stage {stage} ({file}): {id} の応答に失敗表記 {found:?} がある:\n{response}"
+    );
+}
+
 /// N = 1〜12 で段階の辞書を組み立てて実ローダーで読み込み、OnBoot と検証イベント表の
 /// 該当行を送って応答を確かめる（Req 1.6・2.1・2.6・3.9・4.1・4.2・4.2a・4.4・4.5・4.6）。
+/// 応答に失敗表記が無いことも確かめる（failure-output-unification 要件 10.4）。
 /// 仮想イベント（ランダムトーク・時報）は送らない。
 #[test]
 fn every_stage_loads_and_responds() {
@@ -351,11 +385,15 @@ fn every_stage_loads_and_responds() {
         let runtime = PastaLoader::load(ghost.path())
             .unwrap_or_else(|e| panic!("stage {n} ({file}): load failed: {e}"));
 
+        let labels = failure_labels(&runtime);
+
         let response = shiori_request(&runtime, "OnBoot", &[]);
         assert_responds(n, file, "OnBoot", &response);
+        assert_no_failure_notation(n, file, "OnBoot", &response, &labels);
         for e in events.iter().filter(|e| e.stage == n) {
             let response = shiori_request(&runtime, &e.id, &e.references);
             assert_responds(n, file, &e.id, &response);
+            assert_no_failure_notation(n, file, &e.id, &response, &labels);
         }
     }
 }

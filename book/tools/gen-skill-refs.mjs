@@ -2,7 +2,7 @@
 // タスク 3.3（要件 5.1, 5.2, 5.8, 5.9, 1.7 / design「GenSkillRefs」）: 対応表・出力名・口調判定・本文抽出。
 //
 // export:
-//   GENERATION_MAP  … 対応表（23 エントリ・順序固定）。入力の定義はこれだけ（設定ファイルなし）。
+//   GENERATION_MAP  … 対応表（24 エントリ・順序固定）。入力の定義はこれだけ（設定ファイルなし）。
 //   outName         … 章パス → references/ 内の出力名（index.md は直近の親ディレクトリ名付き）。
 //   VOICE_MARKERS   … 口調マーカー（verify-content.mjs から移設）。普通文体と衝突する 3 語だけ否定先読み。
 //   findVoice       … 一致したマーカーの語を返す（空なら口調なし）。
@@ -48,6 +48,7 @@ export const GENERATION_MAP = Object.freeze([
   ['grammar/words.md', GA],
   ['grammar/actor-dictionary.md', GA],
   ['reference/pasta-toml.md', GA],
+  ['reference/runtime-failures.md', GA],
   ['lua/modules/index.md', LC],
   ['lua/modules/pasta-search.md', LC],
   ['lua/modules/pasta-persistence.md', LC],

@@ -135,3 +135,9 @@
 - **行番号がずれた**: `\q` への変換（`choice_to_script`）と `BUILDER.build` の場所は、上の「前提の変化」「触るファイル」に書いた行から動いている。
 - **見直しが要る論点**: アンカーを選択肢と同じ形のトークンにすると、`spot_tail` の分岐を通るかどうかを決めることになる（選択肢として数えれば前後に改行が入り、台詞の途中の 1 語が行を分ける）。アンカーを台詞の文字の中に入れる形にすれば、字の判定（`emits_text`）が `\_a` をどう読むかだけになる。上の「見つけた穴」の `merge_consecutive_talks` の論点と合わせて、設計で決める。
 - **複雑度**: `BUILDER.build` の循環的複雑度は 28 になった（`-- luacheck: ignore 561` を付けている。`choice-line-layout` は分割を範囲の外にした）。分岐を足すなら、分割するかどうかも論点になる。
+
+## 申し送り（failure-output-unification より、2026-10-17）
+
+- 失敗の見せ方を載せる先ができた。シーンが生きている間の失敗は `pasta/failure.lua` の `FAILURE.report(act, record)` から出す（警告 1 行と `【種類：対象（説明）】` の表記 1 つ）。新しい種類は `FAILURE.LABEL` に足す。表記の形・エスケープ・`[logging] balloon_warning` の切り替えは出口が持つ。
+- 応答が表記だけになったシーンは 200 で返る。出さない設定で何も残らないときは 204 になる（`act:build` がすべて空の `raw_script` で nil を返す）。
+- 参照: `.kiro/specs/completed/failure-output-unification/design.md`、マニュアル `book/src/reference/runtime-failures.md`。

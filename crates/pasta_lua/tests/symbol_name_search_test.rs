@@ -206,7 +206,7 @@ fn missing_symbol_call_warns_with_raw_name_and_continues() {
     // （失敗表記は raw_script なので句読点のウェイトは入らない）
     assert_ok_with(
         &response,
-        "【Call失敗：「存在しない・朝」が見つからない】\\p[0]次の行です",
+        "【シーンが見つからない：＞存在しない・朝】\\p[0]次の行です",
     );
     assert!(logs_contain("handler not found: key='存在しない・朝'"));
 }

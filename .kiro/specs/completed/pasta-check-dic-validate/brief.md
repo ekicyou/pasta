@@ -15,7 +15,7 @@
 - **コマンドの入口**: `pasta_check` の入口（`crates/pasta_check/src/main.rs` 16〜20 行）が受け付けるのは、`Release`・`Help`・`Version` の 3 つだけである。依存する部品は `lexopt`・`md5`・`zip` の 3 つ（`crates/pasta_check/Cargo.toml` 18〜26 行）で、辞書を読む部品には依存していない。
 - **先送りしている spec**:
   - scene-anchor-link は、飛び先の無いリンクを読み込みのときに見つける仕事を、選択肢・Call とまとめてこのコマンドに任せている（`.kiro/specs/scene-anchor-link/brief.md` 52 行、`.kiro/steering/roadmap.md` の「文中のシーンリンク」）。
-  - failure-output-unification は、実行する前に見つける仕組みを範囲の外に置き、`pasta_check` の検証・リリースとの関係を論点に残している（`.kiro/specs/failure-output-unification/brief.md` 45 行・66 行）。
+  - failure-output-unification は、実行する前に見つける仕組みを範囲の外に置き、`pasta_check` の検証・リリースとの関係を論点に残している（`.kiro/specs/completed/failure-output-unification/brief.md` 45 行・66 行）。
 - **代用品**:
   - マニュアルの自動検査（`.github/workflows/manual.yml` 128〜135 行）は、「構文を検証するサブコマンドが無いため」と書いたうえで、hello-pasta を本物のランタイムで読み込むテスト（`cargo test -p pasta_sample_ghost`）を構文の検証の代わりにしている。
   - hello-pasta の段階辞書のテスト（`crates/pasta_sample_ghost/tests/tutorial_stages_test.rs` 363〜445 行）は、行頭の `＊名前` を自前で拾う関数（370〜397 行）と、名前どうしの前方一致の重なりを調べる検査（405〜445 行）を手で書いている。

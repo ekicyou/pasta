@@ -479,7 +479,7 @@ fn assert_failed_call(event_id: &str, expected: &str, warnings: &[&str]) {
 fn test_failed_call_undefined_variable() {
     assert_failed_call(
         "OnFcVarMid",
-        r"\p[0]前【Call失敗：var.未代入 が nil】後元\e",
+        r"\p[0]前【名前にならない値：＄未代入（値なし）】後元\e",
         &["act:call - undefined variable: 'var.未代入'"],
     );
 }
@@ -489,7 +489,7 @@ fn test_failed_call_undefined_variable() {
 fn test_failed_call_function_returning_nothing() {
     assert_failed_call(
         "OnFcFnMid",
-        r"\p[0]前【Call失敗：@値なし() が nil】後元\e",
+        r"\p[0]前【名前にならない値：＠値なし（）（値なし）】後元\e",
         &["act:call - key is not a string or number: operand='@値なし()', value=nil"],
     );
 }
@@ -500,7 +500,7 @@ fn test_failed_call_function_returning_nothing() {
 fn test_failed_call_concat_with_nil_operand() {
     assert_failed_call(
         "OnFcConcatMid",
-        r"\p[0]前【Call失敗：「x」が見つからない】後元\e",
+        r"\p[0]前【シーンが見つからない：＞x】後元\e",
         &["act:call - handler not found: key='x', mode='scene', via=act"],
     );
 }
@@ -516,7 +516,7 @@ fn test_call_string_nil_is_searched() {
 fn test_failed_call_empty_string() {
     assert_failed_call(
         "OnFcEmptyMid",
-        r"\p[0]前【Call失敗：var.空 が空文字列】【Call失敗：値が空文字列】後元\e",
+        r"\p[0]前【名前にならない値：＄空（空文字列）】【名前にならない値：空文字列】後元\e",
         &[
             "act:call - empty variable: 'var.空'",
             "act:call - key is not a string or number: value='' (string)",
@@ -529,7 +529,7 @@ fn test_failed_call_empty_string() {
 fn test_failed_call_boolean() {
     assert_failed_call(
         "OnFcBoolMid",
-        r"\p[0]前【Call失敗：var.真 が boolean】【Call失敗：@真を返す() が boolean】後元\e",
+        r"\p[0]前【名前にならない値：＄真（真偽値）】【名前にならない値：＠真を返す（）（真偽値）】後元\e",
         &[
             "act:call - unsupported value type: 'var.真' (boolean)",
             "act:call - key is not a string or number: operand='@真を返す()', value=true (boolean)",
@@ -543,7 +543,7 @@ fn test_failed_call_boolean() {
 fn test_failed_call_with_argument_list() {
     assert_failed_call(
         "OnFcArgsMid",
-        r"\p[0]前【Call失敗：var.未代入 が nil】甲乙後\e",
+        r"\p[0]前【名前にならない値：＄未代入（値なし）】甲乙後\e",
         &["act:call - undefined variable: 'var.未代入'"],
     );
 }
@@ -554,7 +554,7 @@ fn test_failed_call_with_argument_list() {
 fn test_failed_tail_call() {
     assert_failed_call(
         "OnFcTailEnd",
-        r"\p[0]前中【Call失敗：var.未代入甲 が nil】後【Call失敗：var.未代入乙 が nil】\e",
+        r"\p[0]前中【名前にならない値：＄未代入甲（値なし）】後【名前にならない値：＄未代入乙（値なし）】\e",
         &[
             "act:call - undefined variable: 'var.未代入甲'",
             "act:call - undefined variable: 'var.未代入乙'",
@@ -568,11 +568,29 @@ fn test_failed_tail_call() {
 fn test_failed_call_scene_not_found() {
     assert_failed_call(
         "OnFcNotFound",
-        r"\p[0]前【Call失敗：「どこにも無いシーン」が見つからない】【Call失敗：「どこにも無い動的先」が見つからない】後元\e",
+        r"\p[0]前【シーンが見つからない：＞どこにも無いシーン】【シーンが見つからない：＞どこにも無い動的先】後元\e",
         &[
             "act:call - handler not found: key='どこにも無いシーン', mode='scene', via=act",
             "act:call - handler not found: key='どこにも無い動的先', mode='scene', via=act",
         ],
+    );
+}
+
+/// failure-output-unification 4.5: 出力が失敗表記だけのシーンも、空の出力（204）にせず 200 で返す
+#[test]
+fn test_failure_notation_only_scene_responds() {
+    let (values, log) = run_with_extra_dic(
+        Some("＊OnFcNotationOnly\n　＞どこにも無いシーン\n"),
+        &["ID: OnFcNotationOnly"],
+    );
+    assert_eq!(
+        values[0],
+        r"【シーンが見つからない：＞どこにも無いシーン】\e"
+    );
+    assert_eq!(
+        lua_warning_messages(&log),
+        ["act:call - handler not found: key='どこにも無いシーン', mode='scene', via=act"],
+        "{log}"
     );
 }
 
@@ -643,7 +661,7 @@ fn test_call_concat_target_with_nil_operand_searches_result() {
 fn test_call_concat_target_empty_result_fails_as_empty_string() {
     assert_failed_call(
         "OnEnConcatEmpty",
-        r"\p[0]前【Call失敗：値が空文字列】後\e",
+        r"\p[0]前【名前にならない値：空文字列】後\e",
         &["act:call - key is not a string or number: value='' (string)"],
     );
 }
@@ -653,7 +671,7 @@ fn test_call_concat_target_empty_result_fails_as_empty_string() {
 fn test_call_lone_variable_target_nil_unchanged() {
     assert_failed_call(
         "OnEnVarTarget",
-        r"\p[0]前【Call失敗：var.未代入 が nil】後\e",
+        r"\p[0]前【名前にならない値：＄未代入（値なし）】後\e",
         &["act:call - undefined variable: 'var.未代入'"],
     );
 }
@@ -663,7 +681,7 @@ fn test_call_lone_variable_target_nil_unchanged() {
 fn test_call_lone_function_target_nil_unchanged() {
     assert_failed_call(
         "OnEnFnTarget",
-        r"\p[0]前【Call失敗：@何も返さない() が nil】後\e",
+        r"\p[0]前【名前にならない値：＠何も返さない（）（値なし）】後\e",
         &["act:call - key is not a string or number: operand='@何も返さない()', value=nil"],
     );
 }

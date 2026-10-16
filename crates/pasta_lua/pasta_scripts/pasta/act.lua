@@ -9,11 +9,20 @@ local SCENE = require("pasta.scene")
 local GLOBAL = require("pasta.global")
 local STORE = require("pasta.store")
 local WORD = require("pasta.word")
-local log = require "@pasta_log"
+local FAILURE = require("pasta.failure")
 
 -- ============================================================================
 -- グループ化ローカル関数（actor-talk-grouping feature）
 -- ============================================================================
+
+--- 話者のトークンか（talk・sakura_script・アクター付きの raw_script＝未登録アクターの目印）。
+--- グループ化と actor_proxy の「直前の話者」の遡りが同じ判定を使う
+--- @param token table トークン
+--- @return boolean
+local function is_speaker_token(token)
+    local t = token.type
+    return t == "talk" or t == "sakura_script" or (t == "raw_script" and token.actor ~= nil)
+end
 
 --- トークン配列をアクター切り替え境界でグループ化
 --- @param tokens table[] フラットなトークン配列
@@ -39,7 +48,7 @@ local function group_by_actor(tokens)
             table.insert(result, token)
             current_actor_token = nil
             current_actor = nil
-        elseif t == "talk" or t == "sakura_script" then
+        elseif is_speaker_token(token) then
             local talk_actor = token.actor
             -- アクター変更検出（最初のtalkまたはアクター変更時）
             if current_actor_token == nil or talk_actor ~= current_actor then
@@ -54,7 +63,7 @@ local function group_by_actor(tokens)
             end
             table.insert(current_actor_token.tokens, token)
         elseif t == "raw_script" then
-            -- raw_script: ハイブリッド分類
+            -- アクターの無い raw_script: ハイブリッド分類
             -- アクターグループ存在時はグループ内に追加、不在時はresultに直接追加
             if current_actor_token then
                 table.insert(current_actor_token.tokens, token)
@@ -192,20 +201,27 @@ function ACT_IMPL.init_scene(self, scene)
         STORE.last_global_scene = scene.__global_name__
     end
     self.current_scene = scene
+    -- 実行中のスレッドにこの act を対応させる（act を受け取らない ACT.num・ACT.str が引く）
+    FAILURE.bind(self)
     return self.save, self.var
 end
 
 --- talkトークン蓄積（状態レス化: actorトークン/spot_switch生成を削除）
 --- @param self Act アクションオブジェクト
 --- @param actor Actor アクターオブジェクト
---- nil は空文字扱い（トークンを積まない）。nil 以外は tostring する。
+--- nil は空文字扱い（talk を積まない。変数参照由来なら値の無い変数の失敗表記を積む）。nil 以外は tostring する。
 --- @param text any 発話テキスト
---- @param var_name string|nil 変数参照由来のとき変数パス（nil 時の警告用）
+--- @param var_name string|nil 変数参照由来のとき変数パス（nil 時の報告用）
 --- @return Act self メソッドチェーン用
 function ACT_IMPL.talk(self, actor, text, var_name)
     if text == nil then
+        -- var_name の無い nil は内側の参照が報告済みなので黙る
         if var_name then
-            log.warn(string.format("act:talk - undefined variable: '%s'", var_name))
+            FAILURE.report(self, {
+                label = FAILURE.LABEL.UNDEFINED_VAR,
+                subject = FAILURE.var(var_name),
+                warning = string.format("act:talk - undefined variable: '%s'", var_name),
+            })
         end
         return self
     end
@@ -385,7 +401,7 @@ end
 --- 単語取得（find_handler + word ポストプロセス）
 --- 検索順序は find_act_handler の5段階フォールバック（L1〜L5、word モード）
 --- var_path があるとき（動的参照）は name を WORD.dynamic_key でキーにし、継承したメソッドに届かせずに検索する
---- ポストプロセス: handler=nil → warn+nil、function → h(self)、その他 → tostring(h)
+--- ポストプロセス: handler=nil → 失敗の報告+nil、function → h(self)、その他 → tostring(h)
 --- @param self Act アクションオブジェクト
 --- @param name any 単語名。var_path があるときは参照変数の値
 --- @param var_path string|nil 動的参照の変数パス。nil なら既存の挙動（空キーは警告なしで nil）
@@ -393,7 +409,7 @@ end
 function ACT_IMPL.word(self, name, var_path)
     local skip_methods = nil
     if var_path ~= nil then
-        name = WORD.dynamic_key(name, var_path, "act:word")
+        name = WORD.dynamic_key(name, var_path, "act:word", self)
         if name == nil then return nil end
         skip_methods = true
     elseif not name or name == "" then
@@ -402,9 +418,12 @@ function ACT_IMPL.word(self, name, var_path)
 
     local handler = self:find_handler("word", name, skip_methods)
     if handler == nil then
-        log.warn(string.format("act:word - handler not found: key='%s', mode='word', via=act",
-            tostring(name)))
-        return nil
+        return FAILURE.report(self, {
+            label = FAILURE.LABEL.WORD_NOT_FOUND,
+            subject = "＠" .. tostring(name),
+            warning = string.format("act:word - handler not found: key='%s', mode='word', via=act",
+                tostring(name)),
+        })
     end
     if type(handler) == "function" then
         local scene = self.current_scene
@@ -413,7 +432,18 @@ function ACT_IMPL.word(self, name, var_path)
     return tostring(handler)
 end
 
---- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(self, ...)、非function → warn+nil
+--- 関数の参照が成功したとき、呼んだ関数が戻った後に「報告済み」の印を偽にし、戻り値をそのまま返す
+--- （関数の中の別の参照が印を真にしても、戻った時点で偽に戻す）
+--- @param act Act アクションオブジェクト
+--- @param ... any 関数の戻り値
+--- @return any ...
+local function fn_succeeded(act, ...)
+    FAILURE.set_fn_failed(act, false)
+    return ...
+end
+
+--- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(self, ...)、非function → 失敗の報告+nil
+--- どちらの場合も「報告済み」の印（FAILURE.set_fn_failed）を書く（act:call_key が重ねて報告しないため）
 --- @param self Act アクションオブジェクト
 --- @param key string 関数名
 --- @param skip_methods boolean|nil find_handler へ渡す
@@ -423,16 +453,20 @@ local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
         local scene = self.current_scene
-        return self:restore_scene(scene, handler(self, ...))
+        return fn_succeeded(self, self:restore_scene(scene, handler(self, ...)))
     end
-    log.warn(string.format("act:expr_fn - handler not found: key='%s', mode='expr', via=act",
-        tostring(key)))
-    return nil
+    FAILURE.set_fn_failed(self, true)
+    return FAILURE.report(self, {
+        label = FAILURE.LABEL.FN_NOT_FOUND,
+        subject = "＠" .. tostring(key) .. "（）",
+        warning = string.format("act:expr_fn - handler not found: key='%s', mode='expr', via=act",
+            tostring(key)),
+    })
 end
 
 --- expr関数呼び出し（find_handler + expr ポストプロセス）
 --- find_handler("expr", key) でハンドラーを取得してポストプロセスを実行する。
---- ポストプロセス: function → h(self, ...) 可変引数を伝搬、非function → warn+nil
+--- ポストプロセス: function → h(self, ...) 可変引数を伝搬、非function → 失敗の報告+nil
 --- @param self Act アクションオブジェクト
 --- @param key string 関数名
 --- @param ... any 可変引数（ハンドラーに伝搬）
@@ -449,8 +483,11 @@ end
 --- @param ... any 可変引数（ハンドラーに伝搬）
 --- @return any ハンドラーの戻り値、またはnil
 function ACT_IMPL.expr_fn_var(self, value, var_path, ...)
-    local key = WORD.dynamic_key(value, var_path, "act:expr_fn")
-    if key == nil then return nil end
+    local key = WORD.dynamic_key(value, var_path, "act:expr_fn", self)
+    if key == nil then
+        FAILURE.set_fn_failed(self, true) -- dynamic_key が報告済み（call_key は重ねない）
+        return nil
+    end
     return call_expr(self, key, true, ...)
 end
 
@@ -458,8 +495,10 @@ end
 --- 登録済み（self.actors[name]）なら act.名前 と同じプロキシを返す。名前を文字列で受けるため
 --- act のメンバー名と同名のアクターでも __index を通らない。
 --- 未登録なら名前だけのその場限りのアクター（{ name = name }・メタテーブルなし）のプロキシを返す。
---- 直前の話者（self.token を末尾から見て最初の talk／sakura_script の actor）が同じ未登録名ならそれを再利用し、
---- そうでなければ警告を 1 行出して目印の talk トークンを積む。登録状態・立ち位置・act のフィールドには書かない
+--- 直前の話者（self.token を末尾から見て最初の話者のトークン＝talk／sakura_script／目印の actor。
+--- アクターの無い失敗表記は飛ばす）が同じ未登録名ならそれを再利用し、
+--- そうでなければ未登録の印を付けて、警告 1 行と目印（アクター付きの raw_script）を報告する。
+--- 登録状態・立ち位置・act のフィールドには書かない
 --- @param self Act アクションオブジェクト
 --- @param name string アクター名
 --- @return ActorProxy プロキシ（常に非 nil）
@@ -470,7 +509,7 @@ function ACT_IMPL.actor_proxy(self, name)
     end
     for i = #self.token, 1, -1 do
         local t = self.token[i]
-        if t.type == "talk" or t.type == "sakura_script" then
+        if is_speaker_token(t) then
             if t.actor and t.actor.name == name then
                 return ACTOR.create_proxy(t.actor, self)
             end
@@ -478,14 +517,19 @@ function ACT_IMPL.actor_proxy(self, name)
         end
     end
     actor = { name = name }
-    log.warn(string.format("act:actor_proxy - unregistered actor: name='%s'", tostring(name)))
-    table.insert(self.token, { type = "talk", actor = actor, text = "【未登録アクター：" .. tostring(name) .. "】" })
+    FAILURE.mark_unregistered_actor(actor)
+    FAILURE.report(self, {
+        label = FAILURE.LABEL.UNREGISTERED_ACTOR,
+        subject = tostring(name),
+        warning = string.format("act:actor_proxy - unregistered actor: name='%s'", tostring(name)),
+        actor = actor,
+    })
     return ACTOR.create_proxy(actor, self)
 end
 
 --- グローバル関数呼び出し（＠＊名前（…））
 --- GLOBAL[name] が関数なら act を第1引数にして呼ぶ（中のエラーはそのまま伝わる）。
---- 無い・関数でないときは警告して nil（act:expr_fn と同じ warn レベル）
+--- 無い・関数でないときは失敗を報告して nil（act:expr_fn と同じ）。どちらも「報告済み」の印を書く
 --- @param self Act アクションオブジェクト
 --- @param name string 関数名
 --- @param ... any 関数に渡す引数
@@ -494,10 +538,14 @@ function ACT_IMPL.global_fn(self, name, ...)
     local f = GLOBAL[name]
     if type(f) == "function" then
         local scene = self.current_scene
-        return self:restore_scene(scene, f(self, ...))
+        return fn_succeeded(self, self:restore_scene(scene, f(self, ...)))
     end
-    log.warn(string.format("act:global_fn - function not found: key='%s'", tostring(name)))
-    return nil
+    FAILURE.set_fn_failed(self, true)
+    return FAILURE.report(self, {
+        label = FAILURE.LABEL.FN_NOT_FOUND,
+        subject = "＠＊" .. tostring(name) .. "（）",
+        warning = string.format("act:global_fn - function not found: key='%s'", tostring(name)),
+    })
 end
 
 --- 動的コールの「呼ばない」印（act:call_key が返し、act:call が検索せずに nil を返す）。外へ公開しない
@@ -516,7 +564,8 @@ end
 
 --- 算術の被演算子を数値にする（算術式の生成コードが PASTA.num として呼ぶ）。
 --- number はそのまま、string は tonumber（変更前の暗黙変換と同じ範囲）、nil は黙って 0、
---- それ以外は警告（act:arith - …、従来の算術の文言）を 1 行出して 0。メタメソッドは呼ばない。act のメソッドではない
+--- それ以外は警告（act:arith - …、従来の算術の文言）を 1 行と、実行中の act（FAILURE.running_act）へ表記を出して 0
+--- （act が見つからなければログだけ）。メタメソッドは呼ばない。act のメソッドではない
 --- @param op string 警告に出す演算子（"+" | "-" | "*" | "/" | "%"）
 --- @param v any 被演算子
 --- @param desc string|nil 警告に出す被演算子の説明（変数パス・関数名）
@@ -528,15 +577,21 @@ function ACT.num(op, v, desc)
     if n ~= nil then return n end
     if v ~= nil then
         local operand = desc and string.format("operand='%s', ", desc) or ""
-        log.warn(string.format("act:arith - operand is not a number: op='%s', %svalue=%s",
-            op, operand, arith_value_text(v)))
+        FAILURE.report(FAILURE.running_act(), {
+            label = FAILURE.LABEL.NOT_NUMBER,
+            subject = desc and FAILURE.fn(desc),
+            detail = FAILURE.value_of(v),
+            warning = string.format("act:arith - operand is not a number: op='%s', %svalue=%s",
+                op, operand, arith_value_text(v)),
+        })
     end
     return 0
 end
 
 --- 連結の被演算子を文字列にする（連結式の生成コードが PASTA.str として呼ぶ）。
 --- string はそのまま、number は tostring（アクション行の表示と同じ表記）、nil は黙って空文字列、
---- それ以外は警告（act:concat - …、従来の連結の文言）を 1 行出して空文字列。メタメソッドは呼ばない。act のメソッドではない
+--- それ以外は警告（act:concat - …、従来の連結の文言）を 1 行と、実行中の act（FAILURE.running_act）へ表記を出して空文字列
+--- （act が見つからなければログだけ）。メタメソッドは呼ばない。act のメソッドではない
 --- @param v any 被演算子
 --- @param desc string|nil 警告に出す被演算子の説明（変数パス・関数名）
 --- @return string
@@ -546,21 +601,37 @@ function ACT.str(v, desc)
     if t == "number" then return tostring(v) end
     if v ~= nil then
         local operand = desc and string.format("operand='%s', ", desc) or ""
-        log.warn(string.format("act:concat - operand is not a string or number: op='&', %svalue=%s",
-            operand, arith_value_text(v)))
+        FAILURE.report(FAILURE.running_act(), {
+            label = FAILURE.LABEL.NOT_STRING,
+            subject = desc and FAILURE.fn(desc),
+            detail = FAILURE.value_of(v),
+            warning = string.format("act:concat - operand is not a string or number: op='&', %svalue=%s",
+                operand, arith_value_text(v)),
+        })
     end
     return ""
 end
 
+--- トークンが無いか、すべて文字の空の raw_script か（空なら真）
+--- @param tokens table[]
+--- @return boolean
+local function is_all_empty_raw_script(tokens)
+    for _, t in ipairs(tokens) do
+        if t.type ~= "raw_script" or t.text ~= "" then return false end
+    end
+    return true
+end
+
 --- トークン取得とリセット（グループ化・統合済み）
 --- @param self Act アクションオブジェクト
---- @return table[]|nil グループ化されたトークン配列、またはnil（トークン0件時）
+--- @return table[]|nil グループ化されたトークン配列、またはnil（トークン0件時・すべて空の raw_script の時）
 function ACT_IMPL.build(self)
     local tokens = self.token
     self.token = {}
 
-    -- 早期リターン: トークン0件時はnilを返す (act-build-early-return)
-    if #tokens == 0 then
+    -- 早期リターン: 出すものが無いときはnilを返す (act-build-early-return)。
+    -- 失敗表記を出さない設定で未登録アクターの空の目印だけが残ったときも含む
+    if is_all_empty_raw_script(tokens) then
         return nil
     end
 
@@ -611,8 +682,11 @@ end
 function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
     -- nil ガード: 式評価結果が nil の場合（未定義変数等）
     if key == nil then
-        log.warn("act:call - nil key (undefined variable?), skipping scene search")
-        return nil
+        return FAILURE.report(self, {
+            label = FAILURE.LABEL.BAD_NAME,
+            detail = "値なし",
+            warning = "act:call - nil key (undefined variable?), skipping scene search",
+        })
     end
     -- 「呼ばない」印: call_key が警告と失敗表記を出し済み
     if key == SKIP_CALL then
@@ -626,9 +700,13 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
         return handler(self, ...)
     end
 
-    local warning = string.format("act:call - handler not found: key='%s', mode='scene', via=act",
-        tostring(key))
-    return self:failure(string.format("Call失敗：「%s」が見つからない", tostring(key)), warning)
+    -- key は書いた名前（別名の置き換えは検索の中で行い、両名のログはそこで出す）
+    return FAILURE.report(self, {
+        label = FAILURE.LABEL.SCENE_NOT_FOUND,
+        subject = "＞" .. tostring(key),
+        warning = string.format("act:call - handler not found: key='%s', mode='scene', via=act",
+            tostring(key)),
+    })
 end
 
 --- 動的コールの式の値を検索キーにする（生成コードが act:call / act:call_restore のキーに渡す）
@@ -636,6 +714,8 @@ end
 --- 空でない文字列（"nil" を含む）はそのまま、数値は tostring。それ以外（nil・空文字列・真偽値・表など）は
 --- 警告（var_path があれば WORD.dynamic_key と同じ文言、なければ被演算子の表記。値 nil で説明もなければ
 --- 黙る。手書きの Lua から nil を渡したときだけ起きる）と失敗表記を出し、「呼ばない」印を返す。
+--- desc があり、直前の関数の参照が見つからずに報告済み（FAILURE.take_fn_failed）なら黙って「呼ばない」印を返す
+--- （生成コードは関数の参照を call_key の引数として直前に評価する）。
 --- @param self Act アクションオブジェクト
 --- @param value any 動的コールの式の値（生値）
 --- @param var_path string|nil 式が変数参照 1 つのときの Lua パス（"var.x" / "save.x" / "args[1]"）
@@ -645,17 +725,23 @@ function ACT_IMPL.call_key(self, value, var_path, desc)
     local t = type(value)
     if t == "number" then return tostring(value) end
     if t == "string" and value ~= "" then return value end
-    local warning
+    -- 式が関数 1 つでその関数が見つからないとき、関数の参照が報告済みなので重ねない
+    if desc ~= nil and var_path == nil and FAILURE.take_fn_failed(self) then return SKIP_CALL end
     if var_path then
-        WORD.dynamic_key(value, var_path, "act:call") -- 警告だけ出す（キーにできないことは判定済み）
-    elseif value ~= nil or desc ~= nil then
+        WORD.dynamic_key(value, var_path, "act:call", self) -- 報告だけ（キーにできないことは判定済み）
+        return SKIP_CALL
+    end
+    local record = {
+        label = FAILURE.LABEL.BAD_NAME,
+        subject = desc and FAILURE.fn(desc),
+        detail = FAILURE.kind_of(value),
+    }
+    if value ~= nil or desc ~= nil then
         local operand = desc and string.format("operand='%s', ", desc) or ""
-        warning = string.format("act:call - key is not a string or number: %svalue=%s",
+        record.warning = string.format("act:call - key is not a string or number: %svalue=%s",
             operand, arith_value_text(value))
     end
-    local subject = var_path or desc
-    subject = subject and (subject .. " が") or "値が"
-    self:failure("Call失敗：" .. subject .. (value == "" and "空文字列" or (" " .. t)), warning)
+    FAILURE.report(self, record)
     return SKIP_CALL
 end
 
@@ -684,21 +770,14 @@ function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...)
     return self:restore_scene(scene, self:call(global_scene_name, key, attrs, ...))
 end
 
---- 失敗表記の唯一の出口: 警告があればログへ出し、【text】を raw_script トークンとして積む
----
---- raw_script はそのまま出力される（句読点ウェイト・分かち書き改行は入らない）。
---- 切替タグを出さずに積んだ位置（直前に話したアクターのバルーン、
---- または出力の先頭なら現在のスコープ）へ文字を出す。
+--- 失敗表記を出す: 警告があればログへ出し、【text】（中身はエスケープ済み）を raw_script トークンとして積む
+--- （pasta.failure の報告の出口を通る）
 --- @param self Act アクションオブジェクト
---- @param text string 失敗表記の中身（【】はこの関数が付ける）
+--- @param text string 失敗表記の中身（【】はこの関数が付ける。タグとして働く文字は文字のまま出る）
 --- @param warning string|nil ログに出す警告文。nil なら出さない
 --- @return nil
 function ACT_IMPL.failure(self, text, warning)
-    if warning then
-        log.warn(warning)
-    end
-    table.insert(self.token, { type = "raw_script", text = "【" .. text .. "】" })
-    return nil
+    return FAILURE.report(self, { label = text, warning = warning })
 end
 
 --- スポット設定トークン生成（状態レス化）

@@ -1,0 +1,19 @@
+# failure_notation_switch E2E 用フィクスチャ（failure-output-unification task 4.1）
+#
+# [logging] balloon_warning はテストが末尾に書き足す（書かない・false・型違いの 3 通り）。
+# lua_search_paths から "scripts" を外す理由は codegen_runtime_safety の pasta.toml と同じ
+# （埋め込みの pasta 標準ランタイムと本番の entry.lua をそのまま通す）。
+
+[loader]
+pasta_patterns = ["dic/*.pasta"]
+lua_search_paths = [
+    "profile/pasta/save/lua",
+    "profile/pasta/pasta_scripts",
+    "profile/pasta/cache/lua",
+    "scriptlibs",
+]
+transpiled_output_dir = "profile/pasta/cache/lua"
+
+# 登録済みアクターは立ち位置 1。\p[0] は未登録アクターの立ち位置 0 フォールバックからだけ出る
+[actor."さくら"]
+spot = 1

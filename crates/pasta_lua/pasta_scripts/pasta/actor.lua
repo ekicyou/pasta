@@ -6,7 +6,7 @@
 
 local STORE = require("pasta.store")
 local WORD = require("pasta.word")
-local log = require "@pasta_log"
+local FAILURE = require("pasta.failure")
 
 --- @class Actor アクターオブジェクト
 --- @field name string アクター名
@@ -179,7 +179,16 @@ local function drop_self(self, r, ...)
     return r, ...
 end
 
---- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(act, ...)、非function → warn+nil
+--- 関数の参照が成功したとき、呼んだ関数が戻った後に「報告済み」の印を偽にし、戻り値をそのまま返す
+--- @param act Act アクションオブジェクト
+--- @param ... any 関数の戻り値
+--- @return any ...
+local function fn_succeeded(act, ...)
+    FAILURE.set_fn_failed(act, false)
+    return ...
+end
+
+--- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(act, ...)、非function → 失敗の報告+nil
 --- 見つかった段にかかわらず第 1 引数は常に ACT。戻り値は drop_self で正規化する
 --- @param self ActorProxy プロキシオブジェクト
 --- @param key string 関数名
@@ -190,11 +199,15 @@ local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
         local scene = self.act.current_scene
-        return drop_self(self, self.act:restore_scene(scene, handler(self.act, ...)))
+        return fn_succeeded(self.act, drop_self(self, self.act:restore_scene(scene, handler(self.act, ...))))
     end
-    log.warn(string.format("proxy:expr_fn - handler not found: key='%s', mode='expr', via=proxy(%s)",
-        tostring(key), tostring(self.actor.name)))
-    return nil
+    FAILURE.set_fn_failed(self.act, true)
+    return FAILURE.report(self.act, {
+        label = FAILURE.LABEL.FN_NOT_FOUND,
+        subject = "＠" .. tostring(key) .. "（）",
+        warning = string.format("proxy:expr_fn - handler not found: key='%s', mode='expr', via=proxy(%s)",
+            tostring(key), tostring(self.actor.name)),
+    })
 end
 
 --- expr 関数呼び出し（find_handler + expr ポストプロセス）
@@ -214,8 +227,11 @@ end
 --- @param ... any 可変引数（ハンドラーに伝搬。第 1 引数は ACT）
 --- @return any|nil ハンドラー戻り値、またはnil
 function PROXY_IMPL.expr_fn_var(self, value, var_path, ...)
-    local key = WORD.dynamic_key(value, var_path, "proxy:expr_fn")
-    if key == nil then return nil end
+    local key = WORD.dynamic_key(value, var_path, "proxy:expr_fn", self.act)
+    if key == nil then
+        FAILURE.set_fn_failed(self.act, true) -- dynamic_key が報告済み（call_key は重ねない）
+        return nil
+    end
     return call_expr(self, key, true, ...)
 end
 
@@ -225,7 +241,7 @@ end
 
 --- word（find_handler と同じ順序で検索 + word ポストプロセス）
 --- 検索順序は find_actor_handler(A1+A2) → act:find_act_handler(L1-L5)
---- ポストプロセス: handler=nil → warn+nil、その他 → tostring(h)
+--- ポストプロセス: handler=nil → 失敗の報告+nil、その他 → tostring(h)
 --- function は見つかった段で第 1 引数が変わる: アクターの段 → h(proxy)、act の段 → h(act)。戻り値は drop_self で正規化する
 --- var_path があるとき（動的参照）は name を WORD.dynamic_key でキーにし、継承したメソッドに届かせずに検索する
 --- @param self ActorProxy プロキシオブジェクト
@@ -235,7 +251,7 @@ end
 function PROXY_IMPL.word(self, name, var_path)
     local skip_methods = nil
     if var_path ~= nil then
-        name = WORD.dynamic_key(name, var_path, "proxy:word")
+        name = WORD.dynamic_key(name, var_path, "proxy:word", self.act)
         if name == nil then return nil end
         skip_methods = true
     elseif not name or name == "" then
@@ -246,9 +262,12 @@ function PROXY_IMPL.word(self, name, var_path)
         handler, receiver = self.act:find_act_handler("word", name, skip_methods), self.act
     end
     if handler == nil then
-        log.warn(string.format("proxy:word - handler not found: key='%s', mode='word', via=proxy(%s)",
-            tostring(name), tostring(self.actor.name)))
-        return nil
+        return FAILURE.report(self.act, {
+            label = FAILURE.LABEL.WORD_NOT_FOUND,
+            subject = "＠" .. tostring(name),
+            warning = string.format("proxy:word - handler not found: key='%s', mode='word', via=proxy(%s)",
+                tostring(name), tostring(self.actor.name)),
+        })
     end
     if type(handler) == "function" then
         local scene = self.act.current_scene

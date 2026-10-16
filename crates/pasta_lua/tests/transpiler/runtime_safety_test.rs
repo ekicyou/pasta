@@ -140,15 +140,21 @@ fn test_runtime_safety_tokens_vars_and_warnings() {
     );
     let expected_tokens = [
         "talk|さくら|true|開始",
-        // U18（アクション行）: 未定義のグローバル関数は何も出さない
+        // U18: 未定義のグローバル関数はその位置に失敗表記を出す（アクション行・代入行）
+        // （failure-output-unification 対応表 #6）
+        "raw_script|-|false|【関数が見つからない：＠＊未定義関数（）】",
         "talk|さくら|true|です",
+        "raw_script|-|false|【関数が見つからない：＠＊未定義関数（）】",
         // U19: 未登録アクターは目印を 1 回だけ積み、続く行も同じアクターで話す
-        "talk|未登録さん|false|【未登録アクター：未登録さん】",
+        // （目印はアクター付きの raw_script。failure-output-unification 対応表 #8）
+        "raw_script|未登録さん|false|【未登録アクター：未登録さん】",
         "talk|未登録さん|false|こんにちは",
         "talk|未登録さん|false|続きです",
         // U20: act のメンバー名と同名の登録済みアクターが話せる
         "talk|talk|true|トークです",
         "talk|var|true|変数です",
+        // U22: 数にできない値はその位置に失敗表記（failure-output-unification 対応表 #9）
+        "raw_script|-|false|【数にできない値：\"abc\"】",
         // U22: 未代入の変数は算術の文脈で 0 とみなす（expr-nil-coercion 1.1）
         "talk|さくら|true|1",
         // U08: \\ は 2 文字のまま 1 トークン
@@ -555,7 +561,7 @@ end
     );
 }
 
-/// 変えない規則: 台詞の未代入の変数は空文字＋既存の警告、関数の引数に nil を 1 つ渡すとそのまま nil が届く（5.1・5.5）
+/// 変えない規則: 台詞の未代入の変数は空文字（その位置に失敗表記）＋既存の警告、関数の引数に nil を 1 つ渡すとそのまま nil が届く（5.1・5.5）
 #[test]
 fn test_nil_outside_operators_is_unchanged() {
     let source = r##"
@@ -581,7 +587,7 @@ end
         return table.concat(out, "|")
         "#,
     );
-    assert_eq!(texts, "前|後");
+    assert_eq!(texts, "前|【値の無い変数：＄未代入】|後");
     assert_eq!(eval_str(&lua, "return RS_ARGS"), "n=1 v=nil");
     assert_eq!(
         all_logs(&lua),

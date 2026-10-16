@@ -101,3 +101,9 @@
 - 選択肢の挙動を変えない。
 - `choice_select.lua` は、`scene-anchor-link` と同じウェーブに置かない。
 - 小さい spec である（5〜8 タスクの見当）。規模が膨らむなら、バルーンへ書く口を分ける。
+
+## 申し送り（failure-output-unification より、2026-10-17）
+
+- 失敗の見せ方を載せる先ができた。シーンが生きている間の失敗は `pasta/failure.lua` の `FAILURE.report(act, record)` から出す（警告 1 行と `【種類：対象（説明）】` の表記 1 つ）。新しい種類は `FAILURE.LABEL` に足す。表記の形・エスケープ・`[logging] balloon_warning` の切り替えは出口が持つ。
+- 応答が表記だけになったシーンは 200 で返る。出さない設定で何も残らないときは 204 になる（`act:build` がすべて空の `raw_script` で nil を返す）。
+- 参照: `.kiro/specs/completed/failure-output-unification/design.md`、マニュアル `book/src/reference/runtime-failures.md`。

@@ -63,6 +63,7 @@ pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_n
 | `pasta.shiori.sakura_builder`（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`） | グループ化トークンをさくらスクリプト文字列にする `BUILDER.build` |
 | `pasta.shiori.appearance`（`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`） | 外見状態の生成（`APPEARANCE.new`）・観測（`APPEARANCE.observe`）・復旧（`APPEARANCE.restore`）と、さくらスクリプトの単位の読み取り（`APPEARANCE.tag_at`。ビルダーが字の判定と `\c` の読み取りに使う）。状態を持たず、渡された状態の表をその場で更新する。`STORE` や `@pasta_*` を `require` しない |
 | `pasta.buf`（`crates/pasta_lua/pasta_scripts/pasta/buf.lua`） | 組立に使う文字列バッファ。LuaJIT の `string.buffer` があればそれを、無ければ同じ `put`・`tostring` を持つ最小実装を使う |
+| `pasta.failure`（`crates/pasta_lua/pasta_scripts/pasta/failure.lua`） | 失敗表記の `raw_script` トークンを積む報告の出口。`sakura_builder` は未登録の印を読む（[失敗の報告（pasta.failure）](internal-modules.md#失敗の報告pastafailure)） |
 | `pasta.store`（`crates/pasta_lua/pasta_scripts/pasta/store.lua`） | ビルドをまたいで保持する `STORE.actor_spots`（アクター名 → スポット）と `STORE.appearance`（外見状態）を持つ |
 
 ### Rust 側（`crates/pasta_lua/src/sakura_script/`）
@@ -84,9 +85,10 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 | `type` | フィールド | 積むメソッド |
 | ------ | ---------- | ------------ |
-| `talk` | `actor`・`text` | `act:talk(アクター, テキスト)`（アクタープロキシの `talk` 経由を含む）。`text` が `nil` なら積まない。未登録のアクターの目印（`【未登録アクター：名前】`）は `act:actor_proxy` が積む（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fn)） |
+| `talk` | `actor`・`text` | `act:talk(アクター, テキスト)`（アクタープロキシの `talk` 経由を含む）。`text` が `nil` なら積まない（変数参照の展開なら、代わりに値の無い変数の失敗表記を積む） |
 | `sakura_script` | `actor`・`text` | `act:sakura_script(アクター, テキスト)`（アクタープロキシ経由） |
-| `raw_script` | `text` | `act:raw_script(テキスト)`。SHIORI 用の ACT では `set_property`・`get_property` も積む。Call の失敗表記（`【Call失敗：…】`）は `act:failure` が積む（[Call のキーと失敗表記](internal-modules.md#call-のキーと失敗表記call_keyfailure)） |
+| `raw_script` | `text` | `act:raw_script(テキスト)`。SHIORI 用の ACT では `set_property`・`get_property` も積む。失敗表記（[実行時の失敗の出力](../reference/runtime-failures.md)）は `pasta.failure` の `FAILURE.report` が積む（[失敗の報告（pasta.failure）](internal-modules.md#失敗の報告pastafailure)） |
+| `raw_script` | `text`・`actor` | 未登録アクターの目印。`act:actor_proxy` が `FAILURE.report` を通して積む（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fn)）。`text` は目印の表記で、失敗表記を出さない設定では空文字列になる |
 | `surface` | `id` | `act:surface(ID)` |
 | `wait` | `ms` | `act:wait(ミリ秒)`（0 以上の整数に丸める） |
 | `newline` | `n` | `act:newline(回数)`（既定 1） |
@@ -96,21 +98,21 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 | `spot` | `actor`・`spot` | `act:set_spot(名前, 番号)`。`act.actors` に無い名前なら積まない |
 | `clear_spot` | — | `act:clear_spot()` |
 
-`talk` と `sakura_script` だけが発言したアクターを持つ。`surface` などアクターを持たないトークンは、次のグループ化で直前の発言者のグループに入る（出力の先頭か `clear_spot` の後で、発言より前に積んだものはアクター `nil` のグループに入る）。
+`talk`・`sakura_script` と `actor` 付きの `raw_script`（未登録アクターの目印）だけが発言したアクターを持つ（話者のトークン）。`surface` などアクターを持たないトークンは、次のグループ化で直前の発言者のグループに入る（出力の先頭か `clear_spot` の後で、発言より前に積んだものはアクター `nil` のグループに入る）。
 
 ### グループ化トークン
 
-`ACT_IMPL.build` は `act.token` を取り出して空にし、0 件なら `nil` を返す。1 件以上なら次の 2 段で列を作り直す。
+`ACT_IMPL.build` は `act.token` を取り出して空にし、0 件のとき、またはすべてが `text` の空の `raw_script` のとき（失敗表記を出さない設定で残った目印だけの場合など） `nil` を返す。1 件以上なら次の 2 段で列を作り直す。
 
 1. `group_by_actor` は列を先頭から走査する。
    - `spot` は、そのまま結果に置く。グループは閉じない。
    - `clear_spot` は、そのまま結果に置き、現在のグループを閉じる。後の発言と表示制御などは新しいグループに入る。
-   - `talk`・`sakura_script` は、グループがまだ無いか、トークンの `actor` が現在のグループのアクターと別の表であれば、新しいグループ `{ type = "actor", actor = …, tokens = {} }` を結果に追加してから、そのグループの `tokens` に入れる。同じアクターなら現在のグループに入れる。
-   - `raw_script` は、グループがあればその `tokens` に、無ければ結果に直接置く。
+   - 話者のトークン（`talk`・`sakura_script`・`actor` 付きの `raw_script`）は、グループがまだ無いか、トークンの `actor` が現在のグループのアクターと別の表であれば、新しいグループ `{ type = "actor", actor = …, tokens = {} }` を結果に追加してから、そのグループの `tokens` に入れる。同じアクターなら現在のグループに入れる。
+   - `actor` の無い `raw_script` は、グループがあればその `tokens` に、無ければ結果に直接置く。
    - それ以外（`surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout`）は、グループがあればその `tokens` に入れ、無ければアクター `nil` のグループ `{ type = "actor", actor = nil, tokens = {} }` を結果に追加してから、そのグループの `tokens` に入れる。グループが無いのは、出力の先頭か `clear_spot` の後で、まだ発言を積んでいないときである。
 2. `merge_consecutive_talks` は、各グループの `tokens` の中で隣り合う `talk` のテキストを連結して 1 つの `talk` にする。`sakura_script` など `talk` 以外のトークンが間にあれば結合は切れる。
 
-結果は、`type = "actor"` のグループと、`spot`・`clear_spot`・グループの外の `raw_script` が並ぶ列になる。アクター `nil` のグループは、発言より前に積んだ表示制御などを積んだ順に持つ。組立はこのグループでスコープ切替タグを出さず、内側の出力はアクター未指定（`nil`）として観測される（[さくらスクリプトの組立](#さくらスクリプトの組立)）。Call の失敗表記は `raw_script` のため、直前に話したアクターのグループの内側か、グループが無ければ最上位に置かれる。どちらもスコープ切替タグを出さず、グループも区切らないため、後に同じアクターが話しても切り替えの出力は増えない。
+結果は、`type = "actor"` のグループと、`spot`・`clear_spot`・グループの外の `raw_script` が並ぶ列になる。アクター `nil` のグループは、発言より前に積んだ表示制御などを積んだ順に持つ。組立はこのグループでスコープ切替タグを出さず、内側の出力はアクター未指定（`nil`）として観測される（[さくらスクリプトの組立](#さくらスクリプトの組立)）。失敗表記（未登録アクターの目印を除く）は `actor` の無い `raw_script` のため、直前に話したアクターのグループの内側か、グループが無ければ最上位に置かれる。どちらもスコープ切替タグを出さず、グループも区切らないため、後に同じアクターが話しても切り替えの出力は増えない。
 
 ### トークンの種類と出力
 
@@ -150,7 +152,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 グループのアクターが `last_actor` と別の表であれば、アクターの切り替えとして次を行う（`emit_actor_switch`）。
 
-1. スポットを `actor_spots[アクター名]` から引く。無ければ 0 とし、アクターに名前があれば警告をログに出す。`act:actor_proxy` が作るその場限りのアクター（未登録の名前）は `actor_spots` に無いため、ここで 0 になる。
+1. スポットを `actor_spots[アクター名]` から引く。無ければ 0 とし、アクターに名前があれば警告をログに出す。`act:actor_proxy` が作るその場限りのアクター（未登録の名前）は `actor_spots` に無いため、ここで 0 になる。このアクターには未登録の印（`FAILURE.is_unregistered_actor`）があるため、警告は出さない（未登録アクターの警告が既に出ている）。
 2. `\p[スポット]` を出力する。
 3. 続けて `APPEARANCE.restore(appearance, アクター, スポット, グループの内側のトークン)` が返す復旧タグを出力する（[アピアランスの観測と復旧](#アピアランスの観測と復旧)）。
 4. `pending_break` を `spot_has_text[スポット]` で決め直し、`last_spot`・`last_actor` を更新する。

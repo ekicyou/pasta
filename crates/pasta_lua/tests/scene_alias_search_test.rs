@@ -434,7 +434,7 @@ fn missing_aliased_call_reports_written_name_and_skips_prefix_scene() {
                 table,
                 "呼び出し",
                 &response,
-                "【Call失敗：「会話」が見つからない】\\p[0]次の行です",
+                "【シーンが見つからない：＞会話】\\p[0]次の行です",
             );
             assert!(
                 !response.contains("朝の会話です"),

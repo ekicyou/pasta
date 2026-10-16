@@ -171,3 +171,10 @@ roadmap のバックログにあった「`pasta_core` の `resolve_scene_id` の
 - 検査を足すときに触る所: 報告の種類 `FindingKind`（`report.rs`。誤り／注意の分類と kebab-case の code・文言の `msg` を 1 か所で持つ）、検査の段（`validate/mod.rs` の `validate_ghost` が段の順に呼ぶ）、マニュアルの章 `book/src/debug/validate.md` の報告の表。
 - 種類の追加・分類・出力の 1 行の形を変えるのは本 spec の design.md の Revalidation Triggers に当たる（CI・作者のスクリプト・マニュアル・`wasmBridge.ts` の形の検査に効く）。実行時と同じことを守る一致テスト `crates/pasta_check/tests/validate_parity_test.rs` も合わせて見直す。
 - どちらの spec が検査を足すか・誤りか注意かは、この spec の要件で決める論点として渡す（本 spec では決めていない）。
+
+## 申し送り（failure-output-unification より、2026-10-17）
+
+- 上の Constraints にある失敗表記 `【Call失敗：「名前」が見つからない】` は無くなった。Call の失敗は `pasta/failure.lua` の `FAILURE.report(act, record)` から出し、シーンが見つからないときは `【シーンが見つからない：＞書いた名前】`、キーが名前にならないときは `【名前にならない値：対象（説明）】` になる（種類の名前は `FAILURE.LABEL`）。
+- 論点「一致する候補が無いとき」は、この出口に載せる前提で決め直す。種類を足すなら `FAILURE.LABEL` に足し、表記の形・エスケープ・`[logging] balloon_warning` の切り替えは出口に任せる。
+- 動的コールで関数の参照が先に報告したときは、`call_key` が重ねて出さない（「報告済み」の印 `take_fn_failed`）。フィルターの評価を入れる位置は、この印の読み取りより後になる。
+- 参照: `.kiro/specs/completed/failure-output-unification/design.md` の「報告箇所」「重ねない規則」、マニュアル `book/src/reference/runtime-failures.md`。
