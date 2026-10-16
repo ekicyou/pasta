@@ -362,7 +362,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 - [x] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
 - [x] manual-print-media-refs -- マニュアルの印刷用ページ（`print.html`）で動画の参照が切れているのを、ビルド後の書き換えで直し、検査の例外を外す（2026-10-10 棚卸で起票）。Dependencies: none
 - [x] manual-print-page-removal -- 公開サイトの `print.html` を開くとブラウザが固まるので、`book.toml` で印刷用のページを作らせないようにし、`print-media-refs` の道具と CI の段を消し、`verify-static.mjs` を合わせる（2026-10-16 起票）。Dependencies: none
-- [ ] pasta-check-dic-validate -- SSP を起動せずに `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い参照・モジュール名とシーン名の衝突などを見る（2026-10-10 棚卸で起票）。Dependencies: none（`hello-pasta-shell-art` は完了し、`Cargo.lock` の席は空いた）
+- [x] pasta-check-dic-validate -- SSP を起動せずに `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い参照・モジュール名とシーン名の衝突などを見る（2026-10-10 棚卸で起票）。Dependencies: none（`hello-pasta-shell-art` は完了し、`Cargo.lock` の席は空いた）（2026-10-17 完了: `pasta_check validate`・`release` の段 4 の関門・VSCode 拡張の保存のときのゴースト全体の診断・マニュアルの章 `debug/validate.md`）
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
 - [ ] runtime-error-balloon -- スクリプトが止まる実行時エラー（500 の応答）を、辞書を書く人に見えるようバルーンにも出す。2026-10-16 開発者の決定で、やると決めて 0.4.0 に入れた（2026-10-10 の棚卸で `failure-output-unification` から分割）。Dependencies: failure-output-unification, shiori-test-support-runtime
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアルまで揃える（2026-10-08 起票）。Dependencies: failure-output-unification, call-attribute-filter
@@ -387,7 +387,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 
 - [ ] scene-attribute-store -- 属性の読み手に、演出（`scene-stage-attributes`）が加わる。順番を保てる倉の形、ローカルシーンと名前なしの `＊` への受け継ぎを、要件の材料にする。0.4.0 の後の先頭に置く。Dependencies: none
 - [ ] call-attribute-filter -- フラグによる分岐の本命になる。条件の値に変数を書けること、「それ以外」の場面、数のしきい値、候補が複数残るときの扱いを、要件で決める。Dependencies: scene-attribute-store, failure-output-unification
-- [ ] pasta-check-dic-validate -- 範囲は変えない。後から入る spec（`cue-command-runtime`・`call-attribute-filter`・`novel-talk-flow`）が検査を足せる作りにしておく。Dependencies: none
+- [x] pasta-check-dic-validate -- 範囲は変えない。後から入る spec（`cue-command-runtime`・`call-attribute-filter`・`novel-talk-flow`）が検査を足せる作りにしておく。Dependencies: none
 
 ## Direct Implementation Candidates
 
