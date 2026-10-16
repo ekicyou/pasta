@@ -47,7 +47,7 @@
   - _Boundary: Removal / Docs_
   - _Requirements: 3.4, 3.5, 3.6_
 
-- [ ] 4. 全体を CI と同じ順で確かめる
+- [x] 4. 全体を CI と同じ順で確かめる
   - `book/node_modules` が無ければ `book/` で `npm ci` を済ませる（着色の段に要る）
   - 手引きの「手元での確かめ方」の順で出力を作り直し、出力の検査（`--no-build --self-test`）・検索の検査（`--no-build --self-test`）・リンク検査・コンテンツ検査・`book/tools` の `*-test.mjs` 全件を流す
   - 新版の章のページ（例: 文法の章）をブラウザの印刷のプレビューで開き、目次・メニュー・前後の矢印が出ず本文が紙幅に広がること、自分から印刷の画面を開かないことを目で確かめる（mdBook の印刷用の CSS が隠していたコードの右上のボタンのアイコンと、リンクの色も見る）。`file://` で入口を開き、章の移動と画像・動画が今までどおりであることを確かめる
@@ -58,3 +58,4 @@
 
 ## Implementation Notes
 - タスク 2: P-7 の目次・上部バーの `display: none` は既存の C-7（目次と上部バーは色と字体だけ）に当たるため、C-7 は `@media print` の中の規則を数えないようにした（S-29 で固定）。`transform: none` には mdBook の目次を開いたときの規則の詳細度に勝つため `!important` が要る。
+- タスク 4: 印刷のプレビューは headless Edge を CDP でつなぎ `Emulation.setEmulatedMedia({media:"print"})` で `grammar/index.html` を写して確かめた（目次・メニュー・前後の矢印は display:none、本文は紙幅、コードのボタンは見えない、リンクはテーマの赤茶）。pdftoppm が無く PDF は描けない。`file://` の入口と動画（debug/dev-actions.html、readyState=4）も問題なし。旧版の print.html の無さは PR の CI の旧版の段（mdBook v0.5.3）で確かめる。
