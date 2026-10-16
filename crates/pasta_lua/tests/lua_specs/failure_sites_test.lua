@@ -170,7 +170,7 @@ describe("失敗の対応表 #7 WORD.dynamic_key（動的参照の値が名前�
             local key = act:call_key(nil, "var.行き先")
             expect(type(key)):toBe("table")
             expect(act:call(nil, key)):toBeNil()
-            expect(dump(act)):toBe("raw_script|-|【Call失敗：var.行き先 が nil】")
+            expect(dump(act)):toBe("raw_script|-|【名前にならない値：＄行き先（値なし）】")
             expect(#warns):toBe(1)
             expect(warns[1]):toBe("act:call - undefined variable: 'var.行き先'")
         end)
@@ -226,11 +226,11 @@ describe("失敗の対応表 #9・#10 ACT.num・ACT.str", function()
 end)
 
 describe("失敗の対応表 #11〜#13 Call", function()
-    test("#11 act:call(nil) は nil・警告 1 行・トークンなし", function()
+    test("#11 act:call(nil) は nil・失敗表記 1 つ・警告 1 行", function()
         with_sites(function(ACT, _, warns)
             local act = new_act(ACT)
             expect(act:call(nil, nil)):toBeNil()
-            expect(dump(act)):toBe("")
+            expect(dump(act)):toBe("raw_script|-|【名前にならない値：値なし】")
             expect(#warns):toBe(1)
             expect(warns[1]):toBe("act:call - nil key (undefined variable?), skipping scene search")
         end)
@@ -240,7 +240,7 @@ describe("失敗の対応表 #11〜#13 Call", function()
         with_sites(function(ACT, _, warns)
             local act = new_act(ACT)
             expect(act:call(nil, "fs_無いシーン")):toBeNil()
-            expect(dump(act)):toBe("raw_script|-|【Call失敗：「fs_無いシーン」が見つからない】")
+            expect(dump(act)):toBe("raw_script|-|【シーンが見つからない：＞fs_無いシーン】")
             expect(#warns):toBe(1)
             expect(warns[1]):toBe("act:call - handler not found: key='fs_無いシーン', mode='scene', via=act")
         end)
@@ -253,9 +253,9 @@ describe("失敗の対応表 #11〜#13 Call", function()
             expect(type(act:call_key("", nil, "@f()"))):toBe("table")
             expect(type(act:call_key(true, nil, nil))):toBe("table")
             expect(dump(act)):toBe(table.concat({
-                "raw_script|-|【Call失敗：@f() が nil】",
-                "raw_script|-|【Call失敗：@f() が空文字列】",
-                "raw_script|-|【Call失敗：値が boolean】",
+                "raw_script|-|【名前にならない値：＠f（）（値なし）】",
+                "raw_script|-|【名前にならない値：＠f（）（空文字列）】",
+                "raw_script|-|【名前にならない値：真偽値】",
             }, "\n"))
             expect(table.concat(warns, "\n")):toBe(table.concat({
                 "act:call - key is not a string or number: operand='@f()', value=nil",
@@ -269,7 +269,7 @@ describe("失敗の対応表 #11〜#13 Call", function()
         with_sites(function(ACT, _, warns)
             local act = new_act(ACT)
             expect(type(act:call_key(nil, nil, nil))):toBe("table")
-            expect(dump(act)):toBe("raw_script|-|【Call失敗：値が nil】")
+            expect(dump(act)):toBe("raw_script|-|【名前にならない値：値なし】")
             expect(#warns):toBe(0)
         end)
     end)
@@ -286,13 +286,13 @@ describe("失敗の対応表 #11〜#13 Call", function()
 end)
 
 describe("act:failure（Lua からの報告）", function()
-    test("【text】を raw_script で 1 つ積み、警告があれば 1 行出し、nil を返す", function()
+    test("【text】（エスケープ済み）を raw_script で 1 つ積み、警告があれば 1 行出し、nil を返す", function()
         with_sites(function(ACT, _, warns)
             local act = new_act(ACT)
             expect(act:failure("Lua失敗：\\-", "test - direct failure")):toBeNil()
             expect(act:failure("警告なし")):toBeNil()
             expect(dump(act)):toBe(table.concat({
-                "raw_script|-|【Lua失敗：\\-】",
+                "raw_script|-|【Lua失敗：\\\\-】",
                 "raw_script|-|【警告なし】",
             }, "\n"))
             expect(#warns):toBe(1)

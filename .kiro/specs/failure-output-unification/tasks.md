@@ -40,7 +40,7 @@
   - _Requirements: 1.1, 1.5, 3.6, 5.5, 6.2, 6.3, 8.2_
 
 - [ ] 3. 失敗の種類ごとの載せ替え（1 種類 = 1 コミット）
-- [ ] 3.1 Call の失敗 3 か所と `act:failure` を新しい形で出す
+- [x] 3.1 Call の失敗 3 か所と `act:failure` を新しい形で出す
   - `act:call` の値の無いキー（#11）・シーンが見つからない（#12。別名でも書いた名前）、`call_key` の名前にならない値（#13）を出口から新しい文言で出す
   - `act:failure(text, warning)` の署名を保ち、表記を `【text】`（エスケープ済み）にする
   - 別名の両名ログ（Rust 側）は触らずに残る
@@ -132,3 +132,4 @@
 ## Implementation Notes
 - 1.2: `pasta/failure.lua` はログを呼んだ時点で `require("@pasta_log")` する（spec がログを差し替えて act を読み直す慣行のため）。module-level の `local log` に変えない。暫定で `record.label` に表記の中身全文が入っており、2.x で design の FailureRecord（label＝種類の名前）に合わせ直す
 - 2.3: `act:failure` は一時的に `FAILURE.report_text`（エスケープしない従来の経路）を通る。3.1 で `report` へ切り替えたら `report_text` を消す。`notation` の「出さない設定なら nil」と `report` の「目印だけ空で積む」は 4.1 で足し、注釈とテストも合わせる。この LuaJIT ではメインスレッドの `coroutine.running()` は thread＋ismain を返す
+- 3.1: `report_text` は削除済み。変数パス付きの `call_key`（`＞＄行き先`）は暫定で `call_key` 自身が表記を積み、警告は `WORD.dynamic_key` が出す。3.4 で `dynamic_key` に act を渡したら `ACT_IMPL.call_key` の var_path 分岐の `FAILURE.report` を外す（外さないと表記が 2 つ）。`act:call(nil)` は 2.10 により表記を 1 つ積む

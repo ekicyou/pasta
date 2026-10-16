@@ -392,41 +392,41 @@ describe("act:call_key（名前に使えない値）", function()
 
     test("nil・変数の経路あり: 動的単語参照と同じ undefined variable の警告", function()
         check(nil, "var.x", nil,
-            "act:call - undefined variable: 'var.x'", "【Call失敗：var.x が nil】")
+            "act:call - undefined variable: 'var.x'", "【名前にならない値：＄x（値なし）】")
     end)
 
     test("空文字列・変数の経路あり: empty variable の警告", function()
         check("", "save.x", nil,
-            "act:call - empty variable: 'save.x'", "【Call失敗：save.x が空文字列】")
+            "act:call - empty variable: 'save.x'", "【名前にならない値：＄＊x（空文字列）】")
     end)
 
     test("その他の型・変数の経路あり: unsupported value type の警告", function()
         check(true, "args[1]", nil,
-            "act:call - unsupported value type: 'args[1]' (boolean)", "【Call失敗：args[1] が boolean】")
+            "act:call - unsupported value type: 'args[1]' (boolean)", "【名前にならない値：＄０（真偽値）】")
         check({}, "var.t", nil,
-            "act:call - unsupported value type: 'var.t' (table)", "【Call失敗：var.t が table】")
+            "act:call - unsupported value type: 'var.t' (table)", "【名前にならない値：＄t（表）】")
     end)
 
     test("nil・関数の表記あり: 被演算子の表記の警告", function()
         check(nil, nil, "@f()",
-            "act:call - key is not a string or number: operand='@f()', value=nil", "【Call失敗：@f() が nil】")
+            "act:call - key is not a string or number: operand='@f()', value=nil", "【名前にならない値：＠f（）（値なし）】")
     end)
 
     test("nil・説明なし（演算の結果）: 警告なし、失敗表記だけ", function()
-        check(nil, nil, nil, nil, "【Call失敗：値が nil】")
+        check(nil, nil, nil, nil, "【名前にならない値：値なし】")
     end)
 
     test("空文字列・その他の型（変数の経路なし）: key is not a string or number の警告", function()
         check("", nil, "@f()",
             "act:call - key is not a string or number: operand='@f()', value='' (string)",
-            "【Call失敗：@f() が空文字列】")
+            "【名前にならない値：＠f（）（空文字列）】")
         check("", nil, nil,
-            "act:call - key is not a string or number: value='' (string)", "【Call失敗：値が空文字列】")
+            "act:call - key is not a string or number: value='' (string)", "【名前にならない値：空文字列】")
         check(false, nil, "@*g()",
             "act:call - key is not a string or number: operand='@*g()', value=false (boolean)",
-            "【Call失敗：@*g() が boolean】")
+            "【名前にならない値：＠＊g（）（真偽値）】")
         check({}, nil, nil,
-            "act:call - key is not a string or number: value=(table)", "【Call失敗：値が table】")
+            "act:call - key is not a string or number: value=(table)", "【名前にならない値：表】")
     end)
 
     test("印は呼び出しごとに同じ一意の表で、文字列や false と衝突しない", function()
@@ -460,17 +460,19 @@ describe("act:call の失敗の分岐", function()
         end)
     end)
 
-    test("nil キー（Lua からの直接呼び出し）は現行の警告だけで失敗表記を出さない", function()
+    test("nil キー（Lua からの直接呼び出し）は現行の警告 1 件と失敗表記【名前にならない値：値なし】", function()
         with_captured_act(function(ACT, warns)
             local act = ACT.new({})
             expect(act:call(nil, nil, nil)):toBe(nil)
             expect(#warns):toBe(1)
             expect(warns[1]):toBe("act:call - nil key (undefined variable?), skipping scene search")
-            expect(#act.token):toBe(0)
+            expect(#act.token):toBe(1)
+            expect(act.token[1].type):toBe("raw_script")
+            expect(act.token[1].text):toBe("【名前にならない値：値なし】")
         end)
     end)
 
-    test("見つからないと現行の警告 1 件と失敗表記【Call失敗：「名前」が見つからない】", function()
+    test("見つからないと現行の警告 1 件と失敗表記【シーンが見つからない：＞名前】", function()
         with_captured_act(function(ACT, warns)
             local act = ACT.new({})
             act.current_scene = {}
@@ -481,7 +483,7 @@ describe("act:call の失敗の分岐", function()
                 "act:call - handler not found: key='__no_such_scene_2_2__', mode='scene', via=act")
             expect(#act.token):toBe(1)
             expect(act.token[1].type):toBe("raw_script")
-            expect(act.token[1].text):toBe("【Call失敗：「__no_such_scene_2_2__」が見つからない】")
+            expect(act.token[1].text):toBe("【シーンが見つからない：＞__no_such_scene_2_2__】")
         end)
     end)
 

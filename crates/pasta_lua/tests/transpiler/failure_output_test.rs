@@ -259,7 +259,7 @@ fn site_07_dynamic_key_not_a_name() {
         tokens: &[
             "talk|さくら|前",
             "talk|さくら|。後",
-            "raw_script|-|【Call失敗：var.行き先 が nil】",
+            "raw_script|-|【名前にならない値：＄行き先（値なし）】",
         ],
         warns: &[
             "proxy:word - undefined variable: 'var.未代入'",
@@ -334,7 +334,11 @@ fn site_11_call_nil_key() {
         name: "#11 act:call(nil)",
         lua: true,
         body: "　さくら：前＠直接Call（）後\n",
-        tokens: &["talk|さくら|前", "talk|さくら|後"],
+        tokens: &[
+            "talk|さくら|前",
+            "raw_script|-|【名前にならない値：値なし】",
+            "talk|さくら|後",
+        ],
         warns: &["act:call - nil key (undefined variable?), skipping scene search"],
         vars: &[],
     });
@@ -349,7 +353,7 @@ fn site_12_call_scene_not_found() {
         body: "　さくら：前\n　＞会話２\n　さくら：後\n",
         tokens: &[
             "talk|さくら|前",
-            "raw_script|-|【Call失敗：「会話２」が見つからない】",
+            "raw_script|-|【シーンが見つからない：＞会話２】",
             "talk|さくら|後",
         ],
         warns: &["act:call - handler not found: key='会話２', mode='scene', via=act"],
@@ -366,9 +370,9 @@ fn site_13_call_key_not_a_name() {
         lua: true,
         body: "　＞＠値なし（）\n　＞＠真偽（）\n　＞＠無い関数（）\n",
         tokens: &[
-            "raw_script|-|【Call失敗：@値なし() が nil】",
-            "raw_script|-|【Call失敗：@真偽() が boolean】",
-            "raw_script|-|【Call失敗：@無い関数() が nil】",
+            "raw_script|-|【名前にならない値：＠値なし（）（値なし）】",
+            "raw_script|-|【名前にならない値：＠真偽（）（真偽値）】",
+            "raw_script|-|【名前にならない値：＠無い関数（）（値なし）】",
         ],
         warns: &[
             "act:call - key is not a string or number: operand='@値なし()', value=nil",
@@ -380,7 +384,7 @@ fn site_13_call_key_not_a_name() {
     });
 }
 
-/// `act:failure`: Lua ブロックから直接呼ぶ（text をそのまま【】で囲んで積み、警告を出す）
+/// `act:failure`: Lua ブロックから直接呼ぶ（text をエスケープして【】で囲んで積み、警告を出す）
 #[test]
 fn site_14_act_failure_direct() {
     run_case(&Case {

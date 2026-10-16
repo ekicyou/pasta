@@ -150,18 +150,6 @@ function FAILURE.report(act, record)
     return nil
 end
 
---- act:failure(text, warning) の従来の経路: 警告を出し、【text】をエスケープせずに積む
---- （3.1 で act:failure を report へ切り替えたら消す）
----@param act table
----@param text string
----@param warning string|nil
----@return nil
-function FAILURE.report_text(act, text, warning)
-    warn(warning)
-    table.insert(act.token, { type = "raw_script", text = "【" .. text .. "】" })
-    return nil
-end
-
 --- 実行中の act の対応表（スレッド → act）
 local RUNNING = setmetatable({}, { __mode = "k" })
 --- 直前の関数呼び出しが報告済みか（act → 真偽値）

@@ -612,8 +612,11 @@ end
 function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
     -- nil ガード: 式評価結果が nil の場合（未定義変数等）
     if key == nil then
-        log.warn("act:call - nil key (undefined variable?), skipping scene search")
-        return nil
+        return FAILURE.report(self, {
+            label = FAILURE.LABEL.BAD_NAME,
+            detail = "値なし",
+            warning = "act:call - nil key (undefined variable?), skipping scene search",
+        })
     end
     -- 「呼ばない」印: call_key が警告と失敗表記を出し済み
     if key == SKIP_CALL then
@@ -627,9 +630,13 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
         return handler(self, ...)
     end
 
-    local warning = string.format("act:call - handler not found: key='%s', mode='scene', via=act",
-        tostring(key))
-    return self:failure(string.format("Call失敗：「%s」が見つからない", tostring(key)), warning)
+    -- key は書いた名前（別名の置き換えは検索の中で行い、両名のログはそこで出す）
+    return FAILURE.report(self, {
+        label = FAILURE.LABEL.SCENE_NOT_FOUND,
+        subject = "＞" .. tostring(key),
+        warning = string.format("act:call - handler not found: key='%s', mode='scene', via=act",
+            tostring(key)),
+    })
 end
 
 --- 動的コールの式の値を検索キーにする（生成コードが act:call / act:call_restore のキーに渡す）
@@ -646,17 +653,19 @@ function ACT_IMPL.call_key(self, value, var_path, desc)
     local t = type(value)
     if t == "number" then return tostring(value) end
     if t == "string" and value ~= "" then return value end
-    local warning
+    local record = { label = FAILURE.LABEL.BAD_NAME, detail = FAILURE.kind_of(value) }
     if var_path then
         WORD.dynamic_key(value, var_path, "act:call") -- 警告だけ出す（キーにできないことは判定済み）
-    elseif value ~= nil or desc ~= nil then
-        local operand = desc and string.format("operand='%s', ", desc) or ""
-        warning = string.format("act:call - key is not a string or number: %svalue=%s",
-            operand, arith_value_text(value))
+        record.subject = FAILURE.var(var_path)
+    else
+        record.subject = desc and FAILURE.fn(desc)
+        if value ~= nil or desc ~= nil then
+            local operand = desc and string.format("operand='%s', ", desc) or ""
+            record.warning = string.format("act:call - key is not a string or number: %svalue=%s",
+                operand, arith_value_text(value))
+        end
     end
-    local subject = var_path or desc
-    subject = subject and (subject .. " が") or "値が"
-    self:failure("Call失敗：" .. subject .. (value == "" and "空文字列" or (" " .. t)), warning)
+    FAILURE.report(self, record)
     return SKIP_CALL
 end
 
@@ -685,13 +694,14 @@ function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...)
     return self:restore_scene(scene, self:call(global_scene_name, key, attrs, ...))
 end
 
---- 失敗表記を出す: 警告があればログへ出し、【text】を raw_script トークンとして積む（pasta.failure へ委ねる）
+--- 失敗表記を出す: 警告があればログへ出し、【text】（中身はエスケープ済み）を raw_script トークンとして積む
+--- （pasta.failure の報告の出口を通る）
 --- @param self Act アクションオブジェクト
---- @param text string 失敗表記の中身（【】はこの関数が付ける）
+--- @param text string 失敗表記の中身（【】はこの関数が付ける。タグとして働く文字は文字のまま出る）
 --- @param warning string|nil ログに出す警告文。nil なら出さない
 --- @return nil
 function ACT_IMPL.failure(self, text, warning)
-    return FAILURE.report_text(self, text, warning)
+    return FAILURE.report(self, { label = text, warning = warning })
 end
 
 --- スポット設定トークン生成（状態レス化）
