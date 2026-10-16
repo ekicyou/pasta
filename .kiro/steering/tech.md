@@ -13,7 +13,7 @@
 - **pasta_lua**: Luaバックエンド層（pasta_dsl + pasta_core依存）
 - **pasta_shiori**: SHIORI DLLインターフェース層
 - **pasta_lsp**: LSP実装層（tower-lsp, WASM/Native対応）
-- **pasta_check**: リリースCLIツール（ゴーストパッケージング・NAR生成）
+- **pasta_check**: 辞書の検査の核（ライブラリ・ファイルシステム非依存で WASM でも動く）＋CLIツール（`validate`＝辞書の検査、`release`＝検査を関門にしたゴーストパッケージング・NAR生成）
 - **pasta_sample_ghost**: サンプルゴースト「hello-pasta」（publish=false, 配布物作成。立ち絵はコミットした素材）
 
 ### 主要依存関係
@@ -63,15 +63,19 @@
 
 **pasta_lsp:**
 - **pasta_dsl**: DSLパーサー層
+- **pasta_check**（`default-features = false`）: 辞書の検査の核。WASM の入口 `wasm_select_ghost_files`・`wasm_validate_ghost` から呼び、VSCode 拡張のゴースト全体の診断に使う
 - **tower-lsp 0.20**: LSPサーバーフレームワーク
 - **serde 1 / serde_json 1**: シリアライゼーション
 - **thiserror 2**: エラー型定義
 - **wasm-bindgen**: WASM対応（cfg(wasm32)）
 
 **pasta_check:**
-- **lexopt 0.3**: CLIパーサー
-- **md5 0.8**: ハッシュ計算（更新ファイル生成）
-- **zip 8.6**: NAR（ZIP）アーカイブ作成
+- **pasta_dsl / pasta_core**: 検査の核（pasta.dll と同じパーサー・シーン登録）
+- **toml 1 / serde 1 / glob 0.3**: 検査の核（pasta.toml の読み取り・入出力の形・`pasta_patterns` の照合）
+- **lexopt 0.3**: CLIパーサー（feature `cli`）
+- **md5 0.8**: ハッシュ計算（更新ファイル生成・feature `cli`）
+- **zip 8.6**: NAR（ZIP）アーカイブ作成（feature `cli`）
+- 既定の feature `cli` はバイナリ専用の依存だけを有効にする（ライブラリは WASM でも使うので含めない）。dev-dependency の `pasta_lua`（パス依存・publish で外れる）は pasta.dll との一致テスト用
 
 **pasta_sample_ghost:**
 - **png 0.18**（dev-dependency）: 立ち絵の検証テスト（大きさ・透過・表情間の画素一致）
@@ -103,7 +107,7 @@ pasta (workspace)
 │   └── Encoding        # プラットフォーム別エンコーディング
 ├── pasta_shiori        # SHIORI DLLインターフェース
 ├── pasta_lsp           # LSP実装（WASM/Native）
-├── pasta_check         # リリースCLI（NAR生成・更新ファイル）
+├── pasta_check         # 辞書の検査の核＋CLI（validate・release＝NAR生成・更新ファイル）
 └── pasta_sample_ghost  # サンプルゴースト生成ツール
 ```
 
@@ -116,7 +120,7 @@ pasta (workspace)
 | pasta_lua          | Loader       | スクリプト読み込み・キャッシュ  |
 | pasta_shiori       | SHIORI       | DLLエクスポート、リクエスト処理 |
 | pasta_lsp          | LSP          | 構文ハイライト、診断、WASM対応  |
-| pasta_check        | CLI          | リリースパッケージング・NAR生成 |
+| pasta_check        | CLI          | 辞書の検査（核は WASM 共有）・リリースパッケージング・NAR生成 |
 | pasta_sample_ghost | Distribution | サンプルゴーストの素材・配布    |
 
 ### 設計哲学

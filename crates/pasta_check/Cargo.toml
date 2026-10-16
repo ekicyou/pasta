@@ -2,7 +2,7 @@
 name = "pasta_check"
 workspace = "../.."
 version.workspace = true
-description = "CLI tool for ghost release packaging - generates update files and NAR archives"
+description = "CLI tool for ghost dictionary validation and release packaging - validates dictionaries, generates update files and NAR archives"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true

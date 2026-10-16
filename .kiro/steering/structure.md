@@ -169,7 +169,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │           ├── japanese_identifier_test.rs  # Lua基盤テスト
 │           └── ucid_test.rs         # Lua基盤テスト
 │   ├── pasta_lsp/           # LSP実装層
-│   │   ├── Cargo.toml       # pasta_lsp設定（tower-lsp, pasta_dsl依存）
+│   │   ├── Cargo.toml       # pasta_lsp設定（tower-lsp, pasta_dsl, pasta_check（既定 feature 無し）依存）
 │   │   ├── README.md        # クレート概要
 │   │   ├── tests/           # 外部化テスト（Phase A）
 │   │   └── src/
@@ -184,12 +184,16 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │       ├── document.rs  # ドキュメント状態管理
 │   │       ├── error.rs     # LangServerError型定義
 │   │       ├── server.rs    # PastaLangServer (tower-lsp trait実装)
-│   │       └── transport.rs # WASM/Nativeプラットフォーム抽象化
-│   ├── pasta_check/         # リリースCLIツール
-│   │   ├── Cargo.toml       # pasta_check設定（lexopt, md5, zip 依存）
+│   │       └── transport.rs # WASM/Nativeプラットフォーム抽象化（WASM の入口: 解析・辞書ファイルの選び出し・ゴースト全体の検査）
+│   ├── pasta_check/         # 辞書の検査の核（ライブラリ）＋CLIツール（validate・release）
+│   │   ├── Cargo.toml       # pasta_check設定（核: pasta_dsl, pasta_core, toml, serde, glob／feature cli: lexopt, md5, zip）
+│   │   ├── tests/           # CLI統合テスト・検査の規則のテスト・pasta_lua との一致テスト（validate_parity_test.rs）
 │   │   └── src/
+│   │       ├── lib.rs           # ライブラリの入口（validate を公開）
+│   │       ├── validate/        # 検査の核（ファイルシステム非依存・WASM 共有。config/discovery/syntax/transpile_rules/module_name/scenes/builtins/references/report）
 │   │       ├── main.rs          # CLIエントリーポイント
-│   │       ├── release.rs       # リリースビルドオーケストレーション
+│   │       ├── validate_cmd.rs  # validate サブコマンド（ghost/master のファイルを集めて核を呼ぶ・release の段 4 も使う）
+│   │       ├── release.rs       # リリースビルドオーケストレーション（6 段・段 4 が辞書の検査の関門）
 │   │       ├── balloon.rs       # 同梱バルーン判定（install.txt）
 │   │       ├── update_files.rs  # 更新ファイル（updates.txt）生成
 │   │       ├── nar.rs           # NAR（ZIP）アーカイブ作成
@@ -214,7 +218,8 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       ├── tsconfig.json    # TypeScript設定
 │       ├── src/             # TypeScriptソース
 │       │   ├── extension.ts            # アクティベーション・エントリポイント
-│       │   ├── wasmBridge.ts           # WASMモジュールブリッジ
+│       │   ├── wasmBridge.ts           # WASMモジュールブリッジ（解析・ゴースト全体の検査の入口と型）
+│       │   ├── ghostValidator.ts       # ゴースト全体の検査の診断（保存・ファイルの増減で起動・300ms で束ねる・source "pasta validate"）
 │       │   ├── semanticTokensProvider.ts # セマンティックトークン提供
 │       │   ├── diagnosticsManager.ts   # 診断情報管理
 │       │   ├── documentSync.ts         # ドキュメント同期（200msデバウンス）
@@ -321,7 +326,8 @@ pasta (workspace)
 ├── pasta_core          # 言語非依存層（レジストリ）
 ├── pasta_lua           # Luaバックエンド層（pasta_dsl + pasta_core依存）
 ├── pasta_shiori        # SHIORI DLLインターフェース層（src/actor/ = アクタースレッド・flume mailbox・marshaling・teardown・static MAILBOX 所有）
-├── pasta_lsp           # LSP実装層（WASM/Native対応）
+├── pasta_lsp           # LSP実装層（WASM/Native対応・pasta_check の検査の核を WASM で公開）
+├── pasta_check         # 辞書の検査の核（ライブラリ・pasta_dsl + pasta_core依存）＋CLI（validate・release）
 └── pasta_sample_ghost  # サンプルゴースト「hello-pasta」（publish=false）
 ```
 
