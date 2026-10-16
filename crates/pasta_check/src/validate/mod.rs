@@ -20,7 +20,8 @@ pub use report::{Finding, FindingKind, Report, Severity, Stats, msg};
 
 /// 辞書ファイルとして読むべきパス（.pasta のパターンに一致したもの）を、決まった順で返す。
 pub fn select_dictionary_files(input: &GhostInput) -> Vec<String> {
-    discovery::discover(input).0
+    let (config, _) = config::read_config(&input.pasta_toml);
+    discovery::discover(input, &config).0
 }
 
 /// ゴースト全体を検査する。`files` には select_dictionary_files が返した全パスの中身を入れる。
@@ -28,9 +29,9 @@ pub fn select_dictionary_files(input: &GhostInput) -> Vec<String> {
 /// 順番: 設定 → 集め方 → モジュール名・構文 → トランスパイル・シーン → 飛び先。
 /// 構文エラーが 1 つでもあれば飛び先の検査を丸ごと省く（6.8）。
 pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) -> Report {
-    let mut findings = config::check(&input.pasta_toml);
+    let (config, mut findings) = config::read_config(&input.pasta_toml);
 
-    let (dictionary_files, found) = discovery::discover(input);
+    let (dictionary_files, found) = discovery::discover(input, &config);
     findings.extend(found);
     findings.extend(module_name::check(&dictionary_files));
 
@@ -42,7 +43,7 @@ pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) ->
     findings.extend(found);
 
     findings.extend(transpile_rules::check(&parsed));
-    let (table, found) = scenes::check(&parsed);
+    let (table, found) = scenes::check(&parsed, &config.aliases);
     findings.extend(found);
 
     let references_skipped = findings.iter().any(|f| f.code == FindingKind::Syntax);

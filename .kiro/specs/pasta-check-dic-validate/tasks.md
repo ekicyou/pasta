@@ -28,7 +28,7 @@
   - _Requirements: 1.1, 1.7, 11.1_
 
 - [ ] 2. 検査の核: 規則を 1 つずつ入れる
-- [ ] 2.1 pasta.toml の [loader] と [scene] を pasta.dll と同じ厳しさで読む
+- [x] 2.1 pasta.toml の [loader] と [scene] を pasta.dll と同じ厳しさで読む
   - TOML として読めない（行・列）、`[loader]` の 4 つのキーの型の誤り（行が取れれば行）、`[scene]`・`[scene.alias]` の型の誤りと別名表の拒否（空の名前・重複・連鎖、該当する別名の行を全部）を誤りにする
   - `[loader]`・`[scene]` 以外のセクションは見ない。誤りがあっても既定値（`dic/**/*.pasta`・既定の別名表）で続ける
   - `pasta.toml` が無いときは既定値で集めたうえで `config-missing` を誤りにする
@@ -196,3 +196,4 @@
 
 - 1.2: 理由の文言は `validate::msg` の関数にまとめた。`config-scene-alias` は重複の文言だけ用意済み（空の名前・連鎖・型の違いは 2.1 で足す）。並び順の code は FindingKind の宣言の順。serde の kebab-case と `code()` が同じことは 6.1 の JSON の形のテストで 1 行確かめる。
 - 1.3: 各段の関数は crate 内の骨組み。2.1 で design の `read_config(src) -> (GhostConfig, Vec<Finding>)` に切り替え、GhostConfig を discovery と scenes に渡す（TOML を 2 度読まない）。参照を省くかは Syntax の Finding の有無で決める。
+- 2.1: `PastaConfig::from_str` は純粋な文字列の解析で PASTA_DEBUG のガードは要らない（ガードは `PastaLoader::load` を呼ぶテストだけ）。読めない pasta.toml は `file-unreadable`（パス pasta.toml）。

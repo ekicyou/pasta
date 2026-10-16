@@ -225,8 +225,28 @@ fn messages_follow_wording_table() {
         "[loader] の pasta_patterns の型が違います: x"
     );
     assert_eq!(
-        msg::config_scene_alias_duplicate("会話", "OnTalk", "OnX"),
+        msg::config_scene_alias_duplicate("会話", &["OnTalk".into(), "OnX".into()]),
         "[scene.alias] の別名「会話」が OnTalk・OnX に重複しています"
+    );
+    assert_eq!(
+        msg::config_loader_not_table("x"),
+        "[loader] が表ではありません: x"
+    );
+    assert_eq!(
+        msg::config_scene_alias_empty("OnTalk"),
+        "[scene.alias] の OnTalk に空の別名があります"
+    );
+    assert_eq!(
+        msg::config_scene_alias_empty(""),
+        "[scene.alias] に置き換え先の名前が空のものがあります"
+    );
+    assert_eq!(
+        msg::config_scene_alias_chain("会話"),
+        "[scene.alias] の「会話」は置き換え先と別名の両方に書かれています（別名を別名で置き換えることはできません）"
+    );
+    assert_eq!(
+        msg::config_scene_alias_type("x"),
+        "[scene.alias] の型が違います: x"
     );
     assert_eq!(
         msg::config_pattern_invalid("[", "x"),

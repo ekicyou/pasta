@@ -247,8 +247,33 @@ pub mod msg {
     pub fn config_loader_type(key: &str, toml_desc: &str) -> String {
         format!("[loader] の {key} の型が違います: {toml_desc}")
     }
-    pub fn config_scene_alias_duplicate(alias: &str, first: &str, second: &str) -> String {
-        format!("[scene.alias] の別名「{alias}」が {first}・{second} に重複しています")
+    /// `loader = 1` のように [loader] を表でなく書いたとき（config-loader-type）
+    pub fn config_loader_not_table(toml_desc: &str) -> String {
+        format!("[loader] が表ではありません: {toml_desc}")
+    }
+    /// 置き換え先は pasta.dll と同じく名前の昇順で並べる
+    pub fn config_scene_alias_duplicate(alias: &str, targets: &[String]) -> String {
+        format!(
+            "[scene.alias] の別名「{alias}」が {} に重複しています",
+            targets.join("・")
+        )
+    }
+    /// 空の名前（置き換え先が空なら `target` は ""）
+    pub fn config_scene_alias_empty(target: &str) -> String {
+        if target.is_empty() {
+            "[scene.alias] に置き換え先の名前が空のものがあります".into()
+        } else {
+            format!("[scene.alias] の {target} に空の別名があります")
+        }
+    }
+    pub fn config_scene_alias_chain(name: &str) -> String {
+        format!(
+            "[scene.alias] の「{name}」は置き換え先と別名の両方に書かれています（別名を別名で置き換えることはできません）"
+        )
+    }
+    /// `[scene]`・`[scene.alias]` が表でない、値が文字列の配列でない
+    pub fn config_scene_alias_type(toml_desc: &str) -> String {
+        format!("[scene.alias] の型が違います: {toml_desc}")
     }
     pub fn config_pattern_invalid(pattern: &str, desc: &str) -> String {
         format!("pasta_patterns の「{pattern}」はパターンとして読めません: {desc}")
