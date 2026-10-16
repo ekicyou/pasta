@@ -300,6 +300,7 @@ skip_methods が真のとき（動的参照）
 - [handler-resolution-fallback](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/handler-resolution-fallback) — `find_handler` による検索順の統一
 - [actor-dict-word-shuffle](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/actor-dict-word-shuffle) — アクター単語のシャッフルと順次消費
 - [audit-pasta-core](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/audit-pasta-core) — `pasta_core` の監査と簡素化
+- [touch-poke-shortcuts](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/touch-poke-shortcuts) — シーンの完全一致の検索（`resolve_scene_id_exact`・`search_scene_exact`・`SCENE.co_exec_exact`）
 
 ---
 

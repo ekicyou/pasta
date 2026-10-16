@@ -484,6 +484,7 @@ dispatch(act)
 - [lua-require-robustness](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-require-robustness) — `loadu`、処理のエラーを 500 応答で返す契約
 - [pasta-scene-kick](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-scene-kick) — `ActorMsg::Kick` と `SHIORI.kick`
 - [pasta-toml-logging-consistency](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-toml-logging-consistency) — ランタイムの解放を `release_runtime` にまとめ、ロガーの登録解除を最後にする
+- [touch-poke-shortcuts](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/touch-poke-shortcuts) — OnMouseDoubleClick・OnMouseMove の既定ハンドラと、既定ハンドラを上書きしない登録（`REG.X = REG.X or …`）
 
 ---
 
