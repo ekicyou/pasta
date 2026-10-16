@@ -555,7 +555,7 @@ end
     );
 }
 
-/// 変えない規則: 台詞の未代入の変数は空文字＋既存の警告、関数の引数に nil を 1 つ渡すとそのまま nil が届く（5.1・5.5）
+/// 変えない規則: 台詞の未代入の変数は空文字（その位置に失敗表記）＋既存の警告、関数の引数に nil を 1 つ渡すとそのまま nil が届く（5.1・5.5）
 #[test]
 fn test_nil_outside_operators_is_unchanged() {
     let source = r##"
@@ -581,7 +581,7 @@ end
         return table.concat(out, "|")
         "#,
     );
-    assert_eq!(texts, "前|後");
+    assert_eq!(texts, "前|【値の無い変数：＄未代入】|後");
     assert_eq!(eval_str(&lua, "return RS_ARGS"), "n=1 v=nil");
     assert_eq!(
         all_logs(&lua),

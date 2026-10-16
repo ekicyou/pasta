@@ -199,14 +199,19 @@ end
 --- talkトークン蓄積（状態レス化: actorトークン/spot_switch生成を削除）
 --- @param self Act アクションオブジェクト
 --- @param actor Actor アクターオブジェクト
---- nil は空文字扱い（トークンを積まない）。nil 以外は tostring する。
+--- nil は空文字扱い（talk を積まない。変数参照由来なら値の無い変数の失敗表記を積む）。nil 以外は tostring する。
 --- @param text any 発話テキスト
---- @param var_name string|nil 変数参照由来のとき変数パス（nil 時の警告用）
+--- @param var_name string|nil 変数参照由来のとき変数パス（nil 時の報告用）
 --- @return Act self メソッドチェーン用
 function ACT_IMPL.talk(self, actor, text, var_name)
     if text == nil then
+        -- var_name の無い nil は内側の参照が報告済みなので黙る
         if var_name then
-            log.warn(string.format("act:talk - undefined variable: '%s'", var_name))
+            FAILURE.report(self, {
+                label = FAILURE.LABEL.UNDEFINED_VAR,
+                subject = FAILURE.var(var_name),
+                warning = string.format("act:talk - undefined variable: '%s'", var_name),
+            })
         end
         return self
     end

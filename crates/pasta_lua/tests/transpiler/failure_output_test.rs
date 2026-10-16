@@ -160,7 +160,10 @@ fn site_01_talk_undefined_variable() {
         body: "　さくら：今日は＄話題。の話\n　＄n＝＠値なし（）\n　さくら：＄n\n　さくら：＄０だよ\n",
         tokens: &[
             "talk|さくら|今日は",
+            "raw_script|-|【値の無い変数：＄話題】",
             "talk|さくら|。の話",
+            "raw_script|-|【値の無い変数：＄n】",
+            "raw_script|-|【値の無い変数：＄０】",
             "talk|さくら|だよ",
         ],
         warns: &[

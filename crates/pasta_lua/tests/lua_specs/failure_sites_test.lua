@@ -56,11 +56,11 @@ local function dump(act)
 end
 
 describe("失敗の対応表 #1 act:talk", function()
-    test("変数パス付きの nil は警告 1 行・トークンなし・self を返す", function()
+    test("変数パス付きの nil は警告 1 行・表記 1 つ・self を返す", function()
         with_sites(function(ACT, _, warns)
             local act = new_act(ACT)
             expect(act:talk(act.actors[ACTOR_NAME], nil, "var.話題")):toBe(act)
-            expect(dump(act)):toBe("")
+            expect(dump(act)):toBe("raw_script|-|【値の無い変数：＄話題】")
             expect(#warns):toBe(1)
             expect(warns[1]):toBe("act:talk - undefined variable: 'var.話題'")
         end)

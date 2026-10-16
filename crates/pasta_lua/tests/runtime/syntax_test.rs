@@ -388,13 +388,14 @@ fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
         "transfer must be explicit: {without}"
     );
     assert!(
-        without.contains("部位＝。"),
-        "unset var must render empty: {without}"
+        without.contains("部位＝【値の無い変数：＄ｒ４】。"),
+        "unset var must render the failure notation: {without}"
     );
 }
 
 /// 未定義の変数・単語・関数をアクション行で参照すると、"nil" を出さず
 /// 空文字として展開される（マニュアル book/src/grammar/words.md「未定義単語の参照」と同じ扱い）。
+/// 値の無い変数はその位置に失敗表記を出す（failure-output-unification 対応表 #1）。
 /// 前後に文字がある単語参照が nil 連結で実行時エラーにならないことも確認する。
 #[test]
 fn test_e2e_undefined_refs_in_action_line_render_empty() {
@@ -426,7 +427,9 @@ fn test_e2e_undefined_refs_in_action_line_render_empty() {
         "must not render 'nil': {response}"
     );
     assert!(
-        response.contains("変数＝単語＝関数＝　グローバル＝終わり。"),
+        response.contains(
+            "変数＝【値の無い変数：＄未代入】単語＝関数＝　グローバル＝【値の無い変数：＄＊未代入】終わり。"
+        ),
         "undefined refs must render empty: {response}"
     );
 }
