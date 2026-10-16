@@ -185,8 +185,8 @@
   - _Depends: 5.1, 7.4_
   - _Requirements: 10.3, 10.4, 10.6_
 
-- [ ] 9. 最終確認
-- [ ] 9.1 全体のテスト・静的検査・WASM のビルドを通す
+- [x] 9. 最終確認
+- [x] 9.1 全体のテスト・静的検査・WASM のビルドを通す
   - `cargo test --all`、`cargo clippy`、`cargo fmt --check`、ライブラリの wasm32 の `cargo check`、`npm run test:unit`、マニュアルの検査を走らせる
   - `pasta_lua` のテストが書き換える生成物の改行の差分はコミットに混ぜない
   - 完了の状態: 上のすべてが通り、作業ツリーにこの spec の変更以外が残らない
