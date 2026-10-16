@@ -1,16 +1,16 @@
 {
   "feature_name": "pasta-check-dic-validate",
   "created_at": "2026-10-16T08:58:09Z",
-  "updated_at": "2026-10-16T09:07:35Z",
+  "updated_at": "2026-10-16T12:00:00Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {

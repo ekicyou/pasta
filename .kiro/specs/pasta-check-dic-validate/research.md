@@ -257,3 +257,109 @@
   - 名前（`check` は道具の名前と重なる、`validate`・`lint` など）。
   - `ghost/master` そのものも受け付けるか。
   - 引数を位置引数にするか。
+
+---
+
+# 設計フェーズの調査（2026-10-16）
+
+## Summary
+
+- **Feature**: `pasta-check-dic-validate`
+- **Discovery Scope**: Extension（既存の `pasta_check`・`pasta_lsp`・VSCode 拡張への追加。軽い調査とコードの照合。`getrandom` だけ実際にビルドして確かめた）
+- **使ったスキル・規則**: `kiro-spec-design`（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）、テンプレート `design.md`・`research.md`、steering `product.md`・`tech.md`・`structure.md`・`roadmap.md`。
+- **Key Findings**:
+  - `getrandom 0.4.3` は wasm32-unknown-unknown で feature `wasm_js` だけを有効にすれば通る（cfg の指定は要らない）。`pasta_core`・`pasta_dsl`・`toml`・`glob` をまとめて `cargo check --target wasm32-unknown-unknown` で確かめ、`wasm_js` 無しでは今と同じ `compile_error!` になることも確かめた。`pasta_core` は触らずに済む。
+  - `SceneTable::collect_scene_candidates` は乱数を使わない。乱数源を呼ぶのは `DefaultRandomSelector::new()` だけなので、検査は `MockRandomSelector::new(vec![])` を渡せば実行中に `crypto.getRandomValues` を呼ばない（VSCode 1.85 の拡張ホストの Node 18 で `globalThis.crypto` が無くても困らない）。
+  - 新しいクレートを公開すると、release CI が Trusted Publishing だけで動いているため、初回の公開を手で行い Trusted Publisher を登録する手間と、`release.yml` の 5 か所（auth と publish の段、outputs、結果の環境変数、結果の表 2 つ）・`release-setup-check.yml`・`.github/release-ci-setup.md` の変更が要る。`pasta_check` にライブラリを足せば `-DependsOn` の 1 か所で済む。
+
+## Research Log
+
+### WASM のビルド（`getrandom`）
+
+- **Context**: 申し送り 10。`pasta_core` が `rand` → `getrandom 0.4.3` を引き込み wasm32 で失敗する。
+- **Sources Consulted**: `getrandom-0.4.3/src/backends.rs` 170〜181 行（`wasm_js` の feature だけで分岐）、`rand-0.10.3/Cargo.toml`（`sys_rng` → `getrandom/sys_rng`）、`crates/pasta_core/src/registry/random.rs` 31 行、スクラッチの一時のクレートでの `cargo check --target wasm32-unknown-unknown --offline`。
+- **Findings**: `[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies] getrandom = { version = "0.4", features = ["wasm_js"] }` で通る。`Cargo.lock` の `getrandom 0.4.3` はすでに `wasm-bindgen`・`js-sys` を依存に持つ（`fastrand` 経由）ので新しいパッケージは入らない見込み。
+- **Implications**: 設定は検査の部品（`pasta_check`）の wasm32 の依存に置く。`pasta_core` の feature で `rand` を切り離す案より差分が小さく、ネイティブのビルドとランダム選択は変わらない。
+
+### `pasta.dll` の規則の所在（写す対象）
+
+- **Sources Consulted**: `pasta_lua/src/loader/discovery.rs` 15・59〜133 行、`process.rs` 28〜100・105〜271 行、`cache.rs` 238〜282 行、`loader/config/mod.rs` 55〜103・266〜319 行、`sections.rs` 327〜335 行、`transpiler.rs` 208〜236 行、`context.rs` 134 行、`code_gen/element_gen.rs` 41・81・309 行、`string_literalizer.rs` 41〜70 行、`search/context.rs` 91〜157 行、`pasta_scripts/pasta/act.lua` 332〜379 行、`global.lua` 21・27 行、`shiori/entry.lua` 17・26 行、`shiori/act.lua`、`shiori/event/choice_select.lua` 46〜77 行、`shiori/sakura_builder.lua` 31〜35 行、`pasta_dsl/src/parser/parse_scene.rs` 88〜101 行。
+- **Findings**:
+  - 辞書の集め方: パターンごとに `glob::glob(エスケープした基準 + パターン)`（既定の `MatchOptions`）。`..`・ルート・接頭辞を含むパターンは警告して飛ばす。基準の外・シンボリックリンク・`profile/` は除く。並べ替えと重複の除去は無い。`.lua` のパターンは `.pasta` の末尾を置き換えて作り、`.pasta` で終わらないパターンは `.lua` の検索だけ飛ばす。パターンとして読めないのは致命的な誤り。
+  - `init.pasta`・`init.lua` は読み込みの誤り。`.pasta` と `.lua` の重なりは `.lua` を捨てて警告、`.pasta` どうしは見ない。
+  - `pasta.toml` は**無いと読み込みに失敗する**（`ConfigNotFound`。マニュアル `pasta-toml.md` 17 行も「ファイル自体は必須」）。厳しく読むのは TOML の構文・`[loader]` の型（4 キー、知らないキーは無視）・`[scene]` と `[scene.alias]` の型と別名の規則だけ。ほかのセクションは型が違っても黙って既定値になる。→ 申し送り 6 は「`[loader]`・`[scene]` だけ」で閉じる。
+  - シーンの登録: 別名は宣言の名前に 1 段だけ・完全一致で当てる。通し番号は照合用の名前ごと。単独の `＊` は parser が前の名前を入れる（ファイルの先頭なら構文エラー）。名前の無い開始のブロックはローカルとして登録しない。→ 申し送り 3 は AST だけで再現できる。
+  - 実行時の検索: ローカルは照合用の名前に揃えたキーで `:親の登録名:キー` を前方一致（別名なし）、グローバルは別名を置き換えてから照合用の名前で前方一致。1・3・4 段は書いた名前のまま完全一致。
+  - トランスパイルの誤りは要件の 3 つのほかに `StringLiteralError`（`\` か `"` を含み `]]`〜`]==========]` の 11 通りを全部含む文字列）がある。現実には書かれない。
+  - 組み込みの飛び先: `GLOBAL` は `yield`・`チェイントーク`・`close_ghost`・`ゴースト終了` の 4 つ。act は `ACT_IMPL` の関数 27 個、SHIORI act は `SHIORI_ACT_IMPL` の関数 5 個（`transfer_req_to_var` を含む）。一覧を列挙する既存のテストは無い。
+  - 選択肢の `On`・`script:` の除外は `choice_select.lua` ではなく `sakura_builder.lua` の `choice_to_script`（範囲の引数を付けない。SSP がイベントやスクリプトとして扱う）。
+- **Implications**: 規則は `pasta_check` のライブラリに写し、一致テストで照らす（案 C）。`discover_files` は `pub(crate)` なので、一致テストのために `loader/mod.rs` で `#[doc(hidden)]` の公開を 1 行足す（`loader/config/` ではない）。
+
+### hello-pasta の見積もり（申し送り 1）
+
+- **Sources Consulted**: `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/*.pasta`・`pasta.toml`（`pasta_patterns = ["dic/*.pasta"]`、`[scene.alias]` なし）。
+- **Findings**: 静的な Call は `transfer_req_to_var`（7 か所・SHIORI act のメソッド）・`ゴースト終了`（2・GLOBAL）・`チェイントーク`（1・GLOBAL）・`寄り道`（2・ローカル `・寄り道` とグローバル `＊寄り道公園` ほか）。選択肢は `おでかけの話`・`おやつの話`（どちらもグローバルシーンがある）。動的な Call は `＞＠次の話（）` の 1 つ。同じ書いた名前のシーン（`＊会話` 11 個など）は報告しない。
+- **Implications**: 誤り 0・注意 0・動的な Call 1 の見込み（試作では確かめていない。実装の最初のテストで確かめる）。`release` の関門がリリース CI を止める見込みは無い。
+
+### VSCode 拡張と CI
+
+- **Sources Consulted**: `crates/pasta_lsp/src/transport.rs` 111〜151 行、`editors/vscode/src/{extension,wasmBridge,documentSync,diagnosticsManager}.ts`、`editors/vscode/package.json`（`activationEvents: onLanguage:pasta`・`engines ^1.85.0`・`test:unit`）、`scripts/build-wasm.ps1`、`.github/workflows/build.yml` 94〜126 行、`release.yml` 225〜335・555〜570 行、`.github/release-ci-setup.md` 161・235 行、`release-setup-check.yml` 119 行。
+- **Findings**: 拡張は `wasm-pack --target nodejs` の `pasta_lsp` を `require` する。構文の診断は集合 `pasta` で、文書を閉じると消す。保存の購読は無い。テストは esbuild と node の手書きのテストで、`npm test` を走らせるワークフローは無い。`build.yml` の `wasm` の job は `pasta_lsp` を wasm32 でビルドしている。`pasta_lsp` は release.yml で公開されない。
+- **Implications**: WASM の入口は `pasta_lsp` に足し（WASM の成果物を増やさない）、拡張は 2 回呼ぶ（選び出し → 中身を読む → 検査）。重複は「開いている文書の `syntax` は出さない」で消す。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| `pasta_check` にライブラリ（選んだ案） | 核を `pasta_check::validate` に置き、バイナリの依存を feature `cli` に分ける。`pasta_lsp` は `default-features = false` | release.yml は `-DependsOn` だけ・新しい Trusted Publisher 不要・検査の規則が検査の道具のクレートにある | エディタの部品が CLI の名前のクレートに依存する見た目・workspace の依存の行に `default-features = false` が要る | OPEN QUESTION 1 |
+| 新しいクレート `pasta_validate` | 核だけのクレートを足す | 層と名前が素直 | 初回の手での公開・Trusted Publisher の登録・release.yml の 5 か所と周辺の文書・roadmap の約束を越える | 代案 |
+| `pasta_dsl` の feature | 核を `pasta_dsl::validate` に置く | 公開の順は今のまま（`pasta_dsl` は `pasta_core` の後） | 構文の層が `pasta_core`・`toml`・`glob` に依存し責務がぼやける | 代案 |
+| `pasta_lua` に依存（案 D） | `pasta.dll` の規則をそのまま使う | 規則が完全に同じ | LuaJIT をビルド・WASM にできない | 要件（9.1・11.1）で除外 |
+
+## Design Decisions
+
+### Decision: 核はファイルシステムに触れない 2 つの関数
+
+- **Context**: 11.8（TypeScript に規則を写さない）・11.2（CLI とエディタで同じ結果）・WASM にはファイルシステムが無い。
+- **Alternatives Considered**:
+  1. 核が `GhostFs` の trait でファイルを読む（JS のコールバックが要る）。
+  2. 殻がすべてのファイルの中身を渡す（パターンに一致しない UTF-8 でないファイルを誤って報告しうる・`profile/` が重い）。
+  3. 選び出しと検査の 2 回に分ける。
+- **Selected Approach**: 3。核は状態を持たず、`select_dictionary_files(input)` と `validate_ghost(input, files)`。
+- **Rationale**: 殻は「一覧を渡す・言われたファイルを読む」だけになり、照合の規則が Rust にしか無い。
+- **Trade-offs**: 設定の解析を 2 回する（安い）。
+
+### Decision: 一般化（後から足す項目）
+
+- **Context**: 後から入る spec が項目を足す（Adjacent expectations）。
+- **Selected Approach**: `FindingKind` の列挙と、`severity()` の固定の対応と、検査の関数の並びを 1 か所に置く。trait や登録の仕組みは作らない（実装が 1 つしか無い抽象を避ける）。
+- **Rationale**: 項目を足すのは列挙子 1 つと関数 1 つ。分類・形・終了コードは Report が決めるので既存の項目は変わらない。
+
+### Decision: 構文エラーは 1 ファイル 1 件・推測しない
+
+- **Context**: 要件のメモ（設計で決める）と申し送り 5。
+- **Selected Approach**: `parse_str` の最初の 1 件だけ。
+- **Rationale**: `pasta.dll` と同じ位置（3.3）で、推測（`parse_str_partial` の行頭からの推測・列なし）を含まない。開いている文書では入力のたびの診断が複数件を出す。
+- **Follow-up**: OPEN QUESTION 3。
+
+### Decision: `pasta.toml` が無いときも誤りにする（仮定）
+
+- **Context**: Requirement 2.2 と `pasta.dll` の挙動（`ConfigNotFound`）の食い違い。
+- **Selected Approach**: 既定値で集めて検査を続け、`config-missing` を誤りにする。
+- **Follow-up**: OPEN QUESTION 2（要件の書き足し）。
+
+### Decision: Build vs Adopt
+
+- 構文・照合用の名前・別名・前方一致の検索は既存の `pasta_dsl`・`pasta_core` を使う（自作しない）。パターンの照合は `glob::Pattern`（`pasta.dll` と同じクレート）。TOML は `toml`（同じ版）。新しい外部の依存は無い（`getrandom` は lock にある版の feature を有効にするだけ）。
+
+### Decision: Simplification
+
+- `.lua` の中身は読まない（パスだけ）。拡張の起動直後の全体検査・解析の結果のキャッシュ・JSON の出力・CI の `npm test` の job は作らない（要件に無い・必要になってから足せる）。
+
+## Risks & Mitigations
+
+- 規則のずれ — 一致テスト（モジュール名・選び出し・`pasta.toml`・トランスパイル・組み込みの名前・検索）。`pasta_lua` を変える spec は `cargo test -p pasta_check` を通す。
+- Windows のパターンの大文字・小文字 — 核は区別する。ずれる場面（`Dic/` のフォルダ）の扱いを議題にする（OPEN QUESTION 6）。
+- 拡張の保存のたびの全体検査の速さ — 300ms で束ねる。遅ければ解析の結果を中身で覚える改善を後から。
+- `release` の関門がリリース CI を止める — hello-pasta の誤り 0 を CLI のテストで守る。
+- スキル（`.claude/skills/pasta-check/SKILL.md`）の編集を分類器が止める — 実装のときに開発者の許可を取る。
