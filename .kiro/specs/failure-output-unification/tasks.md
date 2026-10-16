@@ -81,7 +81,7 @@
   - _Requirements: 1.3, 2.7, 2.8, 2.12, 4.4, 6.1, 10.1, 10.3_
 
 - [ ] 4. バルーンへの警告の切り替え
-- [ ] 4.1 `[logging] balloon_warning` で表記の有無だけを切り替える
+- [x] 4.1 `[logging] balloon_warning` で表記の有無だけを切り替える
   - 設定を報告のたびに読み（キャッシュしない）、書かれていない・真偽値でないときは出す。`level`・`filter` とは独立させ、Rust と `pasta_check` は変えない
   - 出さない設定では表記を積まず、未登録アクターの目印だけ空で積む。トークンがすべて空の `raw_script` のとき、出力の組み立ては空（nil）を返す
   - 完了: 出さない設定の出力が出す設定の出力から表記を除いたものと一致し、ログが同じで、`ぱすたー：＄未定義` だけのシーンが 204 になり、型違いの値で表記が出るテストが通る
@@ -134,3 +134,4 @@
 - 2.3: `act:failure` は一時的に `FAILURE.report_text`（エスケープしない従来の経路）を通る。3.1 で `report` へ切り替えたら `report_text` を消す。`notation` の「出さない設定なら nil」と `report` の「目印だけ空で積む」は 4.1 で足し、注釈とテストも合わせる。この LuaJIT ではメインスレッドの `coroutine.running()` は thread＋ismain を返す
 - 3.1: `report_text` は削除済み。変数パス付きの `call_key`（`＞＄行き先`）は暫定で `call_key` 自身が表記を積み、警告は `WORD.dynamic_key` が出す。3.4 で `dynamic_key` に act を渡したら `ACT_IMPL.call_key` の var_path 分岐の `FAILURE.report` を外す（外さないと表記が 2 つ）。`act:call(nil)` は 2.10 により表記を 1 つ積む
 - 3.3: 関数の参照は成功時に `fn_succeeded`（act.lua・actor.lua）で呼んだ関数が戻った後に印を偽にする。`expr_fn_var` は `dynamic_key` が nil のとき暫定で印を偽にしている。3.4 で `dynamic_key` に act を渡すのと同時に真へ変える（片方だけだと表記が消えるか 2 つになる）
+- 4.1: `act:raw_script("")` だけを積んだシーンも build が nil を返し 204 になる（design どおり。リリースノートに書く候補）

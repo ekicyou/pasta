@@ -126,11 +126,23 @@ local function warn(warning)
     end
 end
 
---- act の無い場所からの報告: 警告を出し、表記の文字列を返す。トークンに積まない
+--- [logging] balloon_warning（バルーンに失敗表記を出すか）。真偽値でなければ既定値 true
+---
+--- 報告のたびに読む（キャッシュしない）。ログの警告はこの設定にかかわらず出す。
+---@return boolean
+function FAILURE.enabled()
+    -- 呼んだ時点で引く（ログと同じ。テストが設定を差し替えられるように）
+    local value = require("pasta.config").get("logging", "balloon_warning", true)
+    if type(value) ~= "boolean" then return true end
+    return value
+end
+
+--- act の無い場所からの報告: 警告を出し、表記の文字列を返す（出さない設定なら nil）。トークンに積まない
 ---@param record FailureRecord
----@return string
+---@return string|nil
 function FAILURE.notation(record)
     warn(record.warning)
+    if not FAILURE.enabled() then return nil end
     return FAILURE.format(record.label, record.subject, record.detail)
 end
 
@@ -139,13 +151,15 @@ end
 --- raw_script はそのまま出力される（句読点ウェイト・分かち書き改行は入らない）。
 --- 切替タグを出さずに積んだ位置（直前に話したアクターのバルーン、
 --- または出力の先頭なら現在のスコープ）へ文字を出す。
+--- 出さない設定では表記を積まない。ただし未登録アクターの目印（record.actor あり）は、
+--- 話者の切り替えを出す設定と同じにするため空の文字で積む。
 ---@param act table|nil
 ---@param record FailureRecord
 ---@return nil
 function FAILURE.report(act, record)
     local text = FAILURE.notation(record)
-    if act then
-        table.insert(act.token, { type = "raw_script", text = text, actor = record.actor })
+    if act and (text or record.actor) then
+        table.insert(act.token, { type = "raw_script", text = text or "", actor = record.actor })
     end
     return nil
 end

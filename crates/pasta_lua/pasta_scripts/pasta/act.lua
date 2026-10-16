@@ -612,15 +612,26 @@ function ACT.str(v, desc)
     return ""
 end
 
+--- トークンが無いか、すべて文字の空の raw_script か（空なら真）
+--- @param tokens table[]
+--- @return boolean
+local function is_all_empty_raw_script(tokens)
+    for _, t in ipairs(tokens) do
+        if t.type ~= "raw_script" or t.text ~= "" then return false end
+    end
+    return true
+end
+
 --- トークン取得とリセット（グループ化・統合済み）
 --- @param self Act アクションオブジェクト
---- @return table[]|nil グループ化されたトークン配列、またはnil（トークン0件時）
+--- @return table[]|nil グループ化されたトークン配列、またはnil（トークン0件時・すべて空の raw_script の時）
 function ACT_IMPL.build(self)
     local tokens = self.token
     self.token = {}
 
-    -- 早期リターン: トークン0件時はnilを返す (act-build-early-return)
-    if #tokens == 0 then
+    -- 早期リターン: 出すものが無いときはnilを返す (act-build-early-return)。
+    -- 失敗表記を出さない設定で未登録アクターの空の目印だけが残ったときも含む
+    if is_all_empty_raw_script(tokens) then
         return nil
     end
 

@@ -467,3 +467,109 @@ describe("FAILURE.value_of（数・文字列にできない値の説明）", fun
             :toBe('【数にできない値：＄y（"abc"）】')
     end)
 end)
+
+--- [logging] balloon_warning を value にした pasta.config の代役で body を実行し、元へ戻す
+--- （value が nil なら書かれていない）
+--- @param value any
+--- @param body fun()
+local function with_balloon_warning(value, body)
+    local saved = package.loaded["pasta.config"]
+    package.loaded["pasta.config"] = {
+        get = function(section, key, default)
+            if section == "logging" and key == "balloon_warning" and value ~= nil then return value end
+            return default
+        end,
+    }
+    local ok, err = pcall(body)
+    package.loaded["pasta.config"] = saved
+    if not ok then error(err, 0) end
+end
+
+describe("FAILURE.enabled（[logging] balloon_warning）", function()
+    local FAILURE = require("pasta.failure")
+    test("書かれていなければ true", function()
+        with_balloon_warning(nil, function() expect(FAILURE.enabled()):toBe(true) end)
+    end)
+    test("false なら false、true なら true", function()
+        with_balloon_warning(false, function() expect(FAILURE.enabled()):toBe(false) end)
+        with_balloon_warning(true, function() expect(FAILURE.enabled()):toBe(true) end)
+    end)
+    test("真偽値でない値（文字列・数・表）は既定値 true", function()
+        for _, v in ipairs({ "false", 0, {} }) do
+            with_balloon_warning(v, function() expect(FAILURE.enabled()):toBe(true) end)
+        end
+    end)
+    test("報告のたびに読む（キャッシュしない）", function()
+        with_balloon_warning(false, function() expect(FAILURE.enabled()):toBe(false) end)
+        with_balloon_warning(nil, function() expect(FAILURE.enabled()):toBe(true) end)
+    end)
+end)
+
+describe("出さない設定（balloon_warning = false）での報告", function()
+    test("report: 警告は出し、actor の無い表記は積まない", function()
+        with_balloon_warning(false, function()
+            with_log(function(FAILURE, warns)
+                local act = { token = {} }
+                expect(FAILURE.report(act, { label = "x", subject = "＄y", warning = "w" })):toBe(nil)
+                expect(#warns):toBe(1)
+                expect(#act.token):toBe(0)
+            end)
+        end)
+    end)
+    test("report: 未登録アクターの目印は空の raw_script で積む", function()
+        with_balloon_warning(false, function()
+            with_log(function(FAILURE, warns)
+                local act = { token = {} }
+                local actor = { name = "ぱすたー" }
+                FAILURE.report(act, {
+                    label = FAILURE.LABEL.UNREGISTERED_ACTOR, subject = "ぱすたー", warning = "w", actor = actor,
+                })
+                expect(#warns):toBe(1)
+                expect(#act.token):toBe(1)
+                expect(act.token[1].type):toBe("raw_script")
+                expect(act.token[1].text):toBe("")
+                expect(act.token[1].actor):toBe(actor)
+            end)
+        end)
+    end)
+    test("report: act なしでも警告だけ出す", function()
+        with_balloon_warning(false, function()
+            with_log(function(FAILURE, warns)
+                expect(FAILURE.report(nil, { label = "x", warning = "w", actor = {} })):toBe(nil)
+                expect(#warns):toBe(1)
+            end)
+        end)
+    end)
+    test("notation: 警告は出し、nil を返す", function()
+        with_balloon_warning(false, function()
+            with_log(function(FAILURE, warns)
+                expect(FAILURE.notation({ label = "x", warning = "w" })):toBe(nil)
+                expect(#warns):toBe(1)
+            end)
+        end)
+    end)
+    test("型違いの値なら表記を出す", function()
+        with_balloon_warning("no", function()
+            with_log(function(FAILURE)
+                expect(FAILURE.notation({ label = "x" })):toBe("【x】")
+            end)
+        end)
+    end)
+end)
+
+describe("ACT.build: トークンがすべて空の raw_script なら nil", function()
+    local ACT = require("pasta.act")
+    test("空の目印だけなら nil を返し、トークンを空にする", function()
+        local act = ACT.new({})
+        table.insert(act.token, { type = "raw_script", text = "", actor = { name = "a" } })
+        table.insert(act.token, { type = "raw_script", text = "" })
+        expect(act:build()):toBe(nil)
+        expect(#act.token):toBe(0)
+    end)
+    test("空でない raw_script が 1 つでもあれば組み立てる", function()
+        local act = ACT.new({})
+        table.insert(act.token, { type = "raw_script", text = "", actor = { name = "a" } })
+        table.insert(act.token, { type = "raw_script", text = "x" })
+        expect(act:build() ~= nil):toBe(true)
+    end)
+end)
