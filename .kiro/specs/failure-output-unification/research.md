@@ -195,7 +195,7 @@
 ### R4 設定の置き場所
 - **Sources Consulted**: `loader/config/sections.rs` `GhostConfig`、`mod.rs` `apply_shiori_defaults`、`pasta/config.lua`、`shiori/act.lua`（`spot_newlines`・`choice_newlines` の読み方）、マニュアル `reference/pasta-toml.md`。
 - **Findings**: `[ghost]` は書かれていないキーだけを Rust が既定値で補い、Lua は `pasta.config.get` で読む。型は確かめていない。`[debug]` は DAP の設定で、型が合わないとセクション全体が既定値に戻る（別の意味の設定と混ぜたくない）。
-- **Implications**: `[ghost] failure_notation`（真偽値・既定 true）。型の検査は Lua 側でキー単位（真偽値でなければ true）。マニュアルの「値の型が合わないとき」に行を足す。キーの名前は OPEN QUESTION 1。
+- **Implications**: 設計議論で `[logging] balloon_warning`（真偽値・既定 true）に確定（下の Decision 参照）。型の検査は Lua 側でキー単位（真偽値でなければ true）。マニュアルの「値の型が合わないとき」に行を足す。
 
 ### R5 既定で表記を出すことのテストへの影響
 - **Findings**: 警告・表記の文字列を確かめているテストは research.md 1.7 のとおり。加えて、`talk` の nil でトークンが積まれないこと・`word` の nil を確かめる Lua spec（`act_runtime_safety_test.lua`・`act_test.lua`・`act_dynamic_ref_test.lua`・`actor_proxy_act_delegation_test.lua`）の期待値が変わる。`pasta_shiori/tests/` で変わるのは、本物のランタイムを読む 2 本（`call_execution_correctness_e2e_test.rs`・`codegen_runtime_safety_e2e_test.rs`）の期待値だけで、`shiori-test-support-runtime` が触る共通部品・写し・`pasta.toml` とは重ならない。
@@ -242,6 +242,13 @@
 - **Rationale**: 目印のトークンはグループの開始と直前の話者の遡りを担う。積まないと、目印以外に何も積まない行の後で警告の回数が変わる。
 - **Trade-offs**: その行が他に何も積まないと出力が `\p[0]\e` になるため、`act:build` はトークンがすべて空の `raw_script` のとき nil を返す（設計議論で確定。表記を除いて何も残らなければ空の出力という 6.4 の読み）。
 
+### Decision: 切り替えは `[logging] balloon_warning`（設計議論で確定）
+- **Context**: 草案は `[ghost] failure_notation` だったが、名前が作者の言葉（「バルーンに警告を出すかどうか」）でなく、`[ghost]`（ゴーストの動き）に置く理由も実装の都合だった。
+- **Alternatives Considered**: `[ghost] failure_notation`・`[ghost] show_failures`・`[debug]` 配下・新しい節 `[warning] balloon`・`[balloon] warning`・`[talk]`（`TalkConfig` に他のキーを混ぜない方針）・`[logging]`。
+- **Selected Approach**: `[logging] balloon_warning = true`。バルーンへの警告表示もログの出力先の 1 つと考える（開発者の判断）。
+- **Rationale**: `[loader]` 以外の節は Lua へそのまま流れ、`LoggingConfig` は知らないキーを無視するので、Rust を変えずに Lua だけで読める。型の間違いは互いに巻き込まない。`level`・`filter` とは独立させる。
+- **Trade-offs**: `[logging]` の中でこのキーだけ型の間違いがキー単位で既定値に戻る（他のキーは節全体）。マニュアルに明記する。
+
 ### Decision: 設計議論で推奨案のまま確定した事項（2026-10-16）
 - 型の名前は日本語（真偽値・表・関数、それ以外は Lua の型名）。読み手は DSL の作者。
 - 対象が分からないときは説明を対象の位置に出す（`【種類：何か】` の 1 つの形に揃える）。
@@ -250,7 +257,7 @@
 
 ### Synthesis
 - **一般化**: 14 か所は「種類・対象・説明・警告」の 4 つの値の違いでしかない。出口はレコード 1 種で全部を受け、`runtime-error-balloon`・`call-attribute-filter` も種類の名前を足すだけで使える（インターフェースだけを一般化し、実装は今の要件の分だけ）。
-- **Build vs Adopt**: さくらスクリプトのエスケープは既存のマニュアルの決まり（`\`・`\%`）を採る。`\_?` の囲みは採らない。設定は既存の `[ghost]` と `pasta.config.get` を採り、新しいセクション・Rust の型検査を作らない。
+- **Build vs Adopt**: さくらスクリプトのエスケープは既存のマニュアルの決まり（`\`・`\%`）を採る。`\_?` の囲みは採らない。設定は既存の `[logging]` 節と `pasta.config.get` を採り、新しいセクション・Rust の型検査を作らない。
 - **Simplification**: 種類ごとの関数・失敗のクラス階層・抑止の記憶（同じ名前を黙らせる）を作らない。実行中の act の対応表は `init_scene` の 1 行で済ませ、コルーチンを作る 3 か所を触らない。`sakura_builder` の変換は変えない。
 
 ## Risks & Mitigations

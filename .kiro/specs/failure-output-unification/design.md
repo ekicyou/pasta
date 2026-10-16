@@ -12,7 +12,7 @@
 - 実行時の失敗 1 件につき、ログの警告 1 行と失敗表記 1 つを、`FAILURE.report` の 1 経路から出す（1.1〜1.4・5.1）。
 - 失敗表記の形 `【種類：対象（説明）】`、辞書の書き方への名前の変換、さくらスクリプトの無効化を `pasta/failure.lua` の 1 か所で定める（3.1〜3.8）。
 - 生成する Lua を変えずに、`act` を受け取らない `PASTA.num`・`PASTA.str` からも、失敗した位置に表記を出す（2.7・2.8・10.1）。
-- pasta.toml `[ghost]` の 1 キーで表記の有無を切り替える（7.1〜7.6）。
+- pasta.toml `[logging] balloon_warning` の 1 キーで、バルーンに警告（失敗表記）を出すかどうかを切り替える（7.1〜7.6）。
 - `act` の無い場所から表記の文字列とログを得る関数を用意する（8.2）。
 
 ### Non-Goals
@@ -30,7 +30,7 @@
 - `act.lua`・`actor.lua`・`word.lua` の実行時の失敗 14 か所の報告の仕方（何を報告の出口へ渡すか）。
 - 未登録アクターの目印のトークンの形（アクター付きの `raw_script`）と、それを扱う `group_by_actor`・`actor_proxy` の遡りの変更。
 - `shiori/sakura_builder.lua` の `actor_spots fallback` の警告を、未登録アクターのときに出さない規則（5.4）。
-- pasta.toml `[ghost] failure_notation` の定義（既定値・型・型が合わないときの扱い）と、`GhostConfig`・`apply_shiori_defaults` への 1 キーの追加。
+- pasta.toml `[logging] balloon_warning` の定義（既定値・型・型が合わないときの扱い・`level`/`filter` との独立）。Lua 側だけで読み、Rust の型には足さない。
 - `act:failure(text, warning)` の互換の維持（8.3）。
 - マニュアルの「実行時の失敗の出力」ページの新設、関係する章の書き換え、スキル `references/` の再生成。
 
@@ -44,7 +44,7 @@
 ### Allowed Dependencies
 - `pasta/failure.lua` が require してよいのは `@pasta_log` と `pasta.config` だけである。`pasta.act`・`pasta.actor`・`pasta.word`・`pasta.shiori.*` を require しない（循環を作らない。`word.lua` が `act` を require しないのと同じ理由）。
 - `act.lua`・`actor.lua`・`word.lua`・`shiori/sakura_builder.lua` は `pasta.failure` を require してよい。
-- Rust 側の変更は `crates/pasta_lua/src/loader/config/`（`sections.rs`・`mod.rs`）の `[ghost]` の 1 キーだけに限る。
+- Rust 側（`crates/pasta_lua/src/loader/config/`）は変えない。`[logging]` は `[loader]` 以外の節と同じく `custom_fields` のまま Lua の `@pasta_config` へ流れ、`LoggingConfig` は知らないキーを無視して読む。
 - 依存の向き: `@pasta_log`・`pasta.config` → `pasta.failure` → `pasta.word` → `pasta.actor` → `pasta.act` → `pasta.shiori.*`。左の層は右の層を require しない。
 
 ### Revalidation Triggers
@@ -63,7 +63,7 @@
 - `ACT.num`・`ACT.str`（生成コードの `PASTA.num`・`PASTA.str`）と `WORD.dynamic_key` は `act` を受け取らない。
 - 生成するシーン関数は、すべて先頭で `act:init_scene(SCENE)` を呼ぶ（`code_gen/scope_gen.rs` 268 行）。シーン関数はシーンのコルーチン（`SCENE.co_exec`・`choice_select.lua`・`kick.lua` が作る）の中で、そのコルーチンの act を受けて動く。チェイントークで再開したときも、同じコルーチン・同じ act のままである。
 - `raw_script` は `group_by_actor` で直前のアクターのグループに入り（無ければトップレベル）、`sakura_builder` はそのまま出して字のある発言に数えない。`act:build()` はトークン 0 件で nil を返す。
-- `[ghost]` のキーは `apply_shiori_defaults` が書かれていないものだけを既定値で補い、Lua は `pasta.config.get("ghost", key, default)` で読む。型は確かめていない。
+- pasta.toml の `[loader]` 以外の節は書いたまま `custom_fields` として Lua へ流れ、Lua は `pasta.config.get(section, key, default)` で読む。`[logging]` は Rust の `LoggingConfig`（`file_path`・`level`・`filter`。`deny_unknown_fields` なし）にも読まれ、型が合わないと Rust 側では節全体が既定値になる。
 - マニュアルには `\\`・`\%` を台詞の外のエスケープとして説明した節がある（`grammar/sakura-script.md`「タグの外のエスケープ」）。
 
 ### Architecture Pattern & Boundary Map
@@ -107,7 +107,7 @@ graph TB
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
 | Runtime | LuaJIT 2.1（mlua 0.11、`luajit52`） | `failure.lua` と既存モジュールの変更 | 新しい依存なし。`coroutine.running()` と弱参照の表（`__mode = "k"`）を使う |
-| Config | Rust `pasta_lua::loader::config` | `[ghost] failure_notation` の既定値の補完 | `GhostConfig` に 1 フィールド |
+| Config | Lua `pasta.config` | `[logging] balloon_warning` の読み取り | Rust は変えない（既定値は Lua 側） |
 | Docs | mdBook・`book/tools/gen-skill-refs.mjs` | 新ページとスキルの再生成 | `GENERATION_MAP` に 1 件足す |
 
 ## File Structure Plan
@@ -129,12 +129,10 @@ book/src/reference/
 - `crates/pasta_lua/pasta_scripts/pasta/actor.lua` — `proxy:word`・`proxy:expr_fn` の警告を `FAILURE.report(self.act, …)` に置き換え、`WORD.dynamic_key` へ `self.act` を渡す。
 - `crates/pasta_lua/pasta_scripts/pasta/word.lua` — `WORD.dynamic_key(value, var_path, via, act)` の 4 番目の引数（省略可）を足し、警告を `FAILURE.report`（act 無しならログだけ）から出す。戻り値は変えない。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` — `emit_actor_switch` が `FAILURE.is_unregistered_actor(actor)` のとき `actor_spots fallback` を出さない（1 行の条件）。
-- `crates/pasta_lua/src/loader/config/sections.rs` — `GhostConfig.failure_notation: bool`（既定 `true`）と `default_failure_notation()`。
-- `crates/pasta_lua/src/loader/config/mod.rs` — `apply_shiori_defaults` に `failure_notation` を補う 1 行。
 - `crates/pasta_lua/tests/lua_specs/init.lua` — `failure_test` を登録。
-- 既存テストの期待値（意図は変えない。10.3）: `tests/lua_specs/act_call_restore_test.lua`・`act_runtime_safety_test.lua`・`act_test.lua`・`actor_proxy_act_delegation_test.lua`・`act_dynamic_ref_test.lua`・`act_concat_test.lua`・`act_grouping_test.lua`・`sakura_builder_test.lua`、`tests/scene_alias_search_test.rs`・`symbol_name_search_test.rs`・`transpiler/dynamic_call_test.rs`・`transpiler/runtime_safety_test.rs`・`transpiler/scene_test.rs`、`crates/pasta_shiori/tests/call_execution_correctness_e2e_test.rs`・`codegen_runtime_safety_e2e_test.rs`、`loader/config` の既定値のテスト。
+- 既存テストの期待値（意図は変えない。10.3）: `tests/lua_specs/act_call_restore_test.lua`・`act_runtime_safety_test.lua`・`act_test.lua`・`actor_proxy_act_delegation_test.lua`・`act_dynamic_ref_test.lua`・`act_concat_test.lua`・`act_grouping_test.lua`・`sakura_builder_test.lua`、`tests/scene_alias_search_test.rs`・`symbol_name_search_test.rs`・`transpiler/dynamic_call_test.rs`・`transpiler/runtime_safety_test.rs`・`transpiler/scene_test.rs`、`crates/pasta_shiori/tests/call_execution_correctness_e2e_test.rs`・`codegen_runtime_safety_e2e_test.rs`。
 - `crates/pasta_sample_ghost/tests/tutorial_stages_test.rs` — `assert_responds` に「失敗表記の種類の名前を含まない」を足す（10.4）。
-- マニュアル: `book/src/SUMMARY.md`（新ページ）、`reference/pasta-toml.md`（キーの行・「5 キー」→「6 キー」・型の扱い）、`lua/modules/pasta-config.md`（キーの数）、`grammar/action-line.md`・`grammar/call-jump.md`・`grammar/variables.md`・`grammar/words.md`・`grammar/actor-dictionary.md`・`lua/script-api.md`（`act:failure`・`WORD.dynamic_key`・`PASTA.num/str`）・`internals/talk-output.md`（トークン表）・`internals/internal-modules.md`（`pasta.failure`）ほか、失敗時の挙動を書いている章（タスクで grep して確定する）。
+- マニュアル: `book/src/SUMMARY.md`（新ページ）、`reference/pasta-toml.md`（`[logging]` のキーの表・テンプレート・分類表の行・「値の型が合わないとき」で `balloon_warning` だけはキー単位で既定値に戻ること）、`grammar/action-line.md`・`grammar/call-jump.md`・`grammar/variables.md`・`grammar/words.md`・`grammar/actor-dictionary.md`・`lua/script-api.md`（`act:failure`・`WORD.dynamic_key`・`PASTA.num/str`）・`internals/talk-output.md`（トークン表）・`internals/internal-modules.md`（`pasta.failure`）ほか、失敗時の挙動を書いている章（タスクで grep して確定する）。
 - `book/tools/gen-skill-refs.mjs` — `GENERATION_MAP` に `['reference/runtime-failures.md', GA]`（件数を数えるテスト・説明の「23」を更新）。生成物 `.claude/skills/pasta-ghost-authoring/references/` を再生成。
 
 ## System Flows
@@ -232,8 +230,8 @@ sequenceDiagram
 | 6.2 | 値に表記を混ぜない | FailureReporter（トークンにだけ積む） | — | — |
 | 6.3 | 状態を変えない | FailureReporter, SpotFallbackGuard | — | — |
 | 6.4 | 切り替えは表記の有無だけ | FailureReporter | `FAILURE.enabled` | 報告の流れ |
-| 7.1 | pasta.toml で切り替え | NotationSwitch | `[ghost] failure_notation` | — |
-| 7.2 | 既定は出す | NotationSwitch, GhostConfig | 既定値 `true` | — |
+| 7.1 | pasta.toml で切り替え | NotationSwitch | `[logging] balloon_warning` | — |
+| 7.2 | 既定は出す | NotationSwitch | 既定値 `true` | — |
 | 7.3 | 出さない設定ではすべて消す | FailureReporter | `FAILURE.enabled` | 報告の流れ |
 | 7.4 | 設定にかかわらずログは出す | FailureReporter | — | 報告の流れ |
 | 7.5 | 型が合わないときは既定値 | NotationSwitch | `FAILURE.enabled` | — |
@@ -260,7 +258,7 @@ sequenceDiagram
 | FailureReporter | `failure.lua` | ログと表記の唯一の出口 | 1.1〜1.5, 2.12, 4.1, 5.5, 6.2〜6.4, 7.3, 7.4, 8.2 | pasta_log (P0), NotationFormat (P0), NotationSwitch (P0) | Service |
 | NotationFormat | `failure.lua` | 枠・種類の名前・説明の並び・エスケープ | 3.1, 3.2, 3.7, 3.8 | — | Service |
 | NameConversion | `failure.lua` | Lua の書き方 → 辞書の書き方 | 3.3, 3.4 | — | Service |
-| NotationSwitch | `failure.lua` | `[ghost] failure_notation` の読み取り | 7.1〜7.5 | pasta.config (P0) | Service |
+| NotationSwitch | `failure.lua` | `[logging] balloon_warning` の読み取り | 7.1〜7.5 | pasta.config (P0) | Service |
 | RunningActRegistry | `failure.lua` | コルーチン → 実行中の act | 2.7, 2.8, 4.4, 10.1 | `act:init_scene` (P0) | State |
 | FnResultFlag | `failure.lua` | 直前の関数呼び出しが報告済みか | 5.1, 5.2 | — | State |
 | UnregisteredActorMark | `failure.lua` | 未登録アクターの印 | 5.4 | — | State |
@@ -269,7 +267,6 @@ sequenceDiagram
 | ProxySites | `actor.lua` | proxy の 2 か所 | 1.3, 2.2, 2.3 | FailureReporter (P0) | Service |
 | DynamicKey | `word.lua` | 動的参照の値の判定と報告 | 1.3, 2.5, 5.2 | FailureReporter (P0) | Service |
 | SpotFallbackGuard | `sakura_builder.lua` | 未登録アクターの立ち位置の警告を出さない | 5.4, 6.3 | UnregisteredActorMark (P0) | — |
-| GhostConfig | Rust `loader/config` | 既定値の補完 | 7.2 | — | — |
 | ManualPage / SkillRefs | `book/` | 1 か所の説明と生成 | 9.1〜9.5 | gen-skill-refs (P1) | — |
 
 ### Lua ランタイム: `pasta/failure.lua`
@@ -350,7 +347,7 @@ function FAILURE.kind_of(v) end
 ---@return string
 function FAILURE.value_of(v) end
 
---- [ghost] failure_notation。真偽値でなければ既定値 true
+--- [logging] balloon_warning。真偽値でなければ既定値 true
 ---@return boolean
 function FAILURE.enabled() end
 
@@ -482,11 +479,17 @@ function FAILURE.is_unregistered_actor(actor) end
 ### Lua ランタイム: SpotFallbackGuard（`sakura_builder.lua`）
 - `emit_actor_switch` の警告の条件を `if actor_name and not FAILURE.is_unregistered_actor(actor) then` にする。spot 0 で出す挙動と `actor_spots` は変えない（6.3）。切り替えにかかわらず効く（7.4 のとおり、ログは表記の有無で変わらない）。
 
-### 設定: NotationSwitch・GhostConfig
+### 設定: NotationSwitch
 
-- キー: `[ghost] failure_notation`（真偽値、既定 `true`、分類「SHIORI デフォルト有」）。名前は **仮定**（OPEN QUESTION 1）。
-- Rust: `GhostConfig` に `failure_notation: bool` と `default_failure_notation() -> bool { true }`。`apply_shiori_defaults` は書かれていないときだけ `Boolean(true)` を補う（既存のキーを書き換えない）。型は確かめない（`[ghost]` の他のキーと同じ）。
-- Lua: `FAILURE.enabled()` は `pasta.config.get("ghost", "failure_notation", true)` を読み、真偽値でなければ `true`（7.5。キー単位で既定値に戻る。マニュアルの「値の型が合わないとき」の表に `[ghost] › failure_notation` の行を足す）。報告のたびに読む（キャッシュしない。読み込み直しで古い値が残らない）。
+- キー: `[logging] balloon_warning`（真偽値、既定 `true`、分類「SHIORI デフォルト有」）。意味は「バルーンに警告を出すかどうか」。バルーンをログの出力先の 1 つと見て `[logging]` に置く（設計議論で確定）。
+  ```toml
+  [logging]
+  level = "info"
+  balloon_warning = false   # バルーンに警告を出さない（ログには出る）
+  ```
+- Rust: 変えない。`LoggingConfig` に足さないので、`balloon_warning` の型の間違いが `file_path`・`level`・`filter` を既定値に落とすことはなく、逆に `level` の型の間違いで `balloon_warning` が消えることもない（Lua は `custom_fields` の生の値を読む）。
+- `level`・`filter` とは独立させる。`level = "error"` でログから警告が消えても、バルーンの表示は `balloon_warning` だけで決まる。ログに出すかどうかは今までどおり `level`・`filter` が決める（7.4）。
+- Lua: `FAILURE.enabled()` は `pasta.config.get("logging", "balloon_warning", true)` を読み、真偽値でなければ `true`（7.5。キー単位で既定値に戻る。マニュアルの「値の型が合わないとき」の表に、`[logging]` の中で `balloon_warning` だけはキー単位で既定値に戻ることを書く）。報告のたびに読む（キャッシュしない。読み込み直しで古い値が残らない）。
 - `pasta_check` は pasta.toml を読まないので変えない（7.6）。
 
 ### マニュアル: ManualPage・SkillRefs
@@ -553,14 +556,13 @@ graph LR
 - **S1 出口の抽出**: `failure.lua` に `report` を置き、`act:failure` の中身を移す。出力は 1 文字も変えない（既存テスト不変）。1 抽出 = 1 検証 = 1 コミット。
 - **S2 形と変換**: `format`・`escape`・`var`・`fn`・`kind_of`・`value_of`・`notation` を足す（呼び出し元は変えない）。
 - **S3〜S6 載せ替え**: 1 種類 = 1 コミット（Call 3 か所 → `talk` → `word`/`call_expr`/`global_fn`（act と proxy）→ `dynamic_key` → 未登録アクターと立ち位置の警告 → `num`/`str` と `bind`）。各コミットで、その種類の期待値だけを更新する。
-- **S7 切り替え**: Rust の既定値と `FAILURE.enabled`。
+- **S7 切り替え**: `FAILURE.enabled`（`[logging] balloon_warning`）。
 - **S8**: マニュアル・`GENERATION_MAP`・スキルの再生成。
 - どのコミットで止めても main を壊さない。巻き戻しは逆順の revert で済む（後のコミットが前のコミットの関数を使うだけ）。
-- **破壊的変更の記録（10.6）**: main への squash の PR タイトルを `feat!(failure-output-unification): …` にし、本文に「空で展開していた箇所に失敗表記が出る」「既存 2 種の文言が変わる」「`[ghost] failure_notation = false` で消せる」を書く。リリース CI の「動きが変わる変更」に載り、リリースの見どころは `release` スキルが書く。
+- **破壊的変更の記録（10.6）**: main への squash の PR タイトルを `feat!(failure-output-unification): …` にし、本文に「空で展開していた箇所に失敗表記が出る」「既存 2 種の文言が変わる」「`[logging] balloon_warning = false` で消せる」を書く。リリース CI の「動きが変わる変更」に載り、リリースの見どころは `release` スキルが書く。
 
 ## Open Questions / Risks
 
-- **OPEN QUESTION 1**: 切り替えのキーの名前と置き場所（仮定: `[ghost] failure_notation`）。
 - **Risk**: `tutorial_stages_test.rs` は同じ時期の `touch-poke-shortcuts` も触る。後から入る側が rebase で合わせる（足すのは `assert_responds` の 1 条件）。
 - **Risk**: OnTalk のように無作為に選ぶシーンは、hello-pasta のテストで全部を通らない。全段の全イベントを通すことで網羅に近づける。
 - **Risk**: シーンの外（Lua で作ったコルーチン・メインスレッドの古い対応）での `PASTA.num` は表記を出さずログだけになる。生成コードの経路では起きない。
