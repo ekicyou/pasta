@@ -5,7 +5,7 @@
 //   であることを機械的に検証する。具体的には次を立証する。
 //     R1.1 / R1.2 / R1.5 静的出力のみ・オフライン閲覧成立
 //       - 出力配下の全ファイルが静的アセット拡張子のみ（サーバー実行物が無い）
-//       - すべてのページ間リンク／アセット参照（href・src・poster。print.html のメディア要素も含む）が
+//       - すべてのページ間リンク／アセット参照（href・src・poster）が
 //         相対パスで、参照先が出力配下に実在する（= file:// で解決可能）
 //       - SUMMARY 由来の全章 HTML が生成され、相互リンク（next/prev・章間）が解決する
 //       - 目次 (toc) が全章を含む
@@ -18,7 +18,7 @@
 // 依存ゼロ（Node 標準ライブラリのみ）。検証成功で exit 0、失敗で exit 1。
 //
 // 使い方:
-//   node book/tools/verify-static.mjs            # mdbook build → talk-html の変換 → print-media-refs の書き換えをしてから book/book を検証
+//   node book/tools/verify-static.mjs            # mdbook build → talk-html の変換をしてから book/book を検証
 //   node book/tools/verify-static.mjs --no-build # 既存出力をそのまま検証
 //   node book/tools/verify-static.mjs --self-test # 検証ロジック自身の健全性テストも実行
 
@@ -28,7 +28,6 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { transformDir } from './talk/talk-html.mjs';
-import { fixPrintMediaRefs } from './print-media-refs.mjs';
 import { SPEAKERS } from './talk/talk.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -207,15 +206,6 @@ function ensureBuilt() {
     log('FATAL: talk-html の変換に失敗しました:', e.message);
     process.exit(1);
   }
-  // print.html のメディア要素の参照の直し（CI の talk の直後の print-media-refs に当たる）。
-  log('Running print-media-refs.mjs to fix media references in print.html...');
-  try {
-    const { targets, fixed } = fixPrintMediaRefs(outDir);
-    log(`print-media-refs: fixed ${fixed} media reference(s) in print.html (${targets} target(s))`);
-  } catch (e) {
-    log('FATAL: print-media-refs の書き換えに失敗しました:', e.message);
-    process.exit(1);
-  }
 }
 
 // =========================================================================
@@ -253,8 +243,6 @@ function analyze(root) {
   const absoluteRefsInContent = []; // file:// で解決不能なルート絶対参照（本文ページ）
   let checkedRefCount = 0;
   for (const hf of contentHtml) {
-    // print.html のメディア要素（<video>/<source> の src・poster）も例外なく見る。
-    // mdBook が書き換えない分は print-media-refs.mjs が台詞の変換の後に直す。
     const html = fs.readFileSync(hf.abs, 'utf8');
     const fromDir = path.posix.dirname(hf.rel) === '.' ? '' : path.posix.dirname(hf.rel);
     for (const ref of extractRefs(html)) {
@@ -300,7 +288,7 @@ function analyze(root) {
 // =========================================================================
 // テーマ資材・台詞出力・外部参照・メニュー id の検査（manual-claudia-theme タスク 3.5 /
 // 要件 1.7, 8.4, 8.5, 8.6, 8.9, 10.4 / design「StaticVerifier」）。
-//   pages は SUMMARY 全章と print.html（出力根からの相対）。lua/modules.html（リダイレクト）と
+//   pages は SUMMARY 全章（出力根からの相対。manual-print-page-removal 要件 4.1）。lua/modules.html（リダイレクト）と
 //   toc.html（JS 無効時の目次フレーム）は章ではなくテーマ資材を読まないので pages に含めない。
 //   mdBook 0.5.x は追加 CSS・JS を theme/claudia-<hash>.css のようにハッシュ付きで出すため、
 //   固定のファイル名では探さない。参照先の実在は analyze() の相対参照検査が見る。
@@ -414,7 +402,7 @@ function runSelfTest() {
       '<video src="missing.mp4" poster="missing.png"></video><img src="missing.png"><script src="https://example.com/x.js"></script>');
     fs.writeFileSync(path.join(classicDir, 'evil.php'), '<?php echo 1; ?>');
     const withClassic = analyze(tmp);
-    const themeWithClassic = analyzeTheme(tmp, [...summaryChapters(), 'print.html']);
+    const themeWithClassic = analyzeTheme(tmp, summaryChapters());
     const classicHits = [
       ...withClassic.brokenRefs.map((b) => JSON.stringify(b)),
       ...withClassic.absoluteRefsInContent.map((b) => JSON.stringify(b)),
@@ -448,13 +436,14 @@ function runSelfTest() {
     // (d) テーマ資材・台詞出力・外部参照・メニュー id の検査（manual-claudia-theme タスク 3.5）。
     //   無傷コピーで資材・外部参照・メニュー id・未変換の台詞が合格し、
     //   1 か所ずつ壊すと、壊したページと中身を正しく報告することを確かめる。
-    const pages = [...summaryChapters(), 'print.html'];
+    //   確かめるページは目次の全章だけ（manual-print-page-removal 要件 4.1）。
+    const pages = summaryChapters();
     const target = 'grammar/index.html';
     const themeClean = analyzeTheme(tmp, pages);
     check('self-test: 無傷コピーにテーマ CSS・JS が 1 つずつある',
       themeClean.themeCss.length === 1 && themeClean.themeJs.length === 1,
       JSON.stringify({ css: themeClean.themeCss, js: themeClean.themeJs }));
-    check('self-test: 無傷コピーは全章と print.html がテーマ資材を参照している',
+    check('self-test: 無傷コピーは全章がテーマ資材を参照している',
       themeClean.noCssRef.length === 0 && themeClean.noJsRef.length === 0,
       JSON.stringify({ css: themeClean.noCssRef, js: themeClean.noJsRef }));
     check('self-test: 無傷コピーは外部参照が Google Fonts だけ',
@@ -532,18 +521,7 @@ function runSelfTest() {
     check('self-test: 【で始まらない引用は未変換の台詞としない', r.untransformedTalk.length === 0,
       JSON.stringify(r.untransformedTalk));
 
-    // (e) print.html のメディア要素（src・poster）の壊れた参照を検出するべき（要件 3.1・3.2・3.5）。
-    //   実出力の動画の有無に頼らず、架空の <video> を差し込む。
-    const printFile = path.join(tmp, 'print.html');
-    const printOriginal = fs.readFileSync(printFile, 'utf8');
-    fs.writeFileSync(printFile, printOriginal.replace('<main>',
-      '<main><video src="media/__missing__.mp4" poster="media/__missing__.png"></video>'));
-    const brokenPrint = analyze(tmp).brokenRefs.filter((b) => b.from === 'print.html' && b.ref.includes('__missing__'));
-    check('self-test: print.html の壊れた動画の src・poster を 2 件とも検出する',
-      brokenPrint.length === 2, JSON.stringify(brokenPrint));
-    fs.writeFileSync(printFile, printOriginal);
-
-    // (f) 章のページの poster の壊れた参照も検出するべき（要件 3.3）。
+    // (f) 章のページの poster の壊れた参照も検出するべき（manual-print-page-removal 要件 4.2）。
     const chapterFile = path.join(tmp, 'grammar', 'index.html');
     const chapterOriginal = fs.readFileSync(chapterFile, 'utf8');
     fs.writeFileSync(chapterFile, chapterOriginal.replace('<main>', '<main><video poster="__missing__.png"></video>'));
@@ -693,24 +671,25 @@ function run() {
   // --- (7) テーマ資材・台詞出力・外部参照・メニュー id（manual-claudia-theme） ---
   log('');
   log('--- (1.7/8.4–8.6/8.9/10.4) テーマ資材・台詞出力・外部参照・メニュー id ---');
-  const pages = [...chapters, 'print.html'];
+  // 確かめるページは目次の全章だけ（manual-print-page-removal 要件 4.1）。
+  const pages = chapters;
   const t = analyzeTheme(outDir, pages);
   check('10.4: テーマ CSS (theme/claudia-*.css) が出力にある', t.themeCss.length > 0,
     JSON.stringify(t.themeCss));
   check('10.4: テーマ JS (theme/claudia-*.js) が出力にある', t.themeJs.length > 0,
     JSON.stringify(t.themeJs));
-  check(`1.7: 全章と print.html（${pages.length} ページ）がテーマ CSS を参照している`,
+  check(`1.7: 全章（${pages.length} ページ）がテーマ CSS を参照している`,
     t.noCssRef.length === 0, `missing=${JSON.stringify(t.noCssRef)}`);
-  check(`1.7: 全章と print.html（${pages.length} ページ）がテーマ JS を参照している`,
+  check(`1.7: 全章（${pages.length} ページ）がテーマ JS を参照している`,
     t.noJsRef.length === 0, `missing=${JSON.stringify(t.noJsRef)}`);
-  check(`8.4/8.6: 全章と print.html に両方の話し手の台詞部品がある（欠落 ${t.missingTalk.length} ページ）`,
+  check(`8.4/8.6: 全章に両方の話し手の台詞部品がある（欠落 ${t.missingTalk.length} ページ）`,
     t.missingTalk.length === 0);
   for (const m of t.missingTalk) log(`        ${m.page}: 台詞部品が無い話し手 ${m.speakers.join(', ')}`);
   check('8.4: 変換されずに残った台詞（<blockquote> 直後の <p>【）が無い',
     t.untransformedTalk.length === 0, `files=${JSON.stringify(t.untransformedTalk)}`);
   check('8.5: link・script・img の絶対 URL が Google Fonts の 2 オリジンだけ',
     t.externalRefs.length === 0, JSON.stringify(t.externalRefs.slice(0, 6)));
-  check(`8.4: テーマメニューの id（${MENU_IDS.join(', ')}）が全章と print.html にある`,
+  check(`8.4: テーマメニューの id（${MENU_IDS.join(', ')}）が全章にある`,
     t.missingMenuIds.length === 0, JSON.stringify(t.missingMenuIds.slice(0, 6)));
 
   if (SELF_TEST) runSelfTest();

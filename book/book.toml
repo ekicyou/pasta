@@ -12,9 +12,15 @@ preferred-dark-theme = "navy"
 # 相対リンク出力は mdBook 既定のまま維持し、file:// オフライン閲覧と両立させる。
 site-url = "/pasta/"
 git-repository-url = "https://github.com/ekicyou/pasta"
-# Claudia テーマ（manual-claudia-theme）。全章と print.html に読み込まれる。
+# Claudia テーマ（manual-claudia-theme）。全章に読み込まれる。
 additional-css = ["theme/claudia.css"]
 additional-js = ["theme/claudia.js"]
+
+# 全章をつないだ印刷用のページ（print.html）と章の印刷のボタンを作らない。
+# 開くと全章の台詞部品と動画をまとめて読み込みブラウザが固まるため（manual-print-page-removal 要件 1.1・1.2）。
+# 古い URL /pasta/print.html は転送せず、見つからないページのままにする（同 要件 1.4）。
+[output.html.print]
+enable = false
 
 [output.html.redirect]
 "/lua/modules.html" = "modules/index.html"
