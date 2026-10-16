@@ -89,7 +89,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 並走 | manual-print-media-refs | Opus | 2〜3 | 今すぐ（「開発中」としていたが、2026-10-16 の棚卸で作業のブランチが見当たらなかった） |
 | 1（高優先度） | touch-poke-shortcuts | Opus | 10〜13 | 今すぐ（2026-10-11 開発者の依頼で足し、高優先度に置いた。残りの spec より先に始める） |
 | 2 | boot-surface-without-dic | Opus（2026-10-16 に見直し） | 3〜5（やる場合） | 今すぐ |
-| 3 | failure-output-unification | Fable | 15〜19 | 今すぐ |
+| 3 | failure-output-unification | Opus（2026-10-16 に見直し） | 15〜19 | 今すぐ |
 | 4 | pasta-check-dic-validate | Opus（2026-10-16 に見直し） | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
 | 5 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
 | 6 | getting-started-screenshots | Opus | 4〜6 | `boot-surface-without-dic` と `touch-poke-shortcuts` の後（最後に撮る。`hello-pasta-shell-art` と `choice-line-layout` は完了した） |
@@ -129,10 +129,10 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 ### 要件定義のモデルの見直し（2026-10-15 の基準）
 
-Fable を使うのは、後戻りしにくい土台の決定（新しい文法・保存するデータの形・既存のゴーストや後の spec が使う Lua の約束）で、しかも未決が深いときだけにする、と基準を厳しくした（2026-10-15）。0.4.0 の表をこの基準で見直した。
+Fable を使うのは、後戻りしにくい土台の決定（新しい文法・保存するデータの形・ゴーストを書く人が使う公開の Lua の約束）があり、しかもその未決が深いときだけにする、と基準を厳しくした（2026-10-15）。「後の spec が使う」だけでは土台に当たらない。0.4.0 の表と `novel-areka-contract` を、この基準で見直した。結果、Fable の spec は無い。
 
-- `failure-output-unification` — Fable のまま。バルーンに出す失敗表記と報告の関数は、後の spec（`cue-command-runtime`・`call-attribute-filter`・`scene-anchor-link`・`runtime-error-balloon`）が使う約束になる。空文字で続ける今の方針を変えるか、配るゴーストでも出すか、生成コードを変えずに `ACT.num`・`ACT.str` から実行中の `act` へどう届けるかが絡み合い、推奨がまだ無い。
-- `novel-areka-contract` — Fable のまま。areka が実装する語彙・イベント・設定の値の名前は、出した後に変えにくい。NOTIFY には台本を返せないなど、SHIORI の決まりとの突き合わせも残る。
+- `failure-output-unification` — Opus にした。報告の関数は pasta の中の関数で、後の spec が使っても後から直せる。バルーンの失敗表記は、ゴーストが頼りにする出力ではない。空文字で続ける今の方針を変えるのは、移し方のはっきりした破壊的変更である。生成コードを変えない側（報告の関数が実行中の `act` を覚えておく）という推奨も、brief にもうある。
+- `novel-areka-contract` — Opus にした（いちばん近い次点）。areka と取り決める名前は、文法・保存の形・公開の Lua の約束のどれでもない。後の spec が依頼を足す・直す手順も、もう決めてある（「Phase 13」の「areka への依頼の出し方」）。大きな決定（通り道・ト書き・柱・巻き戻しの方式）は discovery で済んでいる。NOTIFY に台本を返せない件も、すべて GET で送ってもらうと決着している。残る議題（文書の置き場所・名前の付け方・依頼の束の分け方・要るかどうかから決める項目）には、推奨案を付けられる。
 - `boot-surface-without-dic` — Opus にした。既定の動きを 1 つ足すかどうかの決定で、議題には推奨案を付けられる。
 - `pasta-check-dic-validate` — Opus にした。依存の重さ（`pasta_lua` に依存すると `cargo install pasta_check` が LuaJIT をビルドする）・誤りと注意の線引き・リリースの関門は、どれも道具の作りの決定で、文法や保存の形ではない。
 
@@ -143,8 +143,8 @@ Fable を使うのは、後戻りしにくい土台の決定（新しい文法�
 | spec | 子孫 | 種別 | 規模 | 要件定義 |
 | ---- | ---- | ---- | ---- | -------- |
 | touch-poke-shortcuts | 約 1（`getting-started-screenshots`） | 機能（開発者の依頼・高優先度） | 10〜13 | Opus |
-| failure-output-unification | 約 11（Phase 11 の 3 本と、`cue-command-runtime` から先の 0.5.0 の spec） | 機能 | 15〜19 | Fable |
-| novel-areka-contract | 約 6（`novel-talk-flow` から先の 0.5.0 の spec） | 文書（areka への依頼） | 文書だけ | Fable |
+| failure-output-unification | 約 11（Phase 11 の 3 本と、`cue-command-runtime` から先の 0.5.0 の spec） | 機能 | 15〜19 | Opus |
+| novel-areka-contract | 約 6（`novel-talk-flow` から先の 0.5.0 の spec） | 文書（areka への依頼） | 文書だけ | Opus |
 | boot-surface-without-dic | 約 1（`getting-started-screenshots`） | 機能（やるかどうかから） | 3〜5 | Opus |
 | pasta-check-dic-validate | 0 | 機能（作成支援） | 10〜14 | Opus |
 | manual-shell-guide | 0 | 文書 | 5〜8 | Opus |
@@ -279,7 +279,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 
 | 順 | spec | 要件定義（見当） | 規模（見当） | 先に要るもの |
 | -- | ---- | ---------------- | ------------ | ------------ |
-| 1 | novel-areka-contract | Fable | 文書だけ | なし。**0.4.0 と並べて、今すぐ始められる** |
+| 1 | novel-areka-contract | Opus（2026-10-16 に見直し） | 文書だけ | なし。**0.4.0 と並べて、今すぐ始められる** |
 | 2 | scene-attribute-store（既存） | Fable | 15〜18 | なし（0.4.0 の後の先頭） |
 | 3 | cue-command-runtime | Opus | 8〜10 | `failure-output-unification`（`act.lua` の席） |
 | 4 | scene-stage-attributes | Fable | 6〜8 | `scene-attribute-store`、`cue-command-runtime` |
