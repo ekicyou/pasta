@@ -72,7 +72,7 @@ pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) ->
     let references_skipped = findings.iter().any(|f| f.code == FindingKind::Syntax);
     let mut unchecked_dynamic_calls = 0;
     if !references_skipped {
-        let (found, dynamic) = references::check(&scenes.table, &parsed);
+        let (found, dynamic) = references::check(&scenes, &config.aliases, &parsed);
         findings.extend(found);
         unchecked_dynamic_calls = dynamic;
     }

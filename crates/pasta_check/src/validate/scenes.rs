@@ -12,7 +12,6 @@ use super::{Finding, FindingKind, builtins, msg};
 pub(crate) struct SceneModel {
     pub table: SceneTable,
     /// グローバルシーン（構文木の順。単独の `＊` も 1 つ）
-    #[allow(dead_code)] // 読むのは飛び先の検査（References）
     pub globals: Vec<GlobalScene>,
 }
 
@@ -23,7 +22,6 @@ pub(crate) struct GlobalScene {
     /// 別名を置き換えた後の名前
     pub declared: String,
     /// 登録名（`registered_name(declared, 通し番号)`）。ローカルの検索の範囲になる
-    #[allow(dead_code)] // 読むのは飛び先の検査（References）
     pub registered: String,
     pub span: Span,
 }

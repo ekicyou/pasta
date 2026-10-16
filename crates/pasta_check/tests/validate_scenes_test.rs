@@ -266,3 +266,145 @@ fn builtin_names_are_listed() {
         ]
     );
 }
+
+// ---- 飛び先（6.1〜6.9） ----
+
+fn report_of(toml: &str, dics: &[(&str, &str)]) -> pasta_check::validate::Report {
+    let input = GhostInput {
+        pasta_toml: TomlSource::Text { text: toml.into() },
+        entries: dics.iter().map(|(p, _)| p.to_string()).collect(),
+    };
+    let files: BTreeMap<_, _> = dics
+        .iter()
+        .map(|(p, t)| {
+            (
+                p.to_string(),
+                FileText::Text {
+                    text: t.to_string(),
+                },
+            )
+        })
+        .collect();
+    validate_ghost(&input, &files)
+}
+
+/// 飛び先の注意だけを (行, 種類, 理由) で返す
+fn reference_findings(toml: &str, text: &str) -> Vec<(u32, FindingKind, String)> {
+    report_of(toml, &[("dic/talk.pasta", text)])
+        .findings
+        .into_iter()
+        .filter(|f| {
+            matches!(
+                f.code,
+                FindingKind::CallTargetMissing | FindingKind::ChoiceTargetMissing
+            )
+        })
+        .map(|f| (f.line.unwrap(), f.code, f.message))
+        .collect()
+}
+
+#[test]
+fn call_finds_local_scene_of_own_global_scene_only() {
+    let text = "＊会話\n  ＞選\n  ・選択\n    さくら：あ。\n＊別\n  ＞選\n";
+    assert_eq!(
+        reference_findings(TOML, text),
+        vec![(
+            6,
+            FindingKind::CallTargetMissing,
+            "Call の飛び先「選」が辞書のシーンにありません（Lua で定義していれば問題ありません）"
+                .into()
+        )]
+    );
+}
+
+#[test]
+fn call_finds_global_scene_by_prefix_after_alias() {
+    let toml = "[loader]\npasta_patterns = [\"dic/**/*.pasta\"]\n[scene.alias]\n\"挨拶\" =[\"こんにちは\"]\n";
+    let text = "＊挨拶\n  さくら：あ。\n＊会話\n  ＞こんにちは\n  ＞挨\n  ＞「挨拶」\n";
+    assert_eq!(reference_findings(toml, text), vec![]);
+    // 別名が無ければ「こんにちは」は見つからない
+    let found = reference_findings(TOML, text);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].0, 4);
+}
+
+#[test]
+fn call_to_builtin_name_is_found() {
+    let text = "＊会話\n  ＞transfer_req_to_var\n  ＞yield\n  ＞ゴースト終了\n";
+    assert_eq!(reference_findings(TOML, text), vec![]);
+}
+
+#[test]
+fn string_literal_dynamic_call_is_checked_as_static() {
+    let text = "＊会話\n  ＞「無いシーン」\n";
+    assert_eq!(
+        reference_findings(TOML, text),
+        vec![(
+            2,
+            FindingKind::CallTargetMissing,
+            "Call の飛び先「無いシーン」が辞書のシーンにありません（Lua で定義していれば問題ありません）"
+                .into()
+        )]
+    );
+}
+
+#[test]
+fn choice_finds_local_then_global_and_skips_on() {
+    // `＠？script:…` は DSL の id に `:` が書けず構文エラーになるので、references.rs の単体テストで確かめる
+    let text = "＊会話\n  ＠？選択\n  ＠？挨\n  ＠？OnBoot\n  ＠？無い\n  ・選択\n    さくら：あ。\n＊挨拶\n  さくら：い。\n";
+    assert_eq!(
+        reference_findings(TOML, text),
+        vec![(
+            5,
+            FindingKind::ChoiceTargetMissing,
+            "選択肢のジャンプ先「無い」が辞書のシーンにありません（Lua で定義・振り分けていれば問題ありません）"
+                .into()
+        )]
+    );
+}
+
+#[test]
+fn choice_does_not_use_builtin_names() {
+    let text = "＊会話\n  ＠？yield\n";
+    let found = reference_findings(TOML, text);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].1, FindingKind::ChoiceTargetMissing);
+}
+
+#[test]
+fn dynamic_calls_are_counted_not_reported() {
+    let text = "＊会話\n  ＄変数＝「会話」\n  ＞＄変数\n  ＞＄変数\n  ＞会話\n";
+    let report = report_of(TOML, &[("dic/talk.pasta", text)]);
+    assert_eq!(reference_findings(TOML, text), vec![]);
+    assert_eq!(report.stats.unchecked_dynamic_calls, 2);
+    assert!(!report.stats.references_skipped);
+    assert_eq!(
+        report.lines().last().unwrap(),
+        "検査した辞書ファイル 1 個: 誤り 0 件、注意 0 件、飛び先を検査しなかった Call 2 件"
+    );
+}
+
+#[test]
+fn syntax_error_skips_references_with_notice() {
+    let dics = [
+        ("dic/a.pasta", "＊会話\n  ＞無いシーン\n  ＞＄変数\n"),
+        ("dic/b.pasta", "＊別\n  さくら：い。\n＄＄＄\n"),
+    ];
+    let report = report_of(TOML, &dics);
+    assert!(report.stats.references_skipped);
+    assert_eq!(report.stats.unchecked_dynamic_calls, 0);
+    assert!(
+        !report.findings.iter().any(|f| matches!(
+            f.code,
+            FindingKind::CallTargetMissing | FindingKind::ChoiceTargetMissing
+        )),
+        "{:?}",
+        report.lines()
+    );
+    let lines = report.lines();
+    assert!(
+        lines.contains(&"構文エラーがあるため、飛び先の検査をしていません。".to_string()),
+        "{lines:?}"
+    );
+    assert!(!lines.last().unwrap().contains("飛び先を検査しなかった"));
+}
