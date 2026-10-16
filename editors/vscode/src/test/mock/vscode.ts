@@ -60,6 +60,8 @@ export class Diagnostic {
   readonly range: Range;
   readonly message: string;
   readonly severity: DiagnosticSeverity;
+  source?: string;
+  code?: string | number;
   constructor(range: Range, message: string, severity: DiagnosticSeverity) {
     this.range = range;
     this.message = message;
@@ -244,10 +246,118 @@ export const inputBoxCalls: Array<Record<string, unknown> | undefined> = [];
 export const didOpenTextDocumentEmitter = new EventEmitter<any>();
 export const didChangeTextDocumentEmitter = new EventEmitter<any>();
 export const didCloseTextDocumentEmitter = new EventEmitter<any>();
+export const didSaveTextDocumentEmitter = new EventEmitter<any>();
 export const didChangeActiveTextEditorEmitter = new EventEmitter<any>();
 export const debugCustomEventEmitter = new EventEmitter<any>();
 export const didChangeActiveDebugSessionEmitter = new EventEmitter<any>();
 export const didTerminateDebugSessionEmitter = new EventEmitter<any>();
+
+// --- in-memory fake file system (workspace.fs) --------------------------------
+
+export enum FileType {
+  Unknown = 0,
+  File = 1,
+  Directory = 2,
+  SymbolicLink = 64,
+}
+
+/**
+ * Fake files keyed by Uri.path. Directories are implied by the paths below
+ * them. A symlink entry reports `type | FileType.SymbolicLink`. An unreadable
+ * entry lists/stats as a file but its readFile rejects.
+ */
+const fakeEntries = new Map<string, { type: FileType; data: Uint8Array; unreadable?: boolean }>();
+
+export function resetFakeFs(): void {
+  fakeEntries.clear();
+}
+export function setFakeFile(path: string, content: string | Uint8Array): void {
+  const data = typeof content === 'string' ? new TextEncoder().encode(content) : content;
+  fakeEntries.set(path, { type: FileType.File, data });
+}
+export function setFakeUnreadable(path: string): void {
+  fakeEntries.set(path, { type: FileType.File, data: new Uint8Array(0), unreadable: true });
+}
+export function setFakeSymlink(path: string, target: FileType = FileType.File): void {
+  fakeEntries.set(path, { type: target | FileType.SymbolicLink, data: new Uint8Array(0) });
+}
+export function deleteFakeFile(path: string): void {
+  fakeEntries.delete(path);
+}
+
+function fakeNotFound(uri: Uri): Error {
+  return Object.assign(new Error(`EntryNotFound (FileSystemError): ${uri.toString()}`), { code: 'FileNotFound' });
+}
+
+function fakeTypeOf(path: string): FileType | undefined {
+  const entry = fakeEntries.get(path);
+  if (entry) {
+    return entry.type;
+  }
+  const prefix = path.endsWith('/') ? path : path + '/';
+  for (const key of fakeEntries.keys()) {
+    if (key.startsWith(prefix)) {
+      return FileType.Directory;
+    }
+  }
+  return undefined;
+}
+
+const fakeFs = {
+  readFile: async (uri: Uri): Promise<Uint8Array> => {
+    const entry = fakeEntries.get(uri.path);
+    if (!entry || entry.unreadable || (entry.type & FileType.File) === 0) {
+      throw fakeNotFound(uri);
+    }
+    return entry.data;
+  },
+  readDirectory: async (uri: Uri): Promise<Array<[string, FileType]>> => {
+    if (fakeTypeOf(uri.path) !== FileType.Directory) {
+      throw fakeNotFound(uri);
+    }
+    const prefix = uri.path.endsWith('/') ? uri.path : uri.path + '/';
+    const children = new Map<string, FileType>();
+    for (const key of fakeEntries.keys()) {
+      if (key.startsWith(prefix)) {
+        const name = key.slice(prefix.length).split('/')[0];
+        children.set(name, fakeTypeOf(prefix + name)!);
+      }
+    }
+    return [...children.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  },
+  stat: async (uri: Uri): Promise<{ type: FileType; ctime: number; mtime: number; size: number }> => {
+    const type = fakeTypeOf(uri.path);
+    if (type === undefined) {
+      throw fakeNotFound(uri);
+    }
+    return { type, ctime: 0, mtime: 0, size: fakeEntries.get(uri.path)?.data.length ?? 0 };
+  },
+};
+
+// --- file system watchers -----------------------------------------------------
+
+export class MockFileSystemWatcher {
+  readonly createEmitter = new EventEmitter<Uri>();
+  readonly changeEmitter = new EventEmitter<Uri>();
+  readonly deleteEmitter = new EventEmitter<Uri>();
+  readonly onDidCreate = this.createEmitter.event;
+  readonly onDidChange = this.changeEmitter.event;
+  readonly onDidDelete = this.deleteEmitter.event;
+  disposed = false;
+  constructor(readonly globPattern: unknown) {}
+  dispose(): void {
+    this.disposed = true;
+    this.createEmitter.dispose();
+    this.changeEmitter.dispose();
+    this.deleteEmitter.dispose();
+  }
+}
+
+/** All watchers created via workspace.createFileSystemWatcher (in order). */
+export const createdFileSystemWatchers: MockFileSystemWatcher[] = [];
+
+/** Every line written to an output channel created via window.createOutputChannel. */
+export const outputLines: Array<{ channel: string; message: string }> = [];
 
 // --- namespaces ---------------------------------------------------------------
 
@@ -262,8 +372,12 @@ export const workspace = {
   onDidOpenTextDocument: didOpenTextDocumentEmitter.event,
   onDidChangeTextDocument: didChangeTextDocumentEmitter.event,
   onDidCloseTextDocument: didCloseTextDocumentEmitter.event,
-  fs: {
-    readFile: async () => new Uint8Array(0),
+  onDidSaveTextDocument: didSaveTextDocumentEmitter.event,
+  fs: fakeFs,
+  createFileSystemWatcher: (globPattern: unknown) => {
+    const watcher = new MockFileSystemWatcher(globPattern);
+    createdFileSystemWatchers.push(watcher);
+    return watcher;
   },
   // Minimal getConfiguration: only `launch.configurations` is consulted by the
   // runSceneAtCursor / reload start-debugging config resolution.
@@ -276,7 +390,7 @@ export const window = {
   activeTextEditor: undefined as any,
   createOutputChannel: (name: string) => ({
     name,
-    appendLine: (_msg: string) => {},
+    appendLine: (message: string) => { outputLines.push({ channel: name, message }); },
     dispose: () => {},
   }),
   showErrorMessage: (message: string, ...items: string[]) => {

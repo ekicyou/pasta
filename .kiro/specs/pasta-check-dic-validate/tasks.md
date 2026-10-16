@@ -144,7 +144,7 @@
   - _Depends: 6.1_
   - _Requirements: 11.2, 11.8_
 
-- [ ] 7.2 拡張のテストの土台を足す
+- [x] 7.2 拡張のテストの土台を足す
   - vscode のモックに `workspace.fs`・保存の通知・ファイルの見張り・`FileType`・`Uri.joinPath` を足す
   - `test:unit` に新しいテストのファイルを足す
   - 完了の状態: 空のゴースト検査のテストのファイルが `npm run test:unit` で走り、既存のテストが通ったままになる
@@ -208,3 +208,4 @@
 - 5.1: `ghost/master` の無い配布フォルダは段 4 で失敗する（理由は validate と同じ日本語）。前回の nar は既存の段 1 で消えるので、関門で止まると nar は残らない。
 - 6.1: WASM の入口の戻り値は `Serializer::json_compatible()`（None を null にするため。既存の wasm_analyze は既定のまま）。
 - 7.1: vscodeModules のテストは事前の WASM のビルド（`pwsh -NoProfile -File scripts/build-wasm.ps1 -Release`）が要る（既存の activate のテストも同じ）。
+- 7.2: モックの `createDiagnosticCollection` は作った集合を記録しない。`outputLines`・`createdFileSystemWatchers` を空に戻す関数も無い（7.3 で集合を外から渡すか記録を足す）。
