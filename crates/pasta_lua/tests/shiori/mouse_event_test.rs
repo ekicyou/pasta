@@ -630,3 +630,60 @@ fn stroke_without_shortcut_always_runs_event_scene() {
         );
     }
 }
+
+// ============================================================================
+// 自前のハンドラは登録の前後にかかわらず優先する（要件 8.2・8.3・8.6）
+// ============================================================================
+
+/// つつき・撫での両方のショートカットのシーンを置いたゴーストで、自前のハンドラを
+/// (a) 起動用 Lua（既定より先）と (b) 辞書の Lua ブロック（既定より後）で登録すると、
+/// どちらでも自前のハンドラの応答が返り、ショートカットのシーンは選ばれず、撫での判定の状態も初期のまま。
+#[test]
+fn ghost_mouse_handlers_win_regardless_of_registration_order() {
+    const SHORTCUTS: &str = "\
+＊つっつき反応その他
+　女の子：つつかれました
+
+＊さわり反応その他
+　女の子：撫でられました
+";
+    let handlers = ghost_handler_lua("OnMouseDoubleClick") + &ghost_handler_lua("OnMouseMove");
+    let in_dic = format!("{SHORTCUTS}\n＊登録\n```lua\n{handlers}```\n");
+    let cases = [
+        ("起動用 Lua", SHORTCUTS, Some(handlers.as_str())),
+        ("辞書の Lua ブロック", in_dic.as_str(), None),
+    ];
+    for (ctx, dic, main_lua) in cases {
+        let (_temp, runtime) = load_ghost_full(dic, main_lua, ACTORS_TOML);
+        let response = fire_with(
+            &runtime,
+            "OnMouseDoubleClick",
+            r#"reference = { [3] = "0", [4] = "Head" }"#,
+        );
+        assert!(
+            response.contains("ゴーストのOnMouseDoubleClick")
+                && !response.contains("つつかれました"),
+            "{ctx}: つつきで自前のハンドラが呼ばれない: {response:?}"
+        );
+        // 既定の受け方なら 2 秒で撫でのシーンが返る移動
+        for i in 0..7 {
+            let t = 1000.0 + f64::from(i) * 0.5;
+            let response = mouse_move(&runtime, t, "balloon(0=0)");
+            assert!(
+                response.contains("ゴーストのOnMouseMove") && !response.contains("撫でられました"),
+                "{ctx}: t={t} 移動で自前のハンドラが呼ばれない: {response:?}"
+            );
+        }
+        let state = runtime
+            .exec(
+                r#"local s = require("pasta.shiori.event.mouse")._get_state()
+return table.concat({ tostring(s.target), tostring(s.start), tostring(s.last), tostring(s.fired) }, ",")"#,
+            )
+            .expect("撫での状態を読めない");
+        assert_eq!(
+            value_as_str(&state).as_deref(),
+            Some("nil,0,0,false"),
+            "{ctx}: 撫での判定の状態が初期のままでない"
+        );
+    }
+}
