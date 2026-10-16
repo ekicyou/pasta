@@ -3,6 +3,9 @@ mod copy;
 mod nar;
 mod release;
 mod update_files;
+// 4.2 で main から呼ぶ（それまでは未使用）
+#[allow(dead_code)]
+mod validate_cmd;
 
 use std::path::PathBuf;
 use std::process;

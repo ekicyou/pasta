@@ -92,7 +92,7 @@
   - _Requirements: 5.4, 6.1, 6.3, 9.2_
 
 - [ ] 4. `pasta_check validate` コマンド
-- [ ] 4.1 ゴーストのフォルダから一覧と中身を集めて核を呼ぶ殻を作る
+- [x] 4.1 ゴーストのフォルダから一覧と中身を集めて核を呼ぶ殻を作る
   - `--target` が無い・存在しない・ディレクトリでない・`ghost/master` を含まないときは理由つきで失敗する（`ghost/master` そのものは読み替えない）
   - `ghost/master` から再帰で一覧を作る（最上位の `profile` に入らず、シンボリックリンクをたどらない、区切りは `/`）。中身はバイトで読み、UTF-8 で読めない・読めないを区別する
   - 報告の行を標準出力に出し、誤りがあれば 1、無ければ 0 で終わる。`release` からも使える、`ghost/master` を直接受ける入口を持つ。何も書き込まない
@@ -204,3 +204,4 @@
 - 2.7: `＠？script:…` は DSL では書けない（choice の飛び先は id）ので判定関数の単体テストで確かめた。`＞（「X」）` は今は動的として数える（実行時は静的と同じ）。
 - 3.1: 名前が `.pasta` で終わるフォルダ（`dic/x.pasta/`）は既定のパターンに一致し pasta.dll は読み込みに失敗するが、核の入力はファイルだけなので報告しない（要件 9.4 の範囲外として受け入れ）。一致テスト (b) は `is_file()` で絞る。`.lua` パターンの読み替えはテストに写した（`discover_all_files` は pub(super)）。
 - 3.2: (f) は design の「SCENE.search の有無」でなく、実際の Call と同じ `find_act_handler`（current_scene をそのグローバルシーンの表にした SHIORI 用の act）で照らす（組み込みも含めて照らせるので強い）。
+- 4.1: 殻は `validate_cmd::run(target: &Path)` と `run_on_master(master) -> Result<ValidateOutcome, String>`（サブフォルダが読めないときは Err。5.1 では io のエラーに写す）。main.rs の `mod validate_cmd;` の `#[allow(dead_code)]` は 4.2 で外す。`--target` が無いときは 4.2 の解析で扱う。
