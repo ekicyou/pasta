@@ -162,3 +162,94 @@
 - **R7.2**: 吹き出しの位置の UKADOC の項（シェルの `descript.txt` の `sakura.balloon.offsetx` 等）のアンカー。
 - **R6.3・R6.5**: UKADOC の `collisionex*` と `collision-sort` の項のアンカー（重なったときの既定）。
 - 0.4.0 の範囲（「入門の完成」）に収まるかの確認: 本 spec はゴーストを完成させるための「入門の次の一歩」で、ゴールの内側にある（roadmap のウェーブ 2026-10-16 に入っている）。
+
+---
+
+# 設計の段の調査と判断（2026-10-16・kiro-spec-design）
+
+## Summary
+
+- **Feature**: `manual-shell-guide`
+- **Discovery Scope**: Extension（既存のマニュアルと検査の型に章を 1 つ足す。light discovery）
+- **Key Findings**:
+  - 章を `book/src/reference/` の直下に置けば、口調・台詞・リンク・静的性・検索の検査が自動でかかる。章の数の決め打ちは 3 つの自己テストと `verify-content.mjs` の冒頭コメント（数字だけ）。`link-check-test.mjs` I-2 の「60 章」は見本のデータで、直さない（ギャップ分析に無かった確認）。
+  - 照合テストを `shell_assets_test.rs` に置くと、`build.yml`（パスの絞り込みなし）の `cargo test --all` で、シェルだけを変えたときも落ちる。`manual.yml` は `book/**` の変更で `cargo test -p pasta_sample_ghost` を走らせるので、章だけを変えたときも落ちる。CI の `paths` を触らなくてよい。
+  - R3.6（シェルに無い番号を指したときの SSP の画面）は確かめられなかった。SSP の MCP は「Server not available」（SSP が起動していない）。UKADOC の `\s[ID]` の項は「`\s[-1]` で非表示」までで、定義の無い番号の扱いは書かれていない。
+
+## Research Log
+
+### 章の置き場所と検査のかかり方
+- **Sources**: `book/tools/verify-content.mjs`（`VOICE_DIRS`・T 系）、`verify-scripts-test.mjs` 78〜84 行、`talk/talk-test.mjs` 453〜454 行、`gen-skill-refs-test.mjs` 592〜606 行、`link-check-test.mjs` 1190〜1230 行
+- **Findings**: `VOICE_DIRS` に `reference` があり非再帰。K-10 は全章で `chapterRegions` と旧来の判定の一致を見るため、本体に `---` を置かない形が安全。`link-check-test.mjs` I-2 の 60 は `judgeHeadingIds` に渡す架空のレポートの値。
+- **Implications**: 直す数は 3 つ（＋コメント 2 か所）。章は H1／導入／`---`／本体／`---`／締め。
+
+### 照合テストの置き場所と改行
+- **Sources**: `crates/pasta_sample_ghost/tests/shell_assets_test.rs`（`book_sample_images_are_byte_identical_to_shell`・`parse_surfaces_txt`）、`.github/workflows/build.yml`・`manual.yml`、`git ls-files --eol`
+- **Findings**: シェルの 2 ファイルはリポジトリ内 LF・作業ツリー CRLF。既存のパーサは `str::lines` で読んでいる。`common::workspace_root()` で `book/` を読む前例がある。
+- **Implications**: 照合も `str::lines` で行単位に比べる。新しい依存は要らない。
+
+### UKADOC の読み先（ukagaka docs MCP で確認）
+- **Findings**:
+  - `descript_shell.html` の `sakura.balloon.offsetx` の項に「X座標の＋はどの場合もシェルに近づく向き」「Y座標の＋は常に下方向」とある（R7.2 の向きの正本）。アンカーは `#_1_sakura.balloon.offsetx%2C%E5%BA%A7%E6%A8%99`（`descript_shell_surfaces.html` にも同名の項があり、そちらは `_2_` 付き。シェル全体の値は `_1_` の方）。
+  - `descript_shell_surfaces.html` の `collision-sort` の項に「none（IDによらず先に書かれている方が手前）」とある（R6.3）。`collisionex*` の項に形の一覧（rect・ellipse・circle・polygon・region）がある（R6.5。章には写さない）。`element*` の項に「element0 が定義されていると元の surface*.png の内容が破棄されて element0 で置き換えられる」とある（R4.6 の突き合わせの根拠）。
+  - `dev_shell.html`（シェルの作成）に「surface○○.png（0以上の数字）」「surface0.png と surface10.png は基本的に必須」「SSP は開発用パレットの『当たり判定を表示』で確認できる」「seriko.use_self_alpha,1 でアルファチャンネルを透明度に使う」とある（R4.4・R5.2・R6.6）。
+  - `manual_install.html` に「ゴーストにバルーンなどを同梱する場合」の構成がある（R7.4。ページ内のアンカーは無いのでページへリンク）。`dev_bind.html` が着せ替え・アニメーションの読み先（R8.1）。
+  - `list_sakura_script.html` の `\s[ID番号]` の項は、定義の無い番号の挙動を書いていない（R3.6 は実機が要る）。
+- **Implications**: 設計書の UKADOC リンク表に URL を固定した。UKADOC のアンカーはリンク検証の対象外なので、実装のときに人が開いて確かめる。
+
+### 実機の事実（hello-pasta-shell-art の Implementation Notes 6.1）
+- 重なりは先に書いた定義が勝つ（`Face` が `Head` の手前）。部位名は女の子: 顔の中央 `Face`・頬の横の髪 `Head`・胴 `Body`・靴／首の隙間／上げた手は空。男の子: コック帽 `Head`・顔 `Face`・胴 `Body`・横の髪 `Head`・靴／首の隙間は空。
+- 注意: 画面の写しで裏が取れたのは女の子の 4 か所と男の子の帽子で、残りは実装者の書き起こし（`dblclick-log.txt`）が根拠と記録されている。R2.7（実機で確かめた事実だけ）との関係は、設計ディスカッションで確認する（OQ-5）。
+- 吹き出しの値は SSP 既定のバルーンの高さ（約 168 px）が前提。反対側に出たときの値（`offsetxr`/`offsetyr`）は置いていない。
+
+### R3.6 の実機確認（未了）
+- **試したこと**: `mcp__ssp__get_active_ghost_list` → 「Server not available」。SSP の起動・インストールの変更はしていない（指示どおり読み取りだけ）。
+- **確かめる手順の案**: SSP で hello-pasta（の複製）を起動し、`mcp__ssp__sakurascript` で `\0\s[9]`、`\1\s[19]` を `strict: true` で送る。`mcp__ssp__dump_surface`（scope 0・1）で画面を、`mcp__ssp__get_log`（error）でエラーログを見る。pasta は表情名の値 `\s[9]` をそのまま出すため、直接送った結果と同じになる。
+- **Implications**: 章の 2.4 節 (a) の画面の挙動は書かずに保留する。確かめられなければ、R3.6 の見直し（画面の挙動を章から外す）を要件に戻して決める。
+
+## Design Decisions
+
+### Decision: 章の置き場所と名前（D1）
+- **Context**: R1.1（`reference/` の直下）
+- **Alternatives**: `reference/shell.md`／`reference/shell/index.md`（下のフォルダは `VOICE_DIRS` が非再帰のため口調・台詞の検査から外れる）
+- **Selected**: `book/src/reference/shell.md`。題は「シェルを自分の絵にする」（R1.3 の目的のうち最初の 1 つを題にし、残り 2 つは導入で示す。OQ-3）
+
+### Decision: 照合の置き場所（D2）
+- **Alternatives**: (1) `book/tools/` に新しい道具か `tutorial-check.mjs` の拡張（`manual.yml` の `paths` に `shell/**` を足す必要がある）／(2) `shell_assets_test.rs` の Rust テスト
+- **Selected**: (2)。既存の「本の写しとシェルの照合」と同じ場所・流儀で、main とマニュアルの両方の CI で走る
+- **Trade-offs**: マニュアルの道具の自己テスト群とは別の場所になる
+
+### Decision: 照合の印（D3）
+- **Alternatives**: (1) フェンスの前に HTML コメントの印を置き、印の付いたブロックだけ照合／(2) 情報文字列に元のファイル名を書く（mdBook と着色の道具への影響が読めない）／(3) 章のコードブロックはすべて `text` の抜き出しとし、全ブロックを照合
+- **Selected**: (3)。印の規約が要らず、照合漏れが起きない。辞書の書き方は表とインラインコードで示し、正本の章へリンクするので、`pasta` ブロックを置く必要が無い（R2.5・R5.4）
+- **Trade-offs**: 将来、章に例示のブロックを置きたくなったら照合の規則を変える必要がある（そのときは仕様の写しになっていないかを先に疑う）
+
+### Decision: 数の照合の範囲（D4）
+- **Context**: R10.2・R10.3（範囲は設計で決める）
+- **Selected**: 座標と吹き出しの値は抜き出しの中にだけ置き、逐語の照合で守る。本文に残る数（333×500・18 枚・0〜8・10〜18・`Face`/`Head`/`Body`）は既存の `shell_assets_test.rs` の定数と検査が守る（シェルが変われば先に落ちる）
+- **Rejected**: 章の本文から数を正規表現で拾う照合（壊れやすく、本文の言い回しを縛る）
+- **Follow-up**: OQ-2
+
+### Decision: 当たり判定の図（D5）・AUTHORING（D6）・外部リンク集（D7）
+- D5: 図を置かない。新しい画像の置き場所と照合の追加が要り、抜き出し E1 と「返る場所」の表で足りる（R2.9）
+- D6: `book/AUTHORING.md` は変えない。規則は照合テストの doc コメントと失敗メッセージにある（OQ-4）
+- D7: `reference/external-links.md` は変えない。UKADOC のシェルのページは章から直接リンクする
+
+## Synthesis
+
+- **一般化**: R3（接点）・R5（表情）・R6（当たり判定）・R7（吹き出し）は、どれも「辞書の側の名前・番号と、シェルの側の行の対応」という同じ形である。章は接点の表を 1 つ置き、後の節はその表の各行を深掘りする構成にした。
+- **Build vs Adopt**: 照合は既存の Rust テストの流儀（`common::workspace_root()`・`str::lines`・panic で失敗）をそのまま使い、新しい道具・依存を足さない。検査ツールの判定ロジックは触らない。
+- **Simplification**: 照合の印・AUTHORING の追記・外部リンク集の追記・図を省いた。足す仕組みは照合テスト 1 つだけ。
+
+## Risks & Mitigations
+
+- R3.6 の実機確認が済まない — 章の該当の文を保留し、確かめられなければ要件へ戻す（OQ-1）
+- UKADOC のアンカーの変更 — リンク検証の対象外。実装のときに開いて確かめ、リンク表に URL を固定した
+- 入門の `08-touch.md` を `touch-poke-shortcuts` と同時に触る — 後から入る側が rebase で 1 行を保つ（roadmap の取り決め）
+- 章を足す別の spec と数が衝突する — 後から入る側が数を合わせる（roadmap の取り決め）
+
+## 参照したスキルと規約
+
+- `kiro-spec-design`（design-principles・discovery-light・synthesis・review-gate）、`kiro-validate-design`（design-review）
+- `book/AUTHORING.md` 第 1〜5 節・第 7 節・第 8 節（入門の章へ足すリンクの制約）
+- ukagaka docs MCP（UKADOC の項とアンカーの確認）、SSP MCP（接続できず）
