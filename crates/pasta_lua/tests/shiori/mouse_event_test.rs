@@ -16,7 +16,21 @@ fn load_ghost(pasta: &str) -> (TempDir, PastaLuaRuntime) {
 
 /// `load_ghost` に加えて、`main_lua` があれば起動用の `scripts/main.lua` として書いてから読み込む。
 fn load_ghost_with_main(pasta: &str, main_lua: Option<&str>) -> (TempDir, PastaLuaRuntime) {
+    load_ghost_full(pasta, main_lua, "")
+}
+
+/// `load_ghost_with_main` に加えて、`toml_extra` を `pasta.toml` の後ろに足してから読み込む。
+fn load_ghost_full(
+    pasta: &str,
+    main_lua: Option<&str>,
+    toml_extra: &str,
+) -> (TempDir, PastaLuaRuntime) {
     let temp = create_temp_with_pasta(pasta);
+    if !toml_extra.is_empty() {
+        let toml = temp.path().join("pasta.toml");
+        let base = std::fs::read_to_string(&toml).unwrap();
+        std::fs::write(&toml, base + toml_extra).unwrap();
+    }
     if let Some(main_lua) = main_lua {
         let scripts = temp.path().join("scripts");
         std::fs::create_dir_all(&scripts).unwrap();
@@ -296,4 +310,214 @@ fn mouse_events_fall_back_to_event_name_scene() {
     let (_temp, runtime) = load_ghost("");
     let response = fire_with(&runtime, "OnMouseDoubleClick", refs);
     assert!(response.starts_with("SHIORI/3.0 204"), "{response:?}");
+}
+
+// ============================================================================
+// つつきの段々・完全一致・抽選・空のシーン・チェイントーク（要件 1・4.4・6.2・6.3・7・8.1）
+// ============================================================================
+
+/// アクター名を引けるように `pasta.toml` に足すアクター（スポット 0・1）。
+const ACTORS_TOML: &str = "\n[actor.\"女の子\"]\nspot = 0\n\n[actor.\"男の子\"]\nspot = 1\n";
+
+/// 女の子（スポット 0）の `Head` をつついたときの 9 段の名前（上の段から）。
+const POKE_RUNGS: [&str; 9] = [
+    "つっつき反応女の子Head",
+    "OnPoke女の子Head",
+    "つっつき反応女の子その他",
+    "OnPoke女の子Other",
+    "つっつき反応Head",
+    "OnPokeHead",
+    "つっつき反応その他",
+    "OnPokeOther",
+    "OnMouseDoubleClick",
+];
+
+/// 段 `rungs`（1 始まり）のシーンだけを置いた辞書。各シーンは「段{n}です」と話す。
+fn rung_dic(rungs: impl IntoIterator<Item = usize>) -> String {
+    rungs
+        .into_iter()
+        .map(|n| format!("＊{}\n　女の子：段{n}です\n\n", POKE_RUNGS[n - 1]))
+        .collect()
+}
+
+/// つつき（OnMouseDoubleClick）を Reference3・4 付きで送る。`scope` が None なら Reference3 を付けない。
+fn poke(runtime: &PastaLuaRuntime, scope: Option<&str>, part: &str) -> String {
+    let scope = scope.map_or(String::new(), |s| format!("[3] = \"{s}\", "));
+    fire_with(
+        runtime,
+        "OnMouseDoubleClick",
+        &format!("reference = {{ {scope}[4] = \"{part}\" }}"),
+    )
+}
+
+/// 応答が 200 で、段 `n` のシーンの出力だけを含むか。
+fn assert_rung(response: &str, n: usize, ctx: &str) {
+    assert!(
+        response.starts_with("SHIORI/3.0 200") && response.contains(&format!("段{n}です")),
+        "{ctx}: 段{n}が選ばれない: {response:?}"
+    );
+    for other in (1..=9).filter(|&m| m != n) {
+        assert!(
+            !response.contains(&format!("段{other}です")),
+            "{ctx}: {response:?}"
+        );
+    }
+}
+
+/// 段 k から下だけを置いたゴーストで、いつも段 k（書いた中で一番上）が選ばれる（要件 1.1）。
+#[test]
+fn poke_picks_highest_written_rung() {
+    for top in 1..=9 {
+        let (_temp, runtime) = load_ghost_full(&rung_dic(top..=9), None, ACTORS_TOML);
+        let response = poke(&runtime, Some("0"), "Head");
+        assert_rung(&response, top, &format!("段{top}から下"));
+    }
+    // 書いた段 1 つだけのゴーストでも、その段が選ばれる
+    for only in 1..=9 {
+        let (_temp, runtime) = load_ghost_full(&rung_dic([only]), None, ACTORS_TOML);
+        let response = poke(&runtime, Some("0"), "Head");
+        assert_rung(&response, only, &format!("段{only}だけ"));
+    }
+}
+
+/// 全段を置いたゴーストで、部位が空なら部位の段（1・2・5・6）を、
+/// アクター名が決まらなければアクターの段（1〜4）を飛ばす（要件 1.4・1.5・4.4）。
+#[test]
+fn poke_skips_rungs_without_part_or_actor() {
+    let (_temp, runtime) = load_ghost_full(&rung_dic(1..=9), None, ACTORS_TOML);
+    let cases: [(Option<&str>, &str, usize); 6] = [
+        (Some("0"), "Head", 1),
+        (Some("0"), "", 3),     // 部位が空 → 女の子その他
+        (Some("5"), "Head", 5), // 未登録のスコープ番号 → 部位の段
+        (None, "Head", 5),      // スコープ番号なし
+        (Some("5"), "", 7),     // どちらも無い → その他
+        (Some("abc"), "", 7),   // 数でないスコープ番号
+    ];
+    for (scope, part, expected) in cases {
+        let response = poke(&runtime, scope, part);
+        assert_rung(
+            &response,
+            expected,
+            &format!("scope={scope:?} part={part:?}"),
+        );
+    }
+    // スコープ番号そのものを入れた名前（つっつき反応0Head）は探さない（要件 4.4）
+    let (_temp, runtime) = load_ghost_full(
+        "＊つっつき反応0Head\n　女の子：番号の段です\n",
+        None,
+        ACTORS_TOML,
+    );
+    let response = poke(&runtime, Some("0"), "Head");
+    assert!(response.starts_with("SHIORI/3.0 204"), "{response:?}");
+}
+
+/// `＊OnMouseDoubleClick` だけのゴーストは、既定のハンドラが無かったとき（イベント名のシーンを
+/// そのまま探す `EVENT.no_entry`）と同じ応答を返す（要件 6.3・8.1）。
+#[test]
+fn poke_with_only_event_scene_matches_previous_behavior() {
+    const DIC: &str = "＊OnMouseDoubleClick\n　女の子：ダブルクリックです\n";
+    const OLD_MAIN: &str = r#"local REG = require "pasta.shiori.event.register"
+REG.OnMouseDoubleClick = function(act) return require("pasta.shiori.event").no_entry(act) end
+"#;
+    let (_t1, new_rt) = load_ghost_full(DIC, None, ACTORS_TOML);
+    let (_t2, old_rt) = load_ghost_full(DIC, Some(OLD_MAIN), ACTORS_TOML);
+    for (scope, part) in [(Some("0"), "Head"), (Some("1"), ""), (None, "")] {
+        let new = poke(&new_rt, scope, part);
+        let old = poke(&old_rt, scope, part);
+        assert!(new.contains("ダブルクリックです"), "{new:?}");
+        assert_eq!(new, old, "scope={scope:?} part={part:?}");
+    }
+}
+
+/// `＊つっつき反応胸右` だけのゴーストで部位 `胸` をつついても `胸右` は選ばれない（要件 6.2・1.3）。
+#[test]
+fn poke_does_not_pick_longer_part_name() {
+    let (_temp, runtime) = load_ghost_full(
+        "＊つっつき反応胸右\n　女の子：胸右です\n",
+        None,
+        ACTORS_TOML,
+    );
+    let response = poke(&runtime, Some("0"), "胸");
+    assert!(response.starts_with("SHIORI/3.0 204"), "{response:?}");
+    // 対照: 部位 `胸右` なら選ばれる
+    let response = poke(&runtime, Some("0"), "胸右");
+    assert!(response.contains("胸右です"), "{response:?}");
+}
+
+/// 同じ名前の 2 シーンは、2 回のつつきで 1 回ずつ出る（要件 1.2）。
+#[test]
+fn poke_draws_same_named_scenes_in_turn() {
+    let (_temp, runtime) = load_ghost_full(
+        "＊つっつき反応その他\n　女の子：甲です\n\n＊つっつき反応その他\n　女の子：乙です\n",
+        None,
+        ACTORS_TOML,
+    );
+    for round in 0..3 {
+        let a = poke(&runtime, Some("0"), "Head");
+        let b = poke(&runtime, Some("0"), "Head");
+        let kou = [&a, &b].iter().filter(|r| r.contains("甲です")).count();
+        let otsu = [&a, &b].iter().filter(|r| r.contains("乙です")).count();
+        assert_eq!((kou, otsu), (1, 1), "{round} 巡目: {a:?} / {b:?}");
+    }
+}
+
+/// 本文の無い `＊つっつき反応Head` があると部位 `Head` のつつきは 204 で、
+/// `その他` は呼ばれない。ほかの部位は `その他` に届く（要件 7.1）。
+#[test]
+fn empty_shortcut_scene_stops_lower_rungs() {
+    let (_temp, runtime) = load_ghost_full(EMPTY_HEAD_DIC, None, ACTORS_TOML);
+    let response = poke(&runtime, Some("0"), "Head");
+    assert!(response.starts_with("SHIORI/3.0 204"), "{response:?}");
+    assert!(!response.contains("その他の反応です"), "{response:?}");
+    let response = poke(&runtime, Some("0"), "Face");
+    assert!(response.contains("その他の反応です"), "{response:?}");
+}
+
+/// ショートカットのシーンの中で `＞transfer_req_to_var` が Reference を変数へ移す（要件 7.2）。
+#[test]
+fn transfer_req_to_var_works_in_shortcut_scene() {
+    let (_temp, runtime) = load_ghost_full(
+        "＊つっつき反応その他\n　＞transfer_req_to_var\n　女の子：番号＄ｒ３　部位＄ｒ４　です\n",
+        None,
+        ACTORS_TOML,
+    );
+    let response = poke(&runtime, Some("1"), "Face");
+    assert!(response.contains("番号1"), "{response:?}");
+    assert!(response.contains("部位Face"), "{response:?}");
+}
+
+/// つつきの後の継続（`STORE.co_scene`）を調べ、残っていれば再開してその出力を返す Lua。
+const RESUME_CONTINUATION: &str = r#"local STORE = require "pasta.store"
+local co = STORE.co_scene
+if co == nil then return "継続なし" end
+local before = coroutine.status(co)
+local ok, value = require("pasta.shiori.event").drive(co, nil)
+return before .. "|" .. tostring(ok) .. "|" .. tostring(value) .. "|" .. tostring(STORE.co_scene)
+"#;
+
+/// チェイントークを含むショートカットのシーンの、応答と継続の扱いが
+/// `＊OnMouseDoubleClick` で書いたときと同じ（要件 7.4）。
+#[test]
+fn chain_talk_after_shortcut_matches_event_scene() {
+    const BODY: &str = "　女の子：前半です\n　＞チェイントーク\n　女の子：後半です\n";
+    let mut results = Vec::new();
+    for name in ["つっつき反応その他", "OnMouseDoubleClick"] {
+        let (_temp, runtime) = load_ghost_full(&format!("＊{name}\n{BODY}"), None, ACTORS_TOML);
+        let first = poke(&runtime, Some("0"), "Head");
+        let value = runtime.exec(RESUME_CONTINUATION).expect("継続の再開に失敗");
+        let cont = value_as_str(&value).expect("文字列でない");
+        assert!(
+            first.contains("前半です") && !first.contains("後半です"),
+            "{name}: {first:?}"
+        );
+        assert!(
+            cont.starts_with("suspended|true|") && cont.contains("後半です"),
+            "{name}: 継続: {cont:?}"
+        );
+        results.push((first, cont));
+    }
+    assert_eq!(
+        results[0], results[1],
+        "ショートカットとイベント名のシーンで扱いが違う"
+    );
 }
