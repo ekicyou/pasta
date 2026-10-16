@@ -54,20 +54,20 @@
   - _Depends: 1.1_
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6_
 
-- [ ] 4. 通しの確認
-- [ ] 4.1 マニュアルの出力の検査に要る Node の依存がそろっていることを確かめる
+- [x] 4. 通しの確認
+- [x] 4.1 マニュアルの出力の検査に要る Node の依存がそろっていることを確かめる
   - ワークツリーの `book/node_modules` の有無を確かめ、無ければ `book/` で既存のロックファイルのまま `npm ci` を走らせる（新しいパッケージは足さない。着色・テーマの自己テストと出力の検査が依存する）。入れられないときは、main 側のチェックアウトの道具で着色を確かめる
   - 完了の目印: `book/node_modules` があり、着色の自己テストがモジュール不足で落ちない
   - _Requirements: 11.4_
 
-- [ ] 4.2 CI と同じ手順で、マニュアルとテストを通しで確かめる
+- [x] 4.2 CI と同じ手順で、マニュアルとテストを通しで確かめる
   - 本文検査・リンク検査・生成物の照合（`gen-skill-refs.mjs --check` で生成物が変わらない）・全自己テストを走らせる
   - `mdbook build book` → 着色 → 台詞の HTML 化 → 索引 → 静的性と検索の検査を走らせ、新しい章が最初の台詞の語で検索に出ることを確かめる
   - `cargo test -p pasta_sample_ghost` を走らせる
   - 完了の目印: 上のすべてが成功し、生成物の差分が無い
   - _Requirements: 11.2, 11.3, 11.4, 11.5_
 
-- [ ] 4.3 機械検査の無い所を人の目で確かめる
+- [x] 4.3 機械検査の無い所を人の目で確かめる
   - 章の UKADOC の各リンクをブラウザで開き、該当の項に飛ぶことを確かめる
   - 本体に UKADOC の書式の一覧・レシピ・作り込みの知見・描き方が無いこと、「食い違ったとき」の画面の挙動が記録した実機の結果と一致することを読み合わせる
   - `talk.mjs --stats` の結果を見直す（1.1 で合わせた状態の確認）。台詞を直したときは、台詞部品の検査と検索の検査を走らせ直す
@@ -80,3 +80,6 @@
 - cargo は `env -u NoDefaultCurrentDirectoryInExePath cargo test -p pasta_sample_ghost` で走らせる（外さないと LuaJIT のビルドが exit 101）
 - 2.1: 章内アンカーは `#当たり判定の名前と-ｒ４`・`#吹き出しとアクターの-spot`・`#辞書とシェルが食い違ったとき`・`#吹き出しバルーン`。他章は `variables.md#リクエスト変数reference`・`actor-dictionary.md#バルーン連携`・`pasta-toml.md#spot` など（mdbook の出力で確認）
 - 2.2: 本体の H3 は第 2 節以外は設計で固定されていない（H2 の順と文言だけ固定）。2.2 で H3 を 5 つ足した（`#足した表情を確かめる` など）。ssp.shillest.net の URL 確認は `curl --ssl-no-revoke` が要る
+- 4.1: ワークツリーに `book/node_modules` が無かったので `book/` で `npm ci`（ロックファイルのまま）。着色・テーマの自己テストを含む 15 本がすべて通る
+- 4.2: CI と同じ順（gen-skill-refs --check → mdbook build → 着色 → talk-html → 索引 → link-check → tutorial-check → verify-static/verify-search --self-test → verify-content → 自己テスト 15 本）がすべて成功。verify-search で「借り物の立ち絵を着せたままでは」が shell.md にヒット（8.2 PASS）。`cargo test -p pasta_sample_ghost` 全通過。生成物の差分なし
+- 4.3: UKADOC の 8 リンクをブラウザで開いて確認。`collision-sort`・`collisionex*`・`element*`・`_1_sakura.balloon.offsetx`・`seriko.use_self_alpha` の各 id が該当の項（当たり判定の判定順ソート／不定形当たり判定／ベース描画／本体側バルーン位置X座標／透明度のある画像）に当たる。dev_shell＝シェルの作成、dev_bind＝アニメーション/着せ替えの設定、manual_install＝インストール。「食い違ったとき」は research.md「R3.6 の実機確認」（SSP 2.9.11・strict なしでエラー無し）と一致。本体に書式の一覧・レシピ・作り込みの知見・描き方は無い。`talk.mjs --stats` は導入「冷笑・素・したり顔」、締め「照れ・素」で 1.1 から変わらず、同じ組み合わせの章は無い
