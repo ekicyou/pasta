@@ -7,7 +7,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 現在の主題は 3 つある。
 
 - **Phase 11 の残り: 属性セマンティクスと失敗の出力**。シーン属性の保持と読み出し、実行時の失敗の出力の一本化、Call の属性フィルター、文中のシーンリンク、スクリプトが止まるエラーのバルーン表示が残る。
-- **Phase 12: 初心者向けの入門ガイド**。段階辞書・マニュアルの着せ替え・入門ガイドの本文・hello-pasta の新しいシェル・9 段目の選択肢の直しは済んだ。残るのは、撫で・つつきの反応のショートカット、辞書が無い間の立ち絵、シェルの説明の章、スクリーンショット。
+- **Phase 12: 初心者向けの入門ガイド**。段階辞書・マニュアルの着せ替え・入門ガイドの本文・hello-pasta の新しいシェル・9 段目の選択肢の直しは済んだ。残るのは、撫で・つつきの反応のショートカット、シェルの説明の章、スクリーンショット（辞書が無い間の立ち絵は、2026-10-16 に優先度を下げて 0.4.0 から外した）。
 - **Phase 13: areka でノベルゲーム（0.5.0）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を 9 本起こした。0.4.0 を出した後に始める（2026-10-16 から、ウェーブは今のゴールの範囲の spec だけで組む）。
 
 このほか、リリース手順（spec `release-workflow`）の CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ（2026-10-10）。リリース手順は `release` スキル（`/release`）へ移し、spec `release-workflow` は完了にした（2026-10-11）。
@@ -88,27 +88,25 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 完了 | release-notes-highlights | Opus | 17（実績） | 2026-10-15 に完了（v0.3.8 のページも見どころの本文と 4 つの添付に直した） |
 | 並走 | manual-print-media-refs | Opus | 2〜3 | 今すぐ（「開発中」としていたが、2026-10-16 の棚卸で作業のブランチが見当たらなかった） |
 | 1（高優先度） | touch-poke-shortcuts | Opus | 10〜13 | 今すぐ（2026-10-11 開発者の依頼で足し、高優先度に置いた。残りの spec より先に始める） |
-| 2 | boot-surface-without-dic | Opus（2026-10-16 に見直し） | 3〜5（やる場合） | 今すぐ |
-| 3 | failure-output-unification | Opus（2026-10-16 に見直し） | 15〜19 | 今すぐ |
-| 4 | pasta-check-dic-validate | Opus（2026-10-16 に見直し） | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
-| 5 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
-| 6 | getting-started-screenshots | Opus | 4〜6 | `boot-surface-without-dic` と `touch-poke-shortcuts` の後（最後に撮る。`hello-pasta-shell-art` と `choice-line-layout` は完了した） |
-| 7 | shiori-test-support-runtime | Opus | 6〜8 | 今すぐ（2026-10-16 開発者の決定で、`runtime-error-balloon` の前段として 0.4.0 に入れた） |
-| 8 | runtime-error-balloon | Opus（2026-10-16 に見直し） | 8〜10 | `failure-output-unification` と `shiori-test-support-runtime` の後（2026-10-16 開発者の決定で 0.4.0 に入れた。やると決まった） |
-| 9 | 0.4.0 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
+| 2 | failure-output-unification | Opus（2026-10-16 に見直し） | 15〜19 | 今すぐ |
+| 3 | pasta-check-dic-validate | Opus（2026-10-16 に見直し） | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
+| 4 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
+| 5 | getting-started-screenshots | Opus | 4〜6 | `touch-poke-shortcuts` の後（最後に撮る。`hello-pasta-shell-art` と `choice-line-layout` は完了した） |
+| 6 | shiori-test-support-runtime | Opus | 6〜8 | 今すぐ（2026-10-16 開発者の決定で、`runtime-error-balloon` の前段として 0.4.0 に入れた） |
+| 7 | runtime-error-balloon | Opus（2026-10-16 に見直し） | 8〜10 | `failure-output-unification` と `shiori-test-support-runtime` の後（2026-10-16 開発者の決定で 0.4.0 に入れた。やると決まった） |
+| 8 | 0.4.0 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
 並走するときの約束（「棚卸」のウェーブの約束に足す）:
 
-- `boot-surface-without-dic` が触るのは、起動のイベント（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/boot.lua`）と準備の章（`book/src/getting-started/setup.md`）である。pasta.toml に設定を足す場合は、設定の読み込み（`crates/pasta_lua/src/loader/config/`）が `failure-output-unification` と重なるので、後から入る側が合わせる。やらないと決めたら却下し、0.4.0 の条件と `getting-started-screenshots` の前提から外す。
 - `failure-output-unification` は、選択肢の出力（`sakura_builder.lua`。立ち位置が決まらないときの警告がある）を、`choice-line-layout` が入るまで触らない（`choice-line-layout` は 2026-10-11 に完了したので、もう触れる）。生成コードの形を変えない約束と、スクリプトが止まるエラーを扱わない線引き（`runtime-error-balloon`）は、そのまま守る。
 - `pasta-check-dic-validate` と `manual-shell-guide` は、どちらもマニュアルに章を足すと、目次（`SUMMARY.md`）と章の数を決め打ちする検査が重なる。後から入る側が数を合わせる。
 - `getting-started-screenshots` は、6 段目（時報）の撮り方を `baseware-virtual-time` に頼らない。失敗の表記を絵に写すなら、`failure-output-unification` の後に撮る。
 - 0.4.0 のリリースノートに、失敗の表記が変わったことを書く。`release-notes-highlights` が入っていれば、本文の見どころに書く。
-- `touch-poke-shortcuts` が触るのは、イベント層の新しいファイル（`pasta_scripts/pasta/shiori/event/`。`init.lua` には `require` を 1 行足すだけ）、hello-pasta の 8・9 段目（`dic/08-touch.pasta`・`dic/09-choice.pasta`・`STAGES.md`・`src/scripts.rs`・`tests/tutorial_stages_test.rs`）、入門の章（`08-touch.md`・`09-choice.md`）とリファレンスである。`act.lua`・`sakura_builder.lua`・`choice_select.lua`・文法・トランスパイラを触らない。設定を足す場合は、設定の読み込み（`loader/config/`）が `failure-output-unification`・`boot-surface-without-dic` と重なるので、後から入る側が合わせる。`manual-shell-guide` は `08-touch.md` にリンクを足すので、後から入る側が合わせる。`getting-started-screenshots` は、この spec の後に 8・9 段目を撮る。
+- `touch-poke-shortcuts` が触るのは、イベント層の新しいファイル（`pasta_scripts/pasta/shiori/event/`。`init.lua` には `require` を 1 行足すだけ）、hello-pasta の 8・9 段目（`dic/08-touch.pasta`・`dic/09-choice.pasta`・`STAGES.md`・`src/scripts.rs`・`tests/tutorial_stages_test.rs`）、入門の章（`08-touch.md`・`09-choice.md`）とリファレンスである。`act.lua`・`sakura_builder.lua`・`choice_select.lua`・文法・トランスパイラを触らない。設定を足す場合は、設定の読み込み（`loader/config/`）が `failure-output-unification` と重なるので、後から入る側が合わせる。`manual-shell-guide` は `08-touch.md` にリンクを足すので、後から入る側が合わせる。`getting-started-screenshots` は、この spec の後に 8・9 段目を撮る。
 - `release-notes-highlights` は、`release.yml` の verify と github-release の段、`release` スキルの手順の文書（`.claude/skills/release/`）を触る。`pasta-check-dic-validate` が `release.yml` の `pasta_check` の公開の段を触る場合は、段が別なので、後から入る側が合わせる。
 - `runtime-error-balloon`（2026-10-16 に 0.4.0 へ入れた）は、スクリプトが止まるエラーをバルーンに出す。これも見える失敗の出力を変えるので、`failure-output-unification` と同じ版の境目に収める。報告の関数・失敗表記の形・pasta.toml の切り替えは `failure-output-unification` が決め、この spec はそれを使う側になる。`shiori/event/init.lua` を触るので、`touch-poke-shortcuts`（`require` を 1 行足す）とは後から入る側が合わせる。0.4.0 のリリースノートには、止まるエラーがバルーンに出るようになったことも書く。
 
-0.4.0 の後（この順）: `scene-attribute-store`（Fable）、`call-attribute-filter`、`scene-anchor-link`、`baseware-virtual-time`。このうち `scene-attribute-store` と `call-attribute-filter` は、0.5.0 の道筋に入った（下の「Phase 13」）。残りの 2 本をどこに挟むかは、0.4.0 を出した後の棚卸で決める。
+0.4.0 の後（この順）: `scene-attribute-store`（Fable）、`call-attribute-filter`、`scene-anchor-link`、`baseware-virtual-time`。このうち `scene-attribute-store` と `call-attribute-filter` は、0.5.0 の道筋に入った（下の「Phase 13」）。残りの 2 本をどこに挟むかは、0.4.0 を出した後の棚卸で決める。`boot-surface-without-dic` は、2026-10-16 開発者の決定で優先度を下げ、0.4.0 から外した（「何も書かなければ何も表示しない」が既定の動き）。やるかどうかは、0.4.0 を出した後の棚卸で見直す。
 
 ### 0.5.0 の目標（2026-10-10 開発者の決定）
 
@@ -141,32 +139,31 @@ Fable を使うのは、後戻りしにくい土台の決定（新しい文法�
 
 ### ウェーブ（2026-10-16）
 
-方針（2026-10-10 の開発者の決定）どおり、0.4.0 の範囲の spec だけを取る。先に要るものが残っていない 7 本を並べる。互いのソースは下の約束で重ならない。最初は `novel-areka-contract`（0.5.0）も入れていたが、2026-10-16 の開発者の決定（今のゴールを超えた spec はウェーブに入れない）で外した。代わりに、同じ日に 0.4.0 へ入った `shiori-test-support-runtime` を入れた。
+方針（2026-10-10 の開発者の決定）どおり、0.4.0 の範囲の spec だけを取る。先に要るものが残っていない 6 本を並べる。互いのソースは下の約束で重ならない。最初は `novel-areka-contract`（0.5.0）も入れていたが、2026-10-16 の開発者の決定（今のゴールを超えた spec はウェーブに入れない）で外した。代わりに、同じ日に 0.4.0 へ入った `shiori-test-support-runtime` を入れた。さらに同じ日に、`boot-surface-without-dic` を 0.4.0 から外した（開発者の決定）。
 
 | spec | 子孫 | 種別 | 規模 | 要件定義 |
 | ---- | ---- | ---- | ---- | -------- |
 | touch-poke-shortcuts | 約 1（`getting-started-screenshots`） | 機能（開発者の依頼・高優先度） | 10〜13 | Opus |
 | failure-output-unification | 約 11（Phase 11 の 3 本と、`cue-command-runtime` から先の 0.5.0 の spec） | 機能 | 15〜19 | Opus |
 | shiori-test-support-runtime | 約 1（`runtime-error-balloon`） | 基盤 | 6〜8 | Opus |
-| boot-surface-without-dic | 約 1（`getting-started-screenshots`） | 機能（やるかどうかから） | 3〜5 | Opus |
 | pasta-check-dic-validate | 0 | 機能（作成支援） | 10〜14 | Opus |
 | manual-shell-guide | 0 | 文書 | 5〜8 | Opus |
 | manual-print-media-refs | 0 | バグ（マニュアル・CI） | 2〜3 | Opus |
 
 同じウェーブに置くときの約束（上の「0.4.0 までの道筋」の約束に足す）:
 
-- 設定の読み込み（`crates/pasta_lua/src/loader/config/` の `sections.rs`・`mod.rs`）は、`failure-output-unification`・`touch-poke-shortcuts`・`boot-surface-without-dic` が、設定を足すと決めた場合に触る。どれも自分の設定を足すだけにして、既にある設定（`choice_newlines` など）を書き換えない。後から入る側が rebase で合わせる。
+- 設定の読み込み（`crates/pasta_lua/src/loader/config/` の `sections.rs`・`mod.rs`）は、`failure-output-unification` と `touch-poke-shortcuts` が、設定を足すと決めた場合に触る。どれも自分の設定を足すだけにして、既にある設定（`choice_newlines` など）を書き換えない。後から入る側が rebase で合わせる。
 - `pasta/act.lua`・`actor.lua`・`word.lua` は `failure-output-unification` だけが触る。立ち位置の警告（`shiori/sakura_builder.lua` 75 行）を一本化に入れる場合も、`sakura_builder.lua` はこの spec だけが触る。
-- `shiori/event/` は、`touch-poke-shortcuts`（新しいファイルと、`init.lua` への `require` 1 行）と `boot-surface-without-dic`（`boot.lua`）が、別のファイルを触る。`failure-output-unification` は `shiori/event/` を触らない。
+- `shiori/event/` は、`touch-poke-shortcuts`（新しいファイルと、`init.lua` への `require` 1 行）だけが触る。`failure-output-unification` は `shiori/event/` を触らない。
 - hello-pasta の辞書・`STAGES.md`・`src/scripts.rs`・`tests/tutorial_stages_test.rs` は、`touch-poke-shortcuts` だけが触る。
-- 入門の章は、別の節なら同じページを触ってよい。`setup.md` は `boot-surface-without-dic`（準備の章の終わり）と `manual-shell-guide`（節「シェルの中身」からのリンク）、`08-touch.md` は `touch-poke-shortcuts`（本文）と `manual-shell-guide`（リンク）。後から入る側が rebase で合わせる。
+- 入門の章は、別の節なら同じページを触ってよい。`08-touch.md` は `touch-poke-shortcuts`（本文）と `manual-shell-guide`（リンク）。後から入る側が rebase で合わせる。
 - `SUMMARY.md` と、章の数を決め打ちする検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）は、章を足す `manual-shell-guide` と、章を足す場合の `pasta-check-dic-validate` が触る。後から入る側が数を合わせる。
 - `Cargo.lock`・ルートの `Cargo.toml`・`release.yml` の `pasta_check` の公開の段は、`pasta-check-dic-validate` だけが触る。`pasta_lua` のソースに手を入れる場合も、`act.lua`・`actor.lua`・`word.lua`・`loader/config/` は触らない。リリースの実行中は main へ入れない。
 - `manual.yml`・`book/tools/verify-static.mjs`・`book/AUTHORING.md` の「CI と同じ順」の一覧は、`manual-print-media-refs` だけが触る。
-- `crates/pasta_shiori/tests/` は `shiori-test-support-runtime` だけが触る。ほかの 6 本は `pasta_shiori` を触らない。
+- `crates/pasta_shiori/tests/` は `shiori-test-support-runtime` だけが触る。ほかの 5 本は `pasta_shiori` を触らない。
 - スキル references は、後から入る側が再生成する。
 
-選ばなかった先頭: `getting-started-screenshots` は、`boot-surface-without-dic` と `touch-poke-shortcuts` の後。`runtime-error-balloon` は先頭ではない（`failure-output-unification` と `shiori-test-support-runtime` の後）。
+選ばなかった先頭: `getting-started-screenshots` は、`touch-poke-shortcuts` の後。`runtime-error-balloon` は先頭ではない（`failure-output-unification` と `shiori-test-support-runtime` の後）。
 
 次のウェーブ: `runtime-error-balloon` と `getting-started-screenshots`。その後に 0.4.0 のリリース（`/release 0.4.0`）。
 
@@ -175,7 +172,6 @@ Fable を使うのは、後戻りしにくい土台の決定（新しい文法�
 ### 開発者の判断が要るもの（ウェーブは止めない）
 
 - `manual-print-media-refs` は「開発中」としていたが、作業のブランチが見当たらなかったので、ウェーブに入れ直した。既にどこかで進めているなら、そちらを続ける。
-- 辞書が無い間に立ち絵を出すか — `boot-surface-without-dic` の要件の最初の議題。やらないなら却下し、`getting-started-screenshots` の前提から外す。
 - `novel-areka-contract` を 0.4.0 と並べて先に進めたい場合は、「0.4.0 までの道筋」の範囲に入れる決定が要る（入れないなら、0.4.0 の後の先頭）。
 - `scene-anchor-link`・`baseware-virtual-time` を 0.5.0 の道筋のどこに挟むか — 0.4.0 を出した後の棚卸で決める。
 - `steering/structure.md`・`tech.md` の作り直し — `/kiro-steering` で直す（下の「Direct Implementation Candidates」）。
@@ -236,9 +232,8 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 | Wave | spec（並走可） | ソースの持ち場 |
 | ---- | -------------- | -------------- |
 | 2026-10-16 のウェーブ | touch-poke-shortcuts | イベント層の新しいファイル（`shiori/event/`）、hello-pasta の 8・9 段目の辞書と `STAGES.md`・`src/scripts.rs`・`tests/tutorial_stages_test.rs`、入門の `08-touch.md`・`09-choice.md` |
-| 2026-10-16 のウェーブ | boot-surface-without-dic | 起動のイベント（`shiori/event/boot.lua`）、準備の章（`setup.md`）。やらないなら却下 |
 | 2026-10-16 のウェーブ | manual-shell-guide | シェルの説明の新しい章、入門の章（`setup.md`・`03-face.md`・`08-touch.md`）からのリンク、`SUMMARY.md` と章の数を決め打ちする検査 |
-| 次 | getting-started-screenshots | 撮影の手順、画像、各章への画像の行、新しいシェルでの 8 段目の実機の確認。`boot-surface-without-dic` と `touch-poke-shortcuts` の後に撮る |
+| 次 | getting-started-screenshots | 撮影の手順、画像、各章への画像の行、新しいシェルでの 8 段目の実機の確認。`touch-poke-shortcuts` の後に撮る |
 
 Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイドの本文（`getting-started-story-guide`）、シェル（`hello-pasta-shell-art`）、9 段目の選択肢の直し（`choice-line-layout`）は完了した。
 
@@ -337,7 +332,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 
 ## 入門ガイドの実機確認で見つかったもの（2026-10-10 起票）
 
-`getting-started-story-guide` の完了時の棚卸で起票した。`manual-link-anchor-check` と `choice-line-layout` は 2026-10-11 に完了した。`boot-surface-without-dic` は 2026-10-16 のウェーブに入れた。`baseware-virtual-time` は 0.4.0 の後に回した。
+`getting-started-story-guide` の完了時の棚卸で起票した。`manual-link-anchor-check` と `choice-line-layout` は 2026-10-11 に完了した。`boot-surface-without-dic` は 2026-10-16 に優先度を下げ、0.4.0 から外した。`baseware-virtual-time` は 0.4.0 の後に回した。
 
 - `baseware-virtual-time` — SSP の仮想の時刻は pasta に届かない（pasta は OS の時計で正時を判定する）。入門ガイド 6 段目は「次の正時を待つ」と教えている。
 - `boot-surface-without-dic` — 辞書が無い間は何も表示されない。入門ガイドの準備の章は「何も表示されないのが正しい」と教えている。
@@ -354,9 +349,9 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
 - [ ] runtime-error-balloon -- スクリプトが止まる実行時エラー（500 の応答）を、辞書を書く人に見えるようバルーンにも出す。2026-10-16 開発者の決定で、やると決めて 0.4.0 に入れた（2026-10-10 の棚卸で `failure-output-unification` から分割）。Dependencies: failure-output-unification, shiori-test-support-runtime
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアルまで揃える（2026-10-08 起票）。Dependencies: failure-output-unification, call-attribute-filter
-- [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: boot-surface-without-dic（準備の章に写る絵が変わる。却下なら外す）, touch-poke-shortcuts（8・9 段目の辞書と章が変わる）
+- [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: touch-poke-shortcuts（8・9 段目の辞書と章が変わる）
 - [ ] baseware-virtual-time -- SSP の「現在時刻の仮想的変更」を pasta の時報に効かせ、正時を待たずに確かめられるようにする。SSP が仮想の時刻を SHIORI に伝えているかの調査から。外から起こした `OnTalk` でチェイントークが続かない件も扱う（2026-10-10 同上）。Dependencies: none
-- [ ] boot-surface-without-dic -- 辞書や `＊OnBoot` が無いゴーストは起動しても立ち絵が出ない。既定で立ち絵を出すかどうかを、やるかどうかから決める（2026-10-10 同上）。Dependencies: none
+- [ ] boot-surface-without-dic -- 辞書や `＊OnBoot` が無いゴーストは起動しても立ち絵が出ない。既定で立ち絵を出すかどうかを、やるかどうかから決める（2026-10-10 同上）。2026-10-16 開発者の決定で優先度を下げ、0.4.0 から外した（何も書かなければ何も表示しないのが既定の動き）。Dependencies: none
 - [ ] manual-shell-guide -- マニュアルに、シェル（見た目）の説明を足す。見本のシェルを自分の絵に差し替える・表情を足す・当たり判定を足す・バルーンの扱いを、辞書と噛み合う所を中心に書く。0.4.0 に入れた（2026-10-10 開発者の指示で起票）。Dependencies: none（題材の新しいシェルと当たり判定は、`hello-pasta-shell-art` で入った）
 - [ ] novel-areka-contract -- pasta と areka の取り決め（台本に載せる語彙・目印・イベント・設定の値）を 1 つの文書にし、areka への依頼書として出す。コードは書かない。areka に依頼を出すための spec（2026-10-10 の discovery で起票。以下 9 本は同じ）。Dependencies: none
 - [ ] cue-command-runtime -- キューコマンド行 `！命令＠対象（引数）` を、実行時に `\![…]` として台本へ流す。日本語の名前の別名表、引数の穴（数字で始まる引数など）の手当て。Dependencies: failure-output-unification（`act.lua` を触る順番）
