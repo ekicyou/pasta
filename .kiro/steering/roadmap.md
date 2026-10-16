@@ -86,7 +86,8 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 完了 | manual-link-anchor-check | Opus | 8（実績） | 2026-10-11 に完了 |
 | 完了 | choice-line-layout | Opus | 12（実績） | 2026-10-11 に完了 |
 | 完了 | release-notes-highlights | Opus | 17（実績） | 2026-10-15 に完了（v0.3.8 のページも見どころの本文と 4 つの添付に直した） |
-| 完了 | manual-print-media-refs | Opus | 7（実績） | 2026-10-16 に完了（公開サイトの `print.html` での再生の確かめはマージの後） |
+| 完了 | manual-print-media-refs | Opus | 7（実績） | 2026-10-16 に完了（公開サイトの `print.html` は開くと固まると分かり、確かめは `manual-print-page-removal` で対象が無くなる） |
+| 並走 | manual-print-page-removal | Opus | 4〜6 | 今すぐ（2026-10-16 起票。公開サイトの `print.html` を開くとブラウザが固まる） |
 | 1（高優先度） | touch-poke-shortcuts | Opus | 10〜13 | 今すぐ（2026-10-11 開発者の依頼で足し、高優先度に置いた。残りの spec より先に始める） |
 | 2 | failure-output-unification | Opus（2026-10-16 に見直し） | 15〜19 | 今すぐ |
 | 3 | pasta-check-dic-validate | Opus（2026-10-16 に見直し） | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
@@ -149,6 +150,7 @@ Fable を使うのは、後戻りしにくい土台の決定（新しい文法�
 | pasta-check-dic-validate | 0 | 機能（作成支援） | 10〜14 | Opus |
 | manual-shell-guide | 0 | 文書 | 5〜8 | Opus |
 | manual-print-media-refs | 0 | バグ（マニュアル・CI） | 2〜3 | Opus |
+| manual-print-page-removal | 0 | バグ（マニュアル・CI。2026-10-16 に足した） | 4〜6 | Opus |
 
 同じウェーブに置くときの約束（上の「0.4.0 までの道筋」の約束に足す）:
 
@@ -159,7 +161,7 @@ Fable を使うのは、後戻りしにくい土台の決定（新しい文法�
 - 入門の章は、別の節なら同じページを触ってよい。`08-touch.md` は `touch-poke-shortcuts`（本文）と `manual-shell-guide`（リンク）。後から入る側が rebase で合わせる。
 - `SUMMARY.md` と、章の数を決め打ちする検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）は、章を足す `manual-shell-guide` と、章を足す場合の `pasta-check-dic-validate` が触る。後から入る側が数を合わせる。
 - `Cargo.lock`・ルートの `Cargo.toml`・`release.yml` の `pasta_check` の公開の段は、`pasta-check-dic-validate` だけが触る。`pasta_lua` のソースに手を入れる場合も、`act.lua`・`actor.lua`・`word.lua`・`loader/config/` は触らない。リリースの実行中は main へ入れない。
-- `manual.yml`・`book/tools/verify-static.mjs`・`book/AUTHORING.md` の「CI と同じ順」の一覧は、`manual-print-media-refs` だけが触る。（2026-10-16 に完了したので、席は空いた）
+- `manual.yml`・`book/tools/verify-static.mjs`・`book/AUTHORING.md` の「CI と同じ順」の一覧は、`manual-print-media-refs` だけが触る。（2026-10-16 に完了し、同じ日に起票した `manual-print-page-removal` が席を引き継いだ。`pasta-check-dic-validate` は、この spec が入るまで `manual.yml` を触らない）
 - `crates/pasta_shiori/tests/` は `shiori-test-support-runtime` だけが触る。ほかの 5 本は `pasta_shiori` を触らない。
 - スキル references は、後から入る側が再生成する。
 
@@ -328,6 +330,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 
 - `pasta-check-dic-validate` — SSP を起動せずに、ゴーストの `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い Call・選択肢・文中のシーンリンク、モジュール名の衝突、記号を落とした後のシーン名の衝突などを見る。何をエラーにして何を警告にするか、`pasta_check release` の関門にするか、依存の重さ（`pasta_lua` に依存すると、`cargo install pasta_check` が LuaJIT をビルドする）を要件で決める。依存を足すと `Cargo.lock` が変わる（`hello-pasta-shell-art` が完了し、席は空いた）。マニュアルに章を足す場合は、章の数を決め打ちする検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）と `SUMMARY.md` を、章を足すほかの spec（`manual-shell-guide` など）と共有する。内部クレートに依存させる場合は、公開の手順（`release.yml` の `pasta_check` の公開の段）も触るので、リリースの実行中は入れない。
 - `manual-print-media-refs` — マニュアルの印刷用ページ（`print.html`）で、デバッグの章の動画が再生できない。ビルドの後に `print.html` の参照だけを書き換え、検査（`verify-static.mjs`）の例外を外す。
+- `manual-print-page-removal`（2026-10-16 起票）— 公開サイトの `print.html` を開くとブラウザが固まる（全章をつないだ約 1 万 5 千行のページが、読み込みの後に自分で印刷の画面を開く。700 ページを超える）。`book.toml` で `print.html` を作らせないようにし、`manual-print-media-refs` が足した `print.html` のための道具と段を消す（開発者の決定）。旧版の `print.html` と古い URL の扱いは要件で決める。
 - `manual-shell-guide`（2026-10-10 追加・0.4.0 に入れた）— 入門ガイドはシェルを「hello-pasta からフォルダごと写す」と教え、中身の説明は `setup.md` の節「シェルの中身」（ファイルの種類と、辞書との接点がサーフェス番号であること）までである。自分の絵に差し替える所から先を、入門の外に章を置いて書く。
 
 ## 入門ガイドの実機確認で見つかったもの（2026-10-10 起票）
@@ -345,6 +348,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 - [ ] failure-output-unification -- シーンが生きている間の実行時の失敗（未定義の参照・見つからない Call など）を、ログとさくらスクリプトの両方へ 1 つの仕組みから出す。既にある 2 つの失敗表記を 1 つにし、`act.lua`・`actor.lua`・`word.lua` の警告を載せ替える（2026-10-10 の棚卸で、スクリプトが止まるエラーを `runtime-error-balloon` へ分けた）。Dependencies: none
 - [x] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
 - [x] manual-print-media-refs -- マニュアルの印刷用ページ（`print.html`）で動画の参照が切れているのを、ビルド後の書き換えで直し、検査の例外を外す（2026-10-10 棚卸で起票）。Dependencies: none
+- [ ] manual-print-page-removal -- 公開サイトの `print.html` を開くとブラウザが固まるので、`book.toml` で印刷用のページを作らせないようにし、`print-media-refs` の道具と CI の段を消し、`verify-static.mjs` を合わせる（2026-10-16 起票）。Dependencies: none
 - [ ] pasta-check-dic-validate -- SSP を起動せずに `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い参照・モジュール名とシーン名の衝突などを見る（2026-10-10 棚卸で起票）。Dependencies: none（`hello-pasta-shell-art` は完了し、`Cargo.lock` の席は空いた）
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
 - [ ] runtime-error-balloon -- スクリプトが止まる実行時エラー（500 の応答）を、辞書を書く人に見えるようバルーンにも出す。2026-10-16 開発者の決定で、やると決めて 0.4.0 に入れた（2026-10-10 の棚卸で `failure-output-unification` から分割）。Dependencies: failure-output-unification, shiori-test-support-runtime
