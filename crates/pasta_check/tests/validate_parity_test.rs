@@ -8,8 +8,8 @@ use std::fs;
 use std::path::Path;
 
 use pasta_check::validate::{
-    FileText, FindingKind, GhostInput, Report, Severity, TomlSource, module_name_of,
-    pasta_dll_paths, select_dictionary_files, validate_ghost,
+    ACT_METHODS, FileText, FindingKind, GLOBAL_NAMES, GhostInput, Report, SHIORI_ACT_METHODS,
+    Severity, TomlSource, module_name_of, pasta_dll_paths, select_dictionary_files, validate_ghost,
 };
 use pasta_lua::loader::{CacheManager, PastaLoader, discover_files};
 use tempfile::TempDir;
@@ -407,5 +407,123 @@ fn transpile_failure_matches_transpile_errors() {
             )
         });
         assert_eq!(found, lua_failed, "{body}");
+    }
+}
+
+// ---- (e) 組み込みの名前の一覧 ----
+
+/// 読み込んだランタイムで、表の値が関数であるキーを昇順で（`__index` は除く）
+fn function_keys(lua: &pasta_lua::mlua::Lua, table_expr: &str) -> Vec<String> {
+    let mut keys: Vec<String> = lua
+        .load(format!(
+            "local t = {table_expr}\n\
+             local out = {{}}\n\
+             for k, v in pairs(t) do\n\
+               if type(v) == 'function' and k ~= '__index' then out[#out + 1] = k end\n\
+             end\n\
+             return out"
+        ))
+        .eval()
+        .unwrap();
+    keys.sort();
+    keys
+}
+
+fn sorted(names: &[&str]) -> Vec<String> {
+    let mut names: Vec<String> = names.iter().map(|n| n.to_string()).collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn builtin_names_match_runtime() {
+    let temp = ghost(&[
+        ("pasta.toml", TOML.as_bytes()),
+        ("dic/a.pasta", TALK.as_bytes()),
+    ]);
+    let runtime = PastaLoader::load(temp.path()).unwrap();
+    let lua = runtime.lua();
+    assert_eq!(
+        function_keys(lua, "require 'pasta.global'"),
+        sorted(&GLOBAL_NAMES),
+        "GLOBAL"
+    );
+    assert_eq!(
+        function_keys(lua, "require('pasta.act').IMPL"),
+        sorted(&ACT_METHODS),
+        "ACT_IMPL"
+    );
+    assert_eq!(
+        function_keys(lua, "require('pasta.shiori.act').IMPL"),
+        sorted(&SHIORI_ACT_METHODS),
+        "SHIORI_ACT_IMPL"
+    );
+}
+
+// ---- (f) 静的な Call の検索 ----
+
+#[test]
+fn static_call_lookup_matches_runtime() {
+    // (書いたグローバルシーン, Call のキー, 実行時に見つかるか)。1 行 1 Call で、行番号から核の判定を引く
+    let calls = [
+        ("挨拶", "ローカル", true),             // L2 ローカル
+        ("挨拶", "ロー", true),                 // L2 ローカルの前方一致
+        ("挨拶", "会話", true), // L5 別名を置き換えたグローバル（既定 OnTalk = ["会話"]）
+        ("挨拶", "OnTa", true), // L5 グローバルの前方一致
+        ("挨拶", "チェイントーク", true), // L4 GLOBAL
+        ("挨拶", "ゴースト終了", true), // L4 GLOBAL（shiori/entry.lua）
+        ("挨拶", "call_key", true), // L3 ACT_IMPL
+        ("挨拶", "transfer_date_to_var", true), // L3 SHIORI_ACT_IMPL
+        ("挨拶", "無い場面", false), // 無い
+        ("挨拶", "内", false),  // 別のグローバルシーンの配下のローカルは届かない
+        ("挨拶", "ｙｉｅｌｄ", false), // 組み込みは完全一致だけ
+        ("OnTalk", "内", true), // L2 ローカル
+        ("OnTalk", "挨", true), // L5 グローバルの前方一致
+    ];
+    let mut text = String::from("＊挨拶\n  さくら：はい。\n");
+    let mut lines = Vec::new();
+    let mut current = "挨拶";
+    for (global, key, _) in calls {
+        if global != current {
+            text.push_str("  ・ローカル\n    さくら：ローカル。\n＊OnTalk\n  さくら：雑談。\n");
+            current = global;
+        }
+        text.push_str(&format!("  ＞{key}\n"));
+        lines.push(text.lines().count() as u32);
+    }
+    text.push_str("  ・内\n    さくら：内。\n");
+
+    let temp = ghost(&[
+        ("pasta.toml", TOML.as_bytes()),
+        ("dic/a.pasta", text.as_bytes()),
+    ]);
+    let report = check(temp.path());
+    let runtime = PastaLoader::load(temp.path()).unwrap();
+    let lua = runtime.lua();
+    // 実行時の Call と同じ: そのグローバルシーンの表を current_scene にした SHIORI 用の act の find_act_handler
+    let find = lua
+        .load(
+            "local global, key = ...\n\
+             local SEARCH = require '@pasta_search'\n\
+             local registered = SEARCH:search_scene(global, nil)\n\
+             local act = require('pasta.shiori.act').new({})\n\
+             act.current_scene = require('pasta.scene').get_global_table(registered)\n\
+             assert(act.current_scene, global)\n\
+             return act:find_act_handler('scene', key) ~= nil",
+        )
+        .into_function()
+        .unwrap();
+
+    for ((global, key, expected), line) in calls.into_iter().zip(lines) {
+        let found_at_runtime: bool = find.call((global, key)).unwrap();
+        assert_eq!(
+            found_at_runtime, expected,
+            "見本の前提が違う: {global} ＞{key}"
+        );
+        let missing = report
+            .findings
+            .iter()
+            .any(|f| f.code == FindingKind::CallTargetMissing && f.line == Some(line));
+        assert_eq!(!missing, found_at_runtime, "{global} ＞{key}（{line} 行）");
     }
 }
