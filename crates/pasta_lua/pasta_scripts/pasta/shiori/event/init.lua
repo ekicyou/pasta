@@ -76,6 +76,7 @@ local CALLBACK = require("pasta.shiori.event.callback")
 require("pasta.shiori.event.boot")
 require("pasta.shiori.event.choice_select")
 require("pasta.shiori.event.second_change")
+require("pasta.shiori.event.mouse")
 
 -- 2. モジュールテーブル宣言
 --- @class EVENT

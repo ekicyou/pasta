@@ -5,8 +5,10 @@ local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
-local MOUSE = require("pasta.shiori.event.mouse")
+-- 他のテストが pasta.store を作り直しても、MOUSE とこのテストが同じ STORE を見るように読み直す
 local STORE = require("pasta.store")
+package.loaded["pasta.shiori.event.mouse"] = nil
+local MOUSE = require("pasta.shiori.event.mouse")
 
 --- 配列を "|" で連結して比べる
 local function joined(list)

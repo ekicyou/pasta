@@ -251,3 +251,49 @@ fn co_exec_exact_runs_only_exactly_named_global_scene() {
         assert!(co_exec_exact_is_nil(&runtime, name), "{name}: nil でない");
     }
 }
+
+// ============================================================================
+// つつき・撫での既定のハンドラ（要件 1.3・3.3・8.1）
+// ============================================================================
+
+/// `extra` を足したリクエストで `EVENT.fire` を呼ぶ（`extra` は Lua の表の中身。例: `reference = { [3] = "0" }`）。
+fn fire_with(runtime: &PastaLuaRuntime, id: &str, extra: &str) -> String {
+    let script = format!(
+        r#"local EVENT = require "pasta.shiori.event"
+return EVENT.fire({{ id = "{id}", method = "get", version = 30, {extra} }})"#
+    );
+    let value = runtime.exec(&script).expect("EVENT.fire に失敗");
+    value_as_str(&value).expect("応答が文字列でない")
+}
+
+/// `＊つっつき反応その他` だけを置いたゴーストにつつきを送ると、そのシーンの応答が返る。
+#[test]
+fn poke_runs_shortcut_scene() {
+    let (_temp, runtime) = load_ghost("＊つっつき反応その他\n　さくら：つつかれました\n");
+    let response = fire_with(
+        &runtime,
+        "OnMouseDoubleClick",
+        r#"reference = { [3] = "0", [4] = "Head" }"#,
+    );
+    assert!(
+        response.starts_with("SHIORI/3.0 200") && response.contains("つつかれました"),
+        "つつきのショートカットの応答: {response:?}"
+    );
+}
+
+/// ショートカットが無ければ、つつき・移動は今までどおりイベント名のシーンへ（要件 8.1）。
+#[test]
+fn mouse_events_fall_back_to_event_name_scene() {
+    let (_temp, runtime) = load_ghost(
+        "＊OnMouseDoubleClick\n　さくら：ダブルクリック\n\n＊OnMouseMove\n　さくら：移動\n",
+    );
+    let refs = r#"reference = { [3] = "0", [4] = "Head" }"#;
+    let response = fire_with(&runtime, "OnMouseDoubleClick", refs);
+    assert!(response.contains("ダブルクリック"), "{response:?}");
+    let response = fire_with(&runtime, "OnMouseMove", refs);
+    assert!(response.contains("移動"), "{response:?}");
+    // どれも無いイベントは 204（要件 1.3）
+    let (_temp, runtime) = load_ghost("");
+    let response = fire_with(&runtime, "OnMouseDoubleClick", refs);
+    assert!(response.starts_with("SHIORI/3.0 204"), "{response:?}");
+}

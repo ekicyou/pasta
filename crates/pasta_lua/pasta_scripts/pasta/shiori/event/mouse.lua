@@ -4,8 +4,13 @@
 --- 候補の名前（M.candidates）: 種類・アクター名・部位から 1〜8 段の名前を上から順に並べる。
 --- アクター名（M.resolve_actor）: スコープ番号（Reference3）から pasta.toml のアクター名を引く。
 --- 撫での判定（M.check_stroke）: 同じ所で途切れなく 2 秒続いた移動を 1 回の「撫でた」と決める。
+--- 既定のハンドラ: REG.OnMouseDoubleClick（つつき）・REG.OnMouseMove（撫で）。
+--- ゴーストが先に登録していれば上書きしない。event/init.lua は require しない（循環させない）。
 
 local STORE = require("pasta.store")
+local REG = require("pasta.shiori.event.register")
+local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+local log = require("@pasta_log")
 
 local M = {}
 
@@ -105,5 +110,60 @@ function M.check_stroke(scope_ref, part, now, blocked)
     end
     return false
 end
+
+--- 候補の名前を上から完全一致で探し、最初に見つかったシーンのコルーチンと名前を返す
+---@return thread|nil, string|nil
+local function find_shortcut(kind, actor, part)
+    local SCENE = require("pasta.scene")
+    for _, name in ipairs(M.candidates(kind, actor, part)) do
+        local co = SCENE.co_exec_exact(name)
+        if co then return co, name end
+    end
+    return nil, nil
+end
+
+--- イベント名のシーン（9 段目。今の no_entry と同じ呼び出し）
+local function exec_event_scene(act, event)
+    return require("pasta.scene").co_exec(act, event, nil, nil)
+end
+
+--- 秒より細かいリクエストの時刻（date が無ければ nil）
+local function request_time(req)
+    local date = req.date
+    if type(date) ~= "table" or date.unix == nil then return nil end
+    return date.unix + (date.ns or 0) / 1e9
+end
+
+--- つつき: 抑止は見ない。Reference5・6 は読まない。
+---@param act ShioriAct
+---@return thread|nil
+local function on_poke(act)
+    local ref = act.req.reference or {}
+    local actor = M.resolve_actor(ref[3])
+    local co, name = find_shortcut("poke", actor, ref[4])
+    if co then
+        log.debug(string.format("つつき: %s/%s → %s", tostring(ref[3]), tostring(ref[4]), name))
+        return co
+    end
+    return exec_event_scene(act, "OnMouseDoubleClick")
+end
+
+--- 撫で: 判定は毎回回す。決めたときだけアクター名を引いて 1〜8 段を探す。
+---@param act ShioriAct
+---@return thread|nil
+local function on_touch(act)
+    local req = act.req
+    local ref = req.reference or {}
+    log.trace("OnMouseMove")
+    if M.check_stroke(ref[3], ref[4], request_time(req), dispatcher.is_blocked(req.status)) then
+        local co, name = find_shortcut("touch", M.resolve_actor(ref[3]), ref[4])
+        log.debug(string.format("撫で: %s/%s → %s", tostring(ref[3]), tostring(ref[4]), tostring(name)))
+        if co then return co end
+    end
+    return exec_event_scene(act, "OnMouseMove")
+end
+
+REG.OnMouseDoubleClick = REG.OnMouseDoubleClick or on_poke
+REG.OnMouseMove = REG.OnMouseMove or on_touch
 
 return M
