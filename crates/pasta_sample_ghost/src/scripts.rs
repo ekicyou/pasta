@@ -141,22 +141,51 @@ mod tests {
         assert!(hour.contains("＄時１２"), "＄時１２ 変数参照がありません");
     }
 
+    /// 8 段目はつつき・撫でをショートカットのシーンで書く。つつきは 4 種の段
+    /// （アクター＋部位・アクターその他・部位だけ・その他）を 1 つ以上ずつ持ち、撫でのシーンがあり、
+    /// 旧い書き方（`＊OnMouseDoubleClick`・`＞transfer_req_to_var`・`＄ｒ４`）を使わない。
     #[test]
     fn test_touch_pasta_contains_events() {
+        const ACTORS: [&str; 2] = ["女の子", "男の子"];
         let touch = read_pasta_script("08-touch.pasta");
-        let count = count_lines(&touch, "＊OnMouseDoubleClick");
-        assert!(count >= 3, "ダブルクリック反応は 3 種以上必要: {}", count);
-        // コメント行（＃）の説明ではなく、シーンの本文に書かれていることを確かめる
-        let body: String = touch
-            .lines()
-            .filter(|l| !l.starts_with('＃'))
-            .collect::<Vec<_>>()
-            .join("\n");
+        // コメント行（＃）の説明ではなく、シーンの本文を調べる
+        let body: Vec<&str> = touch.lines().filter(|l| !l.starts_with('＃')).collect();
+        let pokes: Vec<&str> = body
+            .iter()
+            .filter_map(|l| l.trim_end().strip_prefix("＊つっつき反応"))
+            .collect();
+        // 段の種類: 0=アクター＋部位, 1=アクターその他, 2=部位だけ, 3=その他
+        let mut tiers = [0usize; 4];
+        for suffix in &pokes {
+            let tier = match ACTORS.iter().find_map(|a| suffix.strip_prefix(a)) {
+                Some("その他") => 1,
+                Some(part) if !part.is_empty() => 0,
+                Some(_) => panic!("部位の無い名前 `＊つっつき反応{suffix}`"),
+                None if *suffix == "その他" => 3,
+                None => 2,
+            };
+            tiers[tier] += 1;
+        }
         assert!(
-            body.contains("＞transfer_req_to_var"),
-            "＞transfer_req_to_var がありません"
+            tiers.iter().all(|&n| n >= 1),
+            "つつきの 4 種の段が 1 つ以上ずつ必要（アクター＋部位・アクターその他・部位だけ・その他）: {tiers:?} / {pokes:?}"
         );
-        assert!(body.contains("＄ｒ４"), "＄ｒ４ 変数参照がありません");
+        assert!(
+            body.iter().any(|l| l.starts_with("＊さわり反応")),
+            "撫でのシーン（＊さわり反応…）がありません"
+        );
+        for old in ["＊OnMouseDoubleClick", "＞transfer_req_to_var", "＄ｒ４"] {
+            assert!(
+                body.iter().all(|l| !l.contains(old)),
+                "8 段目に旧い書き方 {old} が残っています"
+            );
+        }
+        let choice = read_pasta_script("09-choice.pasta");
+        assert_eq!(
+            count_lines(&choice, "＊つっつき反応その他"),
+            1,
+            "9 段目に ＊つっつき反応その他 がちょうど 1 つ必要"
+        );
     }
 
     #[test]
