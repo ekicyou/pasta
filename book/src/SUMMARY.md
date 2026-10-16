@@ -59,6 +59,7 @@
   - [開発支援アクション（シーン再生・SHIORIリロード）](debug/dev-actions.md)
   - [構造的制約と緩和策](debug/constraints.md)
   - [接続できないとき（トラブルシューティング）](debug/troubleshooting.md)
+  - [辞書を検査する（pasta_check validate）](debug/validate.md)
 
 # リファレンス
 
