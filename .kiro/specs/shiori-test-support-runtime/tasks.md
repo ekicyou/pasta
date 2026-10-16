@@ -17,7 +17,7 @@
   - _Depends: 1.1_
   - _Requirements: 4.1, 4.3_
 
-- [ ] 2. 4 つのフィクスチャの `pasta.toml` から、写しを避ける設定とコメントを外す
+- [x] 2. 4 つのフィクスチャの `pasta.toml` から、写しを避ける設定とコメントを外す
   - `codegen_runtime_safety`・`actor_proxy_act_delegation`・`call_execution_correctness`・`scene_alias_ontalk` の `lua_search_paths` と回避のコメントを、design.md の表のとおりに消す
   - 回避と関係ない行（見出し、`call_execution_correctness` のウェイトの理由、`scene_alias_ontalk` の別名表の説明、`[loader]` の `pasta_patterns`・`transpiled_output_dir`、`[talk]`・`[ghost]`・`[actor.*]`）は変えない
   - 写しが残ったままだと回避が要るので、1.1 の後に行う
