@@ -145,3 +145,5 @@
 ## Implementation Notes
 - mouse.lua はイベント層から読まれるので、pasta.store を作り直す lua_specs では STORE を先に require してから mouse を読み直す（モジュールの頭で STORE を引き込むため）。
 - STAGES.md 8 段目は `shiori-events.md#つつき撫でのショートカット` を指す。6.2 の見出しは正確に「つつき・撫でのショートカット」にする（link-check は STAGES.md のアンカーを調べない）。
+- 完了時にその場で解決: main（#122）由来の crates/pasta_sample_ghost/tests/shell_assets_test.rs の rustfmt 差分を整えた（a97d6951）。
+- 完了時に main を取り込み、reference/shell.md の消えた見出しへのリンクと「名前を照合しない」の記述をショートカットのシーンに合わせて直した（d4924c48）。

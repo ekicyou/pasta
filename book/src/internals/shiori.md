@@ -94,7 +94,7 @@ VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、�
 | `pasta.shiori.entry` | グローバルの `SHIORI` 表（`load`・`request`・`kick`・`unload`）。`GLOBAL.close_ghost`（`GLOBAL["ゴースト終了"]`）も登録する |
 | `pasta.shiori.event` | `EVENT.fire`（振り分けとコルーチンの再開）と、ハンドラが無いときの `EVENT.no_entry` |
 | `pasta.shiori.event.register` | `REG`。依存を持たない空の表 |
-| `pasta.shiori.event.boot`・`pasta.shiori.event.choice_select`・`pasta.shiori.event.second_change` | 既定ハンドラ（OnBoot・OnChoiceSelectEx・OnSecondChange）を `REG` に登録する |
+| `pasta.shiori.event.boot`・`pasta.shiori.event.choice_select`・`pasta.shiori.event.second_change`・`pasta.shiori.event.mouse` | 既定ハンドラ（OnBoot・OnChoiceSelectEx・OnSecondChange・OnMouseDoubleClick・OnMouseMove）を `REG` に登録する。`pasta.shiori.event.mouse` は、つつき・撫でのショートカットの候補の名前・アクター名の解決・撫での判定も持つ |
 | `pasta.shiori.event.virtual_dispatcher` | 仮想イベント（OnHour・OnTalk）の判定と発行 |
 | `pasta.shiori.event.callback` | 非同期トークのコールバック待ちの登録・ルーティング・タイムアウトの掃引 |
 | `pasta.shiori.event.kick` | シーンキックの保留と起動（[デバッグ基盤とシーンキック](debug.md)） |
@@ -280,7 +280,7 @@ FFI 入口のスレッド: recv_timeout(5 秒)
 
 ### Lua 側の SHIORI エントリとイベント配送
 
-起動の 7 段目（[VM の構築とモジュール登録](execution-model.md#vm-の構築とモジュール登録)）で `require("pasta.shiori.entry")` が評価される。`pasta.shiori.entry` が `require` するモジュールの評価で、既定ハンドラが `REG` に登録される。
+起動の 7 段目（[VM の構築とモジュール登録](execution-model.md#vm-の構築とモジュール登録)）で `require("pasta.shiori.entry")` が評価される。`pasta.shiori.entry` が `require` するモジュールの評価で、既定ハンドラが `REG` に登録される。どの既定ハンドラも `REG.X = REG.X or ハンドラ` の形で登録し、そのキーが空のときだけ入る。`scripts/main.lua`（先に実行される）でゴーストが登録したハンドラはそのまま残り、辞書の Lua ブロック（後に評価される）で登録したハンドラは既定ハンドラを置き換える。
 
 ```text
 pasta.shiori.entry
@@ -289,8 +289,10 @@ pasta.shiori.entry
   │     │  pasta.store・pasta.shiori.event.callback
   │     ├→ pasta.shiori.event.boot           REG.OnBoot を登録
   │     ├→ pasta.shiori.event.choice_select  REG.OnChoiceSelectEx を登録
-  │     └→ pasta.shiori.event.second_change  REG.OnSecondChange を登録
-  │           └→ pasta.shiori.event.virtual_dispatcher
+  │     ├→ pasta.shiori.event.second_change  REG.OnSecondChange を登録
+  │     │     └→ pasta.shiori.event.virtual_dispatcher
+  │     └→ pasta.shiori.event.mouse          REG.OnMouseDoubleClick・REG.OnMouseMove を登録
+  │           └→ pasta.store・pasta.shiori.event.virtual_dispatcher
   ├→ pasta.shiori.res
   ├→ pasta.shiori.event.kick
   └→ pasta.global                            close_ghost・ゴースト終了 を追加
@@ -314,12 +316,14 @@ pasta.shiori.entry
 3. `REG[req.id]` があればそれを、無ければ `EVENT.no_entry` を `act` で呼ぶ。`EVENT.no_entry` は `SCENE.co_exec(act, req.id)` でイベント名のシーンを探し、見つかればそのコルーチンを、無ければ `nil` を返す（`pasta.scene` は循環を避けるため呼び出し時に `require` する）。
 4. 戻り値がコルーチンなら `EVENT.drive` で再開し、その出力を `RES.ok` で応答にする（出力は接頭辞にかかわらず常に `Value`）。`SHIORI/` で始まる文字列なら応答全体として包まずに返し、それ以外の文字列なら `RES.ok` で包み、それ以外なら 204 を返す。コルーチンの扱いは [イベントからシーンへ](execution-model.md#イベントからシーンへ) で扱う。
 
-既定ハンドラの中身は次のとおりである。
+既定ハンドラの中身は次のとおりである。アクター名の解決（`@pasta_config` の `spot` と `STORE.appearance.owners`）・候補の段・撫での判定の規則は [つつき・撫でのショートカット](../lua/shiori-events.md#つつき撫でのショートカット) が正である。
 
 | ハンドラ | 動作 |
 | -------- | ---- |
 | `REG.OnBoot` | `SCENE.co_exec(act, act.req.id)`。シーン関数フォールバックと同じ |
 | `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ探索範囲の親を決める。`act.req.reference[2]`（`\q` の 3 番目の引数。選択肢を出したグローバルシーンの登録名）が文字列で `SCENE.get_global_table` で引けるグローバルシーンならそれを、そうでなければ `STORE.last_global_scene` を親にする。`act.req.reference[1]`（選択 ID）を `SCENE.search(選択 ID, 親)` で探し、無ければ `SCENE.search(選択 ID, nil)` でグローバルシーンを探し、見つかった関数をコルーチンに包んで返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
+| `REG.OnMouseDoubleClick` | `act.req.reference[3]`（スコープ番号）からアクター名を、`act.req.reference[4]`（部位）を部位として、ショートカットの 1〜8 段の名前を上から `SCENE.co_exec_exact` で探し、最初に見つかったコルーチンを返す。無ければ `SCENE.co_exec(act, "OnMouseDoubleClick")`。抑止は見ない |
+| `REG.OnMouseMove` | 撫での判定（`check_stroke`）を毎回回す。判定には部位・スコープ番号・リクエストの時刻（`act.req.date` の `unix` と `ns` から作る小数の秒）と、`virtual_dispatcher.is_blocked(act.req.status)` を渡す。撫でたと決めた回だけ、アクター名を引いて 1〜8 段を `SCENE.co_exec_exact` で探し、見つかればそのコルーチンを返す。それ以外は `SCENE.co_exec(act, "OnMouseMove")`。判定の状態はモジュールのローカル変数 1 つで、保存しない |
 | `REG.OnSecondChange` | `CALLBACK.sweep(os.time())` が応答を返せばそれを返し（その回は仮想イベントを出さない）、そうでなければ `virtual_dispatcher.dispatch(act)` の結果（コルーチンか `nil`）を返す。`sweep` の応答は、期限切れの待機を再開した結果（出力の 200、または理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す |
 
 ### 非同期トーク
