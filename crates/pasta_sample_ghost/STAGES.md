@@ -15,7 +15,7 @@
 | 5 | 単語でちょこっと変えたい | 単語のランダム選択 | [グローバル単語](../../book/src/grammar/words.md#グローバル単語定義) `＠単語：a、b、c`、台詞の中の `＠単語` | — | `05-words.pasta` |
 | 6 | 時刻を知らせたい | 正時に時報 | `＊時報12`・`＊時報その他`（[OnHour](../../book/src/lua/shiori-events.md#onhour) の 4 段の候補）、[日時変数](../../book/src/grammar/variables.md#日時変数) `＄時１２` | — | `06-hour.pasta` |
 | 7 | 挨拶したい | ベースウェアのイベントに応える・付加情報を読む・ベースウェアに聞く | シーン名＝イベント名（[シーン関数フォールバック](../../book/src/lua/shiori-events.md#シーン関数フォールバック)）、[`＞transfer_req_to_var`](../../book/src/grammar/variables.md#リクエスト変数reference)、`＄ｒ０`、[プロパティ変数](../../book/src/grammar/variables.md#プロパティ変数) `＄％baseware.name`、OnGhostChanged・OnGhostChanging に応答すると OnBoot・OnClose は来ない、マニュアルの一覧に無いイベントも同名シーンで応答できる（[UKADOC の OnGhostChanging](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnGhostChanging)） | `OnGhostChanged`・`OnGhostChanging`・`OnFirstBoot`・`OnClose` | `07-greeting.pasta` |
-| 8 | 触ったら反応してほしい | 触られた部位で台詞を変える | `＊OnMouseDoubleClick`、[`＞transfer_req_to_var`](../../book/src/grammar/variables.md#リクエスト変数reference)、`＄ｒ４` | `OnMouseDoubleClick` | `08-touch.pasta` |
+| 8 | 触ったら反応してほしい | 触られた部位とキャラで台詞を変える | [ショートカットのシーン](../../book/src/lua/shiori-events.md#つつき撫でのショートカット)の名前 `＊つっつき反応`（つつく）・`＊さわり反応`（撫でる）＋アクター名＋部位の名前（`＊つっつき反応女の子Head`・`＊つっつき反応男の子その他`・`＊つっつき反応Face`・`＊つっつき反応その他`）、同じ名前のシーンからの抽選 | `OnMouseDoubleClick`・`OnMouseMove` | `08-touch.pasta` |
 | 9 | 選ばせたい | 選択肢を出して選ばれた先へ進む | [選択肢行](../../book/src/grammar/block-structure.md#選択肢行) `＠？ジャンプ先「表示」`、[キューコマンド](../../book/src/grammar/block-structure.md#キューコマンド行) `!select(秒)`、選ばれた ID のシーンへの[自動ルーティング](../../book/src/lua/shiori-events.md#onchoiceselectex) | `OnChoiceSelectEx` | `09-choice.pasta` |
 | 10 | 覚えていてほしい | 終了しても残る値 | [グローバル変数](../../book/src/grammar/variables.md#グローバル変数) `＄＊回数`、算術の代入 `＄＊回数＝＄＊回数＋１`（未代入の変数は算術で 0 とみなされる。[値が無いときの扱い](../../book/src/grammar/variables.md#値が無いときの扱い)） | — | `10-save.pasta` |
 | 11 | 話を続けたい・分岐させたい | 話の続き・ランダムジャンプ | `＞シーン名`（[Call](../../book/src/grammar/call-jump.md)）、同名・[前方一致](../../book/src/grammar/call-jump.md#前方一致によるターゲット解決)の候補からのランダム選択、[ローカルシーン](../../book/src/grammar/block-structure.md#ローカルシーン) `・`、[`＞チェイントーク`](../../book/src/grammar/call-jump.md#チェイントーク)、ローカル優先の[スコープ解決](../../book/src/grammar/call-jump.md#スコープ解決アルゴリズム) | — | `11-jump.pasta` |
@@ -35,12 +35,13 @@
 | 7 | `OnFirstBoot` | `0=0` |
 | 7 | `OnClose` | `0=user` |
 | 8 | `OnMouseDoubleClick` | `3=0, 4=Head` |
-| 9 | `OnChoiceSelectEx` | `0=おやつの話をする, 1=おやつの話, 2=OnMouseDoubleClick` |
+| 8 | `OnMouseMove` | `3=0, 4=Head` |
+| 9 | `OnChoiceSelectEx` | `0=おやつの話をする, 1=おやつの話, 2=つっつき反応その他` |
 
 - 検証は全段階で `OnBoot` を送ったうえで、この表の該当行のイベントを Reference 付きで 1 回ずつ送り、エラーにならずに応答が返ることを確かめる（応答の内容は照合しない）。`OnBoot` はこの表に載せない。
 - 載せるのはベースウェアから来る実イベントだけである。仮想イベント（ランダムトーク・時報）は載せない。
 - Reference は半角の `番号=値` を `, ` で区切って並べる。無ければ `—` と書く。
-- 8 段目の `Head` は、シェルの当たり判定（`shell/master/surfaces.txt`）に置いた部位名である。部位名は `Head`・`Face`・`Body` の 3 つで、女の子も男の子も同じものを使う。足元には当たり判定を置かないので、そこを触ったときの Reference4 は空になる。
+- 8 段目の `Head` は、シェルの当たり判定（`shell/master/surfaces.txt`）に置いた部位名で、ショートカットのシーンの名前の末尾に付ける部位の名前でもある。部位名は `Head`・`Face`・`Body` の 3 つで、女の子も男の子も同じものを使う。足元には当たり判定を置かないので、そこを触ったときの Reference4 は空になり、部位の名前が付いた段は飛ばされる。
 
 ## ファイル名の規則
 
