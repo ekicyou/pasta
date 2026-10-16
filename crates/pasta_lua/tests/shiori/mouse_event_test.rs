@@ -182,3 +182,72 @@ end
         );
     }
 }
+
+// ============================================================================
+// 完全一致でグローバルシーンをコルーチンにする（要件 6.2）
+// ============================================================================
+
+/// 頭が同じ長い名前のシーンと、ローカルシーン・`GLOBAL` の関数を置いた辞書。
+const EXACT_DIC: &str = "\
+＊つっつき反応Head
+　さくら：頭の反応です
+
+＊つっつき反応Head右
+　さくら：頭右の反応です
+
+＊親
+　さくら：親です
+
+　・ローカルだけ
+　　さくら：ローカルです
+";
+
+/// `SCENE.co_exec_exact` を呼ぶハンドラと、同名の `GLOBAL` 関数を登録する起動用 Lua。
+const EXACT_MAIN_LUA: &str = r#"local REG = require "pasta.shiori.event.register"
+local SCENE = require "pasta.scene"
+local GLOBAL = require "pasta.global"
+GLOBAL["グローバル関数だけ"] = function(act) act.sakura:talk("関数です") end
+REG.OnExactHead = function(act)
+    return SCENE.co_exec_exact("つっつき反応Head")
+end
+"#;
+
+/// `SCENE.co_exec_exact(name)` が nil を返すか。
+fn co_exec_exact_is_nil(runtime: &PastaLuaRuntime, name: &str) -> bool {
+    runtime
+        .lua()
+        .load(r#"return require("pasta.scene").co_exec_exact(...) == nil"#)
+        .call::<bool>(name)
+        .expect("co_exec_exact must not error")
+}
+
+/// 完全一致の名前で見つかったシーンのコルーチンを再開すると出力が返り、
+/// 頭が同じ長い名前・前方一致だけの名前・無い名前・ローカルシーン・`GLOBAL` の関数では nil。
+#[test]
+fn co_exec_exact_runs_only_exactly_named_global_scene() {
+    let (_temp, runtime) = load_ghost_with_main(EXACT_DIC, Some(EXACT_MAIN_LUA));
+
+    // 頭が同じ `つっつき反応Head右` は選ばれない（同名は 1 つなので何度でも頭の反応）
+    for _ in 0..8 {
+        let response = fire(&runtime, "OnExactHead");
+        assert!(
+            response.starts_with("SHIORI/3.0 200") && response.contains("頭の反応です"),
+            "完全一致のシーンの応答: {response:?}"
+        );
+        assert!(!response.contains("頭右の反応です"), "{response:?}");
+    }
+
+    assert!(
+        !co_exec_exact_is_nil(&runtime, "つっつき反応Head右"),
+        "長い名前もそれ自体は完全一致で見つかる"
+    );
+    for name in [
+        "つっつき反応",    // 前方一致だけ
+        "つっつき反応Hea", // 前方一致だけ
+        "無いシーン",
+        "ローカルだけ",       // ローカルシーンは見ない
+        "グローバル関数だけ", // GLOBAL の関数は見ない
+    ] {
+        assert!(co_exec_exact_is_nil(&runtime, name), "{name}: nil でない");
+    }
+}
