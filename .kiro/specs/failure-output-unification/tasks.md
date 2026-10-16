@@ -136,3 +136,4 @@
 - 3.3: 関数の参照は成功時に `fn_succeeded`（act.lua・actor.lua）で呼んだ関数が戻った後に印を偽にする。`expr_fn_var` は `dynamic_key` が nil のとき暫定で印を偽にしている。3.4 で `dynamic_key` に act を渡すのと同時に真へ変える（片方だけだと表記が消えるか 2 つになる）
 - 4.1: `act:raw_script("")` だけを積んだシーンも build が nil を返し 204 になる（design どおり。リリースノートに書く候補）
 - 6.1: 章を足すと book のセルフテスト（verify-scripts-test.mjs の T-syntax/T-intro/T-outro の章数、gen-skill-refs-test.mjs の K-10）の決め打ちの章数も直す。runtime-failures.md の `WORD.dynamic_key` へのアンカーは 6.3 で script-api.md の見出しを変えたら直す
+- 完了時にその場で解決: `syntax_test.rs` のテスト名 `…_render_empty` を、失敗表記を確かめる今の中身に合わせて `…_render_failure_notation` に改名した

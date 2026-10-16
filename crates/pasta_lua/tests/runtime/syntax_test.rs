@@ -398,7 +398,7 @@ fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
 /// マニュアル book/src/reference/runtime-failures.md と同じ扱い）。
 /// 前後に文字がある単語参照が nil 連結で実行時エラーにならないことも確認する。
 #[test]
-fn test_e2e_undefined_refs_in_action_line_render_empty() {
+fn test_e2e_undefined_refs_in_action_line_render_failure_notation() {
     let lua = create_runtime_with_finalize().unwrap();
     let config = TalkConfig::default();
     let module = sakura_script::register(&lua, Some(&config)).unwrap();
