@@ -3,6 +3,7 @@
 //! 状態を持たず、`std::fs`・`std::time`・乱数源を使わない。同じ入力には同じ報告を返す。
 //! パスはすべて ghost/master からの相対パスで、区切りは `/`。
 
+mod builtins;
 mod config;
 mod discovery;
 mod input;
@@ -21,6 +22,10 @@ pub use report::{Finding, FindingKind, Report, Severity, Stats, msg};
 /// 一致テスト用: pasta.dll が見るパスからモジュール名を作る（`CacheManager::source_to_module_name` と同じ規則）
 #[doc(hidden)]
 pub use module_name::module_name_of;
+
+/// 一致テスト用: 組み込みの飛び先の名前（GLOBAL・act・SHIORI 用の act のメソッド）
+#[doc(hidden)]
+pub use builtins::{ACT_METHODS, GLOBAL_NAMES, SHIORI_ACT_METHODS};
 
 /// 辞書ファイルとして読むべきパス（.pasta のパターンに一致したもの）を、決まった順で返す。
 pub fn select_dictionary_files(input: &GhostInput) -> Vec<String> {
@@ -61,13 +66,13 @@ pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) ->
     findings.extend(found);
 
     findings.extend(transpile_rules::check(&parsed));
-    let (table, found) = scenes::check(&parsed, &config.aliases);
+    let (scenes, found) = scenes::check(&parsed, &config.aliases);
     findings.extend(found);
 
     let references_skipped = findings.iter().any(|f| f.code == FindingKind::Syntax);
     let mut unchecked_dynamic_calls = 0;
     if !references_skipped {
-        let (found, dynamic) = references::check(&table, &parsed);
+        let (found, dynamic) = references::check(&scenes.table, &parsed);
         findings.extend(found);
         unchecked_dynamic_calls = dynamic;
     }
