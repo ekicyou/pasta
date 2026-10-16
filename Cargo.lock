@@ -944,9 +944,16 @@ dependencies = [
 name = "pasta_check"
 version = "0.3.8"
 dependencies = [
+ "getrandom 0.4.3",
+ "glob",
  "lexopt",
  "md5",
+ "pasta_core",
+ "pasta_dsl",
+ "pasta_lua",
+ "serde",
  "tempfile",
+ "toml",
  "zip",
 ]
 

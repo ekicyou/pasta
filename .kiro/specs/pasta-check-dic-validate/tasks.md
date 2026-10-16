@@ -3,7 +3,7 @@
 > 実装の順番は design.md の Migration Strategy に従う: 核（1〜2）→ 一致テスト（3）→ `validate`（4）→ `release` の関門（5）→ WASM の入口と CI（6）→ VSCode 拡張（7）→ 文書（8）→ 最終確認（9）。核の公開 API（1.3）が決まった後は、CLI の側（3〜5）とエディタの側（6〜7）を並行できる。
 
 - [ ] 1. 土台: pasta_check をライブラリとバイナリに分け、検査の核の骨組みを作る
-- [ ] 1.1 pasta_check をライブラリとバイナリの 2 つにし、依存を feature で分ける
+- [x] 1.1 pasta_check をライブラリとバイナリの 2 つにし、依存を feature で分ける
   - バイナリだけが使う依存（引数の解析・ハッシュ・zip）を既定で有効な feature `cli` の後ろに移し、バイナリはその feature を要るようにする
   - ライブラリの入口を足し、構文・名前の規則の部品・TOML・パターン照合を依存に足す。wasm32-unknown のときだけ乱数源の `wasm_js` を有効にする（`pasta_core` は触らない）
   - テストのためだけに `pasta_lua` を版の無い path の dev-dependency に足す
