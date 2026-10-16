@@ -9,6 +9,7 @@ local SCENE = require("pasta.scene")
 local GLOBAL = require("pasta.global")
 local STORE = require("pasta.store")
 local WORD = require("pasta.word")
+local FAILURE = require("pasta.failure")
 local log = require "@pasta_log"
 
 -- ============================================================================
@@ -684,21 +685,13 @@ function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...)
     return self:restore_scene(scene, self:call(global_scene_name, key, attrs, ...))
 end
 
---- 失敗表記の唯一の出口: 警告があればログへ出し、【text】を raw_script トークンとして積む
----
---- raw_script はそのまま出力される（句読点ウェイト・分かち書き改行は入らない）。
---- 切替タグを出さずに積んだ位置（直前に話したアクターのバルーン、
---- または出力の先頭なら現在のスコープ）へ文字を出す。
+--- 失敗表記を出す: 警告があればログへ出し、【text】を raw_script トークンとして積む（pasta.failure へ委ねる）
 --- @param self Act アクションオブジェクト
 --- @param text string 失敗表記の中身（【】はこの関数が付ける）
 --- @param warning string|nil ログに出す警告文。nil なら出さない
 --- @return nil
 function ACT_IMPL.failure(self, text, warning)
-    if warning then
-        log.warn(warning)
-    end
-    table.insert(self.token, { type = "raw_script", text = "【" .. text .. "】" })
-    return nil
+    return FAILURE.report(self, { label = text, warning = warning })
 end
 
 --- スポット設定トークン生成（状態レス化）

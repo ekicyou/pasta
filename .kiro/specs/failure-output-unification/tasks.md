@@ -9,7 +9,7 @@
   - 完了: 変更前のコードで新しいテストがすべて通り、以降のタスクではその種類の期待値だけを書き換える
   - _Requirements: 2.11, 3.5, 6.1, 10.2, 10.5_
 
-- [ ] 1.2 失敗の報告の出口を新しいモジュールとして切り出す
+- [x] 1.2 失敗の報告の出口を新しいモジュールとして切り出す
   - 新しいモジュールに報告の関数を置き、`act:failure(text, warning)` の中身（警告を出して表記を積む）をそこへ移す。`act:failure` はそれを呼ぶだけにする
   - 依存の向きを守る（新しいモジュールはログと設定だけを使い、act・actor・word を読み込まない）
   - Lua spec の一覧に新しいモジュールの単体テストを登録する
@@ -128,3 +128,6 @@
   - PR タイトルを `feat!(failure-output-unification): …` とし、本文に「空で展開していた箇所に失敗表記が出る」「既存 2 種の文言が変わる」「`act:failure` の text もエスケープされる」「`[logging] balloon_warning = false` で消せる」を書く文面を用意する
   - 完了: 文面が `.kiro/specs/failure-output-unification/release-note.md` にあり、`kiro-complete` がそのまま PR に使える
   - _Requirements: 10.6_
+
+## Implementation Notes
+- 1.2: `pasta/failure.lua` はログを呼んだ時点で `require("@pasta_log")` する（spec がログを差し替えて act を読み直す慣行のため）。module-level の `local log` に変えない。暫定で `record.label` に表記の中身全文が入っており、2.x で design の FailureRecord（label＝種類の名前）に合わせ直す
