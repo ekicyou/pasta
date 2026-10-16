@@ -234,9 +234,17 @@ fn ghost_path(path: &str) -> String {
     format!("ghost/master/{path}")
 }
 
+fn ghost_paths(paths: &[&str]) -> String {
+    paths
+        .iter()
+        .map(|p| ghost_path(p))
+        .collect::<Vec<_>>()
+        .join("、")
+}
+
 /// 理由の文言（design.md の Report の文言の表）。パスは ghost/master からの相対パスで渡す
 pub mod msg {
-    use super::ghost_path;
+    use super::{ghost_path, ghost_paths};
 
     pub fn config_missing() -> String {
         "pasta.toml がありません。pasta.dll はゴーストを読み込めません（辞書は既定の dic/**/*.pasta で集めました）".into()
@@ -310,22 +318,23 @@ pub mod msg {
     pub fn transpile_continuation_without_actor() -> String {
         "アクターの無い継続行です。前の行にアクター行が必要です".into()
     }
-    pub fn module_pasta_collision(module: &str, other_path: &str) -> String {
+    /// 重なったほかのファイルが 2 つ以上なら「、」で並べる（モジュール名の 3 つの文言で同じ）
+    pub fn module_pasta_collision(module: &str, others: &[&str]) -> String {
         format!(
             "モジュール名 {module} が {} と同じです。どちらかの辞書の内容が失われます",
-            ghost_path(other_path)
+            ghost_paths(others)
         )
     }
-    pub fn module_lua_collision(module: &str, other_path: &str) -> String {
+    pub fn module_lua_collision(module: &str, others: &[&str]) -> String {
         format!(
             "モジュール名 {module} が {} と同じです。どちらかの .lua が読み込まれません",
-            ghost_path(other_path)
+            ghost_paths(others)
         )
     }
-    pub fn module_lua_shadowed(module: &str, pasta_path: &str) -> String {
+    pub fn module_lua_shadowed(module: &str, pasta_paths: &[&str]) -> String {
         format!(
             "モジュール名 {module} が {} と同じため、この .lua は読み込まれません",
-            ghost_path(pasta_path)
+            ghost_paths(pasta_paths)
         )
     }
     /// global-scene-collision・local-scene-collision の両方で使う

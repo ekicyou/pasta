@@ -284,15 +284,19 @@ fn messages_follow_wording_table() {
         "アクターの無い継続行です。前の行にアクター行が必要です"
     );
     assert_eq!(
-        msg::module_pasta_collision("pasta.scene.a_b", "dic/a_b.pasta"),
+        msg::module_pasta_collision("pasta.scene.a_b", &["dic/a_b.pasta"]),
         "モジュール名 pasta.scene.a_b が ghost/master/dic/a_b.pasta と同じです。どちらかの辞書の内容が失われます"
     );
     assert_eq!(
-        msg::module_lua_collision("pasta.scene.a", "dic/a.lua"),
+        msg::module_pasta_collision("pasta.scene.a_b", &["dic/a-b.pasta", "dic/a.b.pasta"]),
+        "モジュール名 pasta.scene.a_b が ghost/master/dic/a-b.pasta、ghost/master/dic/a.b.pasta と同じです。どちらかの辞書の内容が失われます"
+    );
+    assert_eq!(
+        msg::module_lua_collision("pasta.scene.a", &["dic/a.lua"]),
         "モジュール名 pasta.scene.a が ghost/master/dic/a.lua と同じです。どちらかの .lua が読み込まれません"
     );
     assert_eq!(
-        msg::module_lua_shadowed("pasta.scene.a", "dic/a.pasta"),
+        msg::module_lua_shadowed("pasta.scene.a", &["dic/a.pasta"]),
         "モジュール名 pasta.scene.a が ghost/master/dic/a.pasta と同じため、この .lua は読み込まれません"
     );
     assert_eq!(

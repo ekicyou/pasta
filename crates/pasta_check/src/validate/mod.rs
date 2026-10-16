@@ -18,6 +18,10 @@ use std::collections::BTreeMap;
 pub use input::{FileText, GhostInput, TomlSource};
 pub use report::{Finding, FindingKind, Report, Severity, Stats, msg};
 
+/// 一致テスト用: pasta.dll が見るパスからモジュール名を作る（`CacheManager::source_to_module_name` と同じ規則）
+#[doc(hidden)]
+pub use module_name::module_name_of;
+
 /// 辞書ファイルとして読むべきパス（.pasta のパターンに一致したもの）を、決まった順で返す。
 pub fn select_dictionary_files(input: &GhostInput) -> Vec<String> {
     let (found, _) = discover(input);
