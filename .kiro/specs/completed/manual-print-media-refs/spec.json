@@ -1,0 +1,23 @@
+{
+  "feature_name": "manual-print-media-refs",
+  "created_at": "2026-10-16T09:01:10Z",
+  "updated_at": "2026-10-16T11:59:49Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "completed_at": "2026-10-16T11:59:49Z"
+}

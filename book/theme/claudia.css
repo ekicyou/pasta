@@ -1,6 +1,6 @@
 /*
  * claudia.css — pasta マニュアルの Claudia テーマ（manual-claudia-theme）。
- * mdBook の additional-css として全章と print.html に読み込まれる。
+ * mdBook の additional-css として全章に読み込まれる。
  *
  * 構成（ファイル内の順序が上書き順。design「ClaudiaTheme / State Management」）:
  *   1. :root — 字体トークンと、部品トークンの既定値（mdBook 変数への参照。rust・coal・ayu でも部品が読める。要件 2.4）
@@ -802,6 +802,9 @@ mark {
  * 7. 印刷の規則（要件 3.10）
  *    どのテーマを選んでいても light の値で刷る（下の値は 2. の light ブロックと同じ。
  *    theme-test の P-2 が一致を検査する）。台詞と扉の途中では改ページしない。
+ *    章の印刷のレイアウト（目次・メニュー・前後の矢印を隠し、本文を紙幅に広げる）もこの節が受け持つ
+ *    （manual-print-page-removal 要件 1.3。全章の印刷用のページを止めると mdBook は印刷用の CSS を
+ *    読み込まないため。theme-test の P-7・P-8 が検査する）。
  * ============================================================ */
 @media print {
     html.light, html.navy, html.rust, html.coal, html.ayu, html:not(.js) {
@@ -898,10 +901,48 @@ mark {
         --claudia-hl-title: #6D1F2C;
         --claudia-hl-keyword: #8A3B1E;
     }
-    /* 本文の枠をスクロールの箱にしない（mdBook の print.css は .page などだけを戻す。扉を含む複数ページの
-     * 印刷で枠にスクロールバーが出て、右端が欠けるのを防ぐ） */
+    /* 本文の枠をスクロールの箱にしない（下の本文の枠の規則は .page などの縦のスクロールだけを戻すので、
+     * .content はここで戻す。扉を含む複数ページの印刷で枠にスクロールバーが出て、右端が欠けるのを防ぐ） */
     .content {
         overflow: visible;
+    }
+    /* 目次・メニュー・前後の矢印（PC 用と携帯用）は刷らない（manual-print-page-removal 要件 1.3。P-7） */
+    #mdbook-sidebar, #mdbook-menu-bar, .nav-chapters, .mobile-nav-chapters {
+        display: none;
+    }
+    /* 本文の枠を紙幅に広げる（要件 1.3。P-8）。目次を開いたままでも本文を押し出さず、縦のスクロールを戻す。
+     * transform は目次を開いたときの mdBook の規則（id ＋ 2 クラス）が勝つので !important で戻す */
+    #mdbook-page-wrapper.page-wrapper {
+        margin-inline-start: 0;
+        transform: none !important;
+        overflow-y: visible;
+    }
+    #mdbook-content {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+    }
+    .page {
+        overflow-y: visible;
+    }
+    /* 見出しの途中と直後、コードの途中では改ページせず、長い行は折り返す。コードは左から右（要件 1.3） */
+    h1, h2, h3, h4, h5, h6 {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        break-after: avoid;
+        page-break-after: avoid;
+    }
+    pre, code {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        white-space: pre-wrap;
+    }
+    code {
+        direction: ltr;
+    }
+    /* コードの右上のボタンを本文の上に重ねない（画面の z-index: 100 を下げる。要件 1.3） */
+    pre > .buttons {
+        z-index: 2;
     }
     /* 台詞と扉は分けずに刷り、顔の円・吹き出しの面も刷る */
     .talk, .claudia-hero {

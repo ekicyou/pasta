@@ -1,7 +1,7 @@
 // talk-html.mjs — mdBook の出力 HTML の台詞引用ブロックを、顔アイコン付きの吹き出し HTML に置き換える。
 // manual-claudia-theme タスク 3.1（要件 3.1, 3.3, 3.6, 3.9, 3.10, 3.11, 8.4, 8.6, 10.7 / design「TalkHtmlTransform」）。
 //
-// 対象: 出力フォルダの *.html すべて（print.html を含む・名前順）。
+// 対象: 出力フォルダの *.html すべて（名前順）。
 //   属性の無い <blockquote> の直後の最初の <p> が「【」で始まるものだけを置き換え、それ以外は 1 バイトも変えない。
 //   mdBook 0.5.x の描画形: `> 【表情】本文` → `<blockquote>\n<p>【表情】本文</p>\n</blockquote>`。
 //   注記（`> [!NOTE]`）は `<blockquote class="blockquote-tag …">` で最初の <p> が見出しなので対象外。

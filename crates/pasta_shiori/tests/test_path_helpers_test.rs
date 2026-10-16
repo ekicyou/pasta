@@ -47,10 +47,6 @@ fn deep_non_ansi_fixture_is_buildable_and_readable() {
         base_dir.join("scripts").is_dir(),
         "scripts が設置されていない"
     );
-    assert!(
-        base_dir.join("scriptlibs").is_dir(),
-        "scriptlibs が設置されていない"
-    );
 }
 
 /// 単一 ANSI コードページで表現できない複数文字体系の混在であること（要件 6.7）。

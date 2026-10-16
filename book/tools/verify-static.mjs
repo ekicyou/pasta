@@ -5,8 +5,8 @@
 //   であることを機械的に検証する。具体的には次を立証する。
 //     R1.1 / R1.2 / R1.5 静的出力のみ・オフライン閲覧成立
 //       - 出力配下の全ファイルが静的アセット拡張子のみ（サーバー実行物が無い）
-//       - すべてのページ間リンク／アセット参照が相対パスで、参照先が出力配下に実在する
-//         （= file:// で解決可能）
+//       - すべてのページ間リンク／アセット参照（href・src・poster）が
+//         相対パスで、参照先が出力配下に実在する（= file:// で解決可能）
 //       - SUMMARY 由来の全章 HTML が生成され、相互リンク（next/prev・章間）が解決する
 //       - 目次 (toc) が全章を含む
 //     R3.2 / R3.3 / R3.4 表示要素
@@ -110,10 +110,10 @@ function listFiles(root) {
   }));
 }
 
-// HTML から href / src 参照を抽出する（単純だが実 mdBook 出力に十分な正規表現ベース）。
+// HTML から href / src / poster 参照を抽出する（単純だが実 mdBook 出力に十分な正規表現ベース）。
 function extractRefs(html) {
   const refs = [];
-  const re = /\b(?:href|src)\s*=\s*"([^"]*)"/gi;
+  const re = /\b(?:href|src|poster)\s*=\s*"([^"]*)"/gi;
   let m;
   while ((m = re.exec(html)) !== null) {
     refs.push(m[1]);
@@ -243,10 +243,7 @@ function analyze(root) {
   const absoluteRefsInContent = []; // file:// で解決不能なルート絶対参照（本文ページ）
   let checkedRefCount = 0;
   for (const hf of contentHtml) {
-    let html = fs.readFileSync(hf.abs, 'utf8');
-    // print.html: mdBook は <a href> を章基準へ書き換えるが <video>/<source> の src は
-    // 書き換えない（既知制約）。印刷ビューで動画は用途外のため、これらのタグの参照のみ対象外とする。
-    if (hf.rel === 'print.html') html = html.replace(/<(?:video|source)\b[^>]*>/gi, '');
+    const html = fs.readFileSync(hf.abs, 'utf8');
     const fromDir = path.posix.dirname(hf.rel) === '.' ? '' : path.posix.dirname(hf.rel);
     for (const ref of extractRefs(html)) {
       if (!isLocalRef(ref)) continue;
@@ -291,7 +288,7 @@ function analyze(root) {
 // =========================================================================
 // テーマ資材・台詞出力・外部参照・メニュー id の検査（manual-claudia-theme タスク 3.5 /
 // 要件 1.7, 8.4, 8.5, 8.6, 8.9, 10.4 / design「StaticVerifier」）。
-//   pages は SUMMARY 全章と print.html（出力根からの相対）。lua/modules.html（リダイレクト）と
+//   pages は SUMMARY 全章（出力根からの相対。manual-print-page-removal 要件 4.1）。lua/modules.html（リダイレクト）と
 //   toc.html（JS 無効時の目次フレーム）は章ではなくテーマ資材を読まないので pages に含めない。
 //   mdBook 0.5.x は追加 CSS・JS を theme/claudia-<hash>.css のようにハッシュ付きで出すため、
 //   固定のファイル名では探さない。参照先の実在は analyze() の相対参照検査が見る。
@@ -375,6 +372,25 @@ function analyzeTheme(root, pages) {
 }
 
 // =========================================================================
+// 全章の印刷用のページ（print.html）が戻っていないかの検査（manual-print-page-removal 要件 4.3・4.4）。
+//   printPage は出力の根の print.html の有無だけで決まる（classic/ の下は見ない。要件 4.6）。
+//   pagesLinkingPrint は pages（SUMMARY の全章）のうち、ローカル参照のパスの最後が print.html の
+//   ものを持つページ。外部 URL は見ない。存在しないページは読み飛ばす（章の欠落は「全章の生成」が報告する）。
+//   出力は書き換えない。
+// =========================================================================
+function analyzePrint(root, pages) {
+  const printPage = fs.existsSync(path.join(root, 'print.html'));
+  const pagesLinkingPrint = [];
+  for (const page of pages) {
+    const abs = path.join(root, page);
+    if (!fs.existsSync(abs)) continue;
+    const refs = extractRefs(fs.readFileSync(abs, 'utf8')).filter(isLocalRef).map(refPath);
+    if (refs.some((r) => path.posix.basename(r) === 'print.html')) pagesLinkingPrint.push(page);
+  }
+  return { printPage, pagesLinkingPrint };
+}
+
+// =========================================================================
 // 自己テスト: 検証ロジックが「本物」であることを保証する。
 //   実出力を一時ディレクトリへコピーし、故意にリンクを壊して analyze() が
 //   それを検出すること、無傷ならクリーンであることを確認する。
@@ -402,10 +418,10 @@ function runSelfTest() {
     fs.writeFileSync(path.join(classicDir, '404.html'),
       '<a href="/pasta/">top</a><img src="https://example.com/x.png"><blockquote>\n<p>【得意】未変換</p>\n</blockquote>');
     fs.writeFileSync(path.join(classicDir, 'print.html'),
-      '<video src="missing.mp4"></video><img src="missing.png"><script src="https://example.com/x.js"></script>');
+      '<video src="missing.mp4" poster="missing.png"></video><img src="missing.png"><script src="https://example.com/x.js"></script>');
     fs.writeFileSync(path.join(classicDir, 'evil.php'), '<?php echo 1; ?>');
     const withClassic = analyze(tmp);
-    const themeWithClassic = analyzeTheme(tmp, [...summaryChapters(), 'print.html']);
+    const themeWithClassic = analyzeTheme(tmp, summaryChapters());
     const classicHits = [
       ...withClassic.brokenRefs.map((b) => JSON.stringify(b)),
       ...withClassic.absoluteRefsInContent.map((b) => JSON.stringify(b)),
@@ -415,6 +431,9 @@ function runSelfTest() {
     ];
     check('self-test: classic/ の下の壊れた参照・外部参照・未変換の台詞は報告しない',
       classicHits.length === 0, classicHits.slice(0, 5).join(' / '));
+    // 旧版の print.html は新版の印刷用のページとして報告しない（manual-print-page-removal 要件 4.6）。
+    check('self-test: classic/print.html を全章の印刷用のページとして報告しない',
+      analyzePrint(tmp, summaryChapters()).printPage === false);
     fs.rmSync(classicDir, { recursive: true, force: true });
 
     // (b) リンクを壊すと検出されるべき
@@ -439,13 +458,14 @@ function runSelfTest() {
     // (d) テーマ資材・台詞出力・外部参照・メニュー id の検査（manual-claudia-theme タスク 3.5）。
     //   無傷コピーで資材・外部参照・メニュー id・未変換の台詞が合格し、
     //   1 か所ずつ壊すと、壊したページと中身を正しく報告することを確かめる。
-    const pages = [...summaryChapters(), 'print.html'];
+    //   確かめるページは目次の全章だけ（manual-print-page-removal 要件 4.1）。
+    const pages = summaryChapters();
     const target = 'grammar/index.html';
     const themeClean = analyzeTheme(tmp, pages);
     check('self-test: 無傷コピーにテーマ CSS・JS が 1 つずつある',
       themeClean.themeCss.length === 1 && themeClean.themeJs.length === 1,
       JSON.stringify({ css: themeClean.themeCss, js: themeClean.themeJs }));
-    check('self-test: 無傷コピーは全章と print.html がテーマ資材を参照している',
+    check('self-test: 無傷コピーは全章がテーマ資材を参照している',
       themeClean.noCssRef.length === 0 && themeClean.noJsRef.length === 0,
       JSON.stringify({ css: themeClean.noCssRef, js: themeClean.noJsRef }));
     check('self-test: 無傷コピーは外部参照が Google Fonts だけ',
@@ -522,6 +542,32 @@ function runSelfTest() {
     r = withTarget(original.replace('<main>', '<main><blockquote>\n<p>ふつうの引用【注】</p>\n</blockquote>'));
     check('self-test: 【で始まらない引用は未変換の台詞としない', r.untransformedTalk.length === 0,
       JSON.stringify(r.untransformedTalk));
+    fs.writeFileSync(targetFile, fs.readFileSync(path.join(outDir, target), 'utf8')); // (d) の書き換えを戻す
+
+    // (e) 全章の印刷用のページと印刷のボタンが戻ったら検出するべき（manual-print-page-removal 要件 4.3・4.4・4.5）。
+    let p = analyzePrint(tmp, pages);
+    check('self-test: 無傷コピーに全章の印刷用のページも、そこへのリンクも無い',
+      p.printPage === false && p.pagesLinkingPrint.length === 0, JSON.stringify(p));
+    const printFile = path.join(tmp, 'print.html');
+    fs.writeFileSync(printFile, '');
+    p = analyzePrint(tmp, pages);
+    check('self-test: 出力の根の print.html を検出する', p.printPage === true, JSON.stringify(p));
+    fs.rmSync(printFile);
+    const targetOriginal = fs.readFileSync(targetFile, 'utf8');
+    fs.writeFileSync(targetFile, targetOriginal.replace('<main>', '<main><a href="../print.html">print</a>'));
+    p = analyzePrint(tmp, pages);
+    check('self-test: print.html へのリンクを持つ章を検出する',
+      p.pagesLinkingPrint.includes(target), JSON.stringify(p));
+    fs.writeFileSync(targetFile, targetOriginal);
+
+    // (f) 章のページの poster の壊れた参照も検出するべき（manual-print-page-removal 要件 4.2）。
+    const chapterFile = path.join(tmp, 'grammar', 'index.html');
+    const chapterOriginal = fs.readFileSync(chapterFile, 'utf8');
+    fs.writeFileSync(chapterFile, chapterOriginal.replace('<main>', '<main><video poster="__missing__.png"></video>'));
+    const brokenPoster = analyze(tmp).brokenRefs.filter((b) => b.from === 'grammar/index.html' && b.ref === '__missing__.png');
+    check('self-test: 章のページの壊れた poster を検出する', brokenPoster.length === 1,
+      JSON.stringify(brokenPoster));
+    fs.writeFileSync(chapterFile, chapterOriginal);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -563,7 +609,7 @@ function run() {
   // --- (2) オフライン参照の健全性 ---
   log('');
   log('--- (R1) file:// で解決可能な相対参照・リンク健全性 ---');
-  check(`R1.2/R1.5: 本文ページの相対 href/src がすべて出力配下に実在する（解析${a.checkedRefCount}件）`,
+  check(`R1.2/R1.5: 本文ページの相対 href/src/poster がすべて出力配下に実在する（解析${a.checkedRefCount}件）`,
     a.brokenRefs.length === 0,
     JSON.stringify(a.brokenRefs.slice(0, 6)));
   check('R1.2: 本文ページに file:// で解決不能なルート絶対参照が無い',
@@ -664,25 +710,34 @@ function run() {
   // --- (7) テーマ資材・台詞出力・外部参照・メニュー id（manual-claudia-theme） ---
   log('');
   log('--- (1.7/8.4–8.6/8.9/10.4) テーマ資材・台詞出力・外部参照・メニュー id ---');
-  const pages = [...chapters, 'print.html'];
+  // 確かめるページは目次の全章だけ（manual-print-page-removal 要件 4.1）。
+  const pages = chapters;
   const t = analyzeTheme(outDir, pages);
   check('10.4: テーマ CSS (theme/claudia-*.css) が出力にある', t.themeCss.length > 0,
     JSON.stringify(t.themeCss));
   check('10.4: テーマ JS (theme/claudia-*.js) が出力にある', t.themeJs.length > 0,
     JSON.stringify(t.themeJs));
-  check(`1.7: 全章と print.html（${pages.length} ページ）がテーマ CSS を参照している`,
+  check(`1.7: 全章（${pages.length} ページ）がテーマ CSS を参照している`,
     t.noCssRef.length === 0, `missing=${JSON.stringify(t.noCssRef)}`);
-  check(`1.7: 全章と print.html（${pages.length} ページ）がテーマ JS を参照している`,
+  check(`1.7: 全章（${pages.length} ページ）がテーマ JS を参照している`,
     t.noJsRef.length === 0, `missing=${JSON.stringify(t.noJsRef)}`);
-  check(`8.4/8.6: 全章と print.html に両方の話し手の台詞部品がある（欠落 ${t.missingTalk.length} ページ）`,
+  check(`8.4/8.6: 全章に両方の話し手の台詞部品がある（欠落 ${t.missingTalk.length} ページ）`,
     t.missingTalk.length === 0);
   for (const m of t.missingTalk) log(`        ${m.page}: 台詞部品が無い話し手 ${m.speakers.join(', ')}`);
   check('8.4: 変換されずに残った台詞（<blockquote> 直後の <p>【）が無い',
     t.untransformedTalk.length === 0, `files=${JSON.stringify(t.untransformedTalk)}`);
   check('8.5: link・script・img の絶対 URL が Google Fonts の 2 オリジンだけ',
     t.externalRefs.length === 0, JSON.stringify(t.externalRefs.slice(0, 6)));
-  check(`8.4: テーマメニューの id（${MENU_IDS.join(', ')}）が全章と print.html にある`,
+  check(`8.4: テーマメニューの id（${MENU_IDS.join(', ')}）が全章にある`,
     t.missingMenuIds.length === 0, JSON.stringify(t.missingMenuIds.slice(0, 6)));
+
+  // --- (8) 全章の印刷用のページ（manual-print-page-removal 要件 4.3・4.4） ---
+  log('');
+  log('--- (4.3/4.4) 全章の印刷用のページ ---');
+  const pr = analyzePrint(outDir, pages);
+  check('4.3: 出力に全章の印刷用のページ（print.html）が無い', !pr.printPage, 'print.html があります');
+  check('4.4: 章のページに全章の印刷用のページへのリンク（印刷のボタン）が無い',
+    pr.pagesLinkingPrint.length === 0, JSON.stringify(pr.pagesLinkingPrint.slice(0, 6)));
 
   if (SELF_TEST) runSelfTest();
 

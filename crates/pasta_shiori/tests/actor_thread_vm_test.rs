@@ -36,22 +36,13 @@ fn neutralize_debug_env() {
     }
 }
 
-/// async_callback フィクスチャ（本番 pasta_scripts + entry.lua override）を temp へ
+/// async_callback フィクスチャ（entry.lua の差し替え。標準ランタイムは自己展開される）を temp へ
 /// 展開し、`load_dir` を返す。`TempDir` は返り値で寿命保持する（スレッドより長命）。
 /// 写経元: `byte_invariant_test.rs::load_async_callback`（ここでは VM をアクター
 /// スレッドで構築するため path のみ返す）。
 fn build_async_callback_dir() -> (PathBuf, TempDir) {
     let temp = TempDir::new().expect("create temp dir");
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-    let pasta_scripts_src = manifest_dir
-        .parent()
-        .expect("parent dir")
-        .join("pasta_lua")
-        .join("pasta_scripts");
-    let pasta_scripts_dst = temp.path().join("pasta_scripts");
-    std::fs::create_dir_all(&pasta_scripts_dst).expect("create pasta_scripts dir");
-    copy_dir_recursive(&pasta_scripts_src, &pasta_scripts_dst).expect("copy pasta_scripts");
 
     let fixture_src = manifest_dir.join("tests/fixtures/async_callback");
     copy_dir_recursive(&fixture_src, temp.path()).expect("copy fixture");
