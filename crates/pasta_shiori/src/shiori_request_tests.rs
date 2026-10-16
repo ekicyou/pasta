@@ -35,19 +35,11 @@ pub(super) fn copy_fixture_to_temp(fixture_name: &str) -> TempDir {
     let temp = TempDir::new().unwrap();
     copy_dir_recursive(&src, temp.path()).unwrap();
 
-    // Copy pasta_scripts directory (standard runtime)
+    // pasta_lua の scriptlibs をコピーする（標準ランタイムは自己展開されるのでコピーしない）
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join("pasta_lua");
-    let scripts_src = crate_root.join("pasta_scripts");
-    let scripts_dst = temp.path().join("pasta_scripts");
-    if scripts_src.exists() {
-        std::fs::create_dir_all(&scripts_dst).unwrap();
-        copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();
-    }
-
-    // Copy scriptlibs directory
     let scriptlibs_src = crate_root.join("scriptlibs");
     let scriptlibs_dst = temp.path().join("scriptlibs");
     if scriptlibs_src.exists() {
@@ -463,32 +455,16 @@ fn copy_shiori_lifecycle_fixture() -> TempDir {
     let temp = TempDir::new().unwrap();
     copy_dir_recursive(&src, temp.path()).unwrap();
 
-    // Copy pasta_scripts directory from pasta_lua (standard runtime)
+    // pasta_lua の scriptlibs をコピーする（標準ランタイムは自己展開されるのでコピーしない）
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join("pasta_lua");
-    let scripts_src = crate_root.join("pasta_scripts");
-    let scripts_dst = temp.path().join("pasta_scripts");
-    if scripts_src.exists() {
-        std::fs::create_dir_all(&scripts_dst).unwrap();
-        copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();
-    }
-
-    // Copy scriptlibs directory
     let scriptlibs_src = crate_root.join("scriptlibs");
     let scriptlibs_dst = temp.path().join("scriptlibs");
     if scriptlibs_src.exists() {
         std::fs::create_dir_all(&scriptlibs_dst).unwrap();
         copy_dir_recursive(&scriptlibs_src, &scriptlibs_dst).unwrap();
-    }
-
-    // Copy fixture's scripts/ as user override (searched before pasta_scripts/)
-    let fixture_scripts = src.join("scripts");
-    let user_scripts_dst = temp.path().join("scripts");
-    if fixture_scripts.exists() {
-        std::fs::create_dir_all(&user_scripts_dst).unwrap();
-        copy_dir_recursive(&fixture_scripts, &user_scripts_dst).unwrap();
     }
 
     temp

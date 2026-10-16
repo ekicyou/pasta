@@ -25,7 +25,7 @@
   - _Depends: 1.1_
   - _Requirements: 2.1, 2.2, 2.3, 2.5_
 
-- [ ] 3. ゴーストの直下の `pasta_scripts/` への効いていないコピーを消す
+- [x] 3. ゴーストの直下の `pasta_scripts/` への効いていないコピーを消す
 - [x] 3.1 (P) `tests/` の 9 ファイルから直下へのコピーを消し、説明を直す
   - 対象: `common/async_callback_support.rs`・`actor_thread_vm_test.rs`・`actor_marshaling_test.rs`・`actor_reload_leak_test.rs`・`actor_teardown_test.rs`・`byte_invariant_test.rs`・`ffi_actor_lifecycle_test.rs`・`ffi_extern_session_e2e_test.rs`・`debug_preservation_test.rs`
   - `.join("pasta_scripts")` のかたまり（コピー元の組み立て・`create_dir_all`・コピーの呼び出し、すぐ上のコメントと後ろの空行）を消す。フィクスチャのコピーに使う再帰コピー関数は残す
@@ -40,7 +40,7 @@
   - 終わった状態: `cargo test -p pasta_shiori --test actor_kick_test` が通り、このファイルについて clippy の未使用の警告が出ない
   - _Boundary: 別のコピー処理（actor_kick_test）_
   - _Requirements: 5.1, 5.2, 6.3, 7.3_
-- [ ] 3.3 (P) `src/shiori_request_tests.rs` から直下へのコピーとフィクスチャの二度目のコピーを消す
+- [x] 3.3 (P) `src/shiori_request_tests.rs` から直下へのコピーとフィクスチャの二度目のコピーを消す
   - 直下へのコピー 2 か所（43〜48 行・471〜476 行）を消し、すぐ上のコメント（38 行・466 行）を `// pasta_lua の scriptlibs をコピーする（標準ランタイムは自己展開されるのでコピーしない）` に書き換え、`// Copy scriptlibs directory`（50 行・478 行）を消す
   - フィクスチャの `scripts/` の二度目のコピー（486〜491 行）とその前の空行を消す
   - `crate_root` と本物の `scriptlibs` のコピーは残す
