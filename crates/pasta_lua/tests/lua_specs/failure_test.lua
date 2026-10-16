@@ -212,3 +212,87 @@ describe("FAILURE.escape（タグとして働かせない）", function()
         expect(rest:find("[\\%%\r\n]")):toBe(nil)
     end)
 end)
+
+describe("FAILURE.var（変数パス → 辞書の書き方）", function()
+    local FAILURE = require("pasta.failure")
+    local cases = {
+        { "var.話題", "＄話題" },
+        { "save.回数", "＄＊回数" },
+        { "args[1]", "＄０" },
+        { "args[2]", "＄１" },
+        { "args[11]", "＄１０" },
+    }
+    for _, c in ipairs(cases) do
+        test(c[1] .. " → " .. c[2], function()
+            expect(FAILURE.var(c[1])):toBe(c[2])
+        end)
+    end
+
+    test("知らない形はそのまま返す", function()
+        for _, s in ipairs({ "x", "var.", "save.", "args[0]", "args[x]", "args[1]x", "@f()", "" }) do
+            expect(FAILURE.var(s)):toBe(s)
+        end
+    end)
+end)
+
+describe("FAILURE.fn（関数・被演算子の説明 → 辞書の書き方）", function()
+    local FAILURE = require("pasta.failure")
+    local cases = {
+        { "@計算()", "＠計算（）" },
+        { "@*計算()", "＠＊計算（）" },
+        { "@$var.f()", "＠＄f（）" },
+        { "@$save.f()", "＠＄＊f（）" },
+        { "@$args[2]()", "＠＄１（）" },
+        { "var.y", "＄y" },
+        { "save.y", "＄＊y" },
+        { "args[3]", "＄２" },
+    }
+    for _, c in ipairs(cases) do
+        test(c[1] .. " → " .. c[2], function()
+            expect(FAILURE.fn(c[1])):toBe(c[2])
+        end)
+    end
+
+    test("知らない形はそのまま返す", function()
+        for _, s in ipairs({ "f", "@f", "@()", "@*()", "@$x()", "@$()", "f()", "" }) do
+            expect(FAILURE.fn(s)):toBe(s)
+        end
+    end)
+end)
+
+describe("FAILURE.kind_of（名前にならない値の説明）", function()
+    local FAILURE = require("pasta.failure")
+    test("値なし・空文字列・真偽値・表・関数", function()
+        expect(FAILURE.kind_of(nil)):toBe("値なし")
+        expect(FAILURE.kind_of("")):toBe("空文字列")
+        expect(FAILURE.kind_of(true)):toBe("真偽値")
+        expect(FAILURE.kind_of(false)):toBe("真偽値")
+        expect(FAILURE.kind_of({})):toBe("表")
+        expect(FAILURE.kind_of(print)):toBe("関数")
+    end)
+    test("それ以外は Lua の型の名前", function()
+        expect(FAILURE.kind_of(coroutine.create(function() end))):toBe("thread")
+        expect(FAILURE.kind_of(1)):toBe("number")
+    end)
+end)
+
+describe("FAILURE.value_of（数・文字列にできない値の説明）", function()
+    local FAILURE = require("pasta.failure")
+    test("文字列は引用符付き", function()
+        expect(FAILURE.value_of("abc")):toBe('"abc"')
+        expect(FAILURE.value_of("")):toBe('""')
+    end)
+    test("真偽値は true / false", function()
+        expect(FAILURE.value_of(true)):toBe("true")
+        expect(FAILURE.value_of(false)):toBe("false")
+    end)
+    test("それ以外は型の名前", function()
+        expect(FAILURE.value_of({})):toBe("表")
+        expect(FAILURE.value_of(print)):toBe("関数")
+        expect(FAILURE.value_of(coroutine.create(function() end))):toBe("thread")
+    end)
+    test("format と組み合わせて要件 3.1 の文言になる", function()
+        expect(FAILURE.format(FAILURE.LABEL.NOT_NUMBER, FAILURE.fn("var.y"), FAILURE.value_of("abc")))
+            :toBe('【数にできない値：＄y（"abc"）】')
+    end)
+end)

@@ -50,6 +50,66 @@ function FAILURE.format(label, subject, detail)
     return "【" .. FAILURE.escape(body) .. "】"
 end
 
+local FULLWIDTH_DIGIT = {
+    ["0"] = "０", ["1"] = "１", ["2"] = "２", ["3"] = "３", ["4"] = "４",
+    ["5"] = "５", ["6"] = "６", ["7"] = "７", ["8"] = "８", ["9"] = "９",
+}
+
+--- Lua の書き方の変数パスを辞書の書き方へ。知らない形はそのまま返す
+--- "var.x" → "＄x"、"save.x" → "＄＊x"、"args[1]" → "＄０"（添字 - 1 を全角数字で）
+---@param var_path string
+---@return string
+function FAILURE.var(var_path)
+    local name = var_path:match("^var%.(.+)$")
+    if name then return "＄" .. name end
+    name = var_path:match("^save%.(.+)$")
+    if name then return "＄＊" .. name end
+    local index = tonumber(var_path:match("^args%[(%d+)%]$"))
+    if index and index >= 1 then
+        return "＄" .. tostring(index - 1):gsub("%d", FULLWIDTH_DIGIT)
+    end
+    return var_path
+end
+
+--- 被演算子・関数の説明を辞書の書き方へ。知らない形はそのまま返す
+--- "@名前()" → "＠名前（）"、"@*名前()" → "＠＊名前（）"、"@$var.x()" → "＠＄x（）"、
+--- 変数パス（"var.x" など）は FAILURE.var と同じ
+---@param desc string
+---@return string
+function FAILURE.fn(desc)
+    local mark, name = desc:match("^@([%$%*]?)(.*)%(%)$")
+    if not name or name == "" then return FAILURE.var(desc) end
+    if mark == "*" then return "＠＊" .. name .. "（）" end
+    if mark == "" then return "＠" .. name .. "（）" end
+    local converted = FAILURE.var(name)
+    -- 変数パスでなければ知らない形
+    if converted == name then return desc end
+    return "＠" .. converted .. "（）"
+end
+
+local KIND = { boolean = "真偽値", table = "表", ["function"] = "関数" }
+
+--- 名前にならない値の説明: nil → "値なし"、"" → "空文字列"、真偽値 → "真偽値"、表 → "表"、関数 → "関数"、
+--- それ以外 → Lua の型の名前（読み手は DSL の作者のため日本語にする）
+---@param v any
+---@return string
+function FAILURE.kind_of(v)
+    if v == nil then return "値なし" end
+    if v == "" then return "空文字列" end
+    local t = type(v)
+    return KIND[t] or t
+end
+
+--- 数・文字列にできない値の説明: 文字列 → "\"abc\""、真偽値 → "true"/"false"、それ以外 → 型の名前
+---@param v any
+---@return string
+function FAILURE.value_of(v)
+    local t = type(v)
+    if t == "string" then return '"' .. v .. '"' end
+    if t == "boolean" then return tostring(v) end
+    return FAILURE.kind_of(v)
+end
+
 ---@class FailureRecord
 ---@field label string        表記の中身（【】はこのモジュールが付ける）
 ---@field warning string|nil  ログの警告文。nil ならログを出さない
