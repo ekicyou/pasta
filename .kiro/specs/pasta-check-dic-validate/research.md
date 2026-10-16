@@ -311,7 +311,7 @@
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
-| `pasta_check` にライブラリ（選んだ案） | 核を `pasta_check::validate` に置き、バイナリの依存を feature `cli` に分ける。`pasta_lsp` は `default-features = false` | release.yml は `-DependsOn` だけ・新しい Trusted Publisher 不要・検査の規則が検査の道具のクレートにある | エディタの部品が CLI の名前のクレートに依存する見た目・workspace の依存の行に `default-features = false` が要る | OPEN QUESTION 1 |
+| `pasta_check` にライブラリ（選んだ案） | 核を `pasta_check::validate` に置き、バイナリの依存を feature `cli` に分ける。`pasta_lsp` は `default-features = false` | release.yml は `-DependsOn` だけ・新しい Trusted Publisher 不要・検査の規則が検査の道具のクレートにある | エディタの部品が CLI の名前のクレートに依存する見た目・workspace の依存の行に `default-features = false` が要る | 選んだ（設計ディスカッションで確定） |
 | 新しいクレート `pasta_validate` | 核だけのクレートを足す | 層と名前が素直 | 初回の手での公開・Trusted Publisher の登録・release.yml の 5 か所と周辺の文書・roadmap の約束を越える | 代案 |
 | `pasta_dsl` の feature | 核を `pasta_dsl::validate` に置く | 公開の順は今のまま（`pasta_dsl` は `pasta_core` の後） | 構文の層が `pasta_core`・`toml`・`glob` に依存し責務がぼやける | 代案 |
 | `pasta_lua` に依存（案 D） | `pasta.dll` の規則をそのまま使う | 規則が完全に同じ | LuaJIT をビルド・WASM にできない | 要件（9.1・11.1）で除外 |
@@ -340,13 +340,13 @@
 - **Context**: 要件のメモ（設計で決める）と申し送り 5。
 - **Selected Approach**: `parse_str` の最初の 1 件だけ。
 - **Rationale**: `pasta.dll` と同じ位置（3.3）で、推測（`parse_str_partial` の行頭からの推測・列なし）を含まない。開いている文書では入力のたびの診断が複数件を出す。
-- **Follow-up**: OPEN QUESTION 3。
+- **Follow-up**: 設計ディスカッションで確定（自明な修正）。
 
-### Decision: `pasta.toml` が無いときも誤りにする（仮定）
+### Decision: `pasta.toml` が無いときも誤りにする
 
 - **Context**: Requirement 2.2 と `pasta.dll` の挙動（`ConfigNotFound`）の食い違い。
 - **Selected Approach**: 既定値で集めて検査を続け、`config-missing` を誤りにする。
-- **Follow-up**: OPEN QUESTION 2（要件の書き足し）。
+- **Follow-up**: 要件 2.10 を足し 9.4 を書き足して確定（自明な修正）。
 
 ### Decision: Build vs Adopt
 
@@ -356,10 +356,29 @@
 
 - `.lua` の中身は読まない（パスだけ）。拡張の起動直後の全体検査・解析の結果のキャッシュ・JSON の出力・CI の `npm test` の job は作らない（要件に無い・必要になってから足せる）。
 
+### Decision: パターンの大文字・小文字は Windows の `glob::glob` を写す（設計ディスカッション 2026-10-16）
+
+- **Context**: `pasta.dll` の `discover_files` は `glob::glob` を使う。`glob::glob` はワイルドカードの無い成分をパターンの文字列のまま繋いでファイルシステムで引くので、Windows では `Dic/` のフォルダも `dic/**/*.pasta` に一致し、返すパスの綴りは `dic` になる。ワイルドカードのある成分は既定の `MatchOptions`（大文字・小文字を区別）で比べる。
+- **Alternatives Considered**:
+  1. 核ですべて区別する（下書き）— `Dic/` で辞書を 1 つも検査せずに成功し、`release` の関門を素通りする。
+  2. CLI だけファイルシステムの `glob` を使う — エディタと食い違い 11.2 を守れない。
+  3. 核で Windows の振る舞いを写す。
+- **Selected Approach**: 3。ワイルドカードの無い成分は区別せず、ある成分は区別する。モジュール名は `pasta.dll` が見るパス（パターンの綴り）から作る。
+- **Rationale**: `pasta.dll` は Windows でしか動かないので、Windows の振る舞いが正典。CLI とエディタは同じ核なので結果は揃ったまま。
+- **Trade-offs**: 成分ごとの照合を自前で書く（数十行）。区別しない比較は Unicode の小文字化で近似する。
+
+### Decision: 設計ディスカッション（2026-10-16）で推奨案のまま確定したもの
+
+- 共有の部品は `pasta_check` のライブラリ（feature `cli`）。新しいクレートは作らない。
+- `release` の段は `[1/6]`〜`[6/6]`、検査は `[4/6] Validating dictionaries...`。
+- 文字列リテラルの変換の失敗（4 つ目のトランスパイルの誤り）は範囲に入れない。
+- VSIX のテストは `test:unit` に足し、CI の job は足さない。
+- 拡張の起動直後には全体の検査をしない・シーン名の重なりは宣言ごとに 1 件・組み込みの名前との衝突は別名を置き換えた後の名前で比べる。
+
 ## Risks & Mitigations
 
 - 規則のずれ — 一致テスト（モジュール名・選び出し・`pasta.toml`・トランスパイル・組み込みの名前・検索）。`pasta_lua` を変える spec は `cargo test -p pasta_check` を通す。
-- Windows のパターンの大文字・小文字 — 核は区別する。ずれる場面（`Dic/` のフォルダ）の扱いを議題にする（OPEN QUESTION 6）。
+- Windows のパターンの大文字・小文字 — 核で `glob::glob` の Windows の振る舞いを写す（下の Decision）。一致テスト (b) を Windows の CI で走らせて守る。
 - 拡張の保存のたびの全体検査の速さ — 300ms で束ねる。遅ければ解析の結果を中身で覚える改善を後から。
 - `release` の関門がリリース CI を止める — hello-pasta の誤り 0 を CLI のテストで守る。
 - スキル（`.claude/skills/pasta-check/SKILL.md`）の編集を分類器が止める — 実装のときに開発者の許可を取る。
