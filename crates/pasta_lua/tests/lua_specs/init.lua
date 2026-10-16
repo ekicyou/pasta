@@ -65,6 +65,7 @@ local specs = {
     "actor_proxy_act_delegation_test",    -- プロキシが呼ぶ関数の第 1 引数（置き場所で決まる）と戻り値の正規化テスト (actor-proxy-act-delegation 1.2)
     "act_concat_test",                    -- PASTA.str 連結の被演算子の文字列化・警告テスト (expr-nil-coercion 1.2)
     "act_call_restore_test",              -- 途中の Call の文脈復元・失敗表記テスト (call-execution-correctness 2.1)
+    "failure_sites_test",                 -- 実行時の失敗 14 か所の現行の挙動の特性化テスト (failure-output-unification 1.1)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
