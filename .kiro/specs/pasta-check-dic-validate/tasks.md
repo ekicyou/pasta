@@ -91,7 +91,7 @@
   - 完了の状態: 一致テストの (e)(f) が通り、一覧と実物がずれるとテストが落ちる
   - _Requirements: 5.4, 6.1, 6.3, 9.2_
 
-- [ ] 4. `pasta_check validate` コマンド
+- [x] 4. `pasta_check validate` コマンド
 - [x] 4.1 ゴーストのフォルダから一覧と中身を集めて核を呼ぶ殻を作る
   - `--target` が無い・存在しない・ディレクトリでない・`ghost/master` を含まないときは理由つきで失敗する（`ghost/master` そのものは読み替えない）
   - `ghost/master` から再帰で一覧を作る（最上位の `profile` に入らず、シンボリックリンクをたどらない、区切りは `/`）。中身はバイトで読み、UTF-8 で読めない・読めないを区別する
@@ -105,7 +105,7 @@
   - 完了の状態: `pasta_check --help` に validate が並び、`pasta_check validate --target <ゴースト>` が 4.1 の殻を通って終了コードを返す
   - _Requirements: 1.4, 1.5, 8.4_
 
-- [ ] 4.3 validate のコマンドのテストと hello-pasta の確認
+- [x] 4.3 validate のコマンドのテストと hello-pasta の確認
   - 誤りあり→1、誤りなし（注意あり）→0、フォルダが無い・`ghost/master` を直接渡す・知らないオプション→1、出力が 2 回とも同じ、パスが `ghost/master/` から始まる
   - 実行の前後でゴーストのフォルダの一覧と更新時刻が変わらない
   - 完了の状態: CLI のテストが通り、hello-pasta（`crates/pasta_sample_ghost/ghosts/hello-pasta`）が誤り 0 で終了コード 0 になる
