@@ -26,7 +26,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.5_
 
 - [ ] 3. ゴーストの直下の `pasta_scripts/` への効いていないコピーを消す
-- [ ] 3.1 (P) `tests/` の 9 ファイルから直下へのコピーを消し、説明を直す
+- [x] 3.1 (P) `tests/` の 9 ファイルから直下へのコピーを消し、説明を直す
   - 対象: `common/async_callback_support.rs`・`actor_thread_vm_test.rs`・`actor_marshaling_test.rs`・`actor_reload_leak_test.rs`・`actor_teardown_test.rs`・`byte_invariant_test.rs`・`ffi_actor_lifecycle_test.rs`・`ffi_extern_session_e2e_test.rs`・`debug_preservation_test.rs`
   - `.join("pasta_scripts")` のかたまり（コピー元の組み立て・`create_dir_all`・コピーの呼び出し、すぐ上のコメントと後ろの空行）を消す。フィクスチャのコピーに使う再帰コピー関数は残す
   - 説明を design.md の「説明の直し」の表の文に直す（読み込み先は自己展開した `profile/pasta/pasta_scripts/`）。`async_callback_support.rs` 18〜20 行の書き換えで、呼んでいない手順（「`copy_fixture_to_temp` でサポート＋フィクスチャをコピーした後」）の記述も消える
