@@ -3,6 +3,7 @@
 ---
 --- 候補の名前（M.candidates）: 種類・アクター名・部位から 1〜8 段の名前を上から順に並べる。
 --- アクター名（M.resolve_actor）: スコープ番号（Reference3）から pasta.toml のアクター名を引く。
+--- 撫での判定（M.check_stroke）: 同じ所で途切れなく 2 秒続いた移動を 1 回の「撫でた」と決める。
 
 local STORE = require("pasta.store")
 
@@ -60,6 +61,49 @@ function M.resolve_actor(scope_ref)
         if name == owner then return name end
     end
     return nil
+end
+
+--- 撫での判定の定数（秒）。設定では変えない
+local THRESHOLD = 2 -- 数え始めからこれ以上で「撫でた」
+local GAP = 2       -- 前の移動からこれより長いと途切れ
+
+--- 撫での判定の状態（1 つだけ・保存しない）。target が nil なら Off
+local state = { target = nil, start = 0, last = 0, fired = false }
+
+--- テスト用: 状態を Off に戻す
+function M._reset()
+    state = { target = nil, start = 0, last = 0, fired = false }
+end
+
+--- テスト用: 状態を読む
+---@return { target: string|nil, start: number, last: number, fired: boolean }
+function M._get_state()
+    return state
+end
+
+--- 撫での判定
+---@param scope_ref string|nil Reference3
+---@param part string|nil Reference4
+---@param now number|nil リクエストの時刻（秒・小数つき）。nil なら数え直す
+---@param blocked boolean 抑止の状態か
+---@return boolean 今回「撫でた」と決めたら true（1 回だけ）
+function M.check_stroke(scope_ref, part, now, blocked)
+    if blocked or part == nil or part == "" or now == nil then
+        M._reset()
+        return false
+    end
+    local target = tostring(scope_ref) .. "\t" .. part
+    if target ~= state.target or now - state.last > GAP or now < state.last then
+        state = { target = target, start = now, last = now, fired = false }
+        return false
+    end
+    state.last = now
+    if state.fired then return false end
+    if now - state.start >= THRESHOLD then
+        state.fired = true
+        return true
+    end
+    return false
 end
 
 return M

@@ -133,3 +133,90 @@ describe("MOUSE.resolve_actor - アクター名", function()
         package.preload["@pasta_config"] = saved_preload
     end)
 end)
+
+-- touch-poke-shortcuts Task 3.2 撫での判定 (Requirements: 2.1–2.8, 3.6, 5.1, 5.2)
+describe("MOUSE.check_stroke - 撫での判定", function()
+    --- 同じ所 (0, Head) へ移動を順に送り、各時刻の結果を "t:true" の形で並べる
+    local function run(times, scope, part)
+        local out = {}
+        for _, t in ipairs(times) do
+            out[#out + 1] = t .. ":" .. tostring(MOUSE.check_stroke(scope or "0", part or "Head", t, false))
+        end
+        return table.concat(out, " ")
+    end
+
+    test("0・0.5・1.0・1.5・1.99 秒は決めず 2.0 秒で決め 2.5 秒は決めない", function()
+        MOUSE._reset()
+        expect(run({ 0, 0.5, 1.0, 1.5, 1.99, 2.0, 2.5 })):toBe(
+            "0:false 0.5:false 1:false 1.5:false 1.99:false 2:true 2.5:false")
+        expect(MOUSE._get_state().fired):toBe(true)
+    end)
+
+    test("途中で部位が変わると数え直す", function()
+        MOUSE._reset()
+        run({ 0, 1.5 }, "0", "Head")
+        expect(run({ 2.0, 3.99 }, "0", "Bust")):toBe("2:false 3.99:false")
+        expect(run({ 4.0 }, "0", "Bust")):toBe("4:true")
+    end)
+
+    test("途中でスコープが変わると数え直す", function()
+        MOUSE._reset()
+        run({ 0, 1.5 }, "0", "Head")
+        expect(run({ 2.0 }, "1", "Head")):toBe("2:false")
+        expect(run({ 4.0 }, "1", "Head")):toBe("4:true")
+    end)
+
+    test("2.01 秒の途切れで数え直す（2 秒ちょうどは続き）", function()
+        MOUSE._reset()
+        expect(run({ 0, 2.01, 4.0, 4.02 })):toBe("0:false 2.01:false 4:false 4.02:true")
+        MOUSE._reset()
+        expect(run({ 0, 2.0 })):toBe("0:false 2:true")
+    end)
+
+    test("発火済みのまま同じ所を撫で続けても 2 回目は決めない", function()
+        MOUSE._reset()
+        expect(run({ 0, 2.0, 3.0, 4.0, 5.5, 7.0 })):toBe("0:false 2:true 3:false 4:false 5.5:false 7:false")
+    end)
+
+    test("部位が空の移動を挟むと発火済みが消える", function()
+        MOUSE._reset()
+        run({ 0, 2.0 })
+        expect(MOUSE.check_stroke("0", "", 2.5, false)):toBe(false)
+        expect(MOUSE._get_state().target):toBeNil()
+        expect(MOUSE._get_state().fired):toBe(false)
+        expect(MOUSE.check_stroke("0", nil, 2.6, false)):toBe(false)
+        expect(run({ 3.0, 4.99, 5.0 })):toBe("3:false 4.99:false 5:true")
+    end)
+
+    test("抑止を挟むと解けた後の最初の移動から 2 秒", function()
+        MOUSE._reset()
+        run({ 0, 1.0 })
+        expect(MOUSE.check_stroke("0", "Head", 1.5, true)):toBe(false)
+        expect(MOUSE.check_stroke("0", "Head", 2.5, true)):toBe(false)
+        expect(MOUSE._get_state().target):toBeNil()
+        expect(run({ 3.0, 4.99, 5.0 })):toBe("3:false 4.99:false 5:true")
+    end)
+
+    test("時計が戻ると数え直す", function()
+        MOUSE._reset()
+        run({ 10, 11.5 })
+        expect(run({ 11.0, 12.99, 13.0 })):toBe("11:false 12.99:false 13:true")
+    end)
+
+    test("時刻なしで数え直す", function()
+        MOUSE._reset()
+        run({ 0, 1.5 })
+        expect(MOUSE.check_stroke("0", "Head", nil, false)):toBe(false)
+        expect(MOUSE._get_state().target):toBeNil()
+        expect(run({ 2.0, 3.99, 4.0 })):toBe("2:false 3.99:false 4:true")
+    end)
+
+    test("_reset で Off に戻る", function()
+        MOUSE._reset()
+        run({ 0, 2.0 })
+        MOUSE._reset()
+        local s = MOUSE._get_state()
+        expect(s.target):toBeNil()
+        expect(s.fired):toBe(false)
+    end)
+end)
