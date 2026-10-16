@@ -171,7 +171,7 @@
   - 完了の状態: `mdbook build` と章の数の検査 4 つが通る
   - _Requirements: 10.1, 10.5, 10.6_
 
-- [ ] 8.2 pasta.toml のリファレンスを直し、スキル references を再生成する
+- [x] 8.2 pasta.toml のリファレンスを直し、スキル references を再生成する
   - 「エディタの言語機能と pasta_check は別名表を読まない」を、`pasta_check validate` と VSCode 拡張のゴースト全体の診断が別名表と `pasta_patterns` を読むことに直す
   - 完了の状態: スキル references の再生成の後、生成物の差分の検査が通る
   - _Requirements: 10.2_
