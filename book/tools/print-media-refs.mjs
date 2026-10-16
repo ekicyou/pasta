@@ -9,9 +9,15 @@
 //   print.html の値が章のページの値そのもの（未修正）か、直した値（修正済み）なら一致とみなす（冪等）。
 // 失敗: 問題を全件集めて 1 つの Error（1 行 1 件）で投げ、何も書かない。書くのは print.html だけ・変わったときだけ 1 回。
 // 依存: Node 標準ライブラリのみ（design「Allowed Dependencies」）。
+//
+// CLI: node book/tools/print-media-refs.mjs [book-out-dir]（既定 book/book。タスク 1.2・要件 2.5, 2.6, 2.8）
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULT_OUT_DIR = path.resolve(here, '../book');
 
 const PAGE_BREAK = '<div style="break-before: page; page-break-before: always;"></div>';
 // 対象の表（要素 → 属性）。
@@ -152,4 +158,15 @@ export function fixPrintMediaRefs(outDir, { write = true } = {}) {
   out += html.slice(last);
   if (write && out !== html) fs.writeFileSync(printFile, out, 'utf8');
   return { targets, fixed: replacements.length };
+}
+
+if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) {
+  const dir = process.argv[2] || DEFAULT_OUT_DIR;
+  try {
+    const { targets, fixed } = fixPrintMediaRefs(dir);
+    console.log(`print-media-refs: fixed ${fixed} media reference(s) in print.html (${targets} target(s))`);
+  } catch (e) {
+    console.error(`print-media-refs failed: ${e.message}`);
+    process.exitCode = 1;
+  }
 }

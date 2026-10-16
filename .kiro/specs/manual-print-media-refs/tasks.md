@@ -12,7 +12,7 @@
   - 完了の状態: その出力に対して呼ぶと `print.html` の `media/dev-actions-demo.mp4` が `debug/media/dev-actions-demo.mp4` になり、`{ targets: 1, fixed: 1 }` を返し、2 回目は `fixed: 0` で `print.html` が変わらない
   - _Requirements: 1.1, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 6.2_
 
-- [ ] 1.2 書き換えをコマンドとして実行できるようにする
+- [x] 1.2 書き換えをコマンドとして実行できるようにする
   - 出力のフォルダを引数に取り、既定は `book/book`（台詞の変換のツールと同じ形）
   - 成功で exit 0 と `print-media-refs: fixed N media reference(s) in print.html (M target(s))` の 1 行（0 件でも同じ形）、失敗で exit 1 と標準エラーに `print-media-refs failed: …` と問題の全件
   - 完了の状態: `node book/tools/print-media-refs.mjs book/book` が件数の 1 行を出し、存在しないフォルダを渡すと exit 1 で無いフォルダを表示する
