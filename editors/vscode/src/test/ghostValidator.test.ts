@@ -1,13 +1,16 @@
 // ゴースト全体の検査（GhostValidator）のテスト。
 //
 // vscode のモック（./mock/vscode.ts、esbuild --alias:vscode=./src/test/mock/vscode.ts）
-// の上で走る。ここではまず、GhostValidator が使うモックの部品
+// の上で走る。前半は GhostValidator が使うモックの部品
 // （workspace.fs のメモリ上の偽のファイル、保存の通知、ファイルの見張り、
-// FileType、Uri.joinPath、Diagnostic の source・code）が想定どおり動くことを確かめる。
+// FileType、Uri.joinPath、Diagnostic の source・code）が想定どおり動くことを、
+// 後半は偽の bridge で GhostValidator の集め方と診断の出し方を確かめる。
 
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as mock from './mock/vscode';
+import { GhostValidator, findGhostMaster } from '../ghostValidator';
+import type { FileText, GhostFinding, GhostInput, GhostReport, GhostStats } from '../wasmBridge';
 
 let passed = 0;
 let failed = 0;
@@ -131,6 +134,263 @@ test('出力チャンネルに書いた行はテストから見える', () => {
     channel: 'Pasta',
     message: '検査に失敗しました',
   });
+});
+
+// --- GhostValidator（集める・検査する・診断を出す） ------------------------------
+
+const EMPTY_STATS: GhostStats = {
+  dictionaryFiles: 0,
+  errors: 0,
+  warnings: 0,
+  uncheckedDynamicCalls: 0,
+  referencesSkipped: false,
+};
+
+/** 偽の bridge。選び出しの結果と報告をテストが決め、呼び出しを記録する */
+class FakeBridge {
+  selected: string[] = [];
+  report: GhostReport = { findings: [], stats: EMPTY_STATS };
+  throwOnValidate = false;
+  readonly selectCalls: GhostInput[] = [];
+  readonly validateCalls: Array<{ input: GhostInput; files: Readonly<Record<string, FileText>> }> = [];
+
+  selectGhostFiles(input: GhostInput): string[] {
+    this.selectCalls.push(input);
+    return this.selected;
+  }
+
+  validateGhost(input: GhostInput, files: Readonly<Record<string, FileText>>): GhostReport {
+    this.validateCalls.push({ input, files });
+    if (this.throwOnValidate) {
+      throw new Error('WASM validateGhost failed: boom');
+    }
+    return this.report;
+  }
+}
+
+function finding(
+  code: string,
+  severity: 'error' | 'warning',
+  path: string,
+  line: number | null,
+  column: number | null,
+  message: string
+): GhostFinding {
+  return { code, severity, path, line, column, message };
+}
+
+function newValidator(bridge: FakeBridge): { gv: GhostValidator; col: mock.MockDiagnosticCollection } {
+  const gv = new GhostValidator(bridge, vscode.window.createOutputChannel('Pasta Language'));
+  const col = mock.createdDiagnosticCollections[mock.createdDiagnosticCollections.length - 1];
+  return { gv, col };
+}
+
+function uriOf(rel: string): vscode.Uri {
+  return vscode.Uri.joinPath(MASTER, ...rel.split('/'));
+}
+
+function setOpenDocuments(rels: string[]): void {
+  mock.workspace.textDocuments.length = 0;
+  for (const rel of rels) {
+    mock.workspace.textDocuments.push({ uri: uriOf(rel) });
+  }
+}
+
+test('findGhostMaster は祖先の ghost/master を返し、無ければ undefined', () => {
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/ghost/master/dic/a.pasta'))?.path, '/ws/ghost/master');
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/ghost/master/pasta.toml'))?.path, '/ws/ghost/master');
+  assert.strictEqual(
+    findGhostMaster(vscode.Uri.file('/ws/ghost/master/dic/ghost/master/x.pasta'))?.path,
+    '/ws/ghost/master/dic/ghost/master'
+  );
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/dic/a.pasta')), undefined);
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/master/a.pasta')), undefined);
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/ghost/master')), undefined);
+});
+
+test('一覧は再帰・最上位の profile に入らず・リンクを含めず、中身は厳格な UTF-8 で読んで区別する', async () => {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  mock.setFakeFile('/ws/ghost/master/pasta.toml', '[loader]\n');
+  mock.setFakeFile('/ws/ghost/master/dic/a.pasta', '﻿＊会話\n');
+  mock.setFakeFile('/ws/ghost/master/dic/sub/b.lua', 'return 1');
+  mock.setFakeFile('/ws/ghost/master/dic/bad.pasta', new Uint8Array([0xe3, 0x81]));
+  mock.setFakeUnreadable('/ws/ghost/master/dic/locked.pasta');
+  mock.setFakeFile('/ws/ghost/master/dic/profile/c.pasta', '');
+  mock.setFakeFile('/ws/ghost/master/profile/x.pasta', '');
+  mock.setFakeSymlink('/ws/ghost/master/dic/link.pasta');
+  mock.setFakeSymlink('/ws/ghost/master/linkdir/d.pasta', vscode.FileType.Directory);
+  const bridge = new FakeBridge();
+  bridge.selected = ['dic/a.pasta', 'dic/bad.pasta', 'dic/locked.pasta', 'dic/gone.pasta'];
+  const { gv } = newValidator(bridge);
+
+  await gv.validate(MASTER);
+
+  assert.strictEqual(bridge.selectCalls.length, 1);
+  const input = bridge.selectCalls[0];
+  assert.deepStrictEqual(input.pastaToml, { kind: 'text', text: '[loader]\n' });
+  assert.deepStrictEqual([...input.entries].sort(), [
+    'dic/a.pasta',
+    'dic/bad.pasta',
+    'dic/locked.pasta',
+    'dic/profile/c.pasta',
+    'dic/sub/b.lua',
+    'pasta.toml',
+  ]);
+  assert.strictEqual(bridge.validateCalls.length, 1);
+  const { input: vInput, files } = bridge.validateCalls[0];
+  assert.deepStrictEqual(vInput, input);
+  // 選ばれたファイルだけを読む（b.lua・c.pasta は読まない）
+  assert.deepStrictEqual(Object.keys(files).sort(), ['dic/a.pasta', 'dic/bad.pasta', 'dic/gone.pasta', 'dic/locked.pasta']);
+  // BOM は残す（CLI の String::from_utf8 と同じ）
+  assert.deepStrictEqual(files['dic/a.pasta'], { kind: 'text', text: '﻿＊会話\n' });
+  assert.deepStrictEqual(files['dic/bad.pasta'], { kind: 'notUtf8' });
+  assert.strictEqual(files['dic/locked.pasta'].kind, 'unreadable');
+  assert.deepStrictEqual(files['dic/gone.pasta'], { kind: 'unreadable', reason: '一覧にありません' });
+  gv.dispose();
+});
+
+test('pasta.toml は無い・UTF-8 でない・読めないを区別する', async () => {
+  const bridge = new FakeBridge();
+  const { gv } = newValidator(bridge);
+
+  mock.resetFakeFs();
+  mock.setFakeFile('/ws/ghost/master/dic/a.pasta', '');
+  await gv.validate(MASTER);
+  assert.deepStrictEqual(bridge.selectCalls[0].pastaToml, { kind: 'missing' });
+
+  mock.setFakeFile('/ws/ghost/master/pasta.toml', new Uint8Array([0xff]));
+  await gv.validate(MASTER);
+  assert.deepStrictEqual(bridge.selectCalls[1].pastaToml, { kind: 'unreadable', reason: 'UTF-8 として読めません' });
+
+  mock.setFakeUnreadable('/ws/ghost/master/pasta.toml');
+  await gv.validate(MASTER);
+  assert.strictEqual(bridge.selectCalls[2].pastaToml.kind, 'unreadable');
+  gv.dispose();
+});
+
+test('開いていないファイルと pasta.toml に Error・Warning を source・code つきで出す', async () => {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  mock.setFakeFile('/ws/ghost/master/dic/b.pasta', '');
+  const bridge = new FakeBridge();
+  bridge.report = {
+    findings: [
+      finding('syntax', 'error', 'dic/b.pasta', 3, 5, '構文の誤り'),
+      finding('config-missing', 'warning', 'pasta.toml', null, null, 'pasta.toml がありません'),
+    ],
+    stats: { ...EMPTY_STATS, errors: 1, warnings: 1 },
+  };
+  const { gv, col } = newValidator(bridge);
+  assert.strictEqual(col.name, 'pasta-ghost');
+
+  await gv.validate(MASTER);
+
+  const b = col.get(uriOf('dic/b.pasta'));
+  assert.ok(b);
+  assert.strictEqual(b.length, 1);
+  assert.strictEqual(b[0].severity, vscode.DiagnosticSeverity.Error);
+  assert.strictEqual(b[0].message, '構文の誤り');
+  assert.strictEqual(b[0].source, 'pasta validate');
+  assert.strictEqual(b[0].code, 'syntax');
+  assert.deepStrictEqual([b[0].range.start.line, b[0].range.start.character], [2, 4]);
+
+  const t = col.get(uriOf('pasta.toml'));
+  assert.ok(t);
+  assert.strictEqual(t.length, 1);
+  assert.strictEqual(t[0].severity, vscode.DiagnosticSeverity.Warning);
+  assert.strictEqual(t[0].code, 'config-missing');
+  assert.deepStrictEqual([t[0].range.start.line, t[0].range.start.character], [0, 0]);
+  gv.dispose();
+});
+
+test('前回あって今回無い URI の診断を消す', async () => {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  mock.setFakeFile('/ws/ghost/master/dic/b.pasta', '');
+  const bridge = new FakeBridge();
+  bridge.report = {
+    findings: [
+      finding('syntax', 'error', 'dic/b.pasta', 1, 1, 'x'),
+      finding('call-target-missing', 'warning', 'dic/c.pasta', 2, null, 'y'),
+    ],
+    stats: EMPTY_STATS,
+  };
+  const { gv, col } = newValidator(bridge);
+  await gv.validate(MASTER);
+  assert.strictEqual(col.size, 2);
+
+  bridge.report = { findings: [finding('call-target-missing', 'warning', 'dic/c.pasta', 2, null, 'y')], stats: EMPTY_STATS };
+  await gv.validate(MASTER);
+  assert.strictEqual(col.get(uriOf('dic/b.pasta')), undefined);
+  assert.strictEqual(col.get(uriOf('dic/c.pasta'))?.length, 1);
+  assert.strictEqual(col.size, 1);
+  gv.dispose();
+});
+
+test('開いている文書の syntax は出さず、閉じると出し、開くとまた外す', async () => {
+  mock.resetFakeFs();
+  mock.setFakeFile('/ws/ghost/master/dic/b.pasta', '');
+  setOpenDocuments(['dic/b.pasta']);
+  const bridge = new FakeBridge();
+  bridge.report = {
+    findings: [
+      finding('syntax', 'error', 'dic/b.pasta', 1, 1, '構文'),
+      finding('module-name-invalid', 'error', 'dic/b.pasta', null, null, 'モジュール名'),
+      finding('syntax', 'error', 'dic/c.pasta', 4, 2, '閉じている文書の構文'),
+    ],
+    stats: EMPTY_STATS,
+  };
+  const { gv, col } = newValidator(bridge);
+  gv.register();
+  await gv.validate(MASTER);
+
+  const codes = (rel: string) => (col.get(uriOf(rel)) ?? []).map((d) => d.code);
+  assert.deepStrictEqual(codes('dic/b.pasta'), ['module-name-invalid']);
+  assert.deepStrictEqual(codes('dic/c.pasta'), ['syntax']);
+
+  // 閉じる: 検査し直さず、前回の結果から syntax を含めて出し直す
+  setOpenDocuments([]);
+  mock.didCloseTextDocumentEmitter.fire({ uri: uriOf('dic/b.pasta') });
+  assert.deepStrictEqual(codes('dic/b.pasta'), ['syntax', 'module-name-invalid']);
+
+  // 開く: syntax を外して出し直す
+  setOpenDocuments(['dic/b.pasta']);
+  mock.didOpenTextDocumentEmitter.fire({ uri: uriOf('dic/b.pasta') });
+  assert.deepStrictEqual(codes('dic/b.pasta'), ['module-name-invalid']);
+  assert.strictEqual(bridge.validateCalls.length, 1);
+
+  // syntax だけの文書を開くと、その URI の診断は消える
+  setOpenDocuments(['dic/b.pasta', 'dic/c.pasta']);
+  mock.didOpenTextDocumentEmitter.fire({ uri: uriOf('dic/c.pasta') });
+  assert.strictEqual(col.get(uriOf('dic/c.pasta')), undefined);
+
+  gv.dispose();
+  // dispose の後は購読が外れている
+  setOpenDocuments([]);
+  mock.didCloseTextDocumentEmitter.fire({ uri: uriOf('dic/c.pasta') });
+  assert.strictEqual(col.get(uriOf('dic/c.pasta')), undefined);
+});
+
+test('WASM の呼び出しが throw したらそのゴーストの診断を消して出力チャンネルに 1 行残す', async () => {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  mock.setFakeFile('/ws/ghost/master/dic/b.pasta', '');
+  const bridge = new FakeBridge();
+  bridge.report = { findings: [finding('syntax', 'error', 'dic/b.pasta', 1, 1, 'x')], stats: EMPTY_STATS };
+  const { gv, col } = newValidator(bridge);
+  await gv.validate(MASTER);
+  assert.strictEqual(col.size, 1);
+
+  const before = mock.outputLines.length;
+  bridge.throwOnValidate = true;
+  await gv.validate(MASTER);
+  assert.strictEqual(col.size, 0);
+  const added = mock.outputLines.slice(before);
+  assert.strictEqual(added.length, 1);
+  assert.strictEqual(added[0].channel, 'Pasta Language');
+  assert.ok(added[0].message.includes('boom'), added[0].message);
+  gv.dispose();
 });
 
 (async () => {

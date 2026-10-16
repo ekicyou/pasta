@@ -150,7 +150,7 @@
   - 完了の状態: 空のゴースト検査のテストのファイルが `npm run test:unit` で走り、既存のテストが通ったままになる
   - _Requirements: 11.3_
 
-- [ ] 7.3 ゴーストのファイルを集めて検査し、診断を出す
+- [x] 7.3 ゴーストのファイルを集めて検査し、診断を出す
   - 祖先の `ghost/master` を探し、`workspace.fs` で再帰に一覧を作る（最上位の `profile` に入らず、シンボリックリンクを含めない）。中身は厳格な UTF-8 で読み、読めない・UTF-8 でないを区別する。選び出しは bridge に任せ、TypeScript はパターンを見ない
   - 診断の集合 `pasta-ghost` に、誤りを Error・注意を Warning、`source`・`code` つきで、開いていないファイル・`pasta.toml` にも出す。前回あって今回無い URI の診断を消す
   - 開いている文書の `syntax` は出さず、閉じたら出し直し、開いたら外して出し直す。WASM の呼び出しが throw したらそのゴーストの診断を消して出力チャンネルに 1 行残す
@@ -209,3 +209,4 @@
 - 6.1: WASM の入口の戻り値は `Serializer::json_compatible()`（None を null にするため。既存の wasm_analyze は既定のまま）。
 - 7.1: vscodeModules のテストは事前の WASM のビルド（`pwsh -NoProfile -File scripts/build-wasm.ps1 -Release`）が要る（既存の activate のテストも同じ）。
 - 7.2: モックの `createDiagnosticCollection` は作った集合を記録しない。`outputLines`・`createdFileSystemWatchers` を空に戻す関数も無い（7.3 で集合を外から渡すか記録を足す）。
+- 7.3: `GhostValidator(bridge, outputChannel)`、公開は `register()`（今は開く・閉じるだけ）・`validate(master)`・`dispose()`。7.4 で保存・見張り・300ms の束ね（design の `requestValidation`）を足し、extension.ts から出力チャンネルを渡す。列は核のコードポイント単位を -1 しただけ（design どおり）。

@@ -26,6 +26,10 @@ export class Uri {
     return new Uri(base.scheme, base.authority, base.path + '/' + pathSegments.join('/'));
   }
 
+  with(change: { path?: string }): Uri {
+    return new Uri(this.scheme, this.authority, change.path ?? this.path);
+  }
+
   toString(): string {
     return `${this.scheme}://${this.path}`;
   }
@@ -306,7 +310,10 @@ function fakeTypeOf(path: string): FileType | undefined {
 const fakeFs = {
   readFile: async (uri: Uri): Promise<Uint8Array> => {
     const entry = fakeEntries.get(uri.path);
-    if (!entry || entry.unreadable || (entry.type & FileType.File) === 0) {
+    if (entry?.unreadable) {
+      throw Object.assign(new Error(`NoPermissions (FileSystemError): ${uri.toString()}`), { code: 'NoPermissions' });
+    }
+    if (!entry || (entry.type & FileType.File) === 0) {
       throw fakeNotFound(uri);
     }
     return entry.data;
@@ -361,8 +368,15 @@ export const outputLines: Array<{ channel: string; message: string }> = [];
 
 // --- namespaces ---------------------------------------------------------------
 
+/** All diagnostic collections created via languages.createDiagnosticCollection (in order). */
+export const createdDiagnosticCollections: MockDiagnosticCollection[] = [];
+
 export const languages = {
-  createDiagnosticCollection: (name: string) => new MockDiagnosticCollection(name),
+  createDiagnosticCollection: (name: string) => {
+    const collection = new MockDiagnosticCollection(name);
+    createdDiagnosticCollections.push(collection);
+    return collection;
+  },
   registerDocumentSemanticTokensProvider: () => ({ dispose: () => {} }),
 };
 
