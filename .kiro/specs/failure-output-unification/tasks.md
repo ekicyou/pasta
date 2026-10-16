@@ -106,7 +106,7 @@
   - 完了: 目次に新しいページが載り、mdBook のビルドが通る
   - _Requirements: 9.1, 9.5_
 
-- [ ] 6.2 (P) pasta.toml の説明に切り替えの設定を書く
+- [x] 6.2 (P) pasta.toml の説明に切り替えの設定を書く
   - `[logging]` のキーの表・テンプレート・分類表に `balloon_warning` を足し、「値の型が合わないとき」にこのキーだけはキー単位で既定値に戻ることを書く
   - 完了: `reference/pasta-toml.md` に名前・型・既定値・型違いの扱いが載る
   - _Boundary: book/src/reference/pasta-toml.md_
