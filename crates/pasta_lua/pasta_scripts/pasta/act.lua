@@ -391,7 +391,7 @@ end
 --- 単語取得（find_handler + word ポストプロセス）
 --- 検索順序は find_act_handler の5段階フォールバック（L1〜L5、word モード）
 --- var_path があるとき（動的参照）は name を WORD.dynamic_key でキーにし、継承したメソッドに届かせずに検索する
---- ポストプロセス: handler=nil → warn+nil、function → h(self)、その他 → tostring(h)
+--- ポストプロセス: handler=nil → 失敗の報告+nil、function → h(self)、その他 → tostring(h)
 --- @param self Act アクションオブジェクト
 --- @param name any 単語名。var_path があるときは参照変数の値
 --- @param var_path string|nil 動的参照の変数パス。nil なら既存の挙動（空キーは警告なしで nil）
@@ -408,9 +408,12 @@ function ACT_IMPL.word(self, name, var_path)
 
     local handler = self:find_handler("word", name, skip_methods)
     if handler == nil then
-        log.warn(string.format("act:word - handler not found: key='%s', mode='word', via=act",
-            tostring(name)))
-        return nil
+        return FAILURE.report(self, {
+            label = FAILURE.LABEL.WORD_NOT_FOUND,
+            subject = "＠" .. tostring(name),
+            warning = string.format("act:word - handler not found: key='%s', mode='word', via=act",
+                tostring(name)),
+        })
     end
     if type(handler) == "function" then
         local scene = self.current_scene
@@ -419,7 +422,18 @@ function ACT_IMPL.word(self, name, var_path)
     return tostring(handler)
 end
 
---- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(self, ...)、非function → warn+nil
+--- 関数の参照が成功したとき、呼んだ関数が戻った後に「報告済み」の印を偽にし、戻り値をそのまま返す
+--- （関数の中の別の参照が印を真にしても、戻った時点で偽に戻す）
+--- @param act Act アクションオブジェクト
+--- @param ... any 関数の戻り値
+--- @return any ...
+local function fn_succeeded(act, ...)
+    FAILURE.set_fn_failed(act, false)
+    return ...
+end
+
+--- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(self, ...)、非function → 失敗の報告+nil
+--- どちらの場合も「報告済み」の印（FAILURE.set_fn_failed）を書く（act:call_key が重ねて報告しないため）
 --- @param self Act アクションオブジェクト
 --- @param key string 関数名
 --- @param skip_methods boolean|nil find_handler へ渡す
@@ -429,16 +443,20 @@ local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
         local scene = self.current_scene
-        return self:restore_scene(scene, handler(self, ...))
+        return fn_succeeded(self, self:restore_scene(scene, handler(self, ...)))
     end
-    log.warn(string.format("act:expr_fn - handler not found: key='%s', mode='expr', via=act",
-        tostring(key)))
-    return nil
+    FAILURE.set_fn_failed(self, true)
+    return FAILURE.report(self, {
+        label = FAILURE.LABEL.FN_NOT_FOUND,
+        subject = "＠" .. tostring(key) .. "（）",
+        warning = string.format("act:expr_fn - handler not found: key='%s', mode='expr', via=act",
+            tostring(key)),
+    })
 end
 
 --- expr関数呼び出し（find_handler + expr ポストプロセス）
 --- find_handler("expr", key) でハンドラーを取得してポストプロセスを実行する。
---- ポストプロセス: function → h(self, ...) 可変引数を伝搬、非function → warn+nil
+--- ポストプロセス: function → h(self, ...) 可変引数を伝搬、非function → 失敗の報告+nil
 --- @param self Act アクションオブジェクト
 --- @param key string 関数名
 --- @param ... any 可変引数（ハンドラーに伝搬）
@@ -456,7 +474,10 @@ end
 --- @return any ハンドラーの戻り値、またはnil
 function ACT_IMPL.expr_fn_var(self, value, var_path, ...)
     local key = WORD.dynamic_key(value, var_path, "act:expr_fn")
-    if key == nil then return nil end
+    if key == nil then
+        FAILURE.set_fn_failed(self, false) -- 直前の別の参照の印を残さない（call_key は現行どおり報告する）
+        return nil
+    end
     return call_expr(self, key, true, ...)
 end
 
@@ -491,7 +512,7 @@ end
 
 --- グローバル関数呼び出し（＠＊名前（…））
 --- GLOBAL[name] が関数なら act を第1引数にして呼ぶ（中のエラーはそのまま伝わる）。
---- 無い・関数でないときは警告して nil（act:expr_fn と同じ warn レベル）
+--- 無い・関数でないときは失敗を報告して nil（act:expr_fn と同じ）。どちらも「報告済み」の印を書く
 --- @param self Act アクションオブジェクト
 --- @param name string 関数名
 --- @param ... any 関数に渡す引数
@@ -500,10 +521,14 @@ function ACT_IMPL.global_fn(self, name, ...)
     local f = GLOBAL[name]
     if type(f) == "function" then
         local scene = self.current_scene
-        return self:restore_scene(scene, f(self, ...))
+        return fn_succeeded(self, self:restore_scene(scene, f(self, ...)))
     end
-    log.warn(string.format("act:global_fn - function not found: key='%s'", tostring(name)))
-    return nil
+    FAILURE.set_fn_failed(self, true)
+    return FAILURE.report(self, {
+        label = FAILURE.LABEL.FN_NOT_FOUND,
+        subject = "＠＊" .. tostring(name) .. "（）",
+        warning = string.format("act:global_fn - function not found: key='%s'", tostring(name)),
+    })
 end
 
 --- 動的コールの「呼ばない」印（act:call_key が返し、act:call が検索せずに nil を返す）。外へ公開しない
@@ -649,6 +674,8 @@ end
 --- 空でない文字列（"nil" を含む）はそのまま、数値は tostring。それ以外（nil・空文字列・真偽値・表など）は
 --- 警告（var_path があれば WORD.dynamic_key と同じ文言、なければ被演算子の表記。値 nil で説明もなければ
 --- 黙る。手書きの Lua から nil を渡したときだけ起きる）と失敗表記を出し、「呼ばない」印を返す。
+--- desc があり、直前の関数の参照が見つからずに報告済み（FAILURE.take_fn_failed）なら黙って「呼ばない」印を返す
+--- （生成コードは関数の参照を call_key の引数として直前に評価する）。
 --- @param self Act アクションオブジェクト
 --- @param value any 動的コールの式の値（生値）
 --- @param var_path string|nil 式が変数参照 1 つのときの Lua パス（"var.x" / "save.x" / "args[1]"）
@@ -658,6 +685,8 @@ function ACT_IMPL.call_key(self, value, var_path, desc)
     local t = type(value)
     if t == "number" then return tostring(value) end
     if t == "string" and value ~= "" then return value end
+    -- 式が関数 1 つでその関数が見つからないとき、関数の参照が報告済みなので重ねない
+    if desc ~= nil and var_path == nil and FAILURE.take_fn_failed(self) then return SKIP_CALL end
     local record = { label = FAILURE.LABEL.BAD_NAME, detail = FAILURE.kind_of(value) }
     if var_path then
         WORD.dynamic_key(value, var_path, "act:call") -- 警告だけ出す（キーにできないことは判定済み）

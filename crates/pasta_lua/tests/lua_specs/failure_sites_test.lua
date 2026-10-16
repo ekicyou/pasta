@@ -77,55 +77,55 @@ describe("失敗の対応表 #1 act:talk", function()
 end)
 
 describe("失敗の対応表 #2〜#6 見つからない単語・関数", function()
-    test("#2 act:word は nil・警告 1 行・トークンなし", function()
+    test("#2 act:word は nil・警告 1 行・表記 1 つ", function()
         with_sites(function(ACT, _, warns)
             local act = new_act(ACT)
             expect(act:word("fs_無い単語")):toBeNil()
-            expect(dump(act)):toBe("")
+            expect(dump(act)):toBe("raw_script|-|【単語が見つからない：＠fs_無い単語】")
             expect(#warns):toBe(1)
             expect(warns[1]):toBe("act:word - handler not found: key='fs_無い単語', mode='word', via=act")
         end)
     end)
 
-    test("#3 proxy:word は nil・警告 1 行・トークンなし", function()
+    test("#3 proxy:word は nil・警告 1 行・表記 1 つ", function()
         with_sites(function(ACT, _, warns)
             local act = new_act(ACT)
             local proxy = act:actor_proxy(ACTOR_NAME)
             expect(proxy:word("fs_無い単語")):toBeNil()
-            expect(dump(act)):toBe("")
+            expect(dump(act)):toBe("raw_script|-|【単語が見つからない：＠fs_無い単語】")
             expect(#warns):toBe(1)
             expect(warns[1]):toBe(
                 "proxy:word - handler not found: key='fs_無い単語', mode='word', via=proxy(fs_さくら)")
         end)
     end)
 
-    test("#4 act:expr_fn は nil・警告 1 行・トークンなし", function()
+    test("#4 act:expr_fn は nil・警告 1 行・表記 1 つ", function()
         with_sites(function(ACT, _, warns)
             local act = new_act(ACT)
             expect(act:expr_fn("fs_無い関数", 1)):toBeNil()
-            expect(dump(act)):toBe("")
+            expect(dump(act)):toBe("raw_script|-|【関数が見つからない：＠fs_無い関数（）】")
             expect(#warns):toBe(1)
             expect(warns[1]):toBe("act:expr_fn - handler not found: key='fs_無い関数', mode='expr', via=act")
         end)
     end)
 
-    test("#5 proxy:expr_fn は nil・警告 1 行・トークンなし", function()
+    test("#5 proxy:expr_fn は nil・警告 1 行・表記 1 つ", function()
         with_sites(function(ACT, _, warns)
             local act = new_act(ACT)
             local proxy = act:actor_proxy(ACTOR_NAME)
             expect(proxy:expr_fn("fs_無い関数")):toBeNil()
-            expect(dump(act)):toBe("")
+            expect(dump(act)):toBe("raw_script|-|【関数が見つからない：＠fs_無い関数（）】")
             expect(#warns):toBe(1)
             expect(warns[1]):toBe(
                 "proxy:expr_fn - handler not found: key='fs_無い関数', mode='expr', via=proxy(fs_さくら)")
         end)
     end)
 
-    test("#6 act:global_fn は nil・警告 1 行・トークンなし", function()
+    test("#6 act:global_fn は nil・警告 1 行・表記 1 つ", function()
         with_sites(function(ACT, _, warns)
             local act = new_act(ACT)
             expect(act:global_fn("fs_無い関数")):toBeNil()
-            expect(dump(act)):toBe("")
+            expect(dump(act)):toBe("raw_script|-|【関数が見つからない：＠＊fs_無い関数（）】")
             expect(#warns):toBe(1)
             expect(warns[1]):toBe("act:global_fn - function not found: key='fs_無い関数'")
         end)
@@ -281,6 +281,57 @@ describe("失敗の対応表 #11〜#13 Call", function()
             expect(act:call_key(2, nil, "@f()")):toBe("2")
             expect(dump(act)):toBe("")
             expect(#warns):toBe(0)
+        end)
+    end)
+end)
+
+describe("関数の参照の「報告済み」の印と call_key（重ねない規則）", function()
+    test("見つからない関数の直後の call_key は黙って「呼ばない」印を返す（act・proxy・グローバル）", function()
+        with_sites(function(ACT, _, warns)
+            local act = new_act(ACT)
+            local proxy = act:actor_proxy(ACTOR_NAME)
+            expect(type(act:call_key(act:expr_fn("fs_無い関数"), nil, "@fs_無い関数()"))):toBe("table")
+            expect(type(act:call_key(proxy:expr_fn("fs_無い関数"), nil, "@fs_無い関数()"))):toBe("table")
+            expect(type(act:call_key(act:global_fn("fs_無い関数"), nil, "@*fs_無い関数()"))):toBe("table")
+            expect(type(act:call_key(act:expr_fn_var("fs_無い関数", "var.x"), nil, "@$var.x()"))):toBe("table")
+            expect(dump(act)):toBe(table.concat({
+                "raw_script|-|【関数が見つからない：＠fs_無い関数（）】",
+                "raw_script|-|【関数が見つからない：＠fs_無い関数（）】",
+                "raw_script|-|【関数が見つからない：＠＊fs_無い関数（）】",
+                "raw_script|-|【関数が見つからない：＠fs_無い関数（）】",
+            }, "\n"))
+            expect(#warns):toBe(4)
+        end)
+    end)
+
+    test("見つかった関数が nil を返したときは現行どおり call_key が報告する（内側の失敗の印は戻った後に偽へ戻す）", function()
+        with_sites(function(ACT, _, warns)
+            local act = new_act(ACT)
+            act.current_scene = {
+                ["fs_値なし"] = function(a)
+                    a:expr_fn("fs_無い関数") -- 関数の中の失敗が印を真にしても、戻った時点で偽に戻す
+                    return nil
+                end,
+            }
+            expect(type(act:call_key(act:expr_fn("fs_値なし"), nil, "@fs_値なし()"))):toBe("table")
+            expect(dump(act)):toBe(table.concat({
+                "raw_script|-|【関数が見つからない：＠fs_無い関数（）】",
+                "raw_script|-|【名前にならない値：＠fs_値なし（）（値なし）】",
+            }, "\n"))
+            expect(#warns):toBe(2)
+        end)
+    end)
+
+    test("印は call_key が読んで偽に戻す（次の call_key は現行どおり報告する）", function()
+        with_sites(function(ACT, _, warns)
+            local act = new_act(ACT)
+            act:call_key(act:expr_fn("fs_無い関数"), nil, "@fs_無い関数()")
+            act:call_key(nil, nil, "@f()")
+            expect(dump(act)):toBe(table.concat({
+                "raw_script|-|【関数が見つからない：＠fs_無い関数（）】",
+                "raw_script|-|【名前にならない値：＠f（）（値なし）】",
+            }, "\n"))
+            expect(#warns):toBe(2)
         end)
     end)
 end)

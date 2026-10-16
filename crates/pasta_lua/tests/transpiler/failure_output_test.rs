@@ -182,7 +182,7 @@ fn site_02_act_word_not_found() {
         name: "#2 act:word",
         lua: false,
         body: "　＄w＝＠挨拶\n",
-        tokens: &[],
+        tokens: &["raw_script|-|【単語が見つからない：＠挨拶】"],
         warns: &["act:word - handler not found: key='挨拶', mode='word', via=act"],
         vars: &["w=nil"],
     });
@@ -195,7 +195,11 @@ fn site_03_proxy_word_not_found() {
         name: "#3 proxy:word",
         lua: false,
         body: "　さくら：前＠挨拶。後\n",
-        tokens: &["talk|さくら|前", "talk|さくら|。後"],
+        tokens: &[
+            "talk|さくら|前",
+            "raw_script|-|【単語が見つからない：＠挨拶】",
+            "talk|さくら|。後",
+        ],
         warns: &["proxy:word - handler not found: key='挨拶', mode='word', via=proxy(さくら)"],
         vars: &[],
     });
@@ -208,7 +212,7 @@ fn site_04_act_expr_fn_not_found() {
         name: "#4 act:expr_fn",
         lua: false,
         body: "　＄f＝＠計算（１）\n",
-        tokens: &[],
+        tokens: &["raw_script|-|【関数が見つからない：＠計算（）】"],
         warns: &["act:expr_fn - handler not found: key='計算', mode='expr', via=act"],
         vars: &["f=nil"],
     });
@@ -221,7 +225,11 @@ fn site_05_proxy_expr_fn_not_found() {
         name: "#5 proxy:expr_fn",
         lua: false,
         body: "　さくら：前＠計算（１）後\n",
-        tokens: &["talk|さくら|前", "talk|さくら|後"],
+        tokens: &[
+            "talk|さくら|前",
+            "raw_script|-|【関数が見つからない：＠計算（）】",
+            "talk|さくら|後",
+        ],
         warns: &["proxy:expr_fn - handler not found: key='計算', mode='expr', via=proxy(さくら)"],
         vars: &[],
     });
@@ -234,7 +242,12 @@ fn site_06_global_fn_not_found() {
         name: "#6 act:global_fn",
         lua: false,
         body: "　さくら：前＠＊計算（１）後\n　＄g＝＠＊計算（）\n",
-        tokens: &["talk|さくら|前", "talk|さくら|後"],
+        tokens: &[
+            "talk|さくら|前",
+            "raw_script|-|【関数が見つからない：＠＊計算（）】",
+            "talk|さくら|後",
+            "raw_script|-|【関数が見つからない：＠＊計算（）】",
+        ],
         warns: &[
             "act:global_fn - function not found: key='計算'",
             "act:global_fn - function not found: key='計算'",
@@ -365,7 +378,7 @@ fn site_12_call_scene_not_found() {
 }
 
 /// #13 `act:call_key`: 変数パスの無い動的コールの式の値が名前にならない。
-/// 式が関数 1 つでその関数が見つからないときは、今は関数と Call の 2 つを報告する
+/// 式が関数 1 つでその関数が見つからないときは、関数だけが報告し Call は黙る（重ねない規則）
 #[test]
 fn site_13_call_key_not_a_name() {
     run_case(&Case {
@@ -375,16 +388,36 @@ fn site_13_call_key_not_a_name() {
         tokens: &[
             "raw_script|-|【名前にならない値：＠値なし（）（値なし）】",
             "raw_script|-|【名前にならない値：＠真偽（）（真偽値）】",
-            "raw_script|-|【名前にならない値：＠無い関数（）（値なし）】",
+            "raw_script|-|【関数が見つからない：＠無い関数（）】",
         ],
         warns: &[
             "act:call - key is not a string or number: operand='@値なし()', value=nil",
             "act:call - key is not a string or number: operand='@真偽()', value=true (boolean)",
             "act:expr_fn - handler not found: key='無い関数', mode='expr', via=act",
-            "act:call - key is not a string or number: operand='@無い関数()', value=nil",
         ],
         vars: &[],
     });
+}
+
+/// 生成コードの評価順の固定: 動的コールの式が関数 1 つのとき、関数の参照は `call_key` の
+/// 引数として `call_key` の直前に評価される（「報告済み」の印はこの順序を前提にする）。
+/// `＞＠無い関数（）` は表記 1 つ・警告 1 行になる
+#[test]
+fn dynamic_call_fn_evaluated_immediately_before_call_key() {
+    let lua_code = transpile(&format!("{SAKURA}\n＊メイン\n　＞＠無い関数（）\n"));
+    assert!(
+        lua_code.contains(r#"act:call_key(act:expr_fn("無い関数"), nil, "@無い関数()")"#),
+        "generated code must pass the function call directly to call_key:\n{lua_code}"
+    );
+    let lua = run_main_scene(&lua_code);
+    assert_eq!(
+        tokens(&lua),
+        ["raw_script|-|【関数が見つからない：＠無い関数（）】"]
+    );
+    assert_eq!(
+        warns(&lua),
+        ["act:expr_fn - handler not found: key='無い関数', mode='expr', via=act"]
+    );
 }
 
 /// `act:failure`: Lua ブロックから直接呼ぶ（text をエスケープして【】で囲んで積み、警告を出す）
@@ -411,7 +444,11 @@ fn site_02_act_word_from_lua_block() {
         name: "#2 act:word from Lua block",
         lua: true,
         body: "　さくら：前＠単語参照（）後\n",
-        tokens: &["talk|さくら|前", "talk|さくら|後"],
+        tokens: &[
+            "talk|さくら|前",
+            "raw_script|-|【単語が見つからない：＠無い単語】",
+            "talk|さくら|後",
+        ],
         warns: &["act:word - handler not found: key='無い単語', mode='word', via=act"],
         vars: &[],
     });

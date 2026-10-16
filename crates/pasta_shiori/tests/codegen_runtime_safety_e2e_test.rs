@@ -67,8 +67,8 @@ fn fire_with_log(event_id: &str) -> (String, String) {
 fn test_typo_scene_returns_talk_with_default_results() {
     let value = fire("OnTypoCheck");
     let expected = concat!(
-        // U18: 未定義の ＠＊未定義関数（） は何も出力しない
-        r"\p[1]前後",
+        // U18: 未定義の ＠＊未定義関数（） はその位置に失敗表記を出す（failure-output-unification #6）
+        r"\p[1]前【関数が見つからない：＠＊未定義関数（）】後",
         // U19: 未登録アクターは立ち位置 0 で、目印を付けて話す
         r"\p[0]【未登録アクター：未登録さん】こんにちは",
         // U20: act のメンバー名と同名のアクター talk が普通に話す

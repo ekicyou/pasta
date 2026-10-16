@@ -140,8 +140,11 @@ fn test_runtime_safety_tokens_vars_and_warnings() {
     );
     let expected_tokens = [
         "talk|さくら|true|開始",
-        // U18（アクション行）: 未定義のグローバル関数は何も出さない
+        // U18: 未定義のグローバル関数はその位置に失敗表記を出す（アクション行・代入行）
+        // （failure-output-unification 対応表 #6）
+        "raw_script|-|false|【関数が見つからない：＠＊未定義関数（）】",
         "talk|さくら|true|です",
+        "raw_script|-|false|【関数が見つからない：＠＊未定義関数（）】",
         // U19: 未登録アクターは目印を 1 回だけ積み、続く行も同じアクターで話す
         "talk|未登録さん|false|【未登録アクター：未登録さん】",
         "talk|未登録さん|false|こんにちは",

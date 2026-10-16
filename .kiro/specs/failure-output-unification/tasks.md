@@ -52,7 +52,7 @@
   - 完了: 発言の途中の失敗が、その発言の中の失敗した位置に出るテストと、期待値を更新した既存テストが通る
   - _Requirements: 1.3, 2.1, 4.1, 5.2, 6.1_
 
-- [ ] 3.3 単語・関数・グローバル関数が見つからない失敗を act と proxy の両方で出す
+- [x] 3.3 単語・関数・グローバル関数が見つからない失敗を act と proxy の両方で出す
   - act と proxy の単語参照（#2・#3）、関数呼び出し（#4・#5）、グローバル関数（#6）を出口から出す
   - 関数呼び出し（act と proxy）・グローバル関数、および動的参照が名前になった後の関数の参照の成功・失敗のたびに「報告済み」の印を書き、動的コールが関数 1 つの式でその関数が見つからないときは `call_key` が黙る（関数が見つかって nil を返したときは現行どおり報告する）
   - 完了: 各箇所の表記 1 つ・警告 1 行のテストと、`＞＠無い関数（）` が表記 1 つ・警告 1 行になるテスト（生成コードの評価順の固定）が通る
@@ -133,3 +133,4 @@
 - 1.2: `pasta/failure.lua` はログを呼んだ時点で `require("@pasta_log")` する（spec がログを差し替えて act を読み直す慣行のため）。module-level の `local log` に変えない。暫定で `record.label` に表記の中身全文が入っており、2.x で design の FailureRecord（label＝種類の名前）に合わせ直す
 - 2.3: `act:failure` は一時的に `FAILURE.report_text`（エスケープしない従来の経路）を通る。3.1 で `report` へ切り替えたら `report_text` を消す。`notation` の「出さない設定なら nil」と `report` の「目印だけ空で積む」は 4.1 で足し、注釈とテストも合わせる。この LuaJIT ではメインスレッドの `coroutine.running()` は thread＋ismain を返す
 - 3.1: `report_text` は削除済み。変数パス付きの `call_key`（`＞＄行き先`）は暫定で `call_key` 自身が表記を積み、警告は `WORD.dynamic_key` が出す。3.4 で `dynamic_key` に act を渡したら `ACT_IMPL.call_key` の var_path 分岐の `FAILURE.report` を外す（外さないと表記が 2 つ）。`act:call(nil)` は 2.10 により表記を 1 つ積む
+- 3.3: 関数の参照は成功時に `fn_succeeded`（act.lua・actor.lua）で呼んだ関数が戻った後に印を偽にする。`expr_fn_var` は `dynamic_key` が nil のとき暫定で印を偽にしている。3.4 で `dynamic_key` に act を渡すのと同時に真へ変える（片方だけだと表記が消えるか 2 つになる）
