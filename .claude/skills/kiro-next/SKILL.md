@@ -117,7 +117,8 @@ Last line: "briefs written: N/N".
 ## Step 7 — Write the roadmap
 Edit `.kiro/steering/roadmap.md` (Edit tool or one Python script in the scratch directory; assert every anchor exists):
 - **Fold** finished specs: every `[x]` ledger row and every completed Phase section collapses into `完了フェーズ（要約）` (one row per Phase: 主題 and spec names). Old wave tables and superseded 棚卸 sections are deleted (git history keeps them; nothing is archived to a separate file).
-- Replace the previous "棚卸（YYYY-MM-DD）" section with the new one: 即時修正 (what was fixed and closed, what was handed to specs), 統合・分割・改名, promotions and what stayed in the backlog (with reason), the wave and why, the Fable/Opus split, broken same-wave promises, holes found, 人手の確認が残っている項目, decisions needed.
+- Replace the previous "棚卸（YYYY-MM-DD）" section with the new one: 即時修正 (what was fixed and closed, what was handed to specs), 統合・分割・改名, promotions and what stayed in the backlog (with reason), the wave and why, the Fable/Opus split, broken same-wave promises, holes found, 人手の確認が残っている項目, decisions needed. In the wave subsection `### ウェーブ（<date>）`, right after its table (first column = spec name), write the wave's start commands as the subsection's only fenced code block — a one-line caption, then the block exactly as in Step 10 item 4 (leave out an empty Fable group). The overview page (Step 8) reads the first fenced block of this subsection and shows it with a copy button (areka developer 2026-10-16 「ウェーブのコード表示をコピペボタン付きで」).
+- Keep the shapes the overview page reads (its markers live in `overview/roadmap-overview.strings.json`): the heading `## 棚卸（YYYY-MM-DD・main …）`, the version tables whose header starts `| 順 | spec |` (one table per version, under a `## ` heading that names the version), `## Specs (dependency order)`, and the first table of `## 完了フェーズ（要約）`. If you change one of these shapes, change the markers and the fixture in the same commit.
 - Active Phase sections: updated `境界戦略` and `ウェーブ構成` (rules, the new wave row with touched files and promises, next-wave candidates, 保留).
 - `## Specs (dependency order)`: unfinished specs only, in dependency order, `- [ ] <name> -- <summary>. Dependencies: <list|none>`; split notes on the original rows, new rows inserted in dependency position.
 - `バックログ` minus promoted items. Update the header `概要` if the current theme changed.
@@ -133,6 +134,7 @@ Edit `.kiro/steering/roadmap.md` (Edit tool or one Python script in the scratch 
   ```
   Otherwise nothing needs to run (Markdown-only inventory).
 - Commit on the worktree branch, no push: `docs(roadmap): 棚卸＝<what landed>の後の再測定・<n> 本を分割・<m> 本を起票・ウェーブ <k> 本を組む`, with a short bullet body and the required attribution trailer.
+- **Overview page** (ported from areka's `/kiro-next` 2026-10-16; developer: 「html で俯瞰したい」): after the commit, build the page from the committed roadmap with `pwsh -NoProfile -File <worktree>\.claude\skills\kiro-next\overview\roadmap-overview.ps1 -OutFile <scratch>\roadmap-overview-latest.html` (expect `OK wrote …`; `WARN` lines are roadmap mismatches — fix the roadmap and amend, or mention them in the report; `FAIL` means no page — report it and go on). If you touched anything under `overview/`, run the same script with `-SelfTest` first and require `selftest: all passed`. The file stays in the scratch directory and is never committed. Read the whole generated file before publishing (the Artifact rule for files Claude did not write; the data line is long, so read it in parts), then publish it with the `Artifact` tool as a new private artifact: `file_path` = that file, `title` = `roadmap-overview-latest`, `icon` = `map`, `description` = `棚卸（<date>・main <BASE>）の時点のロードマップの俯瞰`. Keep the returned URL for the report. If publishing is refused or fails, say so in the report and go on.
 
 ## Step 9 — Memory
 - Write an inventory memory in the project memory directory (base SHA, counts, wave, splits, new briefs, pending items, branch/commit) and add its one-line pointer to `MEMORY.md`; update an existing inventory memory instead of duplicating. Record any new standing rule the developer gave during the run.
@@ -152,6 +154,9 @@ Opus
 ```
    Follow the project preference of one command per block when the developer wants to paste them one by one; the combined block above is the default summary.
 5. Decisions needed from the developer (none of them block the wave) and any manual steps — including "ゴール未設定" and any beyond-goal spec the roadmap or the developer wanted to run early (it needs the milestone scope changed first).
+6. The overview page URL from Step 8 (one line, with the inventory date and base SHA).
+
+Write this whole report as ordinary text **before** stopping at the approval gate. The gate never replaces the report (areka developer 2026-10-16: 「ウェーブを教えてもらってないのに？」 — the wave was missing when only the approval box was shown).
 
 ## Step 11 — Approval gate (STOP here)
 - After the report, STOP. Do not push, open a PR or merge.

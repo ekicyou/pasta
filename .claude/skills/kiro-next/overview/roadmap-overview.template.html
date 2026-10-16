@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title></title>
+<style>
+:root {
+  --bg: #f6f6f4; --fg: #1d1d1b; --muted: #66665f; --panel: #ffffff; --line: #d8d8d2;
+  --mark-bg: #ececea;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1b1b1a; --fg: #e8e8e4; --muted: #a2a29a; --panel: #262624; --line: #3c3c39; --mark-bg: #34342f; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 16px; border-bottom: 1px solid var(--line); }
+header h1 { margin: 0 0 4px; font-size: 20px; }
+.source { color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.warnings { margin-top: 6px; color: #b3261e; font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 16px; }
+.legend button { font: inherit; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--fg); cursor: pointer; }
+.legend button[aria-pressed="true"] { outline: 2px solid var(--fg); }
+.legend .clear { border-style: dashed; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
+.bands { display: flex; gap: 12px; padding: 0 16px 16px; overflow-x: auto; align-items: flex-start; }
+.band { flex: 0 0 300px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.band h2 { margin: 0; font-size: 16px; }
+.band .goal { color: var(--muted); margin: 2px 0; }
+.band .count { font-weight: 600; margin-bottom: 6px; }
+details.card { border: 1px solid var(--line); border-left: 6px solid var(--stripe); border-radius: 6px;
+  margin: 4px 0; background: var(--panel); }
+details.card > summary { cursor: pointer; padding: 6px 8px; list-style: none; }
+details.card > summary::-webkit-details-marker { display: none; }
+.name { font-weight: 600; word-break: break-all; }
+.tag { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 12px; margin-left: 4px;
+  background: var(--tag-bg); color: var(--tag-fg); }
+.one { margin: 2px 0; }
+.meta { color: var(--muted); font-size: 12px; }
+.marks { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.mark { font-size: 12px; padding: 0 6px; border-radius: 4px; background: var(--mark-bg); }
+.mark.wave { background: #fde8b0; color: #4a3500; }
+.mark.done { background: #cdeccf; color: #0f3d14; }
+.mark.warn { background: #f8d0cc; color: #5c0f08; }
+.prereqs { font-size: 12px; margin-top: 2px; }
+.body { margin: 0; padding: 6px 8px 8px; border-top: 1px solid var(--line); font-size: 13px; }
+.body dt { font-weight: 600; margin-top: 4px; }
+.body dd { margin: 0 0 0 8px; white-space: pre-wrap; }
+section.completed { padding: 0 16px 24px; }
+section.completed h2 { font-size: 16px; }
+.row { border: 1px solid var(--line); border-radius: 6px; margin: 4px 0; background: var(--panel); }
+.row > summary { cursor: pointer; padding: 6px 8px; display: grid;
+  grid-template-columns: 6em minmax(0, 2fr) minmax(0, 1fr); gap: 8px; }
+.row > summary span { overflow-wrap: anywhere; }
+.row .body { white-space: pre-wrap; }
+.head-row { display: grid; grid-template-columns: 6em minmax(0, 2fr) minmax(0, 1fr); gap: 8px;
+  padding: 0 9px; color: var(--muted); font-size: 12px; }
+.extra { margin-top: 12px; }
+.wave-cmds { padding: 12px 16px 0; }
+.wave-cmds .bar { display: flex; align-items: center; gap: 8px; }
+.wave-cmds h2 { margin: 0; font-size: 16px; }
+.wave-cmds button { font: inherit; padding: 3px 12px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--fg); cursor: pointer; }
+.wave-cmds pre { margin: 6px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); overflow-x: auto; font: 13px/1.5 ui-monospace, Consolas, monospace; }
+@media (max-width: 640px) {
+  .row > summary, .head-row { grid-template-columns: 1fr; gap: 0; }
+  .head-row { display: none; }
+}
+</style>
+</head>
+<body>
+<script id="roadmap-data" type="application/json">@@ROADMAP_DATA@@</script>
+<script>
+(function () {
+  "use strict";
+  var all = JSON.parse(document.getElementById("roadmap-data").textContent);
+  var L = all.labels, D = all.data;
+  var noTheme = D.themes.length;
+
+  // Labels hold {key} slots; values are inserted as plain text later.
+  function fmt(s, vals) {
+    return s.replace(/\{(\w+)\}/g, function (m, k) { return k in vals ? String(vals[k]) : m; });
+  }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+  function hue(i) { return (i * 137.508) % 360; }
+  function themeName(i) { return i === noTheme ? L.noTheme : D.themes[i]; }
+  function paint(e, i) {
+    if (i === noTheme) {
+      e.style.setProperty("--stripe", "#9a9a94");
+      e.style.setProperty("--tag-bg", "#e2e2de");
+      e.style.setProperty("--tag-fg", "#33332f");
+    } else {
+      var h = hue(i).toFixed(1);
+      e.style.setProperty("--stripe", "hsl(" + h + ", 60%, 45%)");
+      e.style.setProperty("--tag-bg", "hsl(" + h + ", 70%, 88%)");
+      e.style.setProperty("--tag-fg", "hsl(" + h + ", 70%, 22%)");
+    }
+  }
+  function tag(i) { var t = el("span", "tag", themeName(i)); paint(t, i); return t; }
+  function mark(cls, text) { return el("span", "mark " + cls, text); }
+
+  // Header
+  document.title = L.title;
+  var header = el("header");
+  header.appendChild(el("h1", null, L.title));
+  var src = el("div", "source");
+  src.appendChild(el("span", null, fmt(L.sourceUpdated, { date: D.source.updatedAt })));
+  src.appendChild(el("span", null, D.source.blob === null ? L.sourceBlobUnknown : fmt(L.sourceBlob, { blob: D.source.blob })));
+  header.appendChild(src);
+  if (D.warningCount > 0) header.appendChild(el("div", "warnings", fmt(L.warningCount, { count: D.warningCount })));
+  document.body.appendChild(header);
+
+  // The current wave's start commands (the code block /kiro-next writes under the wave table) with a copy button
+  if (D.waveCommands !== null) {
+    var wc = el("section", "wave-cmds");
+    var bar = el("div", "bar");
+    bar.appendChild(el("h2", null, L.waveCommands));
+    var copyBtn = el("button", null, L.copy);
+    copyBtn.type = "button";
+    bar.appendChild(copyBtn);
+    wc.appendChild(bar);
+    var pre = el("pre", null, D.waveCommands);
+    wc.appendChild(pre);
+    var copied = function () {
+      copyBtn.textContent = L.copied;
+      setTimeout(function () { copyBtn.textContent = L.copy; }, 1500);
+    };
+    // Clipboard API first; inside a sandboxed frame it may be refused, so fall back to selecting the text
+    var fallback = function () {
+      var range = document.createRange();
+      range.selectNodeContents(pre);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      try { if (document.execCommand("copy")) copied(); } catch (e) { }
+    };
+    copyBtn.addEventListener("click", function () {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(D.waveCommands).then(copied, fallback);
+      } else {
+        fallback();
+      }
+    });
+    document.body.appendChild(wc);
+  }
+
+  // Legend
+  var legend = el("div", "legend");
+  document.body.appendChild(legend);
+  var used = {};
+  D.bands.forEach(function (b) { b.cards.forEach(function (c) { used[c.theme] = true; }); });
+  D.completed.extra.forEach(function (x) { used[x.theme] = true; });
+  var selected = {};
+  var buttons = [];
+  for (var i = 0; i <= noTheme; i++) {
+    if (i === noTheme && !used[noTheme]) break;
+    (function (ti) {
+      var b = el("button");
+      b.type = "button";
+      b.setAttribute("aria-pressed", "false");
+      var sw = el("span", "swatch"); paint(sw, ti); sw.style.background = "var(--stripe)";
+      b.appendChild(sw);
+      b.appendChild(el("span", null, themeName(ti)));
+      b.addEventListener("click", function () {
+        if (selected[ti]) delete selected[ti]; else selected[ti] = true;
+        b.setAttribute("aria-pressed", selected[ti] ? "true" : "false");
+        apply();
+      });
+      legend.appendChild(b);
+      buttons.push(b);
+    })(i);
+  }
+  var clear = el("button", "clear", L.clearFilter);
+  clear.type = "button";
+  clear.addEventListener("click", function () {
+    selected = {};
+    buttons.forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+    apply();
+  });
+  legend.appendChild(clear);
+
+  function place(p) {
+    var where = [];
+    if (p.band !== null) where.push(p.band === "" ? L.notInBand : p.band);
+    if (p.done) where.push(L.done);
+    if (where.length === 0) where.push(L.notInRoadmap);
+    return p.name + " (" + where.join(", ") + ")";
+  }
+  function dl(pairs) {
+    var d = el("dl");
+    pairs.forEach(function (p) {
+      if (p[1] === null || p[1] === undefined || p[1] === "") return;
+      d.appendChild(el("dt", null, p[0]));
+      d.appendChild(el("dd", null, p[1]));
+    });
+    return d;
+  }
+
+  function card(c) {
+    var d = el("details", "card");
+    paint(d, c.theme);
+    var s = el("summary");
+    var top = el("div");
+    top.appendChild(el("span", "name", c.name));
+    top.appendChild(tag(c.theme));
+    s.appendChild(top);
+    s.appendChild(el("div", "one", c.oneLiner));
+    var meta = [];
+    if (c.order !== null) meta.push(L.order + ": " + c.order);
+    if (c.model !== null) meta.push(L.model + ": " + c.model);
+    if (c.size !== null) meta.push(L.size + ": " + c.size);
+    if (meta.length) s.appendChild(el("div", "meta", meta.join(" / ")));
+    var marks = el("div", "marks");
+    if (c.wave !== null) marks.appendChild(mark("wave", L.wave + " " + c.wave));
+    if (c.done) marks.appendChild(mark("done", L.done));
+    if (c.notInLedger) marks.appendChild(mark("warn", L.notInLedger));
+    if (c.otherBands.length) marks.appendChild(mark("warn", L.otherBands + ": " + c.otherBands.join(", ")));
+    if (marks.childNodes.length) s.appendChild(marks);
+    if (c.prereqs.length) s.appendChild(el("div", "prereqs", L.prereqs + ": " + c.prereqs.map(place).join(" / ")));
+    d.appendChild(s);
+    var body = dl([
+      [L.what, c.ledger && c.ledger.what],
+      [L.prereqs, c.ledger && c.ledger.prereq],
+      [L.note, c.note]
+    ]);
+    body.className = "body";
+    if (body.childNodes.length) d.appendChild(body);
+    return d;
+  }
+
+  // Bands
+  var bandsEl = el("div", "bands");
+  document.body.appendChild(bandsEl);
+  var bandViews = [];
+  D.bands.forEach(function (b) {
+    var col = el("section", "band");
+    col.appendChild(el("h2", null, b.notInBand ? L.notInBand : b.name));
+    if (b.goal) col.appendChild(el("div", "goal", b.goal));
+    var count = el("div", "count");
+    col.appendChild(count);
+    var view = { count: count, items: [] };
+    b.cards.forEach(function (c) {
+      var e = card(c);
+      col.appendChild(e);
+      view.items.push({ el: e, theme: c.theme });
+    });
+    bandViews.push(view);
+    bandsEl.appendChild(col);
+  });
+
+  function apply() {
+    var any = Object.keys(selected).length > 0;
+    bandViews.forEach(function (v) {
+      var n = 0;
+      v.items.forEach(function (it) {
+        var show = !any || !!selected[it.theme];
+        it.el.hidden = !show;
+        if (show) n++;
+      });
+      v.count.textContent = fmt(L.bandCount, { count: n });
+    });
+  }
+  apply();
+
+  // Completed area (never filtered)
+  var done = el("section", "completed");
+  done.appendChild(el("h2", null, L.completedHeading));
+  var hr = el("div", "head-row");
+  [L.colPhase, L.colTopic, L.colSpecs].forEach(function (t) { hr.appendChild(el("span", null, t)); });
+  done.appendChild(hr);
+  D.completed.rows.forEach(function (r) {
+    var d = el("details", "row");
+    var s = el("summary");
+    [r.phase, r.oneLiner, r.specs].forEach(function (t) { s.appendChild(el("span", null, t)); });
+    d.appendChild(s);
+    d.appendChild(el("div", "body", r.topic));
+    done.appendChild(d);
+  });
+  if (D.completed.extra.length) {
+    var ex = el("div", "extra");
+    ex.appendChild(el("h3", null, L.completedExtra));
+    D.completed.extra.forEach(function (x) {
+      var d = el("div", "row");
+      paint(d, x.theme);
+      var line = el("div", "body");
+      line.style.borderTop = "0";
+      line.appendChild(el("span", "name", x.name));
+      line.appendChild(tag(x.theme));
+      line.appendChild(el("span", "mark done", L.done));
+      line.appendChild(el("div", "one", x.oneLiner));
+      d.appendChild(line);
+      ex.appendChild(d);
+    });
+    done.appendChild(ex);
+  }
+  document.body.appendChild(done);
+})();
+</script>
+</body>
+</html>

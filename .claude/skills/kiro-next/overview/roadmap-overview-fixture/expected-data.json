@@ -1,0 +1,162 @@
+{
+  "source": {
+    "updatedAt": "2026-01-02",
+    "blob": "0123456789ab"
+  },
+  "themes": [
+    "Phase 8 の残り: 土台",
+    "Phase 9: 見本の夢"
+  ],
+  "bands": [
+    {
+      "name": "0.9.0",
+      "goal": "0.9.0 までの道筋",
+      "notInBand": false,
+      "cards": [
+        {
+          "name": "done-spec",
+          "oneLiner": "",
+          "theme": 2,
+          "order": "完了",
+          "model": "Fable",
+          "size": "13（実績）",
+          "note": "2026-01-01 に完了",
+          "wave": null,
+          "done": true,
+          "notInLedger": false,
+          "otherBands": [],
+          "prereqs": [],
+          "ledger": null
+        },
+        {
+          "name": "alpha-one",
+          "oneLiner": "一言は台帳の何をするかから取り、六十字を越える長い文は六十字で切って末尾に省略の印を足して見せる、どの帯にも置かれていな…",
+          "theme": 0,
+          "order": "1（高優先度）",
+          "model": "Opus",
+          "size": "10〜13",
+          "note": "今すぐ（a|b と | を書いても割れない）",
+          "wave": "2026-01-02",
+          "done": false,
+          "notInLedger": false,
+          "otherBands": [],
+          "prereqs": [],
+          "ledger": {
+            "what": "一言は台帳の何をするかから取り、六十字を越える長い文は六十字で切って末尾に省略の印を足して見せる、どの帯にも置かれていない spec も同じ決まりで一言を作る（括弧の注は外す）。後ろの文。",
+            "prereq": "none（beta-two は注）"
+          }
+        },
+        {
+          "name": "beta-two",
+          "oneLiner": "鎖の 2 本目を張る",
+          "theme": 1,
+          "order": "2",
+          "model": "Opus（見直し）",
+          "size": "5",
+          "note": "alpha-one の後",
+          "wave": null,
+          "done": false,
+          "notInLedger": false,
+          "otherBands": [],
+          "prereqs": [
+            {
+              "name": "alpha-one",
+              "band": "0.9.0",
+              "done": false
+            },
+            {
+              "name": "done-spec",
+              "band": "0.9.0",
+              "done": true
+            }
+          ],
+          "ledger": {
+            "what": "鎖の 2 本目を張る。",
+            "prereq": "alpha-one, done-spec（注の omega-x は数えない）"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1.0.0",
+      "goal": "Phase 9: 見本の夢",
+      "notInBand": false,
+      "cards": [
+        {
+          "name": "gamma-three",
+          "oneLiner": "見本の「夢」を叶える",
+          "theme": 0,
+          "order": "1",
+          "model": "Fable",
+          "size": "15〜18",
+          "note": "なし",
+          "wave": "2026-01-02",
+          "done": false,
+          "notInLedger": false,
+          "otherBands": [],
+          "prereqs": [
+            {
+              "name": "ghost-of-past",
+              "band": null,
+              "done": false
+            }
+          ],
+          "ledger": {
+            "what": "見本の「夢」を叶える。",
+            "prereq": "ghost-of-past"
+          }
+        }
+      ]
+    },
+    {
+      "name": "",
+      "goal": "",
+      "notInBand": true,
+      "cards": [
+        {
+          "name": "delta-free",
+          "oneLiner": "台帳の文に </script> が在っても壊れない",
+          "theme": 2,
+          "order": null,
+          "model": null,
+          "size": null,
+          "note": null,
+          "wave": null,
+          "done": false,
+          "notInLedger": false,
+          "otherBands": [],
+          "prereqs": [],
+          "ledger": {
+            "what": "台帳の文に </script> が在っても壊れない。",
+            "prereq": "none"
+          }
+        }
+      ]
+    }
+  ],
+  "waveCommands": "Wave 2本\nOpus\n/kiro-start alpha-one\n/kiro-start gamma-three",
+  "completed": {
+    "rows": [
+      {
+        "phase": "1–2",
+        "topic": "古い土台（括弧の。は切らない）。後ろの文は一言に入らない",
+        "oneLiner": "古い土台",
+        "specs": "old-base, done-spec（v0.0.1 で公開・not-a-name-x は注）"
+      },
+      {
+        "phase": "—",
+        "topic": "二つ目の主題",
+        "oneLiner": "二つ目の主題",
+        "specs": "old-two"
+      }
+    ],
+    "extra": [
+      {
+        "name": "eps-done",
+        "oneLiner": "済んだがまだ畳んでいない",
+        "theme": 1
+      }
+    ]
+  },
+  "warningCount": 0
+}
