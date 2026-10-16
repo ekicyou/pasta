@@ -11,7 +11,7 @@
   - 完了の状態: `cargo build -p pasta_check` と、ライブラリだけを feature 無しで wasm32-unknown-unknown に向けた `cargo check` が通り、通常の依存の木（`cargo tree -p pasta_check -e normal`）に `mlua`・`pasta_lua` が現れない
   - _Requirements: 1.7, 9.1, 11.1_
 
-- [ ] 1.2 報告の型・分類・文言・並び順・出力の形を 1 か所に作る
+- [x] 1.2 報告の型・分類・文言・並び順・出力の形を 1 か所に作る
   - 報告の種類 23 個と、種類ごとに固定の誤り／注意の対応、診断用の kebab-case の code を作る
   - 1 件の問題（code・分類・相対パス・行・列・理由）、まとめの数（辞書ファイル数・誤り・注意・飛び先を検査しなかった Call・飛び先の省略）を作る
   - 1 行の形（`ghost/master/{path}:{line}:{col}: 誤り|注意: {理由}`、列・行が無いときは省く）、パス→行（無いものが先）→列→code→理由の並び、飛び先を省いたときの案内の行、まとめの行（省いたときは最後の項を出さない）を作る
@@ -191,3 +191,7 @@
   - `pasta_lua` のテストが書き換える生成物の改行の差分はコミットに混ぜない
   - 完了の状態: 上のすべてが通り、作業ツリーにこの spec の変更以外が残らない
   - _Requirements: 9.1, 9.5, 11.1_
+
+## Implementation Notes
+
+- 1.2: 理由の文言は `validate::msg` の関数にまとめた。`config-scene-alias` は重複の文言だけ用意済み（空の名前・連鎖・型の違いは 2.1 で足す）。並び順の code は FindingKind の宣言の順。serde の kebab-case と `code()` が同じことは 6.1 の JSON の形のテストで 1 行確かめる。
