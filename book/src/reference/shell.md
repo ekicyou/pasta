@@ -26,7 +26,24 @@
 
 ## 当たり判定を足す・直す
 
+```text
+surface0
+{
+element0,overlay,surface0.png,0,0
+collisionex0,Face,rect,124,130,204,200
+collisionex1,Head,rect,96,84,233,201
+collisionex2,Body,rect,110,218,221,403
+}
+```
+
 ## 吹き出し（バルーン）
+
+```text
+sakura.balloon.offsetx,100
+sakura.balloon.offsety,-105
+kero.balloon.offsetx,50
+kero.balloon.offsety,120
+```
 
 ## この章で扱わないこと
 
