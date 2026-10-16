@@ -37,7 +37,7 @@
 ### Out of Boundary
 
 - 見本のシェルのファイル（`crates/pasta_sample_ghost/ghosts/hello-pasta/shell/master/` の全ファイル）。読むだけで変えない
-- 既存の `shell_assets_test.rs` のテストと定数（`CANVAS`・`SAKURA`・`KERO`・当たり判定の順の検査）。変えない
+- 既存の `shell_assets_test.rs` のテストと定数（`CANVAS`・`SAKURA`・`KERO`・当たり判定の順の検査）。変えない（定数の doc コメントに章を指す 1 行を足すことだけは除く。決定 D4）
 - 入門の章の台詞・作例・成功の目印・「もっと詳しく」・段階表 `STAGES.md`
 - `book/AUTHORING.md`（変えない。決定 D6）、`reference/external-links.md`（変えない。決定 D7）
 - 検査ツールの判定ロジック（`verify-content.mjs`・`link-check.mjs`・`talk.mjs`・`gen-skill-refs.mjs`・`tutorial-check.mjs`）。数の決め打ちとコメントの数字以外は触らない
@@ -148,7 +148,7 @@ book/tools/
 - `book/src/getting-started/setup.md` — 節「シェルの中身」の箇条書きの末尾（UKADOC の 2 ページの行の後）に 1 行足す。表と既存の箇条書きは変えない（9.1）
 - `book/src/getting-started/03-face.md` — 「新しく覚える表現」の「表情に名前を付ける」の箇条書きの末尾（「同じ `＠笑顔` でも…」の行の後）に 1 行足す（9.2）
 - `book/src/getting-started/08-touch.md` — 「新しく覚える表現」の「触られた部位の名前を台詞に入れる」の最初の箇条書きの末尾（「上の男の子の台詞は…」の行の後）に 1 行足す（9.3）
-- `crates/pasta_sample_ghost/tests/shell_assets_test.rs` — 照合テスト `book_shell_chapter_code_blocks_are_shell_excerpts` を足す。ファイル冒頭の doc コメントに 1 行足す（10.3）
+- `crates/pasta_sample_ghost/tests/shell_assets_test.rs` — 照合テスト `book_shell_chapter_code_blocks_are_shell_excerpts` を足す。ファイル冒頭の doc コメントに 1 行足す（10.3）。定数 `CANVAS`・`SAKURA`・`KERO` の doc コメントに「変えたら book/src/reference/shell.md の本文も直す」を 1 行ずつ足す（10.2。決定 D4）
 - `book/tools/verify-scripts-test.mjs`・`book/tools/talk/talk-test.mjs`・`book/tools/gen-skill-refs-test.mjs` — 章の数の決め打ちを 61 にする（11.1）
 - `book/tools/verify-content.mjs` — 冒頭コメントの章の数を 61 にする（判定は変えない）
 
@@ -220,7 +220,7 @@ book/tools/
 
 **Responsibilities & Constraints**
 
-- 章の型: 先頭行は H1「`# シェルを自分の絵にする`」（仮置き。OQ-3）。導入（台詞 2〜3 吹き出し・両方の話し手）→ `---` → 本体（普通文体）→ `---` → 締め（台詞 2 吹き出し・両方の話し手）。本体は普通文体で書き、台詞部品と区切り `---` を置かない（2.1。区切りを 2 本に限るのは K-10 の章構造の判定に合わせるため）。
+- 章の型: 先頭行は H1「`# シェルを自分の絵にする`」。導入（台詞 2〜3 吹き出し・両方の話し手）→ `---` → 本体（普通文体）→ `---` → 締め（台詞 2 吹き出し・両方の話し手）。本体は普通文体で書き、台詞部品と区切り `---` を置かない（2.1。区切りを 2 本に限るのは K-10 の章構造の判定に合わせるため）。
 - 最初の台詞は、この章に固有の 4 文字以上の日本語で始める（検索の検査）。導入の台詞で、章が「自分の絵にする・表情を足す・触れる場所を足す」ための章であることを示す（1.3）。各台詞の表情は第 7 節の目安に従い、`talk.mjs --stats` で既存の章との偏りを確かめる（11.6）。
 - コードブロックは、情報文字列 `text` の見本のシェルの抜き出しだけにする。`pasta`・`toml`・情報文字列なしのブロックを置かない（2.5, 10.1。ExcerptMatchTest が確かめる）。辞書側の書き方は表とインラインコードで示し、正本へリンクする。
 - 画像を置かない（2.9。決定 D5）。
@@ -257,7 +257,7 @@ book/tools/
 | 事実 | 出どころ |
 | ---- | -------- |
 | 枚数・寸法・番号・当たり判定の名前と順・吹き出しの値 | 見本のシェルの実物（`shell_assets_test.rs` が形を保証） |
-| 部位名が返る場所・重なりで先の定義が勝つ・当たり判定の外で空 | `hello-pasta-shell-art` の Implementation Notes 6.1（SSP 実機・2026-10-10）と UKADOC `collision-sort` |
+| 部位名が返る場所・重なりで先の定義が勝つ・当たり判定の外で空 | `hello-pasta-shell-art` の Implementation Notes 6.1（SSP 実機・2026-10-10。画面の写しと書き起こし `dblclick-log.txt` の両方。決定 D8）と UKADOC `collision-sort` |
 | 吹き出しの値が SSP の既定のバルーンの大きさを前提にしている | 同 6.1 の「吹き出しの最終値」「残るリスク」 |
 | 表情名と番号の対応・`spot` | `03-face.pasta`・`pasta.toml`（hello-pasta）と、マニュアルの `03-face.md`・`actor-dictionary.md`・`pasta-toml.md` |
 | `＄ｒ４` に名前がそのまま入る | `08-touch.md`・`grammar/variables.md`（pasta は値を加工しない） |
@@ -423,20 +423,18 @@ graph LR
 
 ## Design Decisions（要約。詳細は research.md）
 
-- **D1 置き場所と名前**: `book/src/reference/shell.md`（`reference/` の直下。下のフォルダに置くと口調・台詞の検査から外れる）。題は「シェルを自分の絵にする」（仮。OQ-3）。
+- **D1 置き場所と名前**: `book/src/reference/shell.md`（`reference/` の直下。下のフォルダに置くと口調・台詞の検査から外れる）。題は「シェルを自分の絵にする」。
 - **D2 照合の置き場所**: `shell_assets_test.rs` の Rust のテスト（ギャップ分析 C-2）。シェルだけの変更でも main の CI で落ちる。`manual.yml` の `paths` は触らない。
 - **D3 照合の印**: 印を付けない。章のコードブロックはすべて `text` の抜き出しとし、全ブロックを照合する。HTML コメントなどの印の規約を増やさずに、照合漏れも起きない。
-- **D4 数の照合**: 数値（座標・吹き出しの値）は抜き出しの中にだけ置き、逐語の照合で守る。本文に残る数（333×500・18 枚・番号・当たり判定の名前）は、既存の `shell_assets_test.rs` の定数と検査が守る。章の本文から数を拾う照合は足さない。
+- **D4 数の照合**: 数値（座標・吹き出しの値）は抜き出しの中にだけ置き、逐語の照合で守る。本文に残る数（333×500・18 枚・番号・当たり判定の名前）は、既存の `shell_assets_test.rs` の定数と検査が守る。章の本文から数を拾う照合は足さない。その代わり、定数 `CANVAS`・`SAKURA`・`KERO` の doc コメントに「変えたら book/src/reference/shell.md の本文も直す」を 1 行ずつ足す。定数を直す人に、章も直す必要があることを伝えるためである。
 - **D5 当たり判定の図**: 置かない。新しい画像とその照合（`[0, 10]` の列の拡張）が要り、座標は抜き出し E1 と「返る場所」の表で足りる。
-- **D6 AUTHORING.md**: 変えない。抜き出しの規則は照合テストの doc コメントと失敗メッセージで示す（OQ-4）。
+- **D6 AUTHORING.md**: 変えない。抜き出しの規則は照合テストの doc コメントと失敗メッセージで示す。
 - **D7 外部リンク集**: 変えない。UKADOC のシェルのページは章の中から直接リンクする。
+- **D8 部位名の根拠**: shell-art の Implementation Notes 6.1 にある部位名は、すべて実機の事実として書く。画面の写しで裏が取れたのは女の子の 4 か所と男の子の帽子だけで、残りは実装者の書き起こし（`dblclick-log.txt`）が根拠である。ただし書き起こしも、SSP で実際にダブルクリックした結果を写した記録であり、推測ではない（2.7 を満たす）。
 
 ## Open Questions / Risks
 
 - **OQ-1（3.6）**: 解決済み。2026-10-16 に SSP 2.9.11 の実機で確かめた（前の絵のまま・スクリプトは続く・ふだんはエラーも出ない）。
-- **OQ-2**: 本文に残る数（333×500 など）を、既存の定数に任せる（D4）で足りるか。
-- **OQ-3**: 章の題（H1・目次）「シェルを自分の絵にする」でよいか。
-- **OQ-4**: AUTHORING.md に、シェルの章の書き方（抜き出しだけ・照合あり）の一言を足すか（D6 は足さない）。
-- **OQ-5**: 部位名が返る場所のうち、画面の写しで裏が取れたのは女の子の 4 か所と男の子の帽子で、残り（男の子の顔・横の髪・胴、首の隙間・靴など）は shell-art の実装者の書き起こしが根拠である。2.7 の「実機で確かめた事実」としてそのまま書いてよいか。
+- **OQ-2〜OQ-5**: 設計ディスカッション（2026-10-16）で、すべて推奨案のとおり確定した。OQ-2 は D4 のとおりで、定数の doc コメントに 1 行を足す。OQ-3 は題を「シェルを自分の絵にする」とする（D1）。OQ-4 は AUTHORING を変えない（D6）。OQ-5 は書き起こしも実機の記録として認める（D8）。
 - Risk: 章の最初の台詞の語の選び方で、検索の検査が弱まる（実装で章に固有の語を選ぶ）。
 - Risk: `08-touch.md` を `touch-poke-shortcuts` と同時に触る（後から入る側が rebase で合わせる取り決め）。
