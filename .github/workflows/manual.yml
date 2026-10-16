@@ -8,16 +8,15 @@
 # PR では検証（ビルド・検証スクリプト群）までを行い、Pages への公開は main push 時のみ。
 #
 # パイプライン（manual-ssot-authority design「CI と公開」/ 要件 7.1, 7.2, 7.5, 7.6, 8.2, 10.4、
-# manual-claudia-theme 要件 8.7, 8.8、manual-print-media-refs 要件 4）:
+# manual-claudia-theme 要件 8.7, 8.8）:
 #   node book/tools/gen-skill-refs.mjs --check（スキル生成物の鮮度照合。不一致で中断）
-#     -> mdbook build book -> 着色 -> 台詞部品の変換（talk-html）
-#     -> 印刷用ページのメディアの参照の直し（print-media-refs）-> 日本語 bigram 索引を再生成
+#     -> mdbook build book -> 着色 -> 台詞部品の変換（talk-html）-> 日本語 bigram 索引を再生成
 #     -> node book/tools/link-check.mjs（本の中のリンクと見出し（#…）・読者に届く文書（クレートの README・
 #        ルートの README.md・SOUL.md・スキル）の公開マニュアル URL・スキル自己完結の検証。失敗で中断）
 #     -> チュートリアルの照合（入門の章 12 枚 ↔ hello-pasta の辞書）と構文検証（cargo test）
-#     -> 静的性（print.html のメディアの参照も含む）・検索（この 2 つは --self-test で検査ロジック自身の
+#     -> 静的性・検索（この 2 つは --self-test で検査ロジック自身の
 #        自己テストも実行）・コンテンツ検証・ツール自己テスト
-#     -> 旧版の生成（固定コミット CLASSIC_REF の book/ を旧版のツールで book/book/classic へ。
+#     -> 旧版の生成（固定コミット CLASSIC_REF の book/ を旧版のツールで book/book/classic へ。印刷用のページは作らない。
 #        新版の検査の後に置き、検査の対象に含めない。失敗で中断。manual-claudia-theme 要件 11）
 #     -> Pages artifact（./book/book）をアップロード -> deploy-pages で公開。
 # すべて build ジョブ内で検証するため、失敗時は deploy（needs: build）が走らず公開されない。
@@ -108,14 +107,6 @@ jobs:
       - name: Render talk components
         run: node book/tools/talk/talk-html.mjs book/book
 
-      # 台詞の変換の直後・索引再生成の前に、印刷用ページ（print.html）のメディア要素の参照を直す
-      # （manual-print-media-refs 要件 4.1, 4.2）。mdBook は print.html で <a href>・<img src> だけを
-      # 根からのパスへ書き換え、メディア要素は章の場所からの相対のまま残すため、深い章の動画が切れる。
-      # 対象: <video> の src・poster、<audio>・<source>・<track> の src（章のページの値と照合して直す）。
-      # 直せない参照があれば何も書かずに exit 1＝公開前に止まる。旧版（classic/）には使わない（要件 4.3）。
-      - name: Fix print page media references
-        run: node book/tools/print-media-refs.mjs book/book
-
       # mdbook build の後段で検索インデックスを日本語 bigram へ再生成する（要件 1.4）。
       # 失敗時 exit 1 でビルド中断。出力先は book/book（mdBook 既定）。
       - name: Rebuild bigram search index
@@ -179,6 +170,8 @@ jobs:
       # その版のツール（ビルド -> 着色 -> 索引再生成）でそのまま生成し、新版のツールは使わない（要件 11.2）。
       # 新版の検査はすべてこの段より前に終わるため、旧版は検査の対象に入らない（要件 11.3）。
       # PR でも実行して生成できることを確かめる。どの手順の失敗も exit 1 で公開を止める（要件 11.4）。
+      # 印刷用のページ（print.html）は、生成のときの設定で作らせない（manual-print-page-removal 要件 2）。
+      # 旧版の章の印刷では目次とメニューも刷られる。
       - name: Build classic manual snapshot
         shell: bash
         run: |
@@ -187,12 +180,11 @@ jobs:
           git worktree add --detach "$RUNNER_TEMP/classic" "$CLASSIC_REF"
           (cd "$RUNNER_TEMP/classic/book" && npm ci)
           out="$GITHUB_WORKSPACE/book/book/classic"
-          mdbook build "$RUNNER_TEMP/classic/book" -d "$out"
+          MDBOOK_OUTPUT__HTML__PRINT__ENABLE=false mdbook build "$RUNNER_TEMP/classic/book" -d "$out"
           node "$RUNNER_TEMP/classic/book/tools/highlight/highlight-html.mjs" "$out"
           node "$RUNNER_TEMP/classic/book/tools/bigram-index/build-index.mjs" "$out"
-          for f in index.html print.html; do
-            [ -f "$out/$f" ] || { echo "::error::classic snapshot is missing $f"; exit 1; }
-          done
+          [ -f "$out/index.html" ] || { echo "::error::classic snapshot is missing index.html"; exit 1; }
+          [ ! -e "$out/print.html" ] || { echo "::error::classic snapshot must not have print.html"; exit 1; }
           compgen -G "$out/searchindex*.js" > /dev/null || { echo "::error::classic snapshot is missing searchindex*.js"; exit 1; }
 
       # enablement: true — リポジトリで Pages が未設定でも API 経由で
