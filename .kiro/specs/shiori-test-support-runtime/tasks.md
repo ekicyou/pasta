@@ -33,7 +33,7 @@
   - 終わった状態: 9 ファイルに `.join("pasta_scripts")` が無く、9 ファイルのテストが同じ確かめのまま通る
   - _Boundary: 別のコピー処理（tests の 9 ファイル）_
   - _Requirements: 5.1, 5.2, 6.3, 6.4_
-- [ ] 3.2 (P) `actor_kick_test.rs` から直下へのコピーと、使われなくなる部品を消す
+- [x] 3.2 (P) `actor_kick_test.rs` から直下へのコピーと、使われなくなる部品を消す
   - 直下へのコピーのかたまりと `manifest_dir` の行を消す
   - 使われなくなる再帰コピー関数と後ろの空行を消し、`use std::path::{Path, PathBuf};` を `use std::path::PathBuf;` にする
   - 説明（52〜53 行・78 行）を design.md の表の文に直す
