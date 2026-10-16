@@ -2,7 +2,7 @@
 
 行の番号は design.md と同じく基点 `0ecc524a` のもの。ずれたときはコードの形で場所を探す。
 
-- [ ] 1. 写しを消して、共通部品がフィクスチャだけを置くようにする
+- [x] 1. 写しを消して、共通部品がフィクスチャだけを置くようにする
 - [x] 1.1 写しを消し、共通部品の写しのコピーと説明を直す
   - `crates/pasta_shiori/tests/support/` の 13 ファイル（`scripts/pasta/` の 10、`scriptlibs/lua_test/` の 3）を消す。ディレクトリも残さない
   - 共通部品から、写しをコピーする呼び出しとその前後のコメント（「Copy support files first」など、`main.lua` の例を含む）と、使われなくなる写しのコピー関数を消す。フィクスチャのコピーと、ディレクトリを再帰コピーする関数は残す
@@ -10,7 +10,7 @@
   - 終わった状態: `crates/pasta_shiori/tests/support/` が無く、共通部品に写しへの参照が無い。`cargo test -p pasta_shiori --test shiori_lifecycle_test` など `shiori_lifecycle` を使うテストが、フィクスチャの `entry.lua` の差し替えだけで通る
   - `test_path_helpers_test` は 1.2 で直すまで `scriptlibs` の確かめで落ちる。`pasta_shiori` のテストを通しで確かめるのは 1.2 の後
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.4, 3.1, 3.2, 6.1, 6.2, 6.4_
-- [ ] 1.2 パスの自己検証テストを、写しの有無ではなく置けて読めることの確かめに直す
+- [x] 1.2 パスの自己検証テストを、写しの有無ではなく置けて読めることの確かめに直す
   - `test_path_helpers_test.rs` の `scriptlibs` が置かれることの確かめ（4 行）だけを消す。`pasta.toml` と `scripts/` の確かめは残す
   - この tasks.md の実装メモに、直したテストと理由（写しの `scriptlibs` に頼っていた）を書く
   - 終わった状態: `cargo test -p pasta_shiori --test test_path_helpers_test` が通り、実装メモに記録がある
@@ -60,3 +60,5 @@
   - _Requirements: 1.5, 2.3, 3.3, 3.4, 4.2, 5.2, 7.1, 7.2, 7.3_
 
 ## 実装メモ
+
+- 1.2: `tests/test_path_helpers_test.rs` の `deep_non_ansi_fixture_is_buildable_and_readable` から `scriptlibs` が置かれることの確かめ（4 行）を消した。理由: `scriptlibs/` は写し（`tests/support/scriptlibs/`）がコピーされることで置かれていただけで、フィクスチャ `shiori_lifecycle` 自身は持たない。テストの意図（深いパス・ANSI で表せないパスの下に一時ゴーストを置けて読める）は `pasta.toml` と `scripts/` の確かめで足りる。
