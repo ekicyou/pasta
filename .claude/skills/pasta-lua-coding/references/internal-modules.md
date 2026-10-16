@@ -303,6 +303,7 @@ STORE.scenes = {
 | `get_all_scenes()` | `STORE.scenes` そのもの（複製しない）を返す |
 | `search(name, global_scene_name, attrs)` | 前方一致の検索でシーンを探し、結果オブジェクトを返す（後述） |
 | `co_exec(act, name, global_scene_name, attrs)` | `act:find_scene` で探したシーン関数をコルーチンに包んで返す（後述） |
+| `co_exec_exact(name)` | 完全一致の検索で探したグローバルシーンをコルーチンに包んで返す（後述） |
 
 - 生成コードは `create_scene` を基本名だけで呼び（`local SCENE = PASTA.create_scene("メイン")`）、返ったシーンテーブルに `function SCENE.__start__(act, ...)` の形で関数を直接定義する。`register`・`create_global_table` などは `pasta.scene` の内部とテストが使う。
 - 番号は基本名ごとに全モジュールを通して振られる。`pasta.scene_dic` がモジュールを名前順に `require` するため、同じ基本名のシーンの番号はその順（モジュールの中では出現順）で決まる。
@@ -329,6 +330,10 @@ STORE.scenes = {
 ### co_exec
 
 `SCENE.co_exec(act, name, global_scene_name, attrs)` は、`act:find_scene(name, global_scene_name, attrs)` でシーン関数を探し、関数でなければ `nil` を、関数ならそれを包んだコルーチンを返す。`act:find_scene` は `global_scene_name` と `attrs` を使わず `find_handler("scene", name)` に委ねるため、`co_exec` で親のグローバルシーンを指定してローカルシーンを引くことはできない。第 1 引数の `act` は名前の解決にだけ使い、シーン関数には `coroutine.resume` で渡された ACT が渡る。コルーチンの包み方と再開は [シーンコルーチンの作り方](https://ekicyou.github.io/pasta/internals/execution-model.html#シーンコルーチンの作り方) で扱う。
+
+### co_exec_exact
+
+`SCENE.co_exec_exact(name)` は、`@pasta_search` の `SEARCH:search_scene_exact(name, nil)` でグローバルシーンを完全一致で探し（[search_scene_exact](pasta-search.md#search_scene_exactname-global_scene_name)）、見つかった `(グローバルシーン名, ローカル名)` で `SCENE.get` を引く。見つからないか関数が無ければ `nil` を、関数なら `co_exec` と同じ包み方のコルーチンを返す。`act` を取らず、`act:find_scene` の名前の解決（act のメソッド・`GLOBAL` テーブルなど）を通らない。つつき・撫での既定ハンドラ（`pasta.shiori.event.mouse`）が、ショートカットの 1〜8 段の名前を探すのに使う（[つつき・撫でのショートカット](shiori-events.md#つつき撫でのショートカット)）。
 
 ### DSL の Lua ブロックとの接続
 
