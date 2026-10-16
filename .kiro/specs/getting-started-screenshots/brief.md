@@ -127,3 +127,8 @@
 - **入門の章に絵を載せた前例**: `setup.md` の節「シェルの中身」に、2 セルの表で見本の絵を 2 枚載せた（`book/src/img/hello-pasta/surface0.png`・`surface10.png`）。表のセルに入れた画像の行は、本文の検査（`C-prose`）に落ちない（先頭が `|` の段落を検査が見ないため）。絵の表を既存の表の直後に置くと、2 つの表がくっついて見える。
 - **絵の写しはテストが見る**: `book/src/img/hello-pasta/` の 2 枚は、シェルの絵とバイト単位で同じであることをテスト（`crates/pasta_sample_ghost/tests/shell_assets_test.rs`）が見る。シェルの絵を変える変更は、同じ変更で写しも置き換える。
 - **実機で起動するとき**: hello-pasta は SSP に入れてあるゴーストと名前がぶつかるので、フォルダを複製して名前を変え、`--ghost` で起動した。終わった後、SSP の設定（`data/profile/app.dat` の `Ghost.0`）が複製を指したままになる。
+
+## 申し送り（touch-poke-shortcuts より、2026-10-16）
+- 8 段目の辞書と章が変わった。`＊OnMouseDoubleClick`＋`＄ｒ４` をやめ、ショートカットのシーン（`＊つっつき反応女の子Head`・`＊つっつき反応男の子その他`・`＊つっつき反応Face`・`＊つっつき反応その他`・`＊さわり反応女の子Head`・`＊さわり反応その他`）で書く。9 段目の選択肢のシーンは `＊つっつき反応その他` に改名し、8 段目の `その他` と一緒に抽選される。
+- 撫で（`OnMouseMove`）が新しく反応する。同じ所を撫で始めて 2 秒たった後の最初の動きで 1 回、トーク中（`talking` など）は反応しない。
+- 実機の確かめでは、つつき 4 種・撫で 2 種・9 段目の抽選と、撫での手触り（SSP の `OnMouseMove` の届き方）を見る。操作とシーンの対応は `book/src/getting-started/08-touch.md` の表、決まりは `.kiro/specs/completed/touch-poke-shortcuts/design.md` の SampleDic と StrokeDetector。

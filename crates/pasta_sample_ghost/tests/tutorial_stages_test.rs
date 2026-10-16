@@ -236,8 +236,8 @@ return SHIORI.request({{ id = {id}, method = "get", version = 30, charset = "UTF
     }
 }
 
-/// 204 では素通りさせないイベント。9 段目の OnChoiceSelectEx は Reference2 が登録名でない
-/// `OnMouseDoubleClick` で、グローバル前方一致のフォールバックで `＊おやつの話` に届いて
+/// 204 では素通りさせないイベント。9 段目の OnChoiceSelectEx は Reference2（選択肢を出した
+/// シーンの名前）が登録名でなく、グローバル前方一致のフォールバックで `＊おやつの話` に届いて
 /// 200 になる。ジャンプ先が壊れると 204 に落ちて検査を素通りするので、ここだけ 200 と
 /// 空でない Value を必須にする（tasks.md Implementation Notes「3.2 で」）。
 const MUST_SPEAK: &[&str] = &["OnChoiceSelectEx"];

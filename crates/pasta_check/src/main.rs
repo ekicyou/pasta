@@ -3,6 +3,7 @@ mod copy;
 mod nar;
 mod release;
 mod update_files;
+mod validate_cmd;
 
 use std::path::PathBuf;
 use std::process;
@@ -15,6 +16,7 @@ struct Args {
 /// サブコマンド
 enum Command {
     Release(ReleaseArgs),
+    Validate(ValidateArgs),
     Help,
     Version,
 }
@@ -29,6 +31,12 @@ pub struct ReleaseArgs {
     pub nar: PathBuf,
     /// 上書きコピー元フォルダーパス (--copy, 0回以上)
     pub copy_dirs: Vec<PathBuf>,
+}
+
+/// validate サブコマンドの引数
+pub struct ValidateArgs {
+    /// ゴースト開発フォルダーパス (--target)
+    pub target: PathBuf,
 }
 
 fn main() {
@@ -46,6 +54,13 @@ fn main() {
                     process::exit(1);
                 }
             }
+            Command::Validate(validate_args) => match validate_cmd::run(&validate_args.target) {
+                Ok(outcome) => process::exit(outcome.exit_code()),
+                Err(e) => {
+                    eprintln!("Error: {e}");
+                    process::exit(1);
+                }
+            },
         },
         Err(e) => {
             eprintln!("Error: {e}");
@@ -61,12 +76,16 @@ fn print_usage() {
     eprintln!();
     eprintln!("Commands:");
     eprintln!("  release    Build release package (update files + NAR)");
+    eprintln!("  validate   Check dictionaries without starting SSP");
     eprintln!();
     eprintln!("Options for 'release':");
     eprintln!("  --target <path>   Ghost development folder (required)");
     eprintln!("  --release <path>  Release output folder (required)");
     eprintln!("  --nar <path>      NAR output file path (required)");
     eprintln!("  --copy <path>     Overlay copy folder (repeatable)");
+    eprintln!();
+    eprintln!("Options for 'validate':");
+    eprintln!("  --target <path>   Ghost development folder (required)");
     eprintln!();
     eprintln!("Global options:");
     eprintln!("  --help             Show this help");
@@ -131,6 +150,24 @@ fn parse_args_from(mut parser: lexopt::Parser) -> Result<Args, lexopt::Error> {
                     nar,
                     copy_dirs,
                 }),
+            })
+        }
+        Some("validate") => {
+            // ループはサブコマンドに関係なく受け付けるので、release 用のオプションはここで拒む
+            for (given, option) in [
+                (release_dir.is_some(), "--release"),
+                (nar.is_some(), "--nar"),
+                (!copy_dirs.is_empty(), "--copy"),
+            ] {
+                if given {
+                    return Err(lexopt::Error::UnexpectedOption(option.to_string()));
+                }
+            }
+            let target = target.ok_or_else(|| lexopt::Error::MissingValue {
+                option: Some("--target".to_string()),
+            })?;
+            Ok(Args {
+                command: Command::Validate(ValidateArgs { target }),
             })
         }
         Some(other) => Err(lexopt::Error::UnexpectedValue {
@@ -301,6 +338,43 @@ mod tests {
     fn test_release_option_missing_value() {
         let result = parse(&["release", "--target"]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_target() {
+        let args = parse(&["validate", "--target", "ghost/dir"]).unwrap();
+        match args.command {
+            Command::Validate(v) => assert_eq!(v.target, PathBuf::from("ghost/dir")),
+            _ => panic!("Expected Validate command"),
+        }
+    }
+
+    #[test]
+    fn test_validate_missing_target() {
+        let err = parse(&["validate"]).err().unwrap();
+        assert!(err.to_string().contains("--target"), "{err}");
+    }
+
+    /// validate に release 用のオプションを渡すと、そのオプション名を理由に誤り（Req 1.4）
+    #[test]
+    fn test_validate_rejects_release_options() {
+        for (opt, val) in [("--release", "r"), ("--nar", "n"), ("--copy", "c")] {
+            let err = parse(&["validate", "--target", "t", opt, val])
+                .err()
+                .unwrap_or_else(|| panic!("{opt} should be rejected"));
+            assert!(err.to_string().contains(opt), "{opt}: {err}");
+        }
+    }
+
+    #[test]
+    fn test_validate_unknown_option_rejected() {
+        assert!(parse(&["validate", "--target", "t", "--bogus"]).is_err());
+    }
+
+    #[test]
+    fn test_help_wins_over_validate_subcommand() {
+        let args = parse(&["validate", "--help"]).unwrap();
+        assert!(matches!(args.command, Command::Help));
     }
 
     /// オプションはサブコマンドより前に置いてもよい（パーサは位置に依存しない）

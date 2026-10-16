@@ -479,7 +479,7 @@ test('dispose cancels pending timers and unsubscribes listeners', async () => {
 // not escape as a distant TypeError when the result is spread/iterated later.
 
 /** Real WasmBridge with an injected fake wasm module (bypasses initialize()). */
-function bridgeWithWasmModule(wasmModule: { wasm_analyze(text: string): unknown }): WasmBridge {
+function bridgeWithWasmModule(wasmModule: object): WasmBridge {
   const bridge = new WasmBridge({ appendLine: () => {} } as never);
   const internals = bridge as unknown as { wasmModule: unknown; ready: boolean };
   internals.wasmModule = wasmModule;
@@ -551,6 +551,107 @@ test('analyzeDocument passes a well-formed wasm result through unchanged', () =>
   };
   const result = bridgeWithWasmResult(wellFormed).analyzeDocument('x');
   assert.deepStrictEqual(result, wellFormed);
+});
+
+// --- ゴースト全体の検査（pasta-check-dic-validate 7.1・要件 11.2 / 11.8） ---
+// wasm_select_ghost_files / wasm_validate_ghost は失敗で null を返す。結果の形を
+// 境界で確かめ、違えば throw する（核の結果はそのまま通す）。
+
+const ghostInput = { pastaToml: { kind: 'missing' } as const, entries: ['dic/a.pasta'] };
+
+const wellFormedReport = {
+  findings: [
+    { code: 'syntax', severity: 'error', path: 'dic/a.pasta', line: 3, column: 1, message: '構文の誤り' },
+    { code: 'config-scene-alias', severity: 'warning', path: 'pasta.toml', line: null, column: null, message: '注意' },
+  ],
+  stats: { dictionaryFiles: 1, errors: 1, warnings: 1, uncheckedDynamicCalls: 0, referencesSkipped: true },
+};
+
+test('selectGhostFiles passes the wasm input through and returns the string list', () => {
+  let seen: unknown;
+  const bridge = bridgeWithWasmModule({
+    wasm_select_ghost_files: (input: unknown) => {
+      seen = input;
+      return ['dic/a.pasta'];
+    },
+  });
+  assert.deepStrictEqual(bridge.selectGhostFiles(ghostInput), ['dic/a.pasta']);
+  assert.deepStrictEqual(seen, ghostInput);
+});
+
+test('selectGhostFiles throws on null / non-string-array wasm results', () => {
+  for (const bad of [null, undefined, 'dic/a.pasta', [1], ['ok', null]]) {
+    const bridge = bridgeWithWasmModule({ wasm_select_ghost_files: () => bad });
+    assert.throws(() => bridge.selectGhostFiles(ghostInput), /WASM/, String(bad));
+  }
+});
+
+test('selectGhostFiles throws when the bridge is not ready', () => {
+  const bridge = new WasmBridge({ appendLine: () => {} } as never);
+  assert.throws(() => bridge.selectGhostFiles(ghostInput), /not initialized/);
+});
+
+test('validateGhost passes input/files through and returns a well-formed report unchanged', () => {
+  const files = { 'dic/a.pasta': { kind: 'text', text: '＊会話\n' } as const };
+  let seen: unknown[] = [];
+  const bridge = bridgeWithWasmModule({
+    wasm_validate_ghost: (input: unknown, f: unknown) => {
+      seen = [input, f];
+      return wellFormedReport;
+    },
+  });
+  assert.deepStrictEqual(bridge.validateGhost(ghostInput, files), wellFormedReport);
+  assert.deepStrictEqual(seen, [ghostInput, files]);
+});
+
+test('validateGhost throws on null and on every malformed report shape', () => {
+  const finding = wellFormedReport.findings[0];
+  const stats = wellFormedReport.stats;
+  const bads: unknown[] = [
+    null,
+    undefined,
+    42,
+    { findings: [] },
+    { stats },
+    { findings: 'x', stats },
+    { findings: [], stats: null },
+    { findings: [{ ...finding, severity: 'info' }], stats },
+    { findings: [{ ...finding, code: 7 }], stats },
+    { findings: [{ ...finding, path: undefined }], stats },
+    { findings: [{ ...finding, line: undefined }], stats },
+    { findings: [{ ...finding, column: '1' }], stats },
+    { findings: [{ ...finding, message: null }], stats },
+    { findings: [null], stats },
+    { findings: [], stats: { ...stats, dictionaryFiles: '1' } },
+    { findings: [], stats: { ...stats, errors: undefined } },
+    { findings: [], stats: { ...stats, warnings: null } },
+    { findings: [], stats: { ...stats, uncheckedDynamicCalls: true } },
+    { findings: [], stats: { ...stats, referencesSkipped: 0 } },
+  ];
+  for (const bad of bads) {
+    const bridge = bridgeWithWasmModule({ wasm_validate_ghost: () => bad });
+    assert.throws(() => bridge.validateGhost(ghostInput, {}), /WASM/, JSON.stringify(bad));
+  }
+});
+
+test('real WASM: selectGhostFiles / validateGhost results pass the shape checks', async () => {
+  const bridge = new WasmBridge({ appendLine: () => {} } as never);
+  await bridge.initialize(mock.Uri.joinPath(mock.Uri.file(ROOT), 'wasm', 'pasta_lsp_wasm_bg.wasm') as never);
+  const input = { pastaToml: { kind: 'missing' } as const, entries: ['dic/a.pasta', 'readme.txt'] };
+  assert.deepStrictEqual(bridge.selectGhostFiles(input), ['dic/a.pasta']);
+  const report = bridge.validateGhost(input, { 'dic/a.pasta': { kind: 'notUtf8' } });
+  // 読めないファイルの誤りは位置を持たない（None → null で届く）
+  assert.ok(
+    report.findings.some((f) => f.severity === 'error' && f.path === 'dic/a.pasta' && f.line === null && f.column === null),
+    JSON.stringify(report)
+  );
+  assert.ok(report.stats.errors >= 1);
+  bridge.dispose();
+});
+
+test('validateGhost throws when the bridge is not ready', () => {
+  const bridge = new WasmBridge({ appendLine: () => {} } as never);
+  assert.throws(() => bridge.validateGhost(ghostInput, {}), /not initialized/);
 });
 
 // =============================================================================
@@ -653,10 +754,23 @@ test('word-ref decorator re-applies on active-editor change and document edits',
 const TOGGLE_COMMAND = 'pasta.debug.toggleSourcePresentation';
 const TOGGLE_EVENT = 'pasta/sourcePresentation';
 
+const GHOST_WATCH_GLOB = '**/ghost/master/**/*.{pasta,lua}';
+
+function ghostValidatorCreated(fromCollection: number, fromWatcher: number): { collections: number; watchers: number } {
+  return {
+    collections: mock.createdDiagnosticCollections.slice(fromCollection).filter((c) => c.name === 'pasta-ghost').length,
+    watchers: mock.createdFileSystemWatchers.slice(fromWatcher).filter((w) => w.globPattern === GHOST_WATCH_GLOB).length,
+  };
+}
+
 test('activate loads the real WASM bridge and registers the debug + toggle wiring', async () => {
   mock.workspace.textDocuments = [];
   const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(ROOT) };
+  const collectionsBefore = mock.createdDiagnosticCollections.length;
+  const watchersBefore = mock.createdFileSystemWatchers.length;
   await activate(context as never);
+  // WASM が読めたら GhostValidator を作って登録する（11.12）
+  assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 1, watchers: 1 });
   const state = getActivationState();
   assert.strictEqual(state.wasmReady, true, 'real wasm/pasta_lsp_wasm_bg.wasm must load');
   assert.strictEqual(state.fallbackMode, false);
@@ -763,6 +877,18 @@ test('switching to a non-pasta session hides the status bar and resets the mode'
 
 test('deactivate disposes cleanly', () => {
   assert.doesNotThrow(() => deactivate());
+});
+
+// 最後に走らせる: 失敗した activate はコマンド等を登録し直す
+test('WASM が読めないときは GhostValidator を作らず、activate は失敗しない（11.12）', async () => {
+  const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(path.join(ROOT, 'no-such-dir')) };
+  const collectionsBefore = mock.createdDiagnosticCollections.length;
+  const watchersBefore = mock.createdFileSystemWatchers.length;
+  await activate(context as never);
+  assert.strictEqual(getActivationState().fallbackMode, true);
+  assert.strictEqual(getActivationState().wasmReady, false);
+  assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 0, watchers: 0 });
+  deactivate();
 });
 
 // =============================================================================

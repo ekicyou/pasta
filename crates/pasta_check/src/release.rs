@@ -3,6 +3,7 @@ use crate::balloon::plan_bundled_balloons;
 use crate::copy::{copy_dir_recursive, prepare_release_dir};
 use crate::nar::create_nar;
 use crate::update_files::generate_update_files;
+use crate::validate_cmd::{ValidateOutcome, run_on_master};
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -10,28 +11,38 @@ use std::path::Path;
 /// release サブコマンドを実行
 pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
     // Step 1: リリースフォルダー初期化
-    println!("[1/5] Preparing release folder...");
+    println!("[1/6] Preparing release folder...");
     prepare_release_dir(&args.release)?;
     remove_stale_nar(&args.nar)?;
 
     // Step 2: target → release コピー
-    println!("[2/5] Copying target files...");
+    println!("[2/6] Copying target files...");
     let count = copy_dir_recursive(&args.target, &args.release)?;
     println!("  Copied {count} files from {}", args.target.display());
 
     // Step 3: --copy 上書きコピー
     if !args.copy_dirs.is_empty() {
-        println!("[3/5] Applying overlay copies...");
+        println!("[3/6] Applying overlay copies...");
         for copy_dir in &args.copy_dirs {
             let c = copy_dir_recursive(copy_dir, &args.release)?;
             println!("  Copied {c} files from {}", copy_dir.display());
         }
     } else {
-        println!("[3/5] Applying overlay copies... (none specified)");
+        println!("[3/6] Applying overlay copies... (none specified)");
     }
 
-    // Step 4: 更新ファイル生成（判定は --copy 上書き後の配布フォルダで行う・Req 1.7）
-    println!("[4/5] Generating update files...");
+    // Step 4: 辞書の検査（--copy 上書き後の配布フォルダ・誤りなら更新ファイルと nar の前で止める）
+    println!("[4/6] Validating dictionaries...");
+    let outcome =
+        run_on_master(&args.release.join("ghost").join("master")).map_err(io::Error::other)?;
+    if let ValidateOutcome::HasErrors(n) = outcome {
+        return Err(io::Error::other(format!(
+            "dictionary validation found {n} error(s); update files and NAR were not created"
+        )));
+    }
+
+    // Step 5: 更新ファイル生成（判定は --copy 上書き後の配布フォルダで行う・Req 1.7）
+    println!("[5/6] Generating update files...");
     let plan = plan_bundled_balloons(&args.release)?;
     let summary = generate_update_files(&args.release, &plan.dirs)?;
     println!(
@@ -41,13 +52,13 @@ pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
     for (dir, entries) in &summary.balloon_entries {
         println!("  Generated {dir}/updates.txt ({entries} entries)");
     }
-    // 警告は止めずに段 5 へ進む（Req 7.3・7.4）
+    // 警告は止めずに段 6 へ進む（Req 7.3・7.4）
     for w in &plan.warnings {
         eprintln!("Warning: {w}");
     }
 
-    // Step 5: NAR 作成
-    println!("[5/5] Creating NAR archive...");
+    // Step 6: NAR 作成
+    println!("[6/6] Creating NAR archive...");
     // 途中で失敗したら作りかけの nar を消してから元のエラーを返す（Req 8.8）
     let nar_size = create_nar(&args.release, &args.nar).inspect_err(|_| {
         let _ = fs::remove_file(&args.nar);
@@ -81,12 +92,24 @@ mod tests {
     use std::io::Read;
     use tempfile::TempDir;
 
+    /// 段 4 の検査を通る最小のゴースト（空の pasta.toml と正しい .pasta）
+    const MIN_GHOST: &[(&str, &str)] = &[
+        ("ghost/master/pasta.toml", ""),
+        (
+            "ghost/master/dic/a.pasta",
+            "＊挨拶
+  さくら：こんにちは
+",
+        ),
+    ];
+
     #[test]
     fn test_execute_release_full_pipeline() {
         let temp = TempDir::new().unwrap();
 
         // target フォルダーを準備
         let target = temp.path().join("target_ghost");
+        write_files(&target, MIN_GHOST);
         fs::create_dir_all(target.join("ghost/master")).unwrap();
         fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
         let install_txt = "charset,UTF-8\r\ntype,ghost\r\n";
@@ -124,6 +147,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
+        write_files(&target, MIN_GHOST);
         fs::create_dir_all(&target).unwrap();
         fs::write(target.join("a.txt"), "original").unwrap();
 
@@ -160,6 +184,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
+        write_files(&target, MIN_GHOST);
         fs::create_dir_all(&target).unwrap();
         fs::write(target.join("a.txt"), "fresh").unwrap();
 
@@ -187,6 +212,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
+        write_files(&target, MIN_GHOST);
         fs::create_dir_all(target.join("ghost/master")).unwrap();
         fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
 
@@ -262,6 +288,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
+        write_files(&target, MIN_GHOST);
         write_files(
             &target,
             &[
@@ -303,6 +330,8 @@ mod tests {
                 "bal/sub/arrow0.png",
                 "bal/updates.txt",
                 "ghost/master/descript.txt",
+                "ghost/master/dic/a.pasta",
+                "ghost/master/pasta.toml",
                 "ghost/master/updates.txt",
                 "install.txt",
                 "updates.txt",
@@ -314,7 +343,12 @@ mod tests {
         );
         assert_eq!(
             assert_updates_match_nar(&entries, "updates.txt", ""),
-            ["ghost/master/descript.txt", "install.txt"]
+            [
+                "ghost/master/descript.txt",
+                "ghost/master/dic/a.pasta",
+                "ghost/master/pasta.toml",
+                "install.txt",
+            ]
         );
         assert_eq!(entries["ghost/master/updates.txt"], entries["updates.txt"]);
     }
@@ -326,6 +360,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
+        write_files(&target, MIN_GHOST);
         write_files(
             &target,
             &[
@@ -355,6 +390,8 @@ mod tests {
             [
                 "bal/descript.txt",
                 "ghost/master/descript.txt",
+                "ghost/master/dic/a.pasta",
+                "ghost/master/pasta.toml",
                 "ghost/master/updates.txt",
                 "ghost/master/var/save.dat",
                 "install.txt",
@@ -368,6 +405,8 @@ mod tests {
             [
                 "bal/descript.txt",
                 "ghost/master/descript.txt",
+                "ghost/master/dic/a.pasta",
+                "ghost/master/pasta.toml",
                 "install.txt",
                 "readme.txt",
                 "shell/master/surface0.png",
@@ -375,7 +414,7 @@ mod tests {
         );
     }
 
-    /// 判定エラーでは段 5 に進まず nar を作らず、配布フォルダのルートに updates.txt を書かない
+    /// 判定エラーでは段 6 に進まず nar を作らず、配布フォルダのルートに updates.txt を書かない
     /// （Req 1.10・2.5）。--nar の位置の前回の nar も残らない（Req 8.8）。
     /// 判定は --copy の上書き後の install.txt で行う（Req 1.7）
     #[test]
@@ -405,6 +444,7 @@ mod tests {
             let temp = TempDir::new().unwrap();
 
             let target = temp.path().join("target_ghost");
+            write_files(&target, MIN_GHOST);
             write_files(
                 &target,
                 &[
@@ -432,7 +472,7 @@ mod tests {
 
             let err = execute_release(&args).unwrap_err();
             assert!(err.to_string().contains(expected), "{label}: {err}");
-            // 段 3 までは完了している（失敗は段 4 の判定）
+            // 段 4 までは完了している（失敗は段 5 の判定）
             assert!(release.join("a.txt").exists(), "{label}");
             assert!(!release.join("updates.txt").exists(), "{label}");
             assert!(!nar.exists(), "{label}");
@@ -468,6 +508,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
+        write_files(&target, MIN_GHOST);
         fs::create_dir_all(&target).unwrap();
         fs::write(target.join("a.txt"), "fresh").unwrap();
 
@@ -487,10 +528,10 @@ mod tests {
         assert!(archive.by_name("a.txt").is_ok());
     }
 
-    /// 段 5 の nar 作成が途中で失敗しても --nar の位置に作りかけの nar が残らない（Req 8.8）。
+    /// 段 6 の nar 作成が途中で失敗しても --nar の位置に作りかけの nar が残らない（Req 8.8）。
     /// Unicode として不正な名前（対のないサロゲート）は、nar ファイル作成後の封入時に
     /// InvalidData で止まる。
-    /// var/ は段 4（updates.txt）の対象外で、段 5 だけが読む。
+    /// var/ は段 5（updates.txt）の対象外で、段 6 だけが読む。
     #[cfg(windows)]
     #[test]
     fn test_execute_release_removes_partial_nar_on_stage5_failure() {
@@ -500,6 +541,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
+        write_files(&target, MIN_GHOST);
         let var = target.join("var");
         fs::create_dir_all(&var).unwrap();
         fs::write(target.join("a.txt"), "fresh").unwrap();
@@ -517,7 +559,7 @@ mod tests {
         let err = execute_release(&args).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::InvalidData);
         assert!(err.to_string().contains("not valid Unicode"), "{err}");
-        // 段 4 までは完了している（失敗は段 5）
+        // 段 5 までは完了している（失敗は段 6）
         assert!(release.join("updates.txt").exists());
         assert!(!nar.exists());
     }
@@ -548,6 +590,80 @@ mod tests {
         assert!(nar.is_dir());
     }
 
+    /// 段 4 の検査で誤りがあれば、更新ファイルと nar を作らずに英語の理由で失敗する（Req 8.1・8.2）。
+    /// 検査は --copy の上書き後の配布フォルダで行う（target は正しく、上書きで壊れる）
+    #[test]
+    fn test_execute_release_validation_errors_stop_before_update_files() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("target_ghost");
+        write_files(&target, MIN_GHOST);
+        let overlay = temp.path().join("overlay");
+        write_files(
+            &overlay,
+            &[(
+                "ghost/master/dic/a.pasta",
+                "＊
+  ＠＠＠
+",
+            )],
+        );
+
+        let nar = temp.path().join("out.nar");
+        fs::write(&nar, "old nar").unwrap();
+        let release = temp.path().join("release_out");
+        let args = ReleaseArgs {
+            target,
+            release: release.clone(),
+            nar: nar.clone(),
+            copy_dirs: vec![overlay],
+        };
+
+        let err = execute_release(&args).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "dictionary validation found 1 error(s); update files and NAR were not created"
+        );
+        // 段 3 までは完了している
+        assert!(release.join("ghost/master/dic/a.pasta").exists());
+        assert!(!release.join("updates.txt").exists());
+        assert!(!release.join("ghost/master/updates.txt").exists());
+        assert!(!nar.exists());
+    }
+
+    /// 注意だけなら止めずに nar まで作る（Req 8.3）
+    #[test]
+    fn test_execute_release_validation_warnings_only_continues() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("target_ghost");
+        write_files(
+            &target,
+            &[
+                ("ghost/master/pasta.toml", ""),
+                (
+                    "ghost/master/dic/a.pasta",
+                    "＊挨拶
+  ＞どこにも無い
+",
+                ),
+            ],
+        );
+
+        let nar = temp.path().join("out.nar");
+        let release = temp.path().join("release_out");
+        let args = ReleaseArgs {
+            target,
+            release: release.clone(),
+            nar: nar.clone(),
+            copy_dirs: vec![],
+        };
+
+        execute_release(&args).unwrap();
+        assert!(release.join("updates.txt").exists());
+        assert!(nar.exists());
+    }
+
     /// target が存在しない場合はエラーが伝播する
     #[test]
     fn test_execute_release_missing_target_errors() {
@@ -566,6 +682,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
+        write_files(&target, MIN_GHOST);
         fs::create_dir_all(&target).unwrap();
         fs::write(target.join("a.txt"), "original").unwrap();
 

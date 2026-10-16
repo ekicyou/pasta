@@ -19,6 +19,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 pasta_dsl.workspace = true
+pasta_check = { workspace = true }
 thiserror.workspace = true
 serde.workspace = true
 tower-lsp.workspace = true

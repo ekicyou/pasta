@@ -1,18 +1,22 @@
 # .github/workflows/manual.yml
 # 利用者マニュアル（mdBook）を GitHub Pages へ公開する。
-# build.yml（Rust/WASM CI）とは独立。book/**・本ワークフロー・スキル 2 種
-# （pasta-ghost-authoring / pasta-lua-coding）・クレート README（crates/*/README.md。
-# マニュアル URL の実在検査のため。pasta-runtime-internals-doc 要件 7.8）の変更時のみ起動する。
+# build.yml（Rust/WASM CI）とは独立。次の変更時のみ起動する:
+#   book/**・本ワークフロー・スキル 2 種（pasta-ghost-authoring / pasta-lua-coding）、
+#   クレート README（crates/*/README.md）・ルートの README.md・SOUL.md（公開マニュアル URL の実在検査のため。
+#   pasta-runtime-internals-doc 要件 7.8・manual-link-anchor-check 要件 4）、
+#   hello-pasta の辞書（crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**。チュートリアルの照合のため）。
 # PR では検証（ビルド・検証スクリプト群）までを行い、Pages への公開は main push 時のみ。
 #
 # パイプライン（manual-ssot-authority design「CI と公開」/ 要件 7.1, 7.2, 7.5, 7.6, 8.2, 10.4、
 # manual-claudia-theme 要件 8.7, 8.8）:
 #   node book/tools/gen-skill-refs.mjs --check（スキル生成物の鮮度照合。不一致で中断）
 #     -> mdbook build book -> 着色 -> 台詞部品の変換（talk-html）-> 日本語 bigram 索引を再生成
-#     -> node book/tools/link-check.mjs（マニュアル内リンク・README のマニュアル URL・スキル自己完結の検証。失敗で中断）
-#     -> チュートリアル・静的性・検索（静的性・検索の 2 つは --self-test で検査ロジック自身の自己テストも実行）
-#        ・コンテンツ検証・ツール自己テスト
-#     -> 旧版の生成（固定コミット CLASSIC_REF の book/ を旧版のツールで book/book/classic へ。
+#     -> node book/tools/link-check.mjs（本の中のリンクと見出し（#…）・読者に届く文書（クレートの README・
+#        ルートの README.md・SOUL.md・スキル）の公開マニュアル URL・スキル自己完結の検証。失敗で中断）
+#     -> チュートリアルの照合（入門の章 12 枚 ↔ hello-pasta の辞書）と構文検証（cargo test）
+#     -> 静的性・検索（この 2 つは --self-test で検査ロジック自身の
+#        自己テストも実行）・コンテンツ検証・ツール自己テスト
+#     -> 旧版の生成（固定コミット CLASSIC_REF の book/ を旧版のツールで book/book/classic へ。印刷用のページは作らない。
 #        新版の検査の後に置き、検査の対象に含めない。失敗で中断。manual-claudia-theme 要件 11）
 #     -> Pages artifact（./book/book）をアップロード -> deploy-pages で公開。
 # すべて build ジョブ内で検証するため、失敗時は deploy（needs: build）が走らず公開されない。
@@ -27,6 +31,8 @@ on:
       - '.claude/skills/pasta-ghost-authoring/**'
       - '.claude/skills/pasta-lua-coding/**'
       - 'crates/*/README.md'
+      - 'README.md'
+      - 'SOUL.md'
       - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
   pull_request:
     branches: [main]
@@ -36,6 +42,8 @@ on:
       - '.claude/skills/pasta-ghost-authoring/**'
       - '.claude/skills/pasta-lua-coding/**'
       - 'crates/*/README.md'
+      - 'README.md'
+      - 'SOUL.md'
       - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
   workflow_dispatch:  # 手動実行
 
@@ -104,17 +112,17 @@ jobs:
       - name: Rebuild bigram search index
         run: node book/tools/bigram-index/build-index.mjs book/book
 
-      # マニュアル内リンク切れ・スキルの自己完結（実在ファイルへのリンクのみ）を検証し、
-      # 問題があれば公開前に中断する（要件 8.2, 10.4）。
+      # 本の中のリンクと見出し・読者に届く文書の公開マニュアル URL・スキルの自己完結を検証し、
+      # 問題があれば公開前に中断する（要件 8.2, 10.4・manual-link-anchor-check 要件 4）。
       # スクリプトはリポジトリルートを自己解決するため引数不要。
       - name: Link check
         run: node book/tools/link-check.mjs
 
       # チュートリアル成果物ガード その1（要件 6.2 / design「Content: Getting Started」）。
-      # book/src/getting-started/first-ghost.md の ```pasta 成果物ブロックが、
-      # 起動可能な最小セット一式 hello-pasta（SSOT: crates/pasta_sample_ghost/ghosts/
-      # hello-pasta/ghost/master/dic/*.pasta）と逐語一致するかを検証する。崩れていれば
-      # exit 1 で公開中断。スクリプトはリポジトリルートを自己解決するため引数不要。
+      # 入門の段の章 12 枚（book/src/getting-started/01-boot.md〜12-lua.md）の ```pasta ブロックを、
+      # 同じ名前の辞書（crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/X.pasta ↔ X.md）と
+      # 両方向に逐語照合する（辞書の全体が章にあること・章のブロックが辞書の全体か連続した抜き出しであること）。
+      # 崩れていれば exit 1 で公開中断。スクリプトはリポジトリルートを自己解決するため引数不要。
       - name: Tutorial artifact match check
         run: node book/tools/tutorial-check.mjs
 
@@ -162,6 +170,8 @@ jobs:
       # その版のツール（ビルド -> 着色 -> 索引再生成）でそのまま生成し、新版のツールは使わない（要件 11.2）。
       # 新版の検査はすべてこの段より前に終わるため、旧版は検査の対象に入らない（要件 11.3）。
       # PR でも実行して生成できることを確かめる。どの手順の失敗も exit 1 で公開を止める（要件 11.4）。
+      # 印刷用のページ（print.html）は、生成のときの設定で作らせない（manual-print-page-removal 要件 2）。
+      # 旧版の章の印刷では目次とメニューも刷られる。
       - name: Build classic manual snapshot
         shell: bash
         run: |
@@ -170,12 +180,11 @@ jobs:
           git worktree add --detach "$RUNNER_TEMP/classic" "$CLASSIC_REF"
           (cd "$RUNNER_TEMP/classic/book" && npm ci)
           out="$GITHUB_WORKSPACE/book/book/classic"
-          mdbook build "$RUNNER_TEMP/classic/book" -d "$out"
+          MDBOOK_OUTPUT__HTML__PRINT__ENABLE=false mdbook build "$RUNNER_TEMP/classic/book" -d "$out"
           node "$RUNNER_TEMP/classic/book/tools/highlight/highlight-html.mjs" "$out"
           node "$RUNNER_TEMP/classic/book/tools/bigram-index/build-index.mjs" "$out"
-          for f in index.html print.html; do
-            [ -f "$out/$f" ] || { echo "::error::classic snapshot is missing $f"; exit 1; }
-          done
+          [ -f "$out/index.html" ] || { echo "::error::classic snapshot is missing index.html"; exit 1; }
+          [ ! -e "$out/print.html" ] || { echo "::error::classic snapshot must not have print.html"; exit 1; }
           compgen -G "$out/searchindex*.js" > /dev/null || { echo "::error::classic snapshot is missing searchindex*.js"; exit 1; }
 
       # enablement: true — リポジトリで Pages が未設定でも API 経由で

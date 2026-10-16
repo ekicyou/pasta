@@ -3,6 +3,7 @@
 //! コミットした素材 `ghosts/hello-pasta/shell/master/`（立ち絵 18 枚と `surfaces.txt`）を
 //! 実ファイルのまま読み、枚数・寸法・透過・大きさ・サーフェス定義・当たり判定・画素の一致を検査する。
 //! 入門ガイドに載せる見本（`book/src/img/hello-pasta/` の写し 2 枚）がシェルの絵と同じかも見る。
+//! マニュアルのシェルの章（`book/src/reference/shell.md`）の抜き出しが実物と同じかも見る。
 //! ネットワーク・一時ディレクトリ・DLL は使わず、素材を書き換えない。
 //!
 //! `surfaces.txt` は小さなパーサで読む。行が足りない・順序が違う・座標が整数でないなど
@@ -19,6 +20,7 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 /// 立ち絵のキャンバス（幅・高さ）
+/// 変えたら book/src/reference/shell.md の本文も直す
 const CANVAS: (u32, u32) = (333, 500);
 /// 立ち絵 1 枚の上限（250 KB）
 const MAX_PNG_BYTES: u64 = 250 * 1024;
@@ -27,8 +29,10 @@ const MAX_TOTAL_BYTES: u64 = 4_718_592;
 /// 顔の矩形を外へ広げる余白（ぼかし帯 + 縮小フィルタ）
 const MARGIN: u32 = 8;
 /// 女の子のサーフェス番号
+/// 変えたら book/src/reference/shell.md の本文も直す
 const SAKURA: [u32; 9] = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 /// 男の子のサーフェス番号
+/// 変えたら book/src/reference/shell.md の本文も直す
 const KERO: [u32; 9] = [10, 11, 12, 13, 14, 15, 16, 17, 18];
 /// ポーズの割り当て（基本・びっくり・決めポーズの順。同じポーズを使う表情のサーフェス番号の組）
 const SAKURA_POSES: [&[u32]; 3] = [&[1, 0, 7, 5], &[3, 8], &[6, 2, 4]];
@@ -475,4 +479,82 @@ fn book_sample_images_are_byte_identical_to_shell() {
             shell.len()
         );
     }
+}
+
+/// シェルの章（book/src/reference/shell.md）のコードブロックは、すべて見本のシェルの
+/// descript.txt か surfaces.txt の連続した行の逐語の抜き出しである。
+#[test]
+fn book_shell_chapter_code_blocks_are_shell_excerpts() {
+    let read = |path: PathBuf| {
+        std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("{}: 読めない: {e}", path.display()))
+    };
+    let chapter = read(common::workspace_root().join("book/src/reference/shell.md"));
+    let files = ["descript.txt", "surfaces.txt"].map(|name| (name, read(shell_dir().join(name))));
+    let mut matched = [0usize; 2];
+    let blocks = text_blocks(&chapter);
+    assert!(
+        !blocks.is_empty(),
+        "book/src/reference/shell.md: ```text のブロックが 0 件。見本のシェルから抜き出しを写し直す"
+    );
+    for (start, block) in &blocks {
+        let hit = files
+            .iter()
+            .position(|(_, text)| contains_run(&text.lines().collect::<Vec<_>>(), block));
+        match hit {
+            Some(i) => matched[i] += 1,
+            None => panic!(
+                "book/src/reference/shell.md:{start}: ブロック（1 行目 {:?}）が descript.txt にも surfaces.txt にも逐語で一致しない。見本のシェル（shell/master）から写し直す",
+                block[0]
+            ),
+        }
+    }
+    for (i, (name, _)) in files.iter().enumerate() {
+        assert!(
+            matched[i] > 0,
+            "book/src/reference/shell.md: {name} の抜き出しが 1 つも無い。見本のシェル（shell/master）から写し直す"
+        );
+    }
+}
+
+/// 章の本文から ```text ブロックを (開きの行番号, 中身の行) で取り出す。形が崩れていれば panic。
+fn text_blocks(chapter: &str) -> Vec<(usize, Vec<&str>)> {
+    let mut blocks = Vec::new();
+    let mut open: Option<(usize, Vec<&str>)> = None;
+    for (i, line) in chapter.lines().enumerate() {
+        let no = i + 1;
+        if !line.starts_with("```") {
+            if let Some((_, body)) = open.as_mut() {
+                body.push(line);
+            }
+            continue;
+        }
+        match open.take() {
+            None => {
+                assert!(
+                    line == "```text",
+                    "book/src/reference/shell.md:{no}: 開きが {line:?}。章のコードブロックは見本のシェルの抜き出し（```text）だけにする"
+                );
+                open = Some((no, Vec::new()));
+            }
+            Some((start, body)) => {
+                assert!(
+                    !body.is_empty(),
+                    "book/src/reference/shell.md:{start}: ブロックの中身が空。見本のシェルから写し直す"
+                );
+                blocks.push((start, body));
+            }
+        }
+    }
+    if let Some((start, _)) = open {
+        panic!(
+            "book/src/reference/shell.md:{start}: フェンスが閉じられていない。見本のシェルから写し直す"
+        );
+    }
+    blocks
+}
+
+/// needle が haystack の連続した部分列として現れるか。
+fn contains_run(haystack: &[&str], needle: &[&str]) -> bool {
+    haystack.windows(needle.len()).any(|w| w == needle)
 }

@@ -296,7 +296,7 @@ jobs:
         id: pub_check
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth_check.outputs.token }}
-        run: ./.github/scripts/release/publish-crate.ps1 -Crate pasta_check -Version $env:VERSION
+        run: ./.github/scripts/release/publish-crate.ps1 -Crate pasta_check -Version $env:VERSION -DependsOn pasta_core,pasta_dsl
 
       # status 契約: publish step が書いた値を使う。書いていなければ、auth の失敗 → failed/auth、
       # auth は通ったのに値が無い（スクリプトの異常終了・時間切れ）→ failed/publish、どちらも走っていない → not-run。

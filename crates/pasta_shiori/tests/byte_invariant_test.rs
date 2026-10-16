@@ -127,21 +127,11 @@ SecurityLevel: local\r\n\
 // フィクスチャ構築ヘルパ
 // ===========================================================================
 
-/// async_callback フィクスチャ（本番 pasta_scripts + entry.lua override）で
+/// async_callback フィクスチャ（entry.lua の差し替え。標準ランタイムは自己展開される）で
 /// ロード済み `PastaShiori` を構築する。`TempDir` は返り値で寿命保持する。
 fn load_async_callback() -> (PastaShiori, TempDir) {
     let temp = TempDir::new().expect("create temp dir");
     let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-    // 本番 pasta_scripts/（EVENT/CALLBACK/SHIORI_ACT 等）
-    let pasta_scripts_src = manifest_dir
-        .parent()
-        .expect("parent dir")
-        .join("pasta_lua")
-        .join("pasta_scripts");
-    let pasta_scripts_dst = temp.path().join("pasta_scripts");
-    std::fs::create_dir_all(&pasta_scripts_dst).expect("create pasta_scripts dir");
-    copy_dir_recursive(&pasta_scripts_src, &pasta_scripts_dst).expect("copy pasta_scripts");
 
     // フィクスチャ（entry.lua override + pasta.toml）
     let fixture_src = manifest_dir.join("tests/fixtures/async_callback");

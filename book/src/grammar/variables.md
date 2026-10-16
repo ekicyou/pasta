@@ -389,6 +389,8 @@ in local nil not or repeat return then true until while
 　女の子：＠通常　＄ｒ４　を触ったね？
 ```
 
+触られた部位やキャラクターごとに反応を変えるだけなら、`＄ｒ４` を読まずに、`＊つっつき反応女の子Head` のような名前のシーンで書ける（[つつき・撫でのショートカット](../lua/shiori-events.md#つつき撫でのショートカット)）。
+
 各 `Reference` に何が入るかはイベントごとに異なる。[UKADOC の SHIORI Event 一覧](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html)で確認できる。たとえば `OnMouseDoubleClick` では `Reference4` がダブルクリックされた部位の名前になる。`Reference10` 以降は変数に入らないため、Lua から `act.req.reference[10]` で読む（[scripts/ の記述パターン](../lua/patterns.md)を参照）。
 
 `＄ｒ０`（`Reference0`）と `＄０`（[シーン引数](#シーン引数)）は別物である。イベントで直接起動されたシーンの `＄０` には値が入らない。

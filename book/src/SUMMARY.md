@@ -59,6 +59,7 @@
   - [開発支援アクション（シーン再生・SHIORIリロード）](debug/dev-actions.md)
   - [構造的制約と緩和策](debug/constraints.md)
   - [接続できないとき（トラブルシューティング）](debug/troubleshooting.md)
+  - [辞書を検査する（pasta_check validate）](debug/validate.md)
 
 # リファレンス
 
@@ -66,6 +67,7 @@
 - [pasta.toml リファレンス](reference/pasta-toml.md)
 - [実行時の失敗の出力](reference/runtime-failures.md)
 - [外部リンク集](reference/external-links.md)
+- [シェルを自分の絵にする](reference/shell.md)
 
 # 内部設計（コントリビュータ向け）
 
