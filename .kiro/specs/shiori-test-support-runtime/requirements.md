@@ -21,13 +21,14 @@
   - 写しを避けている 4 つのフィクスチャ（`codegen_runtime_safety`・`actor_proxy_act_delegation`・`call_execution_correctness`・`scene_alias_ontalk`）の回避の設定とコメント。
   - 写しが置かれることを前提にした確かめ（`tests/test_path_helpers_test.rs` の `scriptlibs` の確かめ）と、古いランタイムの結果を期待値にしたテスト（調べた範囲では無い）。
   - 本物のランタイムをゴーストの直下の `pasta_scripts/` へコピーしている、効いていないコピー処理（`tests/` の下の 10 ファイル）と、その説明。
-  - 【仮定・未決 2】`src/shiori_request_tests.rs` にある同じ効いていないコピー（2 か所）。
+  - `src/shiori_request_tests.rs` にある同じ効いていないコピー（2 か所。根が同じなのでここで片付ける。2026-10-16 確定）。
 - **Out of scope**:
   - ランタイムそのもの（`crates/pasta_lua/pasta_scripts/`・ローダー・自己展開）と、`pasta_shiori` の本番のコードの変更。
   - テストの意図の変更。
   - `pasta_lua` 側のテスト基盤（`crates/pasta_lua/scriptlibs/lua_test/`・モック）。
   - テスト用の入口のスクリプト（`scripts/pasta/shiori/entry.lua`）を自分で持つ 3 つのフィクスチャ（`shiori_lifecycle`・`async_callback`・`debug_preservation`）の差し替えそのもの。本番の読み込み順を使った差し替えなので残す。
-  - テストごとに重複して書かれたディレクトリのコピー関数の整理（【仮定・未決 4】）。
+  - テストごとに重複して書かれたディレクトリのコピー関数の整理（不具合ではなく目的にも要らない。2026-10-16 確定）。
+  - 写しがまた置かれないための見張りのテストや検査（写しを消し、共通部品の説明で伝えれば足りる。2026-10-16 確定）。
   - 過去の記録（`TEST_COVERAGE.md` の履歴の節、完了した spec の文書）の書き換え。
 - **Adjacent expectations**:
   - 本物のランタイムは、`pasta.dll` がゴーストの読み込みのときに `profile/pasta/pasta_scripts/` へ自己展開する。この spec はその仕組みに頼り、変えない。
@@ -45,7 +46,7 @@
 1. When 結合テストがフィクスチャから一時ゴーストを作る, the 結合テストの共通部品 shall 標準ランタイムの写しを一時ゴーストの `scripts/` へ置かない。
 2. When 結合テストが一時ゴーストを読み込む, the 一時ゴースト shall 標準ランタイムを、`pasta.dll` が自己展開した `profile/pasta/pasta_scripts/` からだけ読む（フィクスチャが自分で持つ差し替えのファイルを除く）。
 3. The リポジトリ shall `crates/pasta_shiori/tests/support/scripts/` の標準ランタイムの写し（10 ファイル）を持たない。
-4. The リポジトリ shall どのテストも使っていないテスト用ライブラリの写し `crates/pasta_shiori/tests/support/scriptlibs/lua_test/`（3 ファイル）を持たない（【仮定・未決 1】）。
+4. The リポジトリ shall どのテストも使っていないテスト用ライブラリの写し `crates/pasta_shiori/tests/support/scriptlibs/lua_test/`（3 ファイル）を持たない（2026-10-16 確定）。
 5. When 写しを消した後に `pasta_shiori` のテストを通しで走らせる, the `pasta_shiori` のテスト shall 要件 4 で直したものを除き、消す前と同じ確かめのまま全部通る。
 
 ### Requirement 2: 写しを避ける回避の設定とコメントを外す
@@ -58,7 +59,7 @@
 2. The 4 つのフィクスチャの `pasta.toml` shall 写しを避ける理由を書いたコメント（「古い runtime の写し」「理由は同じ」など）を持たない。
 3. When 回避を外した 4 つのフィクスチャを使う結合テストを走らせる, the 結合テスト shall 外す前と同じ確かめのまま通る。
 4. When 開発者が新しいフィクスチャを足す, the 結合テストの共通部品 shall 検索パスを書き換えなくても、その一時ゴーストを本物のランタイムで動かす。
-5. The 4 つのフィクスチャの `pasta.toml` shall 回避と関係のない設定（トークの間隔・アクター・ウェイトなど、テストの確かめに使う設定）を変えずに保つ。
+5. The 4 つのフィクスチャの `pasta.toml` shall 回避と関係のない設定（トークの間隔・アクター・ウェイトなど、テストの確かめに使う設定と、`[loader]` の `transpiled_output_dir`・`pasta_patterns`）を変えずに保つ。
 
 ### Requirement 3: テスト用の差し替えは本番の読み込み順で最小限だけ置く
 
@@ -89,7 +90,7 @@
 
 1. The 一時ゴーストを作るテストの準備 shall 本物のランタイムをゴーストの直下の `pasta_scripts/` へコピーしない（今の読み込み先ではないので効かない。`tests/` の下の 10 ファイル）。
 2. When 効いていないコピーを外した後に、それを使っていたテストを走らせる, the そのテスト shall 外す前と同じ確かめのまま通る。
-3. Where `src/shiori_request_tests.rs` のテスト用の準備が同じ効いていないコピーをしている, the 変更 shall そのコピーも同じく外す（【仮定・未決 2】）。
+3. Where `src/shiori_request_tests.rs` のテスト用の準備が同じ効いていないコピーをしている, the 変更 shall そのコピーも同じく外す（2026-10-16 確定）。
 
 ### Requirement 6: テストの準備の説明を実際の動きに合わせる
 
