@@ -521,3 +521,112 @@ fn chain_talk_after_shortcut_matches_event_scene() {
         "ショートカットとイベント名のシーンで扱いが違う"
     );
 }
+
+// ============================================================================
+// 撫でと抑止（要件 2.1・2.6・3.1・3.3・5.1・5.3・5.4・5.5・8.1・8.5）
+// ============================================================================
+
+/// 撫でのシーンとイベント名のシーンを置いた辞書。
+const STROKE_DIC: &str = "\
+＊さわり反応その他
+　女の子：撫でられました
+
+＊OnMouseMove
+　女の子：移動です
+";
+
+/// 時刻 `t`（秒・小数つき）と Status を付けて、女の子（スポット 0）の `Head` の上の移動を送る。
+fn mouse_move(runtime: &PastaLuaRuntime, t: f64, status: &str) -> String {
+    let unix = t.floor() as i64;
+    let ns = ((t - t.floor()) * 1e9).round() as i64;
+    fire_with(
+        runtime,
+        "OnMouseMove",
+        &format!(
+            r#"reference = {{ [3] = "0", [4] = "Head" }}, status = "{status}", date = {{ unix = {unix}, ns = {ns} }}"#
+        ),
+    )
+}
+
+/// 応答が 200 で、撫でのシーンなら `stroke = true`、イベント名のシーンなら false の出力だけを含むか。
+fn assert_move(response: &str, stroke: bool, ctx: &str) {
+    let (want, other) = if stroke {
+        ("撫でられました", "移動です")
+    } else {
+        ("移動です", "撫でられました")
+    };
+    assert!(
+        response.starts_with("SHIORI/3.0 200")
+            && response.contains(want)
+            && !response.contains(other),
+        "{ctx}: {want} だけが返らない: {response:?}"
+    );
+}
+
+/// 0.5 秒おきの移動で、2 秒に届くまでは `＊OnMouseMove`、届いた移動で撫でのシーンが 1 回だけ返る。
+#[test]
+fn stroke_fires_after_two_seconds_of_moves() {
+    let (_temp, runtime) = load_ghost_full(STROKE_DIC, None, ACTORS_TOML);
+    for (i, t) in [1000.0, 1000.5, 1001.0, 1001.5].into_iter().enumerate() {
+        assert_move(
+            &mouse_move(&runtime, t, "balloon(0=0)"),
+            false,
+            &format!("{i} 回目 t={t}"),
+        );
+    }
+    assert_move(
+        &mouse_move(&runtime, 1002.0, "balloon(0=0)"),
+        true,
+        "2 秒に届いた移動",
+    );
+    // 撫で続けても 2 回目は出ない（1 回だけ）
+    for t in [1002.5, 1003.0, 1004.5] {
+        assert_move(
+            &mouse_move(&runtime, t, "balloon(0=0)"),
+            false,
+            &format!("撫でた後 t={t}"),
+        );
+    }
+}
+
+/// `talking` の間は撫でのシーンが返らず `＊OnMouseMove` が返る。
+/// `balloon(0=0)` だけになると、そこから数え始めて 2 秒で撫でのシーンが返る。
+#[test]
+fn stroke_is_blocked_while_talking() {
+    let (_temp, runtime) = load_ghost_full(STROKE_DIC, None, ACTORS_TOML);
+    for t in [2000.0, 2000.5, 2001.0, 2001.5, 2002.0, 2002.5, 2003.0] {
+        assert_move(
+            &mouse_move(&runtime, t, "talking,balloon(0=0)"),
+            false,
+            &format!("トーク中 t={t}"),
+        );
+    }
+    // 抑止が解けた最初の移動から数え始める（2003.5 → 2005.5 で撫でた）
+    for t in [2003.5, 2004.0, 2004.5, 2005.0] {
+        assert_move(
+            &mouse_move(&runtime, t, "balloon(0=0)"),
+            false,
+            &format!("解けた後 t={t}"),
+        );
+    }
+    assert_move(
+        &mouse_move(&runtime, 2005.5, "balloon(0=0)"),
+        true,
+        "解けてから 2 秒",
+    );
+}
+
+/// 撫でのショートカットが無いゴーストでは、何秒撫でても毎回 `＊OnMouseMove` が返る。
+#[test]
+fn stroke_without_shortcut_always_runs_event_scene() {
+    let (_temp, runtime) =
+        load_ghost_full("＊OnMouseMove\n　女の子：移動です\n", None, ACTORS_TOML);
+    for i in 0..10 {
+        let t = 3000.0 + f64::from(i) * 0.5;
+        assert_move(
+            &mouse_move(&runtime, t, "balloon(0=0)"),
+            false,
+            &format!("t={t}"),
+        );
+    }
+}
