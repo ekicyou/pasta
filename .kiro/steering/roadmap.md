@@ -90,11 +90,11 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 完了 | manual-shell-guide | Opus | 8（実績） | 2026-10-16 に完了（リファレンスに章「シェルを自分の絵にする」を足し、61 章になった。章を足す後の spec は 3 つの数を 62 に合わせる） |
 | 完了 | manual-print-page-removal | Opus | 6（実績） | 2026-10-16 に完了（新版・旧版とも `print.html` と印刷のボタンを作らない。章の印刷はテーマの `@media print` が受け持つ。旧版の段の環境変数が CI の mdBook v0.5.3 で効くかは main の CI で確かめる。公開後に `/pasta/print.html` が 404 になることを一度確かめる） |
 | 1（高優先度） | touch-poke-shortcuts | Opus | 10〜13 | 今すぐ（2026-10-11 開発者の依頼で足し、高優先度に置いた。残りの spec より先に始める） |
-| 2 | failure-output-unification | Opus（2026-10-16 に見直し） | 15〜19 | 今すぐ |
+| 完了 | failure-output-unification | Opus | 18（実績） | 2026-10-17 に完了（報告の出口 `pasta/failure.lua`・`[logging] balloon_warning`・リファレンスの章「実行時の失敗の出力」を足し、63 章になった。章を足す後の spec は 3 つの数を 64 に合わせる。後続 6 本の brief へ申し送った） |
 | 3 | pasta-check-dic-validate | Opus（2026-10-16 に見直し） | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
 | 5 | getting-started-screenshots | Opus | 4〜6 | `touch-poke-shortcuts` の後（最後に撮る。`hello-pasta-shell-art` と `choice-line-layout` は完了した） |
 | 完了 | shiori-test-support-runtime | Opus | 7（実績） | 2026-10-16 に完了（`runtime-error-balloon` の前段） |
-| 7 | runtime-error-balloon | Opus（2026-10-16 に見直し） | 8〜10 | `failure-output-unification` の後（`shiori-test-support-runtime` は 2026-10-16 に完了。2026-10-16 開発者の決定で 0.4.0 に入れた。やると決まった） |
+| 7 | runtime-error-balloon | Opus（2026-10-16 に見直し） | 8〜10 | 今すぐ（`failure-output-unification` は 2026-10-17 に、`shiori-test-support-runtime` は 2026-10-16 に完了。2026-10-16 開発者の決定で 0.4.0 に入れた。やると決まった） |
 | 8 | 0.4.0 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
 並走するときの約束（「棚卸」のウェーブの約束に足す）:
@@ -358,7 +358,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 ## Specs (dependency order)
 
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: none
-- [ ] failure-output-unification -- シーンが生きている間の実行時の失敗（未定義の参照・見つからない Call など）を、ログとさくらスクリプトの両方へ 1 つの仕組みから出す。既にある 2 つの失敗表記を 1 つにし、`act.lua`・`actor.lua`・`word.lua` の警告を載せ替える（2026-10-10 の棚卸で、スクリプトが止まるエラーを `runtime-error-balloon` へ分けた）。Dependencies: none
+- [x] failure-output-unification -- シーンが生きている間の実行時の失敗（未定義の参照・見つからない Call など）を、ログとさくらスクリプトの両方へ 1 つの仕組みから出す。既にある 2 つの失敗表記を 1 つにし、`act.lua`・`actor.lua`・`word.lua` の警告を載せ替える（2026-10-10 の棚卸で、スクリプトが止まるエラーを `runtime-error-balloon` へ分けた）。Dependencies: none
 - [x] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
 - [x] manual-print-media-refs -- マニュアルの印刷用ページ（`print.html`）で動画の参照が切れているのを、ビルド後の書き換えで直し、検査の例外を外す（2026-10-10 棚卸で起票）。Dependencies: none
 - [x] manual-print-page-removal -- 公開サイトの `print.html` を開くとブラウザが固まるので、`book.toml` で印刷用のページを作らせないようにし、`print-media-refs` の道具と CI の段を消し、`verify-static.mjs` を合わせる（2026-10-16 起票）。Dependencies: none

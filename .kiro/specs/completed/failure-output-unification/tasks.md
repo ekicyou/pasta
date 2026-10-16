@@ -126,7 +126,7 @@
 
 - [x] 7. 破壊的変更の記録を用意する
   - PR タイトルを `feat!(failure-output-unification): …` とし、本文に「空で展開していた箇所に失敗表記が出る」「既存 2 種の文言が変わる」「`act:failure` の text もエスケープされる」「`[logging] balloon_warning = false` で消せる」を書く文面を用意する
-  - 完了: 文面が `.kiro/specs/failure-output-unification/release-note.md` にあり、`kiro-complete` がそのまま PR に使える
+  - 完了: 文面が `.kiro/specs/completed/failure-output-unification/release-note.md` にあり、`kiro-complete` がそのまま PR に使える
   - _Requirements: 10.6_
 
 ## Implementation Notes
