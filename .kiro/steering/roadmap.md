@@ -92,8 +92,8 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 | 3 | pasta-check-dic-validate | Opus（2026-10-16 に見直し） | 10〜14 | 今すぐ（`hello-pasta-shell-art` が完了し、`Cargo.lock` の席が空いた） |
 | 4 | manual-shell-guide | Opus | 5〜8 | 今すぐ（`hello-pasta-shell-art` が完了した） |
 | 5 | getting-started-screenshots | Opus | 4〜6 | `touch-poke-shortcuts` の後（最後に撮る。`hello-pasta-shell-art` と `choice-line-layout` は完了した） |
-| 6 | shiori-test-support-runtime | Opus | 6〜8 | 今すぐ（2026-10-16 開発者の決定で、`runtime-error-balloon` の前段として 0.4.0 に入れた） |
-| 7 | runtime-error-balloon | Opus（2026-10-16 に見直し） | 8〜10 | `failure-output-unification` と `shiori-test-support-runtime` の後（2026-10-16 開発者の決定で 0.4.0 に入れた。やると決まった） |
+| 完了 | shiori-test-support-runtime | Opus | 7（実績） | 2026-10-16 に完了（`runtime-error-balloon` の前段） |
+| 7 | runtime-error-balloon | Opus（2026-10-16 に見直し） | 8〜10 | `failure-output-unification` の後（`shiori-test-support-runtime` は 2026-10-16 に完了。2026-10-16 開発者の決定で 0.4.0 に入れた。やると決まった） |
 | 8 | 0.4.0 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
 並走するときの約束（「棚卸」のウェーブの約束に足す）:
@@ -183,7 +183,7 @@ Fable を使うのは、後戻りしにくい土台の決定（新しい文法�
 - **分割理由**: シーン属性を 2 つに分けた（2026-10-04）。保持・継承・読み出し（`scene-attribute-store`）と、Call の属性フィルター（`call-attribute-filter`）。実行時の失敗の出力も 2 つに分けた（2026-10-10）。シーンが生きている間の失敗の出口の一本化（`failure-output-unification`）と、スクリプトが止まるエラーのバルーン表示（`runtime-error-balloon`）。
 - **共有接点**: `crates/pasta_lua/pasta_scripts/pasta/act.lua` は 1 ウェーブに 1 spec だけが持つ。`failure-output-unification`・`call-attribute-filter`・`scene-anchor-link` が触る。`crates/pasta_lua/src/code_gen/element_gen.rs` も 1 ウェーブに 1 spec だけで、`call-attribute-filter` と `scene-anchor-link` が触る。`scene-attribute-store` と `call-attribute-filter` は、`scene.lua` と `pasta_core` のシーン登録（`scene_registry.rs`・`scene_types.rs`）を共有するので、この順に置く。 選択肢の出力（`pasta_scripts/pasta/shiori/sakura_builder.lua`）は `choice-line-layout` と `scene-anchor-link` が触るので、この順に置く。
 - **シーン名の別名との関係**: 別名の解決は検索の入口（`search/context.rs`）でキー正規化の前に行う。`scene-attribute-store`・`call-attribute-filter` は、別名を当てた後の名前で属性を扱う。
-- **結合テスト**: `pasta_shiori` の結合テストは、`shiori-test-support-runtime` が入るまで古いランタイムの写しへの回避を写して増える。`runtime-error-balloon` は同じ `crates/pasta_shiori/tests/` を触るので、その後に置く。
+- **結合テスト**: `pasta_shiori` の結合テストの古いランタイムの写しと回避の設定は、`shiori-test-support-runtime`（2026-10-16 完了）で無くなった。新しい結合テストは、自己展開した本物のランタイムで動き、回避を書かない。`runtime-error-balloon` は同じ `crates/pasta_shiori/tests/` を触るので、その後に置く（満たした）。
 
 ### ウェーブ構成
 
@@ -343,7 +343,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: none
 - [ ] failure-output-unification -- シーンが生きている間の実行時の失敗（未定義の参照・見つからない Call など）を、ログとさくらスクリプトの両方へ 1 つの仕組みから出す。既にある 2 つの失敗表記を 1 つにし、`act.lua`・`actor.lua`・`word.lua` の警告を載せ替える（2026-10-10 の棚卸で、スクリプトが止まるエラーを `runtime-error-balloon` へ分けた）。Dependencies: none
-- [ ] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
+- [x] shiori-test-support-runtime -- `pasta_shiori` の結合テストがコピーして使う古いランタイムの写し（`tests/support/scripts/`）を撤去し、本物のランタイムだけで動かす。回避用の `pasta.toml` の設定とコメントを外す（2026-10-07 棚卸で起票）。Dependencies: none
 - [ ] manual-print-media-refs -- マニュアルの印刷用ページ（`print.html`）で動画の参照が切れているのを、ビルド後の書き換えで直し、検査の例外を外す（2026-10-10 棚卸で起票）。Dependencies: none
 - [ ] pasta-check-dic-validate -- SSP を起動せずに `.pasta` の辞書を検査する `pasta_check` のサブコマンド。飛び先の無い参照・モジュール名とシーン名の衝突などを見る（2026-10-10 棚卸で起票）。Dependencies: none（`hello-pasta-shell-art` は完了し、`Cargo.lock` の席は空いた）
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store, failure-output-unification
