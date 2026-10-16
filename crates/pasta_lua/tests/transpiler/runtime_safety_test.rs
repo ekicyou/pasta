@@ -153,6 +153,8 @@ fn test_runtime_safety_tokens_vars_and_warnings() {
         // U20: act のメンバー名と同名の登録済みアクターが話せる
         "talk|talk|true|トークです",
         "talk|var|true|変数です",
+        // U22: 数にできない値はその位置に失敗表記（failure-output-unification 対応表 #9）
+        "raw_script|-|false|【数にできない値：\"abc\"】",
         // U22: 未代入の変数は算術の文脈で 0 とみなす（expr-nil-coercion 1.1）
         "talk|さくら|true|1",
         // U08: \\ は 2 文字のまま 1 トークン

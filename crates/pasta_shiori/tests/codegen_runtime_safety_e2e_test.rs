@@ -73,7 +73,9 @@ fn test_typo_scene_returns_talk_with_default_results() {
         r"\p[0]【未登録アクター：未登録さん】こんにちは",
         // U20: act のメンバー名と同名のアクター talk が普通に話す
         r"\p[2]トークです",
-        // U22: 数値にできない被演算子は警告を出して 0 とみなす（expr-nil-coercion 4.1）
+        // U22: 数値にできない被演算子は警告を出して 0 とみなす（expr-nil-coercion 4.1）。
+        // 失敗表記は起きた位置（直前の話者のバルーン）に出る（failure-output-unification #9）
+        r#"【数にできない値："abc"】"#,
         r"\p[1]\n[150]結果0、\_w[450]終わり\e",
     );
     assert_eq!(value, expected);

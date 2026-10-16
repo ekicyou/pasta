@@ -264,8 +264,10 @@ describe("失敗の対応表 #8 act:actor_proxy（未登録アクター）", fun
 end)
 
 describe("失敗の対応表 #9・#10 ACT.num・ACT.str", function()
-    test("#9 数にできない値は 0・警告 1 行、nil は黙って 0", function()
+    test("#9 数にできない値は 0・警告 1 行・実行中の act に表記 1 つ、nil は黙って 0", function()
         with_sites(function(ACT, _, warns)
+            local act = new_act(ACT)
+            act:init_scene({})
             expect(ACT.num("+", "abc", "var.x")):toBe(0)
             expect(ACT.num("*", {}, nil)):toBe(0)
             expect(ACT.num("+", nil, "var.x")):toBe(0)
@@ -273,16 +275,39 @@ describe("失敗の対応表 #9・#10 ACT.num・ACT.str", function()
                 "act:arith - operand is not a number: op='+', operand='var.x', value='abc' (string)",
                 "act:arith - operand is not a number: op='*', value=(table)",
             }, "\n"))
+            expect(dump(act)):toBe(table.concat({
+                'raw_script|-|【数にできない値：＄x（"abc"）】',
+                "raw_script|-|【数にできない値：表】",
+            }, "\n"))
         end)
     end)
 
-    test("#10 文字列にできない値は空文字列・警告 1 行、nil は黙って空文字列", function()
+    test("#10 文字列にできない値は空文字列・警告 1 行・実行中の act に表記 1 つ、nil は黙って空文字列", function()
         with_sites(function(ACT, _, warns)
+            local act = new_act(ACT)
+            act:init_scene({})
             expect(ACT.str(true, "@真偽()")):toBe("")
             expect(ACT.str(nil, "var.x")):toBe("")
             expect(#warns):toBe(1)
             expect(warns[1]):toBe(
                 "act:concat - operand is not a string or number: op='&', operand='@真偽()', value=true (boolean)")
+            expect(dump(act)):toBe("raw_script|-|【文字列にできない値：＠真偽（）（true）】")
+        end)
+    end)
+
+    test("#9・#10 実行中の act が無いコルーチンではログだけ（落とさない）", function()
+        with_sites(function(ACT, _, warns)
+            local act = new_act(ACT)
+            act:init_scene({})
+            local co = coroutine.create(function()
+                return ACT.num("+", "abc", "var.x"), ACT.str(true, "var.t")
+            end)
+            local ok, n, s = coroutine.resume(co)
+            expect(ok):toBe(true)
+            expect(n):toBe(0)
+            expect(s):toBe("")
+            expect(#warns):toBe(2)
+            expect(#act.token):toBe(0)
         end)
     end)
 end)

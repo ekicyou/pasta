@@ -66,6 +66,23 @@ fn run_main_scene(lua_code: &str) -> Lua {
 
 /// `run_main_scene` と同じだが、act を `act_module`（`pasta.act`・`pasta.shiori.act`）で作る
 fn run_main_scene_with(lua_code: &str, act_module: &str) -> Lua {
+    let lua = load_scenes(lua_code);
+    lua.load(format!(
+        r#"
+        local SCENE = require "pasta.scene"
+        local STORE = require "pasta.store"
+        local ACT = require "{act_module}"
+        RS_ACT = ACT.new(STORE.actors)
+        SCENE.get_start("メイン_1")(RS_ACT)
+        "#
+    ))
+    .exec()
+    .expect("scene must run without a runtime error");
+    lua
+}
+
+/// ログを記録する `@pasta_log` を差し込んだランタイムで生成コードを読み込み、シーンを確定する（実行はしない）
+fn load_scenes(lua_code: &str) -> Lua {
     let lua = create_runtime_with_finalize().unwrap();
     // pasta.shiori.sakura_builder が使う（既定の会話設定。ウェイトは既定値で入る）
     let sakura = pasta_lua::sakura_script::register(&lua, None).unwrap();
@@ -102,17 +119,6 @@ fn run_main_scene_with(lua_code: &str, act_module: &str) -> Lua {
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
-    lua.load(format!(
-        r#"
-        local SCENE = require "pasta.scene"
-        local STORE = require "pasta.store"
-        local ACT = require "{act_module}"
-        RS_ACT = ACT.new(STORE.actors)
-        SCENE.get_start("メイン_1")(RS_ACT)
-        "#
-    ))
-    .exec()
-    .expect("scene must run without a runtime error");
     lua
 }
 
@@ -350,7 +356,10 @@ fn site_09_num_not_a_number() {
         name: "#9 ACT.num",
         lua: false,
         body: "　＄x＝「abc」\n　＄y＝＄x＋１\n　＄z＝「xy」＊２\n",
-        tokens: &[],
+        tokens: &[
+            "raw_script|-|【数にできない値：＄x（\"abc\"）】",
+            "raw_script|-|【数にできない値：\"xy\"】",
+        ],
         warns: &[
             "act:arith - operand is not a number: op='+', operand='var.x', value='abc' (string)",
             "act:arith - operand is not a number: op='*', value='xy' (string)",
@@ -366,13 +375,109 @@ fn site_10_str_not_a_string() {
         name: "#10 ACT.str",
         lua: true,
         body: "　＄t＝＠真偽（）\n　＄c＝＄t＆「後」\n　＄c2＝「前」＆＠真偽（）\n",
-        tokens: &[],
+        tokens: &[
+            "raw_script|-|【文字列にできない値：＄t（true）】",
+            "raw_script|-|【文字列にできない値：＠真偽（）（true）】",
+        ],
         warns: &[
             "act:concat - operand is not a string or number: op='&', operand='var.t', value=true (boolean)",
             "act:concat - operand is not a string or number: op='&', operand='@真偽()', value=true (boolean)",
         ],
         vars: &["c='後'", "c2='前'"],
     });
+}
+
+/// #9・#10 の位置: act を受け取らない `PASTA.num`・`PASTA.str` の失敗が、実行中の act を引いて
+/// 起きた時点の出力の位置に出る（代入行・Call 行の引数・式の中）
+#[test]
+fn site_09_10_position_in_output() {
+    run_case(&Case {
+        name: "#9/#10 position",
+        lua: true,
+        body: concat!(
+            "　＄x＝「abc」\n",
+            "　＄t＝＠真偽（）\n",
+            "　さくら：前\n",
+            "　＄y＝＄x＋１\n",
+            "　さくら：中\n",
+            "　＞サブ（＄x＊２）\n",
+            "　さくら：後\n",
+            "　＄w＝（＄t＆「a」）＋１\n",
+            "　さくら：終わり\n",
+            "\n＊サブ\n",
+            "　さくら：＄０\n",
+        ),
+        tokens: &[
+            "talk|さくら|前",
+            "raw_script|-|【数にできない値：＄x（\"abc\"）】",
+            "talk|さくら|中",
+            "raw_script|-|【数にできない値：＄x（\"abc\"）】",
+            "talk|さくら|0",
+            "talk|さくら|後",
+            "raw_script|-|【文字列にできない値：＄t（true）】",
+            "raw_script|-|【数にできない値：\"a\"】",
+            "talk|さくら|終わり",
+        ],
+        warns: &[
+            "act:arith - operand is not a number: op='+', operand='var.x', value='abc' (string)",
+            "act:arith - operand is not a number: op='*', operand='var.x', value='abc' (string)",
+            "act:concat - operand is not a string or number: op='&', operand='var.t', value=true (boolean)",
+            "act:arith - operand is not a number: op='+', value='a' (string)",
+        ],
+        vars: &["y=1", "w=1"],
+    });
+}
+
+/// #9 の位置（チェイントークの再開後）: 再開までの間に別の act がメインスレッドで
+/// シーンを始めても、再開したシーンのコルーチンの act に、再開後の出力の位置で出る
+#[test]
+fn site_09_position_after_chain_talk_resume() {
+    let source = format!(
+        "{SAKURA}\n＊メイン\n　＄x＝「abc」\n　さくら：前半\n　＞チェイントーク\n　さくら：後半\n　＄y＝＄x＋１\n　さくら：終わり\n"
+    );
+    let lua = load_scenes(&transpile(&source));
+    // シーンのコルーチンで実行し、チェイントークで止まった後に別のリクエストを挟んで再開する
+    let got = lua
+        .load(
+            r#"
+            local SCENE = require "pasta.scene"
+            local STORE = require "pasta.store"
+            local ACT = require "pasta.act"
+            local function dump(act)
+                local lines = {}
+                for _, t in ipairs(act.token) do
+                    local name = t.actor and t.actor.name or "-"
+                    table.insert(lines, string.format("%s|%s|%s", t.type, name, tostring(t.text)))
+                end
+                return table.concat(lines, "\n")
+            end
+            local act = ACT.new(STORE.actors)
+            local co = coroutine.create(SCENE.get_start("メイン_1"))
+            assert(coroutine.resume(co, act))
+            assert(coroutine.status(co) == "suspended")
+            -- 次のリクエスト: 別の act がメインスレッドでシーンを始める
+            local other = ACT.new(STORE.actors)
+            other:init_scene({})
+            assert(coroutine.resume(co))
+            assert(coroutine.status(co) == "dead")
+            return dump(act) .. "\n--\n" .. dump(other)
+            "#,
+        )
+        .eval::<String>()
+        .unwrap();
+    assert_eq!(
+        got,
+        concat!(
+            "talk|さくら|後半\n",
+            "raw_script|-|【数にできない値：＄x（\"abc\"）】\n",
+            "talk|さくら|終わり\n",
+            "--\n",
+        )
+    );
+    assert_eq!(
+        warns(&lua),
+        ["act:arith - operand is not a number: op='+', operand='var.x', value='abc' (string)"]
+    );
 }
 
 /// #11 `act:call`: Lua から値の無いキーで直接呼ぶ（Lua ブロックから呼んだ act のメソッド）

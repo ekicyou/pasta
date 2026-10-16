@@ -10,7 +10,6 @@ local GLOBAL = require("pasta.global")
 local STORE = require("pasta.store")
 local WORD = require("pasta.word")
 local FAILURE = require("pasta.failure")
-local log = require "@pasta_log"
 
 -- ============================================================================
 -- グループ化ローカル関数（actor-talk-grouping feature）
@@ -202,6 +201,8 @@ function ACT_IMPL.init_scene(self, scene)
         STORE.last_global_scene = scene.__global_name__
     end
     self.current_scene = scene
+    -- 実行中のスレッドにこの act を対応させる（act を受け取らない ACT.num・ACT.str が引く）
+    FAILURE.bind(self)
     return self.save, self.var
 end
 
@@ -563,7 +564,8 @@ end
 
 --- 算術の被演算子を数値にする（算術式の生成コードが PASTA.num として呼ぶ）。
 --- number はそのまま、string は tonumber（変更前の暗黙変換と同じ範囲）、nil は黙って 0、
---- それ以外は警告（act:arith - …、従来の算術の文言）を 1 行出して 0。メタメソッドは呼ばない。act のメソッドではない
+--- それ以外は警告（act:arith - …、従来の算術の文言）を 1 行と、実行中の act（FAILURE.running_act）へ表記を出して 0
+--- （act が見つからなければログだけ）。メタメソッドは呼ばない。act のメソッドではない
 --- @param op string 警告に出す演算子（"+" | "-" | "*" | "/" | "%"）
 --- @param v any 被演算子
 --- @param desc string|nil 警告に出す被演算子の説明（変数パス・関数名）
@@ -575,15 +577,21 @@ function ACT.num(op, v, desc)
     if n ~= nil then return n end
     if v ~= nil then
         local operand = desc and string.format("operand='%s', ", desc) or ""
-        log.warn(string.format("act:arith - operand is not a number: op='%s', %svalue=%s",
-            op, operand, arith_value_text(v)))
+        FAILURE.report(FAILURE.running_act(), {
+            label = FAILURE.LABEL.NOT_NUMBER,
+            subject = desc and FAILURE.fn(desc),
+            detail = FAILURE.value_of(v),
+            warning = string.format("act:arith - operand is not a number: op='%s', %svalue=%s",
+                op, operand, arith_value_text(v)),
+        })
     end
     return 0
 end
 
 --- 連結の被演算子を文字列にする（連結式の生成コードが PASTA.str として呼ぶ）。
 --- string はそのまま、number は tostring（アクション行の表示と同じ表記）、nil は黙って空文字列、
---- それ以外は警告（act:concat - …、従来の連結の文言）を 1 行出して空文字列。メタメソッドは呼ばない。act のメソッドではない
+--- それ以外は警告（act:concat - …、従来の連結の文言）を 1 行と、実行中の act（FAILURE.running_act）へ表記を出して空文字列
+--- （act が見つからなければログだけ）。メタメソッドは呼ばない。act のメソッドではない
 --- @param v any 被演算子
 --- @param desc string|nil 警告に出す被演算子の説明（変数パス・関数名）
 --- @return string
@@ -593,8 +601,13 @@ function ACT.str(v, desc)
     if t == "number" then return tostring(v) end
     if v ~= nil then
         local operand = desc and string.format("operand='%s', ", desc) or ""
-        log.warn(string.format("act:concat - operand is not a string or number: op='&', %svalue=%s",
-            operand, arith_value_text(v)))
+        FAILURE.report(FAILURE.running_act(), {
+            label = FAILURE.LABEL.NOT_STRING,
+            subject = desc and FAILURE.fn(desc),
+            detail = FAILURE.value_of(v),
+            warning = string.format("act:concat - operand is not a string or number: op='&', %svalue=%s",
+                operand, arith_value_text(v)),
+        })
     end
     return ""
 end
