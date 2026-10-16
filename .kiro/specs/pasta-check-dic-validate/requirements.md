@@ -91,6 +91,7 @@
 7. If `pasta_patterns` に一致する辞書ファイルが 1 つも無い, the pasta_check shall 注意として報告する。
 8. If `pasta_patterns` に `..` を含むパターン、または `.pasta` で終わらないパターンがある, the pasta_check shall `pasta.dll` が無視・警告するのと同じく、注意として報告する。
 9. The pasta_check shall 検査の結果に、検査した辞書ファイルの数を示す。
+10. If 設置ディレクトリに `pasta.toml` が無い, the pasta_check shall 2.2 の既定値で辞書ファイルを集めて検査を続けたうえで、`pasta.dll` がゴーストを読み込めないことを示して、誤りとして報告する。
 
 > 確定（OQ-7）: 辞書は `pasta_patterns` に従って集め、既定の場所だけを見る方式にはしない。既定の場所だけを見ると、`pasta_patterns` を変えたゴーストで検査と起動の結果が食い違い、Requirement 9.2 を守れないため。`pasta.toml` の項目のうち、読むのは `[loader]` の `pasta_patterns` と `[scene]` だけで、ほかのセクションの検査はこの spec の範囲に入れない。
 
@@ -192,7 +193,7 @@
 1. The pasta_check shall `cargo install pasta_check` で入れるときに、LuaJIT をビルドする必要を持ち込まない。
 2. The pasta_check shall 照合用の名前・別名の置き換え・モジュール名・辞書の集め方を、同じ版の `pasta.dll` と同じ規則で判定する。
 3. When 同じ版の `pasta.dll` が読み込みに成功するゴーストを検査した, the pasta_check shall 構文エラー・`pasta.toml` の誤り・読み込めない辞書ファイルの名前を、誤りとして報告しない。
-4. When 同じ版の `pasta.dll` が構文エラー・Requirement 3.5 に挙げたトランスパイルの誤り・Requirement 2.5 に挙げた `pasta.toml` の誤り・ファイル名の誤りで読み込みに失敗する辞書を検査した, the pasta_check shall その原因を誤りとして報告する。
+4. When 同じ版の `pasta.dll` が構文エラー・Requirement 3.5 に挙げたトランスパイルの誤り・Requirement 2.5 に挙げた `pasta.toml` の誤り・ファイル名の誤り・`pasta.toml` が無いことで読み込みに失敗する辞書を検査した, the pasta_check shall その原因を誤りとして報告する。
 5. When 見本のゴースト hello-pasta を検査した, the pasta_check shall 誤りを報告しない。
 
 > 確定（OQ-4）: 依存は構文を読む部品と名前の規則を持つ部品の側にとどめ、Lua への変換まで確かめる依存（LuaJIT を含む部品）は持たない。トランスパイルで失敗する書き方は Requirement 3.5 のとおり検査コマンドの側で判定する。規則を `pasta.dll` と揃える方法（一致テストなど）は設計で決める。
@@ -207,8 +208,8 @@
 2. When 検査コマンドが入った, the documentation shall マニュアル `reference/pasta-toml.md` の「pasta_check は別名表を読まない」という記述を、検査コマンドが別名表と `pasta_patterns` を読むことに合わせて直し、スキル references を再生成する。
 3. When 検査コマンドが入った, the documentation shall `crates/pasta_check/README.md` とスキル `pasta-check` に、検査コマンドの使い方と `release` が検査を関門にすることを載せる。
 4. When 検査コマンドが入った, the documentation shall steering（`tech.md`・`structure.md` の `pasta_check`・共有の検査の部品・`pasta_lsp`・VSCode 拡張の役割と依存）を実態に合わせる。
-6. When エディタの診断が入った, the documentation shall VSCode 拡張の README（`editors/vscode/README.md`）と、マニュアルの「デバッグ」の部の検査コマンドの章に、エディタで誤りと注意が表示されることと、表示される時（保存のとき）を載せる。
 5. When マニュアルに章を足した, the documentation shall 目次（`SUMMARY.md`）と、章の数を決め打ちしている検査（今は 60 章）を合わせて直す。
+6. When エディタの診断が入った, the documentation shall VSCode 拡張の README（`editors/vscode/README.md`）と、マニュアルの「デバッグ」の部の検査コマンドの章に、エディタで誤りと注意が表示されることと、表示される時（保存のとき）を載せる。
 
 > 確定（OQ-8）: マニュアルには「デバッグ」の部に検査コマンドの章を 1 つ足す（書き間違いに困った作者が開く部のため）。`release` の詳しい説明は README とスキルに残し、章からはリンクだけにする。
 

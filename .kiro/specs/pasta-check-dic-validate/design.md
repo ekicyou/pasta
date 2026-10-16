@@ -178,7 +178,7 @@ book/src/debug/validate.md        # 新規: マニュアルの章「辞書を検
 - `crates/pasta_check/README.md` — `validate` の使い方、`release` の実行フロー（6 段）と検査の関門、ソース構成・依存クレート。
 - `crates/pasta_lsp/Cargo.toml` — 依存 `pasta_check = { workspace = true }`（workspace 側で `default-features = false`）。
 - `crates/pasta_lsp/src/transport.rs` — WASM の入口 2 つと JS 向けの型（camelCase）。
-- `crates/pasta_lua/src/loader/mod.rs` — 一致テストのために `#[doc(hidden)] pub use discovery::discover_files;` を 1 行足す（`loader/config/` には触らない）。**OPEN QUESTION 8**。
+- `crates/pasta_lua/src/loader/mod.rs` — 一致テストのために `#[doc(hidden)] pub use discovery::discover_files;` を 1 行足す（`loader/config/` には触らない。ウェーブの約束の範囲内）。
 - `editors/vscode/src/wasmBridge.ts` — `selectGhostFiles`・`validateGhost` と型・形の検査。
 - `editors/vscode/src/extension.ts` — WASM が読めたときだけ `GhostValidator` を登録する。
 - `editors/vscode/src/test/mock/vscode.ts` — `workspace.fs`・`onDidSaveTextDocument`・`createFileSystemWatcher`・`FileType`・`Uri.joinPath` のモックを足す。
@@ -295,6 +295,7 @@ sequenceDiagram
 | 2.7 | 辞書が 1 つも無ければ注意 | Discovery | `FindingKind::NoDictionaryFiles` | 核の順番 |
 | 2.8 | `..`・.pasta で終わらないパターンは注意 | Discovery | `FindingKind::PatternIgnored`・`PatternNotPasta` | 核の順番 |
 | 2.9 | 検査したファイルの数 | Report | `Stats::dictionary_files` | まとめの行 |
+| 2.10 | pasta.toml が無いのは誤り | Config | `FindingKind::ConfigMissing` | 核の順番 |
 | 3.1 | 構文エラーがあっても残りを続ける | Syntax | — | 核の順番 |
 | 3.2 | パス・行・列・理由 | Syntax・Report | `FindingKind::Syntax` | — |
 | 3.3 | pasta.dll と同じ最初のエラー | Syntax | `pasta_dsl::parse_str` | — |
@@ -454,7 +455,7 @@ pub fn validate_ghost(input: &GhostInput, files: &std::collections::BTreeMap<Str
   2. `[loader]` の型の誤り。`pasta_patterns: Vec<String>`・`lua_search_paths: Vec<String>`・`transpiled_output_dir: String`・`debug_mode: bool` の 4 つを、`pasta.dll` と同じ型で読む（知らないキーは無視）。行は `[loader]` を文字列から型つきで読み直したときのエラーの位置から取る（取れなければ行なし）。
   3. `[scene]` が表でない、`[scene.alias]` が表でない、値が文字列の配列でない、または `SceneAliasTable::from_entries` が拒む（空の名前・別名の重複・連鎖）。行は `toml::Spanned` の位置から、`pasta.dll` と同じく該当する別名の行を全部示す。
 - `[loader]`・`[scene]` 以外のセクションは見ない（`pasta.dll` もそれらの型の誤りで読み込みを失敗させない。OQ-7）。
-- `pasta.toml` が無いとき: `pasta_patterns` は既定値 `dic/**/*.pasta`、別名表は既定（2.2・2.4）。あわせて `pasta.dll` は `pasta.toml` が無いと読み込みに失敗する（`config/mod.rs` 58 行・マニュアル `pasta-toml.md` 17 行）ため、`ConfigMissing` を誤りとして報告する。**仮定。OPEN QUESTION 2**。
+- `pasta.toml` が無いとき: `pasta_patterns` は既定値 `dic/**/*.pasta`、別名表は既定（2.2・2.4）。あわせて `pasta.dll` は `pasta.toml` が無いと読み込みに失敗する（`config/mod.rs` 58 行・マニュアル `pasta-toml.md` 17 行）ため、`ConfigMissing` を誤りとして報告する（2.10・9.4）。
 - 誤りがあっても既定値で続け、残りの検査を行う。
 
 **Contracts**: Service [x]
@@ -511,7 +512,7 @@ pub(crate) fn module_name_of(rel_path: &str) -> String;
 
 **Responsibilities & Constraints**
 - `FileText::Text` は `pasta_dsl::parse_str(text, rel_path)` で読む。`SyntaxError { line, column, message }` を `Syntax`（誤り・行・列つき）にする。理由の文言は `message` から、`parse_str` が前に付ける `Parse error in {file} at {l}:{c}: ` を外した残りを `構文エラー: ` の後ろに付ける（位置は行の頭に出すので二重にしない）。
-- 1 つのファイルで報告する構文エラーは最初の 1 つだけ（`pasta.dll` と同じ位置。3.3）。2 つ目以降を `parse_str_partial` で推測して出すことはしない。**仮定。OPEN QUESTION 3**。
+- 1 つのファイルで報告する構文エラーは最初の 1 つだけ（`pasta.dll` と同じ位置。3.3）。2 つ目以降を `parse_str_partial` で推測して出すことはしない（行頭の文字からの推測が入り、書いたとおりに読む原則に反するため）。
 - `FileText::NotUtf8` → `FileNotUtf8`（誤り）、`Unreadable` → `FileUnreadable`（誤り。理由に OS の文言）。
 - どのファイルで失敗しても残りのファイルを続ける（3.1）。読めた `PastaFile` を Scenes・TranspileRules に渡す。
 
@@ -833,7 +834,7 @@ export class GhostValidator implements vscode.Disposable {
 
 ### Integration Tests
 
-1. **一致テスト**（`validate_parity_test.rs`、dev-dependency `pasta_lua`）: (a) `CacheManager::source_to_module_name` とモジュール名、(b) `discover_files` と選び出し（一時のフォルダ）、(c) `PastaLoader::load` の成否と `pasta.toml`（`[loader]`・`[scene]` の誤りの見本）・`init.pasta` の誤り、(d) `LuaTranspiler::transpile` の成否とトランスパイルの 3 つ、(e) 読み込んだランタイムで `GLOBAL` と act・SHIORI act の関数の名前を列挙し Builtins と照らす、(f) 見本の辞書の静的な Call について、実行時の `SCENE.search` の有無と References の判定が同じ。`PastaLoader::load` を呼ぶテストは `PASTA_DEBUG` を中和するガードを置く。
+1. **一致テスト**（`validate_parity_test.rs`、dev-dependency `pasta_lua`）: (a) `CacheManager::source_to_module_name` とモジュール名、(b) `discover_files` と選び出し（一時のフォルダ。Windows の CI（`build.yml` の `windows-latest` の `cargo test --all`）で走るので、`pasta.dll` が動く環境のファイルシステムで照らせる）、(c) `PastaLoader::load` の成否と `pasta.toml`（`[loader]`・`[scene]` の誤りの見本）・`init.pasta` の誤り、(d) `LuaTranspiler::transpile` の成否とトランスパイルの 3 つ、(e) 読み込んだランタイムで `GLOBAL` と act・SHIORI act の関数の名前を列挙し Builtins と照らす、(f) 見本の辞書の静的な Call について、実行時の `SCENE.search` の有無と References の判定が同じ。`PastaLoader::load` を呼ぶテストは `PASTA_DEBUG` を中和するガードを置く。
 2. **CLI**（`validate_cli_test.rs`）: 誤りあり→1・誤りなし（注意あり）→0、フォルダが無い・`ghost/master` を直接渡す・知らないオプション→1、出力が 2 回とも同じ、パスが `ghost/master/` から始まる、実行の前後でゴーストのフォルダの一覧と更新時刻が変わらない（1.6）、hello-pasta（`crates/pasta_sample_ghost/ghosts/hello-pasta`）で誤り 0（9.5）。
 3. **release の関門**（`cli_test.rs`）: 誤りのある辞書 → 終了コード 1・`updates.txt` と nar が無い・出力に問題の行、注意だけ → nar ができる、表示が `[1/6]`〜`[6/6]`。
 4. **WASM**: `build.yml` の `wasm` の job で `cargo check -p pasta_check --lib --no-default-features --target wasm32-unknown-unknown` と、既存の `cargo build -p pasta_lsp --target wasm32-unknown-unknown`。`pasta_lsp` のネイティブのテストで、入口の JS の形（serde の形）を照らす。
@@ -866,13 +867,13 @@ export class GhostValidator implements vscode.Disposable {
 設計ディスカッションで決める事項。本文はそれぞれ「仮定」として下の推奨案で書いてある。
 
 1. **共有の部品の置き場所**: 推奨（本文）＝`pasta_check` にライブラリを足す（feature `cli` でバイナリの依存を分ける）。代案＝新しいクレート `pasta_validate`（名前と層は素直だが、crates.io の Trusted Publisher の登録・初回の手での公開・`release.yml` の結果の表 2 か所と outputs・`release-setup-check.yml`・`.github/release-ci-setup.md` の対応表が増え、roadmap の「release.yml は `pasta_check` の公開の段だけ」を越える）、または `pasta_dsl` の feature（`pasta_dsl` が `pasta_core`・`toml` に依存し、構文の層の責務がぼやける）。
-2. **`pasta.toml` が無いとき**: Requirement 2.2 は既定値で集めるとだけ書くが、`pasta.dll` は `pasta.toml` が無いと読み込みに失敗する（`loader/config/mod.rs` 58 行・マニュアル `pasta-toml.md` 17 行）。推奨（本文）＝既定値で集めたうえで `config-missing` を誤りにする（検査を通ったのに起動しない穴を残さない）。要件の 2.2・9.4 の書き足しが要る。代案＝要件どおり何も報告しない。
-3. **1 つのファイルの 2 つ目以降の構文エラー**: 推奨（本文）＝最初の 1 つだけ（`parse_str`。`pasta.dll` と同じ位置で、推測を含まない）。代案＝`parse_str_partial` の結果も出す（列が無く、行頭からの推測が入る）。
+2. **（確定）`pasta.toml` が無いとき**: 要件 2.10・9.4 を足して確定。以下は経緯。 Requirement 2.2 は既定値で集めるとだけ書くが、`pasta.dll` は `pasta.toml` が無いと読み込みに失敗する（`loader/config/mod.rs` 58 行・マニュアル `pasta-toml.md` 17 行）。推奨（本文）＝既定値で集めたうえで `config-missing` を誤りにする（検査を通ったのに起動しない穴を残さない）。要件の 2.2・9.4 の書き足しが要る。代案＝要件どおり何も報告しない。
+3. **（確定）1 つのファイルの 2 つ目以降の構文エラー**: 最初の 1 つだけで確定。以下は経緯。 推奨（本文）＝最初の 1 つだけ（`parse_str`。`pasta.dll` と同じ位置で、推測を含まない）。代案＝`parse_str_partial` の結果も出す（列が無く、行頭からの推測が入る）。
 4. **`release` の段の表示**: 推奨（本文）＝`[1/6]`〜`[6/6]` に番号を振り直し、検査を `[4/6] Validating dictionaries...` にする（`cli_test.rs`・README・スキルを直す）。代案＝番号を変えず、段 3 と段 4 の間に番号なしの行を出す。関門で止めたときの `Error:` の文言は既存の `release` に揃えて英語にする。
 5. **4 つ目のトランスパイルの誤り**: `StringLiteralizer`（`string_literalizer.rs` 63〜70 行）は、`\` か `"` を含み、`]]` から `]==========]` までの 11 通りを全部含む文字列で失敗する。推奨（本文）＝現実には書かれないので範囲に入れない（Requirement 3.5 の 3 つだけ）。代案＝同じ条件の検査を足す。
 6. **パターンの大文字・小文字**: 推奨（本文）＝核の中で大文字・小文字を区別して照合し、CLI とエディタを同じ結果にする。Windows の `glob::glob` はワイルドカードの無い成分（`dic`）をファイルシステムで引くため、`Dic/` のフォルダでは `pasta.dll` だけが一致する。代案＝CLI だけファイルシステムの `glob` を使う（CLI と `pasta.dll` は揃うが、エディタと食い違い 11.2 を守れない）。
 7. **VSIX のテストの CI**: 今どのワークフローも `npm test` を走らせていない。推奨（本文）＝`ghostValidator.test.ts` を `test:unit` に足し、CI の job は足さない（WASM のビルドは `build.yml` の `cargo check` で確かめる）。代案＝`npm run test:unit` の job を足す（`vscodeModules.test.ts` の 1 本は組み立てた WASM を要るので、その準備も要る）。
-8. **一致テストのための `pasta_lua` の 1 行**: 推奨（本文）＝`loader/mod.rs` に `#[doc(hidden)] pub use discovery::discover_files;` を足す（`loader/config/` ではない）。代案＝`pasta_lua` を触らず、`PastaLoader::load` の結果（読み込まれたシーン）から間接に照らす（テストが重くなる）。
+8. **（確定）一致テストのための `pasta_lua` の 1 行**: `#[doc(hidden)] pub use` の 1 行で確定。以下は経緯。 推奨（本文）＝`loader/mod.rs` に `#[doc(hidden)] pub use discovery::discover_files;` を足す（`loader/config/` ではない）。代案＝`pasta_lua` を触らず、`PastaLoader::load` の結果（読み込まれたシーン）から間接に照らす（テストが重くなる）。
 9. **リスク**: 一致テストの (e)(f) はランタイムを起動するので遅い。`pasta_lua` の規則の変更は一致テストが落ちるまで気付けないので、`pasta_lua` を変える spec は `cargo test -p pasta_check` を通す（Revalidation Triggers）。
 
 ## Supporting References
