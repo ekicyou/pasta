@@ -41,6 +41,19 @@ Run one full roadmap inventory ("棚卸") on the current harness worktree branch
 - Repository root = current worktree. Steering: `.kiro/steering/` (`product.md`, `tech.md`, `structure.md`, `workflow.md`, `roadmap.md`). Specs: `.kiro/specs/` (completed under `completed/`). Default branch from `git symbolic-ref refs/remotes/origin/HEAD` (fallback `main`).
 - Scratch directory = the session scratchpad (never `/tmp`, never `C:\`).
 - Load memory relevant to inventories: parallel-spec report format (Fable need flagged at the top), merge-without-waiting-CI, line-ending notes.
+- Clear this repository's desk records once (last item of Step 0, before the sync in Step 1 and before any inventory work). At inventory time nobody works in this repository, so leftover records of dead sessions are removed here. Run this one Bash call in the foreground, exactly once:
+
+```bash
+R=$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")
+if [ -z "$AREKA_IMPL_WATCH_HOME" ]; then echo "desk: skip no-home"
+elif [ ! -f "$AREKA_IMPL_WATCH_HOME/areka-impl-watch.exe" ]; then echo "desk: skip no-exe"
+elif ! [[ "$R" =~ ^[A-Za-z0-9._-]{1,100}$ ]]; then echo "desk: skip bad-name $R"
+else "$AREKA_IMPL_WATCH_HOME/areka-impl-watch.exe" clear --repo "$R" 2>&1; echo "exit=$?"; fi
+```
+
+  - Reading the result: `exit=0` → relay the output's one line as is (`cleared repo=<name>; left: <ids>` or `left: none`). `desk: skip …`, `exit=1` (including a refused environment variable or home folder), or `exit=2` (an exe that does not have `clear --repo` yet) → tell the developer one line and continue the inventory. In no case does this step stop the inventory.
+  - Never call the full `clear` (no arguments) and never touch another repository's records. Do not start `watch` (do not become a desk participant) and do not read `status`.
+  - If the owner of a cleared record was in fact still running, that session's own desk rules re-establish its watch and apply again; this step adds no rule of its own.
 
 ## Step 1 — Sync with remote main
 1. Call `mcp__ccd_host__sync_with_base_branch` (base = default branch).
