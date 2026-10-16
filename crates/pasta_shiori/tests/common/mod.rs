@@ -33,19 +33,21 @@ fn neutralize_debug_env() {
     }
 }
 
-/// Copy fixture directory to a temporary location for isolated testing.
+/// フィクスチャを一時ディレクトリへコピーして、一時ゴーストを作る。
 ///
-/// This function copies both the fixture files and the support files
-/// (scripts and scriptlibs) needed for SHIORI operation.
+/// コピーするのはフィクスチャ自身のファイルだけで、標準ランタイムはコピーしない。
+/// 標準ランタイムは、`pasta.dll` が読み込みのときに `profile/pasta/pasta_scripts/` へ
+/// 自己展開した本物が使われる。
 ///
-/// **Important**: Support files are copied first, then fixture files.
-/// This ensures fixture-specific overrides (e.g., main.lua) take precedence.
+/// フィクスチャには、差し替えるファイルだけを置く（例: `scripts/pasta/shiori/entry.lua`）。
+/// `scripts/` は自己展開した標準ランタイムより先に読まれる（本番のゴーストと同じ読み込み順）。
+/// 検索パス（`pasta.toml` の `lua_search_paths`）を書き換える必要はない。
 ///
 /// # Arguments
-/// * `fixture_name` - Name of fixture under tests/fixtures/
+/// * `fixture_name` - `tests/fixtures/` の下のフィクスチャ名
 ///
 /// # Returns
-/// TempDir containing copied fixture with all necessary support files
+/// フィクスチャをコピーした `TempDir`
 pub fn copy_fixture_to_temp(fixture_name: &str) -> TempDir {
     let temp = TempDir::new().expect("Failed to create temp directory");
     copy_fixture_into(fixture_name, temp.path());
@@ -59,12 +61,6 @@ pub fn copy_fixture_into(fixture: &str, dest: &Path) {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     std::fs::create_dir_all(dest).expect("Failed to create destination directory");
 
-    // Copy support files first (scripts, scriptlibs)
-    // These provide the base runtime environment
-    copy_support_dirs(&manifest_dir.join("tests/support"), dest);
-
-    // Copy fixture files last (overrides support files if needed)
-    // This allows fixture-specific main.lua or other customizations
     let fixture_src = manifest_dir.join("tests/fixtures").join(fixture);
     if fixture_src.exists() {
         copy_dir_recursive(&fixture_src, dest).expect("Failed to copy fixture");
@@ -150,23 +146,4 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
-}
-
-/// Copy support directories (scripts, scriptlibs) to destination.
-fn copy_support_dirs(support_root: &Path, dst: &Path) {
-    // Copy scripts directory
-    let scripts_src = support_root.join("scripts");
-    let scripts_dst = dst.join("scripts");
-    if scripts_src.exists() {
-        std::fs::create_dir_all(&scripts_dst).ok();
-        copy_dir_recursive(&scripts_src, &scripts_dst).ok();
-    }
-
-    // Copy scriptlibs directory
-    let scriptlibs_src = support_root.join("scriptlibs");
-    let scriptlibs_dst = dst.join("scriptlibs");
-    if scriptlibs_src.exists() {
-        std::fs::create_dir_all(&scriptlibs_dst).ok();
-        copy_dir_recursive(&scriptlibs_src, &scriptlibs_dst).ok();
-    }
 }
