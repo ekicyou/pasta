@@ -161,6 +161,7 @@ collisionex2,Body,rect,110,218,221,403
 
 - `collisionex` で始まる 1 行が、当たり判定を 1 つ決める。行に書くのは、名前・形・座標である（`collisionexN,名前,形,座標`）
 - 見本の行の形は、どれも矩形の `rect` で、座標は左・上・右・下の順に並ぶ
+- 男の子のサーフェス（10〜18）も同じ形で、座標が違う
 - 使える形の種類と座標の書き方の正本は、UKADOC の [`collisionex*`](https://ssp.shillest.net/ukadoc/manual/descript_shell_surfaces.html#collisionex*%2CID%2C%E3%82%BF%E3%82%A4%E3%83%97%2C%E5%BA%A7%E6%A8%991%2C%E5%BA%A7%E6%A8%992...) の項である
 
 ### 名前は ＄ｒ４ に入る
