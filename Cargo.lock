@@ -980,6 +980,7 @@ dependencies = [
 name = "pasta_lsp"
 version = "0.3.8"
 dependencies = [
+ "pasta_check",
  "pasta_dsl",
  "serde",
  "serde-wasm-bindgen",

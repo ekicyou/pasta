@@ -121,7 +121,7 @@
   - _Requirements: 7.5, 8.1, 8.2, 8.3, 8.4, 8.5_
 
 - [ ] 6. WASM の入口と CI
-- [ ] 6.1 (P) pasta_lsp に核を呼ぶ WASM の入口 2 つを足す
+- [x] 6.1 (P) pasta_lsp に核を呼ぶ WASM の入口 2 つを足す
   - `pasta_lsp` に `pasta_check`（既定の feature 無し）を依存に足す
   - 辞書ファイルの選び出しと検査の入口を、既存の解析の入口と同じく panic を捕まえて `null` を返す形で足す。核の結果をそのまま返し、文言を作り直さない
   - 完了の状態: `pasta_lsp` のネイティブのテストで入出力の JS の形（camelCase・タグ `kind`）が照らされ、`cargo build -p pasta_lsp --target wasm32-unknown-unknown` が通る
@@ -206,3 +206,4 @@
 - 3.2: (f) は design の「SCENE.search の有無」でなく、実際の Call と同じ `find_act_handler`（current_scene をそのグローバルシーンの表にした SHIORI 用の act）で照らす（組み込みも含めて照らせるので強い）。
 - 4.1: 殻は `validate_cmd::run(target: &Path)` と `run_on_master(master) -> Result<ValidateOutcome, String>`（サブフォルダが読めないときは Err。5.1 では io のエラーに写す）。main.rs の `mod validate_cmd;` の `#[allow(dead_code)]` は 4.2 で外す。`--target` が無いときは 4.2 の解析で扱う。
 - 5.1: `ghost/master` の無い配布フォルダは段 4 で失敗する（理由は validate と同じ日本語）。前回の nar は既存の段 1 で消えるので、関門で止まると nar は残らない。
+- 6.1: WASM の入口の戻り値は `Serializer::json_compatible()`（None を null にするため。既存の wasm_analyze は既定のまま）。
