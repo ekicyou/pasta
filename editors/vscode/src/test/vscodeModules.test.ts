@@ -754,10 +754,23 @@ test('word-ref decorator re-applies on active-editor change and document edits',
 const TOGGLE_COMMAND = 'pasta.debug.toggleSourcePresentation';
 const TOGGLE_EVENT = 'pasta/sourcePresentation';
 
+const GHOST_WATCH_GLOB = '**/ghost/master/**/*.{pasta,lua}';
+
+function ghostValidatorCreated(fromCollection: number, fromWatcher: number): { collections: number; watchers: number } {
+  return {
+    collections: mock.createdDiagnosticCollections.slice(fromCollection).filter((c) => c.name === 'pasta-ghost').length,
+    watchers: mock.createdFileSystemWatchers.slice(fromWatcher).filter((w) => w.globPattern === GHOST_WATCH_GLOB).length,
+  };
+}
+
 test('activate loads the real WASM bridge and registers the debug + toggle wiring', async () => {
   mock.workspace.textDocuments = [];
   const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(ROOT) };
+  const collectionsBefore = mock.createdDiagnosticCollections.length;
+  const watchersBefore = mock.createdFileSystemWatchers.length;
   await activate(context as never);
+  // WASM が読めたら GhostValidator を作って登録する（11.12）
+  assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 1, watchers: 1 });
   const state = getActivationState();
   assert.strictEqual(state.wasmReady, true, 'real wasm/pasta_lsp_wasm_bg.wasm must load');
   assert.strictEqual(state.fallbackMode, false);
@@ -864,6 +877,18 @@ test('switching to a non-pasta session hides the status bar and resets the mode'
 
 test('deactivate disposes cleanly', () => {
   assert.doesNotThrow(() => deactivate());
+});
+
+// 最後に走らせる: 失敗した activate はコマンド等を登録し直す
+test('WASM が読めないときは GhostValidator を作らず、activate は失敗しない（11.12）', async () => {
+  const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(path.join(ROOT, 'no-such-dir')) };
+  const collectionsBefore = mock.createdDiagnosticCollections.length;
+  const watchersBefore = mock.createdFileSystemWatchers.length;
+  await activate(context as never);
+  assert.strictEqual(getActivationState().fallbackMode, true);
+  assert.strictEqual(getActivationState().wasmReady, false);
+  assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 0, watchers: 0 });
+  deactivate();
 });
 
 // =============================================================================

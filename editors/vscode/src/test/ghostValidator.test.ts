@@ -393,6 +393,141 @@ test('WASM の呼び出しが throw したらそのゴーストの診断を消�
   gv.dispose();
 });
 
+// --- 起動の条件と束ね（requestValidation） -----------------------------------------
+
+/** テストの束ねの間隔（本番は 300ms） */
+const DELAY = 20;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** register 済みの GhostValidator。validate の呼び出しを数える（中身は偽の bridge で走る） */
+function newRegistered(): { gv: GhostValidator; masters: string[]; watcher: mock.MockFileSystemWatcher } {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  mock.setFakeFile('/ws/ghost/master/dic/a.pasta', '');
+  const gv = new GhostValidator(new FakeBridge(), vscode.window.createOutputChannel('Pasta Language'), DELAY);
+  const masters: string[] = [];
+  const original = gv.validate.bind(gv);
+  gv.validate = (master: vscode.Uri) => {
+    masters.push(master.path);
+    return original(master);
+  };
+  const before = mock.createdFileSystemWatchers.length;
+  gv.register();
+  assert.strictEqual(mock.createdFileSystemWatchers.length, before + 1, '見張りを 1 つ張る');
+  const watcher = mock.createdFileSystemWatchers[before];
+  return { gv, masters, watcher };
+}
+
+function save(path: string): void {
+  mock.didSaveTextDocumentEmitter.fire({ uri: vscode.Uri.file(path) });
+}
+
+test('見張りのパターンは ghost/master の配下の .pasta・.lua', () => {
+  const { gv, watcher } = newRegistered();
+  assert.strictEqual(watcher.globPattern, '**/ghost/master/**/*.{pasta,lua}');
+  gv.dispose();
+  assert.strictEqual(watcher.disposed, true);
+});
+
+test('起動直後は検査しない。配下の .pasta の保存を続けて 3 回しても 1 回だけ走る', async () => {
+  const { gv, masters } = newRegistered();
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, []);
+
+  save('/ws/ghost/master/dic/a.pasta');
+  save('/ws/ghost/master/dic/a.pasta');
+  save('/ws/ghost/master/dic/b.pasta');
+  assert.deepStrictEqual(masters, [], '束ねの間は走らない');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/master']);
+  gv.dispose();
+});
+
+test('ghost/master の外の保存・.pasta でない保存・直下でない pasta.toml の保存では走らない', async () => {
+  const { gv, masters } = newRegistered();
+  save('/ws/dic/a.pasta');
+  save('/ws/master/a.pasta');
+  save('/ws/ghost/master/dic/a.lua');
+  save('/ws/ghost/master/readme.txt');
+  save('/ws/ghost/master/dic/pasta.toml');
+  save('/ws/pasta.toml');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, []);
+  gv.dispose();
+});
+
+test('ghost/master/pasta.toml の保存で走る', async () => {
+  const { gv, masters } = newRegistered();
+  save('/ws/ghost/master/pasta.toml');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/master']);
+  gv.dispose();
+});
+
+test('配下の .pasta・.lua の作成・削除で走り、ゴーストごとに束ねる', async () => {
+  const { gv, masters, watcher } = newRegistered();
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/ghost/master/dic/new.lua'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/master']);
+
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/ghost/master/dic/old.pasta'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/master', '/ws/ghost/master']);
+
+  // 別のゴーストは別に束ねる
+  masters.length = 0;
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/a/ghost/master/x.pasta'));
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/b/ghost/master/y.lua'));
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/a/ghost/master/z.pasta'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual([...masters].sort(), ['/ws/a/ghost/master', '/ws/b/ghost/master']);
+  gv.dispose();
+});
+
+test('走行中に来たら、終わった後に 1 回だけ走らせる', async () => {
+  const { gv, masters } = newRegistered();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  let running = 0;
+  gv.validate = async (master: vscode.Uri) => {
+    masters.push(master.path);
+    running++;
+    if (masters.length === 1) {
+      await gate;
+    }
+    running--;
+  };
+
+  save('/ws/ghost/master/dic/a.pasta');
+  await sleep(DELAY * 3);
+  assert.strictEqual(masters.length, 1);
+  assert.strictEqual(running, 1, '1 回目が走行中');
+
+  save('/ws/ghost/master/dic/a.pasta');
+  save('/ws/ghost/master/pasta.toml');
+  save('/ws/ghost/master/dic/b.pasta');
+  await sleep(DELAY * 3);
+  assert.strictEqual(masters.length, 1, '走行中は重ねて走らせない');
+
+  release();
+  await sleep(DELAY * 3);
+  assert.strictEqual(masters.length, 2, '終わった後に 1 回だけ');
+  assert.strictEqual(running, 0);
+  gv.dispose();
+});
+
+test('dispose の後は束ねていた検査も保存も走らない', async () => {
+  const { gv, masters } = newRegistered();
+  save('/ws/ghost/master/dic/a.pasta');
+  gv.dispose();
+  save('/ws/ghost/master/dic/a.pasta');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, []);
+});
+
 (async () => {
   console.log('\n[ghostValidator Unit Tests (vscode mock alias)]');
   for (const { name, fn } of queue) {

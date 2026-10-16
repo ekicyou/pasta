@@ -38,22 +38,90 @@ interface GhostState {
   shown: Map<string, vscode.Uri>;
 }
 
+/** ゴーストごとの束ねの状態 */
+interface Schedule {
+  timer?: ReturnType<typeof setTimeout>;
+  running: boolean;
+  /** 走行中に起動の条件が来た */
+  again: boolean;
+}
+
 export class GhostValidator implements vscode.Disposable {
   private readonly collection = vscode.languages.createDiagnosticCollection('pasta-ghost');
   private readonly ghosts = new Map<string, GhostState>();
+  private readonly schedules = new Map<string, Schedule>();
   private readonly subscriptions: vscode.Disposable[] = [];
+  private disposed = false;
 
   constructor(
     private readonly bridge: Pick<WasmBridge, 'selectGhostFiles' | 'validateGhost'>,
-    private readonly output: vscode.OutputChannel
+    private readonly output: vscode.OutputChannel,
+    private readonly delayMs = 300
   ) {}
 
-  /** 開く・閉じるで syntax の出し分けをやり直す（検査はしない。11.9） */
+  /**
+   * 保存（.pasta・master の直下の pasta.toml）と配下の .pasta・.lua の作成・削除で検査を起動する
+   * （11.3・11.6。名前の変更は削除と作成として届く）。ghost/master の外なら何もしない（11.10）。
+   * 開く・閉じるは syntax の出し分けをやり直すだけ（11.9）。起動直後の全体検査はしない
+   */
   register(): void {
+    const watcher = vscode.workspace.createFileSystemWatcher('**/ghost/master/**/*.{pasta,lua}');
+    const onFileChange = (uri: vscode.Uri) => {
+      const master = findGhostMaster(uri);
+      if (master) {
+        this.requestValidation(master);
+      }
+    };
     this.subscriptions.push(
+      watcher,
+      watcher.onDidCreate(onFileChange),
+      watcher.onDidDelete(onFileChange),
+      vscode.workspace.onDidSaveTextDocument((doc) => {
+        const master = findGhostMaster(doc.uri);
+        if (!master) {
+          return;
+        }
+        if (doc.uri.path.endsWith('.pasta') || doc.uri.path === `${master.path}/pasta.toml`) {
+          this.requestValidation(master);
+        }
+      }),
       vscode.workspace.onDidOpenTextDocument((doc) => this.renderAll({ uri: doc.uri.toString(), open: true })),
       vscode.workspace.onDidCloseTextDocument((doc) => this.renderAll({ uri: doc.uri.toString(), open: false }))
     );
+  }
+
+  /** ゴーストごとに delayMs で束ねて検査する。走行中に来たら終わった後に 1 回だけ走らせる */
+  requestValidation(master: vscode.Uri): void {
+    if (this.disposed) {
+      return;
+    }
+    const key = master.toString();
+    let s = this.schedules.get(key);
+    if (!s) {
+      s = { running: false, again: false };
+      this.schedules.set(key, s);
+    }
+    if (s.running) {
+      s.again = true;
+      return;
+    }
+    clearTimeout(s.timer);
+    const schedule = s;
+    s.timer = setTimeout(() => void this.run(master, schedule), this.delayMs);
+  }
+
+  private async run(master: vscode.Uri, s: Schedule): Promise<void> {
+    s.timer = undefined;
+    s.running = true;
+    try {
+      await this.validate(master);
+    } finally {
+      s.running = false;
+    }
+    if (s.again && !this.disposed) {
+      s.again = false;
+      await this.run(master, s);
+    }
   }
 
   /** master のゴーストを集めて検査し、そのゴーストの診断を置き換える */
@@ -71,11 +139,17 @@ export class GhostValidator implements vscode.Disposable {
           : { kind: 'unreadable', reason: '一覧にありません' };
       }
       const report = this.bridge.validateGhost(input, files);
+      if (this.disposed) {
+        return;
+      }
       const state = this.ghosts.get(key) ?? { master, report, shown: new Map<string, vscode.Uri>() };
       state.report = report;
       this.ghosts.set(key, state);
       this.render(state);
     } catch (error) {
+      if (this.disposed) {
+        return;
+      }
       const state = this.ghosts.get(key);
       if (state) {
         for (const uri of state.shown.values()) {
@@ -88,6 +162,11 @@ export class GhostValidator implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.disposed = true;
+    for (const s of this.schedules.values()) {
+      clearTimeout(s.timer);
+    }
+    this.schedules.clear();
     for (const s of this.subscriptions) {
       s.dispose();
     }

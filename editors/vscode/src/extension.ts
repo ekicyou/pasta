@@ -8,6 +8,7 @@ import { WasmBridge } from './wasmBridge';
 import { DocumentSync } from './documentSync';
 import { SemanticTokensProvider, PASTA_TOKENS_LEGEND } from './semanticTokensProvider';
 import { DiagnosticsManager } from './diagnosticsManager';
+import { GhostValidator } from './ghostValidator';
 import { activateWordRefDecorator } from './wordRefDecorator';
 import { PastaDebugAdapterFactory, PastaDebugConfigurationProvider } from './debugAdapterFactory';
 import {
@@ -99,6 +100,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     activationState.wasmReady = true;
     outputChannel.appendLine('WASM bridge initialized successfully.');
   } catch (error) {
+    activationState.wasmReady = false;
     activationState.fallbackMode = true;
     outputChannel.appendLine(`WASM initialization failed: ${error}`);
     vscode.window.showErrorMessage(
@@ -121,6 +123,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     documentSync = new DocumentSync(wasmBridge, semanticTokensProvider, diagnosticsManager, outputChannel);
     context.subscriptions.push(documentSync);
     documentSync.activate(context);
+
+    // ゴースト全体の検査（保存・ファイルの増減で起動。WASM が読めないときは作らない。11.12）
+    const ghostValidator = new GhostValidator(wasmBridge, outputChannel);
+    ghostValidator.register();
+    context.subscriptions.push(ghostValidator);
   }
 
   outputChannel.appendLine(
