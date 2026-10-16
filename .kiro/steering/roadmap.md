@@ -152,6 +152,19 @@ Fable を使うのは、後戻りしにくい土台の決定（新しい文法�
 | manual-print-media-refs | 0 | バグ（マニュアル・CI） | 2〜3 | Opus |
 | manual-print-page-removal | 0 | バグ（マニュアル・CI。2026-10-16 に足した） | 4〜6 | Opus |
 
+開始コマンド（`/kiro-next` の報告と同じ形。俯瞰の頁が、この塊をコピーのボタンつきで出す）:
+
+```
+Wave 6本
+Opus
+/kiro-start touch-poke-shortcuts
+/kiro-start failure-output-unification
+/kiro-start shiori-test-support-runtime
+/kiro-start pasta-check-dic-validate
+/kiro-start manual-shell-guide
+/kiro-start manual-print-media-refs
+```
+
 同じウェーブに置くときの約束（上の「0.4.0 までの道筋」の約束に足す）:
 
 - 設定の読み込み（`crates/pasta_lua/src/loader/config/` の `sections.rs`・`mod.rs`）は、`failure-output-unification` と `touch-poke-shortcuts` が、設定を足すと決めた場合に触る。どれも自分の設定を足すだけにして、既にある設定（`choice_newlines` など）を書き換えない。後から入る側が rebase で合わせる。
