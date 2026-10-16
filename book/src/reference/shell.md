@@ -146,6 +146,9 @@
 
 ## 当たり判定を足す・直す
 
+当たり判定は、`surfaces.txt` のサーフェスの定義の中に書く。
+次は、見本のシェルの `surfaces.txt` から、女の子の `surface0` の定義を抜き出したものである。
+
 ```text
 surface0
 {
@@ -156,7 +159,39 @@ collisionex2,Body,rect,110,218,221,403
 }
 ```
 
+- `collisionex` で始まる 1 行が、当たり判定を 1 つ決める。行に書くのは、名前・形・座標である（`collisionexN,名前,形,座標`）
+- 見本の行の形は、どれも矩形の `rect` で、座標は左・上・右・下の順に並ぶ
+- 使える形の種類と座標の書き方の正本は、UKADOC の [`collisionex*`](https://ssp.shillest.net/ukadoc/manual/descript_shell_surfaces.html#collisionex*%2CID%2C%E3%82%BF%E3%82%A4%E3%83%97%2C%E5%BA%A7%E6%A8%991%2C%E5%BA%A7%E6%A8%992...) の項である
+
+### 名前は ＄ｒ４ に入る
+
+- 行に書いた名前が、立ち絵を触ったときに `＄ｒ４` に入る。見本の名前と返る場所は、[当たり判定の名前と ＄ｒ４](#当たり判定の名前と-ｒ４) にある
+- `＄ｒ４` の取り出し方は、[8 段目：触ったら反応してほしい](../getting-started/08-touch.md#触られた部位の名前を台詞に入れる) と [リクエスト変数](../grammar/variables.md#リクエスト変数reference) にある
+
+### 重なった所では先に書いた定義が返る
+
+- 当たり判定が重なった所を触ると、先に書いた定義の名前が返る
+- 見本では `Face` の行を `Head` の行より先に書いてあり、顔の真ん中では `Face` が、髪と帽子では `Head` が返る
+- 見本の `surfaces.txt` には、判定の順を決める `collision-sort` の行が無い。順の決まりの正本は、UKADOC の [`collision-sort`](https://ssp.shillest.net/ukadoc/manual/descript_shell_surfaces.html#collision-sort%2C%E3%82%BD%E3%83%BC%E3%83%88%E9%A0%86%E5%BA%8F) の項である
+
+### 当たり判定はサーフェスごとに替わる
+
+- 当たり判定は、サーフェスの定義ごとに要る。表情が替わると、当たり判定もそのサーフェスの定義に書いたものに替わる
+- 表情を足すときの当たり判定は、[新しいサーフェスの当たり判定](#新しいサーフェスの当たり判定) にある
+
+### 足した当たり判定を確かめる
+
+1. [8 段目の確かめ方](../getting-started/08-touch.md#起動して確かめる) と同じく、8 段目の辞書のまま SSP を起動する
+2. 足した・直した場所をダブルクリックし、台詞に入る部位名を見る
+
+- 成功の目印: 触った場所の当たり判定の名前が、台詞に入る
+- 当たり判定の枠は、SSP の開発用パレットの「当たり判定を表示」で目で見られる。開発用パレットの開き方は、UKADOC の [シェルの作成](https://ssp.shillest.net/ukadoc/manual/dev_shell.html) にある
+
 ## 吹き出し（バルーン）
+
+見本のゴーストには、バルーンが入っていない。
+台詞は、SSP で選ばれているバルーンに出る。
+吹き出しの位置は、シェルの `descript.txt` の次の 4 行で決まる。
 
 ```text
 sakura.balloon.offsetx,100
@@ -165,7 +200,25 @@ kero.balloon.offsetx,50
 kero.balloon.offsety,120
 ```
 
+- `sakura.balloon` の 2 行がメイン側の、`kero.balloon` の 2 行がサブ側の吹き出しの位置を決める
+- `offsetx` の値は、＋にするほど吹き出しがシェルに近づく。`offsety` の値は、＋にするほど吹き出しが下へ動く
+- 書き方の正本は、UKADOC の [`sakura.balloon.offsetx`](https://ssp.shillest.net/ukadoc/manual/descript_shell.html#_1_sakura.balloon.offsetx%2C%E5%BA%A7%E6%A8%99) の項である
+- 見本の値は、SSP の既定のバルーンの大きさを前提に決めてある。背の高いバルーンを選ぶと、吹き出しが相方の絵にかかることがある
+- どのアクターの台詞がどちらの吹き出しに出るかは、`pasta.toml` の `spot` で決まる。対応は [吹き出しとアクターの spot](#吹き出しとアクターの-spot) にある
+
+### バルーンをゴーストと一緒に配りたいとき
+
+この章では、バルーンを同梱する手順は扱わない。
+同梱のしかたの正本は、次の 2 つである。
+
+- UKADOC の [インストール](https://ssp.shillest.net/ukadoc/manual/manual_install.html)
+- `pasta_check` の README の [同梱バルーン](https://github.com/ekicyou/pasta/blob/main/crates/pasta_check/README.md#同梱バルーン)
+
 ## この章で扱わないこと
+
+- シェルには、着せ替えやアニメーションなどの機能もある。読み先は、UKADOC の [アニメーション/着せ替えの設定](https://ssp.shillest.net/ukadoc/manual/dev_bind.html) である
+- そうした機能を使っても、辞書との接点（サーフェス番号・当たり判定の名前・`spot`）は変わらない。接点は [辞書とシェルの接点](#辞書とシェルの接点) にある
+- pasta は、シェルの書き間違いを検査する道具を持たない。シェルを直したら、SSP で表示して確かめる
 
 ---
 
