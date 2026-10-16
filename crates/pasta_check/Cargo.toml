@@ -49,3 +49,5 @@ getrandom = { version = "0.4", features = ["wasm_js"] }
 tempfile.workspace = true
 # 一致テスト用。版を書かないので cargo publish では外れる
 pasta_lua = { path = "../pasta_lua" }
+# 一致テストで PASTA_DEBUG を main の前に外す（pasta_lua のテストと同じガード）
+ctor = "0.2"
