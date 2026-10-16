@@ -140,3 +140,10 @@
 ## 申し送り（touch-poke-shortcuts より、2026-10-16）
 - `event/init.lua` の既定ハンドラの `require` に `pasta.shiori.event.mouse` が 1 行増えた（行番号が 1 つずれる）。`EVENT.fire`・`EVENT.drive` の本体は変えていない。
 - `OnMouseDoubleClick`・`OnMouseMove` は既定ハンドラ（`mouse.lua`）を通るようになった。見つかったシーンのコルーチンは今までどおり `EVENT.fire` → `EVENT.drive` で再開するので、シーンの途中のエラーの出口は同じ。
+
+## 申し送り（failure-output-unification より、2026-10-17）
+
+- 使う側の関数ができた（`pasta/failure.lua`）。act の無い場所からは `FAILURE.notation(record)` が警告を出して表記の文字列を返す（積まない。出さない設定なら nil）。形とエスケープは `FAILURE.format(label, subject, detail)`・`FAILURE.escape`（`\` と `%` を無効にし、改行を空白にする。行番号は入れない）。新しい種類は `FAILURE.LABEL` に足す。
+- 切り替えは `[logging] balloon_warning`（真偽値・既定 true・型違いは true）。`FAILURE.enabled()` が報告のたびに読む。論点「同じ設定に従うか、別にするか」は、これを前提に決める。
+- `failure.lua` はログと設定だけに依存し、ログ・設定は呼んだ時点で `require` する（読み込み時に握らない）。`shiori/` から使っても循環しない。
+- 参照: `.kiro/specs/completed/failure-output-unification/design.md` の「FailureReporter・NotationFormat・NameConversion・NotationSwitch」、マニュアル `book/src/reference/runtime-failures.md`。
