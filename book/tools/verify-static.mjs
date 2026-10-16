@@ -372,6 +372,25 @@ function analyzeTheme(root, pages) {
 }
 
 // =========================================================================
+// 全章の印刷用のページ（print.html）が戻っていないかの検査（manual-print-page-removal 要件 4.3・4.4）。
+//   printPage は出力の根の print.html の有無だけで決まる（classic/ の下は見ない。要件 4.6）。
+//   pagesLinkingPrint は pages（SUMMARY の全章）のうち、ローカル参照のパスの最後が print.html の
+//   ものを持つページ。外部 URL は見ない。存在しないページは読み飛ばす（章の欠落は「全章の生成」が報告する）。
+//   出力は書き換えない。
+// =========================================================================
+function analyzePrint(root, pages) {
+  const printPage = fs.existsSync(path.join(root, 'print.html'));
+  const pagesLinkingPrint = [];
+  for (const page of pages) {
+    const abs = path.join(root, page);
+    if (!fs.existsSync(abs)) continue;
+    const refs = extractRefs(fs.readFileSync(abs, 'utf8')).filter(isLocalRef).map(refPath);
+    if (refs.some((r) => path.posix.basename(r) === 'print.html')) pagesLinkingPrint.push(page);
+  }
+  return { printPage, pagesLinkingPrint };
+}
+
+// =========================================================================
 // 自己テスト: 検証ロジックが「本物」であることを保証する。
 //   実出力を一時ディレクトリへコピーし、故意にリンクを壊して analyze() が
 //   それを検出すること、無傷ならクリーンであることを確認する。
@@ -412,6 +431,9 @@ function runSelfTest() {
     ];
     check('self-test: classic/ の下の壊れた参照・外部参照・未変換の台詞は報告しない',
       classicHits.length === 0, classicHits.slice(0, 5).join(' / '));
+    // 旧版の print.html は新版の印刷用のページとして報告しない（manual-print-page-removal 要件 4.6）。
+    check('self-test: classic/print.html を全章の印刷用のページとして報告しない',
+      analyzePrint(tmp, summaryChapters()).printPage === false);
     fs.rmSync(classicDir, { recursive: true, force: true });
 
     // (b) リンクを壊すと検出されるべき
@@ -520,6 +542,23 @@ function runSelfTest() {
     r = withTarget(original.replace('<main>', '<main><blockquote>\n<p>ふつうの引用【注】</p>\n</blockquote>'));
     check('self-test: 【で始まらない引用は未変換の台詞としない', r.untransformedTalk.length === 0,
       JSON.stringify(r.untransformedTalk));
+    fs.writeFileSync(targetFile, fs.readFileSync(path.join(outDir, target), 'utf8')); // (d) の書き換えを戻す
+
+    // (e) 全章の印刷用のページと印刷のボタンが戻ったら検出するべき（manual-print-page-removal 要件 4.3・4.4・4.5）。
+    let p = analyzePrint(tmp, pages);
+    check('self-test: 無傷コピーに全章の印刷用のページも、そこへのリンクも無い',
+      p.printPage === false && p.pagesLinkingPrint.length === 0, JSON.stringify(p));
+    const printFile = path.join(tmp, 'print.html');
+    fs.writeFileSync(printFile, '');
+    p = analyzePrint(tmp, pages);
+    check('self-test: 出力の根の print.html を検出する', p.printPage === true, JSON.stringify(p));
+    fs.rmSync(printFile);
+    const targetOriginal = fs.readFileSync(targetFile, 'utf8');
+    fs.writeFileSync(targetFile, targetOriginal.replace('<main>', '<main><a href="../print.html">print</a>'));
+    p = analyzePrint(tmp, pages);
+    check('self-test: print.html へのリンクを持つ章を検出する',
+      p.pagesLinkingPrint.includes(target), JSON.stringify(p));
+    fs.writeFileSync(targetFile, targetOriginal);
 
     // (f) 章のページの poster の壊れた参照も検出するべき（manual-print-page-removal 要件 4.2）。
     const chapterFile = path.join(tmp, 'grammar', 'index.html');
@@ -691,6 +730,14 @@ function run() {
     t.externalRefs.length === 0, JSON.stringify(t.externalRefs.slice(0, 6)));
   check(`8.4: テーマメニューの id（${MENU_IDS.join(', ')}）が全章にある`,
     t.missingMenuIds.length === 0, JSON.stringify(t.missingMenuIds.slice(0, 6)));
+
+  // --- (8) 全章の印刷用のページ（manual-print-page-removal 要件 4.3・4.4） ---
+  log('');
+  log('--- (4.3/4.4) 全章の印刷用のページ ---');
+  const pr = analyzePrint(outDir, pages);
+  check('4.3: 出力に全章の印刷用のページ（print.html）が無い', !pr.printPage, 'print.html があります');
+  check('4.4: 章のページに全章の印刷用のページへのリンク（印刷のボタン）が無い',
+    pr.pagesLinkingPrint.length === 0, JSON.stringify(pr.pagesLinkingPrint.slice(0, 6)));
 
   if (SELF_TEST) runSelfTest();
 
