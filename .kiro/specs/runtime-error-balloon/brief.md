@@ -129,3 +129,10 @@
 - 理由: 今は、スクリプトが止まるエラーがログと応答の 1 行にしか出ず、読者には何も見えない。見える失敗の出力を変えるので、`failure-output-unification` と同じ版の境目に収める。
 - 順番: `failure-output-unification` と `shiori-test-support-runtime` の後（これまでどおり）。
 - 要件定義のモデル: Opus にした（2026-10-15 の基準）。応答コード・配るゴーストでの扱い・SSP が 500 の台詞をバルーンに出すかは、どれも文法・保存の形・公開の Lua の約束ではない。SSP の振る舞いは、要件の最初に実機で確かめる。
+
+## 申し送り（shiori-test-support-runtime より・2026-10-16）
+
+- `shiori-test-support-runtime` は完了した。「先に要るもの」のうち結合テストの片付けは済んだ（`failure-output-unification` の状態は roadmap を見る）。
+- `crates/pasta_shiori/tests/support/`（古いランタイムの写し）は無くなった。結合テストの一時ゴーストは、`pasta.dll` が `profile/pasta/pasta_scripts/` へ自己展開した本物の標準ランタイムだけを読む。
+- 新しい結合テストのフィクスチャは、差し替えるファイル（例: `scripts/pasta/shiori/entry.lua`）と `pasta.toml` だけを持てばよい。`pasta.toml` に `lua_search_paths` の回避を書かない。`scripts/` は標準ランタイムより先に読まれる（本番と同じ）。
+- 共通部品は `crates/pasta_shiori/tests/common/mod.rs` の `copy_fixture_to_temp`。ゴーストの直下の `pasta_scripts/` へ本物をコピーする手順も全部消えたので、写さないこと。参照: `.kiro/specs/completed/shiori-test-support-runtime/design.md` の「ファイルの計画」。
