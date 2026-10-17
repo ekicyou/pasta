@@ -12,7 +12,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 このほか、リリース手順（spec `release-workflow`）の CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ（2026-10-10）。リリース手順は `release` スキル（`/release`）へ移し、spec `release-workflow` は完了にした（2026-10-11）。
 
-**優先順位（開発者の方針 2026-10-10）**: 次の節目は 0.4.0 で、主題は「入門者にやさしく」である（下の「0.4.0 までの道筋」）。その次の 0.5.0 の目標は、areka でノベルゲームが作れるようになること。そこに入れた spec を先に進め、ほかは 0.4.0 の後に回す（トークンの予算のため）。致命的な不具合は、見つかりしだい割り込ませる。2026-10-11 に、撫で・つつきの反応のショートカット（`touch-poke-shortcuts`）を高優先度に置き、2026-10-16 に完了した。
+**優先順位（開発者の方針 2026-10-10）**: 次の節目は 0.4.0 で、主題は「入門者にやさしく」である（下の「0.4.0 までの道筋」）。その次の 0.5.0 の目標は、areka でノベルゲームが作れるようになること。そこに入れた spec を先に進め、ほかは 0.4.0 の後に回す（トークンの予算のため）。致命的な不具合は、見つかりしだい割り込ませる。致命的でない不具合は 0.4.1 に回す（2026-10-17。下の「0.4.1 の範囲」）。2026-10-11 に、撫で・つつきの反応のショートカット（`touch-poke-shortcuts`）を高優先度に置き、2026-10-16 に完了した。
 
 ## 運用ルール
 
@@ -78,10 +78,8 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 ### 人手の確認が残っている項目
 
-- `sakura-script-newline` の Task 5.1（実機 SSP での目視確認）— SSP を操作するツール（SSP MCP）で実機の確認ができるようになった（2026-10-09 に `hello-pasta-tutorial-stages` が使った）。`getting-started-screenshots` の実機の確認のついでに済ませるかを、同 spec の要件で決める。
 - `hello-pasta-shell-art` が変えたリリース CI の配布物の検査（`.github/workflows/release.yml`。`.nar` にシェルの絵 18 枚・`surfaces.txt`・`descript.txt` があることを求める）は、実 CI ではまだ走っていない（2026-10-11）。次のリリース（0.4.0）で、この検査が通ることを確かめる。手元では `release.ps1` の完走と `.nar` の中身（40 エントリ・3.57 MB）を確かめてある。
 - `pasta-check-bundled-balloon` を v0.3.7 で公開したことの、emo2 開発セッションへの連絡 — 実施の有無はリポジトリから確認できない。
-- `getting-started-story-guide` の公開後の確認 4 点（2026-10-10。実装では、SSP を `--ghost` で一時起動して全 13 段をたどった。次の操作は試していない）— (1) 準備の章: ゴーストのフォルダを SSP の `ghost/` の下へ置いて切り替え、立ち絵が無い状態でタスクバーの SSP のアイコンからメニューを開いて終了できるか（最初に確かめる。違っていると読者が 1 段目へ進めない） (2) 目次: 実際のブラウザーで幅を狭めて開き、項目をクリックしても開いたままか (3) 7 段目: メニューから emo2 そのもの（`えも？？`）と切り替えて挨拶が出るか (4) 13 段目: フォルダのドロップで `.nar` ができるか（読者の `profile/` が入るかも見る）。`getting-started-screenshots` の実機の作業のついでに済ませるかを、同 spec の要件で決める。
 
 ## 0.4.0 までの道筋（2026-10-10 開発者の決定）
 
@@ -107,10 +105,25 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 並走するときの約束（「棚卸」のウェーブの約束に足す）:
 
 - `runtime-error-balloon` は、スクリプトが止まるエラーをバルーンに出す。見える失敗の出力を変えるので、`failure-output-unification` と同じ版の境目に収める。表記は `pasta/failure.lua` の出口（`FAILURE.notation`・`FAILURE.format`）と切り替え（`[logging] balloon_warning`）を使い、自分の表記を作らない。`FAILURE.LABEL` に種類を 1 行足すのはよい。
-- `getting-started-screenshots` は、6 段目（時報）の撮り方を `baseware-virtual-time` に頼らない。失敗の表記やエラーのバルーンを絵に写すと決めた場合だけ、その 1 枚を `runtime-error-balloon` の後に撮る。
+- `getting-started-screenshots` は、6 段目（時報）の撮り方を `tutorial-ssp-gaps`（仮想の時刻）に頼らない。失敗の表記やエラーのバルーンを絵に写すと決めた場合だけ、その 1 枚を `runtime-error-balloon` の後に撮る。
 - 0.4.0 のリリースノートの見どころに、失敗の表記が変わったこと（`failure-output-unification`）、止まるエラーがバルーンに出るようになったこと（`runtime-error-balloon`）、SSP を起動しない辞書の検査（`pasta-check-dic-validate`）を書く。
 
-0.4.0 の後（この順）: `scene-attribute-store`（Fable）、`call-attribute-filter`、`scene-anchor-link`、`baseware-virtual-time`。2026-10-17 に起票した `pasta-check-validate-edges` も、0.4.0 に入れると決めなければ、ここに入る。このうち `scene-attribute-store` と `call-attribute-filter` は、0.5.0 の道筋に入った（下の「Phase 13」）。残りの 2 本をどこに挟むかは、0.4.0 を出した後の棚卸で決める。`boot-surface-without-dic` は、2026-10-16 開発者の決定で優先度を下げ、0.4.0 から外した（「何も書かなければ何も表示しない」が既定の動き）。やるかどうかは、0.4.0 を出した後の棚卸で見直す。
+### 0.4.1 の範囲（2026-10-17 開発者の決定）
+
+0.4.0 のリリースが遅れ続けているので、**致命的でない不具合は 0.4.0 に入れず、0.4.1 に回す**。0.4.0 に残すのは、上の表の機能と文書の 2 本（`runtime-error-balloon`・`getting-started-screenshots`）とリリースだけである。
+
+- **0.4.1 に入れたもの**: `pasta-check-validate-edges`（辞書の検査の端のケース 3 つと代用品の置き換え。誤った報告は出すが、検査そのものは働く）。
+- **これから見つかる不具合**: 0.4.0 を出すまでに見つかった不具合は、致命的（起動しない・辞書の内容が失われる・配布物が壊れる・リリースが通らない）なら 0.4.0 に割り込ませる。それ以外は 0.4.1 に置き、0.4.0 のウェーブにも、残る 2 本の範囲にも足さない。
+- **0.4.1 の時期**: 0.4.0 を出した直後に始める。`novel-areka-contract`（文書だけ）とはファイルが重ならないので、同じウェーブに並べてよい。並べる組み合わせは、0.4.0 を出した後の棚卸で決める。
+
+0.4.0 の後（この順）: `scene-attribute-store`（Fable）、`call-attribute-filter`、`scene-anchor-link`、`tutorial-ssp-gaps`。このうち `scene-attribute-store` と `call-attribute-filter` は、0.5.0 の道筋に入った（下の「Phase 13」）。残りの 2 本をどこに挟むかは、0.4.0 を出した後の棚卸で決める。`tutorial-ssp-gaps` のうち起動の立ち絵の分（旧 `boot-surface-without-dic`）は、2026-10-16 開発者の決定で優先度を下げ、0.4.0 から外した（「何も書かなければ何も表示しない」が既定の動き）。やるかどうかは、0.4.0 を出した後の棚卸で見直す。
+
+### 起票の統合（2026-10-17 開発者の決定）
+
+規模が小さく、触る範囲が重なる起票を 2 組まとめた。
+
+- `scene-stage-attributes`（6〜8）を `cue-command-runtime`（8〜10）にまとめた。どちらも `grammar.pest`・`parse_scene.rs`・`scope_gen.rs` を触り、同じ `\![…]` の通り道を作る。もともと 1 本ずつ順に入れる 2 本なので、並走できる分は減らない。合わせて 14〜18 タスクで、要件定義は Fable。柱の分が属性の倉を使うので、`scene-attribute-store` の後に置く。
+- `baseware-virtual-time`（4〜6）と `boot-surface-without-dic`（3〜5）を、新しい `tutorial-ssp-gaps` にまとめた。どちらも入門ガイドを SSP で確かめたときに見つかった「SSP の動きとのずれ」で、`shiori/event/` の層と同じ入門の章を触る。1 回の要件定義で、それぞれやるかどうかを決める。合わせて 7〜11 タスク、要件定義は Fable。
 
 ### 0.5.0 の目標（2026-10-10 開発者の決定）
 
@@ -138,7 +151,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 ### 起票と、バックログに残したもの
 
-- **起票** `pasta-check-validate-edges` — `pasta-check-dic-validate` が裁定待ちで残した端のケース 3 つ（読めない辞書があっても飛び先の検査を省かず、原因と別の「飛び先が無い」が並ぶ／名前が `.pasta` で終わるフォルダを報告しない／VSCode 拡張は小文字の `ghost/master` だけを検査する）と、範囲の外にした代用品の置き換え（`manual.yml` の段・`tutorial_stages_test.rs` の前方一致の検査）。4〜7 タスク、Opus、バグと後片付け。0.4.0 に入れるかは開発者が決める（下の「開発者の判断が要るもの」）。
+- **起票** `pasta-check-validate-edges` — `pasta-check-dic-validate` が裁定待ちで残した端のケース 3 つ（読めない辞書があっても飛び先の検査を省かず、原因と別の「飛び先が無い」が並ぶ／名前が `.pasta` で終わるフォルダを報告しない／VSCode 拡張は小文字の `ghost/master` だけを検査する）と、範囲の外にした代用品の置き換え（`manual.yml` の段・`tutorial_stages_test.rs` の前方一致の検査）。4〜7 タスク、Opus、バグと後片付け。0.4.0 に入れるかは開発者が決める、とした（同じ日に、0.4.1 に回すと決めた。上の「0.4.1 の範囲」）。
 - 分割・統合・改名: なし。
 - バックログは全部そのまま残した（どれも、動機の事例・使う人・計測が無い）。完了した spec の範囲外から 2 行足した（辞書の検査の広げ方、areka の撫で・つつき）。
 
@@ -171,16 +184,15 @@ Opus
 - どちらも章を足さない見込み。足すなら、3 つの数（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）を 64 に合わせる。
 - スキル references は、後から入る側が再生成する。
 
-次: 0.4.0 のリリース（`/release 0.4.0`）。`pasta-check-validate-edges` を 0.4.0 に入れると決めた場合は、このウェーブに足せる（ほかの 2 本とファイルが重ならない）。
+次: 0.4.0 のリリース（`/release 0.4.0`）。`pasta-check-validate-edges` は 0.4.1 に回した（2026-10-17 開発者の決定。上の「0.4.1 の範囲」）。
 
-ゴールの後: `novel-areka-contract`・`scene-attribute-store`・`cue-command-runtime`・`baseware-virtual-time`・`boot-surface-without-dic`（どれも先頭。0.4.0 を出した後の棚卸で、0.5.0 の範囲として組む）。
+ゴールの後: `novel-areka-contract`・`scene-attribute-store`・`tutorial-ssp-gaps`（どれも先頭。`cue-command-runtime` は 2026-10-17 に柱の分をまとめたので、`scene-attribute-store` の後になった。0.4.0 を出した後の棚卸で、0.5.0 の範囲として組む）。
 
 ### 開発者の判断が要るもの（ウェーブは止めない）
 
-- `pasta-check-validate-edges` を 0.4.0 に入れるか。主題「書き間違えたときに原因が分かる」に合い、小さく、ほかと重ならない。入れないなら 0.4.0 の後。
 - `runtime-error-balloon` の要件で、配布したゴーストで失敗の表記を既定で出すかを決める（今の `balloon_warning` は既定で出す。`pasta_check release` は見ていない）。
 - `SOUL.md` §2・§5 の「Wait/Sync はマーカーのみ」「全出力は yield」— 構想の文書なので、直すかどうかは開発者が決める（`tech.md` は直した）。
-- `scene-anchor-link`・`baseware-virtual-time`・`boot-surface-without-dic` を 0.5.0 の道筋のどこに挟むか — 0.4.0 を出した後の棚卸で決める。
+- `scene-anchor-link`・`tutorial-ssp-gaps` を 0.5.0 の道筋のどこに挟むか — 0.4.0 を出した後の棚卸で決める。
 - `steering/structure.md` の作り直し（`pasta_shiori` の木が無い）— `/kiro-steering` で直す。
 
 ## Phase 11 の残り: 属性セマンティクスと失敗の出力
@@ -263,13 +275,13 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 
 ### 境界戦略
 
-- **分割理由**: 持ち場で分けた。areka との取り決め（文書だけ）、ト書きを流す仕組み、柱を流す仕組み、ノベル向けの出力、巻き戻しのための控え、セーブのスロット、エレメントのクリック、見本、入門の文章。pasta の中だけで作れてテストできる物（2〜7 番）と、areka の実装が無いと確かめられない物（8・9 番）を分けた。
+- **分割理由**: 持ち場で分けた。areka との取り決め（文書だけ）、ト書きと柱を流す仕組み（2026-10-17 に 1 本にまとめた）、ノベル向けの出力、巻き戻しのための控え、セーブのスロット、エレメントのクリック、見本、入門の文章。pasta の中だけで作れてテストできる物（2〜6 番）と、areka の実装が無いと確かめられない物（7・8 番）を分けた。
 - **areka との接点**: 語彙・イベント・設定の値の名前は、`novel-areka-contract` の文書が 1 か所で持つ。後続の spec は、名前をそこから引く。依頼を足す・変えるときは、文書を直してから、areka のセッションへ知らせる。areka のリポジトリを、pasta のセッションから書き換えない。
 - **共有接点**:
   - `crates/pasta_lua/pasta_scripts/pasta/act.lua` は、1 つのウェーブに 1 つの spec だけが持つ。`cue-command-runtime`・`novel-talk-flow` が触る。Phase 11 の `call-attribute-filter`・`scene-anchor-link` も触る。
   - 出力の組み立て（`pasta_scripts/pasta/shiori/sakura_builder.lua`）は、`cue-command-runtime`・`novel-talk-flow`・`novel-checkpoint-rollback` が触る。`choice-line-layout`・`scene-anchor-link` も触る。
   - 選択肢の振り分け（`shiori/event/choice_select.lua`）は、`shell-element-click` と `scene-anchor-link` が共有する。先に入る側が、振り分けを関数として取り出す。
-  - 場面の関数を出すコード生成（`code_gen/scope_gen.rs`）は、`scene-attribute-store`・`cue-command-runtime`・`scene-stage-attributes` が触る。この順に置く。
+  - 場面の関数を出すコード生成（`code_gen/scope_gen.rs`）は、`scene-attribute-store`・`cue-command-runtime`（2026-10-17 に `scene-stage-attributes` をまとめた）が触る。この順に置く。
   - 設定の読み込み（`loader/config/`）は、`cue-command-runtime`（別名表）と `novel-talk-flow`（ノベル向けの切り替え）が触る。
 - **検証で分かった制約**（2026-10-10。詳しくは各 brief の「検証で見つかった穴」）:
   - NOTIFY のイベントには台本を返せない。ノベル用のイベントは、すべて GET で送ってもらう。GET の応答は 5 秒以内に返す。
@@ -284,22 +296,21 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 | -- | ---- | ---------------- | ------------ | ------------ |
 | 1 | novel-areka-contract | Opus（2026-10-16 に見直し） | 文書だけ | なし。**0.5.0 のゴールの先頭**（areka の側が早く動けるよう、0.4.0 を出したら最初に始める） |
 | 2 | scene-attribute-store（既存） | Fable | 15〜18 | なし（0.4.0 の後の先頭） |
-| 3 | cue-command-runtime | Opus | 8〜10 | なし（`failure-output-unification` は 2026-10-17 に完了し、`act.lua` の席は空いた） |
-| 4 | scene-stage-attributes | Fable | 6〜8 | `scene-attribute-store`、`cue-command-runtime` |
-| 5 | novel-talk-flow | Fable | 12〜15（超えるなら 2 本に分ける） | `cue-command-runtime`、`novel-areka-contract` |
-| 6 | call-attribute-filter（既存） | Fable | 17〜20 | `scene-attribute-store` |
-| 7 | novel-checkpoint-rollback | Fable | 15〜18（変数の保存の範囲が大きければ分ける） | `novel-talk-flow` |
-| 8 | shell-element-click | Opus | 5〜8 | `novel-talk-flow`（完全一致の場面選び） |
-| 9 | novel-save-slots | Opus | 8〜12 | `novel-checkpoint-rollback` |
-| 10 | hello-novel-sample | Opus | 15〜18 | 2〜9 の全部と、areka の側の実装 |
-| 11 | manual-novel-guide | Opus | 8〜12 | `hello-novel-sample` |
-| 12 | 0.5.0 のリリース（`release` スキル） | Opus | — | 上の全部 |
+| 3 | cue-command-runtime（ト書きと柱。2026-10-17 に `scene-stage-attributes` をまとめた） | Fable | 14〜18（超えるならト書きと柱に分け直す） | `scene-attribute-store`（柱の分。`act.lua` の席は空いている） |
+| 4 | novel-talk-flow | Fable | 12〜15（超えるなら 2 本に分ける） | `cue-command-runtime`、`novel-areka-contract` |
+| 5 | call-attribute-filter（既存） | Fable | 17〜20 | `scene-attribute-store` |
+| 6 | novel-checkpoint-rollback | Fable | 15〜18（変数の保存の範囲が大きければ分ける） | `novel-talk-flow` |
+| 7 | shell-element-click | Opus | 5〜8 | `novel-talk-flow`（完全一致の場面選び） |
+| 8 | novel-save-slots | Opus | 8〜12 | `novel-checkpoint-rollback` |
+| 9 | hello-novel-sample | Opus | 15〜18 | 2〜8 の全部と、areka の側の実装 |
+| 10 | manual-novel-guide | Opus | 8〜12 | `hello-novel-sample` |
+| 11 | 0.5.0 のリリース（`release` スキル） | Opus | — | 上の全部 |
 
 どれとどれを同じウェーブに並べられるかは、0.4.0 を出した後の棚卸で、ソースの持ち場を測って決める。
 
 ### areka の進み具合との関係
 
-- 1〜9 番は、areka を待たずに、pasta だけで作れてテストできる。10・11 番は、areka が画面と音を出せるようになってからでないと、実機で確かめられない。
+- 1〜8 番は、areka を待たずに、pasta だけで作れてテストできる。9・10 番は、areka が画面と音を出せるようになってからでないと、実機で確かめられない。
 - areka には、音の層・複数のシェルを 1 つの窓に並べる仕組み・場面転換の演出・スクリプトへ届くキーボード入力が、まだ無い（2026-10-10・areka main `b3650b68`）。areka の側の作業が一番重い。**1 番を一番先に出して、areka の側が早く動けるようにする。**
 
 ### areka への依頼の出し方（開発者の指示）
@@ -311,7 +322,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 
 - 変数の保存の範囲の書き方（今の `＄＊` をセーブごとにするか、全セーブ共通にするか）— `novel-checkpoint-rollback` の要件の最初の議題。
 - 条件つきの選択肢（フラグが立っているときだけ出す）— `novel-talk-flow` の要件で、要るかどうかを決める。
-- 背景を柱にどう書くか（アクター指定行に並べるか、属性にするか）— `scene-stage-attributes` の要件。
+- 背景を柱にどう書くか（アクター指定行に並べるか、属性にするか）— `cue-command-runtime` の要件（柱の分）。
 - ノベルを 1 本の配布物としてどう起動するか、動画が要るか — `novel-areka-contract` の要件。
 - 数のしきい値（好感度が 50 以上、など）の書き方 — `call-attribute-filter` の要件。
 
@@ -331,42 +342,40 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 
 2026-10-10 に起票した 4 本（`pasta-check-dic-validate`・`manual-print-media-refs`・`manual-print-page-removal`・`manual-shell-guide`）は、2026-10-17 までに完了した（「完了フェーズ」）。
 
-- `pasta-check-validate-edges`（2026-10-17 起票）— 辞書の検査の端のケース 3 つ（読めない辞書があっても飛び先の検査を省かない／`.pasta` で終わるフォルダを報告しない／VSCode 拡張は小文字の `ghost/master` だけを見る）と、代用品（`manual.yml` の段・`tutorial_stages_test.rs` の前方一致の検査）の置き換え。0.4.0 に入れるかは開発者が決める。
+- `pasta-check-validate-edges`（2026-10-17 起票）— 辞書の検査の端のケース 3 つ（読めない辞書があっても飛び先の検査を省かない／`.pasta` で終わるフォルダを報告しない／VSCode 拡張は小文字の `ghost/master` だけを見る）と、代用品（`manual.yml` の段・`tutorial_stages_test.rs` の前方一致の検査）の置き換え。0.4.1 に入れる（2026-10-17 開発者の決定）。
 
 ## 入門ガイドの実機確認で見つかったもの（2026-10-10 起票）
 
-`getting-started-story-guide` の完了時の棚卸で起票した。`manual-link-anchor-check` と `choice-line-layout` は 2026-10-11 に完了した。`boot-surface-without-dic` は 2026-10-16 に優先度を下げ、0.4.0 から外した。`baseware-virtual-time` は 0.4.0 の後に回した。
+`getting-started-story-guide` の完了時の棚卸で起票した。`manual-link-anchor-check` と `choice-line-layout` は 2026-10-11 に完了した。`boot-surface-without-dic` は 2026-10-16 に優先度を下げ、0.4.0 から外した。`baseware-virtual-time` は 0.4.0 の後に回した。2026-10-17 に、残った 2 本を `tutorial-ssp-gaps` にまとめた。
 
-- `baseware-virtual-time` — SSP の仮想の時刻は pasta に届かない（pasta は OS の時計で正時を判定する）。入門ガイド 6 段目は「次の正時を待つ」と教えている。
-- `boot-surface-without-dic` — 辞書が無い間は何も表示されない。入門ガイドの準備の章は「何も表示されないのが正しい」と教えている。
+- `tutorial-ssp-gaps`（旧 `baseware-virtual-time`）— SSP の仮想の時刻は pasta に届かない（pasta は OS の時計で正時を判定する）。入門ガイド 6 段目は「次の正時を待つ」と教えている。
+- `tutorial-ssp-gaps`（旧 `boot-surface-without-dic`）— 辞書が無い間は何も表示されない。入門ガイドの準備の章は「何も表示されないのが正しい」と教えている。
 
 隣の spec への申し送り: `getting-started-screenshots` の brief の「申し送り（getting-started-story-guide より）」の節（章の形・画像の行が本文の検査に落ちること・撮るときの制約・開発者の確認 4 点）。
 
 ## Specs (dependency order)
 
 - [ ] runtime-error-balloon -- スクリプトが止まる実行時エラー（500 の応答）を、辞書を書く人に見えるようバルーンにも出す。表記は `pasta/failure.lua` の出口を使う。2026-10-16 開発者の決定で、やると決めて 0.4.0 に入れた（2026-10-10 の棚卸で `failure-output-unification` から分割）。Dependencies: none（`failure-output-unification`・`shiori-test-support-runtime` は完了）
-- [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: none（`touch-poke-shortcuts` は完了）
-- [ ] pasta-check-validate-edges -- 辞書の検査（`pasta_check validate`）の端のケース 3 つ（読めない辞書・`.pasta` で終わるフォルダ・VSCode 拡張の大文字と小文字）の裁定と直しと、代用品（`manual.yml` の段・`tutorial_stages_test.rs` の前方一致の検査）の置き換え（2026-10-17 の棚卸で、`pasta-check-dic-validate` の残りから起票）。Dependencies: none
+- [x] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: none（`touch-poke-shortcuts` は完了）
+- [ ] pasta-check-validate-edges -- 辞書の検査（`pasta_check validate`）の端のケース 3 つ（読めない辞書・`.pasta` で終わるフォルダ・VSCode 拡張の大文字と小文字）の裁定と直しと、代用品（`manual.yml` の段・`tutorial_stages_test.rs` の前方一致の検査）の置き換え（2026-10-17 の棚卸で、`pasta-check-dic-validate` の残りから起票）。0.4.1 に入れる（2026-10-17 開発者の決定）。Dependencies: none
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: none
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store
 - [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアル、`pasta_check validate` の飛び先の検査まで揃える（2026-10-08 起票）。Dependencies: call-attribute-filter
-- [ ] baseware-virtual-time -- SSP の「現在時刻の仮想的変更」を pasta の時報に効かせ、正時を待たずに確かめられるようにする。SSP が仮想の時刻を SHIORI に伝えているかの調査から。外から起こした `OnTalk` でチェイントークが続かない件も扱う（2026-10-10 同上）。Dependencies: none
-- [ ] boot-surface-without-dic -- 辞書や `＊OnBoot` が無いゴーストは起動しても立ち絵が出ない。既定で立ち絵を出すかどうかを、やるかどうかから決める（2026-10-10 同上）。2026-10-16 開発者の決定で優先度を下げ、0.4.0 から外した（何も書かなければ何も表示しないのが既定の動き）。Dependencies: none
+- [ ] tutorial-ssp-gaps -- 入門ガイドを SSP で確かめたときに見つかった、SSP の動きとのずれ 2 つ。SSP の「現在時刻の仮想的変更」を時報に効かせる（外から起こした `OnTalk` でチェイントークが続かない件も）ことと、辞書や `＊OnBoot` が無いときの起動の立ち絵。どちらも、やるかどうかから決める。2026-10-17 に `baseware-virtual-time` と `boot-surface-without-dic` をまとめた。起動の立ち絵の分は、2026-10-16 開発者の決定で優先度を下げた（何も書かなければ何も表示しないのが既定の動き）。Dependencies: none
 - [ ] novel-areka-contract -- pasta と areka の取り決め（台本に載せる語彙・目印・イベント・設定の値）を 1 つの文書にし、areka への依頼書として出す。コードは書かない。areka に依頼を出すための spec（2026-10-10 の discovery で起票。以下 9 本は同じ）。Dependencies: none
-- [ ] cue-command-runtime -- キューコマンド行 `！命令＠対象（引数）` を、実行時に `\![…]` として台本へ流す。日本語の名前の別名表、引数の穴（数字で始まる引数など）の手当て。Dependencies: none（`failure-output-unification` は完了し、`act.lua` の席は空いた）
-- [ ] scene-stage-attributes -- 柱に書いた `＆属性` とアクター指定行を、場面に入ったときに台本へ流す。受け継ぎと、Call から戻ったときの打ち直し。Dependencies: scene-attribute-store, cue-command-runtime
+- [ ] cue-command-runtime -- キューコマンド行 `！命令＠対象（引数）` を、実行時に `\![…]` として台本へ流す。日本語の名前の別名表、引数の穴（数字で始まる引数など）の手当て。柱に書いた `＆属性` とアクター指定行も、場面に入ったときに台本へ流す（受け継ぎと、Call から戻ったときの打ち直し）。2026-10-17 に `scene-stage-attributes` をまとめた。Dependencies: scene-attribute-store
 - [ ] novel-talk-flow -- ノベル向けの出力に切り替える設定。台詞ごとのクリック待ち、話者名と声と変わらない行 ID、ランダムトークと時報の停止、起動時の場面、「次の場面へ」、完全一致の場面選び。Dependencies: novel-areka-contract, cue-command-runtime
 - [ ] novel-checkpoint-rollback -- 台本に目印の ID を埋め、応答ごとに状態と台本を控える。areka が知らせた ID の時点へ戻す。変数の保存の範囲を、セーブごとと全セーブ共通の 2 つに分ける。Dependencies: novel-talk-flow
 - [ ] novel-save-slots -- スロットを選ぶセーブとロード。控えをスロットへ読み書きし、スロットの中身（日時・章の名前）を場面から読めるようにする。Dependencies: novel-checkpoint-rollback
 - [ ] shell-element-click -- エレメントのクリック（名前つき）を、選択肢と同じ振り分けで場面へ届ける。シェルとして組んだシステム画面を、場面が動かせるようにする。Dependencies: novel-areka-contract, novel-talk-flow（`scene-anchor-link` と `choice_select.lua` を触る順番に注意）
-- [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, scene-stage-attributes, novel-talk-flow, novel-checkpoint-rollback, novel-save-slots, shell-element-click, call-attribute-filter（areka の側の実装も要る）
+- [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-checkpoint-rollback, novel-save-slots, shell-element-click, call-attribute-filter（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
 
 ## Existing Spec Updates
 
 2026-10-10 の discovery で、0.5.0 の道筋に乗せた既存の spec。各 brief の「申し送り（2026-10-10 の discovery・0.5.0 のノベルゲームより）」の節に書いた。
 
-- [ ] scene-attribute-store -- 属性の読み手に、演出（`scene-stage-attributes`）が加わる。順番を保てる倉の形、ローカルシーンと名前なしの `＊` への受け継ぎを、要件の材料にする。0.4.0 の後の先頭に置く。Dependencies: none
+- [ ] scene-attribute-store -- 属性の読み手に、演出（`cue-command-runtime` の柱の分。2026-10-17 に `scene-stage-attributes` をまとめた）が加わる。順番を保てる倉の形、ローカルシーンと名前なしの `＊` への受け継ぎを、要件の材料にする。0.4.0 の後の先頭に置く。Dependencies: none
 - [ ] call-attribute-filter -- フラグによる分岐の本命になる。条件の値に変数を書けること、「それ以外」の場面、数のしきい値、候補が複数残るときの扱いを、要件で決める。Dependencies: scene-attribute-store
 
 ## Direct Implementation Candidates

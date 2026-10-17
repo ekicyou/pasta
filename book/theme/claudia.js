@@ -67,6 +67,9 @@
  *
  * 開く手順は book.js に任せる（チェックボックスの change で、クラス・ARIA 属性・リンクの tabIndex・保存値がそろう）。
  * 目次の要素の判定は保存値を読むより前に行う（目次の無いページでは保存値に触れない）。
+ *
+ * ふだんは head.hbs の claudiaSidebarEarly が、描く前に同じ条件で目次を開き直している（ここまで待つと、閉じた画面が一度描かれてちらつく）。
+ * そのときはチェックボックスが入っているので、ここは何もしない。MutationObserver が無いときの受け皿として残す。
  */
 (function claudiaSidebarKeep() {
     'use strict';

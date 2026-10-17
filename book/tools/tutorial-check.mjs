@@ -145,6 +145,18 @@ function findIndentedFences(markdown) {
   return heads;
 }
 
+// ---- 段落が画像の行（1 行に、空でない代わりの文を持つ画像 1 つだけ）かを判定 ----
+// 画像の行は C-prose の対象から外す（要件 5.3〜5.5）。代わりの文は `]` と空白以外の字を
+// 1 つ以上含む（`\S` だと `![]](x.png)` を通してしまう）。代わりの文が空・空白だけ、
+// 地の文と同じ行・2 行の段落・1 行に画像 2 つは false のまま（今までどおり報告する）。
+/**
+ * @param {readonly string[]} lines フェンスの外の 1 段落の行
+ * @returns {boolean}
+ */
+function isImageLine(lines) {
+  return lines.length === 1 && /^!\[[^\]]*[^\]\s][^\]]*\]\([^\s)]+\)$/.test(lines[0].trimEnd());
+}
+
 // ---- 台詞以外の段落のうち、指示の一文でないもの（説明の地の文）を拾う ----
 // 本文検査（verify-content.mjs）の C-prose の判定（要件 10.8）。本文検査は import した時点で
 // 検査が走り、中の関数を単体テストできないので、純粋な関数としてここに置く。
@@ -181,7 +193,8 @@ export function findProseParagraphs(markdown) {
     return lines.length === 1 && text.endsWith('。') && outside.split('。').length === 2;
   };
   return paragraphs
-    .filter(({ lines }) => !/^(?:>|\||[ \t]|[-*+]\s|\d+\.\s)/.test(lines[0]) && !isInstruction(lines))
+    .filter(({ lines }) => !/^(?:>|\||[ \t]|[-*+]\s|\d+\.\s)/.test(lines[0])
+      && !isInstruction(lines) && !isImageLine(lines))
     .map(({ line, lines }) => ({ line, head: lines[0] }));
 }
 
