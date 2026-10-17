@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use pasta_dsl::parser::Span;
 
 pub use input::{FileText, GhostInput, TomlSource};
-pub use report::{Finding, FindingKind, Report, Severity, Stats, msg};
+pub use report::{Finding, FindingKind, Report, Severity, SkipReason, Stats, msg};
 
 /// 一致テスト用: pasta.dll が見るパスからモジュール名を作る（`CacheManager::source_to_module_name` と同じ規則）
 #[doc(hidden)]
@@ -51,7 +51,8 @@ fn discover(input: &GhostInput) -> (discovery::Discovered, Vec<Finding>) {
 /// ゴースト全体を検査する。`files` には select_dictionary_files が返した全パスの中身を入れる。
 ///
 /// 順番: 設定 → 集め方 → モジュール名・構文 → トランスパイル・シーン → 飛び先。
-/// 構文エラーが 1 つでもあれば飛び先の検査を丸ごと省く（6.8）。
+/// すべての段の報告がそろった後に省く理由を 1 回だけ決め、構文エラー・読めない辞書ファイル・
+/// pasta.toml の誤りが 1 つでもあれば飛び先の検査を丸ごと省く（1.1〜1.3）。
 pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) -> Report {
     let (config, mut findings) = config::read_config(&input.pasta_toml);
 
@@ -71,9 +72,9 @@ pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) ->
     let (scenes, found) = scenes::check(&parsed, &config.aliases);
     findings.extend(found);
 
-    let references_skipped = findings.iter().any(|f| f.code == FindingKind::Syntax);
+    let skip_reasons = report::skip_reasons(&findings);
     let mut unchecked_dynamic_calls = 0;
-    if !references_skipped {
+    if skip_reasons.is_empty() {
         let (found, dynamic) = references::check(&scenes, &config.aliases, &parsed, &texts);
         findings.extend(found);
         unchecked_dynamic_calls = dynamic;
@@ -84,7 +85,7 @@ pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) ->
         Stats {
             dictionary_files: dictionary_files.len(),
             unchecked_dynamic_calls,
-            references_skipped,
+            skip_reasons,
             ..Stats::default()
         },
     )

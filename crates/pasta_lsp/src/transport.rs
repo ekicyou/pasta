@@ -454,11 +454,13 @@ mod tests {
             [
                 "dictionaryFiles",
                 "errors",
-                "referencesSkipped",
+                "skipReasons",
                 "uncheckedDynamicCalls",
                 "warnings"
             ]
         );
+        // 省く理由は kebab-case の文字列の並び（読めない辞書ファイルがあるので省く）
+        assert_eq!(stats["skipReasons"], serde_json::json!(["unreadable-file"]));
         let findings = report["findings"].as_array().expect("findings array");
         for f in findings {
             let mut keys: Vec<&str> = f.as_object().unwrap().keys().map(String::as_str).collect();

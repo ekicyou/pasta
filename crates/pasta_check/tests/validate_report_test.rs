@@ -1,16 +1,16 @@
 //! 報告の形のテスト: 1 行の形・並び順・まとめの行・誤りと注意の固定（7.1〜7.8・2.9・6.7・6.8）
 
-use pasta_check::validate::{Finding, FindingKind, Report, Severity, Stats, msg};
+use pasta_check::validate::{Finding, FindingKind, Report, Severity, SkipReason, Stats, msg};
 
 fn finding(kind: FindingKind, path: &str, line: Option<u32>, col: Option<u32>, m: &str) -> Finding {
     Finding::new(kind, path, line, col, m)
 }
 
-fn stats(n: usize, d: usize, skipped: bool) -> Stats {
+fn stats(n: usize, d: usize, reasons: &[SkipReason]) -> Stats {
     Stats {
         dictionary_files: n,
         unchecked_dynamic_calls: d,
-        references_skipped: skipped,
+        skip_reasons: reasons.to_vec(),
         ..Stats::default()
     }
 }
@@ -41,7 +41,7 @@ fn one_line_with_column_without_column_and_without_line() {
                 "y",
             ),
         ],
-        stats(13, 0, false),
+        stats(13, 0, &[]),
     );
     let lines = report.lines();
     assert_eq!(
@@ -99,7 +99,7 @@ fn findings_are_sorted_by_path_line_column_code_message() {
                 "noline",
             ),
         ],
-        stats(2, 0, false),
+        stats(2, 0, &[]),
     );
     let order: Vec<&str> = report.findings.iter().map(|f| f.message.as_str()).collect();
     assert_eq!(order, ["noline", "c1", "s", "a", "z", "l10", "b"]);
@@ -125,13 +125,13 @@ fn stats_counts_follow_findings() {
                 "w",
             ),
         ],
-        stats(1, 0, false),
+        stats(1, 0, &[]),
     );
     assert_eq!(report.stats.errors, 1);
     assert_eq!(report.stats.warnings, 2);
     assert!(report.has_errors());
 
-    let ok = Report::new(vec![], stats(1, 0, false));
+    let ok = Report::new(vec![], stats(1, 0, &[]));
     assert!(!ok.has_errors());
 }
 
@@ -145,7 +145,7 @@ fn summary_line_with_references_checked() {
             Some(1),
             "w",
         )],
-        stats(13, 4, false),
+        stats(13, 4, &[]),
     );
     assert_eq!(
         report.lines().last().unwrap(),
@@ -169,7 +169,7 @@ fn summary_line_and_notice_when_references_skipped() {
                 "w",
             ),
         ],
-        stats(13, 7, true),
+        stats(13, 7, &[SkipReason::Syntax]),
     );
     let lines = report.lines();
     assert_eq!(lines.len(), 6);
@@ -178,6 +178,45 @@ fn summary_line_and_notice_when_references_skipped() {
         "構文エラーがあるため、飛び先の検査をしていません。"
     );
     assert_eq!(lines[5], "検査した辞書ファイル 13 個: 誤り 3 件、注意 1 件");
+}
+
+/// 案内の行は理由を表の順に「と」でつなぐ。省いたときはまとめの行に飛び先の項が無い（1.4・1.5）
+#[test]
+fn notice_lists_skip_reasons_in_table_order() {
+    use SkipReason::*;
+    for (reasons, notice) in [
+        (
+            &[Syntax][..],
+            "構文エラーがあるため、飛び先の検査をしていません。",
+        ),
+        (
+            &[UnreadableFile][..],
+            "読めない辞書ファイルがあるため、飛び先の検査をしていません。",
+        ),
+        (
+            &[Config][..],
+            "pasta.toml の誤りがあるため、飛び先の検査をしていません。",
+        ),
+        (
+            &[Syntax, Config][..],
+            "構文エラーと pasta.toml の誤りがあるため、飛び先の検査をしていません。",
+        ),
+        (
+            &[Syntax, UnreadableFile, Config][..],
+            "構文エラーと読めない辞書ファイルと pasta.toml の誤りがあるため、飛び先の検査をしていません。",
+        ),
+    ] {
+        let report = Report::new(vec![], stats(2, 3, reasons));
+        assert!(report.stats.references_skipped());
+        assert_eq!(
+            report.lines(),
+            vec![
+                notice.to_string(),
+                "検査した辞書ファイル 2 個: 誤り 0 件、注意 0 件".to_string()
+            ]
+        );
+    }
+    assert!(!stats(2, 3, &[]).references_skipped());
 }
 
 /// すべての種類の分類と code を固定する（7.7）。種類を足したらここにも足す

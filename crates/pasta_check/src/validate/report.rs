@@ -173,6 +173,48 @@ impl Finding {
     }
 }
 
+/// 飛び先の検査を省いた理由。宣言の順が案内の行の順
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SkipReason {
+    Syntax,
+    UnreadableFile,
+    Config,
+}
+
+impl SkipReason {
+    /// 案内の行の言い方
+    pub fn label(self) -> &'static str {
+        match self {
+            SkipReason::Syntax => "構文エラー",
+            SkipReason::UnreadableFile => "読めない辞書ファイル",
+            SkipReason::Config => "pasta.toml の誤り",
+        }
+    }
+}
+
+/// findings から省く理由を決める（昇順・重複なし）。空なら飛び先を検査する（1.1〜1.3・1.6）。
+/// 辞書の中身・集め方・別名表が分からないとき、検査した辞書のシーンの集まりが pasta.dll と同じとは言えない
+pub(crate) fn skip_reasons(findings: &[Finding]) -> Vec<SkipReason> {
+    use FindingKind::*;
+    let mut reasons: Vec<SkipReason> = findings
+        .iter()
+        .filter_map(|f| match f.code {
+            Syntax => Some(SkipReason::Syntax),
+            // pasta.toml を読めないのは設定の誤り。ほかのパス（渡し忘れを含む）は読めない辞書ファイル
+            FileUnreadable if f.path == super::config::PATH => Some(SkipReason::Config),
+            FileNotUtf8 | FileUnreadable => Some(SkipReason::UnreadableFile),
+            ConfigSyntax | ConfigLoaderType | ConfigPatternInvalid | ConfigSceneAlias => {
+                Some(SkipReason::Config)
+            }
+            _ => None,
+        })
+        .collect();
+    reasons.sort();
+    reasons.dedup();
+    reasons
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Stats {
@@ -180,7 +222,14 @@ pub struct Stats {
     pub errors: usize,
     pub warnings: usize,
     pub unchecked_dynamic_calls: usize,
-    pub references_skipped: bool,
+    /// 空なら飛び先を検査した
+    pub skip_reasons: Vec<SkipReason>,
+}
+
+impl Stats {
+    pub fn references_skipped(&self) -> bool {
+        !self.skip_reasons.is_empty()
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -217,8 +266,8 @@ impl Report {
             "検査した辞書ファイル {} 個: 誤り {} 件、注意 {} 件",
             s.dictionary_files, s.errors, s.warnings
         );
-        if s.references_skipped {
-            lines.push("構文エラーがあるため、飛び先の検査をしていません。".to_string());
+        if s.references_skipped() {
+            lines.push(msg::references_skipped(&s.skip_reasons));
         } else {
             summary += &format!(
                 "、飛び先を検査しなかった Call {} 件",
@@ -257,7 +306,23 @@ fn ghost_paths(paths: &[&str]) -> String {
 
 /// 理由の文言（design.md の Report の文言の表）。パスは ghost/master からの相対パスで渡す
 pub mod msg {
-    use super::{ghost_path, ghost_paths};
+    use super::{SkipReason, ghost_path, ghost_paths};
+
+    /// 案内の行。理由を表の順に「と」でつなぐ（reasons は空でないこと）。
+    /// 半角で始まる言い方（pasta.toml）の前には空白を置く
+    pub fn references_skipped(reasons: &[SkipReason]) -> String {
+        let mut s = String::new();
+        for (i, label) in reasons.iter().map(|r| r.label()).enumerate() {
+            if i > 0 {
+                s += "と";
+                if label.starts_with(|c: char| c.is_ascii()) {
+                    s += " ";
+                }
+            }
+            s += label;
+        }
+        format!("{s}があるため、飛び先の検査をしていません。")
+    }
 
     pub fn config_missing() -> String {
         "pasta.toml がありません。pasta.dll はゴーストを読み込めません（辞書は既定の dic/**/*.pasta で集めました）".into()

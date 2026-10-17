@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use pasta_check::validate::{
-    ACT_METHODS, FileText, FindingKind, GLOBAL_NAMES, GhostInput, SHIORI_ACT_METHODS, Severity,
-    TomlSource, validate_ghost,
+    ACT_METHODS, FileText, FindingKind, GLOBAL_NAMES, GhostInput, Report, SHIORI_ACT_METHODS,
+    Severity, SkipReason, TomlSource, validate_ghost,
 };
 
 const TOML: &str = "[loader]\npasta_patterns = [\"dic/**/*.pasta\"]\n";
@@ -422,7 +422,7 @@ fn dynamic_calls_are_counted_not_reported() {
     let report = report_of(TOML, &[("dic/talk.pasta", text)]);
     assert_eq!(reference_findings(TOML, text), vec![]);
     assert_eq!(report.stats.unchecked_dynamic_calls, 2);
-    assert!(!report.stats.references_skipped);
+    assert!(report.stats.skip_reasons.is_empty());
     assert_eq!(
         report.lines().last().unwrap(),
         "検査した辞書ファイル 1 個: 誤り 0 件、注意 0 件、飛び先を検査しなかった Call 2 件"
@@ -436,7 +436,7 @@ fn syntax_error_skips_references_with_notice() {
         ("dic/b.pasta", "＊別\n  さくら：い。\n＄＄＄\n"),
     ];
     let report = report_of(TOML, &dics);
-    assert!(report.stats.references_skipped);
+    assert_eq!(report.stats.skip_reasons, [SkipReason::Syntax]);
     assert_eq!(report.stats.unchecked_dynamic_calls, 0);
     assert!(
         !report.findings.iter().any(|f| matches!(
@@ -452,4 +452,176 @@ fn syntax_error_skips_references_with_notice() {
         "{lines:?}"
     );
     assert!(!lines.last().unwrap().contains("飛び先を検査しなかった"));
+}
+
+/// 無い飛び先への Call・選択肢を持つ辞書
+const MISSING_TARGETS: &str = "＊会話\n  ＞無いシーン\n  ＠？無い選択\n";
+
+/// (パス, 中身) の辞書
+type Dics = Vec<(&'static str, FileText)>;
+
+/// pasta.toml の中身と (パス, 中身) の辞書でゴーストを検査する
+fn report_with(toml: TomlSource, dics: Dics) -> Report {
+    let input = GhostInput {
+        pasta_toml: toml,
+        entries: dics.iter().map(|(p, _)| p.to_string()).collect(),
+        dirs: vec![],
+    };
+    let files = dics.into_iter().map(|(p, t)| (p.to_string(), t)).collect();
+    validate_ghost(&input, &files)
+}
+
+fn text(t: &str) -> FileText {
+    FileText::Text { text: t.into() }
+}
+
+fn toml(t: &str) -> TomlSource {
+    TomlSource::Text { text: t.into() }
+}
+
+fn missing_targets(report: &Report) -> usize {
+    report
+        .findings
+        .iter()
+        .filter(|f| {
+            matches!(
+                f.code,
+                FindingKind::CallTargetMissing | FindingKind::ChoiceTargetMissing
+            )
+        })
+        .count()
+}
+
+/// 辞書の中身・集め方・別名表が分からないときは飛び先の検査を丸ごと省き、理由は当たるものだけ（1.1〜1.3・6.1）
+#[test]
+fn unknown_dictionary_contents_skip_references_with_matching_reasons() {
+    use SkipReason::*;
+    let a = || ("dic/a.pasta", text(MISSING_TARGETS));
+    let bad_syntax = || ("dic/b.pasta", text("＊別\n＄＄＄\n"));
+    let unreadable = FileText::Unreadable {
+        reason: "denied".into(),
+    };
+    let cases: Vec<(&str, TomlSource, Dics, Vec<SkipReason>)> = vec![
+        (
+            "読めない辞書",
+            toml(TOML),
+            vec![a(), ("dic/b.pasta", unreadable.clone())],
+            vec![UnreadableFile],
+        ),
+        (
+            "UTF-8 で読めない辞書",
+            toml(TOML),
+            vec![a(), ("dic/b.pasta", FileText::NotUtf8)],
+            vec![UnreadableFile],
+        ),
+        (
+            "pasta.toml を読めない",
+            TomlSource::Unreadable {
+                reason: "denied".into(),
+            },
+            vec![a()],
+            vec![Config],
+        ),
+        ("TOML の誤り", toml("[loader\n"), vec![a()], vec![Config]),
+        (
+            "[loader] の型",
+            toml("[loader]\npasta_patterns = \"x\"\n"),
+            vec![a()],
+            vec![Config],
+        ),
+        (
+            "読めないパターン",
+            toml("[loader]\npasta_patterns = [\"dic/[*.pasta\", \"dic/*.pasta\"]\n"),
+            vec![a()],
+            vec![Config],
+        ),
+        (
+            "[scene.alias] の誤り",
+            toml("[scene.alias]\nOnTalk = [\"会話\", \"\"]\n"),
+            vec![a()],
+            vec![Config],
+        ),
+        (
+            "構文エラー",
+            toml(TOML),
+            vec![a(), bad_syntax()],
+            vec![Syntax],
+        ),
+        (
+            "構文エラーと pasta.toml の誤り",
+            toml("[scene.alias]\nOnTalk = [\"\"]\n"),
+            vec![a(), bad_syntax()],
+            vec![Syntax, Config],
+        ),
+        (
+            "3 つとも",
+            toml("[loader\n"),
+            vec![a(), bad_syntax(), ("dic/c.pasta", FileText::NotUtf8)],
+            vec![Syntax, UnreadableFile, Config],
+        ),
+    ];
+    for (name, toml, dics, reasons) in cases {
+        let report = report_with(toml, dics);
+        let lines = report.lines();
+        assert_eq!(report.stats.skip_reasons, reasons, "{name}: {lines:?}");
+        assert_eq!(missing_targets(&report), 0, "{name}: {lines:?}");
+        assert_eq!(report.stats.unchecked_dynamic_calls, 0, "{name}");
+        // 原因そのものは今までどおり誤りとして報告する（1.7）
+        assert!(report.has_errors(), "{name}");
+        assert!(
+            !lines.last().unwrap().contains("飛び先を検査しなかった"),
+            "{name}: {lines:?}"
+        );
+    }
+}
+
+/// 省く条件に当たらない誤りだけなら飛び先を検査する（1.6・6.2）
+#[test]
+fn other_errors_still_check_references() {
+    let a = || ("dic/a.pasta", text(MISSING_TARGETS));
+    let cases: Vec<(&str, TomlSource, Dics, FindingKind)> = vec![
+        (
+            "pasta.toml が無い",
+            TomlSource::Missing,
+            vec![a()],
+            FindingKind::ConfigMissing,
+        ),
+        (
+            "init.pasta",
+            toml(TOML),
+            vec![a(), ("dic/init.pasta", text("＊別\n  さくら：あ。\n"))],
+            FindingKind::InitFileName,
+        ),
+        (
+            "モジュール名の重なり",
+            toml(TOML),
+            vec![
+                ("dic/a-b.pasta", text(MISSING_TARGETS)),
+                ("dic/a_b.pasta", text("＊別\n  さくら：あ。\n")),
+            ],
+            FindingKind::ModulePastaCollision,
+        ),
+        (
+            "トランスパイルの誤り",
+            toml(TOML),
+            vec![
+                a(),
+                (
+                    "dic/b.pasta",
+                    text("＊別\n  さくら：あ。\n  ＄x＝＄％p＋1\n"),
+                ),
+            ],
+            FindingKind::TranspilePropertyInExpr,
+        ),
+    ];
+    for (name, toml, dics, kind) in cases {
+        let report = report_with(toml, dics);
+        let lines = report.lines();
+        assert!(
+            report.findings.iter().any(|f| f.code == kind),
+            "{name}: {lines:?}"
+        );
+        assert!(report.stats.skip_reasons.is_empty(), "{name}: {lines:?}");
+        assert_eq!(missing_targets(&report), 2, "{name}: {lines:?}");
+    }
 }
