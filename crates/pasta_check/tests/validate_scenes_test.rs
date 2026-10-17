@@ -14,6 +14,7 @@ fn scene_findings(toml: &str, dics: &[(&str, &str)]) -> Vec<(String, u32, Findin
     let input = GhostInput {
         pasta_toml: TomlSource::Text { text: toml.into() },
         entries: dics.iter().map(|(p, _)| p.to_string()).collect(),
+        dirs: vec![],
     };
     let files: BTreeMap<_, _> = dics
         .iter()
@@ -222,6 +223,7 @@ fn file_with_syntax_error_registers_no_scenes() {
     let input = GhostInput {
         pasta_toml: TomlSource::Text { text: TOML.into() },
         entries: dics.iter().map(|(p, _)| p.to_string()).collect(),
+        dirs: vec![],
     };
     let files: BTreeMap<_, _> = dics
         .iter()
@@ -273,6 +275,7 @@ fn report_of(toml: &str, dics: &[(&str, &str)]) -> pasta_check::validate::Report
     let input = GhostInput {
         pasta_toml: TomlSource::Text { text: toml.into() },
         entries: dics.iter().map(|(p, _)| p.to_string()).collect(),
+        dirs: vec![],
     };
     let files: BTreeMap<_, _> = dics
         .iter()

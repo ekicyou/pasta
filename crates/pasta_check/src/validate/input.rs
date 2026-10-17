@@ -9,6 +9,9 @@ pub struct GhostInput {
     pub pasta_toml: TomlSource,
     /// ghost/master の配下のファイルの相対パス（'/' 区切り）。順序は問わない
     pub entries: Vec<String>,
+    /// ghost/master の配下のフォルダの相対パス（'/' 区切り・末尾の '/' なし・ghost/master
+    /// そのものは入れない）。順序は問わない。必須で既定値を持たない
+    pub dirs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

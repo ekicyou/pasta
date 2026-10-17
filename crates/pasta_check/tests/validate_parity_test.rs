@@ -41,16 +41,18 @@ fn ghost(files: &[File]) -> TempDir {
     temp
 }
 
-/// CLI の殻と同じ形の入力: 最上位の profile に入らず、相対パスを `/` でつなぐ
+/// CLI の殻と同じ形の入力: 最上位の profile に入らず、相対パスを `/` でつなぐ。
+/// 入ったフォルダの相対パスも集める
 fn input_of(base: &Path) -> GhostInput {
-    fn walk(dir: &Path, prefix: &str, out: &mut Vec<String>) {
+    fn walk(dir: &Path, prefix: &str, out: &mut Vec<String>, dirs: &mut Vec<String>) {
         for entry in fs::read_dir(dir).unwrap() {
             let entry = entry.unwrap();
             let name = entry.file_name().to_string_lossy().into_owned();
             let rel = format!("{prefix}{name}");
             if entry.file_type().unwrap().is_dir() {
                 if rel != "profile" {
-                    walk(&entry.path(), &format!("{rel}/"), out);
+                    walk(&entry.path(), &format!("{rel}/"), out, dirs);
+                    dirs.push(rel);
                 }
             } else {
                 out.push(rel);
@@ -58,7 +60,8 @@ fn input_of(base: &Path) -> GhostInput {
         }
     }
     let mut entries = Vec::new();
-    walk(base, "", &mut entries);
+    let mut dirs = Vec::new();
+    walk(base, "", &mut entries, &mut dirs);
     let pasta_toml = match fs::read_to_string(base.join("pasta.toml")) {
         Ok(text) => TomlSource::Text { text },
         Err(_) => TomlSource::Missing,
@@ -66,6 +69,7 @@ fn input_of(base: &Path) -> GhostInput {
     GhostInput {
         pasta_toml,
         entries,
+        dirs,
     }
 }
 

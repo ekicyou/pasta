@@ -74,7 +74,8 @@ fn outcome_of(report: &Report) -> ValidateOutcome {
 /// ghost/master の一覧と pasta.toml を読み、核が選んだ辞書ファイルの中身を集める
 fn collect(master: &Path) -> Result<(GhostInput, BTreeMap<String, FileText>), String> {
     let mut found = Vec::new();
-    walk(master, "", &mut found)?;
+    let mut dirs = Vec::new();
+    walk(master, "", &mut found, &mut dirs)?;
 
     let pasta_toml = match fs::read(master.join("pasta.toml")) {
         Err(e) if e.kind() == io::ErrorKind::NotFound => TomlSource::Missing,
@@ -91,6 +92,7 @@ fn collect(master: &Path) -> Result<(GhostInput, BTreeMap<String, FileText>), St
     let input = GhostInput {
         pasta_toml,
         entries: found.iter().map(|(rel, _)| rel.clone()).collect(),
+        dirs,
     };
 
     let paths: BTreeMap<&str, &PathBuf> = found.iter().map(|(r, p)| (r.as_str(), p)).collect();
@@ -109,9 +111,14 @@ fn collect(master: &Path) -> Result<(GhostInput, BTreeMap<String, FileText>), St
     Ok((input, files))
 }
 
-/// 再帰で (相対パス '/' 区切り, 実際のパス) を集める。最上位の profile に入らず、
-/// シンボリックリンクはたどらず含めない
-fn walk(dir: &Path, prefix: &str, out: &mut Vec<(String, PathBuf)>) -> Result<(), String> {
+/// 再帰でファイルの (相対パス '/' 区切り, 実際のパス) と、入ったフォルダの相対パスを集める。
+/// 最上位の profile に入らず、シンボリックリンクはたどらず含めない
+fn walk(
+    dir: &Path,
+    prefix: &str,
+    out: &mut Vec<(String, PathBuf)>,
+    dirs: &mut Vec<String>,
+) -> Result<(), String> {
     let err = |e: io::Error| format!("{} を読めません: {e}", dir.display());
     for entry in fs::read_dir(dir).map_err(err)? {
         let entry = entry.map_err(err)?;
@@ -125,7 +132,8 @@ fn walk(dir: &Path, prefix: &str, out: &mut Vec<(String, PathBuf)>) -> Result<()
         }
         let rel = format!("{prefix}{name}");
         if file_type.is_dir() {
-            walk(&entry.path(), &format!("{rel}/"), out)?;
+            walk(&entry.path(), &format!("{rel}/"), out, dirs)?;
+            dirs.push(rel);
         } else {
             out.push((rel, entry.path()));
         }
@@ -239,11 +247,27 @@ mod tests {
             entries,
             vec!["dic/profile/b.pasta", "dic/sub/a.pasta", "pasta.toml"]
         );
+        let mut dirs = input.dirs.clone();
+        dirs.sort();
+        assert_eq!(dirs, vec!["dic", "dic/profile", "dic/sub"]);
         assert!(matches!(input.pasta_toml, TomlSource::Text { .. }));
         assert_eq!(
             files.keys().collect::<Vec<_>>(),
             vec!["dic/profile/b.pasta", "dic/sub/a.pasta"]
         );
+    }
+
+    /// 一覧: 中身の無いフォルダや辞書の名前のフォルダも dirs に入る（Req 2.3）
+    #[test]
+    fn test_collect_dirs() {
+        let (_t, _target, master) = ghost();
+        fs::create_dir_all(master.join("dic/x.pasta")).unwrap();
+        fs::create_dir_all(master.join("profile/sub")).unwrap();
+        let (input, _) = collect(&master).unwrap();
+        let mut dirs = input.dirs.clone();
+        dirs.sort();
+        assert_eq!(dirs, vec!["dic", "dic/x.pasta"]);
+        assert!(input.entries.is_empty(), "{:?}", input.entries);
     }
 
     /// 中身: UTF-8 で読めないのは NotUtf8、読めないのは Unreadable。pasta.toml の有無
@@ -280,6 +304,7 @@ mod tests {
         symlink(outside.join("x.pasta"), master.join("dic/l.pasta")).unwrap();
         let (input, _) = collect(&master).unwrap();
         assert!(input.entries.is_empty(), "{:?}", input.entries);
+        assert_eq!(input.dirs, vec!["dic"]);
     }
 
     /// 読むだけ: 実行の前後で一覧が変わらない

@@ -412,9 +412,17 @@ mod tests {
         use std::collections::BTreeMap;
 
         let input: GhostInput = serde_json::from_str(
-            r#"{"pastaToml":{"kind":"missing"},"entries":["dic/a.pasta","dic/b.pasta","dic/c.pasta"]}"#,
+            r#"{"pastaToml":{"kind":"missing"},"entries":["dic/a.pasta","dic/b.pasta","dic/c.pasta"],"dirs":["dic"]}"#,
         )
         .expect("GhostInput should deserialize from the JS shape");
+        // dirs は必須（既定値なし）。付け忘れは形の誤り
+        assert!(
+            serde_json::from_str::<GhostInput>(
+                r#"{"pastaToml":{"kind":"missing"},"entries":["dic/a.pasta"]}"#
+            )
+            .is_err(),
+            "GhostInput without dirs must not deserialize"
+        );
         let files: BTreeMap<String, FileText> = serde_json::from_str(
             r#"{"dic/a.pasta":{"kind":"text","text":"＊会話\n"},
                 "dic/b.pasta":{"kind":"notUtf8"},
@@ -425,8 +433,10 @@ mod tests {
             r#"{"kind":"text","text":"x"}"#,
             r#"{"kind":"unreadable","reason":"r"}"#,
         ] {
-            serde_json::from_str::<GhostInput>(&format!(r#"{{"pastaToml":{kind},"entries":[]}}"#))
-                .expect("TomlSource should deserialize from the JS shape");
+            serde_json::from_str::<GhostInput>(&format!(
+                r#"{{"pastaToml":{kind},"entries":[],"dirs":[]}}"#
+            ))
+            .expect("TomlSource should deserialize from the JS shape");
         }
 
         let selected = select_dictionary_files(&input);

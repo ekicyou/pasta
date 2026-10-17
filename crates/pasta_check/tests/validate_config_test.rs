@@ -13,6 +13,7 @@ fn ghost() -> (GhostInput, BTreeMap<String, FileText>) {
     let input = GhostInput {
         pasta_toml: TomlSource::Text { text: TOML.into() },
         entries: vec!["pasta.toml".into(), "dic/talk.pasta".into()],
+        dirs: vec![],
     };
     let files = select_dictionary_files(&input)
         .into_iter()
@@ -46,6 +47,7 @@ fn input_reads_camel_case_with_kind_tag() {
         r#"
         [input]
         entries = ["dic/a.pasta"]
+        dirs = ["dic"]
         pastaToml = { kind = "unreadable", reason = "denied" }
         [files]
         "dic/a.pasta" = { kind = "text", text = "x" }
@@ -58,6 +60,7 @@ fn input_reads_camel_case_with_kind_tag() {
         matches!(doc.input.pasta_toml, TomlSource::Unreadable { ref reason } if reason == "denied")
     );
     assert_eq!(doc.input.entries, vec!["dic/a.pasta"]);
+    assert_eq!(doc.input.dirs, vec!["dic"]);
     assert!(matches!(&doc.files["dic/a.pasta"], FileText::Text { text } if text == "x"));
     assert!(matches!(doc.files["dic/b.pasta"], FileText::NotUtf8));
     assert!(
@@ -78,6 +81,7 @@ fn config_findings(src: TomlSource) -> Vec<Finding> {
         pasta_toml: src,
         // 辞書が無いことの注意（no-dictionary-files）を混ぜない
         entries: vec!["dic/a.pasta".into()],
+        dirs: vec![],
     };
     validate_ghost(&input, &BTreeMap::new())
         .findings
@@ -305,6 +309,7 @@ fn input_with(patterns: &[&str], entries: &[&str]) -> GhostInput {
             text: format!("[loader]\npasta_patterns = [{list}]\n"),
         },
         entries: entries.iter().map(|e| e.to_string()).collect(),
+        dirs: vec![],
     }
 }
 
