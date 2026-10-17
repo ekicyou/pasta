@@ -158,7 +158,7 @@ areka の側の作業が一番重い。依頼が遅れるほど、0.5.0 が遅�
 ## Upstream / Downstream
 
 - **Upstream**: なし。
-- **Downstream**: `cue-command-runtime`・`scene-stage-attributes`・`novel-talk-flow`・`novel-checkpoint-rollback`・`novel-save-slots`・`shell-element-click`・`hello-novel-sample`・`manual-novel-guide`。areka の側の brief 群。
+- **Downstream**: `cue-command-runtime`（2026-10-17 に `scene-stage-attributes` をまとめた）・`novel-talk-flow`・`novel-checkpoint-rollback`・`novel-save-slots`・`shell-element-click`・`hello-novel-sample`・`manual-novel-guide`。areka の側の brief 群。
 
 ## Existing Spec Touchpoints
 
