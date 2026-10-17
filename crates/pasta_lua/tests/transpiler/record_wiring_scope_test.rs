@@ -138,7 +138,7 @@ fn local_scene_header_records_definition_pasta_line() {
         // 追加された。本テストは行マッピング記録のみを観測するため、親参照は任意の決定的
         // 値で良い（record_scene の join_key 構築にのみ使われ、record_line 記録には影響しない）。
         codegen
-            .generate_local_scene(&scene, 1, &actors, "会話#1")
+            .generate_local_scene(&scene, 1, &actors, "会話#1", "会話")
             .unwrap();
     }
 

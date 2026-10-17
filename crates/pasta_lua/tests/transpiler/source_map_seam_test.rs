@@ -274,7 +274,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, \"メイン\")
 
         act:actor_proxy(\"さくら\"):talk(\"「こんにちは」\")
         act:actor_proxy(\"うにゅう\"):talk(\"「やあ」\")

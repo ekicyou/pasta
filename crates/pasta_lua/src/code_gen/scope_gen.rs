@@ -94,7 +94,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     ///     function SCENE.__start__(act, ...)
     ///         local args = { ... }
-    ///         local save, var = act:init_scene(SCENE)
+    ///         local save, var = act:init_scene(SCENE, "シーン名")
     ///         -- ...
     ///     end
     ///
@@ -185,7 +185,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             // Parent reference for the local join key: "{base}#{counter}" identifies
             // the enclosing global occurrence (matches runtime per-base ordering).
             let parent_ref = format!("{}#{}", base_name, scene_counter);
-            self.generate_local_scene(local_scene, counter, &scene.actors, &parent_ref)?;
+            self.generate_local_scene(
+                local_scene,
+                counter,
+                &scene.actors,
+                &parent_ref,
+                &scene.name,
+            )?;
         }
 
         // Generate code blocks at module level (after all local scene functions)
@@ -212,7 +218,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// ```lua
     /// function SCENE.シーン名_N(act, ...)
     ///     local args = { ... }
-    ///     local save, var = act:init_scene(SCENE)
+    ///     local save, var = act:init_scene(SCENE, "書いたグローバル名", "書いたローカル名")
     ///     -- items...
     /// end
     /// ```
@@ -227,12 +233,16 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// (`"{base}#{counter}"`); it is combined with this local's `fn_name` to form the
     /// local scene join key recorded to the source-map sink (see
     /// `generate_global_scene`'s JOIN-KEY ENCODING doc).
+    ///
+    /// `written_global_name` は作者が書いたグローバルシーン名（別名で置き換える前・記号を直す前。
+    /// 単独の `＊` 行は受け継いだ名前）。ローカル名とともに `init_scene` へ文字列で渡す。
     pub fn generate_local_scene(
         &mut self,
         scene: &LocalSceneScope,
         counter: usize,
         actors: &[SceneActorItem],
         parent_ref: &str,
+        written_global_name: &str,
     ) -> Result<(), TranspileError> {
         let fn_name = if let Some(ref name) = scene.name {
             SceneRegistry::registered_name(name, counter)
@@ -265,7 +275,16 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         // Session initialization: args and init_scene come first
         self.writeln("local args = { ... }")?;
-        self.writeln("local save, var = act:init_scene(SCENE)")?;
+        // 作者が書いた名前（別名・記号を直す前）を渡す。__start__ はローカル名を渡さない。
+        let mut init_args = StringLiteralizer::literalize(written_global_name)?;
+        if let Some(ref name) = scene.name {
+            init_args.push_str(", ");
+            init_args.push_str(&StringLiteralizer::literalize(name)?);
+        }
+        self.writeln(&format!(
+            "local save, var = act:init_scene(SCENE, {})",
+            init_args
+        ))?;
 
         // Generate actor initialization block for __start__ only (counter == 0)
         // Order: init_scene -> clear_spot -> set_spot(s)

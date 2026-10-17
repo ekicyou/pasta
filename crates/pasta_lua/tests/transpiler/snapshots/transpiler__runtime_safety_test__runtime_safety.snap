@@ -25,7 +25,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン")
 
         act:actor_proxy("さくら"):talk("開始")
         act:actor_proxy("さくら"):talk((act:global_fn("未定義関数")))

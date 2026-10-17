@@ -20,7 +20,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン")
 
         act:call_restore(SCENE.__global_name__, "単一呼び出し", {}, table.unpack(args))
         act:call_restore(SCENE.__global_name__, "複数呼び出し", {}, table.unpack(args))
@@ -30,14 +30,14 @@ do
 
     function SCENE.単一呼び出し_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "単一呼び出し")
 
         return act:call(SCENE.__global_name__, "シーン2", {}, table.unpack(args))
     end
 
     function SCENE.複数呼び出し_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "複数呼び出し")
 
         act:call_restore(SCENE.__global_name__, "シーン1", {}, table.unpack(args))
         act:call_restore(SCENE.__global_name__, "シーン2", {}, table.unpack(args))
@@ -46,7 +46,7 @@ do
 
     function SCENE.呼び出し後にアクション_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "呼び出し後にアクション")
 
         act:call_restore(SCENE.__global_name__, "シーン2", {}, table.unpack(args))
         act:actor_proxy("さくら"):talk("こんにちは")
@@ -54,7 +54,7 @@ do
 
     function SCENE.呼び出しなし_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "呼び出しなし")
 
         act:actor_proxy("さくら"):talk("こんにちは")
         act:actor_proxy("うにゅう"):talk("やふぅ")
@@ -62,21 +62,21 @@ do
 
     function SCENE.シーン1_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "シーン1")
 
         act:actor_proxy("さくら"):talk("シーン1です")
     end
 
     function SCENE.シーン2_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "シーン2")
 
         act:actor_proxy("うにゅう"):talk("シーン2やで")
     end
 
     function SCENE.シーン3_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "シーン3")
 
         act:actor_proxy("さくら"):talk("シーン3だよ")
     end

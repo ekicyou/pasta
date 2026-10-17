@@ -25,7 +25,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン")
         act:clear_spot()
         act:set_spot("さくら", 0)
         act:set_spot("うにゅう", 1)
@@ -41,7 +41,7 @@ do
 
     function SCENE.グローバル単語呼び出し_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "グローバル単語呼び出し")
 
         act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("笑顔"))
         act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("挨拶"))
@@ -52,7 +52,7 @@ do
 
     function SCENE.ローカル単語呼び出し_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "ローカル単語呼び出し")
 
         act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("通常"))
         act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("場所"))
@@ -63,7 +63,7 @@ do
 
     function SCENE.会話分岐_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "会話分岐")
 
         act:actor_proxy("さくら"):talk("ローカル分岐１だよ。")
         act:actor_proxy("うにゅう"):talk("ちっぽけやね。")
@@ -71,7 +71,7 @@ do
 
     function SCENE.会話分岐_2(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "会話分岐")
 
         act:actor_proxy("さくら"):talk("ローカル分岐２だよ。")
         act:actor_proxy("うにゅう"):talk("もっと飛べる、ワイは飛べるんや！")
@@ -81,7 +81,7 @@ do
 
     function SCENE.変数代入_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "変数代入")
 
         act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("通常"))
         act:actor_proxy("さくら"):talk("変数を代入。")
@@ -93,7 +93,7 @@ do
 
     function SCENE.引数付き呼び出し_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "引数付き呼び出し")
 
         act:actor_proxy("さくら"):talk("第１引数は")
         act:actor_proxy("さくら"):talk(args[1], "args[1]")
@@ -105,7 +105,7 @@ do
 
     function SCENE.グローバル関数呼び出し_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "グローバル関数呼び出し")
 
         act:actor_proxy("さくら"):talk((act:global_fn("グローバル関数", "グローバル")))
         act:actor_proxy("さくら"):talk("　を呼んだよ。")
@@ -118,7 +118,7 @@ do
 
     function SCENE.共有プロパティ操作_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "共有プロパティ操作")
 
         act:set_property("system.name", "テストゴースト")
         var.ゴースト名 = act:get_property("currentghost.name")
@@ -138,7 +138,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "会話分岐")
 
         act:actor_proxy("さくら"):talk("グローバルの分岐に飛んできた。")
         act:actor_proxy("うにゅう"):talk("世界取れるで。")

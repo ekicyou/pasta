@@ -8,7 +8,7 @@ use crate::common;
 use common::normalize_line_endings;
 use pasta_dsl::parse_str;
 use pasta_dsl::parser::{ActorScope, FileItem, GlobalSceneScope};
-use pasta_lua::{LuaTranspiler, TranspilerConfig};
+use pasta_lua::{LuaTranspiler, SceneAliasTable, TranspilerConfig};
 
 /// Helper to get global scene scopes from PastaFile
 fn get_global_scene_scopes(file: &pasta_dsl::parser::PastaFile) -> Vec<&GlobalSceneScope> {
@@ -140,9 +140,18 @@ fn test_transpile_sample_pasta_scenes() {
         lua_code.contains("local args = { ... }"),
         "Missing args initialization"
     );
+    // 書いたシーン名を渡す（__start__ はグローバル名だけ・runtime-error-balloon 2.4）
     assert!(
-        lua_code.contains("local save, var = act:init_scene(SCENE)"),
-        "Missing session initialization"
+        lua_code
+            .lines()
+            .any(|l| l.trim() == r#"local save, var = act:init_scene(SCENE, "メイン")"#),
+        "Missing session initialization: {}",
+        lua_code
+    );
+    assert!(
+        lua_code.contains("local save, var = act:init_scene(SCENE, \"メイン\", \"自己紹介\")"),
+        "Missing local scene session initialization: {}",
+        lua_code
     );
 
     // Verify local scene function (Requirement 3c)
@@ -407,5 +416,64 @@ fn test_transpile_reference_code_patterns() {
         coverage >= 50.0,
         "Pattern coverage too low: {:.1}%. Expected at least 50%.",
         coverage
+    );
+}
+
+/// `init_scene` には、別名で置き換える前・記号を識別子に直す前の、書いたとおりの名前を
+/// 文字列で渡す。単独の `＊` 行は受け継いだ名前を渡す（runtime-error-balloon 2.4, 2.7）。
+#[test]
+fn test_init_scene_receives_written_scene_names() {
+    let source = "\
+％さくら
+　＠通常：\\s[0]
+
+＊会話
+　　さくら：こんにちは。
+　・朝・挨拶
+　　　さくら：おはよう。
+
+＊
+　　さくら：続きです。
+
+＊天気・雨
+　　さくら：雨です。
+";
+    let file = parse_str(source, "names.pasta").unwrap();
+    let transpiler = LuaTranspiler::new(
+        TranspilerConfig::new().with_scene_aliases(SceneAliasTable::builtin_default()),
+    );
+    let mut output = Vec::new();
+    transpiler.transpile(&file, &mut output).unwrap();
+    let lua_code = String::from_utf8(output).unwrap();
+
+    // 登録には別名・直した名前が使われる
+    assert!(
+        lua_code.contains(r#"PASTA.create_scene("OnTalk")"#),
+        "{lua_code}"
+    );
+    assert!(
+        lua_code.contains(r#"PASTA.create_scene("天気_雨")"#),
+        "{lua_code}"
+    );
+    assert!(
+        lua_code.contains("function SCENE.朝_挨拶_1(act, ...)"),
+        "{lua_code}"
+    );
+
+    // init_scene には書いた名前（単独の ＊ 行は受け継いだ `会話` を 2 回）
+    let init_lines: Vec<&str> = lua_code
+        .lines()
+        .map(str::trim)
+        .filter(|l| l.contains("act:init_scene("))
+        .collect();
+    assert_eq!(
+        init_lines,
+        vec![
+            r#"local save, var = act:init_scene(SCENE, "会話")"#,
+            r#"local save, var = act:init_scene(SCENE, "会話", "朝・挨拶")"#,
+            r#"local save, var = act:init_scene(SCENE, "会話")"#,
+            r#"local save, var = act:init_scene(SCENE, "天気・雨")"#,
+        ],
+        "{lua_code}"
     );
 }
