@@ -179,3 +179,97 @@
 
 ### 決めること（要件ディスカッションへ）
 - 要件ディスカッション（2026-10-17）で全部決めた。`requirements.md` の「決めた事項」を見る。
+
+---
+
+# 設計の調査と判断（2026-10-17・`/kiro-spec-design`）
+
+## Summary
+
+- **Feature**: `getting-started-screenshots`
+- **Discovery Scope**: Extension（軽い調査。既存の検査と執筆規約に足し、撮影は実機の手順として外に置く）
+- **Key Findings**:
+  - 開発機の画面の倍率は 200%（`HKCU\Control Panel\Desktop\WindowMetrics` の `AppliedDPI` が 192）で、SSP は `HighDPIAware,1`。要件の「倍率 100%」を守るには、立ち絵が 1:1 で写ることを試し撮りで確かめる関門が要る。
+  - SSP のプロパティ `currentghost.scope(ID).rect` と `currentghost.balloon.scope(ID).rect` で、立ち絵と吹き出しの矩形が読める。範囲はこの 4 つの外接の矩形で決まり、補助スクリプトは要らない。
+  - 既定のバルーン `ssp`（「SSPデフォルト+」）は、女の子の吹き出し 335×169・男の子の吹き出し 335×96・文字の高さ 12 px。2 人と吹き出し 2 つを入れた範囲は幅 900〜1,000 px になる見込みで、本文の幅（mdBook の既定 750 px）より広い。広い画面での読みやすさ（要件 3.6）が設計の最大の未決。
+
+## Research Log
+
+### 送り主の表示（SSTP のマーカー）
+- **Context**: 要件 2.5。外から台詞を起こすと、吹き出しに送り主の表示が出るか。
+- **Sources Consulted**: UKADOC `\![set,balloonmarker]`・`\![execute,dumpballoon]`、SSP の MCP の `dump_balloon` の説明、SSP ヘルプ「開発用パレット」。
+- **Findings**: マーカーは「SSTP で受信したスクリプトの再生中」に出る。MCP の `raise_event` は「返ったスクリプトを再生する」と書かれており、SSTP の経路で再生される見込みがある。`sakurascript` で送る `\![raise,…]` は、送ったスクリプト自体には台詞が無く、台詞はゴーストが返す別のスクリプトになる。ゴーストが返したスクリプトにマーカーが付くかは、文書から決められない。
+- **Implications**: 試し撮りの関門で確かめる。既定は `sakurascript` の `\![raise,…]`。だめなら、起動・自然なおしゃべり・実際のマウスに寄せ、残りは報告する。
+
+### 写す範囲と画面の倍率
+- **Context**: 要件 3.6・6.1。
+- **Sources Consulted**: UKADOC のプロパティシステム（`currentghost.scope(ID).rect`・`currentghost.balloon.scope(ID).rect`）、`C:/wintools/ssp/balloon/ssp/`（画像の大きさ・`descript.txt` の `font.height,12`）、`data/profile/app.dat`（`HighDPIAware,1`）、レジストリの `AppliedDPI`、mdBook の既定の `--content-max-width: 750px`、シェルの `descript.txt`（吹き出しの位置 4 行）。
+- **Findings**: 範囲は 4 つの矩形から機械的に決まる。幅は 900〜1,000 px の見込み（男の子の吹き出しが男の子の左、女の子の吹き出しが男の子の上）。本文の幅に縮めると文字は 9〜10 px になる。
+- **Implications**: 範囲の幅 900 px を目安にし、超えたら位置の工夫を試して報告する（OPEN QUESTION 1）。倍率は 1:1 を関門にする（OPEN QUESTION 2）。
+
+### 写し方
+- **Context**: 要件 2.1・4.2・4.3。3 段目の 1 枚目は、`\w9`（450 ms）と「？」の後の待ち（500 ms）の約 1 秒しかない。
+- **Sources Consulted**: ffmpeg n8.1.1（ShareX 同梱）の `gdigrab`、`pasta.toml` の `[talk]`。
+- **Findings**: `gdigrab` の連番出力（`-framerate 10`・`-draw_mouse 0`・`-pix_fmt rgb24`）なら、写す瞬間を後から選べ、吹き出しが消えるまでの時間とも競わない。選んだ 1 枚は ffmpeg が書いた可逆の PNG のまま使える。
+- **Implications**: 16 枚とも同じ写し方にする（単発の撮影と連番の 2 通りを持たない）。
+
+### 狙った台詞と待つ場面
+- **Context**: 要件 6.3〜6.5。
+- **Sources Consulted**: 各章の「起動して確かめる」、`dic/03-face.pasta`・`dic/08-touch.pasta`、`touch-poke-shortcuts` の design、`sakura-script-newline` の design（同一スポットの交代）。
+- **Findings**: 一巡の選ばれ方なので、外から最大「同じ名前のシーンの数」回起こせば当たる。6 段目は正時だけ。15 時なら 3 つの掛け合いのどれが出ても本文の例と一字一句同じになる（12 時は 1 つに決まる）。8 段目のショートカットは、男の子はどこでも `男の子その他`、女の子の `Body` と判定の外はどちらも `その他` に行くので、部位の名前は台詞では区別できない。開発用パレットの「当たり判定を表示」で名前を画面で読める。`sakura-script-newline` 5.1 (c) は、hello-pasta の 2 人がスポット 0・1 に分かれているので、段の辞書では出せない。
+- **Implications**: 一覧の「出し方」に最大回数を書く。部位の裏取りは当たり判定の表示を使う。5.1 (c) は作業用の複製の中だけで、スポット 0 を共有するアクターと確かめ用の辞書を足す。
+
+### 画像の行と検査
+- **Context**: 要件 5.3〜5.10。
+- **Sources Consulted**: `book/tools/tutorial-check.mjs`（`findProseParagraphs`）、`tutorial-check-test.mjs`（B-8e）、`verify-content.mjs`（`C-prose`・`T-assets`・`T-authoring`）、`verify-static.mjs`、`link-check.mjs`。
+- **Findings**: `findProseParagraphs` はフェンスの開きの長さを覚えているので、関数の中では 4 本フェンスの問題は起きない。除外を 1 つ足すだけで、空の代わりの文は既存の `C-prose` が `章:行「先頭行」` で名指しする。`T-authoring` は第 7 節（台詞部品）だけを見るので、第 8 節の書き直しは当たらない。
+- **Implications**: `verify-content.mjs` は変えない（要件 5.9 は発動しない）。
+
+## Architecture Pattern Evaluation
+
+| 案 | 内容 | 強み | 弱み | 判断 |
+| -- | -- | -- | -- | -- |
+| 実機の手順だけ（採用） | リポジトリは絵と参照だけ。撮影は `book/SCREENSHOTS.md` の手順で手作業 | 新しいコードが最小。CI は道具なしで通る | 撮り直しに実機と人手が要る | 要件 6.8・決めた事項 Q7 に合う |
+| 撮影の補助スクリプトをコミット | 範囲の計算と ffmpeg の呼び出しを 1 本のスクリプトに | 撮り直しが速い | 保守するコードが増える。MCP は Claude のセッションからしか呼べず、スクリプトから SSP の状態を読む道が別に要る | 作らない。範囲は 4 つの値の最小・最大、写すのは 1 行 |
+| MCP の書き出し（部品）を並べる | `dump_surface`・`dump_balloon` | 背景が透過 | 部品の組み合わせ（要件 2.1 に反する） | 採らない |
+
+## Design Decisions
+
+### Decision: 画像の行は `findProseParagraphs` の除外 1 つで扱う
+- **Context**: 要件 5.3〜5.5・決めた事項 Q4。
+- **Alternatives Considered**: 1) 表や箇条書きに入れて今の検査に通す 2) 新しい検査を `verify-content.mjs` に足す 3) 除外 1 つ（採用）
+- **Selected Approach**: 1 行で、空白以外の字を含む代わりの文の画像 1 つだけの段落を除外する。空の代わりの文・混ざった段落・2 つの画像は除外しない。
+- **Rationale**: 1 つの規則で 5.3・5.4・5.5 を満たす。`verify-content.mjs` を触らない。
+- **Trade-offs**: 空の代わりの文の報告の文言は「指示の一文でない段落」のまま（先頭行に `![](` が出るので原因は読める）。
+- **Follow-up**: 自己テストの例 7 つ。
+
+### Decision: 撮影の手順の記録は `book/SCREENSHOTS.md`
+- **Context**: 要件 6.1・研究の申し送り。
+- **Alternatives Considered**: 1) `AUTHORING.md` 第 8 節の中 2) `book/src/` の下 3) spec の中だけ 4) `book/` の直下（採用）
+- **Selected Approach**: `book/` の直下に置き、第 8 節から相対リンクで指す。
+- **Rationale**: 16 行の一覧と後片付けの表を規約に入れると第 8 節が太る。`book/src/` の外なので mdBook とリンク検査に入らない。spec の中だけだと完了後に見つけにくい。
+- **Trade-offs**: 文書が 1 つ増える。
+
+### Decision: 絵は `book/src/img/getting-started/` に英字の名前で
+- **Context**: 要件 4.4・4.5。
+- **Selected Approach**: `NN-name.png`・`NN-name-場面.png`（場面は英小文字の短い語: `surprised`・`shy`・`poke`・`stroke`・`menu`・`snack`・`detour`・`continue`）。`index.md` は `09-choice-menu.png` を共有する。
+- **Rationale**: `T-assets`（`claudia/`）・`shell_assets_test.rs`（`hello-pasta/` の 2 枚）と役目が混ざらない。URL に日本語を入れない。
+
+### Decision: 16 枚とも同じ範囲・同じ写し方
+- **Context**: 要件 2.1・6.2・3 段目の 1 枚目の短い瞬間。
+- **Selected Approach**: 2 人と吹き出し 2 つの外接の矩形を 1 回決め、`gdigrab` の連番から 1 枚を選ぶ。
+- **Rationale**: 撮り直しで同じ構図になる。写し方が 1 通りで済む。
+
+## Risks & Mitigations
+
+- R1 送り主の表示がどのきっかけでも出る — 外から起こさずに出せる場面に寄せ、残りは報告する。
+- R2 範囲が広すぎて文字が小さい — 男の子を女の子に寄せて試し、だめなら報告する。
+- R3 外から起こした寄り道の後に続きが出ない — 寄り道も自然なおしゃべりで待つ。
+- R4 `--ghost` の起動で `＄＊回数` が終了をまたいで残らない — 止める点として報告する。
+- R5 人手の確認で不具合が見つかる — 記録して報告する。本 spec では直さない。
+
+## 参照したスキル・指針
+
+- `.claude/skills/kiro-spec-design/rules/`（design-principles・design-discovery-light・design-synthesis・design-review-gate）: 境界を先に書く・補助の部品を作らない・要件の番号の機械照合。
+- 記憶 `ssp-ghost-test-launch`（`--ghost` の絶対パス・名前の衝突は複製して改名）、`ffmpeg-sharex-path`（フルパスで呼ぶ）、`high-completeness-or-reject`（部分出荷をしない）。
+- 前例: `hello-pasta-shell-art` 6.1・`hello-pasta-tutorial-stages` 6.1 の実装メモ（実機の起動と後片付け）。
