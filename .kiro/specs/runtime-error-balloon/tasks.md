@@ -117,3 +117,4 @@
 - 3.3: 警告の中身は `FAILURE.body`（枠なし・無効化なし）。`FAILURE.format` は無効化＋枠＋`FAILURE.body` で、出力は不変（research.md「警告の中身」）。応答は `RES.ok` ＋ `X-Error-Reason`（200）。
 - 4.1: 既存の 500 のテストは Lua なら `with_balloon_warning`（shiori_entry_test）、Rust なら `tests/common/mod.rs` の `pin_balloon_warning_off(&runtime)` で表記を出さない設定に固定する。`time_out` は `EVENT.drive` の直後に必ず `STOP.take()` すること（でないと同じ要求の中の別の止まるエラーに古い控えが混ざる）。
 - 検証: 既知の粗さ（直さない）— アクターの単語のハンドラなど `restore_scene` の後に同じシーンで止まると、場所とローカル名は出ず `＊グローバル名` だけになる（設計議題 2）。作者が `pcall` で `EVENT.drive` の失敗を握りつぶした後に同じ要求のハンドラが止まると、古い控えの名前が使われうる（まれ）。`pasta_lua` の公開の形（`LoaderContext.transpiled_output_dir`・`generate_local_scene` の引数・`LineMapSlot`）が変わった。
+- 完了時にその場で解決: 追跡している生成物 `crates/pasta_lua/tests/fixtures/sample.generated.lua` が古い `init_scene(SCENE)` のままだったので、テストが書き出す最新（`sample.expected.lua` と同じ中身）にそろえた。
