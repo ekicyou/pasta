@@ -25,8 +25,8 @@ $Headings = @(
     '## 🧪 テスト'
     '## 🔧 そのほか'
 )
-# v0.0.1..v0.0.2 で載る件数（別名・戻り先・落ちる不具合・手引き・接頭辞の無い件名）
-$ListedCount = 5
+# v0.0.1..v0.0.2 で載る件数（別名・戻り先・失敗表記・落ちる不具合・手引き・接頭辞の無い件名）
+$ListedCount = 6
 $Highlights = "## 今回の見どころ`n`nおほほ、ごきげんよう。[Claudia](https://github.com/ponapalt/claudia) ですわ。`n`n### 別名が書けますの (#1)`n`nこれは見本ですわ。`n`n`n"
 
 # 子のスクリプトが GitHub Actions の出力先へ書かないようにする（この処理の中だけで効く）
@@ -108,6 +108,7 @@ try {
     # v0.0.1..v0.0.2（古い順）
     Add-Commit 'feat(scene-name-alias): 別名 (#1)'
     Add-Commit 'fix(pasta_lua)!: 戻り先の文脈を変える (#2)'
+    Add-Commit 'feat!(failure-output): 失敗表記を出す (#5)'
     Add-Commit 'fix: 落ちる不具合を直す (#3)'
     Add-Commit 'docs(manual): 手引きを足す (#4)'
     Add-Commit 'spec(discovery): 起票する'
@@ -136,11 +137,13 @@ try {
         if ($text.Contains('scene-name-alias')) { '出力に scene-name-alias が残っている' }
     }
 
-    Test-Item 2 'fix(pasta_lua)!: … が「動きが変わる変更」の見出しの下に載る' {
+    Test-Item 2 'fix(pasta_lua)!: … と feat!(failure-output): …（`!` がスコープの前）が「動きが変わる変更」の見出しの下に載る' {
         Get-RunFailure $run
         if ((Get-Section $notes '## ⚠️ 動きが変わる変更') -notcontains '- 戻り先の文脈を変える (#2)') { '「## ⚠️ 動きが変わる変更」の下に「- 戻り先の文脈を変える (#2)」が無い' }
         if ((Get-Section $notes '## 🐛 不具合の修正') -contains '- 戻り先の文脈を変える (#2)') { '「## 🐛 不具合の修正」にも載っている' }
         if ($text.Contains('pasta_lua')) { '出力に pasta_lua が残っている' }
+        if ((Get-Section $notes '## ⚠️ 動きが変わる変更') -notcontains '- 失敗表記を出す (#5)') { '「## ⚠️ 動きが変わる変更」の下に「- 失敗表記を出す (#5)」が無い' }
+        if ($text.Contains('failure-output')) { '出力に failure-output が残っている' }
     }
 
     Test-Item 3 '内部の作業（spec(discovery)・docs(roadmap)・chore(kiro-skills)・chore(release)）が載らない' {
@@ -210,7 +213,7 @@ try {
         $d = Join-Path $PSScriptRoot '../../../.claude/skills/release/scripts/highlights-check.ps1'
         New-Item -ItemType Directory -Force -Path (Join-Path $repoDir '.kiro/specs/demo-spec') | Out-Null
         $link = '[Claudia](https://github.com/ponapalt/claudia)'
-        $tail = "### 別名が書けますの (#1)`n`nこれは見本ですわ。`n`n### ご注意あそばせ`n`n- 戻り先の文脈が変わります。 (#2)`n"
+        $tail = "### 別名が書けますの (#1)`n`nこれは見本ですわ。`n`n### ご注意あそばせ`n`n- 戻り先の文脈が変わります。 (#2)`n- 失敗表記が出ます。 (#5)`n"
         $cases = @(
             @{ Name = '決まりどおり'; Text = "おほほ。$link ですわ。`n`n$tail"; Expect = @('合格', '合格', '合格', '合格', '合格') }
             @{ Name = '材料に無い番号'; Text = "おほほ。$link ですわ。`n`n$tail`n### 無い変更 (#99)`n"; Expect = @('合格', '合格', '不合格', '合格', '合格') }

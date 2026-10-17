@@ -97,11 +97,12 @@ $groups = @{}
 foreach ($key in $Headings.Keys) { $groups[$key] = [System.Collections.Generic.List[string]]::new() }
 foreach ($s in $subjects) {
     # 1. 決まった形でない → そのまま「そのほか」
-    if ($s -notmatch '^(\w+)(?:\(([^)]*)\))?(!)?:\s+(.+)$') { $groups['other'].Add($s); continue }
+    # `!` はスコープの後（正しい形）でも前（`feat!(scope):` の書き間違い）でも受け付ける
+    if ($s -notmatch '^(\w+)(!)?(?:\(([^)]*)\))?(!)?:\s+(.+)$') { $groups['other'].Add($s); continue }
     $type = $Matches[1].ToLowerInvariant()
-    $scope = $Matches[2]
-    $breaking = [bool]$Matches[3]
-    $text = $Matches[4]   # 本文だけを載せる。末尾の (#83) は本文の一部なので残る
+    $scope = $Matches[3]
+    $breaking = [bool]$Matches[2] -or [bool]$Matches[4]
+    $text = $Matches[5]   # 本文だけを載せる。末尾の (#83) は本文の一部なので残る
     # 2. 内部の作業 → 載せない
     if (Test-Internal $type $scope) { continue }
     # 3. `!` → 動きが変わる変更、4. 種類の見出し（5 種以外は「そのほか」）
