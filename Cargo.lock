@@ -960,7 +960,7 @@ dependencies = [
 
 [[package]]
 name = "pasta_check"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "ctor",
  "getrandom 0.4.3",
@@ -978,7 +978,7 @@ dependencies = [
 
 [[package]]
 name = "pasta_core"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "fast_radix_trie",
  "rand",
@@ -987,7 +987,7 @@ dependencies = [
 
 [[package]]
 name = "pasta_dsl"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "pest",
  "pest_derive",
@@ -996,7 +996,7 @@ dependencies = [
 
 [[package]]
 name = "pasta_lsp"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "pasta_check",
  "pasta_dsl",
@@ -1010,7 +1010,7 @@ dependencies = [
 
 [[package]]
 name = "pasta_lua"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "budouy",
  "ctor",
@@ -1040,7 +1040,7 @@ dependencies = [
 
 [[package]]
 name = "pasta_sample_ghost"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "ctor",
  "pasta_lua",
@@ -1052,7 +1052,7 @@ dependencies = [
 
 [[package]]
 name = "pasta_shiori"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "arc-swap",
  "ctor",
