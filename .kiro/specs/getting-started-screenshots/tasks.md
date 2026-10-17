@@ -131,7 +131,7 @@
   - _Requirements: 6.7, 7.5, 8.3_
 
 - [ ] 7. 検査と見た目で仕上がりを確かめる
-- [ ] 7.1 マニュアルの自動検査と回帰を通す
+- [x] 7.1 マニュアルの自動検査と回帰を通す
   - `tutorial-check-test.mjs`・`verify-content.mjs`・`verify-scripts-test.mjs` を回す
   - `mdbook build` の後に `verify-static.mjs`・`link-check.mjs` を回し、16 枚の参照先が実在し外部画像が無いことを見る。`gen-skill-refs.mjs --check` が変わらないことを見る
   - `T-assets` と `cargo test -p pasta_sample_ghost --test shell_assets_test` が通ることを見る（`cargo` の前に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す。外さないと LuaJIT のビルドが失敗する）
@@ -290,3 +290,43 @@
 - `app.dat` を作業の前の控えと比べると、違うのは `SelfUpdate.LastExec`・`DeleteTxt.LastVersion`（2.9.11 → 2.9.18）・`LangUpdate.LastExec` の 3 行だけ。3.2 で SSP が 2.9.18 に自動更新されたためで、版は戻せない（戻さない）。
 - `balloon/emo2-kakukaku` は 4.2 の確かめ直しの前に取った控えから戻し、差分が無い。ghost_dev の `project/emo2/ghost/emo2` は `git restore` で HEAD に戻し、`git status` は空。git の管理外の `profile/` に、`えも？？` を動かした間の保存とログが残っている（開発者に報告する。消すかどうかは開発者が決める）。
 - 作業用の複製・連番・確かめ用の `.nar`・ダウンロードした `emo2.nar`・白の背景の Edge（別のプロファイル）を消した。リポジトリの中の `release/`（`release.ps1` の出力。git の管理外）も消した。開発者のために開いたエクスプローラーの窓は残っている。
+
+### マニュアルの自動検査と回帰（7.1・2026-10-17）
+
+基準は HEAD `73db9f03`。どの検査も警告なしで通った。
+
+| コマンド | 結果 |
+| -------- | ---- |
+| `node book/tools/tutorial-check-test.mjs` | exit 0（132 passed, 0 failed） |
+| `node book/tools/verify-content.mjs` | exit 0（`RESULT: OK`。`T-assets` は `book/src/img/claudia` が登録簿の 16 枚と `LICENSE.txt` に一致し、各 20480 バイト以下で PASS） |
+| `node book/tools/verify-scripts-test.mjs` | exit 0（20 passed, 0 failed） |
+| `node book/tools/verify-static.mjs`（中で `mdbook build`（v0.5.4）と talk-html の変換をしてから `book/book` を検証） | exit 0（27 passed, 0 failed。8.5「link・script・img の絶対 URL が Google Fonts の 2 オリジンだけ」も PASS） |
+| `node book/tools/link-check.mjs` | exit 0（リンク切れ 0 件・スキル自己完結 0 件） |
+| `node book/tools/gen-skill-refs.mjs --check` | exit 0（24 件すべて最新・孤立なし） |
+| `cargo test -p pasta_sample_ghost --test shell_assets_test`（`NoDefaultCurrentDirectoryInExePath` を外して実行） | 11 passed, 0 failed |
+
+- 16 枚の参照: `book/src` の章にある `img/getting-started/*.png` の参照は 16 種類。ビルドした `book/book` の HTML の `src` も 16 種類で、全部が出力の中に実在した。`<img>` の `src` に `http(s)://` で始まる外部画像は 0 件。
+- 差分: `git diff --stat $(git merge-base HEAD origin/main) -- book/tools/verify-content.mjs crates/` は空（差分なし）。
+- 検査の後の `git status` は空（`book/book/` は `.gitignore` 済み）。
+
+16 枚の大きさ（バイト。上限 1 MB = 1048576 バイト。最大は `11-jump-detour.png` の 178138）:
+
+| ファイル | バイト |
+| -------- | -----: |
+| `01-boot.png` | 171687 |
+| `02-talk.png` | 176022 |
+| `03-face-shy.png` | 172168 |
+| `03-face-surprised.png` | 173964 |
+| `04-variety.png` | 171077 |
+| `05-words.png` | 172028 |
+| `06-hour.png` | 176521 |
+| `07-greeting.png` | 176283 |
+| `08-touch-poke.png` | 174522 |
+| `08-touch-stroke.png` | 174163 |
+| `09-choice-menu.png` | 174005 |
+| `09-choice-snack.png` | 171591 |
+| `10-save.png` | 171345 |
+| `11-jump-continue.png` | 175783 |
+| `11-jump-detour.png` | 178138 |
+| `12-lua.png` | 171579 |
+| 合計 | 2780876 |
