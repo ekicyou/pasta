@@ -203,7 +203,7 @@ function STOP.response(report)
         if not text or not report.shown then return nil end
         local reason = report.reason
         if reason == nil or reason == "" then reason = "Unknown error" end
-        return RES.ok(build_value(act, text), { ["X-Error-Reason"] = reason })
+        return RES.build(STOP.STATUS, { Value = build_value(act, text), ["X-Error-Reason"] = reason })
     end)
     if ok then return res end
     return nil
