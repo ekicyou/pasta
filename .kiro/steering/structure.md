@@ -229,11 +229,14 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       └── wasm/             # pasta_lsp WASMバイナリ（ビルド生成物）
 ├── book/                     # 利用者マニュアル（mdBook・GitHub Pages 公開）
 │   ├── book.toml            # mdBook 設定（language=ja, 検索有効, site-url）
+│   ├── AUTHORING.md         # マニュアルの執筆規約（第 8 節は入門ガイドの章の決まり・画像の行）
+│   ├── SCREENSHOTS.md       # 入門ガイドの絵の撮影の手順の記録（撮る環境・16 枚の一覧・後片付け・撮り直す決まり。手作業で撮る）
 │   ├── package.json         # book ツールの npm 依存（vscode-textmate/oniguruma/jsdom・lockfile コミット・node_modules 非コミット）
 │   ├── src/                 # 章ソース（grammar/lua/getting-started/reference/debug）
 │   │   ├── img/claudia/     # 台詞部品の顔アイコン 16 枚＋LICENSE.txt（ponapalt/claudia・Unlicense）
+│   │   ├── img/getting-started/ # 入門ガイドの絵 16 枚（実機の SSP で写した PNG。撮り方は SCREENSHOTS.md）
 │   │   └── internals/       # 内部設計パート（コントリビュータ向け・末尾パート）
-│   ├── theme/               # head.hbs（日本語 bigram 検索 tokenizer ＋ pasta ハイライト中和の override ＋ Web フォント）・claudia.css（Claudia テーマ: light/navy の配色・部品・台詞・扉・狭幅・印刷）・claudia.js（テーマメニューを Auto/Light/Navy に絞る・中間の幅で目次の開閉を次のページへ持ち越す）
+│   ├── theme/               # head.hbs（日本語 bigram 検索 tokenizer ＋ pasta ハイライト中和の override ＋ Web フォント ＋ 中間の幅で目次を描く前に開き直す claudiaSidebarEarly）・claudia.css（Claudia テーマ: light/navy の配色・部品・台詞・扉・狭幅・印刷）・claudia.js（テーマメニューを Auto/Light/Navy に絞る・中間の幅で目次の開閉を次のページへ持ち越す）
 │   ├── tools/               # build-time Node（スキル references 生成 gen-skill-refs・リンク検証 link-check・bigram 索引再生成・pasta 構文ハイライト・台詞部品 talk/（話し手と表情の登録簿 talk.mjs・ビルド後の吹き出し変換 talk-html.mjs）・検証 verify-*・テーマの対比テスト theme-test 等）
 │   └── book/                # mdbook build 生成物（.gitignore 済み・CI で再生成）
 ├── doc/
