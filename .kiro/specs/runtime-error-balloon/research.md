@@ -171,3 +171,75 @@
   2. ローカルシーン名の取り方。act はグローバルシーンの表しか持たない。止まったコルーチンの呼び出し履歴（`debug.getinfo(co, level, "f")`）の関数を、シーンの表の値と照らして引く案がある。失敗したときだけ調べるので、普段の重さは増えない。
   3. エラー文の場所の見分け方。変換した Lua のキャッシュ（`set_name(module_name)` のチャンク名）・`pasta_scripts/` の標準ランタイム・投げ直しの接頭辞を除き、ゴーストのフォルダーの中の `.lua` だけを、ゴーストのフォルダーから見た形で残す。LuaJIT が長いチャンク名の先頭を `...` に縮めることも考える。
   4. `.pasta` の行への読み替えはしない（`debug/source_map` はデバッガを有効にしたときだけ作るため）。
+
+---
+
+# 設計フェーズの調査（2026-10-17・main `29dcdb56`）
+
+## Summary（設計）
+- **Discovery Scope**: Extension（軽い調査。既存の 500 の出口に `pasta/failure.lua` をつなぐ。外部ライブラリは足さない）
+- **使ったスキル・規則**: `kiro-spec-design`（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）、`kiro-validate-design`（`design-review.md`）、`ponytail`（足さない・既存の部品を使う）。スキルの方針として、新しい抽象は 1 つ（止まるエラーの組み立て）に絞り、表記・エスケープ・切り替えは `FAILURE` をそのまま使った。
+- **Key Findings**:
+  1. **pasta のランタイムには Lua の `debug` ライブラリが無い**（`RuntimeConfig` の既定は `std_all` = `StdLib::ALL_SAFE` で、`std_debug` を除く。`debug.getinfo` を呼ぶと `attempt to index global 'debug' (a nil value)`）。要件ディスカッションの申し送り 2「止まったコルーチンの呼び出し履歴を `debug.getinfo(co, …)` で調べる」は、そのままでは使えない。
+  2. **登録名からは作者が書いた名前に戻せない**。グローバルシーンの登録名は「別名を置き換えた名前 → `sanitize_name`（英数字と `_` 以外を `_` にする）→ `_連番`」で作る（`transpiler.rs` `process_global_scene`・`scope_gen.rs`）。`＊会話`（既定の別名）は `OnTalk_1`、`＊OnTalk＿新しいおもちゃ` は `OnTalk_新しいおもちゃ_1` になる。連番は落とせるが、別名と記号は戻せない。実行時のどこにも書いた名前は残っていない（`@pasta_search` の表も Lua のシーンの表から作り直す）。
+  3. **書いた名前を運べる場所は、生成コードの `act:init_scene(SCENE)` だけ**。どのシーン関数（`__start__`・名前付きのローカルシーン）も最初にこれを呼ぶ。Lua のブロックが定義した関数（`function SCENE.次(act)`）は呼ばないので、ブロックの関数の中のエラーは、それを呼んだシーンの名前になる（要件 2.2 の例「ローカルシーン `・雨の日` の Lua のブロックで止まった → `＊天気・雨の日`」と合う）。
+  4. **エラー文の場所は、LuaJIT が 60 バイトに縮める**。手元の実験で、応答の理由の行は次の形だった（一時ゴーストのパスは長い）。
+     - 辞書の Lua のブロック: `.../profile/pasta/pasta_scripts/pasta\shiori\event/init.lua:229: ...d/exp/ghost/profile/pasta/cache/lua/pasta\scene\test.lua:30: attempt to index local 'data' (a nil value)`（投げ直しの場所が先頭に付く。研究ログの見込みどおり）
+     - `scripts/` の Lua（REG のハンドラから呼んだ）: `...0d1-71b684a71d92/scratchpad/exp/ghost/scripts/天気.lua:4: attempt to index local 'data' (a nil value)`
+     - エラーの値が表: `Unknown error`
+     - チャンク名は `@` ＋ `package.path` の型に `?`（モジュール名の `.` を `\` にしたもの）を入れた文字列。区切りは `/` と `\` が混ざる。縮めた形は `...` ＋ 末尾 56 バイトで、バイトで切るので、先頭で日本語の文字が割れることがある。
+  5. **`package.searchpath` は日本語のファイル名を引けない**（`package.searchpath("天気", package.path)` が `nil`。LuaJIT の `fopen` が UTF-8 のパスを開けない。pasta の探索関数は Rust の `std::fs` で開くので読み込める）。縮めたチャンク名から元のパスを引き直すのに、ファイルを開く方法は使えない。
+  6. **チェイントークで再開したシーンの act は、`EVENT.fire` が作った act ではない**。コルーチンは最初の再開で受けた act に台詞を積み続ける。`EVENT.drive(co, act, …)` の `act` は、チェイントークの再開では新しい act になる。コルーチンに対応する act は `FAILURE.bind` の表（`RUNNING[co]`、`init_scene` が書く）にだけある。
+
+## Research Log（設計）
+
+### 手元の実験（スクラッチの一時ゴースト）
+- **Context**: 申し送りの Research Needed 2（シーンの中のエラーの実際の文・LuaJIT のチャンク名の縮め方・辞書の Lua のブロックの場所の形）と、呼び出し履歴を調べられるか。
+- **方法**: スクラッチのクレートから `pasta_shiori` の `PastaShiori::load`・`request` を呼び、`dic/test.pasta`（Lua のブロックで `nil` を添字にする）・`scripts/天気.lua`・`scripts/main.lua`（REG のハンドラと、`EVENT.drive` を包んでエラーの値を書き出す）を持つ一時ゴーストで、4 つのイベントを起こした。リポジトリには何も置いていない。
+- **Findings**: Key Findings 1・4・5 のとおり。加えて、エラーで終わった後の act の `current_scene.__global_name__` は `OnErrBlock_1`、別名の `＊会話` は `OnTalk_1` だった。
+- **Implications**: 呼び出し履歴を調べる案（申し送り 2）は捨てる。名前は生成コードから運び、場所はエラー文の文字列とゴーストのフォルダーの文字列だけで見分ける。
+
+### 書いた名前の運び方
+- **Context**: 要件 2.4・2.7（作者が書いた名前で示す・同じ名前は区別しない）。
+- **Alternatives**:
+  1. 生成コードの `act:init_scene(SCENE)` に、書いたグローバルシーン名とローカルシーン名を足す（`act:init_scene(SCENE, "天気", "雨の日")`）。`init_scene` が act に控え、途中の Call（`call_restore`）が戻った後に呼ぶ前の名前へ戻す。
+  2. Rust に、止まったコルーチンの呼び出し履歴を読む小さな関数を足す（`mlua::Thread::state()` と `lua_getstack`）。関数がどのシーンかは分かるが、書いた名前（別名・記号）は結局生成コードから運ぶ必要があり、1 の変更も要る。unsafe の FFI と、作者のスクリプトから呼べる新しい口が増える。
+  3. 登録名から近い名前を作る（連番を落とす）。`＊会話` が `＊OnTalk` と出て、要件 2.4 を満たさない。
+- **Selected**: 1。生成コードの行数は変わらない（同じ行に引数が増えるだけ）ので、デバッガのソースの対応表は影響を受けない。実行時の重さは、シーン関数の入口ごとに文字列の定数 2 つを渡して act のフィールドに書くだけ。
+- **Trade-offs**: トランスパイラ（`pasta_lua` の Rust のコード生成）と `act.lua` を触る。brief の Out of Boundary は `act.lua` を「触らない」としていた（`failure-output-unification` との分担のための記述）。設計ディスカッションで確かめる（OPEN QUESTION）。生成コードの期待値（`sample.expected.lua` と、`init_scene(SCENE)` の文字列を確かめる 2 つのテスト）を直す。
+- **Follow-up**: Lua の関数のハンドラ（`＠関数（）` の `word`・`expr_fn`・アクタープロキシ）の中で別のシーンへ入って戻った後は、名前が呼んだ先のままになる（`restore_scene` は名前を戻さない）。止まった場所の名前を取り違えるのは、その後の呼び出し元の行で止まったときだけ。
+
+### エラー文の場所の見分け方
+- **Context**: 要件 2.5・2.6。
+- **Findings**: 位置の接頭辞 `チャンク:行: ` は、エラー文の先頭に 0 個以上並ぶ（外側の投げ直しが先、元の場所が後）。チャンクの文字列は 3 通りある。
+  - `[string "…"]`（Rust が `@` を付けずに名前を付けたチャンク: 旧経路の生成コード・作者が上書きした `entry.lua`・`pasta.scene_dic`）
+  - 縮めていないパス（60 バイト未満）
+  - `...` ＋ 末尾 56 バイト
+- **Selected**: ゴーストのフォルダー（`SHIORI.load` の `load_dir`。Rust の `PastaLoader` が `base_dir` に使う文字列と同じ）を `\`→`/` にそろえて控える。接頭辞ごとに、
+  - 縮めていなければ、パスが「ゴーストのフォルダー ＋ `/`」で始まるかを見る。
+  - 縮めていれば、末尾の文字列を「ゴーストのフォルダーの末尾 ＋ `/` ＋ 残り」に分けられる最初の位置を探す（ゴーストのフォルダーの最後の数バイトと、`/` が続く位置）。
+  - 残り（ゴーストのフォルダーから見たパス）が `profile/` で始まらなければ、作者の `.lua` として `scripts\天気.lua:12` の形（区切りを `\` にする）で残す。それ以外（標準ランタイム・生成コードのキャッシュ・`[string …]`・ゴーストの外・見分けられない）は落とす。
+- **Rationale**: ファイルを開かず、`debug` も要らない、文字列だけの純粋な関数になる。テストで表を回せる。
+- **Ceiling**: ゴーストのフォルダーから見たパスが約 55 バイトより長いと（`scripts/` の下の日本語 16 文字ほどの名前）、縮めた末尾にフォルダーの境目が残らず、場所を落とす（エラー文は出す）。`dofile` などで `package.path` の外から読んだファイルも、ゴーストの中なら残り、外なら落ちる。
+
+### 途中までの台詞の取り方
+- **Selected**: `EVENT.drive` の失敗の枝で、止まったコルーチンに対応する act（`FAILURE.act_of(co)`。`FAILURE` に 1 つ足す読み取り関数）とエラーの値を控える（1 要求に 1 つの控え）。出口で表記を act の末尾に積み、`act:build()` で組み立てる。表記の位置と話者の決まりは、`failure-output-unification` の act を通じた報告（`FAILURE.report`）と同じになる。
+- **Rationale**: `EVENT.drive` は、通常のイベント・コールバックの再開・時間切れの掃引の 3 つが通る 1 か所なので、ここに 1 行足せば全部の経路が控えを作る（一般化）。エラーの値は変えずに投げ直す（`error(yielded_value)` は今のまま）ので、応答の理由の行は 1 バイトも変わらない（要件 5.1）。エラーの値を表に包む案は、`error_handler` の「文字列でなければ Unknown error」と、理由の行の中身を変えるので採らない。
+
+### SSP の実機の確かめ（未実施）
+- 指示により、設計では SSP を起動していない。最初の実装タスクで確かめる: (1) 500 ＋ `Value` の台詞がバルーンに出るか、(2) 200 ＋ `Value` ＋ `X-Error-Reason` が普通に出るか、(3) `OnSecondChange` の応答にエラーの表記を返したときの見え方（トーク中に毎秒来るとき）。結果をこの文書に書き足し、応答のステータスを 1 つに決める（要件 3.2）。
+
+## Design Synthesis（設計）
+- **一般化**: 止まるエラーの出口は 3 つ（`SHIORI.request`・理由付きの時間切れ・理由の無い時間切れ）あるが、どれも「控え（act とエラーの値）または要求の ID → 表記 → 応答」の同じ手順になる。1 つの関数（`STOP.response`）に入力の違い（種類・対象の代わり・ログの文）だけを渡す形にした。シーンの失敗の控えは、3 つの再開の経路が通る `EVENT.drive` の 1 か所で作る。
+- **作るか・使うか**: 表記・エスケープ・切り替え・ログの警告・act への積み方は `FAILURE`（`failure-output-unification`）を使う。応答は `RES.err`・`RES.ok`（どちらも中を変えない）。新しく作るのは、場所の見分けと名前の組み立てと控えだけ。
+- **簡素化**: 
+  - 呼び出し履歴を調べる仕組み（Rust の関数）は作らない。
+  - 応答のステータスを選ぶ設定は作らない。実機の結果で 1 つに決めて定数にする。
+  - `error_handler` は変えない（シーンの外のエラーの文は、今の `result`（最初の行）から作れる）。
+  - 書いた名前を別の表に登録する仕組みは作らない（`init_scene` の引数で足りる。シーンの表に文字列を置くと、Rust の `collect_scenes` がローカルシーンとして拾ってしまう）。
+  - リソースの要求の判定は ID の先頭 2 文字だけ。NOTIFY は Rust の側が応答を捨てるので判定しない。
+
+## Risks（設計）
+- SSP が 500 の `Value` を出さず、200 にした場合 — 失敗の応答であることは、理由の行（`X-Error-Reason`）だけで示す。実機の結果を research.md に残す。
+- 理由の無い時間切れの後のエラーが応答の候補になる — その回の `OnSecondChange` は掃引の応答を返すので、その秒の仮想イベント（`OnTalk`・`OnHour`）は次の秒へ回る（理由付きの時間切れの今の動きと同じ）。表記を出さない設定では今のまま。
+- トランスパイラの出力が変わる — 古いキャッシュ（書いた名前の無い `init_scene(SCENE)`）では、登録名から連番を落とした名前で示す（取り違えではなく、別名・記号が戻らないだけ）。キャッシュは版が変わると作り直される。
