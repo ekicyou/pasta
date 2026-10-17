@@ -55,7 +55,7 @@
 - 段の辞書・シェルの絵・吹き出しの位置（`descript.txt`）・既定の起動の見え方の変更（影響する絵を撮り直す。撮り直す決まりに従う）。
 - 絵の置き場所・名前の決まりの変更（章の画像の行と `book/SCREENSHOTS.md` の一覧を一緒に直す）。
 - 入門ガイドの章の数・章立ての変更（画像の行の置き場所が変わる）。
-- `baseware-virtual-time`・`boot-surface-without-dic` が入ったとき（6 段目の撮り方・準備の終わりの見え方が変わりうる）。
+- `tutorial-ssp-gaps`（旧 `baseware-virtual-time`・`boot-surface-without-dic`。2026-10-17 にまとめられた）が入ったとき（6 段目の撮り方・準備の終わりの見え方が変わりうる）。
 
 ## Architecture
 
