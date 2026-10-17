@@ -280,3 +280,9 @@
   - `STOP.location` は行まで付けた `scripts\天気.lua:12`・`dic\天気.pasta:15` の形を返す（設計は場所だけを返し `detail` が行を付ける形だった）。
 - 表で引くので、設計の Ceiling（ゴーストから見たパスが約 55 バイトより長いと場所を落とす）は無くなった。末尾 56 バイトが同じファイルが 2 つあるときだけ（表の値が `false`）場所を落とす。
 - 位置の接頭辞として扱うのは、チャンクが表にある（値が `false` でも）か、`.lua`・`]` で終わるものだけ。行の対応は止まったときに初めて読み解く（最後の `|` で切り、`<lua>:<pasta>` を順に見る）。
+
+## 警告の中身（タスク 3.3）
+- `failure.lua` に `FAILURE.body(label, subject, detail)`（【】の枠なし・さくらスクリプトの文字の無効化なし）を足し、`FAILURE.format` を「`FAILURE.body` を無効化して枠を付けたもの」に書き直した。設計の Out of Boundary（`FAILURE` に足すのは `LABEL` の 2 行と `FAILURE.act_of` だけ・`FAILURE.format` は呼ぶだけ）から外れる。
+- 理由: 要件 5.6 は、ログの警告を「表記と同じ中身から枠と無効化を除いたもの」にするよう求める。`FAILURE.notation` の `warning` は出来上がった文字列しか受けず、`FAILURE.format` の出力から無効化は戻せない。形の決まり（`種類：対象（説明）` と対象が無いときの扱い）を `stop.lua` に写すと、表記の形が 2 か所に分かれる。
+- `FAILURE.format` の出力は 1 バイトも変わらず、既存の `failure_test` はすべて通る。後の spec が `FAILURE.format` の形を変えるときは、`FAILURE.body` も見ること（Revalidation Triggers の「`FAILURE.format` の形が変わる」に含める）。
+- 応答のステータスは `STOP.STATUS = "200 OK"`。応答は `RES.ok(値, { ["X-Error-Reason"] = 理由 })`（理由が無い・空なら `"Unknown error"`）。登録名から作る名前（古いキャッシュ）にも `＊` を付ける（`天気_3` → `＊天気`）。

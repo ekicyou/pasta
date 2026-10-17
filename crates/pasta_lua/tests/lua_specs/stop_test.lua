@@ -113,3 +113,273 @@ describe("STOP.detail（エラー文の整え）", function()
         expect(STOP.detail("", CHUNKS)):toBe(nil)
     end)
 end)
+
+-- ============================================================================
+-- 控え・名前・応答 (runtime-error-balloon 3.3)
+-- ============================================================================
+
+--- 警告を記録するログ・balloon_warning の代役・読み込んだ Lua のファイルの表を差し込んで body を実行し、元へ戻す
+---@param balloon any  [logging] balloon_warning の値（nil なら書かない）
+---@param body fun(warns: string[])
+local function with_env(balloon, body)
+    local saved_log = package.loaded["@pasta_log"]
+    local saved_config = package.loaded["pasta.config"]
+    local saved_chunks = package.loaded["@pasta_chunks"]
+    local warns = {}
+    local noop = function() end
+    package.loaded["@pasta_log"] = {
+        trace = noop, debug = noop, info = noop, error = noop,
+        warn = function(msg) table.insert(warns, msg) end,
+    }
+    package.loaded["pasta.config"] = {
+        get = function(section, key, default)
+            if section == "logging" and key == "balloon_warning" and balloon ~= nil then return balloon end
+            return default
+        end,
+    }
+    package.loaded["@pasta_chunks"] = {
+        [CACHE] = true,
+        ["scripts/boot.lua"] = "scripts\\boot.lua",
+    }
+    local ok, err = pcall(body, warns)
+    package.loaded["@pasta_log"] = saved_log
+    package.loaded["pasta.config"] = saved_config
+    package.loaded["@pasta_chunks"] = saved_chunks
+    STOP.clear()
+    if not ok then error(err, 0) end
+end
+
+local function actors()
+    return { sakura = { name = "さくら", spot = 0 } }
+end
+
+--- 応答の Value の行の中身（無ければ nil）
+local function value_of(res)
+    return res and res:match("\r\nValue: ([^\r\n]*)\r\n")
+end
+
+--- 応答の X-Error-Reason の行の中身（無ければ nil）
+local function reason_of(res)
+    return res and res:match("\r\nX%-Error%-Reason: ([^\r\n]*)\r\n")
+end
+
+--- 天気・雨の日で止まった act（書いた名前と行の対応を控えている）
+local function weather_act()
+    local act = require("pasta.shiori.act").new(actors())
+    act.scene_name = "天気"
+    act.local_scene_name = "雨の日"
+    act.line_map = LINE_MAP
+    return act
+end
+
+local WEATHER_ERR = RUNTIME .. ":229: " .. CACHE .. ":30: attempt to index a nil value (local 'data')"
+local WEATHER_NOTATION =
+    [[【スクリプトのエラー：＊天気・雨の日（dic\\天気.pasta:15: attempt to index a nil value (local 'data')）】]]
+local BOOT_NOTATION = [[【スクリプトのエラー：OnBoot（scripts\\boot.lua:5: attempt to call a nil value）】]]
+
+--- needle が haystack の中で after より後に出るか
+local function appears_after(haystack, after, needle)
+    local a = haystack and haystack:find(after, 1, true)
+    local n = haystack and haystack:find(needle, 1, true)
+    return a ~= nil and n ~= nil and a < n
+end
+
+local function contains(haystack, needle)
+    return haystack ~= nil and haystack:find(needle, 1, true) ~= nil
+end
+
+describe("STOP の控え", function()
+    test("hold した控えを take で取り出すと空になる・clear で空になる", function()
+        local co = coroutine.create(function() end)
+        STOP.clear()
+        expect(STOP.take()):toBe(nil)
+        STOP.hold(co, "e1")
+        local held = STOP.take()
+        expect(held.err):toBe("e1")
+        expect(held.act):toBe(nil)
+        expect(STOP.take()):toBe(nil)
+        STOP.hold(co, "e2")
+        STOP.clear()
+        expect(STOP.take()):toBe(nil)
+    end)
+
+    test("hold は止まったコルーチンの act を FAILURE.act_of で引く・前の控えを上書きする", function()
+        local FAILURE = require("pasta.failure")
+        local act = { token = {} }
+        local co = coroutine.create(function() FAILURE.bind(act); error("boom") end)
+        coroutine.resume(co)
+        STOP.hold(coroutine.create(function() end), "old")
+        STOP.hold(co, "new")
+        local held = STOP.take()
+        expect(held.act):toBe(act)
+        expect(held.err):toBe("new")
+    end)
+
+    test("ハンドラの act の控えは take_handler で取り出すと空になる・clear で空になる", function()
+        local act = {}
+        STOP.hold_handler(act)
+        expect(STOP.take_handler()):toBe(act)
+        expect(STOP.take_handler()):toBe(nil)
+        STOP.hold_handler(act)
+        STOP.clear()
+        expect(STOP.take_handler()):toBe(nil)
+    end)
+end)
+
+describe("STOP.subject（止まった場所の名前）", function()
+    test("書いた名前: ＊グローバル・ローカル", function()
+        expect(STOP.subject({ scene_name = "天気", local_scene_name = "雨の日" })):toBe("＊天気・雨の日")
+        expect(STOP.subject({ scene_name = "天気" })):toBe("＊天気")
+    end)
+
+    test("書いた名前が無ければ登録名から連番を落とした名前", function()
+        expect(STOP.subject({ current_scene = { __global_name__ = "天気_3" } })):toBe("＊天気")
+        expect(STOP.subject({ current_scene = { __global_name__ = "OnTalk_1_2" } })):toBe("＊OnTalk_1")
+        expect(STOP.subject({ current_scene = { __global_name__ = "天気" } })):toBe("＊天気")
+    end)
+
+    test("シーンの外・act が無いときは nil", function()
+        expect(STOP.subject(nil)):toBe(nil)
+        expect(STOP.subject({})):toBe(nil)
+        expect(STOP.subject({ current_scene = {} })):toBe(nil)
+    end)
+end)
+
+describe("STOP.response（表記付きの応答）", function()
+    test("ステータスはタスク 1 で決めた 200 OK", function()
+        expect(STOP.STATUS):toBe("200 OK")
+    end)
+
+    test("シーンで止まった: 要件 2.2 の例の文言・ステータス・理由の行", function()
+        with_env(nil, function()
+            local res = STOP.response({
+                reason = "REASON", hold = { act = weather_act(), err = WEATHER_ERR }, fallback = "OnTalk", shown = true,
+            })
+            expect(res:sub(1, #"SHIORI/3.0 200 OK\r\n")):toBe("SHIORI/3.0 200 OK\r\n")
+            expect(contains(value_of(res), WEATHER_NOTATION)):toBe(true)
+            expect(reason_of(res)):toBe("REASON")
+        end)
+    end)
+
+    test("途中の台詞の後に表記が出る", function()
+        with_env(nil, function()
+            local act = weather_act()
+            act:talk(act.actors.sakura, "今日は")
+            local value = value_of(STOP.response({
+                reason = "R", hold = { act = act, err = WEATHER_ERR }, shown = true,
+            }))
+            expect(appears_after(value, "今日は", WEATHER_NOTATION)):toBe(true)
+        end)
+    end)
+
+    test("シーンの外（ハンドラ）は要求の ID で示し、ハンドラの act の台詞の後に積む", function()
+        with_env(nil, function()
+            local handler = require("pasta.shiori.act").new(actors())
+            handler:talk(handler.actors.sakura, "起動")
+            local value = value_of(STOP.response({
+                reason = "R", handler = handler, err = "scripts/boot.lua:5: attempt to call a nil value",
+                fallback = "OnBoot", shown = true,
+            }))
+            expect(appears_after(value, "起動", BOOT_NOTATION)):toBe(true)
+        end)
+    end)
+
+    test("act が無ければ新しい act に表記だけを積む", function()
+        with_env(nil, function()
+            local value = value_of(STOP.response({
+                reason = "R", err = "scripts/boot.lua:5: attempt to call a nil value", fallback = "OnBoot",
+                shown = true,
+            }))
+            expect(contains(value, BOOT_NOTATION)):toBe(true)
+        end)
+    end)
+
+    test("理由付きの時間切れ: 【時間切れ：…】", function()
+        with_env(nil, function()
+            local value = value_of(STOP.response({
+                reason = "R", timeout = "callback timeout: get_property", shown = true,
+            }))
+            expect(contains(value, "【時間切れ：callback timeout: get_property】")):toBe(true)
+        end)
+    end)
+
+    test("エラーの値が文字列でない: 【スクリプトのエラー】", function()
+        with_env(nil, function()
+            local value = value_of(STOP.response({
+                reason = "R", hold = { act = weather_act(), err = { code = 1 } }, fallback = "OnTalk", shown = true,
+            }))
+            expect(contains(value, "【スクリプトのエラー】")):toBe(true)
+        end)
+    end)
+
+    test("\\・%・改行は書いたとおりに出る形になる", function()
+        with_env(nil, function()
+            local value = value_of(STOP.response({
+                reason = "R", err = [[100% \s0 だめ]], fallback = "OnBoot", shown = true,
+            }))
+            expect(contains(value, [[【スクリプトのエラー：OnBoot（100\% \\s0 だめ）】]])):toBe(true)
+            value = value_of(STOP.response({ reason = "R", timeout = "a\nb", shown = true }))
+            expect(contains(value, "【時間切れ：a b】")):toBe(true)
+        end)
+    end)
+
+    test("理由の行は渡された値のまま・空なら Unknown error", function()
+        with_env(nil, function()
+            local reason = RUNTIME .. ":229: " .. CACHE .. ":30: boom"
+            expect(reason_of(STOP.response({ reason = reason, err = "x", fallback = "OnBoot", shown = true })))
+                :toBe(reason)
+            expect(reason_of(STOP.response({ err = "x", fallback = "OnBoot", shown = true }))):toBe("Unknown error")
+            expect(reason_of(STOP.response({ reason = "", err = "x", fallback = "OnBoot", shown = true })))
+                :toBe("Unknown error")
+        end)
+    end)
+
+    test("出さない設定では nil を返し、警告は 1 行出す", function()
+        with_env(false, function(warns)
+            expect(STOP.response({
+                reason = "R", hold = { act = weather_act(), err = WEATHER_ERR }, shown = true, warning = true,
+            })):toBe(nil)
+            expect(#warns):toBe(1)
+        end)
+    end)
+
+    test("On で始まらない ID（shown が偽）では nil を返し、警告は 1 行出す", function()
+        with_env(nil, function(warns)
+            expect(STOP.response({
+                reason = "R", err = "x", fallback = "version", shown = false, warning = true,
+            })):toBe(nil)
+            expect(#warns):toBe(1)
+        end)
+    end)
+
+    test("警告は表記と同じ整えた中身（枠・エスケープなし・キャッシュのパスなし）で 1 行", function()
+        with_env(nil, function(warns)
+            STOP.response({
+                reason = "R", hold = { act = weather_act(), err = WEATHER_ERR }, shown = true, warning = true,
+            })
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe(
+                "スクリプトのエラー：＊天気・雨の日（dic\\天気.pasta:15: attempt to index a nil value (local 'data')）")
+            expect(warns[1]:find("cache", 1, true)):toBe(nil)
+        end)
+    end)
+
+    test("警告が文字列ならその文を前に付ける・nil なら出さない", function()
+        with_env(nil, function(warns)
+            STOP.response({ reason = "R", timeout = "t", shown = true, warning = "時間切れの掃引: " })
+            STOP.response({ reason = "R", timeout = "t", shown = true })
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe("時間切れの掃引: 時間切れ：t")
+        end)
+    end)
+
+    test("act の組み立てが失敗したら表記だけを値にする", function()
+        with_env(nil, function()
+            local broken = { token = {}, build = function() error("build failed") end }
+            local value = value_of(STOP.response({
+                reason = "R", hold = { act = broken, err = "boom" }, fallback = "OnTalk", shown = true,
+            }))
+            expect(value):toBe("【スクリプトのエラー：OnTalk（boom）】")
+        end)
+    end)
+end)
