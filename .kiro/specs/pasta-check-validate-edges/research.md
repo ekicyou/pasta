@@ -154,3 +154,134 @@
 - VSCode の見張りの書き方（論点 e の 3 案）。モックの `createFileSystemWatcher`（`src/test/mock`）で、どの案もテストできるか。
 - ゴーストの鍵のそろえ方（違う綴りで届いた URI を 1 つのゴーストにまとめる方法）。
 - 拡張の README と、スキル `pasta-check` の記述のどこが変わるか。
+
+---
+
+# 設計フェーズの調査（2026-10-17）
+
+## Summary
+
+- **Feature**: `pasta-check-validate-edges`
+- **Discovery Scope**: Extension（今の検査の核・2 つの殻・CI とテストを広げる。新しい依存・新しいファイルは無い）。軽い調べ（`design-discovery-light.md`）で進めた。
+- **Key Findings**:
+  - フォルダで pasta.dll の読み込みが失敗することを、**実際に動かして確かめた**（下の「確かめた振る舞い」）。中身の無い `dic/x.pasta/`・`dic/x.lua/`・入れ子の `dic/sub/y.pasta/` のどれも `Partial transpilation failure` で読み込み全体が失敗し、2 回目の読み込みでも同じ（キャッシュで逃れない）。
+  - `glob` がフォルダに一致する規則は、ファイルの規則と 2 点だけ違う: パターンの最後の `**` は **1 段以上のフォルダ**に一致する（`dic` そのものには一致しない）。`/` で終わる・最後の成分が `.` のパターンはフォルダだけに一致する。ワイルドカードの無い成分は大文字・小文字を区別せずパターンの綴りで見え、ある成分は区別する（ファイルと同じ）。
+  - 配布フォルダへの写し（`copy.rs` の `copy_dir_inner`）はフォルダごとに `create_dir_all` するので、中身の無いフォルダも写す。`release` の段 4 は配布フォルダを同じ核で検査するので、要件 4.4 は核を直すだけで効く。
+
+## Research Log
+
+### 確かめた振る舞い（pasta.dll のフォルダの扱い）
+
+- **Context**: ギャップ分析は「コードを読んだだけ」だった。設計の前提（分類＝誤り・対象の範囲）を確かめるため、一時のテスト（`crates/pasta_check/tests/` に置いて走らせ、すぐ消した）で `pasta_lua::loader::discover_files` と `PastaLoader::load` を呼んだ。Windows・このブランチ（main 838fbde8 の後）。
+- **Findings**（`pasta_patterns = ["dic/**/*.pasta"]`・`dic/a.pasta` あり。読み込みは 2 回ずつ）:
+
+| 置いたフォルダ／パターン | `discover_files` の結果（フォルダは末尾 `/`） | 読み込み |
+| ------------------------ | --------------------------------------------- | -------- |
+| なし | `dic/a.pasta` | 成功 |
+| 空の `dic/x.pasta/` | `dic/a.pasta`, `dic/x.pasta/` | 失敗（1 succeeded, 1 failed）・2 回目も失敗 |
+| `dic/x.lua/` | `dic/x.lua/` を含む | 失敗・2 回目も失敗 |
+| `dic/X.PASTA/` | 含まない（`*.pasta` は区別する） | 成功 |
+| `dic/sub/y.pasta/` | `dic/sub/y.pasta/` を含む | 失敗 |
+| `profile/z.pasta/` | 含まない | 成功 |
+| パターン `dic/**`・`dic/sub/` | `dic/sub/` | 失敗（0 succeeded, 1 failed） |
+| パターン `dic/`・`dic/*.pasta` | `dic/`, `dic/a.pasta` | 失敗 |
+| パターン `dic/*`・`dic/sub/` | `dic/a.pasta`, `dic/sub/` | 失敗 |
+
+- フォルダの一致の規則（`discover_files` だけを、`dic/sub/deep/deeper/`・`dic/a.pasta/b.pasta/`・`Dic2/x.pasta/`・`dic/.hidden.pasta/` とファイル `dic/f.pasta` で）:
+  - `dic/**` と `dic/**/`: `dic` の下のすべてのフォルダ（1 段以上。`dic` そのものは含まない）。`**`・`**/` も同じで、`ghost/master` そのものは含まない。
+  - `dic/.`・`dic`（ワイルドカードなし）: `dic/`。
+  - `dic/**/*.pasta`: `dic/.hidden.pasta/`・`dic/a.pasta/`・`dic/a.pasta/b.pasta/`（入れ子は両方）と、ファイル `dic/f.pasta`。
+  - `dic2/*.pasta`: `dic2/x.pasta/`（実物は `Dic2`。パターンの綴りで見える）。
+- **Implications**: 分類は誤り（上流の OQ-1）で確定でよい。キャッシュで読み込みが通ることは無い（新しく作ったフォルダの更新時刻はキャッシュより新しく、`needs_transpile` が真になる。そもそもフォルダのキャッシュは一度も作られない）。フォルダの照合は、今の成分の照合を「最後の `**` は 1 段以上」「フォルダだけのパターンも使う」に広げれば写せる。
+
+### 未確認の端（実装の一致テストで確かめる）
+
+- パターン `""`・`.`・`./`（成分が 0 個）は、pasta.dll では `ghost/master` そのものに一致すると見込む（`Path::join("")` が末尾の区切りになり、`dic/` が `dic` に一致したのと同じ規則）。設計は「`ghost/master` そのものもフォルダの候補にする」としたが、仮定として記し、一致テストのパターンの組に入れて確かめる。
+
+### VSCode の見張り（論点 e の続き）
+
+- 拡張の見張りは文字列のパターンで張るので、ワークスペースの見張りの知らせを拡張ホストの側でパターンに照らしている（1.85〜main で同じ。ギャップ分析の出典）。パターンを広げても、届く知らせの数は変わらず、拡張の関数が呼ばれる回数が増えるだけ。
+- テストのモック（`src/test/mock/vscode.ts` の `createFileSystemWatcher`）はパターンを記録するだけで照らさない。パターンに大文字・小文字の扱いを頼る案（文字の範囲で書く・`engines` を上げる）は、VSCode の版ごとの振る舞いをテストで確かめられない。パターンを `**/*` にして拡張の関数で絞る案は、絞る関数をモックの上でそのまま確かめられる。
+
+### 一覧を集める 2 か所と WASM の形
+
+- `GhostInput` を struct の式で作っている所は、殻 1 か所（`validate_cmd.rs`）とテスト 11 か所（`validate_config_test.rs`・`validate_parity_test.rs`・`validate_rules_test.rs`・`validate_scenes_test.rs`）。フィールドを足すと全部に `dirs` を足すことになる（機械的）。
+- JS の形の検査は `transport.rs` の `test_ghost_validate_js_shape`（stats のキーを決め打ちで比べる）と `wasmBridge.ts` の `isGhostReport`（`referencesSkipped` を真偽値で確かめる）・`vscodeModules.test.ts`。`editors/vscode/wasm/` は `.gitignore` にあり、作り直しはビルドの手順（`build-wasm.ps1`）で行う。
+- WASM の入口（`wasm_select_ghost_files`・`wasm_validate_ghost`）は serde で読み書きするだけなので、入口の関数は変わらない。
+
+### 文書の当たり
+
+- `book/src/debug/validate.md`: 54 行（出力の見本の案内の行）・62 行（省く条件）・106〜112 行（「ファイル」の表）・168 行（読むだけでは決まらない範囲）・207 行（検査する時）。
+- `editors/vscode/README.md` 12 行（検査する時の `ghost/master`・`pasta.toml`）を直す。
+- `crates/pasta_check/README.md` と `.claude/skills/pasta-check/SKILL.md` は、省く条件・報告の種類・検査する時を細かく書いていない（マニュアルへ案内しているだけ）ので変えない（要件 7.4 の Where に当たらない）。
+
+### 使ったスキル・決まり
+
+- `kiro-spec-design` の `design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`、テンプレート `design.md`・`research.md`。
+- `pasta-check` スキル（報告・関門の書き方の確かめ）。`kiro-validate-design` の `design-review.md`（設計の検査）。
+- 開発者の方針: 部分的な出荷をしない（同じ根の別の形も直す）、マニュアルに回避のレシピを載せない、起票に逃がさない、想定外の書き方を推測で救わない。
+
+## Architecture Pattern Evaluation
+
+| 案 | 内容 | 良い点 | 気になる点 | 結論 |
+| -- | ---- | ------ | ---------- | ---- |
+| 入力 A-1 | `entries` に `/` で終わる要素としてフォルダを入れる | JS の型の見た目が変わらない・テストの struct の式を直さない | 文字列の意味が変わる（隠れた約束）。殻が `/` を付け忘れると、フォルダがファイルとして選ばれ、読めないファイル（＝省く条件）に化ける | 採らない（代案） |
+| 入力 A-2 | `GhostInput` に `dirs`（フォルダの相対パスの一覧）を足す。必須（既定値なし） | 形がはっきりする・付け忘れは JS の形の誤りとしてすぐ分かる | テストの struct の式 11 か所と JS の型を直す | **採る** |
+| 見張り 1′ | `**/*` で張り、拡張の 1 つの関数（`ghost/master` と拡張子を大文字・小文字を区別せず照らす）で絞る | どの版でも同じ。モックで確かめられる。拡張子の大文字・小文字も保存の起動とそろう | 関数の呼ばれる回数が増える（1 回は文字列の分割だけ） | **採る** |
+| 見張り 1 | `**/*.{pasta,lua}` に広げ、`findGhostMaster` で絞る | ギャップ分析の推奨に近い | 1.106 までは拡張子の大文字・小文字を区別したまま（`X.PASTA` の作成は版によって拾ったり拾わなかったり） | 代案 |
+| 見張り 2・3 | 文字の範囲で書く／`engines` を `^1.107.0` に上げる | — | 2 は読みにくく拡張子は区別のまま。3 は利用者の下限を上げる。どちらもモックで確かめられない | 採らない |
+| Stats S-1 | `references_skipped: bool` を `skip_reasons: Vec<SkipReason>` に置き換える（空＝検査した） | 判定と理由が 1 か所。真偽値と理由が食い違わない | JS のキーが変わる（`referencesSkipped` → `skipReasons`） | **採る** |
+| Stats S-2 | 真偽値を残し、理由の一覧を足す | 今のキーが残る | 同じことを 2 つで持つ | 代案 |
+| Stats S-3 | Stats を変えず、`lines()` が findings から理由を数え直す | JS の形が変わらない | 省く判定（`mod.rs`）と案内の行（`report.rs`）が別々に同じ規則を持つ | 採らない |
+
+## Design Decisions
+
+### Decision: 省く条件は種類の集まりで判定し、理由を Stats に持たせる
+
+- **Context**: 要件 1.1〜1.7・OQ-1・OQ-2・OQ-11。
+- **Alternatives Considered**: 上の表の S-1〜S-3。
+- **Selected Approach**: `report.rs` に `SkipReason`（`Syntax`・`UnreadableFile`・`Config`）と、findings から理由を決める関数を置く。`mod.rs` はその結果で飛び先の検査を省き、`Stats.skip_reasons` に入れる。案内の行は理由を決まった順（構文エラー → 読めない辞書ファイル → pasta.toml の誤り）に「と」でつなぐ。理由が構文エラーだけのときの文言は今と同じ。
+- **Rationale**: 判定の規則を 1 か所にし、案内の行と食い違わない。構文エラーだけのときの文言を変えないので、今のテスト・マニュアルの見本がそのまま通る。
+- **Trade-offs**: JS の stats のキーが変わる（Revalidation Trigger に当たる。入力の形も同時に変わるので、WASM の作り直しは 1 回で済む）。
+
+### Decision: フォルダは核が判定する（入力に `dirs` を足す）
+
+- **Context**: 要件 2.1〜2.7・4.1・OQ-3・OQ-4。
+- **Alternatives Considered**: 上の表の A-1・A-2。
+- **Selected Approach**: 殻（CLI・拡張）は、入ったフォルダの相対パスを `dirs` に積む（最上位の `profile` とリンクは今までどおり除く）。核は `ghost/master` そのもの（空のパス）と `dirs` を候補にし、`.pasta` のパターンと `.lua` のパターンのどれかに pasta.dll と同じ規則で一致するフォルダを、新しい種類 `folder-matches-pattern`（誤り）で報告する。
+- **Rationale**: パターンの照合を TypeScript に写さない（上流の OQ-6）。CLI・拡張・`release` の段 4 が同じ結果になる。
+- **Trade-offs**: テストの struct の式を直す手間。
+- **Follow-up**: 一致テストで、フォルダの選び出しを `discover_files` と照らす。成分が 0 個のパターンの振る舞いもそこで確かめる。
+
+### Decision: 拡張は 1 つの関数で起動の条件を決め、ゴーストの鍵を小文字にそろえる
+
+- **Context**: 要件 3.1〜3.7・OQ-5・OQ-6。
+- **Alternatives Considered**: 上の表の見張り 1′・1・2・3。
+- **Selected Approach**: `findGhostMaster` は大文字・小文字を区別せずに照らす（返す URI は届いた綴りのまま）。見張りは `**/*` で張り、届いた URI の祖先に `ghost/master` があり、名前が `.pasta`・`.lua` で終わる（区別しない）ときだけ起動する。保存は `.pasta`（区別しない）と、`ghost/master` の直下の `pasta.toml`（区別しない）で起動する。束ねと前回の報告の鍵は、`ghost/master` の URI のパスを小文字にした文字列にする。
+- **Rationale**: どの版の VSCode でも同じに動き、モックで確かめられる。同じゴーストが違う綴りで届いても 1 回の検査・1 組の診断になる。
+- **Trade-offs**: 大文字・小文字を区別するファイルシステム（Linux）で、綴りだけが違う 2 つのゴーストが同じ親フォルダにあると 1 つにまとまる（OQ-5 の「どの OS でも区別しない」の帰結として受け入れる）。
+
+### Decision: 代用品の置き換え
+
+- **Context**: 要件 5.1〜5.6・OQ-7〜OQ-10。
+- **Selected Approach**: `manual.yml` の段を `cargo run -q -p pasta_check -- validate --target crates/pasta_sample_ghost/ghosts/hello-pasta` にし、コメントを直す（Rust の準備・キャッシュの段は残す）。`validate_cli_test.rs` の hello-pasta のテストで「誤り 0 件、注意 0 件」を確かめる。`tutorial_stages_test.rs` から `GLOBAL_KEYS` とその比較を外す（前方一致と `Kick`・`Gate` の検査は残す）。
+- **Rationale**: `pasta_check` のバイナリは LuaJIT を持ち込まない（上流の要件 9.1）。組み込みの名前は `builtins.rs` が一致テストで実物と照らしていて、手書きの一覧より強い。
+
+## Synthesis
+
+- **一般化**: 要件 1 の 3 つの条件（構文エラー・読めない辞書・設定の誤り）は「検査した辞書のシーンの集まりが pasta.dll と同じと言えない」という 1 つの条件の別の形。種類→理由の 1 つの対応表で表す。要件 2 の「`.pasta` のフォルダ」「`.lua` のフォルダ」「`.pasta` で終わらないパターンのフォルダ」も「辞書のパターンに一致するフォルダ」1 つにまとめた。要件 3 の保存・作成・削除の起動は、1 つの照合の関数（`findGhostMaster`）と拡張子の判定の組み合わせで表す。
+- **作るか使うか**: フォルダの照合は `glob` の振る舞いを一覧の上で写す今の作り（`discovery.rs`）を広げる。ファイルシステムに触れない核の決まり（WASM でも動く）があるので、`glob::glob` を直接使うことはできない。見張りは VSCode の `createFileSystemWatcher` をそのまま使う。
+- **簡素化**: 新しいモジュール・新しいファイルは作らない。フォルダの照合は今の `matches` に「最後の `**` を 1 段以上にする」切り替えを足すだけにする。エディタに案内の行を出す仕組みは足さない（今もまとめの行を出していない）。`pasta.toml` の作成・削除での起動は要件に無いので足さない。
+
+## Risks & Mitigations
+
+- フォルダの照合の写し間違い — 一致テストに、上の表のパターンの組（`dic/**/*.pasta`・`dic/**`・`dic/`・`dic/*`・`dic/.`・`**`・`*/*.pasta`・成分 0 個）とフォルダの組を入れて `discover_files` と照らす。
+- JS の形の変更の取りこぼし（`dirs`・`skipReasons`） — `transport.rs` の形のテストと `vscodeModules.test.ts` の形の検査を同じタスクで直す。`dirs` を必須にして、付け忘れは `null`（形の誤り）として出る。
+- 診断の URI の綴りと、開いている文書の URI の綴りが違うと、エディタに波線が出ないことがある（問題パネルには出る） — 最後に起動した URI の綴りを使う。エクスプローラから開いた文書と見張りの知らせはどちらもディスクの綴りなので、ふつうは一致する。
+
+## References
+
+- 一時のテストの結果（上の表）。テストのファイルは残していない。
+- `crates/pasta_lua/src/loader/discovery.rs` 59〜130 行・`process.rs` 105〜275 行・`cache.rs` 137〜165 行。
+- `crates/pasta_check/src/copy.rs` 30〜62 行（中身の無いフォルダも写す）。
+- VSCode `extHostFileSystemEventService.ts`（1.85.0・1.106.0・1.107.0・main。ギャップ分析の出典と同じ）。
