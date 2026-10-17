@@ -45,10 +45,10 @@
 | ファイル検出 | `crates/pasta_lua/src/loader/discovery.rs` | `discover_files`。glob パターンでファイルを集め、基準ディレクトリの外・シンボリックリンク・`profile/` 配下を除く |
 | 検出の統合と増分処理 | `crates/pasta_lua/src/loader/process.rs` | `discover_all_files` が `.pasta` と `.lua` を検出し、禁止ファイル名と同名衝突を処理する。増分処理（`process_incremental`）は [トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ) で扱う |
 | `CacheManager` | `crates/pasta_lua/src/loader/cache.rs` | モジュール名とキャッシュ先の導出（`source_to_module_name`・`source_to_cache_path`）。版管理と `scene_dic.lua` の生成はトランスパイル章で扱う |
-| `LoaderContext` | `crates/pasta_lua/src/loader/context.rs` | ローダからランタイムへ渡す材料（絶対パスにした基準ディレクトリ・検索パス・`custom_fields`）。`package.path` の文字列を組み立てる |
+| `LoaderContext` | `crates/pasta_lua/src/loader/context.rs` | ローダからランタイムへ渡す材料（絶対パスにした基準ディレクトリ・検索パス・`custom_fields`・`[loader] transpiled_output_dir`）。`package.path` の文字列を組み立てる |
 | `LoaderError` | `crates/pasta_lua/src/loader/error.rs` | 起動シーケンスのエラー。設定・入出力・検出・キャッシュ・自己展開・トランスパイルの部分失敗・ランタイムの構築失敗を区別する |
-| `setup_package_path` | `crates/pasta_lua/src/runtime/module_registry.rs` | `package.path` を設定し、searcher を置換する。`@pasta_config` の登録（`register_config_module`）も同じファイルにある |
-| searcher | `crates/pasta_lua/src/runtime/searcher.rs` | `install_module_searcher`。`package.loaders` の 2 番目（Lua ファイルの searcher）を Rust の実装に置き換える |
+| `setup_package_path` | `crates/pasta_lua/src/runtime/module_registry.rs` | `package.path` を設定し、searcher を置換し、読み込んだファイルの表（`@pasta_chunks`）を作る。`@pasta_config` の登録（`register_config_module`）も同じファイルにある |
+| searcher | `crates/pasta_lua/src/runtime/searcher.rs` | `install_module_searcher`。`package.loaders` の 2 番目（Lua ファイルの searcher）を Rust の実装に置き換える。`register_chunk_table` が作る `@pasta_chunks` に、読み込めたファイルを書き足す |
 | `RuntimeConfig`・`lua_require` | `crates/pasta_lua/src/runtime/runtime_config.rs` | VM に入れる標準ライブラリと mlua-stdlib のモジュール、解決済みのデバッグ設定、キックの注入口を持つ設定。`lua_require` は Rust から Lua の `require` を呼ぶ |
 | 既定の `main` | `crates/pasta_lua/pasta_scripts/main.lua` | 空の表を返すだけの利用者初期化スクリプト。自己展開され、`scripts/main.lua` があればそちらが優先される |
 | `pasta.config` | `crates/pasta_lua/pasta_scripts/pasta/config.lua` | `@pasta_config` を `pcall(require, …)` で取り込み、`get(section, key, default)` で値か既定値を返す Lua 側のラッパ。`@pasta_config` を取得できない環境（テストなど）では空の表を使う |
@@ -80,6 +80,7 @@ load_with_config(base_dir, runtime_config)
 - 1 の `PastaConfig::load` が決めた別名表（[設定読込](#設定読込)）は、1.5 でロガーを登録した直後に info ログ `Scene alias table` として出す。`source` は表の出どころ（`BuiltinDefault` は既定の表、`PastaToml` は `[scene.alias]` に書いた表）、`table` は表の中身（`OnTalk <- 会話` の形。空の表は `(empty)`）である。ロガーの登録より後に出すため、ゴーストのログファイルに残る。
 - 2 で作るディレクトリは `profile/pasta/save`・`profile/pasta/save/lua`・`profile/pasta/cache` と `[loader] transpiled_output_dir` である。続けて `CacheManager::prepare_cache_dir` がキャッシュの版と別名表の指紋を確認し、どちらかが違えばキャッシュを全破棄する（[トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ)）。
 - 2.5 を 3 より前に置くのは、検出とトランスパイルより前、`package.path` を組む 6 より前に、フレームワークスクリプトをディスク上で最新にしておくためである。
+- 4 のトランスパイルでは、`.pasta` をパースした後に `pasta_file.path` をゴーストのフォルダーから見たパス（`CacheManager::get_relative_path`。Windows では `dic\天気.pasta`）に置き換えてからトランスパイラに渡す。このパスは生成コードの行の対応（`init_scene` の 4 つ目の引数。[init_scene の引数](transpiler.md#init_scene-の引数)）を埋めるのにだけ使う。パースのエラー文は置き換える前の絶対パスのままである。
 - 4 の統計（トランスパイル・省略・失敗・コピーの件数）は、`[loader] debug_mode` が `true` のときだけ info ログに出る。孤立キャッシュは `CacheManager::find_orphaned_caches` が `debug_mode` に関わらず件数と各パスを警告し、`debug_mode` が `true` のときはローダが各パスを重ねて警告する。キャッシュへの保存は `debug_mode` に関わらず行う。
 - 4 と 5.5 は、別名表を持たせた同じ 1 つのトランスパイラ（`transpiler_for`）を使う。キャッシュの `.lua` の宣言名と、ソースマップ・デバッグの突合キーの宣言名は、常に同じ別名表から決まる。6 では同じ表を `RuntimeConfig.scene_aliases` に入れて `@pasta_search` へ渡すため、宣言と検索にも同じ表が効く（[シーン・単語レジストリとシーン検索](registry-search.md#辞書確定)）。
 - 5.5 の要否は、6 で VM が使うのと同じ判定（`pasta.toml` の `[debug]` と環境変数を `DebugConfig::from_env` で解決した結果）で決める。無効なら何も作らない。
@@ -209,7 +210,7 @@ lua_search_paths = ["scripts", "profile/pasta/pasta_scripts"]
 package.path = <基準>/scripts/?.lua;<基準>/scripts/?/init.lua;<基準>/profile/pasta/pasta_scripts/?.lua;<基準>/profile/pasta/pasta_scripts/?/init.lua
 ```
 
-`setup_package_path` はこの文字列を変換せずに `package.path` へ上書きで設定し、続けて `install_module_searcher` を呼ぶ。`package.cpath` は変えない。呼び出しは VM を作って `@pasta_search` などを登録した直後、`@pasta_config` 以降の登録と最初の `require` より前に 1 回だけ行われる（[VM の構築とモジュール登録](execution-model.md#vm-の構築とモジュール登録) の手順 3）。
+`setup_package_path` はこの文字列を変換せずに `package.path` へ上書きで設定し、続けて `install_module_searcher` と `register_chunk_table`（次節の `@pasta_chunks`）を呼ぶ。`package.cpath` は変えない。呼び出しは VM を作って `@pasta_search` などを登録した直後、`@pasta_config` 以降の登録と最初の `require` より前に 1 回だけ行われる（[VM の構築とモジュール登録](execution-model.md#vm-の構築とモジュール登録) の手順 3）。
 
 ### require の解決（searcher）
 
@@ -230,6 +231,18 @@ LuaJIT の `package.loaders` は preload・Lua ファイル・C ライブラリ�
 
 本体は 2 層になっている。Rust 関数 `find_module` は `(ローダ, メッセージ, ロード失敗か)` の組を返すだけにし、エラーの送出は Lua のラッパ（チャンク名 `=pasta_searcher`）が `error(message, 0)` で行う。Rust の `Err` をそのまま返すと `pcall(require, …)` が受け取るエラーが文字列ではなくユーザーデータになり、位置情報の付かない標準の文言とも一致しなくなるためである。
 
+`find_module` は、読み込めた（コンパイルできた）ファイルを `package.loaded["@pasta_chunks"]` の表に書き足す。表は `setup_package_path` が `register_chunk_table` で空のまま置き、Lua からは `require("@pasta_chunks")` で読める。チャンク名そのものは変えない。
+
+| 項目 | 内容 |
+| ---- | ---- |
+| キー | `@` を除いたチャンク名を、LuaJIT がエラー文の位置に出す形にしたもの（`lj_debug_shortname` と同じく、60 バイト以上なら `...` に末尾 56 バイトを続ける。バイトで切るため先頭で UTF-8 の文字が割れることがある） |
+| 値（作者の `.lua`） | ゴーストのフォルダーから見たパスを `\` 区切りにした文字列（`scripts\天気.lua`） |
+| 値（変換した Lua のキャッシュ） | `true`（`[loader] transpiled_output_dir` の下のファイル。`LoaderContext` から受け取る） |
+| 値（別のファイルが同じキーになった） | `false`（見分けられないため、無いのと同じに扱う） |
+| 控えないもの | 標準ランタイム（`profile/pasta/pasta_scripts/` の下）とゴーストのフォルダーの外のファイル。ただしキーの重複の見分けには数える |
+
+同じファイルを 2 回読み込んでも値は変わらない。この表を読むのは `pasta.shiori.stop` だけで、止まるエラーの表記で場所を示すのに使う（[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)）。
+
 Rust 側で登録するモジュール（`@pasta_config`・`@pasta_search` など）は `package.loaded` に直接置くため、`require` は searcher を通らずにそれを返す。利用者から見た検索の優先順位・候補パスの表記・長パスと非 ANSI パスの保証は [モジュール検索パス](../reference/startup.md#1-モジュール検索パス) が正である。
 
 ## 境界の受け渡し
@@ -241,7 +254,7 @@ Rust 側で登録するモジュール（`@pasta_config`・`@pasta_search` な�
 | SHIORI 層 → ローダ | `pasta_shiori` → `PastaLoader::load_with_config` | 基準ディレクトリと `RuntimeConfig`（キックの注入口を含む） | 基準ディレクトリの決定とロード失敗の応答は SHIORI 層が持つ（[SHIORI 層](shiori.md)） |
 | ローダ → ランタイム | `PastaLoader` → `PastaLuaRuntime::from_loader_with_scene_dic` | 統合した `TranspileContext`・`LoaderContext`・`RuntimeConfig`・`PastaConfig`・ロガー・`scene_dic.lua` のパス・ソースマップ | `PastaConfig` はランタイムが保持し、破棄時の保存などで使う |
 | Rust → Lua（設定） | `register_config_module` → `@pasta_config` | `custom_fields` を変換した表 | 表は VM が所有する。`pasta.toml` へは書き戻さない |
-| Rust → Lua（解決） | `setup_package_path` → `package.path`・`package.loaders[2]` | 検索パスの文字列と searcher | 以後の `require` のファイル解決は Rust の searcher が担い、モジュールの読み込みと実行は Lua が担う |
+| Rust → Lua（解決） | `setup_package_path` → `package.path`・`package.loaders[2]` | 検索パスの文字列と searcher、`@pasta_chunks` の表 | 以後の `require` のファイル解決は Rust の searcher が担い、モジュールの読み込みと実行は Lua が担う。`@pasta_chunks` は VM が所有し、searcher だけが書き足す |
 
 ## 不変条件と制約
 

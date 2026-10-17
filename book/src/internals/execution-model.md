@@ -64,14 +64,17 @@
         └→ pasta.word  ──→ pasta.store, pasta.failure
 
 pasta.shiori.entry（SHIORI.load / request / unload / kick）
+  ├→ pasta.shiori.stop
   └→ pasta.shiori.event（EVENT.fire・EVENT.drive）
         ├→ pasta.shiori.act ──→ pasta.act ──→ pasta.actor, pasta.scene, pasta.global,
         │                                     pasta.store, pasta.word, pasta.failure,
         │                                     pasta.save（ACT.new の呼び出し時）
-        ├→ pasta.shiori.event.callback ──→ pasta.store,
+        ├→ pasta.shiori.event.callback ──→ pasta.store, pasta.shiori.stop,
         │                                  pasta.shiori.event（再開の呼び出し時）
+        ├→ pasta.shiori.stop
         └→ pasta.store
 
+pasta.shiori.stop ──→ pasta.failure, pasta.shiori.res（@pasta_chunks・pasta.shiori.act・pasta.store は表記を作る時点で読む）
 pasta.store ──→ （@pasta_config だけを pcall で読む。他の pasta.* を require しない）
 pasta.save  ──→ @pasta_persistence
 pasta.failure ──→ （@pasta_log・pasta.config を報告の時点で読む。他の pasta.* を読み込みの時点では require しない）
@@ -91,6 +94,7 @@ pasta.failure ──→ （@pasta_log・pasta.config を報告の時点で読む
 | `pasta.save` | 永続化データの表。`require` された時点で 1 回だけ `@pasta_persistence.load()` を呼び、その結果を返す |
 | `pasta.shiori.event` | `EVENT.fire` と `EVENT.drive`。`EVENT.fire` はハンドラの戻り値を応答にする。`EVENT.drive` はシーンコルーチンの再開の手順（出力が出るまで再開 → 予約の消費 → `STORE.co_scene` の更新）の持ち主で、`EVENT.fire`・`CALLBACK.try_route`・`CALLBACK.sweep` のすべてがこれを使う |
 | `pasta.shiori.event.callback` | `get_property` のコールバック待ちのコルーチンを、待っているイベント名ごとに持つ。一致したコールバックの再開（`try_route`）と期限切れの掃引（`sweep`）を行い、再開そのものは `EVENT.drive` に任せる |
+| `pasta.shiori.stop` | 止まるエラーの控えと表記付きの応答。`EVENT.drive`・`EVENT.fire` が要求ごとに 1 つずつ控えた act とエラーの値から、`SHIORI.request` と `CALLBACK.sweep` の求めで表記付きの応答を作る（[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)） |
 
 ACT・STORE・PROXY・SCENE・SAVE の内部構造は [Lua ランタイム内部モジュール](internal-modules.md) の [STORE パターン](internal-modules.md#store-パターン)・[ACT の内部](internal-modules.md#act-の内部)・[PROXY パターン](internal-modules.md#proxy-パターン)・[SCENE モジュール](internal-modules.md#scene-モジュール)・[SAVE モジュールの内部](internal-modules.md#save-モジュールの内部) で扱う。
 
@@ -125,7 +129,7 @@ from_loader_with_scene_dic
     e. @pasta_log を登録（libs に依らず常に）
     f. debug::enable を 1 回だけ呼ぶ（無効なら何もしない）
  2. ロガー・PastaConfig・ベースディレクトリを構造体に保持
- 3. package.path を設定し、require の searcher を差し替える
+ 3. package.path を設定し、require の searcher を差し替え、@pasta_chunks（読み込んだファイルの表）を置く
  4. @pasta_config・@enc・@pasta_persistence・@pasta_log・@pasta_sakura_script を登録
  5. pasta.finalize_scene を Rust の実装で上書き（同じ別名表をクロージャに保持する）
  6. require("main")
@@ -138,6 +142,7 @@ from_loader_with_scene_dic
 - 1a の必須ライブラリの検査（`RuntimeConfig::ensure_libs`）は、VM を作るすべての入口がここを通るため 1 か所にある。必須は `std_package` だけである。1c・1e と 3 が `package` 表を無条件に使うためである。`std_string`・`std_table`・`std_math`・`std_os` は検査しない。
 - 6〜8 は `require_startup_module` を通る。失敗は `module`・`fatal` 付きのエラーログと、`failed to load startup module '…'` の文脈を付けた `Err` になり、構築全体が失敗する。利用者から見た扱いは [起動シーケンス](../reference/startup.md#2-起動シーケンス) を参照する。
 - 8 の `pasta.scene_dic` が `finalize_scene()` を呼ぶと、`@pasta_search` が Lua 側の登録から作り直される（[辞書確定](registry-search.md#辞書確定)）。
+- 3 の `@pasta_chunks` は、searcher が読み込んだファイルを書き足す表で、`pasta.shiori.stop` が止まるエラーの表記で場所を示すのにだけ使う（[require の解決（searcher）](loader.md#require-の解決searcher)）。
 - 4 の `@pasta_persistence` の登録はファイルを読まない。永続化ファイルを読むのは、後述のとおり `pasta.save` が最初に `require` されたときである。
 
 構築が終わった VM に対して、SHIORI 層は `SHIORI.load`・`SHIORI.request`・`SHIORI.unload` を取り出して保持し、`SHIORI.request` をリクエストごとに 1 回呼ぶ（`crates/pasta_shiori/src/shiori.rs`）。リクエストの文字列は Rust 側で Lua の表に解析されてから渡る。
@@ -150,7 +155,8 @@ from_loader_with_scene_dic
 EVENT.fire(req)
  1. CALLBACK.try_route(req)          待っているコールバックなら再開して応答を返す（後述）
  2. act = SHIORI_ACT.new(STORE.actors, req)          イベントごとに新しい ACT
- 3. result = (REG[req.id] or EVENT.no_entry)(act)
+ 3. STOP.hold_handler(act)                            渡す act を控える（止まるエラーの表記のため）
+    result = (REG[req.id] or EVENT.no_entry)(act)
  4. result の型で分岐
     thread  → ok, value = EVENT.drive(result, act, act)   後述の再開の手順
               ok が偽  → error(value)
@@ -198,7 +204,8 @@ return coroutine.create(wrapped_fn)
 ```text
 EVENT.drive(co, act, ...)
  1. ok, value = resume_until_valid(co, ...)   ... は最初の resume にだけ渡す
- 2. ok が偽 → CALLBACK.discard_staged()        中断の前にエラーで終わったシーンの予約を捨てる
+ 2. ok が偽 → STOP.hold(co, value)             止まったコルーチンの act とエラーの値を控える
+             CALLBACK.discard_staged()        中断の前にエラーで終わったシーンの予約を捨てる
              set_co_scene(co)                 co は dead。STORE.co_scene も空になる
              return false, value
  3. CALLBACK.consume_staged(co, act)           予約があれば待機として登録（後述）
@@ -206,7 +213,7 @@ EVENT.drive(co, act, ...)
  5. return true, value
 ```
 
-- 応答の文字列は作らない。エラーを投げるか、続けるかも決めない。どちらも呼び出し元が決める。
+- 応答の文字列は作らない。エラーを投げるか、続けるかも決めない。どちらも呼び出し元が決める。2 の `STOP.hold` は控えるだけで、控えから表記付きの応答を作るのは `SHIORI.request` と `CALLBACK.sweep` である（[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)）。
 - 3 と 4 の間には他の処理を挟まない。予約の消費と継続の更新は必ず組で行われる。
 - `act` は、`get_property` で中断したときに待機へ登録する ACT である。`EVENT.fire` ではそのイベントの ACT、`try_route`・`sweep` では待機を登録したときの ACT（`entry.act`）を渡す。
 - `resume_until_valid` と `set_co_scene` は `init.lua` のローカル関数である。`callback.lua` は `EVENT` を呼び出し時に `require` して `EVENT.drive` を使う（読み込み時に `require` すると循環する）。
@@ -280,7 +287,7 @@ EVENT.fire → CALLBACK.try_route(req)
 
 - コールバック待ちのコルーチンは `STORE.co_scene` に入らない。待っている間も、別のシーンの継続とは独立に保たれる。
 - コールバックで再開したシーンは、通常のイベントと同じ規則で扱われる。出力の無い中断は同じリクエストの中で進み、チェイントークで中断すれば `STORE.co_scene` に入って既存の継続を置き換え（次の OnTalk の機会に続きが出る）、続けて `get_property` すれば新しい待機として登録される。最後まで終われば `STORE.co_scene` は空になる。
-- 再開したシーンのエラーは、`pending` にも `STORE.co_scene` にも残らず、`SHIORI.request` が 500 にする。
+- 再開したシーンのエラーは、`pending` にも `STORE.co_scene` にも残らず、`SHIORI.request` が応答にする（表記を出す設定で ID が `On` で始まる要求なら表記付きの `200 OK`、それ以外は 500。[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)）。
 - `req.id` と一致する待機が無ければ `try_route` は `nil` を返し、`EVENT.fire` は通常の振り分けに進む。掃引で外した待機に遅れて届いた結果も、この扱いになる。
 
 ### 期限切れの掃引（CALLBACK.sweep）
@@ -302,8 +309,8 @@ CALLBACK.sweep(now)
 
 | `EVENT.drive` の結果 | `on_timeout` | 応答の候補 |
 | -------------------- | ------------ | ---------- |
-| `ok` が偽 | 文字列 | `RES.err(on_timeout)`（500。理由はシーン内のエラー文字列ではなく `on_timeout` そのもの） |
-| `ok` が偽 | 文字列以外 | なし（エラーを警告ログに出す） |
+| `ok` が偽 | 文字列 | `STOP.response` が作る時間切れの表記付きの応答（`200 OK`）。表記を出さない設定なら `RES.err(on_timeout)`（500）。理由はどちらもシーン内のエラー文字列ではなく `on_timeout` そのもの |
+| `ok` が偽 | 文字列以外 | イベント名を前に付けた警告ログを出し、`STOP.response` が作るスクリプトのエラーの表記付きの応答（`200 OK`）。表記を出さない設定ならなし |
 | `ok` が真で出力あり | どちらでも | `RES.ok(出力)` |
 | `ok` が真で出力なし（`nil` か `""`） | どちらでも | なし |
 
