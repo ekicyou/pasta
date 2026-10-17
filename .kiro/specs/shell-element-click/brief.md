@@ -24,7 +24,7 @@
 ### 2026-10-10 の検証で見つかった穴
 
 - **選択肢の振り分けは、そのままでは使い回せない**: 処理は `REG.OnChoiceSelectEx` の中に直に書いてあり、Reference の番号が決め打ちである（`choice_select.lua` 16〜18・41〜78 行）。場面のコルーチンを作る関数も、そのファイルの中でしか使えない（25〜35 行）。
-- **前方一致**: 場面の検索は前方一致である。`slot1` は `slot10` にも当たる。完全一致の場面選びは `novel-talk-flow` が入れる。
+- **前方一致**: 場面の検索は前方一致である。`slot1` は `slot10` にも当たる。名前が完全に一致する場面を選ぶ部品は、`touch-poke-shortcuts` が入れた（範囲を付けて探せる `@pasta_search` の `SEARCH:search_scene_exact(名前, グローバルシーン名)`、`crates/pasta_lua/src/search/context.rs` 105・302 行と、グローバルシーンだけの `pasta_scripts/pasta/scene.lua` の `SCENE.co_exec_exact`）。この spec は、それを使って中で塞げる。
 - **イベントの引数**: Reference は、場面の引数にならない（`shiori/event/init.lua` 226 行）。
 - **NOTIFY には台本を返せない**: クリックの通知は GET で送ってもらう必要がある。
 - areka は、今は `OnMouseClick` を SHIORI へ送っていない（areka に brief がある: `areka-P0-mouse-click-wheel-events`）。
@@ -80,7 +80,7 @@
 
 ## Upstream / Downstream
 
-- **Upstream**: `novel-areka-contract`（イベントの名前と Reference の決まり）、`novel-talk-flow`（完全一致の場面選び）。
+- **Upstream**: `novel-areka-contract`（イベントの名前と Reference の決まり）。完全一致の場面選びは `touch-poke-shortcuts` が入れた部品を使うので、`novel-talk-flow` は待たない（ノベル向けの切り替えと揃えるかは、要件で決める）。
 - **Downstream**: `novel-save-slots`（セーブ画面）、`hello-novel-sample`（タイトル・セーブ・ロード・設定の画面）。
 
 ## Existing Spec Touchpoints
@@ -114,3 +114,20 @@
 - `FAILURE.format` は `FAILURE.body`（枠なし・無効化なし）を無効化して【】で囲む形になった（出力は不変）。表記の形を変えるときは `FAILURE.body` も見る。
 - 生成コードのシーン関数の先頭は `act:init_scene(SCENE, "書いたグローバル名", "書いたローカル名"|nil, "<.pasta>|<lua>:<pasta>,...")` になった。act は `scene_name`・`local_scene_name`・`line_map`・`scene_names` を控え、`call_restore` は 4 つを戻し、`restore_scene` はグローバル名だけを戻す。`act.lua`・コード生成・`init_scene` の行の数に触るときは、行の対応（`transpiler.rs` の `fill_line_maps`）と止まるエラーの表記を見直す。
 - 参照: `.kiro/specs/completed/runtime-error-balloon/design.md` の Revalidation Triggers と `research.md` の「実装の記録」、マニュアル `book/src/reference/runtime-failures.md`「止まるエラーの表記」。
+
+## 2026-10-17 棚卸の再測定（main b4164100）
+
+- **前提の変化**:
+  - 名前が完全に一致する場面を選ぶ部品が入った（`touch-poke-shortcuts`）。範囲を付けて探せる `@pasta_search` の `SEARCH:search_scene_exact(名前, グローバルシーン名)`（`crates/pasta_lua/src/search/context.rs` 105・302 行）と、グローバルシーンだけの `SCENE.co_exec_exact`（`pasta_scripts/pasta/scene.lua` 227 行）。`slot1` が `slot10` に当たる穴は、この部品でこの spec の中で塞げる。`novel-talk-flow` への依存は、機能としては無くなった（ノベル向けの切り替えと揃えるかは、要件で決める）。
+  - 撫で・つつきの既定の受け口（`shiori/event/mouse.lua`）が、既定のハンドラを `REG.名前 = REG.名前 or 関数` の形で置き、完全一致の部品で場面を探す。新しい受け口の手本になる。選択肢の受け口も同じ形になった（`choice_select.lua` 41 行）。
+  - 止まるエラーのバルーン表示（`runtime-error-balloon`）で、受け口のハンドラが Lua のエラーで止まっても、表記が 200 で出る（`shiori/event/init.lua` 227 行の `STOP.hold_handler`）。この spec で手当てする物は無い。
+- **触るファイル**: 選択肢の振り分け `shiori/event/choice_select.lua` 80（振り分けを関数として取り出す）、クリックの受け口（新しいファイルなら、読み込みの 1 行を `shiori/event/init.lua` 77〜80 行に足す。`choice_select.lua` の中に置けば `init.lua` は触らない）、範囲つきの完全一致の場面の口を `scene.lua` 240 に足すならそれも、マニュアル。1,000 行に近いものは無い。
+- **規模**: 5〜8 タスクのまま（完全一致の部品があるので増えない）。
+- **先に要るもの**: `novel-areka-contract`（イベントの名前と Reference の決まり）だけ。`novel-talk-flow` は要らなくなったので、ロードマップの順番の 7 番より前に出せる。ファイルの重なり: `scene-anchor-link`（`choice_select.lua`。先に入る側が振り分けを取り出す）、`scene.lua` に足すなら `scene-attribute-store`・`call-attribute-filter`・`novel-talk-flow`、`init.lua` に読み込みを足すなら `novel-talk-flow`・`novel-checkpoint-rollback`、`cue-command-runtime` が柱を `choice_select.lua` で打つならそれとも。`pasta-check-validate-edges`・`tutorial-ssp-gaps`・`novel-areka-contract` とは重ならない。
+- **種別**: 機能（名前つきのクリックを場面へ届ける道が無い）。開発者の 0.5.0 の決定（システム画面はシェルで組む）から。
+- **要件定義のモデル**: Opus。イベントの名前は取り決めの文書が決め、振り分けは選択肢の規則を使い回す。「どの画面の場面か」の決め方は 2 案（画面を出した場面を覚える／areka に名前を運んでもらう）に絞れていて、推奨案を付けられる。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**:
+  - 「前方一致… 完全一致の場面選びは `novel-talk-flow` が入れる」と「Upstream」の `novel-talk-flow` は古くなった（上の 1 点目）。2026-10-17 に直した。
+  - 「Reference は場面の引数にならない（`init.lua` 226 行）」は 228〜232 行に動いた（ハンドラには act だけを渡し、`EVENT.drive(result, act, act)` で始める）。`choice_select.lua` の行番号（16〜18・25〜35・41〜78 行）は合っている。
+  - 「失敗の見せ方は `failure-output-unification` に乗せる」は、完了したので `pasta/failure.lua` の `FAILURE.report` と読む（下の申し送りのとおり）。

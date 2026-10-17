@@ -14,7 +14,7 @@
 
 ## Current State
 
-- 飛び先の検査を省く条件は、構文エラーが 1 つでもあることだけ（`crates/pasta_check/src/validate/mod.rs` 54・74 行付近。要件 6.8）。読めないファイルは `FileText::Unreadable`・`FileText::NotUtf8`（`validate/input.rs`）として届くが、省く条件に入っていない。
+- 飛び先の検査を省く条件は、構文エラーが 1 つでもあることだけ（`crates/pasta_check/src/validate/mod.rs` 74 行付近。要件 6.8）。読めないファイルは `FileText::Unreadable`・`FileText::NotUtf8`（`validate/input.rs`）として届くが、省く条件に入っていない。
 - 検査の核の入力はファイルの一覧で、フォルダは見ない（`validate/discovery.rs`）。
 - VSCode 拡張の `findGhostMaster`（`editors/vscode/src/ghostValidator.ts` 18 行付近）は `segments[i] === 'master' && segments[i - 1] === 'ghost'` で探し、見張り（同 70 行付近）も `**/ghost/master/**/*.{pasta,lua}` である。
 - `manual.yml` の段は、hello-pasta の実ファイルを本物の読み込みで読むテスト（`cargo test -p pasta_sample_ghost`）を構文の検証の代わりにしている（コメントは 2026-10-17 の棚卸で直した）。
@@ -70,3 +70,17 @@
 - 要件定義のモデル: Opus（道具の報告の裁定で、文法・保存の形・公開の Lua の約束ではない）。
 - 議題: 読めないファイルがあるときに省く範囲／`.pasta` で終わるフォルダを注意にするか／前方一致の重なりを注意として足すか／`manual.yml` の段の置き換え。
 - 0.4.1 に入れる（2026-10-17 開発者の決定。0.4.0 の遅れを止めるため、致命的でない不具合は 0.4.1 に回す）。0.4.0 を出した直後に始める。
+
+## 2026-10-17 棚卸の再測定（main b4164100）
+
+- **前提の変化**: 前回の測定（main e9b321e0）の後に入った変更は、この spec の触るファイルに届いていない。zip の版上げで変わったのは `crates/pasta_check/src/nar.rs`・`release.rs` のテストの 5 行（入れ物の中の名前の取り出し方）だけで、辞書の検査の核（`crates/pasta_check/src/validate/`）と検査の入口（`validate_cmd.rs`）は変わっていない。マニュアルの CI（`.github/workflows/manual.yml`）の変更は「Tutorial syntax validation」の段のコメント 1 行だけで、段の中身（`cargo test -p pasta_sample_ghost`）はそのまま。「Current State」は今のコードと合う（飛び先の検査を省く条件は `validate/mod.rs` 74 行、ゴーストのフォルダを探す関数の照合は `editors/vscode/src/ghostValidator.ts` 22 行、見張りは 70 行）。
+- **触るファイル**: 検査の核の `validate/mod.rs`（128 行）・`report.rs`（379 行。種類を足すとき）・`discovery.rs`（200 行）。フォルダを報告するなら、核の入力の形 `validate/input.rs`（33 行。今はファイルの一覧だけを持つ）と、一覧を集める 2 か所（CLI の `crates/pasta_check/src/validate_cmd.rs` 309 行の `walk`、拡張の `ghostValidator.ts` 314 行の `walk`）。入力の形を変えるなら、拡張と WASM の橋渡し `editors/vscode/src/wasmBridge.ts`（235 行）・`crates/pasta_lsp/src/transport.rs` と、WASM の作り直し。テストは `crates/pasta_check/tests/validate_*.rs`・`editors/vscode/src/test/ghostValidator.test.ts`。マニュアル `book/src/debug/validate.md`。場合により `manual.yml` と `crates/pasta_sample_ghost/tests/tutorial_stages_test.rs`（483 行）。新しいファイルは無い見込み。1,000 行に近いものは無い。
+- **規模**: 5〜7 タスク（入力の形を変えてフォルダを報告するなら 7）。
+- **先に要るもの**: 無い。0.5.0 の先頭の 2 本とはファイルが重ならない（`novel-areka-contract` は文書だけ。`scene-attribute-store` は文法の読み取り・コード生成・`scene.lua`・`pasta_core` のシーン登録で、`pasta_check` も拡張も触らない）。検査の段の `validate/mod.rs` は、後で検査を足す `call-attribute-filter`・`scene-anchor-link`・`cue-command-runtime`・`novel-talk-flow` も触るので、この 4 本とは同じウェーブに置かない。マニュアル `validate.md` は、同じページの別の節なら並べてよい。
+- **種別**: バグ（読めない辞書があると、本当の原因と別の「飛び先が無い」が並ぶ。拡張が `Ghost/Master` のゴーストを検査しない）と後片付け（代用品の置き換え）。
+- **要件定義のモデル**: Opus（道具の報告の裁定で、文法・保存の形・公開の Lua の約束ではない）。
+- **分割の案**: 分けない。
+- **見つけた穴・古くなった記述**:
+  - 「Current State」の「54・74 行付近」の 54 行は、検査の関数 `validate_ghost` の始まり（55 行）である。省く条件は 74 行の 1 か所だけ。
+  - `.pasta` で終わるフォルダを報告するには、核の入力にフォルダの名前を足すか、一覧を集める 2 か所（CLI と拡張）で別々に報告するかを決める。入力の形を変えると、WASM の作り直しと `wasmBridge.ts` の形の検査に効く（`pasta-check-dic-validate` の design.md の Revalidation Triggers）。
+  - 拡張の見張りの書き方（`**/ghost/master/**`）が Windows で大文字・小文字を区別するかは、確かめていない。照合の関数だけを直しても、見張りが `Ghost/Master` の下の保存を拾わなければ検査は起きない。要件で確かめる。

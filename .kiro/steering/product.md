@@ -21,7 +21,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
 - [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
 
-**完了仕様**: 169件（2026-10-17 時点・`.kiro/specs/completed/` に格納）
+**完了仕様**: 171件（2026-10-17 時点・`.kiro/specs/completed/` に格納）
 
 **主要成果**:
 - ✅ **act-impl-call** - `ACT_IMPL.call` 4段階優先順位検索実装
@@ -43,7 +43,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] SHIORI インターフェース（pasta_shiori）- DLL エクスポート
 
 ### Phase 2: コア機能拡張（進行中）🔄
-**最終更新**: 2026-10-17（現行バージョン v0.3.8）
+**最終更新**: 2026-10-17（現行バージョン v0.4.0）
 
 **完了仕様**:
 - ✅ **release-workflow** - リリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認）。手順は `release` スキル（`/release`）へ移した
@@ -82,7 +82,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - ✅ **vscode-extension-release** / **vscode-trailing-newline** - 拡張リリース・末尾改行整備
 
 **保守性・基盤整備**:
-- ✅ **oversized-file-decomposition** - 巨大 Rust ファイルを俯瞰可能サイズへ振る舞い不変分解（全ファイル < 600 行）
+- ✅ **oversized-file-decomposition** - 巨大 Rust ファイルを俯瞰可能サイズへ振る舞い不変分解（分解した時点で全ファイル < 600 行）
 - ✅ **pasta-config-restructure** - `pasta.toml` をデフォルトプロファイルモデルへ再整理（記述負担軽減）
 - ✅ **budouy-migration** - 分かち書きクレートを budoux → budouy へ移行
 - ✅ **review-improvement-loop** - コードベース総合レビュー＆改善ループ完走（64 セル）
@@ -105,4 +105,4 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [ ] arekaへの投入（`ukagaka-desktop-mascot`メタ仕様）
 - [ ] MCPまたはLLMとの連携
 
-**現在地**: 現行バージョン v0.3.8。次の節目は 0.4.0 で、主題は「入門者にやさしく」（範囲と順番は [roadmap.md](roadmap.md) の「0.4.0 までの道筋」）。これまでは仕様を満たすことと潜在的な高機能さを優先してきたが、0.4.0 では、初めて辞書を書く人が迷わず進めて、書き間違えたときに原因が分かることを優先する。その次の 0.5.0 の目標は、別リポジトリで開発中の areka でノベルゲームが作れるようになること。hello-pasta の新しいシェル、9 段目の選択肢の直し、撫で・つつきの反応のショートカット、実行時の失敗の出力の一本化、SSP を起動しない辞書の検査（`pasta_check validate`）、シェルの説明の章は済んだ（2026-10-17）。残るのは、スクリプトが止まるエラーのバルーン表示とスクリーンショット。属性セマンティクス（シーン属性・Call の属性フィルター・文中のシーンリンク）は 0.4.0 の後に回す。リリースの CI 化と CI での初回リリース（v0.3.8）は完了した
+**現在地**: 現行バージョン v0.4.0（2026-10-17 リリース。主題は「入門者にやさしく」）。初めて辞書を書く人が迷わず進めて、書き間違えたときに原因が分かることを優先した版で、hello-pasta の新しいシェル、9 段目の選択肢の直し、撫で・つつきの反応のショートカット、実行時の失敗の出力の一本化、止まるエラーのバルーン表示、SSP を起動しない辞書の検査（`pasta_check validate`）、シェルの説明の章、入門ガイドの絵が入った。次は 0.4.1（致命的でない不具合。範囲は [roadmap.md](roadmap.md) の「0.4.1 の範囲」）と、0.5.0 の目標（別リポジトリで開発中の areka でノベルゲームが作れるようになること）。属性セマンティクス（シーン属性・Call の属性フィルター）は 0.5.0 の道筋に入った。リリースの CI 化と CI での初回リリース（v0.3.8）は完了した

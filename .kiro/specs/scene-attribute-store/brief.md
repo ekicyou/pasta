@@ -185,3 +185,19 @@ Call ターゲットの後ろに `＆key＝value` 形式のフィルターを付
 - **ローカルシーンと名前なしの `＊`**: 演出の側は、ファイルの属性と親の属性を、ローカルシーンへも受け継がせたい（旧仕様は「ローカルシーンには影響しない」だった）。名前なしの `＊` は、今は属性を受け継がない（`crates/pasta_dsl/src/parser/parse_scene.rs` 88〜91 行）。受け継ぎの決まりを決めるときに、この使い方を材料にする。受け継ぐかどうかの最終の決定は、この spec の要件で行う。
 - **値は 1 つ**: `＆背景：教室、夕方` は、`教室、夕方` という 1 つの文字列になる（`grammar.pest` 164〜166 行）。値を複数持たせる必要が出たら、演出の側の spec が言い出す。この spec では変えない。
 - 参照: `.kiro/specs/cue-command-runtime/brief.md`（2026-10-17 に `scene-stage-attributes` をまとめた）、`.kiro/steering/roadmap.md` の「Phase 13」。
+
+## 2026-10-17 棚卸の再測定（main b4164100）
+
+- **前提の変化**: 止まるエラーのバルーン表示（`runtime-error-balloon`）が、場面の関数の頭の 1 行を変えた。今は `act:init_scene(SCENE, "書いたグローバル名", "書いたローカル名" または nil, "行の対応")` で、4 つ目の「行の対応」は、整形の後にトランスパイラがその行の最後の `)` の前へ埋める（`crates/pasta_lua/src/transpiler.rs` の `fill_line_maps` 308 行、`crates/pasta_lua/src/code_gen/scope_gen.rs` 286〜298 行）。見本の期待値とすべてのスナップショットが、このとき変わった。
+  - 属性を `init_scene` の引数で渡すなら、「行の対応」が最後の引数であることと、最後の `)` を探して埋めることを崩さない置き方にする。
+  - 属性を場面の関数の外に行として出すと、その後ろの場面の「行の対応」の数がずれる（埋め直しは自動なので害は無いが、属性のあるファイルの期待値は多くの行で変わる）。属性の無いファイルの出力を変えない約束は、そのまま守れる。
+  - act は、場面の表から書いたグローバル名を引く表 `scene_names` を持つようになった（`pasta_scripts/pasta/act.lua` 207〜220 行）。読み出しの口を `scene.lua` に置き、`act.lua` を触らない方針は、そのまま取れる。
+- **触るファイル**: 前回と同じ。今の行数は `parse_scene.rs` 426、`scope_gen.rs` 445、`context.rs` 454、`transpiler.rs` 339、`scene.lua` 240（完全一致の `SCENE.co_exec_exact` が増えた）、`finalize.rs` 358、`scene_registry.rs` 576、`scene_types.rs` 36。見本 `crates/pasta_lua/tests/fixtures/sample.expected.lua`・`sample.generated.lua` と、属性の入ったスナップショット（`kind_scene_attributes`・`scene_with_attributes`）。1,000 行に近いものは無い。
+- **規模**: 15〜18 タスクのまま。行の対応の確かめは、見本の作り直しのタスクに含める。
+- **先に要るもの**: なし。0.5.0 の先頭に置ける。ファイルの重なり: `cue-command-runtime`（`parse_scene.rs`・`scope_gen.rs`・`transpiler.rs`・`context.rs`・スナップショット）、`call-attribute-filter`（`scene.lua`・`scene_types.rs`）。どちらもこの spec の後。宣言行の属性の位置を編集中の解析（`crates/pasta_dsl/src/partial.rs`）や VSCode の文法定義で扱うことになれば、`call-attribute-filter`・`scene-anchor-link` とも重なる。`shell-element-click` が `scene.lua` に範囲つきの完全一致を足す場合は、それとも重なる。`novel-areka-contract`・`pasta-check-validate-edges`・`tutorial-ssp-gaps` とは重ならない。
+- **種別**: 機能（書いた属性が、実行時にはどこにも残らない）。
+- **要件定義のモデル**: Fable。決めるのは「属性の倉の意味」で、後の 2 本（Call の絞り込みと柱の演出）がその上に乗る、取り消しにくい文法の意味と公開の Lua の口である。値の型、ローカルシーンと名前なしの `＊` への受け継ぎ、書いた順と重なったときの優先（ファイル・宣言行・次の行の属性行）の 3 つが互いに絡み、まだ推奨案が無い。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**:
+  - シーン 1 つを処理する `process_global_scene` は `transpiler.rs` の 214 行に動いた（前回は 202 行）。空の絞り込み条件を作るのは `crates/pasta_lua/src/search/context.rs` の 121 行（前回は 96 行）。
+  - マニュアルの「内部に記録される」は `book/src/grammar/block-structure.md` の 271 行と 303 行に動いた。宣言行の属性では今も成り立たない。
