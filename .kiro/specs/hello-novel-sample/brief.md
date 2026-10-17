@@ -53,7 +53,7 @@ areka が出すのは部品だけで、ノベルゲームのシステム画面�
 
 ## Upstream / Downstream
 
-- **Upstream**: `cue-command-runtime`、`scene-stage-attributes`、`novel-talk-flow`、`novel-checkpoint-rollback`、`novel-save-slots`、`shell-element-click`、`call-attribute-filter`（フラグによる分岐）、`novel-areka-contract`（語彙）。areka の側の実装（画面・音・入力）。
+- **Upstream**: `cue-command-runtime`（2026-10-17 に `scene-stage-attributes` をまとめた）、`novel-talk-flow`、`novel-checkpoint-rollback`、`novel-save-slots`、`shell-element-click`、`call-attribute-filter`（フラグによる分岐）、`novel-areka-contract`（語彙）。areka の側の実装（画面・音・入力）。
 - **Downstream**: `manual-novel-guide`（この見本を題材にする）。0.5.0 のリリース。
 
 ## Existing Spec Touchpoints

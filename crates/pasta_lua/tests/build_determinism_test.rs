@@ -126,7 +126,7 @@ fn zip_entry_names(zip_bytes: &[u8]) -> Vec<String> {
     let mut names = Vec::with_capacity(archive.len());
     for i in 0..archive.len() {
         let entry = archive.by_index(i).expect("read zip entry");
-        names.push(entry.name().to_string());
+        names.push(entry.name().unwrap().to_string());
     }
     names
 }

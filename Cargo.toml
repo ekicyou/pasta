@@ -51,7 +51,7 @@ embed-resource = "3"
 # pasta_check dependencies
 lexopt = "0.3"
 md5 = "0.8"
-zip = { version = "8.6", default-features = false, features = ["deflate"] }
+zip = { version = "9.0", default-features = false, features = ["deflate"] }
 
 # pasta_lsp dependencies
 tower-lsp = { version = "0.20", default-features = false, features = ["runtime-agnostic"] }
