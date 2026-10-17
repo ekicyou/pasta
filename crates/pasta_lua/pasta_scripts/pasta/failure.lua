@@ -17,6 +17,8 @@ FAILURE.LABEL = {
     NOT_NUMBER         = "数にできない値",
     NOT_STRING         = "文字列にできない値",
     SCENE_NOT_FOUND    = "シーンが見つからない",
+    SCRIPT_ERROR       = "スクリプトのエラー",
+    TIMEOUT            = "時間切れ",
 }
 
 local ESCAPE = { ["\\"] = "\\\\", ["%"] = "\\%", ["\r"] = " ", ["\n"] = " " }
@@ -183,6 +185,13 @@ end
 function FAILURE.running_act()
     local co = coroutine.running()
     return co and RUNNING[co] or nil
+end
+
+--- コルーチンに対応する act（無ければ nil）。読むだけ（止まったコルーチンの act を外から引く）
+---@param co thread
+---@return table|nil
+function FAILURE.act_of(co)
+    return RUNNING[co]
 end
 
 ---@param act table
