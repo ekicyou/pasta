@@ -159,7 +159,7 @@ debug_mode = false                                  # 既定 false
 file_path = "profile/pasta/logs/pasta.log"   # 既定 "profile/pasta/logs/pasta.log"
 level = "info"                               # 既定 "info"
 # filter = "debug,pasta_shiori=info"         # 未設定（設定時は level より優先）
-balloon_warning = true                       # 既定 true（失敗表記をバルーンに出す）
+balloon_warning = true                       # 既定 true（失敗表記をバルーンに出す。配る前に false）
 
 # --- 省略可（SHIORI デフォルト有）: デバッグバックエンド ---
 [debug]
@@ -513,14 +513,14 @@ file_path = "profile/pasta/save/save.json"
 
 ### [logging]（ログ出力）
 
-ログファイルの出力と、実行時の失敗表記をバルーンに出すかどうかを制御する。**分類: SHIORI デフォルト有（省略可）**。
+ログファイルの出力と、失敗表記（実行時の失敗と止まるエラーの表記）をバルーンに出すかどうかを制御する。**分類: SHIORI デフォルト有（省略可）**。
 
 | キー | 型 | 既定値 | 説明 |
 | ---- | -- | ------ | ---- |
 | `file_path` | 文字列 | `"profile/pasta/logs/pasta.log"` | ログファイルのパス（設置ディレクトリからの相対パスで、`profile/` ディレクトリの下だけ） |
 | `level` | 文字列 | `"info"` | 記録するログレベル（`error`/`warn`/`info`/`debug`/`trace`） |
 | `filter` | 文字列 | （なし） | ログのフィルター指定（tracing の EnvFilter の書式）。設定すると `level` より優先される |
-| `balloon_warning` | 真偽値 | `true` | 実行時の失敗表記（`【…】`）をバルーンに出す。`false` で出さない（ログの警告は出る） |
+| `balloon_warning` | 真偽値 | `true` | 失敗表記（`【…】`。実行時の失敗と止まるエラーの表記）をバルーンに出す。`false` で出さない（ログの警告は出る）。配る前に `false` にする |
 
 ```toml
 [logging]
@@ -533,6 +533,13 @@ filter = "debug,pasta_shiori=info"
 - 環境変数 `PASTA_LOG` が設定されていると、`filter`・`level` より優先される。
 - `balloon_warning` は `level`・`filter` と独立している。`false` でもログの警告は出て、ログに残るかどうかは `level`・`filter` が決める。`level = "error"` で警告がログに残らない設定でも、失敗表記を出すかどうかは `balloon_warning` だけで決まる。真偽値でないときは `true` になり、`[logging]` の他のキーは既定値に戻らない（[値の型が合わないとき](#値の型が合わないとき)）。表記の種類と出る位置は [実行時の失敗の出力](runtime-failures.md#表記の切り替え) を参照する。
 - Lua からのログ出力は [@pasta_log](https://ekicyou.github.io/pasta/lua/modules/pasta-log.html)、起動に失敗したときのログの読み方は [ゴーストが起動しない・喋らないとき](https://ekicyou.github.io/pasta/reference/startup.html#4-ゴーストが起動しない喋らないとき) を参照する。
+- `balloon_warning` は、Lua のエラーでシーンや要求が止まったときの表記（`【スクリプトのエラー：…】`・`【時間切れ：…】`）も切り替える。`On` で始まるイベントの GET の要求で止まったとき、`true` では応答が表記付きの `200 OK` になり、`false` ではこれまでどおり表記の無い `500 Internal Server Error`（`X-Error-Reason` 付き）になる（[止まるエラーの表記](runtime-failures.md#止まるエラーの表記)）。
+- 既定の `true` のままでは、配ったゴーストの利用者のバルーンにも表記が出る。ゴーストを配る前に、次のように `false` にする。
+
+```toml
+[logging]
+balloon_warning = false
+```
 
 ---
 
