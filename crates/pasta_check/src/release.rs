@@ -249,7 +249,7 @@ mod tests {
                 let mut entry = archive.by_index(i).unwrap();
                 let mut bytes = Vec::new();
                 entry.read_to_end(&mut bytes).unwrap();
-                (entry.name().to_string(), bytes)
+                (entry.name().unwrap().to_string(), bytes)
             })
             .collect()
     }

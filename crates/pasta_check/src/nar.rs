@@ -116,7 +116,7 @@ mod tests {
         let file = File::open(&nar_path).unwrap();
         let mut archive = zip::ZipArchive::new(file).unwrap();
         let names: Vec<String> = (0..archive.len())
-            .map(|i| archive.by_index(i).unwrap().name().to_string())
+            .map(|i| archive.by_index(i).unwrap().name().unwrap().to_string())
             .collect();
         assert!(names.contains(&"ghost/master/descript.txt".to_string()));
         assert!(names.contains(&"install.txt".to_string()));
@@ -136,7 +136,7 @@ mod tests {
         let file = File::open(&nar_path).unwrap();
         let mut archive = zip::ZipArchive::new(file).unwrap();
         let names: Vec<String> = (0..archive.len())
-            .map(|i| archive.by_index(i).unwrap().name().to_string())
+            .map(|i| archive.by_index(i).unwrap().name().unwrap().to_string())
             .collect();
         assert!(!names.iter().any(|n| n.contains("profile")));
         assert!(names.contains(&"install.txt".to_string()));
@@ -171,7 +171,7 @@ mod tests {
         let file = File::open(&nar_path).unwrap();
         let mut archive = zip::ZipArchive::new(file).unwrap();
         let names: Vec<String> = (0..archive.len())
-            .map(|i| archive.by_index(i).unwrap().name().to_string())
+            .map(|i| archive.by_index(i).unwrap().name().unwrap().to_string())
             .collect();
 
         // 通常ファイルは封入される
@@ -237,7 +237,7 @@ mod tests {
         let file = File::open(&nar_path).unwrap();
         let mut archive = zip::ZipArchive::new(file).unwrap();
         let names: Vec<String> = (0..archive.len())
-            .map(|i| archive.by_index(i).unwrap().name().to_string())
+            .map(|i| archive.by_index(i).unwrap().name().unwrap().to_string())
             .collect();
         // 実ファイルは含まれる
         assert!(names.contains(&"ghost/real.txt".to_string()));
