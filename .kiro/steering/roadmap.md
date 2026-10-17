@@ -6,9 +6,9 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 現在の主題は 3 つある。
 
-- **0.4.1: 致命的でない不具合**。0.4.0 に入れずに回した不具合を直す。今の範囲は、辞書の検査の端のケース（`pasta-check-validate-edges`）だけである（下の「0.4.1 の範囲」）。
+- **0.4.1: 致命的でない不具合**。0.4.0 に入れずに回した不具合を直す。今の範囲は、辞書の検査の端のケース（`pasta-check-validate-edges`）と、入門ガイドを SSP で確かめたときに見つかったずれ（`tutorial-ssp-gaps`。2026-10-17 開発者の決定で足した）の 2 本である（下の「0.4.1 の範囲」）。
 - **Phase 13: areka でノベルゲーム（0.5.0）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性セマンティクス（シーン属性の保持と読み出し・Call の属性フィルター）も、この道筋に入った。
-- **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）と、入門ガイドを SSP で確かめたときに見つかったずれ（`tutorial-ssp-gaps`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
+- **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
 Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイドの絵で完了した（「完了フェーズ」）。
 
@@ -92,12 +92,14 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 | 順 | spec | 要件定義 | 規模 | 始められる時期 |
 | -- | ---- | -------- | ---- | -------------- |
 | 1 | pasta-check-validate-edges | Opus | 5〜7 | 今すぐ（2026-10-17 のウェーブ） |
+| 1 | tutorial-ssp-gaps | Opus | 7〜11 | 今すぐ（2026-10-17 のウェーブ。2026-10-17 開発者の決定で 0.4.1 に入れた） |
 | 2 | 0.4.1 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
-- **0.4.1 に入れたもの**: `pasta-check-validate-edges`（辞書の検査の端のケース 3 つと代用品の置き換え。誤った報告は出すが、検査そのものは働く）。
+- **0.4.1 に入れたもの**: `pasta-check-validate-edges`（辞書の検査の端のケース 3 つと代用品の置き換え。誤った報告は出すが、検査そのものは働く）。`tutorial-ssp-gaps`（SSP の仮想の時刻を時報に効かせるか・辞書が無いときの起動の立ち絵。どちらも、やるかどうかから決める。入門ガイドと SSP のずれで、0.4.0 の主題の続き）。
 - **これから見つかる不具合**: 致命的（起動しない・辞書の内容が失われる・配布物が壊れる・リリースが通らない）なら、すぐに割り込ませる。それ以外は 0.4.1 に置く。
-- **0.5.0 との関係**: 0.5.0 の先頭の `novel-areka-contract`（文書だけ）と `scene-attribute-store` は、`pasta-check-validate-edges` とファイルが重ならない。並べるには、0.5.0 を今のゴールに含める開発者の決定が要る（下の棚卸の「開発者の判断が要るもの」）。
-- **まだ版が決まっていないもの**: `scene-anchor-link`・`tutorial-ssp-gaps`。`tutorial-ssp-gaps` のうち起動の立ち絵の分は、2026-10-16 開発者の決定で優先度を下げた（「何も書かなければ何も表示しない」が既定の動き）。
+- **0.5.0 との関係**: 0.5.0 の先頭の `novel-areka-contract`（文書だけ）と `scene-attribute-store` は、0.4.1 の 2 本とファイルが重ならない。並べるには、0.5.0 を今のゴールに含める開発者の決定が要る（下の棚卸の「開発者の判断が要るもの」）。
+- **まだ版が決まっていないもの**: `scene-anchor-link`。
+- `tutorial-ssp-gaps` のうち起動の立ち絵の分は、2026-10-16 開発者の決定で優先度を下げた（「何も書かなければ何も表示しない」が既定の動き）。やるかどうかは、要件定義の最初に決める。
 
 ### 0.5.0 の目標（2026-10-10 開発者の決定）
 
@@ -107,7 +109,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
 前回（2026-10-17・main `e9b321e0`）の後に、前回のウェーブの 2 本（止まるエラーのバルーン表示 `runtime-error-balloon`・入門ガイドの絵 `getting-started-screenshots`）が入り、v0.4.0 を出した（リリース CI の run 39024925990。全部の job が 1 回目で通った）。ほかに、zip を 9.0 に上げた直しと、リリースの本文の直しが入った。未完了は 13 本（常駐の `review-improvement-loop` を除く。この棚卸で 1 本分けた）、完了は 171 本。作業中のブランチは無い（ほかのワークツリーとリモートのブランチは、どれも main に入った後のもの）。前回の記録は git の履歴にある。
 
-今のゴールは 0.4.1 である（0.4.0 を出したので、いちばん近い版）。範囲は `pasta-check-validate-edges` の 1 本だけ。0.4.0 を出した後の棚卸として、ゴールの後の spec も、0.5.0 の範囲として測り直した。`runtime-error-balloon` が、場面の関数の頭（`act:init_scene` の引数）・`act.lua`・止まるエラーの応答（200 を返す）を変え、Phase 13 の前提が動いたためである。測り直したのは 0.5.0 の土台の 6 本と Phase 11 の残りの 4 本で、合わせて 10 本。遠い 3 本（`novel-save-slots`・`hello-novel-sample`・`manual-novel-guide`）は、前提が変わっていないので、分割の申し送りを足しただけにした。
+今のゴールは 0.4.1 である（0.4.0 を出したので、いちばん近い版）。範囲は `pasta-check-validate-edges` の 1 本だけだった。この棚卸の報告の後に、開発者が `tutorial-ssp-gaps` を足した（2 本）。0.4.0 を出した後の棚卸として、ゴールの後の spec も、0.5.0 の範囲として測り直した。`runtime-error-balloon` が、場面の関数の頭（`act:init_scene` の引数）・`act.lua`・止まるエラーの応答（200 を返す）を変え、Phase 13 の前提が動いたためである。測り直したのは 0.5.0 の土台の 6 本と Phase 11 の残りの 4 本で、合わせて 10 本。遠い 3 本（`novel-save-slots`・`hello-novel-sample`・`manual-novel-guide`）は、前提が変わっていないので、分割の申し送りを足しただけにした。
 
 - `pasta-check-validate-edges`（5〜7）は、zip の直しとも `manual.yml` の直しとも重ならない。0.5.0 の先頭の 2 本とも、ファイルを共有しない。
 - `tutorial-ssp-gaps` は、要件定義を Fable から Opus に下げた。SSP の仮想の時刻が SHIORI に届くかは、実機の記録で確かめれば決まり、決め直せる。今の動きは筋が通っているので、種別は不具合でなく機能と文書とした。
@@ -136,37 +138,41 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
 ### 要件定義のモデル
 
-今のゴール（0.4.1）の `pasta-check-validate-edges` は Opus。端のケースの直しで、文法・保存の形・公開の Lua の約束のどれにも触らない。ゴールの後では、`scene-attribute-store`・`cue-command-runtime`・`call-attribute-filter`・`novel-talk-flow`・`novel-variable-scope`・`novel-checkpoint-rollback` が Fable である（理由は各 brief の再測定の節）。
+今のゴール（0.4.1）の 2 本はどちらも Opus。`pasta-check-validate-edges` は端のケースの直しで、文法・保存の形・公開の Lua の約束のどれにも触らない。`tutorial-ssp-gaps` は、SSP の仮想の時刻が SHIORI に届くかを実機の記録で確かめれば決まり、決め直せる。ゴールの後では、`scene-attribute-store`・`cue-command-runtime`・`call-attribute-filter`・`novel-talk-flow`・`novel-variable-scope`・`novel-checkpoint-rollback` が Fable である（理由は各 brief の再測定の節）。
 
 ### ウェーブ（2026-10-17）
 
-今のゴール（0.4.1）の範囲は 1 本だけなので、1 本のウェーブにする。
+今のゴール（0.4.1）の 2 本を、両方とも並べる（`tutorial-ssp-gaps` は 2026-10-17 開発者の決定で 0.4.1 に入れた）。どちらも先に要るものが無く、互いのソースもマニュアルのページも重ならない。
 
 | spec | 子孫 | 種別 | 規模 | 要件定義 |
 | ---- | ---- | ---- | ---- | -------- |
 | pasta-check-validate-edges | 0（後は 0.4.1 のリリース） | バグと後片付け | 5〜7 | Opus |
+| tutorial-ssp-gaps | 0（後は 0.4.1 のリリース） | 機能と文書（入門ガイドと SSP のずれ） | 7〜11 | Opus |
 
 開始コマンド（`/kiro-next` の報告と同じ形。俯瞰の頁が、この塊をコピーのボタンつきで出す）:
 
 ```
-Wave 1本
+Wave 2本
 Opus
 /kiro-start pasta-check-validate-edges
+/kiro-start tutorial-ssp-gaps
 ```
 
 同じウェーブに置くときの約束:
 
-- `pasta-check-validate-edges` が持つのは、`crates/pasta_check/src/validate/`（`mod.rs`・`report.rs`・`discovery.rs`、フォルダを報告するなら `input.rs`）、`validate_cmd.rs` の集め方、VSCode 拡張の `ghostValidator.ts`（入力の形を変えるなら `wasmBridge.ts` と `pasta_lsp` の受け渡し）、そのテスト、マニュアルの `debug/validate.md`、代用品の置き換えで `manual.yml` と `tutorial_stages_test.rs`。
+- `pasta-check-validate-edges` が持つのは、`crates/pasta_check/src/validate/`（`mod.rs`・`report.rs`・`discovery.rs`、フォルダを報告するなら `input.rs`）、`validate_cmd.rs` の集め方、VSCode 拡張の `ghostValidator.ts`（入力の形を変えるなら `wasmBridge.ts` と `pasta_lsp` の受け渡し）、そのテスト、マニュアルの `debug/validate.md`、代用品の置き換えで `manual.yml` と `tutorial_stages_test.rs`。`crates/pasta_lua`・`crates/pasta_shiori` と入門の章は触らない。
+- `tutorial-ssp-gaps` が持つのは、`pasta_shiori` の `lua_request.rs`（時刻の受け渡し）、`pasta_scripts/pasta/shiori/event/` の `virtual_dispatcher.lua`・`boot.lua`（外から起こした `OnTalk` の件をやるなら `event/init.lua`。止まるエラーの見張り `STOP.hold_handler` は、処理を呼ぶ直前のまま保つ）、そのテスト、入門の章（`getting-started/06-hour.md`・`setup.md`・`11-jump.md`）と `crates/pasta_sample_ghost/STAGES.md`、撮り直す絵。`crates/pasta_check`・`editors/`・`manual.yml`・`tutorial_stages_test.rs` は触らない。
+- どちらも章を足さない見込み。足すなら、3 つの数（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）を 64 に合わせる。スキル references は、後から入る側が再生成する。
 - 0.5.0 を今のゴールに含めると決めたら、`novel-areka-contract`（文書だけ。章を足すなら 3 つの数を 64 に）と `scene-attribute-store`（宣言行の属性のパース・`scope_gen.rs`・`scene.lua`・`pasta_core` のシーン登録）を並べられる。どちらも `pasta_check` と `editors/` を触らない。そのときは、`scene-attribute-store` が `partial.rs` と VSCode の文法定義を触らない約束を足す（`novel-variable-scope` を次のウェーブに置くため）。
 
 次（今のゴールの中）: 0.4.1 のリリース（`/release 0.4.1`）。
 
-ゴールの後（0.5.0 の順）: `novel-areka-contract`（先頭・子孫 約 6）、`scene-attribute-store`（先頭・子孫 約 8）、`novel-variable-scope`（先頭・子孫 約 4）、`shell-element-click`（`novel-areka-contract` の後）。版の決まっていない先頭: `tutorial-ssp-gaps`（子孫 0）。
+ゴールの後（0.5.0 の順）: `novel-areka-contract`（先頭・子孫 約 6）、`scene-attribute-store`（先頭・子孫 約 8）、`novel-variable-scope`（先頭・子孫 約 4）、`shell-element-click`（`novel-areka-contract` の後）。版の決まっていないもの: `scene-anchor-link`（`call-attribute-filter` の後）。
 
 ### 開発者の判断が要るもの（ウェーブは止めない）
 
 - **0.5.0 を今のゴールに含めるか**（0.4.1 と並べるか）。含めないと、ウェーブは 1 本のままで、0.4.1 を出すまで 0.5.0 は始まらない。推奨は含めること。areka の側が早く動けるよう、`novel-areka-contract` を先に出す方針（2026-10-10）とも合う。含めるなら、ウェーブは `novel-areka-contract`（Opus）と `scene-attribute-store`（Fable）を足した 3 本になる。
-- **`tutorial-ssp-gaps` と `scene-anchor-link` の版**。推奨は、`tutorial-ssp-gaps` を 0.4.1 に入れること（入門ガイドと SSP のずれで、0.4.0 の主題の続き。今のゴールの 1 本ともファイルが重ならない）と、`scene-anchor-link` を 0.5.0 の後に置くこと（ノベルの合格に要らず、文法・`act.lua`・出力の組み立てを 0.5.0 の 5 本と共有する）。
+- **`scene-anchor-link` の版**。推奨は 0.5.0 の後（新しい文法なので、不具合を直す 0.4.1 に合わない。ノベルの合格に要らず、文法・`act.lua`・出力の組み立てを 0.5.0 の 5 本と共有する。`pasta-check-validate-edges` とは辞書の検査の本体を共有する）。`tutorial-ssp-gaps` は、2026-10-17 開発者の決定で 0.4.1 に入れた。
 - `SOUL.md` §2・§5 の「Wait/Sync はマーカーのみ」「全出力は yield」— 構想の文書なので、直すかどうかは開発者が決める。
 - `steering/structure.md` の作り直し（`pasta_shiori` の木と、`pasta_scripts/pasta/` の木が無い。`failure.lua`・`shiori/stop.lua` も載っていない）— `/kiro-steering` で直す。
 - `pasta_shiori` の `string_to_multibyte`（テスト専用）を直すか消すか — 次の `review-improvement-loop` の実行で決める（バックログのとおり）。
@@ -300,7 +306,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 ## 入門ガイドの実機確認で見つかったもの（2026-10-10 起票）
 
-`getting-started-story-guide` の完了時の棚卸で起票した。`manual-link-anchor-check` と `choice-line-layout` は 2026-10-11 に完了した。`boot-surface-without-dic` は 2026-10-16 に優先度を下げ、0.4.0 から外した。`baseware-virtual-time` は 0.4.0 の後に回した。2026-10-17 に、残った 2 本を `tutorial-ssp-gaps` にまとめた。
+`getting-started-story-guide` の完了時の棚卸で起票した。`manual-link-anchor-check` と `choice-line-layout` は 2026-10-11 に完了した。`boot-surface-without-dic` は 2026-10-16 に優先度を下げ、0.4.0 から外した。`baseware-virtual-time` は 0.4.0 の後に回した。2026-10-17 に、残った 2 本を `tutorial-ssp-gaps` にまとめ、同じ日に 0.4.1 に入れた（開発者の決定）。
 
 - `tutorial-ssp-gaps`（旧 `baseware-virtual-time`）— SSP の仮想の時刻は pasta に届かない（pasta は OS の時計で正時を判定する）。入門ガイド 6 段目は「次の正時を待つ」と教えている。
 - `tutorial-ssp-gaps`（旧 `boot-surface-without-dic`）— 辞書が無い間は何も表示されない。入門ガイドの準備の章は「何も表示されないのが正しい」と教えている。
@@ -310,7 +316,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 ## Specs (dependency order)
 
 - [ ] pasta-check-validate-edges -- 辞書の検査（`pasta_check validate`）の端のケース 3 つ（読めない辞書・`.pasta` で終わるフォルダ・VSCode 拡張の大文字と小文字）の裁定と直しと、代用品（`manual.yml` の段・`tutorial_stages_test.rs` の前方一致の検査）の置き換え（2026-10-17 の棚卸で、`pasta-check-dic-validate` の残りから起票）。0.4.1 に入れる（2026-10-17 開発者の決定）。Dependencies: none
-- [ ] tutorial-ssp-gaps -- 入門ガイドを SSP で確かめたときに見つかった、SSP の動きとのずれ 2 つ。SSP の「現在時刻の仮想的変更」を時報に効かせる（外から起こした `OnTalk` でチェイントークが続かない件も）ことと、辞書や `＊OnBoot` が無いときの起動の立ち絵。どちらも、やるかどうかから決める。2026-10-17 に `baseware-virtual-time` と `boot-surface-without-dic` をまとめた。起動の立ち絵の分は、2026-10-16 開発者の決定で優先度を下げた（何も書かなければ何も表示しないのが既定の動き）。版は未定。Dependencies: none
+- [ ] tutorial-ssp-gaps -- 入門ガイドを SSP で確かめたときに見つかった、SSP の動きとのずれ 2 つ。SSP の「現在時刻の仮想的変更」を時報に効かせる（外から起こした `OnTalk` でチェイントークが続かない件も）ことと、辞書や `＊OnBoot` が無いときの起動の立ち絵。どちらも、やるかどうかから決める。2026-10-17 に `baseware-virtual-time` と `boot-surface-without-dic` をまとめた。起動の立ち絵の分は、2026-10-16 開発者の決定で優先度を下げた（何も書かなければ何も表示しないのが既定の動き）。0.4.1 に入れる（2026-10-17 開発者の決定）。Dependencies: none
 - [ ] novel-areka-contract -- pasta と areka の取り決め（台本に載せる語彙・目印・イベント・設定の値）を 1 つの文書にし、areka への依頼書として出す。コードは書かない。areka に依頼を出すための spec（2026-10-10 の discovery で起票）。Dependencies: none
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: none
 - [ ] novel-variable-scope -- 変数の保存の範囲を、セーブごとと全セーブ共通の 2 つに分ける書き方。今の `＄＊x` と保存ファイルとの互換、保存できない値の扱い（2026-10-17 の棚卸で `novel-checkpoint-rollback` から分割）。Dependencies: none
