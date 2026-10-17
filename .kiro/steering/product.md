@@ -11,7 +11,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 ## 機能の優先順位
 
-> 以下は初期の Phase 0〜4 の区分で、2026-06 までの記録。それ以降の進捗と現在の主題は [roadmap.md](roadmap.md)（Phase 1〜12）が正本。
+> 以下は初期の Phase 0〜4 の区分で、2026-06 までの記録。それ以降の進捗と現在の主題は [roadmap.md](roadmap.md)（Phase 1〜13）が正本。
 
 ### Phase 0: 一次設計の再構築 ✅ 完了
 **最終更新**: 2026-01-30
@@ -21,7 +21,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
 - [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
 
-**完了仕様**: 162件（2026-10-16 時点・`.kiro/specs/completed/` に格納）
+**完了仕様**: 169件（2026-10-17 時点・`.kiro/specs/completed/` に格納）
 
 **主要成果**:
 - ✅ **act-impl-call** - `ACT_IMPL.call` 4段階優先順位検索実装
@@ -43,7 +43,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] SHIORI インターフェース（pasta_shiori）- DLL エクスポート
 
 ### Phase 2: コア機能拡張（進行中）🔄
-**最終更新**: 2026-10-11（現行バージョン v0.3.8）
+**最終更新**: 2026-10-17（現行バージョン v0.3.8）
 
 **完了仕様**:
 - ✅ **release-workflow** - リリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認）。手順は `release` スキル（`/release`）へ移した
@@ -105,4 +105,4 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [ ] arekaへの投入（`ukagaka-desktop-mascot`メタ仕様）
 - [ ] MCPまたはLLMとの連携
 
-**現在地**: 現行バージョン v0.3.8。次の節目は 0.4.0 で、主題は「入門者にやさしく」（範囲と順番は [roadmap.md](roadmap.md) の「0.4.0 までの道筋」）。これまでは仕様を満たすことと潜在的な高機能さを優先してきたが、0.4.0 では、初めて辞書を書く人が迷わず進めて、書き間違えたときに原因が分かることを優先する。その次の 0.5.0 の目標は、別リポジトリで開発中の areka でノベルゲームが作れるようになること。hello-pasta の新しいシェルと 9 段目の選択肢の直しは済んだ（2026-10-11）。残るのは、撫で・つつきの反応のショートカット、実行時の失敗の出力の一本化、スクリプトが止まるエラーのバルーン表示、SSP を起動しない辞書の検査、シェルの説明の章、スクリーンショット。属性セマンティクス（シーン属性・Call の属性フィルター・文中のシーンリンク）は 0.4.0 の後に回す。リリースの CI 化と CI での初回リリース（v0.3.8）は完了した
+**現在地**: 現行バージョン v0.3.8。次の節目は 0.4.0 で、主題は「入門者にやさしく」（範囲と順番は [roadmap.md](roadmap.md) の「0.4.0 までの道筋」）。これまでは仕様を満たすことと潜在的な高機能さを優先してきたが、0.4.0 では、初めて辞書を書く人が迷わず進めて、書き間違えたときに原因が分かることを優先する。その次の 0.5.0 の目標は、別リポジトリで開発中の areka でノベルゲームが作れるようになること。hello-pasta の新しいシェル、9 段目の選択肢の直し、撫で・つつきの反応のショートカット、実行時の失敗の出力の一本化、SSP を起動しない辞書の検査（`pasta_check validate`）、シェルの説明の章は済んだ（2026-10-17）。残るのは、スクリプトが止まるエラーのバルーン表示とスクリーンショット。属性セマンティクス（シーン属性・Call の属性フィルター・文中のシーンリンク）は 0.4.0 の後に回す。リリースの CI 化と CI での初回リリース（v0.3.8）は完了した

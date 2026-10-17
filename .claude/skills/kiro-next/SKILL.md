@@ -154,7 +154,7 @@ Opus
 ```
    Follow the project preference of one command per block when the developer wants to paste them one by one; the combined block above is the default summary.
 5. Decisions needed from the developer (none of them block the wave) and any manual steps — including "ゴール未設定" and any beyond-goal spec the roadmap or the developer wanted to run early (it needs the milestone scope changed first).
-6. The overview page URL from Step 8 (one line, with the inventory date and base SHA).
+6. The overview page URL from Step 8, as one Markdown link whose text carries the inventory date and base SHA: `[ロードマップの俯瞰（棚卸 <date>・main <BASE>）](<url>)`. Never a bare URL or a code block (developer 2026-10-17: 「URLリンクにすればよい」).
 
 Write this whole report as ordinary text **before** stopping at the approval gate. The gate never replaces the report (areka developer 2026-10-16: 「ウェーブを教えてもらってないのに？」 — the wave was missing when only the approval box was shown).
 

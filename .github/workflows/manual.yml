@@ -134,9 +134,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       # チュートリアル成果物ガード その2（要件 6.2 / design「Testing/コンテンツ整合」）。
-      # pasta_check CLI に .pasta 構文検証サブコマンドは無い（release のみ）ため、
       # hello-pasta 実ファイルを本物の PastaLoader::load で読み込み・トランスパイルして
       # 検証する既存テスト（self_deploy_integration_test.rs 等）を構文検証手段として採用。
+      # pasta_check validate への置き換えは別に決める（前方一致の衝突の検査は validate に無い）。
       # その1で「チュートリアル == 実ファイル」を保証済みのため、チュートリアル成果物の
       # 構文妥当性が transitively 担保される（フル SSP 実行なしの機械的ガード）。
       - name: Tutorial syntax validation (hello-pasta real files)

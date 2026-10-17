@@ -35,7 +35,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 | [入門ガイド](https://ekicyou.github.io/pasta/getting-started/index.html) | 辞書を 1 枚ずつ足しながら、13 段でゴーストを育てて配布するまで |
 | [Pasta DSL 文法](https://ekicyou.github.io/pasta/grammar/index.html) | マーカー・シーン・アクション行・変数・単語・アクター辞書 |
 | [Lua API / コーディング](https://ekicyou.github.io/pasta/lua/index.html) | 公開モジュール・SHIORI イベント・`scripts/` の書き方 |
-| [デバッグ](https://ekicyou.github.io/pasta/debug/index.html) | VSCode から `.pasta` の行で止めて調べる |
+| [デバッグ](https://ekicyou.github.io/pasta/debug/index.html) | VSCode から `.pasta` の行で止めて調べる・SSP を起動せずに辞書を検査する |
 | [pasta.toml リファレンス](https://ekicyou.github.io/pasta/reference/pasta-toml.html) | 設定の全セクション・全キー |
 
 最新版の配布物は、次のリンクから直接ダウンロードできます（過去の版は [リリースページ](https://github.com/ekicyou/pasta/releases)）。
@@ -71,7 +71,7 @@ pasta 本体（パーサ・トランスパイラ・ランタイム・SHIORI）�
 | [pasta_lua](crates/pasta_lua/README.md) | トランスパイラ、ローダ、Lua VM（LuaJIT 2.1）とランタイムモジュール、トーク出力、デバッグ基盤 |
 | [pasta_shiori](crates/pasta_shiori/README.md) | SHIORI DLL（`pasta.dll`）としての FFI 境界 |
 | [pasta_lsp](crates/pasta_lsp/README.md) | 言語サーバ（VSCode 拡張が WASM で使う） |
-| [pasta_check](crates/pasta_check/README.md) | ゴーストの配布物を作る CLI（更新ファイル・NAR） |
+| [pasta_check](crates/pasta_check/README.md) | 辞書の検査（`validate`）と、ゴーストの配布物を作る CLI（更新ファイル・NAR） |
 | [pasta_sample_ghost](crates/pasta_sample_ghost/README.md) | サンプルゴースト hello-pasta（入門ガイドの題材。公開しないクレート） |
 
 データの流れ（詳しくは [内部設計の概要](https://ekicyou.github.io/pasta/internals/index.html)）:

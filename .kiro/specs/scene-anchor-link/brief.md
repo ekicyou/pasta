@@ -49,7 +49,7 @@
   - hello-pasta への作例の追加（要件で要否を決める）
 - **Out**:
   - `\q` によるインラインの選択肢（選択肢待ちになるクリック部品）
-  - 飛び先の無いリンクの、読み込み時・`pasta_check` での検出（バックログの「`.pasta` を検査するコマンド」で、選択肢・Call とまとめて扱う）
+  - 飛び先の無いリンクの、読み込み時の検出（`pasta_check validate` での検出は In。下の「申し送り（pasta-check-dic-validate より）」）
   - 変数でシーン名を決める形（`＠？＄変数`）
   - `On`・`script:` で始まる ID への直接の発火を、記法として案内すること
   - アンカーの色などの見た目の設定（ゴーストが `\f[anchor.font.color,…]` を書けばよい）
@@ -141,3 +141,10 @@
 - 失敗の見せ方を載せる先ができた。シーンが生きている間の失敗は `pasta/failure.lua` の `FAILURE.report(act, record)` から出す（警告 1 行と `【種類：対象（説明）】` の表記 1 つ）。新しい種類は `FAILURE.LABEL` に足す。表記の形・エスケープ・`[logging] balloon_warning` の切り替えは出口が持つ。
 - 応答が表記だけになったシーンは 200 で返る。出さない設定で何も残らないときは 204 になる（`act:build` がすべて空の `raw_script` で nil を返す）。
 - 参照: `.kiro/specs/completed/failure-output-unification/design.md`、マニュアル `book/src/reference/runtime-failures.md`。
+
+## 申し送り（pasta-check-dic-validate より・2026-10-17 の棚卸で補った）
+
+- 辞書の検査は `pasta_check validate`（と `release` の段 4 の関門、VSCode 拡張のゴースト全体の診断）として入った。核は `crates/pasta_check/src/validate/`（ファイルシステムに触れないライブラリ・WASM でも動く）。
+- 検査を足すときに触る所: 報告の種類 `FindingKind`（`report.rs`。誤り／注意の分類と kebab-case の code・文言の `msg` を 1 か所で持つ）、検査の段（`validate/mod.rs` の `validate_ghost` が段の順に呼ぶ）、マニュアルの章 `book/src/debug/validate.md` の報告の表。
+- 種類の追加・分類・出力の 1 行の形を変えるのは、`pasta-check-dic-validate` の design.md の Revalidation Triggers に当たる（CI・作者のスクリプト・マニュアル・`wasmBridge.ts` の形の検査に効く）。実行時と同じことを守る一致テスト `crates/pasta_check/tests/validate_parity_test.rs` も合わせて見直す。
+- `＠？シーン名` の飛び先の検査は、`pasta-check-dic-validate` が範囲の外とした（design.md の Non-Goals）。この spec が `validate` に足す。誤りか注意かは、この spec の要件で決める。

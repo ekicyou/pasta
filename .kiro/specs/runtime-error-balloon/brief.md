@@ -17,7 +17,7 @@
 - **Lua の側の出口**:
   - SHIORI の要求を受ける関数 `SHIORI.request`（`crates/pasta_lua/pasta_scripts/pasta/shiori/entry.lua` 79 行）は、イベントの処理全体を守って呼ぶ。エラーが起きると、エラー文の最初の 1 行を取り出し（34 行の `error_handler`）、500 の応答を作る関数 `RES.err` に渡す（87 行）。
   - `RES.err`（`crates/pasta_lua/pasta_scripts/pasta/shiori/res.lua` 119 行）は、理由を `X-Error-Reason` の行に入れた 500 の応答を作る。
-  - シーンの途中で起きたエラーは、イベントを振り分ける関数 `EVENT.fire` が投げ直す（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua` 228 行）。そのまま上の出口へ行く。途中まで積んだ台詞は捨てられる。
+  - シーンの途中で起きたエラーは、イベントを振り分ける関数 `EVENT.fire` が投げ直す（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua` 229 行）。そのまま上の出口へ行く。途中まで積んだ台詞は捨てられる。
   - 待ち合わせの時間切れ（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/callback.lua` の `time_out`）は、理由の文が付いていれば、その文を理由にした 500 を作る（172 行）。理由の無い時間切れの後のエラーは、警告のログだけを出し、応答を作らない。
 - **Rust の側の出口**:
   - エラーを 500 の応答にする関数 `to_shiori_response`（`crates/pasta_shiori/src/error.rs` 104 行）は、理由を `X-ERROR-REASON` の行に入れる。理由は 1 行にまとめる（79 行の `single_line`）。
@@ -147,3 +147,18 @@
 - 切り替えは `[logging] balloon_warning`（真偽値・既定 true・型違いは true）。`FAILURE.enabled()` が報告のたびに読む。論点「同じ設定に従うか、別にするか」は、これを前提に決める。
 - `failure.lua` はログと設定だけに依存し、ログ・設定は呼んだ時点で `require` する（読み込み時に握らない）。`shiori/` から使っても循環しない。
 - 参照: `.kiro/specs/completed/failure-output-unification/design.md` の「FailureReporter・NotationFormat・NameConversion・NotationSwitch」、マニュアル `book/src/reference/runtime-failures.md`。
+
+## 2026-10-17 棚卸の再測定（main e9b321e0）
+
+- **前提の変化**: 先に要るもの 2 本（`failure-output-unification`・`shiori-test-support-runtime`）は、どちらも main に入った。出口の行番号は、`entry.lua` 34・79・87 行、`res.lua` 119 行、`callback.lua` 172 行、`error.rs` 79・104 行、`thread.rs` 197・209 行で今も合う。`event/init.lua` の投げ直しだけ 229 行に 1 行ずれた。`crates/pasta_shiori/tests/support/` は無くなった。切り替えを確かめる結合テストの手本は `failure_notation_switch_e2e_test.rs` とそのフィクスチャ（`tests/fixtures/failure_notation_switch/`）である。
+- **報告の関数は使える形で入った**: act の無い出口からは `FAILURE.notation(record)` を呼ぶ（警告を出し、表記の文字列を返す。出さない設定なら nil）。表記の形は `【種類：対象（説明）】`、エスケープは `\`・`%`・改行。切り替えは `[logging] balloon_warning`（既定 true）。brief の「表記と切り替えは作らない」はそのまま成り立ち、`failure.lua` を使うことが前提になる（別の表記を作らない）。種類の名前は `FAILURE.LABEL` に 1 つ足す。
+- **触るファイル**: `crates/pasta_lua/pasta_scripts/pasta/` の `shiori/entry.lua` 120・`shiori/event/callback.lua` 213・`failure.lua` 214（`LABEL` に 1 行）。`shiori/res.lua` 141・`shiori/event/init.lua` 255 は触らずに済む見込み。Rust まで含めるなら `crates/pasta_shiori/src/` の `error.rs` 406・`shiori.rs` 397・`actor/thread.rs` 272。テストは `crates/pasta_lua/tests/lua_specs/` の `shiori_entry_test.lua`・`callback_module_test.lua`・`failure_test.lua`、`crates/pasta_lua/tests/shiori/res_test.rs`、`crates/pasta_shiori/tests/` の新しい結合テストとフィクスチャ（新規）。マニュアルは brief の 4 ページに加えて `reference/runtime-failures.md`（15 行目が「500 の応答はこのページの対象外」と書いている）と、要るなら `reference/pasta-toml.md` の `balloon_warning` の説明。スキル用の文書を再生成する。1,000 行に近いファイルは無い。章は足さない見込み。足すなら、章の数を決め打ちする 3 つの検査を 64 に合わせる（今は 63 章）。
+- **規模**: 7〜10 タスク（SSP の実機の確かめ 1、Lua の出口 2、時間切れ 1、Rust の出口 0〜2、テスト 1〜2、マニュアルと生成 1）。
+- **先に要るもの**: 無い（今すぐ始められる）。ファイルの重なり: 次のウェーブのもう 1 本の候補 `getting-started-screenshots` とは、ソースもマニュアルのページも重ならない。`failure.lua` の `LABEL` には、0.4.0 の後の `call-attribute-filter`・`scene-anchor-link`・`shell-element-click` も種類を足すので、それらとは同じウェーブに置かない。
+- **種別**: 機能（止まるエラーが、ログと応答の 1 行にしか出ない）。起点は分割で、開発者の依頼ではない。やることは 2026-10-16 に開発者が決めた。
+- **要件定義のモデル**: Opus のまま。SSP が 500 の台詞をバルーンに出すかは仕様書で決まらないが、応答コードの選び方は、文法・保存の形・公開の Lua の約束のどれでもなく、実機で確かめて決められる。ただし `RES.err` はゴーストの作者が呼べる公開の関数（`lua/shiori-events.md` の表）なので、見せ方は `RES.err` の中ではなく、`SHIORI.request` と時間切れの出口で足す案を推奨にする。
+- **分割の案**: 要らない（20 タスクに遠い）。
+- **見つけた穴・古くなった記述**:
+  - Desired Outcome の「配るゴーストでは、エラーが利用者のバルーンに出ない」は、`balloon_warning` の既定が true なので、同じ切り替えに従うだけでは満たせない。今は、作者が配る前に false にする案内（`runtime-failures.md` の締めの台詞）しか無く、`pasta_check release` も見ていない。hello-pasta の `pasta.toml` にも行が無い。論点「同じ設定に従うか、別にするか」で、案内で足りるか・既定を変えるか・配布物を作る道具で知らせるかも一緒に決める。
+  - エラー文の最初の 1 行には、ファイルの場所と行番号（例 `xxx.lua:12:`）が入り、Windows のパスの `\` も入る。エスケープは `FAILURE.format` が受け持つが、`failure-output-unification` は「表記に行番号を入れない」と決めた。止まるエラーの表記に場所と行番号を残すかを、要件の議題に足す。
+  - 20 行目の「`event/init.lua` 228 行」は今は 229 行。80 行目の Out of Boundary「報告の関数・表記の形・切り替えの設定そのもの」と、`FAILURE.LABEL` に種類を足すこと（申し送りの指示）は食い違わない（表に 1 行足すだけ）と書き添えるとよい。96 行目の「向こうは `act.lua`・`actor.lua`・`word.lua`」は、実際には `shiori/sakura_builder.lua` と新しい `failure.lua` も触った（こちらの予定とは重ならない）。108 行目の同じウェーブの制約は満たした。
