@@ -37,7 +37,7 @@
 - `pasta_shiori` の Rust のソース（要件 5.4）、`pasta_check`（要件 4.5）。
 - シーンが生きている失敗の見せ方（`failure-output-unification`）。
 - 作者が `scripts/` に置いて上書きした `entry.lua` などの動き（そこでは控えを使わないだけで、今と同じに動く）。
-- `actor.lua`・`word.lua` と、`act.lua` の `init_scene`・`call_restore` 以外。`restore_scene` の引数は変えない。
+- `actor.lua`・`word.lua` と、`act.lua` の `init_scene`・`call_restore`・`restore_scene` 以外。`restore_scene` の引数は変えない（設計議題 2）。
 
 ### Allowed Dependencies
 - `pasta.shiori.stop` → `pasta.failure`・`pasta.shiori.res`（読み込み時）、`pasta.store`・`pasta.shiori.act`（呼んだ時点で `require`。`pasta.shiori.act` は `callback.lua` を読み込み時に読むので、読み込み時に握ると循環する）。
@@ -117,7 +117,7 @@ crates/pasta_shiori/tests/
 
 ### Modified Files
 - `crates/pasta_lua/pasta_scripts/pasta/failure.lua` — `LABEL` に `SCRIPT_ERROR = "スクリプトのエラー"`・`TIMEOUT = "時間切れ"` を足す。`FAILURE.act_of(co)`（`RUNNING[co]` を返すだけ）を足す。
-- `crates/pasta_lua/pasta_scripts/pasta/act.lua` — `init_scene(self, scene, scene_name, local_scene_name)` が、書いた名前を `self.scene_name`・`self.local_scene_name` に控える（引数が無ければ `nil` を書く）。`call_restore` が、呼ぶ前の 2 つの名前を、戻った後に戻す（`current_scene` と同じ）。
+- `crates/pasta_lua/pasta_scripts/pasta/act.lua` — `init_scene(self, scene, scene_name, local_scene_name)` が、書いた名前を `self.scene_name`・`self.local_scene_name` に控え、`self.scene_names[scene] = scene_name` も書く（引数が無ければ `nil` を書く）。`call_restore` が、呼ぶ前の 2 つの名前を、戻った後に戻す（`current_scene` と同じ）。`restore_scene(scene)` が、`self.scene_name = self.scene_names[scene]`・`self.local_scene_name = nil` にする（設計議題 2）。
 - `crates/pasta_lua/src/code_gen/scope_gen.rs` — シーン関数の先頭を `local save, var = act:init_scene(SCENE, "書いたグローバルシーン名")`（`__start__`）・`act:init_scene(SCENE, "書いたグローバルシーン名", "書いたローカルシーン名")`（名前付きローカル）にする。書いた名前は、別名で置き換える前・`sanitize_name` の前の名前。行は増やさない。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua` — `EVENT.drive` の失敗の枝の先頭で `STOP.hold(co, value)` を呼ぶ（1 行と `require`）。`EVENT.fire` の投げ直しは今のまま。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/callback.lua` — `time_out` の失敗の枝で `STOP.response` を使う（理由付き・理由無しの 2 つ）。表記を出さない設定なら今と同じ値（`RES.err(reason)`・`nil`）を返す。
@@ -398,16 +398,17 @@ function STOP.response(report) end
 - トランスパイラ: グローバルシーンの書いた名前は、別名で置き換える前の `scene.name`（単独の `＊` 行は受け継いだ名前）。ローカルシーンの書いた名前は `local_scene.name`。どちらも `StringLiteralizer` で Lua の文字列にする。`__start__` はローカルシーン名を渡さない。行は増やさない。
 - `act:init_scene(scene, scene_name, local_scene_name)`: `self.scene_name = scene_name`・`self.local_scene_name = local_scene_name` を書く（引数が無ければ `nil`）。今の処理（`last_global_scene`・`current_scene`・`FAILURE.bind`・戻り値）は変えない。
 - `act:call_restore`: 呼ぶ前の `scene_name`・`local_scene_name` を、戻った後に戻す（`current_scene` を戻すのと同じ時点）。
+- `act:restore_scene(scene)`: グローバル名を `self.scene_names[scene]` から戻し、ローカル名は `nil` にする。粗くなる（`＊天気` とだけ出る）が、別のシーンの名前は出さない（設計議題 2）。
 - 名前はバルーンの出力・単語や Call の検索に使わない（止まらない辞書の出力は変わらない。要件 5.7）。
 
 **Contracts**: State [x]
 
 ##### State Management
-- State model: act のフィールド 2 つ（`scene_name: string|nil`・`local_scene_name: string|nil`）。`current_scene` と同じ寿命。
-- 戻し方: `call_restore` だけが戻す。`restore_scene`（`word`・`expr_fn`・`expr_fn_var`・`global_fn`・アクタープロキシが使う）は名前を戻さない。
+- State model: act のフィールド 3 つ（`scene_name: string|nil`・`local_scene_name: string|nil`・`scene_names: table<SceneTable, string>`）。`current_scene` と同じ寿命（act は 1 要求の間だけ生きる）。
+- 戻し方: `call_restore` は 2 つの名前をそのまま戻す。`restore_scene`（`word`・`expr_fn`・`expr_fn_var`・`global_fn`・アクタープロキシが使う）は、グローバル名を `scene_names` から戻し、ローカル名を `nil` にする。
 
 **Implementation Notes**
-- Risks: Lua の関数のハンドラの中で別のシーンへ入り（`act:call` など）、戻った後に呼び出し元の行で止まると、呼んだ先のシーンの名前が出る。DSL の途中の Call（`call_restore`）では起きない。
+- Lua の関数のハンドラの中で別のシーンへ入り（`act:call` など）、戻った後に呼び出し元の行で止まると、グローバルシーン名だけが出る（`＊天気`）。呼んだ先のシーンの名前は出ない。DSL の途中の Call（`call_restore`）では、ローカルシーン名まで出る。
 - 古いキャッシュ（`init_scene(SCENE)` のまま）と、作者が Lua で書いたシーン関数では名前が `nil` になり、`STOP.subject` は登録名から連番を落とした名前を使う。
 
 #### FailureLabels（`pasta.failure` への追加）
@@ -453,7 +454,7 @@ function STOP.response(report) end
 - `stop_test.lua` — `STOP.detail`: 投げ直しの接頭辞が付いた文から元の文だけが残る、作者の接頭辞が `scripts\天気.lua:12: ` に直る、`10:30: ` を含む文は取らない、文字列でない値は `nil`（2.3・2.5）。
 - `stop_test.lua` — `STOP.subject`: 書いた名前（別名 `会話`・記号 `OnTalk＿新しいおもちゃ`）、`__start__`、名前の無い act は連番を落とす（2.4・2.7）。
 - `stop_test.lua` — `STOP.response`: 種類ごとの文言（2.2 の 3 つの例そのもの）、途中の台詞の後に表記、`\`・`%`・改行が書いたとおりに出る形（6.3）、出さない設定で `nil`・警告は出る（4.2・5.6）、`shown = false` で `nil`（1.6）、理由の行が渡した値のまま（3.3）。
-- `act_call_restore_test.lua` — `call_restore` の後に名前が呼ぶ前に戻る。`failure_test.lua` — `act_of` と 2 つの `LABEL`。
+- `act_call_restore_test.lua` — `call_restore` の後に名前が呼ぶ前に戻る。`restore_scene` の後にグローバル名が戻り、ローカル名が空になる（別のシーンの名前が残らない）。`failure_test.lua` — `act_of` と 2 つの `LABEL`。
 
 ### Integration Tests（Lua の側の出口）
 - `shiori_entry_test.lua` — REG のハンドラの例外・シーンの中の例外（`EVENT.fire` の投げ直し）・チェイントークの再開の中の例外で、表記・ステータス・理由の行を確かめる。今の「500・理由の行・`Value` が無い」の確かめは、表記を出さない設定に固定して残す（6.1・6.2・6.5）。
@@ -474,8 +475,12 @@ function STOP.response(report) end
 6. 結合テストとフィクスチャ。
 7. マニュアルとスキル用の文書の再生成、変更の記録（7.6）。
 
-## Open Questions / Risks（設計ディスカッションへ）
-- 書いた名前を `init_scene` の引数で運ぶため、トランスパイラと `act.lua`（brief の Out of Boundary は「触らない」）を触る。Lua の `debug` が無く、登録名からは別名・記号を戻せないため、他に要件 2.4 を満たす道が無い（research.md「書いた名前の運び方」）。
-- `restore_scene` は名前を戻さない（Lua の関数のハンドラの中で別のシーンへ入って戻った後の取り違え）。
-- 長い相対のパスでは場所を落とす。表示の区切りは `\`（要件の例に合わせた）。
-- 応答のステータスは実機の結果で決まる（タスク 1）。
+## 設計ディスカッションの決定（2026-10-17）
+1. 書いた名前は `init_scene` の引数で運ぶ。トランスパイラと `act.lua` を触る（brief の Out of Boundary「`act.lua` は触らない」を、この目的に限って広げた。Lua の `debug` が無く、登録名からは別名・記号を戻せないため、他に要件 2.4 を満たす道が無い）。`FAILURE.act_of` を足す。
+2. `restore_scene` はグローバル名を戻し、ローカル名を空にする（間違った名前は出さず、粗くなるだけ）。`actor.lua` は触らない。
+3. （議論中）作者の `.lua` の場所の見分け方。
+4. 理由の無い時間切れの後のエラーが、その秒の応答を取ってよい（その秒の `OnTalk`・`OnHour` は次の秒へ回る。理由付きの時間切れの今の動きと同じ）。
+5. ログは止まるエラーごとに警告 1 行（NOTIFY も同じ）。理由付きの時間切れは今の再開前の警告で足り、行を増やさない。
+6. （議論中）シーンの外（REG のハンドラ）で止まったときの台詞。
+7. 「500・理由の行・`Value` が無い」を確かめる既存のテストは、表記を出さない設定に固定して残す。表記を出す設定は新しいテストで確かめる。
+- 応答のステータスは実機の結果で決まる（タスク 1。要件 3.2）。
