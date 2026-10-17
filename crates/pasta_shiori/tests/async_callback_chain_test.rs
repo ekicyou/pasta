@@ -257,10 +257,15 @@ ID: OnSecondChange
 Reference0: 1
 "#,
     );
-    // sweep の 500 応答は EVENT.fire で包まれずにそのまま返る
-    assert_eq!(resp2.status_code, 500, "R2 sweep response should be 500");
-    assert_eq!(resp2.status_text, "Internal Server Error");
-    assert_eq!(resp2.value, None, "R2 should have no Value");
+    // sweep の応答は EVENT.fire で包まれずにそのまま返る。
+    // 既定の設定（balloon_warning を書かない）では時間切れの表記の 200 で、理由の行は今と同じ
+    // （runtime-error-balloon 1.3。表記を出さない設定の 500 は Lua のテストで確かめる）
+    assert_eq!(resp2.status_code, 200, "R2 sweep response should be 200");
+    let v2 = resp2.value.as_ref().expect("R2 should have Value");
+    assert!(
+        v2.contains("【時間切れ：test timeout】"),
+        "R2 should contain timeout notation, got: {v2}"
+    );
     assert_eq!(resp2.header("X-Error-Reason"), Some("test timeout"));
 
     // Round 3: Late callback → 既に sweep で削除済み → 204

@@ -674,23 +674,25 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
     end
 
     test("理由付きの待機のタイムアウトは X-Error-Reason に理由を持つ 500 で、仮想イベントを出さない", function()
-        reset_state()
-        dispatcher._reset()
-        register_scene("OnEntryTimeout", function(act)
-            act:get_property("name", -1, "entry sweep timeout") -- 期限は既に過ぎている
-            act:raw_script("届かない")
-            return act:build()
+        with_balloon_warning(false, function()
+            reset_state()
+            dispatcher._reset()
+            register_scene("OnEntryTimeout", function(act)
+                act:get_property("name", -1, "entry sweep timeout") -- 期限は既に過ぎている
+                act:raw_script("届かない")
+                return act:build()
+            end)
+            request("OnEntryTimeout")
+
+            local res, dispatch_count = request_second_change()
+
+            expect_status(res, "SHIORI/3.0 500 Internal Server Error")
+            expect(header_value(res, "X-Error-Reason")):toBe("entry sweep timeout")
+            expect(header_value(res, "Value")):toBe(nil)
+            expect(dispatch_count):toBe(0)
+            expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
+            expect(STORE.co_scene):toBe(nil)
         end)
-        request("OnEntryTimeout")
-
-        local res, dispatch_count = request_second_change()
-
-        expect_status(res, "SHIORI/3.0 500 Internal Server Error")
-        expect(header_value(res, "X-Error-Reason")):toBe("entry sweep timeout")
-        expect(header_value(res, "Value")):toBe(nil)
-        expect(dispatch_count):toBe(0)
-        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
-        expect(STORE.co_scene):toBe(nil)
     end)
 
     --- タイムアウトを捕まえて再度 get_property するシーンを掃引する
@@ -738,6 +740,126 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
         expect_ok(request("OnEntryGetAfterSweep"), "\\![get,property,OnPastaCallBack3,c]")
         expect(CALLBACK.pending["OnPastaCallBack3"]).not_:toBe(nil)
         expect_sweep_response()
+    end)
+
+    -- ========================================================================
+    -- runtime-error-balloon 5: 時間切れの出口の表記（1.3, 1.4, 1.5, 4.2, 5.6, 6.1, 6.2）
+    -- ========================================================================
+
+    --- body を実行する間の警告ログを集める
+    --- @param body fun()
+    --- @return string[] warns
+    local function collect_warns(body)
+        local log = package.loaded["@pasta_log"]
+        local original = log.warn
+        local warns = {}
+        log.warn = function(msg) warns[#warns + 1] = msg end
+        local ok, err = pcall(body)
+        log.warn = original
+        if not ok then error(err, 0) end
+        return warns
+    end
+
+    --- 時間切れの手順を表記を出さない設定と出す設定で 1 回ずつ実行する
+    --- @param scene function OnEntryTimeoutPlace のシーン関数
+    --- @return table off { res, dispatch_count, warns }
+    --- @return table on { res, dispatch_count, warns }
+    local function run_timeout_both(scene)
+        local results = {}
+        for _, value in ipairs({ false, true }) do
+            with_balloon_warning(value, function()
+                reset_state()
+                dispatcher._reset()
+                register_scene("OnEntryTimeoutPlace", scene)
+                request("OnEntryTimeoutPlace")
+                local r = {}
+                r.warns = collect_warns(function()
+                    r.res, r.dispatch_count = request_second_change()
+                end)
+                results[#results + 1] = r
+            end)
+        end
+        return results[1], results[2]
+    end
+
+    test("理由付きの時間切れは、途中の台詞の後に時間切れの表記の 200（理由の行は出さない設定の 500 と同じ）", function()
+        local off, on = run_timeout_both(function(act)
+            act:init_scene({}, "天気")
+            act:raw_script("途中の台詞")
+            act:get_property("name", -1) -- 期限は既に過ぎている・既定の timeout_message
+            act:raw_script("届かない")
+        end)
+
+        expect_status(off.res, "SHIORI/3.0 500 Internal Server Error")
+        expect(header_value(off.res, "X-Error-Reason")):toBe("callback timeout: get_property")
+        expect(header_value(off.res, "Value")):toBe(nil)
+
+        expect_status(on.res, "SHIORI/3.0 200 OK")
+        expect(header_value(on.res, "X-Error-Reason")):toBe("callback timeout: get_property")
+        expect(header_value(on.res, "Value")):toBe("途中の台詞【時間切れ：callback timeout: get_property】\\e")
+        for _, r in ipairs({ off, on }) do
+            expect(r.dispatch_count):toBe(0)
+            -- 警告は再開の前の 1 行だけ（今のまま）
+            expect(#r.warns):toBe(1)
+            expect(r.warns[1]):toBe("OnPastaCallBack1: callback timeout: get_property")
+        end
+        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
+        expect(STORE.co_scene):toBe(nil)
+    end)
+
+    test("理由の無い時間切れの後のエラーは、スクリプトのエラーの表記の 200 を返し、整えた警告を 1 行出す", function()
+        local off, on = run_timeout_both(function(act)
+            act:init_scene({}, "天気")
+            local v = act:get_property("name", -1, false) -- 期限は既に過ぎている・静かに再開
+            act:raw_script("値:" .. tostring(v))
+            error("silent place boom")
+        end)
+
+        -- 出さない設定は今と同じ: 掃引の応答は無く、仮想イベントへ進む
+        expect_status(off.res, "SHIORI/3.0 204 No Content")
+        expect(off.dispatch_count):toBe(1)
+
+        expect_status(on.res, "SHIORI/3.0 200 OK")
+        expect(on.dispatch_count):toBe(0)
+        expect(header_value(on.res, "Value")):toBe("値:nil【スクリプトのエラー：＊天気（silent place boom）】\\e")
+        local reason = header_value(on.res, "X-Error-Reason")
+        expect(reason:find("silent place boom", 1, true)).not_:toBe(nil)
+
+        -- 警告は両方の設定で、event_id を前に付けた整えた中身 1 行（変換した Lua の場所を含まない）
+        for _, r in ipairs({ off, on }) do
+            expect(#r.warns):toBe(1)
+            expect(r.warns[1]):toBe("OnPastaCallBack1: スクリプトのエラー：＊天気（silent place boom）")
+        end
+    end)
+
+    test("掃引で止まったシーンの控えは、同じ要求の後の止まるエラーに混ざらない", function()
+        with_balloon_warning(false, function()
+            reset_state()
+            dispatcher._reset()
+            register_scene("OnEntryTimeoutStale", function(act)
+                act:init_scene({}, "天気")
+                act:get_property("name", -1, false)
+                error("stale place boom")
+            end)
+            request("OnEntryTimeoutStale")
+
+            local original_dispatch = dispatcher.dispatch
+            dispatcher.dispatch = function(_act)
+                error("dispatch place boom")
+            end
+            local ok, res
+            local warns = collect_warns(function()
+                ok, res = pcall(request, "OnSecondChange")
+            end)
+            dispatcher.dispatch = original_dispatch
+            assert(ok, res)
+
+            expect_status(res, "SHIORI/3.0 500 Internal Server Error")
+            expect(header_value(res, "X-Error-Reason"):find("dispatch place boom", 1, true)).not_:toBe(nil)
+            expect(#warns):toBe(2)
+            expect(warns[1]):toBe("OnPastaCallBack1: スクリプトのエラー：＊天気（stale place boom）")
+            expect(warns[2]):toBe("スクリプトのエラー：OnSecondChange（dispatch place boom）")
+        end)
     end)
 end)
 
