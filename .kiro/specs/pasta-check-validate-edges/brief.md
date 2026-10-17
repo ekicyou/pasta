@@ -1,0 +1,72 @@
+# Brief: pasta-check-validate-edges
+
+2026-10-17 の棚卸で起票した。`pasta-check-dic-validate`（2026-10-17 完了）が「裁定が要るので直していない」として残した端のケース 3 つと、「コマンドが入った後の後片付け」として範囲の外にした代用品の置き換えを拾う（出どころ: `.kiro/specs/completed/pasta-check-dic-validate/tasks.md` の Implementation Notes の最後の項目、`requirements.md` の範囲外の「代用品の置き換え」）。
+
+## Problem
+
+辞書の検査（`pasta_check validate`）は、ふつうの辞書では pasta.dll と同じ規則で正しく報告する。けれども、次の 3 つの端では、報告が原因を指さない、または検査が走らない。
+
+1. UTF-8 で読めない辞書・読めない辞書があっても、飛び先の検査を省かない。そのファイルにあるシーンが「無い」ことになり、そこへの Call・選択肢が、本当の原因（読めないファイル）とは別の「飛び先が無い」の誤りとして並ぶ。
+2. 名前が `.pasta` で終わるフォルダは報告しない（検査の核はファイルだけを入力にする）。
+3. VSCode 拡張は、小文字の `ghost/master` の下だけを検査する。CLI は Windows で大文字・小文字を区別しないので、`Ghost/Master` のゴーストは CLI では検査され、エディタでは検査されない。
+
+あわせて、マニュアルの CI（`.github/workflows/manual.yml` の「Tutorial syntax validation」の段）と、hello-pasta のテスト（`crates/pasta_sample_ghost/tests/tutorial_stages_test.rs` の `scene_names_do_not_prefix_collide`）は、検査のコマンドが無かった頃の代用品のままである。
+
+## Current State
+
+- 飛び先の検査を省く条件は、構文エラーが 1 つでもあることだけ（`crates/pasta_check/src/validate/mod.rs` 54・74 行付近。要件 6.8）。読めないファイルは `FileText::Unreadable`・`FileText::NotUtf8`（`validate/input.rs`）として届くが、省く条件に入っていない。
+- 検査の核の入力はファイルの一覧で、フォルダは見ない（`validate/discovery.rs`）。
+- VSCode 拡張の `findGhostMaster`（`editors/vscode/src/ghostValidator.ts` 18 行付近）は `segments[i] === 'master' && segments[i - 1] === 'ghost'` で探し、見張り（同 70 行付近）も `**/ghost/master/**/*.{pasta,lua}` である。
+- `manual.yml` の段は、hello-pasta の実ファイルを本物の読み込みで読むテスト（`cargo test -p pasta_sample_ghost`）を構文の検証の代わりにしている（コメントは 2026-10-17 の棚卸で直した）。
+- `scene_names_do_not_prefix_collide` は、グローバルシーン名どうしが前方一致で重ならないこと（シーンの検索は前方一致で、`＊第1章` を呼ぶと `第10章` にも当たる）を確かめる。この検査は `validate` に無いので、そのまま置き換えられない。
+
+## Desired Outcome
+
+- 読めない辞書があるときは、その原因の報告だけが出て、それに引きずられた「飛び先が無い」は出ない（または、引きずられたものと分かる形で出る）。
+- `.pasta` で終わるフォルダの扱いが決まり、決めたとおりに報告される。
+- エディタと CLI で、検査するゴーストの範囲が同じになる。
+- 代用品を `validate` に置き換えるかどうかが決まり、置き換えるなら置き換わっている。
+
+## Approach
+
+- 1 は、飛び先の検査を省く条件に「読めないファイルがある」を足すのが素直な案（要件 6.8 の構文エラーと同じ扱い）。ファイルごとに省く案もあるが、どのシーンがどのファイルにあったかは読めないと分からないので、全体を省く案を推奨にする。
+- 2 は、注意として報告する案を推奨にする（pasta.dll はフォルダを読まないので、書いた人の思い違いの可能性が高い）。
+- 3 は、拡張の照合を大文字・小文字を区別しない形にそろえる（Windows の CLI に合わせる）。
+- 代用品は、`manual.yml` の段を `pasta_check validate` に置き換えるかを要件で決める。前方一致の重なりを `validate` の新しい注意にするか（`novel-talk-flow` の完全一致の場面選びとの関係も見る）は、要件の議題にする。
+
+## Scope
+
+- **In**: 上の 3 つの端の裁定と直し、報告の表（マニュアル `book/src/debug/validate.md`）の更新、代用品の置き換えの裁定と、決めたなら置き換え。
+- **Out**: 新しい種類の検査を広げること（前方一致の重なりの注意は、議題で足すと決めた場合だけ In）、機械向けの出力の形（JSON など）、`release` の段の中身。
+
+## Boundary Candidates
+
+- 検査の核（`crates/pasta_check/src/validate/`）と、VSCode 拡張（`editors/vscode/src/ghostValidator.ts`）と、CI・テストの代用品（`manual.yml`・`tutorial_stages_test.rs`）の 3 つ。どれも小さいので 1 本で扱う。
+
+## Out of Boundary
+
+- 文法・ランタイムの読み込みとシーンの検索の規則の変更。
+
+## Upstream / Downstream
+
+- **Upstream**: `pasta-check-dic-validate`（完了）。
+- **Downstream**: 検査を足す後の spec（`call-attribute-filter`・`scene-anchor-link`・`novel-talk-flow`）。報告の種類を足すときの決まりは同じ。
+
+## Existing Spec Touchpoints
+
+- `pasta-check-dic-validate` の design.md の Revalidation Triggers（報告の種類・分類・1 行の形を変えるとき）。一致テスト `crates/pasta_check/tests/validate_parity_test.rs` も見直す。
+
+## Constraints
+
+- 報告の種類を足す・分類を変えるときは、CI・作者のスクリプト・マニュアル・`wasmBridge.ts` の形の検査に効く。
+- `Cargo.lock` は変えない見込み（依存を足さない）。
+
+## 測定（2026-10-17 の棚卸、main e9b321e0）
+
+- 触るファイル: `crates/pasta_check/src/validate/mod.rs`・`discovery.rs`・`report.rs`（種類を足す場合）、`crates/pasta_check/tests/`、`editors/vscode/src/ghostValidator.ts` とそのテスト、`book/src/debug/validate.md`、場合により `.github/workflows/manual.yml`・`crates/pasta_sample_ghost/tests/tutorial_stages_test.rs`。1,000 行に近いファイルは無い。
+- 規模: 4〜7 タスク。
+- 先に要るもの: なし。ほかの未完了の spec とソースのファイルは重ならない（`runtime-error-balloon`・`getting-started-screenshots` とも重ならない）。
+- 種別: バグ（1 は、本当の原因と別の誤りが並ぶ）と後片付け。
+- 要件定義のモデル: Opus（道具の報告の裁定で、文法・保存の形・公開の Lua の約束ではない）。
+- 議題: 読めないファイルがあるときに省く範囲／`.pasta` で終わるフォルダを注意にするか／前方一致の重なりを注意として足すか／`manual.yml` の段の置き換え。
+- 0.4.0 に入れるかは開発者が決める（主題「書き間違えたときに原因が分かる」には合う）。

@@ -132,3 +132,19 @@
 - 8 段目の辞書と章が変わった。`＊OnMouseDoubleClick`＋`＄ｒ４` をやめ、ショートカットのシーン（`＊つっつき反応女の子Head`・`＊つっつき反応男の子その他`・`＊つっつき反応Face`・`＊つっつき反応その他`・`＊さわり反応女の子Head`・`＊さわり反応その他`）で書く。9 段目の選択肢のシーンは `＊つっつき反応その他` に改名し、8 段目の `その他` と一緒に抽選される。
 - 撫で（`OnMouseMove`）が新しく反応する。同じ所を撫で始めて 2 秒たった後の最初の動きで 1 回、トーク中（`talking` など）は反応しない。
 - 実機の確かめでは、つつき 4 種・撫で 2 種・9 段目の抽選と、撫での手触り（SSP の `OnMouseMove` の届き方）を見る。操作とシーンの対応は `book/src/getting-started/08-touch.md` の表、決まりは `.kiro/specs/completed/touch-poke-shortcuts/design.md` の SampleDic と StrokeDetector。
+
+## 2026-10-17 棚卸の再測定（main e9b321e0）
+
+- **前提の変化**: 先に要るもの（`hello-pasta-shell-art`・`choice-line-layout`・`touch-poke-shortcuts`）は全部 main に入った。今すぐ始められる。`touch-poke-shortcuts` が、8・9 段目の辞書（`crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/08-touch.pasta`・`09-choice.pasta`）・`STAGES.md`・章の `08-touch.md`・`09-choice.md` を書き換えた。8 段目はショートカットのシーン 6 つ（つつき 4・撫で 2）になり、9 段目の選択肢のシーンは `＊つっつき反応その他` として 8 段目の `その他` と一緒に抽選される。`manual-shell-guide` がリファレンスに `reference/shell.md` を足し、`manual-print-page-removal` が `print.html` を無くした。マニュアルは 63 章。この spec は章を足さないので、章の数の検査は触らない。
+- **失敗の表記との関係**: hello-pasta は既定の設定で失敗表記を 1 つも出さない（`failure-output-unification` が `tutorial_stages_test.rs` で確かめている）。入門の章は、失敗表記もエラーのバルーンも見せていない。そのため、`runtime-error-balloon` の前でも後でも、撮る絵は変わらない。失敗やエラーの絵を章に載せると要件で決めたときだけ、その絵は `runtime-error-balloon` の後に撮る。
+- **触るファイル**: `book/src/getting-started/` の 16 章（画像の行だけ。`setup.md` の「シェルの中身」には表の形で 2 枚ある）、画像（新規。`book/src/img/` の下）、撮影の手順の記録（新規）。画像の行の書き方しだいで、`book/tools/tutorial-check.mjs` 315 行（`findProseParagraphs` の 184 行目の除外は `>`・`|`・字下げ・箇条書きだけで、`![` の行は今も報告される）と `tutorial-check-test.mjs`、`book/AUTHORING.md` 721 行の第 8 節。`verify-content.mjs` 687 行の `stripCodeFences`（65 行目、3 本のバッククォート固定）も今のまま。人手の確認を済ませるなら、`.kiro/specs/completed/sakura-script-newline/tasks.md`（60 行目の 5.1 は未チェック）と roadmap の「人手の確認が残っている項目」。1,000 行に近いファイルは無い。
+- **規模**: 6〜9 タスク（撮影の手順 1、撮影と画像 2〜3、画像の行と検査の追従 1〜2、8 段目の実機の確かめ 1、ほかの人手の確認 1、通しの確認 1）。
+- **先に要るもの**: 無い。ファイルの重なり: 次のウェーブのもう 1 本の候補 `runtime-error-balloon` とは、ソースもマニュアルのページも重ならない（向こうは `shiori/`・`failure.lua`・`pasta_shiori` と、リファレンス・Lua・内部設計・デバッグのページ）。同じウェーブに置ける。
+- **種別**: 文書（入門ガイドに絵を足す。動作は変えない）。
+- **要件定義のモデル**: Opus のまま（方針は決まっている。残るのは、撮り方の条件と、どの章に何を載せるかの整理）。
+- **分割の案**: 要らない。
+- **人手の確認の引き受け**: roadmap の「人手の確認が残っている項目」のうち、`sakura-script-newline` の Task 5.1 は Boundary Candidates と議題に、`getting-started-story-guide` の公開後の確認 4 点は 2026-10-10 の申し送りに、もう入っている。どちらも「ついでに済ませるか」を要件で決める形で、記録の置き場所も議題にある。ほかに、`hello-pasta-shell-art` の部位名の裏取りの残りと、`touch-poke-shortcuts` の撫での手触りの確かめも、8 段目の実機の作業に入る。
+- **見つけた穴・古くなった記述**:
+  - 13 行目の章の名前と、14 行目の「画像は顔の絵 16 枚だけ」は古い（入門は 16 章。`book/src/img/hello-pasta/` に 2 枚、`book/src/img/ogp.png` もある）。16 行目と 116 行目の「付加情報の 4 番目を台詞に入れる」「部位名が空のときの台詞」は、`touch-poke-shortcuts` で古くなった（部位名はシーンの名前の末尾に付き、足元を触ると部位の名前が付いた段は飛ばされる）。114 行目の 9 段目の選択肢が切れる件は、`choice-line-layout` が直した。
+  - 49 行目と 77 行目の `manual-print-media-refs` は完了した。`print.html` も無くなったので、マニュアルの検査の席の取り合いは無い。
+  - 8 段目で狙った台詞を出す手順には、触る所（女の子の `Head` は頬の横の髪、`Face` は顔の真ん中）のほかに、9 段目の選択肢と `その他` が同じ名前で抽選されること、撫では同じ所を 2 秒続けた後の 1 回だけでトーク中は反応しないことを書く必要がある。

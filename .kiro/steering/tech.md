@@ -127,9 +127,9 @@ pasta (workspace)
 
 | 原則         | 内容                                   |
 | ------------ | -------------------------------------- |
-| UI独立性     | Wait/Syncはマーカーのみ、areka側で制御 |
+| UI独立性     | 待ちと同期の制御は宿主（SSP・areka）に任せる。pasta はさくらスクリプトを書くだけ |
 | 宣言的フロー | Call/Jumpで制御、if/while/forなし      |
-| Yield型      | 全出力はyield、Generator継続           |
+| まとめて返す | 場面の終わりか `＞yield` までの出力を 1 本のさくらスクリプトにまとめて返す（続きはコルーチンが持つ） |
 | 2パス変換    | Pass1: シーン登録、Pass2: コード生成（現行の段階構成は[内部設計: トランスパイルパイプライン](https://ekicyou.github.io/pasta/internals/transpiler.html)を参照） |
 
 **結果**: 完全なユニットテスト可能性を実現
