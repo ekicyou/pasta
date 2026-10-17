@@ -1,0 +1,30 @@
+＃ runtime_error_balloon.pasta - 止まるエラーの表記の E2E 用シーン（runtime-error-balloon task 6.1）
+＃ ＊会話 は既定の別名表で OnTalk になる。ID: OnTalk で起こす。
+
+％さくら
+　＠通常：\s[0]
+
+＊会話
+```lua
+function SCENE.雨を調べる(act)
+    local data = nil
+    return data.雨
+end
+```
+　＞雨の日
+
+　・雨の日
+　　さくら：途中の台詞
+　　さくら：＠雨を調べる（）
+
+＊OnWeather
+```lua
+function SCENE.予報(act)
+    return require("天気").予報()
+end
+```
+　さくら：天気の途中
+　さくら：＠予報（）
+
+＊OnFine
+　さくら：普通のトーク

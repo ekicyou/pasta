@@ -1,0 +1,12 @@
+# runtime_error_balloon E2E 用フィクスチャ（runtime-error-balloon task 6.1）
+#
+# [logging] balloon_warning はテストが末尾に書き足す（書かない・false・型違いの 3 通り）。
+# scripts/ には差し替える main.lua（REG のハンドラ）と作者の 天気.lua だけを置く。
+# 標準ランタイムは pasta.dll が自己展開した本物を使う。
+
+[loader]
+pasta_patterns = ["dic/*.pasta"]
+transpiled_output_dir = "profile/pasta/cache/lua"
+
+[actor."さくら"]
+spot = 0
