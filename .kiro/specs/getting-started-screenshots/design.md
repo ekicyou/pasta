@@ -254,7 +254,8 @@ flowchart TD
 // tutorial-check.mjs の中の私的な判定（JSDoc で型を書く。export しない）
 type IsImageLine = (lines: readonly string[]) => boolean;
 // true になるのは lines.length === 1 かつ lines[0].trimEnd() が
-//   /^!\[[^\]]*\S[^\]]*\]\([^\s)]+\)$/ に一致するときだけ。
+//   /^!\[[^\]]*[^\]\s][^\]]*\]\([^\s)]+\)$/ に一致するときだけ。
+//   （\S だと `![]](x.png)` の `]` を代わりの文の字と見て通してしまうので、`]` と空白を除いた字を 1 つ要る形にする）
 // findProseParagraphs の filter は、今の除外（> | 字下げ 箇条書き）と isInstruction に加えて
 //   !isImageLine(lines) を条件に足す。返り値の型 ProseProblem[] は変えない。
 ```
