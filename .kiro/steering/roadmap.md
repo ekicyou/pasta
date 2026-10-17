@@ -7,7 +7,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 現在の主題は 3 つある。
 
 - **0.4.1: 致命的でない不具合**。0.4.0 に入れずに回した不具合を直す。今の範囲は、辞書の検査の端のケース（`pasta-check-validate-edges`）と、入門ガイドを SSP で確かめたときに見つかったずれ（`tutorial-ssp-gaps`。2026-10-17 開発者の決定で足した）の 2 本である（下の「0.4.1 の範囲」）。
-- **Phase 13: areka でノベルゲーム（0.5.0）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性セマンティクス（シーン属性の保持と読み出し・Call の属性フィルター）も、この道筋に入った。
+- **Phase 13: areka でノベルゲーム（0.5.0）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性セマンティクス（シーン属性の保持と読み出し・Call の属性フィルター）も、この道筋に入った。2026-10-18 に、窓際のぱすたさん（ghost_dev）からの要望の 2 つ（アクターごとの表示の装い `actor-display-style`・budoux の改行の幅）も 0.5.0 に入れた（下の「窓際のぱすたさんからの要望」）。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
 Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイドの絵で完了した（「完了フェーズ」）。
@@ -286,6 +286,15 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - ノベルを 1 本の配布物としてどう起動するか、動画が要るか — `novel-areka-contract` の要件。
 - 数のしきい値（好感度が 50 以上、など）の書き方 — `call-attribute-filter` の要件。
 
+## 窓際のぱすたさんからの要望（2026-10-18 起票・0.5.0）
+
+2026-10-18 の `/kiro-discovery` で、ghost_dev の「ぱすた開発」セッション（窓際のぱすたさん）と相談して起こした。0.5.0 に入れる（開発者の決定「次のマイナーバージョンに押し込む」）。
+
+- **ゴースト側の形（開発者の決定「案C」）**: 奥から、`\1` のシェル（窓。台詞を持たない）、`\0` の縦書きバルーン 1 枚（`vertical,1`。SSP 2.8.80 から標準）、`\0` のシェル（ぱすたとセキュリティボール）。右の枠から左の枠へは、同じバルーンの中で `\_l[x,y]` で飛ぶ。シェルの無い相手役（おじさん・男の子・ギャル・妹）は、ぱすたと同じ `\0` のバルーンに出す。
+- **`actor-display-style`（spec）**: アクターごとの表示の装い（文字の色など）を pasta.toml で決め、`おじさん：やあ。` のとおりに書いて出せるようにする。1 つのスポットを複数のアクターで共有する形を正式に支える。同じスポットで話者が替わったときの改行は、もうある（`[ghost] spot_newlines = 1.8` で `\n[180]`）ので、足りないのは装いだけ。ゴースト側の今の試作は、アクター辞書の Lua 関数で回避している（`ぱすた：＠おじさん　やあ。`）が、ネタ帳のとおりに写せないので採らない（些細なことに Lua を出さない方針）。`novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link` と `sakura_builder.lua` を共有するので、同じウェーブに置かない。
+- **budoux の改行の幅（直接実装）**: 下の「Direct Implementation Candidates」。
+- **左の枠へ飛ぶ `\_l`**: spec は起こさない。単語（`＠左の枠`）で包めば足りる見込み。確かめることは下のバックログ。
+
 ## リリース（`release` スキル）
 
 リリースの CI 化（`release-ci`）、リリース手順（spec `release-workflow`）の書き換え、CI での初回のリリース（v0.3.8）とその後片付けは、2026-10-10 までにすべて済んだ。タグ `vX.Y.Z` の push だけで公開まで進む。記録は `.kiro/specs/completed/release-workflow/first-ci-release.md` と、同じフォルダの `design.md` にある。手順は 2026-10-11 に `release` スキル（`.claude/skills/release/`）へ移し、spec は完了にした。手順を直すときは、スキルを直す。**残るのは、失敗した job の再実行の読み方の確認である**（v0.3.8 も v0.4.0（2026-10-17、run 39024925990）も失敗が起きなかったので未確認。失敗が起きたリリースで確かめる）。
@@ -329,6 +338,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] novel-save-slots -- スロットを選ぶセーブとロード。控えをスロットへ読み書きし、スロットの中身（日時・章の名前）を場面から読めるようにする。Dependencies: novel-checkpoint-rollback
 - [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-variable-scope, novel-checkpoint-rollback, novel-save-slots, shell-element-click, call-attribute-filter（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
+- [ ] actor-display-style -- アクターごとの表示の装い（文字の色など）を pasta.toml で決め、スポットが替わったときと同じスポットで話者が替わったときに出し入れする。1 つのスポットを複数のアクターで共有する形を正式に支える（窓際のぱすたさんのシェルの無い相手役。2026-10-18 起票）。0.5.0 に入れる。`sakura_builder.lua` を共有する `novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link` と同じウェーブに置かない。Dependencies: none
 
 ## Existing Spec Updates
 
@@ -339,6 +349,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 ## Direct Implementation Candidates
 
+- [ ] budoux の改行の幅（2026-10-18、窓際のぱすたさんからの要望。0.5.0）-- アクター設定に `budoux_newlines`（倍率。既定 1.0 で今のまま `\n`、1.8 なら `\n[180]`）を足し、budoux が入れる改行をその幅にする。`spot_newlines`・`choice_newlines` と同じ書き方にそろえる。縦書きのバルーンで、折り返した列だけ間隔が詰まるのを防ぐ。直す所は `crates/pasta_lua/src/sakura_script/line_breaker.rs` の改行を足す 1 か所（163 行）と、アクターの表から `budoux` を読む `sakura_script/mod.rs`（126〜153 行）、テスト、マニュアル（`reference/pasta-toml.md`・`lua/modules/pasta-sakura-script.md`）、スキル references の再生成。バルーンの先頭に改行を入れない今の動きは保つ。選択肢と選択肢の間の `\n`（`sakura_builder.lua` 249・349 行）も縦書きで詰まって見えるなら、同じ直しに含める（ゴースト側の実機の確認待ち）。spec にしないのは、キー 1 つの追加で、既定の動きを変えないため。
 - [ ] areka の `doc/PASTA_PROFILE.md` §5 の作例 -- 手書きの `\w[500]` が、「pasta の上流の欠陥」と誤って記録されている。pasta のエンジンは `\w[` を出さない（2026-10-10 に確かめた）。`novel-areka-contract` の依頼に添えて、areka の側で直してもらう。pasta の側に直す物は無い。
 
 ## バックログ（brief なし・保留）
@@ -380,6 +391,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - 並列負荷で時々落ちる TCP のテスト（2026-10-07 棚卸、`act-token-grouping-fix`・`scene-identity-format` の実装メモ）— `runtime_toggle_e2e_*`・`hook_panic_*`。
 - マニュアルのメニューのテストが持つ mdBook の写し（2026-10-10 棚卸、`manual-claudia-theme` の実装メモ）— `book/tools/theme-menu-test.mjs` は、mdBook 0.5.4 の `book.js` のキー操作の処理を写して持つ。mdBook の版を上げるときに合わせる（CI は 0.5.3 に固定）。
 - 配布版の hello-pasta に会話の変化を足すときの指針（2026-10-10 棚卸、`hello-pasta-tutorial-stages` の実装メモ）— emo2 開発からの知見「1 つの場面に 3 通り」は、段階の形を固定した辞書では満たせない。配布版に変化を足すことになったら、その動機から起票する。
+- 縦書きの左の枠へ飛ぶ `\_l`（2026-10-18、窓際のぱすたさん）— ゴースト側は、同じバルーンの中で `\_l[-295,0]` で左の枠へ飛ぶ。単語（`＠左の枠`）で包めば足りる見込み。確かめること: 単語の値に書いた `\_l` がそのまま出力まで届くか。budoux が `\_l` で飛んだ後も列の字数を数え続けないか（幅の状態は台詞のトークンごとに戻る。`line_breaker.rs`）。困った事例が出たら起票する。
 - budoux の自動改行の禁則（2026-10-05、ghost_dev「emo2 開発」からの申し送り）— `line_breaker.rs` の `break_lines_impl` は禁則を見ない。BudouX の語の区切りの直前で改行するだけである。
   - 方針は JIS X 4051 どおりとする。リーダー（`‥…`）は行頭に置いてよい。並びの途中では分けない。
   - この方針では、申し送りの実例「イイジャン！／‥‥ええと、」は正しい組版になる。
