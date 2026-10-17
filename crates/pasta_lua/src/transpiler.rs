@@ -6,13 +6,16 @@
 use pasta_core::registry::SceneRegistry;
 use pasta_dsl::parser::{ActorScope, FileItem, GlobalSceneScope, KeyWords, PastaFile};
 
-use super::code_gen::LuaCodeGenerator;
 use super::code_gen::source_map::SourceMapSink;
+use super::code_gen::{LineMapSlot, LuaCodeGenerator};
 use super::config::TranspilerConfig;
 use super::context::{TranspileContext, local_scene_counters};
 use super::error::TranspileError;
 use super::normalize::{LineShift, normalize_output_with_shift};
+use super::string_literalizer::StringLiteralizer;
 
+use pasta_dsl::parser::Span;
+use std::collections::BTreeMap;
 use std::io::Write;
 
 /// Lua transpiler for Pasta DSL.
@@ -137,14 +140,15 @@ impl LuaTranspiler {
 
         // Use intermediate buffer for code generation
         let mut intermediate_buffer: Vec<u8> = Vec::new();
+        // シーンの行の対応（runtime-error-balloon 2.5）のために、デバッガの対応表と同じ記録を
+        // いつも受け取る。渡されたシンクへはそのまま流す（デバッガの対応表は変わらない）。
+        let mut recorder = LineRecorder {
+            lines: BTreeMap::new(),
+            inner: sink,
+        };
         let mut codegen =
             LuaCodeGenerator::with_line_ending(&mut intermediate_buffer, self.config.line_ending);
-
-        // Attach the source-map sink (producer side) when provided. When `None`, the
-        // generator's seam stays inert and the output bytes are unchanged (7.1).
-        if let Some(sink) = sink {
-            codegen.set_source_map(sink);
-        }
+        codegen.set_source_map(&mut recorder);
 
         // Write header
         codegen.write_header()?;
@@ -164,6 +168,7 @@ impl LuaTranspiler {
                 }
             }
         }
+        let slots = codegen.take_line_map_slots();
 
         // Convert intermediate buffer to UTF-8 string and normalize. Use the
         // shift-returning normalize so the caller can rebase recorded pre-normalize
@@ -172,6 +177,13 @@ impl LuaTranspiler {
         let raw_output = String::from_utf8(intermediate_buffer)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         let (normalized_output, shift) = normalize_output_with_shift(&raw_output);
+        let normalized_output = fill_line_maps(
+            &normalized_output,
+            &shift,
+            &slots,
+            &recorder.lines,
+            &file.path.to_string_lossy(),
+        )?;
 
         // Write normalized output to final writer
         writer.write_all(normalized_output.as_bytes())?;
@@ -259,6 +271,67 @@ impl LuaTranspiler {
     pub fn config(&self) -> &TranspilerConfig {
         &self.config
     }
+}
+
+/// デバッガの対応表と同じ記録（`.lua` の行 → `.pasta` の行・同じ行は後勝ち）を受け取り、
+/// 渡されたシンクがあればそのまま流す。
+struct LineRecorder<'s> {
+    lines: BTreeMap<u32, u32>,
+    inner: Option<&'s mut dyn SourceMapSink>,
+}
+
+impl SourceMapSink for LineRecorder<'_> {
+    fn record_line(&mut self, lua_line: u32, pasta_line: u32) {
+        self.lines.insert(lua_line, pasta_line);
+        if let Some(inner) = self.inner.as_deref_mut() {
+            inner.record_line(lua_line, pasta_line);
+        }
+    }
+
+    fn record(&mut self, lua_line: u32, span: Span) {
+        self.lines.insert(lua_line, span.start_line as u32);
+        if let Some(inner) = self.inner.as_deref_mut() {
+            inner.record(lua_line, span);
+        }
+    }
+
+    fn record_scene(&mut self, scene_join_key: &str, span: Span) {
+        if let Some(inner) = self.inner.as_deref_mut() {
+            inner.record_scene(scene_join_key, span);
+        }
+    }
+}
+
+/// 整形の後の生成コードの各 `init_scene` の行の `)` の前に、そのシーンの行の対応
+/// `"<.pasta のファイル>|<.lua の行>:<.pasta の行>,..."`（1 行の文字列の定数）を埋める。
+/// 行は増やさない（runtime-error-balloon 2.5）。行は整形の後の最終の行。
+fn fill_line_maps(
+    normalized: &str,
+    shift: &LineShift,
+    slots: &[LineMapSlot],
+    lines: &BTreeMap<u32, u32>,
+    pasta_file: &str,
+) -> Result<String, TranspileError> {
+    let mut out: Vec<String> = normalized.lines().map(str::to_string).collect();
+    for slot in slots {
+        let pairs: Vec<String> = slot
+            .ranges
+            .iter()
+            .filter(|(from, to)| from <= to)
+            .flat_map(|&(from, to)| lines.range(from..=to))
+            .filter_map(|(&pre, &pasta)| shift.map(pre).map(|lua| format!("{lua}:{pasta}")))
+            .collect();
+        let literal = StringLiteralizer::literalize(&format!("{pasta_file}|{}", pairs.join(",")))?;
+        let line = shift
+            .map(slot.init_line)
+            .and_then(|l| out.get_mut(l as usize - 1))
+            .expect("init_scene の行は整形で消えない");
+        let close = line.rfind(')').expect("init_scene の行は ) で閉じる");
+        line.insert_str(close, &format!(", {literal}"));
+    }
+    let mut result = out.join("\n");
+    result.push('\n');
+    Ok(result)
 }
 
 #[cfg(test)]

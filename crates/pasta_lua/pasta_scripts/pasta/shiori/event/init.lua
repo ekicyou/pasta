@@ -71,6 +71,7 @@ local RES = require("pasta.shiori.res")
 local SHIORI_ACT = require("pasta.shiori.act")
 local STORE = require("pasta.store")
 local CALLBACK = require("pasta.shiori.event.callback")
+local STOP = require("pasta.shiori.stop")
 
 -- 1.5. デフォルトイベントハンドラをロード
 require("pasta.shiori.event.boot")
@@ -189,6 +190,8 @@ function EVENT.drive(co, act, ...)
     -- nil yieldをスキップ
     local ok, value = resume_until_valid(co, ...)
     if not ok then
+        -- 止まった場所の表記のため、失敗したコルーチンとエラーの値を控える
+        STOP.hold(co, value)
         -- 予約の後、中断の前にエラーで終わったシーンの予約を残さない
         CALLBACK.discard_staged()
         -- dead のコルーチンを渡し継続を空にする
@@ -220,6 +223,8 @@ function EVENT.fire(req)
     -- ハンドラを呼び出し
     -- エラーは SHIORI.request の xpcall でキャッチされる
     local handler = REG[req.id] or EVENT.no_entry
+    -- ハンドラが止まったときの表記のため、渡す act を控える
+    STOP.hold_handler(act)
     local result = handler(act)
 
     -- 型判定

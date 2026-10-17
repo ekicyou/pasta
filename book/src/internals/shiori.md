@@ -305,7 +305,7 @@ pasta.shiori.entry
 | 関数 | 動作 |
 | ---- | ---- |
 | `SHIORI.load(hinst, load_dir)` | `xpcall` の中で何もせず `true` を返す。エラーなら `print` して `false` |
-| `SHIORI.request(req)` | `xpcall` の中で `EVENT.fire(req)` を呼ぶ。エラーは、文字列なら最初の 1 行を、そうでなければ `nil` を理由にして `RES.err` で 500 応答にする（`nil` は `"Unknown error"` になる） |
+| `SHIORI.request(req)` | `STOP.clear()` で前の要求の控えを空にしてから、`xpcall` の中で `EVENT.fire(req)` を呼ぶ。エラーは、文字列なら最初の 1 行を、そうでなければ `nil` を理由にし、控え（`STOP.take()`・`STOP.take_handler()`）と一緒に `STOP.response` に渡す。表記の応答が返ればそれを、`nil` なら `RES.err` で 500 応答を返す（`nil` の理由は `"Unknown error"` になる。[止まるエラーの控えと応答](#止まるエラーの控えと応答)） |
 | `SHIORI.kick(scene)` | `KICK.install(scene)` でキックを保留するだけで、シーンは動かさない |
 | `SHIORI.unload()` | `xpcall` の中で何もしない |
 
@@ -324,7 +324,7 @@ pasta.shiori.entry
 | `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ探索範囲の親を決める。`act.req.reference[2]`（`\q` の 3 番目の引数。選択肢を出したグローバルシーンの登録名）が文字列で `SCENE.get_global_table` で引けるグローバルシーンならそれを、そうでなければ `STORE.last_global_scene` を親にする。`act.req.reference[1]`（選択 ID）を `SCENE.search(選択 ID, 親)` で探し、無ければ `SCENE.search(選択 ID, nil)` でグローバルシーンを探し、見つかった関数をコルーチンに包んで返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
 | `REG.OnMouseDoubleClick` | `act.req.reference[3]`（スコープ番号）からアクター名を、`act.req.reference[4]`（部位）を部位として、ショートカットの 1〜8 段の名前を上から `SCENE.co_exec_exact` で探し、最初に見つかったコルーチンを返す。無ければ `SCENE.co_exec(act, "OnMouseDoubleClick")`。抑止は見ない |
 | `REG.OnMouseMove` | 撫での判定（`check_stroke`）を毎回回す。判定には部位・スコープ番号・リクエストの時刻（`act.req.date` の `unix` と `ns` から作る小数の秒）と、`virtual_dispatcher.is_blocked(act.req.status)` を渡す。撫でたと決めた回だけ、アクター名を引いて 1〜8 段を `SCENE.co_exec_exact` で探し、見つかればそのコルーチンを返す。それ以外は `SCENE.co_exec(act, "OnMouseMove")`。判定の状態はモジュールのローカル変数 1 つで、保存しない |
-| `REG.OnSecondChange` | `CALLBACK.sweep(os.time())` が応答を返せばそれを返し（その回は仮想イベントを出さない）、そうでなければ `virtual_dispatcher.dispatch(act)` の結果（コルーチンか `nil`）を返す。`sweep` の応答は、期限切れの待機を再開した結果（出力の 200、または理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す |
+| `REG.OnSecondChange` | `CALLBACK.sweep(os.time())` が応答を返せばそれを返し（その回は仮想イベントを出さない）、そうでなければ `virtual_dispatcher.dispatch(act)` の結果（コルーチンか `nil`）を返す。`sweep` の応答は、期限切れの待機を再開した結果（出力の 200、止まるエラーの表記の 200、または表記を出さない設定での理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す |
 
 ### 非同期トーク
 
@@ -342,11 +342,23 @@ SHIORI はベースウェアが問い合わせるだけの通信であり、シ�
 期限切れ（OnSecondChange のたびに確認）
   OnSecondChange の既定ハンドラ → CALLBACK.sweep
     期限切れの待機を集めて pending から外し、番号順に EVENT.drive で (nil, 理由) を渡して再開する
-    最初に生まれた応答（出力の 200、または理由付きタイムアウトの 500）をその回の応答にする
+    最初に生まれた応答（出力の 200、表記の 200、または表記を出さない設定での理由付きタイムアウトの 500）をその回の応答にする
 ```
 
 - アクターランタイムの上では、リクエスト 1 と 2 は別々の mailbox のメッセージとして順に処理される。待っているコルーチンは、その間 VM の `CALLBACK.pending` に保たれる。Rust 側はコルーチンを持たない。
 - 再開したシーンは、通常のイベントと同じ再開の手順（`EVENT.drive`）を通る。待ち合わせの状態の遷移（`consume_staged`・`STORE.co_callback`・`set_co_scene` との関係）は [コールバック待ちとの関係](execution-model.md#コールバック待ちとの関係) で、掃引の手順は [期限切れの掃引](execution-model.md#期限切れの掃引callbacksweep) で扱う。利用者から見た挙動は [OnPastaCallBack](../lua/shiori-events.md#onpastacallbackコールバック応答) が正である。
+
+### 止まるエラーの控えと応答
+
+Lua のエラーでシーンやハンドラが止まったとき（止まるエラー）の表記は、`pasta.shiori.stop`（`STOP`）が作る。止まった場所の名前を作るため、エラーが `SHIORI.request` に届くまでに失われる act を、要求ごとに 1 つずつ控えておく。
+
+- `EVENT.drive` は、コルーチンがエラーで終わると、`STOP.hold(co, err)` でそのコルーチンの act（`FAILURE.act_of(co)`）とエラーの値を控えてから `false` を返す。`EVENT.fire` は、`false` を受けたらそのエラーを投げ直す。
+- `EVENT.fire` は、ハンドラ（`REG` の関数・`EVENT.no_entry`）を呼ぶ直前に、渡す act を `STOP.hold_handler(act)` で控える。シーンの外（ハンドラの中）で止まったときは、この act に積んだ台詞の後に表記が出る。
+- `SHIORI.request` は、要求の始めに `STOP.clear()` で両方の控えを空にする。エラーを受けたら `STOP.take()`・`STOP.take_handler()` で控えを取り出し、理由の行（エラー文の最初の行）・要求の ID・ID が `On` で始まるかと一緒に `STOP.response` に渡す。
+- `STOP.response` は、控えた act（シーンの失敗の act、無ければハンドラの act）から止まった場所の名前を作り、エラー文の場所を直し、ログに警告を 1 行出す（`FAILURE.notation`）。表記を出す設定で、ID が `On` で始まる要求なら、act の末尾に表記を `raw_script` として積んで組み立てた値を `Value` に、受けた理由を `X-Error-Reason` にした `RES.ok`（`200 OK`）の全文を返す。表記を出さない設定・ID が `On` で始まらない・組み立てに失敗したときは `nil` を返し、`SHIORI.request` はこれまでどおり `RES.err` の 500 を返す。
+- 期限切れの掃引（`CALLBACK.sweep`）は、待機ごとの `time_out` で `EVENT.drive` の直後に、成否にかかわらず `STOP.take()` で控えを取り出す（同じ要求の後の止まるエラーに古い控えを混ぜない）。理由付きの待機がエラーで終わると、`timeout_message` を理由と表記の対象にして `STOP.response` に渡し（`【時間切れ：…】`）、`nil` なら `RES.err(理由)` の 500 を候補にする（警告は再開の前に出した 1 行だけで、`STOP.response` は警告を出さない）。理由の無い待機がエラーで終わると、イベント名を前に付けた警告を出し、スクリプトのエラーの表記の応答を候補にする（表記を出さない設定では候補を作らない）。
+
+表記の形・止まった場所の示し方・出る応答と設定ごとの違いは、[止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記) が正である。
 
 ### 仮想イベントディスパッチャ（OnTalk・OnHour）
 
@@ -378,7 +390,7 @@ dispatch(act)
 
 | 作る場所 | 応答 | ヘッダ | 使われる場合 |
 | -------- | ---- | ------ | ------------ |
-| `RES`（Lua） | 200・204・311・312・400・500 | `Charset`・`Sender`・`SecurityLevel` と追加分。500 の理由は `X-Error-Reason` | `EVENT.fire` と `SHIORI.request` のすべての応答 |
+| `RES`（Lua） | 200・204・311・312・400・500 | `Charset`・`Sender`・`SecurityLevel` と追加分。500 の理由と、止まるエラーの表記の 200 の理由は `X-Error-Reason` | `EVENT.fire` と `SHIORI.request` のすべての応答 |
 | `marshaling::default_204`（Rust） | 204 | `Charset`・`Sender`・`SecurityLevel` | NOTIFY、アクターが居ない、メソッドを判定できない、GET の応答が来ない、panic、UTF-8 として読めない |
 | `PastaShiori::default_204_response`（Rust） | 204 | `Charset`・`Sender` | `SHIORI.request` が定義されていない |
 | `MyError::to_shiori_response`（Rust） | 500 | `Charset`・`X-ERROR-REASON` | ロードの失敗・未ロード・`SHIORI.request` の呼び出しの失敗 |
@@ -441,7 +453,7 @@ dispatch(act)
 - mailbox は 1 本で、消費するのはアクタースレッドの `recv_async` のループ 1 つだけである。`select!` は使わない。新しい種類のメッセージは、別のチャネルではなく `ActorMsg` の新しい variant として足す。これにより VM への同時アクセスは構造上起こらず、メッセージは投入順に処理される。NOTIFY はすぐ 204 を返すが、その処理が終わるまで後続の GET は処理されない。
 - 送信の経路（`marshal_request`・`kick_into_mailbox`）は `MAILBOX` の `load_full` だけで送信端を得て、Mutex を取らない。`ACTOR_HANDLE` の Mutex は起動と終了のときだけ触る。
 - ホストのスレッドを際限なく待たせない。GET の応答待ちと終了の完了待ちはそれぞれ 5 秒で打ち切る。応答を返せない場合はすべて `default_204` を返す。
-- リクエストの処理のエラー（ロードの失敗・未ロード・`SHIORI.request` の失敗）は 500 応答になる。204 は応答を返せなかった場合だけの安全網である。
+- リクエストの処理のエラー（ロードの失敗・未ロード・`SHIORI.request` の失敗）は 500 応答になり、設定にかかわらずバルーンに何も出ない。204 は応答を返せなかった場合だけの安全網である。`SHIORI.request` の `xpcall` の中で止まったエラーは、表記を出す設定で ID が `On` で始まる要求なら表記の 200、それ以外は `RES.err` の 500 になる。NOTIFY ではどちらもホストへ届かず、`default_204` が返る（[止まるエラーの控えと応答](#止まるエラーの控えと応答)）。
 - GET が 5 秒を過ぎて 204 を返しても、アクタースレッドの処理は止めない（LuaJIT の実行は途中で止められない）。その処理は最後まで進み、応答は受け取り手が無いため捨てられる。VM の状態はその処理の結果どおりに更新される。
 - 入力の HGLOBAL は DLL が必ず解放し、応答の HGLOBAL はホストが解放する。`GlobalAlloc` の失敗は null のまま使わず、null の応答と長さ 0 にする。
 - 各 FFI 入口は `catch_unwind` で panic をホストへ伝えない。ただしリリースでは `panic = "abort"` のため、正常な経路では panic を起こさない書き方をする（`crates/pasta_shiori/src/actor/marshaling.rs` の正常経路に `unwrap`・`expect` が無いことをテストが確かめる。リクエストの解析は再帰しない）。

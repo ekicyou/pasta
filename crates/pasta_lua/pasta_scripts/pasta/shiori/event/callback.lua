@@ -7,7 +7,8 @@
 ---   - try_route: 到着イベントに一致した待機を外して再開し、出力を常に Value の 200 にする
 ---   - sweep: 期限切れの待機を 集める → 外す → 番号順に並べる → 順に EVENT.drive で再開する。
 ---     最初の候補を応答に採用し、残りは警告ログを出して捨てる。理由付きの待機がエラーで
----     終わったら timeout_message を理由とする 500、静かなタイムアウトのエラーは警告ログだけ
+---     終わったら時間切れの表記の応答（表記を出さない設定なら timeout_message を理由とする 500）、
+---     静かなタイムアウトのエラーはスクリプトのエラーの表記の応答（出さない設定なら警告ログだけ）
 ---
 --- 循環参照回避: このモジュールは pasta.shiori.act を require しない。
 --- pasta.shiori.event（EVENT）は読み込み時にこのモジュールを require するため、
@@ -16,6 +17,8 @@
 local STORE = require("pasta.store")
 local log = require("@pasta_log")
 local RES = require("pasta.shiori.res")
+-- STOP は読み込み時に FAILURE・RES だけを require する（act・store は呼んだ時点）ので循環しない
+local STOP = require("pasta.shiori.stop")
 
 local CALLBACK = {}
 
@@ -156,7 +159,7 @@ end
 --- 待機 1 つをタイムアウトとして EVENT.drive で再開し、応答の候補を返す
 --- @param event_id string
 --- @param entry table pending から外した待機
---- @return string|nil candidate 出力なら 200、理由付きのエラーなら 500、それ以外は nil
+--- @return string|nil candidate 出力なら 200、エラーなら表記付きの 200（出さない設定では理由付きは 500・静かなものは nil）、それ以外は nil
 local function time_out(event_id, entry)
     local reason = nil
     if type(entry.on_timeout) == "string" then
@@ -166,14 +169,24 @@ local function time_out(event_id, entry)
     -- EVENT は呼び出し時に読み込む（読み込み時に require すると循環する）
     local EVENT = require("pasta.shiori.event")
     local ok, value = EVENT.drive(entry.co, entry.act, nil, reason)
+    -- 成否にかかわらず控えを取り出す（同じ要求の後の止まるエラーに古い控えを混ぜない）
+    local hold = STOP.take()
     if not ok then
         if reason then
-            -- 理由はシーン内のエラー文字列ではなく timeout_message そのものを使う
-            return RES.err(reason)
+            -- 理由はシーン内のエラー文字列ではなく timeout_message そのものを使う。
+            -- 警告は再開の前に出したので渡さない。表記を出さない設定なら今の 500
+            return STOP.response({ reason = reason, hold = hold, timeout = reason, shown = true })
+                or RES.err(reason)
         end
-        -- 静かなタイムアウトのエラーは応答を作らず警告ログだけにする
-        log.warn(event_id .. ": scene error after silent timeout: " .. tostring(value))
-        return nil
+        -- 静かなタイムアウトのエラーは、event_id を前に付けた整えた中身の警告を 1 行出し、
+        -- 表記を出す設定ならスクリプトのエラーの表記の応答を候補にする（出さない設定なら今と同じ nil）
+        return STOP.response({
+            reason = type(value) == "string" and value:match("^[^\n]+") or nil,
+            hold = hold,
+            err = value,
+            warning = event_id .. ": ",
+            shown = true,
+        })
     end
     if value ~= nil and value ~= "" then
         return RES.ok(value)

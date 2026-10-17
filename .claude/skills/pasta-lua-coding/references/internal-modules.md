@@ -92,7 +92,11 @@ ACT は、シーン関数が第 1 引数で受け取るオブジェクトであ�
 | `app_ctx` | `STORE.app_ctx` と同じ表 |
 | `var` | ACT ごとの新しい空の表 |
 | `token` | 積んだトークンの配列。`build` が新しい空の配列に置き換える |
-| `current_scene` | 実行中のシーンテーブル。初期値は `nil` で、`init_scene` が設定し、`restore_scene` が呼ぶ前の値に戻す（[シーン文脈の復元](#シーン文脈の復元call_restorerestore_scene)） |
+| `current_scene` | 実行中のシーンテーブル。初期値は `nil` で、`init_scene` が設定し、`call_restore`・`restore_scene` が呼ぶ前の値に戻す（[シーン文脈の復元](#シーン文脈の復元call_restorerestore_scene)） |
+| `scene_name` | 実行中のグローバルシーンの、辞書に書いた名前（`string\|nil`）。初期値は `nil` で、`init_scene` の第 2 引数を控える |
+| `local_scene_name` | 実行中のローカルシーンの、辞書に書いた名前（`string\|nil`）。初期値は `nil` で、`init_scene` の第 3 引数を控える |
+| `line_map` | 実行中のシーンの、生成コードの行と `.pasta` の行の対応（`string\|nil`）。初期値は `nil` で、`init_scene` の第 4 引数を読み解かずに控える |
+| `scene_names` | シーンテーブル → グローバルシーンの書いた名前。ACT ごとの新しい空の表で、`init_scene` が書き足し、`restore_scene` が引く |
 
 `SHIORI_ACT.new(actors, req)` は `ACT.new(actors)` で作った表に、`_spot_newlines`・`_choice_newlines`（`pasta.config` から読む `[ghost]` の `spot_newlines`・`choice_newlines`。既定はどちらも 1.5）と `req`（SHIORI のリクエストの表）を足し、メタテーブルを `SHIORI_ACT_IMPL` に付け替える。`act.req` のフィールドは [act.req](shiori-events.md#actreq) が正である。
 
@@ -123,53 +127,69 @@ act[key]（ACT のフィールドに無いとき）
 
 ### init_scene
 
-`ACT_IMPL.init_scene(self, scene)` は、シーン関数の実行を始めるときに ACT を初期化し、永続化データの表とローカル変数の表を返す。
+`ACT_IMPL.init_scene(self, scene, scene_name, local_scene_name, line_map)` は、シーン関数の実行を始めるときに ACT を初期化し、永続化データの表とローカル変数の表を返す。
 
 ```lua
 --- @param scene SceneTable シーンテーブル（生成コードの SCENE）
+--- @param scene_name string|nil グローバルシーンの書いた名前（無ければ nil）
+--- @param local_scene_name string|nil ローカルシーンの書いた名前（無ければ nil）
+--- @param line_map string|nil 行の対応（読み解かずに控えるだけ）
 --- @return table save 永続化データの表（act.save）
 --- @return table var ローカル変数の表（act.var）
-function ACT_IMPL.init_scene(self, scene) end
+function ACT_IMPL.init_scene(self, scene, scene_name, local_scene_name, line_map) end
 ```
 
 ```lua
 function SCENE.__start__(act, ...)
     local args = { ... }
-    local save, var = act:init_scene(SCENE)
+    local save, var = act:init_scene(SCENE, "天気", nil, [[dic\天気.pasta|12:3,16:4]])
     -- 以降のアクション
 end
 ```
 
-処理は次の 3 つだけである。
+処理は次の 5 つだけである。
 
 1. `scene.__global_name__` があれば、`STORE.last_global_scene` に記録する。`pasta.scene` が作るシーンテーブルはすべて `__global_name__` を持つため、生成コードからの呼び出しでは常に記録される。
 2. `self.current_scene = scene` とする。
-3. `self.save, self.var` を返す。新しい表は作らない。
+3. `scene_name`・`local_scene_name`・`line_map` を同名のフィールドに書き（省略した引数は `nil`）、`self.scene_names[scene] = scene_name` とする。
+4. `FAILURE.bind(self)` で、実行中のスレッドにこの ACT を対応させる（[失敗の報告](#失敗の報告pastafailure)）。
+5. `self.save, self.var` を返す。新しい表は作らない。
 
-- トランスパイラは、すべてのシーン関数の先頭に `local save, var = act:init_scene(SCENE)` を生成する（[生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形)）。
+- トランスパイラは、すべてのシーン関数の先頭に `local save, var = act:init_scene(SCENE, 書いた名前…, 行の対応)` を生成する（[生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形)）。作者が Lua で書いたシーン関数と、引数を渡さない古いキャッシュでは、3 つのフィールドは `nil` になる。
+- `scene_name`・`local_scene_name`・`line_map` は、[止まるエラーの表記](https://ekicyou.github.io/pasta/reference/runtime-failures.html#止まるエラーの表記)にだけ使う。出力・名前の検索には使わず、止まるエラーが起きない要求では定数を受け取って控える以外の仕事をしない。止まったときに `pasta.shiori.stop` が、名前から止まった場所（`＊天気・雨の日`）を作り、行の対応を最後の `|` で切って読み解いて、変換した Lua の行を `.pasta` の行に直す（[止まるエラーの控えと応答](https://ekicyou.github.io/pasta/internals/shiori.html#止まるエラーの控えと応答)）。名前が `nil` のときは、`current_scene.__global_name__` から通し番号を落とした名前を使う。エラー文のチャンクが作者の `.lua` か変換した Lua のキャッシュかは、Rust のモジュール探索関数が読み込んだファイルを書き足す表 `@pasta_chunks`（チャンク名 → ゴーストのフォルダーから見たパス、キャッシュは `true`、見分けられない重複は `false`）で見分ける。
 - `current_scene` は、単語参照・Call・式関数の名前の解決のうち、L1（`current_scene[key]` の完全一致）と L2（`current_scene.__global_name__` をスコープとするローカル辞書の前方一致）が使う（[ローカル優先の検索順](https://ekicyou.github.io/pasta/internals/registry-search.html#ローカル優先の検索順)）。`init_scene` を呼ばない関数の中では、`current_scene` は直前に `init_scene` したシーンのままである。
-- `init_scene` は `current_scene` と `last_global_scene` を上書きするだけで、自分では元へ戻さない。呼び出し元へ戻ったときに `current_scene` を戻すのは呼ぶ側である（次節）。`last_global_scene` は戻さない。
+- `init_scene` は `current_scene`・書いた名前と行の対応・`last_global_scene` を上書きするだけで、自分では元へ戻さない。呼び出し元へ戻ったときに `current_scene` などを戻すのは呼ぶ側である（次節）。`last_global_scene` は戻さない。
 
 ### シーン文脈の復元（call_restore・restore_scene）
 
-`current_scene` の書き手は `init_scene` と `restore_scene` の 2 つである。呼ばれた側のシーン関数が `init_scene` で自分のシーンを設定し、呼ぶ側が、戻った後に `restore_scene` で呼ぶ前の値に書き戻す。利用者から見た振る舞いは [Call から戻った後の名前解決](https://ekicyou.github.io/pasta/grammar/call-jump.html#call-から戻った後の名前解決) と [call_restore](script-api.md#call_restoreglobal_scene_name-key-attrs-) が正である。
+`current_scene` の書き手は `init_scene` と、呼ぶ側の `call_restore`・`restore_scene` である。呼ばれた側のシーン関数が `init_scene` で自分のシーンを設定し、呼ぶ側が、戻った後に呼ぶ前の値に書き戻す。利用者から見た振る舞いは [Call から戻った後の名前解決](https://ekicyou.github.io/pasta/grammar/call-jump.html#call-から戻った後の名前解決) と [call_restore](script-api.md#call_restoreglobal_scene_name-key-attrs-) が正である。
 
 ```lua
 function ACT_IMPL.restore_scene(self, scene, ...)
     self.current_scene = scene
+    self.scene_name = scene and self.scene_names[scene]
+    self.local_scene_name = nil
+    self.line_map = nil
     return ...
 end
 
 function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...)
     local scene = self.current_scene
-    return self:restore_scene(scene, self:call(global_scene_name, key, attrs, ...))
+    local scene_name, local_scene_name, line_map = self.scene_name, self.local_scene_name, self.line_map
+    return (function(...)
+        self.current_scene = scene
+        self.scene_name, self.local_scene_name, self.line_map = scene_name, local_scene_name, line_map
+        return ...
+    end)(self:call(global_scene_name, key, attrs, ...))
 end
 ```
 
-- `restore_scene` は `self.current_scene` だけを書き、`STORE.last_global_scene` は触らない。残りの引数をそのまま返すため、呼んだ関数の複数の戻り値も保たれる。
+- `call_restore` は、呼ぶ前の `current_scene`・`scene_name`・`local_scene_name`・`line_map` の 4 つをそのまま戻す。DSL の途中の Call から戻った後の行で止まると、止まるエラーの表記は呼び出し元のローカルシーンの名前と `.pasta` の行まで示せる。
+- `restore_scene` は、呼ぶ前のローカルシーンと行の対応を知らない。グローバルシーンの書いた名前だけを `scene_names[scene]` から戻し、`local_scene_name`・`line_map` を `nil` にする。関数から戻った後に止まると、表記は `＊天気` のようにグローバルシーンまでになり、`.pasta` の行も示さないが、呼んだ先のシーンの名前は出さない。
+- どちらも `STORE.last_global_scene` は触らない。残りの引数をそのまま返すため、呼んだ関数の複数の戻り値も保たれる。
 - 途中の Call（ローカルシーンの最後の項目でない Call）の生成コードは `act:call_restore(…)` である（[生成される Lua コードの形](https://ekicyou.github.io/pasta/internals/transpiler.html#生成される-lua-コードの形)）。`call_restore` の中の `self:call(…)` は末尾位置ではないため、呼び出しのたびにフレームが 1 つ増える。呼ばれた側の中で `return act:call(…)` がつながっても深くならず、その連鎖から戻った時点で、外側の `call_restore` が 1 回だけ復元する。
 - 復元は、`act:call` の中で何が起きたか（シーン関数・Lua の関数を呼んだ、見つからなかった、キーが `nil`・「呼ばない」印だった）にかかわらず同じ経路で行う。呼ばれた側が `yield` で中断した場合は、コルーチンの再開後に戻った時点で行う。
-- 呼ばれた側が Lua のエラーで抜けた場合は復元しない。エラーはコルーチンごと失敗し（500 応答）、その ACT は捨てられる。
+- 呼ばれた側が Lua のエラーで抜けた場合は復元しない。エラーはコルーチンごと失敗し（止まるエラー。[止まるエラーの表記](https://ekicyou.github.io/pasta/reference/runtime-failures.html#止まるエラーの表記)）、その ACT は止まった場所の名前を作るのに使われた後に捨てられる。
 - 関数を呼ぶ ACT のメソッドも同じ形で復元する。`pasta.act` の局所関数 `call_expr`（`expr_fn`・`expr_fn_var`）・`global_fn`・`word`（見つかったのが関数のとき）は、`local scene = self.current_scene` の後に `return self:restore_scene(scene, h(self, ...))` とする（`word` は引数を渡さず `h(self)`）。`pasta.actor` の `call_expr` とプロキシの `word` は、`self.act.current_scene` を保存して `drop_self(self, self.act:restore_scene(scene, h(…)))` とする。`pasta.actor` は `pasta.act` を `require` せず、プロキシが持つ `self.act` のメソッドを呼ぶ。
 - 末尾の Call（`return act:call(…)`）は復元しない。戻る行が無いため、呼ばれた側のシーンが実行中のまま、その Call を含むシーン関数が終わる。そのシーン関数を `call_restore` で呼んだ側があれば、その側が復元する。
 
@@ -358,7 +378,7 @@ end
 
 - こうして定義した関数は、生成されたシーン関数と同じくシーンテーブルのキーになり、辞書確定でローカルシーンとして集められる。
 - DSL の `＠関数名(…)` は `act:expr_fn("関数名", …)` などに、`＞関数名` は `act:call(…)`・`act:call_restore(…)` になり、どちらも L1 の完全一致（`current_scene[key]`）でこの関数に一致する。
-- 関数の中で `init_scene` を呼ぶと `current_scene` と `last_global_scene` がこのシーンテーブルになり、`save`・`var` が得られる（[init_scene](#init_scene)）。途中の Call・式の関数呼び出しから呼ばれた場合は、戻った後に `current_scene` だけが呼ぶ前の値に戻る（[シーン文脈の復元](#シーン文脈の復元call_restorerestore_scene)）。書き方の利用者向けの説明は [スクリプト用ランタイム API](script-api.md) で扱う。
+- 関数の中で `init_scene` を呼ぶと `current_scene` と `last_global_scene` がこのシーンテーブルになり、`save`・`var` が得られる（[init_scene](#init_scene)）。途中の Call・式の関数呼び出しから呼ばれた場合は、戻った後に `current_scene`（と書いた名前・行の対応）だけが呼ぶ前の値に戻る（[シーン文脈の復元](#シーン文脈の復元call_restorerestore_scene)）。書き方の利用者向けの説明は [スクリプト用ランタイム API](script-api.md) で扱う。
 
 ## SAVE モジュールの内部
 

@@ -265,6 +265,7 @@ mod zero_cost_sandbox_regression {
 
         // 既知 golden: 本番 transpile（scene scaffold + 2 talk アクション）の完全出力。
         // None sink でも余分な行・余分なバイトは一切付かない（シームはゼロバイト）。
+        // init_scene の 4 つ目の行の対応はシンクの有無によらず出る（runtime-error-balloon 2.5）。
         let golden = "\
 local PASTA = require \"pasta\"
 local GLOBAL = require \"pasta.global\"
@@ -274,7 +275,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, \"メイン\", nil, \"test.pasta|7:2,11:2,12:3\")
 
         act:actor_proxy(\"さくら\"):talk(\"「こんにちは」\")
         act:actor_proxy(\"うにゅう\"):talk(\"「やあ」\")

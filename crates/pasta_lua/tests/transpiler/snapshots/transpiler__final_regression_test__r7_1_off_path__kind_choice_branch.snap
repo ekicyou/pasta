@@ -10,7 +10,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "選択シーン", nil, "test.pasta|7:2,11:2")
 
         act:choice("挨拶", "あいさつする")
     end

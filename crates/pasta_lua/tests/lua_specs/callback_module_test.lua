@@ -407,6 +407,28 @@ describe("CALLBACK.sweep", function()
         return res:match("\r\n" .. name .. ": ([^\r\n]*)\r\n")
     end
 
+    -- [logging] balloon_warning を value にした pasta.config の代役で body を実行し、元へ戻す
+    -- （FAILURE.enabled は呼んだ時点で pasta.config を引く）
+    local function with_balloon_warning(value, body)
+        local saved = require("pasta.config")
+        package.loaded["pasta.config"] = {
+            get = function(section, key, default)
+                if section == "logging" and key == "balloon_warning" then return value end
+                return saved.get(section, key, default)
+            end,
+        }
+        local ok, err = pcall(body)
+        package.loaded["pasta.config"] = saved
+        if not ok then error(err, 0) end
+    end
+
+    -- 表記を出さない設定に固定したテスト（今の 500・nil の応答を確かめる。runtime-error-balloon 6.2, 6.5）
+    local function test_off(name, body)
+        test(name, function()
+            with_balloon_warning(false, body)
+        end)
+    end
+
     -- 警告ログのうち、needle を含むものの数
     local function count_warns(needle)
         local n = 0
@@ -444,7 +466,7 @@ describe("CALLBACK.sweep", function()
         expect(CALLBACK.pending["OnPastaCallBack1"]).not_:toBe(nil)
     end)
 
-    test("resumes with nil,on_timeout and returns 500 when on_timeout is string", function()
+    test_off("resumes with nil,on_timeout and returns 500 when on_timeout is string", function()
         setup()
         local received_args = {}
         local co = coroutine.create(function()
@@ -507,7 +529,7 @@ describe("CALLBACK.sweep", function()
         expect(#warn_calls):toBe(0)
     end)
 
-    test("returns only first string on_timeout as 500 among multiple timeouts", function()
+    test_off("returns only first string on_timeout as 500 among multiple timeouts", function()
         setup()
         local co1 = timeout_scene()
         local co2 = timeout_scene()
@@ -652,7 +674,7 @@ describe("CALLBACK.sweep", function()
         expect(#warn_calls):toBe(0)
     end)
 
-    test("1 つ目がエラーで終わっても 2 つ目を処理し、イベント名と理由を警告する (2.9, 3.3)", function()
+    test_off("1 つ目がエラーで終わっても 2 つ目を処理し、イベント名と理由を警告する (2.9, 3.3)", function()
         setup()
         local second_resumed = false
         local co2 = coroutine.create(function()
@@ -681,7 +703,7 @@ describe("CALLBACK.sweep", function()
         expect(next(CALLBACK.pending)):toBe(nil)
     end)
 
-    test("静かなタイムアウトのシーンのエラーは警告ログだけにし、2 つ目の出力を応答にする (2.9, 3.5)", function()
+    test_off("静かなタイムアウトのシーンのエラーは警告ログだけにし、2 つ目の出力を応答にする (2.9, 3.5)", function()
         setup()
         local co1 = coroutine.create(function()
             coroutine.yield()
@@ -710,7 +732,7 @@ describe("CALLBACK.sweep", function()
     -- 3.49 (G3) 境界回帰テスト: sweep タイムアウト 500 の RES.err 経路統一
     -- （X-Error-Reason 正準ケーシング・標準ヘッダー付与・空文字列正規化）
     -- ========================================================================
-    test("sweep: タイムアウト 500 は RES.err 経路で X-Error-Reason 正準ヘッダーを出力する (3.49 G3)", function()
+    test_off("sweep: タイムアウト 500 は RES.err 経路で X-Error-Reason 正準ヘッダーを出力する (3.49 G3)", function()
         setup()
         local co = timeout_scene()
 
@@ -733,7 +755,7 @@ describe("CALLBACK.sweep", function()
         expect(result:find("SecurityLevel: ", 1, true)).not_:toBe(nil)
     end)
 
-    test("sweep: 空文字列 on_timeout は RES.err 規約で Unknown error に正規化される (3.49 G3)", function()
+    test_off("sweep: 空文字列 on_timeout は RES.err 規約で Unknown error に正規化される (3.49 G3)", function()
         setup()
         local co = timeout_scene()
 
@@ -750,7 +772,7 @@ describe("CALLBACK.sweep", function()
         expect(result:find("X-Error-Reason: Unknown error", 1, true)).not_:toBe(nil)
     end)
 
-    test("handles mixed on_timeout types (string and nil)", function()
+    test_off("handles mixed on_timeout types (string and nil)", function()
         setup()
         local co1 = timeout_scene()
         local co2 = timeout_scene()
@@ -778,6 +800,104 @@ describe("CALLBACK.sweep", function()
         -- 理由付きの待機のエラーが応答になる（静かな待機は出力なしで終わり候補を作らない）
         expect(status_line(result)):toBe("SHIORI/3.0 500 Internal Server Error")
         expect(header(result, "X%-Error%-Reason")):toBe("timeout reason")
+    end)
+
+    -- ========================================================================
+    -- runtime-error-balloon 5: 時間切れの出口の表記（1.3, 1.4, 1.5, 4.2, 5.6）
+    -- ========================================================================
+    test("理由付きの時間切れは、時間切れの表記の 200 を候補にし、警告は再開前の 1 行だけ (1.3)", function()
+        with_balloon_warning(true, function()
+            setup()
+            CALLBACK.pending["OnPastaCallBack1"] = {
+                co = timeout_scene(), act = {}, timeout_at = 50, on_timeout = "callback timeout: get_property",
+            }
+
+            local result = CALLBACK.sweep(200)
+
+            expect(status_line(result)):toBe("SHIORI/3.0 200 OK")
+            expect(header(result, "X%-Error%-Reason")):toBe("callback timeout: get_property")
+            expect(header(result, "Value"):find("【時間切れ：callback timeout: get_property】", 1, true)).not_:toBe(nil)
+            expect(#warn_calls):toBe(1)
+            expect(warn_calls[1]):toBe("OnPastaCallBack1: callback timeout: get_property")
+        end)
+    end)
+
+    test("理由の無い時間切れの後のエラーは、スクリプトのエラーの表記の 200 を候補にし、整えた警告を 1 行出す (1.4, 5.6)", function()
+        with_balloon_warning(true, function()
+            setup()
+            local co = coroutine.create(function()
+                coroutine.yield()
+                error("silent scene exploded\nsecond line")
+            end)
+            coroutine.resume(co)
+            CALLBACK.pending["OnPastaCallBack1"] = { co = co, act = {}, timeout_at = 50 }
+
+            local result = CALLBACK.sweep(200)
+
+            expect(status_line(result)):toBe("SHIORI/3.0 200 OK")
+            -- 理由の行はエラー文の最初の行（場所の接頭辞を含む今のエラー文のまま）
+            local reason = header(result, "X%-Error%-Reason")
+            expect(reason:find("silent scene exploded", 1, true)).not_:toBe(nil)
+            expect(reason:find("second line", 1, true)):toBe(nil)
+            expect(header(result, "Value"):find("【スクリプトのエラー：silent scene exploded】", 1, true)).not_:toBe(nil)
+            -- 今の警告（変換した Lua の場所入り）は、event_id を前に付けた整えた中身に置き換わる
+            expect(#warn_calls):toBe(1)
+            expect(warn_calls[1]):toBe("OnPastaCallBack1: スクリプトのエラー：silent scene exploded")
+            expect(count_warns("scene error after silent timeout")):toBe(0)
+        end)
+    end)
+
+    test("表記の候補が 2 つでも、番号の小さい方を採用し残りは警告して捨てる (1.5)", function()
+        with_balloon_warning(true, function()
+            setup()
+            CALLBACK.pending["OnPastaCallBack1"] = {
+                co = timeout_scene(), act = {}, timeout_at = 50, on_timeout = "timeout reason 1",
+            }
+            CALLBACK.pending["OnPastaCallBack2"] = {
+                co = timeout_scene(), act = {}, timeout_at = 60, on_timeout = "timeout reason 2",
+            }
+
+            local result = CALLBACK.sweep(200)
+
+            expect(status_line(result)):toBe("SHIORI/3.0 200 OK")
+            expect(header(result, "X%-Error%-Reason")):toBe("timeout reason 1")
+            expect(header(result, "Value"):find("timeout reason 2", 1, true)):toBe(nil)
+            expect(select(2, result:gsub("SHIORI/3%.0", ""))):toBe(1)
+            expect(count_warns("OnPastaCallBack1: timeout reason 1")):toBe(1)
+            expect(count_warns("OnPastaCallBack2: timeout reason 2")):toBe(1)
+            expect(count_warns("OnPastaCallBack2: timeout response discarded")):toBe(1)
+            expect(#warn_calls):toBe(3)
+            expect(next(CALLBACK.pending)):toBe(nil)
+        end)
+    end)
+
+    test("理由の無い時間切れの後のエラーの候補が先なら、後の出力は警告して捨てる (1.5)", function()
+        with_balloon_warning(true, function()
+            setup()
+            local co1 = coroutine.create(function()
+                coroutine.yield()
+                error("silent scene exploded")
+            end)
+            coroutine.resume(co1)
+            local co2 = coroutine.create(function()
+                coroutine.yield()
+                coroutine.yield("talk2")
+            end)
+            coroutine.resume(co2)
+            CALLBACK.pending["OnPastaCallBack1"] = { co = co1, act = {}, timeout_at = 50 }
+            CALLBACK.pending["OnPastaCallBack2"] = { co = co2, act = {}, timeout_at = 50 }
+
+            local result = CALLBACK.sweep(200)
+
+            expect(status_line(result)):toBe("SHIORI/3.0 200 OK")
+            expect(header(result, "Value"):find("silent scene exploded", 1, true)).not_:toBe(nil)
+            expect(header(result, "Value"):find("talk2", 1, true)):toBe(nil)
+            expect(count_warns("OnPastaCallBack1: スクリプトのエラー：silent scene exploded")):toBe(1)
+            expect(count_warns("OnPastaCallBack2: timeout response discarded")):toBe(1)
+            expect(#warn_calls):toBe(2)
+            -- 2 つ目も再開され継続に入る（今と同じ）
+            expect(STORE.co_scene):toBe(co2)
+        end)
     end)
 end)
 

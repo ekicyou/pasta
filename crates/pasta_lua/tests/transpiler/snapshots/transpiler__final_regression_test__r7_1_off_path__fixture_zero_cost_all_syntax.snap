@@ -27,7 +27,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|24:23,28:23,29:24,30:25,31:26,32:26,33:26,34:26,35:26,36:27,37:27,38:27,39:28,53:33,54:34")
 
         var.カウンタ = "10"
         save.グローバル = "永続値"
@@ -45,7 +45,7 @@ do
 
     function SCENE.サブ会話_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "サブ会話", "test.pasta|42:30,46:31,47:31,48:31,49:31,50:31,53:33,54:34")
 
         act:actor_proxy("さくら"):talk("「カウンタは")
         act:actor_proxy("さくら"):talk(var.カウンタ, "var.カウンタ")

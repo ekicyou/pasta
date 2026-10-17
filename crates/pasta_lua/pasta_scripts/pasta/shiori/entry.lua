@@ -10,6 +10,7 @@
 local EVENT = require "pasta.shiori.event"
 local RES = require "pasta.shiori.res"
 local KICK = require "pasta.shiori.event.kick"
+local STOP = require "pasta.shiori.stop"
 
 -- グローバルシーン関数の登録
 local GLOBAL = require "pasta.global"
@@ -77,6 +78,8 @@ end
 --- @field req.dic table カスタムヘッダーの辞書
 --- @return string SHIORI/3.0 形式のレスポンス
 function SHIORI.request(req)
+    -- 前の要求の控えを持ち越さない
+    STOP.clear()
     local ok, result = xpcall(function()
         return EVENT.fire(req)
     end, error_handler)
@@ -84,7 +87,16 @@ function SHIORI.request(req)
     if ok then
         return result
     else
-        return RES.err(result)
+        -- 表記を出すなら表記付きの応答、出さない（設定・On で始まらない ID・組み立ての失敗）なら今の 500
+        return STOP.response({
+            reason = result,
+            hold = STOP.take(),
+            handler = STOP.take_handler(),
+            err = result,
+            fallback = req.id,
+            warning = true,
+            shown = type(req.id) == "string" and req.id:sub(1, 2) == "On",
+        }) or RES.err(result)
     end
 end
 

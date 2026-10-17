@@ -10,7 +10,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "挨拶", nil, "test.pasta|7:2,11:2")
 
         act:actor_proxy("さくら"):talk("「おはようございます」")
     end
@@ -21,7 +21,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "挨拶", nil, "test.pasta|18:5,22:5")
 
         act:actor_proxy("さくら"):talk("「こんにちは」")
     end
@@ -32,7 +32,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|29:8,33:8")
 
         return act:call(SCENE.__global_name__, "挨拶", {}, table.unpack(args))
     end

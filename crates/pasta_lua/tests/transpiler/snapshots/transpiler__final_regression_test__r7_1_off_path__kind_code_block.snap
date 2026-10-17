@@ -19,7 +19,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|16:10,20:10")
 
         act:actor_proxy("さくら"):talk("「テスト」")
     end

@@ -10,7 +10,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|7:3,11:3,12:4,13:5,14:5,15:5,16:5,17:5")
 
         var.カウンタ = "10"
         save.グローバル = "永続値"

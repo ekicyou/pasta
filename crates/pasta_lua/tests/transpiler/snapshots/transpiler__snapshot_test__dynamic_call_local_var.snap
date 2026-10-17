@@ -10,7 +10,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|7:3,11:3,12:4")
 
         var.target = "挨拶"
         return act:call(SCENE.__global_name__, act:call_key(var.target, "var.target"), {}, table.unpack(args))

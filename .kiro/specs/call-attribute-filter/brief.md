@@ -178,3 +178,10 @@ roadmap のバックログにあった「`pasta_core` の `resolve_scene_id` の
 - 論点「一致する候補が無いとき」は、この出口に載せる前提で決め直す。種類を足すなら `FAILURE.LABEL` に足し、表記の形・エスケープ・`[logging] balloon_warning` の切り替えは出口に任せる。
 - 動的コールで関数の参照が先に報告したときは、`call_key` が重ねて出さない（「報告済み」の印 `take_fn_failed`）。フィルターの評価を入れる位置は、この印の読み取りより後になる。
 - 参照: `.kiro/specs/completed/failure-output-unification/design.md` の「報告箇所」「重ねない規則」、マニュアル `book/src/reference/runtime-failures.md`。
+
+## 申し送り（runtime-error-balloon より、2026-10-17）
+
+- `FAILURE.LABEL` に `SCRIPT_ERROR = "スクリプトのエラー"`・`TIMEOUT = "時間切れ"` が入った（10 種）。種類を足すときは、hello-pasta のテスト（`tutorial_stages_test.rs`）が `LABEL` を全部読んで見張ることを前提にしてよい。
+- `FAILURE.format` は `FAILURE.body`（枠なし・無効化なし）を無効化して【】で囲む形になった（出力は不変）。表記の形を変えるときは `FAILURE.body` も見る。
+- 生成コードのシーン関数の先頭は `act:init_scene(SCENE, "書いたグローバル名", "書いたローカル名"|nil, "<.pasta>|<lua>:<pasta>,...")` になった。act は `scene_name`・`local_scene_name`・`line_map`・`scene_names` を控え、`call_restore` は 4 つを戻し、`restore_scene` はグローバル名だけを戻す。`act.lua`・コード生成・`init_scene` の行の数に触るときは、行の対応（`transpiler.rs` の `fill_line_maps`）と止まるエラーの表記を見直す。
+- 参照: `.kiro/specs/completed/runtime-error-balloon/design.md` の Revalidation Triggers と `research.md` の「実装の記録」、マニュアル `book/src/reference/runtime-failures.md`「止まるエラーの表記」。

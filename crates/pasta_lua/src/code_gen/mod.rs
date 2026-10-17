@@ -48,6 +48,20 @@ pub struct LuaCodeGenerator<'a, W: Write> {
     /// `None` for production transpile (byte-identical, zero-cost). When `Some`, the
     /// generator calls `record(out_line, span)` for span-bearing constructs.
     source_map: Option<&'a mut dyn SourceMapSink>,
+    /// シーン関数ごとの行の対応の置き場所（runtime-error-balloon 2.5）。
+    /// トランスパイラが整形の後に `init_scene` の行へ行の対応を埋める。
+    line_map_slots: Vec<LineMapSlot>,
+}
+
+/// シーン関数 1 つの「行の対応」の置き場所（整形の前の `out_line` で持つ）。
+///
+/// `init_line` は `act:init_scene(...)` の行。`ranges` は対応に含める `.lua` の行の範囲
+/// （両端を含む）で、シーン関数の本体と、同じグローバルシーンの Lua のブロック
+/// （シーン関数の外に出るが、そのシーンから呼ばれる）の 2 つ。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineMapSlot {
+    pub init_line: u32,
+    pub ranges: [(u32, u32); 2],
 }
 
 impl<'a, W: Write> LuaCodeGenerator<'a, W> {
@@ -59,6 +73,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             line_ending: LineEnding::default(),
             out_line: 0,
             source_map: None,
+            line_map_slots: Vec::new(),
         }
     }
 
@@ -70,6 +85,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             line_ending,
             out_line: 0,
             source_map: None,
+            line_map_slots: Vec::new(),
         }
     }
 
@@ -81,6 +97,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// byte-identical and zero-cost (Requirement 4.6).
     pub fn set_source_map(&mut self, sink: &'a mut dyn SourceMapSink) {
         self.source_map = Some(sink);
+    }
+
+    /// 生成したシーン関数の行の対応の置き場所を取り出す（生成の順）。
+    pub fn take_line_map_slots(&mut self) -> Vec<LineMapSlot> {
+        std::mem::take(&mut self.line_map_slots)
     }
 
     /// Current value of the output-line counter (1-based line most recently emitted).

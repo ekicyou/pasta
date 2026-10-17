@@ -68,6 +68,7 @@ local specs = {
     "act_call_restore_test",              -- 途中の Call の文脈復元・失敗表記テスト (call-execution-correctness 2.1)
     "failure_sites_test",                 -- 実行時の失敗 14 か所の現行の挙動の特性化テスト (failure-output-unification 1.1)
     "failure_test",                       -- pasta.failure 失敗の報告の唯一の出口の単体テスト (failure-output-unification 1.2)
+    "stop_test",                          -- pasta.shiori.stop 止まるエラーの場所の見分け・エラー文の整えテスト (runtime-error-balloon 3.2)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

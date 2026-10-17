@@ -148,7 +148,7 @@ impl PastaLoader {
             };
 
             let filename = file_path.to_string_lossy().to_string();
-            let pasta_file = match pasta_dsl::parse_str(&content, &filename) {
+            let mut pasta_file = match pasta_dsl::parse_str(&content, &filename) {
                 Ok(pf) => pf,
                 Err(e) => {
                     failures.push(TranspileFailure {
@@ -159,6 +159,10 @@ impl PastaLoader {
                     continue;
                 }
             };
+
+            // 生成コードの行の対応には、ゴーストのフォルダーから見た形のファイルを載せる
+            // （runtime-error-balloon 2.5。例 `dic\天気.pasta`）
+            pasta_file.path = cache_manager.get_relative_path(file_path).into();
 
             // Transpile
             let mut output = Vec::new();

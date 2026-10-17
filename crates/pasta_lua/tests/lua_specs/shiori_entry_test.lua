@@ -22,6 +22,7 @@ local RELOAD = {
     "pasta.shiori.event.second_change",
     "pasta.shiori.event.virtual_dispatcher",
     "pasta.shiori.res",
+    "pasta.shiori.stop",
     "pasta.shiori.act",
     "pasta.shiori.sakura_builder",
     "pasta.act",
@@ -64,6 +65,23 @@ local function header_value(res, name)
         end
     end
     return nil
+end
+
+--- [logging] balloon_warning を value にした pasta.config の代役で body を実行し、元へ戻す
+--- （FAILURE.enabled は呼んだ時点で pasta.config を引く）
+--- @param value boolean
+--- @param body fun()
+local function with_balloon_warning(value, body)
+    local saved = package.loaded["pasta.config"]
+    package.loaded["pasta.config"] = {
+        get = function(section, key, default)
+            if section == "logging" and key == "balloon_warning" then return value end
+            return saved.get(section, key, default)
+        end,
+    }
+    local ok, err = pcall(body)
+    package.loaded["pasta.config"] = saved
+    if not ok then error(err, 0) end
 end
 
 --- 応答の形を検査する（6.2）: 先頭行がステータス行と完全に一致し、SHIORI/3.0 が 1 回だけ現れる
@@ -126,7 +144,11 @@ describe("SHIORI.request - xpcall 境界", function()
             error("entry boom\nsecond line detail")
         end
 
-        local res = ENTRY.request({ id = "OnEntryRequestError", method = "get", version = 30 })
+        -- 表記を出さない設定では今のまま（6.5）
+        local res
+        with_balloon_warning(false, function()
+            res = ENTRY.request({ id = "OnEntryRequestError", method = "get", version = 30 })
+        end)
 
         expect(res:find("500 Internal Server Error", 1, true)).not_:toBe(nil)
         expect(res:find("X%-Error%-Reason:")).not_:toBe(nil)
@@ -141,10 +163,250 @@ describe("SHIORI.request - xpcall 境界", function()
             error({ code = 42 })
         end
 
-        local res = ENTRY.request({ id = "OnEntryRequestTableError", method = "get", version = 30 })
+        local res
+        with_balloon_warning(false, function()
+            res = ENTRY.request({ id = "OnEntryRequestTableError", method = "get", version = 30 })
+        end)
 
         expect(res:find("500 Internal Server Error", 1, true)).not_:toBe(nil)
         expect(res:find("X-Error-Reason: Unknown error", 1, true)).not_:toBe(nil)
+    end)
+end)
+
+describe("SHIORI.request - 止まるエラーの表記（表記を出す設定）", function()
+    test("ハンドラのエラーは 200 と理由の行と表記付きの Value になる", function()
+        reset_state()
+        REG.OnEntryNotationError = function(_act)
+            error("entry notation boom\nsecond line detail")
+        end
+
+        local res
+        with_balloon_warning(true, function()
+            res = ENTRY.request({ id = "OnEntryNotationError", method = "get", version = 30 })
+        end)
+
+        expect_status(res, "SHIORI/3.0 200 OK")
+        expect(header_value(res, "X-Error-Reason")).not_:toBe(nil)
+        local value = header_value(res, "Value")
+        expect(value).not_:toBe(nil)
+        expect(value:find("スクリプトのエラー", 1, true)).not_:toBe(nil)
+        expect(value:find("entry notation boom", 1, true)).not_:toBe(nil)
+        expect(value:find("second line detail", 1, true)):toBe(nil)
+    end)
+
+    test("シーンの中のエラーも 200 と表記付きの Value になる", function()
+        reset_state()
+        REG.OnEntryNotationScene = function(_act)
+            return coroutine.create(function(_a)
+                error("entry scene boom")
+            end)
+        end
+
+        local res
+        with_balloon_warning(true, function()
+            res = ENTRY.request({ id = "OnEntryNotationScene", method = "get", version = 30 })
+        end)
+
+        expect_status(res, "SHIORI/3.0 200 OK")
+        local value = header_value(res, "Value")
+        expect(value).not_:toBe(nil)
+        expect(value:find("entry scene boom", 1, true)).not_:toBe(nil)
+    end)
+
+    test("On で始まらない ID の要求は表記を出さず今の 500 になる", function()
+        reset_state()
+        REG.entry_notation_plain = function(_act)
+            error("entry plain boom")
+        end
+
+        local res
+        with_balloon_warning(true, function()
+            res = ENTRY.request({ id = "entry_notation_plain", method = "get", version = 30 })
+        end)
+
+        expect_status(res, "SHIORI/3.0 500 Internal Server Error")
+        expect(header_value(res, "Value")):toBe(nil)
+    end)
+end)
+
+-- ============================================================================
+-- SHIORI.request - 止まるエラーの表記を場所ごとに確かめる（1.1, 1.2, 1.6, 1.8, 2.5, 3.3, 3.4, 3.6, 5.2, 6.1）
+-- ============================================================================
+describe("SHIORI.request - 止まるエラーの表記の場所ごとの確かめ", function()
+    --- イベントを SHIORI.request で送る
+    --- @param id string イベント名
+    --- @param reference table|nil Reference（0 始まり）
+    --- @return string
+    local function request(id, reference)
+        return ENTRY.request({ id = id, method = "get", version = 30, reference = reference })
+    end
+
+    --- シーン関数をコルーチンにして返すハンドラを登録する
+    --- @param event_name string 登録イベント名
+    --- @param scene function シーン関数（引数は EVENT.fire が渡す act）
+    local function register_scene(event_name, scene)
+        REG[event_name] = function(_act)
+            return coroutine.create(scene)
+        end
+    end
+
+    --- 次の OnTalk の機会の代わりに、保存された継続をそのまま返すハンドラ
+    REG.OnEntryPlaceContinue = function(_act)
+        return STORE.co_scene
+    end
+
+    --- 同じ手順を表記を出さない設定と出す設定で 1 回ずつ実行し、それぞれの最後の応答を返す
+    --- @param scenario fun(): string 状態を空にした後に実行する手順（最後の応答を返す）
+    --- @return string off 表記を出さない設定の応答
+    --- @return string on 表記を出す設定の応答
+    local function run_both(scenario)
+        local off, on
+        with_balloon_warning(false, function()
+            reset_state()
+            off = scenario()
+        end)
+        with_balloon_warning(true, function()
+            reset_state()
+            on = scenario()
+        end)
+        return off, on
+    end
+
+    --- 表記を出す応答を検査する: 200・理由の行は出さない設定の 500 と同じ中身・Value の完全一致
+    --- @param off string 表記を出さない設定の応答
+    --- @param on string 表記を出す設定の応答
+    --- @param value string 期待する Value（act:build が末尾に付ける \e を除いた部分）
+    --- @return string reason 理由の行
+    local function expect_notation(off, on, value)
+        expect_status(off, "SHIORI/3.0 500 Internal Server Error")
+        expect(header_value(off, "Value")):toBe(nil)
+        local reason = header_value(off, "X-Error-Reason")
+        expect(reason).not_:toBe(nil)
+
+        expect_status(on, "SHIORI/3.0 200 OK")
+        expect(header_value(on, "X-Error-Reason")):toBe(reason)
+        expect(header_value(on, "Value")):toBe(value .. "\\e")
+        return reason
+    end
+
+    test("REG のハンドラの例外は、途中の台詞の後に要求の ID を対象にした表記が出る", function()
+        local off, on = run_both(function()
+            REG.OnEntryPlaceHandler = function(act)
+                act:raw_script("途中の台詞")
+                error("handler place boom\nsecond line")
+            end
+            return request("OnEntryPlaceHandler")
+        end)
+
+        local reason = expect_notation(off, on, "途中の台詞【スクリプトのエラー：OnEntryPlaceHandler（handler place boom）】")
+        expect(reason:find("handler place boom", 1, true)).not_:toBe(nil)
+    end)
+
+    test("シーンの中の例外は、書いた名前を対象にし、投げ直しの場所を表記に入れない", function()
+        local off, on = run_both(function()
+            register_scene("OnEntryPlaceScene", function(act)
+                act:init_scene({}, "天気", "雨の日")
+                act:raw_script("途中の台詞")
+                error("scene place boom")
+            end)
+            return request("OnEntryPlaceScene")
+        end)
+
+        local reason = expect_notation(off, on, "途中の台詞【スクリプトのエラー：＊天気・雨の日（scene place boom）】")
+        -- 理由の行は今のまま投げ直しの場所を含む（表記にだけ入らない）
+        expect(reason:find("init.lua:", 1, true)).not_:toBe(nil)
+    end)
+
+    test("チェイントークの再開の中の例外は、再開した後の途中の台詞の後に表記が出る", function()
+        local first_off, first_on
+        local off, on = run_both(function()
+            register_scene("OnEntryPlaceChain", function(act)
+                act:init_scene({}, "会話")
+                act:raw_script("前半")
+                act:yield()
+                act:raw_script("後半の途中")
+                error("chain place boom")
+            end)
+            local first = request("OnEntryPlaceChain")
+            if first_off then first_on = first else first_off = first end
+            return request("OnEntryPlaceContinue")
+        end)
+
+        -- 中断までの応答は設定にかかわらず普通のトーク
+        expect(header_value(first_off, "Value")):toBe("前半\\e")
+        expect(first_on):toBe(first_off)
+        local reason = expect_notation(off, on, "後半の途中【スクリプトのエラー：＊会話（chain place boom）】")
+        expect(reason:find("init.lua:", 1, true)).not_:toBe(nil)
+        expect(STORE.co_scene):toBe(nil)
+    end)
+
+    test("待ち合わせからの再開の中の例外は、コールバックの投げ直しの場所を表記に入れない", function()
+        local off, on = run_both(function()
+            register_scene("OnEntryPlaceWait", function(act)
+                act:init_scene({}, "天気")
+                local v = act:get_property("name")
+                act:raw_script("届いた:" .. tostring(v))
+                error("wait place boom")
+            end)
+            request("OnEntryPlaceWait")
+            return request("OnPastaCallBack1", { [0] = "v1" })
+        end)
+
+        local reason = expect_notation(off, on, "届いた:v1【スクリプトのエラー：＊天気（wait place boom）】")
+        expect(reason:find("callback.lua:", 1, true)).not_:toBe(nil)
+        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
+    end)
+
+    test("On で始まらない ID は、表記を出す設定でも出さない設定と同じ 500 になる", function()
+        local off, on = run_both(function()
+            REG.entry_place_plain = function(act)
+                act:raw_script("途中の台詞")
+                error("plain place boom")
+            end
+            return request("entry_place_plain")
+        end)
+
+        expect_status(on, "SHIORI/3.0 500 Internal Server Error")
+        expect(on):toBe(off)
+        expect(header_value(on, "Value")):toBe(nil)
+    end)
+
+    test("作者が RES.err で返した応答は、表記を付けずにそのまま返る", function()
+        local built = RES.err("author reason")
+        local off, on = run_both(function()
+            REG.OnEntryPlaceAuthorErr = function(act)
+                act:raw_script("途中の台詞")
+                return built
+            end
+            return request("OnEntryPlaceAuthorErr")
+        end)
+
+        expect(off):toBe(built)
+        expect(on):toBe(built)
+    end)
+
+    test("表記を出した次の要求は普通に処理される", function()
+        with_balloon_warning(true, function()
+            reset_state()
+            register_scene("OnEntryPlaceStop", function(act)
+                act:init_scene({}, "会話")
+                act:raw_script("途中の台詞")
+                error("stop then next boom")
+            end)
+            REG.OnEntryPlaceNext = function(_act)
+                return "次のトーク"
+            end
+
+            local stopped = request("OnEntryPlaceStop")
+            expect(header_value(stopped, "Value")).not_:toBe(nil)
+
+            local res = request("OnEntryPlaceNext")
+            expect_status(res, "SHIORI/3.0 200 OK")
+            expect(header_value(res, "X-Error-Reason")):toBe(nil)
+            expect(header_value(res, "Value")):toBe("次のトーク")
+            -- 止まったシーンの継続は残らない
+            expect_status(request("OnEntryPlaceContinue"), "SHIORI/3.0 204 No Content")
+        end)
     end)
 end)
 
@@ -412,23 +674,25 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
     end
 
     test("理由付きの待機のタイムアウトは X-Error-Reason に理由を持つ 500 で、仮想イベントを出さない", function()
-        reset_state()
-        dispatcher._reset()
-        register_scene("OnEntryTimeout", function(act)
-            act:get_property("name", -1, "entry sweep timeout") -- 期限は既に過ぎている
-            act:raw_script("届かない")
-            return act:build()
+        with_balloon_warning(false, function()
+            reset_state()
+            dispatcher._reset()
+            register_scene("OnEntryTimeout", function(act)
+                act:get_property("name", -1, "entry sweep timeout") -- 期限は既に過ぎている
+                act:raw_script("届かない")
+                return act:build()
+            end)
+            request("OnEntryTimeout")
+
+            local res, dispatch_count = request_second_change()
+
+            expect_status(res, "SHIORI/3.0 500 Internal Server Error")
+            expect(header_value(res, "X-Error-Reason")):toBe("entry sweep timeout")
+            expect(header_value(res, "Value")):toBe(nil)
+            expect(dispatch_count):toBe(0)
+            expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
+            expect(STORE.co_scene):toBe(nil)
         end)
-        request("OnEntryTimeout")
-
-        local res, dispatch_count = request_second_change()
-
-        expect_status(res, "SHIORI/3.0 500 Internal Server Error")
-        expect(header_value(res, "X-Error-Reason")):toBe("entry sweep timeout")
-        expect(header_value(res, "Value")):toBe(nil)
-        expect(dispatch_count):toBe(0)
-        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
-        expect(STORE.co_scene):toBe(nil)
     end)
 
     --- タイムアウトを捕まえて再度 get_property するシーンを掃引する
@@ -476,6 +740,126 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
         expect_ok(request("OnEntryGetAfterSweep"), "\\![get,property,OnPastaCallBack3,c]")
         expect(CALLBACK.pending["OnPastaCallBack3"]).not_:toBe(nil)
         expect_sweep_response()
+    end)
+
+    -- ========================================================================
+    -- runtime-error-balloon 5: 時間切れの出口の表記（1.3, 1.4, 1.5, 4.2, 5.6, 6.1, 6.2）
+    -- ========================================================================
+
+    --- body を実行する間の警告ログを集める
+    --- @param body fun()
+    --- @return string[] warns
+    local function collect_warns(body)
+        local log = package.loaded["@pasta_log"]
+        local original = log.warn
+        local warns = {}
+        log.warn = function(msg) warns[#warns + 1] = msg end
+        local ok, err = pcall(body)
+        log.warn = original
+        if not ok then error(err, 0) end
+        return warns
+    end
+
+    --- 時間切れの手順を表記を出さない設定と出す設定で 1 回ずつ実行する
+    --- @param scene function OnEntryTimeoutPlace のシーン関数
+    --- @return table off { res, dispatch_count, warns }
+    --- @return table on { res, dispatch_count, warns }
+    local function run_timeout_both(scene)
+        local results = {}
+        for _, value in ipairs({ false, true }) do
+            with_balloon_warning(value, function()
+                reset_state()
+                dispatcher._reset()
+                register_scene("OnEntryTimeoutPlace", scene)
+                request("OnEntryTimeoutPlace")
+                local r = {}
+                r.warns = collect_warns(function()
+                    r.res, r.dispatch_count = request_second_change()
+                end)
+                results[#results + 1] = r
+            end)
+        end
+        return results[1], results[2]
+    end
+
+    test("理由付きの時間切れは、途中の台詞の後に時間切れの表記の 200（理由の行は出さない設定の 500 と同じ）", function()
+        local off, on = run_timeout_both(function(act)
+            act:init_scene({}, "天気")
+            act:raw_script("途中の台詞")
+            act:get_property("name", -1) -- 期限は既に過ぎている・既定の timeout_message
+            act:raw_script("届かない")
+        end)
+
+        expect_status(off.res, "SHIORI/3.0 500 Internal Server Error")
+        expect(header_value(off.res, "X-Error-Reason")):toBe("callback timeout: get_property")
+        expect(header_value(off.res, "Value")):toBe(nil)
+
+        expect_status(on.res, "SHIORI/3.0 200 OK")
+        expect(header_value(on.res, "X-Error-Reason")):toBe("callback timeout: get_property")
+        expect(header_value(on.res, "Value")):toBe("途中の台詞【時間切れ：callback timeout: get_property】\\e")
+        for _, r in ipairs({ off, on }) do
+            expect(r.dispatch_count):toBe(0)
+            -- 警告は再開の前の 1 行だけ（今のまま）
+            expect(#r.warns):toBe(1)
+            expect(r.warns[1]):toBe("OnPastaCallBack1: callback timeout: get_property")
+        end
+        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
+        expect(STORE.co_scene):toBe(nil)
+    end)
+
+    test("理由の無い時間切れの後のエラーは、スクリプトのエラーの表記の 200 を返し、整えた警告を 1 行出す", function()
+        local off, on = run_timeout_both(function(act)
+            act:init_scene({}, "天気")
+            local v = act:get_property("name", -1, false) -- 期限は既に過ぎている・静かに再開
+            act:raw_script("値:" .. tostring(v))
+            error("silent place boom")
+        end)
+
+        -- 出さない設定は今と同じ: 掃引の応答は無く、仮想イベントへ進む
+        expect_status(off.res, "SHIORI/3.0 204 No Content")
+        expect(off.dispatch_count):toBe(1)
+
+        expect_status(on.res, "SHIORI/3.0 200 OK")
+        expect(on.dispatch_count):toBe(0)
+        expect(header_value(on.res, "Value")):toBe("値:nil【スクリプトのエラー：＊天気（silent place boom）】\\e")
+        local reason = header_value(on.res, "X-Error-Reason")
+        expect(reason:find("silent place boom", 1, true)).not_:toBe(nil)
+
+        -- 警告は両方の設定で、event_id を前に付けた整えた中身 1 行（変換した Lua の場所を含まない）
+        for _, r in ipairs({ off, on }) do
+            expect(#r.warns):toBe(1)
+            expect(r.warns[1]):toBe("OnPastaCallBack1: スクリプトのエラー：＊天気（silent place boom）")
+        end
+    end)
+
+    test("掃引で止まったシーンの控えは、同じ要求の後の止まるエラーに混ざらない", function()
+        with_balloon_warning(false, function()
+            reset_state()
+            dispatcher._reset()
+            register_scene("OnEntryTimeoutStale", function(act)
+                act:init_scene({}, "天気")
+                act:get_property("name", -1, false)
+                error("stale place boom")
+            end)
+            request("OnEntryTimeoutStale")
+
+            local original_dispatch = dispatcher.dispatch
+            dispatcher.dispatch = function(_act)
+                error("dispatch place boom")
+            end
+            local ok, res
+            local warns = collect_warns(function()
+                ok, res = pcall(request, "OnSecondChange")
+            end)
+            dispatcher.dispatch = original_dispatch
+            assert(ok, res)
+
+            expect_status(res, "SHIORI/3.0 500 Internal Server Error")
+            expect(header_value(res, "X-Error-Reason"):find("dispatch place boom", 1, true)).not_:toBe(nil)
+            expect(#warns):toBe(2)
+            expect(warns[1]):toBe("OnPastaCallBack1: スクリプトのエラー：＊天気（stale place boom）")
+            expect(warns[2]):toBe("スクリプトのエラー：OnSecondChange（dispatch place boom）")
+        end)
     end)
 end)
 

@@ -17,6 +17,8 @@ FAILURE.LABEL = {
     NOT_NUMBER         = "数にできない値",
     NOT_STRING         = "文字列にできない値",
     SCENE_NOT_FOUND    = "シーンが見つからない",
+    SCRIPT_ERROR       = "スクリプトのエラー",
+    TIMEOUT            = "時間切れ",
 }
 
 local ESCAPE = { ["\\"] = "\\\\", ["%"] = "\\%", ["\r"] = " ", ["\n"] = " " }
@@ -28,16 +30,15 @@ function FAILURE.escape(s)
     return (s:gsub("[\\%%\r\n]", ESCAPE))
 end
 
---- 表記の文字列（枠付き・エスケープ済み）。切り替えを見ない純粋な関数
+--- 表記の中身（枠なし・エスケープなし）。ログの警告に表記と同じ中身を出すのに使う純粋な関数
 ---
---- 形は `【label：subject（detail）】`。detail が無ければ（…）を付けず、
---- subject が無ければ detail を対象の位置に出し、両方無ければ `【label】`。
---- エスケープは中身全体にかけ、枠はその後で付ける。行番号は含めない。
+--- 形は `label：subject（detail）`。detail が無ければ（…）を付けず、
+--- subject が無ければ detail を対象の位置に出し、両方無ければ `label`。
 ---@param label string
 ---@param subject string|nil
 ---@param detail string|nil
----@return string  例 "【数にできない値：＄y（\"abc\"）】"
-function FAILURE.format(label, subject, detail)
+---@return string
+function FAILURE.body(label, subject, detail)
     local body = tostring(label)
     if subject ~= nil then
         body = body .. "：" .. tostring(subject)
@@ -47,7 +48,18 @@ function FAILURE.format(label, subject, detail)
     elseif detail ~= nil then
         body = body .. "：" .. tostring(detail)
     end
-    return "【" .. FAILURE.escape(body) .. "】"
+    return body
+end
+
+--- 表記の文字列（枠付き・エスケープ済み）。切り替えを見ない純粋な関数
+---
+--- 中身は FAILURE.body の形。エスケープは中身全体にかけ、枠はその後で付ける。行番号は含めない。
+---@param label string
+---@param subject string|nil
+---@param detail string|nil
+---@return string  例 "【数にできない値：＄y（\"abc\"）】"
+function FAILURE.format(label, subject, detail)
+    return "【" .. FAILURE.escape(FAILURE.body(label, subject, detail)) .. "】"
 end
 
 local FULLWIDTH_DIGIT = {
@@ -183,6 +195,13 @@ end
 function FAILURE.running_act()
     local co = coroutine.running()
     return co and RUNNING[co] or nil
+end
+
+--- コルーチンに対応する act（無ければ nil）。読むだけ（止まったコルーチンの act を外から引く）
+---@param co thread
+---@return table|nil
+function FAILURE.act_of(co)
+    return RUNNING[co]
 end
 
 ---@param act table

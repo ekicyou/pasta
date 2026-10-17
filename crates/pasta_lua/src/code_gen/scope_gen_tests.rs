@@ -167,7 +167,7 @@ fn scene_actors() -> Vec<SceneActorItem> {
 #[test]
 fn start_scene_emits_clear_spot_then_set_spots_in_order() {
     let text = gen_to_string(|cg| {
-        cg.generate_local_scene(&local_scene(None), 0, &scene_actors(), "会話#1")
+        cg.generate_local_scene(&local_scene(None), 0, &scene_actors(), "会話#1", "会話")
     });
 
     assert!(
@@ -194,7 +194,13 @@ fn start_scene_emits_clear_spot_then_set_spots_in_order() {
 #[test]
 fn named_scene_uses_counter_suffix_and_skips_spot_init() {
     let text = gen_to_string(|cg| {
-        cg.generate_local_scene(&local_scene(Some("会話")), 2, &scene_actors(), "会話#1")
+        cg.generate_local_scene(
+            &local_scene(Some("会話")),
+            2,
+            &scene_actors(),
+            "会話#1",
+            "会話",
+        )
     });
 
     assert!(
@@ -210,7 +216,7 @@ fn named_scene_uses_counter_suffix_and_skips_spot_init() {
     // Session initialization is always present.
     assert!(text.contains("local args = { ... }"), "{}", text);
     assert!(
-        text.contains("local save, var = act:init_scene(SCENE)"),
+        text.contains(r#"local save, var = act:init_scene(SCENE, "会話", "会話")"#),
         "{}",
         text
     );
@@ -219,7 +225,8 @@ fn named_scene_uses_counter_suffix_and_skips_spot_init() {
 /// A start scene with NO actors emits no spot block at all.
 #[test]
 fn start_scene_without_actors_emits_no_spot_block() {
-    let text = gen_to_string(|cg| cg.generate_local_scene(&local_scene(None), 0, &[], "会話#1"));
+    let text =
+        gen_to_string(|cg| cg.generate_local_scene(&local_scene(None), 0, &[], "会話#1", "会話"));
     assert!(
         !text.contains("clear_spot") && !text.contains("set_spot"),
         "no actors -> no spot init: {}",
@@ -476,4 +483,51 @@ fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
     let text = gen_to_string(|cg| cg.generate_global_scene(&scene, &scene.name, 1, &ctx, &attrs));
     assert!(text.contains("function SCENE.挨拶_1_1(act, ...)"), "{text}");
     assert!(text.contains("function SCENE.挨拶_1_2(act, ...)"), "{text}");
+    // init_scene には記号を直す前の書いた名前を渡す（runtime-error-balloon 2.4, 2.7）
+    assert!(
+        text.contains(r#"act:init_scene(SCENE, "会話", "挨拶・1")"#),
+        "{text}"
+    );
+    assert!(
+        text.contains(r#"act:init_scene(SCENE, "会話", "挨拶_1")"#),
+        "{text}"
+    );
+}
+
+/// 別名で置き換えた宣言名（`OnTalk`）は登録に使い、`init_scene` には書いた名前（`会話`）を
+/// 渡す。`__start__` はローカルシーン名の代わりに `nil` を渡す（runtime-error-balloon 2.4）。
+/// 4 つ目の行の対応はトランスパイラが整形の後に埋めるので、生成器だけでは出ない（2.5）。
+#[test]
+fn init_scene_receives_written_global_name_not_alias() {
+    let ctx = TranspileContext::new();
+    let attrs = std::collections::HashMap::new();
+    let scene = global_scene_with(
+        "会話",
+        3,
+        vec![
+            LocalSceneScope {
+                name: None,
+                attrs: vec![],
+                items: vec![],
+                code_blocks: vec![],
+                span: Span::default(),
+            },
+            named_local_with_span("挨拶", 5),
+        ],
+    );
+    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, "OnTalk", 1, &ctx, &attrs));
+    assert!(text.contains(r#"PASTA.create_scene("OnTalk")"#), "{text}");
+    let inits: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|l| l.contains("act:init_scene("))
+        .collect();
+    assert_eq!(
+        inits,
+        vec![
+            r#"local save, var = act:init_scene(SCENE, "会話", nil)"#,
+            r#"local save, var = act:init_scene(SCENE, "会話", "挨拶")"#,
+        ],
+        "{text}"
+    );
 }

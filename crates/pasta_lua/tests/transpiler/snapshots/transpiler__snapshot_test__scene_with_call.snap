@@ -10,7 +10,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|7:3,11:3,12:4")
 
         act:actor_proxy("さくら"):talk("「サブルーチンを呼びます」")
         return act:call(SCENE.__global_name__, "サブ", {}, table.unpack(args))
@@ -18,7 +18,7 @@ do
 
     function SCENE.サブ_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE)
+        local save, var = act:init_scene(SCENE, "メイン", "サブ", "test.pasta|15:6,19:7")
 
         act:actor_proxy("うにゅう"):talk("「サブルーチンです」")
     end

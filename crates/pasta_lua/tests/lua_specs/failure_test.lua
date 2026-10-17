@@ -211,6 +211,40 @@ describe("FAILURE.bind / running_act（実行中の act の対応表）", functi
     end)
 end)
 
+describe("FAILURE.act_of（コルーチンの act を外から読む）", function()
+    local FAILURE = require("pasta.failure")
+
+    test("コルーチンの中で bind した act を、コルーチンの外から引ける（エラーで止まった後も）", function()
+        local act = {}
+        local co = coroutine.create(function()
+            FAILURE.bind(act)
+            error("boom")
+        end)
+        expect(coroutine.resume(co)):toBe(false)
+        expect(coroutine.status(co)):toBe("dead")
+        expect(FAILURE.act_of(co)):toBe(act)
+    end)
+
+    test("bind していないコルーチンは nil", function()
+        local co = coroutine.create(function() coroutine.yield() end)
+        coroutine.resume(co)
+        expect(FAILURE.act_of(co)):toBe(nil)
+    end)
+
+    test("読むだけで対応を変えない", function()
+        local act = {}
+        local co = coroutine.create(function()
+            FAILURE.bind(act)
+            coroutine.yield()
+            return FAILURE.running_act()
+        end)
+        coroutine.resume(co)
+        expect(FAILURE.act_of(co)):toBe(act)
+        expect(FAILURE.act_of(co)):toBe(act)
+        expect(select(2, coroutine.resume(co))):toBe(act)
+    end)
+end)
+
 describe("FAILURE.set_fn_failed / take_fn_failed（報告済みの印）", function()
     local FAILURE = require("pasta.failure")
 
@@ -307,10 +341,22 @@ describe("FAILURE.LABEL と要件 3.1 の文言", function()
     local FAILURE = require("pasta.failure")
     local L = FAILURE.LABEL
 
-    test("種類の名前の表は 8 種", function()
+    test("種類の名前の表は 10 種", function()
         local n = 0
         for _ in pairs(L) do n = n + 1 end
-        expect(n):toBe(8)
+        expect(n):toBe(10)
+    end)
+
+    test("スクリプトのエラー（実行時エラーで止まった）", function()
+        expect(L.SCRIPT_ERROR):toBe("スクリプトのエラー")
+        expect(FAILURE.format(L.SCRIPT_ERROR)):toBe("【スクリプトのエラー】")
+        expect(FAILURE.format(L.SCRIPT_ERROR, "＊会話（3 行目）", "attempt to call a nil value"))
+            :toBe("【スクリプトのエラー：＊会話（3 行目）（attempt to call a nil value）】")
+    end)
+
+    test("時間切れ", function()
+        expect(L.TIMEOUT):toBe("時間切れ")
+        expect(FAILURE.format(L.TIMEOUT, "OnTalk")):toBe("【時間切れ：OnTalk】")
     end)
 
     test("値の無い変数", function()

@@ -22,6 +22,10 @@ pub struct LoaderContext {
     /// Custom configuration fields from pasta.toml
     /// (everything except [loader] section)
     pub custom_fields: toml::Table,
+
+    /// 変換した Lua のキャッシュの置き場所（base_dir 相対・`[loader] transpiled_output_dir`）。
+    /// 探索関数が読み込んだファイルを辞書のキャッシュと見分けるのに使う。
+    pub transpiled_output_dir: String,
 }
 
 impl LoaderContext {
@@ -35,6 +39,7 @@ impl LoaderContext {
             base_dir: base_dir.into(),
             lua_search_paths,
             custom_fields,
+            transpiled_output_dir: super::config::LoaderConfig::default().transpiled_output_dir,
         }
     }
 
@@ -71,6 +76,7 @@ impl LoaderContext {
             base_dir: abs_base,
             lua_search_paths: config.loader.lua_search_paths.clone(),
             custom_fields: config.custom_fields.clone(),
+            transpiled_output_dir: config.loader.transpiled_output_dir.clone(),
         }
     }
 

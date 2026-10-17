@@ -398,3 +398,27 @@ fn test_scene_module_with_dot_in_file_name() {
             .exists()
     );
 }
+
+/// 読み込みが作る生成コードの行の対応は、`.pasta` をゴーストのフォルダーから見た形で持つ
+/// （runtime-error-balloon 2.5）。絶対パスは載せない。
+#[test]
+fn test_generated_line_map_uses_ghost_relative_pasta_path() {
+    let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
+    let base_dir = temp.path();
+    let _runtime = PastaLoader::load(base_dir).unwrap();
+
+    let lua = std::fs::read_to_string(
+        base_dir.join("profile/pasta/cache/lua/pasta/scene/test/hello.lua"),
+    )
+    .unwrap();
+    let sep = std::path::MAIN_SEPARATOR;
+    let init = lua
+        .lines()
+        .find(|l| l.contains("act:init_scene("))
+        .expect("init_scene の行");
+    assert!(
+        init.contains(&format!("dic{sep}test{sep}hello.pasta|")),
+        "{init}"
+    );
+    assert!(!init.contains(&*base_dir.to_string_lossy()), "{init}");
+}

@@ -55,6 +55,25 @@ pub fn get_scripts_dir() -> String {
         .replace('\\', "/")
 }
 
+/// `[logging] balloon_warning = false`（止まるエラーの表記を出さない設定）に固定する。
+///
+/// `FAILURE.enabled` は呼んだ時点で `pasta.config` を引くため、その代役だけを差し替える。
+/// 止まるエラーで「500・理由の行・値が無い」応答を確かめるテストが使う（runtime-error-balloon 6.5）。
+pub fn pin_balloon_warning_off(runtime: &PastaLuaRuntime) {
+    runtime
+        .exec(
+            r#"
+            package.loaded["pasta.config"] = {
+                get = function(section, key, default)
+                    if section == "logging" and key == "balloon_warning" then return false end
+                    return default
+                end,
+            }
+            "#,
+        )
+        .expect("Failed to pin balloon_warning = false");
+}
+
 /// Helper to create a runtime with package.path configured for pasta modules.
 pub fn create_runtime_with_pasta_path() -> PastaLuaRuntime {
     let ctx = create_empty_context();

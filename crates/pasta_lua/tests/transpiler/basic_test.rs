@@ -8,7 +8,7 @@ use crate::common;
 use common::normalize_line_endings;
 use pasta_dsl::parse_str;
 use pasta_dsl::parser::{ActorScope, FileItem, GlobalSceneScope};
-use pasta_lua::{LuaTranspiler, TranspilerConfig};
+use pasta_lua::{LuaTranspiler, SceneAliasTable, TranspilerConfig};
 
 /// Helper to get global scene scopes from PastaFile
 fn get_global_scene_scopes(file: &pasta_dsl::parser::PastaFile) -> Vec<&GlobalSceneScope> {
@@ -140,9 +140,18 @@ fn test_transpile_sample_pasta_scenes() {
         lua_code.contains("local args = { ... }"),
         "Missing args initialization"
     );
+    // 書いたシーン名と行の対応を渡す（__start__ はローカル名の代わりに nil・runtime-error-balloon 2.4, 2.5）
     assert!(
-        lua_code.contains("local save, var = act:init_scene(SCENE)"),
-        "Missing session initialization"
+        lua_code.contains(r#"local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|"#),
+        "Missing session initialization: {}",
+        lua_code
+    );
+    assert!(
+        lua_code.contains(
+            r#"local save, var = act:init_scene(SCENE, "メイン", "自己紹介", "test.pasta|"#
+        ),
+        "Missing local scene session initialization: {}",
+        lua_code
     );
 
     // Verify local scene function (Requirement 3c)
@@ -408,4 +417,166 @@ fn test_transpile_reference_code_patterns() {
         "Pattern coverage too low: {:.1}%. Expected at least 50%.",
         coverage
     );
+}
+
+/// `init_scene` には、別名で置き換える前・記号を識別子に直す前の、書いたとおりの名前を
+/// 文字列で渡す。単独の `＊` 行は受け継いだ名前を渡す（runtime-error-balloon 2.4, 2.7）。
+#[test]
+fn test_init_scene_receives_written_scene_names() {
+    let source = "\
+％さくら
+　＠通常：\\s[0]
+
+＊会話
+　　さくら：こんにちは。
+　・朝・挨拶
+　　　さくら：おはよう。
+
+＊
+　　さくら：続きです。
+
+＊天気・雨
+　　さくら：雨です。
+";
+    let file = parse_str(source, "names.pasta").unwrap();
+    let transpiler = LuaTranspiler::new(
+        TranspilerConfig::new().with_scene_aliases(SceneAliasTable::builtin_default()),
+    );
+    let mut output = Vec::new();
+    transpiler.transpile(&file, &mut output).unwrap();
+    let lua_code = String::from_utf8(output).unwrap();
+
+    // 登録には別名・直した名前が使われる
+    assert!(
+        lua_code.contains(r#"PASTA.create_scene("OnTalk")"#),
+        "{lua_code}"
+    );
+    assert!(
+        lua_code.contains(r#"PASTA.create_scene("天気_雨")"#),
+        "{lua_code}"
+    );
+    assert!(
+        lua_code.contains("function SCENE.朝_挨拶_1(act, ...)"),
+        "{lua_code}"
+    );
+
+    // init_scene には書いた名前（単独の ＊ 行は受け継いだ `会話` を 2 回）。4 つ目は行の対応
+    let init_lines: Vec<&str> = lua_code
+        .lines()
+        .map(str::trim)
+        .filter(|l| l.contains("act:init_scene("))
+        .map(|l| l.split(", \"names.pasta|").next().unwrap())
+        .collect();
+    assert_eq!(
+        init_lines,
+        vec![
+            r#"local save, var = act:init_scene(SCENE, "会話", nil"#,
+            r#"local save, var = act:init_scene(SCENE, "会話", "朝・挨拶""#,
+            r#"local save, var = act:init_scene(SCENE, "会話", nil"#,
+            r#"local save, var = act:init_scene(SCENE, "天気・雨", nil"#,
+        ],
+        "{lua_code}"
+    );
+}
+
+/// 生成コードの `init_scene` の 4 つ目の引数（1 行の文字列の定数）から行の対応を取り出す。
+/// 形は `"<.pasta のファイル>|<.lua の行>:<.pasta の行>,..."`。
+fn init_scene_line_maps(lua_code: &str) -> Vec<(String, Vec<(u32, u32)>)> {
+    lua_code
+        .lines()
+        .filter(|l| l.contains("act:init_scene("))
+        .map(|l| {
+            let start = l.rfind(", \"").expect("4 つ目の引数がある") + 3;
+            let end = l.rfind("\")").expect("文字列で閉じる");
+            let (file, pairs) = l[start..end].split_once('|').expect("ファイルと行の組");
+            let pairs = pairs
+                .split(',')
+                .filter(|p| !p.is_empty())
+                .map(|p| {
+                    let (lua, pasta) = p.split_once(':').unwrap();
+                    (lua.parse().unwrap(), pasta.parse().unwrap())
+                })
+                .collect();
+            (file.to_string(), pairs)
+        })
+        .collect()
+}
+
+/// `init_scene` の行の対応は、同じ `.pasta` から作ったデバッガの対応表と同じ `.pasta` の行を
+/// 指し、シーンの Lua のブロックの行も含む。行は増えない（runtime-error-balloon 2.5, 5.7）。
+#[test]
+fn test_init_scene_line_map_matches_debugger_source_map() {
+    use pasta_lua::debug::source_map::MapBuilderSink;
+
+    let source = "\
+％さくら
+　＠通常：\\s[0]
+
+＊会話
+　　さくら：こんにちは。
+　・朝・挨拶
+　　　さくら：おはよう。
+```lua
+function SCENE.壊れた天気(act)
+    local data = nil
+    return data.x
+end
+```
+";
+    let file = parse_str(source, "dic/天気.pasta").unwrap();
+    let transpiler = LuaTranspiler::new(
+        TranspilerConfig::new().with_scene_aliases(SceneAliasTable::builtin_default()),
+    );
+
+    // デバッガを有効にしない読み込みと同じ経路
+    let mut plain = Vec::new();
+    transpiler.transpile(&file, &mut plain).unwrap();
+
+    // デバッガの対応表（同じ .pasta から作る）
+    let mut sink = MapBuilderSink::new("dic/天気.pasta".to_string(), "chunk".to_string());
+    let mut out = Vec::new();
+    let (_, shift) = transpiler
+        .transpile_with_source_map(&file, &mut out, Some(&mut sink))
+        .unwrap();
+    assert_eq!(plain, out, "対応表を作っても生成コードは変わらない");
+    let chunk = sink.finish(&shift);
+    let lua_code = String::from_utf8(out).unwrap();
+    let lines: Vec<&str> = lua_code.lines().collect();
+
+    // __start__ はローカル名の代わりに nil を置き、4 つ目に行の対応を渡す
+    assert!(
+        lua_code.contains(r#"act:init_scene(SCENE, "会話", nil, "dic/天気.pasta|"#),
+        "{lua_code}"
+    );
+    assert!(
+        lua_code.contains(r#"act:init_scene(SCENE, "会話", "朝・挨拶", "dic/天気.pasta|"#),
+        "{lua_code}"
+    );
+
+    let maps = init_scene_line_maps(&lua_code);
+    assert_eq!(maps.len(), 2, "{lua_code}");
+    for (file, pairs) in &maps {
+        assert_eq!(file, "dic/天気.pasta");
+        assert!(!pairs.is_empty(), "{lua_code}");
+        for &(lua_line, pasta_line) in pairs {
+            assert_eq!(
+                chunk.pasta_for_lua(lua_line).map(|p| p.line),
+                Some(pasta_line),
+                "lua {lua_line} はデバッガの対応表と同じ .pasta の行を指す\n{lua_code}"
+            );
+        }
+    }
+
+    // 行は増えない: デバッガの対応表の行（normalize の後の最終の行）が生成コードの行と合う
+    let line_of = |needle: &str| lines.iter().position(|l| l.contains(needle)).unwrap() as u32 + 1;
+    let header = line_of("function SCENE.朝_挨拶_1(act, ...)");
+    assert_eq!(chunk.pasta_for_lua(header).map(|p| p.line), Some(6));
+    let broken = line_of("return data.x");
+    assert_eq!(chunk.pasta_for_lua(broken).map(|p| p.line), Some(11));
+
+    // ローカルシーンの対応は自分のシーン関数の行と Lua のブロックの行を持つ
+    assert!(maps[1].1.contains(&(header, 6)), "{lua_code}");
+    assert!(maps[1].1.contains(&(broken, 11)), "{lua_code}");
+    // __start__ の対応はローカルシーンの関数の行を持たない
+    assert!(!maps[0].1.iter().any(|&(l, _)| l == header), "{lua_code}");
 }

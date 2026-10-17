@@ -14,7 +14,7 @@
 2. `REG` にそのイベントのハンドラがあれば、ハンドラを呼ぶ（[REG](#reg)）。
 3. ハンドラが無ければ、イベント名でシーンを探して実行する（[シーン関数フォールバック](#シーン関数フォールバック)）。
 
-処理中にエラーが起きると 500 応答になる（[エラーハンドリング](#エラーハンドリング)）。
+処理中に Lua のエラーが起きて止まると、既定では止まった理由を表記にした 200 応答、表記を出さない設定（`balloon_warning = false`）では 500 応答になる（[エラーハンドリング](#エラーハンドリング)）。
 
 ## REG
 
@@ -447,10 +447,23 @@ end
 待ち時間の上限（`act:get_property` の既定は 5 秒）を過ぎた待機は、OnSecondChange の既定ハンドラがタイムアウトとして処理する（[get_property](script-api.md#get_propertyname_or_names-timeout-timeout_message)）。
 
 - 待っていたシーンは、`timeout_message`（既定は `"callback timeout: get_property"`）を理由とするエラーで終わり、警告ログにイベント名と理由が出る。
-- その回の OnSecondChange の応答は、`X-Error-Reason` に `timeout_message` の文字列そのものを持つ 500 Internal Server Error になる。
+- その回の OnSecondChange の応答は、`X-Error-Reason` に `timeout_message` の文字列そのものを持つ。既定では、途中の台詞の後に `【時間切れ：理由】` の表記を `Value` に持つ 200 OK になる。表記を出さない設定（`balloon_warning = false`）では、`Value` の無い 500 Internal Server Error になる（[時間切れ](../reference/runtime-failures.md#時間切れ)）。
 - シーンがそのエラーを `pcall` で捕まえて続けたときは、再開したシーンと同じ規則（前の箇条書き）で扱われ、出力があればその回の OnSecondChange の応答（200 OK）になる。
 - 1 回の OnSecondChange で複数の待機がタイムアウトしたときは、`{N}` の小さい順に処理し、最初に応答を生んだ待機の応答を使う。残りの待機の応答は、警告ログを出して捨てられる。
 - タイムアウトした後に届いた結果は、待っていない `OnPastaCallBack{N}` として扱われる。
+
+理由付きの時間切れの応答は、表記を出すかどうかで次のように変わる（ヘッダは抜粋）。
+
+```text
+表記を出す設定（既定）:
+  SHIORI/3.0 200 OK
+  Value: （途中の台詞）【時間切れ：callback timeout: get_property】\e
+  X-Error-Reason: callback timeout: get_property
+
+表記を出さない設定（balloon_warning = false）:
+  SHIORI/3.0 500 Internal Server Error
+  X-Error-Reason: callback timeout: get_property
+```
 
 ### OnMinuteChange
 
@@ -618,19 +631,34 @@ OnBoot = ["起動"]
 
 ## エラーハンドリング
 
-イベントの処理全体（コールバックの再開・`REG` のハンドラ・シーンの実行）は、SHIORI のリクエスト処理関数の中で `xpcall` により保護されている。エラーが起きると 500 Internal Server Error を返し、`X-Error-Reason` ヘッダにエラーメッセージの最初の行を入れる。エラーの値が文字列でないときは `"Unknown error"` になる。
+イベントの処理全体（コールバックの再開・`REG` のハンドラ・シーンの実行）は、SHIORI のリクエスト処理関数の中で `xpcall` により保護されている。エラーが起きて処理が止まると（止まるエラー）、`X-Error-Reason` ヘッダにエラーメッセージの最初の行を入れた応答を返す。エラーの値が文字列でないときは `"Unknown error"` になる。応答の形は、`pasta.toml` の `[logging]` の `balloon_warning` で変わる。
+
+- 表記を出す設定（既定）: 200 OK を返し、`Value` に、エラーまでに積んだ台詞と、その後に止まった理由の表記（`【スクリプトのエラー：止まった場所（エラー文）】`）を入れる。止まった理由はバルーンに出る。
+- 表記を出さない設定（`balloon_warning = false`）: これまでどおり、`Value` の無い 500 Internal Server Error を返す。バルーンには何も出ないので、`X-Error-Reason` の行とログの警告で理由を見る。
+
+`scripts/main.lua` に次のハンドラを書いた例を示す（ヘッダは抜粋）。
 
 ```lua
+local REG = require("pasta.shiori.event.register")
+
 REG.OnBoot = function(act)
     error("何かがおかしい")
 end
--- 応答: SHIORI/3.0 500 Internal Server Error
---       X-Error-Reason: （発生位置）: 何かがおかしい
+-- 応答（表記を出す設定。既定）:
+--   SHIORI/3.0 200 OK
+--   Value: 【スクリプトのエラー：OnBoot（scripts\\main.lua:4: 何かがおかしい）】\e
+--   X-Error-Reason: （発生位置）: 何かがおかしい
+-- 応答（balloon_warning = false）:
+--   SHIORI/3.0 500 Internal Server Error
+--   X-Error-Reason: （発生位置）: 何かがおかしい
 ```
 
-- `error("…")` のメッセージには、通常、発生位置（ファイル名と行番号）が前に付く。
-- シーンの実行中にエラーが起きた場合も 500 になり、そのシーンは再開されない。
-- 500 応答の読み方は [ゴーストが起動しない・喋らないとき](../reference/startup.md#4-ゴーストが起動しない喋らないとき) を参照。
+- `error("…")` のメッセージには、通常、発生位置（ファイル名と行番号）が前に付く。`X-Error-Reason` には Lua のエラー文の最初の行がそのまま入り、中身は表記を出すかどうかで変わらない。
+- 表記の中の場所は、ゴーストのフォルダーから見た形に直して出す。`Value` の `\\` はさくらスクリプトで `\` を表す書き方で、バルーンには `scripts\main.lua:4:` と出る。
+- シーンの実行中にエラーが起きた場合も同じで、表記の止まった場所はシーンの名前になる。止まったシーンは再開されない。
+- ID が `On` で始まらない要求（`version` などのリソースの要求）と NOTIFY の要求では、設定にかかわらず表記を出さない。
+- 表記の形・止まった場所の示し方・出る応答の詳細は [止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記)、設定は [表記の切り替え](../reference/runtime-failures.md#表記の切り替え) を参照。
+- ゴーストの読み込みに失敗しているときの 500 応答（表記は出ない）の読み方は [ゴーストが起動しない・喋らないとき](../reference/startup.md#4-ゴーストが起動しない喋らないとき) を参照。
 
 ## 仮想ディスパッチャ
 

@@ -153,6 +153,10 @@ end
 --- @field var table アクションローカル変数
 --- @field token table[] 構築中のスクリプトトークン
 --- @field current_scene SceneTable|nil 現在のシーンテーブル
+--- @field scene_name string|nil 実行中のグローバルシーンの書いた名前（エラーの表記用）
+--- @field local_scene_name string|nil 実行中のローカルシーンの書いた名前（エラーの表記用）
+--- @field line_map string|nil 実行中のシーンの行の対応（読み解かずに控えるだけ）
+--- @field scene_names table<SceneTable, string> シーンテーブル→グローバルシーンの書いた名前
 local ACT = {}
 
 --- ACT実装メタテーブル
@@ -187,6 +191,7 @@ function ACT.new(actors)
         var = {},
         token = {},
         current_scene = nil,
+        scene_names = {},
     }
     return setmetatable(obj, ACT_IMPL)
 end
@@ -194,13 +199,21 @@ end
 --- シーン初期化（トランスパイラー出力から呼び出し）
 --- @param self Act アクションオブジェクト
 --- @param scene SceneTable SCENEテーブル
+--- @param scene_name string|nil グローバルシーンの書いた名前（無ければ nil）
+--- @param local_scene_name string|nil ローカルシーンの書いた名前（無ければ nil）
+--- @param line_map string|nil 行の対応（読み解かずに控えるだけ）
 --- @return table save 永続変数テーブル
 --- @return table var アクションローカル変数テーブル
-function ACT_IMPL.init_scene(self, scene)
+function ACT_IMPL.init_scene(self, scene, scene_name, local_scene_name, line_map)
     if scene.__global_name__ then
         STORE.last_global_scene = scene.__global_name__
     end
     self.current_scene = scene
+    -- 書いた名前と行の対応はエラーの表記にだけ使う（出力・検索には使わない）
+    self.scene_name = scene_name
+    self.local_scene_name = local_scene_name
+    self.line_map = line_map
+    self.scene_names[scene] = scene_name
     -- 実行中のスレッドにこの act を対応させる（act を受け取らない ACT.num・ACT.str が引く）
     FAILURE.bind(self)
     return self.save, self.var
@@ -746,12 +759,17 @@ function ACT_IMPL.call_key(self, value, var_path, desc)
 end
 
 --- 実行中のシーンを scene に戻し、残りの引数をそのまま返す
+--- グローバルシーンの書いた名前は scene_names から戻し、ローカル名と行の対応は空にする
+--- （呼び出し前のローカルシーンは分からないので、粗くなっても別のシーンの名前を残さない）
 --- @param self Act アクションオブジェクト
 --- @param scene SceneTable|nil 戻す先（呼び出し前の act.current_scene）
 --- @param ... any そのまま返す値
 --- @return any ...
 function ACT_IMPL.restore_scene(self, scene, ...)
     self.current_scene = scene
+    self.scene_name = scene and self.scene_names[scene]
+    self.local_scene_name = nil
+    self.line_map = nil
     return ...
 end
 
@@ -759,6 +777,7 @@ end
 ---
 --- DSL の途中の Call 行が使う（末尾の Call は act:call のまま）。Lua からも呼べる。
 --- 呼ばれた側がシーン・Lua の関数・見つからないのいずれでも戻す。STORE.last_global_scene は触らない。
+--- 書いた名前 2 つと行の対応も呼び出し前のものへ戻す。
 --- @param self Act アクションオブジェクト
 --- @param global_scene_name string|nil 未使用（act:call と同じ）
 --- @param key string|table 検索キー、または act:call_key が返した「呼ばない」印
@@ -767,7 +786,12 @@ end
 --- @return any ... 呼ばれた側の戻り値
 function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...)
     local scene = self.current_scene
-    return self:restore_scene(scene, self:call(global_scene_name, key, attrs, ...))
+    local scene_name, local_scene_name, line_map = self.scene_name, self.local_scene_name, self.line_map
+    return (function(...)
+        self.current_scene = scene
+        self.scene_name, self.local_scene_name, self.line_map = scene_name, local_scene_name, line_map
+        return ...
+    end)(self:call(global_scene_name, key, attrs, ...))
 end
 
 --- 失敗表記を出す: 警告があればログへ出し、【text】（中身はエスケープ済み）を raw_script トークンとして積む

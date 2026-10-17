@@ -8,7 +8,7 @@ use crate::common;
 
 use common::{
     assert_shiori_response, create_empty_context, create_runtime_with_pasta_path, get_scripts_dir,
-    value_as_str,
+    pin_balloon_warning_off, value_as_str,
 };
 use pasta_lua::PastaLuaRuntime;
 
@@ -166,6 +166,8 @@ fn test_scene_fallback_catches_errors() {
             "#,
         )
         .expect("Failed to mock @pasta_sakura_script");
+    // 表記を出さない設定では今の 500 のまま（runtime-error-balloon 6.5）
+    pin_balloon_warning_off(&runtime);
 
     let result = runtime.exec(&format!(
         r#"
