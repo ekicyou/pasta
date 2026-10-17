@@ -111,3 +111,7 @@
 
 - `boot.lua` の登録が `REG.OnBoot = REG.OnBoot or function(act) … end` になった（中身は変えていない）。`choice_select.lua`・`second_change.lua`・新しい `mouse.lua` も同じ形で、既定ハンドラはゴーストが先に登録したハンドラを上書きしない（要件 8.7）。
 - `boot.lua` を触るときは、この 1 行の形を保つこと。マニュアル `lua/shiori-events.md` の「既定ハンドラと上書き」は 5 つ共通の決まりとして書いてある。参照: `.kiro/specs/completed/touch-poke-shortcuts/design.md` の MouseRegistration。
+
+## 申し送り（getting-started-screenshots より、2026-10-17）
+
+- 入門ガイドの 13 章に絵が入った（`book/src/img/getting-started/` の 16 枚。撮り方の正本は `book/SCREENSHOTS.md`、置き方は `book/AUTHORING.md` 第 8 節「画像の行」）。執筆規約の撮り直す決まりにより、6 段目の確かめ方や準備の終わりの見え方を変えて画面が変わるときは、影響する絵を同じ変更で撮り直すか、roadmap の「人手の確認が残っている項目」に撮り直しが要る絵（ファイル名）と理由を足す。影響しうる絵: `06-hour.png`（16:00 の実際の正時で撮った）、11 段目の 2 枚（`11-jump-detour.png`・`11-jump-continue.png`。外から起こした `OnTalk` が挟まると続きが出ないので、寄り道も続きも自然なおしゃべりで撮った。論点 3 を変えると撮り方が変わる）。準備の章（`setup.md`）には絵を置いていないので、論点 7 で準備の章の見え方を変えても撮り直す絵は無い（置くかどうかは別に決める）。

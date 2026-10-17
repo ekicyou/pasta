@@ -287,3 +287,75 @@
     // --- END canonical hljs neutralizer ---
 })();
 </script>
+{{!-- 目次を描く前に開き直す（getting-started-screenshots の完了時の棚卸。2026-10-17 に実ブラウザーで見つかった、目次の持ち越しのちらつきの修正）。
+  mdBook 0.5.x は、本文の頭の埋め込みスクリプトで、幅 1080px 未満では保存値を見ずに目次を閉じる。
+  claudia.js の claudiaSidebarKeep は本文の最後で開き直すので、その間に閉じた画面が一度描かれ、本文の幅が変わってちらつく。
+  ここでは <head> で html のクラスの変化を見張り、埋め込みが目次を閉じた直後（パーサーが続きを読む前・描く前）に、
+  claudiaSidebarKeep と同じ条件（幅 620px 以上 1080px 未満・保存値が visible）で開いた状態へ戻す。
+  続く埋め込みが ARIA 属性とリンクの tabIndex をそろえるよう、埋め込みの変数 sidebar も visible にする。
+  目次がもうある（知らせが遅れて届いた）ときは、ARIA 属性・tabIndex・display をここでそろえる。
+  開くときのアニメーションは出さない（sidebar-resizing を付けて開き、描いた後に外す）。保存値は書かない。
+  claudiaSidebarKeep は、チェックボックスが入っていれば何もしないので、そのまま残す（MutationObserver が無いときの受け皿）。
+  検査: book/tools/theme-sidebar-early-test.mjs（jsdom）。 --}}
+<script>
+(function claudiaSidebarEarly() {
+    'use strict';
+
+    if (typeof MutationObserver !== 'function') {
+        return;
+    }
+    var html = document.documentElement;
+    var observer = new MutationObserver(function () {
+        var checkbox = document.getElementById('mdbook-sidebar-toggle-anchor');
+        if (!checkbox) {
+            return; // まだ目次を閉じる埋め込みより前（テーマの埋め込みがクラスを替えた）
+        }
+        observer.disconnect();
+        if (checkbox.checked || html.classList.contains('sidebar-visible')) {
+            return;
+        }
+        var width = document.body ? document.body.clientWidth : 0;
+        if (width < 620 || width >= 1080) {
+            return;
+        }
+        var stored;
+        try {
+            stored = localStorage.getItem('mdbook-sidebar');
+        } catch (e) {
+            return;
+        }
+        if (stored !== 'visible') {
+            return;
+        }
+        html.classList.add('sidebar-resizing');
+        html.classList.add('sidebar-visible');
+        checkbox.checked = true;
+        try {
+            sidebar = 'visible'; // mdBook の埋め込みの let sidebar（続く埋め込みが ARIA 属性をこれでそろえる）
+        } catch (e) {
+            // 埋め込みの形が変わっていても、下で目次がもうあればそろえる
+        }
+        var nav = document.getElementById('mdbook-sidebar');
+        if (nav) {
+            nav.style.display = '';
+            nav.setAttribute('aria-hidden', 'false');
+            Array.from(nav.querySelectorAll('a')).forEach(function (link) {
+                link.setAttribute('tabIndex', 0);
+            });
+            var toggle = document.getElementById('mdbook-sidebar-toggle');
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', 'true');
+            }
+        }
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                html.classList.remove('sidebar-resizing');
+            });
+        });
+    });
+    observer.observe(html, { attributes: true, attributeFilter: ['class'] });
+    document.addEventListener('DOMContentLoaded', function () {
+        observer.disconnect();
+    });
+})();
+</script>

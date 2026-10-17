@@ -56,12 +56,13 @@
   - _Boundary: loader/startup_test.rs_
   - _Depends: 2_
 
-- [ ] 5. 全体回帰確認と実機 SSP 目視検証を実施する
-- [ ] 5.1 実機 SSP で段落区切りの見た目を目視検証する
+- [x] 5. 全体回帰確認と実機 SSP 目視検証を実施する
+- [x] 5.1 実機 SSP で段落区切りの見た目を目視検証する
   _Manual: 実機 SSP 依存（外部ベースウェア）で自動化対象外（design R6.3）。エージェントでは実行不可のため、開発者による手動チェックリスト検証が必要。下記3項目を実機 SSP で目視確認すること。_
   - 実機 SSP 上で (a) A→B 終了トーク（両バルーンに空行が残らないこと）、(b) A→B→A 往復（異なるスポット、戻り側の段落先頭に約1.5行の区切りが入り修正前と同じ見た目であること）、(c) 同一スポットでの話者交代（段落区切りが入ること）の3項目を再生し確認する
   - Observable: 3項目すべてで意図した見た目（ゴミ改行なし・往復区切り維持・同一スポット区切りが新たに入る）が目視で確認され、チェックリストとして記録される
   - _Requirements: 6.3_
+  - 結果（2026-10-17・SSP 2.9.18）: (a) A→B で終わる掛け合いで両方の吹き出しに空行なし (b) A→B→A の戻った段落の頭に約1.5行の区切り `\n[150]` が入る (c) 同じスポットでの話し手の交代に `\n[150]` の区切りが入る。3項目とも期待どおり。記録は `getting-started-screenshots` の tasks.md の Implementation Notes
 
 - [x] 5.2 ワークスペース全体の回帰テストを実行する
   - `cargo test`（pasta_lua ワークスペース全体、`tests/sakura_script/*.rs` を含む既存 Rust 統合テスト一式）を実行し、段落区切り改行の位置変更以外の出力（`talk`/`surface`/`wait`/`newline`/`raw_script`/`choice`/`choice_timeout`/`sakura_script`/`yield` の変換結果、`spot`/`clear_spot` による `actor_spots` 更新、空 `grouped_tokens` に対する `\e` のみの出力）にリグレッションがないことを確認する
@@ -73,5 +74,5 @@
 - **検証コマンド**: cargo実行前に `unset NoDefaultCurrentDirectoryInExePath`（未設定だとmlua-sys/LuaJITビルドがexit101で死ぬ）。Luaユニット=`cargo test -p pasta_lua --test lua_unittest_runner`、loader統合=`cargo test -p pasta_lua --test loader`、全体=`cargo test -p pasta_lua`。
 - **Task 1 ベースライン（変更前・先出し方式）**: Luaユニット 53スイート全 green、loader 140件 green（`test_shiori_act_uses_config_spot_newlines` の `\n[200]` 含む）。現行は `emit_actor_switch` 内で `allow_break and last_spot ~= nil and last_spot ~= spot` 判定により `\p[spot]` の**直前**（離脱側スコープ末尾）に `\n[N]` を先出しする。完全遅延方式ではこの位置が「切替先スポットの次の非空 talk 直前」へ移動し、A→B 単純シナリオでは改行ゼロになる。
 - **Task 5.2 全体回帰（変更後）**: `cargo test -p pasta_lua` 全テストバイナリ 0 failed（Luaユニット53スイート、loader 140、transpiler 672、runtime 175、sakura_script 59 等すべて green、doc-tests 含む）。段落区切り改行の位置変更以外にリグレッションなし。ベースライン（Task 1）との差分は段落区切り改行の位置のみ。kiro-complete の DoD Test Gate で `cargo test --all`（ワークスペース全体）を追加実行し、`pasta_shiori` クレートの横断回帰1件を検出・修正（詳細は下記ノート）。修正後 `cargo test --all` 全2180件 green。
-- **Task 5.1 手動検証（未実施・人間担当）**: 実機 SSP 目視は外部ベースウェア依存で自動化対象外（design R6.3）。エージェントでは実行不可。開発者が実機 SSP で (a) A→B 終了トーク＝両バルーンに空行なし、(b) A→B→A 往復（異なるスポット）＝戻り側段落先頭に約1.5行の区切り（修正前と同見た目）、(c) 同一スポット話者交代＝段落区切りが入る、の3項目を目視確認する必要がある。
+- **Task 5.1 手動検証（2026-10-17 実施済み・SSP 2.9.18）**: `getting-started-screenshots` の実機の作業で SSP MCP を使って確かめ、3項目とも期待どおりだった（記録は同 spec の tasks.md の Implementation Notes）。確かめた項目は、実機 SSP で (a) A→B 終了トーク＝両バルーンに空行なし、(b) A→B→A 往復（異なるスポット）＝戻り側段落先頭に約1.5行の区切り（修正前と同見た目）、(c) 同一スポット話者交代＝段落区切りが入る、の3項目。
 - **kiro-complete DoD ゲートで発覚した横断クレート回帰（修正済み）**: `cargo test --all`（ワークスペース全体）実行で `crates/pasta_shiori/tests/byte_invariant_test.rs` の `golden_onboot_response_bytes` が FAILED。原因は research.md の全数調査が `crates/pasta_lua/tests/` に限定されており、`pasta_shiori`（pasta-actor-runtime 仕様のFFI入口バイト不変ゴールデン）の OnBoot ハードコード定数（sakura→kero単純切替、`\n[150]` 先出し）を見落としていたこと。同一パターンを持つ `kick_unused_byte_invariant_test.rs` も含め2ファイルのゴールデン定数を完全遅延方式（改行ゼロ、R3.1）へ更新し「意図した変更」コメントを付記。修正後 `cargo test --all` 全2180件 green（0 failed）。**教訓**: 段落区切り改行の出力位置に依存するハードコードゴールデン/フィクスチャの全数調査は、機能境界（sakura_builder.lua）だけでなく `\p[` を出力する全クレートの統合テストまで横断的に grep すべき。
