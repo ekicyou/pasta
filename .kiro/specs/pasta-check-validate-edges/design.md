@@ -341,7 +341,7 @@ pub(crate) struct Discovered {
     pub pasta: Vec<DictFile>,
     pub lua: Vec<DictFile>,
     /// 辞書のパターンに一致したフォルダ（実物の綴りの相対パス・昇順・重複なし。ghost/master そのものは "")
-    pub folders: Vec<String>,
+    pub folders: Vec<DictFile>, // 実物の綴りと pasta.dll が見る綴り（pasta_dll_folders が使う）
 }
 
 /// findings には FolderMatchesPattern を含む（今の PatternNotPasta などに足す）

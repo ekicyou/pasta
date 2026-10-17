@@ -233,6 +233,7 @@ fn every_kind_has_fixed_severity_and_code() {
         (PatternIgnored, Warning, "pattern-ignored"),
         (PatternNotPasta, Warning, "pattern-not-pasta"),
         (NoDictionaryFiles, Warning, "no-dictionary-files"),
+        (FolderMatchesPattern, Error, "folder-matches-pattern"),
         (InitFileName, Error, "init-file-name"),
         (FileNotUtf8, Error, "file-not-utf8"),
         (FileUnreadable, Error, "file-unreadable"),
@@ -268,6 +269,10 @@ fn every_kind_has_fixed_severity_and_code() {
 /// 文言の表（design.md の Report）どおりの理由
 #[test]
 fn messages_follow_wording_table() {
+    assert_eq!(
+        msg::folder_matches_pattern(),
+        "辞書のパターンに一致するフォルダです。pasta.dll はこのフォルダを辞書として読めず、ゴーストを読み込めません"
+    );
     assert_eq!(
         msg::config_missing(),
         "pasta.toml がありません。pasta.dll はゴーストを読み込めません（辞書は既定の dic/**/*.pasta で集めました）"

@@ -625,3 +625,25 @@ fn other_errors_still_check_references() {
         assert_eq!(missing_targets(&report), 2, "{name}: {lines:?}");
     }
 }
+
+/// フォルダの誤りだけなら飛び先を検査する（1.6・6.2）
+#[test]
+fn folder_error_alone_still_checks_references() {
+    let input = GhostInput {
+        pasta_toml: toml(TOML),
+        entries: vec!["dic/a.pasta".into()],
+        dirs: vec!["dic".into(), "dic/x.pasta".into()],
+    };
+    let files = BTreeMap::from([("dic/a.pasta".to_string(), text(MISSING_TARGETS))]);
+    let report = validate_ghost(&input, &files);
+    let lines = report.lines();
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|f| f.code == FindingKind::FolderMatchesPattern && f.path == "dic/x.pasta"),
+        "{lines:?}"
+    );
+    assert!(report.stats.skip_reasons.is_empty(), "{lines:?}");
+    assert_eq!(missing_targets(&report), 2, "{lines:?}");
+}

@@ -33,6 +33,7 @@ pub enum FindingKind {
     PatternIgnored,
     PatternNotPasta,
     NoDictionaryFiles,
+    FolderMatchesPattern,
     InitFileName,
     FileNotUtf8,
     FileUnreadable,
@@ -51,7 +52,7 @@ pub enum FindingKind {
 }
 
 impl FindingKind {
-    pub const ALL: [FindingKind; 23] = {
+    pub const ALL: [FindingKind; 24] = {
         use FindingKind::*;
         [
             ConfigMissing,
@@ -62,6 +63,7 @@ impl FindingKind {
             PatternIgnored,
             PatternNotPasta,
             NoDictionaryFiles,
+            FolderMatchesPattern,
             InitFileName,
             FileNotUtf8,
             FileUnreadable,
@@ -109,6 +111,7 @@ impl FindingKind {
             PatternIgnored => "pattern-ignored",
             PatternNotPasta => "pattern-not-pasta",
             NoDictionaryFiles => "no-dictionary-files",
+            FolderMatchesPattern => "folder-matches-pattern",
             InitFileName => "init-file-name",
             FileNotUtf8 => "file-not-utf8",
             FileUnreadable => "file-unreadable",
@@ -374,6 +377,9 @@ pub mod msg {
     }
     pub fn no_dictionary_files() -> String {
         "pasta_patterns に一致する辞書ファイルが 1 つもありません".into()
+    }
+    pub fn folder_matches_pattern() -> String {
+        "辞書のパターンに一致するフォルダです。pasta.dll はこのフォルダを辞書として読めず、ゴーストを読み込めません".into()
     }
     pub fn init_file_name(file_name: &str) -> String {
         format!("ファイル名 {file_name} は使えません。pasta.dll はゴーストを読み込めません")
