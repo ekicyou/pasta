@@ -10,7 +10,7 @@
 
 ### Goals
 - GET の要求で起きた止まるエラーを、`【スクリプトのエラー：＊天気・雨の日（…）】`・`【時間切れ：…】` の形でバルーンに出す（要件 1・2）。
-- 止まるまでにシーンが出した台詞の後に、表記を出す（要件 3.4）。
+- 止まるまでにシーンやハンドラが積んだ台詞の後に、表記を出す（要件 3.4）。
 - `[logging] balloon_warning = false` で、応答を今と 1 バイトも違わない形に戻す（要件 4.2）。
 - 止まるエラーの最初の行を、警告として 1 行ログに残す（要件 5.6）。
 
@@ -122,7 +122,7 @@ crates/pasta_shiori/tests/
 - `crates/pasta_lua/pasta_scripts/pasta/act.lua` — `init_scene(self, scene, scene_name, local_scene_name)` が、書いた名前を `self.scene_name`・`self.local_scene_name` に控え、`self.scene_names[scene] = scene_name` も書く（引数が無ければ `nil` を書く）。`call_restore` が、呼ぶ前の 2 つの名前を、戻った後に戻す（`current_scene` と同じ）。`restore_scene(scene)` が、`self.scene_name = self.scene_names[scene]`・`self.local_scene_name = nil` にする（設計議題 2）。
 - `crates/pasta_lua/src/code_gen/scope_gen.rs`（と生成の後の仕上げ） — シーン関数の先頭を `local save, var = act:init_scene(SCENE, "書いたグローバルシーン名", nil, "行の対応")`（`__start__`）・`act:init_scene(SCENE, "書いたグローバルシーン名", "書いたローカルシーン名", "行の対応")`（名前付きローカル）にする。書いた名前は、別名で置き換える前・`sanitize_name` の前の名前。行の対応は 1 行の文字列の定数で、`.pasta` のファイル（ゴーストのフォルダーから見た形）と、そのシーン関数の「最終の `.lua` の行 → `.pasta` の行」の組を持つ。最終の行は整形（`normalize`）の後に決まるので、仕上げの段で同じ行の中の置き場所を埋める（行は増やさない。対応の取り方は `debug/source_map` の `MapBuilderSink` と同じ記録を使う）。
 - `crates/pasta_lua/src/runtime/searcher.rs` — 読み込んだファイルを、エラー文に出る形（`@` を除いたチャンク名。60 バイトを超えれば `...` ＋ 末尾 56 バイト）をキーにした Lua の表に控える。値は種類（作者の `.lua` ならゴーストのフォルダーから見たパス、変換した Lua のキャッシュなら「辞書」の印）。標準ランタイム（`pasta_scripts/`）は控えない。同じキーが 2 つになったら、そのキーは見分けられないとして消す。チャンク名は変えない（デバッガの照合に響かない）。
-- `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua` — `EVENT.drive` の失敗の枝の先頭で `STOP.hold(co, value)` を呼ぶ（1 行と `require`）。`EVENT.fire` の投げ直しは今のまま。
+- `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua` — `EVENT.drive` の失敗の枝の先頭で `STOP.hold(co, value)` を呼ぶ（1 行と `require`）。`EVENT.fire` がハンドラを呼ぶ直前に `STOP.hold_handler(act)` を呼ぶ（1 行。設計議題 6）。`EVENT.fire` の投げ直しは今のまま。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/callback.lua` — `time_out` の失敗の枝で `STOP.response` を使う（理由付き・理由無しの 2 つ）。表記を出さない設定なら今と同じ値（`RES.err(reason)`・`nil`）を返す。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/entry.lua` — `SHIORI.load` が `STOP.set_ghost_dir(load_dir)` を呼ぶ。`SHIORI.request` が最初に `STOP.clear()` を呼び、失敗の枝で `STOP.response(…) or RES.err(result)` を返す。`error_handler` は変えない。
 - テストの期待値: `crates/pasta_lua/tests/fixtures/sample.expected.lua`（生成コードの `init_scene` の行）、`crates/pasta_lua/src/code_gen/scope_gen_tests.rs`・`crates/pasta_lua/tests/transpiler/basic_test.rs`（`init_scene(SCENE)` の文字列）、`crates/pasta_lua/tests/lua_specs/shiori_entry_test.lua`・`callback_module_test.lua`（500 の形を確かめる箇所）、`act_call_restore_test.lua`（名前の戻し）、`failure_test.lua`（`act_of`・`LABEL`）、`lua_specs/init.lua`（`stop_test` を登録）、要るなら `crates/pasta_shiori/tests/async_callback_chain_test.rs`（理由付きの時間切れの応答）。
@@ -151,7 +151,7 @@ sequenceDiagram
     Stop-->>Req: response with Value or nil
 ```
 
-- 控えが無い（シーンの外の REG のハンドラなどで止まった）ときは、対象を要求の ID にし、エラー文は `result`（今の理由と同じ最初の行）から作る。台詞は出さない（要件 3.4 はシーンの途中の台詞）。
+- シーンの控えが無い（シーンの外の REG のハンドラなどで止まった）ときは、対象を要求の ID にし、エラー文は `result`（今の理由と同じ最初の行）から作る。台詞は、`EVENT.fire` が控えたハンドラの act に積まれた分を出す（要件 3.4・設計議題 6）。
 - `STOP.response` が `nil` を返す（表記を出さない設定・ID が `On` で始まらない）と、`SHIORI.request` は今と同じ `RES.err(result)` を返す。
 
 ### 時間切れの掃引
@@ -266,6 +266,7 @@ graph TB
 ---@class StopReport
 ---@field reason string|nil   応答の理由の行（今と同じ値。RES.err へそのまま渡す）
 ---@field hold StopHold|nil   シーンの失敗の控え（STOP.take の結果）
+---@field handler table|nil  ハンドラの act の控え（STOP.take_handler の結果。SHIORI.request だけが渡す）
 ---@field err any             控えが無いときのエラーの値（SHIORI.request では result）
 ---@field fallback string|nil 名前が分からないときの対象（SHIORI.request では req.id）
 ---@field timeout string|nil  理由付きの時間切れなら timeout_message（種類が「時間切れ」になる）
@@ -290,6 +291,14 @@ function STOP.hold(co, err) end
 --- 控えを取り出して空にする
 ---@return StopHold|nil
 function STOP.take() end
+
+--- イベントのハンドラに渡す act を控える（EVENT.fire がハンドラを呼ぶ直前に呼ぶ）。STOP.clear で空になる
+---@param act table
+function STOP.hold_handler(act) end
+
+--- 控えたハンドラの act を取り出して空にする
+---@return table|nil
+function STOP.take_handler() end
 
 --- 位置の接頭辞のチャンクの文字列を、ゴーストのフォルダーから見た場所にする（純粋な関数）
 --- 作者の .lua なら "scripts\天気.lua"（区切りは "\"）、出さない場所・見分けられない場所なら nil
@@ -323,7 +332,7 @@ function STOP.response(report) end
     - 理由付きの時間切れ: `LABEL.TIMEOUT`、対象 `report.timeout`、説明なし。
     - それ以外でエラーの値が文字列でない: `LABEL.SCRIPT_ERROR` だけ（`【スクリプトのエラー】`）。
     - それ以外: `LABEL.SCRIPT_ERROR`、対象 `STOP.subject(hold.act)` または `report.fallback`、説明 `STOP.detail(hold.err または report.err)`。対象が無ければ説明が対象の位置に出る（`FAILURE.format` の決まり）。
-  - 値（`Value`）: 控えに act があれば、表記を act の末尾に raw_script として積み、`act:build()` の結果を値にする（止まるまでの台詞の後に表記が出る。位置と話者は `FAILURE.report` と同じ）。act が無ければ、新しい SHIORI の act に表記だけを積んで組み立てる。
+  - 値（`Value`）: 控えに act があれば、表記を act の末尾に raw_script として積み、`act:build()` の結果を値にする（止まるまでの台詞の後に表記が出る。位置と話者は `FAILURE.report` と同じ）。シーンの控えが無ければ、控えたハンドラの act（`report.handler`。`SHIORI.request` の出口だけが `STOP.take_handler()` で渡す。時間切れの出口は渡さない）で同じことをする。それも無ければ（時間切れの出口など）、新しい SHIORI の act に表記だけを積んで組み立てる。
   - 応答: `STOP.STATUS` が 500 なら `RES.err(report.reason, { Value = 値 })`、200 なら `RES.ok(値, { ["X-Error-Reason"] = 理由 })`（理由が `nil`・空なら `"Unknown error"`。`RES.err` と同じ）。
 - Invariants: 理由の行の名前と中身は、表記を出さない場合と同じ（要件 3.3・5.1）。控えは要求をまたいで残らない（要件 3.6）。
 
@@ -340,7 +349,7 @@ function STOP.response(report) end
 - 接頭辞の見分け（`STOP.detail`）: 最初の行の先頭から `^(.-):(%d+): ` を繰り返し取る。チャンクの部分が表で引けるものと、`.lua` で終わる・`]` で終わるものだけを位置の接頭辞として扱う（エラー文の中の `10:30: ` などを誤って取らない）。`STOP.location` が返した場所は `場所:行: ` として残し、それ以外は落とす。
 - 変換した Lua のキャッシュのパスは、表記にもログの警告にも出ない（要件 2.5・5.6）。
 - シーンの失敗は元のエラーの値（投げ直しの前）を使うので、投げ直しの場所（`event/init.lua:229`・`callback.lua:110`）は表記に入らない。理由の行には今どおり入る。
-- 新しい act を作るのは控えに act が無いときだけ（シーンの外のエラー）。`pasta.shiori.act` は呼んだ時点で `require` する（読み込み時に握ると `callback.lua` と循環する）。
+- 新しい act を作るのは、シーンの控えにもハンドラの控えにも act が無いときだけ。`pasta.shiori.act` は呼んだ時点で `require` する（読み込み時に握ると `callback.lua` と循環する）。
 - Risks: 末尾 56 バイトまで同じパスのファイルが 2 つあると、その場所は落とす（エラー文は出す）。
 
 #### DriveHold（`EVENT.drive` の失敗の枝）
@@ -369,7 +378,7 @@ function STOP.response(report) end
 - `SHIORI.request(req)` は、`xpcall` の前に `STOP.clear()` を呼ぶ。失敗したら次を返す。
   ```lua
   STOP.response({
-      reason = result, hold = STOP.take(), err = result, fallback = req.id,
+      reason = result, hold = STOP.take(), handler = STOP.take_handler(), err = result, fallback = req.id,
       warning = true, shown = type(req.id) == "string" and req.id:sub(1, 2) == "On",
   }) or RES.err(result)
   ```
@@ -486,6 +495,6 @@ function STOP.response(report) end
 3. 場所は推測しない。探索関数が読み込んだファイルを、エラー文に出る形で引ける表に控える（チャンク名は変えない）。変換した Lua の中で止まったときは、生成コードが `init_scene` の追加の引数に載せたシーンの行の対応で `.pasta` のファイルと行に直す（デバッガの対応表は普段は作らない）。ログの警告も表記と同じ整えた中身にし、変換した Lua のキャッシュのパスはどこにも新しく出さない。理由の行は今のまま。
 4. 理由の無い時間切れの後のエラーが、その秒の応答を取ってよい（その秒の `OnTalk`・`OnHour` は次の秒へ回る。理由付きの時間切れの今の動きと同じ）。
 5. ログは止まるエラーごとに警告 1 行（NOTIFY も同じ）。理由付きの時間切れは今の再開前の警告で足り、行を増やさない。
-6. （議論中）シーンの外（REG のハンドラ）で止まったときの台詞。
+6. シーンの外（REG のハンドラ・既定のハンドラ）で止まったときも、ハンドラが act に積んだ台詞の後に表記を出す。`EVENT.fire` がハンドラを呼ぶ直前に act を控える（1 行）。要件 3.4 を「シーンまたはハンドラの途中」に広げた。
 7. 「500・理由の行・`Value` が無い」を確かめる既存のテストは、表記を出さない設定に固定して残す。表記を出す設定は新しいテストで確かめる。
 - 応答のステータスは実機の結果で決まる（タスク 1。要件 3.2）。
