@@ -230,6 +230,187 @@ describe("SHIORI.request - 止まるエラーの表記（表記を出す設定�
 end)
 
 -- ============================================================================
+-- SHIORI.request - 止まるエラーの表記を場所ごとに確かめる（1.1, 1.2, 1.6, 1.8, 2.5, 3.3, 3.4, 3.6, 5.2, 6.1）
+-- ============================================================================
+describe("SHIORI.request - 止まるエラーの表記の場所ごとの確かめ", function()
+    --- イベントを SHIORI.request で送る
+    --- @param id string イベント名
+    --- @param reference table|nil Reference（0 始まり）
+    --- @return string
+    local function request(id, reference)
+        return ENTRY.request({ id = id, method = "get", version = 30, reference = reference })
+    end
+
+    --- シーン関数をコルーチンにして返すハンドラを登録する
+    --- @param event_name string 登録イベント名
+    --- @param scene function シーン関数（引数は EVENT.fire が渡す act）
+    local function register_scene(event_name, scene)
+        REG[event_name] = function(_act)
+            return coroutine.create(scene)
+        end
+    end
+
+    --- 次の OnTalk の機会の代わりに、保存された継続をそのまま返すハンドラ
+    REG.OnEntryPlaceContinue = function(_act)
+        return STORE.co_scene
+    end
+
+    --- 同じ手順を表記を出さない設定と出す設定で 1 回ずつ実行し、それぞれの最後の応答を返す
+    --- @param scenario fun(): string 状態を空にした後に実行する手順（最後の応答を返す）
+    --- @return string off 表記を出さない設定の応答
+    --- @return string on 表記を出す設定の応答
+    local function run_both(scenario)
+        local off, on
+        with_balloon_warning(false, function()
+            reset_state()
+            off = scenario()
+        end)
+        with_balloon_warning(true, function()
+            reset_state()
+            on = scenario()
+        end)
+        return off, on
+    end
+
+    --- 表記を出す応答を検査する: 200・理由の行は出さない設定の 500 と同じ中身・Value の完全一致
+    --- @param off string 表記を出さない設定の応答
+    --- @param on string 表記を出す設定の応答
+    --- @param value string 期待する Value（act:build が末尾に付ける \e を除いた部分）
+    --- @return string reason 理由の行
+    local function expect_notation(off, on, value)
+        expect_status(off, "SHIORI/3.0 500 Internal Server Error")
+        expect(header_value(off, "Value")):toBe(nil)
+        local reason = header_value(off, "X-Error-Reason")
+        expect(reason).not_:toBe(nil)
+
+        expect_status(on, "SHIORI/3.0 200 OK")
+        expect(header_value(on, "X-Error-Reason")):toBe(reason)
+        expect(header_value(on, "Value")):toBe(value .. "\\e")
+        return reason
+    end
+
+    test("REG のハンドラの例外は、途中の台詞の後に要求の ID を対象にした表記が出る", function()
+        local off, on = run_both(function()
+            REG.OnEntryPlaceHandler = function(act)
+                act:raw_script("途中の台詞")
+                error("handler place boom\nsecond line")
+            end
+            return request("OnEntryPlaceHandler")
+        end)
+
+        local reason = expect_notation(off, on, "途中の台詞【スクリプトのエラー：OnEntryPlaceHandler（handler place boom）】")
+        expect(reason:find("handler place boom", 1, true)).not_:toBe(nil)
+    end)
+
+    test("シーンの中の例外は、書いた名前を対象にし、投げ直しの場所を表記に入れない", function()
+        local off, on = run_both(function()
+            register_scene("OnEntryPlaceScene", function(act)
+                act:init_scene({}, "天気", "雨の日")
+                act:raw_script("途中の台詞")
+                error("scene place boom")
+            end)
+            return request("OnEntryPlaceScene")
+        end)
+
+        local reason = expect_notation(off, on, "途中の台詞【スクリプトのエラー：＊天気・雨の日（scene place boom）】")
+        -- 理由の行は今のまま投げ直しの場所を含む（表記にだけ入らない）
+        expect(reason:find("init.lua:", 1, true)).not_:toBe(nil)
+    end)
+
+    test("チェイントークの再開の中の例外は、再開した後の途中の台詞の後に表記が出る", function()
+        local first_off, first_on
+        local off, on = run_both(function()
+            register_scene("OnEntryPlaceChain", function(act)
+                act:init_scene({}, "会話")
+                act:raw_script("前半")
+                act:yield()
+                act:raw_script("後半の途中")
+                error("chain place boom")
+            end)
+            local first = request("OnEntryPlaceChain")
+            if first_off then first_on = first else first_off = first end
+            return request("OnEntryPlaceContinue")
+        end)
+
+        -- 中断までの応答は設定にかかわらず普通のトーク
+        expect(header_value(first_off, "Value")):toBe("前半\\e")
+        expect(first_on):toBe(first_off)
+        local reason = expect_notation(off, on, "後半の途中【スクリプトのエラー：＊会話（chain place boom）】")
+        expect(reason:find("init.lua:", 1, true)).not_:toBe(nil)
+        expect(STORE.co_scene):toBe(nil)
+    end)
+
+    test("待ち合わせからの再開の中の例外は、コールバックの投げ直しの場所を表記に入れない", function()
+        local off, on = run_both(function()
+            register_scene("OnEntryPlaceWait", function(act)
+                act:init_scene({}, "天気")
+                local v = act:get_property("name")
+                act:raw_script("届いた:" .. tostring(v))
+                error("wait place boom")
+            end)
+            request("OnEntryPlaceWait")
+            return request("OnPastaCallBack1", { [0] = "v1" })
+        end)
+
+        local reason = expect_notation(off, on, "届いた:v1【スクリプトのエラー：＊天気（wait place boom）】")
+        expect(reason:find("callback.lua:", 1, true)).not_:toBe(nil)
+        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
+    end)
+
+    test("On で始まらない ID は、表記を出す設定でも出さない設定と同じ 500 になる", function()
+        local off, on = run_both(function()
+            REG.entry_place_plain = function(act)
+                act:raw_script("途中の台詞")
+                error("plain place boom")
+            end
+            return request("entry_place_plain")
+        end)
+
+        expect_status(on, "SHIORI/3.0 500 Internal Server Error")
+        expect(on):toBe(off)
+        expect(header_value(on, "Value")):toBe(nil)
+    end)
+
+    test("作者が RES.err で返した応答は、表記を付けずにそのまま返る", function()
+        local built = RES.err("author reason")
+        local off, on = run_both(function()
+            REG.OnEntryPlaceAuthorErr = function(act)
+                act:raw_script("途中の台詞")
+                return built
+            end
+            return request("OnEntryPlaceAuthorErr")
+        end)
+
+        expect(off):toBe(built)
+        expect(on):toBe(built)
+    end)
+
+    test("表記を出した次の要求は普通に処理される", function()
+        with_balloon_warning(true, function()
+            reset_state()
+            register_scene("OnEntryPlaceStop", function(act)
+                act:init_scene({}, "会話")
+                act:raw_script("途中の台詞")
+                error("stop then next boom")
+            end)
+            REG.OnEntryPlaceNext = function(_act)
+                return "次のトーク"
+            end
+
+            local stopped = request("OnEntryPlaceStop")
+            expect(header_value(stopped, "Value")).not_:toBe(nil)
+
+            local res = request("OnEntryPlaceNext")
+            expect_status(res, "SHIORI/3.0 200 OK")
+            expect(header_value(res, "X-Error-Reason")):toBe(nil)
+            expect(header_value(res, "Value")):toBe("次のトーク")
+            -- 止まったシーンの継続は残らない
+            expect_status(request("OnEntryPlaceContinue"), "SHIORI/3.0 204 No Content")
+        end)
+    end)
+end)
+
+-- ============================================================================
 -- GLOBAL.close_ghost / GLOBAL.ゴースト終了
 -- ============================================================================
 describe("GLOBAL.close_ghost - ゴースト終了スクリプト", function()
