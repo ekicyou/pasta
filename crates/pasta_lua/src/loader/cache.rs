@@ -286,7 +286,7 @@ impl CacheManager {
     /// Returns the path relative to base_dir. If the source path contains
     /// directory traversal components (`..`), they are preserved in the
     /// relative path string (caught later by `save_cache` boundary check).
-    fn get_relative_path(&self, source_path: &Path) -> String {
+    pub(super) fn get_relative_path(&self, source_path: &Path) -> String {
         let relative = source_path
             .strip_prefix(&self.base_dir)
             .unwrap_or(source_path);

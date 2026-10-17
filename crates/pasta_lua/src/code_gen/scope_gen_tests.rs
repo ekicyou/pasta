@@ -495,7 +495,8 @@ fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
 }
 
 /// 別名で置き換えた宣言名（`OnTalk`）は登録に使い、`init_scene` には書いた名前（`会話`）を
-/// 渡す。`__start__` はローカルシーン名を渡さない（runtime-error-balloon 2.4）。
+/// 渡す。`__start__` はローカルシーン名の代わりに `nil` を渡す（runtime-error-balloon 2.4）。
+/// 4 つ目の行の対応はトランスパイラが整形の後に埋めるので、生成器だけでは出ない（2.5）。
 #[test]
 fn init_scene_receives_written_global_name_not_alias() {
     let ctx = TranspileContext::new();
@@ -524,7 +525,7 @@ fn init_scene_receives_written_global_name_not_alias() {
     assert_eq!(
         inits,
         vec![
-            r#"local save, var = act:init_scene(SCENE, "会話")"#,
+            r#"local save, var = act:init_scene(SCENE, "会話", nil)"#,
             r#"local save, var = act:init_scene(SCENE, "会話", "挨拶")"#,
         ],
         "{text}"

@@ -94,7 +94,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     ///     function SCENE.__start__(act, ...)
     ///         local args = { ... }
-    ///         local save, var = act:init_scene(SCENE, "シーン名")
+    ///         local save, var = act:init_scene(SCENE, "シーン名", nil, "行の対応")
     ///         -- ...
     ///     end
     ///
@@ -181,6 +181,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // ローカルシーンを照合用の名前ごとの通し番号（_1, _2, ...）で生成する。
         // トランスパイル時のレジストリの登録と同じ local_scene_counters を使う（2.12）。
         let counters = local_scene_counters(&scene.local_scenes);
+        let first_slot = self.line_map_slots.len();
         for (local_scene, counter) in scene.local_scenes.iter().zip(counters) {
             // Parent reference for the local join key: "{base}#{counter}" identifies
             // the enclosing global occurrence (matches runtime per-base ordering).
@@ -196,6 +197,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         // Generate code blocks at module level (after all local scene functions)
         // First: global scene level code blocks
+        let blocks_start = self.out_line + 1;
         for code_block in &scene.code_blocks {
             self.generate_code_block(code_block)?;
         }
@@ -205,6 +207,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             for code_block in &local_scene.code_blocks {
                 self.generate_code_block(code_block)?;
             }
+        }
+        // Lua のブロックの関数は同じグローバルシーンのどのシーンからも呼ばれるので、
+        // このグローバルシーンのすべてのシーン関数の行の対応に含める（2.5）。
+        let blocks = (blocks_start, self.out_line);
+        for slot in &mut self.line_map_slots[first_slot..] {
+            slot.ranges[1] = blocks;
         }
 
         self.end_block()?;
@@ -218,7 +226,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// ```lua
     /// function SCENE.シーン名_N(act, ...)
     ///     local args = { ... }
-    ///     local save, var = act:init_scene(SCENE, "書いたグローバル名", "書いたローカル名")
+    ///     local save, var = act:init_scene(SCENE, "書いたグローバル名", "書いたローカル名", "行の対応")
     ///     -- items...
     /// end
     /// ```
@@ -261,6 +269,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         if self.out_line() > out_line_before {
             self.record_span(scene.span);
         }
+        let fn_start = self.out_line;
 
         // Source-map scene recording (task 2.1): flow the local scene's deterministic
         // join key + `.pasta` header span to the sink. The key reuses the SAME
@@ -275,16 +284,18 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         // Session initialization: args and init_scene come first
         self.writeln("local args = { ... }")?;
-        // 作者が書いた名前（別名・記号を直す前）を渡す。__start__ はローカル名を渡さない。
-        let mut init_args = StringLiteralizer::literalize(written_global_name)?;
-        if let Some(ref name) = scene.name {
-            init_args.push_str(", ");
-            init_args.push_str(&StringLiteralizer::literalize(name)?);
-        }
+        // 作者が書いた名前（別名・記号を直す前）を渡す。__start__ はローカル名の代わりに nil。
+        // 4 つ目の行の対応は、整形の後にトランスパイラがこの行の `)` の前へ埋める（2.5）。
+        let local_name = match scene.name {
+            Some(ref name) => StringLiteralizer::literalize(name)?,
+            None => "nil".to_string(),
+        };
         self.writeln(&format!(
-            "local save, var = act:init_scene(SCENE, {})",
-            init_args
+            "local save, var = act:init_scene(SCENE, {}, {})",
+            StringLiteralizer::literalize(written_global_name)?,
+            local_name
         ))?;
+        let init_line = self.out_line;
 
         // Generate actor initialization block for __start__ only (counter == 0)
         // Order: init_scene -> clear_spot -> set_spot(s)
@@ -309,6 +320,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // This ensures code blocks appear after all local scene function definitions
 
         self.end_block()?;
+        self.line_map_slots.push(super::LineMapSlot {
+            init_line,
+            // Lua のブロックの範囲は generate_global_scene が後で埋める
+            ranges: [(fn_start, self.out_line), (1, 0)],
+        });
 
         Ok(())
     }
