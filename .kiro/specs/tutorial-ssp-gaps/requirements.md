@@ -71,8 +71,8 @@
 #### Acceptance Criteria
 1. Where SSP が仮想時刻を SHIORI に伝える, when 辞書を書く人が仮想時刻を正時の少し前に合わせて待ったとき, the pasta shall 仮想の日時が正時に達した時点で、その時刻の時報のシーンを今と同じ 4 段の候補（`時報HH`・`OnHourHH`・`時報その他`・`OnHourOther`）で選んで出す
 2. Where SSP が仮想時刻を SHIORI に伝える, when 時報のシーンが出るときと、シーンが `＞transfer_date_to_var` で日時を移したとき, the pasta shall 日時変数（`＄時１２`・`＄時` など）に仮想の日時を入れる〔決定 A2〕
-3. Where SSP が仮想時刻を SHIORI に伝える, when 仮想の日時が前の値より戻ったとき, the pasta shall 戻った日時を基準に次の正時を決め直し、戻った日時の次の正時に時報を出す（戻る前の日時の次の正時まで待たせない）
-4. Where SSP が仮想時刻を SHIORI に伝える, when 仮想の日時が 1 つ以上の正時をまたいで進んだとき, the pasta shall 時報を 1 回だけ、進んだ先の時刻で出す（OS の時計がスリープの後などで進んだときと同じ扱い）
+3. Where SSP が仮想時刻を SHIORI に伝える, when 辞書を書く人が仮想時刻を設定し直した（Apply・Reset）とき, the pasta shall 変わった後の日時を基準に次の正時を決め直す（進んだ場合も戻った場合も、変わる前の日時の次の正時を待たせない）。変わった後の日時の直前およそ 1 分の間に正時があるときは、その時刻の時報を 1 回出す〔設計の議題 1〕
+4. Where SSP が仮想時刻を SHIORI に伝える, when 仮想時刻を設定したまま時が流れて、仮想の日時が 1 つ以上の正時をまたいで進んだとき, the pasta shall 時報を 1 回だけ、進んだ先の時刻で出す（OS の時計がスリープの後などで進んだときと同じ扱い）
 5. Where SSP が仮想時刻を SHIORI に伝える, the pasta shall おしゃべりの間隔・撫での判定・コールバックの待ち時間を、実際に過ぎた時間で数え続ける〔決定 A2〕
 6. When 辞書を書く人が仮想時刻を解除した（Reset）とき, the pasta shall 時報の判定と日時変数を OS の時計に戻す
 7. While 仮想時刻を設定していないとき, the pasta shall 時報・おしゃべり・日時変数を、今と同じく OS の時計で決める

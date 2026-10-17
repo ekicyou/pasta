@@ -28,7 +28,7 @@
 
 - 時報の判定と日時変数に使う「今の日時」の決め方（`X-Pasta-Time` → SSP の仮想時刻 → OS の時計の順）。新しいモジュール `pasta.shiori.clock` がこれを一手に持つ。
 - SSP の仮想時刻に気づく合図の判定と、`system.*` プロパティを読む往復（イベント名 `OnPastaClock`）。
-- `check_hour` の「時刻が戻ったら次の正時を決め直す」規則。
+- `check_hour` の「ずれが変わったら次の正時を決め直す」規則。
 - 外から起こした `OnTalk` とチェイントークの続きの関係、辞書や `＊OnBoot` が無いときの起動の動きの、文書での明記。
 - 入門ガイド（準備の章・1・6・7・11・13 段目、目次の表）、段階表 `STAGES.md`、リファレンス（SHIORI イベントの章・チェイントークの節・日時変数の節）、内部の説明（`internals/shiori.md`）、撮り方の正本 `book/SCREENSHOTS.md` の該当する記述。
 
@@ -119,7 +119,7 @@ crates/pasta_lua/pasta_scripts/pasta/shiori/
 └── event/
     ├── init.lua                   # 変更: EVENT.fire が clock.observe を呼ぶ（返事は REG の前で受ける）
     ├── second_change.lua          # 変更: ディスパッチャが何も出さない回に clock.take_probe を返す
-    └── virtual_dispatcher.lua     # 変更: check_hour・check_talk の正時の計算を clock.now・clock.date で行う。戻ったときの決め直し
+    └── virtual_dispatcher.lua     # 変更: check_hour・check_talk の正時の計算を clock.now・clock.date で行う。ずれが変わったときの決め直し
 
 crates/pasta_lua/tests/lua_specs/
 ├── virtual_clock_test.lua         # 新規: clock の単体テスト
@@ -144,6 +144,7 @@ crates/pasta_shiori/tests/
 - `crates/pasta_sample_ghost/STAGES.md` — 「確かめるための道具」の 6・7 段目、23 行（13 段目の表）・77 行の「7 段目で有効にした」を直す。調べの結果（日付・SSP の版・何で伝わるか）と決めた確かめ方を書く（要件 1.4・5.3）。
 - `book/src/lua/shiori-events.md` — `act.req.date` の注記（仮想時刻に従わない）、`OnBoot` の節（シーンが無いと何も返さない）、53・444・603 行の「次の OnTalk の機会」、`OnPastaClock` の節（`OnPastaCallBack` の隣）、仮想ディスパッチャの `OnHour`・`check_hour`・`check_talk`・`OnTalk` の記述（要件 2・3.3・4.4）。
 - `book/src/grammar/call-jump.md` — チェイントークの節の「次に OnTalk が発生する機会」を、自然なおしゃべりに限ると書き、外から起こした `OnTalk` は続きを破棄すると書く（要件 3.3）。
+- `book/src/lua/script-api.md`（447・448 行）・`book/src/lua/patterns.md`（35 行）・`book/src/internals/execution-model.md`（289 行）— 同じ「次の OnTalk の機会」を「次の自然なおしゃべりの機会」にそろえる（設計の議題 5。要件 3.3 の対象外だが、根が同じなのでこの spec で直す）。
 - `book/src/grammar/variables.md` — 日時変数の節に、値は SSP の仮想時刻に従うと書く（要件 2.2）。
 - `book/src/internals/shiori.md` — 仮想イベントディスパッチャの節に、`clock` の状態と合図・読み取りの仕組み、`check_hour` の決め直しを書く。
 - `book/SCREENSHOTS.md` — 77 行「6 段目は、実際の正時を待つ（SSP の仮想時刻は pasta に届かない）」と 97 行の撮り方を、仮想時刻でも撮れる形に直す。
@@ -163,8 +164,8 @@ sequenceDiagram
     participant SC as OnSecondChange
     participant VD as dispatcher
 
-    User->>SSP: TimeMachine で 10時59分30秒に Apply
-    SSP->>Fire: OnMinuteChange 見込みと違う時機
+    User->>SSP: 実際の10時21分10秒に TimeMachine で 10時59分30秒を Apply
+    SSP->>Fire: 仮想の11時00分00秒に OnMinuteChange 実際は10時21分40秒で見込みと違う
     Fire->>Clock: observe で予約を立てる
     SSP->>Fire: OnSecondChange
     Fire->>SC: 既定ハンドラ
@@ -174,13 +175,14 @@ sequenceDiagram
     SSP->>Fire: OnPastaClock Reference0から5
     Fire->>Clock: observe でずれを決める
     Fire-->>SSP: 204
-    SSP->>Fire: OnSecondChange 30秒後
+    SSP->>Fire: 次の OnSecondChange 仮想の11時00分02秒ほど
     Fire->>SC: 既定ハンドラ
     SC->>VD: dispatch
-    VD->>Clock: now と date
-    VD-->>SSP: 時報11 のシーン
+    VD->>Clock: offset が変わった now から70秒前を基準に決め直す
+    VD-->>SSP: 11時は70秒以内なので 時報11 のシーン
 ```
 
+- 59 分 30 秒を入れる手順では、pasta が仮想時刻に気づくのは次の `OnMinuteChange`、つまり仮想の正時ちょうどである（SSP は TimeMachine の変更をイベントで知らせない。開発用パレットのヘルプで確認）。そのため「気づいた回は時報を出さない」とすると肝心の時報が消える。決め直しの猶予（70 秒）がこれを拾う（下の「時報の判定」）。
 - 予約は 1 回の読み取りで消える。返事が来なければ、次の合図まで読み直さない。
 - 読み取りのスクリプトは、ディスパッチャが何も出さず、Status がブロック対象でない回にだけ返す。時報・おしゃべり・キック・コールバックの時間切れの応答が優先する。
 - 読み取りの往復は `set_co_scene` を通らない（文字列の応答のため）。待っているチェイントークの続きは残る（要件 3.2）。
@@ -190,17 +192,22 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> Unset
-    Unset --> Waiting: 最初の判定で次の正時を記録
+    Unset --> Waiting: 最初の判定で now から次の正時を記録
+    Waiting --> Rebased: clock の offset が前回見た値と違う
+    Rebased --> Waiting: now から70秒前を基準に次の正時を記録し直す
     Waiting --> Waiting: now が次の正時より前
-    Waiting --> Rebased: now が次の正時の1時間前より前
-    Rebased --> Waiting: now から次の正時を記録し直す 時報なし
     Waiting --> Fire: now が次の正時以上
     Fire --> Waiting: now から次の正時を記録し直し 時報を1回
 ```
 
 - `now` は `clock.now(act.req)`（仮想のずれを足した時刻）。
-- 「戻った」の判定は `now < next_hour_unix - 3600` である。同じ時間の中で戻ったとき（11:50 → 11:30）は、次の正時（12:00）が正しいので決め直さない。
-- 進んだときは、何時間進んでも時報は 1 回で、`{HH}` は進んだ先の時（`clock.date(act.req).hour`）になる（要件 2.4。スリープの後と同じ）。
+- **決め直しは、ずれ（`clock.offset()`）が前回見た値から変わったときだけ**行う（Apply・Reset。要件 2.3）。基準は `now - REBASE_GRACE`（70 秒）で、決め直した直後の同じ判定で、その 70 秒の間にあった正時の時報が 1 回出る。
+  - 今が 10:21 で 11:59:30 を入れた: 基準は 11:58:20 → 次は 12:00。余分な `時報11` は出ない。
+  - 59 分 30 秒を入れて、仮想の正時ちょうどに気づいた（上の流れ）: 基準は 10:58:51 → 次は 11:00 → すぐ `時報11`。
+  - ちょうど 12:00:00 を入れた: 12:00 が 70 秒以内なので `時報12` が出る。
+  - Reset で実際の 10:21 に戻した: 基準は 10:19:51 → 次は 11:00。時報は出ない。
+- ずれが変わらない間（ずれ 0 で OS の時計を手で戻した場合を含む）は、今の判定を一切変えない（要件 7.3）。時が流れて正時をまたいだときは、何時間進んでも時報は 1 回で、`{HH}` は進んだ先の時（`clock.date(act.req).hour`）になる（要件 2.4。スリープの後と同じ）。
+- `REBASE_GRACE`（70 秒）は調整つまみ。分の合図が届くまでの遅れと、読み取りの往復の遅れを吸収する値で、最初のタスクの実機の確かめで見直す。
 
 ## Requirements Traceability
 
@@ -212,8 +219,8 @@ stateDiagram-v2
 | 1.4 | 段階表に結果と確かめ方 | TutorialDocs（STAGES.md） | — | — |
 | 2.1 | 仮想の正時に 4 段の候補で時報 | VirtualClock, VirtualDispatcher, SecondChangeHandler, EventFireHook | `clock.observe`・`take_probe`・`now`・`date` | 仮想時刻に気づいてから時報が出るまで |
 | 2.2 | 日時変数に仮想の日時 | VirtualClock, ActDateTransfer | `clock.date` | — |
-| 2.3 | 戻ったら次の正時を決め直す | VirtualDispatcher | `check_hour` | 時報の判定 |
-| 2.4 | またいだら 1 回だけ | VirtualDispatcher | `check_hour` | 時報の判定 |
+| 2.3 | 設定し直したら次の正時を決め直す（70 秒の猶予） | VirtualDispatcher, VirtualClock | `check_hour`・`clock.offset` | 時報の判定 |
+| 2.4 | 時が流れてまたいだら 1 回だけ | VirtualDispatcher | `check_hour` | 時報の判定 |
 | 2.5 | 間隔・撫で・待ち時間は実時間 | VirtualDispatcher（`next_talk_time` は `act.req.date.unix`）、`mouse.lua`・`callback.lua` は変えない | `check_talk` | — |
 | 2.6 | Reset で OS の時計に戻る | VirtualClock（ずれを読み直し、2 秒以下は 0） | `clock.observe` | 仮想時刻に気づいてから時報が出るまで |
 | 2.7 | 仮想時刻なしは今と同じ | VirtualClock（ずれ 0 なら `req.date` をそのまま使う・合図が無ければ何も返さない） | `clock.now`・`date`・`take_probe` | — |
@@ -333,6 +340,10 @@ function M.now(req) end
 ---@return PastaDate|nil
 function M.date(req) end
 
+--- 今のずれ（整数秒。0 は仮想時刻なし）。ディスパッチャが「ずれが変わったか」を見るのに使う。
+---@return integer
+function M.offset() end
+
 --- テスト用: 状態を初期値に戻す
 function M._reset() end
 
@@ -353,7 +364,7 @@ function M._get_state() end
 
 | イベント | 見込みどおりの条件 | 外れたとき |
 |----------|--------------------|------------|
-| `OnMinuteChange` | `now(req) % 60` が `5` 以下か `55` 以上 | `probe_armed = true` |
+| `OnMinuteChange` | `now(req) % 60` が `2` 以下か `58` 以上（`MINUTE_TOLERANCE` = 2 秒。調整つまみ） | `probe_armed = true` |
 | `OnHourTimeSignal` | `now(req) % 3600` が `60` 以下か `3595` 以上（トークできるまで待つ遅れを 60 秒まで許す） | `probe_armed = true` |
 
 - **受け取る返事**（`observe` が `true` を返す）:
@@ -363,6 +374,7 @@ function M._get_state() end
   - 読めないとき（足りない・数でない・`os.time` が失敗した）: `offset = 0`、警告ログを 1 行出す。エラーにしない（要件 2.9）。
   - `X-Pasta-Time` がある返事は、ずれを変えずに受け取る（`true`。テストの時刻の上書きと混ぜない）。
 - **Ordering / delivery**: 予約は 1 回の `take_probe` で消える。返事が来ないとき（SSP 以外など）の時間切れは持たない。次の合図で再び予約が立つ。返事が届く順は問わない（最後に届いた返事のずれが残る）。
+- **見落とし（設計の議題 2。記録して許す）**: ずれの変化の秒の端数が許容幅（±2 秒）に入ると、毎分の合図では気づかない。59 分 30 秒を入れる手順で 1 回の Apply あたり約 8%（5/60）。そのときは仮想の正時の `OnHourTimeSignal`（実測で 7 秒遅れ）で気づき、決め直しの猶予で時報が数秒遅れて 1 回出る。Reset を見落としたときは、古いずれが最大 1 時間残り、実際の正時の `OnHourTimeSignal` で直る。ずれの変化が 1 時間の倍数に近いと気づけない。毎分読み直す案は、空のスクリプトを毎分返して吹き出しを消すおそれがあり（いつも読むのは要件 7.3 に反する）、採らない。
 
 ##### State Management
 
@@ -444,7 +456,7 @@ REG.OnSecondChange = REG.OnSecondChange or function(act) end
 - `check_hour(act)`:
   - `now = CLOCK.now(act.req)`。
   - `next_hour_unix == 0` なら `next_hour_unix = calculate_next_hour_unix(now)`、`nil`。
-  - `now < next_hour_unix - 3600` なら（戻った）`next_hour_unix = calculate_next_hour_unix(now)`、`nil`（要件 2.3）。
+  - `CLOCK.offset() ~= seen_offset` なら（設定し直された）`seen_offset = CLOCK.offset()`、`next_hour_unix = calculate_next_hour_unix(now - REBASE_GRACE)` とし、続く判定へ進む（要件 2.3。`REBASE_GRACE` = 70 秒）。
   - `now < next_hour_unix` なら `nil`。
   - それ以外は `next_hour_unix = calculate_next_hour_unix(now)`、`act:transfer_date_to_var()`、`hh = string.format("%02d", CLOCK.date(act.req).hour)` で 4 段の候補を探す（要件 2.1・2.4）。
 - `check_talk(act)`:
@@ -455,12 +467,20 @@ REG.OnSecondChange = REG.OnSecondChange or function(act) end
 **Contracts**: Service [x] / State [x]
 
 - Service: `check_hour(act): thread|nil`・`check_talk(act): thread|nil`・`dispatch(act): thread|nil`（形は今のまま）。
-- State: `next_hour_unix` は「`CLOCK.now` の時刻で数えた次の正時」になる。`next_talk_time` は実際の時刻のまま。`_get_internal_state()` の形は変えない。
+- State: `next_hour_unix` は「`CLOCK.now` の時刻で数えた次の正時」になる。`seen_offset`（前回見たずれ。初期値 0）を 1 つ足す。`next_talk_time` は実際の時刻のまま。`_get_internal_state()` は既存の欄を変えず、`seen_offset` を足す。
 
 **Implementation Notes**
 
-- Validation: `virtual_dispatcher_spec.lua` に「ずれありで仮想の正時に `時報HH` が出る」「戻ったら決め直して戻った先の次の正時に出る」「2 時間進んでも 1 回だけ、進んだ先の HH」「`hour_margin` は仮想の正時までの残りで見る」「`next_talk_time` は実時間のまま」「`X-Pasta-Time` 付きではずれを無視する」を足す。既存のテスト（`dic` の無い req）は、ずれ 0 でそのまま通る。
-- Risks: 戻ったときの決め直しは、ずれ 0 のまま OS の時計が 1 時間以上戻ったときにも働く（下の OPEN QUESTIONS 2）。
+- Validation: `virtual_dispatcher_spec.lua` に次を足す。既存のテスト（`dic` の無い req）は、ずれ 0 でそのまま通る。
+  - 仮想の正時ちょうどにずれが変わったら、すぐ `時報HH` が出る。
+  - 正時をまたいで先へ設定し直しても、余分な時報は出ず、次の正時に出る。
+  - 戻したら、戻った先の次の正時に出る。
+  - ずれ 0 のまま OS の時計が戻っても、決め直さない（今の動き）。
+  - 時が流れて 2 時間進んでも 1 回だけで、`HH` は進んだ先。
+  - `hour_margin` は仮想の正時までの残りで見る。
+  - `next_talk_time` は実時間のまま。
+  - `X-Pasta-Time` 付きでは、ずれを無視する。
+- Risks: 猶予（70 秒）より遅れて気づくと、その正時の時報は出ない。実機の確かめで遅れを測って値を決める。
 
 #### ActDateTransfer
 
@@ -488,10 +508,9 @@ REG.OnSecondChange = REG.OnSecondChange or function(act) end
 - 6 段目の「起動して確かめる」は、次の流れにする（細かい文は実装で書く）。
   1. （6 段目の新しい節）開発者用機能を有効にする（7 段目から移した節。要件 5.2）。
   2. SSP を終了し、もう一度起動する。自分のゴーストに切り替える。
-  3. 開発用パレット（`Ctrl+Shift+D`）の「現在時刻の仮想的変更」で、**今の時刻の 59 分 30 秒**を入れて適用する（例: 今が 10:21 なら 10:59:30）。
-  4. 30 秒ほど待つ。成功の目印は今の 2 つ（12 時の目印・12 時以外の目印）のまま。
+  3. 開発用パレットの「現在時刻の仮想的変更」で、**今の時刻の 59 分 30 秒**を入れて適用する（例: 今が 10:21 なら 10:59:30）。パレットの開き方（ショートカットかメニューか）は最初のタスクの実機の確かめで決める。
+  4. 30 秒ほど待つ。成功の目印は今の 2 つ（12 時の目印・12 時以外の目印）のまま。12 時の目印を見たいときは 11:59:30 を入れればよい（設定し直しても余分な時報は出ない。要件 2.3）。
   5. 確かめ終わったら「現在時刻の仮想的変更」を元に戻す（Reset）。
-  - 今の時刻と違う時の時報を確かめたいときの注意（正時をまたいで進めると、進んだ先の時の時報がすぐ 1 回出る。要件 2.4）を 1 行添える（下の OPEN QUESTIONS 1）。
 - 7 段目と 13 段目は、6 段目の節（`06-hour.md#開発者用機能を有効にする`）を参照する。`link-check.mjs` でリンク切れが無いことを確かめる。
 - 準備の章は `ghost/` の下へ置くところで終わる。1 段目の「起動して確かめる」が最初の起動になり、成功の目印を「立ち絵が出て、女の子の吹き出しに『やっほー、今日もよろしくね。』と出る」にする。「うまく起動しないときは」は 1 段目へ移し、`pasta.dll`・`descript.txt` の `shiori` の行・`shell/master/`・`pasta.log` のでき方・タスクバーの SSP のアイコンからメニューを開く方法を書く（要件 6.3）。準備の章の「文字化けする」「辞書が反映されない」の 2 項目も同じ節へ移す。
 - 11 段目の「手順 4 で続きが出ないとき」に「開発用パレットなどで外から `OnTalk` を起こした」を原因として足す。
@@ -509,6 +528,7 @@ REG.OnSecondChange = REG.OnSecondChange or function(act) end
   - `OnPastaCallBack` の隣に `OnPastaClock`（仮想時刻の読み取り。`REG` より先に処理され、ハンドラは呼ばれない）の節を足す。
   - 仮想ディスパッチャの `OnHour`・`check_hour`・`check_talk` に、正時は SSP の仮想時刻に従うこと、戻ったときの決め直し、`hour_margin` の数え方を書く。`OnTalk` に外から起こした `OnTalk` の扱いを書く。
 - `call-jump.md` のチェイントークの節（345・359 行）を同じ趣旨に直す（要件 3.3）。
+- `script-api.md`（447・448 行）・`patterns.md`（35 行）・`internals/execution-model.md`（289 行）の「次の OnTalk の機会」も同じ言い方にそろえる（設計の議題 5）。
 - `variables.md` の日時変数の節に「値は SSP の仮想時刻に従う。`X-Pasta-Time` があればその日時」を足す（要件 2.2）。
 - `internals/shiori.md` の仮想イベントディスパッチャの節に `clock` の仕組みを書く。
 - 直した後に `node book/tools/gen-skill-refs.mjs` で `.claude/skills` の references を生成し直す。書き換えが拒まれたら、回避を探さずに開発者へ許可を求める。
@@ -544,7 +564,7 @@ REG.OnSecondChange = REG.OnSecondChange or function(act) end
 
 ### Unit Tests（`crates/pasta_lua/tests/lua_specs/`）
 
-1. `virtual_clock_test.lua` — `observe`: `OnMinuteChange` が `now % 60` = 0・3・57 では予約が立たず、30 では立つ。`OnHourTimeSignal` が `now % 3600` = 7 では立たず、1800 では立つ。`X-Pasta-Time` 付きでは立たない（要件 2.1・2.8）。
+1. `virtual_clock_test.lua` — `observe`: `OnMinuteChange` が `now % 60` = 0・2・58 では予約が立たず、3・30 では立つ。`OnHourTimeSignal` が `now % 3600` = 7 では立たず、1800 では立つ。`X-Pasta-Time` 付きでは立たない（要件 2.1・2.8）。
 2. `virtual_clock_test.lua` — 返事: 6 つの値から `offset` が決まる。差が 2 秒以下なら 0。数でない値・足りない値では 0 になり `true` を返す（エラーにならない）。`security_level = "external"` では `false` で `offset` が変わらない（要件 2.6・2.9）。
 3. `virtual_clock_test.lua` — `now`・`date`: `offset == 0` では `date(req) == req.date`（同じ表）。`offset ~= 0` では `hour`・`day`・`wday`（日曜 0）・`yday` が仮想の値で、`req.date` は書き換わらない。`X-Pasta-Time` 付きでは `offset` を無視する（要件 2.2・2.7・2.8）。
 4. `virtual_clock_test.lua` — `take_probe`: 予約が無ければ `nil`。予約があれば決まった文字列を 1 回だけ返す。
@@ -563,12 +583,22 @@ REG.OnSecondChange = REG.OnSecondChange or function(act) end
 2. `node book/tools/tutorial-check.mjs` — 章の ` ```pasta ` ブロックが段の辞書と一致したまま（要件 5.5・6.4）。
 3. `node book/tools/gen-skill-refs.mjs` の後、生成物の差分が文書の変更と一致する（ドリフトの検査）。
 
-### 実機の確認（SSP・人手）
+### 実機の前提の確かめ（SSP・最初のタスク。設計の議題 3）
+
+実装に入る前に、えも2DEBUG（pasta で動く）と SHIORI 呼出ログで次を確かめ、`research.md` に記録する。結果で調整つまみを決め、前提が崩れたら実装の前に設計へ戻す。
+
+1. (a) Reset の瞬間に `OnMinuteChange` が届くか。
+2. (b) 文字の無い `\![get,property,…]\e` だけの応答が、表示中の吹き出しを消すか。消える場合は「Apply・Reset の直後だけのこと」として記録して許す。
+3. (c) `system.year`〜`system.second` の値の形（ゼロ埋めの有無など）と、`OnPastaClock` の Reference への載り方。
+4. (d) `OnMinuteChange`・`OnHourTimeSignal` が届く時機の揺れ。`MINUTE_TOLERANCE`（2 秒）と `REBASE_GRACE`（70 秒）をここで決める。
+5. (e) 開発用パレットの開き方（入門ガイド 6 段目に書く手順）。
+
+### 実機の確認（SSP・人手。実装の後）
 
 1. 自分のゴースト（6 段目まで）で、TimeMachine に今の時刻の 59 分 30 秒を入れて Apply → 30 秒ほどで時報が出る（要件 2.1）。
-2. Reset → 次の実際の正時まで時報が出ない。日時変数が実際の時刻に戻る（要件 2.6）。
-3. 仮想時刻を使わずに数分動かし、SHIORI 呼出ログに `OnPastaClock` が出ない（要件 7.3）。
-4. 吹き出しを表示している間に Apply して、読み取りのスクリプトが吹き出しを消すかどうかを記録する（OPEN QUESTIONS 3）。
+2. 今の時刻より先の時の 59 分 30 秒を入れても、余分な時報が出ず、次の正時に出る（要件 2.3）。
+3. Reset → 次の実際の正時まで時報が出ない。日時変数が実際の時刻に戻る（要件 2.6）。
+4. 仮想時刻を使わずに数分動かし、SHIORI 呼出ログに `OnPastaClock` が出ない（要件 7.3）。
 
 ## Security Considerations
 
@@ -579,21 +609,14 @@ REG.OnSecondChange = REG.OnSecondChange or function(act) end
 - 仮想時刻を使わない間の追加の処理は、リクエストごとのイベント名の比較と、毎分・毎時の剰余の計算だけである。応答の追加は無い。
 - 読み取りは合図があった回に 1 回（Apply・Reset のたびに 1 回ほど）。
 
-## OPEN QUESTIONS（設計の議題へ申し送り）
+## 設計の議題で決めたこと（2026-10-18）
 
-1. **正時をまたぐ Apply で、すぐ時報が 1 回出る**（要件 2.4 をそのまま当てた結果）。今が 10:21 で 11:59:30 を入れると、Apply の直後に `時報11` が出て、30 秒後に `時報12` が出る。
-   - 案 A（下書き）: 要件 2.4 のとおり。入門ガイドは「今の時刻の 59 分 30 秒」を入れる手順にし、ほかの時を試すときの注意を 1 行添える。
-   - 案 B: ずれが変わった（読み取りの返事を受けた）回は、次の正時を決め直すだけで時報を出さない。11:59:30 を入れても `時報12` だけが出る。要件 2.4 の「仮想の日時が正時をまたいで進んだとき」を「時が流れてまたいだとき」に絞る要件の直しが要る。ちょうど 12:00:00 を入れたときは時報が出ない。
-2. **戻ったときの決め直しが、ずれ 0 のときにも働く**。手で OS の時計を 1 時間以上戻したとき、今は「戻る前の次の正時」まで時報が止まるが、下書きでは戻った先の次の正時から出る。
-   - 案 A（下書き）: 条件を 1 つにし、ずれの有無で分けない（今の止まり方は直すべき不具合と見る）。要件 7.3 の「出方を変えない」には、OS の時計を戻した場合だけ触れる。
-   - 案 B: ずれが 0 でないか、ずれが変わった直後だけ決め直す。状態が 1 つ増える。
-3. **実機で確かめていない SSP の動き**（合図の方式の前提）。(a) Reset の瞬間に `OnMinuteChange` が届くか（届かなくても次の分の変わり目で気づく前提）。(b) 文字の無い `\![get,property,…]\e` だけのスクリプトが、表示中の吹き出しを消すか。(c) `system.*` の値の形。
-   - 案 A（下書き）: 合図があったときだけ読む（P1）。実装の最後の作業で (a)〜(c) を実機で確かめ、(b) で吹き出しが消えるなら記録して許す（Apply・Reset の直後に限られるため）。
-   - 案 B: 毎分読む（P2）。見落としは無いが、仮想時刻を使わないゴーストでも毎分スクリプトを返す。
-   - 例: 吹き出しが表示されている 10:21:10 に 10:59:30 を Apply → 次の `OnSecondChange` で読み取りが返る → 吹き出しが消えるかを見る。
-4. **合図の見落とし**。ずれの変化が 60 秒の倍数（±5 秒）で、かつ Apply が分の変わり目の近く（見込み 3% ほど）だと、毎分の合図では気づかず、仮想の正時の `OnHourTimeSignal` で気づく。そのときの時報は正時から数秒〜十数秒遅れ、正時をまたいだ扱いで 1 回出る。ずれの変化が 1 時間の倍数に近いときは気づけない。
-   - 案 A（下書き）: 記録して許す。
-   - 案 B: 1 時間ごとに念のため読む。仮想時刻を使わない間にも毎時スクリプトを返す（要件 7.3 に触れる）。
-5. **返事のイベント名** `OnPastaClock`。SHIORI 呼出ログに見える名前で、マニュアルにも載る。
-   - 案 A（下書き）: `OnPastaClock`（`OnPastaCallBack` と同じ接頭辞）。
-   - 案 B: `OnPastaVirtualTime` など、意味の分かる長い名前。
+設計ディスカッションで、全議題を推奨案で確定した。
+
+1. **設定し直したときの時報**: ずれが変わったときだけ、`now - 70 秒` を基準に次の正時を決め直す（上の「時報の判定」）。ずれ 0 の間の判定は今のまま。要件 2.3・2.4 をこれに合わせて直した。
+2. **合図の見落とし**: 毎分の合図の許容幅を ±2 秒に絞り、見落としは毎時の `OnHourTimeSignal` で拾う。残りは記録して許す（Event Contract の「見落とし」）。
+3. **実機の前提の確かめ**: 最初のタスクにする（Testing Strategy の「実機の前提の確かめ」）。調整つまみ 2 つの値はここで決める。
+4. **返事のイベント名**: `OnPastaClock`。
+5. **「次の OnTalk の機会」の書き方**: 要件 3.3 の 2 ページに加え、`script-api.md`・`patterns.md`・`internals/execution-model.md` もこの spec でそろえる。
+
+時刻の直し方の確認（開発者の問い）: ベースウェアの時計に置き換えるのではなく、SSP から日時を聞けたときに `ずれ = 仮想の日時 − OS の時計` を更新し、`見かけの時刻 = OS の時計 + ずれ` とする。SSP は日時を知らせないので、聞くのは合図があったときだけである。
