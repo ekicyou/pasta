@@ -56,7 +56,7 @@
   - _Requirements: 1.6, 1.8, 2.1, 2.2, 2.4, 2.7, 2.8, 2.9, 3.1, 3.3, 3.4, 4.1, 4.2, 4.3, 5.1, 5.6, 6.3_
 
 - [ ] 4. 要求の出口をつなぐ
-- [ ] 4.1 シーンの再開の失敗の枝・ハンドラの呼び出し・要求の出口と読み込みに、控えと組み立てをつなぐ
+- [x] 4.1 シーンの再開の失敗の枝・ハンドラの呼び出し・要求の出口と読み込みに、控えと組み立てをつなぐ
   - シーンの再開の失敗の枝で失敗したコルーチンとエラーの値を控え、ハンドラを呼ぶ直前にハンドラの act を控える。投げ直しと失敗の枝の今の処理は変えない
   - 要求の始めに控えを空にし、失敗したら表記付きの応答、空なら今と同じ応答を返す。エラーハンドラは変えない
   - 「500・理由の行・値が無い」を確かめる既存の出口のテストを、表記を出さない設定に固定して、今のまま通る
@@ -115,3 +115,4 @@
 - 2.4: 読み込んだ Lua のファイルの表は `require("@pasta_chunks")`。キーは `@` を除いたチャンク名（60 バイト以上で `...` ＋ 末尾 56 バイト）。値は作者の `.lua` が `scripts\天気.lua` 形の文字列、キャッシュが `true`、重複が `false`（無いキーと同じに扱う）。
 - 3.2: `STOP.location(chunk, line, chunks, line_map)`・`STOP.detail(err, chunks, line_map)`（`chunks` 省略時は `package.loaded["@pasta_chunks"]`）。設計の `STOP.set_ghost_dir` と `SHIORI.load` からの呼び出しは要らない。
 - 3.3: 警告の中身は `FAILURE.body`（枠なし・無効化なし）。`FAILURE.format` は無効化＋枠＋`FAILURE.body` で、出力は不変（research.md「警告の中身」）。応答は `RES.ok` ＋ `X-Error-Reason`（200）。
+- 4.1: 既存の 500 のテストは Lua なら `with_balloon_warning`（shiori_entry_test）、Rust なら `tests/common/mod.rs` の `pin_balloon_warning_off(&runtime)` で表記を出さない設定に固定する。`time_out` は `EVENT.drive` の直後に必ず `STOP.take()` すること（でないと同じ要求の中の別の止まるエラーに古い控えが混ざる）。

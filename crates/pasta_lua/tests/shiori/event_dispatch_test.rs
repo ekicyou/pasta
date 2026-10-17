@@ -5,7 +5,9 @@
 
 use crate::common;
 
-use common::{assert_shiori_response, create_runtime_with_pasta_path, value_as_str};
+use common::{
+    assert_shiori_response, create_runtime_with_pasta_path, pin_balloon_warning_off, value_as_str,
+};
 
 // ============================================================================
 // Task 1.1, 3.1: REG Module Tests
@@ -180,6 +182,8 @@ fn test_event_fire_handles_nil_id() {
 #[test]
 fn test_event_fire_catches_handler_error() {
     let runtime = create_runtime_with_pasta_path();
+    // 表記を出さない設定では今の 500 のまま（runtime-error-balloon 6.5）
+    pin_balloon_warning_off(&runtime);
 
     let result = runtime.exec(
         r#"
@@ -208,6 +212,8 @@ fn test_event_fire_catches_handler_error() {
 #[test]
 fn test_error_message_no_newline() {
     let runtime = create_runtime_with_pasta_path();
+    // 表記を出さない設定では今の 500 のまま（runtime-error-balloon 6.5）
+    pin_balloon_warning_off(&runtime);
 
     let result = runtime.exec(
         r#"
@@ -241,6 +247,8 @@ fn test_error_message_no_newline() {
 #[test]
 fn test_event_fire_handles_empty_error_message() {
     let runtime = create_runtime_with_pasta_path();
+    // 表記を出さない設定では今の 500 のまま（runtime-error-balloon 6.5）
+    pin_balloon_warning_off(&runtime);
 
     // Note: In mlua, error("") still includes file location information,
     // so it won't be truly empty. This test verifies that the first line

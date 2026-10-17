@@ -22,6 +22,7 @@ local RELOAD = {
     "pasta.shiori.event.second_change",
     "pasta.shiori.event.virtual_dispatcher",
     "pasta.shiori.res",
+    "pasta.shiori.stop",
     "pasta.shiori.act",
     "pasta.shiori.sakura_builder",
     "pasta.act",
@@ -64,6 +65,23 @@ local function header_value(res, name)
         end
     end
     return nil
+end
+
+--- [logging] balloon_warning を value にした pasta.config の代役で body を実行し、元へ戻す
+--- （FAILURE.enabled は呼んだ時点で pasta.config を引く）
+--- @param value boolean
+--- @param body fun()
+local function with_balloon_warning(value, body)
+    local saved = package.loaded["pasta.config"]
+    package.loaded["pasta.config"] = {
+        get = function(section, key, default)
+            if section == "logging" and key == "balloon_warning" then return value end
+            return saved.get(section, key, default)
+        end,
+    }
+    local ok, err = pcall(body)
+    package.loaded["pasta.config"] = saved
+    if not ok then error(err, 0) end
 end
 
 --- 応答の形を検査する（6.2）: 先頭行がステータス行と完全に一致し、SHIORI/3.0 が 1 回だけ現れる
@@ -126,7 +144,11 @@ describe("SHIORI.request - xpcall 境界", function()
             error("entry boom\nsecond line detail")
         end
 
-        local res = ENTRY.request({ id = "OnEntryRequestError", method = "get", version = 30 })
+        -- 表記を出さない設定では今のまま（6.5）
+        local res
+        with_balloon_warning(false, function()
+            res = ENTRY.request({ id = "OnEntryRequestError", method = "get", version = 30 })
+        end)
 
         expect(res:find("500 Internal Server Error", 1, true)).not_:toBe(nil)
         expect(res:find("X%-Error%-Reason:")).not_:toBe(nil)
@@ -141,10 +163,69 @@ describe("SHIORI.request - xpcall 境界", function()
             error({ code = 42 })
         end
 
-        local res = ENTRY.request({ id = "OnEntryRequestTableError", method = "get", version = 30 })
+        local res
+        with_balloon_warning(false, function()
+            res = ENTRY.request({ id = "OnEntryRequestTableError", method = "get", version = 30 })
+        end)
 
         expect(res:find("500 Internal Server Error", 1, true)).not_:toBe(nil)
         expect(res:find("X-Error-Reason: Unknown error", 1, true)).not_:toBe(nil)
+    end)
+end)
+
+describe("SHIORI.request - 止まるエラーの表記（表記を出す設定）", function()
+    test("ハンドラのエラーは 200 と理由の行と表記付きの Value になる", function()
+        reset_state()
+        REG.OnEntryNotationError = function(_act)
+            error("entry notation boom\nsecond line detail")
+        end
+
+        local res
+        with_balloon_warning(true, function()
+            res = ENTRY.request({ id = "OnEntryNotationError", method = "get", version = 30 })
+        end)
+
+        expect_status(res, "SHIORI/3.0 200 OK")
+        expect(header_value(res, "X-Error-Reason")).not_:toBe(nil)
+        local value = header_value(res, "Value")
+        expect(value).not_:toBe(nil)
+        expect(value:find("スクリプトのエラー", 1, true)).not_:toBe(nil)
+        expect(value:find("entry notation boom", 1, true)).not_:toBe(nil)
+        expect(value:find("second line detail", 1, true)):toBe(nil)
+    end)
+
+    test("シーンの中のエラーも 200 と表記付きの Value になる", function()
+        reset_state()
+        REG.OnEntryNotationScene = function(_act)
+            return coroutine.create(function(_a)
+                error("entry scene boom")
+            end)
+        end
+
+        local res
+        with_balloon_warning(true, function()
+            res = ENTRY.request({ id = "OnEntryNotationScene", method = "get", version = 30 })
+        end)
+
+        expect_status(res, "SHIORI/3.0 200 OK")
+        local value = header_value(res, "Value")
+        expect(value).not_:toBe(nil)
+        expect(value:find("entry scene boom", 1, true)).not_:toBe(nil)
+    end)
+
+    test("On で始まらない ID の要求は表記を出さず今の 500 になる", function()
+        reset_state()
+        REG.entry_notation_plain = function(_act)
+            error("entry plain boom")
+        end
+
+        local res
+        with_balloon_warning(true, function()
+            res = ENTRY.request({ id = "entry_notation_plain", method = "get", version = 30 })
+        end)
+
+        expect_status(res, "SHIORI/3.0 500 Internal Server Error")
+        expect(header_value(res, "Value")):toBe(nil)
     end)
 end)
 
