@@ -285,3 +285,10 @@
 - `crates/pasta_lua/src/loader/discovery.rs` 59〜130 行・`process.rs` 105〜275 行・`cache.rs` 137〜165 行。
 - `crates/pasta_check/src/copy.rs` 30〜62 行（中身の無いフォルダも写す）。
 - VSCode `extHostFileSystemEventService.ts`（1.85.0・1.106.0・1.107.0・main。ギャップ分析の出典と同じ）。
+
+## 設計ディスカッションの決定（2026-10-17）
+
+全 8 議題を推奨案で確定した（開発者の一括承認）。根拠は design.md「確定した設計判断」にある。
+
+- 議題 1〜7: 設計の生成で推奨した形（`dirs` 必須・見張り `**/*` と関数での絞り込み・`skipReasons` への置き換え・`folder-matches-pattern` と末尾 `/` なし・「と」のつなぎ・エディタに案内の行を出さない・`ghost/master` そのものを候補にして一致テストで確かめる）。
+- 議題 8（検証の指摘）: 診断の URI の綴りと開いている文書の綴りが違うと波線が出ない端を、`render` で開いている文書の URI に寄せて直す。リスクとして残す案は、端を残すので採らなかった。
