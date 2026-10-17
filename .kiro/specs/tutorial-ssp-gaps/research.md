@@ -128,3 +128,112 @@
 - リファレンス 2 章を直したら `node book/tools/gen-skill-refs.mjs` を回す。`.claude/skills` の書き換えが拒まれたら、回避を探さずに開発者へ許可を求める。
 - 入門の章を直したら、`link-check.mjs`・`tutorial-check.mjs` と、絵の撮り直す決まり（`book/SCREENSHOTS.md`）を確かめる。影響しうる絵は `06-hour.png`（6 段目）と、案 E のときの `11-jump-detour.png`・`11-jump-continue.png`。
 - テストの置き場: Lua は `crates/pasta_lua/tests/lua_specs/`（`second_change_thread_test.lua` と同じ形）、結合は `crates/pasta_shiori/tests/`（`lua_request_date_test.rs` と同じ形。本物のランタイムで、回避を書かない）。
+
+---
+
+# 設計の調べと決定（2026-10-17・設計フェーズ）
+
+この節から下は設計フェーズで足した。要件の番号は `requirements.md` の今の番号（要件 1〜7）で書く。上の節（1〜6）は下書き時の旧番号のままで、旧 4〜8 が今の 3〜7 にあたる。正は `requirements.md` である。
+
+## Summary
+
+- **Feature**: `tutorial-ssp-gaps`
+- **Discovery Scope**: Extension（既存の時報の振り分けと入門ガイドの手直し。新しい依存は無い）。軽い調べ（`design-discovery-light.md`）で行った。
+- **Key Findings**:
+  - 仮想の日時は「`system.*` プロパティを読む」ことでしか値として得られない。毎分・正時のイベントは、届く時機だけが仮想時刻に従う（3.1.1）。そこで、届く時機のずれを「仮想時刻が変わったかもしれない」合図に使い、合図があったときだけプロパティを 1 回読み、OS の時計とのずれ（秒）を持つ形にした。
+  - プロパティを読む既存の口 `act:get_property` は、シーンのコルーチンの中でしか使えず、待機の登録（`CALLBACK.consume_staged`）が `set_co_scene` を通って**待っているチェイントークの続きを閉じる**。時刻の読み取りに使うと、要件 3.2（続きは自然なおしゃべりで出る）を壊す。そのため、時刻の読み取りは `CALLBACK` を使わず、専用のイベント名の往復にした。
+  - Rust（`lua_request.rs`）を変えずに済む。`act.req.date` は OS の時計（または `X-Pasta-Time`）のまま残し、仮想時刻は「時報の判定」と「日時変数」の 2 か所だけが読む（決定 A2）。`X-Pasta-Time` の扱い（要件 7.1）はコードごと手つかずになる。
+
+## Research Log
+
+### 仮想時刻の値の取り方（要件 2）
+
+- **Context**: 3.1.1 の実機の調べで、仮想時刻はヘッダーに載らず、`system.*` プロパティと、`OnMinuteChange`・`OnHourTimeSignal` の届く時機で伝わると分かった。
+- **Sources Consulted**: 3.1.1 の実機の記録。`act.lua` の `get_property`（`\![get,property,{イベント名},{名前…}]` を返し、ベースウェアが同名のイベントの Reference で値を送り返す）。`event/callback.lua`・`event/init.lua` の `set_co_scene`。UKADOC の `OnHourTimeSignal`（トークできるまで待つので、少しずれる）。
+- **Findings**:
+  - プロパティを読む往復は、`\![get,property,…]` だけのスクリプトを応答として返せば、どのイベントの応答からでも始められる。シーンのコルーチンは要らない。
+  - `OnMinuteChange` は、仮想時刻を入れた瞬間（Apply）に 1 回、その後は仮想の分の変わり目ごとに届く。`OnHourTimeSignal` は仮想の正時の数秒後に届く。どちらも Reference に日時は無い。
+  - `OnSecondChange` の既定ハンドラは pasta のもので、時報・おしゃべりの応答を返す場所である。読み取りのスクリプトもここから返せば、ゴーストの `REG` やシーンの振り分けに触れずに済む。
+- **Implications**: 仮想時刻の部品は「合図を見る」「読み取りのスクリプトを出す」「読んだ値からずれを決める」「ずれを足した時刻と日付の表を返す」の 4 つの働きを持つ 1 つの Lua モジュールにまとまる。
+
+### 時刻を読む所（要件 2.2・2.5）
+
+- **Context**: `act.req.date` は、時報の判定・日時変数・おしゃべりの間隔（`check_talk`）・撫での判定（`mouse.lua` の `request_time`）が読む。コールバックの待ち時間は `os.time()`。
+- **Findings**: 仮想時刻に従わせるのは、`check_hour`（正時の判定と `{HH}`）、`check_talk` の正時までの残り（`hour_margin`）、`transfer_date_to_var`（日時変数）の 3 か所だけでよい。`act.req.date` は変えない。
+- **Implications**: 公開の約束（`shiori-events.md` の `act.req.date` の表）は変えず、「`act.req.date` は仮想時刻に従わない。仮想時刻に従うのは時報と日時変数」と書き足すだけになる。
+
+### 外から起こした OnTalk（要件 3）
+
+- **Findings**: `\![raise,OnTalk]` は `EVENT.fire` → `EVENT.no_entry` で新しいシーンになり、`EVENT.drive` の `set_co_scene` が待っていた続きを閉じる。続きを拾うのは `check_talk` だけ（上の 2・4 節のとおり）。決定 A4 によりコードは変えない。
+- **Implications**: 文書 3 か所（`call-jump.md` のチェイントーク、`shiori-events.md` の 3 か所、入門 11 段目）を直すだけ。絵は変わらない。
+
+### 起動の既定の動き（要件 4）
+
+- **Findings**: `boot.lua` は同名のシーンを探すだけで、無ければ 204。`OnGhostChanged` は既定ハンドラが無く `EVENT.no_entry`。決定 A6 によりコードは変えない。
+- **決めた理由（要件 4.5）**: 何も書かなければ何も表示しないのが pasta の既定の動きである（2026-10-16 の開発者の決定）。辞書が無いと、どのサーフェスを出すかを pasta は決められない。`0`・`10` の決め打ちは辞書を書いた人の意図の推測になる。`[actor].surface` を起動に使うと、`surface` を書いていて `＊OnBoot` が無い既存のゴーストの起動の見え方が変わる（要件 7.4）。入門の体験は、最初の起動を 1 段目へ移すことで手当てする（決定 A7）。
+
+### 入門ガイドの絵（要件 5.4・6.5）
+
+- **Findings**: `06-hour.png` は時報の吹き出し（午後4時）を写していて、確かめ方が変わっても成功の目印の画面は同じである。`01-boot.png` は 1 段目の最初の台詞の画面で、準備の章から起動を移しても同じ画面になる。11 段目の 2 枚は、決定 A4 で動きが変わらないので変わらない。準備の章に絵は無い。
+- **Implications**: 撮り直す絵は無い見込み。`book/SCREENSHOTS.md` の 77 行「6 段目は、実際の正時を待つ（SSP の仮想時刻は pasta に届かない）」は古くなるので直す。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| P1. 合図があったときだけ読む（採用） | 毎分・正時のイベントが、今のずれから見込む時機から外れて届いたら、次の `OnSecondChange` でプロパティを 1 回読む | 仮想時刻を使わない間は、応答が今とバイト単位で同じ（要件 7.3） | 合図を見落とす組み合わせがある（下の Risks） | 合図の許し幅は定数 |
+| P2. 毎分読む | `OnMinuteChange` のたびにプロパティを読む | 見落としが無い。判定が単純 | 仮想時刻を使わないゴーストでも、毎分、文字の無いスクリプトを返す。表示中の吹き出しへの影響を確かめていない。要件 7.3 に触れる | 却下 |
+| P3. `OnHourTimeSignal` で時報を出す | 正時のイベントを時報の合図にし、時刻だけプロパティで読む | 時報の時機は SSP に任せられる | 日時変数（要件 2.2）が正時以外のシーンで仮想にならない。仮想時刻を使わないときの時報の出方も変わる（7.3） | 却下 |
+| P4. `act:get_property` を使う | 小さなコルーチンで `get_property` を呼ぶ | 既存の待機・時間切れの仕組みに乗る | 待機の登録が待っている続きを閉じる（要件 3.2 を壊す） | 却下 |
+| P5. Rust で時刻を作り直す | `lua_request.rs` にずれを持たせる | `act.req.date` 自体が仮想になる | 撫で・おしゃべりの間隔まで仮想になり、要件 2.5 を守るには結局 Lua 側で OS の時刻を別に持つ必要がある。Rust と Lua で状態が分かれる | 却下 |
+
+## Design Decisions
+
+### Decision: 仮想時刻は「OS の時計とのずれ（秒）」として Lua の 1 モジュールが持つ
+
+- **Context**: 要件 2.1〜2.9、決定 A2。
+- **Alternatives Considered**: 上の P1〜P5。
+- **Selected Approach**: 新しいモジュール `pasta.shiori.clock` が、ずれ `offset`（整数秒、0 は仮想時刻なし）と、読み取りの予約 `probe_armed` を持つ。`clock.now(req)` は `req.date.unix + offset`、`clock.date(req)` はその時刻の日付の表を返す。`X-Pasta-Time` があるリクエストでは、ずれを足さない（要件 2.8）。
+- **Rationale**: 仮想に従う所（時報の判定・日時変数）と従わない所（`act.req.date`・間隔・撫で・コールバック）を、読む関数の違いだけで分けられる。Rust を変えない。
+- **Trade-offs**: 読み取りの往復の遅れと秒の切り捨てで、ずれには 1〜2 秒の誤差が出る。時報が仮想の正時から 1〜2 秒ずれて出ることを許す（`OnHourTimeSignal` 自体も数秒ずれる）。
+- **Follow-up**: 実装の最後に、実機の SSP で TimeMachine の Apply・Reset と時報を確かめる。
+
+### Decision: 読み取りは専用のイベント名の往復で行い、`CALLBACK` を使わない
+
+- **Context**: 要件 3.2 を守る（上の Research Log）。
+- **Selected Approach**: 読み取りのスクリプトは `\![get,property,OnPastaClock,system.year,system.month,system.day,system.hour,system.minute,system.second]\e`。返ってきた `OnPastaClock` は `EVENT.fire` が `REG` より前に受け取り、ずれを決めて 204 を返す。`SecurityLevel` が `external` の `OnPastaClock` は無視する。
+- **Trade-offs**: 時間切れの扱いは持たない。返事が来なければ（SSP 以外のベースウェアなど）、ずれは前の値のまま、次の合図まで読み直さない。
+
+### Decision: 合図の判定（許し幅は定数）
+
+- `OnMinuteChange`: `clock.now(req) % 60` が 5 以下か 55 以上なら見込みどおり。外れたら予約を立てる。
+- `OnHourTimeSignal`: `clock.now(req) % 3600` が 60 以下か 3595 以上なら見込みどおり（トークできるまで待つので、遅れを 60 秒まで許す）。外れたら予約を立てる。
+- 読んだずれの絶対値が 2 秒以下なら 0 にする（仮想時刻なし。要件 2.6・2.7 を OS の時計と同じ値で満たす）。
+- 定数は設定にしない（pasta.toml のキーを増やさない。要件 7.2 の「別の設定を要する作りにしない」）。
+
+### Decision: 時刻が戻ったら次の正時を決め直す（要件 2.3）
+
+- **Selected Approach**: `check_hour` は、`now < next_hour_unix - 3600`（記録した正時の 1 時間前より前）なら、`next_hour_unix` を `now` から決め直し、時報は出さない。進んだとき（`now >= next_hour_unix`）は今のまま、進んだ先の時刻で 1 回だけ出す（要件 2.4）。
+- **Trade-offs**: この決め直しは、ずれが 0 のまま OS の時計が戻ったとき（手で時計を戻したなど）にも働く。今は、戻る前の次の正時まで時報が止まる。設計の議題に残す（design.md の OPEN QUESTIONS）。
+
+### Decision: 起動の立ち絵はエンジンでやらない（要件 4。決定 A6）
+
+- 上の Research Log「起動の既定の動き」の理由のとおり。`boot.lua` は変えない。
+
+## Synthesis
+
+- **一般化**: 「時報の判定」と「日時変数」は、どちらも「今の日時」を読む所である。読む口を `clock.now`・`clock.date` の 2 つにまとめ、どちらも `X-Pasta-Time` → 仮想時刻 → OS の時計の順を 1 か所で決める（要件 2.8）。将来、ほかの所を仮想に従わせるときも、この 2 つを呼ぶだけで済む（今は広げない）。
+- **作るか使うか**: 日付の計算は Lua 標準の `os.time{…}`（プロパティの日時 → Unix 時刻）と `os.date("*t", t)`（Unix 時刻 → 年月日時分秒・曜日・通し日）を使う。どちらも OS の地方時で、Rust の `OffsetDateTime::now_local()` と同じ時刻帯になる。フレームワークのスクリプトは既に `os` を使っている（`std_os`）。プロパティの読み取りは SSP の `\![get,property]` をそのまま使う。新しい依存は無い。
+- **簡素化**: Rust の変更・新しい設定キー・新しい `REG` の既定ハンドラ・時間切れの処理・ベースウェアの判定（`Sender`）は入れない。起動の立ち絵と外から起こした `OnTalk` はコードを変えず、文書だけにする。
+
+## Risks & Mitigations
+
+- 実機で確かめていない SSP の動きがある（Reset の瞬間に `OnMinuteChange` が届くか、文字の無いスクリプトが表示中の吹き出しを消すか、プロパティの値の形）。— 実装の最後の作業で実機の SSP で確かめる。合図が来なくても、次の分の変わり目のずれで読み直す。
+- 合図の見落とし: ずれの変化が 60 秒の倍数（±5 秒）で、かつ Apply が分の変わり目の近くだったときは、毎分の合図では気づかない（見込み 3% ほど）。— `OnHourTimeSignal` の時機で気づく。気づくのは仮想の正時の後で、時報は正時をまたいだ扱い（要件 2.4）で 1 回出る。ずれの変化が 1 時間の倍数に近いときは気づけない（記録して許す）。
+- 時報の時機の誤差（1〜2 秒）。— 許す（上の Decision）。
+- `.claude/skills` の references の生成が分類器に拒まれる。— 回避を探さず、開発者に許可を求める（覚え書き）。
+
+## 使ったスキルと規則
+
+- `kiro-spec-design` の規則（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）。
+- 作者向けのスキル（`pasta-ghost-authoring`・`pasta-lua-coding`）は、マニュアルの章（`shiori-events.md`・`call-jump.md`・`variables.md`）が正本なので、章を直接読んだ。
