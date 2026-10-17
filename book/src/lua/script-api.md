@@ -29,9 +29,20 @@ ACT（`act`）は、シーン関数とイベントハンドラが第 1 引数で
 
 ```lua
 local save, var = act:init_scene(SCENE)
+act:init_scene(scene, scene_name?, local_scene_name?, line_map?) -> save, var
 ```
 
 - Lua ブロックで定義するシーン関数（`function SCENE.名前(act, ...)`）の先頭で呼ぶ。`SCENE` は、その Lua ブロックが属するグローバルシーンのシーンテーブルである。
+- 2 番目以降の引数は、[止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記)に止まった場所を示すために、辞書から作った関数（生成コード）が渡す。作者が Lua で書くシーン関数では省略できる。省略すると、止まった場所は登録名から通し番号を落とした名前（`＊名前`）で示し、`.pasta` の行は示さない。
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `scene` | table | シーンテーブル |
+| `scene_name` | string または nil | グローバルシーンの、辞書に書いた名前（別名で置き換える前の名前） |
+| `local_scene_name` | string または nil | ローカルシーンの、辞書に書いた名前。暗黙の開始ブロックでは `nil` |
+| `line_map` | string または nil | 生成コードの行と `.pasta` の行の対応（[生成される Lua コードの形](../internals/transpiler.md#生成される-lua-コードの形)） |
+
+- 渡した名前と対応は、`act.scene_name`・`act.local_scene_name`・`act.line_map` に控えるだけで、止まるエラーの表記にだけ使う。出力・名前の検索には使わない。
 - 戻り値の `save`・`var` は `act.save`・`act.var` と同じ表である。
 - 呼ぶと、そのシーンが実行中のシーンになる。名前の検索（[検索と呼び出し](#検索と呼び出し)）の 1・2 段目と、選択肢が記録する「選択肢を出したグローバルシーン」（[choice](#choicetarget-display)）は、実行中のシーンを基準にする。
 - 実行中のシーンは、次に `init_scene` が呼ばれるまで変わらない。ただし、`call_restore`・`word`・`expr_fn`・`expr_fn_var`・`global_fn` で呼んだ関数から戻ると、呼ぶ前のシーンに戻る（[検索と呼び出し](#検索と呼び出し)）。
@@ -341,7 +352,8 @@ act:call_restore(global_scene_name, key, attrs, ...) -> any
 
 - 引数は [call](#callglobal_scene_name-key-attrs-) と同じである。`act:call` を呼び、その戻り値をすべてそのまま返す。
 - 戻った後、実行中のシーンを呼ぶ前のシーンに戻す。呼んだ先がシーン関数でも Lua の関数でも、見つからなかった場合や `key` が `nil`・「呼ばない」印の場合でも戻す。呼んだ先が `yield` で中断した場合は、再開して戻った時点で戻す。
-- 戻すのは実行中のシーンだけである。記録の無い選択 ID の行き先の検索に使う「最後に `init_scene` を呼んだグローバルシーン」（[OnChoiceSelectEx](shiori-events.md#onchoiceselectex)）は戻さない。
+- 実行中のシーンと一緒に、`init_scene` が控えたシーンの名前 2 つと行の対応も呼ぶ前のものに戻す（止まるエラーの表記が、戻った後の行で止まったとき呼び出し元のローカルシーンまで示せる）。
+- 戻すのは実行中のシーン（と上の控え）だけである。記録の無い選択 ID の行き先の検索に使う「最後に `init_scene` を呼んだグローバルシーン」（[OnChoiceSelectEx](shiori-events.md#onchoiceselectex)）は戻さない。
 - 戻った後に処理が残るため、呼び出しの段が 1 つ残る（`return act:call(…)` は末尾呼び出しで段を残さない）。呼んだ先の中で `return act:call(…)` でつないだ呼び出しは深くならない。
 - DSL の Call 行のうち、ローカルシーンの最後の行でないものはこの呼び出しになる。
 
@@ -375,8 +387,9 @@ act:restore_scene(scene, ...) -> ...
 ```
 
 - 実行中のシーンを `scene`（シーンテーブルまたは `nil`）にし、2 番目以降の引数をそのまま返す。
-- `call_restore`・`word`・`expr_fn`・`expr_fn_var`・`global_fn` とアクタープロキシの `word`・`expr_fn`・`expr_fn_var` が、関数から戻った後に実行中のシーンを戻すのに使う。
+- `word`・`expr_fn`・`expr_fn_var`・`global_fn` とアクタープロキシの `word`・`expr_fn`・`expr_fn_var` が、関数から戻った後に実行中のシーンを戻すのに使う（`call_restore` は自分で戻す）。
 - `init_scene` と違い、最後に `init_scene` を呼んだグローバルシーンの記録は変えない。
+- `init_scene` が控えたシーンの名前は、グローバルシーンの名前だけを、`scene` で `init_scene` を呼んだときに控えた名前に戻し、ローカルシーンの名前と行の対応は空にする。呼ぶ前のローカルシーンは分からないため、止まるエラーの表記は `＊天気` のようにグローバルシーンまでになるが、別のシーンの名前は出さない。
 
 #### failure(text, warning)
 

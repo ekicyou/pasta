@@ -99,7 +99,7 @@
   - 4 つのページの止まるエラーの記述が、新しい動きと食い違わない
   - _Boundary: ManualUpdate（shiori-events.md・startup.md・internals/shiori.md・troubleshooting.md）_
   - _Requirements: 5.5, 7.2_
-- [ ] 7.3 (P) スクリプトの API・内部モジュール・トランスパイラのページに、`init_scene` の新しい引数と act の控えを書く
+- [x] 7.3 (P) スクリプトの API・内部モジュール・トランスパイラのページに、`init_scene` の新しい引数と act の控えを書く
   - `init_scene` の引数（生成コードが書いた名前と行の対応を渡す。省略できる）、act のフィールド、`call_restore`・`restore_scene` の戻し方、生成コードの先頭の行
   - 3 つのページの記述が、2.1〜2.3 の実装と食い違わない
   - _Boundary: ManualUpdate（script-api.md・internal-modules.md・transpiler.md）_
