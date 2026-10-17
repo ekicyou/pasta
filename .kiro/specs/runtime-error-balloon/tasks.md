@@ -39,7 +39,7 @@
   - 2 つの名前と、コルーチンから act が引けることを `failure_test` で確かめる
   - _Boundary: FailureLabels（failure.lua）_
   - _Requirements: 2.2, 3.4_
-- [ ] 3.2 止まった場所の見分けと、エラー文の整え（純粋な関数）を作る
+- [x] 3.2 止まった場所の見分けと、エラー文の整え（純粋な関数）を作る
   - 引数は設計の `(chunk, ghost_dir)` から、2.4 で決めた表と、控えた act の行の対応と行番号に変える（場所を `.pasta` の行に直すのに要る。ゴーストのフォルダーは 2.4 の表が持つので引数とフォルダーの控えは要らない）。この設計からのずれを `research.md` に書く
   - チャンクの部分を 2.4 で決めた名前の表で引き、作者の `.lua` は `scripts\天気.lua:12` の形に、変換した Lua のキャッシュは act が控えた行の対応で `dic\天気.pasta:15` の形に直し、標準ランタイム・`[string "…"]`・表に無いキー・対応に無い行は落とす
   - 最初の行の先頭の位置の接頭辞を繰り返し取り、投げ直しの接頭辞を除く。`10:30: ` のような文中の数字は取らない。文字列でない値は空
@@ -113,3 +113,4 @@
 ## Implementation Notes
 - 2.2: `init_scene` の 4 つ目の引数は `"<.pasta>|<lua>:<pasta>,..."`（`\` を含むと `[[...]]`）。最後の `|` で切って読む。各シーンの対応には同じグローバルシーンの Lua のブロックの行も入る（research.md「実装の記録」）。
 - 2.4: 読み込んだ Lua のファイルの表は `require("@pasta_chunks")`。キーは `@` を除いたチャンク名（60 バイト以上で `...` ＋ 末尾 56 バイト）。値は作者の `.lua` が `scripts\天気.lua` 形の文字列、キャッシュが `true`、重複が `false`（無いキーと同じに扱う）。
+- 3.2: `STOP.location(chunk, line, chunks, line_map)`・`STOP.detail(err, chunks, line_map)`（`chunks` 省略時は `package.loaded["@pasta_chunks"]`）。設計の `STOP.set_ghost_dir` と `SHIORI.load` からの呼び出しは要らない。

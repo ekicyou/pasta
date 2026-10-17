@@ -272,3 +272,11 @@
 - **見分け方**: 候補パスの `\` を `/` にそろえ、ゴーストのフォルダー（`LoaderContext.base_dir` を同じくそろえた形）＋ `/` で始まるかを見る。`package.path` はローダーが同じ `base_dir` から作るので、文字列の前方一致で足りる（ファイルは開かない）。`profile/pasta/save/lua`・`scriptlibs` など、キャッシュと標準ランタイム以外のゴーストの中の `.lua` は作者の `.lua` として控える。
 - **チャンク名**は変えていない（`@` ＋ 候補パスのまま。既存のテストと、新しいテストで `debug.getinfo` の `source` を確かめた）。
 - キャッシュの場所を渡すため、`LoaderContext` に `transpiled_output_dir` を足した（`from_config` は設定の値、`new` は既定値）。
+
+## 場所の見分けとエラー文の整えの引数（タスク 3.2）
+- **設計からのずれ**: 設計は `STOP.location(chunk, ghost_dir)`・`STOP.detail(err, ghost_dir)` としていたが、`STOP.location(chunk, line, chunks, line_map)`・`STOP.detail(err, chunks, line_map)` にした。
+  - `chunks` は 2.4 の読み込んだ Lua のファイルの表（省略すると `package.loaded["@pasta_chunks"]`。ローダーを通さない VM では無く、そのときは場所を示さない）。ゴーストから見たパスは表の値が持つので、ゴーストのフォルダーの引数と控え（`STOP.set_ghost_dir`）は要らない。
+  - `line_map` は act が控えた行の対応（2.3 の `act.line_map`）。変換した Lua のキャッシュの場所を `.pasta` の行に直すのに要る。`line` は接頭辞の行番号（キャッシュでは対応を引くキー、作者の `.lua` ではそのまま出す）。
+  - `STOP.location` は行まで付けた `scripts\天気.lua:12`・`dic\天気.pasta:15` の形を返す（設計は場所だけを返し `detail` が行を付ける形だった）。
+- 表で引くので、設計の Ceiling（ゴーストから見たパスが約 55 バイトより長いと場所を落とす）は無くなった。末尾 56 バイトが同じファイルが 2 つあるときだけ（表の値が `false`）場所を落とす。
+- 位置の接頭辞として扱うのは、チャンクが表にある（値が `false` でも）か、`.lua`・`]` で終わるものだけ。行の対応は止まったときに初めて読み解く（最後の `|` で切り、`<lua>:<pasta>` を順に見る）。
