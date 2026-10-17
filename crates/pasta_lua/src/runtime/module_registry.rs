@@ -8,7 +8,7 @@ use super::enc;
 use super::log;
 use super::persistence;
 use super::renderer_injection::RendererInjection;
-use super::searcher::install_module_searcher;
+use super::searcher::{install_module_searcher, register_chunk_table};
 use crate::loader::{LoaderContext, PastaConfig};
 use mlua::{IntoLua, Lua, Result as LuaResult, Table, Value};
 use std::path::{Path, PathBuf};
@@ -49,6 +49,12 @@ impl PastaLuaRuntime {
 
         // 検索パスを UTF-8 として解釈する searcher へ置換する（他のどの Lua コードよりも前）。
         install_module_searcher(lua)?;
+        // 読み込んだファイルをエラー文の形から引ける表（`@pasta_chunks`）を用意する。
+        register_chunk_table(
+            lua,
+            &loader_context.base_dir,
+            &loader_context.transpiled_output_dir,
+        )?;
 
         tracing::debug!(path = %path, "Set package.path");
         Ok(())
