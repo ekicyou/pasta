@@ -356,7 +356,7 @@ Wave 1（`hello-pasta-tutorial-stages`・`manual-claudia-theme`）、ガイド�
 ## Specs (dependency order)
 
 - [ ] runtime-error-balloon -- スクリプトが止まる実行時エラー（500 の応答）を、辞書を書く人に見えるようバルーンにも出す。表記は `pasta/failure.lua` の出口を使う。2026-10-16 開発者の決定で、やると決めて 0.4.0 に入れた（2026-10-10 の棚卸で `failure-output-unification` から分割）。Dependencies: none（`failure-output-unification`・`shiori-test-support-runtime` は完了）
-- [ ] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: none（`touch-poke-shortcuts` は完了）
+- [x] getting-started-screenshots -- 新しいシェルで、入門ガイドの各章にスクリーンショットを載せ、8 段目（触られたときの反応）を実機で確かめる（2026-10-10 の棚卸で `getting-started-story-guide` から分割）。Dependencies: none（`touch-poke-shortcuts` は完了）
 - [ ] pasta-check-validate-edges -- 辞書の検査（`pasta_check validate`）の端のケース 3 つ（読めない辞書・`.pasta` で終わるフォルダ・VSCode 拡張の大文字と小文字）の裁定と直しと、代用品（`manual.yml` の段・`tutorial_stages_test.rs` の前方一致の検査）の置き換え（2026-10-17 の棚卸で、`pasta-check-dic-validate` の残りから起票）。0.4.1 に入れる（2026-10-17 開発者の決定）。Dependencies: none
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: none
 - [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store
