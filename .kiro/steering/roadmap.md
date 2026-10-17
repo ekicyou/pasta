@@ -349,7 +349,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 ## Direct Implementation Candidates
 
-- [ ] budoux の改行の幅（2026-10-18、窓際のぱすたさんからの要望。0.5.0）-- アクター設定に `budoux_newlines`（倍率。既定 1.0 で今のまま `\n`、1.8 なら `\n[180]`）を足し、budoux が入れる改行をその幅にする。`spot_newlines`・`choice_newlines` と同じ書き方にそろえる。縦書きのバルーンで、折り返した列だけ間隔が詰まるのを防ぐ。直す所は `crates/pasta_lua/src/sakura_script/line_breaker.rs` の改行を足す 1 か所（163 行）と、アクターの表から `budoux` を読む `sakura_script/mod.rs`（126〜153 行）、テスト、マニュアル（`reference/pasta-toml.md`・`lua/modules/pasta-sakura-script.md`）、スキル references の再生成。バルーンの先頭に改行を入れない今の動きは保つ。選択肢と選択肢の間の `\n`（`sakura_builder.lua` 249・349 行）も縦書きで詰まって見えるなら、同じ直しに含める（ゴースト側の実機の確認待ち）。spec にしないのは、キー 1 つの追加で、既定の動きを変えないため。
+- [ ] budoux の改行の幅（2026-10-18、窓際のぱすたさんからの要望。0.5.0）-- アクター設定に `budoux_newlines`（倍率。既定 1.0 で今のまま `\n`、1.8 なら `\n[180]`）を足し、budoux が入れる改行をその幅にする。`spot_newlines`・`choice_newlines` と同じ書き方にそろえる。縦書きのバルーンで、折り返した列だけ間隔が詰まるのを防ぐ。直す所は `crates/pasta_lua/src/sakura_script/line_breaker.rs` の改行を足す 1 か所（163 行）と、アクターの表から `budoux` を読む `sakura_script/mod.rs`（126〜153 行）、テスト、マニュアル（`reference/pasta-toml.md`・`lua/modules/pasta-sakura-script.md`）、スキル references の再生成。バルーンの先頭に改行を入れない今の動きは保つ。選択肢と選択肢の間の `\n`（`sakura_builder.lua` 249・349 行）も、倍率で指定できるようにする（同じ直しに含める）。ゴースト側が SSP 2.9.18 の縦書きのバルーンで確かめた（2026-10-18）: 縦書きでは選択肢 1 つが 1 列になり、選択肢どうしの間が普通の `\n`（約 22px。字は 20px）なので、台詞の列（`\n[180]` で約 39px）より窮屈に見える。問いかけと 1 つ目の選択肢の間（`choice_newlines`）は問題ない。キーの形（`budoux_newlines` と同じ値を使うか、`[ghost]` に別のキーを足すか）は実装のときに決める。spec にしないのは、キー 1 つの追加で、既定の動きを変えないため。
 - [ ] areka の `doc/PASTA_PROFILE.md` §5 の作例 -- 手書きの `\w[500]` が、「pasta の上流の欠陥」と誤って記録されている。pasta のエンジンは `\w[` を出さない（2026-10-10 に確かめた）。`novel-areka-contract` の依頼に添えて、areka の側で直してもらう。pasta の側に直す物は無い。
 
 ## バックログ（brief なし・保留）
