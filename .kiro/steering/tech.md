@@ -281,6 +281,6 @@ local value = act:get_property("baseware.version")
 
 - `pasta.shiori.event.callback` モジュールが ID 管理・待機の登録・タイムアウトを担当し、再開は通常のイベントと同じ `EVENT.drive` に任せる
 - 応答イベント（`OnPastaCallBack{N}`）で待機中のシーンを再開し、出力が応答になる
-- OnSecondChange の既定ハンドラが期限切れの待機を掃引する（理由付きのタイムアウトは `X-Error-Reason` 付きの 500 を返す）
+- OnSecondChange の既定ハンドラが期限切れの待機を掃引する（理由付きのタイムアウトは `【時間切れ：…】` の表記を `200 OK` ＋ `X-Error-Reason` で返す。`[logging] balloon_warning = false` なら従来どおり `X-Error-Reason` 付きの 500）
 
 詳細: `.claude/skills/pasta-lua-coding/SKILL.md`

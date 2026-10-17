@@ -2,6 +2,8 @@
 
 `/kiro-discovery` で起票（2026-10-10・main `88c4bc0e`）。0.5.0「areka でノベルゲームが作れる」の道筋の 5 番目。
 
+2026-10-17 の棚卸で、変数の保存の範囲の分を `novel-variable-scope` へ分けた。今の範囲は、末尾の「2026-10-17 棚卸の分割」が正である。
+
 ## Problem
 
 市販品の体裁のノベルゲームには、バックログから前の場面へ巻き戻る機能と、セーブ・ロードがある。どちらも「過去のある時点の状態へ戻る」ことである。pasta の場面は Lua のコルーチンで走り、走りかけのコルーチンは控えられない。Ren'Py も同じ制約を持ち、公式の文書で「コルーチンは保存できない」と断っている。今の pasta には、過去の時点を指す名前も、その時点の状態の控えも無い。
@@ -117,3 +119,34 @@
 - 全セーブ共通の変数は、巻き戻さない。
 - ノベル向けの設定でないとき、出力と保存の挙動を変えない。
 - 変数の保存の範囲は、文法に触る見込みである。マニュアルが文法の唯一の権威である。
+
+## 2026-10-17 棚卸の再測定（main b4164100）
+
+- **前提の変化**（止まるエラーのバルーン表示 `runtime-error-balloon` より）:
+  - エラーの応答も 200 になった。`shiori/stop.lua` の `STOP.response` が表記を載せた 200 の応答を作り、理由を `X-Error-Reason` の行に入れる（`shiori/entry.lua` 79〜101 行、`shiori/event/callback.lua` のタイムアウト 173〜187 行）。「200 なら場面が最後まで走った」とは読めないので、区切りにしない応答にこの 2 つを足す。
+  - 応答の値を包む所は、`shiori/event/init.lua` の 237・241・243 行と `callback.lua` の 116・192 行に動き、上の 2 か所が増えた。1 か所に寄せるかの議題（要件の 4 番）は、増えた分も含めて決める。
+  - `stop.lua` は止まった場面とハンドラの act を、要求 1 回の間だけ控える（要求の始めに `STOP.clear` で空にする）。act の `call_restore`（`act.lua` 787〜795 行）が戻す名前と行の対応も、応答をまたがない。どちらも区切りの控えに入れなくてよい。
+- **触るファイル**: 目印の出力 `shiori/sakura_builder.lua` 383、区切りの倉（新しい Lua のファイル）、応答の出口 `shiori/entry.lua` 132・`shiori/event/init.lua` 260・`shiori/event/callback.lua` 226、巻き戻しの受け口（新しいファイルと `init.lua` の読み込みの 1 行）、`shiori/appearance.lua` 567、`shiori/event/virtual_dispatcher.lua` 288、`pasta/store.lua` 124・`pasta/save.lua` 13。変数の保存の範囲を入れるなら、文法 `grammar.pest` 272、変数の Lua を出す `code_gen/element_gen.rs` 564（`save.名前` を出すのは 39・71 行）、永続化 `crates/pasta_lua/src/runtime/persistence.rs` 568・`lifecycle.rs` 63、エディタ。
+- **規模**: 21〜25 タスク（目印 2、区切りの倉 2、出口を寄せる 2、巻き戻しの受け口 2、控えの中身 3、戻れない点 1、記録しない範囲 1、保存できない値 1、変数の保存の範囲 4〜6、マニュアル 2、テスト 2）。上限を超える。
+- **分割の案**: 2 本に分ける。`novel-variable-scope`（変数の保存の範囲: セーブごとと全セーブ共通の書き方・今の `＄＊` との両立・保存できない値。`grammar.pest`・パーサ・`element_gen.rs`・`save.lua`・`persistence.rs`・`lifecycle.rs`・エディタ・マニュアルの変数の章。8〜10 タスク）と `novel-checkpoint-rollback`（目印・区切り・巻き戻し・戻れない点・記録しない範囲・控えの中身。`sakura_builder.lua`・新しい倉・応答の出口の 3 ファイル・新しい受け口・`appearance.lua`・`virtual_dispatcher.lua`・`store.lua`。13〜15 タスク）。変数の保存の範囲は要件の最初の議題なので、`novel-variable-scope` を先に置く。2 本は触るファイルが重ならない（`save.lua` は前の 1 本だけが持ち、後の 1 本はその口を使う）。前の 1 本は `novel-talk-flow` を待たないので、もっと早く始められる。
+- **先に要るもの**: `novel-talk-flow`（ノベル向けの出力と場面の境目）、`novel-areka-contract`（目印とイベントの名前）。ファイルの重なり: `novel-talk-flow`（`sakura_builder.lua`・`appearance.lua`・`virtual_dispatcher.lua`・`init.lua`）、`cue-command-runtime`・`scene-anchor-link`（`sakura_builder.lua`）、`tutorial-ssp-gaps`（`virtual_dispatcher.lua`）、`shell-element-click`（`init.lua` の読み込みの行を足す場合）。変数の保存の範囲の分は、`call-attribute-filter`・`scene-anchor-link`（`grammar.pest`・`element_gen.rs`）と `novel-save-slots`（`save.lua`・`persistence.rs`・`lifecycle.rs`）とも重なる。
+- **種別**: 機能（過去の時点を指す名前も、状態の控えも無い）。巻き戻しの方式は開発者の案（2026-10-10）。
+- **要件定義のモデル**: Fable（分けても 2 本とも）。変数の保存の範囲は、今のゴーストの `＄＊x` に関わる保存の形で、取り消しにくい。書き方・どちらを今の `＄＊` にするか・両立・保存できない値が絡み、推奨案が無い。巻き戻しは、どの応答を区切りにするかが、Rust の 5 秒の待ち（届かなかった応答）・Lua のコルーチン・SHIORI の応答にまたがる時間の決まりで、areka がその形に頼る。
+- **見つけた穴・古くなった記述**:
+  - 行番号: 組み立てが立ち位置を書き換える所は `sakura_builder.lua` 226〜231 行 → 294〜304 行、`set_co_scene` は `init.lua` 97 行 → 99 行、`shiori/entry.lua` 79〜89 行 → 79〜101 行、並べ替えの位置は `scene_table.rs` 54・270〜314 行 → 62 行・319〜350 行。`appearance.lua`・`virtual_dispatcher.lua`・`marshaling.rs`・`lifecycle.rs` の行番号は合っている。
+
+## 2026-10-17 棚卸の分割
+
+再測定で 21〜25 タスクになり、上限の 20 を超えたので、2 本に分けた。**この節が、この spec の今の範囲の正である**（上の節の「変数の保存の範囲」の記述は、`novel-variable-scope` へ移った）。
+
+- **移した物**（`novel-variable-scope` の brief へ）: 「Desired Outcome」の 4 点目（変数の保存の範囲の 2 つ）、「Approach」の要件の 1 番（書き方）と 8 番（保存できない値）、「Boundary Candidates」の 4 点目、「Constraints」の 4 点目（文法に触る見込み）。`pasta.save` の表の同一性と予約の `pasta_` の名前の話（「2026-10-10 の検証で分かったこと」の 2・3 点目）は、事実として両方の brief に残す。どう分けて持つかは `novel-variable-scope` が決め、この spec はその口で中身を入れ替える。
+- **In（分割の後）**: 目印の ID の出力。区切りにする応答の決まり（場面が最後まで走った応答だけ。プロパティの読み出しの途中・`＞yield`・止まるエラーと時間切れの 200・届かなかった応答を除く）。区切りごとの状態と台本の控え（控えの中身は、`novel-variable-scope` の口から取るセーブごとの変数、`STORE.actor_spots`、JSON にできる形にした `STORE.appearance`）。応答の出口を 1 か所に寄せるか。巻き戻しのイベントの受け口。戻れる数。戻れない点。記録しない範囲。テスト、マニュアル、スキル references の再生成。
+- **Out（分割の後）**: 変数の保存の範囲の書き方・今の `＄＊x` との両立・保存できない値（`novel-variable-scope`）。セーブとロード（`novel-save-slots`）。既読のための変わらない行 ID（`novel-talk-flow`）。バックログの一覧と画面（areka）。
+- **要件で決めること（残り）**: 上の「Approach」の 2〜7 番（区切りにする応答・控えに入れる物・台本を取る場所・戻れる数・戻れない点・記録しない行）。番号は振り直さない。
+- **順番**: `novel-variable-scope` は `novel-talk-flow` を待たないので、それより先に始められる。`novel-checkpoint-rollback` は、`novel-talk-flow` と `novel-variable-scope` の両方の後に置く（控えに入れる変数がどれかは、`novel-variable-scope` が決める）。
+- **規模**: `novel-variable-scope` は 8〜10 タスク。`novel-checkpoint-rollback` は 13〜15 タスク（目印 2、区切りの倉 2、出口を寄せる 1〜2、巻き戻しの受け口 2、控えの中身 2〜3、戻れない点 1、記録しない範囲 1、マニュアル 1、テスト 1）。
+- **触るファイル（この spec）**: 目印の出力 `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`（383 行）、区切りの倉（新しい Lua のファイル）、応答の出口 `shiori/entry.lua`（132）・`shiori/event/init.lua`（260）・`shiori/event/callback.lua`（226）、巻き戻しの受け口（新しいファイルと、`init.lua` の読み込みの 1 行）、`shiori/appearance.lua`（567）、`shiori/event/virtual_dispatcher.lua`（288。`co_scene` を消す所）、`pasta/store.lua`（124）、マニュアルと生成スキル。`save.lua` は触らない（`novel-variable-scope` が作る口を使う）。
+- **触るファイル（`novel-variable-scope`）**: 文法 `grammar.pest`・パーサ・構文木・`partial.rs`、`code_gen/element_gen.rs`、`save.lua`・`runtime/persistence.rs`・`runtime/lifecycle.rs`、`failure.lua`、辞書の検査 `transpile_rules.rs`、LSP `visit_expr.rs`、VSCode の着色、マニュアルの変数の章と入門 10 段目。表を 2 つにするなら `act.lua` と `scope_gen.rs` も。詳しくは、その brief の「測定」。
+- **2 本のファイルの重なり**: 無いことを確かめた。例外は、`novel-variable-scope` が予約の `pasta_` の名前の置き場所を動かす場合の `virtual_dispatcher.lua` だけ（あちらは 46 行の設定の読み込み、こちらは 288 行）。2 本は前後に置くので、ぶつからない。
+- **先に要るもの（この spec）**: `novel-talk-flow`（ノベル向けの出力と場面の境目）、`novel-areka-contract`（目印とイベントの名前）、`novel-variable-scope`（控えに入れる変数と、中身を入れ替える口）。ファイルの重なりは、上の再測定の節のうち、変数の保存の範囲の分を除いたもの（`novel-talk-flow`・`cue-command-runtime`・`scene-anchor-link`・`tutorial-ssp-gaps`・`shell-element-click`）。
+- **要件定義のモデル**: 2 本とも Fable のまま。この spec は、区切りにする応答が、Rust の 5 秒の待ち・Lua のコルーチン・SHIORI の応答にまたがる時間の決まりで、areka がその形に頼るため。

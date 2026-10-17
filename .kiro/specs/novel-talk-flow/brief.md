@@ -125,3 +125,18 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - 検査を足すときに触る所: 報告の種類 `FindingKind`（`report.rs`。誤り／注意の分類と kebab-case の code・文言の `msg` を 1 か所で持つ）、検査の段（`validate/mod.rs` の `validate_ghost` が段の順に呼ぶ）、マニュアルの章 `book/src/debug/validate.md` の報告の表。
 - 種類の追加・分類・出力の 1 行の形を変えるのは、`pasta-check-dic-validate` の design.md の Revalidation Triggers に当たる（CI・作者のスクリプト・マニュアル・`wasmBridge.ts` の形の検査に効く）。実行時と同じことを守る一致テスト `crates/pasta_check/tests/validate_parity_test.rs` も合わせて見直す。
 - ノベル向けの設定（完全一致の場面選びなど）に合わせた検査を足すかどうか・誤りか注意かは、この spec の要件で決める。
+
+## 2026-10-17 棚卸の再測定（main b4164100）
+
+- **前提の変化**:
+  - 名前が完全に一致する場面を選ぶ部品が入った（`touch-poke-shortcuts`。`crates/pasta_core/src/registry/scene_table.rs` の `resolve_scene_id_exact` 251 行、`crates/pasta_lua/src/search/context.rs` の `search_scene_exact` 105 行、`pasta_scripts/pasta/scene.lua` の `SCENE.co_exec_exact` 227 行。最後のものはグローバルシーンだけ）。残るのは、ノベル向けの設定のときに Call と選択肢の探し方をこれに切り替える仕組みだけ。
+  - 止まるエラーのバルーン表示（`runtime-error-balloon`）で、応答の出口が増えた。止まったときは `shiori/stop.lua` の `STOP.response` が、表記を載せた 200 の応答を作る（`shiori/entry.lua` 79〜101 行・`shiori/event/callback.lua` 173〜187 行）。「次の場面へ」の印をこの応答に付けない、と決める必要がある。
+  - act は、実行中の場面の「行の対応」（生成コードの行と `.pasta` の行の組。`act.line_map`）を持つようになった。ただし `.pasta` の行番号は台本を直すとずれるので、変わらない行 ID の元にはならない。
+- **触るファイル**: 設定の読み込み `crates/pasta_lua/src/loader/config/`（`sections.rs` 344）、出力の組み立て `shiori/sakura_builder.lua` 383、サーフェスの復旧 `shiori/appearance.lua` 567、1 字ごとの待ちと改行 `crates/pasta_lua/src/sakura_script/`（`mod.rs` 247・`wait_inserter.rs` 397・`line_breaker.rs` 462）、ランダムトークと時報 `shiori/event/virtual_dispatcher.lua` 288、起動 `shiori/event/boot.lua` 22、「次の場面へ」の受け口（新しいファイルと、`shiori/event/init.lua` に読み込みの 1 行）、場面の探し方 `act.lua` 829（1,000 行に近い）・`scene.lua` 240、行 ID を生成で埋めるなら `code_gen/scope_gen.rs` 445・`element_gen.rs` 564、検査を足すなら `crates/pasta_check/src/validate/`。
+- **規模**: 17〜21 タスク（設定 1、クリック待ち 2、組み立ての `\x` 対応 3、話者名 1〜2、行 ID と声 2、ランダムトークと時報の停止 1、起動の場面 1、次の場面へ 2、完全一致の切り替え 1、途中の `＞yield` 1、待ちと改行を挟まない 1、マニュアル 2、テスト 2）。完全一致の部品の分は減ったが、20 を超えうる。
+- **先に要るもの**: `cue-command-runtime`（同じ 3 か所を先に触る）、`novel-areka-contract`（名前）。ファイルの重なり: `cue-command-runtime`（`act.lua`・`sakura_builder.lua`・`loader/config/`、生成で埋めるなら `scope_gen.rs`）、`novel-checkpoint-rollback`（`sakura_builder.lua`・`appearance.lua`・`virtual_dispatcher.lua`・`init.lua`）、`scene-anchor-link`（`act.lua`・`sakura_builder.lua`・`sakura_script/`）、`call-attribute-filter`（`act.lua`・`scene.lua`、生成で埋めるなら `element_gen.rs`）、`tutorial-ssp-gaps`（`virtual_dispatcher.lua`・`boot.lua`）、`shell-element-click`（`init.lua` の読み込みの行・`scene.lua` に足す場合）、検査を足すなら `pasta-check-validate-edges`（`validate/`）。`scene-attribute-store` とは `scene.lua` か `scope_gen.rs` を触る場合だけ重なる。
+- **種別**: 機能（ノベル向けの出力の切り替えが無い）。開発者の 0.5.0 の目標（2026-10-10）から。
+- **要件定義のモデル**: Fable。決めるのは、areka が既読と声の引き当てのためにセーブをまたいで覚える「変わらない行 ID」の作り方と、ノベル向けの切り替えの形（後から変えにくい保存の形と設定の約束）。ID の作り方、2 段のクリック待ちと入れない行の書き方、「次の場面へ」の書き方と印、途中の `＞yield` の扱いの 4 つが互いに絡み、推奨案がまだ無い。
+- **分割の案**: 要件で 20 を超えたら、決めてあるとおり 2 本に分ける。`novel-talk-output`（出力の組み立て: 切り替えの設定・クリック待ち・`\x` への対応・話者名・行 ID と声・待ちと改行を挟まない。`loader/config/`・`sakura_builder.lua`・`appearance.lua`・`sakura_script/`・生成）と `novel-scene-flow`（場面の流れ: ランダムトークと時報の停止・起動の場面・次の場面へ・完全一致の切り替え・途中の `＞yield`。`virtual_dispatcher.lua`・`boot.lua`・新しい受け口・`act.lua`・`scene.lua`）。切り替えの設定は前の 1 本に置き、後の 1 本はそれを読む。後の 1 本は `tutorial-ssp-gaps` と同じ 2 ファイルを触る。
+- **見つけた穴・古くなった記述**:
+  - 行番号: 組み立てのアクターの切り替えは `sakura_builder.lua` 240 行 → 310 行、段落の区切りの改行は 245・263〜265 行 → 346〜347 行、`\e` は 284 行 → 379 行。前方一致の探し方は `act.lua` 366〜370 行 → `find_act_handler` 361〜402 行、`scene_table.rs` 185・270〜314 行 → 179 行・319〜350 行。止まっている場面を捨てる所は `shiori/event/init.lua` 124〜132 行 → 127〜134 行。Reference を変数へ移す関数は `shiori/act.lua` 161〜190 行 → 165〜194 行。`appearance.lua`・`virtual_dispatcher.lua`・`kick.lua`・`line_breaker.rs` の行番号は合っている。

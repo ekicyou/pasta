@@ -87,3 +87,8 @@
 - 今のゴーストの保存（1 つのファイル・終了時）を変えない。
 - 書き込みは、今と同じく、一時ファイルへ書いてから名前を替える。
 - セーブのファイルは、利用者の `profile/` の下に置く。配布物に入れない。
+
+## 申し送り（2026-10-17 の棚卸の分割より）
+
+- 変数の保存の範囲（セーブごとと全セーブ共通の書き方・今の `＄＊x` との両立・保存できない値）は、`novel-checkpoint-rollback` から `novel-variable-scope` へ分けた。「Upstream」の「変数の保存の範囲」は `novel-variable-scope` と読む。
+- `save.lua`・`persistence.rs`・`lifecycle.rs` は、先に `novel-variable-scope` が触る。この spec はその後に置き、2 つの範囲を分けて持つ口を使う。全セーブ共通の分を書く時機（書いたらすぐか、区切りごとか）は、線の引き方を `novel-variable-scope` と揃える。
