@@ -273,3 +273,9 @@
 - `.claude/skills/kiro-spec-design/rules/`（design-principles・design-discovery-light・design-synthesis・design-review-gate）: 境界を先に書く・補助の部品を作らない・要件の番号の機械照合。
 - 記憶 `ssp-ghost-test-launch`（`--ghost` の絶対パス・名前の衝突は複製して改名）、`ffmpeg-sharex-path`（フルパスで呼ぶ）、`high-completeness-or-reject`（部分出荷をしない）。
 - 前例: `hello-pasta-shell-art` 6.1・`hello-pasta-tutorial-stages` 6.1 の実装メモ（実機の起動と後片付け）。
+
+## 設計ディスカッションの決定（2026-10-17）
+
+- 議題 2（画面の倍率）: Windows の表示の拡大は変えない。SSP の側の拡大率（シェル・バルーン）で 1:1 に合わせ、配置を調整する。開発者の提案。システムの設定を触らずに済み、エージェントが画面操作で受け持てる。
+- 議題 4（6 段目の時刻）: 撮影の進み具合で、撮る直前に決める。開発者の判断。本文は時刻を「そのときの時刻になる」と書くので、要件 2.3 を「時刻は撮った時刻のままでよい」に直した。
+- 議題 1・3・5・6: 推奨案のとおり（範囲の幅 900 px まで・送り主の表示は最初の試し撮りの関門・分担・白の背景）。
