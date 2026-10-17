@@ -1,0 +1,22 @@
+{
+  "feature_name": "runtime-error-balloon",
+  "created_at": "2026-10-17T02:19:26Z",
+  "updated_at": "2026-10-17T02:40:00Z",
+  "language": "ja",
+  "phase": "requirements-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": false
+    },
+    "design": {
+      "generated": false,
+      "approved": false
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": false
+}
