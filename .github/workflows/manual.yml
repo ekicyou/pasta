@@ -126,21 +126,22 @@ jobs:
       - name: Tutorial artifact match check
         run: node book/tools/tutorial-check.mjs
 
-      # Rust ツールチェーン（その2の構文検証＝cargo test 用）。
+      # Rust ツールチェーン（その2の構文検証＝cargo run -p pasta_check 用）。
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
 
-      # チュートリアル成果物ガード その2（要件 6.2 / design「Testing/コンテンツ整合」）。
-      # hello-pasta 実ファイルを本物の PastaLoader::load で読み込み・トランスパイルして
-      # 検証する既存テスト（self_deploy_integration_test.rs 等）を構文検証手段として採用。
-      # pasta_check validate への置き換えは別に決める（前方一致の衝突の検査は validate に無い）。
+      # チュートリアル成果物ガード その2（要件 6.2 / pasta-check-validate-edges 要件 5.1・5.2）。
+      # hello-pasta の実ファイルを pasta_check validate で検査する。誤りがあれば終了コード 1 で段が落ち、
+      # 公開（deploy は needs: build）が止まる。注意では止めない。
+      # 注意 0 件は validate_cli_test.rs のテスト（build.yml で走る）が守る。
+      # 段階の辞書を読み込んで応答を確かめるテストは build.yml の cargo test --all で走る。
       # その1で「チュートリアル == 実ファイル」を保証済みのため、チュートリアル成果物の
-      # 構文妥当性が transitively 担保される（フル SSP 実行なしの機械的ガード）。
-      - name: Tutorial syntax validation (hello-pasta real files)
-        run: cargo test -p pasta_sample_ghost
+      # 構文の正しさが transitively 担保される（フル SSP 実行なしの機械的ガード）。
+      - name: Tutorial syntax validation (pasta_check validate)
+        run: cargo run -q -p pasta_check -- validate --target crates/pasta_sample_ghost/ghosts/hello-pasta
 
       # 出力の静的性・検索・コンテンツ受入基準の検証（ビルド済み book/book を対象に --no-build）。
       # verify-static / verify-search の --self-test は本検査を行ったうえで、検査ロジック自身の

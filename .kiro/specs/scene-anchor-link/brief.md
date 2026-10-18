@@ -169,3 +169,9 @@
 - **見つけた穴・古くなった記述**:
   - 「Adjacent」の `failure-output-unification`（`act.lua` と失敗の表記を共有）は、完了したので外してよい。
   - 選択肢の飛び先の検査（`validate/references.rs`）は、前方一致と別名まで実行時と同じ規則で探している。アンカーの検査はこれを使える。読む場所は、選択肢の行に加えて台詞の中の要素が 1 つ増える。
+
+## 申し送り（pasta-check-validate-edges より）
+
+- `pasta_check validate` の飛び先の検査は、辞書の中身が分からないとき（構文エラー・読めない辞書ファイル・pasta.toml の誤り）に丸ごと省く形になった。判定は `crates/pasta_check/src/validate/report.rs` の `skip_reasons`（統計の `skipReasons`）で、すべての段の報告がそろった後に 1 回だけ行う（`validate/mod.rs`）。
+- 見直しが要る論点: この spec が `validate` に辞書のシーンの集まりに頼る検査を足すなら、`skip_reasons` が空のときだけ走らせるか。辞書の中身が分からないことを表す誤りの種類を足すなら、`skip_reasons` の対応に入れるか。
+- 参照: `.kiro/specs/completed/pasta-check-validate-edges/design.md` の「Revalidation Triggers」と「Report（report.rs）」の省く理由の表。

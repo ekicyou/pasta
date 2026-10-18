@@ -36,6 +36,7 @@ import {
 import { DiagnosticsManager } from '../diagnosticsManager';
 import { WasmBridge } from '../wasmBridge';
 import { DocumentSync } from '../documentSync';
+import { GhostValidator } from '../ghostValidator';
 import {
   PastaDebugAdapterFactory,
   PastaDebugConfigurationProvider,
@@ -557,14 +558,14 @@ test('analyzeDocument passes a well-formed wasm result through unchanged', () =>
 // wasm_select_ghost_files / wasm_validate_ghost は失敗で null を返す。結果の形を
 // 境界で確かめ、違えば throw する（核の結果はそのまま通す）。
 
-const ghostInput = { pastaToml: { kind: 'missing' } as const, entries: ['dic/a.pasta'] };
+const ghostInput = { pastaToml: { kind: 'missing' } as const, entries: ['dic/a.pasta'], dirs: ['dic'] };
 
 const wellFormedReport = {
   findings: [
     { code: 'syntax', severity: 'error', path: 'dic/a.pasta', line: 3, column: 1, message: '構文の誤り' },
     { code: 'config-scene-alias', severity: 'warning', path: 'pasta.toml', line: null, column: null, message: '注意' },
   ],
-  stats: { dictionaryFiles: 1, errors: 1, warnings: 1, uncheckedDynamicCalls: 0, referencesSkipped: true },
+  stats: { dictionaryFiles: 1, errors: 1, warnings: 1, uncheckedDynamicCalls: 0, skipReasons: ['syntax'] },
 };
 
 test('selectGhostFiles passes the wasm input through and returns the string list', () => {
@@ -626,7 +627,15 @@ test('validateGhost throws on null and on every malformed report shape', () => {
     { findings: [], stats: { ...stats, errors: undefined } },
     { findings: [], stats: { ...stats, warnings: null } },
     { findings: [], stats: { ...stats, uncheckedDynamicCalls: true } },
-    { findings: [], stats: { ...stats, referencesSkipped: 0 } },
+    { findings: [], stats: { ...stats, skipReasons: undefined } },
+    { findings: [], stats: { ...stats, skipReasons: 'syntax' } },
+    { findings: [], stats: { ...stats, skipReasons: ['syntax', 'parse'] } },
+    { findings: [], stats: { ...stats, skipReasons: [null] } },
+    // 古い形（真偽値だけ）は受け付けない
+    {
+      findings: [],
+      stats: { dictionaryFiles: 1, errors: 1, warnings: 1, uncheckedDynamicCalls: 0, referencesSkipped: true },
+    },
   ];
   for (const bad of bads) {
     const bridge = bridgeWithWasmModule({ wasm_validate_ghost: () => bad });
@@ -637,7 +646,7 @@ test('validateGhost throws on null and on every malformed report shape', () => {
 test('real WASM: selectGhostFiles / validateGhost results pass the shape checks', async () => {
   const bridge = new WasmBridge({ appendLine: () => {} } as never);
   await bridge.initialize(mock.Uri.joinPath(mock.Uri.file(ROOT), 'wasm', 'pasta_lsp_wasm_bg.wasm') as never);
-  const input = { pastaToml: { kind: 'missing' } as const, entries: ['dic/a.pasta', 'readme.txt'] };
+  const input = { pastaToml: { kind: 'missing' } as const, entries: ['dic/a.pasta', 'readme.txt'], dirs: ['dic'] };
   assert.deepStrictEqual(bridge.selectGhostFiles(input), ['dic/a.pasta']);
   const report = bridge.validateGhost(input, { 'dic/a.pasta': { kind: 'notUtf8' } });
   // 読めないファイルの誤りは位置を持たない（None → null で届く）
@@ -646,7 +655,35 @@ test('real WASM: selectGhostFiles / validateGhost results pass the shape checks'
     JSON.stringify(report)
   );
   assert.ok(report.stats.errors >= 1);
+  assert.deepStrictEqual(report.stats.skipReasons, ['unreadable-file']);
   bridge.dispose();
+});
+
+// 拡張と本物の核をつなぐ（pasta-check-validate-edges 3.4・要件 4.1 / 4.2）。
+// 大文字・小文字の混じった Ghost/Master の配下の中身の無い dic/x.pasta/ を、
+// 本物の WASM がフォルダの誤りとして返し、フォルダの URI に Error で出る。
+test('real WASM: Ghost/Master の配下の空の dic/x.pasta/ は folder-matches-pattern の Error になる', async () => {
+  const bridge = new WasmBridge({ appendLine: () => {} } as never);
+  await bridge.initialize(mock.Uri.joinPath(mock.Uri.file(ROOT), 'wasm', 'pasta_lsp_wasm_bg.wasm') as never);
+  mock.resetFakeFs();
+  mock.workspace.textDocuments.length = 0;
+  mock.setFakeFile('/ws/Ghost/Master/dic/a.pasta', '＊会話\n');
+  mock.setFakeDir('/ws/Ghost/Master/dic/x.pasta');
+  const gv = new GhostValidator(bridge, mock.window.createOutputChannel('Pasta Language') as never);
+  const col = mock.createdDiagnosticCollections[mock.createdDiagnosticCollections.length - 1];
+  const master = mock.Uri.file('/ws/Ghost/Master');
+
+  await gv.validate(master as never);
+
+  const d = col.get(mock.Uri.joinPath(master, 'dic', 'x.pasta'));
+  assert.ok(d, `フォルダの URI に診断が無い（診断のある URI は ${col.size} 個）`);
+  assert.deepStrictEqual(
+    d.map((x) => [x.code, x.severity]),
+    [['folder-matches-pattern', mock.DiagnosticSeverity.Error]]
+  );
+  gv.dispose();
+  bridge.dispose();
+  mock.resetFakeFs();
 });
 
 test('validateGhost throws when the bridge is not ready', () => {
@@ -754,7 +791,7 @@ test('word-ref decorator re-applies on active-editor change and document edits',
 const TOGGLE_COMMAND = 'pasta.debug.toggleSourcePresentation';
 const TOGGLE_EVENT = 'pasta/sourcePresentation';
 
-const GHOST_WATCH_GLOB = '**/ghost/master/**/*.{pasta,lua}';
+const GHOST_WATCH_GLOB = '**/*';
 
 function ghostValidatorCreated(fromCollection: number, fromWatcher: number): { collections: number; watchers: number } {
   return {

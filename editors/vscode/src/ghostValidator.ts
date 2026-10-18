@@ -14,20 +14,36 @@ const NOT_UTF8_REASON = 'UTF-8 として読めません';
 /** 入力のたびの構文の診断（DocumentSync）と重なる code（11.9） */
 const SYNTAX_CODE = 'syntax';
 
-/** fileUri の祖先の ".../ghost/master"（いちばん近いもの）。無ければ undefined */
+/**
+ * fileUri の祖先の ".../ghost/master"（いちばん近いもの）。無ければ undefined。
+ * 大文字・小文字は区別しない（Windows の規則。3.1・3.5）。返す URI は届いた綴りのまま
+ */
 export function findGhostMaster(fileUri: vscode.Uri): vscode.Uri | undefined {
   const segments = fileUri.path.split('/');
   // 最後の要素はファイルそのものなので、親から上へ探す
   for (let i = segments.length - 2; i >= 1; i--) {
-    if (segments[i] === 'master' && segments[i - 1] === 'ghost') {
+    if (segments[i].toLowerCase() === 'master' && segments[i - 1].toLowerCase() === 'ghost') {
       return fileUri.with({ path: segments.slice(0, i + 1).join('/') });
     }
   }
   return undefined;
 }
 
+/**
+ * ゴーストの鍵（パスを小文字にした URI の文字列）。綴りの違う同じゴーストを 1 つにまとめる（3.6）。
+ * 診断の URI と開いている文書の照らし合わせにも使う
+ */
+export function ghostKey(master: vscode.Uri): string {
+  return master.with({ path: master.path.toLowerCase() }).toString();
+}
+
+/** 名前が suffix で終わるか（大文字・小文字を区別しない） */
+function endsWithIgnoreCase(uri: vscode.Uri, suffix: string): boolean {
+  return uri.path.toLowerCase().endsWith(suffix);
+}
+
 interface OpenChange {
-  uri: string;
+  uri: vscode.Uri;
   open: boolean;
 }
 
@@ -46,6 +62,8 @@ interface Schedule {
   running: boolean;
   /** 走行中に起動の条件が来た */
   again: boolean;
+  /** 最後に起動した URI の綴り */
+  master: vscode.Uri;
 }
 
 export class GhostValidator implements vscode.Disposable {
@@ -64,75 +82,106 @@ export class GhostValidator implements vscode.Disposable {
   /**
    * 保存（.pasta・master の直下の pasta.toml）と配下の .pasta・.lua の作成・削除で検査を起動する
    * （11.3・11.6。名前の変更は削除と作成として届く）。ghost/master の外なら何もしない（11.10）。
+   * 大文字・小文字はどれも区別しない（3.1〜3.4）。見張りはすべてのファイルに張って関数で絞る:
+   * 1.106 までの VSCode はパターンを大文字・小文字を区別して照らすため（OQ-6）。
    * 開く・閉じるは syntax の出し分けをやり直すだけ（11.9）。起動直後の全体検査はしない
    */
   register(): void {
-    const watcher = vscode.workspace.createFileSystemWatcher('**/ghost/master/**/*.{pasta,lua}');
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*');
     const onFileChange = (uri: vscode.Uri) => {
+      if (!endsWithIgnoreCase(uri, '.pasta') && !endsWithIgnoreCase(uri, '.lua')) {
+        return;
+      }
       const master = findGhostMaster(uri);
       if (master) {
+        this.requestValidation(master);
+      }
+    };
+    // フォルダを丸ごと消すと、中の削除は届かないことがある。前回読んだファイルか診断を
+    // 出していた URI がその下にあれば検査をやり直す（残った診断を消し、辞書の変化を拾う）
+    const onDelete = (uri: vscode.Uri) => {
+      onFileChange(uri);
+      const master = findGhostMaster(uri);
+      const state = master && this.ghosts.get(ghostKey(master));
+      if (!master || !state) {
+        return;
+      }
+      const prefix = `${ghostKey(uri)}/`;
+      const under = (u: vscode.Uri) => ghostKey(u).startsWith(prefix);
+      if (
+        [...state.shown.values()].some(under) ||
+        [...state.texts.keys()].some((rel) => under(vscode.Uri.joinPath(state.master, ...rel.split('/'))))
+      ) {
         this.requestValidation(master);
       }
     };
     this.subscriptions.push(
       watcher,
       watcher.onDidCreate(onFileChange),
-      watcher.onDidDelete(onFileChange),
+      watcher.onDidDelete(onDelete),
       vscode.workspace.onDidSaveTextDocument((doc) => {
         const master = findGhostMaster(doc.uri);
         if (!master) {
           return;
         }
-        if (doc.uri.path.endsWith('.pasta') || doc.uri.path === `${master.path}/pasta.toml`) {
+        if (
+          endsWithIgnoreCase(doc.uri, '.pasta') ||
+          doc.uri.path.toLowerCase() === `${master.path.toLowerCase()}/pasta.toml`
+        ) {
           this.requestValidation(master);
         }
       }),
-      vscode.workspace.onDidOpenTextDocument((doc) => this.renderAll({ uri: doc.uri.toString(), open: true })),
-      vscode.workspace.onDidCloseTextDocument((doc) => this.renderAll({ uri: doc.uri.toString(), open: false }))
+      vscode.workspace.onDidOpenTextDocument((doc) => this.renderAll({ uri: doc.uri, open: true })),
+      vscode.workspace.onDidCloseTextDocument((doc) => this.renderAll({ uri: doc.uri, open: false }))
     );
   }
 
-  /** ゴーストごとに delayMs で束ねて検査する。走行中に来たら終わった後に 1 回だけ走らせる */
+  /**
+   * ゴーストごと（鍵は ghostKey）に delayMs で束ねて検査する。走行中に来たら終わった後に
+   * 1 回だけ走らせる。検査に使う master は最後に起動した URI の綴り
+   */
   requestValidation(master: vscode.Uri): void {
     if (this.disposed) {
       return;
     }
-    const key = master.toString();
+    const key = ghostKey(master);
     let s = this.schedules.get(key);
     if (!s) {
-      s = { running: false, again: false };
+      s = { running: false, again: false, master };
       this.schedules.set(key, s);
     }
+    s.master = master;
     if (s.running) {
       s.again = true;
       return;
     }
     clearTimeout(s.timer);
     const schedule = s;
-    s.timer = setTimeout(() => void this.run(master, schedule), this.delayMs);
+    s.timer = setTimeout(() => void this.run(schedule), this.delayMs);
   }
 
-  private async run(master: vscode.Uri, s: Schedule): Promise<void> {
+  private async run(s: Schedule): Promise<void> {
     s.timer = undefined;
     s.running = true;
     try {
-      await this.validate(master);
+      await this.validate(s.master);
     } finally {
       s.running = false;
     }
     if (s.again && !this.disposed) {
       s.again = false;
-      await this.run(master, s);
+      await this.run(s);
     }
   }
 
   /** master のゴーストを集めて検査し、そのゴーストの診断を置き換える */
   async validate(master: vscode.Uri): Promise<void> {
-    const key = master.toString();
+    const key = ghostKey(master);
     try {
       const entries: string[] = [];
-      await walk(master, '', entries);
-      const input: GhostInput = { pastaToml: await readToml(master), entries };
+      const dirs: string[] = [];
+      await walk(master, '', entries, dirs);
+      const input: GhostInput = { pastaToml: await readToml(master), entries, dirs };
       const listed = new Set(entries);
       const files: Record<string, FileText> = {};
       for (const rel of this.bridge.selectGhostFiles(input)) {
@@ -154,6 +203,8 @@ export class GhostValidator implements vscode.Disposable {
         texts.set('pasta.toml', input.pastaToml.text);
       }
       const state = this.ghosts.get(key) ?? { master, report, texts, shown: new Map<string, vscode.Uri>() };
+      // 診断の URI はその回の綴りで作る（前の綴りの URI は render が消す）
+      state.master = master;
       state.report = report;
       state.texts = texts;
       this.ghosts.set(key, state);
@@ -195,24 +246,28 @@ export class GhostValidator implements vscode.Disposable {
 
   /**
    * 前回の報告から診断を出し直す。change は開いた・閉じたばかりの文書で、
-   * textDocuments の更新と通知の順に頼らずその状態として扱う
+   * textDocuments の更新と通知の順に頼らずその状態として扱う。
+   * 作った URI と大文字・小文字だけ違う文書が開いていれば、その文書の URI に付ける（3.6）
    */
   private render(state: GhostState, change?: OpenChange): void {
-    const open = new Set(vscode.workspace.textDocuments.map((d) => d.uri.toString()));
+    // キーは ghostKey、値は開いている文書の URI
+    const open = new Map(vscode.workspace.textDocuments.map((d) => [ghostKey(d.uri), d.uri] as const));
     if (change) {
       if (change.open) {
-        open.add(change.uri);
+        open.set(ghostKey(change.uri), change.uri);
       } else {
-        open.delete(change.uri);
+        open.delete(ghostKey(change.uri));
       }
     }
     const byUri = new Map<string, { uri: vscode.Uri; diagnostics: vscode.Diagnostic[] }>();
     for (const f of state.report.findings) {
-      const uri = vscode.Uri.joinPath(state.master, ...f.path.split('/'));
-      const key = uri.toString();
-      if (f.code === SYNTAX_CODE && open.has(key)) {
+      const built = vscode.Uri.joinPath(state.master, ...f.path.split('/'));
+      const opened = open.get(ghostKey(built));
+      if (f.code === SYNTAX_CODE && opened) {
         continue;
       }
+      const uri = opened ?? built;
+      const key = uri.toString();
       const line = Math.max((f.line ?? 1) - 1, 0);
       const pos = new vscode.Position(line, utf16Column(state.texts.get(f.path), line, Math.max((f.column ?? 1) - 1, 0)));
       const d = new vscode.Diagnostic(
@@ -259,8 +314,11 @@ function utf16Column(text: string | undefined, line: number, column: number): nu
   return utf16;
 }
 
-/** 再帰で '/' 区切りの相対パスを集める。最上位の profile に入らず、リンクは含めない */
-async function walk(dir: vscode.Uri, prefix: string, out: string[]): Promise<void> {
+/**
+ * 再帰で '/' 区切りの相対パスを集める。ファイルは out に、入ったフォルダ（末尾の '/' なし）は dirs に。
+ * 最上位の profile に入らず（名前は区別して比べる）、リンクは含めない（CLI の walk と同じ）
+ */
+async function walk(dir: vscode.Uri, prefix: string, out: string[], dirs: string[]): Promise<void> {
   for (const [name, type] of await vscode.workspace.fs.readDirectory(dir)) {
     if ((type & vscode.FileType.SymbolicLink) !== 0) {
       continue;
@@ -269,7 +327,8 @@ async function walk(dir: vscode.Uri, prefix: string, out: string[]): Promise<voi
       if (prefix === '' && name === 'profile') {
         continue;
       }
-      await walk(vscode.Uri.joinPath(dir, name), `${prefix}${name}/`, out);
+      await walk(vscode.Uri.joinPath(dir, name), `${prefix}${name}/`, out, dirs);
+      dirs.push(`${prefix}${name}`);
     } else if (type === vscode.FileType.File) {
       out.push(`${prefix}${name}`);
     }

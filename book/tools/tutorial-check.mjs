@@ -7,14 +7,14 @@
 //   本スクリプトは、その逐語転記が崩れていないことを CI で機械的にガードする。
 //   崩れていれば exit 1。
 //
-//   一致が保証されれば、構文妥当性は既存の `cargo test -p pasta_sample_ghost`
-//   （self_deploy_integration_test.rs が本物の PastaLoader::load で hello-pasta の
-//    .pasta を実際に読み込み・トランスパイルして検証）が transitively 担保する。
+//   一致が保証されれば、構文の正しさは manual.yml の第 2 段
+//   （`pasta_check validate` で hello-pasta の実ファイルを検査し、誤りがあれば落ちる）が
+//   transitively 担保する。
 //   ＝章の作例が「起動可能な最小セット一式（hello-pasta 由来）」と
 //   一致することの機械的ガード（フル SSP 実行なし）。
 //
-// 検証方式（2 段ガードの第 1 段。第 2 段の構文検証は manual.yml の cargo test ステップ）:
-//   pasta_check CLI には .pasta 構文検証サブコマンドが無い（release のみ）ため、
+// 検証方式（2 段ガードの第 1 段。第 2 段の構文検証は manual.yml の pasta_check validate の段）:
+//   構文の検査は第 2 段の pasta_check validate が受け持つため、
 //   本スクリプトは「逐語一致」検証に専念する。照合は 2 つの向きで行う。
 //   1. 辞書から章へ: 辞書 dic/X.pasta があれば、章 X.md があり、その章に辞書の全体と
 //      一致する ```pasta ブロックがある（無ければ no-chapter / no-matching-block）。

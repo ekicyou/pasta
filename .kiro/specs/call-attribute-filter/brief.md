@@ -201,3 +201,9 @@ roadmap のバックログにあった「`pasta_core` の `resolve_scene_id` の
   - 「Constraints」の失敗表記 `【Call失敗：…】` は無くなった（申し送り（failure-output-unification より）のとおり）。
   - 「候補が 2 つ以上残るとき」の「辞書の検査（`pasta-check-dic-validate`）で知らせる案」は、その spec が完了したので、この spec が `validate` に足す（または `novel-talk-flow` に渡す）と読み替える。足すならタスクに数える。
   - イベントから場面を起こす `SCENE.co_exec`（`scene.lua` 208 行）も `attrs` を受けて捨てている。
+
+## 申し送り（pasta-check-validate-edges より）
+
+- `pasta_check validate` の飛び先の検査は、辞書の中身が分からないとき（構文エラー・読めない辞書ファイル・pasta.toml の誤り）に丸ごと省く形になった。判定は `crates/pasta_check/src/validate/report.rs` の `skip_reasons`（統計の `skipReasons`）で、すべての段の報告がそろった後に 1 回だけ行う（`validate/mod.rs`）。
+- 見直しが要る論点: この spec が `validate` に辞書のシーンの集まりに頼る検査を足すなら、`skip_reasons` が空のときだけ走らせるか。辞書の中身が分からないことを表す誤りの種類を足すなら、`skip_reasons` の対応に入れるか。
+- 参照: `.kiro/specs/completed/pasta-check-validate-edges/design.md` の「Revalidation Triggers」と「Report（report.rs）」の省く理由の表。

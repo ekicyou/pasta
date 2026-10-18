@@ -43,7 +43,12 @@ export type FileText =
 export interface GhostInput {
   pastaToml: TomlSource;
   entries: ReadonlyArray<string>;
+  /** ghost/master の配下のフォルダの相対パス（'/' 区切り・末尾の '/' なし） */
+  dirs: ReadonlyArray<string>;
 }
+/** 飛び先の検査を省いた理由（核の SkipReason と同じ綴り） */
+export type SkipReason = 'syntax' | 'unreadable-file' | 'config';
+const SKIP_REASONS: ReadonlyArray<unknown> = ['syntax', 'unreadable-file', 'config'] satisfies SkipReason[];
 export type GhostSeverity = 'error' | 'warning';
 export interface GhostFinding {
   code: string;
@@ -58,7 +63,7 @@ export interface GhostStats {
   errors: number;
   warnings: number;
   uncheckedDynamicCalls: number;
-  referencesSkipped: boolean;
+  skipReasons: ReadonlyArray<SkipReason>;
 }
 export interface GhostReport {
   findings: ReadonlyArray<GhostFinding>;
@@ -104,7 +109,8 @@ function isGhostReport(value: unknown): value is GhostReport {
     typeof s.errors === 'number' &&
     typeof s.warnings === 'number' &&
     typeof s.uncheckedDynamicCalls === 'number' &&
-    typeof s.referencesSkipped === 'boolean'
+    Array.isArray(s.skipReasons) &&
+    s.skipReasons.every((r) => SKIP_REASONS.includes(r))
   );
 }
 
