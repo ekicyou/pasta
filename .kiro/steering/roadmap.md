@@ -345,6 +345,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
 - [x] actor-display-style -- アクターごとの表示の装い（文字の色など）を pasta.toml で決め、スポットが替わったときと同じスポットで話者が替わったときに出し入れする。1 つのスポットを複数のアクターで共有する形を正式に支える（窓際のぱすたさんのシェルの無い相手役。2026-10-18 起票）。0.4.1 に入れる。`sakura_builder.lua` を共有する `novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link` と同じウェーブに置かない。Dependencies: none
 - [x] vertical-balloon-lines -- 縦書きのバルーンの列の扱い。budoux が入れる改行の幅（`budoux_newlines`）、列を動かすタグ（`\n`・`\n[…]`・`\c`・`\_l[…]`）の所での budoux の数え直し（作者が書いた `\n`・`\c` の後も数え続ける今の不具合の直しを含む）、選択肢どうしの間の改行の幅（窓際のぱすたさん。2026-10-18 起票、直接実装の候補から格上げ）。0.4.1 に入れる。`sakura_builder.lua` を共有する `actor-display-style` と同じウェーブに置かない。Dependencies: none
+- [ ] lua-cmodule-robustness -- C の Lua 拡張モジュール（DLL）の `require` を、深いパス・ANSI に無い文字を含むフォルダでも読めるようにする。LuaJIT は改造せず、`package.loaders[3]`・`[4]`・`package.loadlib` を Rust 側で差し替え（`LoadLibraryExW`＋隣の依存 DLL の解決）、`package.cpath` の相対パスは pasta.dll のフォルダを基点にする（`lua-require-robustness` の続き。2026-10-18 起票）。0.4.2 に入れる（2026-10-18 開発者の決定）。Dependencies: none
 
 ## Existing Spec Updates
 
