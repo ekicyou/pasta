@@ -3422,9 +3422,14 @@ describe("SAKURA_BUILDER - vertical-balloon-lines: 単独の \\ の後の区切�
         -- エスケープした後の末尾は単独の \ ではない（続けて守っても足さない）
         local b = BUILDER._internal.tracking_buffer(require("pasta.buf").new())
         b:put("天気\\")
-        BUILDER._internal.escape_lone_tail(b)
-        BUILDER._internal.escape_lone_tail(b)
-        expect(b:tostring()):toBe("天気\\\\")
+        b:put("\\n")
+        b:put("\\c")
+        expect(b:tostring()):toBe("天気\\\\\\n\\c")
+        -- 作者が書いた片（put_raw）は守らない
+        local r = BUILDER._internal.tracking_buffer(require("pasta.buf").new())
+        r:put("天気\\")
+        r:put_raw("\\s[1]")
+        expect(r:tostring()):toBe("天気\\\\s[1]")
     end)
 
     test("単独の \\ で始まる台詞の頭に持ち越しの改行が入るときも、前の単独の \\ を守る", function()
@@ -3432,6 +3437,46 @@ describe("SAKURA_BUILDER - vertical-balloon-lines: 単独の \\ の後の区切�
         local a = { name = "さくら", spot = 0, budoux = { 6 } }
         local out = BUILDER.build({ group(a, { talk(a, "天気\\"), talk(a, "\\今日") }) }, {}, spots())
         expect(out):toBe("\\p[0]天気\\\\\\n\\今日\\e")
+    end)
+
+    test("終わりの \\e も、末尾の単独の \\ をエスケープにしてから出す", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local out = BUILDER.build({ group(a, { talk(a, "天気\\") }) }, {}, spots())
+        expect(out):toBe("\\p[0]天気\\\\\\e")
+    end)
+
+    test("話し手の切り替えの \\p[…] も、末尾の単独の \\ をエスケープにしてから出す", function()
+        local BUILDER, actors = setup()
+        local a, k = actors.sakura, actors.kero
+        local out = BUILDER.build({
+            group(a, { talk(a, "天気\\") }),
+            group(k, { talk(k, "やあ") }),
+        }, {}, spots())
+        expect(out):toBe("\\p[0]天気\\\\\\p[1]やあ\\e")
+    end)
+
+    test("pasta が出す表情・ウェイト・制限時間のタグも、末尾の単独の \\ をエスケープにしてから出す", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local cases = {
+            { { type = "surface", id = 5 }, "\\s[5]" },
+            { { type = "wait", ms = 300 }, "\\_w[300]" },
+            { { type = "choice_timeout", seconds = 5 }, "\\![set,choicetimeout,5000]" },
+        }
+        for _, c in ipairs(cases) do
+            local out = BUILDER.build({ group(a, { talk(a, "天気\\"), c[1] }) }, {}, spots())
+            expect(out):toBe("\\p[0]天気\\\\" .. c[2] .. "\\e")
+        end
+    end)
+
+    test("作者が書いた raw_script は、前の単独の \\ に触らない", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local out = BUILDER.build({
+            group(a, { talk(a, "天気\\"), { type = "raw_script", text = "\\s[1]" } }),
+        }, {}, spots())
+        expect(out):toBe("\\p[0]天気\\\\s[1]\\e")
     end)
 end)
 

@@ -5,6 +5,7 @@
 //! 台詞に運べる。その直後に budoux の改行（2.3 で守る）や、組み立ての区切り（4.1 で守る）が続くと、
 //! `\` と区切りの頭の `\` がつながって `\\` になる。守り方は各タスクが決めるので、ここでは
 //! 「区切りの直前の `\` の並びが奇数個（＝区切りの `\` がエスケープに食われていない）」だけを見る。
+//! 区切りのほかに pasta が出すタグ（終わりの `\e`・話し手の切り替えの `\p[…]`・制限時間・字ごとのウェイト）も同じに見る。
 //! 結論と根拠は research.md の「単独の `\` と pasta が入れる改行（1.2・決定 9）」に書いた。
 
 use crate::common;
@@ -14,8 +15,8 @@ use pasta_lua::PastaLuaRuntime;
 use pasta_lua::loader::PastaLoader;
 use tempfile::TempDir;
 
-/// 台詞の幅を 4（全角 2 字）にしたアクター。
-const TOML: &str = "\n[actor.\"さくら\"]\nspot = 0\nbudoux = [4]\n";
+/// 台詞の幅を 4（全角 2 字）にしたアクターと、字ごとにウェイト（`\_w[40]`）を入れるアクター。
+const TOML: &str = "\n[actor.\"さくら\"]\nspot = 0\nbudoux = [4]\n\n[actor.\"うにゅう\"]\nspot = 1\nscript_wait_normal = 90\n";
 
 const DIC: &str = r#"＠記号：天気天気\
 
@@ -37,6 +38,21 @@ end
 
 　・次
 　　さくら：つぎ
+
+＊単語の後の終わり
+　さくら：＠記号
+
+＊単語の後の話し手の切り替え
+　さくら：＠記号
+　うにゅう：やあ
+
+＊単語の後の制限時間
+　さくら：＠記号
+　!select(5)
+
+＊単語の後のウェイト
+　うにゅう：＠記号
+　うにゅう：今日は
 "#;
 
 fn load_ghost() -> (TempDir, PastaLuaRuntime) {
@@ -95,4 +111,42 @@ fn budoux_break_after_lone_backslash_stays_a_break() {
 fn choice_break_after_lone_backslash_stays_a_break() {
     let (_temp, runtime) = load_ghost();
     assert_breaks_alive(&fire(&runtime, "単語の後の選択肢"), "n[150]");
+}
+
+/// 終わりの `\e` が、単語の末尾の単独の `\` の直後に出ても、終わりのタグとして働く。
+#[test]
+fn end_tag_after_lone_backslash_stays_a_tag() {
+    let (_temp, runtime) = load_ghost();
+    // 応答の Value の終わり（`e` の直後が行末）
+    assert_breaks_alive(&fire(&runtime, "単語の後の終わり"), "e\r\n");
+}
+
+/// 話し手の切り替えの `\p[1]` が、単語の末尾の単独の `\` の直後に出ても、切り替えとして働く。
+#[test]
+fn speaker_switch_after_lone_backslash_stays_a_tag() {
+    let (_temp, runtime) = load_ghost();
+    assert_breaks_alive(&fire(&runtime, "単語の後の話し手の切り替え"), "p[1]");
+}
+
+/// 選択肢の制限時間のタグが、単語の末尾の単独の `\` の直後に出ても、タグとして働く。
+#[test]
+fn choice_timeout_after_lone_backslash_stays_a_tag() {
+    let (_temp, runtime) = load_ghost();
+    assert_breaks_alive(
+        &fire(&runtime, "単語の後の制限時間"),
+        "![set,choicetimeout,",
+    );
+}
+
+/// 字ごとのウェイト `\_w[40]` は、単独の `\` の直後に入らない（ウェイトを入れる所で守っている）。
+#[test]
+fn char_wait_after_lone_backslash_stays_a_tag() {
+    let (_temp, runtime) = load_ghost();
+    let out = fire(&runtime, "単語の後のウェイト");
+    // `\` には自分のウェイトが付かず、次の字 `今` がそのまま続く
+    assert!(
+        out.contains("]\\今"),
+        "単独の `\\` の後ろにウェイトが入った: {out:?}"
+    );
+    assert_breaks_alive(&out, "_w[40]");
 }

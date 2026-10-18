@@ -233,17 +233,27 @@ local function ends_with_lone_backslash(s)
 end
 
 --- 出力バッファを包み、最後に足した片が単位にならない `\` で終わるか（lone）を覚える（1.2・決定 9）。
---- 呼び出し側は今までどおり buffer:put / buffer:tostring を使う。空の片は lone を変えない
+--- put は pasta が出す片を足す。片が `\` で始まり、直前の出力が単独の `\` で終わっていれば、
+--- `\` を 1 つ足してエスケープの `\\` にしてから足す（片の頭のタグが前の `\` とつながって `\\` に化けるのを防ぐ）。
+--- put_raw は作者が書いた片（作者が書いた頭のままの台詞・raw_script）を、守らずにそのまま足す。
+--- 空の片は lone を変えない
 --- @param inner table 出力バッファ（pasta.buf 互換）
 --- @return table
 local function tracking_buffer(inner)
     local b = { lone = false }
-    function b:put(s)
+    function b:put_raw(s)
         if s ~= "" then
             inner:put(s)
             self.lone = ends_with_lone_backslash(s)
         end
         return self
+    end
+    function b:put(s)
+        if self.lone and s:byte(1) == 92 then -- 92 は `\`
+            inner:put("\\")
+            self.lone = false -- 足した後の末尾はエスケープ。続く片は自分の頭から読む
+        end
+        return self:put_raw(s)
     end
     function b:tostring()
         return inner:tostring()
@@ -251,23 +261,11 @@ local function tracking_buffer(inner)
     return b
 end
 
---- 直前の出力が単位にならない `\` で終わっていれば、エスケープの `\\` にする。
---- pasta が入れる区切り・改行の頭の `\` が、前の `\` とつながって `\\` に化けるのを防ぐ。
---- 足した後の末尾はエスケープの `\\` なので、lone は偽にする（続けて守っても足さない）
---- @param buffer table tracking_buffer
-local function escape_lone_tail(buffer)
-    if buffer.lone then
-        buffer:put("\\")
-        buffer.lone = false
-    end
-end
-
 --- テスト用の内部の表（公開の API ではない。マニュアルに載せない）
 BUILDER._internal = {
     next_column = next_column,
     first_column = first_column,
     tracking_buffer = tracking_buffer,
-    escape_lone_tail = escape_lone_tail,
 }
 
 --- 区切りを出して 1 列進める。区切りを出す所はすべてここを通す（決定 8）
@@ -278,7 +276,6 @@ local function put_break(buffer, column, tag)
     if tag == "" then
         return
     end
-    escape_lone_tail(buffer)
     buffer:put(tag)
     next_column(column, 1)
 end
@@ -315,21 +312,18 @@ local function inner_token_to_string(actor, inner, column)
     return ""
 end
 
---- 変換の出力の頭に、pasta が入れた列を動かすタグがあるか（前の単独の `\` を守る所。決定 9）。
---- newline の `\n`・clear の `\c` と、talk_to_script が台詞の頭に入れた改行（出力の頭の 2 バイトが
---- テキストの頭と違う）。作者が書いた頭のタグは出力の頭がテキストの頭と同じなので触らない
+--- 変換の出力の頭が作者の書いたものか（前の単独の `\` を守らない所。決定 9）。
+--- raw_script と、出力の頭の 2 バイトがテキストの頭と同じ台詞（作者が書いた頭のタグ）。
+--- talk_to_script が台詞の頭に改行を入れたときは頭が違うので、pasta が出す片として守る
 --- @param inner table 内側トークン
 --- @param s string 変換の出力
 --- @return boolean
-local function starts_with_pasta_move(inner, s)
-    if s:byte(1) ~= 92 then
-        return false
-    end
+local function head_written_by_author(inner, s)
     local t = inner.type
-    if t == "newline" or t == "clear" then
+    if t == "raw_script" then
         return true
     end
-    return (t == "talk" or t == "sakura_script") and s:sub(1, 2) ~= tostring(inner.text):sub(1, 2)
+    return (t == "talk" or t == "sakura_script") and s:sub(1, 2) == tostring(inner.text):sub(1, 2)
 end
 
 --- actorグループ内の単一トークンをさくらスクリプトへ変換して出力し、外見状態に観測させる
@@ -341,11 +335,12 @@ end
 --- @param column table 話し手のスポットの列の状態
 local function emit_inner_token(buffer, actor, inner, appearance, spot, column)
     local s = inner_token_to_string(actor, inner, column)
-    -- pasta が入れた頭の改行・`\c` を、前の出力の単独の `\` に食わせない
-    if starts_with_pasta_move(inner, s) then
-        escape_lone_tail(buffer)
+    -- pasta が出したタグ（頭の改行・`\c`・表情・ウェイトなど）を、前の出力の単独の `\` に食わせない
+    if head_written_by_author(inner, s) then
+        buffer:put_raw(s)
+    else
+        buffer:put(s)
     end
-    buffer:put(s)
     -- raw_script はアクター未指定の生さくらスクリプトとして観測する（1.8）
     local speaker = actor
     if inner.type == "raw_script" then
@@ -522,7 +517,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                 end
             end
         elseif t == "raw_script" then
-            buffer:put(token.text)
+            buffer:put_raw(token.text)
             APPEARANCE.observe(appearance, nil, nil, token.text)
         end
     end

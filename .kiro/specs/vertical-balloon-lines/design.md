@@ -484,7 +484,7 @@ fn write_column(t: &Table, c: &Column) -> LuaResult<()>;
 - 動かすのは 2 通りだけ。`next_column(col, n)`（`line` に n を足し、`width` を 0）と `first_column(col)`（`line = 1`・`width = 0`・`jump = false`）。Rust の `Next`・`First` と同じ意味。
 - `BUILDER.build` に新しい分かれ道を足さない。区切りを出す 3 か所の `buffer:put` を `put_break` に替え、`newline`・`clear` の動きは `inner_token_to_string` の今の分かれ道の中に置く。
 - `raw_script`・選択肢・表情・ウェイト・`choice_timeout` は、状態に触らない（4.1・4.8）。
-- 単独の `\` の守り（決定 9。research.md の「4.1 で決めた守り方」）: 出力バッファを `tracking_buffer` で包み、最後に足した片が単位にならない `\` で終わるか（`ends_with_lone_backslash`。`APPEARANCE.tag_at` と同じ読み方）を覚える。pasta が行を動かすタグを出す前に、`escape_lone_tail` が末尾の単独の `\` に `\` を 1 つ足してエスケープの `\\` にする（足した後は単独でないと覚え、続けて足さない）。守る所は、区切りの `put_break`、`newline` の `\n`・`clear` の `\c`、`talk_to_script` が台詞の頭に入れた改行（変換の結果が `\` で始まり、頭の 2 バイトがテキストの頭と違うとき。`starts_with_pasta_move`）。作者が台詞の頭に書いたタグ、話し手の切り替えの `\p[…]`・終わりの `\e` には触らない。
+- 単独の `\` の守り（決定 9。research.md の「4.1 で決めた守り方」）: 出力バッファを `tracking_buffer` で包み、最後に足した片が単位にならない `\` で終わるか（`ends_with_lone_backslash`。`APPEARANCE.tag_at` と同じ読み方）を覚える。pasta が出す片は `tracking_buffer` の `put` で足し、片が `\` で始まり末尾が単独の `\` なら、`\` を 1 つ足してエスケープの `\\` にしてから足す（足した後は単独でないと覚え、続けて足さない）。区切りの `put_break`、`newline` の `\n`・`clear` の `\c`、`talk_to_script` が台詞の頭に入れた改行、話し手の切り替えの `\p[…]` と外見の復旧のタグ、表情・ウェイト・制限時間・選択肢のタグ、終わりの `\e` がこれを通る。作者が書いた片（変換の結果の頭の 2 バイトがテキストの頭と同じ台詞と、`raw_script`。`head_written_by_author`）だけは `put_raw` で守らずに足す。
 
 **Dependencies**
 

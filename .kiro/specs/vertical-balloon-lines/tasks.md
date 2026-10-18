@@ -107,5 +107,6 @@
 - 2.1: `Column`・`BreakRule`・`PlainChar::moves`・`Tokens::leading_moves` に一時の `#[cfg_attr(not(test), allow(dead_code))]` がある。2.2/2.3 で使い始めたら外すこと。
 - 2.2: 空の幅の道は字ごとの `UnicodeWidthChar::width_cjk`、普段の道は `UnicodeWidthStr::width_cjk` で数えている。2.3 でかけらごとに数えるときは、どちらかにそろえること。
 - 2.3: 単独の `\` の守りは 1 回の呼び出しの中だけ。前の呼び出しが単独の `\` で終わり、次の呼び出しの頭に持ち越しの改行や組み立ての区切りが入ると `\` + `\n` になりうる。4.1 で区切りと一緒に確かめること。
-- 4.1: 単独の `\` の直後に pasta の切り替えの `\p[…]` や終わりの `\e` が続く形は守っていない（前の版からある形・research.md に範囲の外として記録）。
+- 4.1: 単独の `\` の直後に pasta の切り替えの `\p[…]` や終わりの `\e` が続く形は守っていなかった（前の版からある形）。完了時に下のとおり直した。
+- 完了時にその場で解決: 単独の `\` の直後に pasta が出すタグ（`\e`・`\p[n]`・表情・ウェイト・制限時間・選択肢）が続くと `\\X` に化けていた。守りを `tracking_buffer.put` の 1 か所にまとめ、作者の片は `put_raw` で通す。範囲の外は `act:set_property` の `raw_script` だけ（research.md）。
 - 5.2: `internals/talk-output.md` の「経緯」に vertical-balloon-lines の行（completed/ へのリンク）を足すのは、kiro-complete で spec を completed/ へ移すとき（今足すとリンク検査が落ちる）。

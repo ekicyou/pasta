@@ -172,7 +172,7 @@ brief が開いたままにした論点は、次のとおり決めた。各要�
 **Objective:** As a 既存のゴースト作者, I want 新しいキーを書かない限り、budoux の不具合の直しのほかは出力が今のままであってほしい, so that pasta を更新しても、台詞の見え方が思わぬ所で変わらない
 
 #### Acceptance Criteria
-1. Where アクター設定に `budoux` を書いていないゴーストである, the pasta shall どの台詞の出力も今と同じにする（`after_choice_newlines` を書いた場合の選択肢の後の区切りと、pasta の区切り・`act:newline()`・`act:clear()` の直前の出力が単独の `\` で終わるときのエスケープ（決定 9）を除く）。
+1. Where アクター設定に `budoux` を書いていないゴーストである, the pasta shall どの台詞の出力も今と同じにする（`after_choice_newlines` を書いた場合の選択肢の後の区切りと、pasta が出すタグ（区切り・`act:newline()`・`act:clear()`・話し手の切り替え・終わりの `\e` など）の直前の出力が単独の `\` で終わるときのエスケープ（決定 9）を除く）。
 2. Where `budoux` を使い、`budoux_newlines`・`budoux_jump`・`after_choice_newlines` を書いていないゴーストである, the pasta shall 列を動かすタグを含まず、pasta の区切りや字を表示しない指定を間に挟まない台詞の出力を、今と同じにする。
 3. Where `budoux` を使うゴーストである, the pasta shall Requirement 2・3・4 の数え直しで出力が変わることを、不具合の直しとして扱い、今の数え方に戻す設定を設けない（【F】）。
 4. The pasta shall budoux の語の区切り方、1 語だけで幅を超える列の扱い（無理に割らない）、出力の先頭の語の前に改行を入れないことを、今と同じにする。
