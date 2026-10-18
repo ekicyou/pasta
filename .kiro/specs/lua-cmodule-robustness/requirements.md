@@ -247,5 +247,3 @@ C で書かれた Lua の拡張モジュール（以下「C モジュール」�
    - 別の案: x86・x64 の取り込み用のライブラリをリリースの `pasta.dll.zip` に入れる。作る人の手間は減るが、リリース CI の中身の検査（`pasta.dll` と `THIRD_PARTY_LICENSES.txt` の 2 つだけ）を変えることになる。
 7. **失敗の理由の文字コード**（Requirement 6.4）
    - **推奨: Windows が返す理由は UTF-8 で入れる（LuaJIT とわざと違える）。** LuaJIT は ANSI のまま入れるので、pasta の UTF-8 の世界では日本語の理由が化ける。文言の形（前後の決まった部分）は LuaJIT と同じに保つ。
-8. **Windows 以外の OS**（Boundary Context）
-   - **推奨: 置き換えず、LuaJIT のままにする。** pasta.dll は Windows 専用で、C モジュールを読む場面は Windows にしかない。
