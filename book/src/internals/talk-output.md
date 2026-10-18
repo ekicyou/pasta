@@ -26,7 +26,7 @@
 - `build` がいつ呼ばれ、その戻り値がどう応答になるか（`act:yield()`・シーン終了時の `build`・再開のループ）は [ランタイム実行モデル](execution-model.md#イベントからシーンへ) で扱う。
 - `@pasta_sakura_script` を VM に登録する継ぎ目（`RendererInjection`）と presentation マーカーは [SHIORI 層](shiori.md#presentation-マーカーとレンダラ注入) で扱う。
 - ACT のメソッドとフィールドの個々の仕様は [Lua ランタイム内部モジュール](internal-modules.md#act-の内部) で扱う。シーン関数がどの ACT のメソッドを呼ぶかは [トランスパイラ](transpiler.md#生成される-lua-コードの形) で扱う。
-- 文字の分類・ウェイトの値・budoux の幅の指定方法は [@pasta_sakura_script](../lua/modules/pasta-sakura-script.md) と [pasta.toml リファレンス](../reference/pasta-toml.md#talkトーク表示制御) が正である。段落区切りの改行量は [spot_newlines](../reference/pasta-toml.md#spot_newlines)、台詞の後の選択肢の前の改行量は [choice_newlines](../reference/pasta-toml.md#choice_newlines)、スポットの決まり方は [バルーン連携](../grammar/actor-dictionary.md#バルーン連携)、外見の復旧の規則と記録できない指定は [同一スポット共有時の外見の復旧](../grammar/actor-dictionary.md#同一スポット共有時の外見の復旧) が正である。
+- 文字の分類・ウェイトの値・budoux の幅の指定方法は [@pasta_sakura_script](../lua/modules/pasta-sakura-script.md) と [pasta.toml リファレンス](../reference/pasta-toml.md#talkトーク表示制御) が正である。段落区切りの改行量は [spot_newlines](../reference/pasta-toml.md#spot_newlines)、台詞の後の選択肢の前の改行量は [choice_newlines](../reference/pasta-toml.md#choice_newlines)、選択肢の後の改行量は [after_choice_newlines](../reference/pasta-toml.md#after_choice_newlines)、budoux の数え方は [budoux](../reference/pasta-toml.md#budoux)、スポットの決まり方は [バルーン連携](../grammar/actor-dictionary.md#バルーン連携)、外見の復旧の規則と記録できない指定は [同一スポット共有時の外見の復旧](../grammar/actor-dictionary.md#同一スポット共有時の外見の復旧) が正である。
 
 ## 構成要素
 
@@ -43,10 +43,10 @@ pasta.shiori.act  SHIORI_ACT_IMPL.build
     │    merge_consecutive_talks … グループ内の連続する talk を 1 つに結合する
     │  グループ化トークンの列
     ▼
-pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_newlines, choice_newlines }, STORE.actor_spots, STORE.appearance)
+pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_newlines, choice_newlines, after_choice_newlines }, STORE.actor_spots, STORE.appearance)
     │  アクターの切り替え: \p[spot] → APPEARANCE.restore（復旧タグ）
-    │  talk / sakura_script: @pasta_sakura_script.talk_to_script(アクター, テキスト)
-    │                          └ Rust: トークナイザ → ウェイト挿入 → budoux 改行
+    │  talk / sakura_script: @pasta_sakura_script.talk_to_script(アクター, テキスト, スポットの行の状態)
+    │                          └ Rust: トークナイザ → ウェイト挿入 → budoux 改行（行の状態を読み書きする）
     │  その他のトークン: 種類ごとのタグ
     │  出力した各片を APPEARANCE.observe に観測させる
     ▼
@@ -59,7 +59,7 @@ pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_n
 | ---------------------- | ---- |
 | `pasta.act`（`crates/pasta_lua/pasta_scripts/pasta/act.lua`） | トークンの蓄積（`talk`・`sakura_script`・`raw_script`・`surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout`・`set_spot`・`clear_spot`）と、`build` の前処理（局所関数 `group_by_actor`・`merge_consecutive_talks`） |
 | `pasta.actor`（`crates/pasta_lua/pasta_scripts/pasta/actor.lua`） | アクタープロキシ。`act:actor_proxy("アクター")` などで得たプロキシの `:talk(…)`・`:sakura_script(…)` を、アクターを添えた ACT の `talk`・`sakura_script` に委ねる |
-| `pasta.shiori.act`（`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`） | `pasta.act` を継承し、`build` を「`ACT_IMPL.build` でグループ化トークンを得て `BUILDER.build` に渡す」処理に差し替える。`spot_newlines`・`choice_newlines` は `[ghost]` から読む |
+| `pasta.shiori.act`（`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`） | `pasta.act` を継承し、`build` を「`ACT_IMPL.build` でグループ化トークンを得て `BUILDER.build` に渡す」処理に差し替える。`spot_newlines`・`choice_newlines`・`after_choice_newlines` は `[ghost]` から読む |
 | `pasta.shiori.sakura_builder`（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`） | グループ化トークンをさくらスクリプト文字列にする `BUILDER.build` |
 | `pasta.shiori.appearance`（`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`） | 外見状態の生成（`APPEARANCE.new`）・観測（`APPEARANCE.observe`）・復旧（`APPEARANCE.restore`）と、さくらスクリプトの単位の読み取り（`APPEARANCE.tag_at`。ビルダーが字の判定と `\c` の読み取りに使う）。状態を持たず、渡された状態の表をその場で更新する。`STORE` や `@pasta_*` を `require` しない |
 | `pasta.buf`（`crates/pasta_lua/pasta_scripts/pasta/buf.lua`） | 組立に使う文字列バッファ。LuaJIT の `string.buffer` があればそれを、無ければ同じ `put`・`tostring` を持つ最小実装を使う |
@@ -70,10 +70,10 @@ pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_n
 
 | ファイル | 役割 |
 | -------- | ---- |
-| `crates/pasta_lua/src/sakura_script/mod.rs` | `@pasta_sakura_script` のモジュール表を作る `register`。`talk_to_script` と `break_lines` の実装、アクター表からのウェイト値と budoux の幅の読み取り |
+| `crates/pasta_lua/src/sakura_script/mod.rs` | `@pasta_sakura_script` のモジュール表を作る `register`。`talk_to_script` と `break_lines` の実装、アクター表からのウェイト値と改行の規則（`budoux`・`budoux_newlines`・`budoux_jump`）の読み取り、`talk_to_script` の 3 つ目の引数（行の状態の表）の読み書き |
 | `crates/pasta_lua/src/sakura_script/tokenizer.rs` | `Tokenizer`（さくらスクリプトの単位（タグ・エスケープ・囲み）の正規表現 `SAKURA_TAG_PATTERN` と文字の集合 `CharSets`）と、文字の種類 `TokenKind` |
 | `crates/pasta_lua/src/sakura_script/wait_inserter.rs` | ウェイト値 `WaitValues` と、トークン列に `\_w[ms]` を挿入する `insert_waits` |
-| `crates/pasta_lua/src/sakura_script/line_breaker.rs` | budoux の分かち書きで `\n` を挿入する `break_lines_impl` |
+| `crates/pasta_lua/src/sakura_script/line_breaker.rs` | budoux の分かち書きで改行を挿入する `break_lines_impl`。行の状態 `Column`、改行の規則 `BreakRule`、行を動かす単位の見分け（局所の `column_move` と動き `ColumnMove`） |
 
 文字の集合とウェイトの既定値は `TalkConfig`（`crates/pasta_lua/src/loader/config/sections.rs`）が持つ。`[talk]` セクションを `TalkConfig` にする仕組みは [ローダ自己展開とモジュール解決](loader.md#設定読込) で扱う。budoux の分かち書きは依存クレート `budouy` の既定の日本語モデルを使う。
 
@@ -121,14 +121,14 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 | 位置 | `type` | 出力 |
 | ---- | ------ | ---- |
 | 最上位 | `spot` | 出力しない。`actor_spots[アクター名] = spot` を記録する |
-| 最上位 | `clear_spot` | 出力しない。`actor_spots` の全エントリを消し、組立の状態（直前の発言者・スポット・段落区切りの判定・最後に表示したもの）をリセットする |
+| 最上位 | `clear_spot` | 出力しない。`actor_spots` の全エントリを消し、組立の状態（直前の発言者・スポット・段落区切りの判定・最後に表示したもの・行の状態）をリセットする |
 | 最上位 | `actor` | アクターが直前の発言者と別なら切り替えの出力（次節）。続けて内側のトークンを順に出力する |
 | 最上位 | `raw_script` | `text` をそのまま |
-| 内側 | `talk`・`sakura_script` | `SAKURA_SCRIPT.talk_to_script(グループのアクター, text)` の戻り値（後処理済みの文字列） |
+| 内側 | `talk`・`sakura_script` | `SAKURA_SCRIPT.talk_to_script(グループのアクター, text, 行の状態)` の戻り値（後処理済みの文字列） |
 | 内側 | `surface` | `\s[id]` |
 | 内側 | `wait` | `\_w[ms]` |
-| 内側 | `newline` | `\n` を `n` 回 |
-| 内側 | `clear` | `\c` |
+| 内側 | `newline` | `\n` を `n` 回（行の状態を `n` 行進める） |
+| 内側 | `clear` | `\c`（行の状態を最初の行に戻す） |
 | 内側 | `raw_script` | `text` をそのまま |
 | 内側 | `choice` | `scope` が文字列で、`target` が `On`・`script:` で始まらなければ `\![*]\q[display,target,scope]`、それ以外は `\![*]\q[display,target]`（`display`・`target`・`scope` の `\`・`]`・`,` を `\` でエスケープする）。`scope` は選択時に OnChoiceSelectEx の Reference2 として戻る（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)） |
 | 内側 | `choice_timeout` | `\![set,choicetimeout,ミリ秒]`（`seconds` の 1000 倍を切り捨て。`seconds` が無ければ 0） |
@@ -138,7 +138,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 ### さくらスクリプトの組立
 
-`BUILDER.build(グループ化トークン, config, actor_spots, appearance)` は、`config.spot_newlines`（既定 1.5）・`config.choice_newlines`（既定 1.5）と、`config.buffer_factory`（既定 `pasta.buf` の `new`。テストが差し替える）を使う。SHIORI 用の ACT は `actor_spots` に `STORE.actor_spots` を、`appearance` に `STORE.appearance` を渡し、`BUILDER.build` はどちらもその場で書き換える。`nil` を渡された場合は、そのビルドの中だけの空の表を使う。
+`BUILDER.build(グループ化トークン, config, actor_spots, appearance)` は、`config.spot_newlines`（既定 1.5）・`config.choice_newlines`（既定 1.5）・`config.after_choice_newlines`（既定 1.0）と、`config.buffer_factory`（既定 `pasta.buf` の `new`。テストが差し替える）を使う。SHIORI 用の ACT は `actor_spots` に `STORE.actor_spots` を、`appearance` に `STORE.appearance` を渡し、`BUILDER.build` はどちらもその場で書き換える。`nil` を渡された場合は、そのビルドの中だけの空の表を使う。
 
 組立は、1 回のビルドの中だけで生きる次の状態を持つ。
 
@@ -149,6 +149,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 | `spot_has_text` | スポットごとに、このビルドで字を出すトークン（字のある `talk`、字を表示する `sakura_script`）を出力したか |
 | `pending_break` | 現在のスポットで、次の字を出すトークンの前に段落区切りの改行を出すか |
 | `spot_tail` | スポットごとに、このビルドでそのスポットのバルーンに最後に表示したもの（`"text"` か `"choice"`。値が無ければ、まだ何も表示していない）。`last_spot` が `nil` の間は、スポット 0 として読み書きする |
+| `columns` | スポットごとに、budoux の行の状態の表（`{ line, width, jump }`。[行の状態の表](../lua/modules/pasta-sakura-script.md#行の状態の表)）。局所関数 `column_at` が、無ければ `{ line = 1, width = 0, jump = false }` を作る。添え字は `spot_tail` と同じ（`last_spot` が `nil` の間は 0）。グループの頭で話し手のスポットの表を 1 度取り、グループの内側のトークンに渡す |
 
 グループのアクターが `last_actor` と別の表であれば、アクターの切り替えとして次を行う（`emit_actor_switch`）。
 
@@ -164,15 +165,17 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 | 内側のトークン | 条件 | 直前に出す区切り | 状態の更新 |
 | -------------- | ---- | ---------------- | ---------- |
 | 字を出すトークン | `pending_break` が真 | `\n[spot_newlines × 100 の切り捨て]` | `pending_break` を偽、`spot_has_text[last_spot]` を真、`spot_tail` を `"text"` にする |
-| 字を出すトークン | `pending_break` が偽で、`spot_tail` が `"choice"` | `\n` | `spot_has_text[last_spot]` を真、`spot_tail` を `"text"` にする |
+| 字を出すトークン | `pending_break` が偽で、`spot_tail` が `"choice"` | `\n[after_choice_newlines × 100 の切り捨て]`（`N` が 100 なら `\n`） | `spot_has_text[last_spot]` を真、`spot_tail` を `"text"` にする |
 | 字を出すトークン | 上の 2 行以外 | 出さない | 同上 |
 | `choice` | `spot_tail` の値が無い | 出さない | `spot_tail` を `"choice"` にする。`spot_has_text`・`pending_break` は変えない |
 | `choice` | `spot_tail` が `"text"` | `\n[choice_newlines × 100 の切り捨て]` | 同上 |
-| `choice` | `spot_tail` が `"choice"` | `\n` | 同上 |
+| `choice` | `spot_tail` が `"choice"` | `\n[after_choice_newlines × 100 の切り捨て]`（`N` が 100 なら `\n`） | 同上 |
 | `clear` | — | 出さない | `\c` を出力したうえで `pending_break` を偽、`spot_has_text[last_spot]` を偽にし、`spot_tail` の値を消す |
 | 上記以外 | — | 出さない | 変えない |
 
-幅つきの改行のタグは、`spot_newlines` と `choice_newlines` のどちらも局所関数 `newline_tag` が作る。`choice` の前の区切りは局所関数 `choice_break` が決める。`spot_tail` の添え字は `last_spot`（`nil` の間は 0）である。`last_spot` が `nil` の間は `spot_has_text` を書かない。`choice` は `pending_break` を変えないため、保留中の段落区切りの改行は `choice` の後の字を出すトークンの直前に出る。
+幅つきの改行のタグは、`spot_newlines` と `choice_newlines` のどちらも局所関数 `newline_tag` が作る。`after_choice_newlines` の区切りは局所関数 `plain_newline_tag` が作り、`newline_tag` の結果が `\n[100]` なら `\n` を返す。`choice` の前の区切りは局所関数 `choice_break` が決める。
+
+表の区切りは、どれも局所関数 `put_break` が出す。`put_break` は、区切りのタグが空文字列でなければ、それを出して話し手のスポットの行の状態を 1 行進める（局所関数 `next_column`。字数は 0 にする）。区切りを出す所はすべて `put_break` を通す。出力バッファは最後に出した片が単位にならない `\` で終わるかを覚えていて（局所関数 `tracking_buffer`）、そのときは区切りの前に `\` を 1 つ足し、エスケープの `\\` にしてから区切りを出す（区切りの頭の `\` が前の `\` とつながって `\\` に読まれるのを防ぐ）。`talk_to_script` が台詞の頭に改行などのタグを入れたとき（テキストは `\` で始まらないのに変換の結果が `\` で始まるとき）も、同じく前の単独の `\` をエスケープしてから出す。`spot_tail` の添え字は `last_spot`（`nil` の間は 0）である。`last_spot` が `nil` の間は `spot_has_text` を書かない。`choice` は `pending_break` を変えないため、保留中の段落区切りの改行は `choice` の後の字を出すトークンの直前に出る。
 
 `talk`・`sakura_script` のテキストに引数の無い `\c` があるトークンは、テキストを切らずにそのまま出力し、状態だけを次のように扱う（局所関数 `text_parts`）。`\c` の位置は、変換前のテキストを `APPEARANCE.tag_at` で読んで探す（局所関数 `clear_span`）。エスケープと囲みの中はタグとして読まない。
 
@@ -208,7 +211,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 ### さくらスクリプトの後処理
 
-`talk_to_script(actor, talk)` は、`talk` が `nil` か空文字列なら空文字列を返す。それ以外は次の順に処理する。
+`talk_to_script(actor, talk, column)` は、`talk` が `nil` か空文字列なら空文字列を返す（`column` は書き換えない）。それ以外は次の順に処理する。
 
 1. **ウェイト値の決定**: `actor` が表なら、その直下の `script_wait_normal`・`script_wait_period`・`script_wait_comma`・`script_wait_strong`・`script_wait_leader` を整数として読み、読めないキーは登録時の既定値（`[talk]` の値、無ければ `TalkConfig` の既定値）を使う。表でなければ既定値だけを使う。
 2. **トークナイザ**: 文字列を先頭から走査する。`\` の位置で `SAKURA_TAG_PATTERN` に一致すれば、その一致を 1 つの単位として `TokenKind::SakuraScript` のトークンにし、そうでなければ 1 文字を `CharSets::classify` で分類する。分類の優先順は句点・読点・強調・リーダー・行頭禁則・行末禁則で、どれにも当たらなければ一般の文字である。`SAKURA_TAG_PATTERN` は次の 3 つの選択肢を持ち、左の選択肢を優先する。
@@ -218,16 +221,20 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
    名前の後ろの文字は一致に入らず、通常の文字として分類する（`\nHello` は `\n` と `Hello`、`\n!?` は `\n` と強調の `!?`）。エスケープはタグより先の選択肢のため、`C:\\new` は `\\` と `new` の文字になり、`\n` のタグにはならない。どの選択肢にも一致しない `\`（`\あ` の `\`、末尾の `\`）は 1 文字として分類する。ウェイト挿入（`wait_inserter.rs` の `append_with_per_char_wait`）は、その `\` の直後にウェイトを入れない（入れると `\\` のエスケープになるため）。囲みは、1 回の `talk_to_script` に渡したテキストの中でだけ読まれる。単位はすべて `TokenKind::SakuraScript` であるため、ウェイトは付かず、budoux 改行の幅にも数えない。
 3. **ウェイト挿入**（`insert_waits`）: 単位（タグ・エスケープ・囲み）と行末禁則の文字はそのまま出力する。一般の文字とリーダーは 1 文字ごとに `\_w[値 - 50]` を後ろに付ける。句点・読点・強調・行頭禁則は連続する並びとしてためておき、並びが途切れたところで、並びの中の最大値から 50 を引いたウェイトを 1 つだけ付ける（行頭禁則の文字は自分の値を持たず、並びを延ばすだけである）。計算したウェイトが 0 以下なら付けない。
-4. **budoux 改行**: `actor` が表で、`budoux` が空でない配列なら、ウェイト挿入後の文字列に `break_lines_impl` を適用する。
+4. **改行の規則の読み取り**（`read_actor_break`）: `actor` が表で、`budoux` が表なら整数の配列として読む。それが空でないときだけ、`budoux_newlines`（数値。`nil` なら無し）と `budoux_jump`（表なら整数の配列、表でなければ空）を読む。`budoux_newlines` から改行の文字列を作る（`newline_for_ratio`。100 倍して切り捨てた `N` が 100 か、値が無ければ `\n`、それ以外は `\n[N]`）。
+5. **budoux 改行**: `budoux` が空でない配列か、`column` が表なら、ウェイト挿入後の文字列に `break_lines_impl` を適用する。`column` が表ならその `line`・`width`・`jump` を始めの状態として読み（無いフィールドは 1・0・偽）、無ければ新しい状態（`Column::default()`）から数える。適用が終わった後にだけ、終わりの状態を `column` に書き戻す。どちらでもなければ、ウェイト挿入後の文字列をそのまま返す。
 
-`break_lines_impl(文字列, 幅の配列, タグの正規表現, パーサ)` は次のように改行を入れる。
+`break_lines_impl(文字列, 改行の規則, 行の状態, タグの正規表現, パーサ)` は、改行の規則 `BreakRule`（`widths`・`jump_widths`・`newline`）に従って改行を入れ、行の状態 `Column`（`line`・`width`・`jump`）をその場で書き換える。
 
-1. タグの正規表現（`talk_to_script`・`break_lines` からはトークナイザの `SAKURA_TAG_PATTERN`。一致した単位は、タグ・エスケープ・囲みのどれでもタグとして扱う）で文字列を「先頭のタグ列」と「本文の文字と、その直後に続くタグ列の組」の並びに分ける。本文の文字が無ければ入力をそのまま返す。
-2. 本文の文字だけをつないだ文字列を budoux で語に分ける。
-3. 語を順に置き、行の幅（`UnicodeWidthStr::width_cjk`。全角は 2）を足していく。行に語がすでにあり、次の語を足すと現在の行の幅の上限を超えるときに、その語の前を改行位置にする。上限は 1 行目が配列の 1 番目、2 行目が 2 番目で、配列の最後の値がそれ以降の行に使われる。1 語だけで上限を超える場合は改行しない。
-4. 先頭のタグ列を出力し、各文字の前に必要なら `\n` を、各文字の後ろにその文字に続いていたタグ列を出力して組み立て直す。タグは幅に数えず、途中に `\n` が入ることもなく、元の相対位置に残る。
+1. タグの正規表現（`talk_to_script`・`break_lines` からはトークナイザの `SAKURA_TAG_PATTERN`。一致した単位は、タグ・エスケープ・囲みのどれでもタグとして扱う）で文字列を「先頭のタグ列」と「本文の文字と、その直後に続くタグ列の組」の並びに分ける。このとき、単位ごとに行の動き（`ColumnMove`）を見分けて記録する。`\n` ちょうどと `\n[` で始まる単位は `Next`（次の行）、`\c` ちょうどの単位は `First`（最初の行）、`\_l[` で始まる単位は `Jump`（飛ぶ）で、ほかの単位は行を動かさない。囲みとエスケープは単位の先頭が違うため、中に `\n` などがあっても動かない。
+2. 先頭のタグ列の動きを順に当てる。`Next` は `line` に 1 を足し、`First` は `line` を 1・`jump` を偽にし、`Jump` は `jump_widths` が空でなければ `line` を 1・`jump` を真にする（空なら `line`・`jump` を変えない）。どの動きも `width` を 0 にする。
+3. `widths` が空か本文の文字が無ければ、本文の文字の幅を `width` に足しながら各文字の後ろの動きを当てるだけで、入力をそのまま返す（`budoux` の無いアクターでも行の状態は進む）。
+4. 本文の文字だけをつないだ文字列を budoux で語に分け、語を、後ろに行の動きがある文字の所で「かけら」に割る。語の頭のかけらは、`width` が 0 でなく、かけらの幅（`UnicodeWidthChar::width_cjk`。全角は 2）を足すと今の行の上限を超えるときに、その前を改行位置にして `Next` を当てる。かけらの幅を `width` に足し、かけらの最後の文字の後ろの動きを順に当てる。タグの後ろのかけらは行の頭なので、幅を足すだけである。1 語だけで上限を超える場合は改行しない。
+5. 今の行の上限は、`jump` が真で `jump_widths` が空でなければ `jump_widths`、それ以外は `widths` の `line` 番目の値で、配列の最後の値がそれ以降の行に使われる。
+6. 改行位置の直前の文字が、後ろに単位の無い単独の `\` なら、改行位置をその `\` の前へ移し（`\` は新しい行に数え直す）、`\` が行の頭にあるなら改行しない（`\` の直後に改行を入れると `\\` に読まれるため）。
+7. 先頭のタグ列を出力し、各文字の前に必要なら `newline` を、各文字の後ろにその文字に続いていたタグ列を出力して組み立て直す。タグは幅に数えず、途中に改行が入ることもなく、元の相対位置に残る。
 
-`break_lines(text, widths)` は同じ `break_lines_impl` をウェイト挿入なしで呼ぶ関数で、組立の経路からは使われない（利用者が `scripts/` から呼ぶための関数である）。
+`break_lines(text, widths)` は同じ `break_lines_impl` を、ウェイト挿入なし・新しい行の状態・`newline` が `\n`・`jump_widths` が空で呼ぶ関数で（`break_fresh`）、組立の経路からは使われない（利用者が `scripts/` から呼ぶための関数である）。
 
 ### アピアランスの観測と復旧
 
@@ -269,8 +276,8 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 | ---- | ---- | -------- | ---- |
 | シーン関数 → ACT | ACT のメソッド | トークンの表 | `act.token` が所有し、`build` で取り出して空にする |
 | `pasta.act` → `pasta.shiori.act` | `ACT_IMPL.build` の戻り値 | グループ化トークンの列（0 件なら `nil`） | 呼び出し側が受け取り、`BUILDER.build` に渡す |
-| `pasta.shiori.act` → `sakura_builder` | `BUILDER.build` の引数 | グループ化トークン、`{ spot_newlines, choice_newlines }`、`STORE.actor_spots`、`STORE.appearance` | `actor_spots` と `appearance` は `STORE` が所有し、ビルダーがその場で書き換える |
-| `sakura_builder` → Rust | `@pasta_sakura_script` の `talk_to_script` | アクターの表（またはそれ以外の値）とテキスト → 後処理済みの文字列 | Rust はアクターの表を呼び出しのたびに読むだけで、保持も変更もしない |
+| `pasta.shiori.act` → `sakura_builder` | `BUILDER.build` の引数 | グループ化トークン、`{ spot_newlines, choice_newlines, after_choice_newlines }`、`STORE.actor_spots`、`STORE.appearance` | `actor_spots` と `appearance` は `STORE` が所有し、ビルダーがその場で書き換える |
+| `sakura_builder` → Rust | `@pasta_sakura_script` の `talk_to_script` | アクターの表（またはそれ以外の値）、テキスト、スポットの行の状態の表 → 後処理済みの文字列 | Rust はアクターの表を呼び出しのたびに読むだけで、保持も変更もしない。行の状態の表は組立が所有し、Rust は変換が成功した後にだけ `line`・`width`・`jump` を書き換える |
 | Rust の内部 | `register` が作るクロージャ | `SakuraScriptState`（トークナイザ・既定のウェイト値・budoux のパーサ） | `Arc` でクロージャが所有する。VM を作るたびに `register` が `TalkConfig` から作り直す |
 | `sakura_builder` → `appearance` | `APPEARANCE.observe`・`APPEARANCE.restore` | 外見状態の表、アクター、スポット、出力した文字列またはグループの内側のトークン | 状態の表は呼び出し側の所有で、`appearance` はその場で書き換える。文字列とトークンは読むだけ |
 | `sakura_builder` → `appearance` | `APPEARANCE.tag_at` | 変換前のトークンのテキストと位置 → 単位の名前・引数・直後の位置・囲みの中身 | 状態を持たない読み取りで、テキストは読むだけ |
@@ -279,21 +286,25 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 ## 不変条件と制約
 
 - 後処理（ウェイト挿入と budoux 改行）は、`talk`・`sakura_script` のトークンごとに組立の途中で適用される。組み立て終わった文字列に後から適用する処理は無い。
-- 後処理は入力の文字とタグを並べ替えず、`\_w[…]` と `\n` を挿入するだけである。タグの文字列はそのまま残る。
-- 後処理の設定は 2 か所から来る。文字の集合とウェイトの既定値は `register` の時点の `TalkConfig` で固定され、トークナイザの正規表現も登録時に 1 度だけコンパイルされる。アクター別のウェイト値と `budoux` の幅は `talk_to_script` の呼び出しのたびにアクターの表から読む。
-- budoux の行の幅は `talk_to_script` の呼び出しごとに 1 行目から数え直す。`merge_consecutive_talks` で結合された `talk` は 1 回の呼び出しになるが、`sakura_script` などで区切られた `talk` は別の呼び出しになる。組立が出す `\n`・`\n[N]` や前の呼び出しの改行は幅の計算に入らない。テキスト内の `\n` も幅を数えないタグとして扱うため、そこでも行の幅は数え直さない。
+- 後処理は入力の文字とタグを並べ替えず、`\_w[…]` と改行（`\n` または `\n[N]`）を挿入するだけである。タグの文字列はそのまま残る。
+- 後処理の設定は 2 か所から来る。文字の集合とウェイトの既定値は `register` の時点の `TalkConfig` で固定され、トークナイザの正規表現も登録時に 1 度だけコンパイルされる。アクター別のウェイト値と改行の規則（`budoux`・`budoux_newlines`・`budoux_jump`）は `talk_to_script` の呼び出しのたびにアクターの表から読む。
+- budoux の行の状態は、組立が 1 回のビルドの中でスポットごとに持ち（`columns`）、`talk_to_script` の 3 つ目の引数で渡す。1 回の呼び出しの中では、テキストの中の行を動かす単位（`\n`・`\n[…]`・引数の無い `\c`・`\_l[…]`）で数え直す。作者が書いたタグも、単語や関数が返して `talk` に結合されたタグも、`sakura_script` のテキストの中のタグも同じに読む。呼び出しの間では、組立が出す区切り（`put_break`）が 1 行、`newline` が `n` 行進め、`clear` が最初の行に戻し、`clear_spot` が全スポットの状態を捨てる。表情・ウェイト・`choice_timeout`・`raw_script`・`choice` は状態を変えない（`raw_script` のテキストの中の `\c` と、選択肢の表示の文字は数えない）。そのため、`sakura_script` や表情で区切られた `talk` も、同じスポットでは前の `talk` の終わりの行と字数を引き継ぐ。状態はビルドをまたがない。
+- `budoux` の無いアクターの `talk`・`sakura_script` も、行の状態を進める（改行は入れない）。同じスポットで相手役が `\n`・`\c` を書いたときに、行の番号がずれないためである。
+- 組立の 2 つの動き（`next_column`・`first_column`）は、Rust の `ColumnMove::Next`・`ColumnMove::First` の写しである。片方だけを直さない。同じ動きになることは `sakura_builder_test.lua` で確かめる。
+- 代わりのレンダラ（[presentation マーカーとレンダラ注入](shiori.md#presentation-マーカーとレンダラ注入)）が 3 つ目の引数を使わなければ、台詞の中の字数は数えられず、行の状態は組立の区切りの分だけ進む。出力は壊れない。
+- SSP が自分で折り返した分（1 語で上限を超えた行、`budoux` の無いアクターの台詞）は行の状態に入らないため、実際の行とずれうる。
 - 単位（タグ・エスケープ・囲み）はどれも budoux 改行の幅に数えない。エスケープと中身のある囲みはバルーンに字を表示するが、ほかのタグと同じく幅 0 として扱われる。そのため囲みが長いと、その行は幅の上限を超えることがある。
-- `budoux` の配列に整数にできない要素があると `talk_to_script` は Lua のエラーになる。ウェイトのキーは読めなければ既定値になる。
+- `budoux` の配列に整数にできない要素があると `talk_to_script` は Lua のエラーになる。`budoux` が空でない配列のときは、数値にできない `budoux_newlines` と、整数にできない要素のある `budoux_jump` も同じくエラーになる。ウェイトのキーは読めなければ既定値になる。
 - 出力の先頭と `clear_spot` の後で、発言より前に積んだ `surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout` は、アクター未指定として、積んだ位置に積んだ順で出力される。スコープ切替タグを伴わないため、その時点のスコープに効く。`last_spot` が `nil` の間に出した `choice` は、スポット 0 のバルーンに出したものとして `spot_tail` に記録する。内側の出力にサーフェス変更などの分類に当たるタグがあれば全スポットが不明になり（[アピアランスの観測と復旧](#アピアランスの観測と復旧)）、次の発言者の切り替えで復旧タグが出ることがある。
 - `clear_spot` は現在のグループを閉じる。そのため `clear_spot` の後の発言は、前のグループと同じアクターでも新しいグループに入り、`clear_spot` で組立の状態をリセットした後の切り替えの出力（`\p[N]`）の後に出力される。
 - `spot` はグループを閉じない。同じアクターの発言が `spot` の前後にあると、後の発言も前のグループに入り、`spot` の処理はそのグループの出力の後になる。それでも出力は変わらない。`spot` をまたいで同じグループに入るのは切り替えを伴わない同じ発言者の発言だけであり、`spot` が記録した立ち位置は次に発言者が切り替わるときに初めて使われるためである。
-- 組立の状態のうち、`actor_spots` と外見状態はビルドをまたいで `STORE` に残り、`last_actor`・`spot_has_text`・`pending_break`・`spot_tail` はビルドごとに作り直す。そのため段落区切りの改行と選択肢の前後の行の区切りは 1 回の出力の中だけで判定され、外見の復旧はトークをまたいで判定される。
+- 組立の状態のうち、`actor_spots` と外見状態はビルドをまたいで `STORE` に残り、`last_actor`・`spot_has_text`・`pending_break`・`spot_tail`・`columns` はビルドごとに作り直す。そのため段落区切りの改行と選択肢の前後の行の区切りと budoux の行の状態は 1 回の出力の中だけで判定され、外見の復旧はトークをまたいで判定される。
 - `clear_spot` は `actor_spots` を表ごと差し替えず、エントリを 1 つずつ消す。`STORE.actor_spots` と同じ表を指し続けるためである。外見状態は `clear_spot` では消さない。
 - アピアランスは pasta 自身が出力した文字列だけを観測する。ベースウェア側だけで起きた外見の変化は状態に入らない。
 - さくらスクリプトの単位の読み方の定義は 4 か所にある。Rust の `Tokenizer::SAKURA_TAG_PATTERN`（`crates/pasta_lua/src/sakura_script/tokenizer.rs`）が正で、Lua の `tag_at`（`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`）、DSL の文法の `sakura_script`・`sakura_escape` の規則（`crates/pasta_dsl/src/parser/grammar.pest`）、VS Code 拡張の文法定義の `inline-sakura-script`・`inline-escape`（`editors/vscode/syntaxes/pasta.tmLanguage.json`）がその写しである。正の正規表現は、後戻りの有無で一致が変わらない形にしてあるため、左から 1 回読むだけの写し（Lua・pest）と結果が一致する。
 - Rust・Lua・DSL の 3 つの読み取りは、適合テスト `crates/pasta_lua/tests/sakura_script/conformance_test.rs` の 1 つの事例の表（入力と期待する単位の並び）で、同じ位置で単位を切り出すことを確かめる。DSL だけが異なるのは、単位にならない `\` をパースエラーにすることである。また DSL は引数・引用・囲みを 1 行の中だけで読む。VS Code 拡張の文法定義は色分けだけに使われ、適合テストの対象ではない（`editors/vscode/src/test/tmGrammar.test.ts` で確かめる）。読み方を変えるときは 4 か所を同じ変更でそろえる。
-- 囲みはトークンをまたがない。後処理は 1 回の `talk_to_script` に渡したテキスト（結合後の `talk`、または 1 つの `sakura_script`）の中でだけ囲みを読み、字の判定と外見の観測もトークン（観測は出力した文字列）ごとに読むため、トークンをまたぐ状態を持たない。開きと閉じを別々のトークンで積むと、それぞれが閉じの無い `\_?`（`\_!`）として、ただのタグに読まれる。
-- 字の判定と `\c` の読み取りは変換前のテキストに対して行い、外見の観測は後処理済みの出力文字列に対して行う。後処理が挿入する `\_w[…]`・`\n` は字の判定に入らない。
+- 囲みはトークンをまたがない。後処理は 1 回の `talk_to_script` に渡したテキスト（結合後の `talk`、または 1 つの `sakura_script`）の中でだけ囲みを読み、字の判定と外見の観測もトークン（観測は出力した文字列）ごとに読むため、囲みの読み取りはトークンをまたぐ状態を持たない（トークンをまたいで持ち越すのは budoux の行の状態だけである）。開きと閉じを別々のトークンで積むと、それぞれが閉じの無い `\_?`（`\_!`）として、ただのタグに読まれる。
+- 字の判定と `\c` の読み取りは変換前のテキストに対して行い、外見の観測は後処理済みの出力文字列に対して行う。後処理が挿入する `\_w[…]`・改行は字の判定に入らない。
 
 ## ソースの所在
 

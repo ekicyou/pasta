@@ -76,7 +76,7 @@
   - マニュアルの表と設定の既定値の照合テストに `after_choice_newlines`（1.0）の行を足し、通る
   - _Depends: 3.1_
   - _Requirements: 6.8, 7.4_
-- [ ] 5.2 (P) 残りの章を新しい数え方とキーに合わせる
+- [x] 5.2 (P) 残りの章を新しい数え方とキーに合わせる
   - `lua/modules/pasta-sakura-script.md` に 3 つ目の引数と列の状態の表、列を動かすタグの表、`break_lines` の数え直し、相対の `\_l[@…]` でも字数が 0 に戻ること、`budoux_newlines`・`budoux_jump` を書く
   - `internals/talk-output.md` の「呼び出しごとに 1 行目から」「テキスト内の `\n` でも数え直さない」を新しい数え方に書き換え、組み立ての状態の表・区切りの表・組み立ての設定に足す
   - `grammar/block-structure.md` の選択肢の配置の表、`lua/modules/pasta-config.md`・`internals/loader.md`・`internals/internal-modules.md` のキーの並び、`book/AUTHORING.md` の検査対象のキーの数を合わせる
@@ -108,3 +108,4 @@
 - 2.2: 空の幅の道は字ごとの `UnicodeWidthChar::width_cjk`、普段の道は `UnicodeWidthStr::width_cjk` で数えている。2.3 でかけらごとに数えるときは、どちらかにそろえること。
 - 2.3: 単独の `\` の守りは 1 回の呼び出しの中だけ。前の呼び出しが単独の `\` で終わり、次の呼び出しの頭に持ち越しの改行や組み立ての区切りが入ると `\` + `\n` になりうる。4.1 で区切りと一緒に確かめること。
 - 4.1: 単独の `\` の直後に pasta の切り替えの `\p[…]` や終わりの `\e` が続く形は守っていない（前の版からある形・research.md に範囲の外として記録）。
+- 5.2: `internals/talk-output.md` の「経緯」に vertical-balloon-lines の行（completed/ へのリンク）を足すのは、kiro-complete で spec を completed/ へ移すとき（今足すとリンク検査が落ちる）。
