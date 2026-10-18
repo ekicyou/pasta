@@ -63,7 +63,7 @@
   - _Requirements: 1.6, 2.1, 2.7, 3.4, 3.7, 3.8, 5.1, 5.2, 6.1, 6.3, 6.4, 6.5, 7.4, 8.1, 8.2, 8.3_
 
 - [ ] 5. FFI のテスト
-- [ ] 5.1 (P) `[loader] ffi` の各場合のテスト
+- [x] 5.1 (P) `[loader] ffi` の各場合のテスト
   - `false`・未記入では `ffi` が `nil` で、`require "ffi"` の失敗が今と同じ
   - `true` では `ffi == require "ffi"` で、`ffi.load` が置き換わり、`ffi.cdef`・`ffi.new`・`ffi.C` が使える
   - 真偽値でない値は読み込みの失敗になる
