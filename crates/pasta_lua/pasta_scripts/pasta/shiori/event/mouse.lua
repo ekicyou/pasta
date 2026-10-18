@@ -10,6 +10,7 @@
 local STORE = require("pasta.store")
 local REG = require("pasta.shiori.event.register")
 local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+local CLOCK = require("pasta.shiori.clock")
 local log = require("@pasta_log")
 
 local M = {}
@@ -127,11 +128,11 @@ local function exec_event_scene(act, event)
     return require("pasta.scene").co_exec(act, event, nil, nil)
 end
 
---- 秒より細かいリクエストの時刻（date が無ければ nil）
+--- 秒より細かいリクエストの時刻（なめらかな時計。date が無ければ nil）
 local function request_time(req)
     local date = req.date
     if type(date) ~= "table" or date.unix == nil then return nil end
-    return date.unix + (date.ns or 0) / 1e9
+    return CLOCK.steady(req) + (date.ns or 0) / 1e9
 end
 
 --- つつき: 抑止は見ない。Reference5・6 は読まない。
