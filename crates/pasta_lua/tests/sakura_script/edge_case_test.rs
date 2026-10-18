@@ -468,3 +468,48 @@ fn test_no_wait_inside_quoted_tag_argument() {
         r#"\![raise,X,"a]b"]や\_w[50]あ\_w[50]"#
     );
 }
+
+// ============================================
+// 新しいアクター設定と列の状態の表のエラー（vertical-balloon-lines 2.4）
+// ============================================
+
+fn talk_err(code: &str) -> String {
+    create_sakura_test_runtime()
+        .load(code)
+        .exec()
+        .unwrap_err()
+        .to_string()
+}
+
+#[test]
+fn test_budoux_newlines_not_number_is_error() {
+    // 数値にできない budoux_newlines は Lua のエラー（1.6）
+    let err = talk_err(
+        r#"require("@pasta_sakura_script").talk_to_script({ budoux = {6}, budoux_newlines = "abc" }, "今日は")"#,
+    );
+    assert!(err.contains("budoux_newlines"), "{err}");
+}
+
+#[test]
+fn test_budoux_jump_non_integer_element_is_error() {
+    // 整数にできない budoux_jump の要素は Lua のエラー（3.5）
+    talk_err(
+        r#"require("@pasta_sakura_script").talk_to_script({ budoux = {6}, budoux_jump = {6, "x"} }, "今日は")"#,
+    );
+}
+
+#[test]
+fn test_budoux_jump_not_table_is_ignored() {
+    // 表でない budoux_jump は無視（budoux と同じ）
+    let out: String = create_sakura_test_runtime()
+        .load(r#"return require("@pasta_sakura_script").talk_to_script({ budoux = {40}, budoux_jump = 5 }, "今日は")"#)
+        .eval()
+        .unwrap();
+    assert_eq!(out, "今日は");
+}
+
+#[test]
+fn test_column_arg_not_table_is_error() {
+    // 3 つ目が表でも nil でもなければ mlua の変換のエラー
+    talk_err(r#"require("@pasta_sakura_script").talk_to_script(nil, "今日は", 5)"#);
+}

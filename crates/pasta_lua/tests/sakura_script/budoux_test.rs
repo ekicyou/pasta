@@ -419,3 +419,211 @@ fn test_talk_to_script_budoux_no_break_inside_percent_escape() {
         r"今日は\%\nいい\n天気ですね"
     );
 }
+
+// ============================================
+// 列の状態の表と新しいアクター設定（vertical-balloon-lines 2.4）
+// Requirement: 1.1, 1.2, 1.3, 1.4, 1.6, 3.5, 3.6, 3.7, 6.3, 6.5, 6.6
+// ============================================
+
+/// Lua のコードを評価して文字列を返す
+fn eval_str(code: &str) -> String {
+    create_sakura_test_runtime().load(code).eval().unwrap()
+}
+
+const LONG_TALK: &str = "私は今日学校へ行って友達と一緒に勉強をしました";
+
+#[test]
+fn test_talk_to_script_two_args_same_as_nil_column() {
+    // 2 つの引数の呼び方は、3 つ目に nil を渡したのと同じ・戻り値は文字列 1 つ（6.5）
+    let lua = create_sakura_test_runtime_with_config(&budoux_talk_config());
+    let (two, three, count): (String, String, i64) = lua
+        .load(format!(
+            r##"
+            local SAKURA = require "@pasta_sakura_script"
+            local actor = {{ budoux = {{6}} }}
+            local two = SAKURA.talk_to_script(actor, "{LONG_TALK}")
+            local three = SAKURA.talk_to_script(actor, "{LONG_TALK}", nil)
+            return two, three, select("#", SAKURA.talk_to_script(actor, "{LONG_TALK}", {{}}))
+            "##
+        ))
+        .eval()
+        .unwrap();
+    assert_eq!(two, three);
+    assert_eq!(count, 1, "戻り値は 1 つ");
+}
+
+#[test]
+fn test_budoux_newlines_ratio_makes_newline_with_percent() {
+    // 1.8 → \n[180]、1.0・無し → \n（1.1・1.2・1.3）
+    let run = |newlines: &str| {
+        eval_str(&format!(
+            r#"
+            local SAKURA = require "@pasta_sakura_script"
+            return SAKURA.talk_to_script({{ budoux = {{6}}, budoux_newlines = {newlines} }}, "{LONG_TALK}")
+            "#
+        ))
+    };
+    let with_180 = run("1.8");
+    assert!(with_180.contains(r"\n[180]"), "{with_180}");
+    let plain = run("nil");
+    assert!(plain.contains(r"\n") && !plain.contains(r"\n["), "{plain}");
+    assert_eq!(run("1.0"), plain);
+    assert_eq!(with_180.replace(r"\n[180]", r"\n"), plain);
+}
+
+#[test]
+fn test_column_table_is_written_back() {
+    // 成功した後に line・width・jump を書き戻す（6.3）
+    let (out, line, width, jump): (String, i64, i64, bool) = create_sakura_test_runtime()
+        .load(format!(
+            r#"
+            local SAKURA = require "@pasta_sakura_script"
+            local col = {{}}
+            local out = SAKURA.talk_to_script({{ budoux = {{6}} }}, "{LONG_TALK}", col)
+            return out, col.line, col.width, col.jump
+            "#
+        ))
+        .eval()
+        .unwrap();
+    let breaks = out.matches(r"\n").count() as i64;
+    assert!(breaks > 0, "{out}");
+    assert_eq!(line, breaks + 1);
+    let last = out.rsplit(r"\n").next().unwrap();
+    assert_eq!(width, 2 * last.chars().count() as i64, "{out}");
+    assert!(!jump);
+}
+
+#[test]
+fn test_column_table_start_state_is_read() {
+    // 渡した表を始めの状態として読む。字数を持ち越して最初の語の前で割る
+    let (out, line): (String, i64) = create_sakura_test_runtime()
+        .load(
+            r#"
+            local SAKURA = require "@pasta_sakura_script"
+            local col = { line = 2, width = 10 }
+            local out = SAKURA.talk_to_script({ budoux = {40, 12} }, "今日は", col)
+            return out, col.line
+            "#,
+        )
+        .eval()
+        .unwrap();
+    assert_eq!(out, r"\n今日は");
+    assert_eq!(line, 3);
+}
+
+#[test]
+fn test_column_table_not_written_on_error() {
+    // 変換が失敗したときは表を書き換えない
+    let (ok, line, width, jump): (bool, i64, i64, bool) = create_sakura_test_runtime()
+        .load(
+            r#"
+            local SAKURA = require "@pasta_sakura_script"
+            local col = { line = 3, width = 5, jump = true }
+            local ok = pcall(SAKURA.talk_to_script, { budoux = {6}, budoux_newlines = "abc" }, "今日はいい天気ですね", col)
+            return ok, col.line, col.width, col.jump
+            "#,
+        )
+        .eval()
+        .unwrap();
+    assert!(!ok);
+    assert_eq!((line, width, jump), (3, 5, true));
+}
+
+#[test]
+fn test_column_advances_without_budoux() {
+    // アクターが nil・budoux の無いアクターでも列の状態は進み、出力は変わらない（決定 3）
+    let lua = create_sakura_test_runtime();
+    let (n_out, n_line, n_width, c_line, c_jump): (String, i64, i64, i64, bool) = lua
+        .load(
+            r#"
+            local SAKURA = require "@pasta_sakura_script"
+            local col = {}
+            local n_out = SAKURA.talk_to_script(nil, "\\n", col)
+            local n_line, n_width = col.line, col.width
+            local col2 = { line = 4, width = 3, jump = true }
+            SAKURA.talk_to_script(nil, "\\c", col2)
+            return n_out, n_line, n_width, col2.line, col2.jump
+            "#,
+        )
+        .eval()
+        .unwrap();
+    assert_eq!(n_out, r"\n");
+    assert_eq!((n_line, n_width), (2, 0));
+    assert_eq!((c_line, c_jump), (1, false));
+
+    let (with_col, without, line, width): (String, String, i64, i64) = lua
+        .load(
+            r#"
+            local SAKURA = require "@pasta_sakura_script"
+            local actor = { name = "test" }
+            local col = {}
+            local with_col = SAKURA.talk_to_script(actor, "あいう\\nかき", col)
+            return with_col, SAKURA.talk_to_script(actor, "あいう\\nかき"), col.line, col.width
+            "#,
+        )
+        .eval()
+        .unwrap();
+    assert_eq!(with_col, without);
+    assert_eq!((line, width), (2, 4));
+}
+
+#[test]
+fn test_new_keys_not_read_without_budoux() {
+    // budoux が無い・空なら budoux_newlines・budoux_jump を読まない（1.4・3.6）
+    let out = eval_str(&format!(
+        r#"
+        local SAKURA = require "@pasta_sakura_script"
+        return SAKURA.talk_to_script({{ budoux_newlines = "abc", budoux_jump = {{"x"}} }}, "{LONG_TALK}", {{}})
+        "#
+    ));
+    assert_eq!(out, LONG_TALK);
+    let empty = eval_str(&format!(
+        r#"
+        local SAKURA = require "@pasta_sakura_script"
+        return SAKURA.talk_to_script({{ budoux = {{}}, budoux_newlines = "abc" }}, "{LONG_TALK}")
+        "#
+    ));
+    assert_eq!(empty, LONG_TALK);
+}
+
+#[test]
+fn test_break_lines_recounts_after_existing_newline() {
+    // 元からある \n の後を数え直す（6.6）。数え直さないと「天気」の前で割る
+    let out = eval_str(
+        r#"
+        local SAKURA = require "@pasta_sakura_script"
+        return SAKURA.break_lines("今日は\\n天気", {8})
+        "#,
+    );
+    assert_eq!(out, r"今日は\n天気");
+}
+
+#[test]
+fn test_jump_widths_conformance_with_jump_tag() {
+    // budoux = [40]・budoux_jump = [40, 28] で \_l[-295,0] を挟む長い台詞（3.7）
+    let part = "今日はとても良い天気なので、公園まで散歩に出かけようと思います。途中で友達に会ったら、一緒にお茶でも飲みに行きたいですね。";
+    let out = eval_str(&format!(
+        r#"
+        local SAKURA = require "@pasta_sakura_script"
+        local actor = {{ budoux = {{40}}, budoux_jump = {{40, 28}} }}
+        return SAKURA.talk_to_script(actor, "{part}" .. [==[\_l[-295,0]]==] .. "{part}{part}", {{}})
+        "#
+    ));
+    let (before, after) = out.split_once(r"\_l[-295,0]").expect(&out);
+    let waits = regex::Regex::new(r"\\_w\[\d+\]").unwrap();
+    let cols = |s: &str| -> Vec<usize> {
+        s.split(r"\n")
+            .map(|c| waits.replace_all(c, "").chars().count())
+            .collect()
+    };
+    let before = cols(before);
+    let after = cols(after);
+    assert!(before.len() >= 3 && after.len() >= 4, "{out}");
+    for n in &before {
+        assert!(*n <= 20, "列が 20 字を越えた {before:?}: {out}");
+    }
+    assert!(after[0] <= 20, "{after:?}: {out}");
+    for n in &after[1..] {
+        assert!(*n <= 14, "列が 14 字を越えた {after:?}: {out}");
+    }
+}

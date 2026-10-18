@@ -300,3 +300,42 @@ fn test_dynamic_actor_reflects_in_config() {
         "STORE.actors への変更は CONFIG.actor にも反映されるべき（参照共有）"
     );
 }
+
+/// pasta.toml の `[actor]` に書いた `budoux_newlines`・`budoux_jump` が
+/// `@pasta_config` から読め、`talk_to_script` に効くこと
+/// (vertical-balloon-lines Requirement 1.7)
+#[test]
+fn test_config_actor_budoux_newlines_and_jump_reach_talk_to_script() {
+    let temp = copy_fixture_to_temp("with_actor_config");
+    std::fs::write(
+        temp.path().join("pasta.toml"),
+        r#"ghost_name = "ActorConfigTest"
+version = "1.0.0"
+
+[loader]
+debug_mode = true
+
+[actor."さくら"]
+spot = 0
+budoux = [6]
+budoux_newlines = 1.8
+budoux_jump = [6, 4]
+"#,
+    )
+    .unwrap();
+    let runtime = PastaLoader::load(temp.path()).unwrap();
+
+    let result = runtime
+        .exec(
+            r#"
+        local CONFIG = require "@pasta_config"
+        local SAKURA = require "@pasta_sakura_script"
+        local a = CONFIG.actor["さくら"]
+        assert(a.budoux_newlines == 1.8 and a.budoux_jump[2] == 4)
+        return SAKURA.talk_to_script(a, "私は今日学校へ行って友達と一緒に勉強をしました")
+    "#,
+        )
+        .unwrap();
+    let out = result.as_string().unwrap().to_str().unwrap().to_string();
+    assert!(out.contains(r"\n[180]"), "{out}");
+}
