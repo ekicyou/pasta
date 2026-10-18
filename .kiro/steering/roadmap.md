@@ -7,7 +7,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 現在の主題は 3 つある。
 
 - **0.4.1: 致命的でない不具合**。0.4.0 に入れずに回した不具合を直す。今の範囲は、辞書の検査の端のケース（`pasta-check-validate-edges`）と、入門ガイドを SSP で確かめたときに見つかったずれ（`tutorial-ssp-gaps`。2026-10-17 開発者の決定で足した）の 2 本である（下の「0.4.1 の範囲」）。
-- **Phase 13: areka でノベルゲーム（0.5.0）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性セマンティクス（シーン属性の保持と読み出し・Call の属性フィルター）も、この道筋に入った。
+- **Phase 13: areka でノベルゲーム（0.5.0）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性セマンティクス（シーン属性の保持と読み出し・Call の属性フィルター）も、この道筋に入った。2026-10-18 に、窓際のぱすたさん（ghost_dev）からの要望の 2 つ（アクターごとの表示の装い `actor-display-style`・budoux の改行の幅）も 0.5.0 に入れた（下の「窓際のぱすたさんからの要望」）。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
 Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイドの絵で完了した（「完了フェーズ」）。
@@ -286,6 +286,15 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - ノベルを 1 本の配布物としてどう起動するか、動画が要るか — `novel-areka-contract` の要件。
 - 数のしきい値（好感度が 50 以上、など）の書き方 — `call-attribute-filter` の要件。
 
+## 窓際のぱすたさんからの要望（2026-10-18 起票・0.5.0）
+
+2026-10-18 の `/kiro-discovery` で、ghost_dev の「ぱすた開発」セッション（窓際のぱすたさん）と相談して起こした。0.5.0 に入れる（開発者の決定「次のマイナーバージョンに押し込む」）。
+
+- **ゴースト側の形（開発者の決定「案C」）**: 奥から、`\1` のシェル（窓。台詞を持たない）、`\0` の縦書きバルーン 1 枚（`vertical,1`。SSP 2.8.80 から標準）、`\0` のシェル（ぱすたとセキュリティボール）。右の枠から左の枠へは、同じバルーンの中で `\_l[x,y]` で飛ぶ。シェルの無い相手役（おじさん・男の子・ギャル・妹）は、ぱすたと同じ `\0` のバルーンに出す。
+- **`actor-display-style`（spec）**: アクターごとの表示の装い（文字の色など）を pasta.toml で決め、`おじさん：やあ。` のとおりに書いて出せるようにする。1 つのスポットを複数のアクターで共有する形を正式に支える。同じスポットで話者が替わったときの改行は、もうある（`[ghost] spot_newlines = 1.8` で `\n[180]`）ので、足りないのは装いだけ。ゴースト側の今の試作は、アクター辞書の Lua 関数で回避している（`ぱすた：＠おじさん　やあ。`）が、ネタ帳のとおりに写せないので採らない（些細なことに Lua を出さない方針）。`novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link` と `sakura_builder.lua` を共有するので、同じウェーブに置かない。
+- **`vertical-balloon-lines`（spec。2026-10-18 に直接実装の候補「budoux の改行の幅」から格上げ）**: budoux が入れる改行の幅（`budoux_newlines`）、列を動かすタグ（`\n`・`\n[…]`・`\c`・`\_l[…]`）の所で budoux が数え直すこと、選択肢どうしの間の改行の幅（`[ghost]` のキー、既定 1.0。汎用の機能。ぱすたは使わない）。budoux は自分で入れた改行しか知らず、作者が書いた `\n`・`\c` の後も前の列の字数を数え続ける（横書きでも起きている今の不具合）。方式は「budoux がタグを見て数え直す」（`act:budoux_reset()` のような明示の手段は採らない）。左の枠の短い列（`\_l` の後の幅）とトークンをまたいだ字数は、要件定義で決める。要件定義は Opus。`actor-display-style` とは `sakura_builder.lua`（選択肢どうしの間）を共有するので、同じウェーブに置かない。
+- **左の枠へ飛ぶ `\_l`**: 飛ぶのは単語（ゴースト側の `＠左`）で足りる。budoux の数え直しは `vertical-balloon-lines` が持つ。
+
 ## リリース（`release` スキル）
 
 リリースの CI 化（`release-ci`）、リリース手順（spec `release-workflow`）の書き換え、CI での初回のリリース（v0.3.8）とその後片付けは、2026-10-10 までにすべて済んだ。タグ `vX.Y.Z` の push だけで公開まで進む。記録は `.kiro/specs/completed/release-workflow/first-ci-release.md` と、同じフォルダの `design.md` にある。手順は 2026-10-11 に `release` スキル（`.claude/skills/release/`）へ移し、spec は完了にした。手順を直すときは、スキルを直す。**残るのは、失敗した job の再実行の読み方の確認である**（v0.3.8 も v0.4.0（2026-10-17、run 39024925990）も失敗が起きなかったので未確認。失敗が起きたリリースで確かめる）。
@@ -329,6 +338,8 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] novel-save-slots -- スロットを選ぶセーブとロード。控えをスロットへ読み書きし、スロットの中身（日時・章の名前）を場面から読めるようにする。Dependencies: novel-checkpoint-rollback
 - [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-variable-scope, novel-checkpoint-rollback, novel-save-slots, shell-element-click, call-attribute-filter（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
+- [ ] actor-display-style -- アクターごとの表示の装い（文字の色など）を pasta.toml で決め、スポットが替わったときと同じスポットで話者が替わったときに出し入れする。1 つのスポットを複数のアクターで共有する形を正式に支える（窓際のぱすたさんのシェルの無い相手役。2026-10-18 起票）。0.5.0 に入れる。`sakura_builder.lua` を共有する `novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link` と同じウェーブに置かない。Dependencies: none
+- [ ] vertical-balloon-lines -- 縦書きのバルーンの列の扱い。budoux が入れる改行の幅（`budoux_newlines`）、列を動かすタグ（`\n`・`\n[…]`・`\c`・`\_l[…]`）の所での budoux の数え直し（作者が書いた `\n`・`\c` の後も数え続ける今の不具合の直しを含む）、選択肢どうしの間の改行の幅（窓際のぱすたさん。2026-10-18 起票、直接実装の候補から格上げ）。0.5.0 に入れる。`sakura_builder.lua` を共有する `actor-display-style` と同じウェーブに置かない。Dependencies: none
 
 ## Existing Spec Updates
 
