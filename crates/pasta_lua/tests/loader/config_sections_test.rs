@@ -234,6 +234,7 @@ fn test_ghost_config_default_values() {
     assert_eq!(config.hour_margin, 30);
     assert_eq!(config.spot_newlines, 1.5);
     assert_eq!(config.choice_newlines, 1.5);
+    assert_eq!(config.after_choice_newlines, 1.0);
 }
 
 // ----- [ghost] 実体化（補完後形状）の公開API検証 -----
@@ -296,6 +297,13 @@ fn test_from_str_materializes_ghost_defaults_when_section_omitted() {
         ghost.get("choice_newlines").and_then(toml::Value::as_float),
         Some(1.5),
         "omitted [ghost] must materialize choice_newlines=1.5 at the public API"
+    );
+    assert_eq!(
+        ghost
+            .get("after_choice_newlines")
+            .and_then(toml::Value::as_float),
+        Some(1.0),
+        "omitted [ghost] must materialize after_choice_newlines=1.0 at the public API"
     );
 }
 

@@ -34,9 +34,9 @@ mod source_map_build;
 pub use cache::{CURRENT_VERSION, CacheManager};
 pub use config::{
     DebugFileConfig, GhostConfig, LoaderConfig, LoggingConfig, PastaConfig, PersistenceConfig,
-    SceneAliasSource, TalkConfig, default_choice_newlines, default_debug_port, default_hour_margin,
-    default_log_file_path, default_lua_search_paths, default_spot_newlines,
-    default_talk_interval_max, default_talk_interval_min,
+    SceneAliasSource, TalkConfig, default_after_choice_newlines, default_choice_newlines,
+    default_debug_port, default_hour_margin, default_log_file_path, default_lua_search_paths,
+    default_spot_newlines, default_talk_interval_max, default_talk_interval_min,
 };
 pub use context::LoaderContext;
 /// 一致テスト用（pasta_check）: 辞書ファイルの集め方
