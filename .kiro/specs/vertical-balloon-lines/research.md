@@ -129,3 +129,164 @@ brief が開いたままにした論点と、要件を書いて見えた論点�
 10. **値の検査**
     - 推奨: 数値でない値は、`budoux` の配列に整数でない要素があるとき・`choice_newlines` に数値でない値があるときと同じ扱いにする。`pasta_check validate` には検査を足さない。
     - 理由: 今のキーも検査していない。検査を足すなら、既存のキーとまとめて別に決める方が筋がよい。
+
+---
+
+# 設計の調査と決定（2026-10-18・設計フェーズ）
+
+ここから下は、`/kiro-spec-design` で足した。上のギャップ分析は、そのまま残す。
+
+## Summary
+
+- **Feature**: `vertical-balloon-lines`
+- **Discovery Scope**: Extension（今の budoux・出力の組み立て・`[ghost]` の既定値の仕組みを広げる）。light discovery を行った。新しい依存は無く、依存の版も変えない。SSP の動きは、ギャップ分析で UKADOC を確かめ済みなので、外の調べ物はしていない。
+- **Key Findings**:
+  - 列の状態の受け渡しは、「省略できる 3 つ目の引数に表を渡し、Rust がその表を直接書き換える。戻り値は今と同じ文字列 1 つ」にした。2 つ目の戻り値を足すと、`table.insert(t, SAKURA.talk_to_script(...))` のような呼び方が壊れる（`table.insert` は 3 つの引数を「位置と値」と読む）。
+  - `talk_to_script` を差し替える仕組みが 3 つある（`renderer_injection.rs` の代わりのレンダラ・`lua_test/mocks.lua`・`tests/common/mod.rs`）。どれも 2 つの引数しか見ない。表を書き換える形なら、差し替えた側が 3 つ目を無視しても組み立ては壊れない。
+  - 「呼び出しの先頭の語の前には割らない」（`line_breaker.rs` 137 行の `char_idx > 0`）を「その列の字数が 0 なら割らない」に替えても、字数 0 から数える呼び出しでは結果が変わらない（`char_idx == 0` なら字数は必ず 0）。2 つの引数の呼び方の出力を保てる。
+
+## Research Log
+
+### talk_to_script を呼ぶ側と差し替える側
+
+- **Context**: 状態の受け渡しの形を決めるため。
+- **Sources Consulted**: `crates/pasta_lua/src/runtime/renderer_injection.rs`・`module_registry.rs`、`scriptlibs/lua_test/mocks.lua` 31 行、`tests/common/mod.rs` 116 行、`tests/lua_specs/act_call_restore_test.lua` 270 行、`pasta_scripts/pasta/shiori/sakura_builder.lua` 196 行。
+- **Findings**:
+  - 本番で呼ぶのは `sakura_builder.lua` の `inner_token_to_string` だけである。
+  - 代わりのレンダラ（`RendererInjection::new`）は、`talk_to_script` を自由な形で作れる。テストの例は引数を 1 つしか読まない。
+  - モックはどれも `function(_actor, text) return text or "" end` の形で、余分な引数を黙って捨てる。
+- **Implications**: 戻り値の数は変えない。3 つ目の引数は「渡されたら書き換える」だけにする。モックは直さない。
+
+### 列を動かすタグの見分け
+
+- **Context**: Requirement 2.1〜2.3・2.8・2.9 の見分けを、どこで、何を手がかりに行うか。
+- **Sources Consulted**: `tokenizer.rs` 138〜146 行 `SAKURA_TAG_PATTERN`、`line_breaker.rs` 26〜89 行 `tokenize_plain_chars`、`sakura_builder.lua` 151〜166 行 `clear_span`、`tests/sakura_script/conformance_test.rs`。
+- **Findings**:
+  - `tokenize_plain_chars` は、正規表現で切り出した単位の範囲（`tag_ranges`）をもう持っている。単位ごとに見分けて、字の後ろ（と先頭）に「列の動き」を記録できる。切り出し直しは要らない。
+  - 単位の文字列の形で決まる。`\n` ちょうど、または `\n[` で始まる → 次の列。`\c` ちょうど → 最初の列。`\_l[` で始まる → 飛ぶ。囲み（`\_?`・`\_!` で始まる）とエスケープ（`\\`・`\%`）は形が違うので外れる。`\c[…]`・`\x`・`\_q`・`\_w[…]`・`\s[…]`・`\0`・`\p[…]`・`\b[…]` も外れる。
+  - 出力の組み立ての `clear_span`（`APPEARANCE.tag_at` で読む）も、「名前が `c` で引数が無い」単位を消去に数える。Rust の「`\c` ちょうど」と同じ単位を指す（単位の読みは conformance test が Lua と Rust の一致を保っている）。
+- **Implications**: 見分けは `line_breaker.rs` の小さな関数 1 つ。新しい正規表現は作らない。
+
+### budoux の 1 語の途中にあるタグ
+
+- **Context**: Requirement 2.6。budoux は本文の字だけをつないで語に分けるので、タグが 1 語の途中に来る。
+- **Sources Consulted**: `line_breaker.rs` 121〜153 行、ギャップ分析の「語の割り方」。
+- **Findings**:
+  - 語の分け方は、今のまま本文全体を 1 度に分ける（列ごとに分けると、タグの無い台詞でも区切りが変わるおそれがある）。
+  - 改行を入れる場所は、今も「語の頭の字の前」だけである。列を動かすタグの所で語を「かけら」に割ると、タグの後ろのかけらは、必ず字数 0 の列の頭から始まる。字数 0 の列には改行を入れないので、語の途中に改行が入ることは無い。
+- **Implications**: 改行を入れうるのは、今と同じく語の頭だけである。タグの後ろのかけらは、新しい列の字数に足すだけ。
+
+### 出力の組み立ての区切りと列
+
+- **Context**: Requirement 4.2・4.3。pasta が出す区切りの、どこで列を進めるか。
+- **Sources Consulted**: `sakura_builder.lua` 192〜215 行（`inner_token_to_string`）・245〜252 行（`choice_break`）・290〜376 行（`BUILDER.build`）。
+- **Findings**: pasta が出す改行は 5 か所ある（話し手の切り替えの `pending_break` の `\n[N]`、字の後の選択肢の前、選択肢の後の選択肢の前、選択肢の後の台詞の前、`newline` トークンの `\n`×n）。消すのは 2 か所（`clear` トークン・`clear_spot`）。`newline` と `clear` は `inner_token_to_string` の今の分かれ道の中で扱える。
+- **Implications**: `BUILDER.build` に新しい分かれ道を足さない（複雑度 28 を `ponytail:` の注記で許している関数を、これ以上複雑にしない）。区切りを出す 3 か所の `buffer:put` を、「出して列を進める」小さな関数に置き換える。
+
+### `[ghost]` のキーを足す前例
+
+- **Context**: Requirement 5.6・7.4。
+- **Sources Consulted**: `loader/config/sections.rs` 184〜259 行、`loader/config/mod.rs` 175〜202 行、`loader/mod.rs` 37 行、`tests/loader/config_defaults_test.rs` 255〜340 行、`book/AUTHORING.md` 192 行。
+- **Findings**: `choice_newlines` と同じ一式で足りる（構造体のフィールド・既定値の関数・再公開・補完の 1 行・Lua の読み出し・照合テストの `expect_row` と Lua のリテラルの照合・マニュアルの表とテンプレート）。照合テストは、表の行とテンプレートの行を自動で拾う。`format!("{:?}", 1.0)` は `"1.0"` なので、マニュアルには `` `1.0` `` と書く。
+- **Implications**: `after_choice_newlines` は前例をそのままなぞる。
+
+### リリースノートの置き場
+
+- **Context**: Requirement 6.8。
+- **Sources Consulted**: `doc/release-notes/README.md`、`crates/pasta_sample_ghost/RELEASE.md`。
+- **Findings**: 見どころ（`doc/release-notes/vX.Y.Z.md`）は、リリースの段 4（版の更新）で書く。詳しいリリースノートは、リリース CI が PR から作る。動きが変わる点は、見どころの「ご注意」に必ず載せる決まりがある。
+- **Implications**: この spec では、PR の本文に「動きが変わる点」を書き、0.4.1 の見どころを書くときに拾える形にする。見どころのファイルは、この spec では作らない。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+| ------ | ----------- | --------- | ------------------- | ----- |
+| A: 今のファイルを広げる | 規則も状態も、各ファイルに足す | ファイルが増えない | 規則が Lua と Rust に散る | ギャップ分析の案 A |
+| B: Rust の userdata | 列の状態を Rust の型にして、組み立てへ渡す | 規則が 1 か所 | このモジュールで初めての userdata。寿命の扱いが増える | 退けた |
+| C: 規則は Rust・状態は Lua の表 | タグの規則・幅の選び方は `line_breaker.rs`。状態は小さな表で受け渡す | 規則が 1 か所。状態は組み立ての流儀（Lua の表） | 組み立ても表を 2 通りに動かす（次の列・最初の列） | **採用** |
+
+## Design Decisions
+
+### Decision: 状態の受け渡しは「3 つ目の引数の表を直接書き換える」
+
+- **Context**: Requirement 4・6.5。2 つの引数の呼び方を残す。
+- **Alternatives Considered**:
+  1. 3 つ目の引数と 2 つ目の戻り値（新しい表を返す）
+  2. 3 つ目の引数の表を直接書き換え、戻り値は文字列 1 つ
+  3. 組み立てが別の関数（例 `SAKURA.advance`）を呼ぶ
+- **Selected Approach**: 2。表は `{ line = 列の番号（最初の列が 1）, width = その列の字数, jump = budoux_jump の並びを使っているか }`。
+- **Rationale**: 戻り値の数が変わらないので、今の呼び方が壊れない。差し替えたレンダラやモックが 3 つ目を無視しても、組み立ては動く。
+- **Trade-offs**: 引数を書き換える関数になる。マニュアルにそう書く。
+- **Follow-up**: 変換が失敗したときは表を書き換えない（成功した後にまとめて書く）。
+
+### Decision: 組み立てが動かすのは「次の列」「最初の列」の 2 つだけ
+
+- **Context**: 規則を 1 か所に置きたいが、pasta が出す区切りは Rust を通らない。
+- **Alternatives Considered**:
+  1. Rust に `next_column`・`first_column` を足し、組み立てから呼ぶ
+  2. 区切りの文字列を `talk_to_script` に通して、状態を進める
+  3. 組み立ての中に同じ意味の小さな関数を 2 つ置き、Rust の `\n`・`\c` の動きと同じになることをテストで保つ
+- **Selected Approach**: 3。
+- **Rationale**: 1 は公開の関数が 2 つ増える。2 は区切りにウェイトの規則を当てる回り道で、読み違えやすい。動きは 2 行ずつなので、Rust の規則の写しとして同値のテストを 1 本置けば保てる。込み入った規則（`\_l` と `budoux_jump`・幅の選び方・語の割り方）は Rust だけが持つ。
+- **Trade-offs**: 2 行の規則が、2 つの言語にある。
+
+### Decision: `budoux` の無いアクターの台詞も、状態を進める
+
+- **Context**: ギャップ分析の申し送り（話し手の吹き出しを共有するアクター）。窓際のぱすたさんは、相手役もスポット 0 に置く。
+- **Alternatives Considered**:
+  1. 状態を進める（字数とタグを数える。改行は入れない）
+  2. 状態に触らない
+  3. 状態を捨てる（最初の列に戻す）
+- **Selected Approach**: 1。
+- **Rationale**: 相手役が台詞に `\n` や `＠改ページ`（`\c`）を書いたとき、2 と 3 では、同じ吹き出しの列の番号が実際とずれる。1 なら、タグの所は正しく進む（字の折り返しは SSP 任せなので、字数のずれは残る）。改行を入れないので、出力の文字列は変わらない（Requirement 6.1）。
+- **Trade-offs**: `budoux` の無い台詞にも、タグを数える手間がかかる（正規表現の読みは今もしている。語の分割はしない）。
+
+### Decision: `raw_script` は状態を変えない
+
+- **Context**: ギャップ分析の申し送り。
+- **Selected Approach**: `raw_script`（失敗の表記・`act:raw_script`）は、字もタグも数えない。
+- **Rationale**: 出力の組み立ては、もう `raw_script` の `\c` を吹き出しの消去に数えない（`text_parts` は talk・sakura_script だけを読む）。規則をそろえる。`raw_script` は「pasta が手を入れない生のさくらスクリプト」で、ウェイトも budoux も当てていない。
+
+### Decision: 倍率で `\n` を出す条件は「`N` が 100」
+
+- **Context**: 【E】。`budoux_newlines`・`after_choice_newlines` が 1.0 のとき、`\n` を出す。
+- **Selected Approach**: 値を 100 倍して切り捨てた `N` が 100 なら `\n`、それ以外は `\n[N]`。
+- **Rationale**: 1.0（TOML の `1` も）は必ず `N = 100` になり、Requirement 1.3・5.3 を満たす。浮動小数の `==` に頼らず、Rust と Lua で同じ形の判定になる。
+- **Trade-offs**: 1.001〜1.009 も `\n` になる（要件の言葉より少し広い。見え方は同じ）。
+
+### Decision: 使わない値は読まない
+
+- **Context**: Requirement 1.4・1.6・3.6。
+- **Selected Approach**: `budoux` が無い、または空のアクターでは、`budoux_newlines`・`budoux_jump` を読まない（数値でない値でもエラーにしない）。
+- **Rationale**: 今の `budoux` も、表でなければ読まずに無視する。使わない値の書き間違いで台詞が出なくなるのは、作者に分かりにくい。
+
+### Decision: 進め方は 3 段・同じリリース
+
+- **Selected Approach**: (1) 呼び出しの中の数え直し・`budoux_newlines`・`budoux_jump`（Rust で閉じる）→ (2) `after_choice_newlines` → (3) 持ち越し（3 つ目の引数と組み立て）。どの段も、先に今の出力を固定する特性化テストを置く。部分出荷はしない。
+- **Rationale**: 1 段ずつ戻せる。(1)(2) は `actor-display-style` と違うファイルで進められる。(3) は `sakura_builder.lua` を触るので、1 本ずつ入れる。
+
+## Synthesis
+
+- **Generalization**: 「列を動かすもの」は、台詞の中のタグと、pasta が出す区切りの 2 つの出どころに分かれて見える。しかし動きは 3 つ（次の列・最初の列・飛ぶ）にまとまる。組み立ての区切りは「次の列」、`clear` は「最初の列」と同じ動きである。状態の形を 1 つ（列の状態）にし、両方の出どころがそれを動かす。
+- **Build vs. Adopt**: 新しい依存は入れない。語の区切りは budouy（今の版）のまま、タグの読みは `SAKURA_TAG_PATTERN` のまま。縦書きの列をさくらスクリプトのタグで数える既成のライブラリは無い。
+- **Simplification**:
+  - Rust の userdata（案 B）は採らない。状態は 3 つのフィールドの表で足りる。
+  - 公開の関数を足さない（`talk_to_script` の 3 つ目の引数だけ）。
+  - `break_lines` に、倍率と飛んだ後の並びの引数を足さない（【G】）。
+  - `pasta_check validate` に検査を足さない（要件の決定）。
+  - モック（`mocks.lua`・`tests/common/mod.rs`）は直さない（3 つ目の引数を捨てても動く）。
+  - 新しいファイルを作らない。テストも今のファイルに足す。
+
+## 参照したスキル
+
+- `kiro-spec-design`（rules: design-principles・design-discovery-light・design-synthesis・design-review-gate）: 境界を先に書くこと、ファイル構成の計画、要件 ID の対応表、レビューの関門の機械的な確認。
+- `pasta-lua-coding`（references/coding-conventions.md・pasta-sakura-script.md）: Lua の命名（局所関数は snake_case、モジュールの表は大文字）、EmmyLua の型注釈、`@pasta_sakura_script` の公開の形。
+- `ponytail`: 足さない判断（userdata・新しい公開の関数・新しいファイル・モックの直し）。
+
+## Risks & Mitigations
+
+- **相対の `\_l[@…]` でも字数が 0 に戻る** — 横書きのゴーストで `\_l` を少しずらす用途に使っていると、budoux の改行の位置が変わる。要件（2.3・【F】）の決定どおりで、マニュアルとリリースノートに書く。
+- **`BUILDER.build` の複雑度** — 分かれ道を足さない形にした。luacheck の複雑度を手元で確かめる。
+- **budoux のモデルが変わると、作例の照合テストが変わる** — 作例のテストは、budouy の今の版で決まる区切りを固定する。版を上げるときは期待値を見直す（今の `break_lines` のマニュアルの例と同じ扱い）。
+- **SSP が自分で折り返した分は数えられない** — 1 語で幅を超える列や、`budoux` の無い台詞では、実際の列と数えた列がずれうる。要件の範囲外（6.4）。マニュアルに書く。
+- **スキル references の再生成が分類器に止められる** — `.claude/skills` への書き込みは止められたことがある。止められたら、再生成の残りを示して開発者に頼む。
