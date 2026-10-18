@@ -351,6 +351,8 @@ in local nil not or repeat return then true until while
 
 時報シーン（`＊時報14`・`＊時報その他`・`＊OnHour14`・`＊OnHourOther`。数字は半角 2 桁）には、発火した時点の日時が自動で入る。ランダムトークやクリック反応など、それ以外のシーンで使うときは、シーンの先頭で `＞transfer_date_to_var` を呼んでから参照する。
 
+日時変数の値は、SSP の仮想時刻（開発用パレットの「現在時刻の仮想的変更」などで進めた時刻）に従う。仮想時刻を使っていなければ OS の時計の日時になる。リクエストに `X-Pasta-Time` ヘッダがあれば、仮想時刻よりも優先して、その日時が入る。Lua の `act.req.date` には、仮想時刻のずれは足されない（[act.req](../lua/shiori-events.md#actreq)）。仮想時刻の読み取り方は [OnPastaClock](../lua/shiori-events.md#onpastaclock仮想時刻の読み取り) を参照する。
+
 | 変数 | 内容 | 例 |
 | ---- | ---- | -- |
 | `＄年` `＄月` `＄日` | 年・月・日（単位付きの文字列） | `2026年` `9月` `26日` |

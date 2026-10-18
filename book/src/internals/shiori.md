@@ -96,6 +96,7 @@ VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、�
 | `pasta.shiori.event.register` | `REG`。依存を持たない空の表 |
 | `pasta.shiori.event.boot`・`pasta.shiori.event.choice_select`・`pasta.shiori.event.second_change`・`pasta.shiori.event.mouse` | 既定ハンドラ（OnBoot・OnChoiceSelectEx・OnSecondChange・OnMouseDoubleClick・OnMouseMove）を `REG` に登録する。`pasta.shiori.event.mouse` は、つつき・撫でのショートカットの候補の名前・アクター名の解決・撫での判定も持つ |
 | `pasta.shiori.event.virtual_dispatcher` | 仮想イベント（OnHour・OnTalk）の判定と発行 |
+| `pasta.shiori.clock` | SSP の仮想時刻と OS の時計のずれを持つ時計。合図の判定・仮想時刻の読み取り・ずれを足した時刻と日付 |
 | `pasta.shiori.event.callback` | 非同期トークのコールバック待ちの登録・ルーティング・タイムアウトの掃引 |
 | `pasta.shiori.event.kick` | シーンキックの保留と起動（[デバッグ基盤とシーンキック](debug.md)） |
 | `pasta.shiori.res` | SHIORI/3.0 の応答文字列を作る `RES` |
@@ -362,7 +363,7 @@ Lua のエラーでシーンやハンドラが止まったとき（止まるエ�
 
 ### 仮想イベントディスパッチャ（OnTalk・OnHour）
 
-OnTalk と OnHour は、`REG.OnSecondChange` の既定ハンドラが毎回呼ぶ `pasta.shiori.event.virtual_dispatcher` が発行する。状態はモジュールのローカル変数 `next_hour_unix`（次の正時）と `next_talk_time`（次のトーク時刻）だけで、どちらも 0 が「未設定」を表す。状態は VM と同じ寿命（`load` から `unload` まで）で、保存されない。
+OnTalk と OnHour は、`REG.OnSecondChange` の既定ハンドラが毎回呼ぶ `pasta.shiori.event.virtual_dispatcher` が発行する。状態はモジュールのローカル変数 `next_hour_unix`（次の正時）・`seen_offset`（前に見た仮想時刻のずれ）・`next_talk_time`（次のトーク時刻）だけで、`next_hour_unix`・`next_talk_time` は 0 が「未設定」を表す。状態は VM と同じ寿命（`load` から `unload` まで）で、保存されない。
 
 ```text
 dispatch(act)
@@ -377,12 +378,45 @@ dispatch(act)
 利用者から見た判定の順・ブロック対象のキーワードと照合の仕方・OnHour のシーン候補の順・トーク間隔の決まり方・テスト用の関数は、[仮想ディスパッチャ](../lua/shiori-events.md#仮想ディスパッチャ)（[ブロック対象 Status キーワード](../lua/shiori-events.md#ブロック対象-status-キーワード)・[OnHour](../lua/shiori-events.md#onhour)・[pasta.toml 設定](../lua/shiori-events.md#pastatoml-設定)・[テスト用関数](../lua/shiori-events.md#テスト用関数)）が正である。ここではそれを実現する仕組みだけを書く。
 
 - 2 の `STORE.kick_force` は `KICK.install` が立てる。`dispatch` の入口が読んだ時点で消費するため、ブロックの判定を飛ばすのはキックの直後の 1 回だけである。4 はキックの保留を起動する段で、中身は [デバッグ基盤とシーンキック](debug.md) で扱う。
-- `check_hour` は、`next_hour_unix` が 0 なら次の正時（`unix - unix % 3600 + 3600`）を記録するだけで終わる。現在時刻がそれに達していれば、同じ式で次の正時を記録し直してからシーンを探す。
-- `check_talk` は、`next_talk_time` が 0 なら次のトーク時刻を決めるだけで終わる。正時までの残りを `hour_margin` と比べる判定は、`check_hour` が記録した `next_hour_unix` を使う。この判定で発行を見送るときは `next_talk_time` を変えないため、次の秒にまた判定する。発行するときは、シーンを探す前に `next_talk_time` を決め直す。
+- `check_hour` の現在時刻は `CLOCK.now(act.req)`（仮想時刻。下の「仮想時刻の時計」）である。`next_hour_unix` が 0 なら次の正時（`unix - unix % 3600 + 3600`）を記録するだけで終わる。`CLOCK.offset()` が `seen_offset` と違えば、`seen_offset` を更新し、現在時刻の 70 秒前（ローカル定数 `REBASE_GRACE`）から同じ式で次の正時を決め直す。現在時刻がそれに達していれば、同じ式で次の正時を記録し直し、`act:transfer_date_to_var()` で日時変数を転記してからシーンを探す。シーン名の `{HH}` は `CLOCK.date(act.req).hour` から作る。
+- `check_talk` は、`next_talk_time` が 0 なら次のトーク時刻を決めるだけで終わる。トーク時刻は `act.req.date.unix`（OS の時計）で数え、仮想時刻に左右されない。正時までの残りを `hour_margin` と比べる判定は、`check_hour` が記録した `next_hour_unix` と `CLOCK.now(act.req)` の差を使う（仮想時刻で数える）。この判定で発行を見送るときは `next_talk_time` を変えないため、次の秒にまた判定する。発行するときは、シーンを探す前に `next_talk_time` を決め直す。
 - 次のトーク時刻は「現在時刻 + `math.random(最小間隔, 最大間隔)`」で決める。間隔は、決めるたびにローカル関数 `get_config` が `pasta.save` と `@pasta_config` を読み直して求める（キャッシュしない）。`hour_margin` は `[ghost].hour_margin`（無ければ 30）を、切り捨てや下限の補正をせずにそのまま使う。`[ghost]` の既定値の補完は [設定読込](loader.md#設定読込) で扱う。
 - ブロック中（3 で終わる間）は `check_hour`・`check_talk` を呼ばないため、`next_hour_unix`・`next_talk_time` は進まない。そのため、ブロックが解けた最初の判定で、過ぎていた正時やトーク時刻の条件が成り立つ。
 - 返したコルーチンは `EVENT.fire` が再開し、`set_co_scene` が `STORE.co_scene` を置き換える。OnHour とキックのシーンが中断中の継続を置き換え、OnTalk だけが継続を再開する（`check_talk` が `STORE.co_scene` を返す）のはこのためである（[継続トークと co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新)）。
 - 仮想イベントは `REG` を通らない。OnHour・OnTalk で発行するシーンはどれも `SCENE.co_exec` で探す（テスト用の差し替え `scene_executor` が設定されていればそれを使う）。4 のキックは検索を使わず、シーン表のキーとの完全一致でシーンを引く（[キックの保留と起動](debug.md#キックの保留と起動kicklua)）。
+
+#### 仮想時刻の時計（pasta.shiori.clock）
+
+SSP の仮想時刻は SHIORI のリクエストに載らないため、`pasta.shiori.clock`（以下 `CLOCK`）が OS の時計とのずれを持つ。利用者から見た読み取りの手順・返事の扱い・ずれの使われ方は [OnPastaClock](../lua/shiori-events.md#onpastaclock仮想時刻の読み取り) が正である。`CLOCK` は `pasta.shiori.event`・`pasta.shiori.act`・`pasta.shiori.event.second_change`・`pasta.shiori.event.virtual_dispatcher` から読まれるため、循環参照を避けて `pasta.shiori.event.*`・`pasta.shiori.act`・`pasta.store` を `require` しない。
+
+状態はモジュールのローカル変数 2 つだけである。
+
+| 変数 | 型 | 初期値 | 意味 |
+| ---- | -- | ------ | ---- |
+| `_offset` | 整数（秒） | `0` | 仮想時刻 − OS の時計。0 は仮想時刻なし |
+| `_probe_armed` | 真偽値 | `false` | 仮想時刻の読み取りを予約しているか |
+
+状態は保存しない。VM と同じ寿命（`load` から `unload` まで）で、次の `load` で初期値から始まる。
+
+```text
+EVENT.fire(req)
+ 1. CALLBACK.try_route(req)          待っているコールバックの返事ならその応答
+ 2. CLOCK.observe(req)               true（OnPastaClock の返事を受け取った）なら 204
+ 3. REG[req.id] を呼ぶ
+
+REG.OnSecondChange（既定）
+ 1. CALLBACK.sweep                   タイムアウトの応答があればそれ
+ 2. dispatcher.dispatch(act)         シーンがあればそれ
+ 3. is_blocked(act.req.status) なら nil
+ 4. CLOCK.take_probe(act.req)        予約があれば読み取りのスクリプト
+```
+
+- 合図の判定（`observe`）: 現在時刻 `CLOCK.now(req)` で、`OnMinuteChange` は `now % 60` が 2 秒を超え 58 秒未満なら、`OnHourTimeSignal` は `now % 3600` が 60 秒を超え 3595 秒未満なら、見込みの時機から外れたとして `_probe_armed` を立てる。毎時の合図は遅れを 60 秒、早まりを 5 秒まで許す（トークできるまで待つ遅れを許すため）。幅はローカル定数 `MINUTE_TOLERANCE`・`HOUR_LATE_TOLERANCE`・`HOUR_EARLY_TOLERANCE` である。
+- 読み取り（`take_probe`）: 予約があれば消して `\![get,property,OnPastaClock,system.year,system.month,system.day,system.hour,system.minute,system.second]\e` を返す。呼ぶのは OnSecondChange の既定ハンドラだけで、何も発行せず Status がブロック対象でない回に限る。予約が無い回は何も返さないため、毎秒のバルーンには影響しない。
+- 返事の受け取り: `id` が `OnPastaClock` で `SecurityLevel` が `external` でなければ、`observe` が返事として消費して true を返す（`REG` へ進まない）。Reference0〜5 を `tonumber` で整数に読み、`os.time`（地方時）で Unix 時刻にし、`act.req.date.unix` との差をずれにする。差の絶対値が 2 秒以下（ローカル定数 `OFFSET_DEADBAND`）なら 0 にする。値が読めなければずれを 0 に戻し、警告ログを出す。ずれが変わったときはデバッグログを出す。
+- `X-Pasta-Time`: ヘッダのあるリクエストでは、合図を判定せず、返事を受け取っても無視し、読み取りも返さない。`now` は `req.date.unix` を、`date` は `req.date` をそのまま返す。
+- 読み出し: `now(req)` は `req.date.unix + _offset`、`date(req)` はずれを足した時刻から `os.date("*t")` で作った新しい日付の表（`act.req.date` と同じ形）を返す。ずれが 0 なら `req.date` をそのまま返し、`act.req.date` は書き換えない。日時変数の転記（`pasta.shiori.act` の `transfer_date_to_var`）は `CLOCK.date` を読む。`offset()` は `_offset` を返し、ディスパッチャが `seen_offset` と比べる。
+- 見落とし: ずれの変化の秒の端数が毎分の許容幅（±2 秒）に入ると、毎分の合図では気づかない。そのときは仮想の正時の `OnHourTimeSignal` で気づき、決め直しの猶予（70 秒）で時報が数秒遅れて 1 回出る。仮想時刻を戻した（Reset）のを見落とすと、古いずれが最大 1 時間残り、実際の正時の `OnHourTimeSignal` で直る。ずれの変化が 1 時間の倍数に近いと気づけない。
 
 ### 応答文字列の出どころ
 

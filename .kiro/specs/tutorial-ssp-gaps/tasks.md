@@ -70,7 +70,7 @@
   - _Boundary: ReferenceDocs（call-jump.md・script-api.md・patterns.md・execution-model.md）_
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 5.3 (P) 日時変数の節と内部の説明に仮想時刻を書く
+- [x] 5.3 (P) 日時変数の節と内部の説明に仮想時刻を書く
   - 日時変数の値は SSP の仮想時刻に従い、`X-Pasta-Time` があればその日時になると書く
   - 内部の説明の仮想イベントディスパッチャの節に、時計の状態・合図と読み取りの仕組み・ずれが変わったときの決め直しを書く
   - 2 ページに仮想時刻の記述が入り、`link-check.mjs` が通る
