@@ -412,6 +412,91 @@ test('開いている文書の syntax は出さず、閉じると出し、開く
   assert.strictEqual(col.get(uriOf('dic/c.pasta')), undefined);
 });
 
+test('フォルダの一覧に入ったフォルダが入り、最上位の profile とリンクは入らない（CLI と同じ）', async () => {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  mock.setFakeFile('/ws/ghost/master/pasta.toml', '');
+  mock.setFakeFile('/ws/ghost/master/dic/a.pasta', '');
+  mock.setFakeDir('/ws/ghost/master/dic/x.pasta');
+  mock.setFakeFile('/ws/ghost/master/dic/sub/b.lua', '');
+  mock.setFakeFile('/ws/ghost/master/dic/profile/c.pasta', '');
+  mock.setFakeFile('/ws/ghost/master/profile/x.pasta', '');
+  mock.setFakeDir('/ws/ghost/master/profile/sub');
+  mock.setFakeSymlink('/ws/ghost/master/linkdir', vscode.FileType.Directory);
+  mock.setFakeSymlink('/ws/ghost/master/dic/link.pasta', vscode.FileType.Directory);
+  const bridge = new FakeBridge();
+  const { gv } = newValidator(bridge);
+
+  await gv.validate(MASTER);
+
+  const input = bridge.selectCalls[0];
+  assert.deepStrictEqual([...input.dirs].sort(), ['dic', 'dic/profile', 'dic/sub', 'dic/x.pasta']);
+  // 中身の無いフォルダはファイルの一覧に入らない
+  assert.ok(!input.entries.some((e) => e.startsWith('dic/x.pasta')), input.entries.join(','));
+  assert.deepStrictEqual(bridge.validateCalls[0].input.dirs, input.dirs);
+  gv.dispose();
+});
+
+test('フォルダの誤りはフォルダの URI に Error で出て、次の回に返さなければ消える', async () => {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  mock.setFakeDir('/ws/ghost/master/dic/x.pasta');
+  const bridge = new FakeBridge();
+  bridge.report = {
+    findings: [finding('folder-matches-pattern', 'error', 'dic/x.pasta', null, null, '辞書のパターンに一致するフォルダ')],
+    stats: { ...EMPTY_STATS, errors: 1 },
+  };
+  const { gv, col } = newValidator(bridge);
+
+  await gv.validate(MASTER);
+  const d = col.get(uriOf('dic/x.pasta'));
+  assert.ok(d);
+  assert.strictEqual(d.length, 1);
+  assert.strictEqual(d[0].severity, vscode.DiagnosticSeverity.Error);
+  assert.strictEqual(d[0].code, 'folder-matches-pattern');
+  assert.strictEqual(col.size, 1);
+
+  bridge.report = { findings: [], stats: EMPTY_STATS };
+  await gv.validate(MASTER);
+  assert.strictEqual(col.get(uriOf('dic/x.pasta')), undefined);
+  assert.strictEqual(col.size, 0);
+  gv.dispose();
+});
+
+test('開いている文書の綴りと起動の綴りが違うとき、診断は開いている文書の URI に付き二重にならない', async () => {
+  mock.resetFakeFs();
+  mock.setFakeFile('/ws/Ghost/Master/dic/a.pasta', '');
+  setOpenDocuments(['dic/a.pasta']); // /ws/ghost/master/dic/a.pasta
+  const bridge = new FakeBridge();
+  bridge.report = {
+    findings: [
+      finding('syntax', 'error', 'dic/a.pasta', 1, 1, '構文'),
+      finding('call-target-missing', 'warning', 'dic/a.pasta', 2, 1, '飛び先'),
+    ],
+    stats: EMPTY_STATS,
+  };
+  const { gv, col } = newValidator(bridge);
+  gv.register();
+  const upper = vscode.Uri.file('/ws/Ghost/Master');
+
+  await gv.validate(upper);
+  // 開いている文書なので syntax は出さない（綴りが違っても開いていると分かる）
+  assert.deepStrictEqual((col.get(uriOf('dic/a.pasta')) ?? []).map((d) => d.code), ['call-target-missing']);
+  assert.strictEqual(col.get(vscode.Uri.joinPath(upper, 'dic', 'a.pasta')), undefined);
+  assert.strictEqual(col.size, 1);
+
+  // 閉じると、その回の起動の綴りの URI に付け替わり、開いていた綴りからは消える
+  setOpenDocuments([]);
+  mock.didCloseTextDocumentEmitter.fire({ uri: uriOf('dic/a.pasta') });
+  assert.strictEqual(col.get(uriOf('dic/a.pasta')), undefined);
+  assert.deepStrictEqual(
+    (col.get(vscode.Uri.joinPath(upper, 'dic', 'a.pasta')) ?? []).map((d) => d.code),
+    ['syntax', 'call-target-missing']
+  );
+  assert.strictEqual(col.size, 1);
+  gv.dispose();
+});
+
 test('WASM の呼び出しが throw したらそのゴーストの診断を消して出力チャンネルに 1 行残す', async () => {
   mock.resetFakeFs();
   setOpenDocuments([]);

@@ -29,8 +29,11 @@ export function findGhostMaster(fileUri: vscode.Uri): vscode.Uri | undefined {
   return undefined;
 }
 
-/** ゴーストの鍵。綴りの違う同じゴーストを 1 つにまとめる（3.6） */
-function ghostKey(master: vscode.Uri): string {
+/**
+ * ゴーストの鍵（パスを小文字にした URI の文字列）。綴りの違う同じゴーストを 1 つにまとめる（3.6）。
+ * 診断の URI と開いている文書の照らし合わせにも使う
+ */
+export function ghostKey(master: vscode.Uri): string {
   return master.with({ path: master.path.toLowerCase() }).toString();
 }
 
@@ -40,7 +43,7 @@ function endsWithIgnoreCase(uri: vscode.Uri, suffix: string): boolean {
 }
 
 interface OpenChange {
-  uri: string;
+  uri: vscode.Uri;
   open: boolean;
 }
 
@@ -110,8 +113,8 @@ export class GhostValidator implements vscode.Disposable {
           this.requestValidation(master);
         }
       }),
-      vscode.workspace.onDidOpenTextDocument((doc) => this.renderAll({ uri: doc.uri.toString(), open: true })),
-      vscode.workspace.onDidCloseTextDocument((doc) => this.renderAll({ uri: doc.uri.toString(), open: false }))
+      vscode.workspace.onDidOpenTextDocument((doc) => this.renderAll({ uri: doc.uri, open: true })),
+      vscode.workspace.onDidCloseTextDocument((doc) => this.renderAll({ uri: doc.uri, open: false }))
     );
   }
 
@@ -158,9 +161,9 @@ export class GhostValidator implements vscode.Disposable {
     const key = ghostKey(master);
     try {
       const entries: string[] = [];
-      await walk(master, '', entries);
-      // ponytail: dirs は仮に空。フォルダの一覧は 3.3 で集める
-      const input: GhostInput = { pastaToml: await readToml(master), entries, dirs: [] };
+      const dirs: string[] = [];
+      await walk(master, '', entries, dirs);
+      const input: GhostInput = { pastaToml: await readToml(master), entries, dirs };
       const listed = new Set(entries);
       const files: Record<string, FileText> = {};
       for (const rel of this.bridge.selectGhostFiles(input)) {
@@ -225,24 +228,28 @@ export class GhostValidator implements vscode.Disposable {
 
   /**
    * 前回の報告から診断を出し直す。change は開いた・閉じたばかりの文書で、
-   * textDocuments の更新と通知の順に頼らずその状態として扱う
+   * textDocuments の更新と通知の順に頼らずその状態として扱う。
+   * 作った URI と大文字・小文字だけ違う文書が開いていれば、その文書の URI に付ける（3.6）
    */
   private render(state: GhostState, change?: OpenChange): void {
-    const open = new Set(vscode.workspace.textDocuments.map((d) => d.uri.toString()));
+    // キーは ghostKey、値は開いている文書の URI
+    const open = new Map(vscode.workspace.textDocuments.map((d) => [ghostKey(d.uri), d.uri] as const));
     if (change) {
       if (change.open) {
-        open.add(change.uri);
+        open.set(ghostKey(change.uri), change.uri);
       } else {
-        open.delete(change.uri);
+        open.delete(ghostKey(change.uri));
       }
     }
     const byUri = new Map<string, { uri: vscode.Uri; diagnostics: vscode.Diagnostic[] }>();
     for (const f of state.report.findings) {
-      const uri = vscode.Uri.joinPath(state.master, ...f.path.split('/'));
-      const key = uri.toString();
-      if (f.code === SYNTAX_CODE && open.has(key)) {
+      const built = vscode.Uri.joinPath(state.master, ...f.path.split('/'));
+      const opened = open.get(ghostKey(built));
+      if (f.code === SYNTAX_CODE && opened) {
         continue;
       }
+      const uri = opened ?? built;
+      const key = uri.toString();
       const line = Math.max((f.line ?? 1) - 1, 0);
       const pos = new vscode.Position(line, utf16Column(state.texts.get(f.path), line, Math.max((f.column ?? 1) - 1, 0)));
       const d = new vscode.Diagnostic(
@@ -289,8 +296,11 @@ function utf16Column(text: string | undefined, line: number, column: number): nu
   return utf16;
 }
 
-/** 再帰で '/' 区切りの相対パスを集める。最上位の profile に入らず、リンクは含めない */
-async function walk(dir: vscode.Uri, prefix: string, out: string[]): Promise<void> {
+/**
+ * 再帰で '/' 区切りの相対パスを集める。ファイルは out に、入ったフォルダ（末尾の '/' なし）は dirs に。
+ * 最上位の profile に入らず（名前は区別して比べる）、リンクは含めない（CLI の walk と同じ）
+ */
+async function walk(dir: vscode.Uri, prefix: string, out: string[], dirs: string[]): Promise<void> {
   for (const [name, type] of await vscode.workspace.fs.readDirectory(dir)) {
     if ((type & vscode.FileType.SymbolicLink) !== 0) {
       continue;
@@ -299,7 +309,8 @@ async function walk(dir: vscode.Uri, prefix: string, out: string[]): Promise<voi
       if (prefix === '' && name === 'profile') {
         continue;
       }
-      await walk(vscode.Uri.joinPath(dir, name), `${prefix}${name}/`, out);
+      await walk(vscode.Uri.joinPath(dir, name), `${prefix}${name}/`, out, dirs);
+      dirs.push(`${prefix}${name}`);
     } else if (type === vscode.FileType.File) {
       out.push(`${prefix}${name}`);
     }

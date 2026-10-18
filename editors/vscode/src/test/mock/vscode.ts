@@ -267,7 +267,7 @@ export enum FileType {
 
 /**
  * Fake files keyed by Uri.path. Directories are implied by the paths below
- * them. A symlink entry reports `type | FileType.SymbolicLink`. An unreadable
+ * them, or placed explicitly with setFakeDir (empty ones). A symlink entry reports `type | FileType.SymbolicLink`. An unreadable
  * entry lists/stats as a file but its readFile rejects.
  */
 const fakeEntries = new Map<string, { type: FileType; data: Uint8Array; unreadable?: boolean }>();
@@ -284,6 +284,10 @@ export function setFakeUnreadable(path: string): void {
 }
 export function setFakeSymlink(path: string, target: FileType = FileType.File): void {
   fakeEntries.set(path, { type: target | FileType.SymbolicLink, data: new Uint8Array(0) });
+}
+/** An explicit (possibly empty) directory. */
+export function setFakeDir(path: string): void {
+  fakeEntries.set(path, { type: FileType.Directory, data: new Uint8Array(0) });
 }
 export function deleteFakeFile(path: string): void {
   fakeEntries.delete(path);
