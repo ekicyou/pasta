@@ -159,3 +159,5 @@
 - 1.1: 調整つまみは既定どおり MINUTE_TOLERANCE=2 秒・REBASE_GRACE=70 秒。読み取りの応答は表示中の吹き出しの文字を消す（許す）。窓際のぱすたさんDEBUG で読み取りの後に約 6 分 talking が続いた件は原因未確定 → 7.2 で SHIORI の応答としての読み取りの後の Status を見る。開発用パレットは Ctrl+Shift+D か右クリック「機能」→「開発用パレット」。
 - 4.1: 既存の syntax_test.rs は unix の無い date 表を EVENT.fire に渡す。clock は unix が無ければ now=nil・date=req.date・返事は読めない値扱いにした（E2E の全件実行で発覚）。
 - 8.3: 飛びは OnSecondChange でだけ数えるので、飛んでから次の秒の合図までの 1 秒足らずに始まった get_property の締め切りや撫では補正前の物差しになる（実害はほぼ無いので許す）。
+- 最終検証: スリープ明けは「OnSysResume が復帰後の最初の OnSecondChange より先に届く」前提で、実機では未確認（先に OnSecondChange が来ると、スリープ中の正時の時報が出ず、おしゃべりも残りの間隔を待つ）。kiro-complete の棚卸で扱う。
+- 最終検証: init.lua・virtual_dispatcher.lua の行が増えたので、novel-talk-flow・novel-checkpoint-rollback・shell-element-click の brief の行番号と、novel-talk-flow の「時報・おしゃべりの停止」（seen_epoch・CLOCK.steady・next_talk_time の意味）を kiro-complete で申し送る。

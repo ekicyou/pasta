@@ -850,6 +850,17 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         expect(dispatcher._get_internal_state().next_hour_unix):toBe(BASE + 2 * H)
     end)
 
+    vtest("初回の判定より前の飛びでは、次の回に決め直さない（実際の正時の直後でも余分な時報が出ない）", function()
+        CLOCK.observe({ id = "OnSecondChange", date = mk_date(BASE + H - 300), dic = {} })
+        -- 初回の判定の前に飛び（+330 秒）が数えられ、初回は 11:00:30 に記録だけする
+        expect(dispatcher.check_hour(mk_act(BASE + H + 30))):toBe(nil)
+        expect(CLOCK.epoch()):toBe(1)
+        expect(dispatcher._get_internal_state().seen_epoch):toBe(1)
+        expect(dispatcher.check_hour(mk_act(BASE + H + 31))):toBe(nil)
+        expect(found):toBe(nil)
+        expect(dispatcher._get_internal_state().next_hour_unix):toBe(BASE + 2 * H)
+    end)
+
     vtest("正時をまたいで先へ設定し直しても、余分な時報は出ず、次の正時に出る", function()
         dispatcher.check_hour(mk_act(R0))
         set_virtual(R0, BASE + 2 * H - 30) -- 11:59:30

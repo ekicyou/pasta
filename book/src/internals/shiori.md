@@ -325,7 +325,7 @@ pasta.shiori.entry
 | `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ探索範囲の親を決める。`act.req.reference[2]`（`\q` の 3 番目の引数。選択肢を出したグローバルシーンの登録名）が文字列で `SCENE.get_global_table` で引けるグローバルシーンならそれを、そうでなければ `STORE.last_global_scene` を親にする。`act.req.reference[1]`（選択 ID）を `SCENE.search(選択 ID, 親)` で探し、無ければ `SCENE.search(選択 ID, nil)` でグローバルシーンを探し、見つかった関数をコルーチンに包んで返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
 | `REG.OnMouseDoubleClick` | `act.req.reference[3]`（スコープ番号）からアクター名を、`act.req.reference[4]`（部位）を部位として、ショートカットの 1〜8 段の名前を上から `SCENE.co_exec_exact` で探し、最初に見つかったコルーチンを返す。無ければ `SCENE.co_exec(act, "OnMouseDoubleClick")`。抑止は見ない |
 | `REG.OnMouseMove` | 撫での判定（`check_stroke`）を毎回回す。判定には部位・スコープ番号・なめらかな時計の時刻（`CLOCK.steady(act.req)` に `act.req.date.ns` を足した小数の秒）と、`virtual_dispatcher.is_blocked(act.req.status)` を渡す。撫でたと決めた回だけ、アクター名を引いて 1〜8 段を `SCENE.co_exec_exact` で探し、見つかればそのコルーチンを返す。それ以外は `SCENE.co_exec(act, "OnMouseMove")`。判定の状態はモジュールのローカル変数 1 つで、保存しない |
-| `REG.OnSecondChange` | `CALLBACK.sweep(CLOCK.steady(act.req) or os.time())` が応答を返せばそれを返し（その回は仮想イベントを出さない）、そうでなければ `virtual_dispatcher.dispatch(act)` の結果（コルーチンか `nil`）を返す。`sweep` の応答は、期限切れの待機を再開した結果（出力の 200、止まるエラーの表記の 200、または表記を出さない設定での理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す |
+| `REG.OnSecondChange` | `CALLBACK.sweep(CLOCK.steady(act.req) or os.time())` が応答を返せばそれを返し（その回は仮想イベントを出さない）、そうでなければ `virtual_dispatcher.dispatch(act)` がコルーチンを返せばそれを返す。何も出さない回は、Status がブロック対象なら `nil`、そうでなければ `CLOCK.take_probe(act.req)`（予約された仮想時刻の読み取りのスクリプトか `nil`）を返す。`sweep` の応答は、期限切れの待機を再開した結果（出力の 200、止まるエラーの表記の 200、または表記を出さない設定での理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す |
 
 ### 非同期トーク
 

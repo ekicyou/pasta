@@ -496,7 +496,7 @@ SSP の仮想時刻（開発用パレットなどで進めた時刻）は、SHIO
 - `X-Pasta-Time` ヘッダのあるリクエストでは、ずれを使わない。その日時をそのまま使う。
 - ずれは保存しない。SHIORI の load から unload までの間だけ保たれる。
 
-覚えたずれは、時報の判定（[OnHour](#onhour)）と[日時変数](../grammar/variables.md#日時変数)に使われる。`act.req.date` には足されない（[act.req](#actreq)）。
+覚えたずれは、時報の判定（[OnHour](#onhour)）と[日時変数](../grammar/variables.md#日時変数)に使われる。`act.req.date` には足されない（[act.req](#actreq)）。SSP が OS の時計を書き換えるときは、ずれは 0 のままで、設定し直しは[時刻の飛び](#時刻の飛び)として扱われる。
 
 ### OnMinuteChange
 

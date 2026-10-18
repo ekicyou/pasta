@@ -145,9 +145,10 @@ end
 function M.check_hour(act)
     local current_unix = CLOCK.now(act.req)
 
-    -- 初回起動: 次の正時を計算して設定、発行スキップ
+    -- 初回起動: 次の正時を計算して設定、発行スキップ（それまでの飛びは見たことにする）
     if next_hour_unix == 0 then
         next_hour_unix = calculate_next_hour_unix(current_unix)
+        seen_epoch = CLOCK.epoch()
         return nil
     end
 
