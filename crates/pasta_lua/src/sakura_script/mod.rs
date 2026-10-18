@@ -17,7 +17,16 @@
 //! -- With nil actor (uses [talk] values or built-in defaults, no line breaking)
 //! local script = SAKURA.talk_to_script(nil, "こんにちは。")
 //! -- → "こんにちは。\_w[950]" (default script_wait_normal = 50 inserts no per-char wait)
+//!
+//! -- 3 つ目の引数に列の状態の表 { line, width, jump } を渡すと、始めの状態として読み、
+//! -- 成功した後に終わりの状態を書き戻す（無いフィールドは 1・0・偽）。
+//! -- budoux の無いアクター・nil でも、列の状態は進める（改行は入れない）。
+//! local col = {}
+//! SAKURA.talk_to_script(CONFIG.actor.sakura, "こんにちは。", col)
 //! ```
+//!
+//! アクターの `budoux` が空でない表のときだけ、`budoux_newlines`（改行の幅の倍率。
+//! `\n[N]` の N は 100 倍して切り捨て、100 なら `\n`）と `budoux_jump`（`\_l[…]` の後の幅の並び）を読む。
 
 pub mod line_breaker;
 pub mod tokenizer;
@@ -76,10 +85,11 @@ pub fn register(lua: &Lua, config: Option<&TalkConfig>) -> LuaResult<Table> {
 
     // Create talk_to_script function
     let state_clone = Arc::clone(&state);
-    let talk_to_script =
-        lua.create_function(move |_lua, (actor, talk): (Value, Option<String>)| {
-            talk_to_script_impl(&state_clone, actor, talk)
-        })?;
+    let talk_to_script = lua.create_function(
+        move |_lua, (actor, talk, column): (Value, Option<String>, Option<Table>)| {
+            talk_to_script_impl(&state_clone, actor, talk, column)
+        },
+    )?;
 
     module.set("talk_to_script", talk_to_script)?;
 
@@ -100,6 +110,7 @@ fn talk_to_script_impl(
     state: &SakuraScriptState,
     actor: Value,
     talk: Option<String>,
+    column: Option<Table>,
 ) -> LuaResult<String> {
     // Requirement 6.1: Return empty string for nil or empty input
     let talk = match talk {
@@ -116,38 +127,109 @@ fn talk_to_script_impl(
     // Insert waits
     let result = wait_inserter::insert_waits(&tokens, &wait_values);
 
-    // Apply budoux line breaking if actor has budoux config
-    let result = apply_budoux_if_configured(&actor, state, result)?;
-
+    // budoux の改行（列の状態を受け取ったら、budoux が無くても状態は進める）
+    let ab = read_actor_break(&actor)?;
+    if ab.widths.is_empty() && column.is_none() {
+        return Ok(result);
+    }
+    let mut col = match &column {
+        Some(t) => read_column(t)?,
+        None => line_breaker::Column::default(),
+    };
+    let rule = line_breaker::BreakRule {
+        widths: &ab.widths,
+        jump_widths: &ab.jump_widths,
+        newline: &ab.newline,
+    };
+    let result = line_breaker::break_lines_impl(
+        &result,
+        &rule,
+        &mut col,
+        state.tokenizer.tag_regex(),
+        &state.budoux_parser,
+    );
+    // 成功した後にだけ書き戻す
+    if let Some(t) = &column {
+        write_column(t, &col)?;
+    }
     Ok(result)
 }
 
-/// Apply budoux line breaking if the actor table has a `budoux` field.
-fn apply_budoux_if_configured(
-    actor: &Value,
-    state: &SakuraScriptState,
-    text: String,
-) -> LuaResult<String> {
-    let actor_table = match actor {
-        Value::Table(t) => t,
-        _ => return Ok(text),
-    };
+/// アクターの表から読んだ改行の規則（`budoux`・`budoux_jump`・`budoux_newlines`）。
+struct ActorBreak {
+    widths: Vec<usize>,
+    jump_widths: Vec<usize>,
+    newline: String,
+}
 
-    let widths: Vec<usize> = match actor_table.get::<Value>("budoux")? {
-        Value::Table(t) => table_to_widths(&t)?,
-        _ => return Ok(text),
+/// アクターの表から ActorBreak を作る。
+///
+/// `budoux` が空でない表のときだけ `budoux_newlines`・`budoux_jump` を読む。
+/// 表でない actor・`budoux` の無いアクターは、空の並び・`\n`。
+fn read_actor_break(actor: &Value) -> LuaResult<ActorBreak> {
+    let mut ab = ActorBreak {
+        widths: Vec::new(),
+        jump_widths: Vec::new(),
+        newline: newline_for_ratio(None),
     };
-
-    if widths.is_empty() {
-        return Ok(text);
+    let Value::Table(t) = actor else {
+        return Ok(ab);
+    };
+    if let Value::Table(w) = t.get::<Value>("budoux")? {
+        ab.widths = table_to_widths(&w)?;
     }
+    if ab.widths.is_empty() {
+        return Ok(ab);
+    }
+    let ratio = t.get::<Option<f64>>("budoux_newlines").map_err(|e| {
+        mlua::Error::external(format!("budoux_newlines は数値で書いてください: {e}"))
+    })?;
+    ab.newline = newline_for_ratio(ratio);
+    if let Value::Table(j) = t.get::<Value>("budoux_jump")? {
+        ab.jump_widths = table_to_widths(&j)?;
+    }
+    Ok(ab)
+}
 
-    Ok(line_breaker::break_lines_impl(
-        &text,
-        &widths,
+/// 倍率から改行の文字列を作る。None・N が 100 なら `\n`、それ以外は `\n[N]`。
+/// N は Lua の `math.floor(ratio * 100)` と同じ値。
+fn newline_for_ratio(ratio: Option<f64>) -> String {
+    match ratio.map(|r| (r * 100.0).floor() as i64) {
+        None | Some(100) => r"\n".to_string(),
+        Some(n) => format!(r"\n[{n}]"),
+    }
+}
+
+/// Lua の表から列の状態を読む。無いフィールドは line = 1・width = 0・jump = false。
+fn read_column(t: &Table) -> LuaResult<line_breaker::Column> {
+    Ok(line_breaker::Column {
+        line: t.get::<Option<i64>>("line")?.unwrap_or(1).max(1) as usize,
+        width: t.get::<Option<i64>>("width")?.unwrap_or(0).max(0) as usize,
+        jump: t.get::<bool>("jump")?,
+    })
+}
+
+/// 列の状態を Lua の表に書く。
+fn write_column(t: &Table, c: &line_breaker::Column) -> LuaResult<()> {
+    t.set("line", c.line)?;
+    t.set("width", c.width)?;
+    t.set("jump", c.jump)
+}
+
+/// 新しい列の状態・`\n`・飛んだ後の並び無しで budoux の改行を入れる（`break_lines`）。
+fn break_fresh(state: &SakuraScriptState, text: &str, widths: &[usize]) -> String {
+    let rule = line_breaker::BreakRule {
+        widths,
+        jump_widths: &[],
+        newline: r"\n",
+    };
+    line_breaker::break_lines_impl(
+        text,
+        &rule,
+        &mut line_breaker::Column::default(),
         state.tokenizer.tag_regex(),
         &state.budoux_parser,
-    ))
+    )
 }
 
 /// Convert a Lua array table of widths to `Vec<usize>`.
@@ -206,14 +288,7 @@ fn break_lines_lua_impl(
         return Ok(text);
     }
 
-    let result = line_breaker::break_lines_impl(
-        &text,
-        &widths_vec,
-        state.tokenizer.tag_regex(),
-        &state.budoux_parser,
-    );
-
-    Ok(result)
+    Ok(break_fresh(state, &text, &widths_vec))
 }
 
 #[cfg(test)]

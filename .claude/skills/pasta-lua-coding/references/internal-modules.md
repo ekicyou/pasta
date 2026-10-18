@@ -98,7 +98,7 @@ ACT は、シーン関数が第 1 引数で受け取るオブジェクトであ�
 | `line_map` | 実行中のシーンの、生成コードの行と `.pasta` の行の対応（`string\|nil`）。初期値は `nil` で、`init_scene` の第 4 引数を読み解かずに控える |
 | `scene_names` | シーンテーブル → グローバルシーンの書いた名前。ACT ごとの新しい空の表で、`init_scene` が書き足し、`restore_scene` が引く |
 
-`SHIORI_ACT.new(actors, req)` は `ACT.new(actors)` で作った表に、`_spot_newlines`・`_choice_newlines`（`pasta.config` から読む `[ghost]` の `spot_newlines`・`choice_newlines`。既定はどちらも 1.5）と `req`（SHIORI のリクエストの表）を足し、メタテーブルを `SHIORI_ACT_IMPL` に付け替える。`act.req` のフィールドは [act.req](shiori-events.md#actreq) が正である。
+`SHIORI_ACT.new(actors, req)` は `ACT.new(actors)` で作った表に、`_spot_newlines`・`_choice_newlines`・`_after_choice_newlines`（`pasta.config` から読む `[ghost]` の `spot_newlines`・`choice_newlines`・`after_choice_newlines`。既定は 1.5・1.5・1.0）と `req`（SHIORI のリクエストの表）を足し、メタテーブルを `SHIORI_ACT_IMPL` に付け替える。`act.req` のフィールドは [act.req](shiori-events.md#actreq) が正である。
 
 シーンのコルーチンに渡った ACT は、そのコルーチンが終わるまで使われ続ける（[再開のループ](https://ekicyou.github.io/pasta/internals/execution-model.html#再開のループresume_until_valid)）。Call で呼んだ先のシーン関数も同じ ACT を受け取るため、`var` と `token` は呼び出しの連鎖の全体で共有される。
 

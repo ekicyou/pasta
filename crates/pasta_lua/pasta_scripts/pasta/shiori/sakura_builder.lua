@@ -185,22 +185,120 @@ local function text_parts(inner)
         emits_text({ type = t, text = text:sub(after) })
 end
 
+--- 列の状態（BudouxColumn）。talk_to_script が 3 つ目の引数として読み書きする
+--- @param columns table<integer, table> スポット ID → 列の状態（1 回の出力の中だけ持つ）
+--- @param spot integer
+--- @return table 列の状態（無ければ 1 列目・字数 0・budoux の並びで作る）
+local function column_at(columns, spot)
+    local column = columns[spot]
+    if column == nil then
+        column = { line = 1, width = 0, jump = false }
+        columns[spot] = column
+    end
+    return column
+end
+
+--- 次の列へ n 列進める（Rust の ColumnMove::Next の写し。片方だけ直さない）
+local function next_column(column, n)
+    column.line = column.line + n
+    column.width = 0
+end
+
+--- 最初の列へ戻す（Rust の ColumnMove::First の写し。片方だけ直さない）
+local function first_column(column)
+    column.line = 1
+    column.width = 0
+    column.jump = false
+end
+
+--- 文字列が単位にならない `\` で終わるか（APPEARANCE.tag_at と同じ読み方。エスケープ・囲みは除く）
+--- @param s string
+--- @return boolean
+local function ends_with_lone_backslash(s)
+    if s:byte(-1) ~= 92 then -- 92 は `\`。ほとんどの出力はここで終わる
+        return false
+    end
+    local pos = 1
+    while true do
+        local i = s:find("\\", pos, true)
+        if not i then
+            return false
+        end
+        local name, _, next_pos = APPEARANCE.tag_at(s, i)
+        if name == nil and next_pos == i + 1 and i == #s then
+            return true
+        end
+        pos = next_pos
+    end
+end
+
+--- 出力バッファを包み、最後に足した片が単位にならない `\` で終わるか（lone）を覚える（1.2・決定 9）。
+--- put は pasta が出す片を足す。片が `\` で始まり、直前の出力が単独の `\` で終わっていれば、
+--- `\` を 1 つ足してエスケープの `\\` にしてから足す（片の頭のタグが前の `\` とつながって `\\` に化けるのを防ぐ）。
+--- put_raw は作者が書いた片（作者が書いた頭のままの台詞・raw_script）を、守らずにそのまま足す。
+--- 空の片は lone を変えない
+--- @param inner table 出力バッファ（pasta.buf 互換）
+--- @return table
+local function tracking_buffer(inner)
+    local b = { lone = false }
+    function b:put_raw(s)
+        if s ~= "" then
+            inner:put(s)
+            self.lone = ends_with_lone_backslash(s)
+        end
+        return self
+    end
+    function b:put(s)
+        if self.lone and s:byte(1) == 92 then -- 92 は `\`
+            inner:put("\\")
+            self.lone = false -- 足した後の末尾はエスケープ。続く片は自分の頭から読む
+        end
+        return self:put_raw(s)
+    end
+    function b:tostring()
+        return inner:tostring()
+    end
+    return b
+end
+
+--- テスト用の内部の表（公開の API ではない。マニュアルに載せない）
+BUILDER._internal = {
+    next_column = next_column,
+    first_column = first_column,
+    tracking_buffer = tracking_buffer,
+}
+
+--- 区切りを出して 1 列進める。区切りを出す所はすべてここを通す（決定 8）
+--- @param buffer table tracking_buffer
+--- @param column table 列の状態
+--- @param tag string 区切りのタグ（"" なら出さず、列も動かさない）
+local function put_break(buffer, column, tag)
+    if tag == "" then
+        return
+    end
+    buffer:put(tag)
+    next_column(column, 1)
+end
+
 --- actorグループ内の単一トークンをさくらスクリプト文字列へ変換する
 --- @param actor table|nil グループの発言アクター
 --- @param inner table グループ内トークン
+--- @param column table 話し手のスポットの列の状態（talk・sakura_script・newline・clear が動かす）
 --- @return string 変換結果（下記以外の型のトークンは空文字列）
-local function inner_token_to_string(actor, inner)
+local function inner_token_to_string(actor, inner, column)
     local inner_type = inner.type
 
     if inner_type == "talk" or inner_type == "sakura_script" then
-        return SAKURA_SCRIPT.talk_to_script(actor, inner.text)
+        return SAKURA_SCRIPT.talk_to_script(actor, inner.text, column)
     elseif inner_type == "surface" then
         return string.format("\\s[%s]", tostring(inner.id))
     elseif inner_type == "wait" then
         return string.format("\\_w[%d]", inner.ms)
     elseif inner_type == "newline" then
+        next_column(column, inner.n)
         return string.rep("\\n", inner.n)
     elseif inner_type == "clear" then
+        first_column(column)
         return "\\c"
     elseif inner_type == "raw_script" then
         return inner.text
@@ -214,15 +312,35 @@ local function inner_token_to_string(actor, inner)
     return ""
 end
 
+--- 変換の出力の頭が作者の書いたものか（前の単独の `\` を守らない所。決定 9）。
+--- raw_script と、出力の頭の 2 バイトがテキストの頭と同じ台詞（作者が書いた頭のタグ）。
+--- talk_to_script が台詞の頭に改行を入れたときは頭が違うので、pasta が出す片として守る
+--- @param inner table 内側トークン
+--- @param s string 変換の出力
+--- @return boolean
+local function head_written_by_author(inner, s)
+    local t = inner.type
+    if t == "raw_script" then
+        return true
+    end
+    return (t == "talk" or t == "sakura_script") and s:sub(1, 2) == tostring(inner.text):sub(1, 2)
+end
+
 --- actorグループ内の単一トークンをさくらスクリプトへ変換して出力し、外見状態に観測させる
 --- @param buffer table 出力バッファ（pasta.buf 互換）
 --- @param actor table|nil グループの発言アクター
 --- @param inner table グループ内トークン
 --- @param appearance table 外見状態（直接変更される）
 --- @param spot integer|nil 現在スコープの解決済みスポットID
-local function emit_inner_token(buffer, actor, inner, appearance, spot)
-    local s = inner_token_to_string(actor, inner)
-    buffer:put(s)
+--- @param column table 話し手のスポットの列の状態
+local function emit_inner_token(buffer, actor, inner, appearance, spot, column)
+    local s = inner_token_to_string(actor, inner, column)
+    -- pasta が出したタグ（頭の改行・`\c`・表情・ウェイトなど）を、前の出力の単独の `\` に食わせない
+    if head_written_by_author(inner, s) then
+        buffer:put_raw(s)
+    else
+        buffer:put(s)
+    end
     -- raw_script はアクター未指定の生さくらスクリプトとして観測する（1.8）
     local speaker = actor
     if inner.type == "raw_script" then
@@ -238,15 +356,27 @@ local function newline_tag(ratio)
     return string.format("\\n[%d]", math.floor(ratio * 100))
 end
 
+--- 選択肢の後の改行のタグ。N が 100 なら今と同じ `\n`、それ以外は newline_tag と同じ `\n[N]`
+--- @param ratio number 行の高さに対する倍率（after_choice_newlines）
+--- @return string
+local function plain_newline_tag(ratio)
+    local tag = newline_tag(ratio)
+    if tag == "\\n[100]" then
+        return "\\n"
+    end
+    return tag
+end
+
 --- 選択肢の直前に出す区切り
 --- @param tail "text"|"choice"|nil その吹き出しに最後に表示したもの
 --- @param choice_newlines number 字の後の選択肢の前の改行幅
---- @return string 空文字列（最初の選択肢）、`\n[N]`（字の後）、`\n`（選択肢の後）のどれか
-local function choice_break(tail, choice_newlines)
+--- @param after_choice_newlines number 選択肢の後の改行幅
+--- @return string 空文字列（最初の選択肢）、`\n[N]`（字の後）、選択肢の後の区切りのどれか
+local function choice_break(tail, choice_newlines, after_choice_newlines)
     if tail == "text" then
         return newline_tag(choice_newlines)
     elseif tail == "choice" then
-        return "\\n"
+        return plain_newline_tag(after_choice_newlines)
     end
     return ""
 end
@@ -254,7 +384,18 @@ end
 --- @class BuildConfig
 --- @field spot_newlines number|nil スポット変更時の改行量（デフォルト1.5）
 --- @field choice_newlines number|nil 字の後の選択肢の前の改行量（デフォルト1.5）
+--- @field after_choice_newlines number|nil 選択肢の後の改行幅（既定 1.0。N が 100 なら `\n`）
 --- @field buffer_factory (fun(): table)|nil 出力バッファの生成関数（デフォルト pasta.buf.new。テスト用）
+--- @field columns_out table|nil 渡すと終わりの列の状態（スポット ID → BudouxColumn）を書き出す（テスト用。公開の API ではない）
+
+--- 終わりの列の状態を columns_out に書き出す（無ければ何もしない。今までどおり捨てる）
+--- @param out table|nil
+--- @param columns table<integer, table>
+local function export_columns(out, columns)
+    for spot, column in pairs(out and columns or {}) do
+        out[spot] = column
+    end
+end
 
 --- グループ化されたトークン配列をさくらスクリプト文字列に変換
 --- @param grouped_tokens table[] グループ化されたトークン配列
@@ -267,7 +408,8 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
     config = config or {}
     local spot_newlines = config.spot_newlines or 1.5
     local choice_newlines = config.choice_newlines or 1.5
-    local buffer = (config.buffer_factory or buf.new)()
+    local after_choice_newlines = config.after_choice_newlines or 1.0
+    local buffer = tracking_buffer((config.buffer_factory or buf.new)())
 
     -- input_actor_spots を直接変更する（nilの場合は内部で空テーブルを作成）
     local actor_spots = input_actor_spots or {}
@@ -286,6 +428,8 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
     -- 選択肢の前と、選択肢の後の字の前の区切りの判定材料。
     -- 話し手なしのグループの中（last_spot が nil の間）はスポット 0 として数える。
     local spot_tail = {}      -- table<integer, "text"|"choice">
+    -- スポットごとの列の状態（BudouxColumn）。talk_to_script に渡し、区切りで進める。出力ごとに作って捨てる（4.5）
+    local columns = {}        -- table<integer, BudouxColumn>
 
     for _, token in ipairs(grouped_tokens) do
         local t = token.type
@@ -302,6 +446,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
             last_spot = nil
             spot_has_text = {}
             spot_tail = {}
+            columns = {}
             pending_break = false
         elseif t == "actor" then
             -- actorトークン処理: アクター切り替え検出後、グループ内のトークンを順次処理
@@ -318,6 +463,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
             end
 
             local tail_spot = last_spot or 0 -- 話し手なしのグループはスポット 0 の吹き出しに出る
+            local column = column_at(columns, tail_spot) -- グループの話し手のスポットの列の状態
             for _, inner in ipairs(token.tokens) do
                 -- lead: 字を出すトークンか（台詞に書いた `\c` があれば、最初の `\c` より前の字だけを見る）
                 local lead, cleared, trail = text_parts(inner)
@@ -326,37 +472,38 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                     -- 現在スポットの has-text を偽へリセットし pending を破棄する。
                     -- クリアで区切るべき先行テキストが消えるため、後続テキスト直前に改行を出さない。
                     -- 最後に表示したものも消す（消した吹き出しの最初の選択肢を区切らない）。
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column)
                     pending_break = false
                     if last_spot ~= nil then
                         spot_has_text[last_spot] = false
                     end
                     spot_tail[tail_spot] = nil
                 elseif inner.type == "choice" then
-                    -- S4c: 選択肢。直前に区切り（字の後は choice_newlines の幅、選択肢の後は `\n`）を出す。
+                    -- S4c: 選択肢。直前に区切り（字の後は choice_newlines、選択肢の後は after_choice_newlines の幅）を出す。
                     -- 字には数えない（has-text・pending 不変。保留は次の字の直前で出る）。
-                    buffer:put(choice_break(spot_tail[tail_spot], choice_newlines))
+                    put_break(buffer, column,
+                        choice_break(spot_tail[tail_spot], choice_newlines, after_choice_newlines))
                     spot_tail[tail_spot] = "choice"
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column)
                 elseif lead then
                     -- S3: 字を出すトークン（字のある talk・字を表示する sakura_script）。
                     -- 改行 → has-text 設定 → 本文 の順を厳守。
-                    -- 区切りは 1 つだけ出す（保留があればそれだけ。無くて選択肢の後なら `\n`）。
+                    -- 区切りは 1 つだけ出す（保留があればそれだけ。無くて選択肢の後なら after_choice_newlines の幅）。
                     if pending_break then
-                        buffer:put(newline_tag(spot_newlines))
+                        put_break(buffer, column, newline_tag(spot_newlines))
                         pending_break = false
                     elseif spot_tail[tail_spot] == "choice" then
-                        buffer:put("\\n")
+                        put_break(buffer, column, plain_newline_tag(after_choice_newlines))
                     end
                     if last_spot ~= nil then
                         spot_has_text[last_spot] = true
                     end
                     spot_tail[tail_spot] = "text"
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column)
                 else
                     -- S4: 字の無い talk・字を表示しない sakura_script・surface・wait・newline・
                     -- choice_timeout・raw_script。変換出力のみ（has-text・pending・最後に表示したもの不変）。
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column)
                 end
                 if cleared then
                     -- S4d: 台詞に書いた `\c`（S3・S4 のどちらを通ったトークンにも当てる）。
@@ -370,12 +517,13 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                 end
             end
         elseif t == "raw_script" then
-            buffer:put(token.text)
+            buffer:put_raw(token.text)
             APPEARANCE.observe(appearance, nil, nil, token.text)
         end
     end
 
     -- S7: ループ終端。未フラッシュの pending は出力せず破棄してから `\e` を付与。
+    export_columns(config.columns_out, columns)
     buffer:put("\\e")
     return buffer:tostring()
 end

@@ -11,8 +11,8 @@ use crate::common;
 
 use common::copy_fixture_to_temp;
 use pasta_lua::loader::{
-    GhostConfig, LoaderError, PastaConfig, PastaLoader, default_choice_newlines,
-    default_hour_margin, default_spot_newlines, default_talk_interval_max,
+    GhostConfig, LoaderError, PastaConfig, PastaLoader, default_after_choice_newlines,
+    default_choice_newlines, default_hour_margin, default_spot_newlines, default_talk_interval_max,
     default_talk_interval_min,
 };
 use std::path::PathBuf;
@@ -80,7 +80,8 @@ fn minimal_and_full_ghost_are_equivalent_in_rust() {
          talk_interval_max = 300\n\
          hour_margin = 30\n\
          spot_newlines = 1.5\n\
-         choice_newlines = 1.5\n",
+         choice_newlines = 1.5\n\
+         after_choice_newlines = 1.0\n",
     )
     .unwrap();
 
@@ -119,6 +120,11 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
         read_pasta_config_ghost_number(&minimal_runtime, "choice_newlines"),
         default_choice_newlines(),
     );
+    // vertical-balloon-lines 5.6: 省いた [ghost] で after_choice_newlines の既定 1.0 が Lua から読める。
+    assert_eq!(
+        read_pasta_config_ghost_number(&minimal_runtime, "after_choice_newlines"),
+        default_after_choice_newlines(),
+    );
     assert_eq!(
         read_pasta_config_ghost_number(&minimal_runtime, "talk_interval_min"),
         default_talk_interval_min() as f64,
@@ -143,7 +149,8 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
          talk_interval_max = 300\n\
          hour_margin = 30\n\
          spot_newlines = 1.5\n\
-         choice_newlines = 1.5\n",
+         choice_newlines = 1.5\n\
+         after_choice_newlines = 1.0\n",
     )
     .unwrap();
     let full_runtime = PastaLoader::load(full_temp.path()).unwrap();
@@ -152,6 +159,7 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
     for key in [
         "spot_newlines",
         "choice_newlines",
+        "after_choice_newlines",
         "talk_interval_min",
         "talk_interval_max",
         "hour_margin",
@@ -237,6 +245,7 @@ fn ghost_config_default_is_ssot_anchor() {
     assert_eq!(d.hour_margin, 30);
     assert_eq!(d.spot_newlines, 1.5);
     assert_eq!(d.choice_newlines, 1.5);
+    assert_eq!(d.after_choice_newlines, 1.0);
 
     // const default_*() 関数も同じ SSOT を返すこと（Lua 比較で利用するため）。
     assert_eq!(default_talk_interval_min(), d.talk_interval_min);
@@ -244,6 +253,7 @@ fn ghost_config_default_is_ssot_anchor() {
     assert_eq!(default_hour_margin(), d.hour_margin);
     assert_eq!(default_spot_newlines(), d.spot_newlines);
     assert_eq!(default_choice_newlines(), d.choice_newlines);
+    assert_eq!(default_after_choice_newlines(), d.after_choice_newlines);
 }
 
 /// リポジトリルートを `CARGO_MANIFEST_DIR`（crates/pasta_lua）から2階層上に解決。
@@ -313,6 +323,11 @@ fn config_reference_doc_matches_ssot() {
     expect_row("spot_newlines", format!("{:?}", d.spot_newlines));
     // choice_newlines も浮動小数（"1.5"）。choice-line-layout 5.5。
     expect_row("choice_newlines", format!("{:?}", d.choice_newlines));
+    // after_choice_newlines も浮動小数（"1.0"）。vertical-balloon-lines 7.4。
+    expect_row(
+        "after_choice_newlines",
+        format!("{:?}", d.after_choice_newlines),
+    );
 }
 
 /// Lua フォールバックリテラルが SSOT と一致すること（R5.5）。
@@ -336,6 +351,14 @@ fn lua_fallback_literals_match_ssot() {
     assert!(
         act_lua.contains(&format!("\"choice_newlines\", {choice_default}")),
         "act.lua の choice_newlines フォールバックリテラルが SSOT ({choice_default}) と不一致 (choice-line-layout 2.9)"
+    );
+    // act.lua: after_choice_newlines の Lua 側フォールバックリテラル（vertical-balloon-lines 5.6）。
+    let after_choice_default = format!("{:?}", d.after_choice_newlines); // "1.0"
+    assert!(
+        act_lua.contains(&format!(
+            "\"after_choice_newlines\", {after_choice_default}"
+        )),
+        "act.lua の after_choice_newlines フォールバックリテラルが SSOT ({after_choice_default}) と不一致 (vertical-balloon-lines 5.6)"
     );
 
     // virtual_dispatcher.lua: talk_interval_min/max/hour_margin のフォールバックリテラル。

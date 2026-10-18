@@ -6,6 +6,7 @@
 #[path = "../common/mod.rs"]
 mod common;
 
+mod backslash_break_test;
 mod basic_test;
 mod budoux_test;
 mod conformance_test;
