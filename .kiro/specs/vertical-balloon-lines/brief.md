@@ -1,6 +1,6 @@
 # Brief: vertical-balloon-lines
 
-`/kiro-discovery` で起票（2026-10-18・main `8298a46c`）。ghost_dev の「ぱすた開発」セッション（窓際のぱすたさん）からの要望で、同じ日に直接実装の候補「budoux の改行の幅」を spec に格上げした（開発者の承認）。0.5.0 に入れる。要件定義は Opus。
+`/kiro-discovery` で起票（2026-10-18・main `8298a46c`）。ghost_dev の「ぱすた開発」セッション（窓際のぱすたさん）からの要望で、同じ日に直接実装の候補「budoux の改行の幅」を spec に格上げした（開発者の承認）。0.4.1 に入れる（2026-10-18 開発者の決定）。要件定義は Opus。
 
 ## Problem
 
