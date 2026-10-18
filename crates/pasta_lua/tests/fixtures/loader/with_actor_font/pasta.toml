@@ -1,0 +1,13 @@
+ghost_name = "ActorFontTest"
+version = "1.0.0"
+
+[loader]
+debug_mode = true
+
+# 装い（font）は書いた順にタグになる（属性名の辞書順ではない）
+[actor."おじさん"]
+spot = 0
+font = { height = 12, color = "90,110,140", bold = true }
+
+[actor."ぱすた"]
+spot = 0
