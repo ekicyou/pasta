@@ -196,3 +196,97 @@ brief は `Cargo.lock` の席を `talk-grapheme-clusters` に渡している。(
 6. `cargo test --target i686-pc-windows-msvc` で `pasta_shiori` の `cdylib`（pasta.dll）ができる場所と、テストからの求め方（10.6）。
 7. `luaJIT_BC_` を生の `luaL_loadbuffer` で読む方法（mlua の中から生の状態を得る道。`create_c_function` の中なら得られる）。
 8. 公開する関数の一覧の決め方（`lua51.lib` から取るか、ヘッダーから取るか）と、LuaJIT の更新で増減したときに気づく仕組み（一覧と `lua51.lib` の照合テストなど）。
+
+## 8. 設計フェーズの調査と決定（2026-10-18・FFI の道）
+
+### Summary
+
+- **Feature**: `lua-cmodule-robustness`
+- **Discovery Scope**: Extension（既存のローダーと VM に、`ffi.load` の置き換えを足す）。light の調べ方に、mlua・LuaJIT のソースの確かめを足した。
+- **Key Findings**:
+  - mlua の app data（`Lua::set_app_data`）は `ExtraData` に入り、`RawLua` の `Drop` が `lua_close` を呼び終えた後に落ちる。DLL の参照をここに持たせれば、`CLibrary` の `__gc`・`ffi.gc` の後始末がすべて済んでから `FreeLibrary` できる。`PastaLuaRuntime` のフィールドの並びにも、`Lua` の複製の数にも左右されない。
+  - LuaJIT の `lua_close` は `cpfinalize` で cdata の後始末（`lj_gc_finalize_cdata`）→ userdata の後始末（`lj_gc_finalize_udata`）の順に最大 10 回回す。userdata の `__gc` で解放する形は、この順と回り方に頼ることになるので採らない。
+  - 元の `ffi.load` を末尾呼び出しにすれば、元の関数が投げる文言の位置は作者のコードの位置になる（`lj_err_callermsg` は C の関数の枠の 1 つ前の Lua の枠の位置を付ける）。pasta が投げる失敗は Lua のラッパの `error(msg, 2)` で同じ書式になる。
+
+### Research Log
+
+#### DLL の参照をいつ解放するか（申し送り 7.2）
+- **Context**: `PastaLuaRuntime` の `Drop` の後（`Lua` を落とした後）か、userdata の `__gc` か。
+- **Sources Consulted**: `mlua-0.11.6/src/state/raw.rs`（`impl Drop for RawLua` が `ffi::lua_close` を呼び、`extra: XRc<UnsafeCell<ExtraData>>` はその後にフィールドとして落ちる）、`src/state/extra.rs`（`app_data: AppData`）、`luajit2/src/lj_state.c`（`lua_close` と `cpfinalize`）。
+- **Findings**: 第 3 の道として app data がある。`ExtraData` は `lua_close` が終わった後に落ちるので、そこで `FreeLibrary` すれば後始末の順に頼らない。`PastaLuaRuntime` のフィールドに持たせる形は、`Lua` の強い参照がほかに残ると VM より先に解放してしまう。
+- **Implications**: `DllPins` を app data に置く。`PastaLuaRuntime` は変えない。
+
+#### LuaJIT の `ffi.load` の細部
+- **Sources Consulted**: `luajit2/src/lj_clib.c`（`clib_error`・`clib_needext`・`clib_extname`・`clib_loadlib`）、`lib_ffi.c:810`、`lj_lib.c`（`lj_lib_checkstr`）、`lj_err.c`（`lj_err_callermsg`）。
+- **Findings**:
+  - `clib_error` は `FormatMessageA(FROM_SYSTEM | IGNORE_INSERTS, NULL, err, 0, buf, 128, NULL)`。言語の指定は 0、バッファは 128 バイトで、足りなければ理由は空になる。末尾の `\r\n` は残る。文言の `<名前>` は拡張子を足す前の名前。
+  - `lj_lib_checkstr` は数を文字列にする。文字列でも数でもなければ `bad argument #1 to 'load'`。ラッパは文字列でない引数を元の関数へそのまま渡せば同じになる。
+  - `global` は `L->base+1 < L->top && tvistruecond(L->base+1)` で読むだけ。型の誤りにならない。ラッパは `...` で渡す。
+- **Implications**: 理由の取り出しは `FormatMessageW` を同じ引数（言語 0）で呼び、末尾の `\r\n` を残す。std の `io::Error` の表示は末尾を削り `(os error N)` を足すので使わない。
+
+#### Windows の拡張子の規則
+- **Context**: 区切りのある名前（`ffi.load("lib/foo")`）で、LuaJIT は `.dll` を足さない（`clib_needext` が偽）。
+- **Findings**: `LoadLibraryEx` は、パスの有無によらず拡張子の無いファイル名に `.dll` を補う（末尾の `.` は「拡張子なし」の印）。今の `ffi.load("lib/foo")` は `lib/foo.dll` を読む。
+- **Implications**: 「最後の部分に `.` が無ければ `.dll` を足す」を 1 つの規則にする。区切りの無い名前では `clib_needext` と同じ結果になる。
+
+#### 取り違えの判定（申し送り 5.2）
+- **Findings**: 読んだ後の `GetModuleHandleW(<ファイル名>)` が今回のハンドルと同じかを見れば、元の `ffi.load` が名前で開いたときに返るものそのものを確かめられる。読む前に確かめるより競合の窓が狭く、パスの文字列の比較（8.3 名・大文字小文字・`\?\`）が要らない。
+- **Implications**: パスの比較の規則は作らない。8.3 名と長い名前の綴りの違いをローダーが同じモジュールと見るかは未計測（設計の Open Questions の 2）。
+
+#### ANSI で表せるかの判定（申し送り 2.8）
+- **Findings**: `crate::encoding` の `Encoding::ANSI.to_bytes` は `WC_COMPOSITECHECK` だけを付けて `WideCharToMultiByte` を呼び、既定の文字が使われたら失敗にする。best-fit の置き換え（似た文字への黙った置き換え）は既定の文字の使用にならない。
+- **Implications**: 新しい Win32 の呼び出しは作らず、`to_bytes` の結果を `to_string` で戻して元と比べる（往復の比較）。
+
+#### 長いパスの設定が無効な環境（申し送り 2.5）
+- **Findings**: マニフェストの無い EXE（`cargo test` の EXE も同じ）は、文書の上では `longPathAware` でないので、レジストリの `LongPathsEnabled` の値によらず長いパスが無効になるはず。2026-10-18 の実測（`LongPathsEnabled=1`・マニフェストなし）で 539 文字の `LoadLibraryExW` が通ったのは、文書の説明と食い違う。どちらが正しいかは、`LongPathsEnabled=0` の機械で確かめるまで分からない。
+- **Implications**: 260 文字以上だけ `\?\` の形にする（Node.js の `process.dlopen` が `\?\` の形を `LoadLibraryExW` に渡しているのと同じ考え方）。CI の各行列で `LongPathsEnabled=0` にして FFI のテストを走らせ、テストの最初に「接頭辞なしの長いパスが本当に通らない」ことを確かめて、設定が効いていないのに緑になるのを防ぐ。開発機のレジストリは変えない。
+
+#### テストの並列とプロセスの中の DLL
+- **Findings**: 同じテストのバイナリの中のテストは同じプロセスの別のスレッドで並列に走る。同じ名前の `foo.dll`・`dep.dll` を別のフォルダから読むと、2 つ目は取り違えになり、依存 DLL の無いことのテストは別のテストが読んだ `dep.dll` で通ってしまう。
+- **Implications**: FFI のテストは新しいバイナリ `tests/ffi/` に分け、中では 1 つの `Mutex` で直列にする。
+
+#### テスト用 DLL のビルド
+- **Sources Consulted**: `cc-1.6.0/src/lib.rs:343`（`windows_registry::find_tool(arch_or_target, tool) -> Option<Tool>`）。`Cargo.lock` の `cc 1.6.0`。
+- **Findings**: `find_tool` は対象（x86・x64）の `cl.exe` を、`INCLUDE`・`LIB`・`PATH` つきの `Tool` で返す。`cl` の既定のランタイムは `/MT`（静的）だが、明示する。CI の windows-latest は `Set-WinSystemLocale ja-JP` を再起動なしで走らせているので、ANSI のコードページは 1252 のままの見込み（理由の文言は英語になる）。
+- **Implications**: `dll_fixture.rs` が `OnceLock` で 1 回だけ作る。
+
+### Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| 先読み＋短い名前（採用） | `LoadLibraryExW` で先に読み、元の `ffi.load` にファイル名を渡す | LuaJIT を改造しない。`CLibrary` の型・後始末は元のまま。実測で確かめた | ファイル名は ANSI に限る。同名の別 DLL があれば失敗 | brief の方針 |
+| ANSI ならフルパスを渡す | 表せるときだけ元の `ffi.load` にフルパス | 取り違えを避けられる場合が増える | フォルダ名の文字種で結果が変わる。深いパスでは `LoadLibraryExA` の長さの制限 | 採らない |
+| `CLibrary` を自分で作る | `lj_clib` の内部を真似る | 名前の制限が無い | LuaJIT の内部の構造に依存（改造と同じ危険） | 範囲外 |
+
+### Design Decisions
+
+#### Decision: 置き場所を `runtime/ffi_load/` の 3 ファイルにする
+- **Context**: `searcher.rs` は 622 行。Windows 専用の unsafe を、OS に依らない規則から分けたい（申し送り）。
+- **Alternatives Considered**: 1. `searcher.rs` に足す 2. 1 ファイル 3. 規則・Win32・登録の 3 ファイル
+- **Selected Approach**: 3（`mod.rs`・`resolve.rs`・`win32.rs`）。モジュール全体を `cfg(windows)` にする（Windows 以外では LuaJIT のまま）。
+- **Rationale**: brief の境界の候補（名前の解決・読み込み・登録）とそのまま合い、unsafe を 1 ファイルに閉じ込められる。
+- **Trade-offs**: ファイルが 3 つ増える。
+- **Follow-up**: 各ファイル 600 行未満を保つ。
+
+#### Decision: 名前だけで見つからない場合も先に読む
+- **Context**: 3.4（そのまま元へ渡す）と 6.2（理由は UTF-8）がぶつかる。元へそのまま渡すと、失敗の理由が ANSI になる。
+- **Selected Approach**: `LoadLibraryExW(name, NULL, 0)`（LuaJIT と同じ探索）で先に読み、成功したらファイル名を元へ渡す。
+- **Rationale**: OS の DLL が今までどおり読めるという 3.4 の目的を保ち、すべての失敗の理由を UTF-8 にできる。
+- **Follow-up**: 話し合いで確かめる（設計の Open Questions の 4）。
+
+#### Decision: 生成（Synthesis）の結果
+- **Generalization**: 3 つの名前の形（名前だけ・相対・絶対）を、1 つの `resolve` と 1 つの拡張子の規則にまとめた。pasta の 3 つの失敗も、LuaJIT と同じ 1 つの文言の形の理由の部分に入れる。
+- **Build vs Adopt**: 探索のフォルダは `LoaderContext::absolute_search_paths()`、ANSI の判定は `crate::encoding`、FFI の有効化は既存の `std_ffi` を使う。新しい依存は dev の `cc` だけ（lock に既にある）。
+- **Simplification**: パスの文字列の比較（8.3 名・大文字小文字・`\?\`）をやめ、ハンドルの一致だけで判定する。DLL の参照の寿命は app data に任せ、`PastaLuaRuntime` を変えない。FFI を有効にしたときの警告のログは足さない（既存の `libs` の debug ログで足りる）。
+
+### Risks & Mitigations
+
+- `\?\` の形での依存 DLL の解決が `LongPathsEnabled=0` で失敗する — CI の手順で毎回確かめる。失敗したら既知の制限にする要件の変更を話し合う。
+- 8.3 名と長い名前の綴りの違いで、同じファイルを別のモジュールとして読む — `collision_test.rs` で確かめ、必要ならファイルの識別子の比較を足す。
+- 確かめと元の `ffi.load` の間の競合（別のスレッドが同名の別 DLL を読む） — 窓は数命令。既知の制限として書く。
+- 末尾呼び出しの位置が LuaJIT と同じになるかは枠の作りに頼る — `compare_test.rs` でバイト比較する。
+
+### 使ったスキルと指針
+
+- `kiro-spec-design`（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）、`kiro-validate-design`（`design-review.md`）。
+- `ponytail`（最小の差分・既存の部品の使い回し・推測の抽象を作らない）。

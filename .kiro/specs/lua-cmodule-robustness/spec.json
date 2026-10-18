@@ -1,16 +1,16 @@
 {
   "feature_name": "lua-cmodule-robustness",
   "created_at": "2026-10-18T13:04:33Z",
-  "updated_at": "2026-10-18T13:10:15Z",
+  "updated_at": "2026-10-18T14:21:42Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {
