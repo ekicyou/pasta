@@ -3398,3 +3398,199 @@ describe("SAKURA_BUILDER - vertical-balloon-lines: 単独の \\ の後の区切�
         expect(out):toBe("\\p[0]天気\\\\s[1]\\e")
     end)
 end)
+
+-- ============================================================================
+-- 作例の照合・Rust との同値・区切りの不変条件（vertical-balloon-lines 7.1・7.3・決定 7・決定 8）
+-- 本物の @pasta_sakura_script を使う（lua_unittest_runner が登録する）
+-- ============================================================================
+
+describe("SAKURA_BUILDER - vertical-balloon-lines: 作例・同値・不変条件", function()
+    local function group(actor, inner_tokens)
+        return { type = "actor", actor = actor, tokens = inner_tokens }
+    end
+    local function talk(actor, text)
+        return { type = "talk", actor = actor, text = text }
+    end
+    local function choice(display)
+        return { type = "choice", display = display, target = display .. "先" }
+    end
+    local function spots()
+        return { ["さくら"] = 0, ["うにゅう"] = 1, ["ぱすた"] = 0 }
+    end
+    local function copy(col)
+        return { line = col.line, width = col.width, jump = col.jump }
+    end
+    local function strip_waits(s)
+        return (s:gsub("\\_w%[%d+%]", ""))
+    end
+
+    test("7.3: Introduction の作例を組み立てると、作例の文字列になる（ウェイトを除く）", function()
+        local BUILDER = setup()
+        local pasta = { name = "ぱすた", spot = 0, budoux = { 40 }, budoux_newlines = 1.8 }
+        -- 1 行目の末尾の ＠左 が返す \_l[-295,0] と 2 行目は、act が 1 つの talk につなぐ
+        local text = "長い長い、記憶の糸。生まれてから、続いてる一本の長い記憶。"
+            .. "\\_l[-295,0]"
+            .. "そう、きっと、一本道。いつか来る終わりの日まで。"
+        local out = BUILDER.build({ group(pasta, { talk(pasta, text) }) }, { spot_newlines = 1.8 }, spots())
+        expect(strip_waits(out)):toBe("\\p[0]長い長い、記憶の糸。生まれてから、\\n[180]続いてる一本の長い記憶。"
+            .. "\\_l[-295,0]そう、きっと、一本道。いつか来る終わりの\\n[180]日まで。\\e")
+    end)
+
+    test("決定 7: next_column・first_column と talk_to_script(\\n・\\c) の書き換えが同じ", function()
+        local BUILDER = setup()
+        local SAKURA_SCRIPT = require("@pasta_sakura_script")
+        local actors = {
+            false, -- nil の代わり（表の中に nil を置けないため）
+            { budoux = { 4 } },
+            { budoux = { 4, 8 }, budoux_jump = { 6 } },
+        }
+        local starts = {
+            { line = 1, width = 0, jump = false },
+            { line = 2, width = 7, jump = true },
+            { line = 5, width = 13, jump = false },
+            { line = 3, width = 0, jump = true },
+        }
+        for _, a in ipairs(actors) do
+            local actor = a or nil
+            for _, start in ipairs(starts) do
+                local cases = {
+                    { "\\n", function(c) BUILDER._internal.next_column(c, 1) end },
+                    { "\\n[180]", function(c) BUILDER._internal.next_column(c, 1) end },
+                    { "\\n\\n", function(c) BUILDER._internal.next_column(c, 2) end },
+                    { "\\c", function(c) BUILDER._internal.first_column(c) end },
+                }
+                for _, case in ipairs(cases) do
+                    local by_lua, by_rust = copy(start), copy(start)
+                    case[2](by_lua)
+                    SAKURA_SCRIPT.talk_to_script(actor, case[1], by_rust)
+                    expect(by_rust.line):toBe(by_lua.line)
+                    expect(by_rust.width):toBe(by_lua.width)
+                    expect(by_rust.jump):toBe(by_lua.jump)
+                end
+            end
+        end
+    end)
+
+    -- 出力の文字列を、スポットごとに列の動きの規則で数え直す（組み立てを呼ばない独立の数え方）。
+    -- \p[n]・\0・\1 で吹き出しを選び、\n・\n[…] で次、引数の無い \c で最初、
+    -- \_l[…] で飛ぶ（has_jump のときだけ。無ければ列は動かない）。\\ はエスケープとして飛ばす。
+    -- CLEAR_SPOT の印（テストが clear_spot の直後に置く raw_script）で全スポットを捨てる。
+    -- ponytail: 選択肢の表示の中の \n などは見分けない。テストの入力に置かない
+    local CLEAR_SPOT = "\\![test,clear_spot]"
+    local function recount(out, has_jump)
+        local cols, spot, i = {}, 0, 1
+        local function at(s)
+            cols[s] = cols[s] or { line = 1, jump = false }
+            return cols[s]
+        end
+        at(0)
+        while i <= #out do
+            local rest = out:sub(i)
+            local n
+            if rest:sub(1, #CLEAR_SPOT) == CLEAR_SPOT then
+                cols, n = {}, #CLEAR_SPOT
+            elseif rest:sub(1, 2) == "\\\\" then
+                n = 2
+            elseif rest:match("^\\p%[%d+%]") then
+                local m = rest:match("^\\p%[(%d+)%]")
+                spot, n = tonumber(m), #m + 4
+                at(spot)
+            elseif rest:match("^\\[01]") then
+                spot, n = tonumber(rest:sub(2, 2)), 2
+                at(spot)
+            elseif rest:match("^\\n%[[^%]]*%]") then
+                at(spot).line, n = at(spot).line + 1, #rest:match("^\\n%[[^%]]*%]")
+            elseif rest:sub(1, 2) == "\\n" then
+                at(spot).line, n = at(spot).line + 1, 2
+            elseif rest:sub(1, 2) == "\\c" and rest:sub(3, 3) ~= "[" then
+                at(spot).line, at(spot).jump, n = 1, false, 2
+            elseif rest:match("^\\_l%[[^%]]*%]") then
+                if has_jump then
+                    at(spot).line, at(spot).jump = 1, true
+                end
+                n = #rest:match("^\\_l%[[^%]]*%]")
+            else
+                n = 1
+            end
+            i = i + n
+        end
+        return cols
+    end
+
+    local function expect_invariant(tokens, config, has_jump)
+        local BUILDER = setup()
+        config = config or {}
+        config.columns_out = {}
+        local out = BUILDER.build(tokens, config, spots())
+        local recounted = recount(out, has_jump)
+        for spot, col in pairs(config.columns_out) do
+            expect(recounted[spot] ~= nil):toBe(true)
+            expect(recounted[spot].line):toBe(col.line)
+            expect(recounted[spot].jump):toBe(col.jump)
+        end
+        -- 組み立てが表を作らなかったスポットは、数え直しでも 1 列目のまま
+        for spot, col in pairs(recounted) do
+            if config.columns_out[spot] == nil then
+                expect(col.line):toBe(1)
+                expect(col.jump):toBe(false)
+            end
+        end
+        return out
+    end
+
+    test("決定 8: 話し手の切り替え・選択肢の前後・表情を挟む台詞", function()
+        local a = { name = "さくら", spot = 0, budoux = { 4, 8 } }
+        local b = { name = "うにゅう", spot = 1, budoux = { 6 } }
+        expect_invariant({
+            group(a, { talk(a, "あいうえおかきく"), { type = "surface", id = 3 }, talk(a, "けこ") }),
+            group(b, { talk(b, "さしすせそたちつ"), choice("甲"), choice("乙"), talk(b, "てと") }),
+            group(a, { talk(a, "なにぬ"), choice("丙"), talk(a, "ねの") }),
+            group(b, { talk(b, "はひ") }),
+        }, { spot_newlines = 1.5, after_choice_newlines = 2.0 })
+    end)
+
+    test("決定 8: newline・clear・台詞の中の \\n と \\c・sakura_script", function()
+        local a = { name = "さくら", spot = 0, budoux = { 4, 20 } }
+        local b = { name = "うにゅう", spot = 1, budoux = { 4 } }
+        expect_invariant({
+            group(a, {
+                talk(a, "あいうえおか"),
+                { type = "newline", n = 2 },
+                talk(a, "きく\\nけこさしすせ"),
+                { type = "sakura_script", actor = a, text = "\\n[half]" },
+                talk(a, "そた"),
+            }),
+            group(b, { talk(b, "まみむめもや"), { type = "clear" }, talk(b, "ゆよ\\cらり") }),
+            group(a, { { type = "wait", ms = 50 }, talk(a, "るれ") }),
+        })
+    end)
+
+    test("決定 8: clear_spot の後は全スポットを捨てて数え直す", function()
+        local a = { name = "さくら", spot = 0, budoux = { 4 } }
+        local b = { name = "うにゅう", spot = 1, budoux = { 4 } }
+        expect_invariant({
+            group(a, { talk(a, "あいうえおか"), { type = "newline", n = 1 } }),
+            group(b, { talk(b, "かきくけこ") }),
+            { type = "clear_spot" },
+            { type = "raw_script", text = CLEAR_SPOT },
+            group(b, { talk(b, "さしすせそ") }),
+            group(a, { talk(a, "たち") }),
+            group(b, { talk(b, "つ") }),
+        })
+    end)
+
+    test("決定 8: budoux_jump のある \\_l で飛び、\\c で戻る", function()
+        local a = { name = "さくら", spot = 0, budoux = { 4 }, budoux_jump = { 6, 4 } }
+        local b = { name = "うにゅう", spot = 1, budoux = { 4 }, budoux_jump = { 6, 4 } }
+        expect_invariant({
+            group(a, {
+                talk(a, "あいうえおか\\_l[-295,0]きくけこさしすせ"),
+                { type = "clear" },
+                talk(a, "こさ\\_l[-295,0]しす"),
+                { type = "clear" },
+            }),
+            group(b, { talk(b, "たちつて\\_l[-295,0]となにぬ\\cねの\\_l[-295,0]はひ") }),
+            group(b, { talk(b, "ふへ") }),
+        }, nil, true)
+    end)
+end)
