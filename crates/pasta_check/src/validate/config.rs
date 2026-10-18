@@ -2,9 +2,13 @@
 
 use std::collections::BTreeMap;
 
-use pasta_core::{SceneAliasError, SceneAliasTable};
+use pasta_core::{
+    ActorFont, ActorFontError, FontInput, FontValue, FontValueProblem, SceneAliasError,
+    SceneAliasTable,
+};
 use serde::Deserialize;
 use toml::Spanned;
+use toml::de::{DeTable, DeValue};
 
 use super::{Finding, FindingKind, TomlSource, msg};
 
@@ -75,6 +79,8 @@ pub(crate) fn read_config(src: &TomlSource) -> (GhostConfig, Vec<Finding>) {
         Ok(None) => {}
         Err(found) => findings.extend(found),
     }
+    // 装いはシーンの集まりに関わらないので GhostConfig は変えない
+    findings.extend(read_actor_fonts(text));
     (config, findings)
 }
 
@@ -212,6 +218,115 @@ fn read_aliases(text: &str) -> Result<Option<SceneAliasTable>, Vec<Finding>> {
         ));
     }
     Err(findings)
+}
+
+/// pasta.dll（loader/config/actor_font.rs）と同じ取り出し方で `[actor.*.font]` を読み、
+/// 誤りを 1 つずつ返す。行は属性の値の行（表でないときは font の値の行）
+fn read_actor_fonts(text: &str) -> Vec<Finding> {
+    let (Ok(table), Ok(doc)) = (toml::from_str::<toml::Table>(text), DeTable::parse(text)) else {
+        return Vec::new();
+    };
+    let Some(toml::Value::Table(actors)) = table.get("actor") else {
+        return Vec::new();
+    };
+    let mut findings = Vec::new();
+    for (name, actor) in actors {
+        let Some(font) = actor.as_table().and_then(|t| t.get("font")) else {
+            continue;
+        };
+        let spanned = entry(doc.get_ref(), "actor")
+            .and_then(|a| a.get_ref().as_table())
+            .and_then(|a| entry(a, name))
+            .and_then(|a| a.get_ref().as_table())
+            .and_then(|a| entry(a, "font"));
+        let font_pos = spanned.map_or(text.len(), |f| f.span().start);
+        let pos_of = |key: &str| {
+            spanned
+                .and_then(|f| f.get_ref().as_table())
+                .and_then(|t| entry(t, key))
+                .map_or(text.len(), |v| v.span().start)
+        };
+        let input = match font {
+            toml::Value::Table(t) => {
+                let mut entries: Vec<_> = t
+                    .iter()
+                    .map(|(k, v)| (pos_of(k), k.clone(), font_value(v)))
+                    .collect();
+                entries.sort_by_key(|(pos, ..)| *pos);
+                FontInput::Table(entries.into_iter().map(|(_, k, v)| (k, v)).collect())
+            }
+            _ => FontInput::NotTable,
+        };
+        let Err(errors) = ActorFont::from_input(name, input) else {
+            continue;
+        };
+        for e in errors {
+            let (pos, message) = match &e {
+                ActorFontError::NotTable { .. } => {
+                    (font_pos, msg::config_actor_font_not_table(name))
+                }
+                ActorFontError::UnknownAttribute { attribute, .. } => (
+                    pos_of(attribute),
+                    msg::config_actor_font_unknown(name, attribute),
+                ),
+                ActorFontError::InvalidValue {
+                    attribute, problem, ..
+                } => (
+                    pos_of(attribute),
+                    match problem {
+                        FontValueProblem::BreaksTag => {
+                            msg::config_actor_font_breaks_tag(name, attribute)
+                        }
+                        FontValueProblem::Empty => {
+                            msg::config_actor_font_value(name, attribute, "空の文字列")
+                        }
+                        FontValueProblem::WrongType { type_name } => {
+                            msg::config_actor_font_value(name, attribute, type_label(type_name))
+                        }
+                    },
+                ),
+            };
+            let line = line_of(text, pos.min(text.len()));
+            findings.push(Finding::new(
+                FindingKind::ConfigActorFont,
+                PATH,
+                Some(line),
+                None,
+                message,
+            ));
+        }
+    }
+    findings
+}
+
+/// 表のキーを名前で引く（キーが span つきなので走査する）
+fn entry<'a, 'i>(table: &'a DeTable<'i>, key: &str) -> Option<&'a Spanned<DeValue<'i>>> {
+    table
+        .iter()
+        .find(|(k, _)| k.get_ref().as_ref() == key)
+        .map(|(_, v)| v)
+}
+
+fn font_value(value: &toml::Value) -> FontValue {
+    match value {
+        toml::Value::String(s) => FontValue::String(s.clone()),
+        toml::Value::Integer(i) => FontValue::Integer(*i),
+        toml::Value::Boolean(b) => FontValue::Boolean(*b),
+        other => FontValue::Other {
+            type_name: other.type_str(),
+        },
+    }
+}
+
+/// toml の型の名前（`type_str`）を文言の言い方に
+fn type_label(type_name: &str) -> &'static str {
+    match type_name {
+        "float" => "浮動小数点数",
+        "array" => "配列",
+        "table" => "表",
+        "datetime" => "日時",
+        _ => "ほかの型",
+    }
 }
 
 /// toml のエラーの位置（1 始まりの行・列。列は文字で数える）

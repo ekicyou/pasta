@@ -21,7 +21,7 @@
   - _Depends: 1.1_
   - _Requirements: 1.1, 1.5, 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 2.2 (P) pasta_check validate に装いの書き間違いの報告を足す
+- [x] 2.2 (P) pasta_check validate に装いの書き間違いの報告を足す
   - 新しい報告の種類 `config-actor-font`（誤り）を足し、種類の一覧を 25 件にする
   - pasta_check 側に、pasta.dll と同じ取り出し（書いた位置の順・行番号）を実装して `[actor.*.font]` を読み（pasta_lua には依存しない）、1 つの誤りにつき 1 件、属性の値の行（表でないときは `font` の値の行）で報告する
   - 誤りがあっても検査は続け、飛び先の検査を止める理由（skip_reasons）には入れない

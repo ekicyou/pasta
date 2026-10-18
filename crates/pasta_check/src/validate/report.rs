@@ -29,6 +29,7 @@ pub enum FindingKind {
     ConfigSyntax,
     ConfigLoaderType,
     ConfigSceneAlias,
+    ConfigActorFont,
     ConfigPatternInvalid,
     PatternIgnored,
     PatternNotPasta,
@@ -52,13 +53,14 @@ pub enum FindingKind {
 }
 
 impl FindingKind {
-    pub const ALL: [FindingKind; 24] = {
+    pub const ALL: [FindingKind; 25] = {
         use FindingKind::*;
         [
             ConfigMissing,
             ConfigSyntax,
             ConfigLoaderType,
             ConfigSceneAlias,
+            ConfigActorFont,
             ConfigPatternInvalid,
             PatternIgnored,
             PatternNotPasta,
@@ -107,6 +109,7 @@ impl FindingKind {
             ConfigSyntax => "config-syntax",
             ConfigLoaderType => "config-loader-type",
             ConfigSceneAlias => "config-scene-alias",
+            ConfigActorFont => "config-actor-font",
             ConfigPatternInvalid => "config-pattern-invalid",
             PatternIgnored => "pattern-ignored",
             PatternNotPasta => "pattern-not-pasta",
@@ -363,6 +366,28 @@ pub mod msg {
     /// `[scene]`・`[scene.alias]` が表でない、値が文字列の配列でない
     pub fn config_scene_alias_type(toml_desc: &str) -> String {
         format!("[scene.alias] の型が違います: {toml_desc}")
+    }
+    pub fn config_actor_font_unknown(actor: &str, attribute: &str) -> String {
+        format!(
+            "[actor.\"{actor}\"] の font に知らない属性「{attribute}」があります（書ける属性: {}）",
+            pasta_core::FONT_ATTRIBUTES.join("・")
+        )
+    }
+    /// 型違い・空。`written` は書かれていたもの（「配列」「空の文字列」など）
+    pub fn config_actor_font_value(actor: &str, attribute: &str, written: &str) -> String {
+        format!(
+            "[actor.\"{actor}\"] の font の {attribute} は文字列・整数・真偽値のどれかで、空にできません: {written}が書かれています"
+        )
+    }
+    pub fn config_actor_font_breaks_tag(actor: &str, attribute: &str) -> String {
+        format!(
+            "[actor.\"{actor}\"] の font の {attribute} に「]」か「\\」が含まれています（さくらスクリプトのタグが壊れます）"
+        )
+    }
+    pub fn config_actor_font_not_table(actor: &str) -> String {
+        format!(
+            "[actor.\"{actor}\"] の font は表で書きます（例: font = {{ color = \"90,110,140\" }}）"
+        )
     }
     pub fn config_pattern_invalid(pattern: &str, desc: &str) -> String {
         format!("pasta_patterns の「{pattern}」はパターンとして読めません: {desc}")
