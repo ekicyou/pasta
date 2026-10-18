@@ -97,10 +97,28 @@ export class GhostValidator implements vscode.Disposable {
         this.requestValidation(master);
       }
     };
+    // フォルダを丸ごと消すと、中の削除は届かないことがある。前回読んだファイルか診断を
+    // 出していた URI がその下にあれば検査をやり直す（残った診断を消し、辞書の変化を拾う）
+    const onDelete = (uri: vscode.Uri) => {
+      onFileChange(uri);
+      const master = findGhostMaster(uri);
+      const state = master && this.ghosts.get(ghostKey(master));
+      if (!master || !state) {
+        return;
+      }
+      const prefix = `${ghostKey(uri)}/`;
+      const under = (u: vscode.Uri) => ghostKey(u).startsWith(prefix);
+      if (
+        [...state.shown.values()].some(under) ||
+        [...state.texts.keys()].some((rel) => under(vscode.Uri.joinPath(state.master, ...rel.split('/'))))
+      ) {
+        this.requestValidation(master);
+      }
+    };
     this.subscriptions.push(
       watcher,
       watcher.onDidCreate(onFileChange),
-      watcher.onDidDelete(onFileChange),
+      watcher.onDidDelete(onDelete),
       vscode.workspace.onDidSaveTextDocument((doc) => {
         const master = findGhostMaster(doc.uri);
         if (!master) {

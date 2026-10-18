@@ -663,6 +663,37 @@ test('大文字・小文字の混じった ghost/master の配下の .pasta・.l
   gv.dispose();
 });
 
+test('診断か読んだファイルのあるフォルダを丸ごと消すと走り、関係の無いフォルダでは走らない', async () => {
+  const { gv, masters, watcher } = newRegistered();
+  mock.setFakeDir('/ws/ghost/master/dic/sub/x.pasta');
+  const bridge = (gv as unknown as { bridge: FakeBridge }).bridge;
+  bridge.selected = ['dic/a.pasta'];
+  bridge.report = {
+    findings: [finding('folder-matches-pattern', 'error', 'dic/sub/x.pasta', null, null, 'フォルダ')],
+    stats: { ...EMPTY_STATS, errors: 1 },
+  };
+  await gv.validate(MASTER);
+  masters.length = 0;
+
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/ghost/master/other'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, [], '関係の無いフォルダ');
+
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/Ghost/Master/dic/SUB'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/Ghost/Master'], '診断のあるフォルダ');
+
+  // 診断が無くなっても、読んだファイル（dic/a.pasta）が下にあれば走る
+  bridge.report = { findings: [], stats: EMPTY_STATS };
+  await gv.validate(MASTER);
+  assert.strictEqual(mock.createdDiagnosticCollections[mock.createdDiagnosticCollections.length - 1].size, 0);
+  masters.length = 0;
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/ghost/master/dic'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/master'], '読んだファイルのあるフォルダ');
+  gv.dispose();
+});
+
 test('readme.txt・ghost/master の外の作成・削除では走らない', async () => {
   const { gv, masters, watcher } = newRegistered();
   watcher.createEmitter.fire(vscode.Uri.file('/ws/Ghost/Master/readme.txt'));
