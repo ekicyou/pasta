@@ -230,7 +230,7 @@ brief は `Cargo.lock` の席を `talk-grapheme-clusters` に渡している。(
 - **Implications**: 「最後の部分に `.` が無ければ `.dll` を足す」を 1 つの規則にする。区切りの無い名前では `clib_needext` と同じ結果になる。
 
 #### 取り違えの判定（申し送り 5.2）
-- **Findings**: 読んだ後の `GetModuleHandleW(<ファイル名>)` が今回のハンドルと同じかを見れば、元の `ffi.load` が名前で開いたときに返るものそのものを確かめられる。読む前に確かめるより競合の窓が狭く、パスの文字列の比較（8.3 名・大文字小文字・`\?\`）が要らない。
+- **Findings**: 読んだ後の `GetModuleHandleW(<ファイル名>)` が今回のハンドルと同じかを見れば、元の `ffi.load` が名前で開いたときに返るものそのものを確かめられる。読む前に確かめるより競合の窓が狭く、パスの文字列の比較（8.3 名・大文字小文字・`\\?\`）が要らない。
 - **Implications**: パスの比較の規則は作らない。8.3 名と長い名前の綴りの違いをローダーが同じモジュールと見るかは未計測（設計の Open Questions の 2）。
 
 #### ANSI で表せるかの判定（申し送り 2.8）
@@ -239,12 +239,12 @@ brief は `Cargo.lock` の席を `talk-grapheme-clusters` に渡している。(
 
 #### 長いパスの設定が無効な環境（申し送り 2.5）
 - **Findings**: マニフェストの無い EXE（`cargo test` の EXE も同じ）は、文書の上では `longPathAware` でないので、レジストリの `LongPathsEnabled` の値によらず長いパスが無効になるはず。2026-10-18 の実測（`LongPathsEnabled=1`・マニフェストなし）で 539 文字の `LoadLibraryExW` が通ったのは、文書の説明と食い違う。どちらが正しいかは、`LongPathsEnabled=0` の機械で確かめるまで分からない。
-- **Implications**: 260 文字以上だけ `\?\` の形にする（Node.js の `process.dlopen` が `\?\` の形を `LoadLibraryExW` に渡しているのと同じ考え方）。CI の各行列で `LongPathsEnabled=0` にして FFI のテストを走らせ、テストの最初に「接頭辞なしの長いパスが本当に通らない」ことを確かめて、設定が効いていないのに緑になるのを防ぐ。開発機のレジストリは変えない。
+- **Implications**: 260 文字以上だけ `\\?\` の形にする（Node.js の `process.dlopen` が `\\?\` の形を `LoadLibraryExW` に渡しているのと同じ考え方）。CI の各行列で `LongPathsEnabled=0` にして FFI のテストを走らせ、テストの最初に「接頭辞なしの長いパスが本当に通らない」ことを確かめて、設定が効いていないのに緑になるのを防ぐ。開発機のレジストリは変えない。
 - **追記（2026-10-19・タスク 1.2 の試し打ち）**:
   - ローダー（`LoadLibrary*`）は長いパスの設定の外にある。MS の文書が設定の対象に挙げるのはファイルとフォルダの API だけで、ローダーは一覧に無い。開発機（マニフェストなしの EXE と `longPathAware` の EXE）の実測でも、CI（run 39139127106・`LongPathsEnabled=0`）でも、接頭辞なしの長いパスの DLL が読めた。上の「食い違い」はこれで説明が付く。
   - そのため「接頭辞なしの長いパスが通らない」ことは前提の確かめに使えない。`GetFileAttributesW` もマニフェストの無い EXE ではレジストリによらず失敗するので、それだけでは手順が効いた証にならない。前提の確かめは `GetFileAttributesW`（プロセスの側）に加え、`RegGetValueW` で `LongPathsEnabled` を直に読む（OS の側。無いか 0 なら成り立つ）。
-  - `\?\` の形で読むと、隣の `dep.dll` も解けて `via_dep()` が呼べる（開発機の x86・x64 で実測）。`LongPathsEnabled=0` の CI での結果は **CI 待ち**。
-  - `\?\` の形で読んだモジュールに `GetModuleFileNameW` が返すパスは、`\?\` の付いた形になる（要件 2.7 のエラーの文言・パスの見せ方に関わる）。
+  - `\\?\` の形で読むと、隣の `dep.dll` も解けて `via_dep()` が呼べる（開発機の x86・x64 で実測）。`LongPathsEnabled=0` の CI（run 39141129339）でも x86・x64 とも `\\?\` の形で読め、`via_dep()` が呼べた。8.3 名の道は使わない（タスク 1.2 で確定）。
+  - `\\?\` の形で読んだモジュールに `GetModuleFileNameW` が返すパスは、`\\?\` の付いた形になる（要件 2.7 のエラーの文言・パスの見せ方に関わる）。
   - 0.2 の実測で `LoadLibraryExA` が失敗したのは、パスに ANSI に無い文字が入っていたため。ASCII だけの 344 文字のパスなら `LoadLibraryExA` で読める（開発機・`LongPathsEnabled=1`）。
 
 #### テストの並列とプロセスの中の DLL
@@ -283,11 +283,11 @@ brief は `Cargo.lock` の席を `talk-grapheme-clusters` に渡している。(
 #### Decision: 生成（Synthesis）の結果
 - **Generalization**: 3 つの名前の形（名前だけ・相対・絶対）を、1 つの `resolve` と 1 つの拡張子の規則にまとめた。pasta の 3 つの失敗も、LuaJIT と同じ 1 つの文言の形の理由の部分に入れる。
 - **Build vs Adopt**: 探索のフォルダは `LoaderContext::absolute_search_paths()`、ANSI の判定は `crate::encoding`、FFI の有効化は既存の `std_ffi` を使う。新しい依存は dev の `cc` だけ（lock に既にある）。
-- **Simplification**: パスの文字列の比較（8.3 名・大文字小文字・`\?\`）をやめ、ハンドルの一致だけで判定する。DLL の参照の寿命は app data に任せ、`PastaLuaRuntime` を変えない。FFI を有効にしたときの警告のログは足さない（既存の `libs` の debug ログで足りる）。
+- **Simplification**: パスの文字列の比較（8.3 名・大文字小文字・`\\?\`）をやめ、ハンドルの一致だけで判定する。DLL の参照の寿命は app data に任せ、`PastaLuaRuntime` を変えない。FFI を有効にしたときの警告のログは足さない（既存の `libs` の debug ログで足りる）。
 
 ### Risks & Mitigations
 
-- `\?\` の形での依存 DLL の解決が `LongPathsEnabled=0` で失敗する — CI の手順で毎回確かめる。失敗したら既知の制限にする要件の変更を話し合う。
+- `\\?\` の形での依存 DLL の解決が `LongPathsEnabled=0` で失敗する — CI の手順で毎回確かめる。失敗したら既知の制限にする要件の変更を話し合う。
 - 8.3 名と長い名前の綴りの違いで、同じファイルを別のモジュールとして読む — `collision_test.rs` で確かめ、必要ならファイルの識別子の比較を足す。
 - 確かめと元の `ffi.load` の間の競合（別のスレッドが同名の別 DLL を読む） — 窓は数命令。既知の制限として書く。
 - 末尾呼び出しの位置が LuaJIT と同じになるかは枠の作りに頼る — `compare_test.rs` でバイト比較する。
