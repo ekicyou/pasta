@@ -3,9 +3,6 @@
 //! ファイルシステムには std（`is_file`・`std::path::absolute`）だけで触る。
 //! 8.3 名とシンボリックリンクは解かない（`fs::canonicalize` は使わない）。
 
-// 4.1 で `prepare` から呼ばれるまでは、テスト以外からの呼び出しが無い。
-#![cfg_attr(not(test), allow(dead_code))]
-
 use crate::encoding::{Encoder, Encoding};
 use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};

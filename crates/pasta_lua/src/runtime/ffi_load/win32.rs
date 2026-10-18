@@ -3,9 +3,6 @@
 //! `unsafe` はこのファイルだけに置く。パスや名前は呼ぶ側（`resolve`）が作った
 //! NUL 終端の UTF-16 で受け取る。
 
-// 4.1 で `prepare` から呼ばれるまでは、テスト以外からの呼び出しが無い。
-#![cfg_attr(not(test), allow(dead_code))]
-
 use std::ffi::c_void;
 use std::ptr::{NonNull, null, null_mut};
 use windows_sys::Win32::Foundation::{FreeLibrary, GetLastError};
