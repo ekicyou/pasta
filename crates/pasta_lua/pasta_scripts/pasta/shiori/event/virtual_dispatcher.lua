@@ -14,9 +14,11 @@
 --- ```
 
 -- 1. require文（遅延ロードで循環参照回避）
+local CLOCK = require("pasta.shiori.clock")
 
 -- 2. モジュールローカル変数（SHIORIセッション中のみ有効）
-local next_hour_unix = 0   -- 次の正時タイムスタンプ
+local next_hour_unix = 0   -- 次の正時タイムスタンプ（CLOCK.now の時刻で数える）
+local seen_offset = 0      -- 前回見た仮想時刻のずれ（CLOCK.offset）
 local next_talk_time = 0   -- 次回トーク発行予定時刻
 local scene_executor = nil -- テスト用: シーン実行関数のオーバーライド
 
@@ -25,6 +27,9 @@ local scene_executor = nil -- テスト用: シーン実行関数のオーバー
 local M = {}
 
 -- 4. 内部関数
+
+--- ずれが変わって次の正時を決め直すときの猶予（秒）。分の合図の遅れと読み取りの往復を吸収する（調整つまみ）
+local REBASE_GRACE = 70
 
 -- ブロック対象SSP Statusキーワード一覧
 local BLOCKED_STATUSES = {
@@ -138,12 +143,18 @@ end
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス）
 ---@return thread|nil コルーチンまたはnil
 function M.check_hour(act)
-    local current_unix = act.req.date.unix
+    local current_unix = CLOCK.now(act.req)
 
     -- 初回起動: 次の正時を計算して設定、発行スキップ
     if next_hour_unix == 0 then
         next_hour_unix = calculate_next_hour_unix(current_unix)
         return nil
+    end
+
+    -- 仮想時刻が設定し直された（ずれが変わった）ときだけ、猶予を引いた時刻から次の正時を決め直す
+    if CLOCK.offset() ~= seen_offset then
+        seen_offset = CLOCK.offset()
+        next_hour_unix = calculate_next_hour_unix(current_unix - REBASE_GRACE)
     end
 
     -- 正時未到達
@@ -161,7 +172,7 @@ function M.check_hour(act)
     end
 
     -- 4段階フォールバックチェーンでシーンを解決
-    local hh = string.format("%02d", act.req.date.hour)
+    local hh = string.format("%02d", CLOCK.date(act.req).hour)
     local candidates = { "時報" .. hh, "OnHour" .. hh, "時報その他", "OnHourOther" }
     for _, name in ipairs(candidates) do
         local t = create_scene_thread(name, act)
@@ -188,8 +199,8 @@ function M.check_talk(act)
         return nil
     end
 
-    -- 時報マージンチェック（正時が近い場合はスキップ）
-    local time_to_hour = next_hour_unix - current_unix
+    -- 時報マージンチェック（正時が近い場合はスキップ）。next_hour_unix は仮想の時刻で数える
+    local time_to_hour = next_hour_unix - CLOCK.now(act.req)
     if time_to_hour > 0 and time_to_hour < cfg.hour_margin then
         return nil
     end
@@ -262,6 +273,7 @@ end
 --- テスト用: 内部状態をリセット
 function M._reset()
     next_hour_unix = 0
+    seen_offset = 0
     next_talk_time = 0
     scene_executor = nil
 end
@@ -272,6 +284,7 @@ function M._get_internal_state()
     return {
         next_hour_unix = next_hour_unix,
         next_talk_time = next_talk_time,
+        seen_offset = seen_offset,
     }
 end
 
