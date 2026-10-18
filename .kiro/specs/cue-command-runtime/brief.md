@@ -188,3 +188,9 @@
 - **分割の案**: 要件で 20 を超えたら、決めてあるとおり 2 本に戻す。`cue-command-runtime`（ト書き: `！` 行の生成・新しいトークン・組み立て・別名表と設定・引数の穴・引数を守る関数）と `scene-stage-attributes`（柱: 場面の頭の命令・入り方ごとの決まり・受け継ぎ・戻ったときの打ち直し・登場人物の行）。どちらも `scope_gen.rs` と `act.lua` を触るので、この順に 1 本ずつ入れる。並走できる分は増えない。
 - **見つけた穴・古くなった記述**:
   - 「Current State」の行番号: `！` 行の生成は `scope_gen.rs` 340〜345 行 → 375〜378 行、それを固めるテストは 311〜322 行 → 318〜330 行、`generate_local_scene` は 230〜236 行 → 247〜253 行（書いたグローバル名の引数が増えたが、属性は今も受け取らない）、タグの引数を守る関数は `shiori/act.lua` 201〜212 行 → 205〜216 行。宣言行の属性を読み飛ばす所（`parse_scene.rs` 80〜86・200〜206 行）、順番を持たない表（`context.rs` 19・106〜114 行）、選択肢から直に入る所（`choice_select.lua` 70〜77 行）は合っている。
+
+## 申し送り（pasta-check-validate-edges より）
+
+- `pasta_check validate` の飛び先の検査は、辞書の中身が分からないとき（構文エラー・読めない辞書ファイル・pasta.toml の誤り）に丸ごと省く形になった。判定は `crates/pasta_check/src/validate/report.rs` の `skip_reasons`（統計の `skipReasons`）で、すべての段の報告がそろった後に 1 回だけ行う（`validate/mod.rs`）。
+- 見直しが要る論点: この spec が `validate` に辞書のシーンの集まりに頼る検査を足すなら、`skip_reasons` が空のときだけ走らせるか。辞書の中身が分からないことを表す誤りの種類を足すなら、`skip_reasons` の対応に入れるか。
+- 参照: `.kiro/specs/completed/pasta-check-validate-edges/design.md` の「Revalidation Triggers」と「Report（report.rs）」の省く理由の表。

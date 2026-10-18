@@ -110,3 +110,9 @@
   - `NoDefaultCurrentDirectoryInExePath` を外して `cargo test --all`・`cargo clippy --all-targets`・`cargo fmt --check`（触ったファイル）・拡張のテストを走らせる。`pasta_lua` のテストが書き換えた `sample.generated.lua` の改行の差分は戻す
   - 完了の状態: すべて通り、作業ツリーに意図しない差分が無い
   - _Requirements: 1.1, 2.1, 3.1, 4.1, 5.1, 6.1_
+
+## Implementation Notes
+
+- 完了時にその場で解決: report から config への逆向きの依存（最終検証の指摘）。pasta.toml のパスの定数を `validate/input.rs` に移した（e913e9fa）。
+- 完了時にその場で解決: フォルダを丸ごと消すと中の削除が届かず、フォルダの誤りの診断が残りうる端。前回読んだファイルか診断の URI が消したフォルダの下にあれば検査をやり直す（78d58c4e）。
+- 申し送り: 後から検査を足す spec は `skip_reasons` が空のときだけ走らせる、という決まりを `call-attribute-filter`・`scene-anchor-link`・`cue-command-runtime`・`novel-talk-flow` の brief.md へ書いた。
