@@ -183,11 +183,11 @@ Lua ブロックの内容は検証されず、そのまま生成される Lua �
 | ------------ | -------------------------------- | ------------------ |
 | 選択肢 | まだ何も表示していない | 出力しない |
 | 選択肢 | 台詞 | `\n[N]`（pasta.toml の `choice_newlines` で決まる幅。既定では `\n[150]`） |
-| 選択肢 | 選択肢 | `\n` |
-| 台詞 | 選択肢 | `\n` |
+| 選択肢 | 選択肢 | `\n` または `\n[N]`（pasta.toml の `after_choice_newlines` で決まる幅。既定では `\n`） |
+| 台詞 | 選択肢 | `\n` または `\n[N]`（`after_choice_newlines` で決まる幅。既定では `\n`） |
 
-- `choice_newlines` の書き方と `N` の決まり方は [choice_newlines](pasta-toml.md#choice_newlines) で扱う。
-- 話すアクターが切り替わって、すでに台詞を出したバルーンへ戻ったときは、戻ってから最初に出す台詞の前に `spot_newlines` の改行が出力される（[spot_newlines](pasta-toml.md#spot_newlines)）。この台詞の前では、そのバルーンに最後に表示したものが選択肢でも、`spot_newlines` の改行だけが出力され、表の `\n` は重ならない。戻った直後に出す選択肢の前の改行は表のとおりに決まり、`spot_newlines` の改行は、その後の最初の台詞の前に出力される。
+- `choice_newlines`・`after_choice_newlines` の書き方と `N` の決まり方は [choice_newlines](pasta-toml.md#choice_newlines)・[after_choice_newlines](pasta-toml.md#after_choice_newlines) で扱う。
+- 話すアクターが切り替わって、すでに台詞を出したバルーンへ戻ったときは、戻ってから最初に出す台詞の前に `spot_newlines` の改行が出力される（[spot_newlines](pasta-toml.md#spot_newlines)）。この台詞の前では、そのバルーンに最後に表示したものが選択肢でも、`spot_newlines` の改行だけが出力され、表の選択肢の後の改行は重ならない。戻った直後に出す選択肢の前の改行は表のとおりに決まり、`spot_newlines` の改行は、その後の最初の台詞の前に出力される。
 - アクション行に書いた `\c` でバルーンを消去すると、そのバルーンは、まだ何も表示していない状態に戻る。消去した直後の選択肢の前には改行を出力しない。引数つきの `\c[…]` と `\x` は、バルーンの消去に数えない。
 - 表情の切り替え・ウェイト・`!select` のように文字を表示しないものは、台詞にも選択肢にも数えない。台詞と選択肢の間や、選択肢と選択肢の間に書いても、出力する改行は変わらない。
 - 台詞に書いた改行（`\n`）は、そのまま出力される。表の改行も省かれず、両方が出力される。

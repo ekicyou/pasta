@@ -84,7 +84,7 @@
   - _Boundary: Manual（`reference/pasta-toml.md` と照合テストを除く章。5.1 とファイルが重ならない）_
   - _Depends: 2.4, 4.1_
   - _Requirements: 6.8, 7.5, 7.6, 7.7_
-- [ ] 5.3 スキル references を再生成し、鮮度とリンクの検査を通す
+- [x] 5.3 スキル references を再生成し、鮮度とリンクの検査を通す
   - マニュアルの章からスキル references を再生成する。`.claude/skills` への書き込みが止められたら、入った分と残りを示して開発者に頼む
   - `gen-skill-refs.mjs --check` とリンクの検査が通る
   - _Depends: 5.1, 5.2_
