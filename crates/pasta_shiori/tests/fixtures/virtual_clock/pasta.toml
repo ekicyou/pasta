@@ -1,0 +1,15 @@
+# virtual_clock E2E 用フィクスチャ（tutorial-ssp-gaps task 4.1）
+#
+# 時報のシーンと、`＄時` を出すシーンだけを持つ。
+
+[loader]
+pasta_patterns = ["dic/*.pasta"]
+transpiled_output_dir = "profile/pasta/cache/lua"
+
+# テストの数秒の間にランダムトークが割り込まないよう、トーク間隔を長くする
+[ghost]
+talk_interval_min = 3600
+talk_interval_max = 3600
+
+[actor."さくら"]
+spot = 0

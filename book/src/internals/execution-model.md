@@ -286,13 +286,13 @@ EVENT.fire → CALLBACK.try_route(req)
 ```
 
 - コールバック待ちのコルーチンは `STORE.co_scene` に入らない。待っている間も、別のシーンの継続とは独立に保たれる。
-- コールバックで再開したシーンは、通常のイベントと同じ規則で扱われる。出力の無い中断は同じリクエストの中で進み、チェイントークで中断すれば `STORE.co_scene` に入って既存の継続を置き換え（次の OnTalk の機会に続きが出る）、続けて `get_property` すれば新しい待機として登録される。最後まで終われば `STORE.co_scene` は空になる。
+- コールバックで再開したシーンは、通常のイベントと同じ規則で扱われる。出力の無い中断は同じリクエストの中で進み、チェイントークで中断すれば `STORE.co_scene` に入って既存の継続を置き換え（次の自然なおしゃべり（仮想ディスパッチャが起こす OnTalk）の機会に続きが出る）、続けて `get_property` すれば新しい待機として登録される。最後まで終われば `STORE.co_scene` は空になる。
 - 再開したシーンのエラーは、`pending` にも `STORE.co_scene` にも残らず、`SHIORI.request` が応答にする（表記を出す設定で ID が `On` で始まる要求なら表記付きの `200 OK`、それ以外は 500。[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)）。
 - `req.id` と一致する待機が無ければ `try_route` は `nil` を返し、`EVENT.fire` は通常の振り分けに進む。掃引で外した待機に遅れて届いた結果も、この扱いになる。
 
 ### 期限切れの掃引（CALLBACK.sweep）
 
-期限を過ぎた待機は、OnSecondChange の既定ハンドラ（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/second_change.lua`）が毎回呼ぶ `CALLBACK.sweep(os.time())` が、タイムアウトとして再開する。
+期限を過ぎた待機は、OnSecondChange の既定ハンドラ（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/second_change.lua`）が毎回呼ぶ `CALLBACK.sweep(CLOCK.steady(act.req) or os.time())`（飛びを差し引いた時計。[仮想時刻の時計](shiori.md#仮想時刻の時計pastashioriclock)）が、タイムアウトとして再開する。
 
 ```text
 CALLBACK.sweep(now)

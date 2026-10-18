@@ -7,6 +7,7 @@
 local ACT = require("pasta.act")
 local BUILDER = require("pasta.shiori.sakura_builder")
 local CALLBACK = require("pasta.shiori.event.callback")
+local CLOCK = require("pasta.shiori.clock")
 local CONFIG = require("pasta.config")
 local STORE = require("pasta.store")
 
@@ -123,7 +124,8 @@ function SHIORI_ACT_IMPL.transfer_date_to_var(self)
         return self
     end
 
-    local date = self.req.date
+    -- 仮想時刻のずれがあれば仮想の日付（ずれ 0 なら req.date そのもの）
+    local date = CLOCK.date(self.req)
 
     -- 英語フィールド（数値型）を転記
     for _, f in ipairs(DATE_NUM_FIELDS) do
@@ -280,9 +282,10 @@ function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_mess
         timeout_message = "callback timeout: get_property"
     end
 
-    -- イベント ID 生成 + ステージング
+    -- イベント ID 生成 + ステージング（締め切りは なめらかな時計。req.date が無ければ OS の時計）
     local event_id = CALLBACK.next_event_id()
-    CALLBACK.stage_pending(event_id, os.time() + timeout, timeout_message)
+    local now = (self.req and CLOCK.steady(self.req)) or os.time()
+    CALLBACK.stage_pending(event_id, now + timeout, timeout_message)
 
     -- トークンバッファ退避
     local saved_tokens = self.token
