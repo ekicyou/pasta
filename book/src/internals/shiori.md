@@ -100,7 +100,7 @@ VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、�
 | `pasta.shiori.event.callback` | 非同期トークのコールバック待ちの登録・ルーティング・タイムアウトの掃引 |
 | `pasta.shiori.event.kick` | シーンキックの保留と起動（[デバッグ基盤とシーンキック](debug.md)） |
 | `pasta.shiori.res` | SHIORI/3.0 の応答文字列を作る `RES` |
-| `pasta.shiori.act`・`pasta.shiori.sakura_builder`・`pasta.shiori.appearance` | SHIORI 用の ACT とさくらスクリプトの組立（[トーク出力とアピアランス](talk-output.md)） |
+| `pasta.shiori.act`・`pasta.shiori.sakura_builder`・`pasta.shiori.appearance`・`pasta.shiori.actor_style` | SHIORI 用の ACT とさくらスクリプトの組立、外見の復旧、装いの出し入れ（[トーク出力とアピアランス](talk-output.md)） |
 | `pasta.shiori` | 空の表を返すだけのモジュール。リポジトリ内に `require` する箇所は無いが、展開されるスクリプトの公開面として残している |
 
 ## 処理とデータの流れ

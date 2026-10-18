@@ -93,7 +93,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 | -- | ---- | -------- | ---- | -------------- |
 | 1 | pasta-check-validate-edges | Opus | 5〜7 | 今すぐ（2026-10-17 のウェーブ） |
 | 1 | tutorial-ssp-gaps | Opus | 7〜11 | 今すぐ（2026-10-17 のウェーブ。2026-10-17 開発者の決定で 0.4.1 に入れた） |
-| 1 | actor-display-style | Opus | 8〜12 | 今すぐ（2026-10-18 開発者の決定で 0.4.1 に入れた） |
+| 1 | actor-display-style | Opus | 8〜12 | 完了（2026-10-18。2026-10-18 開発者の決定で 0.4.1 に入れた） |
 | 1 | vertical-balloon-lines | Opus | 8〜12 | 今すぐ（同上。実装の並走の条件は下） |
 | 2 | 0.4.1 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
@@ -343,7 +343,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] novel-save-slots -- スロットを選ぶセーブとロード。控えをスロットへ読み書きし、スロットの中身（日時・章の名前）を場面から読めるようにする。Dependencies: novel-checkpoint-rollback
 - [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-variable-scope, novel-checkpoint-rollback, novel-save-slots, shell-element-click, call-attribute-filter（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
-- [ ] actor-display-style -- アクターごとの表示の装い（文字の色など）を pasta.toml で決め、スポットが替わったときと同じスポットで話者が替わったときに出し入れする。1 つのスポットを複数のアクターで共有する形を正式に支える（窓際のぱすたさんのシェルの無い相手役。2026-10-18 起票）。0.4.1 に入れる。`sakura_builder.lua` を共有する `novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link` と同じウェーブに置かない。Dependencies: none
+- [x] actor-display-style -- アクターごとの表示の装い（文字の色など）を pasta.toml で決め、スポットが替わったときと同じスポットで話者が替わったときに出し入れする。1 つのスポットを複数のアクターで共有する形を正式に支える（窓際のぱすたさんのシェルの無い相手役。2026-10-18 起票）。0.4.1 に入れる。`sakura_builder.lua` を共有する `novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link` と同じウェーブに置かない。Dependencies: none
 - [x] vertical-balloon-lines -- 縦書きのバルーンの列の扱い。budoux が入れる改行の幅（`budoux_newlines`）、列を動かすタグ（`\n`・`\n[…]`・`\c`・`\_l[…]`）の所での budoux の数え直し（作者が書いた `\n`・`\c` の後も数え続ける今の不具合の直しを含む）、選択肢どうしの間の改行の幅（窓際のぱすたさん。2026-10-18 起票、直接実装の候補から格上げ）。0.4.1 に入れる。`sakura_builder.lua` を共有する `actor-display-style` と同じウェーブに置かない。Dependencies: none
 
 ## Existing Spec Updates

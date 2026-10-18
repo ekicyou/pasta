@@ -20,13 +20,15 @@
 - `pasta.shiori.sakura_builder` による組立: トークンの種類ごとの出力、スポットの解決と `\p[N]` の出力、段落区切りの改行、選択肢の前後の行の区切り、終端の `\e`
 - `@pasta_sakura_script` の後処理（Rust）: さくらスクリプトの単位（タグ・エスケープ・囲み）と文字を分けるトークナイザ、ウェイトの挿入、budoux による改行
 - アピアランス: 出力した文字列からサーフェス変更・着せ替え・スコープ切替を観測して記録し、アクターの切り替え時に外見を復旧するタグを出力する仕組み
+- 装いの出し入れ: `pasta.toml` の `[actor."名前"]` の `font`（装い）のタグ列を、話者の切り替えと `\c`・`\x` の後に出力し、`\f[default]` で既定の表示へ戻す仕組み
 
 次の事項は他の章が権威を持ち、この章では再記述しない。
 
 - `build` がいつ呼ばれ、その戻り値がどう応答になるか（`act:yield()`・シーン終了時の `build`・再開のループ）は [ランタイム実行モデル](execution-model.md#イベントからシーンへ) で扱う。
 - `@pasta_sakura_script` を VM に登録する継ぎ目（`RendererInjection`）と presentation マーカーは [SHIORI 層](shiori.md#presentation-マーカーとレンダラ注入) で扱う。
 - ACT のメソッドとフィールドの個々の仕様は [Lua ランタイム内部モジュール](internal-modules.md#act-の内部) で扱う。シーン関数がどの ACT のメソッドを呼ぶかは [トランスパイラ](transpiler.md#生成される-lua-コードの形) で扱う。
-- 文字の分類・ウェイトの値・budoux の幅の指定方法は [@pasta_sakura_script](../lua/modules/pasta-sakura-script.md) と [pasta.toml リファレンス](../reference/pasta-toml.md#talkトーク表示制御) が正である。段落区切りの改行量は [spot_newlines](../reference/pasta-toml.md#spot_newlines)、台詞の後の選択肢の前の改行量は [choice_newlines](../reference/pasta-toml.md#choice_newlines)、選択肢の後の改行量は [after_choice_newlines](../reference/pasta-toml.md#after_choice_newlines)、budoux の数え方は [budoux](../reference/pasta-toml.md#budoux)、スポットの決まり方は [バルーン連携](../grammar/actor-dictionary.md#バルーン連携)、外見の復旧の規則と記録できない指定は [同一スポット共有時の外見の復旧](../grammar/actor-dictionary.md#同一スポット共有時の外見の復旧) が正である。
+- 文字の分類・ウェイトの値・budoux の幅の指定方法は [@pasta_sakura_script](../lua/modules/pasta-sakura-script.md) と [pasta.toml リファレンス](../reference/pasta-toml.md#talkトーク表示制御) が正である。段落区切りの改行量は [spot_newlines](../reference/pasta-toml.md#spot_newlines)、台詞の後の選択肢の前の改行量は [choice_newlines](../reference/pasta-toml.md#choice_newlines)、選択肢の後の改行量は [after_choice_newlines](../reference/pasta-toml.md#after_choice_newlines)、budoux の数え方は [budoux](../reference/pasta-toml.md#budoux)、スポットの決まり方は [バルーン連携](../grammar/actor-dictionary.md#バルーン連携)、外見の復旧の規則と記録できない指定は [同一スポット共有時の外見の復旧](../grammar/actor-dictionary.md#同一スポット共有時の外見の復旧)、装いの書き方と利用者から見た出し入れは [装い（font）](../reference/pasta-toml.md#装いfont) と [1 つのスポットを複数のアクターで共有する](../grammar/actor-dictionary.md#1-つのスポットを複数のアクターで共有する) が正である。
+- `font` の検査とタグ列への置き換えは [ローダ自己展開とモジュール解決](loader.md#設定読込) で扱う。
 
 ## 構成要素
 
@@ -44,11 +46,11 @@ pasta.shiori.act  SHIORI_ACT_IMPL.build
     │  グループ化トークンの列
     ▼
 pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_newlines, choice_newlines, after_choice_newlines }, STORE.actor_spots, STORE.appearance)
-    │  アクターの切り替え: \p[spot] → APPEARANCE.restore（復旧タグ）
+    │  アクターの切り替え: \p[spot] → APPEARANCE.restore（復旧タグ） → STYLE.switch（装いの出し入れ）
     │  talk / sakura_script: @pasta_sakura_script.talk_to_script(アクター, テキスト, スポットの行の状態)
     │                          └ Rust: トークナイザ → ウェイト挿入 → budoux 改行（行の状態を読み書きする）
     │  その他のトークン: 種類ごとのタグ
-    │  出力した各片を APPEARANCE.observe に観測させる
+    │  内側の各片を STYLE.through に通し（\c・\x の後の装いの出し直し）、APPEARANCE.observe に観測させる
     ▼
 さくらスクリプト文字列（末尾は \e）
 ```
@@ -62,6 +64,7 @@ pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_n
 | `pasta.shiori.act`（`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`） | `pasta.act` を継承し、`build` を「`ACT_IMPL.build` でグループ化トークンを得て `BUILDER.build` に渡す」処理に差し替える。`spot_newlines`・`choice_newlines`・`after_choice_newlines` は `[ghost]` から読む |
 | `pasta.shiori.sakura_builder`（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`） | グループ化トークンをさくらスクリプト文字列にする `BUILDER.build` |
 | `pasta.shiori.appearance`（`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`） | 外見状態の生成（`APPEARANCE.new`）・観測（`APPEARANCE.observe`）・復旧（`APPEARANCE.restore`）と、さくらスクリプトの単位の読み取り（`APPEARANCE.tag_at`。ビルダーが字の判定と `\c` の読み取りに使う）。状態を持たず、渡された状態の表をその場で更新する。`STORE` や `@pasta_*` を `require` しない |
+| `pasta.shiori.actor_style`（`crates/pasta_lua/pasta_scripts/pasta/shiori/actor_style.lua`） | 装いの状態の生成（`STYLE.new`）、話者の切り替えで出す戻すタグと装いのタグ（`STYLE.switch`）、内側のトークンの `\c`・`\x` の後の出し直し（`STYLE.through`）。状態を持たず、渡された状態の表をその場で更新する。タグの読み取りは `APPEARANCE.tag_at` だけを使い、`STORE` や `@pasta_*` を `require` しない |
 | `pasta.buf`（`crates/pasta_lua/pasta_scripts/pasta/buf.lua`） | 組立に使う文字列バッファ。LuaJIT の `string.buffer` があればそれを、無ければ同じ `put`・`tostring` を持つ最小実装を使う |
 | `pasta.failure`（`crates/pasta_lua/pasta_scripts/pasta/failure.lua`） | 失敗表記の `raw_script` トークンを積む報告の出口。`sakura_builder` は未登録の印を読む（[失敗の報告（pasta.failure）](internal-modules.md#失敗の報告pastafailure)） |
 | `pasta.store`（`crates/pasta_lua/pasta_scripts/pasta/store.lua`） | ビルドをまたいで保持する `STORE.actor_spots`（アクター名 → スポット）と `STORE.appearance`（外見状態）を持つ |
@@ -156,7 +159,8 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 1. スポットを `actor_spots[アクター名]` から引く。無ければ 0 とし、アクターに名前があれば警告をログに出す。`act:actor_proxy` が作るその場限りのアクター（未登録の名前）は `actor_spots` に無いため、ここで 0 になる。このアクターには未登録の印（`FAILURE.is_unregistered_actor`）があるため、警告は出さない（未登録アクターの警告が既に出ている）。
 2. `\p[スポット]` を出力する。
 3. 続けて `APPEARANCE.restore(appearance, アクター, スポット, グループの内側のトークン)` が返す復旧タグを出力する（[アピアランスの観測と復旧](#アピアランスの観測と復旧)）。
-4. `pending_break` を `spot_has_text[スポット]` で決め直し、`last_spot`・`last_actor` を更新する。
+4. 続けて `STYLE.switch(style, アクター, スポット)` が返す戻すタグと装いのタグを出力する（[装いの出し入れ](#装いの出し入れ)）。
+5. `pending_break` を `spot_has_text[スポット]` で決め直し、`last_spot`・`last_actor` を更新する。
 
 `last_actor` は各ビルドの初めに `nil` なので、アクターを持つ最初のグループでは必ず `\p[N]` が出る。グループのアクターが `nil` のときは切り替えの出力をせず、現在のスコープのまま内側を出力する。
 
@@ -205,7 +209,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 `talk`・`sakura_script` 以外の種類のトークン（`surface`・`wait`・`newline`・`choice`・`choice_timeout`・`raw_script`）は字を出さない。
 
-内側のトークンを出力するたびに、出力した文字列を `APPEARANCE.observe(appearance, アクター, last_spot, 文字列)` に渡す。内側の `raw_script` と最上位の `raw_script` は、アクター未指定（`nil`）として観測させる。
+内側のトークンは、種類ごとの出力の文字列を `STYLE.through(style, アクター, last_spot, 文字列)` に通してから出力し（[装いの出し入れ](#装いの出し入れ)）、出力した文字列を `APPEARANCE.observe(appearance, アクター, last_spot, 文字列)` に渡す。内側の `raw_script` と最上位の `raw_script` は、アクター未指定（`nil`）として観測させる。
 
 列の終わりでは、出していない段落区切りの改行を捨て、`\e` を付けてバッファを 1 本の文字列にする。
 
@@ -270,6 +274,46 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 サーフェスの復旧タグが先、着せ替えの復旧タグが後に並ぶ。`restore` が更新するのはスポット側と `owners`・`last_spots` だけで、アクターの記録は変えない。
 
+### 装いの出し入れ
+
+アクターの装いは、そのアクターの表の `font` が空でない文字列のときだけ有効である。`font` は pasta.dll の読み込みで、`pasta.toml` に書いた表から検査済みのタグ列（`font = { color = "90,110,140", bold = true }` なら `\f[color,90,110,140]\f[bold,1]`）に置き換えてある（[ローダ自己展開とモジュール解決](loader.md#設定読込)）。`font` の無いアクター、空の表を書いたアクター（タグ列が空文字列になる）、`act:actor_proxy` が作るその場限りのアクターは、装いの無いアクターである。`pasta.shiori.actor_style` は 12 個の属性も値の変換も知らず、出来上がったタグ列をいつ出すかだけを決める。
+
+`BUILDER.build` は呼び出しのたびに `STYLE.new()` で装いの状態を作り、ビルドの終わりで捨てる。`STORE` には置かない。SSP 2.9.18 は次のスクリプトで装いを既定の表示に戻すため、装いはビルドをまたがない。
+
+| フィールド | 中身 |
+| ---------- | ---- |
+| `used[スポット]` | このビルドで切り替えにそのスポットを使い、`\c` で消していないか |
+| `styled[スポット]` | このビルドでそのスポットに装いのタグを出し、`\c` で消していないか |
+| `any` | このビルドで装いのあるアクターが切り替えに現れたか |
+
+スポットの状態は `used` と `styled` の組で 3 つに分かれる。Fresh（このビルドで未使用、または `\c` の後）、UsedPlain（使ったが装いを付けていない）、Styled（装いを付けた）である。`STYLE.switch(state, actor, spot)` は、切り替え先のスポットの状態とアクターの装いの有無で、次の表のタグを返す。
+
+| 切り替え先のスポットの状態 | 装いのあるアクターへ | 装いの無いアクターへ |
+| -------------------------- | -------------------- | -------------------- |
+| Fresh | 装いのタグだけ | 空文字列 |
+| UsedPlain | `\f[default]` ＋ 装いのタグ | 空文字列 |
+| Styled | `\f[default]` ＋ 装いのタグ | `\f[default]` |
+
+返した後、`used[spot]` を真にし、装いのあるアクターなら `styled[spot]` と `any` も真にする。UsedPlain で装いのあるアクターへ替わるときに `\f[default]` を出すのは、前の話者が台詞に書いた `\f[…]` を切り替え先の装いに持ち越さないためである。切り替えは `last_actor` と別のアクターのときだけ起きるので、同じアクターが話し続ける間は何も出さない。状態をスポットごとに持つのは、SSP 2.9.18 がスコープごとに装いを保ち、別のスコープへ移っても装いが移らないためである。そのため別のスポットへ移るときに戻すタグは出さない。
+
+`STYLE.through(state, actor, spot, s)` は、内側のトークンの種類ごとの出力の文字列（`talk`・`sakura_script` なら後処理済みの文字列）を受け取り、次のように返す。最上位の `raw_script` は通さない。
+
+- `any` が偽か、グループのアクターが `nil` なら `s` をそのまま返す。
+- `s` を `APPEARANCE.tag_at` で左から読み、引数の無い `\c` と `\x` を探す。エスケープと囲みの中はタグとして読まない。引数のある `\c[…]`・`\x[noclear]` などは数えない。
+- 装いのあるアクターなら、見つけた `\c`・`\x` の直後に装いのタグを差し込む。状態は Styled のままにする。`\x` を見つけたときは、その後の字がスコープ 0 に出ることがあるため、`used[0]`・`styled[0]` も真にする。
+- 装いの無いアクターなら、文字列は変えず、`\c` を見つけたときにそのスポットの `used`・`styled` を偽にする（Fresh に戻す）。`\x` では状態を変えない。
+- 返す文字列は、`s` の文字を消さず並べ替えず、タグを差し込んだだけのものである。
+
+SSP 2.9.18 は、引数の無い `\c` の後の字を既定の表示で出す（装いが外れる）。装いの無いアクターの `\c` で Fresh に戻すのはこのためである。`\x` も全スコープの吹き出しを消してスコープを `\0` に戻し、その後の字を既定の表示で出す。そのため、装いのあるアクターでは `\x` の直後に必ず出し直し、スポット 0 も装い付きとみなす。`clear` トークンも種類ごとの出力が `\c` なので、同じ規則で扱われる。`clear_spot` トークンでは装いの状態を戻さない（吹き出しは消えないため）。
+
+装いのタグと、字の判定・改行・立ち絵の復旧との順序は次のとおりである。
+
+- 切り替えの出力は `\p[スポット]` → 立ち絵の復旧タグ → 戻すタグと装いのタグの順に並ぶ。段落区切りの改行（`\n[N]`）は、その後の字を出すトークンの直前に出るので、必ず装いのタグより後になる。
+- 字の判定（`emits_text`・`text_parts`）と `\c` の読み取りは、`STYLE.through` に通す前の変換前のテキストに対して済んでいる。差し込んだ装いのタグは字に数えず、段落区切りと選択肢の前後の行の区切りの判定を変えない。
+- 復旧タグは `APPEARANCE.restore` が先に返し、装いのタグはその後に `STYLE.switch` が返す。復旧の判定（先頭のタグ列）はグループの内側のトークンを読むので、装いのタグの影響を受けない。
+- 片を `put` と `put_raw` のどちらで足すか（`head_written_by_author`）は、`STYLE.through` に通す前の文字列で決める。話者の切り替えの装いのタグは `put` を通るので、前の出力の単独の `\` に食われない。
+- `STYLE.through` で差し込んだタグは、`APPEARANCE.observe` にもそのまま渡る。`\f` は観測の分類に当たらないため、外見の記録は変わらない。
+
 ## 境界の受け渡し
 
 | 境界 | 経路 | 渡すもの | 所有 |
@@ -280,6 +324,9 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 | `sakura_builder` → Rust | `@pasta_sakura_script` の `talk_to_script` | アクターの表（またはそれ以外の値）、テキスト、スポットの行の状態の表 → 後処理済みの文字列 | Rust はアクターの表を呼び出しのたびに読むだけで、保持も変更もしない。行の状態の表は組立が所有し、Rust は変換が成功した後にだけ `line`・`width`・`jump` を書き換える |
 | Rust の内部 | `register` が作るクロージャ | `SakuraScriptState`（トークナイザ・既定のウェイト値・budoux のパーサ） | `Arc` でクロージャが所有する。VM を作るたびに `register` が `TalkConfig` から作り直す |
 | `sakura_builder` → `appearance` | `APPEARANCE.observe`・`APPEARANCE.restore` | 外見状態の表、アクター、スポット、出力した文字列またはグループの内側のトークン | 状態の表は呼び出し側の所有で、`appearance` はその場で書き換える。文字列とトークンは読むだけ |
+| ローダ → `sakura_builder` | アクターの表の `font`（`@pasta_config` の `actor."名前".font`） | 検査済みのタグ列（文字列） | 読み込みで作られ、ビルダーと `actor_style` は読むだけ |
+| `sakura_builder` → `actor_style` | `STYLE.new`・`STYLE.switch`・`STYLE.through` | 装いの状態の表、アクター、スポット、変換後の文字列 → 戻すタグと装いのタグ、または出し直しを差し込んだ文字列 | 状態の表は `BUILDER.build` が呼び出しごとに作って所有し、`actor_style` はその場で書き換える。文字列は読むだけで、新しい文字列を返す |
+| `actor_style` → `appearance` | `APPEARANCE.tag_at` | 変換後の文字列と位置 → 単位の名前・引数・直後の位置 | 状態を持たない読み取りで、文字列は読むだけ |
 | `sakura_builder` → `appearance` | `APPEARANCE.tag_at` | 変換前のトークンのテキストと位置 → 単位の名前・引数・直後の位置・囲みの中身 | 状態を持たない読み取りで、テキストは読むだけ |
 | `pasta.shiori.act` → 呼び出し側 | `build` の戻り値 | さくらスクリプト文字列 | `act:yield()` などが `coroutine.yield` で渡す（[ランタイム実行モデル](execution-model.md#イベントからシーンへ)） |
 
@@ -305,15 +352,18 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 - Rust・Lua・DSL の 3 つの読み取りは、適合テスト `crates/pasta_lua/tests/sakura_script/conformance_test.rs` の 1 つの事例の表（入力と期待する単位の並び）で、同じ位置で単位を切り出すことを確かめる。DSL だけが異なるのは、単位にならない `\` をパースエラーにすることである。また DSL は引数・引用・囲みを 1 行の中だけで読む。VS Code 拡張の文法定義は色分けだけに使われ、適合テストの対象ではない（`editors/vscode/src/test/tmGrammar.test.ts` で確かめる）。読み方を変えるときは 4 か所を同じ変更でそろえる。
 - 囲みはトークンをまたがない。後処理は 1 回の `talk_to_script` に渡したテキスト（結合後の `talk`、または 1 つの `sakura_script`）の中でだけ囲みを読み、字の判定と外見の観測もトークン（観測は出力した文字列）ごとに読むため、囲みの読み取りはトークンをまたぐ状態を持たない（トークンをまたいで持ち越すのは budoux の行の状態だけである）。開きと閉じを別々のトークンで積むと、それぞれが閉じの無い `\_?`（`\_!`）として、ただのタグに読まれる。
 - 字の判定と `\c` の読み取りは変換前のテキストに対して行い、外見の観測は後処理済みの出力文字列に対して行う。後処理が挿入する `\_w[…]`・改行は字の判定に入らない。
+- 装いの状態はビルドごとに作り直し、ビルドをまたがない。装いのあるアクターが切り替えに現れないビルドでは、`STYLE.switch` は空文字列を、`STYLE.through` は入力をそのまま返すため、出力は装いの仕組みが無いときと 1 文字も変わらない。
+- 装いの出し入れが追うのは、組立が出す `\p[N]` と、グループの内側の引数の無い `\c`・`\x` だけである。台詞の中に書いたスコープの切り替え（`\p[1]`・`\1` など）と、最上位の `raw_script` の中の `\f`・`\c` は追わない。最上位の `raw_script` の直後には必ず話者の切り替えが起きるため、装いのあるアクターの表示は切り替えで決まる。
 
 ## ソースの所在
 
 - `crates/pasta_lua/src/sakura_script/`
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`
+- `crates/pasta_lua/pasta_scripts/pasta/shiori/actor_style.lua`
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`
 
-本文で参照したその他のファイルは次のとおりである。トークンの蓄積とグループ化は `crates/pasta_lua/pasta_scripts/pasta/act.lua`、アクタープロキシは `crates/pasta_lua/pasta_scripts/pasta/actor.lua`、`STORE.actor_spots`・`STORE.appearance` は `crates/pasta_lua/pasta_scripts/pasta/store.lua`、文字列バッファは `crates/pasta_lua/pasta_scripts/pasta/buf.lua`、`TalkConfig` は `crates/pasta_lua/src/loader/config/sections.rs` にある。振る舞いのテストは `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua`（組立と字の判定）と `crates/pasta_lua/tests/lua_specs/appearance_test.lua`（外見の観測と復旧）にある。単位の読み方の写しは `crates/pasta_dsl/src/parser/grammar.pest` と `editors/vscode/syntaxes/pasta.tmLanguage.json` にあり、3 つの読み取りの適合テストは `crates/pasta_lua/tests/sakura_script/conformance_test.rs` にある。
+本文で参照したその他のファイルは次のとおりである。トークンの蓄積とグループ化は `crates/pasta_lua/pasta_scripts/pasta/act.lua`、アクタープロキシは `crates/pasta_lua/pasta_scripts/pasta/actor.lua`、`STORE.actor_spots`・`STORE.appearance` は `crates/pasta_lua/pasta_scripts/pasta/store.lua`、文字列バッファは `crates/pasta_lua/pasta_scripts/pasta/buf.lua`、`TalkConfig` は `crates/pasta_lua/src/loader/config/sections.rs` にある。振る舞いのテストは `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua`（組立と字の判定）と `crates/pasta_lua/tests/lua_specs/appearance_test.lua`（外見の観測と復旧）、`crates/pasta_lua/tests/lua_specs/actor_style_test.lua`（装いの状態表と `\c`・`\x` の後の出し直し）にある。単位の読み方の写しは `crates/pasta_dsl/src/parser/grammar.pest` と `editors/vscode/syntaxes/pasta.tmLanguage.json` にあり、3 つの読み取りの適合テストは `crates/pasta_lua/tests/sakura_script/conformance_test.rs` にある。
 
 ## 経緯
 
@@ -330,6 +380,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 - [paragraph-break-tag-only-talk](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/paragraph-break-tag-only-talk) — 字を出すトークンによる段落区切りの判定と、単位（タグ・エスケープ・囲み）の読み方を SSP にそろえる変更、3 つの読み取りの適合テスト
 - [choice-line-layout](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/choice-line-layout) — 選択肢を 1 行に 1 つずつ出す改行の配置と `choice_newlines`、台詞に書いた `\c` を吹き出しの消去に数える変更
 - [vertical-balloon-lines](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/vertical-balloon-lines) — 列を動かすタグでの budoux の数え直しと、1 回の出力の中の吹き出しごとの列の持ち越し（`put_break`）、`budoux_newlines`・`budoux_jump`・`after_choice_newlines`、単独の `\` の守り
+- [actor-display-style](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/actor-display-style) — アクターごとの装い（`font`）の出し入れと、1 つのスポットを複数のアクターで共有する出力
 
 ---
 

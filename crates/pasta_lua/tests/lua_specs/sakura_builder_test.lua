@@ -3675,3 +3675,165 @@ describe("SAKURA_BUILDER - vertical-balloon-lines: 作例・同値・不変条�
         }, nil, true)
     end)
 end)
+
+-- ============================================================================
+-- actor-display-style: 装いの出し入れの組み立て（Task 3.1）
+-- ============================================================================
+
+describe("SAKURA_BUILDER - actor-display-style: 装いの出し入れ（Task 3.1）", function()
+    -- 句読点のウェイトを入れない（実効ウェイト＝値 - 50 = 0）
+    local function actor(name, font)
+        return {
+            name = name, font = font,
+            script_wait_period = 50, script_wait_comma = 50,
+            script_wait_strong = 50, script_wait_leader = 50,
+        }
+    end
+    local function group(a, inner_tokens)
+        return { type = "actor", actor = a, tokens = inner_tokens }
+    end
+    local function talk(a, text)
+        return { type = "talk", actor = a, text = text }
+    end
+    local function choice(display)
+        return { type = "choice", display = display, target = display .. "先" }
+    end
+    local OJI = "\\f[color,90,110,140]"
+    local GAL = "\\f[color,255,0,128]"
+    local Q1 = "\\![*]\\q[甲,甲先]"
+    local function cast()
+        return actor("おじさん", OJI .. "\\f[bold,1]"), actor("ギャル", GAL), actor("ぱすた", nil)
+    end
+    local function shared_spot()
+        return { ["おじさん"] = 0, ["ギャル"] = 0, ["ぱすた"] = 0, ["さくら"] = 1 }
+    end
+
+    test("2.5: 要件の例とバイト列で一致する", function()
+        local BUILDER = setup()
+        local oji, pasta = actor("おじさん", OJI), actor("ぱすた", nil)
+        local result = BUILDER.build({
+            group(oji, { talk(oji, "やあ、相変わらず薄着だね。寒くないの？") }),
+            group(pasta, { talk(pasta, "やあ、相変わらずエッチですね。") }),
+        }, { spot_newlines = 1.8 }, { ["おじさん"] = 0, ["ぱすた"] = 0 })
+        expect(result):toBe("\\p[0]\\f[color,90,110,140]やあ、相変わらず薄着だね。寒くないの？"
+            .. "\\p[0]\\f[default]\\n[180]やあ、相変わらずエッチですね。\\e")
+    end)
+
+    test("2.6: 装いのあるアクターどうしの切り替えは戻してから付ける（bold が残らない）", function()
+        local BUILDER = setup()
+        local oji, gal = cast()
+        local result = BUILDER.build({
+            group(oji, { talk(oji, "A") }),
+            group(gal, { talk(gal, "B") }),
+        }, {}, shared_spot())
+        expect(result):toBe("\\p[0]" .. OJI .. "\\f[bold,1]A\\p[0]\\f[default]" .. GAL .. "\\n[150]B\\e")
+    end)
+
+    test("2.1/2.2: 別スポットへ移るときは戻さず、戻ってきたスポットで戻してから付け直す", function()
+        local BUILDER = setup()
+        local oji = actor("おじさん", OJI)
+        local sakura = actor("さくら", nil)
+        local result = BUILDER.build({
+            group(oji, { talk(oji, "A") }),
+            group(sakura, { talk(sakura, "B") }),
+            group(oji, { talk(oji, "C") }),
+        }, {}, shared_spot())
+        expect(result):toBe("\\p[0]" .. OJI .. "A\\p[1]B\\p[0]\\f[default]" .. OJI .. "\\n[150]C\\e")
+    end)
+
+    test("2.4/4.1: 話し続ける間と台詞に書いた \\f の後に装いを差し込まない", function()
+        local BUILDER = setup()
+        local oji = actor("おじさん", OJI)
+        local result = BUILDER.build({
+            group(oji, { talk(oji, "A\\f[bold,1]B"), talk(oji, "C") }),
+            group(oji, { talk(oji, "D") }),
+        }, {}, shared_spot())
+        expect(result):toBe("\\p[0]" .. OJI .. "A\\f[bold,1]BCD\\e")
+    end)
+
+    test("2.9: 未登録アクターは装いの無いアクターとして \\p[0] に出る", function()
+        local BUILDER = setup()
+        local FAILURE = require("pasta.failure")
+        local oji = actor("おじさん", OJI)
+        local adhoc = { name = "sb_装い未登録" }
+        FAILURE.mark_unregistered_actor(adhoc)
+        local result = BUILDER.build({
+            group(oji, { talk(oji, "A") }),
+            group(adhoc, { talk(adhoc, "X") }),
+        }, {}, { ["おじさん"] = 0 })
+        expect(result):toBe("\\p[0]" .. OJI .. "A\\p[0]\\f[default]\\n[150]X\\e")
+    end)
+
+    test("2.7: 装いのタグは改行の判定・選択肢の前の区切りに影響しない", function()
+        local BUILDER = setup()
+        local function run(font)
+            local oji = actor("おじさん", font)
+            local sakura = actor("さくら", nil)
+            return BUILDER.build({
+                group(oji, { choice("甲") }),
+                group(sakura, { talk(sakura, "B") }),
+                group(oji, { talk(oji, "C"), choice("甲") }),
+            }, {}, shared_spot())
+        end
+        local styled = run(OJI)
+        expect(styled):toBe("\\p[0]" .. OJI .. Q1 .. "\\p[1]B\\p[0]\\f[default]" .. OJI
+            .. "\\nC\\n[150]" .. Q1 .. "\\e")
+        expect((styled:gsub("\\f%[[^%]]*%]", ""))):toBe(run(nil))
+    end)
+
+    test("3.3: 選択肢の後に装いを出し直さない", function()
+        local BUILDER = setup()
+        local oji = actor("おじさん", OJI)
+        local result = BUILDER.build({
+            group(oji, { talk(oji, "A"), choice("甲"), talk(oji, "B") }),
+        }, {}, shared_spot())
+        expect(result):toBe("\\p[0]" .. OJI .. "A\\n[150]" .. Q1 .. "\\nB\\e")
+    end)
+
+    test("3.2: 台詞の中の \\c の後に装いを出し直す（内側のトークンは変換後に通す）", function()
+        local BUILDER = setup()
+        local oji = actor("おじさん", OJI)
+        local result = BUILDER.build({
+            group(oji, { talk(oji, "A\\cB"), { type = "clear" }, talk(oji, "C") }),
+        }, {}, shared_spot())
+        expect(result):toBe("\\p[0]" .. OJI .. "A\\c" .. OJI .. "B\\c" .. OJI .. "C\\e")
+    end)
+
+    test("6.1〜6.4/2.1〜2.3/2.6: 共有スポットの会話 ぱすた→おじさん→ぱすた→ギャル→おじさん（Task 3.2）", function()
+        local BUILDER = setup()
+        local function run(oji_font, gal_font)
+            -- シェルのあるぱすた（surface = 0・装い無し）と、シェルの無いおじさん・ギャル
+            local oji, gal, pasta = actor("おじさん", oji_font), actor("ギャル", gal_font), actor("ぱすた", nil)
+            pasta.surface = 0
+            return BUILDER.build({
+                group(pasta, { talk(pasta, "P1") }),
+                group(oji, { talk(oji, "O1") }),
+                group(pasta, { talk(pasta, "P2") }),
+                group(gal, { talk(gal, "G1") }),
+                group(oji, { talk(oji, "O2") }),
+            }, {}, shared_spot())
+        end
+        local OJI_FONT = OJI .. "\\f[bold,1]"
+        local result = run(OJI_FONT, GAL)
+        expect(result):toBe("\\p[0]\\s[0]P1"
+            .. "\\p[0]\\f[default]" .. OJI_FONT .. "\\n[150]O1"
+            .. "\\p[0]\\f[default]\\n[150]P2"
+            .. "\\p[0]\\f[default]" .. GAL .. "\\n[150]G1"
+            .. "\\p[0]\\f[default]" .. OJI_FONT .. "\\n[150]O2\\e")
+        -- 6.2/6.3: 立ち絵の復旧タグは最初のぱすたの 1 回だけ
+        local _, surfaces = result:gsub("\\s%[", "")
+        expect(surfaces):toBe(1)
+        -- 装いを抜くと、装いの無いゴーストの出力と同じ（6.1 の改行・6.2/6.3 の復旧は装いに左右されない）
+        expect((result:gsub("\\f%[[^%]]*%]", ""))):toBe(run(nil, nil))
+    end)
+
+    test("最上位の生のさくらスクリプトは通さない", function()
+        local BUILDER = setup()
+        local oji = actor("おじさん", OJI)
+        local result = BUILDER.build({
+            group(oji, { talk(oji, "A") }),
+            { type = "raw_script", text = "\\c" },
+        }, {}, shared_spot())
+        expect(result):toBe("\\p[0]" .. OJI .. "A\\c\\e")
+    end)
+end)

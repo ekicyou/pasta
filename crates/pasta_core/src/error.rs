@@ -1,7 +1,7 @@
 //! Error types for Pasta Core registry layer.
 //!
 //! This module defines registry-related errors (SceneTableError, WordTableError,
-//! SceneAliasError).
+//! SceneAliasError, ActorFontError).
 //! Parse-related errors (ParseError) are defined in the `pasta_dsl` crate.
 
 use std::collections::HashMap;
@@ -72,6 +72,36 @@ pub enum SceneAliasError {
         "scene alias: '{name}' is both a target and an alias (chained aliases are not allowed)"
     )]
     Chain { name: String },
+}
+
+/// What is wrong with one `font` attribute value (`[actor."name"].font` in pasta.toml).
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum FontValueProblem {
+    #[error("value must be a string, integer or boolean (got {type_name})")]
+    WrongType { type_name: &'static str },
+
+    #[error("value must not be an empty string")]
+    Empty,
+
+    #[error("value must not contain ']' or '\\'")]
+    BreaksTag,
+}
+
+/// Actor font (display style) errors (`[actor."name"].font` in pasta.toml).
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum ActorFontError {
+    #[error("actor font: font of actor '{actor}' must be a table")]
+    NotTable { actor: String },
+
+    #[error("actor font: actor '{actor}' has unknown attribute '{attribute}'")]
+    UnknownAttribute { actor: String, attribute: String },
+
+    #[error("actor font: actor '{actor}' attribute '{attribute}': {problem}")]
+    InvalidValue {
+        actor: String,
+        attribute: String,
+        problem: FontValueProblem,
+    },
 }
 
 #[cfg(test)]

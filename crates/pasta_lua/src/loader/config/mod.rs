@@ -82,7 +82,10 @@ impl PastaConfig {
         let (scene_aliases, scene_alias_source) = Self::parse_scene_aliases(content)?;
 
         // Everything else becomes custom_fields
-        let custom_fields = table;
+        let mut custom_fields = table;
+
+        // `[actor."name"].font` → checked tag string (written order from spans).
+        actor_font::apply(content, &mut custom_fields)?;
 
         tracing::debug!("Parsed configuration");
         let mut config = Self {
@@ -326,6 +329,9 @@ fn default_debug_mode() -> bool {
 /// public surface (and `loader::mod` re-exports) stays unchanged.
 mod sections;
 pub use sections::*;
+
+/// `[actor."name"].font` loading (checked display-style tags).
+mod actor_font;
 
 #[cfg(test)]
 #[path = "../config_tests.rs"]

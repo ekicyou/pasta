@@ -258,6 +258,7 @@ fn stops_loading(kind: FindingKind) -> bool {
             | ConfigSyntax
             | ConfigLoaderType
             | ConfigSceneAlias
+            | ConfigActorFont
             | ConfigPatternInvalid
             | InitFileName
             | FolderMatchesPattern
@@ -408,6 +409,107 @@ fn load_failure_matches_errors() {
                 ("dic/sub/", b""),
             ],
             false,
+        ),
+        // アクターの装い（actor-display-style 7.1〜7.5）
+        (
+            "正しい装い",
+            &[
+                (
+                    "pasta.toml",
+                    "[actor.\"おじさん\"]\nfont = { color = \"90,110,140\", bold = true, height = -2 }\n"
+                        .as_bytes(),
+                ),
+                ("dic/a.pasta", talk),
+            ],
+            false,
+        ),
+        (
+            "属性の無い装い",
+            &[
+                ("pasta.toml", "[actor.\"おじさん\"]\nfont = {}\n".as_bytes()),
+                ("dic/a.pasta", talk),
+            ],
+            false,
+        ),
+        (
+            "装いの知らない属性",
+            &[
+                (
+                    "pasta.toml",
+                    "[actor.\"おじさん\"]\nfont = { Color = \"red\" }\n".as_bytes(),
+                ),
+                ("dic/a.pasta", talk),
+            ],
+            true,
+        ),
+        (
+            "装いの値が浮動小数点数",
+            &[
+                (
+                    "pasta.toml",
+                    "[actor.\"おじさん\"]\nfont = { height = 1.5 }\n".as_bytes(),
+                ),
+                ("dic/a.pasta", talk),
+            ],
+            true,
+        ),
+        (
+            "装いの値が表",
+            &[
+                (
+                    "pasta.toml",
+                    "[actor.\"おじさん\"]\nfont = { color = { r = 1 } }\n".as_bytes(),
+                ),
+                ("dic/a.pasta", talk),
+            ],
+            true,
+        ),
+        (
+            "装いの値が空の文字列",
+            &[
+                (
+                    "pasta.toml",
+                    "[actor.\"おじさん\"]\nfont = { name = \"\" }\n".as_bytes(),
+                ),
+                ("dic/a.pasta", talk),
+            ],
+            true,
+        ),
+        (
+            "装いの値に ]",
+            &[
+                (
+                    "pasta.toml",
+                    "[actor.\"おじさん\"]\nfont = { name = \"a]b\" }\n".as_bytes(),
+                ),
+                ("dic/a.pasta", talk),
+            ],
+            true,
+        ),
+        (
+            "装いの値に \\",
+            &[
+                (
+                    "pasta.toml",
+                    r#"[actor."おじさん"]
+font = { name = "a\\b" }
+"#
+                    .as_bytes(),
+                ),
+                ("dic/a.pasta", talk),
+            ],
+            true,
+        ),
+        (
+            "装いが表でない",
+            &[
+                (
+                    "pasta.toml",
+                    "[actor.\"おじさん\"]\nfont = \"red\"\n".as_bytes(),
+                ),
+                ("dic/a.pasta", talk),
+            ],
+            true,
         ),
         (
             "トランスパイルで失敗する",

@@ -71,6 +71,7 @@ local specs = {
     "stop_test",                          -- pasta.shiori.stop 止まるエラーの場所の見分け・エラー文の整えテスト (runtime-error-balloon 3.2)
     "virtual_clock_test",                 -- pasta.shiori.clock 仮想時刻のずれ・合図・読み取り・時刻と日付の表テスト (tutorial-ssp-gaps 2.1)
     "event_clock_hook_test",              -- EVENT.fire 入口の時計のフック（合図と返事を見せる）テスト (tutorial-ssp-gaps 3.1)
+    "actor_style_test",                   -- pasta.shiori.actor_style 装いの出し入れ・出し直し・素通しテスト (actor-display-style 2.3)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

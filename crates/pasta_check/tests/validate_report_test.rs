@@ -229,6 +229,7 @@ fn every_kind_has_fixed_severity_and_code() {
         (ConfigSyntax, Error, "config-syntax"),
         (ConfigLoaderType, Error, "config-loader-type"),
         (ConfigSceneAlias, Error, "config-scene-alias"),
+        (ConfigActorFont, Error, "config-actor-font"),
         (ConfigPatternInvalid, Error, "config-pattern-invalid"),
         (PatternIgnored, Warning, "pattern-ignored"),
         (PatternNotPasta, Warning, "pattern-not-pasta"),
@@ -255,6 +256,7 @@ fn every_kind_has_fixed_severity_and_code() {
         (ChoiceTargetMissing, Warning, "choice-target-missing"),
     ];
     assert_eq!(table.len(), FindingKind::ALL.len());
+    assert_eq!(FindingKind::ALL.len(), 25);
     for (kind, sev, code) in table {
         assert_eq!(kind.severity(), sev, "{code}");
         assert_eq!(kind.code(), code);

@@ -44,6 +44,7 @@ version = "1.0.0"
 
 - **`[ghost]`**: 書かなくても必ず存在する。`talk_interval_min`・`talk_interval_max`・`hour_margin`・`spot_newlines`・`choice_newlines`・`after_choice_newlines` のうち書かなかったキーには、実装の既定値が入る（書いたキーはそのまま）。
 - **`[actor]`**: `[actor."名前"]` の各サブテーブルに、キー名と同じ値の `name` フィールドが入る（`config.actor["さくら"].name` は `"さくら"`）。`name` を書いていても、キー名で上書きされる。
+- **`[actor]` の `font`**: `[actor."名前"]` に書いた `font`（[装い（font）](https://ekicyou.github.io/pasta/reference/pasta-toml.html#装いfont)）は、表ではなく、検査済みのタグ列の文字列として読める。`font = { color = "90,110,140", bold = true }` なら `config.actor["おじさん"].font` は文字列 `\f[color,90,110,140]\f[bold,1]`、`font = {}` なら空文字列である。書き間違いがあればゴーストの読み込みが失敗するため、読めた値はいつも検査済みである。`font` を書かなかったアクターでは `nil` になる。
 
 `[scene]` には何も補われない。`pasta.toml` に書いたとおりに現れ、書かなければ `config.scene` は `nil` になる。`[scene.alias]` を書かなかったときに使われる既定の別名表（`OnTalk = ["会話"]`）も補完されない。そのため `config.scene` からは、実際に使われている別名表を読み取れないことがある（[[scene]](https://ekicyou.github.io/pasta/reference/pasta-toml.html#sceneシーン名)）。
 

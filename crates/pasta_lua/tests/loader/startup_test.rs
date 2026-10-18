@@ -247,6 +247,36 @@ fn test_shiori_act_uses_config_after_choice_newlines() {
     );
 }
 
+/// pasta.toml の装い（font）から出力までの通し（actor-display-style 1.1・2.1）。
+/// 読み込んだ `STORE.actors` のアクターで組み立てると、装いのタグが書いた順に出て、
+/// 装いの無いアクターへ切り替えると `\f[default]` で戻る
+#[test]
+fn test_shiori_act_emits_config_actor_font() {
+    let temp = copy_fixture_to_temp("with_actor_font");
+    let runtime = PastaLoader::load(temp.path()).unwrap();
+
+    let result = runtime
+        .exec(
+            r#"
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local STORE = require("pasta.store")
+        local oji, pasta = STORE.actors["おじさん"], STORE.actors["ぱすた"]
+        local act = SHIORI_ACT.new(STORE.actors)
+        act:set_spot("おじさん", 0)
+        act:set_spot("ぱすた", 0)
+        act:talk(oji, "やあ")
+        act:talk(pasta, "はい")
+        return act:build()
+    "#,
+        )
+        .unwrap();
+
+    assert_eq!(
+        value_as_str(&result).as_deref(),
+        Some(r"\p[0]\f[height,12]\f[color,90,110,140]\f[bold,1]やあ\p[0]\f[default]\n[150]はい\e")
+    );
+}
+
 // ============================================================================
 // Package Path Tests
 // ============================================================================

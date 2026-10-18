@@ -231,6 +231,139 @@ fn scene_type_errors_are_scene_alias_errors() {
     }
 }
 
+// ---- [actor.*.font] の書き間違い（actor-display-style 7.5） ----
+
+const UNKNOWN_COLOUR: &str = "[actor.\"おじさん\"] の font に知らない属性「colour」があります（書ける属性: color・name・height・bold・italic・underline・strike・sub・sup・outline・shadowcolor・shadowstyle）";
+const COLOR_ARRAY: &str = "[actor.\"おじさん\"] の font の color は文字列・整数・真偽値のどれかで、空にできません: 配列が書かれています";
+const NAME_BREAKS: &str = "[actor.\"おじさん\"] の font の name に「]」か「\\」が含まれています（さくらスクリプトのタグが壊れます）";
+
+fn messages(found: &[Finding]) -> Vec<&str> {
+    found.iter().map(|f| f.message.as_str()).collect()
+}
+
+/// 3 つの書き方のどれでも、1 つの誤りに 1 件・属性の値の行で報告する
+#[test]
+fn actor_font_errors_reported_per_attribute_line_in_three_forms() {
+    let cases = [
+        (
+            "インライン表",
+            "[actor.\"おじさん\"]\nspot = 0\nfont = { colour = \"1\", color = [1], name = \"a]\" }\n",
+            [3, 3, 3],
+        ),
+        (
+            "節",
+            "[actor.\"おじさん\".font]\ncolour = \"1\"\ncolor = [1]\nname = \"a\\\\b\"\n",
+            [2, 3, 4],
+        ),
+        (
+            "ドット付きキー",
+            "[actor.\"おじさん\"]\nfont.colour = \"1\"\nfont.color = [1]\nfont.name = \"a]\"\n",
+            [2, 3, 4],
+        ),
+    ];
+    for (name, text, lines) in cases {
+        let found = toml_findings(text);
+        assert_eq!(
+            codes_lines(&found),
+            lines
+                .iter()
+                .map(|l| (FindingKind::ConfigActorFont, Some(*l)))
+                .collect::<Vec<_>>(),
+            "{name}: {found:?}"
+        );
+        let mut got = messages(&found);
+        got.sort();
+        let mut want = vec![UNKNOWN_COLOUR, COLOR_ARRAY, NAME_BREAKS];
+        want.sort();
+        assert_eq!(got, want, "{name}");
+        assert!(
+            found
+                .iter()
+                .all(|f| f.severity == pasta_check::validate::Severity::Error
+                    && f.code.code() == "config-actor-font"),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn actor_font_value_problems_and_not_table() {
+    let found = toml_findings(
+        "[actor.\"おじさん\".font]\ncolor = \"\"\nheight = 1.5\nbold = { a = 1 }\nitalic = 1979-05-27\n",
+    );
+    assert_eq!(
+        found
+            .iter()
+            .map(|f| (f.line, f.message.as_str()))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                Some(2),
+                "[actor.\"おじさん\"] の font の color は文字列・整数・真偽値のどれかで、空にできません: 空の文字列が書かれています"
+            ),
+            (
+                Some(3),
+                "[actor.\"おじさん\"] の font の height は文字列・整数・真偽値のどれかで、空にできません: 浮動小数点数が書かれています"
+            ),
+            (
+                Some(4),
+                "[actor.\"おじさん\"] の font の bold は文字列・整数・真偽値のどれかで、空にできません: 表が書かれています"
+            ),
+            (
+                Some(5),
+                "[actor.\"おじさん\"] の font の italic は文字列・整数・真偽値のどれかで、空にできません: 日時が書かれています"
+            ),
+        ]
+    );
+
+    // 表でないときは font の値の行
+    let found = toml_findings("[actor.\"おじさん\"]\nspot = 0\nfont = \"red\"\n");
+    assert_eq!(
+        codes_lines(&found),
+        vec![(FindingKind::ConfigActorFont, Some(3))]
+    );
+    assert_eq!(
+        found[0].message,
+        "[actor.\"おじさん\"] の font は表で書きます（例: font = { color = \"90,110,140\" }）"
+    );
+}
+
+/// 正しい装い・装いの無いアクターは報告しない。誤りのあるアクターが複数でも全部報告する
+#[test]
+fn actor_font_correct_or_absent_is_silent_and_all_actors_are_checked() {
+    let ok = "[actor.\"ぱすた\"]\nspot = 0\n[actor.\"おじさん\"]\nfont = { color = \"90,110,140\", bold = true, height = -2 }\n[actor.\"ギャル\".font]\n";
+    assert!(toml_findings(ok).is_empty());
+    assert!(toml_findings("actor = 1\n[ghost]\n").is_empty());
+
+    let found = toml_findings(
+        "[actor.\"ギャル\"]\nfont = 1\n[actor.\"おじさん\"]\nfont = { colour = \"1\" }\n",
+    );
+    assert_eq!(
+        codes_lines(&found),
+        vec![
+            (FindingKind::ConfigActorFont, Some(2)),
+            (FindingKind::ConfigActorFont, Some(4)),
+        ]
+    );
+    assert!(
+        found[0]
+            .message
+            .starts_with("[actor.\"ギャル\"] の font は表で書きます")
+    );
+}
+
+/// 装いの誤りがあっても飛び先の検査は止めない
+#[test]
+fn actor_font_error_does_not_skip_references() {
+    let (mut input, files) = ghost();
+    input.pasta_toml = TomlSource::Text {
+        text: format!("{TOML}[actor.\"さくら\"]\nfont = \"red\"\n"),
+    };
+    let report = validate_ghost(&input, &files);
+    assert!(report.has_errors());
+    assert!(report.stats.skip_reasons.is_empty(), "{:?}", report.lines());
+}
+
 #[test]
 fn missing_toml_is_config_missing_error() {
     let found = config_findings(TomlSource::Missing);
@@ -281,6 +414,11 @@ fn same_strictness_as_pasta_dll() {
         "[scene.alias]\nOnTalk = [\"会話\"]\n\"会話\" = [\"雑談\"]\n",
         "[scene.alias]\nOnTalk = [\"\"]\n",
         "[scene.alias]\n\"\" = [\"a\"]\n",
+        "[actor.\"おじさん\"]\nfont = { color = \"1\", bold = true }\n",
+        "[actor.\"おじさん\"]\nfont = { colour = \"1\" }\n",
+        "[actor.\"おじさん\".font]\ncolor = []\n",
+        "[actor.\"おじさん\"]\nfont.name = \"a]\"\n",
+        "[actor.\"おじさん\"]\nfont = \"red\"\n",
     ];
     for text in cases {
         let dll_rejects = pasta_lua::PastaConfig::from_str(text).is_err();

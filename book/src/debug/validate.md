@@ -62,7 +62,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 - 次のどれかが 1 つでもあると、飛び先の検査をまるごと省く。検査した辞書のシーンが、`pasta.dll` が読み込むシーンと同じとは言えないためである。
   - 構文エラー（`syntax`）
   - 読めない辞書ファイル（`file-not-utf8`・`file-unreadable`）
-  - `pasta.toml` の誤り（`config-syntax`・`config-loader-type`・`config-scene-alias`・`config-pattern-invalid`、`pasta.toml` の `file-unreadable`）。`pasta.toml` が無いこと（`config-missing`）は入らない
+  - `pasta.toml` の誤り（`config-syntax`・`config-loader-type`・`config-scene-alias`・`config-pattern-invalid`、`pasta.toml` の `file-unreadable`）。`pasta.toml` が無いこと（`config-missing`）と、装いの誤り（`config-actor-font`）は入らない
 - 省いたときは、まとめの行の前に、理由を並べた 1 行を出す（「構文エラーがあるため、飛び先の検査をしていません。」「読めない辞書ファイルと pasta.toml の誤りがあるため、飛び先の検査をしていません。」など）。このときまとめの行に最後の項は出ない。
 
 ## 誤りと注意
@@ -80,7 +80,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 
 検査は次の順に進む。
 
-1. **`pasta.toml`**: TOML として読めるか、`[loader]` のキーの型、`[scene.alias]` の別名表を確かめる（[pasta.toml リファレンス](../reference/pasta-toml.md)）。
+1. **`pasta.toml`**: TOML として読めるか、`[loader]` のキーの型、`[scene.alias]` の別名表、`[actor."名前"]` の `font`（装い）を確かめる（[pasta.toml リファレンス](../reference/pasta-toml.md)）。
 2. **辞書の集め方**: `[loader]` の [`pasta_patterns`](../reference/pasta-toml.md#pasta_patterns) に一致する `.pasta` を辞書ファイルとして集める。`pasta_patterns` の `.pasta` を `.lua` に替えたパターンに一致する `.lua` を辞書モジュールとして集める。集め方は `pasta.dll` と同じである。`pasta.toml` が無いときも、既定の `dic/**/*.pasta` で集めて検査を続ける。
 3. **ファイル**: 辞書ファイルが UTF-8 として読めるか、使えないファイル名でないか、辞書のパターンに一致するフォルダが無いかを確かめる。
 4. **モジュール名の重なり**: 辞書ファイルと辞書モジュールのファイル名から作られるモジュール名が重ならないかを確かめる。
@@ -100,6 +100,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 | `config-syntax` | 誤り | `pasta.toml` が TOML として読めない。理由に TOML の説明が続き、行が付く | 示された行の TOML の書き方を直す |
 | `config-loader-type` | 誤り | `[loader]` が表でない、または `pasta_patterns`・`lua_search_paths`（文字列の配列）・`transpiled_output_dir`（文字列）の型が違う | 示されたキーを決まった型で書く |
 | `config-scene-alias` | 誤り | `[scene.alias]` の別名表が正しくない。同じ別名が 2 つ以上の名前にある（重複）、空の名前、別名を別名で置き換える（連鎖）、型の違いのどれか | 理由に示された別名・名前を直す。重複は関わる行のすべてに出る |
+| `config-actor-font` | 誤り | `[actor."名前"]` の `font`（[装い](../reference/pasta-toml.md#装いfont)）が正しくない。12 個に無い属性名、値が文字列・整数・真偽値でない、空の文字列、値に `]` か `\` が含まれる、`font` が表でない、のどれか。`pasta.dll` はゴーストを読み込めない。行は属性の値の行（表でないときは `font` の値の行） | 理由に示された属性と値を直す |
 | `config-pattern-invalid` | 誤り | `pasta_patterns` の要素がパターンとして読めない | パターンの書き方を直す |
 | `pattern-ignored` | 注意 | `pasta_patterns` の要素が `..`・ドライブ名・先頭の `/` を含むため使われない。`pasta.dll` もこのパターンを使わない | `ghost/master` の中を指すパターンにする |
 | `pattern-not-pasta` | 注意 | `pasta_patterns` の要素が `.pasta` で終わらないため、辞書モジュール（`.lua`）を探すのに使われない | `.pasta` で終わるパターンにする |

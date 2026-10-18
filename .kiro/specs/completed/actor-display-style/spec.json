@@ -1,0 +1,23 @@
+{
+  "feature_name": "actor-display-style",
+  "created_at": "2026-10-18T05:30:54Z",
+  "updated_at": "2026-10-18T11:13:15Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "completed_at": "2026-10-18T11:13:15Z"
+}

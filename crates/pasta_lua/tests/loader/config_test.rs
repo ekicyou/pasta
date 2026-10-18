@@ -467,3 +467,227 @@ fn invalid_log_file_path_falls_back_to_default_logger() {
     assert!(base_dir.join(default_log_file_path()).exists());
     assert!(!base_dir.join("profile.log").exists());
 }
+
+// ============================================================================
+// actor-display-style Task 2.1 — `[actor."名前"].font` の読み込み（ActorFontLoader）
+// Requirements 1.1, 1.5, 7.1〜7.4
+// ============================================================================
+
+/// `custom_fields` の `actor."名前"` の表を取り出す
+fn actor_of<'a>(config: &'a PastaConfig, name: &str) -> &'a toml::Table {
+    config.custom_fields["actor"]
+        .as_table()
+        .and_then(|t| t.get(name))
+        .and_then(toml::Value::as_table)
+        .unwrap_or_else(|| panic!("actor {name} must be a table"))
+}
+
+/// `font` を読み込んだ後の値（タグ列の文字列）
+fn font_of(toml_str: &str, name: &str) -> String {
+    let config = PastaConfig::from_str(toml_str).expect("font must load");
+    match actor_of(&config, name).get("font") {
+        Some(toml::Value::String(s)) => s.clone(),
+        other => panic!("font must become a string, got {other:?}"),
+    }
+}
+
+/// 読み込みエラーの文言
+fn font_error(toml_str: &str) -> String {
+    PastaConfig::from_str(toml_str)
+        .expect_err("font error must fail to load")
+        .to_string()
+}
+
+/// 1.1 / 2.1: インライン表は書いた順のタグ列になる（名前順ではない）
+#[test]
+fn actor_font_inline_table_keeps_written_order() {
+    let toml_str = r#"[actor."おじさん"]
+spot = 0
+font = { underline = true, height = 30, color = "90,110,140", bold = false }
+"#;
+    assert_eq!(
+        font_of(toml_str, "おじさん"),
+        r"\f[underline,1]\f[height,30]\f[color,90,110,140]\f[bold,0]"
+    );
+}
+
+/// 1.1 / 2.1: `[actor."X".font]` 節も書いた順
+#[test]
+fn actor_font_section_keeps_written_order() {
+    let toml_str = r#"[actor."おじさん"]
+spot = 0
+
+[actor."おじさん".font]
+shadowstyle = "offset"
+color = "1,2,3"
+height = -2
+"#;
+    assert_eq!(
+        font_of(toml_str, "おじさん"),
+        r"\f[shadowstyle,offset]\f[color,1,2,3]\f[height,-2]"
+    );
+}
+
+/// 1.1 / 2.1: ドット付きキーも書いた順
+#[test]
+fn actor_font_dotted_keys_keep_written_order() {
+    let toml_str = r#"[actor."ギャル"]
+spot = 0
+font.sup = false
+font.bold = true
+font.color = "red"
+"#;
+    assert_eq!(
+        font_of(toml_str, "ギャル"),
+        r"\f[sup,0]\f[bold,1]\f[color,red]"
+    );
+}
+
+/// 空の表は空文字列
+#[test]
+fn actor_font_empty_table_becomes_empty_string() {
+    let toml_str = "[actor.\"おじさん\"]\nspot = 0\nfont = {}\n";
+    assert_eq!(font_of(toml_str, "おじさん"), "");
+}
+
+/// 1.5: `font` 以外のキーの値は変わらず、`font` の無いアクターも変わらない
+#[test]
+fn actor_font_leaves_other_keys_untouched() {
+    let toml_str = r#"[actor."おじさん"]
+spot = 0
+surface = 10
+memo = { a = 1 }
+font = { color = "1,2,3" }
+
+[actor."ぱすた"]
+spot = 1
+surface = 0
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+    let ojisan = actor_of(&config, "おじさん");
+    assert_eq!(ojisan.get("spot"), Some(&toml::Value::Integer(0)));
+    assert_eq!(ojisan.get("surface"), Some(&toml::Value::Integer(10)));
+    assert_eq!(
+        ojisan.get("memo"),
+        Some(&toml::Value::Table(toml::from_str("a = 1").unwrap()))
+    );
+    assert_eq!(ojisan.len(), 4);
+
+    let expected: toml::Table = toml::from_str("spot = 1\nsurface = 0\n").unwrap();
+    assert_eq!(actor_of(&config, "ぱすた"), &expected);
+}
+
+/// `[actor]` が無い・表でない・アクターの値が表でないときは何もしない
+#[test]
+fn actor_font_ignores_missing_or_non_table_actor() {
+    assert!(PastaConfig::from_str("[loader]\n").is_ok());
+    let config = PastaConfig::from_str("actor = 1\n").unwrap();
+    assert_eq!(config.custom_fields["actor"], toml::Value::Integer(1));
+    let config = PastaConfig::from_str("[actor]\n\"おじさん\" = \"x\"\n").unwrap();
+    assert_eq!(
+        config.custom_fields["actor"]["おじさん"],
+        toml::Value::String("x".into())
+    );
+}
+
+/// 7.1: 知らない属性名（大文字違いを含む）は読み込みエラー
+#[test]
+fn actor_font_unknown_attribute_is_load_error() {
+    let toml_str = r#"[actor."おじさん"]
+spot = 0
+font = { Color = "1,2,3" }
+"#;
+    let msg = font_error(toml_str);
+    assert!(msg.contains("おじさん"), "{msg}");
+    assert!(msg.contains("Color"), "{msg}");
+    assert!(msg.contains("(line 3)"), "{msg}");
+}
+
+/// 7.2: 型違い・空文字列は読み込みエラー（1 つの表の誤りはまとめて出す）
+#[test]
+fn actor_font_wrong_type_and_empty_are_load_errors() {
+    let toml_str = r#"[actor."おじさん"]
+spot = 0
+
+[actor."おじさん".font]
+height = 1.5
+name = ""
+"#;
+    let msg = font_error(toml_str);
+    assert!(msg.contains("おじさん"), "{msg}");
+    assert!(msg.contains("height (line 5)"), "{msg}");
+    assert!(msg.contains("name (line 6)"), "{msg}");
+}
+
+/// 7.3: `]`・`\` を含む値は読み込みエラー
+#[test]
+fn actor_font_tag_breaking_values_are_load_errors() {
+    let toml_str = r#"[actor."おじさん"]
+font.color = "1]2"
+font.name = 'a\b'
+"#;
+    let msg = font_error(toml_str);
+    assert!(msg.contains("おじさん"), "{msg}");
+    assert!(msg.contains("color (line 2)"), "{msg}");
+    assert!(msg.contains("name (line 3)"), "{msg}");
+}
+
+/// 7.4: 表でない `font` は読み込みエラー（アクター名・行）
+#[test]
+fn actor_font_not_table_is_load_error() {
+    let toml_str = "[actor.\"おじさん\"]\nspot = 0\nfont = \"red\"\n";
+    let msg = font_error(toml_str);
+    assert!(msg.contains("おじさん"), "{msg}");
+    assert!(msg.contains("font"), "{msg}");
+    assert!(msg.contains("(line 3)"), "{msg}");
+}
+
+/// アクターをまたぐ誤りは名前順で最初のアクターで止める
+#[test]
+fn actor_font_errors_stop_at_first_actor_by_name() {
+    let toml_str = r#"[actor."b"]
+font = { bad_b = 1 }
+
+[actor."a"]
+font = { bad_a = 1 }
+"#;
+    let msg = font_error(toml_str);
+    assert!(msg.contains("bad_a"), "{msg}");
+    assert!(!msg.contains("bad_b"), "{msg}");
+}
+
+/// 1.1: ランタイムの `@pasta_config` の `actor."名前".font` がタグ列の文字列になり、
+/// 誤りはローダーの読み込みエラーになる
+#[test]
+fn actor_font_reaches_pasta_config_and_errors_fail_load() {
+    use crate::common::copy_fixture_to_temp;
+    use pasta_lua::loader::PastaLoader;
+
+    let temp = copy_fixture_to_temp("minimal");
+    std::fs::write(
+        temp.path().join("pasta.toml"),
+        "[loader]\ndebug_mode = true\n\n[actor.\"おじさん\"]\nspot = 0\nfont = { color = \"90,110,140\", bold = true }\n",
+    )
+    .unwrap();
+    let runtime = PastaLoader::load(temp.path()).expect("valid font must load");
+    let font = runtime
+        .exec(r#"return require("@pasta_config").actor["おじさん"].font"#)
+        .unwrap();
+    assert_eq!(
+        font.as_string().map(|s| s.to_string_lossy()).as_deref(),
+        Some(r"\f[color,90,110,140]\f[bold,1]")
+    );
+    drop(runtime);
+
+    std::fs::write(
+        temp.path().join("pasta.toml"),
+        "[loader]\ndebug_mode = true\n\n[actor.\"おじさん\"]\nfont = { colour = \"1\" }\n",
+    )
+    .unwrap();
+    let err = PastaLoader::load(temp.path())
+        .err()
+        .expect("unknown attribute must fail load")
+        .to_string();
+    assert!(err.contains("おじさん") && err.contains("colour"), "{err}");
+    assert!(err.contains("(line 5)"), "{err}");
+}
