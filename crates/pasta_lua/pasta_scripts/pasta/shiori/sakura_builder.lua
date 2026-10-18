@@ -211,9 +211,6 @@ local function first_column(column)
     column.jump = false
 end
 
---- テスト用の内部の表（公開の API ではない。マニュアルに載せない）
-BUILDER._internal = { next_column = next_column, first_column = first_column }
-
 --- 文字列が単位にならない `\` で終わるか（APPEARANCE.tag_at と同じ読み方。エスケープ・囲みは除く）
 --- @param s string
 --- @return boolean
@@ -255,13 +252,23 @@ local function tracking_buffer(inner)
 end
 
 --- 直前の出力が単位にならない `\` で終わっていれば、エスケープの `\\` にする。
---- pasta が入れる区切り・改行の頭の `\` が、前の `\` とつながって `\\` に化けるのを防ぐ
+--- pasta が入れる区切り・改行の頭の `\` が、前の `\` とつながって `\\` に化けるのを防ぐ。
+--- 足した後の末尾はエスケープの `\\` なので、lone は偽にする（続けて守っても足さない）
 --- @param buffer table tracking_buffer
 local function escape_lone_tail(buffer)
     if buffer.lone then
         buffer:put("\\")
+        buffer.lone = false
     end
 end
+
+--- テスト用の内部の表（公開の API ではない。マニュアルに載せない）
+BUILDER._internal = {
+    next_column = next_column,
+    first_column = first_column,
+    tracking_buffer = tracking_buffer,
+    escape_lone_tail = escape_lone_tail,
+}
 
 --- 区切りを出して 1 列進める。区切りを出す所はすべてここを通す（決定 8）
 --- @param buffer table tracking_buffer
@@ -308,6 +315,23 @@ local function inner_token_to_string(actor, inner, column)
     return ""
 end
 
+--- 変換の出力の頭に、pasta が入れた列を動かすタグがあるか（前の単独の `\` を守る所。決定 9）。
+--- newline の `\n`・clear の `\c` と、talk_to_script が台詞の頭に入れた改行（出力の頭の 2 バイトが
+--- テキストの頭と違う）。作者が書いた頭のタグは出力の頭がテキストの頭と同じなので触らない
+--- @param inner table 内側トークン
+--- @param s string 変換の出力
+--- @return boolean
+local function starts_with_pasta_move(inner, s)
+    if s:byte(1) ~= 92 then
+        return false
+    end
+    local t = inner.type
+    if t == "newline" or t == "clear" then
+        return true
+    end
+    return (t == "talk" or t == "sakura_script") and s:sub(1, 2) ~= tostring(inner.text):sub(1, 2)
+end
+
 --- actorグループ内の単一トークンをさくらスクリプトへ変換して出力し、外見状態に観測させる
 --- @param buffer table 出力バッファ（pasta.buf 互換）
 --- @param actor table|nil グループの発言アクター
@@ -317,9 +341,8 @@ end
 --- @param column table 話し手のスポットの列の状態
 local function emit_inner_token(buffer, actor, inner, appearance, spot, column)
     local s = inner_token_to_string(actor, inner, column)
-    -- 台詞の頭に talk_to_script が入れたタグ（持ち越しの改行など。テキストは `\` で始まらないのに
-    -- 出力が `\` で始まる）を、前の出力の単独の `\` に食わせない。作者が書いた頭のタグには触らない
-    if s:byte(1) == 92 and inner.text ~= nil and tostring(inner.text):byte(1) ~= 92 then
+    -- pasta が入れた頭の改行・`\c` を、前の出力の単独の `\` に食わせない
+    if starts_with_pasta_move(inner, s) then
         escape_lone_tail(buffer)
     end
     buffer:put(s)

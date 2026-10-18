@@ -111,7 +111,7 @@ graph TB
 
 ## File Structure Plan
 
-新しいファイルは作らない。変更するファイルと、その責務は次のとおり。
+新しいファイルは、決定 9 の確かめ（タスク 1.2）で足したテスト `crates/pasta_lua/tests/sakura_script/backslash_break_test.rs` の 1 つだけ（下の「テスト」）。変更するファイルと、その責務は次のとおり。
 
 ### Modified Files
 
@@ -145,6 +145,9 @@ graph TB
 - `crates/pasta_lua/tests/sakura_script/edge_case_test.rs` — 数値でない `budoux_newlines`・`budoux_jump` の要素、表でない 3 つ目の引数。
 - `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua` — 持ち越し・区切りでの列の進め方・`clear`・スポットごと・出力ごと・選択肢の後の区切り・作例の照合・Lua と Rust の動きの同値。
 - `crates/pasta_lua/tests/loader/config_defaults_test.rs`・`crates/pasta_lua/src/loader/config_tests.rs`・`crates/pasta_lua/tests/loader/config_sections_test.rs` — `after_choice_newlines` の既定値・補完・マニュアルとの照合・Lua のリテラルとの照合。
+- `crates/pasta_lua/tests/loader/startup_test.rs` — SHIORI の act が `[ghost]` の `after_choice_newlines` を読み、選択肢の後の 2 か所の区切りに使う（5.1・5.2・5.6）。
+- `crates/pasta_lua/tests/loader/config_actors_initialization_test.rs` — `[actor]` に書いた `budoux_newlines`・`budoux_jump` が `@pasta_config` から読め、`talk_to_script` に効く（1.7）。
+- `crates/pasta_lua/tests/sakura_script/backslash_break_test.rs`（新規）・`crates/pasta_lua/tests/sakura_script/main.rs`（モジュールの登録）— 単語や関数が返した単独の `\` の直後に budoux の改行・pasta の区切りが続いても、`\\` に化けないこと（決定 9）。
 
 **マニュアル・スキル references**
 
@@ -481,6 +484,7 @@ fn write_column(t: &Table, c: &Column) -> LuaResult<()>;
 - 動かすのは 2 通りだけ。`next_column(col, n)`（`line` に n を足し、`width` を 0）と `first_column(col)`（`line = 1`・`width = 0`・`jump = false`）。Rust の `Next`・`First` と同じ意味。
 - `BUILDER.build` に新しい分かれ道を足さない。区切りを出す 3 か所の `buffer:put` を `put_break` に替え、`newline`・`clear` の動きは `inner_token_to_string` の今の分かれ道の中に置く。
 - `raw_script`・選択肢・表情・ウェイト・`choice_timeout` は、状態に触らない（4.1・4.8）。
+- 単独の `\` の守り（決定 9。research.md の「4.1 で決めた守り方」）: 出力バッファを `tracking_buffer` で包み、最後に足した片が単位にならない `\` で終わるか（`ends_with_lone_backslash`。`APPEARANCE.tag_at` と同じ読み方）を覚える。pasta が行を動かすタグを出す前に、`escape_lone_tail` が末尾の単独の `\` に `\` を 1 つ足してエスケープの `\\` にする（足した後は単独でないと覚え、続けて足さない）。守る所は、区切りの `put_break`、`newline` の `\n`・`clear` の `\c`、`talk_to_script` が台詞の頭に入れた改行（変換の結果が `\` で始まり、頭の 2 バイトがテキストの頭と違うとき。`starts_with_pasta_move`）。作者が台詞の頭に書いたタグ、話し手の切り替えの `\p[…]`・終わりの `\e` には触らない。
 
 **Dependencies**
 

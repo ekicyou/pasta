@@ -3397,6 +3397,42 @@ describe("SAKURA_BUILDER - vertical-balloon-lines: 単独の \\ の後の区切�
         }, {}, spots())
         expect(out):toBe("\\p[0]天気\\\\s[1]\\e")
     end)
+
+    test("act:newline の改行も、末尾の単独の \\ をエスケープにしてから出す", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local out = BUILDER.build({ group(a, { talk(a, "天気\\"), { type = "newline", n = 2 } }) }, {}, spots())
+        expect(out):toBe("\\p[0]天気\\\\\\n\\n\\e")
+    end)
+
+    test("act:clear の \\c も、末尾の単独の \\ をエスケープにしてから出す", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local out = BUILDER.build({ group(a, { talk(a, "天気\\"), { type = "clear" } }) }, {}, spots())
+        expect(out):toBe("\\p[0]天気\\\\\\c\\e")
+    end)
+
+    test("守りが続いても、エスケープは 1 つだけ足す", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local out = BUILDER.build({
+            group(a, { talk(a, "天気\\"), { type = "newline", n = 1 }, { type = "clear" } }),
+        }, {}, spots())
+        expect(out):toBe("\\p[0]天気\\\\\\n\\c\\e")
+        -- エスケープした後の末尾は単独の \ ではない（続けて守っても足さない）
+        local b = BUILDER._internal.tracking_buffer(require("pasta.buf").new())
+        b:put("天気\\")
+        BUILDER._internal.escape_lone_tail(b)
+        BUILDER._internal.escape_lone_tail(b)
+        expect(b:tostring()):toBe("天気\\\\")
+    end)
+
+    test("単独の \\ で始まる台詞の頭に持ち越しの改行が入るときも、前の単独の \\ を守る", function()
+        local BUILDER = setup()
+        local a = { name = "さくら", spot = 0, budoux = { 6 } }
+        local out = BUILDER.build({ group(a, { talk(a, "天気\\"), talk(a, "\\今日") }) }, {}, spots())
+        expect(out):toBe("\\p[0]天気\\\\\\n\\今日\\e")
+    end)
 end)
 
 -- ============================================================================
