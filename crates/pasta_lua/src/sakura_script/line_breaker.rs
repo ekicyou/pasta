@@ -6,15 +6,116 @@
 use regex::Regex;
 use unicode_width::UnicodeWidthStr;
 
+// ponytail: 列の状態と規則は 2.2/2.3 で break_lines_impl から使う。それまでは単体テストだけが読む。
+
+/// 列の状態。Lua の表 { line, width, jump } と 1 対 1 に対応する。
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Column {
+    /// 列の番号。最初の列が 1。
+    pub line: usize,
+    /// その列に積んだ字数（全角 2・半角 1。タグは数えない）。
+    pub width: usize,
+    /// `budoux_jump` の並びを使っているか。
+    pub jump: bool,
+}
+
+impl Default for Column {
+    /// 最初の列の頭・字数 0・`budoux` の並び。
+    fn default() -> Self {
+        Self {
+            line: 1,
+            width: 0,
+            jump: false,
+        }
+    }
+}
+
+/// 改行の規則（アクターの設定から作る）。
+#[cfg_attr(not(test), allow(dead_code))]
+pub struct BreakRule<'a> {
+    /// `budoux` の並び。空なら改行を入れない（状態は進める）。
+    pub widths: &'a [usize],
+    /// `budoux_jump` の並び。空なら `\_l[…]` は字数だけを 0 にする。
+    pub jump_widths: &'a [usize],
+    /// budoux が入れる改行の文字列（`\n` または `\n[N]`）。
+    pub newline: &'a str,
+}
+
+/// 列の動き（単位 1 つが列をどう動かすか）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ColumnMove {
+    /// `\n` ちょうど・`\n[` で始まる単位。次の列へ。
+    Next,
+    /// `\c` ちょうどの単位。最初の列へ。
+    First,
+    /// `\_l[` で始まる単位。飛ぶ。
+    Jump,
+}
+
+/// 単位の文字列から列の動きを決める。列を動かさない単位は None。
+///
+/// 単位は `SAKURA_TAG_PATTERN` の一致 1 つ。囲み（`\_?…\_?`・`\_!…\_!`）と
+/// エスケープ（`\\`）は先頭が違うので、中に `\n` などがあっても動かない（2.9）。
+fn column_move(unit: &str) -> Option<ColumnMove> {
+    if unit == r"\n" || unit.starts_with(r"\n[") {
+        Some(ColumnMove::Next)
+    } else if unit == r"\c" {
+        Some(ColumnMove::First)
+    } else if unit.starts_with(r"\_l[") {
+        Some(ColumnMove::Jump)
+    } else {
+        None
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl Column {
+    /// 列の動きを当てる。どの動きも字数を 0 にする。
+    /// budoux が入れた改行は `Next` を当ててから、字数に次の語のかけらの幅を入れる。
+    fn apply(&mut self, m: ColumnMove, rule: &BreakRule) {
+        match m {
+            ColumnMove::Next => self.line += 1,
+            ColumnMove::First => {
+                self.line = 1;
+                self.jump = false;
+            }
+            ColumnMove::Jump if !rule.jump_widths.is_empty() => {
+                self.line = 1;
+                self.jump = true;
+            }
+            ColumnMove::Jump => {}
+        }
+        self.width = 0;
+    }
+
+    /// 今の列の幅の上限。並びの最後の値を、それ以降の列で繰り返す。
+    /// `rule.widths` が空でないときだけ呼ぶ。
+    fn threshold(&self, rule: &BreakRule) -> usize {
+        let list = if self.jump && !rule.jump_widths.is_empty() {
+            rule.jump_widths
+        } else {
+            rule.widths
+        };
+        list[(self.line.max(1) - 1).min(list.len() - 1)]
+    }
+}
+
 /// A plain text character paired with trailing sakura script tags.
 struct PlainChar<'a> {
     ch: char,
     trailing: &'a str,
+    /// `trailing` の単位の列の動き（順に）。
+    #[cfg_attr(not(test), allow(dead_code))]
+    moves: Vec<ColumnMove>,
 }
 
 /// Tokenized representation separating plain text from tags.
 struct Tokens<'a> {
     leading: &'a str,
+    /// `leading` の単位の列の動き（順に）。
+    #[cfg_attr(not(test), allow(dead_code))]
+    leading_moves: Vec<ColumnMove>,
     chars: Vec<PlainChar<'a>>,
 }
 
@@ -28,6 +129,7 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
     let mut pos = 0;
     let mut leading_end = 0;
     let mut leading_set = false;
+    let mut leading_moves = Vec::new();
 
     // Collect all tag match ranges
     let tag_ranges: Vec<(usize, usize)> = tag_regex
@@ -39,6 +141,7 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
     while pos < input.len() {
         // Check if current position is inside a tag
         if tag_idx < tag_ranges.len() && pos == tag_ranges[tag_idx].0 {
+            leading_moves.extend(column_move(&input[pos..tag_ranges[tag_idx].1]));
             pos = tag_ranges[tag_idx].1;
             tag_idx += 1;
             continue;
@@ -57,9 +160,11 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
 
             // Find trailing: from char_end to the next plain char (or end)
             let mut trailing_end = char_end;
+            let mut moves = Vec::new();
             // Skip over any tags immediately after this char
             loop {
                 if tag_idx < tag_ranges.len() && trailing_end == tag_ranges[tag_idx].0 {
+                    moves.extend(column_move(&input[trailing_end..tag_ranges[tag_idx].1]));
                     trailing_end = tag_ranges[tag_idx].1;
                     tag_idx += 1;
                 } else {
@@ -70,6 +175,7 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
             chars.push(PlainChar {
                 ch: c,
                 trailing: &input[char_end..trailing_end],
+                moves,
             });
 
             pos = trailing_end;
@@ -85,7 +191,11 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
         input
     };
 
-    Tokens { leading, chars }
+    Tokens {
+        leading,
+        leading_moves,
+        chars,
+    }
 }
 
 /// Insert sakura script line breaks (`\n`) into text at natural Japanese
@@ -599,5 +709,117 @@ mod tests {
                 );
             }
         }
+    }
+
+    // --- 列を動かす単位の見分け (Requirement 2.1, 2.2, 2.8, 2.9) ---
+
+    #[test]
+    fn test_column_move_classification() {
+        let moving = [
+            (r"\n", ColumnMove::Next),
+            (r"\n[180]", ColumnMove::Next),
+            (r"\n[half]", ColumnMove::Next),
+            (r"\c", ColumnMove::First),
+            (r"\_l[-295,0]", ColumnMove::Jump),
+        ];
+        for (unit, want) in moving {
+            assert_eq!(column_move(unit), Some(want), "unit={}", unit);
+        }
+        let still = [
+            r"\c[line,1]",
+            r"\x",
+            r"\x[noclear]",
+            r"\_q",
+            r"\_w[50]",
+            r"\s[1]",
+            r"\0",
+            r"\p[1]",
+            r"\b[2]",
+            r"\\",
+            r"\%",
+            r"\_?\n\_?",
+            r"\_!\c\_!",
+        ];
+        for unit in still {
+            assert_eq!(column_move(unit), None, "unit={}", unit);
+        }
+    }
+
+    #[test]
+    fn test_tokenize_records_column_moves() {
+        let re = tag_regex();
+        let tokens =
+            tokenize_plain_chars(r"\h\c\_l[0,0]あ\_w[50]\n[half]い\_?\n\_?う\\\_l[1,1]", &re);
+        assert_eq!(
+            tokens.leading_moves,
+            vec![ColumnMove::First, ColumnMove::Jump]
+        );
+        assert_eq!(tokens.chars.len(), 3);
+        assert_eq!(tokens.chars[0].moves, vec![ColumnMove::Next]);
+        assert_eq!(tokens.chars[1].moves, vec![]);
+        assert_eq!(tokens.chars[2].moves, vec![ColumnMove::Jump]);
+    }
+
+    #[test]
+    fn test_column_apply_follows_move_table() {
+        let widths = [40];
+        let jump_widths = [40, 28];
+        let with_jump = BreakRule {
+            widths: &widths,
+            jump_widths: &jump_widths,
+            newline: r"\n",
+        };
+        let no_jump = BreakRule {
+            widths: &widths,
+            jump_widths: &[],
+            newline: r"\n",
+        };
+        let at = |line, width, jump| Column { line, width, jump };
+
+        assert_eq!(Column::default(), at(1, 0, false));
+
+        let mut c = at(2, 7, true);
+        c.apply(ColumnMove::Next, &with_jump);
+        assert_eq!(c, at(3, 0, true));
+
+        let mut c = at(3, 7, true);
+        c.apply(ColumnMove::First, &with_jump);
+        assert_eq!(c, at(1, 0, false));
+
+        let mut c = at(3, 7, false);
+        c.apply(ColumnMove::Jump, &with_jump);
+        assert_eq!(c, at(1, 0, true));
+
+        let mut c = at(3, 7, false);
+        c.apply(ColumnMove::Jump, &no_jump);
+        assert_eq!(c, at(3, 0, false));
+    }
+
+    #[test]
+    fn test_column_threshold() {
+        let widths = [4, 20];
+        let jump_widths = [40, 28];
+        let rule = BreakRule {
+            widths: &widths,
+            jump_widths: &jump_widths,
+            newline: r"\n",
+        };
+        let no_jump = BreakRule {
+            widths: &widths,
+            jump_widths: &[],
+            newline: r"\n",
+        };
+        let at = |line, jump| Column {
+            line,
+            width: 0,
+            jump,
+        };
+        assert_eq!(at(0, false).threshold(&rule), 4);
+        assert_eq!(at(1, false).threshold(&rule), 4);
+        assert_eq!(at(2, false).threshold(&rule), 20);
+        assert_eq!(at(9, false).threshold(&rule), 20);
+        assert_eq!(at(1, true).threshold(&rule), 40);
+        assert_eq!(at(5, true).threshold(&rule), 28);
+        assert_eq!(at(1, true).threshold(&no_jump), 4);
     }
 }
