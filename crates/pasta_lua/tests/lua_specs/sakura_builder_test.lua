@@ -3193,6 +3193,34 @@ describe("SAKURA_BUILDER - actor-display-style: 装いの出し入れ（Task 3.1
         expect(result):toBe("\\p[0]" .. OJI .. "A\\c" .. OJI .. "B\\c" .. OJI .. "C\\e")
     end)
 
+    test("6.1〜6.4/2.1〜2.3/2.6: 共有スポットの会話 ぱすた→おじさん→ぱすた→ギャル→おじさん（Task 3.2）", function()
+        local BUILDER = setup()
+        local function run(oji_font, gal_font)
+            -- シェルのあるぱすた（surface = 0・装い無し）と、シェルの無いおじさん・ギャル
+            local oji, gal, pasta = actor("おじさん", oji_font), actor("ギャル", gal_font), actor("ぱすた", nil)
+            pasta.surface = 0
+            return BUILDER.build({
+                group(pasta, { talk(pasta, "P1") }),
+                group(oji, { talk(oji, "O1") }),
+                group(pasta, { talk(pasta, "P2") }),
+                group(gal, { talk(gal, "G1") }),
+                group(oji, { talk(oji, "O2") }),
+            }, {}, shared_spot())
+        end
+        local OJI_FONT = OJI .. "\\f[bold,1]"
+        local result = run(OJI_FONT, GAL)
+        expect(result):toBe("\\p[0]\\s[0]P1"
+            .. "\\p[0]\\f[default]" .. OJI_FONT .. "\\n[150]O1"
+            .. "\\p[0]\\f[default]\\n[150]P2"
+            .. "\\p[0]\\f[default]" .. GAL .. "\\n[150]G1"
+            .. "\\p[0]\\f[default]" .. OJI_FONT .. "\\n[150]O2\\e")
+        -- 6.2/6.3: 立ち絵の復旧タグは最初のぱすたの 1 回だけ
+        local _, surfaces = result:gsub("\\s%[", "")
+        expect(surfaces):toBe(1)
+        -- 装いを抜くと、装いの無いゴーストの出力と同じ（6.1 の改行・6.2/6.3 の復旧は装いに左右されない）
+        expect((result:gsub("\\f%[[^%]]*%]", ""))):toBe(run(nil, nil))
+    end)
+
     test("最上位の生のさくらスクリプトは通さない", function()
         local BUILDER = setup()
         local oji = actor("おじさん", OJI)
