@@ -300,6 +300,13 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - **`vertical-balloon-lines`（spec。2026-10-18 に直接実装の候補「budoux の改行の幅」から格上げ）**: budoux が入れる改行の幅（`budoux_newlines`）、列を動かすタグ（`\n`・`\n[…]`・`\c`・`\_l[…]`）の所で budoux が数え直すこと、選択肢どうしの間の改行の幅（`[ghost]` のキー、既定 1.0。汎用の機能。ぱすたは使わない）。budoux は自分で入れた改行しか知らず、作者が書いた `\n`・`\c` の後も前の列の字数を数え続ける（横書きでも起きている今の不具合）。方式は「budoux がタグを見て数え直す」（`act:budoux_reset()` のような明示の手段は採らない）。左の枠の短い列（`\_l` の後の幅）とトークンをまたいだ字数は、要件定義で決める。要件定義は Opus。`actor-display-style` とは `sakura_builder.lua`（選択肢どうしの間）を共有するので、同じウェーブに置かない。
 - **左の枠へ飛ぶ `\_l`**: 飛ぶのは単語（ゴースト側の `＠左`）で足りる。budoux の数え直しは `vertical-balloon-lines` が持つ。
 
+### 0.4.1 の後に届いた不具合（2026-10-18 起票）
+
+v0.4.1 を出した後に、「ぱすた開発」セッションが実機で見つけて知らせてきた 2 件。どちらも致命的でない。版は開発者が決める（推奨は 0.4.2）。2 本はソースを共有しないので、並べられる。
+
+- **`talk-grapheme-clusters`（spec）**: 自動ウェイトと budoux の改行が、コードポイントごとに台詞を切る。組み合わせの絵文字（`🙆‍♀️`・`✌️`）の途中に `\_w` が入り、縦書きのバルーンで絵文字が割れて描かれる。`chars_*` の組み合わせの絵文字も一致しない。根は `sakura_script/tokenizer.rs` の 1 コードポイントずつの切り出しにある。`wait_inserter.rs`・`line_breaker.rs` も合わせて、書記素クラスタ単位にする。推奨は `unicode-segmentation` を足すこと。`sakura_builder.lua` は触らない見込み。
+- **`dressup-restore-stale-parts`（spec）**: 同じスポットを共有する話者が戻ったときの外見の復旧が、前に着けた別のパーツ（腕・目）を出す。ゴースト側は、選ばなかったパーツを `,0` で明示的に OFF にして避けている。今の設計（記録の順に全部を出し直し、複数選択できないカテゴリでは最後の 1 つが残る）で、なぜ起きるかはまだ確かめていない。要件定義の最初に、実例と SSP の実機で原因を確かめる（再現の材料を「ぱすた開発」セッションに頼んだ）。持ち場は `shiori/appearance.lua`。
+
 ## リリース（`release` スキル）
 
 リリースの CI 化（`release-ci`）、リリース手順（spec `release-workflow`）の書き換え、CI での初回のリリース（v0.3.8）とその後片付けは、2026-10-10 までにすべて済んだ。タグ `vX.Y.Z` の push だけで公開まで進む。記録は `.kiro/specs/completed/release-workflow/first-ci-release.md` と、同じフォルダの `design.md` にある。手順は 2026-10-11 に `release` スキル（`.claude/skills/release/`）へ移し、spec は完了にした。手順を直すときは、スキルを直す。**残るのは、失敗した job の再実行の読み方の確認である**（v0.3.8 も v0.4.0（2026-10-17、run 39024925990）も失敗が起きなかったので未確認。失敗が起きたリリースで確かめる）。
@@ -346,6 +353,8 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [x] actor-display-style -- アクターごとの表示の装い（文字の色など）を pasta.toml で決め、スポットが替わったときと同じスポットで話者が替わったときに出し入れする。1 つのスポットを複数のアクターで共有する形を正式に支える（窓際のぱすたさんのシェルの無い相手役。2026-10-18 起票）。0.4.1 に入れる。`sakura_builder.lua` を共有する `novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link` と同じウェーブに置かない。Dependencies: none
 - [x] vertical-balloon-lines -- 縦書きのバルーンの列の扱い。budoux が入れる改行の幅（`budoux_newlines`）、列を動かすタグ（`\n`・`\n[…]`・`\c`・`\_l[…]`）の所での budoux の数え直し（作者が書いた `\n`・`\c` の後も数え続ける今の不具合の直しを含む）、選択肢どうしの間の改行の幅（窓際のぱすたさん。2026-10-18 起票、直接実装の候補から格上げ）。0.4.1 に入れる。`sakura_builder.lua` を共有する `actor-display-style` と同じウェーブに置かない。Dependencies: none
 - [ ] lua-cmodule-robustness -- C の Lua 拡張モジュール（DLL）の `require` を、深いパス・ANSI に無い文字を含むフォルダでも読めるようにする。LuaJIT は改造せず、`package.loaders[3]`・`[4]`・`package.loadlib` を Rust 側で差し替え（`LoadLibraryExW`＋隣の依存 DLL の解決）、`package.cpath` の相対パスは pasta.dll のフォルダを基点にする（`lua-require-robustness` の続き。2026-10-18 起票）。0.4.2 に入れる（2026-10-18 開発者の決定）。Dependencies: none
+- [ ] talk-grapheme-clusters -- 自動ウェイト・`chars_*` の判定・budoux の改行を、コードポイントでなく書記素クラスタ単位にする。組み合わせの絵文字の途中に `\_w` や改行を入れない（「ぱすた開発」セッションの実機の報告。2026-10-18 起票）。版は未定（推奨 0.4.2）。Dependencies: none
+- [ ] dressup-restore-stale-parts -- 同じスポットを共有する話者が戻ったときの着せ替えの復旧が、前に着けた別のパーツを出す不具合。原因を実例と実機で確かめてから、記録と復旧を直す（`actor-surface-restore` の続き。2026-10-18 起票）。版は未定（推奨 0.4.2）。Dependencies: none
 
 ## Existing Spec Updates
 
