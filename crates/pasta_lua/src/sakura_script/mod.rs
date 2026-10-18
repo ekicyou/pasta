@@ -142,12 +142,23 @@ fn apply_budoux_if_configured(
         return Ok(text);
     }
 
-    Ok(line_breaker::break_lines_impl(
-        &text,
-        &widths,
+    Ok(break_fresh(state, &text, &widths))
+}
+
+/// 新しい列の状態・`\n`・飛んだ後の並び無しで budoux の改行を入れる。
+fn break_fresh(state: &SakuraScriptState, text: &str, widths: &[usize]) -> String {
+    let rule = line_breaker::BreakRule {
+        widths,
+        jump_widths: &[],
+        newline: r"\n",
+    };
+    line_breaker::break_lines_impl(
+        text,
+        &rule,
+        &mut line_breaker::Column::default(),
         state.tokenizer.tag_regex(),
         &state.budoux_parser,
-    ))
+    )
 }
 
 /// Convert a Lua array table of widths to `Vec<usize>`.
@@ -206,14 +217,7 @@ fn break_lines_lua_impl(
         return Ok(text);
     }
 
-    let result = line_breaker::break_lines_impl(
-        &text,
-        &widths_vec,
-        state.tokenizer.tag_regex(),
-        &state.budoux_parser,
-    );
-
-    Ok(result)
+    Ok(break_fresh(state, &text, &widths_vec))
 }
 
 #[cfg(test)]

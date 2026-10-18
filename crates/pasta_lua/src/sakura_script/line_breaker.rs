@@ -4,12 +4,9 @@
 //! boundaries while transparently preserving sakura script tags.
 
 use regex::Regex;
-use unicode_width::UnicodeWidthStr;
-
-// ponytail: 列の状態と規則は 2.2/2.3 で break_lines_impl から使う。それまでは単体テストだけが読む。
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// 列の状態。Lua の表 { line, width, jump } と 1 対 1 に対応する。
-#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Column {
     /// 列の番号。最初の列が 1。
@@ -32,7 +29,6 @@ impl Default for Column {
 }
 
 /// 改行の規則（アクターの設定から作る）。
-#[cfg_attr(not(test), allow(dead_code))]
 pub struct BreakRule<'a> {
     /// `budoux` の並び。空なら改行を入れない（状態は進める）。
     pub widths: &'a [usize],
@@ -69,7 +65,6 @@ fn column_move(unit: &str) -> Option<ColumnMove> {
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 impl Column {
     /// 列の動きを当てる。どの動きも字数を 0 にする。
     /// budoux が入れた改行は `Next` を当ててから、字数に次の語のかけらの幅を入れる。
@@ -106,7 +101,6 @@ struct PlainChar<'a> {
     ch: char,
     trailing: &'a str,
     /// `trailing` の単位の列の動き（順に）。
-    #[cfg_attr(not(test), allow(dead_code))]
     moves: Vec<ColumnMove>,
 }
 
@@ -114,7 +108,6 @@ struct PlainChar<'a> {
 struct Tokens<'a> {
     leading: &'a str,
     /// `leading` の単位の列の動き（順に）。
-    #[cfg_attr(not(test), allow(dead_code))]
     leading_moves: Vec<ColumnMove>,
     chars: Vec<PlainChar<'a>>,
 }
@@ -198,77 +191,67 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
     }
 }
 
-/// Insert sakura script line breaks (`\n`) into text at natural Japanese
-/// word boundaries determined by budoux, respecting per-line width thresholds.
+/// budoux の改行を入れる。`column` を始めの状態として読み、終わりの状態に書き換える。
 ///
-/// Sakura script tags in the input are transparently preserved in the output
-/// at their original relative positions, but excluded from width calculations.
-///
-/// # Arguments
-/// * `input` - Input text, possibly containing sakura script tags
-/// * `widths` - Per-line width thresholds (CJK character widths).
-///   `widths[0]` for line 1, `widths[1]` for line 2, last value repeats for subsequent lines.
-///   Empty slice → return input unchanged.
-/// * `tag_regex` - Regex matching sakura script tags (`SAKURA_TAG_PATTERN`)
-/// * `parser` - budoux Japanese segmentation parser reference
+/// 先頭の単位の列の動きを当て、語を先頭から見て、語の頭で上限を超えるなら改行
+/// （`\n`）を入れて次の列へ進み、語の字の後ろの単位の列の動きを順に当てる。
+/// タグは字数に数えない。`rule.widths` が空なら語に分けず、入力をそのまま返して
+/// 列の状態だけ進める。
 pub fn break_lines_impl(
     input: &str,
-    widths: &[usize],
+    rule: &BreakRule,
+    column: &mut Column,
     tag_regex: &Regex,
     parser: &budouy::Parser,
 ) -> String {
-    if input.is_empty() || widths.is_empty() {
-        return input.to_string();
-    }
-
-    // Phase 1: Tokenize into plain chars with trailing tags
+    column.line = column.line.max(1);
     let tokens = tokenize_plain_chars(input, tag_regex);
+    for &m in &tokens.leading_moves {
+        column.apply(m, rule);
+    }
 
-    if tokens.chars.is_empty() {
+    if rule.widths.is_empty() || tokens.chars.is_empty() {
+        for pc in &tokens.chars {
+            column.width += UnicodeWidthChar::width_cjk(pc.ch).unwrap_or(0);
+            for &m in &pc.moves {
+                column.apply(m, rule);
+            }
+        }
         return input.to_string();
     }
 
-    // Phase 2: Extract plain text and segment with budoux
+    // 本文の字をつないで budoux で語に分ける
     let plaintext: String = tokens.chars.iter().map(|pc| pc.ch).collect();
     let words = parser.parse(&plaintext);
 
-    // Phase 3: Determine break positions using width thresholds
-    // break_positions stores char indices (in tokens.chars) where a line break
-    // should be inserted BEFORE that char.
+    // break_positions は、その字の前に改行を入れる tokens.chars の添字
     let mut break_positions = Vec::new();
-    let mut line_width: usize = 0;
-    let mut line_idx: usize = 0;
     let mut char_idx: usize = 0;
 
     for word in &words {
         let word_width = UnicodeWidthStr::width_cjk(word.as_str());
-        let threshold = widths[line_idx.min(widths.len() - 1)];
+        let word_len = word.chars().count();
 
-        if char_idx > 0 && line_width + word_width > threshold {
-            // Word doesn't fit — insert break before this word
-            // But only if the line already has content (don't break before first word)
-            if line_width > 0 {
-                break_positions.push(char_idx);
-                line_idx += 1;
-                line_width = word_width;
-            } else {
-                // Single word exceeds threshold — don't force-break, just continue
-                line_width += word_width;
-            }
-        } else {
-            line_width += word_width;
+        // 列に字があり、足すと上限を超えるなら語の前で割る（1 語で超えても割らない）
+        if char_idx > 0 && column.width > 0 && column.width + word_width > column.threshold(rule) {
+            break_positions.push(char_idx);
+            column.apply(ColumnMove::Next, rule);
         }
+        column.width += word_width;
 
-        char_idx += word.chars().count();
+        for pc in &tokens.chars[char_idx..char_idx + word_len] {
+            for &m in &pc.moves {
+                column.apply(m, rule);
+            }
+        }
+        char_idx += word_len;
     }
 
-    // Phase 4: Reconstruct output with line breaks
     let mut result = String::with_capacity(input.len() + break_positions.len() * 2);
     result.push_str(tokens.leading);
 
     let mut bp_idx = 0;
     for (i, pc) in tokens.chars.iter().enumerate() {
-        // Insert line break before this char if needed
         if bp_idx < break_positions.len() && i == break_positions[bp_idx] {
             result.push_str("\\n");
             bp_idx += 1;
@@ -294,6 +277,104 @@ mod tests {
         budouy::model::load_default_japanese_parser()
     }
 
+    /// 新しい状態・`\n`・飛んだ後の並び無しで呼ぶ（今の呼び出し口と同じ包み方）。
+    fn break_fresh(input: &str, widths: &[usize], re: &Regex, p: &budouy::Parser) -> String {
+        break_from(input, widths, &mut Column::default(), re, p)
+    }
+
+    fn break_from(
+        input: &str,
+        widths: &[usize],
+        column: &mut Column,
+        re: &Regex,
+        p: &budouy::Parser,
+    ) -> String {
+        let rule = BreakRule {
+            widths,
+            jump_widths: &[],
+            newline: r"\n",
+        };
+        break_lines_impl(input, &rule, column, re, p)
+    }
+
+    // --- 列の状態を受け取って返す (Requirement 1.4, 2.1, 2.2, 2.3, 3.2, 6.1) ---
+
+    fn col(line: usize, width: usize) -> Column {
+        Column {
+            line,
+            width,
+            jump: false,
+        }
+    }
+
+    #[test]
+    fn test_newline_tag_moves_to_next_width() {
+        // 今日は|いい|天気ですね。`\n` の後は 2 列目の 20 で数える
+        let mut c = Column::default();
+        let out = break_from(
+            r"今日は\nいい天気ですね",
+            &[4, 20],
+            &mut c,
+            &tag_regex(),
+            &parser(),
+        );
+        assert_eq!(out, r"今日は\nいい天気ですね");
+        assert_eq!(c, col(2, 14));
+    }
+
+    #[test]
+    fn test_clear_tag_moves_to_first_width() {
+        // 3 列目（20）から始めても、`\c` の後は先頭の 4 で数える
+        let mut c = col(3, 6);
+        let out = break_from(
+            r"\c今日はいい天気ですね",
+            &[4, 20],
+            &mut c,
+            &tag_regex(),
+            &parser(),
+        );
+        assert_eq!(out, r"\c今日は\nいい天気ですね");
+        assert_eq!(c, col(2, 14));
+    }
+
+    #[test]
+    fn test_jump_tag_resets_width_only() {
+        // `\_l` の後は字数だけ 0。列は 1 列目のまま（幅 4）
+        let mut c = Column::default();
+        let out = break_from(
+            r"今日は\_l[0,0]いい天気ですね",
+            &[4, 20],
+            &mut c,
+            &tag_regex(),
+            &parser(),
+        );
+        assert_eq!(out, r"今日は\_l[0,0]いい\n天気ですね");
+        assert_eq!(c, col(2, 10));
+    }
+
+    #[test]
+    fn test_empty_widths_returns_input_and_advances_column() {
+        let mut c = col(1, 3);
+        let input = r"\hあ\nい\_w[50]う\c\nab";
+        let out = break_from(input, &[], &mut c, &tag_regex(), &parser());
+        assert_eq!(out, input);
+        assert_eq!(c, col(2, 2));
+    }
+
+    #[test]
+    fn test_end_state_carries_into_next_call() {
+        let (re, p) = (tag_regex(), parser());
+        let mut c = Column::default();
+        assert_eq!(break_from("今日は", &[4, 20], &mut c, &re, &p), "今日は");
+        assert_eq!(c, col(1, 6));
+        // 持ち越した字数 6 で 1 列目（4）を越えているので、2 つ目の語の前で割る
+        assert_eq!(
+            break_from("いい天気ですね", &[4, 20], &mut c, &re, &p),
+            r"いい\n天気ですね"
+        );
+        assert_eq!(c, col(2, 10));
+    }
+
     // --- Test 1: Plain text line breaking ---
 
     #[test]
@@ -303,7 +384,7 @@ mod tests {
         // "今日はいい天気ですね" — budoux should find natural boundaries.
         // We use a narrow width to force at least one break.
         let input = "今日はいい天気ですね";
-        let result = break_lines_impl(input, &[6], &re, &p);
+        let result = break_fresh(input, &[6], &re, &p);
         // Should contain at least one \n and preserve all original chars
         assert!(result.contains("\\n"), "Expected line break in: {}", result);
         let plain: String = re.replace_all(&result, "").into_owned();
@@ -315,7 +396,7 @@ mod tests {
         let re = tag_regex();
         let p = parser();
         let input = "短い";
-        let result = break_lines_impl(input, &[20], &re, &p);
+        let result = break_fresh(input, &[20], &re, &p);
         assert_eq!(result, "短い");
     }
 
@@ -328,7 +409,7 @@ mod tests {
         // Example from requirements: こ\_w[50]れ\_w[50]は\_w[50]テ\_w[50]ス\_w[50]ト
         // Plain text: これはテスト (6 CJK chars = width 12), threshold 6 → break after ~3 chars
         let input = r"こ\_w[50]れ\_w[50]は\_w[50]テ\_w[50]ス\_w[50]ト";
-        let result = break_lines_impl(input, &[6], &re, &p);
+        let result = break_fresh(input, &[6], &re, &p);
         // Should have a \n somewhere, and all \_w[50] tags should remain
         assert!(result.contains("\\n"), "Expected line break in: {}", result);
         assert_eq!(
@@ -343,7 +424,7 @@ mod tests {
         let re = tag_regex();
         let p = parser();
         let input = r"\h\s[0]こんにちは世界";
-        let result = break_lines_impl(input, &[6], &re, &p);
+        let result = break_fresh(input, &[6], &re, &p);
         assert!(
             result.starts_with(r"\h\s[0]"),
             "Leading tags should be preserved: {}",
@@ -360,7 +441,7 @@ mod tests {
         // Build a long string that forces multiple lines
         // Use simple characters to be predictable
         let input = "私は今日学校へ行って友達と一緒に勉強をしました";
-        let result = break_lines_impl(input, &[4, 6], &re, &p);
+        let result = break_fresh(input, &[4, 6], &re, &p);
         // Should contain line breaks
         assert!(result.contains("\\n"), "Expected line breaks: {}", result);
         // Plain text should be preserved
@@ -374,7 +455,7 @@ mod tests {
     fn test_empty_input_returns_empty() {
         let re = tag_regex();
         let p = parser();
-        let result = break_lines_impl("", &[10], &re, &p);
+        let result = break_fresh("", &[10], &re, &p);
         assert_eq!(result, "");
     }
 
@@ -383,7 +464,7 @@ mod tests {
         let re = tag_regex();
         let p = parser();
         let input = "テスト文字列";
-        let result = break_lines_impl(input, &[], &re, &p);
+        let result = break_fresh(input, &[], &re, &p);
         assert_eq!(result, input);
     }
 
@@ -395,7 +476,7 @@ mod tests {
         let p = parser();
         // A word larger than threshold → should not be force-split
         let input = "超長い一語";
-        let result = break_lines_impl(input, &[2], &re, &p);
+        let result = break_fresh(input, &[2], &re, &p);
         // Plain text should be fully preserved
         let plain: String = re.replace_all(&result, "").into_owned();
         assert_eq!(plain, input);
@@ -407,7 +488,7 @@ mod tests {
         let p = parser();
         // "超超超超超超超超短い" — budoux should split, oversized first part then normal
         let input = "あいうえおかきくけこさしすせそ短い文";
-        let result = break_lines_impl(input, &[4], &re, &p);
+        let result = break_fresh(input, &[4], &re, &p);
         let plain: String = re.replace_all(&result, "").into_owned();
         assert_eq!(plain, input, "Plain text must be preserved");
     }
@@ -419,7 +500,7 @@ mod tests {
         let re = tag_regex();
         let p = parser();
         let input = r"あいう\nえおか";
-        let result = break_lines_impl(input, &[20], &re, &p);
+        let result = break_fresh(input, &[20], &re, &p);
         // With wide threshold, no extra breaks needed; existing \n should remain
         assert!(
             result.contains(r"\n"),
@@ -439,8 +520,8 @@ mod tests {
         let input = "私は今日学校へ行って友達と一緒に勉強をしました";
         // [4, 4] と [4, 4, 4] は最後の値が同じ (4) なので同一結果になること
         // widths[line_idx.min(widths.len()-1)] の実装を直接検証する
-        let result_len2 = break_lines_impl(input, &[4, 4], &re, &p);
-        let result_len3 = break_lines_impl(input, &[4, 4, 4], &re, &p);
+        let result_len2 = break_fresh(input, &[4, 4], &re, &p);
+        let result_len3 = break_fresh(input, &[4, 4, 4], &re, &p);
         assert_eq!(
             result_len2, result_len3,
             "[4,4] と [4,4,4] は等価であること（最後の値繰り返し）:\n{}\nvs\n{}",
@@ -454,9 +535,9 @@ mod tests {
         let p = parser();
         let input = "私は今日学校へ行って友達と一緒に勉強をしました";
         // [4, 4]: 全行 width=4 → 改行数多め
-        let result_narrow = break_lines_impl(input, &[4, 4], &re, &p);
+        let result_narrow = break_fresh(input, &[4, 4], &re, &p);
         // [4, 20]: 1行目 width=4、2行目以降 width=20 (繰り返し) → 改行数少なめ
-        let result_wide = break_lines_impl(input, &[4, 20], &re, &p);
+        let result_wide = break_fresh(input, &[4, 20], &re, &p);
         let breaks_narrow = result_narrow.matches("\\n").count();
         let breaks_wide = result_wide.matches("\\n").count();
         assert!(
@@ -517,7 +598,7 @@ mod tests {
             leader: 200,
         };
         let waited = insert_waits(&tokenizer.tokenize(input), &waits);
-        break_lines_impl(&waited, widths, tokenizer.tag_regex(), &parser())
+        break_fresh(&waited, widths, tokenizer.tag_regex(), &parser())
     }
 
     /// さくらスクリプトの規約どおり左から読み、表示される単位を返す。
@@ -576,7 +657,7 @@ mod tests {
     const CHARACTERIZATION_WIDTHS: [&[usize]; 4] = [&[4], &[4, 8], &[6], &[10, 12]];
 
     fn direct(input: &str, widths: &[usize]) -> String {
-        break_lines_impl(input, widths, &tag_regex(), &parser())
+        break_fresh(input, widths, &tag_regex(), &parser())
     }
 
     /// 数え方を直す前の出力を文字列のまま固定する。直した後も同じ文字列になること。
