@@ -142,7 +142,7 @@ crates/pasta_lua/
 - `crates/pasta_lua/src/runtime/runtime_config.rs` — builder `with_ffi(self, enabled: bool) -> Self` を足す（真なら `libs` に `"std_ffi"` を足す）。
 - `crates/pasta_lua/src/runtime/mod.rs` — `#[cfg(windows)] mod ffi_load;` を足す。
 - `crates/pasta_lua/src/runtime/module_registry.rs` — `setup_package_path` の searcher の設置の直後に、`#[cfg(windows)] ffi_load::install(lua, loader_context)?` を足す。doc コメントの「`package.cpath` は変更しない」はそのまま残し、`ffi.load` の置き換えを書き足す。
-- `crates/pasta_lua/Cargo.toml` — `[target.'cfg(windows)'.dependencies] windows-sys` に機能 2 つ、`[dev-dependencies]` に `cc = "1"`、`[target.'cfg(windows)'.dev-dependencies] windows-sys` に `Win32_Storage_FileSystem`（長パス無効の前提の確かめ用）。
+- `crates/pasta_lua/Cargo.toml` — `[target.'cfg(windows)'.dependencies] windows-sys` に機能 2 つ、`[dev-dependencies]` に `cc = "1"`、`[target.'cfg(windows)'.dev-dependencies] windows-sys` に `Win32_Storage_FileSystem` と `Win32_System_Registry`（長パス無効の前提の確かめ用）。
 - `Cargo.lock` — `pasta_lua` の依存に `cc` が 1 行増える。
 - `.github/workflows/build.yml` — 「Run tests」の後に、`LongPathsEnabled=0` にして FFI のテストを走らせる手順を足す。
 - `book/src/reference/pasta-toml.md` — `[loader] ffi` の 3 分類表の行・フルリファレンステンプレートの行・任意のメモリに触れる注意。
@@ -465,7 +465,7 @@ pub(super) fn load_path_form(path: &Path) -> Vec<u16>;
 **Implementation Notes**
 - Integration: 探索のフォルダは `install` のときに `absolute_search_paths()` から 1 回作り、`prepare` の閉包に持たせる。
 - Validation: `resolve.rs` の単体テスト（拡張子の規則・相対の判定・`\foo`・`C:foo` が基点の外へ出ないこと・往復の判定・接頭辞の付く長さ）。
-- Risks: `\\?\` の形と `LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR` の組み合わせ、およびその下での依存 DLL の解決は未計測（LongPathCiStep で確かめる。決定事項の 3）。
+- Risks: `\\?\` の形と `LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR` の組み合わせ、およびその下での依存 DLL の解決は、`LongPathsEnabled=0` の CI（run 39141129339、x86・x64）で読めることを確かめた（LongPathCiStep が毎回見張る。決定事項の 3）。
 
 #### Win32DllLoader
 
@@ -527,7 +527,7 @@ impl Drop for DllPins { fn drop(&mut self); }
 **Implementation Notes**
 - Integration: `pasta_lua/Cargo.toml` の windows-sys に機能を 2 つ足す。`unsafe` はこのファイルに閉じ込め、各呼び出しに SAFETY のコメントを付ける。
 - Validation: `collision_test.rs`・`lifetime_test.rs`・`load_test.rs`。
-- Risks: 確かめ（`GetModuleHandleW`）と元の `ffi.load` の `LoadLibraryExA` の間に、別のスレッドが同名の別 DLL を読む競合は防がない（同じ SSP の別のゴーストが同じ瞬間に同名の DLL を読む場合だけ。既知の制限として書く）。同じファイルを別の綴り（8.3 名と長い名前）で読んだときにローダーが同じハンドルを返すかは未計測（決定事項の 2）。
+- Risks: 確かめ（`GetModuleHandleW`）と元の `ffi.load` の `LoadLibraryExA` の間に、別のスレッドが同名の別 DLL を読む競合は防がない（同じ SSP の別のゴーストが同じ瞬間に同名の DLL を読む場合だけ。既知の制限として書く）。同じファイルを別の綴り（8.3 名と長い名前）で読んだときにローダーが同じハンドルを返すことは、`collision_test.rs` の 8.3 名のテストで確かめた（開発機と CI。決定事項の 2 のファイルの識別子での比較は足していない）。
 
 ### tests・CI・docs
 
