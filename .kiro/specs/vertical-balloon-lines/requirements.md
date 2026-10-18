@@ -55,26 +55,28 @@ budoux_newlines = 1.8   # → \n[180]。既定は 1.0（今のまま \n）
 - **選択肢の後の改行の幅は、`[ghost]` のキーにする。** 既定は 1.0。汎用の機能で、ぱすたは使わない。
 - **縦書きのバルーンそのもの・左の枠へ飛ぶ単語（`＠左`）は、ゴースト側が持つ。**
 
-### 仮の前提（要件ディスカッションで決める）
+### 要件ディスカッションで決めたこと（2026-10-18 開発者の承認・全議題を推奨案で確定）
 
-brief が開いたままにした論点は、推奨案を仮の前提として要件に書いた。各要件の【仮】の印が、その前提に当たる。理由と他の案は `research.md` の「要件ディスカッションへの申し送り」にある。
+brief が開いたままにした論点は、次のとおり決めた。各要件の【A】〜【G】の印が、その決定に当たる。理由と退けた案は `research.md` の「要件ディスカッションへの申し送り」にある。
 
-- **【仮 A】数え直すタグ**: `\n`・`\n[…]`（`\n[half]` を含む）・引数の無い `\c`・`\_l[…]` の 4 種。`\x`・`\x[noclear]`・`\_q`・引数つきの `\c[…]`・スコープの切り替え（`\0`・`\1`・`\p[…]` など）では数え直さない。`\x` を外すのは、pasta の選択肢の配置が「引数の無い `\c` だけを吹き出しの消去に数える」と決めていて（`grammar/block-structure.md`）、規則を 1 つにそろえるためである。
-- **【仮 B】`\_l` の後の幅**: アクター設定に、飛んだ後に使う別の幅の並び `budoux_jump`（仮の名前）を書けるようにする。書かなければ、`\_l` の所で字数だけを 0 に戻し、列の番号は変えない。
-- **【仮 C】トークンをまたいだ字数**: 1 回の出力の中では、吹き出しごとに、列の番号・字数・どちらの幅の並びかを持ち越す。pasta が出す区切り（段落・選択肢の前後・`act:newline()`）は次の列へ、`act:clear()` は最初の列へ進める。出力をまたいでは持ち越さない。
-- **【仮 D】選択肢の後の改行の幅**: キーの名前は `after_choice_newlines`（仮）。選択肢の後の選択肢の前と、選択肢の後の台詞の前の両方に効かせる。
-- **【仮 E】倍率 1.0 の出力**: `budoux_newlines`・`after_choice_newlines` が 1.0 のときは、`\n[100]` ではなく今と同じ `\n` を出す。
-- **【仮 F】出力の変化の扱い**: 数え直しの直しで、budoux を使うゴーストの出力が変わることを、不具合の直しとして受け入れる。今の動きに戻す切り替えは設けない。変わることはリリースノートとマニュアルに書く。
-- **【仮 G】`break_lines(text, widths)`**: 数え直しは同じに効かせる。倍率と飛んだ後の幅の並びは足さない（今のまま `\n` を入れる）。
+- **キーの名前**: `budoux_newlines`・`budoux_jump`（アクター設定）、`after_choice_newlines`（`[ghost]`）。
+- **値の検査**: 数値でない値は、今の `budoux`・`choice_newlines` と同じ扱いにする。`pasta_check validate` には検査を足さない。
+- **【A】数え直すタグ**: `\n`・`\n[…]`（`\n[half]` を含む）・引数の無い `\c`・`\_l[…]` の 4 種。`\x`・`\x[noclear]`・`\_q`・引数つきの `\c[…]`・スコープの切り替え（`\0`・`\1`・`\p[…]` など）では数え直さない。`\x` を外すのは、pasta の選択肢の配置が「引数の無い `\c` だけを吹き出しの消去に数える」と決めていて（`grammar/block-structure.md`）、規則を 1 つにそろえるためである。
+- **【B】`\_l` の後の幅**: アクター設定に、飛んだ後に使う別の幅の並び `budoux_jump` を書けるようにする。書かなければ、`\_l` の所で字数だけを 0 に戻し、列の番号は変えない。
+- **【C】トークンをまたいだ字数**: 1 回の出力の中では、吹き出しごとに、列の番号・字数・どちらの幅の並びかを持ち越す。pasta が出す区切り（段落・選択肢の前後・`act:newline()`）は次の列へ、`act:clear()` は最初の列へ進める。出力をまたいでは持ち越さない。
+- **【D】選択肢の後の改行の幅**: キーの名前は `after_choice_newlines`。選択肢の後の選択肢の前と、選択肢の後の台詞の前の両方に効かせる。
+- **【E】倍率 1.0 の出力**: `budoux_newlines`・`after_choice_newlines` が 1.0 のときは、`\n[100]` ではなく今と同じ `\n` を出す。
+- **【F】出力の変化の扱い**: 数え直しの直しで、budoux を使うゴーストの出力が変わることを、不具合の直しとして受け入れる。今の動きに戻す切り替えは設けない。変わることはリリースノートとマニュアルに書く。
+- **【G】`break_lines(text, widths)`**: 数え直しは同じに効かせる。倍率と飛んだ後の幅の並びは足さない（今のまま `\n` を入れる）。
 
 ## Boundary Context
 
 - **In scope**:
   - budoux が入れる改行の幅（アクター設定の `budoux_newlines`）
   - 台詞の中の列を動かすタグの所での budoux の数え直し（作者が書いたもの・単語や関数が返したもの）
-  - `\_l` で飛んだ後の幅（【仮 B】）
-  - 1 回の出力の中の、トークンをまたいだ字数の持ち越し（【仮 C】）
-  - 選択肢の後の改行の幅（`[ghost]` のキー。【仮 D】）
+  - `\_l` で飛んだ後の幅（【B】）
+  - 1 回の出力の中の、トークンをまたいだ字数の持ち越し（【C】）
+  - 選択肢の後の改行の幅（`[ghost]` のキー。【D】）
   - 今の出力を変えない範囲と、変わる場所の記録
   - テスト、マニュアル（`reference/pasta-toml.md`・`lua/modules/pasta-sakura-script.md`・`internals/talk-output.md` と、`[ghost]` のキーの一覧を載せる章・選択肢の配置の表を載せる章）、スキル references の再生成
 - **Out of scope**:
@@ -84,11 +86,11 @@ brief が開いたままにした論点は、推奨案を仮の前提として�
   - アクターごとの表示の装い（`actor-display-style`）
   - 縦書きのバルーンそのもの（ゴースト側の descript）、左の枠へ飛ぶ単語（ゴースト側の `＠左`）
   - SSP の自動折り返し（バルーンの `validrect` などで SSP が折り返す分）、ルビ・縦中横
-  - 台詞の中に書いたスコープの切り替え（`\0`・`\1`・`\p[…]`・`\h`・`\u`）・バルーンの切り替え（`\b[…]`）の後の数え方（【仮 A】）
+  - 台詞の中に書いたスコープの切り替え（`\0`・`\1`・`\p[…]`・`\h`・`\u`）・バルーンの切り替え（`\b[…]`）の後の数え方（【A】）
   - `pasta_check validate` での新しいキーの検査（今の `budoux`・`spot_newlines` も検査していないのに合わせる）
 - **Adjacent expectations**:
   - ベースウェア（SSP）は、`\n[N]` を「行の高さの N% の改行」として扱い、縦書きのバルーンでは改行を次の列として描く。本 spec はこの動きを前提にし、変えない
-  - `actor-display-style` は、出力の組み立て（`sakura_builder.lua`）とマニュアルの `reference/pasta-toml.md` を共有する。【仮 C】を採るなら、実装は 1 本ずつ入れる（ロードマップの約束）
+  - `actor-display-style` は、出力の組み立て（`sakura_builder.lua`）とマニュアルの `reference/pasta-toml.md` を共有する。【C】を採ったので、実装は 1 本ずつ入れる（ロードマップの約束）
   - スキル references は、後から入る側が再生成する
 
 ## Requirements
@@ -100,7 +102,7 @@ brief が開いたままにした論点は、推奨案を仮の前提として�
 #### Acceptance Criteria
 1. Where アクター設定に `budoux` と `budoux_newlines` が書かれている, the pasta shall そのアクターの台詞に budoux が入れる改行を `\n[N]` にする。`N` は値を 100 倍して小数点以下を切り捨てた整数とする（`spot_newlines` と同じ換算）。
 2. Where `budoux_newlines` が書かれていない, the pasta shall budoux が入れる改行を今と同じ `\n` にする。
-3. Where `budoux_newlines` の値が 1.0 である, the pasta shall budoux が入れる改行を `\n` にする（`\n[100]` にしない。【仮 E】）。
+3. Where `budoux_newlines` の値が 1.0 である, the pasta shall budoux が入れる改行を `\n` にする（`\n[100]` にしない。【E】）。
 4. Where アクター設定に `budoux` が無い、または空の配列である, the pasta shall `budoux_newlines` があっても、そのアクターの台詞に改行を入れない。
 5. The pasta shall `budoux_newlines` を、budoux が入れる改行だけに効かせる。作者が台詞に書いた改行・単語や関数が返した改行・pasta が出す段落や選択肢の区切りの幅は変えない。
 6. If `budoux_newlines` の値が数値でない, the pasta shall `budoux` の配列に整数にできない要素があるときと同じに、その台詞の変換を失敗させる。
@@ -120,7 +122,7 @@ brief が開いたままにした論点は、推奨案を仮の前提として�
 5. When 列を動かすタグの直後に語が続く, the pasta shall その語の前に改行を入れない（列の頭に空の列を作らない）。
 6. When 列を動かすタグが、budoux が 1 語とした区切りの途中にある, the pasta shall タグの前と後ろを別の列として数え、タグの後ろの部分を新しい列の頭として扱う。
 7. The pasta shall 列を動かすタグの前の字を、今と同じ規則（全角を 2・半角を 1 と数え、タグは数えない）で数え、その列の幅を超える語の前に改行を入れる。
-8. The pasta shall `\x`・`\x[noclear]`・`\_q`・引数つきの `\c[…]`・ウェイト・表情などの列を動かさないタグでは、数え直さない（【仮 A】）。
+8. The pasta shall `\x`・`\x[noclear]`・`\_q`・引数つきの `\c[…]`・ウェイト・表情などの列を動かさないタグでは、数え直さない（【A】）。
 9. The pasta shall エスケープした `\\n` と、タグをそのまま表示する囲み（`\_?…\_?`・`\_!…\_!`）の中の `\n`・`\c`・`\_l` を、列を動かすタグとして読まない。
 
 ### Requirement 3: `\_l` で飛んだ後の幅
@@ -128,7 +130,7 @@ brief が開いたままにした論点は、推奨案を仮の前提として�
 **Objective:** As a ゴースト作者, I want `\_l` で飛んだ先の枠の列の幅を、別の並びで書きたい, so that 左の枠の「20,14,14,14」のように、右の枠と違う列の並びを budoux に守らせられる
 
 #### Acceptance Criteria
-1. Where アクター設定に `budoux_jump`（仮の名前。【仮 B】）が書かれている, when 台詞の中に `\_l[…]` がある, the pasta shall そのタグの後ろの列に `budoux_jump` の先頭の値を使い、続く `\n`・`\n[…]` のたびに次の値を使う（最後の値は、それ以降の列で繰り返す）。
+1. Where アクター設定に `budoux_jump`（【B】）が書かれている, when 台詞の中に `\_l[…]` がある, the pasta shall そのタグの後ろの列に `budoux_jump` の先頭の値を使い、続く `\n`・`\n[…]` のたびに次の値を使う（最後の値は、それ以降の列で繰り返す）。
 2. Where `budoux_jump` が書かれていない、または空の配列である, when 台詞の中に `\_l[…]` がある, the pasta shall 列の番号を変えずに、その列の字数を 0 に戻す（幅の並びは `budoux` のまま、同じ値を使う）。
 3. While `budoux_jump` の並びを使っている, when 引数の無い `\c` がある, the pasta shall `budoux` の並びの先頭へ戻る。
 4. While `budoux_jump` の並びを使っている, when もう一度 `\_l[…]` がある, the pasta shall `budoux_jump` の並びの先頭から使い直す。
@@ -140,7 +142,7 @@ brief が開いたままにした論点は、推奨案を仮の前提として�
 
 **Objective:** As a ゴースト作者, I want 台詞の途中に表情などを挟んでも、同じ列の字数を budoux が引き継いでほしい, so that 表情を替えたところから数え直して列をはみ出し、SSP が語の途中で折り返すことがない
 
-（【仮 C】の前提で書いた。「1 回の出力」は、pasta がベースウェアへ返すさくらスクリプト 1 本を指す。）
+（【C】の決定に基づく。「1 回の出力」は、pasta がベースウェアへ返すさくらスクリプト 1 本を指す。）
 
 #### Acceptance Criteria
 1. While 1 回の出力の中で、同じ吹き出しに続けて台詞を出している, when 台詞と台詞の間に、字を表示しない指定（表情の切り替え・ウェイト・`!select` の制限時間）だけがある, the pasta shall 後ろの台詞を、前の台詞の終わりの列・字数・幅の並びを引き継いで数える。
@@ -157,9 +159,9 @@ brief が開いたままにした論点は、推奨案を仮の前提として�
 **Objective:** As a ゴースト作者, I want 選択肢の後の改行の幅を倍率で指定したい, so that pasta が自分で出す改行（段落の区切り・選択肢の前・budoux の折り返し・選択肢の後）が、すべて倍率で調整できる
 
 #### Acceptance Criteria
-1. Where `pasta.toml` の `[ghost]` に `after_choice_newlines`（仮の名前。【仮 D】）が書かれている, when 同じ吹き出しで選択肢の後に選択肢を出す, the pasta shall 2 つ目の選択肢の直前の区切りを `\n[N]` にする。`N` は値を 100 倍して小数点以下を切り捨てた整数とする。
-2. Where `after_choice_newlines` が書かれている, when 同じ吹き出しで選択肢の後に台詞を出す, the pasta shall 台詞の直前の区切りを、1 と同じ `\n[N]` にする（【仮 D】）。
-3. Where `after_choice_newlines` が書かれていない、または値が 1.0 である, the pasta shall 1・2 の区切りを今と同じ `\n` にする（【仮 E】）。
+1. Where `pasta.toml` の `[ghost]` に `after_choice_newlines`（【D】）が書かれている, when 同じ吹き出しで選択肢の後に選択肢を出す, the pasta shall 2 つ目の選択肢の直前の区切りを `\n[N]` にする。`N` は値を 100 倍して小数点以下を切り捨てた整数とする。
+2. Where `after_choice_newlines` が書かれている, when 同じ吹き出しで選択肢の後に台詞を出す, the pasta shall 台詞の直前の区切りを、1 と同じ `\n[N]` にする（【D】）。
+3. Where `after_choice_newlines` が書かれていない、または値が 1.0 である, the pasta shall 1・2 の区切りを今と同じ `\n` にする（【E】）。
 4. When 話し手が切り替わって、選択肢を最後に出した吹き出しへ戻り、台詞を出す, the pasta shall 今と同じく `spot_newlines` の区切りだけを出し、`after_choice_newlines` の区切りを重ねない。
 5. The pasta shall `after_choice_newlines` の値の換算と、数値でない値の扱いを、`choice_newlines` と同じにする。
 6. Where `pasta.toml` に `after_choice_newlines` が書かれていない, the pasta shall `[ghost]` の他のキーと同じに既定値（1.0）を補い、Lua から `@pasta_config` で既定値が読めるようにする。
@@ -172,10 +174,10 @@ brief が開いたままにした論点は、推奨案を仮の前提として�
 #### Acceptance Criteria
 1. Where アクター設定に `budoux` を書いていないゴーストである, the pasta shall どの台詞の出力も今と同じにする（`after_choice_newlines` を書いた場合の選択肢の後の区切りを除く）。
 2. Where `budoux` を使い、`budoux_newlines`・`budoux_jump`・`after_choice_newlines` を書いていないゴーストである, the pasta shall 列を動かすタグを含まず、pasta の区切りや字を表示しない指定を間に挟まない台詞の出力を、今と同じにする。
-3. Where `budoux` を使うゴーストである, the pasta shall Requirement 2・3・4 の数え直しで出力が変わることを、不具合の直しとして扱い、今の数え方に戻す設定を設けない（【仮 F】）。
+3. Where `budoux` を使うゴーストである, the pasta shall Requirement 2・3・4 の数え直しで出力が変わることを、不具合の直しとして扱い、今の数え方に戻す設定を設けない（【F】）。
 4. The pasta shall budoux の語の区切り方、1 語だけで幅を超える列の扱い（無理に割らない）、出力の先頭の語の前に改行を入れないことを、今と同じにする。
 5. The pasta shall `@pasta_sakura_script` の `talk_to_script(actor, talk)` を、今と同じ 2 つの引数で呼べるようにし、その呼び方では最初の列の頭から数える。
-6. The pasta shall `break_lines(text, widths)` に Requirement 2 の数え直しを同じに当て、改行には今と同じ `\n` を入れる（【仮 G】）。
+6. The pasta shall `break_lines(text, widths)` に Requirement 2 の数え直しを同じに当て、改行には今と同じ `\n` を入れる（【G】）。
 7. The pasta shall hello-pasta と、既存の期待値ファイル（スナップショット・期待値の文字列）が、budoux を設定していない辞書について、そのまま通ることを保つ。
 8. The 本 spec の記録 shall 出力が変わる場所（列を動かすタグの後・表情などを挟んだ台詞・pasta の区切りの後で、幅の並びが先頭に戻らなくなること）を、リリースノートとマニュアルに書く。
 
