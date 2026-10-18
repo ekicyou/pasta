@@ -208,6 +208,18 @@ test('findGhostMaster は祖先の ghost/master を返し、無ければ undefin
   assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/ghost/master')), undefined);
 });
 
+test('findGhostMaster は大文字・小文字を区別せず、届いた綴りのまま返す', () => {
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/Ghost/Master/dic/a.pasta'))?.path, '/ws/Ghost/Master');
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/GHOST/master/pasta.toml'))?.path, '/ws/GHOST/master');
+  // 入れ子ではいちばん近いもの
+  assert.strictEqual(
+    findGhostMaster(vscode.Uri.file('/ws/ghost/master/dic/Ghost/MASTER/x.pasta'))?.path,
+    '/ws/ghost/master/dic/Ghost/MASTER'
+  );
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/Ghost/dic/a.pasta')), undefined);
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/MASTER/Ghost/a.pasta')), undefined);
+});
+
 test('一覧は再帰・最上位の profile に入らず・リンクを含めず、中身は厳格な UTF-8 で読んで区別する', async () => {
   mock.resetFakeFs();
   setOpenDocuments([]);
@@ -453,9 +465,9 @@ function save(path: string): void {
   mock.didSaveTextDocumentEmitter.fire({ uri: vscode.Uri.file(path) });
 }
 
-test('見張りのパターンは ghost/master の配下の .pasta・.lua', () => {
+test('見張りのパターンは **/* で、拡張の側で絞る', () => {
   const { gv, watcher } = newRegistered();
-  assert.strictEqual(watcher.globPattern, '**/ghost/master/**/*.{pasta,lua}');
+  assert.strictEqual(watcher.globPattern, '**/*');
   gv.dispose();
   assert.strictEqual(watcher.disposed, true);
 });
@@ -544,6 +556,87 @@ test('走行中に来たら、終わった後に 1 回だけ走らせる', async
   await sleep(DELAY * 3);
   assert.strictEqual(masters.length, 2, '終わった後に 1 回だけ');
   assert.strictEqual(running, 0);
+  gv.dispose();
+});
+
+test('大文字・小文字の混じった ghost/master の配下の .pasta・.lua の作成・削除で走る', async () => {
+  const { gv, masters, watcher } = newRegistered();
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/Ghost/Master/dic/a.lua'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/Ghost/Master']);
+
+  masters.length = 0;
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/ghost/MASTER/dic/B.PASTA'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/MASTER']);
+
+  masters.length = 0;
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/ghost/MASTER/dic/B.PASTA'));
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/Ghost/Master/dic/a.lua'));
+  await sleep(DELAY * 3);
+  assert.strictEqual(masters.length, 1, '同じゴーストなので 1 回に束ねる');
+  gv.dispose();
+});
+
+test('readme.txt・ghost/master の外の作成・削除では走らない', async () => {
+  const { gv, masters, watcher } = newRegistered();
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/Ghost/Master/readme.txt'));
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/ghost/master/dic/notes.md'));
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/dic/a.pasta'));
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/Ghost/b.lua'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, []);
+  gv.dispose();
+});
+
+test('a.PASTA・直下の PASTA.TOML の保存で走り、dic/pasta.toml の保存では走らない', async () => {
+  const { gv, masters } = newRegistered();
+  save('/ws/Ghost/Master/dic/a.PASTA');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/Ghost/Master']);
+
+  masters.length = 0;
+  save('/ws/Ghost/Master/PASTA.TOML');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/Ghost/Master']);
+
+  masters.length = 0;
+  save('/ws/Ghost/Master/dic/pasta.toml');
+  save('/ws/Ghost/Master/dic/PASTA.TOML');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, []);
+  gv.dispose();
+});
+
+test('綴りの違う 2 つの起動は 1 回の検査にまとまり、診断が二重にならない', async () => {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  // 大文字・小文字を区別しないファイルシステムの代わりに、両方の綴りに置く
+  mock.setFakeFile('/ws/ghost/master/dic/a.pasta', '');
+  mock.setFakeFile('/ws/Ghost/Master/dic/a.pasta', '');
+  const bridge = new FakeBridge();
+  bridge.report = { findings: [finding('call-target-missing', 'warning', 'dic/a.pasta', 1, 1, 'x')], stats: EMPTY_STATS };
+  const gv = new GhostValidator(bridge, vscode.window.createOutputChannel('Pasta Language'), DELAY);
+  const col = mock.createdDiagnosticCollections[mock.createdDiagnosticCollections.length - 1];
+  const masters: string[] = [];
+  const original = gv.validate.bind(gv);
+  gv.validate = (master: vscode.Uri) => {
+    masters.push(master.path);
+    return original(master);
+  };
+  gv.register();
+
+  save('/ws/Ghost/Master/dic/a.pasta');
+  save('/ws/ghost/master/dic/a.pasta');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/master'], '最後の起動の綴りで 1 回');
+  assert.strictEqual(col.size, 1);
+
+  // 別の綴りで検査し直しても、前の綴りの診断は残らない
+  save('/ws/Ghost/Master/dic/a.pasta');
+  await sleep(DELAY * 3);
+  assert.strictEqual(masters.length, 2);
+  assert.strictEqual(col.size, 1);
   gv.dispose();
 });
 

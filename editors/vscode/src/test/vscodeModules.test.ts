@@ -763,7 +763,7 @@ test('word-ref decorator re-applies on active-editor change and document edits',
 const TOGGLE_COMMAND = 'pasta.debug.toggleSourcePresentation';
 const TOGGLE_EVENT = 'pasta/sourcePresentation';
 
-const GHOST_WATCH_GLOB = '**/ghost/master/**/*.{pasta,lua}';
+const GHOST_WATCH_GLOB = '**/*';
 
 function ghostValidatorCreated(fromCollection: number, fromWatcher: number): { collections: number; watchers: number } {
   return {
