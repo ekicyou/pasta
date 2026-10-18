@@ -300,6 +300,16 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - **`vertical-balloon-lines`（spec。2026-10-18 に直接実装の候補「budoux の改行の幅」から格上げ）**: budoux が入れる改行の幅（`budoux_newlines`）、列を動かすタグ（`\n`・`\n[…]`・`\c`・`\_l[…]`）の所で budoux が数え直すこと、選択肢どうしの間の改行の幅（`[ghost]` のキー、既定 1.0。汎用の機能。ぱすたは使わない）。budoux は自分で入れた改行しか知らず、作者が書いた `\n`・`\c` の後も前の列の字数を数え続ける（横書きでも起きている今の不具合）。方式は「budoux がタグを見て数え直す」（`act:budoux_reset()` のような明示の手段は採らない）。左の枠の短い列（`\_l` の後の幅）とトークンをまたいだ字数は、要件定義で決める。要件定義は Opus。`actor-display-style` とは `sakura_builder.lua`（選択肢どうしの間）を共有するので、同じウェーブに置かない。
 - **左の枠へ飛ぶ `\_l`**: 飛ぶのは単語（ゴースト側の `＠左`）で足りる。budoux の数え直しは `vertical-balloon-lines` が持つ。
 
+### 0.4.1 の後に届いた不具合（2026-10-18 起票）
+
+v0.4.1 を出した後に、「ぱすた開発」セッションが実機で見つけて知らせてきた 2 件。どちらも致命的でない。spec にしたのは 1 本で、版は開発者が決める（推奨は 0.4.2）。もう 1 件は、表示の誤りが無いと分かり、取り下げた。
+
+- **`talk-grapheme-clusters`（spec）**: 自動ウェイトと budoux の改行が、コードポイントごとに台詞を切る。組み合わせの絵文字（`🙆‍♀️`・`✌️`）の途中に `\_w` が入り、縦書きのバルーンで絵文字が割れて描かれる。`chars_*` の組み合わせの絵文字も一致しない。根は `sakura_script/tokenizer.rs` の 1 コードポイントずつの切り出しにある。`wait_inserter.rs`・`line_breaker.rs` も合わせて、書記素クラスタ単位にする。推奨は `unicode-segmentation` を足すこと。`sakura_builder.lua` は触らない見込み。
+- **着せ替えの復旧が前のパーツを出す件（取り下げ）**: 起票したが（`dressup-restore-stale-parts`）、同じ日に取り下げた（2026-10-18 開発者の決定「ぱすた側が必要としていないなら取り下げ」）。
+  - ログの調べ直しで、表示が壊れた実例は無いと分かった。腕が残る症状は推測だったと、報告の側が訂正した。
+  - ゴースト側は、復旧の出力が短く済むので、`,0` の明示の OFF を残す。
+  - 残る粗さは、バックログの「着せ替えの復旧の出力の膨らみ」に書いた。
+
 ## リリース（`release` スキル）
 
 リリースの CI 化（`release-ci`）、リリース手順（spec `release-workflow`）の書き換え、CI での初回のリリース（v0.3.8）とその後片付けは、2026-10-10 までにすべて済んだ。タグ `vX.Y.Z` の push だけで公開まで進む。記録は `.kiro/specs/completed/release-workflow/first-ci-release.md` と、同じフォルダの `design.md` にある。手順は 2026-10-11 に `release` スキル（`.claude/skills/release/`）へ移し、spec は完了にした。手順を直すときは、スキルを直す。**残るのは、失敗した job の再実行の読み方の確認である**（v0.3.8 も v0.4.0（2026-10-17、run 39024925990）も失敗が起きなかったので未確認。失敗が起きたリリースで確かめる）。
@@ -346,6 +356,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [x] actor-display-style -- アクターごとの表示の装い（文字の色など）を pasta.toml で決め、スポットが替わったときと同じスポットで話者が替わったときに出し入れする。1 つのスポットを複数のアクターで共有する形を正式に支える（窓際のぱすたさんのシェルの無い相手役。2026-10-18 起票）。0.4.1 に入れる。`sakura_builder.lua` を共有する `novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link` と同じウェーブに置かない。Dependencies: none
 - [x] vertical-balloon-lines -- 縦書きのバルーンの列の扱い。budoux が入れる改行の幅（`budoux_newlines`）、列を動かすタグ（`\n`・`\n[…]`・`\c`・`\_l[…]`）の所での budoux の数え直し（作者が書いた `\n`・`\c` の後も数え続ける今の不具合の直しを含む）、選択肢どうしの間の改行の幅（窓際のぱすたさん。2026-10-18 起票、直接実装の候補から格上げ）。0.4.1 に入れる。`sakura_builder.lua` を共有する `actor-display-style` と同じウェーブに置かない。Dependencies: none
 - [ ] lua-cmodule-robustness -- C の Lua 拡張モジュール（DLL）の `require` を、深いパス・ANSI に無い文字を含むフォルダでも読めるようにする。LuaJIT は改造せず、`package.loaders[3]`・`[4]`・`package.loadlib` を Rust 側で差し替え（`LoadLibraryExW`＋隣の依存 DLL の解決）、`package.cpath` の相対パスは pasta.dll のフォルダを基点にする（`lua-require-robustness` の続き。2026-10-18 起票）。0.4.2 に入れる（2026-10-18 開発者の決定）。Dependencies: none
+- [ ] talk-grapheme-clusters -- 自動ウェイト・`chars_*` の判定・budoux の改行を、コードポイントでなく書記素クラスタ単位にする。組み合わせの絵文字の途中に `\_w` や改行を入れない（「ぱすた開発」セッションの実機の報告。2026-10-18 起票）。版は未定（推奨 0.4.2）。Dependencies: none
 
 ## Existing Spec Updates
 
@@ -393,6 +404,10 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - 辞書の検査の広げ方（2026-10-17 棚卸、`pasta-check-dic-validate` の範囲外）— 単語参照の検査と、Lua の中身の検査。使う人の事例が出たら起票する。
 - areka が撫で・つつきのイベント（`OnMouseMove`・`OnMouseDoubleClick` など）を SSP と同じ形で送るか（2026-10-17 棚卸、`touch-poke-shortcuts` の範囲外）— 確かめていない。0.5.0 で `novel-areka-contract` の依頼に要るなら、そこで確かめる。
 - 止まるエラーの表記の粗さ（2026-10-17 棚卸、`runtime-error-balloon` の実装メモ「既知の粗さ」）— 同じ場面の中で `restore_scene` の後に止まると（アクターの単語の処理など）、`＊グローバル名` だけが出て、場所とローカル名が出ない。作者が `pcall` で失敗を飲み込み、同じ要求の中で止まると、古い場面の名前が出ることがある。困った事例が出たら起票する。
+- 着せ替えの復旧の出力の膨らみ（2026-10-18、`dressup-restore-stale-parts` を取り下げたときの残り）。見た目は壊れない。
+  - `shiori/appearance.lua` は、アクターが着けたことのあるパーツの ON を、カテゴリごとに全部記録する。復旧のたびに、それを記録の順に出し直す（複数選択できないカテゴリでは、最後の 1 つが残る）。
+  - 次の行の先頭の bind はパーツ単位で省くので、復旧の途中の見た目は古いパーツになる。間にウェイトは入らない。
+  - 直すなら、着けたときに同じカテゴリのほかの ON を記録から外し、`multiple` のカテゴリだけを宣言で外す。作者が困った事例が出たら起票する。
 - バルーンが画面の左端で折り返るとき・縦に長いときの見え方（2026-10-17 棚卸、`getting-started-screenshots` の調査メモ。`hello-pasta-shell-art` からの持ち越し）— 実機で確かめていない。
 - 並列負荷で時々落ちる TCP のテスト（2026-10-07 棚卸、`act-token-grouping-fix`・`scene-identity-format` の実装メモ）— `runtime_toggle_e2e_*`・`hook_panic_*`。
 - マニュアルのメニューのテストが持つ mdBook の写し（2026-10-10 棚卸、`manual-claudia-theme` の実装メモ）— `book/tools/theme-menu-test.mjs` は、mdBook 0.5.4 の `book.js` のキー操作の処理を写して持つ。mdBook の版を上げるときに合わせる（CI は 0.5.3 に固定）。
