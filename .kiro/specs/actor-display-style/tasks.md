@@ -102,3 +102,8 @@
 
 ## Implementation Notes
 - 3.1: pasta_shiori の scene_kick_preempt_e2e_test は時々落ちる（hello-pasta の ＊会話 が ＄％baseware.name＝get_property を乱数で選ぶと callback timeout）。add05022 以降の既存の不安定さで、この spec の変更とは無関係。
+- 完了時にその場で解決: 先に main へ入った vertical-balloon-lines（PR#144）と sakura_builder.lua・そのテスト・startup_test・talk-output.md・pasta-toml.md がぶつかった。列の状態（column）と装いの状態（style）の両方を emit_inner_token に渡す形にまとめ、put と put_raw の選び分けは装いを差し込む前の文字列で決めるようにした。merge 後の cargo test --all・clippy・fmt・luacheck・マニュアルの検査はすべて通った。
+- 完了時にその場で解決: vertical-balloon-lines からの申し送り（brief.md）の論点への答え。装いのタグは改行を出さないので put_break は通らない。話者の切り替えの装いのタグは tracking_buffer の put を通る。字を出すトークンは足していない。
+- 完了時にその場で解決: 3.1 の時々落ちるテストは、main の a88b6c64 で直っていた（取り込み済み）。
+- 申し送り: sakura_builder.lua を共有する novel-talk-flow・cue-command-runtime・novel-checkpoint-rollback・scene-anchor-link の brief.md に、装いの出し入れの申し送りを足した（どれも brief の段）。
+- 完了時にその場で解決: Internals Sync Gate で、registry-search.md の pasta_core の型の表に ActorFont の行が無いことが分かった。行を足した。
