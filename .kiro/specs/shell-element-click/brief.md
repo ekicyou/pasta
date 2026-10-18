@@ -131,3 +131,8 @@
   - 「前方一致… 完全一致の場面選びは `novel-talk-flow` が入れる」と「Upstream」の `novel-talk-flow` は古くなった（上の 1 点目）。2026-10-17 に直した。
   - 「Reference は場面の引数にならない（`init.lua` 226 行）」は 228〜232 行に動いた（ハンドラには act だけを渡し、`EVENT.drive(result, act, act)` で始める）。`choice_select.lua` の行番号（16〜18・25〜35・41〜78 行）は合っている。
   - 「失敗の見せ方は `failure-output-unification` に乗せる」は、完了したので `pasta/failure.lua` の `FAILURE.report` と読む（下の申し送りのとおり）。
+
+## 申し送り（tutorial-ssp-gaps より、2026-10-18）
+
+- **イベントの入口に時計が入った**: `EVENT.fire`（`shiori/event/init.lua` 215 行〜）の順が `CALLBACK.try_route` → `CLOCK.observe`（223 行。`OnPastaClock` を受けた回は 204 を返してハンドラへ進まない）→ `create_act` → `STOP.hold_handler`（234 行）→ ハンドラになった。読み込みの行に `pasta.shiori.clock` が足され（75 行）、ファイルは 267 行になった。brief に書いた `init.lua` の行番号はずれているので、要件定義で測り直す（`set_co_scene` は 100 行、ハンドラを `EVENT.drive(result, act, act)` で始める所は 239 行）。
+- **時刻の読み方が変わった**: 新しいモジュール `pasta.shiori.clock` が「今」を一手に持つ。時報の判定と日時変数は `CLOCK.now`・`CLOCK.date`（SSP の仮想時刻に従う）、おしゃべりの間隔・コールバックの待ち時間・撫では `CLOCK.steady`（設定し直しなどの時刻の飛びを差し引いた時計）で数える。SSP 2.9.18 の TimeMachine は `act.req.date` 自体も仮想時刻にする。仕組みは本 spec の design.md の末尾「設計の見直し（7.2 の後・2026-10-18）」とマニュアル `lua/shiori-events.md` の「OnPastaClock」「時刻の飛び」。

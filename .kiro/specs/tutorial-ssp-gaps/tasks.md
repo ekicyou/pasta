@@ -161,3 +161,7 @@
 - 8.3: 飛びは OnSecondChange でだけ数えるので、飛んでから次の秒の合図までの 1 秒足らずに始まった get_property の締め切りや撫では補正前の物差しになる（実害はほぼ無いので許す）。
 - 最終検証: スリープ明けは「OnSysResume が復帰後の最初の OnSecondChange より先に届く」前提で、実機では未確認（先に OnSecondChange が来ると、スリープ中の正時の時報が出ず、おしゃべりも残りの間隔を待つ）。kiro-complete の棚卸で扱う。
 - 最終検証: init.lua・virtual_dispatcher.lua の行が増えたので、novel-talk-flow・novel-checkpoint-rollback・shell-element-click の brief の行番号と、novel-talk-flow の「時報・おしゃべりの停止」（seen_epoch・CLOCK.steady・next_talk_time の意味）を kiro-complete で申し送る。
+- 完了時にその場で解決: 最終検証の I1（初回の check_hour で seen_epoch を合わせる・テスト付き）・I4・I5・I6（文書とコメント）は fe9853f4、I2（長く止まったときも飛びになる）は 6e50f4f8。
+- 完了時の申し送り: novel-talk-flow・novel-checkpoint-rollback・shell-element-click の brief.md に「申し送り（tutorial-ssp-gaps より、2026-10-18）」を足した（EVENT.fire の順・時計のモジュール・ディスパッチャの状態の意味・行番号）。
+- 完了時に残したもの（起票 0 件）: スリープ明けの順番（W1）は実機で確かめられない前提で、直し方が 1 つに決まらないため、確かめる作業として開発者へ提案する。UTC から 30 分ずれた地域で毎時の読み取りが 1 回走る件（I3）は害が無く、正時の計算も以前から同じ前提なので直さない。
+- 完了時の Test Gate: 1 回目の cargo test --all で scene_kick_preempt_e2e_test の kick_preempt_and_force_gate_end_to_end が 1 回だけ落ちた（単独 3 回・全件の流し直しでは通る。X-Pasta-Time で時刻を固定したテストで、本 spec の時計の判定は通らない）。キックと毎秒の合図の順番が重い負荷で入れ替わる、以前からの不安定さと見ている。開発者へ報告する。
