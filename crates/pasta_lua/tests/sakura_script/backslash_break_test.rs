@@ -90,9 +90,8 @@ fn budoux_break_after_lone_backslash_stays_a_break() {
     }
 }
 
-/// 字の後の選択肢の前の区切り `\n[150]` が、単語の末尾の単独の `\` の直後に入る（今も起きる）。
+/// 字の後の選択肢の前の区切り `\n[150]` が、単語の末尾の単独の `\` の直後に入っても、区切りとして働く（4.1 で守った）。
 #[test]
-#[ignore = "1.2 で DSL から届くと確かめた形。4.1（組み立ての区切りの層）で守って ignore を外す"]
 fn choice_break_after_lone_backslash_stays_a_break() {
     let (_temp, runtime) = load_ghost();
     assert_breaks_alive(&fire(&runtime, "単語の後の選択肢"), "n[150]");

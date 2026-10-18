@@ -668,6 +668,7 @@ flowchart LR
 - **決定 6**: `budoux` が無い・空のアクターでは、`budoux_newlines`・`budoux_jump` を読まない（書き間違いでもエラーにしない）。
 - **決定 7**: 組み立ての 2 通りの動き（次の列・最初の列）は Lua に写しを置く（公開の関数を足さない）。Rust の動きとの同値のテスト（Builder Tests 5）は必須とし、`next_column`・`first_column` のコメントに「Rust の `ColumnMove::Next`・`First` の写し。片方だけ直さない」と書く。
   - 補足（タスク生成のとき）: テストから覗けるように、内部用の表 `BUILDER._internal`（`next_column`・`first_column`）を置き、`BuildConfig` の省略できるフィールドで渡した表に、終わりの `columns` を書き出せるようにする。どちらもテスト用で、公開の API としてマニュアルに載せない。渡さなければ、今までどおり出力ごとに捨てる。
+  - 補足（4.1 の実装）: フィールドの名前は `columns_out`。`BUILDER.build` の終わり（`\e` の前）に、その時の `columns` の中身（スポット ID → 列の状態の表。`clear_spot` で捨てたスポットは入らない）を `columns_out` に書き写す。`BUILDER._internal` の 2 つの関数は組み立てが使うものと同じ関数で、Rust との同値のテスト（Builder Tests 5）と不変条件のテスト（Builder Tests 6）だけが使う。
 - **決定 8**: 「区切りは `put_break` を通す」を、不変条件のテスト（Builder Tests 6）で守る。
 - **決定 9**: 台詞の頭に入る改行と、単位にならない `\` の組み合わせ（`\` と `\n[…]` がつながってエスケープの `\\` に化ける形）は、実装の前に DSL から届くかを確かめる（Migration Strategy の手順 2）。届くならこの spec で守り、届かなければ確かめた結果を research.md に記録する。
 - **リスク**: 相対の `\_l[@…]` でも字数が 0 に戻る。横書きで `\_l` を少しずらす用途のゴーストは、改行の位置が変わる（要件 2.3・【F】の決定どおり）。

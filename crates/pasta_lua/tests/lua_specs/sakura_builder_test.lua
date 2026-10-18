@@ -3149,3 +3149,252 @@ describe("SAKURA_BUILDER - 未登録アクターの actor_spots fallback", funct
         end)
     end)
 end)
+
+-- ============================================================================
+-- 吹き出しごとの列の持ち越し（vertical-balloon-lines 1.5・2.4・4.1〜4.5・4.8）
+-- 本物の @pasta_sakura_script を使う。終わりの列の状態はテスト用の columns_out で覗く
+-- ============================================================================
+
+describe("SAKURA_BUILDER - vertical-balloon-lines: 列の持ち越し", function()
+    local function group(actor, inner_tokens)
+        return { type = "actor", actor = actor, tokens = inner_tokens }
+    end
+    local function talk(actor, text)
+        return { type = "talk", actor = actor, text = text }
+    end
+    local function choice(display)
+        return { type = "choice", display = display, target = display .. "先" }
+    end
+    --- budoux の並びを持つアクター 2 人（名前は spots() のスポットに合わせる）
+    local function actors_with(budoux, extra)
+        local a = { name = "さくら", spot = 0, budoux = budoux }
+        local b = { name = "うにゅう", spot = 1, budoux = budoux }
+        for k, v in pairs(extra or {}) do
+            a[k] = v
+            b[k] = v
+        end
+        return a, b
+    end
+    local function spots()
+        return { ["さくら"] = 0, ["うにゅう"] = 1 }
+    end
+    --- 組み立てて、出力と終わりの列の状態の表を返す
+    local function build(tokens, config)
+        local BUILDER = setup()
+        config = config or {}
+        config.columns_out = {}
+        local out = BUILDER.build(tokens, config, spots())
+        return out, config.columns_out
+    end
+    local function expect_column(col, line, width, jump)
+        expect(col ~= nil):toBe(true)
+        expect(col.line):toBe(line)
+        expect(col.width):toBe(width)
+        expect(col.jump):toBe(jump or false)
+    end
+
+    test("4.1: 表情・ウェイト・choice_timeout を挟んでも続きの字数から数える", function()
+        local a = actors_with({ 4 })
+        local out, cols = build({
+            group(a, {
+                talk(a, "あい"),
+                { type = "surface", id = 1 },
+                { type = "wait", ms = 100 },
+                { type = "choice_timeout", seconds = 1 },
+                talk(a, "う"),
+            }),
+        })
+        expect(out):toBe("\\p[0]あい\\s[1]\\_w[100]\\![set,choicetimeout,1000]\\nう\\e")
+        expect_column(cols[0], 2, 2)
+    end)
+
+    test("2.4: act:sakura_script のテキストの中のタグも数える", function()
+        local a = actors_with({ 4 })
+        local out, cols = build({
+            group(a, {
+                talk(a, "あい"),
+                { type = "sakura_script", actor = a, text = "\\n" },
+                talk(a, "う"),
+            }),
+        })
+        expect(out):toBe("\\p[0]あい\\nう\\e")
+        expect_column(cols[0], 2, 2)
+    end)
+
+    test("4.2: 話し手が戻った吹き出しは次の列（2 列目の幅）から", function()
+        local a, b = actors_with({ 4, 20 })
+        local out, cols = build({
+            group(a, { talk(a, "あい") }),
+            group(b, { talk(b, "か") }),
+            group(a, { talk(a, "うえおか") }),
+        })
+        expect(out):toBe("\\p[0]あい\\p[1]か\\p[0]\\n[150]うえおか\\e")
+        expect_column(cols[0], 2, 8)
+        expect_column(cols[1], 1, 2)
+    end)
+
+    test("4.2: 選択肢の前後の区切りの後は次の列から", function()
+        local a = actors_with({ 4, 20 })
+        local out, cols = build({
+            group(a, { talk(a, "あい"), choice("甲"), talk(a, "うえおか") }),
+        })
+        expect(out):toBe("\\p[0]あい\\n[150]\\![*]\\q[甲,甲先]\\nうえおか\\e")
+        expect_column(cols[0], 3, 8)
+    end)
+
+    test("4.2: newline トークンは n 列進める", function()
+        local a = actors_with({ 4, 20 })
+        local out, cols = build({
+            group(a, { talk(a, "あい"), { type = "newline", n = 2 }, talk(a, "うえおか") }),
+        })
+        expect(out):toBe("\\p[0]あい\\n\\nうえおか\\e")
+        expect_column(cols[0], 3, 8)
+    end)
+
+    test("4.3: clear の後は 1 列目の幅から", function()
+        local a = actors_with({ 20, 4 })
+        local out, cols = build({
+            group(a, {
+                talk(a, "あい"),
+                { type = "newline", n = 1 },
+                { type = "clear" },
+                talk(a, "うえおか"),
+            }),
+        })
+        expect(out):toBe("\\p[0]あい\\n\\cうえおか\\e")
+        expect_column(cols[0], 1, 8)
+    end)
+
+    test("4.3: clear_spot は全スポットの表を捨て、次は 1 列目から", function()
+        local a, b = actors_with({ 20, 4 })
+        local out, cols = build({
+            group(a, { talk(a, "あい"), { type = "newline", n = 1 } }),
+            group(b, { talk(b, "か"), { type = "newline", n = 1 } }),
+            { type = "clear_spot" },
+            group(a, { talk(a, "うえおか") }),
+        })
+        expect(out):toBe("\\p[0]あい\\n\\p[1]か\\n\\p[0]うえおか\\e")
+        expect_column(cols[0], 1, 8)
+        expect(cols[1]):toBe(nil)
+    end)
+
+    test("4.4: スポット 0 と 1 を行き来しても、それぞれの続きから数える", function()
+        local a, b = actors_with({ 20 })
+        local _, cols = build({
+            group(a, { talk(a, "あい") }),
+            group(b, { talk(b, "かきくけ"), { type = "newline", n = 1 }, talk(b, "こ") }),
+            group(a, { talk(a, "う") }),
+            group(b, { talk(b, "さし") }),
+        })
+        expect_column(cols[0], 2, 2)
+        expect_column(cols[1], 3, 4)
+    end)
+
+    test("4.5: 2 回目の出力は 1 列目から（表は出力ごとに作って捨てる）", function()
+        local a, b = actors_with({ 4 })
+        local function tokens()
+            return {
+                group(a, { talk(a, "あい") }),
+                group(b, { talk(b, "か") }),
+                group(a, { talk(a, "う") }),
+            }
+        end
+        local first, cols1 = build(tokens())
+        local second, cols2 = build(tokens())
+        expect(second):toBe(first)
+        expect_column(cols1[0], 2, 2)
+        expect_column(cols2[0], 2, 2)
+    end)
+
+    test("4.5: columns_out を渡さなくても出力は同じ", function()
+        local BUILDER = setup()
+        local a = actors_with({ 4 })
+        local tokens = { group(a, { talk(a, "あい"), { type = "surface", id = 1 }, talk(a, "う") }) }
+        expect(BUILDER.build(tokens, {}, spots())):toBe("\\p[0]あい\\s[1]\\nう\\e")
+    end)
+
+    test("4.8: 選択肢の表示の文字は数えない", function()
+        local a = actors_with({ 4, 20 })
+        local _, cols = build({
+            group(a, { talk(a, "あい"), choice("ながいながいせんたくし") }),
+        })
+        expect_column(cols[0], 2, 0)
+    end)
+
+    test("4.1: raw_script は列の状態に触らない", function()
+        local a = actors_with({ 4 })
+        local out, cols = build({
+            group(a, { talk(a, "あい"), { type = "raw_script", text = "\\n\\c" }, talk(a, "う") }),
+        })
+        expect(out):toBe("\\p[0]あい\\n\\c\\nう\\e")
+        expect_column(cols[0], 2, 2)
+    end)
+
+    test("1.5: budoux_newlines は pasta が出す区切りの幅を変えない", function()
+        local a, b = actors_with({ 4 }, { budoux_newlines = 1.8 })
+        local out = build({
+            group(a, { talk(a, "あい"), { type = "wait", ms = 100 }, talk(a, "う"), choice("甲"), choice("乙") }),
+            group(b, { talk(b, "か") }),
+            group(a, { talk(a, "え") }),
+        })
+        expect(out):toBe("\\p[0]あい\\_w[100]\\n[180]う\\n[150]\\![*]\\q[甲,甲先]\\n\\![*]\\q[乙,乙先]"
+            .. "\\p[1]か\\p[0]\\n[150]え\\e")
+    end)
+
+    test("_internal: 次の列・最初の列の動き", function()
+        local BUILDER = setup()
+        local col = { line = 2, width = 7, jump = true }
+        BUILDER._internal.next_column(col, 2)
+        expect_column(col, 4, 0, true)
+        BUILDER._internal.first_column(col)
+        expect_column(col, 1, 0, false)
+    end)
+end)
+
+-- ============================================================================
+-- 単独の `\` の直後の pasta の区切り（vertical-balloon-lines 1.2・決定 9）
+-- ============================================================================
+
+describe("SAKURA_BUILDER - vertical-balloon-lines: 単独の \\ の後の区切り", function()
+    local function group(actor, inner_tokens)
+        return { type = "actor", actor = actor, tokens = inner_tokens }
+    end
+    local function talk(actor, text)
+        return { type = "talk", actor = actor, text = text }
+    end
+    local CHOICE = { type = "choice", display = "甲", target = "甲先" }
+    local Q = "\\![*]\\q[甲,甲先]"
+    local function spots()
+        return { ["さくら"] = 0, ["うにゅう"] = 1 }
+    end
+
+    test("字の後の選択肢の前の区切りは、末尾の単独の \\ をエスケープにしてから出す", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local out = BUILDER.build({ group(a, { talk(a, "天気\\"), CHOICE }) }, {}, spots())
+        expect(out):toBe("\\p[0]天気\\\\\\n[150]" .. Q .. "\\e")
+    end)
+
+    test("エスケープの \\\\ で終わる台詞の後は、区切りを今のまま出す", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local out = BUILDER.build({ group(a, { talk(a, "天気\\\\"), CHOICE }) }, {}, spots())
+        expect(out):toBe("\\p[0]天気\\\\\\n[150]" .. Q .. "\\e")
+    end)
+
+    test("前の呼び出しの単独の \\ の後に、持ち越しで入る台詞の頭の改行も守る", function()
+        local BUILDER = setup()
+        local a = { name = "さくら", spot = 0, budoux = { 6 } }
+        local out = BUILDER.build({ group(a, { talk(a, "天気\\"), talk(a, "今日") }) }, {}, spots())
+        expect(out):toBe("\\p[0]天気\\\\\\n今日\\e")
+    end)
+
+    test("作者が書いたタグが台詞の頭にあるときは、前の単独の \\ に触らない", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local out = BUILDER.build({
+            group(a, { talk(a, "天気\\"), { type = "sakura_script", actor = a, text = "\\s[1]" } }),
+        }, {}, spots())
+        expect(out):toBe("\\p[0]天気\\\\s[1]\\e")
+    end)
+end)
