@@ -82,7 +82,7 @@
   - _Requirements: 4.1, 4.2_
 
 - [ ] 4. 代用品の置き換え
-- [ ] 4.1 (P) マニュアルの CI の段を validate に置き換える
+- [x] 4.1 (P) マニュアルの CI の段を validate に置き換える
   - 「Tutorial syntax validation」の段を、hello-pasta を `pasta_check validate` で検査する形（終了コード 1 で落ちる）にし、段の名前とコメント・前の段の Rust の準備のコメントを設計どおりに直す
   - 完了の状態: 段の `run` を手元で走らせて終了コード 0 で終わり、YAML として読める
   - _Boundary: Substitutes_
