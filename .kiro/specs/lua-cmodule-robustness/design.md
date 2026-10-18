@@ -456,7 +456,7 @@ pub(super) fn load_path_form(path: &Path) -> Vec<u16>;
 **Implementation Notes**
 - Integration: 探索のフォルダは `install` のときに `absolute_search_paths()` から 1 回作り、`prepare` の閉包に持たせる。
 - Validation: `resolve.rs` の単体テスト（拡張子の規則・相対の判定・`\foo`・`C:foo` が基点の外へ出ないこと・往復の判定・接頭辞の付く長さ）。
-- Risks: `\\?\` の形と `LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR` の組み合わせ、およびその下での依存 DLL の解決は未計測（LongPathCiStep で確かめる。Open Questions の 3）。
+- Risks: `\\?\` の形と `LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR` の組み合わせ、およびその下での依存 DLL の解決は未計測（LongPathCiStep で確かめる。決定事項の 3）。
 
 #### Win32DllLoader
 
@@ -518,7 +518,7 @@ impl Drop for DllPins { fn drop(&mut self); }
 **Implementation Notes**
 - Integration: `pasta_lua/Cargo.toml` の windows-sys に機能を 2 つ足す。`unsafe` はこのファイルに閉じ込め、各呼び出しに SAFETY のコメントを付ける。
 - Validation: `collision_test.rs`・`lifetime_test.rs`・`load_test.rs`。
-- Risks: 確かめ（`GetModuleHandleW`）と元の `ffi.load` の `LoadLibraryExA` の間に、別のスレッドが同名の別 DLL を読む競合は防がない（同じ SSP の別のゴーストが同じ瞬間に同名の DLL を読む場合だけ。既知の制限として書く）。同じファイルを別の綴り（8.3 名と長い名前）で読んだときにローダーが同じハンドルを返すかは未計測（Open Questions の 2）。
+- Risks: 確かめ（`GetModuleHandleW`）と元の `ffi.load` の `LoadLibraryExA` の間に、別のスレッドが同名の別 DLL を読む競合は防がない（同じ SSP の別のゴーストが同じ瞬間に同名の DLL を読む場合だけ。既知の制限として書く）。同じファイルを別の綴り（8.3 名と長い名前）で読んだときにローダーが同じハンドルを返すかは未計測（決定事項の 2）。
 
 ### tests・CI・docs
 
@@ -547,7 +547,7 @@ impl Drop for DllPins { fn drop(&mut self); }
 |----------|--------------|------|
 | `config_test.rs` | `ffi` が false・未記入では `ffi` が `nil` で `require "ffi"` の失敗が今と同じ。true では `ffi == require "ffi"` で `ffi.load` が置き換わっている。真偽値でない値は `LoaderError::Config` | 1.1–1.6, 9.7 |
 | `load_test.rs` | 300 文字超えのフォルダ・`NON_ANSI_DIR_NAME`・その両方で `foo.add(1, 2) == 3`。`via_dep()` が隣の `dep.dll` を通る。`dep.dll` が無ければ `cannot load module 'foo': <理由>`。`scripts` と `scriptlibs` に `WHICH` の違う `foo.dll` を置き、先の方が読まれる。`ffi.load("kernel32")` で `GetCurrentProcessId` が呼べる。`ffi.load("lib/foo")` と `ffi.load([[lib\foo.dll]])` がゴーストの基点から解ける。ファイル名が ANSI に無い DLL は 2.8 の文言で失敗 | 2.1–2.9, 3.1–3.8, 4.1–4.5, 9.1–9.4 |
-| `collision_test.rs` | ゴースト A（`WHICH=1`）を読んだまま、ゴースト B（`WHICH=2`・別のフォルダ）の `ffi.load("foo")` が 5.2 の文言で失敗し、B は A の DLL を返さない。A を落とした後は B が読める。A を読んだまま同じフォルダの A′ を作ると読める（5.4）。同じ VM で 2 回読める（5.3）。基点を 8.3 名で綴った VM と長い名前で綴った VM（同じフォルダ）を並べても読める | 5.1–5.4, 9.5 |
+| `collision_test.rs` | ゴースト A（`WHICH=1`）を読んだまま、ゴースト B（`WHICH=2`・別のフォルダ）の `ffi.load("foo")` が 5.2 の文言で失敗し、B は A の DLL を返さない。A を落とした後は B が読める。A を読んだまま同じフォルダの A′ を作ると読める（5.4）。同じ VM で 2 回読める（5.3）。基点を 8.3 名で綴った VM と長い名前で綴った VM（同じフォルダ）を並べても読める（最初に `GetShortPathNameW` の結果が長い名前と違うことを確かめ、同じなら失敗にする） | 5.1–5.4, 9.5 |
 | `lifetime_test.rs` | 戻り値を捨てて `collectgarbage()` しても関数が呼べる。`ffi.gc(ffi.new("int[1]"), lib.release)` を残したまま VM を落としても落ちない。落とした後は `GetModuleHandleW("foo.dll")` と `GetModuleHandleW("dep.dll")` が NULL。そのあと新しい VM で読み直せる。取り違えで失敗した後は B の DLL が残らない | 7.1–7.4, 9.8 |
 | `compare_test.rs` | FFI だけを開いた素の mlua の VM（元の `ffi.load`）と、ローダーの VM を並べ、同じチャンク名の同じ Lua で `pcall` の結果の型と文言を比べる。場合: 名前だけで無いもの・相対パスで無いもの・`nil` と数の引数・関数の中から呼んだもの（位置が付く）・`pcall(ffi.load, …)` で直接呼んだもの（位置が付かない）。理由の部分は、元の側を ANSI から UTF-8 にしてからバイトで比べる | 6.1–6.5, 9.6 |
 
@@ -567,6 +567,7 @@ impl Drop for DllPins { fn drop(&mut self); }
 - Input / validation: `Set-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem LongPathsEnabled 0` の後、`PASTA_TEST_LONG_PATHS_DISABLED=1` で `cargo test -p pasta_lua --target <triple> --test ffi` を走らせる（ビルド済みなので作り直さない）。
 - Output / destination: CI の結果だけ。ランナーは使い捨てなので元に戻さない。開発機のレジストリは変えない。
 - Idempotency & recovery: 前提の確かめ（FfiTestSuite）が、設定が効いていないことを失敗として見せる。
+- 順序: この手順と前提の確かめ・深いパス＋依存 DLL のテストを、実装の**最初のタスク**（試し打ち）として作り、CI で結果を見てから残りを進める。依存 DLL が解けなければ 8.3 名のパスで読む道を試し、それでも満たせなければ開発者の判断を仰ぐ（決定事項の 3）。
 
 #### Docs
 
@@ -622,15 +623,19 @@ Data Contracts・物理のデータは無い（ファイル・レジストリに
 
 - `ffi.load` はゴーストの起動時などに数回呼ぶだけ。1 回につき、`is_file` を探索のフォルダの数まで・`LoadLibraryExW`・`GetModuleHandleW` を 1 回ずつ。目標値は置かない。
 
-## Open Questions / Risks
+## 決定事項（2026-10-18 設計の話し合い・全議題を推奨案で確定）
 
-設計の中で前提を置いて決めたもの。話し合いで確かめる。
+1. **取り違えの決め方（5.2）**: いつもファイル名を元の `ffi.load` に渡し、同名の別 DLL が読み込み済みなら失敗させる。パスが ANSI で表せるときにフルパスを渡して取り違えを避ける案は採らない（フォルダ名の文字種で結果が変わり、深いパスでは `LoadLibraryExA` の長さの制限にかかるため）。作者は DLL の名前を変えれば避けられる。
+2. **同じファイルの判定（5.3・5.4）**: パスの文字列を比べず、Windows のローダーが同じハンドルを返すかで判定する。`collision_test.rs` の 8.3 名の場合は、最初に `GetShortPathNameW` の結果が長い名前と**違う文字列であること**を確かめ、同じ（8.3 名を作らないボリューム）ならテストを失敗にする（空振りの緑を防ぐ）。ローダーが同じファイルを別のモジュールとして読んだと分かったら、ファイルの識別子（`GetFileInformationByHandle` のボリュームとファイルの番号）での比較を `win32.rs` に足す。
+3. **`LongPathsEnabled=0`（2.5）**: 260 文字以上のパスだけ `\\?\` の形で `LoadLibraryExW` に渡す。これで設定が無効でも読め、隣の依存 DLL も解けるという前提は未計測なので、**タスクの 1 番目を CI での試し打ち**にする（LongPathCiStep と前提の確かめを先に作り、深いパス＋依存 DLL を走らせる）。依存 DLL が解けなければ、次に 8.3 名のパス（`GetShortPathNameW`）で読む道を試す。それでも満たせなければ、要件を黙って弱めず、開発者の判断を仰ぐ。
+4. **名前だけで見つからない場合（3.4）**: 元の `ffi.load` へ渡す前に `LoadLibraryExW(name, NULL, 0)` で先に読む。OS の DLL が今までどおり読めること（3.4 の目的）は変わらず、失敗の理由を UTF-8 にできる（6.2）。要件 3.4 の文言はこの目的の書き方に直した。`compare_test.rs` の位置の比べ（関数の中から呼んだもの・`pcall(ffi.load, …)` で直接呼んだもの）は必須とする。
+5. **理由の末尾の `\r\n`（6.2）**: LuaJIT と同じく残す。比べるテストが、元の側を UTF-8 にしたものとバイトで比べられる。
+6. **pasta の理由の言葉（6.3）**: 英語（`searcher.rs` の `cannot read …` など、Rust の側の他の文言と同じ）。
+7. **依存 DLL の同名の取り違え**: 防がない（Windows の規則のまま。防ぐには PE の import 表を読み解く必要があり、見合わない）。マニュアルの既知の制限に書く。
+8. **先読みの後に元の `ffi.load` が失敗した場合（7.4）**: 先に読んだ DLL は Lua の状態を閉じるまで残す。要件 7.4 に例外として書いた。元の関数の末尾呼び出し（6.1・6.4 の位置のため）は外せず、同じ名前で読み込み済みなので起きない見込み。
+9. **スキルの再生成（10.6）**: `pasta-toml.md` は `pasta-ghost-authoring` の `references/` の元でもあるので、`pasta-lua-coding` と両方を再生成する。
 
-1. **取り違えの決め方（5.2）**: 【前提】いつもファイル名を元の `ffi.load` に渡し、同名の別 DLL が読み込み済みなら失敗させる。パスが ANSI で表せるときにフルパスを渡して取り違えを避ける案は採らない（フォルダ名の文字種で結果が変わり、深いパスでは `LoadLibraryExA` の長さの制限にかかるため）。
-2. **同じファイルの判定（5.3・5.4）**: 【前提】パスの文字列を比べず、Windows のローダーが同じハンドルを返すかで判定する。同じファイルを 8.3 名と長い名前で綴ったときもローダーが同じハンドルを返す、と見込む（`collision_test.rs` で確かめる）。返さなければ、ファイルの識別子（`GetFileInformationByHandle` のボリュームとファイルの番号）での比較を足す。
-3. **`LongPathsEnabled=0`（2.5）**: 【前提】260 文字以上のパスだけ `\\?\` の形で `LoadLibraryExW` に渡せば、設定が無効でも読め、隣の依存 DLL も解ける。CI の手順で確かめる。依存 DLL が解けなければ、「長い＋依存 DLL＋設定が無効」の組み合わせを既知の制限にするよう要件を直す必要がある。
-4. **名前だけで見つからない場合（3.4）**: 【前提】元の `ffi.load` へ渡す前に `LoadLibraryExW(name, NULL, 0)` で先に読む。OS の DLL が今までどおり読めること（3.4 の目的）は変わらず、失敗の理由を UTF-8 にできる（6.2）。「そのまま渡す」の字面とは仕組みが違う。
-5. **理由の末尾の `\r\n`（6.2）**: 【前提】LuaJIT と同じく残す。比べるテストが、元の側を UTF-8 にしたものとバイトで比べられる。
-6. **pasta の理由の言葉（6.3）**: 【前提】英語（Rust の側の他の文言と同じ）。
-7. **依存 DLL の同名の取り違え**: 【前提】防がない（Windows の規則のまま）。マニュアルの既知の制限に書く。
-8. **スキルの再生成（10.6）**: `pasta-toml.md` は `pasta-ghost-authoring` の `references/` の元でもあるので、そちらも再生成する。
+### 残る危険
+
+- 確かめ（`GetModuleHandleW`）と元の `ffi.load` の間に、別のスレッドが同名の別 DLL を読む競合は防がない（既知の制限）。
+- 決定 3 の試し打ちの結果しだいで、`DllNameResolver::load_path_form` の形（`\\?\` か 8.3 名か）が変わる。

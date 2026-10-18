@@ -105,7 +105,7 @@ print(foo.add(1, 2))          --> 3
 1. When `ffi.load` に渡された名前が `/`・`\`・`.` のどれも含まない場合, the pasta_lua ランタイム shall LuaJIT と同じく、末尾に `.dll` を足したファイル名で探す。
 2. When `ffi.load` に渡された名前がパスの区切り（`/`・`\`）を含まない場合, the pasta_lua ランタイム shall `package.path` と同じ探索のフォルダ（`[loader] lua_search_paths`）を同じ順で探し、最初に見つかったファイルを読む。
 3. When `pasta.toml` で `lua_search_paths` が変えられた場合, the pasta_lua ランタイム shall `package.path` と、名前だけの `ffi.load` の探索が、同じフォルダを同じ順で指すようにする。
-4. When 名前だけの `ffi.load` で、探索のフォルダのどこにもそのファイルが無い場合, the pasta_lua ランタイム shall その名前を元の `ffi.load` へそのまま渡す（`ffi.load("user32")` のように、OS の DLL を今までどおり読めるようにする）。
+4. When 名前だけの `ffi.load` で、探索のフォルダのどこにもそのファイルが無い場合, the pasta_lua ランタイム shall その名前を LuaJIT と同じ OS の既定の探索で読み、`ffi.load("user32")` のように OS の DLL を今までどおり読めるようにする（失敗の理由は Requirement 6 の UTF-8 で返す）。
 5. When `ffi.load` に渡された名前が相対パス（パスの区切りを含み、ドライブ文字や `\\` で始まらないもの）である場合, the pasta_lua ランタイム shall それをゴーストの基点のフォルダ（`ghost/master`）を起点にして解決する。SSP のカレントのフォルダや SSP.exe のフォルダは起点にしない。
 6. When `ffi.load` に渡された名前が絶対パスである場合, the pasta_lua ランタイム shall そのパスをそのまま使う。
 7. If パスの区切りを含む名前（相対・絶対）のファイルが無い場合, the pasta_lua ランタイム shall 元の `ffi.load` へ渡さず、Requirement 6 の文言で `ffi.load` を失敗させる。
@@ -157,7 +157,7 @@ print(foo.add(1, 2))          --> 3
 1. While Lua の状態が生きている間, the pasta_lua ランタイム shall `ffi.load` のために読み込んだ DLL を解放しない（`ffi.load` が返した値が捨てられても解放しない）。
 2. When Lua の状態が閉じられた場合（ゴーストの終了・再読み込み）, the pasta_lua ランタイム shall Lua の状態の後始末（`__gc`・`ffi.gc` の後始末を含む）がすべて終わってから、読み込んだ DLL を解放する。
 3. When ゴーストが再読み込みされた場合, the pasta_lua ランタイム shall 新しい Lua の状態で、DLL を改めて読み込めるようにする。
-4. If DLL の読み込みに失敗した場合, the pasta_lua ランタイム shall 途中で読み込んだものを残さず解放する。
+4. If DLL の読み込みに失敗した場合, the pasta_lua ランタイム shall 途中で読み込んだものを残さず解放する。ただし pasta が先に読み終えたあとで元の `ffi.load` が失敗した場合（同じ名前で読み込み済みなので起きない見込み）は、先に読んだ DLL を Lua の状態を閉じるまで残す。
 
 ### Requirement 8: 変えないこと
 
