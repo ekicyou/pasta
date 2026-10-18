@@ -48,6 +48,16 @@ jobs:
       - name: Run tests
         run: cargo test --all --target ${{ matrix.target }}
 
+      # 長いパスの設定（LongPathsEnabled）を切った機械で、深いパスの DLL と隣の依存 DLL が読めるかを確かめる
+      # （lua-cmodule-robustness 要件 2.5）。ランナーは使い捨てなので元に戻さない。
+      # テストは最初に接頭辞なしの長いパスが通らないことを確かめ、設定が効いていなければ失敗する。
+      - name: Run FFI tests with LongPathsEnabled=0
+        run: |
+          Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem -Name LongPathsEnabled -Value 0
+          cargo test -p pasta_lua --target ${{ matrix.target }} --test ffi -- --show-output
+        env:
+          PASTA_TEST_LONG_PATHS_DISABLED: "1"
+
       # lint はターゲット非依存のため x64 のみで実行（x86 と二重に回さない）。
       - name: Clippy (-D warnings)
         if: matrix.arch == 'x64'

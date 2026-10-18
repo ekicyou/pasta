@@ -197,6 +197,36 @@ pub fn short_path(path: &Path) -> PathBuf {
     PathBuf::from(std::ffi::OsString::from_wide(&buf))
 }
 
+/// 長いパスの設定が無効な前提を示す環境変数（CI の LongPathCiStep が `1` にする）。
+pub const LONG_PATHS_DISABLED_ENV: &str = "PASTA_TEST_LONG_PATHS_DISABLED";
+
+/// 前提の確かめ（要件 2.5）。環境変数が `1` のとき、接頭辞なしの 260 文字超えの `existing` へ
+/// `GetFileAttributesW` が失敗することを確かめる。通ってしまえば CI の手順が効いていないので失敗にする。
+pub fn assert_long_paths_disabled_if_required(existing: &Path) {
+    use windows_sys::Win32::Storage::FileSystem::{GetFileAttributesW, INVALID_FILE_ATTRIBUTES};
+    if std::env::var(LONG_PATHS_DISABLED_ENV).as_deref() != Ok("1") {
+        return;
+    }
+    assert!(
+        existing.exists(),
+        "確かめる対象が無い: {}",
+        existing.display()
+    );
+    let s = existing.as_os_str();
+    assert!(s.len() > 260, "260 文字以下のパスでは確かめられない");
+    assert!(
+        !s.to_string_lossy().starts_with(r"\\"),
+        "接頭辞・UNC の無いパスで確かめる"
+    );
+    let w = wide(s);
+    // SAFETY: w は NUL 終端の UTF-16。
+    let attrs = unsafe { GetFileAttributesW(w.as_ptr()) };
+    assert_eq!(
+        attrs, INVALID_FILE_ATTRIBUTES,
+        "{LONG_PATHS_DISABLED_ENV}=1 なのに接頭辞なしの長いパスが通った（長いパスの設定が切れていない）"
+    );
+}
+
 /// FFI だけを開いた素の VM（元の `ffi.load` のまま）。比べるテストの相手役。
 pub fn bare_ffi_lua() -> mlua::Lua {
     // SAFETY: FFI は unsafe の標準ライブラリなので unsafe_new_with でしか開けない。テストの中だけで使う。
