@@ -157,7 +157,7 @@ graph TB
 - `book/src/grammar/block-structure.md` — 選択肢の配置の表の「選択肢 → 選択肢」「台詞 ← 選択肢」の行を `after_choice_newlines` に合わせる。
 - `book/src/lua/modules/pasta-config.md`・`book/src/internals/loader.md`・`book/src/internals/internal-modules.md` — `[ghost]` のキーの並びに `after_choice_newlines` を足す。
 - `book/AUTHORING.md` — 192 行の「検査対象の 5 キー」を 6 キーにする。
-- `.kiro/specs/vertical-balloon-lines/research.md` — 実機の確認（7.9）の依頼の内容と結果を記録する。
+- `.kiro/specs/completed/vertical-balloon-lines/research.md` — 実機の確認（7.9）の依頼の内容と結果を記録する。
 - スキル references（`node book/tools/gen-skill-refs.mjs` で再生成。`pasta-ghost-authoring` の `pasta-toml.md`・`block-structure.md`、`pasta-lua-coding` の `pasta-sakura-script.md`・`pasta-config.md`・`internal-modules.md`）。
 
 ## System Flows

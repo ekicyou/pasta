@@ -329,6 +329,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 - [sakura-builder-string-buffer](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/sakura-builder-string-buffer) — 組立の文字列バッファ
 - [paragraph-break-tag-only-talk](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/paragraph-break-tag-only-talk) — 字を出すトークンによる段落区切りの判定と、単位（タグ・エスケープ・囲み）の読み方を SSP にそろえる変更、3 つの読み取りの適合テスト
 - [choice-line-layout](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/choice-line-layout) — 選択肢を 1 行に 1 つずつ出す改行の配置と `choice_newlines`、台詞に書いた `\c` を吹き出しの消去に数える変更
+- [vertical-balloon-lines](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/vertical-balloon-lines) — 列を動かすタグでの budoux の数え直しと、1 回の出力の中の吹き出しごとの列の持ち越し（`put_break`）、`budoux_newlines`・`budoux_jump`・`after_choice_newlines`、単独の `\` の守り
 
 ---
 
