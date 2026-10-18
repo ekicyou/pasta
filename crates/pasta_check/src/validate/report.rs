@@ -205,7 +205,7 @@ pub(crate) fn skip_reasons(findings: &[Finding]) -> Vec<SkipReason> {
         .filter_map(|f| match f.code {
             Syntax => Some(SkipReason::Syntax),
             // pasta.toml を読めないのは設定の誤り。ほかのパス（渡し忘れを含む）は読めない辞書ファイル
-            FileUnreadable if f.path == super::config::PATH => Some(SkipReason::Config),
+            FileUnreadable if f.path == super::input::PASTA_TOML => Some(SkipReason::Config),
             FileNotUtf8 | FileUnreadable => Some(SkipReason::UnreadableFile),
             ConfigSyntax | ConfigLoaderType | ConfigPatternInvalid | ConfigSceneAlias => {
                 Some(SkipReason::Config)

@@ -2,6 +2,9 @@
 
 use serde::Deserialize;
 
+/// 報告での pasta.toml のパス（config と report の両方が使うので入力の側に置く）
+pub(super) const PASTA_TOML: &str = "pasta.toml";
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GhostInput {
