@@ -166,6 +166,8 @@
 
 ### Research Needed（設計の前に SSP 2.9.18 の実機で確かめる。OQ-6・OQ-7）
 
+> 設計フェーズ（2026-10-18）で 1〜3・5・6 を実機で確かめた。4（`\x`）は未確認。結果は本書末尾の「SSP 2.9.18 の実機確認」。2 は下の仮定と違い、`\c` で既定に戻る。
+
 1. `\p[0]\f[color,red]あ\p[1]い\p[0]う\e`
    - 「い」が既定の色か。スコープごとに保つか、スコープをまたいで保つか。
    - 「う」が赤のままか。
@@ -189,3 +191,180 @@
 - `vertical-balloon-lines` と同じ `sakura_builder.lua` を触る。
 - 選択肢 B なら、builder への変更は `emit_actor_switch` の周りの数行と、`\x` の観測の呼び出しに限られる。
 - `pasta-toml.md` は両方が触る。後から入る側が rebase で合わせる。
+
+---
+
+# 設計フェーズの調査（2026-10-18・`/kiro-spec-design -y`）
+
+## Summary
+
+- **Feature**: `actor-display-style`
+- **Discovery Scope**: Extension（既存の出力の組み立てと設定の検査への追加。light discovery＋SSP の実機確認）
+- **Key Findings**:
+  - SSP 2.9.18 の文字装飾は**スコープごと**に保たれ、スコープをまたがない。`\c` で既定に戻る。新しいスクリプトでも既定に戻る。選択肢の後は保たれる（下の実機確認 #1〜#5）。ギャップ分析の「`\c` の後は今の流れのままで満たせる」は誤りで、`\c` の後は出し直しが要る。
+  - `toml` 1.1 は `preserve_order` を有効にしておらず、`toml::Table` は名前順になる。Lua の表も順序を持たない。要件 2.1 の「属性の順は書いた順」は、Rust で span から順を取り出さないと満たせない。`toml::de::DeTable::parse`（span つきの木）が公開 API にある。
+  - 装いのタグ列を Rust（`pasta_core`）で作れば、規則（12 属性・値の検査・変換）を 1 か所に置ける。Lua は「いつ出すか」だけを持てばよい。
+
+## 使ったスキルと指針
+
+- `kiro-spec-design`（rules: design-principles・design-discovery-light・design-synthesis・design-review-gate）。テンプレート `.kiro/settings/templates/specs/design.md`・`research.md`。
+- steering: `product.md`・`tech.md`・`structure.md`（`[scene.alias]` の規則を `pasta_core` に置く形、Lua の状態を持たないモジュールの形）。
+- プロジェクトの記録（memory）: 「リファクタリングは安全かつ可逆に」（`BUILDER.build` の分岐を増やさない）、「`.claude/skills` の編集は分類器が拒否することがある」（references の再生成のリスク）、「マニュアルに回避レシピを載せない」、「cargo の前に NoDefaultCurrentDirectoryInExePath を外す」（`cargo tree` で実行）。
+
+## Research Log
+
+### SSP 2.9.18 の実機確認（Research Needed の 6 項目）
+
+- **Context**: 要件 2.10。タグを出す時点を SSP の振る舞いに合わせる。
+- **方法**: SSP MCP（`mcp__ssp__sakurascript` でスクリプトを送り、`mcp__ssp__dump_balloon` でスコープごとのバルーンの画像を取り、`mcp__ssp__get_status` で開いているバルーンを見る）。対象は起動中のゴースト「悪役令嬢クローディア」（横書きの既定バルーン）。`baseware.version` は `SSP/2.9.18 (20261017-5; …)`。`\_q` で一括表示し、`\x[noclear]` で表示を止めて画像を取った。最後に `\e` を送って閉じた。
+- **結果**:
+
+| # | 送ったスクリプト（要点） | 見えたもの | 結論 |
+| - | ------------------------ | ---------- | ---- |
+| 1 | `\p[0]\f[color,0,180,0]\f[height,24]あああ\p[1]いいいいい\p[0]ううう` | スコープ 0: 「あああううう」が緑・大。スコープ 1: 「いいいいい」は既定の色・大きさ | 装いはスコープごとに保たれ、別のスコープへ移らない。戻ると元の装いのまま |
+| 1b | `\p[0]\f[color,0,180,0]あああ\p[0]ううう\p[0]\f[default]\n[180]えええ` | 「あああううう」が緑、「えええ」は既定で、1.8 行ぶん下 | `\p[0]` の出し直しでは保たれる。`\f[default]` で戻る。要件 2.5 の例の形がそのまま効く |
+| 2 | `\p[0]\f[color,0,180,0]\f[height,24]あああ\cかきくけこ` | 「かきくけこ」は既定の色・大きさ | **`\c` で既定に戻る** |
+| 2b | `\p[1]\f[…]かかか\p[0]あああ\cさしす\p[1]きくけ` | スコープ 1 の「かかかきくけ」は緑・大のまま | `\c` は自分のスコープだけを戻す |
+| 3 | `\p[0]\f[color,0,180,0]\f[height,24]あああ\n\![*]\q[えらぶ,OnTestNothing]\nかきくけこ` | 「かきくけこ」は緑・大。選択肢「えらぶ」は大きさを受け継ぎ、色は選択肢の色（茶） | 選択肢の後も保たれる。選択肢の字は `height` を受け継ぐ |
+| 4 | `\p[0]\f[…]あああ\xかきくけこ` | クリック待ちのまま。クリックを送る手段が無く、**確かめられなかった** | 未確認。ukadoc は「`\f` 系の効果を解除し、スコープを `\0` に戻す」 |
+| 5 | 1 本目 `\p[1]\f[…]かかか\p[0]\f[…]あああ\e`、2 本目 `\p[0]さしすせそ\p[1]たちつてと` | 2 本目は両スコープとも既定 | 新しいスクリプトの始めで既定に戻る |
+| 6 | `\f[height,30]あああ\f[default]\n[180]かかか` と `\f[height,30]あああ\n[180]\f[default]かかか` と `あああ\n[180]かかか`、および `あああ\f[height,30]\n[180]かかか` と `あああ\n[180]\f[height,30]かかか` | 行の送りの差は数ピクセル以内で、順の入れ替えで目に見える違いは無い（大きい字の行はその分だけ高い） | 横書きでは装いのタグと `\n[180]` の順は表示に効かない。縦書きは未確認 |
+| 7 | `\p[0]あ\p[1]\f[color,…]\f[default]\p[0]い` と、対照の `\p[0]あ\p[1]う\p[0]い` | 前者は `balloon(0=0)`、後者は `balloon(0=0/1=0)` | 字の無いスコープに `\f` だけを出しても、バルーンは開かない |
+
+- **Implications**: 状態はスポットごと。別のスポットへ移るときに戻す必要は無い。同じスポットで装いのある話者が関わる交代では `\f[default]` で戻す。`\c` の後は出し直す。選択肢の後は何もしない。ビルドの最初の装いの前に `\f[default]` は要らない。`\x` は未確認のため、どちらの振る舞いでも表示が同じになるよう出し直す。
+
+### toml の表の順序
+
+- **Context**: 要件 2.1「属性の順は書いた順」。
+- **Sources**: `cargo tree -p pasta_lua -e features -i toml`（features は default・display・parse・serde・std。`preserve_order` 無し）、`crates/pasta_lua/src/runtime/module_registry.rs` の `toml_to_lua`（表を Lua の表に、整数を `f64` に直す）、`toml-1.1.7` のソース（`src/de/parser/detable.rs` に `pub type DeTable<'i> = Map<Spanned<DeString<'i>>, Spanned<DeValue<'i>>>` と `DeTable::parse`）。
+- **Findings**: Rust でも Lua でも、型つきの表からは書いた順が取れない。span つきの木（`DeTable`）なら値の位置で並べ直せる。Lua の整数は `f64` になるので、大きな整数の 10 進の文字列化は Rust のほうが正確。
+- **Implications**: タグ列は Rust で作る。`preserve_order` は有効にしない（ほかの表の並びに影響が出るため）。
+
+### 検査の先例と報告の種類
+
+- **Sources**: `pasta_core/src/registry/scene_alias.rs`、`pasta_lua/src/loader/config/mod.rs` の `parse_scene_aliases`、`pasta_check/src/validate/config.rs` の `read_aliases`、`report.rs` の `FindingKind`・`skip_reasons`、`book/src/debug/validate.md` の表、`tests/validate_parity_test.rs`（pasta.dll と pasta_check の読み込みの成否の一致）。
+- **Findings**: 規則は `pasta_core`、取り出し（span と行番号）は各クレートが持つ。報告の種類を足すと `FindingKind::ALL`・`validate_report_test.rs`・`debug/validate.md` も変わる。`skip_reasons` に入る設定の誤りは、シーンの集まりに関わるものだけ。
+- **Implications**: `config-actor-font` を足し、`skip_reasons` には入れない。一致テストに `font` の例を足す。
+
+### 内部設計の章とモジュールの一覧
+
+- **Sources**: `book/src/internals/talk-output.md`（`emit_actor_switch` の手順・モジュール表・境界の表）、`internals/shiori.md` 103 行（SHIORI 用のモジュール一覧）、`internals/index.md` 90 行、`lua/modules/pasta-config.md` 51 行（`name` の注入）、`book/tools/gen-skill-refs.mjs` の `GENERATION_MAP`（`pasta-config.md` は pasta-lua-coding の references の元）、`crates/pasta_lua/build.rs`（`pasta_scripts/` を丸ごと zip に入れる）。
+- **Implications**: 新しい Lua モジュールは登録不要。マニュアルは要件 8 の 5 章に加え、`debug/validate.md`・`pasta-config.md`・内部設計の 2 章も直す。references は pasta-ghost-authoring の 3 つと pasta-lua-coding の `pasta-config.md` を再生成する。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+| ------ | ----------- | --------- | ------------------- | ----- |
+| R1: Rust でタグ列を作り `@pasta_config` の `font` を置き換える | 検査と変換を `pasta_core` に置き、読み込みで `font` を文字列にする | 規則が 1 か所。書いた順を守れる。Lua が単純（文字列を出すだけ）。新しいモジュール・キーが要らない | `@pasta_config` の `font` が TOML の表と違う形になる（マニュアルで説明） | **採用**（OQ-1） |
+| R2: Lua で表からタグ列を作る（固定の順） | Rust は検査だけ、Lua が 12 属性の一覧の順で並べる | Rust→Lua の受け渡しが要らない。`font` は表のまま | 要件 2.1 の「書いた順」を満たさない（要件の変更が要る）。12 属性の一覧が Rust と Lua の 2 か所 | 代案 |
+| R3: Rust でタグ列を作り、別の内部モジュールで渡す | `@pasta_actor_font = { 名前 = タグ列 }` を登録 | `font` は表のまま。書いた順を守れる | 内部モジュールが 1 つ増える。ビルダーのテストに差し替えが要る | 代案 |
+| B1: 出し入れを `sakura_builder.lua` に直接書く | ループの中に分岐を足す | ファイルが増えない | `BUILDER.build` の複雑度がさらに上がる。`vertical-balloon-lines` と衝突しやすい | 不採用 |
+| B2: 状態を持たない専用モジュール | `appearance.lua` と同じ形 | ビルダーは 1 行ずつ。単体で試せる | ファイルが 1 つ増える | **採用** |
+
+## Design Decisions
+
+### Decision: タグ列は Rust（`pasta_core`）で作り、`@pasta_config` の `font` を置き換える
+
+- **Context**: 要件 2.1（書いた順）・7（読み込みエラーと validate の両方）・確定事項 7（`[scene.alias]` と同じ形）。
+- **Alternatives Considered**: R2・R3（上の表）。
+- **Selected Approach**: `ActorFont::from_input` が検査とタグ列への変換を行う。pasta.dll は読み込みで `custom_fields` の `font` を検査済みのタグ列（文字列）に置き換え、Lua はそれを出すだけ。
+- **Rationale**: 規則（12 属性・型・禁止文字・変換）が 1 か所に集まり、pasta.dll と pasta_check がずれない。書いた順を守れる。Lua の整数が `f64` になる問題も避けられる。
+- **Trade-offs**: `@pasta_config` の `actor."名前".font` が TOML の表と違う形（文字列）で読める。`＠font` がそのタグ列に解決される（どちらにしても単語として使えない点は同じ）。
+- **Follow-up**: マニュアル（`pasta-config.md`・`pasta-toml.md`・`actor-dictionary.md`）に形を書く。
+
+### Decision: 装いの状態はスポットごと、ビルドの中だけ
+
+- **Context**: 実機確認 #1・#2・#5、要件 2.8・5.2。
+- **Selected Approach**: `used`（切り替えに使った）・`styled`（装いを付けた）をスポットごとに持ち、装いの無いアクターの `\c` で戻す。`any`（装いのあるアクターが出たか）が偽の間は何もしない。
+- **Rationale**: SSP がスコープごとに保ち、`\c` と新しいスクリプトで戻すので、この 2 つのフラグで「戻す必要があるか」が決まる。装いの無いゴーストの出力は、`any` が偽のまま変わらない。
+- **Trade-offs**: `\x` の後と、最上位の `raw_script` の中は保守的（冗長な `\f[default]` を出すことがある）。要件 2.10 で許される。
+
+### Decision: `\c`・`\x` の後の出し直しは、変換後の文字列への挿入で行う
+
+- **Context**: 要件 3.1・3.2。台詞の中の `\c`（「あ\cい」）の後ろの字も装いで出す必要がある。
+- **Alternatives Considered**: トークンを `\c` で分けて変換する（`talk_to_script` の待ちの挿入が境目で変わりうる）、トークンの後にまとめて出す（同じトークンの中の `\c` の後ろの字に間に合わない）。
+- **Selected Approach**: `STYLE.through` が、変換後の文字列の引数の無い `\c`・`\x` の直後にタグ列を挿入する。読み取りは `APPEARANCE.tag_at`。
+- **Rationale**: 字の判定は変換前のテキストで済んでいるので影響しない。作者の書いた文字は消さず・入れ替えない（4.2）。装いの無いアクターでは挿入しない（5.1）。
+
+### Decision: `config-actor-font` は飛び先の検査を省く理由に入れない
+
+- **Context**: `skip_reasons` は「検査した辞書のシーンが pasta.dll と同じと言えない」ときの理由。
+- **Selected Approach**: 装いの誤りは報告するが、飛び先の検査は続ける。
+- **Rationale**: 装いはシーンの集まりに関わらない。報告はより多く出る方が作者に役立つ。
+
+## Synthesis
+
+- **Generalization**: 「設定の 1 区画を `pasta_core` の規則で検査し、pasta.dll は読み込みエラー、pasta_check は行ごとの報告にする」は `[scene.alias]` と同じ形。共通の仕組みにはしない（2 例しかなく、取り出し方も違う）。
+- **Build vs Adopt**: SSP の `\f[default]` を使う（属性ごとに `default` で戻す方法は採らない。1 つのタグで済み、台詞の `\f` も戻せる）。toml の `DeTable` を使い、自前の span 計算は書かない。
+- **Simplification**: 装いの状態は 2 つのフラグと 1 つの真偽値だけ。「どの装いが付いているか」は持たない（同じ装いのアクターが戻っても `\f[default]`＋装いを出す。表示は同じ）。12 属性の一覧は Rust だけに置く。
+
+## OPEN QUESTIONS（設計）
+
+### OQ-1: 装いのタグ列を Lua へ渡す形
+
+- **仮定（設計の草案）**: pasta.dll の読み込みで、`@pasta_config` の `actor."名前".font` を検査済みのタグ列（文字列）に置き換える（R1）。
+- **推奨**: R1。規則が `pasta_core` の 1 か所に集まり、要件 2.1 の「書いた順」を満たし、新しいモジュールもキーも増えない。
+- **代案**: R2（Lua が表から固定の順で作る。要件 2.1 を「属性の順は Requirement 1.2 の一覧の順」に変える必要がある）、R3（内部モジュール `@pasta_actor_font` で渡す）。
+- **例**:
+
+```toml
+[actor."おじさん"]
+spot = 0
+font = { bold = true, color = "90,110,140" }
+```
+
+```lua
+-- R1: @pasta_config から読むと
+config.actor["おじさん"].font  --> "\\f[bold,1]\\f[color,90,110,140]"
+-- R2: 表のまま（出力は一覧の順で \f[color,90,110,140]\f[bold,1]）
+config.actor["おじさん"].font.bold  --> true
+```
+
+### OQ-2: `\x` の後の SSP の振る舞い（未確認）
+
+- **仮定**: ukadoc のとおり、`\x`（引数なし）はクリック後に `\f` を解除し、スコープを `\0` に戻す。装いのあるアクターの台詞の `\x` の直後に装いのタグを出し直す（スコープ 0 に効く）。状態はスポット 0 も「装いを付けた」にする。
+- **推奨**: 草案のまま。解除されてもされなくても表示は同じ（解除されないなら冗長なタグになるだけ。2.10 で許される）。
+- **代案**: `\x` の後に `\p[spot]` も出し直して、話者のスポットへ戻す（スポット 1 で話すアクターの `\x` の後の字が `\0` に出る、今の振る舞いを変えてしまう。本 spec の範囲を超える）。
+- **実装時の確認手順**: SSP 2.9.18 で `\_q\p[0]\f[color,0,180,0]あああ\xかきくけこ\x[noclear]\e` を送り、クリックした後に `dump_balloon` で「かきくけこ」の色を見る。`\p[1]\f[color,0,180,0]あ\xい` も同じに見る。結果を本書に追記し、解除されないと分かっても出力は変えない。
+- **例（出力）**: `おじさん：やあ\xまたね。` → `\p[0]\f[color,90,110,140]やあ\x\f[color,90,110,140]またね。\e`
+
+### OQ-3: 要件 4.3 の「その組み立てで装いのあるアクターが話したとき」の読み方
+
+- **仮定**: スポット単位で読む。切り替え先のスポットで、そのビルドで装いを付けた（`\c` で消していない）か、切り替え先のアクターが装いを持つときだけ戻す。
+- **推奨**: 草案のまま。要件 5.2（「同じバルーンに装いのあるアクターの台詞が表示されていない」なら出力を変えない）と矛盾しない読み方はこれだけ。
+- **代案**: ビルド単位で読む（装いのあるアクターがどこかで話したら、そのビルドのすべての切り替えで戻す）。5.2 の例で出力が変わる。
+- **例**: おじさん（装い・スポット 0）→ ぱすた（スポット 1・台詞に `\f[bold,1]`）→ 男の子（スポット 1・装い無し）。草案: 男の子への切り替えでは何も出さない（ぱすたの太字が男の子に残る。今の動きのまま）。代案: `\p[1]\f[default]男の子の台詞`。
+
+### OQ-4: 装いのあるアクターのグループで出した選択肢の字
+
+- **仮定**: 何もしない。選択肢の字は装いの `height`・`name` などを受け継ぎ、色は選択肢の色になる（実機 #3）。
+- **推奨**: 草案のまま。選択肢はそのアクターのグループで出したもので、受け継ぐのは SSP の振る舞い。要件にも選択肢の見え方の定めは無い。
+- **代案**: 選択肢の直前に `\f[default]`、直後に装いを出し直す（出力が増え、`vertical-balloon-lines` の選択肢の区切りと同じ場所を触る）。
+- **例**: `font = { height = 14 }` のおじさんのグループで選択肢 → `\p[0]\f[height,14]どっち？\n[150]\![*]\q[こっち,…]`（「こっち」も 14 の大きさ）。
+
+### OQ-5: 縦書きのバルーンでの `\f[height]` と `\n[180]` の順
+
+- **仮定**: 横書きでは順が表示に効かなかった（実機 #6）ので、縦書きでも装いのタグ → 改行の順（要件 2.5）のままにする。
+- **推奨**: 草案のまま。実装の後に、窓際のぱすたさんの縦書きのバルーン（`vertical,1`）で `\p[0]\f[height,30]あ\p[0]\f[default]\n[180]い` と `\p[0]\f[height,30]あ\n[180]\f[default]い` を比べ、列の送りに差があれば報告する。
+- **代案**: 戻すタグを改行の後ろに置く（`\p[0]\n[180]\f[default]い`）。要件 2.5 の例の順と違うので、要件の変更が要る。
+
+### OQ-6: `config-actor-font` と飛び先の検査
+
+- **仮定**: `skip_reasons` に入れない（飛び先の検査を続ける）。
+- **推奨**: 草案のまま（装いはシーンの集まりに関わらない）。`debug/validate.md` の「省く理由」の列挙には足さない。
+- **代案**: ほかの `config-*` と同じく省く理由に入れる（一覧の見た目はそろうが、報告が減る）。
+- **例**: `font = { colour = "red" }` と、存在しない飛び先 `＞おわり` が同じゴーストにあるとき、草案では `config-actor-font`（誤り）と `call-target-missing`（注意）の両方が出る。
+
+## Risks & Mitigations
+
+- `\x` の振る舞いが未確認 — どちらでも表示が同じになる出し直しで備え、実装時に実機で確かめる（OQ-2）。
+- `sakura_builder.lua` を `vertical-balloon-lines` などと共有 — 変更を 2 つの関数の引数と 1 行ずつに限る。
+- スキル references の再生成が `.claude/skills/` への書き込みで分類器に拒まれる — 生成した差分を示して開発者に許可を求める。
+- `@pasta_config` の `font` の形が TOML と違う — マニュアルの 3 か所に書き、`config_test.rs` で固定する。
+
+## References
+
+- ukadoc: `\f[…]`（各属性・`default`）、`\x`・`\x[noclear]`、`\c`、`\n[パーセント]`（ギャップ分析で参照済み）。
+- `toml` 1.1.7 のソース `src/de/parser/detable.rs`（`DeTable::parse`）。
+- `.kiro/specs/completed/scene-name-alias/design.md`（規則を `pasta_core` に置く先例）。
+- `.kiro/specs/completed/actor-surface-restore/`（`appearance.lua` の状態を持たないモジュールの先例）。
