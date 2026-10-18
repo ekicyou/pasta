@@ -163,10 +163,10 @@ fn ffi_load_reads_dll_from_deep_and_non_ansi_folders() {
             .unwrap_or_else(|e| panic!("{label}: ゴーストを読めない: {e}"));
         let abs = file.to_str().unwrap().to_string();
         for name in ["foo".to_string(), abs.clone(), slashed(&file)] {
-            let (sum, dep, shown) = ffi_load_and_call(runtime.lua(), &name)
+            // 2.7（文言に接頭辞が出ない）は失敗の文言で確かめる（下のテスト）。
+            let (sum, dep, _) = ffi_load_and_call(runtime.lua(), &name)
                 .unwrap_or_else(|e| panic!("{label}: ffi.load({name:?}) が失敗: {e}"));
             assert_eq!((sum, dep), (3, VIA_DEP_VALUE), "{label}: {name}");
-            assert!(!shown.contains(VERBATIM_PREFIX), "{label}: {shown}");
         }
         // 次の置き場所の同名の foo.dll と取り違えないよう、VM を落として解放する。
         drop(runtime);
