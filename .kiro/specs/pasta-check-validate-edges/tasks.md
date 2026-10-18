@@ -105,8 +105,8 @@
   - _Depends: 2.1, 2.2, 3.2_
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 6. 最後の確かめ
-- [ ] 6.1 全体のテストと静的検査（すべての要件にまたがる最後の関門）
+- [x] 6. 最後の確かめ
+- [x] 6.1 全体のテストと静的検査（すべての要件にまたがる最後の関門）
   - `NoDefaultCurrentDirectoryInExePath` を外して `cargo test --all`・`cargo clippy --all-targets`・`cargo fmt --check`（触ったファイル）・拡張のテストを走らせる。`pasta_lua` のテストが書き換えた `sample.generated.lua` の改行の差分は戻す
   - 完了の状態: すべて通り、作業ツリーに意図しない差分が無い
   - _Requirements: 1.1, 2.1, 3.1, 4.1, 5.1, 6.1_
