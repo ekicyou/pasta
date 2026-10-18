@@ -4,7 +4,7 @@
 //! boundaries while transparently preserving sakura script tags.
 
 use regex::Regex;
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthChar;
 
 /// 列の状態。Lua の表 { line, width, jump } と 1 対 1 に対応する。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -193,8 +193,9 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
 
 /// budoux の改行を入れる。`column` を始めの状態として読み、終わりの状態に書き換える。
 ///
-/// 先頭の単位の列の動きを当て、語を先頭から見て、語の頭で上限を超えるなら改行
-/// （`\n`）を入れて次の列へ進み、語の字の後ろの単位の列の動きを順に当てる。
+/// 先頭の単位の列の動きを当て、語を列の動きのある所でかけらに割って先頭から見る。
+/// 語の頭のかけらで、列に字があり上限を超えるなら `rule.newline` を入れて次の列へ進み、
+/// かけらの最後の字の後ろの単位の列の動きを順に当てる。タグの後ろのかけらは字数に足すだけ。
 /// タグは字数に数えない。`rule.widths` が空なら語に分けず、入力をそのまま返して
 /// 列の状態だけ進める。
 pub fn break_lines_impl(
@@ -210,9 +211,11 @@ pub fn break_lines_impl(
         column.apply(m, rule);
     }
 
+    let width_of = |pc: &PlainChar| UnicodeWidthChar::width_cjk(pc.ch).unwrap_or(0);
+
     if rule.widths.is_empty() || tokens.chars.is_empty() {
         for pc in &tokens.chars {
-            column.width += UnicodeWidthChar::width_cjk(pc.ch).unwrap_or(0);
+            column.width += width_of(pc);
             for &m in &pc.moves {
                 column.apply(m, rule);
             }
@@ -225,35 +228,55 @@ pub fn break_lines_impl(
     let words = parser.parse(&plaintext);
 
     // break_positions は、その字の前に改行を入れる tokens.chars の添字
-    let mut break_positions = Vec::new();
+    let mut break_positions: Vec<usize> = Vec::new();
     let mut char_idx: usize = 0;
 
     for word in &words {
-        let word_width = UnicodeWidthStr::width_cjk(word.as_str());
-        let word_len = word.chars().count();
-
-        // 列に字があり、足すと上限を超えるなら語の前で割る（1 語で超えても割らない）
-        if char_idx > 0 && column.width > 0 && column.width + word_width > column.threshold(rule) {
-            break_positions.push(char_idx);
-            column.apply(ColumnMove::Next, rule);
-        }
-        column.width += word_width;
-
-        for pc in &tokens.chars[char_idx..char_idx + word_len] {
-            for &m in &pc.moves {
+        let word_end = char_idx + word.chars().count();
+        // 語を、字の後ろに列の動きがある所で「かけら」に割る
+        let mut head = true;
+        for frag in tokens.chars[char_idx..word_end].split_inclusive(|pc| !pc.moves.is_empty()) {
+            let frag_width: usize = frag.iter().map(width_of).sum();
+            // 語の頭のかけらだけ: 列に字があり、足すと上限を超えるなら前で割る（1 語で超えても割らない）。
+            // タグの後ろのかけらは字数 0 の列の頭なので、足すだけ
+            if head && column.width > 0 && column.width + frag_width > column.threshold(rule) {
+                // 単独の `\` の直後に入れると `\\` に化けるので、`\` と語を 1 語として
+                // `\` の前で割る（決定 9）。`\` は今の列に数えてあるので新しい列へ移す。
+                // `\` が列の頭（その前に字が無い）なら、割ると字の無い列ができるので割らない
+                let lone = char_idx
+                    .checked_sub(1)
+                    .map(|i| &tokens.chars[i])
+                    .filter(|prev| prev.ch == '\\' && prev.trailing.is_empty());
+                match lone {
+                    Some(prev) if column.width > width_of(prev) => {
+                        break_positions.push(char_idx - 1);
+                        column.apply(ColumnMove::Next, rule);
+                        column.width = width_of(prev);
+                    }
+                    Some(_) => {}
+                    None => {
+                        break_positions.push(char_idx);
+                        column.apply(ColumnMove::Next, rule);
+                    }
+                }
+            }
+            head = false;
+            column.width += frag_width;
+            for &m in &frag[frag.len() - 1].moves {
                 column.apply(m, rule);
             }
         }
-        char_idx += word_len;
+        char_idx = word_end;
     }
 
-    let mut result = String::with_capacity(input.len() + break_positions.len() * 2);
+    let mut result =
+        String::with_capacity(input.len() + break_positions.len() * rule.newline.len());
     result.push_str(tokens.leading);
 
     let mut bp_idx = 0;
     for (i, pc) in tokens.chars.iter().enumerate() {
         if bp_idx < break_positions.len() && i == break_positions[bp_idx] {
-            result.push_str("\\n");
+            result.push_str(rule.newline);
             bp_idx += 1;
         }
 
@@ -367,12 +390,217 @@ mod tests {
         let mut c = Column::default();
         assert_eq!(break_from("今日は", &[4, 20], &mut c, &re, &p), "今日は");
         assert_eq!(c, col(1, 6));
-        // 持ち越した字数 6 で 1 列目（4）を越えているので、2 つ目の語の前で割る
+        // 持ち越した字数 6 で 1 つ目の語（4）が 1 列目（4）に収まらないので、1 つ目の語の前で割る
         assert_eq!(
             break_from("いい天気ですね", &[4, 20], &mut c, &re, &p),
-            r"いい\n天気ですね"
+            r"\nいい天気ですね"
+        );
+        assert_eq!(c, col(2, 14));
+    }
+
+    /// 飛んだ後の並びと改行の文字列を指定して呼ぶ。
+    fn break_rule(
+        input: &str,
+        widths: &[usize],
+        jump_widths: &[usize],
+        newline: &str,
+        column: &mut Column,
+    ) -> String {
+        let rule = BreakRule {
+            widths,
+            jump_widths,
+            newline,
+        };
+        break_lines_impl(input, &rule, column, &tag_regex(), &parser())
+    }
+
+    // --- 語の途中のタグ・持ち越し・飛んだ後の並び・改行の文字列 (Requirement 1.1, 2.5, 2.6, 3.1, 3.3, 3.4, 4.6, 4.7) ---
+
+    #[test]
+    fn test_tag_inside_word_splits_into_fragments() {
+        // 「空調」は budoux が 1 語にする。`\n` の後ろの「調」は字数 0 の列の頭（前に改行を入れない）
+        let mut c = Column::default();
+        assert_eq!(
+            break_from(r"空\n調", &[2], &mut c, &tag_regex(), &parser()),
+            r"空\n調"
+        );
+        assert_eq!(c, col(2, 2));
+        // 語の頭のかけら「空」（2）だけを足して上限 8 を判定する（語全体の 4 ではない）
+        let mut c = Column::default();
+        assert_eq!(
+            break_from(r"今日は空\n調", &[8], &mut c, &tag_regex(), &parser()),
+            r"今日は空\n調"
+        );
+        assert_eq!(c, col(2, 2));
+    }
+
+    #[test]
+    fn test_carried_width_breaks_before_first_word() {
+        // 持ち越した字数 6 で 1 つ目の語が収まらない: 先頭の単位の後、1 つ目の字の前で割る
+        let mut c = col(1, 6);
+        assert_eq!(
+            break_from(
+                r"\s[1]いい天気ですね",
+                &[4, 20],
+                &mut c,
+                &tag_regex(),
+                &parser()
+            ),
+            r"\s[1]\nいい天気ですね"
+        );
+        assert_eq!(c, col(2, 14));
+        // 字数 0 なら 1 つ目の語の前で割らない
+        let mut c = col(1, 0);
+        assert_eq!(
+            break_from(
+                r"\s[1]いい天気ですね",
+                &[4, 20],
+                &mut c,
+                &tag_regex(),
+                &parser()
+            ),
+            r"\s[1]いい\n天気ですね"
         );
         assert_eq!(c, col(2, 10));
+    }
+
+    #[test]
+    fn test_jump_widths_after_jump_tag() {
+        let at = |line, width, jump| Column { line, width, jump };
+        // `\_l` の後の 1 列目は 40: 36 + 4 は収まり、続く 10 で割る
+        let mut c = at(1, 36, true);
+        assert_eq!(
+            break_rule("いい天気ですね", &[4], &[40, 28], r"\n", &mut c),
+            r"いい\n天気ですね"
+        );
+        assert_eq!(c, at(2, 10, true));
+        // 2 列目以降は 28
+        let mut c = at(2, 14, true);
+        assert_eq!(
+            break_rule("いい天気ですね", &[4], &[40, 28], r"\n", &mut c),
+            "いい天気ですね"
+        );
+        let mut c = at(3, 18, true);
+        assert_eq!(
+            break_rule("いい天気ですね", &[4], &[40, 28], r"\n", &mut c),
+            r"いい\n天気ですね"
+        );
+        // `\_l` の後ろは飛んだ後の並び（40）で数えるので割らない
+        let mut c = Column::default();
+        assert_eq!(
+            break_rule(
+                r"今日は\_l[0,0]いい天気ですね",
+                &[4],
+                &[40, 28],
+                r"\n",
+                &mut c
+            ),
+            r"今日は\_l[0,0]いい天気ですね"
+        );
+        assert_eq!(c, at(1, 14, true));
+        // `\c` で `budoux` の並び（4）に戻る
+        let mut c = Column::default();
+        assert_eq!(
+            break_rule(
+                r"\_l[0,0]今日は\cいい天気ですね",
+                &[4],
+                &[40, 28],
+                r"\n",
+                &mut c
+            ),
+            r"\_l[0,0]今日は\cいい\n天気ですね"
+        );
+        assert_eq!(c, at(2, 10, false));
+        // 2 度目の `\_l` で飛んだ後の並びの先頭から使い直す
+        let mut c = at(3, 20, true);
+        break_rule(r"\_l[0,0]いい", &[4], &[40, 28], r"\n", &mut c);
+        assert_eq!(c, at(1, 4, true));
+    }
+
+    #[test]
+    fn test_newline_string_follows_rule() {
+        let mut c = Column::default();
+        assert_eq!(
+            break_rule("今日はいい天気ですね", &[4], &[], r"\n[180]", &mut c),
+            r"今日は\n[180]いい\n[180]天気ですね"
+        );
+        assert_eq!(c, col(3, 10));
+    }
+
+    #[test]
+    fn test_break_after_lone_backslash_moves_before_it() {
+        // 単独の `\` の直後に改行を入れると `\\`（エスケープ）に化けるので、`\` の前に寄せる
+        let input = r"天気天気\今日は";
+        let out = direct(input, &[4]);
+        assert_eq!(out, r"天気天気\n\今日は");
+        assert!(!out.contains(r"\\n"), "改行がエスケープに化けた: {out}");
+        assert_eq!(out.replace(r"\n", ""), input);
+    }
+
+    #[test]
+    fn test_break_before_lone_backslash_counts_it_in_new_column() {
+        // 寄せた改行の後ろの列は `\今日は`（`\` の 1 ＋ 6）
+        let mut c = Column::default();
+        assert_eq!(
+            break_from(r"天気天気\今日は", &[4], &mut c, &tag_regex(), &parser()),
+            r"天気天気\n\今日は"
+        );
+        assert_eq!(c, col(2, 7));
+    }
+
+    #[test]
+    fn test_lone_backslash_at_column_head_joins_next_word() {
+        // budoux が `\` だけで 1 語にし、その前で割った。`\` と次の語は 1 語として扱い、
+        // 改行を重ねず列も進めない（1 語で上限を超えても割らない）
+        let mut c = Column::default();
+        assert_eq!(
+            break_from(
+                r"こんにちは\「今日」",
+                &[4],
+                &mut c,
+                &tag_regex(),
+                &parser()
+            ),
+            r"こんに\nちは\n\「今日」"
+        );
+        assert_eq!(c, col(3, 9));
+        // 作者の `\n` の後ろの `\` も列の頭。前に寄せると字の無い列ができるので割らない
+        let mut c = Column::default();
+        assert_eq!(
+            break_from(r"天気天気\n\今日は", &[4], &mut c, &tag_regex(), &parser()),
+            r"天気天気\n\今日は"
+        );
+        assert_eq!(c, col(2, 7));
+    }
+
+    #[test]
+    fn test_lone_backslash_state_matches_recount_of_output() {
+        // どの経路でも、終わりの状態は出力を数え直した状態（幅が空なら数えるだけ）と同じ
+        let (re, p) = (tag_regex(), parser());
+        let inputs = [
+            r"天気天気\今日は",
+            r"こんにちは\「今日」",
+            r"ああ\「「",
+            r"天気天気\今日は今日は",
+            r"天気天気\n\今日は",
+            r"\今日はいい天気",
+            r"今日は\",
+        ];
+        for input in inputs {
+            for w in 1..=8 {
+                for start in [0, 3] {
+                    let mut c = col(1, start);
+                    let out = break_from(input, &[w], &mut c, &re, &p);
+                    let mut recount = col(1, start);
+                    break_from(&out, &[], &mut recount, &re, &p);
+                    let ctx = format!("{input} [{w}] start {start} -> {out}");
+                    assert_eq!(c, recount, "{ctx}");
+                    assert!(!out.contains(r"\\n"), "{ctx}");
+                    assert!(!out.contains(r"\n\n"), "{ctx}");
+                    assert_eq!(out.replace(r"\n", ""), input.replace(r"\n", ""), "{ctx}");
+                }
+            }
+        }
     }
 
     // --- Test 1: Plain text line breaking ---

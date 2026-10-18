@@ -76,9 +76,8 @@ fn assert_breaks_alive(out: &str, brk: &str) {
     );
 }
 
-/// budoux の改行が、単語・関数の返り値の末尾の単独の `\` の直後に入る（今も起きる）。
+/// budoux の改行が、単語・関数の返り値の末尾の単独の `\` の直後に入っても、改行として働く（2.3 で守った）。
 #[test]
-#[ignore = "1.2 で DSL から届くと確かめた形。2.3（budoux の改行の層）で守って ignore を外す"]
 fn budoux_break_after_lone_backslash_stays_a_break() {
     let (_temp, runtime) = load_ghost();
     // どちらの経路も確かめるため、片方で止めずに両方の出力を見てから判定する
