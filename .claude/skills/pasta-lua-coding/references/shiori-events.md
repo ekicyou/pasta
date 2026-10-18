@@ -834,7 +834,7 @@ pasta は、OnSecondChange が届くたびに、前の OnSecondChange からの�
 
 - 飛びがあると、時報の次の正時を決め直す（[check_hour](#check_houract)）。仮想時刻を入れ直しても、余分な時報は出ない。
 - おしゃべりの間隔・撫での判定・コールバックの待ち時間（[get_property](script-api.md#get_propertyname_or_names-timeout-timeout_message)）は、飛びの分を差し引いた時計で数える。仮想時刻を 3 時間進めても、次のおしゃべりまでの残りは変わらない。
-- スリープから復帰した後（`OnSysResume`）の最初の差は、飛びとみなさない。時報は 1 回出て、おしゃべりはすぐ出る。
+- スリープから復帰した後の最初の差は、飛びとみなさない（`OnSysSuspend` か `OnSysResume` が届いた後の最初の飛び）。時報は 1 回出て、おしゃべりはすぐ出る。
 - `X-Pasta-Time` ヘッダのあるリクエストでは、飛びを見ない。その日時をそのまま使う。
 - 飛びの記録は保存しない。SHIORI の load から unload までの間だけ保たれる。
 

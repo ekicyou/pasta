@@ -109,6 +109,7 @@ fn build_preempt_kick_ghost_dir() -> (PathBuf, TempDir) {
         .expect("parent dir")
         .join("pasta_sample_ghost/ghosts/hello-pasta/ghost/master");
     copy_dir_recursive(&sample_ghost_dir, temp.path()).expect("copy hello-pasta ghost");
+    remove_baseware_wait_dics(temp.path());
 
     // 本タスクの全シーンを 1 ファイルに定義（dic/*.pasta は loader が自動読み込み）。
     let scenes = [
@@ -148,7 +149,36 @@ fn build_preempt_kick_ghost_dir() -> (PathBuf, TempDir) {
     );
     std::fs::write(&toml_path, toml).expect("write pasta.toml");
 
+    assert_no_baseware_wait(temp.path());
     (temp.path().to_path_buf(), temp)
+}
+
+/// 写した hello-pasta の辞書から、ベースウェアの返事を待つシーン（`＄％`）を含む段を外す。
+/// キックのシーンが借りる表情（03 段目）などはそのまま残す。
+fn remove_baseware_wait_dics(ghost_dir: &Path) {
+    for entry in std::fs::read_dir(ghost_dir.join("dic")).expect("read dic") {
+        let path = entry.expect("dic entry").path();
+        let text = std::fs::read_to_string(&path).expect("read dic file");
+        if text.contains("＄％") {
+            std::fs::remove_file(&path).expect("remove dic file");
+        }
+    }
+}
+
+/// 自然なおしゃべりの抽選で、ベースウェアの返事を待つシーン（`＄％` のプロパティ変数）が
+/// 選ばれないことを確かめる。テストには返事をするベースウェアが無いので、選ばれると
+/// `get_property` の待ちが後の tick で時間切れになり、その応答（掃引が dispatch より先）が
+/// キックのビートを押しのける（抽選しだいで 2 割ほど落ちた原因）。
+fn assert_no_baseware_wait(ghost_dir: &Path) {
+    for entry in std::fs::read_dir(ghost_dir.join("dic")).expect("read dic") {
+        let path = entry.expect("dic entry").path();
+        let text = std::fs::read_to_string(&path).expect("read dic file");
+        assert!(
+            !text.contains("＄％"),
+            "test ghost must not contain scenes that wait for the baseware: {}",
+            path.display()
+        );
+    }
 }
 
 fn normalize_request(text: &str) -> String {

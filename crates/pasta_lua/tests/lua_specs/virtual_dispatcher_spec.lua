@@ -911,6 +911,22 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         expect(found):toBe(nil)
     end)
 
+    vtest("実機の順番のスリープ明け（OnSysSuspend → 最初の秒 → OnSysResume）でも時報は 1 回出て、おしゃべりはすぐ出る", function()
+        dispatcher.check_hour(mk_act(R0)) -- 初回: 11:00 を記録
+        dispatcher.check_talk(mk_act(R0)) -- 初回: 次のおしゃべりを記録
+        local talk_at = dispatcher._get_internal_state().next_talk_time
+        local real = R0 + 2 * H -- 2 時間眠って 12:21
+        CLOCK.observe({ id = "OnSysSuspend", date = mk_date(real), dic = {} }) -- 復帰してから届く
+        expect(type(dispatcher.check_hour(mk_act(real)))):toBe("thread")
+        expect(found):toBe("時報" .. hh_of(real))
+        expect(talk_at < CLOCK.steady({ date = mk_date(real), dic = {} })):toBe(true)
+        expect(type(dispatcher.check_talk(mk_act(real + 1)))):toBe("thread")
+        CLOCK.observe({ id = "OnSysResume", date = mk_date(real + 4), dic = {} }) -- 4 秒遅れて届く
+        found = nil
+        expect(dispatcher.check_hour(mk_act(real + 5))):toBe(nil)
+        expect(found):toBe(nil)
+    end)
+
     vtest("hour_margin は仮想の正時までの残りで見る", function()
         dispatcher.check_hour(mk_act(R0))
         dispatcher.check_talk(mk_act(R0))

@@ -143,9 +143,9 @@ describe("CLOCK.observe - 合図の見込み（Unit 1）", function()
 
     test("他のイベントは false を返し、何も変えない", function()
         with_clock(function(CLOCK)
-            expect(CLOCK.observe(mk_req("OnSysSuspend", BASE + 30))):toBe(false)
+            expect(CLOCK.observe(mk_req("OnBoot", BASE + 30))):toBe(false)
             expect(CLOCK._get_state()):toEqual({
-                offset = 0, probe_armed = false, epoch = 0, jump_total = 0, resumed = false,
+                offset = 0, probe_armed = false, epoch = 0, jump_total = 0, resumed = false, suspended = false,
             })
         end)
     end)
@@ -404,6 +404,50 @@ describe("CLOCK.observe - 時刻の飛び（設計の見直し 1）", function()
         end)
     end)
 
+    -- 実機の順番（2026-10-18・SSP 2.9.18）: 最後の秒 → スリープ → OnSysSuspend（復帰してから届く）
+    -- → 最初の秒（+142 秒）→ 4 秒後に OnSysResume → 次の秒
+    test("実機の順番: OnSysSuspend の後の飛びは数えず、遅れて届く OnSysResume の後も印が残らない", function()
+        with_clock(function(CLOCK)
+            seconds(CLOCK, { BASE })
+            expect(CLOCK.observe(mk_req("OnSysSuspend", BASE + 141))):toBe(false)
+            expect(CLOCK._get_state().suspended):toBe(true)
+            seconds(CLOCK, { BASE + 142, BASE + 143, BASE + 144, BASE + 145, BASE + 146 })
+            expect(CLOCK.epoch()):toBe(0)
+            expect(CLOCK._get_state().jump_total):toBe(0)
+            expect(CLOCK._get_state().suspended):toBe(false)
+            CLOCK.observe(mk_req("OnSysResume", BASE + 146))
+            seconds(CLOCK, { BASE + 147 })
+            expect(CLOCK._get_state().resumed):toBe(false)
+            expect(CLOCK._get_state().suspended):toBe(false)
+            seconds(CLOCK, { BASE + 3600 }) -- その後の設定し直しは数える
+            expect(CLOCK.epoch()):toBe(1)
+        end)
+    end)
+
+    test("OnSysSuspend の印は眠る前の飛ばない秒では消えず、次の飛びを 1 回だけ見逃す", function()
+        with_clock(function(CLOCK)
+            seconds(CLOCK, { BASE })
+            CLOCK.observe(mk_req("OnSysSuspend", BASE))
+            seconds(CLOCK, { BASE + 1, BASE + 2, BASE + 600 })
+            expect(CLOCK.epoch()):toBe(0)
+            seconds(CLOCK, { BASE + 4200 })
+            expect(CLOCK.epoch()):toBe(1)
+        end)
+    end)
+
+    test("OnSysSuspend の後にスリープせず OnSysResume が来たら、飛ばない秒で両方の印が消える", function()
+        with_clock(function(CLOCK)
+            seconds(CLOCK, { BASE })
+            CLOCK.observe(mk_req("OnSysSuspend", BASE))
+            CLOCK.observe(mk_req("OnSysResume", BASE + 1))
+            seconds(CLOCK, { BASE + 1 })
+            expect(CLOCK._get_state().suspended):toBe(false)
+            expect(CLOCK._get_state().resumed):toBe(false)
+            seconds(CLOCK, { BASE + 3600 })
+            expect(CLOCK.epoch()):toBe(1)
+        end)
+    end)
+
     test("X-Pasta-Time 付きは飛びを見ず、prev_now も変えない", function()
         with_clock(function(CLOCK)
             seconds(CLOCK, { BASE })
@@ -440,7 +484,7 @@ describe("CLOCK.observe - 時刻の飛び（設計の見直し 1）", function()
             CLOCK.observe(mk_req("OnSysResume", BASE + 3601))
             CLOCK._reset()
             expect(CLOCK._get_state()):toEqual({
-                offset = 0, probe_armed = false, epoch = 0, jump_total = 0, resumed = false,
+                offset = 0, probe_armed = false, epoch = 0, jump_total = 0, resumed = false, suspended = false,
             })
             expect(CLOCK.epoch()):toBe(0)
         end)

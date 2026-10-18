@@ -399,6 +399,7 @@ SSP の仮想時刻は SHIORI のリクエストのヘッダに載らない。SS
 | `_epoch` | 整数 | `0` | 時刻の飛びの通し番号 |
 | `_jump_total` | 整数（秒） | `0` | 飛びの合計（ふだんの 1 秒分を除く） |
 | `_resumed` | 真偽値 | `false` | `OnSysResume` の後で、次の 1 回の差を飛びとみなさないか |
+| `_suspended` | 真偽値 | `false` | `OnSysSuspend` の後で、次の 1 回の飛びを飛びとみなさないか（飛ばない差では下ろさない） |
 
 状態は保存しない。VM と同じ寿命（`load` から `unload` まで）で、次の `load` で初期値から始まる。
 
@@ -420,7 +421,7 @@ REG.OnSecondChange（既定）
 - 返事の受け取り: `id` が `OnPastaClock` で `SecurityLevel` が `external` でなければ、`observe` が返事として消費して true を返す（`REG` へ進まない）。Reference0〜5 を `tonumber` で整数に読み、`os.time`（地方時）で Unix 時刻にし、`act.req.date.unix` との差をずれにする。差の絶対値が 2 秒以下（ローカル定数 `OFFSET_DEADBAND`）なら 0 にする。値が読めなければずれを 0 に戻し、警告ログを出す。ずれが変わったときはデバッグログを出す。
 - `X-Pasta-Time`: ヘッダのあるリクエストでは、合図を判定せず、返事を受け取っても無視し、読み取りも返さない。`now` は `req.date.unix` を、`date` は `req.date` をそのまま返す。
 - 読み出し: `now(req)` は `req.date.unix + _offset`、`date(req)` はずれを足した時刻から `os.date("*t")` で作った新しい日付の表（`act.req.date` と同じ形）を返す。ずれが 0 なら `req.date` をそのまま返し、`act.req.date` は書き換えない。日時変数の転記（`pasta.shiori.act` の `transfer_date_to_var`）は `CLOCK.date` を読む。`offset()` は `_offset` を返す。
-- 時刻の飛び: `observe` は OnSecondChange のたびに `d = now − _prev_now` を求め、`d` が −2 秒より小さいか 90 秒より大きければ（ローカル定数 `JUMP_BACK`・`JUMP_FORWARD`）飛びとして `_epoch` を 1 増やし、`_jump_total` に `d − 1` を足す。`_resumed` が立っていれば数えず、どちらの場合も `_resumed` を下ろして `_prev_now` を `now` にする。`OnSysResume` を見ると `_resumed` を立てる（スリープ明けは飛びにしない）。`X-Pasta-Time` 付きのリクエストは飛びを見ず、`_prev_now` も変えない。ずれが変わったとき（読み取りの返事）も、次の OnSecondChange で `now` が飛ぶので同じ判定に入る。
+- 時刻の飛び: `observe` は OnSecondChange のたびに `d = now − _prev_now` を求め、`d` が −2 秒より小さいか 90 秒より大きければ（ローカル定数 `JUMP_BACK`・`JUMP_FORWARD`）飛びとして `_epoch` を 1 増やし、`_jump_total` に `d − 1` を足す。`_resumed` か `_suspended` が立っていれば数えずに `_suspended` を下ろす。飛ばない差で `_resumed` が立っていれば `_suspended` も下ろす（スリープせずに戻った場合に印を残さない）。どの場合も最後に `_resumed` を下ろして `_prev_now` を `now` にする。`OnSysSuspend` を見ると `_suspended` を、`OnSysResume` を見ると `_resumed` を立てる（スリープ明けは飛びにしない）。SSP 2.9.18 では、`OnSysSuspend` は復帰してから最初の OnSecondChange より前に届き、`OnSysResume` は最初の OnSecondChange より数秒遅れて届く（2026-10-18 実機）ので、両方を見る。`X-Pasta-Time` 付きのリクエストは飛びを見ず、`_prev_now` も変えない。ずれが変わったとき（読み取りの返事）も、次の OnSecondChange で `now` が飛ぶので同じ判定に入る。
 - なめらかな時計: `steady(req)` は `now(req) − _jump_total`（`X-Pasta-Time` があれば `req.date.unix`）を返す。おしゃべりの間隔（`check_talk`）、`act:get_property` の期限と `CALLBACK.sweep` に渡す今（`req.date` が無ければ `os.time()`）、撫での判定の時刻（`pasta.shiori.event.mouse`）はこれで数える。`epoch()` は `_epoch` を返し、ディスパッチャが `seen_epoch` と比べる。飛んでから次の OnSecondChange までの 1 秒足らずの間に始まった期限や撫では、補正前の時計で数える。
 - 仮想時刻を使わずに OS の時計を手で 90 秒より進めたか 2 秒より戻したときも、飛びになる（10 時 30 分から 9 時 30 分へ戻すと 10 時に時報が出る。10 時 30 分から 12 時 10 分へ進めると 13 時まで時報が出ず、おしゃべりは残りの間隔を待つ）。
 - 見落とし: ずれの変化の秒の端数が毎分の許容幅（±2 秒）に入ると、毎分の合図では気づかない。そのときは仮想の正時の `OnHourTimeSignal` で気づき、決め直しの猶予（70 秒）で時報が数秒遅れて 1 回出る。仮想時刻を戻した（Reset）のを見落とすと、古いずれが最大 1 時間残り、実際の正時の `OnHourTimeSignal` で直る。ずれの変化が 1 時間の倍数に近いと気づけない。

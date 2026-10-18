@@ -187,7 +187,8 @@ impl Default for TalkConfig {
 /// Acts as the single source of truth (SSOT) for the SHIORI default values of
 /// the `[ghost]` section. The defaults (`talk_interval_min = 180`,
 /// `talk_interval_max = 300`, `hour_margin = 30`, `spot_newlines = 1.5`,
-/// `choice_newlines = 1.5`) match the current Lua literal fallbacks so that
+/// `choice_newlines = 1.5`, `after_choice_newlines = 1.0`) match the current
+/// Lua literal fallbacks so that
 /// omitting `[ghost]` keeps the historical behavior (requirements 1.2 / 1.3 /
 /// 3.3).
 ///
@@ -219,6 +220,11 @@ pub struct GhostConfig {
     /// Width of the line break before a choice that follows text (as a ratio).
     /// Default: 1.5
     pub choice_newlines: f64,
+
+    /// Width of the line break after a choice, before the next choice or text
+    /// in the same balloon (as a ratio; `1.0` emits a plain `\n`).
+    /// Default: 1.0
+    pub after_choice_newlines: f64,
 }
 
 impl Default for GhostConfig {
@@ -229,6 +235,7 @@ impl Default for GhostConfig {
             hour_margin: default_hour_margin(),
             spot_newlines: default_spot_newlines(),
             choice_newlines: default_choice_newlines(),
+            after_choice_newlines: default_after_choice_newlines(),
         }
     }
 }
@@ -256,6 +263,11 @@ pub const fn default_spot_newlines() -> f64 {
 /// Default `choice_newlines` (`1.5`).
 pub const fn default_choice_newlines() -> f64 {
     1.5
+}
+
+/// Default `after_choice_newlines` (`1.0`).
+pub const fn default_after_choice_newlines() -> f64 {
+    1.0
 }
 
 /// Debug configuration from `[debug]` section in pasta.toml.

@@ -64,6 +64,7 @@ local _prev_now = nil      -- 前回の OnSecondChange の「今」
 local _epoch = 0           -- 時刻の飛びの通し番号
 local _jump_total = 0      -- 飛びの合計（秒。ふだんの 1 秒分を除く）
 local _resumed = false     -- OnSysResume の後で、次の 1 回の飛びを数えない
+local _suspended = false   -- OnSysSuspend の後で、次の 1 回の飛びを数えない（飛ばない秒では消えない）
 
 --- X-Pasta-Time（テストの時刻の上書き）があるリクエストか
 ---@param req ClockRequest
@@ -122,10 +123,19 @@ end
 local function watch_jump(now)
     if _prev_now ~= nil then
         local d = now - _prev_now
-        if (d < -JUMP_BACK or d > JUMP_FORWARD) and not _resumed then
-            _epoch = _epoch + 1
-            _jump_total = _jump_total + d - 1
-            log.debug(string.format("[clock] 時刻の飛び: %d 秒", d))
+        if d < -JUMP_BACK or d > JUMP_FORWARD then
+            if _resumed or _suspended then
+                -- スリープ明けは飛びにしない。SSP は OnSysSuspend を復帰してから送り、
+                -- OnSysResume は復帰後の最初の秒より数秒遅れて送る（2026-10-18 実機）
+                _suspended = false
+            else
+                _epoch = _epoch + 1
+                _jump_total = _jump_total + d - 1
+                log.debug(string.format("[clock] 時刻の飛び: %d 秒", d))
+            end
+        elseif _resumed then
+            -- 復帰した後の飛ばない秒: スリープしなかった（取りやめた）場合も印を残さない
+            _suspended = false
         end
     end
     _resumed = false
@@ -143,6 +153,7 @@ function M.observe(req)
         return true
     end
     if req.id == "OnSysResume" then _resumed = true end
+    if req.id == "OnSysSuspend" then _suspended = true end
     if has_pasta_time(req) then return false end
     local now = M.now(req)
     if now == nil then return false end
@@ -233,6 +244,7 @@ function M._reset()
     _epoch = 0
     _jump_total = 0
     _resumed = false
+    _suspended = false
 end
 
 --- テスト用: 状態を読む
@@ -246,6 +258,7 @@ function M._get_state()
         epoch = _epoch,
         jump_total = _jump_total,
         resumed = _resumed,
+        suspended = _suspended,
     }
 end
 

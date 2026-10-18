@@ -102,7 +102,7 @@ load_with_config(base_dir, runtime_config)
 5. `[actor."名前"]` の `font` を、`actor_font::apply` が `pasta_core` の `ActorFont` で検査し、`custom_fields` の中で検査済みのタグ列の文字列に置き換える（`font = { color = "90,110,140", bold = true }` は `\f[color,90,110,140]\f[bold,1]`、空の表は空文字列）。属性の書いた順は、同じ内容を `toml::de::DeTable` で読み直して値の位置から取る。知らない属性・型の合わない値・空の文字列・`]` か `\` を含む値・表でない `font` は解析エラーになり、起動を止める。エラーの文言にはアクター名・属性名と、取れるときは行番号が入る。同じ規則で `pasta_check validate` も `config-actor-font` を報告する（利用者向けの説明は [装い（font）](../reference/pasta-toml.md#装いfont)、出し入れは [トーク出力とアピアランス](talk-output.md#装いの出し入れ)）。
 6. `apply_shiori_defaults` で SHIORI 用の既定値を補完する。
 
-`apply_shiori_defaults` は `custom_fields` の `[ghost]` に、書かれていないキー（`talk_interval_min`・`talk_interval_max`・`hour_margin`・`spot_newlines`・`choice_newlines`）だけを `GhostConfig::default()` の値で書き足す。`[ghost]` が無ければ表を作って 5 キーとも入れる。書かれている値は上書きしないため、2 回適用しても結果は変わらない。あわせて `[actor]` が表として存在しなければ警告を 1 行出す（起動は止めない）。補完をここ 1 か所でだけ行うので、Rust 側の消費者と Lua 側（`@pasta_config`）は同じ補完後の値を見る。
+`apply_shiori_defaults` は `custom_fields` の `[ghost]` に、書かれていないキー（`talk_interval_min`・`talk_interval_max`・`hour_margin`・`spot_newlines`・`choice_newlines`・`after_choice_newlines`）だけを `GhostConfig::default()` の値で書き足す。`[ghost]` が無ければ表を作って 6 キーとも入れる。書かれている値は上書きしないため、2 回適用しても結果は変わらない。あわせて `[actor]` が表として存在しなければ警告を 1 行出す（起動は止めない）。補完をここ 1 か所でだけ行うので、Rust 側の消費者と Lua 側（`@pasta_config`）は同じ補完後の値を見る。
 
 `[ghost]` 以外のセクションは、使う側が必要になった時点でアクセサ（`logging`・`persistence`・`talk`・`debug`）を呼び、`custom_fields` の該当セクションを型付きの構造体へ変換する。セクションが無いとき、または変換に失敗したときは `None` を返し、使う側が既定値を使う。型の合わない値を含むセクションが丸ごと既定値になるのはこのためである（利用者向けの説明は [値の型が合わないとき](../reference/pasta-toml.md#値の型が合わないとき)）。
 

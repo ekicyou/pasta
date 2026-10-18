@@ -62,6 +62,10 @@ fn apply_shiori_defaults_fills_all_ghost_keys_when_section_omitted() {
     assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
     assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
     assert_eq!(ghost.get("choice_newlines").unwrap().as_float(), Some(1.5));
+    assert_eq!(
+        ghost.get("after_choice_newlines").unwrap().as_float(),
+        Some(1.0)
+    );
 }
 
 /// 部分的に書かれた `[ghost]`（明示値 `talk_interval_min=120`）は不変で、
@@ -86,6 +90,10 @@ fn apply_shiori_defaults_preserves_explicit_ghost_values() {
     assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
     assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
     assert_eq!(ghost.get("choice_newlines").unwrap().as_float(), Some(1.5));
+    assert_eq!(
+        ghost.get("after_choice_newlines").unwrap().as_float(),
+        Some(1.0)
+    );
 }
 
 /// 補完は冪等: 二重適用しても結果が変わらない（Service Interface invariant）。
@@ -180,6 +188,10 @@ fn parse_materializes_ghost_section_with_defaults() {
     assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
     assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
     assert_eq!(ghost.get("choice_newlines").unwrap().as_float(), Some(1.5));
+    assert_eq!(
+        ghost.get("after_choice_newlines").unwrap().as_float(),
+        Some(1.0)
+    );
 }
 
 // ---------------------------------------------------------------------------
