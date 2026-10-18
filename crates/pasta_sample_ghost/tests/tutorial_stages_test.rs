@@ -398,10 +398,6 @@ fn every_stage_loads_and_responds() {
     }
 }
 
-/// `GLOBAL` のキー。Call は GLOBAL を先に引くので、同じ名前のシーンは呼べない
-/// （`pasta_lua` の `pasta/global.lua`・`pasta/shiori/entry.lua` が定義する）。
-const GLOBAL_KEYS: &[&str] = &["yield", "チェイントーク", "ゴースト終了", "close_ghost"];
-
 /// `pasta_shiori` の e2e が足すシーン（`KickE2EProbe`・`GatePrevScene` など）の接頭辞
 const E2E_PREFIXES: &[&str] = &["Kick", "Gate"];
 
@@ -441,8 +437,11 @@ fn global_scene_names_skip_lua_and_trailers() {
 }
 
 /// 全 `dic/*.pasta` のグローバルシーン名について、異なる 2 つの名前のどちらも他方で始まらず、
-/// `Kick`・`Gate` で始まらず、`GLOBAL` のキーと同じでないことを確かめる（Req 2.5・5.3）。
+/// `Kick`・`Gate` で始まらないことを確かめる（Req 2.5・5.3）。
 /// `＊会話` は別名で OnTalk になるが、書いた名前 `会話` のまま検査する。
+/// 組み込みの飛び先（`GLOBAL` のキー）と同じ名前のシーンは、ここでは確かめない。
+/// `validate` の `scene-shadowed-by-builtin` が、hello-pasta の注意 0 件のテスト
+/// （`pasta_check` の `validate_cli_test.rs` の `test_validate_hello_pasta_clean`）で確かめる。
 #[test]
 fn scene_names_do_not_prefix_collide() {
     let mut names = BTreeSet::new();
@@ -470,9 +469,6 @@ fn scene_names_do_not_prefix_collide() {
             problems.push(format!(
                 "`＊{a}` が `{p}` で始まる（pasta_shiori の e2e と衝突）"
             ));
-        }
-        if GLOBAL_KEYS.contains(&a.as_str()) {
-            problems.push(format!("`＊{a}` が GLOBAL のキーと同じ"));
         }
     }
     assert!(

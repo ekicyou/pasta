@@ -81,7 +81,7 @@
   - _Depends: 2.1, 2.2, 3.1, 3.2, 3.3_
   - _Requirements: 4.1, 4.2_
 
-- [ ] 4. 代用品の置き換え
+- [x] 4. 代用品の置き換え
 - [x] 4.1 (P) マニュアルの CI の段を validate に置き換える
   - 「Tutorial syntax validation」の段を、hello-pasta を `pasta_check validate` で検査する形（終了コード 1 で落ちる）にし、段の名前とコメント・前の段の Rust の準備のコメントを設計どおりに直す
   - 完了の状態: 段の `run` を手元で走らせて終了コード 0 で終わり、YAML として読める
@@ -89,7 +89,7 @@
   - _Depends: 2.4_
   - _Requirements: 5.1, 5.2_
 
-- [ ] 4.2 (P) hello-pasta のテストから組み込みの名前の手書きの一覧を外す
+- [x] 4.2 (P) hello-pasta のテストから組み込みの名前の手書きの一覧を外す
   - 組み込みの名前の一覧とその比較を外し、前方一致と `Kick`・`Gate` の接頭辞の検査は残す。テストのコメントに、組み込みの飛び先と同じ名前は validate の注意 0 件のテストが確かめることを書く
   - 完了の状態: `cargo test -p pasta_sample_ghost --test tutorial_stages_test` が通り、組み込みの名前の一覧がコードに無い
   - _Boundary: Substitutes_
