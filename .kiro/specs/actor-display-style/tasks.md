@@ -84,7 +84,7 @@
   - _Depends: 4.1, 4.2_
   - _Requirements: 8.8_
 
-- [ ] 5. 実機確認と最終の関門
+- [x] 5. 実機確認と最終の関門
 - [x] 5.1 SSP 2.9.18 で `\x` の後と縦書きでの改行の順を確かめる
   - このブランチの pasta.dll をビルドし、hello-pasta を複製・改名して pasta.toml に `font` を書いた確認用のゴーストを用意する（縦書きの確認には `vertical,1` のバルーンを使う）。起動中の SSP とは別に、readonly・別ポートの SSP で動かす
   - `\x` の後の装いを、スポット 0 と 1 で送り、クリックして `dump_balloon` で色を見る
@@ -94,7 +94,7 @@
   - _Depends: 3.1, 3.2, 4.2_
   - _Requirements: 2.10, 3.1_
 
-- [ ] 5.2 ワークスペース全体の関門を通す
+- [x] 5.2 ワークスペース全体の関門を通す
   - `cargo test`（ワークスペース）・`cargo clippy --all-targets -- -D warnings`・`cargo fmt --check`・luacheck・マニュアルの自己テスト・スキル references の食い違いの検査（`--check`）がすべて通る
   - 既存のテストの期待値を書き換えていないことを差分で確かめる
   - _Depends: 3.2, 3.3, 4.3, 5.1_
