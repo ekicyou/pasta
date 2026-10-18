@@ -94,3 +94,22 @@
 - 1 コードポイントの文字だけの台詞では、出力を 1 文字も変えないこと（既存のテストの期待値を書き換えない）。
 - 単独の `\` の直後の守り（`vertical-balloon-lines` の決定 9）を保つこと。
 - 要件定義は Opus でよい（文法・保存の形・公開の Lua の約束に触らない。切り方の選択は決め直せる）。
+
+## 2026-10-18 棚卸の再測定（main facd6cf4）
+
+- **前提の変化**: 起票した日の再測定。改行コードを LF から CRLF にそろえた（中身は同じ）。「Current State」は main と合う: `tokenizer.rs:199` の `remaining.chars().next()`、`CharSets`（49〜67 行。`HashSet<char>` と `.chars().collect()`）、`classify(c: char)`（81 行）、`wait_inserter.rs:157` の `text.chars()`、`line_breaker.rs` の `PlainChar { ch: char }`（100 行）と `width_cjk`（214 行）。マニュアルの行番号も合う。
+- **根は 2 か所**: `vertical-balloon-lines` の後の `line_breaker.rs` は、`tokenizer.rs` と別の自前の切り出し `tokenize_plain_chars`（120〜190 行。145 行で 1 コードポイントずつ）を持つ。`tokenizer.rs` だけ直しても、budoux の側は割れたまま。ほかに直す所: 語と字の対応 `word.chars().count()`（235 行）、単独の `\` の守り `prev.ch == '\\'`（249 行。決定 9）、出力の `result.push(pc.ch)`（283 行）。
+- **unicode-width の幅（確かめた）**: unicode-width 0.2.2 の文書（`src/lib.rs` 59〜61 行）は、文字列の幅で、整った ZWJ の並び・肌色の修飾子の並び・VS16 の絵文字の表示の並びを 2 と数える、と書く。クラスタごとに `UnicodeWidthStr::width_cjk` を呼べばよい（値はテストで確かめる）。
+- **触るファイル**: `crates/pasta_lua/src/sakura_script/tokenizer.rs`（589 行）、`wait_inserter.rs`（397）、`line_breaker.rs`（1,134）、ルートの `Cargo.toml`（41 行の隣）・`crates/pasta_lua/Cargo.toml`（30 行の隣）・`Cargo.lock`・`.kiro/steering/tech.md`（44 行の隣）、テスト `tests/sakura_script/edge_case_test.rs`（`classify` を `char` で呼ぶ。127・136 行）ほか、マニュアル 4 ページとスキルの再生成。`sakura_script/mod.rs` は触らない見込み。
+- **line_breaker.rs の 1,134 行**: 本体は 1〜289 行で、290 行からはテスト（約 845 行）。本体は小さいので割らない。テストが増えて読みにくければ、テストの mod を別ファイルへ移す（中身を変えない移動）のを最初のタスクにしてよい。
+- **規模**: 8〜11 タスク。
+- **先に要るもの**: 機能の上では無い。ファイルの重なり: `novel-talk-flow`（2026-10-17 の再測定で `wait_inserter.rs`・`line_breaker.rs`・`mod.rs` を挙げる）、`scene-anchor-link`（`sakura_script/mod.rs`。こちらが `mod.rs` を触るときだけ）。どちらも前に要る spec があり、今のウェーブの候補ではない。`lua-cmodule-robustness` とはソースは重ならない。重なるのは `crates/pasta_lua/Cargo.toml` の別の行と `tech.md` の依存の表だけで、`Cargo.lock` の席はこちらが持つ。
+- **種別**: バグ（組み合わせの絵文字の途中に `\_w` が入り、縦書きで割れて描かれる。「ぱすた開発」セッションの実機の報告）。
+- **要件定義のモデル**: Opus（文法・保存の形・公開の Lua の約束に触らない。切り方は A を推奨済みで、決め直せる）。
+- **分割の案**: 要らない。
+- **見つけた穴・古くなった記述**:
+  - 「Existing Spec Touchpoints」の「`novel-talk-flow`・`cue-command-runtime`・`scene-anchor-link` と同じウェーブに置ける」は、`novel-talk-flow` について誤り（上の重なり）。`scene-anchor-link` も、こちらが `mod.rs` を触るなら置けない。`cue-command-runtime` は置ける。
+  - `unicode-segmentation` が `Cargo.lock` に無い（間接にも無い）のは正しい。手元の cargo のキャッシュには 1.13.3 があり、ライセンス（MIT OR Apache-2.0）は `deny.toml` の許可に入る。
+  - `CharSets` の公開のフィールド（`HashSet<char>`）と `classify(char)` は、crates.io に出している `pasta_lua` クレートの公開 API。0.4.2 で型を変えると、クレートとしては破壊的な変更になる。`classify(char)` を残してクラスタ版を足すかは、設計で決める。
+  - 「結合テストが 89 本」: `tests/sakura_script/` の `#[test]` は 83 本（basic 13・budoux 26・conformance 3・edge_case 32・output 9）。数え方の違いかもしれない。
+- **即時修正**: なし（`Cargo.lock` と `tech.md` は spec の中で触る）。

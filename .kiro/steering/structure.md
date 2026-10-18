@@ -30,6 +30,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │   │   └── word_table_test.rs # 単語テーブルテスト
 │   │   └── src/
 │   │       ├── lib.rs       # クレートエントリーポイント
+│   │       ├── actor_font.rs # ActorFont - アクターごとの表示の装い（pasta.toml の [actor."名前"].font）からタグ列を作る
 │   │       ├── error.rs     # SceneTableError, WordTableError
 │   │       └── registry/    # 型管理レイヤー（独立）
 │   │           ├── mod.rs   # Registry API
@@ -80,7 +81,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── loader/      # スクリプトローダー（ディレクトリモジュール）
 │       │   │   ├── mod.rs           # ローダーAPI
 │       │   │   ├── cache.rs         # キャッシュ管理
-│       │   │   ├── config/          # ローダー設定（mod.rs・sections.rs。pasta.toml の [scene.alias] の読み込みを含む）
+│       │   │   ├── config/          # ローダー設定（mod.rs・sections.rs・actor_font.rs。pasta.toml の [scene.alias]・[actor."名前"].font の読み込みを含む）
 │       │   │   ├── context.rs       # ローダーコンテキスト
 │       │   │   ├── discovery.rs     # スクリプト検出
 │       │   │   ├── extract.rs       # 起動時自己展開（内蔵zip解凍・MD5マーカー比較・準アトミック展開）
@@ -130,13 +131,15 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │           │   ├── startup_test.rs
 │           │   ├── config_actors_initialization_test.rs
 │           │   └── lua_passthrough_test.rs
-│           ├── shiori/              # SHIORI関連テスト（5 files）
+│           ├── shiori/              # SHIORI関連テスト（7 files）
 │           │   ├── main.rs
 │           │   ├── event_dispatch_test.rs
 │           │   ├── event_handler_test.rs
+│           │   ├── mouse_event_test.rs
 │           │   ├── res_test.rs
-│           │   ├── virtual_event_config_test.rs
-│           │   └── virtual_event_dispatch_test.rs
+│           │   ├── virtual_event_config_resolution_test.rs
+│           │   ├── virtual_event_dispatch_test.rs
+│           │   └── virtual_event_status_skip_test.rs
 │           ├── runtime/             # ランタイム関連テスト（8 files）
 │           │   ├── main.rs
 │           │   ├── finalize_scene_test.rs
@@ -152,9 +155,13 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │           │   ├── integration_test.rs
 │           │   ├── module_test.rs
 │           │   └── stack_level_test.rs
-│           ├── sakura_script/       # SakuraScript関連テスト（2 files）
+│           ├── sakura_script/       # SakuraScript関連テスト（6 files）
 │           │   ├── main.rs
+│           │   ├── backslash_break_test.rs
 │           │   ├── basic_test.rs
+│           │   ├── budoux_test.rs
+│           │   ├── conformance_test.rs
+│           │   ├── edge_case_test.rs
 │           │   └── output_test.rs
 │           ├── search/              # 検索関連テスト（2 files）
 │           │   ├── main.rs
@@ -315,7 +322,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 
 ### ファイルサイズ方針（俯瞰可能性）
 
-- **目安上限 600 行**: Rust ソース・テストファイルは 1 ファイルあたり概ね 600 行未満を保つ（`oversized-file-decomposition` で全ファイルを俯瞰可能サイズへ振る舞い不変分解した。2026-10-17 の時点で、`pasta_check` の `balloon.rs`（1,070 行）だけが超えている）。
+- **目安上限 600 行**: Rust ソース・テストファイルは 1 ファイルあたり概ね 600 行未満を保つ（`oversized-file-decomposition` で全ファイルを俯瞰可能サイズへ振る舞い不変分解した。2026-10-18 の時点で、1,000 行を超えるのは `pasta_lua` の `sakura_script/line_breaker.rs`（1,134 行。本体は約 290 行で、残りはテスト）と `pasta_check` の `balloon.rs`（1,070 行。後半はテスト）の 2 つ。600 行を超えるファイルは 30 近くある）。
 - **分解の方向**: 肥大化したファイルは、フラットな単一ファイル → 同名のディレクトリモジュール（`mod.rs` + 責務別サブモジュール）へ展開する。例: `debug/dap.rs` → `debug/dap/{mod,codec,decode,encode,pending,resolver}.rs`。
 - **不変条件**: 分解はあくまで振る舞い不変（pub API・テスト結果を変えない）。新規実装でこの上限のために責務をまたぐ分割をしない。
 
@@ -368,6 +375,7 @@ pasta_dsl（パーサー） + pasta_core（レジストリ）
 
 ### 公開API (`pasta_core/lib.rs`)
 - **Registry**: `SceneRegistry`, `WordDefRegistry`, `SceneTable`, `WordTable`
+- **ActorFont**: `ActorFont`, `FontInput`, `FontValue`, `FONT_ATTRIBUTES`（アクターごとの表示の装い）
 - **Random**: `RandomSelector`, `DefaultRandomSelector`
 - **Error**: `SceneTableError`, `WordTableError`
 

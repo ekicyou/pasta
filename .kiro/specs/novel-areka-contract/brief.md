@@ -191,3 +191,20 @@ areka の側の作業が一番重い。依頼が遅れるほど、0.5.0 が遅�
 ## 申し送り（2026-10-17 の棚卸の分割より）
 
 - `novel-checkpoint-rollback` から、変数の保存の範囲の分を `novel-variable-scope` へ分けた。areka は変数を見ないので、`novel-variable-scope` はこの spec の名前を使わない。「Downstream」には入れず、「Problem」の「ほか 6 本」にも数えない。
+
+## 2026-10-18 棚卸の再測定（main facd6cf4）
+
+- **前提の変化**:
+  - pasta が台本に出すタグが増えた。アクターごとの装い（`actor-display-style`）で、pasta.toml の `[actor."名前"].font` を書いたアクターが話すと、話者の切り替えと、引数の無い `\c`・`\x` の後に、`\f[属性,値]` の列と戻す `\f[default]` が出る（`crates/pasta_lua/pasta_scripts/pasta/shiori/actor_style.lua`）。属性は `crates/pasta_core/src/actor_font.rs` の 12 個（color・name・height・bold・italic・underline・strike・sub・sup・outline・shadowcolor・shadowstyle）。取り決めの「文章」の色と大きさは、areka が SSP と同じ `\f[…]` を解釈することを前提にでき、areka がどこまで持つかを依頼に入れる。`font` の `name` は書体の名前なので、「話者名の欄」と取り違えない呼び方にする。
+  - 1 つのスポット（`\0`）を複数のアクターで共有する形が正式になった。スコープの番号では話者が分からないので、話者名の欄に書く名前を台本に載せる取り決めの値打ちが上がった（載せ方は `novel-talk-flow`）。
+  - 仮想時刻の読み取り（`tutorial-ssp-gaps`）: pasta は、毎分・毎時の合図が見込みの時機から外れると、トーク中でない OnSecondChange に `\![get,property,OnPastaClock,system.year,system.month,system.day,system.hour,system.minute,system.second]\e` だけの台本を返す（`shiori/clock.lua` 33〜34 行）。areka がこの台本をどう扱うか（`system.*` を返すか、吹き出しを消さないか）を取り決めに書く。返さなければ pasta は OS の時計のままで、害は無い。ノベル向けの設定で出さないかは `novel-talk-flow` が決める。
+  - 縦書きのバルーン（`vertical-balloon-lines`）: budoux の改行は `\n[N]`（`budoux_newlines`。100 なら `\n`）で出て、作者が書く `\_l[x,y]` で列を飛ぶ。areka は縦書きを持つが、`\n[N]` と `\_l` の扱いを確かめる項目に入れる。
+- **触るファイル**: 取り決めの文書・依頼書・対応表だけ。pasta の Rust・Lua・文法・テストは触らない。マニュアルに章を足すなら、目次 `book/src/SUMMARY.md` と、章の数を決め打ちする 3 つの検査（`book/tools/verify-scripts-test.mjs` 81 行・`book/tools/talk/talk-test.mjs` 453〜454 行・`book/tools/gen-skill-refs-test.mjs` 600 行。今も 63 章）を 64 に合わせる。
+- **規模**: 7〜9（前回の 6〜9 に、「pasta が出すタグ」の節に装い・時計の読み取り・縦書きの改行を足す分）。
+- **先に要るもの**: なし。どの未完了の spec ともソースを共有しない（新しく起票した `lua-cmodule-robustness`・`talk-grapheme-clusters` とも）。章を足す場合だけ、章を足す spec と 3 つの数がぶつかる（未完了では `manual-novel-guide` だけ）。
+- **種別**: 文書（コードを書かない取り決めと依頼）。開発者の 0.5.0 の目標（2026-10-10）から起こした。
+- **要件定義のモデル**: Opus のまま。名前と線引きは areka との約束だが、版の番号を持つ書き直せる文書で、議題に推奨案を付けられる。DSL の意味・保存の形・公開の Lua の約束のどれでもない。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**:
+  - 「Approach」の「文章」の「文字の速度、色、大きさ」は、色と大きさを pasta がアクターごとに `\f[…]` で出せるようになったので、要件では「areka が `\f[…]` を解釈すること」の依頼として書く。
+  - 「pasta の現在地」の行番号（`crates/pasta_shiori/src/actor/marshaling.rs` 232 行付近・71 行）は今も合っている（`crates/pasta_shiori/src` は前回から変わっていない）。

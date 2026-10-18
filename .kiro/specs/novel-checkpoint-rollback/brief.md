@@ -174,3 +174,21 @@
 - **装いのあるアクターが出ない出力は 1 文字も変わらない**（`any` が偽の間、`switch` は空文字列を返し、`through` は文字列をそのまま返す）。
 - 見直しが要る論点: この spec が次のどれかをするなら、装いの出し入れ（状態表と出し直し）をどう合わせるか。`emit_actor_switch` の出力順や `emit_inner_token` の形を変える。話者の切り替えの位置に新しいタグを出す。内側に `\c`・`\x` を出すトークンを足す。
 - 参照: `.kiro/specs/completed/actor-display-style/design.md`（ActorStyle・BuilderHook・Revalidation Triggers）、マニュアル `book/src/internals/talk-output.md` の「装いの出し入れ」。
+
+## 2026-10-18 棚卸の再測定（main facd6cf4）
+
+- **前提の変化**:
+  - 区切りにしない応答が 1 つ増えた。仮想時刻の読み取り（`tutorial-ssp-gaps`）で、OnSecondChange の既定の受け口（`shiori/event/second_change.lua` 37 行）が、`\![get,property,OnPastaClock,system.year,…]\e` だけの台本（`shiori/clock.lua` 33〜34・176〜180 行）を返し、`shiori/event/init.lua` 250 行の `RES.ok` で包まれる。その返事（OnPastaClock）は `init.lua` 223〜225 行で 204 になる。プロパティの読み出しと同じく区切りにしない。
+  - 応答を包む所は、`init.lua` 244・250 行（248 行は `SHIORI/` で始まる文字列をそのまま返す）、`callback.lua` 116・192 行、止まるエラーの `STOP.response`（`callback.lua` 178・183 行、`entry.lua` 91 行）。
+  - 出力の組み立てに、1 回の出力の中だけの状態が 2 つ増えた（装いの状態 `STYLE.new()`・吹き出しごとの列 `columns`。`sakura_builder.lua` 426・441 行）。どちらも出力ごとに作って捨てるので、控えに入れなくてよい。控えに入れるのは今までどおり `STORE.actor_spots`（446〜450・453 行で書き換える）と `STORE.appearance`。時計（`shiori/clock.lua`）のずれと時刻の飛びも保存しない状態で、巻き戻しで戻さない。
+  - 目印を `sakura_builder.lua` で出すなら、`tracking_buffer` の `put` を通し、字にも列にも数えない。話者の切り替えの位置に出すなら、`emit_actor_switch`（72〜86 行）の装いの出し入れとの順を決める。
+  - 控えた台本を目印の位置から切り出すとき、切り出した頭が前の部分のタグに頼っていないかを確かめる。装いのタグ（`\f[…]`）は話者の切り替えと `\c`・`\x` の後にしか出ないので、行の途中から切ると装いが落ちる。スコープと立ち絵も同じ。
+- **触るファイル**: 目印の出力 `shiori/sakura_builder.lua` 540、区切りの倉（新しい Lua のファイル）、応答の出口 `shiori/entry.lua` 132・`shiori/event/init.lua` 267・`shiori/event/callback.lua` 226、巻き戻しの受け口（新しいファイルと `init.lua` の読み込みの 1 行）、`shiori/appearance.lua` 567、`shiori/event/virtual_dispatcher.lua` 303（止まっている場面を返す所 215〜217 行）、`pasta/store.lua` 124、マニュアルと生成スキル。1,000 行を超えそうなものは無い（目印で `sakura_builder.lua` に 30〜60 行。テストは `sakura_builder_test.lua` 3,839 行に足さず、新しいファイルに置く）。
+- **規模**: 13〜15 のまま（時計の読み取りを除くのは、区切りにする応答の決まりのタスクに入る）。
+- **先に要るもの**: `novel-talk-flow`、`novel-variable-scope`、`novel-areka-contract`。ファイルの重なり: `novel-talk-flow`（`sakura_builder.lua`・`appearance.lua`・`virtual_dispatcher.lua`・`init.lua`）、`cue-command-runtime`・`scene-anchor-link`（`sakura_builder.lua`）、`shell-element-click`（`init.lua` の読み込みの行）、`novel-variable-scope`（予約の名前を動かす場合の `virtual_dispatcher.lua`。前後に置くのでぶつからない）。`tutorial-ssp-gaps` は完了したので外れた。`talk-grapheme-clusters`・`lua-cmodule-robustness` とは重ならない。
+- **種別**: 機能（過去の時点を指す名前も、状態の控えも無い）。巻き戻しの方式は開発者の案（2026-10-10）。
+- **要件定義のモデル**: Fable のまま。決めるのは、どの応答を区切りにし、何を控えるか（控えは `novel-save-slots` がスロットへ書くので、保存の形になる）。区切りの決まりは、Rust の 5 秒の待ち（届かなかった応答。`crates/pasta_shiori/src/actor/marshaling.rs` 71・213〜223 行。前回から変わっていない）・Lua のコルーチン（`＞yield`・プロパティの読み出しの途中）・SHIORI の応答（止まるエラーの 200・時計の読み取り）にまたがる時間の決まりで、areka がその形に頼る。
+- **分割の案**: 不要（2026-10-17 に分けた後の 13〜15）。
+- **見つけた穴・古くなった記述**:
+  - 行番号（2026-10-10 の節と前回の節）: 組み立てが立ち位置を書き換える所は `sakura_builder.lua` 294〜304 行 → 446〜450 行（`spot`）と 453 行（`clear_spot`）、`pasta_talk_interval_min/max` は `virtual_dispatcher.lua` 72〜73 行 → 77〜78 行、止まっている場面を返す所は 202〜204 行 → 215〜217 行、`set_co_scene` は `init.lua` 99 行 → 100 行、プロパティの読み出しの台本は `shiori/act.lua` 288〜296 行 → 295〜309 行。
+  - ファイルの大きさ: `sakura_builder.lua` 383 → 540、`init.lua` 260 → 267、`virtual_dispatcher.lua` 288 → 303。

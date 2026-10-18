@@ -211,3 +211,22 @@
 - **装いのあるアクターが出ない出力は 1 文字も変わらない**（`any` が偽の間、`switch` は空文字列を返し、`through` は文字列をそのまま返す）。
 - 見直しが要る論点: この spec が次のどれかをするなら、装いの出し入れ（状態表と出し直し）をどう合わせるか。`emit_actor_switch` の出力順や `emit_inner_token` の形を変える。話者の切り替えの位置に新しいタグを出す。内側に `\c`・`\x` を出すトークンを足す。
 - 参照: `.kiro/specs/completed/actor-display-style/design.md`（ActorStyle・BuilderHook・Revalidation Triggers）、マニュアル `book/src/internals/talk-output.md` の「装いの出し入れ」。
+
+## 2026-10-18 棚卸の再測定（main facd6cf4）
+
+- **前提の変化**:
+  - 文法・パーサ・生成・`act.lua`・`scene.lua`・`pasta_dsl`・エディタの文法定義は、前回（`b4164100`）から変わっていない。前回の行番号の直しは、そのまま使える。
+  - 出力の組み立て（`shiori/sakura_builder.lua` 383 → 540 行）: ト書きのトークンを足すなら、片を `tracking_buffer` の `put` で足す（単独の `\` の守り）、字にも選択肢にも数えない（今の `！select` と同じく S4 の枝、513〜515 行）、列を動かさない（`inner_token_to_string` 291〜316 行で列に触れない）、の 3 つを守る。内側のトークンの出力は `STYLE.through` を通るが、`\![…]` は `\c`・`\x` を含まないので装いは動かない。柱の命令を話者の切り替えの位置に出すなら、`emit_actor_switch`（72〜86 行）の `\p` → 立ち絵の復旧 → 装いの順のどこに置くかを決める。
+  - 別名表の手本が 2 つになった。`[scene.alias]`（`loader/config/mod.rs` の `parse_scene_aliases`・`pasta_core` の `SceneAliasTable`）と、`[actor."名前"].font`（検査とタグへの変換は `crates/pasta_core/src/actor_font.rs` 303 行、読み込みは `loader/config/actor_font.rs` 90 行、同じ検査を `crates/pasta_check/src/validate/config.rs` 403 行が持ち、`validate_parity_test.rs` が一致を確かめる）。別名表を読み込みで検査するなら後者と同じ 3 か所の形になり、`pasta_check` の側に 1 タスク要る。
+  - 1 つのスポットを複数のアクターで共有する形が正式になった（`actor-display-style`）。アクター指定行から「この場面にいる人」を伝えるとき、スポットの番号では人が分からないので、名前で伝える。
+  - タグの引数を守る関数 `escape_tag_arg` は、`shiori/act.lua`（325 行）の 210〜221 行に動いた。
+- **触るファイル**: `grammar.pest` 272、`parse_scene.rs` 426、`ast/cue.rs` 99、`scope_gen.rs` 445 と `scope_gen_tests.rs` 533、`transpiler.rs` 339・`context.rs` 454、`act.lua` 829、`shiori/sakura_builder.lua` 540、`shiori/act.lua` 325、設定 `loader/config/`（`mod.rs` 338・`sections.rs` 356。表を検査するなら新しいファイルと `pasta_core` に 1 つ）、一致させるなら `crates/pasta_check/src/validate/config.rs` 403、直に入るローカルシーンで柱を打つなら `shiori/event/choice_select.lua` 80、VSCode の文法定義、見本とスナップショット、マニュアル。
+- **1,000 行の見込み**: `act.lua` は 829 行で、新しいトークンと戻ったときの打ち直しで 60〜120 行足すと 900 行を超える。後に `novel-talk-flow`・`call-attribute-filter`・`scene-anchor-link` も足すので、新しい入口を別のファイルに置くことを設計の最初の議題にする。`sakura_builder.lua` は 30〜50 行足しても余裕がある。テストは `sakura_builder_test.lua`（3,839 行）に足さず、新しいファイルに置く。
+- **規模**: 17〜21（前回の 16〜20 に、別名表の検査を `pasta_check` と一致させる 1 を足した）。
+- **先に要るもの**: `scene-attribute-store`（柱の分）。名前は `novel-areka-contract` から引く（仕組みは待たずに作れる）。ファイルの重なり: `scene-attribute-store`（`parse_scene.rs`・`scope_gen.rs`・`transpiler.rs`・`context.rs`）、`call-attribute-filter`（`grammar.pest`・`act.lua`・VSCode の文法定義）、`scene-anchor-link`（`grammar.pest`・`act.lua`・`sakura_builder.lua`・VSCode の文法定義、`choice_select.lua` で柱を打つならそれも）、`novel-talk-flow`（`act.lua`・`sakura_builder.lua`・`loader/config/`、両方が設定を検査するなら `validate/config.rs`）、`novel-checkpoint-rollback`（`sakura_builder.lua`）、`novel-variable-scope`（`grammar.pest`、表を 2 つにするなら `act.lua`・`scope_gen.rs`）、`shell-element-click`（`choice_select.lua` で柱を打つ場合）。`pasta-check-validate-edges` は完了したので外れた。`talk-grapheme-clusters`・`lua-cmodule-robustness` とは重ならない。
+- **種別**: 機能（`！select` 以外の `！` 行は何も出さずに捨てられ、柱の属性は実行時に残らない）。開発者の 0.5.0 の目標（2026-10-10）と、2026-10-17 のまとめの決定から。
+- **要件定義のモデル**: Fable のまま。決めるのは、柱とト書きが実行時に何をいつ出すかという DSL の意味（areka がその `\![…]` の上に作る）。「場面に入る」の数え方（グローバルの開始・ローカルへの Call・選択肢・イベント）、ローカルシーンと名前なしの `＊` への受け継ぎ、生成で埋めるか実行時に読むか、引数の穴の直し方が互いに絡み、どれにも推奨案がまだ無い（3 つ以上の絡む問い）。今回入った 4 本は、このどれも決めていない。
+- **分割の案**: 要件で 20 をはっきり超えたら、決めてあるとおり `cue-command-runtime`（ト書き）と `scene-stage-attributes`（柱）に戻す。どちらも `scope_gen.rs`・`act.lua` を触るので 1 本ずつ入れることになり、並走できる分は増えない。21 にわずかに届くだけなら分けない。
+- **見つけた穴・古くなった記述**:
+  - 「Current State」の `shiori/act.lua` 201〜212 行（前回の直しで 205〜216 行）→ 210〜221 行。
+  - 前回の節のファイルの大きさ: `sakura_builder.lua` 383 → 540、`shiori/act.lua` 318 → 325、`loader/config/mod.rs` 329 → 338、`sections.rs` 344 → 356。前回の節の「語彙の検査を足すなら `pasta-check-validate-edges` と重なる」は、その spec が完了したので重なりではなくなった。

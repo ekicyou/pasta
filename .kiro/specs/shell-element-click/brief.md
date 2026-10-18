@@ -136,3 +136,19 @@
 
 - **イベントの入口に時計が入った**: `EVENT.fire`（`shiori/event/init.lua` 215 行〜）の順が `CALLBACK.try_route` → `CLOCK.observe`（223 行。`OnPastaClock` を受けた回は 204 を返してハンドラへ進まない）→ `create_act` → `STOP.hold_handler`（234 行）→ ハンドラになった。読み込みの行に `pasta.shiori.clock` が足され（75 行）、ファイルは 267 行になった。brief に書いた `init.lua` の行番号はずれているので、要件定義で測り直す（`set_co_scene` は 100 行、ハンドラを `EVENT.drive(result, act, act)` で始める所は 239 行）。
 - **時刻の読み方が変わった**: 新しいモジュール `pasta.shiori.clock` が「今」を一手に持つ。時報の判定と日時変数は `CLOCK.now`・`CLOCK.date`（SSP の仮想時刻に従う）、おしゃべりの間隔・コールバックの待ち時間・撫では `CLOCK.steady`（設定し直しなどの時刻の飛びを差し引いた時計）で数える。SSP 2.9.18 の TimeMachine は `act.req.date` 自体も仮想時刻にする。仕組みは本 spec の design.md の末尾「設計の見直し（7.2 の後・2026-10-18）」とマニュアル `lua/shiori-events.md` の「OnPastaClock」「時刻の飛び」。
+
+## 2026-10-18 棚卸の再測定（main facd6cf4）
+
+- **前提の変化**:
+  - 選択肢の振り分け `shiori/event/choice_select.lua`（80 行）は変わっていない。行番号（16〜18・25〜35・41〜78・70〜71 行）は合っている。
+  - `tutorial-ssp-gaps` が `shiori/event/init.lua` に時計を入れた（267 行。読み込み 75 行、`CLOCK.observe` 223 行、`STOP.hold_handler` 234 行、`EVENT.drive(result, act, act)` 239 行）。`CLOCK.observe` が止めるのは `OnPastaClock` だけ（`shiori/clock.lua` 150 行）なので、クリックの受け口の作りは変わらない。既定のハンドラの読み込みは 78〜81 行に動いた。
+  - `shiori/event/mouse.lua`（170 行）は、撫での時刻を `CLOCK.steady` で数える 5 行だけの変化。手本の形（`REG.名前 = REG.名前 or 関数`、`SCENE.co_exec_exact` で探す 120 行）はそのまま。完全一致の部品（`scene.lua` 227 行の `SCENE.co_exec_exact`、`search/context.rs` 105 行の `search_scene_exact`）も変わっていない。
+- **触るファイル**: `choice_select.lua`（80。振り分けを関数として取り出す）、受け口を新しいファイルにするなら `init.lua`（267）の 78〜81 行に読み込みを 1 行、範囲つきの完全一致の口を足すなら `scene.lua`（240）、テスト（`crates/pasta_lua/tests/lua_specs/`）、マニュアル（`lua/shiori-events.md`）。`act.lua` は触らない。1,000 行に近いものは無い。
+- **規模**: 5〜8 タスクのまま。
+- **先に要るもの**: `novel-areka-contract`（イベントの名前と Reference の決まり）だけ。ファイルの重なり: `scene-anchor-link`（`choice_select.lua`。先に入る側が振り分けを取り出す）、`cue-command-runtime`（柱を `choice_select.lua` で打つ場合）、`init.lua` に読み込みを足すなら `novel-talk-flow`・`novel-checkpoint-rollback`、`scene.lua` に足すなら `scene-attribute-store`・`call-attribute-filter`・`novel-talk-flow`。`talk-grapheme-clusters`・`lua-cmodule-robustness` とは重ならない。
+- **種別**: 機能（名前つきのクリックを場面へ届ける道が無い）。開発者の 0.5.0 の決定（システム画面はシェルで組む）から。
+- **要件定義のモデル**: Opus のまま。イベントの名前は取り決めの文書が決め、振り分けは選択肢の規則を使い回す。「どの画面の場面か」の決め方は 2 案（画面を出した場面を覚える／areka に名前を運んでもらう）に絞れていて、推奨案を付けられる。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**:
+  - 2026-10-17 の節の「読み込みの 1 行を `init.lua` 77〜80 行に足す」は、78〜81 行に動いた。
+  - `call-attribute-filter` の brief（2026-10-17 の節）は、この spec との重なりを `act.lua` としているが、この spec は `act.lua` を触らない。重なるのは `scene.lua` に口を足す場合だけ。
