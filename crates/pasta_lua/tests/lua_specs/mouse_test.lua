@@ -222,3 +222,68 @@ describe("MOUSE.check_stroke - 撫での判定", function()
         expect(s.fired):toBe(false)
     end)
 end)
+
+-- tutorial-ssp-gaps Task 8.3 撫での判定はなめらかな時計で数える (Requirements: 2.5, 7.3, 7.5)
+describe("OnMouseMove - 時刻の飛びをまたぐ撫で", function()
+    local REG = require("pasta.shiori.event.register")
+    local CLOCK = require("pasta.shiori.clock")
+
+    --- 既定のハンドラを持つ mouse を読み直して body(handler, M) を回し、元に戻す
+    local function with_handler(body)
+        local saved_mod = package.loaded["pasta.shiori.event.mouse"]
+        local saved_handler = REG.OnMouseMove
+        local saved_scene = package.loaded["pasta.scene"]
+        package.loaded["pasta.scene"] = {
+            co_exec = function() return nil end,
+            co_exec_exact = function() return nil end,
+        }
+        package.loaded["pasta.shiori.event.mouse"] = nil
+        REG.OnMouseMove = nil
+        CLOCK._reset()
+        local M = require("pasta.shiori.event.mouse")
+        local ok, err = pcall(body, REG.OnMouseMove, M)
+        REG.OnMouseMove = saved_handler
+        package.loaded["pasta.shiori.event.mouse"] = saved_mod
+        package.loaded["pasta.scene"] = saved_scene
+        CLOCK._reset()
+        if not ok then error(err, 0) end
+    end
+
+    local function move(handler, u)
+        handler({ req = {
+            id = "OnMouseMove", status = "idle",
+            reference = { [3] = "0", [4] = "Head" }, date = { unix = u, ns = 0 },
+        } })
+    end
+
+    local function second(u)
+        CLOCK.observe({ id = "OnSecondChange", date = { unix = u } })
+    end
+
+    local JUMP = 3 * 3600
+
+    test("飛びをまたいでも、なめらかな時計で 2 秒続けば撫でたと決める", function()
+        with_handler(function(handler, M)
+            second(1000)
+            move(handler, 1000)
+            move(handler, 1001)
+            second(1001)
+            second(1002 + JUMP)
+            expect(CLOCK._get_state().epoch):toBe(1)
+            move(handler, 1002 + JUMP)
+            expect(M._get_state().fired):toBe(true)
+        end)
+    end)
+
+    test("飛びそのものでは 2 秒に届かない", function()
+        with_handler(function(handler, M)
+            second(1000)
+            move(handler, 1000)
+            second(1000 + JUMP + 1)
+            move(handler, 1001 + JUMP)
+            expect(M._get_state().fired):toBe(false)
+            move(handler, 1002 + JUMP)
+            expect(M._get_state().fired):toBe(true)
+        end)
+    end)
+end)

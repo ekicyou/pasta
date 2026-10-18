@@ -150,3 +150,10 @@
 - **2 本のファイルの重なり**: 無いことを確かめた。例外は、`novel-variable-scope` が予約の `pasta_` の名前の置き場所を動かす場合の `virtual_dispatcher.lua` だけ（あちらは 46 行の設定の読み込み、こちらは 288 行）。2 本は前後に置くので、ぶつからない。
 - **先に要るもの（この spec）**: `novel-talk-flow`（ノベル向けの出力と場面の境目）、`novel-areka-contract`（目印とイベントの名前）、`novel-variable-scope`（控えに入れる変数と、中身を入れ替える口）。ファイルの重なりは、上の再測定の節のうち、変数の保存の範囲の分を除いたもの（`novel-talk-flow`・`cue-command-runtime`・`scene-anchor-link`・`tutorial-ssp-gaps`・`shell-element-click`）。
 - **要件定義のモデル**: 2 本とも Fable のまま。この spec は、区切りにする応答が、Rust の 5 秒の待ち・Lua のコルーチン・SHIORI の応答にまたがる時間の決まりで、areka がその形に頼るため。
+
+## 申し送り（tutorial-ssp-gaps より、2026-10-18）
+
+- **イベントの入口に時計が入った**: `EVENT.fire`（`shiori/event/init.lua` 215 行〜）の順が `CALLBACK.try_route` → `CLOCK.observe`（223 行。`OnPastaClock` を受けた回は 204 を返してハンドラへ進まない）→ `create_act` → `STOP.hold_handler`（234 行）→ ハンドラになった。読み込みの行に `pasta.shiori.clock` が足され（75 行）、ファイルは 267 行になった。brief に書いた `init.lua` の行番号はずれているので、要件定義で測り直す（`set_co_scene` は 100 行、ハンドラを `EVENT.drive(result, act, act)` で始める所は 239 行）。
+- **時刻の読み方が変わった**: 新しいモジュール `pasta.shiori.clock` が「今」を一手に持つ。時報の判定と日時変数は `CLOCK.now`・`CLOCK.date`（SSP の仮想時刻に従う）、おしゃべりの間隔・コールバックの待ち時間・撫では `CLOCK.steady`（設定し直しなどの時刻の飛びを差し引いた時計）で数える。SSP 2.9.18 の TimeMachine は `act.req.date` 自体も仮想時刻にする。仕組みは本 spec の design.md の末尾「設計の見直し（7.2 の後・2026-10-18）」とマニュアル `lua/shiori-events.md` の「OnPastaClock」「時刻の飛び」。
+- **仮想ディスパッチャの状態の意味が変わった**: `virtual_dispatcher.lua`（303 行）の状態は `next_hour_unix`（`CLOCK.now` で数えた次の正時）・`seen_epoch`（前に見た時刻の飛びの通し番号。飛ぶと「今 − 70 秒」から次の正時を決め直す）・`next_talk_time`（`CLOCK.steady` の時刻で数える）。間隔の設定の読み込みは 50〜83 行、止まっている場面を返す所は 215〜217 行に動いた。ランダムトークと時報を止める設計では、この 3 つの状態と `CLOCK.steady` の意味を前提にする（本 spec の design.md の Revalidation Triggers）。
+- **応答を包む所**: `init.lua` の `RES.ok` は 244・250 行に動いた（`callback.lua` の行は変わっていない。`callback.lua` は注釈 2 行だけ変えた）。

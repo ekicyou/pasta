@@ -69,6 +69,8 @@ local specs = {
     "failure_sites_test",                 -- 実行時の失敗 14 か所の現行の挙動の特性化テスト (failure-output-unification 1.1)
     "failure_test",                       -- pasta.failure 失敗の報告の唯一の出口の単体テスト (failure-output-unification 1.2)
     "stop_test",                          -- pasta.shiori.stop 止まるエラーの場所の見分け・エラー文の整えテスト (runtime-error-balloon 3.2)
+    "virtual_clock_test",                 -- pasta.shiori.clock 仮想時刻のずれ・合図・読み取り・時刻と日付の表テスト (tutorial-ssp-gaps 2.1)
+    "event_clock_hook_test",              -- EVENT.fire 入口の時計のフック（合図と返事を見せる）テスト (tutorial-ssp-gaps 3.1)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

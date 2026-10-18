@@ -244,3 +244,74 @@ describe("SHIORI_ACT_IMPL.get_property() - default timeout_message", function()
         expect(CALLBACK.pending["OnPastaCallBack1"].on_timeout):toBe("callback timeout: get_property")
     end)
 end)
+
+-- ============================================================================
+-- Group G: 時刻の飛びをまたぐ待ち時間（tutorial-ssp-gaps Task 8.3）
+-- Requirements: 2.5, 7.3, 7.5
+-- 締め切りと掃引の今は なめらかな時計（CLOCK.steady）で数える。os.time() は
+-- SSP の req.date.unix と同じ OS の時計なので、飛びに合わせて差し替える。
+-- ============================================================================
+
+describe("SHIORI_ACT_IMPL.get_property() - 時刻の飛びをまたぐ待ち時間", function()
+    local function mk_date(u)
+        local t = os.date("*t", u)
+        return {
+            unix = u, year = t.year, month = t.month, day = t.day, hour = t.hour,
+            min = t.min, sec = t.sec, ns = 0, yday = t.yday, ordinal = t.yday,
+            wday = t.wday - 1, num_days_from_sunday = t.wday - 1,
+        }
+    end
+
+    test("飛ぶ前に待ち始めたコールバックは、飛んだ直後でなく残りの実時間の後に打ち切られる", function()
+        setup()
+        package.loaded["pasta.shiori.event.second_change"] = nil
+        package.loaded["pasta.shiori.event.register"] = nil
+        local CLOCK = require("pasta.shiori.clock")
+        CLOCK._reset()
+        local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        dispatcher._reset()
+        dispatcher._set_scene_executor(function() return nil end)
+        require("pasta.shiori.event.second_change")
+        local REG = require("pasta.shiori.event.register")
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local CALLBACK = require("pasta.shiori.event.callback")
+
+        local real_time = os.time
+        local fake = 1000
+        os.time = function(t) -- luacheck: ignore 122
+            if t ~= nil then return real_time(t) end
+            return fake
+        end
+
+        local function tick(u)
+            fake = u
+            local req = { id = "OnSecondChange", status = "idle", date = mk_date(u) }
+            CLOCK.observe(req)
+            return REG.OnSecondChange(SHIORI_ACT.new(create_mock_actors(), req))
+        end
+
+        local ok, err = pcall(function()
+            tick(1000)
+            local act = SHIORI_ACT.new(create_mock_actors(), { id = "OnTalk", date = mk_date(1000) })
+            local co = coroutine.create(function() act:get_property("x", 5) end)
+            assert(coroutine.resume(co))
+            CALLBACK.consume_staged(co, act)
+
+            expect(tick(1001)):toBeNil()
+            -- 1 秒たって 3 時間先へ設定し直す（飛び 1 回。なめらかな時計は 1002）
+            expect(tick(1002 + 3 * 3600)):toBeNil()
+            expect(CLOCK._get_state().epoch):toBe(1)
+            expect(CALLBACK.pending["OnPastaCallBack1"]).not_:toBe(nil)
+            -- なめらかな時計で 1003〜1005 は待ち続け、1006 で打ち切る
+            for s = 1003, 1005 do
+                expect(tick(s + 3 * 3600)):toBeNil()
+            end
+            expect(tick(1006 + 3 * 3600)).not_:toBeNil()
+            expect(CALLBACK.pending["OnPastaCallBack1"]):toBeNil()
+        end)
+        os.time = real_time -- luacheck: ignore 122
+        CLOCK._reset()
+        dispatcher._reset()
+        if not ok then error(err, 0) end
+    end)
+end)
