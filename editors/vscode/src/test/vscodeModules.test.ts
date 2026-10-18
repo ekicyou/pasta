@@ -36,6 +36,7 @@ import {
 import { DiagnosticsManager } from '../diagnosticsManager';
 import { WasmBridge } from '../wasmBridge';
 import { DocumentSync } from '../documentSync';
+import { GhostValidator } from '../ghostValidator';
 import {
   PastaDebugAdapterFactory,
   PastaDebugConfigurationProvider,
@@ -656,6 +657,33 @@ test('real WASM: selectGhostFiles / validateGhost results pass the shape checks'
   assert.ok(report.stats.errors >= 1);
   assert.deepStrictEqual(report.stats.skipReasons, ['unreadable-file']);
   bridge.dispose();
+});
+
+// 拡張と本物の核をつなぐ（pasta-check-validate-edges 3.4・要件 4.1 / 4.2）。
+// 大文字・小文字の混じった Ghost/Master の配下の中身の無い dic/x.pasta/ を、
+// 本物の WASM がフォルダの誤りとして返し、フォルダの URI に Error で出る。
+test('real WASM: Ghost/Master の配下の空の dic/x.pasta/ は folder-matches-pattern の Error になる', async () => {
+  const bridge = new WasmBridge({ appendLine: () => {} } as never);
+  await bridge.initialize(mock.Uri.joinPath(mock.Uri.file(ROOT), 'wasm', 'pasta_lsp_wasm_bg.wasm') as never);
+  mock.resetFakeFs();
+  mock.workspace.textDocuments.length = 0;
+  mock.setFakeFile('/ws/Ghost/Master/dic/a.pasta', '＊会話\n');
+  mock.setFakeDir('/ws/Ghost/Master/dic/x.pasta');
+  const gv = new GhostValidator(bridge, mock.window.createOutputChannel('Pasta Language') as never);
+  const col = mock.createdDiagnosticCollections[mock.createdDiagnosticCollections.length - 1];
+  const master = mock.Uri.file('/ws/Ghost/Master');
+
+  await gv.validate(master as never);
+
+  const d = col.get(mock.Uri.joinPath(master, 'dic', 'x.pasta'));
+  assert.ok(d, `フォルダの URI に診断が無い（診断のある URI は ${col.size} 個）`);
+  assert.deepStrictEqual(
+    d.map((x) => [x.code, x.severity]),
+    [['folder-matches-pattern', mock.DiagnosticSeverity.Error]]
+  );
+  gv.dispose();
+  bridge.dispose();
+  mock.resetFakeFs();
 });
 
 test('validateGhost throws when the bridge is not ready', () => {
