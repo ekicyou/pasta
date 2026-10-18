@@ -465,7 +465,7 @@ function STYLE.through(state, actor, spot, s) end
 **Implementation Notes**
 - Integration: 差し込んだタグは `APPEARANCE.observe` にもそのまま渡る（`\f` は観測の対象外なので外見の記録は変わらない）。
 - Validation: `actor_style_test.lua` で状態表の 6 マス、`\c`・`\x`・`\x[noclear]`・エスケープした `\\c`・囲みの中の `\c` を確かめる。
-- Risks: `\x` の後の SSP の振る舞いは未確認（確定事項 2。実装時に実機で確かめる）。どちらでも表示が同じになるよう出し直す。
+- Risks: `\x` の後の SSP の振る舞いは、設計の時点では未確認だった（確定事項 2）。タスク 5.1 で確かめ、`\x` で装いが外れてスコープが `\0` に戻ると分かった。今の出し直しで表示は合う。
 
 #### BuilderHook（`sakura_builder.lua` の変更）
 
