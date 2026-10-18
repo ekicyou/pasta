@@ -142,7 +142,7 @@
   - _Boundary: VirtualDispatcher_
   - _Depends: 8.1_
   - _Requirements: 2.1, 2.3, 2.4, 2.5, 7.3_
-- [ ] 8.3 コールバックの待ち時間と撫での判定をなめらかな時計で数える
+- [x] 8.3 コールバックの待ち時間と撫での判定をなめらかな時計で数える
   - `act.lua` の `get_property` の締め切りと `second_change.lua` の掃引に渡す今を `CLOCK.steady(act.req)`（`req.date` が無ければ `os.time()`）にし、`mouse.lua` の `request_time` を `CLOCK.steady(req)` から作る
   - 飛んでも待ち時間と撫での判定がずれないテストが通り、既存のコールバック・撫でのテストが変更なしで通る
   - _Boundary: ActDateTransfer（act.lua の get_property）, SecondChangeHandler, mouse.lua_
@@ -158,3 +158,4 @@
 
 - 1.1: 調整つまみは既定どおり MINUTE_TOLERANCE=2 秒・REBASE_GRACE=70 秒。読み取りの応答は表示中の吹き出しの文字を消す（許す）。窓際のぱすたさんDEBUG で読み取りの後に約 6 分 talking が続いた件は原因未確定 → 7.2 で SHIORI の応答としての読み取りの後の Status を見る。開発用パレットは Ctrl+Shift+D か右クリック「機能」→「開発用パレット」。
 - 4.1: 既存の syntax_test.rs は unix の無い date 表を EVENT.fire に渡す。clock は unix が無ければ now=nil・date=req.date・返事は読めない値扱いにした（E2E の全件実行で発覚）。
+- 8.3: 飛びは OnSecondChange でだけ数えるので、飛んでから次の秒の合図までの 1 秒足らずに始まった get_property の締め切りや撫では補正前の物差しになる（実害はほぼ無いので許す）。

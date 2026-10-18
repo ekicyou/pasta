@@ -40,7 +40,7 @@ end
 --- コールバック登録意図をステージング（yield 直前に呼び出す）
 --- 単一スロット。consume_staged で消費されるまで上書き不可（多重ステージング検出）
 --- @param event_id string ユニークイベント ID
---- @param timeout_at number タイムアウト絶対時刻（os.time() ベース）
+--- @param timeout_at number タイムアウト絶対時刻（CLOCK.steady のなめらかな時計。req.date が無ければ os.time()）
 --- @param on_timeout string|nil タイムアウト時のエラー理由文字列（nil で静かに消える）
 function CALLBACK.stage_pending(event_id, timeout_at, on_timeout)
     if _staged ~= nil then
@@ -197,7 +197,7 @@ end
 --- 期限を過ぎた待機をタイムアウトとして再開し、その回の応答を 1 つ作る
 --- 集める → 外す → 番号順に並べる → 順に EVENT.drive で再開する。
 --- 最初の候補を応答に採用し、2 番目以降は警告ログを出して捨てる。途中のエラーでも残りを続ける。
---- @param now number 現在時刻（os.time() 戻り値）
+--- @param now number 現在時刻（CLOCK.steady のなめらかな時計。req.date が無ければ os.time()）
 --- @return string|nil response その回の応答（200 または 500 の全文）、応答が生まれなければ nil
 function CALLBACK.sweep(now)
     local response = nil

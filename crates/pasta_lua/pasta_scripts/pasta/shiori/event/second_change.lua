@@ -22,7 +22,8 @@ local CLOCK = require("pasta.shiori.clock")
 ---@return string|thread|nil 掃引が応答を生んだ回はその応答（200 または 500 の全文）、シーンが出た回はコルーチン、読み取りの回はそのスクリプト、それ以外は nil
 REG.OnSecondChange = REG.OnSecondChange or function(act)
     -- コールバックのタイムアウト掃引を先に実行（応答は SHIORI/ で始まるため EVENT.fire が素通しする）
-    local timeout_response = CALLBACK.sweep(os.time())
+    -- 今は なめらかな時計（get_property の締め切りと同じ物差し）。req.date が無ければ OS の時計
+    local timeout_response = CALLBACK.sweep(CLOCK.steady(act.req) or os.time())
     if timeout_response then
         return timeout_response
     end
