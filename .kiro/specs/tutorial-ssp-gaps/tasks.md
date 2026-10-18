@@ -100,7 +100,7 @@
   - _Boundary: TutorialDocs（setup.md・01-boot.md・index.md）_
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 6.3 (P) 11 段目に続きが消える原因を足す
+- [x] 6.3 (P) 11 段目に続きが消える原因を足す
   - 「手順 4 で続きが出ないとき」に、開発用パレットなどで外から `OnTalk` を起こしたことを原因の 1 つとして足す
   - 11 段目の該当節に新しい原因が載っている
   - _Boundary: TutorialDocs（11-jump.md）_
