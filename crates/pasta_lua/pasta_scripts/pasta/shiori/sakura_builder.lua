@@ -10,6 +10,7 @@ local SAKURA_SCRIPT = require "@pasta_sakura_script"
 local log = require "@pasta_log"
 local buf = require("pasta.buf")
 local APPEARANCE = require("pasta.shiori.appearance")
+local STYLE = require("pasta.shiori.actor_style")
 local FAILURE = require("pasta.failure")
 
 --- \q[display,target] 内のデリミタ文字をエスケープ
@@ -66,8 +67,9 @@ end
 --- @param actor table 切り替え先アクター（非nil保証は呼び出し元）
 --- @param appearance table 外見状態（直接変更される）
 --- @param tokens table[] 切り替え先グループの内側トークン列（先頭タグ列の判定用）
+--- @param style table 装いの状態（pasta.shiori.actor_style。直接変更される）。復旧タグの後に装いの出し入れのタグを出す
 --- @return number spot 切り替え後のスポットID
-local function emit_actor_switch(buffer, actor_spots, actor, appearance, tokens)
+local function emit_actor_switch(buffer, actor_spots, actor, appearance, tokens, style)
     local actor_name = actor.name
     local spot = actor_spots[actor_name]
     if spot == nil then
@@ -79,6 +81,7 @@ local function emit_actor_switch(buffer, actor_spots, actor, appearance, tokens)
 
     buffer:put(spot_to_tag(spot))
     buffer:put(APPEARANCE.restore(appearance, actor, spot, tokens))
+    buffer:put(STYLE.switch(style, actor, spot))
     return spot
 end
 
@@ -220,8 +223,10 @@ end
 --- @param inner table グループ内トークン
 --- @param appearance table 外見状態（直接変更される）
 --- @param spot integer|nil 現在スコープの解決済みスポットID
-local function emit_inner_token(buffer, actor, inner, appearance, spot)
+--- @param style table 装いの状態（直接変更される）。変換後の文字列を出力の前に STYLE.through に通す
+local function emit_inner_token(buffer, actor, inner, appearance, spot, style)
     local s = inner_token_to_string(actor, inner)
+    s = STYLE.through(style, actor, spot, s)
     buffer:put(s)
     -- raw_script はアクター未指定の生さくらスクリプトとして観測する（1.8）
     local speaker = actor
@@ -273,6 +278,8 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
     local actor_spots = input_actor_spots or {}
     -- 外見状態も直接変更する（nilの場合はビルドローカル。clear_spot では破棄しない）
     appearance = appearance_or_new(appearance)
+    -- 装いの状態はビルドごとに作り、次のビルドへ持ち越さない（actor-display-style）
+    local style = STYLE.new()
     -- ビルドローカル状態機械（sakura-script-newline / 完全遅延方式）
     local last_actor = nil    -- 最後に発言したActor
     local last_spot = nil     -- 最後のスポットID（＝現在スコープ）
@@ -311,7 +318,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                 -- S1: アクター切替検出。スポット解決＋`\p[spot]` 出力。
                 -- 切替先スポットの has-text で pending を再評価する（旧 pending は暗黙破棄）。
                 -- 先出し版の last_spot ~= spot / last_spot == spot ガードは復活させない。
-                local spot = emit_actor_switch(buffer, actor_spots, actor, appearance, token.tokens)
+                local spot = emit_actor_switch(buffer, actor_spots, actor, appearance, token.tokens, style)
                 pending_break = (spot_has_text[spot] == true)
                 last_spot = spot
                 last_actor = actor
@@ -326,7 +333,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                     -- 現在スポットの has-text を偽へリセットし pending を破棄する。
                     -- クリアで区切るべき先行テキストが消えるため、後続テキスト直前に改行を出さない。
                     -- 最後に表示したものも消す（消した吹き出しの最初の選択肢を区切らない）。
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, style)
                     pending_break = false
                     if last_spot ~= nil then
                         spot_has_text[last_spot] = false
@@ -337,7 +344,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                     -- 字には数えない（has-text・pending 不変。保留は次の字の直前で出る）。
                     buffer:put(choice_break(spot_tail[tail_spot], choice_newlines))
                     spot_tail[tail_spot] = "choice"
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, style)
                 elseif lead then
                     -- S3: 字を出すトークン（字のある talk・字を表示する sakura_script）。
                     -- 改行 → has-text 設定 → 本文 の順を厳守。
@@ -352,11 +359,11 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                         spot_has_text[last_spot] = true
                     end
                     spot_tail[tail_spot] = "text"
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, style)
                 else
                     -- S4: 字の無い talk・字を表示しない sakura_script・surface・wait・newline・
                     -- choice_timeout・raw_script。変換出力のみ（has-text・pending・最後に表示したもの不変）。
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, style)
                 end
                 if cleared then
                     -- S4d: 台詞に書いた `\c`（S3・S4 のどちらを通ったトークンにも当てる）。
