@@ -355,7 +355,7 @@ pub(crate) fn discover(input: &GhostInput, config: &GhostConfig) -> (Discovered,
 **Implementation Notes**
 - Integration: `parse` を「成分の並びと、フォルダだけに一致するか」を返す形にし、ファイルの `collect` はフォルダだけのパターンを飛ばす。フォルダは、最後の `**` を 1 段以上として照らす切り替えを `matches` に足す。
 - Validation: 一致テスト（6.4）が `discover_files` の結果のフォルダと照らす。
-- Risks: 成分が 0 個のパターンの振る舞いは確かめていない（確定 A-1）。一致テストのパターンの組に入れ、違えば規則の表の該当の行を直す。
+- Risks: 成分が 0 個のパターンの振る舞いは、一致テスト（validate_parity_test のパターン `""`）で pasta.dll が `ghost/master` そのものを返すことを確かめた（確定 A-1・タスク 2.3）。
 
 #### Report（`report.rs`）
 

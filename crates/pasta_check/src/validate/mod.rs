@@ -43,6 +43,17 @@ pub fn pasta_dll_paths(input: &GhostInput) -> (Vec<String>, Vec<String>) {
     (dll(found.pasta), dll(found.lua))
 }
 
+/// 一致テスト用: 辞書のパターンに一致したフォルダの、pasta.dll が見る綴りの相対パス（昇順・重複なし。
+/// ghost/master そのものは ""）
+#[doc(hidden)]
+pub fn pasta_dll_folders(input: &GhostInput) -> Vec<String> {
+    let (found, _) = discover(input);
+    let mut folders: Vec<String> = found.folders.into_iter().map(|f| f.dll_path).collect();
+    folders.sort();
+    folders.dedup();
+    folders
+}
+
 fn discover(input: &GhostInput) -> (discovery::Discovered, Vec<Finding>) {
     let (config, _) = config::read_config(&input.pasta_toml);
     discovery::discover(input, &config)
