@@ -163,7 +163,7 @@ act:get_property(name_or_names, timeout?, timeout_message?) -> string | nil, ...
 - `name_or_names` が `nil`・空文字列・空の配列のとき、配列に `nil` や空文字列の名前があるとき、文字列でも表でもないときは `error` になる。
 - 呼ぶと `\![get,property,OnPastaCallBack{N},名前,…]` のタグだけを応答として返してシーンを中断し、ベースウェアから結果が届くと再開して値を返す（[OnPastaCallBack](shiori-events.md#onpastacallbackコールバック応答)）。
 - 呼ぶ前に積んだトークンは、中断の応答には含まれない。再開した後にそのまま残り、以降に積んだトークンと一緒に出力される。
-- `timeout` 秒を過ぎても結果が届かないと、シーンの中で `timeout_message` を理由とするエラーが発生し、シーンはそこで終わる（警告ログが出る）。期限は呼び出し時の `os.time()` に `timeout` を足した時刻で、判定は OnSecondChange の既定ハンドラが行う。
+- `timeout` 秒を過ぎても結果が届かないと、シーンの中で `timeout_message` を理由とするエラーが発生し、シーンはそこで終わる（警告ログが出る）。期限は呼び出し時の時刻に `timeout` を足した時刻で、時刻の設定し直しによる飛びを差し引いた時計で数える（[時刻の飛び](shiori-events.md#時刻の飛び)）。判定は OnSecondChange の既定ハンドラが行う。
 - 名前は `set_property` と同じ規則でエスケープされる。
 - DSL の `＄x＝＄％名前` は `var.x = act:get_property("名前")` になる（[プロパティ変数](../grammar/variables.md#プロパティ変数)）。
 

@@ -125,7 +125,8 @@ end
 | `wday` / `num_days_from_sunday` | 曜日（日曜が 0） |
 
 - リクエストに `X-Pasta-Time` ヘッダ（RFC 3339 形式の日時）があると、`act.req.date` は現在時刻ではなくその日時で作られる。形式が正しくないときは、リクエストの処理がエラーになる。
-- `act.req.date` は SSP の仮想時刻に従わない。値はいつも OS の時計（`X-Pasta-Time` があればその日時）である。SSP の仮想時刻に従うのは、時報の判定（[OnHour](#onhour)）と[日時変数](https://ekicyou.github.io/pasta/grammar/variables.html#日時変数)だけである（[OnPastaClock](#onpastaclock仮想時刻の読み取り)）。
+- `act.req.date` の値は、SSP のプロセスの中の OS の時計（`X-Pasta-Time` があればその日時）である。SSP によっては（2.9.18 の「現在時刻の仮想的変更」など）、この OS の時計そのものが仮想時刻になるため、`act.req.date` も仮想時刻に従う。そうでない SSP では、`act.req.date` は仮想時刻に従わない。
+- 時報の判定（[OnHour](#onhour)）と[日時変数](https://ekicyou.github.io/pasta/grammar/variables.html#日時変数)は、どちらの場合も仮想時刻に従う（[OnPastaClock](#onpastaclock仮想時刻の読み取り)）。おしゃべりの間隔・撫での判定・コールバックの待ち時間は、時刻の設定し直しによる飛びを差し引いて数える（[時刻の飛び](#時刻の飛び)）。
 - `act.req` は読み取り専用として扱う。書き換えたときの動作は定めない。
 - DSL のシーンから Reference や日時を使うには、[エンジンが値を入れる変数](https://ekicyou.github.io/pasta/grammar/variables.html#エンジンが値を入れる変数)（[リクエスト変数](https://ekicyou.github.io/pasta/grammar/variables.html#リクエスト変数reference)・[日時変数](https://ekicyou.github.io/pasta/grammar/variables.html#日時変数)）を使う。
 
@@ -468,7 +469,7 @@ end
 
 ### OnPastaClock（仮想時刻の読み取り）
 
-SSP の仮想時刻（開発用パレットなどで進めた時刻）は、SHIORI のリクエストには載らない。pasta は、SSP に仮想の日時を読ませて、OS の時計とのずれ（秒）を覚える。
+SSP の仮想時刻（開発用パレットなどで進めた時刻）は、SHIORI のリクエストのヘッダには載らない。SSP によっては、SSP のプロセスの中の OS の時計そのものを仮想時刻にするため、`act.req.date` がそのまま仮想時刻になる（[act.req](#actreq)）。そうしない SSP のために、pasta は、SSP に仮想の日時を読ませて、OS の時計とのずれ（秒）を覚える。
 
 1. `OnMinuteChange`・`OnHourTimeSignal` は、毎分・毎時の決まった時機に届く。pasta は、これらが OS の時計で見込んだ時機から外れて届くと、仮想時刻が動いたとみなして読み取りを予約する。
 2. 予約の後、何も出さない最初の OnSecondChange の応答で、`\![get,property,OnPastaClock,system.year,system.month,system.day,system.hour,system.minute,system.second]\e` を返す（[OnSecondChange](#onsecondchange)）。
@@ -484,7 +485,7 @@ SSP の仮想時刻（開発用パレットなどで進めた時刻）は、SHIO
 | `act.req.reference[5]` | 秒 |
 
 - このイベントは `REG` より先に処理される。pasta は、返事の日時と OS の時計の差をずれとして覚え、204 No Content を返す。このとき `REG` のハンドラは呼ばれず、シーンも探さない。ハンドラを登録する必要はない。
-- ずれが 2 秒以内なら、0（仮想時刻なし）とみなす。
+- ずれが 2 秒以内なら、0（仮想時刻なし）とみなす。SSP が OS の時計そのものを仮想時刻にするときは、返事の日時と `act.req.date` が同じなので、ずれはいつも 0 になる。読み取りは、時刻を設定し直した直後に 1 回走るだけである。
 - 値が読めないときは、ずれを 0 に戻し、警告ログを出す。OS の時計で動き続ける。
 - `SecurityLevel` が `external` の `OnPastaClock` は、返事として扱わない。通常のイベントとして `REG`・シーン関数フォールバックへ進む。
 - `X-Pasta-Time` ヘッダのあるリクエストでは、ずれを使わない。その日時をそのまま使う。
@@ -567,7 +568,7 @@ end
 ### 撫での判定
 
 - 同じキャラクターの同じ部位の上で、マウスの移動が途切れずに 2 秒続くと、1 回「撫でた」と決める。2 秒を過ぎた後の最初の `OnMouseMove` で決まる。
-- 時間は、リクエストの時刻を 1 秒より細かく測る。
+- 時間は、リクエストの時刻を 1 秒より細かく測る（設定し直しなどの[時刻の飛び](#時刻の飛び)は差し引く）。
 - 一度撫でたと決めた後は、数え直すまで次の「撫でた」を決めない。同じ所を撫で続けても 1 回である。
 - 次のときは、撫での時間を数え直す。
   - 部位かキャラクターが変わったとき
@@ -692,7 +693,7 @@ end
 OnTalk（ランダムトーク）と OnHour（時報）は、ベースウェアが送るイベントではない。OnSecondChange の既定ハンドラが呼ぶ仮想ディスパッチャが、条件を判定して発行する「仮想イベント」である。発行されたシーンの出力は、その OnSecondChange への応答になる。
 
 - 仮想イベントは `REG` を通らず、シーンを直接探して実行する。`REG.OnTalk`・`REG.OnHour` を登録しても呼ばれない。
-- 状態（次の正時・次のトーク時刻・前に見た仮想時刻のずれ）は、SHIORI の load から unload までの間だけ保たれる。unload で Lua の実行環境ごと破棄され、次の load で初めからになる。
+- 状態（次の正時・次のトーク時刻・前に見た時刻の飛びの通し番号）は、SHIORI の load から unload までの間だけ保たれる。unload で Lua の実行環境ごと破棄され、次の load で初めからになる。
 
 ```lua
 local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
@@ -791,7 +792,7 @@ local co = dispatcher.check_hour(act)
 
 - 現在時刻は、仮想時刻（OS の時計にずれを足した時刻）である。
 - 最初の呼び出しでは、次の正時を計算して記録するだけで、何も発行しない。
-- 前の呼び出しから仮想時刻のずれが変わっていれば、次の正時を決め直す。決め直しは現在時刻の 70 秒前から数えるので、70 秒ほど前までに過ぎた正時は、1 回だけ時報になる。
+- 前の呼び出しから[時刻の飛び](#時刻の飛び)があれば、次の正時を決め直す。決め直しは現在時刻の 70 秒前から数えるので、70 秒ほど前までに過ぎた正時は、1 回だけ時報になる。
 - 現在時刻が記録した正時に達していれば、次の正時を記録し直してから、4 つの候補でシーンを探す。
 - 一度に何時間分も進んでいても、時報は 1 回だけである。`{HH}` は進んだ先の時になる。
 
@@ -822,10 +823,27 @@ OnTalk の判定と発行を行う。発行するシーンのコルーチンか 
 local co = dispatcher.check_talk(act)
 ```
 
-- トークの間隔は OS の時計で数える。仮想時刻を進めても、ランダムトークは早まらない。
+- トークの間隔は、[時刻の飛び](#時刻の飛び)を差し引いた時計で数える。仮想時刻を進めても、ランダムトークは早まらない。
 - 最初の呼び出しでは、次のトーク時刻（現在時刻に `talk_interval_min`〜`talk_interval_max` の範囲の乱数秒を足した時刻）を決めるだけで、何も発行しない。
 - 現在時刻が次のトーク時刻に達していても、次の正時までの残りが `hour_margin` 秒未満のときは発行しない（時報を優先する）。この残りは、正時と同じく仮想時刻で数える。
 - 発行するときは、次のトーク時刻を決め直してから、チェイントークの続きか新しい `OnTalk` のシーンを返す。次のトーク時刻は、シーンが見つかったかどうかに関わらず決め直される。
+
+### 時刻の飛び
+
+pasta は、OnSecondChange が届くたびに、前の OnSecondChange からの時刻の差を見る。差が 2 秒より戻ったか 90 秒より進んだら「時刻の飛び」とみなす。開発用パレットの「現在時刻の仮想的変更」で Apply・Reset したときが、これにあたる。
+
+- 飛びがあると、時報の次の正時を決め直す（[check_hour](#check_houract)）。仮想時刻を入れ直しても、余分な時報は出ない。
+- おしゃべりの間隔・撫での判定・コールバックの待ち時間（[get_property](script-api.md#get_propertyname_or_names-timeout-timeout_message)）は、飛びの分を差し引いた時計で数える。仮想時刻を 3 時間進めても、次のおしゃべりまでの残りは変わらない。
+- スリープから復帰した後（`OnSysResume`）の最初の差は、飛びとみなさない。時報は 1 回出て、おしゃべりはすぐ出る。
+- `X-Pasta-Time` ヘッダのあるリクエストでは、飛びを見ない。その日時をそのまま使う。
+- 飛びの記録は保存しない。SHIORI の load から unload までの間だけ保たれる。
+
+仮想時刻を使わずに OS の時計を手で動かしたときも、90 秒より進めたか 2 秒より戻せば飛びになる。
+
+| 操作 | 時報 | おしゃべり |
+| ---- | ---- | ---------- |
+| 10 時 30 分から 9 時 30 分へ戻す | 10 時に出る | 残りの間隔を待つ |
+| 10 時 30 分から 12 時 10 分へ進める | 13 時まで出ない | 残りの間隔を待つ |
 
 ### pasta.toml 設定
 
@@ -859,7 +877,7 @@ dispatcher._reset()
 
 -- 内部状態の取得
 local state = dispatcher._get_internal_state()
--- { next_hour_unix = 次の正時の Unix 時刻（仮想時刻）, next_talk_time = 次のトーク時刻, seen_offset = 前に見た仮想時刻のずれ }
+-- { next_hour_unix = 次の正時の Unix 時刻（仮想時刻）, next_talk_time = 次のトーク時刻, seen_epoch = 前に見た時刻の飛びの通し番号 }
 
 -- シーンを探して実行する関数の差し替え（nil を渡すと解除）
 dispatcher._set_scene_executor(function(event_name, act)

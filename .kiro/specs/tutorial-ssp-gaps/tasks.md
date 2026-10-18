@@ -129,7 +129,7 @@
   - _Depends: 8.4_
   - _Requirements: 2.1, 2.3, 2.6, 7.3_
 
-- [ ] 8. 設計の見直し（7.2 の後）への追従
+- [x] 8. 設計の見直し（7.2 の後）への追従
 - [x] 8.1 時計に時刻の飛びとなめらかな時計を足す
   - `OnSecondChange` ごとに前回の「今」との差を見て、2 秒より戻ったか 90 秒より進んだら飛びとし、通し番号と飛びの合計を増やす。`OnSysResume` の後の 1 回と `X-Pasta-Time` 付きは数えない
   - `steady(req)`（今 − 飛びの合計）と `epoch()` を足し、状態を `_reset`・`_get_state` に含める
@@ -148,7 +148,7 @@
   - _Boundary: ActDateTransfer（act.lua の get_property）, SecondChangeHandler, mouse.lua_
   - _Depends: 8.1_
   - _Requirements: 2.5, 7.3, 7.5_
-- [ ] 8.4 文書を見直しに合わせ、references を生成し直す
+- [x] 8.4 文書を見直しに合わせ、references を生成し直す
   - `act.req.date` の注記・仮想ディスパッチャの決め直しと間隔の数え方・時計の節（飛び・なめらかな時計・要件 7.3 の例外）を、`shiori-events.md`・`variables.md`・`internals/shiori.md`・`STAGES.md`（調べの結果）に書く。入門 6 段目の記述と食い違わないことを確かめる
   - `gen-skill-refs.mjs` で references を生成し直し、`link-check.mjs`・`tutorial-check.mjs`・`gen-skill-refs.mjs --check`・`verify-content.mjs`・mdBook のビルドが通る
   - _Depends: 8.2, 8.3_

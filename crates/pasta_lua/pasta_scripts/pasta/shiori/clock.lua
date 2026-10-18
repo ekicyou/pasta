@@ -219,7 +219,7 @@ function M.epoch()
     return _epoch
 end
 
---- 今のずれ（整数秒。0 は仮想時刻なし）。ディスパッチャが「ずれが変わったか」を見るのに使う。
+--- 今のずれ（整数秒。0 は仮想時刻なし。SSP が OS の時計を書き換えるときは常に 0）。決め直しは epoch() で見る。
 ---@return integer
 function M.offset()
     return _offset

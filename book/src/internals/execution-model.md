@@ -292,7 +292,7 @@ EVENT.fire → CALLBACK.try_route(req)
 
 ### 期限切れの掃引（CALLBACK.sweep）
 
-期限を過ぎた待機は、OnSecondChange の既定ハンドラ（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/second_change.lua`）が毎回呼ぶ `CALLBACK.sweep(os.time())` が、タイムアウトとして再開する。
+期限を過ぎた待機は、OnSecondChange の既定ハンドラ（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/second_change.lua`）が毎回呼ぶ `CALLBACK.sweep(CLOCK.steady(act.req) or os.time())`（飛びを差し引いた時計。[仮想時刻の時計](shiori.md#仮想時刻の時計pastashioriclock)）が、タイムアウトとして再開する。
 
 ```text
 CALLBACK.sweep(now)
