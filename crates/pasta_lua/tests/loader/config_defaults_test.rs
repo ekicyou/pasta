@@ -347,6 +347,14 @@ fn lua_fallback_literals_match_ssot() {
         act_lua.contains(&format!("\"choice_newlines\", {choice_default}")),
         "act.lua の choice_newlines フォールバックリテラルが SSOT ({choice_default}) と不一致 (choice-line-layout 2.9)"
     );
+    // act.lua: after_choice_newlines の Lua 側フォールバックリテラル（vertical-balloon-lines 5.6）。
+    let after_choice_default = format!("{:?}", d.after_choice_newlines); // "1.0"
+    assert!(
+        act_lua.contains(&format!(
+            "\"after_choice_newlines\", {after_choice_default}"
+        )),
+        "act.lua の after_choice_newlines フォールバックリテラルが SSOT ({after_choice_default}) と不一致 (vertical-balloon-lines 5.6)"
+    );
 
     // virtual_dispatcher.lua: talk_interval_min/max/hour_margin のフォールバックリテラル。
     let vd_lua = std::fs::read_to_string(scripts.join("pasta/shiori/event/virtual_dispatcher.lua"))

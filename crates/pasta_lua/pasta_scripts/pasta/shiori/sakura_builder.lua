@@ -238,15 +238,27 @@ local function newline_tag(ratio)
     return string.format("\\n[%d]", math.floor(ratio * 100))
 end
 
+--- 選択肢の後の改行のタグ。N が 100 なら今と同じ `\n`、それ以外は newline_tag と同じ `\n[N]`
+--- @param ratio number 行の高さに対する倍率（after_choice_newlines）
+--- @return string
+local function plain_newline_tag(ratio)
+    local tag = newline_tag(ratio)
+    if tag == "\\n[100]" then
+        return "\\n"
+    end
+    return tag
+end
+
 --- 選択肢の直前に出す区切り
 --- @param tail "text"|"choice"|nil その吹き出しに最後に表示したもの
 --- @param choice_newlines number 字の後の選択肢の前の改行幅
---- @return string 空文字列（最初の選択肢）、`\n[N]`（字の後）、`\n`（選択肢の後）のどれか
-local function choice_break(tail, choice_newlines)
+--- @param after_choice_newlines number 選択肢の後の改行幅
+--- @return string 空文字列（最初の選択肢）、`\n[N]`（字の後）、選択肢の後の区切りのどれか
+local function choice_break(tail, choice_newlines, after_choice_newlines)
     if tail == "text" then
         return newline_tag(choice_newlines)
     elseif tail == "choice" then
-        return "\\n"
+        return plain_newline_tag(after_choice_newlines)
     end
     return ""
 end
@@ -254,6 +266,7 @@ end
 --- @class BuildConfig
 --- @field spot_newlines number|nil スポット変更時の改行量（デフォルト1.5）
 --- @field choice_newlines number|nil 字の後の選択肢の前の改行量（デフォルト1.5）
+--- @field after_choice_newlines number|nil 選択肢の後の改行幅（既定 1.0。N が 100 なら `\n`）
 --- @field buffer_factory (fun(): table)|nil 出力バッファの生成関数（デフォルト pasta.buf.new。テスト用）
 
 --- グループ化されたトークン配列をさくらスクリプト文字列に変換
@@ -267,6 +280,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
     config = config or {}
     local spot_newlines = config.spot_newlines or 1.5
     local choice_newlines = config.choice_newlines or 1.5
+    local after_choice_newlines = config.after_choice_newlines or 1.0
     local buffer = (config.buffer_factory or buf.new)()
 
     -- input_actor_spots を直接変更する（nilの場合は内部で空テーブルを作成）
@@ -333,20 +347,20 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                     end
                     spot_tail[tail_spot] = nil
                 elseif inner.type == "choice" then
-                    -- S4c: 選択肢。直前に区切り（字の後は choice_newlines の幅、選択肢の後は `\n`）を出す。
+                    -- S4c: 選択肢。直前に区切り（字の後は choice_newlines、選択肢の後は after_choice_newlines の幅）を出す。
                     -- 字には数えない（has-text・pending 不変。保留は次の字の直前で出る）。
-                    buffer:put(choice_break(spot_tail[tail_spot], choice_newlines))
+                    buffer:put(choice_break(spot_tail[tail_spot], choice_newlines, after_choice_newlines))
                     spot_tail[tail_spot] = "choice"
                     emit_inner_token(buffer, actor, inner, appearance, last_spot)
                 elseif lead then
                     -- S3: 字を出すトークン（字のある talk・字を表示する sakura_script）。
                     -- 改行 → has-text 設定 → 本文 の順を厳守。
-                    -- 区切りは 1 つだけ出す（保留があればそれだけ。無くて選択肢の後なら `\n`）。
+                    -- 区切りは 1 つだけ出す（保留があればそれだけ。無くて選択肢の後なら after_choice_newlines の幅）。
                     if pending_break then
                         buffer:put(newline_tag(spot_newlines))
                         pending_break = false
                     elseif spot_tail[tail_spot] == "choice" then
-                        buffer:put("\\n")
+                        buffer:put(plain_newline_tag(after_choice_newlines))
                     end
                     if last_spot ~= nil then
                         spot_has_text[last_spot] = true

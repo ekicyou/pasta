@@ -3021,6 +3021,86 @@ describe("SAKURA_BUILDER - choice-line-layout: 選択肢の行の配置", functi
 end)
 
 -- ============================================================================
+-- 選択肢の後の 2 か所の区切り（vertical-balloon-lines 5.1〜5.5・5.7）
+-- ============================================================================
+
+describe("SAKURA_BUILDER - vertical-balloon-lines: after_choice_newlines", function()
+    local function group(actor, inner_tokens)
+        return { type = "actor", actor = actor, tokens = inner_tokens }
+    end
+    local function talk(actor, text)
+        return { type = "talk", actor = actor, text = text }
+    end
+    local function choice(display)
+        return { type = "choice", display = display, target = display .. "先" }
+    end
+    local function spots()
+        return { ["さくら"] = 0, ["うにゅう"] = 1 }
+    end
+    local Q1 = "\\![*]\\q[甲,甲先]"
+    local Q2 = "\\![*]\\q[乙,乙先]"
+
+    -- 字 → 選択肢 → 選択肢 → 字
+    local function sequence(a)
+        return { group(a, { talk(a, "どれ"), choice("甲"), choice("乙"), talk(a, "つづき") }) }
+    end
+
+    test("5.1/5.2: 2.0 で選択肢の後の選択肢の前と台詞の前が \\n[200]", function()
+        local BUILDER, actors = setup()
+        local result = BUILDER.build(sequence(actors.sakura), { after_choice_newlines = 2.0 }, spots())
+        expect(result):toBe("\\p[0]どれ\\n[150]" .. Q1 .. "\\n[200]" .. Q2 .. "\\n[200]つづき\\e")
+    end)
+
+    test("5.3: 書かれていない・1.0 のときは今と同じ \\n", function()
+        local BUILDER, actors = setup()
+        local expected = "\\p[0]どれ\\n[150]" .. Q1 .. "\\n" .. Q2 .. "\\nつづき\\e"
+        expect(BUILDER.build(sequence(actors.sakura), {}, spots())):toBe(expected)
+        expect(BUILDER.build(sequence(actors.sakura), { after_choice_newlines = 1.0 }, spots())):toBe(expected)
+    end)
+
+    test("5.5: 換算は choice_newlines と同じ（100 倍して切り捨て）", function()
+        local BUILDER, actors = setup()
+        local result = BUILDER.build(sequence(actors.sakura), { after_choice_newlines = 1.239 }, spots())
+        expect(result):toBe("\\p[0]どれ\\n[150]" .. Q1 .. "\\n[123]" .. Q2 .. "\\n[123]つづき\\e")
+    end)
+
+    test("5.5: 数値でない値を渡した結果は choice_newlines に渡したときと同じ", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local function build_with(config)
+            return pcall(BUILDER.build, sequence(a), config, spots())
+        end
+        for _, value in ipairs({ "2.0", true, {} }) do
+            local after_ok, after_res = build_with({ after_choice_newlines = value })
+            local choice_ok, choice_res = build_with({ choice_newlines = value })
+            expect(after_ok):toBe(choice_ok)
+            expect(after_ok and after_res:gsub("%[%d+%]", "") or true)
+                :toBe(choice_ok and choice_res:gsub("%[%d+%]", "") or true)
+        end
+    end)
+
+    test("5.4: 話し手が戻った吹き出しでは spot_newlines だけで、after_choice_newlines を重ねない", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { talk(a, "どれ"), choice("甲") }),
+            group(b, { talk(b, "はい") }),
+            group(a, { talk(a, "どう") }),
+        }, { after_choice_newlines = 2.0, spot_newlines = 3.0 }, spots())
+        expect(result):toBe("\\p[0]どれ\\n[150]" .. Q1 .. "\\p[1]はい\\p[0]\\n[300]どう\\e")
+    end)
+
+    test("5.7: 字の後の選択肢の前（choice_newlines）は after_choice_newlines で変わらない", function()
+        local BUILDER, actors = setup()
+        local a = actors.sakura
+        local result = BUILDER.build({
+            group(a, { talk(a, "どれ"), choice("甲") }),
+        }, { after_choice_newlines = 2.0, choice_newlines = 3.0 }, spots())
+        expect(result):toBe("\\p[0]どれ\\n[300]" .. Q1 .. "\\e")
+    end)
+end)
+
+-- ============================================================================
 -- 立ち位置の警告を未登録アクターで重ねない（failure-output-unification 5.4・6.3）
 -- ============================================================================
 

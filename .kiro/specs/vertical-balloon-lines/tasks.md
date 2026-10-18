@@ -46,7 +46,7 @@
   - 省いた `[ghost]` で Lua から 1.0 が読める既定値のテストと、構造体の既定値の確認のテストが通る
   - _Boundary: GhostDefaults_
   - _Requirements: 5.6_
-- [ ] 3.2 選択肢の後の 2 か所の区切りを `after_choice_newlines` で出す
+- [x] 3.2 選択肢の後の 2 か所の区切りを `after_choice_newlines` で出す
   - SHIORI の act が `[ghost]` の `after_choice_newlines`（既定のリテラル 1.0）を読み、組み立ての設定に渡す。既定のリテラルを設定の既定値と照合するテストに足す
   - 組み立ては、選択肢の後の選択肢の前と、選択肢の後の台詞の前の区切りを、倍率から作る改行（N が 100 なら `\n`、他は `\n[N]`）にする。戻ったときは `spot_newlines` だけ、字の後の選択肢の前（`choice_newlines`）は今のまま
   - 組み立てのテストが通る: `2.0` で両方が `\n[200]`、無し・1.0 で `\n`、戻ったときに重ねない、`choice_newlines` の区切りが変わらない
