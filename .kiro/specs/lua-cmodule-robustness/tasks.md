@@ -95,7 +95,7 @@
   - _Boundary: FfiTestSuite, Win32DllLoader_
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 9.5_
 
-- [ ] 5.5 (P) 読み込んだ DLL の寿命のテスト
+- [x] 5.5 (P) 読み込んだ DLL の寿命のテスト
   - `ffi.load` の戻り値を捨てて `collectgarbage()` しても、先に取っておいた関数が呼べる
   - `ffi.gc` の後始末を残したまま VM を落としても落ちない。落とした後は `foo.dll` と `dep.dll` がプロセスに残っていない。そのあと新しい VM で読み直せる
   - 取り違えで失敗した後に、B の DLL が残っていない
