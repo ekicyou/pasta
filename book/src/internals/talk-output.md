@@ -380,7 +380,7 @@ SSP 2.9.18 は、引数の無い `\c` の後の字を既定の表示で出す（
 - [paragraph-break-tag-only-talk](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/paragraph-break-tag-only-talk) — 字を出すトークンによる段落区切りの判定と、単位（タグ・エスケープ・囲み）の読み方を SSP にそろえる変更、3 つの読み取りの適合テスト
 - [choice-line-layout](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/choice-line-layout) — 選択肢を 1 行に 1 つずつ出す改行の配置と `choice_newlines`、台詞に書いた `\c` を吹き出しの消去に数える変更
 - [vertical-balloon-lines](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/vertical-balloon-lines) — 列を動かすタグでの budoux の数え直しと、1 回の出力の中の吹き出しごとの列の持ち越し（`put_break`）、`budoux_newlines`・`budoux_jump`・`after_choice_newlines`、単独の `\` の守り
-- [actor-display-style](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/actor-display-style) — アクターごとの装い（`font`）の出し入れと、1 つのスポットを複数のアクターで共有する出力
+- [actor-display-style](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/actor-display-style) — アクターごとの装い（`font`）の出し入れと、1 つのスポットを複数のアクターで共有する出力
 
 ---
 
