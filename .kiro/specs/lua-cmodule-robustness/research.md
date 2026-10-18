@@ -4,6 +4,42 @@
 - 対象: `requirements.md`（requirements-generated・未承認）
 - 調べ方: リポジトリのコード・文書を読み、`C:\rust\cargo\registry\src\index.crates.io-1949cf8c6b5b557f\` の `luajit-src-210.6.6+707c12b`・`mlua-sys-0.10.0`・`mlua-0.11.6` のソースを読んだ。別のワークツリーにある作り済みの `pasta.dll`（x86・x64）を `dumpbin` で調べた。ビルドとテストは走らせていない。
 
+## 0. 2026-10-18 の方針転換（FFI の道）と設計への申し送り
+
+要件の話し合いで、C モジュールを `require` で読む道をやめ、LuaJIT の FFI の `ffi.load` で DLL を読む道に替えた（brief の「2026-10-18 要件の話し合いの決定」）。**下の 1〜7 節は方針転換の前の C モジュールの道の分析**で、参考に残す。使い回せるのは、2.1 のファイルの表（`searcher.rs`・`module_registry.rs`・`context.rs`・`Cargo.toml` の行）と、5 節のテスト用 DLL の作り方（案 (i)）。2.3・2.4・8 節の C API の話と IAT の書き換えは、FFI の道では要らない。
+
+### 0.1 FFI の道で確かめた事実
+
+- 本番の VM は `RuntimeConfig::new()`（`pasta_shiori/src/shiori.rs:106`）の `default_libs()`（`std_all` ほか）で作る。`std_all` は mlua の `ALL_SAFE`（`(1 << 30) - 1`。FFI と debug を含まない）。`[lua] libs` は `pasta-toml-logging-consistency` で消したので、今は FFI を開く手段が無い。`[loader]`（`LoaderConfig`・`loader/config/mod.rs:274`）は `@pasta_config` に現れない。
+- mlua は FFI を `requiref(state, "ffi", luaopen_ffi, 1)`（`mlua-0.11.6/src/state/raw.rs:1609`）で開く。グローバルの `ffi` と `package.loaded.ffi` は同じ表。
+- LuaJIT の `ffi.load`（`lib_ffi.c:810`）は `lj_clib_load` を呼び、関数の環境（`curr_func(L)->c.env`）から `CLibrary` のメタ表を得る。元の関数をそのまま呼べば、包んでも型は保たれる。
+- `clib_loadlib`（`lj_clib.c:211`）: `LoadLibraryExA(clib_extname(name), NULL, 0)`。`clib_needext` は名前に `/`・`\`・`.` のどれも無いときだけ `.dll` を足す。`global` は使わない。失敗は `clib_error` が `cannot load module '%s': %s`（`FormatMessageA`）を `lj_err_callermsg` で投げる（呼び出し元の位置が付く）。
+- `clib_unloadlib` は `CLibrary` の後始末で `FreeLibrary` する。pasta が先に読んだハンドルを別に持てば、参照の数で DLL が保たれる。
+
+### 0.2 実測（2026-10-18・Win11 26300・ACP 932・LongPathsEnabled=1）
+
+スクラッチ（リポジトリの外）で、マニフェストの無い C の試しの EXE を x64 と x86 の両方で作って走らせた。DLL は 539 文字・絵文字とカタカナ入りのフォルダに置いた。`foo.dll` は隣の `dep.dll` を取り込む。
+
+| 手順 | 結果（x64・x86 とも） |
+| --- | --- |
+| `LoadLibraryExA(ACP のフルパス, NULL, 0)`（今の `ffi.load` と同じ） | 失敗（126） |
+| `LoadLibraryExW(フルパス, NULL, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR\|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)` | 成功 |
+| 続けて `LoadLibraryExA("foo.dll", NULL, 0)` | 成功。上と同じハンドル。`dep.dll` を通った関数の値も正しい |
+| 別のフォルダの同じ名前の `foo.dll` を `LoadLibraryExW` で読む | 成功。1 つ目と別のハンドル |
+| その後の `LoadLibraryExA("foo.dll", NULL, 0)` | **1 つ目が返る**（取り違え） |
+| 2 つ目を読む前の `GetModuleHandleW(L"foo.dll")` | 1 つ目を返す（事前に気づける） |
+
+### 0.3 設計への申し送り（FFI の道）
+
+- 置き換えの流れ: 名前を解く → 取り違えの確かめ（`GetModuleHandleW`）→ `LoadLibraryExW` で先に読む → 元の `ffi.load` に短い名前を渡す → 先に読んだハンドルを Lua の状態を閉じ終わるまで保つ。
+- 取り違えの決め方（Requirement 5.2）: パスが ANSI で表せるときにフルパスを元の `ffi.load` に渡す案（深いパスで `LoadLibraryExA` が通るかの実測が要る。brief の起票時の計測では 480 文字の `LoadLibraryExA` が通ったが、`LongPathsEnabled=1` の機械）と、いつもファイル名を渡して取り違えなら失敗させる案を比べる。`GetModuleHandleW` が返したモジュールのパス（`GetModuleFileNameW`）と自分のパスの比べ方（8.3 名・大文字小文字・`\\?\`）も決める。再読み込みで前の状態の同じファイルを読む場合（5.4）を含める。
+- ファイル名が ANSI で表せるかの判定（2.8）: `WideCharToMultiByte` の `lpUsedDefaultChar` などで確かめる。
+- 先に読んだハンドルの解放（7.2）: Lua の状態を閉じた後（`PastaLuaRuntime` の `Drop` の中で、`Lua` を落とした後）に `FreeLibrary` する形か、userdata の `__gc` に任せる形か。`CLibrary` と `ffi.gc` の後始末より後になることを保証する方を選ぶ。
+- `LongPathsEnabled=0` での `LoadLibraryExW` の 260 文字超え（2.5）: GitHub の windows-latest ランナーの設定を確かめ、`0` の環境で確かめる道（ランナーの設定・別のジョブ）を決める。開発機の設定は変えない。
+- エラーの理由（6.2）: `FormatMessageW` → UTF-8。末尾の `\r\n` の扱い（LuaJIT の `FormatMessageA` は残す）を決める。
+- 置き場所: `ffi.load` の置き換えは `searcher.rs` に足さず、新しいファイルに分ける（`searcher.rs` は 622 行で、目安の 600 行を超えている）。Windows 専用の層は `cfg(windows)` で分ける。
+- テスト用 DLL: 5 節の案 (i)。FFI の DLL は Lua の C API に頼らないので、取り込み用のライブラリは要らない（依存 DLL の `.lib` は `cl` が作る）。
+
 ## 1. まとめ
 
 - 探して読む部分（Requirement 1〜7・9）は、`lua-require-robustness` の `searcher.rs` と同じ形で素直に作れる。手本・テストの道具（`NON_ANSI_DIR_NAME`・`make_deep_dir`・標準と並べる比べるテスト）はそろっている。

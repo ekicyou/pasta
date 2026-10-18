@@ -6,7 +6,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 現在の主題は 3 つある。
 
-- **0.4.2: 致命的でない不具合**。今の範囲は、C の Lua 拡張モジュールの `require` を、深いパス・ANSI に無い文字を含むフォルダでも読めるようにする `lua-cmodule-robustness` の 1 本である（2026-10-18 開発者の決定）。0.4.1 の後に届いた、組み合わせの絵文字が自動ウェイトで割れる不具合（`talk-grapheme-clusters`）は、版がまだ決まっていない（推奨は 0.4.2。下の「0.4.2 の範囲」）。
+- **0.4.2: 致命的でない不具合**。今の範囲は、ゴーストから DLL の関数を LuaJIT の FFI（`ffi.load`）で、深いパス・ANSI に無い文字を含むフォルダでも呼べるようにする `lua-cmodule-robustness` の 1 本である（2026-10-18 開発者の決定。要件の話し合いで、C モジュールの `require` の道から FFI の道に替えた）。0.4.1 の後に届いた、組み合わせの絵文字が自動ウェイトで割れる不具合（`talk-grapheme-clusters`）は、版がまだ決まっていない（推奨は 0.4.2。下の「0.4.2 の範囲」）。
 - **Phase 13: areka でノベルゲーム（0.5.0）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性セマンティクス（シーン属性の保持と読み出し・Call の属性フィルター）も、この道筋に入った。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
@@ -90,11 +90,11 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
 | 順 | spec | 要件定義 | 規模 | 始められる時期 |
 | -- | ---- | -------- | ---- | -------------- |
-| 1 | lua-cmodule-robustness | Opus | 10〜13（C の API の渡し方しだいで 14〜17） | 今すぐ（2026-10-18 のウェーブ） |
+| 1 | lua-cmodule-robustness | Opus（要件は確定） | 10 前後 | 今すぐ（2026-10-18 のウェーブ） |
 | 2 | 0.4.2 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
-- **0.4.2 に入れたもの**: `lua-cmodule-robustness`（`lua-require-robustness` の続き。C の Lua 拡張モジュールを、深いパス・ANSI に無い文字を含むフォルダでも読む）。要件定義の最初の議題は、C のモジュールが Lua の C の API をどこから得るかである。pasta.dll は LuaJIT を静的に取り込んでいて、`lua51.dll` が無い。案は 3 つ（pasta.dll から書き出す・転送用の `lua51.dll` を添える・見つけて読んで `luaopen_*` を呼ぶところまでに限る）。3 つ目なら、spec を続ける値打ちがあるかを開発者に確かめる。
-- **版がまだ決まっていないもの**: `talk-grapheme-clusters`（推奨は 0.4.2。0.4.1 の後に届いた不具合で、致命的でない）。入れるなら、`lua-cmodule-robustness` と同じウェーブに並べられる（ソースを共有しない。`Cargo.lock` とルートの `Cargo.toml` の席は `talk-grapheme-clusters` が持ち、`crates/pasta_lua/Cargo.toml` と `tech.md` の依存の表は、後から入る側が合わせる）。`scene-anchor-link` も版が決まっていない（下の棚卸）。
+- **0.4.2 に入れたもの**: `lua-cmodule-robustness`（`lua-require-robustness` の続き）。2026-10-18 の要件の話し合いで、C モジュールの `require` の道（Lua の C API を pasta.dll から書き出す必要があり、pasta のゴーストが 2 体いると別の pasta.dll に結びつく危険があった）をやめた。代わりに、pasta.toml の `[loader] ffi = true`（既定は無効）で FFI を開き、`ffi.load` を包んで、深いパス・ANSI に無い文字を含むフォルダ・隣の依存 DLL でも DLL を読めるようにする。経緯と実測は spec の brief にある。
+- **版がまだ決まっていないもの**: `talk-grapheme-clusters`（推奨は 0.4.2。0.4.1 の後に届いた不具合で、致命的でない）。入れるなら、`lua-cmodule-robustness` と同じウェーブに並べられる（ソースを共有しない。ルートの `Cargo.toml` の席は `talk-grapheme-clusters` が持つ。`lua-cmodule-robustness` はテスト用の DLL を作るために `cc` を `pasta_lua` の dev の依存に足すので、`Cargo.lock` の `pasta_lua` の依存の行が 1 つ変わる。`Cargo.lock`・`crates/pasta_lua/Cargo.toml`・`tech.md` の依存の表は、後から入る側が作り直して合わせる）。`scene-anchor-link` も版が決まっていない（下の棚卸）。
 - **これから見つかる不具合**: 致命的（起動しない・辞書の内容が失われる・配布物が壊れる・リリースが通らない）なら、すぐに割り込ませる。それ以外は、0.4.2 に入れるかを開発者が決める。
 - **0.5.0 との関係**: 0.5.0 の先頭（`novel-areka-contract`・`scene-attribute-store`・`novel-variable-scope`）は、0.4.2 の spec とファイルが重ならない。並べるには、0.5.0 を今のゴールに含める開発者の決定が要る（下の棚卸の「開発者の判断が要るもの」）。
 
