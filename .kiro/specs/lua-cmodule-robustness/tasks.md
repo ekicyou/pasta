@@ -118,7 +118,7 @@
   - _Boundary: Docs_
   - _Requirements: 10.1_
 
-- [ ] 6.2 (P) 起動の文書に「DLL を FFI で使う」節と既知の制限を足す
+- [x] 6.2 (P) 起動の文書に「DLL を FFI で使う」節と既知の制限を足す
   - 例（`foo.c`・`[loader] ffi = true`・`ffi.load("foo")`）、探すフォルダと順、相対パスの基点、依存 DLL を探す場所、C モジュールの `require` は使えず C の DLL は FFI で使うこと
   - 既知の制限: ファイル名の ANSI の制限、同名の別 DLL が読み込み済みなら失敗すること、依存 DLL の同名の取り違えは防がないこと、OS の探索に任せた DLL は Windows の規則のままであること、DLL の中の ANSI 版の API、`PATH` の依存 DLL、確かめと読み込みの間の別スレッドの競合
   - 完了の状態: `book/src/reference/startup.md` に節と制限の項目があり、マニュアルのビルドが通る
