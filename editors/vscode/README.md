@@ -9,7 +9,7 @@ Pasta DSL（`*.pasta` ファイル）のシンタックスハイライトと診�
 - **TextMate 文法ハイライト** — 全角/半角マーカー両対応の構文ハイライト
 - **セマンティックトークン** — pasta_lsp (WASM) による17種のセマンティックトークン提供
 - **診断情報** — パースエラーの Problems パネル表示
-- **ゴースト全体の診断** — `ghost/master` 配下の `.pasta`・`ghost/master/pasta.toml` を保存したとき、または `ghost/master` 配下の `.pasta`・`.lua` を作成・削除・改名したときに、そのゴースト全体を `pasta_check validate` と同じ規則で検査し、誤りを Error・注意を Warning として該当ファイル・行に表示（source は `pasta validate`。続けて保存したときはまとめて 1 回検査。保存前の入力中と起動直後は検査しない。ディスクに保存された内容を読む。WASM ロード失敗時は動作しない）。報告の意味と直し方は [マニュアル](https://ekicyou.github.io/pasta/debug/validate.html#エディタの診断) を参照
+- **ゴースト全体の診断** — `ghost/master` 配下の `.pasta`・`ghost/master/pasta.toml` を保存したとき、または `ghost/master` 配下の `.pasta`・`.lua` を作成・削除・改名したときに、そのゴースト全体を `pasta_check validate` と同じ規則で検査し（`ghost`・`master`・`pasta.toml` の名前と拡張子は大文字・小文字を区別しない。`Ghost/Master` も対象）、誤りを Error・注意を Warning として該当ファイル・行に表示（source は `pasta validate`。続けて保存したときはまとめて 1 回検査。保存前の入力中と起動直後は検査しない。ディスクに保存された内容を読む。WASM ロード失敗時は動作しない）。報告の意味と直し方は [マニュアル](https://ekicyou.github.io/pasta/debug/validate.html#エディタの診断) を参照
 - **フォールバック** — WASM ロード失敗時は TextMate 文法のみで動作
 - **デバッガ接続** — 実行中の Pasta デバッグバックエンドへの attach（DAP）と、`.pasta` ⇔ `.lua` の提示モード切替（コマンドパレット / デバッグツールバー / ステータスバー）
 

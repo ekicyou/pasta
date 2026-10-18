@@ -14,6 +14,7 @@ fn module_findings(entries: &[&str]) -> Vec<(String, FindingKind, String)> {
     let input = GhostInput {
         pasta_toml: TomlSource::Text { text: TOML.into() },
         entries: entries.iter().map(|s| s.to_string()).collect(),
+        dirs: vec![],
     };
     let files: BTreeMap<_, _> = select_dictionary_files(&input)
         .into_iter()
@@ -136,6 +137,7 @@ fn syntax_findings(files: Vec<(&str, FileText)>) -> Vec<pasta_check::validate::F
     let input = GhostInput {
         pasta_toml: TomlSource::Text { text: TOML.into() },
         entries: files.iter().map(|(p, _)| p.to_string()).collect(),
+        dirs: vec![],
     };
     let files: BTreeMap<_, _> = files.into_iter().map(|(p, t)| (p.to_string(), t)).collect();
     validate_ghost(&input, &files)
@@ -256,6 +258,7 @@ fn transpile_findings(text: &str) -> Vec<(FindingKind, Option<u32>, Option<u32>,
     let input = GhostInput {
         pasta_toml: TomlSource::Text { text: TOML.into() },
         entries: vec![path.into()],
+        dirs: vec![],
     };
     let files = BTreeMap::from([(path.to_string(), FileText::Text { text: text.into() })]);
     let found: Vec<_> = validate_ghost(&input, &files)

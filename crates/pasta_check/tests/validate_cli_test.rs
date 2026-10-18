@@ -113,6 +113,24 @@ fn test_validate_each_finding_is_one_line() {
     );
 }
 
+/// 読めない辞書があると飛び先の検査を省き、理由を案内の行に出す（1.1・1.4・1.5）
+#[test]
+fn test_validate_unreadable_dictionary_skips_references() {
+    let (_t, target, master) = ghost();
+    fs::write(master.join("dic/a.pasta"), "＊挨拶\n  ＞どこにも無い\n").unwrap();
+    fs::write(master.join("dic/b.pasta"), [0xffu8, 0xfe, 0x00]).unwrap();
+    let output = validate(&target);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    let stdout = stdout_of(&output);
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert!(
+        lines.contains(&"読めない辞書ファイルがあるため、飛び先の検査をしていません。"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("飛び先「"), "{stdout}");
+    assert!(!stdout.contains("飛び先を検査しなかった"), "{stdout}");
+}
+
 /// 誤りなし（注意あり）→ 終了コード 0（Req 7.6）
 #[test]
 fn test_validate_warnings_only_exit_zero() {
@@ -173,7 +191,32 @@ fn test_validate_stable_and_read_only() {
     );
 }
 
-/// 見本のゴースト hello-pasta は誤り 0 で終了コード 0、読むだけ（Req 9.5・1.6）
+/// 中身の無い `dic/x.pasta/` → 終了コード 1、フォルダの 1 行（行・列なし）を出す（2.1・4.1）
+#[test]
+fn test_validate_folder_matching_pattern_exit_one() {
+    let (_t, target, master) = ghost();
+    fs::write(master.join("dic/a.pasta"), "＊挨拶\n  さくら：こんにちは\n").unwrap();
+    // Git は空のフォルダを持てないので、走らせるときに作る
+    fs::create_dir(master.join("dic/x.pasta")).unwrap();
+    let output = validate(&target);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    let stdout = stdout_of(&output);
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(
+        lines[0],
+        "ghost/master/dic/x.pasta: 誤り: 辞書のパターンに一致するフォルダです。pasta.dll はこのフォルダを辞書として読めず、ゴーストを読み込めません",
+        "{stdout}"
+    );
+    // フォルダは検査した辞書ファイルの数に入らない（2.5）
+    assert!(
+        stdout.contains("検査した辞書ファイル 1 個: 誤り 1 件、注意 0 件"),
+        "{stdout}"
+    );
+}
+
+/// 見本のゴースト hello-pasta は誤り 0 件・注意 0 件で終了コード 0、読むだけ（Req 9.5・1.6・5.3）。
+/// 11 段目の前方一致の候補（`11-jump.pasta` の `＞寄り道` → `＊寄り道公園`・`＊寄り道本屋`・`＊寄り道駄菓子屋`）が注意にならないこと＝
+/// 前方一致の重なりを報告しないこと（5.4）も、これで守る
 #[test]
 fn test_validate_hello_pasta_clean() {
     let target =
@@ -188,5 +231,7 @@ fn test_validate_hello_pasta_clean() {
         "{stdout}{}",
         stderr_of(&output)
     );
-    assert!(stdout.contains("誤り 0 件"), "{stdout}");
+    assert!(stdout.contains("誤り 0 件、注意 0 件"), "{stdout}");
+    // 問題の行は 1 行も無い
+    assert!(!stdout.contains("ghost/master/"), "{stdout}");
 }

@@ -13,6 +13,7 @@ fn ghost() -> (GhostInput, BTreeMap<String, FileText>) {
     let input = GhostInput {
         pasta_toml: TomlSource::Text { text: TOML.into() },
         entries: vec!["pasta.toml".into(), "dic/talk.pasta".into()],
+        dirs: vec![],
     };
     let files = select_dictionary_files(&input)
         .into_iter()
@@ -46,6 +47,7 @@ fn input_reads_camel_case_with_kind_tag() {
         r#"
         [input]
         entries = ["dic/a.pasta"]
+        dirs = ["dic"]
         pastaToml = { kind = "unreadable", reason = "denied" }
         [files]
         "dic/a.pasta" = { kind = "text", text = "x" }
@@ -58,6 +60,7 @@ fn input_reads_camel_case_with_kind_tag() {
         matches!(doc.input.pasta_toml, TomlSource::Unreadable { ref reason } if reason == "denied")
     );
     assert_eq!(doc.input.entries, vec!["dic/a.pasta"]);
+    assert_eq!(doc.input.dirs, vec!["dic"]);
     assert!(matches!(&doc.files["dic/a.pasta"], FileText::Text { text } if text == "x"));
     assert!(matches!(doc.files["dic/b.pasta"], FileText::NotUtf8));
     assert!(
@@ -78,6 +81,7 @@ fn config_findings(src: TomlSource) -> Vec<Finding> {
         pasta_toml: src,
         // 辞書が無いことの注意（no-dictionary-files）を混ぜない
         entries: vec!["dic/a.pasta".into()],
+        dirs: vec![],
     };
     validate_ghost(&input, &BTreeMap::new())
         .findings
@@ -305,6 +309,7 @@ fn input_with(patterns: &[&str], entries: &[&str]) -> GhostInput {
             text: format!("[loader]\npasta_patterns = [{list}]\n"),
         },
         entries: entries.iter().map(|e| e.to_string()).collect(),
+        dirs: vec![],
     }
 }
 
@@ -489,4 +494,104 @@ fn no_dictionary_files_is_warning_on_pasta_toml() {
     let report = validate_ghost(&input, &BTreeMap::new());
     assert_eq!(report.stats.dictionary_files, 0);
     assert!(!report.has_errors(), "{:?}", report.lines());
+}
+
+// ---- 辞書のパターンに一致するフォルダ（2.1〜2.7） ----
+
+fn with_dirs(mut input: GhostInput, dirs: &[&str]) -> GhostInput {
+    input.dirs = dirs.iter().map(|d| d.to_string()).collect();
+    input
+}
+
+/// フォルダの誤りのパスだけ
+fn folder_findings(input: &GhostInput) -> Vec<String> {
+    validate_ghost(input, &BTreeMap::new())
+        .findings
+        .into_iter()
+        .filter(|f| f.code == FindingKind::FolderMatchesPattern)
+        .map(|f| f.path)
+        .collect()
+}
+
+#[test]
+fn folders_matching_patterns_are_errors_and_others_are_not() {
+    let input = with_dirs(
+        default_input(&["pasta.toml", "dic/x.pasta/inner.pasta", "dic/sub/a.pasta"]),
+        &[
+            "dic",
+            "dic/x.pasta",
+            "dic/x.lua",
+            "dic/a.pasta",
+            "dic/a.pasta/b.pasta",
+            "dic/empty.pasta",
+            "Dic/Up.pasta",
+            "dic/sub",
+            "dic/x.txt",
+            "dic/X.PASTA",
+            "profile",
+            "profile/z.pasta",
+        ],
+    );
+    assert_eq!(
+        folder_findings(&input),
+        vec![
+            "Dic/Up.pasta",
+            "dic/a.pasta",
+            "dic/a.pasta/b.pasta",
+            "dic/empty.pasta",
+            "dic/x.lua",
+            "dic/x.pasta",
+        ]
+    );
+    // 一致したフォルダの中のファイルは今までどおり辞書ファイル（2.4）
+    assert_eq!(
+        select_dictionary_files(&input),
+        vec!["dic/sub/a.pasta", "dic/x.pasta/inner.pasta"]
+    );
+    let report = validate_ghost(&input, &BTreeMap::new());
+    // フォルダは辞書ファイルの数に入らない（2.5）
+    assert_eq!(report.stats.dictionary_files, 2);
+    // 1 行の形と並び順（2.7）
+    let lines = report.lines();
+    let at = |p: &str| lines.iter().position(|l| l.starts_with(p)).unwrap();
+    assert_eq!(
+        lines[at("ghost/master/dic/x.pasta: ")],
+        "ghost/master/dic/x.pasta: 誤り: 辞書のパターンに一致するフォルダです。pasta.dll はこのフォルダを辞書として読めず、ゴーストを読み込めません"
+    );
+    assert!(at("ghost/master/dic/x.lua: ") < at("ghost/master/dic/x.pasta: "));
+    assert!(at("ghost/master/dic/x.pasta: ") < at("ghost/master/dic/x.pasta/inner.pasta"));
+}
+
+#[test]
+fn folder_rules_for_trailing_double_star_and_folder_only_patterns() {
+    let dirs = ["dic", "dic/a", "dic/a/b", "other", "profile", "profile/x"];
+    let cases: [(&str, &[&str]); 6] = [
+        // 最後の ** は 1 段以上（dic そのものには一致しない）
+        ("dic/**", &["dic/a", "dic/a/b"]),
+        // / で終わる・最後が . のパターンはフォルダだけに一致する
+        ("dic/", &["dic"]),
+        ("dic/.", &["dic"]),
+        ("dic/*", &["dic/a"]),
+        // profile は除く
+        ("**", &["dic", "dic/a", "dic/a/b", "other"]),
+        // 成分 0 個は ghost/master そのもの（パスは空）
+        ("", &[""]),
+    ];
+    for (pattern, expected) in cases {
+        let input = with_dirs(input_with(&[pattern], &["pasta.toml"]), &dirs);
+        assert_eq!(folder_findings(&input), expected, "{pattern}");
+        // ファイルの選び出しはフォルダだけのパターンを使わない（今までどおり）
+        assert!(select_dictionary_files(&input).is_empty(), "{pattern}");
+    }
+    // ghost/master そのものの 1 行
+    let input = with_dirs(input_with(&["."], &["pasta.toml"]), &[]);
+    let report = validate_ghost(&input, &BTreeMap::new());
+    assert!(
+        report.lines().contains(&format!(
+            "ghost/master/: 誤り: {}",
+            pasta_check::validate::msg::folder_matches_pattern()
+        )),
+        "{:?}",
+        report.lines()
+    );
 }

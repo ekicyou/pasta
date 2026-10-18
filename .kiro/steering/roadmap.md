@@ -324,7 +324,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 ## Specs (dependency order)
 
-- [ ] pasta-check-validate-edges -- 辞書の検査（`pasta_check validate`）の端のケース 3 つ（読めない辞書・`.pasta` で終わるフォルダ・VSCode 拡張の大文字と小文字）の裁定と直しと、代用品（`manual.yml` の段・`tutorial_stages_test.rs` の前方一致の検査）の置き換え（2026-10-17 の棚卸で、`pasta-check-dic-validate` の残りから起票）。0.4.1 に入れる（2026-10-17 開発者の決定）。Dependencies: none
+- [x] pasta-check-validate-edges -- 辞書の検査（`pasta_check validate`）の端のケース 3 つ（読めない辞書・`.pasta` で終わるフォルダ・VSCode 拡張の大文字と小文字）の裁定と直しと、代用品（`manual.yml` の段・`tutorial_stages_test.rs` の前方一致の検査）の置き換え（2026-10-17 の棚卸で、`pasta-check-dic-validate` の残りから起票）。0.4.1 に入れる（2026-10-17 開発者の決定）。Dependencies: none（2026-10-18 完了）
 - [ ] tutorial-ssp-gaps -- 入門ガイドを SSP で確かめたときに見つかった、SSP の動きとのずれ 2 つ。SSP の「現在時刻の仮想的変更」を時報に効かせる（外から起こした `OnTalk` でチェイントークが続かない件も）ことと、辞書や `＊OnBoot` が無いときの起動の立ち絵。どちらも、やるかどうかから決める。2026-10-17 に `baseware-virtual-time` と `boot-surface-without-dic` をまとめた。起動の立ち絵の分は、2026-10-16 開発者の決定で優先度を下げた（何も書かなければ何も表示しないのが既定の動き）。0.4.1 に入れる（2026-10-17 開発者の決定）。Dependencies: none
 - [ ] novel-areka-contract -- pasta と areka の取り決め（台本に載せる語彙・目印・イベント・設定の値）を 1 つの文書にし、areka への依頼書として出す。コードは書かない。areka に依頼を出すための spec（2026-10-10 の discovery で起票）。Dependencies: none
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: none

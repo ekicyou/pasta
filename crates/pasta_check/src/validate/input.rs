@@ -2,6 +2,9 @@
 
 use serde::Deserialize;
 
+/// 報告での pasta.toml のパス（config と report の両方が使うので入力の側に置く）
+pub(super) const PASTA_TOML: &str = "pasta.toml";
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GhostInput {
@@ -9,6 +12,9 @@ pub struct GhostInput {
     pub pasta_toml: TomlSource,
     /// ghost/master の配下のファイルの相対パス（'/' 区切り）。順序は問わない
     pub entries: Vec<String>,
+    /// ghost/master の配下のフォルダの相対パス（'/' 区切り・末尾の '/' なし・ghost/master
+    /// そのものは入れない）。順序は問わない。必須で既定値を持たない
+    pub dirs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

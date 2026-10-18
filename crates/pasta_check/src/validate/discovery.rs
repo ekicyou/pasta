@@ -3,6 +3,7 @@
 //! pasta.dll（`loader/discovery.rs`・`process.rs`）は Windows で `glob::glob` を使う。その振る舞いを
 //! ファイルの一覧の上で写す: ワイルドカードの無い成分はパターンの綴りでファイルシステムを引くので
 //! 大文字・小文字を区別せず、ある成分は `Pattern::matches`（既定の MatchOptions）で区別する。
+//! `glob::glob` はフォルダにも一致し、pasta.dll はそのフォルダを辞書として読もうとして失敗する（2.1）。
 
 use glob::Pattern;
 
@@ -18,11 +19,14 @@ pub(crate) struct DictFile {
     pub dll_path: String,
 }
 
-/// 辞書ファイル（.pasta）と辞書モジュール（.lua）。どちらも実物の相対パスの昇順で、重複なし
+/// 辞書ファイル（.pasta）と辞書モジュール（.lua）と辞書のパターンに一致したフォルダ。
+/// どれも実物の相対パスの昇順で、重複なし
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Discovered {
     pub pasta: Vec<DictFile>,
     pub lua: Vec<DictFile>,
+    /// .pasta と .lua のパターンの和に一致したフォルダ。ghost/master そのものはパス ""
+    pub folders: Vec<DictFile>,
 }
 
 pub(crate) fn discover(input: &GhostInput, config: &GhostConfig) -> (Discovered, Vec<Finding>) {
@@ -59,10 +63,27 @@ pub(crate) fn discover(input: &GhostInput, config: &GhostConfig) -> (Discovered,
         .filter_map(|p| parse(p).ok())
         .collect();
 
+    // フォルダの候補は ghost/master そのもの（""）と入力のフォルダ
+    let dirs: Vec<String> = std::iter::once(String::new())
+        .chain(input.dirs.iter().cloned())
+        .collect();
+    let both: Vec<Parsed> = pasta_comps.iter().chain(&lua_comps).cloned().collect();
     let found = Discovered {
-        pasta: collect(&input.entries, &pasta_comps),
-        lua: collect(&input.entries, &lua_comps),
+        pasta: collect(&input.entries, &pasta_comps, false),
+        lua: collect(&input.entries, &lua_comps, false),
+        folders: collect(&dirs, &both, true),
     };
+
+    // 両方のパターンに一致しても 1 件。入れ子はそれぞれ（pasta.dll がそれぞれ読もうとして失敗する）
+    for folder in &found.folders {
+        findings.push(Finding::new(
+            FindingKind::FolderMatchesPattern,
+            &folder.path,
+            None,
+            None,
+            msg::folder_matches_pattern(),
+        ));
+    }
 
     for file in found.pasta.iter().chain(&found.lua) {
         let name = file.dll_path.rsplit('/').next().unwrap_or_default();
@@ -98,6 +119,7 @@ fn is_traversal(pattern: &str) -> bool {
         || pattern.split(['/', '\\']).any(|c| c == "..")
 }
 
+#[derive(Clone)]
 enum Comp {
     /// ワイルドカードの無い成分（大文字・小文字を区別しない）
     Literal(String),
@@ -106,15 +128,22 @@ enum Comp {
     Wild(Pattern),
 }
 
-/// パターンを成分に分ける。ファイルに一致し得ない形（`/` や `.` で終わる）は None
-fn parse(pattern: &str) -> Result<Option<Vec<Comp>>, glob::PatternError> {
+/// 成分の並びと、フォルダだけに一致するか
+#[derive(Clone)]
+struct Parsed {
+    comps: Vec<Comp>,
+    dir_only: bool,
+}
+
+/// パターンを成分に分ける
+fn parse(pattern: &str) -> Result<Parsed, glob::PatternError> {
     // Windows では `\` も区切り
     let pattern = pattern.replace('\\', "/");
     Pattern::new(&pattern)?;
-    // `glob::glob` は `/` で終わるとフォルダだけ、最後の `.` もフォルダにしか一致しない
-    if pattern.is_empty() || pattern.ends_with('/') || pattern.rsplit('/').next() == Some(".") {
-        return Ok(None);
-    }
+    // `glob::glob` は `/` で終わるとフォルダだけ、最後の `.` もフォルダにしか一致しない。
+    // 成分が 0 個（`""`・`.`・`./`）は ghost/master そのもの
+    let dir_only =
+        pattern.is_empty() || pattern.ends_with('/') || pattern.rsplit('/').next() == Some(".");
     let mut comps = Vec::new();
     // 空の成分と `.` はフォルダをそのまま指す（`Path::components` と同じく pasta.dll が見るパスにも残らない）
     // ponytail: `.*` のような点で始まるワイルドカードが `.`・`..` にも一致する glob の特例は写さない
@@ -127,20 +156,26 @@ fn parse(pattern: &str) -> Result<Option<Vec<Comp>>, glob::PatternError> {
             Comp::Literal(c.to_string())
         });
     }
-    Ok(Some(comps))
+    Ok(Parsed { comps, dir_only })
 }
 
-/// 一覧のうちどれかのパターンに一致するファイル（profile/ を除き、重複をまとめ、昇順）
-fn collect(entries: &[String], patterns: &[Option<Vec<Comp>>]) -> Vec<DictFile> {
+/// 一覧のうちどれかのパターンに一致するもの（profile を除き、重複をまとめ、昇順）。
+/// `dir` が false ならファイルとして照らし、フォルダだけのパターンを使わない
+fn collect(entries: &[String], patterns: &[Parsed], dir: bool) -> Vec<DictFile> {
     let mut files: Vec<DictFile> = Vec::new();
     for entry in entries {
-        let parts: Vec<&str> = entry.split('/').collect();
-        let dll_path = patterns.iter().flatten().find_map(|comps| {
-            let mut seen = Vec::new();
-            matches(comps, &parts, &mut seen).then(|| seen.join("/"))
-        });
-        // pasta.dll は自分が見るパスで profile/ を判定する（Path::starts_with は大文字・小文字を区別）
-        if let Some(dll_path) = dll_path.filter(|p| !p.starts_with("profile/")) {
+        // ghost/master そのもの（""）は成分 0 個
+        let parts: Vec<&str> = entry.split('/').filter(|p| !p.is_empty()).collect();
+        let dll_path = patterns
+            .iter()
+            .filter(|p| dir || !p.dir_only)
+            .find_map(|p| {
+                let mut seen = Vec::new();
+                matches(&p.comps, &parts, dir, &mut seen).then(|| seen.join("/"))
+            });
+        // pasta.dll は自分が見るパスで profile を判定する（Path::starts_with は大文字・小文字を区別）
+        let excluded = |p: &String| p.starts_with("profile/") || (dir && p == "profile");
+        if let Some(dll_path) = dll_path.filter(|p| !excluded(p)) {
             files.push(DictFile {
                 path: entry.clone(),
                 dll_path,
@@ -152,29 +187,36 @@ fn collect(entries: &[String], patterns: &[Option<Vec<Comp>>]) -> Vec<DictFile> 
     files
 }
 
-/// 成分の並びが一致すれば true。`seen` に pasta.dll が見る綴りを積む
-fn matches(comps: &[Comp], parts: &[&str], seen: &mut Vec<String>) -> bool {
+/// 成分の並びが一致すれば true。`seen` に pasta.dll が見る綴りを積む。`dir` はフォルダとして照らす
+fn matches(comps: &[Comp], parts: &[&str], dir: bool, seen: &mut Vec<String>) -> bool {
     let Some((first, rest)) = comps.split_first() else {
         return parts.is_empty();
     };
     match first {
-        Comp::Recursive => {
-            // 最後の `**` はフォルダにしか一致しない。最後の成分（ファイル名）は残す
-            !rest.is_empty()
-                && (0..parts.len()).any(|n| {
-                    let len = seen.len();
-                    seen.extend(parts[..n].iter().map(|s| s.to_string()));
-                    let ok = matches(rest, &parts[n..], seen);
-                    if !ok {
-                        seen.truncate(len);
-                    }
-                    ok
-                })
+        // 最後の `**` はフォルダにしか一致せず、1 段以上（`dic/**` は dic そのものに一致しない）
+        Comp::Recursive if rest.is_empty() => {
+            let ok = dir && !parts.is_empty();
+            if ok {
+                seen.extend(parts.iter().map(|s| s.to_string()));
+            }
+            ok
         }
-        Comp::Literal(lit) => one(rest, parts, seen, |p| {
+        // 途中の `**` は 0 段以上。残りの成分に少なくとも 1 つ残す
+        Comp::Recursive => (0..parts.len()).any(|n| {
+            let len = seen.len();
+            seen.extend(parts[..n].iter().map(|s| s.to_string()));
+            let ok = matches(rest, &parts[n..], dir, seen);
+            if !ok {
+                seen.truncate(len);
+            }
+            ok
+        }),
+        Comp::Literal(lit) => one(rest, parts, dir, seen, |p| {
             (p.to_lowercase() == lit.to_lowercase()).then(|| lit.clone())
         }),
-        Comp::Wild(pat) => one(rest, parts, seen, |p| pat.matches(p).then(|| p.to_string())),
+        Comp::Wild(pat) => one(rest, parts, dir, seen, |p| {
+            pat.matches(p).then(|| p.to_string())
+        }),
     }
 }
 
@@ -182,6 +224,7 @@ fn matches(comps: &[Comp], parts: &[&str], seen: &mut Vec<String>) -> bool {
 fn one(
     rest: &[Comp],
     parts: &[&str],
+    dir: bool,
     seen: &mut Vec<String>,
     head: impl Fn(&str) -> Option<String>,
 ) -> bool {
@@ -192,7 +235,7 @@ fn one(
         return false;
     };
     seen.push(spelling);
-    let ok = matches(rest, tail, seen);
+    let ok = matches(rest, tail, dir, seen);
     if !ok {
         seen.pop();
     }

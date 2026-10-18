@@ -143,7 +143,7 @@ const EMPTY_STATS: GhostStats = {
   errors: 0,
   warnings: 0,
   uncheckedDynamicCalls: 0,
-  referencesSkipped: false,
+  skipReasons: [],
 };
 
 /** 偽の bridge。選び出しの結果と報告をテストが決め、呼び出しを記録する */
@@ -206,6 +206,18 @@ test('findGhostMaster は祖先の ghost/master を返し、無ければ undefin
   assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/dic/a.pasta')), undefined);
   assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/master/a.pasta')), undefined);
   assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/ghost/master')), undefined);
+});
+
+test('findGhostMaster は大文字・小文字を区別せず、届いた綴りのまま返す', () => {
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/Ghost/Master/dic/a.pasta'))?.path, '/ws/Ghost/Master');
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/GHOST/master/pasta.toml'))?.path, '/ws/GHOST/master');
+  // 入れ子ではいちばん近いもの
+  assert.strictEqual(
+    findGhostMaster(vscode.Uri.file('/ws/ghost/master/dic/Ghost/MASTER/x.pasta'))?.path,
+    '/ws/ghost/master/dic/Ghost/MASTER'
+  );
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/Ghost/dic/a.pasta')), undefined);
+  assert.strictEqual(findGhostMaster(vscode.Uri.file('/ws/MASTER/Ghost/a.pasta')), undefined);
 });
 
 test('一覧は再帰・最上位の profile に入らず・リンクを含めず、中身は厳格な UTF-8 で読んで区別する', async () => {
@@ -400,6 +412,91 @@ test('開いている文書の syntax は出さず、閉じると出し、開く
   assert.strictEqual(col.get(uriOf('dic/c.pasta')), undefined);
 });
 
+test('フォルダの一覧に入ったフォルダが入り、最上位の profile とリンクは入らない（CLI と同じ）', async () => {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  mock.setFakeFile('/ws/ghost/master/pasta.toml', '');
+  mock.setFakeFile('/ws/ghost/master/dic/a.pasta', '');
+  mock.setFakeDir('/ws/ghost/master/dic/x.pasta');
+  mock.setFakeFile('/ws/ghost/master/dic/sub/b.lua', '');
+  mock.setFakeFile('/ws/ghost/master/dic/profile/c.pasta', '');
+  mock.setFakeFile('/ws/ghost/master/profile/x.pasta', '');
+  mock.setFakeDir('/ws/ghost/master/profile/sub');
+  mock.setFakeSymlink('/ws/ghost/master/linkdir', vscode.FileType.Directory);
+  mock.setFakeSymlink('/ws/ghost/master/dic/link.pasta', vscode.FileType.Directory);
+  const bridge = new FakeBridge();
+  const { gv } = newValidator(bridge);
+
+  await gv.validate(MASTER);
+
+  const input = bridge.selectCalls[0];
+  assert.deepStrictEqual([...input.dirs].sort(), ['dic', 'dic/profile', 'dic/sub', 'dic/x.pasta']);
+  // 中身の無いフォルダはファイルの一覧に入らない
+  assert.ok(!input.entries.some((e) => e.startsWith('dic/x.pasta')), input.entries.join(','));
+  assert.deepStrictEqual(bridge.validateCalls[0].input.dirs, input.dirs);
+  gv.dispose();
+});
+
+test('フォルダの誤りはフォルダの URI に Error で出て、次の回に返さなければ消える', async () => {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  mock.setFakeDir('/ws/ghost/master/dic/x.pasta');
+  const bridge = new FakeBridge();
+  bridge.report = {
+    findings: [finding('folder-matches-pattern', 'error', 'dic/x.pasta', null, null, '辞書のパターンに一致するフォルダ')],
+    stats: { ...EMPTY_STATS, errors: 1 },
+  };
+  const { gv, col } = newValidator(bridge);
+
+  await gv.validate(MASTER);
+  const d = col.get(uriOf('dic/x.pasta'));
+  assert.ok(d);
+  assert.strictEqual(d.length, 1);
+  assert.strictEqual(d[0].severity, vscode.DiagnosticSeverity.Error);
+  assert.strictEqual(d[0].code, 'folder-matches-pattern');
+  assert.strictEqual(col.size, 1);
+
+  bridge.report = { findings: [], stats: EMPTY_STATS };
+  await gv.validate(MASTER);
+  assert.strictEqual(col.get(uriOf('dic/x.pasta')), undefined);
+  assert.strictEqual(col.size, 0);
+  gv.dispose();
+});
+
+test('開いている文書の綴りと起動の綴りが違うとき、診断は開いている文書の URI に付き二重にならない', async () => {
+  mock.resetFakeFs();
+  mock.setFakeFile('/ws/Ghost/Master/dic/a.pasta', '');
+  setOpenDocuments(['dic/a.pasta']); // /ws/ghost/master/dic/a.pasta
+  const bridge = new FakeBridge();
+  bridge.report = {
+    findings: [
+      finding('syntax', 'error', 'dic/a.pasta', 1, 1, '構文'),
+      finding('call-target-missing', 'warning', 'dic/a.pasta', 2, 1, '飛び先'),
+    ],
+    stats: EMPTY_STATS,
+  };
+  const { gv, col } = newValidator(bridge);
+  gv.register();
+  const upper = vscode.Uri.file('/ws/Ghost/Master');
+
+  await gv.validate(upper);
+  // 開いている文書なので syntax は出さない（綴りが違っても開いていると分かる）
+  assert.deepStrictEqual((col.get(uriOf('dic/a.pasta')) ?? []).map((d) => d.code), ['call-target-missing']);
+  assert.strictEqual(col.get(vscode.Uri.joinPath(upper, 'dic', 'a.pasta')), undefined);
+  assert.strictEqual(col.size, 1);
+
+  // 閉じると、その回の起動の綴りの URI に付け替わり、開いていた綴りからは消える
+  setOpenDocuments([]);
+  mock.didCloseTextDocumentEmitter.fire({ uri: uriOf('dic/a.pasta') });
+  assert.strictEqual(col.get(uriOf('dic/a.pasta')), undefined);
+  assert.deepStrictEqual(
+    (col.get(vscode.Uri.joinPath(upper, 'dic', 'a.pasta')) ?? []).map((d) => d.code),
+    ['syntax', 'call-target-missing']
+  );
+  assert.strictEqual(col.size, 1);
+  gv.dispose();
+});
+
 test('WASM の呼び出しが throw したらそのゴーストの診断を消して出力チャンネルに 1 行残す', async () => {
   mock.resetFakeFs();
   setOpenDocuments([]);
@@ -453,9 +550,9 @@ function save(path: string): void {
   mock.didSaveTextDocumentEmitter.fire({ uri: vscode.Uri.file(path) });
 }
 
-test('見張りのパターンは ghost/master の配下の .pasta・.lua', () => {
+test('見張りのパターンは **/* で、拡張の側で絞る', () => {
   const { gv, watcher } = newRegistered();
-  assert.strictEqual(watcher.globPattern, '**/ghost/master/**/*.{pasta,lua}');
+  assert.strictEqual(watcher.globPattern, '**/*');
   gv.dispose();
   assert.strictEqual(watcher.disposed, true);
 });
@@ -544,6 +641,118 @@ test('走行中に来たら、終わった後に 1 回だけ走らせる', async
   await sleep(DELAY * 3);
   assert.strictEqual(masters.length, 2, '終わった後に 1 回だけ');
   assert.strictEqual(running, 0);
+  gv.dispose();
+});
+
+test('大文字・小文字の混じった ghost/master の配下の .pasta・.lua の作成・削除で走る', async () => {
+  const { gv, masters, watcher } = newRegistered();
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/Ghost/Master/dic/a.lua'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/Ghost/Master']);
+
+  masters.length = 0;
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/ghost/MASTER/dic/B.PASTA'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/MASTER']);
+
+  masters.length = 0;
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/ghost/MASTER/dic/B.PASTA'));
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/Ghost/Master/dic/a.lua'));
+  await sleep(DELAY * 3);
+  assert.strictEqual(masters.length, 1, '同じゴーストなので 1 回に束ねる');
+  gv.dispose();
+});
+
+test('診断か読んだファイルのあるフォルダを丸ごと消すと走り、関係の無いフォルダでは走らない', async () => {
+  const { gv, masters, watcher } = newRegistered();
+  mock.setFakeDir('/ws/ghost/master/dic/sub/x.pasta');
+  const bridge = (gv as unknown as { bridge: FakeBridge }).bridge;
+  bridge.selected = ['dic/a.pasta'];
+  bridge.report = {
+    findings: [finding('folder-matches-pattern', 'error', 'dic/sub/x.pasta', null, null, 'フォルダ')],
+    stats: { ...EMPTY_STATS, errors: 1 },
+  };
+  await gv.validate(MASTER);
+  masters.length = 0;
+
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/ghost/master/other'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, [], '関係の無いフォルダ');
+
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/Ghost/Master/dic/SUB'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/Ghost/Master'], '診断のあるフォルダ');
+
+  // 診断が無くなっても、読んだファイル（dic/a.pasta）が下にあれば走る
+  bridge.report = { findings: [], stats: EMPTY_STATS };
+  await gv.validate(MASTER);
+  assert.strictEqual(mock.createdDiagnosticCollections[mock.createdDiagnosticCollections.length - 1].size, 0);
+  masters.length = 0;
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/ghost/master/dic'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/master'], '読んだファイルのあるフォルダ');
+  gv.dispose();
+});
+
+test('readme.txt・ghost/master の外の作成・削除では走らない', async () => {
+  const { gv, masters, watcher } = newRegistered();
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/Ghost/Master/readme.txt'));
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/ghost/master/dic/notes.md'));
+  watcher.createEmitter.fire(vscode.Uri.file('/ws/dic/a.pasta'));
+  watcher.deleteEmitter.fire(vscode.Uri.file('/ws/Ghost/b.lua'));
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, []);
+  gv.dispose();
+});
+
+test('a.PASTA・直下の PASTA.TOML の保存で走り、dic/pasta.toml の保存では走らない', async () => {
+  const { gv, masters } = newRegistered();
+  save('/ws/Ghost/Master/dic/a.PASTA');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/Ghost/Master']);
+
+  masters.length = 0;
+  save('/ws/Ghost/Master/PASTA.TOML');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/Ghost/Master']);
+
+  masters.length = 0;
+  save('/ws/Ghost/Master/dic/pasta.toml');
+  save('/ws/Ghost/Master/dic/PASTA.TOML');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, []);
+  gv.dispose();
+});
+
+test('綴りの違う 2 つの起動は 1 回の検査にまとまり、診断が二重にならない', async () => {
+  mock.resetFakeFs();
+  setOpenDocuments([]);
+  // 大文字・小文字を区別しないファイルシステムの代わりに、両方の綴りに置く
+  mock.setFakeFile('/ws/ghost/master/dic/a.pasta', '');
+  mock.setFakeFile('/ws/Ghost/Master/dic/a.pasta', '');
+  const bridge = new FakeBridge();
+  bridge.report = { findings: [finding('call-target-missing', 'warning', 'dic/a.pasta', 1, 1, 'x')], stats: EMPTY_STATS };
+  const gv = new GhostValidator(bridge, vscode.window.createOutputChannel('Pasta Language'), DELAY);
+  const col = mock.createdDiagnosticCollections[mock.createdDiagnosticCollections.length - 1];
+  const masters: string[] = [];
+  const original = gv.validate.bind(gv);
+  gv.validate = (master: vscode.Uri) => {
+    masters.push(master.path);
+    return original(master);
+  };
+  gv.register();
+
+  save('/ws/Ghost/Master/dic/a.pasta');
+  save('/ws/ghost/master/dic/a.pasta');
+  await sleep(DELAY * 3);
+  assert.deepStrictEqual(masters, ['/ws/ghost/master'], '最後の起動の綴りで 1 回');
+  assert.strictEqual(col.size, 1);
+
+  // 別の綴りで検査し直しても、前の綴りの診断は残らない
+  save('/ws/Ghost/Master/dic/a.pasta');
+  await sleep(DELAY * 3);
+  assert.strictEqual(masters.length, 2);
+  assert.strictEqual(col.size, 1);
   gv.dispose();
 });
 

@@ -140,3 +140,9 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - **分割の案**: 要件で 20 を超えたら、決めてあるとおり 2 本に分ける。`novel-talk-output`（出力の組み立て: 切り替えの設定・クリック待ち・`\x` への対応・話者名・行 ID と声・待ちと改行を挟まない。`loader/config/`・`sakura_builder.lua`・`appearance.lua`・`sakura_script/`・生成）と `novel-scene-flow`（場面の流れ: ランダムトークと時報の停止・起動の場面・次の場面へ・完全一致の切り替え・途中の `＞yield`。`virtual_dispatcher.lua`・`boot.lua`・新しい受け口・`act.lua`・`scene.lua`）。切り替えの設定は前の 1 本に置き、後の 1 本はそれを読む。後の 1 本は `tutorial-ssp-gaps` と同じ 2 ファイルを触る。
 - **見つけた穴・古くなった記述**:
   - 行番号: 組み立てのアクターの切り替えは `sakura_builder.lua` 240 行 → 310 行、段落の区切りの改行は 245・263〜265 行 → 346〜347 行、`\e` は 284 行 → 379 行。前方一致の探し方は `act.lua` 366〜370 行 → `find_act_handler` 361〜402 行、`scene_table.rs` 185・270〜314 行 → 179 行・319〜350 行。止まっている場面を捨てる所は `shiori/event/init.lua` 124〜132 行 → 127〜134 行。Reference を変数へ移す関数は `shiori/act.lua` 161〜190 行 → 165〜194 行。`appearance.lua`・`virtual_dispatcher.lua`・`kick.lua`・`line_breaker.rs` の行番号は合っている。
+
+## 申し送り（pasta-check-validate-edges より）
+
+- `pasta_check validate` の飛び先の検査は、辞書の中身が分からないとき（構文エラー・読めない辞書ファイル・pasta.toml の誤り）に丸ごと省く形になった。判定は `crates/pasta_check/src/validate/report.rs` の `skip_reasons`（統計の `skipReasons`）で、すべての段の報告がそろった後に 1 回だけ行う（`validate/mod.rs`）。
+- 見直しが要る論点: この spec が `validate` に辞書のシーンの集まりに頼る検査を足すなら、`skip_reasons` が空のときだけ走らせるか。辞書の中身が分からないことを表す誤りの種類を足すなら、`skip_reasons` の対応に入れるか。
+- 参照: `.kiro/specs/completed/pasta-check-validate-edges/design.md` の「Revalidation Triggers」と「Report（report.rs）」の省く理由の表。

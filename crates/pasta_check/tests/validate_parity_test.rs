@@ -9,7 +9,8 @@ use std::path::Path;
 
 use pasta_check::validate::{
     ACT_METHODS, FileText, FindingKind, GLOBAL_NAMES, GhostInput, Report, SHIORI_ACT_METHODS,
-    Severity, TomlSource, module_name_of, pasta_dll_paths, select_dictionary_files, validate_ghost,
+    Severity, TomlSource, module_name_of, pasta_dll_folders, pasta_dll_paths,
+    select_dictionary_files, validate_ghost,
 };
 use pasta_lua::loader::{CacheManager, PastaLoader, discover_files};
 use tempfile::TempDir;
@@ -27,30 +28,36 @@ fn neutralize_debug_env() {
 const TOML: &str = "[loader]\npasta_patterns = [\"dic/**/*.pasta\"]\n";
 const TALK: &str = "＊挨拶\n  さくら：こんにちは。\n";
 
-/// (ゴーストからの相対パス, 中身)
+/// (ゴーストからの相対パス, 中身)。パスが `/` で終わるものは中身の無いフォルダ
 type File<'a> = (&'a str, &'a [u8]);
 
 /// 一時のゴースト（ghost/master に当たるフォルダ）を作る
 fn ghost(files: &[File]) -> TempDir {
     let temp = TempDir::new().unwrap();
     for (path, body) in files {
-        let path = temp.path().join(path);
-        fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, body).unwrap();
+        let full = temp.path().join(path);
+        if path.ends_with('/') {
+            fs::create_dir_all(full).unwrap();
+            continue;
+        }
+        fs::create_dir_all(full.parent().unwrap()).unwrap();
+        fs::write(full, body).unwrap();
     }
     temp
 }
 
-/// CLI の殻と同じ形の入力: 最上位の profile に入らず、相対パスを `/` でつなぐ
+/// CLI の殻と同じ形の入力: 最上位の profile に入らず、相対パスを `/` でつなぐ。
+/// 入ったフォルダの相対パスも集める
 fn input_of(base: &Path) -> GhostInput {
-    fn walk(dir: &Path, prefix: &str, out: &mut Vec<String>) {
+    fn walk(dir: &Path, prefix: &str, out: &mut Vec<String>, dirs: &mut Vec<String>) {
         for entry in fs::read_dir(dir).unwrap() {
             let entry = entry.unwrap();
             let name = entry.file_name().to_string_lossy().into_owned();
             let rel = format!("{prefix}{name}");
             if entry.file_type().unwrap().is_dir() {
                 if rel != "profile" {
-                    walk(&entry.path(), &format!("{rel}/"), out);
+                    walk(&entry.path(), &format!("{rel}/"), out, dirs);
+                    dirs.push(rel);
                 }
             } else {
                 out.push(rel);
@@ -58,7 +65,8 @@ fn input_of(base: &Path) -> GhostInput {
         }
     }
     let mut entries = Vec::new();
-    walk(base, "", &mut entries);
+    let mut dirs = Vec::new();
+    walk(base, "", &mut entries, &mut dirs);
     let pasta_toml = match fs::read_to_string(base.join("pasta.toml")) {
         Ok(text) => TomlSource::Text { text },
         Err(_) => TomlSource::Missing,
@@ -66,6 +74,7 @@ fn input_of(base: &Path) -> GhostInput {
     GhostInput {
         pasta_toml,
         entries,
+        dirs,
     }
 }
 
@@ -114,23 +123,27 @@ fn module_name_matches_cache_manager() {
 
 // ---- (b) 辞書の選び出し ----
 
-/// pasta.dll（discover_files）が見るパスを、ゴーストからの相対・`/` 区切り・昇順・重複なしで
-fn dll_discover(base: &Path, patterns: &[String]) -> Vec<String> {
-    let mut found: Vec<String> = discover_files(base, patterns)
-        .unwrap()
-        .iter()
-        // ponytail: glob はフォルダにも一致する（`dic/**` など）が、核の入力はファイルだけなので比べない。
-        // pasta.dll はそのフォルダを辞書として読もうとして失敗する（.pasta で終わらないパターンは注意で知らせている）
-        .filter(|p| p.is_file())
-        .map(|p| {
-            let rel = p.strip_prefix(base).unwrap().to_string_lossy();
-            rel.replace('\\', "/")
-        })
-        .collect();
+/// pasta.dll（discover_files）が見るパスを、ゴーストからの相対・`/` 区切り・昇順・重複なしで、
+/// (ファイル, フォルダ) に分けて。ghost/master そのものは ""
+fn dll_discover(base: &Path, patterns: &[String]) -> (Vec<String>, Vec<String>) {
+    let (mut files, mut dirs) = (Vec::new(), Vec::new());
+    for p in discover_files(base, patterns).unwrap() {
+        // `dic/.` の `.` は Path::components に残らない（pasta.dll が読もうとするのも同じフォルダ）
+        let rel = p
+            .strip_prefix(base)
+            .unwrap()
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+            .join("/");
+        if p.is_dir() { &mut dirs } else { &mut files }.push(rel);
+    }
     // pasta_lua はパターンごとに glob の順で連結する（並べ替え・重複除去をしない）ので集合で比べる
-    found.sort();
-    found.dedup();
-    found
+    for found in [&mut files, &mut dirs] {
+        found.sort();
+        found.dedup();
+    }
+    (files, dirs)
 }
 
 /// pasta.toml を書き換えながら、核と discover_files の選び出しを照らす
@@ -153,9 +166,21 @@ fn assert_discovery_parity(base: &Path, pattern_sets: &[&[&str]]) {
             .filter_map(|p| p.strip_suffix(".pasta").map(|s| format!("{s}.lua")))
             .collect();
 
-        let (pasta, lua) = pasta_dll_paths(&input_of(base));
-        assert_eq!(pasta, dll_discover(base, &patterns), ".pasta: {patterns:?}");
-        assert_eq!(lua, dll_discover(base, &lua_patterns), ".lua: {patterns:?}");
+        let input = input_of(base);
+        let (pasta, lua) = pasta_dll_paths(&input);
+        let (dll_pasta, mut dll_dirs) = dll_discover(base, &patterns);
+        let (dll_lua, lua_dirs) = dll_discover(base, &lua_patterns);
+        assert_eq!(pasta, dll_pasta, ".pasta: {patterns:?}");
+        assert_eq!(lua, dll_lua, ".lua: {patterns:?}");
+        // フォルダは .pasta と .lua のパターンの和（pasta.dll はどちらで見つけても読もうとして失敗する）
+        dll_dirs.extend(lua_dirs);
+        dll_dirs.sort();
+        dll_dirs.dedup();
+        assert_eq!(
+            pasta_dll_folders(&input),
+            dll_dirs,
+            "フォルダ: {patterns:?}"
+        );
     }
 }
 
@@ -174,6 +199,12 @@ fn discovery_matches_discover_files() {
         ("profile/p.pasta", b""),
         ("profile/q.lua", b""),
         ("notes.txt", b""),
+        // 辞書のパターンに一致するフォルダ（中身の無いもの・入れ子・.lua）と、一致しないフォルダ
+        ("dic/f.pasta/", b""),
+        ("dic/f.lua/", b""),
+        ("dic/n.pasta/m.pasta/", b""),
+        ("dic/w.txt/", b""),
+        ("profile/pf.pasta/", b""),
     ]);
     assert_discovery_parity(
         temp.path(),
@@ -183,6 +214,12 @@ fn discovery_matches_discover_files() {
             &["**/*.pasta", "dic/*.pasta"],
             &["d?c/*.pasta"],
             &["dic/**"],
+            &["dic/"],
+            &["dic/*"],
+            &["dic/."],
+            &["**"],
+            &["*/*.pasta"],
+            &[""],
             &["*.txt"],
             &["../*.pasta", "dic/*.pasta"],
             &[],
@@ -223,6 +260,7 @@ fn stops_loading(kind: FindingKind) -> bool {
             | ConfigSceneAlias
             | ConfigPatternInvalid
             | InitFileName
+            | FolderMatchesPattern
             | FileNotUtf8
             | FileUnreadable
             | Syntax
@@ -343,6 +381,33 @@ fn load_failure_matches_errors() {
             "UTF-8 で読めない",
             &[("pasta.toml", toml), ("dic/a.pasta", b"\x82\xa0\xff\n")],
             true,
+        ),
+        (
+            "中身の無い dic/x.pasta/",
+            &[
+                ("pasta.toml", toml),
+                ("dic/a.pasta", talk),
+                ("dic/x.pasta/", b""),
+            ],
+            true,
+        ),
+        (
+            "中身の無い dic/x.lua/",
+            &[
+                ("pasta.toml", toml),
+                ("dic/a.pasta", talk),
+                ("dic/x.lua/", b""),
+            ],
+            true,
+        ),
+        (
+            "パターンに一致しない dic/sub/",
+            &[
+                ("pasta.toml", toml),
+                ("dic/a.pasta", talk),
+                ("dic/sub/", b""),
+            ],
+            false,
         ),
         (
             "トランスパイルで失敗する",
