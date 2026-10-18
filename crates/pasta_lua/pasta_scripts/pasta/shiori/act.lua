@@ -7,6 +7,7 @@
 local ACT = require("pasta.act")
 local BUILDER = require("pasta.shiori.sakura_builder")
 local CALLBACK = require("pasta.shiori.event.callback")
+local CLOCK = require("pasta.shiori.clock")
 local CONFIG = require("pasta.config")
 local STORE = require("pasta.store")
 
@@ -123,7 +124,8 @@ function SHIORI_ACT_IMPL.transfer_date_to_var(self)
         return self
     end
 
-    local date = self.req.date
+    -- 仮想時刻のずれがあれば仮想の日付（ずれ 0 なら req.date そのもの）
+    local date = CLOCK.date(self.req)
 
     -- 英語フィールド（数値型）を転記
     for _, f in ipairs(DATE_NUM_FIELDS) do
