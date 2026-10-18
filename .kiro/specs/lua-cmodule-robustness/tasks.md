@@ -111,7 +111,7 @@
   - _Boundary: FfiTestSuite_
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 9.6_
 
-- [ ] 6. 文書
+- [x] 6. 文書
 - [x] 6.1 (P) pasta.toml のリファレンスに `[loader] ffi` を足す
   - 3 分類表の行、フルリファレンステンプレートの行、有効にすると Lua から任意のメモリに触れられ、書き間違いで SSP ごと落ちうる注意
   - 完了の状態: `book/src/reference/pasta-toml.md` に上の 3 つがあり、マニュアルのビルドと既存の文書の検査が通る
@@ -131,7 +131,7 @@
   - _Boundary: Docs_
   - _Requirements: 10.5_
 
-- [ ] 6.4 スキルの参照を再生成し、steering を更新する
+- [x] 6.4 スキルの参照を再生成し、steering を更新する
   - `pasta-lua-coding` と `pasta-ghost-authoring` の `references/` を生成の道具で作り直す（手で書かない）。書き込みが拒まれたら開発者に頼む
   - `tech.md` に依存（dev の `cc`・windows-sys の機能）、`structure.md` に新しいファイルを書き足す
   - 完了の状態: 鮮度の照合（`--check`）が通る

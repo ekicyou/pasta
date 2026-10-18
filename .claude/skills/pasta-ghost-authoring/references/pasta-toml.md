@@ -52,6 +52,7 @@
 | `[loader]` › `lua_search_paths` | SHIORI デフォルト有 | （[lua_search_paths](#lua_search_paths) 参照） |
 | `[loader]` › `transpiled_output_dir` | SHIORI デフォルト有 | `"profile/pasta/cache/lua"` |
 | `[loader]` › `debug_mode` | SHIORI デフォルト有 | `true` |
+| `[loader]` › `ffi` | SHIORI デフォルト有 | `false` |
 | `[ghost]` | SHIORI デフォルト有（省略可） | （下記キー参照） |
 | `[ghost]` › `talk_interval_min` | SHIORI デフォルト有 | `180` |
 | `[ghost]` › `talk_interval_max` | SHIORI デフォルト有 | `300` |
@@ -124,6 +125,7 @@ lua_search_paths = [                            # 既定（優先順位順）:
 ]
 transpiled_output_dir = "profile/pasta/cache/lua"  # 既定 "profile/pasta/cache/lua"
 debug_mode = true                                  # 既定 true
+# ffi = false                                      # 既定 false（true で Lua から任意のメモリに触れられる。[loader] の ffi 参照）
 
 # --- 省略可（SHIORI デフォルト有）: ゴースト動作 ---
 [ghost]
@@ -206,6 +208,7 @@ source_map_sidecar = false  # 既定 false
 | `lua_search_paths` | 文字列の配列 | （[lua_search_paths](#lua_search_paths) 参照） | Lua モジュールの検索パス（優先順位順） |
 | `transpiled_output_dir` | 文字列 | `"profile/pasta/cache/lua"` | トランスパイルした Lua（キャッシュ）の出力先 |
 | `debug_mode` | 真偽値 | `true` | `true` のとき、読み込み時の処理件数（トランスパイル・スキップ・失敗・コピー）を info ログに出す |
+| `ffi` | 真偽値 | `false` | `true` のとき、LuaJIT の FFI を開く（[ffi](#ffi) 参照） |
 
 パスはすべて設置ディレクトリからの相対パスで書く。トランスパイル結果のキャッシュへの保存は、`debug_mode` の値に関わらず行われる。元のファイルが無くなったキャッシュ（孤立キャッシュ）は、`debug_mode` の値に関わらず warn ログに出る（削除はしない）。`true` のときは各パスがもう一度出る。
 
@@ -237,6 +240,17 @@ Lua の `require` がモジュールを探すディレクトリの一覧であ�
 5. `scriptlibs` — スクリプトライブラリ
 
 各ディレクトリでのファイル名の探し方とモジュール解決の詳細は [モジュール検索パス](https://ekicyou.github.io/pasta/reference/startup.html#1-モジュール検索パス) を参照する。
+
+#### ffi
+
+LuaJIT の FFI を開くかどうかである。`true` のときだけ、Lua から `require "ffi"` とグローバルの `ffi` で同じ FFI のライブラリが使え、C の DLL の関数を呼べる。`false` か書かないときは FFI を開かず、`ffi` は `nil` のまま、`require "ffi"` は失敗する。真偽値でない値を書くと、`[loader]` のほかのキーの型の誤りと同じく `pasta.toml` の読み込みエラーになり、ゴーストの読み込みが失敗する。
+
+```toml
+[loader]
+ffi = true
+```
+
+**注意**: `true` にすると、Lua から任意のメモリに触れられるようになる。FFI の書き間違い（関数の宣言の誤り、壊れたポインタ、範囲の外の読み書きなど）は Lua のエラーにならず、SSP ごと落ちうる。C の DLL を使うときだけ `true` にする。
 
 ---
 
