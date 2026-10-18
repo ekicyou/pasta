@@ -19,6 +19,9 @@
 mod enc;
 mod exec;
 mod factory;
+/// `ffi.load` の置き換え（UTF-16 で先に読む・探索のフォルダ・同名の確かめ）。
+#[cfg(windows)]
+mod ffi_load;
 /// Finalize module - Collects Lua-side registries and builds SearchContext.
 pub mod finalize;
 mod lifecycle;
