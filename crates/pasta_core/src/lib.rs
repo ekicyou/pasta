@@ -18,12 +18,15 @@
 //! let mut word_reg = WordDefRegistry::new();
 //! ```
 
+pub mod actor_font;
 pub mod error;
 pub mod registry;
 
 // Convenience re-exports
+pub use actor_font::{ActorFont, FONT_ATTRIBUTES, FontInput, FontValue};
 pub use error::{
-    SceneAliasError, SceneTableError, SceneTableResult, WordTableError, WordTableResult,
+    ActorFontError, FontValueProblem, SceneAliasError, SceneTableError, SceneTableResult,
+    WordTableError, WordTableResult,
 };
 pub use registry::{
     DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable, SceneEntry,
