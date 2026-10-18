@@ -557,14 +557,14 @@ test('analyzeDocument passes a well-formed wasm result through unchanged', () =>
 // wasm_select_ghost_files / wasm_validate_ghost は失敗で null を返す。結果の形を
 // 境界で確かめ、違えば throw する（核の結果はそのまま通す）。
 
-const ghostInput = { pastaToml: { kind: 'missing' } as const, entries: ['dic/a.pasta'] };
+const ghostInput = { pastaToml: { kind: 'missing' } as const, entries: ['dic/a.pasta'], dirs: ['dic'] };
 
 const wellFormedReport = {
   findings: [
     { code: 'syntax', severity: 'error', path: 'dic/a.pasta', line: 3, column: 1, message: '構文の誤り' },
     { code: 'config-scene-alias', severity: 'warning', path: 'pasta.toml', line: null, column: null, message: '注意' },
   ],
-  stats: { dictionaryFiles: 1, errors: 1, warnings: 1, uncheckedDynamicCalls: 0, referencesSkipped: true },
+  stats: { dictionaryFiles: 1, errors: 1, warnings: 1, uncheckedDynamicCalls: 0, skipReasons: ['syntax'] },
 };
 
 test('selectGhostFiles passes the wasm input through and returns the string list', () => {
@@ -626,7 +626,15 @@ test('validateGhost throws on null and on every malformed report shape', () => {
     { findings: [], stats: { ...stats, errors: undefined } },
     { findings: [], stats: { ...stats, warnings: null } },
     { findings: [], stats: { ...stats, uncheckedDynamicCalls: true } },
-    { findings: [], stats: { ...stats, referencesSkipped: 0 } },
+    { findings: [], stats: { ...stats, skipReasons: undefined } },
+    { findings: [], stats: { ...stats, skipReasons: 'syntax' } },
+    { findings: [], stats: { ...stats, skipReasons: ['syntax', 'parse'] } },
+    { findings: [], stats: { ...stats, skipReasons: [null] } },
+    // 古い形（真偽値だけ）は受け付けない
+    {
+      findings: [],
+      stats: { dictionaryFiles: 1, errors: 1, warnings: 1, uncheckedDynamicCalls: 0, referencesSkipped: true },
+    },
   ];
   for (const bad of bads) {
     const bridge = bridgeWithWasmModule({ wasm_validate_ghost: () => bad });
@@ -637,7 +645,7 @@ test('validateGhost throws on null and on every malformed report shape', () => {
 test('real WASM: selectGhostFiles / validateGhost results pass the shape checks', async () => {
   const bridge = new WasmBridge({ appendLine: () => {} } as never);
   await bridge.initialize(mock.Uri.joinPath(mock.Uri.file(ROOT), 'wasm', 'pasta_lsp_wasm_bg.wasm') as never);
-  const input = { pastaToml: { kind: 'missing' } as const, entries: ['dic/a.pasta', 'readme.txt'] };
+  const input = { pastaToml: { kind: 'missing' } as const, entries: ['dic/a.pasta', 'readme.txt'], dirs: ['dic'] };
   assert.deepStrictEqual(bridge.selectGhostFiles(input), ['dic/a.pasta']);
   const report = bridge.validateGhost(input, { 'dic/a.pasta': { kind: 'notUtf8' } });
   // 読めないファイルの誤りは位置を持たない（None → null で届く）
@@ -646,6 +654,7 @@ test('real WASM: selectGhostFiles / validateGhost results pass the shape checks'
     JSON.stringify(report)
   );
   assert.ok(report.stats.errors >= 1);
+  assert.deepStrictEqual(report.stats.skipReasons, ['unreadable-file']);
   bridge.dispose();
 });
 

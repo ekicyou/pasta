@@ -143,7 +143,7 @@ const EMPTY_STATS: GhostStats = {
   errors: 0,
   warnings: 0,
   uncheckedDynamicCalls: 0,
-  referencesSkipped: false,
+  skipReasons: [],
 };
 
 /** 偽の bridge。選び出しの結果と報告をテストが決め、呼び出しを記録する */

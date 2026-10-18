@@ -132,7 +132,8 @@ export class GhostValidator implements vscode.Disposable {
     try {
       const entries: string[] = [];
       await walk(master, '', entries);
-      const input: GhostInput = { pastaToml: await readToml(master), entries };
+      // ponytail: dirs は仮に空。フォルダの一覧は 3.3 で集める
+      const input: GhostInput = { pastaToml: await readToml(master), entries, dirs: [] };
       const listed = new Set(entries);
       const files: Record<string, FileText> = {};
       for (const rel of this.bridge.selectGhostFiles(input)) {
