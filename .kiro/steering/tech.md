@@ -44,7 +44,8 @@
 - **unicode-width 0.2.2**: Unicode文字幅計算
 - **socket2 0.5**: debug transport 待受ソケットの `SO_REUSEADDR` 設定（Windows 以外。Windows では二重 bind を許してしまうため立てない）・非ブロック化（reload 時の再バインド堅牢化）
 - **tracing 0.1 / tracing-appender 0.2 / tracing-subscriber 0.3**: ロギング・診断
-- **windows-sys 0.61**: Windows API（Shift_JISエンコーディング等、cfg(windows)）
+- **windows-sys 0.61**: Windows API（Shift_JISエンコーディング等、cfg(windows)・features: Win32_System_LibraryLoader, Win32_System_Diagnostics_Debug（ffi.load の置き換え）。dev-dependency では Win32_Storage_FileSystem, Win32_System_Registry（8.3 名・長いパスの設定の確かめ））
+- **cc 1**（dev-dependency）: FFI テスト用の DLL をテスト中にビルドする
 - **luacheck v1.2.0**: 静的解析ツール（scriptlibs/）
 - **lua_test**: BDDスタイルテストフレームワーク（scriptlibs/）
 

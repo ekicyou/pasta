@@ -41,6 +41,11 @@ impl PastaLuaRuntime {
     /// あわせて [`install_module_searcher`] を設置し、`require` のファイル解決を
     /// narrow `fopen` から Rust std（wide API）へ移す。これにより長パス（要件 1.4）と
     /// 非 ASCII のモジュール名・設置パス（要件 3.8）が解決できるようになる。
+    ///
+    /// Windows では、FFI を開いた VM（`[loader] ffi = true`）に限り `ffi.load` を
+    /// 包むラッパを設置する（`ffi_load::install`）。DLL をゴーストの探索のフォルダから
+    /// wide API で先に読み、元の `ffi.load` には ANSI のファイル名を渡す。書き換えるのは
+    /// `ffi` の表の `load` だけで、`package.*` と `.lua` の searcher には触らない。
     pub(crate) fn setup_package_path(lua: &Lua, loader_context: &LoaderContext) -> LuaResult<()> {
         let path = loader_context.generate_package_path();
 
@@ -49,6 +54,9 @@ impl PastaLuaRuntime {
 
         // 検索パスを UTF-8 として解釈する searcher へ置換する（他のどの Lua コードよりも前）。
         install_module_searcher(lua)?;
+        // FFI を開いた VM では `ffi.load` を置き換える（開いていなければ何もしない）。
+        #[cfg(windows)]
+        super::ffi_load::install(lua, loader_context)?;
         // 読み込んだファイルをエラー文の形から引ける表（`@pasta_chunks`）を用意する。
         register_chunk_table(
             lua,

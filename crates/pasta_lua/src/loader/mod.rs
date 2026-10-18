@@ -235,7 +235,9 @@ impl PastaLoader {
         debug!("Phase 6: Initializing runtime");
         let loader_context = LoaderContext::from_config(base_dir, &config);
         // Search side gets the same table as the declaration side (6.2).
-        let runtime_config = runtime_config.with_scene_aliases(config.scene_aliases.clone());
+        let runtime_config = runtime_config
+            .with_scene_aliases(config.scene_aliases.clone())
+            .with_ffi(config.loader.ffi);
         let runtime = PastaLuaRuntime::from_loader_with_scene_dic(
             context,
             loader_context,

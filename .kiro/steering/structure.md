@@ -96,6 +96,10 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   ├── persistence.rs      # 永続化
 │       │   │   ├── finalize.rs         # ファイナライズ処理
 │       │   │   ├── renderer_injection.rs # さくらレンダラのアダプタ注入シーム（既定=SHIORIさくら・バイト不変）
+│       │   │   ├── ffi_load/           # ffi.load の置き換え（Windows のときだけ）
+│       │   │   │   ├── mod.rs          # 設置・Lua のラッパ・理由の文言
+│       │   │   │   ├── resolve.rs      # 名前を読むパスへ解く純粋な規則
+│       │   │   │   └── win32.rs        # unsafe の層（DLL の先読み・同名の確かめ・解放）
 │       │   │   └── log.rs              # ランタイムログ
 │       │   ├── sakura_script/ # さくらスクリプト処理
 │       │   │   ├── mod.rs           # さくらスクリプトAPI
@@ -167,6 +171,14 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │           │   ├── main.rs
 │           │   ├── scene_search_test.rs
 │           │   └── module_test.rs
+│           ├── ffi/                 # ffi.load の置き換えのテスト（テスト中に cc で DLL をビルド）
+│           │   ├── main.rs
+│           │   ├── dll_fixture.rs   # テスト用 DLL のビルド
+│           │   ├── load_test.rs
+│           │   ├── config_test.rs
+│           │   ├── collision_test.rs
+│           │   ├── lifetime_test.rs
+│           │   └── compare_test.rs
 │           ├── common/              # テスト共通ユーティリティ
 │           │   ├── mod.rs
 │           │   └── e2e_helpers.rs

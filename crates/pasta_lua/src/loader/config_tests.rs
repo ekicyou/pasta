@@ -347,3 +347,36 @@ fn scene_alias_or_scene_not_table_is_error() {
     let msg = scene_alias_err("scene = 1\n");
     assert!(msg.contains("line 1"), "{msg}");
 }
+
+/// `[loader] ffi` は書かなければ `false`（1.1・1.3）。`[loader]` が無くても、
+/// ほかのキーだけを書いた `[loader]` でも同じ。
+#[test]
+fn loader_ffi_defaults_to_false() {
+    assert!(!LoaderConfig::default().ffi);
+    assert!(!PastaConfig::from_str("").unwrap().loader.ffi);
+    assert!(
+        !PastaConfig::from_str("[loader]\ndebug_mode = false\n")
+            .unwrap()
+            .loader
+            .ffi
+    );
+}
+
+/// `ffi = true` を読む（1.1・1.2）。`@pasta_config` には載らない（1.5）。
+#[test]
+fn loader_ffi_true_is_read_and_not_in_custom_fields() {
+    let config = PastaConfig::from_str("[loader]\nffi = true\n").unwrap();
+    assert!(config.loader.ffi);
+    assert!(!config.custom_fields.contains_key("loader"));
+}
+
+/// 真偽値でない値は、ほかの `[loader]` のキーと同じく読み込みの失敗（1.4）。
+#[test]
+fn loader_ffi_non_bool_is_error() {
+    for toml in ["[loader]\nffi = \"yes\"\n", "[loader]\nffi = 1\n"] {
+        let err = PastaConfig::from_str(toml)
+            .expect_err("non-bool [loader] ffi must be a config error")
+            .to_string();
+        assert!(err.contains("ffi"), "error should name the key: {err}");
+    }
+}

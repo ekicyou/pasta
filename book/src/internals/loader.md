@@ -21,6 +21,7 @@
 - フレームワークスクリプトの埋め込み（ビルド時の zip 化）と、起動時の自己展開・版比較
 - `.pasta`・`.lua` のファイル検出と、モジュール名の生成
 - モジュール検索パス（`package.path`）の組立と、`require` のファイル解決を担う searcher の置換
+- FFI を開いた VM での `ffi.load` の置き換え（Windows のときだけ）
 
 利用者から見た起動シーケンス・モジュール検索パスの優先順位・失敗時の示され方は [起動シーケンスとモジュール解決](../reference/startup.md) が正であり、この章はそれを実現する仕組みだけを書く。`pasta.toml` の各キーの意味と既定値は [pasta.toml リファレンス](../reference/pasta-toml.md) が正である。
 
@@ -50,7 +51,8 @@
 | `LoaderError` | `crates/pasta_lua/src/loader/error.rs` | 起動シーケンスのエラー。設定・入出力・検出・キャッシュ・自己展開・トランスパイルの部分失敗・ランタイムの構築失敗を区別する |
 | `setup_package_path` | `crates/pasta_lua/src/runtime/module_registry.rs` | `package.path` を設定し、searcher を置換し、読み込んだファイルの表（`@pasta_chunks`）を作る。`@pasta_config` の登録（`register_config_module`）も同じファイルにある |
 | searcher | `crates/pasta_lua/src/runtime/searcher.rs` | `install_module_searcher`。`package.loaders` の 2 番目（Lua ファイルの searcher）を Rust の実装に置き換える。`register_chunk_table` が作る `@pasta_chunks` に、読み込めたファイルを書き足す |
-| `RuntimeConfig`・`lua_require` | `crates/pasta_lua/src/runtime/runtime_config.rs` | VM に入れる標準ライブラリと mlua-stdlib のモジュール、解決済みのデバッグ設定、キックの注入口を持つ設定。`lua_require` は Rust から Lua の `require` を呼ぶ |
+| `RuntimeConfig`・`lua_require` | `crates/pasta_lua/src/runtime/runtime_config.rs` | VM に入れる標準ライブラリと mlua-stdlib のモジュール、解決済みのデバッグ設定、キックの注入口を持つ設定。`[loader] ffi` が真なら `with_ffi` が `std_ffi` を足す。`lua_require` は Rust から Lua の `require` を呼ぶ |
+| `ffi.load` の置き換え | `crates/pasta_lua/src/runtime/ffi_load/` | 設置（`install`）・Lua のラッパ・`prepare`・名前の規則（`resolve.rs`）・Windows の呼び出し（`win32.rs`）。詳細は [ffi.load の置き換え](#ffiload-の置き換え) |
 | 既定の `main` | `crates/pasta_lua/pasta_scripts/main.lua` | 空の表を返すだけの利用者初期化スクリプト。自己展開され、`scripts/main.lua` があればそちらが優先される |
 | `pasta.config` | `crates/pasta_lua/pasta_scripts/pasta/config.lua` | `@pasta_config` を `pcall(require, …)` で取り込み、`get(section, key, default)` で値か既定値を返す Lua 側のラッパ。`@pasta_config` を取得できない環境（テストなど）では空の表を使う |
 
@@ -212,7 +214,7 @@ lua_search_paths = ["scripts", "profile/pasta/pasta_scripts"]
 package.path = <基準>/scripts/?.lua;<基準>/scripts/?/init.lua;<基準>/profile/pasta/pasta_scripts/?.lua;<基準>/profile/pasta/pasta_scripts/?/init.lua
 ```
 
-`setup_package_path` はこの文字列を変換せずに `package.path` へ上書きで設定し、続けて `install_module_searcher` と `register_chunk_table`（次節の `@pasta_chunks`）を呼ぶ。`package.cpath` は変えない。呼び出しは VM を作って `@pasta_search` などを登録した直後、`@pasta_config` 以降の登録と最初の `require` より前に 1 回だけ行われる（[VM の構築とモジュール登録](execution-model.md#vm-の構築とモジュール登録) の手順 3）。
+`setup_package_path` はこの文字列を変換せずに `package.path` へ上書きで設定し、続けて `install_module_searcher`、Windows では `ffi_load::install`（[ffi.load の置き換え](#ffiload-の置き換え)）、`register_chunk_table`（次節の `@pasta_chunks`）を呼ぶ。`package.cpath` は変えない。呼び出しは VM を作って `@pasta_search` などを登録した直後、`@pasta_config` 以降の登録と最初の `require` より前に 1 回だけ行われる（[VM の構築とモジュール登録](execution-model.md#vm-の構築とモジュール登録) の手順 3）。
 
 ### require の解決（searcher）
 
@@ -247,6 +249,82 @@ LuaJIT の `package.loaders` は preload・Lua ファイル・C ライブラリ�
 
 Rust 側で登録するモジュール（`@pasta_config`・`@pasta_search` など）は `package.loaded` に直接置くため、`require` は searcher を通らずにそれを返す。利用者から見た検索の優先順位・候補パスの表記・長パスと非 ANSI パスの保証は [モジュール検索パス](../reference/startup.md#1-モジュール検索パス) が正である。
 
+### ffi.load の置き換え
+
+LuaJIT の `ffi.load` は、受け取った名前を `LoadLibraryExA(name, NULL, 0)` に渡して DLL を読む。ANSI の API なので、ゴーストのフォルダが深い（260 文字以上）・ANSI コードページに無い文字を含むと読めず、名前だけの指定はゴーストのフォルダではなくホスト（SSP）の側を探し、隣に置いた依存 DLL も見つからない。pasta は LuaJIT を改造せず、`ffi` の表の `load` だけを「先に `LoadLibraryExW` で読んでから、元の `ffi.load` に ANSI のファイル名を渡す」関数に置き換える。Windows は、読み込み済みのモジュールと同じファイル名を `LoadLibraryExA` に渡すと、探さずにそのモジュールを返す。そのため元の `ffi.load` は先に読んだ DLL を受け取り、`CLibrary` の作成・`ffi.cdef` の解決・後始末は LuaJIT のまま動く。`.lua` の `require` に対して searcher を置き換えたのと同じ「ホストの側で包む」方針を DLL へ広げたものである。利用者から見た探すフォルダ・基点・既知の制限は [起動シーケンスとモジュール解決](../reference/startup.md) が正である。
+
+#### 設置
+
+`ffi_load::install` は `setup_package_path` の中で、`.lua` の searcher を置き換えた直後に呼ばれる（Windows のときだけ。`#[cfg(windows)]`）。
+
+- `package.loaded.ffi` が無ければ何もしない。FFI は `[loader] ffi = true` のときだけ開く（`RuntimeConfig::with_ffi` が `std_ffi` を足す）ので、既定の VM には何も入らない。
+- `ffi.load` が関数でなければ、`mlua::Error` で VM の構築を失敗させる（LuaJIT の構成が想定と違うことを黙って見逃さない）。
+- 参照の集まり `DllPins` を mlua の app data に置く（[参照の保持](#参照の保持)）。
+- Lua のラッパ（チャンク名 `=pasta_ffi_load`）に元の `ffi.load` と Rust の `prepare` を渡して作り、`ffi` の表の `load` へ `raw_set` する。ほかの FFI の機能と `package.*` には触らない。
+
+`setup_package_path` はローダを通る構築（`from_loader*`）だけが呼ぶ。ローダを通らずに `PastaLuaRuntime::with_config` へ `std_ffi` を渡して作った VM の `ffi.load` は LuaJIT のままである。
+
+#### 呼び出しの流れ
+
+```text
+ffi.load(name, ...)                                  … ラッパ（Lua）
+  name が数 → tostring(name)
+  name が文字列 → prepare(name)                      … Rust。Lua のエラーは投げない
+    UTF-8 でない → (nil, nil)
+    1. resolve(name, 基点, 探索のフォルダ)
+         Ghost { path, file_name } / System { file_name }
+         Missing → 理由 = FormatMessageW(ERROR_MOD_NOT_FOUND)
+    2. ansi_file_name(file_name)                     … 往復で一致しなければ理由 = pasta の文言
+    3. 先読み
+         Ghost  → LoadLibraryExW(load_path_form(path), LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)
+         System → LoadLibraryExW(file_name, NULL, 0)
+         失敗   → 理由 = FormatMessageW(GetLastError())
+    4. Ghost だけ: GetModuleHandleW(file_name) が 3 のモジュールか
+         違えば FreeLibrary して理由 = pasta の文言
+    5. DllPins.pin(module)                           … 持っていれば今回の参照を FreeLibrary
+    6. (ANSI のファイル名, nil)
+  理由あり   → error("cannot load module '" .. name .. "': " .. 理由, 2)
+  pass あり  → return orig(pass, select(2, ...))     … 末尾呼び出し
+  それ以外   → return orig(...)                      … 末尾呼び出し
+```
+
+- 形は searcher と同じく「Rust は値を返すだけ、送出は Lua のラッパ」である。Rust の `Err` を返すと `pcall` が受け取る値が文字列でなくなる。
+- ラッパは引数を `...` のまま扱う。`function(name, ...)` の形だと、引数なしの `pcall(ffi.load)` に `nil` を足して文言が `got nil` になり、LuaJIT の `got no value` と変わる。
+- 数の名前は、LuaJIT（`lj_lib_checkstr`）と同じく `tostring` で文字列にしてから文字列の名前と同じに扱う（どちらも `lj_strfmt_number` なので同じ文字列になる）。数でも Windows の理由が出るので、理由を UTF-8 にするためである。数でも文字列でもない引数（`nil`・表など）と UTF-8 でない文字列は、元の `ffi.load` へ同じ引数で渡り、`bad argument #1 to 'load'` などの文言は LuaJIT のままである。
+- 元の `ffi.load` は末尾呼び出しで呼ぶ。ラッパの枠が消えるので、元の関数が投げる文言の位置は作者のコードの位置になる。pasta の失敗は `error(msg, 2)` でラッパを呼んだ作者のコードの位置を付ける。どちらも LuaJIT の `lj_err_callermsg` と同じ `<短いチャンク名>:<行>: ` の形で、`pcall(ffi.load, …)` のように C の関数から直接呼ばれたときは位置が付かない。
+- 元の `ffi.load` に渡すのはパスではなくファイル名（`lib/foo` なら `foo.dll`）である。名前だけの `LoadLibraryExA` は読み込み済みのモジュールを返すので、4 の確かめで「そのファイル名で返るのが今回の DLL であること」を保証しておく。名前だけで OS に探させた DLL（System）には 4 を行わない。
+
+名前の規則（`resolve.rs`）は次のとおりである。ファイルシステムには `is_file` と `std::path::absolute` だけで触り、8.3 短縮名とシンボリックリンクは解かない（`canonicalize` を使わない）。
+
+| 名前 | 解き方 |
+| ---- | ------ |
+| 拡張子 | 最後の部分（区切りの後ろ）に `.` が無ければ `.dll` を足す |
+| 名前だけ（`/`・`\`・`:` を含まない） | 探索のフォルダを順に見て、最初にファイルがあったもの（Ghost）。どこにも無ければ OS の既定の探索に任せる（System） |
+| `/`・`\`・`:` を含む | 絶対パス（ドライブ文字と区切り・`\\` で始まる UNC）はそのまま、それ以外は基点の後ろに `\` と名前を文字列としてつなぐ。ファイルがあれば Ghost、無ければ Missing（OS の探索には回さない） |
+| 末尾が区切り | Missing（`lib/` を `lib.dll` と読まない） |
+
+- 探索のフォルダは `LoaderContext::absolute_search_paths`、つまり `package.path` を作るのと同じ `lua_search_paths` の各要素を基準ディレクトリに連結したもので、宣言順に探す。
+- 基点は基準ディレクトリ（`LoaderContext.base_dir`）である。`Path::join` は `\foo`・`C:foo` で基点を捨てるため使わない。`\foo`・`/foo`・`C:foo` は基点の下を指し、ドライブの根やドライブのカレントへは出ない。区切りの無い `C:foo` もパスの扱いにするのは、名前だけの扱いにすると OS がドライブのカレントで探してしまうためである。
+
+#### LuaJIT と違う点
+
+| 項目 | LuaJIT の `ffi.load` | pasta の置き換え |
+| ---- | -------------------- | ---------------- |
+| 読み込み | `LoadLibraryExA(name, NULL, 0)`（ANSI） | 先に `LoadLibraryExW`（UTF-16）で読む。ゴーストのファイルは `LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR \| LOAD_LIBRARY_SEARCH_DEFAULT_DIRS` で、DLL の隣と既定のフォルダから依存 DLL を探す（カレントと `PATH` は探さない）。OS に探させる名前はフラグ 0 で、探索は LuaJIT と同じ |
+| 名前だけのときに探す場所 | OS の既定の探索（ホストの EXE の隣など） | 先に探索のフォルダ（`package.path` と同じフォルダ）。無ければ OS の既定の探索 |
+| 相対パスの基点 | Windows の規則のまま（ホストのプロセスのカレントディレクトリなど） | ゴーストの基準ディレクトリ |
+| 長いパス・ANSI に無い文字 | ローダーは長いパスの設定と関係なく 260 文字超えも読むが、パスが ANSI を通るので ANSI に無い文字を含むフォルダは読めない | UTF-16 で 260 文字以上のパスにだけ `\\?\`（UNC は `\\?\UNC\`）を付けて読む。この形は読む呼び出しにだけ使い、文言とログには出さない |
+| 理由の文字コード | `FormatMessageA` の ANSI のまま | `FormatMessageW` を UTF-8 にする。言語の指定（0）と末尾の `\r\n` は同じ。数の名前も `tostring` してから同じ道を通るので UTF-8 になる |
+| 理由のバッファ | 128 バイト | 512 個の UTF-16。バッファに入らない長い文言では、LuaJIT は理由が空になり、pasta は文言が出る |
+| pasta だけの失敗 | — | ファイル名が ANSI で表せない（`the file name '<ファイル名>' cannot be represented in the ANSI code page`）、同名の別 DLL が読み込み済み（`a different DLL named '<ファイル名>' is already loaded in this process`）。どちらも英語の固定の文言 |
+| モジュールの参照 | `CLibrary` が持つ | `CLibrary` の参照に加えて、`DllPins` が 1 モジュールにつき 1 つを持つ |
+
+失敗の文言の形（`<位置>: cannot load module '<名前>': <理由>`）は LuaJIT と同じである。区切りのある名前のファイルが無いときの理由は、LuaJIT がそのパスを読んで失敗したときと同じ `ERROR_MOD_NOT_FOUND` の文言にしている。
+
+#### 参照の保持
+
+`DllPins` は読み込んだモジュール（HMODULE）の並びで、同じモジュールは 1 つだけ持つ（2 回目の先読みで増えた参照はその場で `FreeLibrary` する）。mlua の app data に置くので、`lua_close` の後に落ちる。`__gc`・`ffi.gc` の後始末がすべて済んでから `Drop` が全部を `FreeLibrary` するため、後始末の途中で DLL のコードが消えることはない。`prepare` が参照を保った後に元の `ffi.load` が失敗した場合、その参照は VM を閉じるまで残る。
+
 ## 境界の受け渡し
 
 | 境界 | 渡す側 → 受け取る側 | 渡すもの | 所有 |
@@ -257,6 +335,7 @@ Rust 側で登録するモジュール（`@pasta_config`・`@pasta_search` な�
 | ローダ → ランタイム | `PastaLoader` → `PastaLuaRuntime::from_loader_with_scene_dic` | 統合した `TranspileContext`・`LoaderContext`・`RuntimeConfig`・`PastaConfig`・ロガー・`scene_dic.lua` のパス・ソースマップ | `PastaConfig` はランタイムが保持し、破棄時の保存などで使う |
 | Rust → Lua（設定） | `register_config_module` → `@pasta_config` | `custom_fields` を変換した表 | 表は VM が所有する。`pasta.toml` へは書き戻さない |
 | Rust → Lua（解決） | `setup_package_path` → `package.path`・`package.loaders[2]` | 検索パスの文字列と searcher、`@pasta_chunks` の表 | 以後の `require` のファイル解決は Rust の searcher が担い、モジュールの読み込みと実行は Lua が担う。`@pasta_chunks` は VM が所有し、searcher だけが書き足す |
+| Rust → Lua（FFI） | `ffi_load::install` → `ffi.load` | 元の `ffi.load` と `prepare` を閉じ込めたラッパ、app data の `DllPins` | DLL を探して先に読むのは Rust、`CLibrary` の作成と後始末は LuaJIT。`DllPins` は VM が所有し、`lua_close` の後に解放する |
 
 ## 不変条件と制約
 
@@ -269,6 +348,7 @@ Rust 側で登録するモジュール（`@pasta_config`・`@pasta_search` な�
 - ファイル検出は `profile/` 配下を常に除く。キャッシュや自己展開先が検出の対象になることはない。
 - 設定読込を失敗させるのは、`[loader]` の型の誤りと、不正な `[scene]`／`[scene.alias]` と、不正な `[actor."名前"]` の `font` だけである。`[scene]`／`[scene.alias]` の不正とは、型の合わない値（`scene`・`alias` が表でない、別名が文字列の配列でないなど）・空の名前・別名の重複・置き換え先を別名にも書いた表（連鎖）である。`font` の不正は [設定読込](#設定読込) の 5 のとおりである。ほかのセクションの型の誤りは、使う時点でそのセクションが既定値になるだけで、エラーにも警告にもならない。
 - ランタイムの構築は `std` のワイド文字 API でモジュールを開くため、`require` の解決は設置パスの長さと文字種に依存しない。ゴースト作者のコードが直接呼ぶ `io.open` などは対象外である（[既知の制限](../reference/startup.md#3-既知の制限)）。
+- `ffi.load` の置き換えは `ffi` の表の `load` の 1 つだけを書き換え、LuaJIT のソースには手を入れない。元の `ffi.load` に渡すファイル名は ANSI で表せるものに限られ、表せなければ読む前に失敗させる。
 
 ## ソースの所在
 
@@ -278,10 +358,22 @@ Rust 側で登録するモジュール（`@pasta_config`・`@pasta_search` な�
 - `crates/pasta_lua/src/runtime/searcher.rs`
 - `crates/pasta_lua/src/runtime/module_registry.rs`
 - `crates/pasta_lua/src/runtime/runtime_config.rs`
+- `crates/pasta_lua/src/runtime/ffi_load/`
 - `crates/pasta_lua/pasta_scripts/main.lua`
 - `crates/pasta_lua/pasta_scripts/pasta/config.lua`
 
-埋め込みの zip に固める対象は `crates/pasta_lua/pasta_scripts/` のツリー全体である。テストは `crates/pasta_lua/src/loader/extract_tests.rs`・`crates/pasta_lua/src/loader/discovery_tests.rs`・`crates/pasta_lua/src/loader/config_tests.rs`・`crates/pasta_lua/tests/build_determinism_test.rs`・`crates/pasta_lua/tests/loader/` にある。
+`ffi.load` の置き換えのファイルと役割は次のとおりである。
+
+| ファイル | 役割 |
+| -------- | ---- |
+| `crates/pasta_lua/src/runtime/ffi_load/mod.rs` | 設置（`install`）・Lua のラッパ（`WRAPPER_CHUNK`）・`prepare` の組み立て・pasta の理由の文言 |
+| `crates/pasta_lua/src/runtime/ffi_load/resolve.rs` | 名前を読むパスへ解く規則（`resolve`・拡張子の規則・ANSI の往復の確かめ・`\\?\` の形）。`unsafe` を持たない |
+| `crates/pasta_lua/src/runtime/ffi_load/win32.rs` | `unsafe` の Windows の呼び出し（`LoadLibraryExW`・`GetModuleHandleW`・`FreeLibrary`・`FormatMessageW`）と `DllPins` |
+| `crates/pasta_lua/src/runtime/module_registry.rs` | `setup_package_path` から `ffi_load::install` を呼ぶ |
+| `crates/pasta_lua/src/runtime/runtime_config.rs` | `with_ffi` が `[loader] ffi` を `std_ffi` に変える |
+| `crates/pasta_lua/src/loader/config/mod.rs` | `LoaderConfig` の `ffi`（既定 `false`） |
+
+埋め込みの zip に固める対象は `crates/pasta_lua/pasta_scripts/` のツリー全体である。テストは `crates/pasta_lua/src/loader/extract_tests.rs`・`crates/pasta_lua/src/loader/discovery_tests.rs`・`crates/pasta_lua/src/loader/config_tests.rs`・`crates/pasta_lua/tests/build_determinism_test.rs`・`crates/pasta_lua/tests/loader/` にある。`ffi.load` の置き換えのテストは、各ファイルの単体テストと `crates/pasta_lua/tests/ffi/`（テスト用の DLL をその場で作り、元の `ffi.load` と並べて比べるテストを含む）にある。
 
 ## 経緯
 
@@ -292,6 +384,7 @@ Rust 側で登録するモジュール（`@pasta_config`・`@pasta_search` な�
 - [lua-passthrough](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-passthrough) — 辞書ディレクトリの `.lua` の素通し
 - [pasta-config-restructure](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-config-restructure) — `pasta.toml` の構成と既定値の補完
 - [pasta-toml-logging-consistency](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-toml-logging-consistency) — `[lua]` の設定型の撤去、段階 1.5 のフォールバック
+- [lua-cmodule-robustness](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-cmodule-robustness) — `[loader] ffi` と `ffi.load` の置き換え（長パス・非 ANSI パス・隣の依存 DLL）
 
 ---
 

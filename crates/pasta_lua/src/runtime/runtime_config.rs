@@ -227,6 +227,15 @@ impl RuntimeConfig {
         self
     }
 
+    /// `[loader] ffi` の反映（builder）。`enabled` が真なら `libs` に
+    /// `"std_ffi"` を 1 つ足し、偽なら何もしない（`default_libs()` は変えない）。
+    pub fn with_ffi(mut self, enabled: bool) -> Self {
+        if enabled {
+            self.libs.push("std_ffi".into());
+        }
+        self
+    }
+
     /// Resolve and attach the debug gate from a pasta.toml `[debug]` section plus
     /// the process environment (`PASTA_DEBUG` / `PASTA_DEBUG_PORT`).
     ///
@@ -504,5 +513,52 @@ mod kick_sink_tests {
             .with_kick_sink(Some(Arc::new(|_req: KickRequest| {})))
             .with_kick_sink(None);
         assert!(config.kick_sink.is_none());
+    }
+}
+
+#[cfg(test)]
+mod with_ffi_tests {
+    use super::*;
+    use crate::context::TranspileContext;
+    use crate::runtime::PastaLuaRuntime;
+
+    /// 偽なら何もしない（1.3・8.1）。既定のライブラリの組み合わせも変えない（8.4）。
+    #[test]
+    fn with_ffi_false_leaves_libs_unchanged() {
+        assert_eq!(RuntimeConfig::new().with_ffi(false).libs, default_libs());
+        assert!(!default_libs().iter().any(|l| l == "std_ffi"));
+    }
+
+    /// 真なら `std_ffi` を足し、StdLib の FFI が立つ（1.2）。
+    #[test]
+    fn with_ffi_true_adds_std_ffi() {
+        let config = RuntimeConfig::new().with_ffi(true);
+        assert!(config.libs.iter().any(|l| l == "std_ffi"));
+        assert!(config.to_stdlib().unwrap().contains(StdLib::FFI));
+    }
+
+    /// 真で作った VM はグローバルの `ffi` と `require "ffi"` が同じ表、
+    /// 偽なら今までどおり `nil`（1.2・1.3）。
+    #[test]
+    fn vm_has_ffi_global_only_when_enabled() {
+        let on = PastaLuaRuntime::with_config(
+            TranspileContext::new(),
+            RuntimeConfig::new().with_ffi(true),
+        )
+        .unwrap();
+        let same: bool = on
+            .lua()
+            .load("return type(ffi) == 'table' and ffi == require('ffi')")
+            .eval()
+            .unwrap();
+        assert!(same);
+
+        let off = PastaLuaRuntime::with_config(
+            TranspileContext::new(),
+            RuntimeConfig::new().with_ffi(false),
+        )
+        .unwrap();
+        let is_nil: bool = off.lua().load("return ffi == nil").eval().unwrap();
+        assert!(is_nil);
     }
 }

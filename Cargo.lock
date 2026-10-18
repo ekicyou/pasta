@@ -1013,6 +1013,7 @@ name = "pasta_lua"
 version = "0.4.1"
 dependencies = [
  "budouy",
+ "cc",
  "ctor",
  "flate2",
  "glob",

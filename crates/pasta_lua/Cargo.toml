@@ -36,7 +36,8 @@ zip.workspace = true
 md5.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-windows-sys.workspace = true
+# ffi.load の置き換え（runtime/ffi_load）: LoadLibraryExW・GetModuleHandleW・FreeLibrary・FormatMessageW
+windows-sys = { workspace = true, features = ["Win32_System_LibraryLoader", "Win32_System_Diagnostics_Debug"] }
 
 [dev-dependencies]
 tempfile.workspace = true
@@ -44,3 +45,9 @@ insta.workspace = true
 tracing-test.workspace = true
 md5.workspace = true
 ctor = "0.2"
+# FFI のテスト用 DLL を、テストの中で対象のアーキテクチャの cl.exe で作る（tests/ffi/dll_fixture.rs）
+cc = "1"
+
+[target.'cfg(windows)'.dev-dependencies]
+# GetShortPathNameW（8.3 名）・GetFileAttributesW と RegGetValueW（長いパスの設定が無効な前提の確かめ）
+windows-sys = { workspace = true, features = ["Win32_Storage_FileSystem", "Win32_System_Registry"] }

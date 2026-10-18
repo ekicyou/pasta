@@ -289,6 +289,10 @@ pub struct LoaderConfig {
     /// (default: true). Transpiled files are cached regardless of this flag.
     #[serde(default = "default_debug_mode")]
     pub debug_mode: bool,
+
+    /// LuaJIT の FFI を開く（既定 false）。真のときだけ VM に `std_ffi` を足す。
+    #[serde(default)]
+    pub ffi: bool,
 }
 
 impl Default for LoaderConfig {
@@ -298,6 +302,7 @@ impl Default for LoaderConfig {
             lua_search_paths: default_lua_search_paths(),
             transpiled_output_dir: default_transpiled_output_dir(),
             debug_mode: default_debug_mode(),
+            ffi: false,
         }
     }
 }

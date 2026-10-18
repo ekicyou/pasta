@@ -110,6 +110,18 @@ SHIORI の DLL には、設置パスを UTF-8 で受け取る初期化入口 `lo
 
 データの永続化にこれらを使ってはならない。永続化は `@pasta_persistence` モジュールを用いること（[@pasta_persistence](pasta-persistence.md) を参照）。同モジュールはランタイム側でファイルを扱うため、設置パスの長さ・文字種の影響を受けない。
 
+### `ffi.load` で読む DLL の制限
+
+`ffi.load`（第 5 節）が保証するのは、DLL を見つけて読み込み、`ffi.load` の値として返すところまでである。次のことは保証しない。
+
+- **DLL のファイル名は ANSI コードページで表せる文字に限る。** フォルダの部分は深くても ANSI に無い文字を含んでもよいが、ファイル名（最後の部分）は LuaJIT の `ffi.load` へそのまま渡るため、ANSI で表せなければならない。似た文字への置き換えでしか表せない名前も表せないものとして扱う。この場合は `cannot load module '…': the file name '…' cannot be represented in the ANSI code page` で失敗する。
+- **同じファイル名の別の DLL がプロセスに読み込み済みなら失敗する。** 同じ SSP で動く別のゴーストが同名の DLL を読んでいる場合などである。黙ってそちらの DLL に結びつくことはなく、`cannot load module '…': a different DLL named '…' is already loaded in this process` で失敗する。同じファイルを読み直すのは失敗ではない。先に読んだ側が解放されれば読めるようになる。ほかと重ならないファイル名にすれば起きない。
+- **依存 DLL の同名の取り違えは防がない。** 確かめるのは `ffi.load` に渡した DLL 自身だけである。依存 DLL と同じ名前の DLL がプロセスに読み込み済みなら、Windows はそちらを使う。
+- **名前だけの指定で OS の探索に任せた DLL は、Windows の規則のまま読まれる。** 検索パスのどこにも無かった名前（第 5 節）は、探す場所も依存 DLL を探す場所も Windows の既定の探索に従う。この節のほかの保証（深いパス・ANSI に無い文字・依存 DLL の探し方）は及ばない。
+- **DLL の中で ANSI 版の API を使うと失敗しうる。** DLL が自分の置き場所などのパスを ANSI 版の API（`…A` の関数）で扱うと、設置パスが深い場合や ANSI に無い文字を含む場合に、DLL の中で失敗する。読み込みまでは成功しているので、`ffi.load` は失敗を報告しない。
+- **`PATH` にある依存 DLL は見つからない。** カレントディレクトリも探さない。依存 DLL を探す場所は第 5 節のとおりである。
+- **別のスレッドとの競合は防がない。** 同名の DLL の確かめと実際の読み込みの間に、同じプロセスの別のスレッド（同じ SSP で動く別のゴーストなど）が同名の別の DLL を読み込むと、そちらに結びつくことがある。同じ瞬間に同名の DLL を読んだ場合に限られる。
+
 ## 4. ゴーストが起動しない・喋らないとき
 
 ゴーストがまったく反応しない場合、起動シーケンスのどこかで失敗している可能性が高い。次の順で切り分ける。
@@ -177,3 +189,69 @@ Parse error: ファイル:行:列: 内容
 ```
 
 行と列は 1 から数える。`内容` には、該当する行の抜粋と、その位置で期待される要素の一覧が複数行で続く。`X-ERROR-REASON` とロード失敗の行（`PastaShiori load failed`）には、`Partial transpilation failure: 成功数 succeeded, 失敗数 failed [ファイルのパス]` の形で失敗したファイルの一覧だけが載り、行・列は載らない。行・列はログファイルの `Process failure` 行で確かめる。
+
+## 5. DLL を FFI で使う
+
+C で書いた DLL の関数は、LuaJIT の FFI を通して呼ぶ。FFI は既定では開いていない。`pasta.toml` の `[loader] ffi` を `true` にしたゴーストでだけ使える（[ffi](https://ekicyou.github.io/pasta/reference/pasta-toml.html#ffi) を参照。有効にしたときの注意もそこにある）。
+
+C モジュールを `require` で読む道（`package.cpath`・`package.loadlib`）は使えない。pasta.dll は Lua の C API を外に公開しておらず、`lua51.dll` も無いため、C モジュールの DLL はどこに置いても読めない。C の DLL は FFI で使う。
+
+### 例
+
+関数を 1 つ持つ DLL を C で書く。
+
+```c
+/* foo.c */
+__declspec(dllexport) int add(int a, int b) { return a + b; }
+```
+
+これを DLL に作り（Visual Studio なら `cl /LD foo.c`）、できた `foo.dll` をゴーストの `scripts/` に置く。DLL は pasta.dll と同じ 32 ビット・64 ビットの別で作る。
+
+`pasta.toml` で FFI を開く。
+
+```toml
+[loader]
+ffi = true
+```
+
+Lua から関数を宣言し、`ffi.load` で DLL を読んで呼ぶ。
+
+```lua
+local ffi = require "ffi"
+ffi.cdef [[ int add(int a, int b); ]]
+local foo = ffi.load("foo")
+local sum = foo.add(1, 2)  -- 3
+```
+
+`ffi.load` の 2 番目の引数は、LuaJIT の `ffi.load` へそのまま渡る。
+
+### 探すフォルダと順
+
+`ffi.load` に渡す名前は、書き方によって次のように探す。名前の最後の部分に `.` が無ければ `.dll` を足す（`foo` は `foo.dll`、`foo.bin` はそのまま）。
+
+| 書き方 | 例 | 探す場所 |
+| ------ | -- | -------- |
+| 名前だけ（`/`・`\`・`:` を含まない） | `"foo"`・`"foo.dll"` | 第 1 節のモジュール検索パスのディレクトリを同じ順で探し、最初に見つかったものを読む。どこにも無ければ OS の既定の探索に任せる |
+| 相対パス | `"lib/foo"`・`"lib\\foo.dll"` | 基準ディレクトリからの相対として解く |
+| 絶対パス | `"C:/dll/foo.dll"` | そのまま読む |
+
+名前だけの指定で探すディレクトリは、`require` と同じ `[loader] lua_search_paths` から作る。`lua_search_paths` を変えれば `require` と `ffi.load` の両方の探索が変わる。実行中に `package.path` を書き換えても、`ffi.load` の探索は変わらない。基準ディレクトリそのものは、`lua_search_paths` に含めない限り探さない。どのディレクトリにも無い名前（たとえば `"kernel32"`）は、OS の既定の探索で読む。このときの探し方は Windows の規則のままである（第 3 節の [`ffi.load` で読む DLL の制限](#ffiload-で読む-dll-の制限)）。
+
+相対パスの基点は、カレントディレクトリではなく基準ディレクトリである。区切りは `/` と `\` のどちらでもよい。`\foo`・`/foo`・`C:foo` も、ドライブのルートやドライブのカレントではなく、基準ディレクトリの下として解く。絶対パスとして扱うのは、ドライブ文字と区切りで始まるもの（`C:\…`・`C:/…`）と `\\` で始まるものである。
+
+相対パス・絶対パスで指したファイルが無ければ、そこで失敗する。モジュール検索パスのディレクトリや OS の既定の探索には回さない。
+
+ゴーストの設置場所が深くても、フォルダの名前に ANSI コードページに無い文字が含まれていても、ゴーストのフォルダの DLL は読める。ただしファイル名は ANSI で表せる文字に限る（第 3 節）。
+
+### 依存 DLL を探す場所
+
+ゴーストのフォルダから読んだ DLL が頼る依存 DLL は、次の順で探す。
+
+1. 読んだ DLL と同じフォルダ
+2. ホストの実行ファイル（`ssp.exe` など）のフォルダ、System32 などの Windows の既定のフォルダ
+
+カレントディレクトリと環境変数 `PATH` のフォルダは探さない。依存 DLL は、読む DLL と同じフォルダに置く。
+
+### 失敗したとき
+
+`ffi.load` が失敗すると、`cannot load module '名前': 理由` の形のエラーを、`ffi.load` を呼んだ位置で投げる。`名前` は `ffi.load` に渡したままの名前である。`理由` は Windows のエラーメッセージ（OS の表示言語、UTF-8）か、第 3 節に挙げた pasta の英語の文言である。DLL や依存 DLL が見つからないときは、「指定されたモジュールが見つかりません。」に当たる Windows のメッセージになる。失敗してもプロセスは落ちず、`pcall` で受け取れる。
