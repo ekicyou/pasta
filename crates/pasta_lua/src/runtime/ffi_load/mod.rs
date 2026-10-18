@@ -19,10 +19,17 @@ use windows_sys::Win32::Foundation::ERROR_MOD_NOT_FOUND;
 /// `ffi.load` を包む Lua のラッパ。元の関数は末尾呼び出しで呼ぶので、元の関数が投げる文言の
 /// 位置は作者のコードの位置になる。pasta の失敗は `error(msg, 2)` でラッパの呼び出し元の位置を付ける。
 /// 引数は `...` のまま渡す（引数なしの呼び出しに `nil` を足すと、`got no value` の文言が変わる）。
+/// 数の名前は LuaJIT（`lj_lib_checkstr`）と同じく `tostring` で文字列にして読む（同じ
+/// `lj_strfmt_number` なので同じ文字列）。理由を UTF-8 にするため（6.2）。ほかの型と UTF-8 で
+/// ない名前は元の関数へ同じ引数で渡す。
 const WRAPPER_CHUNK: &str = r#"
 local orig, prepare = ...
+local type, tostring, select, error = type, tostring, select, error
 return function(...)
   local name = ...
+  if type(name) == "number" then
+    name = tostring(name)
+  end
   if type(name) == "string" then
     local pass, reason = prepare(name)
     if reason then

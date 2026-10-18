@@ -62,7 +62,7 @@
   - _Depends: 2.1, 3.1, 3.2_
   - _Requirements: 1.6, 2.1, 2.7, 3.4, 3.7, 3.8, 5.1, 5.2, 6.1, 6.3, 6.4, 6.5, 7.4, 8.1, 8.2, 8.3_
 
-- [ ] 5. FFI のテスト
+- [x] 5. FFI のテスト
 - [x] 5.1 (P) `[loader] ffi` の各場合のテスト
   - `false`・未記入では `ffi` が `nil` で、`require "ffi"` の失敗が今と同じ
   - `true` では `ffi == require "ffi"` で、`ffi.load` が置き換わり、`ffi.cdef`・`ffi.new`・`ffi.C` が使える
@@ -103,7 +103,7 @@
   - _Boundary: FfiTestSuite_
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 9.8_
 
-- [ ] 5.6 (P) 元の `ffi.load` と並べて比べるテスト
+- [x] 5.6 (P) 元の `ffi.load` と並べて比べるテスト
   - FFI だけを開いた素の VM（元の `ffi.load`）と、ローダーの VM を並べ、同じチャンク名の同じ Lua で `pcall` の結果の型と文言を比べる
   - 場合: 名前だけで無いもの・相対パスで無いもの・`nil` と数の引数・関数の中から呼んだもの（位置が付く）・`pcall(ffi.load, …)` で直接呼んだもの（位置が付かない）
   - 理由の部分は、元の側を ANSI から UTF-8 にしてからバイトで比べる。名前に ANSI に無い文字を含めても欠けない
@@ -155,5 +155,5 @@
 - 3.1: `C:foo` のようにドライブの `:` を含む名前は区切りが無くてもパスとして基点の下で解く（`is_path`）。`resolve.rs` 先頭の `#![cfg_attr(not(test), allow(dead_code))]` は 4.1 で外す。
 - 3.2: 理由の文言は `FormatMessageW` の 512 u16 のバッファ（LuaJIT は `FormatMessageA` の 128 バイト）。長い文言では LuaJIT が空になる差がある。6.3 の「LuaJIT と違う点」に書く。`win32.rs` 先頭の dead_code の許可も 4.1 で外す。
 - 4.1: ラッパは `function(...)` の形で引数をそのまま渡す（設計の Lua の写しの `function(name, ...)` だと `pcall(ffi.load)` が `got nil` になり 6.4 を破る）。5.6 の比べるテストに `pcall(ffi.load)`（`got no value`）を入れる。
-- 4.1: 数の引数など文字列でない引数は元の `ffi.load` へそのまま渡るので、理由は ANSI のまま。6.3 の「LuaJIT と違う点」に書く。
+- 4.1: 数の名前は LuaJIT（`lj_lib_checkstr`）と同じく `tostring` で文字列にしてから扱う（Windows の理由になるので UTF-8 にする・6.2。5.6 のレビューで直した）。ほかの文字列でない引数（`nil`・表など）は元の `ffi.load` へそのまま渡る（理由は LuaJIT の `bad argument` で Windows の理由ではない）。
 - 5.4: 8.3 名で綴った基点でもローダーは同じ HMODULE を返したので、決定事項 2 のファイルの識別子での比較は足していない（collision_test の 8.3 のテストが見張る）。

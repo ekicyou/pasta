@@ -353,21 +353,30 @@ impl RuntimeConfig {
 
 ```lua
 local orig, prepare = ...
-return function(name, ...)
+local type, tostring, select, error = type, tostring, select, error
+return function(...)
+  local name = ...
+  if type(name) == "number" then
+    name = tostring(name)
+  end
   if type(name) == "string" then
     local pass, reason = prepare(name)
     if reason then
       error("cannot load module '" .. name .. "': " .. reason, 2)
     end
     if pass then
-      return orig(pass, ...)
+      return orig(pass, select(2, ...))
     end
   end
-  return orig(name, ...)
+  return orig(...)
 end
 ```
 
-- 文字列でない引数（数・`nil` など）と UTF-8 でない文字列は、元の関数へ**同じ引数で**末尾呼び出しする。数を文字列にする規則・`bad argument #1 to 'load'` の文言は LuaJIT のまま（6.4）。
+- 引数は `...` のまま渡す。`function(name, ...)` の形だと、引数なしの `pcall(ffi.load)` に `nil` を足して `got nil` になり、LuaJIT の `got no value` と変わる（6.4）。
+- `type` などは設置のときに local に取り込む。ゴーストがグローバルを書き換えても `ffi.load` の動きは変わらない（元の `ffi.load` は C の関数で、その影響を受けないのと同じにする）。
+
+- 数の名前は、LuaJIT（`lj_lib_checkstr`）と同じく `tostring` で文字列にしてから文字列の名前と同じに扱う（どちらも `lj_strfmt_number` なので同じ文字列）。数でも Windows の理由になるので、理由は UTF-8 にする（6.2）。
+- 数でも文字列でもない引数（`nil`・表など）と UTF-8 でない文字列は、元の関数へ**同じ引数で**末尾呼び出しする。`bad argument #1 to 'load'` の文言は LuaJIT のまま（6.4）。
 - `ffi` の表の `load` の 1 つだけを書き換える。`ffi.cdef`・`ffi.new`・`ffi.C`・`package.*` には触らない（1.6・8.3）。
 - 失敗の理由（`reason`）は 3 種類。Windows の理由は `Win32DllLoader::system_message` の UTF-8、pasta の理由は次の英語の定数（Rust の側の他の文言と同じく英語）。
   - ファイル名が ANSI で表せない（2.8）: `the file name '<file>' cannot be represented in the ANSI code page`
@@ -599,7 +608,7 @@ Data Contracts・物理のデータは無い（ファイル・レジストリに
 | 読み込みの失敗（依存 DLL が無い・形式が違うなど。4.5） | Win32DllLoader | `GetLastError()` の Windows の理由 |
 | 同名の別 DLL が読み込み済み（5.2） | Win32DllLoader | `a different DLL named '<file>' is already loaded in this process` |
 | 名前だけで OS の探索でも無い（3.4） | Win32DllLoader | `GetLastError()` の Windows の理由 |
-| 引数が文字列でない・UTF-8 でない | 元の `ffi.load` | LuaJIT のまま |
+| 引数が数でも文字列でもない・UTF-8 でない（数は文字列にして上の行のとおり） | 元の `ffi.load` | LuaJIT のまま |
 
 ### Monitoring
 - 成功した先読みは `tracing::debug!`（作者の名前・解いたパス）。失敗は Lua のエラーとして作者へ届くので、Rust の側では重ねて記録しない（`runtime-error-balloon` などの既存の経路に任せる）。
