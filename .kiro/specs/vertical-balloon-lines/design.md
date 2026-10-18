@@ -57,7 +57,7 @@
 
 - 列の状態の表のフィールド（`line`・`width`・`jump`）や、`talk_to_script` の 3 つ目の引数の意味を変えるとき。組み立て・代わりのレンダラ・マニュアルを見直す。
 - `SAKURA_TAG_PATTERN` を変えるとき。列を動かすタグの見分け（単位の形）を見直す。
-- `sakura_builder.lua` で、改行を出す場所を足す・変えるとき（`actor-display-style`・`novel-talk-flow` など）。区切りは「出して列を進める」関数を通す。
+- `sakura_builder.lua` で、改行を出す場所を足す・変えるとき（`actor-display-style`・`novel-talk-flow` など）。区切りは「出して列を進める」関数を通す（通さないと、Builder Tests 6 の不変条件のテストが落ちる）。
 - `[ghost]` のキーを足すとき（照合テスト・マニュアルの表・`AUTHORING.md` のキーの数）。
 - budouy の版を上げるとき（作例の照合テストの期待値）。
 
@@ -503,8 +503,8 @@ fn write_column(t: &Table, c: &Column) -> LuaResult<()>;
 local columns = {} -- table<integer, BudouxColumn>（BUILDER.build の局所）
 
 local function column_at(columns, spot) end   -- 無ければ { line = 1, width = 0, jump = false } を作る
-local function next_column(column, n) end     -- line = line + n、width = 0
-local function first_column(column) end       -- line = 1、width = 0、jump = false
+local function next_column(column, n) end     -- line = line + n、width = 0（Rust の ColumnMove::Next の写し。片方だけ直さない）
+local function first_column(column) end       -- line = 1、width = 0、jump = false（Rust の ColumnMove::First の写し）
 local function put_break(buffer, column, tag) end -- tag が "" でなければ出して next_column(column, 1)
 local function plain_newline_tag(ratio) end   -- N == 100 なら "\\n"、それ以外は newline_tag(ratio)
 ```
@@ -623,7 +623,8 @@ local function plain_newline_tag(ratio) end   -- N == 100 なら "\\n"、それ�
 2. **区切りと消去**: 話し手の切り替えで戻った吹き出し・選択肢の前後・`newline` トークンの後は次の列から（`budoux = [4, 20]` で 2 列目の幅になる）。`clear`・`clear_spot` の後は 1 列目の幅から（4.2・4.3）。
 3. **スポットごと・出力ごと**: スポット 0 と 1 を行き来しても、それぞれの続きから数える。2 回目の `BUILDER.build` は 1 列目から（4.4・4.5）。選択肢の表示の文字は数えない（4.8）。`budoux_newlines` は、pasta が出す区切りの幅を変えない（1.5）。
 4. **選択肢の後の区切り**: `after_choice_newlines = 2.0` で、選択肢の後の選択肢の前と台詞の前が `\n[200]`、無し・1.0 で `\n`、戻ったときは `spot_newlines` だけ、`choice_newlines` の区切りは変わらない（5.1〜5.4・5.7）。
-5. **作例と同値**: Introduction の作例（`budoux = [40]`・`budoux_newlines = 1.8`・`＠左` が返す `\_l[-295,0]`）を組み立てて、ウェイトのタグを除いた出力を文字列で照合する（7.3）。Lua の `next_column`・`first_column` と、`talk_to_script(nil, "\\n", col)`・`talk_to_script(nil, "\\c", col)` の結果の表が同じになる（組み立てと Rust の動きの同値）。
+5. **作例と同値**: Introduction の作例（`budoux = [40]`・`budoux_newlines = 1.8`・`＠左` が返す `\_l[-295,0]`）を組み立てて、ウェイトのタグを除いた出力を文字列で照合する（7.3）。Lua の `next_column`・`first_column` と、`talk_to_script(nil, "\\n", col)`・`talk_to_script(nil, "\\c", col)` の結果の表が同じになる（組み立てと Rust の動きの同値。決定 7 により必須）。
+6. **不変条件（決定 8）**: いくつかのトークン列（話し手の切り替え・選択肢の前後・`newline`・`clear`・`clear_spot`・表情を挟む台詞）を組み立て、出力の文字列をスポットごとに同じ規則（`\n`・`\n[…]` で次、引数の無い `\c` で最初、`\_l[…]` で飛ぶ）で数え直した結果が、組み立ての `columns` の `line`・`jump` と一致することを確かめる。隣の spec が `put_break` を通さない改行を足したとき、ここで落ちる。
 
 ### 設定と既定の出力
 
@@ -646,7 +647,7 @@ flowchart LR
 ```
 
 1. **特性化テスト**: `line_breaker.rs` の今の出力を固定する（上の Unit Tests 1）。
-2. **呼び出しの中の数え直し**: `line_breaker.rs`・`mod.rs`（`budoux_newlines`・`budoux_jump`・`break_lines`）。Rust で閉じる。`actor-display-style` と並べてよい。
+2. **呼び出しの中の数え直し**: `line_breaker.rs`・`mod.rs`（`budoux_newlines`・`budoux_jump`・`break_lines`）。Rust で閉じる。`actor-display-style` と並べてよい。始める前に、単位にならない `\` で終わるトークンの後に区切りや budoux の改行が続く形が、DSL から届くかを確かめる（決定 9）。届くなら、この段で守ってテストを足す。
 3. **`after_choice_newlines`**: 設定・`shiori/act.lua`・`sakura_builder.lua` の 2 か所。
 4. **持ち越し**: `talk_to_script` の 3 つ目の引数・`sakura_builder.lua` の `columns`。`sakura_builder.lua` を触るので、`actor-display-style` とは 1 本ずつ入れる。
 5. **マニュアルとスキル references**。PR の本文に「動きが変わる点」（列を動かすタグの後・表情などを挟んだ台詞・pasta の区切りの後で、幅の並びが先頭に戻らなくなること。相対の `\_l[@…]` でも字数が 0 に戻ること）を書く（6.8）。0.4.1 の見どころは、版の更新のときにここから拾う。
@@ -655,14 +656,19 @@ flowchart LR
    - 作例: Introduction の `＊ポエム_出来損ないのパスタ`。
    - 見ること: 右の枠 3 列・左の枠 4 列（1 列目 20 字・2〜4 列目 14 字）の中に収まる。折り返した列の間隔が、話者の切り替えの列（`\n[180]`）と同じ。SSP 2.9.18・縦書きのバルーン。
 
-## Open Questions / Risks
+## Decisions / Risks
 
-- **仮定**: `budoux` の無いアクターの台詞も、列の状態を進める（字数とタグ。改行は入れない）。相手役が同じスポットで `\n`・`\c` を書いたときに、列の番号がずれないため。出力は変わらない。
-- **仮定**: `raw_script` は列の状態を変えない（組み立てが `raw_script` の `\c` を消去に数えない今の規則にそろえる）。
-- **仮定**: 倍率で `\n` を出す条件は「`N` が 100」（1.0 を含む。浮動小数の比べ方に頼らない）。
-- **仮定**: `budoux` が無い・空のアクターでは、`budoux_newlines`・`budoux_jump` を読まない（書き間違いでもエラーにしない）。
-- **仮定**: 組み立ての 2 通りの動き（次の列・最初の列）は Lua に置き、Rust の動きとの同値をテストで保つ（公開の関数を足さない）。
-- **仮定**: 3 つ目の引数は公開の API としてマニュアルに書く。
+設計ディスカッションで決めたこと（2026-10-18 開発者の承認・全議題を推奨案で確定。理由は `research.md` の「Design Decisions」と「設計ディスカッションの決定」）:
+
+- **決定 1**: 状態は `talk_to_script` の 3 つ目の引数の表で受け渡す。Rust が成功したときだけ表を書き換え、戻り値は文字列 1 つのまま。`line` は 1 から数える。
+- **決定 2**: 3 つ目の引数は公開の API として `pasta-sakura-script.md` に書く。
+- **決定 3**: `budoux` の無いアクターの台詞も、列の状態を進める（字数とタグ。改行は入れず、語分けもしない）。相手役が同じスポットで `\n`・`\c` を書いたときに、列の番号がずれないため。出力は変わらない。
+- **決定 4**: `raw_script` は列の状態を変えない（組み立てが `raw_script` の `\c` を消去に数えない今の規則にそろえる）。
+- **決定 5**: 倍率で `\n` を出す条件は「`N` が 100」（1.0 を含む。浮動小数の比べ方に頼らない）。
+- **決定 6**: `budoux` が無い・空のアクターでは、`budoux_newlines`・`budoux_jump` を読まない（書き間違いでもエラーにしない）。
+- **決定 7**: 組み立ての 2 通りの動き（次の列・最初の列）は Lua に写しを置く（公開の関数を足さない）。Rust の動きとの同値のテスト（Builder Tests 5）は必須とし、`next_column`・`first_column` のコメントに「Rust の `ColumnMove::Next`・`First` の写し。片方だけ直さない」と書く。
+- **決定 8**: 「区切りは `put_break` を通す」を、不変条件のテスト（Builder Tests 6）で守る。
+- **決定 9**: 台詞の頭に入る改行と、単位にならない `\` の組み合わせ（`\` と `\n[…]` がつながってエスケープの `\\` に化ける形）は、実装の前に DSL から届くかを確かめる（Migration Strategy の手順 2）。届くならこの spec で守り、届かなければ確かめた結果を research.md に記録する。
 - **リスク**: 相対の `\_l[@…]` でも字数が 0 に戻る。横書きで `\_l` を少しずらす用途のゴーストは、改行の位置が変わる（要件 2.3・【F】の決定どおり）。
 - **リスク**: SSP が自分で折り返した分（1 語で幅を超える列・`budoux` の無い台詞）は数えられず、実際の列とずれうる（要件の範囲外。マニュアルに書く）。
 - **リスク**: スキル references の再生成で `.claude/skills` への書き込みが止められたら、残りを示して開発者に頼む。
