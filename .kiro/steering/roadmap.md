@@ -90,7 +90,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
 | 順 | spec | 要件定義 | 規模 | 始められる時期 |
 | -- | ---- | -------- | ---- | -------------- |
-| 1 | lua-cmodule-robustness | Opus（要件は確定） | 10 前後 | 今すぐ（2026-10-18 のウェーブ） |
+| 1 | lua-cmodule-robustness | Opus（要件は確定） | 10 前後 | 完了（2026-10-18。2026-10-18 のウェーブ） |
 | 2 | 0.4.2 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
 - **0.4.2 に入れたもの**: `lua-cmodule-robustness`（`lua-require-robustness` の続き）。2026-10-18 の要件の話し合いで、C モジュールの `require` の道（Lua の C API を pasta.dll から書き出す必要があり、pasta のゴーストが 2 体いると別の pasta.dll に結びつく危険があった）をやめた。代わりに、pasta.toml の `[loader] ffi = true`（既定は無効）で FFI を開き、`ffi.load` を包んで、深いパス・ANSI に無い文字を含むフォルダ・隣の依存 DLL でも DLL を読めるようにする。経緯と実測は spec の brief にある。
@@ -315,7 +315,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 ## Specs (dependency order)
 
-- [ ] lua-cmodule-robustness -- C の Lua 拡張モジュール（DLL）の `require` を、深いパス・ANSI に無い文字を含むフォルダでも読めるようにする。LuaJIT は改造せず、`package.loaders[3]`・`[4]`・`package.loadlib` を Rust 側で差し替え（`LoadLibraryExW`＋隣の依存 DLL の解決）、`package.cpath` の相対パスは pasta.dll のフォルダを基点にする（`lua-require-robustness` の続き。2026-10-18 起票）。0.4.2 に入れる（2026-10-18 開発者の決定）。Dependencies: none
+- [x] lua-cmodule-robustness -- ゴーストから C の DLL を LuaJIT の FFI で、深いパス・ANSI に無い文字を含むフォルダでも呼べるようにする。pasta.toml の `[loader] ffi = true`（既定は無効）で FFI を開き、`ffi.load` を包んで、ゴーストのフォルダを探し・`LoadLibraryExW` で先に読み・隣の依存 DLL を解き・理由を UTF-8 にする。LuaJIT は改造しない（`lua-require-robustness` の続き。2026-10-18 起票。要件の話し合いで C モジュールの `require` の道から替えた）。0.4.2 に入れる（2026-10-18 開発者の決定）。Dependencies: none
 - [ ] talk-grapheme-clusters -- 自動ウェイト・`chars_*` の判定・budoux の改行を、コードポイントでなく書記素クラスタ単位にする。組み合わせの絵文字の途中に `\_w` や改行を入れない（「ぱすた開発」セッションの実機の報告。2026-10-18 起票）。根は `sakura_script/tokenizer.rs` と `line_breaker.rs` の切り出し（`tokenize_plain_chars`）の 2 か所にある。版は未定（推奨 0.4.2）。`wait_inserter.rs`・`line_breaker.rs` を共有する `novel-talk-flow` と同じウェーブに置かない。Dependencies: none
 - [ ] novel-areka-contract -- pasta と areka の取り決め（台本に載せる語彙・目印・イベント・設定の値）を 1 つの文書にし、areka への依頼書として出す。コードは書かない。areka に依頼を出すための spec（2026-10-10 の discovery で起票）。Dependencies: none
 - [ ] scene-attribute-store -- シーン属性の実行時の保持・Lua からの読み出し・ファイルレベル属性の継承と上書き・値の型解釈。Dependencies: none
