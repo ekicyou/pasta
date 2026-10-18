@@ -638,7 +638,7 @@ REG.OnSecondChange = REG.OnSecondChange or function(act) end
   - 飛びの通し番号 `epoch` を 1 増やす（ディスパッチャが決め直しの合図に使う）。
   - 飛びの合計 `jump_total += d − 1`（ふだんの 1 秒分を除く）。
 - ずれ（`offset`）が変わったとき（SSP が書き換えない場合の読み取り）も、次の `OnSecondChange` で「今」が飛ぶので、同じ判定に入る。上の `seen_offset` による決め直しは、`epoch` による決め直しに置き換える。
-- `OnSysResume`（スリープ明け）を見たら、次の 1 回の飛びは飛びとして扱わない（`epoch`・`jump_total` を変えない）。スリープ明けは今と同じ動き（時報は 1 回・おしゃべりはすぐ）のまま（要件 2.4）。
+- `OnSysResume`（スリープ明け）を見たら、次の 1 回の飛びは飛びとして扱わない（`epoch`・`jump_total` を変えない）。（2026-10-18 完了後の追記: 実機では `OnSysResume` が復帰後の最初の OnSecondChange より数秒遅れて届くので、`OnSysSuspend` でも印を立てる。`research.md`「スリープ明けの合図の順番」）スリープ明けは今と同じ動き（時報は 1 回・おしゃべりはすぐ）のまま（要件 2.4）。
 - `X-Pasta-Time` 付きのリクエストは飛びを見ず、`prev_now` も変えない（要件 2.8・7.1。テストが時刻を飛ばしておしゃべりを起こす使い方を守る）。
 - 状態は `offset`・`probe_armed` に、`prev_now`（初期値 `nil`）・`epoch`（0）・`jump_total`（0）・`resumed`（false）を足す。保存しない。
 - 読み取り（`OnPastaClock`）は残す。SSP が OS の時計を書き換えるときは、ずれは常に 0（2 秒以内）になり、読み取りは Apply・Reset の直後に 1 回走るだけである。書き換えない SSP（古いビルドなど。2026-10-17 の調べで時報が出なかった理由は未確定）では、今までどおり読み取りでずれを得る。
