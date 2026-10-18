@@ -16,7 +16,7 @@
 
 ### Non-Goals
 
-- `act.req.date` を仮想時刻に従わせること（決定 A2 の範囲外）。
+- `act.req.date` を仮想時刻に従わせること（決定 A2 の範囲外）（2026-10-18 の見直しで変更。末尾の「設計の見直し（7.2 の後）」を正とする）。
 - 時刻を指定して時報を起こす口（決定 A3。仮想時刻が届くと分かったので作らない）。
 - 外から起こした `OnTalk` で続きを出すこと（決定 A4）。
 - 辞書や `＊OnBoot` が無いときに立ち絵を出すこと（決定 A6）。
@@ -36,7 +36,7 @@
 
 - `crates/pasta_shiori/src/lua_request.rs`（`act.req.date` の作り方と `X-Pasta-Time` の扱い）。変えない。
 - `boot.lua`・`EVENT.no_entry`・`set_co_scene`・`check_talk` のチェイントークの続きの拾い方。変えない。
-- `mouse.lua`（撫での判定）・`callback.lua`（コールバックの待ち時間）。変えない。
+- `mouse.lua`（撫での判定）・`callback.lua`（コールバックの待ち時間）。変えない（2026-10-18 の見直しで変更。末尾の「設計の見直し（7.2 の後）」を正とする）。
 - hello-pasta の辞書・段の数と並び・`tutorial_stages_test.rs`・`crates/pasta_check`・`editors/`・`manual.yml`。
 - おしゃべりの間隔の設定（`[talk]`・`[ghost]` の `talk_interval_*`）、debug transport・シーンキック。
 - 入門ガイドの絵（撮り直しは要らない見込み。下の「入門ガイドの絵」）。
@@ -52,7 +52,7 @@
 - `EVENT.fire` の処理の順（`CALLBACK.try_route` → `clock.observe` → `create_act` → `STOP.hold_handler` → ハンドラ）を変えるとき。`event/init.lua` を共有する `novel-talk-flow`・`novel-checkpoint-rollback`・`shell-element-click` は、この順を確かめ直す。
 - `check_hour`・`check_talk` の状態（`next_hour_unix`・`next_talk_time`）の意味を変えるとき（`novel-talk-flow`・`novel-checkpoint-rollback`）。
 - `transfer_date_to_var` の読む日時を変えるとき。
-- `act.req.date` の約束（OS の時計か `X-Pasta-Time`）を変えるとき。
+- `act.req.date` の約束（OS の時計か `X-Pasta-Time`）を変えるとき（2026-10-18 の見直しで変更。末尾の「設計の見直し（7.2 の後）」を正とする）。
 
 ## Architecture
 
@@ -620,3 +620,72 @@ REG.OnSecondChange = REG.OnSecondChange or function(act) end
 5. **「次の OnTalk の機会」の書き方**: 要件 3.3 の 2 ページに加え、`script-api.md`・`patterns.md`・`internals/execution-model.md` もこの spec でそろえる。
 
 時刻の直し方の確認（開発者の問い）: ベースウェアの時計に置き換えるのではなく、SSP から日時を聞けたときに `ずれ = 仮想の日時 − OS の時計` を更新し、`見かけの時刻 = OS の時計 + ずれ` とする。SSP は日時を知らせないので、聞くのは合図があったときだけである。
+
+## 設計の見直し（7.2 の後・2026-10-18）
+
+7.2 の実機確認（`research.md`「実機の確認（2026-10-18・タスク 7.2）」）で、SSP 2.9.18（20261017-5）の TimeMachine が **SSP のプロセスの中の OS の時計まで仮想時刻にする**と分かった。`act.req.date`（Rust の `now_local()`）も、Lua の `os.time()` も、`pasta.log` の時刻も仮想時刻になる。このため、上の設計のうち次の点が成り立たない。
+
+- 「`act.req.date` は OS の時計のまま」（Boundary・決定 A2・ReferenceDocs の注記）。
+- 決め直しの起点を「ずれ（`offset`）が変わったとき」にしたこと。ずれは 0 のままで、`req.date` が飛ぶ。設定し直すと余分な時報が出る（要件 2.3 に反する）。
+- おしゃべりの間隔を `act.req.date.unix` で数えること。仮想時刻で進む（要件 2.5 に反する）。コールバックの待ち時間（`os.time()`）と撫での判定（`req.date`）も同じ。
+
+この節が、上の該当箇所より優先する。設計ディスカッションで、次の 5 つを推奨案で確定した（2026-10-18）。
+
+### 1. 時刻の飛び（VirtualClock に足す）
+
+- 時計は、前回の `OnSecondChange` の「今」（`now(req)`。ずれを足した仮想の今）を覚える。`observe` が `OnSecondChange` を見るたびに、差 `d = now − prev_now` を求める。
+- `d < −JUMP_BACK`（2 秒）か `d > JUMP_FORWARD`（90 秒）なら「時刻の飛び」とする。
+  - 飛びの通し番号 `epoch` を 1 増やす（ディスパッチャが決め直しの合図に使う）。
+  - 飛びの合計 `jump_total += d − 1`（ふだんの 1 秒分を除く）。
+- ずれ（`offset`）が変わったとき（SSP が書き換えない場合の読み取り）も、次の `OnSecondChange` で「今」が飛ぶので、同じ判定に入る。上の `seen_offset` による決め直しは、`epoch` による決め直しに置き換える。
+- `OnSysResume`（スリープ明け）を見たら、次の 1 回の飛びは飛びとして扱わない（`epoch`・`jump_total` を変えない）。スリープ明けは今と同じ動き（時報は 1 回・おしゃべりはすぐ）のまま（要件 2.4）。
+- `X-Pasta-Time` 付きのリクエストは飛びを見ず、`prev_now` も変えない（要件 2.8・7.1。テストが時刻を飛ばしておしゃべりを起こす使い方を守る）。
+- 状態は `offset`・`probe_armed` に、`prev_now`（初期値 `nil`）・`epoch`（0）・`jump_total`（0）・`resumed`（false）を足す。保存しない。
+- 読み取り（`OnPastaClock`）は残す。SSP が OS の時計を書き換えるときは、ずれは常に 0（2 秒以内）になり、読み取りは Apply・Reset の直後に 1 回走るだけである。書き換えない SSP（古いビルドなど。2026-10-17 の調べで時報が出なかった理由は未確定）では、今までどおり読み取りでずれを得る。
+
+```lua
+--- 飛びを差し引いた「なめらかな時計」。間隔・待ち時間・撫でを数える。req.date が無ければ nil。
+--- X-Pasta-Time があれば req.date.unix をそのまま返す。
+---@param req ClockRequest
+---@return integer|nil
+function M.steady(req) end   -- = now(req) − jump_total
+
+--- 飛びの通し番号。ディスパッチャが「前回見た値から変わったか」で決め直す。
+---@return integer
+function M.epoch() end
+```
+
+### 2. 飛んだら次の正時を決め直す（VirtualDispatcher）
+
+- `check_hour` の決め直しの条件を `CLOCK.offset() ~= seen_offset` から `CLOCK.epoch() ~= seen_epoch` にする。決め直しの計算（`now − REBASE_GRACE` の次の正時）は今のまま。`_get_internal_state()` は `seen_offset` の代わりに `seen_epoch` を出す。
+- 例（実機の 7.2 と同じ操作）:
+  - 14:00:24 から 16:59:30 へ入れ直す → 飛び → 16:58:20 から決め直して次は 17:00 → 「午後4時」は出ず、17:00 に「午後5時」が出る（要件 2.3）。
+  - 10:21 に 10:59:30 を入れる → 飛び → 10:58:20 から決め直して次は 11:00 → 30 秒後に時報（入門 6 段目）。
+  - Reset で 17:01 から 13:11 へ戻す → 飛び → 次は 14:00。時報は出ない（要件 2.6）。
+  - ふだん（差 1 秒）は何も変わらない（要件 7.3）。スリープ明けは飛びにしないので、時報は 1 回出る（要件 2.4）。
+
+### 3. おしゃべりの間隔は「なめらかな時計」で数える（VirtualDispatcher）
+
+- `check_talk` の `next_talk_time` の計算と比較を `act.req.date.unix` から `CLOCK.steady(act.req)` にする。正時までの残り（`hour_margin`）は今のまま `next_hour_unix − CLOCK.now(act.req)`。
+- 例: 次のおしゃべりまで 46 秒の時に +3 時間飛んでも、なめらかな時計では 46 秒後のまま。ふだんは `jump_total` が 0 なので今と同じ値（要件 2.5・7.3）。
+
+### 4. コールバックの待ち時間と撫での判定も「なめらかな時計」で数える
+
+- `act.lua` の `get_property`（`CALLBACK.stage_pending` の締め切り）と、`second_change.lua` の `CALLBACK.sweep` に渡す今を、`os.time()` から `CLOCK.steady(act.req)` にする（`req.date` が無いときは今までどおり `os.time()`）。`callback.lua` 自体は「渡された今」で比べるので変えない。
+- `mouse.lua` の `request_time(req)` を `CLOCK.steady(req) + ns / 1e9` にする。
+- Boundary: `act.lua`・`event/second_change.lua`・`event/mouse.lua` が `pasta.shiori.clock` を読む（一方向。`clock.lua` はどれも `require` しない）。
+
+### 5. 前提と文書
+
+- `act.req.date` の注記を「SSP によっては（2.9.18 の TimeMachine など）`act.req.date` も仮想時刻になる。時報の判定と日時変数は、どちらの場合も仮想時刻に従う。おしゃべりの間隔・撫で・コールバックの待ち時間は、設定し直しの飛びを差し引いて数える」に直す（`shiori-events.md`・`variables.md`・`internals/shiori.md`・スキルの references・`STAGES.md` の調べの結果）。
+- **要件 7.3 の例外として記録する**: 仮想時刻を使わずに OS の時計を手で 90 秒より進めたか 2 秒より戻したときも「飛び」になる。
+  - 10:30 から 9:30 へ戻す: 今は 11:00 まで時報が止まる → 見直し後は 10:00 に出る。
+  - 10:30 から 12:10 へ進める: 今は「時報12」が 1 回出る → 見直し後は 13:00 まで出ない。おしゃべりも、今はすぐ出る → 見直し後は残りの間隔を待つ。
+  - ふだん（時計を動かさない・スリープ明け）の動きは変わらない。
+
+### テスト（追加）
+
+- `virtual_clock_test.lua`: 差 1 秒では飛びにならない／+91 秒・−3 秒で `epoch` が増え `jump_total` が差から 1 を引いた分だけ増える／`OnSysResume` の後の飛びは数えない／`X-Pasta-Time` 付きは飛びを見ない／`steady` = `now − jump_total`。
+- `virtual_dispatcher_spec.lua`: `req.date` だけが飛ぶ（ずれ 0。SSP が OS の時計を書き換える場合）ときの 7.2 の 3 つの操作／スリープ明けの飛びでは時報が 1 回出る／おしゃべりの間隔は飛びの分だけずれない。既存のずれ（`offset`）による決め直しのテストは `epoch` で通る。
+- `second_change_thread_test.lua`・`mouse_test.lua`・コールバックのテスト: なめらかな時計で数える。既存のテストは変更なしで通る。
+- E2E（`virtual_clock_e2e_test.rs`）は今のまま通る（`OnPastaClock` のずれ → 次の `OnSecondChange` で飛び → 決め直し）。SSP が OS の時計を書き換える場合は Rust のテストで作れないので、Lua の単体テストと実機の確認（7.2 のやり直し）で確かめる。

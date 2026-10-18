@@ -120,13 +120,39 @@
   - `research.md` に、起動の立ち絵をエンジンでやらない理由（何も書かなければ何も表示しないのが既定・辞書が無いとサーフェスを決められない）を、足りなければ書き足し、2 つの理由がそろっている
   - _Requirements: 4.5, 5.5, 6.4_
 
-- [ ] 7.2 SSP の実機で仮想時刻の時報を確かめる
+- [ ] 7.2 SSP の実機で仮想時刻の時報を確かめる（8. の後にやり直す）
   - 6 段目まで足したゴーストで、今の時刻の 59 分 30 秒を入れて Apply → 30 秒ほどで時報が出る
   - 先の時の 59 分 30 秒を入れても余分な時報が出ず次の正時に出る。Reset の後は次の実際の正時まで時報が出ず、日時変数が実際の時刻に戻る
   - 仮想時刻を使わずに数分動かし、SHIORI 呼出ログに `OnPastaClock` が出ない
   - 4 項目の結果が `research.md` に記録されている
-  - _Blocked: SSP 2.9.18（20261017-5）の TimeMachine がプロセス内の OS の時計（`req.date`）まで仮想時刻にするため、設計の前提（act.req.date は仮想時刻に従わない）が崩れた。設定し直しで余分な時報が出る（要件 2.3）・おしゃべりの間隔が仮想時刻で進む（要件 2.5）。research.md「実機の確認（2026-10-18・タスク 7.2）」。設計へ戻す_
+  - 1 回目（2026-10-18）は前提の食い違いで止めた（research.md「実機の確認（2026-10-18・タスク 7.2）」）。設計の見直しを入れた後にやり直す
+  - _Depends: 8.4_
   - _Requirements: 2.1, 2.3, 2.6, 7.3_
+
+- [ ] 8. 設計の見直し（7.2 の後）への追従
+- [ ] 8.1 時計に時刻の飛びとなめらかな時計を足す
+  - `OnSecondChange` ごとに前回の「今」との差を見て、2 秒より戻ったか 90 秒より進んだら飛びとし、通し番号と飛びの合計を増やす。`OnSysResume` の後の 1 回と `X-Pasta-Time` 付きは数えない
+  - `steady(req)`（今 − 飛びの合計）と `epoch()` を足し、状態を `_reset`・`_get_state` に含める
+  - 設計「設計の見直し」1 とテスト（追加）の時計の項目が単体テストで通る
+  - _Boundary: VirtualClock_
+  - _Requirements: 2.3, 2.4, 2.5, 2.8, 7.1, 7.3_
+- [ ] 8.2 ディスパッチャの決め直しを飛びの通し番号で、おしゃべりの間隔をなめらかな時計で行う
+  - `seen_offset` を `seen_epoch` に置き換え、`check_talk` の間隔を `CLOCK.steady` で数える。`hour_margin` は今のまま
+  - `req.date` だけが飛ぶ場合の 7.2 の 3 つの操作・スリープ明け・間隔がずれないことのテストが通り、既存のディスパッチャのテストが変更なしで通る（`seen_offset` を見るテストは `seen_epoch` に読み替える）
+  - _Boundary: VirtualDispatcher_
+  - _Depends: 8.1_
+  - _Requirements: 2.1, 2.3, 2.4, 2.5, 7.3_
+- [ ] 8.3 コールバックの待ち時間と撫での判定をなめらかな時計で数える
+  - `act.lua` の `get_property` の締め切りと `second_change.lua` の掃引に渡す今を `CLOCK.steady(act.req)`（`req.date` が無ければ `os.time()`）にし、`mouse.lua` の `request_time` を `CLOCK.steady(req)` から作る
+  - 飛んでも待ち時間と撫での判定がずれないテストが通り、既存のコールバック・撫でのテストが変更なしで通る
+  - _Boundary: ActDateTransfer（act.lua の get_property）, SecondChangeHandler, mouse.lua_
+  - _Depends: 8.1_
+  - _Requirements: 2.5, 7.3, 7.5_
+- [ ] 8.4 文書を見直しに合わせ、references を生成し直す
+  - `act.req.date` の注記・仮想ディスパッチャの決め直しと間隔の数え方・時計の節（飛び・なめらかな時計・要件 7.3 の例外）を、`shiori-events.md`・`variables.md`・`internals/shiori.md`・`STAGES.md`（調べの結果）に書く。入門 6 段目の記述と食い違わないことを確かめる
+  - `gen-skill-refs.mjs` で references を生成し直し、`link-check.mjs`・`tutorial-check.mjs`・`gen-skill-refs.mjs --check`・`verify-content.mjs`・mdBook のビルドが通る
+  - _Depends: 8.2, 8.3_
+  - _Requirements: 2.2, 2.5_
 
 ## Implementation Notes
 
