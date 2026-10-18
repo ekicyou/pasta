@@ -90,3 +90,18 @@ LuaJIT は改造しない。`lua-require-robustness` と同じく、ホストの
 - LuaJIT の `fopen` を経由しないこと（深いパスで落ちる原因）。
 - テストは非 ANSI のフィクスチャ `NON_ANSI_DIR_NAME`（`crates/pasta_lua/tests/common/mod.rs`）と、300 文字を超えるパスで確かめる。
 - スキル（`.claude/skills/`）の編集は分類器に拒まれることがあるので、そのときは開発者に頼む。
+
+## 2026-10-18 棚卸の再測定（main facd6cf4）
+
+- **前提の変化**: 起票した日の再測定。「Current State」の場所は main と合う（`runtime/searcher.rs` の `EXPECTED_LOADERS_LEN = 4`（37 行）と `install_module_searcher`（280 行）、`runtime/module_registry.rs` 44 行の `setup_package_path` が cpath を変えないこと、`book/src/internals/loader.md:215`）。LuaJIT の `lib_package.c` の `LJ_WIN_LOADLIBA`（80 行）・`GetModuleFileNameA`（100 行）・`fopen`（299 行）と、`luaconf.h:24-25` の既定の cpath も書いたとおり。0.4.1 までに入った spec は、この範囲に触れていない。
+- **触るファイル**: `crates/pasta_lua/src/runtime/searcher.rs`（622 行）、`runtime/module_registry.rs`（193）、`loader/context.rs`（278。既定の cpath を作るなら）、C のローダーの新しいファイル（Windows 専用の層）、`crates/pasta_lua/Cargo.toml`（39 行の `windows-sys` に `Win32_System_LibraryLoader`。`pasta_shiori` と同じく crate の側で足せば、ルートの `Cargo.toml` と `Cargo.lock` は変わらない。機能の名前は lock に載らない）、`.kiro/steering/tech.md:47`、テスト（`tests/runtime/module_searcher_test.rs` の隣）、`book/src/internals/loader.md`（302）・`book/src/reference/startup.md`（192。「3. 既知の制限」は 83 行から。C モジュールの記述は今は無い）、スキルの `references/startup.md` の再生成。1,000 行に近いファイルは無い。
+- **規模**: 10〜13 タスク（探索・読み込み・登録・既定の cpath と `!`・寿命・文言の比較・テスト用 DLL・文書）。下の穴の (a) か (b) を範囲に入れると 14〜17。
+- **先に要るもの**: 機能の上では無い（`lua-require-robustness` は完了）。ファイルの重なり: 未完了の spec のどれとも、ソースは重ならない（`searcher.rs`・`module_registry.rs`・`loader/context.rs` を挙げる brief は無い）。`talk-grapheme-clusters` とは `crates/pasta_lua/Cargo.toml` の別の行と `tech.md` の依存の表だけ。`Cargo.lock` の席は向こうに渡す（こちらは、テスト用 DLL を新しい crate で作らない限り lock を触らない）。
+- **種別**: 機能（C モジュールの `require` は今どこに置いても事実上使えず、新しく読めるようにする）。版は 0.4.2（開発者の決定）。
+- **要件定義のモデル**: Opus。下の「Lua の C API をどこから得るか」は外へ出す約束（ABI）になるが、案は 3 つに絞れ、時刻や並行の意味論も絡まない。境目なので Opus とする。
+- **分割の案**: 要らない。
+- **見つけた穴・古くなった記述**:
+  - **C モジュールが Lua の C API（`lua_*`・`luaL_*`）をどこから得るかが書いてない。** mlua は `vendored`（ルートの `Cargo.toml:32`）で LuaJIT を pasta.dll に静的にリンクし、`lua51.dll` は無い。普通の C モジュールは `lua51.dll` を import するので、無ければエラー 126、別の `lua51.dll` を置けば別の VM の関数で pasta の `lua_State` を触ることになり壊れる。表の「隣の依存 DLL」の失敗が同じ原因でないかも確かめる。案: (a) pasta.dll から `lua_*`・`luaL_*` を export し、モジュールは pasta.dll に対して作る、(b) pasta.dll へ転送する `lua51.dll` を用意する、(c) 範囲外とし「DLL を見つけて読み、`luaopen` を呼ぶ」までを保証する。要件定義の最初に決める（(c) なら、この spec の値打ちを開発者に確かめる）。
+  - テスト用の C モジュール DLL も同じ問題に当たる（テストの EXE も LuaJIT を export しない）。作り方（`cc` を dev の依存にしてテストの中で `cl` を呼ぶ・テスト用の新しい crate・ビルド済みの DLL を置く）で、`Cargo.lock` と CI の手間が変わる。x86 と x64 の両方が要る。`cc` は LuaJIT のビルド用に、lock に間接で既にある。
+  - 「Current State」の `module_searcher_test.rs` は `crates/pasta_lua/tests/runtime/` にある。
+- **即時修正**: なし。

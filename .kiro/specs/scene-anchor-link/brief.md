@@ -192,3 +192,21 @@
 - **装いのあるアクターが出ない出力は 1 文字も変わらない**（`any` が偽の間、`switch` は空文字列を返し、`through` は文字列をそのまま返す）。
 - 見直しが要る論点: この spec が次のどれかをするなら、装いの出し入れ（状態表と出し直し）をどう合わせるか。`emit_actor_switch` の出力順や `emit_inner_token` の形を変える。話者の切り替えの位置に新しいタグを出す。内側に `\c`・`\x` を出すトークンを足す。
 - 参照: `.kiro/specs/completed/actor-display-style/design.md`（ActorStyle・BuilderHook・Revalidation Triggers）、マニュアル `book/src/internals/talk-output.md` の「装いの出し入れ」。
+
+## 2026-10-18 棚卸の再測定（main facd6cf4）
+
+- **前提の変化**:
+  - `vertical-balloon-lines` で、budoux の字数が吹き出しごとに持ち越されるようになった（`sakura_builder.lua` の `columns` を `SAKURA_SCRIPT.talk_to_script(actor, text, column)` に渡す。`crates/pasta_lua/src/sakura_script/mod.rs` 109〜153 行）。台詞がアンカーの前後で別のトークンに割れても、字数は続く。ただし列の状態を動かすのは `talk`・`sakura_script`・`newline`・`clear` だけ（`inner_token_to_string` 291〜316 行）なので、アンカーを独り立ちのトークンにすると、その表示の字は字数に入らない。字の判定 `emits_text`（136 行）も「字を出さない」とするので、吹き出しの最後の表示（`spot_tail`）と段落の区切りにも効く。
+  - 台詞の文字の中に `\_a[ID,スコープ]表示\_a` を入れる形では、`\_a[…]` と閉じの `\_a` はタグとして読まれ（`tokenizer.rs` 138〜146 行）、列を動かさない（`line_breaker.rs` 56〜66 行の `column_move` は `\n`・`\c`・`\_l` だけ）。表示の字は字数に入り、自動ウェイトも入るが、budoux はアンカーの中の語の切れ目で改行しうる。止めるなら `line_breaker.rs` を触る。
+  - `actor-display-style`: アンカーは `\c`・`\x` を出さないので、装いの差し込み（`STYLE.through`）とはぶつからない。`emit_inner_token`（340 行）を通せば、単独の `\` の守り（`tracking_buffer`）も効く。
+  - 辞書の検査: 飛び先の検査 `references::check` は、省く理由が無いときだけ走る（`validate/mod.rs` 86〜92 行）。アンカーの検査をここに足せば、申し送り（pasta-check-validate-edges より）の論点は満たされる。今は `LocalSceneItem::CallScene`・`Choice` だけを見る（`references.rs` 30〜60 行）ので、台詞の行の要素を見る腕を足す。報告の種類は 25 種（`report.rs` 56 行）。`wasmBridge.ts` は code を文字列で受けるので直さなくてよい。
+- **行番号の直し**: `sakura_builder.lua` は 540 行（`choice_to_script` 31 行、`emits_text` 136 行、`put_break` 278 行、`BUILDER.build` 414 行）。`act.lua`（829）・`choice_select.lua`（80）・文法・コード生成・LSP・VSCode の文法定義は変わっていない。
+- **触るファイル**: 2026-10-17 の節と同じ（`sakura_builder.lua` 540・`validate/report.rs` 475 に増えた）。アンカーの中で budoux に割らせないなら `sakura_script/line_breaker.rs`（1,134 行。1,000 行を超えている）も。
+- **規模**: 18〜20 のまま（列の状態の扱いは「ウェイトと改行 2」に入る）。
+- **先に要るもの**: 機能として要るものは無い。ファイルの重なり: 2026-10-17 の節のとおり（`pasta-check-validate-edges` は完了したので外す）。加えて、Rust の `sakura_script/` を触るなら `talk-grapheme-clusters`（`tokenizer.rs`・`line_breaker.rs`・`wait_inserter.rs`・`mod.rs`）。アンカーの表示の字を Lua の側で `talk_to_script` に通してから `\_a` で囲む形なら、Rust に触らずに字数とウェイトがそろい、`talk-grapheme-clusters` と並べられる。
+- **種別**: 機能（台詞の途中の `＠？` は今は構文エラー）。起票のときに開発者が決めたことが 3 つある。
+- **要件定義のモデル**: Opus のまま。書き方・`\_a` の出力・飛び先が無いときの 204 は 2026-10-08 に決めてあり、伺かの仕様は UKADOC で確かめてある。今回増えたのは出力の組み立ての中の選び方（独り立ちのトークンにして列の状態を足すか、台詞の文字に入れてアンカーの中の改行を止めるか）で、2 つに絞れていて後から直せる。
+- **分割の案**: 分けない。20 を超えたら、2026-10-17 の節のとおりエディタの分を `scene-anchor-link-editor` として後ろに出す。
+- **見つけた穴・古くなった記述**:
+  - Constraints の「BudouX の行幅の数えは、トークンごとにやり直しになる（`mod.rs:145`）」は古い（上の 1 点目）。
+  - `talk-grapheme-clusters` の brief（Existing Spec Touchpoints）と roadmap 307 行の流れは「`sakura_builder.lua` を触らないので `scene-anchor-link` と同じウェーブに置ける」とするが、この spec の持ち場（roadmap 201 行）には `sakura_script/` がある。この spec が Rust の側を触るなら、同じウェーブに置けない。

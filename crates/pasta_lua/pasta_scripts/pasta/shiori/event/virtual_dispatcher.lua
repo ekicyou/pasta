@@ -13,7 +13,7 @@
 --- local result = dispatcher.dispatch(act)
 --- ```
 
--- 1. require文（遅延ロードで循環参照回避）
+-- 1. require文（CLOCK だけを先に読む。ほかのモジュールは循環参照を避けるため、使う関数の中で遅延ロードする）
 local CLOCK = require("pasta.shiori.clock")
 
 -- 2. モジュールローカル変数（SHIORIセッション中のみ有効）

@@ -207,3 +207,19 @@ roadmap のバックログにあった「`pasta_core` の `resolve_scene_id` の
 - `pasta_check validate` の飛び先の検査は、辞書の中身が分からないとき（構文エラー・読めない辞書ファイル・pasta.toml の誤り）に丸ごと省く形になった。判定は `crates/pasta_check/src/validate/report.rs` の `skip_reasons`（統計の `skipReasons`）で、すべての段の報告がそろった後に 1 回だけ行う（`validate/mod.rs`）。
 - 見直しが要る論点: この spec が `validate` に辞書のシーンの集まりに頼る検査を足すなら、`skip_reasons` が空のときだけ走らせるか。辞書の中身が分からないことを表す誤りの種類を足すなら、`skip_reasons` の対応に入れるか。
 - 参照: `.kiro/specs/completed/pasta-check-validate-edges/design.md` の「Revalidation Triggers」と「Report（report.rs）」の省く理由の表。
+
+## 2026-10-18 棚卸の再測定（main facd6cf4）
+
+- **前提の変化**: 前回（main b4164100）から入った 4 本のうち、この spec の持ち場に触ったのは `pasta-check-validate-edges` だけ。辞書の検査の段の順（`crates/pasta_check/src/validate/mod.rs` 67〜103 行）で、飛び先の検査 `references::check` は省く理由（`skip_reasons`）が空のときだけ走る（86〜92 行）。報告の種類は `actor-display-style` の `ConfigActorFont` が増えて 25 種（`report.rs` 56 行の `FindingKind::ALL`）。VSCode 拡張の `wasmBridge.ts` は報告の code を文字列のまま受けるので、種類を足しても TS は直さなくてよい（省く理由を足すときだけ、`wasmBridge.ts` 50 行の `SKIP_REASONS` も直す）。
+- **変わっていないもの**: Call の文法・生成・`act.lua`・`scene.lua`・`search/`・`pasta_core` の登録表・LSP（`visit_action.rs`）・VSCode の文法定義。2026-10-17 の節の行番号はそのまま合う（Call の Lua を出す `generate_call_scene` は `element_gen.rs` 212 行）。
+- **触るファイル**: 2026-10-17 の節と同じ。候補が複数残る場面の検査を足すなら、`validate/references.rs`（135。Call の腕は 32〜56 行）・`report.rs`（475。前回の 379 から増えた）、一致テスト `crates/pasta_check/tests/validate_parity_test.rs`、マニュアル `book/src/debug/validate.md` の報告の表（163〜164 行の並び）。検査は `pasta_core` の `SceneTable` で飛び先を探す（`references.rs` 5 行）ので、絞り込みの形を変えると検査の側もそろえる。1,000 行に近いのは `act.lua`（829）だけ。新しいファイルは無い見込み。
+- **規模**: 19〜21 のまま。2026-10-04 に一度分けた spec なので、20 をわずかに超えても分けない。
+- **先に要るもの**: `scene-attribute-store`（属性の保持と値の型）。ファイルの重なり: `scene-attribute-store`（文法・`partial.rs`・`element_gen.rs`・`act.lua`・`scene.lua`・`search/context.rs`・`scene_table.rs`・`scene_types.rs`）、`scene-anchor-link`（文法・`parse_action.rs`・構文木・`partial.rs`・`element_gen.rs`・`act.lua`・VSCode の文法定義・`visit_action.rs`・`validate/references.rs`・`report.rs`）、`cue-command-runtime`（文法・`act.lua`・検査の段）、`novel-talk-flow`（`act.lua`・`scene.lua`・`search/context.rs`・`scene_table.rs`・検査の段）、`novel-checkpoint-rollback`（`act.lua`・`scene_table.rs` ほか）、`novel-variable-scope`（文法・`element_gen.rs`・`act.lua`・VSCode の文法定義）、`shell-element-click`（あちらが `scene.lua` に口を足す場合だけ）。`pasta-check-validate-edges` は完了したので、検査の段の重なりは消えた。
+- **種別**: 機能（`＞シーン＆k＝v` は今は構文エラー）。0.5.0 のフラグによる分岐の本命（開発者の決定）。
+- **要件定義のモデル**: Fable のまま。後から戻しにくい決定は、Call の絞り込みの書き方と意味（新しい文法で、見本のノベルと作者の辞書が上に乗る）。推奨の無い論点が 3 つ以上絡んで残る（比べる記号と数のしきい値の向き、条件のつなぎ方、「それ以外」の場面と候補が無いときの動きと候補の控えのキー、条件の値に変数を書く形と連結の `＆` との見分け）。今回の変化は、このどれにも触れていない。
+- **分割の案**: 分けない。
+- **見つけた穴・古くなった記述**:
+  - 2026-10-17 の節の重なりの `pasta-check-validate-edges`（`validate/mod.rs`）は、完了したので外す。`shell-element-click`（`act.lua`）は誤りで、あちらは `act.lua` を触る予定が無い。
+  - 候補が複数残る場面の検査は、`references.rs` の Call の腕に置くのが素直で、そうすれば省く理由があるときは走らない（申し送り（pasta-check-validate-edges より）の論点は「空のときだけ走らせる」を推奨にできる）。種類を足すと `FindingKind::ALL` の数も変わる。
+  - 「申し送り（pasta-check-validate-edges より）」の 5 行と見出しの前の空行は改行が LF だった。今回 CRLF にそろえた。
+  - roadmap 191 行の「辞書の検査に検査を足す spec は `pasta-check-validate-edges` と同じウェーブに置かない」は、完了したので古い（即時修正の候補）。
