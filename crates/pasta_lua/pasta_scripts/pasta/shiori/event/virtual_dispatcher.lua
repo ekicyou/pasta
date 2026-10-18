@@ -18,8 +18,8 @@ local CLOCK = require("pasta.shiori.clock")
 
 -- 2. モジュールローカル変数（SHIORIセッション中のみ有効）
 local next_hour_unix = 0   -- 次の正時タイムスタンプ（CLOCK.now の時刻で数える）
-local seen_offset = 0      -- 前回見た仮想時刻のずれ（CLOCK.offset）
-local next_talk_time = 0   -- 次回トーク発行予定時刻
+local seen_epoch = 0       -- 前回見た時刻の飛びの通し番号（CLOCK.epoch）
+local next_talk_time = 0   -- 次回トーク発行予定時刻（CLOCK.steady の時刻で数える）
 local scene_executor = nil -- テスト用: シーン実行関数のオーバーライド
 
 -- 3. モジュールテーブル宣言
@@ -28,7 +28,7 @@ local M = {}
 
 -- 4. 内部関数
 
---- ずれが変わって次の正時を決め直すときの猶予（秒）。分の合図の遅れと読み取りの往復を吸収する（調整つまみ）
+--- 時刻が飛んで次の正時を決め直すときの猶予（秒）。分の合図の遅れと読み取りの往復を吸収する（調整つまみ）
 local REBASE_GRACE = 70
 
 -- ブロック対象SSP Statusキーワード一覧
@@ -151,9 +151,9 @@ function M.check_hour(act)
         return nil
     end
 
-    -- 仮想時刻が設定し直された（ずれが変わった）ときだけ、猶予を引いた時刻から次の正時を決め直す
-    if CLOCK.offset() ~= seen_offset then
-        seen_offset = CLOCK.offset()
+    -- 時刻が飛んだ（仮想時刻の設定し直しなど）ときだけ、猶予を引いた時刻から次の正時を決め直す
+    if CLOCK.epoch() ~= seen_epoch then
+        seen_epoch = CLOCK.epoch()
         next_hour_unix = calculate_next_hour_unix(current_unix - REBASE_GRACE)
     end
 
@@ -185,7 +185,8 @@ end
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス）
 ---@return thread|nil コルーチンまたはnil
 function M.check_talk(act)
-    local current_unix = act.req.date.unix
+    -- 間隔は飛びを差し引いた「なめらかな時計」で数える（実際に過ぎた時間）
+    local current_unix = CLOCK.steady(act.req)
     local cfg = get_config()
 
     -- 初回または次回トーク時刻未設定
@@ -273,7 +274,7 @@ end
 --- テスト用: 内部状態をリセット
 function M._reset()
     next_hour_unix = 0
-    seen_offset = 0
+    seen_epoch = 0
     next_talk_time = 0
     scene_executor = nil
 end
@@ -284,7 +285,7 @@ function M._get_internal_state()
     return {
         next_hour_unix = next_hour_unix,
         next_talk_time = next_talk_time,
-        seen_offset = seen_offset,
+        seen_epoch = seen_epoch,
     }
 end
 

@@ -136,7 +136,7 @@
   - 設計「設計の見直し」1 とテスト（追加）の時計の項目が単体テストで通る
   - _Boundary: VirtualClock_
   - _Requirements: 2.3, 2.4, 2.5, 2.8, 7.1, 7.3_
-- [ ] 8.2 ディスパッチャの決め直しを飛びの通し番号で、おしゃべりの間隔をなめらかな時計で行う
+- [x] 8.2 ディスパッチャの決め直しを飛びの通し番号で、おしゃべりの間隔をなめらかな時計で行う
   - `seen_offset` を `seen_epoch` に置き換え、`check_talk` の間隔を `CLOCK.steady` で数える。`hour_margin` は今のまま
   - `req.date` だけが飛ぶ場合の 7.2 の 3 つの操作・スリープ明け・間隔がずれないことのテストが通り、既存のディスパッチャのテストが変更なしで通る（`seen_offset` を見るテストは `seen_epoch` に読み替える）
   - _Boundary: VirtualDispatcher_

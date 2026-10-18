@@ -782,8 +782,18 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         }
     end
 
+    --- OnSecondChange の act を作る。EVENT.fire と同じく、ハンドラより前に CLOCK.observe を通す
     local function mk_act(real, dic)
-        return create_mock_act({ id = "OnSecondChange", status = "idle", date = mk_date(real), dic = dic or {} })
+        local req = { id = "OnSecondChange", status = "idle", date = mk_date(real), dic = dic or {} }
+        CLOCK.observe(req)
+        return create_mock_act(req)
+    end
+
+    --- from から to まで（両端を含む）1 秒ずつ OnSecondChange を見せる（時が流れる）
+    local function pass(from, to)
+        for t = from, to do
+            CLOCK.observe({ id = "OnSecondChange", date = mk_date(t), dic = {} })
+        end
     end
 
     local function hh_of(unix)
@@ -836,7 +846,7 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         set_virtual(real, BASE + H + 9)
         expect(type(dispatcher.check_hour(mk_act(real)))):toBe("thread")
         expect(found):toBe("時報" .. hh_of(BASE + H))
-        expect(dispatcher._get_internal_state().seen_offset):toBe(CLOCK.offset())
+        expect(dispatcher._get_internal_state().seen_epoch):toBe(CLOCK.epoch())
         expect(dispatcher._get_internal_state().next_hour_unix):toBe(BASE + 2 * H)
     end)
 
@@ -860,18 +870,19 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         expect(CLOCK.offset()):toBe(0)
         expect(dispatcher.check_hour(mk_act(R0 + 2))):toBe(nil)
         expect(dispatcher._get_internal_state().next_hour_unix):toBe(BASE + H)
-        expect(dispatcher._get_internal_state().seen_offset):toBe(0)
+        expect(dispatcher._get_internal_state().seen_epoch):toBe(CLOCK.epoch())
         expect(dispatcher.check_hour(mk_act(BASE + H - 1))):toBe(nil)
         expect(type(dispatcher.check_hour(mk_act(BASE + H)))):toBe("thread")
         expect(found):toBe("時報" .. hh_of(BASE + H))
     end)
 
-    vtest("ずれ 0 のまま OS の時計が戻っても、決め直さない", function()
-        dispatcher.check_hour(mk_act(R0))
-        expect(dispatcher.check_hour(mk_act(R0 - H))):toBe(nil)
-        expect(dispatcher._get_internal_state().next_hour_unix):toBe(BASE + H)
-        expect(dispatcher.check_hour(mk_act(BASE + H - 1))):toBe(nil)
-        expect(type(dispatcher.check_hour(mk_act(BASE + H)))):toBe("thread")
+    vtest("ずれ 0 のまま OS の時計が 1 時間戻ると、戻った先の次の正時に出る（要件 7.3 の例外）", function()
+        dispatcher.check_hour(mk_act(R0)) -- 10:21
+        expect(dispatcher.check_hour(mk_act(R0 - H))):toBe(nil) -- 9:21 へ戻す
+        expect(dispatcher._get_internal_state().next_hour_unix):toBe(BASE)
+        pass(R0 - H + 1, BASE - 1)
+        expect(type(dispatcher.check_hour(mk_act(BASE)))):toBe("thread")
+        expect(found):toBe("時報" .. hh_of(BASE))
     end)
 
     vtest("時が流れて 2 時間進んでも 1 回だけで、HH は進んだ先（仮想）", function()
@@ -880,6 +891,7 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         dispatcher.check_hour(mk_act(R0))
         dispatcher.check_hour(mk_act(R0 + 1))
         found = nil
+        CLOCK.observe({ id = "OnSysResume", date = mk_date(R0 + 1), dic = {} }) -- スリープ明け
         local real = R0 + 2 * H + 9 * 60 -- 実際の 12:30・仮想の 17:30
         expect(type(dispatcher.check_hour(mk_act(real)))):toBe("thread")
         expect(found):toBe("時報" .. hh_of(real + off))
@@ -893,17 +905,19 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         dispatcher.check_talk(mk_act(R0))
         local talk_at = dispatcher._get_internal_state().next_talk_time
         local real = R0 + 400 -- 実際は 10:27:40（おしゃべりの時刻は過ぎた）
+        pass(R0 + 1, real - 1)
         set_virtual(real, BASE + H - 15) -- 仮想は 10:59:45
         expect(dispatcher.check_hour(mk_act(real))):toBe(nil)
         expect(dispatcher.check_talk(mk_act(real))):toBe(nil)
         expect(dispatcher._get_internal_state().next_talk_time):toBe(talk_at)
     end)
 
-    vtest("next_talk_time は実際の時刻で数える", function()
+    vtest("next_talk_time はなめらかな時計で数える", function()
         set_virtual(R0, R0 + 5 * H)
-        dispatcher.check_talk(mk_act(R0))
-        local t = dispatcher._get_internal_state().next_talk_time
-        expect(t >= R0 + 180 and t <= R0 + 300):toBe(true)
+        local act = mk_act(R0)
+        dispatcher.check_talk(act)
+        local t = dispatcher._get_internal_state().next_talk_time - CLOCK.steady(act.req)
+        expect(t >= 180 and t <= 300):toBe(true)
     end)
 
     vtest("X-Pasta-Time 付きでは、ずれを無視する", function()
@@ -914,5 +928,62 @@ describe("check_hour / check_talk - 仮想の時刻", function()
         expect(dispatcher._get_internal_state().next_hour_unix):toBe(BASE + H)
         expect(type(dispatcher.check_hour(mk_act(BASE + H, XPT)))):toBe("thread")
         expect(found):toBe("時報" .. hh_of(BASE + H))
+    end)
+
+    -- req.date だけが飛ぶ（ずれ 0。SSP 2.9.18 の TimeMachine が OS の時計まで書き換える場合。タスク 7.2 の実機）
+
+    vtest("飛び: 14:00:24 から 16:59:29 へ入れ直すと、時報16は出ず、17:00 に時報17が出る", function()
+        local T14 = BASE + 4 * H
+        dispatcher.check_hour(mk_act(T14 + 24)) -- 次は 15:00
+        expect(dispatcher.check_hour(mk_act(T14 + 3 * H - 31))):toBe(nil)
+        expect(found):toBe(nil)
+        expect(dispatcher._get_internal_state().next_hour_unix):toBe(T14 + 3 * H)
+        expect(dispatcher._get_internal_state().seen_epoch):toBe(CLOCK.epoch())
+        pass(T14 + 3 * H - 30, T14 + 3 * H - 1)
+        expect(type(dispatcher.check_hour(mk_act(T14 + 3 * H)))):toBe("thread")
+        expect(found):toBe("時報" .. hh_of(T14 + 3 * H))
+    end)
+
+    vtest("飛び: 10:21:10 に 10:59:30 を入れると、30 秒後に時報11が出る", function()
+        dispatcher.check_hour(mk_act(R0 + 10))
+        expect(dispatcher.check_hour(mk_act(BASE + H - 30))):toBe(nil)
+        expect(found):toBe(nil)
+        pass(BASE + H - 29, BASE + H - 1)
+        expect(type(dispatcher.check_hour(mk_act(BASE + H)))):toBe("thread")
+        expect(found):toBe("時報" .. hh_of(BASE + H))
+    end)
+
+    vtest("飛び: 17:01 から 13:11 へ戻すと、時報は出ず、次は 14:00", function()
+        local T13 = BASE + 3 * H
+        dispatcher.check_hour(mk_act(T13 + 4 * H + 60)) -- 17:01。次は 18:00
+        expect(dispatcher.check_hour(mk_act(T13 + 11 * 60))):toBe(nil) -- 13:11
+        expect(found):toBe(nil)
+        expect(dispatcher._get_internal_state().next_hour_unix):toBe(T13 + H)
+        pass(T13 + 11 * 60 + 1, T13 + H - 1)
+        expect(type(dispatcher.check_hour(mk_act(T13 + H)))):toBe("thread")
+        expect(found):toBe("時報" .. hh_of(T13 + H))
+    end)
+
+    vtest("スリープ明けに 2 時間進んでも、飛びにせず時報は 1 回、進んだ先の時刻で出る", function()
+        dispatcher.check_hour(mk_act(R0))
+        CLOCK.observe({ id = "OnSysResume", date = mk_date(R0 + 1), dic = {} })
+        local real = R0 + 2 * H + 9 * 60
+        expect(type(dispatcher.check_hour(mk_act(real)))):toBe("thread")
+        expect(found):toBe("時報" .. hh_of(real))
+        expect(CLOCK.epoch()):toBe(0)
+        found = nil
+        expect(dispatcher.check_hour(mk_act(real + 1))):toBe(nil)
+        expect(found):toBe(nil)
+    end)
+
+    vtest("おしゃべりの間隔は、+3 時間の飛びの分だけずれない", function()
+        dispatcher.check_talk(mk_act(R0))
+        local n = dispatcher._get_internal_state().next_talk_time - R0
+        pass(R0 + 1, R0 + 10)
+        local jumped = R0 + 11 + 3 * H -- 1 秒たって +3 時間飛んだ
+        expect(dispatcher.check_talk(mk_act(jumped))):toBe(nil)
+        pass(jumped + 1, jumped + n - 12)
+        expect(dispatcher.check_talk(mk_act(jumped + n - 11 - 1))):toBe(nil)
+        expect(type(dispatcher.check_talk(mk_act(jumped + n - 11)))):toBe("thread")
     end)
 end)
