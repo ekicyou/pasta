@@ -220,6 +220,46 @@ type,ghost
     assert!(!temp.path().join("out.nar").exists());
 }
 
+/// 配布フォルダに中身の無い `dic/x.pasta/` があると段 4 で止まり、
+/// 更新ファイルと nar を作らない（Req 4.4）
+#[test]
+fn test_release_folder_matching_pattern_fails_without_update_files() {
+    let temp = TempDir::new().unwrap();
+    let target = temp.path().join("target_ghost");
+    write_min_ghost(&target);
+    // Git は空のフォルダを持てないので、走らせるときに作る
+    fs::create_dir(target.join("ghost/master/dic/x.pasta")).unwrap();
+    fs::write(
+        target.join("install.txt"),
+        "charset,UTF-8\r\ntype,ghost\r\n",
+    )
+    .unwrap();
+
+    let output = run_release(&temp, &target);
+
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    let stdout = stdout_of(&output);
+    assert!(
+        stdout.contains("[4/6] Validating dictionaries..."),
+        "{stdout}"
+    );
+    assert!(
+        stdout.lines().any(|l| l
+            == "ghost/master/dic/x.pasta: 誤り: 辞書のパターンに一致するフォルダです。pasta.dll はこのフォルダを辞書として読めず、ゴーストを読み込めません"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("[5/6]"), "{stdout}");
+    let stderr = stderr_of(&output);
+    assert!(
+        stderr.contains(
+            "Error: dictionary validation found 1 error(s); update files and NAR were not created"
+        ),
+        "stderr: {stderr:?}"
+    );
+    assert!(!temp.path().join("release_out/updates.txt").exists());
+    assert!(!temp.path().join("out.nar").exists());
+}
+
 /// release を target / release_out / out.nar の配置で実行する
 fn run_release(temp: &TempDir, target: &Path) -> Output {
     run(&[
