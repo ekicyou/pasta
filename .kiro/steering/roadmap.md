@@ -292,8 +292,8 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 - **ゴースト側の形（開発者の決定「案C」）**: 奥から、`\1` のシェル（窓。台詞を持たない）、`\0` の縦書きバルーン 1 枚（`vertical,1`。SSP 2.8.80 から標準）、`\0` のシェル（ぱすたとセキュリティボール）。右の枠から左の枠へは、同じバルーンの中で `\_l[x,y]` で飛ぶ。シェルの無い相手役（おじさん・男の子・ギャル・妹）は、ぱすたと同じ `\0` のバルーンに出す。
 - **`actor-display-style`（spec）**: アクターごとの表示の装い（文字の色など）を pasta.toml で決め、`おじさん：やあ。` のとおりに書いて出せるようにする。1 つのスポットを複数のアクターで共有する形を正式に支える。同じスポットで話者が替わったときの改行は、もうある（`[ghost] spot_newlines = 1.8` で `\n[180]`）ので、足りないのは装いだけ。ゴースト側の今の試作は、アクター辞書の Lua 関数で回避している（`ぱすた：＠おじさん　やあ。`）が、ネタ帳のとおりに写せないので採らない（些細なことに Lua を出さない方針）。`novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link` と `sakura_builder.lua` を共有するので、同じウェーブに置かない。
-- **budoux の改行の幅（直接実装）**: 下の「Direct Implementation Candidates」。
-- **左の枠へ飛ぶ `\_l`**: spec は起こさない。単語（`＠左の枠`）で包めば足りる見込み。確かめることは下のバックログ。
+- **`vertical-balloon-lines`（spec。2026-10-18 に直接実装の候補「budoux の改行の幅」から格上げ）**: budoux が入れる改行の幅（`budoux_newlines`）、列を動かすタグ（`\n`・`\n[…]`・`\c`・`\_l[…]`）の所で budoux が数え直すこと、選択肢どうしの間の改行の幅（`[ghost]` のキー、既定 1.0。汎用の機能。ぱすたは使わない）。budoux は自分で入れた改行しか知らず、作者が書いた `\n`・`\c` の後も前の列の字数を数え続ける（横書きでも起きている今の不具合）。方式は「budoux がタグを見て数え直す」（`act:budoux_reset()` のような明示の手段は採らない）。左の枠の短い列（`\_l` の後の幅）とトークンをまたいだ字数は、要件定義で決める。要件定義は Opus。`actor-display-style` とは `sakura_builder.lua`（選択肢どうしの間）を共有するので、同じウェーブに置かない。
+- **左の枠へ飛ぶ `\_l`**: 飛ぶのは単語（ゴースト側の `＠左`）で足りる。budoux の数え直しは `vertical-balloon-lines` が持つ。
 
 ## リリース（`release` スキル）
 
@@ -339,6 +339,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-variable-scope, novel-checkpoint-rollback, novel-save-slots, shell-element-click, call-attribute-filter（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
 - [ ] actor-display-style -- アクターごとの表示の装い（文字の色など）を pasta.toml で決め、スポットが替わったときと同じスポットで話者が替わったときに出し入れする。1 つのスポットを複数のアクターで共有する形を正式に支える（窓際のぱすたさんのシェルの無い相手役。2026-10-18 起票）。0.5.0 に入れる。`sakura_builder.lua` を共有する `novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link` と同じウェーブに置かない。Dependencies: none
+- [ ] vertical-balloon-lines -- 縦書きのバルーンの列の扱い。budoux が入れる改行の幅（`budoux_newlines`）、列を動かすタグ（`\n`・`\n[…]`・`\c`・`\_l[…]`）の所での budoux の数え直し（作者が書いた `\n`・`\c` の後も数え続ける今の不具合の直しを含む）、選択肢どうしの間の改行の幅（窓際のぱすたさん。2026-10-18 起票、直接実装の候補から格上げ）。0.5.0 に入れる。`sakura_builder.lua` を共有する `actor-display-style` と同じウェーブに置かない。Dependencies: none
 
 ## Existing Spec Updates
 
@@ -349,7 +350,6 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 ## Direct Implementation Candidates
 
-- [ ] budoux の改行の幅（2026-10-18、窓際のぱすたさんからの要望。0.5.0）-- アクター設定に `budoux_newlines`（倍率。既定 1.0 で今のまま `\n`、1.8 なら `\n[180]`）を足し、budoux が入れる改行をその幅にする。`spot_newlines`・`choice_newlines` と同じ書き方にそろえる。縦書きのバルーンで、折り返した列だけ間隔が詰まるのを防ぐ。直す所は `crates/pasta_lua/src/sakura_script/line_breaker.rs` の改行を足す 1 か所（163 行）と、アクターの表から `budoux` を読む `sakura_script/mod.rs`（126〜153 行）、テスト、マニュアル（`reference/pasta-toml.md`・`lua/modules/pasta-sakura-script.md`）、スキル references の再生成。バルーンの先頭に改行を入れない今の動きは保つ。選択肢と選択肢の間の `\n`（`sakura_builder.lua` 249・349 行）は変えない。縦書きでは選択肢どうしの列が詰まって見えるが、開発者が画面を見て「デザイン的には詰まって見えていて良い」と決めた（2026-10-18）。spec にしないのは、キー 1 つの追加で、既定の動きを変えないため。
 - [ ] areka の `doc/PASTA_PROFILE.md` §5 の作例 -- 手書きの `\w[500]` が、「pasta の上流の欠陥」と誤って記録されている。pasta のエンジンは `\w[` を出さない（2026-10-10 に確かめた）。`novel-areka-contract` の依頼に添えて、areka の側で直してもらう。pasta の側に直す物は無い。
 
 ## バックログ（brief なし・保留）
@@ -391,7 +391,6 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - 並列負荷で時々落ちる TCP のテスト（2026-10-07 棚卸、`act-token-grouping-fix`・`scene-identity-format` の実装メモ）— `runtime_toggle_e2e_*`・`hook_panic_*`。
 - マニュアルのメニューのテストが持つ mdBook の写し（2026-10-10 棚卸、`manual-claudia-theme` の実装メモ）— `book/tools/theme-menu-test.mjs` は、mdBook 0.5.4 の `book.js` のキー操作の処理を写して持つ。mdBook の版を上げるときに合わせる（CI は 0.5.3 に固定）。
 - 配布版の hello-pasta に会話の変化を足すときの指針（2026-10-10 棚卸、`hello-pasta-tutorial-stages` の実装メモ）— emo2 開発からの知見「1 つの場面に 3 通り」は、段階の形を固定した辞書では満たせない。配布版に変化を足すことになったら、その動機から起票する。
-- 縦書きの左の枠へ飛ぶ `\_l`（2026-10-18、窓際のぱすたさん）— ゴースト側は、同じバルーンの中で `\_l[-295,0]` で左の枠へ飛ぶ。単語（`＠左の枠`）で包めば足りる見込み。確かめること: 単語の値に書いた `\_l` がそのまま出力まで届くか。budoux が `\_l` で飛んだ後も列の字数を数え続けないか（幅の状態は台詞のトークンごとに戻る。`line_breaker.rs`）。困った事例が出たら起票する。
 - budoux の自動改行の禁則（2026-10-05、ghost_dev「emo2 開発」からの申し送り）— `line_breaker.rs` の `break_lines_impl` は禁則を見ない。BudouX の語の区切りの直前で改行するだけである。
   - 方針は JIS X 4051 どおりとする。リーダー（`‥…`）は行頭に置いてよい。並びの途中では分けない。
   - この方針では、申し送りの実例「イイジャン！／‥‥ええと、」は正しい組版になる。

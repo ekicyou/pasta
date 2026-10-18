@@ -64,7 +64,7 @@ font = { color = "90,110,140" }   # キーの形は要件定義で決める
 ## Scope
 
 - **In**: pasta.toml のアクターの装いのキー、出力の組み立てでの出し入れ、スポットの共有の正式な支え（同じスポットで話者が替わるときの改行・立ち絵の復旧を確かめるテスト）、`pasta_check validate` が装いのキーの書き間違いを報告するか（要件で決める）、マニュアル（`reference/pasta-toml.md`・`grammar/actor-dictionary.md`・`reference/shell.md`・`internals/talk-output.md`）、スキル references の再生成。
-- **Out**: budoux の改行の幅（roadmap の「Direct Implementation Candidates」）。縦書きの左の枠へ飛ぶ `\_l`（バックログ）。ノベル向けの話者名（`novel-talk-flow`）。
+- **Out**: budoux の改行の幅・数え直しと、選択肢どうしの間の改行の幅（`vertical-balloon-lines`。`sakura_builder.lua` を共有するので同じウェーブに置かない）。縦書きの左の枠へ飛ぶ `\_l`（ゴースト側の単語）。ノベル向けの話者名（`novel-talk-flow`）。
 
 ## Boundary Candidates
 
