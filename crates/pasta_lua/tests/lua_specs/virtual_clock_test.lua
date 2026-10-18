@@ -298,6 +298,29 @@ describe("CLOCK.now / CLOCK.date - 今の時刻と日付の表（Unit 3）", fun
             expect(CLOCK.date(req)):toBeNil()
         end)
     end)
+
+    test("unix の無い日付の表では now は nil、date は req.date そのもので、合図も見ない", function()
+        with_clock(function(CLOCK)
+            CLOCK.observe(mk_reply(BASE, BASE + 3600))
+            local req = mk_req("OnMinuteChange", BASE + 30)
+            req.date.unix = nil
+            expect(CLOCK.now(req)):toBeNil()
+            expect(CLOCK.date(req)):toBe(req.date)
+            expect(CLOCK.observe(req)):toBe(false)
+            expect(CLOCK._get_state().probe_armed):toBe(false)
+        end)
+    end)
+
+    test("unix の無い日付の表の返事は読めない値として扱い、ずれを 0 にする", function()
+        with_clock(function(CLOCK, warns)
+            CLOCK.observe(mk_reply(BASE, BASE + 3600))
+            local reply = mk_reply(BASE, BASE + 7200)
+            reply.date.unix = nil
+            expect(CLOCK.observe(reply)):toBe(true)
+            expect(CLOCK.offset()):toBe(0)
+            expect(#warns):toBe(1)
+        end)
+    end)
 end)
 
 describe("CLOCK.take_probe - 読み取りのスクリプト（Unit 4）", function()

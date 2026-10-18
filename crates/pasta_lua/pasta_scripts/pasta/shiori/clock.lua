@@ -95,7 +95,7 @@ end
 local function receive_reply(req)
     if has_pasta_time(req) then return end
     local t = virtual_unix(req.reference)
-    if t == nil or req.date == nil then
+    if t == nil or req.date == nil or req.date.unix == nil then
         local ref = req.reference or {}
         log.warn(string.format(
             "[clock] 仮想時刻の値が読めないため OS の時計を使う: %s,%s,%s,%s,%s,%s",
@@ -140,22 +140,22 @@ function M.take_probe(req)
     return PROBE_SCRIPT
 end
 
---- 時報の判定に使う「今」の Unix 時刻。req.date が無ければ nil。
+--- 時報の判定に使う「今」の Unix 時刻。req.date（か、その unix）が無ければ nil。
 ---@param req ClockRequest
 ---@return integer|nil
 function M.now(req)
-    if req.date == nil then return nil end
+    if req.date == nil or req.date.unix == nil then return nil end
     if has_pasta_time(req) then return req.date.unix end
     return req.date.unix + _offset
 end
 
---- 日時変数に使う「今」の日付の表。req.date が無ければ nil。
+--- 日時変数に使う「今」の日付の表。req.date が無ければ nil。unix の無い表はずれを足せないので、そのまま返す。
 --- 仮想の日付は新しい表で返す（req.date を書き換えない）。
 ---@param req ClockRequest
 ---@return PastaDate|nil
 function M.date(req)
     if req.date == nil then return nil end
-    if _offset == 0 or has_pasta_time(req) then return req.date end
+    if _offset == 0 or has_pasta_time(req) or req.date.unix == nil then return req.date end
     local unix = req.date.unix + _offset
     local t = os.date("*t", unix)
     local wday = t.wday - 1
