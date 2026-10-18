@@ -112,7 +112,7 @@
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 9.6_
 
 - [ ] 6. 文書
-- [ ] 6.1 (P) pasta.toml のリファレンスに `[loader] ffi` を足す
+- [x] 6.1 (P) pasta.toml のリファレンスに `[loader] ffi` を足す
   - 3 分類表の行、フルリファレンステンプレートの行、有効にすると Lua から任意のメモリに触れられ、書き間違いで SSP ごと落ちうる注意
   - 完了の状態: `book/src/reference/pasta-toml.md` に上の 3 つがあり、マニュアルのビルドと既存の文書の検査が通る
   - _Boundary: Docs_
