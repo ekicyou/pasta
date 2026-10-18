@@ -384,6 +384,7 @@ ffi.load(name, ...)                                  … ラッパ（Lua）
 - [lua-passthrough](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-passthrough) — 辞書ディレクトリの `.lua` の素通し
 - [pasta-config-restructure](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-config-restructure) — `pasta.toml` の構成と既定値の補完
 - [pasta-toml-logging-consistency](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-toml-logging-consistency) — `[lua]` の設定型の撤去、段階 1.5 のフォールバック
+- [lua-cmodule-robustness](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/lua-cmodule-robustness) — `[loader] ffi` と `ffi.load` の置き換え（長パス・非 ANSI パス・隣の依存 DLL）
 
 ---
 
