@@ -71,7 +71,7 @@
   - _Requirements: 7.1, 7.3_
 
 - [ ] 5. マニュアルとスキル references
-- [ ] 5.1 `reference/pasta-toml.md` に新しいキーを載せ、照合テストを足す
+- [x] 5.1 `reference/pasta-toml.md` に新しいキーを載せ、照合テストを足す
   - 分類の表・テンプレート・`[ghost]` の表・`after_choice_newlines` の節、アクターの表の `budoux_newlines`・`budoux_jump`、`budoux` の節の数え直し・持ち越し・SSP が自分で折り返した分は数えられないこと・縦書きの作例、`choice_newlines` の節からの案内を書く
   - マニュアルの表と設定の既定値の照合テストに `after_choice_newlines`（1.0）の行を足し、通る
   - _Depends: 3.1_

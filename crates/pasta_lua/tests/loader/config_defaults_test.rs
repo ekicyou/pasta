@@ -323,6 +323,11 @@ fn config_reference_doc_matches_ssot() {
     expect_row("spot_newlines", format!("{:?}", d.spot_newlines));
     // choice_newlines も浮動小数（"1.5"）。choice-line-layout 5.5。
     expect_row("choice_newlines", format!("{:?}", d.choice_newlines));
+    // after_choice_newlines も浮動小数（"1.0"）。vertical-balloon-lines 7.4。
+    expect_row(
+        "after_choice_newlines",
+        format!("{:?}", d.after_choice_newlines),
+    );
 }
 
 /// Lua フォールバックリテラルが SSOT と一致すること（R5.5）。
