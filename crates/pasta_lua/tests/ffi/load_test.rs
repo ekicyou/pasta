@@ -5,8 +5,8 @@ use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
 use crate::dll_fixture::{
-    DEEP_MIN_LEN, LONG_PATHS_DISABLED_ENV, VIA_DEP_VALUE, Which,
-    assert_long_paths_disabled_if_required, deep_dir, loaded_module, lock, put_dlls, short_path,
+    DEEP_MIN_LEN, VIA_DEP_VALUE, Which, assert_long_paths_disabled_if_required, deep_dir,
+    loaded_module, lock, put_dlls, short_path,
 };
 
 /// 拡張長の接頭辞 `\\?\` を付けたパス（`path` は `/` を含まない絶対パス）。
@@ -60,15 +60,13 @@ fn deep_path_dll_resolves_neighbour_dep_without_long_path_setting() {
     let file = dir.join("foo.dll");
     assert!(file.as_os_str().len() > DEEP_MIN_LEN);
     assert_long_paths_disabled_if_required(&file);
-    // マニフェストの無いテストの EXE では、ファイルの API は設定によらず長いパスを通さないが、
-    // ローダーは LongPathsEnabled=1 だけで接頭辞なしの長いパスを読める（2026-10-19 の開発機で実測）。
-    // 設定が本当に切れていることは、接頭辞なしの LoadLibraryExW が失敗することでも確かめる。
-    if std::env::var(LONG_PATHS_DISABLED_ENV).as_deref() == Ok("1") {
-        assert!(
-            load_and_call_via_dep(&file).is_err(),
-            "{LONG_PATHS_DISABLED_ENV}=1 なのに接頭辞なしの長いパスの DLL が読めた（長いパスの設定が切れていない）"
-        );
-    }
+    // ローダー（LoadLibrary*）は長いパスの設定の外にある。MS の文書の対象 API の一覧に無く、開発機の実測でも
+    // CI（run 39139127106・LongPathsEnabled=0）でも接頭辞なしの長いパスの DLL が読めた。
+    // なので接頭辞なしの結果は確かめに使わず、記録だけ残す（読めても読めなくても解放まで済ませる）。
+    eprintln!(
+        "long-path probe: unprefixed = {:?}",
+        load_and_call_via_dep(&file)
+    );
 
     let route = match load_and_call_via_dep(&verbatim(&file)) {
         Ok(v) => {

@@ -49,5 +49,5 @@ ctor = "0.2"
 cc = "1"
 
 [target.'cfg(windows)'.dev-dependencies]
-# GetShortPathNameW（8.3 名）・GetFileAttributesW（長いパスの設定が無効な前提の確かめ）
-windows-sys = { workspace = true, features = ["Win32_Storage_FileSystem"] }
+# GetShortPathNameW（8.3 名）・GetFileAttributesW と RegGetValueW（長いパスの設定が無効な前提の確かめ）
+windows-sys = { workspace = true, features = ["Win32_Storage_FileSystem", "Win32_System_Registry"] }

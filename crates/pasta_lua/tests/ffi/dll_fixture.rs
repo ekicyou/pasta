@@ -200,10 +200,16 @@ pub fn short_path(path: &Path) -> PathBuf {
 /// 長いパスの設定が無効な前提を示す環境変数（CI の LongPathCiStep が `1` にする）。
 pub const LONG_PATHS_DISABLED_ENV: &str = "PASTA_TEST_LONG_PATHS_DISABLED";
 
-/// 前提の確かめ（要件 2.5）。環境変数が `1` のとき、接頭辞なしの 260 文字超えの `existing` へ
-/// `GetFileAttributesW` が失敗することを確かめる。通ってしまえば CI の手順が効いていないので失敗にする。
+/// 前提の確かめ（要件 2.5）。環境変数が `1` のとき、次の 2 つを確かめ、どちらかが崩れていれば失敗にする。
+/// - プロセスの側: 接頭辞なしの 260 文字超えの `existing` へ `GetFileAttributesW` が失敗する。
+///   マニフェストの無いテストの EXE ではレジストリによらず失敗するので、これだけでは CI の手順が効いた証にならない。
+/// - OS の側: レジストリの `LongPathsEnabled` が無いか 0（CI の手順が効いている）。
 pub fn assert_long_paths_disabled_if_required(existing: &Path) {
+    use windows_sys::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
     use windows_sys::Win32::Storage::FileSystem::{GetFileAttributesW, INVALID_FILE_ATTRIBUTES};
+    use windows_sys::Win32::System::Registry::{
+        HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RegGetValueW,
+    };
     if std::env::var(LONG_PATHS_DISABLED_ENV).as_deref() != Ok("1") {
         return;
     }
@@ -224,6 +230,28 @@ pub fn assert_long_paths_disabled_if_required(existing: &Path) {
     assert_eq!(
         attrs, INVALID_FILE_ATTRIBUTES,
         "{LONG_PATHS_DISABLED_ENV}=1 なのに接頭辞なしの長いパスが通った（長いパスの設定が切れていない）"
+    );
+
+    let key = wide(OsStr::new(r"SYSTEM\CurrentControlSet\Control\FileSystem"));
+    let name = wide(OsStr::new("LongPathsEnabled"));
+    let mut value: u32 = 0;
+    let mut size = std::mem::size_of::<u32>() as u32;
+    // SAFETY: key・name は NUL 終端の UTF-16。RRF_RT_REG_DWORD なので書き込みは value の 4 バイトに収まり、
+    // size にその大きさを渡している。種類の受け取りは要らないので null。
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_LOCAL_MACHINE,
+            key.as_ptr(),
+            name.as_ptr(),
+            RRF_RT_REG_DWORD,
+            std::ptr::null_mut(),
+            (&raw mut value).cast(),
+            &mut size,
+        )
+    };
+    assert!(
+        status == ERROR_FILE_NOT_FOUND || (status == ERROR_SUCCESS && value == 0),
+        "CI の手順が効いていない（LongPathsEnabled = {value}・RegGetValueW = {status}）"
     );
 }
 

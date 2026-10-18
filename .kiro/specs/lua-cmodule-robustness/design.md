@@ -551,7 +551,7 @@ impl Drop for DllPins { fn drop(&mut self); }
 | `lifetime_test.rs` | 戻り値を捨てて `collectgarbage()` しても関数が呼べる。`ffi.gc(ffi.new("int[1]"), lib.release)` を残したまま VM を落としても落ちない。落とした後は `GetModuleHandleW("foo.dll")` と `GetModuleHandleW("dep.dll")` が NULL。そのあと新しい VM で読み直せる。取り違えで失敗した後は B の DLL が残らない | 7.1–7.4, 9.8 |
 | `compare_test.rs` | FFI だけを開いた素の mlua の VM（元の `ffi.load`）と、ローダーの VM を並べ、同じチャンク名の同じ Lua で `pcall` の結果の型と文言を比べる。場合: 名前だけで無いもの・相対パスで無いもの・`nil` と数の引数・関数の中から呼んだもの（位置が付く）・`pcall(ffi.load, …)` で直接呼んだもの（位置が付かない）。理由の部分は、元の側を ANSI から UTF-8 にしてからバイトで比べる | 6.1–6.5, 9.6 |
 
-- 長いパスの設定が無効な前提（2.5）: 環境変数 `PASTA_TEST_LONG_PATHS_DISABLED=1` のとき、`load_test.rs` の深いパスのテストは、最初に接頭辞なしの 260 文字超えのパスへ `GetFileAttributesW` が失敗することを確かめてから本体を走らせる。前提が成り立たなければ失敗にし、CI の手順が効いていないのに緑になることを防ぐ。
+- 長いパスの設定が無効な前提（2.5）: 環境変数 `PASTA_TEST_LONG_PATHS_DISABLED=1` のとき、`load_test.rs` の深いパスのテストは、本体の前に 2 つを確かめる。プロセスの側は、接頭辞なしの 260 文字超えのパスへ `GetFileAttributesW` が失敗すること（マニフェストの無いテストの EXE ではレジストリによらず失敗するので、これだけでは手順が効いた証にならない）。OS の側は、`RegGetValueW` で読んだ `HKLM\SYSTEM\CurrentControlSet\Control\FileSystem` の `LongPathsEnabled` が無いか 0 であること。どちらかが崩れていれば失敗にし、CI の手順が効いていないのに緑になることを防ぐ。ローダー（`LoadLibrary*`）は長いパスの設定の外にあるので、接頭辞なしの `LoadLibraryExW` の成否は前提の確かめに使わない（記録だけ残す。research の「長いパスの設定が無効な環境」）。
 
 #### LongPathCiStep
 
@@ -566,7 +566,7 @@ impl Drop for DllPins { fn drop(&mut self); }
 - Trigger: `build.yml` の各行列（x86・x64）で、「Run tests」の後。
 - Input / validation: `Set-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem LongPathsEnabled 0` の後、`PASTA_TEST_LONG_PATHS_DISABLED=1` で `cargo test -p pasta_lua --target <triple> --test ffi` を走らせる（ビルド済みなので作り直さない）。
 - Output / destination: CI の結果だけ。ランナーは使い捨てなので元に戻さない。開発機のレジストリは変えない。
-- Idempotency & recovery: 前提の確かめ（FfiTestSuite）が、設定が効いていないことを失敗として見せる。
+- Idempotency & recovery: 前提の確かめ（FfiTestSuite。レジストリの値を直に読む）が、設定が効いていないことを失敗として見せる。
 - 順序: この手順と前提の確かめ・深いパス＋依存 DLL のテストを、実装の**最初のタスク**（試し打ち）として作り、CI で結果を見てから残りを進める。依存 DLL が解けなければ 8.3 名のパスで読む道を試し、それでも満たせなければ開発者の判断を仰ぐ（決定事項の 3）。
 
 #### Docs

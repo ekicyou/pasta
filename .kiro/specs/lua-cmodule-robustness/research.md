@@ -240,6 +240,12 @@ brief は `Cargo.lock` の席を `talk-grapheme-clusters` に渡している。(
 #### 長いパスの設定が無効な環境（申し送り 2.5）
 - **Findings**: マニフェストの無い EXE（`cargo test` の EXE も同じ）は、文書の上では `longPathAware` でないので、レジストリの `LongPathsEnabled` の値によらず長いパスが無効になるはず。2026-10-18 の実測（`LongPathsEnabled=1`・マニフェストなし）で 539 文字の `LoadLibraryExW` が通ったのは、文書の説明と食い違う。どちらが正しいかは、`LongPathsEnabled=0` の機械で確かめるまで分からない。
 - **Implications**: 260 文字以上だけ `\?\` の形にする（Node.js の `process.dlopen` が `\?\` の形を `LoadLibraryExW` に渡しているのと同じ考え方）。CI の各行列で `LongPathsEnabled=0` にして FFI のテストを走らせ、テストの最初に「接頭辞なしの長いパスが本当に通らない」ことを確かめて、設定が効いていないのに緑になるのを防ぐ。開発機のレジストリは変えない。
+- **追記（2026-10-19・タスク 1.2 の試し打ち）**:
+  - ローダー（`LoadLibrary*`）は長いパスの設定の外にある。MS の文書が設定の対象に挙げるのはファイルとフォルダの API だけで、ローダーは一覧に無い。開発機（マニフェストなしの EXE と `longPathAware` の EXE）の実測でも、CI（run 39139127106・`LongPathsEnabled=0`）でも、接頭辞なしの長いパスの DLL が読めた。上の「食い違い」はこれで説明が付く。
+  - そのため「接頭辞なしの長いパスが通らない」ことは前提の確かめに使えない。`GetFileAttributesW` もマニフェストの無い EXE ではレジストリによらず失敗するので、それだけでは手順が効いた証にならない。前提の確かめは `GetFileAttributesW`（プロセスの側）に加え、`RegGetValueW` で `LongPathsEnabled` を直に読む（OS の側。無いか 0 なら成り立つ）。
+  - `\?\` の形で読むと、隣の `dep.dll` も解けて `via_dep()` が呼べる（開発機の x86・x64 で実測）。`LongPathsEnabled=0` の CI での結果は **CI 待ち**。
+  - `\?\` の形で読んだモジュールに `GetModuleFileNameW` が返すパスは、`\?\` の付いた形になる（要件 2.7 のエラーの文言・パスの見せ方に関わる）。
+  - 0.2 の実測で `LoadLibraryExA` が失敗したのは、パスに ANSI に無い文字が入っていたため。ASCII だけの 344 文字のパスなら `LoadLibraryExA` で読める（開発機・`LongPathsEnabled=1`）。
 
 #### テストの並列とプロセスの中の DLL
 - **Findings**: 同じテストのバイナリの中のテストは同じプロセスの別のスレッドで並列に走る。同じ名前の `foo.dll`・`dep.dll` を別のフォルダから読むと、2 つ目は取り違えになり、依存 DLL の無いことのテストは別のテストが読んだ `dep.dll` で通ってしまう。
