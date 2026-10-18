@@ -1,6 +1,6 @@
 -- pasta.shiori.clock 仮想時刻のずれを持つ時計の単体テスト (tutorial-ssp-gaps 2.1)
 -- 合図の見込み・返事からのずれ・今の時刻と日付の表・読み取りのスクリプト
--- Requirements: 2.1, 2.2, 2.6, 2.7, 2.8, 2.9, 7.1, 7.3
+-- Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 7.1, 7.3
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -143,8 +143,10 @@ describe("CLOCK.observe - 合図の見込み（Unit 1）", function()
 
     test("他のイベントは false を返し、何も変えない", function()
         with_clock(function(CLOCK)
-            expect(CLOCK.observe(mk_req("OnSecondChange", BASE + 30))):toBe(false)
-            expect(CLOCK._get_state()):toEqual({ offset = 0, probe_armed = false })
+            expect(CLOCK.observe(mk_req("OnSysSuspend", BASE + 30))):toBe(false)
+            expect(CLOCK._get_state()):toEqual({
+                offset = 0, probe_armed = false, epoch = 0, jump_total = 0, resumed = false,
+            })
         end)
     end)
 end)
@@ -344,6 +346,142 @@ describe("CLOCK.take_probe - 読み取りのスクリプト（Unit 4）", functi
         with_clock(function(CLOCK)
             CLOCK.observe(mk_req("OnMinuteChange", BASE + 30))
             expect(CLOCK.take_probe(mk_req("OnSecondChange", BASE + 31, { dic = XPT }))):toBeNil()
+        end)
+    end)
+end)
+
+
+describe("CLOCK.observe - 時刻の飛び（設計の見直し 1）", function()
+    --- 秒の合図を順に送る
+    local function seconds(CLOCK, list, opts)
+        for _, u in ipairs(list) do
+            expect(CLOCK.observe(mk_req("OnSecondChange", u, opts))):toBe(false)
+        end
+    end
+
+    test("差 1 秒・最初の 1 回・境目（+90・−2）は飛びにならない", function()
+        with_clock(function(CLOCK)
+            seconds(CLOCK, { BASE, BASE + 1, BASE + 2, BASE + 92, BASE + 90 })
+            local st = CLOCK._get_state()
+            expect(st.epoch):toBe(0)
+            expect(st.jump_total):toBe(0)
+            expect(st.prev_now):toBe(BASE + 90)
+        end)
+    end)
+
+    test("+91 秒・−3 秒で epoch が増え、jump_total が差から 1 を引いた分だけ増える", function()
+        with_clock(function(CLOCK)
+            seconds(CLOCK, { BASE, BASE + 91 })
+            expect(CLOCK.epoch()):toBe(1)
+            expect(CLOCK._get_state().jump_total):toBe(90)
+            seconds(CLOCK, { BASE + 88 })
+            expect(CLOCK.epoch()):toBe(2)
+            expect(CLOCK._get_state().jump_total):toBe(86)
+        end)
+    end)
+
+    test("OnSysResume の後の 1 回の飛びは数えず、その次からは数える", function()
+        with_clock(function(CLOCK)
+            seconds(CLOCK, { BASE })
+            expect(CLOCK.observe(mk_req("OnSysResume", BASE + 1))):toBe(false)
+            expect(CLOCK._get_state().resumed):toBe(true)
+            seconds(CLOCK, { BASE + 3600 })
+            expect(CLOCK.epoch()):toBe(0)
+            expect(CLOCK._get_state().jump_total):toBe(0)
+            expect(CLOCK._get_state().resumed):toBe(false)
+            seconds(CLOCK, { BASE + 7200 })
+            expect(CLOCK.epoch()):toBe(1)
+            expect(CLOCK._get_state().jump_total):toBe(3599)
+        end)
+    end)
+
+    test("OnSysResume の後でも飛ばなかった秒の合図で印は消える", function()
+        with_clock(function(CLOCK)
+            seconds(CLOCK, { BASE })
+            CLOCK.observe(mk_req("OnSysResume", BASE + 1))
+            seconds(CLOCK, { BASE + 1, BASE + 3600 })
+            expect(CLOCK.epoch()):toBe(1)
+        end)
+    end)
+
+    test("X-Pasta-Time 付きは飛びを見ず、prev_now も変えない", function()
+        with_clock(function(CLOCK)
+            seconds(CLOCK, { BASE })
+            seconds(CLOCK, { BASE + 3600, BASE - 3600 }, { dic = XPT })
+            expect(CLOCK.epoch()):toBe(0)
+            expect(CLOCK._get_state().prev_now):toBe(BASE)
+            seconds(CLOCK, { BASE + 1 })
+            expect(CLOCK.epoch()):toBe(0)
+        end)
+    end)
+
+    test("ずれが変わった次の秒の合図も飛びとして数える", function()
+        with_clock(function(CLOCK)
+            seconds(CLOCK, { BASE })
+            CLOCK.observe(mk_reply(BASE + 1, BASE + 1 + 3600))
+            seconds(CLOCK, { BASE + 1 })
+            expect(CLOCK.epoch()):toBe(1)
+            expect(CLOCK._get_state().jump_total):toBe(3600)
+        end)
+    end)
+
+    test("飛びは毎分・毎時の合図の予約を変えない", function()
+        with_clock(function(CLOCK)
+            seconds(CLOCK, { BASE, BASE + 3630 })
+            expect(CLOCK._get_state().probe_armed):toBe(false)
+            CLOCK.observe(mk_req("OnMinuteChange", BASE + 3630))
+            expect(CLOCK._get_state().probe_armed):toBe(true)
+        end)
+    end)
+
+    test("_reset は飛びの状態も初期値に戻す", function()
+        with_clock(function(CLOCK)
+            seconds(CLOCK, { BASE, BASE + 3600 })
+            CLOCK.observe(mk_req("OnSysResume", BASE + 3601))
+            CLOCK._reset()
+            expect(CLOCK._get_state()):toEqual({
+                offset = 0, probe_armed = false, epoch = 0, jump_total = 0, resumed = false,
+            })
+            expect(CLOCK.epoch()):toBe(0)
+        end)
+    end)
+end)
+
+describe("CLOCK.steady - なめらかな時計（設計の見直し 1）", function()
+    test("飛びが無ければ now と同じ、飛んだら now − jump_total", function()
+        with_clock(function(CLOCK)
+            expect(CLOCK.steady(mk_req("OnSecondChange", BASE))):toBe(BASE)
+            CLOCK.observe(mk_req("OnSecondChange", BASE))
+            CLOCK.observe(mk_req("OnSecondChange", BASE + 3 * 3600))
+            expect(CLOCK.steady(mk_req("OnSecondChange", BASE + 3 * 3600))):toBe(BASE + 1)
+            expect(CLOCK.steady(mk_req("OnSecondChange", BASE + 3 * 3600 + 46))):toBe(BASE + 47)
+        end)
+    end)
+
+    test("ずれも足した今から飛びを引く", function()
+        with_clock(function(CLOCK)
+            CLOCK.observe(mk_req("OnSecondChange", BASE))
+            CLOCK.observe(mk_reply(BASE, BASE + 600))
+            CLOCK.observe(mk_req("OnSecondChange", BASE + 1))
+            expect(CLOCK.now(mk_req("OnSecondChange", BASE + 1))):toBe(BASE + 601)
+            expect(CLOCK.steady(mk_req("OnSecondChange", BASE + 1))):toBe(BASE + 1)
+        end)
+    end)
+
+    test("X-Pasta-Time 付きは req.date.unix をそのまま返す", function()
+        with_clock(function(CLOCK)
+            CLOCK.observe(mk_req("OnSecondChange", BASE))
+            CLOCK.observe(mk_req("OnSecondChange", BASE + 3600))
+            expect(CLOCK.steady(mk_req("OnSecondChange", BASE + 5, { dic = XPT }))):toBe(BASE + 5)
+        end)
+    end)
+
+    test("req.date（か unix）が無ければ nil", function()
+        with_clock(function(CLOCK)
+            expect(CLOCK.steady(mk_req("OnSecondChange", nil))):toBeNil()
+            local req = mk_req("OnSecondChange", BASE)
+            req.date.unix = nil
+            expect(CLOCK.steady(req)):toBeNil()
         end)
     end)
 end)

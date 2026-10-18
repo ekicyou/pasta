@@ -7,6 +7,8 @@
 ---     OnPastaClock の返事（Reference0〜5 = 年・月・日・時・分・秒）からずれを決める
 ---   - take_probe: 予約があれば読み取りのスクリプトを 1 回だけ返す
 ---   - now / date: ずれを足した時刻と日付の表（ずれ 0 なら req.date をそのまま返す）
+---   - 時刻の飛び: OnSecondChange ごとに前回の「今」との差を見て、設定し直しなどの飛びを
+---     通し番号（epoch）と飛びの合計に数える。steady は飛びを差し引いた「なめらかな時計」
 ---
 --- 循環参照回避: act.lua と event/init.lua の両方から読まれるため、
 --- pasta.shiori.event.*・pasta.shiori.act・pasta.store を require しない。
@@ -22,6 +24,10 @@ local HOUR_LATE_TOLERANCE = 60
 local HOUR_EARLY_TOLERANCE = 5
 --- この秒数以下のずれは 0（仮想時刻なし）とみなす
 local OFFSET_DEADBAND = 2
+--- 秒の合図の間で「今」がこの秒数より戻ったら時刻の飛びとする（調整つまみ）
+local JUMP_BACK = 2
+--- 秒の合図の間で「今」がこの秒数より進んだら時刻の飛びとする（調整つまみ）
+local JUMP_FORWARD = 90
 
 --- 仮想の日時を読む SSP のスクリプト
 local PROBE_SCRIPT = "\\![get,property,OnPastaClock,system.year,system.month,system.day,"
@@ -54,6 +60,10 @@ local M = {}
 -- Module-local state
 local _offset = 0
 local _probe_armed = false
+local _prev_now = nil      -- 前回の OnSecondChange の「今」
+local _epoch = 0           -- 時刻の飛びの通し番号
+local _jump_total = 0      -- 飛びの合計（秒。ふだんの 1 秒分を除く）
+local _resumed = false     -- OnSysResume の後で、次の 1 回の飛びを数えない
 
 --- X-Pasta-Time（テストの時刻の上書き）があるリクエストか
 ---@param req ClockRequest
@@ -107,6 +117,21 @@ local function receive_reply(req)
     set_offset(t - req.date.unix)
 end
 
+--- 秒の合図ごとに前回の「今」との差を見て、時刻の飛びを数える（X-Pasta-Time 付きは呼ばない）
+---@param now integer
+local function watch_jump(now)
+    if _prev_now ~= nil then
+        local d = now - _prev_now
+        if (d < -JUMP_BACK or d > JUMP_FORWARD) and not _resumed then
+            _epoch = _epoch + 1
+            _jump_total = _jump_total + d - 1
+            log.debug(string.format("[clock] 時刻の飛び: %d 秒", d))
+        end
+    end
+    _resumed = false
+    _prev_now = now
+end
+
 --- 合図と返事を受ける。EVENT.fire が REG より前に、すべてのリクエストで呼ぶ。
 --- 返事（OnPastaClock）を受け取ったときだけ true を返す（呼び元は 204 を返し、REG へ進まない）。
 ---@param req ClockRequest
@@ -117,10 +142,13 @@ function M.observe(req)
         receive_reply(req)
         return true
     end
+    if req.id == "OnSysResume" then _resumed = true end
     if has_pasta_time(req) then return false end
     local now = M.now(req)
     if now == nil then return false end
-    if req.id == "OnMinuteChange" then
+    if req.id == "OnSecondChange" then
+        watch_jump(now)
+    elseif req.id == "OnMinuteChange" then
         local s = now % 60
         if s > MINUTE_TOLERANCE and s < 60 - MINUTE_TOLERANCE then _probe_armed = true end
     elseif req.id == "OnHourTimeSignal" then
@@ -175,6 +203,22 @@ function M.date(req)
     }
 end
 
+--- 飛びを差し引いた「なめらかな時計」。間隔・待ち時間・撫でを数える。req.date（か、その unix）が無ければ nil。
+--- X-Pasta-Time があれば req.date.unix をそのまま返す。
+---@param req ClockRequest
+---@return integer|nil
+function M.steady(req)
+    local now = M.now(req)
+    if now == nil or has_pasta_time(req) then return now end
+    return now - _jump_total
+end
+
+--- 飛びの通し番号。ディスパッチャが「前回見た値から変わったか」で決め直す。
+---@return integer
+function M.epoch()
+    return _epoch
+end
+
 --- 今のずれ（整数秒。0 は仮想時刻なし）。ディスパッチャが「ずれが変わったか」を見るのに使う。
 ---@return integer
 function M.offset()
@@ -185,12 +229,24 @@ end
 function M._reset()
     _offset = 0
     _probe_armed = false
+    _prev_now = nil
+    _epoch = 0
+    _jump_total = 0
+    _resumed = false
 end
 
 --- テスト用: 状態を読む
----@return { offset: integer, probe_armed: boolean }
+---@return { offset: integer, probe_armed: boolean, prev_now: integer|nil,
+---   epoch: integer, jump_total: integer, resumed: boolean }
 function M._get_state()
-    return { offset = _offset, probe_armed = _probe_armed }
+    return {
+        offset = _offset,
+        probe_armed = _probe_armed,
+        prev_now = _prev_now,
+        epoch = _epoch,
+        jump_total = _jump_total,
+        resumed = _resumed,
+    }
 end
 
 return M
