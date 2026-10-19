@@ -291,12 +291,11 @@ fn unload_synchronously_frees_port_for_plain_rebind() {
 }
 
 #[test]
-fn enable_bind_failure_surfaces_debug_error_bind() {
-    // Occupy a concrete loopback port so the backend's bind must fail.
+fn enable_bind_failure_falls_back_to_disabled() {
+    // A second ghost with debugging on finds the port taken by the first one.
     let blocker = std::net::TcpListener::bind("127.0.0.1:0").expect("test listener must bind");
     let taken = blocker.local_addr().expect("bound addr");
 
-    // ALL_SAFE VM: the hook (installed BEFORE the transport bind) needs jit.
     let lua =
         unsafe { mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
     let cfg = DebugConfig {
@@ -305,21 +304,20 @@ fn enable_bind_failure_surfaces_debug_error_bind() {
         ..Default::default()
     };
 
-    // R3.1 / R5.5: a bind failure is surfaced as DebugError::Bind, not a
-    // panic and not a silently disabled backend.
-    let err = enable(&lua, &cfg, None, None).expect_err("bind to an occupied port must fail");
+    // The ghost must still start: no error, no backend.
+    let handle = enable(&lua, &cfg, None, None).expect("bind failure must not fail startup");
     assert!(
-        matches!(err, DebugError::Bind(_)),
-        "expected DebugError::Bind, got: {err:?}"
-    );
-    assert!(
-        format!("{err}").to_lowercase().contains("bind"),
-        "Bind display names the failure: {err}"
+        handle.is_none(),
+        "bind failure => disabled path (no handle)"
     );
 
-    // Clean up the hook the failed enable() left installed (the install
-    // step precedes the bind; the test VM is dropped right after anyway).
-    lua.remove_global_hook();
+    // Same as `enabled = false`: no hook, so the VM keeps JIT on (the hook's
+    // install would have run `jit.off()`).
+    let jit_on: bool = lua
+        .load("return (jit.status())")
+        .eval()
+        .expect("jit.status must be callable");
+    assert!(jit_on, "fallback must not install the hook (jit stays on)");
     drop(blocker);
 }
 
@@ -375,16 +373,17 @@ fn enable_bind_failure_emits_warn_and_no_info() {
         ..Default::default()
     };
 
-    let err = enable(&lua, &cfg, None, None).expect_err("bind to an occupied port must fail");
-    assert!(
-        matches!(err, DebugError::Bind(_)),
-        "expected Bind, got {err:?}"
-    );
+    let handle = enable(&lua, &cfg, None, None).expect("bind failure must not fail startup");
+    assert!(handle.is_none(), "bind failure => disabled path");
 
-    // 2.1/2.3: a warn names the bind failure...
+    // 2.1/2.3: a warn names the bind failure and that startup goes on...
     assert!(
-        logs_contain("debug transport bind failed"),
+        logs_contain("debug transport bind failed; starting without debugging"),
         "bind failure must emit a warn (2.1)"
+    );
+    assert!(
+        logs_contain(&format!("addr={taken}")),
+        "the warn names the attempted addr (2.3)"
     );
     // 2.2: ...and no listening info is emitted on the failure path.
     assert!(
@@ -392,7 +391,6 @@ fn enable_bind_failure_emits_warn_and_no_info() {
         "no listening info must be emitted when the bind fails (2.2)"
     );
 
-    lua.remove_global_hook();
     drop(blocker);
 }
 
