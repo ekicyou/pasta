@@ -102,10 +102,11 @@ else echo "desk: id=$ID repo=$R"; fi
 ```
 
 - `2>&1` で標準エラーの 1 行（`gone:`・`not applied:`・`already running`・断りの文）も同じ出力に入れる。読むのは最後の `exit=<n>` とその前の 1〜2 行だけ。
-- **バックグラウンド**（Bash の `run_in_background`）: `watch`・`merge --wait`・`loadtest --wait`・`stopped --wait`・`resume`。走らせたら、その種類と実行の番号を会話に覚える（「自分の待ち」）。
-- **前景**: `leave`・`merged`・`loaddone`・`cancel`・`loadrunning`、それに 5.7 と訳を調べるときの `status`。
+- **バックグラウンド**（Bash の `run_in_background`）: `watch`・`merge --wait`・`stopped --wait`・`resume`。走らせたら、その種類と実行の番号を会話に覚える（「自分の待ち」）。
+- **前景**: `leave`・`merged`・`cancel`、それに 5.7 と訳を調べるときの `status`。
+- pasta の完了の手順はマージの机だけを取る。排他テストの机・ひとり占めの机（`request`／`return`）は取らない（2026-10-19 開発者の裁定。`cargo test --all` は机なしで回す）。
 
-#### 終わり方の表（どちらのスキルでも同じ）
+#### 終わり方の表（マージの机だけを取る形）
 
 | 終わったもの | 出力 | すること | 要件 |
 |---|---|---|---|
@@ -119,10 +120,9 @@ else echo "desk: id=$ID repo=$R"; fi
 | 再開の待ち | `exit=0`・`stop requested again by <X>` | 作業に戻らず、もう一度 `stopped --wait` | 3.6 |
 | 再開の待ち | `exit=3` | 見張りを立て直して続ける | 3.8 |
 | 再開の待ち | `exit=1`・`a resume wait for <ID> is already running` | 前の再開の待ちが走っている。何もしない（6.4 の失敗に数えない） | 3.10 |
-| `merge --wait`・`loadtest --wait` | `exit=1`・`a merge wait …`／`a load wait … is already running` | 自分の待ちが走っていれば何もしない。覚えが無ければ `cancel --id <ID>` → 申し込み直す → 1 行 | 6.4 |
-| `loaddone` | `exit=3`・`not applied: not the load-test holder` | 机はすでに自分のものでない（記録が消えた など）。返し直さず、1 行伝えて続ける | 4.5, 6.4 |
-| `loadrunning` | `exit=3`・`not applied: the load-test desk already has a holder` | 持ち主にならない。1 行伝え、その計測を記録しないまま開発者の指示を待つ | 4.6 |
-| `leave`・`merged`・`loaddone`・`cancel`・`loadrunning` | `exit=1`・下の 2 行のほか | 標準エラーの 1 行をそのまま伝え、手順書 5 節の終了コード 1 の表に従う。直らなければその回の机の段を止めて最後の報告に残す | 6.3, 6.4 |
+| `merge --wait` | `exit=1`・`a merge wait for <ID> is already running` | 自分の待ちが走っていれば何もしない。覚えが無ければ `cancel --id <ID>` → 申し込み直す → 1 行（`cancel` はマージの机も外すので、マージの机をまだ持っていない番待ちのときだけ） | 6.4 |
+| `merge --wait` | `exit=3`・`not applied: return the test and sole desks before merge`／`not applied: a desk request is waiting; merge after it is granted and returned` | この識別に机の持ち主か机の申し込みが残っている（このスキルは `request` を打たないので、同じ作業木のほかのセッションか残りの記録）。状態を変えずに断られた。`cancel` しない。1 行伝えて開発者の指示を待つ | 6.4 |
+| `leave`・`merged`・`cancel` | `exit=1`・下の 2 行のほか | 標準エラーの 1 行をそのまま伝え、手順書 5 節の終了コード 1 の表に従う。直らなければその回の机の段を止めて最後の報告に残す | 6.3, 6.4 |
 | どれでも | `exit=1`・`state.lock is busy …` | 間を置かずに 1 回だけ呼び直す（実行ファイルが自分で 10 秒待ってから断るので、スキルの側で待たない）。続けば 6.4 | 6.4 |
 | どれでも | `exit=2` | 呼び方の誤り。スキルの文の誤りなので、その回の机の段を止めて最後の報告に残す | 6.4 |
 
@@ -140,7 +140,7 @@ else echo "desk: id=$ID repo=$R"; fi
 
 
 #### 会話が覚えるもの
-- 会話が覚えるもの: 机の段が `on`（`id`・`repo`）か `off`（訳）／見張りの実行の番号／停止の状態（無し・停止要請を受けた・止まった）／負荷テストの机（無し・待っている・持っている）／マージの机（無し・待っている・持っている・自分で外した）／参加を終えたか（実行の終わりの `leave`・`merged` の後。2.8 の外し方の `leave` は数えない）。
+- 会話が覚えるもの: 机の段が `on`（`id`・`repo`）か `off`（訳）／見張りの実行の番号／停止の状態（無し・停止要請を受けた・止まった）／マージの机（無し・待っている・持っている・自分で外した）／参加を終えたか（実行の終わりの `leave`・`merged` の後。2.8 の外し方の `leave` は数えない）。
 - 「今の見張り」は最後に走らせた見張り（2.8 の 1 本を含む）の実行の番号。終わった見張りの 3 は、それが今の見張りのときだけ扱う。立て直す前の古い見張りの終わりは読み流す。
 - 正本はアプリの状態である。会話の覚えが消えても、前置きと終わり方の表だけで元へ戻れる（失うのは 2.7／2.8 の見分けだけで、そのときは 2.8 に倒す）。
 
