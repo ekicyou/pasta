@@ -189,3 +189,8 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - **見つけた穴・古くなった記述**:
   - 「Current State」と「穴」の行番号: `\e` は 284 行 → `sakura_builder.lua` 536 行、間隔の丸めは `virtual_dispatcher.lua` 58〜70 行 → 63〜78 行、止まっている場面の再開は 202〜204 行 → 215〜217 行、アクターの切り替えは 240 行 → 464・468 行（`emit_actor_switch` は 72〜86 行）、段落の区切りは 245・263〜265 行 → 501〜503 行（`put_break`）、Reference を変数へ移す関数は `shiori/act.lua` 161〜190 行 → 171 行から。`line_breaker.rs` 129〜131 行の「トークンごとに数え直す」は直った。
   - 前回の節: `sakura_builder.lua` の 310・346〜347・379 行 → 468・501〜503・536 行。ファイルの大きさは `sakura_builder.lua` 383 → 540、`virtual_dispatcher.lua` 288 → 303、`line_breaker.rs` 462 → 1,134、`sakura_script/mod.rs` 247 → 322、`sections.rs` 344 → 356。
+
+## 申し送り（ontalk-suppression より、2026-10-19）
+
+- 0.4.2 の `ontalk-suppression` が、ランダムトークと時報を止めるスイッチを入れる。`GLOBAL` の `pause_auto_talk`／`resume_auto_talk`（別名 `自動トーク停止`／`自動トーク再開`）で、状態は `STORE` に持ち、`virtual_dispatcher.lua` の `dispatch` が見る。止めるのは OnTalk・OnHour・止まっている場面の続きで、キックは止めない。
+- 本 spec の「ランダムトークと時報の停止」は、新しい止め方を作らず、ノベル向けの設定のときにこのスイッチを常に入れる形で済ませる案を推奨にする。ただし、ノベルの中で作者が `＞自動トーク再開` を呼んだときに、設定とどちらを勝たせるかを要件で決める。

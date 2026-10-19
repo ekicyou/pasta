@@ -103,6 +103,7 @@
 - **Adjacent**:
   - `ponytail-lua-loader`・`ponytail-shiori`（`book/src/internals/shiori.md` の別の節を触る。後から入る側が rebase する）
   - `novel-checkpoint-rollback`（`STORE.co_scene` の扱いを前提にする）
+  - `ontalk-suppression`（0.4.2。`virtual_dispatcher.lua` の `dispatch`・`check_talk` に、止めている間の分岐と、再開した時点での `next_talk_time` の決め直しを足す。こちらが後から入るので、行番号を測り直して合わせる。2026-10-19 の申し送り）
 
 ## Constraints
 
