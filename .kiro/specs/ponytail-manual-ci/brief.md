@@ -106,6 +106,7 @@
 - **Adjacent**:
   - `ponytail-editor-tooling`（tmLanguage を変える。このspec の path filter が入っていれば、マニュアルが再公開される）
   - `ponytail-check-release`（`release.yml` は触らない）
+  - `pasta-check-release-asset`（0.4.2・先に入る）: `release.yml` の build job に x64 のターゲット・`pasta_check.zip` の検査と upload を足し、`github-release.ps1` の添付を 5 つにする。監査のやり直しと修正は、その後の形に合わせる。
 
 ## Constraints
 
