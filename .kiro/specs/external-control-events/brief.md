@@ -91,13 +91,17 @@ OnPastaSetSaveVariable  Reference0=初回済み  Reference1=null
 
 ## Upstream / Downstream
 
-- **Upstream**: イベントの振り分け（`pasta.shiori.event` の `EVENT.fire`・`EVENT.drive`・`REG`）、`＞` の呼び出しの解決（`act:call`・`find_handler`・`[scene.alias]`）、`@json`
+- **Upstream**: `scene-play-event`（0.4.2。先に入る。外からのイベントの既定のハンドラの置き方・マニュアルの既定ハンドラーの表・見つからないときの出し方の先例になる）、イベントの振り分け（`pasta.shiori.event` の `EVENT.fire`・`EVENT.drive`・`REG`）、`＞` の呼び出しの解決（`act:call`・`find_handler`・`[scene.alias]`）、`@json`
 - **Downstream**: MCP からの試験の手順（`ontalk-suppression` の `自動トーク停止` を外から呼ぶ）。将来の値の読み出しのイベント
 
 ## Existing Spec Touchpoints
 
 - **Extends**: なし（新しい境界）
 - **Adjacent**
+  - `scene-play-event`（0.4.2。2026-10-19 起票）: この spec の**前に入る**（Dependencies に置いた。開発者の指示で、どちらが先でもよいが入口が近いため順番を決めた）。
+    - 共有するもの: `pasta/shiori/event/` に新しいモジュールを置く形、`event/init.lua` L78-81 の `require`、マニュアル `lua/shiori-events.md` の既定ハンドラーの表。ハンドラから先の Lua のコードは別物である。
+    - 役目の違い: `OnPastaScene` はデバッグのときだけ、書いた名前どおりの完全一致でシーンを再生する（ローカルシーンも指せる）。`OnPastaCallFunction` はいつでも、辞書の `＞XXX` と同じ探し方（前方一致・`GLOBAL` の関数）で呼ぶ。マニュアルでは、2 つの違いが 1 か所で分かるように書く。
+    - 要件で決めること: 見つからないときの出し方を、あちらの「失敗を出す仕組み（`failure-output-unification`・`runtime-error-balloon`）」に揃えるか。推奨は揃えること（ログには必ず残り、バルーンに出るのはデバッグのときだけなので、Approach の「エラーの応答にはしない」と矛盾しない）。
   - `ontalk-suppression`（0.4.2）: 主な呼び先（`自動トーク停止`／`自動トーク再開`）を作る。この spec の実装は、それが無くても動く（呼び先が見つからなければ 204）。共有するのはマニュアルの `lua/shiori-events.md` だけで、節は別である。並べられる。後から入る側がマニュアルの差分を合わせる。
   - `pasta-check-release-asset`（0.4.2）: ファイルを共有しない。並べられる。
   - `ponytail-lua-scripts`（0.4.3）: `pasta_scripts/` の既存のファイルを触る。この spec は新しいファイルと `event/init.lua` の `require` の 1 行だけなので、ぶつかりは小さい。
