@@ -80,9 +80,10 @@ use super::wiring;
 /// wires the SKELETON only — the consumer LOGIC is tasks 5.x.
 ///
 /// # Errors
-/// [`DebugError::Bind`] if the DAP listener fails to bind; [`DebugError::Vm`] if
-/// the hook install fails (`mlua::Error` is stringified at the boundary, it is
-/// `!Send`). The disabled path never errors.
+/// [`DebugError::Vm`] if the hook install fails (`mlua::Error` is stringified at
+/// the boundary, it is `!Send`). A DAP listener that fails to bind (port taken
+/// by another ghost) is NOT an error: it logs a `warn` and returns `Ok(None)`,
+/// so the ghost starts without debugging. The disabled path never errors.
 ///
 /// # Scene-kick sink injection (pasta-scene-kick tasks 2.3 / 2.4 — `KickSinkSeam`)
 ///
@@ -106,6 +107,37 @@ pub fn enable(
         // and `kick_sink` (if any) are simply dropped here — the disabled gate
         // never consumes them, so the kick path stays inert (R2.6).
         return Ok(None);
+    }
+
+    // I/O side FIRST: bind the transport before anything touches `lua`. If the
+    // port is taken (typically a second ghost with debugging on in the same
+    // baseware), warn and fall back to the disabled path so the ghost still
+    // starts — no hook, no thread, no `std_debug`, exactly like `enabled = false`.
+    // The bound addr is read NOW and stored in the handle, because the transport
+    // is moved into the socket-bridge thread (it is `!Sync`, single-owner).
+    let transport = match Transport::start(cfg.listen) {
+        Ok(transport) => transport,
+        Err(e) => {
+            // The enabled gate guarantees `Some` (R5.5 only materialises a listen
+            // addr when enabled); bind it before applying `%` (Display).
+            let Some(listen) = cfg.listen else {
+                unreachable!("enabled => cfg.listen is Some (R5.5)")
+            };
+            tracing::warn!(
+                addr = %listen,
+                error = %e,
+                "debug transport bind failed; starting without debugging"
+            );
+            return Ok(None);
+        }
+    };
+    let local_addr = transport.local_addr();
+
+    // 1.1/1.3/1.4/1.5 (success info): one line carrying the REAL bound loopback
+    // addr (`local_addr()`'s `Some`, defensively matched). On port 0 this is the
+    // OS-assigned port read back from the transport.
+    if let Some(addr) = local_addr {
+        tracing::info!(addr = %addr, "debug backend listening");
     }
 
     // Effective present-mode cell (task 5.5 / requirement 6.3): initialise the
@@ -164,31 +196,8 @@ pub fn enable(
     let session = DebugSession::new(breakpoints.clone(), cmd_rx, event_tx)
         .with_source_map(source_map.clone(), cfg.source_mode)
         .with_shared_mode(Some(shared_mode.clone()));
+    // A failed install drops `transport`, whose Drop joins and frees the port.
     crate::debug::hook::install(lua, session).map_err(|e| DebugError::Vm(e.to_string()))?;
-
-    // (4) I/O side: bind the transport (None → no port; Some → bind + accept one
-    // client). A bind failure surfaces as DebugError::Bind (R3.1 / R5.5). The
-    // bound addr is read NOW and stored in the handle, because the transport is
-    // moved into the socket-bridge thread (it is `!Sync`, single-owner).
-    let transport = Transport::start(cfg.listen).map_err(|e| {
-        // 2.1/2.3 (failure warn): name the attempted bind addr + io cause, then
-        // propagate `DebugError::Bind` unchanged. `cfg.listen` is `Option`, so
-        // bind it (the enabled gate guarantees `Some` — R5.5 only materialises a
-        // listen addr when enabled) before applying `%` (Display).
-        let Some(listen) = cfg.listen else {
-            unreachable!("enabled => cfg.listen is Some (R5.5)")
-        };
-        tracing::warn!(addr = %listen, error = %e, "debug transport bind failed");
-        e
-    })?;
-    let local_addr = transport.local_addr();
-
-    // 1.1/1.3/1.4/1.5 (success info): one line carrying the REAL bound loopback
-    // addr (`local_addr()`'s `Some`, defensively matched). On port 0 this is the
-    // OS-assigned port read back from the transport.
-    if let Some(addr) = local_addr {
-        tracing::info!(addr = %addr, "debug backend listening");
-    }
 
     // (5) Shared DAP adapter (seq counter + per-kind FIFO request correlation),
     // mutated by BOTH the socket bridge and the event encoder → Arc<Mutex<…>>.

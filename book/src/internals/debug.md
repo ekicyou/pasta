@@ -129,19 +129,21 @@ TCP 127.0.0.1:<port> ── DAP クライアント（1 接続だけ）
 
 ```text
 enable
- 1. SharedSourceMode を cfg.source_mode で初期化する
- 2. SourceMapWiring { source_map, source_mode } を作る（マップは提示モードに関わらず渡す）
- 3. BreakpointSet を作る
- 4. cmd（SessionCommand）と event（SessionEvent）のチャネルを作り、event の送信端を 1 本複製する
- 5. DebugSession を作り、ソースマップ・cfg.source_mode・共有の実効モードを注入する
- 6. hook::install(lua, session)        … jit.off() と行フック。失敗は DebugError::Vm
- 7. Transport::start(cfg.listen)       … bind の失敗は warn ログと DebugError::Bind
+ 1. Transport::start(cfg.listen)       … bind に失敗したら warn ログを出して Ok(None)（無効と同じ）
     成功したら "debug backend listening" と実際のアドレスを info ログに出す
+ 2. SharedSourceMode を cfg.source_mode で初期化する
+ 3. SourceMapWiring { source_map, source_mode } を作る（マップは提示モードに関わらず渡す）
+ 4. BreakpointSet を作る
+ 5. cmd（SessionCommand）と event（SessionEvent）のチャネルを作り、event の送信端を 1 本複製する
+ 6. DebugSession を作り、ソースマップ・cfg.source_mode・共有の実効モードを注入する
+ 7. hook::install(lua, session)        … jit.off() と行フック。失敗は DebugError::Vm
  8. DapAdapter を Arc<Mutex<…>> で作り、encoder → bridge のフレーム用チャネルを作る
  9. socket bridge スレッドを起こす（Transport・BreakpointSet・cmd の送信端・SourceMapWiring・KickSink を移す）
 10. event encoder スレッドを起こす
 11. DebugHandle（設定・待ち受けアドレス・停止フラグ・2 本のスレッド・複製した event の送信端）を返す
 ```
+
+bind を `lua` に触れる前に行うのは、ポートが取れなかったときに、フックも `jit.off()` も残さず無効と同じ状態で起動を続けるためである。同じベースウェアでデバッグを有効にしたゴーストを 2 体起動すると、2 体目がここに当たる。
 
 `enable` は `with_config_and_source_map` の最後（VM を作って `@pasta_search` などを登録した後で、`@pasta_config` などの登録と起動モジュールの `require` より前）に呼ばれる。そのため起動モジュールの評価中から行フックが働く。ポート 0 を指定したときは OS が割り当てたポートが `DebugHandle::local_addr` から読め、`PastaLuaRuntime::debug_local_addr` がそれを返す。
 
