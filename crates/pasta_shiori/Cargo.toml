@@ -39,7 +39,7 @@ arc-swap.workspace = true
 windows-sys = { workspace = true, features = ["Win32_System_Threading"] }
 
 [build-dependencies]
-# pasta.dll のプロパティ「詳細」にファイル/製品バージョンを出す VERSIONINFO を埋め込む。
+# pasta.dll のプロパティ「詳細」にファイル/製品バージョンを出す VERSIONINFO と、アイコン（res/pasta.ico）を埋め込む。
 # 非 Windows ターゲットでは何もしない。
 embed-resource.workspace = true
 
