@@ -91,7 +91,7 @@ Select skills for the current task even when steering/spec context is already av
 
 For each task (one at a time):
 
-**Desk** (see "Desk coordination (areka-impl-watch)"): before each task apply Desk timing 2 (stop request, load-test step detection, desk-free tasks while waiting); on a granted turn Desk timings 3; on a stop request Desk timing 4, then Desk timing 5 on resume; Desk timings 8 and 9 whenever they occur.
+**Desk** (see "Desk coordination (areka-impl-watch)"): before each task apply Desk timing 2 (stop request, load-test detection by the desk criteria, desk-free tasks while waiting); on a `MISSING: ... desk` answer, a granted turn or a `DESK_RUN_DONE` answer Desk timing 3; on a stop request Desk timing 4, then Desk timing 5 on resume; Desk timings 8 and 9 whenever they occur.
 
 **a) Dispatch implementer**:
 - Read `templates/implementer-prompt.md` from this skill's directory
@@ -119,7 +119,8 @@ For each task (one at a time):
 - If `STATUS` is missing, ambiguous, or replaced with prose, re-dispatch the implementer once requesting the exact structured status block only. Do NOT proceed to review without a parseable `READY_FOR_REVIEW | BLOCKED | NEEDS_CONTEXT` value.
 - **READY_FOR_REVIEW** → proceed to review
 - **BLOCKED** → dispatch debug subagent (see section below); do NOT immediately skip
-- **NEEDS_CONTEXT** with `MISSING: load-test desk` → request the desk and re-dispatch per "Desk coordination (areka-impl-watch)" (not counted as the one re-dispatch below, no effort escalation)
+- **NEEDS_CONTEXT** with `MISSING: exclusive-test desk` or `MISSING: load-test desks` → request the desk and continue the same subagent per Desk timing 3 (not counted as the one re-dispatch below, no effort escalation)
+- **NEEDS_CONTEXT** with `DESK_RUN_DONE` → return the desk at once and, if red, continue fixing without it per Desk timing 3 (not counted as the one re-dispatch below, no effort escalation)
 - **NEEDS_CONTEXT** → re-dispatch once with the requested additional context; if still unresolved → dispatch debug subagent
 
 **c) Review the task**:
@@ -132,6 +133,7 @@ For each task (one at a time):
     - The implementer's status report (for reference only — reviewer must verify independently)
   - The reviewer must apply the `kiro-review` protocol to this task-local review.
   - Preserve the existing task-specific context: task text, spec refs, `_Boundary:_` scope, validation commands, implementer report, and the actual `git diff` as the primary source of truth.
+  - Validation commands for the reviewer leave out UI-test and load-test steps unless the main conversation holds the desk for them at this handoff, and the reviewer prompt then carries the no-desk sentence ("Test commands for the reviewer" in "Desk coordination (areka-impl-watch)")
   - The reviewer subagent will run `git diff` itself to read the actual code changes and verify against the spec
   - Dispatch via **Agent tool** as a fresh subagent
 - If review mode is `inline`:
@@ -185,7 +187,7 @@ For each task (one at a time):
 
 #### Manual Mode (main context)
 
-For each selected task (the same Desk timing 2, 3, 4, 5, 8 and 9 as in Autonomous mode apply; with no implementer, timing 3's `loaddone` comes as soon as the measuring step is done):
+For each selected task (the same Desk timing 2, 3, 4, 5, 8 and 9 as in Autonomous mode apply; with no implementer, the main conversation requests the load-test desks before starting a task that contains a load test (timing 2) and the exclusive-test desk before entering a UI test that stands up areka, runs the step once after the turn, and runs `return` as soon as that run ends, per the Manual-mode bullet of timing 3):
 
 **1. Build Task Brief**:
 Before writing any code, read the relevant sections of requirements.md and design.md for this task and clarify:
@@ -209,7 +211,7 @@ Before writing any code, read the relevant sections of requirements.md and desig
 
 ### Step 4: Final Validation
 
-**Desk**: before this step apply Desk timing 6 (not stopped, not holding the load-test desk). When the run ends in any way (GO, NO-GO stop, MANUAL_VERIFY_REQUIRED stop, STOP_FOR_HUMAN, missing debug report stop, BLOCKED, developer abandon, or all tasks BLOCKED) apply Desk timing 7 (`leave`), in both modes.
+**Desk**: before this step apply Desk timing 6 (not stopped, holding no desk). When the run ends in any way (GO, NO-GO stop, MANUAL_VERIFY_REQUIRED stop, STOP_FOR_HUMAN, missing debug report stop, BLOCKED, developer abandon, or all tasks BLOCKED) apply Desk timing 7 (`leave`), in both modes.
 
 **Autonomous mode**:
 - After all tasks complete, run `/kiro-validate-impl {feature}` as a GO/NO-GO gate
@@ -236,11 +238,24 @@ For tasks that add or change behavior, enforce RED → GREEN with a feature flag
 
 ## Desk coordination (areka-impl-watch)
 
-Parallel sessions share the desks of the console app `areka-impl-watch.exe` (participants, stop requests, the load-test desk, the merge desk). The app's state is the source of truth; this section is the convention for calling it. The app and its runbook live in the areka repository (runbook: `C:\home\maz\git\areka\doc\impl-watch.md`); pasta only calls the installed exe.
+Parallel sessions share the desks of the console app `areka-impl-watch.exe`: the **implementation desk** (one per machine; every working participant is on it, and a load test can hold it alone as the **sole desk**, which stops everyone else), the **exclusive-test desk** (one per machine; one holder at a time; in pasta taken only for UI tests that stand up areka; it never stops anyone) and the **merge desk** (one per repository; `kiro-complete` takes it, this skill never does). The app's state is the source of truth; this section is the convention for calling it. The app and its runbook live in the areka repository (runbook: `C:\home\maz\git\areka\doc\impl-watch.md`); pasta only calls the installed exe.
 
 - **Only the main conversation calls desk commands.** Implementer, reviewer, debugger and validator subagents never run `areka-impl-watch.exe` (one session = one participant).
 - **One session per worktree uses the desk.** Two sessions in the same worktree get the same id and remove each other's watch.
 - The desk is a helper. When it cannot be used, skip the desk steps for this run only and keep working; never let the desk stop implementation.
+- Hold the exclusive-test desk only while a step that needs it runs, never while implementing or fixing. Other sessions keep implementing while you wait for it or hold it.
+
+### Desk criteria (pasta's version of section 1 "判定の基準" of `C:\home\maz\git\areka\doc\impl-watch.md`)
+
+pasta narrows the first row to UI tests that stand up areka: pasta's own full test (`cargo test --all`) takes no exclusive-test desk (developer decision 2026-10-19).
+
+| Step | Desk to take |
+|---|---|
+| A UI test that stands up areka or its windows on the real desktop | exclusive-test desk (`--desk test`) |
+| Quiet-CPU measurement, deliberate CPU-load reproduction, timing comparison (a load test) | exclusive-test desk and sole desk (`--desk test,sole`) |
+| Everything else: `cargo test --all`, `cargo test -p <crate>`, the full test run by `/kiro-validate-impl`, SSP real-machine checks, clippy, format checks, builds | none (they run on the implementation desk) |
+
+Decide from the task text, its `_Boundary:_` and the design's verification description whether a task contains a step of the first or the second row.
 
 ### Desk preflight (one foreground Bash, once at the start of the run)
 
@@ -268,34 +283,47 @@ else echo "desk: id=$ID repo=$R"; fi
 ```
 
 - `2>&1` puts the one stderr line (`gone:`, `not applied:`, `already running`, refusals) into the same output. Read only the last `exit=<n>` and the one or two lines before it.
-- **Background** (Bash `run_in_background`): `watch`, `merge --wait`, `loadtest --wait`, `stopped --wait`, `resume`. When starting one, remember its kind and its run id ("own waits").
-- **Foreground**: `leave`, `merged`, `loaddone`, `cancel`, `loadrunning`, and `status` only when investigating a reason.
+- **Background** (Bash `run_in_background`): `watch`, `merge --wait`, `request --wait`, `stopped --wait`, `resume`. When starting one, remember its kind and its run id ("own waits").
+- **Foreground**: `leave`, `merged`, `return`, `cancel`, `loadrunning`, and `status` only when investigating a reason.
+- The desk requests and the return this skill makes:
+  ```bash
+  "$AREKA_IMPL_WATCH_HOME/areka-impl-watch.exe" request --id <ID> --repo <R> --desk test --purpose "<what>" --wait 2>&1; echo "exit=$?"
+  "$AREKA_IMPL_WATCH_HOME/areka-impl-watch.exe" request --id <ID> --repo <R> --desk test,sole --purpose "<what, roughly how many minutes>" --wait 2>&1; echo "exit=$?"
+  "$AREKA_IMPL_WATCH_HOME/areka-impl-watch.exe" return --id <ID> 2>&1; echo "exit=$?"
+  ```
+  The turn comes as `granted test` or `granted test,sole; stopped: <ids>` (`stopped: none` when nobody had to stop). `return` without `--desk` returns every desk you hold but the merge desk (this skill never holds one) and prints `returned <desks>`.
 
 ### How each ending is handled
 
-| Ended | Output | Do | Req |
-|---|---|---|---|
-| watch | `exit=0`, `stop requested by <X>` | Stop request. Run `stopped --wait` at the stop boundary (Desk timing 4) | 3.1, 3.3 |
-| watch | `exit=0`, `already stopped; ...` | Do not record "stopped" again; run `resume` in the background | 3.7 |
-| watch | `exit=1`, `AREKA_IMPL_WATCH_HOME ...` | Stop the desk steps for this run; one line with the stderr line as is; keep it in the final report | 6.3 |
-| watch | `exit=1`, `a watch wait for <ID> is already running` | If your own watch is running, do nothing. If you have no record of one, run the leftover-watch removal one-liner below in the background and tell one line. If you held a request, request again before that one-liner ends | 2.3, 2.7, 2.8 |
-| watch | `exit=1`, anything else | Start the watch again once, at once. If the restart ends with the same `exit=1` line, follow the exit-1 rows below; if still broken, stop the desk steps for this run and keep it in the final report | 2.6, 6.4 |
-| watch | `exit=3` | If it is not the current watch (the last watch run started), do nothing. If it is the current watch and participation has ended (run-end `leave`), do nothing. Otherwise tell one line, start the watch again and re-submit any request you held (if you held the load-test desk, Desk timing 8) | 2.9, 2.10 |
-| resume wait (`stopped --wait`, `resume`) | `exit=0`, `resumed` | Start the watch again, then continue from the step after where you stopped (Desk timing 5) | 3.5 |
-| resume wait | `exit=0`, `stop requested again by <X>` | Do not go back to work; run `stopped --wait` again | 3.6 |
-| resume wait | `exit=3` | Start the watch again and continue | 3.8 |
-| resume wait | `exit=1`, `a resume wait for <ID> is already running` | The earlier resume wait is still running. Do nothing (not a 6.4 failure) | 3.10 |
-| `merge --wait`, `loadtest --wait` | `exit=1`, `a merge wait ...` / `a load wait ... is already running` | If your own wait is running, do nothing. If you have no record of one: `cancel --id <ID>`, request again, one line | 6.4 |
-| `loaddone` | `exit=3`, `not applied: not the load-test holder` | The desk is no longer yours (e.g. the record was cleared). Do not return it again; tell one line and continue | 4.5, 6.4 |
-| `loadrunning` | `exit=3`, `not applied: the load-test desk already has a holder` | You did not become the holder. Tell one line and wait for the developer's instruction without recording that measurement | 4.6 |
-| `leave`, `merged`, `loaddone`, `cancel`, `loadrunning` | `exit=1`, other than the two rows below | Tell the stderr line as is and follow the exit-code-1 table in section 5 of `C:\home\maz\git\areka\doc\impl-watch.md`. If still broken, stop the desk steps for this run and keep it in the final report | 6.3, 6.4 |
-| any | `exit=1`, `state.lock is busy ...` | Call once more right away (the exe already waits 10 seconds before refusing; do not wait on the skill side). If it repeats, 6.4 | 6.4 |
-| any | `exit=2` | Usage error, i.e. an error in this skill's text. Stop the desk steps for this run and keep it in the final report | 6.4 |
+| Ended | Output | Do |
+|---|---|---|
+| watch | `exit=0`, `stop requested by <X>` | Stop request. Run `stopped --wait` at the stop boundary (Desk timing 4) |
+| watch | `exit=0`, `already stopped; ...` | Do not record "stopped" again; run `resume` in the background |
+| watch | `exit=1`, `AREKA_IMPL_WATCH_HOME ...` | Stop the desk steps for this run; one line with the stderr line as is; keep it in the final report |
+| watch | `exit=1`, `a watch wait for <ID> is already running` | If your own watch is running, do nothing. If you have no record of one, run the leftover-watch removal one-liner below in the background and tell one line. If you held a request, request again before that one-liner ends |
+| watch | `exit=1`, anything else | Start the watch again once, at once. If the restart ends with the same `exit=1` line, follow the exit-1 rows below; if still broken, stop the desk steps for this run and keep it in the final report |
+| watch | `exit=3` | If it is not the current watch (the last watch run started), do nothing. If it is the current watch and participation has ended (run-end `leave`), do nothing. Otherwise tell one line, start the watch again and re-submit any request you held (if you held a desk, Desk timing 8) |
+| resume wait (`stopped --wait`, `resume`) | `exit=0`, `resumed` | Start the watch again, then continue from the step after where you stopped (Desk timing 5) |
+| resume wait | `exit=0`, `stop requested again by <X>` | Do not go back to work; run `stopped --wait` again |
+| resume wait | `exit=3` | Start the watch again and continue |
+| resume wait | `exit=1`, `a resume wait for <ID> is already running` | The earlier resume wait is still running. Do nothing |
+| `request --wait` | `exit=0`, `granted test` / `granted test,sole; stopped: ...` | The turn came (Desk timing 3) |
+| `request --wait` | `exit=3`, `not applied: desks are held; only a merge holder may add the test desk` | You requested while holding a desk. The state did not change. Do not read `status`: `return` the desks you hold, then request again; tell one line |
+| `request --wait` | `exit=3`, `not applied: a different desk request is already waiting` | A request for another desk set is waiting under this id. The state did not change. Do not read `status`; `return` removes no request. If you remember starting that request yourself (e.g. the load-test request of Desk timing 2), do not request again (it is refused again): wait for its turn, finish that turn per Desk timing 3 including its `return`, then request again; tell one line. If you have no record of one, it is a leftover of an earlier session in this worktree (same id) and its turn would hold the desk with nobody to return it: `cancel --id <ID>` in the foreground, request again at once, one line (`cancel` also drops any merge desk or merge request under this id; this skill holds none, and only one session per worktree uses the desk) |
+| `request --wait` | `exit=3`, `not applied: a merge request is waiting; ...` | This skill never requests the merge desk, so another session in this worktree or a leftover record is waiting for it under this id. The state did not change. Do not `cancel` it (that would drop the other session's merge request); tell one line and wait for the developer's instruction |
+| `request --wait` | `exit=3`, `gone: request gone` | The request was dropped (cancel, run end, reclaimed, cleared). If you ran `cancel` yourself, do nothing. Otherwise tell one line, start the watch again first, then request again (if you held a desk, Desk timing 8) |
+| `request --wait` | `exit=1`, `a request wait for <ID> is already running` | If your own wait is running, do nothing. If you have no record of one: `cancel --id <ID>`, request again, one line |
+| `return` | `exit=3`, `not applied: not the holder of that desk` / `not applied: holds no desk to return` | The desk is no longer yours (e.g. the record was cleared). Do not return it again; tell one line and continue |
+| `return` | `exit=3`, `not applied: a running load test returns test and sole together` | Call `return --id <ID>` again without `--desk` |
+| `loadrunning` | `exit=3`, `not applied: the test desk or the sole desk already has a holder` / `not applied: a merge request is waiting; ...` | You did not become the holder. Tell one line and wait for the developer's instruction without recording that measurement |
+| `leave`, `merged`, `return`, `cancel`, `loadrunning` | `exit=1`, other than the two rows below | Tell the stderr line as is and follow the exit-code-1 table in section 5 of `C:\home\maz\git\areka\doc\impl-watch.md`. If still broken, stop the desk steps for this run and keep it in the final report |
+| any | `exit=1`, `state.lock is busy ...` | Call once more right away (the exe already waits 10 seconds before refusing; do not wait on the skill side). If it repeats, stop the desk steps for this run and keep it in the final report |
+| any | `exit=2` | Usage error, i.e. an error in this skill's text. Stop the desk steps for this run and keep it in the final report |
 
 - Restarts and re-submissions happen once each, even when two waits end back to back for the same event. A second one ending in `already running` is harmless.
-- Read endings by their output text. Your memory of "is this my watch" decides only the 2.7 / 2.8 split of `already running`.
+- Read endings by their output text. Your memory of "is this my watch / wait / request" decides only the own-or-leftover split of `already running` and `a different desk request is already waiting`.
 
-**Removing a leftover watch** (2.8): a leftover watch from an earlier session keeps holding this id's watch lock until its next poll (every second) sees that its record is gone after `leave`; an immediate restart would hit that lock. So remove, wait and restart in one background Bash, and wake the session only once at its end:
+**Removing a leftover watch**: a leftover watch from an earlier session keeps holding this id's watch lock until its next poll (every second) sees that its record is gone after `leave`; an immediate restart would hit that lock. So remove, wait and restart in one background Bash, and wake the session only once at its end:
 
 ```bash
 "$AREKA_IMPL_WATCH_HOME/areka-impl-watch.exe" leave --id <ID> 2>&1; sleep 3; "$AREKA_IMPL_WATCH_HOME/areka-impl-watch.exe" watch --id <ID> --repo <R> --name <feature> 2>&1; echo "exit=$?"
@@ -303,46 +331,54 @@ else echo "desk: id=$ID repo=$R"; fi
 
 - `sleep 3` is three poll intervals. Read only the last `exit=` and the watch lines (not the `leave` line). Remember this run as the current watch.
 - This `leave` does not count as ending participation (only the run-end `leave` does).
-- If this one-liner ends in `already running` again, do not repeat 2.8; follow 6.4.
+- If this one-liner ends in `already running` again, do not repeat it; stop the desk steps for this run and keep it in the final report.
 
 ### What the conversation remembers
 
 - Desk steps `on` (`id`, `repo`) or `off` (reason).
-- The run id of the current watch: the last watch run started (including the 2.8 one-liner). An `exit=3` of an ended watch is handled only when it is the current watch; endings of older watches are read and ignored.
-- Stop state (none / stop requested / stopped) and the load-test desk (none / waiting / held).
-- Whether participation has ended (after the run-end `leave`; the `leave` inside the 2.8 one-liner does not count).
-- The app's state is the source of truth. If this memory is lost, the preflight and the ending table are enough to recover; only the 2.7 / 2.8 split is lost, and then fall to 2.8.
+- The run id of the current watch: the last watch run started (including the leftover-removal one-liner). An `exit=3` of an ended watch is handled only when it is the current watch; endings of older watches are read and ignored.
+- Stop state (none / stop requested / stopped), the exclusive-test desk (none / waiting / held) and the sole desk (none / waiting / held).
+- Which subagent (or Manual-mode step) a desk request is for, so the turn goes back to it, and the subagents still waiting for that desk behind it (Desk timing 3).
+- Whether participation has ended (after the run-end `leave`; the `leave` inside the leftover-removal one-liner does not count).
+- The app's state is the source of truth. If this memory is lost, the preflight and the ending table are enough to recover; only the own-or-leftover split of `already running` and `a different desk request is already waiting` is lost, and then treat it as a leftover.
 
 ### Desk timings (Autonomous and Manual)
 
 The execution steps point here as "Desk timing N". Every command uses the call form above. While desk steps are `off`, skip all of them.
 
-1. **End of Preflight**: run the desk preflight. On `desk: skip ...`, follow its bullet above and go on without the desk (6.1, 6.2). On `desk: id=<ID> repo=<R>`, before the first task start the watch in the background (2.1):
+1. **End of Preflight**: run the desk preflight. On `desk: skip ...`, follow its bullet above and go on without the desk. On `desk: id=<ID> repo=<R>`, before the first task start the watch in the background:
    ```bash
    "$AREKA_IMPL_WATCH_HOME/areka-impl-watch.exe" watch --id <ID> --repo <R> --name <feature> 2>&1; echo "exit=$?"
    ```
 2. **Before each task**:
-   - If a stop request has come, do not start the next task (3.4); go to timing 4.
-   - Decide from the task text, its `_Boundary:_` and the design's verification description whether the task contains a machine-exclusive step (quiet-CPU measurement, deliberate CPU-load reproduction, timing comparison). Ordinary tests (crate tests, clippy, `cargo test --all`) do not count (4.2). If it does, request the load-test desk in the background and do not hand over (dispatch, or in Manual mode start) that task until the turn comes (4.1):
-     ```bash
-     "$AREKA_IMPL_WATCH_HOME/areka-impl-watch.exe" loadtest --id <ID> --repo <R> --purpose "<what, roughly how many minutes>" --wait 2>&1; echo "exit=$?"
-     ```
-   - While waiting for the turn, continue tasks whose dependencies are done and that need no desk. If none are left, tell one line `負荷テストの机の番待ち` and end the turn (4.3).
-3. **Turn granted** (`granted load; stopped: ...`): if it was granted while stopped, start the watch again once (4.4). Hand that task over (Autonomous: dispatch with the line `The load-test desk is held.` added to the prompt). As soon as it is done (the implementer returns, success or not), run `loaddone --id <ID>` in the foreground (4.5). If review or remediation needs to measure again, request again (timing 2).
-4. **Stop request** (watch `stop requested by <X>`): carry the current task through implementer → review → verification → `[x]` → commit; never cut a running test or subagent (3.1). At that commit boundary run `stopped --id <ID> --wait` in the background, tell one line `負荷テストのために止まった（停止要請: <X>）` and end the turn (3.2). If the next thing to do is a load-test request, run `stopped --wait` first and request after it (3.9). If no work is in progress (e.g. the turn ended waiting for the load-test desk), you are already at the boundary: run `stopped --wait` at once.
-5. **Resume**: per the ending table. On `resumed`, start the watch again, then go on to the next task without waiting for developer input (3.5).
-6. **Before Step 4 (final validation)**: confirm you are not stopped (no stop request pending) and do not hold the load-test desk (3.4). Otherwise finish timing 3 or 4 first.
-7. **Run end**, any end of the run (GO, NO-GO stop, MANUAL_VERIFY_REQUIRED stop, STOP_FOR_HUMAN, missing debug report stop, BLOCKED, developer abandon, or all tasks BLOCKED): run `leave` in the foreground (2.5). An `exit=3` of a watch or wait that ends after it needs nothing (2.10). While waiting for completion approval the session is not a participant (2.4).
+   - If a stop request has come, do not start the next task; go to timing 4.
+   - Decide with the desk criteria whether the task contains a load test (second row). If it does, request `--desk test,sole --purpose "<what, roughly how many minutes>" --wait` in the background and do not hand over (dispatch, or in Manual mode start) that task until the turn comes.
+   - If the task contains only first-row steps (UI tests that stand up areka), hand it over without requesting: no desk is held while implementing. The implementer stops before such a step and asks for the desk (timing 3).
+   - While waiting for a turn, continue tasks whose dependencies are done and that need no desk. A task needs no desk only if, by the desk criteria, it contains neither a first-row step (UI test that stands up areka) nor a second-row step (load test): a task that may come back with `MISSING: exclusive-test desk` is not desk-free while a request is waiting (its request would be refused with `a different desk request is already waiting`). If none are left, tell one line `負荷テストの机の番待ち` (or `排他テストの机の番待ち` when waiting for `--desk test`) and end the turn.
+3. **Desk requests and turns**:
+   - Implementer or debugger returns `NEEDS_CONTEXT` with `MISSING: exclusive-test desk: <what>`: request `--desk test --purpose "<what>" --wait` in the background. On `granted test`, tell the same subagent to continue (SendMessage) with the line `The exclusive-test desk is held.`; if it cannot be continued, re-dispatch with the original prompt and that line added.
+   - `MISSING: load-test desks: <what>`: the same with `--desk test,sole --purpose "<what, roughly how many minutes>"` and the line `The exclusive-test desk and the sole desk are held.`
+   - Load-test turn requested in timing 2 (`granted test,sole; stopped: ...`): hand that task over with the line `The exclusive-test desk and the sole desk are held.` added to the prompt.
+   - A `granted test,sole` that came while you were stopped: start the watch again once before handing over.
+   - As soon as the subagent holding a desk comes back, with `DESK_RUN_DONE: <result>` or any other answer, pass or fail, run `return --id <ID>` in the foreground. Never keep a desk while fixing. If the run was red, tell the same subagent to continue fixing without the desk (SendMessage; re-dispatch only if it cannot be continued); the rerun asks for the desk again through `MISSING`. Each red run costs two round trips.
+   - One desk request at a time: a `MISSING` that comes while a request or a held desk is already for another subagent is not requested yet (a same-set request would be accepted without a turn of its own); remember that subagent as waiting, and request for it right after the first one's `return`.
+   - These requests, continuations and re-dispatches count neither as the one `NEEDS_CONTEXT` re-dispatch nor as an effort escalation.
+   - Manual mode (the main conversation runs the task): the load-test desks are requested before the task (timing 2); request the exclusive-test desk before entering a first-row step. Run the step once after the turn comes, and `return` as soon as the run ends, pass or fail; fix without the desk and request again before rerunning.
+4. **Stop request** (watch `stop requested by <X>`): carry the current task through implementer → review → verification → `[x]` → commit; never cut a running test or subagent. A first-row step inside that task still takes the exclusive-test desk through timing 3. At that commit boundary, if you hold the exclusive-test desk, `return` it first; then run `stopped --id <ID> --wait` in the background, tell one line `負荷テストのために止まった（停止要請: <X>）` and end the turn. If the next thing to do is a load-test request, run `stopped --wait` first and request after it. If no work is in progress (e.g. the turn ended waiting for a desk), you are already at the boundary: run `stopped --wait` at once.
+5. **Resume**: per the ending table. On `resumed`, start the watch again, then go on to the next task without waiting for developer input.
+6. **Step 4 (final validation)**: before it, confirm you are not stopped (no stop request pending) and hold no desk; otherwise finish timing 3 or 4 first. Then call `/kiro-validate-impl` without a desk (in pasta its full test is not a first-row step).
+7. **Run end**, any end of the run (GO, NO-GO stop, MANUAL_VERIFY_REQUIRED stop, STOP_FOR_HUMAN, missing debug report stop, BLOCKED, developer abandon, or all tasks BLOCKED): run `leave` in the foreground (it also drops any desk and request you still have). An `exit=3` of a watch or wait that ends after it needs nothing. While waiting for completion approval the session is not a participant.
    ```bash
    "$AREKA_IMPL_WATCH_HOME/areka-impl-watch.exe" leave --id <ID> 2>&1; echo "exit=$?"
    ```
-8. **`exit=3` of the watch or the turn wait while holding the load-test desk**: do not start the next measurement; start the watch, request the load-test desk again, and continue measuring only after the turn comes (4.7).
-9. **Only when the developer says to record a load test that is already running**: `loadrunning --id <ID> --repo <R> --purpose "<what>"` in the foreground, and `loaddone --id <ID>` when it is done (4.6).
+8. **`exit=3` of the watch or the turn wait while holding the exclusive-test desk or the sole desk**: do not start the next run; start the watch, request the same desks again, and continue only after the turn comes.
+9. **Only when the developer says to record a load test that is already running**: `loadrunning --id <ID> --repo <R> --purpose "<what>"` in the foreground, and `return --id <ID>` when it is done.
 
-**Two sentences for the implementer and the debugger**: on every dispatch (re-dispatches included), append them verbatim to the end of the prompt. While desk steps are `off`, append only the first: the load-test desk does not exist this run, so machine-exclusive steps go ahead without it (6.1). The templates stay unchanged.
-- `Do not run areka-impl-watch.exe; the controller owns the desk commands.` (1.6)
-- `Do not run a machine-exclusive step (quiet-CPU measurement, deliberate CPU-load reproduction, timing comparison) unless this prompt says the load-test desk is held. If the task needs one, stop before it and report NEEDS_CONTEXT with "MISSING: load-test desk: <what and roughly how long>".`
-- When an implementer returns `MISSING: load-test desk`, request the load-test desk as in timing 2; when the turn comes, re-dispatch with `The load-test desk is held.` added (timing 3). This re-dispatch counts neither as the one `NEEDS_CONTEXT` re-dispatch nor as an effort escalation (4.1).
+**Test commands for the reviewer**: give the reviewer a first- or second-row step in `TEST_COMMANDS` / `SMOKE_COMMANDS` only if the main conversation holds the exclusive-test desk (or both desks) at the time of that handoff. Normally leave those steps out; the reviewer reads the evidence of the implementer's desk-held run (`DESK_RUN_DONE`). When you hold no desk at that handoff, add this sentence to the reviewer prompt (`kiro-review` stays unchanged): `Do not run UI tests that stand up areka, or load tests; the controller holds no desk for them now, so read the implementer's DESK_RUN_DONE evidence instead.`
+
+**Two sentences for the implementer and the debugger**: on every dispatch (re-dispatches included), append them verbatim to the end of the prompt. While desk steps are `off`, append only the first: no desk exists this run, so UI tests that stand up areka and load tests go ahead without one. The templates stay unchanged.
+- `Do not run areka-impl-watch.exe; the controller owns the desk commands.`
+- `Run a UI test that stands up areka or its windows on the real desktop only when this prompt says the exclusive-test desk is held, and a load test (quiet-CPU measurement, deliberate CPU-load reproduction, timing comparison) only when it says the exclusive-test desk and the sole desk are held; everything else (cargo test --all, crate tests, SSP checks, clippy, format checks, builds) needs no desk. If the task needs a desk that is not held, stop before that step and report NEEDS_CONTEXT with "MISSING: exclusive-test desk: <what>" or "MISSING: load-test desks: <what and roughly how long>". When a desk is said to be held, run the step that needs it once and come back at once, pass or fail: even when it is red, do not fix and rerun while holding the desk, but report NEEDS_CONTEXT with "DESK_RUN_DONE: <result summary>".`
 
 ### Never
 
@@ -351,7 +387,7 @@ The execution steps point here as "Desk timing N". Every command uses the call f
 - Never stop another session's watch or wait processes (no `kill` by guess). Leftovers are removed from the record with `leave` / `cancel` and end on their own.
 - Never call `clear` (the whole-state clear).
 - No polling, no timed loops, no periodic `status`. In the normal flow read neither `status` nor `status.md`; the session wakes only when a wait command ends.
-- One line to the developer per desk event.
+- One line to the developer per desk event. Waiting for a desk turn or for a resume is not a stop for approval.
 
 ### When the exe is missing (`desk: skip no-exe`)
 
