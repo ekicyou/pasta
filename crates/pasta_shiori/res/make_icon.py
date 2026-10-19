@@ -4,7 +4,7 @@
 潰れるので「pasta」の代わりに点 3 つ（…）を置く。Windows の Edge（SVG の描画）と Pillow を使う。
 
     python make_icon.py <repo>/img/pasta.svg <作業フォルダ>
-    → <作業フォルダ>/pasta.ico をこのフォルダへコピーする（preview.png は目視確認用）
+    → <作業フォルダ>/pasta.ico と pasta-{16..256}.png をこのフォルダへコピーする（preview.png は目視確認用）
 """
 import re, subprocess, sys, time
 from pathlib import Path
@@ -72,7 +72,7 @@ DOTS = {16: (72, 200), 24: (52, 170), 32: (52, 170)}
 imgs = {s: with_dots(*DOTS[s]).resize((s, s), Image.LANCZOS) for s in SMALL}
 imgs |= {s: with_text.resize((s, s), Image.LANCZOS) for s in LARGE}
 for s, im in imgs.items():
-    im.save(out_dir / f"icon-{s}.png")
+    im.save(out_dir / f"pasta-{s}.png")
 imgs[256].save(out_dir / "pasta.ico", sizes=[(s, s) for s in imgs],
                append_images=[imgs[s] for s in sorted(imgs) if s != 256])
 
