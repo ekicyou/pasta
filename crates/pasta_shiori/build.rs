@@ -3,6 +3,8 @@
 //! pasta.dll に VERSIONINFO リソースを埋め込み、エクスプローラーのプロパティ「詳細」タブで
 //! ファイルバージョン／製品バージョンを視認できるようにする。版数はワークスペースの
 //! `version`（CARGO_PKG_VERSION）が唯一の正本で、リリース時の手動同期は不要。
+//! あわせて ICON リソース（res/pasta.ico）も埋め込む。ただしエクスプローラーは .dll を種類共通の
+//! アイコンで描くため、見えるのはアイコン選択ダイアログやリソースビューアなどに限られる。
 //!
 //! .rc は OUT_DIR に生成する（rc.exe へのマクロ文字列受け渡しのエスケープを避けるため）。
 //! 非 Windows ターゲット（docs.rs 等）では embed-resource が何もしない。
@@ -58,6 +60,16 @@ BEGIN
 END
 "#
     );
+    // DLL のアイコン（res/make_icon.py で img/pasta.svg から作る）。
+    // .rc の文字列ではバックスラッシュがエスケープになるため二重にする。
+    let ico = PathBuf::from(var("CARGO_MANIFEST_DIR"))
+        .join("res")
+        .join("pasta.ico");
+    println!("cargo:rerun-if-changed={}", ico.display());
+    println!("cargo:rerun-if-changed=build.rs");
+    let ico = ico.display().to_string().replace('\\', "\\\\");
+    let rc = format!("1 ICON \"{ico}\"\n{rc}");
+
     let rc_path = PathBuf::from(var("OUT_DIR")).join("pasta.rc");
     std::fs::write(&rc_path, rc).expect("write pasta.rc");
 
