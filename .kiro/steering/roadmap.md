@@ -4,9 +4,10 @@
 
 pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトランスパイルし、組込 LuaJIT で実行する「伺か」の SHIORI（`pasta.dll`）と、その周辺ツール（`pasta_check`・LSP・VSCode 拡張・利用者マニュアル）からなる。Phase 1〜11 で、プロパティアクセス・監査・マニュアル・ソースレベルデバッグ・アクターモデル駆動・配布物の形・現行実装の不具合の一掃までを完了した。2026-10-09 までに、リリースの CI 化、シーン名の別名、式の中の値なしの扱い、マニュアルの着せ替え、段階ごとに学べる hello-pasta の辞書も入った（下の「完了フェーズ」）。2026-10-11 までに、hello-pasta の新しいシェル、9 段目の選択肢の表示の直し、マニュアルの見出しへのリンクの検査も入った。2026-10-15 に、リリースの本文を見どころの紹介にした。2026-10-17 までに、撫で・つつきの反応のショートカット、実行時の失敗の出力の一本化、SSP を起動しない辞書の検査、シェルの説明の章、印刷用のページの廃止、結合テストの古いランタイムの写しの撤去も入った。同じ日に、止まる実行時エラーのバルーン表示と入門ガイドの絵 16 枚が入り、v0.4.0（主題「入門者にやさしく」）を出した。2026-10-18 に、辞書の検査の端のケース、入門ガイドと SSP のずれ（SSP の仮想の時刻を時報に効かせる）、窓際のぱすたさん（ghost_dev）からの要望の 2 本（アクターごとの表示の装い・縦書きのバルーンの列の扱い）が入り、v0.4.1 を出した。
 
-現在の主題は 3 つある。
+現在の主題は 4 つある。
 
 - **0.4.2: 致命的でない不具合**。今の範囲は、ゴーストから DLL の関数を LuaJIT の FFI（`ffi.load`）で、深いパス・ANSI に無い文字を含むフォルダでも呼べるようにする `lua-cmodule-robustness` の 1 本である（2026-10-18 開発者の決定。要件の話し合いで、C モジュールの `require` の道から FFI の道に替えた）。0.4.1 の後に届いた、組み合わせの絵文字が自動ウェイトで割れる不具合（`talk-grapheme-clusters`）は、版がまだ決まっていない（推奨は 0.4.2。下の「0.4.2 の範囲」）。
+- **0.4.3: ponytail 監査の指摘の修正**。2026-10-19 に、プラグインの `/ponytail:ponytail-audit` をクレートと領域ごとに 8 つ並べて走らせた。その指摘を、ソースを共有しない 10 本の spec（`ponytail-*`）に切った。0.4.2 を挟んで、0.4.3 で着手する（2026-10-19 開発者の決定）。下の「0.4.3 の範囲」。
 - **Phase 13: areka でノベルゲーム（0.5.0）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性セマンティクス（シーン属性の保持と読み出し・Call の属性フィルター）も、この道筋に入った。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
@@ -14,7 +15,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 
 このほか、リリース手順（spec `release-workflow`）の CI に合わせた書き換えと、CI での初回のリリース（v0.3.8）は済んだ（2026-10-10）。リリース手順は `release` スキル（`/release`）へ移し、spec `release-workflow` は完了にした（2026-10-11）。
 
-**優先順位（開発者の方針）**: 0.4.0（主題「入門者にやさしく」）は 2026-10-17 に、0.4.1（致命的でない不具合と、窓際のぱすたさんからの要望の 2 本）は 2026-10-18 に出した。次の節目は 0.4.2（致命的でない不具合。2026-10-18）で、その次の 0.5.0 の目標は、areka でノベルゲームが作れるようになること（2026-10-10）。ウェーブは、今のゴールの範囲の spec だけで組む（2026-10-16）。致命的な不具合は、見つかりしだい割り込ませる。致命的でない不具合は、次の 0.4.x に入れるかを開発者が決める（2026-10-17 に 0.4.1 へ回した方針の続き。2026-10-18 に `lua-cmodule-robustness` を 0.4.2 に入れた）。
+**優先順位（開発者の方針）**: 0.4.0（主題「入門者にやさしく」）は 2026-10-17 に、0.4.1（致命的でない不具合と、窓際のぱすたさんからの要望の 2 本）は 2026-10-18 に出した。次の節目は 0.4.2（致命的でない不具合。2026-10-18）、その次が 0.4.3（ponytail 監査の指摘の修正。2026-10-19）で、その次の 0.5.0 の目標は、areka でノベルゲームが作れるようになること（2026-10-10）。ウェーブは、今のゴールの範囲の spec だけで組む（2026-10-16）。致命的な不具合は、見つかりしだい割り込ませる。致命的でない不具合は、次の 0.4.x に入れるかを開発者が決める（2026-10-17 に 0.4.1 へ回した方針の続き。2026-10-18 に `lua-cmodule-robustness` を 0.4.2 に入れた）。
 
 ## 運用ルール
 
@@ -112,6 +113,76 @@ v0.4.1 を出した後に、「ぱすた開発」セッション（窓際のぱ�
 
 別リポジトリで開発中の areka で、ノベルゲームが作れるようになること。pasta の側に何が要るかは、2026-10-10 の discovery で洗い出した。合格ライン・決めたこと・spec の割り方と順番は、下の「Phase 13: areka でノベルゲーム（0.5.0）」にある。
 
+## 0.4.3 の範囲（2026-10-19 開発者の決定）
+
+2026-10-19 に、プラグインの `/ponytail:ponytail-audit` を、クレートと領域ごとに 8 つ並べて走らせた。見たのは、正しさ・安全・負荷・テスト・速さ・無駄の順。指摘は約 100 件で、そのうち Must fix は 9 件だった。それを、ソースを共有しない 10 本に切った。0.4.2 を挟んで、0.4.3 で着手する。
+
+| spec | 中身（Must fix は太字） | 持つ所 | 規模 | 要件定義 |
+| ---- | ---- | ---- | ---- | -------- |
+| ponytail-dsl-parser | **解析が辞書の大きさの 2 乗に遅い**・大きな数の字句が化ける・深い括弧でスタックがあふれる・作られない誤りの型 | `pasta_dsl/src/parser/**`・`error.rs`・`lib.rs` | M | Opus |
+| ponytail-core-registry | シーン表・単語表の死んだ API・`fast_radix_trie` を `BTreeMap` に・作られない誤りの型 | `pasta_core/**`・`pasta_lua/src/search/context.rs`・`pasta_check/src/validate/scenes.rs` | S-M | Opus |
+| ponytail-lua-loader | **読めないセーブを空で上書きして失う**・キャッシュの日付・同じモジュール名が黙って消える・finalize 前の検索・パスの `;`・使われない抽象 | `pasta_lua/src/{loader,runtime,presentation,encoding}/**` | M | Opus |
+| ponytail-lua-transpiler | Lua ブロックの中身に字下げが入る・効かない設定・死んだ状態 | `pasta_lua/src/{code_gen/**,normalize,config,context,transpiler}.rs` | S-M | Opus |
+| ponytail-lua-debug | **Lua 表示で `.pasta` のブレークポイントが死ぬ**・**ステップが抜けない**・数の表示・DAP の無応答・行ごとの費用 | `pasta_lua/src/debug/**` | L | Opus |
+| ponytail-lua-scripts | **`hour_margin` が文字列だと毎秒エラー**・応答の見出しの改行・包む関数の写し・`co_callback`・続きのトークの期限 | `pasta_lua/pasta_scripts/**`・`tests/lua_specs/**` | M | Opus |
+| ponytail-shiori | **unload と FreeLibrary の競り**・理由の無い 500・`Key:` の行が黙って 204・x64 の `long`・テストの競り・テストデータ | `pasta_shiori/**` | L | Opus |
+| ponytail-check-release | **`release` が作者のフォルダを消す**・自分を入れ子に写す・.nar が自分を含む・効かない守り | `pasta_check/src/{release,copy,nar,update_files}.rs`・`pasta_sample_ghost/tests/**` | M | Opus |
+| ponytail-editor-tooling | **1 つの誤りでシーン全体に波線**・箱・行末コメント・Lua のフェンス・tower-lsp の撤去・`host` | `pasta_dsl/src/partial.rs`・`pasta_lsp/**`・`editors/vscode/**`・`pasta_check/src/validate/{syntax,report}.rs` | L | Opus |
+| ponytail-manual-ci | マニュアルの検査が Rust の PR とリリースで走らない・Pages の権限・action の SHA 固定・重複したビルド | `.github/workflows/**`・`book/tools/**` | M | Opus |
+
+- **進め方**（2026-10-19 開発者の決定）
+  - 各 brief の「Current State」は、2026-10-19 の監査の控え（出発点）である。
+  - ギャップ分析で、その領域の `/ponytail:ponytail-audit` をやり直し、控えと突き合わせる。
+  - 要件は「その領域の監査の指摘が、残らず直っている」ことにする。
+  - 修正は、設計以降で行う。
+- **決めたこと**（2026-10-19 開発者の決定）
+  - **公開クレートの pub API は消してよい。** README と `tech.md` に「pasta の部品で、外部から使う安定した面ではない」と書く。10 本のうち先に入る 1 本が、1 回だけ書く。
+  - **0.5.0 で使い手の決まっているものは消さない。**
+    - シーンの属性の絞り込み（`call-attribute-filter` が使う）
+    - `TranspileContext` のファイル属性（`scene-attribute-store` が使う）
+    - 空の `pasta.areka`（`novel-areka-contract` の置き場）
+  - **挙動を変える直しは、各 brief の Desired Outcome のとおりにする。**
+    - 読めないセーブは `.broken` に退避する。
+    - 知らない DAP 要求には「unsupported」で答える。
+    - 大きな数は f64 にする。
+    - `Key:` の行を受け付ける。
+    - `launch.json` の `host` は廃止する。
+    - 同じモジュール名はエラーにする。
+  - **`audit-pasta-check` の Req 1.3/1.4 の、働かない守りは消す。**
+- **境界の戦略**
+  - クレートとディレクトリで切り、どの 2 本もソースのファイルを共有しない。
+  - 共有するのは、次のものだけ。
+    - `Cargo.lock` とルートの `Cargo.toml`：`ponytail-editor-tooling`（tower-lsp）と `ponytail-core-registry`（fast_radix_trie）。席は editor-tooling が持ち、後から入る側が作り直す。
+    - `crates/pasta_lua/src/lib.rs` の再輸出：loader と transpiler。
+    - マニュアルの同じ頁の別の節：`internals/shiori.md`・`transpiler.md`・`execution-model.md`・`debug/*.md`。
+    - `tech.md`・`structure.md` の別の行。
+    - `gen-skill-refs` が作る references。
+  - これらは、後から入る側が rebase で合わせる。
+- **ほかの spec との関係**
+  - `talk-grapheme-clusters`（`sakura_script/`）とは、ファイルが重ならない。
+  - 0.5.0 の 3 本（`novel-areka-contract`・`scene-attribute-store`・`novel-variable-scope`）とも、ファイルが重ならない。
+  - `review-improvement-loop`（常駐）が次に回るときは、この 10 本が入った後のコードを基準にする。
+- **人手の確認**
+  - `ponytail-check-release` は、`.claude/skills/pasta-check/SKILL.md` を直す。分類器が止めるので、その場面で開発者の許可を求める。
+  - `ponytail-shiori` の unload の競りと `Key:` の行は、SSP の実機で確かめられれば確かめる。
+
+開始のときの形（0.4.3 で着手するとき。今はウェーブに入れない。ゴールが 0.4.2 のため）:
+
+```
+Wave 10本
+Opus
+/kiro-start ponytail-dsl-parser
+/kiro-start ponytail-core-registry
+/kiro-start ponytail-lua-loader
+/kiro-start ponytail-lua-transpiler
+/kiro-start ponytail-lua-debug
+/kiro-start ponytail-lua-scripts
+/kiro-start ponytail-shiori
+/kiro-start ponytail-check-release
+/kiro-start ponytail-editor-tooling
+/kiro-start ponytail-manual-ci
+```
+
 ## 棚卸（2026-10-18・main `facd6cf4`）
 
 前回（2026-10-17・main `b4164100`）の後に、0.4.1 の 4 本（辞書の検査の端のケース `pasta-check-validate-edges`・入門ガイドと SSP のずれ `tutorial-ssp-gaps`・アクターごとの表示の装い `actor-display-style`・縦書きのバルーンの列の扱い `vertical-balloon-lines`）が入り、v0.4.1 を出した（リリース CI の run 39123004799。全部の job が 1 回目で通った）。ほかに、シーンのキックの E2E テストの揺れの直しが入り、`lua-cmodule-robustness`（0.4.2）と `talk-grapheme-clusters`（版は未定）を起票した。未完了は 14 本（常駐の `review-improvement-loop` を除く）、完了は 175 本。作業中のブランチは無い（ほかのワークツリーとリモートのブランチは、どれも main に入った後のもの）。前回の記録は git の履歴にある。
@@ -182,7 +253,7 @@ Opus
 - **`talk-grapheme-clusters` の版**。推奨は 0.4.2（致命的でない不具合で、0.4.1 に回した方針の続き）。入れるなら、ウェーブに足して 2 本（どちらも Opus）にできる。
 - **0.5.0 を今のゴールに含めるか**（0.4.2 と並べるか）。推奨は含めること。areka の側が早く動けるよう、`novel-areka-contract` を先に出す方針（2026-10-10）と合う。含めるなら、ウェーブに `novel-areka-contract`（Opus）・`scene-attribute-store`（Fable）・`novel-variable-scope`（Fable）を足せる（`scene-attribute-store` が `partial.rs` と VSCode の文法定義を触らない約束で）。
 - **`scene-anchor-link` の版**。推奨は 0.5.0 の後（新しい文法で、ノベルの合格に要らず、文法・`act.lua`・出力の組み立てを 0.5.0 の 5 本と共有する）。
-- `pasta_shiori` の `string_to_multibyte`（テスト専用）を直すか消すか。直すなら、`util/hglobal/windows_api.rs` に、65001 ならバイト列をそのまま返す 1 行を足すだけ（`pasta_lua` の `encoding/windows.rs` と同じ）。消すなら、`EncoderCodePage::to_bytes` と 2 本のテストも消す。どちらも小さいので、次の `review-improvement-loop` を待たずに決めてよい。
+- `pasta_shiori` の `string_to_multibyte`（テスト専用）を直すか消すか。直すなら、`util/hglobal/windows_api.rs` に、65001 ならバイト列をそのまま返す 1 行を足すだけ（`pasta_lua` の `encoding/windows.rs` と同じ）。消すなら、`EncoderCodePage::to_bytes` と 2 本のテストも消す。どちらも小さいので、次の `review-improvement-loop` を待たずに決めてよい。→ 2026-10-19 に、0.4.3 の `ponytail-shiori` で閉じることにした（コードページの層ごと、テストだけの足場を消す）。
 - `SOUL.md` §2・§5 の「Wait/Sync はマーカーのみ」「全出力は yield」— 構想の文書なので、直すかどうかは開発者が決める。
 - `steering/structure.md` の作り直し（`pasta_shiori` の木と、`pasta_scripts/pasta/` の木が無い。`failure.lua`・`shiori/stop.lua`・`shiori/actor_style.lua`・`shiori/clock.lua` も載っていない。`pasta_lua` のテストの木もほかの所が古い）— `/kiro-steering` で直す。
 - ghost_dev の emo2 開発のフォルダに、入門の撮影のときの `profile/` の保存データとログが残っている（`getting-started-screenshots` の実装メモ）。リポジトリの外なので、片付けるかは開発者が決める。
@@ -329,6 +400,16 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] novel-save-slots -- スロットを選ぶセーブとロード。控えをスロットへ読み書きし、スロットの中身（日時・章の名前）を場面から読めるようにする。Dependencies: novel-checkpoint-rollback
 - [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-variable-scope, novel-checkpoint-rollback, novel-save-slots, shell-element-click, call-attribute-filter（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
+- [ ] ponytail-dsl-parser -- 解析を辞書の大きさに比例させる（span の行と桁を pest の行の索引で取る）。大きな数の字句を、どこでも同じ規則（i64、だめなら f64）にする。深い括弧の入れ子を構文の誤りにする。作られない誤りの型と `PastaFile.span` を消す。0.4.3（2026-10-19 起票。ponytail 監査）。Dependencies: none
+- [ ] ponytail-core-registry -- シーン表・単語表の死んだ API と誤りの型を消し、`fast_radix_trie` を `BTreeMap` に替える。属性の絞り込みは残す（0.5.0 が使う）。0.4.3。Dependencies: none
+- [ ] ponytail-lua-loader -- 読めないセーブを `.broken` に退避する。キャッシュを日付の一致で判定する。同じモジュール名の辞書を読み込みのエラーにする。finalize 前の検索を一定にする。パスの `;`・`?` を断る。`presentation/`・`RendererInjection`・テストだけの構築の道を消す。0.4.3。Dependencies: none
+- [ ] ponytail-lua-transpiler -- Lua ブロックの中身を書いたとおりに出す（字下げと空行）。効かない `LineEnding`・`comment_mode` と、死んだ文脈の状態を消す（ファイル属性は残す）。0.4.3。Dependencies: none
+- [ ] ponytail-lua-debug -- Lua 表示でも `.pasta` のブレークポイントを効かせる。ステップがコルーチンや切断で抜けなくなるのを直す。数の表示と、知らない DAP 要求への応答（unsupported）を直す。行ごとの費用を下げ、死んだコードを消す。0.4.3。Dependencies: none
+- [ ] ponytail-lua-scripts -- 数でない `hour_margin` を既定に戻す。応答の見出しの値の改行を空白にする。続きのトークの期限を呼んだ時刻から数える。包む関数の写しと `co_callback` を消す（`pasta.areka` は残す）。0.4.3。Dependencies: none
+- [ ] ponytail-shiori -- unload が、アクターのスレッドが DLL を出るまで（上限つきで）待つ。フォルダが無いときに理由を出す。`Key:` の行を受け付ける。FFI の型を C に合わせ、テストの競りを無くす。テストだけのコードとデータを出荷物から外す。0.4.3。Dependencies: none
+- [ ] ponytail-check-release -- `release` の `--target`・`--release`・`--copy`・`--nar` の包含の関係を、ファイルに触れる前に断る。読み取りの誤りを、起きた段で報告する。働かない守りとテストの写しを消す。0.4.3。Dependencies: none
+- [ ] ponytail-editor-tooling -- 構文の誤りを本当の位置に 1 件だけ出し、部分解析がシーンを落とさないようにする。箱・行末コメント・Lua のフェンスの色を文法に合わせる。`pasta_lsp` を WASM の解析器だけにする（tower-lsp を撤去）。`host` を廃止する。0.4.3。Dependencies: none
+- [ ] ponytail-manual-ci -- マニュアルの 3 つの検査を、全部の push・PR とリリースの関門で走らせる。Pages の権限を deploy に絞る。公開の job の action を SHA で固定する。重複したビルド・PoC・写しを整理する。Node 22・mdBook 0.5.4 に揃える。0.4.3。Dependencies: none
 
 ## Existing Spec Updates
 
