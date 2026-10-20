@@ -104,6 +104,7 @@
   - `ponytail-lua-loader`・`ponytail-shiori`（`book/src/internals/shiori.md` の別の節を触る。後から入る側が rebase する）
   - `novel-checkpoint-rollback`（`STORE.co_scene` の扱いを前提にする）
   - `ontalk-suppression`（0.4.2。`virtual_dispatcher.lua` の `dispatch`・`check_talk` に、止めている間の分岐と、再開した時点での `next_talk_time` の決め直しを足す。こちらが後から入るので、行番号を測り直して合わせる。2026-10-19 の申し送り）
+  - `chain-talk-interrupt`（0.4.2。`shiori/event/init.lua` の `set_co_scene`・`EVENT.drive` の決まりを変える。台詞を出さなかったシーンは待っている続きに触れず、台詞を出したシーンが捨てるときは `＊チェイントーク中断` を添える。キック・シーン再生・エラーは、はっきり捨てる。こちらが後から入るので、4 番の整理は新しい決まりを保ったまま行う。2026-10-20 の申し送り）
 
 ## Constraints
 
