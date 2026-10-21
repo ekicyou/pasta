@@ -223,3 +223,18 @@ roadmap のバックログにあった「`pasta_core` の `resolve_scene_id` の
   - 候補が複数残る場面の検査は、`references.rs` の Call の腕に置くのが素直で、そうすれば省く理由があるときは走らない（申し送り（pasta-check-validate-edges より）の論点は「空のときだけ走らせる」を推奨にできる）。種類を足すと `FindingKind::ALL` の数も変わる。
   - 「申し送り（pasta-check-validate-edges より）」の 5 行と見出しの前の空行は改行が LF だった。今回 CRLF にそろえた。
   - roadmap 191 行の「辞書の検査に検査を足す spec は `pasta-check-validate-edges` と同じウェーブに置かない」は、完了したので古い（即時修正の候補）。
+
+## 申し送り（2026-10-21 の discovery「PastaDSL機能ヒアリング」より）
+
+ghost_dev の「emo2 開発」「ぱすた開発」セッションに、Lua で組んでいるが DSL で書きたいものを聞いた。いちばん数が多かったのは、**イベントの Reference や保存の変数で振り分けて、合わなければ何も返さない（204）**シーンである。今は「`＊イベント` → `＞lua関数` → `act:call(SCENE.__global_name__, …)`」の 3 段で書き、分岐の中身が 1〜3 行なのに定型が 5〜10 行ある。要件の材料にする実例は次のとおり。
+
+- **2 つの値の等しさ**: `OnShellChanging` は Reference0＝Reference1（同じシェルを選び直した）なら 204、違えば「着替え開始」（emo2 `system.pasta`）。比べる相手が両方とも変数になる。
+- **値との等しさ・空**: `OnUpdateComplete` は Reference0＝`changed` なら「更新成功」、それ以外は「更新無し」（emo2 `update.pasta`）。`OnGhostChanging`／`OnGhostChanged` は Reference0 が空か自分の名前なら 204（emo2 `boot.pasta`・`boot.lua`）。`OnBoot` は Reference6＝`halt` かつ Reference7 が空でないなら「起動halt」。
+- **値の前方一致**: `OnInstallComplete` は Reference0 が `ghost`／`shell`／`balloon` で始まるかで 4 つに分ける（`ghost with balloon` のような複合形があるため）。動的 Call の前方一致は「呼ぶ名前がシーン名の頭」の向きなので、「値がシーン名で始まる」の逆向きには使えない。
+- **複数の条件（かつ）**: 窓際のぱすたさんの `OnMouseClick` は、Reference3＝0・Reference5＝0・Reference4＝`セキュリティボール` で、さらに `＄＊初回待ち` が立っていれば「初回の続き」、立っていなければ「ボール巡回」（`window.pasta`）。`OnMouseEnter`／`OnMouseLeave` は Reference4＝`閉じる` かつ Reference3＝0 で、Status に `talking` を含まないときだけ動く。
+- **数の範囲**: 起動の挨拶を時刻で振り分ける（emo2 は 4 帯、窓際のぱすたさんは 5 帯。`＄時` の範囲）。
+- **一度だけ**: `＊ギャル抽選` は `＄＊ギャル初対面済み` が立っていなければ「ギャル出会い」を出してフラグを立て、立っていれば `＞ギャル_`（窓際のぱすたさん `talk_gal.pasta`）。
+- **候補が無いとき**: 両ゴーストとも「条件に合う候補だけで抽選し、どれも合わなければ 204」を望んだ。中身の無いシーンは今も 204 になる（`act:build()` が nil。`book/src/lua/shiori-events.md` L47-48・L630）ので、「候補なし」を何も出さない扱いにすれば、204 を返す専用の書き方は要らない。
+- **作者が想像した書き方**（文法は想像）: 呼ぶ側の `？＄ｒ０＝＝「changed」　＞更新成功`、受ける側の `＊OnMouseClick　＆r4：セキュリティボール　＆＄＊初回待ち`、前方一致の `＆r0^：shell`。両方向（呼ぶ側で絞る・場面の側に条件を書く）の要望がある。2026-10-10 の決定（分岐は Call の絞り込みで書く）のどちらの向きで受けるかを、要件で決める。
+- **Reference の読み方**: 条件に Reference を使うには、今は先に `＞transfer_req_to_var` が要る（自動では入らない。`book/src/grammar/variables.md` L345・L379）。イベントのシーンで自動で転記する件は roadmap の Direct Implementation Candidates に置いた。こちらの要件で Reference を直接書ける形にするなら、そちらは要らなくなる。
+- 今の DSL だけで書ける分（`OnInstallRefuse` の転記だけ、季節の動的 Call）は、両セッションへ書き方を伝えた。
