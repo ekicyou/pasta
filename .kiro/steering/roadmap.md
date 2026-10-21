@@ -429,7 +429,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] ponytail-manual-ci -- マニュアルの 3 つの検査を、全部の push・PR とリリースの関門で走らせる。Pages の権限を deploy に絞る。公開の job の action を SHA で固定する。重複したビルド・PoC・写しを整理する。Node 22・mdBook 0.5.4 に揃える。0.4.3。Dependencies: pasta-check-release-asset（`release.yml`・`github-release.ps1` を共有する）
 - [ ] scene-exact-match -- 完全一致でシーンを呼ぶ `＞＞シーン名`（同名が複数ならランダム。既存の `search_scene_exact` を使う）と、`pasta.toml` の `[scene] match = "exact"`（`＞`・イベントの受け口・OnTalk・時報・選択肢の飛び先を全部完全一致にする。既定は前方一致）を足す。既定のモードでも、イベントの受け口はイベント ID の直後が英大文字で続く候補（`＊OnInstallCompleteAll` など）を外す。`novel-talk-flow` の完全一致の切り替えを引き取る（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者が承認して `event-scene-exact-match` から広げた）。版は未定。`call-attribute-filter` と同じウェーブに置かない。Dependencies: none
 - [ ] dressup-category-exclusive -- 外見の記録で、着せ替えのカテゴリを既定で排他にする。パーツを着けたら同じカテゴリのほかの ON を記録から外し、`multiple` のカテゴリだけを宣言で外す。作者が OFF の列を毎回出さなくてよくなる（2026-10-21 起票。バックログ「着せ替えの復旧の出力の膨らみ」に事例が出た）。版は未定。Dependencies: none
-- [ ] scene-pick-modes -- 同名シーンの選び方に、重み（`＊OnTalk　＆重み：5`）と定義順の巡回を足す。今は複写と Lua で作っている（2026-10-21 起票。ghost_dev のヒアリング）。版は未定。`call-attribute-filter` と同じウェーブに置かない。Dependencies: scene-attribute-store
+- [ ] scene-pick-modes -- 同名シーンの選び方に、重み（`＊OnTalk　＆重み：5`。1 巡の中で重みの数だけ出る）と順番（`＆順番：番号`、別名 `index`。番号の小さい順に出して最初へ戻る。最後に出した番号を保存する）を足す。単語の値にも重み（`＠挨拶：こんにちは＠３、やあ`）を足す。不正な値は読み込みエラー。今は複写と Lua で作っている（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者と書き方を決めた）。版は未定。`＆重み`・`＆順番` だけを先に特別扱いで読まない（属性の早い部分実装にしない）。`call-attribute-filter` と同じウェーブに置かない。Dependencies: scene-attribute-store
 
 ## Existing Spec Updates
 
