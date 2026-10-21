@@ -47,7 +47,7 @@
 ## Out of Boundary
 
 - 属性の構文と保持（`scene-attribute-store`）
-- イベントの受け口のシーン探しの規則（`event-scene-exact-match`）
+- イベントの受け口のシーン探しの規則（`scene-exact-match`）
 
 ## Upstream / Downstream
 
