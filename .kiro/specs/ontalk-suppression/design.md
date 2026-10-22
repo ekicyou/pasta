@@ -33,7 +33,7 @@
 - 止めている印 `STORE.auto_talk_paused`（真偽。既定 `false`）の意味と、その唯一の書き手（停止・再開の関数と `STORE.reset`）。
 - `GLOBAL` の 4 つの名前（`pause_auto_talk`・`自動トーク停止`・`resume_auto_talk`・`自動トーク再開`）の契約: 引数 `act`（`nil` 可）、戻り値なし、出力を積まない、入れ子を数えない、止めていないときの再開は何もしない。
 - 仮想ディスパッチャの「止めている間の門」の位置（キックの後・時報の前）と、再開したときの時計の決め直し（`restart_timers`）の契約。
-- 止めている間の `＞チェイントーク`（`GLOBAL.yield`／`GLOBAL["チェイントーク"]`）の扱い（ログの警告＋再開）。
+- 止めている間のチェイントーク（`ACT_IMPL.yield`。`＞チェイントーク`・`＞yield`・`＠` の形・Lua から直接の `act:yield()` がすべて通る）の扱い（ログの警告＋再開）。
 - つつき・撫での既定ハンドラで、止めている間に 1〜8 段を飛ばす条件。
 - `pasta_check` の `GLOBAL_NAMES` の 4 つの追加と、その書き写し・一致のテスト。
 - マニュアルの該当の節（呼び出し・SHIORI イベント・Lua の API・検査・内部設計）と、生成するスキル references、手書きの `pasta-ghost-authoring/SKILL.md` の特殊 Call の一覧。
@@ -42,7 +42,7 @@
 
 - `BLOCKED_STATUSES`・`is_blocked`・`KICK.try_dispatch`・`STORE.kick_force` の挙動。触らない。
 - `EVENT.fire`・`EVENT.drive`・`set_co_scene`（続きを捨てる決まり）。触らない。
-- `ACT_IMPL.yield`（`act.lua`）。Lua から直接 `act:yield()` を呼ぶ道は、この spec の警告の対象にしない（Open Question 2）。
+- `GLOBAL.yield`（`global.lua`）。`act:yield()` を呼ぶだけなので触らない（見張りは `ACT_IMPL.yield` に置く）。
 - `CALLBACK.sweep`・`CLOCK.take_probe`・`OnSecondChange` の既定ハンドラ（`second_change.lua`）。`dispatch` が `nil` を返すことで今どおり動くので、触らない。
 - `get_config`（`hour_margin` の型・毎秒の読み込み）。隙間の spec `ponytail-lua-scripts` が後から触る。
 - 外から呼ぶ口（`external-control-events`）・ノベル向けの常時停止（`novel-talk-flow`）・シーン再生のイベント（`scene-play-event`）。
@@ -50,7 +50,7 @@
 ### Allowed Dependencies
 
 - `pasta/shiori/entry.lua`（停止・再開）→ `pasta.store`（印）、`pasta.shiori.event.virtual_dispatcher`（`restart_timers`）。
-- `pasta/global.lua`（`GLOBAL.yield`）→ `pasta.store`（印を読む。関数の中で遅延ロード）、`@pasta_log`（warn。止めているときだけ遅延ロード）、同じ表の `GLOBAL.resume_auto_talk`（呼び出し時に引く）。
+- `pasta/act.lua`（`ACT_IMPL.yield`）→ `pasta.store`（印を読む。関数の中で遅延ロード）、`@pasta_log`（warn）と `pasta.global` の `resume_auto_talk`（どちらも止めているときだけ遅延ロード）。
 - `virtual_dispatcher.lua` → `pasta.store`（既存の遅延ロード）、`CLOCK`（既存）。
 - `mouse.lua` → `pasta.store`（既存の require）。
 - `pasta.store` はほかのモジュールを require しない（既存の方針を保つ）。
@@ -61,7 +61,7 @@
 - `STORE.auto_talk_paused` の名前・型・既定値を変えるとき（`novel-talk-flow` が常に立てる想定、`external-control-events` が呼ぶ関数の効き目）。
 - `dispatch` の判定の順（キック → 止める門 → 時報 → ランダムトーク）を変えるとき（`scene-play-event`・`novel-talk-flow`・`scene-exact-match`・`ponytail-lua-scripts`）。
 - `GLOBAL` の 4 つの名前を変えるとき（`pasta_check` の `GLOBAL_NAMES`・マニュアル・`external-control-events` の例）。
-- `restart_timers` の契約（前へだけ進める・時刻が無ければ初回扱い）を変えるとき。
+- `restart_timers` の契約（同じ基準の中では前へだけ進める・基準が変われば置き換える・時刻が無ければ初回扱い）を変えるとき。
 - 続きの再開の経路（`check_talk` の `STORE.co_scene`）を変えるとき（`chain-talk-interrupt`・`scene-play-event`）。
 
 ## Architecture
@@ -82,7 +82,7 @@
 graph TB
     Scene[シーン 自動トーク停止 再開] --> GlobalFns[GLOBAL pause resume]
     LuaCode[Lua のハンドラ] --> GlobalFns
-    ChainTalk[GLOBAL yield] --> Store
+    ChainTalk[ACT_IMPL yield] --> Store
     ChainTalk --> GlobalFns
     GlobalFns --> Store[STORE auto_talk_paused]
     GlobalFns --> Restart[dispatcher restart_timers]
@@ -95,7 +95,7 @@ graph TB
 
 **Architecture Integration**:
 - 採る形: 既存の拡張（案 A＋R1）。印は `STORE`、名前は `GLOBAL`、判定と時計は `virtual_dispatcher.lua`。新しいモジュールは作らない。
-- 境界: 印を書くのは停止・再開の関数と `STORE.reset` だけ。読むのは `dispatch`・`GLOBAL.yield`・`mouse.lua`。時計を書くのはディスパッチャだけ（`restart_timers` もディスパッチャの関数）。
+- 境界: 印を書くのは停止・再開の関数と `STORE.reset` だけ。読むのは `dispatch`・`ACT_IMPL.yield`・`mouse.lua`。時計を書くのはディスパッチャだけ（`restart_timers` もディスパッチャの関数）。
 - 守る先例: `kick_force` のバイト不変、`close_ghost` の別名の書き方、ディスパッチャの遅延ロード、`REG.X = REG.X or 既定`（自前のハンドラが優先）。
 - 依存の向き: `entry.lua` → `virtual_dispatcher.lua` は、既に `entry.lua` → `pasta.shiori.event` → `second_change.lua` → `virtual_dispatcher.lua` と間接に依存しており、`mouse.lua` も直接読む。向きは今と同じで、循環しない（ディスパッチャは先頭で `CLOCK` だけを読む）。
 
@@ -115,7 +115,7 @@ graph TB
 - `crates/pasta_lua/pasta_scripts/pasta/store.lua` — `STORE.auto_talk_paused = false` の宣言（`@field` の注釈つき）と、`STORE.reset` で `false` に戻す 1 行（4.3〜4.5）。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/entry.lua` — `GLOBAL.pause_auto_talk`・`GLOBAL.resume_auto_talk` と、ブラケット記法の別名 `GLOBAL["自動トーク停止"]`・`GLOBAL["自動トーク再開"]`。`close_ghost` の直後に置く（1.1〜1.7・3.4・4.1・4.2）。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua` — `dispatch` のキックの後・`check_hour` の前に「止めていれば `nil`」の門。公開関数 `M.restart_timers(act)`（2.1〜2.4・2.6・2.7・3.1〜3.3）。
-- `crates/pasta_lua/pasta_scripts/pasta/global.lua` — `GLOBAL.yield` の先頭で、止めていれば警告のログを出して `GLOBAL.resume_auto_talk(act)` を呼び、その後は今どおり `act:yield()`（2.8）。
+- `crates/pasta_lua/pasta_scripts/pasta/act.lua` — `ACT_IMPL.yield` の先頭で、止めていれば警告のログを出して `GLOBAL.resume_auto_talk(self)` を呼び、その後は今どおり `build` して `coroutine.yield`（2.8）。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/mouse.lua` — `on_poke` は止めていれば `find_shortcut` を飛ばす。`on_touch` は `check_stroke` の `blocked` に印を足す（2.9〜2.11）。
 - `crates/pasta_check/src/validate/builtins.rs` — `GLOBAL_NAMES: [&str; 8]` に 4 つを足し、doc コメントの出どころを直す（6.1・6.2）。
 - `crates/pasta_check/tests/validate_scenes_test.rs` — `builtin_names_are_listed` の書き写しを 8 つに。`call_to_builtin_name_is_found` に `＞自動トーク停止`・`＞resume_auto_talk` を足す。`＞自動トーク`・`＞ｐａｕｓｅ＿ａｕｔｏ＿ｔａｌｋ` が見つからないと報告されることを 1 本足す（6.1〜6.3）。
@@ -190,7 +190,7 @@ stateDiagram-v2
 | 2.5 | ベースウェアのイベントは今どおり | （変更なし。`dispatch` だけが門を持つ） | — | — |
 | 2.6 | 時間切れ・仮想時刻の読み取りは今どおり | DispatcherGate | `dispatch` が `nil` → `take_probe` | シーケンス図 |
 | 2.7 | 止めている理由では続きを捨てない | DispatcherGate | `set_co_scene` を通らない | — |
-| 2.8 | 止めている間のチェイントークは警告して再開 | ChainTalkGuard | `GLOBAL.yield` | 状態図 |
+| 2.8 | 止めている間のチェイントークは警告して再開 | ChainTalkGuard | `ACT_IMPL.yield` | 状態図 |
 | 2.9 | つつきの 1〜8 段を飛ばし 9 段目は動かす | MouseGate | `on_poke` | — |
 | 2.10 | 撫でを決めず 9 段目は動かす | MouseGate | `on_touch` → `check_stroke(blocked)` | — |
 | 2.11 | 自前の `REG` ハンドラは変えない | MouseGate（`REG.X or 既定`） | — | — |
@@ -224,7 +224,7 @@ stateDiagram-v2
 | AutoTalkSwitch | DSL から呼べる関数（`entry.lua`） | 停止・再開と別名 | 1.1〜1.7, 3.4, 4.1, 4.2 | PauseFlag (P0), TimerRestart (P0) | Service |
 | DispatcherGate | 仮想イベント（`virtual_dispatcher.lua`） | 止めている間は時報・トーク・続きを出さない | 2.1〜2.4, 2.6, 2.7, 5.1, 5.2 | PauseFlag (P0) | Service |
 | TimerRestart | 仮想イベント（`virtual_dispatcher.lua`） | 再開したときの時計の決め直し | 3.1〜3.3, 1.7 | CLOCK (P0) | Service, State |
-| ChainTalkGuard | DSL から呼べる関数（`global.lua`） | 止めている間のチェイントークを警告して再開 | 2.8, 5.1 | PauseFlag (P0), AutoTalkSwitch (P0), `@pasta_log` (P1) | Service |
+| ChainTalkGuard | act のメソッド（`act.lua`） | 止めている間のチェイントークを警告して再開 | 2.8, 5.1 | PauseFlag (P0), AutoTalkSwitch (P0), `@pasta_log` (P1) | Service |
 | MouseGate | つつき・撫での既定ハンドラ（`mouse.lua`） | 止めている間は 1〜8 段を飛ばす | 2.9〜2.11, 5.1 | PauseFlag (P0) | Service |
 | BuiltinNames | 辞書の検査（`builtins.rs`） | 4 つの名前を組み込みの飛び先として知る | 6.1〜6.3 | なし | State |
 | AutoTalkPauseTest | テスト（`auto_talk_pause_test.lua`） | 振る舞いの自動テスト | 5.3, 5.4 | 上の Lua コンポーネント | — |
@@ -248,7 +248,7 @@ stateDiagram-v2
 
 ##### State Management
 - 状態: `false`（止めていない）／`true`（止めている）。回数は持たない（4.1）。
-- `STORE.reset` は印を解くだけで、ディスパッチャの時計は決め直さない（`STORE.reset` は今はテストだけが呼ぶ。Open Question 5）。
+- `STORE.reset` は印を解くだけで、ディスパッチャの時計は決め直さない（`STORE.reset` は今はテストだけが呼ぶ。決定事項 5）。
 
 ### DSL から呼べる関数
 
@@ -296,19 +296,20 @@ GLOBAL["自動トーク再開"] = GLOBAL.resume_auto_talk
 | Requirements | 2.8, 5.1 |
 
 **Responsibilities & Constraints**
-- `global.lua` の `GLOBAL.yield` の先頭で `require("pasta.store").auto_talk_paused` を読む。偽なら今どおり `act:yield()` だけ（5.1）。
-- 真なら `require("@pasta_log").warn(...)` で 1 行の警告を出し（バルーンには出さない）、`GLOBAL.resume_auto_talk(act)` を呼び、その後 `act:yield()` で今どおり区切る。
+- `act.lua` の `ACT_IMPL.yield` の先頭で `require("pasta.store").auto_talk_paused` を読む。偽なら今どおり `build` して `coroutine.yield` するだけ（5.1）。
+- 真なら `require("@pasta_log").warn(...)` で 1 行の警告を出し（バルーンには出さない）、`require("pasta.global").resume_auto_talk(self)` を呼び、その後は今どおり区切る。
 - 警告の文は日本語で、「自動トーク停止の間にチェイントークが呼ばれた」「自動トークを再開した」「止めた区間の区切りには選択肢やイベントを使う」が分かるものにする（テストは `自動トーク` と `チェイントーク` を含むことを確かめる）。
-- `GLOBAL["チェイントーク"]` は `GLOBAL.yield` と同じ関数なので、両方の名前・`＠` の形に効く。Lua から直接 `act:yield()` を呼ぶ道は対象外（Open Question 2）。
-- `GLOBAL.resume_auto_talk` は呼び出しの時点で同じ表から引く（`entry.lua` が登録する）。印が真になるのは `entry.lua` の停止の関数を通ったときだけなので、そのときは必ず登録済みである。
+- `act:yield()` を呼ぶのは `GLOBAL.yield`（＝`GLOBAL["チェイントーク"]`）だけで、Lua から直接 `act:yield()` を書いても同じ所を通る。1 か所で、DSL の `＞チェイントーク`・`＞yield`・`＠` の形と Lua の直接の呼び出しをすべて見張れる（同じ根の穴を残さない）。SHIORI の act のプロパティの読み取り（`shiori/act.lua` L306）は `coroutine.yield` を直接使うので通らない。
+- `resume_auto_talk` は呼び出しの時点で `GLOBAL` の表から引く（`entry.lua` が登録する）。印が真になるのは `entry.lua` の停止の関数を通ったときだけなので、そのときは必ず登録済みである。作者が Lua でこの名前を上書きした場合はその関数が呼ばれる（`main.lua` での上書きは `entry.lua` が戻すので、起きるのはシーンの Lua ブロックで書き換えたときだけ。受け入れる）。
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 ```lua
---- 既存の契約は変えない（act:yield() で区切る）。止めていれば先に警告と再開を行う。
----@param act Act
-function GLOBAL.yield(act) end
+--- 既存の契約は変えない（build して coroutine.yield で区切る）。止めていれば先に警告と再開を行う。
+---@param self Act
+---@return Act self
+function ACT_IMPL.yield(self) end
 ```
 
 ### 仮想イベント
@@ -346,7 +347,7 @@ function M.dispatch(act) end
 **Responsibilities & Constraints**
 - `virtual_dispatcher.lua` の公開関数 `M.restart_timers(act)`。時計の局所変数を書くのはディスパッチャだけ、という今の持ち方を保つ。
 - ランダムトーク: `next_talk_time = 0`。次に `check_talk` が呼ばれたとき（Status の抑止が解けた最初の機会）に、その時点から `talk_interval_min`〜`max` の間隔を引き直す。再開から少なくとも `talk_interval_min` は出ない（3.1）。続きも同じ機会を待つ。
-- 時報: `act.req` から `CLOCK.now` が取れれば、`calculate_next_hour_unix(now)` を求め、**今の `next_hour_unix` より後のときだけ** 置き換え、そのとき `seen_epoch = CLOCK.epoch()` にする（初回の分岐と同じ形）。止めている間に過ぎた正時は捨て（3.2）、再開の後の次の正時は、再開の後の台詞の表示中（Status の `talking`）にまたいでも、抑止が解けた最初の機会に今どおり出る（3.3・5.2）。
+- 時報: `act.req` から `CLOCK.now` が取れれば、`calculate_next_hour_unix(now)` を求め、**今の `next_hour_unix` より後のとき、または仮想時刻の基準（`CLOCK.epoch()`）が `seen_epoch` から変わっていたとき** に置き換え、そのとき `seen_epoch = CLOCK.epoch()` にする（初回の分岐と同じ形）。基準が変わっていたのに置き換えないと、次の `check_hour` が基準の付け替え（70 秒の猶予）で、止めている間に過ぎた正時を出しうるため。止めている間に過ぎた正時は捨て（3.2）、再開の後の次の正時は、再開の後の台詞の表示中（Status の `talking`）にまたいでも、抑止が解けた最初の機会に今どおり出る（3.3・5.2）。
   - 「後のときだけ」にするのは、チェイントークの続きの中で呼ばれたとき `act.req.date` が最初のリクエストの古い時刻なので、すでに出した正時へ戻して二重に出すのを防ぐため。
 - 時刻が取れない（`act` が `nil`、`act.req` や `date` が無い。SHIORI のリクエストでは起きず、Lua の単体テストや直接の呼び出しだけ）ときは `next_hour_unix = 0`（初回扱い）。次の `check_hour` がその時点から次の正時を決め、発行しない。再開からその時点までに正時をまたいだ場合だけ、その時報も出ない（受け入れる端の場合）。
 
@@ -359,7 +360,7 @@ function M.dispatch(act) end
 ---@return nil
 function M.restart_timers(act) end
 ```
-- 事後条件: `next_talk_time == 0`。時刻が取れれば `next_hour_unix > now`（前へだけ進む）、取れなければ `next_hour_unix == 0`。
+- 事後条件: `next_talk_time == 0`。時刻が取れれば `next_hour_unix > now` かつ `seen_epoch == CLOCK.epoch()`（同じ基準の中では前へだけ進む）、取れなければ `next_hour_unix == 0`。
 - テストは既存の `_get_internal_state()` で確かめる。
 
 ### つつき・撫で
@@ -423,10 +424,10 @@ function M.restart_timers(act) end
 - 既定で素通り: 印が偽のとき、`dispatch` が今どおり OnHour・OnTalk・続きを返す（5.1。既存の 5 本のテストが書き換えなしで通ることと合わせて 5.3）。
 - 停止: `＞自動トーク停止` 相当の呼び出しで印が真になり、`act.token` が空のまま（1.1・1.5）。`GLOBAL["自動トーク停止"] == GLOBAL.pause_auto_talk`・再開も同じ（1.3）。
 - 止めている間: 正時を過ぎても・トーク時刻を過ぎても `dispatch` が `nil`。`STORE.co_scene` があっても返さず、捨てもしない（2.1〜2.3・2.7）。`STORE.kick_pending` があればキックのシーンは返る（2.4）。`second_change` の既定ハンドラ経由で `CLOCK.take_probe` の読み取りが返る（2.6）。
-- 再開: 止めている間に正時を過ぎた後に再開 → 次の tick で時報が出ない、次の正時で出る（3.2・3.3）。再開の直後から `talk_interval_min` 未満ではトークも続きも出ない（3.1）。止めていないときの再開で `_get_internal_state()` が変わらない（3.4）。古い時刻の `act` で再開しても `next_hour_unix` が戻らない（TimerRestart の前へだけ）。`act` が `nil` の再開で `next_hour_unix == 0`。
+- 再開: 止めている間に正時を過ぎた後に再開 → 次の tick で時報が出ない、次の正時で出る（3.2・3.3）。再開の直後から `talk_interval_min` 未満ではトークも続きも出ない（3.1）。止めていないときの再開で `_get_internal_state()` が変わらない（3.4）。古い時刻の `act` で再開しても `next_hour_unix` が戻らない（TimerRestart の前へだけ）。止めている間に仮想時刻を巻き戻してから再開しても、過ぎた正時が出ない（基準が変わったら置き換える）。`act` が `nil` の再開で `next_hour_unix == 0`。
 - 停止と再開を同じ組み立ての中で続けて呼んでも、間隔が数え直される（3.1・1.6）。
 - 入れ子: 2 回停止 → 1 回再開で解ける（4.1・4.2）。`STORE.reset()` で解ける（4.5）。
-- チェイントーク: 止めている間に `GLOBAL.yield`／`GLOBAL["チェイントーク"]` → warn が 1 回（モックの `@pasta_log` で記録）、印が偽、`act:yield` は呼ばれる。止めていないときは warn なし（2.8・5.1）。
+- チェイントーク: 止めている間に `GLOBAL.yield`／`GLOBAL["チェイントーク"]`／直接の `act:yield()` → warn が 1 回（モックの `@pasta_log` で記録）、印が偽、区切り（`coroutine.yield`）は起きる。止めていないときは warn なし（2.8・5.1）。
 - つつき・撫で: 止めている間、`＊つっつき反応その他` があっても `OnMouseDoubleClick` のシーンが返る。撫では 2 秒続けても決まらず `OnMouseMove` が返り、判定の状態が Off。`REG` に先に置いたハンドラはそのまま（2.9〜2.11）。`mouse_test.lua` の作りに倣う。
 - 単語参照の形: `＠自動トーク停止` 相当（`act:word` の L4 で `GLOBAL` の関数を呼ぶ道）で止まる（1.4）。
 
@@ -442,10 +443,13 @@ function M.restart_timers(act) end
 
 - luacheck（ブラケット記法・`dispatch` の複雑度 ≤ 15）、`cargo test`（`NoDefaultCurrentDirectoryInExePath` を外して実行）。
 
-## Open Questions / Risks
+## 決定事項（2026-10-22 設計ディスカッション）
 
-1. **時計の決め直しの方式**: research.md §7 の推奨は H4＋R3（印を `STORE` に置きディスパッチャが次の判定で決め直す）だが、この設計は **H1＋R1（再開の関数がディスパッチャの `restart_timers` を直接呼ぶ。時報は前へだけ進め、時刻が無ければ初回扱い）** を採った。理由: 停止と再開が 1 つの組み立ての中で続いても確実に数え直す、状態（通し番号と前に見た値）を増やさない、依存の向きは既存と同じ。
-2. **チェイントークの警告の場所**: `GLOBAL.yield`（DSL の `＞チェイントーク`・`＞yield`・`＠` の形）だけにし、`ACT_IMPL.yield`（Lua から直接 `act:yield()`）は対象外とした。
-3. **止めている間のキックとチェイントーク**: キックしたシーンが最初の出力の中で `＞チェイントーク` を使うと、2.8 により止めている状態が解ける（デバッグの経路だけ）。要件どおりの帰結として受け入れ、マニュアルには書かない想定。
-4. **`STORE.reset` と時計**: リセットは印を解くだけで、時計は決め直さない（`STORE.reset` は今はテストだけが呼ぶ）。
-5. **再開の後の間隔の起点**: `next_talk_time = 0` は「再開の後、Status の抑止が解けた最初の判定の時刻」から数える。再開の時刻そのものより遅いので、「少なくとも `talk_interval_min`」は満たす。
+1. **時計の決め直しの方式**: research.md §7 の推奨 H4＋R3 ではなく、**H1＋R1**（再開の関数がディスパッチャの `restart_timers` を直接呼ぶ）を採る。停止と再開が 1 つの組み立ての中で続いても確実に数え直し、状態（通し番号と前に見た値）を増やさず、依存の向きは既存と同じ。
+2. **チェイントークの見張りの場所**: `ACT_IMPL.yield`。`act:yield()` を呼ぶのは `GLOBAL.yield` だけなので、1 か所で DSL と Lua の直接の呼び出しの両方を見張れる。
+3. **時報の決め直しと仮想時刻の基準**: 同じ基準の中では前へだけ進め、基準（`CLOCK.epoch()`）が変わっていたら置き換える。
+4. **止めている間のキックとチェイントーク**: キックしたシーンが最初の出力の中で `＞チェイントーク` を使うと、2.8 により警告が出て止めている状態が解ける（デバッグの経路だけ）。要件どおりの帰結として受け入れ、マニュアルには書かない。
+5. **`STORE.reset` と時計**: リセットは印を解くだけで、時計は決め直さない（`STORE.reset` は今はテストだけが呼ぶ）。
+6. **再開の後の間隔の起点**: `next_talk_time = 0` は「再開の後、Status の抑止が解けた最初の判定の時刻」から数える。再開の時刻そのものより遅いので、「少なくとも `talk_interval_min`」は満たす。
+7. **関数の置き場所**: 停止・再開は `entry.lua`（`close_ghost` の先例。核の `global.lua` から SHIORI 層のディスパッチャを読まない）。
+8. **組み込みの名前と同名のシーン**: 4 つの名前と同じ名前のグローバルシーンを書いたゴーストに、既存の `scene-shadowed-by-builtin`（警告）が新たに出る。既存の決まりどおりで変えない。
