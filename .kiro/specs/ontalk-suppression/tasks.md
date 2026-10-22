@@ -94,7 +94,7 @@
   - _Depends: 5.1, 5.2, 5.3_
   - _Requirements: 6.7, 6.8_
 
-- [ ] 6. 全体の回帰確認
+- [x] 6. 全体の回帰確認
   - luacheck（ブラケット記法・`dispatch` の複雑度 ≤ 15）、pasta_lua と pasta_check の `cargo test`（`NoDefaultCurrentDirectoryInExePath` を外して実行）、references の差分検査とリンク検査を走らせる
   - pasta_lua のテストが `sample.generated.lua` に改行コードだけの差分を残したら、`git checkout --` で戻してコミットに混ぜない
   - 既存の仮想イベント・つつき・撫でのテストが書き換えなしで通り、すべての検査が緑になる
