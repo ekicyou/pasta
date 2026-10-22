@@ -64,7 +64,7 @@
   - _Boundary: GitHubReleaseAssets, ReleaseScriptsTest_
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
 
-- [ ] 4. (P) release スキルの状態の読み取りと手順書を 4 つの配布物に合わせる
+- [x] 4. (P) release スキルの状態の読み取りと手順書を 4 つの配布物に合わせる
   - `release-state.ps1` の配布物の一覧に `pasta_check.zip` を足し、数の表示を `n/4` に、公開済みの判定を 4 つそろった公開に変える
   - `procedure.md` の状態の表と読み方を `4/4`・`n/4` にし、0.4.1 までの版は `3/4` の添付不足と出ることを一言足す。`SKILL.md` の「添付 3/3」を「添付 4/4」に。公開先の「7/7」は変えない
   - `.claude/skills/**` の編集が分類器に拒否されたら、入った分と残りを示して開発者の許可を求める
