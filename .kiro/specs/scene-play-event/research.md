@@ -20,7 +20,7 @@
 | 1.2 ローカルを名前で | `SEARCH:search_scene_exact(name, parent)` は親を受ける（`src/search/context.rs` L105・L302〜306） | `scene.lua` に親を通す口が無い。親は**登録名**（`会話_1`）を渡す必要があるので、先に大域を引いてからローカルを引く 2 段になる | Missing |
 | 1.3〜1.6 名前の規則 | `search_scene_by`（`context.rs` L114〜）が `sanitize_name`・別名（大域だけ）・`resolve_scene_id_exact`（順送り）を当てる | 差なし。別名はローカルには当たらない（今の規則どおり） | — |
 | 1.7 空の Reference1 | なし | ハンドラで扱う | Missing |
-| 1.8 同名の大域とローカル | 順送りは大域を 1 つ選ぶだけ | 「そのローカルを持つ大域から選ぶ」案（未決事項 2 の別案）を採ると、今の検索の形では足りない（候補の絞り込みが要る） | Constraint |
+| 1.8 同名の大域とローカル | 順送りは大域を 1 つ選ぶだけ | 「そのローカルを持つ大域から選ぶ」案を採った（2026-10-22）。今の検索の形では足りず、候補の絞り込みが要る（設計で決める） | Constraint |
 | 2.1〜2.2 位置で | `SourceMap::scene_at`（`src/debug/source_map/mod.rs` L528）→ `SceneIdentityIndex::scene_at`（`scene_index.rs` L123）。返すのは `(scene_id, parent)` の登録名 | Lua から呼ぶ口が無い | Missing |
 | 2.3 相対パス | `uri_to_pasta_path`（`src/debug/playscene.rs` L100）は `std::path::absolute` で SSP の今のフォルダに結ぶ | `runtime.base_dir`（`factory.rs` L176。`ghost/master/`）に先に結ぶ処理が要る | Missing |
 | 2.4〜2.5 絶対パス・区切り・大小 | `canonicalize_pasta_file` が `\`→`/` と Windows の大小無視を担う | 差なし | — |
@@ -29,10 +29,10 @@
 | 3.1〜3.3 中断と続き | `EVENT.fire` がハンドラの返したコルーチンを `EVENT.drive` で 1 ビート進め、`set_co_scene` で差し替える（`shiori/event/init.lua` L215〜255）。続きは `check_talk`（`virtual_dispatcher.lua` L188〜217）が次のトークの時刻に返す | 差なし。ハンドラはコルーチンを返すだけでよい | — |
 | 3.4 Status の抑止 | 抑止は `virtual_dispatcher.dispatch`（OnSecondChange）の中だけ | 差なし（ほかのイベントは抑止されない） | — |
 | 3.5 実行時のエラー | `EVENT.fire` が `error` を投げ、`runtime-error-balloon` の道で出る | 差なし | — |
-| 4.1〜4.2 有効の判定 | Rust: `DebugConfig::from_env(...)`.enabled（`loader/mod.rs` L214〜216）、`runtime.debug_enabled()`（`runtime/exec.rs` L63。持ち手の有無） | Lua から見える口が無い。設定で決めるなら、待ち受けが立たないときもソースマップと索引を残す直しが要る（`runtime/mod.rs` L267〜271） | Missing / Constraint |
-| 4.3 無効なら 204 | `REG.OnX = REG.OnX or function...` の先例（`choice_select.lua` L41） | ハンドラで nil を返せば 204。ログは `@pasta_log` | — |
-| 4.4 作者の優先 | 同上の先例 | 差なし | — |
-| 4.5 `SecurityLevel` | `act.req.security_level`（`shiori/res.lua` L20・`clock.lua` L151 が `external` を断る先例） | ハンドラで確かめる | Missing |
+| 4.1〜4.3 有効の判定と情報の保持 | Rust: `DebugConfig::from_env(...)`.enabled（`loader/mod.rs` L214〜216）、`runtime.debug_enabled()`（`runtime/exec.rs` L63。持ち手の有無） | Lua から見える口が無い。設定で決めるなら、待ち受けが立たないときもソースマップと索引を残す直しが要る（`runtime/mod.rs` L267〜271） | Missing / Constraint |
+| 4.4 無効なら 204 | `REG.OnX = REG.OnX or function...` の先例（`choice_select.lua` L41） | ハンドラで nil を返せば 204。ログは `@pasta_log` | — |
+| 4.5 作者の優先 | 同上の先例 | 差なし | — |
+| 4.6 `SecurityLevel` | `act.req.security_level`（`shiori/res.lua` L20・`clock.lua` L151 が `external` を断る先例） | ハンドラで確かめる | Missing |
 | 5.1〜5.5 失敗の表記 | `FAILURE.report(act, record)`・`FAILURE.LABEL.SCENE_NOT_FOUND`（`pasta/failure.lua`）。`[logging] balloon_warning` を毎回読む | 引数の誤りの種類の名前は無い（足すかは未決事項 5） | Missing（小） |
 | 5.6 失敗時に会話を残す | 文字列を返せば `set_co_scene` は呼ばれない | 差なし | — |
 | 6.x マニュアル | `book/src/lua/shiori-events.md`（既定ハンドラーの表 L196〜、`OnPastaClock` の節が先例）、`book/src/internals/debug.md`「シーンキック」L347〜、`book/src/debug/dev-actions.md`「シーン再生」L40〜 | 節が無い。スキルの references は `book/tools/gen-skill-refs.mjs` L60 で `lua/shiori-events.md` だけが写される（`internals/`・`debug/` は写されない） | Missing |
@@ -47,6 +47,7 @@
 - そのあと「持ち手があるときだけソースマップを持つ」（`runtime/mod.rs` L267〜271）。持ち手が無いと `runtime.source_map` は `None` になり、`factory.rs` L241 の索引の突合も飛ぶ。
 - つまり今は、2 体目のゴーストでは位置の索引が無い。設定で決めるなら、この 1 か所の条件を「設定が有効なら持つ」に変える必要がある。この変更は、待ち受けなしで持つソースマップを、ほかの消費者（ブレーク・ステップ）が使わないことを確かめてから入れる（消費者はデバッグの持ち手を通して使うので、影響は無い見込み。設計で確かめる）。
 - 待ち受けで決めるなら、Rust 側の直しは要らない。ただし、2 体目では 2 つのイベントが黙って 204 になる。
+- **決定（2026-10-22 要件の話し合い）**: 設定で決め、この 1 か所を直す。必要になったときに後から作る方式は採らない（書き換えたあとの辞書から作ると、読み込んだ中身と食い違うため）。呼ぶ前に SHIORI をリロードするのは呼び出し側の務めとする（要件 6.3）。
 
 ### 3.2 Lua への口の出し方
 
