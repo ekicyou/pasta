@@ -206,6 +206,7 @@ metadata:
 - 前方一致で候補が複数ある場合はシャッフル＆順次消費で1つ選ぶ
 - 特殊Call: `＞ゴースト終了（ミリ秒）` — ゴーストを終了させる
 - 特殊Call: `＞チェイントーク` / `＞yield` — シーン出力を分割し、次回 OnTalk の機会に残りを出力する（詳細は [call-jump.md](references/call-jump.md#チェイントーク)、作例は [authoring-patterns.md §6.7](references/authoring-patterns.md#s6-7)）
+- 特殊Call: `＞自動トーク停止` / `＞自動トーク再開` — 自動トーク（ランダムトーク・時報・止まっているシーンの続き・つつき／撫での 1〜8 段の反応）を止める／再開する。止めた区間の中の `＞チェイントーク` は誤り（警告が出て止めが解ける）。区切りには選択肢やイベントを使う。セッションの間だけ・入れ子は数えない（詳細は [call-jump.md](references/call-jump.md#自動トーク停止自動トーク再開)）
 
 ```pasta
 ＊OnClose
