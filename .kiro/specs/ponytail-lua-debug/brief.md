@@ -122,3 +122,20 @@ VSCode でゴーストをデバッグする作者が困る。
 - 振る舞いを固めるテストを先に書き、1 つ直すごとに確かめて 1 コミットにする。
 - 品質の関門：`cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_lua`。
 - cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。`PASTA_DEBUG=1` がテストを壊さないこと（固定ポート 9276。`#[ctor]` で中和済み。新しいテストにも同じ守りを付ける）。
+
+## 2026-10-22 棚卸の再測定（main 6a8dc479）
+
+- **前提の変化**
+  - 監査の控えの後、2026-10-19 夜の直し（c4d0380e）が `crates/pasta_lua/src/debug/enable.rs`（260 行）と `debug_mod_tests.rs` を変えた。待ち受けの bind を Lua に触れる前に行い、取れなければ警告を出して、デバッグなしで起動を続ける（`Ok(None)`）。
+  - そのため 11 番の `unreachable!` は、L246〜256 から L120〜126（bind に失敗した枝）へ移った。`DebugError::Bind` は `enable` の外へ出なくなり、transport の中だけで使う。
+  - 新しく見つけた点: ポートが取れなかったときも、読み込み（`loader/mod.rs` L214〜232）は設定を見てソースの対応表と索引を作る。デバッグの持ち手は無いので、作った表が使われずに残る（`runtime/exec.rs` の `debug_enabled()` は偽、`debug_source_map()` は有り）。ギャップ分析の監査の候補にする。
+  - ほかの指摘の場所（`wiring/inbound.rs` L186〜201、`inspect.rs` L378〜388、`dap/decode.rs` L303、`transport/mod.rs` L147〜160・L236〜261・L436 など）は変わっていない。FFI の読み込みの作業（`lua-cmodule-robustness`）は `debug/` に触れていない。
+- **触るファイル**: `crates/pasta_lua/src/debug/**`（本番は約 8k 行。大きいのは `source_map/mod.rs` 675 行・`breakpoints.rs` 626 行・`types.rs` 581 行で、1,000 行に近いものは無い）、マニュアル `book/src/internals/debug.md`・`book/src/debug/source-level.md`。
+- **規模**: 14〜18 タスク（12 の指摘と、ギャップ分析で増える分）。
+- **先に要るもの**: 0.4.2 を出した後（隙間の作業）。`scene-play-event` が先に入る。共有するのは `debug/playscene.rs`（今は `#![allow(dead_code)]`。あちらが新しい呼び手を足すので、死んでいる所が変わる）と、ソースの対応表（`source_map/mod.rs` の `scene_at`・`scene_index`、`source_map/scene_index.rs`）。あちらがデバッグの有効を Lua に見せる口を足すなら、その決め方（設定か、持ち手か）も受け継ぐ。`runtime/exec.rs`・`runtime/factory.rs` は隙間の `ponytail-lua-loader` の持ち場なので、上の新しい点を直すなら境を決める。`book/src/debug/*.md` は `ponytail-editor-tooling` と別の節。
+- **種別**: バグ（Lua 表示で `.pasta` のブレークポイントが効かない、ステップが抜けない、など）。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 今は不要。ギャップ分析で 20 を超えたら、正しさ（ブレークポイント・ステップ・数の表示・応答）と無駄（死んだコード・写し・行ごとの費用）の 2 つに分ける。
+- **見つけた穴・古くなった記述**
+  - `book/src/internals/debug.md` L445 の「`PASTA_DEBUG=1` だと、ロードを伴うテストがすべて固定ポートに bind しようとして `AddrInUse` で失敗する」は、c4d0380e の後は当たらない。今は、ポートを取れたテストだけがデバッグを有効にして走り、ほかはデバッグなしで読み込みが通る（壊れ方が変わった）。すぐ直せる文書の誤り。
+  - 11 番の `unreachable!` の場所（上記）。

@@ -131,3 +131,20 @@ MCP の `raise_event` は、SSTP NOTIFY と同じく、SHIORI にイベントを
 - 作者が Lua で `REG.OnPastaScene` を先に定義していたら、そちらを優先する（`REG.OnX = REG.OnX or ...` の先例どおり）。
 - 要件定義は Opus。Fable は不要。
 - 規模は 6 タスク前後の見込み（ハンドラーと引数 1、名前の口 1、位置の口 1、失敗の出し方 1、テスト 1、マニュアルとスキル 1）。
+
+## 2026-10-22 棚卸の再測定（main 6a8dc479）
+
+- **前提の変化**
+  - 2026-10-19 夜の直し（c4d0380e、`crates/pasta_lua/src/debug/enable.rs`）で、デバッグのポートが取れないとき（デバッグを有効にしたゴーストを同じベースウェアで 2 体起動したとき）は、デバッグなしで起動を続けるようになった。このとき設定ではデバッグが有効なので、位置の索引は作られる（`loader/mod.rs` L214〜232）が、ランタイムの `debug_enabled()`（`runtime/exec.rs` L63。デバッグの持ち手があるか）は偽になる。「デバッグを有効にしたときだけ」を設定で決めるか、待ち受けが動いているかで決めるかを要件で決める。推奨は設定（MCP からの再生にポートは要らず、索引はある）。
+  - 名前どおりに引く `SEARCH:search_scene_exact(名前, 親)` は、親（ローカルシーンの範囲）をもう Lua から渡せる（`crates/pasta_lua/src/search/context.rs` L302〜306）。足すのは `scene.lua` の側だけで、Rust の検索は触らない。Lua からデバッグの有効と位置の索引を知る口は、まだ無い。
+  - ほかの Current State の行番号（`kick.lua`・`virtual_dispatcher.lua`・`init.lua`・`playscene.rs`・`scene_index.rs`）は今も合っている。
+- **触るファイル**: 新しいハンドラのファイル（`pasta_scripts/pasta/shiori/event/` の下。新規）、`event/init.lua`（267 行。L78〜81 に読み込みを 1 行）、`pasta_scripts/pasta/scene.lua`（240 行。`co_exec_exact` に親を通す）、`crates/pasta_lua/src/debug/playscene.rs`（相対パスを `ghost/master/` に結ぶ）、Lua へ口を出す登録（`runtime/factory.rs` 324 行か `runtime/module_registry.rs` 201 行）、失敗の種類を足すなら `pasta_scripts/pasta/failure.lua`、テスト（Lua のテストと一覧 `tests/lua_specs/init.lua`、`debug/playscene_tests.rs`）、マニュアル。1,000 行に近いファイルは無い。
+- **規模**: 7〜8 タスク（brief の 6 に、デバッグの有効の決め方と Lua への口の登録で 1〜2 増える）。
+- **先に要るもの**: なし。`pasta-check-release-asset`・`ontalk-suppression` と同じウェーブに並べられる。条件は、`virtual_dispatcher.lua`・`shiori/entry.lua`・`store.lua` に触らないこと（`ontalk-suppression` の brief の注意を参照）。後に入るのは `external-control-events`（`event/init.lua`）と `chain-talk-interrupt`（`event/init.lua` と、この作業が足すハンドラのファイル）。0.4.2 の後に入る作業では、`scene.lua` を `scene-exact-match`・`scene-pick-modes`・`scene-attribute-store`・`call-attribute-filter`・`recommend-menu-scenes`・`novel-talk-flow` が、`playscene.rs` とソースの対応表を隙間の `ponytail-lua-debug` が、`runtime/` を隙間の `ponytail-lua-loader` が触る。
+- **種別**: 機能（MCP から指名したシーンを再生する口。開発者の求め：AI にゴーストをデバッグさせたい）。
+- **要件定義のモデル**: Opus（`raise_event` が GET か NOTIFY かは実機で確かめる項目で、どちらでも決め方の推奨がある）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 「続きのビートは OnSecondChange で流れる」は正確でない。続きは、ランダムトークの判定（`virtual_dispatcher.lua` の `check_talk`）が次のトークの時刻に達したときだけ流れる（既定で 3〜5 分おき）。MCP の利用者向けに、2 ビート目からはしばらく後に出ると書く。
+  - `uri_to_pasta_path`（`playscene.rs` L100）は、相対パスを SSP の今のフォルダから絶対にする。`ghost/master/` からの相対パスを受けるには、先に結ぶ処理が要る。
+  - `ontalk-suppression` との接点（止めている間の続き）は、推奨を「止める」に改めるのがよい。今のコードでは、キックの続きも止まるためである。

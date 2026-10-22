@@ -287,7 +287,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 - ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
 - ルートレベルの `tests/` と `examples/` も削除済み（Pure Virtual Workspace移行完了）
 - 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_dsl, pasta_core, pasta_lua, pasta_lsp, pasta_sample_ghost, pasta_shiori）
-- pasta_sample_ghost のサンプルゴースト hello-pasta は `ghosts/hello-pasta/` に完全な一式として直接配置（SSOT）。テキスト系（descript/pasta.toml/dic/install）は手書き正本、画像・DLL は生成物。`release.ps1` は生成物の配置と `.nar`・`pasta.dll.zip` のパッケージングを担う（旧 dist-src/robocopy 方式は廃止）。生成物のうち DLL・ライセンス表示・`scripts/` と `release/` はコミットしない。配布物の公開はリリースタグの push で `release.yml` が行う
+- pasta_sample_ghost のサンプルゴースト hello-pasta は `ghosts/hello-pasta/` に完全な一式として直接配置（SSOT）。テキスト系（descript/pasta.toml/dic/install）とシェルの画像は追跡する正本、DLL・ライセンス表示・`scripts/` は生成物。`release.ps1` は生成物の配置と `.nar`・`pasta.dll.zip` のパッケージングを担う（旧 dist-src/robocopy 方式は廃止）。生成物のうち DLL・ライセンス表示・`scripts/` と `release/` はコミットしない。配布物の公開はリリースタグの push で `release.yml` が行う
 - `CLAUDE.md` が AI 開発支援の指示（プロジェクト指示・Kiro 仕様駆動ワークフロー・コマンド一覧）を担う
 
 ## ファイル命名規則

@@ -111,3 +111,21 @@ OnPastaSetSaveVariable  Reference0=初回済み  Reference1=null
 - 既存のイベントの挙動は何も変えない。今のテストは、そのまま通ること。
 - 非 ASCII の識別子は、ブラケット記法で扱う（luacheck との互換のため）。
 - 規模は 5〜6 タスクの見込み（ハンドラ 2、テスト 1〜2、マニュアルとスキル 1）。
+
+## 2026-10-22 棚卸の再測定（main 6a8dc479）
+
+- **前提の変化**: 2026-10-19 の後、イベントの振り分け（`pasta_scripts/pasta/shiori/event/init.lua` 267 行）と `＞` の解決（`pasta_scripts/pasta/act.lua` の `ACT_IMPL.call` L695）は変わっていない。Current State は今も正しい。
+- **触るファイル**: 新しいハンドラのファイル（`pasta/shiori/event/` の下。新規）、`event/init.lua` の読み込みの 1 行（L78〜81）、Lua のテスト（新しいファイルと一覧 `crates/pasta_lua/tests/lua_specs/init.lua` の 1 行）、マニュアル（`lua/shiori-events.md` の既定ハンドラの表と 2 節、`grammar/variables.md`）。失敗の種類を足すなら `pasta_scripts/pasta/failure.lua`。
+- **規模**: 5〜6 タスク。
+- **先に要るもの**
+  - `scene-play-event`: `event/init.lua` の読み込みの所を共有するので、同じウェーブに置けない。働きの上では待つ必要は無い（呼び先が無くても動く）。順は入れ替えてもよく、先に入る側がハンドラの置き方と失敗の出し方の先例になる。
+  - `chain-talk-interrupt`: これも `event/init.lua` を共有する（あちらは `set_co_scene`・`EVENT.drive`、こちらは読み込みの 1 行だけ）。厳密には同じウェーブに置けない。読み込みの 1 行を、マニュアルの同じページのように「後から入る側が合わせる」扱いにすれば並べられる。
+  - `ontalk-suppression`・`pasta-check-release-asset`: ソースを共有しない。並べられる。
+  - 0.4.2 の後に入る作業では、`event/init.lua` を `recommend-menu-scenes`・`shell-element-click`・`scene-exact-match`・`novel-talk-flow`・`novel-checkpoint-rollback`・隙間の `ponytail-lua-scripts` が触る。
+- **種別**: 機能（外から `＞XXX` を呼ぶ口と、グローバル変数を書く口。2026-10-19 開発者の決定）。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - `ACT_IMPL.call` はハンドラを直接呼ぶ。呼んだシーンが `＞チェイントーク` で区切ると、コルーチンの外での中断になってエラーで止まる。ハンドラは呼び出しをコルーチンで包んで返し、`EVENT.fire` → `EVENT.drive` で回す形にする必要がある。設計で決める。
+  - 見つからないとき、`ACT_IMPL.call` は自分で失敗の表記（「シーンが見つからない」。`failure.lua` L19）を積み、警告のログも出す（`act.lua` L716〜）。Approach の「警告のログを残して 204」と食い違う。要件で、この表記に任せるか（推奨。`scene-play-event` の失敗の出し方とも揃う）を決める。
+  - MCP の `raise_event` が NOTIFY で送るなら、応答は捨てられる（`crates/pasta_shiori/src/actor/thread.rs` L204〜210）。`＊初回起動` の台本は返らないが、`自動トーク停止` や変数の代入は効く。`scene-play-event` が実機で確かめる結果に合わせて書く。

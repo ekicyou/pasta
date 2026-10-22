@@ -120,3 +120,21 @@
 - LuaJIT 2.1 には `coroutine.close` が無い。捨てるのは参照を外すだけ（`STORE.co_scene = nil`）で、GC に任せる。
 - 非 ASCII のシーン名は、ふだんのシーンと同じく DSL で書ける。Lua から探すときは、ブラケット記法か文字列で引く。
 - 規模は 5 タスク前後の見込み（続きの更新の決まり 1、中断の台詞の差し込み 1、キックとシーン再生の道 1、テスト 1、マニュアルとスキル 1）。
+
+## 2026-10-22 棚卸の再測定（main 6a8dc479）
+
+- **前提の変化**: 2026-10-20 の後、続きの更新の決まり（`pasta_scripts/pasta/shiori/event/init.lua` の `set_co_scene` L100〜136・`EVENT.drive` L190〜207）、撫での受け口（`shiori/event/mouse.lua` L155〜165）、トークンの種類（`act.lua` L241・L308）は変わっていない。Current State は今も正しい。
+- **触るファイル**: `event/init.lua`（267 行）、台詞を出したかの印を立てる所（トークンは `act:build()` の中で空にされる（`act.lua` L641〜643）ので、`EVENT.drive` からは見えない。`shiori/act.lua` 325 行の `SHIORI_ACT_IMPL.build` L65 か、`act.lua` 829 行の `ACT_IMPL.build`）、キックの道 `shiori/event/kick.lua`（163 行）、`scene-play-event` が足すハンドラのファイル、中断の台詞を前に添える所（組み立て `shiori/sakura_builder.lua` 540 行に触る見込み）、Lua のテストと一覧 `crates/pasta_lua/tests/lua_specs/init.lua`、マニュアル。
+- **規模**: 6〜7 タスク（中断の台詞の添え方が見込みより重い）。
+- **先に要るもの**
+  - `scene-play-event`: 本当に待つ必要がある。あちらが足すハンドラのファイルと `event/init.lua` を共有し、シーン再生の道で「はっきり捨てる」を入れる先があちらにあるため。順を逆にして、こちらが捨てる口を先に作り、あちらが使う形もとれるが、どちらにせよ同じウェーブには置けない。
+  - `external-control-events`: `event/init.lua` を共有する（あちらは読み込みの 1 行だけ）。その 1 行を「後から入る側が合わせる」扱いにしない限り、同じウェーブに置けない。
+  - `ontalk-suppression`: キックの「はっきり捨てる」を `virtual_dispatcher.lua` のキックの所ではなく `kick.lua` に置き、印を `STORE`（`store.lua`）に置かなければ、ソースを共有しない。その条件で並べられる。
+  - 0.4.2 の後では、`act.lua`・`sakura_builder.lua` を `cue-command-runtime`・`novel-talk-flow`・`scene-anchor-link` などが、`set_co_scene` を隙間の `ponytail-lua-scripts` が触る。
+- **種別**: バグ（何も喋らないイベントで続きが消える。窓際のぱすたさんの実機で確認）＋機能（`＊チェイントーク中断`）。開発者の決定「次のリリースに含める」。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 組み立てた台本は、終わりに `\e` が付く（`sakura_builder.lua` L534〜536）。中断の台詞の台本と割り込んだシーンの 1 ビート目を文字列でつなぐと、前の `\e` で止まる。しかも、割り込んだシーンが喋るかは組み立てた後でないと分からない。添え方（トークンの段でつなぐか、`\e` を外すか、立ち位置と表情の持ち越し `STORE.actor_spots`・`STORE.appearance` との順）は設計の要点になる。
+  - 台詞を出したかの印を act のメソッドにすると、`pasta_check` の act のメソッドの表（`crates/pasta_check/src/validate/builtins.rs` の `ACT_METHODS`、27 個）と、実行時との一致のテストが変わり、`ontalk-suppression` と `builtins.rs` を共有してしまう。印は act の欄か関数の中の変数にとどめる。
+  - コールバックの再開（`shiori/event/callback.lua` の `CALLBACK.try_route`・`CALLBACK.sweep`）も `EVENT.drive` を通るので、新しい決まりが効く。テストに含める。

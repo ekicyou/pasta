@@ -21,7 +21,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
 - [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
 
-**完了仕様**: 175件（2026-10-18 時点・`.kiro/specs/completed/` に格納）
+**完了仕様**: 176件（2026-10-22 時点・`.kiro/specs/completed/` に格納）
 
 **主要成果**:
 - ✅ **act-impl-call** - `ACT_IMPL.call` 4段階優先順位検索実装
@@ -43,7 +43,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] SHIORI インターフェース（pasta_shiori）- DLL エクスポート
 
 ### Phase 2: コア機能拡張（進行中）🔄
-**最終更新**: 2026-10-18（現行バージョン v0.4.1）
+**最終更新**: 2026-10-22（現行バージョン v0.4.1）
 
 **完了仕様**:
 - ✅ **release-workflow** - リリース手順（版の決定 → 版の更新の PR → リリースタグの push → リリース CI の結果の確認）。手順は `release` スキル（`/release`）へ移した
