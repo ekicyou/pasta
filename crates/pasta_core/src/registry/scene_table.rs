@@ -22,6 +22,8 @@ struct SceneCacheKey {
     filters: Vec<(String, String)>,
     /// Exact-match search (kept apart from the prefix search's cache)
     exact: bool,
+    /// 持ち主のローカルの名前（そのローカルを持つ大域の順送りだけ。ほかは None）
+    owning_local: Option<String>,
 }
 
 impl SceneCacheKey {
@@ -30,6 +32,7 @@ impl SceneCacheKey {
         search_key: &str,
         filters: &HashMap<String, String>,
         exact: bool,
+        owning_local: Option<&str>,
     ) -> Self {
         let mut filter_vec: Vec<_> = filters
             .iter()
@@ -41,6 +44,7 @@ impl SceneCacheKey {
             search_key: search_key.to_string(),
             filters: filter_vec,
             exact,
+            owning_local: owning_local.map(str::to_string),
         }
     }
 }
@@ -204,7 +208,7 @@ impl SceneTable {
         let filtered_ids = self.filter_by_attributes(candidate_ids, search_key, filters)?;
 
         // Phase 3-5: Cache-based sequential selection
-        let cache_key = SceneCacheKey::new("", search_key, filters, false);
+        let cache_key = SceneCacheKey::new("", search_key, filters, false, None);
         self.select_from_cache(cache_key, filtered_ids)
     }
 
@@ -236,7 +240,7 @@ impl SceneTable {
         let filtered_ids = self.filter_by_attributes(candidate_ids, search_key, filters)?;
 
         // Phase 3-5: Cache-based sequential selection
-        let cache_key = SceneCacheKey::new(module_name, search_key, filters, false);
+        let cache_key = SceneCacheKey::new(module_name, search_key, filters, false, None);
         self.select_from_cache(cache_key, filtered_ids)
     }
 
@@ -277,8 +281,60 @@ impl SceneTable {
         }
 
         let filtered_ids = self.filter_by_attributes(candidate_ids, name, filters)?;
-        let cache_key = SceneCacheKey::new(module_name, name, filters, true);
+        let cache_key = SceneCacheKey::new(module_name, name, filters, true, None);
         self.select_from_cache(cache_key, filtered_ids)
+    }
+
+    /// `name` と等しいキーの大域シーンのうち、`:{大域の登録名}:{local}` と等しいキーの
+    /// ローカルシーンを持つものだけを候補にし、重ならない順送りで 1 つ選ぶ。
+    ///
+    /// - Ok(Some(id)): 選んだ大域シーン
+    /// - Ok(None): 大域シーンはあるが、どれも `local` を持たない
+    /// - Err(SceneNotFound): `name` の大域シーンが無い
+    /// - Err(InvalidScene): `name` か `local` が空
+    ///
+    /// 順送りの状態は `resolve_scene_id_exact("", name)` とは別（`SceneCacheKey::owning_local`）。
+    pub fn resolve_global_owning_local_exact(
+        &mut self,
+        name: &str,
+        local: &str,
+        filters: &HashMap<String, String>,
+    ) -> Result<Option<SceneId>, SceneTableError> {
+        if name.is_empty() || local.is_empty() {
+            return Err(SceneTableError::InvalidScene {
+                scene: if name.is_empty() { name } else { local }.to_string(),
+            });
+        }
+        // 大域の名前は `:` で始まらない（`:` で始まるキーはローカル）
+        let globals = match self.prefix_index.get(name.as_bytes()) {
+            Some(ids) if !name.starts_with(':') => ids.clone(),
+            _ => Vec::new(),
+        };
+        if globals.is_empty() {
+            return Err(SceneTableError::SceneNotFound {
+                scene: name.to_string(),
+            });
+        }
+
+        let owners: Vec<SceneId> = globals
+            .into_iter()
+            .filter(|&id| {
+                let fn_name = &self.labels[id.0].fn_name;
+                let owner = fn_name
+                    .split_once("::")
+                    .map_or(fn_name.as_str(), |(g, _)| g);
+                self.prefix_index
+                    .get(format!(":{}:{}", owner, local).as_bytes())
+                    .is_some_and(|ids| !ids.is_empty())
+            })
+            .collect();
+        if owners.is_empty() {
+            return Ok(None);
+        }
+
+        let filtered_ids = self.filter_by_attributes(owners, name, filters)?;
+        let cache_key = SceneCacheKey::new("", name, filters, true, Some(local));
+        self.select_from_cache(cache_key, filtered_ids).map(Some)
     }
 
     /// Filter candidate IDs by attribute filters (Phase 2 of scene resolution).
