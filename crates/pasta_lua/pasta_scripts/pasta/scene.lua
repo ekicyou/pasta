@@ -218,18 +218,44 @@ function SCENE.co_exec(act, name, global_scene_name, attrs)
     return wrap_scene(fn)
 end
 
---- 完全一致でグローバルシーンを探し、コルーチンを返す（実行しない）。
+--- 完全一致でシーンを探し、コルーチンを返す（実行しない）。
 ---
---- グローバルシーンだけを探す。今のシーン・act のメソッド・GLOBAL の関数は見ない。
+--- local_name が nil なら大域だけを探す。渡せば、その大域の中のローカルを書いた名前どおりに探す。
+--- 今のシーン・act のメソッド・GLOBAL の関数は見ない。
 ---
---- @param name string 候補の名前（例: "つっつき反応女の子Head"）
---- @return thread|nil シーンコルーチン。見つからなければ nil
-function SCENE.co_exec_exact(name)
+--- @param name string 大域シーンの書いた名前（例: "つっつき反応女の子Head"）
+--- @param local_name string|nil ローカルシーンの書いた名前
+--- @return thread|nil co シーンコルーチン。見つからなければ nil
+--- @return "global"|"local"|nil miss co が nil のとき、見つからなかった側
+function SCENE.co_exec_exact(name, local_name)
     local SEARCH = require("@pasta_search")
-    local global_name, local_name = SEARCH:search_scene_exact(name, nil)
-    if not global_name then
-        return nil
+    local global_name, found_local, miss
+    if local_name == nil then
+        global_name, found_local = SEARCH:search_scene_exact(name, nil)
+        miss = "global"
+    else
+        global_name, found_local = SEARCH:search_local_scene_exact(name, local_name)
+        if not global_name then
+            return nil, found_local
+        end
+        miss = "local"
     end
+    if not global_name then
+        return nil, miss
+    end
+    local co = SCENE.co_exec_registered(global_name, found_local)
+    if not co then
+        return nil, miss
+    end
+    return co
+end
+
+--- 登録名の組（例: "会話_1", "__start__" / "会話_1", "挨拶_1"）からコルーチンを返す（実行しない）。
+---
+--- @param global_name string 大域シーンの登録名
+--- @param local_name string ローカルシーンの登録名（大域そのものは "__start__"）
+--- @return thread|nil シーンコルーチン。関数が引けなければ nil
+function SCENE.co_exec_registered(global_name, local_name)
     local fn = SCENE.get(global_name, local_name)
     if type(fn) ~= "function" then
         return nil
