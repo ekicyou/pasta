@@ -1,0 +1,27 @@
+THIRD-PARTY SOFTWARE LICENSES
+=============================
+
+この表示は pasta_check.exe のためのものです。
+pasta 自体は MIT License で配布されています（https://github.com/ekicyou/pasta/blob/main/LICENSE）。
+pasta_check.exe には以下の第三者ソフトウェアが組み込まれているため、
+各ライセンスの定めに従い著作権表示と許諾文を掲載します。
+
+This notice is for pasta_check.exe.
+pasta itself is licensed under the MIT License. pasta_check.exe includes
+the third-party software below.
+
+{{#each overview}}
+- {{{name}}} ({{count}})
+{{/each}}
+
+{{#each licenses}}
+================================================================================
+{{{name}}}
+Used by:
+{{#each used_by}}
+  - {{crate.name}} {{crate.version}}{{#if crate.repository}} <{{crate.repository}}>{{/if}}
+{{/each}}
+
+{{{text}}}
+
+{{/each}}

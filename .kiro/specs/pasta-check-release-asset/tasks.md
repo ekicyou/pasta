@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. 下地: 変更前の記録とライセンス表示のひな形
+- [x] 1. 下地: 変更前の記録とライセンス表示のひな形
 - [x] 1.1 変更前のリリースビルドを通し、比べるための記録を残す
   - cargo を走らせる前に、環境変数 `NoDefaultCurrentDirectoryInExePath` を外す（LuaJIT のビルドが止まるため）
   - `x86_64-pc-windows-msvc` のターゲットと cargo-about が手元に入っていることを確かめる（無ければ入れる）
@@ -9,7 +9,7 @@
   - 完了の姿: 変更前の 3 つの記録がスクラッチにあり、2.3 の比較に使える
   - _Requirements: 2.4, 3.7_
 
-- [ ] 1.2 pasta_check.exe 用のライセンス表示のひな形を作る
+- [x] 1.2 pasta_check.exe 用のライセンス表示のひな形を作る
   - ルートに `about-pasta_check.hbs` を置く。冒頭に「pasta_check.exe のための表示」「pasta 自体は MIT License」を日本語と英語で書き、本体は今の `about.hbs` と同じ形の一覧と節にする。LuaJIT の固定の節は持たない
   - `about.toml` は冒頭のコメントに、このひな形も同じ設定を使うと一言足すだけで、値は変えない。`about.hbs` は触らない
   - pasta_check だけを根にし、x64 のターゲットに絞った cargo-about の生成をスクラッチへ回し、`lexopt`・`md5`・`zip` があり、`LuaJIT`・`mlua`・`wasm-bindgen` が無く、冒頭の文があることを確かめる
