@@ -1,6 +1,6 @@
 -- auto_talk_pause_test.lua
 -- 自動トークの停止・再開（AutoTalkSwitch）のテスト (ontalk-suppression 2.3)
--- Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 1.7, 2.8, 3.4, 4.1, 4.2, 5.1
+-- Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 1.7, 2.2, 2.6, 2.8, 3.1, 3.2, 3.4, 4.1, 4.2, 4.5, 5.1
 --
 -- entry の依存閉包を同一インスタンス集合として一括新規ロードする（shiori_entry_test と同方針）。
 local describe = require("lua_test.test").describe
@@ -184,5 +184,75 @@ describe("ChainTalkGuard - 止めている間のチェイントーク", function
     end
 end)
 
+local REG = require("pasta.shiori.event.register")
+local CLOCK = require("pasta.shiori.clock")
+local HOUR = 3600
+
+-- 必ず thread を返す scene_executor を付けて、時計を進めた状態に整える
+local function setup_threads()
+    setup()
+    CLOCK._reset()
+    dispatcher._set_scene_executor(function(event_name)
+        return coroutine.create(function() return event_name end)
+    end)
+end
+
+describe("AutoTalkSwitch - 止めている間の OnSecondChange の既定ハンドラ", function()
+    test("正時を過ぎていても仮想時刻の読み取りが返る（2.2, 2.6）", function()
+        setup_threads()
+        CLOCK.observe({ id = "OnMinuteChange", date = { unix = BASE + HOUR + 30 }, dic = {} })
+        expect(CLOCK._get_state().probe_armed):toBe(true)
+        GLOBAL.pause_auto_talk(nil)
+        local act = act_at(BASE + HOUR + 31)
+        act.req.dic = {}
+        local result = REG.OnSecondChange(act)
+        expect(type(result)):toBe("string")
+        expect(result:find("OnPastaClock", 1, true) ~= nil):toBe(true)
+    end)
+end)
+
+describe("AutoTalkSwitch - 再開の後の時計", function()
+    test("停止と再開を続けて呼んでも間隔が数え直され、min 未満ではトークも続きも出ない（1.6, 3.1）", function()
+        setup_threads()
+        local cfg = dispatcher._get_config()
+        local t = BASE + 600 -- 前回決めた次のトーク時刻（BASE + max まで）は過ぎている
+        local co = coroutine.create(function() end)
+        STORE.co_scene = co
+        local act = act_at(t)
+        GLOBAL.pause_auto_talk(act)
+        GLOBAL.resume_auto_talk(act)
+        expect(dispatcher.dispatch(act_at(t))):toBe(nil)
+        expect(dispatcher.dispatch(act_at(t + cfg.talk_interval_min - 1))):toBe(nil)
+        -- 間隔を過ぎれば、捨てずに残した続きが出る（5.1）
+        expect(dispatcher.dispatch(act_at(t + cfg.talk_interval_max))):toBe(co)
+    end)
+
+    test("止めている間に仮想時刻を巻き戻してから再開しても、過ぎた正時が出ない（3.2）", function()
+        setup_threads()
+        GLOBAL.pause_auto_talk(nil)
+        local orig = CLOCK.epoch
+        local ok, err = pcall(function()
+            CLOCK.epoch = function() return 7 end
+            -- 巻き戻した先は正時の 30 秒後（決め直しの猶予の中）
+            local rewound = BASE - HOUR + 30
+            GLOBAL.resume_auto_talk(act_at(rewound))
+            expect(dispatcher.dispatch(act_at(rewound + 1))):toBe(nil)
+            expect(type(dispatcher.dispatch(act_at(BASE)))):toBe("thread")
+        end)
+        CLOCK.epoch = orig
+        assert(ok, err)
+    end)
+
+    test("STORE.reset() で解け、時報が今どおり出る（4.5, 5.1）", function()
+        setup_threads()
+        GLOBAL.pause_auto_talk(nil)
+        expect(dispatcher.dispatch(act_at(BASE + HOUR))):toBe(nil)
+        STORE.reset()
+        expect(STORE.auto_talk_paused):toBe(false)
+        expect(type(dispatcher.dispatch(act_at(BASE + HOUR)))):toBe("thread")
+    end)
+end)
+
 STORE.reset()
+CLOCK._reset()
 dispatcher._reset()
