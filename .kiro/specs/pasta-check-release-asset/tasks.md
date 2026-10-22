@@ -26,7 +26,7 @@
   - 完了の姿: `release.ps1` を通すと `release\pasta_check.zip` ができ、中身は最上位に `pasta_check.exe` と `THIRD_PARTY_LICENSES.txt` の 2 つだけ
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.5, 2.6, 3.2, 3.3, 3.4, 3.6_
 
-- [ ] 2.2 `pasta_check release` の段を x64 の exe で走らせ、段の並びと表示を合わせる
+- [x] 2.2 `pasta_check release` の段を x64 の exe で走らせ、段の並びと表示を合わせる
   - `pasta_check release` の段を、`cargo run -p pasta_check` から 2.1 で作った exe の起動に替える。引数と失敗の扱いは変えない
   - 段の見出しを `[1/7]`〜`[7/7]` に、冒頭の説明・`-SkipSetup` の説明・リリースの段の範囲の注釈を合わせる
   - 頭の表示とまとめに `Check Zip:` の行を足す
