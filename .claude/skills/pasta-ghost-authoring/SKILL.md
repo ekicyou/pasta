@@ -46,7 +46,7 @@ metadata:
 | [grammar-index.md](references/grammar-index.md) | 生成（マニュアルから） | [文法リファレンス概要](https://ekicyou.github.io/pasta/grammar/index.html) | 文法の全体像（ファイル構造の俯瞰・式の基本例・各章への道案内） |
 | [markers.md](references/markers.md) | 生成（マニュアルから） | [キーワード・マーカー](https://ekicyou.github.io/pasta/grammar/markers.html) | マーカー・演算子・区切り文字・識別子・空白・インデントの規則 |
 | [block-structure.md](references/block-structure.md) | 生成（マニュアルから） | [行とブロック構造](https://ekicyou.github.io/pasta/grammar/block-structure.html) | 行の種類と置ける場所・ブロック構造・Lua ブロックの配置・選択肢行・キューコマンド行・属性・コメント・文字コード |
-| [call-jump.md](references/call-jump.md) | 生成（マニュアルから） | [Call / Jump](https://ekicyou.github.io/pasta/grammar/call-jump.html) | Call（`＞`）・スコープ解決・候補の選択・チェイントーク・ゴースト終了・引数リスト |
+| [call-jump.md](references/call-jump.md) | 生成（マニュアルから） | [Call / Jump](https://ekicyou.github.io/pasta/grammar/call-jump.html) | Call（`＞`）・スコープ解決・候補の選択・チェイントーク・ゴースト終了・自動トーク停止／再開・引数リスト |
 | [literals.md](references/literals.md) | 生成（マニュアルから） | [リテラル型](https://ekicyou.github.io/pasta/grammar/literals.html) | 文字列・数値リテラル・型変換・引用符エスケープ |
 | [action-line.md](references/action-line.md) | 生成（マニュアルから） | [アクション行](https://ekicyou.github.io/pasta/grammar/action-line.html) | アクション行・インライン要素・区切り・行継続・改行 |
 | [sakura-script.md](references/sakura-script.md) | 生成（マニュアルから） | [さくらスクリプト](https://ekicyou.github.io/pasta/grammar/sakura-script.html) | さくらスクリプトの字句構造・配置ルール・主要タグ |
