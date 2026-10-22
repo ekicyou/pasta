@@ -72,7 +72,7 @@ local specs = {
     "virtual_clock_test",                 -- pasta.shiori.clock 仮想時刻のずれ・合図・読み取り・時刻と日付の表テスト (tutorial-ssp-gaps 2.1)
     "event_clock_hook_test",              -- EVENT.fire 入口の時計のフック（合図と返事を見せる）テスト (tutorial-ssp-gaps 3.1)
     "actor_style_test",                   -- pasta.shiori.actor_style 装いの出し入れ・出し直し・素通しテスト (actor-display-style 2.3)
-    "scene_play_event_test",              -- pasta.scene の co_exec_exact・co_exec_registered テスト (scene-play-event 3.1)
+    "scene_play_event_test",              -- co_exec_exact・co_exec_registered・既定のハンドラのテスト (scene-play-event 3.1, 3.2)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

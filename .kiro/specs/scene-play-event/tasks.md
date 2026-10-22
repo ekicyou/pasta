@@ -39,7 +39,7 @@
   - _Depends: 2.1, 2.2_
   - _Requirements: 2.1, 4.1, 4.2_
 
-- [ ] 3. シーンを再生するイベント（Lua）
+- [x] 3. シーンを再生するイベント（Lua）
 - [x] 3.1 名前と登録名の組からシーンのコルーチンを作る口を広げる
   - 完全一致でシーンを探す口に、省略できるローカルの名前と、見つからない側（`"global"`・`"local"`）を示す 2 つ目の戻り値を足す。ローカルを渡したときは 1.2 のメソッドを使う
   - 登録名の組からコルーチンを作る口を足す。引けなければ無しを返す。どちらも今の包み方（最後に `act:build()` を返す）で包む
@@ -48,7 +48,7 @@
   - _Depends: 1.2_
   - _Requirements: 1.1, 1.2, 2.1, 5.1, 5.2_
 
-- [ ] 3.2 `OnPastaScene`・`OnPastaSceneAt` の既定のハンドラを足し、既定のハンドラの並びに載せる
+- [x] 3.2 `OnPastaScene`・`OnPastaSceneAt` の既定のハンドラを足し、既定のハンドラの並びに載せる
   - 作者が先に定義したハンドラがあれば何もしない既定のハンドラの形で置き、門と失敗の小さな共通の関数だけを持つ
   - 門: デバッグのモジュールが無いか無効なら、ログに warn を出して 204。`SecurityLevel` が external なら、ログに warn を出して 204。門は引数を見る前に置く
   - 引数: Reference0 が無い・空なら `名前にならない値`。空の Reference1 は省略と同じ。行は半角数字だけの 1 以上の整数で、それ以外は `数にできない値`
@@ -107,3 +107,4 @@
 - 1.1: `resolve_global_owning_local_exact` は持ち主がいても属性で全部はずれると `Err(NoMatchingScene)` を返す（今の完全一致と同じ）。1.2 の呼び出し側はこれを考えること
 - 2.2: `PastaLuaRuntime::debug_enabled()` は待ち受けの有無（`debug_handle.is_some()`）を返す。`@pasta_debug.enabled()` はこれを使わず、解決した設定の値を見ること
 - 2.3: `@pasta_debug.scene_at(file, line)` は 2 つの戻り値（大域, ローカル）。line は数で受けるので、Reference1 の文字列→数の変換と検査はハンドラ（3.2）の役目。file が文字列でないと Lua のエラーになるので、ハンドラで先に確かめる
+- 3.2: scene_play_event_test.lua の load_handlers／reload は REG と package.loaded を差し替えて戻さない。一覧でこのスイートの後ろに足すときは注意
