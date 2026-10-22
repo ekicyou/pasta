@@ -10,6 +10,7 @@ description = "Pasta DSL - Language Server Protocol implementation"
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
+keywords.workspace = true
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
