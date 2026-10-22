@@ -96,7 +96,7 @@
 
 - 自動トークの停止（`ontalk-suppression`。続きを再開する道を止めるだけで、捨てる決まりには触れない）
 - シーン再生のイベントそのもの（`scene-play-event`）
-- `set_co_scene` の死んだ `coroutine.close` の分岐と `STORE.co_callback` の整理（0.4.3 の `ponytail-lua-scripts`）
+- `set_co_scene` の死んだ `coroutine.close` の分岐と `STORE.co_callback` の整理（隙間の spec の `ponytail-lua-scripts`）
 - ノベルの場面の流れ（0.5.0 の `novel-talk-flow`）
 
 ## Upstream / Downstream
@@ -109,7 +109,7 @@
 - **Extends**: なし（新しい境界）
 - **Adjacent**
   - `scene-play-event`（0.4.2）: シーン再生の道で、続きを捨てる決まり（キックと同じ）を、この spec の新しい決まりの中で保つ。この spec はあちらの後に入り、キックとシーン再生の「はっきり捨てる」を 1 か所で直す。
-  - `ponytail-lua-scripts`（0.4.3）: 同じ `set_co_scene`・`EVENT.drive` を整理する。同じウェーブに置かない。この spec が先に入り、あちらが後から合わせる。
+  - `ponytail-lua-scripts`（ponytail・隙間の spec）: 同じ `set_co_scene`・`EVENT.drive` を整理する。同じウェーブに置かない。この spec が先に入り、あちらが後から合わせる。
   - `ontalk-suppression`（0.4.2）: ファイルを共有しない（あちらは `virtual_dispatcher.lua`・`entry.lua`）。並べられる。
   - `novel-talk-flow`（0.5.0）: 上の Downstream。あちらの要件で、新しい決まりに合わせて読み直す。
 

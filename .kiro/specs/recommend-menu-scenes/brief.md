@@ -170,7 +170,7 @@
   - `ontalk-suppression`（0.4.2）: `pasta_check` の `builtins.rs` の `GLOBAL_NAMES` と、`shiori/entry.lua` の `GLOBAL` の定義を共有する。あちらが先に入る。
   - `chain-talk-interrupt`（0.4.2）: この spec はシーンの続きの置き場所を通さない道を足す。あちらは `set_co_scene` の決まりを変える。同じ `event/init.lua` を触るので、同じウェーブに置かない。
   - `call-attribute-filter`・`scene-attribute-store`（0.5.0）: 別名の置き換え（`scene_aliases.resolve`）を前提にしている。置き換えの規則（完全一致・1 段）は変えないので、影響は表の作り方だけ。
-  - `ponytail-check-release`（0.4.3）: `builtins.rs` を触る。この spec が先に入る。
+  - `ponytail-check-release`（ponytail・隙間の spec）: `builtins.rs` を触る。この spec が先に入る。
 
 ## Constraints
 
