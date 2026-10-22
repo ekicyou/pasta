@@ -82,6 +82,13 @@
 - 続きを再開する道は `check_talk` だけなので、止めている間に `＞チェイントーク` で区切ると、その続き（と、その中の `＞自動トーク再開`）には再起動するか、ほかのシーンが続きを捨てるまで届かない。
 - **決定（2026-10-22 要件ディスカッション）**: 止めている間のチェイントークは、自動トークの切り替えに干渉するスクリプトの誤りとみなす。ログに警告を出し、止めている状態を解く（要件 2.8）。設計では、チェイントーク（`yield`／`チェイントーク`。`entry.lua` の `GLOBAL`）の側で止めている印を見て、再開と同じ手当て（4.1・4.2 で選ぶもの）を呼ぶ。警告のログの出し方（`@pasta_log` の warn など）も設計で決める。
 
+### 4.4b つつき・撫での反応（2026-10-22 要件ディスカッションで追加。要件 2.9〜2.11）
+
+- 既定のハンドラは `pasta_scripts/pasta/shiori/event/mouse.lua`。つつき（`on_poke`）は Status を見ずに 1〜8 段（`find_shortcut`）→ 9 段目（`exec_event_scene(act, "OnMouseDoubleClick")`）。撫で（`on_touch`）は `M.check_stroke(..., dispatcher.is_blocked(req.status))` で「撫でた」を決め、決めたときだけ 1〜8 段、その後 9 段目（`OnMouseMove`）。
+- 手当ては 2 か所: `on_poke` で止めている印が立っていれば `find_shortcut` を飛ばす。`on_touch` で `check_stroke` の `blocked` に止めている印を足す（Status の抑止と同じく判定の状態も Off に戻る）。印は `STORE` から読む（`mouse.lua` は既に `pasta.store` を読んでいる）。
+- `REG` にゴーストが先に置いたハンドラは `REG.OnMouseDoubleClick or on_poke` で既定が使われないので、自動で対象外（要件 2.11）。
+- 既存のテスト `tests/lua_specs/mouse_test.lua` ほかは、印の既定を偽にすれば不変。
+
 ### 4.5 既定の挙動のバイト不変（Constraint）
 
 - フラグの既定を偽（未設定は `nil`）にし、偽のときは分岐が素通りすれば、今の `dispatch` のテスト 5 本はそのまま通る。`STORE.kick_force` の先例（「通常経路ではバイト不変」）と同じ作り。
