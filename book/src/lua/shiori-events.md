@@ -589,6 +589,7 @@ end
 - トークが終わってバルーンが残っているだけ（Status が `balloon(…)` だけ）のときは抑止しない。
 - 抑止の間も、`OnMouseMove` という名前のシーンは今までどおり探す。抑止するのは撫での判定と撫でのショートカットだけである。
 - つつきは抑止しない。しゃべっている途中でも探して返す（トークは打ち切られる）。
+- [自動トークを止めている](../grammar/call-jump.md#自動トーク停止自動トーク再開)間は、つつき・撫でとも 1〜8 段を探さず、9 段目の `OnMouseDoubleClick`・`OnMouseMove` という名前のシーンだけを探す。撫では、Status による抑止と同じく撫でたと決めず、撫での時間を数え直す。`REG` に置いた自前のハンドラは変わらない。
 
 ### 名前の一致
 
@@ -719,8 +720,9 @@ local co = dispatcher.dispatch(act)
 1. `act.req.date` が無ければ `nil` を返す。
 2. `act.req.status` に[ブロック対象のキーワード](#ブロック対象-status-キーワード)が含まれていれば `nil` を返す（`is_blocked` で判定）。
 3. デバッグの[シーン再生](../debug/dev-actions.md#シーン再生-シーンを実行)で再生を求められたシーンがあれば、そのシーンを返す。このときに限り、2 の判定を 1 回だけ無視する。
-4. OnHour を判定する（[check_hour](#check_houract)）。発行するならそのシーンを返す。
-5. OnTalk を判定する（[check_talk](#check_talkact)）。
+4. [自動トークを止めている](#自動トークを止めている間)なら `nil` を返す。
+5. OnHour を判定する（[check_hour](#check_houract)）。発行するならそのシーンを返す。
+6. OnTalk を判定する（[check_talk](#check_talkact)）。
 
 ### ブロック対象 Status キーワード
 
@@ -739,6 +741,20 @@ local co = dispatcher.dispatch(act)
 | `minimizing` | 最小化中 | バルーンが表示されていない |
 
 ブロックされた OnHour は、ブロックが解けた最初の OnSecondChange で発行される。
+
+### 自動トークを止めている間
+
+[`＞自動トーク停止`](../grammar/call-jump.md#自動トーク停止自動トーク再開)で止めている間は、`dispatch` は OnHour・OnTalk の判定に進まず、止まっているシーンの続き（チェイントークで中断したシーンの残りと、シーン再生で再生したシーンの 2 回目以降の出力）も返さない。待っている続きは捨てない。判定の位置は Status による抑止とシーン再生の後なので、シーン再生で求めたシーンの最初の出力は出る。
+
+Status による抑止とは、時報の扱いが違う。
+
+- Status による抑止: 抑止が解けた最初の OnSecondChange で、その間に過ぎた正時の時報を出す。
+- 自動トークの停止: 止めている間に過ぎた正時の時報は、再開した後にも出さない。
+
+`＞自動トーク再開` で再開すると、仮想ディスパッチャの時計を決め直す（`restart_timers(act)`）。
+
+- 次のトーク時刻を未設定に戻す。再開した後の最初の [check_talk](#check_talkact) が、そこから間隔を数え直す。
+- 次の正時を、再開した時刻の次の正時にする。`act.req.date` が無いときは未設定に戻し、次の [check_hour](#check_houract) が決める。
 
 ### is_blocked(status)
 
