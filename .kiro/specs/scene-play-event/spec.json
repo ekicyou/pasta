@@ -1,16 +1,16 @@
 {
   "feature_name": "scene-play-event",
   "created_at": "2026-10-22T11:46:40Z",
-  "updated_at": "2026-10-22T11:50:05Z",
+  "updated_at": "2026-10-22T14:30:00Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {
