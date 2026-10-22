@@ -252,7 +252,16 @@ fn file_with_syntax_error_registers_no_scenes() {
 fn builtin_names_are_listed() {
     assert_eq!(
         GLOBAL_NAMES,
-        ["yield", "チェイントーク", "close_ghost", "ゴースト終了"]
+        [
+            "yield",
+            "チェイントーク",
+            "close_ghost",
+            "ゴースト終了",
+            "pause_auto_talk",
+            "自動トーク停止",
+            "resume_auto_talk",
+            "自動トーク再開"
+        ]
     );
     assert_eq!(ACT_METHODS.len(), 27);
     assert!(ACT_METHODS.contains(&"call_restore"));
@@ -333,8 +342,30 @@ fn call_finds_global_scene_by_prefix_after_alias() {
 
 #[test]
 fn call_to_builtin_name_is_found() {
-    let text = "＊会話\n  ＞transfer_req_to_var\n  ＞yield\n  ＞ゴースト終了\n";
+    let text = "＊会話\n  ＞transfer_req_to_var\n  ＞yield\n  ＞ゴースト終了\n  ＞自動トーク停止\n  ＞resume_auto_talk\n";
     assert_eq!(reference_findings(TOML, text), vec![]);
+}
+
+/// 自動トークの停止・再開も組み込みは完全一致だけ。途中まで・全角英字は見つからない（6.2）
+#[test]
+fn call_to_partial_or_fullwidth_builtin_name_is_missing() {
+    let text = "＊会話\n  ＞自動トーク\n  ＞ｐａｕｓｅ＿ａｕｔｏ＿ｔａｌｋ\n";
+    let missing = |line, name: &str| {
+        (
+            line,
+            FindingKind::CallTargetMissing,
+            format!(
+                "Call の飛び先「{name}」が辞書のシーンにありません（Lua で定義していれば問題ありません）"
+            ),
+        )
+    };
+    assert_eq!(
+        reference_findings(TOML, text),
+        vec![
+            missing(2, "自動トーク"),
+            missing(3, "ｐａｕｓｅ＿ａｕｔｏ＿ｔａｌｋ")
+        ]
+    );
 }
 
 #[test]

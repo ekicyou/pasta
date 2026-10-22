@@ -2,8 +2,18 @@
 //!
 //! 実物は pasta_lua の pasta_scripts。一致テストが実行時の `GLOBAL` と act の関数の名前を列挙して照らす。
 
-/// `GLOBAL` の関数（`pasta/global.lua`・`pasta/shiori/entry.lua`）
-pub const GLOBAL_NAMES: [&str; 4] = ["yield", "チェイントーク", "close_ghost", "ゴースト終了"];
+/// `GLOBAL` の関数（`yield`・`チェイントーク` は `pasta/global.lua`、
+/// ゴースト終了と自動トークの停止・再開は `pasta/shiori/entry.lua`）
+pub const GLOBAL_NAMES: [&str; 8] = [
+    "yield",
+    "チェイントーク",
+    "close_ghost",
+    "ゴースト終了",
+    "pause_auto_talk",
+    "自動トーク停止",
+    "resume_auto_talk",
+    "自動トーク再開",
+];
 
 /// act のメソッド（`pasta/act.lua` の `ACT_IMPL` の関数。メタメソッドの `__index` は除く）
 pub const ACT_METHODS: [&str; 27] = [

@@ -18,6 +18,7 @@
 --- @field actor_words table<string, table> アクター単語レジストリ（actor_name → {key → values[][]}）
 --- @field app_ctx table アプリケーション実行中の汎用コンテキストデータ
 --- @field appearance table 外見状態（セッション常駐・非永続）
+--- @field auto_talk_paused boolean 自動トークを止めている印（セッション常駐・非永続・既定 false）
 --- @field co_callback thread|nil コールバック待ちとして登録したコルーチンの印（下記参照）
 local STORE = {}
 
@@ -74,6 +75,11 @@ STORE.kick_pending = nil
 --- @type boolean
 STORE.kick_force = false
 
+--- 自動トーク（ランダムトーク・時報・チェイントークの続き）を止めている印（既定 false）
+--- 回数は数えない真偽 1 つ。セッション常駐のみ。pasta.save（永続化）には置かない。
+--- @type boolean
+STORE.auto_talk_paused = false
+
 -- STORE.co_callback（thread|nil）はこのモジュールでは初期化しない（未設定は nil）。
 -- pasta.shiori.event.callback の CALLBACK.consume_staged が設定し、
 -- pasta.shiori.event の set_co_scene と CALLBACK.reset が nil に戻す。STORE.reset は触らない。
@@ -103,6 +109,7 @@ function STORE.reset()
     STORE.last_global_scene = nil
     STORE.kick_pending = nil
     STORE.kick_force = false
+    STORE.auto_talk_paused = false
 end
 
 -- CONFIG.actor からの初期化

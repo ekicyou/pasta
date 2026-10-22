@@ -39,7 +39,7 @@ crates/pasta_sample_ghost/
 │       ├── install.txt
 │       ├── ghost/master/   # descript.txt, pasta.toml, dic/*.pasta（手書きSSOT）＋ pasta.dll, THIRD_PARTY_LICENSES.txt, scripts/（生成物・コミットしない）
 │       └── shell/master/   # descript.txt, surfaces.txt（手書きSSOT）＋ surface*.png（コミットした素材）
-├── release.ps1             # ビルド＋セットアップ＋.nar・pasta.dll.zip 作成（動作確認用）
+├── release.ps1             # ビルド＋セットアップ＋pasta_check.zip・.nar・pasta.dll.zip 作成（動作確認用）
 └── tests/
     ├── common/mod.rs                 # テストヘルパー
     ├── dist_src_validation_test.rs   # 配布ファイル構成の検証 ※ファイル名は旧称（dist-src 廃止済み）
@@ -67,16 +67,17 @@ crates/pasta_sample_ghost/
 .\release.ps1 -SkipSetup
 ```
 
-このスクリプトは以下の 6 ステップを実行します:
+このスクリプトは以下の 7 ステップを実行します:
 
 1. `pasta_shiori` DLL（32bit Windows）をビルド
 2. `pasta.dll`・第三者ライセンス表示（`THIRD_PARTY_LICENSES.txt`）・`scripts/`（利用者向けの説明 1 枚）を `ghosts/hello-pasta/ghost/master/` に配置
-3. `pasta_check release` を実行（updates.txt / `release/hello-pasta.nar` 作成）
-4. `release/pasta.dll.zip` を作成（`pasta.dll` と `THIRD_PARTY_LICENSES.txt`）
-5. バージョン整合チェック
-6. `.nar` の大きさを確認（7 MB を超えたらエラーで停止）し、リリース手順を表示
+3. `release/pasta_check.zip` を作成して中身を検査（64 ビット版の `pasta_check.exe` と、その依存の `THIRD_PARTY_LICENSES.txt`）
+4. 手順 3 の `pasta_check.exe` で `pasta_check release` を実行（updates.txt / `release/hello-pasta.nar` 作成）
+5. `release/pasta.dll.zip` を作成（`pasta.dll` と `THIRD_PARTY_LICENSES.txt`）
+6. バージョン整合チェック
+7. `.nar` の大きさを確認（7 MB を超えたらエラーで停止）し、リリース手順を表示
 
-`-SkipSetup` は手順 1〜2 を、`-SkipDllBuild` は手順 1 だけを飛ばします。
+`-SkipSetup` は手順 1〜2 を、`-SkipDllBuild` は手順 1 だけを飛ばします。手順 3 はどちらの指定でも毎回走ります。
 
 **注**: テキスト系配布ファイル（`descript.txt` / `pasta.toml` / `dic/*.pasta` / `install.txt`）と、シェルの立ち絵（`surface*.png`）・`surfaces.txt` は `ghosts/hello-pasta/` にコミット済みのため、コピー工程も生成工程もありません。`release.ps1` は `shell/master/` を書き換えず、生成物（DLL・ライセンス表示）と `scripts/` の配置とパッケージングのみを担います。
 

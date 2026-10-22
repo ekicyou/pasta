@@ -17,11 +17,25 @@
 
 ## 使い方
 
-`pasta_check` は Rust のツールチェーンで入れる。
+`pasta_check` は、GitHub の Release から `pasta_check.zip` を落として入れる。最新版は次の固定のリンクで落とせる。
+
+<https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip>
+
+落とした zip を好きなフォルダに展開する。中身は `pasta_check.exe` と `THIRD_PARTY_LICENSES.txt` で、`pasta_check.exe` は 64 ビット版の Windows 向けである。`pasta_check.exe` には署名が無いため、初めて起動するときに Windows の SmartScreen の警告が出ることがある。
+
+展開した `pasta_check.exe` は、パスで指定して呼べる。たとえば `C:\tools\pasta_check` に展開したなら次のとおり。
+
+```powershell
+C:\tools\pasta_check\pasta_check.exe validate --target ghosts\hello-pasta
+```
+
+Rust を使っている人は、`cargo install pasta_check` でも入れられる。
 
 ```sh
 cargo install pasta_check
 ```
+
+ここから先の例は `pasta_check` と書く。zip から入れたときは、展開した `pasta_check.exe` のパスに読み替える。
 
 ゴーストの開発フォルダ（`ghost/master` を含むフォルダ）を `--target` に渡す。
 
@@ -152,7 +166,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 
 組み込みの飛び先は、次の名前である。
 
-- `GLOBAL` の関数: `yield`・`チェイントーク`・`close_ghost`・`ゴースト終了`
+- `GLOBAL` の関数: `yield`・`チェイントーク`・`close_ghost`・`ゴースト終了`・`pause_auto_talk`・`自動トーク停止`・`resume_auto_talk`・`自動トーク再開`
 - act のメソッド: `init_scene`・`talk`・`sakura_script`・`raw_script`・`surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout`・`find_act_handler`・`find_handler`・`word`・`expr_fn`・`expr_fn_var`・`actor_proxy`・`global_fn`・`build`・`yield`・`find_scene`・`call`・`call_key`・`restore_scene`・`call_restore`・`failure`・`set_spot`・`clear_spot`
 - SHIORI 用の act のメソッド: `build`・`transfer_date_to_var`・`transfer_req_to_var`・`set_property`・`get_property`
 

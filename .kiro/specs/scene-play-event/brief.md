@@ -148,3 +148,9 @@ MCP の `raise_event` は、SSTP NOTIFY と同じく、SHIORI にイベントを
   - 「続きのビートは OnSecondChange で流れる」は正確でない。続きは、ランダムトークの判定（`virtual_dispatcher.lua` の `check_talk`）が次のトークの時刻に達したときだけ流れる（既定で 3〜5 分おき）。MCP の利用者向けに、2 ビート目からはしばらく後に出ると書く。
   - `uri_to_pasta_path`（`playscene.rs` L100）は、相対パスを SSP の今のフォルダから絶対にする。`ghost/master/` からの相対パスを受けるには、先に結ぶ処理が要る。
   - `ontalk-suppression` との接点（止めている間の続き）は、推奨を「止める」に改めるのがよい。今のコードでは、キックの続きも止まるためである。
+
+## 申し送り（ontalk-suppression より、2026-10-22 完了時）
+
+- 止める門は `virtual_dispatcher.lua` の `dispatch` で、`KICK.try_dispatch` の後・`check_hour` の前に置いた。止めている間もキックの 1 ビート目は出て、2 ビート目からの続き（`check_talk` が返す `STORE.co_scene`）は出ない。続きは捨てずに残る。`OnPastaScene` の続きも `co_scene` を通るなら同じ扱いになる（brief の再測定の推奨「止める」のとおり）。
+- 止めている間に再生したシーンが `＞チェイントーク` を使うと、警告が出て止めが解ける（`.kiro/specs/completed/ontalk-suppression/design.md` の決定事項 4。マニュアルには書かない扱い）。
+- マニュアル `grammar/call-jump.md` の「自動トーク停止・自動トーク再開」の節は、止めないものに「シーン再生で求めたシーンの最初の出力」を挙げ、`debug/dev-actions.md#シーン再生-シーンを実行` へリンクしている。新しいイベントを足すときは、この行とリンクを合わせて直す。

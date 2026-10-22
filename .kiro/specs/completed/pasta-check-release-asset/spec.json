@@ -1,0 +1,23 @@
+{
+  "feature_name": "pasta-check-release-asset",
+  "created_at": "2026-10-22T11:46:21Z",
+  "updated_at": "2026-10-22T12:29:59Z",
+  "language": "ja",
+  "phase": "completed",
+  "completed_at": "2026-10-22T14:30:00Z",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

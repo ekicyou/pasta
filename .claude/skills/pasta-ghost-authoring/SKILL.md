@@ -46,7 +46,7 @@ metadata:
 | [grammar-index.md](references/grammar-index.md) | 生成（マニュアルから） | [文法リファレンス概要](https://ekicyou.github.io/pasta/grammar/index.html) | 文法の全体像（ファイル構造の俯瞰・式の基本例・各章への道案内） |
 | [markers.md](references/markers.md) | 生成（マニュアルから） | [キーワード・マーカー](https://ekicyou.github.io/pasta/grammar/markers.html) | マーカー・演算子・区切り文字・識別子・空白・インデントの規則 |
 | [block-structure.md](references/block-structure.md) | 生成（マニュアルから） | [行とブロック構造](https://ekicyou.github.io/pasta/grammar/block-structure.html) | 行の種類と置ける場所・ブロック構造・Lua ブロックの配置・選択肢行・キューコマンド行・属性・コメント・文字コード |
-| [call-jump.md](references/call-jump.md) | 生成（マニュアルから） | [Call / Jump](https://ekicyou.github.io/pasta/grammar/call-jump.html) | Call（`＞`）・スコープ解決・候補の選択・チェイントーク・ゴースト終了・引数リスト |
+| [call-jump.md](references/call-jump.md) | 生成（マニュアルから） | [Call / Jump](https://ekicyou.github.io/pasta/grammar/call-jump.html) | Call（`＞`）・スコープ解決・候補の選択・チェイントーク・ゴースト終了・自動トーク停止／再開・引数リスト |
 | [literals.md](references/literals.md) | 生成（マニュアルから） | [リテラル型](https://ekicyou.github.io/pasta/grammar/literals.html) | 文字列・数値リテラル・型変換・引用符エスケープ |
 | [action-line.md](references/action-line.md) | 生成（マニュアルから） | [アクション行](https://ekicyou.github.io/pasta/grammar/action-line.html) | アクション行・インライン要素・区切り・行継続・改行 |
 | [sakura-script.md](references/sakura-script.md) | 生成（マニュアルから） | [さくらスクリプト](https://ekicyou.github.io/pasta/grammar/sakura-script.html) | さくらスクリプトの字句構造・配置ルール・主要タグ |
@@ -206,6 +206,7 @@ metadata:
 - 前方一致で候補が複数ある場合はシャッフル＆順次消費で1つ選ぶ
 - 特殊Call: `＞ゴースト終了（ミリ秒）` — ゴーストを終了させる
 - 特殊Call: `＞チェイントーク` / `＞yield` — シーン出力を分割し、次回 OnTalk の機会に残りを出力する（詳細は [call-jump.md](references/call-jump.md#チェイントーク)、作例は [authoring-patterns.md §6.7](references/authoring-patterns.md#s6-7)）
+- 特殊Call: `＞自動トーク停止` / `＞自動トーク再開` — 自動トーク（ランダムトーク・時報・止まっているシーンの続き・つつき／撫での 1〜8 段の反応）を止める／再開する。止めた区間の中の `＞チェイントーク` は誤り（警告が出て止めが解ける）。区切りには選択肢やイベントを使う。セッションの間だけ・入れ子は数えない（詳細は [call-jump.md](references/call-jump.md#自動トーク停止自動トーク再開)）
 
 ```pasta
 ＊OnClose

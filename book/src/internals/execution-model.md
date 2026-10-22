@@ -246,7 +246,7 @@ loop
 
 ### 継続トーク（チェイントーク）と co_scene の更新
 
-`act:yield()`（`ACT_IMPL.yield`）は、それまでのトークを `build()` して `coroutine.yield` に渡す。DSL の `＞yield` は Call の検索で ACT のメソッド `yield` に、`＞チェイントーク` は `GLOBAL["チェイントーク"]`（`GLOBAL.yield` と同じ関数）に解決され、どちらも `act:yield()` になる（[ローカル優先の検索順](registry-search.md#ローカル優先の検索順)）。
+`act:yield()`（`ACT_IMPL.yield`）は、それまでのトークを `build()` して `coroutine.yield` に渡す。DSL の `＞yield` は Call の検索で ACT のメソッド `yield` に、`＞チェイントーク` は `GLOBAL["チェイントーク"]`（`GLOBAL.yield` と同じ関数）に解決され、どちらも `act:yield()` になる（[ローカル優先の検索順](registry-search.md#ローカル優先の検索順)）。自動トークを止めている間（`STORE.auto_talk_paused`）に呼ばれたときは、先にログへ警告を 1 行出して `GLOBAL.resume_auto_talk` を呼び、その後は同じく区切る。
 
 `EVENT.drive` は再開の後、`set_co_scene(co)` で `STORE.co_scene` を更新する。呼び出し元が `EVENT.fire`・`CALLBACK.try_route`・`CALLBACK.sweep` のどれでも同じ規則である。
 
@@ -264,7 +264,7 @@ set_co_scene(co)
 この規則から次のことが成り立つ。
 
 - 中断したコルーチンは `STORE.co_scene` に 1 つだけ残る。シーンを再開するたびに（コルーチンを返すイベント・コールバック・掃引）、そのコルーチンの結果で置き換わる。再開したシーンが最後まで動いて終わった場合も、古い継続は破棄されて `nil` になる。
-- 継続を再開するのは仮想イベントの OnTalk だけである。`check_talk`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua`）は、トークの時刻に達したとき `STORE.co_scene` があれば新しいシーンを探さずにそれを返す。OnHour とシーンキックは OnTalk より先に判定され、返したコルーチンが継続を置き換える。
+- 継続を再開するのは仮想イベントの OnTalk だけである。`check_talk`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua`）は、トークの時刻に達したとき `STORE.co_scene` があれば新しいシーンを探さずにそれを返す。OnHour とシーンキックは OnTalk より先に判定され、返したコルーチンが継続を置き換える。自動トークを止めている間（`STORE.auto_talk_paused`）は `check_talk` まで進まないため、継続は再開されず、捨てられもしない。
 - 文字列か `nil` を返すハンドラ（`REG` の関数など）は `STORE.co_scene` を変えない。
 - シーンの実行中にエラーが起きると、そのコルーチンは dead になり、`set_co_scene` で既存の継続も破棄される。エラーは、`EVENT.fire` と `CALLBACK.try_route` の経路では `SHIORI.request` の `xpcall` へ伝わり、`CALLBACK.sweep` では応答の候補になる（後述）。
 

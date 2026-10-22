@@ -8,6 +8,18 @@ SSP を起動せずにゴーストの辞書（`.pasta`）と `pasta.toml` を検
 
 ## インストール
 
+GitHub の Release から `pasta_check.zip` を落として、好きなフォルダに展開します。最新版は次の固定のリンクで落とせます。
+
+<https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip>
+
+中身は `pasta_check.exe` と `THIRD_PARTY_LICENSES.txt` です。`pasta_check.exe` は 64 ビット版の Windows 向けで、署名が無いため、初めて起動するときに Windows の SmartScreen の警告が出ることがあります。展開した `pasta_check.exe` はパスで指定して呼べます。
+
+```powershell
+C:\tools\pasta_check\pasta_check.exe validate --target ghosts\hello-pasta
+```
+
+Rust を使っている場合は、`cargo install` でも入れられます。
+
 ```bash
 cargo install pasta_check
 ```

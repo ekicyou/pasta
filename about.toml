@@ -1,5 +1,6 @@
 # cargo-about 設定: 配布バイナリ（pasta.dll / VSIX 同梱 wasm）の第三者ライセンス表示を生成する。
 # build-dependency 経由で静的リンクされる LuaJIT（luajit-src）は依存解析に出ないため about.hbs に固定で記載している。
+# pasta_check.exe 用の表示（about-pasta_check.hbs）も同じ設定を使う。
 # 許可ライセンスは deny.toml の [licenses].allow と揃えること。
 accepted = [
     "MIT",

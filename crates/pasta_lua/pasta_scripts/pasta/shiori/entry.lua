@@ -26,6 +26,27 @@ end
 -- （luacheck）互換の等価なブラケット記法で定義する（3.47 global.lua と同方針）
 GLOBAL["ゴースト終了"] = GLOBAL.close_ghost
 
+--- 自動トークを止める。出力を積まない。止めていても何もしない（数えない）。
+--- @param act ShioriAct|nil 使わない（Call の呼び方に合わせて受け取るだけ）
+function GLOBAL.pause_auto_talk(act)
+    require("pasta.store").auto_talk_paused = true
+end
+
+GLOBAL["自動トーク停止"] = GLOBAL.pause_auto_talk
+
+--- 止めていれば解き、ディスパッチャの時計を決め直す。止めていなければ何もしない。
+--- @param act ShioriAct|nil 時刻（act.req.date）が取れれば決め直しに使う
+function GLOBAL.resume_auto_talk(act)
+    local STORE = require("pasta.store")
+    if not STORE.auto_talk_paused then
+        return
+    end
+    STORE.auto_talk_paused = false
+    require("pasta.shiori.event.virtual_dispatcher").restart_timers(act)
+end
+
+GLOBAL["自動トーク再開"] = GLOBAL.resume_auto_talk
+
 -- グローバル SHIORI テーブルを初期化（既存の場合は維持）
 SHIORI = SHIORI or {}
 

@@ -112,3 +112,7 @@
 - 振る舞いを固めるテストを先に書き、1 つ直すごとに確かめて 1 コミットにする。
 - 品質の関門：`cargo test -p pasta_lua`（Lua の spec を含む）、luacheck（luarocks の lfs・argparse を `LUA_PATH`・`LUA_CPATH` に足せば、手元でも動く）。
 - cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。`sample.generated.lua` の改行だけの差分は戻す。
+
+## 申し送り（ontalk-suppression より、2026-10-22 完了時）
+
+- `virtual_dispatcher.lua` の `dispatch` に、キックの後・`check_hour` の前の門（`if STORE.auto_talk_paused then return nil end`）を足した。公開の関数 `M.restart_timers(act)` も足した（`next_talk_time`・`next_hour_unix`・`seen_epoch` を書く）。`check_talk` には手を入れていない。行番号は測り直して合わせる。
