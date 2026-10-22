@@ -93,7 +93,7 @@
   - _Boundary: AssetListDocs（`pasta-check/SKILL.md` を除く）_
   - _Requirements: 7.7, 7.8, 7.9_
 
-- [ ] 6. 全体の確かめと開発者への引き継ぎ
+- [x] 6. 全体の確かめと開発者への引き継ぎ
   - `gen-skill-refs.mjs --check` が落ちていれば `gen-skill-refs.mjs` でスキルの `references/` を作り直す
   - `release-scripts-test.ps1` の全項目、`gen-skill-refs.mjs --check`、`link-check.mjs` を通しで走らせる
   - 古い数（「3 つの配布物」「添付 4 つ」「/3」「[n/6]」）の取り残しを、触ったファイルと File Structure Plan の文書で検索する
