@@ -136,9 +136,13 @@ local function request_time(req)
 end
 
 --- つつき: 抑止は見ない。Reference5・6 は読まない。
+--- 自動トークを止めている間は 1〜8 段を探さず 9 段目だけ。
 ---@param act ShioriAct
 ---@return thread|nil
 local function on_poke(act)
+    if STORE.auto_talk_paused then
+        return exec_event_scene(act, "OnMouseDoubleClick")
+    end
     local ref = act.req.reference or {}
     local actor = M.resolve_actor(ref[3])
     local co, name = find_shortcut("poke", actor, ref[4])
@@ -150,13 +154,15 @@ local function on_poke(act)
 end
 
 --- 撫で: 判定は毎回回す。決めたときだけアクター名を引いて 1〜8 段を探す。
+--- 自動トークを止めている間は抑止と同じく決めない（判定の状態は Off）。
 ---@param act ShioriAct
 ---@return thread|nil
 local function on_touch(act)
     local req = act.req
     local ref = req.reference or {}
     log.trace("OnMouseMove")
-    if M.check_stroke(ref[3], ref[4], request_time(req), dispatcher.is_blocked(req.status)) then
+    if M.check_stroke(ref[3], ref[4], request_time(req),
+            STORE.auto_talk_paused or dispatcher.is_blocked(req.status)) then
         local co, name = find_shortcut("touch", M.resolve_actor(ref[3]), ref[4])
         log.debug(string.format("撫で: %s/%s → %s", tostring(ref[3]), tostring(ref[4]), tostring(name)))
         if co then return co end

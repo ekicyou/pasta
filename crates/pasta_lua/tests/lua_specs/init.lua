@@ -60,6 +60,7 @@ local specs = {
     "virtual_dispatcher_kick_hook_test", -- KickDispatchHook dispatch 前段キック起動＋preempt 結合テスト (pasta-scene-kick 4.4)
     "kick_position_path_inheritance_test", -- 位置パスの dispatch 越し kick 継承テスト (pasta-scene-kick-from-cursor 6.2)
     "mouse_test",                         -- event.mouse 候補の名前・アクター名テスト (touch-poke-shortcuts 3.1)
+    "mouse_pause_test",                   -- 止めている間のつつき・撫での既定ハンドラテスト (ontalk-suppression 2.2)
     "store_appearance_test",              -- STORE.appearance 外見状態のセッション常駐テスト (actor-surface-restore 1.3)
     "appearance_test",                    -- pasta.shiori.appearance タグ走査・サーフェス観測テスト (actor-surface-restore 2.1)
     "act_dynamic_ref_test",               -- 動的参照のキー解決・警告テスト (dynamic-word-reference 2.1)
