@@ -11,6 +11,20 @@ use pasta_core::registry::{
 };
 use std::collections::HashMap;
 
+/// [`SearchContext::search_local_scene_exact`] の結果。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LocalSceneMatch {
+    /// 登録名の組（例: ("会話_1", "挨拶_1")）。
+    Found {
+        global_name: String,
+        local_name: String,
+    },
+    /// その名前の大域シーンが無い。
+    NoGlobal,
+    /// 大域シーンはあるが、どれもそのローカルシーンを持たない。
+    NoLocal,
+}
+
 /// SearchContext - manages search state for a Lua runtime instance.
 ///
 /// Each Lua runtime has its own SearchContext with independent
@@ -181,6 +195,61 @@ impl SearchContext {
         }
     }
 
+    /// 大域とローカルの書いた名前から、そのローカルを持つ大域を順送りで選び、
+    /// ローカルを完全一致で引く。
+    ///
+    /// 別名（`[scene.alias]`）は大域の名前にだけ当て、両方の名前を
+    /// `SceneRegistry::sanitize_name` で直してから探す。別名を当てて大域が
+    /// 無かったときは `search_scene` と同じ警告を出す。
+    pub fn search_local_scene_exact(
+        &mut self,
+        global_name: &str,
+        local_name: &str,
+    ) -> Result<LocalSceneMatch, SearchError> {
+        let filters = HashMap::new();
+        let alias = self.scene_aliases.resolve(global_name);
+        let global_key = SceneRegistry::sanitize_name(alias.unwrap_or(global_name));
+        let local_key = SceneRegistry::sanitize_name(local_name);
+
+        let global_id = match self.scene_table.resolve_global_owning_local_exact(
+            &global_key,
+            &local_key,
+            &filters,
+        ) {
+            Ok(Some(id)) => id,
+            Ok(None) => return Ok(LocalSceneMatch::NoLocal),
+            Err(
+                pasta_core::SceneTableError::SceneNotFound { .. }
+                | pasta_core::SceneTableError::NoMatchingScene { .. }
+                | pasta_core::SceneTableError::NoMoreScenes { .. },
+            ) => {
+                if let Some(target) = alias {
+                    tracing::warn!(
+                        name = %global_name,
+                        resolved = %target,
+                        "Scene not found (alias applied)"
+                    );
+                }
+                return Ok(LocalSceneMatch::NoGlobal);
+            }
+            Err(e) => return Err(SearchError::SceneTableError(e)),
+        };
+        let parent = self
+            .scene_table
+            .get_scene(global_id)
+            .map(|scene| Self::parse_fn_name(&scene.fn_name).0)
+            .ok_or_else(|| SearchError::InvalidArgument("Scene ID not found".to_string()))?;
+
+        // 選んだ大域の中で、今の完全一致でローカルを選ぶ（同名のローカルは順送り）
+        match self.search_scene_exact(&local_key, Some(&parent))? {
+            Some((global_name, local_name)) => Ok(LocalSceneMatch::Found {
+                global_name,
+                local_name,
+            }),
+            None => Ok(LocalSceneMatch::NoLocal),
+        }
+    }
+
     /// Parse fn_name to extract global_name and local_name in transpiler output format.
     ///
     /// # Arguments
@@ -308,6 +377,23 @@ impl UserData for SearchContext {
                 Ok(Some((global, local))) => (global, local).into_lua_multi(lua),
                 Ok(None) => Ok(MultiValue::new()),
                 Err(e) => Err(mlua::Error::from(e)),
+            },
+        );
+
+        // search_local_scene_exact(global_name, local_name)
+        //   -> (global_name, local_name) or nil, "global" / nil, "local"
+        methods.add_method_mut(
+            "search_local_scene_exact",
+            |lua, this, (global_name, local_name): (String, String)| match this
+                .search_local_scene_exact(&global_name, &local_name)
+                .map_err(mlua::Error::from)?
+            {
+                LocalSceneMatch::Found {
+                    global_name,
+                    local_name,
+                } => (global_name, local_name).into_lua_multi(lua),
+                LocalSceneMatch::NoGlobal => (mlua::Value::Nil, "global").into_lua_multi(lua),
+                LocalSceneMatch::NoLocal => (mlua::Value::Nil, "local").into_lua_multi(lua),
             },
         );
 
@@ -770,6 +856,149 @@ mod tests {
         .unwrap();
         assert_eq!(ctx.search_scene("存在しない", None).unwrap(), None);
         assert!(!logs_contain("alias applied"));
+    }
+
+    /// 大域 `会話・朝` を 2 つ（1 つ目はローカル無し、2 つ目にローカル `挨拶・A` を 2 つ）、
+    /// 大域 `OnTalk`（ローカル `挨拶`）を持ち、組み込みの別名表（会話 → OnTalk）と
+    /// 順送りのモックを持つ文脈。
+    fn create_local_search_context() -> SearchContext {
+        let mut scenes = SceneRegistry::new();
+        scenes.register_global("会話・朝", HashMap::new());
+        let (_, counter) = scenes.register_global("会話・朝", HashMap::new());
+        scenes.register_local("挨拶・A", "会話・朝", counter, 1, HashMap::new());
+        scenes.register_local("挨拶・A", "会話・朝", counter, 2, HashMap::new());
+        let (_, counter) = scenes.register_global("OnTalk", HashMap::new());
+        scenes.register_local("挨拶", "OnTalk", counter, 1, HashMap::new());
+        let mut ctx = SearchContext::with_aliases(
+            scenes,
+            WordDefRegistry::new(),
+            SceneAliasTable::builtin_default(),
+        )
+        .unwrap();
+        ctx.set_scene_selector(Some(vec![0])).unwrap();
+        ctx
+    }
+
+    fn found(global_name: &str, local_name: &str) -> LocalSceneMatch {
+        LocalSceneMatch::Found {
+            global_name: global_name.to_string(),
+            local_name: local_name.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_search_local_scene_exact_returns_registered_names() {
+        // 1.2・1.3・1.5・1.8: 書いた名前を直し、ローカルを持つ大域だけから選ぶ。
+        // 同じ大域の中の同名のローカルは順送り。
+        let mut ctx = create_local_search_context();
+        let got: Vec<LocalSceneMatch> = (0..3)
+            .map(|_| ctx.search_local_scene_exact("会話・朝", "挨拶・A").unwrap())
+            .collect();
+        assert_eq!(
+            got,
+            [
+                found("会話_朝_2", "挨拶_A_1"),
+                found("会話_朝_2", "挨拶_A_2"),
+                found("会話_朝_2", "挨拶_A_1"),
+            ]
+        );
+        // 直したあとの名前でも同じものに当たる
+        assert_eq!(
+            ctx.search_local_scene_exact("会話_朝", "挨拶_A").unwrap(),
+            found("会話_朝_2", "挨拶_A_2")
+        );
+    }
+
+    #[test]
+    fn test_search_local_scene_exact_alias_applies_to_global_only() {
+        // 1.5: 大域の名前にだけ別名が当たる
+        let mut ctx = create_local_search_context();
+        assert_eq!(
+            ctx.search_local_scene_exact("会話", "挨拶").unwrap(),
+            found("OnTalk_1", "挨拶_1")
+        );
+        // ローカルの名前 `会話` は OnTalk に置き換わらない
+        let mut scenes = SceneRegistry::new();
+        let (_, counter) = scenes.register_global("OnTalk", HashMap::new());
+        scenes.register_local("OnTalk", "OnTalk", counter, 1, HashMap::new());
+        let mut ctx = SearchContext::with_aliases(
+            scenes,
+            WordDefRegistry::new(),
+            SceneAliasTable::builtin_default(),
+        )
+        .unwrap();
+        assert_eq!(
+            ctx.search_local_scene_exact("OnTalk", "会話").unwrap(),
+            LocalSceneMatch::NoLocal
+        );
+    }
+
+    #[test]
+    fn test_search_local_scene_exact_not_found_cases() {
+        // 5.2: 大域が無い／大域はあるがローカルが無い。前方一致はしない。
+        let mut ctx = create_local_search_context();
+        assert_eq!(
+            ctx.search_local_scene_exact("存在しない", "挨拶").unwrap(),
+            LocalSceneMatch::NoGlobal
+        );
+        assert_eq!(
+            ctx.search_local_scene_exact("会話・", "挨拶・A").unwrap(),
+            LocalSceneMatch::NoGlobal
+        );
+        assert_eq!(
+            ctx.search_local_scene_exact("会話・朝", "挨拶").unwrap(),
+            LocalSceneMatch::NoLocal
+        );
+        assert_eq!(
+            ctx.search_local_scene_exact("会話・朝", "存在しない")
+                .unwrap(),
+            LocalSceneMatch::NoLocal
+        );
+    }
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn test_search_local_scene_exact_alias_miss_logs_both_names() {
+        let mut ctx = SearchContext::with_aliases(
+            SceneRegistry::new(),
+            WordDefRegistry::new(),
+            SceneAliasTable::builtin_default(),
+        )
+        .unwrap();
+        assert_eq!(
+            ctx.search_local_scene_exact("会話", "挨拶").unwrap(),
+            LocalSceneMatch::NoGlobal
+        );
+        assert!(logs_contain("Scene not found (alias applied)"));
+        assert!(logs_contain("name=会話"));
+        assert!(logs_contain("resolved=OnTalk"));
+    }
+
+    #[test]
+    fn test_search_local_scene_exact_lua_method_returns() {
+        let lua = mlua::Lua::new();
+        lua.globals()
+            .set(
+                "SEARCH",
+                lua.create_userdata(create_local_search_context()).unwrap(),
+            )
+            .unwrap();
+        let call = |g: &str, l: &str| -> (Option<String>, Option<String>) {
+            lua.load("return SEARCH:search_local_scene_exact(...)")
+                .call((g, l))
+                .unwrap()
+        };
+        let s = |v: &str| Some(v.to_string());
+        assert_eq!(call("会話・朝", "挨拶・A"), (s("会話_朝_2"), s("挨拶_A_1")));
+        assert_eq!(call("存在しない", "挨拶"), (None, s("global")));
+        assert_eq!(call("会話・朝", "挨拶"), (None, s("local")));
+
+        // 内部の失敗（空の名前）は Lua のエラー
+        let err = lua
+            .load(r#"return SEARCH:search_local_scene_exact("会話・朝", "")"#)
+            .exec()
+            .unwrap_err();
+        assert!(err.to_string().contains("Invalid scene name"), "{err}");
     }
 
     #[test]
