@@ -66,8 +66,9 @@ impl PastaLuaRuntime {
 
     /// The aggregated `.pasta`↔`.lua` source map held at runtime scope, or `None`.
     ///
-    /// `Some` only when debugging was ENABLED at VM init and the loader built and
-    /// handed the map to the enable path (task 4.4 / requirement 3.1). On the
+    /// `Some` only when debugging is ENABLED in the resolved config and the loader
+    /// built and handed the map to the enable path (task 4.4 / requirement 3.1),
+    /// even if the DAP listener could not bind (scene-play-event 4.3). On the
     /// disabled (default) zero-cost path this is always `None` — no map is built
     /// (requirement 7.1). The returned `Arc` is a cheap refcount clone of the same
     /// immutable map the debug backend wiring consumes.

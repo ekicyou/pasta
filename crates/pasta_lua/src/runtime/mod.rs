@@ -83,10 +83,12 @@ pub struct PastaLuaRuntime {
     debug_handle: Option<crate::debug::DebugHandle>,
     /// Aggregated `.pasta`↔`.lua` source map held at runtime scope (task 4.4).
     ///
-    /// `Some` only when debugging was ENABLED at VM init AND the loader built the
-    /// map (after transpile) and handed it to [`with_config`]→[`crate::debug::enable`]
-    /// (requirements 3.1: メモリ内保持 ＋ enable へ到達). The same `Arc` was cloned
-    /// into the debug backend's wiring/session by `enable`; this field keeps a
+    /// `Some` only when debugging is ENABLED in the resolved config
+    /// (`config.debug.enabled`) AND the loader built the map (after transpile) and
+    /// handed it to [`with_config`]→[`crate::debug::enable`] (requirements 3.1:
+    /// メモリ内保持 ＋ enable へ到達). It is kept even when the DAP listener could
+    /// not bind (no `debug_handle`; scene-play-event 4.3). When the listener is up,
+    /// the same `Arc` was cloned into the debug backend's wiring/session by `enable`; this field keeps a
     /// runtime-scope clone so the map outlives a single request and is observable
     /// (e.g. for diagnostics / sidecar). On the disabled (default) zero-cost path
     /// it is `None` — the loader does not build a map and nothing is held
@@ -262,9 +264,10 @@ impl PastaLuaRuntime {
         )
         .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
 
-        // Only hold the map when the backend is actually active (debug enabled).
-        // On the disabled zero-cost path nothing is built nor held (7.1).
-        let source_map = if debug_handle.is_some() {
+        // 設定でデバッグが有効なら、待ち受けが立たなくて（ポートが取れず）handle が
+        // None でもマップを持ち続ける（scene-play-event 4.3：位置でのシーン再生と
+        // 索引の突合が使う）。無効のときはローダーがマップを作らず何も持たない（7.1）。
+        let source_map = if config.debug.enabled {
             source_map
         } else {
             None
