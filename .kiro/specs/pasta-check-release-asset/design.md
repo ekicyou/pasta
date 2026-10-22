@@ -4,7 +4,7 @@
 
 **目的**: Rust を入れていないゴーストの作者が、GitHub Release から `pasta_check.zip` を落として展開するだけで、`pasta_check.exe`（辞書の検査とリリースビルド）を使えるようにする。
 
-**利用者**: ゴーストの作者は、固定のリンク `https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip` から最新版を落とす。pasta の開発者は、手元の `release.bat` とリリース CI で、同じ 4 つの配布物を作って確かめる。
+**利用者**: ゴーストの作者は、固定のリンク `https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip` から最新版を落とす。pasta の開発者は、手元の `release.bat` とリリース CI で同じ `release.ps1` を使い、`pasta.dll.zip`・`hello-pasta.nar`・`pasta_check.zip` の 3 つを作って確かめる（VSIX はこれまでどおり別の手順が作る）。
 
 **変わること**: 今のリリースビルド（`release.ps1`）に段を 1 つ足し、リリース CI の build の job・GitHub Release の添付・`release` スキルの状態の読み取り・入手の手順の文書を、配布物 4 つ（添付 5 つ）に合わせる。新しい仕組みは作らず、今の部品を伸ばす。
 
