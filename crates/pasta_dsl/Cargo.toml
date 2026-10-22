@@ -10,6 +10,7 @@ description = "Pasta DSL - Independent DSL parser and AST definitions"
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
+keywords.workspace = true
 
 [dependencies]
 pest.workspace = true
