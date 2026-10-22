@@ -166,7 +166,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 
 組み込みの飛び先は、次の名前である。
 
-- `GLOBAL` の関数: `yield`・`チェイントーク`・`close_ghost`・`ゴースト終了`
+- `GLOBAL` の関数: `yield`・`チェイントーク`・`close_ghost`・`ゴースト終了`・`pause_auto_talk`・`自動トーク停止`・`resume_auto_talk`・`自動トーク再開`
 - act のメソッド: `init_scene`・`talk`・`sakura_script`・`raw_script`・`surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout`・`find_act_handler`・`find_handler`・`word`・`expr_fn`・`expr_fn_var`・`actor_proxy`・`global_fn`・`build`・`yield`・`find_scene`・`call`・`call_key`・`restore_scene`・`call_restore`・`failure`・`set_spot`・`clear_spot`
 - SHIORI 用の act のメソッド: `build`・`transfer_date_to_var`・`transfer_req_to_var`・`set_property`・`get_property`
 

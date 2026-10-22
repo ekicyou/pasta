@@ -617,8 +617,12 @@ end
 | `GLOBAL["チェイントーク"]` | `GLOBAL.yield` と同じ関数。`＞チェイントーク` が呼ぶ（[チェイントーク](https://ekicyou.github.io/pasta/grammar/call-jump.html#チェイントーク)） |
 | `GLOBAL.close_ghost` | `close_ghost(act, ms)`。`ms` が 1 以上の数値なら `act:wait(ms)` を積み、ゴーストを終了させる `\-` を `raw_script` で積む |
 | `GLOBAL["ゴースト終了"]` | `GLOBAL.close_ghost` と同じ関数。`＞ゴースト終了` が呼ぶ（[ゴースト終了](https://ekicyou.github.io/pasta/grammar/call-jump.html#ゴースト終了)） |
+| `GLOBAL.pause_auto_talk` | `pause_auto_talk(act)`。ランダムトーク・時報などの自動トークを止める。出力は積まない |
+| `GLOBAL["自動トーク停止"]` | `GLOBAL.pause_auto_talk` と同じ関数。`＞自動トーク停止` が呼ぶ（[自動トーク停止・自動トーク再開](https://ekicyou.github.io/pasta/grammar/call-jump.html#自動トーク停止自動トーク再開)） |
+| `GLOBAL.resume_auto_talk` | `resume_auto_talk(act)`。止めていれば再開し、仮想ディスパッチャの時計を決め直す（[自動トークを止めている間](shiori-events.md#自動トークを止めている間)）。出力は積まない |
+| `GLOBAL["自動トーク再開"]` | `GLOBAL.resume_auto_talk` と同じ関数。`＞自動トーク再開` が呼ぶ |
 
-- `GLOBAL.close_ghost`・`GLOBAL["ゴースト終了"]` は、`main.lua` の後に読み込まれる `pasta.shiori.entry` が登録する。`main.lua` でこれらの名前に代入しても上書きされる（読み込み順は [起動シーケンスとモジュール解決](startup.md)）。
+- `GLOBAL.close_ghost`・`GLOBAL["ゴースト終了"]`・`GLOBAL.pause_auto_talk`・`GLOBAL["自動トーク停止"]`・`GLOBAL.resume_auto_talk`・`GLOBAL["自動トーク再開"]` は、`main.lua` の後に読み込まれる `pasta.shiori.entry` が登録する。`main.lua` でこれらの名前に代入しても上書きされる（読み込み順は [起動シーケンスとモジュール解決](startup.md)）。
 
 ## SAVE
 

@@ -260,6 +260,12 @@ function M.dispatch(act)
         return kick_co
     end
 
+    -- 止める門（DispatcherGate）: 自動トークを止めている間は時報・ランダムトーク・続きの判定に
+    -- 進まない。set_co_scene を通らないので続きは捨てない。キックは門の前なので出る。
+    if STORE.auto_talk_paused then
+        return nil
+    end
+
     -- OnHour 判定（優先）
     local hour_result = M.check_hour(act)
     if hour_result then
@@ -268,6 +274,25 @@ function M.dispatch(act)
 
     -- OnTalk 判定
     return M.check_talk(act)
+end
+
+--- 自動トークを再開したときの時計の決め直し（再開の関数が止めていたときだけ呼ぶ）。
+--- ランダムトークは初回扱いに戻し、再開の時点から間隔を数え直す。時報は止めている間に過ぎた正時を捨てる。
+---@param act ShioriAct|nil act.req.date があれば再開の時刻として使う
+function M.restart_timers(act)
+    next_talk_time = 0
+    local now = act and act.req and CLOCK.now(act.req)
+    if not now then
+        next_hour_unix = 0
+        return
+    end
+    -- 同じ基準の中では前へだけ進める（チェイントークの続きの古い時刻で、出した正時へ戻さない）。
+    -- 基準が変わっていれば置き換える（でないと次の check_hour の決め直しが過ぎた正時を出しうる）
+    local next_hour = calculate_next_hour_unix(now)
+    if next_hour > next_hour_unix or CLOCK.epoch() ~= seen_epoch then
+        next_hour_unix = next_hour
+        seen_epoch = CLOCK.epoch()
+    end
 end
 
 -- 6. テスト用関数（内部状態リセット）

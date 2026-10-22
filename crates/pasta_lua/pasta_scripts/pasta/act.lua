@@ -658,9 +658,17 @@ function ACT_IMPL.build(self)
 end
 
 --- build()結果をyield
+--- 自動トークを止めている間に呼ばれたら、警告を 1 行出して再開してから区切る（ontalk-suppression 2.8）。
 --- @param self Act アクションオブジェクト
 --- @return Act self メソッドチェーン用
 function ACT_IMPL.yield(self)
+    -- 循環 require を避けるため、ストア・ログ・GLOBAL は呼び出しの時点で引く
+    if require("pasta.store").auto_talk_paused then
+        require("@pasta_log").warn(
+            "自動トーク停止の間にチェイントークが呼ばれたので、自動トークを再開しました。"
+            .. "止めた区間の区切りには選択肢やイベントを使ってください。")
+        require("pasta.global").resume_auto_talk(self)
+    end
     local result = self:build()
     coroutine.yield(result)
     return self

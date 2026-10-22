@@ -639,6 +639,8 @@ fn static_call_lookup_matches_runtime() {
         ("挨拶", "OnTa", true), // L5 グローバルの前方一致
         ("挨拶", "チェイントーク", true), // L4 GLOBAL
         ("挨拶", "ゴースト終了", true), // L4 GLOBAL（shiori/entry.lua）
+        ("挨拶", "自動トーク停止", true), // L4 GLOBAL（shiori/entry.lua）
+        ("挨拶", "自動トーク", false), // 組み込みに前方一致は無い
         ("挨拶", "call_key", true), // L3 ACT_IMPL
         ("挨拶", "transfer_date_to_var", true), // L3 SHIORI_ACT_IMPL
         ("挨拶", "無い場面", false), // 無い

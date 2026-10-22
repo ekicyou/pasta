@@ -129,3 +129,8 @@ OnPastaSetSaveVariable  Reference0=初回済み  Reference1=null
   - `ACT_IMPL.call` はハンドラを直接呼ぶ。呼んだシーンが `＞チェイントーク` で区切ると、コルーチンの外での中断になってエラーで止まる。ハンドラは呼び出しをコルーチンで包んで返し、`EVENT.fire` → `EVENT.drive` で回す形にする必要がある。設計で決める。
   - 見つからないとき、`ACT_IMPL.call` は自分で失敗の表記（「シーンが見つからない」。`failure.lua` L19）を積み、警告のログも出す（`act.lua` L716〜）。Approach の「警告のログを残して 204」と食い違う。要件で、この表記に任せるか（推奨。`scene-play-event` の失敗の出し方とも揃う）を決める。
   - MCP の `raise_event` が NOTIFY で送るなら、応答は捨てられる（`crates/pasta_shiori/src/actor/thread.rs` L204〜210）。`＊初回起動` の台本は返らないが、`自動トーク停止` や変数の代入は効く。`scene-play-event` が実機で確かめる結果に合わせて書く。
+
+## 申し送り（ontalk-suppression より、2026-10-22 完了時）
+
+- 呼び先の `GLOBAL` の 4 つの名前（`pause_auto_talk`・`自動トーク停止`・`resume_auto_talk`・`自動トーク再開`）は入った。引数 `act` は `nil` でも動き、出力を積まない。再開は `act.req.date` が取れればその時刻で時計を決め直し、取れなければ時報を初回扱いにする（`.kiro/specs/completed/ontalk-suppression/design.md` の TimerRestart）。外からのイベントの `act` にも `date` があるので、そのまま効く。
+- `pasta_check` の組み込みの名前は 8 つになった（`builtins.rs` の `GLOBAL_NAMES`）。

@@ -39,6 +39,30 @@ describe("pasta.store - save field removed", function()
     end)
 end)
 
+-- ontalk-suppression Task 1: 止めている印はセッション常駐（読み込み直後 false・reset で false・保存しない）
+describe("pasta.store - auto_talk_paused", function()
+    test("読み込み直後は false", function()
+        package.loaded["pasta.store"] = nil
+        local STORE = require("pasta.store")
+        expect(STORE.auto_talk_paused):toBe(false)
+    end)
+
+    test("reset() で false に戻る", function()
+        local STORE = require("pasta.store")
+        STORE.auto_talk_paused = true
+        STORE.reset()
+        expect(STORE.auto_talk_paused):toBe(false)
+    end)
+
+    test("pasta.save には置かない", function()
+        -- 止めた後でも保存側にキーが出ないことを確かめる
+        local STORE = require("pasta.store")
+        STORE.auto_talk_paused = true
+        expect(require("pasta.save").auto_talk_paused):toBe(nil)
+        STORE.reset()
+    end)
+end)
+
 -- Task 3.3: pasta.act uses pasta.save
 describe("pasta.act - save from pasta.save", function()
     test("ACT.new() returns act with save from pasta.save", function()
