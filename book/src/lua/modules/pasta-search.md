@@ -122,6 +122,48 @@ if g then
 end
 ```
 
+### search_local_scene_exact(global_name, local_name)
+
+グローバルシーンの名前とローカルシーンの名前の組で、ローカルシーンを完全一致で検索する。
+
+```lua
+SEARCH:search_local_scene_exact(global_name, local_name) -> global_name, local_name | nil, miss
+```
+
+| パラメータ | 型 | 必須 | 説明 |
+| ---- | ---- | ---- | ---- |
+| `global_name` | string | ✅ | グローバルシーンの名前（作者が書く名前。別名表で置き換え、照合用の名前に揃えてから完全一致） |
+| `local_name` | string | ✅ | ローカルシーンの名前（作者が書く名前。照合用の名前に揃えてから完全一致） |
+
+2 つの引数は、どちらも作者が書くシーン名として扱う。`search_scene_exact` の第 2 引数と違い、`global_name` に登録名（`"会話_1"`）を渡しても、その登録名のグローバルシーンは指さない。照合用の名前への揃え方は [search_scene](#search_scenename-global_scene_name) と同じである。別名表での置き換えは `global_name` にだけ行い、`local_name` には行わない。
+
+候補は次の 2 段で選ぶ。
+
+1. 照合用の名前が `global_name` と完全に等しいグローバルシーンのうち、照合用の名前が `local_name` と完全に等しいローカルシーンを持つものだけを候補にし、シャッフル＆順次消費で 1 つを選ぶ。同じ名前のグローバルシーンのうち片方だけがローカルシーンを持つときは、持つ方が毎回選ばれる。並び順の記録は、`search_scene_exact(global_name)` とも `search_scene` とも別に持つ。
+2. 選んだグローバルシーンの中で、`local_name` のローカルシーンを `search_scene_exact` と同じ方法で選ぶ（同じ名前のローカルシーンが複数あれば、シャッフル＆順次消費）。
+
+**戻り値**:
+
+- 見つかったとき: `global_name, local_name` の 2 値。どちらも登録名である（[search_scene](#search_scenename-global_scene_name) の戻り値と同じ形。例: `"会話_1", "挨拶_1"`）。
+- 見つからないとき: `nil` と、見つからなかった側を表す文字列の 2 値。
+  - `"global"`: `global_name` のグローバルシーンが無い。別名で置き換えた後の名前で見つからなかったときは、`search_scene` と同じく、書いた名前と置き換えた後の名前の両方を記した警告ログ（`Scene not found (alias applied)`）を出す。
+  - `"local"`: `global_name` のグローバルシーンはあるが、どれも `local_name` のローカルシーンを持たない。
+
+`global_name` か `local_name` に空文字列を渡すと、Lua のエラー（`Scene search error: Invalid scene name: ''`）になる。
+
+デバッグ用のイベント `OnPastaScene` の既定ハンドラは、Reference1 を渡されたとき、この関数でローカルシーンを探す（[OnPastaScene](../shiori-events.md#onpastascene名前でシーンを再生)）。
+
+```lua
+local SEARCH = require "@pasta_search"
+
+local g, l = SEARCH:search_local_scene_exact("会話", "挨拶")
+if g then
+    print(g, l)  -- "会話_1", "挨拶_1"
+else
+    print("not found:", l)  -- "global" か "local"
+end
+```
+
 ### search_word(name, global_scene_name?)
 
 単語を前方一致で検索し、候補の値を 1 つ返す。

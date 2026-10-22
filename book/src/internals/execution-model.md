@@ -86,7 +86,7 @@ pasta.failure ──→ （@pasta_log・pasta.config を報告の時点で読む
 | ---------- | ------------------ |
 | `pasta`（`crates/pasta_lua/pasta_scripts/pasta/init.lua`） | 生成コードが呼ぶ `create_actor`・`create_scene`・`create_word` の窓口と、Rust が上書きする `finalize_scene` のスタブ |
 | `pasta.store` | ランタイムの共有状態の置き場。アクター・シーン・単語の Lua 側の登録表、外見の状態、継続中のコルーチン（`co_scene`）、選択肢とキックのための状態を持つ。他の `pasta.*` を `require` しないため、どのモジュールからも循環なく参照できる |
-| `pasta.scene` | シーン関数の登録と、検索結果からシーン関数を引く `SCENE.search`、シーン関数をコルーチンで包む `SCENE.co_exec`・`SCENE.co_exec_exact` |
+| `pasta.scene` | シーン関数の登録と、検索結果からシーン関数を引く `SCENE.search`、シーン関数をコルーチンで包む `SCENE.co_exec`・`SCENE.co_exec_exact`・`SCENE.co_exec_registered` |
 | `pasta.word`・`pasta.actor` | 単語とアクターの登録。アクターのプロキシ（`act.アクター名`）は `pasta.actor` が作る |
 | `pasta.failure` | 実行時の失敗の報告の出口。ログの警告と失敗表記のトークンを作る（[実行時の失敗の出力](../reference/runtime-failures.md)・[失敗の報告（pasta.failure）](internal-modules.md#失敗の報告pastafailure)） |
 | `pasta.act`・`pasta.shiori.act` | シーン関数が第 1 引数で受け取る ACT。トークの蓄積、名前の解決（`call`・`word` など）、`yield`。`pasta.shiori.act` は `pasta.act` を継承し、`build` をさくらスクリプトの生成に差し替え、`get_property` などの SHIORI 固有のメソッドを加える |
@@ -130,12 +130,12 @@ from_loader_with_scene_dic
     f. debug::enable を 1 回だけ呼ぶ（無効なら何もしない）
  2. ロガー・PastaConfig・ベースディレクトリを構造体に保持
  3. package.path を設定し、require の searcher を差し替え、@pasta_chunks（読み込んだファイルの表）を置く
- 4. @pasta_config・@enc・@pasta_persistence・@pasta_log・@pasta_sakura_script を登録
+ 4. @pasta_config・@enc・@pasta_persistence・@pasta_log・@pasta_sakura_script・@pasta_debug を登録
  5. pasta.finalize_scene を Rust の実装で上書き（同じ別名表をクロージャに保持する）
  6. require("main")
  7. require("pasta.shiori.entry")
  8. require("pasta.scene_dic")   … 全シーンモジュールの require と finalize_scene()
- 9. （デバッグ有効時だけ）シーンの identity 索引を突き合わせてソースマップへ格納
+ 9. （ソースマップを持つときだけ）シーンの identity 索引を突き合わせてソースマップへ格納
 ```
 
 - 1 の `with_config_and_source_map` は `PastaLuaRuntime::new`・`with_config` の実体でもあり、そこで作った VM は 2 以降の登録を持たない。`@pasta_log` は 1e と 4 の 2 回登録され、2 回目が置き換える。
@@ -143,6 +143,8 @@ from_loader_with_scene_dic
 - 6〜8 は `require_startup_module` を通る。失敗は `module`・`fatal` 付きのエラーログと、`failed to load startup module '…'` の文脈を付けた `Err` になり、構築全体が失敗する。利用者から見た扱いは [起動シーケンス](../reference/startup.md#2-起動シーケンス) を参照する。
 - 8 の `pasta.scene_dic` が `finalize_scene()` を呼ぶと、`@pasta_search` が Lua 側の登録から作り直される（[辞書確定](registry-search.md#辞書確定)）。
 - 3 の `@pasta_chunks` は、searcher が読み込んだファイルを書き足す表で、`pasta.shiori.stop` が止まるエラーの表記で場所を示すのにだけ使う（[require の解決（searcher）](loader.md#require-の解決searcher)）。
+- 4 の `@pasta_debug` は、0 で解決した設定の `enabled` の値と、1 で保持したソースマップと、ベースディレクトリ（`ghost/master/`）を持つ内部モジュールである（[位置でのシーンの再生](debug.md#位置でのシーンの再生)）。この入口だけが登録するため、`PastaLuaRuntime::new`・`with_config` の VM には無い。
+- 1 の後にランタイムがソースマップを持つのは、0 で解決した設定でデバッグが有効なときである。1f の `debug::enable` が待ち受けのポートを取れずに `None` を返しても、ソースマップは持ち続けるため、9 も行われる。無効なときはローダがソースマップを作らず、9 は行われない（[有効化の判定](debug.md#有効化の判定)）。
 - 4 の `@pasta_persistence` の登録はファイルを読まない。永続化ファイルを読むのは、後述のとおり `pasta.save` が最初に `require` されたときである。
 
 構築が終わった VM に対して、SHIORI 層は `SHIORI.load`・`SHIORI.request`・`SHIORI.unload` を取り出して保持し、`SHIORI.request` をリクエストごとに 1 回呼ぶ（`crates/pasta_shiori/src/shiori.rs`）。リクエストの文字列は Rust 側で Lua の表に解析されてから渡る。
@@ -169,7 +171,7 @@ EVENT.fire(req)
 - 文字列の分岐は、先頭 7 文字が `SHIORI/` と等しいかで判定する。`RES` の関数で作った応答（`RES.err` の 500 など）を返したハンドラは、そのステータスのまま応答になる。
 - コルーチンの出力にはこの規則を適用しない。出力は接頭辞にかかわらず常に `RES.ok` の `Value` になる（`CALLBACK.try_route`・`CALLBACK.sweep` の出力も同じ）。
 
-ハンドラがコルーチンを返す経路は、シーン関数フォールバック（`EVENT.no_entry`）、既定の OnBoot・OnChoiceSelectEx・OnMouseDoubleClick・OnMouseMove、OnSecondChange の仮想イベント（OnTalk・OnHour・シーンキック）と、コルーチンを返す利用者の `REG` ハンドラである。振り分けの詳細は [SHIORI 層](shiori.md) で、利用者から見た挙動は [SHIORI イベントとハンドラ](../lua/shiori-events.md#シーン関数フォールバック) で扱う。
+ハンドラがコルーチンを返す経路は、シーン関数フォールバック（`EVENT.no_entry`）、既定の OnBoot・OnChoiceSelectEx・OnMouseDoubleClick・OnMouseMove・OnPastaScene・OnPastaSceneAt、OnSecondChange の仮想イベント（OnTalk・OnHour・シーンキック）と、コルーチンを返す利用者の `REG` ハンドラである。振り分けの詳細は [SHIORI 層](shiori.md) で、利用者から見た挙動は [SHIORI イベントとハンドラ](../lua/shiori-events.md#シーン関数フォールバック) で扱う。
 
 ### シーンコルーチンの作り方
 
@@ -189,7 +191,8 @@ return coroutine.create(wrapped_fn)
 | 箇所 | シーン関数の得方 |
 | ---- | ---------------- |
 | `SCENE.co_exec`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `act:find_scene(名前)`。`EVENT.no_entry`・既定の OnBoot・仮想イベント・明示的な OnChoiceSelectEx シーン・既定の OnMouseDoubleClick と OnMouseMove（ショートカットが見つからないとき）が使う |
-| `SCENE.co_exec_exact`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `search_scene_exact(名前, nil)` の結果で `SCENE.get`。完全一致のグローバルシーンだけ。既定の OnMouseDoubleClick・OnMouseMove がショートカットの 1〜8 段を探すのに使う（[co_exec_exact](internal-modules.md#co_exec_exact)） |
+| `SCENE.co_exec_exact`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `search_scene_exact(名前, nil)` か `search_local_scene_exact(名前, ローカル名)` の結果で `SCENE.get`。完全一致のシーンだけ。既定の OnMouseDoubleClick・OnMouseMove がショートカットの 1〜8 段を探すのに、既定の OnPastaScene が名前で指名したシーンを探すのに使う（[co_exec_exact](internal-modules.md#co_exec_exact)） |
+| `SCENE.co_exec_registered`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | 登録名の組で `SCENE.get`。`co_exec_exact` が使うほか、既定の OnPastaSceneAt が位置から引いた組で使う（[co_exec_registered](internal-modules.md#co_exec_registered)） |
 | `create_scene_coroutine`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`） | `SCENE.search(選択 ID, 親)`、無ければ `SCENE.search(選択 ID, nil)`。親は Reference2 のグローバルシーン名（既知のグローバルシーンのとき）か `STORE.last_global_scene`（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)） |
 | `wrap_local_func`・`wrap_reload_func`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`） | シーン表から完全一致で引いたキック対象のシーン関数（`SCENE.get`・`SCENE.get_start`）、または SHIORI 再読み込みのタグだけを出す関数 |
 

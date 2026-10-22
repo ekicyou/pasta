@@ -12,7 +12,7 @@
 
 ## 目的と責務
 
-デバッグ基盤は、DAP クライアント（VSCode の pasta 拡張）から TCP で接続を受け、実行中の Lua VM を行単位で止め、`.pasta` の座標でブレークポイント・ステップ・コールスタック・変数参照を提供する。シーンキックは、DAP の独自リクエストで指定された位置のシーンを、次の OnSecondChange で割り込み再生する。
+デバッグ基盤は、DAP クライアント（VSCode の pasta 拡張）から TCP で接続を受け、実行中の Lua VM を行単位で止め、`.pasta` の座標でブレークポイント・ステップ・コールスタック・変数参照を提供する。シーンキックは、DAP の独自リクエストで指定された位置のシーンを、次の OnSecondChange で割り込み再生する。あわせて、SHIORI のイベント `OnPastaScene`・`OnPastaSceneAt` が使う、デバッグの有効と位置からシーンを引く口（`@pasta_debug`）を Lua に出す。
 
 この章が責務を持つのは次の事項である。
 
@@ -23,6 +23,7 @@
 - ブレークポイントの保持と照合、停止中の inspect（コールスタックと変数の取得）
 - ソースマップ: ローダでの構築、構造、チャンク名の正規化、双方向の解決、任意のサイドカー出力
 - シーンキック: シーン identity 索引、位置からシーンへの解決、`KickSink`、`pasta.shiori.event.kick` の保留と起動
+- 位置でのシーンの再生: `@pasta_debug`（`enabled`・`scene_at`）と、位置を登録名の組に引く `resolve_position`
 
 次の事項は他の章が権威を持ち、この章では再記述しない。
 
@@ -31,6 +32,7 @@
 - VM の構築順序の中で `debug::enable` とシーン identity 索引の突合が入る位置は [VM の構築とモジュール登録](execution-model.md#vm-の構築とモジュール登録) で扱う。
 - `ActorMsg::Kick` が mailbox を通ってアクタースレッドで `SHIORI.kick` になるまでは [アクタースレッドのメッセージループ](shiori.md#アクタースレッドのメッセージループ) で、`STORE.kick_force` を消費する仮想イベントディスパッチャの判定順は [仮想イベントディスパッチャ（OnTalk・OnHour）](shiori.md#仮想イベントディスパッチャontalkonhour) で扱う。
 - キックしたシーンのコルーチンが応答になり `STORE.co_scene` を置き換える流れは [継続トーク（チェイントーク）と co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新) で扱う。
+- `OnPastaScene`・`OnPastaSceneAt` の引数・探し方・失敗の出方・デバッグが有効なときだけ動くことは、利用者向けの [OnPastaScene](../lua/shiori-events.md#onpastascene名前でシーンを再生)・[OnPastaSceneAt](../lua/shiori-events.md#onpastasceneat位置でシーンを再生)・[シーンを再生するイベントの共通の決まり](../lua/shiori-events.md#シーンを再生するイベントの共通の決まり) が正である。名前での探し方の仕組みは [前方一致による候補の収集](registry-search.md#前方一致による候補の収集) で、コルーチンを作る `SCENE.co_exec_exact`・`SCENE.co_exec_registered` は [co_exec_exact](internal-modules.md#co_exec_exact)・[co_exec_registered](internal-modules.md#co_exec_registered) で扱う。
 
 ## 構成要素
 
@@ -96,12 +98,13 @@ TCP 127.0.0.1:<port> ── DAP クライアント（1 接続だけ）
 | シーン identity 索引 | `crates/pasta_lua/src/debug/source_map/scene_index.rs` | `.pasta` の（ファイル, 行）から `(scene_id, parent)` を引く `SceneIdentityIndex` |
 | シーンの突合 | `crates/pasta_lua/src/debug/source_map/scene_join.rs` | `build_scene_index`。トランスパイル時の記録と実行時の登録名を、定義元の `.pasta` ファイルごとに突き合わせる（`join_records`・`rank_globals`） |
 | サイドカー | `crates/pasta_lua/src/debug/source_map/sidecar.rs` | `write_sidecar`・`read_sidecar`・`SidecarFile` |
-| 位置の解決 | `crates/pasta_lua/src/debug/playscene.rs` | `resolve_and_kick`・`uri_to_pasta_path` |
+| 位置の解決 | `crates/pasta_lua/src/debug/playscene.rs` | `resolve_and_kick`（キック）・`resolve_position`（位置でのシーンの再生）・`uri_to_pasta_path` |
 | `KickSink` | `crates/pasta_lua/src/debug/kick.rs` | `KickRequest { scene }` と、外側のホストが注入するクロージャの型 |
 | ソースマップの構築 | `crates/pasta_lua/src/loader/source_map_build.rs` | `PastaLoader::build_source_map` |
+| `@pasta_debug` の登録 | `crates/pasta_lua/src/runtime/module_registry.rs` | `register_debug_module`。`enabled`・`scene_at` の 2 つの関数を持つ内部モジュールを `package.loaded` に置く |
 | 記録の受け口 | `crates/pasta_lua/src/code_gen/source_map.rs` | 生成器が呼ぶ `SourceMapSink` トレイトと `PastaPos` |
 
-ランタイムとの接点は `crates/pasta_lua/src/runtime/mod.rs`（`enable` の呼び出しと `DebugHandle`・ソースマップの保持）、`crates/pasta_lua/src/runtime/factory.rs`（シーン identity 索引の突合）、`crates/pasta_lua/src/runtime/runtime_config.rs`（`RuntimeConfig::debug`・`with_kick_sink`）にある。これらのファイルは [ランタイム実行モデル](execution-model.md) の範囲である。
+ランタイムとの接点は `crates/pasta_lua/src/runtime/mod.rs`（`enable` の呼び出しと `DebugHandle`・ソースマップの保持）、`crates/pasta_lua/src/runtime/factory.rs`（シーン identity 索引の突合と `@pasta_debug` の登録の呼び出し）、`crates/pasta_lua/src/runtime/runtime_config.rs`（`RuntimeConfig::debug`・`with_kick_sink`）にある。これらのファイルは [ランタイム実行モデル](execution-model.md) の範囲である。
 
 ### Lua 側のモジュール
 
@@ -111,6 +114,7 @@ TCP 127.0.0.1:<port> ── DAP クライアント（1 接続だけ）
 | `pasta.shiori.entry` | `SHIORI.kick(scene)` が `KICK.install` に委ねる |
 | `pasta.shiori.event.virtual_dispatcher` | `dispatch` の入口で `STORE.kick_force` を消費し、`KICK.try_dispatch` を呼ぶ |
 | `pasta.store` | `STORE.kick_pending`（保留中のシーン名）と `STORE.kick_force`（割り込みの許可）を持つ。`reset` で両方を初期値に戻す |
+| `pasta.shiori.event.scene_play` | `OnPastaScene`・`OnPastaSceneAt` の既定ハンドラ。`@pasta_debug` でデバッグの有効を確かめ、位置は `scene_at` で登録名の組に引く |
 
 ## 処理とデータの流れ
 
@@ -121,7 +125,7 @@ TCP 127.0.0.1:<port> ── DAP クライアント（1 接続だけ）
 - `enabled` が偽のとき、`listen` は必ず `None` になる。真のときだけ `127.0.0.1:<port>` の `SocketAddr` を作る。ホストは定数で、設定で変える経路は無い。
 - 各値の優先順位と既定値は利用者向け章が正である（[優先順位](../debug/index.md#優先順位)・[初期モードの指定](../debug/source-level.md#初期モードの指定)・[サイドカー出力（任意）](../debug/source-level.md#サイドカー出力任意)）。`from_env` の段階では `attach` の値は無く、`attach` による上書きは後述の wiring が実効モードに書き込む形で行う。
 
-判定はローダとランタイムで 2 回行うが、入力は同じである。ローダは段階 5.5 で `DebugConfig::from_env` を呼び、有効ならソースマップを作る。`PastaLuaRuntime::from_loader_with_scene_dic` は `RuntimeConfig::with_debug_from_file_and_env` で同じ解決を `RuntimeConfig::debug` に載せ、`with_config_and_source_map` が `debug::enable` を 1 回だけ呼ぶ。`debug::enable` が `None` を返したとき、ランタイムはソースマップを保持しない。
+判定はローダとランタイムで 2 回行うが、入力は同じである。ローダは段階 5.5 で `DebugConfig::from_env` を呼び、有効ならソースマップを作る。`PastaLuaRuntime::from_loader_with_scene_dic` は `RuntimeConfig::with_debug_from_file_and_env` で同じ解決を `RuntimeConfig::debug` に載せ、`with_config_and_source_map` が `debug::enable` を 1 回だけ呼ぶ。ランタイムがソースマップを保持するかは、待ち受けが立ったかではなく、解決した設定の `enabled` で決まる。有効なら、待ち受けのポートが取れず `debug::enable` が `None` を返したとき（警告を出してデバッグなしで続くとき）も、ソースマップを保持し、シーン identity 索引も作る。位置でのシーンの再生がこれを使う（[位置でのシーンの再生](#位置でのシーンの再生)）。無効ならローダがソースマップを作らないため、ランタイムは何も保持しない。
 
 ### バックエンドの起動
 
@@ -410,6 +414,31 @@ KICK.try_dispatch(act)
 
 キックの解決は、シーン表のキーとの完全一致である。`act:find_scene`・`SCENE.search`・`SCENE.co_exec` を通らないため、ACT の検索の各段（ACT のメソッド・`GLOBAL` の関数・前方一致）は使わず、シーン表のシーンだけを再生する。前方一致を使わないので、`メイン_1` のキックが `メイン_10` を、`:メイン_1:挨拶_1` のキックが `挨拶_10` を再生することはない。引数の `act` は解決に使わない。返したコルーチンは `EVENT.fire` が再開して応答にし、`STORE.co_scene` を置き換える。SHIORI リロードの場合は、その応答のさくらスクリプトでベースウェアが SHIORI を読み込み直し、`unload` でランタイムと `DebugHandle` が破棄されてポートが解放され、次の `load` で新しいバックエンドが同じポートを bind する。
 
+#### 位置でのシーンの再生
+
+`OnPastaSceneAt` の既定ハンドラは、DAP を通らずに、ファイルと行からシーンを引く。そのための口は内部モジュール `@pasta_debug` である。
+
+```text
+@pasta_debug（register_debug_module が作る表）
+ enabled()          解決した設定の enabled の値。待ち受けが立ったか（DebugHandle の有無）は見ない
+ scene_at(file, line)
+   line が 1 以上 u32 に収まる整数でない、ソースマップが無い → nil
+   resolve_position(map, ghost/master のパス, file, line)
+     base_dir.join(file)        相対パスは ghost/master/ に結ぶ。絶対パスは join がそのまま返す
+     uri_to_pasta_path          キックと同じパスの直し方
+     map.scene_at(パス, line)   キックと同じシーン identity 索引
+       グローバル → (scene_id, "__start__")
+       ローカル   → (parent, scene_id)
+       見つからない → nil
+```
+
+- `scene_at` は 2 つの値（グローバルシーンの登録名, ローカルシーンの登録名か `__start__`）を返し、見つからなければ `nil` を返す。エラーにはしない。`file` が文字列（または数）でなければ Lua のエラーになるため、ハンドラが先に確かめる。行の文字列から数への変換と検査もハンドラが行う。
+- `resolve_position` はファイルを開かない。キックの `resolve_and_kick` とはパスの直し方と索引を共有するが、`KickSink` を呼ばず、合成名（`:親:ローカル`）も作らない。返した組は、ハンドラが `SCENE.co_exec_registered` に渡してコルーチンにする（[co_exec_registered](internal-modules.md#co_exec_registered)）。
+- 行からシーンを選ぶ規則は、前述の `SceneIdentityIndex::scene_at` と同じである。ファイルの最後のシーンはファイルの末尾まで続くため、索引にあるファイルの行は必ずどれかのシーンに当たり、見つからないのは索引に無いファイルのときだけである。
+- `@pasta_debug` は本番の入口（`PastaLuaRuntime::from_loader_with_scene_dic`）だけが登録する。`PastaLuaRuntime::new`・`with_config` で作った VM には無い。`enabled` には、`with_debug_from_file_and_env` で解決した `RuntimeConfig::debug.enabled` の値が入る。`ghost/master/` のパスはローダの基準ディレクトリ（`LoaderContext::base_dir`）である。
+
+キックとの違いは、要求が SHIORI のリクエストとして届き、その場で応答にすることである。`KickSink`・`STORE.kick_pending` を通らず、次の OnSecondChange を待たない。
+
 ## 境界の受け渡し
 
 | 境界 | 渡す側 → 受け取る側 | 渡すもの | 所有 |
@@ -422,6 +451,7 @@ KICK.try_dispatch(act)
 | `code_gen` → `debug` | 生成器 → `MapBuilderSink` | `record_line`・`record_scene` の呼び出し | 依存は `debug` → `code_gen` の向きで、`code_gen` は `debug` を参照しない（`SourceMapSink` と `PastaPos` は `code_gen` にある） |
 | ローダ → ランタイム → バックエンド | `build_source_map` → `from_loader_with_scene_dic` → `debug::enable` | `Option<Arc<SourceMap>>` | ランタイムが 1 本、wiring とセッションがそれぞれ 1 本を持つ |
 | ランタイム → ソースマップ | `build_scene_index` → `SourceMap::set_scene_index` | `SceneIdentityIndex` | 書き込みは 1 回だけ（`OnceLock`） |
+| Rust → Lua（位置でのシーンの再生） | `@pasta_debug.scene_at` → `pasta.shiori.event.scene_play` | 登録名の組（2 つの文字列）か `nil` | 関数はソースマップの `Arc` とベースディレクトリをクロージャに持つ。シーン関数は Rust を通らない |
 | `pasta_lua` → `pasta_shiori`（キック） | socket bridge → `KickSink` | `KickRequest { scene }`（シーン名の文字列だけ） | `pasta_lua` は `pasta_shiori` を参照しない。クロージャは `pasta_shiori` が作り、`RuntimeConfig` で渡す |
 | Rust → Lua（キック） | `PastaShiori::kick` → `SHIORI.kick` | シーン名・合成名・`RELOAD_SENTINEL` の文字列 | 保留の状態は `STORE` が持ち、Rust 側はコルーチンを持たない |
 
@@ -438,6 +468,7 @@ KICK.try_dispatch(act)
 - リリースビルドは `panic = "abort"` のため、行フックの `catch_unwind` が働くのは dev・test のビルドだけである（[DLL のビルド構成](shiori.md#dll-のビルド構成)）。
 - socket bridge はロックが毒されても panic しない（その場で処理を終えるか、何もしない）。
 - `SourceMap` は構築後に変わらない。シーン identity 索引だけが 1 回書き込まれる。
+- ソースマップを保持する条件は、解決した設定でデバッグが有効なことである。待ち受けが立たなかったランタイムも、ソースマップとシーン identity 索引を持つ。ブレーク・ステップ・ソースの提示は待ち受けとセッションがあるときだけ働き、この条件では変わらない。
 - `.pasta` の座標への変換は、マップがあり実効モードが `Pasta` のときだけ働く。それ以外では生成 `.lua` の座標のまま扱う。対応の無い位置を別の `.pasta` 位置に結びつけることはない。
 - ローカルの合成名（`:` で始まる `KickRequest.scene`）と `RELOAD_SENTINEL` は、デバッグのキックの経路でだけ生じる。通常のトークの再生はこれらを作らない。
 - キックは要求を受けた時点ではシーンを動かさない。実行は次の OnSecondChange（`act.req.date` があるもの）まで遅れ、1 回の OnSecondChange で起動するキックは 1 つだけである。
@@ -450,8 +481,9 @@ KICK.try_dispatch(act)
 - `crates/pasta_lua/src/loader/source_map_build.rs`
 - `crates/pasta_lua/src/code_gen/source_map.rs`
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`
+- `crates/pasta_lua/pasta_scripts/pasta/shiori/event/scene_play.lua`
 
-テストは `crates/pasta_lua/src/debug/` の `*_tests.rs`・`*_e2e.rs`・`crates/pasta_lua/tests/loader_source_map_build_test.rs`・`crates/pasta_lua/tests/scene_identity_index_test.rs`・`crates/pasta_lua/tests/chunk_name_validation_test.rs`・`crates/pasta_lua/tests/lua_specs/kick_try_dispatch_test.lua`・`crates/pasta_shiori/tests/scene_kick_e2e_test.rs`・`crates/pasta_shiori/tests/actor_kick_test.rs` にある。
+テストは `crates/pasta_lua/src/debug/` の `*_tests.rs`・`*_e2e.rs`・`crates/pasta_lua/tests/loader_source_map_build_test.rs`・`crates/pasta_lua/tests/scene_identity_index_test.rs`・`crates/pasta_lua/tests/chunk_name_validation_test.rs`・`crates/pasta_lua/tests/lua_specs/kick_try_dispatch_test.lua`・`crates/pasta_lua/tests/scene_play_event_test.rs`・`crates/pasta_lua/tests/lua_specs/scene_play_event_test.lua`・`crates/pasta_shiori/tests/scene_kick_e2e_test.rs`・`crates/pasta_shiori/tests/actor_kick_test.rs` にある。
 
 ## 経緯
 
