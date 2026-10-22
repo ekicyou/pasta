@@ -102,6 +102,6 @@ REG.OnPastaSceneAt = REG.OnPastaSceneAt or function(act)
     return fail(act, {
         label = FAILURE.LABEL.SCENE_NOT_FOUND,
         subject = event .. " " .. file .. ":" .. line,
-        warning = event .. ": scene not found: file='" .. file .. "', line=" .. n,
+        warning = event .. ": scene not found: file='" .. file .. "', line=" .. line,
     })
 end

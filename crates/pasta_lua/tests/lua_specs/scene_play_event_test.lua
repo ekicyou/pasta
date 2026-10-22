@@ -316,6 +316,13 @@ describe("既定のハンドラ - 見つからない", function()
         expect(contains(result, "【シーンが見つからない：OnPastaSceneAt dic\\\\boot.pasta:42】")):toBe(true)
         expect(warns[1]):toBe("OnPastaSceneAt: scene not found: file='dic\\boot.pasta', line=42")
     end)
+
+    test("位置に無い（u32 を超える行は、ログにも渡された文字列のまま出す）", function()
+        local big = "99999999999999999999"
+        local result, warns = call("OnPastaSceneAt", { [0] = "dic/a.pasta", [1] = big })
+        expect(contains(result, "【シーンが見つからない：OnPastaSceneAt dic/a.pasta:" .. big .. "】")):toBe(true)
+        expect(warns[1]):toBe("OnPastaSceneAt: scene not found: file='dic/a.pasta', line=" .. big)
+    end)
 end)
 
 describe("既定のハンドラ - 再生", function()
