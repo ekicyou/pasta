@@ -58,6 +58,7 @@
 - **windows-sys 0.61**: Windows DLL API（cfg(windows)・Win32_System_Threading 含む）
 - **flume 0.12**: アクター mailbox（async `recv_async` ＋同期 `recv_timeout` 兼用・`Sender: Send+Sync+Clone`）
 - **arc-swap 1**: `static MAILBOX` の lock-free スロット（送信パスに Mutex を置かない）
+- **embed-resource 3**（build-dependency）: pasta.dll に VERSIONINFO（ファイル/製品バージョン）とアイコン（`res/pasta.ico`）を埋め込む（Windows ターゲットのみ）
 - **wintf-winmsg-executor 0.0.3**: アクタースレッドの `block_on` メッセージループ（`!Send` VM を pin）
 
 > **エンジン駆動モデル**: `pasta_lua` の `!Send` Lua VM を `pasta_shiori` 所有のアクタースレッドへ pin し、SHIORI スレッドとは flume mailbox の CH marshaling（GET=block-on-reply／NOTIFY=即204／drop・timeout→204）で通信する。`unsafe impl Send/Sync` は構造的に撤去済み。さくらスクリプト描画は pasta_lua に物理維持（Lua 集約）し、レンダラはアダプタ注入で論理デカップリング（`pasta-actor-runtime` で確立）。

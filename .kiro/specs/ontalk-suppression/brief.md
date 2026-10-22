@@ -110,3 +110,18 @@
 
 - 窓際のぱすたさん（ghost_dev）の初回の演出（`boot.pasta` の `shokai_matsu`）は、`save["初回待ち"]` を立て、`REG.OnSecondChange` を一番外側で包み直して毎秒のイベントを全部止めている。ほかに `pose.pasta`（8 秒静かなら表情を戻す）と `tategaki.pasta`（窓あわせ）も `REG.OnSecondChange` を包んでおり、3 か所の包み合いが読み込みの順に頼っていて壊れやすい、と作者は書いた。
 - ランダムトークと時報を止める部分は、この spec の `＞自動トーク停止`／`＞自動トーク再開` で置き換えられる見込みである。ゴースト自身の毎秒のフックまで止める門と、`REG` に複数のハンドラを重ねる仕組みは、この spec の範囲の外（roadmap のバックログに置いた）。
+
+## 2026-10-22 棚卸の再測定（main 6a8dc479）
+
+- **前提の変化**: 2026-10-19 の後、仮想イベントの発行（`virtual_dispatcher.lua` 303 行）、DSL から呼べる関数の登録（`shiori/entry.lua` 132 行。`close_ghost`／`ゴースト終了` は L18〜27 のまま）、組み込みの名前の表（`crates/pasta_check/src/validate/builtins.rs` 53 行）は変わっていない。Current State は今も正しい。
+- **触るファイル**: `virtual_dispatcher.lua`（止めている間の判定と、再開したときの次の時刻の決め直し）、`shiori/entry.lua`（`GLOBAL` の 4 つの名前）、`pasta_scripts/pasta/store.lua`（124 行。止めている印と `STORE.reset` での片付け）、`builtins.rs`、`pasta_check` のテスト 2 本（名前を書き写して確かめる `tests/validate_scenes_test.rs` の `builtin_names_are_listed`、実行時との一致を見る `tests/validate_parity_test.rs` の `builtin_names_match_runtime`）、Lua のテスト（新しいファイルと、テストの一覧 `crates/pasta_lua/tests/lua_specs/init.lua` への 1 行）、マニュアル。1,000 行に近いファイルは無い。
+- **規模**: 5〜6 タスク。
+- **先に要るもの**: なし。`pasta-check-release-asset`・`scene-play-event` とソースのファイルを共有しない（下の注意を守れば）ので、同じウェーブに並べられる。`external-control-events` ともソースを共有しない。`chain-talk-interrupt` とは、あちらが `virtual_dispatcher.lua`・`store.lua` に触らなければ共有しない。マニュアルの `lua/shiori-events.md` はこの 3 本と共有するが、こちらは「仮想ディスパッチャ」の節（L696〜）で別の節。`grammar/call-jump.md` も、こちらは特別な呼び出しの表（L332 あたり）、`chain-talk-interrupt` はチェイントークの節で別。ほかの未完了の作業では `recommend-menu-scenes`（`entry.lua`・`builtins.rs`）、`novel-talk-flow`・`novel-checkpoint-rollback`・`scene-exact-match`（`virtual_dispatcher.lua`）、隙間の `ponytail-lua-scripts`（`virtual_dispatcher.lua`・`store.lua`・`entry.lua`）が、こちらの後に入る。
+- **注意（`scene-play-event` との境）**: 今のコードでは、キックしたシーンの 2 回目からの続きも、ランダムトークの判定（`check_talk` の `STORE.co_scene`）から流れる。だから、この作業の決めどおり「止まっている場面の続きを止める」と、キックの続きも止まる（1 回目だけは出る）。`scene-play-event` の brief は「キックと同じく止めない」を推奨にしているが、それには `check_talk` で続きの出どころを見分ける必要があり、`virtual_dispatcher.lua` を共有してしまう。推奨は、この作業の要件で「止めている間は、キックとシーン再生の続きも止める（1 回目は出る）」と決め、`scene-play-event` は `virtual_dispatcher.lua` に触らないこと。
+- **種別**: 機能（シーンから自動トークを止める口を足す。2026-10-19 開発者の決定。窓際のぱすたさんの初回の演出が動機）。
+- **要件定義のモデル**: Opus（名前と効き目はもう決まっている）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 組み込みの名前は `builtins.rs` のほかに、`validate_scenes_test.rs` の `builtin_names_are_listed` が 4 つを書き写して確かめている。Scope の「その検査のテスト」に、この書き写しの直しを入れる。
+  - `GLOBAL` の名前を挙げているマニュアルは、Scope の 4 ページのほかに `book/src/internals/shiori.md` L94・L299 と `book/src/internals/registry-search.md` L254 がある。手で書いたスキル `.claude/skills/pasta-ghost-authoring/SKILL.md` L207（特別な呼び出しの一覧）に足すかも決める（直すときは許可が要ることがある）。
+  - テストの一覧 `tests/lua_specs/init.lua` には、Lua のテストを足す 0.4.2 の 4 本がそろって 1 行ずつ足す。これをソースの共有とみなすと 4 本とも並べられなくなるので、マニュアルの同じページと同じく「後から入る側が合わせる」扱いにするかを、棚卸で決める。

@@ -442,7 +442,7 @@ KICK.try_dispatch(act)
 - ローカルの合成名（`:` で始まる `KickRequest.scene`）と `RELOAD_SENTINEL` は、デバッグのキックの経路でだけ生じる。通常のトークの再生はこれらを作らない。
 - キックは要求を受けた時点ではシーンを動かさない。実行は次の OnSecondChange（`act.req.date` があるもの）まで遅れ、1 回の OnSecondChange で起動するキックは 1 つだけである。
 - `RELOAD_SENTINEL` は Rust と Lua の 2 か所に書かれており、片方だけ変えるとリロードが届かない。
-- テストの環境: 開発環境で `PASTA_DEBUG=1` が設定されていると、`PastaLoader::load` を呼ぶテストがすべて固定ポートに bind しようとして `AddrInUse` で失敗する。そのため、ロードを伴う結合テストは `#[ctor]` で `main` の前に `PASTA_DEBUG`・`PASTA_DEBUG_PORT` を消している（`crates/pasta_lua/tests/common/mod.rs` の `neutralize_debug_env`、`crates/pasta_shiori/tests/` の各アクターのテスト）。ロードを伴うテストを追加するときは同じ処置が要る。クレート内の単体テストは環境変数を読まない `DebugConfig::resolve` を使う。
+- テストの環境: 開発環境で `PASTA_DEBUG=1` が設定されていると、`PastaLoader::load` を呼ぶテストがすべて固定ポートに bind しようとする。ポートを取れなかったロードは警告を出してデバッグなしで続くので失敗はしないが、どのテストでデバッグが有効になるかが実行の順で変わる。そのため、ロードを伴う結合テストは `#[ctor]` で `main` の前に `PASTA_DEBUG`・`PASTA_DEBUG_PORT` を消している（`crates/pasta_lua/tests/common/mod.rs` の `neutralize_debug_env`、`crates/pasta_shiori/tests/` の各アクターのテスト）。ロードを伴うテストを追加するときは同じ処置が要る。クレート内の単体テストは環境変数を読まない `DebugConfig::resolve` を使う。
 
 ## ソースの所在
 

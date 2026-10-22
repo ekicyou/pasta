@@ -104,3 +104,22 @@ Rust を入れていないゴーストの作者が困る。
 - **CI の確かめ方**: draft の PR は分類器が止める。途中の CI は `gh workflow run build.yml --ref <branch>` で回す。`release.yml` はタグの push でしか動かないので、配布物の作成は手元の `release.ps1` で、添付の数は `github-release.ps1 -DryRun` と `release-scripts-test.ps1` で確かめる。本番の確かめは 0.4.2 のリリースで行う。
 - **ライセンス**: 許可するライセンスは `deny.toml` の `[licenses].allow` と `about.toml` の `accepted` で揃える。pasta_check の依存（`lexopt`・`md5`・`zip` など）が、そこに収まることを確かめる。
 - **マニュアル**: 挙動の説明を変えたら、同じ変更で `node book/tools/gen-skill-refs.mjs` を回してスキル `references/` を作り直す。
+
+## 2026-10-22 棚卸の再測定（main 6a8dc479）
+
+- **前提の変化**: 2026-10-19 の後に入った FFI の読み込みの作業（`lua-cmodule-robustness`）は、毎回の CI（`.github/workflows/build.yml`）に FFI のテストの段を足しただけで、リリースの道具には触れていない。x64 の組み合わせが `pasta_check` をビルドしてテストすることも変わらない。Current State の行番号（`github-release.ps1` L18・L72・L79・L89、`release-state.ps1` L84）は今も合っている。
+- **触るファイル**
+  - `crates/pasta_sample_ghost/release.ps1`（263 行。段の見出しの `[4/6]` などの数も直す）
+  - `.github/workflows/release.yml`（574 行。build の段だけ。検査は L131〜、添付は L189〜）
+  - `.github/scripts/release/github-release.ps1`（132 行）、`.claude/skills/release/scripts/release-state.ps1`（L84〜87 の「/3」の表示も）
+  - ライセンス表示のひな形（`about.toml`・`about.hbs`。分けるなら新しいひな形が 1 つ増える）と、Current State に挙げた文書
+- **規模**: 7〜8 タスク。
+- **先に要るもの**: なし。ほかの 0.4.2 の 4 本とソースのファイルを共有しない。`release.ps1`・`release.yml`・`github-release.ps1`・`release-state.ps1`・`about.*` を触る 0.4.2 の作業は、ほかに無いことを確かめた（後から隙間の `ponytail-manual-ci` が `release.yml`・`github-release.ps1` を合わせる）。マニュアルの `book/src/debug/validate.md` は `ontalk-suppression` と共有するが、こちらは入れ方の節（L20〜23）、あちらは組み込みの名前の一覧（L155）で、節が別である。`tech.md` も別の行。
+- **種別**: 機能（新しい配布物を足す。2026-10-19 開発者の決定）。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - `release-scripts-test.ps1` が試すのは、リリースノートの作成・タグの確かめ・見どころの検査だけで、`github-release.ps1` の添付の数を試すテストは今は無い。「そのテストを合わせる」ではなく、添付の数の確かめを足すか、`-DryRun` だけで確かめるかを要件で決める。
+  - 配布物の一覧や `release.ps1` の段の説明は、Current State のほかにもある。`crates/pasta_sample_ghost/README.md` L42・L75（段の並び）、`.claude/skills/pasta-check/SKILL.md` L107・L133・L153、`release.yml` L120 の段の名前「Build pasta.dll.zip and hello-pasta.nar」。
+  - `pasta-check/SKILL.md` の入れ方は、今は L12〜18 にある（brief の L14-17 から少しずれた）。
+  - `pasta_check` の CLI の依存（`lexopt`・`md5`・`zip`）は、任意の機能（feature）で入る。ライセンス表示を pasta_check だけで作るとき、CLI の機能を入れた形で数えることを設計で確かめる。
