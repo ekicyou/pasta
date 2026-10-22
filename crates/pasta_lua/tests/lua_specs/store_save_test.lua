@@ -55,7 +55,11 @@ describe("pasta.store - auto_talk_paused", function()
     end)
 
     test("pasta.save には置かない", function()
+        -- 止めた後でも保存側にキーが出ないことを確かめる
+        local STORE = require("pasta.store")
+        STORE.auto_talk_paused = true
         expect(require("pasta.save").auto_talk_paused):toBe(nil)
+        STORE.reset()
     end)
 end)
 

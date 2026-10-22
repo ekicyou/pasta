@@ -129,6 +129,29 @@ describe("AutoTalkSwitch - DSL の Call の道", function()
     end)
 end)
 
+describe("AutoTalkSwitch - DSL の単語参照の道", function()
+    test("act:word で ＠自動トーク停止／＠自動トーク再開 が届き、見える文字を足さない（1.4, 1.5）", function()
+        setup()
+        local act = ACT.new({ actors = {}, save = {} })
+        act:talk(nil, act:word("自動トーク停止"))
+        expect(STORE.auto_talk_paused):toBe(true)
+        act:talk(nil, act:word("自動トーク再開"))
+        expect(STORE.auto_talk_paused):toBe(false)
+        expect(#act.token):toBe(0)
+    end)
+
+    test("アクター行の ＠自動トーク停止（proxy:word、トランスパイル後の形）でも届く（1.4, 1.5）", function()
+        setup()
+        local act = ACT.new({ ["ats_さくら"] = { name = "ats_さくら" } })
+        local p = act:actor_proxy("ats_さくら")
+        p:talk(p:word("自動トーク停止"))
+        expect(STORE.auto_talk_paused):toBe(true)
+        p:talk(p:word("自動トーク再開"))
+        expect(STORE.auto_talk_paused):toBe(false)
+        expect(#act.token):toBe(0)
+    end)
+end)
+
 --- 警告を記録するログに差し替えて、コルーチンの中で fn(act) を 1 回区切るまで回す。
 --- ログは pcall で包んで必ず元へ戻す（act.lua は呼び出しの時点でログを引く）。
 --- @return string[] warns, boolean yielded
