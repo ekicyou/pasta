@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. 下地: 変更前の記録とライセンス表示のひな形
-- [ ] 1.1 変更前のリリースビルドを通し、比べるための記録を残す
+- [x] 1.1 変更前のリリースビルドを通し、比べるための記録を残す
   - cargo を走らせる前に、環境変数 `NoDefaultCurrentDirectoryInExePath` を外す（LuaJIT のビルドが止まるため）
   - `x86_64-pc-windows-msvc` のターゲットと cargo-about が手元に入っていることを確かめる（無ければ入れる）
   - 変更前の `release.ps1` を pwsh から直に呼んで通す（`-ExecutionPolicy Bypass` は使わない）
