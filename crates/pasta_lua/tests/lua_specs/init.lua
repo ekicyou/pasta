@@ -56,6 +56,7 @@ local specs = {
     "kick_local_composite_test",          -- KICK.try_dispatch local-composite 分岐テスト (pasta-scene-kick-from-cursor 3.1)
     "kick_reload_shiori_test",            -- KICK.try_dispatch リロード sentinel 分岐テスト (pasta-scene-kick-from-cursor 4.3)
     "virtual_dispatcher_kick_force_test", -- KickForceGate dispatch 入口割り込み許可ゲートテスト (pasta-scene-kick 4.3)
+    "virtual_dispatcher_pause_gate_test", -- 止める門・restart_timers テスト (ontalk-suppression 2.1)
     "virtual_dispatcher_kick_hook_test", -- KickDispatchHook dispatch 前段キック起動＋preempt 結合テスト (pasta-scene-kick 4.4)
     "kick_position_path_inheritance_test", -- 位置パスの dispatch 越し kick 継承テスト (pasta-scene-kick-from-cursor 6.2)
     "mouse_test",                         -- event.mouse 候補の名前・アクター名テスト (touch-poke-shortcuts 3.1)
