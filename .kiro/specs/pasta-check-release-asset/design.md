@@ -154,7 +154,7 @@ flowchart TB
 ```
 
 - 段 3 は準備（段 1〜2）の外に置く。`-SkipSetup`・`-SkipDllBuild` のときも必ず走り、作り直す（R3.6）。
-- 段 4 は、段 3 が作った `target\x86_64-pc-windows-msvc\release\pasta_check.exe` を起動する（今の `cargo run -p pasta_check` を置き換える。**仮の決定**、Open Questions 1）。
+- 段 4 は、段 3 が作った `target\x86_64-pc-windows-msvc\release\pasta_check.exe` を起動する（今の `cargo run -p pasta_check` を置き換える。2026-10-22 確定）。
 - 段 5〜7 の中身は今の段 4〜6 と同じで、番号だけが変わる。
 
 ### 段 3 の中（どこで止まるか）
@@ -275,9 +275,9 @@ flowchart TB
 - **冪等性**: 毎回作り直す（`-Force`・古い zip の削除）。exe と表示は `target\` の下に置き、`release\` と git の作業ツリーには zip だけが出る（`target\`・`release\` は `.gitignore` 済み）。
 
 **Implementation Notes**
-- 版（1.5）は `version.workspace = true` から決まる。手元では版の検査を足さない（**仮の決定**、Open Questions 2）。
+- 版（1.5）は `version.workspace = true` から決まる。手元では版の検査を足さない（2026-10-22 確定）。
 - 段 4（今）の zip と検査の行は、関数に括り出さずに同じ形を写す（括り出すと今の段の行も変わり、3.7 の確かめが増える）。
-- リスク: x64 の exe を起動できない手元では段 4 が動かない（Open Questions 1）。
+- リスク: x64 の exe を起動できない手元では段 4 が動かない（開発機と CI は x64 なので受け入れる）。
 
 #### NarStep（`release.ps1` 段 4「Running pasta_check release」）
 
@@ -328,7 +328,7 @@ flowchart TB
 - **起動**: 今と同じ（`needs: [verify, gate]`）。
 - **変更点**
   - Install Rust toolchain: `targets: i686-pc-windows-msvc,x86_64-pc-windows-msvc`（4.1）。
-  - Setup Rust cache: `key: i686-x86_64-pc-windows-msvc`（**仮の決定**、Open Questions 3。今の key でも復元できていないので遅くならない）。
+  - Setup Rust cache: `key: i686-x86_64-pc-windows-msvc`（2026-10-22 確定。今の key でも復元できていないので遅くならない）。
   - 段の名前: `Build pasta.dll.zip, hello-pasta.nar and pasta_check.zip`。実行の行（`pwsh -NoProfile -File crates/pasta_sample_ghost/release.ps1`）は変えない（3.8）。
   - Verify release assets に `pasta_check.zip` の項目を足す（`pasta.dll.zip` の項目の直後）:
     - `Get-ZipEntries 'release/pasta_check.zip'` を並べ替え、`pasta_check.exe|THIRD_PARTY_LICENSES.txt` と比べる。無ければ `Get-ZipEntries` が「配布物が無い: …」で止まる（4.2・4.4）。
@@ -449,11 +449,19 @@ flowchart TB
 - exe は署名しない（範囲外）。マニュアルで SmartScreen の警告が出ることを書く（7.4）。
 - 利用者が受け取るのは、タグのソースからリリース CI が作り、版を検査した exe だけである。手元の `release\` の物は公開しない（今と同じ）。
 
-## Open Questions / Risks
+## Decisions / Risks
 
-1. **`pasta_check release` の段を x64 の exe で走らせるか**（申し送り 2）: 仮の決定は「段 3 で作った exe で段 4 を走らせる」。代わりの案は「段 3 は今の `cargo run -p pasta_check` のまま、新しい段を `pasta.dll.zip` の後に足す」。
-2. **exe の版の検査を手元でもするか**（申し送り 3）: 仮の決定は「CI だけ」。
-3. **rust-cache の key**（申し送り 4）: 仮の決定は `i686-x86_64-pc-windows-msvc` に変える（今の key でも復元できていない）。
-4. **ひな形の分け方**（申し送り 1）: 仮の決定は「`about-pasta_check.hbs` を新しく置き、`about.toml` は共用する」。
+2026-10-22 の設計ディスカッションで、次の 4 件を推奨案で確定した（根拠は `research.md` 11 節）。
+
+1. **`pasta_check release` の段**（申し送り 2）: 段 3 で作った x64 の exe で段 4 を走らせる。
+2. **exe の版の検査**（申し送り 3）: リリース CI の Verify だけで行い、手元の `release.ps1` には足さない。
+3. **rust-cache の key**（申し送り 4）: `i686-x86_64-pc-windows-msvc` に変える（今の key でも復元できていない）。
+4. **ひな形の分け方**（申し送り 1）: `about-pasta_check.hbs` を新しく置き、`about.toml` は共用する。
+
+設計の検証（GO）が挙げた次の 3 つの確かめは、タスクに必ず入れる（Testing Strategy にある手順）。
+
+- 変更の前後で、`.nar` と `pasta.dll.zip` の中身の名前の一覧が同じであること（段 4 を x64 の exe に替えるため）。
+- 開発者が `release.bat`（Windows PowerShell 5.1）で 1 回通すこと（エージェントは走らせられない）。
+- 「Verify release assets」の `run` をスクラッチの `.ps1` に写し、版が合う場合と違う場合の 2 通りを手元で走らせること（`actionlint` も当てる）。
 - リスク: 0.4.1 までの版の状態の読み取りは `3/4` の添付不足と出る（手順書に一言書く）。
 - リスク: `.claude/skills/**` の編集が分類器に拒否されると、6.3 と 7.6・7.7 の一部が止まる（開発者の許可で進める）。
