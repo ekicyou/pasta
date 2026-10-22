@@ -138,3 +138,8 @@
   - 組み立てた台本は、終わりに `\e` が付く（`sakura_builder.lua` L534〜536）。中断の台詞の台本と割り込んだシーンの 1 ビート目を文字列でつなぐと、前の `\e` で止まる。しかも、割り込んだシーンが喋るかは組み立てた後でないと分からない。添え方（トークンの段でつなぐか、`\e` を外すか、立ち位置と表情の持ち越し `STORE.actor_spots`・`STORE.appearance` との順）は設計の要点になる。
   - 台詞を出したかの印を act のメソッドにすると、`pasta_check` の act のメソッドの表（`crates/pasta_check/src/validate/builtins.rs` の `ACT_METHODS`、27 個）と、実行時との一致のテストが変わり、`ontalk-suppression` と `builtins.rs` を共有してしまう。印は act の欄か関数の中の変数にとどめる。
   - コールバックの再開（`shiori/event/callback.lua` の `CALLBACK.try_route`・`CALLBACK.sweep`）も `EVENT.drive` を通るので、新しい決まりが効く。テストに含める。
+
+## 申し送り（ontalk-suppression より、2026-10-22 完了時）
+
+- `pasta/act.lua` の `ACT_IMPL.yield` の先頭に、止めている間の見張り（警告を出して `GLOBAL.resume_auto_talk` を呼び、その後は今どおり区切る）を足した。台詞を出したかの印などで `ACT_IMPL.yield` を触るときは、この分岐と並べる。
+- 止める門は `set_co_scene` を通らないので、続きを捨てる決まりには触れていない。`builtins.rs` の `GLOBAL_NAMES` は 8 つになった（`ACT_METHODS` は触っていない）。
