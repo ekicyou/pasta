@@ -45,7 +45,7 @@
   - 完了の姿: 上の確かめがすべて通り、`release\pasta_check.zip` が 3.1 の確かめに使える形で残っている
   - _Requirements: 1.1, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 2.6, 3.1, 3.6, 3.7, 4.6_
 
-- [ ] 3. リリース CI の配線
+- [x] 3. リリース CI の配線
 - [x] 3.1 (P) リリース CI の build の job で pasta_check.zip を作り、検査して渡す
   - toolchain の targets に x64 を足し、rust-cache の key を `i686-x86_64-pc-windows-msvc` にする。リリースビルドの段の名前を合わせ、実行の行は変えない
   - 配布物の検査に、`pasta_check.zip` の中身がちょうど 2 つかの項目と、中身が合うときに exe の `--version` が `pasta_check <タグの版>` と完全に一致するかの項目を足す
@@ -57,7 +57,7 @@
   - _Depends: 2.3_
   - _Requirements: 1.5, 3.8, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7_
 
-- [ ] 3.2 (P) GitHub Release の添付を 5 つにし、欠けのテストを足す
+- [x] 3.2 (P) GitHub Release の添付を 5 つにし、欠けのテストを足す
   - `github-release.ps1` の添付の一覧に `pasta_check.zip` を足し、説明と文言を「5 つ（配布物 4 つと詳しいリリースノート）」に合わせる。gh の前の有無の検査・下書き → 添付 → 公開・再実行の規則の流れは変えない
   - `release-scripts-test.ps1` に項目 10 を足す。`pasta_check.zip` だけが無いフォルダで呼び、終了コード 1 で出力にその名前が出ることを確かめる。冒頭の説明に `github-release.ps1` を足す
   - 完了の姿: `release-scripts-test.ps1` を走らせると項目 1〜10 がすべて ok になる
