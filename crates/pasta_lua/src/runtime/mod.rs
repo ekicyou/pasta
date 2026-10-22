@@ -69,8 +69,9 @@ pub struct PastaLuaRuntime {
     base_dir: Option<PathBuf>,
     /// Runtime-scope debug backend handle (task 4.2).
     ///
-    /// `Some` only when debugging was enabled at VM init (`config.debug.enabled`);
-    /// the hook is installed exactly ONCE there and this handle owns the bridge
+    /// `Some` only when debugging was enabled at VM init (`config.debug.enabled`)
+    /// AND the listener could bind its port (a bind failure leaves it `None` while
+    /// `source_map` is still kept); the hook is installed exactly ONCE there and this handle owns the bridge
     /// threads + transport + the runtime-scope `DebugSession`/`BreakpointSet`. It
     /// is `None` on the disabled (default) zero-cost path — no hook, no port, no
     /// `std_debug` (R5.2 / R5.3 / R5.5).
