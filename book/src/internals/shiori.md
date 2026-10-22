@@ -371,8 +371,9 @@ dispatch(act)
  2. force = STORE.kick_force。真なら false に戻す（1 回だけ使う）
  3. force でなく is_blocked(act.req.status) なら nil
  4. KICK.try_dispatch(act) がコルーチンを返せばそれを返す
- 5. check_hour(act) がコルーチンを返せばそれを返す
- 6. check_talk(act) を返す
+ 5. STORE.auto_talk_paused が真なら nil
+ 6. check_hour(act) がコルーチンを返せばそれを返す
+ 7. check_talk(act) を返す
 ```
 
 利用者から見た判定の順・ブロック対象のキーワードと照合の仕方・OnHour のシーン候補の順・トーク間隔の決まり方・テスト用の関数は、[仮想ディスパッチャ](../lua/shiori-events.md#仮想ディスパッチャ)（[ブロック対象 Status キーワード](../lua/shiori-events.md#ブロック対象-status-キーワード)・[OnHour](../lua/shiori-events.md#onhour)・[pasta.toml 設定](../lua/shiori-events.md#pastatoml-設定)・[テスト用関数](../lua/shiori-events.md#テスト用関数)）が正である。ここではそれを実現する仕組みだけを書く。
@@ -382,6 +383,7 @@ dispatch(act)
 - `check_talk` は、`next_talk_time` が 0 なら次のトーク時刻を決めるだけで終わる。トーク時刻は `CLOCK.steady(act.req)`（飛びを差し引いた時計）で数え、仮想時刻の設定し直しに左右されない。正時までの残りを `hour_margin` と比べる判定は、`check_hour` が記録した `next_hour_unix` と `CLOCK.now(act.req)` の差を使う（仮想時刻で数える）。この判定で発行を見送るときは `next_talk_time` を変えないため、次の秒にまた判定する。発行するときは、シーンを探す前に `next_talk_time` を決め直す。
 - 次のトーク時刻は「現在時刻 + `math.random(最小間隔, 最大間隔)`」で決める。間隔は、決めるたびにローカル関数 `get_config` が `pasta.save` と `@pasta_config` を読み直して求める（キャッシュしない）。`hour_margin` は `[ghost].hour_margin`（無ければ 30）を、切り捨てや下限の補正をせずにそのまま使う。`[ghost]` の既定値の補完は [設定読込](loader.md#設定読込) で扱う。
 - ブロック中（3 で終わる間）は `check_hour`・`check_talk` を呼ばないため、`next_hour_unix`・`next_talk_time` は進まない。そのため、ブロックが解けた最初の判定で、過ぎていた正時やトーク時刻の条件が成り立つ。
+- 5 の `STORE.auto_talk_paused` は、`GLOBAL.pause_auto_talk`／`resume_auto_talk`（`pasta/shiori/entry.lua`）が書く（[自動トークを止めている間](../lua/shiori-events.md#自動トークを止めている間)）。止めている間もブロック中と同じく時計は進まないが、再開の関数が公開の関数 `restart_timers(act)` を 1 回呼び、時計を決め直す。`next_talk_time` を 0 に戻し、`CLOCK.now(act.req)` が取れれば次の正時を求めて、今の `next_hour_unix` より後のとき、または `CLOCK.epoch()` が `seen_epoch` と違うときだけ置き換えて `seen_epoch` を記録する（取れなければ `next_hour_unix` を 0 にする）。そのため、ブロックと違い、止めている間に過ぎた正時は再開の後にも発行されない。`set_co_scene` を通らないので、中断中の継続は捨てずに残る。
 - 返したコルーチンは `EVENT.fire` が再開し、`set_co_scene` が `STORE.co_scene` を置き換える。OnHour とキックのシーンが中断中の継続を置き換え、OnTalk だけが継続を再開する（`check_talk` が `STORE.co_scene` を返す）のはこのためである（[継続トークと co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新)）。
 - 仮想イベントは `REG` を通らない。OnHour・OnTalk で発行するシーンはどれも `SCENE.co_exec` で探す（テスト用の差し替え `scene_executor` が設定されていればそれを使う）。4 のキックは検索を使わず、シーン表のキーとの完全一致でシーンを引く（[キックの保留と起動](debug.md#キックの保留と起動kicklua)）。
 
