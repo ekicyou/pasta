@@ -3,7 +3,7 @@
 > このドキュメントは AI と相談しながらリリースを進めるためのガイドです。
 
 リリースは、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）が行います。
-ビルド・crates.io への公開・VSCode Marketplace への公開・GitHub Release の作成（`pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-X.Y.Z.vsix` の添付）は、すべて CI の中で行われます。手元で公開や Release の作成をする必要はありません。
+ビルド・crates.io への公開・VSCode Marketplace への公開・GitHub Release の作成（`pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-X.Y.Z.vsix`・`pasta_check.zip` の添付）は、すべて CI の中で行われます。手元で公開や Release の作成をする必要はありません。
 
 ## 前提条件
 
@@ -39,10 +39,10 @@ GitHub の「Actions」→「Release」の実行を開きます。job は次の�
 |-----|------|
 | verify | タグの形・版の一致・`main` からの到達・見どころのファイルの有無を検査 |
 | gate | `build.yml` の検査（test・clippy・deny・luacheck・WASM）をタグのコミットで実行 |
-| build | `pasta.dll.zip`・`hello-pasta.nar`・VSIX を作る |
+| build | `pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip` を作る |
 | publish-crates | crates.io へ 5 クレートを公開 |
 | publish-vsce | VSCode Marketplace へ拡張を公開 |
-| github-release | 詳しいリリースノートを作り、見どころを本文とする GitHub Release `pasta vX.Y.Z` を作成して、配布物 3 つと詳しいリリースノートを添付 |
+| github-release | 詳しいリリースノートを作り、見どころを本文とする GitHub Release `pasta vX.Y.Z` を作成して、配布物 4 つと詳しいリリースノートの 5 つを添付 |
 | report | 公開先ごとの結果と Release の URL を表にまとめる |
 
 report job の Summary の表で、公開先ごとの結果を確かめます。
@@ -104,4 +104,4 @@ pwsh -File release.ps1
 ```
 
 - `cargo-about` がインストール済みであること（`cargo install cargo-about`）。`release.ps1` が第三者ライセンス表示 `THIRD_PARTY_LICENSES.txt` を `pasta.dll` の隣に生成します
-- `pasta.dll` のビルド、DLL と `scripts/` のコピー、`pasta_check release`（検査と `.nar` の作成）、`pasta.dll.zip` の作成、版の確認、`.nar` の大きさの検査までを一括で実行します
+- `pasta.dll` のビルド、DLL と `scripts/` のコピー、`pasta_check.zip` の作成（64 ビット版の `pasta_check.exe` とそのライセンス表示）と中身の検査、その `pasta_check.exe` での `pasta_check release`（検査と `.nar` の作成）、`pasta.dll.zip` の作成、版の確認、`.nar` の大きさの検査までの 7 段を一括で実行します

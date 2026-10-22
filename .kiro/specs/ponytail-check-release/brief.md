@@ -106,3 +106,11 @@
 - 振る舞いを固めるテストを先に書き、1 つ直すごとに確かめて 1 コミットにする。消す・壊すケースは、一時フォルダで再現してから直す。
 - 品質の関門：`cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_check -p pasta_sample_ghost`。cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。
 - パスの形に依存するバグは、CI でしか再現しないことがある（GitHub のランナーの `%TEMP%` は `RUNNER~1` という 8.3 の短い名前）。テストは、短い名前が混じっても通るように書く。
+
+## 申し送り（pasta-check-release-asset より）
+
+2026-10-22 に main に入った変更。
+
+- `release.ps1` は 7 段になった。段 3 が x64 の `pasta_check.exe` をビルドし、`THIRD_PARTY_LICENSES.txt`（`about-pasta_check.hbs` から生成）と合わせて `release\pasta_check.zip` を作って検査する。段 4 の `pasta_check release` は、`cargo run -p pasta_check` ではなく、その exe（`target\x86_64-pc-windows-msvc\release\pasta_check.exe`）で走る。引数と失敗の扱いは変えていない。
+- `pasta_check` の `--version` の出力の形を変えると、リリース CI の版の検査（`pasta_check <タグの版>` と完全一致）が落ちる。`pasta_check` の依存に許可に無いライセンスが入ると、段 3 のライセンス表示の生成が止まる（`about.toml` の `accepted`）。
+- 参照: `.kiro/specs/completed/pasta-check-release-asset/design.md` の CheckZipStep と Revalidation Triggers。

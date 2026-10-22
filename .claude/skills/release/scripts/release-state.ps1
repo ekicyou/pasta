@@ -81,10 +81,10 @@ else {
     $state = if ($LASTEXITCODE -eq 0) {
         $j = ($out -join "`n") | ConvertFrom-Json
         $have = @($j.assets | Where-Object state -eq 'uploaded' | ForEach-Object name)
-        $n = @('pasta.dll.zip', 'hello-pasta.nar', "pasta-vscode-$V.vsix" | Where-Object { $have -contains $_ }).Count
-        if ($j.isDraft) { "下書き（添付 $n/3）" }
-        elseif ($n -eq 3) { $found++; "あり（公開・添付 3/3） $($j.url)" }
-        else { "添付不足（公開・添付 $n/3） $($j.url)" }
+        $n = @('pasta.dll.zip', 'hello-pasta.nar', "pasta-vscode-$V.vsix", 'pasta_check.zip' | Where-Object { $have -contains $_ }).Count
+        if ($j.isDraft) { "下書き（添付 $n/4）" }
+        elseif ($n -eq 4) { $found++; "あり（公開・添付 4/4） $($j.url)" }
+        else { "添付不足（公開・添付 $n/4） $($j.url)" }
     }
     elseif (($out -join ' ') -match 'release not found') { '無し' }
     else { $unknown++; '不明' }

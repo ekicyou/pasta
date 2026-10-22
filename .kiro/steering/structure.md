@@ -222,7 +222,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       ├── README.md        # クレート概要
 │       ├── RELEASE.md       # リリース手順
 │       ├── STAGES.md        # 入門ガイドの段階表（段階 N の辞書 = dic/01〜NN。.nar には入らない）
-│       ├── release.ps1      # ビルド＋配布パッケージ生成スクリプト（6 段。絵を生成する段は無い。手元では動作確認用・リリース CI の build job も呼ぶ）
+│       ├── release.ps1      # ビルド＋配布パッケージ生成スクリプト（7 段。段 3 で x64 の pasta_check.zip を作り、段 4 でその exe の release を走らせる。絵を生成する段は無い。手元では動作確認用・リリース CI の build job も呼ぶ）
 │       ├── art/             # 立ち絵の生成の記録（README.md）と設定画像 2 枚（.nar には入らない）
 │       ├── src/
 │       │   ├── lib.rs              # テスト用モジュールの宣言だけ
@@ -276,7 +276,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   ├── scripts/release/     # リリース CI の job 補助スクリプト（verify-tag/publish-crate/publish-vsix/release-notes/github-release の .ps1）と、その検査 release-scripts-test.ps1（build.yml の release-scripts job で実行）
 │   └── release-ci-setup.md  # リリース CI の一回限りのセットアップ手順書
 ├── release.bat              # crates/pasta_sample_ghost/release.ps1 のバッチラッパー（ダブルクリック用）
-├── release/                 # release.ps1 の出力先（.nar・pasta.dll.zip。.gitignore 済み・コミットしない）
+├── release/                 # release.ps1 の出力先（pasta_check.zip・.nar・pasta.dll.zip。.gitignore 済み・コミットしない）
 ├── Cargo.lock               # 依存の解決結果（コミット対象・リリース CI の build で不変を検査）
 ├── README.md                # プロジェクト概要
 ├── LICENSE                  # ライセンス
@@ -287,7 +287,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 - ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
 - ルートレベルの `tests/` と `examples/` も削除済み（Pure Virtual Workspace移行完了）
 - 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_dsl, pasta_core, pasta_lua, pasta_lsp, pasta_sample_ghost, pasta_shiori）
-- pasta_sample_ghost のサンプルゴースト hello-pasta は `ghosts/hello-pasta/` に完全な一式として直接配置（SSOT）。テキスト系（descript/pasta.toml/dic/install）とシェルの画像は追跡する正本、DLL・ライセンス表示・`scripts/` は生成物。`release.ps1` は生成物の配置と `.nar`・`pasta.dll.zip` のパッケージングを担う（旧 dist-src/robocopy 方式は廃止）。生成物のうち DLL・ライセンス表示・`scripts/` と `release/` はコミットしない。配布物の公開はリリースタグの push で `release.yml` が行う
+- pasta_sample_ghost のサンプルゴースト hello-pasta は `ghosts/hello-pasta/` に完全な一式として直接配置（SSOT）。テキスト系（descript/pasta.toml/dic/install）とシェルの画像は追跡する正本、DLL・ライセンス表示・`scripts/` は生成物。`release.ps1` は生成物の配置と `pasta_check.zip`・`.nar`・`pasta.dll.zip` のパッケージングを担う（旧 dist-src/robocopy 方式は廃止）。生成物のうち DLL・ライセンス表示・`scripts/` と `release/` はコミットしない。配布物の公開はリリースタグの push で `release.yml` が行う
 - `CLAUDE.md` が AI 開発支援の指示（プロジェクト指示・Kiro 仕様駆動ワークフロー・コマンド一覧）を担う
 
 ## ファイル命名規則
