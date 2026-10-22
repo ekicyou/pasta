@@ -83,7 +83,7 @@
   - _Boundary: InstallDocs, AssetListDocs（`pasta-check/SKILL.md` だけ）_
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9_
 
-- [ ] 5.2 (P) 配布物の一覧と段の並びの記述を 4 つ（添付 5 つ）に合わせる
+- [x] 5.2 (P) 配布物の一覧と段の並びの記述を 4 つ（添付 5 つ）に合わせる
   - ルートの `README.md`・マニュアルの `introduction.md` の直リンクに `pasta_check.zip` を足す
   - `crates/pasta_sample_ghost/RELEASE.md`・`crates/pasta_sample_ghost/README.md` の配布物・build の役目・`release.ps1` の段の並びを合わせる
   - steering の `tech.md`・`structure.md` の配布物の数と添付の数を合わせる
