@@ -28,7 +28,7 @@ raise_event("OnPastaSceneAt", ["dic/boot.pasta", "42"])  → 42 行目のシー�
 - シーンに引数やアクターを渡すこと。登録名（`会話_1`）や前方一致での指名。
 - SSTP 以外の経路（`\![raise]` の作例など）と、`pasta_check validate` のイベント名の一覧。
 - 同じ名前のシーンが別のファイルにあるときの、位置の索引と通し番号の制約の直し（受け継ぐ）。
-- `raise_event` が NOTIFY で届く場合の別の道（GET を前提にする。未決事項 1）。
+- `raise_event` が NOTIFY で届く場合の別の道（GET と決めた。Decisions 1）。
 
 ## Boundary Commitments
 
@@ -284,7 +284,7 @@ flowchart TD
 | `OnPastaScene` | 大域シーンの書いた名前（必須・空でない） | ローカルシーンの書いた名前（省略・空なら大域だけ） | 再生: 200（1 ビート目）。失敗: 200（表記）か 204。断り: 204 |
 | `OnPastaSceneAt` | `.pasta` ファイル。`ghost/master/` からの相対パスか絶対パス。区切りは `/`・`\` | 行。半角数字だけの 1 以上の整数（`"42"`） | 同上 |
 
-- 前提: SHIORI の GET で届く（未決事項 1）。NOTIFY で届いたときもハンドラは同じに動き、応答は `pasta_shiori` が捨てる。
+- 前提: SHIORI の GET で、`SecurityLevel: local` で届く（Decisions 1）。NOTIFY で届いたときもハンドラは同じに動き、応答は `pasta_shiori` が捨てる。
 - 冪等ではない: 呼ぶたびに順送りが進み、進行中の会話を差し替える。
 
 ##### Service Interface（Lua）
@@ -482,7 +482,7 @@ impl PastaLuaRuntime {
 - `enabled` は `from_loader_with_scene_dic` で解決した `RuntimeConfig.debug.enabled` をそのまま持つ。待ち受けが立ったかどうか（`debug_enabled()`）は見ない（4.2）。
 - `scene_at` は `PositionResolver::resolve_position` を呼ぶ。マップが無ければ常に nil。`line` は数で受け、`1..=u32::MAX` の整数でなければ nil（500 にしない）。
 - 登録は本番の入口（`from_loader_with_scene_dic`）だけで行う。`PastaLuaRuntime::new` などの簡易な入口では登録しない（ハンドラは無いものを無効として扱う）。
-- 内部用のモジュールとし、マニュアルでは内部設計の章にだけ書く（作者向けのモジュールの章には載せない。未決事項 3）。
+- 内部用のモジュールとし、マニュアルでは内部設計の章にだけ書く（作者向けのモジュールの章には載せない。Decisions 5）。
 
 #### PositionResolver
 
@@ -574,6 +574,15 @@ pub fn resolve_position(
 4. 待ち受けのポートを先に塞いでから読み込み、`debug_enabled()` が偽でも `debug_source_map()` があり、位置で再生できること（4.2・4.3）。
 5. デバッグを無効にしたゴーストでは 2 つのイベントが 204 になること（4.4・7.1）。見つからないときに 200 で表記が返ること（5.1・5.3）。
 
+### 実機での確かめ（実装の最後）
+
+SSP の実機で、デバッグを有効にした試験用のゴーストに、MCP の `reload` の後で `raise_event` を送る（起動中の SSP とは別の SSP で試す）。次を確かめる。
+
+1. `OnPastaScene`・`OnPastaSceneAt` が SHIORI に GET で、`SecurityLevel: local` で届くこと（pasta のログで見る）。
+2. ツールの結果に 1 ビート目の台本が載り、見つからないときは表記が載ること。
+
+GET でなかったとき、または `local` でなかったときは、実装を完了とせず、設計に戻る（Decisions 1）。
+
 ### Regression
 
 - 今のテスト（Rust・Lua・luacheck）を書き換えずに通す（7.3）。とくに `failure_test.lua` の種類の数、`source_map_handoff_test.rs`・`scene_identity_index_test.rs` の無効のときの `None`、キックの Lua のテスト 5 本（7.2）。
@@ -586,10 +595,15 @@ pub fn resolve_position(
 - `OnPastaSceneAt` のパスは索引を引くためだけに使い、ファイルを開かない。どんなパスを渡されても、ファイルの中身や有無は漏れない（見つからない表記に出るのは、渡された文字列だけ）。
 - 表記に入る値（名前・パス・行）は `FAILURE.format` がエスケープするので、さくらスクリプトとして働かない。
 
-## Open Questions / Risks
+## Decisions（2026-10-22 設計の話し合いで、すべて推奨案で確定）
 
-1. **`raise_event` が SHIORI に GET で届くか、`SecurityLevel` は何か**（実機で確かめる）: 文書（SSP ヘルプの MCP の節、SHIORI/3.0 の NOTIFY は Value を捨てる、SSTP の strict の説明）からは「GET・`local`」と強く推せる（research.md 8.1）。設計は GET を前提にする。NOTIFY なら 1 ビート目は捨てられ、MCP の結果に台本が載らないので、1 ビート目を捨てない別の道（例: `KICK.install` で次の OnSecondChange に出す）を設計し直す。`external` で届くなら、4.6 によりいつも断られるので、要件を見直す。
-2. **失敗の表記の対象の書き方**: 「イベント名、半角の空白、`＊大域 ・ローカル`／`ファイル:行`／`ReferenceN`」にした。要件 5.2 の例（`会話・挨拶`）とは、空白と印の分だけ違う（大域の名前に `・` が入りうるため）。
-3. **`@pasta_debug` を作者向けの公開モジュールにするか**: 内部用として内部設計の章にだけ書く案にした。
-4. **引数の誤りの種類**: 新しい種類を足さず、`名前にならない値`・`数にできない値` を使う案にした。`"0"` を `数にできない値` と呼ぶのは少しずれる。専用の種類を足すなら、`failure_test.lua` の種類の数（10 種）を直すことになり、要件 7.3 と食い違う。
-5. **門で断ったときのログの水準**: warn にした（MCP の `get_log` で気づけるように）。配るゴーストで 2 つのイベントを受けたときにも warn が 1 行出る。
+1. **`raise_event` は GET・`SecurityLevel: local` で届く**: SHIORI/3.0 は NOTIFY の応答の Value を捨てる。SSP ヘルプは、`raise_event` が「ゴーストが返したスクリプトを再生する」こと、MCP の操作が Owned SSTP と同様に扱われるローカル専用の機能であることを書く（research.md 8.1）。実機での確かめは、実装の最後に行う（Testing Strategy の「実機での確かめ」）。NOTIFY だったときは、1 ビート目を捨てない別の道（例: `KICK.install` で次の OnSecondChange に出す）に設計し直す。`external` だったときは、要件 4.6 を見直す。
+2. **順送りの状態の鍵**: `SceneCacheKey` に持ち主のローカルの名前の欄（`Option<String>`）を足す。今の 3 か所の解決は `None` を渡す。`module_name` に `:` で始まる印を埋める案は、隠れた約束を残すので採らない。
+3. **失敗の表記の対象**: 「イベント名、半角の空白、`＊大域 ・ローカル`／`ファイル:行`／`ReferenceN`」。DSL と同じ印で、大域とローカルを取り違えない。要件 5.2 の例もこの形に直した。
+4. **引数の誤りの種類**: 新しい種類を足さず、`名前にならない値`・`数にできない値` を使う。`"0"` も `数にできない値` と呼び、括弧の中に値を出して分かるようにする。足すと `failure_test.lua` の種類の数（10 種）が変わり、要件 7.3 と食い違う。
+5. **`@pasta_debug` は内部用**: 内部設計の章にだけ書き、作者向けのモジュールの章には載せない。後の `ponytail-lua-debug` のために、口を小さく保つ。
+6. **門で断ったときのログは warn**: 204 の理由はログにしか残らない。配るゴーストにこのイベントが届くのは、誰かがわざわざ送ったときだけなので、警告で目立たせてよい。
+
+## Risks
+
+- 実機で GET・`local` でなかったときは、1 ビート目の返し方か要件 4.6 を直すことになる（Decisions 1）。

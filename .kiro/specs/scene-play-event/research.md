@@ -260,3 +260,10 @@
 - SSP ヘルプ「その他の機能」MCP サーバー対応機能: https://ssp.shillest.net/ukadoc/ssphelp/other.html
 - UKADOC SHIORI/3.0 メソッド・SecurityLevel: https://ssp.shillest.net/ukadoc/manual/spec_shiori3.html#request
 - UKADOC SSTP request の共通ヘッダ（SecurityLevel・Option strict・ID）: https://ssp.shillest.net/ukadoc/manual/spec_sstp.html#req_res
+
+## 13. 設計の話し合いの決定（2026-10-22）
+
+設計の未決事項 6 件は、すべて推奨案で確定した（`design.md` の Decisions）。根拠の要点:
+
+- GET・`local`: UKADOC の SHIORI/3.0 は「NOTIFY ではレスポンスの Value ヘッダは無視される」とする。SSP ヘルプは `raise_event` が返したスクリプトを再生し、MCP の操作を Owned SSTP と同様に扱うとする。実機での確かめは実装の最後に行う。
+- pasta は SHIORI の応答に `ErrorLevel` を載せないので、警告は SSP の MCP の `get_log` に出ない。AI エージェントが読むのは、応答の表記と pasta のログファイルである。
