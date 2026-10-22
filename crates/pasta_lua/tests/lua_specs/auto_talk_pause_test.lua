@@ -1,6 +1,6 @@
 -- auto_talk_pause_test.lua
 -- 自動トークの停止・再開（AutoTalkSwitch）のテスト (ontalk-suppression 2.3)
--- Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 1.7, 3.4, 4.1, 4.2
+-- Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 1.7, 2.8, 3.4, 4.1, 4.2, 5.1
 --
 -- entry の依存閉包を同一インスタンス集合として一括新規ロードする（shiori_entry_test と同方針）。
 local describe = require("lua_test.test").describe
@@ -127,6 +127,61 @@ describe("AutoTalkSwitch - DSL の Call の道", function()
         act:call("global", "自動トーク再開", {})
         expect(STORE.auto_talk_paused):toBe(false)
     end)
+end)
+
+--- 警告を記録するログに差し替えて、コルーチンの中で fn(act) を 1 回区切るまで回す。
+--- ログは pcall で包んで必ず元へ戻す（act.lua は呼び出しの時点でログを引く）。
+--- @return string[] warns, boolean yielded
+local function run_chain(fn)
+    local warns = {}
+    local noop = function() end
+    local saved_log = package.loaded["@pasta_log"]
+    package.loaded["@pasta_log"] = {
+        trace = noop,
+        debug = noop,
+        info = noop,
+        warn = function(msg) table.insert(warns, msg) end,
+        error = noop,
+    }
+    local ok, err = pcall(function()
+        local act = ACT.new({ actors = {}, save = {} })
+        local co = coroutine.create(fn)
+        local resumed, e = coroutine.resume(co, act)
+        assert(resumed, e)
+        return coroutine.status(co)
+    end)
+    package.loaded["@pasta_log"] = saved_log
+    assert(ok, err)
+    return warns, err == "suspended"
+end
+
+local CHAIN_CALLS = {
+    { "GLOBAL.yield（＞yield）", function(act) GLOBAL.yield(act) end },
+    { "GLOBAL[\"チェイントーク\"]（＞チェイントーク）", function(act) GLOBAL["チェイントーク"](act) end },
+    { "Lua の直接の act:yield()", function(act) act:yield() end },
+}
+
+describe("ChainTalkGuard - 止めている間のチェイントーク", function()
+    for _, case in ipairs(CHAIN_CALLS) do
+        test(case[1] .. " は警告 1 回・印を解いて区切る（2.8）", function()
+            setup()
+            GLOBAL.pause_auto_talk(nil)
+            local warns, yielded = run_chain(case[2])
+            expect(#warns):toBe(1)
+            expect(warns[1]:find("自動トーク", 1, true) ~= nil):toBe(true)
+            expect(warns[1]:find("チェイントーク", 1, true) ~= nil):toBe(true)
+            expect(STORE.auto_talk_paused):toBe(false)
+            expect(yielded):toBe(true)
+        end)
+
+        test(case[1] .. " は止めていなければ警告しない（5.1）", function()
+            setup()
+            local warns, yielded = run_chain(case[2])
+            expect(#warns):toBe(0)
+            expect(STORE.auto_talk_paused):toBe(false)
+            expect(yielded):toBe(true)
+        end)
+    end
 end)
 
 STORE.reset()
