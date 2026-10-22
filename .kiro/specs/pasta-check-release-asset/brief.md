@@ -92,8 +92,8 @@ Rust を入れていないゴーストの作者が困る。
 
 - **Extends**: なし（`release-ci` は完了済み。挙動はこの spec が足す）
 - **Adjacent**
-  - `ponytail-manual-ci`（0.4.3）: `.github/workflows/**` と `.github/scripts/release/*.ps1` を持つ。この spec が先に入り、`ponytail-manual-ci` が後から合わせる。この spec が触るのは `release.yml` の build job の行で、`ponytail-manual-ci` が触る publish 系の job の行・Node の版の行とは別である。
-  - `ponytail-check-release`（0.4.3）: `pasta_check` の `release` まわりのソースと `pasta_sample_ghost/tests/**` を持つ。`release.ps1` は持たない。この spec は Rust のソースを触らない。
+  - `ponytail-manual-ci`（ponytail・隙間の spec）: `.github/workflows/**` と `.github/scripts/release/*.ps1` を持つ。この spec が先に入り、`ponytail-manual-ci` が後から合わせる。この spec が触るのは `release.yml` の build job の行で、`ponytail-manual-ci` が触る publish 系の job の行・Node の版の行とは別である。
+  - `ponytail-check-release`（ponytail・隙間の spec）: `pasta_check` の `release` まわりのソースと `pasta_sample_ghost/tests/**` を持つ。`release.ps1` は持たない。この spec は Rust のソースを触らない。
 
 ## Constraints
 

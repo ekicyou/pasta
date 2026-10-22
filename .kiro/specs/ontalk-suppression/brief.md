@@ -85,7 +85,7 @@
 
 - ノベル向けの設定で、ランダムトークと時報を**ずっと**止めること（`novel-talk-flow`。この spec のスイッチを使い回す想定）
 - Status による抑止の範囲（`BLOCKED_STATUSES`）を変えること
-- `hour_margin` の型の確かめと `get_config` の重さ（0.4.3 の `ponytail-lua-scripts`）
+- `hour_margin` の型の確かめと `get_config` の重さ（隙間の spec の `ponytail-lua-scripts`）
 
 ## Upstream / Downstream
 
@@ -96,7 +96,7 @@
 
 - **Extends**: なし（新しい境界）
 - **Adjacent**
-  - `ponytail-lua-scripts`（0.4.3）: 同じ `virtual_dispatcher.lua` の `get_config`（`hour_margin` の型、毎秒の読み込み）を触る。同じウェーブに置かない。この spec が先に入り、あちらが後から合わせる。
+  - `ponytail-lua-scripts`（ponytail・隙間の spec）: 同じ `virtual_dispatcher.lua` の `get_config`（`hour_margin` の型、毎秒の読み込み）を触る。同じウェーブに置かない。この spec が先に入り、あちらが後から合わせる。
   - `novel-talk-flow`（0.5.0）: 止める場所が同じ `dispatch` である。あちらはこのスイッチを使い回す（あちらの brief に申し送りを書いた）。
   - `pasta-check-release-asset`（0.4.2）: ファイルを共有しない。並べられる。
 

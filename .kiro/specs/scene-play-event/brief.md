@@ -122,7 +122,7 @@ MCP の `raise_event` は、SSTP NOTIFY と同じく、SHIORI にイベントを
   - `external-control-events`（0.4.2。2026-10-19 起票）: この spec の**後に入る**。外から `＞XXX` を呼ぶ `OnPastaCallFunction` と、グローバル変数を書く `OnPastaSetSaveVariable` を足す。既定のハンドラの置き方・`event/init.lua` の `require`・マニュアルの既定ハンドラーの表を共有し、あちらがこの spec の形に揃える。ハンドラから先は別物である。
   - `ontalk-suppression`（0.4.2）: 自動トークを止めている間に、このイベントのシーンの続き（`co_scene`）を流すかが接点になる。要件で「キックと同じく止めない」と決める案を推奨にする。ファイルは `virtual_dispatcher.lua` を共有しない見込みなので、同じウェーブに並べられる。共有することになったら、あちらが先に入る。
   - `pasta-check-release-asset`（0.4.2）: ファイルを共有しない。並べられる。
-  - `ponytail-lua-debug`（0.4.3）: 同じ `crates/pasta_lua/src/debug/` を触る。この spec が先に入り、あちらが後から合わせる。
+  - `ponytail-lua-debug`（ponytail・隙間の spec）: 同じ `crates/pasta_lua/src/debug/` を触る。この spec が先に入り、あちらが後から合わせる。
 
 ## Constraints
 

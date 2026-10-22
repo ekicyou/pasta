@@ -104,7 +104,7 @@ OnPastaSetSaveVariable  Reference0=初回済み  Reference1=null
     - 要件で決めること: 見つからないときの出し方を、あちらの「失敗を出す仕組み（`failure-output-unification`・`runtime-error-balloon`）」に揃えるか。推奨は揃えること（ログには必ず残り、バルーンに出るのはデバッグのときだけなので、Approach の「エラーの応答にはしない」と矛盾しない）。
   - `ontalk-suppression`（0.4.2）: 主な呼び先（`自動トーク停止`／`自動トーク再開`）を作る。この spec の実装は、それが無くても動く（呼び先が見つからなければ 204）。共有するのはマニュアルの `lua/shiori-events.md` だけで、節は別である。並べられる。後から入る側がマニュアルの差分を合わせる。
   - `pasta-check-release-asset`（0.4.2）: ファイルを共有しない。並べられる。
-  - `ponytail-lua-scripts`（0.4.3）: `pasta_scripts/` の既存のファイルを触る。この spec は新しいファイルと `event/init.lua` の `require` の 1 行だけなので、ぶつかりは小さい。
+  - `ponytail-lua-scripts`（ponytail・隙間の spec）: `pasta_scripts/` の既存のファイルを触る。この spec は新しいファイルと `event/init.lua` の `require` の 1 行だけなので、ぶつかりは小さい。
 
 ## Constraints
 
