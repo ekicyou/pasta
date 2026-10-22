@@ -114,3 +114,11 @@
 - Pages の最初の有効化は手動である。この spec では変えない。
 - `tech.md` の mdBook の版の行（:220）を直す。`ponytail-editor-tooling` が触る行とは別である。
 - ワークツリーに `book/node_modules` が無いことがある。在るかを先に `ls` で確かめる。
+
+## 申し送り（pasta-check-release-asset より）
+
+2026-10-22 に main に入った変更。監査と修正はこの形を前提にする（詳しくは `.kiro/specs/completed/pasta-check-release-asset/design.md` の ReleaseBuildJob・GitHubReleaseAssets・ReleaseScriptsTest の節）。
+
+- `release.yml` の build job: toolchain の targets に `x86_64-pc-windows-msvc` を足し、rust-cache の key を `i686-x86_64-pc-windows-msvc` に変えた。「Verify release assets」に `pasta_check.zip` の中身（ちょうど 2 つ）と `pasta_check.exe --version` ＝ `pasta_check <タグの版>` の検査を足し、upload の path に `release/pasta_check.zip` を足した。verify・gate・公開系の job と `Cargo.lock` の検査は変えていない。
+- `github-release.ps1` の添付は 5 つ（配布物 4 つと詳しいリリースノート）。`release-scripts-test.ps1` の項目 10 が、`pasta_check.zip` だけが無いときに gh より前で終了コード 1 になることを確かめる（`github-release.ps1` は今はこのテストで試されている）。
+- 見直しの論点: 合わせるときに上の行を保つこと（本 spec の Revalidation Triggers）。

@@ -11,13 +11,21 @@ pasta_check はゴーストの配布パッケージ（.nar）を作成し、SSP 
 
 ## インストール
 
-crates.io から `cargo install` でインストールする。
+GitHub の Release から `pasta_check.zip` を落として、好きなフォルダに展開する。最新版は固定のリンク <https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip> で落とせる。
+
+中身は `pasta_check.exe` と `THIRD_PARTY_LICENSES.txt`。`pasta_check.exe` は 64 ビット版の Windows 向けで、署名が無いため、初めて起動するときに Windows の SmartScreen の警告が出ることがある。展開した `pasta_check.exe` はパスで指定して呼ぶ。
+
+```powershell
+C:\tools\pasta_check\pasta_check.exe validate --target ghosts\hello-pasta
+```
+
+Rust を使っている人は、crates.io から `cargo install` でも入れられる。
 
 ```bash
 cargo install pasta_check
 ```
 
-インストール後は `pasta_check` コマンドとして使える（`~/.cargo/bin` にパスが通っている前提）。
+`cargo install` で入れたときは `pasta_check` コマンドとして使える（`~/.cargo/bin` にパスが通っている前提）。以下の例は `pasta_check` と書く。zip から入れたときは、展開した `pasta_check.exe` のパスに読み替える。
 
 ## pasta_check CLI
 
@@ -103,14 +111,16 @@ pasta_check release `
 
 ```
 [Setup Phase]                      [Release Phase]
-  1. SHIORI DLL ビルド               3. pasta_check release
-  2. DLL/スクリプトを開発フォルダーへ  4. 追加の配布物の作成（hello-pasta は pasta.dll.zip）
-                                     5. バージョン確認
-                                     6. 大きさの検査とリリース案内表示
+  1. SHIORI DLL ビルド               3. pasta_check.zip の作成と検査（hello-pasta 固有）
+  2. DLL/スクリプトを開発フォルダーへ  4. pasta_check release
+                                     5. 追加の配布物の作成（hello-pasta は pasta.dll.zip）
+                                     6. バージョン確認
+                                     7. 大きさの検査とリリース案内表示
 ```
 
-- 段 3 は pasta_check が汎用的に処理する
-- それ以外（Setup Phase と段 4〜6）はゴースト固有の手順（release.ps1 等で実装）
+- 段 4 は pasta_check が汎用的に処理する
+- それ以外（Setup Phase と段 3・段 5〜7）はゴースト固有の手順（release.ps1 等で実装）
+- 段 3 は x64 の `pasta_check.exe` と `THIRD_PARTY_LICENSES.txt` を `release/pasta_check.zip` に詰めて検査し、段 4 はその `pasta_check.exe` で走る
 - 段の番号は hello-pasta の `release.ps1` のもの。立ち絵などの素材はコミットしたものをそのまま詰めるので、成果物を生成する段は無い
 
 ### ディレクトリ構成例
@@ -130,7 +140,8 @@ workspace/                               # ワークスペースルート
 │   │   ├── install.txt                  # UTF-8・1 行目は charset,UTF-8
 │   │   └── updates.txt                  # 自動生成（ゴースト用）
 │   ├── {ghost-name}.nar                 # --nar 出力
-│   └── pasta.dll.zip                    # 追加の配布物（hello-pasta 固有・release.ps1 の段 4）
+│   ├── pasta_check.zip                  # pasta_check.exe と THIRD_PARTY_LICENSES.txt（hello-pasta 固有・release.ps1 の段 3）
+│   └── pasta.dll.zip                    # 追加の配布物（hello-pasta 固有・release.ps1 の段 5）
 └── crates/pasta_sample_ghost/
     ├── release.ps1                      # Setup + Release を統合したスクリプト
     └── ghosts/{ghost-name}/             # --target ゴースト開発フォルダー
@@ -150,7 +161,7 @@ SSP 仕様および NAR フォーマットの詳細:
 ### pasta リポジトリ（hello-pasta）の場合
 
 - 手元で `release.bat`・`release.ps1`（中で `pasta_check release` を呼ぶ）を実行して `release/` にできる成果物は、動作確認用である。コミットしない（`release/` は `.gitignore` で無視）。
-- 配布物（`pasta.dll.zip`・`hello-pasta.nar`・VSIX）の公開は、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）が行う。CI はタグのソースから配布物を作り直し、GitHub Release（題名 `pasta vX.Y.Z`。本文は `doc/release-notes/vX.Y.Z.md` の見どころ）を作って、配布物と詳しいリリースノート（`release-notes-vX.Y.Z.md`）を添付する。
+- 配布物（`pasta.dll.zip`・`pasta_check.zip`・`hello-pasta.nar`・VSIX）の公開は、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）が行う。CI はタグのソースから配布物を作り直し、GitHub Release（題名 `pasta vX.Y.Z`。本文は `doc/release-notes/vX.Y.Z.md` の見どころ）を作って、配布物と詳しいリリースノート（`release-notes-vX.Y.Z.md`）を添付する。
 - 手元で `gh release create` を実行しない。手順と失敗したときの回復は `crates/pasta_sample_ghost/RELEASE.md` を参照。
 
 ## トラブルシューティング

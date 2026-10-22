@@ -1,7 +1,7 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1・定型コマンド D の highlights-check.ps1）を、一時の git リポジトリで実際に動かして確かめる。
+  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1・定型コマンド D の highlights-check.ps1・添付の欠けを見る github-release.ps1）を、一時の git リポジトリで実際に動かして確かめる。
 .DESCRIPTION
   一時のフォルダに git リポジトリを作り、決まった件名のコミットとタグ（v0.0.1・v0.0.2）を積んで、スクリプトを子の pwsh で呼ぶ。
   ネットワークと gh を使わない。一時のフォルダは終わりに消し、リポジトリの作業ツリーを変えない。
@@ -231,6 +231,15 @@ try {
             if (($got -join ',') -cne ($c.Expect -join ',')) { "$($c.Name): $($out -join ' ／ ')" }
         }
         Write-Utf8 $hlPath $Highlights
+    }
+
+    Test-Item 10 'github-release.ps1 が、添付 5 つのうち pasta_check.zip だけが無いとき、終了コード 1 で、出力にその名前を示す' {
+        # 添付の有無は gh の呼び出しより前に検査されるので、ネットワークと gh を使わない
+        $dir = Join-Path $tmp 'assets'
+        foreach ($n in 'pasta.dll.zip', 'hello-pasta.nar', 'pasta-vscode-0.0.2.vsix', 'release-notes-v0.0.2.md') { Write-Utf8 (Join-Path $dir $n) '' }
+        $r = Invoke-Script github-release.ps1 @('-Tag', 'v0.0.2', '-NotesFile', $notesPath, '-AssetDir', $dir)
+        if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('pasta_check.zip')) { "出力に pasta_check.zip が無い: $($r.Output)" }
     }
 }
 finally {
