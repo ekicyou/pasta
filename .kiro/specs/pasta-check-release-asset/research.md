@@ -140,3 +140,111 @@
 - 推奨: Option A（リリースビルド・CI・添付・状態の読み取り）＋ライセンス表示のひな形は Option B。
 - 決めること: ひな形の分け方、`--target` での絞り方、段 3 で使う exe、exe の版の検査を手元でもするか、rust-cache の key、添付の欠けのテスト（項目 10）の形。
 - 守ること: `pasta.dll.zip`・`.nar`・VSIX の中身と検査を変えない。`release.bat` の 5.1 で動く。`build.yml` と公開系の job の action の行に触らない。
+
+---
+
+# 設計の調査と決定（2026-10-22・`/kiro-spec-design -y`）
+
+## 8. 設計の調査のまとめ
+
+- **種別**: 既存の仕組みの拡張（Extension）。軽い discovery（`design-discovery-light.md`）で、つなぎ目と今の形を確かめた。
+- **参照したスキルと規則**: `kiro-spec-design` の `design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`。ドメインのスキルは `pasta-check`（`release.ps1` の段と `release/` の木の書き方を確かめた）。新しいライブラリは入れないので、外部の調査（WebSearch）はしていない。
+- **主な発見**
+  - `cargo about generate` の `--target x86_64-pc-windows-msvc` は、`about.toml` の `targets` を置き換える。wasm 向けの `wasm-bindgen` 系が消え、MIT 45・Apache-2.0 1・Unicode-3.0 1・Zlib 1 になる。`lexopt`・`md5`・`zip`・`zlib-rs` は入り、`mlua`・LuaJIT は出ない（R2.1・R2.2）。
+  - 許可に無いライセンスがあると、`cargo about generate` は終了コード 1 で、出力のファイルを作らない（R2.5 は終了コードを見るだけで満たせる）。
+  - `pasta_check.exe --version` の出力は `pasta_check 0.4.1` の 1 行（`main.rs` L49 の `println!("pasta_check {}", env!("CARGO_PKG_VERSION"))`）。
+  - x64 の release ビルドの exe（約 950 KB）は `VCRUNTIME140.dll` を取り込まない（`crt-static` が効く。R1.3）。ビルドで `Cargo.lock` は変わらない（R4.6）。
+  - 今のリリース CI の build の job は、rust-cache の復元が「No cache found.」だった（v0.4.1 の実行 39123004799）。key を変えても失う物は無い。
+  - `release/` は、今は段 3 の `pasta_check release` が作っている。新しい段を段 3 より前に置くなら、zip を書く前に `release/` を作る必要がある（CI はまっさらのチェックアウト）。
+
+## 9. 調べた記録
+
+### cargo-about で pasta_check だけを数える
+
+- **きっかけ**: R2.1・R2.2（pasta_check.exe に入る物だけ、LuaJIT・wasm 向けを出さない）。
+- **確かめたこと**: `cargo about generate -m crates/pasta_check/Cargo.toml -c about.toml --target x86_64-pc-windows-msvc --format json`（cargo-about 0.9.2）。`--help` に「Overrides the `targets` configuration value」とある。
+- **結果**: 上の 8 節のとおり。`[seahorse.clarify]` の「グラフに無いクレートの設定」の警告は出るが、終了コードは 0。`-c about.toml` を省くと、設定の既定は `<manifest_root>/about.toml`（`crates/pasta_check/about.toml`、無い）になるので、明示して渡す。
+- **設計への影響**: 設定は今の `about.toml` を共用し、`accepted` を 1 か所に保つ。ひな形だけを分ける。
+
+### 許可に無いライセンスのときの振る舞い
+
+- **確かめたこと**: `about.toml` から `"Zlib"` を除いた写しをスクラッチに作り、`-c` で渡して `generate` した。
+- **結果**: `error: failed to satisfy license requirements`（`zlib-rs` の `license = "Zlib"`）、終了コード 1、出力のファイルは作られない。
+- **設計への影響**: 新しい段は終了コードを見て止まるだけでよい（R2.5）。前の実行で残った `pasta_check.zip` を段の頭で消しておけば、「作らない」が手元の再実行でも厳密に成り立つ。
+
+### exe の版と静的 CRT
+
+- **確かめたこと**: スクラッチの `CARGO_TARGET_DIR` で `cargo build --release --target x86_64-pc-windows-msvc -p pasta_check` を回し、`--version` を起動し、exe の中の DLL 名を拾った。
+- **結果**: `pasta_check 0.4.1`、終了コード 0。DLL 名は `KERNEL32.dll`・`ntdll.dll`・`bcryptprimitives.dll` などで、`vcruntime140` は無い。`git status` はきれいなまま。
+- **設計への影響**: CI の版の検査は、出力が `pasta_check <版>` と完全に一致することで判定する（R4.3）。
+
+### rust-cache の key
+
+- **確かめたこと**: v0.4.1 のリリース CI の build の job の「Setup Rust cache」のログ。
+- **結果**: key は `v0-rust-i686-pc-windows-msvc-build-Windows_NT-x64-d107b311-…`。環境変数のハッシュ（`CARGO_ABOUT_VERSION` など `CARGO_` で始まる env を含む）が gate の build-x86 と違い、「No cache found.」だった。
+- **設計への影響**: key を変えても今より遅くはならない。key の名前を、入れるターゲットの 2 つに合わせる。
+
+### PowerShell 5.1 で動く書き方
+
+- **きっかけ**: `release.bat` は `powershell.exe`（5.1）で `release.ps1` を走らせる。
+- **結果**: 足すコードは、今の段 4 と同じ `Compress-Archive`・`[System.IO.Compression.ZipFile]::OpenRead`・`& <exe>`・`$LASTEXITCODE` だけで書ける。`??`・三項演算子・`&&`・`-Parallel` は使わない。
+- **設計への影響**: エージェントは `-ExecutionPolicy Bypass` で 5.1 を走らせられない（分類器が拒否）。5.1 の確かめは、`powershell.exe` で `Parser::ParseFile` の構文の検査をするところまでにし、通しの実行は pwsh で行う。
+
+## 10. 設計の合成（design-synthesis）
+
+- **一般化**: 「zip を作って中身がちょうど N 個かを検査する」は段 4 と新しい段で同じ形になる。関数に括り出すと段 4 の行も変わり R3.7（今の配布物の検査を変えない）の確かめが増えるので、括り出さずに同じ形を写す。2 か所なら写しの方が読みやすい。
+- **作るか使うか**: ライセンス表示は cargo-about（版固定・CI で導入済み）、zip は PowerShell の標準、添付は今の `github-release.ps1` をそのまま使う。新しい道具・依存は入れない。
+- **簡素化**
+  - 別のスクリプトに切り出す案（ギャップ分析の Option C）は採らない。手元と CI が同じ `release.ps1` を呼ぶ今の形（R3.8）のままにする。
+  - pasta_check 用の `about.toml` は作らない（`accepted` を 2 か所にしない）。ひな形 1 つだけ増やす。
+  - ライセンス表示の置き場は新しいフォルダを作らず、exe と同じ `target\x86_64-pc-windows-msvc\release\` に書く。
+  - 段 3 の `cargo run -p pasta_check`（ホスト向けの debug ビルド）を、新しく作る x64 の exe の起動に置き換える。ビルドが 1 回減り、配布する exe そのものが `.nar` を作れることを毎回確かめられる。
+
+## 11. 設計の決定
+
+### 決定: ライセンス表示のひな形を分ける
+
+- **きっかけ**: R2.2・R2.3・R2.4。今の `about.hbs` は LuaJIT の表示を固定で持ち、冒頭の文が pasta.dll・wasm 向け。
+- **候補**
+  1. `about.hbs` を 1 つのまま条件で出し分ける — cargo-about には外から変数を渡す口が無く、`overview` のクレート名で判定するなどの工夫が要る。pasta.dll 用の表示を変える危険がある。
+  2. pasta_check 用のひな形 `about-pasta_check.hbs` を新しく置く。
+- **採った案**: 2。設定（`about.toml`）は共用し、`--target x86_64-pc-windows-msvc` と `-m crates/pasta_check/Cargo.toml` で数える範囲を絞る。
+- **理由**: 今の `about.hbs` と `about.toml` の中身に触らないので、R2.4 を確実に満たせる。条件の無い素直なひな形になる。
+- **引き換え**: `{{#each licenses}}` の節（十数行）が 2 か所になる。
+- **後で確かめること**: 生成した表示に LuaJIT・`mlua`・`wasm-bindgen` が無く、`lexopt`・`md5`・`zip` があること。
+
+### 決定: 新しい段を `pasta_check release` の前に置き、その exe で `.nar` を作る
+
+- **きっかけ**: 申し送り 2。R3.6（`-SkipSetup` でも飛ばさない）・R3.7。
+- **候補**
+  1. 新しい段を段 4（`pasta.dll.zip`）の後に足し、段 3 は `cargo run -p pasta_check` のまま。
+  2. 新しい段を段 3 に置き、次の段（`pasta_check release`）を、その段が作った x64 の exe で走らせる。
+- **採った案**: 2（**仮の決定。ディスカッションで確かめる**）。
+- **理由**: 配布する exe そのものが検査と `.nar` の作成をこなせることを、手元と CI のリリースビルドのたびに確かめられる（R1.4 の裏付け）。ホスト向けの debug ビルドが 1 回減る。`pasta_check` のソースは同じなので、`.nar` と `pasta.dll.zip` の中身と検査は変わらない（R3.7）。
+- **引き換え**: 段の順序が変わる（どちらの案でも段の数は 7 になり、見出しの番号は全部直す）。x64 の exe を起動できない手元（ARM64 の Windows で x64 のエミュレーションが無い場合など）では段 4 が動かない。
+- **後で確かめること**: 手元のリリースビルドで、`.nar` の中身が変わる前と同じであること（CI の「Verify release assets」の nar の項目と同じ物が在る）。
+
+### 決定: exe の版の検査はリリース CI だけで行う
+
+- **きっかけ**: 申し送り 3。R4.3。
+- **採った案**: 手元のリリースビルド（`release.ps1`）には版の検査を足さない。リリース CI の「Verify release assets」で、zip から取り出した exe の `--version` がタグの版と一致することを検査する（**仮の決定**）。
+- **理由**: 手元では、その場で `cargo build` した exe を使うので、古い exe の取り違えは起きにくい。`release.ps1` は CI でも走るので、足すと CI で同じ検査が 2 回になる。
+
+### 決定: rust-cache の key を 2 つのターゲットの名前にする
+
+- **きっかけ**: 申し送り 4。
+- **採った案**: `key: i686-x86_64-pc-windows-msvc`（**仮の決定**）。
+- **理由**: 今の build の job は復元できていない（9 節）ので、変えても遅くならない。名前が中身（2 つのターゲット）と合う。
+
+### 決定: 添付の欠けのテストは「無い名前を示して失敗する」だけを試す
+
+- **きっかけ**: R5.6。
+- **採った案**: `release-scripts-test.ps1` に項目 10 を足す。一時のフォルダに、5 つのうち `pasta_check.zip` を除く 4 つを置いて `github-release.ps1` を呼び、終了コード 1 と、出力に `pasta_check.zip` があることを確かめる。
+- **理由**: `github-release.ps1` は gh を呼ぶ前に添付の有無を検査するので、ネットワークと gh 無しで試せる。5 つそろったときの先（gh の呼び出し）は試さない（`-DryRun` で手元の補助として確かめる）。
+
+## 12. 設計で見つけたリスク
+
+- **5.1 の通しの実行ができない**: エージェントは `release.bat`（`-ExecutionPolicy Bypass`）を走らせられない。構文の検査（5.1 の Parser）と、7 だけの書き方を使わないことの見直しで補う。開発者が `release.bat` をダブルクリックで確かめるのが最後の確かめになる。
+- **過去の版の状態の読み取り**: `release-state.ps1` を 0.4.1 までの版に向けると、`pasta_check.zip` が無いので「添付不足（公開・添付 3/4）」と出る。過去の版へ足すのは範囲外（要件の Out of scope）なので、手順書の読み方の節に一言書く。
+- **`[seahorse.clarify]` の警告**: pasta_check の表示を作るとき、毎回警告が 1 つ出る。失敗ではない。消すために設定を分けると `accepted` が 2 か所になるので、受け入れる。
+- **`ponytail-manual-ci` との重なり**: `release.yml` で触るのは、冒頭の説明 1 行・build の job（toolchain・cache・段の名前・検査・upload）だけ。公開系の job の action の行と Node の版の行には触らない。
