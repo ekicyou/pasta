@@ -551,7 +551,8 @@ pub fn resolve_position(
 
 ### Monitoring
 
-- 門で断ったとき、見つからないとき、引数の誤りは、どれも warn のログに 1 行残る。AI エージェントは MCP の `get_log` か pasta のログで読める。
+- 門で断ったとき、見つからないとき、引数の誤りは、どれも pasta のログに warn で 1 行残る。pasta は SHIORI の応答に `ErrorLevel` を載せないので、SSP の MCP の `get_log` には出ない。AI エージェントは pasta のログファイルを読む。
+- 見つからないときと引数の誤りは、既定（`balloon_warning = true`）では表記が応答に載るので、`raise_event` の結果だけで分かる。門で断ったとき（204）だけは、ログを読まないと理由が分からない。
 
 ## Testing Strategy
 
