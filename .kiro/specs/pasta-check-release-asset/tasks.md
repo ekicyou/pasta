@@ -72,8 +72,8 @@
   - _Boundary: ReleaseStateReader, ReleaseSkillDocs_
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 5. 入手の手順と配布物の一覧の文書
-- [ ] 5.1 (P) 入手の手順を Release の zip が第一の道になるように書き直す
+- [x] 5. 入手の手順と配布物の一覧の文書
+- [x] 5.1 (P) 入手の手順を Release の zip が第一の道になるように書き直す
   - マニュアル `book/src/debug/validate.md` の入れ方の節を、固定のリンクから落として展開する道（64 ビット版・SmartScreen の一言・パスで呼ぶ例 1 つ）を第一に、`cargo install pasta_check` を Rust の利用者向けの別の道にする。ほかの節のコマンド例と PATH の話は変えない
   - `crates/pasta_check/README.md`（絶対 URL）と `pasta-check` スキルの入れ方を同じ順にそろえる。同じスキルの段の並び・出力の木・公開の説明にも `pasta_check.zip` を足す
   - `pasta-check/SKILL.md` は、入れ方も配布物の一覧の行もこのタスクが持つ（5.2 は触らない）
