@@ -101,3 +101,7 @@
   - 完了の姿: 3 つの検査が通り、取り残しが無く、開発者に頼む 2 つの確かめが報告に書かれている
   - _Depends: 3.1, 3.2, 4, 5.1, 5.2_
   - _Requirements: 3.5, 5.6, 7.7, 7.8, 7.9_
+
+## Implementation Notes
+
+- 完了時の棚卸（2026-10-22）: その場で解決 0 件・申し送り 2 件（ponytail-manual-ci・ponytail-check-release の brief.md。release.yml／github-release.ps1 の変更と、release.ps1 の段 4 が x64 の exe で走ること）・起票 0 件。
