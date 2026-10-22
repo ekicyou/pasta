@@ -1,6 +1,6 @@
 # .github/workflows/release.yml
 # リリース CI（release-ci）。リリースタグ vX.Y.Z の push だけで起動し、
-# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（3 つの配布物）の順に進める。
+# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（4 つの配布物）の順に進める。
 # 上流の job が失敗したら後続は needs の既定で止まり、どの公開先にも公開しない。
 name: Release
 
@@ -72,12 +72,12 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: i686-pc-windows-msvc
+          targets: i686-pc-windows-msvc,x86_64-pc-windows-msvc
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          key: i686-pc-windows-msvc
+          key: i686-x86_64-pc-windows-msvc
 
       - name: Set Japanese locale for Shift-JIS support
         run: |
@@ -117,7 +117,7 @@ jobs:
           cache-dependency-path: editors/vscode/package-lock.json
 
       # release.ps1 の cargo は --locked を持たないため、後段の Cargo.lock の不変検査で同等にする。
-      - name: Build pasta.dll.zip and hello-pasta.nar
+      - name: Build pasta.dll.zip, hello-pasta.nar and pasta_check.zip
         run: pwsh -NoProfile -File crates/pasta_sample_ghost/release.ps1
 
       - name: Build VSIX
@@ -142,6 +142,20 @@ jobs:
           $dllZip = @(Get-ZipEntries 'release/pasta.dll.zip' | Sort-Object)
           if (($dllZip -join '|') -ne 'pasta.dll|THIRD_PARTY_LICENSES.txt') {
             $errors.Add("pasta.dll.zip の中身が pasta.dll・THIRD_PARTY_LICENSES.txt の 2 つでない: $($dllZip -join ', ')")
+          }
+
+          # pasta_check.zip: pasta_check.exe と THIRD_PARTY_LICENSES.txt の 2 つだけ・exe の --version がタグの版
+          $checkZip = @(Get-ZipEntries 'release/pasta_check.zip' | Sort-Object)
+          if (($checkZip -join '|') -ne 'pasta_check.exe|THIRD_PARTY_LICENSES.txt') {
+            $errors.Add("pasta_check.zip の中身が pasta_check.exe・THIRD_PARTY_LICENSES.txt の 2 つでない: $($checkZip -join ', ')")
+          }
+          else {
+            $checkDir = Join-Path $env:RUNNER_TEMP 'pasta_check'
+            Expand-Archive -LiteralPath 'release/pasta_check.zip' -DestinationPath $checkDir -Force
+            $reported = "$(& (Join-Path $checkDir 'pasta_check.exe') --version)"
+            if ($LASTEXITCODE -ne 0 -or $reported -cne "pasta_check $env:VERSION") {
+              $errors.Add("pasta_check.zip の pasta_check.exe の版が $env:VERSION でない: $reported")
+            }
           }
 
           # hello-pasta.nar: 配置の要のファイルと、シェル一式（descript.txt・surfaces.txt・立ち絵 18 枚）
@@ -193,6 +207,7 @@ jobs:
           path: |
             release/pasta.dll.zip
             release/hello-pasta.nar
+            release/pasta_check.zip
             release/pasta-vscode-${{ needs.verify.outputs.version }}.vsix
           retention-days: 90
           if-no-files-found: error

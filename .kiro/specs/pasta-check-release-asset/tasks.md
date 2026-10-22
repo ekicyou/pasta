@@ -46,7 +46,7 @@
   - _Requirements: 1.1, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 2.6, 3.1, 3.6, 3.7, 4.6_
 
 - [ ] 3. リリース CI の配線
-- [ ] 3.1 (P) リリース CI の build の job で pasta_check.zip を作り、検査して渡す
+- [x] 3.1 (P) リリース CI の build の job で pasta_check.zip を作り、検査して渡す
   - toolchain の targets に x64 を足し、rust-cache の key を `i686-x86_64-pc-windows-msvc` にする。リリースビルドの段の名前を合わせ、実行の行は変えない
   - 配布物の検査に、`pasta_check.zip` の中身がちょうど 2 つかの項目と、中身が合うときに exe の `--version` が `pasta_check <タグの版>` と完全に一致するかの項目を足す
   - 受け渡しの path に `release/pasta_check.zip` を足し、冒頭の説明を 4 つの配布物にする。verify・gate・公開系の job と `Cargo.lock` の検査の行は変えない
