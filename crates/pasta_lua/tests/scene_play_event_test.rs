@@ -7,6 +7,8 @@
 //!   `STORE.co_scene` に置かれる（要件 1.1・1.2・3.1・3.2・3.3）
 //! - 同じ名前の大域が 2 つあり片方だけがローカルを持つとき、毎回再生できる（要件 1.8）
 //! - 相対パスと絶対パスで位置から再生できる（要件 2.1・2.3・2.4）
+//! - 待ち受けが立たなくてもソースマップが残り、位置で再生できる（要件 4.2・4.3、task 4.2）
+//! - デバッグが無効なら 204、見つからないときは 200 で失敗の表記（要件 4.4・5.1・5.3・7.1・7.4、task 4.2）
 //!
 //! `PASTA_DEBUG` の中和は `common` の `#[ctor]` に従い、待ち受けのポートは `port = 0` にする。
 
@@ -56,14 +58,18 @@ const REL_PATH: &str = "dic/test/scene_play.pasta";
 
 /// デバッグを有効にした一時ゴーストを作って読み込む。
 fn load_debug_ghost(base: &Path) -> PastaLuaRuntime {
+    load_ghost(
+        base,
+        "[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\nport = 0\n",
+    )
+}
+
+/// 指定の pasta.toml で一時ゴーストを作って読み込む。
+fn load_ghost(base: &Path, pasta_toml: &str) -> PastaLuaRuntime {
     let pasta_file = base.join(REL_PATH);
     std::fs::create_dir_all(pasta_file.parent().unwrap()).unwrap();
     std::fs::write(&pasta_file, FIXTURE).unwrap();
-    std::fs::write(
-        base.join("pasta.toml"),
-        "[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\nport = 0\n",
-    )
-    .unwrap();
+    std::fs::write(base.join("pasta.toml"), pasta_toml).unwrap();
 
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     for sub in ["pasta_scripts", "scriptlibs"] {
@@ -72,8 +78,7 @@ fn load_debug_ghost(base: &Path) -> PastaLuaRuntime {
         common::copy_dir_recursive(&crate_root.join(sub), &dst).unwrap();
     }
 
-    PastaLoader::load_with_config(base, RuntimeConfig::new())
-        .expect("debug-enabled ghost must load")
+    PastaLoader::load_with_config(base, RuntimeConfig::new()).expect("ghost must load")
 }
 
 /// `SHIORI.request` に GET のリクエスト（SecurityLevel: local）を渡し、応答の文字列を返す。
@@ -240,4 +245,84 @@ fn on_pasta_scene_at_plays_by_relative_and_absolute_path() {
             "attempt {i}: pointed twin must play: {value}"
         );
     }
+}
+
+/// 4.2・4.3: 待ち受けのポートを先に塞いでも、ソースマップが残り、位置で再生できる。
+#[test]
+fn on_pasta_scene_at_plays_when_listener_cannot_bind() {
+    let temp = tempfile::TempDir::new().unwrap();
+    // 空いたポートを先に塞ぐ（固定のポートは使わない）。読み込みが終わるまで持ち続ける
+    let blocker = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = blocker.local_addr().unwrap().port();
+    let runtime = load_ghost(
+        temp.path(),
+        &format!("[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\nport = {port}\n"),
+    );
+
+    assert!(!runtime.debug_enabled(), "listener must not be up");
+    assert!(
+        runtime.debug_source_map().is_some(),
+        "source map must be kept without a listener"
+    );
+
+    let line = LINE_GLOBAL_BODY.to_string();
+    let value = value_of_200(&request(&runtime, "OnPastaSceneAt", &[REL_PATH, &line]));
+    assert!(
+        value.contains("大域の声"),
+        "plays by position without a listener: {value}"
+    );
+    drop(blocker);
+}
+
+/// 4.4・7.1: デバッグを無効にしたゴーストでは、2 つのイベントが 204 になる。
+#[test]
+fn scene_play_events_return_204_when_debug_disabled() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_ghost(temp.path(), "[loader]\ndebug_mode = true\n");
+
+    let line = LINE_GLOBAL_BODY.to_string();
+    for (id, refs) in [
+        ("OnPastaScene", vec!["再生大域"]),
+        ("OnPastaSceneAt", vec![REL_PATH, line.as_str()]),
+    ] {
+        let response = request(&runtime, id, &refs);
+        assert_eq!(
+            response.lines().next(),
+            Some("SHIORI/3.0 204 No Content"),
+            "{id} must be 204 when debug is disabled: {response:?}"
+        );
+        assert!(
+            !response.contains("大域の声"),
+            "{id} must not play: {response:?}"
+        );
+    }
+}
+
+/// 5.1・5.2・5.3: 見つからないときは 200 で、イベント名と探した名前か位置を含む失敗の表記が返る。
+#[test]
+fn scene_play_events_return_failure_notice_when_not_found() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_debug_ghost(temp.path());
+
+    let value = value_of_200(&request(&runtime, "OnPastaScene", &["無い名前"]));
+    assert!(
+        value.contains("【シーンが見つからない：OnPastaScene ＊無い名前】"),
+        "global not found: {value}"
+    );
+
+    let value = value_of_200(&request(&runtime, "OnPastaScene", &["再生親", "無い子"]));
+    assert!(
+        value.contains("【シーンが見つからない：OnPastaScene ＊再生親 ・無い子】"),
+        "local not found: {value}"
+    );
+
+    let value = value_of_200(&request(
+        &runtime,
+        "OnPastaSceneAt",
+        &["dic/test/無い.pasta", "1"],
+    ));
+    assert!(
+        value.contains("【シーンが見つからない：OnPastaSceneAt dic/test/無い.pasta:1】"),
+        "position not found: {value}"
+    );
 }
