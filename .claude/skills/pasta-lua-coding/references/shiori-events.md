@@ -749,7 +749,7 @@ Status による抑止とは、時報の扱いが違う。
 `＞自動トーク再開` で再開すると、仮想ディスパッチャの時計を決め直す（`restart_timers(act)`）。
 
 - 次のトーク時刻を未設定に戻す。再開した後の最初の [check_talk](#check_talkact) が、そこから間隔を数え直す。
-- 次の正時を、再開した時刻の次の正時にする。`act.req.date` が無いときは未設定に戻し、次の [check_hour](#check_houract) が決める。
+- 次の正時を、再開した時刻の次の正時にする（今の値より後になるときだけ。仮想時刻の基準が変わっていれば置き換える）。`act.req.date` が無いときは未設定に戻し、次の [check_hour](#check_houract) が決める。
 
 ### is_blocked(status)
 
