@@ -339,7 +339,8 @@ STORE.scenes = {
 | `get_all_scenes()` | `STORE.scenes` そのもの（複製しない）を返す |
 | `search(name, global_scene_name, attrs)` | 前方一致の検索でシーンを探し、結果オブジェクトを返す（後述） |
 | `co_exec(act, name, global_scene_name, attrs)` | `act:find_scene` で探したシーン関数をコルーチンに包んで返す（後述） |
-| `co_exec_exact(name)` | 完全一致の検索で探したグローバルシーンをコルーチンに包んで返す（後述） |
+| `co_exec_exact(name, local_name)` | 完全一致の検索で探したグローバルシーンかローカルシーンをコルーチンに包んで返す（後述） |
+| `co_exec_registered(global_name, local_name)` | 登録名の組で引いたシーン関数をコルーチンに包んで返す（後述） |
 
 - 生成コードは `create_scene` を基本名だけで呼び（`local SCENE = PASTA.create_scene("メイン")`）、返ったシーンテーブルに `function SCENE.__start__(act, ...)` の形で関数を直接定義する。`register`・`create_global_table` などは `pasta.scene` の内部とテストが使う。
 - 番号は基本名ごとに全モジュールを通して振られる。`pasta.scene_dic` がモジュールを名前順に `require` するため、同じ基本名のシーンの番号はその順（モジュールの中では出現順）で決まる。
@@ -369,7 +370,18 @@ STORE.scenes = {
 
 ### co_exec_exact
 
-`SCENE.co_exec_exact(name)` は、`@pasta_search` の `SEARCH:search_scene_exact(name, nil)` でグローバルシーンを完全一致で探し（[search_scene_exact](../lua/modules/pasta-search.md#search_scene_exactname-global_scene_name)）、見つかった `(グローバルシーン名, ローカル名)` で `SCENE.get` を引く。見つからないか関数が無ければ `nil` を、関数なら `co_exec` と同じ包み方のコルーチンを返す。`act` を取らず、`act:find_scene` の名前の解決（act のメソッド・`GLOBAL` テーブルなど）を通らない。つつき・撫での既定ハンドラ（`pasta.shiori.event.mouse`）が、ショートカットの 1〜8 段の名前を探すのに使う（[つつき・撫でのショートカット](../lua/shiori-events.md#つつき撫でのショートカット)）。
+`SCENE.co_exec_exact(name, local_name)` は、完全一致の検索でシーンを探し、`co_exec_registered` でコルーチンにして返す。`act` を取らず、`act:find_scene` の名前の解決（act のメソッド・`GLOBAL` テーブルなど）を通らない。
+
+- `local_name` が `nil` のとき: `@pasta_search` の `SEARCH:search_scene_exact(name, nil)` でグローバルシーンを探す（[search_scene_exact](../lua/modules/pasta-search.md#search_scene_exactname-global_scene_name)）。
+- `local_name` を渡したとき: `SEARCH:search_local_scene_exact(name, local_name)` で、`name` のグローバルシーンの中の `local_name` のローカルシーンを探す（[search_local_scene_exact](../lua/modules/pasta-search.md#search_local_scene_exactglobal_name-local_name)）。2 つの引数はどちらも作者が書く名前である。
+
+戻り値は、見つかればコルーチン 1 つである。見つからないか、引いた値が関数でなければ、`nil` と見つからなかった側（`"global"` か `"local"`）の 2 値を返す。`local_name` が `nil` のときは常に `"global"` である。`local_name` を渡したときは、グローバルシーンが無ければ `"global"`、グローバルシーンはあるがローカルシーンが無いか関数でなければ `"local"` である。
+
+つつき・撫での既定ハンドラ（`pasta.shiori.event.mouse`）は、`local_name` を渡さずにショートカットの 1〜8 段の名前を探す（[つつき・撫でのショートカット](../lua/shiori-events.md#つつき撫でのショートカット)）。`OnPastaScene` の既定ハンドラ（`pasta.shiori.event.scene_play`）は、Reference0 と Reference1（空の文字列なら `nil`）を渡し、戻り値の 2 つ目で失敗の表記を選ぶ（[OnPastaScene](../lua/shiori-events.md#onpastascene名前でシーンを再生)）。
+
+### co_exec_registered
+
+`SCENE.co_exec_registered(global_name, local_name)` は、登録名の組で `SCENE.get(global_name, local_name)` を引き、関数なら `co_exec` と同じ包み方のコルーチンを返す。関数でなければ `nil` を返す。検索をしないため、シャッフル＆順次消費の記録は進まない。`local_name` に `"__start__"` を渡すと、グローバルシーンの本体を引く。`co_exec_exact` は、検索で得た登録名の組をこの関数に渡す。`OnPastaSceneAt` の既定ハンドラは、位置から引いた登録名の組を渡す（[OnPastaSceneAt](../lua/shiori-events.md#onpastasceneat位置でシーンを再生)）。
 
 ### DSL の Lua ブロックとの接続
 

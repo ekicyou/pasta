@@ -385,3 +385,113 @@ fn test_resolve_scene_id_exact_attribute_filter() {
         Err(SceneTableError::NoMatchingScene { .. })
     ));
 }
+
+// ======================================================================
+// Tests for resolve_global_owning_local_exact（そのローカルを持つ大域を順送りで選ぶ）
+// ======================================================================
+
+/// `会話_1`（挨拶あり）・`会話_2`（なし）・`会話_3`（あり）と、ローカルを持たない `雑談_1`
+fn build_owning_table() -> SceneTable {
+    use crate::registry::SceneRegistry;
+
+    let mut registry = SceneRegistry::new();
+    let (_, c1) = registry.register_global("会話", HashMap::new());
+    registry.register_local("挨拶", "会話", c1, 1, HashMap::new());
+    let (_, c2) = registry.register_global("会話", HashMap::new());
+    registry.register_local("挨拶続き", "会話", c2, 1, HashMap::new());
+    let (_, c3) = registry.register_global("会話", HashMap::new());
+    registry.register_local("挨拶", "会話", c3, 1, HashMap::new());
+    registry.register_global("雑談", HashMap::new());
+    let mut table =
+        SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0])))
+            .unwrap();
+    table.set_shuffle_enabled(false);
+    table
+}
+
+fn owner_name(table: &SceneTable, id: SceneId) -> String {
+    let scene = table.get_scene(id).unwrap();
+    assert_eq!(scene.scope, SceneScope::Global);
+    scene.fn_name.split_once("::").unwrap().0.to_string()
+}
+
+#[test]
+fn test_resolve_global_owning_local_exact_picks_only_owners_per_cycle() {
+    let mut table = build_owning_table();
+    let empty = HashMap::new();
+
+    for _cycle in 0..2 {
+        let mut picked: Vec<String> = (0..2)
+            .map(|_| {
+                let id = table
+                    .resolve_global_owning_local_exact("会話", "挨拶", &empty)
+                    .unwrap()
+                    .expect("挨拶を持つ大域がある");
+                owner_name(&table, id)
+            })
+            .collect();
+        picked.sort();
+        assert_eq!(
+            picked,
+            vec!["会話_1", "会話_3"],
+            "一巡で 1 と 3 が 1 回ずつ"
+        );
+    }
+}
+
+#[test]
+fn test_resolve_global_owning_local_exact_no_global_and_no_owner() {
+    let mut table = build_owning_table();
+    let empty = HashMap::new();
+
+    // 大域が無い
+    let result = table.resolve_global_owning_local_exact("存在しない", "挨拶", &empty);
+    match result {
+        Err(SceneTableError::SceneNotFound { scene }) => assert_eq!(scene, "存在しない"),
+        other => panic!("Expected SceneNotFound, got {:?}", other),
+    }
+
+    // 大域はあるがどれも持たない（頭が同じローカル「挨拶続き」も数えない）
+    assert_eq!(
+        table
+            .resolve_global_owning_local_exact("会話", "挨", &empty)
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        table
+            .resolve_global_owning_local_exact("雑談", "挨拶", &empty)
+            .unwrap(),
+        None
+    );
+
+    // 名前が空
+    for (name, local) in [("", "挨拶"), ("会話", "")] {
+        let result = table.resolve_global_owning_local_exact(name, local, &empty);
+        assert!(
+            matches!(result, Err(SceneTableError::InvalidScene { .. })),
+            "({name:?}, {local:?}) は不正なシーン"
+        );
+    }
+}
+
+#[test]
+fn test_resolve_global_owning_local_exact_cache_independent_of_exact() {
+    // ふつうの完全一致（1,2,3 の順送り）と状態が混ざらない
+    let mut table = build_owning_table();
+    let empty = HashMap::new();
+
+    let mut owning = Vec::new();
+    let mut exact = Vec::new();
+    for _ in 0..3 {
+        let id = table
+            .resolve_global_owning_local_exact("会話", "挨拶", &empty)
+            .unwrap()
+            .unwrap();
+        owning.push(owner_name(&table, id));
+        let id = table.resolve_scene_id_exact("", "会話", &empty).unwrap();
+        exact.push(owner_name(&table, id));
+    }
+    assert_eq!(owning, vec!["会話_1", "会話_3", "会話_1"]);
+    assert_eq!(exact, vec!["会話_1", "会話_2", "会話_3"]);
+}

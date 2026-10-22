@@ -127,3 +127,7 @@
 - 品質の関門：`cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_lua -p pasta_shiori`。
 - cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。`PASTA_DEBUG` を読む新しいテストには、それを中和する守りを付ける。
 - pasta_lua のテストは `sample.generated.lua` の改行を書き換える。`git checkout --` で戻し、コミットに混ぜない。
+
+## 申し送り（scene-play-event より、2026-10-22 完了時）
+
+- `runtime/mod.rs`（`with_config_and_source_map`）がソースの対応表を持つ条件を、待ち受けが立ったか（`debug_handle.is_some()`）から、解決した設定のデバッグの有効（`config.debug.enabled`）へ変えた。`factory.rs` の Step 7（索引の構築）もこれで、待ち受けが無くても走る。`from_loader_with_scene_dic` は `@pasta_debug` を登録するようになった（`register_finalize_scene` の直前）。`runtime/` を整理するときは、この 2 つの条件（設定の有効・待ち受けの有無）を混ぜないこと。参照先は `.kiro/specs/completed/scene-play-event/design.md` の SourceMapRetention・DebugLuaModule。

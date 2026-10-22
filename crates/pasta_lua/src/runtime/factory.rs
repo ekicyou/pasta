@@ -164,6 +164,8 @@ impl PastaLuaRuntime {
         // finalize_scene must re-register @pasta_search with the SAME alias table
         // as the initial registration inside `with_config_and_source_map`.
         let scene_aliases = runtime_config.scene_aliases.clone();
+        // `@pasta_debug.enabled()` は待ち受けの有無ではなく解決した設定の値を見る（4.2）。
+        let debug_enabled = runtime_config.debug.enabled;
 
         // Create base runtime (installs the debug hook exactly once iff enabled,
         // and holds + forwards the source map to enable when present).
@@ -201,6 +203,14 @@ impl PastaLuaRuntime {
             &runtime.lua,
             &runtime.config,
             RendererInjection::default(),
+        )?;
+
+        // Register internal @pasta_debug module (production entry only; scene-play-event 2.3)
+        Self::register_debug_module(
+            &runtime.lua,
+            debug_enabled,
+            runtime.source_map.clone(),
+            &loader_context.base_dir,
         )?;
 
         // Register finalize_scene Rust binding to overwrite Lua stub (Requirement 4.3)

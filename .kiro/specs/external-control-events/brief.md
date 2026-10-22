@@ -134,3 +134,10 @@ OnPastaSetSaveVariable  Reference0=初回済み  Reference1=null
 
 - 呼び先の `GLOBAL` の 4 つの名前（`pause_auto_talk`・`自動トーク停止`・`resume_auto_talk`・`自動トーク再開`）は入った。引数 `act` は `nil` でも動き、出力を積まない。再開は `act.req.date` が取れればその時刻で時計を決め直し、取れなければ時報を初回扱いにする（`.kiro/specs/completed/ontalk-suppression/design.md` の TimerRestart）。外からのイベントの `act` にも `date` があるので、そのまま効く。
 - `pasta_check` の組み込みの名前は 8 つになった（`builtins.rs` の `GLOBAL_NAMES`）。
+
+## 申し送り（scene-play-event より、2026-10-22 完了時）
+
+- 実機（SSP 2.9・MCP）で、`raise_event` は **GET**・`SecurityLevel: local`・`SenderType: external,sstp` で届いた。応答の Value の台本はツールの結果に載る。上の「NOTIFY なら応答は捨てられる」の心配は当たらない。`＊初回起動` の台本も返る前提で書いてよい。
+- MCP の `reload` は読み込み直しを頼むだけで、終わるのを待たない。終わる前の `raise_event` は SHIORI に届かず「台本なし」で返り、204 と見分けがつかない。マニュアルの例は「`get_status` が答えてから呼ぶ」とした（`book/src/lua/shiori-events.md` の「MCP からの呼び方」）。
+- 既定のハンドラの形は `pasta/shiori/event/scene_play.lua`（`REG.X = REG.X or function`、門を引数より前、失敗は `FAILURE.report` → `act:build()`、成功はコルーチンを返して `EVENT.fire` に任せる）。`event/init.lua` の `require` の並びに 1 行足した。写すときの参照先は `.kiro/specs/completed/scene-play-event/design.md` の ScenePlayHandler。
+- `SCENE.co_exec_exact(name, local_name)` は 2 つ目の戻り値（`"global"`・`"local"`）を返すようになった。`＞XXX` の探し方を「シーンと同じ」にするなら、この口と `SEARCH:search_local_scene_exact` を使える。

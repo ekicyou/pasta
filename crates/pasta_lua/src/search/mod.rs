@@ -21,7 +21,7 @@
 mod context;
 mod error;
 
-pub use context::SearchContext;
+pub use context::{LocalSceneMatch, SearchContext};
 pub use error::SearchError;
 
 use mlua::{Lua, Result as LuaResult, Table};

@@ -49,6 +49,8 @@
 | メニュー表示名 | `▶ シーンを実行` |
 | 送信される DAP リクエスト | `pasta/playSceneAt`（`{ uri, line }`、`line` は 1 始まり） |
 
+VSCode を使わずに、AI エージェントなどから SSP の MCP サーバーを通して、同じ規則で行位置のシーンを再生することもできる。SHIORI のイベント `OnPastaSceneAt` にファイルと行を渡す（[OnPastaSceneAt](../lua/shiori-events.md#onpastasceneat位置でシーンを再生)）。シーン名で指名するときは `OnPastaScene` を使う（[OnPastaScene](../lua/shiori-events.md#onpastascene名前でシーンを再生)）。どちらもデバッグを有効にしたときだけ動き、デバッグセッションへの接続は要らない（[シーンを再生するイベントの共通の決まり](../lua/shiori-events.md#シーンを再生するイベントの共通の決まり)・[MCP からの呼び方](../lua/shiori-events.md#mcp-からの呼び方)）。
+
 ### 起動方法
 
 | 導線 | 操作 | 表示条件 |

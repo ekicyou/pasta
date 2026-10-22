@@ -291,6 +291,32 @@ fn unload_synchronously_frees_port_for_plain_rebind() {
 }
 
 #[test]
+fn runtime_keeps_source_map_when_bind_fails() {
+    // scene-play-event 4.3: 待ち受けが立たなくても、設定でデバッグが有効ならマップを持つ。
+    let blocker = std::net::TcpListener::bind("127.0.0.1:0").expect("test listener must bind");
+    let mut config = crate::runtime::RuntimeConfig::new();
+    config.debug = DebugConfig {
+        enabled: true,
+        listen: Some(blocker.local_addr().expect("bound addr")),
+        ..Default::default()
+    };
+    let map = std::sync::Arc::new(crate::debug::source_map::SourceMap::default());
+
+    let runtime = crate::runtime::PastaLuaRuntime::with_config_and_source_map(
+        crate::context::TranspileContext::new(),
+        config,
+        Some(map.clone()),
+    )
+    .expect("bind failure must not fail startup");
+
+    assert!(!runtime.debug_enabled(), "no listener => no backend handle");
+    let held = runtime
+        .debug_source_map()
+        .expect("enabled in config => map is held without a listener");
+    assert!(std::sync::Arc::ptr_eq(&held, &map));
+}
+
+#[test]
 fn enable_bind_failure_falls_back_to_disabled() {
     // A second ghost with debugging on finds the port taken by the first one.
     let blocker = std::net::TcpListener::bind("127.0.0.1:0").expect("test listener must bind");
