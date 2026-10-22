@@ -90,14 +90,14 @@
   - _Depends: 5.1, 5.2_
   - _Requirements: 6.5_
 
-- [ ] 6. 回帰と実機での確かめ
+- [x] 6. 回帰と実機での確かめ
 - [x] 6.1 今のテストをすべて書き換えずに通す
   - Rust の全テスト、Lua のテスト、clippy、luacheck を回す（LuaJIT のビルドのための環境変数の扱いに従う）
   - 失敗の種類の数のテスト、デバッグが無効なときのソースマップの無しのテスト、キックの Lua のテストが、書き換えずに通る
   - テストが書き換える `sample.generated.lua` の改行の差分をコミットに混ぜない
   - _Requirements: 7.2, 7.3, 7.4_
 
-- [ ] 6.2 SSP の実機で、GET と `SecurityLevel: local` で届くことを確かめる
+- [x] 6.2 SSP の実機で、GET と `SecurityLevel: local` で届くことを確かめる
   - デバッグを有効にした試験用のゴーストを、起動中の SSP とは別の SSP で動かし、MCP の `reload` の後で `raise_event` で 2 つのイベントを送る
   - pasta のログで GET と `SecurityLevel: local` で届いたこと、ツールの結果に 1 ビート目の台本が、見つからないときは失敗の表記が載ることを確かめる
   - GET でないか local でないときは、実装を完了とせず設計に戻る
@@ -110,3 +110,4 @@
 - 3.2: scene_play_event_test.lua の load_handlers／reload は REG と package.loaded を差し替えて戻さない。一覧でこのスイートの後ろに足すときは注意
 - 4.2: ファイルの最後のシーンは end_line=u32::MAX なので、辞書にあるファイルの位置は必ずどれかのシーンに当たる（VSCode のキックと同じ）。位置の「見つからない」は辞書に無いファイルのときだけ。マニュアル（5.1）で位置の規則を書くときはこれに合わせる
 - 5.1: マニュアルでは spec の言葉（大域シーン・ビート・位置の索引）を使わない。グローバルシーン・チェイントーク・既定ハンドラなど book/src の既存の用語にそろえる。新しい節の見出し: #onpastascene名前でシーンを再生／#onpastasceneat位置でシーンを再生／#シーンを再生するイベントの共通の決まり／#mcp-からの呼び方（shiori-events.md）
+- 6.2: SSP 2.9 の実機（readonly の別 SSP・MCP）で、MCP の raise_event は GET・SecurityLevel: local・SenderType: external,sstp で届いた（Status は見ない）。reload は非同期で、終わる前の raise_event は SHIORI に届かず台本なしになるので、マニュアルに「get_status が答えてから呼ぶ」を足した
