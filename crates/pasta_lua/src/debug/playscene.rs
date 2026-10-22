@@ -82,6 +82,28 @@ pub fn resolve_and_kick(map: &SourceMap, kick: &KickSink, uri: &str, line: u32) 
     }
 }
 
+/// 位置 `(file, line)` を登録名の組 `(大域, ローカル)` に引く（純粋・task 2.1・
+/// scene-play-event requirements 2.2-2.7/5.3）。
+///
+/// - `file` が相対パスなら `base_dir`（`ghost/master/`）に結び、絶対パスはそのまま使う。
+/// - 結んだパスを [`uri_to_pasta_path`] に通し、[`SourceMap::scene_at`] で引く
+///   （区切り・大小は `canonicalize_pasta_file` に任せる）。
+/// - 大域なら `(大域, "__start__")`、ローカルなら `(親の大域, ローカル)`。
+/// - 見つからなければ `None`。ファイルは開かない。[`resolve_and_kick`] とは別の道。
+pub fn resolve_position(
+    map: &SourceMap,
+    base_dir: &std::path::Path,
+    file: &str,
+    line: u32,
+) -> Option<(String, String)> {
+    let joined = base_dir.join(file); // 絶対パスなら join はそれをそのまま返す
+    let identity = map.scene_at(&uri_to_pasta_path(&joined.to_string_lossy()), line)?;
+    Some(match identity.parent {
+        Some(global) => (global, identity.scene_id),
+        None => (identity.scene_id, "__start__".to_string()),
+    })
+}
+
 /// VSCode uri → `.pasta` ファイルシステムパス文字列（純粋・単体テスト対象・task 6.3）。
 ///
 /// 変換規則（`fs::canonicalize` 非使用・`std::path::absolute` 統一）:

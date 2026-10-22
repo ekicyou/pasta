@@ -290,3 +290,46 @@ fn nonexistent_path_still_resolves_fs_independent() {
          FS 非依存（std::path::absolute）。fs::canonicalize は実在しないパスで Err になる。"
     );
 }
+
+// ===========================================================================
+// scene-play-event task 2.1: `resolve_position`（requirements 2.2-2.7/5.3）。
+// ===========================================================================
+
+/// `base`（ghost/master 相当の絶対パス）配下の `dic/boot.pasta` に索引を張る。
+fn boot_fixture() -> (std::path::PathBuf, SourceMap) {
+    let base = std::path::absolute("ghost_fixture/ghost/master").unwrap();
+    let file = base.join("dic/boot.pasta");
+    (base, map_with_index(&file.to_string_lossy()))
+}
+
+#[test]
+fn resolve_position_joins_relative_path_to_base_dir() {
+    let (base, map) = boot_fixture();
+    let want = Some(("会話_1".to_string(), "__start__".to_string()));
+    assert_eq!(resolve_position(&map, &base, "dic/boot.pasta", 15), want);
+    assert_eq!(resolve_position(&map, &base, r"dic\boot.pasta", 15), want);
+}
+
+#[test]
+fn resolve_position_uses_absolute_path_as_is() {
+    let (base, map) = boot_fixture();
+    let abs = base.join("dic/boot.pasta").to_string_lossy().into_owned();
+    let other_base = std::path::absolute("elsewhere").unwrap();
+    assert_eq!(
+        resolve_position(&map, &other_base, &abs, 25),
+        Some(("会話_1".to_string(), "挨拶_1".to_string()))
+    );
+}
+
+#[test]
+fn resolve_position_returns_none_when_not_found() {
+    let (base, map) = boot_fixture();
+    // 索引に無いファイル・シーンの無い行
+    assert_eq!(resolve_position(&map, &base, "dic/other.pasta", 15), None);
+    assert_eq!(resolve_position(&map, &base, "dic/boot.pasta", 100), None);
+    // 索引の無いマップ
+    assert_eq!(
+        resolve_position(&SourceMap::new(), &base, "dic/boot.pasta", 15),
+        None
+    );
+}
