@@ -218,6 +218,58 @@ fn normal_mode_builds_no_index_and_line_mapping_is_unchanged() {
     );
 }
 
+/// scene-play-event task 2.3（requirements 2.1/4.1/4.2）: `@pasta_debug` を Lua から呼ぶ。
+/// 有効なら `enabled()` が真で、`scene_at` は相対・絶対パスとも登録名の組を返し、
+/// 行が 1..=u32::MAX の整数でなければエラーにせず nil。無効なら偽で、マップが無いので常に nil。
+#[test]
+fn pasta_debug_module_reports_enabled_and_resolves_positions() {
+    const PROBE: &str = r#"
+        local file = ...
+        local D = require("@pasta_debug")
+        local function pair(f, l)
+            local g, s = D.scene_at(f, l)
+            return tostring(g) .. "/" .. tostring(s)
+        end
+        return table.concat({
+            tostring(D.enabled()),
+            pair("dic/test/scene_identity_index.pasta", 8),
+            pair("dic\\test\\scene_identity_index.pasta", 12),
+            pair(file, 15),
+            pair(file, 0),
+            pair(file, 1.5),
+            pair(file, 4294967296),
+            pair(file, "8"),
+        }, "|")
+    "#;
+    let temp = tempfile::TempDir::new().expect("temp dir");
+    let pasta_file = make_base_dir(temp.path(), true);
+    let runtime = PastaLoader::load_with_config(temp.path(), RuntimeConfig::new())
+        .expect("debug-enabled runtime must load");
+    let got: String = runtime
+        .lua()
+        .load(PROBE)
+        .call(pasta_file.to_string_lossy().to_string())
+        .expect("@pasta_debug must be callable");
+    assert_eq!(
+        got,
+        "true|OnTalk_1/__start__|OnTalk_1/挨拶_1|OnTalk_2/__start__|nil/nil|nil/nil|nil/nil|nil/nil"
+    );
+
+    let temp_off = tempfile::TempDir::new().expect("temp dir");
+    let off_file = make_base_dir(temp_off.path(), false);
+    let runtime_off = PastaLoader::load_with_config(temp_off.path(), RuntimeConfig::new())
+        .expect("debug-disabled runtime must load");
+    let got_off: String = runtime_off
+        .lua()
+        .load(PROBE)
+        .call(off_file.to_string_lossy().to_string())
+        .expect("@pasta_debug must be callable when disabled");
+    assert_eq!(
+        got_off,
+        "false|nil/nil|nil/nil|nil/nil|nil/nil|nil/nil|nil/nil|nil/nil"
+    );
+}
+
 // ===========================================================================
 // task 6.1 統合/回帰テスト（pasta-scene-kick-from-cursor・requirements 3.1/3.3/3.4/7.1）。
 //

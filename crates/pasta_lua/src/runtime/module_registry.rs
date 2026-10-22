@@ -9,9 +9,12 @@ use super::log;
 use super::persistence;
 use super::renderer_injection::RendererInjection;
 use super::searcher::{install_module_searcher, register_chunk_table};
+use crate::debug::playscene::resolve_position;
+use crate::debug::source_map::SourceMap;
 use crate::loader::{LoaderContext, PastaConfig};
 use mlua::{IntoLua, Lua, Result as LuaResult, Table, Value};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Register a module into `package.loaded` under the given name.
 ///
@@ -170,6 +173,41 @@ impl PastaLuaRuntime {
     pub(crate) fn register_log_module(lua: &Lua) -> LuaResult<()> {
         let log_table = log::register(lua)?;
         set_loaded_module(lua, "@pasta_log", log_table)
+    }
+
+    /// Register the internal `@pasta_debug` module（scene-play-event 2.1/4.1/4.2）。
+    ///
+    /// 関数は 2 つだけ: `enabled()` は解決した設定の値（待ち受けの有無は見ない）、
+    /// `scene_at(file, line)` は位置を登録名の組 `(大域, ローカル)` に引く。マップが無い、
+    /// 行が `1..=u32::MAX` の整数でない、見つからないときはエラーにせず nil を返す。
+    /// 本番の入口（`from_loader_with_scene_dic`）だけが呼ぶ。
+    pub(crate) fn register_debug_module(
+        lua: &Lua,
+        enabled: bool,
+        source_map: Option<Arc<SourceMap>>,
+        base_dir: &Path,
+    ) -> LuaResult<()> {
+        let table = lua.create_table()?;
+        table.set("enabled", lua.create_function(move |_, ()| Ok(enabled))?)?;
+        let base_dir = base_dir.to_path_buf();
+        let scene_at = lua.create_function(move |_, (file, line): (String, Value)| {
+            let line = match line {
+                Value::Integer(i) => u32::try_from(i).ok(),
+                Value::Number(n) if n.fract() == 0.0 && n >= 0.0 && n <= u32::MAX as f64 => {
+                    Some(n as u32)
+                }
+                _ => None,
+            };
+            let found = match (&source_map, line) {
+                (Some(map), Some(line)) if line >= 1 => {
+                    resolve_position(map, &base_dir, &file, line)
+                }
+                _ => None,
+            };
+            Ok(found.unzip())
+        })?;
+        table.set("scene_at", scene_at)?;
+        set_loaded_module(lua, "@pasta_debug", table)
     }
 
     /// Convert toml::Value to mlua::Value.
