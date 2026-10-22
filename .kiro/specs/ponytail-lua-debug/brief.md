@@ -139,3 +139,9 @@ VSCode でゴーストをデバッグする作者が困る。
 - **見つけた穴・古くなった記述**
   - `book/src/internals/debug.md` L445 の「`PASTA_DEBUG=1` だと、ロードを伴うテストがすべて固定ポートに bind しようとして `AddrInUse` で失敗する」は、c4d0380e の後は当たらない。今は、ポートを取れたテストだけがデバッグを有効にして走り、ほかはデバッグなしで読み込みが通る（壊れ方が変わった）。すぐ直せる文書の誤り。
   - 11 番の `unreachable!` の場所（上記）。
+
+## 申し送り（scene-play-event より、2026-10-22 完了時）
+
+- 上の「新しく見つけた点」（ポートが取れなくても表を作るのに使われない）は、scene-play-event で**仕様にした**。ランタイムは、設定でデバッグが有効なら、待ち受けが立たなくてもソースの対応表と索引を持ち続ける（`runtime/mod.rs` の `if config.debug.enabled`）。位置でシーンを再生する `OnPastaSceneAt` がこれを使う。直す対象ではない。
+- 内部用のモジュール `@pasta_debug`（`runtime/module_registry.rs` の `register_debug_module`）を足した。`enabled()` は**解決した設定の値**を返し、待ち受けの有無（`debug_enabled()`）は見ない。`scene_at(file, line)` は `debug/playscene.rs` の新しい `resolve_position` を呼ぶ。`playscene.rs` に呼び手が増えたので、`#![allow(dead_code)]` の外し方を見直すときはこれを数える。
+- `debug_enabled()`（`runtime/exec.rs`）と `debug_handle` の doc は「待ち受けの有無」を表す（doc は完了時に直した）。設定の有効と待ち受けの有無の 2 つがある、という前提で整理すること。

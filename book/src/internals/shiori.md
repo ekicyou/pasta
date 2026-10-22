@@ -99,6 +99,7 @@ VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、�
 | `pasta.shiori.clock` | SSP の仮想時刻と OS の時計のずれ・時刻の飛びを持つ時計。合図の判定・仮想時刻の読み取り・ずれを足した時刻と日付・飛びを差し引いた時計 |
 | `pasta.shiori.event.callback` | 非同期トークのコールバック待ちの登録・ルーティング・タイムアウトの掃引 |
 | `pasta.shiori.event.kick` | シーンキックの保留と起動（[デバッグ基盤とシーンキック](debug.md)） |
+| `pasta.shiori.event.scene_play` | 既定ハンドラ（OnPastaScene・OnPastaSceneAt）を `REG` に登録する。デバッグが有効なときだけ、名前か位置で指名したシーンを再生する（[位置でのシーンの再生](debug.md#位置でのシーンの再生)） |
 | `pasta.shiori.res` | SHIORI/3.0 の応答文字列を作る `RES` |
 | `pasta.shiori.act`・`pasta.shiori.sakura_builder`・`pasta.shiori.appearance`・`pasta.shiori.actor_style` | SHIORI 用の ACT とさくらスクリプトの組立、外見の復旧、装いの出し入れ（[トーク出力とアピアランス](talk-output.md)） |
 | `pasta.shiori` | 空の表を返すだけのモジュール。リポジトリ内に `require` する箇所は無いが、展開されるスクリプトの公開面として残している |

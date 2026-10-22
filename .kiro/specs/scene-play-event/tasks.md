@@ -111,3 +111,6 @@
 - 4.2: ファイルの最後のシーンは end_line=u32::MAX なので、辞書にあるファイルの位置は必ずどれかのシーンに当たる（VSCode のキックと同じ）。位置の「見つからない」は辞書に無いファイルのときだけ。マニュアル（5.1）で位置の規則を書くときはこれに合わせる
 - 5.1: マニュアルでは spec の言葉（大域シーン・ビート・位置の索引）を使わない。グローバルシーン・チェイントーク・既定ハンドラなど book/src の既存の用語にそろえる。新しい節の見出し: #onpastascene名前でシーンを再生／#onpastasceneat位置でシーンを再生／#シーンを再生するイベントの共通の決まり／#mcp-からの呼び方（shiori-events.md）
 - 6.2: SSP 2.9 の実機（readonly の別 SSP・MCP）で、MCP の raise_event は GET・SecurityLevel: local・SenderType: external,sstp で届いた（Status は見ない）。reload は非同期で、終わる前の raise_event は SHIORI に届かず台本なしになるので、マニュアルに「get_status が答えてから呼ぶ」を足した
+- 完了時にその場で解決: `OnPastaSceneAt` の「見つからない」のログで、u32 を超える行が `line=1e+20` になっていたのを、渡された文字列のまま出すようにした（テスト付き）
+- 完了時にその場で解決: `runtime/mod.rs` の `debug_handle` の doc に、待ち受けが取れないと `None` になる（ソースマップは残る）ことを書いた
+- 完了時に直さないと判断: Lua のテストが `REG`・`package.loaded` を戻さないのは、ほかのスイートと同じ作法（各スイートが要るモジュールを読み直す）。マージ後の main（ontalk-suppression の 3 スイート入り）でも 70 スイートが通った

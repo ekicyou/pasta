@@ -111,7 +111,7 @@ load_with_config(base_dir, runtime_config)
 | アクセサ | 使う場所 |
 | -------- | -------- |
 | `logging` | ローダの段階 1.5 |
-| `debug` | ローダの段階 5.5 と VM の構築（`from_loader_with_scene_dic`） |
+| `debug` | ローダの段階 5.5 と VM の構築（`from_loader_with_scene_dic`。待ち受けの起動と、`@pasta_debug` の `enabled` に渡す値） |
 | `persistence` | `@pasta_persistence` の登録と、ランタイムの破棄時の保存 |
 | `talk` | `@pasta_sakura_script` の登録 |
 
