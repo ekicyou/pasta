@@ -99,3 +99,9 @@
   - pasta_lua のテストが `sample.generated.lua` に改行コードだけの差分を残したら、`git checkout --` で戻してコミットに混ぜない
   - 既存の仮想イベント・つつき・撫でのテストが書き換えなしで通り、すべての検査が緑になる
   - _Requirements: 5.2, 5.3_
+
+## Implementation Notes
+
+- 完了時にその場で解決: design.md の New Files に、実装で分けて作ったテストファイル 2 本と store_save_test.lua への追記を書き足した（最終検証の指摘）。
+- 完了時にその場で解決: マニュアルの例の止めたままになる場合（選択肢が選ばれずに閉じられたとき）と、時報の決め直しの条件を書き足した（最終検証の指摘・177d0b88）。
+- 完了時にその場で解決: 内部設計の章（shiori.md の dispatch の手順・internal-modules.md の STORE の表と reset・execution-model.md の yield と継続）に止める印と門を書き足した（Internals Sync Gate）。

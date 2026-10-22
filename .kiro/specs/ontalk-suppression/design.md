@@ -132,6 +132,9 @@ graph TB
 ### New Files
 
 - `crates/pasta_lua/tests/lua_specs/auto_talk_pause_test.lua` — 停止・再開・門・時計の決め直し・チェイントークの警告・つつき・撫で・入れ子・リセットの Lua テスト（5.4）。`virtual_dispatcher_kick_force_test.lua` の作り（`package.loaded` の一括新規ロード・`_set_scene_executor`・`_get_internal_state`）と、`kick_try_dispatch_test.lua` の `@pasta_log` のモックに倣う。
+- `crates/pasta_lua/tests/lua_specs/virtual_dispatcher_pause_gate_test.lua` — 止める門と `restart_timers` の事後条件のテスト（実装のタスク 2.1 で分けて作った）。
+- `crates/pasta_lua/tests/lua_specs/mouse_pause_test.lua` — 止めている間のつつき・撫でのテスト（タスク 2.2 で分けて作った）。
+- 既存の `store_save_test.lua` に、読み込み直後・リセット後の印と `pasta.save` に置かないことのテストを足した。
 
 ## System Flows
 
