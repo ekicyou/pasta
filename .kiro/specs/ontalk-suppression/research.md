@@ -131,3 +131,88 @@
 - 止めていないときに再開を呼んだら何もしない（要件 3.4）ために、「止めていたか」を見て分岐する。
 - Lua のテストの観点: 既定で素通り／停止で OnTalk・OnHour・続きが出ない／キックの最初の出力は出る／`CLOCK.take_probe` が返る／再開で間隔の数え直し／止めている間に過ぎた正時を出さない／再開した後の次の正時は出す／2 回停止→1 回再開で解ける／止めていないときの再開で時刻が変わらない／`STORE.reset` で解ける／`＠` の形と `＞` の形の両方。
 - **Research Needed**: シーンの外から呼ばれる `act` の `req.date` の有無（`external-control-events` の呼び方）。
+
+---
+
+# 設計フェーズの調査と決定（2026-10-22）
+
+## Summary
+
+- **Feature**: `ontalk-suppression`
+- **Discovery Scope**: Extension（軽い調査。`design-discovery-light.md`）。外部のライブラリ・API は足さないので、Web の調査はしない。
+- **参照したもの**: steering（`product.md`・`tech.md`・`structure.md`）、スキル `kiro-spec-design` の rules（design-principles・discovery-light・synthesis・review-gate）、`pasta-lua-coding` の考え方（`GLOBAL`・`STORE`・`@pasta_log`）、完了 spec `touch-poke-shortcuts` の設計書（書き方の手本）。
+- **Key Findings**:
+  - すべての SHIORI リクエストに `req.date` がある（`crates/pasta_shiori/src/lua_request.rs` の `parse_request` L53 が常に `date` を置き、`X-Pasta-Time` があれば置き換える）。§4.1・§7 の **Research Needed は解決**: シーンの中・`REG` ハンドラ・`external-control-events` の口のどれから呼んでも、`act.req.date` から時刻が取れる。取れないのは `act` が `nil` や `req` の無い Lua の単体テスト・直接の呼び出しだけ。
+  - **チェイントークの続きの `act` は古い**: 続きを再開するとき `EVENT.drive(co, act, act)` は新しい act を渡すが、`ACT_IMPL.yield`（`act.lua` L663）は `coroutine.yield` の戻り値を捨てるので、シーンの中の `act` は最初のリクエストのまま。続きの中で `CLOCK.now(act.req)` を読むと古い時刻になる。時報の決め直しで「戻す」と、すでに出した正時を二重に出しうる。
+  - チェイントークの登録は `entry.lua` でなく `pasta/global.lua`（`GLOBAL.yield`・`GLOBAL["チェイントーク"]`）。呼ぶ先は `ACT_IMPL.yield` だけで、ランタイムの中で `act:yield()` を呼ぶのは `GLOBAL.yield` だけ。
+  - `pasta_check` は `＠` の単語参照の飛び先を検査しない（`references.rs` は Call だけを見る）ので、`＠自動トーク停止` は今も報告されない。`scenes.rs` L70 の `scene-shadowed-by-builtin` は `is_builtin` を使うので、4 つの名前と同じ名前のグローバルシーンに新たに警告が出る（既存の決まりの帰結）。
+  - `dispatch` の循環的複雑度は今 8 の見込み（if 5・and/or 2・基本 1）。門を 1 つ足して 9。上限 15 に余裕がある。
+
+## Research Log
+
+### 時刻の取り方（§4.1 の Research Needed）
+
+- **Context**: 再開の時点の時刻で時報を決め直す案（H1・H4）は `act.req.date` に頼る。シーンの外から呼ばれたときに時刻があるか。
+- **Sources Consulted**: `crates/pasta_shiori/src/lua_request.rs`（`parse_request`・`lua_date`）、`pasta/shiori/clock.lua`（`M.now`・`M.steady`）、`.kiro/specs/external-control-events/brief.md`（`OnPastaCallFunction` の `act:call` で呼ぶ）。
+- **Findings**: リクエストの表には常に `date` がある。`external-control-events` は `REG` ハンドラの `act` で `act:call` するので、時刻は取れる。
+- **Implications**: 時刻が取れない場合は SHIORI の経路では起きない。落としどころ（初回扱い）は単体テストと直接の呼び出しのためだけで足りる。
+
+### 続きの中の古い act
+
+- **Context**: 再開の関数・チェイントークの警告は、続き（2 回目以降の出力）の中でも呼ばれうる。
+- **Sources Consulted**: `pasta/act.lua` L660〜667（`ACT_IMPL.yield`）、`pasta/shiori/event/init.lua` L190〜（`EVENT.drive`）、L239（`EVENT.drive(result, act, act)`）、`pasta/scene.lua`（`wrap_scene`）。
+- **Findings**: 続きのシーンが見る `act` は最初のリクエストの act。`act.req.date` は古い。
+- **Implications**: 時報の決め直しは「前へだけ進める」（今の `next_hour_unix` より後のときだけ置き換える）。止めている間に続きは動かない（門が `check_talk` を呼ばない）ので、古い act で再開するのは「同じ出力の中で停止と再開を続けて呼んだ」ときだけで、そのとき前へだけ進める決まりは何も壊さない。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| H1＋R1（採用） | 再開の関数がディスパッチャの `restart_timers(act)` を直接呼ぶ。トークは `next_talk_time = 0`、時報は再開の時刻から前へだけ進める。時刻が無ければ `next_hour_unix = 0` | 停止と再開が 1 つの組み立ての中で続いても確実に数え直す。状態を増やさない。時報が正確 | `entry.lua` → ディスパッチャの直接の依存（既に間接に依存していて向きは同じ） | §4.2 の R2 の欠点が出ない |
+| H4＋R3（research §7 の推奨） | `STORE` に再開の通し番号と時刻を置き、ディスパッチャが次の判定で前に見た値と比べて決め直す | 関数は `STORE` だけを触る | 状態が 2〜3 個増える（通し番号・時刻・前に見た値）。続きの古い act の時刻を印に残すと同じ二重発行の問題が残る | 依存の向きの利点は、R1 でも向きが変わらないので小さい |
+| H3 単独 | 再開で `next_hour_unix = 0` | 1 行 | 再開の後の台詞の表示中に正時をまたぐと、その時報が出ない（3.3 の端の場合） | 時刻が取れないときの落としどころとして採る |
+| 案 B（新しいモジュール） | `auto_talk.lua` に関数と状態 | 責任が分かれる | ファイルが増え、時計の決め直しには結局ディスパッチャの口が要る | 規模に対して重い。採らない |
+
+## Design Decisions
+
+### Decision: 時計の決め直しは H1＋R1（前へだけ進める）
+
+- **Context**: 3.1〜3.3。§4.1・§4.2。
+- **Alternatives Considered**: 上の表の H4＋R3・H3 単独。
+- **Selected Approach**: `GLOBAL.resume_auto_talk` が止めていたときだけ `dispatcher.restart_timers(act)` を呼ぶ。`next_talk_time = 0`。時刻が取れれば `calculate_next_hour_unix(now)` が今の値より後のときだけ置き換え、`seen_epoch = CLOCK.epoch()`。取れなければ `next_hour_unix = 0`。
+- **Rationale**: 最小の状態で要件を満たす。古い act の時刻でも二重発行しない。
+- **Trade-offs**: 時刻が取れないとき（単体テスト・直接の呼び出しだけ）は H3 の端の場合を受け入れる。
+- **Follow-up**: 古い時刻の act での再開と、`act` が `nil` の再開をテストで押さえる。
+
+### Decision: 関数は `entry.lua`、チェイントークの警告は `global.lua` の `GLOBAL.yield`
+
+- **Context**: brief の Approach 1（`close_ghost` の先例）と、要件 2.8（`＞チェイントーク` の側で止めている印を見る）。
+- **Alternatives Considered**: (1) 4 つの名前も `global.lua` に置く（`yield` と同じ場所）。(2) 警告を `ACT_IMPL.yield`（`act.lua`）に置き、Lua から直接の `act:yield()` も拾う。(3) 警告を `set_co_scene` に置き、続きができるすべての道を拾う。
+- **Selected Approach**: 停止・再開は `entry.lua`（SHIORI 層。ディスパッチャを読む）。`GLOBAL.yield` は印を読み、真なら warn と `GLOBAL.resume_auto_talk(act)`（同じ表から呼び出しの時点で引く）。
+- **Rationale**: `global.lua` から SHIORI 層のディスパッチャを読まずに済む。要件 2.8 の文言（`＞チェイントーク`・`＞yield`）にちょうど合う。(3) は `EVENT` の本体に触れ、境界が広がる。
+- **Trade-offs**: Lua から直接 `act:yield()` を呼ぶ道は警告されない（Open Question 2）。
+
+### Decision: 門の位置はキックの後・時報の前
+
+- **Context**: 2.1〜2.4・2.6・2.7・5.2。
+- **Selected Approach**: `dispatch` の `KICK.try_dispatch` の直後に `if STORE.auto_talk_paused then return nil end`。
+- **Rationale**: 1 か所で時報・トーク・続きを止め、キックの最初の出力・Status の抑止・時間切れ・仮想時刻の読み取りは今どおり。
+
+### Decision: つつき・撫では `mouse.lua` の 2 か所
+
+- **Context**: 2.9〜2.11（§4.4b）。
+- **Selected Approach**: `on_poke` は印が真なら `find_shortcut` を飛ばす。`on_touch` は `check_stroke` の `blocked` に印を `or` で足す。
+- **Rationale**: 既に `mouse.lua` は `STORE` を読む。印が偽なら式の値が今と同じでバイト不変。
+
+## Synthesis
+
+- **Generalization**: 「止める」は 3 か所（ディスパッチャ・つつき・撫で）で同じ印を読むだけ。印の読み手を抽象化する層は作らない（読み手が 3 つで、どれも 1 行）。`novel-talk-flow` の「常に止める」も同じ印で表せる（インタフェースとしては印 1 つで足りる）。
+- **Build vs. Adopt**: すべて既存の仕組みを使う（`STORE`・`GLOBAL`・`@pasta_log`・`_get_internal_state`・`gen-skill-refs.mjs`）。新しい依存なし。
+- **Simplification**: 新しいモジュール（案 B）・再開の通し番号（R3）・止めているかを問い合わせる関数・切り替えのログは作らない。`restart_timers` だけをディスパッチャの公開関数に足す。
+
+## Risks & Mitigations
+
+- 古い act の時刻で時報を戻して二重に出す — 前へだけ進める決まりとテストで防ぐ。
+- 4 つの名前と同じ名前のグローバルシーンを持つゴーストに、検査の警告が新たに出る — 既存の決まりの帰結。マニュアルの検査の一覧に名前を足すことで説明になる。
+- 同じウェーブ・後から入る spec と `virtual_dispatcher.lua`・`store.lua`・`entry.lua`・`builtins.rs`・マニュアルを共有する — §4.6 のとおり、この spec が先に入り、あちらが合わせる。`dispatch` の判定の順を Revalidation Triggers に書いた。
+- `.claude/skills/pasta-ghost-authoring/SKILL.md` の編集が分類器に拒まれる — 入った分と残りを示して開発者の許可を得る。
