@@ -21,9 +21,7 @@
 3. pasta_check.exe validate --target <ゴーストの開発フォルダ>
 ```
 
-配布物を作るのは、今の作りに 1 段足した手順である。手元の `release.bat`（中で `release.ps1` を呼ぶ）とリリース CI の build は同じ手順で、同じ 4 つの一式を `release/` に作る。
-
-本文書の中の **【仮定】** は、brief.md だけでは決めきれず、要件ディスカッションで確かめる前提を示す。対応する論点は末尾の「未決事項（要件ディスカッションへの申し送り）」に番号付きでまとめた。
+配布物を作るのは、今の作りに 1 段足した手順である。手元の `release.bat`（中で `release.ps1` を呼ぶ）とリリース CI の build は同じ `release.ps1` を使い、`pasta.dll.zip`・`hello-pasta.nar`・`pasta_check.zip` の 3 つを `release/` に作る。VSIX はこれまでどおり VSCode 拡張のパッケージの手順（`npm run package`）が作る。手元で両方の手順を回せば、リリース CI と同じ 4 つの配布物がそろう。
 
 用語:
 - **配布物**: GitHub Release に添付する、利用者向けのファイル。本仕様の後は `pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-X.Y.Z.vsix`・`pasta_check.zip` の 4 つ。
@@ -90,12 +88,12 @@
 
 #### Acceptance Criteria
 
-1. When リリースビルドが成功したとき, the リリースビルド shall `release/` に `pasta.dll.zip`・`hello-pasta.nar`・`pasta_check.zip` を作り、終わりのまとめに `pasta_check.zip` の場所も示す。**【仮定】** VSIX はこれまでどおり VSCode 拡張のパッケージの手順が作る（未決事項 5）。
+1. When リリースビルドが成功したとき, the リリースビルド shall `release/` に `pasta.dll.zip`・`hello-pasta.nar`・`pasta_check.zip` を作り、終わりのまとめに `pasta_check.zip` の場所も示す。VSIX はこれまでどおり VSCode 拡張のパッケージの手順が作り、リリースビルドは VSIX を作らない。
 2. When `pasta_check.zip` を作ったとき, the リリースビルド shall zip の中身が `pasta_check.exe` と `THIRD_PARTY_LICENSES.txt` のちょうど 2 つであることを検査する。
 3. If `pasta_check.zip` の中身がちょうどその 2 つでないとき, the リリースビルド shall 期待する中身と実際の中身の両方を示して失敗する。
 4. If `pasta_check.exe` のビルドが失敗したとき, the リリースビルド shall 失敗し、x64 のターゲットが入っていない場合に足す方法（`rustup target add x86_64-pc-windows-msvc`）を示す。
 5. The リリースビルド shall 段の見出しの番号（`[1/6]` など）と、スクリプトの冒頭の説明・`release.bat` の説明を、新しい段を含めた並びに合わせる。
-6. While `-SkipSetup` または `-SkipDllBuild` を指定して実行しているとき, the リリースビルド shall `pasta_check.zip` の段を飛ばさずに行う。**【仮定】** `pasta_check.zip` は `pasta.dll` の準備（setup）と別の物で、どちらの指定でも作り直す（未決事項 2）。
+6. While `-SkipSetup` または `-SkipDllBuild` を指定して実行しているとき, the リリースビルド shall `pasta_check.zip` の段を飛ばさずに行い、作り直す。`pasta_check.zip` は `pasta.dll` の準備（setup）と別の物である。`pasta_check.zip` の段だけを飛ばす指定は足さない。
 7. The リリースビルド shall 本仕様の前から作っていた配布物（`pasta.dll.zip`・`hello-pasta.nar`）の中身と、その検査を変えない。
 8. The リリースビルド shall 手元とリリース CI で同じ手順を使い、リリース CI だけの別の作り方を持たない。
 
@@ -107,7 +105,7 @@
 
 1. When リリースタグが push され、関門の検査が通ったとき, the リリース CI shall build の job で、タグのコミットのソースから `pasta_check.zip` を、ほかの配布物と同じリリースビルドで作る。
 2. When build の job が配布物を検査するとき, the リリース CI shall `pasta_check.zip` が在り、中身が `pasta_check.exe` と `THIRD_PARTY_LICENSES.txt` のちょうど 2 つであることを検査する。
-3. When build の job が配布物を検査するとき, the リリース CI shall `pasta_check.zip` の中の `pasta_check.exe` を起動し、`--version` が示す版がリリースタグの版と一致することを検査する。**【仮定】** brief は中身の 2 つの検査だけを挙げるが、VSIX の版の検査と同じく、exe が起動できて版が合うことまで確かめる（未決事項 3）。
+3. When build の job が配布物を検査するとき, the リリース CI shall `pasta_check.zip` の中の `pasta_check.exe` を起動し、`--version` が示す版がリリースタグの版と一致することを検査する。VSIX の版の検査と同じく、壊れた exe や古い exe の取り違えを公開前に止める。
 4. If `pasta_check.zip` が無いか、中身か版が合わないとき, the リリース CI shall 何が合わないかを示して build の job を失敗させ、どの公開先（crates.io・Marketplace・GitHub Release）へも公開しない。
 5. When build の job の検査が通ったとき, the リリース CI shall `pasta_check.zip` を、ほかの配布物と同じ受け渡し（artifact `release-assets`）に入れて後続の job へ渡す。
 6. The リリース CI shall build の job が `Cargo.lock` を書き換えていないことの検査を、`pasta_check.exe` のビルドを足した後も保つ。
@@ -124,7 +122,7 @@
 3. If 添付する 5 つのうち 1 つでも手元に無いとき, the リリース CI shall Release を作らず・公開せずに失敗し、無いファイルの名前を示す。
 4. When 5 つの添付がすべてそろったとき, the リリース CI shall Release を公開する。5 つがそろう前の Release を公開状態にしない。
 5. When 失敗した job を再実行したとき, the リリース CI shall 今と同じ規則（公開済みで 5 つ添付済みなら飛ばす・下書きなら足りない添付だけを付け直す・公開済みの添付は消さない）で続ける。
-6. The リリース CI shall 添付の数を 5 つとする判定を、手元で、ネットワークと gh を使わずに確かめられるテストを持つ。テストは少なくとも、`pasta_check.zip` が無いときに Release を作らずに失敗し、その名前を示すことを確かめる。**【仮定】** 今の `release-scripts-test.ps1` には添付の数を試すテストが無い。`-DryRun` だけに頼らず、テストを足す（未決事項 1）。
+6. The リリース CI shall 添付の数を 5 つとする判定を、手元で、ネットワークと gh を使わずに確かめられるテストを持つ。テストは少なくとも、`pasta_check.zip` が無いときに Release を作らずに失敗し、その名前を示すことを確かめる。テストは `release-scripts-test.ps1` に足し、毎回の CI でも走らせる。`-DryRun`（gh の認証が要る）は手元の補助の確かめに留める。
 
 ### Requirement 6: リリースの状態の読み取りと手順書
 
@@ -147,19 +145,17 @@
 2. The 利用者マニュアル shall `cargo install pasta_check` を、Rust を使っている人向けの別の道として残す。
 3. The 利用者マニュアル shall `pasta_check.exe` が 64 ビット版の Windows 向けであることを示す。
 4. The 利用者マニュアル shall `pasta_check.exe` には署名が無いため、初めて起動するときに Windows の SmartScreen の警告が出ることがある、と一言書く。
-5. The 利用者マニュアル shall 展開した `pasta_check.exe` の起動の仕方（展開したフォルダの exe をパスで指定して呼ぶ例）を示す。PATH への登録の手順は書かない。
+5. The 利用者マニュアル shall 入れ方の節に、展開した `pasta_check.exe` をパスで指定して呼ぶ例を 1 つ示す（例: `C:\tools\pasta_check\pasta_check.exe validate --target ghosts\hello-pasta`）。ほかの節のコマンド例は `pasta_check validate …` の書き方のままにする。PATH への登録の手順は書かない。
 6. The 文書 shall `pasta_check` の入れ方を書いた所（`crates/pasta_check/README.md`・`pasta-check` スキル）を、マニュアルと同じ順（Release の zip が第一、`cargo install` が別の道）にそろえる。
 7. The 文書 shall 配布物の一覧を書いた所（ルートの `README.md`・マニュアルの `introduction.md`・`crates/pasta_sample_ghost/RELEASE.md`・`crates/pasta_sample_ghost/README.md`・`pasta-check` スキル・steering の `tech.md`・`structure.md`）に `pasta_check.zip` を加え、配布物の数・添付の数・リリースビルドの段の並びの記述を 4 つ（添付は 5 つ）に合わせる。
 8. When マニュアルの挙動の説明を変えたとき, the 文書 shall 同じ変更の中でスキルの `references/` を作り直し、鮮度の照合（`gen-skill-refs.mjs --check`）が通る状態にする。
 9. The 文書 shall マニュアルの検査（リンクの検証など、`manual.yml` が行うもの）を通る状態に保つ。
 
-## 未決事項（要件ディスカッションへの申し送り）
+## 設計への申し送り
 
-本文の **【仮定】** に対応するもの（1〜3・5）と、設計で決めるもの（4・6）を並べる。brief.md だけでは決めきれなかったため、最善の仮定で要件を書いた。
+要件ディスカッション（2026-10-22）で、議題 5 件はすべて推奨案で確定した。次の事項は設計で決める（詳しくは `research.md` の 5 節・7 節）。
 
-1. **添付の数の確かめ方**（R5.6）: brief の 2026-10-22 の再測定で「`release-scripts-test.ps1` に添付の数を試すテストは無い。テストを足すか、`-DryRun` だけで確かめるかを要件で決める」とされた。`github-release.ps1` は、添付がそろっているかの検査を gh を呼ぶ前に行うので、ネットワークと gh を使わずにテストできる。仮定: テストを足す（`pasta_check.zip` が欠けた添付のフォルダで、Release を作らずに失敗し、その名前を示すこと）。`-DryRun` は gh の認証が要るため、手元の補助の確かめに留める。
-2. **`-SkipSetup`・`-SkipDllBuild` のときの `pasta_check.zip`**（R3.6）: brief は触れていない。仮定: どちらの指定でも `pasta_check.zip` を作り直す（`pasta.dll` の準備とは別の物で、作り直しても数十秒）。別に飛ばす指定（例: `-SkipCheckBuild`）は足さない。
-3. **exe の起動と版の検査**（R4.3）: brief は「中身が 2 つであることを検査する」だけを挙げる。仮定: リリース CI で `pasta_check.exe --version` を起動し、タグの版と一致することまで確かめる（VSIX の `package.json` の版の検査と同じ考え。壊れた exe や古い exe の取り違えを公開前に止める）。手元のリリースビルドでも同じ検査をするかは設計で決める。
-4. **→ 設計へ**: ライセンス表示のひな形を分けるか、1 つのひな形を条件で出し分けるか（brief の Approach のとおり設計で決める）。要件は R2 の「pasta_check の依存だけ・LuaJIT を載せない・今の 2 つの表示を変えない」とする。あわせて、CLI の機能（`cli`）を入れた形で依存を数えることを設計で確かめる（brief の再測定の指摘）。
-5. **「同じ 4 つの一式」の範囲**（R3.1・R3.8）: brief の Desired Outcome は「手元の `release.bat` とリリース CI が、同じ `release/` の一式（4 つ）を作る」とする。しかし今の `release.bat`（`release.ps1`）が作るのは `pasta.dll.zip`・`hello-pasta.nar` で、VSIX はリリース CI でも別の手順（`npm run package`）が作る。仮定: `release.ps1` が作るのは `pasta_check.zip` を足した 3 つで、VSIX はこれまでどおり別の手順とする。「4 つ」は、手元で両方の手順を回せば CI と同じ 4 つがそろう、の意味に読む。`release.bat` から VSIX まで作るようには広げない。
-6. **→ 設計へ**: リリースビルドの段 3（`pasta_check release` の実行）が今は `cargo run -p pasta_check`（手元の既定のターゲット）を使っている。新しく作る x64 の `pasta_check.exe` で段 3 を走らせて、配布する exe そのものを使って確かめるか、今のままにするか。要件は R3.7（今の配布物と検査を変えない）だけを課す。
+1. ライセンス表示のひな形を分けるか、1 つのひな形を条件で出し分けるか。要件は R2 の「pasta_check の依存だけ・LuaJIT を載せない・今の 2 つの表示を変えない」とする。CLI の機能（`cli`）を入れた形で依存を数えること、`--target x86_64-pc-windows-msvc` で wasm 向けの依存を外すことを確かめる。
+2. リリースビルドの段 3（`pasta_check release` の実行）を、新しく作る x64 の `pasta_check.exe` で走らせるか、今の `cargo run -p pasta_check` のままにするか。要件は R3.7（今の配布物と検査を変えない）だけを課す。
+3. exe の版の検査（R4.3）を、手元のリリースビルドでもするか。
+4. rust-cache の key の付け方。
