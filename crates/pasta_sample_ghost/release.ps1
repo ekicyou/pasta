@@ -25,6 +25,8 @@ $GhostDir = Join-Path $ScriptDir "ghosts\hello-pasta"
 $ReleaseDir = Join-Path $WorkspaceRoot "release\hello-pasta"
 $NarFilePath = Join-Path $WorkspaceRoot "release\hello-pasta.nar"
 $DllZipPath = Join-Path $WorkspaceRoot "release\pasta.dll.zip"
+$CheckZipPath = Join-Path $WorkspaceRoot "release\pasta_check.zip"
+$PastaCheckExe = Join-Path $WorkspaceRoot "target\x86_64-pc-windows-msvc\release\pasta_check.exe"
 
 Write-Host "========================================"
 Write-Host "  hello-pasta Build & Release"
@@ -158,6 +160,70 @@ else {
 # ============================================================
 # Release Phase (Steps 3-6)
 # ============================================================
+
+# --- Step 3: Build pasta_check.zip (x64 pasta_check.exe + THIRD_PARTY_LICENSES.txt) ---
+# Always runs, even with -SkipSetup / -SkipDllBuild.
+Write-Host "[3/7] Building pasta_check.zip..."
+
+# Remove a stale zip so a failed run never leaves an old one behind
+if (Test-Path $CheckZipPath) {
+    Remove-Item -Path $CheckZipPath -Force
+}
+
+# Checked here too: step 2 (which also checks) is skipped with -SkipSetup
+if (-not (Get-Command cargo-about -ErrorAction SilentlyContinue)) {
+    Write-Host ""
+    Write-Host "ERROR: cargo-about not found. Install via: cargo install cargo-about" -ForegroundColor Red
+    exit 1
+}
+
+$CheckLicensesPath = Join-Path (Split-Path -Parent $PastaCheckExe) "THIRD_PARTY_LICENSES.txt"
+Push-Location $WorkspaceRoot
+try {
+    & cargo build --release --target x86_64-pc-windows-msvc -p pasta_check --quiet
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "ERROR: pasta_check build failed" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "Make sure you have the x86_64-pc-windows-msvc target installed:"
+        Write-Host "  rustup target add x86_64-pc-windows-msvc"
+        exit 1
+    }
+
+    & cargo about generate -m crates\pasta_check\Cargo.toml -c about.toml --target x86_64-pc-windows-msvc --output-file $CheckLicensesPath about-pasta_check.hbs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "ERROR: cargo about generate failed for pasta_check" -ForegroundColor Red
+        exit 1
+    }
+}
+finally {
+    Pop-Location
+}
+
+$CheckZipDir = Split-Path -Parent $CheckZipPath
+if (-not (Test-Path $CheckZipDir)) {
+    New-Item -ItemType Directory -Path $CheckZipDir -Force | Out-Null
+}
+Compress-Archive -Path @($PastaCheckExe, $CheckLicensesPath) -DestinationPath $CheckZipPath -Force
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [System.IO.Compression.ZipFile]::OpenRead($CheckZipPath)
+try {
+    $zipEntries = @($zip.Entries | ForEach-Object { $_.FullName } | Sort-Object)
+}
+finally {
+    $zip.Dispose()
+}
+$expectedEntries = @("pasta_check.exe", "THIRD_PARTY_LICENSES.txt") | Sort-Object
+if (($zipEntries -join "|") -ne ($expectedEntries -join "|")) {
+    Write-Host ""
+    Write-Host "ERROR: pasta_check.zip must contain exactly: $($expectedEntries -join ', ')" -ForegroundColor Red
+    Write-Host "  Actual: $($zipEntries -join ', ')"
+    exit 1
+}
+Write-Host "  Created pasta_check.zip ($($zipEntries -join ', '))" -ForegroundColor Green
+Write-Host ""
 
 # --- Step 3: Run pasta_check release ---
 Write-Host "[3/6] Running pasta_check release..."

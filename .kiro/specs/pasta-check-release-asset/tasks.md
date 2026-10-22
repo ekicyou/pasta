@@ -18,7 +18,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
 - [ ] 2. リリースビルドに pasta_check.zip の段を足す
-- [ ] 2.1 pasta_check.zip を作って検査する段を足す
+- [x] 2.1 pasta_check.zip を作って検査する段を足す
   - 準備の段（1〜2）の後、`pasta_check release` の段の前に、新しい段を置く。`-SkipSetup`・`-SkipDllBuild` でも必ず走る
   - 古い zip を消す → cargo-about の有無を検査（無ければ入れ方を示して失敗）→ x64 の exe をビルド（失敗なら `rustup target add x86_64-pc-windows-msvc` を示す）→ 1.2 のひな形で表示を生成（失敗なら zip を作らない）→ zip にまとめる → 中身がちょうど 2 つかを検査（違えば期待と実際を示して失敗）、の順にする
   - exe と表示は `target\` の下に置き、`release\` には zip だけを出す。`release\` が無ければ作る
