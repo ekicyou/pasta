@@ -80,7 +80,7 @@
   - _Boundary: ManualAndSkills_
   - _Requirements: 6.4_
 
-- [ ] 5.3 (P) 検査と内部設計のページの名前の列挙を直す
+- [x] 5.3 (P) 検査と内部設計のページの名前の列挙を直す
   - 検査のページの組み込みの名前の一覧と、SHIORI の内部・登録と検索の内部のページの GLOBAL の列挙を 8 つの名前にする
   - 3 つのページの列挙が実際の 8 つの名前と一致する
   - _Boundary: ManualAndSkills_

@@ -91,7 +91,7 @@ VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、�
 
 | モジュール | 役割 |
 | ---------- | ---- |
-| `pasta.shiori.entry` | グローバルの `SHIORI` 表（`load`・`request`・`kick`・`unload`）。`GLOBAL.close_ghost`（`GLOBAL["ゴースト終了"]`）も登録する |
+| `pasta.shiori.entry` | グローバルの `SHIORI` 表（`load`・`request`・`kick`・`unload`）。`GLOBAL.close_ghost`（`GLOBAL["ゴースト終了"]`）・`GLOBAL.pause_auto_talk`（`GLOBAL["自動トーク停止"]`）・`GLOBAL.resume_auto_talk`（`GLOBAL["自動トーク再開"]`）も登録する |
 | `pasta.shiori.event` | `EVENT.fire`（振り分けとコルーチンの再開）と、ハンドラが無いときの `EVENT.no_entry` |
 | `pasta.shiori.event.register` | `REG`。依存を持たない空の表 |
 | `pasta.shiori.event.boot`・`pasta.shiori.event.choice_select`・`pasta.shiori.event.second_change`・`pasta.shiori.event.mouse` | 既定ハンドラ（OnBoot・OnChoiceSelectEx・OnSecondChange・OnMouseDoubleClick・OnMouseMove）を `REG` に登録する。`pasta.shiori.event.mouse` は、つつき・撫でのショートカットの候補の名前・アクター名の解決・撫での判定も持つ |
@@ -296,7 +296,7 @@ pasta.shiori.entry
   │           └→ pasta.store・pasta.shiori.event.virtual_dispatcher
   ├→ pasta.shiori.res
   ├→ pasta.shiori.event.kick
-  └→ pasta.global                            close_ghost・ゴースト終了 を追加
+  └→ pasta.global                            close_ghost・ゴースト終了・pause_auto_talk・自動トーク停止・resume_auto_talk・自動トーク再開 を追加
 ```
 
 既定ハンドラの上書きがどの時点で効くかは [既定ハンドラと上書き](../lua/shiori-events.md#既定ハンドラと上書き) を参照する。
