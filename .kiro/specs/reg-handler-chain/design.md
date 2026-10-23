@@ -267,7 +267,7 @@ function handlers(id) end
 **Implementation Notes**
 - Integration: 既定ハンドラの `REG.X = REG.X or …` は `register` 以外のキーなので `__index` の影響を受けない。
 - Validation: `next(REG) == nil`（`event_dispatch_test.rs` L40）と、3 つのテストの `pairs(REG)` のループが今どおり働くこと。
-- Risks: 作者が `REG.register = 関数` と代入すると、生のキーが `__index` より先に引かれ、`REG:register` の口が隠れる（OPEN QUESTION 2）。
+- Risks: 作者が `REG.register = 関数` と代入すると、生のキーが `__index` より先に引かれ、`REG:register` の口が隠れる（Design Decision 2。守らず、内部の説明に書く）。
 
 #### EventFire
 
@@ -311,7 +311,7 @@ function EVENT.fire(req) end
 - Invariants: 鎖のハンドラ・底・シーンは、それぞれ別の act を受け取る。前のハンドラが積んだ台詞は、後の出力に混ざらない。
 
 **Implementation Notes**
-- Integration: `event/init.lua` の持ち場の約束は「L231〜236 と冒頭の説明」だが、act を作る L228〜229 も同じ塊として替える（ループの中で作り直すため）。L238〜255（`chain-talk-interrupt`）・L78〜82（`external-control-events`）は触らない（OPEN QUESTION 1）。
+- Integration: `event/init.lua` の持ち場の約束は「L231〜236 と冒頭の説明」だが、act を作る L228〜229 も同じ塊として替える（ループの中で作り直すため）。L238〜255（`chain-talk-interrupt`）・L78〜82（`external-control-events`）は触らない（Design Decision 1）。
 - Validation: 鎖が空のイベントで、既存の Rust・Lua のテストが全部通ること。
 - Risks: OnSecondChange は毎秒届き、鎖の長さ＋1 個の act を作る。`SHIORI_ACT.new` は設定を 3 つ読む程度で、負担は小さい。
 
@@ -330,7 +330,7 @@ function EVENT.fire(req) end
 - `lua/shiori-events.md`:
   - 冒頭の処理の順（L15〜16）を「3. `REG:register` で重ねたハンドラ（鎖）を新しい順に呼ぶ／4. 全部見送れば `REG` のハンドラ／5. それも無ければシーン」にする。
   - REG の節: 返り値の表の後に「ハンドラを重ねる（`REG:register`）」の小節を足す。中身は書き方・外す関数・新しい順・鎖のハンドラの返り値の表（`nil`・`false`＝次へ、`true`＝止めて 204、文字列とコルーチン＝今の表のとおり、`""` も止まって 204、数・表も止まって 204）・ハンドラごとに新しい act・鎖の底・見張り役が無いこと・`＞自動トーク停止` と鎖の門の使い分け。L55「1 つのイベントに登録できるハンドラは 1 つである」は「`REG.X` に置けるハンドラは 1 つ（代入し直すと置き換わる）。重ねるときは `REG:register`」に改める。
-  - 包む段落（L81〜95）: 今の包み方を残したまま、鎖での書き換え例（毎秒の処理を足す例・`true` を返す一時的な門を外す例）を足す。L69〜79 は触らない。
+  - 包む段落（L81〜95）: 今の包み方を残したまま、鎖での書き換え例（毎秒の処理を足す例・`true` を返す一時的な門を外す例）を足す。L69〜79 は触らない（ただし `external-control-events` が先に main に入っていれば、L69 の「登録すると」を「代入すると」に 1 語だけ直す。Design Decision 6）。
   - フォールバックの図（L738〜750）: 先頭に鎖の段を足す。
 - `internals/execution-model.md` L157〜161・L174、`internals/shiori.md` L96・L314〜318・L358・L410〜413 を鎖を含む順に改める。
 - 作り直し: `node book/tools/gen-skill-refs.mjs`（CI の `--check` を通すため）。
@@ -381,10 +381,11 @@ function EVENT.fire(req) end
 
 - 移行は要らない。今の `REG.X = …` の代入と包み合いは、鎖の底としてそのまま動く。ghost_dev の書き換えは、マニュアルの書き換え例を手がかりに ghost_dev の側で行う（範囲外）。
 
-## Open Questions / Risks
+## Design Decisions（2026-10-23 設計ディスカッションで一括承認）
 
-1. **`event/init.lua` の持ち場の端**（仮定: L228〜236 をまとめて替える）。棚卸の約束は「L231〜236 と冒頭の説明」。ハンドラごとに act を作るため、L228〜229 の `local act = create_act(req)` もループへ移す必要がある。L238〜255（型判定・`chain-talk-interrupt`）とは間に空行とコメント行（`-- 型判定`）を残して触る。
-2. **`REG.register = 関数` の代入**（仮定: 守らず、内部の説明にだけ書く）。生のキーが `__index` より先に引かれるので、作者が `register` という ID のハンドラを `REG.register` に代入すると、以後 `REG:register` の口が隠れる。`__newindex` で止める案は、要件 1.6（代入を今と同じに働かせる）と引き換えになるので取らない。`register` という ID の底を置きたい作者はまず居ない。
-3. **内部の口の置き場所**（仮定: メタテーブルの `handlers` 欄、`getmetatable(REG).handlers(id)`）。`__index` に置くと `REG.handlers` が `nil` でなくなり、要件 1.6 に反する。モジュールを分ける案（research.md の Option B）は、読み直しで鎖が空にならないので取らない。
-4. **場所の表記の確かめ方**（仮定: Lua テストで理由の行にテストのファイルのチャンクと行が出ることを見る。`pasta_shiori` の e2e fixture（`runtime_error_balloon`）には鎖のケースを足さない）。`scripts/` の `.lua` のファイルと行に直す仕組み（`@pasta_chunks`）は鎖と無関係で、今の `REG` のハンドラの e2e が既に確かめている。
-5. **引数の誤りのメッセージの言葉**（仮定: 今の Lua の口に合わせ、英語の `REG:register: …` の形）。作者向けに日本語にするかは、ほかの Lua の口のメッセージと合わせて決める。
+1. **`event/init.lua` の持ち場の端**（決定: L228〜236 をまとめて替える。変数名 `act`・`result` は今のまま残し、L238〜255 の型判定の枝は 1 文字も変えない。ぶつかったら後から入る側が rebase で合わせる）。棚卸の約束は「L231〜236 と冒頭の説明」。ハンドラごとに act を作るため、L228〜229 の `local act = create_act(req)` もループへ移す必要がある。L238〜255（型判定・`chain-talk-interrupt`）とは間に空行とコメント行（`-- 型判定`）を残して触る。
+2. **`REG.register = 関数` の代入**（決定: 守らず、`internals/shiori.md` の `REG` の説明にだけ書く）。生のキーが `__index` より先に引かれるので、作者が `register` という ID のハンドラを `REG.register` に代入すると、以後 `REG:register` の口が隠れる。`__newindex` で止める案は、要件 1.6（代入を今と同じに働かせる）と引き換えになるので取らない。`register` という ID の底を置きたい作者はまず居ない。
+3. **内部の口の置き場所**（決定: メタテーブルの `handlers` 欄、`getmetatable(REG).handlers(id)`）。`__index` に置くと `REG.handlers` が `nil` でなくなり、要件 1.6 に反する。モジュールを分ける案（research.md の Option B）は、読み直しで鎖が空にならないので取らない。
+4. **場所の表記の確かめ方**（決定: Lua テストで理由の行にテストのファイルのチャンクと行が出ることを見る。`pasta_shiori` の e2e fixture（`runtime_error_balloon`）には鎖のケースを足さない）。`scripts/` の `.lua` のファイルと行に直す仕組み（`@pasta_chunks`）は鎖と無関係で、今の `REG` のハンドラの e2e が既に確かめている。
+5. **引数の誤りのメッセージの言葉**（決定: 今の Lua の口に合わせ、英語の `REG:register: …` の形。直し方 `(call as REG:register(id, fn))` を添える）。
+6. **マニュアル L69 の「登録すると置き換わる」**（決定: 新しい小節に「既定ハンドラが置き換わるのは `REG.X` への代入のときで、`REG:register` で重ねても既定は鎖の底に残る」と書く。実装のときに `external-control-events` が main に入っていれば、L69 の「登録すると」を「代入すると」に 1 語だけ直す。入っていなければ L69 は触らない）。
