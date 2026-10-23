@@ -151,27 +151,35 @@ from_loader_with_scene_dic
 
 ### イベントからシーンへ
 
-`SHIORI.request(req)`（`crates/pasta_lua/pasta_scripts/pasta/shiori/entry.lua`）から `EVENT.fire(req)` までの経路と、`EVENT.fire` の振り分け（コールバック・`REG`・シーン関数フォールバック）は [Lua 側の SHIORI エントリとイベント配送](shiori.md#lua-側の-shiori-エントリとイベント配送) で扱う。`EVENT.fire`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`）のうち、コルーチンを扱う部分の流れは次のとおりである。
+`SHIORI.request(req)`（`crates/pasta_lua/pasta_scripts/pasta/shiori/entry.lua`）から `EVENT.fire(req)` までの経路と、`EVENT.fire` の振り分け（コールバック・`REG:register` の鎖・`REG` の値・シーン関数フォールバック）は [Lua 側の SHIORI エントリとイベント配送](shiori.md#lua-側の-shiori-エントリとイベント配送) で扱う。`EVENT.fire`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`）のうち、コルーチンを扱う部分の流れは次のとおりである。
 
 ```text
 EVENT.fire(req)
  1. CALLBACK.try_route(req)          待っているコールバックなら再開して応答を返す（後述）
- 2. act = SHIORI_ACT.new(STORE.actors, req)          イベントごとに新しい ACT
- 3. STOP.hold_handler(act)                            渡す act を控える（止まるエラーの表記のため）
-    result = (REG[req.id] or EVENT.no_entry)(act)
- 4. result の型で分岐
+    CLOCK.observe(req)               時計の返事（OnPastaClock）を受け取った回は 204
+ 2. 鎖（REG:register）の写し getmetatable(REG).handlers(req.id) を新しい順に
+      act = SHIORI_ACT.new(STORE.actors, req)        ハンドラごとに新しい ACT
+      STOP.hold_handler(act)                          渡す act を控える（止まるエラーの表記のため）
+      result = fn(act)                                真の値ならここで止める
+ 3. 全部見送れば（鎖が空でも）底を呼ぶ
+      act = SHIORI_ACT.new(STORE.actors, req)
+      STOP.hold_handler(act)
+      result = (rawget(REG, req.id) or EVENT.no_entry)(act)    底の戻り値は真偽で見ない
+ 4. result の型で分岐（act は止めたハンドラか底のもの）
     thread  → ok, value = EVENT.drive(result, act, act)   後述の再開の手順
               ok が偽  → error(value)
               ok が真  → return RES.ok(value)        value が nil か "" なら 204
     string  → "SHIORI/" で始まる → return result     応答全体として包まずに返す
               それ以外           → return RES.ok(result)
-    その他  → return RES.no_content()                STORE.co_scene は触らない
+    その他  → return RES.no_content()                STORE.co_scene は触らない（鎖の true・数・表もここ）
 ```
+
+- 鎖の写しは呼ぶ前に 1 回だけ取る。ハンドラの中での登録・外しは、次のイベントから効く。見送ったハンドラの act は捨てるので、その台詞は応答に混ざらない。
 
 - 文字列の分岐は、先頭 7 文字が `SHIORI/` と等しいかで判定する。`RES` の関数で作った応答（`RES.err` の 500 など）を返したハンドラは、そのステータスのまま応答になる。
 - コルーチンの出力にはこの規則を適用しない。出力は接頭辞にかかわらず常に `RES.ok` の `Value` になる（`CALLBACK.try_route`・`CALLBACK.sweep` の出力も同じ）。
 
-ハンドラがコルーチンを返す経路は、シーン関数フォールバック（`EVENT.no_entry`）、既定の OnBoot・OnChoiceSelectEx・OnMouseDoubleClick・OnMouseMove・OnPastaScene・OnPastaSceneAt、OnSecondChange の仮想イベント（OnTalk・OnHour・シーンキック）と、コルーチンを返す利用者の `REG` ハンドラである。振り分けの詳細は [SHIORI 層](shiori.md) で、利用者から見た挙動は [SHIORI イベントとハンドラ](../lua/shiori-events.md#シーン関数フォールバック) で扱う。
+ハンドラがコルーチンを返す経路は、シーン関数フォールバック（`EVENT.no_entry`）、既定の OnBoot・OnChoiceSelectEx・OnMouseDoubleClick・OnMouseMove・OnPastaScene・OnPastaSceneAt、OnSecondChange の仮想イベント（OnTalk・OnHour・シーンキック）と、コルーチンを返す利用者のハンドラ（`REG:register` で重ねた鎖のハンドラと `REG` の値）である。振り分けの詳細は [SHIORI 層](shiori.md) で、利用者から見た挙動は [SHIORI イベントとハンドラ](../lua/shiori-events.md#シーン関数フォールバック) で扱う。
 
 ### シーンコルーチンの作り方
 
