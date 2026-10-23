@@ -662,7 +662,7 @@ raise_event(event = "OnPastaSceneAt", references = ["dic/boot.pasta", "42"])
 **引数**
 
 - Reference1 から、値の無い最初の Reference の手前までを、受け取った文字列のまま、順に引数として渡す。数に直すことはしない。空の文字列も 1 つの引数として渡す。
-- シーンを呼んだときは、Reference1 がシーン引数の `＄０`、Reference2 が `＄１` になる（[シーン引数](../grammar/variables.md#シーン引数)）。`GLOBAL` の関数を呼んだときは、`GLOBAL["名前"](act, Reference1, Reference2, …)` の形で呼ばれる。
+- シーンを呼んだときは、Reference1 がシーン引数の `＄０`、Reference2 が `＄１` になる（[シーン引数](../grammar/variables.md#シーン引数)）。`GLOBAL` の関数を呼んだときは、関数が `act, Reference1, Reference2, …` の順に引数を受け取る。
 
 **応答**
 
