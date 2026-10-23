@@ -101,7 +101,7 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
 ## Existing Spec Touchpoints
 
 - **Extends**: なし
-- **Adjacent**: `ponytail-shiori`（隙間の spec。unload がアクターのスレッドが DLL を出るまで待つ・FFI の型を C に合わせる。`windows.rs`・`actor/` を共有するので、同じウェーブに置かない）
+- **Adjacent**: `ponytail-shiori`（隙間の spec。SHIORI/3.0 の書き出しの型（`bool`→i32 の `BOOL`、`usize`→`c_long`）を直す。この spec も `windows.rs` を触るので、先に入るほうが直してよい。unload がアクターのスレッドが DLL を出るまで待つ・FFI の型を C に合わせる。`windows.rs`・`actor/` を共有するので、同じウェーブに置かない）
 
 ## Constraints
 

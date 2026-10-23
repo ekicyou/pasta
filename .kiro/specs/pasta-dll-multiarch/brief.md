@@ -61,6 +61,7 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 - **Upstream**:
   - `shiori4-v3-portable`。areka が x64・arm64 の pasta を読むのは shiori4 の入口（`shiori_get_api`）経由なので、それが無い x64 版を出しても areka では使えない
   - shiori4 の arch ごとの名前の決まり（abi-conventions の論点 12。2026-10-23 に確定）
+  - `ponytail-shiori`（隙間の spec）の「FFI の型を C に合わせる」。今の SHIORI/3.0 の書き出しは、`long` の所に `usize`・`&mut usize`、`BOOL` の所に Rust の `bool` を使っている（`crates/pasta_shiori/src/windows.rs`）。i686 では `usize` と `long` がどちらも 32bit なので表に出ないが、x64 では `usize` が 64bit になる。x64 版の `request` は、ホストの 32bit の `long` に 8 バイトを書いてしまう。x64 版を出す前に、型を `c_long`・`*mut c_long`・i32 の `BOOL` に直す必要がある（`ponytail-shiori` を先に入れるか、この spec で直す）。`bool` の戻り値も、2026-10-23 に shiori4 の `shiori3-legacy-host` の論点として挙がった（ホストは下位 1 バイトで読むのが推奨だが、正典は 32bit の BOOL）
 - **Downstream**: areka での x64・arm64 の実機確認
 
 ## Existing Spec Touchpoints
