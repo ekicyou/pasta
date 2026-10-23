@@ -1,6 +1,6 @@
 -- ============================================================================
--- REG:register で重ねたハンドラ（鎖）のテスト (reg-handler-chain 1.1)
--- Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 3.4, 4.1, 4.2, 4.3, 6.5, 7.1
+-- REG:register で重ねたハンドラ（鎖）のテスト (reg-handler-chain 1.1, 1.2)
+-- Requirements: 1.1-1.7, 2.1-2.4, 2.7, 2.9, 3.1, 3.3, 3.4, 4.1-4.3, 5.2, 6.3, 6.5, 7.1
 -- ============================================================================
 
 local describe = require("lua_test.test").describe
@@ -184,6 +184,110 @@ describe("REG:register - 引数の誤り", function()
         local ok, err = pcall(function() REG:register("OnTest", nil) end)
         expect(ok):toBe(false)
         expect(err:find("reg_handler_chain_test", 1, true) ~= nil):toBe(true)
+    end)
+end)
+
+--- 振り分けの関連モジュールを読み直し、REG を空にする（鎖も空になる）
+local function reload_event()
+    package.loaded["pasta.shiori.event"] = nil
+    package.loaded["pasta.shiori.event.callback"] = nil
+    package.loaded["pasta.shiori.event.register"] = nil
+    package.loaded["pasta.store"] = nil
+    package.loaded["pasta.shiori.event.boot"] = nil
+    package.loaded["pasta.shiori.event.second_change"] = nil
+
+    local REG = require("pasta.shiori.event.register")
+    require("pasta.store").reset()
+    for k in pairs(REG) do
+        REG[k] = nil
+    end
+    local EVENT = require("pasta.shiori.event")
+    return EVENT, REG
+end
+
+--- 200 の応答で Value が value か
+local function is_value(res, value)
+    return res:find("^SHIORI/3.0 200") ~= nil and res:find("Value: " .. value, 1, true) ~= nil
+end
+
+describe("EVENT.fire - 鎖の振り分け (1.2)", function()
+    test("鎖を新しい順に呼び、nil と false は見送り、真の値で止める", function()
+        local EVENT, REG = reload_event()
+        local calls = {}
+        REG:register("OnTest", function() calls[#calls + 1] = "oldest"; return "never" end)
+        REG:register("OnTest", function() calls[#calls + 1] = "stop"; return "stopped" end)
+        REG:register("OnTest", function() calls[#calls + 1] = "false"; return false end)
+        REG:register("OnTest", function() calls[#calls + 1] = "nil" end)
+        local bottom = false
+        REG.OnTest = function() bottom = true; return "bottom" end
+
+        local res = EVENT.fire({ id = "OnTest" })
+        expect(is_value(res, "stopped")):toBe(true)
+        expect(table.concat(calls, ",")):toBe("nil,false,stop")
+        expect(bottom):toBe(false)
+    end)
+
+    test("true で止めたら 204", function()
+        local EVENT, REG = reload_event()
+        REG:register("OnTest", function() return true end)
+        REG.OnTest = function() return "bottom" end
+
+        expect(EVENT.fire({ id = "OnTest" }):find("^SHIORI/3.0 204") ~= nil):toBe(true)
+    end)
+
+    test("全部見送れば底の REG[id] を呼び、その戻り値で応答する", function()
+        local EVENT, REG = reload_event()
+        REG:register("OnTest", function() end)
+        REG:register("OnTest", function() return false end)
+        REG.OnTest = function() return "bottom" end
+
+        expect(is_value(EVENT.fire({ id = "OnTest" }), "bottom")):toBe(true)
+    end)
+
+    test("register という ID でも底は生の値を引く", function()
+        local EVENT, REG = reload_event()
+        expect(EVENT.fire({ id = "register" }):find("^SHIORI/3.0 204") ~= nil):toBe(true)
+    end)
+
+    test("ハンドラと底は呼ぶたびに別の act を受け取る", function()
+        local EVENT, REG = reload_event()
+        local acts = {}
+        REG:register("OnTest", function(act) acts[#acts + 1] = act end)
+        REG:register("OnTest", function(act) acts[#acts + 1] = act end)
+        REG.OnTest = function(act) acts[#acts + 1] = act end
+
+        EVENT.fire({ id = "OnTest" })
+        expect(#acts):toBe(3)
+        expect(acts[1] ~= acts[2]):toBe(true)
+        expect(acts[2] ~= acts[3]):toBe(true)
+        expect(acts[1] ~= acts[3]):toBe(true)
+        expect(acts[3].req.id):toBe("OnTest")
+    end)
+
+    test("止まったときの表記の控えは止まったハンドラの act を指す", function()
+        local EVENT, REG = reload_event()
+        local STOP = require("pasta.shiori.stop")
+        local failed_act
+        REG:register("OnTest", function() error("older must not run") end)
+        REG:register("OnTest", function(act) failed_act = act; error("boom") end)
+        REG:register("OnTest", function() end)
+
+        local ok, err = pcall(EVENT.fire, { id = "OnTest" })
+        expect(ok):toBe(false)
+        expect(tostring(err):find("boom", 1, true) ~= nil):toBe(true)
+        expect(STOP.take_handler()):toBe(failed_act)
+    end)
+
+    test("鎖が空なら今と同じく底へ回る", function()
+        local EVENT, REG = reload_event()
+        REG.OnTest = function() return "bottom" end
+        expect(is_value(EVENT.fire({ id = "OnTest" }), "bottom")):toBe(true)
+        expect(EVENT.fire({ id = "OnUnknownForChain" }):find("^SHIORI/3.0 204") ~= nil):toBe(true)
+    end)
+
+    test("最後に読み直し、鎖の無い振り分けを残す", function()
+        local EVENT = reload_event()
+        expect(type(EVENT.fire)):toBe("function")
     end)
 end)
 
