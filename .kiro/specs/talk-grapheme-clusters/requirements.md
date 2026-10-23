@@ -90,7 +90,7 @@
 #### Acceptance Criteria
 1. While 台詞のテキストの単位でない部分が 1 コードポイントのクラスタだけでできている間, the pasta_sakura_script module shall `talk_to_script` と `break_lines` の出力と列の状態を、今の版と 1 文字も違わないものにする。
 2. The pasta_lua test suite shall 既存の `sakura_script` のテスト（単体・結合）の期待値を書き換えずに通る。
-3. When 半角カナと半角の濁点・半濁点（`ｶﾞ`・`ﾊﾟ` など、クラスタの規則で 1 つのクラスタになる並び）を含む台詞を変換したとき, the pasta_sakura_script module shall その並びを 1 つのクラスタとして扱う（ウェイトと改行をその間に入れない。今の `ｶ\_w[…]ﾞ\_w[…]` は `ｶﾞ\_w[…]` に変わる。この変化はマニュアルとリリースノートに書く）。
+3. When 半角カナと半角の濁点・半濁点（`ｶﾞ`・`ﾊﾟ` など、クラスタの規則で 1 つのクラスタになる並び）を含む台詞を変換したとき, the pasta_sakura_script module shall その並びを 1 つのクラスタとして扱う（ウェイトと改行をその間に入れない。既定の設定では `ﾞ` が行頭禁則なので、今の `ｶ\_w[…]ﾞ` は `ｶﾞ\_w[…]` に変わる。この変化はマニュアルとリリースノートに書く）。
 4. The pasta_sakura_script module shall `talk_to_script`・`break_lines` の Lua からの呼び方（引数と戻り値の形）を変えない。
 
 ### Requirement 6: 退行テストで約束を確かめる
