@@ -9,7 +9,7 @@
 - **直しの芯は 3 つ**。(1) その回の出力に台詞があったかの印、(2) 続きの置き換え（`set_co_scene`）の決まりの分岐、(3) `＊チェイントーク中断` の出力を、割り込んだシーンの出力の前に 1 本で組むこと。(1)(2) は既存の形に素直に乗る。(3) が設計の要点で、組み立ての順と `\e`・立ち位置・外見の状態の持ち越しをどう扱うかで案が分かれる。
 - **印はトークンの段で取るしかない**。トークンは `act.lua` の `ACT_IMPL.build`（L637〜656）で空にされ、`EVENT.drive` には組み立て済みの文字列しか届かない。文字列からは表情と台詞の区別が付かない。
 - **「はっきり捨てる」は 2 つのファイルで印を付け、続きの置き換えで読む**。キック（`shiori/event/kick.lua` の `wrap_local_func`・`wrap_reload_func`）とシーン再生（`shiori/event/scene_play.lua` の 2 つのハンドラ）は、どちらもコルーチンを返すだけで、ふつうの道（`EVENT.fire` → `EVENT.drive` → `set_co_scene`）を通る。
-- **既存テストの多くは残る見込み**。今の続きの更新のテストは、act を通らない素のコルーチンが文字列を出す形が多い。要件 1.7 の仮定（出力が空でなければ台詞に数える）なら、そのまま通る。仮定を変えると直すテストが増える。
+- **既存テストの多くは残る見込み**。今の続きの更新のテストは、act を通らない素のコルーチンが文字列を出す形が多い。要件 1.7（出力が空でなければ台詞に数える。2026-10-23 確定）なので、そのまま通る。
 - **規模は M・リスクは中**。6〜7 タスク（brief の見積もりどおり）。リスクは (3) の組み立てに集まる。
 
 ## 2. 今の仕組み（調べた所）
@@ -54,7 +54,7 @@
 ### 2.6 既存のテスト
 
 - 続きの更新を見ているもの: `event_coroutine_test.lua`・`integration_coroutine_test.lua`・`callback_module_test.lua`・`second_change_thread_test.lua`・`virtual_dispatcher_thread_test.lua`・`global_chaintalk_integration_test.lua`・`scene_play_event_test.lua`（と Rust の `tests/scene_play_event_test.rs`）・`kick_*_test.lua`・`auto_talk_pause_test.lua`・`virtual_dispatcher_pause_gate_test.lua` など。
-- 「古い続きが新しいシーンで捨てられる」テストの多くは、act を通らない素のコルーチンが `"new"`・`"second result"` などの文字列を出す（`event_coroutine_test.lua` L268〜298、`integration_coroutine_test.lua` L202〜240）。要件 1.7 の仮定なら台詞に数えるので、今のまま通る。
+- 「古い続きが新しいシーンで捨てられる」テストの多くは、act を通らない素のコルーチンが `"new"`・`"second result"` などの文字列を出す（`event_coroutine_test.lua` L268〜298、`integration_coroutine_test.lua` L202〜240）。要件 1.7 で台詞に数えるので、今のまま通る。
 - コールバックの枝: `callback_module_test.lua` L233〜235 などは、待ちに入ったシーンが続きに入らないことを見ている（今も `STORE.co_scene` は無い前提）。待ちに入るときに別の続きがあれば捨てる、を確かめるテストがあれば、要件 2.6 で直す対象になる（下の「調べが要る所」）。
 - 一覧は `tests/lua_specs/init.lua` に 1 行ずつ足す。
 
@@ -98,7 +98,7 @@
 | 5.1〜5.3 エラー | `EVENT.drive` の失敗の道 | **Constraint**: 失敗の道では中断を流さない。台詞を出した後のエラーも同じ |
 | 6.1 外から起こした `OnTalk` | `EVENT.no_entry` → `SCENE.co_exec` | なし（ふつうのイベント） |
 | 6.2 `OnPastaCallFunction` | まだ無い（`external-control-events`） | **Unknown**: あちらのハンドラがコルーチンを返す形なら、ふつうの道で効く |
-| 7 テスト | 2.6 のテスト群・`lua_test` のモック | **Missing**: 新しいテスト。**Unknown**: 直すテストの数（要件 1.7 の仮定次第） |
+| 7 テスト | 2.6 のテスト群・`lua_test` のモック | **Missing**: 新しいテスト。**Unknown**: 直すテストの数（要件 1.7 は確定済みで、少ない見込み） |
 | 8 マニュアル・スキル | 2.7 の各所・`gen-skill-refs.mjs` | **Missing**: 書き直し。**Constraint**: スキルの references の書き込みが分類器に止められることがある（6 章） |
 
 ## 4. 実装の案
@@ -126,8 +126,8 @@
 | キック・シーン再生の印がある | 捨てる（区切れば新しい残りを置く） | 流さない |
 | 別のシーン・台詞あり | 捨てる（区切れば新しい残りを置く） | 流す |
 | 別のシーン・台詞なし・最後まで動いた | 残す | 流さない |
-| 別のシーン・台詞なし・区切った | 残す（新しい残りは捨てる。仮定） | 流さない |
-| 別のシーン・台詞なし・コールバック待ちに入った | 残す（仮定） | 流さない |
+| 別のシーン・台詞なし・区切った | 残す（新しい残りは捨てる。確定） | 流さない |
+| 別のシーン・台詞なし・コールバック待ちに入った | 残す（確定） | 流さない |
 
 - 書き換えは `event/init.lua` の L97〜208 の中に収まる（brief の約束）。`EVENT.fire` は触らない。
 - `coroutine.close` の分岐は残したまま（整理は `ponytail-lua-scripts`）。
