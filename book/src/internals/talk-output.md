@@ -61,8 +61,8 @@ pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_n
 | ---------------------- | ---- |
 | `pasta.act`（`crates/pasta_lua/pasta_scripts/pasta/act.lua`） | トークンの蓄積（`talk`・`sakura_script`・`raw_script`・`surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout`・`set_spot`・`clear_spot`）と、`build` の前処理（局所関数 `group_by_actor`・`merge_consecutive_talks`） |
 | `pasta.actor`（`crates/pasta_lua/pasta_scripts/pasta/actor.lua`） | アクタープロキシ。`act:actor_proxy("アクター")` などで得たプロキシの `:talk(…)`・`:sakura_script(…)` を、アクターを添えた ACT の `talk`・`sakura_script` に委ねる |
-| `pasta.shiori.act`（`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`） | `pasta.act` を継承し、`build` を「`ACT_IMPL.build` でグループ化トークンを得て `BUILDER.build` に渡す」処理に差し替える。`spot_newlines`・`choice_newlines`・`after_choice_newlines` は `[ghost]` から読む |
-| `pasta.shiori.sakura_builder`（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`） | グループ化トークンをさくらスクリプト文字列にする `BUILDER.build` |
+| `pasta.shiori.act`（`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`） | `pasta.act` を継承し、`build` を「`ACT_IMPL.build` でグループ化トークンを得て `BUILDER.build` に渡す」処理に差し替える。`spot_newlines`・`choice_newlines`・`after_choice_newlines` は `[ghost]` から読む。渡す前に `BUILDER.speaks` で台詞の有無を見て act の欄 `_spoke` を立て、チェイントークの割り込みでは中断のシーンのグループ化トークンと差し替える（[ランタイム実行モデル](execution-model.md#台詞の印と中断のシーン)） |
+| `pasta.shiori.sakura_builder`（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`） | グループ化トークンをさくらスクリプト文字列にする `BUILDER.build` と、字のある `talk` か `choice` があるかを答える `BUILDER.speaks`（`talk` の字の判定は下の `has_text`） |
 | `pasta.shiori.appearance`（`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`） | 外見状態の生成（`APPEARANCE.new`）・観測（`APPEARANCE.observe`）・復旧（`APPEARANCE.restore`）と、さくらスクリプトの単位の読み取り（`APPEARANCE.tag_at`。ビルダーが字の判定と `\c` の読み取りに使う）。状態を持たず、渡された状態の表をその場で更新する。`STORE` や `@pasta_*` を `require` しない |
 | `pasta.shiori.actor_style`（`crates/pasta_lua/pasta_scripts/pasta/shiori/actor_style.lua`） | 装いの状態の生成（`STYLE.new`）、話者の切り替えで出す戻すタグと装いのタグ（`STYLE.switch`）、内側のトークンの `\c`・`\x` の後の出し直し（`STYLE.through`）。状態を持たず、渡された状態の表をその場で更新する。タグの読み取りは `APPEARANCE.tag_at` だけを使い、`STORE` や `@pasta_*` を `require` しない |
 | `pasta.buf`（`crates/pasta_lua/pasta_scripts/pasta/buf.lua`） | 組立に使う文字列バッファ。LuaJIT の `string.buffer` があればそれを、無ければ同じ `put`・`tostring` を持つ最小実装を使う |
@@ -74,7 +74,7 @@ pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_n
 | ファイル | 役割 |
 | -------- | ---- |
 | `crates/pasta_lua/src/sakura_script/mod.rs` | `@pasta_sakura_script` のモジュール表を作る `register`。`talk_to_script` と `break_lines` の実装、アクター表からのウェイト値と改行の規則（`budoux`・`budoux_newlines`・`budoux_jump`）の読み取り、`talk_to_script` の 3 つ目の引数（行の状態の表）の読み書き |
-| `crates/pasta_lua/src/sakura_script/tokenizer.rs` | `Tokenizer`（さくらスクリプトの単位（タグ・エスケープ・囲み）の正規表現 `SAKURA_TAG_PATTERN` と文字の集合 `CharSets`）と、文字の種類 `TokenKind` |
+| `crates/pasta_lua/src/sakura_script/tokenizer.rs` | `Tokenizer`（さくらスクリプトの単位（タグ・エスケープ・囲み）の正規表現 `SAKURA_TAG_PATTERN` と文字の集合 `CharSets`）と、文字の種類 `TokenKind`、クラスタを切り出す `next_cluster` |
 | `crates/pasta_lua/src/sakura_script/wait_inserter.rs` | ウェイト値 `WaitValues` と、トークン列に `\_w[ms]` を挿入する `insert_waits` |
 | `crates/pasta_lua/src/sakura_script/line_breaker.rs` | budoux の分かち書きで改行を挿入する `break_lines_impl`。行の状態 `Column`、改行の規則 `BreakRule`、行を動かす単位の見分け（局所の `column_move` と動き `ColumnMove`） |
 
@@ -218,22 +218,22 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 `talk_to_script(actor, talk, column)` は、`talk` が `nil` か空文字列なら空文字列を返す（`column` は書き換えない）。それ以外は次の順に処理する。
 
 1. **ウェイト値の決定**: `actor` が表なら、その直下の `script_wait_normal`・`script_wait_period`・`script_wait_comma`・`script_wait_strong`・`script_wait_leader` を整数として読み、読めないキーは登録時の既定値（`[talk]` の値、無ければ `TalkConfig` の既定値）を使う。表でなければ既定値だけを使う。
-2. **トークナイザ**: 文字列を先頭から走査する。`\` の位置で `SAKURA_TAG_PATTERN` に一致すれば、その一致を 1 つの単位として `TokenKind::SakuraScript` のトークンにし、そうでなければ 1 文字を `CharSets::classify` で分類する。分類の優先順は句点・読点・強調・リーダー・行頭禁則・行末禁則で、どれにも当たらなければ一般の文字である。`SAKURA_TAG_PATTERN` は次の 3 つの選択肢を持ち、左の選択肢を優先する。
+2. **トークナイザ**: 文字列を先頭から走査する。`\` の位置で `SAKURA_TAG_PATTERN` に一致すれば、その一致を 1 つの単位として `TokenKind::SakuraScript` のトークンにし、そうでなければ 1 文字を `CharSets::classify` で分類する。ここの「1 文字」は拡張書記素クラスタ（見た目の 1 文字。`🙆‍♀️` のような組み合わせの絵文字や結合文字の付いた文字、`ｶﾞ` のような半角カナと半角の濁点の並びを含む）で、`tokenizer.rs` の `next_cluster` が切り出す。`next_cluster` は、クラスタの 2 つ目以降のコードポイントに `\` があればその手前で切り、単位の `\` をクラスタに含めない。`classify(&str)` は、クラスタの全体で優先順に全種類の集合を引き、どれにも当たらなければ先頭のコードポイントで同じ順に引く。2 つ目以降のコードポイントでは引かない。集合（`CharSets` の各フィールド、`HashSet<String>`）は、`chars_*` の文字列をクラスタに分けた項目と、各コードポイントの項目の和である。分類の優先順は句点・読点・強調・リーダー・行頭禁則・行末禁則で、どれにも当たらなければ一般の文字である。`SAKURA_TAG_PATTERN` は次の 3 つの選択肢を持ち、左の選択肢を優先する。
    1. 囲み: `\_?` から次の `\_?` まで（最短一致）と、`\_!` から次の `\_!` まで。`(?s)` を付けてあるため、途中に改行文字があっても読みは変わらない。
    2. エスケープ: `\\` と `\%`。
    3. タグ: `\` に続けて、`s`・`p`・`b` と数字 1 桁（0〜9）、`w` と数字 1 桁（1〜9）、または `_` 0〜2 個と名前の 1 文字（`[0-9A-Za-z!+*?&-]`）。最後の形だけが、直後の `[` から始まる引数を取れる。引数は `,` で区切った並びで、引数の中では `\` と続く 1 文字を組として読み、引数の先頭の `"` から次の `"` まで（中の `""` は 1 文字）を引用として読む。エスケープも引用もされていない `]` で閉じ、閉じなければ名前までがタグになる。
 
-   名前の後ろの文字は一致に入らず、通常の文字として分類する（`\nHello` は `\n` と `Hello`、`\n!?` は `\n` と強調の `!?`）。エスケープはタグより先の選択肢のため、`C:\\new` は `\\` と `new` の文字になり、`\n` のタグにはならない。どの選択肢にも一致しない `\`（`\あ` の `\`、末尾の `\`）は 1 文字として分類する。ウェイト挿入（`wait_inserter.rs` の `append_with_per_char_wait`）は、その `\` の直後にウェイトを入れない（入れると `\\` のエスケープになるため）。囲みは、1 回の `talk_to_script` に渡したテキストの中でだけ読まれる。単位はすべて `TokenKind::SakuraScript` であるため、ウェイトは付かず、budoux 改行の幅にも数えない。
-3. **ウェイト挿入**（`insert_waits`）: 単位（タグ・エスケープ・囲み）と行末禁則の文字はそのまま出力する。一般の文字とリーダーは 1 文字ごとに `\_w[値 - 50]` を後ろに付ける。句点・読点・強調・行頭禁則は連続する並びとしてためておき、並びが途切れたところで、並びの中の最大値から 50 を引いたウェイトを 1 つだけ付ける（行頭禁則の文字は自分の値を持たず、並びを延ばすだけである）。計算したウェイトが 0 以下なら付けない。
+   名前の後ろの文字は一致に入らず、通常の文字として分類する（`\nHello` は `\n` と `Hello`、`\n!?` は `\n` と強調の `!?`）。エスケープはタグより先の選択肢のため、`C:\\new` は `\\` と `new` の文字になり、`\n` のタグにはならない。どの選択肢にも一致しない `\`（`\あ` の `\`、末尾の `\`）は 1 文字として分類する。ウェイト挿入（`wait_inserter.rs` の `append_with_wait`）は、テキストがちょうど `\` のトークンの直後にウェイトを入れない（入れると `\\` のエスケープになるため）。囲みは、1 回の `talk_to_script` に渡したテキストの中でだけ読まれる。単位はすべて `TokenKind::SakuraScript` であるため、ウェイトは付かず、budoux 改行の幅にも数えない。
+3. **ウェイト挿入**（`insert_waits`）: 単位（タグ・エスケープ・囲み）と行末禁則の文字はそのまま出力する。一般の文字とリーダーはトークン（クラスタ）1 つごとに `\_w[値 - 50]` を 1 つ後ろに付ける（`append_with_wait`）。クラスタの途中には付けない。句点・読点・強調・行頭禁則は連続する並びとしてためておき、並びが途切れたところで、並びの中の最大値から 50 を引いたウェイトを 1 つだけ付ける（行頭禁則の文字は自分の値を持たず、並びを延ばすだけである）。計算したウェイトが 0 以下なら付けない。
 4. **改行の規則の読み取り**（`read_actor_break`）: `actor` が表で、`budoux` が表なら整数の配列として読む。それが空でないときだけ、`budoux_newlines`（数値。`nil` なら無し）と `budoux_jump`（表なら整数の配列、表でなければ空）を読む。`budoux_newlines` から改行の文字列を作る（`newline_for_ratio`。100 倍して切り捨てた `N` が 100 か、値が無ければ `\n`、それ以外は `\n[N]`）。
 5. **budoux 改行**: `budoux` が空でない配列か、`column` が表なら、ウェイト挿入後の文字列に `break_lines_impl` を適用する。`column` が表ならその `line`・`width`・`jump` を始めの状態として読み（無いフィールドは 1・0・偽）、無ければ新しい状態（`Column::default()`）から数える。適用が終わった後にだけ、終わりの状態を `column` に書き戻す。どちらでもなければ、ウェイト挿入後の文字列をそのまま返す。
 
 `break_lines_impl(文字列, 改行の規則, 行の状態, タグの正規表現, パーサ)` は、改行の規則 `BreakRule`（`widths`・`jump_widths`・`newline`）に従って改行を入れ、行の状態 `Column`（`line`・`width`・`jump`）をその場で書き換える。
 
-1. タグの正規表現（`talk_to_script`・`break_lines` からはトークナイザの `SAKURA_TAG_PATTERN`。一致した単位は、タグ・エスケープ・囲みのどれでもタグとして扱う）で文字列を「先頭のタグ列」と「本文の文字と、その直後に続くタグ列の組」の並びに分ける。このとき、単位ごとに行の動き（`ColumnMove`）を見分けて記録する。`\n` ちょうどと `\n[` で始まる単位は `Next`（次の行）、`\c` ちょうどの単位は `First`（最初の行）、`\_l[` で始まる単位は `Jump`（飛ぶ）で、ほかの単位は行を動かさない。囲みとエスケープは単位の先頭が違うため、中に `\n` などがあっても動かない。
+1. タグの正規表現（`talk_to_script`・`break_lines` からはトークナイザの `SAKURA_TAG_PATTERN`。一致した単位は、タグ・エスケープ・囲みのどれでもタグとして扱う）で文字列を「先頭のタグ列」と「本文の文字と、その直後に続くタグ列の組」の並びに分ける。本文の文字は、トークナイザと同じ `next_cluster` で切り出したクラスタである。幅は局所関数 `cluster_width` で数える。1 コードポイントのクラスタはその文字の東アジアの幅（`UnicodeWidthChar::width_cjk`）、`\r\n` は 0、それ以外は文字列の東アジアの幅（`UnicodeWidthStr::width_cjk`。`🙆‍♀️` は 2）である。分けるときに、単位ごとに行の動き（`ColumnMove`）を見分けて記録する。`\n` ちょうどと `\n[` で始まる単位は `Next`（次の行）、`\c` ちょうどの単位は `First`（最初の行）、`\_l[` で始まる単位は `Jump`（飛ぶ）で、ほかの単位は行を動かさない。囲みとエスケープは単位の先頭が違うため、中に `\n` などがあっても動かない。
 2. 先頭のタグ列の動きを順に当てる。`Next` は `line` に 1 を足し、`First` は `line` を 1・`jump` を偽にし、`Jump` は `jump_widths` が空でなければ `line` を 1・`jump` を真にする（空なら `line`・`jump` を変えない）。どの動きも `width` を 0 にする。
 3. `widths` が空か本文の文字が無ければ、本文の文字の幅を `width` に足しながら各文字の後ろの動きを当てるだけで、入力をそのまま返す（`budoux` の無いアクターでも行の状態は進む）。
-4. 本文の文字だけをつないだ文字列を budoux で語に分け、語を、後ろに行の動きがある文字の所で「かけら」に割る。語の頭のかけらは、`width` が 0 でなく、かけらの幅（`UnicodeWidthChar::width_cjk`。全角は 2）を足すと今の行の上限を超えるときに、その前を改行位置にして `Next` を当てる。かけらの幅を `width` に足し、かけらの最後の文字の後ろの動きを順に当てる。タグの後ろのかけらは行の頭なので、幅を足すだけである。1 語だけで上限を超える場合は改行しない。
+4. 本文の文字だけをつないだ文字列を budoux で語に分ける。budoux の区切りのうち、文字の先頭に当たるものだけを語の境界にし、文字の途中の区切りは捨てて前後を 1 語にする（クラスタの途中では改行しない）。語を、後ろに行の動きがある文字の所で「かけら」に割る。語の頭のかけらは、`width` が 0 でなく、かけらの幅（局所関数 `cluster_width` の和。全角は 2）を足すと今の行の上限を超えるときに、その前を改行位置にして `Next` を当てる。かけらの幅を `width` に足し、かけらの最後の文字の後ろの動きを順に当てる。タグの後ろのかけらは行の頭なので、幅を足すだけである。1 語だけで上限を超える場合は改行しない。
 5. 今の行の上限は、`jump` が真で `jump_widths` が空でなければ `jump_widths`、それ以外は `widths` の `line` 番目の値で、配列の最後の値がそれ以降の行に使われる。
 6. 改行位置の直前の文字が、後ろに単位の無い単独の `\` なら、改行位置をその `\` の前へ移し（`\` は新しい行に数え直す）、`\` が行の頭にあるなら改行しない（`\` の直後に改行を入れると `\\` に読まれるため）。
 7. 先頭のタグ列を出力し、各文字の前に必要なら `newline` を、各文字の後ろにその文字に続いていたタグ列を出力して組み立て直す。タグは幅に数えず、途中に改行が入ることもなく、元の相対位置に残る。

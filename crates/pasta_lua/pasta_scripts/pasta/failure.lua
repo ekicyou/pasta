@@ -19,6 +19,8 @@ FAILURE.LABEL = {
     SCENE_NOT_FOUND    = "シーンが見つからない",
     SCRIPT_ERROR       = "スクリプトのエラー",
     TIMEOUT            = "時間切れ",
+    NOT_JSON           = "JSON として読めない値",
+    NOT_ASSIGNABLE     = "代入できない値",
 }
 
 local ESCAPE = { ["\\"] = "\\\\", ["%"] = "\\%", ["\r"] = " ", ["\n"] = " " }

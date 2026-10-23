@@ -31,7 +31,7 @@
 - ローダの段階構成の中でソースマップを作る位置（段階 5.5）は [起動の段階構成](loader.md#起動の段階構成) で、基準ディレクトリを `canonicalize` せず `std::path::absolute` で絶対化する理由（チャンク名とキャッシュのパスの一致）は [モジュール検索パス](loader.md#モジュール検索パス) で扱う。
 - VM の構築順序の中で `debug::enable` とシーン identity 索引の突合が入る位置は [VM の構築とモジュール登録](execution-model.md#vm-の構築とモジュール登録) で扱う。
 - `ActorMsg::Kick` が mailbox を通ってアクタースレッドで `SHIORI.kick` になるまでは [アクタースレッドのメッセージループ](shiori.md#アクタースレッドのメッセージループ) で、`STORE.kick_force` を消費する仮想イベントディスパッチャの判定順は [仮想イベントディスパッチャ（OnTalk・OnHour）](shiori.md#仮想イベントディスパッチャontalkonhour) で扱う。
-- キックしたシーンのコルーチンが応答になり `STORE.co_scene` を置き換える流れは [継続トーク（チェイントーク）と co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新) で扱う。
+- キックしたシーンのコルーチン（`wrap_local_func`・`wrap_reload_func` が `STORE.co_preempt` の印を付けて作る）が応答になり、台詞の有無によらず中断中の `STORE.co_scene` を捨てる（区切れば自分の残りが続きになる）流れは [継続トーク（チェイントーク）と co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新) で扱う。
 - `OnPastaScene`・`OnPastaSceneAt` の引数・探し方・失敗の出方・デバッグが有効なときだけ動くことは、利用者向けの [OnPastaScene](../lua/shiori-events.md#onpastascene名前でシーンを再生)・[OnPastaSceneAt](../lua/shiori-events.md#onpastasceneat位置でシーンを再生)・[シーンを再生するイベントの共通の決まり](../lua/shiori-events.md#シーンを再生するイベントの共通の決まり) が正である。名前での探し方の仕組みは [前方一致による候補の収集](registry-search.md#前方一致による候補の収集) で、コルーチンを作る `SCENE.co_exec_exact`・`SCENE.co_exec_registered` は [co_exec_exact](internal-modules.md#co_exec_exact)・[co_exec_registered](internal-modules.md#co_exec_registered) で扱う。
 
 ## 構成要素

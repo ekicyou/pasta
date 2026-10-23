@@ -124,7 +124,7 @@ fn test_classify_priority_leader_wins_over_line_start_prohibited() {
     // first, so Leader must win.
     let char_sets = CharSets::from_config(&TalkConfig::default());
 
-    assert_eq!(char_sets.classify('･'), TokenKind::Leader);
+    assert_eq!(char_sets.classify("･"), TokenKind::Leader);
 }
 
 #[test]
@@ -133,7 +133,7 @@ fn test_classify_halfwidth_comma_is_line_start_prohibited() {
     // chars_comma ("、，,"), so it must classify as LineStartProhibited.
     let char_sets = CharSets::from_config(&TalkConfig::default());
 
-    assert_eq!(char_sets.classify('､'), TokenKind::LineStartProhibited);
+    assert_eq!(char_sets.classify("､"), TokenKind::LineStartProhibited);
 }
 
 // ============================================

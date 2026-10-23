@@ -404,6 +404,24 @@ local function export_columns(out, columns)
     end
 end
 
+--- まとめたトークン列に、字のある台詞か選択肢があるか（chain-talk-interrupt 1.2）。
+--- 台詞は talk のトークンで、テキストに字が出るもの（has_text。組み立ての段落の区切りと同じ判定）。
+--- 表情の単語（字が \s[5] だけの talk）・空の talk・sakura_script・raw_script（失敗の表記を含む）・
+--- surface・wait・newline・clear・choice_timeout・spot・clear_spot は数えない
+--- @param groups table[] グループ化されたトークン配列（ACT_IMPL.build の戻り値）
+--- @return boolean
+function BUILDER.speaks(groups)
+    for _, token in ipairs(groups) do
+        -- talk と choice はアクターのグループの中にだけ入る
+        for _, inner in ipairs(token.type == "actor" and token.tokens or {}) do
+            if inner.type == "choice" or (inner.type == "talk" and emits_text(inner)) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 --- グループ化されたトークン配列をさくらスクリプト文字列に変換
 --- @param grouped_tokens table[] グループ化されたトークン配列
 --- @param config BuildConfig|nil 設定

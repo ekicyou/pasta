@@ -20,6 +20,7 @@
 --- @field appearance table 外見状態（セッション常駐・非永続）
 --- @field auto_talk_paused boolean 自動トークを止めている印（セッション常駐・非永続・既定 false）
 --- @field co_callback thread|nil コールバック待ちとして登録したコルーチンの印（下記参照）
+--- @field co_preempt table<thread, true> 開発者が指名した再生（キック・シーン再生）のコルーチンの印
 local STORE = {}
 
 --- アクターキャッシュ（名前→アクター）
@@ -62,6 +63,12 @@ STORE.appearance = { actors = {}, spots = {}, owners = {}, last_spots = {} }
 --- 継続用コルーチン（OnTalkチェイントーク用）
 --- @type thread|nil
 STORE.co_scene = nil
+
+--- 開発者が指名した再生（キック・シーン再生）のコルーチンの印（コルーチン→true）
+--- 印の付いたコルーチンが区切れば、止まっている続きをはっきり捨てる。
+--- キーを弱い参照にするので、捨てたコルーチンは GC で消える。
+--- @type table<thread, true>
+STORE.co_preempt = setmetatable({}, { __mode = "k" })
 
 --- 最後に実行したグローバルシーン名（選択肢コールバックルーティング用）
 --- @type string|nil
@@ -110,6 +117,7 @@ function STORE.reset()
     STORE.kick_pending = nil
     STORE.kick_force = false
     STORE.auto_talk_paused = false
+    STORE.co_preempt = setmetatable({}, { __mode = "k" })
 end
 
 -- CONFIG.actor からの初期化

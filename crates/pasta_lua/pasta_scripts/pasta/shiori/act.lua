@@ -16,6 +16,9 @@ local STORE = require("pasta.store")
 --- @field _choice_newlines number 字の後の選択肢の前の改行幅（デフォルト1.5）
 --- @field _after_choice_newlines number 選択肢の後の改行幅（デフォルト1.0）
 --- @field req ShioriRequest|nil SHIORIリクエストオブジェクト（読み取り専用として扱うこと）
+--- @field _spoke boolean|nil この再開の間に組み立てた出力に台詞があったか（nil は組み立てていない、false は組み立てて台詞なし）
+--- @field _on_speech (fun(act: table): table[]|nil)|nil 台詞を見つけたときに呼ぶ中断の流し方（割り込みのときだけ掛かる）
+--- @field _interrupted boolean|nil この再開で中断の台詞を反応の代わりに出したか
 local SHIORI_ACT = {}
 
 --- SHIORI_ACT実装メタテーブル
@@ -66,9 +69,25 @@ function SHIORI_ACT_IMPL.build(self)
     -- 親のbuild()でトークン取得＆リセット
     local token = ACT.IMPL.build(self)
 
+    -- 台詞の印: 同じ再開の中では一度立てたら落とさない (chain-talk-interrupt)
+    local spoke = token ~= nil and BUILDER.speaks(token)
+    self._spoke = self._spoke or spoke
+
     -- 早期リターン: ACT.IMPL.build()がnilを返した場合はnilを返す (act-build-early-return)
     if token == nil then
         return nil
+    end
+
+    -- 割り込みが台詞を出すなら、中断のトークン列と差し替える（割り込んだ側は文字列にしない）
+    local on_speech = self._on_speech
+    if spoke and on_speech then
+        -- 呼ぶ前に外す: 中断のシーンの組み立てから入れ子に呼ばせない (3.8)
+        self._on_speech = nil
+        local head = on_speech(self)
+        if head then
+            token = head
+            self._interrupted = true
+        end
     end
 
     -- STORE.actor_spots・STORE.appearanceを直接BUILDER.build()に渡す（直接変更方式）

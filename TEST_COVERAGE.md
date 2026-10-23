@@ -13,7 +13,7 @@
 | --------------------------------------- | -------------------------------------------------------------------------------------- | ------ | -------- |
 | 日本語フレンドリー（全角キーワード）    | `transpiler_basic_test.rs`<br>`transpiler_comparison_test.rs`                          | ✅ 完了 | 24       |
 | UNICODE識別子（日本語シーン名・変数名） | `japanese_identifier_test.rs`<br>`ucid_test.rs`                                        | ✅ 完了 | 2<br>3   |
-| yield型エンジン（継続出力）             | `transpiler_basic_test.rs`<br>`global_chaintalk_*_test.lua`<br>`runtime_scene_test.rs` | ✅ 完了 | 13       |
+| yield型エンジン（継続出力）             | `transpiler_basic_test.rs`<br>`global_chaintalk_*_test.lua`<br>`runtime_scene_test.rs`<br>`lua_specs/chain_talk_interrupt_test.lua`<br>`chain_talk_interrupt_test.rs` | ✅ 完了 | 13<br>37<br>3 |
 | 宣言的フロー（Call制御）                | `transpiler_scene_test.rs`                                                             | ✅ 完了 | -        |
 
 ---
@@ -109,6 +109,7 @@
 | さくらスクリプト記号タグトークナイズ  | `tokenizer.rs` 内テスト                                           | ✅ 完了 | 6テスト（`-+*?&` タグ認識）                                      |
 | タグの読み取りの 3 か所の一致         | `sakura_script/conformance_test.rs`<br>`tokenizer.rs` 内 `test_tag_pattern_table` | ✅ 完了 | 38 事例の表を Rust・Lua（`APPEARANCE.tag_at`）・DSL の 3 つに通す＋正規表現の表 31 事例（paragraph-break-tag-only-talk） |
 | タグ・エスケープ・囲みとウェイト・改行 | `sakura_script/edge_case_test.rs`<br>`sakura_script/budoux_test.rs` | ✅ 完了 | タグ直後の字のウェイト・`\%`/囲み/引数の中に何も入らない・単位にならない `\` の直後にウェイトを入れない（paragraph-break-tag-only-talk） |
+| 書記素クラスタ単位のウェイト・改行   | `sakura_script/grapheme_test.rs`                                  | ✅ 完了 | 絵文字・結合文字の途中にウェイトも改行も入らない・`chars_*` の判定・budoux の幅・特性化テスト（talk-grapheme-clusters） |
 | 段落区切りの字の判定                  | `sakura_builder_test.lua`<br>`shiori_act_test.lua`<br>`appearance_test.lua` | ✅ 完了 | 申し送り (a)(b)・字の境界 28 件・保留中の改行・スクリプト API 経路、外見の観測の正確な名前の判定と囲み（paragraph-break-tag-only-talk） |
 | EVENT.fire コルーチン対応             | `event_coroutine_test.lua`                                        | ✅ 完了 | 17テスト（resume_until_valid含む、callback-resume-unification追加1） |
 | resume_until_valid nil yieldスキップ  | `event_coroutine_test.lua`                                        | ✅ 完了 | 6テスト（coroutine-resume-loop）                                 |

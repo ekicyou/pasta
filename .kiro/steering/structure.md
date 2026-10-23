@@ -159,13 +159,14 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │           │   ├── integration_test.rs
 │           │   ├── module_test.rs
 │           │   └── stack_level_test.rs
-│           ├── sakura_script/       # SakuraScript関連テスト（6 files）
+│           ├── sakura_script/       # SakuraScript関連テスト（7 files）
 │           │   ├── main.rs
 │           │   ├── backslash_break_test.rs
 │           │   ├── basic_test.rs
 │           │   ├── budoux_test.rs
 │           │   ├── conformance_test.rs
 │           │   ├── edge_case_test.rs
+│           │   ├── grapheme_test.rs  # 書記素クラスタ単位のウェイト・改行・幅
 │           │   └── output_test.rs
 │           ├── search/              # 検索関連テスト（2 files）
 │           │   ├── main.rs
@@ -334,7 +335,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 
 ### ファイルサイズ方針（俯瞰可能性）
 
-- **目安上限 600 行**: Rust ソース・テストファイルは 1 ファイルあたり概ね 600 行未満を保つ（`oversized-file-decomposition` で全ファイルを俯瞰可能サイズへ振る舞い不変分解した。2026-10-18 の時点で、1,000 行を超えるのは `pasta_lua` の `sakura_script/line_breaker.rs`（1,134 行。本体は約 290 行で、残りはテスト）と `pasta_check` の `balloon.rs`（1,070 行。後半はテスト）の 2 つ。600 行を超えるファイルは 30 近くある）。
+- **目安上限 600 行**: Rust ソース・テストファイルは 1 ファイルあたり概ね 600 行未満を保つ（`oversized-file-decomposition` で全ファイルを俯瞰可能サイズへ振る舞い不変分解した。2026-10-18 の時点で、1,000 行を超えるのは `pasta_lua` の `sakura_script/line_breaker.rs`（1,155 行。本体は約 310 行で、残りはテスト）と `pasta_check` の `balloon.rs`（1,070 行。後半はテスト）の 2 つ。600 行を超えるファイルは 30 近くある）。
 - **分解の方向**: 肥大化したファイルは、フラットな単一ファイル → 同名のディレクトリモジュール（`mod.rs` + 責務別サブモジュール）へ展開する。例: `debug/dap.rs` → `debug/dap/{mod,codec,decode,encode,pending,resolver}.rs`。
 - **不変条件**: 分解はあくまで振る舞い不変（pub API・テスト結果を変えない）。新規実装でこの上限のために責務をまたぐ分割をしない。
 
@@ -403,6 +404,7 @@ pasta_dsl（パーサー） + pasta_core（レジストリ）
 | Loader       | スクリプト読み込み  | `loader_integration_test.rs`     |
 | Registry     | 型管理、独立性      | `scene_search_test.rs`           |
 | Control Flow | Call、最適化        | `transpiler_snapshot_test.rs`    |
+| SakuraScript | 書記素クラスタ単位のウェイト・改行 | `sakura_script/grapheme_test.rs` |
 
 ### テストファイル配置
 - `crates/<crate>/tests/<feature>_test.rs`: 統合テスト

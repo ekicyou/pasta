@@ -1,6 +1,6 @@
 # Brief: talk-grapheme-clusters
 
-> **ステータス**: 未着手（2026-10-18 の `/kiro-discovery` で起票）。版は開発者が決める（推奨は 0.4.2。致命的でない不具合）。着手するときは `/kiro-start talk-grapheme-clusters` で開始する。
+> **ステータス**: 要件確定（2026-10-23）。版は 0.4.2（2026-10-23 開発者の決定）。正規化はしない。次は `/kiro-design talk-grapheme-clusters`。
 
 ## Problem
 

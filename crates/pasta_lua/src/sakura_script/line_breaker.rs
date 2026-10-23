@@ -3,8 +3,9 @@
 //! Inserts sakura script line break tags (`\n`) at natural Japanese word
 //! boundaries while transparently preserving sakura script tags.
 
+use super::tokenizer::next_cluster;
 use regex::Regex;
-use unicode_width::UnicodeWidthChar;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// 列の状態。Lua の表 { line, width, jump } と 1 対 1 に対応する。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,9 +97,19 @@ impl Column {
     }
 }
 
-/// A plain text character paired with trailing sakura script tags.
+/// クラスタの幅。1 コードポイントは文字の幅（今と同じ）、`\r\n` は 0、それ以外は文字列の東アジアの幅。
+fn cluster_width(cluster: &str) -> usize {
+    let mut cs = cluster.chars();
+    match (cs.next(), cs.next()) {
+        (Some(c), None) => UnicodeWidthChar::width_cjk(c).unwrap_or(0),
+        _ if cluster == "\r\n" => 0,
+        _ => UnicodeWidthStr::width_cjk(cluster),
+    }
+}
+
+/// A plain text cluster (`next_cluster`) paired with trailing sakura script tags.
 struct PlainChar<'a> {
-    ch: char,
+    cluster: &'a str,
     trailing: &'a str,
     /// `trailing` の単位の列の動き（順に）。
     moves: Vec<ColumnMove>,
@@ -140,16 +151,16 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
             continue;
         }
 
-        // Plain character
-        let remaining = &input[pos..];
-        if let Some(c) = remaining.chars().next() {
+        // Plain cluster
+        let c = next_cluster(&input[pos..]);
+        if !c.is_empty() {
             if !leading_set {
                 // Everything before the first plain char is "leading"
                 leading_end = pos;
                 leading_set = true;
             }
 
-            let char_end = pos + c.len_utf8();
+            let char_end = pos + c.len();
 
             // Find trailing: from char_end to the next plain char (or end)
             let mut trailing_end = char_end;
@@ -166,7 +177,7 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
             }
 
             chars.push(PlainChar {
-                ch: c,
+                cluster: c,
                 trailing: &input[char_end..trailing_end],
                 moves,
             });
@@ -211,7 +222,7 @@ pub fn break_lines_impl(
         column.apply(m, rule);
     }
 
-    let width_of = |pc: &PlainChar| UnicodeWidthChar::width_cjk(pc.ch).unwrap_or(0);
+    let width_of = |pc: &PlainChar| cluster_width(pc.cluster);
 
     if rule.widths.is_empty() || tokens.chars.is_empty() {
         for pc in &tokens.chars {
@@ -223,16 +234,26 @@ pub fn break_lines_impl(
         return input.to_string();
     }
 
-    // 本文の字をつないで budoux で語に分ける
-    let plaintext: String = tokens.chars.iter().map(|pc| pc.ch).collect();
-    let words = parser.parse(&plaintext);
+    // 本文のクラスタをつないで budoux で区切り、クラスタの先頭に当たる区切りだけを語の境界にする
+    // （途中の区切りは捨てて前後を 1 語にする）。語の終わりは tokens.chars の添字
+    let plaintext: String = tokens.chars.iter().map(|pc| pc.cluster).collect();
+    // 各クラスタの先頭の char の位置
+    let starts: Vec<usize> = (tokens.chars.iter())
+        .scan(0, |cp, pc| {
+            let start = *cp;
+            *cp += pc.cluster.chars().count();
+            Some(start)
+        })
+        .collect();
+    let word_ends = (parser.parse_boundaries(&plaintext).into_iter())
+        .filter_map(|b| starts.binary_search(&b).ok())
+        .chain(std::iter::once(tokens.chars.len()));
 
     // break_positions は、その字の前に改行を入れる tokens.chars の添字
     let mut break_positions: Vec<usize> = Vec::new();
     let mut char_idx: usize = 0;
 
-    for word in &words {
-        let word_end = char_idx + word.chars().count();
+    for word_end in word_ends {
         // 語を、字の後ろに列の動きがある所で「かけら」に割る
         let mut head = true;
         for frag in tokens.chars[char_idx..word_end].split_inclusive(|pc| !pc.moves.is_empty()) {
@@ -246,7 +267,7 @@ pub fn break_lines_impl(
                 let lone = char_idx
                     .checked_sub(1)
                     .map(|i| &tokens.chars[i])
-                    .filter(|prev| prev.ch == '\\' && prev.trailing.is_empty());
+                    .filter(|prev| prev.cluster == "\\" && prev.trailing.is_empty());
                 match lone {
                     Some(prev) if column.width > width_of(prev) => {
                         break_positions.push(char_idx - 1);
@@ -280,7 +301,7 @@ pub fn break_lines_impl(
             bp_idx += 1;
         }
 
-        result.push(pc.ch);
+        result.push_str(pc.cluster);
         result.push_str(pc.trailing);
     }
 
@@ -789,7 +810,7 @@ mod tests {
         let tokens = tokenize_plain_chars("abc", &re);
         assert_eq!(tokens.leading, "");
         assert_eq!(tokens.chars.len(), 3);
-        assert_eq!(tokens.chars[0].ch, 'a');
+        assert_eq!(tokens.chars[0].cluster, "a");
         assert_eq!(tokens.chars[0].trailing, "");
     }
 
@@ -799,9 +820,9 @@ mod tests {
         let tokens = tokenize_plain_chars(r"\hこ\_w[50]ん", &re);
         assert_eq!(tokens.leading, r"\h");
         assert_eq!(tokens.chars.len(), 2);
-        assert_eq!(tokens.chars[0].ch, 'こ');
+        assert_eq!(tokens.chars[0].cluster, "こ");
         assert_eq!(tokens.chars[0].trailing, r"\_w[50]");
-        assert_eq!(tokens.chars[1].ch, 'ん');
+        assert_eq!(tokens.chars[1].cluster, "ん");
         assert_eq!(tokens.chars[1].trailing, "");
     }
 

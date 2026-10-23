@@ -64,6 +64,9 @@ fn run_lua_unit_tests() -> LuaResult<()> {
     let log_table = pasta_lua::runtime::log::register(&lua)?;
     loaded.set("@pasta_log", log_table)?;
 
+    // 本物の @json（null は userdata・false は真偽値）を単体テストで確かめるため
+    mlua_stdlib::json::register(&lua, None)?;
+
     // Lua ユニットテストを実行（エントリーポイント: init.lua）
     let test_file = lua_specs_path.join("init.lua");
     println!("Running Lua tests from: {}", test_file.display());

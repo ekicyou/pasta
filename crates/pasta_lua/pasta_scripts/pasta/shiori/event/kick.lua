@@ -65,7 +65,9 @@ local function wrap_local_func(fn)
             return result
         end
     end
-    return coroutine.create(wrapped_fn)
+    local co = coroutine.create(wrapped_fn)
+    STORE.co_preempt[co] = true -- 指名した再生ははっきり捨てる（印）
+    return co
 end
 
 --- SHIORI リロード用さくらスクリプトを出すコルーチンを生成する（reload sentinel 専用）
@@ -84,7 +86,9 @@ local function wrap_reload_func()
             return result
         end
     end
-    return coroutine.create(wrapped_fn)
+    local co = coroutine.create(wrapped_fn)
+    STORE.co_preempt[co] = true -- 指名した再生ははっきり捨てる（印）
+    return co
 end
 
 --- 保留キックシーンをシーン表から完全一致で引き当てシーンコルーチンを返す

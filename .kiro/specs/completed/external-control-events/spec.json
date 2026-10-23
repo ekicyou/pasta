@@ -1,0 +1,23 @@
+{
+  "feature_name": "external-control-events",
+  "created_at": "2026-10-23T03:10:23Z",
+  "updated_at": "2026-10-23T09:00:00Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "completed_at": "2026-10-23T09:00:00Z"
+}

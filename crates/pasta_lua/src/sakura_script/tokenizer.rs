@@ -1,10 +1,11 @@
 //! Tokenizer for sakura script wait insertion.
 //!
-//! Breaks input text into tokens by character type for wait insertion.
+//! Breaks input text into units and grapheme clusters, classified by character type for wait insertion.
 
 use crate::loader::TalkConfig;
 use regex::Regex;
 use std::collections::HashSet;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Token kind for character classification.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,30 +46,43 @@ impl Token {
 }
 
 /// Character sets for token classification.
+///
+/// 各集合は `chars_*` の文字列を書記素クラスタに分けた項目と、各コードポイント（1 文字の文字列）の項目の和。
 #[derive(Debug, Clone)]
 pub struct CharSets {
-    pub period: HashSet<char>,
-    pub comma: HashSet<char>,
-    pub strong: HashSet<char>,
-    pub leader: HashSet<char>,
-    pub line_start_prohibited: HashSet<char>,
-    pub line_end_prohibited: HashSet<char>,
+    pub period: HashSet<String>,
+    pub comma: HashSet<String>,
+    pub strong: HashSet<String>,
+    pub leader: HashSet<String>,
+    pub line_start_prohibited: HashSet<String>,
+    pub line_end_prohibited: HashSet<String>,
+}
+
+/// `chars_*` の文字列を、クラスタに分けた項目と各コードポイントの項目の和の集合にする。
+fn cluster_items(s: &str) -> HashSet<String> {
+    s.graphemes(true)
+        .map(str::to_string)
+        .chain(s.chars().map(String::from))
+        .collect()
 }
 
 impl CharSets {
     /// Create CharSets from TalkConfig.
     pub fn from_config(config: &TalkConfig) -> Self {
         Self {
-            period: config.chars_period.chars().collect(),
-            comma: config.chars_comma.chars().collect(),
-            strong: config.chars_strong.chars().collect(),
-            leader: config.chars_leader.chars().collect(),
-            line_start_prohibited: config.chars_line_start_prohibited.chars().collect(),
-            line_end_prohibited: config.chars_line_end_prohibited.chars().collect(),
+            period: cluster_items(&config.chars_period),
+            comma: cluster_items(&config.chars_comma),
+            strong: cluster_items(&config.chars_strong),
+            leader: cluster_items(&config.chars_leader),
+            line_start_prohibited: cluster_items(&config.chars_line_start_prohibited),
+            line_end_prohibited: cluster_items(&config.chars_line_end_prohibited),
         }
     }
 
-    /// Classify a character into TokenKind.
+    /// Classify one grapheme cluster into TokenKind.
+    ///
+    /// 2 段で引く: クラスタ全体を優先順で全種類 → 先頭のコードポイントを同じ優先順で全種類 → 一般。
+    /// 2 つ目以降のコードポイントでは引かない。空の文字列は一般。
     ///
     /// Priority order (first match wins):
     /// 1. Period
@@ -78,29 +92,40 @@ impl CharSets {
     /// 5. LineStartProhibited
     /// 6. LineEndProhibited
     /// 7. General (fallback)
-    pub fn classify(&self, c: char) -> TokenKind {
-        if self.period.contains(&c) {
-            TokenKind::Period
-        } else if self.comma.contains(&c) {
-            TokenKind::Comma
-        } else if self.strong.contains(&c) {
-            TokenKind::Strong
-        } else if self.leader.contains(&c) {
-            TokenKind::Leader
-        } else if self.line_start_prohibited.contains(&c) {
-            TokenKind::LineStartProhibited
-        } else if self.line_end_prohibited.contains(&c) {
-            TokenKind::LineEndProhibited
-        } else {
-            TokenKind::General
-        }
+    pub fn classify(&self, cluster: &str) -> TokenKind {
+        let first = cluster.chars().next().map(String::from);
+        std::iter::once(cluster)
+            .chain(first.as_deref())
+            .find_map(|key| self.lookup(key))
+            .unwrap_or(TokenKind::General)
     }
+
+    /// 1 つの文字列を優先順で全種類の集合に引く。
+    fn lookup(&self, key: &str) -> Option<TokenKind> {
+        [
+            (&self.period, TokenKind::Period),
+            (&self.comma, TokenKind::Comma),
+            (&self.strong, TokenKind::Strong),
+            (&self.leader, TokenKind::Leader),
+            (&self.line_start_prohibited, TokenKind::LineStartProhibited),
+            (&self.line_end_prohibited, TokenKind::LineEndProhibited),
+        ]
+        .into_iter()
+        .find_map(|(set, kind)| set.contains(key).then_some(kind))
+    }
+}
+
+/// 単位でない所の次のクラスタ。2 つ目以降のコードポイントの `\` の手前で切る（単位を食わせない）。
+pub(crate) fn next_cluster(s: &str) -> &str {
+    let cluster = s.graphemes(true).next().unwrap_or(s);
+    let cut = cluster.char_indices().skip(1).find(|&(_, c)| c == '\\');
+    &cluster[..cut.map_or(cluster.len(), |(i, _)| i)]
 }
 
 /// Tokenizer for sakura script text.
 ///
 /// Tokenizes input text by detecting sakura script tags first (priority),
-/// then classifying individual characters by their type.
+/// then classifying each extended grapheme cluster (`next_cluster`) by its type.
 pub struct Tokenizer {
     sakura_tag_regex: Regex,
     char_sets: CharSets,
@@ -123,7 +148,7 @@ impl Tokenizer {
     ///   3. タグ       `\` ＋（`[spb]` ＋ 数字 | `w` ＋ 1〜9 | `_` 0〜2 個 ＋ 名前の 1 文字 ＋ 任意の引数）
     ///
     /// 引数は `[` ARG (`,` ARG)* `]`（ARG は `sakura_tag_arg!`）。閉じなければ名前までがタグになる。
-    /// 名前の後ろの文字は一致に入らず、通常の文字として分類される（`\nHello` は `\n` ＋ `Hello`）。
+    /// 名前の後ろの文字は一致に入らず、クラスタとして分類される（`\nHello` は `\n` ＋ `Hello`）。
     /// 一致はすべて `TokenKind::SakuraScript` になるので、ウェイトは付かず、
     /// 改行推定では幅 0 として前の文字に付いて運ばれる。
     /// `(?s)` は `.` を改行にも一致させる（テキストに改行文字があっても囲みの読みが変わらない）。
@@ -170,7 +195,7 @@ impl Tokenizer {
     /// Tokenize input text.
     ///
     /// Sakura script tags are matched first (highest priority).
-    /// Other characters are classified individually.
+    /// Other text is split into grapheme clusters (`next_cluster`), one token per cluster.
     ///
     /// # Arguments
     /// * `input` - Input text to tokenize
@@ -194,15 +219,9 @@ impl Tokenizer {
                 continue;
             }
 
-            // Process single character
-            let remaining = &input[pos..];
-            if let Some(c) = remaining.chars().next() {
-                let kind = self.char_sets.classify(c);
-                tokens.push(Token::new(kind, c.to_string()));
-                pos += c.len_utf8();
-            } else {
-                break;
-            }
+            let cluster = next_cluster(&input[pos..]);
+            tokens.push(Token::new(self.char_sets.classify(cluster), cluster));
+            pos += cluster.len();
         }
 
         tokens
