@@ -276,23 +276,86 @@ fn test_budoux_breaks_only_at_cluster_boundaries() {
         "ね",
     ];
     let input: String = clusters.concat();
-    let mut starts = vec![0];
-    for c in &clusters {
-        starts.push(starts.last().unwrap() + c.len());
-    }
     for widths in ["2", "3", "4", "6"] {
         let (out, _) = talk_budoux_width(widths, &input);
-        let pieces: Vec<&str> = out.split(r"\n").collect();
-        assert_eq!(pieces.concat(), input, "widths={widths}");
-        let mut pos = 0;
-        for p in &pieces[..pieces.len() - 1] {
-            pos += p.len();
-            assert!(
-                starts.contains(&pos),
-                "クラスタの途中の改行 widths={widths}: {out}"
-            );
-        }
+        assert_breaks_between(&clusters, &out);
     }
+}
+
+/// `out` を `\n` で割ったかけらをつなぐと `clusters` をつないだものに戻り、割れ目が全部クラスタの境界にある。
+/// 割れ目の数を返す。
+fn assert_breaks_between(clusters: &[&str], out: &str) -> usize {
+    let mut starts = vec![0];
+    for c in clusters {
+        starts.push(starts.last().unwrap() + c.len());
+    }
+    let pieces: Vec<&str> = out.split(r"\n").collect();
+    assert_eq!(pieces.concat(), clusters.concat(), "{out}");
+    let mut pos = 0;
+    for p in &pieces[..pieces.len() - 1] {
+        pos += p.len();
+        assert!(starts.contains(&pos), "クラスタの途中の改行: {out}");
+    }
+    pieces.len() - 1
+}
+
+/// `SAKURA.break_lines` を Lua から呼ぶ。
+fn break_lines(input: &str, widths: &str) -> String {
+    crate::common::create_sakura_test_runtime()
+        .load(format!(
+            r#"return require("@pasta_sakura_script").break_lines([==[{input}]==], {{{widths}}})"#
+        ))
+        .eval()
+        .unwrap()
+}
+
+/// 要件 4.1・4.2・6.4: `break_lines` で組み合わせの絵文字・結合文字を並べた台詞を狭い幅で割る。
+#[test]
+fn test_break_lines_breaks_emoji_run_between_clusters() {
+    // 絵文字だけが続くと budoux は区切らないので、語を挟む。
+    // `か` ＋ U+3099 はコードポイントで割ると budoux が途中を区切る並び
+    let (w, ga) = (WOMAN_GESTURING_OK, "か\u{3099}");
+    let thumbs = "\u{1F44D}\u{1F3FD}";
+    let jp = "\u{1F1EF}\u{1F1F5}";
+    let clusters = [
+        "今日", "は", w, w, w, "いい", "天気", w, w, "です", "ね", w, w, w, "明日", "は", ga,
+        thumbs, thumbs, "雨", jp, jp, "の", "e\u{301}", "e\u{301}", "天気", ga, ga, ga, "今日",
+    ];
+    for widths in ["2", "3", "4", "6"] {
+        let out = break_lines(&clusters.concat(), widths);
+        assert!(
+            assert_breaks_between(&clusters, &out) > 0,
+            "割れていない widths={widths}: {out}"
+        );
+    }
+}
+
+/// 要件 4.3・4.8・6.4: 縦書きのアクター（`budoux` と `budoux_newlines`）でも `🙆‍♀️` は続けて出て、幅 2 で数える。
+/// 語は「今日は」「🙆‍♀️いい」「天気」。`🙆‍♀️` を幅 4 と数えると「🙆‍♀️いい」の前で割れる。
+#[test]
+fn test_vertical_actor_keeps_emoji_cluster_together() {
+    let out: String = crate::common::create_sakura_test_runtime()
+        .load(format!(
+            r#"
+            local SAKURA = require "@pasta_sakura_script"
+            local actor = {{ budoux = {{12}}, budoux_newlines = 1.5 }}
+            return SAKURA.talk_to_script(actor, [==[今日は{WOMAN_GESTURING_OK}いい天気]==])
+            "#
+        ))
+        .eval()
+        .unwrap();
+    assert_eq!(out, format!(r"今日は{WOMAN_GESTURING_OK}いい\n[150]天気"));
+}
+
+/// 要件 4.7（決定 9）: 単独の `\` に続く語で上限を超えたら `\` の前で割る。
+/// `\` ＋ U+0301 のクラスタは単独の `\` ではないので、その後ろで割る（`\\` にならない）。
+#[test]
+fn test_budoux_lone_backslash_guard_only_for_bare_backslash() {
+    assert_eq!(break_lines(r"天気天気\今日は", "4"), r"天気天気\n\今日は");
+    assert_eq!(
+        break_lines("天気天気\\\u{301}今日は", "4"),
+        "天気天気\\\u{301}\\n今日は"
+    );
 }
 
 /// 要件 4.1・4.7: `\` ＋ 結合文字のクラスタは割れずに 1 つで出て、`\\` を作らない。
