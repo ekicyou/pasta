@@ -113,7 +113,7 @@ pasta-skills.zip
 1. When リリースタグが push され、関門の検査が通ったとき, the リリース CI shall build の job で、タグのコミットのソースから `pasta-skills.zip` を、ほかの配布物と同じリリースビルドで作る。
 2. When build の job が配布物を検査するとき, the リリース CI shall `pasta-skills.zip` が在り、3 つの `SKILL.md`（`pasta-ghost-authoring/SKILL.md`・`pasta-lua-coding/SKILL.md`・`pasta-check/SKILL.md`）と `LICENSE` があり、最上位にほかのフォルダやファイル（開発用のスキルなど）が無いことを検査する。
 3. When build の job が配布物を検査するとき, the リリース CI shall `pasta-skills.zip` の中のファイルの一覧が、タグのコミットの配るスキル 3 つのフォルダのファイルの一覧と過不足なく一致し、パスが `/` で区切られていることを検査する。
-4. When build の job が配布物を検査するとき, the リリース CI shall 生成ファイルが、タグのコミットのマニュアルから生成した結果と一致することを照合する。生成ファイルを配る以上、マージで CI を待たない運用でもタグの時点の鮮度を保証するため。
+4. When build の job が配布物を作り始める前に, the リリース CI shall 生成ファイルが、タグのコミットのマニュアルから生成した結果と一致することを照合する。生成ファイルを配る以上、マージで CI を待たない運用でもタグの時点の鮮度を保証するため。
 5. If `pasta-skills.zip` が無いか、中身が合わないか、生成ファイルの照合が合わないとき, the リリース CI shall 何が合わないかを示して build の job を失敗させ、どの公開先（crates.io・Marketplace・GitHub Release）へも公開しない。
 6. When build の job の検査が通ったとき, the リリース CI shall `pasta-skills.zip` を、ほかの配布物と同じ受け渡し（artifact `release-assets`）に入れて後続の job へ渡す。
 7. The リリース CI shall 毎回の CI（`build.yml`）の構成と、関門（gate）が呼ぶ検査を変えない。

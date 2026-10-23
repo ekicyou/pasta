@@ -45,7 +45,7 @@
 ### Allowed Dependencies
 
 - `.NET` の `System.IO.Compression`（`ZipArchive`・`ZipFile.Open`・`ZipFileExtensions.CreateEntryFromFile`・`ZipFile.OpenRead`）。Windows PowerShell 5.1（.NET Framework 4.x）と pwsh 7 の両方で使える物に限る。`Compress-Archive` と `ZipFile.CreateFromDirectory` は使わない（5.1 で `\` を書く）。
-- `git ls-files`（詰める元の一覧。手元は開発者のクローン、CI はタグの checkout。どちらにも git がある）。
+- `git ls-files`・`git ls-tree`（詰める元の一覧と、CI の検査の期待の一覧。手元は開発者のクローン、CI はタグの checkout。どちらにも git がある）。
 - ルートの `LICENSE`（そのまま詰める）と、`.claude/skills/<3 つ>/` の追跡しているファイル。
 - `node book/tools/gen-skill-refs.mjs --check`（npm の依存なし。build の job の「Setup Node」の Node をそのまま使う）。
 - `github-release.ps1` の今の流れ（添付の有無の検査 → 下書き → 添付 → 公開・冪等な再実行）。
@@ -102,7 +102,7 @@ graph TB
 |---|---|---|---|
 | スクリプト | Windows PowerShell 5.1 / pwsh 7 | `release.ps1` の段 6 | 5.1 で動く書き方に限る（`??`・三項演算子・`&&` を使わない） |
 | zip | .NET `System.IO.Compression`（5.1 は .NET Framework 4.x、7 は .NET） | エントリの名前を `/` で組んで書く・読んで検査する | 5.1 と 7 で同じ 33 エントリ・`\` 無しを実験で確かめた（`research.md` 8 節） |
-| 一覧 | git（`ls-files`） | 詰める元の一覧と、検査の期待の一覧 | 出力は既にリポジトリ相対・`/` 区切り |
+| 一覧 | git（`ls-files`・`ls-tree`） | 詰める元の一覧（`ls-files`）と、CI の検査の期待の一覧（`ls-tree -r --name-only HEAD`） | 出力は既にリポジトリ相対・`/` 区切り |
 | 照合 | Node 20（build の job の「Setup Node」）・`gen-skill-refs.mjs --check` | 生成ファイルの鮮度 | npm の依存なし・0.1 秒。改行を LF に正規化して比べるので Windows の checkout でも通る |
 | CI | GitHub Actions（windows-latest） | build の job | step を 1 つ足し、検査と upload を伸ばす |
 
@@ -210,7 +210,7 @@ flowchart TB
 | 2.10 | 手元と CI で同じ手順 | ReleaseBuildJob | CI は `release.ps1` を呼ぶだけ | — |
 | 3.1 | CI の build で作る | ReleaseBuildJob | 今の `release.ps1` の step（名前だけ変える） | build の job |
 | 3.2 | 3 つの SKILL.md と LICENSE・最上位にほかが無い | ReleaseBuildJob | Verify の必須の名前と余計なエントリの検査 | build の job |
-| 3.3 | 一覧がタグの 3 つのフォルダと一致・`/` 区切り | ReleaseBuildJob | Verify の `git ls-files` との突き合わせ・`\` の検査 | build の job |
+| 3.3 | 一覧がタグの 3 つのフォルダと一致・`/` 区切り | ReleaseBuildJob | Verify の `git ls-tree -r --name-only HEAD` との突き合わせ・`\` の検査 | build の job |
 | 3.4 | 生成ファイルの照合 | ReleaseBuildJob | `gen-skill-refs.mjs --check` の step | build の job |
 | 3.5 | 合わなければ失敗・公開しない | ReleaseBuildJob | `$errors` → `exit 1`・照合の終了コード 1・後続は needs で止まる | build の job |
 | 3.6 | `release-assets` で渡す | ReleaseBuildJob | upload の path に 1 行 | build の job |
@@ -286,9 +286,10 @@ flowchart TB
 - **冪等性**: 毎回作り直す（段の頭で消す）。作業ツリーと git には何も書かない。
 
 **Implementation Notes**
-- 詰める元を `git ls-files` にするのは、(1) 出力が既にリポジトリ相対で `/` 区切りなので、5.1 で相対パスを組む処理が要らない（5.1 の .NET Framework に `Path.GetRelativePath` は無い）、(2) 「リリースするコミットのファイル」（1.2）に合い、手元の未追跡のファイルを詰めない、(3) CI の検査の期待の一覧と同じ取り方になる、の 3 つのため。
+- 詰める元を `git ls-files` にするのは、(1) 出力が既にリポジトリ相対で `/` 区切りなので、5.1 で相対パスを組む処理が要らない（5.1 の .NET Framework に `Path.GetRelativePath` は無い）、(2) 「リリースするコミットのファイル」（1.2）に合い、手元の未追跡のファイルを詰めない、の 2 つのため。CI の検査の期待の一覧は、別の取り方（`git ls-tree -r --name-only HEAD`）にする（ReleaseBuildJob）。
 - 中身の一致（1.2）は、ファイルをそのまま書くことで保つ。検査はファイルの一覧と名前の形を見て、中身のハッシュは比べない（Testing Strategy の展開と `diff` で確かめる）。
 - 改行は checkout に従う（Windows の `core.autocrlf=true` では CRLF）。手元と CI はどちらも Windows の checkout なので同じになる見込みで、2.6 が求めるのは一覧とパスの形だけである。
+- 手元の zip は確かめ用である。中身は作業ツリーのファイルなので、コミットしていない変更も入る。また、段 3〜5 で失敗すると段 6 まで進まず、前の実行の `pasta-skills.zip` が `release\` に残る（ほかの配布物と同じ扱い）。公開するのは、リリース CI がタグのまっさらな checkout から作った物だけなので、どちらも受け入れる。警告の処理は足さない。
 - リスク: ASCII でない名前のファイルを足すと、`git ls-files` は名前を引用符と 8 進数で出し、そのパスのファイルが見つからずに手順 3 で失敗する（壊れた zip は出さない）。今の 32 ファイルはすべて ASCII。Revalidation Triggers に挙げた。
 
 #### ReleaseScriptFrame（段の並びと表示）
@@ -318,14 +319,14 @@ flowchart TB
   - Verify release assets に `pasta-skills.zip` の項目を足す（`pasta_check.zip` の項目の直後）:
     - `$skills = @(Get-ZipEntries 'release/pasta-skills.zip')`。無ければ `Get-ZipEntries` が「配布物が無い: …」で止まる（3.5）。
     - 必須の名前（3 つの `SKILL.md` と `LICENSE`）のうち無い物を、「`pasta-skills.zip` に `<名前>` が無い」として `$errors` に積む（3.2）。
-    - 期待の一覧を `git ls-files -- .claude/skills/pasta-ghost-authoring .claude/skills/pasta-lua-coding .claude/skills/pasta-check` から `.claude/skills/` を外した物＋`LICENSE` で作り、zip に無い物（「`pasta-skills.zip` に足りない: …」）と、期待に無い物（「`pasta-skills.zip` に余計な物: …」。開発用のスキルや版のファイルはここに出る）を `$errors` に積む（3.2・3.3）。比べるのは `-cnotcontains`（大文字と小文字を区別する）。
+    - 期待の一覧を `git ls-tree -r --name-only HEAD -- .claude/skills/pasta-ghost-authoring .claude/skills/pasta-lua-coding .claude/skills/pasta-check` から `.claude/skills/` を外した物＋`LICENSE` で作り、zip に無い物（「`pasta-skills.zip` に足りない: …」）と、期待に無い物（「`pasta-skills.zip` に余計な物: …」。開発用のスキルや版のファイルはここに出る）を `$errors` に積む（3.2・3.3）。比べるのは `-cnotcontains`（大文字と小文字を区別する）。
     - `\` を含むエントリを「`pasta-skills.zip` のパスが `/` 区切りでない: …」として `$errors` に積む（3.3）。
   - Upload release-assets の `path` に `release/pasta-skills.zip`（3.6）。
 - **変えない物**: Check Cargo.lock is unchanged、verify・gate の job、`build.yml`（3.7）、公開系の job のすべての行。
 - **失敗の伝わり方**: build の job が失敗すれば、publish-crates・publish-vsce・github-release は needs で走らない（今と同じ。3.5）。
 
 **Implementation Notes**
-- Verify の期待の一覧は `release.ps1` と同じ取り方（`git ls-files`）にそろえる。CI のチェックアウトはまっさらなので、インデックスはタグのコミットと同じである（3.3）。別の目としての意味は、zip を実際に読み直すことと、決め打ちの必須の名前（`SKILL.md` が消えたコミットを見逃さない）にある。
+- Verify の期待の一覧は、`release.ps1`（`git ls-files`・インデックス）とは別に、タグのコミットの木（`git ls-tree -r --name-only HEAD`）から取る。要件 3.3 の「タグのコミットの一覧」に文字どおり合い、作る側の式の繰り返しにならない。出力はどちらもリポジトリ相対の `/` 区切りなので、`.claude/skills/` を外す処理は同じでよい。別の目としての意味は、これに加えて、zip を実際に読み直すことと、決め打ちの必須の名前（`SKILL.md` が消えたコミットを見逃さない）にある。
 - `pasta-check` のスキルは生成ファイルを持たない（`GENERATION_MAP` は `pasta-ghost-authoring`・`pasta-lua-coding` だけ）。照合は対応表に載るものすべてを見るので、本仕様で対象を絞る必要はない。
 
 #### GitHubReleaseAssets（`github-release.ps1`）
@@ -444,13 +445,15 @@ flowchart TB
 
 ## Decisions / Risks
 
-設計で決めた次の 5 件は、設計ディスカッションで確かめる（根拠は `research.md` 8 節）。
+次の 7 件は、2026-10-23 の設計ディスカッションで確定した（開発者の一括承認。根拠は `research.md` 8 節）。
 
 1. **段の位置**: 段 5（`pasta.dll.zip`）の後の段 6。番号が変わるのは版の確認と大きさの 2 段だけ。
 2. **zip の書き方**: `ZipFile.Open(…, 'Create')`＋`ZipFileExtensions.CreateEntryFromFile` で、名前を `/` で自分で組む。5.1（5.1.26100）と 7（7.6.7）の両方で、33 エントリ・`\` 無し・同じ一覧になることを確かめた。
-3. **詰める元の一覧**: `git ls-files`（作る側と CI の検査で同じ取り方）。
-4. **生成ファイルの照合の位置**: build の job の「Setup Node」の直後（長いビルドの前）。
+3. **一覧の取り方**: 作る側は `git ls-files`。CI の検査の期待の一覧は `git ls-tree -r --name-only HEAD`（タグのコミットの木から別に取る）。
+4. **生成ファイルの照合の位置**: build の job の「Setup Node」の直後（長いビルドの前）。要件 3.4 もこの位置に合わせて言い直した。
 5. **失敗の後片付け**: 古い zip だけでなく、作りかけと検査に落ちた zip も消す。
+6. **zip の中の改行**: checkout のまま詰める（Windows では CRLF）。LF にそろえる処理は足さない。
+7. **手元の zip**: コミットしていない変更が入ること、段 3〜5 の失敗で前の zip が残ることを受け入れる（SkillsZipStep の Implementation Notes）。
 
 - リスク: 0.4.1 までの版の状態の読み取りは `3/5` の添付不足と出る（手順書に書く）。
 - リスク: `.claude/skills/**` の編集が分類器に拒否されると、5.3・5.4・7.2 が止まる（開発者の許可で進める）。
