@@ -75,7 +75,7 @@ SHIORI/3.0 の SHIORI は、ホストに呼ばれたときに文字列を 1 回�
 
 ## Upstream / Downstream
 
-- **Upstream**: `shiori4-v3-portable`（入口と実行器）。shiori4 の `abi-conventions`・`host-protocol`（公開された版に依存する）。areka の版 4 の対応（実機の確認に要る）
+- **Upstream**: `shiori4-v3-portable`（入口と実行器）。shiori4 の `abi-conventions`・`host-protocol`（公開された版に依存する）。areka の版 4 の対応（実機の確認に要る。2026-10-23 の areka の開発者の決定: areka は COM の作りかけを消して shiori4 に移り、版 4 には areka v0.2.0 で対応する。どちらが先に来ても困らないよう、shiori4 の正本どおりに作る）
 - **Downstream**: ノベルゲームの演出で、表示の終わりを待つ書き方を使いたい spec（あれば）
 
 ## Existing Spec Touchpoints
