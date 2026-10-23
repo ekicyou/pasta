@@ -6,7 +6,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 
 現在の主題は 4 つある。
 
-- **0.4.2: 致命的でない不具合**。はじめの範囲の 7 本（2026-10-18・2026-10-19・2026-10-20・2026-10-22 開発者の決定。`lua-cmodule-robustness`・`pasta-check-release-asset`・`ontalk-suppression`・`scene-play-event`・`external-control-events`・`reg-handler-chain`・`chain-talk-interrupt`）と、0.4.1 の後に届いた不具合の `talk-grapheme-clusters`（組み合わせの絵文字が自動ウェイトで割れる）は、2026-10-23 までに全部完了した。残りは、2026-10-23 に足した `shiori4-v3-portable`（shiori4 の SHIORI3 互換モードで pasta を Windows 以外でも動かす。開発者の意向。下の「0.4.2 の範囲」）と、0.4.2 のリリースである。2026-10-20・21 に起票した `recommend-menu-scenes`・`scene-exact-match`・`scene-pick-modes` と、2026-10-23 に起票した `pasta-dll-multiarch` は、版がまだ決まっていない。
+- **0.4.2: 致命的でない不具合**。はじめの範囲の 7 本（2026-10-18・2026-10-19・2026-10-20・2026-10-22 開発者の決定。`lua-cmodule-robustness`・`pasta-check-release-asset`・`ontalk-suppression`・`scene-play-event`・`external-control-events`・`reg-handler-chain`・`chain-talk-interrupt`）と、0.4.1 の後に届いた不具合の `talk-grapheme-clusters`（組み合わせの絵文字が自動ウェイトで割れる）は、2026-10-23 までに全部完了した。残りは、2026-10-23 に足した `shiori4-v3-portable`（shiori4 の SHIORI3 互換モードで pasta を Windows 以外でも動かす。開発者の意向。まだ実施できないので、0.4.2 の最後に回した。下の「0.4.2 の範囲」）と、0.4.2 のリリースである。2026-10-20・21 に起票した `recommend-menu-scenes`・`scene-exact-match`・`scene-pick-modes` と、2026-10-23 に起票した `pasta-dll-multiarch` は、版がまだ決まっていない。
 - **ponytail 監査の指摘の修正（隙間の spec）**。2026-10-19 に、プラグインの `/ponytail:ponytail-audit` をクレートと領域ごとに 8 つ並べて走らせた。その指摘を、ソースを共有しない 10 本の spec（`ponytail-*`）に切った。版には縛らない。0.4.2 を出した後、0.5.0 の spec が並べられずに空いた所へ入れる（2026-10-22 開発者の決定。2026-10-19 に決めた専用の版 0.4.3 はなくした）。下の「ponytail 監査の指摘の修正（隙間の spec）」。
 - **Phase 13: areka でノベルゲーム（0.5.0）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性セマンティクス（シーン属性の保持と読み出し・Call の属性フィルター）も、この道筋に入った。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
@@ -107,7 +107,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 | 6 | chain-talk-interrupt | Opus | 6〜7 | 完了（2026-10-23。2026-10-23 のウェーブ。中断の台詞は反応の代わりに出す） |
 | 7 | reg-handler-chain | Opus | 5〜7 | 完了（2026-10-23。2026-10-23 のウェーブ。`REG` にメタテーブルを付け、鎖のハンドラはハンドラごとに新しい act を受け取る） |
 | 8 | talk-grapheme-clusters | Opus | 8〜11 | 完了（2026-10-23。0.4.1 の後に届いた不具合を 0.4.2 に入れた。`unicode-segmentation` を足した） |
-| 9 | shiori4-v3-portable | Opus | 14〜18 | 2026-10-23 の 2 回目の棚卸のウェーブ（0.4.2 の範囲の最後の 1 本。`pasta_shiori` の `windows.rs`・`actor/`、ルートの `Cargo.toml`・`Cargo.lock`、`build.yml` を触る。ほかの 0.4.2 の候補とはソースを共有しない） |
+| 9 | shiori4-v3-portable | Opus | 14〜18 | 0.4.2 の最後（まだ実施できない。2026-10-23 開発者の決定。リリースの前に入る。`pasta_shiori` の `windows.rs`・`actor/`、ルートの `Cargo.toml`・`Cargo.lock`、`build.yml` を触る。ほかの 0.4.2 の候補とはソースを共有しない） |
 | 10 | 0.4.2 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
 - **0.4.2 に入れたもの（2026-10-18 完了）**: `lua-cmodule-robustness`（`lua-require-robustness` の続き）。2026-10-18 の要件の話し合いで、C モジュールの `require` の道（Lua の C API を pasta.dll から書き出す必要があり、pasta のゴーストが 2 体いると別の pasta.dll に結びつく危険があった）をやめた。代わりに、pasta.toml の `[loader] ffi = true`（既定は無効）で FFI を開き、`ffi.load` を包んで、深いパス・ANSI に無い文字を含むフォルダ・隣の依存 DLL でも DLL を読めるようにする。経緯と実測は spec の brief にある。
@@ -117,7 +117,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 - **0.4.2 に足したもの（2026-10-19 開発者の決定）**: `external-control-events`。SSP の MCP（`raise_event`）などの外から、イベントを 1 つ送るだけで辞書の `＞XXX` と同じ呼び出し（`OnPastaCallFunction`。Reference0 が名前、Reference1 以降が文字列の引数。探し方はシーンの外の `＞XXX` と同じ）と、グローバル変数の代入（`OnPastaSetSaveVariable`。Reference1 は JSON の値、`null` で消す）ができるようにする。主な使い道は、試験の間だけ `自動トーク停止` を外から呼ぶこと。いつでも有効で、止めたい作者はハンドラを上書きする。値の読み出しは範囲の外。`ontalk-suppression` とはマニュアルの `lua/shiori-events.md` だけを共有し（節は別）、並べられる。`scene-play-event` の後に入る。どちらも「外からのイベントを受けて何かする」口で、既定のハンドラの置き方・`event/init.lua` の `require`・マニュアルの既定ハンドラーの表と見つからないときの出し方を、先に入るあちらに揃える（ハンドラから先の Lua のコードは別物）。2026-10-23 完了。
 - **0.4.2 に足したもの（2026-10-20 開発者の決定「次のリリースに含める」）**: `chain-talk-interrupt`。窓際のぱすたさんで、`＞チェイントーク` の後半が出なかった。マウスのシーンが何も出さずに終わる（204）たびに、`set_co_scene` が待っている続きを捨てていた。台詞（`talk`・`choice`）を出さなかったシーンは続きに触れないようにする。台詞を出したシーンが割り込んだら続きは忘れ（再開の仕組みは作らない）、作者が `＊チェイントーク中断`（完全一致）を書いていれば、割り込んだシーンの台詞の代わりに出す（設計の話し合いで「前に添える」から改めた）。キック・`OnPastaScene`・`OnPastaSceneAt`・エラーで止まったシーンは、今どおり捨て、中断の台詞は出さない。`scene-play-event` の後に入り、隙間の spec の `ponytail-lua-scripts`（同じ `set_co_scene` を整理する）より先に入る。2026-10-23 完了。
 - **0.4.2 に足したもの（2026-10-22 開発者の決定「次のリリースに含める」）**: `reg-handler-chain`。窓際のぱすたさんは `REG.OnSecondChange` を 3 か所で包み合い、どれが外側になるかが読み込みの順に頼っていた。`REG:register("OnSecondChange", fn)` で重ねて登録できるようにする。新しく登録したものから呼び、`nil`・`false` なら次へ回り、`true` なら止めて 204、文字列・コルーチンなら止めてその応答にする。全部が見送ったら、今どおり `REG[id]`（組み込みの既定か作者の代入）、それも無ければイベントと同じ名前のシーンを呼ぶ。`register` は外す関数を返す。`register` は表のキーにせず、`EVENT.fire` は `rawget` で引く。優先度の数と、全部に見せる見張り役の口は作らない。バックログの「`REG` に 1 つのイベントのハンドラを重ねる仕組み」を引き取った。`EVENT.fire` のある `event/init.lua` を `external-control-events`・`chain-talk-interrupt` と共有するが、持ち場（この spec は `EVENT.fire` のハンドラの引き当て）が重ならないので、2026-10-23 のウェーブで並べた。2026-10-23 完了。
-- **0.4.2 に足したもの（2026-10-23 開発者の意向「今やってるマイナーバージョンアップに入れちゃってもよいかな」）**: `shiori4-v3-portable`。2026-10-23 の 3 者会談（pasta・areka・shiori4 の各セッション）で、shiori4 の C ABI の規約とホストとの取り決めを合意した（正本は shiori4 の `abi-conventions`・`host-protocol`）。pasta の対応は 2 段に分ける（開発者の方針）。1 段目のこの spec は、SHIORI4 のためというより「SHIORI/3.0 を Windows 以外で動かす別口」で、`shiori_get_api(3)`（SHIORI3 互換モード。要求と応答は SHIORI/3.0 の全文）を書き出し、アクターの実行器を OS に頼らない形にし、Linux・macOS でビルドとテストを通す。Windows の今の入口は残す。pasta のエンジンは状態をインスタンスごとに持ち、グローバルな状態を避ける（2026-10-23 開発者の決定。グローバルな状態に頼る怪しい不具合を避けるため）。shiori4 の入口で同じプロセスの 2 つ目の `load` を受けるかは、別の判断として要件で決める（areka は SHIORI ごとに helper のプロセスを起こすので、今は来ない）。2 段目の版 4 への本格対応は `shiori4-v4-host`（Rust の土台）と `shiori4-v4-lua-api`（Lua と DSL の口）で、0.5.0 に入れる（2026-10-23 の棚卸で 2 本に分けた）。隙間の spec の `ponytail-shiori` と `windows.rs`・`actor/` を共有するので、同じウェーブに置かない。
+- **0.4.2 に足したもの（2026-10-23 開発者の意向「今やってるマイナーバージョンアップに入れちゃってもよいかな」）**: `shiori4-v3-portable`。2026-10-23 の 3 者会談（pasta・areka・shiori4 の各セッション）で、shiori4 の C ABI の規約とホストとの取り決めを合意した（正本は shiori4 の `abi-conventions`・`host-protocol`）。pasta の対応は 2 段に分ける（開発者の方針）。1 段目のこの spec は、SHIORI4 のためというより「SHIORI/3.0 を Windows 以外で動かす別口」で、`shiori_get_api(3)`（SHIORI3 互換モード。要求と応答は SHIORI/3.0 の全文）を書き出し、アクターの実行器を OS に頼らない形にし、Linux・macOS でビルドとテストを通す。Windows の今の入口は残す。pasta のエンジンは状態をインスタンスごとに持ち、グローバルな状態を避ける（2026-10-23 開発者の決定。グローバルな状態に頼る怪しい不具合を避けるため）。shiori4 の入口で同じプロセスの 2 つ目の `load` を受けるかは、別の判断として要件で決める（areka は SHIORI ごとに helper のプロセスを起こすので、今は来ない）。2 段目の版 4 への本格対応は `shiori4-v4-host`（Rust の土台）と `shiori4-v4-lua-api`（Lua と DSL の口）で、0.5.0 に入れる（2026-10-23 の棚卸で 2 本に分けた）。この spec は、まだ実施できないので、0.4.2 の最後に回す（2026-10-23 開発者の決定）。隙間の spec の `ponytail-shiori` と `windows.rs`・`actor/` を共有するので、同じウェーブに置かない。
 - **0.4.2 に足したもの（2026-10-23 開発者の決定）**: `talk-grapheme-clusters`。台詞の「1 文字」を拡張書記素クラスタにし、組み合わせの絵文字・結合文字の途中に自動ウェイトも budoux の改行も入れない。`chars_*` に組み合わせの絵文字を書ける。半角カナの濁点つき（`ｶﾞ`）が 1 文字になる。`unicode-segmentation` を足した（2026-10-23 完了）。
 - **版がまだ決まっていないもの**: `scene-anchor-link`（下の棚卸）。
 - **版がまだ決まっていないもの（2026-10-23 起票）**: `pasta-dll-multiarch`。x64 版と arm64 版の pasta.dll をビルドし、32bit 版と同じリリースで出す。見本ゴーストの .nar には、areka の探し方（x64 は `pasta.x64.dll` → `pasta.dll`、arm64 は `pasta.arm64.dll` → `pasta.x64.dll` → `pasta.dll`）に合う名前で同梱する。接尾辞の無い `pasta.dll` は SSP 向けの 32bit 版のまま。`pasta_check` は名前も arch も気にしないので今のまま使える。手を入れるのは `release.ps1`・`.cargo/config.toml`（aarch64 の `crt-static`）・配布物とリリース CI の検査・マニュアル（`[loader] ffi` で作者の DLL の arch が合わないと読めない注意）。aarch64 で LuaJIT がビルドできるかは確かめていない。`shiori4-v3-portable` の後（areka は shiori4 の入口で読むため）。版は開発者が後で決める（2026-10-23）。
@@ -229,7 +229,7 @@ Opus
 
 前回（2026-10-23・main `8fc9bdff`）の後に、0.4.2 の 4 本（`external-control-events`・`reg-handler-chain`・`chain-talk-interrupt`・`talk-grapheme-clusters`）と、推したウェーブを別のセッションで一括して始めるスキル `/kiro-wave` が入った。起票は shiori4 の対応の 3 本（`shiori4-v3-portable`・`shiori4-v4-host`・`pasta-dll-multiarch`。PR#178）。この棚卸で `shiori4-v4-host` を 2 本に分けた。未完了は 29 本（常駐の `review-improvement-loop` を除く）、完了は 183 本。作業中のブランチは無い（ほかのワークツリーとブランチは、どれも main に入った後のもの）。前回の記録は git の履歴にある。
 
-今のゴールは 0.4.2 である。範囲の残りは `shiori4-v3-portable` の 1 本と、リリースだけになった。測り直したのは 11 本で、`shiori4-v3-portable` と、版の決まっていない `recommend-menu-scenes`、新しく起票した 2 本（`shiori4-v4-host`・`pasta-dll-multiarch`）、入った 4 本がファイルや前提を動かした 7 本（`ponytail-shiori`・`ponytail-lua-scripts`・`shell-element-click`・`novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link`）である。
+今のゴールは 0.4.2 である。範囲の残りは `shiori4-v3-portable` の 1 本と、リリースだけになった。`shiori4-v3-portable` は、まだ実施できないので、0.4.2 の最後に回した（棚卸の後の開発者の決定）。測り直したのは 11 本で、`shiori4-v3-portable` と、版の決まっていない `recommend-menu-scenes`、新しく起票した 2 本（`shiori4-v4-host`・`pasta-dll-multiarch`）、入った 4 本がファイルや前提を動かした 7 本（`ponytail-shiori`・`ponytail-lua-scripts`・`shell-element-click`・`novel-talk-flow`・`cue-command-runtime`・`novel-checkpoint-rollback`・`scene-anchor-link`）である。
 
 - `shiori4-v3-portable` は 14〜18 タスクのまま。shiori4 の C ABI のクレート `shiori4_abi` は crates.io に 0.0.1 が出ていて（依存なし・MIT）、SHIORI3 互換モードの書き出しに足りる。アクターの中で Win32 のメッセージを使う所は無く、待つ所は `actor/thread.rs` の 1 か所だけなので、メッセージ専用の窓（`wintf`）をやめて、どの OS でも普通の受信の繰り返しにするのを推奨する。インスタンスごとに持つ状態の一覧に、キックの受け口が読む `MAILBOX`（`actor/lifecycle.rs`）と、2 つ目の `load` でログの設定が前のインスタンスに漏れる件（ログの絞り込みの持ち手が 1 度しか作られない）が抜けていた。brief に足した。`recommend-menu-scenes` とはソースを共有しない（設定の読み込み `loader/config/` に触らない約束を brief に書いた）。
 - `recommend-menu-scenes` は、先に要る 3 本が全部入り、先頭になった（10〜12 タスク）。`REG["sakura.recommendsites"]` は、`REG` のメタテーブルの後も今どおり勝つ。ただし、リソースの問い合わせのハンドラで失敗の表記（`FAILURE.report`）を出すと、表記がリソースの値に混ざる。リソースの失敗はログだけにするのを推奨する。待っているチェイントークがあるとき、選んだ後のシーンの台詞は割り込みになり、`＊チェイントーク中断` に置き換わる。選んだ後のハンドラに `STORE.co_preempt` の印を付けない（付けると黙って捨てる）。
@@ -267,35 +267,26 @@ Opus
 
 ### ウェーブ（2026-10-23）
 
-今のゴール（0.4.2）の残りの 1 本だけを置く。先に要るものは無い。版の決まっていない `recommend-menu-scenes` は、ゴールの外なので入れていない。0.4.2 に入れると決めれば、この 1 本とソースを共有しないので、同じウェーブに足せる（下の「開発者の判断が要るもの」）。
+今のゴール（0.4.2）の中に、今すぐ始められる spec は無い。範囲の残りの `shiori4-v3-portable` は、まだ実施できないので、0.4.2 の最後に回した（棚卸の後の 2026-10-23 開発者の決定「まだ実施できない。0.4.2 の最後に回して」）。版の決まっていない `recommend-menu-scenes` と、0.5.0 の先頭の spec は、ゴールの外なので入れていない。どちらかをゴールに入れると決めれば、次のウェーブに置ける（下の「開発者の判断が要るもの」）。
 
-| spec | 子孫 | 種別 | 規模 | 要件定義 |
-| ---- | ---- | ---- | ---- | -------- |
-| shiori4-v3-portable | 約 4（`shiori4-v4-host`・`shiori4-v4-lua-api`・`pasta-dll-multiarch`・隙間の `ponytail-shiori`） | 機能（開発者の意向で 0.4.2 に入れた） | 14〜18 | Opus |
-
-開始コマンド（`/kiro-next` の報告と同じ形。俯瞰の頁が、この塊をコピーのボタンつきで出す）:
+開始コマンド（`/kiro-next` の報告と同じ形。俯瞰の頁が、この塊をコピーのボタンつきで出す。始める spec が無いので、`/kiro-wave` は何も始めずに止まる）:
 
 ```
-Wave 1本
-Opus
-/kiro-start shiori4-v3-portable
+Wave 0本
 ```
 
-持ち場と約束:
+`shiori4-v3-portable` を始めるときの持ち場: `pasta_shiori`（`windows.rs`・`actor/`・新しい入口）、ルートの `Cargo.toml`・`Cargo.lock`（`shiori4_abi` を足す。`wintf` をやめるなら外す）、`.github/workflows/build.yml`、マニュアルの `internals/shiori.md`、`tech.md`。ログの初期化をインスタンスごとにするなら `pasta_lua/src/logging/` も。`Cargo.lock` の席はこの spec が持つ。`recommend-menu-scenes` と並べるときは、この spec が `pasta_lua/src/loader/config/`・Lua のスクリプト・`pasta_core`・`pasta_check` に触らないこと（brief に書いた）と、`recommend-menu-scenes` が `pasta_shiori`・Cargo・`build.yml` に触らないことを約束にする。
 
-- 1 本だけなので、同じウェーブの約束は無い。持ち場は `pasta_shiori`（`windows.rs`・`actor/`・新しい入口）、ルートの `Cargo.toml`・`Cargo.lock`（`shiori4_abi` を足す。`wintf` をやめるなら外す）、`.github/workflows/build.yml`、マニュアルの `internals/shiori.md`、`tech.md`。ログの初期化をインスタンスごとにするなら `pasta_lua/src/logging/` も。`Cargo.lock` の席はこの spec が持つ。
-- `recommend-menu-scenes` を足すときは、この spec が `pasta_lua/src/loader/config/`・Lua のスクリプト・`pasta_core`・`pasta_check` に触らないこと（brief に書いた）と、`recommend-menu-scenes` が `pasta_shiori`・Cargo・`build.yml` に触らないことを約束にする。
-
-次（今のゴールの中）: 0.4.2 のリリース（`/release 0.4.2`）。`recommend-menu-scenes` を 0.4.2 に入れるなら、リリースの前に入れる。
+次（今のゴールの中）: `shiori4-v3-portable`（始められるようになったら。0.4.2 の最後）→ 0.4.2 のリリース（`/release 0.4.2`）。`recommend-menu-scenes` を 0.4.2 に入れるなら、`shiori4-v3-portable` より前に入れられる。
 
 ゴールの後（0.5.0 の順）: `novel-areka-contract`（先頭・子孫 約 6）、`scene-attribute-store`（先頭・子孫 約 9）、`novel-variable-scope`（先頭・子孫 約 4）、`shiori4-v4-host`（`shiori4-v3-portable` の後）。版の決まっていないもの: `recommend-menu-scenes`（先頭・推奨 0.4.2）、`scene-exact-match`（先頭・推奨 0.5.0）、`pasta-dll-multiarch`（`shiori4-v3-portable` の後）、`scene-pick-modes`（`scene-attribute-store` の後）、`scene-anchor-link`（`call-attribute-filter` の後）。隙間の spec: ponytail の 10 本（0.4.2 を出した後。データが失われる Must fix を持つ `ponytail-lua-loader`・`ponytail-check-release` を最初に。`ponytail-shiori` は `shiori4-v3-portable` の後。`ponytail-lua-scripts` の待ちは無くなった）。
 
 ### 開発者の判断が要るもの（ウェーブは止めない）
 
-- **`recommend-menu-scenes` の版**。推奨は 0.4.2。先に要る 3 本が入り、`shiori4-v3-portable` とソースを共有しないので、今のウェーブに足しても 0.4.2 の出る時期は延びない（前回の「1 ウェーブ延びる」は無くなった）。入れるなら、0.4.2 の範囲の表に足す決定が要る。
+- **`recommend-menu-scenes` の版**。推奨は 0.4.2。先に要る 3 本が入り、`shiori4-v3-portable` を最後に回したので、0.4.2 の中で今すぐ始められるのはこの spec だけになる。`shiori4-v3-portable` とソースを共有しないので、0.4.2 の出る時期は延びない（前回の「1 ウェーブ延びる」は無くなった）。入れるなら、0.4.2 の範囲の表に足す決定が要る。
 - **`pasta-dll-multiarch` の版**。`shiori4-v3-portable` の後に入る。推奨は 0.5.0（0.4.2 は `shiori4-v3-portable` で締め、aarch64 の LuaJIT の確かめを 0.4.2 の出る時期に乗せない）。
 - **`scene-exact-match`・`scene-pick-modes` の版**。推奨は 0.5.0（前回と同じ）。
-- **0.5.0 を今のゴールに含めるか**（0.4.2 と並べるか）。推奨は含めること。含めるなら、今のウェーブに `novel-areka-contract`（Opus・文書だけ）と `scene-attribute-store`（Fable）を足せる（どちらも `shiori4-v3-portable` とソースを共有しない）。
+- **0.5.0 を今のゴールに含めるか**（0.4.2 と並べるか）。推奨は含めること。0.4.2 の残りが始められない間も手が止まらない。含めるなら、次のウェーブに `novel-areka-contract`（Opus・文書だけ）と `scene-attribute-store`（Fable）を置ける（どちらも `shiori4-v3-portable` とソースを共有しない）。
 - **`scene-anchor-link` の版**。推奨は 0.5.0 の後（前回と同じ）。
 - `SOUL.md` §2・§5 の「Wait/Sync はマーカーのみ」「全出力は yield」— 構想の文書なので、直すかどうかは開発者が決める。
 - `steering/structure.md` の作り直し（`pasta_shiori` の木と、`pasta_scripts/pasta/` の木が無い。`event/external_control.lua` と新しい結合テストも載っていない。テストの数も古い）— `/kiro-steering` で直す。数だけ直すと下のファイルの一覧と合わなくなるので、即時修正にしなかった。
@@ -434,7 +425,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 ## Specs (dependency order)
 
 - [ ] recommend-menu-scenes -- 右クリックメニューの「おすすめ」「ポータル」を辞書のシーンだけで書けるようにする。`＊おすすめメニュー`・`＊相方おすすめメニュー`・`＊ポータルメニュー`（別名の既定に足す。完全一致）の中で `＞おすすめ項目（…）`・`＞おすすめ区切り` を積み、リソースの問い合わせでシーンをその場で動かして値を返す（`STORE.co_scene` に触れない）。選んだ後は項目のシーンへ回す。ボタンの名前は決まった名前の単語。Lua の `REG` が勝つ。`[scene.alias]` をキーごとの置き換えに改める（2026-10-20 起票）。版は未定（推奨は 0.4.2）。先に要る 3 本は 2026-10-23 に入った。`shiori4-v3-portable` とはソースを共有しない。Dependencies: none
-- [ ] shiori4-v3-portable -- pasta.dll が shiori4 の `shiori_get_api(3)`（SHIORI3 互換モード。SHIORI/3.0 の全文を UTF-8 で運ぶ）を書き出し、Windows 以外（Linux・macOS）でもビルドとテストが通るようにする。アクターの実行器を OS に頼らない形にし、Windows だけの依存を `cfg(windows)` に閉じ込める。Windows の今の入口は残す。エンジンは状態をインスタンスごとに持つ（2026-10-23 開発者の決定）。入口で 2 つ目の `load` を受けるかは要件で決める。版 4 は範囲の外（2026-10-23 起票。3 者会談の後、開発者の方針で 2 段に分けた 1 段目）。0.4.2 に入れる（2026-10-23 開発者の意向）。2026-10-23 の 2 回目の棚卸のウェーブ。`ponytail-shiori` と同じウェーブに置かない。Dependencies: none
+- [ ] shiori4-v3-portable -- pasta.dll が shiori4 の `shiori_get_api(3)`（SHIORI3 互換モード。SHIORI/3.0 の全文を UTF-8 で運ぶ）を書き出し、Windows 以外（Linux・macOS）でもビルドとテストが通るようにする。アクターの実行器を OS に頼らない形にし、Windows だけの依存を `cfg(windows)` に閉じ込める。Windows の今の入口は残す。エンジンは状態をインスタンスごとに持つ（2026-10-23 開発者の決定）。入口で 2 つ目の `load` を受けるかは要件で決める。版 4 は範囲の外（2026-10-23 起票。3 者会談の後、開発者の方針で 2 段に分けた 1 段目）。0.4.2 に入れる（2026-10-23 開発者の意向）。まだ実施できないので、0.4.2 の最後に回す（2026-10-23 開発者の決定）。`ponytail-shiori` と同じウェーブに置かない。Dependencies: none
 - [ ] shiori4-v4-host -- 版 4 に本格対応する Rust の土台。ホストのテーブルを受け、アクタースレッドからの `host->request` を SHIORI のスレッドへ中継する。post（SSTP に揃えた `SEND`＋`Script`・`Option: nobreak`、`NOTIFY`）と `Tag` の Rust の側、unload での無効化、ホストの `log` への転送、キックの即時化（チェイントークの続きの決まりと自動トークの停止を保つ）、Lua への低い入口と「版 4 で読まれた」の印。取り決めの正本は shiori4 の `abi-conventions`・`host-protocol`（2026-10-23 起票。2 段の 2 段目。同じ日の棚卸で、Lua と DSL の口を `shiori4-v4-lua-api` へ分けた）。0.5.0 に入れる（2026-10-23 開発者の方針。ノベルゲームと同じリリース）。`ponytail-shiori` と同じウェーブに置かない。Dependencies: shiori4-v3-portable
 - [ ] shiori4-v4-lua-api -- 版 4 のホストの機能を Lua と DSL から使う口。ホストのプロパティの読み出し（今の `act:get_property` と `CALLBACK.pending` の上に作る）、シーンからの SEND・NOTIFY、終わりを待って `OnHostComplete` で待っているシーンを再開する書き方（`REG:register` との並び・チェイントークの `STORE.co_preempt` との関係・待っている間の unload）、SHIORI3 だけのときの扱い、`pasta_check` の組み込みの名前、マニュアル（2026-10-23 の棚卸で `shiori4-v4-host` から分けた）。0.5.0。Dependencies: shiori4-v4-host
 - [ ] pasta-dll-multiarch -- x64・arm64 版の pasta.dll をビルドし、32bit 版と同じリリースで出す。見本ゴーストの .nar に areka の探し方に合う名前（`pasta.x64.dll`・`pasta.arm64.dll`）で同梱し、接尾辞の無い `pasta.dll` は SSP 向けの 32bit 版のまま残す。`release.ps1`・`.cargo/config.toml`・配布物とリリース CI の検査・マニュアル。aarch64 の LuaJIT のビルドは要確認（2026-10-23 起票。3 者会談の後の areka の相談から）。版は未定。`ponytail-manual-ci`・`ponytail-check-release` と同じウェーブに置かない。Dependencies: shiori4-v3-portable
