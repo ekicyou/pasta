@@ -43,7 +43,7 @@
 - **budouy 0.2.2**: 日本語改行位置推定（BudouX、vendored-models）
 - **unicode-width 0.2.2**: Unicode文字幅計算
 - **unicode-segmentation 1.13.3**: 書記素クラスタの切り出し（トークの文字の単位）
-- **socket2 0.5**: debug transport 待受ソケットの `SO_REUSEADDR` 設定（Windows 以外。Windows では二重 bind を許してしまうため立てない）・非ブロック化（reload 時の再バインド堅牢化）
+- **socket2 0.6**: debug transport 待受ソケットの `SO_REUSEADDR` 設定（Windows 以外。Windows では二重 bind を許してしまうため立てない）・非ブロック化（reload 時の再バインド堅牢化）
 - **tracing 0.1 / tracing-appender 0.2 / tracing-subscriber 0.3**: ロギング・診断
 - **windows-sys 0.61**: Windows API（Shift_JISエンコーディング等、cfg(windows)・features: Win32_System_LibraryLoader, Win32_System_Diagnostics_Debug（ffi.load の置き換え）。dev-dependency では Win32_Storage_FileSystem, Win32_System_Registry（8.3 名・長いパスの設定の確かめ））
 - **cc 1**（dev-dependency）: FFI テスト用の DLL をテスト中にビルドする
