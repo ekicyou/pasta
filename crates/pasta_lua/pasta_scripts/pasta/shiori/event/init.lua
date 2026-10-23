@@ -161,13 +161,6 @@ local function drive_kind(co)
     return "interrupt"
 end
 
---- 中断のシーンを動かして、まとめたトークン列を返す（まだ中断のシーンを探さない仮の形）
---- @param _act table 割り込んだシーンの act
---- @return table[]|nil
-local function run_interrupt_scene(_act)
-    return nil
-end
-
 --- nil yieldをスキップして有効値またはdead状態まで繰り返しresumeする
 --- @param co thread コルーチン
 --- @param ... any 初回resume引数（通常はact）
@@ -197,6 +190,39 @@ local function resume_until_valid(co, ...)
         -- nil + suspended: 引数なしで再度resume
         ok, value = coroutine.resume(co)
     end
+end
+
+--- 中断のシーンを動かして、まとめたトークン列を返す。
+--- 見つからない・出力が無い・待ちに入ったなら nil を返す。
+--- 中断のシーンがエラーで止まったら、そのエラーを投げ直す（割り込んだシーンのコルーチンが止まる）
+--- @param act table 割り込んだシーンの act（act.req を中断の act に渡す）
+--- @return table[]|nil
+local function run_interrupt_scene(act)
+    -- 遅延ロードで循環参照回避
+    local SCENE = require("pasta.scene")
+    local ico = SCENE.co_exec_exact("チェイントーク中断")
+    if not ico then
+        return nil
+    end
+    local iact = SHIORI_ACT.new(STORE.actors, act.req)
+    -- 文字列にせず、まとめたトークン列で受け取る（割り込んだ側の組み立てが差し替えて 1 回で文字列にする）
+    iact.build = require("pasta.act").IMPL.build
+    -- 最初に出力のある区切りまで。残りのコルーチンは参照を外して捨てる
+    local ok, groups = resume_until_valid(ico, iact)
+    -- 中断の中の get_property の予約で、割り込んだシーンが待ちに登録されないようにする
+    local waited = CALLBACK.has_staged()
+    CALLBACK.discard_staged()
+    if not ok then
+        -- 止まるエラーの表記をふつうの組み立てで作るため、インスタンスの build を外す
+        iact.build = nil
+        -- 投げ直す前に結び直す: STOP.hold が止まった場所を中断のシーンとして控えるため
+        require("pasta.failure").bind(iact)
+        error(groups, 0)
+    end
+    if waited then
+        return nil
+    end
+    return groups
 end
 
 -- 4. 公開関数
