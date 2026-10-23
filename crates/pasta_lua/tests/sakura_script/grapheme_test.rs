@@ -301,3 +301,99 @@ fn test_budoux_backslash_with_combining_mark_stays_one_cluster() {
     let (out, _) = talk_budoux_width("4", "今日は\\\u{301}いい天気ですね");
     assert_eq!(out, "今日は\\n\\\u{301}いい\\n天気ですね");
 }
+
+// ============================================
+// 退行テスト: talk_to_script の自動ウェイト（要件 6.1・6.2・6.3・6.6・5.3）
+// ============================================
+
+/// `config` で `talk_to_script` を呼び、出力を返す。
+fn talk(config: &TalkConfig, input: &str) -> String {
+    create_sakura_test_runtime_with_config(config)
+        .load(format!(
+            r#"
+            local SAKURA = require "@pasta_sakura_script"
+            return SAKURA.talk_to_script(nil, [==[{input}]==])
+            "#
+        ))
+        .eval()
+        .unwrap()
+}
+
+/// 要件 2.3・2.4・6.1: 報告の 2 例。
+#[test]
+fn test_reported_examples_wait_once_per_cluster() {
+    let config = TalkConfig {
+        script_wait_normal: 90,
+        ..Default::default()
+    };
+    assert_eq!(
+        talk(&config, &format!("りょ{WOMAN_GESTURING_OK}✨")),
+        format!(r"り\_w[40]ょ\_w[40]{WOMAN_GESTURING_OK}\_w[40]✨\_w[40]")
+    );
+    assert_eq!(
+        talk(&mixed_talk_config(), "\u{270C}\u{FE0F}"),
+        "\u{270C}\u{FE0F}\\_w[50]"
+    );
+}
+
+/// 要件 3.2・6.2: chars_period に書いた組み合わせの絵文字の後ろに句点のウェイト。
+#[test]
+fn test_multi_codepoint_chars_period_gets_period_wait() {
+    let config = TalkConfig {
+        chars_period: format!("。{WOMAN_GESTURING_OK}"),
+        ..mixed_talk_config()
+    };
+    assert_eq!(
+        talk(&config, &format!("あ{WOMAN_GESTURING_OK}い")),
+        format!(r"あ\_w[50]{WOMAN_GESTURING_OK}\_w[950]い\_w[50]")
+    );
+    // 要件 3.3: 部品（♀・U+FE0F）だけを書いても、クラスタは一般のまま 1 つのウェイト
+    let config = TalkConfig {
+        chars_period: "\u{2640}\u{FE0F}".to_string(),
+        ..mixed_talk_config()
+    };
+    assert_eq!(
+        talk(&config, WOMAN_GESTURING_OK),
+        format!(r"{WOMAN_GESTURING_OK}\_w[50]")
+    );
+}
+
+/// 要件 1.5・6.3・5.3: 肌色・国旗 2 つ・結合文字・半角カナ＋濁点の途中にウェイトが無い。
+#[test]
+fn test_no_wait_inside_clusters() {
+    for cluster in [
+        "\u{1F44D}\u{1F3FD}",
+        "\u{1F1EF}\u{1F1F5}",
+        "\u{1F1FA}\u{1F1F8}",
+        "e\u{301}",
+        "ｶﾞ",
+    ] {
+        assert_eq!(
+            talk(&mixed_talk_config(), &format!("あ{cluster}")),
+            format!(r"あ\_w[50]{cluster}\_w[50]"),
+            "{cluster:?}"
+        );
+    }
+    // 2 つの国旗が並んでも、国旗の間にだけウェイトが入る
+    assert_eq!(
+        talk(&mixed_talk_config(), "\u{1F1EF}\u{1F1F5}\u{1F1FA}\u{1F1F8}"),
+        "\u{1F1EF}\u{1F1F5}\\_w[50]\u{1F1FA}\u{1F1F8}\\_w[50]"
+    );
+}
+
+/// 要件 1.3・1.4・2.6・6.6: Prepend の後ろの単位、単位の直後の結合文字、単独の `\` の守り。
+#[test]
+fn test_unit_boundaries_and_lone_backslash_waits() {
+    let config = mixed_talk_config();
+    // `\h` の後ろにはウェイトが無い
+    assert_eq!(talk(&config, "\u{600}\\h"), "\u{600}\\_w[50]\\h");
+    // 単独の `\` の直後にはウェイトが無い
+    assert_eq!(talk(&config, "\u{600}\\あ"), "\u{600}\\_w[50]\\あ\\_w[50]");
+    // 単位の直後の U+0301 は単独のクラスタで、後ろに一般のウェイト
+    assert_eq!(
+        talk(&config, "\\n\u{301}あ"),
+        "\\n\u{301}\\_w[50]あ\\_w[50]"
+    );
+    // `\` ＋ U+0301 のクラスタの後ろにはウェイトが入る
+    assert_eq!(talk(&config, "\\\u{301}"), "\\\u{301}\\_w[50]");
+}
