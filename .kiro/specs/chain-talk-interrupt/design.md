@@ -2,18 +2,18 @@
 
 ## Overview
 
-**目的**: 待っているチェイントークの続きを捨てる決まりを狭める。続きを捨てるのは、続きとは別のシーンが台詞か選択肢を出したときだけにする。台詞を出して割り込んだときは、作者が書いた `＊チェイントーク中断` の出力を、割り込んだシーンの出力の前に添えて、1 本のさくらスクリプトで返す。
+**目的**: 待っているチェイントークの続きを捨てる決まりを狭める。続きを捨てるのは、続きとは別のシーンが台詞か選択肢を出したときだけにする。台詞を出して割り込んだときは、作者が `＊チェイントーク中断` を書いていれば、割り込んだシーンのその回の出力の代わりに、その出力を 1 本のさくらスクリプトで返す（中断の台詞が優先）。書いていなければ、割り込んだシーンの出力を今どおり返す。
 
 **利用者**: `＞チェイントーク` で話を区切り、マウスの出入り・撫で・つつきなどのイベントにもシーンを書いているゴーストの作者。窓際のぱすたさんでは、何も出さない `＊OnMouseMove` などが動くたびに後半が消えていた。
 
-**変えること**: 続きの置き換え（`shiori/event/init.lua` の `set_co_scene`・`EVENT.drive`）が、再開の前に「割り込みの種類」を決め、再開の後に「台詞を出したか」を読んで分岐する。台詞の印は、SHIORI の組み立て（`shiori/act.lua` の `build`）が act の欄に立てる。中断の台詞は、同じ組み立ての中でトークンの段で前に足し、組み立てを 1 回にする。
+**変えること**: 続きの置き換え（`shiori/event/init.lua` の `set_co_scene`・`EVENT.drive`）が、再開の前に「割り込みの種類」を決め、再開の後に「台詞を出したか」を読んで分岐する。台詞の印は、SHIORI の組み立て（`shiori/act.lua` の `build`）が act の欄に立てる。中断の台詞は、同じ組み立ての中で、割り込んだシーンのトークンと差し替えてから文字列にする。
 
 位置の表記は `crates/pasta_lua/pasta_scripts/pasta/` からの相対パス（Lua）と、`book/src/` からの相対パス（マニュアル）。
 
 ### Goals
 
 - 台詞を出さないシーンは、待っている続きに触れない（1.1〜1.7）。
-- 台詞を出して割り込んだら続きを捨て、`＊チェイントーク中断` を前に添える（2.1〜2.6、3.1〜3.11）。
+- 台詞を出して割り込んだら続きを捨て、`＊チェイントーク中断` があれば反応の代わりに出す（2.1〜2.6、3.1〜3.12）。
 - キック・`OnPastaScene`・`OnPastaSceneAt`・エラーは、今どおり捨てる（4.1〜4.5、5.1〜5.3）。
 - 外から起こしたイベントも同じ決まりに従う（6.1・6.2）。
 - Lua のテストとマニュアル・スキルの references を新しい決まりに合わせる（7.1・7.2、8.1〜8.6）。
@@ -33,9 +33,8 @@
 
 - 続きの置き換えの決まり。割り込みの種類（再開・続きなし・はっきり捨てる・割り込み）と、台詞の有無による分岐。
 - 台詞の印（act の欄 `_spoke`）と、その数え方（字のある台詞と選択肢だけ）。
-- 中断の台詞の流し方。`＊チェイントーク中断` の完全一致の検索・入れ子の実行・前への差し込み・エラーの伝え方。
+- 中断の台詞の流し方。`＊チェイントーク中断` の完全一致の検索・入れ子の実行・割り込んだシーンの出力との差し替え・エラーの伝え方。
 - はっきり捨てる印（`STORE.co_preempt`）と、キック・シーン再生がそれを付けること。
-- 中断の台詞と割り込んだシーンの「つなぎ目」のトークン（`seam`）と、組み立てでの扱い。
 - 新しいテストと、直す 2 本のテスト。マニュアルの該当節とスキルの references の作り直し。
 
 ### Out of Boundary
@@ -59,7 +58,7 @@
 
 - `EVENT.drive` の引数・戻り値、または「再開の前に種類を決め、後に台詞を読む」順が変わるとき（`callback.lua`・`ponytail-lua-scripts`）。
 - act の欄 `_spoke`・`_on_speech` の意味が変わるとき、または `SHIORI_ACT_IMPL.build` が別の形に分かれるとき（`cue-command-runtime`・`novel-talk-flow`）。
-- `seam` のトークンや、組み立ての状態（話し手・段落の区切り・列）の持ち方が変わるとき（`sakura_builder.lua` を触る spec）。
+- 台詞の判定（`BUILDER.speaks` と `has_text`）や、組み立ての中の状態（表情・立ち位置の持ち越し）の持ち方が変わるとき（`sakura_builder.lua` を触る spec）。
 - `STORE.co_preempt` の置き場所や、印を付ける所（キック・シーン再生）が増減するとき。新しく「開発者が指名する再生」を足す spec は、印を付けるかを決める。
 - `OnPastaCallFunction` がコルーチンでなく文字列を返す形になるとき（要件 6.2 が効かなくなる）。あちらのハンドラは `scene_play.lua` の形を写すが、`STORE.co_preempt` の印は写さない（ふつうのイベントと同じ決まりにするため。要件 6.2）。どちらが先に入っても、後から入る側がこれを確かめる。
 - `novel-talk-flow`: 「止まっている場面が捨てられる」の前提が、台詞を出したシーンだけに狭まる。
@@ -76,7 +75,7 @@
 
 ### Architecture Pattern & Boundary Map
 
-採るのは「組み立ての中で差し込む」形（`research.md` 4.3 の案 C）である。中断の台詞を流す本体は `event/init.lua` に置き、`EVENT.drive` が割り込みのときだけ act の欄に掛けておく。組み立てが台詞を見つけたら、その関数を呼んで中断のまとめたトークン列を受け取り、前に足してから 1 回だけ文字列にする。
+採るのは「組み立ての中で差し込む」形（`research.md` 4.3 の案 C）である。中断の台詞を流す本体は `event/init.lua` に置き、`EVENT.drive` が割り込みのときだけ act の欄に掛けておく。組み立てが台詞を見つけたら、その関数を呼んで中断のまとめたトークン列を受け取り、割り込んだシーンのトークンと差し替えてから 1 回だけ文字列にする。
 
 ```mermaid
 graph TB
@@ -109,8 +108,8 @@ graph TB
 
 **Architecture Integration**:
 
-- 選んだ形: 組み立ての中で差し込む（案 C）。組み立てが 1 回なので、話し手の切り替え・段落の区切り・表情と立ち位置の持ち越しが、1 本のシーンと同じ規則で出る（3.6）。出力の受け渡しの形（コルーチンが文字列を渡す）は変えない。
-- 持ち場の分け方: 続きの決まりと中断の流し方は `event/init.lua`、台詞の印とつなぎ目の差し込みは `shiori/act.lua`、台詞の判定とつなぎ目の組み立ては `sakura_builder.lua`、はっきり捨てる印は `store.lua` に置き、付けるのはキックとシーン再生の 2 ファイル。
+- 選んだ形: 組み立ての中で差し替える（案 C）。割り込んだシーンのトークンを文字列にしないので、その表情・立ち位置は `STORE` に残らない。中断の台詞は 1 本のシーンと同じ規則で組み立てる（3.6）。出力の受け渡しの形（コルーチンが文字列を渡す）は変えない。
+- 持ち場の分け方: 続きの決まりと中断の流し方は `event/init.lua`、台詞の印と差し替えは `shiori/act.lua`、台詞の判定は `sakura_builder.lua`、はっきり捨てる印は `store.lua` に置き、付けるのはキックとシーン再生の 2 ファイル。
 - 守る既存の形: `EVENT.drive` が 3 つの呼び出し元の唯一の再開の手順であること。コールバック待ちは `CALLBACK.pending` が持ち、`STORE.co_scene` に入れないこと。捨てるのは参照を外すだけで、GC に任せること（LuaJIT 2.1 に `coroutine.close` は無い）。
 - 新しい部品の理由: 中断の流し方（`run_interrupt_scene`）は、続きを捨てる判断と同じ所に置くため `event/init.lua` の内部の関数にする。組み立てから呼べるように、act の欄に関数を掛ける。新しい act のメソッドは足さない。
 - ステアリングとの整合: Lua の循環を作らない（`store` は何も読まない、`shiori/act` は `event/init` を読まない）。DSL の作者には特別な書き方を求めない（3.11）。
@@ -128,8 +127,8 @@ graph TB
 ### Modified Files
 
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua` — L97〜208 の範囲だけを触る。`set_co_scene(co, keep)` に引数を 1 つ足す。新しい内部の関数 `drive_kind(co)` と `run_interrupt_scene(act)` を、`set_co_scene` と `EVENT.drive` の間に置く。`EVENT.drive` は、再開の前に種類を決めて act の欄を整え、再開の後に台詞を読んで `set_co_scene` を呼ぶ。`EVENT.fire`・読み込みの並び・冒頭の説明は触らない。
-- `crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua` — `SHIORI_ACT_IMPL.build` で、台詞の印 `_spoke` を立て、割り込みのときは `_on_speech` を呼んで中断のまとめたトークン列と `seam` を前に足す。冒頭の `@field` に 2 つの欄を書き足す。新しいメソッドは足さない。
-- `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` — `BUILDER.speaks(groups)` を足す（`has_text` を使う）。`BUILDER.build` のループに `seam` の枝を足す。
+- `crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua` — `SHIORI_ACT_IMPL.build` で、台詞の印 `_spoke` を立て、割り込みのときは `_on_speech` を呼んで、中断のまとめたトークン列があれば自分のトークンと差し替え、`_interrupted` を立てる。冒頭の `@field` に 3 つの欄を書き足す。新しいメソッドは足さない。
+- `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` — `BUILDER.speaks(groups)` を足す（`has_text` を使う）。`BUILDER.build` は変えない。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/callback.lua` — 消費されていない予約があるかを返す `CALLBACK.has_staged()` を足す（中断のシーンが待ちに入ったかを見るため）。ほかは触らない。
 - `crates/pasta_lua/pasta_scripts/pasta/store.lua` — `STORE.co_preempt`（弱い参照のキーの表）を足し、`STORE.reset` で作り直す。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua` — `wrap_local_func`・`wrap_reload_func` が作ったコルーチンに印を付ける。
@@ -181,10 +180,10 @@ sequenceDiagram
     Co->>Build: その回の出力を組み立てる
     Build->>Build: 台詞あり
     Build->>Int: 欄の関数を呼ぶ
-    Int->>Ico: 入れ子で 1 回だけ再開
+    Int->>Ico: 入れ子で最初の出力まで再開
     Ico-->>Int: まとめたトークン列
     Int-->>Build: 中断のトークン列
-    Build->>Build: 中断 と seam と自分を 1 回で組み立てる
+    Build->>Build: 自分のトークンを中断のトークン列と差し替えて 1 回で組み立てる
     Build-->>Co: 1 本のスクリプト
     Co-->>Drive: 出力
     Drive->>Drive: 欄の関数を外し台詞の印を読む
@@ -192,7 +191,7 @@ sequenceDiagram
     Drive-->>Fire: 出力
 ```
 
-- 中断のシーンは、割り込んだシーンのコルーチンの中で、別のコルーチンとして 1 回だけ再開する。最初の区切りまでの出力だけを使い、残りのコルーチンは参照を外して GC に任せる（3.9）。
+- 中断のシーンは、割り込んだシーンのコルーチンの中で、別のコルーチンとして、出力の無い区切りを飛ばして最初の出力まで再開する。最初に出力のある区切りまでの出力だけを使い、残りのコルーチンは参照を外して GC に任せる（3.9）。
 - 中断のシーンは `EVENT.drive` を通らないので、続きにも割り込みの判断にも関わらない（3.8）。
 - 組み立てが台詞を見つけたときだけ欄の関数を呼ぶ。台詞を出さない回・続きが無い回・はっきり捨てる回・続きの再開では、中断のシーンを探しもしない（3.2・3.3）。
 
@@ -203,7 +202,8 @@ sequenceDiagram
 | 再開（`co` が待っている続きそのもの） | どれでも | 今どおり `co` の結果で置き換える | 流さない | 1.4 |
 | 続きなし | どれでも | 今どおり（区切れば `co` の残りが続きになる） | 流さない | 1.5・3.2 |
 | はっきり捨てる（`co` に印） | エラーでない | 捨てる。区切れば `co` の残りが続きになる | 流さない | 4.1〜4.3 |
-| 割り込み | 台詞あり | 捨てる。区切れば `co` の残りが続きになる | 流す | 2.1・2.2・3.1 |
+| 割り込み | 台詞あり・中断の台詞が出た | 捨てる。`co` が区切っていても残りは捨てる（続きは無くなる） | 反応の代わりに流す | 2.1・3.1・3.12 |
+| 割り込み | 台詞あり・中断が無いか空 | 捨てる。区切れば `co` の残りが続きになる | 流さない（反応を今どおり出す） | 2.1・2.2・2.4・3.7 |
 | 割り込み | 台詞なし・最後まで | 残す | 流さない | 1.1・3.3 |
 | 割り込み | 台詞なし・区切った | 残す。`co` の残りは捨てる | 流さない | 1.3 |
 | 割り込み | 台詞なし・コールバック待ち | 残す。`co` は待ちの表が持つ | 流さない | 2.6 |
@@ -218,29 +218,30 @@ sequenceDiagram
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
 | 1.1 | 台詞なしで最後まで動いたら続きを残す | ContinuationRule | `set_co_scene(co, keep)` | 続きの決まり |
-| 1.2 | 台詞に数えるもの | SpeechMark・BuilderSeam | `BUILDER.speaks` | — |
+| 1.2 | 台詞に数えるもの | SpeechMark・BuilderSpeaks | `BUILDER.speaks` | — |
 | 1.3 | 台詞なしで区切ったら前の続きを残し自分の残りを捨てる | ContinuationRule | `set_co_scene(co, true)` | 続きの決まり |
 | 1.4 | 再開は今どおり置き換える | ContinuationRule | `drive_kind` | 続きの決まり |
 | 1.5 | 続きが無いときは今どおり | ContinuationRule | `drive_kind` | 続きの決まり |
 | 1.6 | イベントの種類によらない | ContinuationRule | `EVENT.drive` | — |
 | 1.7 | シーンでないコルーチンは出力の有無で決める | ContinuationRule | `EVENT.drive` の読み方 | — |
 | 2.1 | 台詞を出した割り込みは続きを捨てる | ContinuationRule | `set_co_scene(co, false)` | 続きの決まり |
-| 2.2 | 割り込んだシーンが区切れば新しい続き | ContinuationRule | 同上 | 続きの決まり |
+| 2.2 | 割り込んだシーンが区切れば新しい続き（中断の台詞が出なければ） | ContinuationRule | 同上 | 続きの決まり |
 | 2.3 | 捨てた続きを再開しない | ContinuationRule | 参照を外すだけ | — |
 | 2.4 | 中断が無ければ今と同じ | InterruptRunner | `run_interrupt_scene` が nil | 割り込みと中断の台詞 |
 | 2.5 | コールバックから戻って台詞を出したら捨てる | ContinuationRule | `EVENT.drive` | 続きの決まり |
 | 2.6 | 台詞なしでコールバック待ちに入ったら残す | ContinuationRule | `set_co_scene(co, true)` | 続きの決まり |
-| 3.1 | 中断の出力を前に置き同じ応答で返す | InterruptRunner・SpeechMark・BuilderSeam | `_on_speech`・`seam` | 割り込みと中断の台詞 |
+| 3.1 | 中断の台詞を反応の代わりに返す | InterruptRunner・SpeechMark | `_on_speech`・`_interrupted` | 割り込みと中断の台詞 |
 | 3.2 | 続きが無いときは流さない | ContinuationRule | `drive_kind` | 続きの決まり |
 | 3.3 | 台詞を出さないときは流さない | SpeechMark | `BUILDER.speaks` | 割り込みと中断の台詞 |
 | 3.4 | 完全一致で探す | InterruptRunner | `SCENE.co_exec_exact` | — |
 | 3.5 | 同名から選ぶ | InterruptRunner | `SCENE.co_exec_exact` | — |
-| 3.6 | 1 本のスクリプト・話し手と表情が崩れない | SpeechMark・BuilderSeam | `seam` | 割り込みと中断の台詞 |
+| 3.6 | 1 本のスクリプト・出さなかった表情を持ち越さない | SpeechMark | 差し替えてから 1 回だけ組み立てる | 割り込みと中断の台詞 |
 | 3.7 | 中断の出力が空なら無いときと同じ | InterruptRunner | `run_interrupt_scene` が nil | — |
 | 3.8 | 中断を入れ子に呼ばない | InterruptRunner・SpeechMark | `_on_speech` を使う前に外す | 割り込みと中断の台詞 |
-| 3.9 | 中断の中の区切りは最初まで | InterruptRunner | 1 回だけ再開 | 割り込みと中断の台詞 |
+| 3.9 | 中断の中の区切りは最初の出力まで | InterruptRunner | `resume_until_valid` | 割り込みと中断の台詞 |
 | 3.10 | 中断のエラーは止まるエラーの応答 | InterruptRunner・ContinuationRule | エラーを投げ直す | 続きの決まり |
 | 3.11 | ふつうの DSL で書ける | InterruptRunner | ふつうのシーンの検索 | — |
+| 3.12 | 中断の台詞が出たら続きを残さない | ContinuationRule・SpeechMark | `_interrupted` → `set_co_scene(nil, false)` | 続きの決まり |
 | 4.1 | キックは捨てて流さない | PreemptMark・ContinuationRule | `STORE.co_preempt` | 続きの決まり |
 | 4.2 | シーン再生は捨てて流さない | PreemptMark・ContinuationRule | `STORE.co_preempt` | 続きの決まり |
 | 4.3 | 指名した再生が区切れば新しい続き | ContinuationRule | `set_co_scene(co, false)` | 続きの決まり |
@@ -264,10 +265,10 @@ sequenceDiagram
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
-| ContinuationRule | `shiori/event/init.lua` | 種類と台詞で続きを置き換える | 1.1, 1.3, 1.4, 1.5, 1.6, 1.7, 2.1, 2.2, 2.3, 2.5, 2.6, 3.2, 3.10, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 6.1, 6.2 | STORE (P0), FAILURE.act_of (P0), CALLBACK (P1) | Service, State |
+| ContinuationRule | `shiori/event/init.lua` | 種類と台詞で続きを置き換える | 1.1, 1.3, 1.4, 1.5, 1.6, 1.7, 2.1, 2.2, 2.3, 2.5, 2.6, 3.2, 3.10, 3.12, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 6.1, 6.2 | STORE (P0), FAILURE.act_of (P0), CALLBACK (P1) | Service, State |
 | InterruptRunner | `shiori/event/init.lua` | 中断のシーンを入れ子で 1 回動かしトークン列を返す | 2.4, 3.1, 3.4, 3.5, 3.7, 3.8, 3.9, 3.10, 3.11 | SCENE.co_exec_exact (P0), SHIORI_ACT (P0), FAILURE.bind (P1) | Service |
-| SpeechMark | `shiori/act.lua` | 台詞の印を立て、割り込みのとき中断を前に足す | 1.2, 3.1, 3.3, 3.6, 3.8 | BUILDER (P0) | State |
-| BuilderSeam | `shiori/sakura_builder.lua` | 台詞の判定とつなぎ目の組み立て | 1.2, 3.6 | APPEARANCE.tag_at (P1) | Service |
+| SpeechMark | `shiori/act.lua` | 台詞の印を立て、割り込みのとき中断の台詞と差し替える | 1.2, 3.1, 3.3, 3.6, 3.8, 3.12 | BUILDER (P0) | State |
+| BuilderSpeaks | `shiori/sakura_builder.lua` | 台詞の判定 | 1.2 | — | Service |
 | PreemptMark | `store.lua`・`kick.lua`・`scene_play.lua` | 指名した再生のコルーチンに印を付ける | 4.1, 4.2, 4.4, 4.5 | STORE (P0) | State |
 | Tests | `tests/` | 決まりを確かめる | 7.1, 7.2 | lua_test・PastaLoader (P1) | — |
 | Docs | `book/src/`・references | 決まりを書く | 8.1〜8.6 | gen-skill-refs.mjs (P1) | — |
@@ -338,13 +339,13 @@ function EVENT.drive(co, act, ...) end
 `EVENT.drive(co, act, ...)` の手順:
 
 1. `kind = drive_kind(co)`。
-2. `target = FAILURE.act_of(co) or act`。`target` があれば `target._spoke = nil` とし、`kind == "interrupt"` なら `target._on_speech = run_interrupt_scene`。
+2. `target = FAILURE.act_of(co) or act`。`target` があれば `target._spoke = nil`・`target._interrupted = nil` とし、`kind == "interrupt"` なら `target._on_speech = run_interrupt_scene`。
 3. `ok, value = resume_until_valid(co, ...)`（今のまま）。
 4. `scene_act = FAILURE.act_of(co) or act`。`target` と `scene_act` の `_on_speech` を `nil` に戻す。
 5. 失敗なら、今どおり `STOP.hold(co, value)`・`CALLBACK.discard_staged()` の後、`set_co_scene(co, false)` を呼んで `false, value` を返す。
 6. 成功なら、今どおり `CALLBACK.consume_staged(co, act)`。
 7. `spoke = scene_act and scene_act._spoke`。`spoke == nil`（act の印が無い）なら `spoke = value ~= nil and value ~= ""`（1.7）。
-8. `set_co_scene(co, kind == "interrupt" and not spoke)` の後、`true, value` を返す。
+8. `scene_act and scene_act._interrupted` なら `set_co_scene(nil, false)`（中断の台詞が出たので、古い続きも `co` の残りも捨てる。3.12）。それ以外は `set_co_scene(co, kind == "interrupt" and not spoke)`。どちらの後も `true, value` を返す。
 
 - Preconditions: `co` は suspended（今どおり）。
 - Postconditions: 表「続きの決まり」のとおりに `STORE.co_scene` が決まる。`target`・`scene_act` の `_on_speech` は `nil`。
@@ -423,8 +424,8 @@ local function run_interrupt_scene(act) end
 
 | Field | Detail |
 |-------|--------|
-| Intent | その回の出力に台詞があったかを act の欄に記録し、割り込みのときは中断の出力を前に足す |
-| Requirements | 1.2, 3.1, 3.3, 3.6, 3.8 |
+| Intent | その回の出力に台詞があったかを act の欄に記録し、割り込みのときは中断の台詞と差し替える |
+| Requirements | 1.2, 3.1, 3.3, 3.6, 3.8, 3.12 |
 
 **Responsibilities & Constraints**
 
@@ -441,23 +442,24 @@ act の欄（`ShioriAct` の `@field` に書き足す）:
 | -- | -- | -- | -- |
 | `_spoke` | `boolean\|nil` | `EVENT.drive` が再開の前に `nil`、`build` が `self._spoke or 台詞あり` | この再開の間に組み立てた出力に台詞があったか。`nil` は「組み立てていない」 |
 | `_on_speech` | `(fun(act: table): table[]\|nil)\|nil` | `EVENT.drive` が割り込みのときに掛け、使う前の `build` と再開の後の `EVENT.drive` が外す | 台詞を見つけたときに呼ぶ、中断の流し方 |
+| `_interrupted` | `boolean\|nil` | `EVENT.drive` が再開の前に `nil`、`build` が差し替えたときに `true` | この再開で、中断の台詞を反応の代わりに出したか |
 
 `build` の手順:
 
 1. `token = ACT.IMPL.build(self)`（今どおり）。
 2. `spoke = token ~= nil and BUILDER.speaks(token)`。`self._spoke = self._spoke or spoke`。
 3. `token == nil` なら `nil` を返す（今どおり）。
-4. `spoke` で `self._on_speech` があれば、欄を `nil` に戻してから呼ぶ。返ったトークン列 `head` があれば、`token` を「`head` の全部 → `{ type = "seam" }` → 元の `token`」の順の新しい表にする。
+4. `spoke` で `self._on_speech` があれば、欄を `nil` に戻してから呼ぶ。返ったトークン列 `head` があれば、`token = head` と差し替え、`self._interrupted = true` とする。割り込んだシーンのトークンは文字列にしないので、その表情・立ち位置は `STORE.appearance`・`STORE.actor_spots` に残らない（3.6）。
 5. `BUILDER.build(token, …)` で 1 回だけ文字列にする（今どおり）。
 
 - `get_property` が出す `\![get,property,…]` だけの回は台詞を数えない。退避した台詞は、まだ出していないので数えない。
 
-#### BuilderSeam（`BUILDER.speaks`・`seam`）
+#### BuilderSpeaks（`BUILDER.speaks`）
 
 | Field | Detail |
 |-------|--------|
-| Intent | 台詞の判定と、中断の台詞と割り込んだシーンのつなぎ目の組み立て |
-| Requirements | 1.2, 3.6 |
+| Intent | まとめたトークン列に、台詞か選択肢があるかを判定する |
+| Requirements | 1.2 |
 
 **Contracts**: Service [x]
 
@@ -473,12 +475,7 @@ act の欄（`ShioriAct` の `@field` に書き足す）:
 function BUILDER.speaks(groups) end
 ```
 
-`seam` のトークン（まとめたトークン列の一番上の段だけに置く）を、`BUILDER.build` は次のとおりに扱う。
-
-- 直前のスコープが 0 以外なら `\p[0]` を出す（スクリプトの頭と同じスコープに戻す）。
-- 直前の話し手と直前のスコープを空に戻す（`last_actor = nil`・`last_spot = nil`）。吹き出しの字の有無・最後に表示したもの・列の状態は残す。
-
-これで、割り込んだシーンの最初の話し手への切り替え（`\p[…]` と表情の復旧）は、中断の台詞が無いときと同じに出る。同じ吹き出しに中断の台詞が先に出ていれば、段落の区切りの改行（`spot_newlines`）か選択肢の前の改行（`choice_newlines`）が 1 つ入る。`\e` は最後に 1 つだけ付く（3.6）。
+`BUILDER.build` は変えない。中断の台詞は、ふつうのシーンの 1 回の出力と同じに組み立てる（`\e` は最後に 1 つ）。
 
 ### 印の層
 
@@ -519,10 +516,10 @@ function BUILDER.speaks(groups) end
 - 何も出さないシーン（`＊OnMouseMove` の代わりに、何も積まないシーン）を `EVENT.fire` で動かしても `STORE.co_scene` が同じコルーチンのまま残り、次に続きを返すハンドラで後半が出る（1.1・7.1）。
 - 表情の単語（字が `\s[5]` の `talk`）・`sakura_script` の `\![bind,…]`・失敗の表記だけのシーンでも続きが残る（1.2・7.1）。
 - 台詞を出すシーンと、選択肢だけを出すシーンは続きを捨てる（2.1・7.1）。台詞を出さずに区切ったシーンは、前の続きを残し、自分の残りを捨てる（1.3）。
-- 中断のシーンがあるとき、応答の Value が「中断の出力 → 割り込んだシーンの出力」の 1 本で、`\e` が最後に 1 つだけ。話し手が同じなら段落の区切りが入り、違えば切り替えのタグが出る。割り込んだシーンが表情から始まるとき、表情が中断の台詞の後に出る（3.1・3.6・7.1）。中断のシーンが無いときと空のときは、今と同じ応答（2.4・3.7）。
+- 中断のシーンがあるとき、応答の Value が中断の台詞だけの 1 本で、割り込んだシーンの台詞・表情が含まれない。その次の応答で、割り込んだシーンの表情が持ち越されていない（3.1・3.6・7.1）。中断のシーンが無いときと空のときは、今と同じ応答（2.4・3.7）。
 - 検索の差し替えが `チェイントーク中断ごっこ` だけを持つとき、中断の台詞が付かない（3.4・7.1）。
-- 割り込んだシーン自身が区切ると、新しい方の続きが残り、中断の台詞も付く（2.2・7.1）。
-- 中断のシーンが区切ると、最初に出力のある区切りまでだけが付き（頭が空の区切りは飛ばす）、中断のシーンが `get_property` で待ちに入ると中断の台詞は付かず、待っている続きは割り込んだシーンの残りになる（3.9）。中断のシーンがエラーで止まると、止まるエラーの応答（止まった場所が `＊チェイントーク中断`）になり、続きは捨てられる（3.10）。
+- 割り込んだシーン自身が区切ったとき、中断の台詞が出れば続きは残らない（3.12）。中断が無ければ新しい方の続きが残る（2.2・7.1）。
+- 中断のシーンが区切ると、最初に出力のある区切りまでだけが付き（頭が空の区切りは飛ばす）、続きは残らない（3.9・3.12）。中断のシーンが `get_property` で待ちに入ると中断の台詞は出ず、反応が今どおり出る（3.7 と同じ扱い）。中断のシーンがエラーで止まると、止まるエラーの応答（止まった場所が `＊チェイントーク中断`）になり、続きは捨てられる（3.10）。
 - キック（`KICK.try_dispatch` が返すコルーチン）・`OnPastaScene`・`OnPastaSceneAt` は、台詞が無くても続きを捨て、中断の台詞を付けない（4.1〜4.3・7.1）。
 - エラーで止まったシーンは、台詞を積んでいても続きを捨て、表記に中断の台詞が混ざらない（5.1・7.1）。
 - コールバック待ち: 台詞を出さずに待ちに入ったシーンは続きを残し（2.6）、戻った回に台詞を出せば続きを捨てて中断の台詞を付ける（2.5・7.1）。
@@ -536,7 +533,7 @@ function BUILDER.speaks(groups) end
 
 `scene_play_event_test.rs` と同じく、実際のゴーストの一時フォルダーと `PastaLoader` で動かす。
 
-- DSL に `＊OnTalk`（前半・`＞チェイントーク`・後半）、`＊チェイントーク中断`、台詞を出すシーンと出さないシーンを書く。台詞を出さないシーンの後は後半が出て、台詞を出すシーンの後は「中断の台詞 → 反応」の 1 本が返り、後半が出ない（1.1・3.1・3.6）。
+- DSL に `＊OnTalk`（前半・`＞チェイントーク`・後半）、`＊チェイントーク中断`、台詞を出すシーンと出さないシーンを書く。台詞を出さないシーンの後は後半が出て、台詞を出すシーンの後は中断の台詞だけが返り（反応は出ない）、後半も出ない（1.1・3.1・3.6）。
 - `＊チェイントーク中断ごっこ` だけを書いたゴーストでは、中断の台詞が付かない（3.4）。
 
 ### 確かめ方
@@ -554,8 +551,8 @@ function BUILDER.speaks(groups) end
 
 議題はすべて推奨案で確定した（開発者の承認）。番号は生成時の未決事項の番号である。
 
-1. **act を通らないコルーチンの中断の台詞**（1.7 と 3.1）: 出力が空でなければ台詞に数えて続きを捨てるが、中断の台詞は流さない（組み立てを通らないので、前に足せない）。マニュアル（`lua/shiori-events.md` の OnTalk かチェイントークの所）に「Lua で作ったコルーチンでは中断の台詞は付かない」と 1 行書く。文字列でつなぐ案は、`\e` と表情の持ち越しが崩れるので採らない。
-2. **つなぎ目の見え方**（3.6）: `seam` で話し手の切り替えを出し直し、同じ吹き出しなら段落の区切りを 1 つ入れる。中断の台詞と反応が別の発話として読め、反応の頭は中断の台詞が無いときと同じ形になる。`grammar/call-jump.md` に例（同じ話し手のとき段落が変わる）を載せる。
+1. **act を通らないコルーチンの中断の台詞**（1.7 と 3.1）: 出力が空でなければ台詞に数えて続きを捨てるが、中断の台詞は流さない（組み立てを通らないので、差し替えられない）。マニュアル（`lua/shiori-events.md` の OnTalk かチェイントークの所）に「Lua で作ったコルーチンでは中断の台詞は付かない」と 1 行書く。文字列でつなぐ案は、`\e` と表情の持ち越しが崩れるので採らない。
+2. **中断の台詞と反応の関係**（3.1・3.6・3.12）: 下書きは「中断の台詞を反応の前に添え、つなぎ目（`seam`）で話し手を切り替え直す」だったが、開発者が改めた。中断の台詞を反応に添えると会話がうまくつながらないため、中断の台詞があれば反応の代わりに出す（優先）。無ければ反応を今どおり出す。中断の台詞が出た回は、割り込んだシーンが区切った残りも捨て、続きを残さない。`seam` のトークンは足さない。メニューや `OnClose` のように反応に役目があるイベントでも同じで、もう一度操作すれば今どおり反応することを、マニュアルに書く。
 3. **中断のエラーの応答の中身**（3.10）: 止まった場所は `＊チェイントーク中断`、中身は中断が止まるまでの出力と表記で、割り込んだシーンのその回の出力は載せない。表示の順で中断が先にあるので、「止まった所までを出す」決まりがそのまま当てはまる。
 4. **中断の中の区切りと待ち**（3.9）: 前提の案を改めた。出力の無い区切りは、ふつうのシーンと同じく `resume_until_valid` で飛ばし、最初に出力のある区切りまでを使う。中断のシーンが待ちに入った回は、中断の台詞を付けない（get のタグも出さない）。要件 3.9 の文言も合わせて直した。
 5. **台詞に数えるさくらスクリプト**（1.2）: `sakura_script` は字を表示するもの（`\_u[…]` など）も数えない。台詞は `talk` だけを字の判定で数える。brief の決まりのとおりで、判定も単純に保てる。
