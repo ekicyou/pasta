@@ -223,3 +223,25 @@
 - budoux の幅は `line_breaker.rs` の `cluster_width`（1 コードポイントは今までどおり・`\r\n` は 0・それ以外は文字列の東アジアの幅）で数え、改行はクラスタの境目にだけ入る。`line_breaker.rs` は 1,155 行、`tokenizer.rs` は 608 行になった。
 - 公開 Rust API: `CharSets` の各フィールドは `HashSet<String>`、`CharSets::classify` は `&str`（クラスタ）を取る。Lua からの呼び方（`talk_to_script`・`break_lines`）は変わらない。
 - 見直しが要る論点: この spec が待ち・改行・列の数え方に手を入れるなら、上の単位（クラスタ）と関数名を前提にする。参照は `.kiro/specs/completed/talk-grapheme-clusters/design.md` の LineBreaker・WaitInserter の節と `book/src/internals/talk-output.md`。
+
+## 2026-10-23 棚卸の再測定（main 82176f19）
+
+- **前提の変化**（前回 2026-10-18・`facd6cf4` から）:
+  - 書記素クラスタ（`talk-grapheme-clusters`）: 表示名を台詞の文字の中に入れる形（`\_a[ID,スコープ]表示\_a`）なら、`\_a[…]` と閉じの `\_a` は今もタグ 1 つとして読まれ（タグの読み方 `SAKURA_TAG_PATTERN` は変えていない。`tokenizer.rs` 163 行）、列を動かさない（`line_breaker.rs` の `column_move` 57〜67 行）。表示の字には 1 クラスタに 1 つ自動ウェイトが入り（`wait_inserter.rs` の `append_with_wait` 154 行）、budoux はクラスタの境目で、アンカーの中でも改行しうる。字の幅は `cluster_width`（`line_breaker.rs` 101 行）が数える。
+  - 表示名を Lua の側で `talk_to_script` に通してから `\_a` で包む形なら、Rust に触らない。触るとしても、`talk-grapheme-clusters` が完了したので「同じウェーブに置かない」約束はもう要らない。アンカーの中で改行させないなら、触るのは `line_breaker.rs` の本体（1〜310 行。ファイルは 1,155 行で、残りは中のテスト）で、テストは `tests/sakura_script/` に置く。公開の Rust の形（`CharSets` は `HashSet<String>`、`classify(&str)`）と、Lua からの呼び方（`talk_to_script(actor, text, column)`・`break_lines`）は変わらない前提でよい。
+  - チェイントークの続き（`chain-talk-interrupt`）: アンカーは、トークを止めないので、待っているチェイントークの途中の台詞にも置ける。クリックで始まる飛び先のシーンは印の無い新しいコルーチンなので、待っている続きがあれば「割り込み」になる（`shiori/event/init.lua` の `drive_kind` 161 行）。台詞を出せば続きは捨てられ、`＊チェイントーク中断` があれば、その台詞が飛び先のシーンの**代わりに**出る。読み手には、押したのに飛ばないように見える。印（`STORE.co_preempt`。キックは `kick.lua` 69 行で付ける）を付けて「指名した再生」にするか、選択肢と同じ割り込みのままにするかを要件で決める。選択肢の受け口（`choice_select.lua` 25〜35 行の `create_scene_coroutine`）を共有するなら、選択肢にも効く。
+  - アンカーを独り立ちのトークンにするなら、台詞の印（`sakura_builder.lua` の `BUILDER.speaks` 413 行。字のある `talk` と `choice` だけを数える）にどう数えるかも決める。台詞の文字の中に入れる形なら、今のまま `talk` として数えられる。
+  - 鎖（`reg-handler-chain`）: `REG` にメタテーブルが付いた（`event/register.lua` 115 行）が、`REG.OnAnchorSelectEx = REG.OnAnchorSelectEx or function(act) … end` の既定の登録は、`choice_select.lua` 41 行と同じ形のまま書ける。作者の `REG:register` の鎖が先に呼ばれ、全部見送ったときに既定が呼ばれる（`init.lua` 324〜339 行）。
+  - 中断のシーンが走ると `STORE.last_global_scene` が中断のシーンの名前になる（`chain-talk-interrupt` の design.md の Risks）。選択肢の受け口は Reference2 が無いときだけこれを範囲に使う（`choice_select.lua` 68 行）。アンカーの ID の後ろに範囲を必ず載せれば、影響しない。
+- **触るファイル**: 2026-10-17 の節と同じ。行数が動いたのは `shiori/sakura_builder.lua` 540 → 558（`choice_to_script` 31 行・`emits_text` 136 行・`put_break` 278 行・`emit_inner_token` 340 行は動かず、`BUILDER.build` は 414 → 432 行）と `act.lua` 829 → 837（`act:choice` 305 行・`merge_consecutive_talks` 94 行は動かず）。ほかは `grammar.pest` 272・`parse_action.rs` 456・`ast/action.rs` 323・`partial.rs` 477・`element_gen.rs` 564・`choice_select.lua` 80・`sakura_script/mod.rs` 322・`visit_action.rs` 431・`pasta.tmLanguage.json` 272・`wordRefDecorator.ts` 41・`validate/references.rs` 135・`report.rs` 475・`validate/mod.rs` 140。
+- **規模**: 18〜20 のまま（割り込みの扱いはクリックの受け口のタスクに、台詞の印の数え方は `\_a` の出力のタスクに入る）。
+- **先に要るもの**: 機能として要るものは無い。roadmap の順は `call-attribute-filter`（未完了。同じファイルを触る順番だけ）の後。`talk-grapheme-clusters` と 0.4.2 の 3 本は完了したので外れた。ファイルの重なり:
+  - 0.5.0 の道筋: `call-attribute-filter`（文法・`parse_action.rs`・構文木・`partial.rs`・`element_gen.rs`・`act.lua`・VSCode の文法定義・`visit_action.rs`・検査の段）、`scene-attribute-store`（`grammar.pest`・`act.lua`）、`cue-command-runtime`（`grammar.pest`・`act.lua`・`sakura_builder.lua`、柱を `choice_select.lua` で打つならそれも）、`novel-talk-flow`（`act.lua`・`sakura_builder.lua`）、`novel-checkpoint-rollback`（`sakura_builder.lua`）、`novel-variable-scope`（`grammar.pest`・`parse_action.rs`・`partial.rs`・`element_gen.rs`・VSCode の文法定義）、`shell-element-click`（`act.lua`・`choice_select.lua`）。
+  - 版の決まっていないもの: `scene-exact-match`（`act.lua`・`choice_select.lua`・`parse_action.rs`・`element_gen.rs`・`references.rs`）、`scene-pick-modes`（`grammar.pest`・`act.lua`）。
+  - 隙間の spec: `ponytail-dsl-parser`（文法・`parse_action.rs`）、`ponytail-editor-tooling`（`partial.rs`・`visit_action.rs`・VSCode・`report.rs`）、`ponytail-lua-scripts`（`act.lua`・`choice_select.lua`）。
+- **種別**: 機能（台詞の途中の `＠？` は今は構文エラー）。起票のときに開発者が決めたことが 3 つある（`\_a`・`＠？`・飛び先が無ければ 204）。
+- **要件定義のモデル**: Opus のまま。後から戻しにくい書き方・出力・204 は 2026-10-08 に決めてあり、伺かの仕様は UKADOC で確かめてある。今回増えた割り込みの扱いは「印を付ける・付けない」の 2 つに絞れていて、選択肢と揃える推奨が立つ。表示名の字の数え方も 2 つの案に絞れていて、後から直せる。
+- **分割の案**: 分けない。20 を超えたら、2026-10-17 の節のとおり、エディタの分を `scene-anchor-link-editor` として後ろに出す。
+- **見つけた穴・古くなった記述**:
+  - roadmap の Phase 11 の表（325 行）と Phase 13 の共有接点（369 行）の「`talk-grapheme-clusters` と同じウェーブに置かない」は、完了したので要らない。2026-10-18 の節の 2 点目（`talk-grapheme-clusters` の brief と roadmap の流れの食い違い）も、同じ理由で閉じた。
+  - Constraints の「BudouX の行幅の数えは、トークンごとにやり直し（`mod.rs:145`）」は今も古いまま（列は吹き出しごとに持ち越す。`sakura_script/mod.rs` 132〜153 行）。

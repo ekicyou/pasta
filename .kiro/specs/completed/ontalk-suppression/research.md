@@ -153,7 +153,7 @@
 ### 時刻の取り方（§4.1 の Research Needed）
 
 - **Context**: 再開の時点の時刻で時報を決め直す案（H1・H4）は `act.req.date` に頼る。シーンの外から呼ばれたときに時刻があるか。
-- **Sources Consulted**: `crates/pasta_shiori/src/lua_request.rs`（`parse_request`・`lua_date`）、`pasta/shiori/clock.lua`（`M.now`・`M.steady`）、`.kiro/specs/external-control-events/brief.md`（`OnPastaCallFunction` の `act:call` で呼ぶ）。
+- **Sources Consulted**: `crates/pasta_shiori/src/lua_request.rs`（`parse_request`・`lua_date`）、`pasta/shiori/clock.lua`（`M.now`・`M.steady`）、`.kiro/specs/completed/external-control-events/brief.md`（`OnPastaCallFunction` の `act:call` で呼ぶ）。
 - **Findings**: リクエストの表には常に `date` がある。`external-control-events` は `REG` ハンドラの `act` で `act:call` するので、時刻は取れる。
 - **Implications**: 時刻が取れない場合は SHIORI の経路では起きない。落としどころ（初回扱い）は単体テストと直接の呼び出しのためだけで足りる。
 

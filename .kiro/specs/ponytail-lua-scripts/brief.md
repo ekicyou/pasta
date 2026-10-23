@@ -149,3 +149,25 @@
 - 続きを捨てるのは 3 つだけになった: 台詞（字のある `talk` か `choice`）を出した割り込み・指名した再生（キックと `OnPastaScene`・`OnPastaSceneAt`。`STORE.co_preempt` の印）・エラー。台詞を出さないシーンや、台詞を出さずにコールバック待ちに入ったシーンは、待っている続きに触れない。
 - 仕組み: `shiori/event/init.lua` の `set_co_scene(co, keep)`・`drive_kind(co)`・`run_interrupt_scene(act)`・`EVENT.drive`（種類を決める → act の欄 `_spoke`・`_on_speech`・`_interrupted` を整える → 再開 → 欄を外す → 台詞の印を読む）。台詞の判定は `sakura_builder.lua` の `BUILDER.speaks`、印は `shiori/act.lua` の `SHIORI_ACT_IMPL.build` が立てる。詳しくは `.kiro/specs/completed/chain-talk-interrupt/design.md` の「続きの決まり」と ContinuationRule。
 - 見直しが要る論点: 4 番の整理（`coroutine.close` の死んだ分岐・`STORE.co_callback`）で、`set_co_scene` の `keep` の引数と `_interrupted` の枝（`set_co_scene(nil, false)`）を保つこと。brief の L70 の案（`if consume_staged then co = nil end; set_co_scene(co)`）はもう今の形に合わない。`EVENT.drive` の手順の順は `tests/lua_specs/chain_talk_interrupt_test.lua` が守っている。
+
+## 2026-10-23 棚卸の再測定（main 82176f19）
+
+- **前提の変化**: 順番の約束の 2 本（`chain-talk-interrupt`・`reg-handler-chain`）が入った。0.4.2 の残りは `shiori4-v3-portable`（Rust だけ）で、この spec とファイルを共有しない。監査のやり直しの対象に新しいコードが増えた: `event/init.lua` 268 → 371 行（`drive_kind`・`run_interrupt_scene`・鎖のループ）、`event/register.lua` 117 行（メタテーブル）、新しいファイル `event/external_control.lua` 145 行、`shiori/act.lua` 344・`sakura_builder.lua` 558・`store.lua` 139・`callback.lua` 233・`kick.lua` 167・`scene_play.lua` 114。
+  - 1 番（Must fix）は残っている。`virtual_dispatcher.lua`（328 行。変わっていない）84 行が `ghost.hour_margin or 30`、206 行で比べ、計算し直す 211 行より前で返る。設定の読み直しは 100・191 行。
+  - 2 番は残っている（`res.lua` 52〜56 行。変わっていない）。
+  - 3 番: 写しが 1 つ増えた。`external_control.lua` 82〜85 行の `coroutine.create`（呼び先に引数を渡し `a:build()` を返す。形が違う）。キックの `wrap_local_func`（`kick.lua` 59〜72 行）と `wrap_reload_func`（80〜92 行）は `STORE.co_preempt[co] = true` の印を付けるようになった。`SCENE.co_exec_registered`（`scene.lua` 258 行）にまとめるときは、印を付ける行を呼ぶ側に残す。`choice_select.lua` 25〜35 行と `scene.lua` 186〜197 行の `wrap_scene` は変わっていない。
+  - 4 番: `set_co_scene(co, keep)` は 110〜154 行。死んだ `coroutine.close` の分岐は 112〜117・133・146〜150 行と `store.lua` 97〜105 行。`STORE.co_callback` は `keep` の枝（120〜125 行）でも読むようになった。`EVENT.drive`（257〜301 行）は 286 行で `consume_staged` の戻り値を捨てている。直すときはこの真偽を `keep` の枝と捨てる枝の両方へ渡し、`_interrupted` の枝（295 行の `set_co_scene(nil, false)`）を保つ。手順の順は `tests/lua_specs/chain_talk_interrupt_test.lua` が守る。`callback.lua` は 73・230 行、`store.lua` の説明は 22・90〜92 行。
+  - 7 番は残っている。期限は `shiori/act.lua` 309〜310 行の `CLOCK.steady(self.req)` で、`self` は区切る前の act（`pasta/act.lua` 664〜675 行の `ACT_IMPL.yield` が `self` を返し、再開の値を捨てる）。
+  - 5・6・9 番の場所は変わっていない（`entry.lua` 69・140 行、`actor.lua` 20〜53 行、`pasta/act.lua` 410 行の `find_handler`）。
+- **触るファイル**: 上のとおり。`pasta/act.lua` 837（1,000 行に近い。この spec は減らす向き）。新しいファイルは無い見込み。
+- **規模**: 11〜14 タスク（新しいコードの監査と、増えた写しの分で 1 つ増える）。
+- **先に要るもの**: 機能の上では無い（Dependencies の 2 本は完了）。ファイルの重なり（未完了）: `recommend-menu-scenes`（`init.lua`・`entry.lua`、`scene.lua` に足すならそれも）、`shell-element-click`（`choice_select.lua`・`init.lua`）、`scene-exact-match`（`choice_select.lua`・`init.lua`・`scene.lua`・`virtual_dispatcher.lua`）、`scene-anchor-link`（`choice_select.lua`・`init.lua`・`act.lua`・`sakura_builder.lua`）、`novel-talk-flow`・`novel-checkpoint-rollback`（`init.lua`・`virtual_dispatcher.lua`・`entry.lua` ほか）、`scene-attribute-store`・`scene-pick-modes`（`scene.lua`）、`call-attribute-filter`・`cue-command-runtime`（`act.lua` ほか）。`shiori4-v3-portable` とは重ならない。
+- **種別**: バグ（数でない `hour_margin` で毎秒エラー、値の改行で応答が割れる、続きのトークの `get_property` がすぐ時間切れ）。残りは写しと死んだ分岐の整理。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - roadmap の台帳（460 行）の Dependencies（`chain-talk-interrupt`・`reg-handler-chain`）は、どちらも完了した。
+  - Approach の「`if CALLBACK.consume_staged(co, act) then co = nil end; set_co_scene(co)`」は今の形に合わない（上の 4 番）。
+  - `virtual_dispatcher.lua` 251〜253 行の説明「`set_co_scene` 置換で前 co_scene を閉じる」は古い。今はキックのコルーチンに付けた `STORE.co_preempt` の印で捨て、LuaJIT には `close` が無い。監査の指摘に入れる。
+  - 申し送り（`external-control-events` の設計の Non-Goals）: `scene_play.lua` と `external_control.lua` に共通する部品（名前の引き当てと、見つからないときの失敗の表記）の取り出しは、この spec の題材にする。
+  - 申し送り（`chain-talk-interrupt` の tasks.md の注記）: `EVENT.drive` の `_interrupted` の枝は `STORE.co_callback` を戻さない。`get_property` の組み立てが台詞として数えられるように変わるなら、ここを見直す。

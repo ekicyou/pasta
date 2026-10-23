@@ -157,3 +157,21 @@
 
 - `FAILURE.LABEL` に `NOT_JSON = "JSON として読めない値"`・`NOT_ASSIGNABLE = "代入できない値"` が入り、12 種になった（上の「10 種」は古い）。種類を足すときは `failure_test.lua` の数のテストも合わせて直す。
 - 既定のハンドラの読み込みの並び（`pasta/shiori/event/init.lua`）の末尾に、`scene_play` の次の 1 行として `external_control` が入った。読み込みの行を足すときはその後ろになる。
+
+## 2026-10-23 棚卸の再測定（main 82176f19）
+
+- **前提の変化**
+  - `choice_select.lua`（80 行）・`mouse.lua`（176 行）・`scene.lua`（266 行）・`search/context.rs` は、前の棚卸から変わっていない。行番号（16〜18・25〜35・41〜78・70〜71 行）は合っている。
+  - `event/init.lua` は 371 行になった（`reg-handler-chain`・`chain-talk-interrupt`）。読み込みの並びは 85〜90 行で、末尾は `external_control`。新しい受け口のファイルを置くなら、その後ろに 1 行。ハンドラには今も act だけを渡し、Reference は場面の引数にならない（`EVENT.drive(result, act, act)` は 343 行）。`CLOCK.observe` は 317 行、`STOP.hold_handler` は 327・337 行。
+  - `REG` にメタテーブルが付いた（`register.lua`）。既定のハンドラの置き方 `REG.名前 = REG.名前 or 関数` はそのまま使える。作者が `REG:register` で重ねたハンドラは、既定の受け口より先に呼ばれる。
+  - チェイントークの決まり（`chain-talk-interrupt`）: クリックで動いた場面が台詞を出すと、待っている続きを捨てる割り込みになり、`＊チェイントーク中断` があれば反応の代わりにそれが出る。システム画面のボタンを、選択肢と同じ割り込みとして扱うか、指名した再生（`STORE.co_preempt` の印。中断の台詞を出さずに捨てる）として扱うかを、要件で決める。
+  - 「どの画面の場面か」を覚える案で、`STORE.last_global_scene` は使えない。選択肢の受け口は範囲が無いときにこれを使う（`choice_select.lua` 68 行）が、中断の場面が走るとその名前になる（`chain-talk-interrupt` の design の Risks）。覚えるなら専用の置き場所にする。
+- **触るファイル**: `choice_select.lua`（80）、受け口を新しいファイルにするなら `init.lua`（371）に 1 行、範囲つきの完全一致の口を足すなら `scene.lua`（266）、テスト、マニュアル（`lua/shiori-events.md` の既定ハンドラの表 119〜131 行と新しい節）。`act.lua` は触らない。1,000 行に近いものは無い。
+- **規模**: 6〜8 タスク（チェイントークとの関係を決めて試す分で、下の端が 1 つ上がる）。
+- **先に要るもの**: `novel-areka-contract`（未着手。イベントの名前と Reference の決まり）。ファイルの重なり（未完了）: `ponytail-lua-scripts`（`choice_select.lua` の写しを消す・`init.lua`）、`scene-anchor-link`（`choice_select.lua`）、`scene-exact-match`（`choice_select.lua`・`init.lua`・`scene.lua`）、`recommend-menu-scenes`（`init.lua` の読み込みの行。マニュアルの既定ハンドラの表にも同じく行を足す）、`cue-command-runtime`（柱を `choice_select.lua` で打つ場合）、`novel-talk-flow`・`novel-checkpoint-rollback`（`init.lua`）、`scene.lua` に足すなら `scene-attribute-store`・`call-attribute-filter`・`scene-pick-modes`。
+- **種別**: 機能（名前つきのクリックを場面へ届ける道が無い）。開発者の 0.5.0 の決定（システム画面はシェルで組む）から。
+- **要件定義のモデル**: Opus のまま（決め方は 2 案に絞れていて推奨を付けられる。チェイントークとの関係も 2 案）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 2026-10-18 の節の「`init.lua`（267）の 78〜81 行に読み込みを 1 行」は、85〜90 行の後ろに動いた。
+  - `ponytail-lua-scripts` が先に入ると、`create_scene_coroutine`（`choice_select.lua` 25〜35 行）は `SCENE` 側の関数に置き換わる見込み。振り分けの取り出しは、先に入った側の形に合わせる。
