@@ -129,3 +129,4 @@
 ## Implementation Notes
 
 - 2.3: `_interrupted` の枝は `set_co_scene(nil, false)` で `STORE.co_callback` を戻さない。中断の台詞が出る回（台詞のある組み立て）とコールバック待ち（`get_property` は台詞をよけて組み立てる）は同じ再開で重ならないので害はない。`get_property` の組み立てが台詞を数えるように変わるときは見直す。
+- 申し送り（kiro-complete で各 brief へ）: external-control-events は OnPastaCallFunction がコルーチンを返して EVENT.drive を通し、co_preempt の印を付けないこと（要件 6.2）。reg-handler-chain は thread を返すハンドラに EVENT.drive(result, act, act) と同じ act を渡し続けること。ponytail-lua-scripts は set_co_scene(co, keep) と _interrupted の枝を保つこと。novel-talk-flow・novel-checkpoint-rollback は「捨てる」が台詞を出した割り込み・指名した再生・エラーの 3 つに狭まったことと co_preempt を前提にすること。
