@@ -26,6 +26,7 @@ $ReleaseDir = Join-Path $WorkspaceRoot "release\hello-pasta"
 $NarFilePath = Join-Path $WorkspaceRoot "release\hello-pasta.nar"
 $DllZipPath = Join-Path $WorkspaceRoot "release\pasta.dll.zip"
 $CheckZipPath = Join-Path $WorkspaceRoot "release\pasta_check.zip"
+$SkillsZipPath = Join-Path $WorkspaceRoot "release\pasta-skills.zip"
 $PastaCheckExe = Join-Path $WorkspaceRoot "target\x86_64-pc-windows-msvc\release\pasta_check.exe"
 
 Write-Host "========================================"
@@ -269,6 +270,81 @@ if (($zipEntries -join "|") -ne ($expectedEntries -join "|")) {
     exit 1
 }
 Write-Host "  Created pasta.dll.zip ($($zipEntries -join ', '))" -ForegroundColor Green
+Write-Host ""
+
+# --- Step 6: Create pasta-skills.zip (3 distributed skills + LICENSE) ---
+# Always runs, even with -SkipSetup / -SkipDllBuild.
+# Written entry by entry with '/' names: Compress-Archive / CreateFromDirectory write '\' on PowerShell 5.1.
+Write-Host "[6/8] Creating pasta-skills.zip..."
+
+$SkillNames = @('pasta-ghost-authoring', 'pasta-lua-coding', 'pasta-check')
+
+# Remove a stale zip so a failed run never leaves an old one behind
+if (Test-Path $SkillsZipPath) {
+    Remove-Item -Path $SkillsZipPath -Force
+}
+
+# Tracked files only (repo-relative, '/'-separated), so untracked local files never get in
+$SkillFiles = @(& git -C $WorkspaceRoot ls-files -- ($SkillNames | ForEach-Object { ".claude/skills/$_" }))
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "ERROR: git ls-files failed" -ForegroundColor Red
+    exit 1
+}
+$SkillsPrefix = '.claude/skills/'
+$expectedEntries = @($SkillFiles | ForEach-Object { $_.Substring($SkillsPrefix.Length) }) + @('LICENSE')
+
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = $null
+try {
+    $zip = [System.IO.Compression.ZipFile]::Open($SkillsZipPath, 'Create')
+    foreach ($f in $SkillFiles) {
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $WorkspaceRoot $f), $f.Substring($SkillsPrefix.Length)) | Out-Null
+    }
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $WorkspaceRoot "LICENSE"), 'LICENSE') | Out-Null
+    $zip.Dispose()
+}
+catch {
+    if ($null -ne $zip) {
+        $zip.Dispose()
+    }
+    if (Test-Path $SkillsZipPath) {
+        Remove-Item -Path $SkillsZipPath -Force
+    }
+    Write-Host ""
+    Write-Host "ERROR: failed to write pasta-skills.zip: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}
+
+$zip = [System.IO.Compression.ZipFile]::OpenRead($SkillsZipPath)
+try {
+    $zipEntries = @($zip.Entries | ForEach-Object { $_.FullName })
+}
+finally {
+    $zip.Dispose()
+}
+# Case-sensitive checks (-c*): names must match the source tree exactly
+$requiredEntries = @($SkillNames | ForEach-Object { "$_/SKILL.md" }) + @('LICENSE')
+$missingEntries = @(($requiredEntries + $expectedEntries) | Select-Object -Unique | Where-Object { $zipEntries -cnotcontains $_ })
+$extraEntries = @($zipEntries | Where-Object { $expectedEntries -cnotcontains $_ })
+$badEntries = @($zipEntries | Where-Object { $_.Contains('\') })
+if ($missingEntries.Count -gt 0 -or $extraEntries.Count -gt 0 -or $badEntries.Count -gt 0) {
+    Write-Host ""
+    Write-Host "ERROR: pasta-skills.zip content mismatch" -ForegroundColor Red
+    if ($missingEntries.Count -gt 0) {
+        Write-Host "  Missing: $($missingEntries -join ', ')"
+    }
+    if ($extraEntries.Count -gt 0) {
+        Write-Host "  Extra: $($extraEntries -join ', ')"
+    }
+    if ($badEntries.Count -gt 0) {
+        Write-Host "  Bad path: $($badEntries -join ', ')"
+    }
+    Remove-Item -Path $SkillsZipPath -Force
+    exit 1
+}
+Write-Host "  Created pasta-skills.zip ($($zipEntries.Count) files: $(($SkillNames + @('LICENSE')) -join ', '))" -ForegroundColor Green
 Write-Host ""
 
 # --- Step 6: Version Check ---

@@ -8,7 +8,7 @@
   - _Requirements: 2.9_
 
 - [ ] 2. リリースビルドに pasta-skills.zip の段を足す
-- [ ] 2.1 pasta-skills.zip を作って検査する段を足す
+- [x] 2.1 pasta-skills.zip を作って検査する段を足す
   - 段 5（`pasta.dll.zip`）の後に段 6「Creating pasta-skills.zip」を置く。見出しは最初から `[6/8]` で書く（ほかの段の番号の付け直しは 2.2）。リリースの段（3〜8）の中にあり、`-SkipSetup`・`-SkipDllBuild` でも必ず走る。冒頭のパスの設定に `pasta-skills.zip` の場所を足す
   - 古い zip を消す → 配るスキル 3 つのフォルダの追跡しているファイルの一覧を git から取る（失敗なら `ERROR: git ls-files failed`）→ 名前を `/` 区切りで組んで（先頭の `.claude/skills/` を外す）ファイルを書き、最後にルートの `LICENSE` を `LICENSE` の名前で書く → 書く途中の例外では zip を閉じて消して失敗する、の順にする
   - 書いた zip を読み直し、必須の名前（3 つの `SKILL.md` と `LICENSE`）・期待の一覧との過不足のない一致（大文字と小文字を区別）・`\` を含むエントリが無いこと、を検査する。合わなければ `ERROR: pasta-skills.zip content mismatch` と、空でない `Missing:`・`Extra:`・`Bad path:` の行を出し、zip を消して失敗する
@@ -100,3 +100,7 @@
   - 完了の姿: 上の検査がすべて通り、変更が File Structure Plan のファイルだけに収まっている
   - _Depends: 3.1, 3.2, 4.1, 4.2, 5.1, 5.2_
   - _Requirements: 2.9, 3.7, 4.6, 5.5, 6.5, 7.1_
+
+## Implementation Notes
+
+- 段の行を `powershell.exe -NoProfile -Command -` に流して 5.1 で走らせるときは、入力の末尾に空行を置く（無いと最後の文が走らない）
