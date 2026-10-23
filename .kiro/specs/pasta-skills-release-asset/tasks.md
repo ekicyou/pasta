@@ -105,3 +105,4 @@
 
 - 段の行を `powershell.exe -NoProfile -Command -` に流して 5.1 で走らせるときは、入力の末尾に空行を置く（無いと最後の文が走らない）
 - 2.3: pwsh 直の通し・`-SkipSetup`・失敗の道・5.1 の同一性はすべて確認済み。`release.bat`（`-ExecutionPolicy Bypass`）での通しは開発者の確かめに回した
+- 完了時にその場で解決: `release.ps1` のまとめの表示で `Skills Zip:` の値だけ 1 桁ずれていたのを、ほかのラベルの桁を合わせてそろえた
