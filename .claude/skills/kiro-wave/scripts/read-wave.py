@@ -3,6 +3,7 @@
 Usage:
   MSYS_NO_PATHCONV=1 git show origin/main:.kiro/steering/roadmap.md | python -I read-wave.py
   (Git Bash rewrites "origin/main:..." as a Windows path without MSYS_NO_PATHCONV=1.)
+  ... | python -I read-wave.py --models <name>...   (requirements model of named specs)
   python -I read-wave.py --self-test
 
 Prints one line per spec: "<model> <name>" (model is Fable or Opus), then
@@ -10,6 +11,8 @@ Prints one line per spec: "<model> <name>" (model is Fable or Opus), then
 A spec is Fable when the code block lists it under Fable OR the wave table's
 last column (要件定義) starts with Fable — the stricter of the two wins.
 Exit 1 when no wave can be found.
+With --models, prints "<Fable|Opus|unknown> <name>" per named spec, looked up in
+every table that has "spec" and "要件定義" columns (Fable wins on conflict).
 """
 import sys
 
@@ -65,6 +68,36 @@ def read_wave(text):
     return date, specs, warns
 
 
+def spec_name(cell):
+    name = ""
+    for ch in cell:
+        if not (ch.isascii() and (ch.isalnum() or ch == "-")):
+            break
+        name += ch
+    return name
+
+
+def read_models(text):
+    """Requirements model per spec from every roadmap table that has both a
+    "spec" column and a "要件定義" column. Fable wins over Opus on conflict."""
+    models, cols = {}, None
+    for l in text.splitlines():
+        if not l.startswith("|"):
+            cols = None
+            continue
+        cells = [c.strip() for c in l.strip().strip("|").split("|")]
+        if cols is None:
+            cols = (cells.index("spec"), cells.index("要件定義")) if "spec" in cells and "要件定義" in cells else False
+            continue
+        if not cols or set(cells[0]) <= set("-: ") or len(cells) <= max(cols):
+            continue
+        name, model = spec_name(cells[cols[0]]), cells[cols[1]]
+        kind = "Fable" if model.startswith("Fable") else "Opus" if model.startswith("Opus") else None
+        if name and kind and models.get(name) != "Fable":
+            models[name] = kind
+    return models
+
+
 SAMPLE = """# Roadmap
 ## 棚卸（2026-01-02・main `abc`）
 ### ウェーブ（2026-01-02）
@@ -84,6 +117,11 @@ Opus
 ```
 ### 次
 ## Phase 1
+| 順 | spec | 要件定義 | 規模 |
+| -- | ---- | -------- | ---- |
+| 1 | d-spec（既存） | Fable | 15 |
+| 2 | a-spec | Opus（確定） | 3 |
+| 3 | e-spec | 未定 | 3 |
 """
 
 
@@ -92,6 +130,8 @@ def self_test():
     assert date == "2026-01-02", date
     assert specs == [("Fable", "b-spec"), ("Opus", "a-spec"), ("Fable", "c-spec")], specs
     assert len(warns) == 1 and warns[0].startswith("c-spec"), warns
+    models = read_models(SAMPLE)
+    assert models == {"a-spec": "Opus", "b-spec": "Fable", "c-spec": "Fable", "d-spec": "Fable"}, models
     for bad in ("# none\n", "## 棚卸（x）\n### ウェーブ（x）\nno block\n"):
         try:
             read_wave(bad)
@@ -106,6 +146,11 @@ def main():
     sys.stderr.reconfigure(encoding="utf-8")
     if "--self-test" in sys.argv:
         self_test()
+        return 0
+    if "--models" in sys.argv:
+        models = read_models(sys.stdin.buffer.read().decode("utf-8"))
+        for name in sys.argv[sys.argv.index("--models") + 1:]:
+            print(f"{models.get(name, 'unknown')} {name}")
         return 0
     try:
         date, specs, warns = read_wave(sys.stdin.buffer.read().decode("utf-8"))
