@@ -257,3 +257,8 @@ ghost_dev の「emo2 開発」「ぱすた開発」セッションに、Lua で�
 - **分割の案**: 分けない。
 - **見つけた穴・古くなった記述**:
   - 2026-10-17 の節の行番号: `act.lua` 829 → 837（`find_scene` 680 → 688、`call` 695 → 703、その中の `find_handler("scene", key)` 709 → 717。`search_dictionary` の `SCENE.search` 336 は同じ）。`search/context.rs` 788 → 1,017（`search_scene` 91 → 105、`search_scene_exact` 105 → 119、`search_scene_by` 115〜121 → 129〜135）。`scene_table.rs` 483 → 539（`resolve_scene_id` 179 → 183、`resolve_scene_id_unified` 226 → 230、`resolve_scene_id_exact` 251 → 255、`filter_by_attributes` 287 → 343、`find_scene` 453 → 509）。`scene.lua` の 150・160・208 行は同じ。
+
+## 申し送り（external-control-events より、2026-10-23）
+
+- `FAILURE.LABEL` に `NOT_JSON = "JSON として読めない値"`・`NOT_ASSIGNABLE = "代入できない値"` が入り、12 種になった（上の「10 種」は古い）。種類を足すときは `failure_test.lua` の数のテストも合わせて直す。
+- 既定のハンドラの読み込みの並び（`pasta/shiori/event/init.lua`）の末尾に、`scene_play` の次の 1 行として `external_control` が入った。読み込みの行を足すときはその後ろになる。

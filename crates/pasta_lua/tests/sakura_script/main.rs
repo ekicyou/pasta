@@ -11,4 +11,5 @@ mod basic_test;
 mod budoux_test;
 mod conformance_test;
 mod edge_case_test;
+mod grapheme_test;
 mod output_test;

@@ -1,8 +1,8 @@
 --- @module pasta.shiori.event
 --- イベント振り分けモジュール
 ---
---- SHIORI リクエストのイベント ID に応じてハンドラを呼び分ける。
---- 未登録イベントはデフォルトハンドラ（no_entry）で処理する。
+--- SHIORI リクエストのイベント ID に応じてハンドラを呼び分ける（鎖 → REG の値 → シーンの順）。
+--- 鎖も REG の値も無いイベントはデフォルトハンドラ（no_entry）で処理する。
 --- no_entry ではシーン関数フォールバックを試み、見つからなければ 204 を返す。
 --- エラーは呼び出し元（SHIORI.request）の xpcall でキャッチされる。
 ---
@@ -51,8 +51,15 @@
 --- end
 --- ```
 ---
+--- ハンドラの引き方（鎖 → 表の値 → シーン）:
+--- まず REG:register で重ねたハンドラ（鎖）を新しく登録した順に呼ぶ。nil・false は見送って
+--- 次へ回り、真の値を返したらそこで止めて、その戻り値を上の規則で応答にする。
+--- 鎖の写しは呼ぶ前に 1 回だけ取るので、途中の登録・外しは次のイベントから効く。
+--- 全部見送れば（鎖が空でも）表の生の値 rawget(REG, req.id) を呼ぶ（戻り値は真偽で見ない）。
+--- 鎖のハンドラも表の値も、呼ぶたびに新しい act を受け取る。
+---
 --- シーン関数フォールバック:
---- REG にハンドラが未登録の場合、SCENE.co_exec(act, req.id) でシーンを検索し、
+--- 鎖が全部見送り、REG にハンドラも未登録の場合、SCENE.co_exec(act, req.id) でシーンを検索し、
 --- 見つかればシーンコルーチンを EVENT.drive で再開してさくらスクリプトを 200 OK で返す。
 --- 見つからなければ 204 No Content を返す。
 ---
@@ -80,6 +87,7 @@ require("pasta.shiori.event.choice_select")
 require("pasta.shiori.event.second_change")
 require("pasta.shiori.event.mouse")
 require("pasta.shiori.event.scene_play")
+require("pasta.shiori.event.external_control")
 
 -- 2. モジュールテーブル宣言
 --- @class EVENT
@@ -295,7 +303,7 @@ end
 --- イベント振り分け
 --- 待機中のコールバックに一致すれば CALLBACK.try_route の応答を返す。
 --- 次に CLOCK.observe に合図と返事を見せ、返事（OnPastaClock）を受け取った回は 204 を返す。
---- それ以外はハンドラを実行し、戻り値をモジュール冒頭の規則で応答にする（thread は EVENT.drive で再開）
+--- それ以外は鎖 → REG の値 → シーンの順にハンドラを実行し、戻り値をモジュール冒頭の規則で応答にする（thread は EVENT.drive で再開）
 --- @param req table リクエストテーブル（req.id にイベント名）
 --- @return string SHIORI レスポンス
 function EVENT.fire(req)
@@ -310,15 +318,25 @@ function EVENT.fire(req)
         return RES.no_content()
     end
 
-    -- act オブジェクトを作成
-    local act = create_act(req)
-
-    -- ハンドラを呼び出し
+    -- 鎖（REG:register）を新しい順に呼び、真の値を返したものの act と戻り値で応答する
+    -- ハンドラごとに新しい act を作り、止まったときの表記のため呼ぶたびに控え直す
     -- エラーは SHIORI.request の xpcall でキャッチされる
-    local handler = REG[req.id] or EVENT.no_entry
-    -- ハンドラが止まったときの表記のため、渡す act を控える
-    STOP.hold_handler(act)
-    local result = handler(act)
+    local act, result
+    for _, fn in ipairs(getmetatable(REG).handlers(req.id)) do
+        act = create_act(req)
+        STOP.hold_handler(act)
+        result = fn(act)
+        if result then
+            break
+        end
+    end
+
+    -- 全部見送れば底（REG[id] の生の値、無ければシーンを探す既定）を呼ぶ。底の戻り値は真偽で見ない
+    if not result then
+        act = create_act(req)
+        STOP.hold_handler(act)
+        result = (rawget(REG, req.id) or EVENT.no_entry)(act)
+    end
 
     -- 型判定
     if type(result) == "thread" then

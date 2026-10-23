@@ -54,8 +54,8 @@ impl WaitValues {
 ///
 /// # Rules
 /// 1. SakuraScript and LineEndProhibited tokens: no wait
-/// 2. General tokens: insert (normal - 50)ms after each character
-/// 3. Leader tokens: insert (leader - 50)ms after each character
+/// 2. General tokens: insert (normal - 50)ms after each cluster
+/// 3. Leader tokens: insert (leader - 50)ms after each cluster
 /// 4. Period/Comma/Strong/LineStartProhibited: accumulate until end of consecutive run
 /// 5. At end of consecutive punctuation: insert (max_wait - 50)ms
 /// 6. If calculated wait <= 0, skip insertion
@@ -85,16 +85,16 @@ pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues) -> String {
                 result.push_str(&token.text);
             }
 
-            // Rule 2: General - output with wait per character
+            // Rule 2: General - output with one wait per token (cluster)
             TokenKind::General => {
                 flush_pending(&mut result, &mut pending_text, &mut pending_max_wait);
-                append_with_per_char_wait(&mut result, &token.text, wait_values.normal);
+                append_with_wait(&mut result, &token.text, wait_values.normal);
             }
 
-            // Rule 3: Leader - output with wait per character
+            // Rule 3: Leader - output with one wait per token (cluster)
             TokenKind::Leader => {
                 flush_pending(&mut result, &mut pending_text, &mut pending_max_wait);
-                append_with_per_char_wait(&mut result, &token.text, wait_values.leader);
+                append_with_wait(&mut result, &token.text, wait_values.leader);
             }
 
             // Rules 4-5: Punctuation - accumulate and track max
@@ -150,17 +150,14 @@ fn flush_pending(
     *pending_max_wait = None;
 }
 
-/// Append text with per-character wait.
-fn append_with_per_char_wait(result: &mut String, text: &str, wait_ms: i64) {
+/// Append one token (one cluster) followed by one wait.
+fn append_with_wait(result: &mut String, text: &str, wait_ms: i64) {
     let effective_wait = wait_ms - 50;
-
-    for c in text.chars() {
-        result.push(c);
-        // Units never reach here, so a `\` is one that starts no unit. A wait right
-        // after it would form `\\` (an escape), so its wait goes after the next char.
-        if effective_wait > 0 && c != '\\' {
-            result.push_str(&format!(r"\_w[{}]", effective_wait));
-        }
+    result.push_str(text);
+    // Units never reach here, so a lone `\` starts no unit. A wait right after it
+    // would form `\\` (an escape), so its wait goes after the next cluster.
+    if effective_wait > 0 && text != "\\" {
+        result.push_str(&format!(r"\_w[{}]", effective_wait));
     }
 }
 
@@ -322,6 +319,51 @@ mod tests {
         let result = insert_waits(&tokens, &wait_values);
 
         assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_multi_codepoint_general_token_one_wait() {
+        // 🙆‍♀️ (4 code points) and ✌️ (2) are one cluster each: one wait after each
+        let tokens = vec![
+            make_token(TokenKind::General, "🙆\u{200D}♀\u{FE0F}"),
+            make_token(TokenKind::General, "✌\u{FE0F}"),
+        ];
+
+        let result = insert_waits(&tokens, &default_wait_values());
+
+        assert_eq!(result, "🙆\u{200D}♀\u{FE0F}\\_w[50]✌\u{FE0F}\\_w[50]");
+    }
+
+    #[test]
+    fn test_multi_codepoint_leader_token_one_wait() {
+        let tokens = vec![make_token(TokenKind::Leader, "…\u{0301}")];
+
+        let result = insert_waits(&tokens, &default_wait_values());
+
+        assert_eq!(result, "…\u{0301}\\_w[150]");
+    }
+
+    #[test]
+    fn test_lone_backslash_token_no_wait() {
+        // A wait right after a lone `\` would form `\\`; it goes after the next cluster
+        let tokens = vec![
+            make_token(TokenKind::General, "\\"),
+            make_token(TokenKind::General, "あ"),
+        ];
+
+        let result = insert_waits(&tokens, &default_wait_values());
+
+        assert_eq!(result, "\\あ\\_w[50]");
+    }
+
+    #[test]
+    fn test_backslash_with_combining_mark_gets_wait() {
+        // `\` + U+0301 is not a lone `\`: its wait does not follow `\` directly
+        let tokens = vec![make_token(TokenKind::General, "\\\u{0301}")];
+
+        let result = insert_waits(&tokens, &default_wait_values());
+
+        assert_eq!(result, "\\\u{0301}\\_w[50]");
     }
 
     #[test]
