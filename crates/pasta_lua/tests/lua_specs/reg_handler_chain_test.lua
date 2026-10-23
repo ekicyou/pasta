@@ -1,6 +1,6 @@
 -- ============================================================================
--- REG:register で重ねたハンドラ（鎖）のテスト (reg-handler-chain 1.1, 1.2, 2.1, 2.2)
--- Requirements: 1.1-1.7, 2.1-2.4, 2.6-2.9, 3.1-3.5, 4.1-4.5, 5.1, 5.2, 6.3, 6.5, 7.1, 7.3
+-- REG:register で重ねたハンドラ（鎖）のテスト (reg-handler-chain 1.1, 1.2, 2.1, 2.2, 2.3)
+-- Requirements: 1.1-1.7, 2.1-2.9, 3.1-3.6, 4.1-4.5, 5.1, 5.2, 6.1-6.5, 7.1, 7.3
 -- ============================================================================
 
 local describe = require("lua_test.test").describe
@@ -283,11 +283,6 @@ describe("EVENT.fire - 鎖の振り分け (1.2)", function()
         REG.OnTest = function() return "bottom" end
         expect(is_value(EVENT.fire({ id = "OnTest" }), "bottom")):toBe(true)
         expect(EVENT.fire({ id = "OnUnknownForChain" }):find("^SHIORI/3.0 204") ~= nil):toBe(true)
-    end)
-
-    test("最後に読み直し、鎖の無い振り分けを残す", function()
-        local EVENT = reload_event()
-        expect(type(EVENT.fire)):toBe("function")
     end)
 end)
 
@@ -609,16 +604,239 @@ describe("EVENT.fire - 外す・ID (2.2)", function()
         expect(called):toBe(false)
         CLOCK._reset()
     end)
+end)
 
-    test("最後に読み直し、鎖の無い振り分けを残す", function()
-        local EVENT = reload_event()
-        expect(type(EVENT.fire)):toBe("function")
+-- ============================================================================
+-- SHIORI.request を通す結合のテスト (2.3)
+-- ============================================================================
+
+--- entry の依存閉包（既定のハンドラを置くモジュールを含む）を同一インスタンス集合として読み直す
+--- （shiori_entry_test と同じ方針。新しい REG は鎖が空で、振り分けと既定のハンドラが同じ表を見る）
+local ENTRY_CLOSURE = {
+    "pasta.shiori.entry",
+    "pasta.shiori.event",
+    "pasta.shiori.event.register",
+    "pasta.shiori.event.callback",
+    "pasta.shiori.event.boot",
+    "pasta.shiori.event.choice_select",
+    "pasta.shiori.event.second_change",
+    "pasta.shiori.event.mouse",
+    "pasta.shiori.event.scene_play",
+    "pasta.shiori.event.virtual_dispatcher",
+    "pasta.shiori.res",
+    "pasta.shiori.stop",
+    "pasta.shiori.act",
+    "pasta.shiori.sakura_builder",
+    "pasta.act",
+    "pasta.actor",
+    "pasta.scene",
+    "pasta.word",
+    "pasta.global",
+    "pasta.store",
+    "pasta.config",
+    "pasta.save",
+}
+
+--- @return table ENTRY, table REG, table STORE, table dispatcher
+local function reload_entry()
+    local mocks = require("lua_test.mocks")
+    mocks.reset()
+    mocks.install()
+    for _, name in ipairs(ENTRY_CLOSURE) do
+        package.loaded[name] = nil
+    end
+    local ENTRY = require("pasta.shiori.entry")
+    local STORE = require("pasta.store")
+    STORE.reset()
+    require("pasta.shiori.event.callback").reset()
+    require("pasta.shiori.stop").clear()
+    return ENTRY, require("pasta.shiori.event.register"), STORE, require("pasta.shiori.event.virtual_dispatcher")
+end
+
+--- 応答のヘッダ行の値（無ければ nil）
+local function header_value(res, name)
+    local prefix = name .. ": "
+    for line in res:gmatch("(.-)\r\n") do
+        if line:sub(1, #prefix) == prefix then
+            return line:sub(#prefix + 1)
+        end
+    end
+    return nil
+end
+
+--- 応答のステータス行
+local function status_of(res)
+    return res:match("^(.-)\r\n")
+end
+
+--- [logging] balloon_warning を value にした pasta.config の代役で body を走らせ、元へ戻す
+local function with_balloon_warning(value, body)
+    local saved = package.loaded["pasta.config"]
+    package.loaded["pasta.config"] = {
+        get = function(section, key, default)
+            if section == "logging" and key == "balloon_warning" then return value end
+            return saved.get(section, key, default)
+        end,
+    }
+    local ok, err = pcall(body)
+    package.loaded["pasta.config"] = saved
+    if not ok then error(err, 0) end
+end
+
+--- 表記を出さない設定と出す設定で、読み直した entry に scenario を 1 回ずつ走らせ、応答を返す
+--- @param scenario fun(ENTRY: table, REG: table, STORE: table): string
+--- @return string off, string on
+local function run_both(scenario)
+    local off, on
+    for _, setting in ipairs({ false, true }) do
+        local ENTRY, REG, STORE = reload_entry()
+        with_balloon_warning(setting, function()
+            local res = scenario(ENTRY, REG, STORE)
+            if setting then on = res else off = res end
+        end)
+    end
+    return off, on
+end
+
+local function request(ENTRY, id)
+    return ENTRY.request({ id = id, method = "get", version = 30 })
+end
+
+describe("SHIORI.request - 鎖を通す結合 (2.3)", function()
+    test("鎖のハンドラが返したコルーチンは、出力があれば 200 で、続きは今どおり残る", function()
+        local ENTRY, REG, STORE = reload_entry()
+        local co
+        REG:register("OnChainCo", function()
+            co = coroutine.create(function(act)
+                act:raw_script("前半")
+                act:yield()
+                act:raw_script("後半")
+                return act:build()
+            end)
+            return co
+        end)
+        REG:register("OnChainCo", function() end)
+        REG.OnChainContinue = function() return STORE.co_scene end
+
+        local res = request(ENTRY, "OnChainCo")
+        expect(status_of(res)):toBe("SHIORI/3.0 200 OK")
+        expect(header_value(res, "Value")):toBe("前半\\e")
+        expect(STORE.co_scene):toBe(co)
+
+        res = request(ENTRY, "OnChainContinue")
+        expect(header_value(res, "Value")):toBe("後半\\e")
+        expect(STORE.co_scene):toBeNil()
+    end)
+
+    test("鎖のハンドラが返したコルーチンに出力が無ければ 204", function()
+        local ENTRY, REG, STORE = reload_entry()
+        REG:register("OnChainCoEmpty", function()
+            return coroutine.create(function() end)
+        end)
+
+        expect(status_of(request(ENTRY, "OnChainCoEmpty"))):toBe("SHIORI/3.0 204 No Content")
+        expect(STORE.co_scene):toBeNil()
+    end)
+
+    test("鎖のハンドラのエラーは、止まったハンドラの台詞の後に表記が付き、底を呼ばず、次の回も両方呼ぶ", function()
+        local ID = "OnChainError"
+        local err_line
+        local calls, bottom
+        local function scenario(ENTRY, REG)
+            calls, bottom = {}, false
+            REG:register(ID, function(act)
+                calls[#calls + 1] = "old"
+                act:raw_script("止めた台詞")
+                -- debug ライブラリが無いので、空のエラー文から位置を読み、その 2 行後で止める
+                local _, here = pcall(function() error("") end)
+                err_line = tonumber(here:match(":(%d+):%s*$")) + 2
+                error("chain boom")
+            end)
+            REG:register(ID, function(act)
+                calls[#calls + 1] = "new"
+                act:raw_script("見送った台詞")
+            end)
+            REG[ID] = function() bottom = true; return "bottom" end
+            return request(ENTRY, ID)
+        end
+        local off, on = run_both(scenario)
+
+        -- 出さない設定では今どおりの 500、出す設定では同じ理由の行の 200
+        expect(status_of(off)):toBe("SHIORI/3.0 500 Internal Server Error")
+        expect(header_value(off, "Value")):toBeNil()
+        local reason = header_value(off, "X-Error-Reason")
+        expect(reason:find("reg_handler_chain_test.lua:" .. err_line .. ": chain boom", 1, true) ~= nil):toBe(true)
+
+        expect(status_of(on)):toBe("SHIORI/3.0 200 OK")
+        expect(header_value(on, "X-Error-Reason")):toBe(reason)
+        expect(header_value(on, "Value")):toBe("止めた台詞【スクリプトのエラー：" .. ID .. "（chain boom）】\\e")
+        expect(table.concat(calls, ",")):toBe("new,old")
+        expect(bottom):toBe(false)
+
+        -- エラーで登録は外れず、次のイベントでも両方とも呼ばれる（出す設定の表のまま）
+        with_balloon_warning(true, function()
+            calls = {}
+            request(require("pasta.shiori.entry"), ID)
+        end)
+        expect(table.concat(calls, ",")):toBe("new,old")
+        expect(bottom):toBe(false)
+    end)
+
+    test("鎖のハンドラが返したコルーチンのエラーは、REG のハンドラのコルーチンと同じ応答になる", function()
+        local ID = "OnChainCoError"
+        local function scene(act)
+            act:raw_script("途中")
+            error("co boom")
+        end
+        local off_reg, on_reg = run_both(function(ENTRY, REG)
+            REG[ID] = function() return coroutine.create(scene) end
+            return request(ENTRY, ID)
+        end)
+        local off_chain, on_chain = run_both(function(ENTRY, REG)
+            REG:register(ID, function() return coroutine.create(scene) end)
+            REG:register(ID, function() end)
+            return request(ENTRY, ID)
+        end)
+
+        expect(off_chain):toBe(off_reg)
+        expect(on_chain):toBe(on_reg)
+        expect(status_of(on_chain)):toBe("SHIORI/3.0 200 OK")
+        expect(header_value(on_chain, "Value")):toBe("途中【スクリプトのエラー：" .. ID .. "（co boom）】\\e")
+    end)
+
+    test("鎖が全部見送った秒は底の既定の OnSecondChange を呼び、止めた秒は呼ばない", function()
+        local ENTRY, REG, _, dispatcher = reload_entry()
+        local count = 0
+        local original = dispatcher.dispatch
+        dispatcher.dispatch = function()
+            count = count + 1
+            return nil
+        end
+        local stop = false
+        local ok, err = pcall(function()
+            REG:register("OnSecondChange", function() end)
+            REG:register("OnSecondChange", function() if stop then return true end end)
+
+            expect(status_of(request(ENTRY, "OnSecondChange"))):toBe("SHIORI/3.0 204 No Content")
+            expect(count):toBe(1)
+
+            stop = true
+            request(ENTRY, "OnSecondChange")
+            expect(count):toBe(1)
+        end)
+        dispatcher.dispatch = original
+        if not ok then error(err, 0) end
     end)
 end)
 
 describe("REG:register - 後片付け", function()
-    test("最後に読み直し、鎖の無い登録表を後のスイートへ渡す", function()
-        local REG = reload()
-        expect(#handlers(REG, "OnTest")):toBe(0)
+    test("最後に entry の閉包を読み直し、鎖の無い登録表を後のスイートへ渡す", function()
+        local _, REG = reload_entry()
+        for _, id in ipairs({ "OnTest", "OnSecondChange", "OnChainError", "register" }) do
+            expect(#handlers(REG, id)):toBe(0)
+        end
+        -- 振り分けと既定のハンドラが同じ新しい表を見ている
+        expect(require("pasta.shiori.event.register")):toBe(REG)
+        expect(type(rawget(REG, "OnSecondChange"))):toBe("function")
     end)
 end)
