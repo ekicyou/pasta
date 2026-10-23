@@ -48,7 +48,7 @@ const WATCHDOG: Duration = Duration::from_secs(20);
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前に中和する。
 /// 本フィクスチャは pasta.toml `[debug]` で明示的にデバッグを有効化し、ポートは 0
 /// （エフェメラル）なので、ambient env が `enabled`/`port` を上書きしないようにする。
-#[ctor::ctor]
+#[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");

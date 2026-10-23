@@ -45,7 +45,7 @@ use pasta::{load, request, unload};
 
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前に中和する
 /// （固定ポート枯渇でのテスト破壊を防ぐ・他統合テストと同一ガード）。
-#[ctor::ctor]
+#[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");

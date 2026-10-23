@@ -41,11 +41,11 @@ flate2 = "1.1.9"
 budouy = { version = "0.2.2", features = ["vendored-models"] }
 unicode-width = "0.2.2"
 unicode-segmentation = "1.13.3"
-socket2 = "0.5"
+socket2 = "0.6"
 
 # pasta_shiori actor-runtime dependencies
 flume = "0.12"
-wintf-winmsg-executor = "0.0.3"
+wintf-winmsg-executor = "0.0.5"
 arc-swap = "1.9"
 # pasta.dll の VERSIONINFO リソース埋め込み（build.rs）
 embed-resource = "3"

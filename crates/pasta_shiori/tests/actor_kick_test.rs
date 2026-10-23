@@ -20,7 +20,7 @@ use tempfile::TempDir;
 
 /// 開発セッションが export した DAP debug env を main 前に中和する（写経元:
 /// `actor_thread_vm_test.rs` / `common/mod.rs`）。固定ポート衝突による偽陰性を防ぐ。
-#[ctor::ctor]
+#[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");

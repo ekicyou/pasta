@@ -22,7 +22,7 @@ use tempfile::TempDir;
 /// Loads in this binary would then bind that single fixed port and collide with
 /// `AddrInUse`. Same guard as `self_deploy_integration_test.rs`; running inside a
 /// `#[ctor]` (before `main`, single-threaded) makes `remove_var` race-free.
-#[ctor::ctor]
+#[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");

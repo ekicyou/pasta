@@ -16,7 +16,7 @@ use pasta_lua::loader::{CacheManager, PastaLoader, discover_files};
 use tempfile::TempDir;
 
 /// PASTA_DEBUG が環境にあると読み込みが固定ポートを開いて落ちる。main の前（単一スレッド）で外す
-#[ctor::ctor]
+#[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");

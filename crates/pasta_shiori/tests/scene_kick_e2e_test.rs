@@ -40,7 +40,7 @@ use tempfile::TempDir;
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前に中和する
 /// （固定ポート衝突による偽陰性を防ぐ・写経元: `ffi_actor_lifecycle_test.rs`）。これにより
 /// DAP セッションは張られず、キックは「停止ループ非経由・通常実行中」に届くことになる。
-#[ctor::ctor]
+#[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");

@@ -23,5 +23,5 @@ pasta_lua.workspace = true
 tracing.workspace = true
 tracing-test.workspace = true
 # 統合テスト: テスト前に ambient な PASTA_DEBUG を中和するための before-main フック
-ctor = "0.2"
+ctor = "1.0"
 

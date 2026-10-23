@@ -43,7 +43,7 @@
 - **budouy 0.2.2**: 日本語改行位置推定（BudouX、vendored-models）
 - **unicode-width 0.2.2**: Unicode文字幅計算
 - **unicode-segmentation 1.13.3**: 書記素クラスタの切り出し（トークの文字の単位）
-- **socket2 0.5**: debug transport 待受ソケットの `SO_REUSEADDR` 設定（Windows 以外。Windows では二重 bind を許してしまうため立てない）・非ブロック化（reload 時の再バインド堅牢化）
+- **socket2 0.6**: debug transport 待受ソケットの `SO_REUSEADDR` 設定（Windows 以外。Windows では二重 bind を許してしまうため立てない）・非ブロック化（reload 時の再バインド堅牢化）
 - **tracing 0.1 / tracing-appender 0.2 / tracing-subscriber 0.3**: ロギング・診断
 - **windows-sys 0.61**: Windows API（Shift_JISエンコーディング等、cfg(windows)・features: Win32_System_LibraryLoader, Win32_System_Diagnostics_Debug（ffi.load の置き換え）。dev-dependency では Win32_Storage_FileSystem, Win32_System_Registry（8.3 名・長いパスの設定の確かめ））
 - **cc 1**（dev-dependency）: FFI テスト用の DLL をテスト中にビルドする
@@ -60,7 +60,7 @@
 - **flume 0.12**: アクター mailbox（async `recv_async` ＋同期 `recv_timeout` 兼用・`Sender: Send+Sync+Clone`）
 - **arc-swap 1**: `static MAILBOX` の lock-free スロット（送信パスに Mutex を置かない）
 - **embed-resource 3**（build-dependency）: pasta.dll に VERSIONINFO（ファイル/製品バージョン）とアイコン（`res/pasta.ico`）を埋め込む（Windows ターゲットのみ）
-- **wintf-winmsg-executor 0.0.3**: アクタースレッドの `block_on` メッセージループ（`!Send` VM を pin）
+- **wintf-winmsg-executor 0.0.5**: アクタースレッドの `block_on` メッセージループ（`!Send` VM を pin）
 
 > **エンジン駆動モデル**: `pasta_lua` の `!Send` Lua VM を `pasta_shiori` 所有のアクタースレッドへ pin し、SHIORI スレッドとは flume mailbox の CH marshaling（GET=block-on-reply／NOTIFY=即204／drop・timeout→204）で通信する。`unsafe impl Send/Sync` は構造的に撤去済み。さくらスクリプト描画は pasta_lua に物理維持（Lua 集約）し、レンダラはアダプタ注入で論理デカップリング（`pasta-actor-runtime` で確立）。
 
