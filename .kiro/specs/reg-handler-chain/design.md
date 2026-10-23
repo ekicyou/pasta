@@ -320,7 +320,7 @@ function EVENT.fire(req) end
 #### ChainTest（`reg_handler_chain_test.lua`）
 
 - 始めに、`event_clock_hook_test.lua` の `reload()` と同じく、`pasta.shiori.event`・`pasta.shiori.event.register`・`pasta.store`・既定ハンドラのモジュールを `package.loaded` から外して読み直す。エラーの確かめは、`shiori_entry_test.lua` と同じく entry の依存の閉包（`pasta.shiori.entry`・`pasta.shiori.stop`・`pasta.config` ほか）を一括で読み直し、`SHIORI.request` を通す。
-- 各テストの終わりに、登録を外す関数で後片付けする。Lua テストは 1 つの VM で続けて走り、`register` を読み直さないスイート（`event_no_entry_test.lua` ほか）が後にあるため。
+- 後片付けは外す関数に頼らない。各テストの始めに読み直し、スイートの最後のテストでもう 1 度読み直して、鎖の無い `REG` を後のスイートへ渡す。Lua テストは 1 つの VM で続けて走り、`register` を読み直さないスイート（`event_no_entry_test.lua` ほか）が後にあるため。途中の assert が落ちて外す関数が呼ばれなくても、鎖が持ち越されない（lua_test に `after_each` は無いので、既存の `teardown()` の流儀に合わせる）。
 - 確かめる振る舞いは Testing Strategy のとおり。
 
 ### Docs
