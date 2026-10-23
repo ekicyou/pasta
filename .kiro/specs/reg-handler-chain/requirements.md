@@ -83,7 +83,7 @@ off()
 4. The pasta shall `scripts/` の Lua・辞書の Lua ブロック・シーンの中の Lua のどこからでも、また読み込みの後のいつでも、登録を受け付ける。
 5. The pasta shall 鎖の登録を `REG` の表のキーとして見せない（`pairs(REG)` で回るのは、今どおりイベントのハンドラだけにする）。
 6. The pasta shall `REG.X = 関数` の代入と `REG.X` の読み出しを、今と同じに働かせる（鎖の登録は `REG.X` の値を変えない。ただし `REG.register` を読むと登録の口が返る）。
-7. If `id` が文字列でないか、`fn` が関数でないとき（`REG.register(id, fn)` のように `:` を付けずに呼んだときを含む）, the pasta shall 登録せず、何が違うかを示すエラーにする。【仮定。OPEN QUESTION 3】
+7. If `id` が文字列でないか、`fn` が関数でないとき（`REG.register(id, fn)` のように `:` を付けずに呼んだときを含む）, the pasta shall 登録せず、何が違うかを示すエラーにする。
 
 ### Requirement 2: 鎖を呼ぶ順と止まり方
 
@@ -96,10 +96,10 @@ off()
 3. When 鎖のハンドラが `true` を返したとき, the pasta shall そこで止め、204 No Content を返す。
 4. When 鎖のハンドラが文字列を返したとき, the pasta shall そこで止め、今の `REG` のハンドラの戻り値と同じ決まりで応答にする（`SHIORI/` で始まれば応答全体としてそのまま、それ以外は `Value` の 200、空文字列なら 204）。
 5. When 鎖のハンドラがシーンのコルーチンを返したとき, the pasta shall そこで止め、今の `REG` のハンドラが返したコルーチンと同じく再開して、出力があれば `Value` の 200、無ければ 204 を返す。
-6. When 鎖のハンドラが、`true`・文字列・コルーチンのどれでもない真の値（数・表など）を返したとき, the pasta shall Lua の真偽のとおりにそこで止め、204 No Content を返す。【仮定。OPEN QUESTION 5】
+6. When 鎖のハンドラが、`true`・文字列・コルーチンのどれでもない真の値（数・表など）を返したとき, the pasta shall Lua の真偽のとおりにそこで止め、204 No Content を返す（空文字列 `""` も真なので、2.4 のとおり止めて 204 にし、次へは回らない）。
 7. When 鎖のハンドラがそこで止めたとき, the pasta shall それより前に登録した鎖のハンドラ・`REG[id]`・イベントと同じ名前のシーンを、その回には呼ばない。
 8. When 待っているコールバックへの応答か、時計の返事（`OnPastaClock`）を受け取った回, the pasta shall 今どおりそちらを先に処理し、鎖を呼ばない。
-9. When 鎖のハンドラが、前の鎖のハンドラが見送った後に呼ばれたとき, the pasta shall 見送ったハンドラが積んだ台詞を、後のハンドラ・`REG[id]`・シーンの出力に混ぜない。【仮定。OPEN QUESTION 1】
+9. When 鎖のハンドラが、前の鎖のハンドラが見送った後に呼ばれたとき, the pasta shall 見送ったハンドラが積んだ台詞を、後のハンドラ・`REG[id]`・シーンの出力に混ぜない（鎖のハンドラ・`REG[id]`・シーンには、それぞれ新しい act を渡す）。
 
 ### Requirement 3: 鎖の底（REG[id] とシーン）
 
@@ -124,7 +124,7 @@ off()
 2. When 登録を外したとき, the pasta shall ほかの登録と、その呼ぶ順を変えない。
 3. When 外す関数が 2 回目以降に呼ばれたとき, the pasta shall 何もせず、エラーにもしない。
 4. When あるイベントの鎖の登録を全部外したとき, the pasta shall そのイベントに、鎖を足す前と同じ応答を返す。
-5. When 鎖を呼んでいる途中のハンドラの中で、登録や外す関数の呼び出しがあったとき, the pasta shall その回の呼ぶ順を変えず（まだ呼ばれていないハンドラを飛ばさず、新しく登録したハンドラはその回には呼ばず）、次のイベントから反映する。【仮定。OPEN QUESTION 2】
+5. When 鎖を呼んでいる途中のハンドラの中で、登録や外す関数の呼び出しがあったとき, the pasta shall その回の呼ぶ順を変えず（まだ呼ばれていないハンドラを飛ばさず、新しく登録したハンドラはその回には呼ばず）、次のイベントから反映する。
 
 ### Requirement 5: すべての ID に効く
 
@@ -153,7 +153,7 @@ off()
 
 #### Acceptance Criteria
 
-1. The pasta shall テストが、`REG` の表の中身とは別に、すべてのイベントの鎖を空に戻せるようにする。【手段は OPEN QUESTION 6】
+1. The pasta shall テストが、`REG` の表の中身とは別に、すべてのイベントの鎖を空に戻せるようにする（専用の口は作らず、既存のテストと同じく `pasta.shiori.event.register` を `package.loaded` から外して読み直せば鎖も空になる形にする）。
 2. When `REG` の表を空にしている既存の 3 つのテスト（`event_clock_hook_test`・`event_coroutine_test`・`second_change_thread_test`）を走らせたとき, the pasta shall 鎖を足す前と同じ結果にする。
 3. The pasta shall Requirement 1〜6 の振る舞い（順番・止まり方・`true` の 204・外す・底の既定と代入・`register` という ID・リソースの ID・コルーチンを返すハンドラ・エラー）を、Lua の自動テストで確かめ、Lua のテストの一覧に載せる。
 
@@ -163,10 +163,11 @@ off()
 
 #### Acceptance Criteria
 
-1. The pasta shall マニュアルの `lua/shiori-events.md` の REG の節に、`REG:register` の書き方・返り値の読み方の表（偽なら次へ・`true` は 204・文字列とコルーチンは今の決まり）・新しい順に呼ぶこと・外す関数・鎖の底（`REG[id]` → シーン）を、作例付きで書く。
+1. The pasta shall マニュアルの `lua/shiori-events.md` の REG の節に、`REG:register` の書き方・返り値の読み方の表（偽なら次へ・`true` は 204・文字列とコルーチンは今の決まり・空文字列 `""` も止まる）・新しい順に呼ぶこと・外す関数・鎖の底（`REG[id]` → シーン）を、作例付きで書く。
 2. The pasta shall 同じ節に、包み合いから鎖への書き換えの例（毎秒の処理を足す例と、`true` を返す一時的な門を外す例）を書く。
 3. The pasta shall 「1 つのイベントに登録できるハンドラは 1 つである」という今の記述を、鎖を前提にした記述に改め、ページ冒頭の処理の順とシーン関数フォールバックの図にも鎖を加える。
 4. The pasta shall 鎖に「見張り役」は無いこと（新しいハンドラが応答した回は、古いハンドラが呼ばれないこと）を書く。
 5. The pasta shall `＞自動トーク停止` と鎖の門の使い分け（ランダムトークと時報を止めるだけなら `＞自動トーク停止`、表情や窓あわせのような毎秒の処理まで止めるなら鎖の門）を書く。
 6. The pasta shall 内部の説明（`internals/execution-model.md`・`internals/shiori.md`）の `EVENT.fire` の振り分けの順を、鎖を含む順に改める。
-7. The pasta shall 生成のスキルの references を、マニュアルから作り直す（手書きの `.claude/skills/pasta-lua-coding/SKILL.md` を直す場合は、開発者の許可を得てから直す）。【OPEN QUESTION 7】
+7. The pasta shall 生成のスキルの references を、マニュアルから作り直す。
+8. The pasta shall 手書きのスキル `.claude/skills/pasta-lua-coding/SKILL.md` のモジュール表の `pasta.shiori.event.register` の行と §6 の要約に、`REG:register(id, fn)` を足す（分類器が止めるので、直すその場で開発者の許可を得る）。
