@@ -35,7 +35,33 @@
 | リンク | 内容 |
 | ------ | ---- |
 | [GitHub リポジトリ（ekicyou/pasta）](https://github.com/ekicyou/pasta) | ソースコード・ビルド方法などの開発者向け情報。[README](https://github.com/ekicyou/pasta/blob/main/README.md) も参照 |
-| [リリースページ](https://github.com/ekicyou/pasta/releases) | 各版の配布物（[`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip)・サンプルゴースト [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)・検査の CLI [`pasta_check.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip)・VSCode 拡張）と変更点。ファイル名のリンクは、最新版を直接ダウンロードする |
+| [リリースページ](https://github.com/ekicyou/pasta/releases) | 各版の配布物（[`pasta.dll.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta.dll.zip)・サンプルゴースト [`hello-pasta.nar`](https://github.com/ekicyou/pasta/releases/latest/download/hello-pasta.nar)・検査の CLI [`pasta_check.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta_check.zip)・AI 向けのスキル [`pasta-skills.zip`](https://github.com/ekicyou/pasta/releases/latest/download/pasta-skills.zip)・VSCode 拡張）と変更点。ファイル名のリンクは、最新版を直接ダウンロードする |
+
+## AI にゴーストを書かせるとき
+
+Claude Code などの AI のエージェントにゴーストを書かせるときは、pasta のスキルを読ませる。
+スキルは `pasta-skills.zip` にまとめて配布しており、中身は次の 3 つである。
+
+| スキル | 役目 |
+| ------ | ---- |
+| `pasta-ghost-authoring` | Pasta DSL の文法と辞書の書き方 |
+| `pasta-lua-coding` | ランタイムの Lua API と書き方の決まり |
+| `pasta-check` | `pasta_check` による辞書の検査とリリースビルド |
+
+`pasta-skills.zip` は、[最新版への固定のリンク](https://github.com/ekicyou/pasta/releases/latest/download/pasta-skills.zip)か、
+[リリースページ](https://github.com/ekicyou/pasta/releases)の各版の添付から入手する。
+入手した zip は、ゴーストの開発フォルダの `.claude/skills/` に展開する。展開すると、次の木ができる。
+
+```text
+.claude/skills/
+├── pasta-ghost-authoring/SKILL.md
+├── pasta-lua-coding/SKILL.md
+├── pasta-check/SKILL.md
+└── LICENSE
+```
+
+スキルは、使っている pasta と同じ版の `pasta-skills.zip` を使うこと。pasta の版を上げるときは、
+3 つのフォルダを消してから新しい版の zip を展開する。上書きで展開すると、新しい版で消えたファイルが古いまま残るためである。
 
 ## このマニュアルが対象とするバージョン
 
