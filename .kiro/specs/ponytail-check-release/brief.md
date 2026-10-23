@@ -114,3 +114,24 @@
 - `release.ps1` は 7 段になった。段 3 が x64 の `pasta_check.exe` をビルドし、`THIRD_PARTY_LICENSES.txt`（`about-pasta_check.hbs` から生成）と合わせて `release\pasta_check.zip` を作って検査する。段 4 の `pasta_check release` は、`cargo run -p pasta_check` ではなく、その exe（`target\x86_64-pc-windows-msvc\release\pasta_check.exe`）で走る。引数と失敗の扱いは変えていない。
 - `pasta_check` の `--version` の出力の形を変えると、リリース CI の版の検査（`pasta_check <タグの版>` と完全一致）が落ちる。`pasta_check` の依存に許可に無いライセンスが入ると、段 3 のライセンス表示の生成が止まる（`about.toml` の `accepted`）。
 - 参照: `.kiro/specs/completed/pasta-check-release-asset/design.md` の CheckZipStep と Revalidation Triggers。
+
+## 2026-10-23 棚卸の再測定（main 8fc9bdff）
+
+- **前提の変化**
+  - pasta-check-release-asset が、`crates/pasta_sample_ghost/release.ps1`（7 段になった）・ルートの `release.bat`・`crates/pasta_sample_ghost/README.md`・`RELEASE.md`・スキル `pasta-check/SKILL.md` を変えた。この spec の持ち場（`crates/pasta_check/src/` の `release.rs`・`copy.rs`・`nar.rs`・`update_files.rs`・`main.rs` と `crates/pasta_sample_ghost/tests/`）には触れていない。
+  - 指摘の場所は 2026-10-19 のまま。作者のフォルダを消す `copy.rs` の `prepare_release_dir`（6〜11 行）、包含を確かめない `release.rs` の段 1〜3（12〜30 行）、`nar.rs` の働かない守り（33 行、呼び出しは 84 行）、`update_files.rs` の `read_dir.flatten()`（170 行）、DLL の名前を取り違える `tests/common/mod.rs`（16〜46 行）。
+  - 手元の `release.ps1` は、段 4 で `pasta_check release --target ghosts\hello-pasta --release <ルート>\release\hello-pasta --nar <ルート>\release\hello-pasta.nar` を、段 3 で作った x64 の `pasta_check.exe` で走らせる（234 行）。この組み合わせは、新しく断る 3 つの関係のどれにも当たらないので、リリースは止まらない。設計で、この呼び出しの形を守るテストを置くとよい。
+- **触るファイル**: 上の `pasta_check` の 5 ファイル（`release.rs` 720 行・`update_files.rs` 789 行・`main.rs` 393 行・`nar.rs` 385 行・`copy.rs` 232 行）、`crates/pasta_sample_ghost/tests/` の 6 ファイル（`common/mod.rs`・`integration_test.rs`・`dist_src_validation_test.rs`・`touch_shortcuts_test.rs`・`tutorial_stages_test.rs`・`self_deploy_integration_test.rs`）、選択肢の説明 3 か所（`crates/pasta_check/README.md` の release の節 57〜107 行、スキル `.claude/skills/pasta-check/SKILL.md` の 63〜86 行、マニュアル `book/src/debug/validate.md` の「release との関係」202〜221 行）。1,000 行に近いものは無い。
+- **規模**: 12〜15 タスク。
+- **先に要るもの**
+  - 機能の上では無い。0.4.2 の残りと 0.5.0 の spec は、`pasta_check` のこの 5 ファイルを触らない。
+  - `tutorial_stages_test.rs` は、失敗の種類を足す 0.5.0 の spec（`call-attribute-filter`・`shell-element-click`）が種類の一覧の確かめを合わせることがある。この spec が触るのはファイルの頭の写し（`copy_master`・`neutralize_debug_env`）で、別の所。
+  - 隙間の中では、`ponytail-editor-tooling`（`validate/syntax.rs`・`report.rs`）・`ponytail-core-registry`（`validate/scenes.rs`）と同じクレートの別のファイル。
+- **種別**: バグ（`release` の引数の組み合わせで、作者のゴーストのフォルダを丸ごと消す。データが失われる）。隙間の決まりで、最初の空いた所に入れる。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - スキルの編集の計画は今も当たる。pasta-check-release-asset が直したのは、入手の段落（12〜28 行）・段の図（111〜124 行）・フォルダの図（140〜145 行）・hello-pasta の注意（161〜165 行）。この spec が直す選択肢の表と段の説明（63〜86 行）とは別の所。分類器が止める点も変わらない。
+  - Scope の「マニュアル（`book/` の pasta_check の章）」は不正確。選択肢の権威は `crates/pasta_check/README.md` の release の節で、マニュアルは `debug/validate.md` の「release との関係」から README へ案内しているだけ。直すのは上の 3 か所。
+  - Current State 8 の「`copy_master` と `neutralize_debug_env` が 3 つのファイルにある」は、`neutralize_debug_env` が 3 ファイル（`self_deploy_integration_test.rs`・`touch_shortcuts_test.rs`・`tutorial_stages_test.rs`）、`copy_master` が 2 ファイル（後の 2 つ）。
+  - `pasta_check release` を呼ぶのは、今は `release.ps1` の段 4（以前は段 3）。`pasta_check --version` の出力の形は、リリースの版の検査が完全一致で見るので変えない（申し送りのとおり）。

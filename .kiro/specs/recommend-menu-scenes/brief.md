@@ -182,3 +182,25 @@
 ## 申し送り（2026-10-21 の discovery「PastaDSL機能ヒアリング」より）
 
 - 窓際のぱすたさん（ghost_dev）の `menu.pasta` は、`REG["sakura.recommendsites"]` と `REG["kero.recommendsites"]` が `\1`・`\2` 区切りの文字列を返し、イベントのシーン `＊osusume_site` は Lua の足場だけ（`return nil`）である。この spec の `＊おすすめメニュー`・`＊相方おすすめメニュー` で置き換える実例として、要件の確認に使える。
+
+## 2026-10-23 棚卸の再測定（main 8fc9bdff）
+
+- **前提の変化**
+  - `ontalk-suppression`・`scene-play-event` が入り、先に要るものから外れた。`GLOBAL` の組み込みの名前は 8 つ（`pasta_scripts/pasta/shiori/entry.lua` L18〜48、`pasta_check` の `builtins.rs` の名前の表）。足すのはその後ろ。
+  - 完全一致の引き方 `SCENE.co_exec_exact`（`scene.lua` L230〜256）は、ローカルの名前を 2 つ目に取り、見つからない側を 2 つ目の戻り値で返す形になった。同じ名前のシーンが複数あると、前方一致と同じく、混ぜてから順に重ならないように 1 つを選ぶ（`pasta_core/src/registry/scene_table.rs` の `resolve_scene_id_exact`）。「要件で決めること」の「完全一致でもランダムに選ぶか」は「選ぶ」で閉じてよい。選ぶたびに次へ進むので、選んだときにシーンを動かし直すと別の並びになる。開いたときの並びを覚えておく論点は残る。
+  - 行の位置: イベントの振り分け `EVENT.fire` は `event/init.lua` L216、ハンドラを引く行は L233、イベント名でシーンを探す `EVENT.no_entry` は L177〜181、シーンを包む関数は `scene.lua` L186〜195。マニュアルのリソースの要求は `lua/shiori-events.md` L810 に移った。別名の読み込みは `pasta_lua/src/loader/config/mod.rs` L115。
+- **触るファイル**: 新しいハンドラのファイル（新規）、`event/init.lua` の読み込みの並びの末尾に 1 行、`shiori/entry.lua`（153 行）、`pasta_core/src/registry/scene_alias.rs`（284 行）、`pasta_lua/src/loader/config/mod.rs`（343 行）とその試験、`pasta_check` の `builtins.rs`（名前の表 8 → 12）・`validate/config.rs`・試験（名前の一覧と一致の試験）、マニュアル。1,000 行に近いファイルは触らない。
+- **規模**: 10〜12 タスク。
+- **先に要るもの**
+  - 働きの上では `chain-talk-interrupt`（P3 の中断の台詞）と `reg-handler-chain`（P5）。どちらも決まりを書くためで、コードの上では待たない。ファイルは `external-control-events` と読み込みの並び・既定ハンドラの表を共有する。
+  - 版が決まるまでウェーブに入れない。0.4.2 に決めたら、「`event/init.lua` は読み込みの並びに 1 行だけ、`act.lua` は触らない（項目は `GLOBAL` の関数が act の欄に積む）、マニュアルの既定ハンドラの表は行を足すだけ」と約束すれば上の 3 本と同じウェーブにも置ける。安全なのは 3 本の後のウェーブ（0.4.2 が 1 ウェーブ延びる）。
+- **種別**: 機能（窓際のぱすたさんの実例。シーンで書く形は開発者の決定）。
+- **要件定義のモデル**: Opus（SSP が URL を開くかは実機で確かめられる。ほかの議題は承認済み）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - `reg-handler-chain` が入ると、P5 は「`REG[...]` に代入すれば組み込みの受け手を差し替える。`REG:register` で重ねた受け手は先に呼ばれ、`nil` を返せば組み込み（辞書のメニュー）へ回る」と書き直す。
+  - シーンを包む関数（`scene.lua` の `wrap_scene`）は最後に `act:build()` を呼び、ゴースト側の組み立て（`shiori/act.lua` の `build`）は立ち位置と表情の持ち越し（`STORE.actor_spots`・`STORE.appearance`）を直接書き換える。メニューのシーンの台詞を捨てるつもりでも、この道を通すと持ち越しが動く。その場で動かす道は、この関数を使わず、組み立てずに捨てる。
+  - 自動トークを止めている間にメニューのシーンが `＞チェイントーク` を呼ぶと、区切りの見張り（`act.lua` L664）が自動トークを再開してしまう。打ち切りの扱いを決めるとき、この副作用も避ける。
+  - その場で動かす道は `EVENT.drive` を通らないので、止まったシーンの控え（`STOP.hold`）も置かれない。エラーのとき（`On` で始まらない要求は 500 と `X-Error-Reason`）の出方を確かめる。
+  - `OnRecommendsiteChoice` の既定の受け手は、項目のシーンが無いとき、今の `EVENT.no_entry` と同じ前方一致で `＊OnRecommendsiteChoice` へ回す（完全一致にしない）。
+  - steering の roadmap の Dependencies（`recommend-menu-scenes` の行と Existing Spec Updates の行）に、入った `scene-play-event`・`ontalk-suppression` が残っている。

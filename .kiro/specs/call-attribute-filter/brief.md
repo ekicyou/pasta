@@ -238,3 +238,22 @@ ghost_dev の「emo2 開発」「ぱすた開発」セッションに、Lua で�
 - **作者が想像した書き方**（文法は想像）: 呼ぶ側の `？＄ｒ０＝＝「changed」　＞更新成功`、受ける側の `＊OnMouseClick　＆r4：セキュリティボール　＆＄＊初回待ち`、前方一致の `＆r0^：shell`。両方向（呼ぶ側で絞る・場面の側に条件を書く）の要望がある。2026-10-10 の決定（分岐は Call の絞り込みで書く）のどちらの向きで受けるかを、要件で決める。
 - **Reference の読み方**: 条件に Reference を使うには、今は先に `＞transfer_req_to_var` が要る（自動では入らない。`book/src/grammar/variables.md` L345・L379）。イベントのシーンで自動で転記する件は roadmap の Direct Implementation Candidates に置いた。こちらの要件で Reference を直接書ける形にするなら、そちらは要らなくなる。
 - 今の DSL だけで書ける分（`OnInstallRefuse` の転記だけ、季節の動的 Call）は、両セッションへ書き方を伝えた。
+
+## 2026-10-23 棚卸の再測定（main 8fc9bdff）
+
+- **前提の変化**: `scene-play-event` が、シーンを探す道を 1 本足した。Call の道（`act:call` → `find_handler` → `SCENE.search` → `search_scene`）は変わっていない。
+  - シーン表 `crates/pasta_core/src/registry/scene_table.rs` に `resolve_global_owning_local_exact`（297 行）が増えた。指名したローカルシーンを持つグローバルシーンだけを候補にする。絞り込み条件 `filters` を受ける関数は、これで 4 つになった（`resolve_scene_id`・`resolve_scene_id_unified`・`resolve_scene_id_exact` と、この関数）。条件の形を変えるなら、これとその試験（`scene_table_resolve_filter_tests.rs` に 3 本増えて 497 行）も合わせる。
+  - 候補の控えのキー `SceneCacheKey` に「持ち主のローカル名」の欄が増えた（25〜26 行）。条件をキーに含める作り直しでは、この欄を残す。
+  - 検索の入口 `crates/pasta_lua/src/search/context.rs` に、グローバルとローカルの名前の組で完全一致に探す `search_local_scene_exact`（204 行）が増え、ここも空の条件で探す（215 行）。Lua 側は `SCENE.co_exec_exact(名前, ローカル名)`（`scene.lua` 230 行）で、外から指名したシーンを再生するイベント（`OnPastaScene`）と撫で・つつきの近道が使う。`attrs` を受けない。要件で「指名の再生は絞り込まない」と書いておくのを推奨する。
+  - `ontalk-suppression` が、区切りの関数 `ACT_IMPL.yield`（`act.lua` 664 行）の頭に、自動トークを止めている間の見張りを足した。Call の道には触れていない。
+- **触るファイル**: 2026-10-17 の節と同じ。行数は `act.lua` 837（1,000 行に近い）、`scene.lua` 266、`search/context.rs` 1,017（本体は 437 行まで、残りは中のテスト。試験を足すなら別のファイルに置く）、`scene_table.rs` 539、`scene_table_resolve_filter_tests.rs` 497。文法・Call の Lua を出すコード生成・構文木・編集中の解析・エディタの着色・VSCode の文法定義・辞書の検査は変わっていない。
+- **規模**: 19〜21 のまま（増えた関数 1 つを合わせる分は小さい）。2026-10-04 に一度分けた spec なので、分けない。
+- **先に要るもの**: `scene-attribute-store`。ファイルの重なり（前回のものに足す）:
+  - `scene-exact-match`（Call の文法 `call_scene`、Call の Lua を出す `element_gen.rs`、`act.lua` の 5 段の探し方 `find_act_handler` と `search_dictionary`、`scene.lua` の `SCENE.search`、`search/context.rs` の `search_scene_by`、エディタの着色、VSCode の文法定義）。どちらも `act:call` の 3 つ目の引数のあたりを使いたくなるので、先に入る側が受け渡しの形を決める。`scene-exact-match` が先なら、`attrs` を条件のために空けておく約束にする。
+  - `chain-talk-interrupt`（`act.lua` の `ACT_IMPL.build` のあたり。同じファイルなので同じウェーブに置かない）。
+  - 隙間の spec: `ponytail-dsl-parser`（文法）、`ponytail-lua-transpiler`（`element_gen.rs`）、`ponytail-core-registry`（`scene_table.rs`・`search/context.rs`・`pasta_core` の README）、`ponytail-editor-tooling`（`visit_action.rs`・文法定義・`partial.rs`）、`ponytail-lua-scripts`（`act.lua`・`scene.lua`）。
+- **種別**: 機能（`＞シーン＆k＝v` は今は構文エラー）。0.5.0 のフラグによる分岐の本命（開発者の決定）。
+- **要件定義のモデル**: Fable のまま。新しい書き方と意味（見本のノベルと作者の辞書が上に乗る）で、推奨の無い論点が 3 つ以上絡む（比べる記号としきい値の向き、条件のつなぎ方、「それ以外」の場面と候補が無いときの動き、条件の値に変数を書く形と連結の `＆` との見分け）。今回の変化は、このどれにも触れていない。
+- **分割の案**: 分けない。
+- **見つけた穴・古くなった記述**:
+  - 2026-10-17 の節の行番号: `act.lua` 829 → 837（`find_scene` 680 → 688、`call` 695 → 703、その中の `find_handler("scene", key)` 709 → 717。`search_dictionary` の `SCENE.search` 336 は同じ）。`search/context.rs` 788 → 1,017（`search_scene` 91 → 105、`search_scene_exact` 105 → 119、`search_scene_by` 115〜121 → 129〜135）。`scene_table.rs` 483 → 539（`resolve_scene_id` 179 → 183、`resolve_scene_id_unified` 226 → 230、`resolve_scene_id_exact` 251 → 255、`filter_by_attributes` 287 → 343、`find_scene` 453 → 509）。`scene.lua` の 150・160・208 行は同じ。
