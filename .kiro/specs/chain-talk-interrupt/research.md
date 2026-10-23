@@ -189,3 +189,117 @@
 - **スキルの references**: `.claude/skills/` への書き込みは、分類器に Self-Modification として止められることがある（SKILL.md の編集で確認済み）。`gen-skill-refs.mjs` による作り直しも止められたら、回避を探さずに、入った分と残りを示して開発者に許可を求める。
 - **テストの書き換え**: `pasta_lua` のテストは `sample.generated.lua` の改行コードを書き換えることがある。コミットに混ぜない。
 - **マニュアル**: 入門（`getting-started/11-jump.md`）にも同じ決まりが書いてある。brief の一覧に無いので、書き直しの対象に足す。マニュアルには回避のレシピを載せない（部品の能力だけを書く）。
+
+## 7. 設計の調査と決定（kiro-spec-design、2026-10-23）
+
+### 7.1 まとめ
+
+- **種類**: 既存の仕組みの拡張（Extension）。軽い調査（design-discovery-light）で、つなぎ目の所だけ深く読んだ。外の依存は足さない。
+- **使ったスキルと規則**: `kiro-spec-design`（design-principles・design-discovery-light・design-synthesis・design-review-gate）、`kiro-validate-design`（design-review）。ステアリングは `product.md`・`tech.md`・`structure.md`（Lua の循環を作らない・`store` は何も読まない・テストは `tests/lua_specs/`）。
+- **決めたこと**: 中断の台詞は「組み立ての中で差し込む」（4.3 の案 C）。流し方の本体は `event/init.lua` の約束の範囲に置き、`EVENT.drive` が act の欄に関数を掛け、`SHIORI_ACT_IMPL.build` が台詞を見つけたときに呼ぶ。組み立ては 1 回のまま。
+- **見つけたこと**: 表情の単語は `talk` のトークンになる（`＠笑顔` → 字が `\s[5]`）。台詞の判定は「字のある talk」でなく、組み立ての `has_text` と同じ「字が出るか」で取る必要がある。
+
+### 7.2 調べたこと
+
+#### 表情の単語のトークン
+
+- 調べた所: `tests/fixtures/sample.generated.lua`（`act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("笑顔"))`）、`tests/fixtures/sample.pasta`（`＠通常：\s[0]`）、`pasta/actor.lua` の `PROXY_IMPL.word`。
+- 分かったこと: 表情の単語は `talk` のトークンで、字はさくらスクリプトのタグだけになる。`text ~= ""` で数えると、表情だけのシーンが台詞に数えられ、要件 1.2 に反する。
+- 設計への影響: 台詞の判定を `sakura_builder.lua` に置き、`has_text`（組み立ての段落の区切りと同じ判定）を使う。`BUILDER.speaks` として公開する。
+
+#### 組み立てのつなぎ目
+
+- 調べた所: `shiori/sakura_builder.lua` の `BUILDER.build`（話し手の切り替え・`pending_break`・`spot_has_text`・`spot_tail`・列）、`act.lua` の `group_by_actor`・`merge_consecutive_talks`、`grammar/action-line.md`（同じアクターの行は続けて出る）。
+- 分かったこと:
+  - まとめたトークン列を 2 つつないで 1 回で組み立てると、表情と立ち位置の持ち越し（`STORE.appearance`・`STORE.actor_spots`）が表示の順に書き換わる。案 A（文字列でつなぐ）では逆順になり、中断の台詞で変えた表情を、割り込んだシーンの組み立てが知らない。
+  - 同じ話し手のまま 2 つをつなぐと、切り替えのタグも段落の区切りも出ず、字が続けて出る。割り込んだシーンの頭が話し手の無いグループ（選択肢だけ・表情だけ）だと、中断の最後のスコープに出る。
+- 設計への影響: つなぎ目のトークン `seam` を置き、組み立てがそこで「直前の話し手とスコープを空に戻す（0 以外なら `\p[0]` を出す）」。割り込んだシーンの頭は、中断が無いときと同じ切り替えで出て、同じ吹き出しなら段落の区切りが 1 つ入る。
+
+#### act とコルーチンの対応
+
+- 調べた所: `failure.lua` の `FAILURE.bind`・`act_of`、`act.lua` の `init_scene`、`scene.lua` の `wrap_scene`、`event/init.lua` の `EVENT.fire`（`EVENT.drive(result, act, act)`）、`callback.lua`（`entry.act`）。
+- 分かったこと: 新しいシーンは、最初の再開の前には `act_of(co)` が無い。最初の再開の引数の act が、シーンの書き込む act になる。続きとコールバックでは `act_of(co)` が引ける。
+- 設計への影響: 再開の前は `FAILURE.act_of(co) or act`、後も同じ式で act を引く。
+
+#### 止まるエラーの控え
+
+- 調べた所: `shiori/stop.lua` の `STOP.hold`・`STOP.response`・`build_value`。
+- 分かったこと: 控えは `FAILURE.act_of(co)` の act を使い、表記の止まった場所（`act.scene_name`）と行の対応（`act.line_map`）をそこから取る。`STOP.response` は後で `act:build()` を呼んで、止まるまでの出力に表記を足す。
+- 設計への影響:
+  - 中断のシーンがエラーで止まったら、投げ直す前に `FAILURE.bind(iact)` で、いま動いている割り込んだシーンのコルーチンを中断の act に結び直す。結び直さないと、中断のエラーの行を割り込んだシーンの行の対応で読み、違う場所を表記しうる。
+  - `EVENT.drive` は、act の欄の関数を再開の後すぐに外す。外さないと、止まるエラーの応答の `act:build()` が中断のシーンを動かす（要件 5.1 に反する）。
+
+#### 選択肢の検索の親
+
+- 調べた所: `choice_select.lua` の `OnChoiceSelectEx`（`STORE.last_global_scene` は Reference2 が使えないときの予備）、`act.lua` の `init_scene`。
+- 分かったこと: 中断のシーンを動かすと、`STORE.last_global_scene` は中断のシーンの名前になる。選択肢のトークンは出した時点のシーン名を持ち、Reference2 で戻る。
+- 設計への影響: 戻さない（書く所を増やさない）。
+
+#### 既存のテストの洗い出し（5.2 の調べが要る所）
+
+- 読んだ所: `event_coroutine_test.lua`・`integration_coroutine_test.lua`・`callback_module_test.lua`・`second_change_thread_test.lua`・`get_property_test.lua`・`shiori_entry_test.lua`・`scene_play_event_test.lua`・`kick_*_test.lua`・`virtual_dispatcher_*_test.lua`・`auto_talk_pause_test.lua`・`global_chaintalk_integration_test.lua`・`store_coroutine_test.lua`、Rust の `tests/scene_play_event_test.rs`。
+- 分かったこと:
+  - `STORE.co_scene` に続きを置いてから別のシーンを動かすテストは、素のコルーチンが空でない文字列を出す形（`"new"`・`"second result"`）か、エラーの形か、キック・シーン再生の形である。要件 1.7・4・5 で今と同じ結果になる。
+  - コールバック待ちに入るときに別の続きを捨てることを確かめるテストは無い（`get_property_test.lua` は `co_scene` を見ない）。
+  - **直す必要があるのは `shiori_entry_test.lua` の 2 本**。「コールバック側のシーンが中断すれば、既存の継続を置き換える」と「コールバック側のシーンが終われば、既存の継続を空にする」。戻ったシーンが `raw_script` だけを出すので、新しい決まりでは別のシーンの続きが残る。
+  - キックの試験（`virtual_dispatcher_kick_hook_test.lua`・`kick_position_path_inheritance_test.lua`）は `dispatch` が返すコルーチンだけを見て、`EVENT.drive` を通らない。変わらない。
+  - Rust の `scene_play_event_test.rs` は、再生したシーンが古い続きを置き換えることを見ている。はっきり捨てる印で、今と同じ。
+- 設計への影響: 直すテストは 2 本。`reg-handler-chain` が触る `event_coroutine_test.lua`・`second_change_thread_test.lua` は触らない。
+
+#### OnPastaCallFunction の形
+
+- 調べた所: `.kiro/specs/external-control-events/brief.md` L129・L153。
+- 分かったこと: あちらは呼び出しをコルーチンで包んで返す形を前提にしている。
+- 設計への影響: 要件 6.2 は、あちらがコルーチンを返す限り、ふつうの道で効く。文字列を返す形になったら再確認する（Revalidation Triggers）。
+
+### 7.3 案の比較（4.3 の案の決着）
+
+| 案 | 中身 | 強み | 弱み | 判断 |
+| -- | -- | -- | -- | -- |
+| A 文字列でつなぐ | `EVENT.drive` で中断を別に動かし、`\e` を外して前につなぐ | `event/init.lua` だけで済む | 表情・立ち位置の持ち越しが逆順。段落の区切りと話し手の無い頭の位置に細工が要る。3.6 を満たしにくい | 採らない |
+| B トークンでつなぐ | 出力をトークンのまま `EVENT.drive` へ渡し、1 回で組み立てる | 状態が正しい | 出力の受け渡しの形（3 か所の `yield`・`return`）が変わる。ゴーストが Lua で `act:build()` の文字列を使う所も壊れる | 採らない |
+| C 組み立ての中で差し込む | `EVENT.drive` が act の欄に関数を掛け、組み立てが台詞を見つけたら呼んで前に足す | 組み立ては 1 回。受け渡しの形は変えない。本体は `event/init.lua` に置ける | 入れ子のコルーチン。エラーの止まった場所の結び直しと、欄の外し忘れに注意 | **採る** |
+
+### 7.4 決定
+
+#### 決定: 中断の台詞を組み立ての中で差し込む
+
+- **背景**: 割り込んだシーンが台詞を出したかは、組み立ての時にしか分からない。中断の台詞は前に置く。組み立ては 1 回ごとに状態を持つ。
+- **選んだ形**: 案 C。`EVENT.drive` が割り込みのときだけ `act._on_speech = run_interrupt_scene` を掛ける。`SHIORI_ACT_IMPL.build` は台詞を見つけたら欄を外してから呼び、返ったまとめたトークン列と `seam` を前に足して 1 回で組み立てる。
+- **理由**: 3.6 を細工なしで満たす。受け渡しの形を変えない。本体を同じウェーブの約束の範囲に置ける。
+- **引き換え**: `shiori/act.lua`・`sakura_builder.lua` を小さく触る。入れ子のコルーチンのエラーの扱いを詰める必要がある。
+- **後で確かめること**: 中断のエラーの止まった場所、止まるエラーの応答に中断が混ざらないこと、`\e` が 1 つだけのこと。
+
+#### 決定: 台詞の印を act の欄に置く
+
+- **選んだ形**: `_spoke`（`boolean|nil`）。`EVENT.drive` が再開の前に `nil`、組み立てが `self._spoke or 台詞あり`。`nil` のままなら act を通らないコルーチンとして出力の有無で決める（1.7）。
+- **理由**: act のメソッドにしない（`ACT_METHODS`・`SHIORI_ACT_METHODS` と実行時の一致のテスト `validate_parity_test.rs` は `IMPL` の関数だけを見るので、インスタンスの欄は関わらない）。`pasta/act.lua` を触らない。
+
+#### 決定: はっきり捨てる印を `STORE.co_preempt` に置く
+
+- **選んだ形**: キーを弱い参照にした表。キックの 2 つの包みとシーン再生の 2 つのハンドラが付け、`drive_kind` だけが読む。
+- **理由**: `scene_play.lua` は `event/init.lua` を読まない（循環させない）。`ontalk-suppression` の申し送り（キックの印は `kick.lua` と `STORE`）のとおり。「次の再開は捨てる」旗を 1 つ立てる形（4.4 の案 4-b）は、別のイベントが先に来ると取り違える。
+
+#### 決定: 続きの置き換えに `keep` の引数を 1 つ足す
+
+- **選んだ形**: `set_co_scene(co, keep)`。`keep` は「割り込み・台詞なし・成功」のときだけ真。種類は `drive_kind(co)` で再開の前に決める（続きなし → 再開 → はっきり捨てる → 割り込みの順）。
+- **理由**: 今の規則（コールバックの印・同じコルーチン・置き換え）を残したまま、残す場合だけを足せる。表「続きの決まり」の全部の行がこの 2 つで決まる。
+
+### 7.5 合成（design-synthesis）
+
+- **一般化**: キック・`OnPastaScene`・`OnPastaSceneAt` は「開発者が指名した再生」として 1 つの印にまとめた。新しい指名の再生を足すときも、印を付けるだけで済む。イベントの種類（撫で・時報・外から起こした `OnTalk`・コールバック・`OnPastaCallFunction`）は分けず、すべて `EVENT.drive` の 1 か所で決める。
+- **採用か自作か**: 外のライブラリは使わない。今ある部品を使う。完全一致の検索と同名からの選択は `SCENE.co_exec_exact`、act の引き当ては `FAILURE.act_of`、字の判定は `has_text`、止まるエラーの応答は `STOP` の道。
+- **簡素化**:
+  - 中断のシーンの残りを `STORE` に置かない。参照を外すだけ。
+  - `STORE.last_global_scene` を戻さない。
+  - つなぎ目は新しいトークン 1 つで表し、組み立てに専用の設定を足さない。
+  - 中断のシーンの名前は固定の文字列。設定・別名表・`pasta_check` の組み込みの名前には足さない。
+  - act を通らないコルーチンには中断の台詞を流さない（前提。未決事項 1）。
+
+### 7.6 リスクと手当て
+
+- 入れ子のコルーチンのエラーで、止まった場所を取り違える → 投げ直す前に `FAILURE.bind(iact)` で結び直し、テストで止まった場所の名前を確かめる。
+- act の欄の関数の外し忘れで、止まるエラーの応答に中断が混ざる → `EVENT.drive` が再開の後すぐに、成否にかかわらず外す。テストで確かめる。
+- ゴーストの Lua が、シーンの途中で `act:build()` を自分で呼んで文字列を使う → 台詞があれば、そこで中断の台詞が付く（その回の出力の組み立てと同じに扱う）。まれな書き方なので手当てはしない。
+- マニュアルのぶつかり → `lua/shiori-events.md` は `external-control-events`（表と新しい節）・`reg-handler-chain`（L81〜95・L745）と同じページ、`internals/execution-model.md` は `reg-handler-chain`（L161）と近い。触る節を分け、後から入る側が rebase で合わせる。references は rebase の後に作り直す。
+- スキルの references の書き込みが分類器に止められる → 回避を探さず、入った分と残りを示して開発者に許可を求める（6 章のとおり）。
