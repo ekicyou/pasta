@@ -159,13 +159,14 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │           │   ├── integration_test.rs
 │           │   ├── module_test.rs
 │           │   └── stack_level_test.rs
-│           ├── sakura_script/       # SakuraScript関連テスト（6 files）
+│           ├── sakura_script/       # SakuraScript関連テスト（7 files）
 │           │   ├── main.rs
 │           │   ├── backslash_break_test.rs
 │           │   ├── basic_test.rs
 │           │   ├── budoux_test.rs
 │           │   ├── conformance_test.rs
 │           │   ├── edge_case_test.rs
+│           │   ├── grapheme_test.rs  # 書記素クラスタ単位のウェイト・改行・幅
 │           │   └── output_test.rs
 │           ├── search/              # 検索関連テスト（2 files）
 │           │   ├── main.rs
@@ -403,6 +404,7 @@ pasta_dsl（パーサー） + pasta_core（レジストリ）
 | Loader       | スクリプト読み込み  | `loader_integration_test.rs`     |
 | Registry     | 型管理、独立性      | `scene_search_test.rs`           |
 | Control Flow | Call、最適化        | `transpiler_snapshot_test.rs`    |
+| SakuraScript | 書記素クラスタ単位のウェイト・改行 | `sakura_script/grapheme_test.rs` |
 
 ### テストファイル配置
 - `crates/<crate>/tests/<feature>_test.rs`: 統合テスト
