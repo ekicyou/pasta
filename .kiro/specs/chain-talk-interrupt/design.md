@@ -61,7 +61,7 @@
 - act の欄 `_spoke`・`_on_speech` の意味が変わるとき、または `SHIORI_ACT_IMPL.build` が別の形に分かれるとき（`cue-command-runtime`・`novel-talk-flow`）。
 - `seam` のトークンや、組み立ての状態（話し手・段落の区切り・列）の持ち方が変わるとき（`sakura_builder.lua` を触る spec）。
 - `STORE.co_preempt` の置き場所や、印を付ける所（キック・シーン再生）が増減するとき。新しく「開発者が指名する再生」を足す spec は、印を付けるかを決める。
-- `OnPastaCallFunction` がコルーチンでなく文字列を返す形になるとき（要件 6.2 が効かなくなる）。
+- `OnPastaCallFunction` がコルーチンでなく文字列を返す形になるとき（要件 6.2 が効かなくなる）。あちらのハンドラは `scene_play.lua` の形を写すが、`STORE.co_preempt` の印は写さない（ふつうのイベントと同じ決まりにするため。要件 6.2）。どちらが先に入っても、後から入る側がこれを確かめる。
 - `novel-talk-flow`: 「止まっている場面が捨てられる」の前提が、台詞を出したシーンだけに狭まる。
 
 ## Architecture
@@ -327,7 +327,7 @@ function EVENT.drive(co, act, ...) end
 `set_co_scene(co, keep)` の手順:
 
 1. `co` が suspended でなければ `co = nil` として扱う（今どおり）。
-2. `keep` が真なら、`STORE.co_callback == co` のとき印を `nil` に戻して終わる。`STORE.co_scene` は触らない。
+2. `keep` が真なら、`STORE.co_scene` は触らずに終わる。`STORE.co_callback == co` のときは、その印だけ `nil` に戻す（`co` は待ちの表が持つ）。区切った `co` の残りは、どこにも置かないので捨てられる。
 3. `STORE.co_callback == co` なら、`STORE.co_scene = nil`・`STORE.co_callback = nil` として終わる（今どおり）。
 4. `STORE.co_scene == co` なら何もしない（今どおり）。
 5. `STORE.co_scene = co`（古い続きは参照を外すだけ）。
@@ -359,7 +359,7 @@ function EVENT.drive(co, act, ...) end
 
 - Integration: `set_co_scene` と `EVENT.drive` の間に `drive_kind`・`run_interrupt_scene` を置く。L97〜208 の範囲の外は触らない。
 - Validation: 表「続きの決まり」の各行を 1 つずつテストする（Testing Strategy）。
-- Risks: `EVENT.drive` の中の順（種類 → 欄 → 再開 → 欄を外す → 読む）を崩すと、捨て間違いや中断の二重実行が起きる。テストで順を固定する。
+- Risks: `EVENT.drive` の中の順（種類 → 欄 → 再開 → 欄を外す → 読む）を崩すと、捨て間違いや中断の二重実行が起きる。テストで順を固定する。順に意味がある所（`EVENT.drive` の各手順・`build` で欄を外してから呼ぶ所・`run_interrupt_scene` の結び直し）には、理由を 1 行のコメントで書く。
 
 #### InterruptRunner（`run_interrupt_scene`）
 
@@ -556,4 +556,6 @@ function BUILDER.speaks(groups) end
 3. **中断のエラーの応答の中身**（3.10）。前提: 止まった場所は `＊チェイントーク中断`、中身は中断が止まるまでの出力と表記で、割り込んだシーンのその回の出力は載せない。代わり: 割り込んだシーンを止まった場所にする、または割り込んだシーンの出力も後ろに載せる。
 4. **中断の中の区切りと待ち**（3.9）。前提: 最初の再開の出力だけを使う。最初の区切りの前に何も積んでいなければ、中断の台詞は無い。`get_property` の待ちは捨てる（get のタグは出力に残る）。代わり: ふつうのシーンと同じく、出力の無い区切りを飛ばして最初の出力まで進める。
 5. **台詞に数えるさくらスクリプト**（1.2）。前提: `sakura_script` は字を表示するもの（`\_u[…]` など）も数えない。台詞は `talk` だけを字の判定で数える。代わり: 組み立ての段落の判定と同じく、字を表示する `sakura_script` も数える。
-6. **同じウェーブの約束の読み方**。前提: 中断の流し方の本体は `event/init.lua` の約束の範囲（L97〜208 の間の新しい内部の関数）に置き、組み立てからは act の欄の関数として呼ぶ。`shiori/act.lua`・`sakura_builder.lua`・`store.lua`・`kick.lua`・`scene_play.lua` も小さく触る。`external-control-events`・`reg-handler-chain` はこれらを触らない。代わり: 組み立てを触らず、`EVENT.drive` の中で文字列でつなぐ（案 A。3.6 の表情の持ち越しが崩れる）。
+### 決着済み
+
+- 6. **同じウェーブの約束の読み方**: 中断の流し方の本体は `event/init.lua` の約束の範囲（L97〜208 の間の新しい内部の関数）に置き、組み立てからは act の欄の関数として呼ぶ。`shiori/act.lua`・`sakura_builder.lua`・`store.lua`・`kick.lua`・`scene_play.lua` も小さく触る。2026-10-23 に `external-control-events`・`reg-handler-chain` の brief を確かめた。両方とも `kick.lua`・`scene_play.lua` は先例として名前を挙げるだけで、書き換えない。ほかの 3 つのファイルには触れない。
