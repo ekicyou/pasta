@@ -59,6 +59,7 @@ Think in English. Every developer-facing message (progress, warnings, the report
    MSYS_NO_PATHCONV=1 git show origin/<default>:.kiro/steering/roadmap.md | python -I .claude/skills/kiro-wave/scripts/read-wave.py
    ```
    Output: `date <YYYY-MM-DD>` then one `<Fable|Opus> <name>` line per spec. `WARN …` lines on stderr are relayed to the developer as they are. `FAIL …` (exit 1) → STOP and tell the developer to run `/kiro-next` first (or fix the wave subsection); start nothing.
+   A `release <X.Y.Z>` line instead of spec lines means the inventory found nothing left in the current goal and recommends the release (areka developer 2026-10-23: 「ウェーブの対象が０本となり、リリースできるなら、/releaseを開始コマンドとせよ」): start nothing — `/release` runs only when the developer types it — and tell the developer to type `/release <X.Y.Z>` (one untagged fenced block), then stop.
    The script treats a spec as Fable when either the code block or the wave table says Fable.
 
 ## Step 2 — Check each spec before starting it
