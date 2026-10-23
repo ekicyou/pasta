@@ -82,7 +82,7 @@ off()
 3. When 作者が同じ関数を同じイベントに 2 回登録したとき, the pasta shall それぞれを別の登録として扱い、どちらも呼ぶ（それぞれの外す関数は、自分の登録だけを外す）。
 4. The pasta shall `scripts/` の Lua・辞書の Lua ブロック・シーンの中の Lua のどこからでも、また読み込みの後のいつでも、登録を受け付ける。
 5. The pasta shall 鎖の登録を `REG` の表のキーとして見せない（`pairs(REG)` で回るのは、今どおりイベントのハンドラだけにする）。
-6. The pasta shall `REG.X = 関数` の代入と `REG.X` の読み出しを、今と同じに働かせる（鎖の登録は `REG.X` の値を変えない）。
+6. The pasta shall `REG.X = 関数` の代入と `REG.X` の読み出しを、今と同じに働かせる（鎖の登録は `REG.X` の値を変えない。ただし `REG.register` を読むと登録の口が返る）。
 7. If `id` が文字列でないか、`fn` が関数でないとき（`REG.register(id, fn)` のように `:` を付けずに呼んだときを含む）, the pasta shall 登録せず、何が違うかを示すエラーにする。【仮定。OPEN QUESTION 3】
 
 ### Requirement 2: 鎖を呼ぶ順と止まり方
