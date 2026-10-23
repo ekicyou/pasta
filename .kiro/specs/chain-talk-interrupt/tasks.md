@@ -119,7 +119,7 @@
   - _Depends: 4.1, 4.2, 4.3_
   - _Requirements: 8.5, 8.6_
 
-- [ ] 5. 全体の確かめ
+- [x] 5. 全体の確かめ
   - `cargo test -p pasta_lua`（Lua のテストの一覧と結合テスト）・`cargo test -p pasta_check`（act のメソッドの表の一致）・`cargo clippy` を通す
   - luacheck で触った Lua のファイルに警告が無いことを確かめる
   - `event/init.lua` の差分が、約束の範囲（続きの置き換えから再開の手順まで）とその間の内部の関数だけに収まっていることを確かめる
