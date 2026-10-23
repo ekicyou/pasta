@@ -57,13 +57,14 @@ end
 local function load_handlers()
     local REG = require("pasta.shiori.event.register")
     REG.OnPastaCallFunction = nil
+    REG.OnPastaSetSaveVariable = nil
     package.loaded[MODULE] = nil
     require(MODULE)
     return REG
 end
 
 --- 既定のハンドラを 1 回呼ぶ（act は本物の ShioriAct。find_handler・build だけ差し替える）
---- opts: find（find_handler の代役）、build（build の代役）、balloon、security_level
+--- opts: find（find_handler の代役）、build（build の代役）、balloon、security_level、save（pasta.save の代役）
 ---@return any result, string[] warns, table act
 local function call(event, refs, opts)
     opts = opts or {}
@@ -74,6 +75,7 @@ local function call(event, refs, opts)
     with_loaded({
         ["@pasta_log"] = make_log(warns),
         ["pasta.config"] = make_config(balloon),
+        ["pasta.save"] = opts.save or {},
     }, function()
         local REG = load_handlers()
         act = require("pasta.shiori.act").new({}, {
@@ -229,5 +231,135 @@ describe("OnPastaCallFunction - 呼び出し", function()
         local ok, result = coroutine.resume(co, act)
         expect(ok):toBe(true)
         expect(result):toBe("BUILT")
+    end)
+end)
+
+-- ============================================================================
+-- 2.2: 既定のハンドラ REG.OnPastaSetSaveVariable
+-- pasta.save は代役の表。@json は土台の本物。
+-- ============================================================================
+
+local EVENT_SET = "OnPastaSetSaveVariable"
+
+--- 代入を 1 回送る。save は前の値を入れた代役の表
+local function set(name, text, opts)
+    opts = opts or {}
+    opts.save = opts.save or { ["会員番号"] = "前の値" }
+    local result, warns = call(EVENT_SET, { [0] = name, [1] = text }, opts)
+    return result, warns, opts.save
+end
+
+describe("OnPastaSetSaveVariable - 門と作者の優先", function()
+    test("SecurityLevel が external なら変えずに nil を返し、warn を 1 行出す", function()
+        local result, warns, save = set("会員番号", "60", { security_level = "external" })
+        expect(result):toBeNil()
+        expect(save["会員番号"]):toBe("前の値")
+        expect(#warns):toBe(1)
+        expect(warns[1]):toBe(EVENT_SET .. ": SecurityLevel external is refused; nothing done")
+    end)
+
+    test("作者が先に定義したハンドラは残る", function()
+        local REG = require("pasta.shiori.event.register")
+        local saved = REG.OnPastaSetSaveVariable
+        local mine = function() end
+        REG.OnPastaSetSaveVariable = mine
+        package.loaded[MODULE] = nil
+        require(MODULE)
+        local kept = REG.OnPastaSetSaveVariable
+        REG.OnPastaSetSaveVariable = saved
+        expect(kept):toBe(mine)
+    end)
+end)
+
+describe("OnPastaSetSaveVariable - 代入", function()
+    test("数値・文字列・真偽値を代入し、nil（204）を返す。false も消えない", function()
+        local cases = {
+            { "60", 60 }, { '"01"', "01" }, { "true", true }, { "false", false },
+        }
+        for _, c in ipairs(cases) do
+            local result, warns, save = set("会員番号", c[1])
+            expect(result):toBeNil()
+            expect(#warns):toBe(0)
+            expect(type(save["会員番号"])):toBe(type(c[2]))
+            expect(save["会員番号"]):toBe(c[2])
+        end
+    end)
+
+    test("null ならキーを消す", function()
+        local result, warns, save = set("会員番号", "null")
+        expect(result):toBeNil()
+        expect(#warns):toBe(0)
+        expect(save["会員番号"]):toBeNil()
+    end)
+
+    test("名前を区切らない（a.b はそのままのキー）", function()
+        local _, _, save = set("a.b", "1")
+        expect(save["a.b"]):toBe(1)
+        expect(save.a):toBeNil()
+    end)
+
+    test("予約変数にも代入できる", function()
+        local result, _, save = set("pasta_talk_interval_min", "60")
+        expect(result):toBeNil()
+        expect(save.pasta_talk_interval_min):toBe(60)
+    end)
+end)
+
+describe("OnPastaSetSaveVariable - 失敗", function()
+    test("Reference0 が無い・空なら 名前にならない値 の表記と警告", function()
+        local result, warns = set(nil, "60")
+        expect(contains(result, "【名前にならない値：OnPastaSetSaveVariable Reference0（値なし）】")):toBe(true)
+        expect(warns[1]):toBe("OnPastaSetSaveVariable: bad argument: Reference0=nil")
+        result, warns = set("", "60")
+        expect(contains(result, "【名前にならない値：OnPastaSetSaveVariable Reference0（空文字列）】")):toBe(true)
+        expect(warns[1]):toBe("OnPastaSetSaveVariable: bad argument: Reference0=''")
+    end)
+
+    test("Reference1 が無い・空・読めないなら JSON として読めない値（読めない文字列は引用符なし）で、前の値が残る", function()
+        local cases = {
+            { nil, "値なし", "nil" },
+            { "", "空文字列", "''" },
+            { "nul", "nul", "'nul'" },
+            { "01", "01", "'01'" },
+            { "{", "{", "'{'" },
+        }
+        for _, c in ipairs(cases) do
+            local result, warns, save = set("会員番号", c[1])
+            expect(contains(result, "【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（" .. c[2] .. "）】"))
+                :toBe(true)
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe("OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1=" .. c[3])
+            expect(save["会員番号"]):toBe("前の値")
+        end
+    end)
+
+    test("配列・オブジェクトは 代入できない値（表）で、前の値が残る", function()
+        for _, text in ipairs({ "[1,2]", '{"a":1}' }) do
+            local result, warns, save = set("会員番号", text)
+            expect(contains(result, "【代入できない値：OnPastaSetSaveVariable ＄＊会員番号（表）】")):toBe(true)
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe(
+                "OnPastaSetSaveVariable: JSON array or object is refused: name='会員番号', Reference1='" .. text .. "'")
+            expect(save["会員番号"]):toBe("前の値")
+        end
+    end)
+
+    test("@json が無いなら JSON の部品が無い の表記と警告で、前の値が残る", function()
+        local loaded, preload = package.loaded["@json"], package.preload["@json"]
+        package.loaded["@json"], package.preload["@json"] = nil, nil
+        local ok, result, warns, save = pcall(set, "会員番号", "60")
+        package.loaded["@json"], package.preload["@json"] = loaded, preload
+        expect(ok):toBe(true)
+        expect(contains(result, "【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（JSON の部品が無い）】"))
+            :toBe(true)
+        expect(warns[1]):toBe("OnPastaSetSaveVariable: @json is not available; variable not set: name='会員番号'")
+        expect(save["会員番号"]):toBe("前の値")
+    end)
+
+    test("balloon_warning = false なら表記を出さず nil、ログは出し、前の値が残る", function()
+        local result, warns, save = set("会員番号", "[1,2]", { balloon = false })
+        expect(result):toBeNil()
+        expect(#warns):toBe(1)
+        expect(save["会員番号"]):toBe("前の値")
     end)
 end)
