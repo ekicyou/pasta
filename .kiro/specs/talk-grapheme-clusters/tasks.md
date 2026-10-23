@@ -93,3 +93,4 @@
 ## Implementation Notes
 - 新しいテストは `tests/sakura_script/grapheme_test.rs` に公開 API で置く（`tokenizer.rs`・`line_breaker.rs` の行数を増やさない。`tokenizer.rs` は 608 行で上限ぎりぎり）。テストを流すと `tests/fixtures/sample.generated.lua` が改行だけ書き換わるので戻す。
 - 決定 9（`\` ＋ 結合文字のクラスタは守らない側）は budoux がその位置で割る入力が見つからずテストで区別できていない。5.2 で補う（例: 守りが `starts_with('\\')` に化けても通ってしまう）。
+- 完了時の棚卸（2026-10-23）: その場で解決 0 件（最終検証の文書の指摘 4 件は 9bf2a96e で解決済み）・申し送り 2 件（`novel-talk-flow`・`scene-anchor-link` の brief.md へ、待ち・改行の単位がクラスタになったこと）・起票 0 件。x86 の動きは PR の build.yml の 2 ターゲットで確かめる。
