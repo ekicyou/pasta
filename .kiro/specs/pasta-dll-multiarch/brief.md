@@ -25,13 +25,13 @@ pasta が配っているのは、32bit（i686）の `pasta.dll` だけである�
 - x64 版と arm64 版の pasta.dll が、32bit 版と同じリリースで出る。
 - 見本ゴースト（hello-pasta）の .nar に、areka の探し方に合う名前で同梱される。
   - x64 の Windows では `pasta.x64.dll` → `pasta.dll` の順に探す。
-  - arm64 の Windows では `pasta.arm64.dll` → `pasta.x64.dll` → `pasta.dll` の順に探す。
+  - arm64 の Windows では `pasta.arm64.dll` →（x64 のプロセスを起こせるホストだけ）`pasta.x64.dll` → `pasta.dll` の順に探す。
   - 接尾辞の無い `pasta.dll` は、SSP 向けの 32bit 版のまま残す。
 - 作者は、自分のゴーストに同じ名前で同梱できる。手順がマニュアルにある。
 
 ## Approach
 
-areka の探し方（2026-10-23 の areka の開発者の決定。shiori4 の正本に置く提案中）に名前を合わせる。`pasta_check` は今のまま使える。手を入れるのは、ビルド・配布物・見本ゴースト・リリース CI・マニュアルである。
+shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。abi-conventions の論点 12。areka の探し方が元）に名前を合わせる。Linux は `libpasta.<x64|arm64>.so` → `libpasta.so`、macOS は `libpasta.dylib` だけ（ユニバーサルバイナリを推奨）と決まった。この spec は Windows の arch を持つ。`pasta_check` は今のまま使える。手を入れるのは、ビルド・配布物・見本ゴースト・リリース CI・マニュアルである。
 
 ## Scope
 
@@ -60,7 +60,7 @@ areka の探し方（2026-10-23 の areka の開発者の決定。shiori4 の正
 
 - **Upstream**:
   - `shiori4-v3-portable`。areka が x64・arm64 の pasta を読むのは shiori4 の入口（`shiori_get_api`）経由なので、それが無い x64 版を出しても areka では使えない
-  - shiori4 で決まる arch ごとの名前の決まり（areka の論点 12。2026-10-23 時点で裁定待ち）
+  - shiori4 の arch ごとの名前の決まり（abi-conventions の論点 12。2026-10-23 に確定）
 - **Downstream**: areka での x64・arm64 の実機確認
 
 ## Existing Spec Touchpoints
