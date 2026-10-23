@@ -58,7 +58,7 @@ SHIORI/3.0 の SHIORI は、ホストに呼ばれたときに文字列を 1 回�
 - **Out**:
   - shiori4 の ABI とホストの取り決めの変更（shiori4 の spec が持つ）
   - areka の側の実装（再生の列・SSTP の受け口）
-  - 1 プロセスに複数のインスタンスを置くこと。`shiori4-v3-portable` の要件で決める（推奨はあちらで入れる）。あちらで入らなかったときだけ、この spec の In に移す
+  - 1 プロセスに複数のインスタンスを置くこと。`shiori4-v3-portable` の要件で決める（areka は SHIORI ごとに helper のプロセスを起こすので、areka のもとでは起きない）
 
 ## Boundary Candidates
 
