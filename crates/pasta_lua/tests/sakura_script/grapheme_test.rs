@@ -213,3 +213,91 @@ fn test_lone_backslash_takes_combining_mark() {
 fn test_halfwidth_kana_with_voiced_mark_is_one_token() {
     assert_eq!(tokenize("ｶﾞ"), vec![general("ｶﾞ")]);
 }
+
+// ============================================
+// budoux の改行と幅をクラスタで数える（要件 4.1〜4.8）
+// ============================================
+
+/// budoux を `widths` にしたアクターで `talk_to_script` を呼び、出力と終わりの列の字数を返す。
+fn talk_budoux_width(widths: &str, input: &str) -> (String, i64) {
+    crate::common::create_sakura_test_runtime()
+        .load(format!(
+            r#"
+            local SAKURA = require "@pasta_sakura_script"
+            local col = {{}}
+            local out = SAKURA.talk_to_script({{ budoux = {{{widths}}} }}, [==[{input}]==], col)
+            return out, col.width
+            "#
+        ))
+        .eval()
+        .unwrap()
+}
+
+/// 要件 4.3・4.4: 組み合わせの絵文字は 1 つで幅 2。
+#[test]
+fn test_budoux_counts_emoji_cluster_as_width_two() {
+    for emoji in [
+        WOMAN_GESTURING_OK,
+        "\u{270C}\u{FE0F}",
+        "\u{1F44D}\u{1F3FD}",
+        "\u{1F1EF}\u{1F1F5}",
+    ] {
+        let (out, width) = talk_budoux_width("100", emoji);
+        assert_eq!(out, emoji);
+        assert_eq!(width, 2, "{emoji:?}");
+    }
+}
+
+/// 要件 4.5: 1 コードポイントのクラスタと `\r\n` の幅は今と同じ（曖昧な字は 2・制御文字は 0）。
+#[test]
+fn test_budoux_single_codepoint_and_crlf_width_unchanged() {
+    assert_eq!(talk_budoux_width("100", "a♀あ").1, 5);
+    assert_eq!(talk_budoux_width("100", "あ\r\nい").1, 4);
+}
+
+/// 要件 4.1・4.2・4.8: 改行はクラスタの境界にだけ入り、クラスタの中身は続けて出る。
+#[test]
+fn test_budoux_breaks_only_at_cluster_boundaries() {
+    let clusters = [
+        "今日",
+        WOMAN_GESTURING_OK,
+        "は",
+        "\u{270C}\u{FE0F}",
+        "い",
+        "\u{1F44D}\u{1F3FD}",
+        "い",
+        "\u{1F1EF}\u{1F1F5}",
+        "天気",
+        "か\u{3099}",
+        "e\u{301}",
+        "です",
+        WOMAN_GESTURING_OK,
+        WOMAN_GESTURING_OK,
+        "ね",
+    ];
+    let input: String = clusters.concat();
+    let mut starts = vec![0];
+    for c in &clusters {
+        starts.push(starts.last().unwrap() + c.len());
+    }
+    for widths in ["2", "3", "4", "6"] {
+        let (out, _) = talk_budoux_width(widths, &input);
+        let pieces: Vec<&str> = out.split(r"\n").collect();
+        assert_eq!(pieces.concat(), input, "widths={widths}");
+        let mut pos = 0;
+        for p in &pieces[..pieces.len() - 1] {
+            pos += p.len();
+            assert!(
+                starts.contains(&pos),
+                "クラスタの途中の改行 widths={widths}: {out}"
+            );
+        }
+    }
+}
+
+/// 要件 4.1・4.7: `\` ＋ 結合文字のクラスタは割れずに 1 つで出て、`\\` を作らない。
+#[test]
+fn test_budoux_backslash_with_combining_mark_stays_one_cluster() {
+    let (out, _) = talk_budoux_width("4", "今日は\\\u{301}いい天気ですね");
+    assert_eq!(out, "今日は\\n\\\u{301}いい\\n天気ですね");
+}
