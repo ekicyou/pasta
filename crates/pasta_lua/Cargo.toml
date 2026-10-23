@@ -46,7 +46,7 @@ tempfile.workspace = true
 insta.workspace = true
 tracing-test.workspace = true
 md5.workspace = true
-ctor = "0.2"
+ctor = "1.0"
 # FFI のテスト用 DLL を、テストの中で対象のアーキテクチャの cl.exe で作る（tests/ffi/dll_fixture.rs）
 cc = "1"
 

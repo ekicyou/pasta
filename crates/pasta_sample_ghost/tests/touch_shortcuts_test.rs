@@ -12,7 +12,7 @@ use pasta_lua::loader::PastaLoader;
 use tempfile::TempDir;
 
 /// `tutorial_stages_test.rs` と同じく、環境の PASTA_DEBUG で固定ポートがぶつからないようにする
-#[ctor::ctor]
+#[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");

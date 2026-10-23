@@ -34,7 +34,7 @@ use tempfile::TempDir;
 
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前に中和する
 /// （固定ポート衝突による偽陰性を防ぐ・写経元: `scene_kick_e2e_test.rs`）。
-#[ctor::ctor]
+#[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
