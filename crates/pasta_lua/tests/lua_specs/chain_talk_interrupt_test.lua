@@ -21,6 +21,7 @@ local RELOAD = {
     "pasta.shiori.event.mouse",
     "pasta.shiori.event.scene_play",
     "pasta.shiori.event.kick",
+    "pasta.shiori.event.external_control",
     "pasta.shiori.event.virtual_dispatcher",
     "pasta.shiori.res",
     "pasta.shiori.stop",
@@ -636,6 +637,25 @@ describe("続きの決まり - 外から起こした OnTalk", function()
             SCENE.register("cti_ontalk_1", "__start__", function(act) talk(act, "NEWTALK") end)
             res = request("OnTalk")
             expect(has(res, "NEWTALK")):toBe(true)
+            expect(STORE.co_scene):toBeNil()
+        end)
+    end)
+end)
+
+describe("続きの決まり - 外から呼んだ OnPastaCallFunction", function()
+    test("台詞を出さない呼び先は続きを残し、台詞を出す呼び先は捨てて中断の台詞を付ける", function()
+        with_env({ chudan = true, names = { cti_call = "cti_call_1" } }, function()
+            local co = start_chain()
+            SCENE.register("cti_call_1", "__start__", function(act) talk(act, "\\s[5]") end)
+            request("OnPastaCallFunction", { [0] = "cti_call" })
+            expect(chudan.ran):toBe(false)
+            expect(STORE.co_scene):toBe(co)
+
+            SCENE.register("cti_call_1", "__start__", function(act) talk(act, "CALLED") end)
+            local res = request("OnPastaCallFunction", { [0] = "cti_call" })
+            expect(chudan.ran):toBe(true)
+            expect(has(res, "CHUDAN")):toBe(true)
+            expect(has(res, "CALLED")):toBe(false)
             expect(STORE.co_scene):toBeNil()
         end)
     end)
