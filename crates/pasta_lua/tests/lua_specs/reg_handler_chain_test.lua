@@ -1,6 +1,6 @@
 -- ============================================================================
--- REG:register で重ねたハンドラ（鎖）のテスト (reg-handler-chain 1.1, 1.2, 2.1)
--- Requirements: 1.1-1.7, 2.1-2.4, 2.6, 2.7, 2.9, 3.1-3.5, 4.1-4.3, 5.2, 6.3, 6.5, 7.1, 7.3
+-- REG:register で重ねたハンドラ（鎖）のテスト (reg-handler-chain 1.1, 1.2, 2.1, 2.2)
+-- Requirements: 1.1-1.7, 2.1-2.4, 2.6-2.9, 3.1-3.5, 4.1-4.5, 5.1, 5.2, 6.3, 6.5, 7.1, 7.3
 -- ============================================================================
 
 local describe = require("lua_test.test").describe
@@ -451,6 +451,168 @@ describe("EVENT.fire - 止まり方・底・互換・act の分離 (2.1)", funct
 
         expect(is_value(EVENT.fire({ id = "OnTest" }), "resumed")):toBe(true)
         expect(resumed_act):toBe(stopped_act)
+    end)
+end)
+
+describe("EVENT.fire - 外す・ID (2.2)", function()
+    test("外した登録は次の回から呼ばれず、ほかの順は変わらず、2 回目の外しは何もしない", function()
+        local EVENT, REG = reload_event()
+        local calls = {}
+        REG:register("OnTest", function() calls[#calls + 1] = "a" end)
+        local off_b = REG:register("OnTest", function() calls[#calls + 1] = "b" end)
+        REG:register("OnTest", function() calls[#calls + 1] = "c" end)
+        REG.OnTest = function() calls[#calls + 1] = "bottom" end
+
+        EVENT.fire({ id = "OnTest" })
+        expect(table.concat(calls, ",")):toBe("c,b,a,bottom")
+
+        off_b()
+        expect(pcall(off_b)):toBe(true)
+        calls = {}
+        EVENT.fire({ id = "OnTest" })
+        expect(table.concat(calls, ",")):toBe("c,a,bottom")
+    end)
+
+    test("全部外せば、鎖を足す前と同じ応答になる", function()
+        local EVENT, REG = reload_event()
+        REG.OnTest = function() return "bottom" end
+        local before_bottom = EVENT.fire({ id = "OnTest" })
+        local before_none = EVENT.fire({ id = "OnNothing" })
+
+        local offs = {}
+        for _, id in ipairs({ "OnTest", "OnNothing" }) do
+            offs[#offs + 1] = REG:register(id, function() return "chained" end)
+            offs[#offs + 1] = REG:register(id, function() return true end)
+        end
+        expect(EVENT.fire({ id = "OnTest" }) ~= before_bottom):toBe(true)
+        for _, off in ipairs(offs) do
+            off()
+        end
+
+        expect(EVENT.fire({ id = "OnTest" })):toBe(before_bottom)
+        expect(EVENT.fire({ id = "OnNothing" })):toBe(before_none)
+    end)
+
+    test("同じ関数の 2 回の登録はどちらも呼ばれ、片方を外せば 1 回になる", function()
+        local EVENT, REG = reload_event()
+        local count = 0
+        local f = function() count = count + 1 end
+        local off1 = REG:register("OnTest", f)
+        REG:register("OnTest", f)
+
+        EVENT.fire({ id = "OnTest" })
+        expect(count):toBe(2)
+
+        off1()
+        count = 0
+        EVENT.fire({ id = "OnTest" })
+        expect(count):toBe(1)
+    end)
+
+    test("ループの途中の登録は、その回には呼ばれず次の回から呼ばれる", function()
+        local EVENT, REG = reload_event()
+        local calls = {}
+        local added = false
+        REG:register("OnTest", function() calls[#calls + 1] = "old" end)
+        REG:register("OnTest", function()
+            calls[#calls + 1] = "adder"
+            if not added then
+                added = true
+                REG:register("OnTest", function() calls[#calls + 1] = "new" end)
+            end
+        end)
+
+        EVENT.fire({ id = "OnTest" })
+        expect(table.concat(calls, ",")):toBe("adder,old")
+
+        calls = {}
+        EVENT.fire({ id = "OnTest" })
+        expect(table.concat(calls, ",")):toBe("new,adder,old")
+    end)
+
+    test("ループの途中の外しは、その回のまだ呼ばれていないハンドラを飛ばさず、次の回から効く", function()
+        local EVENT, REG = reload_event()
+        local calls = {}
+        local off_old = REG:register("OnTest", function() calls[#calls + 1] = "old" end)
+        local off_self
+        off_self = REG:register("OnTest", function()
+            calls[#calls + 1] = "remover"
+            off_old()
+            off_self()
+        end)
+
+        EVENT.fire({ id = "OnTest" })
+        expect(table.concat(calls, ",")):toBe("remover,old")
+
+        calls = {}
+        EVENT.fire({ id = "OnTest" })
+        expect(#calls):toBe(0)
+    end)
+
+    test("リソースの ID にも同じ鎖の決まりが当たる", function()
+        local EVENT, REG = reload_event()
+        local id = "sakura.recommendsites"
+        local stop = false
+        REG:register(id, function() if stop then return "chained" end end)
+        REG[id] = function() return "bottom" end
+
+        expect(is_value(EVENT.fire({ id = id }), "bottom")):toBe(true)
+        stop = true
+        expect(is_value(EVENT.fire({ id = id }), "chained")):toBe(true)
+    end)
+
+    test("register という ID の鎖を呼び、登録の口そのものは呼ばない", function()
+        local EVENT, REG = reload_event()
+        local called = false
+        local off = REG:register("register", function() called = true; return "chained" end)
+
+        expect(is_value(EVENT.fire({ id = "register" }), "chained")):toBe(true)
+        expect(called):toBe(true)
+        expect(type(REG.register)):toBe("function")
+
+        off()
+        expect(EVENT.fire({ id = "register" }):find("^SHIORI/3.0 204") ~= nil):toBe(true)
+    end)
+
+    test("待っているコールバックへの応答の回は、鎖を呼ばない", function()
+        local EVENT, REG = reload_event()
+        local CALLBACK = require("pasta.shiori.event.callback")
+        local called = false
+        REG:register("OnPastaCallBack1", function() called = true; return "chained" end)
+
+        local co = coroutine.create(function()
+            coroutine.yield()
+            coroutine.yield("callback")
+        end)
+        coroutine.resume(co)
+        CALLBACK.pending["OnPastaCallBack1"] = { co = co, act = {}, timeout_at = 999999 }
+
+        local res = EVENT.fire({ id = "OnPastaCallBack1", reference = {} })
+        expect(is_value(res, "callback")):toBe(true)
+        expect(called):toBe(false)
+        CALLBACK.reset()
+    end)
+
+    test("時計の返事（OnPastaClock）の回は、鎖を呼ばない", function()
+        local EVENT, REG = reload_event()
+        local CLOCK = require("pasta.shiori.clock")
+        CLOCK._reset()
+        local called = false
+        REG:register("OnPastaClock", function() called = true; return "chained" end)
+
+        local res = EVENT.fire({
+            id = "OnPastaClock",
+            date = { unix = os.time(), ns = 0 },
+            reference = { [0] = "2026", "10", "18", "13", "0", "0" },
+        })
+        expect(res:find("^SHIORI/3.0 204") ~= nil):toBe(true)
+        expect(called):toBe(false)
+        CLOCK._reset()
+    end)
+
+    test("最後に読み直し、鎖の無い振り分けを残す", function()
+        local EVENT = reload_event()
+        expect(type(EVENT.fire)):toBe("function")
     end)
 end)
 
