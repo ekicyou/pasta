@@ -171,7 +171,7 @@ pasta.*名前空間の内部Luaモジュール。`STORE`（一元データ管理
 
 ## §6 SHIORI Handlers
 
-SHIORIイベントハンドラの登録と応答。`REG`テーブルに `function(act)` 形式のハンドラを登録し、リクエストは `act.req` で読む。ハンドラは `Value` にする文字列（またはシーンのコルーチン、`nil`）を返し、エンジンがそれを応答にする（`RES` はエンジンが応答文字列を作るモジュール）。同じイベントに重ねるときは `REG:register(id, fn)`（外す関数を返す。新しい順に呼び、真の値で止まり、全部見送れば `REG` の値やシーンへ回る）。主要イベント（OnBoot, OnClose, OnMouseDoubleClick, OnMouseMove, OnChoiceSelectEx等）のReference仕様。つつき・撫でのショートカット（`つっつき反応…`・`さわり反応…` を段々に探す既定ハンドラ）。`OnTalk`/`OnHour`を自動発行する仮想ディスパッチャ。`OnChoiceSelectEx`選択肢自動ルーティング。デバッグが有効なときに名前か位置で指名したシーンを再生する `OnPastaScene`・`OnPastaSceneAt`（SSP の MCP の `raise_event` からの呼び方）。REG未登録時のシーン関数フォールバック。
+SHIORIイベントハンドラの登録と応答。`REG`テーブルに `function(act)` 形式のハンドラを登録し、リクエストは `act.req` で読む。ハンドラは `Value` にする文字列（またはシーンのコルーチン、`nil`）を返し、エンジンがそれを応答にする（`RES` はエンジンが応答文字列を作るモジュール）。同じイベントに重ねるときは `REG:register(id, fn)`（外す関数を返す。新しい順に呼び、真の値で止まり、全部見送れば `REG` の値やシーンへ回る）。主要イベント（OnBoot, OnClose, OnMouseDoubleClick, OnMouseMove, OnChoiceSelectEx等）のReference仕様。つつき・撫でのショートカット（`つっつき反応…`・`さわり反応…` を段々に探す既定ハンドラ）。`OnTalk`/`OnHour`を自動発行する仮想ディスパッチャ。`OnChoiceSelectEx`選択肢自動ルーティング。デバッグが有効なときに名前か位置で指名したシーンを再生する `OnPastaScene`・`OnPastaSceneAt`（SSP の MCP の `raise_event` からの呼び方）。外から `＞名前` と同じ呼び出しをする `OnPastaCallFunction` と、グローバル変数に JSON の値を代入する `OnPastaSetSaveVariable`。REG未登録時のシーン関数フォールバック。
 
 > 📖 詳細: [references/shiori-events.md](references/shiori-events.md)
 

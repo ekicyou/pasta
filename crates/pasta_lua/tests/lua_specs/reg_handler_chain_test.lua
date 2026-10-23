@@ -622,6 +622,7 @@ local ENTRY_CLOSURE = {
     "pasta.shiori.event.second_change",
     "pasta.shiori.event.mouse",
     "pasta.shiori.event.scene_play",
+    "pasta.shiori.event.external_control",
     "pasta.shiori.event.virtual_dispatcher",
     "pasta.shiori.res",
     "pasta.shiori.stop",
