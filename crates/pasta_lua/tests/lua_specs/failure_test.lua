@@ -341,10 +341,22 @@ describe("FAILURE.LABEL と要件 3.1 の文言", function()
     local FAILURE = require("pasta.failure")
     local L = FAILURE.LABEL
 
-    test("種類の名前の表は 10 種", function()
+    test("種類の名前の表は 12 種", function()
         local n = 0
         for _ in pairs(L) do n = n + 1 end
-        expect(n):toBe(10)
+        expect(n):toBe(12)
+    end)
+
+    test("JSON として読めない値", function()
+        expect(L.NOT_JSON):toBe("JSON として読めない値")
+        expect(FAILURE.format(L.NOT_JSON, "OnPastaSetSaveVariable", "空文字列"))
+            :toBe("【JSON として読めない値：OnPastaSetSaveVariable（空文字列）】")
+    end)
+
+    test("代入できない値", function()
+        expect(L.NOT_ASSIGNABLE):toBe("代入できない値")
+        expect(FAILURE.format(L.NOT_ASSIGNABLE, "＄＊会員", "表"))
+            :toBe("【代入できない値：＄＊会員（表）】")
     end)
 
     test("スクリプトのエラー（実行時エラーで止まった）", function()

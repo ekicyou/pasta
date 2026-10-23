@@ -152,3 +152,8 @@
 - **見つけた穴・古くなった記述**:
   - 2026-10-17 の節の「読み込みの 1 行を `init.lua` 77〜80 行に足す」は、78〜81 行に動いた。
   - `call-attribute-filter` の brief（2026-10-17 の節）は、この spec との重なりを `act.lua` としているが、この spec は `act.lua` を触らない。重なるのは `scene.lua` に口を足す場合だけ。
+
+## 申し送り（external-control-events より、2026-10-23）
+
+- `FAILURE.LABEL` に `NOT_JSON = "JSON として読めない値"`・`NOT_ASSIGNABLE = "代入できない値"` が入り、12 種になった（上の「10 種」は古い）。種類を足すときは `failure_test.lua` の数のテストも合わせて直す。
+- 既定のハンドラの読み込みの並び（`pasta/shiori/event/init.lua`）の末尾に、`scene_play` の次の 1 行として `external_control` が入った。読み込みの行を足すときはその後ろになる。
