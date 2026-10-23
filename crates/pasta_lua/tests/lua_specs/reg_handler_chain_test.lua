@@ -1,6 +1,6 @@
 -- ============================================================================
--- REG:register で重ねたハンドラ（鎖）のテスト (reg-handler-chain 1.1, 1.2)
--- Requirements: 1.1-1.7, 2.1-2.4, 2.7, 2.9, 3.1, 3.3, 3.4, 4.1-4.3, 5.2, 6.3, 6.5, 7.1
+-- REG:register で重ねたハンドラ（鎖）のテスト (reg-handler-chain 1.1, 1.2, 2.1)
+-- Requirements: 1.1-1.7, 2.1-2.4, 2.6, 2.7, 2.9, 3.1-3.5, 4.1-4.3, 5.2, 6.3, 6.5, 7.1, 7.3
 -- ============================================================================
 
 local describe = require("lua_test.test").describe
@@ -288,6 +288,169 @@ describe("EVENT.fire - 鎖の振り分け (1.2)", function()
     test("最後に読み直し、鎖の無い振り分けを残す", function()
         local EVENT = reload_event()
         expect(type(EVENT.fire)):toBe("function")
+    end)
+end)
+
+--- SCENE.search を差し替えて fn を走らせ、落ちても元に戻す
+--- @param search function 差し替える SCENE.search
+--- @param fn function 走らせるテストの本体
+local function with_scene_search(search, fn)
+    local SCENE = require("pasta.scene")
+    local original = SCENE.search
+    SCENE.search = search
+    local ok, err = pcall(fn)
+    SCENE.search = original
+    if not ok then
+        error(err, 0)
+    end
+end
+
+--- 名前が name のときだけ、text を話すシーンを返す SCENE.search
+local function scene_search(name, text)
+    return function(event_name)
+        if event_name ~= name then
+            return nil
+        end
+        return {
+            func = function(act) act.sakura:talk(text) end,
+            global_name = name,
+            local_name = "__start__",
+        }
+    end
+end
+
+--- 振り分けを読み直し、台詞を話せるアクターを置く
+--- act と scene も読み直し、act の引く SCENE と差し替える SCENE を同じ表に揃える
+local function reload_event_with_actor()
+    package.loaded["pasta.scene"] = nil
+    package.loaded["pasta.shiori.act"] = nil
+    package.loaded["pasta.act"] = nil
+    local EVENT, REG = reload_event()
+    require("pasta.store").actors.sakura = { name = "さくら", spot = 0 }
+    return EVENT, REG
+end
+
+describe("EVENT.fire - 止まり方・底・互換・act の分離 (2.1)", function()
+    test("真の値で止めると、古い方と底を呼ばず、値の種類ごとの応答になる", function()
+        local raw = "SHIORI/3.0 200 OK\r\nValue: raw\r\n\r\n"
+        local cases = {
+            { value = "x", check = function(res) return is_value(res, "x") end },
+            { value = raw, check = function(res) return res == raw end },
+            { value = true },
+            { value = "" },
+            { value = 1 },
+            { value = 0 },
+            { value = {} },
+        }
+        for _, case in ipairs(cases) do
+            local EVENT, REG = reload_event()
+            local older, bottom = false, false
+            REG:register("OnTest", function() older = true; return "older" end)
+            REG:register("OnTest", function() return case.value end)
+            REG.OnTest = function() bottom = true; return "bottom" end
+
+            local res = EVENT.fire({ id = "OnTest" })
+            local check = case.check or function(r) return r:find("^SHIORI/3.0 204") ~= nil end
+            expect(check(res)):toBe(true)
+            expect(older):toBe(false)
+            expect(bottom):toBe(false)
+        end
+    end)
+
+    test("REG の値が無ければ、全部見送った後に同じ名前のシーンを呼ぶ", function()
+        local EVENT, REG = reload_event_with_actor()
+        with_scene_search(scene_search("OnTest", "シーン"), function()
+            REG:register("OnTest", function() end)
+            expect(EVENT.fire({ id = "OnTest" }):find("シーン", 1, true) ~= nil):toBe(true)
+        end)
+    end)
+
+    test("止めた回は同じ名前のシーンも呼ばない", function()
+        local EVENT, REG = reload_event_with_actor()
+        with_scene_search(scene_search("OnTest", "シーン"), function()
+            REG:register("OnTest", function() return "stopped" end)
+            local res = EVENT.fire({ id = "OnTest" })
+            expect(is_value(res, "stopped")):toBe(true)
+            expect(res:find("シーン", 1, true)):toBeNil()
+        end)
+    end)
+
+    test("鎖が空なら、今と同じく同じ名前のシーンを呼ぶ", function()
+        local EVENT = reload_event_with_actor()
+        with_scene_search(scene_search("OnTest", "シーン"), function()
+            expect(EVENT.fire({ id = "OnTest" }):find("シーン", 1, true) ~= nil):toBe(true)
+        end)
+    end)
+
+    test("登録の後に REG に代入しても、鎖は先に呼ばれる", function()
+        local EVENT, REG = reload_event()
+        REG:register("OnTest", function() return "chained" end)
+        REG.OnTest = function() return "assigned" end
+        expect(is_value(EVENT.fire({ id = "OnTest" }), "chained")):toBe(true)
+    end)
+
+    test("包み合いは鎖が見送れば今どおり動き、鎖が止めれば呼ばれない", function()
+        local EVENT, REG = reload_event()
+        REG.OnTest = function() return "inner" end
+        local prev = REG.OnTest
+        REG.OnTest = function(act) return "outer(" .. prev(act) .. ")" end
+
+        local stop = false
+        REG:register("OnTest", function() if stop then return "chained" end end)
+        expect(is_value(EVENT.fire({ id = "OnTest" }), "outer(inner)")):toBe(true)
+
+        stop = true
+        expect(is_value(EVENT.fire({ id = "OnTest" }), "chained")):toBe(true)
+    end)
+
+    test("見送ったハンドラの台詞は、後のハンドラの出力に混ざらない", function()
+        local EVENT, REG = reload_event_with_actor()
+        REG:register("OnTest", function(act)
+            act.sakura:talk("止めた")
+            return act:build()
+        end)
+        REG:register("OnTest", function(act) act.sakura:talk("見送り") end)
+
+        local res = EVENT.fire({ id = "OnTest" })
+        expect(res:find("止めた", 1, true) ~= nil):toBe(true)
+        expect(res:find("見送り", 1, true)):toBeNil()
+    end)
+
+    test("見送ったハンドラの台詞は、底とシーンの出力に混ざらない", function()
+        local EVENT, REG = reload_event_with_actor()
+        with_scene_search(scene_search("OnScene", "シーン"), function()
+            for _, id in ipairs({ "OnTest", "OnScene" }) do
+                REG:register(id, function(act) act.sakura:talk("見送り") end)
+            end
+            REG.OnTest = function(act)
+                act.sakura:talk("底")
+                return act:build()
+            end
+
+            local res = EVENT.fire({ id = "OnTest" })
+            expect(res:find("底", 1, true) ~= nil):toBe(true)
+            expect(res:find("見送り", 1, true)):toBeNil()
+
+            res = EVENT.fire({ id = "OnScene" })
+            expect(res:find("シーン", 1, true) ~= nil):toBe(true)
+            expect(res:find("見送り", 1, true)):toBeNil()
+        end)
+    end)
+
+    test("止めたハンドラが返したコルーチンは、そのハンドラの act で再開する", function()
+        local EVENT, REG = reload_event()
+        local stopped_act, resumed_act
+        REG:register("OnTest", function(act)
+            stopped_act = act
+            return coroutine.create(function(a)
+                resumed_act = a
+                return "resumed"
+            end)
+        end)
+        REG:register("OnTest", function() end)
+
+        expect(is_value(EVENT.fire({ id = "OnTest" }), "resumed")):toBe(true)
+        expect(resumed_act):toBe(stopped_act)
     end)
 end)
 
