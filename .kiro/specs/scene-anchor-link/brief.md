@@ -215,3 +215,11 @@
 
 - `FAILURE.LABEL` に `NOT_JSON = "JSON として読めない値"`・`NOT_ASSIGNABLE = "代入できない値"` が入り、12 種になった（上の「10 種」は古い）。種類を足すときは `failure_test.lua` の数のテストも合わせて直す。
 - 既定のハンドラの読み込みの並び（`pasta/shiori/event/init.lua`）の末尾に、`scene_play` の次の 1 行として `external_control` が入った。読み込みの行を足すときはその後ろになる。
+
+## 申し送り（talk-grapheme-clusters より、2026-10-23 完了時）
+
+- 台詞の「1 文字」が、コードポイントから拡張書記素クラスタ（見た目の 1 文字）に変わった。`sakura_script/tokenizer.rs` の `next_cluster`（2 つ目以降のコードポイントの `\` の手前で切る）が切り出しの正で、`line_breaker.rs` もこれを呼ぶ。
+- 自動ウェイトは 1 トークン（クラスタ）に 1 つ（`wait_inserter.rs` の `append_with_wait`。旧名 `append_with_per_char_wait`）。テキストがちょうど `\` のトークンの後ろには入れない。
+- budoux の幅は `line_breaker.rs` の `cluster_width`（1 コードポイントは今までどおり・`\r\n` は 0・それ以外は文字列の東アジアの幅）で数え、改行はクラスタの境目にだけ入る。`line_breaker.rs` は 1,155 行、`tokenizer.rs` は 608 行になった。
+- 公開 Rust API: `CharSets` の各フィールドは `HashSet<String>`、`CharSets::classify` は `&str`（クラスタ）を取る。Lua からの呼び方（`talk_to_script`・`break_lines`）は変わらない。
+- 見直しが要る論点: この spec が待ち・改行・列の数え方に手を入れるなら、上の単位（クラスタ）と関数名を前提にする。参照は `.kiro/specs/completed/talk-grapheme-clusters/design.md` の LineBreaker・WaitInserter の節と `book/src/internals/talk-output.md`。

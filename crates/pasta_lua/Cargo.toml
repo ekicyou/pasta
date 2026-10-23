@@ -29,6 +29,7 @@ flate2.workspace = true
 regex.workspace = true
 budouy.workspace = true
 unicode-width.workspace = true
+unicode-segmentation.workspace = true
 socket2.workspace = true
 zip.workspace = true
 
