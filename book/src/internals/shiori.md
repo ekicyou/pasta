@@ -93,7 +93,7 @@ VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、�
 | ---------- | ---- |
 | `pasta.shiori.entry` | グローバルの `SHIORI` 表（`load`・`request`・`kick`・`unload`）。`GLOBAL.close_ghost`（`GLOBAL["ゴースト終了"]`）・`GLOBAL.pause_auto_talk`（`GLOBAL["自動トーク停止"]`）・`GLOBAL.resume_auto_talk`（`GLOBAL["自動トーク再開"]`）も登録する |
 | `pasta.shiori.event` | `EVENT.fire`（振り分けとコルーチンの再開）と、ハンドラが無いときの `EVENT.no_entry` |
-| `pasta.shiori.event.register` | `REG`。依存を持たない空の表 |
+| `pasta.shiori.event.register` | `REG`。依存を持たない表で、生のキーには代入したハンドラ（鎖の底）だけを置く。鎖はモジュールのローカル変数 `chains` に持ち、読み出しの `REG.register` はメタテーブルの `__index` から登録の口（`REG:register(id, fn)`）を返す。`EVENT.fire` が鎖の写しを取る内部の口は、`__index` でなくメタテーブルの `handlers` 欄（`getmetatable(REG).handlers(id)`）に置き、`REG.handlers` からは見えない。`REG.register` に代入すると、生のキーが先に引かれて登録の口が隠れる（代入を今と同じに働かせるため止めない） |
 | `pasta.shiori.event.boot`・`pasta.shiori.event.choice_select`・`pasta.shiori.event.second_change`・`pasta.shiori.event.mouse` | 既定ハンドラ（OnBoot・OnChoiceSelectEx・OnSecondChange・OnMouseDoubleClick・OnMouseMove）を `REG` に登録する。`pasta.shiori.event.mouse` は、つつき・撫でのショートカットの候補の名前・アクター名の解決・撫での判定も持つ |
 | `pasta.shiori.event.virtual_dispatcher` | 仮想イベント（OnHour・OnTalk）の判定と発行 |
 | `pasta.shiori.clock` | SSP の仮想時刻と OS の時計のずれ・時刻の飛びを持つ時計。合図の判定・仮想時刻の読み取り・ずれを足した時刻と日付・飛びを差し引いた時計 |
@@ -314,10 +314,10 @@ pasta.shiori.entry
 
 `EVENT.fire(req)` の振り分けは次の順である。
 
-1. `CALLBACK.try_route(req)` が応答を返せば、それを返す（待っているコールバックの再開）。
-2. `act = SHIORI_ACT.new(STORE.actors, req)` を作る。
-3. `REG[req.id]` があればそれを、無ければ `EVENT.no_entry` を `act` で呼ぶ。`EVENT.no_entry` は `SCENE.co_exec(act, req.id)` でイベント名のシーンを探し、見つかればそのコルーチンを、無ければ `nil` を返す（`pasta.scene` は循環を避けるため呼び出し時に `require` する）。
-4. 戻り値がコルーチンなら `EVENT.drive` で再開し、その出力を `RES.ok` で応答にする（出力は接頭辞にかかわらず常に `Value`）。`SHIORI/` で始まる文字列なら応答全体として包まずに返し、それ以外の文字列なら `RES.ok` で包み、それ以外なら 204 を返す。コルーチンの扱いは [イベントからシーンへ](execution-model.md#イベントからシーンへ) で扱う。
+1. `CALLBACK.try_route(req)` が応答を返せば、それを返す（待っているコールバックの再開）。`CLOCK.observe(req)` が時計の返事（OnPastaClock）を受け取れば 204 を返す。この 2 つで返した回は、鎖も `REG` の値も呼ばない。
+2. 鎖（`REG:register` で重ねたハンドラ）の写しを `getmetatable(REG).handlers(req.id)` で 1 回だけ取り、新しく登録した順に呼ぶ。1 つ呼ぶたびに `act = SHIORI_ACT.new(STORE.actors, req)` を作り直して渡す。真の値を返したらそこで止め、その act と戻り値で 4 へ進む。`nil`・`false` なら次へ回る。写しを取った後の登録・外しは次のイベントから効く。作者から見た規則は [ハンドラを重ねる](../lua/shiori-events.md#ハンドラを重ねるregregister) が正である。
+3. 全部見送れば（鎖が空でも）、新しい `act` で底を呼ぶ。底は表の生の値 `rawget(REG, req.id)` で、無ければ `EVENT.no_entry` である。底の戻り値は真偽で見ない。`EVENT.no_entry` は `SCENE.co_exec(act, req.id)` でイベント名のシーンを探し、見つかればそのコルーチンを、無ければ `nil` を返す（`pasta.scene` は循環を避けるため呼び出し時に `require` する）。
+4. 戻り値がコルーチンなら `EVENT.drive` で再開し、その出力を `RES.ok` で応答にする（出力は接頭辞にかかわらず常に `Value`）。`SHIORI/` で始まる文字列なら応答全体として包まずに返し、それ以外の文字列なら `RES.ok` で包み、それ以外（鎖の `true`・数・表を含む）なら 204 を返す。コルーチンの扱いは [イベントからシーンへ](execution-model.md#イベントからシーンへ) で扱う。
 
 既定ハンドラの中身は次のとおりである。アクター名の解決（`@pasta_config` の `spot` と `STORE.appearance.owners`）・候補の段・撫での判定の規則は [つつき・撫でのショートカット](../lua/shiori-events.md#つつき撫でのショートカット) が正である。
 
@@ -356,7 +356,7 @@ SHIORI はベースウェアが問い合わせるだけの通信であり、シ�
 Lua のエラーでシーンやハンドラが止まったとき（止まるエラー）の表記は、`pasta.shiori.stop`（`STOP`）が作る。止まった場所の名前を作るため、エラーが `SHIORI.request` に届くまでに失われる act を、要求ごとに 1 つずつ控えておく。
 
 - `EVENT.drive` は、コルーチンがエラーで終わると、`STOP.hold(co, err)` でそのコルーチンの act（`FAILURE.act_of(co)`）とエラーの値を控えてから `false` を返す。`EVENT.fire` は、`false` を受けたらそのエラーを投げ直す。
-- `EVENT.fire` は、ハンドラ（`REG` の関数・`EVENT.no_entry`）を呼ぶ直前に、渡す act を `STOP.hold_handler(act)` で控える。シーンの外（ハンドラの中）で止まったときは、この act に積んだ台詞の後に表記が出る。
+- `EVENT.fire` は、ハンドラ（鎖のハンドラ・`REG` の関数・`EVENT.no_entry`）を 1 つ呼ぶ直前ごとに、渡す act を `STOP.hold_handler(act)` で控え直す。シーンの外（ハンドラの中）で止まったときは、止まったハンドラの act に積んだ台詞の後に表記が出る。見送った鎖のハンドラの act は控えが上書きされるので、その台詞は表記に混ざらない。
 - `SHIORI.request` は、要求の始めに `STOP.clear()` で両方の控えを空にする。エラーを受けたら `STOP.take()`・`STOP.take_handler()` で控えを取り出し、理由の行（エラー文の最初の行）・要求の ID・ID が `On` で始まるかと一緒に `STOP.response` に渡す。
 - `STOP.response` は、控えた act（シーンの失敗の act、無ければハンドラの act）から止まった場所の名前を作り、エラー文の場所を直し、ログに警告を 1 行出す（`FAILURE.notation`）。表記を出す設定で、ID が `On` で始まる要求なら、act の末尾に表記を `raw_script` として積んで組み立てた値を `Value` に、受けた理由を `X-Error-Reason` にした `RES.ok`（`200 OK`）の全文を返す。表記を出さない設定・ID が `On` で始まらない・組み立てに失敗したときは `nil` を返し、`SHIORI.request` はこれまでどおり `RES.err` の 500 を返す。
 - 期限切れの掃引（`CALLBACK.sweep`）は、待機ごとの `time_out` で `EVENT.drive` の直後に、成否にかかわらず `STOP.take()` で控えを取り出す（同じ要求の後の止まるエラーに古い控えを混ぜない）。理由付きの待機がエラーで終わると、`timeout_message` を理由と表記の対象にして `STOP.response` に渡し（`【時間切れ：…】`）、`nil` なら `RES.err(理由)` の 500 を候補にする（警告は再開の前に出した 1 行だけで、`STOP.response` は警告を出さない）。理由の無い待機がエラーで終わると、イベント名を前に付けた警告を出し、スクリプトのエラーの表記の応答を候補にする（表記を出さない設定では候補を作らない）。
@@ -411,9 +411,10 @@ SSP の仮想時刻は SHIORI のリクエストのヘッダに載らない。SS
 EVENT.fire(req)
  1. CALLBACK.try_route(req)          待っているコールバックの返事ならその応答
  2. CLOCK.observe(req)               true（OnPastaClock の返事を受け取った）なら 204
- 3. REG[req.id] を呼ぶ
+ 3. 鎖（REG:register）を新しい順に   真の値を返したものの応答
+ 4. 全部見送れば REG[req.id] を呼ぶ  rawget。OnSecondChange では既定ハンドラ（下）
 
-REG.OnSecondChange（既定）
+REG.OnSecondChange（既定。鎖の底）
  1. CALLBACK.sweep                   タイムアウトの応答があればそれ
  2. dispatcher.dispatch(act)         シーンがあればそれ
  3. is_blocked(act.req.status) なら nil

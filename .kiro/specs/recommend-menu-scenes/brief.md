@@ -204,3 +204,10 @@
   - その場で動かす道は `EVENT.drive` を通らないので、止まったシーンの控え（`STOP.hold`）も置かれない。エラーのとき（`On` で始まらない要求は 500 と `X-Error-Reason`）の出方を確かめる。
   - `OnRecommendsiteChoice` の既定の受け手は、項目のシーンが無いとき、今の `EVENT.no_entry` と同じ前方一致で `＊OnRecommendsiteChoice` へ回す（完全一致にしない）。
   - steering の roadmap の Dependencies（`recommend-menu-scenes` の行と Existing Spec Updates の行）に、入った `scene-play-event`・`ontalk-suppression` が残っている。
+
+## 申し送り（reg-handler-chain より、2026-10-23 完了時）
+
+- `REG:register(id, fn)` が入った。`EVENT.fire` は、コールバックと時計の後で、鎖を新しい順に呼び（偽なら次・真なら止める）、全部見送れば `rawget(REG, id) or EVENT.no_entry` を呼ぶ。リソースの ID（`sakura.recommendsites` など）も同じ道を通る（Lua テスト `reg_handler_chain_test.lua` の 2.2 で確かめ済み）。
+- P5 の書き直し（上の 2026-10-21 の申し送りの「`REG:register` で重ねた受け手は先に呼ばれ、`nil` を返せば組み込みへ回る」）は、この実装のとおりで成り立つ。組み込みの受け手は `REG[...]` の生の値（鎖の底）に置けばよい。
+- 鎖のハンドラはハンドラごとに新しい act を受け取る。その場でシーンを動かす道を `REG` の受け手から呼ぶときも、渡された act を使う。
+- 参照: `.kiro/specs/completed/reg-handler-chain/design.md` の「Components and Interfaces > EventFire」、マニュアル `lua/shiori-events.md` の「ハンドラを重ねる（`REG:register`）」。
