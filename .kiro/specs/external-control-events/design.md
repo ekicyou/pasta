@@ -6,7 +6,7 @@
 
 **利用者**: 外から試験・操作する人（AI エージェントを含む）と、2 つのイベントを止めたり差し替えたりしたいゴーストの作者。
 
-**変わること**: 既定のハンドラを 2 つ、新しいファイルに足す。Rust の本体、`act.lua`・`scene.lua`・`failure.lua`・シーン再生のファイル・`pasta_check` は触らない。ほかのイベントの動きは変えない。
+**変わること**: 既定のハンドラを 2 つ、新しいファイルに足す。失敗の種類の名前の表（`failure.lua` の `FAILURE.LABEL`）に 2 行足す。Rust の本体、`act.lua`・`scene.lua`・シーン再生のファイル・`pasta_check` は触らない。ほかのイベントの動きは変えない。
 
 ```
 raise_event("OnPastaCallFunction",    ["自動トーク停止"])               → 204（停止する）
@@ -38,7 +38,7 @@ raise_event("OnPastaSetSaveVariable", ["初回済み", "null"])             → 
 ### This Spec Owns
 
 - `REG.OnPastaCallFunction`・`REG.OnPastaSetSaveVariable` の既定のハンドラ（新しいファイル `pasta/shiori/event/external_control.lua`）。門（`SecurityLevel`）、引数の確かめ、呼び先をコルーチンで包むこと、JSON の値の分け方、失敗の表記とログの警告の文言。
-- 2 つの失敗の種類の名前（`JSON として読めない値`・`代入できない値`）。ハンドラのファイルの中の定数として持ち、`FAILURE.LABEL` には足さない。
+- 2 つの失敗の種類の名前（`NOT_JSON = "JSON として読めない値"`・`NOT_ASSIGNABLE = "代入できない値"`）。`FAILURE.LABEL` の表の末尾に足し（表の決まり「後続 spec は自分の名前を足す」どおり）、`failure_test.lua` の数のテストを 10 から 12 に直し、2 つの文言のテストを足す。
 - Lua の単体テストの土台に `@json` を登録すること（`tests/lua_unittest_runner.rs` の 1 行）。
 - 2 つのイベントのテスト（Lua の単体テスト 1 本、Rust の結合テスト 1 本）。
 - マニュアルの 2 つの節と比べ読みの節、既定ハンドラの表の 2 行と数の文、主要イベントの表の 2 行、変数の章からの案内、内部設計の章の 2 か所の追記、スキルの references の作り直し。
@@ -49,13 +49,12 @@ raise_event("OnPastaSetSaveVariable", ["初回済み", "null"])             → 
 - イベントの振り分け（`EVENT.fire`・`EVENT.drive`・`set_co_scene`）。今のまま使う。チェイントークの続きを残すか捨てるかの決まりは `chain-talk-interrupt` が持つ。
 - 鎖でのハンドラの登録（`REG:register`）は `reg-handler-chain` が持つ。
 - 自動トークの停止と再開そのもの（`ontalk-suppression` の `GLOBAL` の 4 つの名前）。
-- 失敗の表記の仕組み（`pasta/failure.lua`。表の数を変えない）、シーン再生の既定のハンドラ（`scene_play.lua`）、`act.lua`、`scene.lua`、`pasta_check` の組み込みの名前。
+- 失敗の表記の仕組み（`pasta/failure.lua` の `report`・`format`・`value_of` など。触るのは `FAILURE.LABEL` の 2 行だけ）、シーン再生の既定のハンドラ（`scene_play.lua`）、`act.lua`、`scene.lua`、`pasta_check` の組み込みの名前。
 - グローバル変数の保存（`@pasta_persistence`・`save.json`）。
-- 手書きのスキル `.claude/skills/pasta-lua-coding/SKILL.md`（未決事項 6）。
 
 ### Allowed Dependencies
 
-- ハンドラ → `pasta.shiori.event.register`（REG）、`pasta.failure`（`report`・`LABEL.BAD_NAME`・`LABEL.SCENE_NOT_FOUND`・`kind_of`・`value_of`）、`@pasta_log`、`pasta.save`、`@json`（`pcall` で読む）、`act:find_handler`・`act:build`（ShioriAct が受け継ぐ `ACT_IMPL` の口）。
+- ハンドラ → `pasta.shiori.event.register`（REG）、`pasta.failure`（`report`・`LABEL.BAD_NAME`・`LABEL.SCENE_NOT_FOUND`・`LABEL.NOT_JSON`・`LABEL.NOT_ASSIGNABLE`・`kind_of`）、`@pasta_log`、`pasta.save`、`@json`（`pcall` で読む）、`act:find_handler`・`act:build`（ShioriAct が受け継ぐ `ACT_IMPL` の口）。
 - ハンドラは呼んだ時に `@pasta_log`・`pasta.save`・`@json` を `require` する（テストが差し替えられるように。`scene_play.lua` と同じ）。
 - `event/init.lua` → ハンドラ（`require` の 1 行）。ハンドラは `event/init.lua` を `require` しない（循環させない）。
 - 依存の向き: `pasta.failure`・`pasta.save`・`act` → ハンドラ → `event/init.lua` の読み込み。逆向きの依存は作らない。
@@ -66,7 +65,7 @@ raise_event("OnPastaSetSaveVariable", ["初回済み", "null"])             → 
 - `ACT_IMPL.call` が関数でない値を呼ぶようになったとき — このハンドラの「関数でなければ見つからない」を揃え直す。
 - `EVENT.fire` のコルーチンの扱いと `set_co_scene` の決まりを変えたとき（`chain-talk-interrupt`） — 要件 2.4 はあちらに従うだけなので、このハンドラは変えない。結合テストが続きを確かめる所だけ見直す。
 - `REG` の引き方を変えたとき（`reg-handler-chain`） — 作者の鎖のハンドラが既定より先に呼ばれること（要件 5.3）を確かめ直す。
-- `FAILURE.LABEL` の数のテストの決まりが変わったとき — ハンドラの中の 2 つの定数を表へ移すかを決め直す（未決事項 1）。
+- 同じウェーブのほかの spec が `FAILURE.LABEL` に名前を足したとき — 後から入る側が数のテストの数を rebase で合わせる。
 - `@json`（mlua-stdlib）の版を上げたとき — `null` の返り方（light userdata）と `decode` の戻り値を確かめ直す。
 - SSP の MCP の `raise_event` が GET・`local` で届かなくなったとき — 応答の載り方と門を見直す。
 
@@ -130,6 +129,9 @@ crates/pasta_lua/tests/
 
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua` — 既定のハンドラの `require` の並びの末尾（今は L82 の `scene_play` の次）に `require("pasta.shiori.event.external_control")` を 1 行足す。ほかは触らない（ウェーブの約束）。
 - `crates/pasta_lua/tests/lua_specs/init.lua` — テストの一覧の `scene_play_event_test` の次に `"external_control_event_test"` を 1 行足す。
+- `crates/pasta_lua/pasta_scripts/pasta/failure.lua` — `FAILURE.LABEL` の表の末尾に `NOT_JSON`・`NOT_ASSIGNABLE` の 2 行を足す。ほかは触らない。
+- `crates/pasta_lua/tests/lua_specs/failure_test.lua` — 「種類の名前の表は 10 種」を 12 種に直し、2 つの文言のテストを足す（決定 1。振る舞いのテストは触らない）。
+- `.claude/skills/pasta-lua-coding/SKILL.md` — L174 の要約に 2 つのイベントを足す。分類器が止めるので、実装のこの手順で開発者に許可を求める（決定 6）。
 - `crates/pasta_lua/tests/lua_unittest_runner.rs` — `@pasta_log` の登録の後に `mlua_stdlib::json::register(&lua, None)?;`（コメント 1 行付き）を足す。`register_module` が `package.loaded["@json"]` に置く。
 - `book/src/lua/shiori-events.md`
   - 「既定ハンドラと上書き」: 表の末尾に 2 行、数の文を「次の 7 つ」から「次の 9 つ」に。表の下の包み方の段落は触らない。
@@ -236,7 +238,7 @@ flowchart TD
 | 6.6 | references の作り直し | Manual | `gen-skill-refs.mjs`（`--check` で照合） | — |
 | 7.1 | ほかのイベントは不変 | 全部品 | 足すのは `REG` の 2 つのキーだけ | — |
 | 7.2 | `＞名前`・キック・`OnPastaScene` は不変 | 全部品 | `act.lua`・`kick.lua`・`scene_play.lua` を触らない | — |
-| 7.3 | 今のテストを書き換えない | 全部品 | `FAILURE.LABEL` に足さない（10 種のまま） | — |
+| 7.3 | 今のテストを書き換えない | 全部品 | 振る舞いのテストは触らない。直すのは `FAILURE.LABEL` の数のテスト（10 → 12）だけ | — |
 | 7.4 | 自動テスト | Tests | Testing Strategy の各項 | — |
 
 ## Components and Interfaces
@@ -410,7 +412,7 @@ REG.OnPastaSetSaveVariable = REG.OnPastaSetSaveVariable or function(act) end
 
 **失敗の表記とログ**
 
-種類の名前は、ハンドラのファイルの中の定数（`local NOT_JSON = "JSON として読めない値"`、`local NOT_ASSIGNABLE = "代入できない値"`）。`FAILURE.LABEL` には足さない（要件 7.3。未決事項 1）。
+種類の名前は、`FAILURE.LABEL` に足す `NOT_JSON = "JSON として読めない値"`・`NOT_ASSIGNABLE = "代入できない値"`（決定 1）。
 
 | 場合 | 種類 | 対象 | 説明 | 表記の例 | ログの警告 |
 | --- | --- | --- | --- | --- | --- |
@@ -418,10 +420,10 @@ REG.OnPastaSetSaveVariable = REG.OnPastaSetSaveVariable or function(act) end
 | `@json` が無い（4.5） | `JSON として読めない値` | `OnPastaSetSaveVariable ＄＊名前` | `JSON の部品が無い` | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（JSON の部品が無い）】` | `OnPastaSetSaveVariable: @json is not available; variable not set: name='会員番号'` |
 | Reference1 が無い（4.4） | 同上 | 同上 | `値なし` | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（値なし）】` | `OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1=nil` |
 | Reference1 が空（4.4） | 同上 | 同上 | `空文字列` | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（空文字列）】` | `OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1=''` |
-| JSON として読めない（4.4） | 同上 | 同上 | `FAILURE.value_of(text)` | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（"01"）】`（引用符なしの `01` を送ったとき） | `OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1='01'` |
+| JSON として読めない（4.4） | 同上 | 同上 | 受け取った文字列そのまま（引用符で包まない） | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（01）】`（引用符なしの `01` を送ったとき） | `OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1='01'` |
 | 配列・オブジェクト（3.9） | `代入できない値` | 同上 | `表` | `【代入できない値：OnPastaSetSaveVariable ＄＊会員番号（表）】` | `OnPastaSetSaveVariable: JSON array or object is refused: name='会員番号', Reference1='[1,2]'` |
 
-- 説明の `"01"` は、今の表記の決まり（文字列の値は `"…"` で囲む。`FAILURE.value_of`）による。マニュアルでは、引用符なしの `01` を送るとこの表記になり、文字列にするには `"01"` と送ることを例で示す。
+- 読めない値の説明だけは `FAILURE.value_of` を使わず、受け取った文字列を引用符で包まずにそのまま入れる（決定 2）。`value_of` は文字列を `"…"` で囲むので、引用符なしの `01` が `（"01"）` と出て、正しい送り方と見分けがつかなくなるため。種類の名前が「JSON として読めない値」なので、届いたものがそのまま見えれば足りる。マニュアルでは、引用符なしの `01` を送るとこの表記になり、文字列にするには `"01"` と送ることを例で示す。
 - 名前・値の `\`・`%` は `FAILURE.format` がエスケープする。
 
 ### Rust のテストの土台
@@ -496,7 +498,7 @@ REG.OnPastaSetSaveVariable = REG.OnPastaSetSaveVariable or function(act) end
 
 ### Regression
 
-- 今のテスト（Rust・Lua・luacheck）を書き換えずに通す（7.3）。とくに `failure_test.lua` の「種類の名前の表は 10 種」、`scene_play_event_test.lua`・`scene_play_event_test.rs`、`auto_talk_pause_test.lua`、キックの Lua のテスト（7.2）。
+- 今のテスト（Rust・Lua・luacheck）を書き換えずに通す（7.3）。例外は `failure_test.lua` の「種類の名前の表は 10 種」だけで、12 種に直す（決定 1）。とくに `scene_play_event_test.lua`・`scene_play_event_test.rs`、`auto_talk_pause_test.lua`、キックの Lua のテスト（7.2）。
 - `node book/tools/gen-skill-refs.mjs --check` とリンクの検証（`link-check.mjs`）を通す（6.6）。
 - `pasta_lua` のテストが `sample.generated.lua` の改行を書き換えることがあるので、コミットに混ぜない。ローカルの `cargo test` の前に `NoDefaultCurrentDirectoryInExePath` を外す（LuaJIT のビルドのため）。
 
@@ -510,11 +512,11 @@ REG.OnPastaSetSaveVariable = REG.OnPastaSetSaveVariable or function(act) end
 
 ## 未決事項（設計の話し合いで決める）
 
-1. **読めない JSON の種類の名前**: 下書きは、ハンドラのファイルの中の定数 `JSON として読めない値`（無い・空・読めない・`@json` が無い）と `代入できない値`（配列・オブジェクト）。`FAILURE.LABEL` に足すと `failure_test.lua` の 10 種のテストが落ち、要件 7.3 に反するため。ほかの案: 表に足してテストの数を直す（7.3 の読み直しが要る）／1 つの名前にまとめる。
+1. **読めない JSON の種類の名前**: **決定（2026-10-23 設計の話し合い・推奨案で承認）**。`FAILURE.LABEL` に `NOT_JSON = "JSON として読めない値"`（無い・空・読めない・`@json` が無い）と `NOT_ASSIGNABLE = "代入できない値"`（配列・オブジェクト）を足し、`failure_test.lua` の数のテストを 10 から 12 に直す。表は「後続 spec は自分の名前を足す」作りで、数のテストはその足し忘れを見張る役なので、数を直すのは表の決まりどおりである。表の外に置くと名前の一覧が 2 か所に分かれる。要件 7.3 は、この読み方に合わせて書き直した。
 2. **`null` の見分け方**: **閉じた（2026-10-23 設計の話し合い）**。既定の `json.decode` の結果の `type` が `"userdata"` なら `null`。`json.null` は `@json` に無く（research.md 3.3 の訂正）、`null_as_nil` にすると読めない値との見分けを 2 つ目の戻り値に頼ることになり、`pcall` の戻り値と重なって紛れる。
 3. **Lua の単体テストの土台に `@json` を足すか**: **閉じた**。足す（`tests/lua_unittest_runner.rs` に 1 行）。本物の `null` と `false` の扱いを単体テストで確かめられ、ほかのテストは `@json` を読まないので影響が無い。
 4. **MCP の `raise_event` で引用符付きの文字列が崩れないか**: **閉じた**。実装の最後に実機で確かめる手順を残す（Testing Strategy の「実機での確かめ」）。崩れたときは SSP の側の制約としてマニュアルに書く（SSP の側の変更は範囲の外）。今決めることは無い。
 5. **内部設計の章の 2 か所の追記**: **閉じた**。古くならないように `internals/shiori.md` のモジュールの表と `internals/execution-model.md` の列挙にも足す（`reg-handler-chain` が触る行とは別）。既定のハンドラが増えるのに内部設計の表が古くなるのを避けるのは、要件 6 の趣旨の内側。
-6. **手書きのスキル `pasta-lua-coding/SKILL.md` の要約の 1 文**: 今は `OnPastaScene`・`OnPastaSceneAt` を挙げる。2 つのイベントを足すには、分類器が止めるので開発者の許可が要る。下書きは、references の作り直しだけを範囲にし（要件 6.6）、SKILL.md は実装のときに許可を求めて足すかを決める。
+6. **手書きのスキル `pasta-lua-coding/SKILL.md` の要約の 1 文**: **決定（推奨案で承認）**。範囲に入れ、L174 の要約（今は `OnPastaScene`・`OnPastaSceneAt` を挙げる）に 2 つのイベントを足す。`.claude/skills` の SKILL.md の書き換えは分類器が止めるので、実装のその手順で開発者に 1 度許可を求めて入れる（回避策は探さない）。要約から漏れると、AI エージェントがこのイベントに気づけない。
 7. **マニュアルの MCP の例の置き場所**: **閉じた**。今の「MCP からの呼び方」（シーン再生の 2 つの例）を触らず、新しい 2 つの節の中にそれぞれの例を置く。ウェーブの約束（シーン再生の節は触らない）に合い、読む人は節を開けばその場で呼び方が分かる。
-8. **読めない値の表記の説明**: 引用符なしの `01` を送ると、今の `FAILURE.value_of` の決まりで説明が `（"01"）` になり、正しい送り方と見分けがつかない（設計の検証の指摘 3）。
+8. **読めない値の表記の説明**: **決定（推奨案で承認）**。引用符なしの `01` を送ると、今の `FAILURE.value_of` の決まりでは説明が `（"01"）` になり、正しい送り方と見分けがつかない（設計の検証の指摘 3）。この種類だけは、受け取った文字列を引用符で包まずにそのまま説明に入れる（エスケープは `FAILURE.format` に任せる）。

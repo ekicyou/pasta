@@ -153,7 +153,7 @@ OnPastaSetSaveVariable  Reference0=初回済み  Reference1=null
 
 1. The pasta shall 2 つのイベント以外のすべてのイベントの挙動を変えない。
 2. The pasta shall 辞書の `＞名前` の呼び出し、VSCode からのシーンの再生、`OnPastaScene`・`OnPastaSceneAt` の挙動を変えない。
-3. The pasta shall 今ある自動テストを、書き換えずに通す。
+3. The pasta shall 今ある自動テストを、書き換えずに通す（例外は、失敗の種類の名前の表の数を数えるテストだけ。表の決まり「後続 spec は自分の名前を足す」どおり、足した数に直す。2026-10-23 設計の話し合いで決定）。
 4. The pasta shall 呼び出し（シーン・`GLOBAL` の関数・別名・引数・見つからない名前・Reference0 の誤り）と、代入（数値・文字列・真偽値・`null`・読めない JSON・名前の欠け）と、`SecurityLevel` が `external` のときを、自動テストで確かめる。
 
 ## 要件の話し合いでの決定（2026-10-23）
