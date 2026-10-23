@@ -73,7 +73,7 @@
   - _Boundary: ReleaseSkillDocs_
   - _Requirements: 5.3, 5.4, 5.5_
 
-- [ ] 5. 文書を合わせる
+- [x] 5. 文書を合わせる
 - [x] 5.1 (P) マニュアルの「はじめに」にスキルの受け取り方を書く
   - 関連リンクの表の「リリースページ」の行の、検査の CLI の後に、`pasta-skills.zip` を固定のリンクで足す
   - 表の後・「このマニュアルが対象とするバージョン」の前に、節「AI にゴーストを書かせるとき」を「である」調で置く: 中身（3 つのスキルとそれぞれの役目）、落とし方（固定のリンクと版ごとのリリースページ）と置き場所（ゴーストの開発フォルダの `.claude/skills/` に展開した木）、版（同じ版を使う・版を上げるときは 3 つのフォルダを消してから展開する理由）
@@ -83,7 +83,7 @@
   - _Boundary: ManualSkillsSection_
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 5.2 (P) 配布物の一覧と段の並びを書いた文書を合わせる
+- [x] 5.2 (P) 配布物の一覧と段の並びを書いた文書を合わせる
   - ルートの `README.md` の直リンクの並びの `pasta_check.zip` の後に、`pasta-skills.zip` の 1 行を足す
   - `crates/pasta_sample_ghost/RELEASE.md`・`README.md` の配布物・build の役目・添付 6 つ・`release.ps1` の 8 段の並び（段 6 を足し、版の確認 7・大きさ 8、「手順 3〜8 は毎回走る」）を合わせる
   - steering の `tech.md`（成果物 5 つ・添付 6 つ）・`structure.md`（`release.ps1` の 8 段・`release/` の中身）を合わせる
