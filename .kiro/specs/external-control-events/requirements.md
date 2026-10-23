@@ -116,7 +116,7 @@ OnPastaSetSaveVariable  Reference0=初回済み  Reference1=null
 2. If `OnPastaCallFunction` で、Reference0 の名前の呼び先が見つからないとき, the pasta shall 何も呼ばず、イベント名と探した名前と「見つからない」ことを、失敗の表記とログの警告に出す（`OnPastaScene` の先例に揃える）。
 3. If `OnPastaSetSaveVariable` の Reference0 が無いか空のとき, the pasta shall どの変数も変えず、イベント名と誤った引数（Reference0）と値の様子を、失敗の表記とログの警告に出す。
 4. If `OnPastaSetSaveVariable` の Reference1 が無いか、JSON の値として読めないとき, the pasta shall 変数の値を変えず（消しもせず）、イベント名と変数の名前と読めなかった値を、失敗の表記とログの警告に出す（変数を消すのは、`null` を明示したときだけ）。
-5. If ゴーストの設定で JSON を読む部品を外しているために Reference1 を読めないとき, the pasta shall 変数の値を変えず、その旨を、ほかの失敗と同じく失敗の表記とログの警告に出す。
+5. If JSON を読む部品（`@json`）を読み込めないために Reference1 を読めないとき, the pasta shall 変数の値を変えず、その旨を、ほかの失敗と同じく失敗の表記とログの警告に出す。
 6. The pasta shall 2 つのイベントの失敗の表記を、ほかの実行時の失敗と同じ形（`【種類：対象（説明）】`。対象にイベント名を含める）で、同じ設定（`[logging] balloon_warning`）に従ってこのイベントの応答に載せ、出さない設定では 204 No Content を返す（表記はデバッグの有無によらず、既定で応答に載る）。
 7. The pasta shall ログの警告を、表記を出す・出さないの設定にかかわらず出す。
 8. If 呼び出しや代入が失敗したとき, the pasta shall チェイントークで待っているシーンの続きを、中断せずにそのまま残す。
@@ -169,4 +169,4 @@ OnPastaSetSaveVariable  Reference0=初回済み  Reference1=null
 7. **Reference1 が無いとき**（要件 4.4）: **閉じた**。読めない値と同じ失敗にし、変数は消さない（消すのは `null` を明示したときだけ。値の欠けで消えると、送り間違いで状態を失う）。
 8. **チェイントークの続き**（要件 2.4）: **閉じた**。brief の再測定の推奨どおり、ふつうのイベントと同じ決まりに従う。`chain-talk-interrupt` より先に入ると、今の決まりでは、台詞を出さない `自動トーク停止` を外から呼んでも待っている続きが捨てられるが、どちらの順でも壊れはしない。
 9. **Reference の並び**（要件 1.4）: **閉じた**。Reference1 から、値の無い最初の Reference の手前までを引数にする。空の文字列は値として渡す（`＞名前（）` に空の引数を書いたのと同じ）。
-10. **JSON を読む部品を外したゴースト**（要件 4.5）: `pasta.toml` の `[lua]` の `libs` で JSON の部品を外すと、Reference1 を読めない。**決定（推奨案で承認）**: 変数を変えず、ほかの失敗と同じく失敗の表記とログの警告を出す（決定 2）。
+10. **JSON を読む部品を外したゴースト**（要件 4.5）: JSON の部品（`@json`）を読み込めないと、Reference1 を読めない（注: `pasta.toml` の `[lua] libs` は撤去済みで、今は設定で外す口が無い。実装は `pcall(require, "@json")` の守りとして残す）。**決定（推奨案で承認）**: 変数を変えず、ほかの失敗と同じく失敗の表記とログの警告を出す（決定 2）。

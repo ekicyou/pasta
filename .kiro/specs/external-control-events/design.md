@@ -108,7 +108,7 @@ graph TB
 | 層 | 選んだもの | この機能での役割 | 備考 |
 | --- | --- | --- | --- |
 | Lua ランタイムのスクリプト | LuaJIT 2.1（mlua 0.11） | 2 つの既定のハンドラ | 新しい依存なし |
-| JSON | mlua-stdlib 0.1 の `@json`（`decode`） | Reference1 を値に読む | `pasta.toml` の `[lua] libs` で外せる。`pcall(require, "@json")` で確かめる |
+| JSON | mlua-stdlib 0.1 の `@json`（`decode`） | Reference1 を値に読む | 設定で外す口は無い（`[lua] libs` は撤去済み）。`pcall(require, "@json")` で確かめる |
 | テスト | `lua_test`（Lua）、`cargo test`（Rust の結合） | 単体と結合 | 単体の土台に `@json` を登録する |
 | マニュアル | mdBook、`book/tools/gen-skill-refs.mjs` | 使い方と references | 今の手順のまま |
 
@@ -349,7 +349,7 @@ local function collect_args(reference) end
 | --- | --- | --- | --- | --- | --- |
 | Reference0 が無い（4.1） | `BAD_NAME` | `OnPastaCallFunction Reference0` | `値なし` | `【名前にならない値：OnPastaCallFunction Reference0（値なし）】` | `OnPastaCallFunction: bad argument: Reference0=nil` |
 | Reference0 が空（4.1） | `BAD_NAME` | 同上 | `空文字列` | `【名前にならない値：OnPastaCallFunction Reference0（空文字列）】` | `OnPastaCallFunction: bad argument: Reference0=''` |
-| 呼び先が無い・関数でない（4.2） | `SCENE_NOT_FOUND` | `OnPastaCallFunction ＞名前` | なし | `【シーンが見つからない：OnPastaCallFunction ＞自動トーク停止】` | `OnPastaCallFunction: handler not found: name='自動トーク停止'` |
+| 呼び先が無い・関数でない（4.2） | `SCENE_NOT_FOUND` | `OnPastaCallFunction ＞名前` | なし | `【シーンが見つからない：OnPastaCallFunction ＞無い名前】` | `OnPastaCallFunction: handler not found: name='無い名前'` |
 
 - 別名を当てたときは、検索の中の今のログ（両名）も出る。
 - `ACT_IMPL.call` の「見つからない」の報告は通らない（呼ばないため）。表記は 1 つだけ出る。
@@ -438,7 +438,7 @@ REG.OnPastaSetSaveVariable = REG.OnPastaSetSaveVariable or function(act) end
 - **既定ハンドラの表**: `OnPastaCallFunction`「Reference0 の名前を、辞書の `＞名前` と同じ探し方で呼ぶ（[OnPastaCallFunction](#…)）」、`OnPastaSetSaveVariable`「Reference1 を JSON の値として読み、グローバル変数に代入する（[OnPastaSetSaveVariable](#…)）」。数の文は 9 つ。
 - **主要イベントの表**: 分類「外からの操作」で 2 行（「あり（`＞名前` と同じ呼び出し。いつでも）」「あり（グローバル変数への代入。いつでも）」）。
 - **`OnPastaCallFunction` の節**: Reference の表、探し方（`＞名前` を辞書のシーンの外に書いたのと同じ。前方一致・`GLOBAL` の関数・`[scene.alias]`・`act` のメソッド。ローカルは探さない）、引数（文字列のまま・値の無い最初の Reference の手前まで）、応答（1 ビート目・出力が無ければ 204・戻り値は載らない・続きは次の自然なおしゃべりの機会）、Status で止めないこと、チェイントークの続きはふつうのイベントと同じ決まり、失敗の表記の表、`SecurityLevel: external` は 204 とログ、作者のハンドラでの止め方（`REG.OnPastaCallFunction = function() end` の例）、`＊OnPastaCallFunction…` のフォールバックは起きないこと、MCP の例（`raise_event(event = "OnPastaCallFunction", references = ["自動トーク停止"])`）。
-- **`OnPastaSetSaveVariable` の節**: Reference の表、値の読み方（JSON の値 1 つ・`60`・`"01"`・`true`・`null` の例と結果の型・配列とオブジェクトは断る・`a.b` は区切らない・予約変数の効き目は次にトーク間隔を計算するとき・保存は終了時）、応答、失敗の表記の表（引用符なし `01` の例を含む）、`[lua] libs` で JSON を外したとき、`external` の断り、作者のハンドラでの止め方、MCP の例（`raise_event(event = "OnPastaSetSaveVariable", references = ["pasta_talk_interval_min", "60"])` と引用符付き文字列の書き方 `"\"01\""`）。
+- **`OnPastaSetSaveVariable` の節**: Reference の表、値の読み方（JSON の値 1 つ・`60`・`"01"`・`true`・`null` の例と結果の型・配列とオブジェクトは断る・`a.b` は区切らない・予約変数の効き目は次にトーク間隔を計算するとき・保存は終了時）、応答、失敗の表記の表（引用符なし `01` の例を含む）、`@json` を読み込めないとき、`external` の断り、作者のハンドラでの止め方、MCP の例（`raise_event(event = "OnPastaSetSaveVariable", references = ["pasta_talk_interval_min", "60"])` と引用符付き文字列の書き方 `"\"01\""`）。
 - **比べ読みの節**: `OnPastaCallFunction` と `OnPastaScene` を表で並べる（いつ働くか: いつでも／デバッグのときだけ、探し方: `＞名前` と同じ前方一致・関数・メソッド／完全一致のシーンだけ、ローカル: 指せない／指せる、引数: 渡せる／渡せない、見つからないとき: どちらも表記）。
 - **変数の章**: 「グローバル変数」と「予約グローバル変数」に、外から代入する口として `OnPastaSetSaveVariable` へのリンクを 1 文ずつ。
 - **内部設計の章**: `internals/shiori.md` のモジュールの表に 1 行、`internals/execution-model.md` のコルーチンを返す経路の列挙に `OnPastaCallFunction` を足す。

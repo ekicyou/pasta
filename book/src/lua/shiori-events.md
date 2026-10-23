@@ -66,7 +66,7 @@ end
 
 ### 既定ハンドラと上書き
 
-次の 7 つのイベントには、pasta が既定のハンドラを `REG` に登録している。ゴーストが `REG` の同じキーにハンドラを登録すると、そのイベントでは既定ハンドラの代わりにゴーストのハンドラが呼ばれる。
+次の 9 つのイベントには、pasta が既定のハンドラを `REG` に登録している。ゴーストが `REG` の同じキーにハンドラを登録すると、そのイベントでは既定ハンドラの代わりにゴーストのハンドラが呼ばれる。
 
 | イベント | 既定ハンドラの動作 |
 | -------- | ------------------ |
@@ -77,6 +77,8 @@ end
 | `OnSecondChange` | コールバックのタイムアウト処理と、仮想ディスパッチャによる OnTalk・OnHour の発行を行う（[OnSecondChange](#onsecondchange)） |
 | `OnPastaScene` | デバッグが有効なとき、名前で指名したシーンを再生する（[OnPastaScene](#onpastascene名前でシーンを再生)） |
 | `OnPastaSceneAt` | デバッグが有効なとき、ファイルと行で指名したシーンを再生する（[OnPastaSceneAt](#onpastasceneat位置でシーンを再生)） |
+| `OnPastaCallFunction` | Reference0 の名前を、辞書の `＞名前` と同じ探し方で呼ぶ（[OnPastaCallFunction](#onpastacallfunction名前を外から呼ぶ)） |
+| `OnPastaSetSaveVariable` | Reference1 を JSON の値として読み、グローバル変数に代入する（[OnPastaSetSaveVariable](#onpastasetsavevariableグローバル変数に代入)） |
 
 既定ハンドラは、ゴーストが登録したハンドラを上書きしない。既定ハンドラは、エンジンの起動処理（SHIORI 応答関数の読み込み）の中で、`REG` のそのキーがまだ空のときだけ登録される。そのため、ゴーストのハンドラは `scripts/main.lua`（既定ハンドラの登録より前に実行される）に書いても、辞書ファイル（`.pasta`）の Lua ブロック（登録より後に評価される）に書いてもよい（起動の順序は [起動シーケンス](../reference/startup.md#2-起動シーケンス)）。
 
@@ -214,6 +216,8 @@ end
 | 時計 | `OnPastaClock` | `REG` より先に処理される（仮想時刻の読み取り） |
 | デバッグ | `OnPastaScene` | あり（名前で指名したシーンを再生。デバッグが有効なときだけ） |
 | デバッグ | `OnPastaSceneAt` | あり（位置で指名したシーンを再生。デバッグが有効なときだけ） |
+| 外からの操作 | `OnPastaCallFunction` | あり（`＞名前` と同じ呼び出し。いつでも） |
+| 外からの操作 | `OnPastaSetSaveVariable` | あり（グローバル変数への代入。いつでも） |
 
 ここに無いイベントも、`REG` にハンドラを登録するか、同名のシーンを書けば応答できる。
 
@@ -637,6 +641,169 @@ raise_event(event = "OnPastaSceneAt", references = ["dic/boot.pasta", "42"])
 
 - シーンの一覧と、行からシーンを引くための表は、SHIORI の読み込みのときに作られ、辞書のファイルを書き換えても変わらない。
 - 読み込み直さないと、書き足したシーンや名前を変えたシーンは見つからず、`OnPastaSceneAt` の行は書き換える前の辞書の行として引かれる。行がずれると、狙ったものとは違うシーンが、失敗も出さずに再生されることがある。
+
+### OnPastaCallFunction（＞名前を外から呼ぶ）
+
+名前で指名したものを、辞書の `＞名前` と同じ探し方で呼ぶ。pasta の組み込みのイベントで、ベースウェアが自分から送ることはない。AI エージェントなどが、SSP の MCP サーバーの `raise_event` で送る。試験の間だけ [`＞自動トーク停止`](../grammar/call-jump.md#自動トーク停止自動トーク再開) を呼ぶ、といった使い方をする。デバッグの有無によらず働く。
+
+| Reference | 内容 |
+| --------- | ---- |
+| `act.req.reference[0]` | 呼ぶ名前（必須）。`＞自動トーク停止` なら `自動トーク停止` |
+| `act.req.reference[1]` 以降 | 呼び先に渡す引数（省略できる） |
+
+**探し方**
+
+- 辞書のシーンの外に `＞名前` を書いたのと同じに探す。[スコープ解決アルゴリズム](../grammar/call-jump.md#スコープ解決アルゴリズム)の 5 段のうち、実行中のグローバルシーンが無いので、3 段目以降（act のメソッド・`GLOBAL` テーブル・すべてのグローバルシーン）から探す。
+- `GLOBAL` の関数（`自動トーク停止`・`ゴースト終了` など）と、`act` のメソッドにも届く。
+- グローバルシーンは前方一致で探す。`初回` で `＊初回起動` も候補になる。候補が複数あれば、シャッフル＆順次消費で 1 つを選ぶ（[候補の選択](../grammar/call-jump.md#候補の選択)）。呼ぶたびに順送りが進む。
+- 照合用の名前への揃え方と、`[scene.alias]` の別名の当て方は、`＞名前` と同じである（[シーン名の別名](../grammar/call-jump.md#シーン名の別名)）。
+- ローカルシーンは探さない。ローカルシーンを指して再生するときは [OnPastaScene](#onpastascene名前でシーンを再生) を使う（[OnPastaCallFunction と OnPastaScene の違い](#onpastacallfunction-と-onpastascene-の違い)）。
+
+**引数**
+
+- Reference1 から、値の無い最初の Reference の手前までを、受け取った文字列のまま、順に引数として渡す。数に直すことはしない。空の文字列も 1 つの引数として渡す。
+- シーンを呼んだときは、Reference1 がシーン引数の `＄０`、Reference2 が `＄１` になる（[シーン引数](../grammar/variables.md#シーン引数)）。`GLOBAL` の関数を呼んだときは、`GLOBAL["名前"](act, Reference1, Reference2, …)` の形で呼ばれる。
+
+**応答**
+
+- 呼び先が台詞を出せば、その最初の[チェイントーク](../grammar/call-jump.md#チェイントーク)までの出力を `Value` にして 200 OK を返す。残りは、ほかのイベントで実行したシーンと同じく、次の自然なおしゃべり（仮想ディスパッチャが起こす OnTalk）の機会に出る。
+- 呼び先が何も出さなければ（`自動トーク停止` など）、204 No Content を返す。
+- 呼び先の戻り値は、応答に載らない。
+- 受け取ったその場で呼ぶ。Status に[ブロック対象のキーワード](#ブロック対象-status-キーワード)が含まれていても止めない（ほかのイベントのハンドラと同じ）。
+- 呼び先の実行がエラーで止まったときは、ほかのイベントと同じく止まるエラーの応答になる（[エラーハンドリング](#エラーハンドリング)）。
+
+**失敗の出方**
+
+見つからないときと引数の誤りでは何も呼ばず、失敗の表記とログの警告を出す。表記の形と、表記を出さない設定（`balloon_warning = false`）で 204 No Content になることは、[シーンを再生するイベントの共通の決まり](#シーンを再生するイベントの共通の決まり)の「失敗の出方」と同じである。ただし、表記はデバッグの有無によらず出る。
+
+| 場合 | 表記 | ログの警告 |
+| ---- | ---- | ---------- |
+| 名前が見つからない | `【シーンが見つからない：OnPastaCallFunction ＞無い名前】` | `OnPastaCallFunction: handler not found: name='無い名前'` |
+| Reference0 が無い | `【名前にならない値：OnPastaCallFunction Reference0（値なし）】` | `OnPastaCallFunction: bad argument: Reference0=nil` |
+| Reference0 が空の文字列 | `【名前にならない値：OnPastaCallFunction Reference0（空文字列）】` | `OnPastaCallFunction: bad argument: Reference0=''` |
+
+**断り**
+
+- `SecurityLevel` が `external` のリクエストは、何も呼ばずに 204 No Content を返し、ログに警告 `OnPastaCallFunction: SecurityLevel external is refused; nothing done` を書く。ほかの機械から `ゴースト終了` などを呼べないようにするためである。MCP からは `local` で届くので、断られない。
+- 断るときは引数を見ないので、失敗の表記は出ない。
+
+**作者のハンドラで止める**
+
+既定ハンドラは、ゴーストが `REG.OnPastaCallFunction` に登録したハンドラを上書きしない（[既定ハンドラと上書き](#既定ハンドラと上書き)）。外から呼ばせたくないときは、何もしないハンドラを登録する。いつも 204 No Content を返すようになる。
+
+```lua
+local REG = require("pasta.shiori.event.register")
+
+REG.OnPastaCallFunction = function() end  -- 外からの呼び出しを受け付けない
+```
+
+既定ハンドラがあるので、[シーン関数フォールバック](#シーン関数フォールバック)は起きない。`＊OnPastaCallFunction` のような、イベント名で始まる名前のシーンを前方一致で実行することはない。
+
+**MCP からの呼び方**
+
+```text
+raise_event(event = "OnPastaCallFunction", references = ["自動トーク停止"])
+raise_event(event = "OnPastaCallFunction", references = ["自動トーク再開"])
+raise_event(event = "OnPastaCallFunction", references = ["初回起動"])
+```
+
+- 1 行目は自動トークを止め、2 行目は再開する。どちらも台詞を出さないので、ツールの結果には何も載らない（204）。
+- 3 行目は `＊初回起動` を呼び、最初のチェイントークまでの台本がツールの結果に載る。
+- 辞書を書き換えたあとは、呼ぶ前に `reload(target = "shiori")` で SHIORI を読み込み直す（[MCP からの呼び方](#mcp-からの呼び方)）。
+
+### OnPastaSetSaveVariable（グローバル変数に代入）
+
+グローバル変数 `＄＊名前` に、外から値を代入する。`OnPastaCallFunction` と同じく pasta の組み込みのイベントで、デバッグの有無によらず働く。試験の間だけ [`＄＊pasta_talk_interval_min`](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前) を縮める、といった使い方をする。
+
+| Reference | 内容 |
+| --------- | ---- |
+| `act.req.reference[0]` | 変数の名前（必須）。`＄＊会員番号` なら `会員番号` |
+| `act.req.reference[1]` | 代入する値（必須）。JSON の値 1 つで書く |
+
+**値の読み方**
+
+Reference1 を JSON の値 1 つとして読み、その型のまま代入する。
+
+| Reference1 | 代入される値 |
+| ---------- | ------------ |
+| `60` | 数値の `60` |
+| `"01"`（引用符も含めて送る） | 文字列の `01` |
+| `true`・`false` | 真偽値 |
+| `null` | 変数を消す（値の無い状態に戻す） |
+
+- 文字列にしたいときは、値を `"` で囲んで送る。引用符なしの `01` は JSON として読めないので、失敗になる（下の表）。
+- JSON の配列（`[1,2]`）とオブジェクト（`{"a":1}`）は代入しない。失敗になり、変数は変わらない。
+- 名前は区切らない。`a.b` は、`a` の中の `b` ではなく、`a.b` という名前の 1 つの変数になる。
+- `pasta_` で始まる[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前)にも代入できる。トークの間隔の変数は数値で送る（`60`。`"60"` は文字列なので無視される）。代入した値は、次にトーク間隔を計算するときから反映される。
+- 代入した値は、その後に読む `＄＊名前`（Lua の `save.名前`）にすぐ見える。保存は、ほかのグローバル変数と同じく、ランタイムの終了時に行われる（[グローバル変数の保存先](../grammar/variables.md#グローバル変数の保存先)）。代入するたびにファイルへ書き出すことはしない。
+
+**応答**
+
+- 代入したとき・消したときは、204 No Content を返す。ログは出さない。
+- 変数の値を読み出して返すことはしない。
+
+**失敗の出方**
+
+失敗では変数を変えず、失敗の表記とログの警告を出す。表記の出方は `OnPastaCallFunction` と同じである（デバッグの有無によらず出る。`balloon_warning = false` では 204 No Content）。表の例は、名前 `会員番号` に送ったときである。
+
+| 場合 | 表記 | ログの警告 |
+| ---- | ---- | ---------- |
+| Reference1 が JSON として読めない（引用符なしの `01` を送った） | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（01）】` | `OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1='01'` |
+| Reference1 が無い | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（値なし）】` | `OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1=nil` |
+| Reference1 が空の文字列 | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（空文字列）】` | `OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1=''` |
+| Reference1 が配列かオブジェクト | `【代入できない値：OnPastaSetSaveVariable ＄＊会員番号（表）】` | `OnPastaSetSaveVariable: JSON array or object is refused: name='会員番号', Reference1='[1,2]'` |
+| JSON を読む部品（`@json`）が読み込めない | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（JSON の部品が無い）】` | `OnPastaSetSaveVariable: @json is not available; variable not set: name='会員番号'` |
+| Reference0 が無い | `【名前にならない値：OnPastaSetSaveVariable Reference0（値なし）】` | `OnPastaSetSaveVariable: bad argument: Reference0=nil` |
+| Reference0 が空の文字列 | `【名前にならない値：OnPastaSetSaveVariable Reference0（空文字列）】` | `OnPastaSetSaveVariable: bad argument: Reference0=''` |
+
+- 読めない値は、受け取った文字列を引用符で包まずに、そのまま表記に入れる。`（01）` と出たら、引用符なしで届いている。
+- Reference1 が無いときも、変数は消さない。消すのは `null` を送ったときだけである。
+
+**断り**
+
+- `SecurityLevel` が `external` のリクエストは、代入せずに 204 No Content を返し、ログに警告 `OnPastaSetSaveVariable: SecurityLevel external is refused; nothing done` を書く。MCP からは `local` で届くので、断られない。
+- 断るときは引数を見ないので、失敗の表記は出ない。
+
+**作者のハンドラで止める**
+
+`OnPastaCallFunction` と同じく、ゴーストが `REG.OnPastaSetSaveVariable` にハンドラを登録すると、既定ハンドラは動かない（[既定ハンドラと上書き](#既定ハンドラと上書き)）。
+
+```lua
+local REG = require("pasta.shiori.event.register")
+
+REG.OnPastaSetSaveVariable = function() end  -- 外からの代入を受け付けない
+```
+
+既定ハンドラがあるので、`＊OnPastaSetSaveVariable` のような名前のシーンへの[シーン関数フォールバック](#シーン関数フォールバック)は起きない。
+
+**MCP からの呼び方**
+
+```text
+raise_event(event = "OnPastaSetSaveVariable", references = ["pasta_talk_interval_min", "60"])
+raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "\"01\""])
+raise_event(event = "OnPastaSetSaveVariable", references = ["初回済み", "null"])
+```
+
+- 1 行目は `＄＊pasta_talk_interval_min` に数値の `60` を代入する。
+- 2 行目は `＄＊会員番号` に文字列の `01` を代入する。`references` の中では、JSON の引用符を `\"` と書く。SHIORI には `"01"` が届く。
+- 3 行目は `＄＊初回済み` を消す。
+- `references = ["会員番号", "01"]` と送ると、SHIORI には引用符なしの `01` が届き、`【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（01）】` がツールの結果に載る。
+
+### OnPastaCallFunction と OnPastaScene の違い
+
+どちらも名前で指名して、その場で動かすイベントである。違いは次のとおり。
+
+| | `OnPastaCallFunction` | `OnPastaScene` |
+| - | --------------------- | -------------- |
+| いつ働くか | いつでも | デバッグが有効なときだけ |
+| 探し方 | `＞名前` と同じ。グローバルシーンは前方一致。`GLOBAL` の関数・`act` のメソッドにも届く | シーンだけを完全一致で探す |
+| ローカルシーン | 指せない | Reference1 で指せる |
+| 引数 | Reference1 以降を渡せる | 渡せない |
+| 見つからないとき | 失敗の表記とログの警告 | 失敗の表記とログの警告 |
+| `SecurityLevel` が `external` | 断る（204） | 断る（204） |
+
+- `＊挨拶` と `＊挨拶2` があるとき、`OnPastaCallFunction` の `挨拶` はどちらも候補にするが、`OnPastaScene` の `挨拶` は `＊挨拶` だけを再生する。
+- `自動トーク停止` のような `GLOBAL` の関数は、`OnPastaCallFunction` でだけ呼べる。
 
 ## つつき・撫でのショートカット
 
