@@ -16,7 +16,7 @@
   - 完了の姿: 段 6 の行をスクラッチの写しにして pwsh で走らせると `release\pasta-skills.zip` ができ、成功の行 `Created pasta-skills.zip (<N> files: …)` が出る。最上位は 3 つのフォルダと `LICENSE` だけ（通しの実行は 2.3 で行う）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.2, 2.3, 2.4, 2.6, 2.7_
 
-- [ ] 2.2 段の並びと表示・release.bat の説明を合わせる
+- [x] 2.2 段の並びと表示・release.bat の説明を合わせる
   - 段の見出しを `[1/8]`〜`[8/8]` に。今の段 6・7（版の確認・大きさとまとめ）を段 7・8 にし、中身は変えない。段 3〜5 は触らない
   - 冒頭の説明（作る物に `pasta-skills.zip`、`-SkipSetup` の「run release steps (3-8) only」）と、リリースの段の範囲の注釈（`Release Phase (Steps 3-8)`）を合わせる
   - 頭の表示とまとめの `Check Zip:` の次に `Skills Zip:` の行を足す

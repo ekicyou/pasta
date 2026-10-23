@@ -1,5 +1,5 @@
 ﻿# release.ps1 - hello-pasta Build, Setup & Release Script
-# Builds ghost distribution and creates .nar, pasta.dll.zip and pasta_check.zip release packages
+# Builds ghost distribution and creates .nar, pasta.dll.zip, pasta_check.zip and pasta-skills.zip release packages
 # (also run by the release CI: .github/workflows/release.yml)
 #
 # Usage (PowerShell 7):
@@ -8,7 +8,7 @@
 #   pwsh -File release.ps1 -SkipDllBuild
 #
 # Parameters:
-#   -SkipSetup     Skip setup phase (steps 1-2), run release steps (3-7) only
+#   -SkipSetup     Skip setup phase (steps 1-2), run release steps (3-8) only
 #   -SkipDllBuild  Skip DLL build step only (use existing pasta.dll)
 
 param(
@@ -39,6 +39,7 @@ Write-Host "Release Dir: $ReleaseDir"
 Write-Host "NAR File:    $NarFilePath"
 Write-Host "DLL Zip:     $DllZipPath"
 Write-Host "Check Zip:   $CheckZipPath"
+Write-Host "Skills Zip:  $SkillsZipPath"
 if ($SkipSetup) {
     Write-Host "Mode:        Release only (setup skipped)"
 }
@@ -54,17 +55,17 @@ Write-Host ""
 # Setup Phase (Steps 1-2)
 # ============================================================
 if ($SkipSetup) {
-    Write-Host "[1/7] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[2/7] Copying DLL and scripts ............ SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[1/8] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[2/8] Copying DLL and scripts ............ SKIPPED" -ForegroundColor DarkGray
     Write-Host ""
 }
 else {
     # --- Step 1: Build pasta.dll (32bit) ---
     if ($SkipDllBuild) {
-        Write-Host "[1/7] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+        Write-Host "[1/8] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
     }
     else {
-        Write-Host "[1/7] Building pasta.dll (32bit release)..."
+        Write-Host "[1/8] Building pasta.dll (32bit release)..."
         Write-Host "  Target: i686-pc-windows-msvc"
 
         Push-Location $WorkspaceRoot
@@ -87,7 +88,7 @@ else {
     Write-Host ""
 
     # --- Step 2: Copy pasta.dll and scripts/ ---
-    Write-Host "[2/7] Copying files..."
+    Write-Host "[2/8] Copying files..."
 
     $MasterDir = Join-Path $GhostDir "ghost\master"
     if (-not (Test-Path $MasterDir)) {
@@ -160,12 +161,12 @@ else {
 }
 
 # ============================================================
-# Release Phase (Steps 3-7)
+# Release Phase (Steps 3-8)
 # ============================================================
 
 # --- Step 3: Build pasta_check.zip (x64 pasta_check.exe + THIRD_PARTY_LICENSES.txt) ---
 # Always runs, even with -SkipSetup / -SkipDllBuild.
-Write-Host "[3/7] Building pasta_check.zip..."
+Write-Host "[3/8] Building pasta_check.zip..."
 
 # Remove a stale zip so a failed run never leaves an old one behind
 if (Test-Path $CheckZipPath) {
@@ -228,7 +229,7 @@ Write-Host "  Created pasta_check.zip ($($zipEntries -join ', '))" -ForegroundCo
 Write-Host ""
 
 # --- Step 4: Run pasta_check release (x64 exe built in step 3) ---
-Write-Host "[4/7] Running pasta_check release..."
+Write-Host "[4/8] Running pasta_check release..."
 
 Push-Location $WorkspaceRoot
 try {
@@ -246,7 +247,7 @@ Write-Host "  Release package created" -ForegroundColor Green
 Write-Host ""
 
 # --- Step 5: Create pasta.dll.zip (pasta.dll + THIRD_PARTY_LICENSES.txt) ---
-Write-Host "[5/7] Creating pasta.dll.zip..."
+Write-Host "[5/8] Creating pasta.dll.zip..."
 
 $ZipSources = @(
     (Join-Path $WorkspaceRoot "target\i686-pc-windows-msvc\release\pasta.dll"),
@@ -347,8 +348,8 @@ if ($missingEntries.Count -gt 0 -or $extraEntries.Count -gt 0 -or $badEntries.Co
 Write-Host "  Created pasta-skills.zip ($($zipEntries.Count) files: $(($SkillNames + @('LICENSE')) -join ', '))" -ForegroundColor Green
 Write-Host ""
 
-# --- Step 6: Version Check ---
-Write-Host "[6/7] Checking version..."
+# --- Step 7: Version Check ---
+Write-Host "[7/8] Checking version..."
 
 $CargoToml = Join-Path $WorkspaceRoot "Cargo.toml"
 if (-not (Test-Path $CargoToml)) {
@@ -373,11 +374,11 @@ Write-Host "  Version: $Version"
 Write-Host "  Tag:     $TagName"
 Write-Host ""
 
-# --- Step 7: Size Check & Release Instructions ---
+# --- Step 8: Size Check & Release Instructions ---
 $narSize = (Get-Item $NarFilePath).Length
 $narSizeMB = [math]::Round($narSize / 1MB, 2)
 
-Write-Host "[7/7] Size check and release instructions"
+Write-Host "[8/8] Size check and release instructions"
 
 $NarMaxBytes = 7MB  # 7,340,032 bytes
 if ($narSize -gt $NarMaxBytes) {
@@ -393,6 +394,7 @@ Write-Host ""
 Write-Host "  NAR:       $NarFilePath ($narSizeMB MB)"
 Write-Host "  DLL Zip:   $DllZipPath"
 Write-Host "  Check Zip: $CheckZipPath"
+Write-Host "  Skills Zip: $SkillsZipPath"
 Write-Host "  Version:   $Version"
 Write-Host "  Tag:       $TagName"
 Write-Host ""
