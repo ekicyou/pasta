@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. 下地: 変更前の記録を残す
+- [x] 1. 下地: 変更前の記録を残す
   - cargo を走らせる前に、環境変数 `NoDefaultCurrentDirectoryInExePath` を外す（LuaJIT のビルドが止まるため）
   - 変更前の `release.ps1` を pwsh から直に呼んで通す（`-ExecutionPolicy Bypass` は使わない）
   - `pasta.dll.zip`・`hello-pasta.nar`・`pasta_check.zip` の中身の名前の一覧と、段の見出しの並び（`[1/7]`〜`[7/7]`）を、`target\pasta-skills-release-asset-baseline\` の `assets-before.txt`（配布物ごとの名前の一覧）と `steps-before.txt`（段の見出し）に書き出す（`target\` は git の外なので、後のタスクの担当も同じ場所で読める）
