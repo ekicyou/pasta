@@ -73,7 +73,7 @@
   - _Boundary: ManualDocs（internals）_
   - _Requirements: 8.6_
 
-- [ ] 3.3 スキルの references を作り直す
+- [x] 3.3 スキルの references を作り直す
   - `book/node_modules` が在るかを先に確かめ、無ければ入れる（ワークツリーに無いことがある）
   - マニュアルからスキルの references を生成し直す
   - 完了の状態: 生成の鮮度の照合（`--check`）が通る
