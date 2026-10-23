@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. 土台: 依存の追加と特性化テスト
-- [ ] 1.1 書記素クラスタの切り出しの依存を足す
+- [x] 1.1 書記素クラスタの切り出しの依存を足す
   - ワークスペースの依存と `pasta_lua` の依存に `unicode-segmentation 1.13.3` を足し、ロックファイルに載せる
   - 技術の steering の依存の表に、このクレートと役割（書記素クラスタの切り出し）を書く
   - `cargo build -p pasta_lua` が通り、`cargo deny check` が（ローカルで動けば）ライセンスの関門を通る
