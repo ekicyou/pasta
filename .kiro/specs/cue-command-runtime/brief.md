@@ -241,3 +241,25 @@ ghost_dev の「ぱすた開発」セッションは、**外見として記録�
 - 作者は「bind を書くと台詞の加工でバルーンに `閉じる,赤,1` と文字で出る」とも報告した。調べた範囲では、行に書いた `\![bind,閉じる,赤,1]` は 1 つのタグとして通り、ウェイトも BudouX の改行も入らない。壊れるのは、単語の値に `「」` で囲まずに書いたとき（`、`・`,` が値の区切りになる）である。再現の手順は残っていない。作者のメモでは、同じ時期に Lua の長い括弧を書き違えて末尾の `]` が欠けていた（SSP が「Unclosed [」と出した）ので、それを取り違えた見込みが高い（2026-10-21「ぱすた開発」の返信）。不具合として扱わない。
 - 2026-10-21 に SSP の実機で確かめた（窓際のぱすたさんの複製）。トークの頭で `pasta_layout.lua` が `raw_script` を使って表情を 0000 に戻した。その後に相手役が話し、ぱすたへ戻ったところで、復旧が**前のトークの腕と口**を出し直した。`raw_script` の出力は外見の記録に残らず、アクターの記録には前のトークのパーツが残っているからである。台詞が表情の単語で始まれば上書きされるが、表情の単語の無い台詞では前のトークのパーツが残る。`！命令` の出力を記録しないと決めるなら、同じことが起きる。要件では、この実例を前提に決める。
 - カテゴリの排他の扱いは、`dressup-category-exclusive` を実機の確認の後に取り下げたので、roadmap のバックログ「着せ替えの復旧の出力の膨らみ」に残っている。
+
+## 2026-10-23 棚卸の再測定（main 82176f19）
+
+- **前提の変化**（前回 2026-10-18・`facd6cf4` から）:
+  - 文法・パーサ・構文木・生成（`grammar.pest`・`parse_scene.rs`・`ast/cue.rs`・`scope_gen.rs`・`scope_gen_tests.rs`・`transpiler.rs`・`context.rs`）と、`choice_select.lua`・`appearance.lua`・`actor_style.lua`・VSCode の文法定義・LSP は変わっていない。`！` 行の生成は今も `scope_gen.rs` 376〜377 行で `select` だけを拾う。
+  - 台詞の印（`chain-talk-interrupt`）: 組み立ての `BUILDER.speaks`（`sakura_builder.lua` 413 行）が「字のある `talk` か `choice`」を台詞と数え、その印で、待っているチェイントークの続きを捨てるかが決まる（`shiori/act.lua` 73〜74 行 → `shiori/event/init.lua` の `EVENT.drive` 257 行）。ト書きのトークンを足すなら、台詞に数えない（今の `choice_timeout`・`raw_script` と同じ）のが自然で、`！` 行だけのシーン（効果音だけなど）は続きを消さない。数えるなら `BUILDER.speaks` を直すことになり、`chain-talk-interrupt` の design.md の Revalidation Triggers に当たる。台詞の無い割り込みは、自分の残りを捨てる（`set_co_scene(co, true)`）ことも前提にする。
+  - 中断の台詞（`＊チェイントーク中断`）が出た回は、組み立ての前に、割り込んだシーンのトークン列を中断のシーンのものと差し替える（`shiori/act.lua` 81〜91 行）。割り込んだシーンが場面の頭で打った柱の命令も、一緒に消える。柱を打つ・打ち直す決まりを決めるとき、この「差し替えで消える柱」も扱う。
+  - 書記素クラスタ（`talk-grapheme-clusters`）: 台詞の中に直に書いた知らない `\![…]` は、今もタグ 1 つとして通り、待ちも改行も挟まれない（タグの読み方 `SAKURA_TAG_PATTERN` は変えていない）。
+  - 自動トークの停止（`ontalk-suppression`）で `act.lua` が 829 → 837 行になった（`ACT_IMPL.yield` 664 行の門）。`call_restore` は 795〜803 行。
+  - `shiori/act.lua` は 325 → 344 行で、`escape_tag_arg` は 230 行から。`loader/config/mod.rs` は 338 → 343 行（`[loader] ffi` の 1 項目）。別名表の手本（`[scene.alias]`・`[actor."名前"].font`）は前回のまま。
+- **触るファイル**: 前回と同じ。行数は `grammar.pest` 272・`parse_scene.rs` 426・`ast/cue.rs` 99・`scope_gen.rs` 445・`scope_gen_tests.rs` 533・`transpiler.rs` 339・`context.rs` 454・`act.lua` 837（1,000 行に近い）・`shiori/sakura_builder.lua` 558（字にも選択肢にも数えない S4 の枝は 531〜535 行、`inner_token_to_string` 291 行、`emit_actor_switch` 72 行）・`shiori/act.lua` 344・`loader/config/`（`mod.rs` 343・`sections.rs` 356）・`validate/config.rs` 403・`choice_select.lua` 80・VSCode の文法定義 272、見本とスナップショット、マニュアル。新しいファイルは、ト書きの入口（`act.lua` に足さない場合）と別名表の検査。
+- **規模**: 17〜21 のまま（台詞に数えないことはトークンのタスクに、差し替えで消える柱は入り方の決まりのタスクに入る）。
+- **先に要るもの**: `scene-attribute-store`（柱の分。未完了）。名前は `novel-areka-contract` から引く（待たずに作れる）。0.4.2 の 3 本と `talk-grapheme-clusters` は完了し、重ならない。ファイルの重なり:
+  - 0.5.0 の道筋: `scene-attribute-store`（`parse_scene.rs`・`scope_gen.rs`・`transpiler.rs`・`context.rs`）、`call-attribute-filter`（`grammar.pest`・`act.lua`・VSCode の文法定義）、`novel-talk-flow`（`act.lua`・`sakura_builder.lua`・`loader/config/`、両方が設定を検査するなら `validate/config.rs`）、`novel-checkpoint-rollback`（`sakura_builder.lua`）、`novel-variable-scope`（`grammar.pest`、表を 2 つにするなら `act.lua`・`scope_gen.rs`）、`shell-element-click`（柱を `choice_select.lua` で打つ場合）。
+  - 版の決まっていないもの: `scene-anchor-link`（`grammar.pest`・`act.lua`・`sakura_builder.lua`・VSCode の文法定義）、`scene-exact-match`（`act.lua`・`loader/config/`、柱を `choice_select.lua` で打つならそれも）、`scene-pick-modes`（`grammar.pest`・`act.lua`）、`recommend-menu-scenes`（`loader/config/mod.rs`、別名表を検査するなら `validate/config.rs`）。
+  - 隙間の spec: `ponytail-dsl-parser`（文法・`parse_scene.rs`）、`ponytail-lua-transpiler`（`scope_gen.rs`・`context.rs`・`transpiler.rs`）、`ponytail-lua-loader`（`loader/config/`）、`ponytail-lua-scripts`（`act.lua`・`shiori/act.lua`）、`ponytail-editor-tooling`（VSCode の文法定義）。
+- **種別**: 機能（`！select` 以外の `！` 行は何も出さずに捨てられ、柱の属性は実行時に残らない）。開発者の 0.5.0 の目標（2026-10-10）と、2026-10-17 のまとめの決定から。
+- **要件定義のモデル**: Fable のまま。決めるのは、柱とト書きが実行時に何をいつ出すかという DSL の意味で、areka がその `\![…]` の上に作る（後から変えにくい）。「場面に入る」の数え方、ローカルシーンと名前なしの `＊` への受け継ぎ、生成で埋めるか実行時に読むか、引数の穴の直し方の 4 つが絡み、推奨案がまだ無い（3 つ以上の絡む問い）。今回入った 4 本は、このどれも決めていない。増えた論点（台詞に数えるか）は「数えない」の推奨が立つので、深い論点に入れない。
+- **分割の案**: 2026-10-18 の節のとおり。20 をはっきり超えたら `cue-command-runtime`（ト書き）と `scene-stage-attributes`（柱）に戻す。21 にわずかに届くだけなら分けない。
+- **見つけた穴・古くなった記述**:
+  - Current State の `sakura_script/` の行番号: `tokenizer.rs` 138〜146 行 → `SAKURA_TAG_PATTERN` 163 行、`wait_inserter.rs` 77〜80 行 → 77 行（`TokenKind::SakuraScript` の枝）、`line_breaker.rs` 33〜45 行 → `column_move` 57〜67 行。2026-10-18 の節の S4 の枝 513〜515 行 → 531〜535 行。
+  - 2026-10-17 の節の `call_restore` 787〜795 行 → 795〜803 行。2026-10-17・2026-10-18 の節の `act.lua` 829 行 → 837 行。

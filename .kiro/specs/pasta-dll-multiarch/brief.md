@@ -75,3 +75,14 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 - 32bit の `pasta.dll` は SSP 向けに今のまま出す（名前も中身も変えない）
 - debug の待受は 127.0.0.1 固定のまま。出荷物は arch ごとに 1 種類（debug は opt-in）
 - **確かめていない危険**: pasta は mlua 経由で LuaJIT を静的に組み込んでいる。`aarch64-pc-windows-msvc` で LuaJIT がビルドできるか（クロスコンパイルを含む）は、2026-10-23 時点で確かめていない。要件の前に試す。できないなら、arm64 版を落として x64 版だけにするかを開発者が決める（arm64 の areka は x64 版へ戻って読める）
+
+## 2026-10-23 棚卸の再測定（main 82176f19）
+
+- **前提の変化**: 起票の後に入った 4 本は、ビルド・配布物・`release.ps1`・`release.yml` を触っていない。Current State の行番号（`release.ps1` 71 行・97〜107 行、`release.yml` 141〜144 行・163 行）は今も合っている。aarch64・arm64 の言及が無いのも同じ。名前の決まり（x64 は `pasta.x64.dll`、arm64 は `pasta.arm64.dll`）は shiori4 の main（PR #7）に入った。
+- **触るファイル**: `.cargo/config.toml`（aarch64 の `crt-static`）、`crates/pasta_sample_ghost/release.ps1`（331 行）、`.github/workflows/release.yml`（589 行。75 行の targets・80 行の cache の key・141〜163 行の中身の検査・208 行の添付）、`.github/workflows/build.yml`（arm64 のビルドを足すなら。今の matrix は i686 と x86_64 だけ）、`about.toml`（17 行の `targets` に aarch64 が無い。ライセンスの一覧を arch ごとに作るなら要る）、`.gitignore`（40 行は `ghost/master/pasta.dll` だけを外す。`pasta.x64.dll`・`pasta.arm64.dll` も足す）、`crates/pasta_sample_ghost/tests/`（`pasta.dll` を見るテスト 4 つ）、マニュアル（`getting-started/13-nar.md`・`reference/startup.md`・`internals/shiori.md` など、`pasta.dll` に触れる頁が 12）。FFI の型を直すならこの spec が `pasta_shiori/src/windows.rs` も持つ。
+- **規模**: 9〜12。
+- **先に要るもの**: `shiori4-v3-portable`（areka は `shiori_get_api` で読む）。x64 版を出す前に、SHIORI/3.0 の書き出しの型（`usize`→`c_long`、`bool`→i32 の `BOOL`。`windows.rs` 109・129・222・257 行）を直すこと。`shiori4-v3-portable` が `BOOL` を直すなら、残りは `c_long` だけ。そこも同じ spec か `ponytail-shiori` で先に直すのが推奨（この spec が `windows.rs` を持たずに済む）。ファイルの重なり: `ponytail-manual-ci`（`release.yml`・`build.yml`）、`ponytail-check-release`（`pasta_sample_ghost/tests/**`）、`shiori4-v3-portable`（`build.yml`）、`windows.rs` を直すなら `ponytail-shiori`。
+- **種別**: 機能（areka の 64bit・arm64 向けの配布物）。
+- **要件定義のモデル**: Opus。決めることは配布物の形（zip を 1 つにするか分けるか）と arm64 を出すかで、どれも後から変えられる。
+- **分割の案**: 要らない。
+- **見つけた穴・古くなった記述**: aarch64 で LuaJIT（mlua の vendored）がビルドできるかは、まだ試していない（前のまま。要件の前に試す）。CI で arm64 を作るには、arm64 の Windows の runner か、x64 からのクロスビルドが要る。`embed-resource` の VERSIONINFO も arm64 で通るかを一緒に試す。`.cargo/config.toml` の頭の説明（9 行「出荷ターゲットは x86・x64 の両方」）は、x64 の `pasta_check.exe` のことで、x64 の pasta.dll は配っていない。arch を足すときに書き直す。

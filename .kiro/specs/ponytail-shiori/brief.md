@@ -126,3 +126,18 @@
 - 振る舞いを固めるテストを先に書き、1 つ直すごとに確かめて 1 コミットにする。
 - 品質の関門：`cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_shiori`。i686 のビルドも通す。
 - cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。
+
+## 2026-10-23 棚卸の再測定（main 82176f19）
+
+- **前提の変化**: 2026-10-23 に `shiori4-v3-portable`（0.4.2）が起票された。`windows.rs`・`actor/` を共有し、0.4.2 のほうが先に入る。あちらの推奨どおりに進むと、この spec の土台が次のように変わる。
+  - 4 番（FFI の型）: `load`・`loadu`・`unload` の戻り値の `bool`→i32 の `BOOL` は、あちらの In に入る見込み（2026-10-23 に shiori4 の `shiori3-legacy-host` が「BOOL は 32bit の int で 0 以外が真」と確定）。残るのは `usize`→`c_long` だけ。`pasta-dll-multiarch` が x64 版を出す前にこれが要る。
+  - 1 番（unload と FreeLibrary の競り）: あちらは unload の待ちの上限を見直し、実行器の wintf を外す見込み。メッセージ専用ウィンドウの後始末は無くなるが、detach する限り競りは残る。直しはこの spec のまま。
+  - 5 番（MAILBOX のテストの競り）: あちらが `MAILBOX`・`ACTOR_HANDLE` をインスタンスへ移せば、消えるか形が変わる。
+  - 7・8 番（`teardown.rs` の測り・`marshal_request` の写し）: `lifecycle.rs` が書き直されるので、場所を測り直す。
+- **触るファイル**: 前のとおり `crates/pasta_shiori/**`（`Cargo.toml` の `exclude` を含む）、`book/src/internals/shiori.md`、`crates/pasta_shiori/README.md`。`crates/pasta_shiori/src` は 2026-10-19 から変わっていない（最後は #166）。1,000 行に近いものは無い（いちばん大きいのは `shiori_lifecycle_tests.rs` の 596 行）。
+- **規模**: 14〜18。あちらが 4 番の一部と 5 番を持っていけば、12〜15。
+- **先に要るもの**: 機能の上では無い。`shiori4-v3-portable` の後に入る（`windows.rs`・`actor/` を共有。同じウェーブに置かない）。ほかの重なり: `shiori4-v4-host`（`actor/`）、`pasta-dll-multiarch`（4 番の `c_long` をどちらが直すか）。`ponytail-lua-loader`・`ponytail-lua-scripts` とは `internals/shiori.md` の別の節（後から入る側が合わせる）。
+- **種別**: バグ（ゴーストを閉じると SSP が落ちうる・`Key:` の行が黙って 204）。監査の指摘より。
+- **要件定義のモデル**: Opus（前のまま）。
+- **分割の案**: 要らない。
+- **見つけた穴・古くなった記述**: Current State の行番号のうち、`lifecycle.rs` の 2 つは監査の日にもずれていた。`teardown_actor` は 150〜182 行（「L192-215」は `kick_into_mailbox`）、`marshal_request` は 124〜148 行（「L174-182」ではない）。`thread.rs` 250〜258 行・`shiori.rs` 66〜70 行・`windows.rs` 109・129・222・257 行・`req_parser.pest` の `_tag`（44 行）・`shiori-sample.log` 47 行の裸の `Reference0:` は合っている。ギャップ分析は `shiori4-v3-portable` が入った後の main で測り直す。Existing Spec Touchpoints の Adjacent に `shiori4-v3-portable`・`shiori4-v4-host`・`pasta-dll-multiarch` が無い。

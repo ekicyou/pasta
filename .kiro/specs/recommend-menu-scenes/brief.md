@@ -211,3 +211,24 @@
 - P5 の書き直し（上の 2026-10-21 の申し送りの「`REG:register` で重ねた受け手は先に呼ばれ、`nil` を返せば組み込みへ回る」）は、この実装のとおりで成り立つ。組み込みの受け手は `REG[...]` の生の値（鎖の底）に置けばよい。
 - 鎖のハンドラはハンドラごとに新しい act を受け取る。その場でシーンを動かす道を `REG` の受け手から呼ぶときも、渡された act を使う。
 - 参照: `.kiro/specs/completed/reg-handler-chain/design.md` の「Components and Interfaces > EventFire」、マニュアル `lua/shiori-events.md` の「ハンドラを重ねる（`REG:register`）」。
+
+## 2026-10-23 棚卸の再測定（main 82176f19）
+
+- **前提の変化**
+  - 先に要るものの 3 本（`external-control-events`・`chain-talk-interrupt`・`reg-handler-chain`）がすべて入った。この spec は先頭になった。
+  - `REG` の勝ち方: `REG` にメタテーブルが付いた（`shiori/event/register.lua` 117 行）。`EVENT.fire`（`event/init.lua` 309 行）は鎖（`REG:register`）を新しい順に呼び、全部見送れば `rawget(REG, id) or EVENT.no_entry`（338 行）を呼ぶ。組み込みの受け手を `REG["sakura.recommendsites"] = REG["sakura.recommendsites"] or 関数` で置けば、窓際のぱすたさんの代入は今どおり勝つ。P5 の「組み込みの受け手は作者のスクリプトより先に置かれる」は不正確で、`main.lua` は既定の登録より先に走り、既定は空のキーにだけ置く（マニュアル `lua/shiori-events.md` 133 行）。「どちらの置き場所でも作者が勝つ」と書き直す。
+  - マニュアル `lua/shiori-events.md` 70 行に「`REG:register` のイベント名には `On` で始まらないリソースの ID も書ける」が入った。Problem の「どこにも書いていない」は半分閉じた。`REG[...]` に代入する作例とおすすめの節は、まだ無い。
+  - チェイントークの決まり: 続きを捨てるのは、台詞（字のある `talk` か `choice`）を出した割り込み・`STORE.co_preempt` の印の付いた再生・エラーだけ（`event/init.lua` 257〜301 行の `EVENT.drive`）。台詞を出した割り込みは、`＊チェイントーク中断` があれば反応の**代わりに**それを出す。P3 の選んだ後のトークは、チェイントークが待っていると、項目のシーンの台詞でなく中断の台詞が出る。P3 の受け手は `co_preempt` の印を付けない（付けると中断の台詞を出さずに黙って捨てる）。
+  - その場で動かす道は、今も自前で要る。`EVENT.drive` を通すと、メニューのシーンに書いた台詞で割り込み扱いになり、続きを捨てる。`act:build()`（`shiori/act.lua` 68 行）は台詞の印 `_spoke` を立て、立ち位置と表情の持ち越しを書き換える。
+  - 失敗の出し方: `external-control-events` の手本は `FAILURE.report(act, record)` の後に `act:build()` を返す形（`external_control.lua` 29〜32 行）。`FAILURE.report`（`pasta/failure.lua` 173 行）は ID を見ないので、リソースの受け手がこれをまねると表記がリソースの値に混ざる。リソースの受け手の失敗はログの警告だけにする（マニュアル 1086 行「`On` で始まらない要求では表記を出さない」に合わせる）。`OnRecommendsiteChoice` の受け手は手本の形でよい。
+  - 既定ハンドラの表は `lua/shiori-events.md` 119〜131 行（「次の 9 つのイベント」）。行を足し、数を直す。読み込みの並びは `event/init.lua` 85〜90 行で、末尾は `external_control`。
+- **触るファイル**: 新しいハンドラのファイル（新規）、`event/init.lua`（371。読み込みに 1 行）、`shiori/entry.lua`（153）、`pasta_core/src/registry/scene_alias.rs`（284）、`pasta_lua/src/loader/config/mod.rs`（343。`parse_scene_aliases` 115 行）と info ログ（`loader/mod.rs` 125 行）、`pasta_check` の `builtins.rs`（63。名前 8 → 12）・`validate/config.rs`（403）、試験、マニュアル。1,000 行に近いものは無い。
+- **規模**: 10〜12 タスクのまま。
+- **先に要るもの**: 働きの上では無い。ファイルの重なり（未完了）: `ponytail-lua-scripts`（`init.lua`・`entry.lua`）、`ponytail-core-registry`（`scene_alias.rs`）、`ponytail-lua-loader`（`loader/config/mod.rs`・`loader/mod.rs`）、`shell-element-click`・`scene-anchor-link`・`call-attribute-filter`・`novel-checkpoint-rollback`（`init.lua`）、`novel-talk-flow`（`init.lua`・`entry.lua`・`loader/config/`）、`cue-command-runtime`（`loader/config/`・`validate/config.rs`）、`scene-exact-match`（`init.lua`・`loader/config/`）。`scene.lua` に足すなら `scene-attribute-store`・`scene-pick-modes` も。`shiori4-v3-portable`（`pasta_shiori`・`Cargo.toml`・`pasta_lua` のログ。Lua の振る舞いは持ち場の外）とは共有しない。0.4.2 に入れるなら、あちらと同じウェーブに置ける。
+- **種別**: 機能（窓際のぱすたさんの実例。シーンで書く形は開発者の決定）。
+- **要件定義のモデル**: Opus（議題は推奨のまま承認済み。SSP が URL を開くかは実機で確かめられる）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - Adjacent の「`ponytail-check-release` が `builtins.rs` を触る」は誤り。あちらの持ち場は `pasta_check/src/{release,copy,nar,update_files}.rs`。
+  - Upstream・Adjacent・Out of Boundary の `scene-play-event`・`external-control-events`・`ontalk-suppression`・`chain-talk-interrupt` は完了した。
+  - roadmap の台帳（438・479 行）の Dependencies に、完了した 3 本が残る。「版がまだ決まっていないもの」（119 行）と「開発者の判断が要るもの」（296 行）の「3 本の後に入る・1 ウェーブ延びる」も古い。

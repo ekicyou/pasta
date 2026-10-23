@@ -199,3 +199,25 @@
 - 続きを捨てるのは 3 つだけになった: 台詞（字のある `talk` か `choice`）を出した割り込み・指名した再生（キックと `OnPastaScene`・`OnPastaSceneAt`。`STORE.co_preempt` の印）・エラー。台詞を出さないシーンや、台詞を出さずにコールバック待ちに入ったシーンは、待っている続きに触れない。
 - 仕組み: `shiori/event/init.lua` の `set_co_scene(co, keep)`・`drive_kind(co)`・`run_interrupt_scene(act)`・`EVENT.drive`（種類を決める → act の欄 `_spoke`・`_on_speech`・`_interrupted` を整える → 再開 → 欄を外す → 台詞の印を読む）。台詞の判定は `sakura_builder.lua` の `BUILDER.speaks`、印は `shiori/act.lua` の `SHIORI_ACT_IMPL.build` が立てる。詳しくは `.kiro/specs/completed/chain-talk-interrupt/design.md` の「続きの決まり」と ContinuationRule。
 - 見直しが要る論点: 「止まっている場面が捨てられる」を前提にする所は、台詞を出したシーン・指名した再生・エラーの 3 つに狭まったことを前提に測り直すこと。`STORE.co_preempt`（弱い参照の表）が `STORE` に増え、`STORE.reset` で作り直される。
+
+## 2026-10-23 棚卸の再測定（main 82176f19）
+
+- **前提の変化**（前回 2026-10-18・`facd6cf4` から）:
+  - 続きの決まり（`chain-talk-interrupt`）: 待っている続き（`STORE.co_scene`）を捨てるのは、台詞（`sakura_builder.lua` の `BUILDER.speaks` 413 行）を出した割り込み・印の付いた指名の再生（キック・`OnPastaScene`・`OnPastaSceneAt`。`STORE.co_preempt`）・エラーだけになった。台詞の無い割り込みは前の続きを残し、自分の残りを捨てる（`shiori/event/init.lua` の `set_co_scene(co, keep)` 110 行・`EVENT.drive` 257〜301 行）。「場面が最後まで走った応答だけを区切りにする」の「最後まで」に、この「残りを捨てた割り込み」と「前の続きが残ったままの応答」をどう数えるかが加わる。
+  - 中断の台詞（`＊チェイントーク中断`）が出た回は、割り込んだシーンのトークン列が中断のシーンのものに差し替わり、1 回の組み立てで台本になる（`shiori/act.lua` 81〜91 行）。目印を組み立てで打つなら、差し替えた後の列に打つことになる。台本は中断の台詞で、状態は割り込んだシーンが動かした後、という組を区切りとして控えてよいかを要件で決める。
+  - 控えの中身: `STORE` に `co_preempt`（コルーチンを弱い参照で持つ表。`store.lua` 71 行、`STORE.reset` 120 行で作り直す）が増えた。走りかけのコルーチンの印なので控えない。巻き戻しで `co_scene` を捨てれば、印は GC で消える。act の欄 `_spoke`・`_on_speech`・`_interrupted` も再開 1 回の間だけのもので、控えない。`set_co_scene` は今もファイルの中の関数で、引数が 2 つになった。巻き戻しの受け口から続きを捨てる口をどこに置くかを決める。
+  - 外からの書き込み（`external-control-events`）: `OnPastaSetSaveVariable`（`shiori/event/external_control.lua` 105 行）は、デバッグの有無によらず `pasta.save` を書き換え（143 行）、台本を出さない。区切りの後に書いた値は、巻き戻すと控えの値で上書きされる。`OnPastaCallFunction`（65 行）のコルーチンは印を持たないので、ふつうの割り込みになる。どちらの応答を区切りにするかも、要件の 2 番に入れる。
+  - 鎖（`reg-handler-chain`）: `EVENT.fire` は、鎖のハンドラごとに act を作り直す（`init.lua` 324〜339 行）。応答を作る所は前と同じく `EVENT.fire` の 3 つの枝で、増えていない。
+  - 起票された `shiori4-v4-host`（0.5.0）は、応答の外から台本を送る道（`SEND`＋`Script`）と、完了で待っているシーンを起こす `OnHostComplete` を足す。応答の出口だけで台本を控える形は、この道の台本を取りこぼす。先に入った側に、後から入る側が合わせる（区切りにする応答の決まりに含める）。
+- **触るファイル**: 目印の出力 `shiori/sakura_builder.lua` 558（立ち位置を書き換えるのは 465〜467 行の `spot` と 469〜471 行の `clear_spot`）、区切りの倉（新しい Lua のファイル）、応答の出口 `shiori/entry.lua` 153（止まるエラーの `STOP.response` 112 行）・`shiori/event/init.lua` 371（`RES.ok` 348・354 行、`SHIORI/` で始まる文字列をそのまま返すのは 352 行）・`shiori/event/callback.lua` 233（`RES.ok` 123・199 行、`STOP.response` 185・190 行）、巻き戻しの受け口（新しいファイルと、`init.lua` の読み込みの並び 85〜90 行の後ろに 1 行）、`shiori/appearance.lua` 567、`shiori/event/virtual_dispatcher.lua` 328（止まっている場面を返す所 215〜217 行）、`pasta/store.lua` 139、マニュアルと生成スキル。1,000 行に近づくものは無い。テストは `sakura_builder_test.lua` に足さず、新しいファイルに置く。
+- **規模**: 13〜15 → 14〜16（区切りにする応答の決まりに、残りを捨てた割り込み・中断の台詞の回・外からの書き込みが加わる。続きを捨てる口の置き場所で 1）。
+- **先に要るもの**: `novel-talk-flow`、`novel-variable-scope`、`novel-areka-contract`（どれも未完了）。0.4.2 の 3 本は完了したので外れた。ファイルの重なり:
+  - 0.5.0 の道筋: `novel-talk-flow`（`sakura_builder.lua`・`appearance.lua`・`virtual_dispatcher.lua`・`init.lua`）、`cue-command-runtime`（`sakura_builder.lua`）、`shell-element-click`（`init.lua` の読み込みの行）、`novel-variable-scope`（予約の名前を動かす場合の `virtual_dispatcher.lua`。前後に置くのでぶつからない）、`shiori4-v4-host`（応答の出口と待ちの再開。`callback.lua`・`init.lua` を触る見込み）。
+  - 版の決まっていないもの: `scene-anchor-link`（`sakura_builder.lua`）、`scene-exact-match`（`init.lua`・`virtual_dispatcher.lua`）、`recommend-menu-scenes`（`init.lua` の読み込みの行）。
+  - 隙間の spec: `ponytail-lua-scripts`（`init.lua` の `set_co_scene`・`callback.lua`・`store.lua`・`entry.lua`・`virtual_dispatcher.lua`）。
+- **種別**: 機能（過去の時点を指す名前も、状態の控えも無い）。巻き戻しの方式は開発者の案（2026-10-10）。
+- **要件定義のモデル**: Fable のまま。控えは `novel-save-slots` がスロットへ書く保存の形で、areka が頼る。区切りの決まりは、Rust の 5 秒の待ち（届かなかった応答。`crates/pasta_shiori/src/actor/marshaling.rs` 71・213〜223 行。変わっていない）・Lua のコルーチン（`＞yield`・プロパティの読み出しの途中・今回の続きの決まり）・SHIORI の応答（止まるエラーの 200・時計の読み取り・v4 の応答の外の台本）にまたがる時の流れの決まりで、推奨案がまだ無い。
+- **分割の案**: 不要（14〜16）。
+- **見つけた穴・古くなった記述**:
+  - 2026-10-18 の節の応答を包む所（`init.lua` 244・250 行、`callback.lua` 116・192 行、`STOP.response` の `callback.lua` 178・183 行と `entry.lua` 91 行）→ 上の「触るファイル」の行。`set_co_scene` は `init.lua` 100 行 → 110 行。立ち位置を書き換える所は `sakura_builder.lua` 446〜450・453 行 → 465〜467・469〜471 行。
+  - ファイルの大きさ: `entry.lua` 132 → 153、`init.lua` 267 → 371、`callback.lua` 226 → 233、`store.lua` 124 → 139、`virtual_dispatcher.lua` 303 → 328、`sakura_builder.lua` 540 → 558。

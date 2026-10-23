@@ -248,7 +248,7 @@
 
 #### OnPastaCallFunction の形
 
-- 調べた所: `.kiro/specs/external-control-events/brief.md` L129・L153。
+- 調べた所: `.kiro/specs/completed/external-control-events/brief.md` L129・L153。
 - 分かったこと: あちらは呼び出しをコルーチンで包んで返す形を前提にしている。
 - 設計への影響: 要件 6.2 は、あちらがコルーチンを返す限り、ふつうの道で効く。文字列を返す形になったら再確認する（Revalidation Triggers）。
 
