@@ -122,3 +122,24 @@
 - `release.yml` の build job: toolchain の targets に `x86_64-pc-windows-msvc` を足し、rust-cache の key を `i686-x86_64-pc-windows-msvc` に変えた。「Verify release assets」に `pasta_check.zip` の中身（ちょうど 2 つ）と `pasta_check.exe --version` ＝ `pasta_check <タグの版>` の検査を足し、upload の path に `release/pasta_check.zip` を足した。verify・gate・公開系の job と `Cargo.lock` の検査は変えていない。
 - `github-release.ps1` の添付は 5 つ（配布物 4 つと詳しいリリースノート）。`release-scripts-test.ps1` の項目 10 が、`pasta_check.zip` だけが無いときに gh より前で終了コード 1 になることを確かめる（`github-release.ps1` は今はこのテストで試されている）。
 - 見直しの論点: 合わせるときに上の行を保つこと（本 spec の Revalidation Triggers）。
+
+## 2026-10-23 棚卸の再測定（main 8fc9bdff）
+
+- **前提の変化**
+  - pasta_check を単体で配る作業（pasta-check-release-asset）が 2026-10-22 に入った。この spec が先に入るのを待つ理由は無くなった。
+  - リリースの流れ `.github/workflows/release.yml` は 589 行になり、公開の資格を持つ job の行番号が 15 行ずれた（ツールの用意 259 行・キャッシュ 262 行・crates.io の認証 268〜308 行・Azure のログイン 410 行）。build の job（73・78 行）にも同じ可変のタグの action があるが、資格を持たない job なので、固定するかはギャップ分析で決める。
+  - `github-release.ps1` は添付が 5 つになり、リリースの補助スクリプトのテスト `release-scripts-test.ps1`（項目 10）が試すようになった。このテストは `build.yml` の最後の段（149 行）で走る。
+  - `manual.yml`・`release-setup-check.yml`・`book/tools`・`book/theme` は変わっていない。Node 20 は `manual.yml` 75 行・`release.yml` 25 行（共通の値 `NODE_VERSION`）・`release-setup-check.yml` 35 行。mdBook 0.5.3 は `manual.yml` 92 行と `tech.md` 221 行（brief の 220 行から 1 行ずれた）。
+- **触るファイル**: `.github/workflows/` の `build.yml`（149 行）・`manual.yml`（216 行）・`release.yml`（589 行）・`release-setup-check.yml`（122 行）、`book/tools/`（`highlight/highlight-html.mjs`・`talk/talk.mjs`・`bigram-index/poc-test.mjs`・`bigram-index/poc/`・`bigram-index/build-index-test.mjs` と、写しを比べる小さな検査）、`book/theme/head.hbs`、`tech.md`。`.github/scripts/release/*.ps1` はギャップ分析の監査の対象（前回は読んでいない）。1,000 行に近いものは無い。
+- **規模**: 11〜14 タスク。
+- **先に要るもの**
+  - 機能の上では無い。Specs の一覧の `Dependencies: pasta-check-release-asset` は、もう満たされている。合わせるときは、build の job の x64 のターゲット・キャッシュのキー `i686-x86_64-pc-windows-msvc`・`pasta_check.zip` の検査と upload の行・添付 5 つを保つ（申し送りのとおり）。
+  - 0.4.2 の残りと 0.5.0 の spec は `.github/` を触らない。重なりうるのは `book/tools` だけ。文法定義を変える spec（`call-attribute-filter`・`scene-exact-match`・`scene-anchor-link`）は、マニュアルの色付けのテスト（`book/tools/highlight/` の `tokenizer-test.mjs` など）を合わせることがある。この spec が触るのは `highlight-html.mjs` の終わりの判定（257〜269 行）で、別のファイル。
+  - 章を足す spec（`novel-areka-contract` が足すなら）は、章の数を決め打ちする 3 つの検査を直す。この spec の写しの整理（`talk.mjs` の `chapterRegions`）が `gen-skill-refs.mjs`・`gen-skill-refs-test.mjs` に及ぶなら、ぶつかる。
+  - 0.4.2 のリリースの間は、`release.yml` を main に入れない（リリースの席）。
+- **種別**: 基盤（検査の置き場所・権限・action の版の固定。Rust のファイルの名前を変える PR で main が後から赤くなる穴を塞ぐ）。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 3 番の行番号（L244・L247・L253-293・L395）は、上のとおり 15 行ずれた。
+  - `manual.yml` 191〜197 行の Setup Pages の注記（`enablement: true` で Pages が有効になる）は誤り（2 番。直すのは設計以降）。

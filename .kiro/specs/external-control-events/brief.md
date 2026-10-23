@@ -141,3 +141,22 @@ OnPastaSetSaveVariable  Reference0=初回済み  Reference1=null
 - MCP の `reload` は読み込み直しを頼むだけで、終わるのを待たない。終わる前の `raise_event` は SHIORI に届かず「台本なし」で返り、204 と見分けがつかない。マニュアルの例は「`get_status` が答えてから呼ぶ」とした（`book/src/lua/shiori-events.md` の「MCP からの呼び方」）。
 - 既定のハンドラの形は `pasta/shiori/event/scene_play.lua`（`REG.X = REG.X or function`、門を引数より前、失敗は `FAILURE.report` → `act:build()`、成功はコルーチンを返して `EVENT.fire` に任せる）。`event/init.lua` の `require` の並びに 1 行足した。写すときの参照先は `.kiro/specs/completed/scene-play-event/design.md` の ScenePlayHandler。
 - `SCENE.co_exec_exact(name, local_name)` は 2 つ目の戻り値（`"global"`・`"local"`）を返すようになった。`＞XXX` の探し方を「シーンと同じ」にするなら、この口と `SEARCH:search_local_scene_exact` を使える。
+
+## 2026-10-23 棚卸の再測定（main 8fc9bdff）
+
+- **前提の変化**: `scene-play-event` と `ontalk-suppression` が入り、待つものは無くなった。先例の形は、シーンを再生する既定のハンドラ（`pasta_scripts/pasta/shiori/event/scene_play.lua`）で決まった。`REG.X = REG.X or function` の形、門は引数を見る前、Reference0 の誤りは「名前にならない値：OnPastaScene Reference0（値なし）」の表記、見つからないときは「シーンが見つからない」の表記とログの警告（`OnPastaScene: scene not found: …`）を出して `act:build()` を返す（表記を出さない設定なら 204）、見つかればコルーチンを返してイベントの振り分け（`EVENT.fire`）に任せる。読み込みの並びはイベントの振り分け `event/init.lua` の L78〜82（最後が `scene_play`）。`＞` の解決 `ACT_IMPL.call` は `act.lua` の L703 に移った（中身は同じ）。
+- **触るファイル**: 新しいハンドラのファイル（新規）、`event/init.lua` の読み込みの並びの末尾に 1 行だけ、Lua のテスト（新規と一覧への 1 行）、マニュアル `lua/shiori-events.md`（既定ハンドラの表と「7 つ」の数の文 L69〜79、主要イベントの表 L202〜216、新しい 2 節、必要なら「MCP からの呼び方」L620〜）と `grammar/variables.md`。シーン再生のファイル・`act.lua`・`pasta_check` の組み込みの名前の表は触らない。
+- **規模**: 5〜6 タスク。
+- **先に要るもの**
+  - 働きの上では無い。
+  - `chain-talk-interrupt`・`reg-handler-chain` と同じウェーブに置ける。約束は「`event/init.lua` は読み込みの並びの末尾に 1 行足すだけ。マニュアルの既定ハンドラの節は表の行と数の文だけを触り、その下の包み方の段落（L81〜95）とシーン再生の共通の決まりの節（L590〜618）は触らない。後から入る側が rebase で合わせ、生成の references は rebase の後に作り直す」。
+  - `chain-talk-interrupt` より先に入ると、外から `自動トーク停止` を呼んだときコルーチンの道を通るので、今の決まりで待っているチェイントークの続きが捨てられる。あちらが入れば、台詞を出さない呼び出しは続きを残す。どちらの順でも壊れはしない。
+- **種別**: 機能（外から `＞XXX` を呼ぶ口と、グローバル変数を書く口。2026-10-19 開発者の決定）。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 「警告のログを残して 204」は先例と食い違う。シーン再生と同じく、表記とログの警告を出して `act:build()` を返す形に揃えるのを推奨する。`act:call` に任せると表記の対象が「＞名前」になりイベント名が付かないので、先に `act:find_handler("scene", 名前)` で引いて、無ければイベント名付きの表記を自分で出すかを要件で決める。
+  - 「いつでも有効」と、シーン再生の門（`SecurityLevel` が `external` なら断る）を揃えるか決める。MCP は `local` で届く。変数の書き換えや `ゴースト終了` をほかの機械から呼べないように、`external` は断るのを推奨する。
+  - JSON の部品（`@json`）は、`pasta.toml` の `[lua]` の `libs` に `-json` と書くと読み込まれない（`crates/pasta_lua/src/runtime/runtime_config.rs` の `should_enable_module`）。`pcall` で引き、無ければ警告にする。`null` を読んだ結果が `nil` か特別な値かも確かめる。
+  - `chain-talk-interrupt` の決まりのどれに当てるか（ふつうのイベントと同じか、`OnPastaScene` と同じく「はっきり捨てる」か）を、後から入る側の要件で決める。推奨はふつうのイベントと同じ（台詞を出さない呼び出しは続きを残す）。
+  - このファイルの「申し送り（scene-play-event より）」の節だけ改行が LF だったので、CRLF に揃えた。

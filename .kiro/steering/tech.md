@@ -253,6 +253,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
 | `@pasta_sakura_script` | さくらスクリプト変換                    |                            |
 | `@enc`                 | UTF-8⇔ANSI変換                          |                            |
 | `@pasta_log`           | ロギング（trace/debug/info/warn/error） |                            |
+| `@pasta_debug`         | デバッグの有効と、位置からのシーンの引き当て（内部。`OnPastaScene`・`OnPastaSceneAt` の既定ハンドラーが使う） | 本番の入口だけが登録 |
 | `@env`                 | 環境変数アクセス                        | **無効**（セキュリティ上） |
 
 ### シーン関数定型パターン

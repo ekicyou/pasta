@@ -143,3 +143,23 @@
 
 - `pasta/act.lua` の `ACT_IMPL.yield` の先頭に、止めている間の見張り（警告を出して `GLOBAL.resume_auto_talk` を呼び、その後は今どおり区切る）を足した。台詞を出したかの印などで `ACT_IMPL.yield` を触るときは、この分岐と並べる。
 - 止める門は `set_co_scene` を通らないので、続きを捨てる決まりには触れていない。`builtins.rs` の `GLOBAL_NAMES` は 8 つになった（`ACT_METHODS` は触っていない）。
+
+## 2026-10-23 棚卸の再測定（main 8fc9bdff）
+
+- **前提の変化**
+  - `ontalk-suppression` が入った。止めている間は、自動トークの判定の入口（`pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua` の `dispatch` L262〜267）が続きを返さず、捨てもしない。撫での受け口（`event/mouse.lua` L159〜171）は、止めている間は撫でと決めないので、届いた `OnMouseMove` はすべて `＊OnMouseMove` のシーンへ回る。今のままだと、止めている間に何も喋らないマウスのシーンが続きを捨てる。この spec の直しが、これもそのまま直す。チェイントークの区切り（`act.lua` L664 の `ACT_IMPL.yield`）の先頭には、止めている間の見張り（自動トークを再開してから区切る）が入った。
+  - `scene-play-event` が入った。シーン再生のハンドラ（`event/scene_play.lua`）は自分で続きを扱わず、コルーチンを返してふつうの道（イベントの振り分け → `EVENT.drive` → 続きの置き換え）に任せる。失敗のときは文字列を返すので続きに触れない。キックも、自動トークの判定 → 毎秒の既定のハンドラ → イベントの振り分けの、ふつうの道を通る。だから「はっきり捨てる」は、シーン再生のファイルとキックのファイル（`event/kick.lua` のシーンを包む 2 つの関数）で印を付け、続きの置き換えの所で読む形になる。
+  - 行の位置: 続きの置き換え `set_co_scene` は `event/init.lua` L101〜137、`EVENT.drive` は L191〜208、`EVENT.fire` は L216〜256。トークンを空にする所は `act.lua` L641〜643。
+- **触るファイル**: `event/init.lua`（268 行）、`event/scene_play.lua`（107 行）、`event/kick.lua`（163 行）、台詞を出した印を立てる所（`act.lua` 837 行の `ACT_IMPL.build` か `shiori/act.lua` の `build`）、中断の台詞を前に添える所（`shiori/sakura_builder.lua` 540 行の見込み）、Lua のテストと一覧の 1 行、マニュアル（`grammar/call-jump.md` L349・L364、`lua/shiori-events.md` のシーン再生の「再生と続き」L605 と OnTalk の節 L937〜、`internals/execution-model.md` L247〜270、`internals/shiori.md` L388）。`pasta_check` は触らない（中断はシーンの名前なので）。
+- **規模**: 6〜7 タスク。
+- **先に要るもの**
+  - 働きの上では無い。
+  - `external-control-events`・`reg-handler-chain` と同じウェーブに置ける。約束は「`event/init.lua` は続きの置き換えから `EVENT.drive` まで（L97〜208）と、その間に置く新しい内部の関数だけを触る。イベントの振り分け `EVENT.fire`・読み込みの並び・モジュールの冒頭の説明は触らない。中断の台詞を添えるのも `EVENT.drive` か、それが呼ぶ関数の中で行う」。どうしても `EVENT.fire` に入れるなら、型で分ける枝（L238〜255）だけにして、`reg-handler-chain` が触るハンドラを引く行（L231〜236）との間の行を残す。
+- **種別**: バグ（何も喋らないイベントで続きが消える）＋機能（`＊チェイントーク中断`）。開発者の決定「次のリリースに含める」。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 「`OnPastaScene` は今どおり捨てる」には、位置で指名する `OnPastaSceneAt`（同じファイルの 2 つ目のハンドラ）も含める。
+  - 外から `＞XXX` を呼ぶ `OnPastaCallFunction`（`external-control-events`）をどの決まりに当てるか。推奨はふつうのイベントと同じ（台詞を出さない `自動トーク停止` は続きを残す）。
+  - シーンが書き込む act は、コルーチンを最初に動かしたときの act で、続きを再開するときに `EVENT.drive` が受け取る act とは別のもの。印を読むときは、失敗の部品の「コルーチンから act を引く」関数（`pasta/failure.lua` の `act_of`）を使える。
+  - コールバック待ちから戻ったシーン（続きの置き換えのコールバックの枝 L110〜121）も、今は待っている続きを捨てる。そこも台詞の有無で分けるかを決める。

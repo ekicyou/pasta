@@ -210,3 +210,22 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - 入った形: 印は `STORE.auto_talk_paused`（真偽・既定 false・保存しない）。書くのは `GLOBAL.pause_auto_talk`／`resume_auto_talk`（`shiori/entry.lua`）と `STORE.reset` だけという契約にした。ノベル向けに常に止めるなら、印を直に書かず停止の関数を呼ぶか、この契約を見直す（`.kiro/specs/completed/ontalk-suppression/design.md` の PauseFlag）。
 - 止めている間に `＞チェイントーク`（`ACT_IMPL.yield`。`＞yield`・Lua の `act:yield()` も同じ所を通る）を呼ぶと、ログに警告を出して止めを解く（要件 2.8）。ノベルで常に止めたままチェイントークを使う形とは真っ向からぶつかるので、要件で扱いを決める論点になる。
 - 再開すると `virtual_dispatcher.restart_timers` がランダムトークの間隔と次の正時を決め直す。止めている間に過ぎた時報は出さない。
+
+## 2026-10-23 棚卸の再測定（main 8fc9bdff）
+
+- **前提の変化**:
+  - 自動トークを止めるスイッチが入った（`ontalk-suppression`）。印は `STORE.auto_talk_paused`（`crates/pasta_lua/pasta_scripts/pasta/store.lua`。保存しない）、止める・再開する関数は `GLOBAL.pause_auto_talk`／`resume_auto_talk`（`shiori/entry.lua` 29〜48 行。別名 `自動トーク停止`／`自動トーク再開`）。ランダムトークと時報の持ち主 `shiori/event/virtual_dispatcher.lua`（303 → 328 行）の `M.dispatch` は、キックの後・時報の前の門（263〜267 行）で止まる。止まっている場面の続きも止まり、捨てはしない。再開すると `M.restart_timers`（282 行）が間隔と次の正時を決め直す。「ノベル向けの設定ではこのスイッチを常に入れる」案は、そのまま使える。
+  - ただし、スイッチの効き目はランダムトークと時報だけではない。撫で・つつきの受け口（`shiori/event/mouse.lua` 143・165 行）は、止めている間は、つつきを 9 段目だけにし、撫でを決めない。区切りの関数 `ACT_IMPL.yield`（`pasta/act.lua` 664 行）は、止めている間に呼ばれると警告を出して再開する。ノベルで常に止めるなら、この 2 つ（撫で・つつきの近道を止めてよいか、`＞yield` で再開してしまう決まりをどうするか）を要件で決める。
+  - 指名したシーンを再生するイベント（`OnPastaScene`）と、完全一致の部品の広がり（`scene-play-event`）は、この spec の持ち場を変えない。完全一致の切り替えは `scene-exact-match` の設定を入れるだけ（2026-10-21 の申し送りのとおり）。
+  - 出力の組み立て `sakura_builder.lua`（540）・立ち絵の復旧 `appearance.lua`（567）・文の加工 `sakura_script/`・設定の読み込み `loader/config/` は、前回から変わっていない。
+- **触るファイル**: 2026-10-18 の節と同じ。行数が動いたのは `virtual_dispatcher.lua` 328、`act.lua` 837（1,000 行に近い）、`scene.lua` 266、`shiori/event/init.lua` 268（読み込みの行は 78〜82 行）。ほかは `loader/config/`（`mod.rs` 343・`sections.rs` 356）、`sakura_builder.lua` 540、`actor_style.lua` 90、`appearance.lua` 567、`sakura_script/`（`mod.rs` 322・`line_breaker.rs` 1,134。本体は 289 行で残りは中のテスト）、`boot.lua` 22、`mouse.lua` 176、生成で行 ID を埋めるなら `scope_gen.rs` 445・`element_gen.rs` 564。
+- **規模**: 16〜20 タスク（完全一致の切り替え 1 を外し、止めるスイッチとの整合（撫で・つつき・`＞yield`）の 1 を足した。止める仕組みそのものは作らないので、停止の 1 は軽くなる）。
+- **先に要るもの**: `novel-areka-contract`、`cue-command-runtime`、`scene-exact-match`。ファイルの重なり（前回のものに足す）:
+  - 0.4.2 の残り: `chain-talk-interrupt`（`init.lua` の `set_co_scene`・`EVENT.drive` と `act.lua`）、`reg-handler-chain`（`init.lua` の `EVENT.fire`）、`external-control-events`（`init.lua` の読み込みの 1 行。受け口を新しいファイルに置くなら、後から入る側が合わせる約束で並べられる）。
+  - 隙間の spec: `ponytail-lua-scripts`（`virtual_dispatcher.lua` の設定の読み・`init.lua`・`act.lua`・`scene.lua`）、`ponytail-lua-loader`（`loader/config/`）、行 ID を生成で埋めるなら `ponytail-lua-transpiler`（コード生成）。
+- **種別**: 機能（ノベル向けの出力の切り替えが無い）。開発者の 0.5.0 の目標（2026-10-10）から。
+- **要件定義のモデル**: Fable のまま。areka が既読と声の引き当てのために全セーブ共通で覚える「変わらない行 ID」は、後から変えにくい保存の形である。ID の細かさが、クリック待ちの単位・「次の場面へ」の書き方と印・途中の `＞yield` の扱い（今回、止めている間の `＞yield` が自動トークを再開する決まりも加わった）と絡み、推奨案がまだ無い。
+- **分割の案**: 2026-10-18 の節のとおり。要件で 20 を超えたら `novel-talk-output`（Fable）と `novel-scene-flow`（Opus）に分ける。止めるスイッチの整合は後の 1 本に入る。
+- **見つけた穴・古くなった記述**:
+  - 2026-10-18 の節の行番号: `virtual_dispatcher.lua` 303 → 328 行（`M.dispatch` は 227 行から。止まっている場面を返す所は `check_talk` の中の 215〜217 行で、門の後ろ）、`init.lua` 267 → 268 行。`act.lua` 829 → 837、`scene.lua` 240 → 266。
+  - 2026-10-22 の申し送りの「止めている間に `＞チェイントーク` を呼ぶと止めを解く」は、区切りの関数 `ACT_IMPL.yield` に入った（上の 2 点目）。
