@@ -192,3 +192,10 @@
 - **見つけた穴・古くなった記述**:
   - 行番号（2026-10-10 の節と前回の節）: 組み立てが立ち位置を書き換える所は `sakura_builder.lua` 294〜304 行 → 446〜450 行（`spot`）と 453 行（`clear_spot`）、`pasta_talk_interval_min/max` は `virtual_dispatcher.lua` 72〜73 行 → 77〜78 行、止まっている場面を返す所は 202〜204 行 → 215〜217 行、`set_co_scene` は `init.lua` 99 行 → 100 行、プロパティの読み出しの台本は `shiori/act.lua` 288〜296 行 → 295〜309 行。
   - ファイルの大きさ: `sakura_builder.lua` 383 → 540、`init.lua` 260 → 267、`virtual_dispatcher.lua` 288 → 303。
+
+## 申し送り（chain-talk-interrupt より、2026-10-23 の完了時）
+
+- 前の申し送り（2026-10-20）の「`＊チェイントーク中断` を割り込んだシーンの台詞の前に添える」は設計で改めた。中断の台詞は反応の**代わりに**出る（優先）。中断の台詞が出た回は、割り込んだシーンが区切った残りも捨て、続きを残さない。
+- 続きを捨てるのは 3 つだけになった: 台詞（字のある `talk` か `choice`）を出した割り込み・指名した再生（キックと `OnPastaScene`・`OnPastaSceneAt`。`STORE.co_preempt` の印）・エラー。台詞を出さないシーンや、台詞を出さずにコールバック待ちに入ったシーンは、待っている続きに触れない。
+- 仕組み: `shiori/event/init.lua` の `set_co_scene(co, keep)`・`drive_kind(co)`・`run_interrupt_scene(act)`・`EVENT.drive`（種類を決める → act の欄 `_spoke`・`_on_speech`・`_interrupted` を整える → 再開 → 欄を外す → 台詞の印を読む）。台詞の判定は `sakura_builder.lua` の `BUILDER.speaks`、印は `shiori/act.lua` の `SHIORI_ACT_IMPL.build` が立てる。詳しくは `.kiro/specs/completed/chain-talk-interrupt/design.md` の「続きの決まり」と ContinuationRule。
+- 見直しが要る論点: 「止まっている場面が捨てられる」を前提にする所は、台詞を出したシーン・指名した再生・エラーの 3 つに狭まったことを前提に測り直すこと。`STORE.co_preempt`（弱い参照の表）が `STORE` に増え、`STORE.reset` で作り直される。

@@ -13,7 +13,7 @@
 | --------------------------------------- | -------------------------------------------------------------------------------------- | ------ | -------- |
 | 日本語フレンドリー（全角キーワード）    | `transpiler_basic_test.rs`<br>`transpiler_comparison_test.rs`                          | ✅ 完了 | 24       |
 | UNICODE識別子（日本語シーン名・変数名） | `japanese_identifier_test.rs`<br>`ucid_test.rs`                                        | ✅ 完了 | 2<br>3   |
-| yield型エンジン（継続出力）             | `transpiler_basic_test.rs`<br>`global_chaintalk_*_test.lua`<br>`runtime_scene_test.rs` | ✅ 完了 | 13       |
+| yield型エンジン（継続出力）             | `transpiler_basic_test.rs`<br>`global_chaintalk_*_test.lua`<br>`runtime_scene_test.rs`<br>`lua_specs/chain_talk_interrupt_test.lua`<br>`chain_talk_interrupt_test.rs` | ✅ 完了 | 13<br>37<br>3 |
 | 宣言的フロー（Call制御）                | `transpiler_scene_test.rs`                                                             | ✅ 完了 | -        |
 
 ---
