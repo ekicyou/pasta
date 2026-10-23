@@ -54,9 +54,9 @@ pasta-skills.zip
   - リリース CI の build の job で `pasta-skills.zip` を作り、検査し、後続の job へ渡す。
   - GitHub Release の添付を 6 つにする。添付の数の確かめ方（スクリプトのテスト）を整える。
   - `release` スキルのリリースの状態の読み取りと、その手順書の添付の数え方（5/5）。
-  - 文書: マニュアル（`introduction.md` の配布物の並びと、スキルの受け取り方と置き場所の短い説明）、`crates/pasta_sample_ghost/RELEASE.md`・`README.md`、steering の `tech.md`・`structure.md`、ルートの `README.md` と `release.bat` の説明（【仮定】下の OPEN QUESTION 参照）。
+  - 文書: マニュアル（`introduction.md` の配布物の並びと、スキルの受け取り方と置き場所の短い説明）、`crates/pasta_sample_ghost/RELEASE.md`・`README.md`、steering の `tech.md`・`structure.md`、ルートの `README.md` と `release.bat` の説明（2026-10-23 の要件ディスカッションで含めると決めた）。
 - **Out of scope**:
-  - 配るスキルの中身の書き直し（`pasta-check` の `SKILL.md` の段の並びと配布物の一覧の書き換えを除く。【仮定】下の OPEN QUESTION 参照）。
+  - 配るスキルの中身の書き直し（`pasta-check` の `SKILL.md` の段の並びと配布物の一覧の書き換えを除く。2026-10-23 の要件ディスカッションで、0.4.2 の zip に古い段の番号を入れないために本仕様で直すと決めた）。
   - claude.ai へのアップロード向けの、スキルごとの zip。
   - 開発用のスキルの配布。
   - VSIX へのスキルの同梱。
@@ -81,11 +81,11 @@ pasta-skills.zip
 #### Acceptance Criteria
 
 1. The リリースビルド shall `pasta-skills.zip` の最上位に、`pasta-ghost-authoring/`・`pasta-lua-coding/`・`pasta-check/` の 3 つのフォルダと、`LICENSE` の 1 ファイルだけを置く。
-2. The リリースビルド shall 3 つのフォルダそれぞれに、リリースするコミットの `.claude/skills/<スキル名>/` にあるファイル（`SKILL.md` と `references/` の下のファイル）を、同じ相対パス・同じ中身で、過不足なく入れる（【仮定】全ファイルの突き合わせ。OPEN QUESTION 1）。
+2. The リリースビルド shall 3 つのフォルダそれぞれに、リリースするコミットの `.claude/skills/<スキル名>/` にあるファイル（`SKILL.md` と `references/` の下のファイル）を、同じ相対パス・同じ中身で、過不足なく入れる。
 3. The リリースビルド shall 開発用のスキル（`kiro-*`・`release`・`karpathy-guidelines` など）と、配るスキル 3 つと `LICENSE` のほかのファイルを、`pasta-skills.zip` に入れない。
 4. The リリースビルド shall `pasta-skills.zip` の `LICENSE` に、リポジトリのルートの `LICENSE`（MIT License）と同じ中身を入れる。
 5. The リリースビルド shall zip の中のパスを `/` で区切って記録し、展開した先に `pasta-ghost-authoring/SKILL.md` などがフォルダの形のまま出るようにする。上に別のフォルダ（`skills/` など）を挟まない。
-6. The リリースビルド shall `pasta-skills.zip` に、版を示すファイルなど、上の形のほかの物を足さない。版は、zip を添付した Release の版で示す（【仮定】OPEN QUESTION 5）。
+6. The リリースビルド shall `pasta-skills.zip` に、版を示すファイルなど、上の形のほかの物を足さない。版は、zip を添付した Release の版で示す。
 
 ### Requirement 2: 手元のリリースビルドで作って検査する
 
@@ -112,8 +112,8 @@ pasta-skills.zip
 
 1. When リリースタグが push され、関門の検査が通ったとき, the リリース CI shall build の job で、タグのコミットのソースから `pasta-skills.zip` を、ほかの配布物と同じリリースビルドで作る。
 2. When build の job が配布物を検査するとき, the リリース CI shall `pasta-skills.zip` が在り、3 つの `SKILL.md`（`pasta-ghost-authoring/SKILL.md`・`pasta-lua-coding/SKILL.md`・`pasta-check/SKILL.md`）と `LICENSE` があり、最上位にほかのフォルダやファイル（開発用のスキルなど）が無いことを検査する。
-3. When build の job が配布物を検査するとき, the リリース CI shall `pasta-skills.zip` の中のファイルの一覧が、タグのコミットの配るスキル 3 つのフォルダのファイルの一覧と過不足なく一致し、パスが `/` で区切られていることを検査する（【仮定】OPEN QUESTION 1）。
-4. When build の job が配布物を検査するとき, the リリース CI shall 生成ファイルが、タグのコミットのマニュアルから生成した結果と一致することを照合する（【仮定】OPEN QUESTION 2）。
+3. When build の job が配布物を検査するとき, the リリース CI shall `pasta-skills.zip` の中のファイルの一覧が、タグのコミットの配るスキル 3 つのフォルダのファイルの一覧と過不足なく一致し、パスが `/` で区切られていることを検査する。
+4. When build の job が配布物を検査するとき, the リリース CI shall 生成ファイルが、タグのコミットのマニュアルから生成した結果と一致することを照合する。生成ファイルを配る以上、マージで CI を待たない運用でもタグの時点の鮮度を保証するため。
 5. If `pasta-skills.zip` が無いか、中身が合わないか、生成ファイルの照合が合わないとき, the リリース CI shall 何が合わないかを示して build の job を失敗させ、どの公開先（crates.io・Marketplace・GitHub Release）へも公開しない。
 6. When build の job の検査が通ったとき, the リリース CI shall `pasta-skills.zip` を、ほかの配布物と同じ受け渡し（artifact `release-assets`）に入れて後続の job へ渡す。
 7. The リリース CI shall 毎回の CI（`build.yml`）の構成と、関門（gate）が呼ぶ検査を変えない。
@@ -150,8 +150,8 @@ pasta-skills.zip
 #### Acceptance Criteria
 
 1. The 利用者マニュアル shall はじめに（`introduction.md`）の関連リンクの配布物の並びに、`pasta-skills.zip` を固定のリンク（`releases/latest/download/pasta-skills.zip`）で加える。
-2. The 利用者マニュアル shall `pasta-skills.zip` について、中身（AI にゴーストを書かせるときに使う pasta のスキル 3 つ）、落とし方（固定のリンクと、版ごとのリリースページ）、置き場所（ゴーストの開発フォルダの `.claude/skills/` に展開する）を短く書く（【仮定】書く場所は `introduction.md`。OPEN QUESTION 3）。
-3. The 利用者マニュアル shall 使っている pasta と同じ版の `pasta-skills.zip` を使うことと、版を上げるときは 3 つのフォルダを新しい版のもので置き換えることを書く（【仮定】OPEN QUESTION 5）。
+2. The 利用者マニュアル shall `pasta-skills.zip` について、中身（AI にゴーストを書かせるときに使う pasta のスキル 3 つ）、落とし方（固定のリンクと、版ごとのリリースページ）、置き場所（ゴーストの開発フォルダの `.claude/skills/` に展開する）を、`introduction.md` の関連リンクの後の短い節に書く。章は足さない。
+3. The 利用者マニュアル shall 使っている pasta と同じ版の `pasta-skills.zip` を使うことと、版を上げるときは 3 つのフォルダを新しい版のもので置き換えること（上書きで展開すると、新しい版で消えたファイルが残るため）を書く。
 4. The 利用者マニュアル shall claude.ai へのアップロードの手順や、スキルごとに zip を作り直す手順など、配布物の形で用意していない使い方の代わりの書き方を載せない。
 5. The 利用者マニュアル shall マニュアルの検査（リンクの検証・章の数の検査・台詞部品の検査など、`manual.yml` が行うもの）を通る状態に保つ。
 
@@ -161,6 +161,6 @@ pasta-skills.zip
 
 #### Acceptance Criteria
 
-1. The 文書 shall 配布物の一覧を書いた所（`crates/pasta_sample_ghost/RELEASE.md`・`crates/pasta_sample_ghost/README.md`・steering の `tech.md`・`structure.md`・ルートの `README.md`）に `pasta-skills.zip` を加え、配布物の数（5 つ）・添付の数（6 つ）・リリースビルドの段の並びの記述を合わせる（【仮定】ルートの `README.md` を含める。OPEN QUESTION 4）。
-2. The 文書 shall `pasta-check` スキルの `SKILL.md` のうち、hello-pasta のリリースビルドの段の並びと配布物の一覧を書いた所を、新しい段と `pasta-skills.zip` に合わせる（【仮定】OPEN QUESTION 4）。
+1. The 文書 shall 配布物の一覧を書いた所（`crates/pasta_sample_ghost/RELEASE.md`・`crates/pasta_sample_ghost/README.md`・steering の `tech.md`・`structure.md`・ルートの `README.md`）に `pasta-skills.zip` を加え、配布物の数（5 つ）・添付の数（6 つ）・リリースビルドの段の並びの記述を合わせる。
+2. The 文書 shall `pasta-check` スキルの `SKILL.md` のうち、hello-pasta のリリースビルドの段の並びと配布物の一覧を書いた所を、新しい段と `pasta-skills.zip` に合わせる。
 3. The 文書 shall リリース CI のワークフローの冒頭の説明（作る配布物の数）を、5 つの配布物に合わせる。
