@@ -74,6 +74,13 @@ function CALLBACK.consume_staged(co, act)
     return true
 end
 
+--- 消費されていない予約があるかを返す（予約は変えない）
+--- チェイントークの中断が、中断のシーンが待ちに入ったかを捨てる前に見るために使う
+--- @return boolean staged true: 予約あり, false: 予約なし
+function CALLBACK.has_staged()
+    return _staged ~= nil
+end
+
 --- 消費されていない予約を捨てる（予約が無ければ何もしない）
 --- EVENT.drive の失敗の経路だけが呼ぶ。pending・STORE には触れない
 function CALLBACK.discard_staged()
