@@ -1,16 +1,16 @@
 {
   "feature_name": "pasta-skills-release-asset",
   "created_at": "2026-10-23T09:11:06Z",
-  "updated_at": "2026-10-23T09:16:17Z",
+  "updated_at": "2026-10-23T10:19:53Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {
@@ -20,5 +20,3 @@
   },
   "ready_for_implementation": false
 }
-
-

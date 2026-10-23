@@ -154,3 +154,87 @@ PowerShell 7
 3. **マニュアルのどこに受け取り方を書くか**（brief の議題の候補）。【仮定】`introduction.md` に短い節を足す（R6.2）。推奨: `introduction.md` の「関連リンク」の後に「AI にゴーストを書かせるとき」のような短い節（落とし方・置き場所・同じ版を使うこと）。理由: 読者が最初に開く頁で、配布物の並びと同じ所にあり、章を足さないので章の数の検査 3 か所を触らずに済む。生成ファイルの元でもない。代わりの案: 入門の `prerequisites.md` の「必要なもの」に足す（入門の台詞の流れに AI を持ち込むことになり、入門は AI 無しで進める作り）／新しい章を立てる（章の数の検査と `SUMMARY.md` を直す。内容に対して重い）。
 4. **brief の Scope に無い文書を含めるか**（ルートの `README.md`・`release.bat` の説明・`pasta-check/SKILL.md` の段の並びと配布物の並び）。【仮定】含める（R2.8・R7.1・R7.2）。推奨: 含める。理由: どれも同じ配布物の並びや段の番号を書いており、直さないと本仕様の直後から古くなる。先例 `pasta-check-release-asset` も同じ所を直した。`pasta-check/SKILL.md` は zip に入るので、古い段の番号を利用者に配ることにもなる。編集は分類器に止められる見込みなので、その場面で開発者の許可を求める（brief の Constraints と同じ扱い）。代わりの案: `pasta-check/SKILL.md` は `ponytail-check-release`（0.4.3）に申し送る（その間、0.4.2 の zip に古い段の番号が入る）。
 5. **版の示し方と更新の案内**。【仮定】zip の中に版を示すファイルは足さず（R1.6）、マニュアルに「使っている pasta と同じ版の zip を使う・版を上げるときは 3 つのフォルダを置き換える」と書く（R6.3）。推奨: そのとおり。理由: brief の Desired Outcome が zip の中身を「次の形だけ」と決めており、版は Release ごとの添付で示せる。上書きで展開すると、新しい版で消えた `references/` のファイルが残るので、置き換えの一言は要る（回避の書き方ではなく、置き場所の説明の一部）。代わりの案: zip の中に `VERSION` などを足す（brief の形から外れる）／案内を書かない（古いファイルが残る）。
+
+## 8. 設計の調査（2026-10-23・kiro-spec-design）
+
+発見の種別は「既存の仕組みの拡張」（light discovery）。外の新しい依存は無いので、Web の調査は行わず、手元のコードと実験で確かめた。
+
+### 8.1 読んだもの
+
+- 規則: `kiro-spec-design` の `design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`、テンプレート `design.md`・`research.md`。
+- 先例: 完了 spec `pasta-check-release-asset` の `design.md`（段の足し方・検査の形・文書の直し方・テストの立て方を写した）。
+- steering: `tech.md` のリリース CI と `manual.yml` の節、`structure.md` の `release.ps1`・`release/` の行。
+- コード: `release.ps1`（全体）、`release.bat`、`release.yml` の build の job（L58〜214）、`github-release.ps1`（全体）、`release-scripts-test.ps1` の項目 10、`release-state.ps1` L75〜110、`procedure.md` L471・L477、`release/SKILL.md` L166、`pasta-check/SKILL.md` L100〜170、`book/src/introduction.md`、ルートの `README.md` L30〜55、`crates/pasta_sample_ghost/README.md` L60〜85。
+
+### 8.2 zip の書き方の実験（Windows PowerShell 5.1 と pwsh 7）
+
+スクラッチで、このワークツリーの実物（3 つのスキルの追跡ファイル 32 個とルートの `LICENSE`）を、同じコードで 5.1 と 7 から zip にした。コードは `powershell.exe -NoProfile -Command -`（標準入力から読ませる。`-ExecutionPolicy Bypass` は使わない）と `pwsh -NoProfile -Command -` に同じものを流した。
+
+```text
+Add-Type -AssemblyName System.IO.Compression / System.IO.Compression.FileSystem
+$files = git -C <ws> ls-files -- .claude/skills/pasta-ghost-authoring .claude/skills/pasta-lua-coding .claude/skills/pasta-check
+$zip = [ZipFile]::Open($out, [ZipArchiveMode]::Create)
+foreach ($f in $files) { [ZipFileExtensions]::CreateEntryFromFile($zip, <ws>\$f, $f.Substring('.claude/skills/'.Length)) }
+[ZipFileExtensions]::CreateEntryFromFile($zip, <ws>\LICENSE, 'LICENSE')
+```
+
+| 版 | ファイル | エントリ | `\` を含む | 最上位 |
+|---|---|---|---|---|
+| 5.1.26100.9711（Desktop） | 32 | 33 | 0 | LICENSE, pasta-check, pasta-ghost-authoring, pasta-lua-coding |
+| 7.6.7（Core） | 32 | 33 | 0 | 同じ |
+
+- 2 つの zip のエントリの一覧（並べ替えた物）は完全に同じ（`diff` で差なし）。
+- 5.1 の zip を `unzip` で展開すると、最上位に 3 つのフォルダと `LICENSE` が出て、各フォルダは `.claude/skills/<名前>/` と `diff -r` で差が無く、`LICENSE` もルートと同じバイト列だった。5.1 の `Expand-Archive` でも 33 ファイル・3 つのフォルダに展開された。
+- 5.1 では拡張メソッドをインスタンスの形（`$zip.CreateEntryFromFile(...)`）で呼べないので、`[System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile` と静的に呼ぶ。7 でも同じ書き方で動く。
+- `git ls-files` の出力は、5.1 でもリポジトリ相対で `/` 区切りのまま得られる（5.1 の .NET Framework には `Path.GetRelativePath` が無いので、フォルダを辿る案ではここを自分で組む必要があった）。
+- 追跡ファイルの名前は 32 個すべて ASCII（`grep -P '[^\x20-\x7e]'` で該当なし）。
+- 2.1 節の実験（`Compress-Archive`・`CreateFromDirectory` は 5.1 で `\` を書く）と合わせ、**`Compress-Archive` を使わず、`ZipArchive` に自分で組んだ名前で書く**ことに決めた。
+
+### 8.3 そのほかの確かめ
+
+- `node book/tools/gen-skill-refs.mjs --check` は、このワークツリー（`core.autocrlf=true`・CRLF の checkout）で「24 件すべて最新・孤立なし」・終了コード 0・0.1 秒。`checkAll` が LF に正規化して比べるので、windows-latest の build の job でもそのまま使える。npm の依存は無い。
+- 今のリリースビルド（`release.ps1` と各 `build.rs`）は git を呼んでいない。ただし手元は開発者のクローン（`RELEASE.md` の手順も git を使う）、CI は `actions/checkout` で、どちらにも git がある。新しく入れる道具ではない（R2.7）。
+- `release-scripts-test.ps1` の項目 10 の検査は「出力に `pasta_check.zip` がある」だけなので、6 つにしても通り続ける。「だけが無い」を確かめるには、もう一方の名前が出ないことも見る必要がある。
+- `pasta-check` のスキルは `GENERATION_MAP` に無い（生成ファイルを持たない）。照合は対応表のすべてを見るので、本仕様で対象を絞る必要はない。
+
+### 8.4 設計の決定
+
+#### 決定: 新しい段の位置
+- **背景**: R2.8 で段の番号と説明を新しい並びに合わせる。番号は `release.ps1`・`release.bat`・`pasta-check/SKILL.md`・sample の README・RELEASE.md に書かれている。
+- **候補**: (1) 段 3 の後（段 4〜7 がずれる）、(2) 段 5 の後（版の確認・大きさの 2 段だけがずれる）、(3) リリースの段の先頭（段 3〜7 がすべてずれる）。
+- **選んだもの**: (2) 段 5 の後の段 6。
+- **理由**: 書き換える番号が最も少ない（`pasta-check/SKILL.md` の段 3・4・5 の記述はそのまま）。どの案でも段 3 以降なので `-SkipSetup` でも走る（R2.5）。段 6 はビルドに依らないので、ビルドより前に置いて早く失敗させる利点は小さい。
+- **トレードオフ**: 段 3〜5 が失敗したときは段 6 まで進まず、前の実行の `pasta-skills.zip` が `release\` に残る（今の `pasta.dll.zip` と同じ扱い。R2.4 は段 6 自身の失敗のときの要件）。
+
+#### 決定: zip の書き方
+- **候補**: (1) `Compress-Archive`、(2) `ZipFile.CreateFromDirectory`（作業フォルダに写してから）、(3) `ZipArchive`＋`CreateEntryFromFile` で名前を自分で組む、(4) 外部の道具（7-Zip・`tar.exe`）。
+- **選んだもの**: (3)。
+- **理由**: (1)(2) は 5.1 で `\` を書く（2.1 節の実験）。(4) は新しい道具か、Windows の版に依る道具で、R2.7 に反するか、手元と CI の差の元になる。(3) は 5.1 と 7 で同じ結果になることを 8.2 節で確かめた。
+
+#### 決定: 詰める元の一覧の取り方
+- **候補**: (1) フォルダを辿る（`Get-ChildItem -Recurse -File`）、(2) `git ls-files`。
+- **選んだもの**: (2)。作る側（`release.ps1`）と CI の検査（`release.yml`）の両方で同じ取り方にする。
+- **理由**: 出力が既に `/` 区切りの相対パスで、5.1 で相対パスを組む処理が要らない。「リリースするコミットのファイル」（R1.2・R3.3）に合い、手元の未追跡のファイル（エディタの控えなど）を詰めないので、手元の結果が CI と同じになる。
+- **トレードオフ**: git が要る（手元・CI とも既にある）。ASCII でない名前のファイルは引用符付きで出るため、そのファイルが見つからずに段が失敗する（壊れた zip は出ない）。今は該当なし。Revalidation Triggers に挙げた。
+
+#### 決定: 生成ファイルの照合の位置
+- **候補**: (1) build の job の「Setup Node」の直後（長いビルドの前）、(2) 「Verify release assets」の直前、(3) verify の job（ギャップ分析の Option C）。
+- **選んだもの**: (1)。
+- **理由**: 照合はソースだけを見るので、ビルドの前に置けば数十分のビルドを待たずに止まる。build の job の中なので、配布物の検査は build の job という分け方を保つ（(3) を退けた理由）。R3.5 の「公開しない」は、build の job の失敗で後続が needs で止まることで満たす。
+
+#### 決定: 失敗の後片付け
+- 段の頭で前の実行の zip を消し（R2.4）、さらに書く途中の例外と検査の失敗でも作りかけの zip を消す。先例の段 3 は検査に落ちた zip を残すが、`pasta-skills.zip` は検査に落ちた物を手元で配る誤りを避けるために消す。
+
+#### 決定: テストの項目
+- 項目 10 は置くファイルに `pasta-skills.zip` を足し、「出力に `pasta-skills.zip` が出ない」も見る。項目 11 は別の一時のフォルダで `pasta-skills.zip` だけを欠かし、`pasta_check.zip` が出ないことも見る。2 つの項目を互いに裏返しにして、「だけが無い」を確かめる。
+
+### 8.5 合成（synthesis）
+
+- **一般化**: 3 つの zip を作る共通の関数や、配布物の一覧を 1 か所に持つ表は作らない。要件が求めるのは 1 つの zip の追加で、今の 2 つの zip と同じ「段ごとに書き下す」形を保つほうが、段 3〜5 を変えないこと（R2.9）を確かめやすい。配るスキルの名前だけは段 6 の中で 1 つの配列に持ち、検査と一覧の取得で共用する。
+- **作るか採るか**: zip は .NET の標準（`System.IO.Compression`）を採る。PowerShell の `Compress-Archive` は 5.1 の挙動のため退けた。外部の道具は採らない。生成ファイルの照合は既存の `gen-skill-refs.mjs --check` を採る。
+- **簡素化**: 別のスクリプト（ギャップ分析の Option B）は作らない。zip の中に版のファイルは足さない（R1.6）。中身のハッシュの検査は足さない（ファイルをそのまま書くので一覧と名前の形の検査で足り、中身の一致はテストの展開と `diff` で確かめる）。手元の `release.ps1` で生成ファイルの照合はしない（Node が要ることになり R2.7 に反する。照合はリリース CI の要件 R3.4 だけ）。
+
+### 8.6 設計ディスカッションへの申し送り
+
+- 上の 5 つの決定（段の位置・zip の書き方・一覧の取り方・照合の位置・失敗の後片付け）は、`design.md` の Decisions / Risks に推奨として書いた。開発者の確認を受ける。
+- 設計の検証（kiro-validate-design）の結果は、ディスカッションの議題に入れる。
