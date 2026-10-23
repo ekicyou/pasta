@@ -1,16 +1,16 @@
 @echo off
 REM release.bat - hello-pasta Build & Release Script
-REM Double-click this file to build ghost distribution and create hello-pasta.nar, pasta.dll.zip and pasta_check.zip
+REM Double-click this file to build ghost distribution and create hello-pasta.nar, pasta.dll.zip, pasta_check.zip and pasta-skills.zip
 REM Outputs in release/ are for local checks only (not committed). Publishing is done by
 REM the release CI (.github/workflows/release.yml) when a vX.Y.Z tag is pushed.
 REM
 REM Workflow:
 REM   1-2. Build pasta.dll, copy DLL/scripts
-REM   3-7. Build pasta_check.zip (x64), pasta_check release, create pasta.dll.zip, version check,
-REM        size check and release instructions
+REM   3-8. Build pasta_check.zip (x64), pasta_check release, create pasta.dll.zip,
+REM        create pasta-skills.zip, version check, size check and release instructions
 REM
 REM Options (passed through to release.ps1):
-REM   -SkipSetup     Skip setup phase (steps 1-2); steps 3-7 still run
+REM   -SkipSetup     Skip setup phase (steps 1-2); steps 3-8 still run
 REM   -SkipDllBuild  Skip DLL build step only
 
 setlocal

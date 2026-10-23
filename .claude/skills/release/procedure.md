@@ -468,13 +468,13 @@ gh run view {RUN} --log-failed | tail -n 60
 | `tag` | `tag \| 最大 <版> \| v{V} <状態>` | `あり <コミットの SHA>`・`無し`。照会できなければ `tag \| 不明` |
 | `crates.io` | `crates.io \| <クレート> \| 最大 <版> \| {V} <状態>`（5 行） | `あり`・`無し`・`不明（HTTP <コード>）` |
 | `Marketplace` | `Marketplace \| ekicyou.pasta-vscode \| 最大 <版> \| {V} <状態>` | `あり`・`無し`。照会できなければ `不明` |
-| `GitHub Release` | `GitHub Release \| 最大 <版> \| v{V} <状態>` | `あり（公開・添付 4/4） <URL>`・`下書き（添付 n/4）`・`添付不足（公開・添付 n/4） <URL>`・`無し`・`不明` |
+| `GitHub Release` | `GitHub Release \| 最大 <版> \| v{V} <状態>` | `あり（公開・添付 5/5） <URL>`・`下書き（添付 n/5）`・`添付不足（公開・添付 n/5） <URL>`・`無し`・`不明` |
 | `run` | `run \| <ID> \| <status> \| <conclusion> \| attempt <n> \| <URL>` | 無ければ `run \| 無し`。照会できなければ `run \| 不明` |
 | `PR` | `PR \| 未統合 \| #<番号> \| <ブランチ> \| <URL>` | 無ければ `PR \| 無し` |
 | `集計` | `集計 \| {V} の公開済み <n>/7 \| 不明 <m>` | 7 = 5 クレート + Marketplace + GitHub Release |
 | `提案` | `提案 \| <版>（すべての出どころの最大 <版> の PATCH + 1）` | `不明` があれば `提案 \| 出せない（不明がある）` |
 
-「公開済み」に数えるのは、crates.io と Marketplace の `あり`、GitHub Release の `あり（公開・添付 4/4）` だけである。下書きと添付不足は数えない。配布物は `pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-{V}.vsix`・`pasta_check.zip` の 4 つで、`pasta_check.zip` を添付していない 0.4.1 までの版は `添付不足（公開・添付 3/4）` と出る。
+「公開済み」に数えるのは、crates.io と Marketplace の `あり`、GitHub Release の `あり（公開・添付 5/5）` だけである。下書きと添付不足は数えない。配布物は `pasta.dll.zip`・`hello-pasta.nar`・`pasta-vscode-{V}.vsix`・`pasta_check.zip`・`pasta-skills.zip` の 5 つで、`pasta_check.zip`・`pasta-skills.zip` を添付していない 0.4.1 までの版は `添付不足（公開・添付 3/5）` と出る。
 
 ## 定型コマンド B の出力（リリース CI の結果）
 

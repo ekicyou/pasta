@@ -1,6 +1,6 @@
 # .github/workflows/release.yml
 # リリース CI（release-ci）。リリースタグ vX.Y.Z の push だけで起動し、
-# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（4 つの配布物）の順に進める。
+# verify（タグと版の検査）→ gate（build.yml の全検査）→ build（5 つの配布物）の順に進める。
 # 上流の job が失敗したら後続は needs の既定で止まり、どの公開先にも公開しない。
 name: Release
 
@@ -116,8 +116,12 @@ jobs:
           cache: npm
           cache-dependency-path: editors/vscode/package-lock.json
 
+      # 生成ファイルを pasta-skills.zip で配るので、タグの時点の鮮度をここで保証する（manual.yml は path filter 付きで、マージは CI を待たない）。
+      - name: Check generated skill references
+        run: node book/tools/gen-skill-refs.mjs --check
+
       # release.ps1 の cargo は --locked を持たないため、後段の Cargo.lock の不変検査で同等にする。
-      - name: Build pasta.dll.zip, hello-pasta.nar and pasta_check.zip
+      - name: Build pasta.dll.zip, hello-pasta.nar, pasta_check.zip and pasta-skills.zip
         run: pwsh -NoProfile -File crates/pasta_sample_ghost/release.ps1
 
       - name: Build VSIX
@@ -156,6 +160,21 @@ jobs:
             if ($LASTEXITCODE -ne 0 -or $reported -cne "pasta_check $env:VERSION") {
               $errors.Add("pasta_check.zip の pasta_check.exe の版が $env:VERSION でない: $reported")
             }
+          }
+
+          # pasta-skills.zip: 3 つの SKILL.md と LICENSE が在り、中身がタグのコミットの木の 3 つのスキル＋LICENSE と過不足なく一致し、/ 区切り
+          $skills = @(Get-ZipEntries 'release/pasta-skills.zip')
+          foreach ($e in 'pasta-ghost-authoring/SKILL.md', 'pasta-lua-coding/SKILL.md', 'pasta-check/SKILL.md', 'LICENSE') {
+            if ($skills -cnotcontains $e) { $errors.Add("pasta-skills.zip に $e が無い") }
+          }
+          $skillsExpected = @(git ls-tree -r --name-only HEAD -- .claude/skills/pasta-ghost-authoring .claude/skills/pasta-lua-coding .claude/skills/pasta-check | ForEach-Object { $_ -replace '^\.claude/skills/', '' }) + 'LICENSE'
+          if ($LASTEXITCODE -ne 0) { throw 'git ls-tree が失敗した' }
+          foreach ($e in $skillsExpected) {
+            if ($skills -cnotcontains $e) { $errors.Add("pasta-skills.zip に足りない: $e") }
+          }
+          foreach ($e in $skills) {
+            if ($skillsExpected -cnotcontains $e) { $errors.Add("pasta-skills.zip に余計な物: $e") }
+            if ($e.Contains('\')) { $errors.Add("pasta-skills.zip のパスが / 区切りでない: $e") }
           }
 
           # hello-pasta.nar: 配置の要のファイルと、シェル一式（descript.txt・surfaces.txt・立ち絵 18 枚）
@@ -208,6 +227,7 @@ jobs:
             release/pasta.dll.zip
             release/hello-pasta.nar
             release/pasta_check.zip
+            release/pasta-skills.zip
             release/pasta-vscode-${{ needs.verify.outputs.version }}.vsix
           retention-days: 90
           if-no-files-found: error

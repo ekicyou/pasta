@@ -135,3 +135,8 @@
   - Scope の「マニュアル（`book/` の pasta_check の章）」は不正確。選択肢の権威は `crates/pasta_check/README.md` の release の節で、マニュアルは `debug/validate.md` の「release との関係」から README へ案内しているだけ。直すのは上の 3 か所。
   - Current State 8 の「`copy_master` と `neutralize_debug_env` が 3 つのファイルにある」は、`neutralize_debug_env` が 3 ファイル（`self_deploy_integration_test.rs`・`touch_shortcuts_test.rs`・`tutorial_stages_test.rs`）、`copy_master` が 2 ファイル（後の 2 つ）。
   - `pasta_check release` を呼ぶのは、今は `release.ps1` の段 4（以前は段 3）。`pasta_check --version` の出力の形は、リリースの版の検査が完全一致で見るので変えない（申し送りのとおり）。
+
+## 申し送り（pasta-skills-release-asset より）
+
+- `release.ps1` は 8 段になった。段 6 が `pasta-skills.zip` を作って検査し、版の確認が段 7、大きさの検査とまとめが段 8。`pasta_check release` を呼ぶのは段 4 のまま。`pasta-check/SKILL.md` の段の図・`release/` の木・配布物の並びは、本 spec が開発者の許可を得て 8 段と `pasta-skills.zip` に合わせた。
+- `pasta-check/SKILL.md` は `pasta-skills.zip` に入って作者へ配られるようになった。リポジトリの中の話（`crates/…` のパス・hello-pasta の段）を文字として含んだまま配られるので、中身を直すときはこの点も論点になる。参照先: `.kiro/specs/completed/pasta-skills-release-asset/design.md` の「Decisions / Risks」。

@@ -86,3 +86,8 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 - **要件定義のモデル**: Opus。決めることは配布物の形（zip を 1 つにするか分けるか）と arm64 を出すかで、どれも後から変えられる。
 - **分割の案**: 要らない。
 - **見つけた穴・古くなった記述**: aarch64 で LuaJIT（mlua の vendored）がビルドできるかは、まだ試していない（前のまま。要件の前に試す）。CI で arm64 を作るには、arm64 の Windows の runner か、x64 からのクロスビルドが要る。`embed-resource` の VERSIONINFO も arm64 で通るかを一緒に試す。`.cargo/config.toml` の頭の説明（9 行「出荷ターゲットは x86・x64 の両方」）は、x64 の `pasta_check.exe` のことで、x64 の pasta.dll は配っていない。arch を足すときに書き直す。
+
+## 申し送り（pasta-skills-release-asset より）
+
+- `release.ps1` は 8 段になった（段 6 が `pasta-skills.zip` の作成と検査、版の確認が 7、大きさとまとめが 8）。arch を足すときは段 6 を保ち、段の番号と `/8` の見出し・`release.bat` の説明・文書の段の並びを合わせる。
+- 配布物は 5 つ・GitHub Release の添付は 6 つになり、`release.yml` の「Verify release assets」に `pasta-skills.zip` の項目が 1 つ増えた。配布物を足すときは `release.ps1`・`release.yml`・`github-release.ps1`・`.claude/skills/release/scripts/release-state.ps1`・文書の 5 か所を合わせる。参照先: `.kiro/specs/completed/pasta-skills-release-asset/design.md` の「Revalidation Triggers」。

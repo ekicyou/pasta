@@ -114,12 +114,13 @@ pasta_check release `
   1. SHIORI DLL ビルド               3. pasta_check.zip の作成と検査（hello-pasta 固有）
   2. DLL/スクリプトを開発フォルダーへ  4. pasta_check release
                                      5. 追加の配布物の作成（hello-pasta は pasta.dll.zip）
-                                     6. バージョン確認
-                                     7. 大きさの検査とリリース案内表示
+                                     6. pasta-skills.zip の作成と検査（hello-pasta 固有）
+                                     7. バージョン確認
+                                     8. 大きさの検査とリリース案内表示
 ```
 
 - 段 4 は pasta_check が汎用的に処理する
-- それ以外（Setup Phase と段 3・段 5〜7）はゴースト固有の手順（release.ps1 等で実装）
+- それ以外（Setup Phase と段 3・段 5〜8）はゴースト固有の手順（release.ps1 等で実装）
 - 段 3 は x64 の `pasta_check.exe` と `THIRD_PARTY_LICENSES.txt` を `release/pasta_check.zip` に詰めて検査し、段 4 はその `pasta_check.exe` で走る
 - 段の番号は hello-pasta の `release.ps1` のもの。立ち絵などの素材はコミットしたものをそのまま詰めるので、成果物を生成する段は無い
 
@@ -141,6 +142,7 @@ workspace/                               # ワークスペースルート
 │   │   └── updates.txt                  # 自動生成（ゴースト用）
 │   ├── {ghost-name}.nar                 # --nar 出力
 │   ├── pasta_check.zip                  # pasta_check.exe と THIRD_PARTY_LICENSES.txt（hello-pasta 固有・release.ps1 の段 3）
+│   ├── pasta-skills.zip                 # pasta のスキル 3 つと LICENSE（hello-pasta 固有・release.ps1 の段 6）
 │   └── pasta.dll.zip                    # 追加の配布物（hello-pasta 固有・release.ps1 の段 5）
 └── crates/pasta_sample_ghost/
     ├── release.ps1                      # Setup + Release を統合したスクリプト
@@ -161,7 +163,7 @@ SSP 仕様および NAR フォーマットの詳細:
 ### pasta リポジトリ（hello-pasta）の場合
 
 - 手元で `release.bat`・`release.ps1`（中で `pasta_check release` を呼ぶ）を実行して `release/` にできる成果物は、動作確認用である。コミットしない（`release/` は `.gitignore` で無視）。
-- 配布物（`pasta.dll.zip`・`pasta_check.zip`・`hello-pasta.nar`・VSIX）の公開は、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）が行う。CI はタグのソースから配布物を作り直し、GitHub Release（題名 `pasta vX.Y.Z`。本文は `doc/release-notes/vX.Y.Z.md` の見どころ）を作って、配布物と詳しいリリースノート（`release-notes-vX.Y.Z.md`）を添付する。
+- 配布物（`pasta.dll.zip`・`pasta_check.zip`・`pasta-skills.zip`・`hello-pasta.nar`・VSIX）の公開は、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）が行う。CI はタグのソースから配布物を作り直し、GitHub Release（題名 `pasta vX.Y.Z`。本文は `doc/release-notes/vX.Y.Z.md` の見どころ）を作って、配布物と詳しいリリースノート（`release-notes-vX.Y.Z.md`）を添付する。
 - 手元で `gh release create` を実行しない。手順と失敗したときの回復は `crates/pasta_sample_ghost/RELEASE.md` を参照。
 
 ## トラブルシューティング

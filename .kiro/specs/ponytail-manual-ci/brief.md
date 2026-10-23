@@ -143,3 +143,9 @@
 - **見つけた穴・古くなった記述**
   - 3 番の行番号（L244・L247・L253-293・L395）は、上のとおり 15 行ずれた。
   - `manual.yml` 191〜197 行の Setup Pages の注記（`enablement: true` で Pages が有効になる）は誤り（2 番。直すのは設計以降）。
+
+## 申し送り（pasta-skills-release-asset より）
+
+- `release.yml` の build の job の「Setup Node」の直後に、step「Check generated skill references」（`node book/tools/gen-skill-refs.mjs --check`）を足した。タグの時点で配るスキルの写しが最新であることを、長いビルドの前に保証するためである。関門（gate）に同じ照合を足すときは、この step との重複を整理する（どちらに残すかは本 spec の論点）。
+- 配布物は 5 つ（`pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip`・`pasta-skills.zip`）、GitHub Release の添付は 6 つ（配布物 5 つと詳しいリリースノート）になった。上の申し送りの「添付 5 つ」「配布物 4 つ」は古い。合わせるときは、build の job の `pasta-skills.zip` の検査（「Verify release assets」の項目と、`git ls-tree` の失敗で止まる 1 行）・upload の path の行・`github-release.ps1` の `$names` の 6 つ・`release-scripts-test.ps1` の項目 11 を保つ。
+- `release.yml` の行は、build の job の中で 19 行ほど下へずれた。参照先: `.kiro/specs/completed/pasta-skills-release-asset/design.md` の「ReleaseBuildJob」「GitHubReleaseAssets」。
