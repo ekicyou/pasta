@@ -85,7 +85,7 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
 
 - **Upstream**: shiori4（`shiori4_abi` の版 3 の取り決め。0.0.1 で公開済みなので、shiori4 の Phase 2 の spec を待たずに始められる）
   - 2026-10-23 の shiori4 の裁定（shiori4 のコミット `b5344f0`）:
-    - SHIORI/3.0 の書き出し（`load`・`request`・`unload`）と `shiori_get_api` の両方を持つ DLL は許される（pasta の形）。ホストは先に `shiori_get_api` を見て、4 → 3 の順に試し、どちらも NULL なら SHIORI/3.0 の書き出しで読む。pasta は版 4 に NULL を返すので、shiori4 を知るホストは版 3 で読む。SSP は今どおり SHIORI/3.0 の書き出しで読む
+    - SHIORI/3.0 の書き出し（`load`・`request`・`unload`）と `shiori_get_api` の両方を持つ DLL は許される（pasta の形）。ホストは `shiori_get_api` → `loadu` → `load` の順に探し、最初に見つかった口で解決する（shiori4 のコミット `b3d93ce` で確定）。`shiori_get_api` を持つ DLL は、4 も 3 も NULL なら読めなかったゴーストになり、`loadu`・`load` へは戻らない。pasta は版 4 に NULL を返すので、shiori4 を知るホストは版 3 で読む。SSP は今どおり SHIORI/3.0 の書き出しで読む。`shiori4_host` には許可する口の集合（4・3・loadu・load）を渡せるので、pasta の CI で同じ DLL を従来の口で試すときは `loadu` と `load` だけを許可する
     - 版 4 の `load` が NULL を返したら、ホストは SHIORI/3.0 として読み直さない（`shiori4_host` の `from_library`。DLL を 2 回読まないため。areka の要望）。版 3 の `load` が NULL のときに読み直すかは、知らせに書かれていない（`shiori4-v4-host` で版 4 を出すときに効く。この spec は版 4 に NULL を返すだけなので影響しない）
     - カレントディレクトリは規約で決めない。SHIORI は頼らずに `load` の dir を使う
     - ファイル名の決まり（abi-conventions の論点 12。確定）。`descript.txt` の `shiori,pasta.dll` に対して、ホストは次の順に探す
@@ -101,7 +101,7 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
 ## Existing Spec Touchpoints
 
 - **Extends**: なし
-- **Adjacent**: `ponytail-shiori`（隙間の spec。SHIORI/3.0 の書き出しの型（`bool`→i32 の `BOOL`、`usize`→`c_long`）を直す。この spec も `windows.rs` を触るので、先に入るほうが直してよい。unload がアクターのスレッドが DLL を出るまで待つ・FFI の型を C に合わせる。`windows.rs`・`actor/` を共有するので、同じウェーブに置かない）
+- **Adjacent**: `ponytail-shiori`（隙間の spec。SHIORI/3.0 の書き出しの型（`bool`→i32 の `BOOL`、`usize`→`c_long`）を直す。この spec も `windows.rs` を触るので、先に入るほうが直してよい。2026-10-23 に shiori4 の `shiori3-legacy-host` が「BOOL は 32bit の int で 0 以外を真と読む（下位 1 バイトで読む守りは採らない）」と確定した。今の `-> bool` は EAX の上位が不定なので、失敗を真と読まれうる。推奨は、`load`・`loadu`・`unload` の戻り値を i32 の 1／0 に直すことを、この spec の In に入れること（要件で決める）。unload がアクターのスレッドが DLL を出るまで待つ・FFI の型を C に合わせる。`windows.rs`・`actor/` を共有するので、同じウェーブに置かない）
 
 ## Constraints
 
