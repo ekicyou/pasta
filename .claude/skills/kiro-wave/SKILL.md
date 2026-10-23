@@ -59,6 +59,7 @@ Think in English. Every developer-facing message (progress, warnings, the report
    MSYS_NO_PATHCONV=1 git show origin/<default>:.kiro/steering/roadmap.md | python -I .claude/skills/kiro-wave/scripts/read-wave.py
    ```
    Output: `date <YYYY-MM-DD>` then one `<Fable|Opus> <name>` line per spec. `WARN …` lines on stderr are relayed to the developer as they are. `FAIL …` (exit 1) → STOP and tell the developer to run `/kiro-next` first (or fix the wave subsection); start nothing.
+   A `release <X.Y.Z>` line instead of spec lines means the inventory found nothing left in the current goal and recommends the release (areka developer 2026-10-23: 「ウェーブの対象が０本となり、リリースできるなら、/releaseを開始コマンドとせよ」): start nothing — `/release` runs only when the developer types it — and tell the developer to type `/release <X.Y.Z>` (one untagged fenced block), then stop.
    The script treats a spec as Fable when either the code block or the wave table says Fable.
 
 ## Step 2 — Check each spec before starting it
@@ -99,7 +100,9 @@ Named mode:
 ```
 
 ## Step 4 — Report (persona language)
-1. Started sessions: one line each, `[<title>](#<local_… id>)` with the id from the tool result (never invent one). Say that each session stops at the requirements discussion and waits for the developer there.
+Before the report, detach every session confirmed as starting or working in Step 3 with `mcp__ccd_session_mgmt__detach_session` (load with `ToolSearch` if deferred), one call per session id. Otherwise the app wakes this session each time a started session ends a turn on its own, e.g. every time a `/kiro-impl` implementer or reviewer comes back (developer 2026-10-23: monitoring the started sessions is not needed). A refused detach is reported in one line; it does not stop the report.
+
+1. Started sessions: one line each, `[<title>](#<local_… id>)` with the id from the tool result (never invent one). Say that each session stops at the requirements discussion and waits for the developer there, and that, once detached, it no longer reports back here (follow it from the sidebar).
 2. **If any candidate was Fable (or its model could not be confirmed) — a clearly marked warning** (e.g. 「⚠ Fable の spec を除外しました」) naming each excluded spec and the model reason (where the model came from: the wave, a roadmap table, or the brief), then for each one its start command in its own untagged fenced block (one command per block, so it can be pasted alone; not `bash`, it is not a shell command), and an explicit prompt to run it: open a new session (a harness worktree), switch the model to Fable, and paste the command.
    ```
    /kiro-start <name>
@@ -107,6 +110,6 @@ Named mode:
 3. Skipped specs with their reasons (Step 2) and `WARN` lines from Step 1. In named mode, add one line that the named specs outside the current wave were not checked for file overlap with running specs here (each new session checks it in its requirements discussion).
 4. If nothing was started (all Fable or all skipped), say so plainly.
 
-When a started session ends a turn, the app may continue this session with a note; then report in a line or two which sessions are waiting for the developer, and start nothing new.
+If a session could not be detached and the app later continues this session with a note on it, report in a line or two which sessions are waiting for the developer, and start nothing new.
 
 </instructions>
