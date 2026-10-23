@@ -210,3 +210,8 @@
 - **見つけた穴・古くなった記述**:
   - Constraints の「BudouX の行幅の数えは、トークンごとにやり直しになる（`mod.rs:145`）」は古い（上の 1 点目）。
   - `talk-grapheme-clusters` の brief（Existing Spec Touchpoints）と roadmap 307 行の流れは「`sakura_builder.lua` を触らないので `scene-anchor-link` と同じウェーブに置ける」とするが、この spec の持ち場（roadmap 201 行）には `sakura_script/` がある。この spec が Rust の側を触るなら、同じウェーブに置けない。
+
+## 申し送り（external-control-events より、2026-10-23）
+
+- `FAILURE.LABEL` に `NOT_JSON = "JSON として読めない値"`・`NOT_ASSIGNABLE = "代入できない値"` が入り、12 種になった（上の「10 種」は古い）。種類を足すときは `failure_test.lua` の数のテストも合わせて直す。
+- 既定のハンドラの読み込みの並び（`pasta/shiori/event/init.lua`）の末尾に、`scene_play` の次の 1 行として `external_control` が入った。読み込みの行を足すときはその後ろになる。

@@ -70,3 +70,5 @@
 ## Implementation Notes
 - `pasta.toml` の `[lua] libs` は撤去済みで、`@json` を設定で外す口は無い（4.1 のレビューで判明）。要件 4.5 と設計の記述を事実に合わせて直した。`pcall(require, "@json")` の分岐は守りとして残す。
 - 5.2 の実機（SSP 2.9.x・readonly の試験用 SSP に MCP が届いた）: `raise_event` の `"\"07\""` は引用符付きのまま届き `番号は07です` を話した。引用符なしの `01` は `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（01）】` が結果に載った。SSP の側の制約は無い。外からの SSTP SEND の `\-` では SSP が閉じず、`OnPastaCallFunction ["ゴースト終了"]` で閉じた。
+- 完了時にその場で解決: 要件 4.8（失敗で続きが残る）と 5.4（`＊OnPastaCallFunction` へのフォールバックが起きない）を結合テスト `call_function_reports_not_found` で確かめるようにした（71ca20f0）。要件 2.2（Status で止めない）は Status を見る門が無い作りで満たし、専用のテストは置かない。
+- 完了時の申し送り: `call-attribute-filter`・`scene-anchor-link`・`shell-element-click` の brief.md に、`FAILURE.LABEL` が 12 種になったことと読み込みの並びに 1 行増えたことを追記した。
