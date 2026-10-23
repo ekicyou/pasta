@@ -66,7 +66,8 @@ Merge the latest `{remote}/{default-branch}` into the current branch first, so t
 3. If the current branch equals `{default-branch}`: `git merge --ff-only {remote}/{default-branch}` (Step 2 will STOP afterwards anyway).
    Otherwise: `git merge --no-edit {remote}/{default-branch}`.
 4. If the merge fails (conflict, diverged default branch, or uncommitted changes in the way): run `git merge --abort` when a merge is in progress, then STOP and report the cause and the conflicting files. Never resolve conflicts silently or discard local changes.
-5. Report the result in one line (already up to date / merged N commits), then proceed.
+5. Confirm the merge really took (areka developer 2026-10-23: `/kiro-wave` squash-merges the inventory just before it starts this session, and the spec must be read only after that merge is in): `git merge-base --is-ancestor {remote}/{default-branch} HEAD` must exit 0. Otherwise STOP and report it; nothing about the spec has been read yet.
+6. Report the result in one line (already up to date / merged N commits, with the `{remote}/{default-branch}` short SHA), then proceed.
 
 ### Step 1: Verify post-discovery precondition (hard gate)
 This skill is deterministic about its precondition: the spec folder created by `/kiro-discovery` MUST already exist.

@@ -16,8 +16,9 @@ Run one full roadmap inventory ("棚卸") on the current harness worktree branch
 1. main has advanced → inventory the roadmap, deep-dive the specs, brief thoroughly.
 2. Apply roadmap-listed trivial fixes (no brief needed) immediately and close them.
 3. Of the items that exist only in the roadmap (no brief), launch briefs for those that warrant one; adjust granularity; split specs whose load is too high.
-4. Build a strict dependency tree, rank its head specs, and pick at most 8 as the next wave — only from specs inside the current goal (the next release milestone the roadmap sets). Specs beyond the goal never enter the wave.
-5. Report the wave in the fixed code-block format, split into Fable and Opus.
+4. Build a strict dependency tree, rank its head specs, and pick at most 8 as the next wave — only from specs inside the current goal (the next release milestone the roadmap sets). Specs beyond the goal never enter the wave. When the current goal has no spec left and can be released, the wave is `/release <X.Y.Z>` instead (Step 6 release gate).
+5. Keep only live milestones in the roadmap: fold released milestones and emptied groups (Step 7).
+6. Report the wave in the fixed code-block format, split into Fable and Opus (or the `/release` block).
 
 `$ARGUMENTS` (optional) carries extra developer instructions for this run; they override the defaults where they conflict.
 
@@ -66,7 +67,7 @@ else "$AREKA_IMPL_WATCH_HOME/areka-impl-watch.exe" clear --repo "$R" 2>&1; echo 
 - Inventory: `ls .kiro/specs/` (non-completed folders — each should hold `brief.md`; note any with `spec.json`), `ls .kiro/specs/completed | wc -l`. Cross-check that every unchecked `- [ ]` ledger row has a folder and vice versa.
 - **In-flight specs**: `git worktree list` and `git branch -r --sort=-committerdate`. For each in-flight spec branch (other worktrees, recent `origin/claude/*` branches not yet merged): `git diff --name-only <default>...<branch> | grep -v '^\.kiro/'` → save to `<scratch>/inflight-files.md`. Also read each in-flight spec's brief/design for files it still plans to touch. All of these are **reserved**. A spec whose branch is already merged is not in flight.
 - Determine the inventory date (today) and whether a previous "棚卸（YYYY-MM-DD）" section exists to supersede.
-- **Current goal**: find the roadmap's milestone sections (e.g. `## 0.4.0 までの道筋` and the goal set for the version after it). The current goal is the nearest unreleased milestone; its scope is the set of specs its section lists (in its table or text). Record that scope and the section's own order and priority marks (e.g. 高優先度). If no milestone is set, note "ゴール未設定" for Step 10 and treat every unfinished spec as in scope.
+- **Current goal**: find the roadmap's milestone sections (e.g. `## 0.4.0 までの道筋` and the goal set for the version after it). The current goal is the nearest unreleased milestone (unreleased = no tag `vX.Y.Z` on origin: `git ls-remote --tags origin refs/tags/vX.Y.Z` prints nothing); its scope is the set of specs its section lists (in its table or text). Record that scope and the section's own order and priority marks (e.g. 高優先度). If no milestone is set, note "ゴール未設定" for Step 10 and treat every unfinished spec as in scope.
 
 ## Step 3 — Parallel re-measurement (subagents)
 1. Write `<scratch>/remeasure-common.md` (template below).
@@ -107,6 +108,9 @@ Last line: "briefs written: N/N".
 **Single-seat resources** (one spec per wave): `Cargo.lock` / `tech.md` dependency additions; `.github/workflows/release.yml` and `release.ps1` (the release-ci seat); the `release` skill (`.claude/skills/release/`) during any release.
 **Excluded from the tree**: 却下・保留・据え置きの spec and `常駐 spec` (neither candidates nor counted as descendants). **Not parallelised**: specs whose core work is measurement (latency/perf/load).
 **Goal gate**: only specs inside the current goal (Step 2) are wave candidates. A spec beyond the goal never enters the wave — not when it is a head, not when it has the most descendants, not when the roadmap says it may run "alongside" the milestone. The only exception is a bug the developer or the roadmap marks 致命的 (fatal). Extra developer instructions for this run do not lift the gate by themselves: if they name a beyond-goal spec, report that the milestone section must first be changed to include it (a Step 10 decision item). Beyond-goal specs still count as descendants.
+**Release gate** (areka developer 2026-10-23: 「ウェーブの対象が０本となり、リリースできるなら、/releaseを開始コマンドとせよ」):
+- The current goal can be released when it has **no unfinished spec** (every in-scope spec landed, none in flight) and every last check the roadmap lists for it (its milestone section or "人手の確認が残っている項目") is recorded as done. Then the wave is the release: the start-command block holds only `/release <X.Y.Z>` — no beyond-goal spec and no other spec (the `release` skill seat; the next inventory after the tag picks the next goal). The milestone section stays until the tag exists.
+- No spec left but a listed last check not done → not releasable yet: no wave (the goal gate still holds), and the check goes to the report as the developer's manual step.
 **Procedure**:
 1. Heads = specs with no unfinished predecessor (in-flight specs count as unfinished predecessors).
 2. Descendant count = number of unfinished specs transitively depending on the head (approximate is fine; state "約").
@@ -118,6 +122,7 @@ Last line: "briefs written: N/N".
 ## Step 7 — Write the roadmap
 Edit `.kiro/steering/roadmap.md` (Edit tool or one Python script in the scratch directory; assert every anchor exists):
 - **Fold** finished specs: every `[x]` ledger row and every completed Phase section collapses into `完了フェーズ（要約）` (one row per Phase: 主題 and spec names). Old wave tables and superseded 棚卸 sections are deleted (git history keeps them; nothing is archived to a separate file).
+- **Live milestones only** (areka developer 2026-10-23: 「０本になったバージョンターゲットは消して整理して欲しい。生きてるバージョンターゲットが見れれば良い」): the milestone section (and its `| 順 | spec |` table) of every released version (its tag exists) and every non-version group whose specs all landed fold into `完了フェーズ（要約）` the same way, and drop out of any count line (never write a `0＋`). An unreleased milestone with 0 specs left stays (release gate).
 - Replace the previous "棚卸（YYYY-MM-DD）" section with the new one: 即時修正 (what was fixed and closed, what was handed to specs), 統合・分割・改名, promotions and what stayed in the backlog (with reason), the wave and why, the Fable/Opus split, broken same-wave promises, holes found, 人手の確認が残っている項目, decisions needed. In the wave subsection `### ウェーブ（<date>）`, right after its table (first column = spec name), write the wave's start commands as the subsection's only fenced code block — a one-line caption, then the block exactly as in Step 10 item 4 (leave out an empty Fable group). The overview page (Step 8) reads the first fenced block of this subsection and shows it with a copy button (areka developer 2026-10-16 「ウェーブのコード表示をコピペボタン付きで」). `/kiro-wave` reads the same block and the table's last column (要件定義) with `.claude/skills/kiro-wave/scripts/read-wave.py` to start the wave; if you change this shape, change that script and its self-test in the same commit.
 - Keep the shapes the overview page reads (its markers live in `overview/roadmap-overview.strings.json`): the heading `## 棚卸（YYYY-MM-DD・main …）`, the version tables whose header starts `| 順 | spec |` (one table per version, under a `## ` heading that names the version), `## Specs (dependency order)`, and the first table of `## 完了フェーズ（要約）`. If you change one of these shapes, change the markers and the fixture in the same commit.
 - Active Phase sections: updated `境界戦略` and `ウェーブ構成` (rules, the new wave row with touched files and promises, next-wave candidates, 保留).
@@ -153,7 +158,12 @@ Fable
 Opus
 /kiro-start <name>
 ```
-   Follow the project preference of one command per block when the developer wants to paste them one by one; the combined block above is the default summary. `/kiro-wave` lands the inventory (PR → squash merge, after one approval dialog) and then starts the Opus specs as separate sessions, leaving the Fable ones to the developer; say so in one line.
+   Follow the project preference of one command per block when the developer wants to paste them one by one; the combined block above is the default summary. When the release gate (Step 6) holds, the block is instead exactly:
+```
+Wave リリース（<X.Y.Z> の spec は 0 本）
+/release <X.Y.Z>
+```
+   `/kiro-wave` lands the inventory (PR → squash merge, after one approval dialog) and then starts the Opus specs as separate sessions, leaving the Fable ones to the developer; say so in one line. For the release block it starts nothing: `/release` runs only when the developer types it — say so instead.
 5. Decisions needed from the developer (none of them block the wave) and any manual steps — including "ゴール未設定" and any beyond-goal spec the roadmap or the developer wanted to run early (it needs the milestone scope changed first).
 6. The overview page URL from Step 8, as one Markdown link whose text carries the inventory date and base SHA: `[ロードマップの俯瞰（棚卸 <date>・main <BASE>）](<url>)`. Never a bare URL or a code block (developer 2026-10-17: 「URLリンクにすればよい」).
 
