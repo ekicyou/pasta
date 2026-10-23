@@ -73,7 +73,7 @@ end
 local REG = require("pasta.shiori.event.register")
 
 REG:register("OnSecondChange", function(act)
-    if act.req.reference[3] == "1" then
+    if act.req.reference[3] == "1" then  -- トークを再生できるときだけ
         -- ここに毎秒の処理を書く
     end
     -- 何も返さなければ、次のハンドラへ回る
