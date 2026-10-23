@@ -89,3 +89,6 @@
 ## Implementation Notes
 - 1.1: reg_handler_chain_test.lua と一覧の 1 行は 1.1 で作成済み。2.3 の後片付けは register だけでなく pasta.shiori.event も読み直し、新しい REG に揃える
 - 1.2: 止めたハンドラが thread を返す場合、その act で再開される（EVENT.drive(result, act, act)）ことを 2.x のテストで確かめる
+- 完了時にその場で解決: main に `external-control-events` が入ったので、設計の決定 6 のとおりマニュアルの既定ハンドラの節の「登録すると」を「代入すると」に直した（main の取り込みのコミット 73f36997）
+- 完了時にその場で解決: 結合テストの後片付けの読み直しの一覧に、新しい既定ハンドラのモジュール `pasta.shiori.event.external_control` を足した（同 73f36997）
+- 完了時の申し送り: `recommend-menu-scenes`・`ponytail-lua-scripts` の brief.md へ 1 件ずつ（起票 0 件）

@@ -136,3 +136,9 @@
   - 「Current State」の行番号: `hour_margin` は `virtual_dispatcher.lua` 121〜125・245〜247 行 → 84 行（設定の表）と 206 行（比べる所）、計算し直す行 251 → 211 行、毎秒の設定の読み直し 231 → 191 行（ほかに 100 行）。`set_co_scene` 96〜136 行 → 101〜136 行、203〜205 行 → 200・206 行。`store.lua` 77〜92 行 → 83 行あたり。`entry.lua` の `SHIORI.load` 45〜59 行 → 69〜84 行、`SHIORI.unload` 122〜131 行 → 140〜150 行。`shiori/act.lua` 291 → 292 行。
   - 「Lua の spec 66 本は通る」は古い（4 本増えた）。
   - ロードマップの台帳（`roadmap.md` 449 行）の「Dependencies: none」は、上の順番の約束（`chain-talk-interrupt`、`reg-handler-chain`）を書いていない。運用ルールの「同じファイルを触る順も Dependencies に書く」に合わせるなら足す。
+
+## 申し送り（reg-handler-chain より、2026-10-23 完了時）
+
+- `shiori/event/init.lua` の `EVENT.fire` の、act を作ってハンドラを呼ぶ所が、鎖のループ（ハンドラごとに `create_act` と `STOP.hold_handler`）と底の `rawget(REG, req.id) or EVENT.no_entry` に変わった。冒頭の説明も伸びたので、このファイルの行番号は測り直す。型判定の枝・`set_co_scene`・`EVENT.drive` には触れていない。
+- `event/register.lua` の `REG` にメタテーブル（`__index` の `register` と、欄 `handlers`）が付いた。`REG` を空にするテストは、`package.loaded` から読み直せば鎖も空になる。
+- 参照: `.kiro/specs/completed/reg-handler-chain/design.md` の「File Structure Plan」「Components and Interfaces」。
