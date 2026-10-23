@@ -7,7 +7,7 @@
   - 完了の姿: 変更前の 3 つの配布物の一覧と段の見出しが上の 2 つのファイルにあり、2.3 の比較に使える
   - _Requirements: 2.9_
 
-- [ ] 2. リリースビルドに pasta-skills.zip の段を足す
+- [x] 2. リリースビルドに pasta-skills.zip の段を足す
 - [x] 2.1 pasta-skills.zip を作って検査する段を足す
   - 段 5（`pasta.dll.zip`）の後に段 6「Creating pasta-skills.zip」を置く。見出しは最初から `[6/8]` で書く（ほかの段の番号の付け直しは 2.2）。リリースの段（3〜8）の中にあり、`-SkipSetup`・`-SkipDllBuild` でも必ず走る。冒頭のパスの設定に `pasta-skills.zip` の場所を足す
   - 古い zip を消す → 配るスキル 3 つのフォルダの追跡しているファイルの一覧を git から取る（失敗なら `ERROR: git ls-files failed`）→ 名前を `/` 区切りで組んで（先頭の `.claude/skills/` を外す）ファイルを書き、最後にルートの `LICENSE` を `LICENSE` の名前で書く → 書く途中の例外では zip を閉じて消して失敗する、の順にする
@@ -36,7 +36,7 @@
   - _Depends: 1_
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.8, 2.9_
 
-- [ ] 3. リリース CI の配線
+- [x] 3. リリース CI の配線
 - [x] 3.1 (P) リリース CI の build の job で照合し、pasta-skills.zip を検査して渡す
   - 「Setup Node」の直後に「Check generated skill references」の step（`node book/tools/gen-skill-refs.mjs --check`）を、タグの時点の鮮度を保証する理由の注釈付きで足す
   - リリースビルドの段の名前に `pasta-skills.zip` を足し、実行の行は変えない。冒頭の説明を「5 つの配布物」にする
@@ -57,7 +57,7 @@
   - _Boundary: GitHubReleaseAssets, ReleaseScriptsTest_
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
 
-- [ ] 4. release スキルの添付の数え方を 5/5 にする
+- [x] 4. release スキルの添付の数え方を 5/5 にする
   - `.claude/skills/**` の編集が分類器に拒否されたら、回避策を探さずに、入った分と残りを示して開発者の許可を求める
 - [x] 4.1 (P) リリースの状態の読み取りを n/5 にする
   - 配布物の配列に `pasta-skills.zip` を足し、表示の `/4` を `/5` に、公開済みの判定を 5 つそろったときだけにする。リリースノートの添付は数えない
@@ -66,7 +66,7 @@
   - _Boundary: ReleaseStateReader_
   - _Requirements: 5.1, 5.2_
 
-- [ ] 4.2 (P) release スキルの手順書の読み方を 5 つの配布物に合わせる
+- [x] 4.2 (P) release スキルの手順書の読み方を 5 つの配布物に合わせる
   - 手順書の状態の表の読み方を `5/5`・`n/5` に、配布物の並びに `pasta-skills.zip` を足し、0.4.1 までの版は `添付不足（公開・添付 3/5）` と出ることを書く
   - スキルの見どころの「添付 4/4」を「添付 5/5」に。手で添付する案内（F5）は数を含まないことを確かめ、変えない。公開先の「7/7」は変えない
   - 完了の姿: `release` スキルの文書に `4/4`・`n/4`・`2/4` の言い方が残らず、`7/7` はそのまま
