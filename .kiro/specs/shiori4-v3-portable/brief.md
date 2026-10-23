@@ -96,7 +96,7 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
       - Linux・macOS は lib の付いた名前だけを探す。Rust の cdylib が作る `libpasta.so`・`libpasta.dylib` を、そのまま置ける。この spec の Windows 以外のビルドは、この名前に合わせる
     - 版 3 の `load` の失敗の理由（abi-conventions の論点 16・17。確定）: ABI では理由を返さない。NULL を返すだけで、規約は今のまま。理由は pasta 自身のログに出す。`shiori4_host` は版 3 を読む口を持ち、`load` の失敗はホストに `Err(LoadFailed)` として届く。読み込みは `shiori4_host` が持ち、`shiori4_abi` は型と定数だけを持つ
   - これで shiori4 の側の議題は、2026-10-23 にすべて決まった
-  - 試験: `shiori4_host` の v3 の口と許可する口の集合（どちらも shiori4 0.0.2 で入る予定）を dev-dependency で使えば、DLL の境界まで CI で試せる。0.0.2 が 0.4.2 のリリースに間に合わなければ、自前の呼び出しで試し、出てから切り替える（0.0.2 を待たない。出たら shiori4 のセッションが知らせる約束）
+  - 試験: `shiori4_host` の v3 の口と許可する口の集合（どちらも shiori4 0.0.2 で入る予定）を dev-dependency で使えば、DLL の境界まで CI で試せる。0.0.2 が出るのは、shiori4 の abi-conventions・host-protocol を作って統合した後で、時期の目安は無い（2026-10-23 時点で、2 本はこれから要件の段）。この spec は自前の呼び出しで試す前提で進め、0.0.2 が出てから切り替える（0.0.2 を待たない。出たら shiori4 のセッションが知らせる約束で、shiori4 の roadmap にも記録済み）
 - **Downstream**: `shiori4-v4-host`（この spec の入口と実行器の上に、版 4 を足す）。areka（Windows 以外で pasta を読む）
 
 ## Existing Spec Touchpoints
