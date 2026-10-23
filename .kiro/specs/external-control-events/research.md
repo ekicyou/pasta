@@ -66,6 +66,7 @@
 - `json.decode("null")` は既定で `json.null`（light userdata）を返す。`json.decode("nul")` は `nil, "…"` を返す。
 - `{ null_as_nil = true }` を渡すと `null` は `nil` になり、失敗との見分けは 2 つ目の戻り値に頼る。
 - 既定のまま `json.null` と比べる方が、配列の中の `null` を含めて素直（ただし配列は断る案なので、比べるのは一段目だけで済む）。
+- **設計のときの訂正（2026-10-23）**: `@json` の表は `decode`・`decode_native`・`encode` の 3 つだけで、`json.null` は出していない（`mlua-stdlib-0.1.0/src/json.rs` の `loader`）。`null` は mlua の `Value::NULL`（light userdata。Lua の `type` は `"userdata"`）で返る。見分けは `type(値) == "userdata"` で行う（7.2）。
 
 ### 3.4 失敗の表記が既定で応答に載る（未決事項 1・2）
 
@@ -115,3 +116,77 @@
 - **Research Needed**
   - SSP の MCP の `raise_event` で、Reference1 に `"01"` のような引用符付きの文字列を、崩さずに送れるか（JSON の文字列を MCP の引数の文字列の中に書く形。`scene-play-event` は引用符の要らない値しか試していない）。設計のときに実機で確かめる。
   - `chain-talk-interrupt` が先に入った場合の、台詞を出さない呼び出しの扱い（その spec の設計を読んで合わせる）。
+
+## 7. 設計の調査と決め事（2026-10-23）
+
+### 7.0 まとめ
+
+- **Feature**: `external-control-events`
+- **Discovery Scope**: Extension（今のイベントの振り分けに既定のハンドラを 2 つ足す。`design-discovery-light.md` を使った）
+- **Key Findings**:
+  - 失敗の種類の名前を `FAILURE.LABEL` に足すと、今のテスト `failure_test.lua` の「種類の名前の表は 10 種」が落ちる（要件 7.3 に反する）。`scene-play-event` も同じ理由で足さなかった。読めない JSON の種類の名前は、ハンドラのファイルの中の定数にする（7.3）。
+  - `@json` に `json.null` は無い。`null` は light userdata で返るので、`type` で見分ける（7.2）。
+  - `json.decode("false")` は `false` を返す。`ok and v or nil` の書き方では `false` が消えるので、型で分ける（7.2）。
+
+### 7.1 参照したもの
+
+- 先例: `crates/pasta_lua/pasta_scripts/pasta/shiori/event/scene_play.lua`（107 行）と `.kiro/specs/completed/scene-play-event/design.md` の ScenePlayHandler。門・`fail`・`quoted`・`bad_reference0`・`is_name` の形と、ログの警告の英語の並びを写す。
+- 呼び出しの解決: `act.lua` の `ACT_IMPL.find_act_handler`（L361〜402）・`ACT_IMPL.call`（L703〜）。`call` は `find_handler("scene", key)` が関数のときだけ呼び、関数でない値（`GLOBAL` の文字列など）は「見つからない」と同じに扱う。外からの呼び出しも同じにする。
+- コルーチンの包み方: `scene.lua` の `wrap_scene`（内部関数）。`fn(act, ...)` の後に `act:build()` を返す。
+- `@json`: `mlua-stdlib-0.1.0/src/json.rs`。`decode(data, opts)` は失敗で `nil, メッセージ`（`lua_try!`）。成功は値 1 つ。配列・オブジェクトは Lua の表。`null` は既定で `Value::NULL`。`lua.to_value_with(..)?` の失敗は Lua のエラーとして投げられうるので、`pcall` で包む。
+- 予約変数: `virtual_dispatcher.lua` の `get_config().resolve` は呼ぶたびに `require("pasta.save")` を読み、数値だけを使う。
+- テストの土台: `tests/lua_unittest_runner.rs` は `@json` を登録しない。`pasta_lua` は `mlua-stdlib` を通常の依存に持つので、テストから `mlua_stdlib::json::register(&lua, None)` を呼べる（`register_module` が `package.loaded["@json"]` に置く）。
+- 結合テストの先例: `tests/scene_play_event_test.rs`（一時ゴーストを `PastaLoader::load_with_config` で読み、`SHIORI.request` に GET を渡す）。
+- 自動トークの停止の状態: `STORE.auto_talk_paused`（`virtual_dispatcher.lua` L265）。
+- luacheck: `std = "lua51"`、`unpack` は read_globals にある。`max_cyclomatic_complexity = 15`。`shiori/act.lua` L322 は `table.unpack` を使う。
+- 同じウェーブの brief: `reg-handler-chain`（鎖で登録した作者のハンドラは、鎖の底の `REG[id]` より先に呼ばれる）、`chain-talk-interrupt`（台詞を出さずに終わったシーンは、待っている続きを残す決まりに変える）。
+- 参照したスキル: `kiro-spec-design`（rules の design-principles・design-discovery-light・design-synthesis・design-review-gate）、`kiro-validate-design`（rules の design-review）。pasta のスキルは、DSL と Lua の書き方を先例のコードから直接読んだので開かなかった。
+
+### 7.2 `null` と読めない値の見分け
+
+- `pcall(json.decode, text)` の結果で分ける。
+  - `pcall` が偽、または値が `nil` → 読めない（`decode` の `nil, メッセージ` も、投げられたエラーもここ）。
+  - `type(値) == "userdata"` → `null`（変数を消す）。
+  - `type(値) == "table"` → 配列かオブジェクト（断る）。
+  - `"number"`・`"string"`・`"boolean"` → 代入する。
+- `{ null_as_nil = true }` を渡して 2 つ目の戻り値で見分ける案は採らない。`nil` を返す成功と失敗の違いが戻り値の個数だけになり、読み違えやすい。
+- `type(text) ~= "string"`（Reference1 が無い）は `decode` を呼ばずに読めない値とする。
+
+### 7.3 失敗の種類の名前
+
+- `FAILURE.LABEL` に足すと `failure_test.lua` L344〜348 の数（10）が変わる。要件 7.3 は今のテストを書き換えないことを求める。
+- `FailureRecord.label` はただの文字列で、表に無い名前でも `FAILURE.report` は動く。ハンドラのファイルに 2 つの定数を置く。
+  - `JSON として読めない値`: Reference1 が無い・空・JSON として読めない、`@json` が無い。
+  - `代入できない値`: JSON の配列・オブジェクト。
+- 却下: 今の種類を使い回す（`数にできない値`・`名前にならない値` は意味が合わない）。表に足してテストの数を直す（7.3 に反する）。
+- 決めきれない点は設計の話し合いに回す（design.md の未決事項 1）。
+
+### 7.4 総合（design-synthesis）
+
+- **一般化**: 2 つのイベントは「門 → Reference0 の名前 → 本体 → 失敗は表記」の同じ骨組みを持つ。骨組みの小さな関数（門・`fail`・`bad_reference0`）を 1 つのファイルの中で共有する。`scene_play.lua` との共通化はウェーブの約束（シーン再生のファイルを触らない）で行わない（後の `ponytail-lua-scripts` の題材）。
+- **作るか使うか**: 呼び先の探し方は `act:find_handler` をそのまま使い、新しい探し方を作らない。JSON は `@json` を使う。保存は `pasta.save` の表と終了時の自動保存に任せる。新しく作るのは、引数を集めて呼び先をコルーチンで包む数行と、JSON の値を型で分ける数行だけ。
+- **簡素化**: `SCENE` に包む口を足す案（`wrap_scene` を外へ出す）は採らない。`scene.lua` を触ることになり、包み方は数行で済む。成功のときの info ログ、値の読み出し、設定の切り替えは足さない。
+
+### 7.5 決め事
+
+| 決め事 | 選んだもの | 理由 |
+| --- | --- | --- |
+| ファイル | `pasta/shiori/event/external_control.lua` に 2 つのハンドラ | brief の決定とウェーブの約束。テストを分けやすい |
+| 呼び先の引き方 | `act:find_handler("scene", 名前)` で引き、関数でなければ見つからない | `＞名前` と同じ段と順（要件 1.1〜1.3）。イベント名付きの表記を自分で出せる（4.2）。見つからないときにコルーチンを返さない（4.8） |
+| 呼び方 | `coroutine.create(function(a) fn(a, 引数…); return a:build() end)` を返す | `EVENT.fire` → `EVENT.drive` に任せる（2.1〜2.4）。`＞チェイントーク` で区切っても止まらない |
+| 引数 | Reference1 から、値の無い最初の Reference の手前まで、文字列のまま | 要件 1.4・決定 9 |
+| `null` の見分け | `type(値) == "userdata"` | 7.2 |
+| 読めない JSON の種類の名前 | ハンドラの中の定数 2 つ | 7.3 |
+| Lua の単体テストの `@json` | `tests/lua_unittest_runner.rs` に登録を 1 行足す | 本物の `null` と `false` の扱いを確かめられる。ほかのテストは `@json` を読まないので影響が無い |
+| 結合テスト | 一時ゴーストで `SHIORI.request` を通す Rust のテストを 1 本 | 本物の前方一致・別名・`GLOBAL`・DSL からの `＄＊名前` の読みを確かめる（要件 1.1・3.6） |
+
+### 7.6 調べきれなかったこと（実装の最後に確かめる）
+
+- SSP の MCP の `raise_event` で、`references` の 2 つ目に `"01"`（引用符を含む文字列）を渡したとき、SHIORI に `Reference1: "01"` のまま届くか。SSP ヘルプ（`ssphelp:other` の「MCPサーバ対応機能」）には引数の書き方の細部が無い。この環境では SSP を動かさないので、実装の最後に別の SSP で確かめる（design.md の Testing Strategy）。
+- `chain-talk-interrupt` が先に入ったときに、出力の無い呼び出しが続きを残すこと。こちらは決まりを作らないので、あちらの結合テストに任せ、こちらはどちらの順でも落ちないテストにする（続きの有無を確かめるのは、台詞を出したシーンを呼んだときだけ）。
+
+### 7.7 危険と手当て
+
+- ゴーストに `＊OnPastaCallFunction…`・`＊OnPastaSetSaveVariable…` で始まるシーンがあると、前方一致のフォールバックで動いていたものが動かなくなる — 要件 5.4 のとおり。マニュアルの節に 1 行書く。
+- `OnPastaCallFunction` で `act` のメソッド（`build` など）や `ゴースト終了` に当たる名前も呼べる — `＞名前` と同じ（決定 4）。`SecurityLevel: external` は断る（5.2）。
+- 引用符付きの文字列が MCP で崩れると、数字の形の文字列を代入できない — 7.6 の実機の確かめ。崩れたときは SSP の側の制約としてマニュアルに書く（SSP の MCP サーバーの側の変更は範囲の外）。
