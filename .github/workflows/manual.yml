@@ -72,7 +72,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       # スキル生成物（references/ の生成ファイル）がマニュアル章からの生成結果と一致するかを
       # 照合する（要件 7.1, 7.2）。生成器は npm 依存を持たないため npm ci より前に置き、
