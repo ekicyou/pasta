@@ -1,8 +1,8 @@
 ---
 name: kiro-wave
-description: 'Launch the wave that /kiro-next recommended: reads the current wave from .kiro/steering/roadmap.md on the remote default branch (the "### ウェーブ（日付）" subsection of the latest "## 棚卸（…）" section) and starts one separate Claude Code session per Opus spec, each in its own worktree, running /kiro-start <name>. Specs whose requirements model is Fable are NOT started: they are excluded with a warning and given as individual /kiro-start commands for the developer to run in a Fable session. With spec names as arguments (e.g. /kiro-wave scene-exact-match) it starts only those specs, in or out of the wave, under the same Fable rule. Never edits files, commits, pushes or merges. Use when: /kiro-wave, ウェーブを立ち上げる, ウェーブを一括で起動, start the wave. DO NOT USE FOR: planning the wave (use /kiro-next), starting one spec here (use /kiro-start).'
+description: 'Launch the wave that /kiro-next recommended: reads the current wave from .kiro/steering/roadmap.md on the remote default branch (the "### ウェーブ（日付）" subsection of the latest "## 棚卸（…）" section) and starts one separate Claude Code session per Opus spec, each in its own worktree, running /kiro-start <name>. Specs whose requirements model is Fable are NOT started: they are excluded with a warning and given as individual /kiro-start commands for the developer to run in a Fable session. With spec names as arguments (e.g. /kiro-wave scene-exact-match) it starts only those specs, in or out of the wave, under the same Fable rule. Because the new sessions read the remote default branch, it first lands this worktree's own changes (uncommitted edits or unmerged commits, e.g. the /kiro-next inventory) with PR → squash merge, after one approval dialog; otherwise it edits nothing. Use when: /kiro-wave, ウェーブを立ち上げる, ウェーブを一括で起動, start the wave. DO NOT USE FOR: planning the wave (use /kiro-next), starting one spec here (use /kiro-start).'
 disable-model-invocation: true
-allowed-tools: Bash, Read, Grep, Glob, ToolSearch
+allowed-tools: Bash, Read, Grep, Glob, ToolSearch, AskUserQuestion
 argument-hint: '[spec names to start instead of the wave]'
 ---
 
@@ -23,13 +23,32 @@ Invoking `/kiro-wave` is the developer's explicit request for separate sessions:
 Think in English. Every developer-facing message (progress, warnings, the report) uses the session's console language and persona (fall back to Japanese).
 
 ## Hard Rules
-- Read-only in this checkout: no file edits, no commits, no push, no PR, no merge, no roadmap changes.
+- The only writes are Step 0 (commit → push → PR → squash merge of this worktree's own changes, after the approval dialog). Otherwise read-only: no file edits, no roadmap changes.
+- Never start a session before this worktree's changes are on the remote default branch: the new sessions read it, so an unmerged inventory would start the wrong wave (developer 2026-10-23: 「kiro-wave の実施には『PR→スクワッシュマージ』が必須」).
 - Candidates are the wave's code block (wave mode) or exactly the named specs (named mode) — nothing else. Never start a Fable spec, or one whose model cannot be confirmed as Opus. Never start a spec twice.
 - **Never print the remote URL** (it may carry a token). Mask with `sed -E 's#https://[^@]*@#https://***@#'`.
 - Git Bash rewrites `origin/main:path` as a Windows path: prefix `git show <ref>:<path>` with `MSYS_NO_PATHCONV=1`.
 
-## Step 1 — Read the candidates from the remote default branch
+## Step 0 — Land this worktree's changes first (PR → squash merge)
 1. Default branch from `git symbolic-ref refs/remotes/origin/HEAD` (fallback `main`). `git fetch origin <default>` (masked output). If the fetch fails, STOP and report it (a stale roadmap may start the wrong wave).
+2. Find what is not landed yet:
+   - **uncommitted**: `git status --porcelain`. Files whose diff is line endings only (`git diff --ignore-cr-at-eol --quiet -- <file>` exits 0, e.g. the `sample.generated.lua` that the pasta_lua tests rewrite) are restored with `git checkout -- <file>` and not counted.
+   - **unmerged commits**: `git log --oneline origin/<default>..HEAD`. Commits already squash-merged still show here, so when the list is not empty, check `gh pr list --head <branch> --state merged --json number,headRefOid`: if a merged PR's `headRefOid` equals `git rev-parse HEAD`, the commits are landed.
+3. Nothing left → say so in one line and go to Step 1.
+4. If the current branch is the default branch and something is left → STOP: changes on the default branch cannot go through a PR; ask the developer to move them to a worktree branch. Start nothing.
+5. Otherwise ask **once with `AskUserQuestion`** (the approval dialog; load it with `ToolSearch` if deferred). Question (persona language): this worktree has changes that are not on `origin/<default>`, and the new sessions need them there — land them with PR → squash merge and continue? Put the facts in the option descriptions: the branch, the unmerged commit subjects, the uncommitted files (at most ~10, then "ほか N 件"), and an open PR if `gh pr list --head <branch> --state open` finds one. Options:
+   - `PR→スクワッシュマージして続ける (Recommended)` — land, then start the sessions
+   - `やめる` — start nothing
+   Anything other than the first option → STOP and start nothing (say the wave can be started after the changes are merged).
+6. On approval, without asking again (developer 2026-10-10: no second confirmation between PR and merge):
+   1. If there are uncommitted changes: `git add -A` and commit with a subject that says what changed (from the diff, conventional-commit style like the repository's history) and the session's attribution trailer.
+   2. `git push -u origin <branch>` (masked output).
+   3. Reuse the open PR if there is one; otherwise `gh pr create --base <default> --head <branch>` with the commit subject as the title (the latest subject if several, or a one-line summary) and a short bullet body ending with the attribution line. Avoid double backslashes in `gh` arguments.
+   4. `gh pr merge <number> --squash --delete-branch`. Do not wait for CI. The local-branch deletion warning ("checked out in the current worktree") is not a failure.
+   5. Verify with `gh pr view <number> --json state,mergeCommit`: `MERGED` → `git fetch origin <default>` and report the PR (as a full link) and the merge commit in one line. Anything else, or a refused merge → STOP and report it; do not route around the refusal with another tool, and start nothing.
+
+## Step 1 — Read the candidates from the remote default branch
+1. Use the default branch and the fetch from Step 0 (after a merge in Step 0, the fetch there already includes it).
 2. **Named mode**: first refuse (report, do not start) any name that is not `[a-z0-9-]+` — names go into shell commands. Then get each named spec's requirements model, then go to Step 2.
    ```bash
    MSYS_NO_PATHCONV=1 git show origin/<default>:.kiro/steering/roadmap.md | python -I .claude/skills/kiro-wave/scripts/read-wave.py --models <name>...
