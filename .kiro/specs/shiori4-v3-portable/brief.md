@@ -94,8 +94,8 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
       - Linux: `libpasta.<x64|arm64>.so` → `libpasta.so`
       - macOS: `libpasta.dylib` だけ（ユニバーサルバイナリを推奨）
       - Linux・macOS は lib の付いた名前だけを探す。Rust の cdylib が作る `libpasta.so`・`libpasta.dylib` を、そのまま置ける。この spec の Windows 以外のビルドは、この名前に合わせる
-  - 次の 1 つは、2026-10-23 時点で shiori4 の開発者の裁定待ちである。要件の前に結果を確かめる
-    - 版 3 ではホストのテーブルが NULL なので、`load` の失敗の理由をどこに出すか
+    - 版 3 の `load` の失敗の理由（abi-conventions の論点 16・17。確定）: ABI では理由を返さない。NULL を返すだけで、規約は今のまま。理由は pasta 自身のログに出す。`shiori4_host` は版 3 を読む口を持ち、`load` の失敗はホストに `Err(LoadFailed)` として届く。読み込みは `shiori4_host` が持ち、`shiori4_abi` は型と定数だけを持つ
+  - これで shiori4 の側の議題は、2026-10-23 にすべて決まった
 - **Downstream**: `shiori4-v4-host`（この spec の入口と実行器の上に、版 4 を足す）。areka（Windows 以外で pasta を読む）
 
 ## Existing Spec Touchpoints
