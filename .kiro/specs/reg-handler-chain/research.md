@@ -145,3 +145,61 @@
 - **Research Needed**:
   - `REG` にメタテーブルを付けたとき、`pasta_lua` の Rust 側が `REG` の表を直接読む所が無いかの確認（grep では見つからなかった。`pasta_shiori` の fixtures を含めて設計で再確認）。
   - 鎖の中で `SCENE.co_exec` や `act:call` を使うハンドラが、作り直した act で今と同じに動くこと（`act.req` を持つ新しい act なら同じはず）。
+
+## 設計フェーズの調査と決定（2026-10-23、/kiro-spec-design -y）
+
+- **Discovery**: light（既存の延長）。使ったスキルの手引き: `kiro-spec-design` の `design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`・`design-principles.md`。ponytail（最小の完全な変更）を Option A の選定に当てた。
+
+### Rust 側が REG の表を直接読むか（Research Needed の解消）
+
+- **Sources**: `crates/*/src` と `crates/*/tests`（`pasta_shiori/tests/fixtures` を含む）の grep（`event.register`・`REG`・`pairs(REG)`・`next(REG)`・`getmetatable`）。
+- **Findings**:
+  - `crates/*/src` に `REG` を読む Rust のコードは無い。Rust は `SHIORI.request` → `EVENT.fire` を通すだけ。
+  - Rust のテストと fixtures は、Lua の文字列の中で `REG.X = …` の代入と `type(REG.X)` の読み出しを使う。表の形を見るのは `tests/shiori/event_dispatch_test.rs` L40 の `type(REG) == "table" and next(REG) == nil` だけ。鎖をモジュールのローカルに置き、`register` を `__index` からだけ見せれば、`next(REG)` は今どおり `nil`。
+  - fixtures のうち `async_callback`・`debug_preservation` は `scripts/pasta/shiori/entry.lua` を上書きするが、どちらも `EVENT.fire` を呼ぶ。`register.lua`・`event/init.lua` を上書きする fixture は無い。`runtime_error_balloon/scripts/main.lua` の `REG.plain_fail` は底として今どおり動く。
+- **Implications**: メタテーブルを付けても Rust 側の変更は要らない。
+
+### 鎖を引く内部の口の置き場所
+
+- `__index` に置くと `REG.<名前>` が `nil` でなくなり、要件 1.6（`REG.register` 以外の読み出しは今と同じ）に反する。
+- メタテーブルの普通の欄（`handlers`）に置き、`EVENT.fire` は `getmetatable(REG).handlers(id)` で引く。`__index` を通らないので `REG.handlers` は `nil` のまま。手元の Lua で `getmetatable(setmetatable({}, {__index = {...}, handlers = f})).handlers` が引けること、`rawget({}, nil)` が `nil` を返すことを確かめた。
+
+### 外す関数と同じ関数の 2 回の登録
+
+- 登録ごとに目印の表 `{ fn = fn }` を積み、外す関数はその目印を探して `table.remove` する。関数そのもので探すと、同じ関数の 2 回の登録を区別できない（要件 1.3）。
+
+### テストの持ち越し
+
+- `lua_specs/init.lua` は全スイートを 1 つの VM で順に `require` する。`event_no_entry_test.lua` などは `pasta.shiori.event` だけを読み直し、`register` は読み直さない。新しいテストが鎖に登録を残すと、後のスイートの `EVENT.fire` に効く。新しいテストは各テストの終わりに外す関数で後片付けする。
+- エラーの確かめは `shiori_entry_test.lua` と同じく、entry の依存の閉包を一括で読み直してから `SHIORI.request` を通す（`STOP.clear`・`take_handler` の道を通すため）。
+
+### マニュアルの追加の行
+
+- ギャップ分析の一覧に加え、`internals/shiori.md` L96（`REG` の説明「依存を持たない空の表」）と L358（`hold_handler` を呼ぶ時期）、`internals/execution-model.md` L174（コルーチンを返す経路の列挙）も鎖に合わせて直す。
+- `reference/runtime-failures.md` L159・L183 の「`REG` に登録した関数」は鎖のハンドラも含むので直さない。
+
+## Design Synthesis（2026-10-23）
+
+- **Generalization**: 鎖のハンドラの戻り値と底の戻り値は、止めた後は同じ型判定の枝で応答にする。鎖の専用の応答の規則は作らず、「真なら止める」だけを足す。すべての ID（イベント・リソース）を同じループで扱う。
+- **Build vs Adopt**: 標準の Lua の `setmetatable`・`rawget`・`table.remove` で足りる。イベントのライブラリ（優先度付きのディスパッチャなど）は、要件が「新しい順・真で止める」だけなので取らない。
+- **Simplification**: 専用の鎖を空にする口・鎖の列挙の口・優先度・見張り役・数の上限・新しいモジュール（Option B）を作らない。型判定の枝を関数に切り出すこともしない（`chain-talk-interrupt` の持ち場の行を動かさないため）。`EVENT.fire` は `act`・`result` の 2 つの変数をループと底で埋め、今の枝がそれを読む形にする。
+
+## Design Decisions（2026-10-23）
+
+### Decision: `EVENT.fire` の変える行の範囲
+
+- **Context**: ハンドラごとに act を作る（要件 2.9）には、今の L229 `local act = create_act(req)` をループの中へ移す必要がある。棚卸の約束は L231〜236。
+- **Selected Approach**: L228〜236 をまとめて替え、L238〜255 の型判定の枝は 1 行も動かさない。
+- **Trade-offs**: 約束より 2 行広いが、`chain-talk-interrupt` の持ち場（型判定の枝・`EVENT.drive`）とは重ならない。設計ディスカッションで確かめる（design.md の OPEN QUESTION 1）。
+
+### Decision: `REG.register = 関数` を守らない
+
+- **Context**: 生のキーが `__index` より先に引かれるため、代入すると `REG:register` が隠れる。
+- **Alternatives**: (1) 守らない（2）`__newindex` で `register` への代入をエラーにする。
+- **Selected Approach**: (1)。要件 1.6（代入を今と同じに働かせる）を優先し、`register` という ID の底を置く作者はまず居ないので、内部の説明に書くだけにする（design.md の OPEN QUESTION 2）。
+
+## Risks & Mitigations（設計）
+
+- 鎖を残したまま後のスイートが走る — 新しいテストが外す関数で後片付けする。
+- `event/init.lua` を同じウェーブの 2 本と共有 — 変える行を L228〜236 に閉じ、後から入る側が rebase で合わせる。
+- 生成の references の古さで CI が落ちる — マニュアルを直したタスクで `gen-skill-refs.mjs` を走らせ、`--check` を通す。
