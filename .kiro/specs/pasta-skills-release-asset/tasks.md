@@ -24,7 +24,7 @@
   - 完了の姿: 通しの実行で段の番号が 1〜8 で並び、まとめに `pasta-skills.zip` の場所が出る。`release.bat` の説明が 8 段の並びを示す
   - _Requirements: 2.1, 2.5, 2.8, 2.9_
 
-- [ ] 2.3 手元のリリースビルドで通しの確かめをする
+- [x] 2.3 手元のリリースビルドで通しの確かめをする
   - pwsh から `release.ps1` を直に通し、`release\` に 4 つの配布物ができ、まとめに `Skills Zip:` が出ることを確かめる
   - `pasta-skills.zip` を展開し、最上位が 3 つのフォルダと `LICENSE` だけで、各フォルダを `.claude/skills/<名前>/` と `diff -r` して差が無く、`LICENSE` がルートと同じバイト列で、エントリに `\` が無いことを確かめる
   - `pasta.dll.zip`・`hello-pasta.nar`・`pasta_check.zip` の中身の名前の一覧が、1 の記録（`target\pasta-skills-release-asset-baseline\assets-before.txt`）と同じことを確かめる
@@ -104,3 +104,4 @@
 ## Implementation Notes
 
 - 段の行を `powershell.exe -NoProfile -Command -` に流して 5.1 で走らせるときは、入力の末尾に空行を置く（無いと最後の文が走らない）
+- 2.3: pwsh 直の通し・`-SkipSetup`・失敗の道・5.1 の同一性はすべて確認済み。`release.bat`（`-ExecutionPolicy Bypass`）での通しは開発者の確かめに回した
