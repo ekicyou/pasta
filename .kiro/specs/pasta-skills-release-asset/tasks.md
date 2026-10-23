@@ -37,7 +37,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.8, 2.9_
 
 - [ ] 3. リリース CI の配線
-- [ ] 3.1 (P) リリース CI の build の job で照合し、pasta-skills.zip を検査して渡す
+- [x] 3.1 (P) リリース CI の build の job で照合し、pasta-skills.zip を検査して渡す
   - 「Setup Node」の直後に「Check generated skill references」の step（`node book/tools/gen-skill-refs.mjs --check`）を、タグの時点の鮮度を保証する理由の注釈付きで足す
   - リリースビルドの段の名前に `pasta-skills.zip` を足し、実行の行は変えない。冒頭の説明を「5 つの配布物」にする
   - 配布物の検査の `pasta_check.zip` の項目の後に、`pasta-skills.zip` の項目を足す: 必須の名前（3 つの `SKILL.md` と `LICENSE`）、タグのコミットの木（`git ls-tree -r --name-only HEAD`）から取った期待の一覧との過不足（大文字と小文字を区別）、`\` を含むエントリ、をそれぞれ `$errors` に積む
