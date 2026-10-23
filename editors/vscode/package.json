@@ -314,7 +314,7 @@
         "@types/node": "^20.0.0",
         "@types/vscode": "^1.85.0",
         "@vscode/vsce": "^3.0.0",
-        "esbuild": "^0.24.0",
+        "esbuild": "^0.28.2",
         "eslint": "^10.4.1",
         "typescript": "^5.5.0",
         "typescript-eslint": "^8.61.0",
