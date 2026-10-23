@@ -6,7 +6,7 @@
 
 use crate::common::create_sakura_test_runtime_with_config;
 use pasta_lua::loader::TalkConfig;
-use pasta_lua::sakura_script::tokenizer::{TokenKind, Tokenizer};
+use pasta_lua::sakura_script::tokenizer::{CharSets, TokenKind, Tokenizer};
 
 // ============================================
 // 特性化テスト 1: 既定の chars_* の各文字の種類
@@ -109,4 +109,45 @@ fn test_mixed_talk_output_with_budoux_is_fixed() {
         r"こ\_w[50]ん\_w[50]に\_w[50]\nち\_w[50]は\_w[50]、\_w[450]\n世\_w[50]界\_w[50]。\_w[950]\nH\_w[50]e\_w[50]l\_w[50]l\_w[50]o\_w[50],\_w[450] \_w[50]p\_w[50]a\_w[50]s\_w[50]t\_w[50]a\_w[50] \_w[50]1\_w[50]2\_w[50]3\_w[50]!\_w[450]\h｡．\n.，,？！\n!?\_w[950]･\_w[150]・\_w[150]‥\_w[150]…\_w[150]\s[0]\nﾞ゛゜ヽヾゝゞ々ー）］｝」』):;]}｣､ｰ\s[10]ﾟ\n（［｛\n「『([{｢ｱ\_w[50]ｲ\_w[50]ｳ\_w[50]ｴ\_w[50]ｵ\_w[50]\あ\_w[50]漢\_w[50]字\_w[50]で\_w[50]す\_w[50]"
     );
     assert_eq!((line, width, jump), (9, 24, false));
+}
+
+// ============================================
+// 文字の種類の判定（CharSets::classify をクラスタの文字列で直接呼ぶ）
+// ============================================
+
+const WOMAN_GESTURING_OK: &str = "\u{1F646}\u{200D}\u{2640}\u{FE0F}"; // 🙆‍♀️
+
+/// 要件 3.2・3.7: 複数コードポイントの項目は全体で当たり、その部品も単独で当たる。
+#[test]
+fn test_classify_multi_codepoint_item_and_its_parts() {
+    let config = TalkConfig {
+        chars_period: format!("。{WOMAN_GESTURING_OK}"),
+        ..TalkConfig::default()
+    };
+    let sets = CharSets::from_config(&config);
+    assert_eq!(sets.classify(WOMAN_GESTURING_OK), TokenKind::Period);
+    assert_eq!(sets.classify("\u{2640}"), TokenKind::Period);
+    assert_eq!(sets.classify("。"), TokenKind::Period);
+}
+
+/// 要件 3.3: 2 つ目以降のコードポイントでは種類を決めない。
+#[test]
+fn test_classify_ignores_non_first_codepoints() {
+    let config = TalkConfig {
+        chars_period: "\u{2640}\u{FE0F}".to_string(),
+        ..TalkConfig::default()
+    };
+    let sets = CharSets::from_config(&config);
+    assert_eq!(sets.classify(WOMAN_GESTURING_OK), TokenKind::General);
+}
+
+/// 要件 3.6: 全体で外れたら、先頭のコードポイントで判定する（`❗️` = `❗` + U+FE0F）。
+#[test]
+fn test_classify_falls_back_to_first_codepoint() {
+    let config = TalkConfig {
+        chars_strong: "\u{2757}".to_string(),
+        ..TalkConfig::default()
+    };
+    let sets = CharSets::from_config(&config);
+    assert_eq!(sets.classify("\u{2757}\u{FE0F}"), TokenKind::Strong);
 }
