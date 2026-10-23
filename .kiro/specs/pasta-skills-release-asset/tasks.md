@@ -93,7 +93,7 @@
   - _Depends: 2.2_
   - _Requirements: 7.1, 7.2_
 
-- [ ] 6. 全体の確かめ
+- [x] 6. 全体の確かめ
   - `release-scripts-test.ps1`・`node book/tools/gen-skill-refs.mjs --check`・`link-check.mjs` をまとめて走らせ、すべて通ることを確かめる
   - リポジトリを `4/4`・`n/4`・`/7]`・「添付 5 つ」・「配布物 4 つ」など、GitHub Release の添付と配布物の総数を指す古い言い方で grep し、本仕様の範囲（完了 spec と過去の記録を除く）に残りが無いことを確かめる。「4 つ」は文脈で判断する（`release.ps1` が `release/` に作る物は変更後も 4 つで正しい）
   - `git diff main --stat` で、`build.yml`・gate・段 3〜5 の中身・公開系の job の行を変えていないことを確かめる
