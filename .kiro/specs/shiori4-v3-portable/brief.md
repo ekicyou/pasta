@@ -83,7 +83,10 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
 
 ## Upstream / Downstream
 
-- **Upstream**: shiori4（`shiori4_abi` の版 3 の取り決め。0.0.1 で公開済みなので、shiori4 の Phase 2 の spec を待たずに始められる）
+- **Upstream**: shiori4（`shiori4_abi` の版 3 の取り決め。0.0.1 で公開済みなので、shiori4 の Phase 2 の spec を待たずに始められる）。ただし次の 3 つは、2026-10-23 時点で shiori4 の開発者の裁定待ちである。要件の前に結果を確かめる
+  - 版 3 ではホストのテーブルが NULL なので、`load` の失敗の理由をどこに出すか
+  - 同じ DLL が SHIORI/3.0 の書き出し（`load`・`request`・`unload`）と `shiori_get_api` の両方を持つとき、ホストはどちらを先に見るか（pasta は両方を出す）
+  - Windows 以外のファイル名（`descript.txt` の `shiori,pasta.dll` に対して `pasta.so`・`libpasta.so`・`.dylib` のどれを探すか。areka の arch ごとの名前 `pasta.x64.dll` などと一緒に決まる）。ビルドの出力名がこれで決まる
 - **Downstream**: `shiori4-v4-host`（この spec の入口と実行器の上に、版 4 を足す）。areka（Windows 以外で pasta を読む）
 
 ## Existing Spec Touchpoints
