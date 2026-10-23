@@ -142,3 +142,10 @@
 - `shiori/event/init.lua` の `EVENT.fire` の、act を作ってハンドラを呼ぶ所が、鎖のループ（ハンドラごとに `create_act` と `STOP.hold_handler`）と底の `rawget(REG, req.id) or EVENT.no_entry` に変わった。冒頭の説明も伸びたので、このファイルの行番号は測り直す。型判定の枝・`set_co_scene`・`EVENT.drive` には触れていない。
 - `event/register.lua` の `REG` にメタテーブル（`__index` の `register` と、欄 `handlers`）が付いた。`REG` を空にするテストは、`package.loaded` から読み直せば鎖も空になる。
 - 参照: `.kiro/specs/completed/reg-handler-chain/design.md` の「File Structure Plan」「Components and Interfaces」。
+
+## 申し送り（chain-talk-interrupt より、2026-10-23 の完了時）
+
+- 前の申し送り（2026-10-20）の「`＊チェイントーク中断` を割り込んだシーンの台詞の前に添える」は設計で改めた。中断の台詞は反応の**代わりに**出る（優先）。中断の台詞が出た回は、割り込んだシーンが区切った残りも捨て、続きを残さない。
+- 続きを捨てるのは 3 つだけになった: 台詞（字のある `talk` か `choice`）を出した割り込み・指名した再生（キックと `OnPastaScene`・`OnPastaSceneAt`。`STORE.co_preempt` の印）・エラー。台詞を出さないシーンや、台詞を出さずにコールバック待ちに入ったシーンは、待っている続きに触れない。
+- 仕組み: `shiori/event/init.lua` の `set_co_scene(co, keep)`・`drive_kind(co)`・`run_interrupt_scene(act)`・`EVENT.drive`（種類を決める → act の欄 `_spoke`・`_on_speech`・`_interrupted` を整える → 再開 → 欄を外す → 台詞の印を読む）。台詞の判定は `sakura_builder.lua` の `BUILDER.speaks`、印は `shiori/act.lua` の `SHIORI_ACT_IMPL.build` が立てる。詳しくは `.kiro/specs/completed/chain-talk-interrupt/design.md` の「続きの決まり」と ContinuationRule。
+- 見直しが要る論点: 4 番の整理（`coroutine.close` の死んだ分岐・`STORE.co_callback`）で、`set_co_scene` の `keep` の引数と `_interrupted` の枝（`set_co_scene(nil, false)`）を保つこと。brief の L70 の案（`if consume_staged then co = nil end; set_co_scene(co)`）はもう今の形に合わない。`EVENT.drive` の手順の順は `tests/lua_specs/chain_talk_interrupt_test.lua` が守っている。

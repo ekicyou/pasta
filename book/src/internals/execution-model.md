@@ -92,7 +92,7 @@ pasta.failure ──→ （@pasta_log・pasta.config を報告の時点で読む
 | `pasta.act`・`pasta.shiori.act` | シーン関数が第 1 引数で受け取る ACT。トークの蓄積、名前の解決（`call`・`word` など）、`yield`。`pasta.shiori.act` は `pasta.act` を継承し、`build` をさくらスクリプトの生成に差し替え、`get_property` などの SHIORI 固有のメソッドを加える |
 | `pasta.global` | 利用者が関数を足すグローバル関数の表。`yield` と `チェイントーク` を最初から持つ |
 | `pasta.save` | 永続化データの表。`require` された時点で 1 回だけ `@pasta_persistence.load()` を呼び、その結果を返す |
-| `pasta.shiori.event` | `EVENT.fire` と `EVENT.drive`。`EVENT.fire` はハンドラの戻り値を応答にする。`EVENT.drive` はシーンコルーチンの再開の手順（出力が出るまで再開 → 予約の消費 → `STORE.co_scene` の更新）の持ち主で、`EVENT.fire`・`CALLBACK.try_route`・`CALLBACK.sweep` のすべてがこれを使う |
+| `pasta.shiori.event` | `EVENT.fire` と `EVENT.drive`。`EVENT.fire` はハンドラの戻り値を応答にする。`EVENT.drive` はシーンコルーチンの再開の手順（割り込みの種類の判定 → 出力が出るまで再開 → 予約の消費 → 種類と台詞の有無による `STORE.co_scene` の更新）と、中断のシーンの流し方（`run_interrupt_scene`）の持ち主で、`EVENT.fire`・`CALLBACK.try_route`・`CALLBACK.sweep` のすべてがこれを使う |
 | `pasta.shiori.event.callback` | `get_property` のコールバック待ちのコルーチンを、待っているイベント名ごとに持つ。一致したコールバックの再開（`try_route`）と期限切れの掃引（`sweep`）を行い、再開そのものは `EVENT.drive` に任せる |
 | `pasta.shiori.stop` | 止まるエラーの控えと表記付きの応答。`EVENT.drive`・`EVENT.fire` が要求ごとに 1 つずつ控えた act とエラーの値から、`SHIORI.request` と `CALLBACK.sweep` の求めで表記付きの応答を作る（[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)） |
 
@@ -105,7 +105,7 @@ ACT・STORE・PROXY・SCENE・SAVE の内部構造は [Lua ランタイム内部
 | 持ち主 | 持つもの | 寿命 |
 | ------ | -------- | ---- |
 | 再開する側のローカル変数（`EVENT.fire`・`CALLBACK.try_route`・`CALLBACK.sweep`） | ハンドラが返したコルーチン、または `CALLBACK.pending` から外した待機のコルーチン | `EVENT.drive` での再開が終わるまで |
-| `STORE.co_scene` | 中断した（`suspended` の）継続待ちのコルーチン 1 つ、または `nil` | 次にシーンを再開するまで（コルーチンを返すイベント・コールバック・掃引のどれでも） |
+| `STORE.co_scene` | 中断した（`suspended` の）継続待ちのコルーチン 1 つ、または `nil` | 仮想イベントの OnTalk で再開されるか、別のシーンの再開の結果で捨てられるまで（台詞を出した割り込み・指名した再生・エラー。[続きの決まり](#継続トークチェイントークと-co_scene-の更新)） |
 | `CALLBACK.pending[イベント名]` | `get_property` のコールバックを待つコルーチン | 該当するコールバックが届くか、タイムアウトで掃引されるまで |
 
 `STORE.co_callback` は、`CALLBACK.consume_staged` がコールバック待ちとして登録したコルーチンを、`EVENT.drive` の直後の `set_co_scene` に知らせるための印である。`set_co_scene` は、渡されたコルーチンがこの印と一致したときだけ `nil` に戻す。`act:get_property` は予約（`stage_pending`）の直後に必ず get タグを出力として中断するため、`consume_staged` が登録するコルーチンは suspended であり、続く `set_co_scene` が印を `nil` に戻す（予約の後、中断の前にエラーで終わった場合は `consume_staged` を呼ばず、`discard_staged` が予約を捨てる）。したがって `EVENT.drive` を抜けた時点で印は常に `nil` である。
@@ -214,20 +214,30 @@ return coroutine.create(wrapped_fn)
 
 ```text
 EVENT.drive(co, act, ...)
- 1. ok, value = resume_until_valid(co, ...)   ... は最初の resume にだけ渡す
- 2. ok が偽 → STOP.hold(co, value)             止まったコルーチンの act とエラーの値を控える
+ 1. kind = drive_kind(co)                      再開の前に割り込みの種類を決める（後述）
+ 2. target = FAILURE.act_of(co) or act         target._spoke = nil・target._interrupted = nil
+                                               kind が "interrupt" なら target._on_speech = run_interrupt_scene
+ 3. ok, value = resume_until_valid(co, ...)   ... は最初の resume にだけ渡す
+ 4. scene_act = FAILURE.act_of(co) or act      target と scene_act の _on_speech を nil に戻す（成否によらず）
+ 5. ok が偽 → STOP.hold(co, value)             止まったコルーチンの act とエラーの値を控える
              CALLBACK.discard_staged()        中断の前にエラーで終わったシーンの予約を捨てる
-             set_co_scene(co)                 co は dead。STORE.co_scene も空になる
+             set_co_scene(co, false)          co は dead。STORE.co_scene も空になる
              return false, value
- 3. CALLBACK.consume_staged(co, act)           予約があれば待機として登録（後述）
- 4. set_co_scene(co)
- 5. return true, value
+ 6. CALLBACK.consume_staged(co, act)           予約があれば待機として登録（後述）
+ 7. spoke = scene_act._spoke                   印が nil（組み立てていない）なら value が nil でも "" でもないか
+ 8. scene_act._interrupted が真 → set_co_scene(nil, false)
+    それ以外                    → set_co_scene(co, kind == "interrupt" and not spoke)
+ 9. return true, value
 ```
 
-- 応答の文字列は作らない。エラーを投げるか、続けるかも決めない。どちらも呼び出し元が決める。2 の `STOP.hold` は控えるだけで、控えから表記付きの応答を作るのは `SHIORI.request` と `CALLBACK.sweep` である（[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)）。
-- 3 と 4 の間には他の処理を挟まない。予約の消費と継続の更新は必ず組で行われる。
+- 応答の文字列は作らない。エラーを投げるか、続けるかも決めない。どちらも呼び出し元が決める。5 の `STOP.hold` は控えるだけで、控えから表記付きの応答を作るのは `SHIORI.request` と `CALLBACK.sweep` である（[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)）。
+- 1 は再開の前に行う。再開の中で `STORE.co_scene` が変わる前の状態で種類を決めるためである。
+- 2 の `target` は、新しく始まるシーンではまだ `FAILURE.act_of(co)` が無いので、最初の `resume` に渡す ACT になる（`EVENT.fire` は `EVENT.drive(result, act, act)` と呼ぶので、シーンが積む ACT と同じ）。4 の `scene_act` は、再開の中で `init_scene` が記録した ACT である。印の意味は [台詞の印と中断のシーン](#台詞の印と中断のシーン) で扱う。
+- 4 で欄の関数を外すのは、失敗の後に `STOP.response` が `act:build()` を呼んでも、中断のシーンを動かさないためである。
+- 6 から 8 の間には、台詞の印を読むこと（7）のほかに処理を挟まない。予約の消費と継続の更新は必ず組で行われる。6 を先に行うのは、`set_co_scene` が `STORE.co_callback` で待ちに入ったかを見るためである。
+- 7 で ACT の印が無いのは、ACT を通らない素のコルーチン（テストやゴーストが Lua で作ったもの）である。出力が空でなければ台詞に数える。
 - `act` は、`get_property` で中断したときに待機へ登録する ACT である。`EVENT.fire` ではそのイベントの ACT、`try_route`・`sweep` では待機を登録したときの ACT（`entry.act`）を渡す。
-- `resume_until_valid` と `set_co_scene` は `init.lua` のローカル関数である。`callback.lua` は `EVENT` を呼び出し時に `require` して `EVENT.drive` を使う（読み込み時に `require` すると循環する）。
+- `resume_until_valid`・`drive_kind`・`set_co_scene`・`run_interrupt_scene` は `init.lua` のローカル関数である。`callback.lua` は `EVENT` を呼び出し時に `require` して `EVENT.drive` を使う（読み込み時に `require` すると循環する）。
 
 ### 再開のループ（resume_until_valid）
 
@@ -256,25 +266,101 @@ loop
 
 `act:yield()`（`ACT_IMPL.yield`）は、それまでのトークを `build()` して `coroutine.yield` に渡す。DSL の `＞yield` は Call の検索で ACT のメソッド `yield` に、`＞チェイントーク` は `GLOBAL["チェイントーク"]`（`GLOBAL.yield` と同じ関数）に解決され、どちらも `act:yield()` になる（[ローカル優先の検索順](registry-search.md#ローカル優先の検索順)）。自動トークを止めている間（`STORE.auto_talk_paused`）に呼ばれたときは、先にログへ警告を 1 行出して `GLOBAL.resume_auto_talk` を呼び、その後は同じく区切る。
 
-`EVENT.drive` は再開の後、`set_co_scene(co)` で `STORE.co_scene` を更新する。呼び出し元が `EVENT.fire`・`CALLBACK.try_route`・`CALLBACK.sweep` のどれでも同じ規則である。
+`EVENT.drive` は、再開の前に `drive_kind(co)` で割り込みの種類を決め、再開の後に台詞の印を読んで `set_co_scene(co, keep)` で `STORE.co_scene` を更新する。呼び出し元が `EVENT.fire`・`CALLBACK.try_route`・`CALLBACK.sweep` のどれでも、イベントの種類が何でも同じ規則である。利用者から見た決まりは [続きが捨てられるとき](../grammar/call-jump.md#続きが捨てられるとき) と [チェイントーク中断](../grammar/call-jump.md#チェイントーク中断) が正であり、ここではそれを実現する仕組みだけを書く。
 
 ```text
-set_co_scene(co)
+drive_kind(co)                       判定の順はこのとおり
+  STORE.co_scene が nil         → "none"       待っている続きが無い
+  co == STORE.co_scene          → "resume"     待っている続きそのものの再開
+  STORE.co_preempt[co] が真     → "preempt"    開発者が指名した再生（キック・シーン再生）
+  それ以外                      → "interrupt"  続きを待っている間の割り込み
+
+set_co_scene(co, keep)
  1. co が suspended でなければ co = nil として扱う（dead のコルーチンは残さない）
- 2. co が STORE.co_callback と同じなら（コールバック待ちとして登録済み）
+ 2. keep が真なら STORE.co_scene には触れずに終わる。co が STORE.co_callback と同じなら
+      印だけ nil に戻す（co は CALLBACK.pending が持つ）。それ以外の co の残りは
+      どこにも置かないので捨てられる
+ 3. co が STORE.co_callback と同じなら（コールバック待ちとして登録済み）
       STORE.co_scene が別のコルーチンなら破棄し、STORE.co_scene = nil、
       STORE.co_callback = nil として終わる
- 3. STORE.co_scene と co が同じなら何もしない（継続中のコルーチンがまだ続く）
- 4. STORE.co_scene があれば破棄する
- 5. STORE.co_scene = co
+ 4. STORE.co_scene と co が同じなら何もしない（継続中のコルーチンがまだ続く）
+ 5. STORE.co_scene があれば破棄する
+ 6. STORE.co_scene = co
 ```
+
+`STORE.co_scene` をランタイムの中で書くのは `set_co_scene` だけである（`STORE.reset` も `nil` に戻す）。`STORE.co_preempt` は、キーを弱い参照にした表（`table<thread, true>`）で、指名した再生のコルーチンに付ける「はっきり捨てる」の印である。付けるのは `kick.lua` の `wrap_local_func`・`wrap_reload_func` が作るコルーチンと、`scene_play.lua` の `OnPastaScene`・`OnPastaSceneAt` が返すコルーチンだけで、読むのは `drive_kind` だけである。印はコルーチンごとに 1 つで消さないため、キックのシーンがコールバック待ちから戻った回も "preempt" になる。キックのシーンが区切って続きになった後は、`co == STORE.co_scene` が先に当たるので "resume" になる。
+
+`EVENT.drive` の 8 は、種類と再開の結果から次のように `STORE.co_scene` を決める。「台詞」は 7 の `spoke`、「中断」は `run_interrupt_scene`（[台詞の印と中断のシーン](#台詞の印と中断のシーン)）である。
+
+| 種類 | 再開の結果 | 呼び出し | `STORE.co_scene` | 中断 |
+| ---- | ---------- | -------- | ---------------- | ---- |
+| `resume` | エラーでない | `set_co_scene(co, false)` | `co` の結果で置き換える（区切れば `co`、終われば `nil`） | 動かさない |
+| `none` | エラーでない | `set_co_scene(co, false)` | 区切れば `co` の残りが続きになる | 動かさない |
+| `preempt` | エラーでない | `set_co_scene(co, false)` | 待っている続きを捨てる。区切れば `co` の残りが続きになる | 動かさない |
+| `interrupt` | 台詞あり・中断の台詞を出した（`_interrupted`） | `set_co_scene(nil, false)` | `nil`。`co` が区切っていても残りは捨てる | 反応の代わりに出す |
+| `interrupt` | 台詞あり・中断が `nil` を返した | `set_co_scene(co, false)` | 待っている続きを捨てる。区切れば `co` の残りが続きになる | 動かしたが出さない（反応をそのまま出す） |
+| `interrupt` | 台詞なし・最後まで動いた | `set_co_scene(co, true)` | 待っている続きを残す | 動かさない |
+| `interrupt` | 台詞なし・区切った | `set_co_scene(co, true)` | 待っている続きを残す。`co` の残りは捨てる | 動かさない |
+| `interrupt` | 台詞なし・コールバック待ちに入った | `set_co_scene(co, true)` | 待っている続きを残す。`co` は `CALLBACK.pending` が持つ | 動かさない |
+| どれでも | エラー | `set_co_scene(co, false)` | `co` は dead なので `nil`。待っている続きも捨てる | 動かさない（エラーの前に動いていても応答に載らない） |
 
 この規則から次のことが成り立つ。
 
-- 中断したコルーチンは `STORE.co_scene` に 1 つだけ残る。シーンを再開するたびに（コルーチンを返すイベント・コールバック・掃引）、そのコルーチンの結果で置き換わる。再開したシーンが最後まで動いて終わった場合も、古い継続は破棄されて `nil` になる。
-- 継続を再開するのは仮想イベントの OnTalk だけである。`check_talk`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua`）は、トークの時刻に達したとき `STORE.co_scene` があれば新しいシーンを探さずにそれを返す。OnHour とシーンキックは OnTalk より先に判定され、返したコルーチンが継続を置き換える。自動トークを止めている間（`STORE.auto_talk_paused`）は `check_talk` まで進まないため、継続は再開されず、捨てられもしない。
+- 中断したコルーチンは `STORE.co_scene` に 1 つだけ残る。待っている続きを捨てるのは、待っている続きそのものの再開・指名した再生・台詞を出した割り込み・エラーのどれかである。台詞を出さない割り込み（何も積まないハンドラのシーン、表情の単語・さくらスクリプト・`get_property` の get タグだけを出すシーン）は、待っている続きを残す。捨てた続きは参照を外すだけで、再開されない。
+- 中断のシーンを動かすのは、種類が "interrupt" で、組み立てが台詞を見つけたときだけである。続きが無い回・続きの再開・指名した再生・台詞を出さない回では、中断のシーンを探しもしない。
+- 継続を再開するのは仮想イベントの OnTalk だけである。`check_talk`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua`）は、トークの時刻に達したとき `STORE.co_scene` があれば新しいシーンを探さずにそれを返す。外から起こした `OnTalk`（`EVENT.no_entry` が `SCENE.co_exec` で探したシーン）は、ほかのイベントと同じく "interrupt" である。OnHour は OnTalk より先に判定されるが、`check_hour` が `SCENE.co_exec` で探したコルーチンに印は無く、ふつうの割り込みとして扱われる（時報のシーンが台詞を出せば続きを捨てる）。シーンキックは印の付いたコルーチンを返すので "preempt" になる。自動トークを止めている間（`STORE.auto_talk_paused`）は `check_talk` まで進まないため、継続は再開されず、捨てられもしない。
 - 文字列か `nil` を返すハンドラ（`REG` の関数など）は `STORE.co_scene` を変えない。
-- シーンの実行中にエラーが起きると、そのコルーチンは dead になり、`set_co_scene` で既存の継続も破棄される。エラーは、`EVENT.fire` と `CALLBACK.try_route` の経路では `SHIORI.request` の `xpcall` へ伝わり、`CALLBACK.sweep` では応答の候補になる（後述）。
+- シーンの実行中にエラーが起きると、そのコルーチンは dead になり、`set_co_scene(co, false)` で既存の継続も破棄される。中断のシーンのエラーも、割り込んだシーンのコルーチンの中で投げ直されるので、同じ枝を通る。エラーは、`EVENT.fire` と `CALLBACK.try_route` の経路では `SHIORI.request` の `xpcall` へ伝わり、`CALLBACK.sweep` では応答の候補になる（後述）。
+
+### 台詞の印と中断のシーン
+
+台詞の有無と中断の流し方は、ACT の欄で `EVENT.drive` と組み立て（`SHIORI_ACT_IMPL.build`、`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`）の間を受け渡す。ACT のメソッドは足さない。
+
+| 欄 | 型 | 書く所 | 意味 |
+| -- | -- | ------ | ---- |
+| `_spoke` | `boolean\|nil` | `EVENT.drive` が再開の前に `nil`、`build` が `self._spoke or 台詞あり` | この再開の間に組み立てた出力に台詞があったか。`nil` は組み立てていない |
+| `_on_speech` | `(fun(act): table[]\|nil)\|nil` | `EVENT.drive` が "interrupt" のときに `run_interrupt_scene` を掛け、使う前の `build` と再開の後の `EVENT.drive` が外す | 台詞を見つけたときに呼ぶ、中断の流し方 |
+| `_interrupted` | `boolean\|nil` | `EVENT.drive` が再開の前に `nil`、`build` が差し替えたときに `true` | この再開で、中断の台詞を反応の代わりに出したか |
+
+```text
+SHIORI_ACT_IMPL.build(self)
+ 1. token = ACT.IMPL.build(self)                 まとめたトークン列（0 件なら nil）
+ 2. spoke = token ~= nil and BUILDER.speaks(token)
+    self._spoke = self._spoke or spoke           同じ再開の中では一度立てたら落とさない
+ 3. token が nil → return nil
+ 4. spoke で self._on_speech があれば
+      self._on_speech = nil                      呼ぶ前に外す（中断の組み立てから入れ子に呼ばせない）
+      head = on_speech(self)
+      head があれば token = head、self._interrupted = true
+ 5. BUILDER.build(token, …) で 1 回だけ文字列にする
+```
+
+- `BUILDER.speaks(groups)`（`sakura_builder.lua`）は、アクターのグループの中に、字が出る `talk`（`emits_text`。組み立ての段落の区切りと同じ判定）か `choice` があるかを返す。表情の単語（字が `\s[5]` だけの `talk`）・空の `talk`・`sakura_script`・`raw_script`（失敗の表記を含む）・`surface`・`wait`・`newline`・`clear`・`choice_timeout`・`spot`・`clear_spot` は数えない。`get_property` が出す get タグだけの回は台詞にならず、待つ前によけた台詞はまだ出していないので数えない。
+- 4 で差し替えた割り込んだシーンのトークンは文字列にしないため、その表情・立ち位置は `STORE.appearance`・`STORE.actor_spots` に残らない。応答は中断の台詞だけの 1 本のスクリプトになる。
+- 素のコルーチンでも、渡された ACT に積んで `act:build()` するものは、組み立てが印を立てるので、ふつうのシーンと同じに数える。出力を自分で文字列にして返すコルーチンは印が立たず、`EVENT.drive` の 7 が出力の有無で決める。この場合、組み立てを通らないので中断の台詞は付かない。
+
+`run_interrupt_scene(act)` は、割り込んだシーンの組み立ての中（割り込んだシーンのコルーチンの中）で呼ばれ、`＊チェイントーク中断` を入れ子のコルーチンで 1 回だけ動かして、まとめたトークン列を返す。
+
+```text
+run_interrupt_scene(act)
+ 1. ico = SCENE.co_exec_exact("チェイントーク中断")       名前の完全一致。同名が複数ならふつうの選び方で 1 つ
+    無ければ return nil
+ 2. iact = SHIORI_ACT.new(STORE.actors, act.req)         割り込んだシーンの要求を持つ新しい ACT
+    iact.build = ACT.IMPL.build                          文字列にせず、まとめたトークン列で受け取る
+ 3. ok, groups = resume_until_valid(ico, iact)           出力の無い区切りを飛ばし、最初に出力のある区切りまで
+ 4. waited = CALLBACK.has_staged()
+    CALLBACK.discard_staged()                            中断の中の予約で割り込んだシーンを待ちに登録しない
+ 5. ok が偽 → iact.build = nil                           止まるエラーの表記をふつうの組み立てで作るため
+             FAILURE.bind(iact)                          止まった場所を中断のシーンとして控えさせる
+             error(groups, 0)                            割り込んだシーンのコルーチンの中で投げ直す
+ 6. waited → return nil                                  get タグも出さない
+ 7. return groups                                        nil なら中断の台詞は無い
+```
+
+- 名前は固定の文字列 `"チェイントーク中断"` で、設定や別名表の特別扱いは無い。ふつうのシーンとして DSL で書け、`pasta_check` も特別な名前として扱わない。
+- 中断のシーンのコルーチンは `EVENT.drive` を通らないため、`STORE.co_scene` にも `CALLBACK.pending` にも入らず、割り込みの判断にも関わらない。区切っても残りは参照を外すだけで捨てる。
+- 5 のエラーは `EVENT.drive` の失敗の枝 → `SHIORI.request` の `xpcall` → `STOP.response` の道を通る。表記の止まった場所は `＊チェイントーク中断` になり、中身は中断のシーンが止まるまでに積んだ出力と表記で、割り込んだシーンのその回の出力は載らない。待っている続きは失敗の枝で捨てる。
+- `STORE.last_global_scene` は中断のシーンの名前になる。選択肢の検索の親は Reference2 が持つので、戻さない。
 
 ### コールバック待ちとの関係
 
@@ -288,7 +374,8 @@ set_co_scene(co)
 EVENT.drive（どの呼び出し元から再開していても同じ）
   CALLBACK.consume_staged(co, act)   予約があれば pending[イベント名] = {co, act, …}
                                      STORE.co_callback = co
-  set_co_scene(co)                   co_callback と一致 → co_scene には入れず、印を nil に戻す
+  set_co_scene(co, keep)             co_callback と一致 → co_scene には入れず、印を nil に戻す
+                                     keep が偽なら co_scene も nil にする（keep が真なら触れない）
         ↓ 後のリクエスト
 EVENT.fire → CALLBACK.try_route(req)
   pending[req.id] があれば外して EVENT.drive(co, entry.act, Reference の配列)
@@ -297,7 +384,8 @@ EVENT.fire → CALLBACK.try_route(req)
 ```
 
 - コールバック待ちのコルーチンは `STORE.co_scene` に入らない。待っている間も、別のシーンの継続とは独立に保たれる。
-- コールバックで再開したシーンは、通常のイベントと同じ規則で扱われる。出力の無い中断は同じリクエストの中で進み、チェイントークで中断すれば `STORE.co_scene` に入って既存の継続を置き換え（次の自然なおしゃべり（仮想ディスパッチャが起こす OnTalk）の機会に続きが出る）、続けて `get_property` すれば新しい待機として登録される。最後まで終われば `STORE.co_scene` は空になる。
+- 待ちに入った回の `STORE.co_scene` は、[続きの決まり](#継続トークチェイントークと-co_scene-の更新)の表のとおりに決まる。get タグは台詞に数えないので、台詞を出さずに待ちに入った割り込みは待っている続きを残す（`keep` が真）。待っている続きそのものが待ちに入ったとき（"resume"）は `STORE.co_scene` を空にし、待っている間に次の自然なおしゃべりが同じコルーチンを再開しないようにする。続きが無い回・指名した再生の回も `keep` は偽なので空になる。
+- コールバックで再開したシーンは、戻った回の `EVENT.drive` で、通常のイベントと同じ規則で扱われる。待ちに入った回に続きを残していれば、戻った回の種類は "interrupt" になり、台詞を出せば続きを捨てて中断の台詞を流す。台詞を出さなければ続きは残る。指名した再生のコルーチンは印が残っているので "preempt" になる。出力の無い中断は同じリクエストの中で進み、チェイントークで中断すれば表のとおりに `STORE.co_scene` が決まり（続きになれば、次の自然なおしゃべり（仮想ディスパッチャが起こす OnTalk）の機会に続きが出る）、続けて `get_property` すれば新しい待機として登録される。
 - 再開したシーンのエラーは、`pending` にも `STORE.co_scene` にも残らず、`SHIORI.request` が応答にする（表記を出す設定で ID が `On` で始まる要求なら表記付きの `200 OK`、それ以外は 500。[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)）。
 - `req.id` と一致する待機が無ければ `try_route` は `nil` を返し、`EVENT.fire` は通常の振り分けに進む。掃引で外した待機に遅れて届いた結果も、この扱いになる。
 
@@ -374,8 +462,8 @@ VM の構築      register_persistence_module → persistence::register
 ## 不変条件と制約
 
 - VM は `PastaLuaRuntime` ごとに 1 つであり、1 つのスレッドだけが触る。`Lua::unsafe_new_with` の使用は、ライブラリの指定を検証済みの `RuntimeConfig` から作ることと、単一スレッドで使うことを前提にしている。
-- コルーチンを再開するのは `EVENT.drive`（`resume_until_valid`）だけであり、`EVENT.drive` を呼ぶのは `EVENT.fire`・`CALLBACK.try_route`・`CALLBACK.sweep` だけである。Rust 側はコルーチンを再開しない。
-- `STORE.co_scene` は、中断中のコルーチン 1 つか `nil` だけを持つ。コールバック待ちのコルーチンは `STORE.co_scene` に入らない。
+- コルーチンを再開するのは `resume_until_valid` だけであり、それを呼ぶのは `EVENT.drive` と、`EVENT.drive` の再開の中で中断のシーンを動かす `run_interrupt_scene` だけである。`EVENT.drive` を呼ぶのは `EVENT.fire`・`CALLBACK.try_route`・`CALLBACK.sweep` だけである。Rust 側はコルーチンを再開しない。
+- `STORE.co_scene` は、中断中のコルーチン 1 つか `nil` だけを持ち、ランタイムの中で書くのは `set_co_scene` だけである（`STORE.reset` も `nil` に戻す）。コールバック待ちのコルーチンと中断のシーンのコルーチンは `STORE.co_scene` に入らない。
 - 出力の無い中断（`nil` の `yield`）は、どの呼び出し元から再開した場合も同じリクエストの中で飛ばされる。
 - 継続したシーンは、最初の `resume` で受け取った ACT を使い続ける。イベントごとに作られる ACT は、新しく始まったシーンにだけ渡る。
 - 永続化されるのは `package.loaded["pasta.save"]` の表である。`act.save` に別の表を代入しても、その表は `Drop` では保存されない。
@@ -395,7 +483,7 @@ VM の構築      register_persistence_module → persistence::register
 - `crates/pasta_lua/src/runtime/`
 - `crates/pasta_lua/pasta_scripts/pasta/`
 
-本文で参照した主なファイルは次のとおりである。VM の構築は `crates/pasta_lua/src/runtime/mod.rs`・`crates/pasta_lua/src/runtime/factory.rs`・`crates/pasta_lua/src/runtime/module_registry.rs`、永続化は `crates/pasta_lua/src/runtime/persistence.rs`・`crates/pasta_lua/src/runtime/lifecycle.rs`・`crates/pasta_lua/pasta_scripts/pasta/save.lua`、イベントとコルーチンは `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/callback.lua`・`crates/pasta_lua/pasta_scripts/pasta/scene.lua`・`crates/pasta_lua/pasta_scripts/pasta/act.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`、失敗の報告は `crates/pasta_lua/pasta_scripts/pasta/failure.lua` にある。`SHIORI.request` を呼ぶ側は `crates/pasta_shiori/src/shiori.rs`、構築を呼ぶローダは `crates/pasta_lua/src/loader/mod.rs` である。
+本文で参照した主なファイルは次のとおりである。VM の構築は `crates/pasta_lua/src/runtime/mod.rs`・`crates/pasta_lua/src/runtime/factory.rs`・`crates/pasta_lua/src/runtime/module_registry.rs`、永続化は `crates/pasta_lua/src/runtime/persistence.rs`・`crates/pasta_lua/src/runtime/lifecycle.rs`・`crates/pasta_lua/pasta_scripts/pasta/save.lua`、イベントとコルーチンは `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/callback.lua`・`crates/pasta_lua/pasta_scripts/pasta/scene.lua`・`crates/pasta_lua/pasta_scripts/pasta/act.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`、台詞の判定は `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`、はっきり捨てる印は `crates/pasta_lua/pasta_scripts/pasta/store.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/scene_play.lua`、失敗の報告は `crates/pasta_lua/pasta_scripts/pasta/failure.lua` にある。`SHIORI.request` を呼ぶ側は `crates/pasta_shiori/src/shiori.rs`、構築を呼ぶローダは `crates/pasta_lua/src/loader/mod.rs` である。
 
 ## 経緯
 

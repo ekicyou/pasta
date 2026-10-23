@@ -5,12 +5,13 @@
 --- OnPastaSceneAt: Reference0 = ファイル（ghost/master/ からの相対パスか絶対パス）、Reference1 = 行（半角数字だけの 1 以上）
 ---
 --- デバッグが有効（@pasta_debug.enabled()）で、SecurityLevel が external でないときだけ働く。
---- 再生するときはコルーチンを返すだけにし、差し替え・1 ビート目・続き・実行時エラーは EVENT.fire に任せる。
+--- 再生するときはコルーチンに STORE.co_preempt の印（はっきり捨てる）を付けて返し、差し替え・1 ビート目・実行時エラーは EVENT.fire に任せる。
 --- 失敗では表記とログの警告を出して act:build() を返し、場面の続きを変えない。Status は見ない。
 --- ゴーストが先に登録していれば上書きしない。event/init.lua は require しない（循環させない）。
 
 local REG = require("pasta.shiori.event.register")
 local FAILURE = require("pasta.failure")
+local STORE = require("pasta.store")
 
 --- 門: デバッグが有効で external でなければ @pasta_debug を返す。断るときは warn を出して nil
 ---@param act ShioriAct
@@ -66,7 +67,10 @@ REG.OnPastaScene = REG.OnPastaScene or function(act)
     if local_name == "" then local_name = nil end
 
     local co, miss = require("pasta.scene").co_exec_exact(name, local_name)
-    if co then return co end
+    if co then
+        STORE.co_preempt[co] = true
+        return co
+    end
     local subject, warning = "＊" .. name, "global='" .. name .. "'"
     if miss == "local" then
         subject = subject .. " ・" .. local_name
@@ -98,7 +102,10 @@ REG.OnPastaSceneAt = REG.OnPastaSceneAt or function(act)
 
     local global_name, local_name = debug.scene_at(file, n)
     local co = global_name and require("pasta.scene").co_exec_registered(global_name, local_name)
-    if co then return co end
+    if co then
+        STORE.co_preempt[co] = true
+        return co
+    end
     return fail(act, {
         label = FAILURE.LABEL.SCENE_NOT_FOUND,
         subject = event .. " " .. file .. ":" .. line,

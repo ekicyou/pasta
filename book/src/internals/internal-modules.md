@@ -33,7 +33,8 @@ local STORE = require("pasta.store")
 | `local_words` | `table<string, table>` | グローバルシーン名 → { 単語キー → 値リストの配列 } | `pasta.word` の `create_local` のビルダー |
 | `actor_words` | `table<string, table>` | アクター名 → { 単語キー → 値リストの配列 } | `pasta.word` の `create_actor` のビルダー |
 | `app_ctx` | `table` | セッション中の汎用の表 | ACT の生成時に同じ表が `act.app_ctx` に入る |
-| `co_scene` | `thread\|nil` | 中断中の継続待ちのコルーチン | `pasta.shiori.event` の `set_co_scene`（[継続トーク（チェイントーク）と co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新)） |
+| `co_scene` | `thread\|nil` | 中断中の継続待ちのコルーチン。台詞を出さない割り込みでは残り、台詞を出した割り込み・指名した再生・エラーで捨てられる | ランタイムの中では `pasta.shiori.event` の `set_co_scene` だけが書き、`EVENT.drive` が種類と台詞の印で呼ぶ。`STORE.reset` も `nil` に戻す（[継続トーク（チェイントーク）と co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新)） |
+| `co_preempt` | `table<thread, true>` | 開発者が指名した再生（キック・シーン再生）のコルーチンの印（はっきり捨てる）。キーを弱い参照にした表で、捨てたコルーチンは GC で消える | `pasta.shiori.event.kick` の `wrap_local_func`・`wrap_reload_func` と、`pasta.shiori.event.scene_play` の `OnPastaScene`・`OnPastaSceneAt` が付ける。読むのは `pasta.shiori.event` の `drive_kind` だけ。`STORE.reset` が作り直す |
 | `last_global_scene` | `string\|nil` | 最後に `init_scene` したシーンテーブルの `__global_name__` | `ACT_IMPL.init_scene` だけが書く（Call から戻っても戻さない）。OnChoiceSelectEx の既定ハンドラが、Reference2 から選択肢を出したグローバルシーンが得られないときの、選択 ID の検索の親に使う |
 | `kick_pending` | `string\|nil` | 保留中のキック対象のシーン名 | `KICK.install` が書き、`KICK.try_dispatch` が消費する（[キックの保留と起動](debug.md#キックの保留と起動kicklua)） |
 | `kick_force` | `boolean` | キックの割り込み許可（既定 `false`） | `KICK.install` が立て、仮想イベントの `dispatch` の入口が 1 回で下ろす |
@@ -60,7 +61,7 @@ STORE.reset()
 ```
 
 - `co_scene` は、`coroutine.close` があり中断中なら閉じてから `nil` にする。LuaJIT 2.1 には `coroutine.close` が無いため、ランタイムでは閉じる処理は実行されず、参照を外すだけになる（[LuaJIT 2.1 の制約](execution-model.md#luajit-21-の制約)）。
-- `actors`・`actor_spots`・`scenes`・`app_ctx`・`counters`・`global_words`・`local_words`・`actor_words`・`appearance` を新しい空の表（`appearance` は空の 4 つの表を持つ表）にし、`last_global_scene`・`kick_pending` を `nil`、`kick_force`・`auto_talk_paused` を `false` にする。仮想イベントの時計は決め直さない。
+- `actors`・`actor_spots`・`scenes`・`app_ctx`・`counters`・`global_words`・`local_words`・`actor_words`・`appearance` を新しい空の表（`appearance` は空の 4 つの表を持つ表）にし、`last_global_scene`・`kick_pending` を `nil`、`kick_force`・`auto_talk_paused` を `false` にし、`co_preempt` をキーを弱い参照にした新しい表にする。仮想イベントの時計は決め直さない。
 - `@pasta_config` からの初期化はやり直さない。`actors`・`actor_spots` は空の表になる。
 - `co_callback` は変えない。コールバックの状態を消すのは `CALLBACK.reset()` である。
 - フィールドの表を新しい表に置き換えるため、すでに作られた ACT が持つ `act.app_ctx`・`act.actors` は古い表を指したまま残る。
