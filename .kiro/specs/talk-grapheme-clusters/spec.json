@@ -1,16 +1,16 @@
 {
   "feature_name": "talk-grapheme-clusters",
   "created_at": "2026-10-23T03:10:34Z",
-  "updated_at": "2026-10-23T03:17:13Z",
+  "updated_at": "2026-10-23T03:57:08Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {

@@ -182,3 +182,104 @@ Research Needed（設計で確かめる）:
 5. 公開 Rust API の扱い（5.4）と、0.4.2 のリリースノートでの書き方。
 6. `line_breaker.rs` のテストが増えて読みにくければ、テストの mod を別ファイルへ移す（中身を変えない移動）を最初のタスクにするか（brief の申し送り）。
 7. ファイルの重なり: `novel-talk-flow`（`wait_inserter.rs`・`line_breaker.rs`・`mod.rs`）と同じウェーブに置かない。`scene-anchor-link` とは、この spec が `mod.rs` を触らなければ重ならない。`lua-cmodule-robustness` とは `crates/pasta_lua/Cargo.toml` の別の行と `tech.md` の依存の表だけが重なる。
+
+---
+
+# 設計フェーズの調査と決定（2026-10-23）
+
+## 要約
+
+- 種別: 既存の仕組みの拡張（軽い発見の手順。`design-discovery-light`）。新しい依存は `unicode-segmentation` の 1 つ。
+- 読んだもの: `requirements.md`（要件ディスカッションの決定を含む）・`brief.md`・この文書の 1〜7 節・steering（`tech.md`・`structure.md`）・`tokenizer.rs`・`wait_inserter.rs`・`line_breaker.rs`・`mod.rs`・`budouy 0.2.2` の `parser.rs`・`deny.toml`・`about.toml`・`.github/workflows/build.yml`・`doc/release-notes/README.md`。
+- 使ったスキル: `kiro-spec-design`（規則: design-principles・design-discovery-light・design-synthesis・design-review-gate）、`kiro-validate-design`（design-review）。ドメインのスキル（`pasta-lua-coding`・`pasta-ghost-authoring`）は、Lua の API の形を変えないので読んでいない。
+- 主な結論:
+  - クラスタの切り方を `tokenizer.rs` の `next_cluster` 1 つにまとめ、2 つの切り出しが使う。ファイルは増やさない。
+  - `next_cluster` は、2 つ目以降のコードポイントの `\` の手前で必ず切る（単位の頭でも、単位にならない `\` でも）。
+  - `CharSets` は `HashSet<String>`。項目は「クラスタに分けた項目」＋「各コードポイント」。判定は「全体を全種類」→「先頭のコードポイントを全種類」→ 一般。
+  - 幅は「1 コードポイントと `\r\n` は今の数え方、それ以外は文字列の幅」。
+  - budoux は `parse_boundaries` の `char` の位置を、クラスタの先頭の位置と照合する。
+
+## 調査の記録
+
+### `\` で切る規則（申し送りの 1・3）
+
+- 試した（スクラッチパッドの `gc` の `examples/d.rs`。`unicode-segmentation 1.13.3`）。
+  - `\u{600}\あ` → `\u{600}`・`\`・`あ`（切らないと `\u{600}\` が 1 つになり、後ろのウェイトで `\\` ができる）。
+  - `\u{600}\h` → `\u{600}`・`\`・`h`（トークナイザでは `\` の位置で `\h` が単位として先に読まれる）。
+  - `\` ＋ ZWJ ＋ `x` → `\‍`・`x`。`\` ＋ U+0301 ＋ `a` → `\́`・`a`。`\\` → `\`・`\`（トークナイザでは `\\` はエスケープの単位として先に読まれる）。
+- 結論: 「単位の頭の `\` だけで切る」は不十分（単位にならない `\` を前のクラスタに入れると要件 2.6 を破る）。「どの `\` でも切る」が最小で正しい。
+- `\` ＋ 結合文字のクラスタは、今の出力と同じになる（今は `\`（ウェイトなし）＋ U+0301（ウェイト）＝ `\́\_w[…]`。直した後も `\́\_w[…]`）。単独の `\` の判定は「クラスタが `\` ちょうど」で、ウェイトの側と改行の側（決定 9）で同じにする。
+
+### 幅（申し送りの 4）
+
+- 試した: `\r\n` のクラスタの文字列の幅は 1、今の数え方（`\r`・`\n` の文字の幅の和）は 0。`🇯🇵🇺🇸` は 2・2。`❗️` は 2。`ｰﾞﾟ` は 1（今の和も 1）。
+- UAX #29 の GB4・GB5 により、制御文字が他の文字とつながるクラスタは `\r\n` だけ。
+- 結論: 1 コードポイントと `\r\n` は今の数え方、それ以外は `UnicodeWidthStr::width_cjk`。`\r\n` を 0 に保つのは前提（設計の OPEN QUESTION 3）。
+
+### budoux の区切りの写し（申し送りの 7 節の推奨）
+
+- `budouy 0.2.2` の `Parser::parse_boundaries(&str) -> Vec<usize>` は、`char` の位置の区切り（その位置の字の前で割る）を返す。`parse` は同じ区切りで語の文字列を作るだけ（`parser.rs` 29〜45 行）。
+- 結論: `parse_boundaries` に替え、クラスタの先頭の `char` の位置と照合する。語の文字列を作らずに済み、「捨てる」（要件 4.2）をそのまま書ける。本文は今と同じコードポイントの並びなので、1 コードポイントの台詞では区切りが今と同じ。
+
+### トークナイザと改行の側でクラスタがずれないか
+
+- `talk_to_script` の経路では、改行の側はウェイトの入った文字列を切り直す。ウェイトはクラスタの境界にしか入らず、`next_cluster` は `\` の手前で切るので、ウェイトの手前でクラスタが終わる。境界から切り始めた UAX #29 の結果は、元の文字列での結果と同じ（地域指示子の対も、境界から数え直せば同じ）。
+- 結論: 切り出しを 1 本にする（ギャップ分析の選択肢 C）必要は無い。共通の関数で足りる。
+
+### 文字の種類の判定の順（申し送りの 2）
+
+- 要件 3.6 の文言は「`chars_*` のどの項目とも全体では一致しないとき」。よって、全体の判定を全種類で先に見て、全部外れてから先頭のコードポイントを見る（種類ごとに全体 → 先頭、ではない）。
+- 決定 1 と決定 2 を重ねると、`chars_period = "🙆‍♀️"` のとき `🙆‍♂️` も先頭の `🙆` で句点に当たる。要件 3.3 は 2 つ目以降の部品だけを禁じるので、要件の文言には合う。2 段目を「書いたクラスタの項目」だけに絞る案は、既定の `ｰﾞﾟ` で台詞の `ｰﾞ`（1 クラスタ）が一般になる（今は `ｰ`・`ﾞ` とも行頭禁則）ので採らない。設計の OPEN QUESTION 1。
+- 気づいたこと: 要件 5.3 は今の出力を `ｶ\_w[…]ﾞ\_w[…]` と書くが、既定では `ﾞ` が行頭禁則（自分の値を持たない）なので、今は `ｶ\_w[…]ﾞ`。動きの約束は変わらない。設計の OPEN QUESTION 6。
+
+### 公開 API（申し送りの 5）
+
+- `CharSets`・`classify` の呼び出し元は、ワークスペースの中では `tokenizer.rs` と `edge_case_test.rs` の 2 行だけ（2026-10-23 に確かめた）。`pasta_check`・`pasta_lsp`・`pasta_shiori` は使っていない。
+- 結論: `classify(&str)` に置き換え、`classify(char)` は残さない（設計の OPEN QUESTION 2）。
+
+### 依存と配布（要件 8）
+
+- `deny.toml` と `about.toml` の許可に `MIT` があり、`unicode-segmentation`（`MIT OR Apache-2.0`）は設定を変えずに通る。純 Rust・依存なしで、x86・x64 で同じ動き。`build.yml` が 2 つのターゲットで `cargo test --all` と `cargo-deny` を回す。
+- `pasta_check` は `pasta_lua` に依存するので、`pasta_check.zip` の第三者ライセンスにも自動で載る（cargo-about）。
+
+### リリースノート（要件 5.3）
+
+- `doc/release-notes/README.md` は、見どころのファイルを版の更新（release スキルの段 4）で書くと決めている。本 spec は PR の本文に「動きが変わる点」を残す（設計の OPEN QUESTION 4）。
+
+### テストの置き場（申し送りの 6）
+
+- `structure.md` の目安は 1 ファイル 600 行未満。`tokenizer.rs` は 589 行、`line_breaker.rs` は 1,134 行（本体は約 290 行）。
+- 結論: 新しいテストは結合テストの新しいファイル `tests/sakura_script/grapheme_test.rs` に置く。公開の API（Lua の `@pasta_sakura_script`・`Tokenizer`・`CharSets`）から確かめられる。`line_breaker.rs` のテストの mod は移さない（設計の OPEN QUESTION 5）。
+
+## 統合（design-synthesis）
+
+- **一般化**: 2 つの切り出しの「1 コードポイントずつ進む」所は、どちらも「単位でない所の次の 1 文字」という同じ問い。`next_cluster` 1 つにまとめた。`classify` の 2 段も、1 コードポイントのときは 1 段と同じ結果になる 1 つの規則にした。
+- **作るか使うか**: クラスタの切り方は `unicode-segmentation` を使う（UAX #29 の全規則。手書きは国旗・ハングル・Prepend で漏れる）。幅は `unicode-width` の文字列の幅を使う。語の区切りは `budouy` の `parse_boundaries` を使う。自前で書くのは「`\` で切る」1 行と「`\r\n` は 0」1 行だけ。
+- **単純化**: 新しい型・新しいモジュール・設定のキーは足さない。クラスタは入力の `&str` のまま持つ。`mod.rs` と Lua は触らない。`classify(char)` の互換の関数も残さない。
+
+## 設計の決定
+
+### 決定: クラスタの切り出しは `tokenizer.rs` の `next_cluster` 1 つ
+
+- 代案: (1) 新しいファイル `grapheme.rs`、(2) 切り出しを 1 本にする（ギャップ分析の選択肢 C）。
+- 選んだもの: `tokenizer.rs` の `pub(crate) fn next_cluster`。`line_breaker.rs` から使う。
+- 理由: 規則は数行で、ファイルを増やすほどではない。選択肢 C は流れの組み替えが大きく、`vertical-balloon-lines` の数え直しに触れる。
+- 引き換え: `line_breaker.rs` → `tokenizer.rs` の依存が 1 つ増える（同じモジュールの中で、向きは一方だけ）。
+
+### 決定: `chars_*` の項目は「クラスタ」＋「各コードポイント」、判定は 2 段
+
+- 要件ディスカッションの議題 1・2 の決定どおり。判定の順は要件 3.6 の文言から「全体を全種類 → 先頭のコードポイントを全種類」。
+
+### 決定: 幅の規則
+
+- 1 コードポイントと `\r\n` は今の数え方、それ以外は文字列の幅。
+
+### 決定: 公開 API は置き換え
+
+- `CharSets` のフィールドは `HashSet<String>`、`classify(&str)`。`classify(char)` は残さない。
+
+## 危険と手当て
+
+- 1 コードポイントの台詞の出力が変わる見落とし — 特性化テスト（既定の `chars_*` の全文字・ひらがな・漢字・ASCII・単独の `\`・タグ・budoux の列の状態）を本体の変更より先に置く。
+- `unicode-segmentation`・`unicode-width` の版を上げたときの変化 — 退行テストが捕まえる。版を上げるのは Revalidation Triggers。
+- `wait_inserter.rs`・`line_breaker.rs` を触る spec（`novel-talk-flow`）との衝突 — 同じウェーブに置かない。
