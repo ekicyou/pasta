@@ -98,13 +98,22 @@ end
 --- LuaJIT 2.1 には coroutine.close が無いため、以下の close 分岐は実行されず、
 --- 破棄は参照を外すだけになる（破棄したコルーチンは GC が回収する）。
 --- @param co thread|nil コルーチンまたはnil
-local function set_co_scene(co)
+--- @param keep boolean 真なら待っている続きをそのまま残し、co の残りは捨てる
+local function set_co_scene(co, keep)
     -- 1. 引数検証（suspended以外はclose）
     if co and coroutine.status(co) ~= "suspended" then
         if coroutine.close then
             coroutine.close(co)
         end
         co = nil
+    end
+
+    -- 待っている続きを残す: co は待ちの表が持つか、どこにも置かずに捨てる
+    if keep then
+        if STORE.co_callback and co == STORE.co_callback then
+            STORE.co_callback = nil
+        end
+        return
     end
 
     -- NEW: コールバック登録済みコルーチン検出
@@ -134,6 +143,29 @@ local function set_co_scene(co)
 
     -- 4. 上書き（coはsuspendedまたはnil確定）
     STORE.co_scene = co
+end
+
+---@alias DriveKind "resume"|"none"|"preempt"|"interrupt"
+
+--- 再開の前に、このコルーチンの割り込みの種類を決める（判定の順はこのとおり）
+--- @param co thread
+--- @return DriveKind
+local function drive_kind(co)
+    if STORE.co_scene == nil then
+        return "none"
+    elseif co == STORE.co_scene then
+        return "resume"
+    elseif STORE.co_preempt[co] then
+        return "preempt"
+    end
+    return "interrupt"
+end
+
+--- 中断のシーンを動かして、まとめたトークン列を返す（まだ中断のシーンを探さない仮の形）
+--- @param _act table 割り込んだシーンの act
+--- @return table[]|nil
+local function run_interrupt_scene(_act)
+    return nil
 end
 
 --- nil yieldをスキップして有効値またはdead状態まで繰り返しresumeする
@@ -189,21 +221,48 @@ end
 --- @return boolean ok false ならシーンがエラーで終わった
 --- @return any value ok=true: 出力（nil は出力の無いまま終了）／ok=false: エラーの値
 function EVENT.drive(co, act, ...)
-    -- nil yieldをスキップ
+    local FAILURE = require("pasta.failure")
+    -- 1. 種類は再開の前に決める（再開の中で続きが変わる前の状態で判断するため）
+    local kind = drive_kind(co)
+    -- 2. 印を整える（新しいシーンはまだ act が記録されていないので、最初の再開に渡す act に掛ける）
+    local target = FAILURE.act_of(co) or act
+    if target then
+        target._spoke = nil
+        target._interrupted = nil
+        if kind == "interrupt" then
+            target._on_speech = run_interrupt_scene
+        end
+    end
+    -- 3. nil yieldをスキップ
     local ok, value = resume_until_valid(co, ...)
+    -- 4. 欄の関数は成否にかかわらずすぐ外す（後で STOP.response が build しても中断を動かさないため）
+    local scene_act = FAILURE.act_of(co) or act
+    if target then target._on_speech = nil end
+    if scene_act then scene_act._on_speech = nil end
     if not ok then
         -- 止まった場所の表記のため、失敗したコルーチンとエラーの値を控える
         STOP.hold(co, value)
         -- 予約の後、中断の前にエラーで終わったシーンの予約を残さない
         CALLBACK.discard_staged()
-        -- dead のコルーチンを渡し継続を空にする
-        set_co_scene(co)
+        -- 5. dead のコルーチンを渡し継続を空にする
+        set_co_scene(co, false)
         return false, value
     end
-    -- ステージング消費
+    -- 6. ステージング消費（待ちに入ったかを set_co_scene が STORE.co_callback で見るので先に行う）
     CALLBACK.consume_staged(co, act)
-    -- 状態保存（set_co_scene内部でstatus判断）
-    set_co_scene(co)
+    -- 7. 台詞の印が無い素のコルーチンは、出力が空でないかで決める
+    local spoke = scene_act and scene_act._spoke
+    if spoke == nil then
+        spoke = value ~= nil and value ~= ""
+    end
+    -- 8. 状態保存（set_co_scene内部でstatus判断）
+    if scene_act and scene_act._interrupted then
+        -- 中断の台詞が出たので、古い続きも co の残りも捨てる
+        set_co_scene(nil, false)
+    else
+        -- 台詞の無い割り込みだけが待っている続きを残す
+        set_co_scene(co, kind == "interrupt" and not spoke)
+    end
     return true, value
 end
 
