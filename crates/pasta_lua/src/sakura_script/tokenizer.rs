@@ -1,6 +1,6 @@
 //! Tokenizer for sakura script wait insertion.
 //!
-//! Breaks input text into tokens by character type for wait insertion.
+//! Breaks input text into units and grapheme clusters, classified by character type for wait insertion.
 
 use crate::loader::TalkConfig;
 use regex::Regex;
@@ -115,10 +115,17 @@ impl CharSets {
     }
 }
 
+/// 単位でない所の次のクラスタ。2 つ目以降のコードポイントの `\` の手前で切る（単位を食わせない）。
+pub(crate) fn next_cluster(s: &str) -> &str {
+    let cluster = s.graphemes(true).next().unwrap_or(s);
+    let cut = cluster.char_indices().skip(1).find(|&(_, c)| c == '\\');
+    &cluster[..cut.map_or(cluster.len(), |(i, _)| i)]
+}
+
 /// Tokenizer for sakura script text.
 ///
 /// Tokenizes input text by detecting sakura script tags first (priority),
-/// then classifying individual characters by their type.
+/// then classifying each extended grapheme cluster (`next_cluster`) by its type.
 pub struct Tokenizer {
     sakura_tag_regex: Regex,
     char_sets: CharSets,
@@ -141,7 +148,7 @@ impl Tokenizer {
     ///   3. タグ       `\` ＋（`[spb]` ＋ 数字 | `w` ＋ 1〜9 | `_` 0〜2 個 ＋ 名前の 1 文字 ＋ 任意の引数）
     ///
     /// 引数は `[` ARG (`,` ARG)* `]`（ARG は `sakura_tag_arg!`）。閉じなければ名前までがタグになる。
-    /// 名前の後ろの文字は一致に入らず、通常の文字として分類される（`\nHello` は `\n` ＋ `Hello`）。
+    /// 名前の後ろの文字は一致に入らず、クラスタとして分類される（`\nHello` は `\n` ＋ `Hello`）。
     /// 一致はすべて `TokenKind::SakuraScript` になるので、ウェイトは付かず、
     /// 改行推定では幅 0 として前の文字に付いて運ばれる。
     /// `(?s)` は `.` を改行にも一致させる（テキストに改行文字があっても囲みの読みが変わらない）。
@@ -188,7 +195,7 @@ impl Tokenizer {
     /// Tokenize input text.
     ///
     /// Sakura script tags are matched first (highest priority).
-    /// Other characters are classified individually.
+    /// Other text is split into grapheme clusters (`next_cluster`), one token per cluster.
     ///
     /// # Arguments
     /// * `input` - Input text to tokenize
@@ -212,16 +219,9 @@ impl Tokenizer {
                 continue;
             }
 
-            // Process single character
-            let remaining = &input[pos..];
-            if let Some(c) = remaining.chars().next() {
-                let text = c.to_string();
-                let kind = self.char_sets.classify(&text);
-                tokens.push(Token::new(kind, text));
-                pos += c.len_utf8();
-            } else {
-                break;
-            }
+            let cluster = next_cluster(&input[pos..]);
+            tokens.push(Token::new(self.char_sets.classify(cluster), cluster));
+            pos += cluster.len();
         }
 
         tokens

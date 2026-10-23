@@ -151,3 +151,65 @@ fn test_classify_falls_back_to_first_codepoint() {
     let sets = CharSets::from_config(&config);
     assert_eq!(sets.classify("\u{2757}\u{FE0F}"), TokenKind::Strong);
 }
+
+// ============================================
+// 単位でない所を書記素クラスタ 1 つずつ切り出す（要件 1.1・1.3・1.4・1.5・5.3）
+// ============================================
+
+fn tokenize(input: &str) -> Vec<(TokenKind, String)> {
+    Tokenizer::new(&TalkConfig::default())
+        .unwrap()
+        .tokenize(input)
+        .into_iter()
+        .map(|t| (t.kind, t.text))
+        .collect()
+}
+
+fn general(s: &str) -> (TokenKind, String) {
+    (TokenKind::General, s.to_string())
+}
+
+fn sakura(s: &str) -> (TokenKind, String) {
+    (TokenKind::SakuraScript, s.to_string())
+}
+
+#[test]
+fn test_zwj_emoji_is_one_token() {
+    assert_eq!(
+        tokenize(&format!("あ{WOMAN_GESTURING_OK}い")),
+        vec![general("あ"), general(WOMAN_GESTURING_OK), general("い")]
+    );
+}
+
+/// Prepend（U+0600）の後ろの `\` は単位の頭として残す。
+#[test]
+fn test_prepend_does_not_take_unit() {
+    assert_eq!(
+        tokenize("\u{600}\\h"),
+        vec![general("\u{600}"), sakura(r"\h")]
+    );
+    assert_eq!(
+        tokenize("\u{600}\\あ"),
+        vec![general("\u{600}"), general("\\"), general("あ")]
+    );
+}
+
+/// 単位の直後の結合文字は前の字につながらず単独のトークンになる。
+#[test]
+fn test_combining_after_unit_is_alone() {
+    assert_eq!(
+        tokenize("\\n\u{301}あ"),
+        vec![sakura(r"\n"), general("\u{301}"), general("あ")]
+    );
+}
+
+/// 単位にならない `\` には後ろの結合文字がつながる。
+#[test]
+fn test_lone_backslash_takes_combining_mark() {
+    assert_eq!(tokenize("\\\u{301}"), vec![general("\\\u{301}")]);
+}
+
+#[test]
+fn test_halfwidth_kana_with_voiced_mark_is_one_token() {
+    assert_eq!(tokenize("ｶﾞ"), vec![general("ｶﾞ")]);
+}
