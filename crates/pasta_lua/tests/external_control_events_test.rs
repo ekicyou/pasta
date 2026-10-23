@@ -34,6 +34,9 @@ const FIXTURE: &str = "\
 ＊OnTalk
 　さくら：「ふだんの会話」
 
+＊OnPastaCallFunction
+　さくら：「フォールバック」
+
 ＊会員番号を話す
 　さくら：「番号は＄＊会員番号　です」
 
@@ -230,16 +233,39 @@ fn set_save_variable_then_scene_speaks_the_string() {
     assert!(value.contains("番号は01"), "assigned value spoken: {value}");
 }
 
-/// 4.2・4.6: 無い名前で 200 と表記。
+/// 4.2・4.6・4.8・5.4: 無い名前で 200 と表記。待っている続きは残り、
+/// `＊OnPastaCallFunction` へのフォールバックも起きない。
 #[test]
 fn call_function_reports_not_found() {
     let temp = tempfile::TempDir::new().unwrap();
     let runtime = load_ghost(temp.path());
 
+    request(&runtime, "OnPastaCallFunction", &["初回起動"]);
+    runtime
+        .lua()
+        .load("_G.__co = require(\"pasta.store\").co_scene")
+        .exec()
+        .unwrap();
+
     let value = value_of_200(&request(&runtime, "OnPastaCallFunction", &["無い名前"]));
     assert!(
         value.contains("【シーンが見つからない：OnPastaCallFunction ＞無い名前】"),
         "not found notice: {value}"
+    );
+    assert!(
+        !value.contains("フォールバック"),
+        "no fallback scene: {value}"
+    );
+    assert!(
+        lua_bool(
+            &runtime,
+            r#"
+            local STORE = require("pasta.store")
+            return STORE.co_scene == _G.__co
+                and coroutine.status(STORE.co_scene) == "suspended"
+            "#,
+        ),
+        "continuation must be kept on failure"
     );
 }
 
