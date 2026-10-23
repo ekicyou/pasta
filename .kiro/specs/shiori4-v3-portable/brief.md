@@ -83,10 +83,14 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
 
 ## Upstream / Downstream
 
-- **Upstream**: shiori4（`shiori4_abi` の版 3 の取り決め。0.0.1 で公開済みなので、shiori4 の Phase 2 の spec を待たずに始められる）。ただし次の 3 つは、2026-10-23 時点で shiori4 の開発者の裁定待ちである。要件の前に結果を確かめる
-  - 版 3 ではホストのテーブルが NULL なので、`load` の失敗の理由をどこに出すか
-  - 同じ DLL が SHIORI/3.0 の書き出し（`load`・`request`・`unload`）と `shiori_get_api` の両方を持つとき、ホストはどちらを先に見るか（pasta は両方を出す）
-  - Windows 以外のファイル名（`descript.txt` の `shiori,pasta.dll` に対して `pasta.so`・`libpasta.so`・`.dylib` のどれを探すか。areka の arch ごとの名前 `pasta.x64.dll` などと一緒に決まる）。ビルドの出力名がこれで決まる
+- **Upstream**: shiori4（`shiori4_abi` の版 3 の取り決め。0.0.1 で公開済みなので、shiori4 の Phase 2 の spec を待たずに始められる）
+  - 2026-10-23 の shiori4 の裁定（shiori4 のコミット `b5344f0`）:
+    - SHIORI/3.0 の書き出し（`load`・`request`・`unload`）と `shiori_get_api` の両方を持つ DLL は許される（pasta の形）。ホストは先に `shiori_get_api` を見て、4 → 3 の順に試し、どちらも NULL なら SHIORI/3.0 の書き出しで読む。pasta は版 4 に NULL を返すので、shiori4 を知るホストは版 3 で読む。SSP は今どおり SHIORI/3.0 の書き出しで読む
+    - 版 4 の `load` が NULL を返したら、ホストは SHIORI/3.0 として読み直さない（`shiori4_host` の `from_library`。DLL を 2 回読まないため。areka の要望）。版 3 の `load` が NULL のときに読み直すかは、知らせに書かれていない（`shiori4-v4-host` で版 4 を出すときに効く。この spec は版 4 に NULL を返すだけなので影響しない）
+    - カレントディレクトリは規約で決めない。SHIORI は頼らずに `load` の dir を使う
+  - 次の 2 つは、2026-10-23 時点で shiori4 の開発者の裁定待ちである。要件の前に結果を確かめる
+    - 版 3 ではホストのテーブルが NULL なので、`load` の失敗の理由をどこに出すか
+    - Windows 以外のファイル名（`descript.txt` の `shiori,pasta.dll` に対して `pasta.so`・`libpasta.so`・`.dylib` のどれを探すか。areka の arch ごとの名前 `pasta.x64.dll` などと一緒に決まる）。ビルドの出力名がこれで決まる
 - **Downstream**: `shiori4-v4-host`（この spec の入口と実行器の上に、版 4 を足す）。areka（Windows 以外で pasta を読む）
 
 ## Existing Spec Touchpoints
