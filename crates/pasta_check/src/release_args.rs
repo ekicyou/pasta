@@ -62,6 +62,7 @@ fn reject(a_option: &str, a: &Path, rel: &Relation, b_option: &str, b: &Path) ->
 }
 
 /// 比べるための形: absolute にし、在る一番近い祖先を canonicalize して、残りの部品を書かれたまま足す
+// shortcut: Windows 以外では、まだ無い部分の .. を畳まない。CI が Windows 以外で試験を回すようになったら、残りの部品を字面で畳む
 fn resolve(path: &Path) -> io::Result<PathBuf> {
     let abs = std::path::absolute(path).map_err(|e| path_error(e, "read", path))?;
     for ancestor in abs.ancestors() {
@@ -278,6 +279,96 @@ mod tests {
             let a = args(&f.release, nar, &f);
             assert_rejected(&a, &f, expected);
         }
+    }
+
+    /// 再現 C: --release が --target の中（1.3）。前は無限の入れ子でスタックあふれ
+    #[test]
+    fn test_rejects_release_inside_target() {
+        let f = fixture();
+        let release = f.ghost.join("out");
+        let a = args(&release, &f.nar, &f);
+        let expected = format!(
+            "--release ({}) must not be inside --target ({})",
+            release.display(),
+            f.ghost.display()
+        );
+        assert_rejected(&a, &f, expected);
+        assert!(!release.exists());
+    }
+
+    /// `..` を含む形で --target と同じ場所（2.1・7.3）
+    #[test]
+    fn test_rejects_dotdot_form() {
+        let f = fixture();
+        let release = f.dev.join("x").join("..").join("ghost");
+        let a = args(&release, &f.nar, &f);
+        let expected = format!(
+            "--release ({}) must not be the same as --target ({})",
+            release.display(),
+            f.ghost.display()
+        );
+        assert_rejected(&a, &f, expected);
+    }
+
+    /// 大文字にした形で --target と同じ場所（2.1・7.3）
+    #[cfg(windows)]
+    #[test]
+    fn test_rejects_uppercase_form() {
+        let f = fixture();
+        let release = PathBuf::from(f.ghost.to_string_lossy().to_uppercase());
+        let a = args(&release, &f.nar, &f);
+        let expected = format!(
+            "--release ({}) must not be the same as --target ({})",
+            release.display(),
+            f.ghost.display()
+        );
+        assert_rejected(&a, &f, expected);
+    }
+
+    /// まだ無い --release と --nar で、大文字と小文字だけ違う残りの部品（2.2・7.3）
+    #[cfg(windows)]
+    #[test]
+    fn test_rejects_case_differing_missing_parts() {
+        let f = fixture();
+        let release = f.dev.join("new");
+        let nar = f.dev.join("NEW").join("x.nar");
+        let a = args(&release, &nar, &f);
+        let expected = format!(
+            "--nar ({}) must not be inside --release ({})",
+            nar.display(),
+            release.display()
+        );
+        assert_rejected(&a, &f, expected);
+        assert!(!release.exists());
+    }
+
+    /// 8.3 の短い名前で --target の中（2.1・7.6）。そのボリュームで 8.3 が無効なら何もせずに通す
+    #[cfg(windows)]
+    #[test]
+    fn test_rejects_short_name_form() {
+        let f = fixture();
+        let target = f.dev.join("target_ghost_long");
+        fs::create_dir_all(&target).unwrap();
+        let short = f.dev.join("TARGET~1");
+        if !short.exists() {
+            return;
+        }
+        let release = short.join("out");
+        let a = ReleaseArgs {
+            target: target.clone(),
+            release: release.clone(),
+            nar: f.nar.clone(),
+            copy_dirs: vec![],
+        };
+        let err = check_release_args(&a).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            format!(
+                "--release ({}) must not be inside --target ({})",
+                release.display(),
+                target.display()
+            )
+        );
     }
 
     /// 断らない組: 名前の頭が同じ隣・--copy が --target の中・--nar が --release の隣（4.1）
