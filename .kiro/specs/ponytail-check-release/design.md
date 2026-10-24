@@ -493,7 +493,7 @@ pub fn master_copy() -> TempDir;
 
 ## Migration Strategy（実装の順）
 
-特性化の試験を先に置き、1 つ直すごとに確かめて 1 コミットにする（brief の Constraints）。振る舞いを変えるコミットは、同じコミットで README・`validate.md` を直す（8.6）。
+特性化の試験を先に置き、1 つ直すごとに確かめて 1 コミットにする（brief の Constraints）。振る舞いを変えるコミットは、同じコミットで README・`validate.md` を直す。`SKILL.md`・`nar-spec.md` は 10 で直し、8.6 は同じ PR の中で満たす（A-7）。
 
 ```mermaid
 flowchart TD
@@ -515,11 +515,14 @@ flowchart TD
 - 9 は試験だけの変更で、小さく 4 つに分ける（DLL の道具と試験・`common` への寄せ・`dist_src_validation_test.rs`・`scripts.rs`）。
 - 10 は分類器が止める。止まったら回避策を探さずに、入った分と残り（`SKILL.md` の表・段の説明・トラブルシューティングの行、`nar-spec.md` の 1 項目）を示して開発者の許可を求める。
 
-## 前提と限界（設計の判断で、ディスカッションで確かめるもの）
+## 決めたことと限界（2026-10-24 の設計ディスカッションで開発者が全議題を推奨案で確定）
 
-- **A-1**: 5.3（段 5 の I/O にパス）を満たすため、`balloon.rs` の I/O の 4 か所（`read_utf8_kv` の `fs::read`、`resolve_existing_dir` の `read_dir`・項目・`file_type`）を `path_error` で包む。判定・文言つきの誤り・kind は変えない。requirements の Out of scope「同梱バルーンの判定（`balloon.rs`）…の振る舞い」は判定のことと読んだ。
-- **A-2**: 段 1 の I/O（`prepare_release_dir` の 2 か所・`remove_stale_nar`）にもパスを添える。5.3 の字面は「段 2・3・5・6」だが、開発者の決定は「I/O の誤りにパスを含める」で、段 1 だけ OS の文言のままにすると、`--release` がファイルのとき・使用中のときにどのパスか分からないまま残る。
-- **A-3**: 断る文言は、要件の例「must not be the same as or contain」でなく、当たった関係を 1 つの語で示す形（`be the same as`・`contain`・`be inside`）にする（3.2 の「関係を示す」に合わせる）。
-- **A-4**: Windows では部品を小文字にして比べる（まだ無い部分の大文字と小文字の違いのため）。
-- **A-5**: 8.3 の明示の試験は、8.3 が無効なボリュームでは何もせずに通す。
-- **限界**: Windows 以外の、まだ無い残りの部品の `..`（上の ReleaseArgsCheck の Risks）。`--nar` が在るフォルダで入力を中に含む場合は専用の文言で断らない（Non-Goals）。段 5 の項目の誤りのうち、`ReadDir` の項目そのものの誤りと `modified()` の誤りは Windows で作る方法が無く、コードの直し（`?`）だけで守る（試験は中身の読みの誤りで代える）。
+- **A-1**（確定。要件 5.3 と Out of scope を合わせて直した）: 5.3（段 5 の I/O にパス）を満たすため、`balloon.rs` の I/O の 4 か所（`read_utf8_kv` の `fs::read`、`resolve_existing_dir` の `read_dir`・項目・`file_type`）を `path_error` で包む。判定・文言つきの誤り・kind は変えない。requirements の Out of scope は「`balloon.rs` の判定と文言つきの誤り」に書き直した。
+- **A-2**（確定。要件 5.3 を「段 1・2・3・5・6」に直した）: 段 1 の I/O（`prepare_release_dir` の 2 か所・`remove_stale_nar`）にもパスを添える。開発者の決定は「I/O の誤りにパスを含める」で、段 1 だけ OS の文言のままにすると、`--release` がファイルのとき・使用中のときにどのパスか分からないまま残る。
+- **A-3**（確定。要件の序の例も合わせた）: 断る文言は、当たった関係を 1 つの語で示す形（`be the same as`・`contain`・`be inside`）にする（3.2 の「関係を示す」に合わせる）。
+- **A-4**（確定）: Windows では部品を小文字にして比べる（まだ無い部分の大文字と小文字の違いのため）。
+- **A-5**（確定）: 8.3 の明示の試験は、8.3 が無効なボリュームでは何もせずに通す。
+- **A-6**（確定）: 調べる順は「System Flows」の flowchart の順。置き場は新しい `release_args.rs`、誤りの手助けは `main.rs`。roadmap の持ち場の欄（`main.rs`・`balloon.rs`・`release_args.rs`・`tests/cli_test.rs`・`src/scripts.rs`・README も触る）は kiro-complete で直す。
+- **A-7**（確定。要件 8.6 を直した）: 8.6 は「同じ PR の中で」と読む。README・`validate.md` は振る舞いを変えるコミットで直し、`SKILL.md`・`nar-spec.md` は実装の順の 10 にまとめる。
+- **A-8**（確定）: `.claude/skills/pasta-check/references/updates-txt-spec.md` の誤りの表には足さない（同梱バルーンの判定の誤りの一覧のため。読み取りの誤りは README と `SKILL.md` のトラブルシューティングに書く）。
+- **限界**（受け入れた）: Windows 以外の、まだ無い残りの部品の `..`（上の ReleaseArgsCheck の Risks）。`--nar` が在るフォルダで入力を中に含む場合は専用の文言で断らない（Non-Goals）。段 5 の項目の誤りのうち、`ReadDir` の項目そのものの誤りと `modified()` の誤りは Windows で作る方法が無く、コードの直し（`?`）だけで守る（試験は中身の読みの誤りで代える）。

@@ -16,10 +16,10 @@ pasta_check release --target G --release G\out                    ... G\out\out\
 pasta_check release --target G --release out --nar out\g.nar      ... 書きかけの g.nar を g.nar に入れて「Release complete!」
 ```
 
-本仕様の後は、これらはどれも、ファイルに触れる前に次のような英語の誤りで止まる（文言は設計で決める）。
+本仕様の後は、これらはどれも、ファイルに触れる前に次のような英語の誤りで止まる（当たった関係を 1 語で示す。文言の表は design.md）。
 
 ```text
-Error: --release (C:\dev) must not be the same as or contain --target (C:\dev\myghost)
+Error: --release (C:\dev) must not contain --target (C:\dev\myghost)
 ```
 
 `release.ps1` の段 4 の形（`--target ghosts\hello-pasta --release <ルート>\release\hello-pasta --nar <ルート>\release\hello-pasta.nar`）のような正しい使い方は、今までどおり 6 段を進んで nar を作る。
@@ -47,7 +47,7 @@ Error: --release (C:\dev) must not be the same as or contain --target (C:\dev\my
   - 引数の関係と、断る組み合わせの説明（`crates/pasta_check/README.md`、スキル `pasta-check` の `SKILL.md` と `references/nar-spec.md`、マニュアル `book/src/debug/validate.md` の「release との関係」）。
 - **Out of scope**:
   - `pasta_check` の `validate/`（辞書の検査の規則。`syntax.rs`・`report.rs` は `ponytail-editor-tooling`、`scenes.rs` は `ponytail-core-registry` が持つ）。
-  - 同梱バルーンの判定（`balloon.rs`）と、`validate` サブコマンドの入口（`validate_cmd.rs`）の振る舞い。段 4 の検査の出力が日本語であることも変えない。
+  - 同梱バルーンの判定と文言つきの誤り（`balloon.rs`。その I/O の誤りにパスを添えることは 5.3 に入る）と、`validate` サブコマンドの入口（`validate_cmd.rs`）の振る舞い。段 4 の検査の出力が日本語であることも変えない。
   - 配布フォルダが、前回の配布フォルダでない中身の入ったフォルダかどうかの判定（「毎回クリーンされる」は今の約束のまま）。
   - リリース CI（`ponytail-manual-ci`）と `release.ps1`・`release.bat` の中身。
   - 新しいオプション（確かめを省く・消さずに写す など）。
@@ -118,7 +118,7 @@ Error: --release (C:\dev) must not be the same as or contain --target (C:\dev\my
 
 1. If 段 5 で、配布フォルダか同梱バルーンのフォルダの中のフォルダの一覧を読めない, the pasta_check release shall 段 5 で失敗し、`updates.txt` と nar を作らない。
 2. If 段 5 で、フォルダの一覧の中の 1 項目（名前・種類・大きさ・更新日時・中身）を読めない, the pasta_check release shall 段 5 で失敗し、`updates.txt` と nar を作らない。
-3. When 段 2・3・5・6 でファイルの読み書きに失敗したとき, the pasta_check release shall `Error: ` で始まる英語の理由に、失敗したファイルかフォルダのパスを含める（2026-10-24 開発者の決定。今は OS の文言だけ（例: `Error: 指定されたパスが見つかりません。 (os error 3)`）で、どのパスか分からない）。
+3. When 段 1・2・3・5・6（段 5 の同梱バルーンの読み取りを含む）でファイルの読み書きに失敗したとき, the pasta_check release shall `Error: ` で始まる英語の理由に、失敗したファイルかフォルダのパスを含める（2026-10-24 開発者の決定。今は OS の文言だけ（例: `Error: 指定されたパスが見つかりません。 (os error 3)`）で、どのパスか分からない）。
 4. When 段 5 で失敗したとき, the pasta_check release shall 今の約束どおり、段 1 で消した前回の nar を残さない。
 
 ### Requirement 6: 監査の指摘の解消
@@ -162,5 +162,5 @@ Error: --release (C:\dev) must not be the same as or contain --target (C:\dev\my
 3. The スキル `pasta-check` の `SKILL.md` shall 選択肢の表と段の説明に断る組み合わせを書き、トラブルシューティングの表に新しい誤りの行を足す（編集は分類器が止めるので、実装のその場面で、入った分と残りを示して開発者の許可を得る）。
 4. The スキル `pasta-check` の `references/nar-spec.md` shall 段 1 の前回の nar の削除の説明を、引数の確かめで止まったときの扱い（入力のフォルダが無いときも、前回の nar を残す）と合わせる（許可の扱いは 3 と同じ）。
 5. The マニュアル `book/src/debug/validate.md` の「release との関係」 shall 1 段目の前に引数を確かめ、危ない組み合わせでは何にも触れずに止まることを書く。
-6. When 振る舞いを変える直しを入れるとき, the 開発者 shall 同じ変更で上の文書を直す。
+6. When 振る舞いを変える直しを入れるとき, the 開発者 shall 同じ PR の中で上の文書を直す（README・`validate.md` は振る舞いを変えるコミットで直す。`SKILL.md`・`references/nar-spec.md` は分類器が止めるので最後の別タスクにする。2026-10-24 開発者の決定）。
 7. When 文書を直した後, the 開発者 shall `gen-skill-refs` の `--check` を走らせ、生成ファイルにずれが無いことを確かめる。
