@@ -2,7 +2,7 @@
 //! 478-485 / Data Contracts 601-602）。
 //!
 //! メモリ内 [`ChunkSourceMap`](super::ChunkSourceMap) の前方写像を最小・独自スキーマの
-//! JSON（[`SidecarFile`]）へ落とし、生成 `.lua` の隣（`<lua_path>.map`）へ
+//! TOML（[`SidecarFile`]）へ落とし、生成 `.lua` の隣（`<lua_path>.map`）へ
 //! 出力・読み戻しする（[`write_sidecar`]/[`read_sidecar`]）。本番可視性は不変で、
 //! ハブ [`super`] が `pub use sidecar::*` で再エクスポートするため、外部の
 //! `crate::debug::source_map::{SidecarFile, write_sidecar, read_sidecar, ...}` 経路は
@@ -27,7 +27,7 @@ pub const SIDECAR_VERSION: u32 = 1;
 /// "SidecarWriter" 478-485 / Data Contracts 601-602）。
 ///
 /// メモリ内 [`ChunkSourceMap`] の前方写像（最終 `.lua` 行 → `.pasta` 位置）を、最小・
-/// 独自スキーマの JSON へ落とす（**Source Map v3 非採用**・research.md D-4）。スキーマ:
+/// 独自スキーマの TOML へ落とす（**Source Map v3 非採用**・research.md D-4）。スキーマ:
 ///
 /// - `version`: スキーマ版（[`SIDECAR_VERSION`]）。前方/後方互換のため（602）。
 /// - `pasta_file`: 由来 `.pasta` ファイルパス（[`PastaPos::file`]）。
@@ -100,7 +100,7 @@ pub fn sidecar_path_for_lua(lua_path: &Path) -> PathBuf {
 /// design "SidecarWriter" 478-485）。
 ///
 /// メモリ内 [`ChunkSourceMap`] を [`SidecarFile`]（`version`＋`pasta_file`＋行ペア列）
-/// として serde_json で直列化し、[`sidecar_path_for_lua`] が指すパスへ書き込む。出力は
+/// として TOML に直列化し（`pairs` は `[[lua, pasta], ...]` の配列の配列）、[`sidecar_path_for_lua`] が指すパスへ書き込む。出力は
 /// `BTreeMap` 昇順走査で **決定論的**（再トランスパイルで同一内容・冪等性 design 484）。
 ///
 /// # 失敗は非致命（3.1 / design Error 611, 616）
@@ -115,9 +115,9 @@ pub fn write_sidecar(
     map: &ChunkSourceMap,
 ) -> std::io::Result<()> {
     let sidecar = SidecarFile::from_chunk(pasta_file, map);
-    // serde_json::to_vec はメモリ内シリアライズのみで I/O を伴わない。失敗（理論上
+    // toml::to_string はメモリ内シリアライズのみで I/O を伴わない。失敗（理論上
     // 起こらない）も I/O エラーへ写して非致命の単一経路に統一する。
-    let bytes = serde_json::to_vec(&sidecar)
+    let bytes = toml::to_string(&sidecar)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
     let path = sidecar_path_for_lua(lua_path);
     // 生成 `.lua` の親ディレクトリは本番経路（loader の `save_cache`）が先に作るが、
@@ -132,14 +132,14 @@ pub fn write_sidecar(
 /// `<lua_path>.map` サイドカーを読み戻し、メモリ内 [`ChunkSourceMap`] へ復元する
 /// （往復同一性の検証経路・3.2 完了条件）。
 ///
-/// [`sidecar_path_for_lua`] が指すサイドカーを読み、serde_json で [`SidecarFile`] へ
+/// [`sidecar_path_for_lua`] が指すサイドカーを読み、TOML として [`SidecarFile`] へ
 /// デシリアライズし、[`SidecarFile::to_chunk`] でメモリ写像へ戻す。
 /// [`write_sidecar`] の逆操作であり、往復で元のメモリ写像と一致する（同一 `lua_line`
 /// → `pasta_line` ペア）。
 pub fn read_sidecar(lua_path: &Path) -> std::io::Result<ChunkSourceMap> {
     let path = sidecar_path_for_lua(lua_path);
     let bytes = std::fs::read(&path)?;
-    let sidecar: SidecarFile = serde_json::from_slice(&bytes)
+    let sidecar: SidecarFile = toml::from_slice(&bytes)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
     Ok(sidecar.to_chunk())
 }
