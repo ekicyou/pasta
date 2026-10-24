@@ -435,7 +435,8 @@ enum SaveGate {
 
 **Implementation Notes**
 - Integration: `pasta_shiori` の `shiori_lifecycle_tests.rs` は保存先の親を通常のファイルにして失敗させる。Windows では読みが「無い」になり、書き込みで失敗する。Unix では読みが `NotADirectory` で「読めない」になり、退避も失敗して `Closed` になる。どちらも `Drop` が `"Failed to save persistence data on drop"` を出すので、テストは変えずに通る。
-- Validation: `SaveGate::Closed` は src 内テストで直接置いて確かめる（`save()` が `nil, err`、保存先が変わらない）。退避の名前の重なりは `.broken` と `.broken.1` を先に作って確かめる。
+- Validation: `SaveGate::Closed` は src 内テストで直接置いて確かめる（`save()` が `nil, err`、保存先が変わらない）。退避の名前の重なりは `.broken` と `.broken.1` を先に作って確かめる。本物の OS の失敗の道も 1 本試す: Windows では、保存先を `std::os::windows::fs::OpenOptionsExt::share_mode(0)` で開いたままにして `load()` を呼び、読みも退避も失敗して `Closed` になり、`save()` が `nil, err` を返し、保存先の中身が変わらないことを確かめる（`#[cfg(windows)]`。新しい依存は要らない）。
+- 印が無いまま `save(data)` を呼んだときの先読みは、初めての起動ではファイルが無いので `Persistence file not found, using empty table` の警告を 1 行出す。害は無いので、そのままにする（要件 1.6 の今の動き）。
 - Risks: 読みが一時的なロックで失敗し、退避も同じロックで失敗したときは、そのランタイムの変更が残らない（A6 で開発者が受け入れた）。
 
 ### Runtime（`lifecycle.rs`）
@@ -606,7 +607,7 @@ name = "剣"
 - 根: `save[1] = "x"` と `save[true] = 1` は 1 件ずつ外れ、根は表のまま書かれる。（4.10）
 - 往復: 文字列・整数（`i64::MIN`・`i64::MAX`）・浮動小数点数（`1.5`・`-0.0`・`nan`・`inf`・`2^63`）・真偽値・入れ子の表・配列・空の表・読み込んだ空の配列・改行（`\n`・`\r\n`）とタブを含む文字列が、`save_to_file` → `load_from_file` → `toml_to_lua` で同じ値に戻る。日時は文字列で戻り、次の保存で文字列として書かれる。（1.7・1.12）
 - 毎回同じ: キーを違う順で入れた 2 つの表から、同じバイト列ができる（`preserve_order` が入ったら落ちる）。（1.8）
-- 退避と印: 壊れた TOML が `.broken` に移り空の表が返る。`.broken` と `.broken.1` が既にあれば `.broken.2` に移り、既にある 2 つは中身が変わらない。`SaveGate::Closed` を置いた状態で `save()` が `nil, err` を返し、保存先と一時ファイルが変わらない。印が無い状態で `save()` を呼ぶと、先に読んで壊れたファイルを退避してから書く。（5.1〜5.6）
+- 退避と印: 壊れた TOML が `.broken` に移り空の表が返る。`.broken` と `.broken.1` が既にあれば `.broken.2` に移り、既にある 2 つは中身が変わらない。`SaveGate::Closed` を置いた状態で `save()` が `nil, err` を返し、保存先と一時ファイルが変わらない。印が無い状態で `save()` を呼ぶと、先に読んで壊れたファイルを退避してから書く。Windows では `share_mode(0)` で開いたままの保存先で、本物の失敗から `Closed` になることを確かめる（`#[cfg(windows)]`）。（5.1〜5.6）
 - 移したテスト（gzip の判別・原子的な書き込み・フォルダの作成・パスの検査・`load()`・`save()` の戻り値）を TOML の材料で通す。空のファイルは警告なしで空の表。BOM の付いたファイルが読める。（1.3・1.5・1.9・1.10・1.11・3.5）
 
 ### Integration Tests
