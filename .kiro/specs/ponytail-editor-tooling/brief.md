@@ -155,3 +155,22 @@ VSCode で辞書を書くゴーストの作者が困る。
 - VSIX のビルドには wasm-pack が要る（導入済み）。非対話では、`build:wasm` が AllSigned で落ちる。`build-wasm.ps1` を pwsh で先に走らせ、`vsce package` を直接叩いて避ける。
 - 振る舞いを固めるテストを先に書き、1 つ直すごとに確かめて 1 コミットにする。
 - 品質の関門：`cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_lsp -p pasta_dsl -p pasta_check`、拡張の `npm test`。cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。
+
+## 2026-10-24 棚卸の再測定（main c20ad104）
+
+- **前提の変化**
+  - 監査（2026-10-19）の後に持ち場へ入ったのは、版の上げ（v0.4.2 の `package.json` の `version`）と PR #187 だけ。PR #187 は `editors/vscode/package.json` の esbuild を 0.24 → 0.28.2 にし（317 行。pasta は CLI の `--bundle` しか使わない）、`package-lock.json` を update と audit fix で大きく書き換えた（jsdom などの勧告を消した）。`crates/pasta_lsp`・`crates/pasta_dsl/src/partial.rs`・`editors/vscode/src`・`syntaxes` は変わっていない。
+  - 2026-10-24 に、この spec は 0.4.4（0.4.3 の後）になった。mlua 0.12 へ上げた後の main で測り直す。
+- **触るファイル**: `crates/pasta_lsp/**`（`server.rs` 184 行・`document.rs` 327 行・`error.rs` 48 行・`analysis/mod.rs` 131 行・`transport.rs` 487 行・`Cargo.toml`・`tests/` 17 ファイル）、`crates/pasta_dsl/src/partial.rs`（477 行）、`crates/pasta_check/src/validate/{syntax,report}.rs`（`report.rs` 475 行。`code()` は 105 行）、`editors/vscode/`（`package.json` の `host` の 250・281・293 行、tmLanguage、`src/*.ts`、`scripts/build-wasm.bat`、`src/test/*`）、ルートの `Cargo.toml`（59 行の tower-lsp）・`Cargo.lock`、マニュアルの `debug/` の 3 頁、`tech.md`・`structure.md`。1,000 行に近いものは無い。
+- **規模**: 16〜19 タスク（13 の指摘と、テスト・文書の追従）。
+- **先に要るもの**
+  - 働きの上では無い。
+  - 0.4.3 の 6 本との重なり: `mlua-stdlib-removal`・`mlua-0-12-upgrade`・`shiori4-v3-portable` とルートの `Cargo.toml`・`Cargo.lock`（ウェーブに 1 本だけの席）。`recommend-menu-scenes` は `pasta_check` の `builtins.rs`・`validate/config.rs` で別のファイルだが、`FindingKind` を足すと決めれば `validate/report.rs` が重なる。`toml-serialization`・`ponytail-check-release` とは重ならない（`pasta_lsp/src/transport.rs` の JSON は `toml-serialization` の対象外）。0.4.3 はどれも先に入るので、こちらが合わせる。
+  - ほか: `vsce-4-upgrade` と `editors/vscode/package.json`・`package-lock.json`（同じウェーブに置かない）。`ponytail-core-registry`・`pest-2-9-4-upgrade` と `Cargo.lock` の席（席はこの spec が持つ）。`pest-2-9-4-upgrade` は `pasta_lsp` の WASM のビルドも触る。
+- **種別**: バグ（書き間違いが 1 つでシーンの全行に、ずれた位置で波線が付く）。監査の指摘より。
+- **要件定義のモデル**: Opus。挙動を変える決めごと（`host` の廃止）は 2026-10-19 に決まっている。
+- **分割の案**: 今は不要。ギャップ分析で 20 を超えたら、「診断とサーバの撤去（`pasta_lsp`・`partial.rs`・`pasta_check` の 2 ファイル・`Cargo.lock`）」と「VSCode 拡張の色と整理（tmLanguage・`src/*.ts`・`package.json` の `host`）」の 2 本に分ける。
+- **見つけた穴・古くなった記述**
+  - 7 番の `release.yml:L329` は古い。crates.io へ出す 5 つ（`pasta_core`・`pasta_dsl`・`pasta_lua`・`pasta_shiori`・`pasta_check`）は今 `release.yml` 294〜334 行で、`pasta_lsp` が無いのは同じ。
+  - Scope の `tech.md`（L15・L65・L110・L123）は、今は 15 行・67〜72 行（tower-lsp は 70 行）・112 行・125 行。`structure.md`（L190-205）は 191〜206 行。
+  - 10-23 の棚卸で、この brief だけ再測定の節が無かった。

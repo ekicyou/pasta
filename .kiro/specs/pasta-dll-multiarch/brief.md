@@ -91,3 +91,23 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 
 - `release.ps1` は 8 段になった（段 6 が `pasta-skills.zip` の作成と検査、版の確認が 7、大きさとまとめが 8）。arch を足すときは段 6 を保ち、段の番号と `/8` の見出し・`release.bat` の説明・文書の段の並びを合わせる。
 - 配布物は 5 つ・GitHub Release の添付は 6 つになり、`release.yml` の「Verify release assets」に `pasta-skills.zip` の項目が 1 つ増えた。配布物を足すときは `release.ps1`・`release.yml`・`github-release.ps1`・`.claude/skills/release/scripts/release-state.ps1`・文書の 5 か所を合わせる。参照先: `.kiro/specs/completed/pasta-skills-release-asset/design.md` の「Revalidation Triggers」。
+
+## 2026-10-24 棚卸の再測定（main c20ad104）
+
+- **前提の変化**
+  - pasta-skills-release-asset が `crates/pasta_sample_ghost/release.ps1` に段 6（`pasta-skills.zip`）を足し、409 行・8 段になった。Current State と 10-23 の再測定の行番号は古い。今は、32bit のビルドが 73 行（段 1 は 63〜88 行）、DLL の写しが 98〜110 行、`pasta.dll.zip` を作って中身をちょうど 2 つと確かめる段 5 が 249〜273 行（期待する名前は 266 行）。
+  - `release.yml` は 609 行になった。targets（75 行）と cache の key（80 行）は同じ。`pasta.dll.zip` の中身の検査は 145〜148 行、.nar の `ghost/master/pasta.dll` の検査は 182 行、upload は 226〜230 行に動いた（brief の 141〜144・163・208 行は古い）。
+  - GitHub Release の添付は 6 つで、名前は `.github/scripts/release/github-release.ps1` 72 行に並んでいる。配布物の形を変える（zip を arch ごとに分ける）なら、ここと `release-scripts-test.ps1`・`release` スキルの `release-state.ps1`（`n/5` の数え方）も合わせる。
+  - PR #187 は見本ゴーストのテスト 3 つ（`self_deploy_integration_test.rs`・`touch_shortcuts_test.rs`・`tutorial_stages_test.rs`）の 1 行を ctor 1.0 の書き方に直しただけ。`.cargo/config.toml`・`about.toml`・`.gitignore`・`build.yml` は変わっていない。
+- **触るファイル**: `.cargo/config.toml`、`crates/pasta_sample_ghost/release.ps1`（409 行）、`.github/workflows/release.yml`（609 行）、`github-release.ps1`（132 行。形を変えるなら）、`.github/workflows/build.yml`（149 行。arm64 を足すなら）、`about.toml`（17 行の targets）、`.gitignore`（40 行）、`crates/pasta_sample_ghost/tests/` の `pasta.dll` を見る 4 つ（`common/mod.rs`・`integration_test.rs`・`touch_shortcuts_test.rs`・`tutorial_stages_test.rs`）、マニュアル。型を直すなら `crates/pasta_shiori/src/windows.rs`（`usize` は 109・129・257 行、`bool` は 109・129・222 行）。1,000 行に近いものは無い。
+- **規模**: 9〜12 のまま（配布物を arch ごとに分けるなら、添付の数え方を合わせる 1〜2 が増える）。
+- **先に要るもの**
+  - 働きの上では `shiori4-v3-portable`（0.4.3 の最後）。x64 版を出す前に、SHIORI/3.0 の書き出しの `usize`→`c_long` を直すこと（前のまま）。
+  - 0.4.3 の 6 本との重なり: `shiori4-v3-portable`（`build.yml`、型を直すなら `windows.rs`）、`ponytail-check-release`（`pasta_sample_ghost/tests/` の `common/mod.rs`・`integration_test.rs`・`touch_shortcuts_test.rs`・`tutorial_stages_test.rs`）、`mlua-0-12-upgrade`（`pasta_sample_ghost/tests/` の `self_deploy_integration_test.rs` が `mlua::` を引く。こちらが触らなければ重ならない）。`toml-serialization`・`mlua-stdlib-removal`・`recommend-menu-scenes` とは重ならない。
+  - ほか: `ponytail-manual-ci`・`vsce-4-upgrade`（`release.yml`）、`ponytail-shiori`（`windows.rs` を直すなら）。リリースの実行中は `release.ps1`・`release.yml` を main へ入れない。
+- **種別**: 機能（areka の 64bit・arm64 向けの配布物）。
+- **要件定義のモデル**: Opus（前のまま）。
+- **分割の案**: 要らない。
+- **見つけた穴・古くなった記述**
+  - 上の行番号のずれ。`.cargo/config.toml` の頭の説明「出荷ターゲットは x86（i686）・x64（x86_64）の両方」は 9 行でなく 11 行にある。x64 で配っているのは `pasta_check.exe` だけで、x64 の pasta.dll は配っていない（すぐ直せる誤り。arch を足すときに書き直してもよい）。
+  - aarch64 で LuaJIT（mlua の同梱版）をビルドできるかは、まだ試していない（前のまま。mlua 0.12 へ上げた後で試すほうが、試し直しが要らない）。

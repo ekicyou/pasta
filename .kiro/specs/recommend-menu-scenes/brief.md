@@ -232,3 +232,21 @@
   - Adjacent の「`ponytail-check-release` が `builtins.rs` を触る」は誤り。あちらの持ち場は `pasta_check/src/{release,copy,nar,update_files}.rs`。
   - Upstream・Adjacent・Out of Boundary の `scene-play-event`・`external-control-events`・`ontalk-suppression`・`chain-talk-interrupt` は完了した。
   - roadmap の台帳（438・479 行）の Dependencies に、完了した 3 本が残る。「版がまだ決まっていないもの」（119 行）と「開発者の判断が要るもの」（296 行）の「3 本の後に入る・1 ウェーブ延びる」も古い。
+
+## 2026-10-24 棚卸の再測定（main c20ad104）
+
+- **前提の変化**: 前回（main `82176f19`）の後、この spec の持ち場のソースは変わっていない（依存の更新 PR #187 は試験の 1 行と依存の版だけ）。2026-10-23 の決定で 0.4.3 に入り、ウェーブ 1 に置かれた。
+- **触るファイル**: 前回の一覧のまま（新しいハンドラのファイル（新規）、`event/init.lua`（371）、`shiori/entry.lua`（153）、`pasta_core/src/registry/scene_alias.rs`（284）、`pasta_lua/src/loader/config/mod.rs`（343。`parse_scene_aliases` 115 行）、`loader/mod.rs`（344。info ログ 125 行）、`pasta_check` の `validate/builtins.rs`（63）・`validate/config.rs`（403）、試験、マニュアル）。加えて、別名の出どころの印 `SceneAliasSource`（`pasta_lua/src/loader/config/sections.rs` 349〜356 行）と、その試験 `loader/config_tests.rs` 213〜243 行。見出しだけの `[scene.alias]` を既定と同じに扱う（A3）と、印の意味が変わる。
+- **規模**: 10〜12 タスクのまま。
+- **先に要るもの**: 働きの上では無い。0.4.3 の中のファイルの重なり:
+  - `toml-serialization`: `loader/config/sections.rs`（あちらは `[persistence]` の 60〜115 行）。印の型を変えず、出どころの判定を `config/mod.rs` の中で決めれば重ならない。`reference/pasta-toml.md` は節が別。
+  - `mlua-stdlib-removal`: マニュアル `lua/shiori-events.md` の既定ハンドラの表（119〜131 行。同じ表の隣の行）。失敗の種類を足すと `pasta/failure.lua`・`tests/lua_specs/failure_test.lua`（種類の数 12）で重なるので、選んだ後の受け手は今ある「シーンが見つからない」の種類を使うのが安全。
+  - `ponytail-check-release`: `pasta_check` の別のファイル。マニュアル `debug/validate.md` は節が別。
+  - `mlua-0-12-upgrade`・`shiori4-v3-portable`: 重ならない（持ち場のソースは `mlua::` を参照していない）。
+- **種別**: 機能（窓際のぱすたさんの実例。シーンで書く形は開発者の決定）。
+- **要件定義のモデル**: Opus（前回のまま。議題は承認済みで、SSP が URL を開くかは実機で確かめられる）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 冒頭のステータス（「推奨は 0.4.2」）と「要件で決めること」の版の行は古い。版は 0.4.3 に決まった。
+  - A5 の「マニュアルの変更点に書く」の置き場が無い（マニュアルに変更点の頁は無い）。コミットの件名の `!`（詳しいリリースノートの「動きが変わる変更」）と、`reference/pasta-toml.md` の `[scene]` の節で知らせる。
+  - 本文の Adjacent の「`ponytail-check-release` が `builtins.rs` を触る」は、前回のとおり誤りのまま残っている。

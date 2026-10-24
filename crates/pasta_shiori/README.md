@@ -89,7 +89,7 @@ println!("Response: {}", response);
 | pest        | 2.8        | SHIORI リクエストパース                           |
 | pest_derive | 2.8        | pest パーサー導出マクロ                           |
 | flume       | 0.12       | アクタースレッドの mailbox（チャネル）            |
-| wintf-winmsg-executor | 0.0.3 | アクタースレッドのメッセージループ           |
+| wintf-winmsg-executor | 0.0.5 | アクタースレッドのメッセージループ           |
 | arc-swap    | 1.9        | mailbox の送信端の差し替え                        |
 
 ### Windows 専用
@@ -109,7 +109,7 @@ println!("Response: {}", response);
 | クレート | バージョン | 用途                     |
 | -------- | ---------- | ------------------------ |
 | tempfile | 3          | テスト用一時ディレクトリ |
-| ctor     | 0.2        | テスト前の環境変数の中和 |
+| ctor     | 1.0        | テスト前の環境変数の中和 |
 | serde_json | 1        | デバッグ通信のテスト     |
 | tracing-test | 0.2    | ログ出力のテスト         |
 

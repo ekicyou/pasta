@@ -80,3 +80,19 @@ pasta の Lua ランタイムは mlua 0.11（LuaJIT 2.1、features `luajit52`・
 - LuaJIT のビルドは、環境変数 `NoDefaultCurrentDirectoryInExePath` を外して行う（残っていると exit 101 で落ちる）。
 - pasta.dll は静的 CRT のまま（mlua の `vendored` の LuaJIT も同じビルドに入る）。
 - `Cargo.lock` とルートの `Cargo.toml` は、ウェーブの中では 1 本の spec だけが触る。
+
+## 2026-10-24 棚卸の再測定（main c20ad104）
+
+- **前提の変化**: 起票（main `f472fc27`）の後に入ったのは文書だけ。`mlua::` を参照するファイルは 101 のまま（`pasta_lua` 92・`pasta_shiori` 7・`pasta_check` 1・`pasta_sample_ghost` 1）。mlua の値の変換（`LuaSerdeExt`）を使うファイルは 4 でなく 3（`runtime/persistence.rs`・`runtime/log.rs`・`runtime/lifecycle.rs`）で、3 つとも `toml-serialization` が書き直す。
+- **触るファイル**: ルートの `Cargo.toml` 33 行と `Cargo.lock`、上の 101 ファイル（`pasta_shiori` は `src/error.rs`・`lua_request.rs`・`shiori.rs` と試験 4、`pasta_check` は `tests/validate_parity_test.rs`、見本のゴーストは `tests/self_deploy_integration_test.rs`）。破壊的変更が当たる所: 利用者の値の型 `pasta_lua/src/search/context.rs` 357 行（`impl UserData`。`MaybeSync`）、型の名前 `runtime/enc.rs` 74・117 行と `tests/ffi/compare_test.rs` 40 行。GC の口・`ToLuaConversionError`・`BorrowedStr`・`Function::wrap` は pasta のどこにも無い。`tech.md` 7・33 行。1,000 行に近いものは無い。
+- **規模**: 12〜16 タスク（L のまま）。
+- **先に要るもの**
+  - 働きの上では `mlua-stdlib-removal`。
+  - ファイルの重なりでは、ウェーブ 1 の 3 本が入った後: `toml-serialization`（上の 3 ファイル）、`mlua-stdlib-removal`（`runtime/mod.rs`・`runtime_config.rs`・`module_registry.rs`・`tests/runtime/unit_test.rs`・`tests/lua_unittest_runner.rs`・`Cargo.toml`・`Cargo.lock`）、`ponytail-check-release`（`self_deploy_integration_test.rs`）。`recommend-menu-scenes` とは重ならない。
+  - 後の `shiori4-v3-portable` とは `Cargo.toml`・`Cargo.lock`・`pasta_shiori/src/shiori.rs` で重なる。
+- **種別**: 基盤（依存の版上げ。`/update` から）。
+- **要件定義のモデル**: Opus（土台の決定は無く、直しの量が多いだけ）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - Current State の「serde の変換を使うファイルは 4」は 3。
+  - Upstream に `toml-serialization` を、ファイルの順として足す（今は Adjacent にだけある）。値の変換の特性化の試験は、`toml-serialization` が入った後のセーブとログの表に対して書く。あちらが手書きの変換にすれば、この spec の値の変換の直しは減る。
