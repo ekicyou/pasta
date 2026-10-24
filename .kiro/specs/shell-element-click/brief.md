@@ -175,3 +175,8 @@
 - **見つけた穴・古くなった記述**
   - 2026-10-18 の節の「`init.lua`（267）の 78〜81 行に読み込みを 1 行」は、85〜90 行の後ろに動いた。
   - `ponytail-lua-scripts` が先に入ると、`create_scene_coroutine`（`choice_select.lua` 25〜35 行）は `SCENE` 側の関数に置き換わる見込み。振り分けの取り出しは、先に入った側の形に合わせる。
+
+
+## 申し送り（mlua-stdlib-removal より・2026-10-24）
+
+- `FAILURE.LABEL` の `NOT_JSON = "JSON として読めない値"` は無くなり、同じ席が `BAD_TYPE = "型の名前にならない値"` になった（`OnPastaSetSaveVariable` の Reference2 の型の名前が知らないもの）。種類の数は 12 のまま。参照先: `.kiro/specs/completed/mlua-stdlib-removal/design.md` の FailureLabels。

@@ -245,3 +245,8 @@
 - **見つけた穴・古くなった記述**:
   - roadmap の Phase 11 の表（325 行）と Phase 13 の共有接点（369 行）の「`talk-grapheme-clusters` と同じウェーブに置かない」は、完了したので要らない。2026-10-18 の節の 2 点目（`talk-grapheme-clusters` の brief と roadmap の流れの食い違い）も、同じ理由で閉じた。
   - Constraints の「BudouX の行幅の数えは、トークンごとにやり直し（`mod.rs:145`）」は今も古いまま（列は吹き出しごとに持ち越す。`sakura_script/mod.rs` 132〜153 行）。
+
+
+## 申し送り（mlua-stdlib-removal より・2026-10-24）
+
+- `FAILURE.LABEL` の `NOT_JSON = "JSON として読めない値"` は無くなり、同じ席が `BAD_TYPE = "型の名前にならない値"` になった（`OnPastaSetSaveVariable` の Reference2 の型の名前が知らないもの）。種類の数は 12 のまま。参照先: `.kiro/specs/completed/mlua-stdlib-removal/design.md` の FailureLabels。
