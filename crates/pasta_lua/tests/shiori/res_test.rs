@@ -46,11 +46,9 @@ fn test_res_env_defaults() {
     let result = runtime.exec(
         r#"
         local RES = require "pasta.shiori.res"
-        local assertions = require "@assertions"
-        
-        assertions.assert_eq(RES.env.charset, "UTF-8", "default charset")
-        assertions.assert_eq(RES.env.sender, "Pasta", "default sender")
-        assertions.assert_eq(RES.env.security_level, "local", "default security_level")
+        assert(RES.env.charset == "UTF-8", "default charset")
+        assert(RES.env.sender == "Pasta", "default sender")
+        assert(RES.env.security_level == "local", "default security_level")
         return true
     "#,
     );

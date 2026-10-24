@@ -31,7 +31,6 @@ tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 # pasta_lua dependencies
 mlua = { version = "0.11", features = ["luajit52", "vendored", "serialize"] }
-mlua-stdlib = { version = "0.1", features = ["json", "regex", "yaml"] }
 regex = "1.12.3"
 toml = "1.1.2"
 serde = { version = "1", features = ["derive"] }
