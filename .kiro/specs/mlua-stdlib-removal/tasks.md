@@ -73,7 +73,7 @@
   - 完了: 4 つのファイルを `mlua-stdlib`・`@env`・`stdlib_modules_test`・`stdlib_regex_test` で検索して 0 件
   - _Boundary: ReadmeSteering_
   - _Requirements: 5.7_
-- [ ] 4.5 スキル `pasta-lua-coding` を直し、references を作り直す
+- [x] 4.5 スキル `pasta-lua-coding` を直し、references を作り直す
   - references を作る道具とその自己テストの章の対応を `lua/modules/toml.md` にする
   - 道具で references を作り直し、消えた章の写しを手で消す
   - `SKILL.md` の表・references の表・統合モジュールの表・モジュールの一覧とリンク・`OnPastaSetSaveVariable` の説明を直す（分類器に止められたら、入った分と残りを示して開発者の許可を求める）
