@@ -3,7 +3,7 @@
 進め方は設計の Migration Strategy の 4 段（`@toml` を足す → `OnPastaSetSaveVariable` を型で受ける → 6 つと依存を外す → 文書）に従う。どの段の後でもテストが通る。`cargo build`・`cargo test` の前に `NoDefaultCurrentDirectoryInExePath` を外す。`pasta_lua` のテストが書き換える `sample.generated.lua` の改行の差分は `git checkout --` で戻す。
 
 - [ ] 1. `@toml` を足す（6 つのモジュールはまだ残す）
-- [ ] 1.1 TOML の文字列を Lua の表に読む `@toml` を、設定によらず初期化の時から登録する
+- [x] 1.1 TOML の文字列を Lua の表に読む `@toml` を、設定によらず初期化の時から登録する
   - `decode` だけを持つ表を `@pasta_log` の隣で必ず登録し、ほかの登録の順は変えない
   - 値の変換は `@pasta_config` と同じ既存の変換を使い、日付と時刻は RFC 3339 の形の文字列になる
   - 読めない文字列（UTF-8 として正しくないものを含む）は `nil` とエラーメッセージを返し、文字列でない引数（数・`nil`・表）は Lua のエラーにする

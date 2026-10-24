@@ -234,6 +234,9 @@ impl PastaLuaRuntime {
         // Register @pasta_log module (always available, independent of RuntimeConfig.libs)
         Self::register_log_module(&lua)?;
 
+        // Register @toml module (always available, independent of RuntimeConfig.libs)
+        Self::register_toml_module(&lua)?;
+
         // Debug backend gate (task 4.2): the SINGLE enable choke point. After the
         // VM is constructed and all modules are registered, install the debug hook
         // exactly ONCE iff `config.debug.enabled`. When disabled (the default),
