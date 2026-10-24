@@ -1,9 +1,9 @@
 {
   "feature_name": "toml-serialization",
   "created_at": "2026-10-24T04:26:12Z",
-  "updated_at": "2026-10-24T05:43:57Z",
+  "updated_at": "2026-10-24T08:19:36Z",
   "language": "ja",
-  "phase": "tasks-generated",
+  "phase": "completed",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -18,5 +18,6 @@
       "approved": true
     }
   },
-  "ready_for_implementation": false
+  "ready_for_implementation": true,
+  "completed_at": "2026-10-24T08:19:36Z"
 }
