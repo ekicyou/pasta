@@ -127,3 +127,32 @@ SHIORI/3.0 の SHIORI は、ホストに呼ばれたときに文字列を 1 回�
 - **要件定義のモデル**: Opus（上の再測定の行のとおり。ABI とスレッドの決まりは shiori4 の正本が決めていて、残りは仕組みの選び方）。
 - **見つけた穴**: プロパティの読み出しと、待って再開する仕組みは、pasta に既にある。`act:get_property`（`pasta/shiori/act.lua` 294 行。DSL では `＄x＝＄％prop`）は `\![get,property]` を出して `OnPastaCallBack` を待ち、待ちの表 `CALLBACK.pending`（`pasta/shiori/event/callback.lua`。時間切れの掃除つき）で再開する。上の Current State と Scope はこれに触れていない。`shiori4-v4-lua-api` はこの上に作る（あちらの brief に書いた）。この spec からは、版 4 のときに同じ `get_property` を中継の同期の読み出しで答えられる下回りを用意する。
 - **マニュアルの間**: この spec だけが main に入った間は、作者が使える口がまだ無いので、マニュアルに版 4 のことはまだ書かない。
+
+## 2026-10-24 shiori4 の host-protocol からの知らせ
+
+shiori4 の spec `host-protocol` の要件が、2026-10-24 に確定した（開発者が全議題を推奨案で承認した）。その後、設計で 1 つ決まった。正本の置き場所は、shiori4 の設計が終わった後に知らせが来る。
+
+- **確定した語のうち、上の Approach と違う所**:
+  - プロパティの読みは `ID: getproperty`。0.0.1 の `property` から改めた（互換は無い）。書き込みの `ID: setproperty`（`Reference0` が名前、`Reference1` が値。成功は 204、不正は 400）が増えた。
+  - `Reason` は付けなくてもよい。`Reason` の無い 400 は「不正」、`Reason: forbidden` は「拒否」、それ以外の語は「理由不明の拒否」と読む。これはすべての 400 に当てはまる。
+  - `OnHostComplete` も「post から起きた要求」に入る。`SenderType: internal`・`SecurityLevel: local` が付く。pasta が断るのは `SecurityLevel: external` だけなので、そのまま通る。
+  - `OnHostComplete` の `Status` は、結果のステータスコードを運ぶ。ukadoc の `Status`（ベースウェアの状態）とは意味が違う。今の `dispatcher.is_blocked(req.status)` には通さない。
+- **pasta の出発点は変わらない**:
+  - shiori4 の `Ghost` は、解析済みのヘッダではなく原文 `&str` を受けるようになる。`Headers`・`HeaderWriter`・`PendingTags`・`Properties`／`Lookup` は、芯から便利関数のモジュールへ移る。
+  - pasta は `shiori4::Ghost` を使わず、`shiori4_abi::Shiori` を直に使う（`shiori4-v3-portable`）。上の型はどれも使っていない。
+  - `Properties` は `ShioriHostHandle` を持つ。`ShioriHostHandle` は Send でないので、アクタースレッドからの中継には使えない。要求の文字列は、便利関数の純粋な関数か、自前の関数で作る。
+- **逆向きの変換は shiori4 では作らない**（2026-10-24 の shiori4 の設計。開発者が確定）:
+  - 作らないもの: v4 のヘッダ部分を SHIORI/3.0 の全文に直す変換と、SHIORI/3.0 の応答をステータスとヘッダ部分に分ける変換。
+  - 理由: この変換が要るのは、pasta の中が SHIORI/3.0 の全文の形で組まれているためである。開始行を求める pest の文法（`util/parsers/req_parser.pest`）や、開始行と `Charset` を必ず付ける Lua の RES（`shiori/res.lua`）がそうなっている。だからこれは pasta の事柄とされた。
+  - `shiori4::v3::{parse_request, response}` は公開のまま残る。
+- **開発者の意向**:「ここはもう少しモダンに設計してほしい」。
+  - v4 の入口で SHIORI/3.0 の全文に詰め替えて今の解析に流すことはしない。
+  - pasta の内部の表現を、SHIORI/3.0 の全文に縛られない形（v4 のヘッダ部分をそのまま扱える形）に寄せる。これをこの spec の設計で検討する。
+- **設計の出発点の案**（まだ決まっていない）:
+  - **中の表現**: 要求は「メソッド（get／notify）＋ヘッダ部分」、応答は「ステータス＋ヘッダ部分」にする。どちらも `Charset` を持たない。
+  - **変換する場所**: 開始行の読み書きと、`Charset` の検査・補いは、旧来の入口（HGLOBAL の `load`・`request`）と版 3 の入口だけが行う。版 3 の入口は `shiori4::v3` を使える。
+  - **pest の文法**: ヘッダ部分の規則（`key_values`）と開始行の規則（`header`）を分ける。v4 ではヘッダ部分だけを解析する。SHIORI/2.x の開始行（`header2`）は、旧来の入口の側にだけ残す。
+  - **Lua の RES と `error.rs`**: 返すのはステータスとヘッダ部分だけにする。開始行と `Charset` は入口が付ける。応答のゴールデン（`actor/marshaling.rs` の標準ヘッダ 3 種）も見直す。
+  - **`req.version`**: 版の数をやめ、入口の種類（v4・v3・旧来）を表す印にする方向で考える。印は、上の In の「版 4 で読まれたかどうかの印」と同じものにする。
+  - **入れる時期**: 0.4.2 の `shiori4-v3-portable` は今の全文の形のまま入れる。版 3 の口は全文を受けるので、そのままでよい。作り直しは、この spec（0.5.0）で行う。
+- **触るファイル（足すもの）**: `pasta_shiori/src/lua_request.rs`・`util/parsers/{req_parser.pest,req.rs}`・`error.rs`・`actor/marshaling.rs`（ゴールデン）・`pasta_lua/pasta_scripts/pasta/shiori/res.lua`。ファイルの重なりも見直す。`ponytail-shiori`（`windows.rs`・`actor/`）と `ponytail-lua-scripts`（`res.lua`）が重なる。
