@@ -111,3 +111,8 @@
 - 2.2: 既定の保存先に書くテストが、追跡されている crates/pasta_lua/profile/pasta/save/save.json（中身 {}）を save.json.broken へ移して TOML を書く。テストの後は git checkout -- で戻し .broken を消す。3.1 で既定が save.toml（gitignore 済み）になったら、この追跡ファイルを残すかは完了時に判断する。保存先にフォルダがあっても読めない物として .broken へ退避する（設計どおり）。persistence.rs は 665 行。
 - 6: PR（squash）の件名にも `!` を付ける（例 `feat(toml-serialization)!: セーブファイル・ログの表・サイドカーを TOML にする`）。リリースノートの詫びの文案は design.md「移行とリリースノートへの申し送り」にあり、release スキルが doc/release-notes/v0.4.3.md へ写す。
 - 最終検証: 使われなくなった追跡ファイル crates/pasta_lua/profile/pasta/save/save.json を消した（既定が save.toml になり、どこも読まない）。終了時の保存が印 Closed で書かないことを Drop から確かめる結合テストを足した（Windows のみ）。
+- 完了時にその場で解決: 見本のゴースト hello-pasta の pasta.toml の読まれない `[persistence] data_dir` を、`file_path`・`obfuscate` の説明（コメント）に替えた（見出しは残す）。
+- 完了時にその場で解決: main で入った `@toml` を tech.md の toml の用途に足した。
+- 完了時に申し送り: mlua-0-12-upgrade の brief.md へ、serde の値の変換が手書きになり LuaSerdeExt が array_metatable のためだけに残ることを申し送った。
+- 完了時の判断: persistence.rs は 664 行で設計の目安 600 行を超える。分けると File Structure Plan（2 ファイル）から外れるので、目安の超過を許容した。
+- 棚卸の件数: その場で解決 2 件・申し送り 1 件・起票 0 件。

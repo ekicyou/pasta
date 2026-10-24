@@ -108,3 +108,10 @@ pasta の Lua ランタイムは mlua 0.11（LuaJIT 2.1、features `luajit52`・
 - `RuntimeConfig` の公開の中身が変わった: `default_libs()`・`new()`・`minimal()` は `["std_all"]`、`full()` は `["std_all_unsafe"]`、`should_enable_module` は無い。`validate_and_warn` の `env` の警告も無い。`UnknownLibrary` の文は 13 の `std_` の名前だけ。
 - `runtime/mod.rs` の初期化は `@pasta_search` → `@pasta_log` → `@toml`（`module_registry.rs` の `register_toml_module`。`toml_to_lua` を使う）。mlua 0.12 で `Value`・`Function` の型が変わるなら、この関数も直す範囲に入る。
 - 参照先: `.kiro/specs/completed/mlua-stdlib-removal/design.md` の RuntimeConfig・TomlModule・RuntimeInit。
+
+## 申し送り（toml-serialization より）
+
+- mlua の serde の値の変換（`to_value`・`from_value`）を使う所は 0 になった。セーブ（`runtime/persistence.rs`）・ログの表（`runtime/log.rs`）・終了時の保存（`runtime/lifecycle.rs`）は、Lua の値と TOML の値を手書きの変換でつなぐ（`lua_table_to_toml_document`・`lua_value_to_toml_strict`・`toml_to_lua`）。上の「serde の変換を使うファイルは 3」と、値の変換の特性化の論点は古い。
+- `LuaSerdeExt` が残るのは `persistence.rs` だけで、`lua.array_metatable()`（配列の印。空の配列を `[]` に書くかの判定と、読んだ配列に印を付ける所）のため。mlua 0.12 でこの口が動くなら、ここが直す範囲に入る。配列の印の扱いは `persistence_tests.rs` の `test_codec_array_marked_empty_table_is_empty_array`・`test_codec_read_value_types` が押さえている。
+- 表の中身は `Table::pairs`（`lua_next`。`__pairs` を呼ばない）と `raw_get` で読む。mlua 0.12 で `pairs` の意味が変わるなら見直す。
+- 参照先: `.kiro/specs/completed/toml-serialization/design.md` の SaveCodec・LogTableFormatter。
