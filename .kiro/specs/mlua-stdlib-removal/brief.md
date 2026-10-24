@@ -60,6 +60,7 @@ raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "", 
   - mlua 0.12 への更新（`mlua-0-12-upgrade`。この spec の後）
   - JSON・YAML・正規表現の代わりの部品（作者の要望が出たら起票する）
   - `OnPastaCallFunction`（JSON を使っていない）
+  - セーブファイル・`@pasta_log` の表の出力・ソースマップのサイドカーの JSON（`toml-serialization`）
 
 ## Boundary Candidates
 
@@ -87,7 +88,7 @@ raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "", 
 ## Constraints
 
 - 作者に見える API を消す変更（6 つのモジュール）と、0.4.2 で出した `OnPastaSetSaveVariable` の形を変える変更を含む。リリースノートで知らせる。
-- 作者に見える書式を新しく決めるときは TOML を既定にする（2026-10-24 開発者の指摘）。JSON にするなら開発者に確かめる。
+- pasta から JSON を追い出す。作者の要望で JSON が求められるまで、シリアライズは TOML（2026-10-24 開発者の方針）。DAP・LSP の JSON はプロトコルが決めているので残る。
 - `pasta-lua-coding` の `SKILL.md` の編集は、分類器が Self-Modification として止める。止まったら開発者の許可を求める。
 - マニュアルの章を消す・足すときは、章の数を決め打ちする 3 つの検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）を合わせる。章の数は、mlua-stdlib の章を `@toml` の章に置き換えるなら変わらない。
 - `Cargo.lock` とルートの `Cargo.toml` は、ウェーブの中では 1 本の spec だけが触る。
@@ -96,4 +97,4 @@ raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "", 
 
 - **型の名前**: `number`・`string`・`boolean`・`delete` にするか、日本語（`数`・`文字列`・`真偽`・`削除`）にするか。
 - **`@toml` の `encode`**: Lua の表を TOML の文字列にする関数を持つか。推奨は持たない（配列か表かの見分けの規則から作ることになる。要る作者が出てから）。
-- **セーブファイル**: `@pasta_persistence` のセーブファイル（`save.json`・gzip の `save.dat`）も JSON である。「既定のシリアライズは TOML」に合わせて TOML にするか、するならこの spec か別の spec か。今あるゴーストのセーブを読めるようにする移し方が要る。この spec の範囲には、まだ入れていない。
+- セーブファイルは決まった（2026-10-24 開発者の方針「pasta から json は一旦追い出して。ユーザー要望で json が要求されるまではシリアライズは toml」）。TOML にする。セーブファイル・ログの表・サイドカーは、別の spec `toml-serialization` が持つ。
