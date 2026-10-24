@@ -6,7 +6,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use mlua::{Debug, Lua, LuaOptions, StdLib, VmState};
+use mlua::{Lua, LuaOptions, StdLib, VmState, debug::Debug};
 
 use super::*;
 

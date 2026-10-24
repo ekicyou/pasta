@@ -58,7 +58,7 @@ fn test_enc_to_ansi_ascii() {
         return result
     "#;
 
-    let result: mlua::String = runtime.exec(script).unwrap().as_string().unwrap().clone();
+    let result: mlua::LuaString = runtime.exec(script).unwrap().as_string().unwrap().clone();
     assert_eq!(result.as_bytes(), b"hello world");
 }
 
@@ -75,7 +75,7 @@ fn test_enc_to_utf8_ascii() {
         return result
     "#;
 
-    let result: mlua::String = runtime.exec(script).unwrap().as_string().unwrap().clone();
+    let result: mlua::LuaString = runtime.exec(script).unwrap().as_string().unwrap().clone();
     assert_eq!(result.as_bytes(), b"hello world");
 }
 
@@ -274,7 +274,7 @@ fn test_package_path_set_correctly() {
 
     // Get package.path
     let script = r#"return package.path"#;
-    let path: mlua::String = runtime.exec(script).unwrap().as_string().unwrap().clone();
+    let path: mlua::LuaString = runtime.exec(script).unwrap().as_string().unwrap().clone();
 
     // 検索パス設定は `generate_package_path()` の文字列と**バイト同一**である
     // （要件 2.1 / 3.1 / 3.2）。ASCII パスでは ANSI 変換していた変更前と同じ値になる。
@@ -316,7 +316,7 @@ fn test_package_path_with_japanese_base() {
     let result = runtime.exec(script);
     assert!(result.is_ok(), "package.path should be set without error");
 
-    let path: mlua::String = result.unwrap().as_string().unwrap().clone();
+    let path: mlua::LuaString = result.unwrap().as_string().unwrap().clone();
     // 非 ANSI パスでも ANSI へ変換せず、UTF-8 のまま設定される（要件 2.1 / 3.8）。
     // 変更前は ANSI バイト列だったため、ここは UTF-8 契約への更新である。
     assert_eq!(path.as_bytes().as_ref(), expected.as_bytes());

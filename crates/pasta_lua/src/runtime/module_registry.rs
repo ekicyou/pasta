@@ -104,7 +104,7 @@ impl PastaLuaRuntime {
             _ => return Ok(()),
         };
 
-        for pair in actor_table.pairs::<mlua::String, Value>() {
+        for pair in actor_table.pairs::<mlua::LuaString, Value>() {
             let (key, value) = pair?;
             if let Value::Table(sub_table) = value {
                 sub_table.set("name", key.clone())?;

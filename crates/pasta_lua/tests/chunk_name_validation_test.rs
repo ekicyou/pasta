@@ -54,7 +54,7 @@ mod common;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use mlua::{Debug, HookTriggers, Lua, LuaOptions, StdLib, VmState};
+use mlua::{HookTriggers, Lua, LuaOptions, StdLib, VmState, debug::Debug};
 
 use common::NON_ANSI_DIR_NAME;
 use pasta_dsl::parser::parse_str;

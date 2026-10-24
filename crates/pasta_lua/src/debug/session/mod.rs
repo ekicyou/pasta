@@ -94,7 +94,7 @@ use crate::debug::hook::LineHook;
 #[cfg(test)]
 use crate::debug::types::ThreadId;
 #[cfg(test)]
-use mlua::Debug;
+use mlua::debug::Debug;
 
 /// The DAP thread id reported for the (single) main execution thread.
 ///

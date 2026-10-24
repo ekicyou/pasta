@@ -21,7 +21,7 @@
 //! ```
 
 use crate::encoding::{Encoder, Encoding};
-use mlua::{Lua, Result as LuaResult, String as LuaString, Table, Value};
+use mlua::{Lua, LuaString, Result as LuaResult, Table, Value};
 
 /// Module version.
 const VERSION: &str = "0.1.0";

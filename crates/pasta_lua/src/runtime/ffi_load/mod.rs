@@ -75,7 +75,7 @@ pub(crate) fn install(lua: &Lua, ctx: &LoaderContext) -> mlua::Result<()> {
 
     let base_dir = ctx.base_dir.clone();
     let search_dirs = ctx.absolute_search_paths();
-    let prepare = lua.create_function(move |lua, name: mlua::String| {
+    let prepare = lua.create_function(move |lua, name: mlua::LuaString| {
         prepare(lua, &name, &base_dir, &search_dirs)
     })?;
     let wrapper: Function = lua
@@ -94,10 +94,10 @@ pub(crate) fn install(lua: &Lua, ctx: &LoaderContext) -> mlua::Result<()> {
 ///         (None, None) = UTF-8 でない名前。元の ffi.load に同じ引数で渡す
 fn prepare(
     lua: &Lua,
-    name: &mlua::String,
+    name: &mlua::LuaString,
     base_dir: &Path,
     search_dirs: &[PathBuf],
-) -> mlua::Result<(Option<mlua::String>, Option<String>)> {
+) -> mlua::Result<(Option<mlua::LuaString>, Option<String>)> {
     let Ok(name) = name.to_str() else {
         return Ok((None, None));
     };

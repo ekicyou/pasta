@@ -23,23 +23,23 @@
   - 新しいテストが mlua 0.11 の上で x86・x64 とも通り、`cargo test --all` が両方で全部通る。段 2 を 1 コミットにする
   - _Requirements: 3.7, 5.1, 5.2, 5.4_
 
-- [ ] 3. 段 3: mlua を 0.12.2 へ上げる
-- [ ] 3.1 ルートの依存の版を 0.12.2 にし、`Cargo.lock` を mlua に引かれる分だけ動かす
+- [x] 3. 段 3: mlua を 0.12.2 へ上げる
+- [x] 3.1 ルートの依存の版を 0.12.2 にし、`Cargo.lock` を mlua に引かれる分だけ動かす
   - 版の指定を `0.12.2`（0.12.2 以上・0.13 未満）にし、features の行・クレート側の `workspace = true`・`pub use mlua;`・静的 CRT の設定は変えない
   - `cargo update -p mlua` だけを使い、全体の更新はかけない
   - `git diff Cargo.lock` の差が、mlua・mlua-sys・`luajit-src`・`lua-src` の 4 つの版だけである
   - この時点ではまだビルドが通らなくてよい（移った名前で落ちる）。ビルドの確かめは 3.2 で 3.1 と合わせて行う
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
-- [ ] 3.2 0.12 で移った名前と非推奨になった名前を置き換える
+- [x] 3.2 0.12 で移った名前と非推奨になった名前を置き換える
   - デバッグ情報の型を `mlua::debug::Debug` に（6 ファイル）、文字列の型を `mlua::LuaString` に（6 ファイル・14 か所）置き換える。ほかの名前は変えない
   - ワークスペースが x86・x64 でビルドでき、`cargo clippy --all-targets --workspace -- -D warnings` が両方で警告 0 になる
   - _Requirements: 2.1, 2.3_
-- [ ] 3.3 新しい LuaJIT が `continue` 文を受け付けることを固定するテストを足す
+- [x] 3.3 新しい LuaJIT が `continue` 文を受け付けることを固定するテストを足す
   - pasta のランタイムで `continue` 文を含むチャンクを読み込んで走らせ、構文の誤りにならず、`continue` で飛ばした回が数えられないことを照合する
   - テストの注釈でマニュアル（`book/src/lua/basics.md`）の段落を指す
   - 新しいテストが x86・x64 で通る
   - _Requirements: 4.3_
-- [ ] 3.4 0.12.2 の上で関門をすべて通し、落ちたテストは挙動の差として扱う
+- [x] 3.4 0.12.2 の上で関門をすべて通し、落ちたテストは挙動の差として扱う
   - x86・x64 の `cargo test --all`（lua_test のランナー・デバッガ・searcher・FFI・`@toml`・`@enc`・結合の試験を含む）、x86・x64 の clippy（`-D warnings`）、`pasta_lsp` の WASM のビルド、`pasta_check` のライブラリの WASM の check を走らせる
   - 版上げの前に通っていたテストが落ちたら、期待を書き換えず、原因を mlua の差・LuaJIT の差・pasta の不具合に分け、戻せるなら pasta の側で戻す
   - 戻さない差は、そのテストの期待を新しい挙動に固定し、注釈で差を書く所（マニュアルの章）を指す。差の一覧を 4.3・4.4・4.5 に渡す
@@ -86,3 +86,4 @@
 ## Implementation Notes
 
 - 段 2: `__pairs` の罠は persistence.rs の `raw_entries` を通る 3 入口で押さえた。`log.rs` の `count_table_elements` も `Table::pairs` を使うので、段 3 で 0.12 の `Table::pairs` が生のたどり方のままかを `raw_entries` と合わせて確かめる。
+- 段 3: 0.12.2 でも `Table::pairs` は `__pairs` を呼ばず生のまま辿る（mlua-0.12.2/src/table.rs）。版上げで落ちた既存テストは無く、挙動の差は 3.3 の `continue` だけ（x64・x86 とも 3053 passed）。

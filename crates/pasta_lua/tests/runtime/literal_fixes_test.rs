@@ -95,7 +95,7 @@ fn test_newline_literal_round_trips_in_lua() {
     let lua = Lua::new();
     for value in NEWLINE_VALUES {
         let literal = StringLiteralizer::literalize(value).unwrap();
-        let back: mlua::String = lua.load(format!("return {literal}")).eval().unwrap();
+        let back: mlua::LuaString = lua.load(format!("return {literal}")).eval().unwrap();
         assert_eq!(
             back.as_bytes().as_ref(),
             value.as_bytes(),
@@ -153,7 +153,7 @@ fn test_newline_word_values_load_and_read_back() {
         .unwrap();
 
     for (i, value) in NEWLINE_VALUES.iter().enumerate() {
-        let back: mlua::String = lua
+        let back: mlua::LuaString = lua
             .load(format!("return require('pasta.act').new():word('w{i}')"))
             .eval()
             .unwrap();

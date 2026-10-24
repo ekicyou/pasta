@@ -22,7 +22,7 @@ pub(super) fn build_jit_off_vm() -> Lua {
 
 /// Read the chunk name + current line from a hook `Debug` (safe API), to
 /// locate the stop line for the test (mirrors hook.rs's pattern).
-pub(super) fn source_and_line(debug: &mlua::Debug) -> (String, u32) {
+pub(super) fn source_and_line(debug: &mlua::debug::Debug) -> (String, u32) {
     let src = debug.source();
     let source = src
         .source
