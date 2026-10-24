@@ -1,16 +1,16 @@
 {
   "feature_name": "recommend-menu-scenes",
   "created_at": "2026-10-24T04:26:44Z",
-  "updated_at": "2026-10-24T04:32:46Z",
+  "updated_at": "2026-10-24T05:06:57Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {

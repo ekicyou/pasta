@@ -198,3 +198,78 @@
 - **選んだ後のトークの渡し方**（Req 4.2）: メニューの値の 4 つ目の欄で送るか、`OnRecommendsiteChoice` で話すか。SSP の実機（Research Needed 1）で、URL を開くか・欄のトークが流れるかを確かめてから決める。
 - **ボタンの名前の結びつけ**（Req 7）: 3.6 は「`[scene.alias]` の表を使い回す」に決まった（3.6 のどの案とも違う第 5 の案）。既定の表は 7 件になる。ボタンの名前の受け手は、リソースの ID に結びついた名前を知る必要があるので、別名の表を Lua から引く口（`@pasta_search` など）が要る。`char*.recommendsites` の受け手（3.4）と同じ口で解けるかを一緒に決める。`search/mod.rs` は同じウェーブのほかの 3 本の持ち場に無い。
 - **辞書の検査の報告の種類**（Req 10.3・10.4・10.6）: `recommend-item-invalid`・`recommend-menu-talk` の 2 種類を `report.rs` に足す（3.7 の案 A を 2 種類に広げた）。`recommend-menu-talk` はメニューのシーンの本体のアクション行だけを見る。
+
+## 7. 設計フェーズの調査（2026-10-24）
+
+- 調査の種別: **Extension（軽い discovery）**。既存の受け手の置き方（`external_control.lua`・`scene_play.lua`）、その場で動かす道（`run_interrupt_scene`）、`GLOBAL` の組み込み、別名表（`pasta_core`）、`pasta_check` の段に沿う。新しい依存は無い。
+- 使ったスキル・規則: `kiro-spec-design`（`design-discovery-light`・`design-synthesis`・`design-review-gate`・`design-principles`）、テンプレート `specs/design.md`・`specs/research.md`。ponytail（最小の完全な変更）の方針。
+
+### 7.1 SSP・UKADOC の決まり（論点 a の根拠）
+
+- **出典**: 伺かドキュメント MCP（UKADOC `list_shiori_event.html#OnRecommendsiteChoice`、`list_shiori_resource.html#sakura.recommendsites` ほか、SSP ヘルプ `howto-rclick.html`・`config-extprog.html`、UKADOC `memo.html`）。WebFetch で `list_shiori_event.html` の本文も確かめた。
+- **書いてあること**
+  - `OnRecommendsiteChoice` は「メニューからサイトのリンクが選択された際に発生」。Reference0＝サイト名、1＝URL、2＝バナー（SSP のみ）、3＝`recommend`／`portal`（SSP のみ）、4＝0／1（sakura／kero。SSP のみ）、5＝メニューの上から何番目か（0 始まり。SSP のみ）。注記はこれだけ。
+  - リソースの値は「項目名 `\1` URL `\1` バナー `\1` 選択時トークスクリプト `\2` 項目名 2 …」。トーク部分はさくらスクリプト。URL を `script:` で始めるとそのスクリプトを実行する。
+  - SSP ヘルプ（右クリックメニュー）: おすすめ・ポータルは「メニューから選択すると、ブラウザでそのサイトを開きます」。使うブラウザは「外部アプリ」の設定（「おすすめ等からURLを参照する場合に使用するブラウザ」）。
+- **書いていないこと**: ゴーストが `OnRecommendsiteChoice` に 200 で答えたときに SSP が URL を開くのをやめるか。選択時トークの欄と `OnRecommendsiteChoice` の両方があるとき両方流すか。Reference5 が区切り線を数えるか。`char*` のメニューで Reference4 が何になるか。
+- **手元の実例（決まりではなく証拠）**: SSP 同梱の Emily/Phase4（`C:\wintools\ssp\ghost\emily4\ghost\master\aya_ghostintroduce.dic`）は、`OnRecommendsiteChoice` で紹介のトークを返す。そのとき、メニューから来た（Reference1 の URL がある）ときだけ「配布元へ飛ぶ」選択肢を**出さない**（アンカーから来たときだけ出す）。メニューの値は `名前\1URL\1\1\2` の形で、トークの欄は空、各項目の後ろに `\2` を付ける。項目の特定は Reference0（名前）・Reference1（URL）・Reference4（sakura／kero）で行い、Reference5 を使わない。→ SSP の作者側のゴーストが「選ぶと SSP が URL を開き、同時にゴーストが話す」前提で書かれていると読める。
+
+### 7.2 コードの調べ（論点 b〜f）
+
+- `@pasta_search` は `PastaLuaRuntime::with_config_and_source_map`（`runtime/mod.rs` 207 行）で、**main.lua・entry.lua より前に**、本番と同じ別名表を持って登録される（`finalize_scene` は同じ表で登録し直す）。既定ハンドラのファイルは require の時点で別名表を引ける。→ `char*.recommendsites`・`char*.recommendsites.caption` の受け手は require の時点で置ける（論点 b）。
+- 別名は**登録と検索の両方**に効く: `＊おすすめメニュー` は `sakura.recommendsites` の名前で登録され、`SEARCH:search_scene_exact("sakura.recommendsites")` で引ける（`scene_alias_declared_name_test.rs`）。→ メニューの受け手はリソースの ID で完全一致を引けばよく、別名表を読む必要が無い。別名表を Lua から読むのは、ボタンの名前（単語は別名の対象外）と `char*` の受け手の一覧のためだけ。
+- `SceneAliasTable::entries()` は置き換え先・別名とも辞書順（書いた順ではない）。空の配列を書いたキーは別名を 1 つも持たないので、表に現れない（＝既定を消す、が自然に成り立つ）。
+- `ACT_IMPL.init_scene` は `STORE.last_global_scene` を書き換える（`choice_select.lua` が Reference2 の無い選択肢のスコープに使う）。メニューのシーンを動かすと、表示中の選択肢の探索範囲が変わりうる。→ その場で動かす道は、動かす前の値を控えて戻す。
+- `ACT_IMPL.yield` は `self:build()` の前に `resume_auto_talk` を呼ぶ。`GLOBAL.yield`・`GLOBAL["チェイントーク"]` は `act:yield()` を呼び、`＞yield` は `find_act_handler` の L3（`self[key]`）で引かれる。→ act のインスタンスの欄 `yield` に関数を置けば、どちらの書き方でも欄の関数が先に引かれる（`run_interrupt_scene` が `iact.build` を差し替える手口と同じ）。
+- `SHIORI_ACT_IMPL.get_property` は `coroutine.yield(self:build())` で区切る。インスタンスの `build` を素の `ACT.IMPL.build` にしておけば、持ち越し（`STORE.actor_spots`・`STORE.appearance`）に触れずに区切る。予約は `CALLBACK.has_staged()`・`discard_staged()` で捨てられる（`_staged` は 1 枠で、`EVENT.drive` が毎回すぐ消費するので、メニューの要求の時点でほかのシーンの予約は残っていない）。
+- `FAILURE.report` は表記を `act.token` に積み、`nil` を返す。未定義の変数・関数を引数に渡すと、組み込みは `nil` を受け取り、表記はトークンに残る。→ トークンを捨てれば表記は値に混ざらない（Research Needed 2 は閉じた）。単語は Call の引数の式に直接書けない（`Expr` に単語の参照は無い）。`＄x＝＠単語` で変数に入れてから渡す。
+- Call の生成コードは、書いた引数の後ろにいまのシーンの引数を `table.unpack(args)` で足す。メニューのシーンは引数なしで動かすので、メニューのシーンの中の `＞おすすめ項目` は書いた引数だけを受け取る。引数つきで呼んだ共通のシーンの中では、その引数が後ろに付く（既存の Call の決まり）。
+- 例外は `SHIORI.request` の xpcall が受け、`On` で始まらない ID は `STOP.response` が表記を出さず `RES.err`（500 と `X-Error-Reason`）にする。→ 受け手は止まったエラーを投げ直すだけで Req 9.5 を満たす。
+- `pasta_check` の `SceneModel.globals[].declared` は別名を置き換えた後の名前。照合用の名前に揃えて比べれば、実行時の完全一致（`resolve_scene_id_exact`）と同じ判定になる。`pasta_core` に新しい口は要らない。
+- `pasta_shiori/tests/scene_alias_ontalk_e2e_test.rs` は「見出しだけの `[scene.alias]` で別名を消す」版を作っている。A3 で意味が変わるので、`OnTalk = []` に直す必要がある。
+- `pasta_lua/src/search/context.rs` は 1,017 行（本体約 437 行、残りはテスト）。メソッドを 1 つ足すだけにし、テストは `tests/search/scene_search_test.rs` に置く。
+
+### 7.3 総合（design-synthesis）
+
+- **一般化**: 4 つのメニューの ID（`char*` を含む）は「リソースの ID で完全一致のシーンを引き、その場で 1 回だけ動かし、積んだ項目を値にする」1 本の関数で受ける。ボタンの名前の 4 種も「ID に結びついた別名の名前で単語を引く」1 本の関数で受ける。受け手は ID ごとにその関数を閉じ込めて `REG` に置く。
+- **作るか使うか**: 選んだ後のトークは SSP の `OnRecommendsiteChoice` と pasta の既存の `EVENT.drive`（割り込み・中断の台詞）をそのまま使う。メニューの値の 4 つ目の欄は使わない。値の組み立て・項目の検証は小さいので自前で書く（ライブラリは不要）。
+- **簡素化**: `scene.lua`・`act.lua`・`event/init.lua`（1 行を除く）・`entry.lua`・`loader/mod.rs`・`sections.rs` は触らない。`GLOBAL` の 2 対は項目の入れ物の決まりを持つ新しいハンドラのファイルに置く（決まりを 1 か所に閉じる）。別名の合成は `pasta_core` に 1 関数だけ足し、エラーの種類を 1 つ足す。`pasta_core` に完全一致の検査用の口は足さない（`pasta_check` は `declared` を比べる）。
+
+## 8. 設計の決定（2026-10-24）
+
+### 決定: 選んだ後のトークは `OnRecommendsiteChoice` で話す（4 つ目の欄は空）
+- **背景**: Req 4.2 が設計に回した。
+- **案**: (1) メニューの値の 4 つ目の欄に項目のシーンの出力を入れる。(2) 4 つ目の欄は空にし、`OnRecommendsiteChoice` の既定の受け手が項目のシーンを動かす。
+- **選んだもの**: (2)。
+- **理由**: (1) はメニューを開くたびに全項目のシーンを動かして文字列にする必要があり、SHIORI の組み立てで持ち越しが動く（Req 5.2 に反する）。SSP が欄のスクリプトを流すときは pasta を通らないので、`chain-talk-interrupt` の決まり（Req 6.5）を当てられない。(2) は選んだときに 1 回だけ動かし、ふつうのイベントと同じ `EVENT.drive` に乗る。SSP ヘルプは「選択するとブラウザで開く」と書き、同梱の Emily/Phase4 は選択時にトークを返しつつ URL を開く前提で書かれている。
+- **トレードオフ**: SSP が「ゴーストが 200 で答えたら URL を開かない」振る舞いだった場合、Req 4.2 の URL が開かない。実機の確かめを OPEN QUESTION にする（design.md の Open Questions 1）。
+- **後で確かめること**: 実機の試験の手順（design.md）。
+
+### 決定: 選ばれた項目は「ID の推定 → Reference5 を手がかりに名前と URL で確かめる → 名前と URL で探す → ほかの並びも探す」
+- **案**: research 3.5 の α（Reference5 で引き、食い違えば名前と URL）・β（名前と URL だけ）。
+- **選んだもの**: α を簡単にしたもの。Reference3・4 から ID を推す（`portal`→`sakura.portalsites`、`recommend`＋`0`→`sakura`、`1`→`kero`、それ以外の数 N→`charN`）。その並びの `Reference5＋1` 番目（区切り線も 1 つと数えた位置）が名前と URL で一致すれば使い、違えば同じ並びから名前と URL が一致する最初の項目、無ければ覚えているほかの並びを決まった順で探す。
+- **理由**: Reference5 が区切り線を数えるか・`char*` の Reference4 が何かが分からなくても、どちらでも正しく引ける。Emily/Phase4 も名前・URL・側で引いている。
+- **トレードオフ**: 同じ並びに名前と URL の同じ項目が 2 つあり、Reference5 も外れたときは最初のものになる（まれ）。
+
+### 決定: 別名表の合成は `pasta_core` の `SceneAliasTable::with_written`、既定とのぶつかりは新しいエラーの種類
+- **選んだもの**: 書いた行だけをまず `from_entries` で検証し（今の文言と行番号を保つ。Req 2.5）、次に「書かなかったキーの既定＋書いた行」を `from_entries` で検証する。2 回目の重複は必ず既定の別名との重複なので `SceneAliasError::ConflictsWithDefault` に読み替える。pasta.dll（`config/mod.rs`）と `pasta_check`（`validate/config.rs`）の両方がこれを呼ぶ。
+- **理由**: 規則が 1 か所になり、2 つの読み方がずれない。文言の差（既定の相手・直し方）を型で持てる。
+
+### 決定: 別名表を Lua から読む口は `SEARCH:scene_aliases()`
+- **案**: (1) `@pasta_search` にメソッドを 1 つ。(2) `@pasta_config` に合成した表を足す（`runtime/mod.rs` は `mlua-stdlib-removal` の持ち場）。(3) Lua で書いた表を読み直して合成（規則が 2 か所になる）。
+- **選んだもの**: (1)。`{ [置き換え先] = { 別名, … } }`（`entries()` の順）を返す。
+
+### 決定: `GLOBAL` の 2 対は新しいハンドラのファイルに置く
+- **理由**: 項目の入れ物（act の欄）の決まりを、受け手と同じファイルに閉じる。`entry.lua` を触らずに済む。`pasta_check` の一致テストは実行時の `GLOBAL` を列挙するので、置き場所によらず働く。
+
+### 決定: その場で動かす道は「素の関数を自前のコルーチンで 1 回だけ resume」
+- research 3.2 の案 1、3.3 の案 a。加えて `STORE.last_global_scene` を控えて戻す（7.2）。
+
+### 決定: 値の形は Emily/Phase4 と同じく各項目の後ろに `\2` を付ける
+- 区切り線は `-\1\1\1\2`。トークの欄は常に空。
+
+## 9. リスク（設計）
+
+- SSP が 200 の応答で URL を開かない — 実機の試験（design.md の Open Questions 1）。開かなかったときは、項目のシーンの出力の前に URL を開くさくらスクリプトを足す案を設計で選び直す。
+- 見出しだけの `[scene.alias]` で別名を消していたゴーストに既定が戻る・`＊おすすめメニュー` という名前のふつうのシーンがメニューになる — マニュアルと `!` の件名で知らせる（Req 11.4・11.7）。
+- `builtin_default()` の件数・表示を前提にしたテストの直しが広い — 実装のタスクで `cargo test` の全体を回して洗い出す。
