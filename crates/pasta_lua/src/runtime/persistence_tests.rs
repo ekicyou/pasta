@@ -1117,3 +1117,21 @@ fn test_read_big_integer_is_lua_number() {
         .unwrap();
     assert!(ok);
 }
+
+/// 呼ばれたら誤りを起こす `__pairs` を持つ表（3.7）。
+const PAIRS_TRAP: &str = r#"local function trap() return setmetatable({ a = 1 }, { __pairs = function() error("called") end }) end"#;
+
+#[test]
+fn test_codec_does_not_call_pairs_metamethod() {
+    // 3.7: セーブとログの表は `__pairs` を呼ばず、生の中身だけを読む
+    let (root, dropped) = codec_doc(&format!("{PAIRS_TRAP} return trap()"));
+    assert_eq!(root, doc("a = 1"));
+    assert!(dropped.is_empty(), "{dropped:?}");
+
+    let (nested, dropped) = codec_doc(&format!("{PAIRS_TRAP} return {{ t = trap() }}"));
+    assert_eq!(nested, doc("t = { a = 1 }"));
+    assert!(dropped.is_empty(), "{dropped:?}");
+
+    let log = codec_strict(&format!("{PAIRS_TRAP} return trap()"), SAVE_MAX_DEPTH).unwrap();
+    assert_eq!(log, toml::Value::Table(doc("a = 1")));
+}
