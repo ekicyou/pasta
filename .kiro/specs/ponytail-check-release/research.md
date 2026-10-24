@@ -9,8 +9,8 @@
   - brief の 1〜8 は、どれも今も残っている。行番号は 2026-10-24 の再測定のまま（`ensure_within` などは 1 行ずれ）。
   - 1〜3 の壊れるケースを、スクラッチの一時フォルダで実際に再現した。2 は「パスが長すぎて失敗」ではなく、**スタックあふれでプロセスが落ちる**（`Error:` も終了コード 1 も出ない）。
   - 監査のやり直しで、同じ領域の新しい指摘が 11 件（N1〜N11）。いちばん重いのは N1（`--nar` が開発フォルダの中の作者のファイルを指すと、段 1 で消して nar に置き換え、成功と報告する。再現済み）。
-  - brief の Approach の「`--release` は在れば `canonicalize`、`--nar` は `absolute` で比べる」は、そのままでは働かない。Windows の `canonicalize` は `\\?\C:\…` の形を返し、`absolute` は `C:\…` を返すので、`starts_with` が決して真にならない（N15）。まだ無いパスは「在る一番近い親を `canonicalize` して、残りを足す」形で比べる必要がある。
-  - 説明の文書は brief の 3 か所のほかに、README の仕様メモ（外す守りの記述）と、スキルの `references/nar-spec.md`（段 1 の説明）にも及ぶ（N14）。`gen-skill-refs` は `debug/validate.md` を元にしないので、走らせても変わらない（`--check` で確かめるだけ）。
+  - brief の Approach の「`--release` は在れば `canonicalize`、`--nar` は `absolute` で比べる」は、そのままでは働かない。Windows の `canonicalize` は `\\?\C:\…` の形を返し、`absolute` は `C:\…` を返すので、`starts_with` が決して真にならない（5 の 1 を参照）。まだ無いパスは「在る一番近い親を `canonicalize` して、残りを足す」形で比べる必要がある。
+  - 説明の文書は brief の 3 か所のほかに、README の仕様メモ（外す守りの記述）と、スキルの `references/nar-spec.md`（段 1 の説明）にも及ぶ（3 の表の 8.x の行を参照）。`gen-skill-refs` は `debug/validate.md` を元にしないので、走らせても変わらない（`--check` で確かめるだけ）。
 
 ---
 
@@ -44,7 +44,7 @@
 | 3 | `--nar` が `--release` の中にあると .nar が自分を含む | **残っている**。`nar.rs` 9〜28 行（`File::create` 17 行の後に `read_dir` が書きかけの nar を拾う） | 再現 D。成功と報告する |
 | 4 | 見本のゴーストの試験の道具が `pasta_shiori.dll` を探す（lib の名前は `pasta`） | **残っている**。`tests/common/mod.rs` 16〜46 行、`tests/integration_test.rs` 216〜234 行 | 道具を使うのは、その試験 1 本だけ。DLL が無ければ自分で作った文言に「pasta_shiori.dll」が入っているかを見るだけなので、決して落ちない。この道具のために `shell_assets_test.rs` 13〜15 行が `#[allow(dead_code)] mod common;` を置いている（N9） |
 | 5 | `updates.txt` を集めるとき、読み取りの誤りを握りつぶす | **残っている**。`update_files.rs` 170 行の `read_dir.flatten()` | 控えより広い。165〜168 行で `read_dir` 自体の失敗も `Ok(())` にしている（N3）。その振る舞いを `test_generate_update_files_nonexistent_root_returns_zero`（359〜366 行）が固定している。205 行の更新日時も握りつぶす（N4） |
-| 6 | 決して働かない守り（`ensure_within`・`ensure_no_parent_component`） | **残っている**。`copy.rs` 13〜27 行と呼び出し 51〜52 行、試験 135〜151 行。`nar.rs` 30〜41 行と呼び出し 83〜84 行、試験 311〜341 行 | 行が 1 つずれただけ。README の仕様メモ 137 行がこの守りを説明している（N14） |
+| 6 | 決して働かない守り（`ensure_within`・`ensure_no_parent_component`） | **残っている**。`copy.rs` 13〜27 行と呼び出し 51〜52 行、試験 135〜151 行。`nar.rs` 30〜41 行と呼び出し 83〜84 行、試験 311〜341 行 | 行が 1 つずれただけ。README の仕様メモ 137 行がこの守りを説明している（3 の表の 8.x の行を参照） |
 | 7 | `non_unicode_name` の写しが 2 つ | **残っている**。`nar.rs` 43〜49 行、`update_files.rs` 150〜156 行 | 同じ |
 | 8 | 見本のゴーストの試験の写し | **残っている** | `neutralize_debug_env` は 3 ファイル（`self_deploy_integration_test.rs` 35〜41・`touch_shortcuts_test.rs` 15〜21・`tutorial_stages_test.rs` 25〜31 行。どれも `#[ctor::ctor(unsafe)]`）。写す処理は名前違いを含めて 3 つ（`self_deploy` の `copy_tree_skip_profile` 59〜76 行、`touch` の `copy_master` 36〜49 行、`tutorial` の `copy_master` 184〜198 行。違いは `pasta.dll` を外すかだけ。3 つとも `.flatten()` で読み取りの誤りを握りつぶす＝N10）。`dist_src_validation_test.rs` の 4 ファイルの存在の確かめは、`integration_test.rs` の `test_pasta_toml_content`・`test_ukadoc_files` が同じ 4 ファイルを `unwrap` で読むので、丸ごと重複 |
 
@@ -128,7 +128,7 @@
 
 ## 5. Research Needed（設計へ持ち越す）
 
-1. **正規化の形**: `fs::canonicalize` は Windows で `\\?\C:\…`（UNC なら `\\?\UNC\…`）を返す。`std::path::absolute` は `C:\…` を返す。両者を `Path::starts_with` で比べても一致しない（N15）。どのパスも「`absolute` で絶対にし、在る一番近い親を `canonicalize` して、無い残りの部品を足す」形にそろえる案が、8.3・大文字と小文字・junction を在る部分で解き、まだ無いパス（`--release`・`--nar`）にも効く。まだ無い部分は在るフォルダと同じになりえないので、残りの部品を書かれたまま足しても判定は崩れない。`..` が無い残りの部品に入る場合（Windows の `absolute` は字面で `..` を畳むので問題にならない見込み）を確かめる。
+1. **正規化の形**: `fs::canonicalize` は Windows で `\\?\C:\…`（UNC なら `\\?\UNC\…`）を返す。`std::path::absolute` は `C:\…` を返す。両者を `Path::starts_with` で比べても一致しない（5 の 1 を参照）。どのパスも「`absolute` で絶対にし、在る一番近い親を `canonicalize` して、無い残りの部品を足す」形にそろえる案が、8.3・大文字と小文字・junction を在る部分で解き、まだ無いパス（`--release`・`--nar`）にも効く。まだ無い部分は在るフォルダと同じになりえないので、残りの部品を書かれたまま足しても判定は崩れない。`..` が無い残りの部品に入る場合（Windows の `absolute` は字面で `..` を畳むので問題にならない見込み）を確かめる。
 2. **同じ・中にあるの比べ方**: `Path::starts_with` は部品ごとの比べで、`C:\dev\g` と `C:\dev\ghost` を取り違えない。正規化の後は大文字と小文字もそろうので、そのまま使える見込み。ドライブ文字の大小（`c:` と `C:`）は `canonicalize` がそろえる。
 3. **8.3 の短い名前の試験**: `pasta_check` に `windows-sys` の dev-dependency を足すと `Cargo.lock` が変わり、同じウェーブで `Cargo.lock` の席を持つ `mlua-stdlib-removal` と重なる。要件 7.3 は書き方の違いの試験に 8.3 を入れていない。CI の `%TEMP%` が `RUNNER~1` なので、`TempDir` のパスと正規化した形が混ざる試験は CI で自然に 8.3 を通る。明示の試験を置くかは設計で決める（置くなら、依存を足さずに作る方法を探す）。
 4. **段 5 の読み取りの誤りの試験**: 読めないフォルダを Windows の一時フォルダで作る方法（ACL で読み取りを拒む・`generate_update_files` を在らないフォルダに直接呼ぶ など）。いちばん小さいのは、関数の単位で在らないフォルダを渡す試験（今の `…_nonexistent_root_returns_zero` を誤りの期待に替える）。
