@@ -101,9 +101,8 @@ local STORE = require("pasta.store")
 local ACT = require("pasta.act")
 
 --- MenuMemory: リソースの ID → 最後に開いたときの並び（メモリ上だけ。OnRecommendsiteChoice が読む）
---- 読む側（OnRecommendsiteChoice の受け手）を置くまでは書くだけなので、未使用の警告を止める
 ---@type table<string, RecommendItem[]>
-local last = {} -- luacheck: ignore 241
+local last = {}
 
 --- 区切り: 自動トークを再開せず、組み立てずに止める（resume は 1 回だけなので続きは捨てる）
 local function cut()
@@ -181,4 +180,79 @@ end
 -- 作者が先に置いた受け手を上書きしない
 for _, id in ipairs(menu_ids) do
     REG[id] = REG[id] or menu_receiver(id)
+end
+
+-- ============================================================================
+-- 選んだときの受け手（ChoiceReceiver）
+-- ============================================================================
+
+--- 推す ID（Reference3: recommend／portal、Reference4: 0・1・char の番号）。分からなければ nil
+---@param ref table<integer, string>
+---@return string|nil
+local function preferred_id(ref)
+    if ref[3] == "portal" then return "sakura.portalsites" end
+    local owner = ref[3] == "recommend" and tostring(ref[4]):match("^%d+$")
+    if owner == "0" then return "sakura.recommendsites" end
+    if owner == "1" then return "kero.recommendsites" end
+    return owner and ("char" .. owner .. ".recommendsites") or nil
+end
+
+--- 名前（Reference0）と URL（Reference1）が一致する項目か（区切り線は URL が空なので当たらない）
+local function matches(item, ref)
+    return item ~= nil and item.url ~= "" and item.name == ref[0] and item.url == ref[1]
+end
+
+--- 並びから名前と URL が一致する最初の項目
+local function first_match(items, ref)
+    for _, item in ipairs(items or {}) do
+        if matches(item, ref) then return item end
+    end
+    return nil
+end
+
+--- 開いたときの並びから選ばれた項目を探す
+---@param ref table<integer, string> act.req.reference
+---@return RecommendItem|nil
+local function find_chosen(ref)
+    local items = last[preferred_id(ref) or ""]
+    if items then
+        -- Reference5 は手がかり（区切り線も 1 つと数える位置）。外れれば同じ並びを探す
+        local hinted = items[(tonumber(ref[5]) or -1) + 1]
+        if matches(hinted, ref) then return hinted end
+        local item = first_match(items, ref)
+        if item then return item end
+    end
+    -- 覚えているほかの並びを決まった順に探す（char* は ID の文字列の昇順）
+    local chars = {}
+    for id in pairs(last) do
+        if id:match("^char") then chars[#chars + 1] = id end
+    end
+    table.sort(chars)
+    local order = { "sakura.recommendsites", "kero.recommendsites", "sakura.portalsites" }
+    for _, id in ipairs(chars) do order[#order + 1] = id end
+    for _, id in ipairs(order) do
+        local item = first_match(last[id], ref)
+        if item then return item end
+    end
+    return nil
+end
+
+--- 選んだ項目のシーンを完全一致で引き、コルーチンを返す（EVENT.drive がふつうの割り込みの決まりで再開する）
+REG.OnRecommendsiteChoice = REG.OnRecommendsiteChoice or function(act)
+    local SCENE = require("pasta.scene")
+    local item = find_chosen(act.req.reference or {})
+    if not (item and item.scene) then
+        -- EVENT.no_entry と同じ前方一致（無ければ nil で 204）
+        return SCENE.co_exec(act, act.req.id)
+    end
+    local co = SCENE.co_exec_exact(item.scene)
+    if co then return co end
+    -- 書き間違いを ＊OnRecommendsiteChoice で隠さない
+    local FAILURE = require("pasta.failure")
+    FAILURE.report(act, {
+        label = FAILURE.LABEL.SCENE_NOT_FOUND,
+        subject = "＊" .. item.scene,
+        warning = "OnRecommendsiteChoice: scene not found: name='" .. item.scene .. "'",
+    })
+    return act:build()
 end

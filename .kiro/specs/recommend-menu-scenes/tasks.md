@@ -60,7 +60,7 @@
   - _Boundary: InPlaceRun_
   - _Requirements: 4.5, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 9.4, 9.5, 9.6, 12.2_
 
-- [ ] 3.4 `OnRecommendsiteChoice` で、選ばれた項目のシーンを話させる
+- [x] 3.4 `OnRecommendsiteChoice` で、選ばれた項目のシーンを話させる
   - Reference3・4 で推す ID を決め、Reference5 を手がかりに名前（Reference0）と URL（Reference1）で確かめ、外れれば同じ並び、さらにほかの覚えている並びを決まった順で探す（区切り線は対象にしない。Reference5 が区切りを数えても数えなくても引ける）
   - 項目のシーンを完全一致で引いてコルーチンを返し、ふつうのイベントと同じ割り込みの決まりで再開させる（黙って捨てる再生の印は付けない）。項目が無い・シーンの引数が無いときは `OnRecommendsiteChoice` の前方一致のシーンへ回し、それも無ければ 204
   - 項目のシーンが辞書に無いときは「シーンが見つからない」の表記と warn を返し、`＊OnRecommendsiteChoice` へは回さない

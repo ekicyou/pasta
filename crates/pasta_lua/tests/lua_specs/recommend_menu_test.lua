@@ -586,3 +586,246 @@ describe("recommend_menu - ほかの状態に触れない", function()
         end)
     end)
 end)
+
+-- ============================================================================
+-- 3.4: OnRecommendsiteChoice（ChoiceReceiver）
+-- 依存閉包を読み直し、メニューを SHIORI.request で開いてから選ぶ。
+-- ============================================================================
+
+--- 読み直した集合で状態を作り、body(ctx) を走らせる
+--- names: 書いた名前 → 大域の登録名の並び（make_search と同じ）。aliases: scene_aliases の戻り値
+--- ctx: STORE・REG・warns・menu_runs・request(id, reference)・scene(global, fn)・talk(act, text)・menu(global, items)
+local function with_choice(names, aliases, body)
+    for _, name in ipairs(RELOAD) do package.loaded[name] = nil end
+    local ctx = { warns = {}, menu_runs = 0 }
+    local noop = function() end
+    with_loaded({
+        ["@pasta_search"] = make_search(names, aliases),
+        ["@pasta_log"] = {
+            trace = noop, debug = noop, info = noop, error = noop,
+            warn = function(msg) ctx.warns[#ctx.warns + 1] = msg end,
+        },
+    }, function()
+        local ENTRY = require("pasta.shiori.entry")
+        local STORE = require("pasta.store")
+        local CALLBACK = require("pasta.shiori.event.callback")
+        ctx.STORE = STORE
+        ctx.REG = require("pasta.shiori.event.register")
+        STORE.reset()
+        CALLBACK.reset()
+        STORE.actors = { sakura = { name = "さくら", spot = 0 } }
+        ctx.request = function(id, reference)
+            return ENTRY.request({
+                id = id, method = "get", version = 30, reference = reference or {},
+                security_level = "local",
+            })
+        end
+        ctx.scene = function(global, fn)
+            require("pasta.scene").register(global, "__start__", fn)
+        end
+        ctx.talk = function(act, text)
+            act:talk(STORE.actors.sakura, text)
+        end
+        --- 項目を並べるメニューのシーン（items: { 名前, URL, シーン } の並び。"-" は区切り線）
+        ctx.menu = function(global, items)
+            ctx.scene(global, function(act)
+                ctx.menu_runs = ctx.menu_runs + 1
+                for _, item in ipairs(items) do
+                    if item == "-" then
+                        act:call(nil, "おすすめ区切り", {})
+                    else
+                        act:call(nil, "おすすめ項目", {}, item[1], item[2], item[3])
+                    end
+                end
+            end)
+        end
+        local ok, err = pcall(body, ctx)
+        STORE.reset()
+        CALLBACK.reset()
+        if not ok then error(err, 0) end
+    end)
+end
+
+--- 選んだときの Reference（0 始まり。2 はバナーなし）
+local function chosen(name, url, kind, owner, pos)
+    return { [0] = name, [1] = url, [2] = "", [3] = kind, [4] = owner, [5] = pos }
+end
+
+local function has(res, part)
+    return res:find(part, 1, true) ~= nil
+end
+
+--- メニューと項目のシーン（A・C）を持つ検索の名前
+local function choice_names(extra)
+    local names = {
+        ["sakura.recommendsites"] = { "rms_ch_menu" },
+        ["rms項目A"] = { "rms_ch_a" },
+        ["rms項目C"] = { "rms_ch_c" },
+    }
+    for k, v in pairs(extra or {}) do names[k] = v end
+    return names
+end
+
+--- 項目のシーン A・C を登録する
+local function item_scenes(ctx)
+    ctx.scene("rms_ch_a", function(act) ctx.talk(act, "ATALK") end)
+    ctx.scene("rms_ch_c", function(act) ctx.talk(act, "CTALK") end)
+end
+
+local MAIN_ITEMS = { { "A", "ua", "rms項目A" }, "-", { "B", "ub" }, { "C", "uc", "rms項目C" } }
+
+describe("recommend_menu - 選んだ項目のシーン", function()
+    test("項目のシーンが話し、メニューのシーンは動かし直さない", function()
+        with_choice(choice_names(), nil, function(ctx)
+            ctx.menu("rms_ch_menu", MAIN_ITEMS)
+            item_scenes(ctx)
+            expect(has(ctx.request("sakura.recommendsites"), "200 OK")):toBe(true)
+            local res = ctx.request("OnRecommendsiteChoice", chosen("C", "uc", "recommend", "0", "3"))
+            expect(has(res, "200 OK")):toBe(true)
+            expect(has(res, "CTALK")):toBe(true)
+            expect(ctx.menu_runs):toBe(1)
+            expect(next(ctx.STORE.co_preempt)):toBeNil()
+        end)
+    end)
+
+    test("並びが変わっても最後に開いた並びから引く（Reference5 が区切りを数えても数えなくても）", function()
+        local names = choice_names({ ["sakura.recommendsites"] = { "rms_ch_m1", "rms_ch_m2" } })
+        with_choice(names, nil, function(ctx)
+            ctx.menu("rms_ch_m1", { { "A", "ua", "rms項目A" }, "-", { "C", "uc", "rms項目C" } })
+            ctx.menu("rms_ch_m2", { { "C", "uc", "rms項目C" }, "-", { "A", "ua", "rms項目A" } })
+            item_scenes(ctx)
+            ctx.request("sakura.recommendsites")
+            ctx.request("sakura.recommendsites")
+            -- 2 は区切りを数えた位置、1 は数えない位置（区切り線に当たる）、0 は外れた手がかり
+            for _, pos in ipairs({ "2", "1", "0" }) do
+                local res = ctx.request("OnRecommendsiteChoice", chosen("A", "ua", "recommend", "0", pos))
+                expect(has(res, "ATALK")):toBe(true)
+            end
+            expect(ctx.menu_runs):toBe(2)
+        end)
+    end)
+
+    test("同じ名前と URL の項目は Reference3・4 で推す並びから引く（char2 は Reference4 が 2）", function()
+        local names = choice_names({ ["char2.recommendsites"] = { "rms_ch_c2" } })
+        local aliases = { ["char2.recommendsites"] = { "rms三人目" } }
+        with_choice(names, aliases, function(ctx)
+            ctx.menu("rms_ch_menu", { { "X", "ux", "rms項目A" } })
+            ctx.menu("rms_ch_c2", { { "X", "ux", "rms項目C" } })
+            item_scenes(ctx)
+            ctx.request("sakura.recommendsites")
+            expect(has(ctx.request("char2.recommendsites"), "200 OK")):toBe(true)
+            local res = ctx.request("OnRecommendsiteChoice", chosen("X", "ux", "recommend", "2", "0"))
+            expect(has(res, "CTALK")):toBe(true)
+            res = ctx.request("OnRecommendsiteChoice", chosen("X", "ux", "recommend", "0", "0"))
+            expect(has(res, "ATALK")):toBe(true)
+        end)
+    end)
+
+    test("推す並びに無ければ、覚えているほかの並びから引く", function()
+        with_choice(choice_names(), nil, function(ctx)
+            ctx.menu("rms_ch_menu", MAIN_ITEMS)
+            item_scenes(ctx)
+            ctx.request("sakura.recommendsites")
+            local res = ctx.request("OnRecommendsiteChoice", chosen("A", "ua", "portal", "0", "0"))
+            expect(has(res, "ATALK")):toBe(true)
+        end)
+    end)
+end)
+
+describe("recommend_menu - 選んだ項目を特定できない・シーンが無い", function()
+    local function names_with_default()
+        return choice_names({ ["OnRecommendsiteChoice"] = { "rms_ch_def" } })
+    end
+
+    test("3 つ目の引数が無い項目は ＊OnRecommendsiteChoice が話す", function()
+        with_choice(names_with_default(), nil, function(ctx)
+            ctx.menu("rms_ch_menu", MAIN_ITEMS)
+            item_scenes(ctx)
+            ctx.scene("rms_ch_def", function(act) ctx.talk(act, "DEFTALK") end)
+            ctx.request("sakura.recommendsites")
+            local res = ctx.request("OnRecommendsiteChoice", chosen("B", "ub", "recommend", "0", "2"))
+            expect(has(res, "DEFTALK")):toBe(true)
+        end)
+    end)
+
+    test("メニューを開いた記憶が無ければ ＊OnRecommendsiteChoice が話し、それも無ければ 204", function()
+        with_choice(names_with_default(), nil, function(ctx)
+            item_scenes(ctx)
+            ctx.scene("rms_ch_def", function(act) ctx.talk(act, "DEFTALK") end)
+            local res = ctx.request("OnRecommendsiteChoice", chosen("A", "ua", "recommend", "0", "0"))
+            expect(has(res, "DEFTALK")):toBe(true)
+        end)
+        with_choice(choice_names(), nil, function(ctx)
+            item_scenes(ctx)
+            local res = ctx.request("OnRecommendsiteChoice", chosen("A", "ua", "recommend", "0", "0"))
+            expect(has(res, "204 No Content")):toBe(true)
+        end)
+    end)
+
+    test("項目のシーンが辞書に無ければ「シーンが見つからない」の表記と warn（既定のシーンへは回さない）", function()
+        with_choice(names_with_default(), nil, function(ctx)
+            ctx.menu("rms_ch_menu", { { "D", "ud", "rms無いシーン" } })
+            ctx.scene("rms_ch_def", function(act) ctx.talk(act, "DEFTALK") end)
+            ctx.request("sakura.recommendsites")
+            local res = ctx.request("OnRecommendsiteChoice", chosen("D", "ud", "recommend", "0", "0"))
+            expect(has(res, "シーンが見つからない")):toBe(true)
+            expect(has(res, "＊rms無いシーン")):toBe(true)
+            expect(has(res, "DEFTALK")):toBe(false)
+            expect(ctx.warns[#ctx.warns]):toBe("OnRecommendsiteChoice: scene not found: name='rms無いシーン'")
+        end)
+    end)
+end)
+
+describe("recommend_menu - 選んだときの割り込みと受け手", function()
+    --- 前半を出して後半を待たせる続きを作る
+    local function start_chain(ctx)
+        ctx.scene("rms_ch_chain", function(act)
+            ctx.talk(act, "ZENHAN")
+            act:yield()
+            ctx.talk(act, "KOUHAN")
+        end)
+        ctx.REG.OnRmsChain = function()
+            return require("pasta.scene").co_exec_registered("rms_ch_chain", "__start__")
+        end
+        expect(has(ctx.request("OnRmsChain"), "ZENHAN")):toBe(true)
+        expect(type(ctx.STORE.co_scene)):toBe("thread")
+    end
+
+    test("チェイントークが待っていれば続きを捨て、＊チェイントーク中断 を出す", function()
+        local names = choice_names({ ["チェイントーク中断"] = { "rms_ch_chudan" } })
+        with_choice(names, nil, function(ctx)
+            ctx.menu("rms_ch_menu", MAIN_ITEMS)
+            item_scenes(ctx)
+            ctx.scene("rms_ch_chudan", function(act) ctx.talk(act, "CHUDAN") end)
+            ctx.request("sakura.recommendsites")
+            start_chain(ctx)
+            local res = ctx.request("OnRecommendsiteChoice", chosen("A", "ua", "recommend", "0", "0"))
+            expect(has(res, "CHUDAN")):toBe(true)
+            expect(has(res, "ATALK")):toBe(false)
+            expect(ctx.STORE.co_scene):toBeNil()
+        end)
+    end)
+
+    test("作者が先に代入した REG.OnRecommendsiteChoice が勝つ", function()
+        with_choice(choice_names(), nil, function(ctx)
+            local mine = function() return "mine" end
+            ctx.REG.OnRecommendsiteChoice = mine
+            package.loaded[MODULE] = nil
+            require(MODULE)
+            expect(rawget(ctx.REG, "OnRecommendsiteChoice")):toBe(mine)
+        end)
+    end)
+
+    test("REG:register の鎖が nil を返せば組み込みの受け手が答える", function()
+        with_choice(choice_names(), nil, function(ctx)
+            ctx.menu("rms_ch_menu", MAIN_ITEMS)
+            item_scenes(ctx)
+            ctx.request("sakura.recommendsites")
+            local seen = 0
+            ctx.REG:register("OnRecommendsiteChoice", function() seen = seen + 1 end)
+            local res = ctx.request("OnRecommendsiteChoice", chosen("A", "ua", "recommend", "0", "0"))
+            expect(seen):toBe(1)
+            expect(has(res, "ATALK")):toBe(true)
+        end)
+    end)
+end)
