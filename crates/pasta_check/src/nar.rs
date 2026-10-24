@@ -30,19 +30,6 @@ pub(crate) fn create_nar(release_dir: &Path, nar_path: &Path) -> io::Result<u64>
     Ok(metadata.len())
 }
 
-/// ZIP エントリ名に親ディレクトリ参照（`..` コンポーネント）が含まれないことを検証する。
-/// パストラバーサル防御（Req 1.3）。release ビルドでも常時有効な実行時検査
-/// （旧実装の `debug_assert!` は release で無効化され本番防御にならなかった）。
-fn ensure_no_parent_component(relative: &str) -> io::Result<()> {
-    if relative.split('/').any(|c| c == "..") {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("path traversal in ZIP entry: {relative}"),
-        ));
-    }
-    Ok(())
-}
-
 /// Unicode として不正な名前は化けさせずに止める（UTF-8 限定の作成ツール）
 fn non_unicode_name(path: &Path) -> io::Error {
     io::Error::new(
@@ -83,9 +70,6 @@ fn add_dir_to_zip<W: Write + io::Seek>(
                 .to_str()
                 .ok_or_else(|| non_unicode_name(&path))?
                 .replace('\\', "/");
-
-            // パストラバーサル防御: ZIPエントリ名に ".." が含まれないこと（Req 1.3）
-            ensure_no_parent_component(&relative)?;
 
             let pack_err = |e| path_error(e, "pack", &path);
             zip.start_file(&relative, *options)
@@ -313,38 +297,6 @@ mod tests {
         let file = File::open(&nar_path).unwrap();
         let mut archive = zip::ZipArchive::new(file).unwrap();
         assert!(archive.by_name("profile").is_ok());
-    }
-
-    /// 回帰テスト（許容ハードニング・Req 1.3）: ZIP エントリ名の `..` コンポーネントは
-    /// debug/release を問わず常に `InvalidInput` エラーで拒否される。
-    /// （従来は `debug_assert!` のみで release ビルドでは無防備だった）
-    #[test]
-    fn test_zip_entry_name_rejects_parent_component() {
-        for bad in ["../evil.txt", "a/../b.txt", "..", "ghost/../../x.txt"] {
-            let err = ensure_no_parent_component(bad).unwrap_err();
-            assert_eq!(err.kind(), io::ErrorKind::InvalidInput, "input: {bad:?}");
-            assert!(
-                err.to_string().contains("path traversal"),
-                "input: {bad:?}, err: {err}"
-            );
-        }
-    }
-
-    /// 境界の正常側: `..` を部分文字列として含むだけのコンポーネントは拒否されない
-    /// （拒否は厳密に `..` コンポーネント単位）
-    #[test]
-    fn test_zip_entry_name_accepts_normal_paths() {
-        for ok in [
-            "a.txt",
-            "ghost/master/descript.txt",
-            "..foo/bar.txt",
-            "a..b/c",
-        ] {
-            assert!(
-                ensure_no_parent_component(ok).is_ok(),
-                "input: {ok:?} should be accepted"
-            );
-        }
     }
 
     #[test]

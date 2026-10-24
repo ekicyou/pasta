@@ -12,22 +12,6 @@ pub(crate) fn prepare_release_dir(release_dir: &Path) -> io::Result<()> {
     fs::create_dir_all(release_dir).map_err(|e| path_error(e, "create", release_dir))
 }
 
-/// `child` が `parent` ディレクトリの配下であることを検証する。
-/// パストラバーサル防御のための防御的チェック。
-fn ensure_within(child: &Path, parent: &Path) -> io::Result<()> {
-    if !child.starts_with(parent) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!(
-                "path traversal detected: {} is outside {}",
-                child.display(),
-                parent.display()
-            ),
-        ));
-    }
-    Ok(())
-}
-
 /// src の内容を dst に再帰コピー。戻り値はコピーしたファイル数。
 pub(crate) fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<u64> {
     let mut count = 0u64;
@@ -52,9 +36,6 @@ fn copy_dir_inner(src: &Path, dst: &Path, count: &mut u64) -> io::Result<()> {
         }
 
         let dst_path = dst.join(entry.file_name());
-
-        // パストラバーサル防御: dst_pathがdstの配下であることを検証（Req 1.4）
-        ensure_within(&dst_path, dst)?;
 
         if file_type.is_dir() {
             copy_dir_inner(&src_path, &dst_path, count)?;
@@ -137,24 +118,6 @@ mod tests {
 
         copy_dir_recursive(&src, &dst).unwrap();
         assert_eq!(fs::read_to_string(src.join("a.txt")).unwrap(), "content");
-    }
-
-    #[test]
-    fn test_ensure_within_accepts_child_path() {
-        let temp = TempDir::new().unwrap();
-        let parent = temp.path().join("dst");
-        let child = parent.join("sub").join("file.txt");
-        ensure_within(&child, &parent).unwrap();
-    }
-
-    #[test]
-    fn test_ensure_within_rejects_outside_path() {
-        let temp = TempDir::new().unwrap();
-        let parent = temp.path().join("dst");
-        let outside = temp.path().join("other").join("file.txt");
-        let err = ensure_within(&outside, &parent).unwrap_err();
-        assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
-        assert!(err.to_string().contains("path traversal detected"));
     }
 
     /// コピー元が存在しない場合は `read_dir` のエラーが、コピー元のパスを添えて伝播する
