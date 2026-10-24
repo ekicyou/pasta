@@ -234,3 +234,11 @@
 - cargo-deny の `unused-allowed-license` は既定で警告（失敗にならない）。依存が減って使われなくなる許可のライセンスがあっても、`deny.toml`・`about.toml` は触らない。
 - `recommend-menu-scenes` と `lua/shiori-events.md` の既定ハンドラーの表を共有する → この spec は `OnPastaSetSaveVariable` の行の文だけを直す。行の数・表の前の「9 つ」には触らない。後から入る側が合わせる。
 - `toml-serialization` と `tech.md`・マニュアルの頁を共有する → この spec は `tech.md` の mlua-stdlib の依存の行と、組み込みモジュールの表の `@env` の行（と `@toml` の行を足す）だけを直す。
+
+## 10. kiro-complete への申し送り（破壊的変更の知らせ方）
+
+- **PR の題名の案**: `feat(mlua-stdlib-removal)!: mlua-stdlib の 6 つのモジュールを外して @toml を足し、OnPastaSetSaveVariable の型を Reference2 で受ける（破壊的変更）`。`release-notes.ps1` は main の件名の `!` だけを見るので、squash マージの件名（PR の題名）に必ず `!` を付ける。
+- **`release` スキルへ渡す「動きが変わる点」**:
+  1. `@assertions`・`@testing`・`@env`・`@regex`・`@json`・`@yaml` の 6 つのモジュールを外した。`require` すると失敗する。TOML の文字列は新しい `@toml` の `decode` で表に読み、文字列は Lua 標準の `string` の関数で調べる。
+  2. `OnPastaSetSaveVariable` は値を JSON として読まず、Reference2 の型（省けば `string`・`number`・`boolean`・`delete`）で読む。`"01"` のような引用符の包みや `null` による削除は使えない。トークの間隔の変数は `number` を付けて送る。
+  3. Rust から `pasta_lua` を使う人向け: `RuntimeConfig` から 6 つの名前と `should_enable_module` が無くなった。`libs` に 6 つの名前を並べても誤りにならず、黙って無視される。
