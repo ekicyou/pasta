@@ -53,7 +53,7 @@ spot = 1
 
 ## 組み込みモジュール
 
-ランタイムは `@pasta_search`・`@pasta_persistence`・`@pasta_config`・`@pasta_sakura_script`・`@enc`・`@pasta_log` を登録し、mlua-stdlib の `@json`・`@yaml`・`@regex`・`@assertions`・`@testing` を既定で有効にします（`@env` は既定で無効）。各モジュールの API は [公開モジュール API](https://ekicyou.github.io/pasta/lua/modules/index.html) を参照してください。
+ランタイムは `@pasta_search`・`@pasta_persistence`・`@pasta_config`・`@pasta_sakura_script`・`@enc`・`@pasta_log`・`@toml`（TOML の文字列を表に読む `decode`）を登録します。各モジュールの API は [公開モジュール API](https://ekicyou.github.io/pasta/lua/modules/index.html) を参照してください。
 
 ## 使用方法
 
@@ -74,22 +74,21 @@ let result = runtime.exec("return 1 + 1")?;
 ```rust
 use pasta_lua::{PastaLoader, RuntimeConfig};
 
-// デフォルト設定（std_all + assertions, testing, regex, json, yaml）
+// デフォルト設定（std_all）
 let config = RuntimeConfig::new();
 let runtime = PastaLoader::load_with_config("path/to/base", config)?;
 
-// 全機能有効（std_all_unsafe + @env モジュール含む）
+// 全機能有効（std_all_unsafe、debug ライブラリを含む）
 let config = RuntimeConfig::full();
 let runtime = PastaLoader::load_with_config("path/to/base", config)?;
 
-// 最小構成（std_all のみ、mlua-stdlib モジュールなし）
+// 最小構成（std_all のみ）
 let config = RuntimeConfig::minimal();
 let runtime = PastaLoader::load_with_config("path/to/base", config)?;
 
 // カスタム構成
 let config = RuntimeConfig::from_libs(vec![
     "std_all".into(),
-    "regex".into(),
     "-std_io".into(),  // io を除外
 ]);
 let runtime = PastaLoader::load_with_config("path/to/base", config)?;

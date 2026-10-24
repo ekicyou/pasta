@@ -51,7 +51,7 @@
 | `LoaderError` | `crates/pasta_lua/src/loader/error.rs` | 起動シーケンスのエラー。設定・入出力・検出・キャッシュ・自己展開・トランスパイルの部分失敗・ランタイムの構築失敗を区別する |
 | `setup_package_path` | `crates/pasta_lua/src/runtime/module_registry.rs` | `package.path` を設定し、searcher を置換し、読み込んだファイルの表（`@pasta_chunks`）を作る。`@pasta_config` の登録（`register_config_module`）も同じファイルにある |
 | searcher | `crates/pasta_lua/src/runtime/searcher.rs` | `install_module_searcher`。`package.loaders` の 2 番目（Lua ファイルの searcher）を Rust の実装に置き換える。`register_chunk_table` が作る `@pasta_chunks` に、読み込めたファイルを書き足す |
-| `RuntimeConfig`・`lua_require` | `crates/pasta_lua/src/runtime/runtime_config.rs` | VM に入れる標準ライブラリと mlua-stdlib のモジュール、解決済みのデバッグ設定、キックの注入口を持つ設定。`[loader] ffi` が真なら `with_ffi` が `std_ffi` を足す。`lua_require` は Rust から Lua の `require` を呼ぶ |
+| `RuntimeConfig`・`lua_require` | `crates/pasta_lua/src/runtime/runtime_config.rs` | VM に入れる標準ライブラリ、解決済みのデバッグ設定、キックの注入口を持つ設定。`[loader] ffi` が真なら `with_ffi` が `std_ffi` を足す。`lua_require` は Rust から Lua の `require` を呼ぶ |
 | `ffi.load` の置き換え | `crates/pasta_lua/src/runtime/ffi_load/` | 設置（`install`）・Lua のラッパ・`prepare`・名前の規則（`resolve.rs`）・Windows の呼び出し（`win32.rs`）。詳細は [ffi.load の置き換え](#ffiload-の置き換え) |
 | 既定の `main` | `crates/pasta_lua/pasta_scripts/main.lua` | 空の表を返すだけの利用者初期化スクリプト。自己展開され、`scripts/main.lua` があればそちらが優先される |
 | `pasta.config` | `crates/pasta_lua/pasta_scripts/pasta/config.lua` | `@pasta_config` を `pcall(require, …)` で取り込み、`get(section, key, default)` で値か既定値を返す Lua 側のラッパ。`@pasta_config` を取得できない環境（テストなど）では空の表を使う |

@@ -10,10 +10,6 @@
 //! 形が崩れていれば、0 件として素通りせず panic（テストの失敗）にする
 //! （`tutorial_stages_test.rs` と同じ流儀）。
 
-// このファイルが使うのは `workspace_root` だけ（DLL を写すヘルパーは使わない）
-#[allow(dead_code)]
-mod common;
-
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::BufReader;
@@ -75,6 +71,13 @@ struct SurfaceDef {
 
 fn shell_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ghosts/hello-pasta/shell/master")
+}
+
+fn workspace_root() -> &'static Path {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .unwrap()
 }
 
 /// 立ち絵のサーフェス番号（0〜8・10〜18）
@@ -464,7 +467,7 @@ fn pixels_outside_face_are_identical_within_a_pose() {
 /// 入門ガイドの見本（`book/src/img/hello-pasta/`）は、シェルの同じ名前の絵とバイト単位で同じ。
 #[test]
 fn book_sample_images_are_byte_identical_to_shell() {
-    let book_dir = common::workspace_root().join("book/src/img/hello-pasta");
+    let book_dir = workspace_root().join("book/src/img/hello-pasta");
     for id in [0, 10] {
         let name = png_name(id);
         let read = |path: PathBuf| {
@@ -489,7 +492,7 @@ fn book_shell_chapter_code_blocks_are_shell_excerpts() {
         std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("{}: 読めない: {e}", path.display()))
     };
-    let chapter = read(common::workspace_root().join("book/src/reference/shell.md"));
+    let chapter = read(workspace_root().join("book/src/reference/shell.md"));
     let files = ["descript.txt", "surfaces.txt"].map(|name| (name, read(shell_dir().join(name))));
     let mut matched = [0usize; 2];
     let blocks = text_blocks(&chapter);

@@ -31,7 +31,6 @@
 - **pasta_dsl**: DSLパーサー層
 - **pasta_core**: レジストリ層
 - **mlua 0.11**: Lua VMバインディング（LuaJIT 2.1, features: luajit52, vendored, serialize）
-- **mlua-stdlib 0.1**: Lua標準拡張ライブラリ（json, regex, yaml）
 - **regex 1.x**: 正規表現（さくらスクリプトタグ検出）
 - **thiserror 2**: エラー型定義
 - **toml 1.1.2**: pasta の既定の書式。設定ファイル（pasta.toml）・セーブデータ（`@pasta_persistence`）・ソースマップのサイドカー（`.map`）の読み書き、`@pasta_log` の表の 1 行の書き出し
@@ -255,7 +254,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
 | `@enc`                 | UTF-8⇔ANSI変換                          |                            |
 | `@pasta_log`           | ロギング（trace/debug/info/warn/error） |                            |
 | `@pasta_debug`         | デバッグの有効と、位置からのシーンの引き当て（内部。`OnPastaScene`・`OnPastaSceneAt` の既定ハンドラーが使う） | 本番の入口だけが登録 |
-| `@env`                 | 環境変数アクセス                        | **無効**（セキュリティ上） |
+| `@toml`                | TOML の文字列を表に読む（`decode`）     |                            |
 
 ### シーン関数定型パターン
 

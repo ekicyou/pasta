@@ -1,16 +1,7 @@
 -- external-control-events: 外からの操作のイベントの既定のハンドラの単体テスト
--- まずは単体テストの土台が本物の @json を出していることを確かめる。
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
-
-describe("単体テストの土台の @json", function()
-    test("null は userdata、false は真偽値で返る", function()
-        local json = require("@json")
-        expect(type(json.decode("null"))):toBe("userdata")
-        expect(json.decode("false")):toBe(false)
-    end)
-end)
 
 -- ============================================================================
 -- 2.1: 既定のハンドラ REG.OnPastaCallFunction
@@ -236,22 +227,22 @@ end)
 
 -- ============================================================================
 -- 2.2: 既定のハンドラ REG.OnPastaSetSaveVariable
--- pasta.save は代役の表。@json は土台の本物。
+-- pasta.save は代役の表。Reference2 の型に従って Reference1 を読む。
 -- ============================================================================
 
 local EVENT_SET = "OnPastaSetSaveVariable"
 
---- 代入を 1 回送る。save は前の値を入れた代役の表
-local function set(name, text, opts)
+--- 代入を 1 回送る。kind は Reference2（nil なら送らない）。save は前の値を入れた代役の表
+local function set(name, text, kind, opts)
     opts = opts or {}
     opts.save = opts.save or { ["会員番号"] = "前の値" }
-    local result, warns = call(EVENT_SET, { [0] = name, [1] = text }, opts)
+    local result, warns = call(EVENT_SET, { [0] = name, [1] = text, [2] = kind }, opts)
     return result, warns, opts.save
 end
 
 describe("OnPastaSetSaveVariable - 門と作者の優先", function()
     test("SecurityLevel が external なら変えずに nil を返し、warn を 1 行出す", function()
-        local result, warns, save = set("会員番号", "60", { security_level = "external" })
+        local result, warns, save = set("会員番号", "60", "number", { security_level = "external" })
         expect(result):toBeNil()
         expect(save["会員番号"]):toBe("前の値")
         expect(#warns):toBe(1)
@@ -271,39 +262,66 @@ describe("OnPastaSetSaveVariable - 門と作者の優先", function()
     end)
 end)
 
+--- 代入して nil（204）を返し、警告を出さず、値が want（型も）であることを確かめる
+local function expect_assigned(name, text, kind, want)
+    local result, warns, save = set(name, text, kind)
+    expect(result):toBeNil()
+    expect(#warns):toBe(0)
+    expect(type(save[name])):toBe(type(want))
+    expect(save[name]):toBe(want)
+end
+
 describe("OnPastaSetSaveVariable - 代入", function()
-    test("数値・文字列・真偽値を代入し、nil（204）を返す。false も消えない", function()
-        local cases = {
-            { "60", 60 }, { '"01"', "01" }, { "true", true }, { "false", false },
-        }
-        for _, c in ipairs(cases) do
-            local result, warns, save = set("会員番号", c[1])
-            expect(result):toBeNil()
-            expect(#warns):toBe(0)
-            expect(type(save["会員番号"])):toBe(type(c[2]))
-            expect(save["会員番号"]):toBe(c[2])
+    test("型を省く・空・string なら届いた文字列をそのまま代入する（何の書式としても読まない）", function()
+        for _, kind in ipairs({ false, "", "string" }) do
+            for _, text in ipairs({ "01", '"01"', "60", "null", "" }) do
+                expect_assigned("会員番号", text, kind or nil, text)
+            end
         end
     end)
 
-    test("null ならキーを消す", function()
-        local result, warns, save = set("会員番号", "null")
-        expect(result):toBeNil()
-        expect(#warns):toBe(0)
-        expect(save["会員番号"]):toBeNil()
+    test("number なら Lua の標準の数の読み方で数値を代入する", function()
+        local cases = { { "60", 60 }, { "-1.5", -1.5 }, { " 60 ", 60 }, { "0x10", 16 }, { "1e3", 1000 } }
+        for _, c in ipairs(cases) do
+            expect_assigned("会員番号", c[1], "number", c[2])
+        end
+    end)
+
+    test("boolean なら true・false を真偽値で代入する。false も消えない", function()
+        expect_assigned("会員番号", "true", "boolean", true)
+        expect_assigned("会員番号", "false", "boolean", false)
+    end)
+
+    test("delete なら Reference1 を見ずにキーを消し、nil（204）を返す", function()
+        for _, text in ipairs({ false, "", "60", "abc" }) do
+            local result, warns, save = set("会員番号", text or nil, "delete")
+            expect(result):toBeNil()
+            expect(#warns):toBe(0)
+            expect(save["会員番号"]):toBeNil()
+        end
     end)
 
     test("名前を区切らない（a.b はそのままのキー）", function()
-        local _, _, save = set("a.b", "1")
+        local _, _, save = set("a.b", "1", "number")
         expect(save["a.b"]):toBe(1)
         expect(save.a):toBeNil()
     end)
 
     test("予約変数にも代入できる", function()
-        local result, _, save = set("pasta_talk_interval_min", "60")
+        local result, _, save = set("pasta_talk_interval_min", "60", "number")
         expect(result):toBeNil()
         expect(save.pasta_talk_interval_min):toBe(60)
     end)
 end)
+
+--- 失敗して表記・警告 1 行を出し、前の値が残ることを確かめる
+local function expect_refused(text, kind, notation, warning)
+    local result, warns, save = set("会員番号", text, kind)
+    expect(contains(result, notation)):toBe(true)
+    expect(#warns):toBe(1)
+    expect(warns[1]):toBe(warning)
+    expect(save["会員番号"]):toBe("前の値")
+end
 
 describe("OnPastaSetSaveVariable - 失敗", function()
     test("Reference0 が無い・空なら 名前にならない値 の表記と警告", function()
@@ -315,49 +333,59 @@ describe("OnPastaSetSaveVariable - 失敗", function()
         expect(warns[1]):toBe("OnPastaSetSaveVariable: bad argument: Reference0=''")
     end)
 
-    test("Reference1 が無い・空・読めないなら JSON として読めない値（読めない文字列は引用符なし）で、前の値が残る", function()
+    test("number で数にならない・無限大・非数なら 数にできない値（値は引用符なし）で、前の値が残る", function()
         local cases = {
-            { nil, "値なし", "nil" },
+            { "abc", "abc", "'abc'" },
             { "", "空文字列", "''" },
-            { "nul", "nul", "'nul'" },
-            { "01", "01", "'01'" },
-            { "{", "{", "'{'" },
+            { nil, "値なし", "nil" },
+            { "inf", "inf", "'inf'" },
+            { "nan", "nan", "'nan'" },
+            { "1e999", "1e999", "'1e999'" },
+            { "-1e999", "-1e999", "'-1e999'" },
         }
-        for _, c in ipairs(cases) do
-            local result, warns, save = set("会員番号", c[1])
-            expect(contains(result, "【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（" .. c[2] .. "）】"))
-                :toBe(true)
-            expect(#warns):toBe(1)
-            expect(warns[1]):toBe("OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1=" .. c[3])
-            expect(save["会員番号"]):toBe("前の値")
+        for i = 1, #cases do
+            local c = cases[i]
+            expect_refused(c[1], "number",
+                "【数にできない値：OnPastaSetSaveVariable ＄＊会員番号（" .. c[2] .. "）】",
+                "OnPastaSetSaveVariable: not a number: name='会員番号', Reference1=" .. c[3])
         end
     end)
 
-    test("配列・オブジェクトは 代入できない値（表）で、前の値が残る", function()
-        for _, text in ipairs({ "[1,2]", '{"a":1}' }) do
-            local result, warns, save = set("会員番号", text)
-            expect(contains(result, "【代入できない値：OnPastaSetSaveVariable ＄＊会員番号（表）】")):toBe(true)
-            expect(#warns):toBe(1)
-            expect(warns[1]):toBe(
-                "OnPastaSetSaveVariable: JSON array or object is refused: name='会員番号', Reference1='" .. text .. "'")
-            expect(save["会員番号"]):toBe("前の値")
+    test("boolean で true・false でないなら 代入できない値 で、前の値が残る", function()
+        local cases = {
+            { "TRUE", "TRUE", "'TRUE'" },
+            { "1", "1", "'1'" },
+            { "", "空文字列", "''" },
+            { nil, "値なし", "nil" },
+        }
+        for i = 1, #cases do
+            local c = cases[i]
+            expect_refused(c[1], "boolean",
+                "【代入できない値：OnPastaSetSaveVariable ＄＊会員番号（" .. c[2] .. "）】",
+                "OnPastaSetSaveVariable: not a boolean: name='会員番号', Reference1=" .. c[3])
         end
     end)
 
-    test("@json が無いなら JSON の部品が無い の表記と警告で、前の値が残る", function()
-        local loaded, preload = package.loaded["@json"], package.preload["@json"]
-        package.loaded["@json"], package.preload["@json"] = nil, nil
-        local ok, result, warns, save = pcall(set, "会員番号", "60")
-        package.loaded["@json"], package.preload["@json"] = loaded, preload
-        expect(ok):toBe(true)
-        expect(contains(result, "【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（JSON の部品が無い）】"))
-            :toBe(true)
-        expect(warns[1]):toBe("OnPastaSetSaveVariable: @json is not available; variable not set: name='会員番号'")
-        expect(save["会員番号"]):toBe("前の値")
+    test("知らない型の名前（Number・数値）なら 型の名前にならない値 で、Reference1 が無くても型の誤りを出す", function()
+        for _, kind in ipairs({ "Number", "数値" }) do
+            for _, text in ipairs({ "60", false }) do
+                expect_refused(text or nil, kind,
+                    "【型の名前にならない値：OnPastaSetSaveVariable ＄＊会員番号（" .. kind .. "）】",
+                    "OnPastaSetSaveVariable: unknown type: name='会員番号', Reference2='" .. kind .. "'")
+            end
+        end
+    end)
+
+    test("型を省く・空・string で Reference1 が無いなら 代入できない値（値なし）で、前の値が残る", function()
+        for _, kind in ipairs({ false, "", "string" }) do
+            expect_refused(nil, kind or nil,
+                "【代入できない値：OnPastaSetSaveVariable ＄＊会員番号（値なし）】",
+                "OnPastaSetSaveVariable: no value: name='会員番号', Reference1=nil")
+        end
     end)
 
     test("balloon_warning = false なら表記を出さず nil、ログは出し、前の値が残る", function()
-        local result, warns, save = set("会員番号", "[1,2]", { balloon = false })
+        local result, warns, save = set("会員番号", "abc", "number", { balloon = false })
         expect(result):toBeNil()
         expect(#warns):toBe(1)
         expect(save["会員番号"]):toBe("前の値")

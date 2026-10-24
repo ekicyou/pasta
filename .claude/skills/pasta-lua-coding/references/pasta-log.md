@@ -11,7 +11,7 @@ local log = require "@pasta_log"
 
 **モジュールのメタデータ**: `_VERSION = "0.1.0"`、`_DESCRIPTION = "Lua logging bridge to Rust tracing"`
 
-ランタイムのモジュール構成に関係なく、常に登録される（[mlua-stdlib 統合モジュール](mlua-stdlib.md) の有効・無効に左右されない）。
+ランタイムのモジュール構成に関係なく、常に登録される。
 
 ## 出力先とログレベル
 

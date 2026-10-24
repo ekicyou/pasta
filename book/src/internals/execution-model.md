@@ -120,13 +120,13 @@ ACT・STORE・PROXY・SCENE・SAVE の内部構造は [Lua ランタイム内部
 from_loader_with_scene_dic
  0. pasta.toml の [debug] と環境変数からデバッグ設定を解決し、RuntimeConfig に載せる
  1. with_config_and_source_map
-    a. RuntimeConfig の libs を検証して警告（std_debug・std_all_unsafe・env）
+    a. RuntimeConfig の libs を検証して警告（std_debug・std_all_unsafe）
        std_package を欠けば ConfigError::MissingRequiredLibrary で失敗（VM を作らない）
     b. libs を mlua の StdLib に変換し、Lua::unsafe_new_with で VM を作る
        math があれば、時刻とプロセス ID から作った種で math.randomseed を呼ぶ
     c. @pasta_search を登録（トランスパイル時の TranspileContext のレジストリと、RuntimeConfig の別名表から）
-    d. libs に応じて @assertions・@testing・@env・@regex・@json・@yaml を登録
-    e. @pasta_log を登録（libs に依らず常に）
+    d. @pasta_log を登録（libs に依らず常に）
+    e. @toml を登録（libs に依らず常に）
     f. debug::enable を 1 回だけ呼ぶ（無効なら何もしない）
  2. ロガー・PastaConfig・ベースディレクトリを構造体に保持
  3. package.path を設定し、require の searcher を差し替え、@pasta_chunks（読み込んだファイルの表）を置く

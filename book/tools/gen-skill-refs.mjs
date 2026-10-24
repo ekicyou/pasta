@@ -56,7 +56,7 @@ export const GENERATION_MAP = Object.freeze([
   ['lua/modules/pasta-sakura-script.md', LC],
   ['lua/modules/enc.md', LC],
   ['lua/modules/pasta-log.md', LC],
-  ['lua/modules/mlua-stdlib.md', LC],
+  ['lua/modules/toml.md', LC],
   ['lua/shiori-events.md', LC],
   ['reference/startup.md', LC],
   ['lua/script-api.md', LC],

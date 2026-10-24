@@ -95,7 +95,7 @@ const EXPECTED_MAP = [
   ['lua/modules/pasta-sakura-script.md', 'pasta-lua-coding'],
   ['lua/modules/enc.md', 'pasta-lua-coding'],
   ['lua/modules/pasta-log.md', 'pasta-lua-coding'],
-  ['lua/modules/mlua-stdlib.md', 'pasta-lua-coding'],
+  ['lua/modules/toml.md', 'pasta-lua-coding'],
   ['lua/shiori-events.md', 'pasta-lua-coding'],
   ['reference/startup.md', 'pasta-lua-coding'],
   ['lua/script-api.md', 'pasta-lua-coding'],

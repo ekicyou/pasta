@@ -4,21 +4,13 @@
 //! `OnMouseDoubleClick`・`OnMouseMove` を送って、呼ばれたシーンを各シーンに固有の
 //! 台詞の一部が応答に含まれるかで確かめる（Req 9.6）。
 
+mod common;
+
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
 
 use pasta_lua::PastaLuaRuntime;
 use pasta_lua::loader::PastaLoader;
 use tempfile::TempDir;
-
-/// `tutorial_stages_test.rs` と同じく、環境の PASTA_DEBUG で固定ポートがぶつからないようにする
-#[ctor::ctor(unsafe)]
-fn neutralize_debug_env() {
-    unsafe {
-        std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
-    }
-}
 
 // 各シーンに固有の台詞の一部（08-touch.pasta・09-choice.pasta）。読点の後ろにはウェイトが入るので、読点をまたがない
 const POKE_GIRL_HEAD: &str = "頭をつつかれると";
@@ -32,27 +24,9 @@ const TOUCH_OTHER: &str = "くすぐったいってば";
 /// 撫での時刻の起点（任意の unix 秒）
 const T0: f64 = 1_700_000_000.0;
 
-/// master/ を（profile/ と pasta.dll を除いて）tempdir へ再帰コピーする
-fn copy_master(src: &Path, dst: &Path) {
-    std::fs::create_dir_all(dst).expect("create dst dir");
-    for entry in std::fs::read_dir(src).expect("read src dir").flatten() {
-        let path = entry.path();
-        let name = entry.file_name();
-        if entry.metadata().expect("metadata").is_dir() {
-            if name != "profile" {
-                copy_master(&path, &dst.join(&name));
-            }
-        } else if name != "pasta.dll" {
-            std::fs::copy(&path, dst.join(&name)).expect("copy file");
-        }
-    }
-}
-
 /// 配布辞書のゴーストを読み込む（TempDir は runtime より長く生かす）
 fn load_ghost() -> (TempDir, PastaLuaRuntime) {
-    let master = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ghosts/hello-pasta/ghost/master");
-    let temp = TempDir::new().expect("tempdir");
-    copy_master(&master, temp.path());
+    let temp = common::master_copy();
     let runtime = PastaLoader::load(temp.path()).expect("load hello-pasta");
     (temp, runtime)
 }

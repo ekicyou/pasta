@@ -3,7 +3,7 @@
 //! `updates.txt` を SSP 仕様に準拠して生成します。
 
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -86,9 +86,9 @@ fn days_to_ymd(mut days: u32) -> (u32, u32, u32) {
     (year, month, days + 1)
 }
 
-/// 段 4 の生成結果
+/// 段 5 の生成結果
 pub(crate) struct UpdateSummary {
-    /// ゴースト用 updates.txt の登録件数（0 なら生成していない。従来の戻り値と同じ意味）
+    /// ゴースト用 updates.txt の登録件数（0 なら生成していない）
     pub ghost_entries: usize,
     /// 生成したバルーン用 updates.txt の (フォルダ, 登録件数)。0 件で生成しなかったものは含めない
     pub balloon_entries: Vec<(String, usize)>,
@@ -102,8 +102,13 @@ pub(crate) fn generate_update_files(
     root_dir: &Path,
     balloon_dirs: &[String],
 ) -> io::Result<UpdateSummary> {
+    // 読み取りを全部終えてから書く（途中で止まっても updates.txt を残さない）
     let entries = collect_files(root_dir, balloon_dirs)?;
     let ghost_entries = entries.len();
+    let balloon_lists = balloon_dirs
+        .iter()
+        .map(|dir| Ok((dir, collect_files(&root_dir.join(dir), &[])?)))
+        .collect::<io::Result<Vec<_>>>()?;
 
     if !entries.is_empty() {
         generate_updates_txt(root_dir, &entries)?;
@@ -111,22 +116,20 @@ pub(crate) fn generate_update_files(
         // ghost/master が存在する場合、updates.txt をそこにもコピー
         let ghost_master = root_dir.join("ghost/master");
         if ghost_master.is_dir() {
-            fs::copy(
-                root_dir.join("updates.txt"),
-                ghost_master.join("updates.txt"),
-            )?;
+            let from = root_dir.join("updates.txt");
+            let to = ghost_master.join("updates.txt");
+            fs::copy(&from, &to)
+                .map_err(|e| crate::path_error(e, &format!("copy {} to", from.display()), &to))?;
         }
     }
 
     // バルーン用: フォルダ直下にだけ書く（ghost/master への複製はしない）
     let mut balloon_entries = Vec::new();
-    for dir in balloon_dirs {
-        let balloon_dir = root_dir.join(dir);
-        let entries = collect_files(&balloon_dir, &[])?;
+    for (dir, entries) in balloon_lists {
         if entries.is_empty() {
             continue;
         }
-        generate_updates_txt(&balloon_dir, &entries)?;
+        generate_updates_txt(&root_dir.join(dir), &entries)?;
         balloon_entries.push((dir.clone(), entries.len()));
     }
 
@@ -147,14 +150,6 @@ fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<Fi
     Ok(entries)
 }
 
-/// Unicode として不正な名前は化けさせずに止める（UTF-8 限定の作成ツール）
-fn non_unicode_name(path: &Path) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        format!("file name is not valid Unicode: {}", path.display()),
-    )
-}
-
 /// 再帰的にファイルを収集
 fn collect_files_recursive(
     root_dir: &Path,
@@ -162,20 +157,19 @@ fn collect_files_recursive(
     excluded_dirs: &[String],
     entries: &mut Vec<FileEntry>,
 ) -> io::Result<()> {
-    let read_dir = match fs::read_dir(current_dir) {
-        Ok(rd) => rd,
-        Err(_) => return Ok(()),
-    };
-
-    for entry in read_dir.flatten() {
-        let file_type = entry.file_type()?;
+    let read_err = |e| crate::path_error(e, "read", current_dir);
+    for entry in fs::read_dir(current_dir).map_err(read_err)? {
+        let entry = entry.map_err(read_err)?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|e| crate::path_error(e, "read", &path))?;
 
         // シンボリックリンクはスキップ（リンク先を追跡しない）
         if file_type.is_symlink() {
             continue;
         }
 
-        let path = entry.path();
         let name = entry.file_name();
 
         // 基準フォルダからの相対パス（スラッシュ区切り。read_dir の実在名から作る）
@@ -183,7 +177,7 @@ fn collect_files_recursive(
             .strip_prefix(root_dir)
             .map_err(|e| io::Error::other(e.to_string()))?
             .to_str()
-            .ok_or_else(|| non_unicode_name(&path))?
+            .ok_or_else(|| crate::non_unicode_name(&path))?
             .replace('\\', "/");
 
         if file_type.is_dir() {
@@ -196,13 +190,14 @@ fn collect_files_recursive(
                 continue;
             }
 
-            let metadata = fs::metadata(&path)?;
+            let read_err = |e| crate::path_error(e, "read", &path);
+            let metadata = fs::metadata(&path).map_err(read_err)?;
 
             entries.push(FileEntry {
-                path: relative_path,
-                md5: calculate_md5(&path)?,
+                md5: calculate_md5(&path).map_err(read_err)?,
                 size: metadata.len(),
-                modified: metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH),
+                modified: metadata.modified().map_err(read_err)?,
+                path: relative_path,
             });
         }
     }
@@ -214,18 +209,8 @@ fn collect_files_recursive(
 ///
 /// SSP 仕様準拠の非暗号学的ファイル変更検出用途。認証・署名には使用しない。
 fn calculate_md5(path: &Path) -> io::Result<String> {
-    let mut file = File::open(path)?;
     let mut context = md5::Context::new();
-    let mut buffer = [0u8; 8192];
-
-    loop {
-        let bytes_read = file.read(&mut buffer)?;
-        if bytes_read == 0 {
-            break;
-        }
-        context.consume(&buffer[..bytes_read]);
-    }
-
+    io::copy(&mut File::open(path)?, &mut context)?;
     let digest = context.finalize();
     Ok(format!("{:032x}", digest))
 }
@@ -236,10 +221,11 @@ fn calculate_md5(path: &Path) -> io::Result<String> {
 ///   以降: `file,<filepath>\x01<md5>\x01size=<bytes>\x01date=<YYYY-MM-DDTHH:MM:SS>\x01<CRLF>`
 fn generate_updates_txt(root_dir: &Path, entries: &[FileEntry]) -> io::Result<()> {
     let output_path = root_dir.join("updates.txt");
-    let mut file = File::create(&output_path)?;
+    let write_err = |e| crate::path_error(e, "write", &output_path);
+    let mut file = File::create(&output_path).map_err(write_err)?;
 
     // charset ヘッダー（UTF-8 ゴースト向け）
-    file.write_all(b"charset,UTF-8\r\n")?;
+    file.write_all(b"charset,UTF-8\r\n").map_err(write_err)?;
 
     for entry in entries {
         let date = format_datetime(entry.modified);
@@ -247,7 +233,7 @@ fn generate_updates_txt(root_dir: &Path, entries: &[FileEntry]) -> io::Result<()
             "file,{}\x01{}\x01size={}\x01date={}\x01\r\n",
             entry.path, entry.md5, entry.size, date
         );
-        file.write_all(record.as_bytes())?;
+        file.write_all(record.as_bytes()).map_err(write_err)?;
     }
 
     Ok(())
@@ -356,13 +342,105 @@ mod tests {
         assert!(!temp.path().join("updates.txt").exists());
     }
 
-    /// root が存在しない場合も collect_files が空集合へフォールバックし Ok(0)
+    /// root が存在しないときは 0 件の成功でなく「無い」の誤りになり、文にパスが入る
     #[test]
-    fn test_generate_update_files_nonexistent_root_returns_zero() {
+    fn test_generate_update_files_nonexistent_root_is_not_found() {
         let temp = TempDir::new().unwrap();
         let missing = temp.path().join("no_such_dir");
-        let count = generate_update_files(&missing, &[]).unwrap().ghost_entries;
-        assert_eq!(count, 0);
+        let err = generate_update_files(&missing, &[]).err().unwrap();
+        assert_eq!(err.kind(), io::ErrorKind::NotFound);
+        assert!(
+            err.to_string()
+                .starts_with(&format!("cannot read {}: ", missing.display())),
+            "{err}"
+        );
+    }
+
+    /// 根の下のフォルダを排他で開いたままだと、そのフォルダの読みの誤りで止まり updates.txt を作らない
+    #[cfg(windows)]
+    #[test]
+    fn test_generate_update_files_locked_dir_fails_without_updates_txt() {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+
+        let temp = TempDir::new().unwrap();
+        fs::write(temp.path().join("a.txt"), "a").unwrap();
+        let locked = temp.path().join("sub");
+        fs::create_dir(&locked).unwrap();
+        fs::write(locked.join("b.txt"), "b").unwrap();
+        let _handle = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+            .open(&locked)
+            .unwrap();
+
+        let err = generate_update_files(temp.path(), &[]).err().unwrap();
+        assert!(
+            err.to_string()
+                .starts_with(&format!("cannot read {}: ", locked.display())),
+            "{err}"
+        );
+        assert!(!temp.path().join("updates.txt").exists());
+    }
+
+    /// 根の下のファイルを排他で開いたままだと、中身の読みの誤りになり文にそのファイルのパスが入る
+    #[cfg(windows)]
+    #[test]
+    fn test_generate_update_files_locked_file_error_carries_path() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let temp = TempDir::new().unwrap();
+        let locked = temp.path().join("a.txt");
+        fs::write(&locked, "a").unwrap();
+        let _handle = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&locked)
+            .unwrap();
+
+        let err = generate_update_files(temp.path(), &[]).err().unwrap();
+        assert!(
+            err.to_string()
+                .starts_with(&format!("cannot read {}: ", locked.display())),
+            "{err}"
+        );
+        assert!(!temp.path().join("updates.txt").exists());
+    }
+
+    /// 同梱バルーンの中のフォルダが読めないときも、ゴースト用・バルーン用どちらの updates.txt も作らない
+    #[cfg(windows)]
+    #[test]
+    fn test_generate_update_files_locked_balloon_dir_fails_without_updates_txt() {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+
+        let temp = TempDir::new().unwrap();
+        fs::write(temp.path().join("a.txt"), "a").unwrap();
+        let balloon = "balloon/mine".to_string();
+        let balloon_dir = temp.path().join(&balloon);
+        fs::create_dir_all(&balloon_dir).unwrap();
+        fs::write(balloon_dir.join("descript.txt"), "d").unwrap();
+        let locked = balloon_dir.join("sub");
+        fs::create_dir(&locked).unwrap();
+        fs::write(locked.join("b.txt"), "b").unwrap();
+        let _handle = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+            .open(&locked)
+            .unwrap();
+
+        let err = generate_update_files(temp.path(), &[balloon])
+            .err()
+            .unwrap();
+        assert!(
+            err.to_string()
+                .starts_with(&format!("cannot read {}: ", locked.display())),
+            "{err}"
+        );
+        assert!(!temp.path().join("updates.txt").exists());
+        assert!(!balloon_dir.join("updates.txt").exists());
     }
 
     /// EXCLUDED_DIRS の "var" ディレクトリが除外されること（profile は既存テストで担保）

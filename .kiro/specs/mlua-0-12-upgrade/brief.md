@@ -96,3 +96,15 @@ pasta の Lua ランタイムは mlua 0.11（LuaJIT 2.1、features `luajit52`・
 - **見つけた穴・古くなった記述**
   - Current State の「serde の変換を使うファイルは 4」は 3。
   - Upstream に `toml-serialization` を、ファイルの順として足す（今は Adjacent にだけある）。値の変換の特性化の試験は、`toml-serialization` が入った後のセーブとログの表に対して書く。あちらが手書きの変換にすれば、この spec の値の変換の直しは減る。
+
+## 申し送り（ponytail-check-release より、2026-10-24）
+
+- `crates/pasta_sample_ghost/tests/self_deploy_integration_test.rs` の形が変わった。ファイルの中の `neutralize_debug_env`・`copy_tree_skip_profile`・`fresh_ghost_copy`・`fixture_master_dir` は無くなり、`mod common;` の `common::master_copy()`（`profile/` と `pasta.dll` を除いて master を一時フォルダへ写す）と、`common/mod.rs` の `#[ctor]`（`PASTA_DEBUG`・`PASTA_DEBUG_PORT` を外す）を使う。mlua の直しでこのファイルを触るときは、今の形の上で直す。
+- `common/mod.rs` の公開の口はこの 2 つだけ（`touch_shortcuts_test.rs`・`tutorial_stages_test.rs` も使う）。参照: `.kiro/specs/completed/ponytail-check-release/design.md` の「SampleGhostTests」。
+
+## 申し送り（mlua-stdlib-removal より・2026-10-24）
+
+- mlua-stdlib は依存から外れた（ルートと `pasta_lua` の `Cargo.toml`・`Cargo.lock`）。上の「依存」「mlua-stdlib が止めている」「tech.md」の記述は古い。
+- `RuntimeConfig` の公開の中身が変わった: `default_libs()`・`new()`・`minimal()` は `["std_all"]`、`full()` は `["std_all_unsafe"]`、`should_enable_module` は無い。`validate_and_warn` の `env` の警告も無い。`UnknownLibrary` の文は 13 の `std_` の名前だけ。
+- `runtime/mod.rs` の初期化は `@pasta_search` → `@pasta_log` → `@toml`（`module_registry.rs` の `register_toml_module`。`toml_to_lua` を使う）。mlua 0.12 で `Value`・`Function` の型が変わるなら、この関数も直す範囲に入る。
+- 参照先: `.kiro/specs/completed/mlua-stdlib-removal/design.md` の RuntimeConfig・TomlModule・RuntimeInit。

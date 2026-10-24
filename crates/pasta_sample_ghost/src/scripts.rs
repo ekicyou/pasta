@@ -41,16 +41,6 @@ mod tests {
         content.lines().filter(|l| l.trim_end() == line).count()
     }
 
-    #[test]
-    fn test_face_pasta_contains_all_characters() {
-        let face = read_pasta_script("03-face.pasta");
-        assert!(face.contains("％女の子"), "女の子アクターがありません");
-        assert!(face.contains("％男の子"), "男の子アクターがありません");
-        assert!(face.contains("＠笑顔"), "笑顔表情がありません");
-        assert!(face.contains("＠通常"), "通常表情がありません");
-        assert!(face.contains("＠怒り"), "怒り表情がありません");
-    }
-
     /// 表情名とサーフェス番号の対応（女の子 0〜8・男の子 10〜18）が揃っている
     #[test]
     fn test_face_pasta_expression_surface_mapping() {
