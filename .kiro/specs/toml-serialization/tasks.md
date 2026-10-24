@@ -110,3 +110,4 @@
 - 2.1: SaveGate・load_toml_from_file・set_gate・read_or_quarantine にも dead_code の許可がある（2.2 で外す）。PersistenceError に TomlParseError を先に足した（2.2 で JsonError を消し SaveDisabled・TomlWriteError を足す）。persistence.rs が 696 行で、2.2 で JSON の道を消したあと行数を確かめる。
 - 2.2: 既定の保存先に書くテストが、追跡されている crates/pasta_lua/profile/pasta/save/save.json（中身 {}）を save.json.broken へ移して TOML を書く。テストの後は git checkout -- で戻し .broken を消す。3.1 で既定が save.toml（gitignore 済み）になったら、この追跡ファイルを残すかは完了時に判断する。保存先にフォルダがあっても読めない物として .broken へ退避する（設計どおり）。persistence.rs は 665 行。
 - 6: PR（squash）の件名にも `!` を付ける（例 `feat(toml-serialization)!: セーブファイル・ログの表・サイドカーを TOML にする`）。リリースノートの詫びの文案は design.md「移行とリリースノートへの申し送り」にあり、release スキルが doc/release-notes/v0.4.3.md へ写す。
+- 最終検証: 使われなくなった追跡ファイル crates/pasta_lua/profile/pasta/save/save.json を消した（既定が save.toml になり、どこも読まない）。終了時の保存が印 Closed で書かないことを Drop から確かめる結合テストを足した（Windows のみ）。

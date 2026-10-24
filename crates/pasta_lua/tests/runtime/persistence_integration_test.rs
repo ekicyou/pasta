@@ -527,3 +527,47 @@ fn test_drop_writes_toml_and_drops_only_unwritable_key() {
         "the function value must be dropped"
     );
 }
+
+/// 読めず移せないセーブがあると、落とすときの自動保存は何も書かずエラーを残す（5.5）。
+#[cfg(windows)]
+#[tracing_test::traced_test]
+#[test]
+fn test_drop_with_closed_gate_writes_nothing_and_logs_error() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let temp = common::create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
+    let save_dir = temp.path().join("profile/pasta/save");
+    std::fs::create_dir_all(&save_dir).unwrap();
+    let path = save_dir.join("save.toml");
+    std::fs::write(&path, "keep = \"me\"\n").unwrap();
+    // ランタイムが最初に読む前に、共有なしで開いておく（読めず移せず、印が Closed になる）
+    let lock = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(&path)
+        .unwrap();
+
+    let runtime = pasta_lua::loader::PastaLoader::load(temp.path()).unwrap();
+    runtime
+        .exec(
+            r#"
+            local SAVE = require("pasta.save")
+            SAVE.name = "落とす前"
+            "#,
+        )
+        .unwrap();
+    drop(runtime);
+    drop(lock);
+
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "keep = \"me\"\n");
+    // .broken（番号付きも）も save.tmp もできていない
+    let names: Vec<_> = std::fs::read_dir(&save_dir)
+        .unwrap()
+        .map(|e| e.unwrap())
+        .filter(|e| e.file_type().unwrap().is_file())
+        .map(|e| e.file_name())
+        .collect();
+    assert_eq!(names, vec![std::ffi::OsString::from("save.toml")]);
+    assert!(logs_contain("Failed to save persistence data on drop"));
+    // 書き込みの失敗でなく、印が閉じたから書かなかった
+    assert!(logs_contain("Saving is disabled for this runtime"));
+}
