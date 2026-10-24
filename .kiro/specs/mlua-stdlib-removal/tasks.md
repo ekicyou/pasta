@@ -42,7 +42,7 @@
   - 単体テスト: 既定の名前、`std_` でない名前（6 つの名前）を飛ばすこと、`env` を並べても警告せず `std_debug` は警告すること、誤りの文に 6 つの名前が無いこと。`should_enable_module` と `env` の試験は消す
   - 完了: `pasta_lua` の単体テストが通り、`crates/pasta_lua/src` に `should_enable_module` が無い
   - _Requirements: 1.4, 1.5, 1.6, 1.7_
-- [ ] 3.3 6 つのモジュールが入らないことの結合テストを足す
+- [x] 3.3 6 つのモジュールが入らないことの結合テストを足す
   - `RuntimeConfig::new()` と、6 つの名前を並べた `from_libs` の VM のどちらでも、6 つの `pcall(require, …)` が `false`
   - 完了: 足したテストが通り、`pasta_scripts` と `crates/pasta_lua/src` を 6 つのモジュール名で検索して 0 件
   - _Requirements: 1.1, 1.3, 1.5_
