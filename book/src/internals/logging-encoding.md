@@ -193,12 +193,11 @@ log.info(値)
       target は Rust のモジュールパス pasta_lua::runtime::log
 ```
 
-`table_to_string` は、表を JSON にする前に 2 つの関門を通す。
+`table_to_string` は、表を次の順に扱う。
 
 1. `pairs` で数えたキーと値の組が 1000（`MAX_TABLE_ELEMENTS`）を超えたら `<table: 要素数 elements>` を返す。
-2. `table_depth_exceeds` が、明示的なスタックを使った反復で入れ子の深さを調べ、10（`MAX_NESTING_DEPTH`）を超えたら `tostring` の結果を返す。キーが表の場合もたどる。循環参照のある表は深さが増え続けるため、ここで止まる。
-
-関門を通った表は、`deny_recursive_tables` を付けて `serde_json::Value` へ変換してから文字列にする。変換に失敗したとき（関数を含む表など）は `tostring` の結果を返し、`tostring` も失敗したら `"<unconvertible value>"` を返す。深さの関門を変換より前に置くのは、serde の変換が Rust の再帰で表をたどるため、深く入れ子にした表でホストのスタックが溢れるのを防ぐためである。
+2. セーブと共有の変換 `persistence::lua_value_to_toml_strict` で `toml::Value` にする。深さの上限は 10（`MAX_NESTING_DEPTH`。根の表を 1 段目と数える）で、変換はたどっている祖先の表の列で循環参照を見つける。上限を超える表、循環参照、TOML で書けない値（関数・配列の要素と名前のキーが混ざった表・文字列でないキーなど）が 1 つでもあれば変換は失敗し、`tostring` の結果を返す。`tostring` も失敗したら `"<unconvertible value>"` を返す。変換は上限の段で止まる再帰なので、深く入れ子にした表や循環参照のある表でもホストのスタックは溢れない。
+3. 変換できた値を `write_inline` で 1 行に書く。キーのある表は `{ k1 = v1, k2 = v2 }`（キーの昇順）、配列は `[v1, v2]`、空の表は `{}`、空の配列は `[]` にする。キーは `A-Za-z0-9_-` だけでできた空でないものはそのまま、それ以外は基本文字列にする。文字列はいつも 1 行の基本文字列 `"…"` で書き、`\`・`"`・`\b`・`\t`・`\n`・`\f`・`\r` をエスケープし、そのほかの制御文字（U+0000〜U+001F・U+007F）を `\uXXXX` にする。toml の `Display` は改行を含む文字列を複数行の文字列にするため、文字列だけ自前で書く。整数・浮動小数点数・真偽値は `toml::Value` の `Display`（`1.0`・`nan`・`inf` など）に任せる。
 
 呼び出し元の段数 1 は、`crates/pasta_lua/tests/log/stack_level_test.rs` で確かめている（段数 0 は Rust の関数自身になる）。レベル関数は値の変換で Lua のエラーを出さず、常に何も返さずに戻る。
 

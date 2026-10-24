@@ -346,7 +346,13 @@ build_source_map_inner
 
 #### サイドカー
 
-サイドカーは、チャンクの前方写像を生成 `.lua` の隣の `<.lua のパス>.map` に JSON（`version`（1）・`pasta_file`・`[.lua 行, .pasta 行]` の配列 `pairs`）で書いたものである。ランタイムはサイドカーを読まず、デバッグには常にメモリ上の `SourceMap` を使う（`read_sidecar` を呼ぶのはテストだけである）。シーン宣言の記録はサイドカーに入らない。
+サイドカーは、チャンクの前方写像を生成 `.lua` の隣の `<.lua のパス>.map` に TOML（`version = 1`・`pasta_file`・`[.lua 行, .pasta 行]` の配列 `pairs`）で書いたものである。`write_sidecar` は `toml::to_string`、`read_sidecar` は `toml::from_slice` を使う。キーは `SidecarFile` の項目の順、`pairs` は `.lua` 行の昇順に並ぶので、同じマップからは毎回同じバイト列ができる。`pairs` が 0 件なら `pairs = []` になる。ランタイムはサイドカーを読まず、デバッグには常にメモリ上の `SourceMap` を使う（`read_sidecar` を呼ぶのはテストだけである）。シーン宣言の記録はサイドカーに入らない。
+
+```toml
+version = 1
+pasta_file = "dic/a.pasta"
+pairs = [[3, 1], [4, 2]]
+```
 
 ### シーンキック
 
