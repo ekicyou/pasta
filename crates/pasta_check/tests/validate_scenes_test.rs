@@ -260,7 +260,11 @@ fn builtin_names_are_listed() {
             "pause_auto_talk",
             "自動トーク停止",
             "resume_auto_talk",
-            "自動トーク再開"
+            "自動トーク再開",
+            "recommend_item",
+            "おすすめ項目",
+            "recommend_separator",
+            "おすすめ区切り"
         ]
     );
     assert_eq!(ACT_METHODS.len(), 27);
@@ -343,6 +347,13 @@ fn call_finds_global_scene_by_prefix_after_alias() {
 #[test]
 fn call_to_builtin_name_is_found() {
     let text = "＊会話\n  ＞transfer_req_to_var\n  ＞yield\n  ＞ゴースト終了\n  ＞自動トーク停止\n  ＞resume_auto_talk\n";
+    assert_eq!(reference_findings(TOML, text), vec![]);
+}
+
+/// おすすめメニューの項目・区切りは組み込みの飛び先として見つかる（10.1・12.4）
+#[test]
+fn call_to_recommend_builtin_is_found() {
+    let text = "＊メニュー\n  ＞おすすめ項目（「a」、「https://a/」）\n  ＞おすすめ区切り\n  ＞recommend_item（「b」、「https://b/」）\n  ＞recommend_separator\n";
     assert_eq!(reference_findings(TOML, text), vec![]);
 }
 
