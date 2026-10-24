@@ -1,10 +1,14 @@
 # Brief: toml-serialization
 
-> **ステータス**: 未着手（2026-10-24 の `/kiro-discovery` で起票。開発者の方針「pasta から json は一旦追い出して。ユーザー要望で json が要求されるまではシリアライズは toml」）。版は未定。要件定義は Opus。
+> **ステータス**: 未着手（2026-10-24 の `/kiro-discovery` で起票。開発者の方針「pasta から json は一旦追い出して。ユーザー要望で json が要求されるまではシリアライズは toml」）。セーブファイルは仕様違反の不具合（`@pasta_persistence` は TOML でなければならない。開発者の決定）。版は未定（致命的でない不具合として、入れる版を開発者が決める）。要件定義は Opus。
 
 ## Problem
 
 pasta の既定のシリアライズは TOML である（2026-10-24 開発者の方針）。ところが、pasta が自分で読み書きするファイルと出力に、JSON が残っている。
+
+**`@pasta_persistence` は TOML でなければならない**（2026-10-24 開発者の決定「pasta_persistence は toml です」「toml でないとだめ」）。今の JSON は仕様からの逸脱で、直すべき不具合として扱う。
+
+- 経緯: Rune 版の pasta（`crates/pasta`、〜2025-12）のセーブは TOML だった（`src/stdlib/persistence.rs` の `toml_to_string`／`toml_from_string`、テストの材料 `sample_save.toml`）。Rune 版は 2026-01-01 に廃止された（`23978966`）。2026-01-26 に Lua 版の `@pasta_persistence` を作った spec `store-save-persistence`（`c09d4612`）の要件が「JSON 形式で保存する」（requirements.md 55・67 行）と書き、TOML から替える理由も比べた跡も無いまま、JSON になった。
 
 - **セーブファイル**: `＄＊` のグローバル変数（Lua の `save` テーブル）は、終了時に `profile/pasta/save/save.json`（`obfuscate = true` なら gzip した `save.dat`）へ JSON で保存される。
 - **ログの表**: `@pasta_log` は、引数の Lua の表を JSON の文字列にしてログに出す。
