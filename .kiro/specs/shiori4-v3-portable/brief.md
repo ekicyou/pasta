@@ -1,6 +1,6 @@
 # Brief: shiori4-v3-portable
 
-> **ステータス**: 未着手（2026-10-23 の `/kiro-discovery` で起票）。0.4.2 に入れる（2026-10-23 開発者の意向「今やってるマイナーバージョンアップに入れちゃってもよいかな」）。要件定義は Opus。
+> **ステータス**: 未着手（2026-10-23 の `/kiro-discovery` で起票）。0.4.3 の最後（0.4.2 に入れる意向だったが、同じ日に 0.4.3 へ移した。開発者の決定「これは 0.4.3」）。2026-10-24 の `/kiro-discovery` で shiori4 0.1.0 に合わせた（末尾の「shiori4 0.1.0 への合わせ」。上の本文より末尾の節が新しい）。要件定義は Opus。
 
 ## Problem
 
@@ -19,7 +19,7 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
 - **アクター**: `crates/pasta_shiori/src/actor/`。Lua VM はアクタースレッドに固定されている。SHIORI のスレッドは mailbox（flume）で GET を投げ、応答を待つ。NOTIFY は受け取ったらすぐ 204 を返し、処理はアクターが後から行う。unload は Stop を送り、ack を最大 5 秒待つ。スレッドは join せずに detach する。
 - **Windows だけの依存**: `wintf-winmsg-executor`（通常の依存。cfg で囲っていない）、`windows-sys`（teardown のリーク検査）。`pasta_lua` は `encoding/windows.rs`・`ffi_load/win32.rs` などを `cfg(windows)` で分けている。
 - **1 プロセス 1 インスタンス**: static な mailbox・ロガーの登録・デバッグの待受が 1 つずつある。
-- **shiori4**（`ekicyou/shiori4`。crates.io に 0.0.1 公開済み）: 公開シンボル `shiori_get_api` が 1 つで、`#[repr(C)]` の関数テーブルを返す C ABI である。版 3（SHIORI3 互換モード）では、`request` に SHIORI/3.0 の要求の全文（UTF-8）を渡し、応答の全文を受け取る。ホストのテーブルは NULL。メモリは確保した側が `release` で解放する（pasta.dll の静的 CRT リンクと合う）。
+- **shiori4**（`ekicyou/shiori4`。2026-10-24 に crates.io へ 0.1.0 を公開）: 公開シンボル `shiori_get_api` が 1 つで、`#[repr(C)]` の関数テーブルを返す C ABI である。版 3（SHIORI3 互換モード）では、`request` に SHIORI/3.0 の要求の全文（UTF-8）を渡し、応答の全文を受け取る。0.1.0 から、版 3 の `load` の host は `copy_from_slice` だけを持つテーブルで、応答の `out` は常にホストが作る（SHIORI は `copy_from_slice` で写す）。0.0.2 以前の「ホストのテーブルは NULL」「確保した側が `release` で解放する」は古い（末尾の節）。
 
 ## Desired Outcome
 
@@ -31,7 +31,7 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
 
 2026-10-23 の開発者の方針: pasta の shiori4 対応は 2 段に分ける。
 
-1. **この spec（0.4.2）**: SHIORI4 のためというより、「SHIORI/3.0 を Windows 以外で動かすための別口」として、shiori4 の版 3 を出す。
+1. **この spec（0.4.3）**: SHIORI4 のためというより、「SHIORI/3.0 を Windows 以外で動かすための別口」として、shiori4 の版 3 を出す。
 2. **`shiori4-v4-host`（0.5.0。ノベルゲームと同じリリース）**: 版 4（ホストの呼び出し・post・完了通知）に本格的に対応する。
 
 版 3 の要求は SHIORI/3.0 の全文なので、今の解析と応答の組み立てを流用できる。新しく作るのは、`shiori_get_api` の入口と、アクターの実行器を OS に頼らない形にすることである。
@@ -96,7 +96,7 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
       - Linux・macOS は lib の付いた名前だけを探す。Rust の cdylib が作る `libpasta.so`・`libpasta.dylib` を、そのまま置ける。この spec の Windows 以外のビルドは、この名前に合わせる
     - 版 3 の `load` の失敗の理由（abi-conventions の論点 16・17。確定）: ABI では理由を返さない。NULL を返すだけで、規約は今のまま。理由は pasta 自身のログに出す。`shiori4_host` は版 3 を読む口を持ち、`load` の失敗はホストに `Err(LoadFailed)` として届く。読み込みは `shiori4_host` が持ち、`shiori4_abi` は型と定数だけを持つ
   - これで shiori4 の側の議題は、2026-10-23 にすべて決まった
-  - 試験: `shiori4_host` の v3 の口と許可する口の集合（どちらも shiori4 0.0.2 で入る予定）を dev-dependency で使えば、DLL の境界まで CI で試せる。0.0.2 が出るのは、shiori4 の abi-conventions・host-protocol を作って統合した後で、時期の目安は無い（2026-10-23 時点で、2 本はこれから要件の段）。この spec は自前の呼び出しで試す前提で進め、0.0.2 が出てから切り替える（0.0.2 を待たない。出たら shiori4 のセッションが知らせる約束で、shiori4 の roadmap にも記録済み）
+  - 試験: `shiori4_host` の v3 の口と許可する口の集合（`load_ghost_with` と `EntryKind`）は、2026-10-24 の 0.1.0 に入った（0.0.2 で入る予定と書いていたもの）。試験用のホスト `shiori4-testhost` も 0.1.0 に入った。使い方は末尾の節
 - **Downstream**: `shiori4-v4-host`（この spec の入口と実行器の上に、版 4 を足す）。areka（Windows 以外で pasta を読む）
 
 ## Existing Spec Touchpoints
@@ -108,7 +108,7 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
 
 - pasta.dll は静的 CRT リンクを保つ（`.cargo/config.toml`。動的に戻さない）
 - Windows の出荷物は 1 種類のまま（`pasta.dll` に `shiori_get_api` が増えるだけ）。debug の待受は 127.0.0.1 固定のまま
-- shiori4 の ABI 規約に従う（UTF-8・NUL 終端なし・`out` は確保した側の `release` で解放・パニックは `SHIORI_E_PANIC`）
+- shiori4 の ABI 規約に従う（UTF-8・NUL 終端なし・`out` は常にホストが作り、SHIORI は `host.copy_from_slice` で写す（0.1.0 から。ABI 規約 5・6）・パニックは `SHIORI_E_PANIC`）
 - 2026-10-23 の 3 者会談（pasta・areka・shiori4）の合意: `load` の dir は「絶対パス・OS の区切り・末尾に区切りあり・UTF-8」。失敗するときは理由をログに出す（版 3 はホストのログが無いので pasta のログに出す）。2 つ目のインスタンスは断ってよいが、できれば受ける（pasta の入口が受けるかは要件で決める。エンジンは複数を持てる作りにする）。「単一のスレッド」はインスタンスごとで、同じ DLL の 2 つのインスタンスは別々のスレッドから呼ばれうる
 
 ## 2026-10-23 棚卸の再測定（main 82176f19）
@@ -164,3 +164,51 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
 - 2026-10-24 に mlua 0.12.2 が main に入った（`Cargo.lock` で動いたのは mlua・mlua-sys・luajit-src・lua-src の 4 つだけ）。ファイルの順で待っていた理由は満ちた。
 - 0.12 で移った名前は `mlua::Debug` → `mlua::debug::Debug`、`mlua::String` → `mlua::LuaString` の 2 つで、`pasta_shiori` の `use pasta_lua::mlua::{Function, Table}` は当たらず、`pasta_shiori` のコードは変えていない。新しく mlua の型を書くときは 0.12 の名前で書く（`.kiro/specs/completed/mlua-0-12-upgrade/design.md` の Revalidation Triggers）。
 - x86 の pasta.dll のセーブの整数は、x64 と同じ決まり（`persistence.rs` の `lua_int`）で書く。Linux・macOS の 32 ビットの target を足すなら、この決まりと `target_pointer_width` で期待を分けたテストがそのまま効く。
+
+## shiori4 0.1.0 への合わせ（2026-10-24 の `/kiro-discovery`）
+
+shiori4 の 0.1.0 が 2026-10-24 に出た（crates.io の `shiori4_abi`・`shiori4`・`shiori4_host`、GitHub のタグ `v0.1.0`）。shiori4 の PR や教科書には「0.0.3」と書いた所があるが、出た版は 0.1.0 である（shiori4 のセッションからの知らせ）。この spec は 0.1.0 を使う。知らせの正本は shiori4 の `.kiro/specs/completed/abi-textbook/research.md` の「二進互換の申し送り」、移り方は教科書の `doc/textbook/migration.md`。
+
+### 二進互換でない変更（shiori4 #11）
+
+- 応答の `ShioriBytes`（`request` の `out`）は、常にホストが作る。SHIORI は `ShioriHostApi` の末尾に足された `copy_from_slice` で写す。`release` は常にホストの関数で、unload の後でも、どのスレッドからでも呼べる。
+- 版 3 の `load` にも、`copy_from_slice` だけを持つテーブル（`abi_version` は 3。`request`・`post`・`log` は NULL）が渡る。SHIORI はこの欄があるかだけを確かめ、無ければ `load` で NULL を返す。
+- Rust の `ShioriHostApi` の `request`・`post`・`log` の欄は `Option` になった（二進の形は C と同じ）。
+- 0.0.2 以前のホストでは、新しい SHIORI は読めない（`load` が NULL）。SHIORI もホストも 0.1.0 で作り直す。
+
+### pasta への効き目
+
+- **写しのコードは書かない**。`copy_from_slice` があるかの確かめと写しは、`shiori4_abi` の `ShioriApi::new` が作るテーブルの関数（`shiori_load`・`shiori_request`）が行う。pasta は `shiori4_abi::Shiori` を実装し（`SUPPORTS_V3 = true`。`load` には `ShioriLoadMode::V3` が来る）、応答を `ShioriResponse` で返すだけでよい。`Option` になった 3 つの欄も、版 3 では触らない。
+- **書き出しのマクロ `export_shiori!` は使えない**。このマクロは、版 4 を求められると `SUPPORTS_V3` にかかわらず版 4 のテーブルを返す（`shiori4_abi` 0.1.0 の `src/lib.rs` 1003〜1018 行）。この spec は版 4 に NULL を返すので、`shiori_get_api` を自分で書き出す。`ShioriApi::new::<_, { SHIORI_ABI_VERSION_3 }>()` の static を 1 つ持ち、3 のときだけそれを返し、ほかは NULL にする（10 行ほど）。版 4 を足す `shiori4-v4-host` で、`export_shiori!` に替えてよい。
+- **版 4 に NULL を返すのは要る**。版 4 の `load` が NULL を返すと、ホストは版 3 へ読み直さない（Upstream の 2026-10-23 の裁定）。版 4 のテーブルを返して `load` で断る形にすると、shiori4 を知るホストで読めなくなる。
+- **依存**: `shiori4_abi = "0.1"`（依存 0・MIT・rust-version 1.85 のまま）。試験に `shiori4_host` を使うなら dev-dependency で `0.1`。
+- **areka**: 0.1.0 の `shiori4_host` で作り直す（shiori4 から areka への知らせ）。pasta の試験も 0.1.0 のホストだけで行い、0.0.2 以前のホストで試さない。
+
+### 試験
+
+- **試験用のホスト `shiori4-testhost`**（`shiori4_host` 0.1.0 の example。教科書の `doc/textbook/testhost.md`）で、ベースウェア無しに 1 往復させられる。
+  - 入れ方: `cargo install shiori4_host --version 0.1.0 --example shiori4-testhost`
+  - 呼び方: `shiori4-testhost [--entry v3] [-H "名前: 値"]... <ライブラリ> <ゴーストのディレクトリ（絶対パス）> [ID]`（ID を省くと `OnBoot`）
+  - 終了の状態: 0＝2xx・1＝2xx 以外（版 3 で開始行が読めないときも）・2＝ABI エラー・3＝読み込みの失敗・4＝従来の口だけが見つかった・64＝引数の誤り
+  - shiori4 自身の CI が 3 OS でこれを回している（shiori4 の `.github/workflows/build.yml` の job `textbook`）。
+- **この spec の CI**: Windows・Linux（できれば macOS）で、見本ゴーストを `--entry v3` で読み、終了の状態 0 を確かめる段を `build.yml` に足す。`--entry` を省いても、pasta.dll は `shiori_get_api` を持つので版 3 で解決される（版 4 は NULL）。どの ID を送るか（`OnBoot` で台本が返るか）は要件で決める。
+- **Rust の試験**: dev-dependency の `shiori4_host` の `load_ghost_with(.., &[EntryKind::V3])` で、DLL の境界まで試せる。試験用のホストと Rust の試験のどちらを使うか（両方か）は、設計で決める。
+- **従来の口（`loadu`・`load`）は、shiori4 0.1.0 では試せない**。試験用のホストも `shiori4_host` の `load_ghost_with` も、従来の口は見つけるだけで呼ばない（`LoadedGhost::Legacy`。pasta.dll は `shiori_get_api` を持つので、そもそもそちらで解決される）。従来の口を CI で試せるのは、shiori4 の `shiori3-legacy-host`（x86 の Windows だけ。まだ出ていない）が出てから。それまでは今の pasta の試験（`windows_tests.rs`・`shiori_lifecycle_tests.rs` など）で守る。
+
+### 今の入口（`windows.rs`）をどうするか
+
+2026-10-24 の discovery で決めた（shiori4 のセッションから「移すか、移行をどう段に分けるかも discovery で決める」と頼まれた。開発者は要件のディスカッションで覆してよい）。
+
+- **shiori4 のクレートへは移さない。HGLOBAL の入口は pasta に残す。**
+  - shiori4 0.1.0 には、SHIORI の側で従来の口（`loadu`・`load`・`request`・`unload`）を書き出すものが無い。`export_ghost!`・`export_shiori!` が書き出すのは `shiori_get_api` だけで、`shiori3-legacy-host` はホストの側（従来の DLL を読む口）である。
+  - shiori4 の位置づけでも、版 3 は「Windows 以外のための、HGLOBAL に頼らない SHIORI/3.0 の口」で、従来の DLL を置き換えない（教科書の移行の手引き「v3 互換モードと旧来の DLL」）。SSP は従来の口でしか読まないので、この口は無くならない。
+  - 従来の口には pasta の事情が多い（`loadu` で済んだら `load` は何もしない・`DllMain` の FreeLibrary での片付け・ANSI のパスのデコード・loader lock を避けて load 起点でスレッドを起こす）。
+- **段の分け方**:
+  1. **この spec（0.4.3）**: 2 つの口を並べ、同じ芯につなぐ。芯は「インスタンス 1 つ＝アクター 1 つ」の型（名前は設計で決める）で、`load`（UTF-8 の dir）・`request`（SHIORI/3.0 の全文）・`unload` を持つ。版 3 の口は、それを `shiori4_abi::Shiori` の実装で包み、インスタンスごとに持つ。HGLOBAL の口は、芯を 1 つだけ置く場所（プロセスに 1 つ）を `windows.rs` に閉じ込め、HGLOBAL の受け渡しとパスのデコードだけを受け持つ。今の `actor/lifecycle.rs` の static（`MAILBOX`・`ACTOR_HANDLE`）は、芯の中か、HGLOBAL の口の置き場へ移す（上の「決めたこと」）。
+  2. **`shiori4-v4-host`（0.5.0）**: 同じ `Shiori` の実装に版 4 を足す（`shiori_get_api` が 4 にもテーブルを返す）。中の表現を「メソッド＋ヘッダ部分」「ステータス＋ヘッダ部分」に寄せ、開始行と `Charset` の読み書きを、従来の口と版 3 の口だけが行う（あちらの brief の 2026-10-24 の節）。そのとき、2 つの口の変換に `shiori4::v3::{parse_request, response}` を使えるかを測る。使えば、変換は shiori4 のクレートに寄り、HGLOBAL の受け渡しだけが pasta に残る。`shiori4::v3::parse_request` は SHIORI/2.x の要求を 400 にするので、従来の口で 2.x を受け続けるかも、そこで決める。
+  3. **その後（予定しない）**: 従来の口を消すことは無い（SSP のため）。HGLOBAL の受け渡しまで shiori4 のクレートへ移すのは、shiori4 が SHIORI の側で従来の口を書き出す道を持ったときだけ考える。pasta から shiori4 へは頼まない（あちらの範囲の判断）。
+
+### 先に要るもの・規模
+
+- **先に要るもの**: 働きの上でも、ファイルの順でも無い（`mlua-0-12-upgrade` は 2026-10-24 に入った。shiori4 0.1.0 で試験の口も揃った）。roadmap の「開発者の判断が要るもの」にあった「shiori4 の側の準備など、ほかに待つもの」は無い。
+- **規模**: 14〜18 のまま。増えるのは、自前の `shiori_get_api`（小さい）と、CI の試験用のホストの段（1 つ）。

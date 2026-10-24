@@ -292,7 +292,7 @@ Wave 3（見込み）リリース（0.4.3 の spec は 0 本）
 
 ### 開発者の判断が要るもの（ウェーブは止めない）
 
-- **`shiori4-v3-portable` を始める時期**。2026-10-23 の「まだ実施できない」の理由は、記録にはファイルの順番しか無い。ほかに待つもの（shiori4 の側の準備など）があるなら、0.4.3 の表に書く。無ければ、ウェーブ 2 で始める。
+- **`shiori4-v3-portable` を始める時期**。2026-10-23 の「まだ実施できない」の理由は、記録にはファイルの順番しか無い。ほかに待つもの（shiori4 の側の準備など）があるなら、0.4.3 の表に書く。無ければ、ウェーブ 2 で始める。2026-10-24 の追記: shiori4 の 0.1.0 が出て、試験の口（`shiori4_host` の版 3 の読み込み・試験用のホスト `shiori4-testhost`）も揃った。shiori4 の側で待つものは無い。0.1.0 は 0.0.2 以前と二進互換でない（応答の `out` をホストが作る）ので、この spec は 0.1.0 で作る（brief の「shiori4 0.1.0 への合わせ」）。
 - **`kiro-next` スキルを軽くする案と、3 ウェーブ先までの開始コマンドの形**（2026-10-24 の指示）。この棚卸で試した測り方と形を、スキルの文面に入れるか。スキルの編集は開発者の許可が要る。
 - 前回からの持ち越し（推奨は前回のまま）: `pasta-dll-multiarch` の版（0.5.0）、`vsce-4-upgrade`・`pest-2-9-4-upgrade` の版（0.4.4）、`scene-exact-match`・`scene-pick-modes` の版（0.5.0）、0.5.0 を今のゴールに含めるか、`scene-anchor-link` の版（0.5.0 の後）、`SOUL.md` §2・§5 の記述、`steering/structure.md` の作り直し、ghost_dev の emo2 開発のフォルダに残る撮影の保存データとログ。
 
@@ -390,7 +390,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 | 9 | novel-save-slots | Opus | 8〜12 | `novel-checkpoint-rollback` |
 | 10 | hello-novel-sample | Opus | 15〜18 | 2〜9 の全部と、areka の側の実装 |
 | 11 | manual-novel-guide | Opus | 8〜12 | `hello-novel-sample` |
-| 12 | shiori4-v4-host（2026-10-23 起票。同じ日の棚卸で Rust の土台だけにした） | Opus | 11〜13 | `shiori4-v3-portable`、shiori4 の `abi-conventions`・`host-protocol` が crates.io に出ること。ノベルの合格には要らないので、ほかの 0.5.0 の spec を待たせない |
+| 12 | shiori4-v4-host（2026-10-23 起票。同じ日の棚卸で Rust の土台だけにした） | Opus | 11〜13 | `shiori4-v3-portable`。shiori4 の `abi-conventions`・`host-protocol` は 2026-10-24 の 0.1.0 で crates.io に出た。ノベルの合格には要らないので、ほかの 0.5.0 の spec を待たせない |
 | 13 | shiori4-v4-lua-api（2026-10-23 の棚卸で `shiori4-v4-host` から分けた） | Fable | 11〜13 | `shiori4-v4-host` |
 | 14 | 0.5.0 のリリース（`release` スキル） | Opus | — | 上の全部 |
 
@@ -450,7 +450,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 ## Specs (dependency order)
 
-- [ ] shiori4-v3-portable -- pasta.dll が shiori4 の `shiori_get_api(3)`（SHIORI3 互換モード。SHIORI/3.0 の全文を UTF-8 で運ぶ）を書き出し、Windows 以外（Linux・macOS）でもビルドとテストが通るようにする。アクターの実行器を OS に頼らない形にし、Windows だけの依存を `cfg(windows)` に閉じ込める。Windows の今の入口は残す。エンジンは状態をインスタンスごとに持つ（2026-10-23 開発者の決定）。入口で 2 つ目の `load` を受けるかは要件で決める。版 4 は範囲の外（2026-10-23 起票。3 者会談の後、開発者の方針で 2 段に分けた 1 段目）。0.4.2 に入れた（2026-10-23 開発者の意向）が、まだ実施できないので、0.4.3 へ移した（2026-10-23 開発者の決定）。0.4.3 の最後。`ponytail-shiori` と同じウェーブに置かない。Dependencies: mlua-0-12-upgrade（ルートの `Cargo.toml`・`Cargo.lock`・`pasta_shiori/src/shiori.rs` のファイルの順番）
+- [ ] shiori4-v3-portable -- （2026-10-24 に shiori4 0.1.0 に合わせた。`shiori4_abi` 0.1 を使い、版 4 に NULL を返すため `shiori_get_api` は自前で書き出す。CI で試験用のホスト `shiori4-testhost` の `--entry v3` を回す。HGLOBAL の入口は shiori4 のクレートへ移さず pasta に残し、同じ芯につなぐ）pasta.dll が shiori4 の `shiori_get_api(3)`（SHIORI3 互換モード。SHIORI/3.0 の全文を UTF-8 で運ぶ）を書き出し、Windows 以外（Linux・macOS）でもビルドとテストが通るようにする。アクターの実行器を OS に頼らない形にし、Windows だけの依存を `cfg(windows)` に閉じ込める。Windows の今の入口は残す。エンジンは状態をインスタンスごとに持つ（2026-10-23 開発者の決定）。入口で 2 つ目の `load` を受けるかは要件で決める。版 4 は範囲の外（2026-10-23 起票。3 者会談の後、開発者の方針で 2 段に分けた 1 段目）。0.4.2 に入れた（2026-10-23 開発者の意向）が、まだ実施できないので、0.4.3 へ移した（2026-10-23 開発者の決定）。0.4.3 の最後。`ponytail-shiori` と同じウェーブに置かない。Dependencies: mlua-0-12-upgrade（ルートの `Cargo.toml`・`Cargo.lock`・`pasta_shiori/src/shiori.rs` のファイルの順番）
 - [ ] shiori4-v4-host -- 版 4 に本格対応する Rust の土台。ホストのテーブルを受け、アクタースレッドからの `host->request` を SHIORI のスレッドへ中継する。post（SSTP に揃えた `SEND`＋`Script`・`Option: nobreak`、`NOTIFY`）と `Tag` の Rust の側、unload での無効化、ホストの `log` への転送、キックの即時化（チェイントークの続きの決まりと自動トークの停止を保つ）、Lua への低い入口と「版 4 で読まれた」の印。取り決めの正本は shiori4 の `abi-conventions`・`host-protocol`（2026-10-23 起票。2 段の 2 段目。同じ日の棚卸で、Lua と DSL の口を `shiori4-v4-lua-api` へ分けた）。0.5.0 に入れる（2026-10-23 開発者の方針。ノベルゲームと同じリリース）。`ponytail-shiori` と同じウェーブに置かない。Dependencies: shiori4-v3-portable
 - [ ] shiori4-v4-lua-api -- 版 4 のホストの機能を Lua と DSL から使う口。ホストのプロパティの読み出し（今の `act:get_property` と `CALLBACK.pending` の上に作る）、シーンからの SEND・NOTIFY、終わりを待って `OnHostComplete` で待っているシーンを再開する書き方（`REG:register` との並び・チェイントークの `STORE.co_preempt` との関係・待っている間の unload）、SHIORI3 だけのときの扱い、`pasta_check` の組み込みの名前、マニュアル（2026-10-23 の棚卸で `shiori4-v4-host` から分けた）。0.5.0。Dependencies: shiori4-v4-host
 - [ ] pasta-dll-multiarch -- x64・arm64 版の pasta.dll をビルドし、32bit 版と同じリリースで出す。見本ゴーストの .nar に areka の探し方に合う名前（`pasta.x64.dll`・`pasta.arm64.dll`）で同梱し、接尾辞の無い `pasta.dll` は SSP 向けの 32bit 版のまま残す。`release.ps1`・`.cargo/config.toml`・配布物とリリース CI の検査・マニュアル。aarch64 の LuaJIT のビルドは要確認（2026-10-23 起票。3 者会談の後の areka の相談から）。版は未定。`ponytail-manual-ci`・`ponytail-check-release` と同じウェーブに置かない。Dependencies: shiori4-v3-portable

@@ -109,3 +109,9 @@
   6. 版 3 と SHIORI/3.0 での SEND・NOTIFY の返し方（エラーにするか、何もせずにログを出すか）
   7. NOTIFY のハンドラの中で `＄％prop` を書いたときの見せ方（版 4 でも同期では読めない）
 - **見つけた穴**: 元の brief は、`get_property`・`＄％prop` と待ちの表 `CALLBACK.pending` が既にあることに触れていなかった。これに乗せる前提で規模を見積もった。`shiori4-v4-host` の下回りの口の名前と形が決まるまで、この spec の要件は細部を詰められない（あちらの要件で、ここから使う形を先に決めてもらう）。
+
+## shiori4 0.1.0 への合わせ（2026-10-24 の `/kiro-discovery`）
+
+- shiori4 の 0.1.0 が 2026-10-24 に crates.io へ出た（`host-protocol` を含む。shiori4 の PR や教科書の「0.0.3」は 0.1.0 のこと）。上の「先に要るもの」の「shiori4 の `host-protocol` が crates.io に出ること」は満ちた。残るのは `shiori4-v4-host` と、実機の areka v0.2.0。
+- ホストとの語の正本は shiori4 の `doc/host-protocol.md`。プロパティの読みは `ID: getproperty`、書き込みは `ID: setproperty`（0.0.1 の `property` から改めた。`shiori4-v4-host` の brief の 2026-10-24 の節）。教科書 `doc/textbook/vocabulary.md` に語の表がある。
+- 0.1.0 の二進互換でない変更（応答の `out` をホストが作る・`copy_from_slice`）は Rust の入口の話で、この spec の Lua と DSL の口には効かない。
