@@ -3,7 +3,7 @@
 //! `updates.txt` を SSP 仕様に準拠して生成します。
 
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -86,9 +86,9 @@ fn days_to_ymd(mut days: u32) -> (u32, u32, u32) {
     (year, month, days + 1)
 }
 
-/// 段 4 の生成結果
+/// 段 5 の生成結果
 pub(crate) struct UpdateSummary {
-    /// ゴースト用 updates.txt の登録件数（0 なら生成していない。従来の戻り値と同じ意味）
+    /// ゴースト用 updates.txt の登録件数（0 なら生成していない）
     pub ghost_entries: usize,
     /// 生成したバルーン用 updates.txt の (フォルダ, 登録件数)。0 件で生成しなかったものは含めない
     pub balloon_entries: Vec<(String, usize)>,
@@ -209,18 +209,8 @@ fn collect_files_recursive(
 ///
 /// SSP 仕様準拠の非暗号学的ファイル変更検出用途。認証・署名には使用しない。
 fn calculate_md5(path: &Path) -> io::Result<String> {
-    let mut file = File::open(path)?;
     let mut context = md5::Context::new();
-    let mut buffer = [0u8; 8192];
-
-    loop {
-        let bytes_read = file.read(&mut buffer)?;
-        if bytes_read == 0 {
-            break;
-        }
-        context.consume(&buffer[..bytes_read]);
-    }
-
+    io::copy(&mut File::open(path)?, &mut context)?;
     let digest = context.finalize();
     Ok(format!("{:032x}", digest))
 }

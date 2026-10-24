@@ -10,11 +10,6 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process;
 
-/// コマンドライン引数
-struct Args {
-    command: Command,
-}
-
 /// サブコマンド
 enum Command {
     Release(ReleaseArgs),
@@ -57,7 +52,7 @@ pub(crate) fn non_unicode_name(path: &Path) -> io::Error {
 
 fn main() {
     match parse_args_from(lexopt::Parser::from_env()) {
-        Ok(args) => match args.command {
+        Ok(command) => match command {
             Command::Help => {
                 print_usage();
             }
@@ -108,7 +103,7 @@ fn print_usage() {
     eprintln!("  --version          Show version");
 }
 
-fn parse_args_from(mut parser: lexopt::Parser) -> Result<Args, lexopt::Error> {
+fn parse_args_from(mut parser: lexopt::Parser) -> Result<Command, lexopt::Error> {
     use lexopt::prelude::*;
 
     let mut subcommand: Option<String> = None;
@@ -120,14 +115,10 @@ fn parse_args_from(mut parser: lexopt::Parser) -> Result<Args, lexopt::Error> {
     while let Some(arg) = parser.next()? {
         match arg {
             Long("help") | Short('h') => {
-                return Ok(Args {
-                    command: Command::Help,
-                });
+                return Ok(Command::Help);
             }
             Long("version") | Short('V') => {
-                return Ok(Args {
-                    command: Command::Version,
-                });
+                return Ok(Command::Version);
             }
             Long("target") => {
                 target = Some(parser.value()?.into());
@@ -159,14 +150,12 @@ fn parse_args_from(mut parser: lexopt::Parser) -> Result<Args, lexopt::Error> {
             let nar = nar.ok_or_else(|| lexopt::Error::MissingValue {
                 option: Some("--nar".to_string()),
             })?;
-            Ok(Args {
-                command: Command::Release(ReleaseArgs {
-                    target,
-                    release: release_dir,
-                    nar,
-                    copy_dirs,
-                }),
-            })
+            Ok(Command::Release(ReleaseArgs {
+                target,
+                release: release_dir,
+                nar,
+                copy_dirs,
+            }))
         }
         Some("validate") => {
             // ループはサブコマンドに関係なく受け付けるので、release 用のオプションはここで拒む
@@ -182,9 +171,7 @@ fn parse_args_from(mut parser: lexopt::Parser) -> Result<Args, lexopt::Error> {
             let target = target.ok_or_else(|| lexopt::Error::MissingValue {
                 option: Some("--target".to_string()),
             })?;
-            Ok(Args {
-                command: Command::Validate(ValidateArgs { target }),
-            })
+            Ok(Command::Validate(ValidateArgs { target }))
         }
         Some(other) => Err(lexopt::Error::UnexpectedValue {
             option: "command".to_string(),
@@ -200,14 +187,14 @@ fn parse_args_from(mut parser: lexopt::Parser) -> Result<Args, lexopt::Error> {
 mod tests {
     use super::*;
 
-    fn parse(args: &[&str]) -> Result<Args, lexopt::Error> {
+    fn parse(args: &[&str]) -> Result<Command, lexopt::Error> {
         let parser = lexopt::Parser::from_args(args);
         parse_args_from(parser)
     }
 
     #[test]
     fn test_release_all_required_options() {
-        let args = parse(&[
+        let command = parse(&[
             "release",
             "--target",
             "ghost/dir",
@@ -217,7 +204,7 @@ mod tests {
             "out.nar",
         ])
         .unwrap();
-        match args.command {
+        match command {
             Command::Release(r) => {
                 assert_eq!(r.target, PathBuf::from("ghost/dir"));
                 assert_eq!(r.release, PathBuf::from("release/dir"));
@@ -248,7 +235,7 @@ mod tests {
 
     #[test]
     fn test_release_multiple_copy() {
-        let args = parse(&[
+        let command = parse(&[
             "release",
             "--target",
             "t",
@@ -264,7 +251,7 @@ mod tests {
             "overlay3",
         ])
         .unwrap();
-        match args.command {
+        match command {
             Command::Release(r) => {
                 assert_eq!(r.copy_dirs.len(), 3);
                 assert_eq!(r.copy_dirs[0], PathBuf::from("overlay1"));
@@ -283,14 +270,14 @@ mod tests {
 
     #[test]
     fn test_help_flag() {
-        let args = parse(&["--help"]).unwrap();
-        assert!(matches!(args.command, Command::Help));
+        let command = parse(&["--help"]).unwrap();
+        assert!(matches!(command, Command::Help));
     }
 
     #[test]
     fn test_version_flag() {
-        let args = parse(&["--version"]).unwrap();
-        assert!(matches!(args.command, Command::Version));
+        let command = parse(&["--version"]).unwrap();
+        assert!(matches!(command, Command::Version));
     }
 
     #[test]
@@ -301,21 +288,21 @@ mod tests {
 
     #[test]
     fn test_help_short_flag() {
-        let args = parse(&["-h"]).unwrap();
-        assert!(matches!(args.command, Command::Help));
+        let command = parse(&["-h"]).unwrap();
+        assert!(matches!(command, Command::Help));
     }
 
     #[test]
     fn test_version_short_flag() {
-        let args = parse(&["-V"]).unwrap();
-        assert!(matches!(args.command, Command::Version));
+        let command = parse(&["-V"]).unwrap();
+        assert!(matches!(command, Command::Version));
     }
 
     /// `release` サブコマンド指定中でも `--help` が優先される（早期 return）
     #[test]
     fn test_help_wins_over_release_subcommand() {
-        let args = parse(&["release", "--target", "t", "--help"]).unwrap();
-        assert!(matches!(args.command, Command::Help));
+        let command = parse(&["release", "--target", "t", "--help"]).unwrap();
+        assert!(matches!(command, Command::Help));
     }
 
     /// 2 つ目の位置引数は `arg.unexpected()` で拒否される
@@ -358,8 +345,8 @@ mod tests {
 
     #[test]
     fn test_validate_target() {
-        let args = parse(&["validate", "--target", "ghost/dir"]).unwrap();
-        match args.command {
+        let command = parse(&["validate", "--target", "ghost/dir"]).unwrap();
+        match command {
             Command::Validate(v) => assert_eq!(v.target, PathBuf::from("ghost/dir")),
             _ => panic!("Expected Validate command"),
         }
@@ -389,15 +376,15 @@ mod tests {
 
     #[test]
     fn test_help_wins_over_validate_subcommand() {
-        let args = parse(&["validate", "--help"]).unwrap();
-        assert!(matches!(args.command, Command::Help));
+        let command = parse(&["validate", "--help"]).unwrap();
+        assert!(matches!(command, Command::Help));
     }
 
     /// オプションはサブコマンドより前に置いてもよい（パーサは位置に依存しない）
     #[test]
     fn test_options_before_subcommand_accepted() {
-        let args = parse(&["--target", "t", "release", "--release", "r", "--nar", "n"]).unwrap();
-        match args.command {
+        let command = parse(&["--target", "t", "release", "--release", "r", "--nar", "n"]).unwrap();
+        match command {
             Command::Release(r) => {
                 assert_eq!(r.target, PathBuf::from("t"));
                 assert_eq!(r.release, PathBuf::from("r"));

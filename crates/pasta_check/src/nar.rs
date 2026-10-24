@@ -1,5 +1,5 @@
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::path::Path;
 
 use crate::{non_unicode_name, path_error};
@@ -10,9 +10,8 @@ use zip::write::SimpleFileOptions;
 /// NAR ファイルを作成。戻り値は NAR ファイルのサイズ（バイト）。
 pub(crate) fn create_nar(release_dir: &Path, nar_path: &Path) -> io::Result<u64> {
     // 親ディレクトリを必要に応じて作成
-    if let Some(parent) = nar_path.parent()
-        && !parent.exists()
-    {
+    // create_dir_all("") は成功するので `--nar g.nar` もそのまま通る
+    if let Some(parent) = nar_path.parent() {
         fs::create_dir_all(parent).map_err(|e| path_error(e, "create", parent))?;
     }
 
@@ -21,8 +20,7 @@ pub(crate) fn create_nar(release_dir: &Path, nar_path: &Path) -> io::Result<u64>
     let mut zip = ZipWriter::new(file);
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
 
-    let mut buffer = Vec::new();
-    add_dir_to_zip(&mut zip, release_dir, release_dir, &options, &mut buffer)?;
+    add_dir_to_zip(&mut zip, release_dir, release_dir, &options)?;
 
     zip.finish().map_err(|e| write_err(io::Error::other(e)))?;
 
@@ -35,7 +33,6 @@ fn add_dir_to_zip<W: Write + io::Seek>(
     root: &Path,
     current: &Path,
     options: &SimpleFileOptions,
-    buffer: &mut Vec<u8>,
 ) -> io::Result<()> {
     let read_err = |e| path_error(e, "read", current);
     for entry in fs::read_dir(current).map_err(read_err)? {
@@ -54,7 +51,7 @@ fn add_dir_to_zip<W: Write + io::Seek>(
             if entry.file_name() == "profile" {
                 continue;
             }
-            add_dir_to_zip(zip, root, &path, options, buffer)?;
+            add_dir_to_zip(zip, root, &path, options)?;
         } else if file_type.is_file() {
             let relative = path
                 .strip_prefix(root)
@@ -67,11 +64,8 @@ fn add_dir_to_zip<W: Write + io::Seek>(
             zip.start_file(&relative, *options)
                 .map_err(|e| pack_err(io::Error::other(e)))?;
 
-            buffer.clear();
-            File::open(&path)
-                .and_then(|mut f| f.read_to_end(buffer))
-                .map_err(|e| path_error(e, "read", &path))?;
-            zip.write_all(buffer).map_err(pack_err)?;
+            let mut file = File::open(&path).map_err(|e| path_error(e, "read", &path))?;
+            io::copy(&mut file, zip).map_err(pack_err)?;
         }
     }
     Ok(())
@@ -80,6 +74,7 @@ fn add_dir_to_zip<W: Write + io::Seek>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Read;
     use tempfile::TempDir;
 
     #[test]

@@ -604,7 +604,7 @@ mod tests {
     /// var/ は段 5（updates.txt）の対象外で、段 6 だけが読む。
     #[cfg(windows)]
     #[test]
-    fn test_execute_release_removes_partial_nar_on_stage5_failure() {
+    fn test_execute_release_removes_partial_nar_on_stage6_failure() {
         use std::ffi::OsString;
         use std::os::windows::ffi::OsStringExt;
 
