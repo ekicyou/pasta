@@ -103,7 +103,7 @@ $MARKER_KEYS  = 'secInventory', 'secWave', 'secNextWaves', 'secLedger', 'secSumm
 $LABEL_KEYS   = 'title', 'sourceUpdated', 'sourceBlob', 'sourceBlobUnknown', 'bandCount', 'warningCount', 'wave',
                 'done', 'notInLedger', 'notInBand', 'otherBands', 'prereqs', 'notInRoadmap', 'order', 'model', 'size',
                 'noTheme', 'clearFilter', 'completedHeading', 'colPhase', 'colTopic', 'colSpecs', 'completedExtra',
-                'what', 'note', 'waveCommands', 'nextWaveCommands', 'copy', 'copied'
+                'what', 'note', 'waveCommands', 'copy', 'copied'
 $SECTION_PREFIX = '## '
 $TABLE_RULE     = '^\|\s*:?-'
 $ONE_LINER_MAX  = 60

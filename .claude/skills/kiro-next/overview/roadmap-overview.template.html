@@ -151,9 +151,9 @@ section.completed h2 { font-size: 16px; }
     });
     document.body.appendChild(wc);
   }
-  // The current wave (the code block /kiro-next writes under the wave table), then the outlined next waves
-  if (D.waveCommands !== null) commandBlock(L.waveCommands, D.waveCommands);
-  D.nextWaveCommands.forEach(function (t) { commandBlock(L.nextWaveCommands, t); });
+  // The current wave (the code block /kiro-next writes under the wave table) and the outlined next waves,
+  // joined into one block so one copy takes them all
+  if (D.waveCommands !== null) commandBlock(L.waveCommands, [D.waveCommands].concat(D.nextWaveCommands).join("\n\n"));
 
   // Legend
   var legend = el("div", "legend");
