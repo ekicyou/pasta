@@ -35,7 +35,7 @@ use thiserror::Error;
 const VERSION: &str = "0.1.0";
 
 /// Module description.
-const DESCRIPTION: &str = "Persistent data storage (JSON/gzip)";
+const DESCRIPTION: &str = "Persistent data storage (TOML/gzip)";
 
 /// Gzip magic header bytes.
 const GZIP_MAGIC: [u8; 2] = [0x1f, 0x8b];
@@ -47,13 +47,13 @@ pub enum PersistenceError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 
-    /// JSON serialization/deserialization error.
-    #[error("JSON error: {0}")]
-    JsonError(#[from] serde_json::Error),
-
     /// TOML として読めない（UTF-8 でない中身もここ）。
     #[error("TOML parse error: {0}")]
     TomlParseError(#[from] toml::de::Error),
+
+    /// TOML の文書を書けない（理論上起きない）。
+    #[error("TOML write error: {0}")]
+    TomlWriteError(#[from] toml::ser::Error),
 
     /// Lua value conversion error.
     #[error("Lua conversion error: {0}")]
@@ -70,6 +70,10 @@ pub enum PersistenceError {
     /// Invalid file format.
     #[error("Invalid file format: {0}")]
     InvalidFormat(String),
+
+    /// 読めないセーブを退避できず、このランタイムでは保存しない。
+    #[error("Saving is disabled for this runtime: {0}")]
+    SaveDisabled(String),
 }
 
 impl From<mlua::Error> for PersistenceError {
@@ -166,61 +170,28 @@ pub fn register(lua: &Lua, config: &PersistenceConfig, base_dir: &Path) -> LuaRe
 /// Implementation of `persistence.load()`.
 ///
 /// Loads data from the persistence file.
-/// Returns empty table if file doesn't exist or is corrupted.
+/// Returns empty table if file doesn't exist or is unreadable (unreadable files are moved aside).
 fn load_impl(lua: &Lua, state: &PersistenceState) -> LuaResult<Table> {
-    match load_from_file(&state.file_path) {
-        Ok(value) => {
-            if state.debug_mode {
-                tracing::debug!(path = %state.file_path.display(), "Loaded persistence data");
-            }
-            // Convert serde_json::Value to Lua Value, then extract table
-            let lua_value: Value = lua.to_value(&value)?;
-            match lua_value {
-                Value::Table(t) => Ok(t),
-                _ => {
-                    tracing::warn!(
-                        path = %state.file_path.display(),
-                        "Persistence data is not an object, using empty table"
-                    );
-                    lua.create_table()
-                }
-            }
-        }
-        Err(PersistenceError::IoError(ref e)) if e.kind() == std::io::ErrorKind::NotFound => {
-            // File not found is expected on first run
-            tracing::warn!(path = %state.file_path.display(), "Persistence file not found, using empty table");
-            lua.create_table()
-        }
-        Err(e) => {
-            // Other errors: log warning and return empty table
-            tracing::warn!(error = %e, path = %state.file_path.display(), "Failed to load persistence data, using empty table");
-            lua.create_table()
-        }
+    let doc = read_or_quarantine(lua, &state.file_path);
+    if state.debug_mode {
+        tracing::debug!(path = %state.file_path.display(), "Loaded persistence data");
+    }
+    match toml_to_lua(lua, &toml::Value::Table(doc))? {
+        Value::Table(t) => Ok(t),
+        _ => unreachable!("a TOML table converts to a Lua table"),
     }
 }
 
 /// Implementation of `persistence.save(data)`.
 ///
-/// Saves data to the persistence file.
+/// Saves data to the persistence file (unwritable keys are dropped with a warning).
 /// Returns (true, nil) on success, (nil, error_message) on error.
 fn save_impl(
     lua: &Lua,
     state: &PersistenceState,
     data: Table,
 ) -> LuaResult<(Option<bool>, Option<String>)> {
-    // Convert Lua table to serde_json::Value
-    let lua_value = Value::Table(data);
-    let json_value: serde_json::Value = match lua.from_value(lua_value) {
-        Ok(v) => v,
-        Err(e) => {
-            let err_msg = format!("Failed to convert Lua value: {}", e);
-            tracing::warn!(error = %err_msg, "Persistence save conversion error");
-            return Ok((None, Some(err_msg)));
-        }
-    };
-
-    // Save to file
-    match save_to_file(&json_value, &state.file_path, state.obfuscate) {
+    match save_table(lua, &data, &state.file_path, state.obfuscate) {
         Ok(()) => {
             if state.debug_mode {
                 tracing::debug!(path = %state.file_path.display(), "Saved persistence data");
@@ -235,33 +206,52 @@ fn save_impl(
     }
 }
 
+/// `save(data)` と終了時の自動保存の共通の道。印を確かめ、変換し、外したキーを警告し、書く。
+pub(crate) fn save_table(
+    lua: &Lua,
+    table: &Table,
+    path: &Path,
+    obfuscate: bool,
+) -> Result<(), PersistenceError> {
+    // まだ読んでいなければ先に読む（読めないセーブを確かめずに上書きしない）
+    let unread = lua.app_data_ref::<SaveGate>().is_none();
+    if unread {
+        read_or_quarantine(lua, path);
+    }
+    if let Some(SaveGate::Closed(reason)) = lua.app_data_ref::<SaveGate>().as_deref() {
+        return Err(PersistenceError::SaveDisabled(reason.clone()));
+    }
+    let (doc, dropped) = lua_table_to_toml_document(lua, table);
+    for key in &dropped {
+        tracing::warn!(
+            key = %key.path,
+            reason = %key.reason,
+            "key '{}' was not saved: {}",
+            key.path,
+            key.reason
+        );
+    }
+    save_to_file(&doc, path, obfuscate)
+}
+
 /// Load data from a persistence file.
 ///
-/// Automatically detects format (JSON or gzip) based on file content.
+/// Detects gzip by its magic header, then parses the content as a TOML document.
 ///
 /// # Arguments
 /// * `path` - Path to the persistence file
 ///
 /// # Returns
-/// * `Ok(Value)` - Loaded JSON value
+/// * `Ok(Table)` - Loaded TOML document
 /// * `Err(e)` - Load failed
-pub fn load_from_file(path: &Path) -> Result<serde_json::Value, PersistenceError> {
+pub fn load_from_file(path: &Path) -> Result<toml::Table, PersistenceError> {
     let data = fs::read(path)?;
-
-    if data.is_empty() {
-        return Ok(serde_json::Value::Object(serde_json::Map::new()));
-    }
-
-    // Detect format by magic header
-    if data.len() >= 2 && data[0] == GZIP_MAGIC[0] && data[1] == GZIP_MAGIC[1] {
-        // Gzip compressed
-        let mut decoder = GzDecoder::new(&data[..]);
-        let mut json_bytes = Vec::new();
-        decoder.read_to_end(&mut json_bytes)?;
-        Ok(serde_json::from_slice(&json_bytes)?)
+    if data.starts_with(&GZIP_MAGIC) {
+        let mut toml_bytes = Vec::new();
+        GzDecoder::new(&data[..]).read_to_end(&mut toml_bytes)?;
+        Ok(toml::from_slice(&toml_bytes)?)
     } else {
-        // Plain JSON
-        Ok(serde_json::from_slice(&data)?)
+        Ok(toml::from_slice(&data)?)
     }
 }
 
@@ -270,7 +260,7 @@ pub fn load_from_file(path: &Path) -> Result<serde_json::Value, PersistenceError
 /// Uses atomic write (temp file + rename) to prevent corruption.
 ///
 /// # Arguments
-/// * `data` - JSON value to save
+/// * `data` - TOML document to save
 /// * `path` - Path to the persistence file
 /// * `obfuscate` - Whether to use gzip compression
 ///
@@ -278,7 +268,7 @@ pub fn load_from_file(path: &Path) -> Result<serde_json::Value, PersistenceError
 /// * `Ok(())` - Save successful
 /// * `Err(e)` - Save failed
 pub fn save_to_file(
-    data: &serde_json::Value,
+    data: &toml::Table,
     path: &Path,
     obfuscate: bool,
 ) -> Result<(), PersistenceError> {
@@ -291,15 +281,14 @@ pub fn save_to_file(
     }
 
     // Serialize data
+    let text = toml::to_string(data)?;
     let bytes = if obfuscate {
         // Gzip compressed
-        let json_bytes = serde_json::to_vec(data)?;
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(&json_bytes)?;
+        encoder.write_all(text.as_bytes())?;
         encoder.finish()?
     } else {
-        // Pretty-printed JSON
-        serde_json::to_vec_pretty(data)?
+        text.into_bytes()
     };
 
     // Atomic write: write to temp file, then rename
@@ -326,11 +315,9 @@ pub fn save_to_file(
 // ---------------------------------------------------------------------------
 
 /// セーブの入れ子の上限（根の表を 1 段目と数える）。
-#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で save_table が使い始めたら外す
 pub(crate) const SAVE_MAX_DEPTH: usize = 32;
 
 /// 保存しなかったキー 1 件。
-#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で警告に使い始めたら外す
 #[derive(Debug)]
 pub(crate) struct DroppedKey {
     /// 根からの道筋（例: "flags.secret"・"inventory[1].f"）。
@@ -340,7 +327,6 @@ pub(crate) struct DroppedKey {
 }
 
 /// セーブの根の表を TOML の文書にする。書けないキーは外して一覧に入れる。失敗しない。
-#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で save_table が使い始めたら外す
 pub(crate) fn lua_table_to_toml_document(
     lua: &Lua,
     root: &Table,
@@ -563,7 +549,6 @@ fn convert_keyed(
 
 /// TOML の値を Lua の値にする（日時は文字列、配列には配列の印）。
 /// 設定の読み込みの変換（module_registry）は呼ばず、ここに小さな写しを持つ。
-#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で load が使い始めたら外す
 fn toml_to_lua(lua: &Lua, value: &toml::Value) -> LuaResult<Value> {
     Ok(match value {
         toml::Value::String(s) => Value::String(lua.create_string(s)?),
@@ -595,7 +580,6 @@ fn toml_to_lua(lua: &Lua, value: &toml::Value) -> LuaResult<Value> {
 // ---------------------------------------------------------------------------
 
 /// 1 つのランタイムで、セーブファイルを読んだ結果（Lua の app_data）。無い = まだ読んでいない。
-#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で save_table が使い始めたら外す
 #[derive(Debug, Clone, PartialEq)]
 enum SaveGate {
     /// 読めた・無かった・退避できた。保存してよい。
@@ -604,21 +588,7 @@ enum SaveGate {
     Closed(String),
 }
 
-/// gzip の印を見て展開し、TOML の文書として読む。
-#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で load_from_file に置き換えたら外す
-fn load_toml_from_file(path: &Path) -> Result<toml::Table, PersistenceError> {
-    let data = fs::read(path)?;
-    if data.starts_with(&GZIP_MAGIC) {
-        let mut toml_bytes = Vec::new();
-        GzDecoder::new(&data[..]).read_to_end(&mut toml_bytes)?;
-        Ok(toml::from_slice(&toml_bytes)?)
-    } else {
-        Ok(toml::from_slice(&data)?)
-    }
-}
-
 /// 印を置く。`Closed` を `Open` で上書きしない。
-#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で read_or_quarantine が使い始めたら外す
 fn set_gate(lua: &Lua, gate: SaveGate) {
     // 借りたまま set_app_data を呼ばないよう、判定の借用は先に返す
     let closed = matches!(
@@ -631,9 +601,8 @@ fn set_gate(lua: &Lua, gate: SaveGate) {
 }
 
 /// 読む・退避する・印を置く。どの結果でも表を返す（失敗は空の表）。
-#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で load_impl が使い始めたら外す
 fn read_or_quarantine(lua: &Lua, path: &Path) -> toml::Table {
-    match load_toml_from_file(path) {
+    match load_from_file(path) {
         Ok(doc) => {
             set_gate(lua, SaveGate::Open);
             doc

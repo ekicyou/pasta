@@ -2,7 +2,7 @@ use super::*;
 use tempfile::TempDir;
 
 fn create_test_config(temp_dir: &TempDir, obfuscate: bool) -> (PersistenceConfig, PathBuf) {
-    let file_name = if obfuscate { "save.dat" } else { "save.json" };
+    let file_name = if obfuscate { "save.dat" } else { "save.toml" };
     let config = PersistenceConfig {
         obfuscate,
         file_path: file_name.to_string(),
@@ -12,23 +12,39 @@ fn create_test_config(temp_dir: &TempDir, obfuscate: bool) -> (PersistenceConfig
     (config, base_dir)
 }
 
+/// TOML の文字列から文書を作る。
+fn doc(src: &str) -> toml::Table {
+    toml::from_str(src).unwrap()
+}
+
 #[test]
-fn test_save_load_json() {
+fn test_description_is_toml() {
     let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("save.json");
+    let (config, base_dir) = create_test_config(&temp_dir, false);
+    let lua = Lua::new();
+    let module = register(&lua, &config, &base_dir).unwrap();
+    let desc: String = module.get("_DESCRIPTION").unwrap();
+    assert_eq!(desc, "Persistent data storage (TOML/gzip)");
+}
 
-    let data = serde_json::json!({
-        "player_name": "Alice",
-        "play_count": 42,
-        "flags": {
-            "tutorial_complete": true
-        }
-    });
+#[test]
+fn test_save_load_toml() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("save.toml");
 
-    // Save
+    let data = doc(r#"
+player_name = "Alice"
+play_count = 42
+[flags]
+tutorial_complete = true
+"#);
+
     save_to_file(&data, &file_path, false).unwrap();
 
-    // Load
+    // 素の TOML の文字列として読める
+    let text = fs::read_to_string(&file_path).unwrap();
+    assert_eq!(toml::from_str::<toml::Table>(&text).unwrap(), data);
+
     let loaded = load_from_file(&file_path).unwrap();
     assert_eq!(loaded, data);
 }
@@ -38,10 +54,10 @@ fn test_save_load_obfuscated() {
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("save.dat");
 
-    let data = serde_json::json!({
-        "player_name": "Bob",
-        "inventory": ["sword", "shield"]
-    });
+    let data = doc(r#"
+player_name = "Bob"
+inventory = ["sword", "shield"]
+"#);
 
     // Save with obfuscation
     save_to_file(&data, &file_path, true).unwrap();
@@ -60,7 +76,7 @@ fn test_save_load_obfuscated() {
 #[test]
 fn test_load_nonexistent_returns_error() {
     let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("nonexistent.json");
+    let file_path = temp_dir.path().join("nonexistent.toml");
 
     let result = load_from_file(&file_path);
     assert!(matches!(result, Err(PersistenceError::IoError(_))));
@@ -69,35 +85,29 @@ fn test_load_nonexistent_returns_error() {
 #[test]
 fn test_load_corrupted_returns_error() {
     let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("corrupted.json");
+    let file_path = temp_dir.path().join("corrupted.toml");
 
-    // Write invalid JSON
-    fs::write(&file_path, "{ invalid json }").unwrap();
+    // 古い JSON も TOML としては読めない
+    fs::write(&file_path, r#"{ "invalid": "json" }"#).unwrap();
 
     let result = load_from_file(&file_path);
-    assert!(matches!(result, Err(PersistenceError::JsonError(_))));
+    assert!(matches!(result, Err(PersistenceError::TomlParseError(_))));
 }
 
 #[test]
 fn test_auto_detect_format() {
     let temp_dir = TempDir::new().unwrap();
 
-    let data = serde_json::json!({"key": "value"});
+    let data = doc(r#"key = "value""#);
 
-    // Save as JSON
-    let json_path = temp_dir.path().join("test.json");
-    save_to_file(&data, &json_path, false).unwrap();
-
-    // Save as gzip
+    // obfuscate に関係なく、どちらの形も読める
+    let plain_path = temp_dir.path().join("test.toml");
+    save_to_file(&data, &plain_path, false).unwrap();
     let gzip_path = temp_dir.path().join("test.dat");
     save_to_file(&data, &gzip_path, true).unwrap();
 
-    // Both should load correctly
-    let loaded_json = load_from_file(&json_path).unwrap();
-    let loaded_gzip = load_from_file(&gzip_path).unwrap();
-
-    assert_eq!(loaded_json, data);
-    assert_eq!(loaded_gzip, data);
+    assert_eq!(load_from_file(&plain_path).unwrap(), data);
+    assert_eq!(load_from_file(&gzip_path).unwrap(), data);
 }
 
 #[test]
@@ -107,35 +117,45 @@ fn test_atomic_write_creates_directory() {
         .path()
         .join("subdir")
         .join("nested")
-        .join("save.json");
+        .join("save.toml");
 
-    let data = serde_json::json!({"test": true});
+    let data = doc("test = true");
 
     // Should create directories automatically
     save_to_file(&data, &file_path, false).unwrap();
 
     assert!(file_path.exists());
+    // 一時ファイルは名前の置き換えで残らない
+    assert!(!file_path.with_extension("tmp").exists());
     let loaded = load_from_file(&file_path).unwrap();
     assert_eq!(loaded, data);
 }
 
 #[test]
+fn test_atomic_write_failure_removes_temp_file() {
+    let temp_dir = TempDir::new().unwrap();
+    // 保存先にフォルダがあると rename が失敗する
+    let file_path = temp_dir.path().join("save.toml");
+    fs::create_dir(&file_path).unwrap();
+
+    let result = save_to_file(&doc("a = 1"), &file_path, false);
+    assert!(matches!(result, Err(PersistenceError::IoError(_))));
+    assert!(!file_path.with_extension("tmp").exists());
+    assert!(file_path.is_dir());
+}
+
+#[test]
 fn test_nested_table_serialization() {
     let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("nested.json");
+    let file_path = temp_dir.path().join("nested.toml");
 
-    let data = serde_json::json!({
-        "level1": {
-            "level2": {
-                "level3": {
-                    "value": 123,
-                    "array": [1, 2, 3],
-                    "bool": true,
-                    "string": "nested"
-                }
-            }
-        }
-    });
+    let data = doc(r#"
+[level1.level2.level3]
+value = 123
+array = [1, 2, 3]
+bool = true
+string = "nested"
+"#);
 
     save_to_file(&data, &file_path, false).unwrap();
     let loaded = load_from_file(&file_path).unwrap();
@@ -145,13 +165,13 @@ fn test_nested_table_serialization() {
 #[test]
 fn test_empty_file_returns_empty_object() {
     let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("empty.json");
+    let file_path = temp_dir.path().join("empty.toml");
 
     // Create empty file
     fs::write(&file_path, "").unwrap();
 
     let loaded = load_from_file(&file_path).unwrap();
-    assert_eq!(loaded, serde_json::json!({}));
+    assert!(loaded.is_empty());
 }
 
 #[test]
@@ -554,6 +574,25 @@ fn codec_round_trip_doc(lua: &Lua, doc: &toml::Table) -> toml::Table {
     toml::from_str::<toml::Table>(&text).unwrap()
 }
 
+/// ファイルを通す往復: Lua の表 → save_to_file → load_from_file → toml_to_lua → TOML の文書。
+fn file_round_trip_doc(lua: &Lua, doc: &toml::Table, obfuscate: bool) -> toml::Table {
+    let Value::Table(root) = toml_to_lua(lua, &toml::Value::Table(doc.clone())).unwrap() else {
+        panic!()
+    };
+    let (written, dropped) = lua_table_to_toml_document(lua, &root);
+    assert!(dropped.is_empty(), "{:?}", dropped);
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("save.toml");
+    save_to_file(&written, &path, obfuscate).unwrap();
+    let loaded = load_from_file(&path).unwrap();
+    let Value::Table(t) = toml_to_lua(lua, &toml::Value::Table(loaded)).unwrap() else {
+        panic!()
+    };
+    let (back, dropped) = lua_table_to_toml_document(lua, &t);
+    assert!(dropped.is_empty(), "{:?}", dropped);
+    back
+}
+
 #[test]
 fn test_codec_read_value_types() {
     let lua = Lua::new();
@@ -617,33 +656,39 @@ arr = [1, "x", { k = 1 }]
 nested = { a = { b = { c = "deep" } } }
 "#;
     let doc: toml::Table = toml::from_str(src).unwrap();
-    let back = codec_round_trip_doc(&lua, &doc);
-    assert_eq!(back.len(), doc.len());
-    for key in [
-        "s",
-        "ctl",
-        "imin",
-        "f",
-        "inf",
-        "ninf",
-        "yes",
-        "no",
-        "empty_table",
-        "empty_array",
-        "arr",
-        "nested",
+    // メモリの中・素のファイル・gzip のファイルの 3 通りで同じ値に戻る
+    for back in [
+        codec_round_trip_doc(&lua, &doc),
+        file_round_trip_doc(&lua, &doc, false),
+        file_round_trip_doc(&lua, &doc, true),
     ] {
-        assert_eq!(back[key], doc[key], "{key}");
+        assert_eq!(back.len(), doc.len());
+        for key in [
+            "s",
+            "ctl",
+            "imin",
+            "f",
+            "inf",
+            "ninf",
+            "yes",
+            "no",
+            "empty_table",
+            "empty_array",
+            "arr",
+            "nested",
+        ] {
+            assert_eq!(back[key], doc[key], "{key}");
+        }
+        assert_eq!(back["ctl"].as_str(), Some("a\nb\r\nc\td"));
+        assert_eq!(back["empty_array"], toml::Value::Array(vec![]));
+        let nz = back["nz"].as_float().unwrap();
+        assert_eq!(nz.to_bits(), (-0.0f64).to_bits());
+        assert!(back["nan"].as_float().unwrap().is_nan());
+        // 表に入った i64::MAX は LuaJIT の倍精度で 2^63 に丸まる（確定した設計判断 6。値そのものの往復は別のテスト）
+        assert_eq!(back["imax"], toml::Value::Float(9223372036854775808.0));
+        // 2^63 は i64 の外なので浮動小数点数のまま
+        assert_eq!(back["big"], toml::Value::Float(9223372036854775808.0));
     }
-    assert_eq!(back["ctl"].as_str(), Some("a\nb\r\nc\td"));
-    assert_eq!(back["empty_array"], toml::Value::Array(vec![]));
-    let nz = back["nz"].as_float().unwrap();
-    assert_eq!(nz.to_bits(), (-0.0f64).to_bits());
-    assert!(back["nan"].as_float().unwrap().is_nan());
-    // 表に入った i64::MAX は LuaJIT の倍精度で 2^63 に丸まる（確定した設計判断 6。値そのものの往復は別のテスト）
-    assert_eq!(back["imax"], toml::Value::Float(9223372036854775808.0));
-    // 2^63 は i64 の外なので浮動小数点数のまま
-    assert_eq!(back["big"], toml::Value::Float(9223372036854775808.0));
 }
 
 #[test]
@@ -703,7 +748,7 @@ fn test_read_toml_plain_and_gzip() {
     let temp_dir = TempDir::new().unwrap();
     let plain = temp_dir.path().join("save.toml");
     fs::write(&plain, "name = \"Alice\"\n[flags]\ndone = true\n").unwrap();
-    let doc = load_toml_from_file(&plain).unwrap();
+    let doc = load_from_file(&plain).unwrap();
     assert_eq!(doc["name"].as_str(), Some("Alice"));
     assert_eq!(doc["flags"]["done"].as_bool(), Some(true));
 
@@ -711,10 +756,7 @@ fn test_read_toml_plain_and_gzip() {
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(b"count = 3\n").unwrap();
     fs::write(&gz, encoder.finish().unwrap()).unwrap();
-    assert_eq!(
-        load_toml_from_file(&gz).unwrap()["count"].as_integer(),
-        Some(3)
-    );
+    assert_eq!(load_from_file(&gz).unwrap()["count"].as_integer(), Some(3));
 }
 
 #[tracing_test::traced_test]
@@ -845,4 +887,127 @@ fn test_read_or_quarantine_locked_file_closes_gate() {
 
     drop(lock);
     assert_eq!(fs::read_to_string(&path).unwrap(), "keep = \"me\"\n");
+}
+
+// ---------------------------------------------------------------------------
+// 保存（save_table）と save() の戻り値
+// ---------------------------------------------------------------------------
+
+/// save.toml を保存先にしたモジュールの save を呼ぶ。
+fn call_save(lua: &Lua, temp_dir: &TempDir, code: &str) -> (Option<bool>, Option<String>) {
+    let (config, base_dir) = create_test_config(temp_dir, false);
+    let module = register(lua, &config, &base_dir).unwrap();
+    let save_fn: mlua::Function = module.get("save").unwrap();
+    let data: Table = lua.load(code).eval().unwrap();
+    save_fn.call(data).unwrap()
+}
+
+#[test]
+fn test_save_gate_closed_save_returns_error_and_writes_nothing() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("save.toml");
+    fs::write(&path, "keep = 1\n").unwrap();
+    let lua = Lua::new();
+    lua.set_app_data(SaveGate::Closed("locked".into()));
+
+    let (ok, err) = call_save(&lua, &temp_dir, "return { a = 1 }");
+    assert_eq!(ok, None);
+    let err = err.unwrap();
+    assert!(err.starts_with("Failed to save: "), "{err}");
+    assert!(
+        err.contains("Saving is disabled for this runtime: locked"),
+        "{err}"
+    );
+    assert_eq!(fs::read_to_string(&path).unwrap(), "keep = 1\n");
+    assert!(!path.with_extension("tmp").exists());
+    assert!(matches!(
+        save_table(&lua, &lua.create_table().unwrap(), &path, false),
+        Err(PersistenceError::SaveDisabled(_))
+    ));
+}
+
+#[test]
+fn test_save_without_gate_quarantines_broken_file_first() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("save.toml");
+    fs::write(&path, r#"{"old": "json"}"#).unwrap();
+    let lua = Lua::new();
+
+    let (ok, err) = call_save(&lua, &temp_dir, r#"return { name = "新" }"#);
+    assert_eq!((ok, err), (Some(true), None));
+    assert_eq!(
+        fs::read_to_string(temp_dir.path().join("save.toml.broken")).unwrap(),
+        r#"{"old": "json"}"#
+    );
+    assert_eq!(load_from_file(&path).unwrap()["name"].as_str(), Some("新"));
+    assert_eq!(gate(&lua), Some(SaveGate::Open));
+}
+
+#[tracing_test::traced_test]
+#[test]
+fn test_save_drops_unwritable_key_and_returns_true() {
+    let temp_dir = TempDir::new().unwrap();
+    let lua = Lua::new();
+    let (ok, err) = call_save(
+        &lua,
+        &temp_dir,
+        "return { ok = 1, f = function() end, flags = { secret = function() end, other = true } }",
+    );
+    assert_eq!((ok, err), (Some(true), None));
+    let saved = load_from_file(&temp_dir.path().join("save.toml")).unwrap();
+    assert_eq!(saved["ok"].as_integer(), Some(1));
+    assert!(saved.get("f").is_none());
+    assert_eq!(saved["flags"]["other"].as_bool(), Some(true));
+    assert!(saved["flags"].get("secret").is_none());
+    assert!(logs_contain(
+        "key 'f' was not saved: unsupported value type (function)"
+    ));
+    assert!(logs_contain(
+        "key 'flags.secret' was not saved: unsupported value type (function)"
+    ));
+}
+
+#[test]
+fn test_lua_module_save_obfuscated_and_load_either_form() {
+    let temp_dir = TempDir::new().unwrap();
+    let lua = Lua::new();
+    let (config, base_dir) = create_test_config(&temp_dir, true);
+    let module = register(&lua, &config, &base_dir).unwrap();
+    let save_fn: mlua::Function = module.get("save").unwrap();
+    let data: Table = lua.load("return { n = 7 }").eval().unwrap();
+    let (ok, _): (Option<bool>, Option<String>) = save_fn.call(data).unwrap();
+    assert_eq!(ok, Some(true));
+    let path = temp_dir.path().join("save.dat");
+    assert!(fs::read(&path).unwrap().starts_with(&GZIP_MAGIC));
+
+    // obfuscate = true でも素の TOML のファイルを読める
+    fs::write(&path, "n = 8\n").unwrap();
+    let load_fn: mlua::Function = module.get("load").unwrap();
+    let t: Table = load_fn.call(()).unwrap();
+    assert_eq!(t.get::<i64>("n").unwrap(), 8);
+}
+
+/// 本物の OS の失敗: 共有なしで開いたままの保存先へ save() すると、nil, err で中身が変わらない。
+#[cfg(windows)]
+#[test]
+fn test_save_locked_file_returns_error_and_keeps_content() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("save.toml");
+    fs::write(&path, "keep = \"me\"\n").unwrap();
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(&path)
+        .unwrap();
+
+    let lua = Lua::new();
+    let (ok, err) = call_save(&lua, &temp_dir, "return { a = 1 }");
+    assert_eq!(ok, None);
+    assert!(err.unwrap().starts_with("Failed to save: "));
+    assert!(matches!(gate(&lua), Some(SaveGate::Closed(_))));
+
+    drop(lock);
+    assert_eq!(fs::read_to_string(&path).unwrap(), "keep = \"me\"\n");
+    assert!(!path.with_extension("tmp").exists());
 }

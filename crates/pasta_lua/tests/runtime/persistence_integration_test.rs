@@ -11,27 +11,29 @@ use tempfile::TempDir;
 
 use crate::common;
 
-/// Test JSON format load/save roundtrip via persistence module
+/// Test TOML format load/save roundtrip via persistence module
 #[test]
-fn test_persistence_json_roundtrip() {
+fn test_persistence_toml_roundtrip() {
     let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("save.json");
+    let file_path = temp_dir.path().join("save.toml");
 
     // Save data
-    let data = serde_json::json!({
-        "player_name": "Alice",
-        "score": 1000,
-        "flags": {
-            "tutorial_complete": true
-        }
-    });
+    let data: toml::Table = toml::from_str(
+        r#"
+player_name = "Alice"
+score = 1000
+[flags]
+tutorial_complete = true
+"#,
+    )
+    .unwrap();
     persistence::save_to_file(&data, &file_path, false).unwrap();
 
     // Load and verify
     let loaded = persistence::load_from_file(&file_path).unwrap();
-    assert_eq!(loaded["player_name"], "Alice");
-    assert_eq!(loaded["score"], 1000);
-    assert_eq!(loaded["flags"]["tutorial_complete"], true);
+    assert_eq!(loaded["player_name"].as_str(), Some("Alice"));
+    assert_eq!(loaded["score"].as_integer(), Some(1000));
+    assert_eq!(loaded["flags"]["tutorial_complete"].as_bool(), Some(true));
 }
 
 /// Test obfuscated (gzip) format load/save roundtrip
@@ -41,10 +43,13 @@ fn test_persistence_obfuscated_roundtrip() {
     let file_path = temp_dir.path().join("save.dat");
 
     // Save with obfuscation
-    let data = serde_json::json!({
-        "secret": "hidden_value",
-        "inventory": ["sword", "shield", "potion"]
-    });
+    let data: toml::Table = toml::from_str(
+        r#"
+secret = "hidden_value"
+inventory = ["sword", "shield", "potion"]
+"#,
+    )
+    .unwrap();
     persistence::save_to_file(&data, &file_path, true).unwrap();
 
     // Verify file is compressed (starts with gzip magic header)
@@ -55,8 +60,8 @@ fn test_persistence_obfuscated_roundtrip() {
 
     // Load and verify
     let loaded = persistence::load_from_file(&file_path).unwrap();
-    assert_eq!(loaded["secret"], "hidden_value");
-    assert_eq!(loaded["inventory"][0], "sword");
+    assert_eq!(loaded["secret"].as_str(), Some("hidden_value"));
+    assert_eq!(loaded["inventory"][0].as_str(), Some("sword"));
 }
 
 /// Test PersistenceConfig effective_file_path conversion
@@ -91,14 +96,14 @@ fn test_persistence_creates_directories() {
         .path()
         .join("nested")
         .join("deep")
-        .join("save.json");
+        .join("save.toml");
 
-    let data = serde_json::json!({"test": true});
+    let data: toml::Table = toml::from_str("test = true").unwrap();
     persistence::save_to_file(&data, &file_path, false).unwrap();
 
     assert!(file_path.exists());
     let loaded = persistence::load_from_file(&file_path).unwrap();
-    assert_eq!(loaded["test"], true);
+    assert_eq!(loaded["test"].as_bool(), Some(true));
 }
 
 /// Test Lua module registration and basic operations
@@ -286,15 +291,15 @@ fn test_persistence_module_obfuscated_roundtrip() {
     assert_eq!(count, 3);
 }
 
-/// 保存先パスが書き込み不能（同名ディレクトリが存在）の場合、
+/// 保存先パスが書き込み不能（親が通常のファイル）の場合、
 /// save() は (nil, エラーメッセージ) を返し、panic も Lua エラーもしない。
 #[test]
 fn test_persistence_save_failure_returns_nil_and_message() {
     let temp_dir = TempDir::new().unwrap();
-    // save.json の位置にディレクトリを作り、rename を失敗させる
-    std::fs::create_dir(temp_dir.path().join("save.json")).unwrap();
+    // 親フォルダの位置に通常のファイルを置き、フォルダの作成か読み込みと退避を失敗させる
+    std::fs::write(temp_dir.path().join("blocker"), "not a directory").unwrap();
 
-    let (lua, module) = register_module_in_temp(&temp_dir, "save.json", false);
+    let (lua, module) = register_module_in_temp(&temp_dir, "blocker/save.toml", false);
     let data: mlua::Table = lua.create_table().unwrap();
     data.set("k", "v").unwrap();
 

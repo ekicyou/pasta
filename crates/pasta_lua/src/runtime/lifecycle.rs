@@ -5,7 +5,7 @@
 
 use super::PastaLuaRuntime;
 use super::persistence;
-use mlua::{LuaSerdeExt, Table, Value};
+use mlua::Table;
 use std::path::Path;
 
 impl PastaLuaRuntime {
@@ -35,15 +35,13 @@ impl PastaLuaRuntime {
             }
         };
 
-        // Convert Lua table to serde_json::Value
-        let lua_value = Value::Table(save_table);
-        let json_value: serde_json::Value = self
-            .lua
-            .from_value(lua_value)
-            .map_err(|e| persistence::PersistenceError::LuaConversionError(e.to_string()))?;
-
-        // Save to file
-        persistence::save_to_file(&json_value, &file_path, persistence_config.obfuscate)?;
+        // save(data) と同じ共通の道で保存する
+        persistence::save_table(
+            &self.lua,
+            &save_table,
+            &file_path,
+            persistence_config.obfuscate,
+        )?;
 
         if persistence_config.debug_mode {
             tracing::debug!(path = %file_path.display(), "Saved persistence data on drop");
