@@ -87,3 +87,4 @@
 
 - 段 2: `__pairs` の罠は persistence.rs の `raw_entries` を通る 3 入口で押さえた。`log.rs` の `count_table_elements` も `Table::pairs` を使うので、段 3 で 0.12 の `Table::pairs` が生のたどり方のままかを `raw_entries` と合わせて確かめる。
 - 段 3: 0.12.2 でも `Table::pairs` は `__pairs` を呼ばず生のまま辿る（mlua-0.12.2/src/table.rs）。版上げで落ちた既存テストは無く、挙動の差は 3.3 の `continue` だけ（x64・x86 とも 3053 passed）。
+- 完了時の棚卸: その場で解決 0 件・申し送り 1 件（shiori4-v3-portable の brief へ、0.12 の名前と x86 の整数の決まり）・起票 0 件。
