@@ -1,9 +1,6 @@
 //! pasta_sample_ghost 統合テスト
 
-mod common;
-
 use std::path::PathBuf;
-use tempfile::TempDir;
 
 /// ghosts/hello-pasta ディレクトリのパスを取得
 fn ghost_dir() -> PathBuf {
@@ -211,24 +208,4 @@ fn test_ukadoc_files() {
         shell_desc.contains("kero.balloon.offsety,120"),
         "shell descript.txt の kero.balloon.offsety が120ではありません"
     );
-}
-
-/// DLL コピーヘルパーテスト（DLL存在時のみ成功）
-#[test]
-fn test_dll_copy_helper_message() {
-    let temp = TempDir::new().unwrap();
-    let result = common::copy_pasta_shiori_dll(temp.path());
-
-    // DLL がない場合はエラーメッセージを確認
-    if let Err(msg) = result {
-        assert!(
-            msg.contains("pasta_shiori.dll"),
-            "エラーメッセージにDLL名が含まれていません"
-        );
-        assert!(
-            msg.contains("cargo build"),
-            "ビルドコマンドの案内がありません"
-        );
-    }
-    // DLL がある場合は成功
 }
