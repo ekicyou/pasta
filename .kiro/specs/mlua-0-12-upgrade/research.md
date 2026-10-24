@@ -166,3 +166,124 @@ mlua 0.12.2 と 1 章の仮の直し（x86 の整数の 3 か所、`test_codec_r
   - どちらも、期待 `Integer(-9223372036854775808)` に対して `Float(-9.223372036854776e18)` が戻った。x86 では Lua に渡った `-2^63` が `mlua::Integer`（`i32`）に収まらないので `Value::Number` になり、浮動小数として書かれる（OPEN QUESTION 2 の差そのもの）。
 - ほかは、デバッガ・FFI・Shift_JIS の変換・SHIORI の結合・lua_test を含めて全部通った。mlua 0.12 から来る x86 だけの差は見つからなかった。
 - x86 の clippy（`-D warnings`）は、この仮の直しで通った。x64 の clippy は `i64::from` の `useless_conversion` 2 件で落ちる（1 章）。
+
+## 設計の調べ（2026-10-24、kiro-spec-design）
+
+### 要約
+
+- **Feature**: `mlua-0-12-upgrade`
+- **Discovery Scope**: Extension（依存の版上げ。軽い調べ。ギャップ分析の実測を土台にし、5 章の持ち越しをソースと実行で確かめた）
+- **使った決まり・スキル**: `kiro-spec-design` の `design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`。ドメインのスキル（`pasta-lua-coding` など）は、API を変えないので読まなかった。
+- **要点**
+  - x86 の整数の直しは、`persistence.rs` の非公開の関数 `lua_int` 1 つにまとめられる。x86・x64 の clippy（`-D warnings`）と x86 のテストを、スクラッチ（mlua 0.11.6）で実際に走らせて確かめた。
+  - `test_codec_round_trip_i64_extremes_as_values` の `i64::MAX` の回は、x86 では期待を変えずに通せない（下）。要件の「決まった論点 2」とずれるので、設計の OPEN QUESTION 1 にした。
+  - LuaJIT `707c12b` → `c6ffc14` は、Lua に新しい書き方（`continue`・`const`・`!=`・`&&`・`||`・`??`・`?.`・ビット演算の記号・`|x| -> 式`・数の `_` 区切り）を足す。今まで動いていた書き方は変わらない。設計の OPEN QUESTION 2 にした。
+
+### 調べたこと
+
+#### x86 の整数の書き方（clippy を両方で通す形）
+
+- **Context**: 5 章「決めること」の 1 つ目。仮の直しの `i64::from(*i)` は x64 の `useless_conversion` で落ちた。
+- **Sources**: スクラッチ（`git archive HEAD`、mlua 0.11.6）で `cargo clippy -p pasta_lua --all-targets --target <x64・x86> -- -D warnings` と `cargo test -p pasta_lua --lib runtime::` を走らせた。mlua 0.12.2 `src/state/raw.rs` 922〜928 行、mlua-sys 0.13.0 `src/lua51/compat.rs` 184〜194 行。
+- **Findings**
+  - `Value::Integer(i) => Some(i as i64)` は x64 の clippy の `unnecessary_cast` で落ちる。
+  - `#[allow(clippy::useless_conversion)]` を付けた関数の中の `i64::from(i)` は、x86・x64 とも通る（`allow` は、x86 で警告が出なくても誤りにならない。`expect` は使わない）。
+  - `mlua::Integer::try_from(*i)` は x64 でも警告にならない。
+  - mlua は LuaJIT の数を `num_traits::cast` で `mlua::Integer` に収まるかを見てから、戻して同じビットかを確かめる。x64 では `-2^63` 以上 `2^63` 未満の整数の値が `Value::Integer`。Rust の `n as i64` は `2^63` を `i64::MAX` に飽和させ、戻すと同じビットに見えるので、範囲を見ないと `2^63` だけ x64 とずれる。
+  - x86 で、Lua の表 `{ big = 3000000000, neg = -3000000000, two53 = 9007199254740993, one = 1.0, nz = -0.0, m63 = -2^63, p63 = 2^63, arr = { 3000000000, 2 } }` を書いた TOML は、x64 と同じ文字になった（`big = 3000000000`・`m63 = -9223372036854775808`・`p63 = 9223372036854776000.0`・`nz = -0.0`・`one = 1`・`two53 = 9007199254740992`・`arr = [3000000000, 2]`）。TOML の `x = 3000000000` を読むと、x86 でも Lua の数 `3000000000` になった。
+  - 外すキーの理由だけが、x86 の `-3000000000` のキーで `non-string key (number)`、x64 で `non-string key (integer)` とずれた（`3000000000` のキーは両方 `integer`。穴のある配列は両方 `hole in array`）。型の名前も `lua_int` で揃える。
+- **Implications**: 設計の SaveIntegerRule。新しい依存（`num-traits` を直に）は足さない。
+
+#### x86 で落ちていた往復の試験 2 本
+
+- **Context**: 要件の「決まった論点 2」は、2 本を期待を変えずに x86 でも通すとした。
+- **Findings**（上の形の直しの上で x86 を走らせた）
+  - `test_codec_round_trip_values` は通った（`imin` の `-2^63` が整数で書き戻る）。
+  - `test_codec_round_trip_i64_extremes_as_values` は、`i64::MAX` の回で落ちた（期待 `Integer(9223372036854775807)`、戻り `Float(9.223372036854776e18)`）。この試験は `toml_to_lua` の結果の `Value` を Lua に入れずに書き戻すので、x64 では Rust の側の `Value::Integer(i64::MAX)` がそのまま残る。x86 の `mlua::Value` は 32 ビットを超える整数を `Value::Number` でしか持てない。Lua に入れれば x64 でも `2^63` の浮動小数になる（`test_codec_round_trip_values` の `imax`）。
+  - `i64::MIN`・`-0.0` の回は x86 でも通る。
+- **Implications**: `i64::MAX` の回だけを 64 ビットに限る前提で設計した（7.6 の例外の内側と読む）。設計の OPEN QUESTION 1。
+
+#### `@pasta_log` の x86 の整数の出方（5 章の Research Needed）
+
+- **Findings**: 表の値は SaveCodec の `lua_value_to_toml_strict` を通るので、`lua_int` で x64 と同じになる。スカラー（`log.rs` の `value_to_string`）は、x86 の `Value::Number(3e9)` も Rust の `f64` の表示で `3000000000`（`.0` が付かない）になり、x64 の `Value::Integer` の表示と同じ。`-0.0` は両方 `-0`。
+- **Implications**: `log.rs` は直さない。
+
+#### `coroutine.status` の試験の網羅（5 章の Research Needed）
+
+- **Findings**: `suspended`・`dead` を照合する試験は lua_spec に多くある（`event_coroutine_test.lua` 6 か所・`actor_proxy_act_delegation_test.lua`・`choice_select_test.lua`・`act_dynamic_ref_test.lua`・`integration_coroutine_test.lua`・`global_chaintalk_*` など）。再開の結果は `act_test.lua`・`act_call_restore_test.lua` などが照合する。Rust の側は `external_control_events_test.rs` が `STORE.co_scene` の `suspended` を見る。`running`・`normal` を照合する試験は無く、pasta のランタイム（`store.lua`・`event/init.lua`）も使わない。LuaJIT の差分で、`lib_base.c` のコルーチンの関数と、`lj_state.c` の再開の所に変更は無い（`lj_state.c` の差はスタックの伸ばし方の誤りの道だけ）。
+- **Implications**: 3.5 の特性化テストは足さない。
+
+#### LuaJIT `707c12b` → `c6ffc14`（5 章の Research Needed）
+
+- **Sources**: cargo の registry の `luajit-src-210.6.6+707c12b` と `luajit-src-210.7.4+c6ffc14` の `luajit2/` を `diff -r` で比べた（66 ファイル）。上流は Mike Pall の LuaJIT 2.1（`luajit-src` の README）。mlua 0.12.2（`luajit52`・`vendored`）の小さなプログラムで書き方を走らせた。
+- **Findings**
+  - `lj_lex.c`・`lj_lex.h`・`lj_parse.c`（779 行の差）: 新しい言葉と記号（`const`・`continue`・`?.`・`??`・`<<`・`>>`・`~>>`・`&&`・`||`・`!=`・`->`）と、数の `_` 区切り。走らせて確かめた: `continue` 文・`const y = 2`・`a ?? 5`・`t?.x`・`1 != 2`・`true && false`・`false || 7`・`1 << 3`・`16 >> 2`・`-16 ~>> 2`・`|x| -> x + 1`・`1_000`・`0x_ff` が動く。`local x <const> = 1`（Lua 5.4 の書き方）は構文の誤りのまま。
+  - `continue`・`const` は文脈で決まる言葉で、`local continue = 1`・`local const = 1`・`t.continue`・`{ const = 1 }`・`goto continue` と `::continue::` は今までどおり動く（走らせて確かめた）。pasta のリポジトリの Lua に、これらを名前に使う所は無い（`git grep -w`。注釈の英文だけ）。
+  - `lj_errmsg.h`: `no loop to continue` など新しい書き方の誤りの文が増えただけ。今までの文は変わらない。
+  - `lib_os.c`: `os.time` が `errno` を見て、ちょうど `-1` になる時刻を誤りにしない直し。`month`・`year` の符号なしの計算の直し。
+  - `lib_base.c`: `unpack` の端の回の直しと JIT の記録。`lib_package.c`・`lib_debug.c`: 内部の鍵の値だけ。`lib_ffi.c`: `ffi.abi("dualnum")` の追加。`lj_meta.c`・`lj_gc.c`・`lj_state.c`・`lj_tab.c`・`lj_api.c`: ビット演算の記号の実装、GC・スタックの直し、型の直し。
+  - `jit.version` は `LuaJIT 2.1.1767980792` → `LuaJIT 2.1.1788856981`。`jit.version_num` は 20199 のまま、`_VERSION` は `Lua 5.1` のまま。
+  - `luajit2/COPYRIGHT` は同じ文（ギャップ分析のとおり）。
+- **Implications**: 今まで動いていた書き方の結果は変わらない。新しい書き方を受け付けることは Lua から見える差で、LuaJIT にパッチを当てない限り戻せない（4.1）。4.2 に従い、マニュアルとリリースノートに書く前提にした（設計の OPEN QUESTION 2）。
+
+#### デバッガの説明の確かめ直し（5 章の Research Needed）
+
+- **Sources**: mlua 0.12.2 `src/state/raw.rs` 449〜464 行（`global_hook_proc`）、`src/state/util.rs` 10〜23 行（`StateGuard`）・123 行（`callback_error_ext` の中の `StateGuard::new`）、`src/state.rs` 1869〜1886 行（`current_thread`）、`src/lib.rs` 90 行（`pub mod debug;`）・145 行（`HookTriggers` はクレート直下）。
+- **Findings**: フックの入口が走っている `lua_State*` を受け取り、`callback_error_ext` が `StateGuard` で `RawLua.state` を差し替え、`current_thread()` がそれを `lua_pushthread` する仕組みは、0.11.6 と同じ。0.12 で足された分岐（暗黙の非同期のスレッドを持ち主に解く）は `async` の features のときだけ。
+- **Implications**: 説明の版とファイルの位置だけを書き改める（設計の SourceComments）。
+
+#### リリースノートの載せ方（8.5）
+
+- **Findings**: 詳しいリリースノートは `.github/scripts/release/release-notes.ps1` が main のコミットの件名から作り、`!` の付いた件名を「⚠️ 動きが変わる変更」に載せる（種類より先に判定）。前例の `failure-output-unification` は、spec の中の `release-note.md` に PR のタイトルと本文を書き、`kiro-complete` のステップ 8 がそのまま使った。見どころのファイル（`doc/release-notes/v0.4.3.md`）は `release` スキルが書く。
+- **Implications**: この spec は `release-note.md` を書く。見どころは範囲の外。
+
+### 進め方の評価
+
+| 案 | 中身 | 良い所 | 弱い所 |
+|----|------|--------|--------|
+| A（採る） | 1 本の流れ: x86 の整数 → 特性化 → 版上げ → 説明と文書 | 5.2 を x86 でも守れる。段ごとに戻せる。6〜8 タスク | x86 の main の赤は、この spec が入るまで続く（要件で受け入れ済み） |
+| `#[cfg(target_pointer_width)]` で関数を 2 つ書く | 機械ごとに分ける | `allow` が要らない | 同じ決まりが 2 か所に分かれ、片方の機械でしか型を確かめられない |
+| 汎用の関数（`fn widen<T: Into<i64>>`）で包む | 型の差を隠す | `allow` が要らない | clippy から意図を隠すだけで、読む人に分かりにくい |
+| `num-traits` を直に足す | mlua と同じ `cast` を使う | mlua の決まりと字面が同じ | 1 行のために依存を足す |
+
+### 設計の判断
+
+#### 判断: 整数の決まりを `lua_int` 1 つに置く
+
+- **Context**: 7.1〜7.5。x86 と x64 で同じ文字を書く。
+- **Selected**: 非公開の `fn lua_int(&Value) -> Option<i64>` を `persistence.rs` に置き、値・配列のキー・キーの型の名前の 3 つの所が使う。読み込みは `mlua::Integer::try_from` で、収まらなければ `Value::Number(i as f64)`。
+- **Rationale**: 決まりが 1 か所なら、x86 と x64 でずれる所が生まれない。読み込みは、LuaJIT の中ではどちらも倍精度なので、`Value::Number` にしても Lua から見える値は x64 と同じ。
+- **Trade-offs**: `allow(clippy::useless_conversion)` を 1 つ持つ。
+- **Follow-up**: 実装で、x86・x64 の clippy と `persistence_tests.rs` を走らせる。
+
+#### 判断（総合）: 一般化・採用・簡素化
+
+- **一般化**: 7.1〜7.5 の 5 項目は、すべて「Lua の数を整数とみなすかの決まり」の言い換えである。`lua_int` 1 つで満たす。
+- **採用**: 決まりそのものは mlua（x64 の `Value::Integer` の決まり）と mlua-sys の `lua_isinteger` から採る。新しい依存は足さない。
+- **簡素化**: `log.rs`・`module_registry.rs`（`u32::try_from` と `Value::Number` の両方をすでに受ける）・デバッガ・`pasta_shiori` は直さない。コルーチンの特性化テストは足さない。
+
+### 危うさと手当て
+
+- `test_codec_round_trip_i64_extremes_as_values` の `i64::MAX` の回を 64 ビットに限ることが、要件の決まりとずれる — 設計の OPEN QUESTION 1 で開発者に確かめる。
+- LuaJIT の新しい書き方を作者が使い、同梱の luacheck が読めない — マニュアルに書く（OPEN QUESTION 2）。
+- 試験で押さえていない LuaJIT の差（JIT・FFI の算術・GC） — x86・x64 の全部の試験を関門にする。差が見つかれば下の記録に足す。
+
+## 挙動の差の記録（BehaviorRecord。4.1〜4.4）
+
+実装の段 3・4 で足す。設計の段階で分かっていること:
+
+| 差 | 判断 | 書いた所 |
+|----|------|----------|
+| mlua 0.12.2 の Lua から見える差 | 無し（ギャップ分析の x64 のテスト 3,046 本・x86 の 3,043 本） | この表 |
+| LuaJIT の新しい書き方を受け付ける | 戻せない。マニュアルとリリースノートに書く（OPEN QUESTION 2） | `book/src/lua/basics.md`・`release-note.md`（実装で） |
+| `os.time` の `-1` の時刻 | LuaJIT の不具合の直し。リリースノートにまとめる | `release-note.md`（実装で） |
+| `jit.version` の文字 | 差として扱わない（`jit.version_num`・`pasta.lua_version` は同じ） | この表 |
+| x86 のセーブの整数 | mlua でなく main の不具合の直し。x64 と同じ文字にした | `release-note.md`（実装で） |
+
+## 参照
+
+- mlua 0.12.2 のソース（cargo の registry `mlua-0.12.2/src/`）: `state/raw.rs`・`state/util.rs`・`state.rs`・`lib.rs`
+- mlua-sys 0.13.0 `src/lua51/compat.rs`・`src/lua51/lua.rs`
+- `luajit-src` 210.6.6+707c12b・210.7.4+c6ffc14 の `luajit2/`（LuaJIT 2.1、<https://github.com/LuaJIT/LuaJIT>）
+- `.kiro/specs/completed/toml-serialization/design.md`（SaveCodec・確定した判断 6）
+- `.kiro/specs/completed/failure-output-unification/release-note.md`（リリースノートの前例）
