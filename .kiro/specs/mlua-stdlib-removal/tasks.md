@@ -35,7 +35,7 @@
   - 6 つを確かめていた 2 つのテストのファイルを消し、runtime のテストの入口から外す
   - 完了: `Cargo.lock` に `name = "mlua-stdlib"` が無く、`cargo tree -i mlua-stdlib` が見つからず、`cargo test -p pasta_lua` が通る
   - _Requirements: 1.1, 1.2, 6.5_
-- [ ] 3.2 Rust の設定から 6 つの名前と `env` の警告を外し、誤りの文を `std_` の名前だけにする
+- [x] 3.2 Rust の設定から 6 つの名前と `env` の警告を外し、誤りの文を `std_` の名前だけにする
   - `default_libs()`・`new()`・`minimal()` は `["std_all"]`、`full()` は `["std_all_unsafe"]`。`should_enable_module` を消す
   - `validate_and_warn` から `env` の分岐を消す（`std_debug`・`std_all_unsafe` の警告は残す）。設定の文書と注釈から mlua-stdlib を消す
   - `UnknownLibrary` の文を 13 の `std_` の名前だけにする

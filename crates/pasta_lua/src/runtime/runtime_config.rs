@@ -1,7 +1,7 @@
 //! Runtime configuration for Lua standard library and module selection.
 //!
-//! RuntimeConfig controls which Lua standard libraries and mlua-stdlib modules
-//! are enabled in the PastaLuaRuntime.
+//! RuntimeConfig controls which Lua standard libraries are enabled in the
+//! PastaLuaRuntime.
 
 use crate::debug::kick::KickSink;
 use crate::debug::{DebugConfig, DebugFileConfig};
@@ -11,17 +11,9 @@ use pasta_core::registry::SceneAliasTable;
 
 /// Default libs configuration used by [`RuntimeConfig::new`].
 ///
-/// Returns: ["std_all", "assertions", "testing", "regex", "json", "yaml"]
-/// Note: `env` is excluded by default for security (filesystem access).
+/// Returns: `["std_all"]`
 pub fn default_libs() -> Vec<String> {
-    vec![
-        "std_all".into(),
-        "assertions".into(),
-        "testing".into(),
-        "regex".into(),
-        "json".into(),
-        "yaml".into(),
-    ]
+    vec!["std_all".into()]
 }
 
 /// Libraries the VM cannot be built without (Rust-side module registration
@@ -41,7 +33,7 @@ const REQUIRED_LIBS: &[&str] = &["std_package"];
 /// ```rust
 /// use pasta_lua::RuntimeConfig;
 ///
-/// // Default configuration (safe libraries + common mlua-stdlib modules)
+/// // Default configuration (safe Lua standard libraries)
 /// let config = RuntimeConfig::new();
 ///
 /// // Full configuration with all features including security-sensitive ones
@@ -53,7 +45,6 @@ const REQUIRED_LIBS: &[&str] = &["std_package"];
 /// // Custom configuration
 /// let config = RuntimeConfig::from_libs(vec![
 ///     "std_all".into(),
-///     "testing".into(),
 ///     "-std_debug".into(),
 /// ]);
 /// ```
@@ -61,17 +52,14 @@ const REQUIRED_LIBS: &[&str] = &["std_package"];
 pub struct RuntimeConfig {
     /// Library configuration array.
     ///
-    /// Supports Lua standard libraries (std_* prefix) and mlua-stdlib modules.
-    /// Use `-` prefix to subtract/exclude a library.
+    /// Only Lua standard library names (std_* prefix) have meaning; other
+    /// names are silently ignored. Use `-` prefix to subtract/exclude a library.
     ///
     /// Valid Lua standard libraries:
     /// - `std_all` - All safe libraries (StdLib::ALL_SAFE, excludes std_debug)
     /// - `std_all_unsafe` - All libraries including debug (StdLib::ALL)
     /// - `std_coroutine`, `std_table`, `std_io`, `std_os`, `std_string`
     /// - `std_math`, `std_package`, `std_debug`, `std_jit`, `std_ffi`, `std_bit`
-    ///
-    /// Valid mlua-stdlib modules:
-    /// - `assertions`, `testing`, `env`, `regex`, `json`, `yaml`
     ///
     /// Required: `std_package` (`std_all` / `std_all_unsafe` include it).
     /// Without it the runtime returns [`ConfigError::MissingRequiredLibrary`]
@@ -132,11 +120,9 @@ impl std::fmt::Debug for RuntimeConfig {
 }
 
 impl RuntimeConfig {
-    /// Create a new configuration with all safe features enabled (default).
+    /// Create a new configuration with all safe libraries enabled (default).
     ///
-    /// Default: `["std_all", "assertions", "testing", "regex", "json", "yaml"]`
-    ///
-    /// Note: `env` is disabled by default for security reasons.
+    /// Default: `["std_all"]`
     pub fn new() -> Self {
         Self {
             libs: default_libs(),
@@ -146,20 +132,12 @@ impl RuntimeConfig {
         }
     }
 
-    /// Create a configuration with all features enabled, including security-sensitive ones.
+    /// Create a configuration with all libraries enabled, including `std_debug`.
     ///
-    /// Includes: `std_all_unsafe` (debug), `env`
+    /// Contains: `["std_all_unsafe"]`
     pub fn full() -> Self {
         Self {
-            libs: vec![
-                "std_all_unsafe".into(),
-                "assertions".into(),
-                "testing".into(),
-                "env".into(),
-                "regex".into(),
-                "json".into(),
-                "yaml".into(),
-            ],
+            libs: vec!["std_all_unsafe".into()],
             debug: DebugConfig::default(),
             kick_sink: None,
             scene_aliases: SceneAliasTable::empty(),
@@ -167,8 +145,6 @@ impl RuntimeConfig {
     }
 
     /// Create a minimal configuration with only safe Lua standard libraries.
-    ///
-    /// No mlua-stdlib modules are enabled.
     ///
     /// Contains: `["std_all"]`
     pub fn minimal() -> Self {
@@ -281,7 +257,7 @@ impl RuntimeConfig {
 
             // Only process std_* prefixed names for StdLib
             if !name.starts_with("std_") {
-                // mlua-stdlib modules are handled separately
+                // Non-std_ names are silently ignored
                 continue;
             }
 
@@ -339,27 +315,10 @@ impl RuntimeConfig {
         }
     }
 
-    /// Check if a specific mlua-stdlib module should be enabled.
-    ///
-    /// # Arguments
-    /// * `module` - Module name without prefix (e.g., "testing", "regex")
-    ///
-    /// # Returns
-    /// `true` if module is in libs array and not subtracted
-    pub fn should_enable_module(&self, module: &str) -> bool {
-        let has_positive = self.libs.iter().any(|lib| lib == module);
-        let has_negative = self
-            .libs
-            .iter()
-            .any(|lib| lib.strip_prefix('-') == Some(module));
-        has_positive && !has_negative
-    }
-
     /// Validate configuration and emit security warnings.
     ///
     /// Emits `tracing::warn` for:
     /// - `std_debug` or `std_all_unsafe` enabled
-    /// - `env` module enabled
     ///
     /// Emits `tracing::debug` for enabled libraries list.
     pub fn validate_and_warn(&self) {
@@ -385,14 +344,6 @@ impl RuntimeConfig {
                      Not recommended for production."
                 );
             }
-        }
-
-        // Check for security-sensitive mlua-stdlib modules
-        if self.should_enable_module("env") {
-            tracing::warn!(
-                "Security-sensitive module enabled: env. \
-                 Provides filesystem and environment variable access."
-            );
         }
 
         // Log enabled libraries at debug level
