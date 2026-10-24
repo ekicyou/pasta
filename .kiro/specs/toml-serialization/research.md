@@ -212,3 +212,48 @@ toml 1.1.8 の `toml::Value` の読み取り（`value.rs` 420〜517 行）は `v
 7. **`save(data)` の戻り値（A7）**: キーを外しても `true, nil` を返し、外したことはログで知らせる。— 推奨: このまま。戻り値の形を変えず、今の呼び出し側を壊さない。
 8. **ログの表の戻し方（A8）**: 書けない値を含む表は、表全体を `tostring()` にする。— 推奨: このまま。今の「変換できなければ tostring」と同じで、一部を黙って省いた出力を出さない。
 9. **サイドカーの名前と版（A9）**: `<lua_path>.map` のまま、`version` は設計で決める。— 推奨: 名前は変えない、`version` は 1 のまま。中身の項目が同じで、読むのはテストだけ。
+
+## 8. 設計フェーズの調査と決定（2026-10-24・`/kiro-spec-design -y`）
+
+> 種別は **Extension**（既存のセーブ・ログ・サイドカーを広げる）として、軽い調査（design-discovery-light）を行った。使ったスキルと規則: `kiro-spec-design` の `design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`、テンプレート `.kiro/settings/templates/specs/design.md`・`research.md`、ponytail（新しいコードを最小にする。既存の型を使う）。steering は `tech.md`・`structure.md`（src 内テストの配置・600 行の目安）・`roadmap.md`（同じウェーブの持ち場）。
+
+### 8.1 調べたこと
+
+- **toml 1.1.8 の書き出しの見た目**（スクラッチの小さなクレートで `cargo run --offline`）: `toml::to_string(&toml::Table)` は、キーを昇順に、日本語のキーを `"会員番号" = "01"`、入れ子の表を `[flags]`・`[flags.deep]`、表の配列を `[[inventory]]`、空の表を `[empty_tbl]`、空の配列を `[]`、型の混ざった配列を `[1, {}]`、入れ子の配列を `[[1], 2]`、`1.0` を `1.0`、NaN を `nan`、改行を含む文字列を `"""…"""` で書く。どれも `toml::from_str` で読み戻せた。6 章の Research Needed の 1 つ目を閉じる。
+- **値の `Display`**: `toml::Value::Table` の `Display` は `{ a = 1, b = { c = 2 } }` の 1 行になるが、改行を含む文字列は複数行（`"""`）になる。ログ（Requirement 6.2）は文字列だけを自前で基本文字列にエスケープし、ほかは `Display` に任せる（`write_inline`）。6 章の 3 つ目を閉じる。
+- **読み込みの深さ**: toml 1.1.8 は `de/parser/mod.rs` の `const LIMIT: u32 = 80` で、配列とインライン表の入れ子、ドット区切りのキーの長さを 80 で断る（`unbounded` の機能は無効）。100 段の配列は読み込みの誤りになった。手で書いた深いセーブはスタックを溢れさせず、読めないセーブとして退避される。6 章の 2 つ目を閉じる。
+- **BOM・空の文書・日時**: 先頭の BOM は読み飛ばされ、空の文書は空の表、日時は `Datetime` の `Display` で `1979-05-27T07:32:00Z` になる（同じスクラッチで確かめた）。
+- **`2^63` の飽和**: mlua 0.11.6 の LuaJIT の数の読み取り（`state/raw.rs` 805〜813 行）は `num_traits::cast(n)` で `i64` の範囲を確かめてから `Value::Integer` にし、範囲外は `Value::Number` のまま渡す。`2^63` は浮動小数点数として届く。pasta の変換は mlua の分け方をそのまま使い、自前で `as i64` をしないので、6 章の飽和の落とし穴は起きない（設計に書いた）。
+- **`preserve_order`**: `cargo tree --offline --workspace -e features -i toml` で、ワークスペースのどこも `toml` の `preserve_order` を有効にしていない。`toml::Table` は `BTreeMap` で、キーは昇順になる（Requirement 1.8）。将来だれかが有効にすると挿入順（Lua の `pairs` の順）になるので、テストで検出する。
+- **状態の置き場所**: Lua の状態ごとの値を `Lua::set_app_data` で持つ型が既にある（`runtime/searcher.rs` の `ChunkTable`、`runtime/ffi_load/mod.rs` の `DllPins`）。`SaveGate` も同じ型にすると、`save` の閉包と `Drop` が `module_registry.rs` を触らずに同じ値を見られる。
+- **保存先の一致**: `module_registry.rs` の `register_persistence_module` と `lifecycle.rs` は、同じ `PastaConfig` と `base_dir` から `effective_file_path` を計算する。2 つの道の保存先は同じになる。
+- **`pasta.save` を読む時機**: `pasta.save` は最初の `require` まで読まれない（`act.lua`・`virtual_dispatcher.lua`・`external_control.lua`）。作者が先に `require("@pasta_persistence").save(t)` を呼ぶと、今の作りでは読めないセーブを確かめずに上書きしうる。`save_table` は、印が無ければ先に読む（Requirement 5.3）。
+- **サイドカーの形**: `SidecarFile` の `derive` のまま `toml::to_string` すると `version = 1`・`pasta_file = "…"`・`pairs = [[3, 1], [4, 2]]` になり、`pairs = []` も含めて `toml::from_slice` で同じ値に戻った（スクラッチで確かめた）。
+
+### 8.2 合成（design-synthesis）
+
+- **一般化**: セーブの変換とログの表の変換は、同じ「Lua の値 → TOML の値」の問題である。1 つの再帰の変換に「外すモード」（セーブ）と「厳しいモード」（ログ）を持たせ、深さの上限を引数にする（32 と 10）。ログの `table_depth_exceeds` は、この変換の深さの上限と祖先の列が同じ守りをするので消す（循環・11 段・表のキーは、どれも `Err` → `tostring` で今と同じ結果）。
+- **作るか使うか**: Lua → TOML は mlua の serde では作れない（キーごとに外せない・混ざった表の名前のキーを黙って捨てる。2.6）ので作る。TOML の文書の書き出しと読み込み、gzip、原子的な書き込みは既にあるもの（`toml`・`flate2`・`save_to_file`）を使う。TOML → Lua は `module_registry.rs` の `toml_to_lua` を呼べない（同じウェーブの約束）ので、日時を文字列にする小さな写しを `persistence.rs` に置く。1 行のログは `toml_writer` を直接の依存にできない（`Cargo.toml` を触らない）ので、文字列のエスケープだけ自前で書く。
+- **簡素化**: 新しいソースのモジュールを作らない（`runtime/mod.rs` を触らない）。`lifecycle.rs` の変換と書き込みを `save_table` の 1 行にまとめ、2 つの道の重複を消す。警告を間引く仕組み・`.broken` の数の上限・日時つきの名前は作らない。`PersistenceError` は `JsonError` を 2 つの TOML の誤りに替え、`SaveDisabled` を 1 つ足すだけにする。
+
+### 8.3 決定
+
+- **Decision: 変換は `persistence.rs` の 1 つの再帰で持つ**
+  - Context: Requirement 4（キーごとに外す・道筋つきの警告・深さ・循環）と 6.5（ログは全体を `tostring`）。
+  - Alternatives: (1) mlua の serde を根のキーごとに呼ぶ（Option C）— 根の単位でしか外せない。(2) 新しいファイル `runtime/toml_value.rs`（Option B）— `runtime/mod.rs` に `mod` の行が要る。
+  - Selected: `persistence.rs` の中の `convert`（深さで止まる再帰・祖先の列・`Option<&mut Vec<DroppedKey>>` でモードを切り替える）。ログは `pub(crate)` の厳しい口を使う。
+  - Trade-offs: `persistence.rs` は増えるが、テストを `persistence_tests.rs` へ出して本体を 600 行の内に保つ。
+- **Decision: 「書かない」印は Lua の `app_data` の `SaveGate`**
+  - Context: Requirement 5.5（退避できなければ、`save(data)` も `Drop` も書かない）。
+  - Alternatives: (1) `PersistenceState` に `Rc<Cell<…>>` を持たせる — `Drop` の道から見えない。(2) `Drop` が Lua の `save` 関数を呼ぶ形に寄せる — 作者が `package.loaded` を差し替えると終了時の保存が変わる。(3) `PastaLuaRuntime` に項目を足す — `runtime/mod.rs` を触る。
+  - Selected: `lua.set_app_data(SaveGate)`。無い＝まだ読んでいない、`Open`、`Closed(理由)` の 3 つ。`save_table` は無ければ先に読む。
+- **Decision: `.broken` の名前は番号を足す**（OPEN QUESTION 3）。`<保存先>.broken`、`.broken.1`、`.broken.2`…。先に有無を確かめてから `rename` する（`rename` は Windows でも置き換えるため）。
+- **Decision: 書けない文字列のキーはそのキーだけ外す**（OPEN QUESTION 5）。
+- **Decision: サイドカーの `version` は 1 のまま**（OPEN QUESTION 2）。
+- **Decision: 外したキーの警告は間引かない**（OPEN QUESTION 1）。
+
+### 8.4 危うさと手当て
+
+- `preserve_order` が将来入るとキーの順が崩れる — 違う順で入れた表から同じバイト列ができることをテストで確かめる。
+- 読めないセーブが一時的なロックによるもので、退避も失敗する — そのランタイムの変更は残らないが、元のセーブは残る（A6 で受け入れ済み）。エラーのログで分かる。
+- `pasta_shiori` のテストの失敗の作り方（保存先の親が通常のファイル）は、Windows と Unix で通る道が違う — どちらも `Drop` のエラーのログに行き着くことを設計で確かめた（SaveStore の Implementation Notes）。
