@@ -33,7 +33,7 @@
 - **mlua 0.11**: Lua VMバインディング（LuaJIT 2.1, features: luajit52, vendored, serialize）
 - **regex 1.x**: 正規表現（さくらスクリプトタグ検出）
 - **thiserror 2**: エラー型定義
-- **toml 1.1.2**: pasta の既定の書式。設定ファイル（pasta.toml）・セーブデータ（`@pasta_persistence`）・ソースマップのサイドカー（`.map`）の読み書き、`@pasta_log` の表の 1 行の書き出し
+- **toml 1.1.2**: pasta の既定の書式。設定ファイル（pasta.toml）・セーブデータ（`@pasta_persistence`）・ソースマップのサイドカー（`.map`）の読み書き、`@toml`（`decode`）、`@pasta_log` の表の 1 行の書き出し
 - **serde 1 / serde_json 1**: serde は TOML の型付きの読み書き。serde_json は DAP のメッセージ（JSON が DAP の決まり）だけに使う
 - **glob 0.3**: ファイルパターンマッチ
 - **flate2 1.x**: gzip圧縮（キャッシュ等）
