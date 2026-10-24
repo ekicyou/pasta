@@ -6,7 +6,7 @@
 
 **Users**: ゴーストの作者は、版上げの前と後で同じ辞書と Lua を同じように動かす。pasta の開発者は、今後の mlua の更新を `/update` の小さな直しで済ませる。後に続く spec（`shiori4-v3-portable`・`ponytail-lua-*`）は、0.12 の上の main でギャップ分析をやり直す。
 
-**Impact**: ルートの `Cargo.toml` の mlua の版と `Cargo.lock` の 4 つの版が変わる。コードの直しは、x86 の整数の 1 か所（`persistence.rs`）、0.12 で移った名前の `use` の 6 ファイル、非推奨になった名前の 6 ファイル、版を書いた説明の 3 ファイルである。Lua から見える差は、新しい LuaJIT が受け付ける書き方が増えることだけである（今まで構文の誤りだった書き方。今まで動いていた書き方の結果は変わらない）。
+**Impact**: ルートの `Cargo.toml` の mlua の版と `Cargo.lock` の 4 つの版が変わる。コードの直しは、x86 の整数の 1 か所（`persistence.rs`）、0.12 で移った名前の `use` の 6 ファイル、非推奨になった名前の 6 ファイル、版を書いた説明の 3 ファイルである。Lua から見える差は、新しい LuaJIT が受け付ける書き方が増えること（今まで構文の誤りだった書き方。今まで動いていた書き方の結果は変わらない）と、LuaJIT の `os.time` の不具合の直し（ちょうど `-1` になる時刻で `nil` を返さなくなる）だけである。
 
 ### Goals
 
@@ -313,7 +313,7 @@ mlua 0.12.2 のソースで、デバッガが頼る仕組みが 0.11.6 と同じ
 - `about.hbs` の LuaJIT の著作権の文は、`luajit-src` 210.6.6 と 210.7.4 の `luajit2/COPYRIGHT` が同じ文であることを確かめたので変えない（8.3）。
 - `roadmap.md` 137 行を、「mlua 0.12 へ上げた（`mlua-0-12-upgrade`）。`pasta_lua` を触る ponytail（`ponytail-lua-*`）は、この後の main でギャップ分析をやり直す」の形に改める（8.4）。
 - `book/src/lua/basics.md` の「前提」に、次の中身の段落を足す（4.2。**前提（仮定）**。OPEN QUESTION 2）: 同梱の LuaJIT（2.1 の新しい版）は、Lua 5.1 にない書き方の一部（`continue`・`const`・`!=`・`&&`・`||`・`??`・`?.`・ビット演算の記号・`|x| -> 式` の短い関数・数の `_` 区切りなど）を構文の誤りにしない。pasta のマニュアルは Lua 5.1 系＋LuaJIT 拡張の範囲だけを案内し、これらの書き方は同梱の luacheck が読めない。今まで動いていた書き方の結果は変わらない。回避の書き方は書かない。
-- `release-note.md`（新規）: `kiro-complete` のステップ 8 がそのまま使う PR のタイトルと本文。タイトルは `feat!(mlua-0-12-upgrade): mlua を 0.12 に上げる` の形にし、`!` でリリースノートの「動きが変わる変更」に載せる（`release-notes.ps1` の決まり）。本文には、(1) `pasta_lua` が公開する `pasta_lua::mlua` が 0.12 になったこと（Rust のライブラリとして使う人は 0.12 の名前で書く。`mlua::debug::Debug`・`mlua::LuaString`）、(2) 同梱の LuaJIT が新しい書き方を受け付けること、(3) x86 の pasta.dll のセーブの整数が x64 と同じ文字で書かれるようになったこと（今の main の x86 のビルドの不具合の直し）を書く（8.5）。
+- `release-note.md`（新規）: `kiro-complete` のステップ 8 がそのまま使う PR のタイトルと本文。タイトルは `feat(mlua-0-12-upgrade)!: mlua を 0.12 に上げる` の形にし、スコープの後の `!` でリリースノートの「動きが変わる変更」に載せる（`release-notes.ps1` の決まり。スコープの前の `feat!(…)` は書き間違いとして受けているだけなので使わない）。本文には、(1) `pasta_lua` が公開する `pasta_lua::mlua` が 0.12 になったこと（Rust のライブラリとして使う人は 0.12 の名前で書く。`mlua::debug::Debug`・`mlua::LuaString`）、(2) 同梱の LuaJIT が新しい書き方を受け付けること、(3) x86 の pasta.dll のセーブの整数が x64 と同じ文字で書かれるようになったこと（今の main の x86 のビルドの不具合の直し）を書く（8.5）。
 
 #### BehaviorRecord
 
