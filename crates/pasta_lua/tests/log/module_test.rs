@@ -4,7 +4,7 @@
 //! - All 5 log level functions (trace/debug/info/warn/error)
 //! - Value conversion (string, number, boolean, table, nil)
 //! - Caller information capture (source, line, function name)
-//! - Table JSON conversion with size/depth limits
+//! - Table TOML one-line conversion with size/depth limits
 //! - Edge cases (empty args, circular refs, large tables)
 
 use mlua::{Lua, StdLib, Table};
@@ -200,7 +200,7 @@ fn test_log_boolean_false() {
 
 #[traced_test]
 #[test]
-fn test_log_table_as_json() {
+fn test_log_table_as_toml_inline() {
     let lua = create_test_lua_with_log();
     lua.load(
         r#"
@@ -211,14 +211,12 @@ fn test_log_table_as_json() {
     .exec()
     .unwrap();
 
-    // Table should be converted to JSON
-    assert!(logs_contain("key"));
-    assert!(logs_contain("value"));
+    assert!(logs_contain(r#"{ key = "value" }"#));
 }
 
 #[traced_test]
 #[test]
-fn test_log_array_table_as_json() {
+fn test_log_array_table_as_toml_inline() {
     let lua = create_test_lua_with_log();
     lua.load(
         r#"
@@ -229,7 +227,7 @@ fn test_log_array_table_as_json() {
     .exec()
     .unwrap();
 
-    assert!(logs_contain("[1,2,3]"));
+    assert!(logs_contain("[1, 2, 3]"));
 }
 
 // ============================================================================
@@ -429,7 +427,7 @@ fn test_module_has_all_functions() {
 
 #[traced_test]
 #[test]
-fn test_log_nested_table_json() {
+fn test_log_nested_table_toml_inline() {
     let lua = create_test_lua_with_log();
     lua.load(
         r#"
@@ -440,7 +438,7 @@ fn test_log_nested_table_json() {
     .exec()
     .unwrap();
 
-    assert!(logs_contain("nested"));
+    assert!(logs_contain("{ nested = { a = 1 } }"));
 }
 
 #[traced_test]
@@ -460,4 +458,121 @@ fn test_log_circular_reference_no_error() {
     .unwrap();
 
     // Should not crash — tostring fallback
+}
+
+// ============================================================================
+// toml-serialization Requirement 6: 表は TOML の値の書き方で 1 行
+// ============================================================================
+
+/// Lua のコードを走らせる（ログを捕まえるのは呼ぶ側の traced_test）。
+fn run_log(code: &str) {
+    let lua = create_test_lua_with_log();
+    lua.load(code).exec().unwrap();
+}
+
+#[traced_test]
+#[test]
+fn test_log_keys_are_sorted_ascending() {
+    run_log(r#"require("@pasta_log").info({ score = 100, player = "ユーザー" })"#);
+    assert!(logs_contain(r#"{ player = "ユーザー", score = 100 }"#));
+}
+
+#[traced_test]
+#[test]
+fn test_log_empty_table_is_braces() {
+    run_log(r#"require("@pasta_log").info({})"#);
+    assert!(logs_contain("{}"));
+    assert!(!logs_contain("table: 0x"));
+}
+
+#[traced_test]
+#[test]
+fn test_log_string_with_newline_stays_one_line() {
+    run_log(r#"require("@pasta_log").info({ msg = "a\nb\tc" })"#);
+    assert!(logs_contain(r#"{ msg = "a\nb\tc" }"#));
+    assert!(!logs_contain("\"\"\""));
+}
+
+#[traced_test]
+#[test]
+fn test_log_non_bare_key_is_quoted() {
+    run_log(r#"require("@pasta_log").info({ ["会員番号"] = 1, ok_key = true })"#);
+    assert!(logs_contain(r#"{ ok_key = true, "会員番号" = 1 }"#));
+}
+
+#[traced_test]
+#[test]
+fn test_log_float_in_toml_notation() {
+    run_log(r#"require("@pasta_log").info({ x = 1.5 })"#);
+    assert!(logs_contain("{ x = 1.5 }"));
+}
+
+#[traced_test]
+#[test]
+fn test_log_mixed_table_falls_back_to_tostring() {
+    run_log(r#"require("@pasta_log").info({ 1, 2, mixed_marker = 3 })"#);
+    assert!(logs_contain("table: 0x"));
+    assert!(!logs_contain("mixed_marker"));
+}
+
+#[traced_test]
+#[test]
+fn test_log_table_with_function_falls_back_to_tostring() {
+    run_log(r#"require("@pasta_log").info({ fn_marker = function() end })"#);
+    assert!(logs_contain("table: 0x"));
+    assert!(!logs_contain("fn_marker"));
+}
+
+#[traced_test]
+#[test]
+fn test_log_cycle_falls_back_to_tostring() {
+    run_log(
+        r#"
+        local t = { cycle_marker = 1 }
+        t.self = t
+        require("@pasta_log").info(t)
+    "#,
+    );
+    assert!(logs_contain("table: 0x"));
+    assert!(!logs_contain("cycle_marker"));
+}
+
+#[traced_test]
+#[test]
+fn test_log_eleven_levels_falls_back_to_tostring() {
+    run_log(
+        r#"
+        local t = { leaf = "d11_marker" }
+        for _ = 1, 10 do t = { t } end
+        require("@pasta_log").info(t)
+    "#,
+    );
+    assert!(logs_contain("table: 0x"));
+    assert!(!logs_contain("d11_marker"));
+}
+
+#[traced_test]
+#[test]
+fn test_log_ten_levels_is_written() {
+    run_log(
+        r#"
+        local t = { leaf = "d10" }
+        for _ = 1, 9 do t = { t } end
+        require("@pasta_log").info(t)
+    "#,
+    );
+    assert!(logs_contain(r#"[[[[[[[[[{ leaf = "d10" }]]]]]]]]]"#));
+}
+
+#[traced_test]
+#[test]
+fn test_log_large_table_reports_count() {
+    run_log(
+        r#"
+        local t = {}
+        for i = 1, 1001 do t[i] = i end
+        require("@pasta_log").info(t)
+    "#,
+    );
+    assert!(logs_contain("<table: 1001 elements>"));
 }

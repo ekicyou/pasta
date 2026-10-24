@@ -348,7 +348,6 @@ pub(crate) fn lua_table_to_toml_document(
 }
 
 /// 値を TOML の値にする。どこか 1 つでも書けなければ Err(理由)。ログが使う。
-#[cfg_attr(not(test), allow(dead_code))] // shortcut: 3.3 で log.rs が使い始めたら外す
 pub(crate) fn lua_value_to_toml_strict(
     lua: &Lua,
     value: &Value,
