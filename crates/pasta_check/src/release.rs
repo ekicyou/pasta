@@ -232,6 +232,37 @@ mod tests {
         assert!(archive.by_name("ghost/master/updates.txt").is_ok());
     }
 
+    /// release.ps1 の段 4 の形（ghosts\<名前> から release\<名前> と release\<名前>.nar を
+    /// 同じ親に並べて作る）で最後まで進む（Req 4.1・4.2・7.4）
+    #[test]
+    fn test_execute_release_release_ps1_stage4_shape() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("ghosts").join("hello");
+        write_files(&target, MIN_GHOST);
+        write_files(
+            &target,
+            &[("install.txt", "charset,UTF-8\r\ntype,ghost\r\n")],
+        );
+
+        let release = temp.path().join("release").join("hello");
+        let nar = temp.path().join("release").join("hello.nar");
+        let args = ReleaseArgs {
+            target,
+            release: release.clone(),
+            nar: nar.clone(),
+            copy_dirs: vec![],
+        };
+
+        execute_release(&args).unwrap();
+
+        let entries = read_nar(&nar);
+        assert!(entries.contains_key("install.txt"));
+        assert!(entries.contains_key("updates.txt"));
+        assert!(entries.contains_key("ghost/master/dic/a.pasta"));
+        assert!(release.join("updates.txt").exists());
+    }
+
     /// root 配下に (相対パス, 内容) のファイルを親フォルダごと書く
     fn write_files(root: &Path, files: &[(&str, &str)]) {
         for (path, body) in files {
