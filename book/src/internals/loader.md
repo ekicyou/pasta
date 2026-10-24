@@ -99,7 +99,7 @@ load_with_config(base_dir, runtime_config)
 
 1. 全体を TOML の表として読む。
 2. `loader` キーを表から取り除き、`LoaderConfig` へ変換する。各キーは serde の既定値の関数で補われ、型の合わない値は解析エラーになる。`loader` キーが無ければ `LoaderConfig::default()` を使う。
-3. `[scene.alias]` を同じ内容から読み直し、有効な別名表（`scene_aliases`）とその出どころ（`scene_alias_source`）を決める。`[scene.alias]` が無ければ既定の表（`OnTalk = ["会話"]`）、あれば書いた表をそのまま使う（既定の表と合わせない）。型の合わない値・空の名前・別名の重複・置き換え先を別名にも書いた表は解析エラーになり、起動を止める（利用者向けの説明は [pasta.toml の `[scene]`](../reference/pasta-toml.md#sceneシーン名)）。
+3. `[scene.alias]` を同じ内容から読み直し、有効な別名表（`scene_aliases`）とその出どころ（`scene_alias_source`）を決める。`[scene.alias]` が無ければ既定の表（`SceneAliasTable::builtin_default` の 7 件）を使い、あれば `SceneAliasTable::with_written` で書いたキーだけ既定の別名を書いた配列に置き換える（空の配列なら消すだけ。書かなかったキーの既定は残す。見出しだけなら既定の表と等しく、出どころも既定になる）。型の合わない値・空の名前・別名の重複・置き換え先を別名にも書いた表・残った既定の別名とぶつかる表は解析エラーになり、起動を止める（利用者向けの説明は [pasta.toml の `[scene]`](../reference/pasta-toml.md#sceneシーン名)）。
 4. 残りの表をすべて `custom_fields` とする。`[scene]` も書いたとおりに残り、既定の別名表は書き足さない。`[loader]` 以外のセクションはこの段階では型付きの値にしない。
 5. `[actor."名前"]` の `font` を、`actor_font::apply` が `pasta_core` の `ActorFont` で検査し、`custom_fields` の中で検査済みのタグ列の文字列に置き換える（`font = { color = "90,110,140", bold = true }` は `\f[color,90,110,140]\f[bold,1]`、空の表は空文字列）。属性の書いた順は、同じ内容を `toml::de::DeTable` で読み直して値の位置から取る。知らない属性・型の合わない値・空の文字列・`]` か `\` を含む値・表でない `font` は解析エラーになり、起動を止める。エラーの文言にはアクター名・属性名と、取れるときは行番号が入る。同じ規則で `pasta_check validate` も `config-actor-font` を報告する（利用者向けの説明は [装い（font）](../reference/pasta-toml.md#装いfont)、出し入れは [トーク出力とアピアランス](talk-output.md#装いの出し入れ)）。
 6. `apply_shiori_defaults` で SHIORI 用の既定値を補完する。

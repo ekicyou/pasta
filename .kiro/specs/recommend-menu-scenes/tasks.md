@@ -107,7 +107,7 @@
   - マニュアルのビルドと自己テストが通り、新しい節が目次から引ける
   - _Requirements: 11.1, 11.4_
 
-- [ ] 5.2 参照・Lua・検査の頁を新しい受け手と読み方に合わせる
+- [x] 5.2 参照・Lua・検査の頁を新しい受け手と読み方に合わせる
   - `reference/pasta-toml.md` の `[scene]` の節と冒頭の既定の説明、`internals/loader.md` の手順の 1 文、`lua/modules/pasta-search.md` に別名の表を返すメソッドの節を書く
   - `lua/shiori-events.md` の既定ハンドラの表に行を足して表の前の数を直し、`On` で始まらないリソースの ID も `REG` に代入して受けられることを `REG["sakura.recommendsites"]` の作例と勝ち負けとともに書き、「丸ごと置き換わる」の記述を直す（表は行を足すだけ）
   - `debug/validate.md` に `recommend-item-invalid`・`recommend-menu-talk`・`config-scene-alias` の新しい誤り・組み込みの名前の一覧を書く
@@ -141,3 +141,4 @@
 - 3.2: Lua の実行器の `@pasta_search` は空のレジストリなので、Lua テストではシーンの検索を `with_loaded` の差し替えで書く。MenuMemory（`last`）は 3.4 まで読む側が無く `-- luacheck: ignore 241` を付けた。3.4 で外す。
 - 3.x: Lua テストはシーンと単語の登録表が空の実行器で回るため、選び方・前方一致は検索の差し替えで模している。本物の登録表を通す確かめは 6.2 の実機で行う。
 - 4.3: `＞おすすめ項目` の名前つきの 3 つ目（`名：「…」`）も、生成コードがキーを捨てて位置で渡すので同じく照合する。
+- 5.2: `lua/shiori-events.md` の既定ハンドラの表の前の数は「12 行」。同じ表に行を足す `mlua-stdlib-removal` とマージするときに数え直す。
