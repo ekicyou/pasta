@@ -40,7 +40,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.9, 1.10, 3.5, 4.5, 4.6, 4.9, 5.3, 5.5, 5.6_
 
 - [ ] 3. 保存先の決まり・サイドカー・ログの表
-- [ ] 3.1 (P) 保存先の既定を `save.toml` にし、`obfuscate` の名前を末尾だけで決める
+- [x] 3.1 (P) 保存先の既定を `save.toml` にし、`obfuscate` の名前を末尾だけで決める
   - 既定の `file_path` を `profile/pasta/save/save.toml` にし、`obfuscate = true` のときは末尾の `.toml` だけを `.dat` に替え、`.dat` はそのまま、それ以外は末尾に `.dat` を足す（途中のフォルダ名は替えない。`.json` を特別に扱わない）
   - 設定のキーの名前と意味は変えない。doc コメントを新しい決まりに直す
   - 設定のテスト 2 つのファイルで、既定 `save.toml`、設計の表の 5 行（既定・`my.toml.d/save.toml`・`save.json`・`data.bin`・`save.dat`）が期待どおりになり、通る

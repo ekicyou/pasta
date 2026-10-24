@@ -64,20 +64,30 @@ inventory = ["sword", "shield", "potion"]
     assert_eq!(loaded["inventory"][0].as_str(), Some("sword"));
 }
 
-/// Test PersistenceConfig effective_file_path conversion
+/// Test PersistenceConfig effective_file_path conversion (3.1〜3.4)
 #[test]
 fn test_persistence_config_effective_path() {
-    // Default (non-obfuscated)
+    // Default (non-obfuscated): save.toml
     let config = PersistenceConfig::default();
-    assert_eq!(config.effective_file_path(), "profile/pasta/save/save.json");
+    assert_eq!(config.effective_file_path(), "profile/pasta/save/save.toml");
 
-    // Obfuscated with .json extension -> .dat
+    // Obfuscated default: trailing .toml -> .dat
+    let config = PersistenceConfig {
+        obfuscate: true,
+        ..PersistenceConfig::default()
+    };
+    assert_eq!(config.effective_file_path(), "profile/pasta/save/save.dat");
+
+    // Obfuscated with .json: not special, .dat is appended
     let config = PersistenceConfig {
         obfuscate: true,
         file_path: "profile/pasta/save/save.json".to_string(),
         debug_mode: false,
     };
-    assert_eq!(config.effective_file_path(), "profile/pasta/save/save.dat");
+    assert_eq!(
+        config.effective_file_path(),
+        "profile/pasta/save/save.json.dat"
+    );
 
     // Obfuscated with .dat extension -> unchanged
     let config = PersistenceConfig {

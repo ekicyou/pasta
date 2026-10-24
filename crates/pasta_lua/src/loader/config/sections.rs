@@ -72,7 +72,7 @@ pub struct PersistenceConfig {
     pub obfuscate: bool,
 
     /// Save file path relative to load_dir.
-    /// Default: "profile/pasta/save/save.json" (or .dat if obfuscate=true)
+    /// Default: "profile/pasta/save/save.toml" (save.dat if obfuscate=true)
     #[serde(default = "default_persistence_file_path")]
     pub file_path: String,
 
@@ -93,20 +93,22 @@ impl Default for PersistenceConfig {
 }
 
 fn default_persistence_file_path() -> String {
-    "profile/pasta/save/save.json".to_string()
+    "profile/pasta/save/save.toml".to_string()
 }
 
 impl PersistenceConfig {
     /// Get the effective file path based on obfuscate setting.
     ///
-    /// If obfuscate is true and file_path ends with .json, changes extension to .dat.
+    /// If obfuscate is true: a trailing ".toml" becomes ".dat", a trailing ".dat" is kept,
+    /// and any other path gets ".dat" appended. Only the end of the path is touched
+    /// (folder names are never rewritten), and ".json" is not special.
     pub fn effective_file_path(&self) -> String {
-        if self.obfuscate && self.file_path.ends_with(".json") {
-            self.file_path.replace(".json", ".dat")
-        } else if self.obfuscate && !self.file_path.ends_with(".dat") {
-            format!("{}.dat", self.file_path)
-        } else {
+        if !self.obfuscate || self.file_path.ends_with(".dat") {
             self.file_path.clone()
+        } else if let Some(stem) = self.file_path.strip_suffix(".toml") {
+            format!("{stem}.dat")
+        } else {
+            format!("{}.dat", self.file_path)
         }
     }
 }

@@ -322,7 +322,7 @@ debug_mode = true
 fn test_persistence_config_default() {
     let config = PersistenceConfig::default();
     assert!(!config.obfuscate);
-    assert_eq!(config.file_path, "profile/pasta/save/save.json");
+    assert_eq!(config.file_path, "profile/pasta/save/save.toml");
     assert!(!config.debug_mode);
 }
 
@@ -354,7 +354,7 @@ obfuscate = true
         .persistence()
         .expect("persistence section should exist");
     assert!(persistence.obfuscate);
-    assert_eq!(persistence.file_path, "profile/pasta/save/save.json"); // default
+    assert_eq!(persistence.file_path, "profile/pasta/save/save.toml"); // default
     assert!(!persistence.debug_mode); // default
 }
 
@@ -368,27 +368,40 @@ debug_mode = true
     assert!(config.persistence().is_none());
 }
 
+/// 3.1〜3.4: 設計の表の 5 行（既定・`my.toml.d/save.toml`・`save.json`・`data.bin`・`save.dat`）。
+/// `obfuscate = true` は末尾の `.toml` だけを `.dat` に替え、`.dat` はそのまま、ほかは `.dat` を足す。
 #[test]
 fn test_persistence_effective_file_path() {
-    // Non-obfuscated: keep original path
-    let config = PersistenceConfig::default();
-    assert_eq!(config.effective_file_path(), "profile/pasta/save/save.json");
-
-    // Obfuscated with .json: change to .dat
-    let config = PersistenceConfig {
-        obfuscate: true,
-        file_path: "profile/pasta/save/save.json".to_string(),
-        debug_mode: false,
-    };
-    assert_eq!(config.effective_file_path(), "profile/pasta/save/save.dat");
-
-    // Obfuscated with .dat: keep as-is
-    let config = PersistenceConfig {
-        obfuscate: true,
-        file_path: "profile/pasta/save/save.dat".to_string(),
-        debug_mode: false,
-    };
-    assert_eq!(config.effective_file_path(), "profile/pasta/save/save.dat");
+    let default_path = PersistenceConfig::default().file_path;
+    let rows = [
+        (
+            default_path.as_str(),
+            "profile/pasta/save/save.toml",
+            "profile/pasta/save/save.dat",
+        ),
+        (
+            "my.toml.d/save.toml",
+            "my.toml.d/save.toml",
+            "my.toml.d/save.dat",
+        ),
+        ("save.json", "save.json", "save.json.dat"),
+        ("data.bin", "data.bin", "data.bin.dat"),
+        ("save.dat", "save.dat", "save.dat"),
+    ];
+    for (file_path, plain, obfuscated) in rows {
+        for (obfuscate, expected) in [(false, plain), (true, obfuscated)] {
+            let config = PersistenceConfig {
+                obfuscate,
+                file_path: file_path.to_string(),
+                debug_mode: false,
+            };
+            assert_eq!(
+                config.effective_file_path(),
+                expected,
+                "file_path={file_path} obfuscate={obfuscate}"
+            );
+        }
+    }
 }
 
 /// 1.3, 2.3, 7.1: 撤去したキー（`[lua] libs`・`[logging] rotation_days`）を書いた
