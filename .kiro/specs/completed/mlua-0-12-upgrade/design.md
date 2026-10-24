@@ -101,7 +101,7 @@ graph TB
 新しいファイルは、この spec のリリースノートの文面だけである。
 
 ```
-.kiro/specs/mlua-0-12-upgrade/
+.kiro/specs/completed/mlua-0-12-upgrade/
 └── release-note.md        # PR のタイトルと本文（kiro-complete のステップ 8 がそのまま使う）
 ```
 
@@ -127,8 +127,8 @@ graph TB
 - `.kiro/steering/roadmap.md`（137 行）— 前提が満ちたことを書く。
 - `book/src/lua/basics.md`（「前提」の段落）— 新しい LuaJIT が受け付ける書き方の注意を 1 段落足す（設計ディスカッションで確定）。
 - `crates/pasta_lua/tests/` の既存の runtime の試験 — 新しい書き方の代表（`continue` 文）を pasta のランタイムが受け付けることを固定するテストを 1 本足す（4.3。段 3 で足す）。
-- `.kiro/specs/mlua-0-12-upgrade/release-note.md`（新規）。
-- `.kiro/specs/mlua-0-12-upgrade/research.md` — BehaviorRecord の「挙動の差の記録」に、確かめた差と判断を足す。
+- `.kiro/specs/completed/mlua-0-12-upgrade/release-note.md`（新規）。
+- `.kiro/specs/completed/mlua-0-12-upgrade/research.md` — BehaviorRecord の「挙動の差の記録」に、確かめた差と判断を足す。
 
 VerificationGates はファイルを持たない（CI の `build.yml` と同じコマンドを手元で走らせる）。`pasta_shiori`・`pasta_check`・`pasta_sample_ghost`・`about.hbs`・`.cargo/config.toml` は変えない。
 
