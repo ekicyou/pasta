@@ -154,3 +154,24 @@
 
 - `manual.yml` の Node は、PR #187 で 20 → 22 にした（jsdom 30 が Node ^22.22.2 以上を要るため。75 行）。上の再測定の「Node 20 は `manual.yml` 75 行」は古い。残る Node 20 は `release.yml` 25 行（`NODE_VERSION`）と `release-setup-check.yml` 35 行。
 - 2026-10-24 に起票した `vsce-4-upgrade`（vsce 4 は Node 22 を要る）は、この spec が `release.yml`・`release-setup-check.yml` を Node 22 にするのを待つ（`Dependencies: ponytail-manual-ci`）。この spec の範囲から Node 22 を外すときは、`vsce-4-upgrade` の brief の Scope に戻す。
+
+## 2026-10-24 棚卸の再測定（main c20ad104）
+
+- **前提の変化**
+  - pasta のスキル 3 本を配る作業（pasta-skills-release-asset）が入り、v0.4.2 を出した。配布物は 5 つ、GitHub Release の添付は 6 つ（配布物 5 つと詳しいリリースノート）。上の申し送りの「添付 5 つ」「配布物 4 つ」は古い。
+  - リリースの流れ `.github/workflows/release.yml` は 609 行になった。公開の資格を持つ job の行は、10-23 からさらに 20 行下へずれた（ツールの用意 279 行・キャッシュ 282 行・crates.io の認証 288〜328 行・Azure のログイン 430 行）。build の job の可変のタグ（73・78 行）は動いていない。
+  - build の job に、スキルの写しの鮮度の照合（120〜121 行 `gen-skill-refs.mjs --check`）が入った。1 番の 3 つの検査のうち、リリースで走らないのは `link-check` と `tutorial-check` の 2 つになった。
+  - マニュアルの流れ `manual.yml` は PR #187 で Node を 22 にした（75 行）だけで、ほかの行（権限 56〜59 行・mdBook 0.5.3 の 92 行・Rust の用意 131・134 行・Setup Pages 191〜197 行）は変わらない。`book/package.json` は jsdom 30（Node 22.22.2 以上が要る）になった。
+  - `book/tools`・`book/theme` は 10-23 から変わっていない。`tech.md` の mdBook の版の行は 222 行（10-23 の 221 行から 1 行ずれた）。
+- **触るファイル**: `.github/workflows/` の `build.yml`（149 行）・`manual.yml`（216 行）・`release.yml`（609 行）・`release-setup-check.yml`（122 行。Node は 35 行、Azure のログインは 43 行）、`book/tools/` の `highlight/highlight-html.mjs`・`talk/talk.mjs`（写しは 262〜274 行）・`bigram-index/poc-test.mjs`・`bigram-index/poc/`・`bigram-index/build-index-test.mjs`、写しを比べる小さな検査（新規）、`book/theme/head.hbs`（361 行）、`tech.md`。`.github/scripts/release/*.ps1`（いちばん大きいのは `release-scripts-test.ps1` の 266 行）は監査の対象。1,000 行に近いものは無い。
+- **規模**: 11〜14 タスクのまま。
+- **先に要るもの**
+  - 働きの上では無い。合わせるときは、build の job の `pasta-skills.zip` の検査（165〜177 行。`git ls-tree` の失敗で止まる 171 行を含む）・upload の 226〜230 行・`github-release.ps1` 72 行の 6 つの名前・`release-scripts-test.ps1` の項目 11（246 行）を保つ。鮮度の照合を関門に足すなら、build の job の 120〜121 行との重なりを整理する。
+  - 0.4.3 の 6 本との重なり: `shiori4-v3-portable` と `build.yml` を共有する（あちらは Linux の job で cargo を回す。こちらは ubuntu の job を 1 つ足す）。同じウェーブに置かない。ほかの 5 本（`toml-serialization`・`mlua-stdlib-removal`・`recommend-menu-scenes`・`ponytail-check-release`・`mlua-0-12-upgrade`）とはソースを共有しない。マニュアルの章を足す spec が出たら、章の数の 3 つの検査と `talk.mjs` の写しの整理がぶつかりうる。
+  - 0.4.4 以降: `pasta-dll-multiarch`（`release.yml`・`build.yml`）、`vsce-4-upgrade`（`release.yml`・`release-setup-check.yml`。Node 22 を待つ）と同じウェーブに置かない。リリースの実行中は `release.yml` を main へ入れない。
+- **種別**: 基盤（検査の置き場所・権限・action の版の固定）。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 配るスキルは 3 本になったが、リンクの検査 `book/tools/link-check.mjs` 280 行の `CHECKED_SKILLS` は 2 本（`pasta-ghost-authoring`・`pasta-lua-coding`）だけで、`manual.yml` の path filter（26〜46 行）にも `.claude/skills/pasta-check/**` が無い。`pasta-check` のスキルのリンクと鮮度を誰も見ていない。ギャップ分析で、この spec に入れるかを決める。
+  - 3 番の行番号は上のとおり、また 20 行ずれた。`manual.yml` 191〜192 行の Setup Pages の注記の誤りは前のまま（2 番。直すのは設計以降）。

@@ -141,3 +141,20 @@
 - **要件定義のモデル**: Opus（前のまま）。
 - **分割の案**: 要らない。
 - **見つけた穴・古くなった記述**: Current State の行番号のうち、`lifecycle.rs` の 2 つは監査の日にもずれていた。`teardown_actor` は 150〜182 行（「L192-215」は `kick_into_mailbox`）、`marshal_request` は 124〜148 行（「L174-182」ではない）。`thread.rs` 250〜258 行・`shiori.rs` 66〜70 行・`windows.rs` 109・129・222・257 行・`req_parser.pest` の `_tag`（44 行）・`shiori-sample.log` 47 行の裸の `Reference0:` は合っている。ギャップ分析は `shiori4-v3-portable` が入った後の main で測り直す。Existing Spec Touchpoints の Adjacent に `shiori4-v3-portable`・`shiori4-v4-host`・`pasta-dll-multiarch` が無い。
+
+## 2026-10-24 棚卸の再測定（main c20ad104）
+
+- **前提の変化**
+  - `crates/pasta_shiori` に入ったのは PR #187 だけ。ctor を 0.2 → 1.0 にし（`Cargo.toml` 50 行の dev 依存）、テスト 14 ファイル（`src/shiori_request_tests.rs` と `tests/` の 13）の 1 行を `#[ctor::ctor(unsafe)]` に直した。本体のソースは変わっていない。新しいテストに `PASTA_DEBUG` を中和する守りを足すときは、この新しい書き方にする。
+  - アクタースレッドのメッセージループ wintf-winmsg-executor は 0.0.5 になった（ルートの `Cargo.toml` 48 行。pasta は `block_on` しか使わず、振る舞いは同じ）。`shiori4-v3-portable` が外す見込みは前のまま。
+  - 2026-10-24 に、この spec は 0.4.4（`shiori4-v3-portable` の後）になった。10-23 の再測定の行番号（`windows.rs` 109・129・222・257 行、`shiori.rs` 66〜70 行、`thread.rs` 250〜258 行、`lifecycle.rs` の `marshal_request` 124 行・`teardown_actor` 150 行、`req_parser.pest` 44 行の `_tag`）は今も合っている。
+- **触るファイル**: 前のとおり `crates/pasta_shiori/**`（`Cargo.toml` の `exclude` を含む）、`book/src/internals/shiori.md`、`crates/pasta_shiori/README.md`。1,000 行に近いものは無い（いちばん大きいのは `tests/call_execution_correctness_e2e_test.rs` の 687 行。10-23 の「`shiori_lifecycle_tests.rs` の 596 行」は `src` の中だけの話）。
+- **規模**: 14〜18（`shiori4-v3-portable` が 4 番の `BOOL` と 5 番を持っていけば 12〜15）のまま。
+- **先に要るもの**
+  - 働きの上では無い。`shiori4-v3-portable` が入った後の main でギャップ分析をやり直す（前のまま）。
+  - 0.4.3 の 6 本との重なり: `shiori4-v3-portable`（`windows.rs`・`actor/{lifecycle,thread,teardown,mod}.rs`・`pasta_shiori` の `Cargo.toml`・`README.md`・`tests/actor_*`。`internals/shiori.md` は節が別）、`mlua-0-12-upgrade`（`mlua::` を引く `src/error.rs`・`src/shiori.rs`・`src/lua_request.rs` とテスト 4 つ。`shiori.rs` は 2 番と 8 番、`error.rs` は 10 番の `MyError::Poison` の場所）。どちらも 0.4.3 に先に入り、こちらが合わせる。`toml-serialization`・`mlua-stdlib-removal`・`recommend-menu-scenes`・`ponytail-check-release` とは重ならない。
+  - ほか: `shiori4-v4-host`（`actor/`）、`pasta-dll-multiarch`（4 番の `c_long` をどちらが直すか）。
+- **種別**: バグ（ゴーストを閉じると SSP が落ちうる・`Key:` の行が黙って 204）。監査の指摘より。
+- **要件定義のモデル**: Opus（前のまま）。
+- **分割の案**: 要らない。
+- **見つけた穴・古くなった記述**: Existing Spec Touchpoints の Adjacent に `shiori4-v3-portable`・`shiori4-v4-host`・`pasta-dll-multiarch`・`mlua-0-12-upgrade` が無い（前の 3 つは 10-23 の再測定でも指摘済み）。Current State の `lifecycle.rs` の 2 つの行番号の誤りは 10-23 の再測定のとおり。

@@ -140,3 +140,19 @@
 
 - `release.ps1` は 8 段になった。段 6 が `pasta-skills.zip` を作って検査し、版の確認が段 7、大きさの検査とまとめが段 8。`pasta_check release` を呼ぶのは段 4 のまま。`pasta-check/SKILL.md` の段の図・`release/` の木・配布物の並びは、本 spec が開発者の許可を得て 8 段と `pasta-skills.zip` に合わせた。
 - `pasta-check/SKILL.md` は `pasta-skills.zip` に入って作者へ配られるようになった。リポジトリの中の話（`crates/…` のパス・hello-pasta の段）を文字として含んだまま配られるので、中身を直すときはこの点も論点になる。参照先: `.kiro/specs/completed/pasta-skills-release-asset/design.md` の「Decisions / Risks」。
+
+## 2026-10-24 棚卸の再測定（main c20ad104）
+
+- **前提の変化**
+  - `pasta-skills-release-asset`（PR #183）は `release.ps1`（8 段）・スキル `pasta-check/SKILL.md`・`pasta_sample_ghost/README.md`・`RELEASE.md` を変え、`pasta_check` のソースと見本のゴーストの試験には触れていない（上の申し送りのとおり）。
+  - 依存の更新（PR #187）は、見本のゴーストの試験 3 つ（`self_deploy_integration_test.rs`・`touch_shortcuts_test.rs`・`tutorial_stages_test.rs`）で、試験の前に環境変数を中和する関数の印を `#[ctor::ctor(unsafe)]` に替えた（1 行ずつ）。写しの数は変わらない。
+  - 指摘の場所は今も同じ。`copy.rs` の `prepare_release_dir` 6〜11 行（`remove_dir_all` 8 行）と `ensure_within` 15 行、`nar.rs` の働かない守り 33 行（呼び出し 84 行）と写し 44 行、`update_files.rs` の写し 151 行と `read_dir.flatten()` 170 行、`tests/common/mod.rs` 16〜46 行（`pasta_shiori.dll` を探す）。スキルの選択肢の表は `SKILL.md` 63〜86 行のまま。
+- **触るファイル**: 前回のまま（`pasta_check` の 5 ファイル、見本のゴーストの試験 6 ファイル、説明 3 か所）。1,000 行に近いものは無い。
+- **規模**: 12〜15 タスクのまま。
+- **先に要るもの**: 働きの上では無い。0.4.3 の他の 5 本とソースを共有しない。`recommend-menu-scenes` とはマニュアル `debug/validate.md` の別の節だけ。後の `mlua-0-12-upgrade` が `self_deploy_integration_test.rs`（見本のゴーストで `mlua::` を参照する唯一のファイル）を触るので、こちらが先に入る。
+- **種別**: バグ（`release` の引数の組み合わせで、作者のゴーストのフォルダを丸ごと消す）。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 冒頭の「同じ監査の 10 本と同じウェーブで並走できる」は古い。ほかの 9 本は 0.4.4 へ移った。
+  - `toml-serialization` が見本のゴーストの `pasta.toml` の `[persistence]` を直すことがある。そのときも `integration_test.rs` 52 行（見出しの有無を見る）は、この spec の持ち場のまま。

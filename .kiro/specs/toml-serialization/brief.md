@@ -94,3 +94,25 @@ pasta の既定のシリアライズは TOML である（2026-10-24 開発者の
 ## 開発者の判断が要るもの（要件の前）
 
 - すべて決まった（2026-10-24 開発者の決定）。移し替えはしない。TOML で書けない値は、そのキーだけ保存せず警告する。読めないセーブの退避を取り込む。
+
+## 2026-10-24 棚卸の再測定（main c20ad104）
+
+- **前提の変化**: 起票（main `543e0437`）の後に入ったのは文書だけで、Current State の行の位置は今も合っている。依存の更新（PR #187）は、ここで触るファイルに触れていない。読めないセーブの退避は `ponytail-lua-loader` からこの spec へ移った。
+- **触るファイル**: セーブの読み書き `crates/pasta_lua/src/runtime/persistence.rs`（568 行。作者が呼ぶ `save` の `save_impl`・`load` の `load_impl` もここ）、終了時の保存 `runtime/lifecycle.rs`（63）、`[persistence]` の既定と拡張子の決まり `loader/config/sections.rs`（356。60〜115 行あたり）、ログの表 `runtime/log.rs`（241。108〜129 行）、サイドカー `debug/source_map/sidecar.rs`（145）。試験は `tests/runtime/persistence_integration_test.rs`・`tests/loader/config_test.rs`（325〜391 行）・`tests/loader/config_sections_test.rs`・`debug/source_map_sidecar_tests.rs`・`tests/loader_source_map_build_test.rs`。マニュアルは `lua/modules/pasta-persistence.md`・`reference/pasta-toml.md`（167・713〜722 行）・`grammar/variables.md`（318〜320 行）・`lua/modules/pasta-log.md`（104〜110 行）・`internals/execution-model.md`（440〜458 行）・`internals/logging-encoding.md`（196〜201 行）・`internals/debug.md`（349 行）・`debug/source-level.md`（146 行）。`tech.md` 37 行。新しいファイルは要らない見込み。1,000 行に近いものは無い。
+- **依存**: `toml` 1.1.2 は既に `pasta_lua` の依存で、書き出しも読み込みもできる。`serde_json` はデバッガーとの通信が使い続けるので外さない。ルートの `Cargo.toml`・`Cargo.lock` は触らない（席を取らない）。
+- **規模**: 12〜14 タスク（セーブ 8 前後、ログの表 2、サイドカー 2、文書 2〜3）。
+- **先に要るもの**: 働きの上では無い。0.4.3 の中のファイルの重なり:
+  - `mlua-stdlib-removal`: 試験 `tests/loader/config_test.rs`（あちらの `@env` の試験 396〜436 行は、モジュールが消えても通るので、あちらが手を付けなければ重ならない）。`runtime/module_registry.rs`（TOML を Lua の表にする `toml_to_lua` が 216 行にあり、あちらは `@toml` をここに足す見込み。こちらは触らず、mlua の値の変換か `persistence.rs` の中の変換で読む約束にする）。マニュアル `pasta-log.md`・`execution-model.md` と `tech.md` は節が別。
+  - `recommend-menu-scenes`: `loader/config/sections.rs`（あちらが別名の出どころの印 `SceneAliasSource`（349〜356 行）を変えるときだけ）。`reference/pasta-toml.md` は節が別。
+  - `ponytail-check-release`・`shiori4-v3-portable`: 重ならない。
+  - `mlua-0-12-upgrade`: mlua の値の変換を使う 3 ファイル（`persistence.rs`・`log.rs`・`lifecycle.rs`）は、どれもこの spec の持ち場。こちらが先に入る。
+- **種別**: バグ（セーブファイルが JSON で、TOML という決まりに反する。開発者が致命的と決めた）。
+- **要件定義のモデル**: Opus。形式は TOML、移し替えをしない、書けない値はそのキーだけ落とす、退避する、まで決まった。残る線引き（数のキー・穴のある配列・空の表）は、今の JSON と同じ mlua の値の変換の決まりに揃える案が立つ。
+- **分割の案**: 不要。ログの表とサイドカーは合わせて 4 タスクほどで、分けるとマニュアルと `tech.md` を 2 本で取り合う。起票のときの「遅れるなら分けてよい」は、規模からは要らない。
+- **見つけた穴・古くなった記述**
+  - Current State の「`ponytail-lua-loader` が、読めないセーブを退避する直しを持つ」と、Downstream の同じ趣旨の行は古い（退避はこの spec の In）。
+  - スキル `pasta-ghost-authoring/SKILL.md` 175 行が「JSON ファイルに保存」と書いている。Scope に無い。直すとき、分類器が止めたら開発者の許可を求める。
+  - 見本のゴーストの `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.toml` 56〜58 行の `[persistence] data_dir` は、pasta が読まないキーである。直すなら見出しは残す（`pasta_sample_ghost/tests/integration_test.rs` 52 行が見出しの有無を見る。その試験は `ponytail-check-release` の持ち場なので触らない）。
+  - 保存の変換には、ログの表にある入れ子の深さの先の確かめ（`log.rs` の `table_depth_exceeds`）が無い。キーごとに落とす変換を書くとき、深い入れ子と循環の守りも置く。
+  - 「リリースノートで詫びる」は spec の中では書けない。見どころのファイル `doc/release-notes/v0.4.3.md` は `release` スキルが書く。spec はコミットの件名に `!` を付け（詳しいリリースノートの「動きが変わる変更」に出る）、詫びの文案を申し送る。
+  - `pasta_shiori/src/shiori_lifecycle_tests.rs` 552 行の `blocker/save.json` は、保存を失敗させるための名前で、拡張子に意味は無い。直さなくても通る。

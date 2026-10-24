@@ -124,3 +124,23 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
 - **要件定義のモデル**: Opus。2 つ目の `load` は「受ける／断る（NULL＋ログ）」の 2 つに絞れていて、エンジンを複数持てる作りにする決定と 3 者会談の「できれば受ける」から、推奨（受ける）が立つ。インスタンスの状態はエンジンの内側の作りで、DSL・保存の形・公開の Lua の取り決めではない（Fable の (i) に当たらない）。ABI は shiori4 の正本が決めている。
 - **分割の案**: 今は分けない。20 を超えたら、`pasta-portable-build`（実行器・cfg の囲い・Linux と macOS の CI まで）と、この spec（`shiori_get_api`・インスタンスの状態・2 つ目の load）に分ける。
 - **見つけた穴・古くなった記述**: Constraints の「パニックは `SHIORI_E_PANIC`」は、リリースの `panic = "abort"`（ルートの `Cargo.toml` 85 行）の下では効かない（`catch_unwind` が受けられない。今の `windows.rs` も同じ）。要件に書く。Upstream の shiori4 のコミット `b5344f0`・`b3d93ce` は、shiori4 の main からは辿れない（squash で PR #7・`2d8178d` に入った）。引くなら PR #7 を指す。Linux・macOS では静的 CRT の指定は当てはまらない（Windows だけの決まりと書く）。`about.toml` の `targets` に Linux を足すかは、配布しないなら要らない。
+
+## 2026-10-24 棚卸の再測定（main c20ad104）
+
+- **前提の変化**
+  - 前回（main `82176f19`）の後、`pasta_shiori` に入ったのは依存の更新（PR #187）だけ。`wintf-winmsg-executor` を 0.0.3 から 0.0.5 に上げた（ウィンドウの種類の口と既定のカーソルの追加。pasta は `block_on` だけを使うので当たらない）。試験のファイルは、環境変数を中和する関数の印が 1 行ずつ替わっただけ。
+  - アクターの中の待ちは今も `actor/thread.rs` 173 行の `rx.recv_async()` の 1 つで、`wintf` を外す推奨はそのまま。
+  - 2026-10-24 の shiori4 からの知らせ（`shiori4-v4-host` の brief の末尾）: pasta は `shiori4::Ghost` でなく `shiori4_abi::Shiori` を直に使う。この spec は今の SHIORI/3.0 の全文の形のまま入れ、内の表現の作り直しは `shiori4-v4-host` が持つ。この spec の範囲は変わらない。
+- **触るファイル**: 前回のまま（`pasta_shiori` の `Cargo.toml`・`lib.rs`（26）・`windows.rs`（335）・`actor/` の `lifecycle.rs`（329）・`thread.rs`（272）・`teardown.rs`（345）・`mod.rs`（42）、版 3 の入口（新規）、試験、`README.md`。ルートの `Cargo.toml`・`Cargo.lock`。`.github/workflows/build.yml`（149）。インスタンスに移すなら `pasta_lua/src/logging/`。マニュアル `internals/shiori.md`。`tech.md` 63 行）。2 つ目のインスタンスでログの量を分けるなら、`pasta_shiori/src/shiori.rs` 89 行（`init_tracing_with_reload` の呼び出し）も触る。
+- **規模**: 14〜18 のまま。
+- **先に要るもの**
+  - 働きの上では無い（`shiori4_abi` 0.0.1 に版 3 の型と書き出しのマクロがある）。
+  - ファイルの順: `mlua-0-12-upgrade` と `Cargo.toml`・`Cargo.lock`・`pasta_shiori/src/shiori.rs`（`mlua::` を参照）を共有するので、その後。ほかの 0.4.3 の 4 本とは重ならない。
+  - これ以外に「まだ実施できない」理由は、リポジトリに書かれていない（2026-10-23 の開発者の決定）。始める時期は開発者が決める。
+- **種別**: 機能（Windows 以外で読める別口。開発者の意向）。
+- **要件定義のモデル**: Opus（前回のまま。2 つ目の `load` は 2 つに絞れて推奨がある）。
+- **分割の案**: 前回のまま（20 を超えたら `pasta-portable-build` と分ける）。
+- **見つけた穴・古くなった記述**
+  - 冒頭のステータス（「0.4.2 に入れる」）と Approach の「この spec（0.4.2）」は古い。今は 0.4.3 の最後。
+  - `crates/pasta_shiori/README.md` 92 行の `wintf-winmsg-executor` が 0.0.3、112 行の `ctor` が 0.2 のまま（PR #187 で 0.0.5・1.0）。この spec で `wintf` を外すなら、92 行は行ごと消す。
+  - crates.io の `shiori4` 0.0.2 が出たかは、今回は確かめていない。

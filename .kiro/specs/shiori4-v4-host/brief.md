@@ -16,7 +16,7 @@ SHIORI/3.0 の SHIORI は、ホストに呼ばれたときに文字列を 1 回�
 
 - pasta.dll は Lua VM をアクタースレッドに固定し、SHIORI のスレッドとは mailbox でやり取りする。NOTIFY はすぐに 204 を返し、後で処理する。
 - キックは保留のフラグを立てるだけで、次の要求の応答で台本を出す（`actor/thread.rs` の KICK）。
-- 0.4.2 の `shiori4-v3-portable` が、shiori4 の版 3 の入口（`shiori_get_api`）と、OS に頼らない実行器を入れる（予定）。
+- 0.4.3 の `shiori4-v3-portable` が、shiori4 の版 3 の入口（`shiori_get_api`）と、OS に頼らない実行器を入れる（予定）。
 - shiori4 の版 4: ホストのテーブル `ShioriHostApi` に、同期の `request`（プロパティなど）・任意のスレッドから呼べる `post`・`log` がある。post の結果は、`Tag` 付きの通常のイベント（`OnHostComplete`）として後から届く。
 
 ## Desired Outcome
@@ -154,5 +154,5 @@ shiori4 の spec `host-protocol` の要件が、2026-10-24 に確定した（開
   - **pest の文法**: ヘッダ部分の規則（`key_values`）と開始行の規則（`header`）を分ける。v4 ではヘッダ部分だけを解析する。SHIORI/2.x の開始行（`header2`）は、旧来の入口の側にだけ残す。
   - **Lua の RES と `error.rs`**: 返すのはステータスとヘッダ部分だけにする。開始行と `Charset` は入口が付ける。応答のゴールデン（`actor/marshaling.rs` の標準ヘッダ 3 種）も見直す。
   - **`req.version`**: 版の数をやめ、入口の種類（v4・v3・旧来）を表す印にする方向で考える。印は、上の In の「版 4 で読まれたかどうかの印」と同じものにする。
-  - **入れる時期**: 0.4.2 の `shiori4-v3-portable` は今の全文の形のまま入れる。版 3 の口は全文を受けるので、そのままでよい。作り直しは、この spec（0.5.0）で行う。
+  - **入れる時期**: 0.4.3 の `shiori4-v3-portable` は今の全文の形のまま入れる。版 3 の口は全文を受けるので、そのままでよい。作り直しは、この spec（0.5.0）で行う。
 - **触るファイル（足すもの）**: `pasta_shiori/src/lua_request.rs`・`util/parsers/{req_parser.pest,req.rs}`・`error.rs`・`actor/marshaling.rs`（ゴールデン）・`pasta_lua/pasta_scripts/pasta/shiori/res.lua`。ファイルの重なりも見直す。`ponytail-shiori`（`windows.rs`・`actor/`）と `ponytail-lua-scripts`（`res.lua`）が重なる。

@@ -97,3 +97,25 @@ raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "", 
 
 - すべて決まった（2026-10-24 開発者の決定）。型の名前は英語（`number`・`string`・`boolean`・`delete`）。`@toml` は `decode` だけで、`encode` は持たない（要る作者が出てから）。
 - セーブファイルは決まった（2026-10-24 開発者の方針「pasta から json は一旦追い出して。ユーザー要望で json が要求されるまではシリアライズは toml」）。TOML にする。セーブファイル・ログの表・サイドカーは、別の spec `toml-serialization` が持つ。
+
+## 2026-10-24 棚卸の再測定（main c20ad104）
+
+- **前提の変化**: 起票（main `06d0b342`）の後に入ったのは文書だけで、Current State の行の位置は合っている。依存の更新（PR #187）は mlua-stdlib に触れていない（ルートの `Cargo.toml` 34 行のまま）。
+- **触るファイル**
+  - 依存: ルートの `Cargo.toml` 34 行、`crates/pasta_lua/Cargo.toml` 23 行、`Cargo.lock`（mlua-stdlib と、それだけが引く `serde_yaml`・`ouroboros`・`owo-colors`・`quick_cache` など）。`regex` クレートは `sakura_script/tokenizer.rs`・`line_breaker.rs`・`runtime/mod.rs` が直に使うので残る。
+  - Rust: 登録 `runtime/mod.rs`（286。214〜232 行）、モジュール名と警告 `runtime/runtime_config.rs`（564）、誤りの文 `src/error.rs`（291。試験 288〜289 行）、`@toml` の置き場 `runtime/module_registry.rs`（239。`toml_to_lua` 216 行）。
+  - Lua: `pasta_scripts/pasta/shiori/event/external_control.lua`（145）、失敗の種類 `pasta/failure.lua`（22 行。置き換えなら種類の数 12 は変わらない）。
+  - 試験: `tests/lua_unittest_runner.rs` 68 行、`tests/runtime/unit_test.rs` 149 行、`tests/lua_specs/external_control_event_test.lua`・`failure_test.lua`（351 行）。Current State に無いもの: `tests/runtime/stdlib_modules_test.rs`（310）・`stdlib_regex_test.rs`（278）を消し、`tests/runtime/main.rs` 26〜27 行を外す。`tests/shiori/res_test.rs` 49 行が `@assertions` を使う。
+  - 文書: マニュアル 10 頁（数は合っている）、`crates/pasta_lua/README.md` 56・85 行、マニュアルの章からスキルの写しを作る道具 `book/tools/gen-skill-refs.mjs` 59 行とその試験 `gen-skill-refs-test.mjs` 98 行（章のファイル名を持つ）、スキル `pasta-lua-coding/SKILL.md`（53・76・114〜118・158・160 行）と写し 4 つ（`references/mlua-stdlib.md` は消す）、`tech.md` 34 行。新しいファイルは `@toml` の章と、その試験。1,000 行に近いものは無い。
+- **規模**: 9〜11 タスク。
+- **先に要るもの**: 働きの上では無い。0.4.3 の中のファイルの重なり:
+  - `toml-serialization`: `tests/loader/config_test.rs`（`@env` の試験 396〜436 行は、モジュールが消えても通るので手を付けない）と `runtime/module_registry.rs`（あちらが触らない約束）。その 2 つを守れば重ならない。マニュアル `pasta-log.md`（19 行）・`internals/execution-model.md`（128 行）・`tech.md` は節が別。
+  - `recommend-menu-scenes`: ソースは重ならない。マニュアル `lua/shiori-events.md` の既定ハンドラの表（119〜131 行）は同じ表の隣の行（こちらは `OnPastaSetSaveVariable` の行、あちらは行を足して数を直す）で、後から入る側が合わせる。あちらが失敗の種類を足すと `failure.lua`・`failure_test.lua` で重なる。
+  - `ponytail-check-release`: 重ならない。ウェーブ 1 で `Cargo.lock` を触るのはこの spec だけ。
+- **種別**: 基盤（mlua 0.12 を止めている依存を外す。開発者の依頼。作者に見える部品の入れ替えと、0.4.2 で出したイベントの形の変更を含む）。
+- **要件定義のモデル**: Opus（公開の Lua の部品を変えるが、型の名前・`decode` だけ・既定で有効まで開発者が決めた）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - Current State の試験と文書の一覧に、上の `stdlib_modules_test.rs`・`stdlib_regex_test.rs`・`tests/runtime/main.rs`・`res_test.rs`・`pasta_lua/README.md`・`gen-skill-refs.mjs`・`gen-skill-refs-test.mjs` が無い。
+  - 章を置き換えるときは、`SUMMARY.md`・上の 2 つの道具・古い写しの `references/mlua-stdlib.md` を同じ変更で直す（`gen-skill-refs --check` が消えた章の写しを見るかを確かめる）。
+  - 「リリースノートで知らせる」は、コミットの件名の `!`（詳しいリリースノートの「動きが変わる変更」）と申し送りで行う。見どころのファイルは `release` スキルが書く。

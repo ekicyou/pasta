@@ -136,3 +136,20 @@
 
 - Must fix の 1 番「読めないセーブを空で上書きして失う」は、0.4.3 の `toml-serialization`（セーブファイルを TOML にする致命的な不具合）へ移した（2026-10-24 開発者の決定）。`persistence.rs` を書き直すので、同じ所で直す。2026-10-19 の決定（`<name>.broken` へ rename してから空の表を返す）は、そのまま引き継いだ。この spec の範囲からは外れる。
 - この spec は 0.4.4 になった。`toml-serialization`・`mlua-stdlib-removal`・`mlua-0-12-upgrade` が入った後の main で、`persistence.rs`・`runtime/` の行番号と前提を測り直す。
+
+## 2026-10-24 棚卸の再測定（main c20ad104）
+
+- **前提の変化**
+  - 読めないセーブの退避（1 番。Must fix）は `toml-serialization` の Scope に入った（あちらの brief の In の 3 つ目。壊れた `save.toml` は `save.toml.broken` へ移してから空の表を返し、警告する）。この spec の残りは 2〜8 番（キャッシュの日付・同じモジュール名・finalize 前の検索・パスの `;`・使われない抽象・古い構築の道・小物）。Must fix は残らない。
+  - 持ち場（`crates/pasta_lua/src` の `loader/`・`runtime/`・`presentation/`・`encoding/`・`lib.rs`）のソースは 10-23 から変わっていない（PR #187 はテストの `tests/common/mod.rs` の 1 行だけ）。行番号は今も合っている（`cache.rs` の比べる所 153 行、`factory.rs` の `from_loader` 46 行・`_scene_dic_path` 149 行・`load_scene_dic` 284 行、`module_registry.rs` の `register_sakura_script_module` 156 行）。
+- **触るファイル**: `loader/` の `cache.rs`（507 行）・`process.rs`（276 行）・`context.rs`（278 行）・`mod.rs`（344 行）、`runtime/` の `factory.rs`（334 行）・`searcher.rs`・`renderer_injection.rs`（213 行。消す）・`module_registry.rs`（239 行）、`presentation/`（418 行。消す）、`encoding/mod.rs`、`lib.rs` の再輸出、テスト、マニュアル（`internals/transpiler.md`・`internals/loader.md`・`reference/startup.md`・`internals/shiori.md`・`internals/talk-output.md`・`internals/execution-model.md`）、`structure.md`。1 番が抜けたので、`runtime/persistence.rs`・`runtime/lifecycle.rs` と `pasta-persistence.md` は触らない。1,000 行に近いものは無い。
+- **規模**: 9〜12 タスク（1 番が抜けて 2 ほど減った）。
+- **先に要るもの**
+  - 働きの上では無い。0.4.3 の 3 本（`toml-serialization`・`mlua-stdlib-removal`・`mlua-0-12-upgrade`）が入った後の main でギャップ分析をやり直す。
+  - `toml-serialization` との重なり（同じウェーブに置かない）: あちらは `runtime/persistence.rs`（568 行）・`runtime/lifecycle.rs`（63 行）・`runtime/log.rs`（241 行）・`loader/config/sections.rs`（356 行。`[persistence]` の既定）を書き直し、`runtime/module_registry.rs` 216 行の `toml_to_lua` を使う。こちらの持ち場の `runtime/**`・`loader/**` に入るので、監査のやり直しで同じファイルに当たる。こちらが合わせて `module_registry.rs` を触るときは、あちらの形を保つ。
+  - 0.4.3 のほかの 5 本との重なり: `mlua-stdlib-removal`（`runtime/mod.rs` 214〜232 行の組み込み・`runtime/runtime_config.rs`・`src/error.rs`・`tests/loader/config_test.rs`。`toml_to_lua` で `@toml` を足すなら `module_registry.rs` も）、`mlua-0-12-upgrade`（`pasta_lua` の 92 ファイル。持ち場のほぼ全部）、`recommend-menu-scenes`（`loader/config/mod.rs` 343 行・`loader/mod.rs` 125 行の info ログ）、`shiori4-v3-portable`（Linux でテストを回すなら `loader/discovery_tests.rs`・`loader/context.rs` の `C:\` の文字列）。`ponytail-check-release` とは重ならない。
+  - ほか: `ponytail-lua-transpiler`（`lib.rs` の再輸出。行が別）、0.5.0 の `scene-attribute-store`（`runtime/finalize.rs`）。
+- **種別**: バグ（古い日付の辞書に戻しても古い変換が動き続ける・同じモジュール名の辞書が黙って消える）。監査の指摘より。
+- **要件定義のモデル**: Opus（前のまま）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: 1 番が移ったのに、本文のあちこちに残っている。Problem の 1 つ目、Current State の 1 番、Desired Outcome の 1 つ目、Approach の 1 つ目（`<name>.broken` へ rename）、Scope のマニュアルの `pasta-persistence.md`、Boundary Candidates の「セーブの保護（persistence）」。要件では、上の申し送りの節を正として読み、これらを範囲に入れない。roadmap の ponytail の表（`.kiro/steering/roadmap.md` 211 行）の ponytail-lua-loader の行も、まだ「読めないセーブを空で上書きして失う」を太字の Must fix として載せている。

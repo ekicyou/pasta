@@ -163,3 +163,8 @@ VSCode でゴーストをデバッグする作者が困る。
 - **見つけた穴・古くなった記述**
   - `playscene.rs` の頭の説明（1〜3 行）は `resolve_and_kick` だけを書き、足された `resolve_position` に触れていない。`#![allow(dead_code)]`（31 行）と `scene_index.rs` の同じ許可（39 行）は、注記どおり結線の前の名残り。
   - 4 番の知らない要求の扱いは、マニュアル `book/src/internals/debug.md` 207 行の表（「その他: なし（無視する）」）にも書いてある。直すときにこの行も変える。
+
+## 申し送り（2026-10-24 の棚卸より。サイドカーの TOML 化）
+
+- 0.4.3 の `toml-serialization` が、ソースマップのサイドカー（`.map`）を JSON から TOML に替える。サイドカーの読み書きはこの spec の持ち場（`crates/pasta_lua/src/debug/source_map/`）と重なりうるので、この spec は `toml-serialization` が入った後の main でギャップ分析をやり直す（roadmap の「0.4.4 の範囲」）。
+- 0.4.3 の `mlua-0-12-upgrade` が `mlua::` を参照するファイルを広く書き換えるので、`debug/**` もその後の形で測り直す。
