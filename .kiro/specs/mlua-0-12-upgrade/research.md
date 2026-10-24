@@ -270,15 +270,16 @@ mlua 0.12.2 と 1 章の仮の直し（x86 の整数の 3 か所、`test_codec_r
 
 ## 挙動の差の記録（BehaviorRecord。4.1〜4.4）
 
-実装の段 3・4 で足す。設計の段階で分かっていること:
+段 3・4 の実装で確かめた結果（段 3 の関門: x86・x64 とも `cargo test --all` 3053 本通過・落ち 0。版上げの前に通っていたテストで落ちたものは無い）:
 
 | 差 | 判断 | 書いた所 |
 |----|------|----------|
-| mlua 0.12.2 の Lua から見える差 | 無し（ギャップ分析の x64 のテスト 3,046 本・x86 の 3,043 本） | この表 |
-| LuaJIT の新しい書き方を受け付ける | 戻せない。マニュアルとリリースノートに書き、テストで固定する（4.3） | `book/src/lua/basics.md`・`release-note.md`・`continue` 文のテスト（実装で） |
-| `os.time` の `-1` の時刻 | LuaJIT の不具合の直し。リリースノートにまとめる | `release-note.md`（実装で） |
-| `jit.version` の文字 | 差として扱わない（`jit.version_num`・`pasta.lua_version` は同じ） | この表 |
-| x86 のセーブの整数 | mlua でなく main の不具合の直し。x64 と同じ文字にした | `release-note.md`（実装で） |
+| mlua 0.12.2 の Lua から見える差 | 差が無かった（版上げで落ちた既存テスト 0。`Table::pairs` も 0.12.2 で `__pairs` を呼ばず生のまま辿る） | この表・段 2 の `__pairs` のテスト（`persistence_tests.rs` の `test_codec_does_not_call_pairs_metamethod`） |
+| LuaJIT の新しい書き方を受け付ける | 戻さず書いた（戻すには LuaJIT にパッチが要る） | `book/src/lua/basics.md` の「前提」・`release-note.md`・`runtime_api_test.rs` の `test_luajit_accepts_continue_statement` |
+| `os.time` の `-1` の時刻 | 戻さず書いた（LuaJIT の不具合の直し。既存テストには出なかった） | `release-note.md` |
+| `jit.version` の文字 | 差が無かった扱い（`jit.version_num`・`pasta.lua_version` は同じ。既存テストにも出なかった） | この表 |
+| x86 のセーブの整数 | 直した（mlua でなく main の不具合。x64 と同じ文字にした） | `release-note.md`・`persistence_tests.rs` の整数のテスト（段 1） |
+| 3.4 で新たに見つかった差 | 無かった | この表 |
 
 ## 参照
 

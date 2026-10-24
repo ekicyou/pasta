@@ -134,7 +134,7 @@ ponytail 監査の指摘を直す 9 本（`ponytail-check-release` を除く）�
 | 9 | ponytail-shiori | Opus | L | `shiori4-v3-portable` の後（`windows.rs`・`actor/` を共有する。入った後の main でギャップ分析をやり直す） |
 | 10 | 0.4.4 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
-- mlua 0.12 へ上げた後の main で、`pasta_lua` を触る ponytail（`ponytail-lua-*`）はギャップ分析をやり直す。
+- mlua 0.12 へ上げた（`mlua-0-12-upgrade`）。`pasta_lua` を触る ponytail（`ponytail-lua-*`）は、この後の main でギャップ分析をやり直す。
 
 ## ponytail 監査の指摘の修正（2026-10-19 起票・2026-10-22 に隙間の spec へ・2026-10-23 開発者の決定で 0.4.3 へ・2026-10-24 に 0.4.4 へ）
 

@@ -156,7 +156,8 @@ return result
 // note: 2.4 is a CALLER change (pass the running coroutine `&Thread`), not a
 // rewrite of the traversal.
 //
-// Why this works (empirically confirmed against mlua 0.11.6 source):
+// Why this works (empirically confirmed against mlua 0.12.2 source:
+// `src/state/raw.rs`, `src/state/util.rs`, `src/state.rs`):
 // mlua's C `global_hook_proc` receives the *running* `lua_State*` and wraps
 // the user callback in `callback_error_ext`, which installs a `StateGuard`
 // that swaps `RawLua.state` to that running state for the callback's

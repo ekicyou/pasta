@@ -4,7 +4,7 @@
 
 ### 言語・ランタイム
 - **Rust 2024 edition**: メインコンパイラ言語
-- **LuaJIT 2.1 (mlua 0.11)**: Luaバックエンドスクリプト実行
+- **LuaJIT 2.1 (mlua 0.12)**: Luaバックエンドスクリプト実行
 - **Pest 2.8.6**: PEGパーサー生成器（`grammar.pest`文法定義）
 
 ### ワークスペース構成
@@ -30,7 +30,7 @@
 **pasta_lua:**
 - **pasta_dsl**: DSLパーサー層
 - **pasta_core**: レジストリ層
-- **mlua 0.11**: Lua VMバインディング（LuaJIT 2.1, features: luajit52, vendored, serialize）
+- **mlua 0.12**: Lua VMバインディング（LuaJIT 2.1, features: luajit52, vendored, serialize）
 - **regex 1.x**: 正規表現（さくらスクリプトタグ検出）
 - **thiserror 2**: エラー型定義
 - **toml 1.1.2**: pasta の既定の書式。設定ファイル（pasta.toml）・セーブデータ（`@pasta_persistence`）・ソースマップのサイドカー（`.map`）の読み書き、`@toml`（`decode`）、`@pasta_log` の表の 1 行の書き出し
