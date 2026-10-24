@@ -264,8 +264,8 @@ mlua 0.12.2 と 1 章の仮の直し（x86 の整数の 3 か所、`test_codec_r
 
 ### 危うさと手当て
 
-- `test_codec_round_trip_i64_extremes_as_values` の `i64::MAX` の回を 64 ビットに限ることが、要件の決まりとずれる — 設計の OPEN QUESTION 1 で開発者に確かめる。
-- LuaJIT の新しい書き方を作者が使い、同梱の luacheck が読めない — マニュアルに書く（OPEN QUESTION 2）。
+- `test_codec_round_trip_i64_extremes_as_values` の `i64::MAX` の回は x86 で同じ期待を通せない — 設計ディスカッションで、64 ビットに限らず x86・x64 の期待を分けると決めた（pasta.dll の本番は x86 なので、x86 の振る舞いの確かめを省かない。開発者の決定）。`test_codec_read_value_types` も同じ扱い。
+- LuaJIT の新しい書き方を作者が使い、同梱の luacheck が読めない — `basics.md` に 1 段落とリリースノートに書き、`continue` 文を受け付けるテストで固定する（設計ディスカッションで確定）。
 - 試験で押さえていない LuaJIT の差（JIT・FFI の算術・GC） — x86・x64 の全部の試験を関門にする。差が見つかれば下の記録に足す。
 
 ## 挙動の差の記録（BehaviorRecord。4.1〜4.4）
@@ -275,7 +275,7 @@ mlua 0.12.2 と 1 章の仮の直し（x86 の整数の 3 か所、`test_codec_r
 | 差 | 判断 | 書いた所 |
 |----|------|----------|
 | mlua 0.12.2 の Lua から見える差 | 無し（ギャップ分析の x64 のテスト 3,046 本・x86 の 3,043 本） | この表 |
-| LuaJIT の新しい書き方を受け付ける | 戻せない。マニュアルとリリースノートに書く（OPEN QUESTION 2） | `book/src/lua/basics.md`・`release-note.md`（実装で） |
+| LuaJIT の新しい書き方を受け付ける | 戻せない。マニュアルとリリースノートに書き、テストで固定する（4.3） | `book/src/lua/basics.md`・`release-note.md`・`continue` 文のテスト（実装で） |
 | `os.time` の `-1` の時刻 | LuaJIT の不具合の直し。リリースノートにまとめる | `release-note.md`（実装で） |
 | `jit.version` の文字 | 差として扱わない（`jit.version_num`・`pasta.lua_version` は同じ） | この表 |
 | x86 のセーブの整数 | mlua でなく main の不具合の直し。x64 と同じ文字にした | `release-note.md`（実装で） |

@@ -109,7 +109,7 @@ graph TB
 
 **段 1: x86 の整数（mlua 0.11 の上）**
 - `crates/pasta_lua/src/runtime/persistence.rs` — `lua_int` を足し、`convert`（値）・`convert_table`（配列のキーの数え上げと、文字列でないキーの理由）・`convert_keyed`（根の文字列でないキーの印と理由）・`toml_to_lua`（TOML の整数）をこの決まりに揃える。
-- `crates/pasta_lua/src/runtime/persistence_tests.rs` — `test_codec_read_value_types` を 64 ビットだけにする。`test_codec_round_trip_i64_extremes_as_values` の `i64::MAX` の回を 64 ビットだけにする（**前提（仮定）**。OPEN QUESTION 1）。x86・x64 で同じ期待の整数のテストを足す。
+- `crates/pasta_lua/src/runtime/persistence_tests.rs` — `test_codec_read_value_types` の `i64::MAX`・`i64::MIN` の照合を、`#[cfg(target_pointer_width = "64")]` と `#[cfg(target_pointer_width = "32")]` の 2 つの期待に分ける（x64 は `Value::Integer(i64::MAX)`・`Value::Integer(i64::MIN)`、x86 は `Value::Number(9223372036854775808.0)`・`Value::Number(-9223372036854775808.0)`）。`test_codec_round_trip_i64_extremes_as_values` の `i64::MAX` の回を、同じく 2 つの期待に分ける（x64 は `Integer(i64::MAX)`、x86 は `Float(9223372036854775808.0)`。`i64::MIN` と `-0.0` の回は両方で同じ期待）。どのテストも片方の機械だけに限らない（設計ディスカッションで確定）。x86・x64 で同じ期待の整数のテストを足す。
 
 **段 2: 特性化（mlua 0.11 の上）**
 - `crates/pasta_lua/src/runtime/persistence_tests.rs` — `__pairs` を持つ表を保存して、`__pairs` を呼ばずに生の中身だけを書くことを確かめるテストを足す（セーブと、同じ変換を通るログの表の両方の入口）。
@@ -125,7 +125,8 @@ graph TB
 - `crates/pasta_lua/src/debug/types.rs`（217 行）— 文書のコメントの `mlua::Debug` を `mlua::debug::Debug` にする。
 - `.kiro/steering/tech.md`（7・33 行）— `mlua 0.11` を `mlua 0.12` にする。
 - `.kiro/steering/roadmap.md`（137 行）— 前提が満ちたことを書く。
-- `book/src/lua/basics.md`（「前提」の段落）— 新しい LuaJIT が受け付ける書き方の注意を 1 段落足す（**前提（仮定）**。OPEN QUESTION 2）。
+- `book/src/lua/basics.md`（「前提」の段落）— 新しい LuaJIT が受け付ける書き方の注意を 1 段落足す（設計ディスカッションで確定）。
+- `crates/pasta_lua/tests/` の既存の runtime の試験 — 新しい書き方の代表（`continue` 文）を pasta のランタイムが受け付けることを固定するテストを 1 本足す（4.3。段 3 で足す）。
 - `.kiro/specs/mlua-0-12-upgrade/release-note.md`（新規）。
 - `.kiro/specs/mlua-0-12-upgrade/research.md` — BehaviorRecord の「挙動の差の記録」に、確かめた差と判断を足す。
 
@@ -175,7 +176,7 @@ graph LR
 | 3.9 | 13 の `std_` の名前 | VerificationGates | `runtime_config.rs` の試験 | 段 3 |
 | 4.1 | 戻せるなら戻す | BehaviorRecord | 差の一覧と判断 | 段 4 |
 | 4.2 | マニュアルとリリースノート | Docs, BehaviorRecord | `basics.md`・`release-note.md` | 段 4 |
-| 4.3 | 新しい挙動を期待にする | CharacterizationTests, BehaviorRecord | 期待と、差を書いた所 | 段 4 |
+| 4.3 | 新しい挙動を期待にする | CharacterizationTests, BehaviorRecord | `continue` 文を受け付けるテスト（`basics.md` を指す注釈付き） | 段 3 |
 | 4.4 | 差が無かったことも残す | BehaviorRecord | `research.md` の記録 | 段 4 |
 | 5.1 | 押さえていない項目を足す | CharacterizationTests | 3.7 のテスト | 段 2 |
 | 5.2 | 0.11 の上で通す | CharacterizationTests, VerificationGates | 段 1・2 の関門 | 段 1, 2 |
@@ -265,10 +266,12 @@ fn lua_int(value: &Value) -> Option<i64>;
 
 **Responsibilities & Constraints**
 - 段 1 の整数のテスト（`persistence_tests.rs`、x86・x64 で同じ期待）: Lua から `{ big = 3000000000, neg = -3000000000, m63 = -2^63, p63 = 2^63, nz = -0.0, one = 1.0, arr = { 3000000000, 2 } }` を書くと、TOML の文字が `big = 3000000000`・`neg = -3000000000`・`m63 = -9223372036854775808`・`p63 = 9223372036854776000.0`・`nz = -0.0`・`one = 1`・`arr = [3000000000, 2]` になる。キー `3000000000` の表・`-3000000000` の表は、どちらも `non-string key (integer)` の理由で外れる。TOML の `x = 3000000000` を読むと、Lua の数 `3000000000` になる。
-- 既存の 64 ビットだけのテスト: `test_codec_read_value_types`（`Value::Integer(i64::MAX)` を照合する。7.6 の例外）を `#[cfg(target_pointer_width = "64")]` にする。
-- `test_codec_round_trip_values` は期待を変えずに x86 でも通る（スクラッチで確かめた）。
-- `test_codec_round_trip_i64_extremes_as_values` の `i64::MIN` と `-0.0` の確かめは x86 でも同じ期待で通る。`i64::MAX` の回は、Rust の側で `Value::Integer(i64::MAX)` を持つことを確かめる試験で、x86 の `mlua::Value` にはこの値を持つ形が無い（スクラッチの x86 で `Float(9.223372036854776e18)` が戻った）。**前提（仮定）**: この回だけを 64 ビットに限る（7.6 の例外の内側と読む）。Lua の表に入った `i64::MAX` が `2^63` の浮動小数になることは、`test_codec_round_trip_values` の `imax` が x86・x64 で同じ期待で押さえる。OPEN QUESTION 1。
+- プラットフォームで期待が分かれるテスト（7.6）: pasta.dll の本番は x86 なので、x86 の振る舞いを確かめるテストは省かない。x86 で値の持ち方が違う所は、テストを 64 ビットに限るのでなく、`#[cfg(target_pointer_width = …)]` で期待を 2 つ書き、両方の機械で走らせる。
+  - `test_codec_read_value_types` の `i64::MAX`・`i64::MIN` の照合を、`#[cfg(target_pointer_width = "64")]` と `#[cfg(target_pointer_width = "32")]` の 2 つの期待に分ける（x64 は `Value::Integer(i64::MAX)`・`Value::Integer(i64::MIN)`、x86 は `Value::Number(9223372036854775808.0)`・`Value::Number(-9223372036854775808.0)`）。x86 では `mlua::Integer::try_from` が通らないので `Value::Number` になる（SaveIntegerRule の `toml_to_lua` の約束）。
+  - `test_codec_round_trip_i64_extremes_as_values` の `i64::MAX` の回を、同じく 2 つの期待に分ける（x64 は `Integer(i64::MAX)`、x86 は `Float(9223372036854775808.0)`。`i64::MIN` と `-0.0` の回は両方で同じ期待）。x86 の `mlua::Value` は `i64::MAX` を整数で持てないので、読んだ時点で `2^63` の浮動小数になり、`lua_int` の範囲の外なので浮動小数で書き戻る（スクラッチの x86 で `Float(9.223372036854776e18)` が戻ったことと合う）。これは Lua の表に入った `i64::MAX`（`test_codec_round_trip_values` の `imax`）と同じ振る舞いである。
+- `test_codec_round_trip_values` は期待を変えずに x86・x64 の両方で通る。
 - 段 2 の `__pairs` のテスト: `setmetatable({ a = 1 }, { __pairs = function() error("called") end })` を根の表と、根の中の値と、`lua_value_to_toml_strict` に渡し、`a = 1` だけが書かれ、誤りにならないことを確かめる（3.7）。
+- 段 3 の LuaJIT の新しい書き方のテスト（4.3）: pasta のランタイムで `for i = 1, 3 do if i == 2 then continue end end` のような `continue` 文を含むチャンクを読み込んで走らせ、構文の誤りにならないことを確かめる。注釈で `book/src/lua/basics.md` の段落を指す。mlua 0.11（古い LuaJIT）では構文の誤りになるので、版上げの段 3 で足す。将来 LuaJIT がこの書き方を変えたら、このテストが落ちてマニュアルの直しに気づける。
 - どのテストもライブラリの中の関数を直に呼び、`PASTA_DEBUG` を読むランタイムの `load` を通さない（5.4）。
 
 **Implementation Notes**
@@ -312,7 +315,7 @@ mlua 0.12.2 のソースで、デバッガが頼る仕組みが 0.11.6 と同じ
 - `tech.md` 7 行を `LuaJIT 2.1 (mlua 0.12)`、33 行を `mlua 0.12` にする（8.1）。
 - `about.hbs` の LuaJIT の著作権の文は、`luajit-src` 210.6.6 と 210.7.4 の `luajit2/COPYRIGHT` が同じ文であることを確かめたので変えない（8.3）。
 - `roadmap.md` 137 行を、「mlua 0.12 へ上げた（`mlua-0-12-upgrade`）。`pasta_lua` を触る ponytail（`ponytail-lua-*`）は、この後の main でギャップ分析をやり直す」の形に改める（8.4）。
-- `book/src/lua/basics.md` の「前提」に、次の中身の段落を足す（4.2。**前提（仮定）**。OPEN QUESTION 2）: 同梱の LuaJIT（2.1 の新しい版）は、Lua 5.1 にない書き方の一部（`continue`・`const`・`!=`・`&&`・`||`・`??`・`?.`・ビット演算の記号・`|x| -> 式` の短い関数・数の `_` 区切りなど）を構文の誤りにしない。pasta のマニュアルは Lua 5.1 系＋LuaJIT 拡張の範囲だけを案内し、これらの書き方は同梱の luacheck が読めない。今まで動いていた書き方の結果は変わらない。回避の書き方は書かない。
+- `book/src/lua/basics.md` の「前提」に、次の中身の段落を足す（4.2。設計ディスカッションで確定）: 同梱の LuaJIT（2.1 の新しい版）は、Lua 5.1 にない書き方の一部（`continue`・`const`・`!=`・`&&`・`||`・`??`・`?.`・ビット演算の記号・`|x| -> 式` の短い関数・数の `_` 区切りなど）を構文の誤りにしない。pasta のマニュアルは Lua 5.1 系＋LuaJIT 拡張の範囲だけを案内し、これらの書き方は同梱の luacheck が読めない。今まで動いていた書き方の結果は変わらない。回避の書き方は書かない。
 - `release-note.md`（新規）: `kiro-complete` のステップ 8 がそのまま使う PR のタイトルと本文。タイトルは `feat(mlua-0-12-upgrade)!: mlua を 0.12 に上げる` の形にし、スコープの後の `!` でリリースノートの「動きが変わる変更」に載せる（`release-notes.ps1` の決まり。スコープの前の `feat!(…)` は書き間違いとして受けているだけなので使わない）。本文には、(1) `pasta_lua` が公開する `pasta_lua::mlua` が 0.12 になったこと（Rust のライブラリとして使う人は 0.12 の名前で書く。`mlua::debug::Debug`・`mlua::LuaString`）、(2) 同梱の LuaJIT が新しい書き方を受け付けること、(3) x86 の pasta.dll のセーブの整数が x64 と同じ文字で書かれるようになったこと（今の main の x86 のビルドの不具合の直し）を書く（8.5）。
 
 #### BehaviorRecord
@@ -332,7 +335,7 @@ mlua 0.12.2 のソースで、デバッガが頼る仕組みが 0.11.6 と同じ
   - `cargo test --all --target x86_64-pc-windows-msvc`・`cargo test --all --target i686-pc-windows-msvc`
   - `cargo clippy --all-targets --workspace --target <両方> -- -D warnings`
   - `cargo build -p pasta_lsp --target wasm32-unknown-unknown --release`・`cargo check -p pasta_check --lib --no-default-features --target wasm32-unknown-unknown`
-- Output: すべて誤り無し。x64 のテストは版上げの前と同じ数（ギャップ分析では 3,046 本）が通る。x86 は 64 ビットだけにした試験の分だけ少ない。
+- Output: すべて誤り無し。x64 のテストは版上げの前と同じ数（ギャップ分析では 3,046 本）が通る。x86 も同じ数が通る（片方の機械だけに限った試験は無い）。
 - Idempotency & recovery: テストが `crates/pasta_lua` の `sample.generated.lua` の改行だけを書き換えたら `git checkout --` で戻し、コミットに混ぜない。
 
 ## Data Models
@@ -356,7 +359,7 @@ mlua 0.12.2 のソースで、デバッガが頼る仕組みが 0.11.6 と同じ
 
 | 差 | 今まで | これから | 扱い |
 |----|--------|----------|------|
-| 新しい書き方（`continue` 文・`const` の宣言・`!=`・`&&`・`\|\|`・`??`・`?.`・`<<`・`>>`・`~>>`・`\|x\| -> 式`・数の `_` 区切り。確かめた） | 構文の誤り | 受け付ける | 戻せない（LuaJIT にパッチを当てない）。マニュアルとリリースノートに書く（OPEN QUESTION 2） |
+| 新しい書き方（`continue` 文・`const` の宣言・`!=`・`&&`・`\|\|`・`??`・`?.`・`<<`・`>>`・`~>>`・`\|x\| -> 式`・数の `_` 区切り。確かめた） | 構文の誤り | 受け付ける | 戻せない（LuaJIT にパッチを当てない）。マニュアルとリリースノートに書き、受け付けることをテストで固定する（4.3） |
 | `continue`・`const` を名前に使う（`local continue`・`t.const`・`::continue::`） | 動く | 動く（文脈で決まる言葉。確かめた） | 差なし |
 | `jit.version` | `LuaJIT 2.1.1767980792` | `LuaJIT 2.1.1788856981` | 差として書かない（`jit.version_num` は 20199 のまま。`pasta.lua_version` は 221 のまま） |
 | `os.time` の誤りの判定（`errno` を見る直し） | ちょうど `-1` になる時刻で `nil` | その時刻の数 | LuaJIT の不具合の直し。リリースノートの (2) にまとめる |
@@ -372,6 +375,8 @@ mlua 0.12.2 のソースで、デバッガが頼る仕組みが 0.11.6 と同じ
 - **Unit（段 1、既存）**: `test_codec_round_trip_values` が期待を変えずに x86 で通ること。`test_codec_round_trip_i64_extremes_as_values` の `i64::MIN`・`-0.0` の確かめが x86 で通ること。
 - **Unit（段 2）**: `__pairs` を持つ表を、根・値・`lua_value_to_toml_strict` の 3 つの入口で書き、`__pairs` が呼ばれず `a = 1` だけが書かれること（3.7）。
 - **Integration（段 3、既存）**: lua_test のランナー、デバッガの試験（`hook_tests`・`inspect_stack_coroutine_tests`・`wiring_*`・`session_step_controller_tests`・`wiring_pasta_step_e2e`）、FFI の試験、`runtime_error_balloon_e2e_test.rs`、`module_searcher_test.rs`、`pasta_shiori` の結合の試験、`pasta_sample_ghost` の試験が、x86・x64 で期待を変えずに通ること（2.2・2.5・3.1〜3.9・6.1〜6.4）。
+- **Unit（段 3）**: `continue` 文を含むチャンクを pasta のランタイムが受け付けること（4.3）。
+- **Unit（段 1、期待を分ける）**: `test_codec_read_value_types`・`test_codec_round_trip_i64_extremes_as_values` の `i64::MAX`（と読みの `i64::MIN`）を、x86・x64 の期待で照合すること（7.6）。
 - **Build（段 3）**: x86・x64 の clippy（`-D warnings`）、WASM の 2 つのコマンド（2.3・2.4）。
 
 ## Migration Strategy
@@ -382,6 +387,8 @@ mlua 0.12.2 のソースで、デバッガが頼る仕組みが 0.11.6 と同じ
 
 ## Open Questions / Risks
 
-- **OPEN QUESTION 1**: 要件の「決まった論点 2」は、x86 だけで落ちていた往復の試験 2 本を「期待を変えずに x86 でも通す」とした。`test_codec_round_trip_values` は通るが、`test_codec_round_trip_i64_extremes_as_values` の `i64::MAX` の回は x86 では通せない（Rust の側の `Value::Integer(i64::MAX)` を x86 の `mlua::Value` が持てない。Lua に入れれば x64 でも `2^63` の浮動小数になる）。設計は、この回だけを 64 ビットに限る前提で書いた（7.6 の例外の内側と読む）。
-- **OPEN QUESTION 2**: 新しい LuaJIT の書き方を、どう書くか。設計は、`basics.md` に 1 段落（受け付けること・マニュアルは案内しないこと・luacheck が読めないこと）と、リリースノートの「動きが変わる変更」に書く前提にした。ほかの道: 書かない（今まで動いていた書き方は変わらないので差として扱わない）、書き方として案内する。
+- 設計ディスカッション（2026-10-24）で閉じた論点:
+  1. x86 で値の持ち方が違うテストは、64 ビットに限らず、x86・x64 の期待を分けて両方で走らせる（pasta.dll の本番は x86 なので、x86 の振る舞いの確かめは省かない。開発者の決定）。
+  2. 新しい LuaJIT の書き方は、`basics.md` に 1 段落（受け付けること・本書は前提にしないこと・同梱の luacheck が読めないこと。回避の書き方は書かない）と、リリースノートの「動きが変わる変更」に書く。
+  3. 4.3 の受け皿として、`continue` 文を受け付けることを固定するテストを段 3 で 1 本足す。
 - 危うさ: 試験で押さえていない LuaJIT の差（JIT の最適化・FFI の算術・GC の直し）。pasta の試験は全部通ったので、低いと見る。

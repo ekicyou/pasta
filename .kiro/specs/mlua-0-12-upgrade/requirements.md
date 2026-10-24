@@ -133,7 +133,7 @@ coroutine.status(co)        -- "suspended"  ← 前後で同じ
 3. When x86 の pasta.dll が 32 ビットに収まる整数をセーブから読むとき, the pasta ランタイム shall x64 と同じ値の Lua の数として渡す。
 4. If x86 の pasta.dll が 32 ビットに収まらない整数をセーブから読むとき, the pasta ランタイム shall 値を黙って切り詰めず、Lua の数（浮動小数）として、表せる範囲で同じ値を渡す。**前提（仮定）**: LuaJIT の数はもともと倍精度の浮動小数なので、2^53 までは値を失わない。2^53 を超える整数は、x64 と同じく丸めて渡す（`toml-serialization` の確定した設計判断 6。マニュアル `pasta-persistence.md`・`toml.md` に書いてある）。
 5. When 配列の印を判定するために表の整数のキーを数えるとき, the pasta ランタイム shall x86 と x64 で同じ表を同じ配列・同じ表として判定する。
-6. The pasta の自動テスト shall x86 と x64 のそれぞれで、セーブの整数の書き出しと読み戻しを確かめる（書いた TOML の文字と読み戻した値は、x86 と x64 で同じ期待にする。`mlua::Value::Integer(i64::MAX)` のように、Rust の側で 64 ビットの Lua の整数を直に作る試験だけは、x86 で型が合わないので 64 ビットの機械に限ってよい）。
+6. The pasta の自動テスト shall x86 と x64 のそれぞれで、セーブの整数の書き出しと読み戻しを確かめる（Lua から書いた TOML の文字と読み戻した値は、x86 と x64 で同じ期待にする。Rust の側で `i64` の端の値を Lua の値にする試験のように、x86 で値の持ち方が違う所は、テストを片方の機械に限らず、x86 と x64 の期待を分けて書き、両方で走らせる。pasta.dll の本番は x86 なので、x86 の振る舞いの確かめは省かない）。
 
 ### Requirement 8: 文書の更新
 **Objective:** As a pasta の開発者, I want 依存の版を書いた文書が今の姿を示す, so that 後に続く spec と作者が古い版を前提にしない
@@ -150,7 +150,7 @@ coroutine.status(co)        -- "suspended"  ← 前後で同じ
 下書きの「前提（仮定）」で残した 5 つの論点は、すべて閉じた。
 
 1. **x86 のビルドの不具合を、どこで直すか**: この spec の最初のタスクで直す（Boundary Context・Requirement 7）。
-2. **x86 と x64 で、セーブに書いた文字を揃えるか**: 揃える。「64 ビットの整数に戻しても同じビットになる数は整数として書く」（Requirement 7.2）。x86 だけで落ちていた往復の試験 2 本（`test_codec_round_trip_values`・`test_codec_round_trip_i64_extremes_as_values`）は、期待を変えずに x86 でも通す。
+2. **x86 と x64 で、セーブに書いた文字を揃えるか**: 揃える。「64 ビットの整数に戻しても同じビットになる数は整数として書く」（Requirement 7.2）。x86 だけで落ちていた往復の試験のうち、`test_codec_round_trip_values` は期待を変えずに x86 でも通す。`test_codec_round_trip_i64_extremes_as_values` の `i64::MAX` の回は、x86 の `mlua::Value` が `i64::MAX` を整数で持てないので、x86 と x64 の期待を分ける（設計ディスカッションで確定。どの試験も片方の機械だけに限らない。Requirement 7.6）。
 3. **features の `serialize` を残すか**: 残す（brief の Out「features を変えない」。Requirement 1.2）。
 4. **mlua の版の下限**: 0.12.2（ギャップ分析で試した版。Requirement 1.1）。
 5. **`pasta_lua::mlua` の版が変わることを 0.4.3 で出してよいか**: 0.4.3 のまま出し、リリースノートに書く（0.4.3 にはすでに破壊的変更が入っている。ゴールの版は開発者が決めた 0.4.3。Requirement 8.5）。
