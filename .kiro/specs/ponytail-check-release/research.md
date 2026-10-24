@@ -151,3 +151,41 @@
 - **振る舞いを変える直し**: 1.1〜1.7（断る）、5.1〜5.3（段 5 で止まる・パスを含む）。同じ変更で README・validate.md を直し、SKILL.md・nar-spec.md は許可を求める。
 - **変えないもの**: 6 段の表示、`--version`・`--help`、段 1 の前回の nar の削除と段 6 の作りかけの削除、nar のエントリ、`updates.txt` のバイト（日時を除く）。既存の特性化の試験（`test_updates_txt_characterization_without_balloon` など）がそのまま通ること。
 - **順番**: 後の `mlua-0-12-upgrade` が `self_deploy_integration_test.rs` を触るので、見本のゴーストの試験の寄せはこの spec で済ませておく。
+
+---
+
+## 8. 設計フェーズの調査と判断（2026-10-24）
+
+### 8.1 Research Needed の答え
+
+| # | 項目 | 答え | 確かめ方 |
+| - | ---- | ---- | -------- |
+| 1 | 正規化の形 | `std::path::absolute` → 在る一番近い祖先を `fs::canonicalize` → 残りの部品を書かれたまま足す。`canonicalize` は 8.3（`C-3003~1` → 長い名前）・大文字と小文字・junction を解き、`\\?\C:\…`（UNC は `\\?\UNC\…`）を返す。`absolute` は `..`・`.` を字面で畳み、末尾の区切りを残す。ファイルを通るパスの `canonicalize` は `NotFound`（os error 3）で、祖先のファイルまで戻る。在らないドライブは `absolute` のまま | スクラッチの小さな Rust の実行で確かめた（このリポジトリの Cargo.lock には触れていない） |
+| 2 | 同じ・中にあるの比べ方 | `Path` の `==`・`starts_with` は部品ごとだが**大文字と小文字を区別する**（`C:\A\b` は `C:\a` で始まらない）。在る部分は `canonicalize` がそろえるが、まだ無い残りの部品はそろわないので、Windows では部品を小文字にして比べる。`join("")` の末尾の区切りは部品の比べでは消える | 同上 |
+| 3 | 8.3 の試験 | 依存を足さずに作れる。8.3 が有効なボリュームでは、新しいフォルダ `target_ghost_long` の短い名前は `TARGET~1` になる（同じ親で最初の 1 つ）。在るときだけ確かめ、無ければ通す。CI の `%TEMP%`（`RUNNER~1`）は C: にあり、`TempDir` のパスに自然に短い名前が混じる | スクラッチで `mkdir target_ghost_long` → `ls TARGET~1` が成功 |
+| 4 | 読めないフォルダの作り方 | `std::os::windows::fs::OpenOptionsExt` で、フォルダを `share_mode(0)`＋`FILE_FLAG_BACKUP_SEMANTICS`（`0x02000000`）で開いたままにすると、`read_dir` が os error 32 で失敗し、`metadata`・`canonicalize`・親の一覧は成功する。ファイルを `share_mode(0)` で開くと `File::open`・`fs::copy` が失敗し、`metadata` は成功する。ハンドルを閉じれば元に戻るので後始末が要らない。`icacls /deny *S-1-1-0:(RD)` でも作れるが、戻し忘れると一時フォルダが消せなくなるので採らない | スクラッチで両方を確かめた |
+| 5 | md5 0.8 の `io::Write` | 0.8.1 の `src/lib.rs` 163〜164 行に `#[cfg(feature = "std")] impl core::io::Write for Context`。`std` は既定の機能で、workspace の `md5 = "0.8"` は既定の機能のまま。`io::copy(&mut file, &mut context)` で済む | `C:\rust\cargo\registry\src\index.crates.io-…\md5-0.8.1`（`CARGO_HOME` は `c:\rust\cargo`） |
+| 6 | 誤りの文言 | design.md の「断る文言」の表。`balloon.rs` の `overlaps with` でなく、当たった関係を `be the same as`・`contain`・`be inside` の 1 語で示す（要件 3.2） | — |
+| 7 | 見本のゴーストの `common` | `common` を「`#[ctor]` で環境変数を外す」と「`master_copy()`」の 2 つだけにすると、使う 3 つのバイナリが両方を使うので dead_code が出ない。`shell_assets_test.rs` が使っていた `workspace_root` は、そのファイルの中の 1 行の関数にする。`integration_test.rs` は `common` を使わなくなる | 各ファイルの `mod common;` と `common::` の参照を grep した |
+| 8 | `release.rs` の試験の置き場 | 確かめを新しいファイル `release_args.rs` に置き、関係ごとの試験もそこに置く（`release.rs` は既に 720 行で、目安の 600 行を超えている） | `wc -l`・steering の structure.md |
+| 9 | 段 1 の後の失敗の試験 | 作り直しは要らない。`test_execute_release_validation_errors_stop_before_update_files`（段 4）と `test_execute_release_balloon_plan_error_creates_no_nar`（段 5）が、前回の nar を置いて消えることを確かめている。`test_execute_release_removes_stale_nar_on_failure` は、無い `--copy` で断って前回の nar が残る試験に替える | 2 つの試験の中身を読んだ |
+
+### 8.2 合成（design-synthesis）
+
+- **一般化**: 要件 1.1〜1.6 は「2 つのパスの関係（同じ・含む・中にある）を求め、組ごとに断る関係の集合と比べる」1 つの問題。`relation(a, b) -> Option<Relation>` を 1 つ作り、`--release` の組は全部の関係、`--nar` の組は同じ・中にあるを断る。1.7 は別の小さな確かめ（`require_dir`）。
+- **作るか採るか**: 標準ライブラリの `canonicalize`・`absolute` を採る。`dunce`（`\\?\` を外す crate）や `same-file` は採らない（依存を足すと `Cargo.lock` が変わり、ウェーブの約束に反する。比べは両側を同じ形にそろえれば `\\?\` のままで足りる）。8.3 の試験の `windows-sys`（`GetShortPathNameW`）も採らない（同じ理由。短い名前の推測で足りる）。
+- **簡素化**: 新しい誤りの型・確かめを省くオプション・正規化したパスを段の処理に流す作りは入れない。I/O の誤りの手助けは 1 関数（`path_error`）で、`non_unicode_name` と同じ `main.rs` に置く（新しいファイルを作らない）。新しいファイルは `release_args.rs` だけ（行数の目安のため）。
+
+### 8.3 設計の判断（design.md の「前提と限界」に対応）
+
+- `balloon.rs` の I/O の 4 か所を包む（A-1）。要件 5.3 は段 5 を含み、段 5 の I/O の一部は `balloon.rs` にある。判定と文言つきの誤りは変えない。
+- 段 1 の I/O にもパスを添える（A-2）。要件 5.3 の字面は段 2・3・5・6。
+- Windows では部品を小文字にして比べる（A-4）。`to_string_lossy` のために Unicode でない名前どうしを同じとみなすことがあるが、断る側に倒れるだけ。
+- Windows 以外では、まだ無い残りの部品の `..` を畳まない（`absolute` が字面で畳まないため）。CI は Windows だけで Rust の試験を回すので、`shortcut:` のコメントで残す。
+
+### 8.4 参照したスキル・規則
+
+- `kiro-spec-design` の `design-principles.md`・`design-discovery-light.md`（既存の拡張なので軽い調査）・`design-synthesis.md`・`design-review-gate.md`、テンプレート `.kiro/settings/templates/specs/design.md`。
+- ponytail（最小で完全な変更）: 依存を足さない・新しい抽象を作らない・置き場だけ分ける・試験は小さく。
+- steering: `tech.md`（pasta_check の役割）、`structure.md`（1 ファイル 600 行の目安）、`roadmap.md`（2026-10-24 のウェーブの約束: `validate/`・`Cargo.toml`・`Cargo.lock` に触らない）。
+- 利用者の記録: `NoDefaultCurrentDirectoryInExePath` を外して cargo を走らせる、CI の 8.3 の短い名前、`SKILL.md` の編集は分類器が止める。
