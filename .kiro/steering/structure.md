@@ -144,7 +144,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │           │   ├── virtual_event_config_resolution_test.rs
 │           │   ├── virtual_event_dispatch_test.rs
 │           │   └── virtual_event_status_skip_test.rs
-│           ├── runtime/             # ランタイム関連テスト（7 files）
+│           ├── runtime/             # ランタイム関連テスト（主なもの。全 21 files）
 │           │   ├── main.rs
 │           │   ├── finalize_scene_test.rs
 │           │   ├── scene_test.rs

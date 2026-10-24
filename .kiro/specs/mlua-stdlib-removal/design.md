@@ -462,7 +462,7 @@ impl RuntimeConfig {
 
 ### Integration Tests（Rust）
 
-1. 新規 `tests/runtime/toml_module_test.rs`: `RuntimeConfig::minimal()` の VM で `require "@toml"` でき（2.1）、正しい TOML（文字列・整数・小数・真偽値・日付・配列・入れ子の表）が `@pasta_config` と同じ値になる（2.2・2.3）、読めない文字列で `nil` と空でない文字列が返りエラーにならない（2.4）、`toml.encode == nil` で表の鍵が `decode` だけ（2.5）、2 回の `require` が同じ表で、続けた `decode` が互いに混ざらない（2.6）、`decode(42)`・`decode(nil)`・`decode({})` が `pcall` で `false`（2.7）。`from_loader` で読み込んだゴーストの `main.lua` の先頭で `require "@toml"` できる（2.1。`runtime_api_test.rs` の `from_loader` の試験と同じ一時フォルダの作り方）。
+1. 新規 `tests/runtime/toml_module_test.rs`: `RuntimeConfig::minimal()` の VM で `require "@toml"` でき（2.1）、正しい TOML（文字列・整数・小数・真偽値・日付・配列・入れ子の表）が `@pasta_config` と同じ値になる（2.2・2.3）、読めない文字列で `nil` と空でない文字列が返りエラーにならない（2.4）、`toml.encode == nil` で表の鍵が `decode` だけ（2.5）、2 回の `require` が同じ表で、続けた `decode` が互いに混ざらない（2.6）、`decode(42)`・`decode(nil)`・`decode({})` が `pcall` で `false`（2.7）。`PastaLoader::load` で読み込んだゴーストの `main.lua` の先頭で `require "@toml"` できる（2.1。`from_loader` は `main.lua` を読まないので、`main.lua` を読む `from_loader_with_scene_dic` の道を通す）。
 2. `tests/runtime/runtime_api_test.rs` に足す: `RuntimeConfig::new()` と、6 つの名前を並べた `from_libs` の VM のどちらでも、6 つの `pcall(require, …)` が `false`（1.1・1.5）。
 3. `tests/external_control_events_test.rs`: `&["会員番号", "01"]` を送ると `save["会員番号"] == "01"` で、その後のシーンが `01` を話す（3.1・3.9 の通し）。
 4. `tests/shiori/res_test.rs`: `@assertions` を素の `assert` にして通す（6.5）。
