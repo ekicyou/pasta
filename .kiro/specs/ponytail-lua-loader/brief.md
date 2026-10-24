@@ -1,6 +1,6 @@
 # Brief: ponytail-lua-loader
 
-> **ステータス**: 未着手（2026-10-19 の `/kiro-discovery` で起票。`/ponytail:ponytail-audit` の指摘より）。版には縛らない。0.4.2 を出した後、0.5.0 の spec が並べられずに空いた所へ入れる（2026-10-22 開発者の決定。2026-10-19 の「0.4.3 に入れる」から改めた）。同じ監査の 10 本と同じウェーブで並走できる。
+> **ステータス**: 未着手（2026-10-19 の `/kiro-discovery` で起票。`/ponytail:ponytail-audit` の指摘より）。0.4.4（2026-10-24 開発者の決定「ポニーテールは 0.0.1 後ろからの着手に変更」。経緯: 2026-10-19 に 0.4.3、2026-10-22 に版に縛らない隙間、2026-10-23 に 0.4.3）。0.4.3 の mlua 0.12 の後の main で測り直す。同じ監査の 10 本と同じウェーブで並走できる。
 
 ## 進め方（2026-10-19 開発者の決定）
 
@@ -131,3 +131,8 @@
 ## 申し送り（scene-play-event より、2026-10-22 完了時）
 
 - `runtime/mod.rs`（`with_config_and_source_map`）がソースの対応表を持つ条件を、待ち受けが立ったか（`debug_handle.is_some()`）から、解決した設定のデバッグの有効（`config.debug.enabled`）へ変えた。`factory.rs` の Step 7（索引の構築）もこれで、待ち受けが無くても走る。`from_loader_with_scene_dic` は `@pasta_debug` を登録するようになった（`register_finalize_scene` の直前）。`runtime/` を整理するときは、この 2 つの条件（設定の有効・待ち受けの有無）を混ぜないこと。参照先は `.kiro/specs/completed/scene-play-event/design.md` の SourceMapRetention・DebugLuaModule。
+
+## 申し送り（2026-10-24 の 0.4.3 の組み替えより）
+
+- Must fix の 1 番「読めないセーブを空で上書きして失う」は、0.4.3 の `toml-serialization`（セーブファイルを TOML にする致命的な不具合）へ移した（2026-10-24 開発者の決定）。`persistence.rs` を書き直すので、同じ所で直す。2026-10-19 の決定（`<name>.broken` へ rename してから空の表を返す）は、そのまま引き継いだ。この spec の範囲からは外れる。
+- この spec は 0.4.4 になった。`toml-serialization`・`mlua-stdlib-removal`・`mlua-0-12-upgrade` が入った後の main で、`persistence.rs`・`runtime/` の行番号と前提を測り直す。

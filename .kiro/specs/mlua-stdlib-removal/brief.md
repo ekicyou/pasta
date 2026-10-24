@@ -1,6 +1,6 @@
 # Brief: mlua-stdlib-removal
 
-> **ステータス**: 未着手（2026-10-24 の `/kiro-discovery` で起票。開発者の依頼「mlua-stdlib を外す spec に、OnPastaSetSaveVariable の改めも含めて起票し直して」）。版は未定。要件定義は Opus。作者に見える API を変えるので、版は開発者が決める。
+> **ステータス**: 未着手（2026-10-24 の `/kiro-discovery` で起票。開発者の依頼「mlua-stdlib を外す spec に、OnPastaSetSaveVariable の改めも含めて起票し直して」）。0.4.3（2026-10-24 開発者の決定「次のリリースのタイミングで、mlua 上げちゃいたい」。ウェーブ 1）。要件定義は Opus。作者に見える API を変えるので、リリースノートで知らせる。
 
 ## Problem
 
@@ -33,7 +33,7 @@ pasta は、Rust のライブラリ mlua-stdlib（0.1.0）の 6 つのモジュ�
 
 mlua-stdlib を丸ごと外す。pasta 自身が要る分（TOML を読む）だけを、既にある部品（`toml` クレートと `toml_to_lua`）で `@toml` として持つ。`OnPastaSetSaveVariable` は、型を Reference2 で受け取る形に改める。
 
-`OnPastaSetSaveVariable` の新しい形（2026-10-24 の推奨。型の名前は要件で決める）:
+`OnPastaSetSaveVariable` の新しい形（2026-10-24 開発者の決定。型の名前は英語）:
 
 | Reference | 中身 |
 |-----------|------|
@@ -93,8 +93,7 @@ raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "", 
 - マニュアルの章を消す・足すときは、章の数を決め打ちする 3 つの検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）を合わせる。章の数は、mlua-stdlib の章を `@toml` の章に置き換えるなら変わらない。
 - `Cargo.lock` とルートの `Cargo.toml` は、ウェーブの中では 1 本の spec だけが触る。
 
-## 開発者の判断が要るもの（要件の前）
+## 開発者の判断（要件の前）
 
-- **型の名前**: `number`・`string`・`boolean`・`delete` にするか、日本語（`数`・`文字列`・`真偽`・`削除`）にするか。
-- **`@toml` の `encode`**: Lua の表を TOML の文字列にする関数を持つか。推奨は持たない（配列か表かの見分けの規則から作ることになる。要る作者が出てから）。
+- すべて決まった（2026-10-24 開発者の決定）。型の名前は英語（`number`・`string`・`boolean`・`delete`）。`@toml` は `decode` だけで、`encode` は持たない（要る作者が出てから）。
 - セーブファイルは決まった（2026-10-24 開発者の方針「pasta から json は一旦追い出して。ユーザー要望で json が要求されるまではシリアライズは toml」）。TOML にする。セーブファイル・ログの表・サイドカーは、別の spec `toml-serialization` が持つ。
