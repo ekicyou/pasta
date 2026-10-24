@@ -50,10 +50,12 @@ pub enum FindingKind {
     SceneShadowedByBuiltin,
     CallTargetMissing,
     ChoiceTargetMissing,
+    RecommendItemInvalid,
+    RecommendMenuTalk,
 }
 
 impl FindingKind {
-    pub const ALL: [FindingKind; 25] = {
+    pub const ALL: [FindingKind; 27] = {
         use FindingKind::*;
         [
             ConfigMissing,
@@ -81,6 +83,8 @@ impl FindingKind {
             SceneShadowedByBuiltin,
             CallTargetMissing,
             ChoiceTargetMissing,
+            RecommendItemInvalid,
+            RecommendMenuTalk,
         ]
     };
 
@@ -96,7 +100,9 @@ impl FindingKind {
             | LocalSceneCollision
             | SceneShadowedByBuiltin
             | CallTargetMissing
-            | ChoiceTargetMissing => Severity::Warning,
+            | ChoiceTargetMissing
+            | RecommendItemInvalid
+            | RecommendMenuTalk => Severity::Warning,
             _ => Severity::Error,
         }
     }
@@ -130,6 +136,8 @@ impl FindingKind {
             SceneShadowedByBuiltin => "scene-shadowed-by-builtin",
             CallTargetMissing => "call-target-missing",
             ChoiceTargetMissing => "choice-target-missing",
+            RecommendItemInvalid => "recommend-item-invalid",
+            RecommendMenuTalk => "recommend-menu-talk",
         }
     }
 }
@@ -486,6 +494,22 @@ pub mod msg {
     pub fn choice_target_missing(target: &str) -> String {
         format!(
             "選択肢のジャンプ先「{target}」が辞書のシーンにありません（Lua で定義・振り分けていれば問題ありません）"
+        )
+    }
+    /// recommend.lua: 2 個より少なければ項目を外し、5 個目から後は使わない
+    pub fn recommend_item_arg_count(n: usize) -> String {
+        format!(
+            "＞おすすめ項目 の引数は 2〜4 個です（{n} 個あります）。2 個より少ないと項目はメニューに入らず、5 個目から後は使われません"
+        )
+    }
+    pub fn recommend_item_scene_missing(name: &str) -> String {
+        format!(
+            "＞おすすめ項目 の 3 つ目の引数のシーン「{name}」が辞書にありません（名前が完全に同じグローバルシーンを探します）"
+        )
+    }
+    pub fn recommend_menu_talk(scene: &str) -> String {
+        format!(
+            "メニューのシーン「{scene}」の台詞はメニューに入らずに捨てられます（項目は ＞おすすめ項目 で足します）"
         )
     }
 }

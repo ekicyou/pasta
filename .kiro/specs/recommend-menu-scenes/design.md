@@ -539,6 +539,7 @@ pub(crate) fn check(
     model: &SceneModel,
     aliases: &SceneAliasTable,
     parsed: &[(String, PastaFile)],
+    texts: &[(String, FileText)], // 字下げの後ろの列を出すため（references::check と同じ）
 ) -> Vec<Finding>;
 ```
 
