@@ -15,30 +15,10 @@
 //! 自己展開の書き込みは temp 配下にのみ発生させる。コピー時に `profile/` をスキップして
 //! 必ずフレッシュ状態から開始する。
 
-use std::path::Path;
+mod common;
 
 use pasta_lua::loader::PastaLoader;
 use pasta_lua::mlua;
-use tempfile::TempDir;
-
-/// Neutralize ambient DAP debug env vars before any test thread starts.
-///
-/// The developer session may export `PASTA_DEBUG=1` / `PASTA_DEBUG_PORT=9276`.
-/// Without this guard, every `PastaLoader::load` here would enable the DAP
-/// listener and bind that single fixed port; the multiple loads performed in this
-/// binary then collide with `AddrInUse` and the tests fail. Tests must behave
-/// identically regardless of the session environment, so we clear these here.
-///
-/// Running inside a `#[ctor]` (executed before `main`, while the process is still
-/// single-threaded) makes the `remove_var` calls race-free under the Rust 2024
-/// edition where `std::env::remove_var` is `unsafe`.
-#[ctor::ctor(unsafe)]
-fn neutralize_debug_env() {
-    unsafe {
-        std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
-    }
-}
 
 /// Lua の文字列値を Rust 文字列として取り出すヘルパー。
 fn value_as_str(value: &mlua::Value) -> Option<String> {
@@ -46,39 +26,6 @@ fn value_as_str(value: &mlua::Value) -> Option<String> {
         .as_string()
         .and_then(|s| s.to_str().ok())
         .map(|s| s.to_string())
-}
-
-/// テスト対象の本物のサンプルゴースト master ディレクトリ。
-fn fixture_master_dir() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("ghosts/hello-pasta/ghost/master")
-}
-
-/// `src` のディレクトリツリーを `dst` へ再帰コピーする。ただし `profile/` サブディレクトリ
-/// （フィクスチャに自己展開済みの版が万一あっても）は持ち越さず、必ずフレッシュ初回起動から
-/// 始められるようスキップする。
-fn copy_tree_skip_profile(src: &Path, dst: &Path) {
-    std::fs::create_dir_all(dst).expect("create dst dir");
-    for entry in std::fs::read_dir(src).expect("read src dir").flatten() {
-        let path = entry.path();
-        let name = entry.file_name();
-        let meta = entry.metadata().expect("metadata");
-        if meta.is_dir() {
-            // フレッシュ自己展開を保証するため profile/ は持ち越さない。
-            if name == std::ffi::OsStr::new("profile") {
-                continue;
-            }
-            copy_tree_skip_profile(&path, &dst.join(&name));
-        } else {
-            std::fs::copy(&path, dst.join(&name)).expect("copy file");
-        }
-    }
-}
-
-/// フィクスチャを tempdir へ（profile を除いて）コピーし、その tempdir を返す。
-fn fresh_ghost_copy() -> TempDir {
-    let temp = TempDir::new().expect("tempdir");
-    copy_tree_skip_profile(&fixture_master_dir(), temp.path());
-    temp
 }
 
 /// 自己展開先（`base_dir` 相対）。production の `SELF_DEPLOY_REL` と一致させる。
@@ -91,7 +38,7 @@ const MARKER_NAME: &str = ".md5";
 
 #[test]
 fn fresh_first_boot_self_deploys_and_require_resolves() {
-    let temp = fresh_ghost_copy();
+    let temp = common::master_copy();
     let base = temp.path();
     let target = base.join(SELF_DEPLOY_REL);
 
@@ -170,7 +117,7 @@ fn fresh_first_boot_self_deploys_and_require_resolves() {
 
 #[test]
 fn scripts_override_takes_priority() {
-    let temp = fresh_ghost_copy();
+    let temp = common::master_copy();
     let base = temp.path();
 
     // フレームワークも提供する単純モジュール名 'dkjson' を scripts/ 側でセンチネル上書き。
@@ -237,7 +184,7 @@ fn scripts_override_takes_priority() {
 fn write_failure_logs_error_and_continues() {
     use std::os::windows::fs::OpenOptionsExt;
 
-    let temp = fresh_ghost_copy();
+    let temp = common::master_copy();
     let base = temp.path();
     let target = base.join(SELF_DEPLOY_REL);
 

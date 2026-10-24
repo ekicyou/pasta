@@ -84,7 +84,7 @@
   - _Boundary: SampleGhostTests_
   - _Requirements: 6.4_
 
-- [ ] 5.2 ゴーストの写しと環境変数の中和を共通の手助け 1 か所に寄せる
+- [x] 5.2 ゴーストの写しと環境変数の中和を共通の手助け 1 か所に寄せる
   - 共通の手助けを、main の前に `PASTA_DEBUG`・`PASTA_DEBUG_PORT` を外す処理と、`profile/` と `pasta.dll` を除いて master を新しい一時フォルダへ写す処理（読み取りの誤りは `expect` で止める）の 2 つだけにする
   - ゴーストを読み込む 3 つの試験ファイルがそれを使い、各ファイルの中和・写し・使わなくなった手助けを消す。シェルの素材の試験は共通の手助けの読み込みをやめ、ワークスペースの根を 1 行の関数で自分で持つ
   - `cargo test -p pasta_sample_ghost` が同じ本数緑で、dead_code の警告と `#[allow(dead_code)]` の読み込みが無い
