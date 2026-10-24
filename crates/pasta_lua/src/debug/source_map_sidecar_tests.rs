@@ -26,7 +26,7 @@ fn sidecar_path_appends_map_next_to_lua() {
 }
 
 /// 3.2 完了条件（往復同一性）: `write_sidecar` で出力 → `read_sidecar` で再読込し、
-/// 再読込した行ペア写像がメモリ内 [`ChunkSourceMap`] と一致する。さらに JSON が
+/// 再読込した行ペア写像がメモリ内 [`ChunkSourceMap`] と一致する。さらに TOML が
 /// `version`＋`pasta_file`＋行ペア列を含むことを表明する（design 601-602）。
 #[test]
 fn write_then_read_sidecar_round_trips_to_memory_map() {
@@ -44,9 +44,14 @@ fn write_then_read_sidecar_round_trips_to_memory_map() {
         "サイドカー <lua>.map が生成されること（3.2）"
     );
 
-    // JSON が version + pasta_file + ペア列を含む（自己記述スキーマ・602）。
+    // TOML が version + pasta_file + ペア列を含む（自己記述スキーマ・602・7.1/7.2）。
     let raw = std::fs::read_to_string(&sidecar).unwrap();
-    let parsed: SidecarFile = serde_json::from_str(&raw).unwrap();
+    assert_eq!(
+        raw,
+        "version = 1\npasta_file = \"dict.pasta\"\npairs = [[10, 3], [12, 7], [13, 7], [15, 7], [20, 9]]\n",
+        "サイドカーは TOML の項目として書かれる（7.1/7.2）"
+    );
+    let parsed: SidecarFile = toml::from_str(&raw).unwrap();
     assert_eq!(
         parsed.version, SIDECAR_VERSION,
         "version フィールドを持つ（602）"
@@ -137,7 +142,7 @@ fn write_sidecar_failure_is_non_fatal_and_leaves_memory_map_intact() {
 }
 
 /// `read_sidecar` のエラー経路: サイドカーが存在しない → `NotFound` の `Err`、
-/// JSON 不正 → `InvalidData` の `Err`。いずれも panic せず非致命（3.1/611 の
+/// TOML 不正 → `InvalidData` の `Err`。いずれも panic せず非致命（3.1/611 の
 /// 「warn して継続」を呼び出し側が選べる単一の `Result` 経路）。
 #[test]
 fn read_sidecar_missing_or_corrupt_returns_err_without_panic() {
@@ -151,11 +156,11 @@ fn read_sidecar_missing_or_corrupt_returns_err_without_panic() {
         std::io::ErrorKind::NotFound
     );
 
-    // (2) JSON 不正（壊れたサイドカー）→ InvalidData。
-    std::fs::write(sidecar_path_for_lua(&lua_path), b"{ not valid json !!").unwrap();
+    // (2) TOML 不正（壊れたサイドカー）→ InvalidData（7.5）。
+    std::fs::write(sidecar_path_for_lua(&lua_path), b"version = = 1 [[ broken").unwrap();
     let corrupt = read_sidecar(&lua_path);
     assert_eq!(
-        corrupt.expect_err("JSON 不正は Err").kind(),
+        corrupt.expect_err("TOML 不正は Err").kind(),
         std::io::ErrorKind::InvalidData
     );
 }
@@ -193,7 +198,7 @@ fn read_sidecar_currently_accepts_unknown_version() {
     };
     std::fs::write(
         sidecar_path_for_lua(&lua_path),
-        serde_json::to_vec(&future).unwrap(),
+        toml::to_string(&future).unwrap(),
     )
     .unwrap();
 
@@ -217,8 +222,12 @@ fn write_sidecar_creates_parents_and_round_trips_empty_map() {
     // 空マップの往復同一性。
     let reread = read_sidecar(&lua_path).expect("read_sidecar");
     assert!(reread.is_empty());
-    let parsed: SidecarFile =
-        serde_json::from_slice(&std::fs::read(sidecar_path_for_lua(&lua_path)).unwrap()).unwrap();
+    let raw = std::fs::read_to_string(sidecar_path_for_lua(&lua_path)).unwrap();
+    assert!(
+        raw.contains("pairs = []"),
+        "0 件は pairs = [] と書かれる（7.4）: {raw}"
+    );
+    let parsed: SidecarFile = toml::from_str(&raw).unwrap();
     assert_eq!(parsed.pairs, Vec::<[u32; 2]>::new());
     assert_eq!(parsed.version, SIDECAR_VERSION);
 }

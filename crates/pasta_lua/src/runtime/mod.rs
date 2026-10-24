@@ -102,16 +102,9 @@ impl PastaLuaRuntime {
     ///
     /// Initializes a Lua VM with standard libraries enabled and registers:
     /// - `@pasta_search` module with scene and word registries
-    /// - `@assertions` module for testing and validation
-    /// - `@testing` module for testing framework with hooks and reporting
-    /// - `@regex` module for regular expression support
-    /// - `@json` module for JSON encoding/decoding
-    /// - `@yaml` module for YAML encoding/decoding
     /// - `@pasta_log` module for the Lua→Rust tracing log bridge
     ///   (always registered, independent of `RuntimeConfig::libs`)
-    ///
-    /// Note: `@env` module is disabled by default for security reasons.
-    /// Use `RuntimeConfig::full()` or enable it explicitly to access environment variables.
+    /// - `@toml` module for TOML decoding (always registered)
     ///
     /// # Arguments
     /// * `context` - TranspileContext from LuaTranspiler::transpile()
@@ -179,7 +172,7 @@ impl PastaLuaRuntime {
         //  1. `std_lib` is constructed from validated `RuntimeConfig` via `to_stdlib()`,
         //     which only maps known library names to mlua `StdLib` flags.
         //  2. `validate_and_warn()` above alerts on dangerous libraries (std_debug /
-        //     std_all_unsafe) and the `env` module.
+        //     std_all_unsafe).
         //  3. Default LuaOptions are used, so no custom allocator or hook is involved.
         //  4. The returned `Lua` handle is used in a single-threaded context and is not
         //     shared across threads.
@@ -211,28 +204,11 @@ impl PastaLuaRuntime {
             config.scene_aliases.clone(),
         )?;
 
-        // Register mlua-stdlib modules based on configuration
-        if config.should_enable_module("assertions") {
-            mlua_stdlib::assertions::register(&lua, None)?;
-        }
-        if config.should_enable_module("testing") {
-            mlua_stdlib::testing::register(&lua, None)?;
-        }
-        if config.should_enable_module("env") {
-            mlua_stdlib::env::register(&lua, None)?;
-        }
-        if config.should_enable_module("regex") {
-            mlua_stdlib::regex::register(&lua, None)?;
-        }
-        if config.should_enable_module("json") {
-            mlua_stdlib::json::register(&lua, None)?;
-        }
-        if config.should_enable_module("yaml") {
-            mlua_stdlib::yaml::register(&lua, None)?;
-        }
-
         // Register @pasta_log module (always available, independent of RuntimeConfig.libs)
         Self::register_log_module(&lua)?;
+
+        // Register @toml module (always available, independent of RuntimeConfig.libs)
+        Self::register_toml_module(&lua)?;
 
         // Debug backend gate (task 4.2): the SINGLE enable choke point. After the
         // VM is constructed and all modules are registered, install the debug hook

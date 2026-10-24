@@ -128,7 +128,7 @@ off()
 | `OnPastaScene` | デバッグが有効なとき、名前で指名したシーンを再生する（[OnPastaScene](#onpastascene名前でシーンを再生)） |
 | `OnPastaSceneAt` | デバッグが有効なとき、ファイルと行で指名したシーンを再生する（[OnPastaSceneAt](#onpastasceneat位置でシーンを再生)） |
 | `OnPastaCallFunction` | Reference0 の名前を、辞書の `＞名前` と同じ探し方で呼ぶ（[OnPastaCallFunction](#onpastacallfunction名前を外から呼ぶ)） |
-| `OnPastaSetSaveVariable` | Reference1 を JSON の値として読み、グローバル変数に代入する（[OnPastaSetSaveVariable](#onpastasetsavevariableグローバル変数に代入)） |
+| `OnPastaSetSaveVariable` | Reference2 の型に従って Reference1 をグローバル変数に代入する（[OnPastaSetSaveVariable](#onpastasetsavevariableグローバル変数に代入)） |
 | `sakura.recommendsites`・`kero.recommendsites`・`sakura.portalsites`（と、別名表の置き換え先にある `char<数字>.recommendsites`） | メニューのシーンを動かし、`＞おすすめ項目`・`＞おすすめ区切り` で並べた項目をメニューの中身として返す（[おすすめメニュー](../grammar/call-jump.md#おすすめメニュー)・[リソースの問い合わせを受ける](#リソースの問い合わせを受ける)） |
 | `sakura.recommendbuttoncaption`・`kero.recommendbuttoncaption`・`sakura.portalbuttoncaption`（と、別名表の置き換え先にある `char<数字>.recommendsites.caption`） | 結びついた名前の単語から 1 つを、ボタンの名前として返す（[ボタンの名前](../grammar/call-jump.md#ボタンの名前)） |
 | `OnRecommendsiteChoice` | 選ばれた項目の 3 つ目の引数のシーンを実行する。項目に 3 つ目の引数が無ければ、イベント名でシーンを探して実行する（[選んだ後のトーク](../grammar/call-jump.md#選んだ後のトーク)） |
@@ -848,23 +848,23 @@ raise_event(event = "OnPastaCallFunction", references = ["初回起動"])
 | Reference | 内容 |
 | --------- | ---- |
 | `act.req.reference[0]` | 変数の名前（必須）。`＄＊会員番号` なら `会員番号` |
-| `act.req.reference[1]` | 代入する値（必須）。JSON の値 1 つで書く |
+| `act.req.reference[1]` | 代入する値。届いた文字列をそのまま使う（引用符は要らない） |
+| `act.req.reference[2]` | 型。`number`・`string`・`boolean`・`delete` のどれか。省くか空の文字列なら `string` |
 
-**値の読み方**
+**型ごとの代入**
 
-Reference1 を JSON の値 1 つとして読み、その型のまま代入する。
+型の名前は英小文字で、そのとおりに書く。`Number`・`数値` は型の名前にならず、失敗になる（下の表）。
 
-| Reference1 | 代入される値 |
-| ---------- | ------------ |
-| `60` | 数値の `60` |
-| `"01"`（引用符も含めて送る） | 文字列の `01` |
-| `true`・`false` | 真偽値 |
-| `null` | 変数を消す（値の無い状態に戻す） |
+| 型（Reference2） | Reference1 | 代入される値 |
+| ---------------- | ---------- | ------------ |
+| 省く・空・`string` | 文字列（空の文字列も） | その文字列のまま。`01`・`"01"`・`60`・`null` も文字列になる |
+| `number` | 数として読める文字列（`60`・`-1.5`・`0x10`・`1e3`。前後に空白があってもよい） | 数値。無限大と非数になるもの（`inf`・`nan`）は失敗 |
+| `boolean` | `true`・`false` | 真偽値。ほかの文字列（`TRUE`・`1`）は失敗 |
+| `delete` | 見ない（無くても、何でもよい） | 変数を消す（値の無い状態に戻す） |
 
-- 文字列にしたいときは、値を `"` で囲んで送る。引用符なしの `01` は JSON として読めないので、失敗になる（下の表）。
-- JSON の配列（`[1,2]`）とオブジェクト（`{"a":1}`）は代入しない。失敗になり、変数は変わらない。
+- 型を省けば、届いた文字列がそのまま文字列として入る。`01` を送れば文字列の `01` になる。
 - 名前は区切らない。`a.b` は、`a` の中の `b` ではなく、`a.b` という名前の 1 つの変数になる。
-- `pasta_` で始まる[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前)にも代入できる。トークの間隔の変数は数値で送る（`60`。`"60"` は文字列なので無視される）。代入した値は、次にトーク間隔を計算するときから反映される。
+- `pasta_` で始まる[予約グローバル変数](../grammar/variables.md#予約グローバル変数pasta_-で始まる名前)にも代入できる。トークの間隔の変数は `number` を付けて送る。付けないと文字列の `60` が入り、トークの間隔には使われない。代入した値は、次にトーク間隔を計算するときから反映される。
 - 代入した値は、その後に読む `＄＊名前`（Lua の `save.名前`）にすぐ見える。保存は、ほかのグローバル変数と同じく、ランタイムの終了時に行われる（[グローバル変数の保存先](../grammar/variables.md#グローバル変数の保存先)）。代入するたびにファイルへ書き出すことはしない。
 
 **応答**
@@ -878,16 +878,16 @@ Reference1 を JSON の値 1 つとして読み、その型のまま代入する
 
 | 場合 | 表記 | ログの警告 |
 | ---- | ---- | ---------- |
-| Reference1 が JSON として読めない（引用符なしの `01` を送った） | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（01）】` | `OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1='01'` |
-| Reference1 が無い | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（値なし）】` | `OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1=nil` |
-| Reference1 が空の文字列 | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（空文字列）】` | `OnPastaSetSaveVariable: not JSON: name='会員番号', Reference1=''` |
-| Reference1 が配列かオブジェクト | `【代入できない値：OnPastaSetSaveVariable ＄＊会員番号（表）】` | `OnPastaSetSaveVariable: JSON array or object is refused: name='会員番号', Reference1='[1,2]'` |
-| JSON を読む部品（`@json`）が読み込めない | `【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（JSON の部品が無い）】` | `OnPastaSetSaveVariable: @json is not available; variable not set: name='会員番号'` |
+| `number` で、Reference1 が数にならない（`abc`・空・無い・`inf`・`nan`） | `【数にできない値：OnPastaSetSaveVariable ＄＊会員番号（abc）】` | `OnPastaSetSaveVariable: not a number: name='会員番号', Reference1='abc'` |
+| `boolean` で、Reference1 が `true`・`false` でない（`TRUE`・`1`・空・無い） | `【代入できない値：OnPastaSetSaveVariable ＄＊会員番号（TRUE）】` | `OnPastaSetSaveVariable: not a boolean: name='会員番号', Reference1='TRUE'` |
+| 型の名前を知らない（`Number`・`数値`） | `【型の名前にならない値：OnPastaSetSaveVariable ＄＊会員番号（Number）】` | `OnPastaSetSaveVariable: unknown type: name='会員番号', Reference2='Number'` |
+| 型が省かれた・空・`string` で、Reference1 が無い | `【代入できない値：OnPastaSetSaveVariable ＄＊会員番号（値なし）】` | `OnPastaSetSaveVariable: no value: name='会員番号', Reference1=nil` |
 | Reference0 が無い | `【名前にならない値：OnPastaSetSaveVariable Reference0（値なし）】` | `OnPastaSetSaveVariable: bad argument: Reference0=nil` |
 | Reference0 が空の文字列 | `【名前にならない値：OnPastaSetSaveVariable Reference0（空文字列）】` | `OnPastaSetSaveVariable: bad argument: Reference0=''` |
 
-- 読めない値は、受け取った文字列を引用符で包まずに、そのまま表記に入れる。`（01）` と出たら、引用符なしで届いている。
-- Reference1 が無いときも、変数は消さない。消すのは `null` を送ったときだけである。
+- 表記には、誤った値を引用符で包まずにそのまま入れる。Reference1 の誤りは Reference1 を、型の名前の誤りは Reference2 を入れる。値が無ければ「値なし」、空なら「空文字列」と出る。
+- 型の名前は Reference1 より先に見る。型の名前が誤っていれば、Reference1 が何でも型の名前の失敗になる。
+- Reference1 が無いときも、変数は消さない。消すのは `delete` を送ったときだけである。
 
 **断り**
 
@@ -909,15 +909,14 @@ REG.OnPastaSetSaveVariable = function() end  -- 外からの代入を受け付�
 **MCP からの呼び方**
 
 ```text
-raise_event(event = "OnPastaSetSaveVariable", references = ["pasta_talk_interval_min", "60"])
-raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "\"01\""])
-raise_event(event = "OnPastaSetSaveVariable", references = ["初回済み", "null"])
+raise_event(event = "OnPastaSetSaveVariable", references = ["pasta_talk_interval_min", "60", "number"])
+raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "01"])
+raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "", "delete"])
 ```
 
 - 1 行目は `＄＊pasta_talk_interval_min` に数値の `60` を代入する。
-- 2 行目は `＄＊会員番号` に文字列の `01` を代入する。`references` の中では、JSON の引用符を `\"` と書く。SHIORI には `"01"` が届く。
-- 3 行目は `＄＊初回済み` を消す。
-- `references = ["会員番号", "01"]` と送ると、SHIORI には引用符なしの `01` が届き、`【JSON として読めない値：OnPastaSetSaveVariable ＄＊会員番号（01）】` がツールの結果に載る。
+- 2 行目は型を省いたので、`＄＊会員番号` に文字列の `01` を代入する。
+- 3 行目は `＄＊会員番号` を消す。`delete` では Reference1 を見ないが、Reference2 の手前を埋めるために空の文字列を置く。
 
 ### OnPastaCallFunction と OnPastaScene の違い
 

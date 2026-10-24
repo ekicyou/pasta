@@ -221,3 +221,7 @@
 - **見つけた穴・古くなった記述**:
   - 2026-10-18 の節の応答を包む所（`init.lua` 244・250 行、`callback.lua` 116・192 行、`STOP.response` の `callback.lua` 178・183 行と `entry.lua` 91 行）→ 上の「触るファイル」の行。`set_co_scene` は `init.lua` 100 行 → 110 行。立ち位置を書き換える所は `sakura_builder.lua` 446〜450・453 行 → 465〜467・469〜471 行。
   - ファイルの大きさ: `entry.lua` 132 → 153、`init.lua` 267 → 371、`callback.lua` 226 → 233、`store.lua` 124 → 139、`virtual_dispatcher.lua` 303 → 328、`sakura_builder.lua` 540 → 558。
+
+## 申し送り（mlua-stdlib-removal より・2026-10-24）
+
+- `OnPastaSetSaveVariable` の契約が変わった: 値は JSON として読まず、Reference1 の文字列を Reference2 の型（省けば `string`・`number`・`boolean`・`delete`）で読む。消すのは `delete` のときだけ（`null` では消えない）。上の `external_control.lua` の行番号は古い。`pasta.save` を外から書き換えることは変わらない。参照先: `.kiro/specs/completed/mlua-stdlib-removal/design.md` の SetSaveVariableHandler。

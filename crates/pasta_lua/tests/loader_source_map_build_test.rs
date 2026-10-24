@@ -269,6 +269,23 @@ fn loader_writes_sidecar_when_enabled_and_round_trips() {
             sidecar.display()
         );
 
+        // (1b) `.map` は TOML として読め、`version = 1`・`pasta_file`・`.lua` 行昇順の
+        // `pairs` を持つ（7.1/7.2/7.3）。
+        let raw = std::fs::read_to_string(&sidecar).expect("read sidecar");
+        let table: toml::Table = toml::from_str(&raw).expect("サイドカーは TOML として読める");
+        assert_eq!(table["version"].as_integer(), Some(1));
+        assert!(table["pasta_file"].is_str());
+        let lua_lines: Vec<i64> = table["pairs"]
+            .as_array()
+            .expect("pairs は配列")
+            .iter()
+            .map(|p| p.as_array().expect("ペアは配列")[0].as_integer().unwrap())
+            .collect();
+        assert!(
+            lua_lines.windows(2).all(|w| w[0] < w[1]),
+            "pairs は .lua 行の昇順（7.3）: {lua_lines:?}"
+        );
+
         // (2) 再読込した写像がメモリ内集約マップの当該チャンクと一致する（往復同一性）。
         let reread = read_sidecar(&lua_path).expect("read_sidecar");
         // メモリ側で当該チャンクが持つ全 `.lua`→`.pasta` 対応を列挙し、サイドカー側と

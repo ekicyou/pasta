@@ -206,7 +206,7 @@ fn call_function_pauses_auto_talk() {
     );
 }
 
-/// 3.2・3.6: `"01"` を代入した後に話すシーンで `01` が出て、値は文字列のまま。
+/// 3.1・3.9: 型を省いた `01` を代入した後に話すシーンで `01` が出て、値は文字列のまま。
 #[test]
 fn set_save_variable_then_scene_speaks_the_string() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -215,14 +215,14 @@ fn set_save_variable_then_scene_speaks_the_string() {
     assert_204(&request(
         &runtime,
         "OnPastaSetSaveVariable",
-        &["会員番号", "\"01\""],
+        &["会員番号", "01"],
     ));
     assert!(
         lua_bool(
             &runtime,
             r#"return require("pasta.save")["会員番号"] == "01""#
         ),
-        "save must hold the string \"01\""
+        "save must hold the string 01"
     );
 
     let value = value_of_200(&request(

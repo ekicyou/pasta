@@ -42,7 +42,6 @@ crates/pasta_sample_ghost/
 ├── release.ps1             # ビルド＋セットアップ＋pasta_check.zip・.nar・pasta.dll.zip・pasta-skills.zip 作成（動作確認用）
 └── tests/
     ├── common/mod.rs                 # テストヘルパー
-    ├── dist_src_validation_test.rs   # 配布ファイル構成の検証 ※ファイル名は旧称（dist-src 廃止済み）
     ├── integration_test.rs           # 統合テスト
     ├── self_deploy_integration_test.rs # 実 .pasta を PastaLoader で parse/transpile 検証
     ├── shell_assets_test.rs          # 立ち絵と surfaces.txt の機械検証

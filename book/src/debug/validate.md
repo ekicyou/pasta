@@ -223,6 +223,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 [6/6] Creating NAR archive...
 ```
 
+- 1 段目の前に、`--release`・`--nar` と `--target`・`--copy` の関係を確かめる。配布フォルダが開発フォルダと同じ・含む・中にある、nar が配布フォルダや開発フォルダの中にある、といった危ない組み合わせでは、段の表示を出さずに、何にも触れずに止まる（作らず、消さない）。
 - 4 段目は `validate` と同じ形で問題とまとめの行を出す。
 - 誤りが 1 件でもあると、`Error: dictionary validation found N error(s); update files and NAR were not created` を出して、更新ファイル（`updates.txt`）と nar を作らずに失敗の終了コードで終わる。
 - 1 段目で `--nar` の位置にある前回の nar を消しているので、関門で止まったときは、新しい nar も前回の nar も残らない。壊れた辞書の nar や、古い nar を最新と取り違えて配ることはない。

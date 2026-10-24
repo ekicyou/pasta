@@ -14,21 +14,13 @@ use pasta_lua::{ConfigError, RuntimeConfig};
 #[test]
 fn test_runtime_config_new_returns_default_libs() {
     let config = RuntimeConfig::new();
-    assert!(config.libs.contains(&"std_all".to_string()));
-    assert!(config.libs.contains(&"assertions".to_string()));
-    assert!(config.libs.contains(&"testing".to_string()));
-    assert!(config.libs.contains(&"regex".to_string()));
-    assert!(config.libs.contains(&"json".to_string()));
-    assert!(config.libs.contains(&"yaml".to_string()));
-    // env should NOT be in default
-    assert!(!config.libs.contains(&"env".to_string()));
+    assert_eq!(config.libs, vec!["std_all".to_string()]);
 }
 
 #[test]
-fn test_runtime_config_full_includes_unsafe() {
+fn test_runtime_config_full_is_std_all_unsafe_only() {
     let config = RuntimeConfig::full();
-    assert!(config.libs.contains(&"std_all_unsafe".to_string()));
-    assert!(config.libs.contains(&"env".to_string()));
+    assert_eq!(config.libs, vec!["std_all_unsafe".to_string()]);
 }
 
 #[test]
@@ -146,42 +138,21 @@ fn test_to_stdlib_unknown_library_error() {
 }
 
 #[test]
-fn test_to_stdlib_ignores_mlua_stdlib_modules() {
-    // mlua-stdlib modules (no std_ prefix) should be ignored by to_stdlib
+fn test_to_stdlib_ignores_non_std_names() {
+    // Names without the std_ prefix (including the removed module names
+    // assertions/testing/env/regex/json/yaml) are silently skipped (1.5).
     let config = RuntimeConfig::from_libs(vec![
         "std_table".into(),
         "assertions".into(),
+        "testing".into(),
+        "env".into(),
         "regex".into(),
+        "json".into(),
+        "yaml".into(),
     ]);
     let stdlib = config.to_stdlib().unwrap();
     // Only std_table should be processed
     assert_eq!(stdlib, StdLib::TABLE);
-}
-
-// ============================================================================
-// should_enable_module() tests
-// ============================================================================
-
-#[test]
-fn test_should_enable_module_positive() {
-    let config = RuntimeConfig::from_libs(vec!["testing".into(), "regex".into()]);
-    assert!(config.should_enable_module("testing"));
-    assert!(config.should_enable_module("regex"));
-    assert!(!config.should_enable_module("assertions"));
-}
-
-#[test]
-fn test_should_enable_module_with_subtraction() {
-    let config = RuntimeConfig::from_libs(vec!["testing".into(), "-testing".into()]);
-    // Has both positive and negative, so should return false
-    assert!(!config.should_enable_module("testing"));
-}
-
-#[test]
-fn test_should_enable_module_subtraction_without_positive() {
-    let config = RuntimeConfig::from_libs(vec!["-testing".into()]);
-    // Only negative, no positive - should return false
-    assert!(!config.should_enable_module("testing"));
 }
 
 // ============================================================================
@@ -190,7 +161,7 @@ fn test_should_enable_module_subtraction_without_positive() {
 
 #[test]
 fn test_default_libs_public_paths_agree() {
-    let expected = vec!["std_all", "assertions", "testing", "regex", "json", "yaml"];
+    let expected = vec!["std_all"];
     assert_eq!(pasta_lua::runtime::default_libs(), expected);
     assert_eq!(pasta_lua::default_libs(), expected);
     assert_eq!(pasta_lua::loader::default_libs(), expected);
@@ -250,14 +221,16 @@ fn test_validate_and_warn_detects_std_all_unsafe() {
     assert!(config.libs.contains(&"std_all_unsafe".to_string()));
 }
 
-/// Test that validate_and_warn() correctly identifies env module as security-sensitive.
+/// `env` in libs no longer warns; `std_debug` still does (1.7).
+#[tracing_test::traced_test]
 #[test]
-fn test_validate_and_warn_detects_env_module() {
-    let config = RuntimeConfig::from_libs(vec!["std_all".into(), "env".into()]);
-    config.validate_and_warn();
+fn test_validate_and_warn_ignores_env_but_warns_std_debug() {
+    RuntimeConfig::from_libs(vec!["std_all".into(), "env".into()]).validate_and_warn();
+    assert!(!logs_contain("Security-sensitive module enabled"));
+    assert!(!logs_contain("Unsafe Lua librar"));
 
-    // Verify that the method correctly identifies env
-    assert!(config.should_enable_module("env"));
+    RuntimeConfig::from_libs(vec!["std_debug".into(), "env".into()]).validate_and_warn();
+    assert!(logs_contain("Unsafe Lua library enabled: std_debug"));
 }
 
 /// Test that validate_and_warn() respects subtraction for std_debug.
@@ -268,16 +241,6 @@ fn test_validate_and_warn_respects_debug_subtraction() {
 
     // Verify subtraction is detected
     assert!(config.libs.iter().any(|lib| lib == "-std_debug"));
-}
-
-/// Test that validate_and_warn() respects subtraction for env module.
-#[test]
-fn test_validate_and_warn_respects_env_subtraction() {
-    let config = RuntimeConfig::from_libs(vec!["env".into(), "-env".into()]);
-    config.validate_and_warn();
-
-    // Verify that env is effectively disabled via subtraction
-    assert!(!config.should_enable_module("env"));
 }
 
 /// Test that validate_and_warn() handles empty libs configuration.
@@ -298,7 +261,6 @@ fn test_validate_and_warn_minimal() {
     // Verify minimal has no security-sensitive options
     assert!(!config.libs.contains(&"std_debug".to_string()));
     assert!(!config.libs.contains(&"std_all_unsafe".to_string()));
-    assert!(!config.should_enable_module("env"));
 }
 
 // ============================================================================

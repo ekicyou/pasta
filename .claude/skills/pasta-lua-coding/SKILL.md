@@ -50,7 +50,7 @@ metadata:
 | 基本的なシーン定義                | DSL (`＊シーン名`)       | 可読性が高い                          |
 | 条件分岐を含む複雑なロジック      | Lua (シーン関数)         | DSLの制御構文は限定的                 |
 | カスタムSHIORIイベント処理        | Lua (REGテーブル)        | DSLではイベントハンドラを直接定義不可 |
-| 外部データ（JSON/YAML）の読み込み | Lua (`@json`/`@yaml`)    | DSLには外部ファイル操作機能なし       |
+| 外部データ（TOML）の読み込み      | Lua (`@toml`)            | DSLには外部ファイル操作機能なし       |
 
 **自己完結性**: 本スキルは別リポジトリにコピーして単体で機能する。pastaリポジトリ内の他ファイルへの参照に依存しない。
 
@@ -73,7 +73,7 @@ metadata:
 | [pasta-sakura-script.md](references/pasta-sakura-script.md) | 生成（マニュアルから） | [@pasta_sakura_script](https://ekicyou.github.io/pasta/lua/modules/pasta-sakura-script.html) | さくらスクリプト変換（ウェイト挿入・自動改行） |
 | [enc.md](references/enc.md) | 生成（マニュアルから） | [@enc](https://ekicyou.github.io/pasta/lua/modules/enc.html) | UTF-8 ⇔ ANSI の文字コード変換 |
 | [pasta-log.md](references/pasta-log.md) | 生成（マニュアルから） | [@pasta_log](https://ekicyou.github.io/pasta/lua/modules/pasta-log.html) | ロギング（trace/debug/info/warn/error） |
-| [mlua-stdlib.md](references/mlua-stdlib.md) | 生成（マニュアルから） | [mlua-stdlib 統合モジュール](https://ekicyou.github.io/pasta/lua/modules/mlua-stdlib.html) | `@json`・`@yaml`・`@regex`・`@assertions`・`@testing`・`@env` と Lua 標準ライブラリの構成 |
+| [toml.md](references/toml.md) | 生成（マニュアルから） | [@toml](https://ekicyou.github.io/pasta/lua/modules/toml.html) | TOML の文字列を Lua の表に変える（`decode` のみ） |
 | [shiori-events.md](references/shiori-events.md) | 生成（マニュアルから） | [SHIORI イベントとハンドラ](https://ekicyou.github.io/pasta/lua/shiori-events.html) | `REG`・`RES`・主要イベント・シーン関数フォールバック・仮想ディスパッチャ |
 | [startup.md](references/startup.md) | 生成（マニュアルから） | [起動シーケンスとモジュール解決](https://ekicyou.github.io/pasta/reference/startup.html) | モジュール検索パス・起動シーケンス・既知の制限・起動しないときの調べ方 |
 | [script-api.md](references/script-api.md) | 生成（マニュアルから） | [スクリプト用ランタイム API](https://ekicyou.github.io/pasta/lua/script-api.html) | ACT・WORD・GLOBAL・SAVE のスクリプト向け API |
@@ -111,16 +111,13 @@ metadata:
 | `pasta.shiori.event.register` | イベントハンドラ登録   | `REG.EventName = function(act) ... end`・重ねるときは `REG:register("EventName", fn)`（外す関数を返す） |
 | `pasta.shiori.res`            | SHIORIレスポンス       | `RES.ok()`, `RES.no_content()`                                       |
 
-### mlua-stdlib統合モジュール
+### 統合モジュール
 
-| モジュール    | 用途                   | デフォルト               |
-| ------------- | ---------------------- | ------------------------ |
-| `@json`       | JSON encode/decode     | ✅ 有効                   |
-| `@yaml`       | YAML encode/decode     | ✅ 有効                   |
-| `@regex`      | 正規表現               | ✅ 有効                   |
-| `@assertions` | アサーション           | ✅ 有効                   |
-| `@testing`    | テストフレームワーク   | ✅ 有効                   |
-| `@env`        | 環境変数・パスアクセス | ❌ 無効（セキュリティ上） |
+| モジュール | 用途                                 | デフォルト |
+| ---------- | ------------------------------------ | ---------- |
+| `@toml`    | TOML の文字列を Lua の表に（decode） | ✅ 常に有効 |
+
+JSON・YAML・正規表現のモジュールは無い。文字列は Lua 標準の `string.find`・`string.match`・`string.gsub` で調べる。
 
 ### DSL→Luaブリッジ基本形
 
@@ -155,9 +152,9 @@ end                                           -- 終了時に自動で出力（�
 
 ## §4 Runtime API
 
-Rust組み込みモジュールの完全APIリファレンス。モジュールの一覧と共通事項は [references/modules-index.md](references/modules-index.md)、各モジュールは 1 モジュール 1 ファイル。`@pasta_search`（シーン・単語の前方一致検索、テスト用セレクタ）、`@pasta_persistence`（セーブデータ永続化）、`@pasta_config`（`pcall`必須）、`@pasta_sakura_script`（ウェイト挿入・自動改行）、`@enc`（UTF-8⇔ANSI）、`@pasta_log`（ロギング、trace/debug/info/warn/error）。mlua-stdlib（`@json`, `@yaml`, `@regex`等）も含む。
+Rust組み込みモジュールの完全APIリファレンス。モジュールの一覧と共通事項は [references/modules-index.md](references/modules-index.md)、各モジュールは 1 モジュール 1 ファイル。`@pasta_search`（シーン・単語の前方一致検索、テスト用セレクタ）、`@pasta_persistence`（セーブデータ永続化）、`@pasta_config`（`pcall`必須）、`@pasta_sakura_script`（ウェイト挿入・自動改行）、`@enc`（UTF-8⇔ANSI）、`@pasta_log`（ロギング、trace/debug/info/warn/error）、`@toml`（TOML の decode）。
 
-> 📖 詳細: [references/modules-index.md](references/modules-index.md)（一覧）／[pasta-search.md](references/pasta-search.md)・[pasta-persistence.md](references/pasta-persistence.md)・[pasta-config.md](references/pasta-config.md)・[pasta-sakura-script.md](references/pasta-sakura-script.md)・[enc.md](references/enc.md)・[pasta-log.md](references/pasta-log.md)・[mlua-stdlib.md](references/mlua-stdlib.md)
+> 📖 詳細: [references/modules-index.md](references/modules-index.md)（一覧）／[pasta-search.md](references/pasta-search.md)・[pasta-persistence.md](references/pasta-persistence.md)・[pasta-config.md](references/pasta-config.md)・[pasta-sakura-script.md](references/pasta-sakura-script.md)・[enc.md](references/enc.md)・[pasta-log.md](references/pasta-log.md)・[toml.md](references/toml.md)
 
 ---
 
@@ -171,7 +168,7 @@ pasta.*名前空間の内部Luaモジュール。`STORE`（一元データ管理
 
 ## §6 SHIORI Handlers
 
-SHIORIイベントハンドラの登録と応答。`REG`テーブルに `function(act)` 形式のハンドラを登録し、リクエストは `act.req` で読む。ハンドラは `Value` にする文字列（またはシーンのコルーチン、`nil`）を返し、エンジンがそれを応答にする（`RES` はエンジンが応答文字列を作るモジュール）。同じイベントに重ねるときは `REG:register(id, fn)`（外す関数を返す。新しい順に呼び、真の値で止まり、全部見送れば `REG` の値やシーンへ回る）。主要イベント（OnBoot, OnClose, OnMouseDoubleClick, OnMouseMove, OnChoiceSelectEx等）のReference仕様。つつき・撫でのショートカット（`つっつき反応…`・`さわり反応…` を段々に探す既定ハンドラ）。`OnTalk`/`OnHour`を自動発行する仮想ディスパッチャ。`OnChoiceSelectEx`選択肢自動ルーティング。デバッグが有効なときに名前か位置で指名したシーンを再生する `OnPastaScene`・`OnPastaSceneAt`（SSP の MCP の `raise_event` からの呼び方）。外から `＞名前` と同じ呼び出しをする `OnPastaCallFunction` と、グローバル変数に JSON の値を代入する `OnPastaSetSaveVariable`。REG未登録時のシーン関数フォールバック。
+SHIORIイベントハンドラの登録と応答。`REG`テーブルに `function(act)` 形式のハンドラを登録し、リクエストは `act.req` で読む。ハンドラは `Value` にする文字列（またはシーンのコルーチン、`nil`）を返し、エンジンがそれを応答にする（`RES` はエンジンが応答文字列を作るモジュール）。同じイベントに重ねるときは `REG:register(id, fn)`（外す関数を返す。新しい順に呼び、真の値で止まり、全部見送れば `REG` の値やシーンへ回る）。主要イベント（OnBoot, OnClose, OnMouseDoubleClick, OnMouseMove, OnChoiceSelectEx等）のReference仕様。つつき・撫でのショートカット（`つっつき反応…`・`さわり反応…` を段々に探す既定ハンドラ）。`OnTalk`/`OnHour`を自動発行する仮想ディスパッチャ。`OnChoiceSelectEx`選択肢自動ルーティング。デバッグが有効なときに名前か位置で指名したシーンを再生する `OnPastaScene`・`OnPastaSceneAt`（SSP の MCP の `raise_event` からの呼び方）。外から `＞名前` と同じ呼び出しをする `OnPastaCallFunction` と、グローバル変数に Reference2 の型（既定 `string`・`number`・`boolean`・`delete`）で値を代入する `OnPastaSetSaveVariable`。REG未登録時のシーン関数フォールバック。
 
 > 📖 詳細: [references/shiori-events.md](references/shiori-events.md)
 

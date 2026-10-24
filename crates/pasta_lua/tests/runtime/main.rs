@@ -23,7 +23,6 @@ mod runtime_toggle_e2e_step_test;
 mod scene_identity_format_test;
 mod scene_test;
 mod source_map_handoff_test;
-mod stdlib_modules_test;
-mod stdlib_regex_test;
 mod syntax_test;
+mod toml_module_test;
 mod unit_test;
