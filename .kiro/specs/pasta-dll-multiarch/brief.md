@@ -111,3 +111,9 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 - **見つけた穴・古くなった記述**
   - 上の行番号のずれ。`.cargo/config.toml` の頭の説明「出荷ターゲットは x86（i686）・x64（x86_64）の両方」は 9 行でなく 11 行にある。x64 で配っているのは `pasta_check.exe` だけで、x64 の pasta.dll は配っていない（すぐ直せる誤り。arch を足すときに書き直してもよい）。
   - aarch64 で LuaJIT（mlua の同梱版）をビルドできるかは、まだ試していない（前のまま。mlua 0.12 へ上げた後で試すほうが、試し直しが要らない）。
+
+## shiori4 0.1.0 への合わせ（2026-10-24 の `/kiro-discovery`）
+
+- shiori4 の 0.1.0 が 2026-10-24 に出た。名前の決まり（abi-conventions の論点 12）は、教科書の配布の決まり `doc/textbook/distribution.md` に書かれ、`shiori4_host` の `shiori_file_candidates` が同じ順を返す（`pasta.dll` に対し、x64 は `pasta.x64.dll` → `pasta.dll`、arm64 は `pasta.arm64.dll` →（x64 を起こせるホストだけ）`pasta.x64.dll` → `pasta.dll`）。上の Approach の名前は、そのまま合っている。
+- 0.1.0 は 0.0.2 以前と二進互換でない（応答の `out` をホストが作る）。areka の版 4・版 3 の読み込みは 0.1.0 で作り直すので、この spec の x64・arm64 の pasta.dll も、0.1.0 の `shiori4_abi` で作った `shiori4-v3-portable` の入口が前提になる（先に要るものは変わらない）。
+- 試験用のホスト `shiori4-testhost`（`shiori4_host` 0.1.0 の example）で、x64 の pasta.dll を x64 のランナーで 1 往復させられる（`shiori4-v3-portable` が `build.yml` に足す段を、arch ごとに回せる）。arm64 は、ランナーがあるときだけ。

@@ -156,3 +156,19 @@ shiori4 の spec `host-protocol` の要件が、2026-10-24 に確定した（開
   - **`req.version`**: 版の数をやめ、入口の種類（v4・v3・旧来）を表す印にする方向で考える。印は、上の In の「版 4 で読まれたかどうかの印」と同じものにする。
   - **入れる時期**: 0.4.3 の `shiori4-v3-portable` は今の全文の形のまま入れる。版 3 の口は全文を受けるので、そのままでよい。作り直しは、この spec（0.5.0）で行う。
 - **触るファイル（足すもの）**: `pasta_shiori/src/lua_request.rs`・`util/parsers/{req_parser.pest,req.rs}`・`error.rs`・`actor/marshaling.rs`（ゴールデン）・`pasta_lua/pasta_scripts/pasta/shiori/res.lua`。ファイルの重なりも見直す。`ponytail-shiori`（`windows.rs`・`actor/`）と `ponytail-lua-scripts`（`res.lua`）が重なる。
+
+## shiori4 0.1.0 への合わせ（2026-10-24 の `/kiro-discovery`）
+
+shiori4 の 0.1.0 が 2026-10-24 に出た（crates.io の `shiori4_abi`・`shiori4`・`shiori4_host`、GitHub のタグ `v0.1.0`。shiori4 の PR や教科書の「0.0.3」は 0.1.0 のこと）。`abi-conventions`・`host-protocol` は shiori4 の main に入り、この版で crates.io に出た。上の Constraints の「shiori4 の spec が main に入り、crates.io に出た版を使う」と、2026-10-23 の再測定の「先に要るもの」の shiori4 の分は満ちた。残る先に要るものは `shiori4-v3-portable` と、実機の areka v0.2.0。
+
+- **正本の置き場所**（上の 2026-10-24 の節の「正本の置き場所は後で知らせが来る」の答え）: 規約の正本は C ヘッダ `shiori4_abi/include/shiori4_abi.h` の冒頭と、`shiori4_abi` のクレート冒頭の `//!`。ホストとの語は `doc/host-protocol.md`。読みやすく言い直したものが教科書 `doc/textbook/`（規約の一覧 `rules.md`・移行の手引き `migration.md`・試験用のホスト `testhost.md` など）。食い違ったら正本が正しい。
+- **二進互換でない変更（shiori4 #11）と、この spec への効き目**:
+  - 応答の `out` は常にホストが作り、SHIORI は `ShioriHostApi` の末尾の `copy_from_slice` で写す。`shiori4_abi` の `ShioriApi::new` が作るテーブルの関数がこれを行うので、pasta は写しのコードを書かない。版 4 の `load` も `copy_from_slice` の欄が無いテーブル（`struct_size` が足りない）なら、`SHIORI_E_UNSUPPORTED` の 1 行を `log` に出して NULL を返す（`shiori4_abi` が行う）。
+  - `release` は常にホストの関数で、unload の後でも、どのスレッドからでも呼べる（スレッド規約 6）。join しない pasta のアクターが unload の後に応答を捨てても、規約の内である。
+  - Rust の `ShioriHostApi` の `request`・`post`・`log` の欄は `Option` になった。pasta は `ShioriHostHandle`（同期の `request`。SHIORI のスレッドだけ）と `ShioriHostPoster`（`post`・`log`。任意のスレッド）を通して呼ぶので、欄を直に読まない。欄を直に読む作りにするなら、NULL を確かめる。
+- **0.1.0 にあって、この spec で使えるもの**:
+  - `ShioriHostPoster` は、unload を始めた時点で無効になる（`post` は `SHIORI_E_SHUTDOWN`、`log` は何もしない。どちらもホストに触れない。スレッド規約 5）。上の Approach の「unload を始めた時点で poster を無効にする」は、shiori4 のクレートがこの作りで持っている。pasta が自前で無効化を持つかは、要件で決める。
+  - `shiori4` の `Ghost` の文書に、「アクターは `host.request` を呼ばず、問い合わせを channel で応答を待っている SHIORI のスレッドへ送り、SHIORI のスレッドが中継する」例がある（`shiori4/src/lib.rs` の「例: アクターの中継（スレッド規約 2）」）。pasta の中継はこの形で作る。
+  - 試験用のホスト `shiori4-testhost`（`shiori4_host` の example）は、`--entry` を省くと版 4 から試し、`-H "名前: 値"` でヘッダを足せる。版 4 を足したら、CI の段（`shiori4-v3-portable` が足す）で版 4 も 1 往復させられる。
+  - 書き出しのマクロ `export_shiori!` は、版 4 を求められると版 4 のテーブルを返し、`SUPPORTS_V3` なら版 3 も返す。版 4 を足すこの spec で、`shiori4-v3-portable` の自前の `shiori_get_api`（版 3 だけを返す）を、このマクロに替えてよい。
+- **旧来の入口の段の分け方**（`shiori4-v3-portable` の 2026-10-24 の節で決めた）: HGLOBAL の入口は shiori4 のクレートへ移さず pasta に残す。この spec で、従来の口と版 3 の口の開始行と `Charset` の変換に `shiori4::v3::{parse_request, response}` を使えるかを測る（使えば変換は shiori4 に寄る）。`shiori4::v3::parse_request` は SHIORI/2.x の開始行（今の pest の `header2`）を 400 にするので、従来の口で 2.x を受け続けるかも、ここで決める。
