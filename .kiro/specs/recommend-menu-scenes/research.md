@@ -281,3 +281,33 @@
 - 実機の試験を実装の最初に回したのは、外れたときの直しが ChoiceReceiver の中だけで済み、設計の骨組み（その場で動かす道・並びの記憶・別名表の合成）に響かないため。
 - 細かい仮定（ボタンの名前の別名の順・引数の型・Call の引数・台詞の検査の範囲・Reference の数え方）は、どれも今ある決まりのままにして新しい規則を作らないため、仮定のまま確定した。
 - `sections.rs` の注釈は、ウェーブの約束（`toml-serialization` の持ち場）を守るため後回しにした。
+
+## 11. SSP の実機の試験（タスク 1、2026-10-24）
+
+HEAD（0fb36bd1）から作った pasta.dll（i686 release）を、スクラッチパッドに複製した hello-pasta（name を `hello-pasta-wt` に変えた）に置き、`ssp.exe --option readonly --ghost "<絶対パス>"` で立てた試験用の SSP（普段の SSP は起動していなかった）で確かめた。辞書は変えず、`scripts/main.lua` の `REG` で次の値を返した。
+
+- `REG["sakura.recommendsites"]`: A（`https://www.iana.org/domains/reserved`）・区切り線・B（`https://www.iana.org/about`）・C（`script:\![raise,OnRecommendTestScript]`）。各項目は `名前\1URL\1\1\2`、区切り線は `-\1\1\1\2`（Emily/Phase4 と同じ形、選択時トークの欄は空）。
+- `REG["kero.recommendsites"]`: K の 1 つ。`REG["sakura.portalsites"]`: P1・区切り線・P2。`REG["sakura.recommendbuttoncaption"]`: `本棚`。
+- `REG.OnRecommendsiteChoice`: Reference0〜6 を `@pasta_log` の info に出し、B・P2 のときは `nil`（204）、ほかは台詞（200）を返す。
+
+結果:
+
+| 確かめたこと | 結果 |
+|---|---|
+| ボタンの名前 | 本体のメニューのボタンが「本棚」になった。相方は既定の「おすすめ(R)」 |
+| 区切り線と各項目の後ろの `\2` | サブメニューに A・区切り線・B・C と並び、表示は崩れない（Open Questions 4） |
+| 200 で答えたとき URL が開くか | 開く。A を選ぶと台詞を話し、Edge に `IANA-managed Reserved Domains` が開いた（Open Questions 1） |
+| 204 で答えたとき URL が開くか | 開く。B を選ぶと Edge に `About us` が開いた |
+| `script:` の URL | C を選ぶと `\![raise,OnRecommendTestScript]` が走り、そのイベントの台詞を話した。`OnRecommendsiteChoice` も届く |
+| 本体のおすすめの Reference | A: `R3=recommend R4=0 R5=0`、B: `R5=2`、C: `R5=3`（Reference5 は区切り線も 1 つと数える。Open Questions 2） |
+| 相方のおすすめの Reference | K: `R3=recommend R4=1 R5=0` |
+| ポータルの Reference | P2: `R3=portal R4=0 R5=2`（ポータルでも区切り線を数える） |
+| Reference2 | バナーなしの項目では空文字列 |
+
+決まったこと:
+
+- SSP は `OnRecommendsiteChoice` の応答（200・204 のどちら）にかかわらず URL を開く。ChoiceReceiver に URL を開くさくらスクリプトは**足さない**（設計ディスカッションの決定 1 のとおり、設計は変えない）。
+- `find_chosen` は design.md のとおり `Reference5 + 1` 番目を区切り線も数えて引けば一致する（数えない場合の落ち先もそのまま残す）。Reference3・4 の読み方も design.md の仮定どおり。
+- `\p[2]` 以上のキャラクターを持つシェルでの `char*` の Reference4 は、手元に無いため確かめていない（決定 6 のとおり公開後の確認に回す）。
+
+試験の後始末: 試験用の SSP は `OnPastaCallFunction`（`ゴースト終了`）で閉じた。複製のゴーストと pasta.dll はスクラッチパッドにだけ置き、リポジトリには入れていない。

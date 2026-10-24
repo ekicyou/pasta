@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. SSP の実機で、メニューの値と選んだときの動きを確かめる
+- [x] 1. SSP の実機で、メニューの値と選んだときの動きを確かめる
   - 受け手を書く前に、作者の `REG` で値を返す小さな辞書で、設計の Open Questions 1〜4 の仮定を確かめる（設計ディスカッションの決定 1）
   - 環境変数 `NoDefaultCurrentDirectoryInExePath` を外して pasta.dll をビルドし、スクラッチパッドに複製した hello-pasta（name を `hello-pasta-wt` に変える）に `release.ps1` で pasta.dll と scripts を置いて、readonly・別ポートの SSP で起動する（普段の SSP には触らない。閉じるときは `\-` を送る）
   - `REG["sakura.recommendsites"]`・`REG["kero.recommendsites"]`・`REG["sakura.portalsites"]` が Emily/Phase4 と同じ形（各項目の後ろにバイト値 2、選択時トークの欄は空）の値を返し、`REG.OnRecommendsiteChoice` が台詞を返す版で、項目を選んだときに URL が開くか・台詞が話すか・`script:` の URL が走るか・区切り線の後の表示が崩れないかを見る
