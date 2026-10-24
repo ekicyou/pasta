@@ -514,9 +514,9 @@ mod tests {
         }
     }
 
-    /// 後段で失敗しても --nar の位置に前回の nar が残らない（Req 8.8）
+    /// 無い --copy は確かめで断り、前回の nar が中身ごと残る（Req 1.7・8.6）
     #[test]
-    fn test_execute_release_removes_stale_nar_on_failure() {
+    fn test_execute_release_keeps_stale_nar_when_check_rejects() {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
@@ -533,8 +533,9 @@ mod tests {
             copy_dirs: vec![temp.path().join("no_such_overlay")],
         };
 
-        assert!(execute_release(&args).is_err());
-        assert!(!nar.exists());
+        let err = execute_release(&args).unwrap_err();
+        assert!(err.to_string().ends_with("does not exist"), "{err}");
+        assert_eq!(fs::read_to_string(&nar).unwrap(), "old nar");
     }
 
     /// 成功時は前回の nar が新しい nar に置き換わる（Req 8.8）

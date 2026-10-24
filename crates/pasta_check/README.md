@@ -84,6 +84,8 @@ pasta_check release --target <path> --release <path> --nar <path> [--copy <path>
 
 段 1 は `--release` を消して作り直し、`--nar` の位置のファイルを消すので、段 1 より前に引数の関係を確かめ、次の組み合わせを断ります。
 
+その前に、`--target` と各 `--copy`（渡した順）が無いとき・フォルダでないときは、`Error: --target (C:\dev\myghost) does not exist`（フォルダでないときは `... is not a directory`）を出して断ります。
+
 | 組み合わせ | 断る関係 |
 |-----------|---------|
 | `--release` と `--target` | 同じ・`--release` が含む・`--release` が中にある |
@@ -91,7 +93,7 @@ pasta_check release --target <path> --release <path> --nar <path> [--copy <path>
 | `--nar` と `--release`・`--target`・各 `--copy` | 同じ・`--nar` が中にある |
 
 - 関係はパスを絶対の形にし、在る部分を正規化してから部品ごとに比べます（相対パス・`..`・Windows の大文字と小文字の違いでも同じ場所なら断ります）。名前の頭が同じだけの隣（`release\hello` と `release\hello.nar`）は断りません
-- 調べる順は表の上から（`--copy` は渡した順）で、最初に当たった 1 つを `Error: --release (C:\dev) must not contain --target (C:\dev\myghost)` のように、渡したままのパスを含む英語の 1 行で出し、終了コード 1 で終わります
+- 調べる順は、まず無い・フォルダでない入力（`--target`、各 `--copy` の順）、次に表の上から（`--copy` は渡した順）で、最初に当たった 1 つを `Error: --release (C:\dev) must not contain --target (C:\dev\myghost)` のように、渡したままのパスを含む英語の 1 行で出し、終了コード 1 で終わります
 - 止まったときは何も消しません。段の表示（`[1/6]`）を出さず、配布フォルダの中身・前回の NAR・開発フォルダのファイルはそのまま残り、まだ無いフォルダも作りません
 
 #### 辞書の検査の関門（段 4）
@@ -143,6 +145,7 @@ pasta_check release `
 
 - 段 1 で配布フォルダを準備した後に `--nar` の位置の前回の NAR を削除する（`--nar` がフォルダなど削除できないときは段 1 でエラー）
 - 段 6 で失敗したときは作りかけの NAR も削除する。削除した後の段でエラーになったときは `--nar` の位置に NAR が残らない（古い NAR を最新と誤って配らないため）
+- 段 1 の前の確かめ（無い入力のフォルダを含む）で止まったときは、何も消さない。前回の NAR もそのまま残る
 
 ### NAR（ZIP）封入規則
 

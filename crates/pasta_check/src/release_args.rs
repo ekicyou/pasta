@@ -21,6 +21,11 @@ enum Relation {
 /// 段 1 の前に引数の関係を確かめる（読み取りだけ・何も作らない・消さない）。
 /// 最初に見つかった 1 つを Err で返す。
 pub(crate) fn check_release_args(args: &ReleaseArgs) -> io::Result<()> {
+    // 無い入力は関係より先に断る（渡した順）
+    require_dir("--target", &args.target)?;
+    for copy in &args.copy_dirs {
+        require_dir("--copy", copy)?;
+    }
     let release = resolve(&args.release)?;
     let nar = resolve(&args.nar)?;
     let mut inputs = vec![("--target", &args.target, resolve(&args.target)?)];
@@ -42,6 +47,22 @@ pub(crate) fn check_release_args(args: &ReleaseArgs) -> io::Result<()> {
         }
     }
     Ok(())
+}
+
+/// 入力のフォルダが在ってフォルダであること
+fn require_dir(option: &str, path: &Path) -> io::Result<()> {
+    match fs::metadata(path) {
+        Ok(meta) if meta.is_dir() => Ok(()),
+        Ok(_) => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("{option} ({}) is not a directory", path.display()),
+        )),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("{option} ({}) does not exist", path.display()),
+        )),
+        Err(e) => Err(path_error(e, "read", path)),
+    }
 }
 
 /// 断る文: `--a (<A>) must not <関係> --b (<B>)`
@@ -168,6 +189,53 @@ mod tests {
             "author"
         );
         assert_eq!(fs::read_to_string(&f.nar).unwrap(), "old nar");
+    }
+
+    /// 無い・フォルダでない入力を、関係より先に断る（1.7・1.8）。目印と前回の nar が残る
+    #[test]
+    fn test_rejects_missing_or_file_inputs() {
+        let f = fixture();
+        let missing = f.dev.join("no_such_ghost");
+        let file = f.ghost.join("author.txt");
+        let no_copy = f.dev.join("no_such_overlay");
+        // --release を --target と同じにしても、無いことを先に示す
+        for (target, copy, expected, kind) in [
+            (
+                &missing,
+                &f.overlay,
+                format!("--target ({}) does not exist", missing.display()),
+                io::ErrorKind::NotFound,
+            ),
+            (
+                &file,
+                &f.overlay,
+                format!("--target ({}) is not a directory", file.display()),
+                io::ErrorKind::InvalidInput,
+            ),
+            (
+                &f.ghost,
+                &no_copy,
+                format!("--copy ({}) does not exist", no_copy.display()),
+                io::ErrorKind::NotFound,
+            ),
+        ] {
+            let a = ReleaseArgs {
+                target: target.clone(),
+                release: target.clone(),
+                nar: f.nar.clone(),
+                copy_dirs: vec![f.overlay.clone(), copy.clone()],
+            };
+            let err = execute_release(&a).unwrap_err();
+            assert_eq!(err.kind(), kind, "{err}");
+            assert_eq!(err.to_string(), expected);
+            for dir in [&f.ghost, &f.overlay, &f.release] {
+                assert_eq!(
+                    fs::read_to_string(dir.join("marker.txt")).unwrap(),
+                    "marker"
+                );
+            }
+            assert_eq!(fs::read_to_string(&f.nar).unwrap(), "old nar");
+        }
     }
 
     /// 再現 B: --release が --target と同じ（1.1）
