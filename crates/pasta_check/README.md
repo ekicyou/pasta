@@ -80,6 +80,20 @@ pasta_check release --target <path> --release <path> --nar <path> [--copy <path>
 [6/6] Creating NAR archive       ← --release を ZIP 圧縮して --nar に出力
 ```
 
+#### 引数の確かめ（段 1 の前）
+
+段 1 は `--release` を消して作り直し、`--nar` の位置のファイルを消すので、段 1 より前に引数の関係を確かめ、次の組み合わせを断ります。
+
+| 組み合わせ | 断る関係 |
+|-----------|---------|
+| `--release` と `--target` | 同じ・`--release` が含む・`--release` が中にある |
+| `--release` と各 `--copy` | 同じ・`--release` が含む・`--release` が中にある |
+| `--nar` と `--release`・`--target`・各 `--copy` | 同じ・`--nar` が中にある |
+
+- 関係はパスを絶対の形にし、在る部分を正規化してから部品ごとに比べます（相対パス・`..`・Windows の大文字と小文字の違いでも同じ場所なら断ります）。名前の頭が同じだけの隣（`release\hello` と `release\hello.nar`）は断りません
+- 調べる順は表の上から（`--copy` は渡した順）で、最初に当たった 1 つを `Error: --release (C:\dev) must not contain --target (C:\dev\myghost)` のように、渡したままのパスを含む英語の 1 行で出し、終了コード 1 で終わります
+- 止まったときは何も消しません。段の表示（`[1/6]`）を出さず、配布フォルダの中身・前回の NAR・開発フォルダのファイルはそのまま残り、まだ無いフォルダも作りません
+
 #### 辞書の検査の関門（段 4）
 
 - 段 4 は validate と同じ形で問題とまとめの行を出します
@@ -160,6 +174,7 @@ pasta_check/
 │   ├── main.rs          # CLI 引数解析（lexopt）・ディスパッチ
 │   ├── validate_cmd.rs  # validate サブコマンド（ghost/master のファイルを集めて核を呼ぶ・release の段 4 も使う）
 │   ├── release.rs       # release サブコマンド（6ステップパイプライン）
+│   ├── release_args.rs  # release の引数の確かめ（段 1 の前に危ない組み合わせを断る）
 │   ├── copy.rs          # 再帰コピー・release フォルダー初期化
 │   ├── balloon.rs       # 同梱バルーン判定（install.txt・descript.txt の読み取り）
 │   ├── update_files.rs  # updates.txt 生成（MD5・ISO 8601 日時）

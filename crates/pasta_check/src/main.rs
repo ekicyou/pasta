@@ -2,10 +2,12 @@ mod balloon;
 mod copy;
 mod nar;
 mod release;
+mod release_args;
 mod update_files;
 mod validate_cmd;
 
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
 use std::process;
 
 /// コマンドライン引数
@@ -37,6 +39,12 @@ pub struct ReleaseArgs {
 pub struct ValidateArgs {
     /// ゴースト開発フォルダーパス (--target)
     pub target: PathBuf,
+}
+
+/// I/O の誤りに、操作とパスを英語で添える（kind は元のまま）。
+/// 文: "cannot {action} {path}: {元の誤り}"
+pub(crate) fn path_error(e: io::Error, action: &str, path: &Path) -> io::Error {
+    io::Error::new(e.kind(), format!("cannot {action} {}: {e}", path.display()))
 }
 
 fn main() {

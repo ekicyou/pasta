@@ -2,6 +2,7 @@ use crate::ReleaseArgs;
 use crate::balloon::plan_bundled_balloons;
 use crate::copy::{copy_dir_recursive, prepare_release_dir};
 use crate::nar::create_nar;
+use crate::release_args::check_release_args;
 use crate::update_files::generate_update_files;
 use crate::validate_cmd::{ValidateOutcome, run_on_master};
 use std::fs;
@@ -10,6 +11,9 @@ use std::path::Path;
 
 /// release サブコマンドを実行
 pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
+    // 段の表示より前に、危ない組み合わせを何にも触れずに断る
+    check_release_args(args)?;
+
     // Step 1: リリースフォルダー初期化
     println!("[1/6] Preparing release folder...");
     prepare_release_dir(&args.release)?;
