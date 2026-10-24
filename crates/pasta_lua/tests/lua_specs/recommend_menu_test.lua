@@ -408,3 +408,181 @@ describe("recommend_menu - EVENT.fire を通す", function()
         end)
     end)
 end)
+
+-- ============================================================================
+-- 3.3: ほかの状態に触れずにその場で 1 回だけ動かす（InPlaceRun）
+-- 依存閉包を同一インスタンス集合として読み直す（chain_talk_interrupt_test と同じ）。
+-- ============================================================================
+
+local RELOAD = {
+    "pasta.shiori.entry", "pasta.shiori.event", "pasta.shiori.event.register",
+    "pasta.shiori.event.callback", "pasta.shiori.event.boot", "pasta.shiori.event.choice_select",
+    "pasta.shiori.event.second_change", "pasta.shiori.event.mouse", "pasta.shiori.event.scene_play",
+    "pasta.shiori.event.kick", "pasta.shiori.event.external_control",
+    "pasta.shiori.event.virtual_dispatcher", MODULE, "pasta.shiori.res", "pasta.shiori.stop",
+    "pasta.shiori.act", "pasta.shiori.sakura_builder", "pasta.act", "pasta.actor", "pasta.scene",
+    "pasta.word", "pasta.global", "pasta.store", "pasta.config", "pasta.save",
+}
+
+--- 状態の写し（関数・スレッド・表の同一性も字にして比べる）
+--- 写しのために作る外側の表（root）は同一性を見ない
+local function snapshot(value, seen)
+    if type(value) ~= "table" then return tostring(value) end
+    local root = seen == nil
+    seen = seen or {}
+    if seen[value] then return "<cycle>" end
+    seen[value] = true
+    local keys = {}
+    for k in pairs(value) do keys[#keys + 1] = k end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    local parts = { root and "" or tostring(value) }
+    for _, k in ipairs(keys) do
+        parts[#parts + 1] = tostring(k) .. "=" .. snapshot(value[k], seen)
+    end
+    return "{" .. table.concat(parts, ",") .. "}"
+end
+
+--- メニューのシーンが触れてはならない状態の写し
+local function guarded(STORE, CALLBACK)
+    return snapshot({
+        co_scene = STORE.co_scene, co_preempt = STORE.co_preempt,
+        actor_spots = STORE.actor_spots, appearance = STORE.appearance,
+        last_global_scene = STORE.last_global_scene, auto_talk_paused = STORE.auto_talk_paused,
+        pending = CALLBACK.pending, staged = CALLBACK.has_staged(),
+    })
+end
+
+--- 読み直した集合で状態を作り、id のメニューのシーン fn を置いて body(ctx) を走らせる
+--- ctx: STORE・CALLBACK・ENTRY・REG・ask()（受け手を 1 回呼ぶ）・warns・before（呼ぶ前の写し）
+local function with_menu(fn, body)
+    local id = "sakura.recommendsites"
+    for _, name in ipairs(RELOAD) do package.loaded[name] = nil end
+    local names = { [id] = { "rms_ip_1" }, ["チェイントーク中断"] = { "rms_ip_chudan" } }
+    local chudan_ran = false
+    local ctx = { warns = {} }
+    local noop = function() end
+    with_loaded({
+        ["@pasta_search"] = make_search(names),
+        ["@pasta_log"] = {
+            trace = noop, debug = noop, info = noop, error = noop,
+            warn = function(msg) ctx.warns[#ctx.warns + 1] = msg end,
+        },
+    }, function()
+        ctx.ENTRY = require("pasta.shiori.entry")
+        ctx.STORE = require("pasta.store")
+        ctx.CALLBACK = require("pasta.shiori.event.callback")
+        ctx.REG = require("pasta.shiori.event.register")
+        local STORE = ctx.STORE
+        STORE.reset()
+        ctx.CALLBACK.reset()
+        -- STORE.reset が登録したシーンも消すので、その後に登録する
+        local scene = require("pasta.scene")
+        scene.register("rms_ip_1", "__start__", fn)
+        scene.register("rms_ip_chudan", "__start__", function() chudan_ran = true end)
+        STORE.actors = { sakura = { name = "さくら", spot = 0 } }
+        -- 待っているチェイントークの続き・持ち越し・最後のグローバルシーン・ほかの待ちを置く
+        STORE.co_scene = coroutine.create(function() coroutine.yield() end)
+        coroutine.resume(STORE.co_scene)
+        STORE.co_preempt[STORE.co_scene] = true
+        STORE.actor_spots = { ["さくら"] = 1 }
+        STORE.last_global_scene = "rms_before"
+        ctx.CALLBACK.pending["999"] = { co = STORE.co_scene, timeout_at = 1 }
+        ctx.before = guarded(STORE, ctx.CALLBACK)
+        ctx.ask = function()
+            return ctx.REG[id](require("pasta.shiori.act").new(STORE.actors,
+                { id = id, method = "get", reference = {} }))
+        end
+        local ok, err = pcall(body, ctx)
+        expect(chudan_ran):toBe(false)
+        STORE.reset()
+        ctx.CALLBACK.reset()
+        if not ok then error(err, 0) end
+    end)
+end
+
+describe("recommend_menu - ほかの状態に触れない", function()
+    test("区切り（＞チェイントーク）で打ち切り、続き・持ち越し・待ちは変わらない", function()
+        with_menu(function(act)
+            local STORE = require("pasta.store")
+            act:call(nil, "おすすめ項目", {}, "前", "u")
+            act:set_spot("sakura", 2)
+            act:talk(STORE.actors.sakura, "TALK")
+            act:surface(5)
+            STORE.last_global_scene = "rms_menu"
+            act:call(nil, "チェイントーク", {})
+            act:call(nil, "おすすめ項目", {}, "後", "u")
+        end, function(ctx)
+            expect(ctx.ask()):toBe("前\1u\1\1\2")
+            expect(guarded(ctx.STORE, ctx.CALLBACK)):toBe(ctx.before)
+        end)
+    end)
+
+    test("自動トークを止めているときの区切りは再開しない", function()
+        with_menu(function(act)
+            act:call(nil, "おすすめ項目", {}, "前", "u")
+            act:yield()
+        end, function(ctx)
+            ctx.STORE.auto_talk_paused = true
+            ctx.before = guarded(ctx.STORE, ctx.CALLBACK)
+            local GLOBAL = require("pasta.global")
+            local resumed = 0
+            local real = GLOBAL.resume_auto_talk
+            GLOBAL.resume_auto_talk = function() resumed = resumed + 1 end
+            local result = ctx.ask()
+            GLOBAL.resume_auto_talk = real
+            expect(result):toBe("前\1u\1\1\2")
+            expect(resumed):toBe(0)
+            expect(ctx.STORE.auto_talk_paused):toBe(true)
+            expect(guarded(ctx.STORE, ctx.CALLBACK)):toBe(ctx.before)
+            expect(#ctx.warns):toBe(0)
+        end)
+    end)
+
+    test("get_property で打ち切り、warn を 1 行出して予約を残さない", function()
+        with_menu(function(act)
+            act:call(nil, "おすすめ項目", {}, "前", "u")
+            act:get_property("currentghost.name")
+            act:call(nil, "おすすめ項目", {}, "後", "u")
+        end, function(ctx)
+            expect(ctx.ask()):toBe("前\1u\1\1\2")
+            expect(ctx.CALLBACK.has_staged()):toBe(false)
+            expect(guarded(ctx.STORE, ctx.CALLBACK)):toBe(ctx.before)
+            expect(#ctx.warns):toBe(1)
+            expect(ctx.warns[1]):toBe("recommend menu: sakura.recommendsites: "
+                .. "get_property is not available in a menu scene; the scene was cut there")
+        end)
+    end)
+
+    test("変数の代入は打ち切りの後も残る", function()
+        with_menu(function(act)
+            act.save.rms_kept = "kept"
+            act:call(nil, "おすすめ項目", {}, "前", "u")
+            act:yield()
+            act.save.rms_kept = "after"
+        end, function(ctx)
+            ctx.ask()
+            local SAVE = require("pasta.save")
+            expect(SAVE.rms_kept):toBe("kept")
+            SAVE.rms_kept = nil
+        end)
+    end)
+
+    test("実行時エラーは表記なしの 500 と X-Error-Reason になり、状態は変わらない", function()
+        with_menu(function(act)
+            local STORE = require("pasta.store")
+            act:call(nil, "おすすめ項目", {}, "前", "u")
+            STORE.last_global_scene = "rms_menu"
+            act:talk(STORE.actors.sakura, "TALK")
+            error("rms boom")
+        end, function(ctx)
+            local res = ctx.ENTRY.request({
+                id = "sakura.recommendsites", method = "get", version = 30, reference = {},
+                security_level = "local",
+            })
+            expect(res:find("500 Internal Server Error", 1, true) ~= nil):toBe(true)
+            expect(res:find("X%-Error%-Reason: [^\r\n]*rms boom") ~= nil):toBe(true)
+            expect(res:find("Value:", 1, true)):toBeNil()
+            expect(guarded(ctx.STORE, ctx.CALLBACK)):toBe(ctx.before)
+        end)
+    end)
+end)

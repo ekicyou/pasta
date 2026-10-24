@@ -96,14 +96,23 @@ GLOBAL["おすすめ区切り"] = GLOBAL.recommend_separator
 -- ============================================================================
 
 local REG = require("pasta.shiori.event.register")
+local CALLBACK = require("pasta.shiori.event.callback")
+local STORE = require("pasta.store")
+local ACT = require("pasta.act")
 
 --- MenuMemory: リソースの ID → 最後に開いたときの並び（メモリ上だけ。OnRecommendsiteChoice が読む）
 --- 読む側（OnRecommendsiteChoice の受け手）を置くまでは書くだけなので、未使用の警告を止める
 ---@type table<string, RecommendItem[]>
 local last = {} -- luacheck: ignore 241
 
+--- 区切り: 自動トークを再開せず、組み立てずに止める（resume は 1 回だけなので続きは捨てる）
+local function cut()
+    coroutine.yield()
+end
+
 --- メニューのシーンをその場で 1 回だけ動かし、積んだ項目を返す（シーンが無ければ nil）
---- EVENT.drive・set_co_scene・wrap_scene を通さない。続きのコルーチンは参照を外して捨てる
+--- EVENT.drive・set_co_scene・wrap_scene を通さない。続きのコルーチンは参照を外して捨てる。
+--- STORE は last_global_scene の控えと戻しのほかに触れない（変数の代入は取り消さない）
 ---@param act ShioriAct
 ---@param id string
 ---@return RecommendItem[]|nil
@@ -114,10 +123,23 @@ local function run_menu(act, id)
     if type(fn) ~= "function" then return nil end
     local items = { id = id, calls = 0 }
     act._recommend_items = items
+    -- インスタンスの欄で区切りを差し替える: 持ち越し（立ち位置・表情）に触れない組み立てと、
+    -- 自動トークを再開しない区切り。get_property も self:build()・yield で区切る
+    act.build = ACT.IMPL.build
+    act.yield = cut
+    local last_global_scene = STORE.last_global_scene
     local ok, err = coroutine.resume(coroutine.create(fn), act)
+    -- 成否にかかわらず: この要求で積まれたコールバック待ちを捨て、控えを戻す
+    local waited = CALLBACK.has_staged()
+    CALLBACK.discard_staged()
+    STORE.last_global_scene = last_global_scene
     -- 台詞と失敗の表記は値に混ぜない
     act.token = {}
     if not ok then error(err, 0) end
+    if waited then
+        require("@pasta_log").warn("recommend menu: " .. id
+            .. ": get_property is not available in a menu scene; the scene was cut there")
+    end
     return items
 end
 
