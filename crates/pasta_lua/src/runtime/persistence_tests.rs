@@ -537,3 +537,155 @@ fn test_codec_strict_mode_fails_whole_value() {
         Err("nested deeper than 10 levels".to_string())
     );
 }
+
+// ---------------------------------------------------------------------------
+// SaveCodec（TOML の値 → Lua の値）と往復
+// ---------------------------------------------------------------------------
+
+/// TOML の文書を Lua の表に戻し、もう一度 TOML の文字列にして読み直す。
+fn codec_round_trip_doc(lua: &Lua, doc: &toml::Table) -> toml::Table {
+    let value = toml_to_lua(lua, &toml::Value::Table(doc.clone())).unwrap();
+    let Value::Table(root) = value else {
+        panic!("table expected: {value:?}")
+    };
+    let (back, dropped) = lua_table_to_toml_document(lua, &root);
+    assert!(dropped.is_empty(), "{:?}", dropped);
+    let text = toml::to_string(&back).unwrap();
+    toml::from_str::<toml::Table>(&text).unwrap()
+}
+
+#[test]
+fn test_codec_read_value_types() {
+    let lua = Lua::new();
+    let v = |t: toml::Value| toml_to_lua(&lua, &t).unwrap();
+    assert!(matches!(
+        v(toml::Value::Integer(i64::MAX)),
+        Value::Integer(i64::MAX)
+    ));
+    assert!(matches!(
+        v(toml::Value::Integer(i64::MIN)),
+        Value::Integer(i64::MIN)
+    ));
+    assert!(matches!(v(toml::Value::Float(1.5)), Value::Number(f) if f == 1.5));
+    assert!(matches!(
+        v(toml::Value::Boolean(true)),
+        Value::Boolean(true)
+    ));
+    match v(toml::Value::String("あ\n\t".into())) {
+        Value::String(s) => assert_eq!(s.to_str().unwrap(), "あ\n\t"),
+        other => panic!("{other:?}"),
+    }
+    // 配列は 1 から順の表で、配列の印が付く
+    let arr = toml::Value::Array(vec![toml::Value::Integer(7), toml::Value::Integer(8)]);
+    let Value::Table(t) = v(arr) else { panic!() };
+    assert_eq!(t.raw_get::<i64>(1).unwrap(), 7);
+    assert_eq!(t.raw_get::<i64>(2).unwrap(), 8);
+    assert_eq!(t.raw_len(), 2);
+    assert_eq!(
+        t.metatable().unwrap().to_pointer(),
+        lua.array_metatable().to_pointer()
+    );
+    // 表は文字列のキーの表で、印は付かない
+    let mut tab = toml::Table::new();
+    tab.insert("a".into(), toml::Value::Integer(1));
+    let Value::Table(t) = v(toml::Value::Table(tab)) else {
+        panic!()
+    };
+    assert_eq!(t.get::<i64>("a").unwrap(), 1);
+    assert!(t.metatable().is_none());
+}
+
+#[test]
+fn test_codec_round_trip_values() {
+    let lua = Lua::new();
+    let src = r#"
+s = "あいう"
+ctl = "a\nb\r\nc\td"
+imin = -9223372036854775808
+imax = 9223372036854775807
+f = 1.5
+nz = -0.0
+nan = nan
+inf = inf
+ninf = -inf
+big = 9223372036854775808.0
+yes = true
+no = false
+empty_table = {}
+empty_array = []
+arr = [1, "x", { k = 1 }]
+nested = { a = { b = { c = "deep" } } }
+"#;
+    let doc: toml::Table = toml::from_str(src).unwrap();
+    let back = codec_round_trip_doc(&lua, &doc);
+    assert_eq!(back.len(), doc.len());
+    for key in [
+        "s",
+        "ctl",
+        "imin",
+        "f",
+        "inf",
+        "ninf",
+        "yes",
+        "no",
+        "empty_table",
+        "empty_array",
+        "arr",
+        "nested",
+    ] {
+        assert_eq!(back[key], doc[key], "{key}");
+    }
+    assert_eq!(back["ctl"].as_str(), Some("a\nb\r\nc\td"));
+    assert_eq!(back["empty_array"], toml::Value::Array(vec![]));
+    let nz = back["nz"].as_float().unwrap();
+    assert_eq!(nz.to_bits(), (-0.0f64).to_bits());
+    assert!(back["nan"].as_float().unwrap().is_nan());
+    // 表に入った i64::MAX は LuaJIT の倍精度で 2^63 に丸まる（確定した設計判断 6。値そのものの往復は別のテスト）
+    assert_eq!(back["imax"], toml::Value::Float(9223372036854775808.0));
+    // 2^63 は i64 の外なので浮動小数点数のまま
+    assert_eq!(back["big"], toml::Value::Float(9223372036854775808.0));
+}
+
+#[test]
+fn test_codec_round_trip_i64_extremes_as_values() {
+    // LuaJIT の表に入れると 2^53 を超える整数は丸まる（マニュアルに書く）。
+    // 値そのものは Integer で戻り、Integer で書き戻る
+    let lua = Lua::new();
+    for i in [i64::MIN, i64::MAX] {
+        let v = toml_to_lua(&lua, &toml::Value::Integer(i)).unwrap();
+        let back = lua_value_to_toml_strict(&lua, &v, SAVE_MAX_DEPTH).unwrap();
+        assert_eq!(back, toml::Value::Integer(i));
+    }
+    let v = toml_to_lua(&lua, &toml::Value::Float(-0.0)).unwrap();
+    let back = lua_value_to_toml_strict(&lua, &v, SAVE_MAX_DEPTH).unwrap();
+    assert!(back.as_float().unwrap().is_sign_negative());
+}
+
+#[test]
+fn test_codec_datetime_comes_back_as_string() {
+    let lua = Lua::new();
+    let src = r#"
+odt = 1979-05-27T07:32:00Z
+ldt = 1979-05-27T07:32:00
+ld = 1979-05-27
+lt = 07:32:00
+"#;
+    let doc: toml::Table = toml::from_str(src).unwrap();
+    let Value::Table(t) = toml_to_lua(&lua, &toml::Value::Table(doc.clone())).unwrap() else {
+        panic!()
+    };
+    assert_eq!(t.get::<String>("odt").unwrap(), "1979-05-27T07:32:00Z");
+    assert_eq!(t.get::<String>("ldt").unwrap(), "1979-05-27T07:32:00");
+    assert_eq!(t.get::<String>("ld").unwrap(), "1979-05-27");
+    assert_eq!(t.get::<String>("lt").unwrap(), "07:32:00");
+    // もう一度 TOML にすると文字列として書かれる
+    let back = codec_round_trip_doc(&lua, &doc);
+    for (key, s) in [
+        ("odt", "1979-05-27T07:32:00Z"),
+        ("ldt", "1979-05-27T07:32:00"),
+        ("ld", "1979-05-27"),
+        ("lt", "07:32:00"),
+    ] {
+        assert_eq!(back[key], toml::Value::String(s.into()), "{key}");
+    }
+}

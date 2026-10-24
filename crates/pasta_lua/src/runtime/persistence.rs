@@ -553,6 +553,39 @@ fn convert_keyed(
     Ok(out)
 }
 
+// ---------------------------------------------------------------------------
+// SaveCodec（TOML の値 → Lua の値）
+// ---------------------------------------------------------------------------
+
+/// TOML の値を Lua の値にする（日時は文字列、配列には配列の印）。
+/// 設定の読み込みの変換（module_registry）は呼ばず、ここに小さな写しを持つ。
+#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で load が使い始めたら外す
+fn toml_to_lua(lua: &Lua, value: &toml::Value) -> LuaResult<Value> {
+    Ok(match value {
+        toml::Value::String(s) => Value::String(lua.create_string(s)?),
+        toml::Value::Integer(i) => Value::Integer(*i),
+        toml::Value::Float(f) => Value::Number(*f),
+        toml::Value::Boolean(b) => Value::Boolean(*b),
+        toml::Value::Datetime(dt) => Value::String(lua.create_string(dt.to_string())?),
+        toml::Value::Array(arr) => {
+            let table = lua.create_table_with_capacity(arr.len(), 0)?;
+            for (i, v) in arr.iter().enumerate() {
+                table.raw_set(i + 1, toml_to_lua(lua, v)?)?;
+            }
+            // 空の配列が空の配列のまま書き戻るように印を付ける
+            table.set_metatable(Some(lua.array_metatable()))?;
+            Value::Table(table)
+        }
+        toml::Value::Table(t) => {
+            let table = lua.create_table_with_capacity(0, t.len())?;
+            for (k, v) in t {
+                table.raw_set(k.as_str(), toml_to_lua(lua, v)?)?;
+            }
+            Value::Table(table)
+        }
+    })
+}
+
 #[cfg(test)]
 #[path = "persistence_tests.rs"]
 mod tests;
