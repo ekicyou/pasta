@@ -98,12 +98,12 @@ $ErrorActionPreference = 'Stop'
 # 較正値（説明の一覧と対応。変更はここだけ）
 # =============================================================================
 $STRINGS_FILE = 'roadmap-overview.strings.json'
-$MARKER_KEYS  = 'secInventory', 'secWave', 'secLedger', 'secSummary', 'bandHeader', 'versionRegex', 'dateRegex',
+$MARKER_KEYS  = 'secInventory', 'secWave', 'secNextWaves', 'secLedger', 'secSummary', 'bandHeader', 'versionRegex', 'dateRegex',
                 'doneOrder', 'rowSep', 'depsMarker', 'brackets', 'sentenceEnd', 'ellipsis'
 $LABEL_KEYS   = 'title', 'sourceUpdated', 'sourceBlob', 'sourceBlobUnknown', 'bandCount', 'warningCount', 'wave',
                 'done', 'notInLedger', 'notInBand', 'otherBands', 'prereqs', 'notInRoadmap', 'order', 'model', 'size',
                 'noTheme', 'clearFilter', 'completedHeading', 'colPhase', 'colTopic', 'colSpecs', 'completedExtra',
-                'what', 'note', 'waveCommands', 'copy', 'copied'
+                'what', 'note', 'waveCommands', 'nextWaveCommands', 'copy', 'copied'
 $SECTION_PREFIX = '## '
 $TABLE_RULE     = '^\|\s*:?-'
 $ONE_LINER_MAX  = 60
@@ -384,19 +384,29 @@ function Get-Wave([string[]]$Lines, [pscustomobject]$Markers) {
         $c = Get-Cells $row $table.Width 'wave-table' $warnings
         Get-SpecName $c[0] $Markers
     }
-    $commands = $null
-    for ($i = $sec.Start + 1; $i -lt $sec.End; $i++) {
-        if (-not $Lines[$i].StartsWith('```')) { continue }
-        $body = [System.Collections.Generic.List[string]]::new()
-        for ($i++; $i -lt $sec.End -and -not $Lines[$i].StartsWith('```'); $i++) { $body.Add($Lines[$i]) }
-        $commands = $body -join "`n"
-        break
-    }
+    $commands = @(Get-Fences $Lines $sec)[0]
     $date = [regex]::Match($Lines[$sec.Start], $Markers.dateRegex)
     [pscustomobject]@{
         Name = $date.Success ? $date.Value : (ConvertTo-Plain $Lines[$sec.Start].TrimStart('#'))
         Names = [string[]]@($names | Where-Object { $_ }); Commands = $commands; Warnings = [object[]]$warnings
     }
+}
+
+# 節の中の ``` の塊を、出る順に囲みを外して返す（呼ぶ側が @() で包む）
+function Get-Fences([string[]]$Lines, $Sec) {
+    for ($i = $Sec.Start + 1; $i -lt $Sec.End; $i++) {
+        if (-not $Lines[$i].StartsWith('```')) { continue }
+        $body = [System.Collections.Generic.List[string]]::new()
+        for ($i++; $i -lt $Sec.End -and -not $Lines[$i].StartsWith('```'); $i++) { $body.Add($Lines[$i]) }
+        $body -join "`n"
+    }
+}
+
+# その先のウェーブの節（markers.secNextWaves）の ``` の塊を全部。節は無くてよい（無ければ空）
+function Get-NextWaves([string[]]$Lines, [pscustomobject]$Markers) {
+    $sec = Get-Section $Lines $Markers.secNextWaves
+    if ($null -eq $sec) { return , [string[]]@() }
+    , [string[]]@(Get-Fences $Lines $sec)
 }
 
 # 完了の表（markers.secSummary の節の最初の表。Phase・主題・spec）を読む。節か表が無ければ $null。
@@ -539,6 +549,7 @@ function Read-Roadmap([string]$Text, [pscustomobject]$Markers, [pscustomobject]$
         themes = $themes
         bands = [object[]]$outBands
         waveCommands = $wave.Commands
+        nextWaveCommands = Get-NextWaves $lines $Markers
         completed = [pscustomobject][ordered]@{ rows = [object[]]@($rows); extra = [object[]]$extra }
         warningCount = $warnings.Count
     }

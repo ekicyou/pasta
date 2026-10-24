@@ -118,16 +118,16 @@ section.completed h2 { font-size: 16px; }
   if (D.warningCount > 0) header.appendChild(el("div", "warnings", fmt(L.warningCount, { count: D.warningCount })));
   document.body.appendChild(header);
 
-  // The current wave's start commands (the code block /kiro-next writes under the wave table) with a copy button
-  if (D.waveCommands !== null) {
+  // One block of start commands with a copy button
+  function commandBlock(title, text) {
     var wc = el("section", "wave-cmds");
     var bar = el("div", "bar");
-    bar.appendChild(el("h2", null, L.waveCommands));
+    bar.appendChild(el("h2", null, title));
     var copyBtn = el("button", null, L.copy);
     copyBtn.type = "button";
     bar.appendChild(copyBtn);
     wc.appendChild(bar);
-    var pre = el("pre", null, D.waveCommands);
+    var pre = el("pre", null, text);
     wc.appendChild(pre);
     var copied = function () {
       copyBtn.textContent = L.copied;
@@ -144,13 +144,16 @@ section.completed h2 { font-size: 16px; }
     };
     copyBtn.addEventListener("click", function () {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(D.waveCommands).then(copied, fallback);
+        navigator.clipboard.writeText(text).then(copied, fallback);
       } else {
         fallback();
       }
     });
     document.body.appendChild(wc);
   }
+  // The current wave (the code block /kiro-next writes under the wave table), then the outlined next waves
+  if (D.waveCommands !== null) commandBlock(L.waveCommands, D.waveCommands);
+  D.nextWaveCommands.forEach(function (t) { commandBlock(L.nextWaveCommands, t); });
 
   // Legend
   var legend = el("div", "legend");

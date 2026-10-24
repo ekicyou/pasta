@@ -135,6 +135,10 @@
     }
   ],
   "waveCommands": "Wave 2本\nOpus\n/kiro-start alpha-one\n/kiro-start gamma-three",
+  "nextWaveCommands": [
+    "Wave 2（見込み）1本\nOpus\n/kiro-start beta-two",
+    "Wave 3（見込み）リリース（0.9.0 の spec は 0 本）\n/release 0.9.0"
+  ],
   "completed": {
     "rows": [
       {

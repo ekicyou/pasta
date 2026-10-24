@@ -124,6 +124,15 @@ Opus
 /kiro-start a-spec
 /kiro-start c-spec
 ```
+### その先のウェーブ（2026-01-02 の見込み）
+| ウェーブ | spec | 入る条件 | 要件定義 |
+| -------- | ---- | -------- | -------- |
+| 2 | z-spec | a-spec の後 | Opus |
+```
+Wave 2（見込み）1本
+Opus
+/kiro-start z-spec
+```
 ### 次
 ## Phase 1
 | 順 | spec | 要件定義 | 規模 |
@@ -150,7 +159,7 @@ def self_test():
     assert specs == [("Fable", "b-spec"), ("Opus", "a-spec"), ("Fable", "c-spec")], specs
     assert len(warns) == 1 and warns[0].startswith("c-spec"), warns
     models = read_models(SAMPLE)
-    assert models == {"a-spec": "Opus", "b-spec": "Fable", "c-spec": "Fable", "d-spec": "Fable"}, models
+    assert models == {"a-spec": "Opus", "b-spec": "Fable", "c-spec": "Fable", "d-spec": "Fable", "z-spec": "Opus"}, models
     rel = SAMPLE_RELEASE
     assert read_wave(rel) == ("2026-01-03", [], [], "0.1.0"), read_wave(rel)
     for bad in ("# none\n", "## 棚卸（x）\n### ウェーブ（x）\nno block\n",

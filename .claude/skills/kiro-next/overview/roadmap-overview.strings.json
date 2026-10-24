@@ -2,6 +2,7 @@
   "markers": {
     "secInventory": "## 棚卸（",
     "secWave": "### ウェーブ（",
+    "secNextWaves": "### その先のウェーブ（",
     "secLedger": "## Specs (dependency order)",
     "secSummary": "## 完了フェーズ",
     "bandHeader": ["順", "spec"],
@@ -41,6 +42,7 @@
     "what": "何をするか",
     "note": "版の表の注",
     "waveCommands": "今のウェーブの開始コマンド",
+    "nextWaveCommands": "次のウェーブの開始コマンド（見込み）",
     "copy": "コピー",
     "copied": "コピーしました"
   }
