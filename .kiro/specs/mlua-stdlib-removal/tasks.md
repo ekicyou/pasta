@@ -98,3 +98,7 @@
 
 - `from_loader` は main.lua を読まない。main.lua を通す試験は `PastaLoader::load`（`from_loader_with_scene_dic`）で読み込む（1.2）
 - 5.1 の名前の検索で `runtime_api_test.rs` の `test_mlua_stdlib_modules_are_not_requirable` が当たるのは、3.3 の回帰テストなので想定どおり（5.1）
+- 完了時にその場で解決: design.md の Testing Strategy の main.lua の試験の読み込み方を `PastaLoader::load` に直した（57fd5e0b）
+- 完了時にその場で解決: structure.md の tests/runtime の数（古い「7 files」）を「主なもの。全 21 files」に直した（57fd5e0b）
+- 完了時にその場で解決: roadmap.md の `OnPastaSetSaveVariable` の「値は JSON」を今の形に直した（6e7a7467）・runtime/mod.rs の SAFETY の注釈の `env` を消した（9a572cbd）
+- 申し送り 6 件: call-attribute-filter・scene-anchor-link・shell-element-click（`NOT_JSON`→`BAD_TYPE`）、mlua-0-12-upgrade（依存と `RuntimeConfig`）、novel-checkpoint-rollback（`OnPastaSetSaveVariable` の契約）、recommend-menu-scenes（既定ハンドラーの表と失敗の種類）。起票 0 件
