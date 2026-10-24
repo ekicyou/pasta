@@ -2,7 +2,8 @@
 --- 外からゴーストを操作する既定のハンドラ（OnPastaCallFunction・OnPastaSetSaveVariable）
 ---
 --- OnPastaCallFunction: Reference0 = 呼ぶ名前（＞名前 と同じ探し方）、Reference1 以降 = 引数（文字列のまま）
---- OnPastaSetSaveVariable: Reference0 = ＄＊ の後ろの名前（区切らない）、Reference1 = JSON の値 1 つ（null で消す）
+--- OnPastaSetSaveVariable: Reference0 = ＄＊ の後ろの名前（区切らない）、Reference1 = 値（届いた文字列のまま）、
+---   Reference2 = 型（number・string・boolean・delete。無い・空は string。delete は Reference1 を見ずに消す）
 ---
 --- デバッグの有無によらず働く。SecurityLevel が external なら警告だけ書いて何もしない（204）。
 --- 呼ぶときはコルーチンを返すだけにし、1 ビート目・続き・実行時エラーは EVENT.fire に任せる。
@@ -85,21 +86,33 @@ REG.OnPastaCallFunction = REG.OnPastaCallFunction or function(act)
     end)
 end
 
---- Reference1 を JSON の値 1 つとして読む（decode の失敗も、投げられたエラーも「読めない」）
----@param json table  require("@json")
+--- 型の名前（英小文字の完全一致）。無い・空は string として扱う
+local TYPES = { string = true, number = true, boolean = true, delete = true }
+
+--- Reference1 を型ごとに読む。delete は Reference1 を見ずに nil（キーが消える）
+---@param kind "string"|"number"|"boolean"|"delete"
 ---@param text string|nil  Reference1
----@return "value"|"null"|"table"|"unreadable" kind
----@return number|string|boolean|nil value  kind == "value" のときだけ
-local function read_json(json, text)
-    if type(text) ~= "string" then return "unreadable" end
-    local ok, value = pcall(json.decode, text)
-    if not ok then return "unreadable" end
-    -- and/or で書かない（JSON の false が消えるため）
-    local t = type(value)
-    if t == "number" or t == "string" or t == "boolean" then return "value", value end
-    if t == "userdata" then return "null" end -- JSON の null（mlua の light userdata）
-    if t == "table" then return "table" end
-    return "unreadable"
+---@return string|number|boolean|nil value  label が nil のときだけ
+---@return string|nil label  Reference1 の誤りの種類
+---@return string|nil what  ログの警告の言い回し
+local function read_value(kind, text)
+    if kind == "string" then
+        if text == nil then return nil, FAILURE.LABEL.NOT_ASSIGNABLE, "no value" end
+        return text
+    elseif kind == "number" then
+        local n = type(text) == "string" and tonumber(text)
+        -- 無限大・非数は断る（n ~= n は非数）
+        if type(n) ~= "number" or n ~= n or n == math.huge or n == -math.huge then
+            return nil, FAILURE.LABEL.NOT_NUMBER, "not a number"
+        end
+        return n
+    elseif kind == "boolean" then
+        -- and/or で書かない（false が消えるため）
+        if text == "true" then return true end
+        if text == "false" then return false end
+        return nil, FAILURE.LABEL.NOT_ASSIGNABLE, "not a boolean"
+    end
+    return nil
 end
 
 REG.OnPastaSetSaveVariable = REG.OnPastaSetSaveVariable or function(act)
@@ -109,37 +122,31 @@ REG.OnPastaSetSaveVariable = REG.OnPastaSetSaveVariable or function(act)
     if not is_name(name) then return bad_reference0(act, event, name) end
 
     local subject = event .. " ＄＊" .. name
-    local loaded, json = pcall(require, "@json")
-    if not loaded then
+    -- 型の名前を Reference1 より先に見る
+    local kind = act.req.reference[2]
+    if kind == nil or kind == "" then kind = "string" end
+    if not TYPES[kind] then
         return fail(act, {
-            label = FAILURE.LABEL.NOT_JSON,
+            label = FAILURE.LABEL.BAD_TYPE,
             subject = subject,
-            detail = "JSON の部品が無い",
-            warning = event .. ": @json is not available; variable not set: name='" .. name .. "'",
+            detail = kind,
+            warning = event .. ": unknown type: name='" .. name .. "', Reference2=" .. quoted(kind),
         })
     end
     local text = act.req.reference[1]
-    local kind, value = read_json(json, text)
-    if kind == "unreadable" then
-        -- 読めた文字列は引用符で包まずにそのまま説明に出す（"01" と送ったときと見分けるため）
+    local value, label, what = read_value(kind, text)
+    if label then
+        -- 値は引用符で包まずにそのまま説明に出す（無い・空は種類の説明）
         local detail = text
         if not is_name(text) then detail = FAILURE.kind_of(text) end
         return fail(act, {
-            label = FAILURE.LABEL.NOT_JSON,
+            label = label,
             subject = subject,
             detail = detail,
-            warning = event .. ": not JSON: name='" .. name .. "', Reference1=" .. quoted(text),
+            warning = event .. ": " .. what .. ": name='" .. name .. "', Reference1=" .. quoted(text),
         })
     end
-    if kind == "table" then
-        return fail(act, {
-            label = FAILURE.LABEL.NOT_ASSIGNABLE,
-            subject = subject,
-            detail = "表",
-            warning = event .. ": JSON array or object is refused: name='" .. name .. "', Reference1=" .. quoted(text),
-        })
-    end
-    -- 名前は区切らず、予約変数も除かない。null は value が nil なのでキーが消える。書き出しは終了時の自動保存に任せる
+    -- 名前は区切らず、予約変数も除かない。delete は value が nil なのでキーが消える。書き出しは終了時の自動保存に任せる
     require("pasta.save")[name] = value
     return nil
 end

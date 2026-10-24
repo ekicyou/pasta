@@ -17,7 +17,7 @@
   - 完了: 新しいテストがすべて通る
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 6.4_
 
-- [ ] 2. `OnPastaSetSaveVariable` を Reference2 の型で受け、`@json` を使わなくする
+- [x] 2. `OnPastaSetSaveVariable` を Reference2 の型で受け、`@json` を使わなくする
   - 失敗の種類の「JSON として読めない値」の席を「型の名前にならない値」（鍵は `BAD_TYPE`）に置き換える。`NOT_NUMBER`・`NOT_ASSIGNABLE` はそのまま、種類は 12 のまま。失敗の種類の Lua のテストを、12 種・`BAD_TYPE` の文言・`NOT_JSON` が無いことに直す
   - 既定ハンドラの確かめの順は 門 → Reference0 → Reference2 → `delete` なら消す → Reference1 があるか → 型ごとに読む。型が無い・空・`string` は届いた文字列をそのまま、`number` は Lua の標準の `tonumber` で読み無限大・非数を断る、`boolean` は `true`・`false` の完全一致、`delete` は Reference1 を見ずに消す
   - 失敗は設計の失敗の表のとおりの種類・表記・ログの警告（`not a number`・`not a boolean`・`unknown type`・`no value`）を、既存の失敗の出口から出し、変数に触れない。`@json` を読まず、冒頭の説明を新しい形に直す。`OnPastaCallFunction` と共有の局所関数の働きは変えない
