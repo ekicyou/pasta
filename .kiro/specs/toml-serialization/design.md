@@ -637,7 +637,9 @@ name = "剣"
 > **セーブファイルが TOML になりました（セーブは引き継がれません）**
 > 0.4.3 から、`＄＊` の値や `@pasta_persistence` のセーブは `profile/pasta/save/save.toml`（`obfuscate = true` なら gzip した `save.dat`）に TOML で保存されます。pasta の決まりは TOML なのに、これまで JSON で書いていました。これまでの `save.json`・`save.dat` は読み込まれず、セーブは引き継がれません。ごめんなさい。古い `save.json` は消さずに残しています。`obfuscate = true` で使っていた古い `save.dat` は、`save.dat.broken` という名前に移して残しています。
 
-## OPEN QUESTIONS
+## 確定した設計判断（2026-10-24 設計ディスカッションで、全議題を推奨案で確定）
+
+下の 1〜6 と、7（変換は `persistence.rs` の `pub(crate)` に置き、同じウェーブの `mlua-stdlib-removal` の `@toml` とはそれぞれが持つ。まとめるかは両方が入った後に決める。Revalidation Triggers のとおり）を、開発者が推奨案のまま承認した。
 
 1. **外したキーの警告を間引くか**: 間引かない（保存のたびに 1 キー 1 件）。— 推奨理由: 保存の回数は作者の `save()` の回数と終了時の 1 回で決まり、要件 4.5 の「保存ごとに 1 件」をそのまま満たす。間引くと状態が 1 つ増える。
 2. **サイドカーの `version`**: 1 のまま。— 推奨理由: 中身の項目は同じで、読むのはテストだけ（VSCode 拡張・DAP は読まない）。
