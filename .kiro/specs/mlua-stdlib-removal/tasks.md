@@ -56,7 +56,7 @@
   - 完了: `link-check.mjs` と章の会話の検査が通り、新しい節へのリンクが届く
   - _Boundary: ManualDocs（toml.md・SUMMARY.md・lua/modules/index.md・lua/index.md）_
   - _Requirements: 5.1, 5.3, 5.5_
-- [ ] 4.2 (P) SHIORI イベントの章の `OnPastaSetSaveVariable` の節と既定ハンドラーの表の行を、型で受ける形に書き直す
+- [x] 4.2 (P) SHIORI イベントの章の `OnPastaSetSaveVariable` の節と既定ハンドラーの表の行を、型で受ける形に書き直す
   - 見出しを変えずに、Reference0〜2 の表、型の表（型を省けば文字列）、失敗の表、MCP からの呼び方の例 3 つを書き、トークの間隔の変数は `number` を付けて送ると書く
   - JSON・引用符の二重の包み・`null`・配列とオブジェクト・`@json` の行を消す。表は `OnPastaSetSaveVariable` の行の文だけを直す（行の数と「9 つのイベント」の文は触らない）
   - 完了: 節に「JSON」と `@json` が無く、`grammar/variables.md`・`internals/shiori.md` からのリンクが届く
