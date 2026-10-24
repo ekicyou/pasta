@@ -89,7 +89,7 @@ raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "", 
 
 1. The pasta shall `@toml` を、設定なしで、ほかの組み込みのモジュールと同じ時機から（ランタイムの初期化の時、`main.lua` を読む前から）、ゴーストの Lua で `require "@toml"` できるようにする。
 2. When 作者が `toml.decode(文字列)` に TOML として正しい文字列を渡したとき, the `@toml` shall その中身を Lua の表にして返す。
-3. The `@toml` shall TOML の値を、`@pasta_config` が pasta.toml の値を表にするときと同じ規則で Lua の値にする（表はキーの文字列の表、配列は 1 から始まる並びの表、文字列は文字列、整数と小数は数値、真偽値は真偽値、日付と時刻は TOML に書いた形の文字列）。
+3. The `@toml` shall TOML の値を、`@pasta_config` が pasta.toml の値を表にするときと同じ規則で Lua の値にする（表はキーの文字列の表、配列は 1 から始まる並びの表、文字列は文字列、整数と小数は数値、真偽値は真偽値、日付と時刻は RFC 3339 の形に整えた文字列。`1979-05-27 07:32:00` は `1979-05-27T07:32:00` になる）。
 4. If `toml.decode` に渡した文字列が TOML として読めないとき, the `@toml` shall エラーを投げずに `nil` と、読めなかった理由を述べたエラーメッセージの文字列の 2 つを返す。
 5. The `@toml` shall `decode` だけを持ち、Lua の値を TOML の文字列にする関数（`encode`）を持たない（`toml.encode` は `nil`）。
 6. The `@toml` shall 何度 `require` しても同じ表を返し、`decode` の呼び出しが前の呼び出しの結果に左右されない。

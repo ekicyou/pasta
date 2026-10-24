@@ -312,12 +312,12 @@ local t, err = toml.decode(text)
 |--------|--------|
 | `decode(TOML として正しい文字列)` | 中身の表 1 つ（空の文字列は空の表） |
 | `decode(TOML として読めない文字列)` | `nil`, `toml` クレートの誤りの文（複数行になることがある） |
-| `decode(UTF-8 として正しくない文字列)` | `nil`, UTF-8 でないことを述べた文（**仮定**: TOML として読めない文字列と同じ扱い） |
+| `decode(UTF-8 として正しくない文字列)` | `nil`, UTF-8 でないことを述べた文（TOML として読めない文字列と同じ扱い。中身の誤りで Lua のエラーにしない） |
 | `decode(文字列でない値)`（`nil`・数・表など） | Lua のエラー `bad argument #1 to 'decode' (string expected, got <型>)` |
 
 - 事前条件: なし。
 - 事後条件: 成功の表は毎回新しく作る。前の呼び出しの結果を共有しない。
-- 値の対応（`toml_to_lua` のまま。`@pasta_config` と同じ）: 表 → キーの文字列の表、配列 → 1 から始まる並びの表、文字列 → 文字列、整数と小数 → 数値（2^53 を超える整数は丸まる）、真偽値 → 真偽値、日付と時刻 → TOML に書いた形の文字列。
+- 値の対応（`toml_to_lua` のまま。`@pasta_config` と同じ）: 表 → キーの文字列の表、配列 → 1 から始まる並びの表、文字列 → 文字列、整数と小数 → 数値（2^53 を超える整数は丸まる）、真偽値 → 真偽値、日付と時刻 → RFC 3339 の形に整えた文字列（`toml_datetime` の `Display`。日付と時刻の間は `T`、`z` は `Z` になるので、`1979-05-27 07:32:00` は `1979-05-27T07:32:00` になる）。試験はこの形で書く。
 
 **Implementation Notes**
 - 引数は `mlua::Value` で受ける。mlua の `String` は数を文字列へ変えてしまい、要件 2.7 を満たせない。
@@ -439,7 +439,7 @@ impl RuntimeConfig {
 | `SecurityLevel` が `external` | — | 出さない（204） | 今のまま |
 
 - 表記の説明: Reference1 の誤りは Reference1 を、型の名前の誤りは Reference2 を入れる。ログの警告の値は `quoted`（`'abc'`・`nil`）で書く（今の形）。
-- **仮定**: 警告の文の英語の言い回し（`not a number`・`not a boolean`・`unknown type`・`no value`）は、今の `not JSON`・`bad argument` の形に合わせた。
+- 警告の文の英語の言い回し（`not a number`・`not a boolean`・`unknown type`・`no value`）は、今の `not JSON`・`bad argument` の形に合わせる。
 
 ### Monitoring
 
@@ -484,7 +484,7 @@ impl RuntimeConfig {
 ## Migration Strategy
 
 - 互換は持たない。0.4.2 の `["会員番号", "\"01\""]` は、新しい形では引用符を含めた文字列 `"01"` になる。`["pasta_talk_interval_min", "60"]` は文字列の `60` になり、トークの間隔には使われない（`number` を付けて送る）。
-- 知らせ方: squash マージの件名（PR の題名）に `!` を付け、6 つのモジュールを外すことと `OnPastaSetSaveVariable` の形を変えることの 2 つを書く（例: `feat(mlua-stdlib-removal)!: mlua-stdlib の 6 つのモジュールを外して @toml を足し、OnPastaSetSaveVariable の型を Reference2 で受ける（破壊的変更）`）。`release-notes.ps1` は main の件名の `!` だけを見るので、途中のコミットの `!` は main に残らない。見どころのファイルの「動きが変わる点」に 2 点を載せることは、`kiro-complete` の申し送りで `release` スキルへ渡す。
+- 知らせ方: squash マージの件名（PR の題名）に `!` を付け、6 つのモジュールを外すことと `OnPastaSetSaveVariable` の形を変えることの 2 つを書く（例: `feat(mlua-stdlib-removal)!: mlua-stdlib の 6 つのモジュールを外して @toml を足し、OnPastaSetSaveVariable の型を Reference2 で受ける（破壊的変更）`）。`release-notes.ps1` は main の件名の `!` だけを見るので、途中のコミットの `!` は main に残らない。見どころのファイルの「動きが変わる点」に 2 点を載せることは、`kiro-complete` の申し送りで `release` スキルへ渡す。Rust から `pasta_lua` を使う人向けに、`RuntimeConfig` から 6 つの名前と `should_enable_module` が無くなったこと（並べても誤りにならず黙って無視される）も、同じ申し送りに 1 行添える。
 - 進め方（安全に戻せる小さな段）: 1. `@toml` を足す（6 つはまだ残る）→ 2. `OnPastaSetSaveVariable` を型で受ける形にし、`@json` を使わなくする → 3. 6 つの登録・`RuntimeConfig` の名前・依存を外し、テストを書き直す → 4. 文書。どの段の後でもテストが通る。
 
 ## Open Questions / Risks
@@ -492,9 +492,10 @@ impl RuntimeConfig {
 - スキル `pasta-lua-coding` の `SKILL.md` の編集と `references/mlua-stdlib.md` の削除は、分類器が Self-Modification として止めることがある。止まったら、入った分と残りを示して開発者の許可を求める。
 - `lua/shiori-events.md` の既定ハンドラーの表は `recommend-menu-scenes` と隣の行。後から入る側が合わせる。
 - 依存が減って `deny.toml` の許可のライセンスに使われないものが出ても、cargo-deny は警告だけで失敗しない（`deny.toml` は触らない）。
-- 仮定で書いたもの（設計の話し合いで確かめる）:
-  1. `decode` に UTF-8 として正しくない文字列を渡したら、Lua のエラーでなく `nil, エラーメッセージ`（文字列ではあるので、要件 2.4 の「TOML として読めない」に入れた）。
-  2. `decode(42)` は Lua のエラー（mlua の既定の数から文字列への変換を使わない。要件 2.7 の「文字列でない値」に数を含めた）。
-  3. ログの警告の英語の言い回し（`not a number`・`not a boolean`・`unknown type`・`no value`）。
+- 設計の話し合い（2026-10-24）で確定したもの（仮定から確定へ）:
+  1. `decode` に UTF-8 として正しくない文字列を渡したら、Lua のエラーでなく `nil, エラーメッセージ`（文字列ではあるので、要件 2.4 の「TOML として読めない」に入れる）。
+  2. `decode(42)` は Lua のエラー（mlua の既定の数から文字列への変換を使わない。要件 2.7 の「文字列でない値」に数を含める）。
+  3. ログの警告の英語の言い回し（`not a number`・`not a boolean`・`unknown type`・`no value`）と、鍵の名前 `BAD_TYPE`（`BAD_NAME` と同じ形）。
   4. 要件の一覧に無い `structure.md`・`TEST_COVERAGE.md` の、消すテストの名前の行も直す（古い記述を残さないため）。
-  5. 移す Lua 標準ライブラリの節で、`[loader] ffi` の 1 点を今の姿に直す。
+  5. 移す Lua 標準ライブラリの節で、`[loader] ffi` の 1 点を今の姿に直す（PR #150 で古くなった文を、移すついでに直す）。
+  6. 日付と時刻は `toml_to_lua` のまま RFC 3339 の形に整えた文字列にし、要件 2.3 の書き方をこれに合わせる。
