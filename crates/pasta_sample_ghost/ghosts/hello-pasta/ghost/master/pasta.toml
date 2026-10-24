@@ -54,5 +54,7 @@ spot = 0
 spot = 1
 
 [persistence]
-# 永続化データディレクトリ
-data_dir = "profile/pasta/save"
+# セーブデータ（TOML）の保存先。書かなければ既定の profile/pasta/save/save.toml
+# file_path = "profile/pasta/save/save.toml"
+# true にすると gzip して save.dat に保存する
+# obfuscate = false

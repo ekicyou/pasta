@@ -154,7 +154,7 @@ port = 12345
 
 // ----- PersistenceConfig::effective_file_path 第3分岐 -----
 
-/// obfuscate=true かつ .json でも .dat でもない拡張子は ".dat" が付加されること。
+/// obfuscate=true かつ .toml でも .dat でもない拡張子は ".dat" が付加されること。
 #[test]
 fn test_persistence_effective_file_path_appends_dat_for_other_ext() {
     let config = PersistenceConfig {

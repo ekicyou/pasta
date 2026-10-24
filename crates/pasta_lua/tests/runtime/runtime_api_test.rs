@@ -577,8 +577,8 @@ fn test_pasta_config_non_table_actor_is_noop() {
 
 /// @pasta_log は極端に深い入れ子テーブル（Lua 入力で自由に構築可能）でも
 /// ホストの Rust スタックを溢れさせない（abort は SHIORI ホストごと落とす — R3.7）。
-/// 深さ上限（MAX_NESTING_DEPTH）を超えるテーブルは JSON 変換へ入る前に
-/// tostring() フォールバックへ退避することを、プロセス生存と正常復帰で確認する。
+/// 深さ上限（MAX_NESTING_DEPTH）を超えるテーブルは共有の厳しい変換（深さ 10）が
+/// Err を返し tostring() フォールバックへ退避することを、プロセス生存と正常復帰で確認する。
 #[test]
 fn test_log_deeply_nested_table_does_not_overflow_host_stack() {
     let runtime = PastaLuaRuntime::new(create_empty_context()).unwrap();
@@ -598,12 +598,12 @@ fn test_log_deeply_nested_table_does_not_overflow_host_stack() {
     assert!(value.as_boolean().unwrap_or(false));
 }
 
-/// 深さゲートの境界ペア（その1）: ちょうど深さ上限（MAX_NESTING_DEPTH = 10）の
-/// テーブルは JSON 変換され、リーフの値がログへそのまま現れる
+/// 深さ上限の境界ペア（その1）: ちょうど深さ上限（MAX_NESTING_DEPTH = 10）の
+/// テーブルは TOML の 1 行に書かれ、リーフの値がログへそのまま現れる
 /// （review-improvement-loop セル 3.18 / 3.17 申し送り — 閾値ドリフト防止）。
 #[tracing_test::traced_test]
 #[test]
-fn test_log_table_at_depth_limit_is_json_converted() {
+fn test_log_table_at_depth_limit_is_toml_inline() {
     let runtime = PastaLuaRuntime::new(create_empty_context()).unwrap();
 
     // ルートを深さ1として 9 回ラップ → 総深さ 10 = ちょうど上限（超過しない）
@@ -611,7 +611,7 @@ fn test_log_table_at_depth_limit_is_json_converted() {
         .exec(
             r#"
             local log = require "@pasta_log"
-            local t = { leaf = "d10_json_marker" }
+            local t = { leaf = "d10_marker" }
             for _ = 1, 9 do t = { t } end
             log.info(t)
             "#,
@@ -619,13 +619,13 @@ fn test_log_table_at_depth_limit_is_json_converted() {
         .unwrap();
 
     assert!(
-        logs_contain("d10_json_marker"),
-        "depth-10 table should be JSON-converted, exposing the leaf value"
+        logs_contain("d10_marker"),
+        "depth-10 table should be written as one TOML line, exposing the leaf value"
     );
 }
 
-/// 深さゲートの境界ペア（その2）: 上限を 1 だけ超えた深さ 11 のテーブルは
-/// JSON 変換せず tostring() フォールバック（"table: 0x..."）へ退避し、
+/// 深さ上限の境界ペア（その2）: 上限を 1 だけ超えた深さ 11 のテーブルは
+/// 共有の厳しい変換（深さ 10）が Err を返し tostring() フォールバック（"table: 0x..."）へ退避し、
 /// リーフの値はログへ現れない（境界ペアその1との対で閾値を固定）。
 #[tracing_test::traced_test]
 #[test]
@@ -650,12 +650,12 @@ fn test_log_table_one_past_depth_limit_falls_back_to_tostring() {
     );
     assert!(
         !logs_contain("d11_fallback_marker"),
-        "leaf value must not leak through JSON conversion past the depth limit"
+        "leaf value must not leak into the TOML line past the depth limit"
     );
 }
 
 /// 自己参照（循環）テーブルも log 呼び出しを失敗させない
-/// （深さゲートが循環で必ず発火し tostring() フォールバックへ退避する境界の固定）。
+/// （循環では共有の厳しい変換（深さ 10）が必ず Err を返し tostring() フォールバックへ退避する境界の固定）。
 #[test]
 fn test_log_cyclic_table_falls_back_without_error() {
     let runtime = PastaLuaRuntime::new(create_empty_context()).unwrap();

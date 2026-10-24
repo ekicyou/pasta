@@ -432,13 +432,15 @@ VM の構築      register_persistence_module → persistence::register
                  → 返った表が package.loaded["pasta.save"] に入り、以後は同じ表を返す
 実行中          ACT.new が act.save に同じ表を入れる。生成コードの save.名前 = 式 や
                  act:init_scene の戻り値で読み書きする
-任意の時点      @pasta_persistence.save(表)（save_impl → save_to_file）
-ランタイム破棄  Drop → save_persistence_data → save_to_file
+任意の時点      @pasta_persistence.save(表)（save_impl → save_table → save_to_file）
+ランタイム破棄  Drop → save_persistence_data → save_table → save_to_file
 ```
 
 - `persistence::register` は、保存先が絶対パスであるか、`..`・ルート・ドライブの接頭辞を含むと `RuntimeError` を返す。これは `from_loader_with_scene_dic` の `?` で構築全体の失敗になる。
-- `load_from_file` はファイルを読み、空なら空の JSON オブジェクトにする。先頭 2 バイトが gzip のマジック（`1f 8b`）なら `GzDecoder` で展開してから、そうでなければそのまま `serde_json` で解析する。`load_impl` はその結果を Lua の値に変換し、読み込みの失敗と表にならない値を警告ログ付きの空の表に置き換える。
-- `save_impl` と `save_persistence_data` は、表を `serde_json::Value` に変換して `save_to_file` に渡す。Lua の表と JSON の変換は mlua の serde 連携（`LuaSerdeExt`）で行う。`save_to_file` は親ディレクトリを作り、`obfuscate` に応じて `GzEncoder` で圧縮するか整形した JSON にして、`Path::with_extension("tmp")` のファイルに書いて `sync_all` し、`fs::rename` で保存先に置き換える。`rename` が失敗したら一時ファイルを消してエラーを返す。
+- `load_from_file` はファイルを読み、先頭 2 バイトが gzip のマジック（`1f 8b`）なら `GzDecoder` で展開してから、そうでなければそのまま TOML の文書（`toml::Table`）として解析する。空のファイルは空の表になる。
+- `load_impl` は `read_or_quarantine` で読み、結果の `toml::Table` を `toml_to_lua` で Lua の表にして返す。`read_or_quarantine` は、ファイルが無ければ警告を出して空の表にし、読めなければ `.broken`（既にあれば `.broken.1`・`.broken.2`…）の名前へ移して警告を出し、空の表にする。読んだ結果は、保存を止める印 `SaveGate` として Lua の `app_data` に置く。読めた・無かった・退避できたときは `Open`、読めず退避もできなかったときは理由付きの `Closed`（エラーのログを出す）で、`Closed` は `Open` で上書きしない。
+- `save_impl`（`save(data)`）と `save_persistence_data`（`Drop`）は、同じ `save_table` を通る。`save_table` は、印がまだ無ければ先に `read_or_quarantine` で読み（読めないセーブを確かめずに上書きしないため）、印が `Closed` なら何も書かずに `SaveDisabled` を返す。`Open` なら `lua_table_to_toml_document` で表を `toml::Table` にする。この変換は書けない値のキーだけを外し（入れ子の上限は 32 段の `SAVE_MAX_DEPTH`）、外したキーごとに `key '{道筋}' was not saved: {理由}` の警告を出してから `save_to_file` に渡す。
+- `save_to_file` は親ディレクトリを作り、`toml::to_string` で書いた TOML を `obfuscate` に応じて `GzEncoder` で圧縮するかそのままにして、`Path::with_extension("tmp")` のファイルに書いて `sync_all` し、`fs::rename` で保存先に置き換える。`rename` が失敗したら一時ファイルを消してエラーを返す。
 - `Drop` での保存（`crates/pasta_lua/src/runtime/lifecycle.rs`）は、`PastaLuaRuntime` が保持する `PastaConfig` とベースディレクトリから保存先を計算し直し、`require("pasta.save")` を評価した表を書き出す。`require` が失敗した場合（`@pasta_persistence` の登録前など）は保存を省く。変換・書き込みの失敗はエラーログに出し、`Drop` からは伝えない。
 - `Drop` での保存は、`PastaLuaRuntime` が破棄されるすべての場合に走る。SHIORI 層では、ゴーストの終了（`SHIORI.unload` を呼んだ後のランタイムの破棄）と、`load` のやり直しで前のランタイムを捨てるときがこれにあたる。起動が途中で失敗して構築中のランタイムが破棄されるときも同じ処理が走る。`unload` を呼ばれずにホストのプロセスが終わったときはランタイムが破棄されないため、保存されない（[SHIORI 層](shiori.md#unloaddllmain-と-teardown)）。
 - `Drop` は `pasta.save` を `require` して保存するため、セッション中に一度も読み込まれていなければ、破棄の時点で読み込んでそのまま書き戻す。
@@ -455,7 +457,7 @@ VM の構築      register_persistence_module → persistence::register
 | `pasta_shiori` → Lua（リクエスト） | `PastaShiori` → `SHIORI.request` | 解析済みのリクエストの表 | `PastaShiori` が `PastaLuaRuntime` と取り出した Lua 関数を所有する。表は呼び出しの間だけ使われ、ACT の `req` として残る |
 | Lua → `pasta_shiori`（応答） | `SHIORI.request` → `PastaShiori` | SHIORI 応答の文字列 | 文字列の複製が Rust に渡る |
 | Lua 内（シーンの状態） | `EVENT.drive` → `STORE.co_scene`・`CALLBACK.pending` | コルーチンと ACT | Lua だけが所有する。Rust はコルーチンを持たず、再開もしない |
-| Lua ↔ Rust（永続化） | `pasta.save` ↔ `@pasta_persistence`、`Drop` ↔ `pasta.save` | `save` テーブル ↔ `serde_json::Value` | 表は Lua が所有する。Rust は変換して書き出すだけで、表を保持しない |
+| Lua ↔ Rust（永続化） | `pasta.save` ↔ `@pasta_persistence`、`Drop` ↔ `pasta.save` | `save` テーブル ↔ `toml::Table` | 表は Lua が所有する。Rust は変換して書き出すだけで、表を保持しない |
 
 `PastaLuaRuntime` を所有して呼び出すスレッドと、リクエストが届くまでの経路は [SHIORI 層](shiori.md) で扱う。
 
