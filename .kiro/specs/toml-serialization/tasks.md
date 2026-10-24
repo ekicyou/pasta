@@ -72,7 +72,7 @@
   - _Depends: 2.2, 3.1_
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 3.4, 4.5, 4.6, 4.9, 5.1, 5.2, 5.5_
 
-- [ ] 5. 文書
+- [x] 5. 文書
 - [x] 5.1 (P) セーブ機能のマニュアルの頁を TOML の動きに直す
   - `@pasta_persistence` の頁に、TOML（gzip した TOML）で保存すること、既定の保存先、`obfuscate` の名前の表、書ける値と書けない値、キーだけを外す扱いと警告の例、入れ子 32 段、`2^53` を超える整数が丸まること、`.broken` の退避と退避できないときに保存しないこと、0.4.3 から古いセーブを引き継がないことと古いファイルが残ること、新しい `_DESCRIPTION` を書く
   - `pasta.toml` の参照の頁（全体の例と `[persistence]` の節）と、変数の頁のグローバル変数の保存先を、TOML と新しい既定に直す
@@ -88,7 +88,7 @@
   - _Boundary: Docs_
   - _Requirements: 8.3, 8.4, 8.5_
 
-- [ ] 5.3 スキルの references を作り直し、steering と SKILL.md の 1 行を直す
+- [x] 5.3 スキルの references を作り直し、steering と SKILL.md の 1 行を直す
   - マニュアルからスキルの references を作り直し、作り直しの `--check` が 0 で終わる。マニュアルのリンクの検査が通る
   - `tech.md` の `toml` と `serde`／`serde_json` の用途の説明を、本仕様の後の使い方に直す
   - `pasta-ghost-authoring` の `SKILL.md` 175 行の「JSON ファイルに保存」を TOML の記述に直す。分類器が止めたら、入った分と残りを示して開発者の許可を求める

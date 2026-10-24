@@ -34,8 +34,8 @@
 - **mlua-stdlib 0.1**: Lua標準拡張ライブラリ（json, regex, yaml）
 - **regex 1.x**: 正規表現（さくらスクリプトタグ検出）
 - **thiserror 2**: エラー型定義
-- **toml 1.1.2**: 設定ファイル管理
-- **serde 1 / serde_json 1**: シリアライゼーション
+- **toml 1.1.2**: pasta の既定の書式。設定ファイル（pasta.toml）・セーブデータ（`@pasta_persistence`）・ソースマップのサイドカー（`.map`）の読み書き、`@pasta_log` の表の 1 行の書き出し
+- **serde 1 / serde_json 1**: serde は TOML の型付きの読み書き。serde_json は DAP のメッセージ（JSON が DAP の決まり）だけに使う
 - **glob 0.3**: ファイルパターンマッチ
 - **flate2 1.x**: gzip圧縮（キャッシュ等）
 - **zip 9.0 (deflate)**: pasta_scripts 自己展開（起動時 zip 解凍）・ビルド時の決定論 zip 生成

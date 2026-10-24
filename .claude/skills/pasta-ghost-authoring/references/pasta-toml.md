@@ -159,7 +159,7 @@ chars_line_end_prohibited = "（［｛「『([{｢"                           # 
 # --- 省略可（SHIORI デフォルト有）: 永続化 ---
 [persistence]
 obfuscate = false                                   # 既定 false
-file_path = "profile/pasta/save/save.json"          # 既定 "profile/pasta/save/save.json"
+file_path = "profile/pasta/save/save.toml"          # 既定 "profile/pasta/save/save.toml"
 debug_mode = false                                  # 既定 false
 
 # --- 省略可（SHIORI デフォルト有）: ログ出力 ---
@@ -705,16 +705,17 @@ script_wait_comma = 300
 | キー | 型 | 既定値 | 説明 |
 | ---- | -- | ------ | ---- |
 | `obfuscate` | 真偽値 | `false` | gzip 圧縮して保存する（難読化）。保存先の拡張子は `.dat` になる |
-| `file_path` | 文字列 | `"profile/pasta/save/save.json"` | 保存先のパス（設置ディレクトリからの相対パス） |
+| `file_path` | 文字列 | `"profile/pasta/save/save.toml"` | 保存先のパス（設置ディレクトリからの相対パス） |
 | `debug_mode` | 真偽値 | `false` | 読み込み・保存のたびにデバッグログを出す |
 
 ```toml
 [persistence]
 obfuscate = true
-file_path = "profile/pasta/save/save.json"
+file_path = "profile/pasta/save/save.toml"
 ```
 
-- `obfuscate = true` のとき、`file_path` が `.json` で終わればその部分を `.dat` に変え、それ以外なら末尾に `.dat` を足したパスへ保存する（既定では `profile/pasta/save/save.dat`）。
+- 保存の形式は TOML（`obfuscate = true` なら gzip 圧縮した TOML）である。
+- `obfuscate = true` のとき、`file_path` の末尾が `.toml` ならその末尾だけを `.dat` に変え、`.dat` ならそのまま、それ以外なら末尾に `.dat` を足したパスへ保存する（既定では `profile/pasta/save/save.dat`）。
 - `file_path` に絶対パスや `..` を含むパスを書くと、ゴーストの読み込みが失敗する。
 - 保存のしくみと API は [@pasta_persistence](https://ekicyou.github.io/pasta/lua/modules/pasta-persistence.html) を参照する。
 
