@@ -144,3 +144,17 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
   - 冒頭のステータス（「0.4.2 に入れる」）と Approach の「この spec（0.4.2）」は古い。今は 0.4.3 の最後。
   - `crates/pasta_shiori/README.md` 92 行の `wintf-winmsg-executor` が 0.0.3、112 行の `ctor` が 0.2 のまま（PR #187 で 0.0.5・1.0）。この spec で `wintf` を外すなら、92 行は行ごと消す。
   - crates.io の `shiori4` 0.0.2 が出たかは、今回は確かめていない。
+
+## 2026-10-24 棚卸の再測定（main `1fb7ed38`）
+
+- **前提の変化**: 前回（main `c20ad104`）の後に入った 4 本のうち、`pasta_shiori` に触れたのは `recommend-menu-scenes` の別名の試験（`tests/scene_alias_ontalk_e2e_test.rs`・`tests/fixtures/scene_alias_ontalk/pasta.toml`）と `README.md` の版の表だけ。`actor/`・`windows.rs`・`lib.rs`・`shiori.rs`・`pasta_lua/src/logging/`・`build.yml` は変わっていない。
+- **触るファイル**: 前回のまま。
+- **規模**: 14〜18 のまま。分割は不要。
+- **先に要るもの**
+  - 働きの上では無い。
+  - ファイルの順: 記録にある始められない理由は、今も `mlua-0-12-upgrade` とルートの `Cargo.toml`・`Cargo.lock`・`pasta_shiori/src/shiori.rs`（3 行 `use pasta_lua::mlua::{Function, Table}`）を共有することだけ。`mlua-0-12-upgrade` は今すぐ始められるようになったので、その次のウェーブで始められる。同じウェーブには置けない（`Cargo.lock` の席と `shiori.rs`）。
+- **種別**: 機能（Windows 以外で読める別口）。
+- **要件定義のモデル**: Opus（前回のまま）。
+- **見つけた穴・古くなった記述**
+  - 前回の穴の `README.md` 92 行（`wintf-winmsg-executor` 0.0.5）・112 行（`ctor` 1.0）は直った。`wintf` を外すなら 92 行を行ごと消すのは、そのまま残る。
+  - 冒頭のステータス（「0.4.2 に入れる」）は、まだ古い。

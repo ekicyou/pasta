@@ -21,7 +21,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
 - [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
 
-**完了仕様**: 184件（2026-10-24 時点・`.kiro/specs/completed/` に格納）
+**完了仕様**: 188件（2026-10-24 時点・`.kiro/specs/completed/` に格納）
 
 **主要成果**:
 - ✅ **act-impl-call** - `ACT_IMPL.call` 4段階優先順位検索実装
@@ -106,4 +106,4 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [ ] arekaへの投入（`ukagaka-desktop-mascot`メタ仕様）
 - [ ] MCPまたはLLMとの連携
 
-**現在地**: 現行バージョン v0.4.2（2026-10-23 リリース）。致命的でない不具合の 7 本（ゴーストから DLL の関数を FFI で呼ぶ・`pasta_check` の単体配布・シーンからの自動トークの停止と再開・MCP から指名したシーンの再生・外からの `＞名前` の呼び出しと変数の代入・`REG:register` によるハンドラの重ね・台詞を出さないイベントでチェイントークの続きが消えない直し）と、書記素クラスタ単位の自動ウェイトと改行、pasta のスキル 3 本を `pasta-skills.zip` にしてリリースに添える直しが入った。その前の v0.4.1（2026-10-18 リリース）には、辞書の検査の端のケース・入門ガイドと SSP のずれと、窓際のぱすたさんからの要望 2 本（アクターごとの表示の装い・縦書きのバルーンの列の扱い）が入った。その前の v0.4.0（2026-10-17 リリース。主題は「入門者にやさしく」）は、初めて辞書を書く人が迷わず進めて、書き間違えたときに原因が分かることを優先した版で、hello-pasta の新しいシェル、9 段目の選択肢の直し、撫で・つつきの反応のショートカット、実行時の失敗の出力の一本化、止まるエラーのバルーン表示、SSP を起動しない辞書の検査（`pasta_check validate`）、シェルの説明の章、入門ガイドの絵が入った。次は 0.4.3（範囲は [roadmap.md](roadmap.md) の「0.4.3 の範囲」。致命的な不具合のセーブの TOML 化 `toml-serialization` を最優先に、mlua 0.12 へ上げる 2 本（`mlua-stdlib-removal`・`mlua-0-12-upgrade`）、おすすめメニューをシーンで書く `recommend-menu-scenes`、作者のフォルダを消す不具合を直す `ponytail-check-release`、最後に SHIORI3 互換モードで Windows 以外でも動かす `shiori4-v3-portable`。2026-10-24 開発者の決定）、その次の 0.4.4（ponytail 監査の指摘を直す残りの 9 本）と、0.5.0 の目標（別リポジトリで開発中の areka でノベルゲームが作れるようになること）。属性セマンティクス（シーン属性・Call の属性フィルター）は 0.5.0 の道筋に入った。リリースの CI 化と CI での初回リリース（v0.3.8）は完了した
+**現在地**: 現行バージョン v0.4.2（2026-10-23 リリース）。致命的でない不具合の 7 本（ゴーストから DLL の関数を FFI で呼ぶ・`pasta_check` の単体配布・シーンからの自動トークの停止と再開・MCP から指名したシーンの再生・外からの `＞名前` の呼び出しと変数の代入・`REG:register` によるハンドラの重ね・台詞を出さないイベントでチェイントークの続きが消えない直し）と、書記素クラスタ単位の自動ウェイトと改行、pasta のスキル 3 本を `pasta-skills.zip` にしてリリースに添える直しが入った。その前の v0.4.1（2026-10-18 リリース）には、辞書の検査の端のケース・入門ガイドと SSP のずれと、窓際のぱすたさんからの要望 2 本（アクターごとの表示の装い・縦書きのバルーンの列の扱い）が入った。その前の v0.4.0（2026-10-17 リリース。主題は「入門者にやさしく」）は、初めて辞書を書く人が迷わず進めて、書き間違えたときに原因が分かることを優先した版で、hello-pasta の新しいシェル、9 段目の選択肢の直し、撫で・つつきの反応のショートカット、実行時の失敗の出力の一本化、止まるエラーのバルーン表示、SSP を起動しない辞書の検査（`pasta_check validate`）、シェルの説明の章、入門ガイドの絵が入った。次は 0.4.3（範囲は [roadmap.md](roadmap.md) の「0.4.3 の範囲」。致命的な不具合のセーブの TOML 化 `toml-serialization` を最優先に、mlua 0.12 へ上げる 2 本（`mlua-stdlib-removal`・`mlua-0-12-upgrade`）、おすすめメニューをシーンで書く `recommend-menu-scenes`、作者のフォルダを消す不具合を直す `ponytail-check-release`、最後に SHIORI3 互換モードで Windows 以外でも動かす `shiori4-v3-portable`。2026-10-24 開発者の決定。2026-10-24 に `toml-serialization`・`mlua-stdlib-removal`・`recommend-menu-scenes`・`ponytail-check-release` の 4 本が入り、残りは `mlua-0-12-upgrade`・`shiori4-v3-portable`）、その次の 0.4.4（ponytail 監査の指摘を直す残りの 9 本）と、0.5.0 の目標（別リポジトリで開発中の areka でノベルゲームが作れるようになること）。属性セマンティクス（シーン属性・Call の属性フィルター）は 0.5.0 の道筋に入った。リリースの CI 化と CI での初回リリース（v0.3.8）は完了した
