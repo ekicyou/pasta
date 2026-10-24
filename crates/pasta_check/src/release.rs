@@ -2,6 +2,8 @@ use crate::ReleaseArgs;
 use crate::balloon::plan_bundled_balloons;
 use crate::copy::{copy_dir_recursive, prepare_release_dir};
 use crate::nar::create_nar;
+use crate::path_error;
+use crate::release_args::check_release_args;
 use crate::update_files::generate_update_files;
 use crate::validate_cmd::{ValidateOutcome, run_on_master};
 use std::fs;
@@ -10,6 +12,9 @@ use std::path::Path;
 
 /// release サブコマンドを実行
 pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
+    // 段の表示より前に、危ない組み合わせを何にも触れずに断る
+    check_release_args(args)?;
+
     // Step 1: リリースフォルダー初期化
     println!("[1/6] Preparing release folder...");
     prepare_release_dir(&args.release)?;
@@ -81,7 +86,7 @@ fn remove_stale_nar(nar: &Path) -> io::Result<()> {
             Ok(())
         }
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e),
+        Err(e) => Err(path_error(e, "remove", nar)),
     }
 }
 
@@ -230,6 +235,70 @@ mod tests {
         let mut archive = zip::ZipArchive::new(file).unwrap();
         assert!(archive.by_name("updates.txt").is_ok());
         assert!(archive.by_name("ghost/master/updates.txt").is_ok());
+    }
+
+    /// release.ps1 の段 4 の形（ghosts\<名前> から release\<名前> と release\<名前>.nar を
+    /// 同じ親に並べて作る）で最後まで進む（Req 4.1・4.2・7.4）
+    #[test]
+    fn test_execute_release_release_ps1_stage4_shape() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("ghosts").join("hello");
+        write_files(&target, MIN_GHOST);
+        write_files(
+            &target,
+            &[("install.txt", "charset,UTF-8\r\ntype,ghost\r\n")],
+        );
+
+        let release = temp.path().join("release").join("hello");
+        let nar = temp.path().join("release").join("hello.nar");
+        let args = ReleaseArgs {
+            target,
+            release: release.clone(),
+            nar: nar.clone(),
+            copy_dirs: vec![],
+        };
+
+        execute_release(&args).unwrap();
+
+        let entries = read_nar(&nar);
+        assert!(entries.contains_key("install.txt"));
+        assert!(entries.contains_key("updates.txt"));
+        assert!(entries.contains_key("ghost/master/dic/a.pasta"));
+        assert!(release.join("updates.txt").exists());
+    }
+
+    /// 段 2 の I/O の誤りは、読めなかったフォルダのパスを添えて返る（Req 5.3）。
+    /// 確かめ（metadata・canonicalize）は排他で開いたフォルダでも通る
+    #[cfg(windows)]
+    #[test]
+    fn test_execute_release_stage2_io_error_carries_path() {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+
+        let temp = TempDir::new().unwrap();
+        let target = temp.path().join("ghost");
+        write_files(&target, MIN_GHOST);
+        let locked = target.join("ghost").join("master").join("dic");
+        let _handle = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+            .open(&locked)
+            .unwrap();
+
+        let args = ReleaseArgs {
+            target,
+            release: temp.path().join("release"),
+            nar: temp.path().join("out.nar"),
+            copy_dirs: vec![],
+        };
+        let err = execute_release(&args).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.starts_with(&format!("cannot read {}: ", locked.display())),
+            "{msg}"
+        );
     }
 
     /// root 配下に (相対パス, 内容) のファイルを親フォルダごと書く
@@ -479,9 +548,9 @@ mod tests {
         }
     }
 
-    /// 後段で失敗しても --nar の位置に前回の nar が残らない（Req 8.8）
+    /// 無い --copy は確かめで断り、前回の nar が中身ごと残る（Req 1.7・8.6）
     #[test]
-    fn test_execute_release_removes_stale_nar_on_failure() {
+    fn test_execute_release_keeps_stale_nar_when_check_rejects() {
         let temp = TempDir::new().unwrap();
 
         let target = temp.path().join("target_ghost");
@@ -498,8 +567,9 @@ mod tests {
             copy_dirs: vec![temp.path().join("no_such_overlay")],
         };
 
-        assert!(execute_release(&args).is_err());
-        assert!(!nar.exists());
+        let err = execute_release(&args).unwrap_err();
+        assert!(err.to_string().ends_with("does not exist"), "{err}");
+        assert_eq!(fs::read_to_string(&nar).unwrap(), "old nar");
     }
 
     /// 成功時は前回の nar が新しい nar に置き換わる（Req 8.8）
@@ -534,7 +604,7 @@ mod tests {
     /// var/ は段 5（updates.txt）の対象外で、段 6 だけが読む。
     #[cfg(windows)]
     #[test]
-    fn test_execute_release_removes_partial_nar_on_stage5_failure() {
+    fn test_execute_release_removes_partial_nar_on_stage6_failure() {
         use std::ffi::OsString;
         use std::os::windows::ffi::OsStringExt;
 

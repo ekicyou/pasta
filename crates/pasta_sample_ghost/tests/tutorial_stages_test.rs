@@ -9,26 +9,14 @@
 //! 段階 N の検証は `master/` を tempdir へコピーしてから行い、コミット済みのゴーストを
 //! その場では読み込まない（自己展開の `profile/` は tempdir の中にだけできる）。
 
+mod common;
+
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use pasta_lua::PastaLuaRuntime;
 use pasta_lua::loader::PastaLoader;
 use tempfile::TempDir;
-
-/// Neutralize ambient DAP debug env vars before any test thread starts.
-///
-/// The developer session may export `PASTA_DEBUG=1` / `PASTA_DEBUG_PORT=9276`.
-/// Loads in this binary would then bind that single fixed port and collide with
-/// `AddrInUse`. Same guard as `self_deploy_integration_test.rs`; running inside a
-/// `#[ctor]` (before `main`, single-threaded) makes `remove_var` race-free.
-#[ctor::ctor(unsafe)]
-fn neutralize_debug_env() {
-    unsafe {
-        std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
-    }
-}
 
 /// 段階表の 1 行（テストが読む列だけ）
 struct StageRow {
@@ -178,29 +166,10 @@ fn read_stages_md() -> String {
     std::fs::read_to_string(crate_dir().join("STAGES.md")).expect("STAGES.md を読めない")
 }
 
-/// `src` を `dst` へ再帰コピーする。`profile/`（自己展開先・保存データ）と `pasta.dll`
-/// （ローダーに不要）は持ち越さない。`self_deploy_integration_test.rs` の
-/// `copy_tree_skip_profile` と同じ処理に `pasta.dll` の除外を足したもの。
-fn copy_master(src: &Path, dst: &Path) {
-    std::fs::create_dir_all(dst).expect("create dst dir");
-    for entry in std::fs::read_dir(src).expect("read src dir").flatten() {
-        let path = entry.path();
-        let name = entry.file_name();
-        if entry.metadata().expect("metadata").is_dir() {
-            if name != "profile" {
-                copy_master(&path, &dst.join(&name));
-            }
-        } else if name != "pasta.dll" {
-            std::fs::copy(&path, dst.join(&name)).expect("copy file");
-        }
-    }
-}
-
 /// master/ を tempdir へコピーし（profile/ と pasta.dll を除く）、
 /// dic/ から段階 n より後のファイルを消す
 fn assemble_stage(rows: &[StageRow], n: u8) -> TempDir {
-    let temp = TempDir::new().expect("tempdir");
-    copy_master(&master_dir(), temp.path());
+    let temp = common::master_copy();
     for row in rows.iter().filter(|r| r.stage > n) {
         if let Some(file) = &row.file {
             std::fs::remove_file(temp.path().join("dic").join(file))

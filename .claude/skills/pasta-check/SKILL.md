@@ -70,6 +70,17 @@ pasta_check release --target <path> --release <path> --nar <path> [--copy <path>
 | `--nar <path>` | ✅ | 出力 NAR ファイルパス |
 | `--copy <path>` | | 上書きコピー元フォルダー（複数指定可、後勝ち） |
 
+段 1 の前に引数の関係を確かめ、次の組み合わせは何にも触れずに断る（段の表示も出さない）。
+
+| 組み合わせ | 断る関係 |
+|-----------|---------|
+| `--target`・各 `--copy` | 無い・フォルダでない（最初に調べる） |
+| `--release` と `--target`・各 `--copy` | 同じ・`--release` が含む・`--release` が中にある |
+| `--nar` と `--release`・`--target`・各 `--copy` | 同じ・`--nar` が中にある |
+
+- パスは絶対の形にし、在る部分を正規化して部品ごとに比べる（相対パス・`..`・大文字と小文字・8.3 の短い名前でも同じ場所なら断る）。`release\hello` と `release\hello.nar` のような隣は断らない
+- 断ったときは配布フォルダの中身・前回の nar・開発フォルダのファイルが全部そのまま残る
+
 #### release の実行フロー（6ステップ）
 
 ```
@@ -81,7 +92,9 @@ pasta_check release --target <path> --release <path> --nar <path> [--copy <path>
 [6/6] Creating NAR archive       ← --release を ZIP 圧縮して --nar に出力
 ```
 
+- 段 1 の前の引数の確かめ（上の表）で止まったときは何も消さない。前回の nar も残る。
 - 段 1 で配布フォルダを準備した後に前回の nar を消し、段 6 で失敗したときは作りかけの nar も消すため、削除した後の段でエラーになったときは nar が残らない（古い nar を最新と誤って配らない）。
+- 段 1〜3・5・6 の I/O の誤りは `cannot read <パス>: <OS の文言>` のように、操作とパスを添えて出す。段 5 で読めない項目（同梱バルーンのフォルダの中も含む）があれば段 5 で止まり、updates.txt と nar を作らない。
 - 段 4（関門）は validate と同じ形で問題とまとめの行を出す。誤りが 1 件でもあると `Error: dictionary validation found N error(s); update files and NAR were not created` で終了コード 1 になり、updates.txt と nar を作らない。配布フォルダに ghost/master が無いときも段 4 でエラー。注意だけなら注意を出して段 5 へ進む。検査を省くオプションは無い。
 - 段 5 は `--copy` 上書き後の配布フォルダ直下の `install.txt` を読む。`install.txt` があるときは、UTF-8 で 1 行目が `charset,UTF-8` でなければならない（同梱バルーンの有無にかかわらず必須）。`install.txt` が無ければ同梱バルーンは無いものとする。
 - `install.txt` のバルーン指定（`balloon[N].source.directory`・`balloon[N].directory`）が指すフォルダを同梱バルーンとし、そのフォルダ配下はゴースト用 `updates.txt` から除き、フォルダ直下にバルーン用 `updates.txt`（パスはバルーンのフォルダが基準）を生成する。
@@ -173,6 +186,10 @@ SSP 仕様および NAR フォーマットの詳細:
 | `pasta_shiori build failed` | 32bit ターゲット未インストール | `rustup target add i686-pc-windows-msvc` |
 | `pasta.dll not found` | DLL ビルドをスキップしたが未ビルド | DLL ビルドを先に実行 |
 | `pasta_check release failed` | パス不正 or ディスク容量 | エラーメッセージの詳細を確認 |
+| `Error: --target (<パス>) does not exist`／`... is not a directory`（`--copy` も同じ形） | 開発フォルダか上書きフォルダが無い、またはファイルを指している | 在るフォルダを渡す（何も消さずに止まっている） |
+| `Error: --release (<パス>) must not be the same as / contain / be inside --target (<パス>)`（`--copy` も同じ形） | 配布フォルダが開発フォルダ・上書きフォルダと同じ・親・中にある | 開発フォルダの外の別のフォルダ（例: `release\<ゴースト名>`）を渡す（何も消さずに止まっている） |
+| `Error: --nar (<パス>) must not be the same as / be inside --release (<パス>)`（`--target`・`--copy` も同じ形） | nar の置き場が配布フォルダ・開発フォルダ・上書きフォルダと同じか中にある | 配布フォルダの隣（例: `release\<ゴースト名>.nar`）に置く |
+| `Error: cannot read <パス>: ...`（`create`・`write`・`copy … to`・`pack`・`remove` も同じ形） | そのパスの読み書きに失敗した（使用中・権限など。後ろは OS の文言） | 示されたパスを開いているプログラムを閉じる・権限を確かめる |
 | `Error: dictionary validation found N error(s); update files and NAR were not created` | 段 4 の辞書の検査で誤りが見つかった（直前に問題の行が出る） | 問題の行の誤りを直す（`pasta_check validate --target <ゴースト開発フォルダー>` で手元で確かめられる） |
 | `Warning: bundled balloon "<フォルダ>": descript.txt has no homeurl` | 同梱バルーンの `descript.txt` に `homeurl` が無いか値が空（nar は作成される） | バルーンをネットワーク更新させるなら `descript.txt` に `homeurl` を書く |
 | `Error: install.txt is not UTF-8: ...` | `install.txt` が UTF-8 でない、または 1 行目が `charset,UTF-8` でない | `install.txt` を UTF-8 で保存し、1 行目を `charset,UTF-8` にする |
