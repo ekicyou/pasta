@@ -125,10 +125,8 @@
 
 1. **`RuntimeConfig` に 6 つの名前が並んだとき**。今の `to_stdlib` は `std_` で始まらない名前を黙って飛ばす。6 つの名前を誤りにすると、Rust から `pasta_lua` を使う人が気づけるが、`ConfigError` の新しい場合を作ることになる。推奨は、今のまま黙って飛ばす（`std_` でない知らない名前も今そうしている）。
 2. **`@toml` を `libs` で切れるようにするか**。推奨は、切れない（上の推奨）。
-3. **`number` で受ける数の書き方**。LuaJIT の `tonumber` は、前後の空白、`0x10`、`1e3` を数にし、`inf`・`nan` も数にしうる。`inf`・`nan` がセーブに入ると、`toml-serialization` の TOML の書き出しで扱いが要る。先例は 2 つある（`act.lua` の `tonumber` の範囲と、`scene_play.lua` の `^%d+$`）。推奨は、10 進の整数と小数、先頭の `-` だけを受け（`^-?%d+$`・`^-?%d+%.%d+$` の形）、空白・全角・16 進・指数・`inf`・`nan` は断る。
-4. **失敗の種類の割り当て**。種類の数 12 を保つ案は 2 つ。
-   - 案 1: `NOT_JSON` を「知らない型」（例「型の名前にならない値」）に置き換え、値が型に合わない（`number`・`boolean`）と Reference1 が無いときは `NOT_ASSIGNABLE`（代入できない値）を使う。
-   - 案 2: `number` の失敗に既存の `NOT_NUMBER`（数にできない値）を使い、`boolean` と Reference1 が無いときは `NOT_ASSIGNABLE`、知らない型は `NOT_JSON` を置き換えた種類にする。
-   - どちらも `failure_test.lua` の数は 12 のまま。`recommend-menu-scenes` は種類を足さない約束なので、重ならない。
+3. **`number` で受ける数の書き方**。LuaJIT の `tonumber` は、前後の空白、`0x10`、`1e3` を数にし、`inf`・`nan` も数にしうる。`inf`・`nan` がセーブに入ると、`toml-serialization` の TOML の書き出しで扱いが要る。先例は 2 つある（`act.lua` の `tonumber` の範囲と、`scene_play.lua` の `^%d+$`）。**決定（2026-10-24 要件の話し合い）**: Lua の `tonumber` で数にし、`inf`・`nan`（結果が無限大か非数）だけを断る。実行中に届いた値を数にする所（`ACT.num`・`clock.lua`・`mouse.lua`・`callback.lua`・`scene_play.lua`）はどれも Lua の `tonumber` で、Rust の変換は書いた文を読むとき（DSL の数・SHIORI の見出し・pasta.toml）だけという今の線に合わせる。Rust の変換を Lua に公開する案は、5 か所と DSL の算術の動きを変えるので採らない（そろえたくなったら別の spec）。`lj_strscan.c` で、前後の空白・`inf`/`infinity`/`nan`・`0x` を受けることを確かめた。
+4. **失敗の種類の割り当て**。**決定（2026-10-24）**: `number` の失敗は既存の `NOT_NUMBER`（数にできない値）、`boolean` の失敗と Reference1 が無いときは `NOT_ASSIGNABLE`（代入できない値）、知らない型の名前は `NOT_JSON` を置き換えた「型の名前にならない値」。`failure_test.lua` の数は 12 のまま。`recommend-menu-scenes` は種類を足さない約束なので、重ならない。
+   - 空の Reference2 は型を省いたのと同じ（文字列）。空の Reference1 は空の文字列を代入し、無い Reference1 は断る（同じ日の決定）。
 5. **`toml::de::Error` の文の形**。`Display` は複数行（位置と、問題の行の抜き出し）になる。失敗の表記やログに載せるときに 1 行にするかは、`@toml` を使う作者に任せる（`decode` は文をそのまま返す）のが簡単。
 6. **大きな整数**。`toml_to_lua` は整数を `f64` にするので、2^53 を超える整数は丸まる。`@pasta_config` と同じ規則（要件 2.3）なので、そのままにしてマニュアルに一言書くかを設計で決める。

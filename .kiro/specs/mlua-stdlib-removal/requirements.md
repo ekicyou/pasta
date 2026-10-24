@@ -101,13 +101,13 @@ raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "", 
 
 #### Acceptance Criteria
 
-1. When `OnPastaSetSaveVariable` を受け取り、Reference0 に名前があり、Reference2 が無いとき, the pasta shall Reference1 に届いた文字列を、手を加えずに文字列のまま、その名前のグローバル変数（`＄＊名前`）に代入する。
+1. When `OnPastaSetSaveVariable` を受け取り、Reference0 に名前があり、Reference2 が無いか空の文字列のとき, the pasta shall Reference1 に届いた文字列を、手を加えずに文字列のまま、その名前のグローバル変数（`＄＊名前`）に代入する（空の Reference2 は型を省いたのと同じ。送る道具が Reference の席を空で埋めても文字列になる）。
 2. When Reference2 が `string` のとき, the pasta shall Reference2 が無いときと同じく、Reference1 の文字列をそのまま代入する。
 3. The pasta shall 型が文字列のとき、Reference1 を何の書式としても読まない（`01` は文字列の `01`、`"01"` は引用符を含めた文字列、`60` は文字列の `60`、`null` は文字列の `null`、空の文字列は空の文字列になる）。
-4. When Reference2 が `number` で、Reference1 が数の形の文字列（`60`・`-1.5` など）のとき, the pasta shall Reference1 を数値にして代入する。
+4. When Reference2 が `number` で、Reference1 が、実行中に届いた値をほかの所で数にするときと同じ範囲（DSL の算術や時計の Reference と同じく Lua の標準の数の読み方。`60`・`-1.5`・前後の空白・`0x10`・`1e3` を含む）で数として読め、無限大・非数にならないとき, the pasta shall Reference1 を数値にして代入する。
 5. When Reference2 が `boolean` で、Reference1 が `true` か `false` のとき, the pasta shall それぞれ真偽値の `true`・`false` を代入する。
 6. When Reference2 が `delete` のとき, the pasta shall Reference1 の中身（無い・空・どんな文字列でも）を見ずに、その名前のグローバル変数を消し、値の無い状態に戻す（辞書から `＄＊名前` を読むと、値を代入していない変数と同じになる）。
-7. The pasta shall 型の名前を、`number`・`string`・`boolean`・`delete` の英小文字の完全一致だけで見分ける（`Number`・`数値`・空の文字列は知らない型の名前になる）。
+7. The pasta shall 型の名前を、`number`・`string`・`boolean`・`delete` の英小文字の完全一致だけで見分ける（`Number`・`数値` は知らない型の名前になる。空の文字列は 3.1 のとおり型を省いたのと同じ）。
 8. When 代入したとき・消したとき, the pasta shall 204 No Content を返す。
 9. The pasta shall 名前の扱い（区切らない・予約グローバル変数にも代入できる）、代入した値がその後の `＄＊名前` にすぐ見えること、保存を終了時の自動保存に任せることを、`external-control-events` で決めたとおりに保つ。
 
@@ -117,13 +117,13 @@ raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "", 
 
 #### Acceptance Criteria
 
-1. If Reference2 が `number` で、Reference1 が数の形でない（`abc`・空の文字列・無い）とき, the pasta shall 変数を変えずに前の値を残し、失敗の表記とログの警告を出す。
-2. If Reference2 が `boolean` で、Reference1 が `true`・`false` のどちらでもない（`TRUE`・`1`・空の文字列・無い）とき, the pasta shall 変数を変えずに前の値を残し、失敗の表記とログの警告を出す。
-3. If Reference2 が `number`・`string`・`boolean`・`delete` のどれでもないとき, the pasta shall 変数を変えずに前の値を残し、届いた型の名前を含めた失敗の表記とログの警告を出す。
-4. If Reference2 が無いか `string` で、Reference1 が無いとき, the pasta shall 変数を変えずに前の値を残し、失敗の表記とログの警告を出す（変数を消すのは `delete` を送ったときだけである）。
+1. If Reference2 が `number` で、Reference1 が数として読めない（`abc`・空の文字列・無い）か、無限大・非数になる（`inf`・`nan`）とき, the pasta shall 変数を変えずに前の値を残し、種類「数にできない値」の失敗の表記とログの警告を出す。
+2. If Reference2 が `boolean` で、Reference1 が `true`・`false` のどちらでもない（`TRUE`・`1`・空の文字列・無い）とき, the pasta shall 変数を変えずに前の値を残し、種類「代入できない値」の失敗の表記とログの警告を出す。
+3. If Reference2 が空でなく、`number`・`string`・`boolean`・`delete` のどれでもないとき, the pasta shall 変数を変えずに前の値を残し、種類「型の名前にならない値」で、届いた型の名前を含めた失敗の表記とログの警告を出す。
+4. If Reference2 が無い・空・`string` のどれかで、Reference1 が無いとき, the pasta shall 変数を変えずに前の値を残し、種類「代入できない値」の失敗の表記とログの警告を出す（変数を消すのは `delete` を送ったときだけである）。
 5. The pasta shall 失敗の表記に、イベント名と変数の名前（`OnPastaSetSaveVariable ＄＊会員番号`）と、届いた値を引用符で包まずにそのまま（値が無ければ「値なし」、空なら「空文字列」）入れ、ログの警告に、イベント名・変数の名前・誤った Reference とその値を書く。
 6. The pasta shall 失敗の表記の出方（デバッグの有無によらず出る、`balloon_warning = false` では 204 No Content）を、ほかの実行時の失敗と同じにする。
-7. The pasta shall `OnPastaSetSaveVariable` の失敗の種類の名前に「JSON」を含めず、今の「JSON として読めない値」を置き換えて、失敗の種類の数を増やさない。
+7. The pasta shall `OnPastaSetSaveVariable` の失敗の種類の名前に「JSON」を含めず、今の「JSON として読めない値」を「型の名前にならない値」に置き換え、「数にできない値」「代入できない値」は今ある種類を使って、失敗の種類の数（12）を増やさない。
 8. The pasta shall Reference0 が無い・空のとき、`SecurityLevel` が `external` のときの断り方を、今のまま変えない。
 
 ### Requirement 5: マニュアル・スキル・文書を今の姿にする
