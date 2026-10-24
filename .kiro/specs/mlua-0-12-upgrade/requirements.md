@@ -65,8 +65,8 @@ coroutine.status(co)        -- "suspended"  ← 前後で同じ
 **Objective:** As a pasta の開発者, I want pasta が mlua 0.12 系の上でビルドされる, so that 0.12 の側にだけ入る不具合の直しと LuaJIT の取り込みを受け取れる
 
 #### Acceptance Criteria
-1. The pasta ワークスペース shall mlua を 0.12 系（0.12.2 以上・0.13 未満）に依存する。**前提（仮定）**: 下限は 0.12.2（OPEN QUESTION 4）。
-2. The pasta ワークスペース shall mlua の features を `luajit52`・`vendored`・`serialize` のまま保つ。**前提（仮定）**: `serialize` は配列の印のためだけに要るが、残す（OPEN QUESTION 3）。
+1. The pasta ワークスペース shall mlua を 0.12 系（0.12.2 以上・0.13 未満）に依存する（下限は、ギャップ分析で x86・x64 の試験を通した 0.12.2。試していない版を許さない）。
+2. The pasta ワークスペース shall mlua の features を `luajit52`・`vendored`・`serialize` のまま保つ（`serialize` は配列の印のためだけに要るが、brief の Out「features を変えない」に従って残す）。
 3. The pasta ワークスペース shall crates.io に公開できる形の依存だけで mlua を引く（git やパスの依存を使わない）。
 4. When `Cargo.lock` を更新するとき, the pasta ワークスペース shall mlua に引かれて上がる mlua-sys・`luajit-src`・`lua-src` 以外の依存の版を変えない。
 5. The pasta.dll shall 静的 CRT のリンクのまま、mlua が組み込む LuaJIT を同じビルドに含める。
@@ -151,6 +151,6 @@ coroutine.status(co)        -- "suspended"  ← 前後で同じ
 
 1. **x86 のビルドの不具合を、どこで直すか**: 今の main は x86 のビルドが通らない（CI の build-x86 が `e221ebf3`（`toml-serialization`）から赤）。前提（仮定）はこの spec で直す（Requirement 7）。先に小さな直しとして main へ入れる道もある。
 2. **x86 と x64 で、セーブに書いた文字を揃えるか**: 32 ビットに収まらない整数を、x86 は `3000000000.0`、x64 は `3000000000` と書く（読み戻した値は同じ）。表に入った `i64::MIN` も、x64 は整数、x86 は `-9.223372036854776e18` と書く（版上げの試しで、既存の往復の試験 2 本が x86 だけこの差で落ちた）。揃えるなら、整数の値を持つ浮動小数を整数として書く決まりが要る（Requirement 7.2）。
-3. **features の `serialize` を残すか**: 使うのは配列の印（`array_metatable`）だけ。前提（仮定）は残す（brief の推奨。範囲を広げない。Requirement 1.2）。
-4. **mlua の版の下限**: 前提（仮定）は 0.12.2 以上（0.12.1・0.12.2 のコルーチン・フック・コールバックの直しを確実に受ける。Requirement 1.1）。`0.12` とだけ書くかは設計で決めてもよい。
+3. **（閉じた）features の `serialize` を残すか**: 使うのは配列の印（`array_metatable`）だけ。前提（仮定）は残す（brief の推奨。範囲を広げない。Requirement 1.2）。
+4. **（閉じた）mlua の版の下限**: 前提（仮定）は 0.12.2 以上（0.12.1・0.12.2 のコルーチン・フック・コールバックの直しを確実に受ける。Requirement 1.1）。`0.12` とだけ書くかは設計で決めてもよい。
 5. **`pasta_lua::mlua` の版が変わることを、0.4.3（パッチの版）で出してよいか**: `pasta_lua` は crates.io に出しており、`pub use mlua;` で mlua を公開の口に含む。0.4.3 にはすでに破壊的変更（`mlua-stdlib-removal` の `RuntimeConfig` など）が入っているので、前提（仮定）は 0.4.3 のまま出してリリースノートに書く（Requirement 8.5）。
