@@ -2,12 +2,14 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+use crate::path_error;
+
 /// release フォルダーを削除して空ディレクトリとして再作成
 pub(crate) fn prepare_release_dir(release_dir: &Path) -> io::Result<()> {
     if release_dir.exists() {
-        fs::remove_dir_all(release_dir)?;
+        fs::remove_dir_all(release_dir).map_err(|e| path_error(e, "remove", release_dir))?;
     }
-    fs::create_dir_all(release_dir)
+    fs::create_dir_all(release_dir).map_err(|e| path_error(e, "create", release_dir))
 }
 
 /// `child` が `parent` ディレクトリの配下であることを検証する。
@@ -34,18 +36,21 @@ pub(crate) fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<u64> {
 }
 
 fn copy_dir_inner(src: &Path, dst: &Path, count: &mut u64) -> io::Result<()> {
-    fs::create_dir_all(dst)?;
+    fs::create_dir_all(dst).map_err(|e| path_error(e, "create", dst))?;
 
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
+    let read_err = |e| path_error(e, "read", src);
+    for entry in fs::read_dir(src).map_err(read_err)? {
+        let entry = entry.map_err(read_err)?;
+        let src_path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|e| path_error(e, "read", &src_path))?;
 
         // シンボリックリンクはスキップ（Req 2.1）
         if file_type.is_symlink() {
             continue;
         }
 
-        let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
 
         // パストラバーサル防御: dst_pathがdstの配下であることを検証（Req 1.4）
@@ -54,7 +59,9 @@ fn copy_dir_inner(src: &Path, dst: &Path, count: &mut u64) -> io::Result<()> {
         if file_type.is_dir() {
             copy_dir_inner(&src_path, &dst_path, count)?;
         } else {
-            fs::copy(&src_path, &dst_path)?;
+            fs::copy(&src_path, &dst_path).map_err(|e| {
+                path_error(e, &format!("copy {} to", src_path.display()), &dst_path)
+            })?;
             *count += 1;
         }
     }
@@ -150,13 +157,19 @@ mod tests {
         assert!(err.to_string().contains("path traversal detected"));
     }
 
-    /// コピー元が存在しない場合は `read_dir` のエラーがそのまま伝播する
+    /// コピー元が存在しない場合は `read_dir` のエラーが、コピー元のパスを添えて伝播する
     #[test]
     fn test_copy_dir_recursive_missing_src_errors() {
         let temp = TempDir::new().unwrap();
         let src = temp.path().join("no_such_dir");
         let dst = temp.path().join("dst");
-        assert!(copy_dir_recursive(&src, &dst).is_err());
+        let err = copy_dir_recursive(&src, &dst).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::NotFound);
+        assert!(
+            err.to_string()
+                .starts_with(&format!("cannot read {}: ", src.display())),
+            "{err}"
+        );
     }
 
     /// 空のコピー元: コピー数 0 だがコピー先ディレクトリは作成される

@@ -7,6 +7,8 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+use crate::path_error;
+
 /// UTF-8 の `key,value` ファイルを読む。BOM を除き、1 行目が `charset,UTF-8` であることを確かめ、
 /// 2 行目以降を (小文字化したキー, trim した値) の列で返す。カンマの無い行は無視する。
 /// 重複キーは出現順のまま残す（重複の扱いは呼び出し側が決める）。
@@ -19,7 +21,7 @@ fn read_utf8_kv(path: &Path, label: &str) -> io::Result<Vec<(String, String)>> {
         )
     };
 
-    let bytes = fs::read(path)?;
+    let bytes = fs::read(path).map_err(|e| path_error(e, "read", path))?;
     let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&bytes);
     let text =
         std::str::from_utf8(bytes).map_err(|_| not_utf8("contains invalid UTF-8 byte sequence"))?;
@@ -196,9 +198,10 @@ fn resolve_existing_dir(root: &Path, comps: &[String], key: &str) -> io::Result<
     for comp in comps {
         // file_type() はリンクをたどらないので、シンボリックリンク（ジャンクション含む）は is_dir() が偽
         let mut subdirs = Vec::new();
-        for entry in fs::read_dir(&dir)? {
-            let entry = entry?;
-            if entry.file_type()?.is_dir()
+        let read_err = |e| path_error(e, "read", &dir);
+        for entry in fs::read_dir(&dir).map_err(read_err)? {
+            let entry = entry.map_err(read_err)?;
+            if entry.file_type().map_err(read_err)?.is_dir()
                 && let Ok(name) = entry.file_name().into_string()
             {
                 subdirs.push(name);

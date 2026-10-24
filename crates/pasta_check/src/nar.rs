@@ -1,6 +1,8 @@
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::Path;
+
+use crate::path_error;
 use zip::CompressionMethod;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
@@ -11,19 +13,20 @@ pub(crate) fn create_nar(release_dir: &Path, nar_path: &Path) -> io::Result<u64>
     if let Some(parent) = nar_path.parent()
         && !parent.exists()
     {
-        fs::create_dir_all(parent)?;
+        fs::create_dir_all(parent).map_err(|e| path_error(e, "create", parent))?;
     }
 
-    let file = File::create(nar_path)?;
+    let write_err = |e| path_error(e, "write", nar_path);
+    let file = File::create(nar_path).map_err(write_err)?;
     let mut zip = ZipWriter::new(file);
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
 
     let mut buffer = Vec::new();
     add_dir_to_zip(&mut zip, release_dir, release_dir, &options, &mut buffer)?;
 
-    zip.finish().map_err(io::Error::other)?;
+    zip.finish().map_err(|e| write_err(io::Error::other(e)))?;
 
-    let metadata = fs::metadata(nar_path)?;
+    let metadata = fs::metadata(nar_path).map_err(write_err)?;
     Ok(metadata.len())
 }
 
@@ -55,9 +58,10 @@ fn add_dir_to_zip<W: Write + io::Seek>(
     options: &SimpleFileOptions,
     buffer: &mut Vec<u8>,
 ) -> io::Result<()> {
-    for entry in fs::read_dir(current)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
+    let read_err = |e| path_error(e, "read", current);
+    for entry in fs::read_dir(current).map_err(read_err)? {
+        let entry = entry.map_err(read_err)?;
+        let file_type = entry.file_type().map_err(read_err)?;
 
         // シンボリックリンクはスキップ（Req 2.1, 2.2）
         if file_type.is_symlink() {
@@ -83,12 +87,15 @@ fn add_dir_to_zip<W: Write + io::Seek>(
             // パストラバーサル防御: ZIPエントリ名に ".." が含まれないこと（Req 1.3）
             ensure_no_parent_component(&relative)?;
 
+            let pack_err = |e| path_error(e, "pack", &path);
             zip.start_file(&relative, *options)
-                .map_err(io::Error::other)?;
+                .map_err(|e| pack_err(io::Error::other(e)))?;
 
             buffer.clear();
-            File::open(&path)?.read_to_end(buffer)?;
-            zip.write_all(buffer)?;
+            File::open(&path)
+                .and_then(|mut f| f.read_to_end(buffer))
+                .map_err(|e| path_error(e, "read", &path))?;
+            zip.write_all(buffer).map_err(pack_err)?;
         }
     }
     Ok(())

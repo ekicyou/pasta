@@ -2,6 +2,7 @@ use crate::ReleaseArgs;
 use crate::balloon::plan_bundled_balloons;
 use crate::copy::{copy_dir_recursive, prepare_release_dir};
 use crate::nar::create_nar;
+use crate::path_error;
 use crate::release_args::check_release_args;
 use crate::update_files::generate_update_files;
 use crate::validate_cmd::{ValidateOutcome, run_on_master};
@@ -85,7 +86,7 @@ fn remove_stale_nar(nar: &Path) -> io::Result<()> {
             Ok(())
         }
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e),
+        Err(e) => Err(path_error(e, "remove", nar)),
     }
 }
 
@@ -265,6 +266,39 @@ mod tests {
         assert!(entries.contains_key("updates.txt"));
         assert!(entries.contains_key("ghost/master/dic/a.pasta"));
         assert!(release.join("updates.txt").exists());
+    }
+
+    /// 段 2 の I/O の誤りは、読めなかったフォルダのパスを添えて返る（Req 5.3）。
+    /// 確かめ（metadata・canonicalize）は排他で開いたフォルダでも通る
+    #[cfg(windows)]
+    #[test]
+    fn test_execute_release_stage2_io_error_carries_path() {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+
+        let temp = TempDir::new().unwrap();
+        let target = temp.path().join("ghost");
+        write_files(&target, MIN_GHOST);
+        let locked = target.join("ghost").join("master").join("dic");
+        let _handle = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+            .open(&locked)
+            .unwrap();
+
+        let args = ReleaseArgs {
+            target,
+            release: temp.path().join("release"),
+            nar: temp.path().join("out.nar"),
+            copy_dirs: vec![],
+        };
+        let err = execute_release(&args).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.starts_with(&format!("cannot read {}: ", locked.display())),
+            "{msg}"
+        );
     }
 
     /// root 配下に (相対パス, 内容) のファイルを親フォルダごと書く
