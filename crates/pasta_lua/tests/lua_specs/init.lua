@@ -79,6 +79,7 @@ local specs = {
     "chain_talk_interrupt_test",          -- 続きの決まり・台詞の判定・はっきり捨てる印・予約の確かめ・中断の台詞のテスト (chain-talk-interrupt 3.2・3.3)
     "external_control_event_test",        -- 外からの操作のイベントの既定のハンドラのテスト (external-control-events 1.2)
     "reg_handler_chain_test",             -- REG:register で重ねたハンドラ（鎖）のテスト (reg-handler-chain 1.1, 2.x)
+    "recommend_menu_test",                -- おすすめメニューの組み込みと既定のハンドラのテスト (recommend-menu-scenes 3.1)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

@@ -88,6 +88,7 @@ require("pasta.shiori.event.second_change")
 require("pasta.shiori.event.mouse")
 require("pasta.shiori.event.scene_play")
 require("pasta.shiori.event.external_control")
+require("pasta.shiori.event.recommend")
 
 -- 2. モジュールテーブル宣言
 --- @class EVENT
