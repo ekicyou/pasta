@@ -689,3 +689,160 @@ lt = 07:32:00
         assert_eq!(back[key], toml::Value::String(s.into()), "{key}");
     }
 }
+
+// ---------------------------------------------------------------------------
+// 読み込みと退避（read_or_quarantine）・SaveGate
+// ---------------------------------------------------------------------------
+
+fn gate(lua: &Lua) -> Option<SaveGate> {
+    lua.app_data_ref::<SaveGate>().map(|g| g.clone())
+}
+
+#[test]
+fn test_read_toml_plain_and_gzip() {
+    let temp_dir = TempDir::new().unwrap();
+    let plain = temp_dir.path().join("save.toml");
+    fs::write(&plain, "name = \"Alice\"\n[flags]\ndone = true\n").unwrap();
+    let doc = load_toml_from_file(&plain).unwrap();
+    assert_eq!(doc["name"].as_str(), Some("Alice"));
+    assert_eq!(doc["flags"]["done"].as_bool(), Some(true));
+
+    let gz = temp_dir.path().join("save.dat");
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(b"count = 3\n").unwrap();
+    fs::write(&gz, encoder.finish().unwrap()).unwrap();
+    assert_eq!(
+        load_toml_from_file(&gz).unwrap()["count"].as_integer(),
+        Some(3)
+    );
+}
+
+#[tracing_test::traced_test]
+#[test]
+fn test_read_or_quarantine_broken_toml_moves_to_broken() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("save.toml");
+    fs::write(&path, "this is = = not toml").unwrap();
+
+    let lua = Lua::new();
+    let doc = read_or_quarantine(&lua, &path);
+    assert!(doc.is_empty());
+    assert!(!path.exists());
+    let broken = temp_dir.path().join("save.toml.broken");
+    assert_eq!(fs::read_to_string(&broken).unwrap(), "this is = = not toml");
+    assert_eq!(gate(&lua), Some(SaveGate::Open));
+    assert!(logs_contain(
+        "Unreadable persistence file moved aside, using empty table"
+    ));
+}
+
+#[test]
+fn test_read_or_quarantine_picks_first_free_broken_name() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("save.toml");
+    let b0 = temp_dir.path().join("save.toml.broken");
+    let b1 = temp_dir.path().join("save.toml.broken.1");
+    fs::write(&path, "[[[").unwrap();
+    fs::write(&b0, "old0").unwrap();
+    fs::write(&b1, "old1").unwrap();
+
+    let lua = Lua::new();
+    assert!(read_or_quarantine(&lua, &path).is_empty());
+    assert_eq!(
+        fs::read_to_string(temp_dir.path().join("save.toml.broken.2")).unwrap(),
+        "[[["
+    );
+    assert_eq!(fs::read_to_string(&b0).unwrap(), "old0");
+    assert_eq!(fs::read_to_string(&b1).unwrap(), "old1");
+    assert_eq!(gate(&lua), Some(SaveGate::Open));
+}
+
+#[tracing_test::traced_test]
+#[test]
+fn test_read_or_quarantine_missing_file_warns_and_opens() {
+    let temp_dir = TempDir::new().unwrap();
+    let lua = Lua::new();
+    let doc = read_or_quarantine(&lua, &temp_dir.path().join("save.toml"));
+    assert!(doc.is_empty());
+    assert_eq!(gate(&lua), Some(SaveGate::Open));
+    assert!(logs_contain(
+        "Persistence file not found, using empty table"
+    ));
+    // 空のファイルの「警告なし」の確かめ方が効くことを示す
+    assert!(logs_contain("WARN"));
+}
+
+#[tracing_test::traced_test]
+#[test]
+fn test_read_or_quarantine_empty_file_is_empty_without_warning() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("save.toml");
+    fs::write(&path, "").unwrap();
+    let lua = Lua::new();
+    assert!(read_or_quarantine(&lua, &path).is_empty());
+    assert!(path.exists());
+    assert_eq!(gate(&lua), Some(SaveGate::Open));
+    assert!(!logs_contain("WARN"));
+    assert!(!logs_contain("ERROR"));
+}
+
+#[test]
+fn test_read_or_quarantine_reads_bom_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("save.toml");
+    fs::write(&path, "\u{FEFF}name = \"Alice\"\n").unwrap();
+    let lua = Lua::new();
+    let doc = read_or_quarantine(&lua, &path);
+    assert_eq!(doc["name"].as_str(), Some("Alice"));
+    assert!(path.exists());
+    assert_eq!(gate(&lua), Some(SaveGate::Open));
+}
+
+#[test]
+fn test_save_gate_closed_is_not_overwritten_by_open() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("save.toml");
+    fs::write(&path, "ok = 1\n").unwrap();
+    let lua = Lua::new();
+    lua.set_app_data(SaveGate::Closed("earlier".into()));
+    let doc = read_or_quarantine(&lua, &path);
+    assert_eq!(doc["ok"].as_integer(), Some(1));
+    assert_eq!(gate(&lua), Some(SaveGate::Closed("earlier".into())));
+}
+
+#[test]
+fn test_save_gate_is_per_lua_state() {
+    let temp_dir = TempDir::new().unwrap();
+    let lua_a = Lua::new();
+    let lua_b = Lua::new();
+    read_or_quarantine(&lua_a, &temp_dir.path().join("save.toml"));
+    assert_eq!(gate(&lua_a), Some(SaveGate::Open));
+    assert_eq!(gate(&lua_b), None);
+}
+
+/// 本物の OS の失敗: 共有なしで開いたままの保存先は、読めず移せず、印が Closed になる。
+#[cfg(windows)]
+#[tracing_test::traced_test]
+#[test]
+fn test_read_or_quarantine_locked_file_closes_gate() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("save.toml");
+    fs::write(&path, "keep = \"me\"\n").unwrap();
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(&path)
+        .unwrap();
+
+    let lua = Lua::new();
+    assert!(read_or_quarantine(&lua, &path).is_empty());
+    assert!(matches!(gate(&lua), Some(SaveGate::Closed(_))));
+    assert!(!temp_dir.path().join("save.toml.broken").exists());
+    assert!(logs_contain(
+        "Unreadable persistence file could not be moved aside; saving is disabled for this runtime"
+    ));
+
+    drop(lock);
+    assert_eq!(fs::read_to_string(&path).unwrap(), "keep = \"me\"\n");
+}

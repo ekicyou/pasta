@@ -21,7 +21,7 @@
   - _Requirements: 1.7, 1.12_
 
 - [ ] 2. セーブファイルの読み書き・退避・保存を止める印
-- [ ] 2.1 読めないセーブを `.broken` へ退避し、ランタイムごとの保存を止める印を置く読み込みを、今の道に足す形で作る
+- [x] 2.1 読めないセーブを `.broken` へ退避し、ランタイムごとの保存を止める印を置く読み込みを、今の道に足す形で作る
   - 先頭の gzip の印で展開してから TOML の文書として読む内部の読み込みを作る（この時点では公開の関数と `load()`・`save()` はまだ JSON のまま。足すだけなので crate は通る）
   - 読んだ結果を、無い（警告・空・印は保存してよい）、読めない（`.broken`、`.broken.1`、… のまだ無い最初の名前へ移し、元・先・理由の警告・空・印は保存してよい）、読めないし移せない（エラーのログ・空・印は保存しない）の 3 つに分け、どの結果でも表を返し、エラーを投げない
   - 印は Lua の状態ごとに 1 つ持ち、保存しない印を保存してよい印で上書きしない
@@ -107,3 +107,4 @@
 - 1.2: SAVE_MAX_DEPTH・DroppedKey・lua_table_to_toml_document には 2.2 で、lua_value_to_toml_strict には 3.3 で使い始めたら `#[cfg_attr(not(test), allow(dead_code))]` と `shortcut:` の注記を外す。
 - 1.2: mlua の LuaJIT は `n.to_bits() == (i as f64).to_bits()` のときだけ Integer にするので -0.0 は Float のまま届く。テストの Lua リテラルの扱いで Integer(0) に見えることがある。
 - 1.3: toml_to_lua にも dead_code の許可がある（2.2 で外す）。表の中の i64::MAX は LuaJIT の倍精度で Float(2^63) に丸まる（確定した設計判断 6 の限界）。ファイルを通す往復の確認は 2.2 で足す。
+- 2.1: SaveGate・load_toml_from_file・set_gate・read_or_quarantine にも dead_code の許可がある（2.2 で外す）。PersistenceError に TomlParseError を先に足した（2.2 で JsonError を消し SaveDisabled・TomlWriteError を足す）。persistence.rs が 696 行で、2.2 で JSON の道を消したあと行数を確かめる。

@@ -51,6 +51,10 @@ pub enum PersistenceError {
     #[error("JSON error: {0}")]
     JsonError(#[from] serde_json::Error),
 
+    /// TOML として読めない（UTF-8 でない中身もここ）。
+    #[error("TOML parse error: {0}")]
+    TomlParseError(#[from] toml::de::Error),
+
     /// Lua value conversion error.
     #[error("Lua conversion error: {0}")]
     LuaConversionError(String),
@@ -584,6 +588,107 @@ fn toml_to_lua(lua: &Lua, value: &toml::Value) -> LuaResult<Value> {
             Value::Table(table)
         }
     })
+}
+
+// ---------------------------------------------------------------------------
+// SaveStore（読み込み・退避・SaveGate）
+// ---------------------------------------------------------------------------
+
+/// 1 つのランタイムで、セーブファイルを読んだ結果（Lua の app_data）。無い = まだ読んでいない。
+#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で save_table が使い始めたら外す
+#[derive(Debug, Clone, PartialEq)]
+enum SaveGate {
+    /// 読めた・無かった・退避できた。保存してよい。
+    Open,
+    /// 退避できなかった。理由を持ち、このランタイムでは保存しない。
+    Closed(String),
+}
+
+/// gzip の印を見て展開し、TOML の文書として読む。
+#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で load_from_file に置き換えたら外す
+fn load_toml_from_file(path: &Path) -> Result<toml::Table, PersistenceError> {
+    let data = fs::read(path)?;
+    if data.starts_with(&GZIP_MAGIC) {
+        let mut toml_bytes = Vec::new();
+        GzDecoder::new(&data[..]).read_to_end(&mut toml_bytes)?;
+        Ok(toml::from_slice(&toml_bytes)?)
+    } else {
+        Ok(toml::from_slice(&data)?)
+    }
+}
+
+/// 印を置く。`Closed` を `Open` で上書きしない。
+#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で read_or_quarantine が使い始めたら外す
+fn set_gate(lua: &Lua, gate: SaveGate) {
+    // 借りたまま set_app_data を呼ばないよう、判定の借用は先に返す
+    let closed = matches!(
+        lua.app_data_ref::<SaveGate>().as_deref(),
+        Some(SaveGate::Closed(_))
+    );
+    if !closed {
+        lua.set_app_data(gate);
+    }
+}
+
+/// 読む・退避する・印を置く。どの結果でも表を返す（失敗は空の表）。
+#[cfg_attr(not(test), allow(dead_code))] // shortcut: 2.2 で load_impl が使い始めたら外す
+fn read_or_quarantine(lua: &Lua, path: &Path) -> toml::Table {
+    match load_toml_from_file(path) {
+        Ok(doc) => {
+            set_gate(lua, SaveGate::Open);
+            doc
+        }
+        Err(PersistenceError::IoError(ref e)) if e.kind() == std::io::ErrorKind::NotFound => {
+            tracing::warn!(path = %path.display(), "Persistence file not found, using empty table");
+            set_gate(lua, SaveGate::Open);
+            toml::Table::new()
+        }
+        Err(e) => {
+            match quarantine(path) {
+                Ok(to) => {
+                    tracing::warn!(
+                        from = %path.display(),
+                        to = %to.display(),
+                        error = %e,
+                        "Unreadable persistence file moved aside, using empty table"
+                    );
+                    set_gate(lua, SaveGate::Open);
+                }
+                Err(rename_error) => {
+                    tracing::error!(
+                        path = %path.display(),
+                        error = %e,
+                        rename_error = %rename_error,
+                        "Unreadable persistence file could not be moved aside; saving is disabled for this runtime"
+                    );
+                    set_gate(
+                        lua,
+                        SaveGate::Closed(format!(
+                            "{} could not be read ({e}) or moved aside ({rename_error})",
+                            path.display()
+                        )),
+                    );
+                }
+            }
+            toml::Table::new()
+        }
+    }
+}
+
+/// 空いている .broken の名前（`.broken`、`.broken.1`、…）を選んで移す。移した先を返す。
+fn quarantine(path: &Path) -> std::io::Result<PathBuf> {
+    let name = |suffix: String| {
+        let mut s = path.as_os_str().to_owned();
+        s.push(suffix);
+        PathBuf::from(s)
+    };
+    // rename は Windows でも行き先を置き換えるので、先に有無を確かめる
+    let to = std::iter::once(name(".broken".into()))
+        .chain((1..).map(|n| name(format!(".broken.{n}"))))
+        .find(|p| !p.exists())
+        .expect("unbounded candidates");
+    fs::rename(path, &to)?;
+    Ok(to)
 }
 
 #[cfg(test)]
