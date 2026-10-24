@@ -20,13 +20,16 @@
 //! From inside a `set_global_hook` line hook, `hook_lua.current_thread()`
 //! resolves to the **running coroutine** (not the main thread), so passing that
 //! `&Thread` makes `thread.state()` the coroutine's own `lua_State` and the
-//! 2.3 traversal lands on the body frame. Verified against mlua 0.11.6 source
-//! (`state/raw.rs::global_hook_proc` + `state/util.rs::callback_error_ext`):
+//! 2.3 traversal lands on the body frame. Verified against mlua 0.12.2 source
+//! (`src/state/raw.rs::global_hook_proc` + `src/state/util.rs::StateGuard` /
+//! `callback_error_ext` + `src/state.rs::Lua::current_thread`):
 //! the C hook trampoline receives the *running* `lua_State*` and wraps the user
 //! callback in `callback_error_ext`, which installs a `StateGuard` that
 //! **swaps `RawLua.state` to that running state** for the callback's duration.
 //! `current_thread()` reads `RawLua.state` and `lua_pushthread`es it, hence it
-//! yields the running coroutine. (mlua's own doc: "for parameters given to a
+//! yields the running coroutine. (Its 0.12 branch that maps an implicit async
+//! thread to its owner exists only under mlua's `async` feature, which pasta
+//! does not enable.) (mlua's own doc: "for parameters given to a
 //! callback, this will be whatever Lua thread called the callback".)
 //!
 //! The upstream PoC's "coroutine body frame unreachable from the main state"
@@ -63,7 +66,7 @@
 //! is robust if a C frame ever sits at the requested level, but the common case
 //! is a clean level-0 Lua frame.
 //!
-//! # mlua 0.11 / mlua-sys 0.10 (luajit52 = lua51 ABI) FFI used
+//! # mlua 0.12 / mlua-sys 0.13 (luajit52 = lua51 ABI) FFI used
 //! - [`lua_getstack`](mlua::ffi::lua_getstack)`(L, level, &ar) -> c_int`
 //!   (0 = no such level).
 //! - [`lua_getinfo`](mlua::ffi::lua_getinfo)`(L, what, &ar) -> c_int`. `"Snl"`

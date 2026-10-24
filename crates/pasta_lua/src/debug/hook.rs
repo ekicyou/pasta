@@ -58,7 +58,7 @@
 use std::panic::{self, AssertUnwindSafe};
 use std::sync::{Arc, Mutex};
 
-use mlua::{Debug, HookTriggers, Lua, VmState};
+use mlua::{HookTriggers, Lua, VmState, debug::Debug};
 
 /// `Send`-safe channel a hook panic's cause string is recorded into.
 ///

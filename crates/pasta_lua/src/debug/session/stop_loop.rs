@@ -6,7 +6,7 @@
 //! hub (C5 production split) — child of `session`, so it reaches the
 //! `DebugSession` private state via the ancestor rule (no visibility widening).
 
-use mlua::{Debug, Lua, VmState};
+use mlua::{Lua, VmState, debug::Debug};
 
 use crate::debug::SourceMode;
 use crate::debug::hook::LineHook;
@@ -16,7 +16,7 @@ use crate::debug::types::{Scope, SessionCommand, SessionEvent, StopReason, Threa
 use super::{DebugSession, MAIN_THREAD_ID, RunMode, StepKind};
 
 impl DebugSession {
-    /// Extract `(source, line)` from a hook [`mlua::Debug`] frame.
+    /// Extract `(source, line)` from a hook [`mlua::debug::Debug`] frame.
     ///
     /// Prefers the chunk `source()` name; falls back to `short_src`; uses
     /// `current_line()` for the line (0 when unavailable). This matches the PoC

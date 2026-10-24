@@ -96,6 +96,20 @@ fn test_exec_named_returns_value() {
     assert_eq!(value.as_i64(), Some(3));
 }
 
+/// 同梱の LuaJIT（mlua 0.12 から）は `continue` 文を構文の誤りにせず、飛ばした回を数えない。
+/// マニュアルの book/src/lua/basics.md の「前提」に書いた挙動の差を固定する（LuaJIT が変えたらここが落ちる）。
+#[test]
+fn test_luajit_accepts_continue_statement() {
+    let runtime = PastaLuaRuntime::new(create_empty_context()).unwrap();
+    let value = runtime
+        .exec_named(
+            "local n = 0\nfor i = 1, 3 do\n  if i == 2 then continue end\n  n = n + i\nend\nreturn n",
+            "continue_chunk",
+        )
+        .unwrap();
+    assert_eq!(value.as_i64(), Some(1 + 3));
+}
+
 // ============================================================================
 // register_module
 // ============================================================================

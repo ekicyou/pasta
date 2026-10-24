@@ -158,3 +158,9 @@ Windows 以外の互換ベースウェア（areka など）は、pasta を読み
 - **見つけた穴・古くなった記述**
   - 前回の穴の `README.md` 92 行（`wintf-winmsg-executor` 0.0.5）・112 行（`ctor` 1.0）は直った。`wintf` を外すなら 92 行を行ごと消すのは、そのまま残る。
   - 冒頭のステータス（「0.4.2 に入れる」）は、まだ古い。
+
+## 申し送り（mlua-0-12-upgrade より）
+
+- 2026-10-24 に mlua 0.12.2 が main に入った（`Cargo.lock` で動いたのは mlua・mlua-sys・luajit-src・lua-src の 4 つだけ）。ファイルの順で待っていた理由は満ちた。
+- 0.12 で移った名前は `mlua::Debug` → `mlua::debug::Debug`、`mlua::String` → `mlua::LuaString` の 2 つで、`pasta_shiori` の `use pasta_lua::mlua::{Function, Table}` は当たらず、`pasta_shiori` のコードは変えていない。新しく mlua の型を書くときは 0.12 の名前で書く（`.kiro/specs/completed/mlua-0-12-upgrade/design.md` の Revalidation Triggers）。
+- x86 の pasta.dll のセーブの整数は、x64 と同じ決まり（`persistence.rs` の `lua_int`）で書く。Linux・macOS の 32 ビットの target を足すなら、この決まりと `target_pointer_width` で期待を分けたテストがそのまま効く。

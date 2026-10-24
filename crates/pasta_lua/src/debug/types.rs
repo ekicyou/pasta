@@ -214,7 +214,7 @@ impl ThreadId {
 /// Records the coroutine identity (`thread_ptr`, a `lua_State` address as
 /// `usize`) so cross-coroutine firing can be distinguished. Re-exported from
 /// `crate::debug`, but the production hook/session do not use it (they work on
-/// `mlua::Debug` directly); only tests construct it.
+/// `mlua::debug::Debug` directly); only tests construct it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LineEvent {
     /// Source identifier of the firing line.

@@ -597,14 +597,29 @@ fn file_round_trip_doc(lua: &Lua, doc: &toml::Table, obfuscate: bool) -> toml::T
 fn test_codec_read_value_types() {
     let lua = Lua::new();
     let v = |t: toml::Value| toml_to_lua(&lua, &t).unwrap();
-    assert!(matches!(
-        v(toml::Value::Integer(i64::MAX)),
-        Value::Integer(i64::MAX)
-    ));
-    assert!(matches!(
-        v(toml::Value::Integer(i64::MIN)),
-        Value::Integer(i64::MIN)
-    ));
+    #[cfg(target_pointer_width = "64")]
+    {
+        assert!(matches!(
+            v(toml::Value::Integer(i64::MAX)),
+            Value::Integer(i64::MAX)
+        ));
+        assert!(matches!(
+            v(toml::Value::Integer(i64::MIN)),
+            Value::Integer(i64::MIN)
+        ));
+    }
+    // x86 の Lua の整数は 32 ビット。収まらない整数は浮動小数の数で渡る
+    #[cfg(target_pointer_width = "32")]
+    {
+        assert!(matches!(
+            v(toml::Value::Integer(i64::MAX)),
+            Value::Number(f) if f == 9223372036854775808.0
+        ));
+        assert!(matches!(
+            v(toml::Value::Integer(i64::MIN)),
+            Value::Number(f) if f == -9223372036854775808.0
+        ));
+    }
     assert!(matches!(v(toml::Value::Float(1.5)), Value::Number(f) if f == 1.5));
     assert!(matches!(
         v(toml::Value::Boolean(true)),
@@ -694,13 +709,18 @@ nested = { a = { b = { c = "deep" } } }
 #[test]
 fn test_codec_round_trip_i64_extremes_as_values() {
     // LuaJIT の表に入れると 2^53 を超える整数は丸まる（マニュアルに書く）。
-    // 値そのものは Integer で戻り、Integer で書き戻る
+    // 値そのものは Integer で戻り、Integer で書き戻る（x86 の i64::MAX だけは下の別の期待）
     let lua = Lua::new();
-    for i in [i64::MIN, i64::MAX] {
+    let back = |i: i64| {
         let v = toml_to_lua(&lua, &toml::Value::Integer(i)).unwrap();
-        let back = lua_value_to_toml_strict(&lua, &v, SAVE_MAX_DEPTH).unwrap();
-        assert_eq!(back, toml::Value::Integer(i));
-    }
+        lua_value_to_toml_strict(&lua, &v, SAVE_MAX_DEPTH).unwrap()
+    };
+    assert_eq!(back(i64::MIN), toml::Value::Integer(i64::MIN));
+    #[cfg(target_pointer_width = "64")]
+    assert_eq!(back(i64::MAX), toml::Value::Integer(i64::MAX));
+    // x86 の Lua の値は i64::MAX を整数で持てず 2^63 の浮動小数になり、そのまま浮動小数で書き戻る
+    #[cfg(target_pointer_width = "32")]
+    assert_eq!(back(i64::MAX), toml::Value::Float(9223372036854775808.0));
     let v = toml_to_lua(&lua, &toml::Value::Float(-0.0)).unwrap();
     let back = lua_value_to_toml_strict(&lua, &v, SAVE_MAX_DEPTH).unwrap();
     assert!(back.as_float().unwrap().is_sign_negative());
@@ -1010,4 +1030,108 @@ fn test_save_locked_file_returns_error_and_keeps_content() {
     drop(lock);
     assert_eq!(fs::read_to_string(&path).unwrap(), "keep = \"me\"\n");
     assert!(!path.with_extension("tmp").exists());
+}
+
+/// lua_int: 64 ビットの整数として読む決まり（x86・x64 で同じ結果）。
+#[test]
+fn test_lua_int_rule() {
+    let p63 = 9223372036854775808.0_f64; // 2^63
+    assert_eq!(lua_int(&Value::Integer(7)), Some(7));
+    assert_eq!(lua_int(&Value::Number(3000000000.0)), Some(3000000000));
+    assert_eq!(lua_int(&Value::Number(-3000000000.0)), Some(-3000000000));
+    assert_eq!(lua_int(&Value::Number(-p63)), Some(i64::MIN));
+    assert_eq!(lua_int(&Value::Number(1.0)), Some(1));
+    // 2^63 は i64 に飽和させない
+    assert_eq!(lua_int(&Value::Number(p63)), None);
+    assert_eq!(lua_int(&Value::Number(-p63 * 2.0)), None);
+    assert_eq!(lua_int(&Value::Number(-0.0)), None);
+    assert_eq!(lua_int(&Value::Number(0.5)), None);
+    assert_eq!(lua_int(&Value::Number(f64::NAN)), None);
+    assert_eq!(lua_int(&Value::Number(f64::INFINITY)), None);
+    assert_eq!(lua_int(&Value::Number(f64::NEG_INFINITY)), None);
+    assert_eq!(lua_int(&Value::Boolean(true)), None);
+}
+
+/// TOML の整数が Lua の整数に収まらなければ浮動小数の数で渡す（切り詰めない）。
+#[test]
+fn test_toml_to_lua_integer_never_truncates() {
+    let lua = Lua::new();
+    let v = toml_to_lua(&lua, &toml::Value::Integer(3000000000)).unwrap();
+    assert_eq!(lua_int(&v), Some(3000000000));
+    let v = toml_to_lua(&lua, &toml::Value::Integer(5)).unwrap();
+    assert!(matches!(v, Value::Integer(5)));
+}
+
+/// Lua から作った表を書くと、x86・x64 で同じ TOML の文字になる（Data Models の表）。
+#[test]
+fn test_codec_integer_text_same_on_x86_and_x64() {
+    let (doc, dropped) = codec_doc(
+        r#"return {
+            big = 3000000000, neg = -3000000000, m63 = -2^63, p63 = 2^63,
+            nz = -0.0, one = 1.0, arr = { 3000000000, 2 },
+        }"#,
+    );
+    assert!(dropped.is_empty(), "{dropped:?}");
+    let text = toml::to_string(&doc).unwrap();
+    let mut lines: Vec<&str> = text.lines().collect();
+    lines.sort();
+    assert_eq!(
+        lines,
+        [
+            "arr = [3000000000, 2]",
+            "big = 3000000000",
+            "m63 = -9223372036854775808",
+            "neg = -3000000000",
+            "nz = -0.0",
+            "one = 1",
+            "p63 = 9223372036854776000.0",
+        ]
+    );
+}
+
+/// 32 ビットを超える整数のキーの表は、x86・x64 で同じ理由で外れる。
+#[test]
+fn test_codec_big_integer_keys_are_integer_keys() {
+    let (doc, got) =
+        codec_doc(r#"return { pos = { [3000000000] = 1 }, neg = { [-3000000000] = 1 }, ok = 1 }"#);
+    assert_eq!(
+        got,
+        dropped(&[
+            ("neg", "non-string key (integer)"),
+            ("pos", "non-string key (integer)"),
+        ])
+    );
+    assert_eq!(doc.len(), 1);
+}
+
+/// TOML の `x = 3000000000` を読むと Lua の数 3000000000 になる。
+#[test]
+fn test_read_big_integer_is_lua_number() {
+    let lua = Lua::new();
+    let doc: toml::Table = toml::from_str("x = 3000000000").unwrap();
+    let t = toml_to_lua(&lua, &toml::Value::Table(doc)).unwrap();
+    lua.globals().set("t", t).unwrap();
+    let ok: bool = lua
+        .load("return t.x == 3000000000 and t.x + 1 == 3000000001")
+        .eval()
+        .unwrap();
+    assert!(ok);
+}
+
+/// 呼ばれたら誤りを起こす `__pairs` を持つ表（3.7）。
+const PAIRS_TRAP: &str = r#"local function trap() return setmetatable({ a = 1 }, { __pairs = function() error("called") end }) end"#;
+
+#[test]
+fn test_codec_does_not_call_pairs_metamethod() {
+    // 3.7: セーブとログの表は `__pairs` を呼ばず、生の中身だけを読む
+    let (root, dropped) = codec_doc(&format!("{PAIRS_TRAP} return trap()"));
+    assert_eq!(root, doc("a = 1"));
+    assert!(dropped.is_empty(), "{dropped:?}");
+
+    let (nested, dropped) = codec_doc(&format!("{PAIRS_TRAP} return {{ t = trap() }}"));
+    assert_eq!(nested, doc("t = { a = 1 }"));
+    assert!(dropped.is_empty(), "{dropped:?}");
+
+    let log = codec_strict(&format!("{PAIRS_TRAP} return trap()"), SAVE_MAX_DEPTH).unwrap();
+    assert_eq!(log, toml::Value::Table(doc("a = 1")));
 }

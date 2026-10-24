@@ -114,7 +114,7 @@ fn search(package_path: &str, module_name: &str) -> SearchOutcome {
 /// - ロード失敗: `(nil, メッセージ, true)` — ラッパが `error(message, 0)` する。
 fn find_module(
     lua: &Lua,
-    module_name: mlua::String,
+    module_name: mlua::LuaString,
 ) -> LuaResult<(Option<Function>, Option<String>, bool)> {
     let module_name = String::from_utf8_lossy(&module_name.as_bytes()).into_owned();
 
@@ -451,7 +451,7 @@ mod tests {
             format!("天気{}", "e".repeat(55)),
         ];
         for name in cases {
-            let message: mlua::String = lua
+            let message: mlua::LuaString = lua
                 .load("local function f() error('x') end local ok, e = pcall(f) return e")
                 .set_name(format!("@{name}"))
                 .eval()
@@ -505,7 +505,7 @@ mod tests {
             ("pasta.scene.天気", Some(Value::Boolean(true))),
             ("rt", None),
         ] {
-            let err: mlua::String = lua
+            let err: mlua::LuaString = lua
                 .load(format!("local ok, e = pcall(require, '{module}') return e"))
                 .eval()
                 .unwrap();
