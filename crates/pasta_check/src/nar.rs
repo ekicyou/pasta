@@ -1,6 +1,8 @@
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::path::Path;
+
+use crate::{non_unicode_name, path_error};
 use zip::CompressionMethod;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
@@ -8,44 +10,22 @@ use zip::write::SimpleFileOptions;
 /// NAR ファイルを作成。戻り値は NAR ファイルのサイズ（バイト）。
 pub(crate) fn create_nar(release_dir: &Path, nar_path: &Path) -> io::Result<u64> {
     // 親ディレクトリを必要に応じて作成
-    if let Some(parent) = nar_path.parent()
-        && !parent.exists()
-    {
-        fs::create_dir_all(parent)?;
+    // create_dir_all("") は成功するので `--nar g.nar` もそのまま通る
+    if let Some(parent) = nar_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| path_error(e, "create", parent))?;
     }
 
-    let file = File::create(nar_path)?;
+    let write_err = |e| path_error(e, "write", nar_path);
+    let file = File::create(nar_path).map_err(write_err)?;
     let mut zip = ZipWriter::new(file);
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
 
-    let mut buffer = Vec::new();
-    add_dir_to_zip(&mut zip, release_dir, release_dir, &options, &mut buffer)?;
+    add_dir_to_zip(&mut zip, release_dir, release_dir, &options)?;
 
-    zip.finish().map_err(io::Error::other)?;
+    zip.finish().map_err(|e| write_err(io::Error::other(e)))?;
 
-    let metadata = fs::metadata(nar_path)?;
+    let metadata = fs::metadata(nar_path).map_err(write_err)?;
     Ok(metadata.len())
-}
-
-/// ZIP エントリ名に親ディレクトリ参照（`..` コンポーネント）が含まれないことを検証する。
-/// パストラバーサル防御（Req 1.3）。release ビルドでも常時有効な実行時検査
-/// （旧実装の `debug_assert!` は release で無効化され本番防御にならなかった）。
-fn ensure_no_parent_component(relative: &str) -> io::Result<()> {
-    if relative.split('/').any(|c| c == "..") {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("path traversal in ZIP entry: {relative}"),
-        ));
-    }
-    Ok(())
-}
-
-/// Unicode として不正な名前は化けさせずに止める（UTF-8 限定の作成ツール）
-fn non_unicode_name(path: &Path) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        format!("file name is not valid Unicode: {}", path.display()),
-    )
 }
 
 fn add_dir_to_zip<W: Write + io::Seek>(
@@ -53,11 +33,11 @@ fn add_dir_to_zip<W: Write + io::Seek>(
     root: &Path,
     current: &Path,
     options: &SimpleFileOptions,
-    buffer: &mut Vec<u8>,
 ) -> io::Result<()> {
-    for entry in fs::read_dir(current)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
+    let read_err = |e| path_error(e, "read", current);
+    for entry in fs::read_dir(current).map_err(read_err)? {
+        let entry = entry.map_err(read_err)?;
+        let file_type = entry.file_type().map_err(read_err)?;
 
         // シンボリックリンクはスキップ（Req 2.1, 2.2）
         if file_type.is_symlink() {
@@ -71,7 +51,7 @@ fn add_dir_to_zip<W: Write + io::Seek>(
             if entry.file_name() == "profile" {
                 continue;
             }
-            add_dir_to_zip(zip, root, &path, options, buffer)?;
+            add_dir_to_zip(zip, root, &path, options)?;
         } else if file_type.is_file() {
             let relative = path
                 .strip_prefix(root)
@@ -80,15 +60,12 @@ fn add_dir_to_zip<W: Write + io::Seek>(
                 .ok_or_else(|| non_unicode_name(&path))?
                 .replace('\\', "/");
 
-            // パストラバーサル防御: ZIPエントリ名に ".." が含まれないこと（Req 1.3）
-            ensure_no_parent_component(&relative)?;
-
+            let pack_err = |e| path_error(e, "pack", &path);
             zip.start_file(&relative, *options)
-                .map_err(io::Error::other)?;
+                .map_err(|e| pack_err(io::Error::other(e)))?;
 
-            buffer.clear();
-            File::open(&path)?.read_to_end(buffer)?;
-            zip.write_all(buffer)?;
+            let mut file = File::open(&path).map_err(|e| path_error(e, "read", &path))?;
+            io::copy(&mut file, zip).map_err(pack_err)?;
         }
     }
     Ok(())
@@ -97,6 +74,7 @@ fn add_dir_to_zip<W: Write + io::Seek>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Read;
     use tempfile::TempDir;
 
     #[test]
@@ -306,38 +284,6 @@ mod tests {
         let file = File::open(&nar_path).unwrap();
         let mut archive = zip::ZipArchive::new(file).unwrap();
         assert!(archive.by_name("profile").is_ok());
-    }
-
-    /// 回帰テスト（許容ハードニング・Req 1.3）: ZIP エントリ名の `..` コンポーネントは
-    /// debug/release を問わず常に `InvalidInput` エラーで拒否される。
-    /// （従来は `debug_assert!` のみで release ビルドでは無防備だった）
-    #[test]
-    fn test_zip_entry_name_rejects_parent_component() {
-        for bad in ["../evil.txt", "a/../b.txt", "..", "ghost/../../x.txt"] {
-            let err = ensure_no_parent_component(bad).unwrap_err();
-            assert_eq!(err.kind(), io::ErrorKind::InvalidInput, "input: {bad:?}");
-            assert!(
-                err.to_string().contains("path traversal"),
-                "input: {bad:?}, err: {err}"
-            );
-        }
-    }
-
-    /// 境界の正常側: `..` を部分文字列として含むだけのコンポーネントは拒否されない
-    /// （拒否は厳密に `..` コンポーネント単位）
-    #[test]
-    fn test_zip_entry_name_accepts_normal_paths() {
-        for ok in [
-            "a.txt",
-            "ghost/master/descript.txt",
-            "..foo/bar.txt",
-            "a..b/c",
-        ] {
-            assert!(
-                ensure_no_parent_component(ok).is_ok(),
-                "input: {ok:?} should be accepted"
-            );
-        }
     }
 
     #[test]

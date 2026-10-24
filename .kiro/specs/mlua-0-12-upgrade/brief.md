@@ -96,3 +96,8 @@ pasta の Lua ランタイムは mlua 0.11（LuaJIT 2.1、features `luajit52`・
 - **見つけた穴・古くなった記述**
   - Current State の「serde の変換を使うファイルは 4」は 3。
   - Upstream に `toml-serialization` を、ファイルの順として足す（今は Adjacent にだけある）。値の変換の特性化の試験は、`toml-serialization` が入った後のセーブとログの表に対して書く。あちらが手書きの変換にすれば、この spec の値の変換の直しは減る。
+
+## 申し送り（ponytail-check-release より、2026-10-24）
+
+- `crates/pasta_sample_ghost/tests/self_deploy_integration_test.rs` の形が変わった。ファイルの中の `neutralize_debug_env`・`copy_tree_skip_profile`・`fresh_ghost_copy`・`fixture_master_dir` は無くなり、`mod common;` の `common::master_copy()`（`profile/` と `pasta.dll` を除いて master を一時フォルダへ写す）と、`common/mod.rs` の `#[ctor]`（`PASTA_DEBUG`・`PASTA_DEBUG_PORT` を外す）を使う。mlua の直しでこのファイルを触るときは、今の形の上で直す。
+- `common/mod.rs` の公開の口はこの 2 つだけ（`touch_shortcuts_test.rs`・`tutorial_stages_test.rs` も使う）。参照: `.kiro/specs/completed/ponytail-check-release/design.md` の「SampleGhostTests」。

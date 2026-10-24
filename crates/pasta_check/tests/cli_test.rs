@@ -334,3 +334,58 @@ fn test_release_install_txt_without_charset_fails_without_nar() {
         "nar must not be created"
     );
 }
+
+/// 開発フォルダの中で `--target . --release .` を走らせると、段 1 の前に断り、
+/// 開発フォルダの中身を消さない（Req 1.9・7.2・7.7）
+#[test]
+fn test_release_same_dot_paths_rejected_before_stage_one() {
+    let temp = TempDir::new().unwrap();
+    let ghost = temp.path().join("ghost");
+    write_min_ghost(&ghost);
+    let nar = Path::new("..").join("out.nar");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_pasta_check"))
+        .current_dir(&ghost)
+        .args(["release", "--target", ".", "--release", "."])
+        .arg("--nar")
+        .arg(&nar)
+        .output()
+        .expect("failed to spawn pasta_check binary");
+
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert_eq!(
+        stderr_of(&output).lines().collect::<Vec<_>>(),
+        ["Error: --release (.) must not be the same as --target (.)"]
+    );
+    assert!(!stdout_of(&output).contains("[1/6]"), "{output:?}");
+    assert!(ghost.join("ghost/master/dic/a.pasta").is_file());
+    assert!(!temp.path().join("out.nar").exists());
+}
+
+/// 相対の開発フォルダと、その中を指す絶対の配布フォルダも断る（Req 7.3）
+#[test]
+fn test_release_absolute_release_inside_relative_target_rejected() {
+    let temp = TempDir::new().unwrap();
+    write_min_ghost(&temp.path().join("ghost"));
+    let release = temp.path().join("ghost").join("out");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_pasta_check"))
+        .current_dir(temp.path())
+        .args(["release", "--target", "ghost", "--release"])
+        .arg(&release)
+        .args(["--nar", "out.nar"])
+        .output()
+        .expect("failed to spawn pasta_check binary");
+
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    let stderr = stderr_of(&output);
+    assert!(
+        stderr.contains(&format!(
+            "Error: --release ({}) must not be inside --target (ghost)",
+            release.display()
+        )),
+        "stderr: {stderr:?}"
+    );
+    assert!(!stdout_of(&output).contains("[1/6]"), "{output:?}");
+    assert!(!release.exists());
+}
