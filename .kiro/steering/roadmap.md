@@ -7,7 +7,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 現在の主題は 4 つある。
 
 - **0.4.2: 致命的でない不具合**。はじめの範囲の 7 本（2026-10-18・2026-10-19・2026-10-20・2026-10-22 開発者の決定。`lua-cmodule-robustness`・`pasta-check-release-asset`・`ontalk-suppression`・`scene-play-event`・`external-control-events`・`reg-handler-chain`・`chain-talk-interrupt`）と、0.4.1 の後に届いた不具合の `talk-grapheme-clusters`（組み合わせの絵文字が自動ウェイトで割れる）と、2026-10-23 に起票した `pasta-skills-release-asset`（pasta のスキル 3 本を `pasta-skills.zip` にしてリリースに添える。開発者の依頼）は、2026-10-23 までに全部完了した。残りは 0.4.2 のリリースである（下の「0.4.2 の範囲」）。
-- **0.4.3: shiori4 の SHIORI3 互換モード・おすすめメニュー・ponytail 監査の指摘の修正**（2026-10-23 開発者の決定）。0.4.2 から移した `shiori4-v3-portable`（まだ実施できないので、0.4.3 の最後）、版の決まっていなかった `recommend-menu-scenes`、ponytail 監査の指摘を直す 10 本（`ponytail-*`。2026-10-22 に決めた「版に縛らない隙間の spec」をやめた）を入れる（下の「0.4.3 の範囲」と「ponytail 監査の指摘の修正」）。2026-10-21 に起票した `scene-exact-match`・`scene-pick-modes` と、2026-10-23 に起票した `pasta-dll-multiarch` と、2026-10-24 に起票した依存の更新の 3 本（`mlua-0-12-upgrade`・`vsce-4-upgrade`・`pest-2-9-4-upgrade`。下の「依存の更新」）は、版がまだ決まっていない。
+- **0.4.3: shiori4 の SHIORI3 互換モード・おすすめメニュー・ponytail 監査の指摘の修正**（2026-10-23 開発者の決定）。0.4.2 から移した `shiori4-v3-portable`（まだ実施できないので、0.4.3 の最後）、版の決まっていなかった `recommend-menu-scenes`、ponytail 監査の指摘を直す 10 本（`ponytail-*`。2026-10-22 に決めた「版に縛らない隙間の spec」をやめた）を入れる（下の「0.4.3 の範囲」と「ponytail 監査の指摘の修正」）。2026-10-21 に起票した `scene-exact-match`・`scene-pick-modes` と、2026-10-23 に起票した `pasta-dll-multiarch` と、2026-10-24 に起票した依存の更新の 4 本（`mlua-stdlib-removal`・`mlua-0-12-upgrade`・`vsce-4-upgrade`・`pest-2-9-4-upgrade`。下の「依存の更新」）は、版がまだ決まっていない。
 - **Phase 13: areka でノベルゲーム（0.5.0）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性セマンティクス（シーン属性の保持と読み出し・Call の属性フィルター）も、この道筋に入った。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
 
@@ -442,12 +442,13 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 ## 依存の更新（2026-10-24 起票・版は未定）
 
-2026-10-24 の `/update`（PR #187）で、互換の範囲の更新と、直しの小さい互換の無い更新（esbuild・ctor・socket2・wintf-winmsg-executor・jsdom）は入れた。直しが大きいか、確かめ方が要る 3 件を spec にした（開発者の依頼）。版は開発者が後で決める。
+2026-10-24 の `/update`（PR #187）で、互換の範囲の更新と、直しの小さい互換の無い更新（esbuild・ctor・socket2・wintf-winmsg-executor・jsdom）は入れた。直しが大きいか、確かめ方が要る 3 件を spec にした（開発者の依頼）。同じ日に、mlua 0.12 を止めている mlua-stdlib を外す spec を足して 4 本にした。版は開発者が後で決める。
 
-- **`mlua-0-12-upgrade`**: mlua 0.11 → 0.12。Lua ランタイムの土台で、`mlua::` を参照するファイルが 101 ある。**今は始められない**。crates.io の mlua-stdlib は 0.1.0（`mlua = "^0.11"`）しかなく、上流の main は 0.12.2 に上げたが公開していない。待たずに進める案（mlua-stdlib を外して json・regex・yaml を置き換える）は要件で比べる。
+- **`mlua-stdlib-removal`**: mlua-stdlib（`@json`・`@yaml`・`@regex`・`@assertions`・`@testing`・`@env`）を外す。2026-10-24 のヒアリングで、窓際のぱすたさんも emo2 も 6 つを使っておらず、hello-pasta も使っていない。TOML を読む `@toml`（`decode`）を、既にある `toml_to_lua` で持つ。`OnPastaSetSaveVariable` は JSON をやめ、型を Reference2（`number`・`string`・`boolean`・`delete`。省いたら `string`）で受ける形に改める（開発者の指摘「既定のシリアライズは TOML」「なんで普通にリファレンスを増やさなかったの？」）。作者に見える API を変えるので、版は開発者が決める。型の名前（英語か日本語か）・`@toml` の `encode`・セーブファイル（`save.json`）を TOML にするかは、要件の前に開発者が決める。
+- **`mlua-0-12-upgrade`**: mlua 0.11 → 0.12。Lua ランタイムの土台で、`mlua::` を参照するファイルが 101 ある。crates.io の mlua-stdlib は 0.1.0（`mlua = "^0.11"`）しかなく、上流の公開も無いので、`mlua-stdlib-removal` の後に始める（上流は待たない。2026-10-24 開発者の決定）。
 - **`vsce-4-upgrade`**: `@vscode/vsce` 3.9 → 4.0。Node 22 が要る（`release.yml`・`release-setup-check.yml` は Node 20）。`--azure-credential` の公開の道が 4.x でも通るかを、`release-setup-check.yml` で公開の前に確かめる。Node 22 を持つ `ponytail-manual-ci` の後に入れる。
 - **`pest-2-9-4-upgrade`**: pest 2.9.2 → 2.9.4 以降。2.9.4 は `std` で stacker・psm を必ず引き込み、psm が wasm32 のビルドに clang を要るので、手元の `build-wasm.ps1` が落ちる。wasm32 向けの C コンパイラを手元と CI に用意するか、上流に直してもらうかを要件で比べる。
-- **席**: `mlua-0-12-upgrade` と `pest-2-9-4-upgrade` は `Cargo.lock` とルートの `Cargo.toml` を触る。互いにも、`ponytail-editor-tooling`（席を持つ）・`ponytail-core-registry`・`shiori4-v3-portable` とも、同じウェーブに置かない。`vsce-4-upgrade` はリリースの席（`release.yml`）を触るので、リリースの実行中は main へ入れない。
+- **席**: `mlua-stdlib-removal`・`mlua-0-12-upgrade`・`pest-2-9-4-upgrade` は `Cargo.lock` とルートの `Cargo.toml` を触る。互いにも、`ponytail-editor-tooling`（席を持つ）・`ponytail-core-registry`・`shiori4-v3-portable` とも、同じウェーブに置かない。`vsce-4-upgrade` はリリースの席（`release.yml`）を触るので、リリースの実行中は main へ入れない。
 
 ## リリース（`release` スキル）
 
@@ -493,7 +494,8 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] ponytail-manual-ci -- マニュアルの 3 つの検査を、全部の push・PR とリリースの関門で走らせる。Pages の権限を deploy に絞る。公開の job の action を SHA で固定する。重複したビルド・PoC・写しを整理する。Node 22・mdBook 0.5.4 に揃える。0.4.3。`pasta-check-release-asset`（完了）が `release.yml`・`github-release.ps1` に足した段を保つ。Dependencies: none
 - [ ] scene-exact-match -- 完全一致でシーンを呼ぶ `＞＞シーン名`（同名が複数ならランダム。既存の `search_scene_exact` を使う）と、`pasta.toml` の `[scene] match = "exact"`（`＞`・イベントの受け口・OnTalk・時報・選択肢の飛び先を全部完全一致にする。既定は前方一致）を足す。既定のモードでも、イベントの受け口はイベント ID の直後が英大文字で続く候補（`＊OnInstallCompleteAll` など）を外す。`novel-talk-flow` の完全一致の切り替えを引き取る（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者が承認して `event-scene-exact-match` から広げた）。版は未定。`call-attribute-filter` と同じウェーブに置かない。Dependencies: none
 - [ ] scene-pick-modes -- 同名シーンの選び方に、重み（`＊OnTalk　＆重み：5`。1 巡の中で重みの数だけ出る）と順番（`＆順番：番号`、別名 `index`。番号の小さい順に出して最初へ戻る。最後に出した番号を保存する）を足す。単語の値にも重み（`＠挨拶：こんにちは＠３、やあ`）を足す。不正な値は読み込みエラー。今は複写と Lua で作っている（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者と書き方を決めた）。版は未定。`＆重み`・`＆順番` だけを先に特別扱いで読まない（属性の早い部分実装にしない）。`call-attribute-filter` と同じウェーブに置かない。Dependencies: scene-attribute-store
-- [ ] mlua-0-12-upgrade -- mlua を 0.12 に上げる（再エクスポートの再編・userdata の `MaybeSync`・serde の配列の出し方・エラーの型）。Lua から見える挙動を特性化テストで保つ。mlua-stdlib の 0.12 対応版が crates.io に出るまで始められない（2026-10-24 起票。`/update` から）。版は未定。`Cargo.lock` の席を触る spec・`ponytail-lua-*` と同じウェーブに置かない。Dependencies: none
+- [ ] mlua-stdlib-removal -- mlua-stdlib の 6 つのモジュールを外し（どのゴーストも使っていない）、TOML を読む `@toml`（`decode`）を足す。`OnPastaSetSaveVariable` を、JSON の値でなく Reference2 の型（`number`・`string`・`boolean`・`delete`）で受ける形に改める。マニュアルの mlua-stdlib の章を `@toml` の章に置き換える（2026-10-24 起票。開発者の指摘「既定のシリアライズは TOML」）。版は未定（作者に見える API を変える）。`Cargo.lock` の席を触る spec・`ponytail-lua-loader`・`ponytail-lua-scripts` と同じウェーブに置かない。Dependencies: none
+- [ ] mlua-0-12-upgrade -- mlua を 0.12 に上げる（再エクスポートの再編・userdata の `MaybeSync`・serde の配列の出し方・エラーの型）。Lua から見える挙動を特性化テストで保つ。mlua-stdlib を外してから始める（2026-10-24 起票。`/update` から）。版は未定。`Cargo.lock` の席を触る spec・`ponytail-lua-*` と同じウェーブに置かない。Dependencies: mlua-stdlib-removal
 - [ ] vsce-4-upgrade -- `@vscode/vsce` を 4.x に上げる。リリース CI の Node を 22 にし、`--azure-credential` の公開の道を `release-setup-check.yml` で確かめる。だめなら 4.x の OIDC の口へ移すかを決める（2026-10-24 起票。`/update` から）。版は未定。`pasta-dll-multiarch` と同じウェーブに置かない。Dependencies: ponytail-manual-ci
 - [ ] pest-2-9-4-upgrade -- pest を 2.9.4 以降に上げても、手元と CI の 3 か所で `pasta_lsp` の WASM のビルドが通るようにする（psm が wasm32 に clang を要る）。wasm32 向けの C コンパイラの用意か、上流の直しかを決める（2026-10-24 起票。`/update` から）。版は未定。`Cargo.lock` の席を触る spec・`ponytail-dsl-parser` と同じウェーブに置かない。Dependencies: none
 

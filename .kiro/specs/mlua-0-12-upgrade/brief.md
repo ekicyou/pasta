@@ -1,6 +1,6 @@
 # Brief: mlua-0-12-upgrade
 
-> **ステータス**: 未着手（2026-10-24 の `/kiro-discovery` で起票。`/update` の提案（PR #187）で「起票を勧める」とした 1 本）。版は未定。要件定義は Opus。**今は始められない**（下の Constraints の「先に要るもの」）。
+> **ステータス**: 未着手（2026-10-24 の `/kiro-discovery` で起票。`/update` の提案（PR #187）で「起票を勧める」とした 1 本）。版は未定。要件定義は Opus。`mlua-stdlib-removal` の後に始める（下の Constraints の「先に要るもの」。2026-10-24 に、上流の公開を待つ道から改めた）。
 
 ## Problem
 
@@ -16,17 +16,18 @@ pasta の Lua ランタイムは mlua 0.11（LuaJIT 2.1、features `luajit52`・
 - **依存**: ルートの `Cargo.toml` 33 行 `mlua = { version = "0.11", … }`、34 行 `mlua-stdlib = { version = "0.1", features = ["json", "regex", "yaml"] }`。使うのは `pasta_lua` で、`pasta_shiori`・`pasta_check`・`pasta_sample_ghost` も `mlua::` を参照する。
 - **使っている場所**: `mlua::` を参照するファイルは 101（`pasta_lua` 92・`pasta_shiori` 7・`pasta_check` 1・`pasta_sample_ghost` 1）。serde の変換（`LuaSerdeExt`・`to_value`・`from_value`）を使うファイルは 4。
 - **mlua-stdlib が止めている**: crates.io の mlua-stdlib は 0.1.0（2025-09-24）しかなく、`mlua = "^0.11"` を要る。上流の main は 2026-10-03 に「Upgrade to mlua 0.12.2」を入れたが、版は 0.1.0 のままで、公開されていない。pasta のクレートは crates.io に出すので、git の依存では置き換えられない。
+  - 2026-10-24 のヒアリングで、どのゴーストも mlua-stdlib の 6 つのモジュールを使っていないと分かった。開発者の決定で、mlua-stdlib を外す spec（`mlua-stdlib-removal`）を先に入れる。この spec は mlua-stdlib を扱わない。
 - **tech.md**: 「主要依存関係」に `mlua 0.11`・`mlua-stdlib 0.1` と書いてある。前提の「LuaJIT 2.1 には `coroutine.close`・`<close>` が無い」（roadmap）は、mlua の版に関わらず変わらない。
 
 ## Desired Outcome
 
-- pasta が mlua 0.12 系と、それに合う mlua-stdlib の上で動く。
+- pasta が mlua 0.12 系の上で動く。
 - Lua から見える挙動（serde の変換の結果・エラーの文言・コルーチンの扱い・`require` の探し方）が変わらない。変わるところは、決めたうえでマニュアルに書く。
 - x86（`i686-pc-windows-msvc`）と x64 のビルドとテスト、`pasta_lsp` の WASM のビルドが通る。
 
 ## Approach
 
-mlua-stdlib の 0.12 対応版が crates.io に出てから始める。始めたら、0.12 の破壊的変更を pasta の使い方に当てて、まとめて直す。直しの量が多いので、`/update` の C 区分（その場で直す）ではなく、spec にした。
+`mlua-stdlib-removal` で mlua-stdlib を外してから始める。0.12 の破壊的変更を pasta の使い方に当てて、まとめて直す。直しの量が多いので、`/update` の C 区分（その場で直す）ではなく、spec にした。
 
 0.12 の主な破壊的変更（変更履歴より）:
 
@@ -41,7 +42,7 @@ mlua-stdlib の 0.12 対応版が crates.io に出てから始める。始めた
 ## Scope
 
 - **In**:
-  - ルートの `Cargo.toml` の mlua・mlua-stdlib の版と、`Cargo.lock`
+  - ルートの `Cargo.toml` の mlua の版と、`Cargo.lock`
   - 4 つのクレートの mlua の使い方の直し（再エクスポートの移動・userdata・serde・エラーの型）
   - serde の変換の挙動が変わるかを確かめる特性化テスト（直す前に足す）
   - `tech.md` の「主要依存関係」、マニュアルの内部設計で mlua の版に触れている所
@@ -61,7 +62,7 @@ mlua-stdlib の 0.12 対応版が crates.io に出てから始める。始めた
 
 ## Upstream / Downstream
 
-- **Upstream**: mlua-stdlib の 0.12 対応版の公開（上流 mlua-rs/mlua-stdlib）
+- **Upstream**: `mlua-stdlib-removal`（mlua-stdlib を外す）
 - **Downstream**: なし（今後の mlua の更新は `/update` で扱う）
 
 ## Existing Spec Touchpoints
@@ -74,7 +75,7 @@ mlua-stdlib の 0.12 対応版が crates.io に出てから始める。始めた
 
 ## Constraints
 
-- **先に要るもの**: mlua-stdlib の mlua 0.12 対応版が crates.io に出ること。出るまでは始められない。待たずに進める案（mlua-stdlib を外して json・regex・yaml を自前か別のクレートで置き換える）は、要件で比べる。
+- **先に要るもの**: `mlua-stdlib-removal`。mlua-stdlib が残っていると、0.12 へ上げられない（上流の公開は待たない。2026-10-24 開発者の決定）。
 - LuaJIT のビルドは、環境変数 `NoDefaultCurrentDirectoryInExePath` を外して行う（残っていると exit 101 で落ちる）。
 - pasta.dll は静的 CRT のまま（mlua の `vendored` の LuaJIT も同じビルドに入る）。
 - `Cargo.lock` とルートの `Cargo.toml` は、ウェーブの中では 1 本の spec だけが触る。
