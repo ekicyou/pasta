@@ -115,3 +115,16 @@ pasta の Lua ランタイムは mlua 0.11（LuaJIT 2.1、features `luajit52`・
 - `LuaSerdeExt` が残るのは `persistence.rs` だけで、`lua.array_metatable()`（配列の印。空の配列を `[]` に書くかの判定と、読んだ配列に印を付ける所）のため。mlua 0.12 でこの口が動くなら、ここが直す範囲に入る。配列の印の扱いは `persistence_tests.rs` の `test_codec_array_marked_empty_table_is_empty_array`・`test_codec_read_value_types` が押さえている。
 - 表の中身は `Table::pairs`（`lua_next`。`__pairs` を呼ばない）と `raw_get` で読む。mlua 0.12 で `pairs` の意味が変わるなら見直す。
 - 参照先: `.kiro/specs/completed/toml-serialization/design.md` の SaveCodec・LogTableFormatter。
+
+## 2026-10-24 棚卸の再測定（main `1fb7ed38`）
+
+- **前提の変化**: 先に要る `mlua-stdlib-removal`、ファイルを共有する `toml-serialization`・`ponytail-check-release` は 3 本とも入った（`completed/`）。未完の先行は無い。mlua-stdlib はルートの `Cargo.toml`・`Cargo.lock`・`tech.md` から消えた。mlua の serde の変換（`to_value`・`from_value`）を使う所は 0。`LuaSerdeExt` は `runtime/persistence.rs` 28 行だけで、使うのは `lua.array_metatable()`（416・564 行、`persistence_tests.rs` 343・625 行）だけ。features の `serialize` が要るのは、この配列の印のためだけになった。
+- **触るファイル**: `mlua::`・`use mlua` を参照するファイルは 103（前回と同じ数え方で 102 → 103。`toml-serialization` が足した `runtime/persistence_tests.rs`（1,013 行）の 1 つ増え。内訳 `pasta_lua` 94・`pasta_shiori` 7・`pasta_check` 1・`pasta_sample_ghost` 1）。ルートの `Cargo.toml` 33 行。破壊的変更が当たる所は前回のまま（`search/context.rs` 357 行・`runtime/enc.rs` 74・117 行・`tests/ffi/compare_test.rs` 40 行）に、`module_registry.rs` の `register_toml_module` と、`persistence.rs` 362 行・`log.rs` 123 行の `Table::pairs` が加わる。
+- **規模**: 11〜15 タスク（serde の挙動の特性化が配列の印だけに減った）。分割は不要。
+- **先に要るもの**: 働きの上でもファイルの順でも、残りは無い。今すぐ始められる。後の `shiori4-v3-portable` とは `Cargo.toml`・`Cargo.lock`・`pasta_shiori/src/shiori.rs` で重なるので、同じウェーブに置かない。`pest-2-9-4-upgrade`・`ponytail-editor-tooling`・`ponytail-core-registry`（`Cargo.lock` の席）とも同じ。
+- **種別**: 基盤（依存の版上げ）。
+- **要件定義のモデル**: Opus（土台の決定は無い）。
+- **見つけた穴・古くなった記述**
+  - Current State の「依存」（34 行の mlua-stdlib）・「serde の変換を使うファイルは 4」・「mlua-stdlib が止めている」・「tech.md」は古い（上の申し送りのとおり）。Desired Outcome の「serde の変換の結果」と Scope の「serde の変換の特性化テスト」は、配列の印（`array_metatable`）の確かめに読み替える。0.12 の serde の変更（配列の印のある表をいつも配列で出す）は、`to_value` を使っていないので当たらない。
+  - Out の「features は `serialize` のまま」は、配列の印を手で持てば外せる。外すかは要件で決める（推奨: 外さない。この spec の範囲を広げない）。
+  - Upstream に `toml-serialization`・`ponytail-check-release` を足す必要は、もう無い（入った）。
