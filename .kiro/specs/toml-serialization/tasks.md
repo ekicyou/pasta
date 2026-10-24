@@ -63,7 +63,7 @@
   - _Depends: 1.2_
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-- [ ] 4. セーブ機能の結合テストを TOML の場面で足す（結合テストのファイルはこのタスクだけが持つ）
+- [x] 4. セーブ機能の結合テストを TOML の場面で足す（結合テストのファイルはこのタスクだけが持つ）
   - Lua から `save()` してファイルから読む往復（素と gzip）、`obfuscate` の設定と逆の形のファイルも読めることを確かめる
   - `file_path = "save.json"` に古い JSON を置くと `save.json.broken` に移り次の保存で `save.json` に TOML が書かれること、既定の設定で古い `save.json` を置いても読まれず中身も名前も変わらないこと、`obfuscate = true` の古い gzip の JSON の `save.dat` が `save.dat.broken` に移ることを確かめる
   - 混ざった表を保存すると `key '混ざり' was not saved: table mixes array items and named keys` の警告が出ることを、ログを捕まえて確かめる
