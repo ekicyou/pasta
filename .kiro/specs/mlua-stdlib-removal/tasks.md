@@ -9,7 +9,7 @@
   - 読めない文字列（UTF-8 として正しくないものを含む）は `nil` とエラーメッセージを返し、文字列でない引数（数・`nil`・表）は Lua のエラーにする
   - 完了: `RuntimeConfig::minimal()` の VM で `require("@toml").decode('a = 1')` が `{a = 1}` を返し、`cargo build -p pasta_lua` が通る
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 6.1_
-- [ ] 1.2 `@toml` の結合テストを足す
+- [x] 1.2 `@toml` の結合テストを足す
   - 新しいテストのファイルを runtime のテストの入口に登録する
   - 正しい TOML（文字列・整数・小数・真偽値・日付・配列・入れ子の表）が `@pasta_config` と同じ値になり、日付は `1979-05-27T07:32:00` の形になる
   - 読めない文字列で `nil` と空でない文字列、`encode` が `nil` で鍵が `decode` だけ、2 回の `require` が同じ表で続けた `decode` が混ざらない、`decode(42)`・`decode(nil)`・`decode({})` が `pcall` で `false`
@@ -93,3 +93,7 @@
   - PR の題名に `!` を付ける案（6 つのモジュールを外すことと `OnPastaSetSaveVariable` の形を変えることの 2 つ）と、`release` スキルへの「動きが変わる点」2 点と `RuntimeConfig` の 1 行を、`kiro-complete` が読める所（research.md の申し送りの節）に書く
   - 完了: research.md に PR の題名の案と申し送りの 3 行がある
   - _Requirements: 6.6_
+
+## Implementation Notes
+
+- `from_loader` は main.lua を読まない。main.lua を通す試験は `PastaLoader::load`（`from_loader_with_scene_dic`）で読み込む（1.2）
