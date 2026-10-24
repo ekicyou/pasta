@@ -2,7 +2,7 @@ use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::Path;
 
-use crate::path_error;
+use crate::{non_unicode_name, path_error};
 use zip::CompressionMethod;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
@@ -28,14 +28,6 @@ pub(crate) fn create_nar(release_dir: &Path, nar_path: &Path) -> io::Result<u64>
 
     let metadata = fs::metadata(nar_path).map_err(write_err)?;
     Ok(metadata.len())
-}
-
-/// Unicode として不正な名前は化けさせずに止める（UTF-8 限定の作成ツール）
-fn non_unicode_name(path: &Path) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        format!("file name is not valid Unicode: {}", path.display()),
-    )
 }
 
 fn add_dir_to_zip<W: Write + io::Seek>(

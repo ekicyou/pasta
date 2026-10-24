@@ -47,6 +47,14 @@ pub(crate) fn path_error(e: io::Error, action: &str, path: &Path) -> io::Error {
     io::Error::new(e.kind(), format!("cannot {action} {}: {e}", path.display()))
 }
 
+/// Unicode として不正な名前は化けさせずに止める（UTF-8 限定の作成ツール）
+pub(crate) fn non_unicode_name(path: &Path) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("file name is not valid Unicode: {}", path.display()),
+    )
+}
+
 fn main() {
     match parse_args_from(lexopt::Parser::from_env()) {
         Ok(args) => match args.command {

@@ -150,14 +150,6 @@ fn collect_files(root_dir: &Path, excluded_dirs: &[String]) -> io::Result<Vec<Fi
     Ok(entries)
 }
 
-/// Unicode として不正な名前は化けさせずに止める（UTF-8 限定の作成ツール）
-fn non_unicode_name(path: &Path) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        format!("file name is not valid Unicode: {}", path.display()),
-    )
-}
-
 /// 再帰的にファイルを収集
 fn collect_files_recursive(
     root_dir: &Path,
@@ -185,7 +177,7 @@ fn collect_files_recursive(
             .strip_prefix(root_dir)
             .map_err(|e| io::Error::other(e.to_string()))?
             .to_str()
-            .ok_or_else(|| non_unicode_name(&path))?
+            .ok_or_else(|| crate::non_unicode_name(&path))?
             .replace('\\', "/");
 
         if file_type.is_dir() {
