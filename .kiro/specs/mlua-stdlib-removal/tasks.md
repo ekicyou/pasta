@@ -67,7 +67,7 @@
   - 完了: `book/src` を 6 つのモジュール名と `mlua-stdlib` で検索して 0 件
   - _Boundary: ManualDocs（dsl-vs-lua.md・patterns.md・pasta-log.md・internals/execution-model.md・internals/loader.md）_
   - _Requirements: 5.2_
-- [ ] 4.4 (P) README と steering と試験の一覧から mlua-stdlib を消す
+- [x] 4.4 (P) README と steering と試験の一覧から mlua-stdlib を消す
   - `crates/pasta_lua/README.md` の組み込みモジュールの文と例の注釈・`from_libs` の例を直す
   - `tech.md` の依存の行と `@env` の行を消し `@toml` の行を足す。`structure.md`・`TEST_COVERAGE.md` の消したテストの 2 行を `toml_module_test.rs` の 1 行にする
   - 完了: 4 つのファイルを `mlua-stdlib`・`@env`・`stdlib_modules_test`・`stdlib_regex_test` で検索して 0 件

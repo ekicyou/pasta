@@ -87,8 +87,7 @@
 | 機能                                  | テストファイル                                                    | 状態   | 説明                                                             |
 | ------------------------------------- | ----------------------------------------------------------------- | ------ | ---------------------------------------------------------------- |
 | Luaスクリプトローダー                 | `loader_startup_test.rs`<br>`loader_lifecycle_test.rs`            | ✅ 完了 | スクリプト読み込み（2ファイルに分割）                            |
-| 標準ライブラリモジュール              | `stdlib_modules_test.rs`                                          | ✅ 完了 | stdlib機能                                                       |
-| 正規表現モジュール                    | `stdlib_regex_test.rs`                                            | ✅ 完了 | 14テスト                                                         |
+| TOMLモジュール（`@toml`）             | `toml_module_test.rs`                                             | ✅ 完了 | 5テスト（decode）                                                |
 | Lua単体テスト実行                     | `lua_unittest_runner.rs`                                          | ✅ 完了 | Luaテストランナー                                                |
 | STORE.save/CTX注入                    | `store_save_test.lua`                                             | ✅ 完了 | 10テスト（永続変数・参照同一性）                                 |
 | STORE コルーチン連携                  | `store_coroutine_test.lua`                                        | ✅ 完了 | 7テスト                                                          |
