@@ -130,3 +130,107 @@
    - 空の Reference2 は型を省いたのと同じ（文字列）。空の Reference1 は空の文字列を代入し、無い Reference1 は断る（同じ日の決定）。
 5. **`toml::de::Error` の文の形**。`Display` は複数行（位置と、問題の行の抜き出し）になる。失敗の表記やログに載せるときに 1 行にするかは、`@toml` を使う作者に任せる（`decode` は文をそのまま返す）のが簡単。
 6. **大きな整数**。`toml_to_lua` は整数を `f64` にするので、2^53 を超える整数は丸まる。`@pasta_config` と同じ規則（要件 2.3）なので、そのままにしてマニュアルに一言書くかを設計で決める。
+
+## 6. 設計の調べ（2026-10-24・`kiro-spec-design`）
+
+### 要約
+
+- **種別**: 既存の仕組みの拡張（Extension）。軽い調べ（`design-discovery-light`）で足りる。新しい外部の依存は無く、`toml` クレート（Cargo.lock では 1.1.8）・`toml_to_lua`・`set_loaded_module`・失敗の仕組み（`FAILURE.report`・`kind_of`）がすべて手元にある。
+- **使ったスキルと手引き**: `ponytail`（いちばん小さい完全な変更・後のためのコードを作らない）、`pasta-lua-coding`（`SKILL.md` の 53・76・114〜123・158・160・174 行を確かめた。公開モジュールの規範の正はマニュアルの章）、`kiro-spec-design` の `design-principles`・`design-discovery-light`・`design-synthesis`・`design-review-gate`。
+- **大事な発見**:
+  - ギャップ分析の一覧に無い、消すテストの名前を持つ文書が 2 つある。`.kiro/steering/structure.md` 155〜156 行（`stdlib_modules_test.rs`・`stdlib_regex_test.rs` の木）と、ルートの `TEST_COVERAGE.md` 90〜91 行。
+  - スキル `pasta-lua-coding` の `SKILL.md` 174 行も「グローバル変数に JSON の値を代入する」と書いている（ギャップ分析の行の一覧に無い）。
+  - リリースノートの「動きが変わる変更」は、main のコミットの件名の `!` から作る（`.github/scripts/release/release-notes.ps1` 104〜109 行）。PR は squash でマージするので、main に残る件名は PR の題名 1 つだけになる。ギャップ分析の「コミットを分けて 2 つに `!`」は main に残らないので、PR の題名に `!` を付け、2 つの変更を両方書く。
+  - 移す「Lua 標準ライブラリ」の節は「ゴーストから変える手段は無い」と書いているが、`[loader] ffi = true` で `ffi` を開ける（`reference/pasta-toml.md` 249 行）。移すときに、この 1 点を今の姿に直す。
+
+### 調べたこと
+
+#### `@toml` の置き場と読み方
+
+- **きっかけ**: 要件 2.1〜2.7。
+- **見たもの**: `runtime/mod.rs` 214〜235 行（6 つの登録と、`@pasta_log` を常に登録する行）、`runtime/module_registry.rs`（`set_loaded_module` 24 行・`register_log_module`・`toml_to_lua` 216 行）、`loader/config/mod.rs` 71 行（`toml::from_str::<toml::Table>` で文字列を読む先例）。
+- **分かったこと**:
+  - `with_config_and_source_map` は、`PastaLuaRuntime::new`・`with_config`・`from_loader` のどれからも通る共通の道で、`main.lua` を読む前に走る。`@pasta_log` の隣に 1 行足せば、要件 2.1 の時機がそろう。
+  - `toml_to_lua` は `PastaLuaRuntime` の私的な関連関数で、`module_registry.rs` の中から `Self::toml_to_lua` で呼べる。見える範囲を変えずに済む。
+  - mlua 0.11 の `String`（Rust の `String` と `mlua::String`）は、引数の数を文字列へ変える（`coerce_string`）。`toml.decode(42)` を Lua のエラーにする（要件 2.7）には、引数を `Value` で受けて、文字列でなければエラーにする。
+  - `toml::de::Error` の `Display` は複数行（位置・問題の行・理由）になる。
+- **影響**: 新しい Rust のファイルは要らない。`module_registry.rs` に関数 1 つ、`mod.rs` は 18 行を消して 1 行を足す。
+
+#### `RuntimeConfig` に残るもの
+
+- **見たもの**: `runtime_config.rs` 全体、`should_enable_module` と `default_libs`・`minimal`・`full` の呼び出し元（ワークスペースを検索）。
+- **分かったこと**:
+  - `should_enable_module` を呼ぶのは `mod.rs` の 6 行と `tests/runtime/unit_test.rs` だけ。`pasta_shiori`・`pasta_check` は呼ばない。
+  - `RuntimeConfig::minimal()` はテスト 4 ファイル（`log/integration_test.rs`・`debug_integration_test.rs`・`debug_integration_zero_cost_test.rs`・`encoding_test.rs`）が使う。`full()` は `debug_integration_test.rs` 595 行が `debug.enabled` を見るだけ。
+  - `to_stdlib` は `std_` で始まらない名前を黙って飛ばす。`from_libs` に 6 つの名前を渡す呼び出しは、テストのほかに無い（`README.md` 85〜95 行の例だけ）。
+- **影響**: `should_enable_module` は消す。`new()` と `minimal()` は同じ中身（`["std_all"]`）になるが、どちらも公開の API で呼び出し元があるので残す。
+
+#### 文書の行き先
+
+- **見たもの**: `book/src/SUMMARY.md` 48 行、`gen-skill-refs.mjs` 59 行・`gen-skill-refs-test.mjs` 98 行、`outName`（`lua/modules/toml.md` → `references/toml.md`）、`lua/index.md` 30 行、`lua/modules/index.md` の共通事項、ほかの章のファイル名の付け方（`pasta-search.md`・`enc.md`。`@` を外したモジュールの名前）。
+- **分かったこと**: 章のファイル名は `lua/modules/toml.md`、写しは `references/toml.md` になる。章の数は 63 のまま。リンクの行き先の見出し `### Lua 標準ライブラリ` を `lua/modules/index.md` へ移せば、アンカーは `#lua-標準ライブラリ` のままで、`lua/index.md` はファイル名だけを直せばよい。
+
+## 7. 設計の決定
+
+### 決定: `@toml` は `RuntimeConfig.libs` によらず常に登録する（申し送り 1・Research Needed 2）
+
+- **きっかけ**: 要件 2.1「設定なしで」。
+- **案**: 1. 常に登録する（`@pasta_log` と同じ）／2. `libs` に `toml` の名前を足して切れるようにする。
+- **推奨・採用**: 1。
+- **理由**: 2 は、この spec で無くす「モジュールの名前で入り切りする口」をまた作る。切りたい人がいない。
+- **得失**: Rust から `pasta_lua` を使う人も `@toml` を外せない。読むだけの部品で、ファイルにも環境にも触れないので害が無い。
+
+### 決定: `RuntimeConfig.libs` の 6 つの名前は黙って飛ばす（申し送り 2・Research Needed 1）
+
+- **案**: 1. 今の `to_stdlib` のまま、`std_` で始まらない名前を黙って飛ばす／2. `std_` で始まらない名前を `ConfigError::UnknownLibrary` にする。
+- **推奨・採用**: 1。
+- **理由**: 要件 1.5 は「どの名前を並べても入らない」で、1 で満たせる。2 は `ConfigError` の新しい場合と試験を足し、今 `std_` でない名前を並べている呼び出し（`README.md` の例）を壊す。
+- **得失**: Rust から 6 つの名前を並べた人は、誤りでなく黙って無視される。`pasta_lua` を Rust から使う人は今のところ pasta 自身だけである。
+
+### 決定: マニュアルの章は `lua/modules/toml.md`、Lua 標準ライブラリの節は公開モジュールの一覧の頁へ（申し送り 3）
+
+- **推奨・採用**: `lua/modules/mlua-stdlib.md` を消し、`lua/modules/toml.md`（題は `@toml`）を作る。`### Lua 標準ライブラリ` の節は `lua/modules/index.md` の「共通事項」の終わりへ移し、`lua/index.md` 30 行のリンクを `modules/index.md#lua-標準ライブラリ` に直す。
+- **理由**: ほかの章と同じ名付け（`@` を外したモジュールの名前）。Lua 標準ライブラリはどのモジュールにも共通の前提で、一覧の頁の共通事項に合う。
+- **ついでに直すこと**: 移す節の「ゴーストから変える手段は無い」を、「`ffi` だけは `pasta.toml` の `[loader] ffi = true` で開ける。ほかは変えられない」に直す（`reference/pasta-toml.md` の `ffi` へリンク）。今の文は、FFI を開く口を足した `lua-cmodule-robustness`（PR #150）の後に古くなっている。
+
+### 決定: `@toml` はモジュールのメタデータ（`_VERSION`・`_DESCRIPTION`）を持たない（申し送り 4）
+
+- **推奨・採用**: 持たない。
+- **理由**: 要件 2.5「`decode` だけを持つ」。`@pasta_config`・`@pasta_search` も持たない。版の文字列を足しても使う人がいない。`lua/modules/index.md` のメタデータの節（4 つのモジュールを並べる）は変えない。
+
+### 決定: 読めないときのエラーメッセージは `toml` クレートの文をそのまま返す（申し送り 5）
+
+- **推奨・採用**: `toml::de::Error` の `Display` をそのまま 2 つ目の戻り値にする。1 行にしない。
+- **理由**: 位置と問題の行を含む文が、作者がいちばん直しやすい。失敗の表記に載せるときは、`FAILURE.escape` が CR・LF を空白にする。章に「複数行になることがある」と書く。
+
+### 決定: 2^53 を超える整数は `@pasta_config` と同じく丸まる。章に 1 行書く（申し送り 6）
+
+- **推奨・採用**: `toml_to_lua` をそのまま使い、`@toml` の章の値の対応の表の下に「2^53（9007199254740992）を超える整数は、いちばん近い数に丸まる（`@pasta_config` と同じ）」と書く。
+- **理由**: 要件 2.3 が `@pasta_config` と同じ規則を求める。LuaJIT の数は倍精度の浮動小数点数だけなので、丸めない方法が無い。
+
+### 決定: `OnPastaSetSaveVariable` の確かめの順
+
+- **採用**: 門（`SecurityLevel`）→ Reference0 → Reference2 の型の名前（無い・空は `string`。知らない名前は「型の名前にならない値」）→ `delete` なら Reference1 を見ずに消す → Reference1 が無ければ断る（`number` は「数にできない値」、ほかは「代入できない値」）→ 型ごとの読み。
+- **理由**: 型の名前を先に確かめれば、`delete` も型の 1 つとして同じ分かれ道で扱え、要件 3.6・4.3・4.4 の優先がはっきりする。知らない型の名前と無い Reference1 が同時に来たときは、型の名前の誤りを出す（要件 4.4 は型が無い・空・`string` のときだけ）。
+
+### 決定: 「型の名前にならない値」の鍵の名前は `BAD_TYPE`
+
+- **採用**: `FAILURE.LABEL.NOT_JSON` を消し、同じ席に `BAD_TYPE = "型の名前にならない値"` を置く。
+- **理由**: 文言の「〜にならない値」は既存の `BAD_NAME = "名前にならない値"` と同じ形で、鍵の名前も合わせる。数は 12 のまま。
+
+### 決定: `!` は PR の題名に付ける
+
+- **採用**: squash マージの件名（PR の題名）に `!` を付け、6 つのモジュールを外すことと `OnPastaSetSaveVariable` の形を変えることの 2 つを書く。途中のコミットにも付けてよいが、main に残るのは題名だけである。見どころのファイル（`doc/release-notes/v0.4.3.md`）は `release` スキルが書くので、この spec は `kiro-complete` の申し送りで 2 点を渡す。
+
+## 8. まとめ直し（design-synthesis）
+
+- **一般化**: `number`・`string`・`boolean`・`delete` の 4 つの読み方は、「型の名前 → Reference1 の読み方」の小さな対応表 1 つにまとまる。表を外へ公開したり、型を足す口を作ったりはしない（要る型が出てから）。
+- **作るか借りるか**: TOML を読むのは `toml` クレート（借りる）、値の変換は既存の `toml_to_lua`（借りる）、数の読み方は Lua の `tonumber`（借りる）。新しく書くのは、`decode` の Lua 関数 1 つと、型で分ける Lua の関数 1 つだけ。JSON・YAML・正規表現の代わりは作らない（Out of scope）。
+- **削ったもの**: `should_enable_module`（使う所が無くなる）、`env` の警告、`read_json`、`@json` の有無の確かめ（「JSON の部品が無い」の失敗）、配列・オブジェクトの失敗。新しい Rust のファイル・新しい `ConfigError`・`@toml` の切り替え・`encode`・メタデータは作らない。
+
+## 9. 危うさと手当て
+
+- スキル `pasta-lua-coding` の `SKILL.md` と `references/mlua-stdlib.md` の削除は、分類器が Self-Modification として止めることがある → 止まったら、入った分と残りを示して開発者の許可を求める（作業を止めて待つ）。`references/` の作り直しは `gen-skill-refs.mjs` が書くが、古い写しの削除は手で行う。
+- cargo-deny の `unused-allowed-license` は既定で警告（失敗にならない）。依存が減って使われなくなる許可のライセンスがあっても、`deny.toml`・`about.toml` は触らない。
+- `recommend-menu-scenes` と `lua/shiori-events.md` の既定ハンドラーの表を共有する → この spec は `OnPastaSetSaveVariable` の行の文だけを直す。行の数・表の前の「9 つ」には触らない。後から入る側が合わせる。
+- `toml-serialization` と `tech.md`・マニュアルの頁を共有する → この spec は `tech.md` の mlua-stdlib の依存の行と、組み込みモジュールの表の `@env` の行（と `@toml` の行を足す）だけを直す。
