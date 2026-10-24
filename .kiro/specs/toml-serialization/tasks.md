@@ -95,7 +95,7 @@
   - _Depends: 5.1, 5.2_
   - _Requirements: 8.6, 8.7, 8.8_
 
-- [ ] 6. 全体の確かめと、動きが変わる変更としてのコミット
+- [x] 6. 全体の確かめと、動きが変わる変更としてのコミット
   - `NoDefaultCurrentDirectoryInExePath` を外して `pasta_lua` と `pasta_shiori` のテストと clippy を回し、すべて通る。テストが書き換える `sample.generated.lua` の改行だけの差分は戻してコミットに混ぜない
   - 変えた 5 つのソースとサイドカーのテストに `serde_json` が残らず、`runtime/module_registry.rs`・`runtime/mod.rs`・`Cargo.toml`・`Cargo.lock` に差分が無い
   - 本仕様のコミットの件名に `!` を付け、本文に保存先と形式の変更と公開の Rust API の型の変更を書き、設計のリリースノートの詫びの文案を申し送る
@@ -109,3 +109,4 @@
 - 1.3: toml_to_lua にも dead_code の許可がある（2.2 で外す）。表の中の i64::MAX は LuaJIT の倍精度で Float(2^63) に丸まる（確定した設計判断 6 の限界）。ファイルを通す往復の確認は 2.2 で足す。
 - 2.1: SaveGate・load_toml_from_file・set_gate・read_or_quarantine にも dead_code の許可がある（2.2 で外す）。PersistenceError に TomlParseError を先に足した（2.2 で JsonError を消し SaveDisabled・TomlWriteError を足す）。persistence.rs が 696 行で、2.2 で JSON の道を消したあと行数を確かめる。
 - 2.2: 既定の保存先に書くテストが、追跡されている crates/pasta_lua/profile/pasta/save/save.json（中身 {}）を save.json.broken へ移して TOML を書く。テストの後は git checkout -- で戻し .broken を消す。3.1 で既定が save.toml（gitignore 済み）になったら、この追跡ファイルを残すかは完了時に判断する。保存先にフォルダがあっても読めない物として .broken へ退避する（設計どおり）。persistence.rs は 665 行。
+- 6: PR（squash）の件名にも `!` を付ける（例 `feat(toml-serialization)!: セーブファイル・ログの表・サイドカーを TOML にする`）。リリースノートの詫びの文案は design.md「移行とリリースノートへの申し送り」にあり、release スキルが doc/release-notes/v0.4.3.md へ写す。
