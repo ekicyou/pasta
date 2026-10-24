@@ -352,12 +352,12 @@ describe("recommend_menu - 受け手を置く ID", function()
         SCENE.register("rms_k_1", "__start__", function(act)
             act:call(nil, "おすすめ項目", {}, "三人目", "u")
         end)
-        local others = { "OnTalk", "char2.recommendsites.caption" }
+        local others = { "OnTalk", "char2.recommendbuttoncaption" }
         local result = ask("char2.recommendsites", { ["char2.recommendsites"] = { "rms_k_1" } }, {
             aliases = {
                 ["char2.recommendsites"] = { "三人目のおすすめ" },
                 ["OnTalk"] = { "会話" },
-                ["char2.recommendsites.caption"] = { "三人目のボタン" },
+                ["char2.recommendbuttoncaption"] = { "三人目のボタン" },
             },
             extra_ids = { "char2.recommendsites", others[1], others[2] },
         })
@@ -827,5 +827,138 @@ describe("recommend_menu - 選んだときの割り込みと受け手", function
             expect(seen):toBe(1)
             expect(has(res, "ATALK")):toBe(true)
         end)
+    end)
+end)
+
+-- ============================================================================
+-- 3.5: ボタンの名前の問い合わせ（CaptionReceiver）
+-- ============================================================================
+
+local CAPTION_IDS = { "sakura.recommendbuttoncaption", "kero.recommendbuttoncaption", "sakura.portalbuttoncaption" }
+
+--- 単語の名前 → 候補の並びを引く @pasta_search の代役（＠名前 と同じく前方一致で、呼ぶたびに候補を順に選ぶ。
+--- 本物の選び方の差し替え set_word_selector の代わり）。calls に引いた名前を記録する
+---@param words table<string, string[]>
+---@param aliases table|nil scene_aliases の戻り値
+local function make_word_search(words, aliases)
+    local calls, picks = {}, {}
+    local search = make_search({}, aliases)
+    search.search_word = function(_, name, scope)
+        calls[#calls + 1] = { name = name, scope = scope }
+        local keys = {}
+        for key in pairs(words) do
+            if key:sub(1, #name) == name then keys[#keys + 1] = key end
+        end
+        if #keys == 0 then return nil end
+        table.sort(keys)
+        local list = {}
+        for _, key in ipairs(keys) do
+            for _, w in ipairs(words[key]) do list[#list + 1] = w end
+        end
+        picks[name] = (picks[name] or 0) % #list + 1
+        return list[picks[name]]
+    end
+    return search, calls
+end
+
+local DEFAULT_CAPTION_ALIASES = {
+    ["sakura.recommendbuttoncaption"] = { "おすすめボタン名" },
+    ["kero.recommendbuttoncaption"] = { "相方おすすめボタン名" },
+    ["sakura.portalbuttoncaption"] = { "ポータルボタン名" },
+}
+
+--- 差し替えの検索で受け手を置き直し、id の受け手を n 回呼んだ結果の並びと検索の記録を返す
+local function ask_caption(id, words, aliases, n, extra_ids)
+    local got = {}
+    local search, calls = make_word_search(words, aliases or DEFAULT_CAPTION_ALIASES)
+    with_loaded({ ["@pasta_search"] = search }, function()
+        local REG = require("pasta.shiori.event.register")
+        for _, cid in ipairs(CAPTION_IDS) do REG[cid] = nil end
+        for _, cid in ipairs(extra_ids or {}) do REG[cid] = nil end
+        load_receivers()
+        for i = 1, n or 1 do
+            got[i] = REG[id](shiori_act(id))
+        end
+    end)
+    return got, calls
+end
+
+describe("recommend_menu - ボタンの名前", function()
+    test("結びついた単語の候補から 1 つを返す（前方一致の単語も候補）", function()
+        local words = { ["おすすめボタン名"] = { "よみもの" }, ["おすすめボタン名_冬"] = { "ふゆ" } }
+        local got, calls = ask_caption("sakura.recommendbuttoncaption", words, nil, 3)
+        expect(got[1]):toBe("よみもの")
+        expect(got[2]):toBe("ふゆ")
+        expect(got[3]):toBe("よみもの")
+        expect(calls[1].name):toBe("おすすめボタン名")
+        expect(calls[1].scope):toBeNil()
+    end)
+
+    test("値は加工せずそのまま返す（さくらスクリプトの表記を足さない）", function()
+        local words = { ["相方おすすめボタン名"] = { "\\_a[x]相方\\_a" } }
+        local got = ask_caption("kero.recommendbuttoncaption", words)
+        expect(got[1]):toBe("\\_a[x]相方\\_a")
+    end)
+
+    test("別名が複数あれば辞書順に引き、単語が見つかった最初の名前を使う", function()
+        local aliases = { ["sakura.portalbuttoncaption"] = { "い_ボタン", "あ_ボタン", "う_ボタン" } }
+        local words = { ["い_ボタン"] = { "い" }, ["う_ボタン"] = { "う" } }
+        local got, calls = ask_caption("sakura.portalbuttoncaption", words, aliases)
+        expect(got[1]):toBe("い")
+        expect(#calls):toBe(2)
+        expect(calls[1].name):toBe("あ_ボタン")
+        expect(calls[2].name):toBe("い_ボタン")
+    end)
+
+    test("単語が無ければ nil（204）", function()
+        local got = ask_caption("sakura.recommendbuttoncaption", {})
+        expect(got[1]):toBeNil()
+    end)
+
+    test("別名の表が無い検索では名前が無いので nil（204）", function()
+        local got
+        local search = make_word_search({ ["おすすめボタン名"] = { "x" } }, nil)
+        with_loaded({ ["@pasta_search"] = search }, function()
+            local REG = require("pasta.shiori.event.register")
+            for _, id in ipairs(CAPTION_IDS) do REG[id] = nil end
+            load_receivers()
+            got = REG["sakura.recommendbuttoncaption"](shiori_act("sakura.recommendbuttoncaption"))
+        end)
+        expect(got):toBeNil()
+    end)
+
+    test("決まった 3 つに置く（@pasta_search が引けなくても）", function()
+        with_loaded({ ["@pasta_search"] = false }, function()
+            local REG = require("pasta.shiori.event.register")
+            for _, id in ipairs(CAPTION_IDS) do REG[id] = nil end
+            load_receivers()
+            for _, id in ipairs(CAPTION_IDS) do
+                expect(type(rawget(REG, id))):toBe("function")
+            end
+        end)
+    end)
+
+    test("別名の表の置き換え先の charN.recommendsites.caption にも置く", function()
+        local aliases = {
+            ["char2.recommendsites.caption"] = { "三人目のボタン" },
+            ["char2.recommendbuttoncaption"] = { "置かない" },
+        }
+        local got = ask_caption("char2.recommendsites.caption", { ["三人目のボタン"] = { "みっつめ" } }, aliases, 1,
+            { "char2.recommendsites.caption", "char2.recommendbuttoncaption" })
+        expect(got[1]):toBe("みっつめ")
+        local REG = require("pasta.shiori.event.register")
+        expect(rawget(REG, "char2.recommendbuttoncaption")):toBeNil()
+        REG["char2.recommendsites.caption"] = nil
+    end)
+
+    test("作者が先に代入した REG[\"sakura.recommendbuttoncaption\"] が勝つ", function()
+        local REG = load_receivers()
+        local mine = function() return "mine" end
+        REG["sakura.recommendbuttoncaption"] = mine
+        package.loaded[MODULE] = nil
+        require(MODULE)
+        expect(rawget(REG, "sakura.recommendbuttoncaption")):toBe(mine)
+        REG["sakura.recommendbuttoncaption"] = nil
+        load_receivers()
     end)
 end)

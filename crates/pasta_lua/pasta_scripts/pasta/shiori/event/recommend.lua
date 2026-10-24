@@ -1,5 +1,5 @@
 ---@module pasta.shiori.event.recommend
---- おすすめメニューの既定のハンドラと組み込み（＞おすすめ項目・＞おすすめ区切り）
+--- おすすめメニュー・ボタンの名前の既定のハンドラと組み込み（＞おすすめ項目・＞おすすめ区切り）
 ---
 --- 組み込みは act の欄 _recommend_items（メニューの受け手だけが作る入れ物）に項目を積む。
 --- 入れ物が無ければ（メニューの外では）何もしない。項目を台詞として積まない（act.token に触れない）。
@@ -168,18 +168,45 @@ local function menu_receiver(id)
     end
 end
 
---- 受け手を置く ID: 決まった 3 つと、別名の表の置き換え先のうち charN.recommendsites
+--- 受け手を置く ID: 決まった 3 つずつと、別名の表の置き換え先のうち charN.recommendsites（.caption）
 local menu_ids = { "sakura.recommendsites", "kero.recommendsites", "sakura.portalsites" }
+local caption_ids = { "sakura.recommendbuttoncaption", "kero.recommendbuttoncaption", "sakura.portalbuttoncaption" }
 -- @pasta_search が引けない・scene_aliases を持たない（テストの差し替えなど）なら決まった 3 つだけ
 local found, aliases = pcall(function() return require("@pasta_search"):scene_aliases() end)
-if found and type(aliases) == "table" then
-    for target in pairs(aliases) do
-        if target:match("^char%d+%.recommendsites$") then menu_ids[#menu_ids + 1] = target end
-    end
+if not (found and type(aliases) == "table") then aliases = {} end
+for target in pairs(aliases) do
+    if target:match("^char%d+%.recommendsites$") then menu_ids[#menu_ids + 1] = target end
+    if target:match("^char%d+%.recommendsites%.caption$") then caption_ids[#caption_ids + 1] = target end
 end
 -- 作者が先に置いた受け手を上書きしない
 for _, id in ipairs(menu_ids) do
     REG[id] = REG[id] or menu_receiver(id)
+end
+
+-- ============================================================================
+-- ボタンの名前の受け手（CaptionReceiver）
+-- ============================================================================
+
+--- ボタンの名前の受け手を作る。別名の辞書順に ＠名前 と同じ前方一致で単語を引き、
+--- 最初に見つかった値をそのまま返す（無ければ nil で 204）。act:word は使わない（失敗の表記を積まない）
+---@param id string
+---@return fun(act: ShioriAct): string|nil
+local function caption_receiver(id)
+    local names = {}
+    for i, name in ipairs(aliases[id] or {}) do names[i] = name end
+    table.sort(names)
+    return function()
+        local SEARCH = require("@pasta_search")
+        for _, name in ipairs(names) do
+            local word = SEARCH:search_word(name)
+            if word ~= nil then return word end
+        end
+        return nil
+    end
+end
+
+for _, id in ipairs(caption_ids) do
+    REG[id] = REG[id] or caption_receiver(id)
 end
 
 -- ============================================================================

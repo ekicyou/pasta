@@ -69,7 +69,7 @@
   - _Depends: 1_
   - _Requirements: 4.2, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 8.1, 8.2, 12.3_
 
-- [ ] 3.5 ボタンの名前の問い合わせに、結びついた単語で答える
+- [x] 3.5 ボタンの名前の問い合わせに、結びついた単語で答える
   - 決まった 3 つの ID と、読み込みの時点の別名の表で `char<数字>.recommendsites.caption` に当たる ID に、作者の代入が無いときだけ受け手を置く
   - 別名の辞書順に、`＠名前` と同じ前方一致で単語を引き、最初に見つかった単語の候補から 1 つを加工せずに返す（200）。どれも無ければ 204。失敗の表記は積まない
   - Lua テストで、単語の候補から 1 つ選ぶ・単語が無いと 204・`char2.recommendsites.caption` の別名で受け手が置かれる・値に表記が混ざらない・作者の `REG["sakura.recommendbuttoncaption"]` の代入が勝つ、が通る
@@ -139,3 +139,4 @@
 - 2.3: pasta_lua の全テストは追跡中の `crates/pasta_lua/profile/pasta/save/save.json` も書き換える。`sample.generated.lua` と同じく `git checkout --` で戻す。
 - 3.1: 項目の warn の値は、型の誤りは型の名前（nil・boolean・table）、空は `empty string`、バイト値は `contains byte 1`／`contains byte 2`。
 - 3.2: Lua の実行器の `@pasta_search` は空のレジストリなので、Lua テストではシーンの検索を `with_loaded` の差し替えで書く。MenuMemory（`last`）は 3.4 まで読む側が無く `-- luacheck: ignore 241` を付けた。3.4 で外す。
+- 3.x: Lua テストはシーンと単語の登録表が空の実行器で回るため、選び方・前方一致は検索の差し替えで模している。本物の登録表を通す確かめは 6.2 の実機で行う。
