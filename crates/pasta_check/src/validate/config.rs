@@ -180,6 +180,12 @@ fn read_aliases(text: &str) -> Result<Option<SceneAliasTable>, Vec<Finding>> {
         SceneAliasError::EmptyName { .. } => target.is_empty() || alias.is_empty(),
         SceneAliasError::DuplicateAlias { alias: dup, .. } => alias == dup,
         SceneAliasError::Chain { name } => alias == name,
+        SceneAliasError::ConflictsWithDefault {
+            alias: dup,
+            target: t,
+            ..
+        } => alias == dup && target == t,
+        SceneAliasError::TargetIsDefaultAlias { target: t, .. } => target == t,
     };
     let message = |target: &str| match &error {
         SceneAliasError::EmptyName { .. } => msg::config_scene_alias_empty(target),
@@ -187,6 +193,9 @@ fn read_aliases(text: &str) -> Result<Option<SceneAliasTable>, Vec<Finding>> {
             msg::config_scene_alias_duplicate(alias, targets)
         }
         SceneAliasError::Chain { name } => msg::config_scene_alias_chain(name),
+        // shortcut: 文言は tasks 4.1 で msg に足すまでエラーの文のまま
+        e @ (SceneAliasError::ConflictsWithDefault { .. }
+        | SceneAliasError::TargetIsDefaultAlias { .. }) => e.to_string(),
     };
     let mut findings: Vec<Finding> = map
         .iter()

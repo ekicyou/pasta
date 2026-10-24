@@ -72,6 +72,23 @@ pub enum SceneAliasError {
         "scene alias: '{name}' is both a target and an alias (chained aliases are not allowed)"
     )]
     Chain { name: String },
+
+    #[error(
+        "scene alias: alias '{alias}' of '{target}' conflicts with the default alias of '{default_target}' (write {default_target} = [] to remove the default)"
+    )]
+    ConflictsWithDefault {
+        alias: String,
+        target: String,
+        default_target: String,
+    },
+
+    #[error(
+        "scene alias: target '{target}' is a default alias of '{default_target}' (write {default_target} = [] to remove the default)"
+    )]
+    TargetIsDefaultAlias {
+        target: String,
+        default_target: String,
+    },
 }
 
 /// What is wrong with one `font` attribute value (`[actor."name"].font` in pasta.toml).

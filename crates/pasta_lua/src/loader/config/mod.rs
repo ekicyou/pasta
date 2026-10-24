@@ -138,6 +138,12 @@ impl PastaConfig {
                 SceneAliasError::EmptyName { .. } => target.is_empty() || alias.is_empty(),
                 SceneAliasError::DuplicateAlias { alias: dup, .. } => alias == dup,
                 SceneAliasError::Chain { name } => alias == name,
+                SceneAliasError::ConflictsWithDefault {
+                    alias: dup,
+                    target: t,
+                    ..
+                } => alias == dup && target == t,
+                SceneAliasError::TargetIsDefaultAlias { target: t, .. } => target == t,
             };
             let locations: Vec<String> = map
                 .iter()
