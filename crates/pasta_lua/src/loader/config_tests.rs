@@ -225,17 +225,17 @@ fn scene_section_without_alias_uses_builtin_default() {
     assert_eq!(config.scene_alias_source, SceneAliasSource::BuiltinDefault);
 }
 
-/// `[scene.alias]` の見出しだけなら空の表（2.3・5.6）。
+/// `[scene.alias]` の見出しだけなら既定の表で、出どころは内蔵の既定（recommend-menu-scenes 2.3）。
 #[test]
-fn scene_alias_header_only_is_empty_table() {
+fn scene_alias_header_only_is_builtin_default() {
     let config = PastaConfig::from_str("[scene.alias]\n").unwrap();
-    assert!(config.scene_aliases.is_empty());
-    assert_eq!(config.scene_alias_source, SceneAliasSource::PastaToml);
+    assert_eq!(config.scene_aliases, SceneAliasTable::builtin_default());
+    assert_eq!(config.scene_alias_source, SceneAliasSource::BuiltinDefault);
 }
 
-/// 書いた行だけが有効（既定とマージしない。2.1・2.2・2.4）。
+/// 書いたキーだけ既定を置き換え、書かなかったキーの既定は残る（recommend-menu-scenes 2.1・2.2）。
 #[test]
-fn scene_alias_author_table_replaces_default() {
+fn scene_alias_written_rows_overlay_default() {
     let config = PastaConfig::from_str(
         "[scene.alias]\nOnTalk = [\"会話\", \"雑談\"]\nOnBoot = [\"起動\"]\n",
     )
@@ -245,10 +245,56 @@ fn scene_alias_author_table_replaces_default() {
     assert_eq!(config.scene_aliases.resolve("雑談"), Some("OnTalk"));
     assert_eq!(config.scene_aliases.resolve("起動"), Some("OnBoot"));
 
-    // 既定とマージしない: OnBoot だけを書けば「会話」は置き換わらない。
+    // OnBoot だけを書いても、書かなかった OnTalk の既定「会話」は残る。
     let only_boot = PastaConfig::from_str("[scene.alias]\nOnBoot = [\"起動\"]\n").unwrap();
-    assert_eq!(only_boot.scene_aliases.resolve("会話"), None);
+    assert_eq!(only_boot.scene_alias_source, SceneAliasSource::PastaToml);
+    assert_eq!(only_boot.scene_aliases.resolve("会話"), Some("OnTalk"));
     assert_eq!(only_boot.scene_aliases.resolve("起動"), Some("OnBoot"));
+    assert_eq!(
+        only_boot.scene_aliases.resolve("おすすめメニュー"),
+        Some("sakura.recommendsites")
+    );
+
+    // 空の配列は、そのキーの既定を消すだけ。
+    let no_talk = PastaConfig::from_str("[scene.alias]\nOnTalk = []\n").unwrap();
+    assert_eq!(no_talk.scene_alias_source, SceneAliasSource::PastaToml);
+    assert_eq!(no_talk.scene_aliases.resolve("会話"), None);
+    assert_eq!(
+        no_talk.scene_aliases.resolve("おすすめメニュー"),
+        Some("sakura.recommendsites")
+    );
+}
+
+/// 既定の別名とぶつかると読み込みエラー。相手（既定の OnTalk）・直し方・書いた行の行番号を含む（2.4）。
+#[test]
+fn scene_alias_conflict_with_default_is_error_with_line() {
+    let msg = scene_alias_err("[scene.alias]\nOnBoot = [\"起動\", \"会話\"]\n");
+    assert!(msg.contains("default alias of 'OnTalk'"), "{msg}");
+    assert!(msg.contains("OnTalk = []"), "{msg}");
+    assert!(msg.contains("OnBoot = \"会話\" (line 2)"), "{msg}");
+    assert!(!msg.contains("起動"), "{msg}");
+
+    // 直し方どおり既定を消せば通る。
+    let config =
+        PastaConfig::from_str("[scene.alias]\nOnTalk = []\nOnBoot = [\"会話\"]\n").unwrap();
+    assert_eq!(config.scene_aliases.resolve("会話"), Some("OnBoot"));
+}
+
+/// 置き換え先が既定の別名なら読み込みエラー。相手・直し方・書いた行の行番号を含む（2.4）。
+#[test]
+fn scene_alias_target_is_default_alias_is_error_with_line() {
+    let msg = scene_alias_err("[scene.alias]\nOnBoot = [\"起動\"]\n\"会話\" = [\"雑談\"]\n");
+    assert!(msg.contains("default alias of 'OnTalk'"), "{msg}");
+    assert!(msg.contains("OnTalk = []"), "{msg}");
+    assert!(msg.contains("会話 = \"雑談\" (line 3)"), "{msg}");
+}
+
+/// 残った既定の置き換え先を別名に書くと、今の連鎖のエラーと行番号のまま（2.5）。
+#[test]
+fn scene_alias_alias_equal_to_default_target_is_chain_with_line() {
+    let msg = scene_alias_err("[scene.alias]\nOnBoot = [\"OnTalk\"]\n");
+    assert!(msg.contains("chained"), "{msg}");
+    assert!(msg.contains("line 2"), "{msg}");
 }
 
 /// 配列でない値は型不一致の読み込みエラー（toml の行・列つき。2.5）。

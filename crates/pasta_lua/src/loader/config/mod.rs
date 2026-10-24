@@ -107,11 +107,13 @@ impl PastaConfig {
 
     /// Read `[scene.alias]` into the effective alias table and its source.
     ///
-    /// No `alias` table → builtin default. A present `alias` table (even with
-    /// no rows) is the author's table, used as written (never merged with the
-    /// default). Type mismatches come from toml with line/column; semantic
-    /// errors (empty name, duplicate, chain) get the target key, the alias and
-    /// the alias's line number appended.
+    /// No `alias` table → builtin default. Written rows are laid over the
+    /// builtin default per key (`SceneAliasTable::with_written`); the source
+    /// stays `BuiltinDefault` for a header-only table and becomes `PastaToml`
+    /// ("written rows laid over the default") once at least one row is written.
+    /// Type mismatches come from toml with line/column; semantic errors (empty
+    /// name, duplicate, chain, conflicts with the default) get the written
+    /// target key, the alias and the alias's line number appended.
     fn parse_scene_aliases(
         content: &str,
     ) -> Result<(SceneAliasTable, SceneAliasSource), toml::de::Error> {
@@ -132,7 +134,7 @@ impl PastaConfig {
                     .collect::<Vec<_>>(),
             )
         });
-        let table = SceneAliasTable::from_entries(entries).map_err(|e| {
+        let table = SceneAliasTable::with_written(entries).map_err(|e| {
             // Locate the aliases the error is about, with their line numbers.
             let hit = |target: &str, alias: &str| match &e {
                 SceneAliasError::EmptyName { .. } => target.is_empty() || alias.is_empty(),
@@ -160,7 +162,12 @@ impl PastaConfig {
                 serde::de::Error::custom(format!("{e}; at {}", locations.join(", ")))
             }
         })?;
-        Ok((table, SceneAliasSource::PastaToml))
+        let source = if map.is_empty() {
+            SceneAliasSource::BuiltinDefault
+        } else {
+            SceneAliasSource::PastaToml
+        };
+        Ok((table, source))
     }
 
     /// Fill missing SHIORI-profile defaults into `custom_fields`.
