@@ -170,7 +170,8 @@ fn read_aliases(text: &str) -> Result<Option<SceneAliasTable>, Vec<Finding>> {
     let entries = map
         .iter()
         .map(|(target, aliases)| (target.clone(), aliases.iter().map(|a| a.get_ref().clone())));
-    let error = match SceneAliasTable::from_entries(entries) {
+    // pasta.dll と同じく書いたキーだけを既定に重ねる（見出しだけなら既定と等しい）
+    let error = match SceneAliasTable::with_written(entries) {
         Ok(table) => return Ok(Some(table)),
         Err(e) => e,
     };
@@ -193,9 +194,15 @@ fn read_aliases(text: &str) -> Result<Option<SceneAliasTable>, Vec<Finding>> {
             msg::config_scene_alias_duplicate(alias, targets)
         }
         SceneAliasError::Chain { name } => msg::config_scene_alias_chain(name),
-        // shortcut: 文言は tasks 4.1 で msg に足すまでエラーの文のまま
-        e @ (SceneAliasError::ConflictsWithDefault { .. }
-        | SceneAliasError::TargetIsDefaultAlias { .. }) => e.to_string(),
+        SceneAliasError::ConflictsWithDefault {
+            alias,
+            target,
+            default_target,
+        } => msg::config_scene_alias_default_conflict(alias, target, default_target),
+        SceneAliasError::TargetIsDefaultAlias {
+            target,
+            default_target,
+        } => msg::config_scene_alias_target_is_default(target, default_target),
     };
     let mut findings: Vec<Finding> = map
         .iter()
@@ -370,12 +377,48 @@ mod tests {
         );
         assert_eq!(c.pasta_patterns, vec!["a/*.pasta", "b/*.pasta"]);
         assert_eq!(c.aliases.resolve("起動"), Some("OnBoot"));
-        assert_eq!(c.aliases.resolve("会話"), None);
+        // 書かなかったキーの既定は残る
+        assert_eq!(c.aliases.resolve("会話"), Some("OnTalk"));
     }
 
     #[test]
-    fn empty_alias_table_is_used_as_written() {
-        assert!(read("[scene.alias]\n").aliases.is_empty());
+    fn header_only_alias_table_equals_default() {
+        let (c, findings) = read_config(&TomlSource::Text {
+            text: "[scene.alias]\n".into(),
+        });
+        assert_eq!(c.aliases, SceneAliasTable::builtin_default());
+        assert!(findings.is_empty(), "{findings:?}");
+    }
+
+    fn findings(text: &str) -> Vec<Finding> {
+        read_config(&TomlSource::Text { text: text.into() }).1
+    }
+
+    #[test]
+    fn conflict_with_default_is_reported_on_written_line() {
+        let f = findings("[scene.alias]\nOnBoot = [\"起動\",\n  \"会話\"]\n");
+        assert_eq!(f.len(), 1, "{f:?}");
+        assert_eq!(f[0].code, FindingKind::ConfigSceneAlias);
+        assert_eq!(f[0].line, Some(3));
+        let m = &f[0].message;
+        assert!(m.contains("「会話」") && m.contains("OnBoot"), "{m}");
+        assert!(
+            m.contains("既定の OnTalk") && m.contains("OnTalk = []"),
+            "{m}"
+        );
+        // 既定を消せば通る
+        assert!(findings("[scene.alias]\nOnBoot = [\"会話\"]\nOnTalk = []\n").is_empty());
+    }
+
+    #[test]
+    fn target_that_is_default_alias_is_reported() {
+        let f = findings("[scene.alias]\n\"会話\" = [\"雑談\"]\n");
+        assert_eq!(f.len(), 1, "{f:?}");
+        assert_eq!(f[0].code, FindingKind::ConfigSceneAlias);
+        assert_eq!(f[0].line, Some(2));
+        let m = &f[0].message;
+        assert!(m.contains("「会話」") && m.contains("既定の OnTalk"), "{m}");
+        assert!(m.contains("OnTalk = []"), "{m}");
     }
 
     #[test]

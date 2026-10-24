@@ -363,6 +363,22 @@ pub mod msg {
             "[scene.alias] の「{name}」は置き換え先と別名の両方に書かれています（別名を別名で置き換えることはできません）"
         )
     }
+    /// 書いた別名が、書かなかったキーの既定の別名とぶつかる
+    pub fn config_scene_alias_default_conflict(
+        alias: &str,
+        target: &str,
+        default_target: &str,
+    ) -> String {
+        format!(
+            "[scene.alias] の {target} の別名「{alias}」は、既定の {default_target} の別名とぶつかります。既定を消すには {default_target} = [] を書きます"
+        )
+    }
+    /// 書いた置き換え先が、書かなかったキーの既定の別名
+    pub fn config_scene_alias_target_is_default(target: &str, default_target: &str) -> String {
+        format!(
+            "[scene.alias] の置き換え先「{target}」は、既定の {default_target} の別名です。既定を消すには {default_target} = [] を書きます"
+        )
+    }
     /// `[scene]`・`[scene.alias]` が表でない、値が文字列の配列でない
     pub fn config_scene_alias_type(toml_desc: &str) -> String {
         format!("[scene.alias] の型が違います: {toml_desc}")
