@@ -1,6 +1,6 @@
 # Brief: mlua-0-12-upgrade
 
-> **ステータス**: 未着手（2026-10-24 の `/kiro-discovery` で起票。`/update` の提案（PR #187）で「起票を勧める」とした 1 本）。版は未定。要件定義は Opus。`mlua-stdlib-removal` の後に始める（下の Constraints の「先に要るもの」。2026-10-24 に、上流の公開を待つ道から改めた）。
+> **ステータス**: 未着手（2026-10-24 の `/kiro-discovery` で起票。`/update` の提案（PR #187）で「起票を勧める」とした 1 本）。0.4.3 のウェーブ 2（2026-10-24 開発者の決定「次のリリースのタイミングで、mlua 上げちゃいたい」。1 本だけで走らせる）。要件定義は Opus。`mlua-stdlib-removal` の後に始める（下の Constraints の「先に要るもの」。2026-10-24 に、上流の公開を待つ道から改めた）。
 
 ## Problem
 
@@ -69,7 +69,8 @@ pasta の Lua ランタイムは mlua 0.11（LuaJIT 2.1、features `luajit52`・
 
 - **Extends**: なし
 - **Adjacent**:
-  - `ponytail-lua-loader`・`ponytail-lua-debug`・`ponytail-lua-scripts`・`ponytail-lua-transpiler`（`pasta_lua` のソースを広く共有する。同じウェーブに置かない）
+  - `ponytail-lua-loader`・`ponytail-lua-debug`・`ponytail-lua-scripts`・`ponytail-lua-transpiler`（`pasta_lua` のソースを広く共有する。2026-10-24 に 0.4.4 へ移ったので、この spec の後に入る）
+  - `toml-serialization`（0.4.3 の先頭。`persistence.rs`・`log.rs` の mlua の serde の使い方が、この spec の直しと重なる。先に入ったものに合わせる）
   - `ponytail-editor-tooling`・`ponytail-core-registry`（`Cargo.lock` とルートの `Cargo.toml` の席）
   - `shiori4-v3-portable`（`pasta_shiori` とルートの `Cargo.toml`・`Cargo.lock`）
 
