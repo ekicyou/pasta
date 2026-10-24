@@ -108,7 +108,7 @@
 **Objective:** ゴースト作者として、書いたメニューのシーンの項目が SSP のメニューにそのまま並んでほしい。メニューを開くたびに並びを変えられるようにするためである。
 
 #### Acceptance Criteria
-1. When SSP が `sakura.recommendsites`・`kero.recommendsites`・`char*.recommendsites`・`sakura.portalsites` を問い合わせ、結びついたメニューのシーンがあるとき, the pasta shall そのシーンを最後まで動かし、加えた項目を SSP の決まりの形（項目ごとに「名前・URL・バナー・選んだときのトーク」をバイト値 1 でつなぎ、項目どうしをバイト値 2 でつなぐ）にした値を 200 で返す。
+1. When SSP が `sakura.recommendsites`・`kero.recommendsites`・`char*.recommendsites`・`sakura.portalsites` を問い合わせ、結びついたメニューのシーンがあるとき, the pasta shall そのシーンを最後まで動かし、加えた項目を SSP の決まりの形（項目ごとに「名前・URL・バナー・選んだときのトーク」をバイト値 1 でつなぎ、各項目の後ろにバイト値 2 を付ける。SSP 同梱の Emily/Phase4 と同じ形）にした値を 200 で返す。
 2. When 作者がメニューの項目を選んだとき, the pasta shall SSP が項目の URL を開き（`script:` で始まる URL ならそのスクリプトが走り）、Requirement 6 の項目のシーンが話すように、メニューの値を作る。選んだ後のトークをメニューの値の 4 つ目の欄（選んだときのトーク）で送るか `OnRecommendsiteChoice` で話すかは、設計で SSP の実機を確かめて決める（4 つ目の欄を使うと決めたときは、Requirement 6 の「`OnRecommendsiteChoice` を送り」を「項目を選び」と読み替える）。
 3. The pasta shall バナーのパスを、書いたまま加工せずに SSP へ渡す（基準のフォルダの変換をしない）。
 4. The pasta shall URL を書いたまま SSP へ渡す（`script:` で始まる URL も含む。SSP がそのスクリプトを走らせる）。

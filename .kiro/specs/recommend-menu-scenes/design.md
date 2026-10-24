@@ -39,6 +39,12 @@
 - `loader/config/sections.rs`（`SceneAliasSource` の型と注釈。`toml-serialization` のファイル）、`runtime/mod.rs`・`module_registry.rs`（`mlua-stdlib-removal` の持ち場）、`Cargo.toml`・`Cargo.lock`。
 - `pasta_check` の `release.rs`・`copy.rs`・`nar.rs`・`update_files.rs`（`ponytail-check-release` の持ち場）。
 
+### 同じウェーブとの持ち場（roadmap の一覧に無いもの）
+
+- roadmap の持ち場の行に無いソース: `pasta_lua/src/search/context.rs`・`pasta_core/src/error.rs`・`pasta_check/src/validate/{recommend,report,mod}.rs`・`pasta_shiori/tests/scene_alias_ontalk_e2e_test.rs`。どれも同じウェーブのほかの 3 本の持ち場に無い（2026-10-24 に各 brief で確かめた）。
+- マニュアルで同じ頁を共有するもの（節が別なので共有してよい）: `lua/shiori-events.md`（既定ハンドラの表は行を足すだけ。`mlua-stdlib-removal`）、`internals/loader.md`（この spec は `PastaConfig::parse` の手順 3 の 1 文だけ。`mlua-stdlib-removal`）、`reference/pasta-toml.md`（`[scene]` の節だけ。`toml-serialization` は `[persistence]`）。
+- roadmap の持ち場の行は、このウェーブの途中では書き換えない（ほかの 3 本と同じファイルを触らないため）。`kiro-complete` のロードマップ更新で直す。
+
 ### Allowed Dependencies
 
 - Lua: `pasta.shiori.event.register`（`REG`）、`pasta.global`（`GLOBAL`）、`pasta.act`（`IMPL.build`）、`pasta.scene`（`get`・`co_exec`・`co_exec_exact`）、`pasta.store`（`last_global_scene` の控えと戻しだけ）、`pasta.shiori.event.callback`（`has_staged`・`discard_staged`）、`pasta.failure`（`report`・`LABEL.SCENE_NOT_FOUND`）、`@pasta_search`（`search_scene_exact`・`search_word`・`scene_aliases`）、`@pasta_log`。
@@ -124,7 +130,7 @@ crates/pasta_check/tests/
 
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua` — 読み込みの並びの末尾に `require("pasta.shiori.event.recommend")` を 1 行。ほかは触らない。
 - `crates/pasta_core/src/registry/scene_alias.rs` — 既定の 7 件（`DEFAULT_ENTRIES`）、`builtin_default()` をそこから作る、`with_written()` を足す、単体テスト。
-- `crates/pasta_core/src/error.rs` — `SceneAliasError::ConflictsWithDefault` を足す。
+- `crates/pasta_core/src/error.rs` — `SceneAliasError::ConflictsWithDefault`・`TargetIsDefaultAlias` を足す。
 - `crates/pasta_lua/src/loader/config/mod.rs` — `parse_scene_aliases` が `with_written` を呼ぶ。見出しだけなら `BuiltinDefault`、行があれば `PastaToml`。新しい誤りの行番号の取り方。注釈の書き直し。
 - `crates/pasta_lua/src/loader/config_tests.rs` — 見出しだけ・キーごとの置き換え・空の配列・既定とのぶつかりの文のテスト（今の「見出しだけは空」「丸ごと置き換え」のテストを書き直す）。
 - `crates/pasta_lua/src/search/context.rs` — `add_methods` に `scene_aliases` を 1 つ（テストはここに足さない）。
@@ -485,7 +491,7 @@ impl SceneAliasTable {
 }
 ```
 
-- `with_written` の手順: (1) 書いた行だけを `from_entries` で検証する（空の名前・書いた行どうしの重複・連鎖は今のエラーと同じ。Req 2.5）。(2) 書かなかったキーの既定の行と書いた行を合わせて `from_entries` で検証する。(3) (2) の `DuplicateAlias { alias, targets }` は既定の別名とのぶつかりなので、`ConflictsWithDefault { alias, target: 書いた側, default_target: 既定の側 }` に読み替える。(2) の `Chain` はそのまま返す。
+- `with_written` の手順: (1) 書いた行だけを `from_entries` で検証する（空の名前・書いた行どうしの重複・連鎖は今のエラーと同じ。Req 2.5）。(2) 書かなかったキーの既定の行と書いた行を合わせて `from_entries` で検証する。(3) (2) で出る誤りは、どれも既定の行が絡む（(1) を通ったので書いた行どうしでは起きない）。`DuplicateAlias { alias, targets }` は `ConflictsWithDefault { alias, target: 書いた側, default_target: 既定の側 }` に、`Chain`（書いた置き換え先が既定の別名。例 `会話 = ["雑談"]`）は `TargetIsDefaultAlias { target: 書いた置き換え先, default_target: その別名を持つ既定の置き換え先 }` に読み替える。どちらも相手が既定の表のものと分かる文と直し方を持つ（Req 2.4）。
 - 書いた行が空（見出しだけ）なら `builtin_default()` と等しい表を返す（Req 2.3）。
 - `builtin_default()` は `DEFAULT_ENTRIES` から直接作る（単体テストで `from_entries(DEFAULT_ENTRIES)` と等しいことを確かめる）。
 - 置き換え・`entries`・`fingerprint`・`Display` は変えない（Req 2.7・2.8）。
@@ -495,13 +501,16 @@ impl SceneAliasTable {
 ```rust
 #[error("scene alias: alias '{alias}' of '{target}' conflicts with the default alias of '{default_target}' (write {default_target} = [] to remove the default)")]
 ConflictsWithDefault { alias: String, target: String, default_target: String },
+
+#[error("scene alias: target '{target}' is a default alias of '{default_target}' (write {default_target} = [] to remove the default)")]
+TargetIsDefaultAlias { target: String, default_target: String },
 ```
 
 #### LoaderConfig（`pasta_lua/src/loader/config/mod.rs` の `parse_scene_aliases`）
 
 - `[scene.alias]` が無い → `(builtin_default(), BuiltinDefault)`（今のまま）。
 - 表がある → 出どころは行が 0 なら `BuiltinDefault`、1 つ以上なら `PastaToml`（型は変えない。意味は「書いた行を既定に重ねた」になる）。表は `SceneAliasTable::with_written(entries)`。
-- 誤りの行番号: `hit` に `ConflictsWithDefault { alias: dup, target, .. } => alias == dup && 置き換え先 == target` を足す（書いた側の行だけが当たる）。文は `"{e}; at [scene.alias] {target} = \"{alias}\" (line N)"` の今の形。
+- 誤りの行番号: `hit` に `ConflictsWithDefault { alias: dup, target, .. } => alias == dup && 置き換え先 == target` と `TargetIsDefaultAlias { target, .. } => 置き換え先 == target` を足す（書いた側の行だけが当たる）。文は `"{e}; at [scene.alias] {target} = \"{alias}\" (line N)"` の今の形。
 - info ログ `Scene alias table`（`loader/mod.rs`）は変えない。合成後の表を `Display` するので Req 2.6 を満たす。
 
 #### SearchAliasesMethod（`pasta_lua/src/search/context.rs`）
@@ -515,7 +524,7 @@ methods.add_method("scene_aliases", |lua, this, ()| { /* this.scene_aliases.entr
 
 #### CheckConfig（`pasta_check/src/validate/config.rs` の `read_aliases`）
 
-- `SceneAliasTable::with_written(entries)` を呼ぶ。`hit`・`message` に `ConflictsWithDefault` を足す。文言は `msg::config_scene_alias_default_conflict(alias, target, default_target)`（例「[scene.alias] の {target} の別名「{alias}」は、既定の {default_target} の別名とぶつかります。既定を消すには {default_target} = [] を書きます」）。報告の種類は今の `config-scene-alias`（誤り）。
+- `SceneAliasTable::with_written(entries)` を呼ぶ。`hit`・`message` に `ConflictsWithDefault`・`TargetIsDefaultAlias` を足す。文言は `msg::config_scene_alias_default_conflict(alias, target, default_target)`（例「[scene.alias] の {target} の別名「{alias}」は、既定の {default_target} の別名とぶつかります。既定を消すには {default_target} = [] を書きます」）と `msg::config_scene_alias_target_is_default(target, default_target)`（例「[scene.alias] の置き換え先「{target}」は、既定の {default_target} の別名です。既定を消すには {default_target} = [] を書きます」）。報告の種類は今の `config-scene-alias`（誤り）。
 - 見出しだけのときは既定と等しい表を返す（`GhostConfig` の既定と同じ）。
 
 #### CheckBuiltins（`pasta_check/src/validate/builtins.rs`）
@@ -543,7 +552,7 @@ pub(crate) fn check(
 #### report.rs（`pasta_check/src/validate/report.rs`）
 
 - `FindingKind` の末尾に `RecommendItemInvalid`・`RecommendMenuTalk`（ともに注意）。`ALL` は 27。コード名は `recommend-item-invalid`・`recommend-menu-talk`（serde の kebab-case と同じ）。
-- `msg` に: `recommend_item_arg_count(n)`、`recommend_item_scene_missing(name)`、`recommend_menu_talk(scene)`、`config_scene_alias_default_conflict(alias, target, default_target)`。
+- `msg` に: `recommend_item_arg_count(n)`、`recommend_item_scene_missing(name)`、`recommend_menu_talk(scene)`、`config_scene_alias_default_conflict(alias, target, default_target)`、`config_scene_alias_target_is_default(target, default_target)`。
 
 ## Data Models
 
@@ -594,7 +603,7 @@ pub(crate) fn check(
 
 ### Unit Tests（Rust）
 
-- `scene_alias.rs`: 既定が 7 件で `from_entries(DEFAULT_ENTRIES)` と等しい・`with_written` で書いたキーだけ置き換わる（`OnBoot = ["起動"]` で既定 7 件が残る、`OnTalk = ["会話", "おしゃべり"]`）・空の配列で消える（`"sakura.recommendsites" = []`）・空の入力は既定と等しい・書いた行どうしの重複は `DuplicateAlias` のまま・既定とのぶつかりは `ConflictsWithDefault`（`OnBoot = ["会話"]`、`OnTalk = []` を足すと通る）・指紋が既定の変更で変わる（Req 12.1）。
+- `scene_alias.rs`: 既定が 7 件で `from_entries(DEFAULT_ENTRIES)` と等しい・`with_written` で書いたキーだけ置き換わる（`OnBoot = ["起動"]` で既定 7 件が残る、`OnTalk = ["会話", "おしゃべり"]`）・空の配列で消える（`"sakura.recommendsites" = []`）・空の入力は既定と等しい・書いた行どうしの重複は `DuplicateAlias` のまま・既定とのぶつかりは `ConflictsWithDefault`（`OnBoot = ["会話"]`、`OnTalk = []` を足すと通る）・置き換え先が既定の別名なら `TargetIsDefaultAlias`（`会話 = ["雑談"]`）・指紋が既定の変更で変わる（Req 12.1）。
 - `config_tests.rs`: 見出しだけが既定で `BuiltinDefault`、行ありは `PastaToml`、既定とのぶつかりの文に相手（既定の `OnTalk`）・直し方（`OnTalk = []`）・書いた行の行番号が入る、型の違い・空の名前・連鎖の今の文言（Req 2.3〜2.5）。
 - `scene_search_test.rs`: Lua から `SEARCH:scene_aliases()` が既定 7 件を置き換え先 → 別名の配列で返す（Req 1.5・7.4 の口）。
 - `pasta_check` の `config.rs`: 見出しだけが既定と等しい、既定とのぶつかりが `config-scene-alias` に書いた行の行番号で出る（Req 10.2）。
@@ -643,7 +652,7 @@ pub(crate) fn check(
    - 開かなかったとき: 設計を選び直す（項目のシーンの出力の前に URL を開くさくらスクリプトを足す、など）。開いた上で項目のシーンが話せば、この設計のまま。
 2. **Reference5 は区切り線を数えるか**。仮定: どちらでもよい作り（手がかりにして名前と URL で確かめる）。実機の試験 5 で控え、マニュアルには書かない。
 3. **`char*` のメニューでの Reference4 と、SSP が問い合わせるボタンの名前の ID**（`char*.recommendsites.caption` と `char*.recommendbuttoncaption` の両方が UKADOC にある）。仮定: Reference4 は数 N を `charN` と読み、外れても全部の並びを探すので引ける。ボタンの名前は要件どおり `char*.recommendsites.caption` だけに受け手を置く。`\p[2]` のキャラクターを持つシェルでの実機の試験は、手元に無ければ公開後の確認に回す。
-4. **各項目の後ろの `\2`**（要件の「項目どうしをつなぐ」）。仮定: Emily/Phase4 と同じく各項目の後ろに付ける。実機の試験 3 で表示が崩れないことを見る。
+4. **各項目の後ろの `\2`**（Req 4.1 を Emily/Phase4 と同じ形に揃えた）。実機の試験 3 で表示が崩れないことを見る。
 5. **`SceneAliasSource::PastaToml` の注釈**（`sections.rs`「書かれた表を使う」）が意味とずれる。仮定: ウェーブの約束（`sections.rs` に触らない）を守り、このウェーブでは直さない。意味は `config/mod.rs` の注釈に書く。ウェーブの後に 1 行直すかは開発者が決める。
 6. **共通のシーンを引数つきで Call すると、その引数が `＞おすすめ項目` の後ろに付く**（生成コードの `table.unpack(args)`）。仮定: 組み込みに特別な扱いを入れない（ほかの組み込みと同じ）。5 つ目から後は warn、3・4 つ目に入れば書いた値として扱われる。マニュアルの作例は引数なしの Call で書く。
 7. **ボタンの名前に複数の別名を書いたとき**。仮定: 別名の辞書順で、単語が見つかった最初の名前を使う（候補は混ぜない）。単語は `＠名前` と同じ前方一致。
