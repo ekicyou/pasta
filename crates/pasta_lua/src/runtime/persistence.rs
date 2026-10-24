@@ -362,6 +362,31 @@ fn raw_entries(table: &Table) -> Vec<(Value, Value)> {
     table.pairs::<Value, Value>().flatten().collect()
 }
 
+/// Lua の数を 64 ビットの整数として読む。x64 の mlua が Value::Integer にする決まりと同じ。
+/// 範囲を見ないと `n as i64` が 2^63 を i64::MAX に飽和させ、x86 だけ整数で書いてしまう。
+#[allow(clippy::useless_conversion)] // mlua::Integer は x64 で i64・x86 で i32
+fn lua_int(value: &Value) -> Option<i64> {
+    const P63: f64 = 9_223_372_036_854_775_808.0; // 2^63
+    match value {
+        Value::Integer(i) => Some(i64::from(*i)),
+        Value::Number(n)
+            if (-P63..P63).contains(n) && (*n as i64 as f64).to_bits() == n.to_bits() =>
+        {
+            Some(*n as i64)
+        }
+        _ => None,
+    }
+}
+
+/// 文字列でないキーの理由に書く型の名前（整数として読める数は `integer`）。
+fn key_type_name(key: &Value) -> &'static str {
+    if lua_int(key).is_some() {
+        "integer"
+    } else {
+        key.type_name()
+    }
+}
+
 /// 値 1 つを変換する。`dropped` が `None` なら厳しいモード。
 /// `depth` はこの値が表のときの段（根の表が 1）。`ancestors` はいまたどっている祖先の表。
 fn convert(
@@ -379,8 +404,10 @@ fn convert(
             .map(|s| toml::Value::String(s.to_owned()))
             .map_err(|_| "string is not valid UTF-8".to_string()),
         Value::Boolean(b) => Ok(toml::Value::Boolean(*b)),
-        Value::Integer(i) => Ok(toml::Value::Integer(*i)),
-        Value::Number(f) => Ok(toml::Value::Float(*f)),
+        Value::Number(f) => Ok(lua_int(value).map_or(toml::Value::Float(*f), toml::Value::Integer)),
+        Value::Integer(_) => Ok(toml::Value::Integer(
+            lua_int(value).expect("every Value::Integer fits i64"),
+        )),
         Value::Table(t) => {
             let ptr = t.to_pointer();
             if ancestors.contains(&ptr) {
@@ -423,14 +450,17 @@ fn convert_table(
 
     let (mut strings, mut ints, mut max_int, mut has_one) = (0usize, 0i64, 0i64, false);
     for (key, _) in &entries {
-        match key {
-            Value::String(_) => strings += 1,
-            Value::Integer(i) if *i >= 1 => {
+        if let Value::String(_) = key {
+            strings += 1;
+            continue;
+        }
+        match lua_int(key) {
+            Some(i) if i >= 1 => {
                 ints += 1;
-                max_int = max_int.max(*i);
-                has_one |= *i == 1;
+                max_int = max_int.max(i);
+                has_one |= i == 1;
             }
-            other => return Err(format!("non-string key ({})", other.type_name())),
+            _ => return Err(format!("non-string key ({})", key_type_name(key))),
         }
     }
     if strings > 0 && ints > 0 {
@@ -519,15 +549,15 @@ fn convert_keyed(
                 ),
             },
             other => {
-                let label = match other {
-                    Value::Integer(i) => i.to_string(),
-                    Value::Number(n) => n.to_string(),
-                    Value::Boolean(b) => b.to_string(),
+                let label = match (lua_int(other), other) {
+                    (Some(i), _) => i.to_string(),
+                    (None, Value::Number(n)) => n.to_string(),
+                    (None, Value::Boolean(b)) => b.to_string(),
                     _ => other.type_name().to_string(),
                 };
                 (
                     format!("{path}[{label}]"),
-                    format!("non-string key at root ({})", other.type_name()),
+                    format!("non-string key at root ({})", key_type_name(other)),
                 )
             }
         };
@@ -551,7 +581,10 @@ fn convert_keyed(
 fn toml_to_lua(lua: &Lua, value: &toml::Value) -> LuaResult<Value> {
     Ok(match value {
         toml::Value::String(s) => Value::String(lua.create_string(s)?),
-        toml::Value::Integer(i) => Value::Integer(*i),
+        // Lua の整数に収まらない値（x86 の 32 ビット超え）は浮動小数の数で渡し、切り詰めない
+        toml::Value::Integer(i) => {
+            mlua::Integer::try_from(*i).map_or(Value::Number(*i as f64), Value::Integer)
+        }
         toml::Value::Float(f) => Value::Number(*f),
         toml::Value::Boolean(b) => Value::Boolean(*b),
         toml::Value::Datetime(dt) => Value::String(lua.create_string(dt.to_string())?),
