@@ -77,7 +77,7 @@ Load `mcp__ccd_session__start_session` and `mcp__ccd_session__mark_chapter` with
 2. Right before each start, in the same message, write a bold title line and one sentence on what the session will do.
 3. Start the **first** spec alone with:
    - `initiation`: `"user_asked"`, `context`: `"fresh"`, `use_worktree`: `true`
-   - `title`: `<name> の要件定義`, `name`: the spec name cut to 24 characters (`[a-z0-9-]`), `branch_name`: `kiro-start-<name>` (the Step 2 duplicate check looks for this)
+   - `title`: `<name>` — the spec name alone (developer 2026-10-24: 「サブセッションの名前は単純にスペック名にしてほしい」), `name`: the spec name cut to 24 characters (`[a-z0-9-]`), `branch_name`: `kiro-start-<name>` (the Step 2 duplicate check looks for this)
    - `prompt`: exactly `/kiro-start <name>` — nothing else, so the whole line reaches `/kiro-start` as its argument
    - `background`: the shared context below (≥80 characters)
    - do not pass `model` (it inherits this session's model, which must be Opus for these specs)
