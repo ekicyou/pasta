@@ -62,7 +62,7 @@
   - 完了: 節に「JSON」と `@json` が無く、`grammar/variables.md`・`internals/shiori.md` からのリンクが届く
   - _Boundary: ManualDocs（lua/shiori-events.md）_
   - _Requirements: 5.4_
-- [ ] 4.3 (P) ほかのマニュアルの頁から、6 つのモジュールと mlua-stdlib の記述を無くす
+- [x] 4.3 (P) ほかのマニュアルの頁から、6 つのモジュールと mlua-stdlib の記述を無くす
   - DSL と Lua の使い分け・パターン集・`@pasta_log` の章・実行モデルとローダーの内部の頁を、設計の Modified Files のとおりに直す
   - 完了: `book/src` を 6 つのモジュール名と `mlua-stdlib` で検索して 0 件
   - _Boundary: ManualDocs（dsl-vs-lua.md・patterns.md・pasta-log.md・internals/execution-model.md・internals/loader.md）_
