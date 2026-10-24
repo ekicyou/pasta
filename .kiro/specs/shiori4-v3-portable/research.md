@@ -43,7 +43,7 @@
 | `kick_sink` の送り先 | `lifecycle.rs` 184〜227 行 | デバッガの頼みが「今の MAILBOX」へ行く | 自分の `Sender` を閉じ込める（R5.5） |
 | `LOADU_INITIALIZED` | `windows.rs` | 旧来の入口だけの印 | 旧来の入口に閉じ込めたまま（R5.7） |
 | `FILTER_HANDLE`・tracing の購読者 | `pasta_lua/src/logging/tracing_init.rs` | 後から読んだインスタンスの `[logging]` が全体に効く | インスタンスごとに分ける（R5.4・OQ-6） |
-| `REGISTRY`（ロガーの登録） | `pasta_lua/src/logging/registry.rs` | ディレクトリが鍵。違うディレクトリなら複数のゴーストを前提にした作り。同じディレクトリだと取り合う | 同じディレクトリの 2 つ目を断る（R6.2・OQ-2） |
+| `REGISTRY`（ロガーの登録） | `pasta_lua/src/logging/registry.rs` | ディレクトリが鍵。違うディレクトリなら複数のゴーストを前提にした作り。同じディレクトリだと取り合う | プロセスに 1 つ残す（R5.7）。同じディレクトリの 2 つ目を断る見分けにも使う（R6.2。2026-10-25 確定） |
 | `CURRENT_LOAD_DIR` | `registry.rs` の thread_local | スレッドごとなので害は無い | そのまま |
 | `REQUEST_SEQ`・`UNIQUE_COUNTER` | `lifecycle.rs`・`pasta_lua/src/loader/extract.rs` 55 行 | 数を振るだけ | そのまま（R5.7） |
 
@@ -145,7 +145,11 @@
 
 - 選択肢 C（芯の型＋旧来の入口の窓口）と E1（同期 `recv()` ループ）。
 - 版 3 の口の判定の順: `determine_method` で GET／NOTIFY を決める → SHIORI/2.x（`header2`）を 400 → `request` は GET を `marshal_get`、NOTIFY を `marshal_notify`（204 の全文）→ 応答の開始行から戻り値を読む。`notify` は NOTIFY だけを受け、GET は 400。
-- 同じディレクトリの検出（R6.2）を入れるなら、その集合はプロセスに 1 つになるので、R5.7 の例外に足す（要件のディスカッションで OQ-2 と一緒に決める）。
+- 同じディレクトリの検出（R6.2）は、新しい集合を作らず `REGISTRY` で見分ける（2026-10-25 の要件のディスカッションで確定。R5.7 に `REGISTRY` と tracing の購読者を挙げた）。
+- 版 3 の `load` の失敗（R2.4・2.7。確定）: NULL はディレクトリが無い・スレッドを起こせないときだけ。辞書・Lua・`SHIORI.load` の失敗はインスタンスを返し、旧来と同じ 500 を返す。失敗のたびにアクターを止めて片付ける道は、ほぼ要らなくなった（Research Needed の 4 番は、ディレクトリの確かめをスレッドを起こす前に置けば消える）。
+- unload の join（R4.4・7.6。確定）: 後始末の完了が上限の中で届いたら、芯の型の Drop で `JoinHandle::join` してから返る。`DllMain` の FreeLibrary の detach から呼ばれる片付けでは join しない（loader lock の中でスレッドの終わりを待つとデッドロックする）。どちらの道から呼ばれたかを芯へどう渡すかを設計で決める。
+- 旧来の入口の型（R7.3。確定）: 戻り値は `i32`（1／0）、長さは `c_long`（`load`・`loadu` の `len` と `request` の `*mut len`）。
+- ログの量（R5.4。確定）: インスタンスごとに分ける。L3（共有）は採らない。L1 か L2 を設計で選ぶ。
 - CI: `build.yml` に `linux`（`ubuntu-latest`。ビルド・`cargo test --workspace`・clippy）と `macos`（`macos-latest`。ビルド・テスト）のジョブを足し、Windows x64・Linux・macOS で `shiori4-testhost --entry v3 <ライブラリ> <hello-pasta の master の絶対パス>` を回す。`cargo install` の結果はキャッシュする。
 - `Cargo.toml`: ルートに `shiori4_abi = "0.1"` を足し、`wintf-winmsg-executor` を消す。`shiori4_host = "0.1"` は dev 依存（Rust の試験で使うなら）。`Cargo.lock` の席を持つので、`pest-2-9-4-upgrade`・`ponytail-editor-tooling`・`ponytail-core-registry` と同じウェーブに置かない。
 
