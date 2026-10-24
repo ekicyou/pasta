@@ -126,7 +126,7 @@ impl fmt::Display for SpanDisplay {
 pub enum ConfigError {
     /// Unknown library name in libs array.
     #[error(
-        "Unknown library: {0}. Valid libraries: std_all, std_all_unsafe, std_coroutine, std_table, std_io, std_os, std_string, std_math, std_package, std_debug, std_jit, std_ffi, std_bit, assertions, testing, env, regex, json, yaml"
+        "Unknown library: {0}. Valid libraries: std_all, std_all_unsafe, std_coroutine, std_table, std_io, std_os, std_string, std_math, std_package, std_debug, std_jit, std_ffi, std_bit"
     )]
     UnknownLibrary(String),
 
@@ -285,7 +285,11 @@ mod tests {
         assert!(msg.contains("Unknown library: std_bogus"));
         // The message must enumerate valid library names to guide the user.
         assert!(msg.contains("std_all"));
-        assert!(msg.contains("regex"));
-        assert!(msg.contains("yaml"));
+        assert!(msg.contains("std_bit"));
+        // Only std_ names are listed; the six removed module names are not (1.6).
+        let valid = msg.split_once("Valid libraries: ").unwrap().1;
+        for name in valid.split(", ") {
+            assert!(name.starts_with("std_"), "non-std_ name listed: {name}");
+        }
     }
 }

@@ -262,3 +262,8 @@ ghost_dev の「emo2 開発」「ぱすた開発」セッションに、Lua で�
 
 - `FAILURE.LABEL` に `NOT_JSON = "JSON として読めない値"`・`NOT_ASSIGNABLE = "代入できない値"` が入り、12 種になった（上の「10 種」は古い）。種類を足すときは `failure_test.lua` の数のテストも合わせて直す。
 - 既定のハンドラの読み込みの並び（`pasta/shiori/event/init.lua`）の末尾に、`scene_play` の次の 1 行として `external_control` が入った。読み込みの行を足すときはその後ろになる。
+
+
+## 申し送り（mlua-stdlib-removal より・2026-10-24）
+
+- `FAILURE.LABEL` の `NOT_JSON = "JSON として読めない値"` は無くなり、同じ席が `BAD_TYPE = "型の名前にならない値"` になった（`OnPastaSetSaveVariable` の Reference2 の型の名前が知らないもの）。種類の数は 12 のまま。参照先: `.kiro/specs/completed/mlua-stdlib-removal/design.md` の FailureLabels。

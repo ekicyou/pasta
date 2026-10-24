@@ -144,7 +144,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │           │   ├── virtual_event_config_resolution_test.rs
 │           │   ├── virtual_event_dispatch_test.rs
 │           │   └── virtual_event_status_skip_test.rs
-│           ├── runtime/             # ランタイム関連テスト（8 files）
+│           ├── runtime/             # ランタイム関連テスト（主なもの。全 21 files）
 │           │   ├── main.rs
 │           │   ├── finalize_scene_test.rs
 │           │   ├── scene_test.rs
@@ -152,8 +152,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │           │   ├── unit_test.rs
 │           │   ├── persistence_integration_test.rs
 │           │   ├── encoding_test.rs
-│           │   ├── stdlib_modules_test.rs
-│           │   └── stdlib_regex_test.rs
+│           │   └── toml_module_test.rs
 │           ├── log/                 # ログ関連テスト（3 files）
 │           │   ├── main.rs
 │           │   ├── integration_test.rs

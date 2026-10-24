@@ -250,3 +250,8 @@
   - 冒頭のステータス（「推奨は 0.4.2」）と「要件で決めること」の版の行は古い。版は 0.4.3 に決まった。
   - A5 の「マニュアルの変更点に書く」の置き場が無い（マニュアルに変更点の頁は無い）。コミットの件名の `!`（詳しいリリースノートの「動きが変わる変更」）と、`reference/pasta-toml.md` の `[scene]` の節で知らせる。
   - 本文の Adjacent の「`ponytail-check-release` が `builtins.rs` を触る」は、前回のとおり誤りのまま残っている。
+
+## 申し送り（mlua-stdlib-removal より・2026-10-24）
+
+- マニュアル `lua/shiori-events.md` の既定ハンドラーの表は、`OnPastaSetSaveVariable` の行の文だけを直した（行の数・「9 つのイベント」の文は触っていない）。後から入るこの spec が表を合わせる。
+- `pasta/failure.lua` の `NOT_JSON` は `BAD_TYPE = "型の名前にならない値"` になった（種類は 12 のまま）。種類を足すときは `tests/lua_specs/failure_test.lua` の数と文言も合わせる。

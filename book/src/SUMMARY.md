@@ -45,7 +45,7 @@
     - [@pasta_sakura_script](lua/modules/pasta-sakura-script.md)
     - [@enc](lua/modules/enc.md)
     - [@pasta_log](lua/modules/pasta-log.md)
-    - [mlua-stdlib 統合モジュール](lua/modules/mlua-stdlib.md)
+    - [@toml](lua/modules/toml.md)
   - [SHIORI イベントとハンドラ](lua/shiori-events.md)
   - [スクリプト用ランタイム API](lua/script-api.md)
   - [scripts/ の記述パターン](lua/patterns.md)

@@ -219,6 +219,31 @@ fn test_runtime_without_math_library_still_builds() {
     assert!(runtime.exec("return math").unwrap().is_nil());
 }
 
+/// mlua-stdlib の 6 つのモジュールは、既定の構成でも 6 つの名前を並べた構成でも入らない（1.1・1.5）。
+#[test]
+fn test_mlua_stdlib_modules_are_not_requirable() {
+    const NAMES: [&str; 6] = ["assertions", "testing", "env", "regex", "json", "yaml"];
+    let mut libs = vec!["std_all".to_string()];
+    libs.extend(NAMES.iter().map(|s| s.to_string()));
+
+    for (label, config) in [
+        ("new", RuntimeConfig::new()),
+        ("from_libs", RuntimeConfig::from_libs(libs)),
+    ] {
+        let runtime = PastaLuaRuntime::with_config(create_empty_context(), config).unwrap();
+        for name in NAMES {
+            let ok = runtime
+                .exec(&format!("return (pcall(require, '@{name}'))"))
+                .unwrap();
+            assert_eq!(
+                ok.as_boolean(),
+                Some(false),
+                "{label}: @{name} must not load"
+            );
+        }
+    }
+}
+
 // ============================================================================
 // load_scene_dic
 // ============================================================================

@@ -175,6 +175,33 @@ impl PastaLuaRuntime {
         set_loaded_module(lua, "@pasta_log", log_table)
     }
 
+    /// Register @toml module (`decode` only).
+    ///
+    /// Reads a TOML string into a Lua table with the same conversion as
+    /// `@pasta_config`. Unreadable input returns `nil, message`; a non-string
+    /// argument is a Lua error. Always available, independent of RuntimeConfig.libs.
+    pub(crate) fn register_toml_module(lua: &Lua) -> LuaResult<()> {
+        let table = lua.create_table()?;
+        // Value で受ける: mlua の String は数を文字列へ変えてしまう（要件 2.7）。
+        let decode = lua.create_function(|lua, text: Value| {
+            let Value::String(text) = text else {
+                return Err(mlua::Error::runtime(format!(
+                    "bad argument #1 to 'decode' (string expected, got {})",
+                    text.type_name()
+                )));
+            };
+            let parsed = std::str::from_utf8(&text.as_bytes())
+                .map_err(|e| e.to_string())
+                .and_then(|s| toml::from_str::<toml::Table>(s).map_err(|e| e.to_string()));
+            match parsed {
+                Ok(t) => Ok((Self::toml_to_lua(lua, &toml::Value::Table(t))?, None)),
+                Err(msg) => Ok((Value::Nil, Some(msg))),
+            }
+        })?;
+        table.set("decode", decode)?;
+        set_loaded_module(lua, "@toml", table)
+    }
+
     /// Register the internal `@pasta_debug` module（scene-play-event 2.1/4.1/4.2）。
     ///
     /// 関数は 2 つだけ: `enabled()` は解決した設定の値（待ち受けの有無は見ない）、
