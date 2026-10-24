@@ -80,7 +80,7 @@ load_with_config(base_dir, runtime_config)
 
 - 0 の直後に、基準ディレクトリで `LoadDirGuard` を張り、`load_with_config` を抜けるまで保つ。組み込みで複数のゴーストを読んでも、ローダのログは自分のロガーへ届く（[ロギングとエンコーディング](logging-encoding.md#振り分けの規則)）。
 - 1.5 で `[logging]` の `file_path` からロガーを作れないとき（`profile/` ディレクトリの下にないなど）は、既定のログファイル `profile/pasta/logs/pasta.log` のロガーに切り替えて登録し、不正と判断した `file_path` を warn に残して続ける。`level`・`filter` は反映される（[ロギングとエンコーディング](logging-encoding.md#ロガーの-2-段階の初期化)）。
-- 1 の `PastaConfig::load` が決めた別名表（[設定読込](#設定読込)）は、1.5 でロガーを登録した直後に info ログ `Scene alias table` として出す。`source` は表の出どころ（`BuiltinDefault` は既定の表、`PastaToml` は `[scene.alias]` に書いた表）、`table` は表の中身（`OnTalk <- 会話` の形。空の表は `(empty)`）である。ロガーの登録より後に出すため、ゴーストのログファイルに残る。
+- 1 の `PastaConfig::load` が決めた別名表（[設定読込](#設定読込)）は、1.5 でロガーを登録した直後に info ログ `Scene alias table` として出す。`source` は表の出どころ（`BuiltinDefault` は既定の表、`PastaToml` は `[scene.alias]` に書いた行を既定の表に重ねた表）、`table` は表の中身（`OnTalk <- 会話` の形。空の表は `(empty)`）である。ロガーの登録より後に出すため、ゴーストのログファイルに残る。
 - 2 で作るディレクトリは `profile/pasta/save`・`profile/pasta/save/lua`・`profile/pasta/cache` と `[loader] transpiled_output_dir` である。続けて `CacheManager::prepare_cache_dir` がキャッシュの版と別名表の指紋を確認し、どちらかが違えばキャッシュを全破棄する（[トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ)）。
 - 2.5 を 3 より前に置くのは、検出とトランスパイルより前、`package.path` を組む 6 より前に、フレームワークスクリプトをディスク上で最新にしておくためである。
 - 4 のトランスパイルでは、`.pasta` をパースした後に `pasta_file.path` をゴーストのフォルダーから見たパス（`CacheManager::get_relative_path`。Windows では `dic\天気.pasta`）に置き換えてからトランスパイラに渡す。このパスは生成コードの行の対応（`init_scene` の 4 つ目の引数。[init_scene の引数](transpiler.md#init_scene-の引数)）を埋めるのにだけ使う。パースのエラー文は置き換える前の絶対パスのままである。
@@ -99,7 +99,7 @@ load_with_config(base_dir, runtime_config)
 
 1. 全体を TOML の表として読む。
 2. `loader` キーを表から取り除き、`LoaderConfig` へ変換する。各キーは serde の既定値の関数で補われ、型の合わない値は解析エラーになる。`loader` キーが無ければ `LoaderConfig::default()` を使う。
-3. `[scene.alias]` を同じ内容から読み直し、有効な別名表（`scene_aliases`）とその出どころ（`scene_alias_source`）を決める。`[scene.alias]` が無ければ既定の表（`OnTalk = ["会話"]`）、あれば書いた表をそのまま使う（既定の表と合わせない）。型の合わない値・空の名前・別名の重複・置き換え先を別名にも書いた表は解析エラーになり、起動を止める（利用者向けの説明は [pasta.toml の `[scene]`](../reference/pasta-toml.md#sceneシーン名)）。
+3. `[scene.alias]` を同じ内容から読み直し、有効な別名表（`scene_aliases`）とその出どころ（`scene_alias_source`）を決める。`[scene.alias]` が無ければ既定の表（`SceneAliasTable::builtin_default` の 7 件）を使い、あれば `SceneAliasTable::with_written` で書いたキーだけ既定の別名を書いた配列に置き換える（空の配列なら消すだけ。書かなかったキーの既定は残す。見出しだけなら既定の表と等しく、出どころも既定になる）。型の合わない値・空の名前・別名の重複・置き換え先を別名にも書いた表・残った既定の別名とぶつかる表は解析エラーになり、起動を止める（利用者向けの説明は [pasta.toml の `[scene]`](../reference/pasta-toml.md#sceneシーン名)）。
 4. 残りの表をすべて `custom_fields` とする。`[scene]` も書いたとおりに残り、既定の別名表は書き足さない。`[loader]` 以外のセクションはこの段階では型付きの値にしない。
 5. `[actor."名前"]` の `font` を、`actor_font::apply` が `pasta_core` の `ActorFont` で検査し、`custom_fields` の中で検査済みのタグ列の文字列に置き換える（`font = { color = "90,110,140", bold = true }` は `\f[color,90,110,140]\f[bold,1]`、空の表は空文字列）。属性の書いた順は、同じ内容を `toml::de::DeTable` で読み直して値の位置から取る。知らない属性・型の合わない値・空の文字列・`]` か `\` を含む値・表でない `font` は解析エラーになり、起動を止める。エラーの文言にはアクター名・属性名と、取れるときは行番号が入る。同じ規則で `pasta_check validate` も `config-actor-font` を報告する（利用者向けの説明は [装い（font）](../reference/pasta-toml.md#装いfont)、出し入れは [トーク出力とアピアランス](talk-output.md#装いの出し入れ)）。
 6. `apply_shiori_defaults` で SHIORI 用の既定値を補完する。
@@ -346,7 +346,7 @@ ffi.load(name, ...)                                  … ラッパ（Lua）
 - 自己展開先は `profile/pasta/pasta_scripts` に固定されており、`lua_search_paths` からは独立している。検索パスからこのディレクトリを外すと、展開は行われてもフレームワークスクリプトは解決されない。
 - キャッシュの出力先（`transpiled_output_dir`）と検索パスも独立している。`pasta.scene.*` と `pasta.scene_dic` は検索パスを通して解決されるため、出力先を変えるときは検索パスにもそれを含める必要がある。また、検索パスで先に来るディレクトリに同じ相対パスのファイルがあれば、そちらが解決される。
 - ファイル検出は `profile/` 配下を常に除く。キャッシュや自己展開先が検出の対象になることはない。
-- 設定読込を失敗させるのは、`[loader]` の型の誤りと、不正な `[scene]`／`[scene.alias]` と、不正な `[actor."名前"]` の `font` だけである。`[scene]`／`[scene.alias]` の不正とは、型の合わない値（`scene`・`alias` が表でない、別名が文字列の配列でないなど）・空の名前・別名の重複・置き換え先を別名にも書いた表（連鎖）である。`font` の不正は [設定読込](#設定読込) の 5 のとおりである。ほかのセクションの型の誤りは、使う時点でそのセクションが既定値になるだけで、エラーにも警告にもならない。
+- 設定読込を失敗させるのは、`[loader]` の型の誤りと、不正な `[scene]`／`[scene.alias]` と、不正な `[actor."名前"]` の `font` だけである。`[scene]`／`[scene.alias]` の不正とは、型の合わない値（`scene`・`alias` が表でない、別名が文字列の配列でないなど）・空の名前・別名の重複・置き換え先を別名にも書いた表（連鎖）・既定の別名とのぶつかり・既定の別名を置き換え先に書いた表である。`font` の不正は [設定読込](#設定読込) の 5 のとおりである。ほかのセクションの型の誤りは、使う時点でそのセクションが既定値になるだけで、エラーにも警告にもならない。
 - ランタイムの構築は `std` のワイド文字 API でモジュールを開くため、`require` の解決は設置パスの長さと文字種に依存しない。ゴースト作者のコードが直接呼ぶ `io.open` などは対象外である（[既知の制限](../reference/startup.md#3-既知の制限)）。
 - `ffi.load` の置き換えは `ffi` の表の `load` の 1 つだけを書き換え、LuaJIT のソースには手を入れない。元の `ffi.load` に渡すファイル名は ANSI で表せるものに限られ、表せなければ読む前に失敗させる。
 

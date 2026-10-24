@@ -1,7 +1,7 @@
 //! scene-name-alias task 6.3: pasta.toml の別名表だけを変えて読み直すキャッシュの結合テスト。
 //!
 //! 同じゴーストディレクトリ（キャッシュが残る）を、`.pasta` を触らずに pasta.toml だけを
-//! 「既定 → 空の `[scene.alias]` → 削除」と変えて 3 回読み直し、各段で登録名と
+//! 「既定 → `[scene.alias]` の `OnTalk = []` → 削除」と変えて 3 回読み直し、各段で登録名と
 //! `SEARCH:search_scene` の結果の両方が新しい表に切り替わること、`.scene_alias` マーカーが
 //! 新しい表の指紋に更新されることを確かめる（requirements 6.1〜6.3 / 10.4）。
 //! PASTA_DEBUG の中和は `tests/common/mod.rs` の `#[ctor]` ガードが担う。
@@ -81,12 +81,12 @@ fn changing_only_alias_table_in_pasta_toml_switches_declaration_and_search() {
         "会話_",
     );
 
-    // (2) 空の [scene.alias] を足す: ＊会話 → 会話_1
-    std::fs::write(&toml, format!("{BASE_TOML}\n[scene.alias]\n")).unwrap();
+    // (2) OnTalk の既定を消す [scene.alias] を足す: ＊会話 → 会話_1
+    std::fs::write(&toml, format!("{BASE_TOML}\n[scene.alias]\nOnTalk = []\n")).unwrap();
     load_and_check(
         base,
-        "2:empty",
-        &SceneAliasTable::empty(),
+        "2:no-ontalk",
+        &SceneAliasTable::with_written([("OnTalk".to_string(), Vec::<String>::new())]).unwrap(),
         "会話_1",
         "OnTalk",
     );

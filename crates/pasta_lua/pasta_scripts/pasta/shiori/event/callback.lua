@@ -82,7 +82,7 @@ function CALLBACK.has_staged()
 end
 
 --- 消費されていない予約を捨てる（予約が無ければ何もしない）
---- EVENT.drive の失敗の経路だけが呼ぶ。pending・STORE には触れない
+--- EVENT.drive の失敗の経路と、おすすめメニューのシーンを動かした後（recommend.lua）が呼ぶ。pending・STORE には触れない
 function CALLBACK.discard_staged()
     _staged = nil
 end

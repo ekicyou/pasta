@@ -581,3 +581,63 @@ fn test_search_scene_exact_empty_name_is_lua_error() {
         .unwrap_err();
     assert!(err.to_string().contains("Invalid scene name"), "{err}");
 }
+
+// =============================================================================
+// recommend-menu-scenes 2.3: Lua から別名の表を読む（SEARCH:scene_aliases）
+// =============================================================================
+
+#[test]
+fn test_scene_aliases_returns_default_targets_and_aliases() {
+    use pasta_core::registry::SceneAliasTable;
+
+    let lua = create_exact_search_lua(&[], SceneAliasTable::builtin_default());
+    let ok: bool = lua
+        .load(
+            r#"
+            local t = SEARCH:scene_aliases()
+            local n = 0
+            for _, aliases in pairs(t) do n = n + #aliases end
+            return n == 7
+                and t["sakura.recommendsites"][1] == "おすすめメニュー"
+                and t["kero.recommendsites"][1] == "相方おすすめメニュー"
+                and t["sakura.portalsites"][1] == "ポータルメニュー"
+                and t["sakura.recommendbuttoncaption"][1] == "おすすめボタン名"
+                and t["kero.recommendbuttoncaption"][1] == "相方おすすめボタン名"
+                and t["sakura.portalbuttoncaption"][1] == "ポータルボタン名"
+                and t.OnTalk[1] == "会話"
+            "#,
+        )
+        .eval()
+        .unwrap();
+    assert!(ok);
+}
+
+#[test]
+fn test_scene_aliases_sorts_aliases_and_returns_new_table_each_call() {
+    use pasta_core::registry::SceneAliasTable;
+
+    let aliases = SceneAliasTable::with_written([(
+        "char2.recommendsites".to_string(),
+        vec!["三人目メニュー".to_string(), "あいうメニュー".to_string()],
+    )])
+    .unwrap();
+    let lua = create_exact_search_lua(&[], aliases);
+    let got: String = lua
+        .load(
+            r#"
+            local t = SEARCH:scene_aliases()
+            local first = table.concat(t["char2.recommendsites"], ",")
+            t["char2.recommendsites"][1] = "書き換え"
+            t.OnTalk = nil
+            local again = SEARCH:scene_aliases()
+            return first .. "|" .. table.concat(again["char2.recommendsites"], ",")
+                .. "|" .. again.OnTalk[1]
+            "#,
+        )
+        .eval()
+        .unwrap();
+    assert_eq!(
+        got,
+        "あいうメニュー,三人目メニュー|あいうメニュー,三人目メニュー|会話"
+    );
+}

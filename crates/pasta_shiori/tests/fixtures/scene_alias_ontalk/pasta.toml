@@ -1,7 +1,7 @@
 # scene_alias_ontalk E2E 用フィクスチャ（scene-name-alias task 6.4）
 #
-# [scene.alias] を書かない（既定の別名表「会話 → OnTalk」が効く）。空の表の版は
-# テスト側が一時コピーの pasta.toml に `[scene.alias]` を書き足して作る。
+# [scene.alias] を書かない（既定の別名表「会話 → OnTalk」が効く）。別名を消す版は
+# テスト側が一時コピーの pasta.toml に `[scene.alias]` と `OnTalk = []` を書き足して作る。
 
 [loader]
 pasta_patterns = ["dic/*.pasta"]

@@ -59,7 +59,7 @@ SEARCH:search_scene(name, global_scene_name?) -> global_name, local_name | nil
 
 `name` は、DSL の Call と同じく、照合用の名前（名前の中の文字と数字と `_` 以外の文字を `_` に置き換えた名前。[シーン名の照合](https://ekicyou.github.io/pasta/grammar/call-jump.html#シーン名の照合)）に揃えてから、シーン名の照合用の名前と前方一致させる。`"挨拶・朝"` も `"挨拶_朝"` も、照合用の名前 `挨拶_朝` で探す。照合用の名前が同じになるグローバルシーンは区別されず、同じ名前の候補になる。第 2 引数 `global_scene_name` には `global_name`（登録名）を渡す。第 2 引数は照合用の名前に揃えずに使う。
 
-第 2 引数を省略したとき（グローバルシーンの検索）は、照合用の名前に揃える前に、`name` を pasta.toml の別名表で置き換える（[シーン名の別名](https://ekicyou.github.io/pasta/grammar/call-jump.html#シーン名の別名)・[pasta.toml の `[scene]`](https://ekicyou.github.io/pasta/reference/pasta-toml.html#sceneシーン名)）。`name` が別名と完全に一致するときだけ置き換え先の名前にし、その名前を照合用の名前に揃えて前方一致させる。既定の別名表（`OnTalk = ["会話"]`）のもとでは、`search_scene("会話")` は `search_scene("OnTalk")` と同じ候補から選び、同じ順次消費の記録を進める。`"会話・朝"` は別名と完全一致しないため置き換えない。第 2 引数を指定したとき（ローカルシーンの検索）は、`name` を置き換えない。`search_word` は別名表を使わない。
+第 2 引数を省略したとき（グローバルシーンの検索）は、照合用の名前に揃える前に、`name` を pasta.toml の別名表で置き換える（[シーン名の別名](https://ekicyou.github.io/pasta/grammar/call-jump.html#シーン名の別名)・[pasta.toml の `[scene]`](https://ekicyou.github.io/pasta/reference/pasta-toml.html#sceneシーン名)）。`name` が別名と完全に一致するときだけ置き換え先の名前にし、その名前を照合用の名前に揃えて前方一致させる。既定の別名表（`OnTalk = ["会話"]` を含む）のもとでは、`search_scene("会話")` は `search_scene("OnTalk")` と同じ候補から選び、同じ順次消費の記録を進める。`"会話・朝"` は別名と完全一致しないため置き換えない。第 2 引数を指定したとき（ローカルシーンの検索）は、`name` を置き換えない。`search_word` は別名表を使わない。
 
 照合の相手は、シーン名の照合用の名前である。登録名（後述の `global_name`・`local_name`）の末尾の `_` と通し番号は照合に使わない。`name` は作者が書くシーン名として扱うため、登録名を渡しても、その登録名のシーンは指さない。たとえば `"メイン_1"` は、1 つ目の `＊メイン` ではなく、照合用の名前が `メイン_1` で始まるシーン（`＊メイン・1` など）を探す。第 2 引数を指定したときの第 1 引数（ローカルシーン名）も同じである。
 
@@ -192,6 +192,26 @@ if word then print(word) end  -- 例: "こんにちは"
 local g = SEARCH:search_scene("メイン")
 local reply = SEARCH:search_word("返事", g)
 ```
+
+### scene_aliases()
+
+実際に使っている別名表（既定の表と pasta.toml の `[scene.alias]` に書いた行を合わせた結果）を返す（[pasta.toml の `[scene]`](https://ekicyou.github.io/pasta/reference/pasta-toml.html#sceneシーン名)）。
+
+```lua
+SEARCH:scene_aliases() -> { [置き換え先] = { 別名, ... } }
+```
+
+**戻り値**: キーが置き換え先の名前、値が別名の文字列の配列である表。別名の配列は辞書順（文字コード順）に並ぶ。別名表が空なら空の表を返す。
+
+```lua
+local aliases = SEARCH:scene_aliases()
+-- 既定の表のもとでは
+-- aliases["OnTalk"]                     → { "会話" }
+-- aliases["sakura.recommendsites"]      → { "おすすめメニュー" }
+-- aliases["sakura.portalbuttoncaption"] → { "ポータルボタン名" }
+```
+
+- 呼ぶたびに新しい表を返す。返った表を書き換えても、別名表と検索は変わらない。別名表は pasta.toml でだけ変えられる。
 
 ### set_scene_selector(...) / set_word_selector(...)
 

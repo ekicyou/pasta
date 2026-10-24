@@ -8,6 +8,7 @@ mod config;
 mod discovery;
 mod input;
 mod module_name;
+mod recommend;
 mod references;
 mod report;
 mod scenes;
@@ -89,6 +90,7 @@ pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) ->
         let (found, dynamic) = references::check(&scenes, &config.aliases, &parsed, &texts);
         findings.extend(found);
         unchecked_dynamic_calls = dynamic;
+        findings.extend(recommend::check(&scenes, &config.aliases, &parsed, &texts));
     }
 
     Report::new(

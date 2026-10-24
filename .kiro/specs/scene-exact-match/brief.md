@@ -134,3 +134,9 @@
 - **見つけた穴・古くなった記述**:
   - 「Current State」: `resolve_scene_id_exact` は 251 → 255 行、`search_scene_exact` は 105 → 119 行、`SCENE.co_exec_exact` は 227〜238 → 230〜251 行で形も変わった。「使っているのはデバッグのキックと撫で・つつきの 1〜8 段目だけ」は古い。キックは登録名で関数を直に引いていて完全一致の検索を使わない。今の使い手は撫で・つつき（`mouse.lua` 120 行）と `OnPastaScene`（`scene_play.lua` 68 行）。イベントの受け口は `init.lua` 179 → 180 行、マニュアルの「イベント名で始まる名前のシーンも候補」は 635 → 753 行。
   - 「Approach」2 の「今の 5 段」は 4 つしか挙げていない。1 段目の「実行中のシーンの表の完全一致」が抜けている。
+
+## 申し送り（recommend-menu-scenes より、2026-10-24）
+
+- `[scene.alias]` の読み方が変わった。既定の表は 7 件（`OnTalk = ["会話"]` に、メニューのシーン 3 件 `sakura.recommendsites`・`kero.recommendsites`・`sakura.portalsites` とボタンの名前 3 件）。書いたキーだけ既定を置き換え、空の配列でそのキーの既定を消し、見出しだけなら既定のまま、既定の別名とぶつかれば読み込みエラー（`SceneAliasTable::with_written`、`SceneAliasError::ConflictsWithDefault`・`TargetIsDefaultAlias`）。置き換えの規則（完全一致・1 段・グローバルシーン名だけ・登録と検索の両方）は変わっていない。
+- 論点: 完全一致のモードと別名の置き換えの順番を決めるときは、この 7 件の既定を前提にする。メニューのシーンは `SEARCH:search_scene_exact(id)` で ID そのもの（置き換え後の名前）を完全一致で引いている（`pasta/shiori/event/recommend.lua`）。
+- 参照: `.kiro/specs/completed/recommend-menu-scenes/design.md` の「AliasTable」「MenuReceiver・InPlaceRun」。

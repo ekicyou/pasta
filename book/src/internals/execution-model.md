@@ -108,7 +108,7 @@ ACT・STORE・PROXY・SCENE・SAVE の内部構造は [Lua ランタイム内部
 | `STORE.co_scene` | 中断した（`suspended` の）継続待ちのコルーチン 1 つ、または `nil` | 仮想イベントの OnTalk で再開されるか、別のシーンの再開の結果で捨てられるまで（台詞を出した割り込み・指名した再生・エラー。[続きの決まり](#継続トークチェイントークと-co_scene-の更新)） |
 | `CALLBACK.pending[イベント名]` | `get_property` のコールバックを待つコルーチン | 該当するコールバックが届くか、タイムアウトで掃引されるまで |
 
-`STORE.co_callback` は、`CALLBACK.consume_staged` がコールバック待ちとして登録したコルーチンを、`EVENT.drive` の直後の `set_co_scene` に知らせるための印である。`set_co_scene` は、渡されたコルーチンがこの印と一致したときだけ `nil` に戻す。`act:get_property` は予約（`stage_pending`）の直後に必ず get タグを出力として中断するため、`consume_staged` が登録するコルーチンは suspended であり、続く `set_co_scene` が印を `nil` に戻す（予約の後、中断の前にエラーで終わった場合は `consume_staged` を呼ばず、`discard_staged` が予約を捨てる）。したがって `EVENT.drive` を抜けた時点で印は常に `nil` である。
+`STORE.co_callback` は、`CALLBACK.consume_staged` がコールバック待ちとして登録したコルーチンを、`EVENT.drive` の直後の `set_co_scene` に知らせるための印である。`set_co_scene` は、渡されたコルーチンがこの印と一致したときだけ `nil` に戻す。`act:get_property` は予約（`stage_pending`）の直後に必ず get タグを出力として中断するため、`consume_staged` が登録するコルーチンは suspended であり、続く `set_co_scene` が印を `nil` に戻す（予約の後、中断の前にエラーで終わった場合は `consume_staged` を呼ばず、`discard_staged` が予約を捨てる。おすすめメニューのシーンを動かした後も、`pasta.shiori.event.recommend` が `discard_staged` で予約を捨てる）。したがって `EVENT.drive` を抜けた時点で印は常に `nil` である。
 
 ## 処理とデータの流れ
 

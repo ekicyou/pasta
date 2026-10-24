@@ -409,6 +409,11 @@ impl UserData for SearchContext {
             },
         );
 
+        // scene_aliases() -> { [置き換え先] = { 別名, ... } }（別名は辞書順。毎回新しい表）
+        methods.add_method("scene_aliases", |lua, this, ()| {
+            lua.create_table_from(this.scene_aliases.entries())
+        });
+
         // set_scene_selector(n1, n2, ...) or set_scene_selector() to reset
         methods.add_method_mut("set_scene_selector", |_lua, this, args: MultiValue| {
             if args.is_empty() {

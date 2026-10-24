@@ -36,7 +36,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 - **FFI**: pasta.toml の `[loader] ffi = true`（既定は無効）で LuaJIT の FFI を開く。`ffi.load` は `pasta_lua` の `runtime/ffi_load/` の置き換えが受け、深いパス・ANSI に無い文字のフォルダ・隣の依存 DLL でも DLL を読む。C モジュールの `require` は使えない。
 - **エンジン**: コアは宿主非依存でアクタースレッドに pin。シーンキックは即時再生のみ。
 - **LuaJIT 2.1**: `coroutine.close`・`<close>` が無い。中断したコルーチンは参照を外して GC に任せる。
-- **シーン名の別名**: pasta.toml の `[scene.alias]` で定義する。未定義なら `会話 → OnTalk` の 1 件が既定。完全一致の 1 段だけで、キー正規化の前段で登録・検索の両側に効く。
+- **シーン名の別名**: pasta.toml の `[scene.alias]` で定義する。既定の表は 7 件（`会話 → OnTalk`・おすすめメニューのシーン 3 件・ボタンの名前 3 件）で、書いたキーだけ既定を置き換える（空の配列で消す・見出しだけなら既定のまま・既定とぶつかれば読み込みエラー。2026-10-24 `recommend-menu-scenes`）。完全一致の 1 段だけで、キー正規化の前段で登録・検索の両側に効く。
 - **式の中の値なし**: 式の中の nil は、算術なら 0、連結なら空文字列とみなし、ログを出さない。
 - **リリース**: タグ `vX.Y.Z` の push で `.github/workflows/release.yml` が検証・ビルド・公開まで行う。ビルドした成果物は git で追跡しない。シェルの画像は追跡を続ける。配布物は `pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip`・`pasta-skills.zip` の 5 つで、GitHub Release には、それにリリースの全件の一覧を足した 6 つを添える（`pasta-skills.zip` は 0.4.2 で `pasta-skills-release-asset` が足した）。
 - **hello-pasta の辞書**: 1 段 1 ファイル（`dic/01-boot.pasta`〜`12-lua.pasta`）で、段階表は `crates/pasta_sample_ghost/STAGES.md`。全段が起動することをテストが確かめる。
@@ -456,7 +456,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 ## Specs (dependency order)
 
-- [ ] recommend-menu-scenes -- 右クリックメニューの「おすすめ」「ポータル」を辞書のシーンだけで書けるようにする。`＊おすすめメニュー`・`＊相方おすすめメニュー`・`＊ポータルメニュー`（別名の既定に足す。完全一致）の中で `＞おすすめ項目（…）`・`＞おすすめ区切り` を積み、リソースの問い合わせでシーンをその場で動かして値を返す（`STORE.co_scene` に触れない）。選んだ後は項目のシーンへ回す。ボタンの名前は決まった名前の単語。Lua の `REG` が勝つ。`[scene.alias]` をキーごとの置き換えに改める（2026-10-20 起票）。0.4.3 に入れる（2026-10-23 開発者の決定）。先に要る 3 本は 2026-10-23 に入った。`shiori4-v3-portable` とはソースを共有しない。`ponytail-lua-loader`・`ponytail-lua-scripts`・`ponytail-core-registry` と同じウェーブに置かない。Dependencies: none
+- [x] recommend-menu-scenes -- 右クリックメニューの「おすすめ」「ポータル」を辞書のシーンだけで書けるようにする。`＊おすすめメニュー`・`＊相方おすすめメニュー`・`＊ポータルメニュー`（別名の既定に足す。完全一致）の中で `＞おすすめ項目（…）`・`＞おすすめ区切り` を積み、リソースの問い合わせでシーンをその場で動かして値を返す（`STORE.co_scene` に触れない）。選んだ後は項目のシーンへ回す。ボタンの名前は決まった名前の単語。Lua の `REG` が勝つ。`[scene.alias]` をキーごとの置き換えに改める（2026-10-20 起票）。0.4.3 に入れる（2026-10-23 開発者の決定）。先に要る 3 本は 2026-10-23 に入った。`shiori4-v3-portable` とはソースを共有しない。`ponytail-lua-loader`・`ponytail-lua-scripts`・`ponytail-core-registry` と同じウェーブに置かない。Dependencies: none
 - [ ] shiori4-v3-portable -- pasta.dll が shiori4 の `shiori_get_api(3)`（SHIORI3 互換モード。SHIORI/3.0 の全文を UTF-8 で運ぶ）を書き出し、Windows 以外（Linux・macOS）でもビルドとテストが通るようにする。アクターの実行器を OS に頼らない形にし、Windows だけの依存を `cfg(windows)` に閉じ込める。Windows の今の入口は残す。エンジンは状態をインスタンスごとに持つ（2026-10-23 開発者の決定）。入口で 2 つ目の `load` を受けるかは要件で決める。版 4 は範囲の外（2026-10-23 起票。3 者会談の後、開発者の方針で 2 段に分けた 1 段目）。0.4.2 に入れた（2026-10-23 開発者の意向）が、まだ実施できないので、0.4.3 へ移した（2026-10-23 開発者の決定）。0.4.3 の最後。`ponytail-shiori` と同じウェーブに置かない。Dependencies: none
 - [ ] shiori4-v4-host -- 版 4 に本格対応する Rust の土台。ホストのテーブルを受け、アクタースレッドからの `host->request` を SHIORI のスレッドへ中継する。post（SSTP に揃えた `SEND`＋`Script`・`Option: nobreak`、`NOTIFY`）と `Tag` の Rust の側、unload での無効化、ホストの `log` への転送、キックの即時化（チェイントークの続きの決まりと自動トークの停止を保つ）、Lua への低い入口と「版 4 で読まれた」の印。取り決めの正本は shiori4 の `abi-conventions`・`host-protocol`（2026-10-23 起票。2 段の 2 段目。同じ日の棚卸で、Lua と DSL の口を `shiori4-v4-lua-api` へ分けた）。0.5.0 に入れる（2026-10-23 開発者の方針。ノベルゲームと同じリリース）。`ponytail-shiori` と同じウェーブに置かない。Dependencies: shiori4-v3-portable
 - [ ] shiori4-v4-lua-api -- 版 4 のホストの機能を Lua と DSL から使う口。ホストのプロパティの読み出し（今の `act:get_property` と `CALLBACK.pending` の上に作る）、シーンからの SEND・NOTIFY、終わりを待って `OnHostComplete` で待っているシーンを再開する書き方（`REG:register` との並び・チェイントークの `STORE.co_preempt` との関係・待っている間の unload）、SHIORI3 だけのときの扱い、`pasta_check` の組み込みの名前、マニュアル（2026-10-23 の棚卸で `shiori4-v4-host` から分けた）。0.5.0。Dependencies: shiori4-v4-host
@@ -502,7 +502,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 - [ ] call-attribute-filter -- イベントの Reference・保存の変数で振り分け、合わなければ 204 にする実例（2 つの値の等しさ・空・値の前方一致・かつ・数の範囲・一度だけ）。両ゴーストでいちばん数の多い要望。Dependencies: scene-attribute-store
 - [ ] cue-command-runtime -- 外見として記録させない生のさくらスクリプト（今は `act:raw_script`）の実例。`！命令` の出力を外見に記録するかを要件で決める。Dependencies: scene-attribute-store
-- [ ] recommend-menu-scenes -- `REG["sakura.recommendsites"]`・`REG["kero.recommendsites"]` を使っている実例。Dependencies: none
+- [x] recommend-menu-scenes -- `REG["sakura.recommendsites"]`・`REG["kero.recommendsites"]` を使っている実例。Dependencies: none
 - [ ] scene-attribute-store -- 属性の新しい読み手 `scene-pick-modes`（重み・巡回）。Dependencies: none
 
 ## Direct Implementation Candidates

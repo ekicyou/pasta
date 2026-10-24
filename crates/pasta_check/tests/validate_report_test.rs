@@ -254,9 +254,11 @@ fn every_kind_has_fixed_severity_and_code() {
         (SceneShadowedByBuiltin, Warning, "scene-shadowed-by-builtin"),
         (CallTargetMissing, Warning, "call-target-missing"),
         (ChoiceTargetMissing, Warning, "choice-target-missing"),
+        (RecommendItemInvalid, Warning, "recommend-item-invalid"),
+        (RecommendMenuTalk, Warning, "recommend-menu-talk"),
     ];
     assert_eq!(table.len(), FindingKind::ALL.len());
-    assert_eq!(FindingKind::ALL.len(), 25);
+    assert_eq!(FindingKind::ALL.len(), 27);
     for (kind, sev, code) in table {
         assert_eq!(kind.severity(), sev, "{code}");
         assert_eq!(kind.code(), code);

@@ -8,6 +8,17 @@ use std::fmt;
 
 use crate::error::SceneAliasError;
 
+/// 内蔵の既定表（置き換え先, 別名の列）
+const DEFAULT_ENTRIES: [(&str, &[&str]); 7] = [
+    ("OnTalk", &["会話"]),
+    ("sakura.recommendsites", &["おすすめメニュー"]),
+    ("kero.recommendsites", &["相方おすすめメニュー"]),
+    ("sakura.portalsites", &["ポータルメニュー"]),
+    ("sakura.recommendbuttoncaption", &["おすすめボタン名"]),
+    ("kero.recommendbuttoncaption", &["相方おすすめボタン名"]),
+    ("sakura.portalbuttoncaption", &["ポータルボタン名"]),
+];
+
 /// 別名 → 置き換え先 の表。`Default` は空の表。
 ///
 /// 不変条件: 空文字列なし・別名は一意・置き換え先は別名として書かれていない。
@@ -22,11 +33,74 @@ impl SceneAliasTable {
         Self::default()
     }
 
-    /// 内蔵の既定表: `OnTalk = ["会話"]` の 1 件だけ。
+    /// 内蔵の既定表（DEFAULT_ENTRIES の 7 件）
     pub fn builtin_default() -> Self {
         Self {
-            map: BTreeMap::from([("会話".to_string(), "OnTalk".to_string())]),
+            map: DEFAULT_ENTRIES
+                .iter()
+                .flat_map(|(target, aliases)| {
+                    aliases
+                        .iter()
+                        .map(move |alias| (alias.to_string(), target.to_string()))
+                })
+                .collect(),
         }
+    }
+
+    /// 既定の表に、書いた行をキーごとに重ねる。
+    /// 書いたキーの既定の別名は捨てて書いた列にする（空の列なら消すだけ）。書かなかったキーの既定は残す。
+    pub fn with_written<I, A>(written: I) -> Result<Self, SceneAliasError>
+    where
+        I: IntoIterator<Item = (String, A)>,
+        A: IntoIterator<Item = String>,
+    {
+        let written: Vec<(String, Vec<String>)> = written
+            .into_iter()
+            .map(|(target, aliases)| (target, aliases.into_iter().collect()))
+            .collect();
+        // 書いた行どうしの誤りは今のエラーのまま
+        Self::from_entries(written.clone())?;
+
+        let defaults: Vec<(String, Vec<String>)> = DEFAULT_ENTRIES
+            .iter()
+            .filter(|(target, _)| !written.iter().any(|(t, _)| t == target))
+            .map(|(target, aliases)| {
+                (
+                    target.to_string(),
+                    aliases.iter().map(|a| a.to_string()).collect(),
+                )
+            })
+            .collect();
+        let owner = |entries: &[(String, Vec<String>)], alias: &str| {
+            entries
+                .iter()
+                .find(|(_, aliases)| aliases.iter().any(|a| a == alias))
+                .map(|(target, _)| target.clone())
+        };
+
+        // ここで出る誤りは既定の行が絡むので、相手が既定だと分かるエラーに読み替える
+        Self::from_entries(written.iter().chain(&defaults).cloned()).map_err(|e| match e {
+            SceneAliasError::DuplicateAlias { ref alias, .. } => {
+                match (owner(&written, alias), owner(&defaults, alias)) {
+                    (Some(target), Some(default_target)) => SceneAliasError::ConflictsWithDefault {
+                        alias: alias.clone(),
+                        target,
+                        default_target,
+                    },
+                    _ => e,
+                }
+            }
+            SceneAliasError::Chain { ref name } if written.iter().any(|(t, _)| t == name) => {
+                match owner(&defaults, name) {
+                    Some(default_target) => SceneAliasError::TargetIsDefaultAlias {
+                        target: name.clone(),
+                        default_target,
+                    },
+                    None => e,
+                }
+            }
+            e => e,
+        })
     }
 
     /// (置き換え先, 別名の列) の並びから作る。検証は空文字列 → 重複 → 連鎖の順。
@@ -156,8 +230,140 @@ mod tests {
         ] {
             assert_eq!(t.resolve(name), None, "{name}");
         }
-        // 既定表は OnTalk への 1 件だけ（OnHour への別名は含めない）
-        assert_eq!(t.entries(), vec![("OnTalk", vec!["会話"])]);
+        // OnHour への別名は含めない
+        assert_eq!(t.resolve("おすすめメニュー"), Some("sakura.recommendsites"));
+    }
+
+    fn written(entries: &[(&str, &[&str])]) -> Result<SceneAliasTable, SceneAliasError> {
+        SceneAliasTable::with_written(entries.iter().map(|(t, aliases)| {
+            (
+                t.to_string(),
+                aliases.iter().map(|a| a.to_string()).collect::<Vec<_>>(),
+            )
+        }))
+    }
+
+    #[test]
+    fn test_builtin_default_has_seven_entries() {
+        let t = SceneAliasTable::builtin_default();
+        assert_eq!(t, table(&DEFAULT_ENTRIES).unwrap());
+        assert_eq!(
+            t.entries(),
+            vec![
+                ("OnTalk", vec!["会話"]),
+                ("kero.recommendbuttoncaption", vec!["相方おすすめボタン名"]),
+                ("kero.recommendsites", vec!["相方おすすめメニュー"]),
+                ("sakura.portalbuttoncaption", vec!["ポータルボタン名"]),
+                ("sakura.portalsites", vec!["ポータルメニュー"]),
+                ("sakura.recommendbuttoncaption", vec!["おすすめボタン名"]),
+                ("sakura.recommendsites", vec!["おすすめメニュー"]),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_with_written_replaces_only_written_keys() {
+        // 書かなかったキーの既定は残る
+        let t = written(&[("OnBoot", &["起動"])]).unwrap();
+        assert_eq!(t.resolve("起動"), Some("OnBoot"));
+        let mut expected = DEFAULT_ENTRIES.to_vec();
+        expected.push(("OnBoot", &["起動"]));
+        assert_eq!(t, table(&expected).unwrap());
+        // 書いたキーは置き換わる
+        let t = written(&[("OnTalk", &["会話", "おしゃべり"])]).unwrap();
+        assert_eq!(t.resolve("おしゃべり"), Some("OnTalk"));
+        assert_eq!(t.resolve("会話"), Some("OnTalk"));
+        assert_eq!(t.entries().len(), 7);
+        let t = written(&[("OnTalk", &["雑談"])]).unwrap();
+        assert_eq!(t.resolve("会話"), None);
+        assert_eq!(t.resolve("雑談"), Some("OnTalk"));
+    }
+
+    #[test]
+    fn test_with_written_empty_array_removes_default() {
+        let t = written(&[("sakura.recommendsites", &[])]).unwrap();
+        assert_eq!(t.resolve("おすすめメニュー"), None);
+        assert_eq!(t.entries().len(), 6);
+        assert!(
+            !t.entries()
+                .iter()
+                .any(|(k, _)| *k == "sakura.recommendsites")
+        );
+    }
+
+    #[test]
+    fn test_with_written_no_rows_equals_default() {
+        let t = written(&[]).unwrap();
+        assert_eq!(t, SceneAliasTable::builtin_default());
+        assert_eq!(
+            t.fingerprint(),
+            SceneAliasTable::builtin_default().fingerprint()
+        );
+    }
+
+    #[test]
+    fn test_with_written_keeps_errors_among_written_rows() {
+        assert_eq!(
+            written(&[("OnBoot", &["起動"]), ("OnClose", &["起動"])]),
+            Err(SceneAliasError::DuplicateAlias {
+                alias: "起動".into(),
+                targets: vec!["OnBoot".into(), "OnClose".into()],
+            })
+        );
+        assert_eq!(
+            written(&[("OnBoot", &[""])]),
+            Err(SceneAliasError::EmptyName {
+                target: "OnBoot".into()
+            })
+        );
+        assert_eq!(
+            written(&[("OnBoot", &["起動"]), ("起動", &["始動"])]),
+            Err(SceneAliasError::Chain {
+                name: "起動".into()
+            })
+        );
+    }
+
+    #[test]
+    fn test_with_written_conflicts_with_default_alias() {
+        let e = written(&[("OnBoot", &["会話"])]).unwrap_err();
+        assert_eq!(
+            e,
+            SceneAliasError::ConflictsWithDefault {
+                alias: "会話".into(),
+                target: "OnBoot".into(),
+                default_target: "OnTalk".into(),
+            }
+        );
+        let msg = e.to_string();
+        assert!(msg.contains("default"), "{msg}");
+        assert!(msg.contains("OnTalk = []"), "{msg}");
+        // 既定を消せば通る
+        let t = written(&[("OnBoot", &["会話"]), ("OnTalk", &[])]).unwrap();
+        assert_eq!(t.resolve("会話"), Some("OnBoot"));
+    }
+
+    #[test]
+    fn test_with_written_target_is_default_alias() {
+        let e = written(&[("会話", &["雑談"])]).unwrap_err();
+        assert_eq!(
+            e,
+            SceneAliasError::TargetIsDefaultAlias {
+                target: "会話".into(),
+                default_target: "OnTalk".into(),
+            }
+        );
+        assert!(e.to_string().contains("OnTalk = []"), "{e}");
+        assert!(written(&[("会話", &["雑談"]), ("OnTalk", &[])]).is_ok());
+    }
+
+    #[test]
+    fn test_fingerprint_changes_with_default_table() {
+        // 版を上げて既定が変わると指紋も変わる（キャッシュを作り直す）
+        assert_ne!(
+            SceneAliasTable::builtin_default().fingerprint(),
+            table(&[("OnTalk", &["会話"])]).unwrap().fingerprint()
+        );
     }
 
     #[test]
@@ -261,7 +467,7 @@ mod tests {
         assert_eq!(a.fingerprint(), b.fingerprint());
         assert_eq!(
             SceneAliasTable::builtin_default().fingerprint(),
-            table(&[("OnTalk", &["会話"])]).unwrap().fingerprint()
+            table(&DEFAULT_ENTRIES).unwrap().fingerprint()
         );
     }
 

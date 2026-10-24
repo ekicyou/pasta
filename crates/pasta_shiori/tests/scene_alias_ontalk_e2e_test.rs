@@ -5,7 +5,8 @@
 //! フィクスチャ `tests/fixtures/scene_alias_ontalk/` は `＊会話` を 2 つだけ持ち `＊OnTalk` を持たない。
 //! SHIORI として読み込み、OnBoot の後に X-Pasta-Time で時刻を固定した OnSecondChange を送って
 //! 仮想ディスパッチャの次回トーク時刻を進め、OnTalk の機会に `＊会話` の台詞が出ることを確かめる。
-//! 同じゴーストの pasta.toml に空の `[scene.alias]` を書き足した版では OnTalk が発行されない。
+//! 見出しだけの `[scene.alias]` を書き足した版でも同じく発行され、
+//! `OnTalk = []` を書き足した版では OnTalk が発行されない。
 
 mod common;
 
@@ -56,7 +57,17 @@ fn on_second_change(shiori: &mut PastaShiori, time: &str) -> ShioriResponse {
 /// 発行条件は従来どおり（初回は次回トーク時刻の設定だけ・間隔未到達では出ない。1.5）。
 #[test]
 fn default_alias_table_issues_kaiwa_as_random_talk() {
-    let (mut shiori, _temp) = load("");
+    assert_kaiwa_issued_as_random_talk("");
+}
+
+/// 見出しだけの `[scene.alias]` は既定の表のまま：`＊会話` が OnTalk になる（recommend-menu-scenes 2.3）
+#[test]
+fn header_only_alias_table_issues_kaiwa_as_random_talk() {
+    assert_kaiwa_issued_as_random_talk("\n[scene.alias]\n");
+}
+
+fn assert_kaiwa_issued_as_random_talk(extra_toml: &str) {
+    let (mut shiori, _temp) = load(extra_toml);
     on_boot(&mut shiori);
 
     // 初回：次回トーク時刻（12:05:10）を決めるだけで発行しない
@@ -84,10 +95,10 @@ fn default_alias_table_issues_kaiwa_as_random_talk() {
     assert_eq!(seen, expected, "both ＊会話 scenes must be issued");
 }
 
-/// 空の別名表：`＊会話` は「会話」のままで OnTalk は発行されない（5.6）
+/// `OnTalk = []` で既定の別名を消す：`＊会話` は「会話」のままで OnTalk は発行されない（5.6）
 #[test]
-fn empty_alias_table_does_not_issue_ontalk() {
-    let (mut shiori, _temp) = load("\n[scene.alias]\n");
+fn ontalk_alias_removed_does_not_issue_ontalk() {
+    let (mut shiori, _temp) = load("\n[scene.alias]\nOnTalk = []\n");
     on_boot(&mut shiori);
 
     let init = on_second_change(&mut shiori, "2025-07-15T12:05:00Z");

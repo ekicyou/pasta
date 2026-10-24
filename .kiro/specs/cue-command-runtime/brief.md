@@ -263,3 +263,8 @@ ghost_dev の「ぱすた開発」セッションは、**外見として記録�
 - **見つけた穴・古くなった記述**:
   - Current State の `sakura_script/` の行番号: `tokenizer.rs` 138〜146 行 → `SAKURA_TAG_PATTERN` 163 行、`wait_inserter.rs` 77〜80 行 → 77 行（`TokenKind::SakuraScript` の枝）、`line_breaker.rs` 33〜45 行 → `column_move` 57〜67 行。2026-10-18 の節の S4 の枝 513〜515 行 → 531〜535 行。
   - 2026-10-17 の節の `call_restore` 787〜795 行 → 795〜803 行。2026-10-17・2026-10-18 の節の `act.lua` 829 行 → 837 行。
+
+## 申し送り（recommend-menu-scenes より、2026-10-24）
+
+- 「別名表を `[scene.alias]` と同じ流儀にするか・既定の表を持つか」の参考: `[scene.alias]` は既定の表（7 件）を持ち、書いたキーだけ既定を置き換える形になった（空の配列で既定を消す・見出しだけなら既定のまま・既定とぶつかれば読み込みエラー）。合成の規則は `pasta_core` の `SceneAliasTable::with_written` の 1 か所にあり、pasta.dll と `pasta_check` が同じ規則で読む。
+- 参照: `.kiro/specs/completed/recommend-menu-scenes/design.md` の「AliasTable」、マニュアル `grammar/call-jump.md` の「シーン名の別名」。

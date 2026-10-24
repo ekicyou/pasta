@@ -73,7 +73,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 - 構文エラーの行と列は、構文が読めなくなった位置である。理由の `expected …` は、その位置に来られる書き方である。
 - 並び順はファイルのパスの順、同じファイルの中では行・列の順で、何度走らせても同じ順になる。
 - 最後の行は、検査した辞書ファイルの数・誤りの数・注意の数をまとめた行である。最後の項「飛び先を検査しなかった Call」は、読むだけでは飛び先が決まらない Call の数である（[読むだけでは決まらない範囲](#読むだけでは決まらない範囲)）。
-- 次のどれかが 1 つでもあると、飛び先の検査をまるごと省く。検査した辞書のシーンが、`pasta.dll` が読み込むシーンと同じとは言えないためである。
+- 次のどれかが 1 つでもあると、飛び先の検査とおすすめメニューの検査をまるごと省く。検査した辞書のシーンが、`pasta.dll` が読み込むシーンと同じとは言えないためである。
   - 構文エラー（`syntax`）
   - 読めない辞書ファイル（`file-not-utf8`・`file-unreadable`）
   - `pasta.toml` の誤り（`config-syntax`・`config-loader-type`・`config-scene-alias`・`config-pattern-invalid`、`pasta.toml` の `file-unreadable`）。`pasta.toml` が無いこと（`config-missing`）と、装いの誤り（`config-actor-font`）は入らない
@@ -101,6 +101,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 5. **構文**: 辞書ファイルを 1 つずつ構文として読む。構文としては読めても Lua への変換で失敗する 3 つの書き方も、ここで見つける。
 6. **シーン名の重なり**: [照合用の名前](../grammar/call-jump.md#シーン名の照合)に揃えると同じになるシーン名と、組み込みの飛び先と同じ名前のシーンを見つける。
 7. **飛び先**: 静的な飛び先の Call（`＞名前`・`＞「名前」`）と選択肢行のジャンプ先（`＠？名前`）が、辞書のシーンか組み込みの飛び先に見つかるかを確かめる。探し方は実行時の検索（[スコープ解決アルゴリズム](../grammar/call-jump.md#スコープ解決アルゴリズム)）と同じで、別名表（[シーン名の別名](../grammar/call-jump.md#シーン名の別名)）による置き換えと前方一致も同じように効く。
+8. **おすすめメニュー**: `＞おすすめ項目` の引数の数と 3 つ目の引数のシーン、メニューのシーンの本体の台詞を確かめる（[おすすめメニュー](../grammar/call-jump.md#おすすめメニュー)）。
 
 ## 報告の意味と直し方
 
@@ -113,7 +114,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 | `config-missing` | 誤り | `ghost/master` に `pasta.toml` が無い。`pasta.dll` は `pasta.toml` が無いとゴーストを読み込めない | `ghost/master` に `pasta.toml` を置く |
 | `config-syntax` | 誤り | `pasta.toml` が TOML として読めない。理由に TOML の説明が続き、行が付く | 示された行の TOML の書き方を直す |
 | `config-loader-type` | 誤り | `[loader]` が表でない、または `pasta_patterns`・`lua_search_paths`（文字列の配列）・`transpiled_output_dir`（文字列）の型が違う | 示されたキーを決まった型で書く |
-| `config-scene-alias` | 誤り | `[scene.alias]` の別名表が正しくない。同じ別名が 2 つ以上の名前にある（重複）、空の名前、別名を別名で置き換える（連鎖）、型の違いのどれか | 理由に示された別名・名前を直す。重複は関わる行のすべてに出る |
+| `config-scene-alias` | 誤り | `[scene.alias]` の別名表が正しくない。同じ別名が 2 つ以上の名前にある（重複）、空の名前、別名を別名で置き換える（連鎖）、型の違い、書いた別名か置き換え先が書かなかったキーの既定の別名と同じ（既定とのぶつかり）のどれか。別名表は `pasta.dll` と同じく、書いたキーだけ既定を置き換えて読む（[[scene]](../reference/pasta-toml.md#sceneシーン名)） | 理由に示された別名・名前を直す。重複は関わる行のすべてに出る。既定とのぶつかりは、理由に相手の既定のキーが出るので、そのキーに空の配列（`OnTalk = []` など）を書いて既定を消すか、書いた名前を変える |
 | `config-actor-font` | 誤り | `[actor."名前"]` の `font`（[装い](../reference/pasta-toml.md#装いfont)）が正しくない。12 個に無い属性名、値が文字列・整数・真偽値でない、空の文字列、値に `]` か `\` が含まれる、`font` が表でない、のどれか。`pasta.dll` はゴーストを読み込めない。行は属性の値の行（表でないときは `font` の値の行） | 理由に示された属性と値を直す |
 | `config-pattern-invalid` | 誤り | `pasta_patterns` の要素がパターンとして読めない | パターンの書き方を直す |
 | `pattern-ignored` | 注意 | `pasta_patterns` の要素が `..`・ドライブ名・先頭の `/` を含むため使われない。`pasta.dll` もこのパターンを使わない | `ghost/master` の中を指すパターンにする |
@@ -166,7 +167,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 
 組み込みの飛び先は、次の名前である。
 
-- `GLOBAL` の関数: `yield`・`チェイントーク`・`close_ghost`・`ゴースト終了`・`pause_auto_talk`・`自動トーク停止`・`resume_auto_talk`・`自動トーク再開`
+- `GLOBAL` の関数: `yield`・`チェイントーク`・`close_ghost`・`ゴースト終了`・`pause_auto_talk`・`自動トーク停止`・`resume_auto_talk`・`自動トーク再開`・`recommend_item`・`おすすめ項目`・`recommend_separator`・`おすすめ区切り`
 - act のメソッド: `init_scene`・`talk`・`sakura_script`・`raw_script`・`surface`・`wait`・`newline`・`clear`・`choice`・`choice_timeout`・`find_act_handler`・`find_handler`・`word`・`expr_fn`・`expr_fn_var`・`actor_proxy`・`global_fn`・`build`・`yield`・`find_scene`・`call`・`call_key`・`restore_scene`・`call_restore`・`failure`・`set_spot`・`clear_spot`
 - SHIORI 用の act のメソッド: `build`・`transfer_date_to_var`・`transfer_req_to_var`・`set_property`・`get_property`
 
@@ -177,6 +178,16 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 | `call-target-missing` | 注意 | Call の飛び先が、辞書のシーンにも組み込みの飛び先にも見つからない。実行すると Call は失敗する（[Call が失敗したとき](../grammar/call-jump.md#call-が失敗したとき)） | 名前の書き間違いなら直す。Lua で定義した飛び先なら、そのままでよい |
 | `choice-target-missing` | 注意 | 選択肢行のジャンプ先が、辞書のシーンに見つからない | 名前の書き間違いなら直す。Lua で定義・振り分けているなら、そのままでよい |
 
+### おすすめメニュー
+
+| code | 分類 | 意味 | 直し方 |
+| ---- | ---- | ---- | ------ |
+| `recommend-item-invalid` | 注意 | `＞おすすめ項目`（`＞recommend_item`）の引数の数が 2〜4 個でない（2 個より少ないと項目はメニューに入らず、5 個目から後は使われない）。または、3 つ目の引数に書いた名前のグローバルシーンが辞書に無い。シーンは、別名表による置き換えの後の名前で、名前が完全に同じものを探す（前方一致にしない） | 引数の数を直す。シーンの名前の書き間違いなら直す |
+| `recommend-menu-talk` | 注意 | メニューのシーン（別名表の置き換えの後で、メニューのリソースの ID に結びついたグローバルシーン。既定の表では `＊おすすめメニュー`・`＊相方おすすめメニュー`・`＊ポータルメニュー`）の本体に台詞（アクション行・継続行）がある。その台詞はメニューに入らずに捨てられる（[メニューのシーン](../grammar/call-jump.md#メニューのシーン)） | 項目は `＞おすすめ項目` で足し、台詞は消す |
+
+- 引数が文字列だけの式（`「名前」` など）でないとき（単語・変数・式）は、その引数を確かめない。値は実行するまで決まらないためである。
+- `recommend-menu-talk` は、メニューのシーンの本体（名前の無い最初の範囲）だけを見る。名前つきのローカルシーンと、Call で呼んだ先のシーンの台詞は見ない。
+
 ## 読むだけでは決まらない範囲
 
 検査は辞書を読むだけで、実行はしない。そのため、次のものは確かめない。
@@ -185,7 +196,7 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 - **Lua の中身**: `scripts/` の Lua・辞書の Lua ブロック・辞書モジュール（`.lua`）の中身は読まない。Lua で定義したシーンや関数は飛び先の候補にならないので、それを呼ぶ Call は注意として報告される。飛び先の報告が注意なのはこのためである。
 - **`On`・`script:` で始まる選択肢のジャンプ先**: ベースウェア（SSP）が別の意味で使うので探さない。
 - **単語参照の参照先**: `＠単語` の単語が定義されているかは確かめない。
-- **構文エラー・読めない辞書ファイル・`pasta.toml` の誤りがあるとき**: 飛び先の検査をまるごと省く（[出力の読み方](#出力の読み方)）。案内の行に出た理由を直してから、もう一度検査する。
+- **構文エラー・読めない辞書ファイル・`pasta.toml` の誤りがあるとき**: 飛び先の検査とおすすめメニューの検査をまるごと省く（[出力の読み方](#出力の読み方)）。案内の行に出た理由を直してから、もう一度検査する。
 
 注意が出ないことは、実行して失敗しないことの保証ではない。実行してからの失敗の見え方は [Call が失敗したとき](../grammar/call-jump.md#call-が失敗したとき) を、ゴーストが起動しないときは [起動シーケンスとモジュール解決](../reference/startup.md) を参照する。
 

@@ -351,8 +351,8 @@ pub(crate) struct SceneProbe {
 /// 有効な別名表の出どころ（読み込み時のログ用）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SceneAliasSource {
-    /// pasta.toml に `[scene.alias]` が無く、内蔵の既定表を使う。
+    /// pasta.toml に `[scene.alias]` が無いか行が 1 つも無く、内蔵の既定表を使う。
     BuiltinDefault,
-    /// pasta.toml の `[scene.alias]` に書かれた表を使う。
+    /// pasta.toml の `[scene.alias]` に書いた行を、キーごとに既定表へ重ねた表を使う。
     PastaToml,
 }

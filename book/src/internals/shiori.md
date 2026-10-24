@@ -100,6 +100,7 @@ VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、�
 | `pasta.shiori.event.callback` | 非同期トークのコールバック待ちの登録・ルーティング・タイムアウトの掃引 |
 | `pasta.shiori.event.kick` | シーンキックの保留と起動（[デバッグ基盤とシーンキック](debug.md)） |
 | `pasta.shiori.event.scene_play` | 既定ハンドラ（OnPastaScene・OnPastaSceneAt）を `REG` に登録する。デバッグが有効なときだけ、名前か位置で指名したシーンを再生する（[位置でのシーンの再生](debug.md#位置でのシーンの再生)） |
+| `pasta.shiori.event.recommend` | 既定ハンドラ（メニューのリソース `sakura.recommendsites` など・ボタンの名前のリソース・OnRecommendsiteChoice）を `REG` に登録し、`＞おすすめ項目`・`＞おすすめ区切り` を `GLOBAL` に置く。メニューのシーンは `EVENT.drive` を通さず、自前のコルーチンで 1 回だけ動かして、続き・持ち越し・ほかの予約に触れない（[おすすめメニュー](../grammar/call-jump.md#おすすめメニュー)） |
 | `pasta.shiori.event.external_control` | 既定ハンドラ（OnPastaCallFunction・OnPastaSetSaveVariable）を `REG` に登録する。デバッグの有無によらず、名前で指名したものを `＞名前` と同じ探し方で呼ぶか、グローバル変数に代入する（[OnPastaCallFunction](../lua/shiori-events.md#onpastacallfunction名前を外から呼ぶ)・[OnPastaSetSaveVariable](../lua/shiori-events.md#onpastasetsavevariableグローバル変数に代入)） |
 | `pasta.shiori.res` | SHIORI/3.0 の応答文字列を作る `RES` |
 | `pasta.shiori.act`・`pasta.shiori.sakura_builder`・`pasta.shiori.appearance`・`pasta.shiori.actor_style` | SHIORI 用の ACT とさくらスクリプトの組立、外見の復旧、装いの出し入れ（[トーク出力とアピアランス](talk-output.md)） |

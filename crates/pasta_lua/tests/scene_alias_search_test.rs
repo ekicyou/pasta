@@ -1,4 +1,4 @@
-//! scene-name-alias task 6.2: 既定・作者定義・空の 3 表で、宣言と検索の全入口が同じシーンに解決される結合テスト。
+//! scene-name-alias task 6.2: 既定・作者定義・OnTalk の既定を消した表（`OnTalk = []`）の 3 つで、宣言と検索の全入口が同じシーンに解決される結合テスト。
 //!
 //! テスト用の `.pasta` と pasta.toml の `[scene.alias]` で一時ゴーストを作り、`PastaLoader::load` で
 //! 実物のランタイムを起こす。シーンの出力は `EVENT.fire` の応答文字列で、登録名は `collect_scenes`
@@ -19,9 +19,9 @@ use tracing_test::traced_test;
 enum Table {
     /// `[scene.alias]` 無し（既定の `OnTalk = ["会話"]`）。
     Default,
-    /// 作者定義の表（既定とはマージしない）。
+    /// 作者定義の表（書いたキーだけ既定を置き換える）。
     Author,
-    /// 見出しだけの空の表（別名なし＝導入前と同じ）。
+    /// `OnTalk = []` で既定の別名を消した表（「会話」は置き換わらない＝導入前と同じ）。
     Empty,
 }
 
@@ -35,7 +35,7 @@ impl Table {
             Table::Author => {
                 "\n[scene.alias]\nOnTalk = [\"会話\", \"雑談\"]\nOnBoot = [\"起動\"]\n"
             }
-            Table::Empty => "\n[scene.alias]\n",
+            Table::Empty => "\n[scene.alias]\nOnTalk = []\n",
         }
     }
 
@@ -178,7 +178,7 @@ fn assert_ok_with(table: Table, what: &str, response: &str, text: &str) {
 
 /// 4.3〜4.6・1.2・8.3・5.6: 3 表それぞれで、`＊会話` の登録名と、Call（静的・「」・変数）・選択肢の飛び先・
 /// Lua の検索 API（範囲省略の `SEARCH:search_scene`・`SCENE.co_exec`・`act:call`）がすべて宣言と同じシーンに
-/// 解決される。空の表では導入前と同じく `会話_1` として登録・解決される。
+/// 解決される。`OnTalk = []` の表では導入前と同じく `会話_1` として登録・解決される。
 #[traced_test]
 #[test]
 fn every_entry_resolves_to_declared_scene_under_each_table() {
@@ -209,7 +209,7 @@ fn every_entry_resolves_to_declared_scene_under_each_table() {
             Some(table.kaiwa_id()),
             "{table:?}: search_scene(\"会話\")"
         );
-        // 置き換え後の名前で探しても同じシーン（空の表では OnTalk のグローバルシーンは無い）
+        // 置き換え後の名前で探しても同じシーン（`OnTalk = []` の表では OnTalk のグローバルシーンは無い）
         let ontalk = table.aliases_kaiwa().then_some("OnTalk_1");
         assert_eq!(
             search_global(&runtime, "OnTalk").as_deref(),
@@ -245,7 +245,7 @@ return EVENT.fire({
 }
 
 /// 4.5・2.4: SHIORI イベントのシーン探索。作者定義の `OnBoot = ["起動"]` で `＊起動` が OnBoot で実行され、
-/// 既定表・作者表では OnTalk のイベントで `＊会話` が実行される。空の表では導入前と同じく実行されない。
+/// 既定表・作者表では OnTalk のイベントで `＊会話` が実行される。`OnTalk = []` の表では導入前と同じく実行されない。
 #[test]
 fn shiori_event_scene_lookup_uses_declared_alias() {
     for table in Table::ALL {
@@ -270,7 +270,7 @@ fn shiori_event_scene_lookup_uses_declared_alias() {
         } else {
             assert!(
                 talk.starts_with("SHIORI/3.0 204"),
-                "{table:?}: 空の表では OnTalk のシーンが無い: {talk:?}"
+                "{table:?}: `OnTalk = []` の表では OnTalk のシーンが無い: {talk:?}"
             );
         }
 
@@ -348,7 +348,7 @@ return table.concat(out, ",")"#,
 }
 
 /// 1.3・1.4・5.3: `＊会話` と `＊OnTalk` は既定表・作者表で OnTalk の同じ候補の集まりになり、
-/// 「会話」と「OnTalk」の検索が 1 つの順次消費の記録を進める。空の表では別々のシーンのまま。
+/// 「会話」と「OnTalk」の検索が 1 つの順次消費の記録を進める。`OnTalk = []` の表では別々のシーンのまま。
 #[test]
 fn kaiwa_and_ontalk_share_one_sequential_consumption_state() {
     const PASTA: &str = "\
@@ -406,7 +406,7 @@ fn aliased_call_prefix_matches_ontalk_suffixed_scene() {
 
 /// 3.7・8.1・5.4・5.6: 別名と完全一致する名前の検索は置き換え前の名前で始まる `＊会話・朝` を候補にせず、
 /// 見つからない Call の失敗表記は書いた名前「会話」になり、Rust 側の warn に両方の名前が出る。
-/// `＊会話・朝` 自体は置き換わらない。空の表では導入前と同じく `＞会話` が `＊会話・朝` に当たる。
+/// `＊会話・朝` 自体は置き換わらない。`OnTalk = []` の表では導入前と同じく `＞会話` が `＊会話・朝` に当たる。
 #[traced_test]
 #[test]
 fn missing_aliased_call_reports_written_name_and_skips_prefix_scene() {
