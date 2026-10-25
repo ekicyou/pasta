@@ -234,3 +234,34 @@
 - **占有の世代の札**: 検証で、旧来の口の再読み込みが「手放したスレッドの占有」で断られる退行が見つかった（DAP で止めたまま SSP で再読み込みするなど）。札なしで力ずくで引き継ぐと、古い VM の後片付けの `unregister` が新しい持ち主の項目を消すので、世代の数を項目に持たせ、札が今の世代のときだけ消す。世代の数は表の中にあり、プロセスに 1 つの新しい状態は足さない。
 - **`pasta_lua` のログの関数の破壊的な変更**: 形を残すと `init_tracing_with_reload(config)` の `config` を黙って無視し、`update_tracing_filter(config)` が文脈の無いスレッドで何もしない。黙って引数を無視する関数は誤用を招くので、形を正直に変える。公開クレートの pub API を変えてよいという 2026-10-19 の開発者の決定にも合う。
 - **測りを設計の段で行う**: Linux・macOS で落ちるテストの数しだいで `pasta-portable-build` への分割があり、それがタスクを作った後で分かると作り直しになるため。
+
+## 8. Linux・macOS の測り（2026-10-25・設計の段）
+
+設計のディスカッションの決定（タスク分解の前に測る）に従い、このブランチに一時の `measure-unix` ジョブ（`ubuntu-latest`・`macos-latest`。クレートごとに `cargo test -p <crate> --no-fail-fast`、`continue-on-error`）を足し、`gh workflow run build.yml --ref claude/shiori4-v3-portable-start-ce0eb9` で 1 回回した（run `40148461794`、base `2b7e0df0`）。測り終えたあと、そのコミットは revert した。
+
+### 結果
+
+| 対象 | Linux（ubuntu） | macOS（arm64） |
+|---|---|---|
+| `pasta_shiori` のビルド | 失敗: `windows-future` がコンパイルできない（`wintf-winmsg-executor` が引く。設計どおり外せば消える見込み） | 同じ |
+| `pasta_shiori` のテスト | 測れない（上のビルドの失敗。wintf を外した後に初めて測れる） | 同じ |
+| `pasta_dsl`・`pasta_core`・`pasta_lsp`・`pasta_sample_ghost` | 全部通る | 全部通る |
+| `pasta_lua` | 13 本落ちる（826＋4 本のうち） | 12 本落ちる（`searcher` の 1 本は通る） |
+| `pasta_check` | 1 本落ちる（132 本のうち） | 同じ |
+| clippy（`pasta_shiori` を除く・`-D warnings`） | 警告 0 | （回していない） |
+| vendored LuaJIT のビルド | 通る | 通る（`MACOSX_DEPLOYMENT_TARGET` などの追加は要らない） |
+
+### 落ちたテストと原因の見立て
+
+- `pasta_lua/src/debug/playscene_tests.rs`（6 本）・`debug/wiring_play_scene_at_tests.rs`（2 本）: `C:/work/dic/talk.pasta`・`file:///C:/…` のようなドライブ文字のパスを、ゴーストのディレクトリとして使っている。Linux・macOS ではドライブ文字のパスが絶対パスにならず、正規化が一致しないので `NotFound`。テストのパスを OS ごとに作る（または Windows の形の解釈そのものを試す数本だけを囲う）直し。
+- `pasta_lua/src/debug/source_map_resolve_tests.rs`（2 本）: `C:/proj/cache/A.lua` と `a.lua` を同じとみなす（大文字小文字を畳む）期待。大文字小文字を畳むのは Windows の正規化の決まりで、Linux・macOS では区別するのが正しい。期待を OS で分ける。
+- `pasta_lua/tests/chunk_name_validation_test.rs`（2 本）: 「生の文字列はバイト一致しない（区切りが違う）」ことの確認。Linux・macOS では区切りが `/` だけなので一致する。この確認は Windows だけの前提なので、その assert を Windows だけにする（正規化の後の一致の確認は全部の OS で残す）。
+- `pasta_lua/src/runtime/searcher.rs` の `chunk_table_records_author_and_cache_but_not_runtime`（Linux だけ）: 「一時フォルダーが短すぎる」。テストが一時フォルダーのパスの長さを前提にしている（Linux の `/tmp/.tmpXXXX` は短い）。テストの作りの直し。
+- `pasta_check/src/release_args.rs` の `test_rejects_dotdot_form`: `x/../ghost` の形を `InvalidInput` で断る期待だが、Linux・macOS では、無いディレクトリを通る `..` を OS が先に解けず `NotFound`（`Other`）になる。`..` の形の検査を、ファイルシステムに触る前に行う直しか、テストの前提の直し（実装で中身を見て決める）。
+
+### 判断
+
+- 直す所は `pasta_shiori` の外で **6 ファイル・14 本**（macOS は 13 本）。どれもテストの前提（パスの形・大文字小文字・区切り・一時フォルダーの長さ）か、`..` の検査の順で、エンジンの振る舞いの移植の問題は見つかっていない。
+- 分割の目安（`pasta_shiori` の外の 10 ファイルを大きく超える）に届かないので、**`pasta-portable-build` には分けない**。
+- 残る不確かさは `pasta_shiori` のテストだけ（wintf を外すまでビルドできない）。実装で実行器を替えた直後に、同じ形で `workflow_dispatch` を回して測る。
+- macOS の LuaJIT は追加の設定なしで通ったので、Research Needed 2 は閉じる。

@@ -673,7 +673,9 @@ pub fn update_tracing_filter(load_dir: &Path, config: &LoggingConfig); // ディ
   - Windows だけの働き（HGLOBAL・ANSI のコードページ・DLL の読み込みの置き換え・Windows の資源の測り・ドライブ文字のパスの解釈そのもの）を試すテストだけを `#[cfg(windows)]`（ファイルなら `#![cfg(windows)]`）で囲い、すぐ上に `// Windows だけ: <理由>` を書く。
   - 32 ビットの target は足さないので、`target_pointer_width` で期待を分けた試験はそのまま全部の Windows の行で走る（x86 の試験は省かない決まり）。
 - 手順: Linux・macOS で落ちるテストとビルドの失敗は、設計の段（タスク分解の前）に `workflow_dispatch` で測り、`research.md` の「8. Linux・macOS の測り」に書いた（Research Needed 1・2。2026-10-25 の設計のディスカッションの決定）。実装はその一覧を、直すものと囲うものに分けてから直す。
-- 分割の目安: 直しが `pasta_shiori` の外の 10 ファイルを大きく超えるなら、brief の分割の案（`pasta-portable-build`）を使う（要件のディスカッションの決定）。
+- 測りの結果（`research.md` 8 節）: `pasta_shiori` の外で落ちるのは 6 ファイル・14 本（`pasta_lua` の `debug/playscene_tests.rs`・`debug/wiring_play_scene_at_tests.rs`・`debug/source_map_resolve_tests.rs`・`tests/chunk_name_validation_test.rs`・`runtime/searcher.rs`、`pasta_check` の `release_args.rs`）。原因はテストの前提（ドライブ文字のパス・大文字小文字を畳む期待・区切りの差の確認・一時フォルダーの長さ）と、`..` の形の検査の順。`pasta_dsl`・`pasta_core`・`pasta_lsp`・`pasta_sample_ghost` は通り、Linux の clippy（`pasta_shiori` を除く）は警告 0、macOS の vendored LuaJIT も追加の設定なしで通る。
+- 分割の判断: 分割の目安（`pasta_shiori` の外の 10 ファイルを大きく超える）に届かないので、`pasta-portable-build` には分けない（確定）。
+- `pasta_shiori` のテストは、wintf を外すまで Linux・macOS でビルドできず測れていない。実行器を替えた直後（Migration の S3 の後）に、同じ形で `workflow_dispatch` を回して測ってから S7 の直しに入る。
 
 ### 文書
 
@@ -803,7 +805,7 @@ flowchart LR
 開発者が全議題を推奨案で承認した。
 
 1. **手放した後の同じディレクトリの読み直し**（検証の重大 1）: 占有に世代の札（`ClaimToken`）を付ける。旧来の口は、自分の片付けが打ち切りに終わった直後の同じディレクトリなら `ClaimMode::TakeOver` で占有を引き継ぐ（今の SSP の再読み込みを保つ。7.1・7.2）。古い VM の片付けは札が違えば何もしない。版 3 は断るまま。
-2. **Linux・macOS で落ちるテストの測り**（検証の重大 2）: タスク分解の前に、このブランチで `workflow_dispatch` を回して測る。結果は `research.md` の 8 節。分割（`pasta-portable-build`）するかはその結果で決める。
+2. **Linux・macOS で落ちるテストの測り**（検証の重大 2）: タスク分解の前に、このブランチで `workflow_dispatch` を回して測った（`research.md` の 8 節）。`pasta_shiori` の外で 6 ファイル・14 本で、分割はしない。`pasta_shiori` のテストは S3 の後に測る。
 3. **`pasta_lua` のログの関数**（検証の重大 3）: 形を正直に変える。`init_tracing()`・`update_tracing_filter(load_dir, config)`。破壊的な変更として `crates/pasta_lua/README.md` と内部の章に書く。
 4. **旧来の置き場**: 案 C（`actor::lifecycle` に置き場と窓口。全部の OS でコンパイル）。
 5. **版 3 が占有中のディレクトリを旧来の `load` に渡されたとき**: FALSE・アクターを起こさない・占有している側のログ。
