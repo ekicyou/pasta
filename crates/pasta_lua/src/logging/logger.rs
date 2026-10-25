@@ -6,25 +6,21 @@
 use std::io::{self, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
-use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 
 use crate::loader::LoggingConfig;
 
 /// PastaLogger - Instance-specific file logger.
 ///
-/// Each instance manages its own log file with non-blocking writes.
+/// Each instance manages its own log file with synchronous writes.
 /// The file is never rotated.
 pub struct PastaLogger {
     /// Absolute path to the log file.
     log_path: PathBuf,
 
-    /// Non-blocking writer.
-    writer: Mutex<NonBlocking>,
-
-    /// Worker guard - must be kept alive to ensure logs are flushed.
-    /// Dropped when PastaLogger is dropped.
-    _guard: WorkerGuard,
+    /// Synchronous writer. No worker thread: a worker outlives its guard and would run
+    /// unmapped code once the host frees pasta.dll right after unload.
+    writer: Mutex<RollingFileAppender>,
 }
 
 impl PastaLogger {
@@ -67,13 +63,9 @@ impl PastaLogger {
             .build(log_dir)
             .map_err(io::Error::other)?;
 
-        // Create non-blocking writer
-        let (writer, guard) = tracing_appender::non_blocking(appender);
-
         Ok(Self {
             log_path,
-            writer: Mutex::new(writer),
-            _guard: guard,
+            writer: Mutex::new(appender),
         })
     }
 
@@ -320,8 +312,8 @@ mod tests {
 
     #[test]
     fn test_logger_write_content_persisted_after_drop() {
-        // Bytes written through the non-blocking writer must reach the log
-        // file once the logger (and its worker guard) is dropped.
+        // Bytes written through the writer must reach the log file once the
+        // logger is dropped.
         let temp_dir = TempDir::new().unwrap();
         let base_dir = temp_dir.path();
 
@@ -331,7 +323,7 @@ mod tests {
         let written = logger.write(b"persisted log line\n").unwrap();
         assert_eq!(written, b"persisted log line\n".len());
 
-        // Dropping flushes and joins the worker thread.
+        // Dropping flushes the writer.
         drop(logger);
 
         let content = std::fs::read_to_string(&log_path).unwrap();

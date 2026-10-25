@@ -55,7 +55,7 @@ GlobalLoggerRegistry::make_writer（イベントごと）
      │  CURRENT_LOAD_DIR（スレッドローカル）で文脈（設置パス）を得る
      │  resolve: Mutex<HashMap<設置パス, 項目>> を引く（振り分けの 3 規則）
      ▼
-RoutingWriter ── 決まった → PastaLogger::write → NonBlocking → ワーカースレッド → ログファイル
+RoutingWriter ── 決まった → PastaLogger::write → RollingFileAppender → ログファイル
                └ 無い     → 何もせず書いたことにする（捨てる）
 ```
 
@@ -123,7 +123,7 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 1. イベントがフィルタを通ると、fmt レイヤが 1 行に整形する（時刻・レベル・target・メッセージ・フィールド。ANSI の色付けはしない）。
 2. fmt レイヤはイベントごとに `GlobalLoggerRegistry::make_writer` を呼ぶ。`make_writer` はそのスレッドの `CURRENT_LOAD_DIR` を読み、`resolve` で書き込み先のロガーを決めて（下の 3 規則）、`RoutingWriter` を返す。
 3. `RoutingWriter` は、ロガーがあれば `PastaLogger::write` へ渡し、無ければ書いたバイト数を返して捨てる。捨てるときもエラーや panic は起こさない。
-4. `PastaLogger::write` は、ミューテックスで守った `tracing_appender::non_blocking` の writer に書く。実際のファイル書き込みは、ロガーごとのワーカースレッドが行う。
+4. `PastaLogger::write` は、ミューテックスで守った `RollingFileAppender` に、呼び出したスレッドのまま書く。書き込み用のスレッドは作らない（下の「ログファイル」）。
 
 ### 振り分けの規則
 
@@ -133,7 +133,7 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 2. 文脈が無く、登録されたロガーがちょうど 1 つ → そのロガーへ書く。
 3. それ以外（文脈が無く、登録が 0 個または 2 個以上）→ 捨てる。
 
-規則 1 で他のロガーへ流さないのは、あるゴーストのログを別のゴーストのログファイルに書かないためである。規則 3 で 2 個以上のときに捨てるのも、どのゴーストに属するかを決められないためである。登録簿のミューテックスを持つのは、表を引いて `Arc` を複製する間だけである。`register` が置き換えた古いロガーと `unregister` が外したロガーの破棄（フラッシュとワーカースレッドの終了待ち）は、ロックを放してから行う。
+規則 1 で他のロガーへ流さないのは、あるゴーストのログを別のゴーストのログファイルに書かないためである。規則 3 で 2 個以上のときに捨てるのも、どのゴーストに属するかを決められないためである。登録簿のミューテックスを持つのは、表を引いて `Arc` を複製する間だけである。`register` が置き換えた古いロガーと `unregister` が外したロガーの破棄（フラッシュ）は、ロックを放してから行う。
 
 `CURRENT_LOAD_DIR` を設定するのは `LoadDirGuard` で、ガードの破棄で元の値に戻す（入れ子にできる）。文脈を張るのは次の箇所である。
 
@@ -177,9 +177,9 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
    `profile/pasta/logs/pasta.log`・`profile/x.log` は正しい。`profile.log`・`profiles/x.log` のように文字列として `profile` で始まっても `profile/` ディレクトリの下にないもの、`profile` だけのもの、`../x.log`・`profile/../x.log`・`logs/x.log` は不正である。
 3. 親ディレクトリを作る（`create_dir_all`）。
 4. `RollingFileAppender` を `Rotation::NEVER` とファイル名そのものを接頭辞にして作る。日付の接尾辞は付かず、ファイル名は `file_path` のとおりになる。既存のファイルには追記する。
-5. `tracing_appender::non_blocking` でワーカースレッドと `WorkerGuard` を作り、`PastaLogger` が保持する。
+5. `RollingFileAppender` をミューテックスで包んで `PastaLogger` が保持する。
 
-`PastaLogger` の `Drop` はフラッシュし、続く `WorkerGuard` の破棄がワーカースレッドに残りを書かせる。ログファイルは日付で分けず、古いファイルの削除もしない。
+`PastaLogger` の `Drop` はフラッシュする。`tracing_appender::non_blocking` のワーカースレッドは使わない。ワーカースレッドは `WorkerGuard` を破棄しても join されないので、ホストが unload の直後に pasta.dll を解放すると、外れたコードの上で動き続けて落ちる。ログファイルは日付で分けず、古いファイルの削除もしない。
 
 ### `@pasta_log` の呼び出し
 
@@ -256,7 +256,7 @@ VM の中の文字列（DSL から生成したコード、`scripts/` の Lua ソ
 - ログの振り分け先は、イベントを出したスレッドの `CURRENT_LOAD_DIR` と登録簿の中身だけで決まる（振り分けの 3 規則）。文脈のあるスレッドのログを別の設置パスのロガーへ書くことは無い。捨てるときもエラーにならない。
 - 登録簿のキーは設置パスの `PathBuf` で、正規化せずに完全一致で比べる。段階 1 と段階 1.5 は同じ設置パスの値を使う。
 - ログファイルのパスは、設置パスからの相対パスが `profile/` ディレクトリの下にあり `..` を含まないものに限られる。満たさない `file_path` は既定のログファイルに切り替わる。ファイルは追記で、ローテーションも切り詰めもしない。
-- 書き込みは `tracing_appender::non_blocking` の既定の設定で、ワーカースレッドへの行のバッファが満ちたときは、呼び出し側を待たせずにその行を捨てる。
+- 書き込みは呼び出したスレッドで同期に行い、行を捨てない。ロガーはスレッドを持たないので、unload の後に pasta.dll のコードの上で動くロガーのスレッドは残らない。
 - `@pasta_log` と `@enc` は、不正な入力で Lua のエラーを出さない。`@pasta_log` は必ず文字列にして記録し、`@enc` は `(nil, メッセージ)` を返す。
 - 文字コードの変換をするのは Windows だけである。Windows 以外では `Encoding` の両方の種類が UTF-8 のまま通す。
 - `@enc` の結果は、変換を呼んだ時点のシステムの ANSI コードページに依存する。

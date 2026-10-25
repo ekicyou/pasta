@@ -84,7 +84,7 @@ fn get_reply_drop_emits_drop_seam_and_204() {
 fn get_timeout_emits_timeout_seam_and_204() {
     let (tx, rx) = mailbox();
     let short_timeout = Duration::from_millis(20);
-    let actor_delay = Duration::from_millis(120);
+    let actor_delay = Duration::from_secs(2); // 遅いランナーでも timeout が先に来る幅
 
     let actor = thread::spawn(move || {
         if let Ok(ActorMsg::Get { req: _, reply }) = rx.recv() {
