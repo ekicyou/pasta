@@ -24,7 +24,7 @@ static FILTER_HANDLE: OnceLock<FilterHandle> = OnceLock::new();
 /// Priority: PASTA_LOG env var > config.filter > config.level.
 /// A `PASTA_LOG` that is unset or unparsable is skipped; an unparsable
 /// config directive falls back to "info".
-fn build_filter(config: &LoggingConfig) -> EnvFilter {
+pub(super) fn build_filter(config: &LoggingConfig) -> EnvFilter {
     EnvFilter::try_from_env("PASTA_LOG")
         .or_else(|_| EnvFilter::try_new(config.to_filter_directive()))
         .unwrap_or_else(|e| {

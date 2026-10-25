@@ -612,7 +612,7 @@ impl GlobalLoggerRegistry {
 
 - 項目の選び方（ロガーと量の設定で同じ決まり）: スレッドの `CURRENT_LOAD_DIR` があればその項目。無ければ、ロガーを持つ項目がちょうど 1 つならそれ。ほかは選ばない。選んだ項目の量の設定で判定し、選べなければ出さない（どちらにしても書き先が無い）。ほかのゴーストの設定へ逃げない（「共有」の逃げ道は置かない。5.4）。
 - 表を変えたら（`register`・`unregister`・`try_claim`・`set_filter`）、ロックを外した後で `tracing_core::callsite::rebuild_interest_cache()` を呼ぶ（ロックを持ったまま呼ぶと、フィルタの `max_level_hint` が同じロックを取って止まる）。
-- 鍵は `PathBuf`（今のまま）。`ClaimToken` は「鍵＋世代の数」で、世代の数は表の中の数（項目ごとに増やす）。プロセスに 1 つの新しい状態は足さない。
+- 鍵は `PathBuf`（今のまま）。`ClaimToken` は「鍵＋世代の数」で、世代の数は表に 1 つの連番（項目を消しても戻さない。項目ごとの数だと、消して作り直した項目の世代が古い札と重なり、手放された古い VM が今の持ち主の項目を消してしまう。実装の段 3.1 で直した）。プロセスに 1 つの新しい状態は足さない。
 
 #### TracingInit（`crates/pasta_lua/src/logging/tracing_init.rs`）
 
