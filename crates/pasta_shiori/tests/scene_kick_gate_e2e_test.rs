@@ -3,10 +3,10 @@
 //! ＋ Error Handling（`kick.unresolved` / `kick.drop`）・`MailboxKickInjector`（D6 no-op））。
 //!
 //! # 何を観測可能に固定するか（actor/SHIORI レベルの E2E ゲート）
-//! 既存ユニットを **跨ぐ全経路（実 sink→MAILBOX→executor→Lua→OnSecondChange）上で観測可能な
+//! 既存ユニットを **跨ぐ全経路（実 sink→LEGACY→executor→Lua→OnSecondChange）上で観測可能な
 //! 応答さくらスクリプト／ライフサイクル不変**として補完する。本ファイルは 3 ゲートのうち
 //! actor/SHIORI レベルで最も自然に観測できる 2 つ（未解決破棄・teardown 競合 drop）を 1 本の
-//! `#[test]` に直列に詰める（`static MAILBOX` はプロセスグローバルゆえ 6.1/7.2/7.3 と同方針で
+//! `#[test]` に直列に詰める（`static LEGACY` はプロセスグローバルゆえ 6.1/7.2/7.3 と同方針で
 //! 別バイナリ・単一テスト）。残る「debug 無効＝非活性（R2.6）」は層が `pasta_lua` debug の
 //! enable ゲートなので、そちらの in-crate テスト（`disabled_enable_keeps_wired_kick_sink_inert`）で
 //! 観測する（task 7.4 scope の層分担に従う）。
@@ -16,10 +16,10 @@
 //!    OnSecondChange が **通常応答（キックビート無し・進行中会話の継続が不変）** であること。
 //!    進行中のマルチビート会話を先に走らせておき、未解決キックがそれを一切変えない（後続ビートが
 //!    通常ペースでそのまま継続する）ことで「co_scene 不変」を観測可能にする。
-//!  - **teardown 競合 drop（R3.5 / D6）**: `teardown_actor()`（`MAILBOX.swap(None)`）後に実 sink
-//!    クロージャ（`kick_sink()`）を呼ぶ → **panic せず** no-op（MAILBOX 不在で送信されない・
-//!    `kick.drop` ベストエフォート）。観測: panic しないこと＋MAILBOX が None のまま（後続の
-//!    `marshal_request` がアクター不在の 204 を返すことで MAILBOX 不在を観測）。
+//!  - **teardown 競合 drop（R3.5 / D6）**: `teardown_actor()`（`LEGACY.swap(None)`）後に実 sink
+//!    クロージャ（`kick_sink()`）を呼ぶ → **panic せず** no-op（LEGACY 不在で送信されない・
+//!    `kick.drop` ベストエフォート）。観測: panic しないこと＋LEGACY が None のまま（後続の
+//!    `marshal_request` がアクター不在の 204 を返すことで LEGACY 不在を観測）。
 
 use std::path::{Path, PathBuf};
 
@@ -177,12 +177,12 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
 }
 
 /// task 7.4: 未解決破棄ゲート（R3.5）と teardown 競合 drop ゲート（R3.5 / D6）を 1 本貫通で
-/// 観測する E2E 結合テスト。単一テスト・全ゲート直列（`static MAILBOX` 共有のため）。
+/// 観測する E2E 結合テスト。単一テスト・全ゲート直列（`static LEGACY` 共有のため）。
 #[test]
 fn kick_unresolved_and_teardown_drop_gates_end_to_end() {
     let (load_dir, _temp) = build_gate_ghost_dir();
 
-    // --- load（spawn_actor＝FFI load 相当・kick_sink 束縛＋MAILBOX store） ---
+    // --- load（spawn_actor＝FFI load 相当・kick_sink 束縛＋LEGACY store） ---
     let loaded = spawn_actor(0, load_dir.clone());
     assert!(
         loaded,
@@ -244,24 +244,24 @@ fn kick_unresolved_and_teardown_drop_gates_end_to_end() {
 
     // =====================================================================
     // ゲート B: teardown 競合 drop（R3.5 / D6）
-    //  teardown_actor()（MAILBOX.swap(None)）後に実 sink クロージャを呼ぶ → panic せず no-op
-    //  （MAILBOX 不在で送信されない・kick.drop ベストエフォート）。観測: panic しないこと＋
-    //  MAILBOX が None のまま（teardown 後の marshal_request がアクター不在の 204 を返す）。
+    //  teardown_actor()（LEGACY.swap(None)）後に実 sink クロージャを呼ぶ → panic せず no-op
+    //  （LEGACY 不在で送信されない・kick.drop ベストエフォート）。観測: panic しないこと＋
+    //  LEGACY が None のまま（teardown 後の marshal_request がアクター不在の 204 を返す）。
     // =====================================================================
 
-    // teardown（MAILBOX.swap(None)）= アクター不在状態を作る。
+    // teardown（LEGACY.swap(None)）= アクター不在状態を作る。
     let _ = teardown_actor();
 
     // teardown 後に実 sink を呼ぶ → panic せず黙って破棄される（kick.drop・ベストエフォート）。
     // （この行が panic すれば drop ゲートが破れている＝load-bearing。）
     kick(DROP_SCENE);
 
-    // 観測: MAILBOX が None のまま（送信されていない）＝アクター不在 → marshal_request は 204。
+    // 観測: LEGACY が None のまま（送信されていない）＝アクター不在 → marshal_request は 204。
     let after_drop = on_second_change("idle", 30);
     assert!(
         after_drop.contains("SHIORI/3.0 204 No Content"),
         "gateB: after teardown the actor is absent — kick must be dropped (no-op) and \
-         marshal_request must return 204 (MAILBOX stays None).\nactual: {after_drop:?}"
+         marshal_request must return 204 (LEGACY stays None).\nactual: {after_drop:?}"
     );
 
     // 二重 teardown でもハング/panic しない（冪等・後始末）。

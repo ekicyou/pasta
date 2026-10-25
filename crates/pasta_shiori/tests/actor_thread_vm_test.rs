@@ -1,12 +1,12 @@
 //! 本番アクタースレッド × mailbox 駆動 × 実 `!Send` VM コルーチン継続の統合テスト
 //! （task 3.3・R4.1/R4.2/R4.3/R4.5/R9.1/R9.2/R9.3/R9.4）。
 //!
-//! task 5.1 で FFI 出荷経路がアクター経路へ昇格し、wintf が既定ビルド依存になったため、
+//! task 5.1 で FFI 出荷経路がアクター経路へ昇格したため、
 //! 本テストは **既定（no-feature）ビルドで実行される**（旧 `actor-poc` ガードは撤去）。
 //!
 //! # 何を証明するか（task 3.3 の observable 完了条件）
-//! 専用アクタースレッド上で `wintf block_on` が実 [`PastaShiori`] VM を生成・pin し、
-//! 単一 `recv_async().await` ループで mailbox（task 3.2）を消費する。SHIORI（テスト）
+//! 専用アクタースレッドが実 [`PastaShiori`] VM を生成・pin し、
+//! 単一の同期 `recv()` ループで mailbox（task 3.2）を消費する。SHIORI（テスト）
 //! スレッドから `ActorMsg::Get`/`Notify` を投入すると:
 //!  (a) VM 実行スレッド ID ＝アクタースレッド ID（テスト/送信スレッドと別）— R4.2/R4.5。
 //!  (b) コルーチン継続が tick をまたいで動く（GET property yield → callback resume の
@@ -147,7 +147,7 @@ fn actor_thread_pins_vm_and_continues_coroutine_across_messages() {
         "round2: callback must resume the suspended coroutine and reflect the value\nactual: {round2:?}"
     );
 
-    // clean stop: Stop を同一 FIFO で投入 → ループ脱出 → block_on 戻り → join 可能。
+    // clean stop: Stop を同一 FIFO で投入 → ループ脱出 → スレッド終了 → join 可能。
     let (stop, done_rx) = ActorMsg::stop();
     tx.send(stop).expect("send Stop into mailbox");
     done_rx

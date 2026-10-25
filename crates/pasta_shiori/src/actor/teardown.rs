@@ -5,22 +5,21 @@
 //! teardown」の本番化。teardown は **`ActorMsg::Stop { done }` 制御メッセージ**を
 //! mailbox（単一 FIFO）へ送ることで成立する。Stop は同一 FIFO を通るため、先行
 //! メッセージは Stop の前に drain される（clean drain）。アクター（[`thread`] の
-//! `spawn_actor_thread` が回す単一 `recv_async` ループ）は Stop で:
+//! `spawn_actor_thread` が回す単一の同期 `recv()` ループ）は Stop で:
 //!
 //! 1. 残メッセージを drain 後（FIFO 順序が保証）、
 //! 2. VM（`PastaShiori` が内包する `!Send` Lua VM）を drop して debug backend teardown を
 //!    完了させ、mailbox の receiver を閉じ、
 //! 3. `done` ack を送る、
 //!
-//! という順序で teardown する。executor のメッセージ専用ウィンドウ（wintf の thread_local）
-//! は ack の後、`block_on` が戻ってスレッドが終了するときに破棄される。SHIORI 側は `done_rx.recv_timeout` で **有界に** ack を
+//! という順序で teardown する。その後ループを抜けたスレッドが終了する。SHIORI 側は `done_rx.recv_timeout` で **有界に** ack を
 //! 待ち、ack 受信＝全資源解放済みを確認してからスレッドを **detach** する
 //! （[`thread::ActorThread::detach`]）。
 //!
 //! # `JoinHandle`／二重 join を採らない理由（設計補足・R7.4）
 //! 完了確認は done ack で行うため、`JoinHandle::join`・`Arc<AtomicBool>` shutdown フラグ・
 //! `take()` 二重 join 回避の小細工は **不要**（join 自体を廃止）。これにより AC4 の
-//! 「二重 join 回避」は構造的に成立する。スレッドは detach し、block_on 完了後に自然
+//! 「二重 join 回避」は構造的に成立する。スレッドは detach し、ack の後に自然
 //! 終了する。
 //!
 //! # 冪等性（R7.4）
@@ -34,7 +33,7 @@
 //! [`TeardownReport::anomaly`] に載せる。**panic も `unwrap`/`expect` も使わず**、
 //! 異常を呼び出し側へ値で返してホスト（SSP）プロセスを巻き込まない。
 //!
-//! 本モジュールはアクタースレッド（[`thread`]・wintf `block_on` 依存）と実 OS リソース
+//! 本モジュールはアクタースレッド（[`thread`]）と実 OS リソース
 //! 計測（`windows-sys/Win32_System_Threading`）を用いる。FFI 入口（`windows.rs` の
 //! `load`/`unload`）への配線は task 5.1 で完了し、本番（既定）出荷ビルドに含まれる。
 
@@ -84,7 +83,7 @@ impl TeardownReport {
 ///
 /// `tx`（mailbox 送信端）から `ActorMsg::Stop { done }` を送り、`timeout` 付きで done ack
 /// を待つ。ack 受信＝アクターが残メッセージ drain・VM 破棄・debug teardown を終えた合図
-/// （メッセージ専用ウィンドウはこの後のスレッド終了時に破棄される）なので、その後 `actor` を **detach** する（join しない）。
+/// なので、その後 `actor` を **detach** する（join しない）。
 ///
 /// - ack 受信: `acked=true`・clean（[`TeardownReport::is_clean`]）。
 /// - Stop 送信が `Disconnected`（アクター既終了）: `already_done=true`（冪等 no-op）。
@@ -97,14 +96,14 @@ pub fn teardown_actor(
 ) -> TeardownReport {
     let report = teardown_via_sender(tx, timeout);
     // done ack を受けたか否かに関わらずスレッドは detach する（join しない=R7.4）。
-    // ack 済みなら block_on は戻り済み。timeout 異常時も join でハングさせない。
+    // ack 済みならループは抜け済み。timeout 異常時も join でハングさせない。
     actor.detach();
     report
 }
 
 /// mailbox 送信端のみで teardown（Stop{done}→ack 待ち）を試行する冪等経路。
 ///
-/// 本番 FFI 経路では `ActorThread` ハンドルを持たずに `static MAILBOX`（task 5.1）の
+/// 本番 FFI 経路では `ActorThread` ハンドルを持たずに `static LEGACY`（task 5.1）の
 /// `Sender` 越しに teardown を撃つ場面があり、また二重 teardown（unload と `DllMain
 /// detach` の競合）も起こりうる。本関数はそのどちらでも安全に振る舞う:
 ///
@@ -218,7 +217,7 @@ pub struct LeakMetric {
 /// reload teardown の反復リーク検査ハーネス（design「Reload / Teardown Tests」）。
 ///
 /// spawn→teardown（`Stop{done}` ack）→ 再 spawn のサイクルを反復し、各サイクルで
-/// アクタースレッド・VM・メッセージ専用ウィンドウ・チャネルが漏れなく解放される
+/// アクタースレッド・VM・チャネルが漏れなく解放される
 /// （clean teardown）こと、サイクル間でリソースが累積しない（リーク／枯渇不在）ことを
 /// **done ack 後に** 実測する。
 pub struct ReloadProbe;
@@ -308,7 +307,7 @@ struct ResourceSample {
 ///
 /// Windows では `GetProcessHandleCount`（カーネルハンドル・スレッド／イベント／
 /// チャネル由来ハンドルが漏れれば増える）と `GetGuiResources(GR_USEROBJECTS)`
-/// （USER オブジェクト＝メッセージ専用ウィンドウを含む）を読む。非 Windows では
+/// （USER オブジェクト。アクターはウィンドウを作らないので増えないはず）を読む。非 Windows では
 /// 計測手段がないため `None`。
 #[cfg(windows)]
 fn sample_resources() -> ResourceSample {

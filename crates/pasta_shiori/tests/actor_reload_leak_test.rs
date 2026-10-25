@@ -139,7 +139,7 @@ fn repeated_reload_tears_down_and_does_not_leak() {
         assert!(
             user_slope <= SLOPE_TOLERANCE,
             "USER object growth scales with cycle count: growth({}) = {} but growth({}) = {} \
-             (delta = {} > tolerance {}); a leaked message-only window per cycle would make this \
+             (delta = {} > tolerance {}); a leaked USER object (window) per cycle would make this \
              delta ~2N = ~{}. small(baseline={}, final={}), large(baseline={}, final={})",
             N_SMALL,
             small_leak.user_object_growth,

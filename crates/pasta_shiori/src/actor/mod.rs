@@ -6,11 +6,11 @@
 //!
 //! ## モジュール構成
 //! task 5.1 で FFI 出荷経路（`windows.rs`）が [`lifecycle`] の置き場（芯の型 1 つ）へ
-//! 配線され、本モジュール群はすべて **既定（no-feature）ビルドでコンパイル・リンク**される
-//! （wintf は出荷依存へ昇格）。`unsafe impl Send/Sync` は撤去済み（R8）。
+//! 配線され、本モジュール群はすべて **既定（no-feature）ビルドでコンパイル・リンク**される。
+//! `unsafe impl Send/Sync` は撤去済み（R8）。
 //! - [`mailbox`]: 単一直列 mailbox（flume unbounded・`ActorMsg{Get/Notify/Stop}`・
 //!   単一 consumer・FIFO 順序保証・task 3.2）。
-//! - [`thread`]: アクタースレッド起動・`!Send` VM pin・`recv_async().await` 単一ループで実
+//! - [`thread`]: アクタースレッド起動・`!Send` VM pin・同期 `recv()` 単一ループで実
 //!   `SHIORI.request` を駆動（task 3.3）。
 //! - [`marshaling`]: GET=block-on-reply／NOTIFY=即 204／drop・timeout・異常→204（task 3.4）。
 //! - [`teardown`]: `Stop{done}` ack→drain→cleanup→detach、reload リーク検査（task 4.1）。
@@ -18,19 +18,19 @@
 
 pub mod mailbox;
 
-/// 本番アクタースレッド（task 3.3）。`!Send` VM を pin し mailbox を `recv_async`
-/// 駆動する。task 5.1 で FFI 入口が本スレッドへ切り替わり、wintf（`block_on`）が出荷
-/// 依存へ昇格したため、既定（no-feature）ビルドでコンパイルされる。
+/// 本番アクタースレッド（task 3.3）。`!Send` VM を pin し mailbox を同期 `recv()`
+/// のループで駆動する（OS のウィンドウやメッセージの仕組みを使わない）。task 5.1 で FFI 入口が
+/// 本スレッドへ切り替わり、既定（no-feature）ビルドでコンパイルされる。
 pub mod thread;
 
 /// 本番 marshaling 層（task 3.4）。GET=block-on-reply（`recv_timeout`）／NOTIFY=即 204／
 /// drop・timeout・異常→204 の同期契約を、SHIORI スレッドとアクタースレッド（task 3.3）の
-/// 間で本番化する。task 5.1 で FFI 入口（`static MAILBOX`）へ配線され、既定ビルドで
+/// 間で本番化する。task 5.1 で FFI 入口（`static LEGACY`）へ配線され、既定ビルドで
 /// コンパイルされる。
 pub mod marshaling;
 
 /// 本番 teardown（task 4.1）。`ActorMsg::Stop { done }` 制御メッセージで drain→VM 破棄・
-/// debug teardown→done ack を成立させ（executor のウィンドウはその後のスレッド終了時に破棄）、SHIORI 側は ack を有界に待って
+/// debug teardown→done ack を成立させ、SHIORI 側は ack を有界に待って
 /// スレッドを detach する（join 廃止・冪等・異常記録）。reload 反復のリーク検査
 /// （`GetProcessHandleCount`/`GetGuiResources`）も提供する。task 5.1 で FFI 入口
 /// （`windows.rs` の load/unload）へ配線され、既定ビルドでコンパイルされる。

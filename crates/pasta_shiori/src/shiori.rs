@@ -58,7 +58,7 @@ impl PastaShiori {
 
 // 旧来の `unsafe impl Send for PastaShiori` / `unsafe impl Sync` は task 5.1（R8.1/R8.3）で
 // **撤去**した。VM（`!Send` な mlua ランタイム）は本番アクタースレッド（`actor::thread`）へ
-// pin され、`static MAILBOX`（`actor::lifecycle`）越しのメッセージ送信でのみアクセスされる。
+// pin され、`static LEGACY`（`actor::lifecycle`）越しのメッセージ送信でのみアクセスされる。
 // `PastaShiori` がスレッドを越境しない構造的不変条件によりスレッド安全性を担保するため、
 // `unsafe` の健全性仮定（「ホストのメインスレッドからのみ呼ばれる」運用前提）は不要になった。
 // `PastaShiori` は `!Send`（mlua 由来）のままでよい——アクタースレッド上でのみ構築・所有される。

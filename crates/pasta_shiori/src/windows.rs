@@ -5,12 +5,12 @@
 //! # 所有モデル（task 5.1・R8.1/R8.2/R8.3/R8.4）
 //! FFI 入口は旧来の同期 in-place VM モデル（`OnceLock<RawShiori<PastaShiori>>` ＋
 //! `Arc<Mutex<Option<PastaShiori>>>` ＋ `unsafe impl Send/Sync`）から、**アクタースレッドへ
-//! VM を pin し `static MAILBOX`（flume `Sender`）越しにメッセージ送信でのみアクセスする**
+//! VM を pin し `static LEGACY`（芯の型 `ActorInstance` が持つ flume `Sender`）越しにメッセージ送信でのみアクセスする**
 //! 本番アクターモデル（[`crate::actor::lifecycle`]）へ再配線済み。VM（`!Send`）はアクター
 //! スレッドを越えないため `unsafe impl Send/Sync` は構造的に不要（撤去済み）。
 //!
 //! - `loadu` / `load` → [`lifecycle::spawn_actor`]（mailbox 生成 → アクタースレッド spawn →
-//!   `Sender` を MAILBOX へ格納）。スレッド spawn は **load 起点**で行い loader lock を
+//!   `ActorInstance` を LEGACY へ格納）。スレッド spawn は **load 起点**で行い loader lock を
 //!   回避する（R4.4）。
 //! - `request`→ [`lifecycle::marshal_request`]（GET=block-on-reply／NOTIFY=即 204）。
 //! - `unload` / `DllMain detach` → [`lifecycle::teardown_actor`]（`Stop{done}` ack → detach）。
@@ -162,7 +162,7 @@ fn load_entry(entry: &str, hdir: HGLOBAL, len: usize, encoding: DirEncoding) -> 
     }
 }
 
-/// load 本体: dir をデコードしてアクタースレッドを spawn（MAILBOX 設定）する。
+/// load 本体: dir をデコードしてアクタースレッドを spawn（LEGACY 設定）する。
 fn load_impl(entry: &str, hdir: &ShioriString, encoding: DirEncoding) -> bool {
     let dir = match decode_dir(hdir, encoding) {
         Ok(d) => d,

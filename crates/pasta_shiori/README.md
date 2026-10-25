@@ -89,7 +89,6 @@ println!("Response: {}", response);
 | pest        | 2.8        | SHIORI リクエストパース                           |
 | pest_derive | 2.8        | pest パーサー導出マクロ                           |
 | flume       | 0.12       | アクタースレッドの mailbox（チャネル）            |
-| wintf-winmsg-executor | 0.0.5 | アクタースレッドのメッセージループ           |
 | arc-swap    | 1.9        | mailbox の送信端の差し替え                        |
 
 ### Windows 専用

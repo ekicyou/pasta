@@ -1,15 +1,15 @@
 //! FFI extern 入口（`load`/`loadu`/`request`/`unload`/`DllMain`）の in-process テスト。
 //!
-//! task 5.1 で FFI が **アクターモデル**（`actor::lifecycle` の `static MAILBOX` 所有）へ
+//! task 5.1 で FFI が **アクターモデル**（`actor::lifecycle` の `static LEGACY` 所有）へ
 //! 再配線されたため、旧 `RawShiori<MockShiori>` ベースの dispatch テストは廃止し、本番経路の
 //! **FFI 境界契約**（HGLOBAL 所有移譲＝解放／null・zero-len ガード／未初期化時 204／panic 非
 //! unwind）を実 extern 関数に対して検証する。
 //!
 //! # プロセス全域状態の取り扱い
-//! `actor::lifecycle::MAILBOX` と `loadu` 初期化フラグはどちらもプロセスグローバルである。
+//! `actor::lifecycle::LEGACY` と `loadu` 初期化フラグはどちらもプロセスグローバルである。
 //! これらに触れるテストは `lock_global_state()` で直列化し、末尾で `unload()` して未初期化へ
 //! 戻すことで順序非依存を保つ。`loadu` のフラグ契約を検証するテストは、実在しない
-//! ディレクトリを渡して `spawn_actor` へ到達させる（VM は起こさず MAILBOX のみ設定される）。
+//! ディレクトリを渡して `spawn_actor` へ到達させる（VM は起こさず LEGACY のみ設定される）。
 //! 実 VM を起こす load→request→unload→reload サイクルの E2E はアクタースレッド・実ゴーストを
 //! 要するため統合テスト（`tests/`・既定ビルド）側に置く。
 
@@ -23,8 +23,8 @@ const GMEM_INVALID_HANDLE: u32 = 0x8000;
 
 const LEAK_PROBE_LEN: usize = 64;
 
-/// `windows.rs` のプロセス全域状態（`lifecycle::MAILBOX` と `loadu` 初期化フラグ）を
-/// 触るテストを直列化する。並列実行下でも互いの前提（MAILBOX 未初期化／フラグの状態）を
+/// `windows.rs` のプロセス全域状態（`lifecycle::LEGACY` と `loadu` 初期化フラグ）を
+/// 触るテストを直列化する。並列実行下でも互いの前提（LEGACY 未初期化／フラグの状態）を
 /// 壊さない。
 static FFI_GLOBAL_STATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
@@ -81,17 +81,17 @@ fn extern_load_zero_len_returns_false_and_frees_input() {
     );
 }
 
-// NOTE: 実 `load`→spawn_actor（アクタースレッド起動・`static MAILBOX` 設定）を踏む E2E は
-// プロセスグローバル MAILBOX を変化させ、並列実行中の他ユニットテスト（None 経路）と競合する。
+// NOTE: 実 `load`→spawn_actor（アクタースレッド起動・`static LEGACY` 設定）を踏む E2E は
+// プロセスグローバル LEGACY を変化させ、並列実行中の他ユニットテスト（None 経路）と競合する。
 // そのため load→request→unload→reload サイクルは統合テスト（`tests/`）へ置き、本ユニット
-// 群は MAILBOX を spawn しない（順序非依存）ガード／未初期化契約のみを検証する。
+// 群は LEGACY を spawn しない（順序非依存）ガード／未初期化契約のみを検証する。
 
 // ------------------------------------------------------------------
 // loadu（UTF-8 設置パス）と「loadu 済みなら load を無視」契約（要件 2.4/2.5/2.6）。
 // ------------------------------------------------------------------
 
 /// `loadu` → `load` 無視 → `unload` でフラグ解除、までを 1 つのテストへ直列に詰める
-/// （プロセス全域フラグと MAILBOX を共有するため）。
+/// （プロセス全域フラグと LEGACY を共有するため）。
 ///
 /// 設置ディレクトリには**実在しないパス**を使う。`spawn_actor` へは到達するが VM は
 /// 起きないため軽量で、かつ「ロード失敗時もフラグを立てる」契約（設計
@@ -135,7 +135,7 @@ fn loadu_initialized_flag_makes_load_a_noop_until_unload() {
         "after unload the legacy load must decode ANSI and attempt a real load"
     );
 
-    // 後始末: MAILBOX を未初期化へ戻す（他テストの前提）。
+    // 後始末: LEGACY を未初期化へ戻す（他テストの前提）。
     assert!(unload());
 }
 
@@ -154,7 +154,7 @@ fn extern_request_null_returns_null_and_zero_len() {
 #[test]
 fn extern_request_without_actor_returns_204_and_frees_input() {
     let _guard = lock_global_state();
-    // MAILBOX 未初期化（アクター未 spawn）。本番アクター経路は SHIORI スレッドを無限
+    // LEGACY 未初期化（アクター未 spawn）。本番アクター経路は SHIORI スレッドを無限
     // 待機させない契約のため、旧 500 ではなく安全網 204 を返す（R5.6）。入力は解放される。
     let h = alloc_leak_probe();
     let mut len = LEAK_PROBE_LEN;

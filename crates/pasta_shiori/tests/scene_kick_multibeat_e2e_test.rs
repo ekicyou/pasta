@@ -10,9 +10,9 @@
 //!  - **残りビートは既存 `check_talk` 継続（`STORE.co_scene`）で 1 tick 1 ビートずつ順序どおり**
 //!    （R4.1）。`is_blocked` に従うビート間ペース（継続 tick は idle で進める）。
 //!
-//! # 単一テスト・全フェーズ直列（`static MAILBOX` 共有のため）
-//! `lifecycle::MAILBOX` はプロセスグローバル。6.1（`scene_kick_e2e_test.rs`）と同方針で、本
-//! ファイルは **1 つの `#[test]`** に全フェーズを直列に詰める（別バイナリゆえ MAILBOX は隔離）。
+//! # 単一テスト・全フェーズ直列（`static LEGACY` 共有のため）
+//! `lifecycle::LEGACY` はプロセスグローバル。6.1（`scene_kick_e2e_test.rs`）と同方針で、本
+//! ファイルは **1 つの `#[test]`** に全フェーズを直列に詰める（別バイナリゆえ LEGACY は隔離）。
 //!
 //! # 決定論性の担保（X-Pasta-Time による時刻注入＋固定 talk 間隔）
 //! 継続ビート（2 ビート目以降）は `check_talk` が `current_unix >= next_talk_time` のときのみ
@@ -174,12 +174,12 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
 
 /// task 7.2: マルチ yield シーンのキック→継続配信を 1 本貫通する E2E 結合テスト。
 ///
-/// 単一テスト・全フェーズ直列（`static MAILBOX` 共有のため）。
+/// 単一テスト・全フェーズ直列（`static LEGACY` 共有のため）。
 #[test]
 fn kick_multibeat_scene_delivers_one_beat_per_tick_in_order_end_to_end() {
     let (load_dir, _temp) = build_multibeat_kick_ghost_dir();
 
-    // --- フェーズ 1: load（spawn_actor＝FFI load 相当・kick_sink 束縛＋MAILBOX store） ---
+    // --- フェーズ 1: load（spawn_actor＝FFI load 相当・kick_sink 束縛＋LEGACY store） ---
     let loaded = spawn_actor(0, load_dir.clone());
     assert!(
         loaded,

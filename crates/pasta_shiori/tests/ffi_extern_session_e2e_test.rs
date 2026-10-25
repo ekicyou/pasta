@@ -12,15 +12,15 @@
 //! - `ffi_actor_lifecycle_test`: `actor::lifecycle::{spawn_actor,marshal_request,teardown_actor}`
 //!   （内部自由関数）経由。extern シンボルと HGLOBAL marshalling・dir の ANSI デコードは踏まない。
 //! - `windows_tests`（unit）: extern `load`/`request`/`unload` を踏むが、**実 VM を spawn しない**
-//!   ガード／未初期化（204）契約のみ（プロセスグローバル MAILBOX 競合回避）。
+//!   ガード／未初期化（204）契約のみ（プロセスグローバル LEGACY 競合回避）。
 //!
 //! 結果として「出荷 extern シンボルを通して **実ゴースト VM** を load→request(複数・コルーチン跨ぎ)
 //! →unload する完全セッションのバイト不変」を end-to-end で確認するテストが**存在しなかった**。
 //! 本ファイルはその継ぎ目を、SSP と同一の C ABI（no_mangle シンボル＋HGLOBAL＋CP_ACP dir デコード
 //! ＋UTF-8 request デコード）で閉じる。
 //!
-//! # `static MAILBOX` 共有のため単一 `#[test]`・他テストと同居させない
-//! extern 入口は `actor::lifecycle::MAILBOX`（プロセスグローバル）を変化させる。本ファイルは
+//! # `static LEGACY` 共有のため単一 `#[test]`・他テストと同居させない
+//! extern 入口は `actor::lifecycle::LEGACY`（プロセスグローバル）を変化させる。本ファイルは
 //! 全フェーズを 1 つの `#[test]` に直列化し、同一バイナリ内に他テストを置かない（順序非依存）。
 //!
 //! # 特性化（characterization）E2E について

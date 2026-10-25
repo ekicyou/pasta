@@ -25,7 +25,7 @@
 //! ゴールデンとも突き合わせ、「両方とも同じように壊れている」状態での一致を排除する。
 //!
 //! # 直列実行（プロセス全域 static を共有するため）
-//! `actor::lifecycle::MAILBOX` はプロセスグローバルである。A と B は 1 本の `#[test]` の中で
+//! `actor::lifecycle::LEGACY` はプロセスグローバルである。A と B は 1 本の `#[test]` の中で
 //! 順に駆動し、各設置先の最後に `teardown_actor` してから次を spawn する
 //! （既存 `load_failure_visibility_test.rs` / `ffi_actor_lifecycle_test.rs` と同方式）。
 //!
@@ -89,7 +89,7 @@ fn normalize_request(text: &str) -> String {
 
 /// `base_dir` へゴーストを設置し、本番経路でリクエスト列を駆動して応答を集める。
 ///
-/// 次の設置先が汚れた `MAILBOX` を引き継がないよう、最後に必ず teardown する。
+/// 次の設置先が汚れた `LEGACY` を引き継がないよう、最後に必ず teardown する。
 fn drive_install(label: &str, base_dir: &Path) -> Vec<String> {
     copy_fixture_into("shiori_lifecycle", base_dir);
 

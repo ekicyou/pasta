@@ -25,7 +25,7 @@
 //!
 //! # 呼び出し経路
 //! - marshaling 自由関数は **呼び出し側が渡した `Sender`** に対して動作する。出荷経路では
-//!   `lifecycle::marshal_request` が `static MAILBOX` から読んだ `Sender` を
+//!   `lifecycle::marshal_request` が `static LEGACY` の芯の型 `ActorInstance` から読んだ `Sender` を
 //!   [`determine_method`]・[`marshal_get`]・[`marshal_notify`] に渡す（`windows.rs` の
 //!   `request` から呼ばれる）。テストは `spawn_actor_thread` が返す mailbox の `Sender` を
 //!   直接渡して契約を隔離検証する。
@@ -184,7 +184,7 @@ pub fn marshal_get_with_timeout(
         "GET enqueued; awaiting reply"
     );
 
-    // wake は flume の native Waker が executor を起こす（手動 wake 不要・task 3.1 実証）。
+    // アクター側は同期 recv() で待っており、送信がそれを起こす（手動 wake 不要）。
     // 同期 recv_timeout ゆえ flume の cancel 欠陥に無関係。
     match reply_rx.recv_timeout(timeout) {
         // 値到達: アクター VM が構築した応答文字列を返す（R5.1・通常経路バイト不変 R5.8）。
