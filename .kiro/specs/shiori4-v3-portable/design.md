@@ -61,7 +61,7 @@
 
 - `ActorInstance` の公開の形（`spawn`・`request`・`get`・`notify`・`kick`・`shutdown`・`JoinPolicy`）が変わるとき → `shiori4-v4-host`（版 4 をこの型の上に足す）が確かめ直す。
 - `shiori_get_api` が版 4 にもテーブルを返すようになるとき（`shiori4-v4-host` が行う）→ CI の 1 往復の段と、版 4 が NULL であることの試験を直す。
-- `GlobalLoggerRegistry` の項目の形（ロガー＋量の設定・占有）や `init_tracing_with_reload`・`update_tracing_filter` の意味が変わるとき → `pasta_check`・`pasta_lua` の試験と、ログの振り分けの章を確かめ直す。
+- `GlobalLoggerRegistry` の項目の形（ロガー＋量の設定・占有）や `init_tracing`・`update_tracing_filter` の形と意味が変わるとき → `pasta_check`・`pasta_lua` の試験と、ログの振り分けの章を確かめ直す。
 - 旧来の FFI の型（`BOOL`・`c_long`）→ `pasta-dll-multiarch`（x64 の配布）と shiori4 の `shiori3-legacy-host` が前提にする。
 - `build.yml` のジョブ名・関門の形 → `release.yml` の gate（`workflow_call`）。
 
@@ -215,7 +215,8 @@ stateDiagram-v2
 ```
 
 - join するのは ack が届いたときだけ。ack の後にアクタースレッドがすることは、受け口を閉じた後の ack の送信と、スレッドの局所の値（ログの振り分けの印）の片付けだけで、待つ所が無い。よって join は上限なしでも止まらない。
-- ack が来なかったときはスレッドを手放し、その旨を警告のログに出す。手放したスレッドの VM が持つディレクトリの占有は、そのスレッドが VM を片付けるまで残る（同じディレクトリをすぐ読み直しても断られる。ファイルの取り合いを避けるため）。
+- ack が来なかったときはスレッドを手放し、その旨を警告のログに出す。手放したスレッドの VM が持つディレクトリの占有は、そのスレッドが VM を片付けるまで残る。版 3 の口から同じディレクトリをすぐ読み直すと断られる（ホストの別のインスタンスとファイルを取り合わないため）。
+- 旧来の口だけは、自分の片付けが打ち切りに終わった直後に同じディレクトリを読み直すとき、占有を引き継ぐ（`ClaimMode::TakeOver`。今の SSP での再読み込みの振る舞いを保つ。7.1・7.2）。占有には世代の札（`ClaimToken`）が付き、手放された古い VM があとで片付けを終えても、札が違うので新しい持ち主の項目は消えない。
 - `DllMain` の FreeLibrary の detach からの片付けは `JoinPolicy::Detach`（loader lock の中では待てない）。プロセスの終了の detach は今どおり何もしない。
 
 ## Requirements Traceability
@@ -396,7 +397,7 @@ fn bad_request(reason: &str) -> String;                // "SHIORI/3.0 400 Bad Re
 - `c_long` は Windows では x86・x64 とも 32 ビット。x86 では `usize` と同じ幅なので、SSP（x86）から見た振る舞いは変わらない（7.3）。
 - 長さが負なら 0 と同じに扱い（`load` は今の「長さ 0」の道で FALSE、`request` は空の要求として今の道）、応答の長さが `c_long` に収まらなければ null と長さ 0 を返す（今の確保の失敗と同じ道）。`request` の `len` が null なら null を返す。
 - `DllMain` の FreeLibrary の detach は `lifecycle::teardown_actor_detached()` を呼ぶ（join しない）。`unload` は `lifecycle::teardown_actor()`（ack の後 join する。7.6）。
-- `DllMain` の戻り値の型の直しは、7.3 に名前の無い口だが、同じ欠陥（`bool` の上位の不定）なのでここで一緒に直す（前提。OPEN QUESTION 6）。
+- `DllMain` の戻り値の型の直しは、7.3 に名前の無い口だが、同じ欠陥（`bool` の上位の不定）なのでここで一緒に直す（2026-10-25 の設計のディスカッションで確定）。
 
 ### 入口の置き場
 
@@ -417,7 +418,9 @@ fn bad_request(reason: &str) -> String;                // "SHIORI/3.0 400 Bad Re
 ##### Service Interface（名前と形は今のまま。`teardown_actor_detached` だけ新規）
 
 ```rust
-pub fn spawn_actor(hinst: isize, load_dir: PathBuf) -> bool;   // 先に teardown_actor() → ActorInstance::spawn → LEGACY へ。戻り値は loaded。SpawnError は false（置き場は空）
+pub fn spawn_actor(hinst: isize, load_dir: PathBuf) -> bool;   // 先に teardown_actor() → ActorInstance::spawn_with → LEGACY へ。戻り値は loaded。SpawnError は false（置き場は空）
+// 片付けの TeardownReport が打ち切り（!acked && !already_done）で、前のインスタンスと同じディレクトリなら
+// ClaimMode::TakeOver、それ以外は ClaimMode::Exclusive（新しいグローバルな状態は持たない。前のディレクトリは片付けの前に手元へ取る）
 pub fn marshal_request(request: &str) -> String;               // LEGACY.load_full() → instance.request(request)。空なら default_204()
 pub fn teardown_actor() -> TeardownReport;                     // JoinPolicy::JoinAfterAck
 pub fn teardown_actor_detached() -> TeardownReport;            // JoinPolicy::Detach（DllMain だけ）
@@ -426,7 +429,7 @@ pub fn kick_sink() -> KickSink;                                // LEGACY の ins
 
 ##### State Management
 - 片付けは `LEGACY.swap(None)` で取り出し、`Arc::try_unwrap` で持ち主になってから `shutdown(policy)` を呼ぶ。
-- `try_unwrap` が失敗するのは、片付けと同時に別のスレッドで要求が走っているときだけ（SHIORI の単一スレッドの規約に反する呼び方）。そのときは `instance.request_stop()`（Stop と ack の待ちだけ）を呼び、最後の `Arc` の Drop でスレッドを手放す（join は保証しない。前提。OPEN QUESTION 10）。
+- `try_unwrap` が失敗するのは、片付けと同時に別のスレッドで要求が走っているときだけ（SHIORI の単一スレッドの規約に反する呼び方）。そのときは `instance.request_stop()`（Stop と ack の待ちだけ）を呼び、最後の `Arc` の Drop でスレッドを手放す（join は保証しない。確定）。
 - 送信の道（`marshal_request`・`kick_sink`）は `load_full()` だけで、ロックを取らない（今の決まりを保つ）。
 
 ### 芯
@@ -441,7 +444,7 @@ pub fn kick_sink() -> KickSink;                                // LEGACY の ins
 **Responsibilities & Constraints**
 - 持つもの: mailbox の送信端（`Sender<ActorMsg>`）・アクタースレッドのハンドル（`Option<ActorThread>`）・ディレクトリ（`PathBuf`）・要求の連番（`AtomicU64`）。グローバルな状態を参照しない（ログの `REGISTRY` を除く）。
 - `Send + Sync`（`Sender` と `JoinHandle` だけを持つ。VM はアクタースレッドから出ない）。
-- 起動の前に `REGISTRY` でディレクトリを占有する（6.2）。占有はアクタースレッドの `PastaShiori` が VM を片付けるときに外れる（`release_runtime` の `unregister`）。`ActorInstance` が自分で外すのは、アクタースレッドを起こせなかったときだけ。
+- 起動の前に `REGISTRY` でディレクトリを占有し、世代の札（`ClaimToken`）を受け取る（6.2）。札はアクタースレッドの `PastaShiori` に渡し、VM を片付けるときに札で外す（`release_runtime` の `release_claim(token)`。札が今の世代でなければ何もしない）。`ActorInstance` が自分で外すのは、アクタースレッドを起こせなかったときだけ。
 - kick の送り先は、自分の送信端の `WeakSender` を閉じ込めたクロージャにし、VM を作る前に `PastaShiori` へ渡す（5.5）。`WeakSender` なので、kick の送り先が受け口を生かし続けない。
 
 **Dependencies**
@@ -460,6 +463,12 @@ pub struct ActorInstance { /* tx, thread: Option<ActorThread>, load_dir, seq: At
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JoinPolicy { JoinAfterAck, Detach }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClaimMode {
+    Exclusive,                 // 占有されていれば DirInUse（版 3 と、旧来の口の普通の読み込み）
+    TakeOver,                  // 占有を新しい世代で奪う（旧来の口が、打ち切りに終わった自分の片付けの直後に同じディレクトリを読むときだけ）
+}
+
 #[derive(Debug)]
 pub enum SpawnError {
     DirInUse,                  // 同じディレクトリを生きているインスタンスが占有している
@@ -468,7 +477,8 @@ pub enum SpawnError {
 }
 
 impl ActorInstance {
-    pub fn spawn(hinst: isize, load_dir: PathBuf) -> Result<Self, SpawnError>;
+    pub fn spawn(hinst: isize, load_dir: PathBuf) -> Result<Self, SpawnError>;   // spawn_with(.., ClaimMode::Exclusive)
+    pub fn spawn_with(hinst: isize, load_dir: PathBuf, mode: ClaimMode) -> Result<Self, SpawnError>;
     pub fn loaded(&self) -> bool;
     pub fn load_dir(&self) -> &Path;
     pub fn request(&self, req: &str) -> String;   // 旧来の意味: determine_method → GET/NOTIFY、読めなければ default_204()
@@ -482,9 +492,9 @@ impl Drop for ActorInstance { /* まだ片付けていなければ shutdown(Join
 ```
 
 - `spawn` の手順:
-  1. `GlobalLoggerRegistry::instance().try_claim(load_dir.clone())` が偽 → `LoadDirGuard(load_dir)` の中で `warn!` を出し（占有している側のログのファイルに入る）、`Err(DirInUse)`（6.2・2.5）。
+  1. `Exclusive` なら `GlobalLoggerRegistry::instance().try_claim(load_dir.clone())`、`TakeOver` なら `take_over(load_dir.clone())` で札を得る。`try_claim` が `None` → `LoadDirGuard(load_dir)` の中で `warn!` を出し（占有している側のログのファイルに入る）、`Err(DirInUse)`（6.2・2.5）。`take_over` は前の世代の項目のロガーを引き継ぎ、「占有を引き継いだ」を `warn!` で出す。
   2. `mailbox()` を作り、`tx.downgrade()` を閉じ込めた `KickSink` を作る。
-  3. `spawn_actor_thread_with(hinst, load_dir, rx, Some(sink))` が `Err` → 理由を出すため、そのディレクトリに既定の `PastaLogger` を登録してから `error!` を出し、`unregister` して `Err(Thread | NotReady)`（2.4・2.5）。`NotReady` のときは終わったスレッドを join してから返す（資源を残さない）。
+  3. `spawn_actor_thread_with(hinst, load_dir, rx, Some(sink), token)` が `Err` → 理由を出すため、そのディレクトリに既定の `PastaLogger` を登録してから `error!` を出し、`release_claim(token)` して `Err(Thread | NotReady)`（2.4・2.5）。`NotReady` のときは終わったスレッドを join してから返す（資源を残さない）。
   4. `Ok(ActorInstance)`。この時点で VM の構築と `SHIORI.load` の呼び出しは終わっている（2.3）。
 - `shutdown` の手順: `teardown_via_sender(&tx, TEARDOWN_TIMEOUT)` → `acked` かつ `JoinAfterAck` なら `ActorThread::join`、それ以外は `detach`。ack が来なかったときは「アクタースレッドを手放した」を警告で出す（4.2）。`TeardownReport` を返す。二度目の呼び出しは `already_done`（冪等）。
 - `TeardownReport` に `pub joined: bool`（join を終えたときだけ真）を足す。構築は `teardown.rs`・`lifecycle.rs` の中だけなので、既存の試験に当たらない。4.4・7.6 を試験で確かめる観測点。
@@ -495,12 +505,12 @@ impl Drop for ActorInstance { /* まだ片付けていなければ shutdown(Join
 
 ##### State Management
 - 状態: Running → StopSent → Acked／TimedOut／AlreadyDone → Joined／Detached（System Flows の図）。
-- 占有の持ち主は VM（`PastaShiori`）。ack が来ずに手放したときは、占有もそのスレッドとともに残る。
+- 占有の持ち主は VM（`PastaShiori`）で、札を持つ。ack が来ずに手放したときは、占有もそのスレッドとともに残る（旧来の口の `TakeOver` で新しい世代に移ったときは、古い札で外しても何も起きない）。
 
 **Implementation Notes**
 - Integration: `TEARDOWN_TIMEOUT`（5 秒）は `lifecycle.rs` からこのファイルへ移す（4.2 の上限は今のまま）。
 - Validation: `tests/multi_instance_test.rs`（2 つのインスタンス）・`tests/shiori4_v3_entry_test.rs`（unload の後にスレッドが残らないこと）。
-- Risks: 同じディレクトリの見分けは `Path` の比較（成分ごと）による。末尾の区切りと、Windows の `/` と `\` の違いは同じに扱うが、大文字小文字の違い・シンボリックリンク・8.3 の短い名前は別のディレクトリと見る（`fs::canonicalize` は 8.3 のパスで不具合の前例があるので使わない。OPEN QUESTION 7）。
+- Risks: 同じディレクトリの見分けは `Path` の比較（成分ごと）による。末尾の区切りと、Windows の `/` と `\` の違いは同じに扱うが、大文字小文字の違い・シンボリックリンク・8.3 の短い名前は別のディレクトリと見る（`fs::canonicalize` は 8.3 のパスで不具合の前例があるので使わない。確定）。
 
 ### アクター
 
@@ -519,14 +529,15 @@ pub fn spawn_actor_thread_with(
     load_dir: PathBuf,
     rx: Receiver<ActorMsg>,
     kick_sink: Option<KickSink>,
+    claim: Option<ClaimToken>,   // VM の片付けで外す占有の札（今の形の spawn_actor_thread は None）
 ) -> std::io::Result<ActorThread>;   // thread::Builder::spawn の失敗は Err。ready を受けられなければ Err(io::ErrorKind::Other)
 
 pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg>) -> ActorThread;
-// 今の形のまま残す（既存の試験が使う）。spawn_actor_thread_with(.., None) を呼び、失敗は今どおり panic
+// 今の形のまま残す（既存の試験が使う）。spawn_actor_thread_with(.., None, None) を呼び、失敗は今どおり panic
 ```
 
 - ループは `while let Ok(msg) = rx.recv() { … }`。中の処理（Get・Notify・Kick・Stop の各腕、Stop の後の VM の片付け→受け口を閉じる→ack）は今のまま（8.3）。`block_on` と `async` を外すだけ。
-- `PastaShiori` は `PastaShiori::with_kick_sink(kick_sink)` で作る。
+- `PastaShiori` は `PastaShiori::with_kick_sink(kick_sink)` で作り、札を `set_claim(token)` で渡す。
 - ready の受け取りに失敗したら（スレッドが ready の前に終わった）、`Err` を返す（`ActorInstance` が `NotReady` にする）。
 
 #### Marshaling（`crates/pasta_shiori/src/actor/marshaling.rs`）
@@ -569,7 +580,8 @@ pub fn classify_request(request: &str) -> RequestKind;
 | Requirements | 2.7, 3.9, 5.5 |
 
 - 足すもの: `kick_sink: Option<KickSink>` のフィールドと `pub fn with_kick_sink(sink: Option<KickSink>) -> Self`。`load` は `RuntimeConfig::new().with_kick_sink(self.kick_sink.clone())` を使う（`lifecycle::kick_sink()` を呼ばない）。`Default` の `kick_sink` は `None`（kick の道は働かない。`pasta_lua` の既定と同じ）。
-- `load` で `self.load_dir = Some(..)` をディレクトリの有無の確かめより前に置く。ディレクトリが無いときも、VM の片付け（`release_runtime`）で `unregister` が走り、占有が外れる。
+- 足すもの: `claim: Option<ClaimToken>` と `set_claim`。VM の片付け（`release_runtime`・Drop）は、札があれば `release_claim(token)`、無ければ今どおり `unregister(load_dir)`（札を持たない既存の試験の道）。
+- `load` で `self.load_dir = Some(..)` をディレクトリの有無の確かめより前に置く。ディレクトリが無いときも、VM の片付けで占有が外れる。
 - ローカルの `Shiori` トレイト（`pasta::Shiori`）は残す（試験が使う）。`shiori4_abi::Shiori` とは、`v3.rs` の中で完全な名前で書き分ける。
 
 ### ログ
@@ -589,7 +601,9 @@ impl GlobalLoggerRegistry {
     pub fn register(&self, load_dir: PathBuf, logger: Arc<PastaLogger>);  // 項目のロガーを入れ替える。量の設定は残す（無ければ既定）
     pub fn unregister(&self, load_dir: &Path);                            // 項目ごと消す（ロガー・量の設定・占有）
     pub fn get(&self, load_dir: &Path) -> Option<Arc<PastaLogger>>;       // 今のまま
-    pub fn try_claim(&self, load_dir: PathBuf) -> bool;                   // 新規: 項目が無ければ「ロガー無し・既定の量」の項目を足して true。あれば false
+    pub fn try_claim(&self, load_dir: PathBuf) -> Option<ClaimToken>;     // 新規: 項目が無ければ「ロガー無し・既定の量」の項目を新しい世代で足して札を返す。あれば None
+    pub fn take_over(&self, load_dir: PathBuf) -> ClaimToken;             // 新規: 項目の世代を新しくして札を返す（ロガーと量の設定は引き継ぐ）。旧来の口の再読み込みだけが使う
+    pub fn release_claim(&self, token: &ClaimToken);                      // 新規: 札の世代が項目の今の世代と同じときだけ項目を消す
     pub(crate) fn set_filter(&self, load_dir: &Path, filter: EnvFilter);  // 新規: 項目の量の設定を替える（項目が無ければ作る）
     pub(crate) fn event_enabled<S>(&self, meta: &Metadata<'_>, cx: &Context<'_, S>) -> bool; // 新規: 下の決まりで選んだ項目の EnvFilter で判定
     pub(crate) fn max_level_hint(&self) -> Option<LevelFilter>;           // 新規: 全部の項目の量の最大（項目が無ければ OFF）
@@ -598,7 +612,7 @@ impl GlobalLoggerRegistry {
 
 - 項目の選び方（ロガーと量の設定で同じ決まり）: スレッドの `CURRENT_LOAD_DIR` があればその項目。無ければ、ロガーを持つ項目がちょうど 1 つならそれ。ほかは選ばない。選んだ項目の量の設定で判定し、選べなければ出さない（どちらにしても書き先が無い）。ほかのゴーストの設定へ逃げない（「共有」の逃げ道は置かない。5.4）。
 - 表を変えたら（`register`・`unregister`・`try_claim`・`set_filter`）、ロックを外した後で `tracing_core::callsite::rebuild_interest_cache()` を呼ぶ（ロックを持ったまま呼ぶと、フィルタの `max_level_hint` が同じロックを取って止まる）。
-- 鍵は `PathBuf`（今のまま）。
+- 鍵は `PathBuf`（今のまま）。`ClaimToken` は「鍵＋世代の数」で、世代の数は表の中の数（項目ごとに増やす）。プロセスに 1 つの新しい状態は足さない。
 
 #### TracingInit（`crates/pasta_lua/src/logging/tracing_init.rs`）
 
@@ -608,15 +622,17 @@ impl GlobalLoggerRegistry {
 | Requirements | 5.4, 5.7 |
 
 ```rust
-pub fn init_tracing_with_reload(config: &LoggingConfig);  // 形は今のまま。購読者を 1 度だけ入れる。config は使わない（前提。OPEN QUESTION 3）
-pub fn update_tracing_filter(config: &LoggingConfig);     // 形は今のまま。今のスレッドの CURRENT_LOAD_DIR の項目の量の設定を build_filter(config) にする。文脈が無ければ何もしない
+pub fn init_tracing();                                              // init_tracing_with_reload(config) から改名。購読者を 1 度だけ入れる（量の設定は持たない）
+pub fn update_tracing_filter(load_dir: &Path, config: &LoggingConfig); // ディレクトリを引数で明示。その項目の量の設定を build_filter(config) にする
+// pasta_lua の公開 API の破壊的な変更（2026-10-25 の設計のディスカッションで確定）。
+// crates/pasta_lua/README.md と内部の章に書く。呼び出し元（shiori.rs・loader/mod.rs・pasta_lua の試験 2 本）は形だけ合わせる
 ```
 
 - 購読者: `registry().with(fmt::layer().with_writer(GlobalLoggerRegistry).with_filter(RegistryFilter))`。`RegistryFilter` は `tracing_subscriber::layer::Filter` を実装し、`callsite_enabled` は `Interest::sometimes()`、`enabled` は `GlobalLoggerRegistry::event_enabled`、`max_level_hint` は `GlobalLoggerRegistry::max_level_hint`。
 - `FILTER_HANDLE` と `reload::Layer` を消す（プロセスに 1 つの量の設定が無くなる）。
 - 量の設定の作り方（`build_filter`。`PASTA_LOG` → `config.filter` → `config.level`）は今のまま。
-- `PastaLoader` は Stage 1.5 で、`LoadDirGuard(base_dir)` の中から `update_tracing_filter` を呼んでいる（`loader/mod.rs` 111 行・274 行）。呼び方は変えない。
-- 制約: 1 つの `EnvFilter` を項目ごとに `Filter::enabled` で呼ぶだけなので、スパンの中身で絞る書き方（`[span{field=…}]` のような動的な指定）は効かない。ターゲットと量の指定（`warn,pasta_lua=debug` など）は今どおり効く（前提。OPEN QUESTION 4）。
+- `PastaLoader` は Stage 1.5 で `update_tracing_filter` を呼んでいる（`loader/mod.rs` 274 行）。`update_tracing_filter(base_dir, &logging_config)` に直す。
+- 制約: 1 つの `EnvFilter` を項目ごとに `Filter::enabled` で呼ぶだけなので、スパンの中身で絞る書き方（`[span{field=…}]` のような動的な指定）は効かない。ターゲットと量の指定（`warn,pasta_lua=debug` など）は今どおり効く。効かないことは内部の章に書く（確定）。
 
 ### ビルドと CI
 
@@ -656,7 +672,7 @@ pub fn update_tracing_filter(config: &LoggingConfig);     // 形は今のまま�
   - 移植できる働きのテストが、パスの書き方（`"C:\\…"`・`\` の区切り）・改行（`LineEnding::native()`・CRLF のフィクスチャ）・実行ファイルの名前（`.exe`）に頼って落ちるなら、テストを直す（`tempfile`・`Path::join`・`MAIN_SEPARATOR`・改行をそろえて比べる・`env!("CARGO_BIN_EXE_…")`）。
   - Windows だけの働き（HGLOBAL・ANSI のコードページ・DLL の読み込みの置き換え・Windows の資源の測り・ドライブ文字のパスの解釈そのもの）を試すテストだけを `#[cfg(windows)]`（ファイルなら `#![cfg(windows)]`）で囲い、すぐ上に `// Windows だけ: <理由>` を書く。
   - 32 ビットの target は足さないので、`target_pointer_width` で期待を分けた試験はそのまま全部の Windows の行で走る（x86 の試験は省かない決まり）。
-- 手順: 実装の最初に `build-unix` のジョブを足したブランチで `gh workflow run build.yml --ref <branch>` を回し、Linux・macOS で落ちるテストとビルドの失敗を全部数えて `research.md` に書く（Research Needed 1・2）。数えた一覧を、直すものと囲うものに分けてから直す。
+- 手順: Linux・macOS で落ちるテストとビルドの失敗は、設計の段（タスク分解の前）に `workflow_dispatch` で測り、`research.md` の「8. Linux・macOS の測り」に書いた（Research Needed 1・2。2026-10-25 の設計のディスカッションの決定）。実装はその一覧を、直すものと囲うものに分けてから直す。
 - 分割の目安: 直しが `pasta_shiori` の外の 10 ファイルを大きく超えるなら、brief の分割の案（`pasta-portable-build`）を使う（要件のディスカッションの決定）。
 
 ### 文書
@@ -669,6 +685,7 @@ pub fn update_tracing_filter(config: &LoggingConfig);     // 形は今のまま�
 | Requirements | 9.7, 11.1, 11.2, 11.3, 11.4 |
 
 - `book/src/internals/shiori.md`: 「スレッドとデータの経路」「load とアクターの起動」「アクタースレッドのメッセージループ」「unload・DllMain と teardown」「DLL のビルド構成」「不変条件と制約」の各節を、2 つの入口と `ActorInstance`・同期 `recv()` のループ・後始末の決まり（ack の後 join・`DllMain` は join しない）に書き換える。プロセスに 1 つ残す状態（`LEGACY`・`LOADU_INITIALIZED`・tracing の購読者・`REGISTRY`・`UNIQUE_COUNTER`）とそれぞれの理由、ログの量の判定の決まりとスパンの指定が効かないこと、版 3 がパニックを `SHIORI_E_PANIC` で返せるのは unwind のビルドだけでリリースではプロセスが終わること（9.7）を書く（11.1）。
+- `crates/pasta_lua/README.md`: ログの公開関数の破壊的な変更（`init_tracing_with_reload(config)` → `init_tracing()`、`update_tracing_filter(config)` → `update_tracing_filter(load_dir, config)`）と、量の設定がディレクトリごとになったことを書く。
 - `crates/pasta_shiori/README.md`: 依存の表から `wintf-winmsg-executor` の行を消し、`shiori4_abi` を足す。Linux・macOS でのビルドの仕方（`cargo build --release -p pasta_shiori` で `libpasta.so`・`libpasta.dylib`）を書く（11.2）。
 - `.kiro/steering/tech.md`: `pasta_shiori` の依存（wintf を消し `shiori4_abi` を足す・`arc-swap` の役目を旧来の入口の置き場に）・エンジン駆動モデル（インスタンスごと・同期 `recv()`）・CI（Linux・macOS のジョブと 1 往復の段）を直す（11.3）。`structure.md` の `pasta_shiori` の 1 行（`static MAILBOX 所有`）も直す。
 - 利用者向けの章（`book/src/` の internals 以外）には書き足さない（11.4）。
@@ -681,7 +698,7 @@ pub fn update_tracing_filter(config: &LoggingConfig);     // 形は今のまま�
 - **ディレクトリの項目**（`REGISTRY` の 1 項目）: 鍵はゴーストのディレクトリ。ロガー（無いこともある）と量の設定を持つ。項目が在ること＝占有されていること。
 - 決まり:
   - 生きているインスタンスどうしは、同じ鍵の項目を持たない。
-  - 項目を消すのは、その項目を占有したインスタンスの VM の片付け（または起動の失敗）だけ。
+  - 項目を消すのは、その項目の今の世代の札を持つ VM の片付け（または起動の失敗）だけ。古い世代の札では消えない。
   - ログのイベントは、選んだ 1 つの項目の量の設定で判定し、その項目のロガーにだけ書く。
 
 ## Error Handling
@@ -699,7 +716,8 @@ pub fn update_tracing_filter(config: &LoggingConfig);     // 形は今のまま�
 | GET が 5 秒を超える／アクターがいない | 204 の全文（今の `marshal_get`） | 今どおり |
 | `unload`: ack が 5 秒で来ない | スレッドを手放して返る | `warn`（手放したこと。4.2） |
 | パニック（unwind のビルドだけ） | 版 3 は `shiori4_abi` が `SHIORI_E_PANIC`。旧来は今どおり `catch_unwind` | 今どおり。リリース（`panic = "abort"`）ではプロセスが終わる（9.7） |
-| 旧来の `load`: 版 3 のインスタンスが同じディレクトリを占有中 | FALSE。アクターは起こさない（以後の GET は 204） | 占有している側のログに `warn`（前提。OPEN QUESTION 2） |
+| 旧来の `load`: 版 3 のインスタンスが同じディレクトリを占有中 | FALSE。アクターは起こさない（以後の GET は 204） | 占有している側のログに `warn`（確定。SSP は版 3 を使わないので実際には起きない） |
+| 旧来の `load`: 自分の前の片付けが打ち切りに終わり、同じディレクトリを読み直す | 占有を新しい世代で引き継いで読み込む（今の SSP の再読み込みと同じ） | `warn`（引き継いだこと） |
 
 ### Monitoring
 
@@ -711,7 +729,7 @@ pub fn update_tracing_filter(config: &LoggingConfig);     // 形は今のまま�
 
 - `v3::status_of`: `"SHIORI/3.0 200 OK\r\n…"`→200、`"SHIORI/3.0 204 No Content"`→204、`"SHIORI/3.0 500 …"`→500、`"garbage"`・`"SHIORI/3.0 2x0"`・`"SHIORI/2.6 200 OK"`・空文字→500（3.1・3.7）。
 - `marshaling::classify_request`: GET 3.0→`Get`、NOTIFY 3.0→`Notify`、`GET Sentence SHIORI/2.6`→`Shiori2`、`NOTIFY OwnerGhostName SHIORI/2.0`→`Shiori2`、`PUT SHIORI/3.0`・空・壊れたヘッダ→`Unreadable`（3.4〜3.6）。
-- `GlobalLoggerRegistry::try_claim`: 空なら true・2 回目は false・`unregister` の後は true。末尾の区切りの違う同じパスは同じ鍵（6.2）。
+- `GlobalLoggerRegistry::try_claim`: 空なら札・2 回目は `None`・`release_claim` の後は札。末尾の区切りの違う同じパスは同じ鍵（6.2）。`take_over` の後に古い札で `release_claim` しても項目は残り、新しい札でなら消えること。
 - `GlobalLoggerRegistry` の選び方: 文脈ありはその項目、文脈なしでロガー 1 つならそれ、2 つなら選ばない（5.3・5.4）。
 - `teardown::sample_resources`（Windows）: USER オブジェクトが 0 のプロセスで `Some(0)` を返す（8.4）。
 
@@ -730,6 +748,7 @@ pub fn update_tracing_filter(config: &LoggingConfig);     // 形は今のまま�
 1. `ActorInstance::spawn` → `shutdown(JoinAfterAck)` の `TeardownReport` が `acked && joined`。`shutdown(Detach)` は `acked && !joined`（4.4・7.6）。
 2. 応答の遅いアクター（`v3_probe` の「1 秒ほど回り続ける」ID を NOTIFY で積み、上限を 100 ミリ秒に注入）で、上限を過ぎると `!acked && !joined` で返り、手放しの警告が出ること（4.2）。
 3. 旧来の窓口の `teardown_actor()` が `joined`、`teardown_actor_detached()` が `!joined`（7.6）。
+4. 旧来の窓口で、回り続けるアクターの片付けが打ち切りに終わった直後に同じディレクトリを `spawn_actor` すると、読み込みが成功し（`loaded`）、手放された古いスレッドがあとで片付けを終えても、新しいインスタンスのログと占有が残ること（7.1・7.2）。
 
 `tests/multi_instance_test.rs`（2 つのゴーストを別の一時ディレクトリに置く）:
 1. 2 つの版 3 のインスタンスを別々のスレッドで読み、変数・チェイントークの続きが混ざらないこと（5.2・6.1・6.3）。
@@ -766,7 +785,7 @@ pub fn update_tracing_filter(config: &LoggingConfig);     // 形は今のまま�
 
 ```mermaid
 flowchart LR
-    S1[CI unix job added and failures counted] --> S2[ActorInstance extracted behind lifecycle]
+    S1[unix failures measured in design phase] --> S2[ActorInstance extracted behind lifecycle]
     S2 --> S3[executor switched to recv loop and wintf removed]
     S3 --> S4[per dir filter and claim in REGISTRY]
     S4 --> S5[v3 entry and shiori_get_api]
@@ -779,15 +798,17 @@ flowchart LR
 - S3・S4・S5・S6 はそれぞれ単独で戻せる。S5 は S2・S4 に、S6 は S2 に頼る。
 - `Cargo.lock` の席を持つので、`pest-2-9-4-upgrade`・`ponytail-editor-tooling`・`ponytail-core-registry` と同じウェーブに置かない。`ponytail-shiori` はこの spec の後。
 
-## OPEN QUESTIONS（設計のディスカッションで決める）
+## 設計のディスカッションで決めたこと（2026-10-25）
 
-1. **旧来の入口の置き場の場所**: 案 C（`actor::lifecycle` に置き場と窓口を残し、全部の OS でコンパイル。既存の 12 ファイルの試験はそのまま）で書いた。brief の言い方（置き場を `windows.rs` に閉じ込める）に寄せる案 B は、試験を `ActorInstance` へ書き換える分だけ大きい。
-2. **旧来の `load` が、版 3 のインスタンスの占有しているディレクトリを渡されたとき**: 要件に無い。芯の占有の決まりを両方の口に効かせ、FALSE（アクターを起こさない）＋占有している側のログ、で書いた。SSP は版 3 を使わないので、実際には起きない。
-3. **`pasta_lua` のログの関数の形**: 公開 API を壊さないため、`init_tracing_with_reload(config)`・`update_tracing_filter(config)` の形を残し、`update_tracing_filter` は今のスレッドの文脈のディレクトリに効かせ、`init_tracing_with_reload` の `config` は使わない、で書いた。形を変えて（ディレクトリを引数に取る）分かりやすくする案もある（`pasta_lua` の利用者に破壊的な変更）。
-4. **スパンの中身で絞るログの指定**: 項目ごとの `EnvFilter` を `Filter::enabled` で呼ぶ作りでは、動的な指定（`[span{field=…}]`）が効かなくなる。pasta の文書と見本は使っていないので「効かない」と内部の章に書く、で書いた。
-5. **Linux・macOS の 1 往復に使うライブラリ**: リリースのプロファイル（`panic = "abort"`・LTO。出荷に近い）で書いた。CI の時間が延びる（LuaJIT を 2 つのプロファイルでビルドする）。デバッグのビルドを使えば速い。
-6. **`DllMain` の戻り値**: 7.3 は `load`・`loadu`・`unload` を挙げる。`DllMain` も同じ `-> bool` の欠陥なので、i32 に一緒に直す、で書いた。
-7. **同じディレクトリの見分けの粒度**: `Path` の成分の比較（末尾の区切り・Windows の `/` と `\` は同じに扱う）で書いた。大文字小文字・シンボリックリンク・8.3 の短い名前は別のディレクトリと見る（`canonicalize` は使わない）。
-8. **Linux・macOS で落ちるテストの数**（実装の時の調べ）: 実際に回すまで分からない。実装の最初の段で `workflow_dispatch` を回して数え、直しが膨らんだら `pasta-portable-build` に分ける。
-9. **macOS の vendored LuaJIT のビルドの条件**（実装の時の調べ）: `macos-latest`（arm64）での `MACOSX_DEPLOYMENT_TARGET` などの要否は、8 と同じ CI の回しで確かめる。要るなら `build-unix` の macOS の行に環境変数を足す。
-10. **規約に反する同時の呼び方での unload**: 旧来の入口で、片付けと同時に別のスレッドで要求が走っているときは、join を保証せず手放す、で書いた（SHIORI の単一スレッドの規約に反する呼び方のときだけ）。
+開発者が全議題を推奨案で承認した。
+
+1. **手放した後の同じディレクトリの読み直し**（検証の重大 1）: 占有に世代の札（`ClaimToken`）を付ける。旧来の口は、自分の片付けが打ち切りに終わった直後の同じディレクトリなら `ClaimMode::TakeOver` で占有を引き継ぐ（今の SSP の再読み込みを保つ。7.1・7.2）。古い VM の片付けは札が違えば何もしない。版 3 は断るまま。
+2. **Linux・macOS で落ちるテストの測り**（検証の重大 2）: タスク分解の前に、このブランチで `workflow_dispatch` を回して測る。結果は `research.md` の 8 節。分割（`pasta-portable-build`）するかはその結果で決める。
+3. **`pasta_lua` のログの関数**（検証の重大 3）: 形を正直に変える。`init_tracing()`・`update_tracing_filter(load_dir, config)`。破壊的な変更として `crates/pasta_lua/README.md` と内部の章に書く。
+4. **旧来の置き場**: 案 C（`actor::lifecycle` に置き場と窓口。全部の OS でコンパイル）。
+5. **版 3 が占有中のディレクトリを旧来の `load` に渡されたとき**: FALSE・アクターを起こさない・占有している側のログ。
+6. **スパンの中身で絞るログの指定**: 効かないと内部の章に書く。
+7. **Linux・macOS の 1 往復のライブラリ**: リリースのビルド。
+8. **`DllMain` の戻り値**: i32 に一緒に直す。
+9. **同じディレクトリの見分け**: `Path` の成分の比較。`canonicalize` は使わない。
+10. **規約に反する同時の呼び方での unload**: join を保証せず手放す。
