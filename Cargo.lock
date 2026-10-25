@@ -1331,9 +1331,9 @@ dependencies = [
 
 [[package]]
 name = "shiori4_abi"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16ec44e6ceb814546d7a7fb317b67b3dcc54832122ecb8f798dd7d8cfe750b61"
+checksum = "48c389c5bcd6cc54f621fae39ba50f576915c5fdd96053417eb2e7b270de0ae0"
 
 [[package]]
 name = "shlex"

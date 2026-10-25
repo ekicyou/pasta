@@ -53,7 +53,7 @@
 
 - `shiori4_abi = "0.1"`（通常の依存。依存 0・MIT）。試験でも `shiori4_abi` の `ShioriApi::load_v3`・`ShioriInstance` を使い、`shiori4_host` は依存に入れない。
 - 既存: `flume 0.12`（`Sender::downgrade` を使う）・`arc-swap 1.9`・`tracing`・`tracing-subscriber 0.3`（`env-filter`）・`windows-sys`（`cfg(windows)`）。
-- CI の外部ツール: `shiori4-testhost`（`cargo install shiori4_host --version 0.1.0 --example shiori4-testhost`）。
+- CI の外部ツール: `shiori4-testhost`（`cargo install shiori4_host --version 0.1.1 --example shiori4-testhost`）。
 - 依存の向き: `windows.rs`・`v3.rs`（入口）→ `actor::lifecycle`（旧来の置き場）→ `actor::instance` → `actor::{thread, marshaling, mailbox, teardown}` → `shiori.rs`（`PastaShiori`）→ `pasta_lua`。逆向きの参照は誤りとして扱う。`actor::instance` は `lifecycle`・入口を参照しない。`pasta_lua` は `pasta_shiori` を参照しない。
 - 外すもの: `wintf-winmsg-executor`（ルートと `pasta_shiori` の `Cargo.toml` から）。
 
@@ -651,10 +651,10 @@ pub fn update_tracing_filter(load_dir: &Path, config: &LoggingConfig); // ディ
   2. `cargo build --release -p pasta_shiori`（`libpasta.so`・`libpasta.dylib`。9.1・9.2）
   3. `cargo test --workspace`（9.4・10.1・10.2）
   4. Linux だけ: `cargo clippy --all-targets --workspace -- -D warnings`（9.5・10.1）
-  5. `cargo install shiori4_host --version 0.1.0 --example shiori4-testhost`（キャッシュに在れば飛ばされる）
+  5. `cargo install shiori4_host --version 0.1.1 --example shiori4-testhost`（キャッシュに在れば飛ばされる）
   6. 1 往復（`shell: bash`）: `shiori4-testhost --entry v3 "$GITHUB_WORKSPACE/target/release/libpasta.$ext" "$GITHUB_WORKSPACE/crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/"`（ID を省くと `OnBoot`）。終了の状態が 0 でなければ失敗（9.6・10.3）。
 - Windows の `build` ジョブに、`if: matrix.arch == 'x64'` の段を足す:
-  1. `cargo install shiori4_host --version 0.1.0 --example shiori4-testhost`
+  1. `cargo install shiori4_host --version 0.1.1 --example shiori4-testhost`
   2. 1 往復（`shell: bash`。パスは shiori4 の `textbook` ジョブと同じく `cygpath -w` で作り、末尾に `\` を付ける。PowerShell で `"…\"` と書くと、末尾の `\"` がネイティブのプログラムの引数で引用符の逃がしに読まれるため）。`--entry v3` の 1 回と、`--entry` を付けない 1 回（全部の口を許すホストでも版 3 に決まること。1.5）。DLL は既にビルドした `target/x86_64-pc-windows-msvc/release/pasta.dll`。
 - x86 の行は 1 往復の対象にしない（x64 のホストは x86 の DLL を読めない。旧来の入口の今のテストで守る。10.3）。
 - 失敗の扱い: どの段にも `continue-on-error` を付けない。`build-unix` の失敗は `build.yml` 全体を失敗にし、`workflow_call` で呼ぶリリースの関門も止まる（10.4）。
