@@ -14,8 +14,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use flume::Sender;
-use pasta_lua::LoadDirGuard;
 use pasta_lua::debug::{KickRequest, KickSink};
+use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLogger};
 
 use crate::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use crate::actor::marshaling::{
@@ -37,9 +37,20 @@ pub enum JoinPolicy {
     Detach,
 }
 
+/// 起動の前のディレクトリの占有のしかた（design.md「ActorInstance」・6.2）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClaimMode {
+    /// 占有されていれば [`SpawnError::DirInUse`]（版 3 と、旧来の口の普通の読み込み）。
+    Exclusive,
+    /// 占有を新しい世代で奪う（旧来の口が、打ち切りに終わった自分の片付けの直後に同じディレクトリを読むときだけ・7.1・7.2）。
+    TakeOver,
+}
+
 /// [`ActorInstance::spawn`] の失敗。
 #[derive(Debug)]
 pub enum SpawnError {
+    /// 同じディレクトリを生きているインスタンスが占有している（6.2）。
+    DirInUse,
     /// OS がスレッドを起こせない。
     Thread(std::io::Error),
     /// アクタースレッドが ready を返す前に終わった（unwind のビルドでのパニック）。
@@ -89,15 +100,56 @@ fn kick_sink_for(tx: &Sender<ActorMsg>) -> KickSink {
 }
 
 impl ActorInstance {
-    /// アクタースレッドを起こし、VM を構築して `SHIORI.load` を呼ぶ。
+    /// アクタースレッドを起こし、VM を構築して `SHIORI.load` を呼ぶ（[`ClaimMode::Exclusive`]）。
     ///
     /// 返った時点で VM の構築と `SHIORI.load` の呼び出しは終わっている（2.3）。辞書・Lua・
     /// `SHIORI.load` の失敗はインスタンスを返す（[`loaded`](Self::loaded) が偽）。
     pub fn spawn(hinst: isize, load_dir: PathBuf) -> Result<Self, SpawnError> {
+        Self::spawn_with(hinst, load_dir, ClaimMode::Exclusive)
+    }
+
+    /// [`spawn`](Self::spawn) の、ディレクトリの占有のしかたを選ぶ形。
+    ///
+    /// 起動の前にディレクトリを占有して札を得る。札はアクタースレッドの VM が持ち、VM の
+    /// 片付けで札で外す。占有に失敗したら占有している側のログに理由を出し、
+    /// [`SpawnError::DirInUse`] を返す（6.2・2.5）。
+    pub fn spawn_with(
+        hinst: isize,
+        load_dir: PathBuf,
+        mode: ClaimMode,
+    ) -> Result<Self, SpawnError> {
+        let registry = GlobalLoggerRegistry::instance();
+        let token = match mode {
+            ClaimMode::Exclusive => match registry.try_claim(load_dir.clone()) {
+                Some(token) => token,
+                None => {
+                    // 文脈を占有している側のディレクトリにして、その側のログのファイルへ出す。
+                    let _log_context = LoadDirGuard::new(load_dir.clone());
+                    tracing::warn!(
+                        seam = "instance.claim",
+                        load_dir = %load_dir.display(),
+                        "load refused: the ghost directory is in use by another live instance"
+                    );
+                    return Err(SpawnError::DirInUse);
+                }
+            },
+            ClaimMode::TakeOver => {
+                let token = registry.take_over(load_dir.clone());
+                let _log_context = LoadDirGuard::new(load_dir.clone());
+                tracing::warn!(
+                    seam = "instance.claim",
+                    load_dir = %load_dir.display(),
+                    "claim taken over from an abandoned actor thread of the same directory"
+                );
+                token
+            }
+        };
+
         let (tx, rx) = mailbox();
         // VM を作る前に kick の送り先を渡す（5.5）。
         let sink = kick_sink_for(&tx);
-        match spawn_actor_thread_with(hinst, load_dir.clone(), rx, Some(sink)) {
+        match spawn_actor_thread_with(hinst, load_dir.clone(), rx, Some(sink), Some(token.clone()))
+        {
             Ok(thread) => Ok(Self {
                 tx,
                 thread: Some(thread),
@@ -105,8 +157,19 @@ impl ActorInstance {
                 seq: AtomicU64::new(0),
             }),
             Err(e) => {
-                let _log_context = LoadDirGuard::new(load_dir);
-                tracing::error!(seam = "instance.spawn", error = %e, "actor thread could not start");
+                // ready の前に終わったスレッドは、その VM の片付けで札を外している。項目が無ければ
+                // 取り直し、理由を出した後に外す（項目を残さない）。
+                // shortcut: 取り直す前に別のインスタンスが同じディレクトリを占有すると、そのロガーを既定のものに替えてしまう。unwind のビルドで同じディレクトリを同時に起こすときだけ起きるので、それが要る用途ができたら直す。
+                let token = registry.try_claim(load_dir.clone()).unwrap_or(token);
+                // 理由を出すため、そのディレクトリに既定のロガーを登録する（2.5）。
+                if let Ok(logger) = PastaLogger::new(&load_dir, None) {
+                    registry.register(load_dir.clone(), Arc::new(logger));
+                }
+                {
+                    let _log_context = LoadDirGuard::new(load_dir);
+                    tracing::error!(seam = "instance.spawn", error = %e, "actor thread could not start");
+                }
+                registry.release_claim(&token);
                 // ready の前に終わったスレッドは spawn_actor_thread_with が join 済み。
                 Err(if e.kind() == std::io::ErrorKind::Other {
                     SpawnError::NotReady

@@ -1,7 +1,9 @@
 use crate::error::*;
 use crate::lua_request;
 use pasta_lua::mlua::{Function, Table};
-use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime, RuntimeConfig};
+use pasta_lua::{
+    ClaimToken, GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime, RuntimeConfig,
+};
 use std::{ffi::*, path::*};
 use tracing::{debug, error, info, trace, warn};
 
@@ -44,6 +46,9 @@ pub struct PastaShiori {
 
     /// VM を作るときに渡す kick の送り先（持ち主が外から渡す。既定は無し＝kick の道は働かない）
     kick_sink: Option<pasta_lua::debug::KickSink>,
+
+    /// ディレクトリの占有の札（持ち主が外から渡す）。在れば VM の片付けで札で外し、無ければディレクトリで外す
+    claim: Option<ClaimToken>,
 }
 
 impl PastaShiori {
@@ -53,6 +58,12 @@ impl PastaShiori {
         let mut shiori = Self::default();
         shiori.kick_sink = kick_sink;
         shiori
+    }
+
+    /// ディレクトリの占有の札を渡す。VM の片付けは、札の世代が今の世代のときだけ登録を外す
+    /// （手放された古い VM が、占有を引き継いだ新しい持ち主の登録を消さない・7.1・7.2）。
+    pub fn set_claim(&mut self, claim: Option<ClaimToken>) {
+        self.claim = claim;
     }
 }
 
@@ -228,7 +239,10 @@ impl PastaShiori {
 
         if let Some(ref load_dir) = self.load_dir {
             info!(load_dir = %load_dir.display(), "Unregistering logger");
-            GlobalLoggerRegistry::instance().unregister(load_dir);
+            match &self.claim {
+                Some(token) => GlobalLoggerRegistry::instance().release_claim(token),
+                None => GlobalLoggerRegistry::instance().unregister(load_dir),
+            }
         }
     }
 

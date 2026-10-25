@@ -19,11 +19,12 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use arc_swap::ArcSwapOption;
 use pasta_lua::debug::{KickRequest, KickSink};
 
-use crate::actor::instance::{ActorInstance, JoinPolicy};
+use crate::actor::instance::{ActorInstance, ClaimMode, JoinPolicy, TEARDOWN_TIMEOUT};
 use crate::actor::marshaling::default_204;
 use crate::actor::teardown::TeardownReport;
 
@@ -35,12 +36,35 @@ static LEGACY: ArcSwapOption<ActorInstance> = ArcSwapOption::const_empty();
 /// 前のインスタンスがあれば先に [`teardown_actor`] で片付ける（reload・7.2）。
 /// 戻り値はアクタースレッド上での `PastaShiori::load` 成否。ロードに失敗してもインスタンスは
 /// 置き場に入り、以後の GET の応答は失敗の種類で異なる（`PastaShiori::request` を参照）。
-/// スレッドを起こせなかったとき（`SpawnError`）は偽を返し、置き場は空のまま。
+/// スレッドを起こせなかったときと、ディレクトリをほかのインスタンスが占有しているとき
+/// （`SpawnError`）は偽を返し、置き場は空のまま。
+///
+/// 前の片付けが打ち切りに終わり（ack が来ずにスレッドを手放した）同じディレクトリを読み直すときは、
+/// 手放したスレッドの VM がまだ持つ占有を引き継ぐ（今の SSP の再読み込みを保つ・7.1・7.2）。
 pub fn spawn_actor(hinst: isize, load_dir: PathBuf) -> bool {
-    teardown_actor();
+    spawn_actor_with_teardown_timeout(hinst, load_dir, TEARDOWN_TIMEOUT)
+}
 
-    let Ok(instance) = ActorInstance::spawn(hinst, load_dir) else {
-        // 理由は ActorInstance::spawn がログに出している。
+/// [`spawn_actor`] の、前のインスタンスの片付けで ack を待つ上限を差し替える形
+/// （試験から短い値を注入する内部の口。本番の上限は [`TEARDOWN_TIMEOUT`] のまま）。
+#[doc(hidden)]
+pub fn spawn_actor_with_teardown_timeout(
+    hinst: isize,
+    load_dir: PathBuf,
+    teardown_timeout: Duration,
+) -> bool {
+    // 前のディレクトリは片付けの前に手元へ取る（新しいグローバルな状態は持たない）。
+    let prev_dir = LEGACY.load().as_ref().map(|i| i.load_dir().to_path_buf());
+    let report = teardown_slot(&LEGACY, JoinPolicy::Detach, teardown_timeout);
+    let timed_out = !report.acked && !report.already_done;
+    let mode = if timed_out && prev_dir.as_deref() == Some(load_dir.as_path()) {
+        ClaimMode::TakeOver
+    } else {
+        ClaimMode::Exclusive
+    };
+
+    let Ok(instance) = ActorInstance::spawn_with(hinst, load_dir, mode) else {
+        // 理由は ActorInstance::spawn_with がログに出している。
         return false;
     };
     let loaded = instance.loaded();
@@ -71,10 +95,14 @@ fn request_into(slot: &ArcSwapOption<ActorInstance>, request: &str) -> String {
 /// 戻り値は後始末の結果（clean／冪等 no-op／異常を値で返す。ホストを巻き込まない）。
 /// この段では今どおり join しない（ack の後に join への切り替えは 5.1）。
 pub fn teardown_actor() -> TeardownReport {
-    teardown_slot(&LEGACY, JoinPolicy::Detach)
+    teardown_slot(&LEGACY, JoinPolicy::Detach, TEARDOWN_TIMEOUT)
 }
 
-fn teardown_slot(slot: &ArcSwapOption<ActorInstance>, policy: JoinPolicy) -> TeardownReport {
+fn teardown_slot(
+    slot: &ArcSwapOption<ActorInstance>,
+    policy: JoinPolicy,
+    timeout: Duration,
+) -> TeardownReport {
     // 取り出し＝以後の送信を遮断（次の spawn まで置き場は空）。
     let Some(instance) = slot.swap(None) else {
         // 置き場が空（load 前 / 片付け済み）: 冪等 no-op。
@@ -86,7 +114,7 @@ fn teardown_slot(slot: &ArcSwapOption<ActorInstance>, policy: JoinPolicy) -> Tea
         };
     };
     match Arc::try_unwrap(instance) {
-        Ok(instance) => instance.shutdown(policy),
+        Ok(instance) => instance.shutdown_with_timeout(policy, timeout),
         // 片付けと同時に別のスレッドで要求が走っている（単一スレッドの規約に反する呼び方）。
         // 停止の要求だけをして、最後の参照の Drop でスレッドを手放す（join は保証しない）。
         Err(shared) => shared.request_stop(),
@@ -161,7 +189,7 @@ mod tests {
     fn teardown_without_actor_is_idempotent_noop() {
         let slot: ArcSwapOption<ActorInstance> = ArcSwapOption::const_empty();
         for _ in 0..2 {
-            let report = teardown_slot(&slot, JoinPolicy::Detach);
+            let report = teardown_slot(&slot, JoinPolicy::Detach, TEARDOWN_TIMEOUT);
             assert!(
                 report.already_done && !report.acked && report.anomaly.is_none(),
                 "teardown with no actor must be a safe idempotent no-op: {report:?}"
@@ -184,7 +212,7 @@ mod tests {
             }
         ));
 
-        let report = teardown_slot(&slot, JoinPolicy::Detach);
+        let report = teardown_slot(&slot, JoinPolicy::Detach, TEARDOWN_TIMEOUT);
         assert!(report.acked && !report.joined, "{report:?}");
         assert!(slot.load().is_none(), "teardown must empty the slot");
         assert!(!kick_into(
@@ -194,7 +222,7 @@ mod tests {
             }
         ));
 
-        let report = teardown_slot(&slot, JoinPolicy::Detach);
+        let report = teardown_slot(&slot, JoinPolicy::Detach, TEARDOWN_TIMEOUT);
         assert!(report.already_done && !report.acked, "{report:?}");
     }
 
@@ -206,7 +234,7 @@ mod tests {
         let slot = ArcSwapOption::from_pointee(instance);
         let in_flight = slot.load_full().expect("instance");
 
-        let report = teardown_slot(&slot, JoinPolicy::Detach);
+        let report = teardown_slot(&slot, JoinPolicy::Detach, TEARDOWN_TIMEOUT);
         assert!(report.acked && !report.joined, "{report:?}");
         assert!(!in_flight.kick("OnLate".into()), "actor must be stopped");
         // 最後の参照の Drop で手放す（Stop 済みなので待たずに返る）。

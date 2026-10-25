@@ -201,7 +201,7 @@ fn actor_thread_with_returns_ready_actor_as_ok() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(0, load_dir, rx, None)
+    let actor = spawn_actor_thread_with(0, load_dir, rx, None, None)
         .expect("spawning the actor thread must succeed");
     assert!(
         actor.loaded(),

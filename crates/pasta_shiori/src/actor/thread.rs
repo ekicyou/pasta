@@ -39,8 +39,8 @@ use std::path::PathBuf;
 use std::thread::{self, JoinHandle, ThreadId};
 
 use flume::Receiver;
-use pasta_lua::LoadDirGuard;
 use pasta_lua::debug::KickSink;
+use pasta_lua::{ClaimToken, LoadDirGuard};
 
 use crate::actor::mailbox::{ActorMsg, Reply};
 use crate::shiori::{PastaShiori, Shiori};
@@ -131,14 +131,15 @@ impl ActorThread {
 /// [`ActorThread`]。`actor_thread_id()` で VM 実行スレッド id、`loaded()` でロード
 /// 成否を観測できる。`join()` 前に [`ActorMsg::Stop`] を送ること。
 pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg>) -> ActorThread {
-    // kick の送り先は渡さない（送り先を持つのは芯の型 `ActorInstance`）。
-    spawn_actor_thread_with(hinst, load_dir, rx, None)
+    // kick の送り先と占有の札は渡さない（持つのは芯の型 `ActorInstance`）。
+    spawn_actor_thread_with(hinst, load_dir, rx, None, None)
         .expect("actor thread must spawn and report readiness")
 }
 
 /// [`spawn_actor_thread`] の、失敗を返す形（仕様 `shiori4-v3-portable` 2.3・2.4）。
 ///
 /// - `kick_sink`: VM（[`PastaShiori::with_kick_sink`]）へ渡す kick の送り先。
+/// - `claim`: VM の片付けで外すディレクトリの占有の札（[`PastaShiori::set_claim`]）。
 ///
 /// # 戻り値
 /// 返った時点で VM の構築と `SHIORI.load` の呼び出しは終わっている（2.3）。OS がスレッドを
@@ -150,6 +151,7 @@ pub fn spawn_actor_thread_with(
     load_dir: PathBuf,
     rx: Receiver<ActorMsg>,
     kick_sink: Option<KickSink>,
+    claim: Option<ClaimToken>,
 ) -> io::Result<ActorThread> {
     // VM 実行スレッド id・ロード成否・debug DAP 束縛アドレスを呼び出し側へ返す小チャネル
     // （いずれも `Send` な値のみ越境・VM 本体は越境しない）。`SocketAddr` は `Copy`。
@@ -164,6 +166,7 @@ pub fn spawn_actor_thread_with(
             let _log_context = LoadDirGuard::new(load_dir.clone());
             // (1) VM をこのスレッドで構築・pin（!Send ゆえ越境不可）。
             let mut shiori = PastaShiori::with_kick_sink(kick_sink);
+            shiori.set_claim(claim);
             let loaded = shiori
                 .load(hinst, load_dir.as_os_str())
                 .unwrap_or(false);
