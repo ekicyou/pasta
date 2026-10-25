@@ -136,7 +136,7 @@
   - _Requirements: 7.1, 7.3, 7.4, 7.6_
 
 - [ ] 6. Linux・macOS でワークスペースを通し、CI で毎回確かめる（S7）
-- [ ] 6.1 (P) `pasta_lua` の Linux・macOS で落ちる試験を直す
+- [x] 6.1 (P) `pasta_lua` の Linux・macOS で落ちる試験を直す
   - ドライブ文字のパス・大文字小文字を畳む期待・区切りの差の確認・一時フォルダーの長さに頼る 5 ファイル（research.md 8 節）を、移植できる形に直すか、Windows だけの働き（ドライブ文字のパスの解釈そのもの）なら理由のコメントつきで Windows だけに囲う
   - Windows での期待は変えない
   - 該当の試験が Windows で通り、Linux・macOS で落ちない形になっている（CI での確認は 6.4）

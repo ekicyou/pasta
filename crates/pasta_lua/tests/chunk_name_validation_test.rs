@@ -273,9 +273,12 @@ fn run_round_trip(base_dir: &Path) -> RoundTrip {
 
     // --- 7. set_name 不要の裏取り: *生*文字列はバイト一致しない（区切り差） --------
     //     （正規化が *必要* であることの明示・正規化なしでは突合不能）
-    let hook_no_at = hook_source_raw.strip_prefix('@').unwrap();
+    //     区切りの差は Windows（`\` と `/` の混在）だけの前提。Linux・macOS は区切りが
+    //     `/` だけなので生でも一致し得る（正規化後の一致は上で全 OS 確かめている）。
+    #[cfg(windows)]
     assert_ne!(
-        hook_no_at, loader_key_raw,
+        hook_source_raw.strip_prefix('@').unwrap(),
+        loader_key_raw,
         "実機では生文字列はバイト一致しない（区切り差など）→ 正規化が必須であることの確認"
     );
 

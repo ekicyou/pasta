@@ -473,7 +473,9 @@ mod tests {
     #[test]
     fn chunk_table_records_author_and_cache_but_not_runtime() {
         let dir = tempfile::tempdir().unwrap();
-        let ghost = dir.path().join("ghost");
+        // Linux の一時フォルダー（`/tmp/.tmpXXXXXX`）は短いので、縮めた形のキーを試せるよう
+        // 長さを足す（どの OS でも作者の .lua のパスが 60 バイトを超える）。
+        let ghost = dir.path().join("p".repeat(40)).join("ghost");
         let write = |rel: &str| {
             let path = ghost.join(rel);
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -517,7 +519,7 @@ mod tests {
                 None => assert!(got.is_nil(), "{module}: {got:?}"),
             }
         }
-        // 作者の .lua の値は、縮めた形のキーで引ける（一時フォルダーは 60 バイトを超える）。
+        // 作者の .lua の値は、縮めた形のキーで引ける（上で足した長さで 60 バイトを超える）。
         let author_key = error_form(&format!("{root}/scripts/src.lua"));
         assert!(author_key.starts_with(b"..."), "一時フォルダーが短すぎる");
         let got: Value = chunks
