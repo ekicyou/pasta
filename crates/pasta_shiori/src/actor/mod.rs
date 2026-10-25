@@ -5,7 +5,7 @@
 //! SHIORI スレッドはチャネル marshaling 経由でのみ VM へアクセスする構造を確立する。
 //!
 //! ## モジュール構成
-//! task 5.1 で FFI 出荷経路（`windows.rs`）が [`lifecycle`] の `static MAILBOX` 所有モデルへ
+//! task 5.1 で FFI 出荷経路（`windows.rs`）が [`lifecycle`] の置き場（芯の型 1 つ）へ
 //! 配線され、本モジュール群はすべて **既定（no-feature）ビルドでコンパイル・リンク**される
 //! （wintf は出荷依存へ昇格）。`unsafe impl Send/Sync` は撤去済み（R8）。
 //! - [`mailbox`]: 単一直列 mailbox（flume unbounded・`ActorMsg{Get/Notify/Stop}`・
@@ -14,7 +14,7 @@
 //!   `SHIORI.request` を駆動（task 3.3）。
 //! - [`marshaling`]: GET=block-on-reply／NOTIFY=即 204／drop・timeout・異常→204（task 3.4）。
 //! - [`teardown`]: `Stop{done}` ack→drain→cleanup→detach、reload リーク検査（task 4.1）。
-//! - [`lifecycle`]: `static MAILBOX` 所有・spawn/marshal/teardown 自由関数（FFI 入口・task 5.1）。
+//! - [`lifecycle`]: 旧来の入口の置き場（`static LEGACY`）と spawn/marshal/teardown 自由関数（FFI 入口）。
 
 pub mod mailbox;
 
@@ -36,7 +36,7 @@ pub mod marshaling;
 /// （`windows.rs` の load/unload）へ配線され、既定ビルドでコンパイルされる。
 pub mod teardown;
 
-/// FFI 入口の所有モデル（`static MAILBOX` ＋ spawn/marshal/teardown 自由関数・task 5.1）。
+/// 旧来の入口の置き場（`static LEGACY` に芯の型 1 つ ＋ spawn/marshal/teardown 自由関数）。
 /// `OnceLock<RawShiori>`＋`Arc<Mutex<Option<PastaShiori>>>`＋`unsafe impl Send/Sync` を
 /// 置換する本番ライフサイクル層。`windows.rs` の FFI extern 関数から呼ばれる。
 pub mod lifecycle;

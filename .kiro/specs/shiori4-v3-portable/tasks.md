@@ -25,7 +25,7 @@
   - 芯の型が `Send + Sync` であることをコンパイルの検査で確かめる
   - 単体の試験: 芯の型の kick の送り先が生きている間はアクターに kick が届き、インスタンスを片付けた後は送れずに偽を返す（1.4 で旧来の置き場から移す kick の届きの試験をここで持つ）
   - _Requirements: 2.3, 3.8, 4.1, 4.2, 4.3, 4.4, 5.1, 5.2, 5.5, 6.3_
-- [ ] 1.4 旧来の置き場を、芯の型 1 つを持つ置き場に置き換える
+- [x] 1.4 旧来の置き場を、芯の型 1 つを持つ置き場に置き換える
   - プロセスに 1 つの状態を「芯の型の置き場」1 つにし、mailbox・スレッドのハンドル・要求の連番のグローバルを消す
   - 窓口の自由関数（起動・要求・後始末・kick の送り先）は名前と形を残し、置き場の芯の型へ委ねる。送信の道はロックを取らない
   - 後始末は置き場から取り出して持ち主になってから行い、持ち主になれない（規約に反する同時の呼び方）ときは停止の要求だけをして最後の参照の Drop で手放す
@@ -184,3 +184,5 @@
 - 1.2: `spawn_actor_thread_with` は ready の前に終わったスレッドを中で join してから `io::Error::other` を返す（`io::Error` はハンドルを運べないため）。ActorInstance は `ErrorKind::Other` を NotReady に写すだけで、join を重ねない。
 - 1.2: 今の形の `spawn_actor_thread` は旧来の `lifecycle::kick_sink()` を渡している（振る舞いを保つため）。1.4 で置き場が芯の型へ移った後に design どおり `None` へ戻す。
 - 1.3: spawn の失敗時に既定の PastaLogger を登録する手順（design の spawn 手順 3・2.5）は占有と一緒に 3.3 で足す。`shutdown_with_timeout` は結合試験から呼ぶため pub（`marshal_get_with_timeout` と同じ作り）。
+- 1.4: 旧来の置き場は `static LEGACY: ArcSwapOption<ActorInstance>` だけになった。「static MAILBOX」「lifecycle::MAILBOX」という古い言い方が windows.rs・windows_tests.rs・marshaling.rs・teardown.rs・mailbox.rs・shiori.rs・lib.rs・actor/mod.rs・tests/ffi_actor_lifecycle_test.rs・tests/ffi_extern_session_e2e_test.rs・tests/scene_kick_gate_e2e_test.rs・pasta_lua/src/debug/kick.rs に残る。2.1 の文言の直しで一緒に直す。
+- 1.4: 置き場の後始末で持ち主になれない（規約に反する同時の呼び方）とき、最後の参照の Drop は JoinAfterAck を試みる。5.1 で DllMain 用の join しない窓口を足すとき、この道が loader lock の中で join しないかを見直す。

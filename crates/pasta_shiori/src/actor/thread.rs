@@ -26,7 +26,7 @@
 //! 後に処理され、ループを抜けて `block_on` が戻る。
 //!
 //! # 配線（task 5.1 で完了）
-//! FFI 入口（`windows.rs` → [`crate::actor::lifecycle`] の `static MAILBOX`）が本スレッドへ
+//! FFI 入口（`windows.rs` → [`crate::actor::lifecycle`] の置き場の芯の型 `ActorInstance`）が本スレッドへ
 //! 配線済み。GET の完全な timeout/204/drop marshaling 契約は [`crate::actor::marshaling`]
 //! （task 3.4）が担い、本スレッドの `Get` 応答は VM 応答文字列を [`Reply::Value`] で返す
 //! （エラー時も `MyError::to_shiori_response()` の 500 応答文字列を [`Reply::Value`] で返す・
@@ -132,14 +132,9 @@ impl ActorThread {
 /// [`ActorThread`]。`actor_thread_id()` で VM 実行スレッド id、`loaded()` でロード
 /// 成否を観測できる。`join()` 前に [`ActorMsg::Stop`] を送ること。
 pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg>) -> ActorThread {
-    // 今は旧来の置き場（`MAILBOX`）への kick の送り先を渡す（振る舞いは変わらない）。
-    spawn_actor_thread_with(
-        hinst,
-        load_dir,
-        rx,
-        Some(crate::actor::lifecycle::kick_sink()),
-    )
-    .expect("actor thread must spawn and report readiness")
+    // kick の送り先は渡さない（送り先を持つのは芯の型 `ActorInstance`）。
+    spawn_actor_thread_with(hinst, load_dir, rx, None)
+        .expect("actor thread must spawn and report readiness")
 }
 
 /// [`spawn_actor_thread`] の、失敗を返す形（仕様 `shiori4-v3-portable` 2.3・2.4）。
