@@ -165,9 +165,10 @@
 
 - **1 番（unload と FreeLibrary の競り）は、あちらで閉じる**。あちらの R4.2・4.4・7.6: 後始末の完了が上限（5 秒）の中で届けば、アクタースレッドの終わりを待ってから `unload` を返す。上限を過ぎたら今どおり手放してログに出す。版 3 と旧来の入口の両方に効く（芯の型の片付けに 1 度書く）。
   - **`DllMain` の中の片付け（unload をせずに FreeLibrary されたとき）は、あちらの Out**（loader lock の中ではスレッドの終わりを待てない）。この spec の 1 番の「もう 1 つの場合」（DllMain が loader lock を持ったまま 5 秒待ち、アクターの `drop(shiori)` が Lua の C モジュールの FreeLibrary で止まる）は、こちらに残る。
-  - こちらの Approach の「ack の後に `WaitForSingleObject(TEARDOWN_TIMEOUT)`」は、あちらの作り（設計で決まる）に置き換わる。
+  - こちらの Approach の「ack の後に `WaitForSingleObject(TEARDOWN_TIMEOUT)`」は、あちらの作りに置き換わる（2026-10-25 確定）: `ActorInstance::shutdown(JoinPolicy)` が ack を 5 秒まで待ち、届けば `JoinHandle::join`、届かなければ手放して警告。`unload` は `JoinAfterAck`、`DllMain` の FreeLibrary の detach は `lifecycle::teardown_actor_detached()`（`JoinPolicy::Detach`）。`TeardownReport` に `joined` が足される。
+  - あちらはディレクトリの占有（`REGISTRY` の世代の札 `ClaimToken`）も足す。旧来の口の再読み込みは、前の片付けが打ち切りに終わっても占有を引き継いで読める（今の振る舞いを保つ）。
 - **4 番（FFI の型）は、あちらで全部閉じる**。あちらの R7.3: `load`・`loadu`・`unload` の戻り値は i32 の 1／0、`load`・`loadu` の長さと `request` の長さ（受けと返し）は C の `long`。10-23 の再測定の「残るのは `usize`→`c_long` だけ」も無くなる。
-- **5 番（MAILBOX の単体テストの競り）は、あちらの設計しだい**。あちらは `MAILBOX`・`ACTOR_HANDLE` をインスタンスごとの芯の型へ移す（R5.1）。ただし、`lifecycle` の自由関数を旧来の入口の置き場への窓口として残す案（あちらのギャップ分析の選択肢 C）が推奨なので、テストが置き場を共有し続けて競りが残ることもある。あちらの `design.md` で確かめること。
+- **5 番（MAILBOX の単体テストの競り）は、こちらに残る**（2026-10-25 にあちらの設計で確定）。あちらは `MAILBOX`・`ACTOR_HANDLE`・`REQUEST_SEQ` を消し、芯の型 `ActorInstance` へ移すが、旧来の入口の置き場 `static LEGACY: ArcSwapOption<ActorInstance>` と窓口の自由関数（`spawn_actor`・`marshal_request`・`teardown_actor`・`kick_sink`、新しく `teardown_actor_detached`）を `actor/lifecycle.rs` に全部の OS で残す（案 C）。`lifecycle` を呼ぶ試験は `LEGACY` を共有し続けるので、鍵の 2 種類と鍵を取らない 2 本の競りは形を変えて残る。あちらの新しい試験（`ActorInstance` を直に持つもの）は置き場を使わない。
 - **7・8 番（`teardown.rs` の測り・`marshal_request` の写し）**: `lifecycle.rs`・`thread.rs` が書き直され、実行器の `wintf-winmsg-executor` も外れる（あちらの R8）。場所と形を測り直すこと。
 - **2 番（フォルダが無いと理由の無い 500）**: あちらの版 3 の `load` は、ディレクトリが無いときに NULL を返す（R2.4。ログを置けないので理由は出さなくてよい）。旧来の入口の 500 の理由は、こちらに残る。
 - **3 番・6 番・9〜12 番**: あちらは触らない。
