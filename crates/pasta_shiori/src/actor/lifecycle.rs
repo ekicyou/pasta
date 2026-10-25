@@ -9,7 +9,8 @@
 //! - [`spawn_actor`]: 先に [`teardown_actor`] で前のインスタンスを片付け（7.2）、新しい
 //!   [`ActorInstance`] を起こして置き場へ入れる。
 //! - [`marshal_request`]: 置き場の芯の型へ要求を渡す。空なら 204（SHIORI スレッドを待たせない）。
-//! - [`teardown_actor`]: 置き場から取り出して後始末する。空なら冪等の no-op。
+//! - [`teardown_actor`]: 置き場から取り出して後始末する（ack の後に join・7.6）。空なら冪等の no-op。
+//! - [`teardown_actor_detached`]: 同じだが join しない（`DllMain` の FreeLibrary の detach だけ）。
 //! - [`kick_sink`]: 置き場の芯の型へ kick を積む送り先。空なら `kick.drop` の診断ログで捨てる。
 //!
 //! # 送信の道にロックを置かない
@@ -55,7 +56,7 @@ pub fn spawn_actor_with_teardown_timeout(
 ) -> bool {
     // 前のディレクトリは片付けの前に手元へ取る（新しいグローバルな状態は持たない）。
     let prev_dir = LEGACY.load().as_ref().map(|i| i.load_dir().to_path_buf());
-    let report = teardown_slot(&LEGACY, JoinPolicy::Detach, teardown_timeout);
+    let report = teardown_slot(&LEGACY, JoinPolicy::JoinAfterAck, teardown_timeout);
     let timed_out = !report.acked && !report.already_done;
     let mode = if timed_out && prev_dir.as_deref() == Some(load_dir.as_path()) {
         ClaimMode::TakeOver
@@ -90,11 +91,18 @@ fn request_into(slot: &ArcSwapOption<ActorInstance>, request: &str) -> String {
     }
 }
 
-/// 置き場のアクターを後始末する（`unload`／`DllMain detach` 入口・7.1）。
+/// 置き場のアクターを後始末する（`unload` 入口・7.1・7.6）。
 ///
 /// 戻り値は後始末の結果（clean／冪等 no-op／異常を値で返す。ホストを巻き込まない）。
-/// この段では今どおり join しない（ack の後に join への切り替えは 5.1）。
+/// ack が届けばアクタースレッドを join してから返る（ack が来なければ手放す）。
 pub fn teardown_actor() -> TeardownReport {
+    teardown_slot(&LEGACY, JoinPolicy::JoinAfterAck, TEARDOWN_TIMEOUT)
+}
+
+/// 置き場のアクターを、join せずに後始末する（`DllMain` の FreeLibrary の detach だけ・7.6）。
+///
+/// loader lock の中ではアクタースレッドの終わりを待てないので、ack を受けたらスレッドを手放す。
+pub fn teardown_actor_detached() -> TeardownReport {
     teardown_slot(&LEGACY, JoinPolicy::Detach, TEARDOWN_TIMEOUT)
 }
 
@@ -117,6 +125,8 @@ fn teardown_slot(
         Ok(instance) => instance.shutdown_with_timeout(policy, timeout),
         // 片付けと同時に別のスレッドで要求が走っている（単一スレッドの規約に反する呼び方）。
         // 停止の要求だけをして、最後の参照の Drop でスレッドを手放す（join は保証しない）。
+        // Drop の Stop は先の Stop でループを抜けたアクターに ack されないので、Drop が join する
+        // ことは無い（`DllMain` の道の loader lock の中でも join で待たない）。
         Err(shared) => shared.request_stop(),
     }
 }

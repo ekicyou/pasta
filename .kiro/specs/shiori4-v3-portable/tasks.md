@@ -123,7 +123,7 @@
   - _Requirements: 4.3, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 6.1, 6.3, 6.4_
 
 - [ ] 5. 旧来の入口の後始末と FFI の型を直す（S6）
-- [ ] 5.1 旧来の unload を「ack の後に join」にし、DllMain の道だけ手放す口を足す
+- [x] 5.1 旧来の unload を「ack の後に join」にし、DllMain の道だけ手放す口を足す
   - 旧来の窓口の後始末を「ack の後に join」にし、join しない後始末の窓口を新しく足す
   - 試験: 旧来の窓口の後始末が「join 済み」、join しない窓口が「join なし」で返る
   - _Depends: 1.4_
@@ -192,3 +192,4 @@
 - 3.2: 層ごとのフィルタが 1 つのとき `tracing::enabled!` はディレクトリごとの断りを映さない（全部の項目の最大量だけで決まる）。書き出しはディレクトリの量に従う。7.1 の内部の章に、スパンの中身で絞る指定が効かないことと並べて書く。
 - 4.3: design.md の「unload の後にスレッドが残らない」は shiori4_v3_entry_test では確かめていない（join の振る舞いは actor_instance_test が持つ）。kiro-validate-impl はここを覆われているとみなさない。
 - 4.4: multi_instance_test の `v3_unload_leaves_no_actor_thread` は、旧来の後始末が join しない間（5.1 まで）、終わりきらない旧来のアクターのスレッド ID を Windows が使い回すとまれに誤って落ちうる。5.1 の後に塞がったことを確かめる。v3_probe に `OnProbeSlowUnload`（次の unload を 0.3 秒回す）を足した。
+- 5.1: この段の後、DllMain の FreeLibrary の道はまだ `teardown_actor()`（join する）を呼ぶ。5.2 で `teardown_actor_detached()` に向け、windows.rs のモジュールの説明（16 行目）も直す。5.2 を入れずに main へ入れない。

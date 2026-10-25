@@ -198,10 +198,16 @@ fn legacy_reload_after_timed_out_teardown_takes_over_claim() {
         "the new instance must answer: {count:?}"
     );
 
+    // 旧来の unload の窓口は「ack の後に join」（7.6）。
     let report = lifecycle::teardown_actor();
-    assert!(report.acked, "{report:?}");
+    assert!(report.acked && report.joined, "{report:?}");
     assert!(
         registry.get(&dir).is_none(),
         "unloading the new instance must release the registration"
     );
+
+    // DllMain の道の窓口だけは join しない（loader lock の中では待てない）。
+    assert!(lifecycle::spawn_actor(0, dir.clone()), "v3_probe must load");
+    let report = lifecycle::teardown_actor_detached();
+    assert!(report.acked && !report.joined, "{report:?}");
 }
