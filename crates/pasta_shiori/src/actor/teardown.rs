@@ -62,6 +62,11 @@ pub struct TeardownReport {
     /// teardown 途中の異常（ack timeout・送信失敗等）。`Some` ならホストを巻き込まずに
     /// 記録した異常内容（R7.5）。clean teardown／冪等 no-op の双方とも `None`。
     pub anomaly: Option<String>,
+    /// アクタースレッドの join を終えたか（仕様 `shiori4-v3-portable` 4.4・7.6 の観測点）。
+    ///
+    /// ack が届き、後始末の決まりが「ack の後に join」のときだけ真
+    /// （`ActorInstance::shutdown`）。Stop と ack だけの道（本関数）では常に偽。
+    pub joined: bool,
 }
 
 impl TeardownReport {
@@ -124,6 +129,7 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
             acked: false,
             already_done: true,
             anomaly: None,
+            joined: false,
         };
     }
     // 観測ログ点（R10.4・無効時ゼロコスト）: Stop を mailbox へ投入し done ack を待つ。
@@ -147,6 +153,7 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
                 acked: true,
                 already_done: false,
                 anomaly: None,
+                joined: false,
             }
         }
         Err(flume::RecvTimeoutError::Timeout) => {
@@ -158,6 +165,7 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
                 acked: false,
                 already_done: false,
                 anomaly: Some(msg),
+                joined: false,
             }
         }
         Err(flume::RecvTimeoutError::Disconnected) => {
@@ -170,6 +178,7 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
                 acked: false,
                 already_done: false,
                 anomaly: Some(msg),
+                joined: false,
             }
         }
     }

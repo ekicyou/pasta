@@ -40,3 +40,7 @@ pub mod teardown;
 /// `OnceLock<RawShiori>`＋`Arc<Mutex<Option<PastaShiori>>>`＋`unsafe impl Send/Sync` を
 /// 置換する本番ライフサイクル層。`windows.rs` の FFI extern 関数から呼ばれる。
 pub mod lifecycle;
+
+/// 芯の型 `ActorInstance`（仕様 `shiori4-v3-portable`）。インスタンス 1 つ＝アクター 1 つで、
+/// mailbox の送信端・アクタースレッドのハンドル・ディレクトリ・要求の連番を持つ。
+pub mod instance;

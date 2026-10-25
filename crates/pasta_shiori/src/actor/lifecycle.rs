@@ -36,22 +36,18 @@
 //! 必ず 204 を返し、SHIORI スレッドを無限待機させない（R5.6）。
 
 use std::path::PathBuf;
-use std::time::Duration;
 
 use arc_swap::ArcSwapOption;
 use flume::Sender;
 use pasta_lua::debug::{KickRequest, KickSink};
 
+use crate::actor::instance::TEARDOWN_TIMEOUT;
 use crate::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use crate::actor::marshaling::{
     ShioriMethod, default_204, determine_method, marshal_get, marshal_notify,
 };
 use crate::actor::teardown::{TeardownReport, teardown_via_sender};
 use crate::actor::thread::{ActorThread, spawn_actor_thread};
-
-/// FFI 入口が teardown ack を待つ既定の上限。通常運転では teardown は速やかに完了する。
-/// 万一アクターが ack を返さない場合でも SHIORI スレッド（＝SSP 側）を無限待機させない安全網。
-const TEARDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// reload の都度に投入される連番（FIFO 観測用の `seq`）。送信のみで読まれる軽量カウンタ。
 static REQUEST_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -161,6 +157,7 @@ pub fn teardown_actor() -> TeardownReport {
             acked: false,
             already_done: true,
             anomaly: None,
+            joined: false,
         },
     };
 
