@@ -70,50 +70,6 @@ jobs:
           path: target/${{ matrix.target }}/release/pasta.dll
           retention-days: 7
 
-  # 一時の測り（shiori4-v3-portable の設計の段）: Linux・macOS で落ちるビルドとテストを数える。
-  # 測り終えたらこのジョブのコミットは revert する（本物の build-unix は実装で足す）。
-  measure-unix:
-    name: measure-${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: measure-${{ matrix.os }}
-      - name: build pasta_shiori (release)
-        continue-on-error: true
-        run: cargo build --release -p pasta_shiori
-      - name: test pasta_dsl
-        continue-on-error: true
-        run: cargo test -p pasta_dsl --no-fail-fast
-      - name: test pasta_core
-        continue-on-error: true
-        run: cargo test -p pasta_core --no-fail-fast
-      - name: test pasta_lua
-        continue-on-error: true
-        run: cargo test -p pasta_lua --no-fail-fast
-      - name: test pasta_shiori
-        continue-on-error: true
-        run: cargo test -p pasta_shiori --no-fail-fast
-      - name: test pasta_check
-        continue-on-error: true
-        run: cargo test -p pasta_check --no-fail-fast
-      - name: test pasta_lsp
-        continue-on-error: true
-        run: cargo test -p pasta_lsp --no-fail-fast
-      - name: test pasta_sample_ghost
-        continue-on-error: true
-        run: cargo test -p pasta_sample_ghost --no-fail-fast
-      - name: clippy workspace except pasta_shiori
-        if: matrix.os == 'ubuntu-latest'
-        continue-on-error: true
-        run: cargo clippy --all-targets --workspace --exclude pasta_shiori -- -D warnings
-
   # 依存クレートの脆弱性勧告・ライセンス・取得元を deny.toml に照らして検査する。
   deny:
     name: cargo-deny
