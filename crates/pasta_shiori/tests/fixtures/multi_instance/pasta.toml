@@ -1,0 +1,16 @@
+# multi_instance の試験用フィクスチャ（shiori4-v3-portable task 4.4）
+#
+# 標準ランタイムをそのまま使う。[logging] と [debug] は試験が一時コピーの末尾に書き足す。
+
+[loader]
+pasta_patterns = ["dic/*.pasta"]
+transpiled_output_dir = "profile/pasta/cache/lua"
+
+# OnTalk の機会を決定論化するため、トーク間隔を固定する
+# （OnSecondChange に X-Pasta-Time を載せて 10 秒ずつ進める）。
+[ghost]
+talk_interval_min = 10
+talk_interval_max = 10
+
+[actor."さくら"]
+spot = 0

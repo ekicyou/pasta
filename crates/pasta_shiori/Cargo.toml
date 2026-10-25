@@ -57,4 +57,5 @@ tracing-test.workspace = true
 # 本番 `to_ansi_str`（CP_ACP デコード）と対称な `WideCharToMultiByte`/CP_ACP で ANSI エンコードし、
 # 応答 HGLOBAL を read/free するために Win32 Memory/Globalization を直接利用する。
 # 本体は既に windows-sys を通常依存として持つため、dev 側はリンク可能化のための再宣言のみ。
-windows-sys = { workspace = true }
+# ToolHelp は multi_instance_test がアクタースレッドを数えるため（unload の後に残らないこと）。
+windows-sys = { workspace = true, features = ["Win32_System_Diagnostics_ToolHelp"] }
