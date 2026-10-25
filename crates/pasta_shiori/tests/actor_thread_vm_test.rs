@@ -23,7 +23,7 @@ use std::thread;
 use std::time::Duration;
 
 use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
-use pasta::actor::thread::spawn_actor_thread;
+use pasta::actor::thread::{spawn_actor_thread, spawn_actor_thread_with};
 use tempfile::TempDir;
 
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前
@@ -182,6 +182,37 @@ fn actor_thread_processes_notify_then_get_in_fifo() {
         resp.as_bytes(),
         EXPECT_ROUND1.as_bytes(),
         "GET after NOTIFY must return the actor-VM response in FIFO order\nactual: {resp:?}"
+    );
+
+    let (stop, done_rx) = ActorMsg::stop();
+    tx.send(stop).expect("send Stop into mailbox");
+    done_rx
+        .recv_timeout(Duration::from_secs(10))
+        .expect("Stop must be acked");
+    actor
+        .join()
+        .expect("actor thread must join cleanly after Stop");
+}
+
+/// 失敗を返す起動の口（`spawn_actor_thread_with`・仕様 `shiori4-v3-portable` 2.3）が、
+/// 返った時点で読み込みを終え、渡した kick の送り先（ここでは `None`）で要求を受けることを確かめる。
+#[test]
+fn actor_thread_with_returns_ready_actor_as_ok() {
+    let (load_dir, _temp) = build_async_callback_dir();
+
+    let (tx, rx) = mailbox();
+    let actor = spawn_actor_thread_with(0, load_dir, rx, None)
+        .expect("spawning the actor thread must succeed");
+    assert!(
+        actor.loaded(),
+        "actor thread must load the ghost VM before returning"
+    );
+
+    let resp = get_via_actor(&tx, 1, "GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n");
+    assert_eq!(
+        resp.as_bytes(),
+        EXPECT_ROUND1.as_bytes(),
+        "actual: {resp:?}"
     );
 
     let (stop, done_rx) = ActorMsg::stop();

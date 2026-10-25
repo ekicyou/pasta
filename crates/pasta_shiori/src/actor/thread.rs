@@ -33,12 +33,14 @@
 //! 仕様 `lua-require-robustness` 4.3/4.4/4.8）。wintf（`block_on`）は本スレッドの
 //! メッセージループに必須のため出荷依存である。
 
+use std::io;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::thread::{self, JoinHandle, ThreadId};
 
 use flume::Receiver;
 use pasta_lua::LoadDirGuard;
+use pasta_lua::debug::KickSink;
 
 use crate::actor::mailbox::{ActorMsg, Reply};
 use crate::shiori::{PastaShiori, Shiori};
@@ -130,6 +132,31 @@ impl ActorThread {
 /// [`ActorThread`]。`actor_thread_id()` で VM 実行スレッド id、`loaded()` でロード
 /// 成否を観測できる。`join()` 前に [`ActorMsg::Stop`] を送ること。
 pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg>) -> ActorThread {
+    // 今は旧来の置き場（`MAILBOX`）への kick の送り先を渡す（振る舞いは変わらない）。
+    spawn_actor_thread_with(
+        hinst,
+        load_dir,
+        rx,
+        Some(crate::actor::lifecycle::kick_sink()),
+    )
+    .expect("actor thread must spawn and report readiness")
+}
+
+/// [`spawn_actor_thread`] の、失敗を返す形（仕様 `shiori4-v3-portable` 2.3・2.4）。
+///
+/// - `kick_sink`: VM（[`PastaShiori::with_kick_sink`]）へ渡す kick の送り先。
+///
+/// # 戻り値
+/// 返った時点で VM の構築と `SHIORI.load` の呼び出しは終わっている（2.3）。OS がスレッドを
+/// 起こせないときは `thread::Builder::spawn` の誤り、スレッドが ready を返す前に終わった
+/// ときは `io::ErrorKind::Other` の誤りを返す（パニックしない・2.4）。後者ではスレッドを
+/// join してから返し、資源を残さない。
+pub fn spawn_actor_thread_with(
+    hinst: isize,
+    load_dir: PathBuf,
+    rx: Receiver<ActorMsg>,
+    kick_sink: Option<KickSink>,
+) -> io::Result<ActorThread> {
     // VM 実行スレッド id・ロード成否・debug DAP 束縛アドレスを呼び出し側へ返す小チャネル
     // （いずれも `Send` な値のみ越境・VM 本体は越境しない）。`SocketAddr` は `Copy`。
     let (ready_tx, ready_rx) = flume::bounded::<(ThreadId, bool, Option<SocketAddr>)>(1);
@@ -145,9 +172,7 @@ pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg
             // future は `!Send` な PastaShiori を所有し、recv_async().await のみで待機。
             wintf_winmsg_executor::block_on(async move {
                 // (1) VM をこのスレッドで構築・pin（!Send ゆえ越境不可）。
-                // 今は旧来の置き場（`MAILBOX`）への kick の送り先を渡す（振る舞いは変わらない）。
-                let mut shiori =
-                    PastaShiori::with_kick_sink(Some(crate::actor::lifecycle::kick_sink()));
+                let mut shiori = PastaShiori::with_kick_sink(kick_sink);
                 let loaded = shiori
                     .load(hinst, load_dir.as_os_str())
                     .unwrap_or(false);
@@ -258,17 +283,21 @@ pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg
                 // thread_local のメッセージ専用ウィンドウが破棄される。スレッドは SHIORI 側が
                 // detach 済み。
             });
-        })
-        .expect("actor thread must spawn");
+        })?;
 
     // VM 構築完了（実行スレッド id・ロード成否・debug DAP 束縛アドレス）を待つ。
-    let (actor_thread_id, loaded, debug_local_addr) =
-        ready_rx.recv().expect("actor thread must report readiness");
+    // ready の送り手が落ちた＝スレッドが ready の前に終わった（パニック等）。join して資源を残さない。
+    let Ok((actor_thread_id, loaded, debug_local_addr)) = ready_rx.recv() else {
+        let _ = handle.join();
+        return Err(io::Error::other(
+            "actor thread ended before reporting readiness",
+        ));
+    };
 
-    ActorThread {
+    Ok(ActorThread {
         handle: Some(handle),
         actor_thread_id,
         loaded,
         debug_local_addr,
-    }
+    })
 }
