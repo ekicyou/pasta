@@ -53,7 +53,7 @@
   - USER オブジェクトが 0 のプロセスで、測りが 0 を返すことを単体の試験で確かめる
   - 漏れの検査の試験（Windows）が、期待を変えずに許容の中で通る
   - _Requirements: 8.4_
-- [ ] 2.3 Linux・macOS での `pasta_shiori` のテストの失敗を測り、直すものと囲うものに分ける
+- [x] 2.3 Linux・macOS での `pasta_shiori` のテストの失敗を測り、直すものと囲うものに分ける
   - このブランチに一時のジョブを足して `workflow_dispatch` で Linux・macOS の `pasta_shiori` のビルドとテストを `--no-fail-fast` で走らせ、ログから落ちた試験を数える。コンパイルに失敗したテストのターゲットは、ターゲットごとに一覧に書く
   - 結果を research.md の 8 節に足し、試験ごとに「移植できる形に直す」か「Windows だけの働きとして理由つきで囲う」かを決めて書く
   - 測り終えたら一時のジョブを revert する
@@ -187,3 +187,4 @@
 - 1.4: 旧来の置き場は `static LEGACY: ArcSwapOption<ActorInstance>` だけになった。「static MAILBOX」「lifecycle::MAILBOX」という古い言い方が windows.rs・windows_tests.rs・marshaling.rs・teardown.rs・mailbox.rs・shiori.rs・lib.rs・actor/mod.rs・tests/ffi_actor_lifecycle_test.rs・tests/ffi_extern_session_e2e_test.rs・tests/scene_kick_gate_e2e_test.rs・pasta_lua/src/debug/kick.rs に残る。2.1 の文言の直しで一緒に直す。
 - 1.4: 置き場の後始末で持ち主になれない（規約に反する同時の呼び方）とき、最後の参照の Drop は JoinAfterAck を試みる。5.1 で DllMain 用の join しない窓口を足すとき、この道が loader lock の中で join しないかを見直す。
 - 1.5: 試験用のゴースト `tests/fixtures/v3_probe/` の ID は `OnProbeCount`（Lua に届いた要求の数・その要求も含む）・`OnProbeBadStatus`（開始行 `SHIORI/3.0 2x0 OK`）・`OnProbeSpin`（1 秒回って 204）。4.3 はこの名前を使う。
+- 2.3: 2.1 の後の Linux・macOS で `pasta_shiori` のテストは 302 本すべて通った（run 40154842867）。6.3 は直す対象が無いことを確かめるだけになる。

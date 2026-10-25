@@ -265,3 +265,16 @@
 - 分割の目安（`pasta_shiori` の外の 10 ファイルを大きく超える）に届かないので、**`pasta-portable-build` には分けない**。
 - 残る不確かさは `pasta_shiori` のテストだけ（wintf を外すまでビルドできない）。実装で実行器を替えた直後に、同じ形で `workflow_dispatch` を回して測る。
 - macOS の LuaJIT は追加の設定なしで通ったので、Research Needed 2 は閉じる。
+
+### `pasta_shiori` の測り（2026-10-25・実装の段・タスク 2.3）
+
+タスク 2.1（実行器を同期の受け取りのループへ替え、`wintf-winmsg-executor` を外した）の後、同じ一時の `measure-unix` ジョブを戻して `workflow_dispatch` で 1 回回した（run `40154842867`、base `92903379` の 1 つ前の 2.1 の後）。測り終えたそのコミットは revert した。
+
+| 対象 | Linux（ubuntu） | macOS（arm64） |
+|---|---|---|
+| `pasta_shiori` のリリースのビルド | 通る | 通る |
+| `pasta_shiori` のテスト（`--no-fail-fast`） | 41 のテストのターゲットがすべてコンパイルでき、302 本すべて通る（落ちる試験 0） | 同じ（302 本すべて通る） |
+| `pasta_lua`・`pasta_check` | 前回と同じ（`pasta_lua` 13 本・`pasta_check` 1 本） | 前回と同じ（`pasta_lua` 12 本・`pasta_check` 1 本） |
+
+- コンパイルに失敗したテストのターゲットは無い。Windows だけの働き（HGLOBAL・ANSI のコードページ・Windows の資源の測り・`DllMain`・FFI の書き出し）を試す試験は、もともと `#[cfg(windows)]` で囲われていて、Linux・macOS では 0 本のターゲットとしてコンパイルされる。
+- **判断**: `pasta_shiori` には「移植できる形に直す」ものも「新しく Windows だけに囲う」ものも無い。6.3 は直す対象が無いことを確かめて閉じる（6.4 の CI で毎回確かめる）。
