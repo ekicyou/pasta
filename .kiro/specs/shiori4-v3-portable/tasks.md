@@ -152,7 +152,7 @@
   - Windows での期待は変えない
   - _Depends: 2.3, 5.2_
   - _Requirements: 9.4_
-- [ ] 6.4 `build.yml` に Linux・macOS のジョブと版 3 の 1 往復の段を足し、3 OS で緑にする
+- [x] 6.4 `build.yml` に Linux・macOS のジョブと版 3 の 1 往復の段を足し、3 OS で緑にする
   - Linux・macOS の行列のジョブで、リリースのビルド（`libpasta.so`・`libpasta.dylib`）・ワークスペースのテスト・Linux だけ clippy（警告を誤り）を走らせる
   - 3 OS で試験用のホストを入れ、`--entry v3` で hello-pasta を読ませて `OnBoot` を送り、終了の状態 0 を確かめる。Windows は x64 の行だけで、`--entry` を付けない 1 回も足す
   - どの段にも失敗の無視を付けず、Linux・macOS のジョブは成果物を upload しない。`release.yml` は変えない
@@ -195,3 +195,4 @@
 - 5.1: この段の後、DllMain の FreeLibrary の道はまだ `teardown_actor()`（join する）を呼ぶ。5.2 で `teardown_actor_detached()` に向け、windows.rs のモジュールの説明（16 行目）も直す。5.2 を入れずに main へ入れない。
 - 6.2: 原因は POSIX の `std::path::absolute` が `..` を字面で畳まないこと。`--release` と `--target` が同じ場所と判定されず、前回の nar を消してから落ちていた（試験の前提ではなく製品の不具合）。`resolve` で、まだ無い部品の `..` を字面で畳んで直した。
 - 6.3: 2.3 の測りで `pasta_shiori` の Linux・macOS の落ちる試験は 0 本だったので、直すものも囲うものも無い（research.md 8 節）。6.4 の CI で毎回確かめる。
+- 6.4: 6475c181 の build.yml で run 40165427644 が 8 ジョブすべて緑（Linux・macOS のワークスペースの試験は失敗 0・3 OS で版 3 の 1 往復が 200）。
