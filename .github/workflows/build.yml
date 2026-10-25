@@ -63,12 +63,70 @@ jobs:
         if: matrix.arch == 'x64'
         run: cargo clippy --all-targets --workspace --target ${{ matrix.target }} -- -D warnings
 
+      # 版 3 の 1 往復（shiori4-v3-portable 要件 9.6・10.3・1.5）。x64 のホストは x86 の DLL を読めないので x64 の行だけ。
+      - name: Install shiori4-testhost
+        if: matrix.arch == 'x64'
+        run: cargo install shiori4_host --version 0.1.0 --example shiori4-testhost
+
+      # パスは cygpath -w で作り末尾に \ を付ける（PowerShell の "…\" は末尾の \" が引用符の逃がしに読まれる）。
+      # --entry なしの 1 回は、全部の口を許すホストでも版 3 に決まることを確かめる（1.5）。
+      - name: SHIORI/4 v3 round trip
+        if: matrix.arch == 'x64'
+        shell: bash
+        run: |
+          dll="$(cygpath -w "$GITHUB_WORKSPACE/target/${{ matrix.target }}/release/pasta.dll")"
+          ghost="$(cygpath -w "$GITHUB_WORKSPACE/crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master")\\"
+          shiori4-testhost --entry v3 "$dll" "$ghost"
+          shiori4-testhost "$dll" "$ghost"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: pasta-dll-${{ matrix.arch }}
           path: target/${{ matrix.target }}/release/pasta.dll
           retention-days: 7
+
+  # Linux・macOS のビルドとテストと版 3 の 1 往復（shiori4-v3-portable 要件 9.1〜9.6・10.1〜10.5）。
+  # 成果物は upload しない（配布は Windows だけ）。
+  build-unix:
+    name: build-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}
+
+      - name: Build pasta_shiori
+        run: cargo build --release -p pasta_shiori
+
+      - name: Run tests
+        run: cargo test --workspace
+
+      # lint はターゲット非依存のため Linux のみ。
+      - name: Clippy (-D warnings)
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo clippy --all-targets --workspace -- -D warnings
+
+      - name: Install shiori4-testhost
+        run: cargo install shiori4_host --version 0.1.0 --example shiori4-testhost
+
+      # ID を省くと OnBoot を送る。終了の状態が 0 でなければ失敗。
+      - name: SHIORI/4 v3 round trip
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then ext=dylib; else ext=so; fi
+          shiori4-testhost --entry v3 "$GITHUB_WORKSPACE/target/release/libpasta.$ext" "$GITHUB_WORKSPACE/crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/"
 
   # 依存クレートの脆弱性勧告・ライセンス・取得元を deny.toml に照らして検査する。
   deny:
