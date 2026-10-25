@@ -311,6 +311,7 @@ struct ResourceSample {
 /// 計測手段がないため `None`。
 #[cfg(windows)]
 fn sample_resources() -> ResourceSample {
+    use windows_sys::Win32::Foundation::{GetLastError, SetLastError};
     use windows_sys::Win32::System::Threading::{
         GR_USEROBJECTS, GetCurrentProcess, GetGuiResources, GetProcessHandleCount,
     };
@@ -329,17 +330,30 @@ fn sample_resources() -> ResourceSample {
         }
     };
 
-    // SAFETY: `GetGuiResources` は読み取り専用。戻り値 0 は「USER オブジェクト 0 個」と
-    // 「呼び出し失敗」が区別できないが、長命なテストプロセスでは 0 は実質ない。安全側に
-    // 倒し、0 のときは計測不能扱い（None）として偽の増分を作らない。
+    // SAFETY: `GetGuiResources` は読み取り専用。`SetLastError`/`GetLastError` は
+    // 呼び出しスレッドの誤りの番号を読み書きするだけ。アクターはウィンドウを作らないので
+    // 試験のプロセスでは本当に 0 個になりうる。0 は誤りの番号で読み分ける。
     let user_objects = unsafe {
+        SetLastError(0);
         let n = GetGuiResources(process, GR_USEROBJECTS);
-        if n != 0 { Some(n) } else { None }
+        user_objects_from(n, GetLastError())
     };
 
     ResourceSample {
         kernel_handles,
         user_objects,
+    }
+}
+
+/// `GetGuiResources` の戻り値と、その直後の `GetLastError` から USER オブジェクト数を読む。
+/// 0 は「USER オブジェクト 0 個」と「呼び出し失敗」の両方を表すので、誤りの番号で読み分ける
+/// （誤りの番号 0 なら本当に 0 個、それ以外は測れない）。
+#[cfg(windows)]
+fn user_objects_from(n: u32, last_error: u32) -> Option<u32> {
+    if n != 0 || last_error == 0 {
+        Some(n)
+    } else {
+        None
     }
 }
 
@@ -349,5 +363,19 @@ fn sample_resources() -> ResourceSample {
     ResourceSample {
         kernel_handles: None,
         user_objects: None,
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::user_objects_from;
+
+    /// `GetGuiResources` の 0 を、`GetLastError` で「本当に 0」と「測れない」に読み分ける（8.4）。
+    /// USER オブジェクトが 0 のプロセス（誤りの番号 0）では `Some(0)` を返す。
+    #[test]
+    fn user_objects_zero_is_read_by_last_error() {
+        assert_eq!(user_objects_from(0, 0), Some(0));
+        assert_eq!(user_objects_from(0, 5), None);
+        assert_eq!(user_objects_from(3, 0), Some(3));
     }
 }
