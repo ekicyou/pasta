@@ -979,6 +979,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "serde_json",
+ "shiori4_abi",
  "tempfile",
  "thiserror 2.0.21",
  "time",
@@ -1327,6 +1328,12 @@ checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
 ]
+
+[[package]]
+name = "shiori4_abi"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16ec44e6ceb814546d7a7fb317b67b3dcc54832122ecb8f798dd7d8cfe750b61"
 
 [[package]]
 name = "shlex"

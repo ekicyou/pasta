@@ -10,9 +10,13 @@ pub mod error;
 pub mod lua_request;
 mod shiori;
 mod util;
+mod v3;
 
 #[cfg(windows)]
 mod windows;
+
+// 版 3 の口（全部の OS で書き出す）。旧来の入口と同じく、rlib の試験から到達させるために再エクスポートする。
+pub use v3::shiori_get_api;
 
 // Re-export for integration tests
 pub use shiori::{PastaShiori, Shiori};

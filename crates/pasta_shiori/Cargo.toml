@@ -28,6 +28,8 @@ flume.workspace = true
 # アクタースレッド＋チャネルを teardown→再 spawn するため、送信端 Sender を Mutex なしで
 # 差し替え可能にする ArcSwapOption を用いる（送信パスは load/store のみ・lock-free）。
 arc-swap.workspace = true
+# 版 3 の口（`shiori_get_api`）。ABI の検査（copy_from_slice・UTF-8・パニックの捕捉）はこのクレートが行う。
+shiori4_abi.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 # teardown のリーク検査（GetProcessHandleCount/GetGuiResources）に Win32_System_Threading を
