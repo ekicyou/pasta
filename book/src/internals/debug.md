@@ -395,7 +395,7 @@ resolve_and_kick(map, sink, uri, line)
 
 #### KickSink から VM まで
 
-`KickSink` は `Arc<dyn Fn(KickRequest) + Send + Sync>` である。`pasta_lua` はこれを中身を知らずに保持し、socket bridge のスレッドから呼ぶだけである。`pasta_shiori` は `load` で `RuntimeConfig::with_kick_sink(Some(kick_sink()))` を渡す。クロージャの中身（`kick_into_mailbox`）は `MAILBOX` に `ActorMsg::Kick { scene }` を `try_send` し、アクタースレッドがそれを `SHIORI.kick(scene)` にする（[アクタースレッドのメッセージループ](shiori.md#アクタースレッドのメッセージループ)）。`MAILBOX` が空のとき、送信に失敗したときは捨てる。
+`KickSink` は `Arc<dyn Fn(KickRequest) + Send + Sync>` である。`pasta_lua` はこれを中身を知らずに保持し、socket bridge のスレッドから呼ぶだけである。`pasta_shiori` は、インスタンス（`ActorInstance`）ごとに送り先を作り、`load` で `RuntimeConfig::with_kick_sink(送り先)` を渡す。クロージャはそのインスタンスの mailbox の送信端の弱い参照だけを持ち、`ActorMsg::Kick { scene }` を `try_send` する。アクタースレッドがそれを `SHIORI.kick(scene)` にする（[アクタースレッドのメッセージループ](shiori.md#アクタースレッドのメッセージループ)）。そのため、キックは DAP がつながっているインスタンスにだけ届く。インスタンスが片付いた後や送信に失敗したときは捨てる。
 
 #### キックの保留と起動（kick.lua）
 
