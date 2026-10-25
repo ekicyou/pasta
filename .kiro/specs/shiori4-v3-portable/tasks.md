@@ -166,7 +166,7 @@
   - プロセスに 1 つ残す状態とそれぞれの理由、ログの量の判定の決まりとスパンの中身で絞る指定が効かないこと、版 3 のパニックが unwind のビルドだけで返せてリリースではプロセスが終わることを書く
   - マニュアルのビルドとリンクの検査が通る
   - _Requirements: 5.7, 9.7, 11.1_
-- [ ] 7.2 README と steering を直す
+- [x] 7.2 README と steering を直す
   - `pasta_shiori` の README の依存の表から実行器の依存を消して `shiori4_abi` を足し、Linux・macOS でのビルドの仕方を書く
   - `pasta_lua` の README に、ログの公開関数の破壊的な変更と、量の設定がディレクトリごとになったことを書く
   - `tech.md` の依存・エンジン駆動モデル・CI と、`structure.md` の `pasta_shiori` の 1 行を直す

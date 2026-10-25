@@ -111,6 +111,19 @@ let runtime = PastaLuaRuntime::new(context)?;
 runtime.exec(&lua_code)?;
 ```
 
+## ログ
+
+tracing の購読者はプロセスに 1 つで、`init_tracing()` で据え付けます（2 回目からは何もしません）。ログの量の設定（`pasta.toml` の `[logging]`）はゴーストのディレクトリごとに持ち、`update_tracing_filter(load_dir, config)` でそのディレクトリの分だけを作り直します。同じプロセスで別のゴーストを読み込んでも、互いの量の設定は混ざりません。
+
+ログの公開関数は破壊的に変わりました。
+
+| 前                                  | 今                                           |
+| ----------------------------------- | -------------------------------------------- |
+| `init_tracing_with_reload(config)`  | `init_tracing()`                             |
+| `update_tracing_filter(config)`     | `update_tracing_filter(load_dir, config)`    |
+
+量の判定の決まりは [内部設計: ログの量の判定](https://ekicyou.github.io/pasta/internals/shiori.html#ログの量の判定) にあります。
+
 ## SHIORI 統合
 
 SHIORI のエントリ（`pasta.shiori.entry`）はフレームワークスクリプトとして同梱され、起動時に読み込まれます。ゴースト作者は `REG` にイベントハンドラを登録し、ハンドラはさくらスクリプトの文字列（応答の `Value`）を返します。SHIORI/3.0 の応答文字列への組み立てはエンジンが `RES`（`pasta.shiori.res`）で行います。

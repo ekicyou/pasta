@@ -7,11 +7,11 @@
 `pasta_shiori` は pasta_lua を使用して SHIORI/3.0 プロトコルを実装し、
 従来の伺かユーザー向けのDLLインターフェースを提供します。
 
-Windows DLL（`pasta.dll`）として出力され、伺かベースウェアから呼び出されます。
+Windows DLL（`pasta.dll`）として出力され、伺かベースウェアから呼び出されます。同じ DLL は shiori4 の版 3 の口（`shiori_get_api`）も書き出し、Linux・macOS でもビルドできます（配布は Windows だけ）。
 
 ## アーキテクチャ
 
-ベースウェアは pasta.dll のエクスポート関数 `loadu`（設置パスを UTF-8 で受け取る）または `load`（ANSI で受け取る）・`request`・`unload` を呼びます。FFI 入口（`windows.rs`）は Lua VM を直接触らず、アクターランタイム（`actor/`）が起こした専用スレッドへ mailbox 経由でメッセージを送ります。そのスレッド上の `PastaShiori`（`shiori.rs`）が `pasta_lua` の `PastaLoader` で VM を構築し、リクエスト文字列を Lua の表に変換して（`lua_request.rs`）、Lua 側の `SHIORI.request` を呼びます。
+ベースウェアは pasta.dll のエクスポート関数 `loadu`（設置パスを UTF-8 で受け取る）または `load`（ANSI で受け取る）・`request`・`unload` を呼びます。shiori4 のホストは `shiori_get_api(3)` で版 3 の関数の表を受け取り、インスタンスごとに `load`・`request`・`notify`・`unload` を呼びます（`v3.rs`）。どちらの FFI 入口（旧来は `windows.rs`）も Lua VM を直接触らず、アクターランタイム（`actor/`）が起こした専用スレッドへ mailbox 経由でメッセージを送ります。そのスレッド上の `PastaShiori`（`shiori.rs`）が `pasta_lua` の `PastaLoader` で VM を構築し、リクエスト文字列を Lua の表に変換して（`lua_request.rs`）、Lua 側の `SHIORI.request` を呼びます。
 
 詳細は [内部設計: SHIORI 層](https://ekicyou.github.io/pasta/internals/shiori.html#構成要素) を参照してください。ファイルごとの役割は [Rust 側（pasta_shiori）](https://ekicyou.github.io/pasta/internals/shiori.html#rust-側pasta_shiori) にあります。
 
@@ -89,7 +89,8 @@ println!("Response: {}", response);
 | pest        | 2.8        | SHIORI リクエストパース                           |
 | pest_derive | 2.8        | pest パーサー導出マクロ                           |
 | flume       | 0.12       | アクタースレッドの mailbox（チャネル）            |
-| arc-swap    | 1.9        | mailbox の送信端の差し替え                        |
+| arc-swap    | 1.9        | 旧来の入口の置き場（`static LEGACY`）の差し替え   |
+| shiori4_abi | 0.1        | 版 3 の口（`shiori_get_api`）の ABI の検査        |
 
 ### Windows 専用
 
@@ -120,6 +121,15 @@ println!("Response: {}", response);
 cargo build --release -p pasta_shiori
 # 出力: target/release/pasta.dll
 ```
+
+### Linux・macOS
+
+```bash
+cargo build --release -p pasta_shiori
+# 出力: target/release/libpasta.so（Linux）・target/release/libpasta.dylib（macOS）
+```
+
+Windows 以外では書き出すのは版 3 の口 `shiori_get_api` だけです（`load`・`loadu`・`request`・`unload` は Windows だけ）。shiori4 のホストから版 3 で読み込みます。
 
 ### ライブラリ（テスト用）
 
