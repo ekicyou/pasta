@@ -1,16 +1,16 @@
 {
   "feature_name": "shiori4-v3-portable",
   "created_at": "2026-10-24T23:31:39Z",
-  "updated_at": "2026-10-24T23:40:59Z",
+  "updated_at": "2026-10-25T00:46:48Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {

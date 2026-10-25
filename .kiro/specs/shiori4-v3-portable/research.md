@@ -169,3 +169,62 @@
 - `shiori4-v4-host`: この spec の芯の型と `Shiori` の実装の上に版 4 を足す（`SUPPORTS_V3` のまま版 4 のテーブルも返す形へ。`export_shiori!` に替えられる）。
 - `pasta-dll-multiarch`: `request` の長さの `c_long`（OQ-7）をどちらが直すか。x64 の配布の前に要る。
 - `recommend-menu-scenes`（完了済み）とは重ならない。
+
+## 7. 設計フェーズの調べ（2026-10-25・`/kiro-spec-design -y`）
+
+- 種別: 既存の仕組みの拡張（Extension）。`rules/design-discovery-light.md` に沿って、つなぎ目・既存の型・新しい依存を確かめた。新しく足す依存は `shiori4_abi` だけで、ローカルの clone（`C:\home\maz\git\shiori4`、`v0.1.0-2-g04e4318`）で API を確かめたので、ウェブの調べは要らなかった。
+- 使ったスキルの決まり: `kiro-spec-design` の `rules/design-principles.md`（境界を先に・依存の向き）・`design-discovery-light.md`・`design-synthesis.md`（一般化・作るか採るか・削る）・`design-review-gate.md`（要件の番号の機械的な照合・境界の欄・ファイルの計画）。レビューの関門は 1 回の直しで通った（試験の観測点の具体化・文書の部品の追加・9.3 の囲いの明記）。
+
+### 7.1 確かめたこと（設計の根拠）
+
+- **`shiori4_abi` 0.1.0 の試験の口**: `ShioriApi::load_v3(dir) -> Option<ShioriInstance>` と `ShioriInstance::{request, notify}`（Drop で unload）が `shiori4_abi` にある（`lib.rs` 857〜866 行・1026〜1062 行）。`V3_HOST`（`copy_from_slice` だけのテーブル）を渡すので、pasta の static のテーブル（`shiori_get_api(3)` の戻り値）を、同じプロセスの中で ABI のテーブル越しに試せる。→ `shiori4_host` を dev 依存に入れなくてよい（Research Needed 7 は消えた。`libloading`・`deny.toml`・cdylib のパスの見つけ方の心配も無くなる）。ライブラリの境界をまたぐ試験は CI の `shiori4-testhost` が持つ。
+- **`ShioriApi::new` は `const fn`**: `static API_V3: ShioriApi = ShioriApi::new::<PastaV3, { SHIORI_ABI_VERSION_3 }>();` と書ける（`export_shiori!` と同じ作り）。
+- **`shiori4_host` の `V3Runtime` の Drop**: unload の直後にライブラリを閉じる（`v3.rs` 117〜122 行）。unload が返った時点でアクタースレッドが残っていると、閉じたライブラリのコードを走ることになる。→ ack の後の join（R4.4）は要る（Research Needed 5 はこれで閉じる）。
+- **`GetGuiResources` の 0**: wintf を外すと、試験のプロセスの USER オブジェクトが 0 になりうる。今の `sample_resources` は 0 を「測れない」とするので、`actor_reload_leak_test` の `leak_metric.expect(..)` が Windows で落ちる。`SetLastError(0)`→呼ぶ→0 なら `GetLastError()` で読み分ける直しが要る（設計の Teardown）。
+- **ログの量の設定**: `FILTER_HANDLE`（`reload::Handle<EnvFilter>`）は `PastaLoader` の Stage 1.5（`loader/mod.rs` 274 行）から `update_tracing_filter` で替えられる。その時点で `LoadDirGuard(base_dir)`（同 111 行）が張られている。`REGISTRY` の振り分けの決まり（文脈あり→その項目、文脈なしでロガー 1 つ→それ）は、量の設定の選び方にもそのまま使える。既存の `logging_filter_reload_test.rs`（文脈なしの試験のスレッドで `tracing::enabled!` を見る）は、ロガーが 1 つなので期待を変えずに通る見込み。
+- **同じディレクトリの見分け**: `REGISTRY` の鍵は `PathBuf`。`Path` の比較は成分ごとなので、末尾の区切りと Windows の `/`・`\` の違いは同じ鍵になる。`PastaLoader` は `base_dir` を正規化せずに鍵にしている（Stage 1 と Stage 1.5 で同じ鍵）。
+- **占有の外れ方**: `PastaShiori::release_runtime` は `self.load_dir` が `Some` のときだけ `unregister` する。今はディレクトリが無いと `load_dir` を持つ前に返るので、占有が外れなくなる。→ `load_dir` を有無の確かめより前に持つ直しを入れる。
+- **kick の送り先**: `pasta_lua` の `KickSink` は `None` が既定で、そのとき DAP の kick・`pasta/reloadShiori` は働かない（`debug/kick.rs`・`wiring/inbound.rs`）。インスタンスの送信端の `WeakSender`（flume 0.12 の `Sender::downgrade`）を閉じ込めれば、送り先が受け口を生かし続けない。
+- **CI のパスの渡し方**: shiori4 の `textbook` ジョブは Windows でも `shell: bash` と `cygpath -w` でパスを作り、末尾に `\` を付けている。PowerShell の `"…\"` は、ネイティブのプログラムの引数で末尾の `\"` が引用符の逃がしに読まれるので避ける。
+
+### 7.2 決めたこと
+
+| 論点 | 決め | 理由 |
+|---|---|---|
+| 芯の型 | `actor::instance::ActorInstance`（送信端・スレッド・ディレクトリ・連番）。`Drop` で ack を待ち、届けば join | インスタンスごとの状態の持ち主を 1 つにする。版 3 の Drop＝unload にそのまま合う |
+| 後始末の道の分け方 | `JoinPolicy::{JoinAfterAck, Detach}` を `shutdown` に渡す。`DllMain` の道だけ `Detach` | loader lock の中で待たない。呼ぶ側が道を知っている |
+| 旧来の入口の置き場 | 案 C。`actor::lifecycle` に `static LEGACY: ArcSwapOption<ActorInstance>` と今の名前の窓口を残す（全 OS） | 12 ファイルの試験を期待を変えずに全 OS で走らせたまま芯へ移せる。送信の道にロックを置かない決まりを保つ |
+| 版 3 の口 | `PastaV3`（`ActorInstance` 1 つ）と手書きの `shiori_get_api`（3 だけ） | `export_shiori!` は版 4 にもテーブルを返す |
+| 版 3 の判定 | `classify_request` → `Get`／`Notify`／`Shiori2`（`Rule::header2`）／`Unreadable`。戻り値は開始行の 3 桁、読めなければ 500 | 今の文法を読み取りだけで使う。文法は変えない |
+| 実行器 | E1（`while let Ok(msg) = rx.recv()`）。`spawn_actor_thread` の今の形は残し、`spawn_actor_thread_with` を足す | 待ちは 1 か所。既存の試験の呼び出しを変えない |
+| ログの量 | L1。購読者は 1 つ、層のフィルタが `REGISTRY` の項目の `EnvFilter` で判定。`FILTER_HANDLE` を消す。`max_level_hint` は項目の最大、表を変えたら `rebuild_interest_cache` | 書き先の選び方と量の選び方を同じ決まりにでき、「共有」の逃げ道が要らない。L2 は FFI の入口のスレッドやデバッグの橋のスレッドのログの扱いが要る |
+| 同じディレクトリの 2 つ目 | `GlobalLoggerRegistry::try_claim`（項目が無ければ足す）を、スレッドを起こす前に呼ぶ。外すのは VM の片付け（または起動の失敗） | 新しいグローバルな状態を足さない（R5.7・R6.2）。確かめと占有を 1 回のロックで行う |
+| 旧来の FFI の型 | `loadu`・`load`・`unload`・`DllMain` を i32、長さを `c_long` | R7.3。`DllMain` は同じ欠陥なので一緒に（OPEN QUESTION） |
+| Rust の試験 | `shiori4_abi::ShioriApi::load_v3` で in-process。境界をまたぐのは CI の `shiori4-testhost` | dev 依存を増やさない |
+| CI | `build-unix`（ubuntu・macos。release のビルド・`cargo test --workspace`・Linux の clippy・testhost）と Windows x64 の testhost の段 | R10。Windows はすでにビルドしたリリースの DLL を使う |
+
+### 7.3 合成（design-synthesis）
+
+- **一般化**: 旧来の入口と版 3 の入口は、どちらも「インスタンスを 1 つ作り、全文の要求を送り、片付ける」の変種なので、芯を `ActorInstance` 1 つにした。違いは入口の層（HGLOBAL・ABI のテーブル・判定）にだけ置く。版 4 は同じ芯の上に足せる（`shiori4-v4-host`）。
+- **作るか採るか**: ABI の検査と応答の写しは `shiori4_abi` を採る（自分で書かない）。試験のホストも `shiori4_abi` の `load_v3` と、CI の `shiori4-testhost` を採る。実行器は新しいクレートを採らず、flume の同期 `recv()` で足りる（E3 を採らない）。同じディレクトリの見分けは新しい集合を作らず `REGISTRY` を使う。
+- **削ったもの**: `MAILBOX`・`ACTOR_HANDLE`・`REQUEST_SEQ`・`FILTER_HANDLE`・`wintf-winmsg-executor`。`shiori4_host` の dev 依存。版 3 の口のための別の応答の型（`ShioriResponse` に `String` を入れるだけ）。版 3 の 400 の本文は、今の `to_shiori_400_response` と同じ形の小さな関数 1 つ。
+
+### 7.4 Research Needed の行き先
+
+| 番号 | 行き先 |
+|---|---|
+| 1. Linux・macOS で落ちるテスト | 実装の最初の段で `build-unix` を足したブランチを `workflow_dispatch` で回して数える（設計の OPEN QUESTION 8）。直しが膨らめば `pasta-portable-build` に分ける |
+| 2. macOS の vendored LuaJIT | 1 と同じ回しで確かめる（OPEN QUESTION 9） |
+| 3. ログの量を分ける作り | L1 に決めた（7.2）。`pasta_lua/tests/logging_per_dir_filter_test.rs` と `multi_instance_test.rs` で確かめる |
+| 4. load の失敗で片付ける待ち | 消えた。NULL はディレクトリの確かめ・占有の失敗（どちらもスレッドの前）と、スレッドを起こせない（待つものが無い）・ready の前に終わった（終わったスレッドを join するだけ）のときだけ |
+| 5. `dlclose` との競り | `V3Runtime` は unload の直後にライブラリを閉じると確かめた。ack の後の join で閉じる |
+| 6. x86 で testhost | 要件で対象外にした（R10.3） |
+| 7. `shiori4_host` の dev 依存 | 消えた（`shiori4_abi::ShioriApi::load_v3` を使う） |
+
+### 7.5 リスク
+
+- Linux・macOS のテストの直しの量（High のまま。7.4 の 1）。
+- ログの量の判定がイベントごとに `REGISTRY` のロックを取る。`max_level_hint` と `rebuild_interest_cache` で、誰も求めない量のコールサイトは先に弾く。`rebuild_interest_cache` は `REGISTRY` のロックを外してから呼ぶ（持ったまま呼ぶと止まる）。
+- 占有は「項目が在ること」で判定するので、同じテストのプロセスで `PastaLoader` を直に使って登録したまま、同じディレクトリで `ActorInstance` を起こすと断られる（`PastaLoader` を直に使う道は `unregister` しない）。出荷の道は必ず `PastaShiori` を通るので当たらない。
+- `PastaShiori::default()` の kick の送り先は `None` になる（今は `lifecycle::kick_sink()`）。`PastaShiori` を直に使う試験で DAP の kick を試すものは無いと見ている（実装で確かめる）。
+- 旧来の入口で、規約に反して片付けと要求が同時に走ると join を保証しない（OPEN QUESTION 10）。
