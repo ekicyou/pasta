@@ -117,3 +117,8 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 - shiori4 の 0.1.0 が 2026-10-24 に出た。名前の決まり（abi-conventions の論点 12）は、教科書の配布の決まり `doc/textbook/distribution.md` に書かれ、`shiori4_host` の `shiori_file_candidates` が同じ順を返す（`pasta.dll` に対し、x64 は `pasta.x64.dll` → `pasta.dll`、arm64 は `pasta.arm64.dll` →（x64 を起こせるホストだけ）`pasta.x64.dll` → `pasta.dll`）。上の Approach の名前は、そのまま合っている。
 - 0.1.0 は 0.0.2 以前と二進互換でない（応答の `out` をホストが作る）。areka の版 4・版 3 の読み込みは 0.1.0 で作り直すので、この spec の x64・arm64 の pasta.dll も、0.1.0 の `shiori4_abi` で作った `shiori4-v3-portable` の入口が前提になる（先に要るものは変わらない）。
 - 試験用のホスト `shiori4-testhost`（`shiori4_host` 0.1.0 の example）で、x64 の pasta.dll を x64 のランナーで 1 往復させられる（`shiori4-v3-portable` が `build.yml` に足す段を、arch ごとに回せる）。arm64 は、ランナーがあるときだけ。
+
+## 申し送り（shiori4-v3-portable の要件より・2026-10-25）
+
+- SHIORI/3.0 の書き出しの型は、`shiori4-v3-portable` で全部直ることになった（あちらの R7.3。開発者の決定）。`load`・`loadu`・`unload` の戻り値は i32 の 1／0、`load`・`loadu` の長さと `request` の長さは C の `long`。この spec の「x64 版を出す前に型を直す」は、あちらが入れば満ちる。この spec が `windows.rs` を持つ必要は無い。
+- あちらは Windows 以外の配布物を出さない（CI で Linux・macOS のビルドとテストを守るだけ。Windows の版 3 の 1 往復は x64 だけ）。Windows の x64 版の `pasta.x64.dll` を出すなら、shiori4 のファイル名の決まり（`pasta.x64.dll` → `pasta.dll`）を見ること。

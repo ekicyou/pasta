@@ -158,3 +158,17 @@
 - **要件定義のモデル**: Opus（前のまま）。
 - **分割の案**: 要らない。
 - **見つけた穴・古くなった記述**: Existing Spec Touchpoints の Adjacent に `shiori4-v3-portable`・`shiori4-v4-host`・`pasta-dll-multiarch`・`mlua-0-12-upgrade` が無い（前の 3 つは 10-23 の再測定でも指摘済み）。Current State の `lifecycle.rs` の 2 つの行番号の誤りは 10-23 の再測定のとおり。
+
+## 申し送り（shiori4-v3-portable の要件より・2026-10-25）
+
+`shiori4-v3-portable` の要件のディスカッションで、開発者が次を決めた（あちらの `requirements.md` の末尾の「要件のディスカッションで決めたこと」）。あちらが先に入るので、この spec のギャップ分析は、あちらが入った後の main で測り直すこと。
+
+- **1 番（unload と FreeLibrary の競り）は、あちらで閉じる**。あちらの R4.2・4.4・7.6: 後始末の完了が上限（5 秒）の中で届けば、アクタースレッドの終わりを待ってから `unload` を返す。上限を過ぎたら今どおり手放してログに出す。版 3 と旧来の入口の両方に効く（芯の型の片付けに 1 度書く）。
+  - **`DllMain` の中の片付け（unload をせずに FreeLibrary されたとき）は、あちらの Out**（loader lock の中ではスレッドの終わりを待てない）。この spec の 1 番の「もう 1 つの場合」（DllMain が loader lock を持ったまま 5 秒待ち、アクターの `drop(shiori)` が Lua の C モジュールの FreeLibrary で止まる）は、こちらに残る。
+  - こちらの Approach の「ack の後に `WaitForSingleObject(TEARDOWN_TIMEOUT)`」は、あちらの作り（設計で決まる）に置き換わる。
+- **4 番（FFI の型）は、あちらで全部閉じる**。あちらの R7.3: `load`・`loadu`・`unload` の戻り値は i32 の 1／0、`load`・`loadu` の長さと `request` の長さ（受けと返し）は C の `long`。10-23 の再測定の「残るのは `usize`→`c_long` だけ」も無くなる。
+- **5 番（MAILBOX の単体テストの競り）は、あちらの設計しだい**。あちらは `MAILBOX`・`ACTOR_HANDLE` をインスタンスごとの芯の型へ移す（R5.1）。ただし、`lifecycle` の自由関数を旧来の入口の置き場への窓口として残す案（あちらのギャップ分析の選択肢 C）が推奨なので、テストが置き場を共有し続けて競りが残ることもある。あちらの `design.md` で確かめること。
+- **7・8 番（`teardown.rs` の測り・`marshal_request` の写し）**: `lifecycle.rs`・`thread.rs` が書き直され、実行器の `wintf-winmsg-executor` も外れる（あちらの R8）。場所と形を測り直すこと。
+- **2 番（フォルダが無いと理由の無い 500）**: あちらの版 3 の `load` は、ディレクトリが無いときに NULL を返す（R2.4。ログを置けないので理由は出さなくてよい）。旧来の入口の 500 の理由は、こちらに残る。
+- **3 番・6 番・9〜12 番**: あちらは触らない。
+- **規模**: 1 番の主な部分と 4 番が抜けるので、10-23 の見積もり（12〜15）より小さくなる見込み。
