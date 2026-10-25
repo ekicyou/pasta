@@ -22,17 +22,14 @@ tracing.workspace = true
 thiserror.workspace = true
 pest.workspace = true
 pest_derive.workspace = true
-# mailbox=recv_async／reply・done=recv_timeout（本番アクター経路で使用）
+# mailbox=同期 recv()（アクタースレッドのループ）／reply・done=recv_timeout（本番アクター経路で使用）
 flume.workspace = true
-# 本番アクタースレッドの block_on メッセージループ。task 5.1 で FFI 入口が本スレッドへ
-# 切り替わったため、optional/actor-poc から通常依存へ昇格（R4.4: アクタースレッド所有を
-# アダプタ層に閉じ込める）。PoC の feature（actor-poc）は撤去済みで、wintf は出荷経路の
-# 通常依存としてリンクされる。
-wintf-winmsg-executor.workspace = true
-# static MAILBOX の lock-free 再設定可能スロット（RN6: respawn モデル）。reload で
+# 旧来の入口の置き場（static LEGACY）の lock-free 再設定可能スロット（RN6: respawn モデル）。reload で
 # アクタースレッド＋チャネルを teardown→再 spawn するため、送信端 Sender を Mutex なしで
 # 差し替え可能にする ArcSwapOption を用いる（送信パスは load/store のみ・lock-free）。
 arc-swap.workspace = true
+# 版 3 の口（`shiori_get_api`）。ABI の検査（copy_from_slice・UTF-8・パニックの捕捉）はこのクレートが行う。
+shiori4_abi.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 # teardown のリーク検査（GetProcessHandleCount/GetGuiResources）に Win32_System_Threading を
@@ -60,4 +57,5 @@ tracing-test.workspace = true
 # 本番 `to_ansi_str`（CP_ACP デコード）と対称な `WideCharToMultiByte`/CP_ACP で ANSI エンコードし、
 # 応答 HGLOBAL を read/free するために Win32 Memory/Globalization を直接利用する。
 # 本体は既に windows-sys を通常依存として持つため、dev 側はリンク可能化のための再宣言のみ。
-windows-sys = { workspace = true }
+# ToolHelp は multi_instance_test がアクタースレッドを数えるため（unload の後に残らないこと）。
+windows-sys = { workspace = true, features = ["Win32_System_Diagnostics_ToolHelp"] }

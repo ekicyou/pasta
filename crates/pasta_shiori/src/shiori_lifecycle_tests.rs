@@ -108,6 +108,53 @@ fn test_load_nonexistent_directory_returns_false() {
     assert!(shiori.runtime.is_none());
 }
 
+/// ディレクトリが無いときも、ディレクトリは有無を確かめる前に覚えられ、VM の片付けで
+/// そのディレクトリのログの登録が外れる（先にアクターの持ち主が登録・占有した項目を残さない）。
+#[test]
+fn test_load_nonexistent_directory_unregisters_logger_on_drop() {
+    let temp = TempDir::new().unwrap();
+    let missing = temp.path().join("missing_ghost_dir");
+    let logger = pasta_lua::PastaLogger::new(temp.path(), None).unwrap();
+    GlobalLoggerRegistry::instance().register(missing.clone(), std::sync::Arc::new(logger));
+
+    let mut shiori = PastaShiori::default();
+    assert!(!shiori.load(0, missing.as_os_str()).unwrap());
+    drop(shiori);
+
+    assert!(
+        GlobalLoggerRegistry::instance().get(&missing).is_none(),
+        "logger registration for a missing load_dir must be removed on cleanup"
+    );
+}
+
+/// 札を渡された持ち主が同じディレクトリを読み直しても、最後の片付けで登録が外れる
+/// （一度使った札を持ち続けると、読み直しで世代が変わった項目を札の照合で外せずに残す）。
+#[test]
+fn test_reload_with_claim_unregisters_logger_on_drop() {
+    let temp = copy_fixture_to_temp("minimal");
+    let dir = temp.path().to_path_buf();
+    let token = GlobalLoggerRegistry::instance().try_claim(dir.clone());
+    assert!(token.is_some(), "fresh dir must be claimable");
+
+    let mut shiori = PastaShiori::default();
+    shiori.set_claim(token);
+    assert!(shiori.load(0, dir.as_os_str()).unwrap());
+    assert!(shiori.load(0, dir.as_os_str()).unwrap());
+    drop(shiori);
+
+    assert!(
+        GlobalLoggerRegistry::instance().get(&dir).is_none(),
+        "logger registration must be removed after reload with a claim"
+    );
+}
+
+/// 既定の作り方では kick の送り先は無い（kick の道は働かない）。
+#[test]
+fn test_default_has_no_kick_sink() {
+    assert!(PastaShiori::default().kick_sink.is_none());
+    assert!(PastaShiori::with_kick_sink(None).kick_sink.is_none());
+}
+
 #[test]
 fn test_request_after_load_failure_returns_load_error() {
     let temp = TempDir::new().unwrap();

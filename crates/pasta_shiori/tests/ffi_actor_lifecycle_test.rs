@@ -1,7 +1,7 @@
 //! FFI 所有モデル E2E 統合テスト（task 5.1・R8.1/R8.2/R8.3/R8.4）。
 //!
 //! `windows.rs` の FFI extern 入口（`load`/`request`/`unload`）が結線する本番ライフサイクル
-//! 自由関数 [`pasta::actor::lifecycle`]（`static MAILBOX` 所有モデル）を、実ゴースト VM に対して
+//! 自由関数 [`pasta::actor::lifecycle`]（`static LEGACY` 所有モデル）を、実ゴースト VM に対して
 //! **load→request→unload→reload** の完全サイクルで駆動し、以下を実証する:
 //!
 //!  (a) `spawn_actor` がアクタースレッド上で実 VM をロードし、`marshal_request` 経由の GET が
@@ -12,9 +12,9 @@
 //!      正常稼働し、reload 後も GET 応答が不変（R7.2 reload・R8 所有モデル）。
 //!  (e) アクター不在（teardown 後）の `marshal_request` は 204（無限待機なし・R5.6）。
 //!
-//! # 単一スレッド直列実行（`static MAILBOX` 共有のため）
-//! `lifecycle::MAILBOX` はプロセスグローバルである。本ファイルは **1 つの `#[test]`** に
-//! 全フェーズを直列に詰め、他テストと MAILBOX を共有しない（同一バイナリ内に他テストを置かない）。
+//! # 単一スレッド直列実行（`static LEGACY` 共有のため）
+//! `lifecycle::LEGACY` はプロセスグローバルである。本ファイルは **1 つの `#[test]`** に
+//! 全フェーズを直列に詰め、他テストと LEGACY を共有しない（同一バイナリ内に他テストを置かない）。
 //! これにより順序非依存・競合なしで FFI 所有モデルの一連の遷移を観測できる。
 
 use std::path::{Path, PathBuf};

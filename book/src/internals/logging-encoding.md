@@ -35,9 +35,9 @@
 
 | ファイル | 主な型・関数 | 役割 |
 | -------- | ------------ | ---- |
-| `crates/pasta_lua/src/logging/tracing_init.rs` | `init_tracing_with_reload`・`update_tracing_filter`・`FILTER_HANDLE` | tracing の購読者を 1 回だけ設置し、ログフィルタを後から差し替える |
+| `crates/pasta_lua/src/logging/tracing_init.rs` | `init_tracing`・`update_tracing_filter`・`RegistryFilter`・`build_filter` | tracing の購読者を 1 回だけ設置し、量の判定を登録簿の項目（設置パスごと）に任せる |
 | `crates/pasta_lua/src/logging/logger.rs` | `PastaLogger` | 1 つのゴーストのログファイル。パスの検査、非同期の書き込み、破棄時のフラッシュ |
-| `crates/pasta_lua/src/logging/registry.rs` | `GlobalLoggerRegistry`・`RoutingWriter`・`CURRENT_LOAD_DIR`・`LoadDirGuard` | 設置パスをキーにロガーを登録する簿と、書き込み先をスレッドローカルの設置パスで選ぶ writer |
+| `crates/pasta_lua/src/logging/registry.rs` | `GlobalLoggerRegistry`・`ClaimToken`・`RoutingWriter`・`CURRENT_LOAD_DIR`・`LoadDirGuard` | 設置パスをキーに、ロガー・量の設定・占有の世代を 1 項目にまとめる簿と、書き込み先をスレッドローカルの設置パスで選ぶ writer |
 | `crates/pasta_lua/src/runtime/log.rs` | `register`・`value_to_string`・`get_caller_info` | `@pasta_log` のモジュール表と 5 つのレベル関数 |
 | `crates/pasta_lua/src/loader/config/sections.rs` | `LoggingConfig` | `[logging]` の型（`file_path`・`level`・`filter`）と、フィルタ文字列への変換 `to_filter_directive` |
 
@@ -49,13 +49,13 @@ tracing のイベント（Rust の info! など、@pasta_log の呼び出し）
    ▼
 Registry（プロセスに 1 つ）
  └ fmt レイヤ（ANSI 色なし・target とレベルを出力）
-     │  レイヤ単位のフィルタ: reload::Layer<EnvFilter>（FILTER_HANDLE で差し替え）
+     │  レイヤ単位のフィルタ: RegistryFilter（文脈で選んだ項目の EnvFilter で判定）
      ▼
 GlobalLoggerRegistry::make_writer（イベントごと）
      │  CURRENT_LOAD_DIR（スレッドローカル）で文脈（設置パス）を得る
-     │  resolve: loggers: Mutex<HashMap<設置パス, Arc<PastaLogger>>> を引く（振り分けの 3 規則）
+     │  resolve: Mutex<HashMap<設置パス, 項目>> を引く（振り分けの 3 規則）
      ▼
-RoutingWriter ── 決まった → PastaLogger::write → NonBlocking → ワーカースレッド → ログファイル
+RoutingWriter ── 決まった → PastaLogger::write → RollingFileAppender → ログファイル
                └ 無い     → 何もせず書いたことにする（捨てる）
 ```
 
@@ -83,13 +83,13 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
  1. 再読み込みなら、前の設置パスのロガーの登録を外す
  2. PastaLogger::new(設置パス, None)      … 既定の file_path で作る。失敗しても続行
     成功 → GlobalLoggerRegistry に 設置パス → ロガー で登録
- 3. init_tracing_with_reload(LoggingConfig::default())
-      購読者の設置は try_init。プロセスで最初の 1 回だけ成功し、そのときだけ FILTER_HANDLE を保存
+ 3. init_tracing()
+      購読者の設置は try_init。プロセスで最初の 1 回だけ成功する。量の設定は持たない
  4. LoadDirGuard::new(設置パス)            … 以後このスレッドのログは設置パスのロガーへ
 
 段階 1.5（PastaLoader::load_with_config。pasta.toml を読んだ直後）
  5. config.logging()                       … [logging] が無い・型が合わない → None
-    update_tracing_filter([logging] または既定) で FILTER_HANDLE のフィルタを差し替える
+    update_tracing_filter(設置パス, [logging] または既定) でその項目の量の設定を作り直す
  6. PastaLogger::new(設置パス, [logging] または既定)
     成功 → 同じ設置パスで登録し直す（段階 1 のロガーを置き換える）
     失敗 → PastaLogger::new(設置パス, None) で既定のログファイルのロガーを作り直す
@@ -114,14 +114,16 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 2. `LoggingConfig::to_filter_directive` の文字列（`filter` があればそれ、無ければ `level`。`level` の既定は `"info"`）を解釈できれば、それを使う。
 3. どちらも使えなければ、標準エラーに警告を出して `"info"` にする。
 
-段階 1 は既定の設定でこの順をたどり、段階 1.5 は毎回、`[logging]` の設定（無ければ既定の設定）で作り直したフィルタに差し替える。再読み込みで `[logging]` を消すと、フィルタは既定に戻る。フィルタは `reload::Layer` で包まれており、購読者を設置し直さずに `FILTER_HANDLE` 経由で中身だけを入れ替える。
+フィルタは登録簿の項目（設置パス）ごとに 1 つある。項目を作ったときは既定の設定でこの順をたどり、段階 1.5 は毎回、`[logging]` の設定（無ければ既定の設定）で作り直したフィルタをその項目に入れる。再読み込みで `[logging]` を消すと、フィルタは既定に戻る。あるゴーストの `[logging]` は、そのゴーストのログだけに効く。
+
+購読者のフィルタ `RegistryFilter` は、イベントごとに下の振り分けの規則と同じ決まりで項目を選び、その項目のフィルタで判定する。選べなければ出さない。判定の決まりの詳細と、スパンの中身で絞る指定が効かないことは [SHIORI 層](shiori.md#ログの量の判定) が書く。
 
 ### ログ 1 件がファイルに届くまで
 
 1. イベントがフィルタを通ると、fmt レイヤが 1 行に整形する（時刻・レベル・target・メッセージ・フィールド。ANSI の色付けはしない）。
 2. fmt レイヤはイベントごとに `GlobalLoggerRegistry::make_writer` を呼ぶ。`make_writer` はそのスレッドの `CURRENT_LOAD_DIR` を読み、`resolve` で書き込み先のロガーを決めて（下の 3 規則）、`RoutingWriter` を返す。
 3. `RoutingWriter` は、ロガーがあれば `PastaLogger::write` へ渡し、無ければ書いたバイト数を返して捨てる。捨てるときもエラーや panic は起こさない。
-4. `PastaLogger::write` は、ミューテックスで守った `tracing_appender::non_blocking` の writer に書く。実際のファイル書き込みは、ロガーごとのワーカースレッドが行う。
+4. `PastaLogger::write` は、ミューテックスで守った `RollingFileAppender` に、呼び出したスレッドのまま書く。書き込み用のスレッドは作らない（下の「ログファイル」）。
 
 ### 振り分けの規則
 
@@ -131,22 +133,24 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 2. 文脈が無く、登録されたロガーがちょうど 1 つ → そのロガーへ書く。
 3. それ以外（文脈が無く、登録が 0 個または 2 個以上）→ 捨てる。
 
-規則 1 で他のロガーへ流さないのは、あるゴーストのログを別のゴーストのログファイルに書かないためである。規則 3 で 2 個以上のときに捨てるのも、どのゴーストに属するかを決められないためである。登録簿のミューテックスを持つのは、表を引いて `Arc` を複製する間だけである。`register` が置き換えた古いロガーと `unregister` が外したロガーの破棄（フラッシュとワーカースレッドの終了待ち）は、ロックを放してから行う。
+規則 1 で他のロガーへ流さないのは、あるゴーストのログを別のゴーストのログファイルに書かないためである。規則 3 で 2 個以上のときに捨てるのも、どのゴーストに属するかを決められないためである。登録簿のミューテックスを持つのは、表を引いて `Arc` を複製する間だけである。`register` が置き換えた古いロガーと `unregister` が外したロガーの破棄（フラッシュ）は、ロックを放してから行う。
 
 `CURRENT_LOAD_DIR` を設定するのは `LoadDirGuard` で、ガードの破棄で元の値に戻す（入れ子にできる）。文脈を張るのは次の箇所である。
 
 | 箇所 | 張る範囲 |
 | ---- | -------- |
-| アクタースレッドの入口（`spawn_actor_thread` のスレッド本体の先頭） | スレッドの終わりまで。メッセージループの観測ログ（`actor.spawn`・`actor.recv`・`actor.reply`・`actor.stop`）もこの文脈で出る |
+| アクタースレッドの入口（`spawn_actor_thread_with` のスレッド本体の先頭） | スレッドの終わりまで。メッセージループの観測ログ（`actor.spawn`・`actor.recv`・`actor.reply`・`actor.stop`）もこの文脈で出る |
 | `PastaShiori` の `load`（段階 1 の登録の後）・`request`・`kick`・`call_lua_unload`・`release_runtime` | 各メソッドを抜けるまで。アクタースレッドの文脈の内側で入れ子になる |
 | `PastaLoader::load_with_config`（設置パスの存在を確かめた直後） | 関数を抜けるまで。組み込みで複数のゴーストを読んでも、ローダのログは自分のロガーへ届く |
 | FFI 入口の `load_impl`（`load_entry` から呼ばれる） | `spawn_actor` が戻った後、入口名と成否の 1 行を出す間（理由は [SHIORI 層](shiori.md#load-とアクターの起動)） |
+| 版 3 の入口（`PastaV3` の `load`・`request`・`notify`） | 入口の 1 行・弾いた要求・開始行を読めない警告を出す間 |
+| `ActorInstance` の起動と後始末 | 占有を断った・引き継いだ・起動に失敗した・スレッドを手放したログを出す間 |
 
-文脈を持たないのは、ホストのスレッド（FFI 入口の `request`・`unload`・`load_entry`、`DllMain` の detach から呼ばれる `unload`）と、デバッグバックエンドのスレッドである。これらのログは規則 2 で届く。
+文脈を持たないのは、ホストのスレッド（旧来の入口の `request`・`unload`・`load_entry`、`DllMain` の detach の後始末）と、デバッグバックエンドのスレッドである。これらのログは規則 2 で届く。
 
 ### 残るログと捨てるログ
 
-pasta.dll では、登録簿のロガーは 0 個か 1 個である。そのため、ロガーが登録されている間に出たログは、どのスレッドで出たものでもログファイルに残る。捨てるのはロガーが登録されていないときのログだけである。
+旧来の入口だけを使うホスト（SSP）では、登録簿のロガーは 0 個か 1 個である。そのため、ロガーが登録されている間に出たログは、どのスレッドで出たものでもログファイルに残る。捨てるのはロガーが登録されていないときのログだけである。版 3 のインスタンスが並ぶと、文脈の無いログは規則 3 で捨てる。
 
 | ログ | 扱い |
 | ---- | ---- |
@@ -155,9 +159,9 @@ pasta.dll では、登録簿のロガーは 0 個か 1 個である。そのた�
 | 終了処理の間のログ（`SHIORI.unload` の結果、永続化データの保存の失敗、登録解除の通知「Unregistering logger」） | 登録解除の前に出るので届く。登録解除がファイルを閉じる最後の手順である |
 | 最初の `load` の段階 1 より前のログ（入口の引数の誤り、設置パスを読めないなど） | 登録が 0 個なので捨てる（規則 3） |
 | 終了処理の完了の通知（done ack）の後のログ（アクタースレッドの `actor.done`、FFI 入口の「done ack received」） | 登録解除の後なので捨てる（規則 1・規則 3） |
-| 同じプロセスに 2 つ以上のロガーがあるとき（組み込みで複数のゴーストを読む場合）の、文脈の無いログ | どのゴーストのものか決められないので捨てる（規則 3） |
+| 同じプロセスに 2 つ以上のロガーがあるとき（版 3 のインスタンスが並ぶ場合や、組み込みで複数のゴーストを読む場合）の、文脈の無いログ | どのゴーストのものか決められないので捨てる（規則 3） |
 
-ログを残すために、SHIORI の応答・応答までの待ち時間の上限・`unload` の戻り値は変えない。FFI 入口のスレッドが登録簿のミューテックスを取るのは、ログのイベントがフィルタを通ったときだけで、mailbox の送信の経路には触れない。
+ログを残すために、SHIORI の応答・応答までの待ち時間の上限・`unload` の戻り値は変えない。FFI 入口のスレッドが登録簿のミューテックスを取るのは、ログのイベントが全部の項目の量の最大（`max_level_hint`）を通って、量の判定と書き込み先を引くときだけで、mailbox の送信の経路には触れない。
 
 ### ログファイル
 
@@ -173,9 +177,9 @@ pasta.dll では、登録簿のロガーは 0 個か 1 個である。そのた�
    `profile/pasta/logs/pasta.log`・`profile/x.log` は正しい。`profile.log`・`profiles/x.log` のように文字列として `profile` で始まっても `profile/` ディレクトリの下にないもの、`profile` だけのもの、`../x.log`・`profile/../x.log`・`logs/x.log` は不正である。
 3. 親ディレクトリを作る（`create_dir_all`）。
 4. `RollingFileAppender` を `Rotation::NEVER` とファイル名そのものを接頭辞にして作る。日付の接尾辞は付かず、ファイル名は `file_path` のとおりになる。既存のファイルには追記する。
-5. `tracing_appender::non_blocking` でワーカースレッドと `WorkerGuard` を作り、`PastaLogger` が保持する。
+5. `RollingFileAppender` をミューテックスで包んで `PastaLogger` が保持する。
 
-`PastaLogger` の `Drop` はフラッシュし、続く `WorkerGuard` の破棄がワーカースレッドに残りを書かせる。ログファイルは日付で分けず、古いファイルの削除もしない。
+`PastaLogger` の `Drop` はフラッシュする。`tracing_appender::non_blocking` のワーカースレッドは使わない。ワーカースレッドは `WorkerGuard` を破棄しても join されないので、ホストが unload の直後に pasta.dll を解放すると、外れたコードの上で動き続けて落ちる。ログファイルは日付で分けず、古いファイルの削除もしない。
 
 ### `@pasta_log` の呼び出し
 
@@ -237,8 +241,8 @@ VM の中の文字列（DSL から生成したコード、`scripts/` の Lua ソ
 
 | 境界 | 渡す側 → 受ける側 | 渡すもの | 所有 |
 | ---- | ----------------- | -------- | ---- |
-| SHIORI → ロギング | `PastaShiori::load` → `GlobalLoggerRegistry`・`init_tracing_with_reload` | 段階 1 の `Arc<PastaLogger>`（キーは設置パス）、既定の `LoggingConfig` | 登録簿が `Arc` を持つ。登録を外すのは `PastaShiori` |
-| ローダ → ロギング | `PastaLoader::create_and_register_logger` → `GlobalLoggerRegistry`・`update_tracing_filter` | 段階 1.5 の `Arc<PastaLogger>`、`[logging]`（無ければ既定）の `LoggingConfig` | 同上 |
+| SHIORI → ロギング | `ActorInstance::spawn_with`・`PastaShiori::load` → `GlobalLoggerRegistry`・`init_tracing` | 占有の札（`try_claim`・`take_over`）、段階 1 の `Arc<PastaLogger>`（キーは設置パス） | 登録簿が `Arc` を持つ。札を返して登録を外すのは `PastaShiori` |
+| ローダ → ロギング | `PastaLoader::create_and_register_logger` → `GlobalLoggerRegistry`・`update_tracing_filter(設置パス, …)` | 段階 1.5 の `Arc<PastaLogger>`、`[logging]`（無ければ既定）の `LoggingConfig` | 同上 |
 | ローダ → ランタイム | `PastaLoader` → `PastaLuaRuntime::from_loader_with_scene_dic` | 段階 1.5 の `Arc<PastaLogger>`（無ければ `None`） | ランタイムは参照を保持するだけで、書き込みには使わない |
 | Rust → Lua | `crates/pasta_lua/src/runtime/module_registry.rs` → `package.loaded` | `@pasta_log`・`@enc` のモジュール表 | VM が持つ |
 | Lua → Rust（`@pasta_log`） | Lua の呼び出し → tracing | 任意の値 1 つ（2 つ目以降は無視）。呼び出し元の情報は Rust 側がスタックから取る | 文字列化した結果だけがイベントに載る |
@@ -247,12 +251,12 @@ VM の中の文字列（DSL から生成したコード、`scripts/` の Lua ソ
 
 ## 不変条件と制約
 
-- tracing の購読者はプロセスに 1 つで、最初の `init_tracing_with_reload` だけが設置する。先に別の購読者が設置されていた場合、pasta の購読者は設置されず、`FILTER_HANDLE` も保存されないため、`update_tracing_filter` は何もしない。
-- フィルタは購読者の 1 つの fmt レイヤに付いており、プロセス内のすべてのインスタンスで共有される。インスタンスごとに異なるフィルタは持てず、最後に差し替えたフィルタがすべてに効く。
+- tracing の購読者はプロセスに 1 つで、最初の `init_tracing` だけが設置する。先に別の購読者が設置されていた場合、pasta の購読者は設置されず、`update_tracing_filter` は項目のフィルタを替えるだけで、出力には効かない。
+- フィルタは登録簿の項目（設置パス）ごとに持ち、あるゴーストの `[logging]` はそのゴーストのログだけに効く。スパンの中身で絞る指定は効かず、`tracing::enabled!` はディレクトリごとの断りを映さない（[SHIORI 層](shiori.md#ログの量の判定)）。
 - ログの振り分け先は、イベントを出したスレッドの `CURRENT_LOAD_DIR` と登録簿の中身だけで決まる（振り分けの 3 規則）。文脈のあるスレッドのログを別の設置パスのロガーへ書くことは無い。捨てるときもエラーにならない。
 - 登録簿のキーは設置パスの `PathBuf` で、正規化せずに完全一致で比べる。段階 1 と段階 1.5 は同じ設置パスの値を使う。
 - ログファイルのパスは、設置パスからの相対パスが `profile/` ディレクトリの下にあり `..` を含まないものに限られる。満たさない `file_path` は既定のログファイルに切り替わる。ファイルは追記で、ローテーションも切り詰めもしない。
-- 書き込みは `tracing_appender::non_blocking` の既定の設定で、ワーカースレッドへの行のバッファが満ちたときは、呼び出し側を待たせずにその行を捨てる。
+- 書き込みは呼び出したスレッドで同期に行い、行を捨てない。ロガーはスレッドを持たないので、unload の後に pasta.dll のコードの上で動くロガーのスレッドは残らない。
 - `@pasta_log` と `@enc` は、不正な入力で Lua のエラーを出さない。`@pasta_log` は必ず文字列にして記録し、`@enc` は `(nil, メッセージ)` を返す。
 - 文字コードの変換をするのは Windows だけである。Windows 以外では `Encoding` の両方の種類が UTF-8 のまま通す。
 - `@enc` の結果は、変換を呼んだ時点のシステムの ANSI コードページに依存する。

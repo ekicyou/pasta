@@ -190,10 +190,20 @@ fn source_map_resolve_lua_to_pasta_matches_normalized_chunk_key() {
     let file_a = "C:/proj/scene/a.pasta";
 
     // 格納時とは異なる等価形（前方スラッシュ・大小違い・`@` 無し）でも一致する。
+    // 大小違いを等価とみなすのは Windows の正規化だけ（非 Windows は大小を区別する）。
+    #[cfg(windows)]
     assert_eq!(
         sm.resolve_lua_to_pasta("C:/proj/cache/a.lua", 10),
         Some(&pos_in(file_a, 3))
     );
+    #[cfg(not(windows))]
+    {
+        assert_eq!(
+            sm.resolve_lua_to_pasta("C:/proj/cache/A.lua", 10),
+            Some(&pos_in(file_a, 3))
+        );
+        assert_eq!(sm.resolve_lua_to_pasta("C:/proj/cache/a.lua", 10), None);
+    }
     // 別の等価形（`@` 付き・別大小）でも一致。
     #[cfg(windows)]
     assert_eq!(
@@ -201,8 +211,14 @@ fn source_map_resolve_lua_to_pasta_matches_normalized_chunk_key() {
         Some(&pos_in(file_a, 9))
     );
     // 1 `.pasta` 行 7 へ集約される複数 `.lua` 行も各々解決できる。
+    #[cfg(windows)]
     assert_eq!(
         sm.resolve_lua_to_pasta("c:/proj/cache/a.lua", 12),
+        Some(&pos_in(file_a, 7))
+    );
+    #[cfg(not(windows))]
+    assert_eq!(
+        sm.resolve_lua_to_pasta("C:/proj/cache/A.lua", 12),
         Some(&pos_in(file_a, 7))
     );
 }
@@ -242,11 +258,11 @@ fn source_map_resolve_pasta_to_lua_returns_all_ascending() {
         ("c:/proj/cache/a.lua".to_string(), 13u32),
         ("c:/proj/cache/c.lua".to_string(), 4u32),
     ];
-    // 非 Windows では正規形は元の大小（小文字化しない）。"a.lua" < "c.lua"。
+    // 非 Windows では正規形は格納時の元の大小（小文字化しない）。"A.lua" < "c.lua"。
     #[cfg(not(windows))]
     let expected = vec![
-        ("C:/proj/cache/a.lua".to_string(), 12u32),
-        ("C:/proj/cache/a.lua".to_string(), 13u32),
+        ("C:/proj/cache/A.lua".to_string(), 12u32),
+        ("C:/proj/cache/A.lua".to_string(), 13u32),
         ("C:/proj/cache/c.lua".to_string(), 4u32),
     ];
     assert_eq!(resolved, expected);

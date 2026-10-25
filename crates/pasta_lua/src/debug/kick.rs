@@ -3,7 +3,7 @@
 //! This module defines the *type-only* boundary by which an outer host
 //! (`pasta_shiori`) can hand `pasta_lua` a closure that delivers a scene-kick
 //! request, without `pasta_lua` knowing anything about the request's eventual
-//! destination (`ActorMsg` / `MAILBOX`). The dependency direction
+//! destination (`ActorMsg` / `ActorInstance` mailbox). The dependency direction
 //! `pasta_shiori` → `pasta_lua` is preserved: this module never references
 //! `pasta_shiori` (requirements 2.4, 2.6).
 //!
@@ -30,8 +30,8 @@ pub struct KickRequest {
 
 /// Type-erased, thread-crossing kick sink.
 ///
-/// `pasta_shiori` injects a closure of this shape (typically a `MAILBOX`
-/// `try_send`) via [`RuntimeConfig::with_kick_sink`](crate::RuntimeConfig::with_kick_sink).
+/// `pasta_shiori` injects a closure of this shape (typically a `try_send`
+/// of `ActorMsg::Kick` into the actor instance's mailbox) via [`RuntimeConfig::with_kick_sink`](crate::RuntimeConfig::with_kick_sink).
 /// `pasta_lua` holds it opaquely and calls it from the socket-bridge thread,
 /// hence the `Send + Sync` bound.
 pub type KickSink = Arc<dyn Fn(KickRequest) + Send + Sync>;

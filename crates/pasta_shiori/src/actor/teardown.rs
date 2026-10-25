@@ -5,23 +5,23 @@
 //! teardown」の本番化。teardown は **`ActorMsg::Stop { done }` 制御メッセージ**を
 //! mailbox（単一 FIFO）へ送ることで成立する。Stop は同一 FIFO を通るため、先行
 //! メッセージは Stop の前に drain される（clean drain）。アクター（[`thread`] の
-//! `spawn_actor_thread` が回す単一 `recv_async` ループ）は Stop で:
+//! `spawn_actor_thread` が回す単一の同期 `recv()` ループ）は Stop で:
 //!
 //! 1. 残メッセージを drain 後（FIFO 順序が保証）、
 //! 2. VM（`PastaShiori` が内包する `!Send` Lua VM）を drop して debug backend teardown を
 //!    完了させ、mailbox の receiver を閉じ、
 //! 3. `done` ack を送る、
 //!
-//! という順序で teardown する。executor のメッセージ専用ウィンドウ（wintf の thread_local）
-//! は ack の後、`block_on` が戻ってスレッドが終了するときに破棄される。SHIORI 側は `done_rx.recv_timeout` で **有界に** ack を
-//! 待ち、ack 受信＝全資源解放済みを確認してからスレッドを **detach** する
-//! （[`thread::ActorThread::detach`]）。
+//! という順序で teardown する。その後ループを抜けたスレッドが終了する。SHIORI 側は `done_rx.recv_timeout` で **有界に** ack を
+//! 待ち、ack 受信＝全資源解放済みを確認する。
 //!
-//! # `JoinHandle`／二重 join を採らない理由（設計補足・R7.4）
-//! 完了確認は done ack で行うため、`JoinHandle::join`・`Arc<AtomicBool>` shutdown フラグ・
-//! `take()` 二重 join 回避の小細工は **不要**（join 自体を廃止）。これにより AC4 の
-//! 「二重 join 回避」は構造的に成立する。スレッドは detach し、block_on 完了後に自然
-//! 終了する。
+//! # ack の後の join／detach（仕様 `shiori4-v3-portable` 4.2・4.4・7.6）
+//! ack の後にスレッドをどう扱うかは芯の型 `ActorInstance` の後始末の決まりが選ぶ:
+//! unload は ack の後に join し、`DllMain` の FreeLibrary は join せずに detach し、
+//! ack が来なければ手放す（abandon）。本モジュールの低い層の [`teardown_actor`]
+//! （reload 反復のリーク検査が使う）は join せず、常に detach する
+//! （[`thread::ActorThread::detach`]）。完了確認は done ack で行うので、
+//! `Arc<AtomicBool>` shutdown フラグ・`take()` 二重 join 回避の小細工は持たない（R7.4）。
 //!
 //! # 冪等性（R7.4）
 //! done ack を受けた後の二重 teardown は、mailbox の receiver が既に drop されている
@@ -34,7 +34,7 @@
 //! [`TeardownReport::anomaly`] に載せる。**panic も `unwrap`/`expect` も使わず**、
 //! 異常を呼び出し側へ値で返してホスト（SSP）プロセスを巻き込まない。
 //!
-//! 本モジュールはアクタースレッド（[`thread`]・wintf `block_on` 依存）と実 OS リソース
+//! 本モジュールはアクタースレッド（[`thread`]）と実 OS リソース
 //! 計測（`windows-sys/Win32_System_Threading`）を用いる。FFI 入口（`windows.rs` の
 //! `load`/`unload`）への配線は task 5.1 で完了し、本番（既定）出荷ビルドに含まれる。
 
@@ -62,6 +62,11 @@ pub struct TeardownReport {
     /// teardown 途中の異常（ack timeout・送信失敗等）。`Some` ならホストを巻き込まずに
     /// 記録した異常内容（R7.5）。clean teardown／冪等 no-op の双方とも `None`。
     pub anomaly: Option<String>,
+    /// アクタースレッドの join を終えたか（仕様 `shiori4-v3-portable` 4.4・7.6 の観測点）。
+    ///
+    /// ack が届き、後始末の決まりが「ack の後に join」のときだけ真
+    /// （`ActorInstance::shutdown`）。Stop と ack だけの道（本関数）では常に偽。
+    pub joined: bool,
 }
 
 impl TeardownReport {
@@ -75,11 +80,13 @@ impl TeardownReport {
     }
 }
 
-/// アクタースレッドを teardown する（本番経路・design.md「reload teardown」）。
+/// アクタースレッドを join せずに teardown する（reload 反復のリーク検査の経路）。
+///
+/// 本番の unload（ack の後に join）は `ActorInstance` の後始末が受け持つ。
 ///
 /// `tx`（mailbox 送信端）から `ActorMsg::Stop { done }` を送り、`timeout` 付きで done ack
 /// を待つ。ack 受信＝アクターが残メッセージ drain・VM 破棄・debug teardown を終えた合図
-/// （メッセージ専用ウィンドウはこの後のスレッド終了時に破棄される）なので、その後 `actor` を **detach** する（join しない）。
+/// なので、その後 `actor` を **detach** する（join しない）。
 ///
 /// - ack 受信: `acked=true`・clean（[`TeardownReport::is_clean`]）。
 /// - Stop 送信が `Disconnected`（アクター既終了）: `already_done=true`（冪等 no-op）。
@@ -92,14 +99,14 @@ pub fn teardown_actor(
 ) -> TeardownReport {
     let report = teardown_via_sender(tx, timeout);
     // done ack を受けたか否かに関わらずスレッドは detach する（join しない=R7.4）。
-    // ack 済みなら block_on は戻り済み。timeout 異常時も join でハングさせない。
+    // ack 済みならループは抜け済み。timeout 異常時も join でハングさせない。
     actor.detach();
     report
 }
 
 /// mailbox 送信端のみで teardown（Stop{done}→ack 待ち）を試行する冪等経路。
 ///
-/// 本番 FFI 経路では `ActorThread` ハンドルを持たずに `static MAILBOX`（task 5.1）の
+/// 本番 FFI 経路では `ActorThread` ハンドルを持たずに `static LEGACY`（task 5.1）の
 /// `Sender` 越しに teardown を撃つ場面があり、また二重 teardown（unload と `DllMain
 /// detach` の競合）も起こりうる。本関数はそのどちらでも安全に振る舞う:
 ///
@@ -124,6 +131,7 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
             acked: false,
             already_done: true,
             anomaly: None,
+            joined: false,
         };
     }
     // 観測ログ点（R10.4・無効時ゼロコスト）: Stop を mailbox へ投入し done ack を待つ。
@@ -147,6 +155,7 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
                 acked: true,
                 already_done: false,
                 anomaly: None,
+                joined: false,
             }
         }
         Err(flume::RecvTimeoutError::Timeout) => {
@@ -158,6 +167,7 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
                 acked: false,
                 already_done: false,
                 anomaly: Some(msg),
+                joined: false,
             }
         }
         Err(flume::RecvTimeoutError::Disconnected) => {
@@ -170,6 +180,7 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
                 acked: false,
                 already_done: false,
                 anomaly: Some(msg),
+                joined: false,
             }
         }
     }
@@ -209,7 +220,7 @@ pub struct LeakMetric {
 /// reload teardown の反復リーク検査ハーネス（design「Reload / Teardown Tests」）。
 ///
 /// spawn→teardown（`Stop{done}` ack）→ 再 spawn のサイクルを反復し、各サイクルで
-/// アクタースレッド・VM・メッセージ専用ウィンドウ・チャネルが漏れなく解放される
+/// アクタースレッド・VM・チャネルが漏れなく解放される
 /// （clean teardown）こと、サイクル間でリソースが累積しない（リーク／枯渇不在）ことを
 /// **done ack 後に** 実測する。
 pub struct ReloadProbe;
@@ -299,10 +310,11 @@ struct ResourceSample {
 ///
 /// Windows では `GetProcessHandleCount`（カーネルハンドル・スレッド／イベント／
 /// チャネル由来ハンドルが漏れれば増える）と `GetGuiResources(GR_USEROBJECTS)`
-/// （USER オブジェクト＝メッセージ専用ウィンドウを含む）を読む。非 Windows では
+/// （USER オブジェクト。アクターはウィンドウを作らないので増えないはず）を読む。非 Windows では
 /// 計測手段がないため `None`。
 #[cfg(windows)]
 fn sample_resources() -> ResourceSample {
+    use windows_sys::Win32::Foundation::{GetLastError, SetLastError};
     use windows_sys::Win32::System::Threading::{
         GR_USEROBJECTS, GetCurrentProcess, GetGuiResources, GetProcessHandleCount,
     };
@@ -321,17 +333,30 @@ fn sample_resources() -> ResourceSample {
         }
     };
 
-    // SAFETY: `GetGuiResources` は読み取り専用。戻り値 0 は「USER オブジェクト 0 個」と
-    // 「呼び出し失敗」が区別できないが、長命なテストプロセスでは 0 は実質ない。安全側に
-    // 倒し、0 のときは計測不能扱い（None）として偽の増分を作らない。
+    // SAFETY: `GetGuiResources` は読み取り専用。`SetLastError`/`GetLastError` は
+    // 呼び出しスレッドの誤りの番号を読み書きするだけ。アクターはウィンドウを作らないので
+    // 試験のプロセスでは本当に 0 個になりうる。0 は誤りの番号で読み分ける。
     let user_objects = unsafe {
+        SetLastError(0);
         let n = GetGuiResources(process, GR_USEROBJECTS);
-        if n != 0 { Some(n) } else { None }
+        user_objects_from(n, GetLastError())
     };
 
     ResourceSample {
         kernel_handles,
         user_objects,
+    }
+}
+
+/// `GetGuiResources` の戻り値と、その直後の `GetLastError` から USER オブジェクト数を読む。
+/// 0 は「USER オブジェクト 0 個」と「呼び出し失敗」の両方を表すので、誤りの番号で読み分ける
+/// （誤りの番号 0 なら本当に 0 個、それ以外は測れない）。
+#[cfg(windows)]
+fn user_objects_from(n: u32, last_error: u32) -> Option<u32> {
+    if n != 0 || last_error == 0 {
+        Some(n)
+    } else {
+        None
     }
 }
 
@@ -341,5 +366,19 @@ fn sample_resources() -> ResourceSample {
     ResourceSample {
         kernel_handles: None,
         user_objects: None,
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::user_objects_from;
+
+    /// `GetGuiResources` の 0 を、`GetLastError` で「本当に 0」と「測れない」に読み分ける（8.4）。
+    /// USER オブジェクトが 0 のプロセス（誤りの番号 0）では `Some(0)` を返す。
+    #[test]
+    fn user_objects_zero_is_read_by_last_error() {
+        assert_eq!(user_objects_from(0, 0), Some(0));
+        assert_eq!(user_objects_from(0, 5), None);
+        assert_eq!(user_objects_from(3, 0), Some(3));
     }
 }

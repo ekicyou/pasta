@@ -56,12 +56,12 @@
 - **tracing 0.1**: ロギング（subscriber/appenderはpasta_luaに移管）
 - **thiserror 2**: エラー型定義
 - **windows-sys 0.61**: Windows DLL API（cfg(windows)・Win32_System_Threading 含む）
-- **flume 0.12**: アクター mailbox（async `recv_async` ＋同期 `recv_timeout` 兼用・`Sender: Send+Sync+Clone`）
-- **arc-swap 1**: `static MAILBOX` の lock-free スロット（送信パスに Mutex を置かない）
+- **flume 0.12**: アクター mailbox（アクタースレッドは同期 `recv()` のループ・応答待ちは `recv_timeout`・`Sender: Send+Sync+Clone`）
+- **arc-swap 1**: 旧来の入口の置き場 `static LEGACY` の lock-free スロット（送信パスに Mutex を置かない）
+- **shiori4_abi 0.1**: 版 3 の口（`shiori_get_api`）の ABI の検査（バッファの写し・UTF-8・パニックの捕捉）
 - **embed-resource 3**（build-dependency）: pasta.dll に VERSIONINFO（ファイル/製品バージョン）とアイコン（`res/pasta.ico`）を埋め込む（Windows ターゲットのみ）
-- **wintf-winmsg-executor 0.0.5**: アクタースレッドの `block_on` メッセージループ（`!Send` VM を pin）
 
-> **エンジン駆動モデル**: `pasta_lua` の `!Send` Lua VM を `pasta_shiori` 所有のアクタースレッドへ pin し、SHIORI スレッドとは flume mailbox の CH marshaling（GET=block-on-reply／NOTIFY=即204／drop・timeout→204）で通信する。`unsafe impl Send/Sync` は構造的に撤去済み。さくらスクリプト描画は pasta_lua に物理維持（Lua 集約）し、レンダラはアダプタ注入で論理デカップリング（`pasta-actor-runtime` で確立）。
+> **エンジン駆動モデル**: `pasta_lua` の `!Send` Lua VM を、インスタンス（`ActorInstance`）ごとに 1 本のアクタースレッドへ pin し、SHIORI スレッドとは flume mailbox の CH marshaling（GET=block-on-reply／NOTIFY=即204／drop・timeout→204）で通信する。アクタースレッドは OS に頼らない同期 `recv()` のループで回る。入口は 2 つ（旧来の HGLOBAL の `load`・`loadu`・`request`・`unload` は Windows だけ・置き場 `static LEGACY` に 1 つ／shiori4 の版 3 の `shiori_get_api` は全 OS・インスタンスごと）で、同じ芯につながる（`shiori4-v3-portable` で確立）。`unsafe impl Send/Sync` は構造的に撤去済み。さくらスクリプト描画は pasta_lua に物理維持（Lua 集約）し、レンダラはアダプタ注入で論理デカップリング（`pasta-actor-runtime` で確立）。
 
 **pasta_lsp:**
 - **pasta_dsl**: DSLパーサー層
@@ -199,7 +199,8 @@ cargo test -p pasta_lua     # pasta_luaテスト
 ### CI/CD
 - **GitHub Actions**: `.github/workflows/build.yml`（Rust/WASM）
   - push/PR/手動実行トリガー＋`workflow_call`（`release.yml` の gate から同じ検査を呼ぶ）
-  - **DLLビルド**: マトリックスビルド: x86 (`i686-pc-windows-msvc`) + x64 (`x86_64-pc-windows-msvc`)
+  - **DLLビルド**: マトリックスビルド: x86 (`i686-pc-windows-msvc`) + x64 (`x86_64-pc-windows-msvc`)。x64 の行で `shiori4-testhost`（`shiori4_host` の example）による版 3 の 1 往復
+  - **Linux・macOS（`build-unix`）**: ubuntu-latest・macos-latest で `cargo build --release -p pasta_shiori`（`libpasta.so`・`libpasta.dylib`）→ `cargo test --workspace` → clippy（Linux のみ）→ `shiori4-testhost --entry v3` で版 3 の 1 往復。成果物は upload しない（配布は Windows だけ）
   - **WASMビルド**: `pasta_lsp` を `wasm32-unknown-unknown` ターゲットでビルド（10MBサイズ上限チェック付き）
   - Rust キャッシュ: `Swatinem/rust-cache@v2`
   - アーティファクト: `pasta-dll-x86`, `pasta-dll-x64`（7日間保持）

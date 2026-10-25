@@ -12,15 +12,15 @@
 //! - `ffi_actor_lifecycle_test`: `actor::lifecycle::{spawn_actor,marshal_request,teardown_actor}`
 //!   （内部自由関数）経由。extern シンボルと HGLOBAL marshalling・dir の ANSI デコードは踏まない。
 //! - `windows_tests`（unit）: extern `load`/`request`/`unload` を踏むが、**実 VM を spawn しない**
-//!   ガード／未初期化（204）契約のみ（プロセスグローバル MAILBOX 競合回避）。
+//!   ガード／未初期化（204）契約のみ（プロセスグローバル LEGACY 競合回避）。
 //!
 //! 結果として「出荷 extern シンボルを通して **実ゴースト VM** を load→request(複数・コルーチン跨ぎ)
 //! →unload する完全セッションのバイト不変」を end-to-end で確認するテストが**存在しなかった**。
 //! 本ファイルはその継ぎ目を、SSP と同一の C ABI（no_mangle シンボル＋HGLOBAL＋CP_ACP dir デコード
 //! ＋UTF-8 request デコード）で閉じる。
 //!
-//! # `static MAILBOX` 共有のため単一 `#[test]`・他テストと同居させない
-//! extern 入口は `actor::lifecycle::MAILBOX`（プロセスグローバル）を変化させる。本ファイルは
+//! # `static LEGACY` 共有のため単一 `#[test]`・他テストと同居させない
+//! extern 入口は `actor::lifecycle::LEGACY`（プロセスグローバル）を変化させる。本ファイルは
 //! 全フェーズを 1 つの `#[test]` に直列化し、同一バイナリ内に他テストを置かない（順序非依存）。
 //!
 //! # 特性化（characterization）E2E について
@@ -42,6 +42,7 @@ use windows_sys::Win32::System::Memory::{GMEM_FIXED, GlobalAlloc};
 // ホストが C ABI で呼ぶ出荷入口そのもの。lib.rs の `pub use windows::{load,request,unload}`
 // を介して rlib 経由でリンク到達し、SSP と同一の HGLOBAL／ANSI dir／UTF-8 request 契約で駆動する。
 use pasta::{load, request, unload};
+use std::ffi::c_long;
 
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前に中和する
 /// （固定ポート枯渇でのテスト破壊を防ぐ・他統合テストと同一ガード）。
@@ -116,7 +117,7 @@ fn alloc_hglobal(bytes: &[u8]) -> HGLOBAL {
 /// extern `request` が返した応答 HGLOBAL（呼び出し側所有）を UTF-8 として読み取り、解放する。
 fn read_and_free_response(h: HGLOBAL, len: usize) -> String {
     assert!(!h.is_null(), "response HGLOBAL must not be null");
-    // SAFETY: 応答は h が len バイトの有効ブロックを指す（emit_response_into の契約）。
+    // SAFETY: 応答は h が len バイトの有効ブロックを指す（emit_response の契約）。
     let s = unsafe {
         let bytes = std::slice::from_raw_parts(h as *const u8, len);
         String::from_utf8(bytes.to_vec()).expect("response must be valid UTF-8")
@@ -146,10 +147,10 @@ fn drive_request(text: &str) -> String {
     let req = normalize_request(text);
     let bytes = req.as_bytes();
     let hreq = alloc_hglobal(bytes);
-    let mut len: usize = bytes.len();
+    let mut len: c_long = bytes.len().try_into().unwrap();
     // hreq は len バイトの有効 UTF-8 ブロック。所有は extern 側（capture）へ移譲される。
     let hres = request(hreq, &mut len);
-    read_and_free_response(hres, len)
+    read_and_free_response(hres, len.try_into().unwrap())
 }
 
 /// ghost ディレクトリパスを、本番 `to_ansi_str`（CP_ACP デコード）と**対称**な
@@ -196,7 +197,7 @@ fn drive_load(dir: &Path) -> bool {
     let ansi = path_to_ansi_bytes(dir);
     let hdir = alloc_hglobal(&ansi);
     // hdir は ansi.len() バイトの有効 CP_ACP ブロック。所有は extern 側（capture）へ移譲される。
-    load(hdir, ansi.len())
+    load(hdir, ansi.len().try_into().unwrap()) == 1
 }
 
 // ===========================================================================
@@ -291,8 +292,9 @@ fn extern_ffi_session_byte_invariant_e2e() {
     );
 
     // --- unload（出荷 extern `unload` → teardown_actor・常に true・冪等） ---
-    assert!(
+    assert_eq!(
         unload(),
+        1,
         "extern unload() must return true (clean teardown)"
     );
 
@@ -317,8 +319,9 @@ fn extern_ffi_session_byte_invariant_e2e() {
     );
 
     // クリーンアップ: 最終 unload（プロセス終了時の漏れ防止・冪等）。
-    assert!(
+    assert_eq!(
         unload(),
+        1,
         "final extern unload() must remain a safe no-op returning true"
     );
 

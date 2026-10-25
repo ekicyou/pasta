@@ -3,16 +3,20 @@
 //! This crate provides the SHIORI protocol interface as a Windows DLL.
 
 // 本番アクターランタイム。task 5.1 で FFI 入口（windows.rs）が `actor::lifecycle` の
-// `static MAILBOX` 所有モデルへ配線され、出荷経路となった。mailbox/thread/marshaling/
+// `static LEGACY` 所有モデルへ配線され、出荷経路となった。mailbox/thread/marshaling/
 // teardown/lifecycle が既定（no-feature）ビルドでコンパイル・リンクされる。
 pub mod actor;
 pub mod error;
 pub mod lua_request;
 mod shiori;
 mod util;
+mod v3;
 
 #[cfg(windows)]
 mod windows;
+
+// 版 3 の口（全部の OS で書き出す）。旧来の入口と同じく、rlib の試験から到達させるために再エクスポートする。
+pub use v3::shiori_get_api;
 
 // Re-export for integration tests
 pub use shiori::{PastaShiori, Shiori};

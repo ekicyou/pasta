@@ -7,14 +7,14 @@
 //!
 //! # チャンネル決定（design.md Technology Stack / RN7）
 //! - mailbox 本体 = **flume unbounded**。consumer は単一（アクタースレッド）で、
-//!   `recv_async().await`（`thread.rs`）による直列処理。flume `Sender` は
-//!   `Send + Sync + Clone` ゆえ `static MAILBOX`（`lifecycle.rs`）へ lock-free に共有され、
+//!   同期 `recv()` ループ（`thread.rs`）による直列処理。flume `Sender` は
+//!   `Send + Sync + Clone` ゆえ芯の型 `ActorInstance`（`instance.rs`）越しに lock-free に共有され、
 //!   送信パスに Mutex を置かない（R8）。
 //! - reply / done = **flume bounded(1)**。GET 応答・teardown done ack とも
 //!   `recv_timeout` で有界に待つ（`marshaling.rs`・`teardown.rs`）。
 //!
 //! # 単一 consumer 不変条件（design.md Revalidation Trigger）
-//! mailbox は **単一の非 cancel `recv_async` ループ**で消費し、`select!` を張らない。
+//! mailbox は **単一の同期 `recv()` ループ**で消費し、`select!` を張らない。
 //! 将来の新メッセージ源（Kick 等）は別チャンネル＋`select!` ではなく [`ActorMsg`] の
 //! variant として同一 mailbox へ merge する。この不変条件により flume の
 //! cancel 欠陥（#104/#135）に構造的に到達しない。
@@ -156,8 +156,8 @@ impl ActorMsg {
 /// ペアを返す（flume unbounded）。
 ///
 /// `Sender<ActorMsg>` は `Send + Sync + Clone` ゆえ複数 SHIORI 経路（および
-/// `static MAILBOX`）から lock-free に合流でき、`Receiver<ActorMsg>` は単一 consumer
-/// （アクタースレッド）が所有する。consumer は `recv_async().await`（`thread.rs`）で
+/// 芯の型 `ActorInstance`）から lock-free に合流でき、`Receiver<ActorMsg>` は単一 consumer
+/// （アクタースレッド）が所有する。consumer は同期 `recv()`（`thread.rs`）で
 /// 単一 recv ループを回し、`select!` を張らない（単一 consumer 不変条件）。
 pub fn mailbox() -> (Sender<ActorMsg>, Receiver<ActorMsg>) {
     unbounded()
@@ -184,7 +184,7 @@ mod tests {
 
     /// 単一 consumer が現在キューにあるメッセージを FIFO で drain する。
     ///
-    /// 本番アクターは `recv_async().await` の単一ループで消費する（task 3.3）。
+    /// 本番アクターは同期 `recv()` の単一ループで消費する（task 3.3）。
     /// task 3.2 のテストではブロッキングせず `try_recv` で「現時点で利用可能な分」を
     /// 投入順に取り出し、FIFO / 単一直列契約を確認する。
     fn drain(rx: &Receiver<ActorMsg>) -> Vec<ActorMsg> {
@@ -372,7 +372,7 @@ mod tests {
             "single consumer receives both clones' sends in order"
         );
 
-        // Sender が Send + Sync であることを静的に確認（static MAILBOX 共有の前提）。
+        // Sender が Send + Sync であることを静的に確認（芯の型 ActorInstance 越しに SHIORI スレッドと共有する前提）。
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<Sender<ActorMsg>>();
     }

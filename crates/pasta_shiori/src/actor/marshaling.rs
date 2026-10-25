@@ -25,7 +25,7 @@
 //!
 //! # 呼び出し経路
 //! - marshaling 自由関数は **呼び出し側が渡した `Sender`** に対して動作する。出荷経路では
-//!   `lifecycle::marshal_request` が `static MAILBOX` から読んだ `Sender` を
+//!   `lifecycle::marshal_request` が `static LEGACY` の芯の型 `ActorInstance` から読んだ `Sender` を
 //!   [`determine_method`]・[`marshal_get`]・[`marshal_notify`] に渡す（`windows.rs` の
 //!   `request` から呼ばれる）。テストは `spawn_actor_thread` が返す mailbox の `Sender` を
 //!   直接渡して契約を隔離検証する。
@@ -128,6 +128,42 @@ pub fn determine_method(request: &str) -> Option<ShioriMethod> {
     None
 }
 
+/// 版 3 の口が受けた要求の見分け（shiori4-v3-portable 3.4〜3.6）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RequestKind {
+    /// `GET SHIORI/3.0`。
+    Get,
+    /// `NOTIFY SHIORI/3.0`。
+    Notify,
+    /// SHIORI/2.x のヘッダ（GET でも NOTIFY でも）。版 3 では 400。
+    Shiori2,
+    /// 今の文法で読めない要求（知らないメソッド・空・壊れたヘッダ）。版 3 では 400。
+    Unreadable,
+}
+
+/// 版 3 の口のための要求の見分け（3.4〜3.6）。
+///
+/// 今の pest の文法（`Rule::req`）で読み、読めなければ `Unreadable`、`Rule::header2` が
+/// あれば `Shiori2`、そうでなければ `Rule::get`→`Get`・`Rule::notify`→`Notify`。
+/// 旧来の入口は [`determine_method`] を使い続ける（読めない要求の 204 は変えない）。
+pub fn classify_request(request: &str) -> RequestKind {
+    let Ok(pairs) = Parser::parse(Rule::req, request) else {
+        return RequestKind::Unreadable;
+    };
+    let mut kind = RequestKind::Unreadable;
+    // header2 はメソッドの後ろに来るので、ヘッダの中を最後まで見る。
+    for pair in pairs.flatten() {
+        match pair.as_rule() {
+            Rule::header2 => return RequestKind::Shiori2,
+            Rule::get => kind = RequestKind::Get,
+            Rule::notify => kind = RequestKind::Notify,
+            Rule::key_values => break,
+            _ => {}
+        }
+    }
+    kind
+}
+
 /// GET marshaling（R5.1/R5.3/R5.6/R5.7）。
 ///
 /// flume `bounded(1)` の reply tx を [`ActorMsg::Get`] に同梱して `try_send`、同期
@@ -184,7 +220,7 @@ pub fn marshal_get_with_timeout(
         "GET enqueued; awaiting reply"
     );
 
-    // wake は flume の native Waker が executor を起こす（手動 wake 不要・task 3.1 実証）。
+    // アクター側は同期 recv() で待っており、送信がそれを起こす（手動 wake 不要）。
     // 同期 recv_timeout ゆえ flume の cancel 欠陥に無関係。
     match reply_rx.recv_timeout(timeout) {
         // 値到達: アクター VM が構築した応答文字列を返す（R5.1・通常経路バイト不変 R5.8）。
@@ -276,6 +312,42 @@ mod tests {
         assert_eq!(determine_method(notify), Some(ShioriMethod::Notify));
         // 不正リクエストは None（呼び出し側で 204）。パニックしない。
         assert_eq!(determine_method("not a shiori request"), None);
+    }
+
+    /// classify_request（版 3 の判定・3.4〜3.6）: 7 通りが期待どおりに分かれる。
+    /// 知らないメソッド（PUT）は今の文法で読めないので Unreadable。
+    #[test]
+    fn classify_request_splits_seven_cases() {
+        let cases = [
+            (
+                "GET SHIORI/3.0\r\nCharset: UTF-8\r\nID: version\r\n\r\n",
+                RequestKind::Get,
+            ),
+            (
+                "NOTIFY SHIORI/3.0\r\nCharset: UTF-8\r\nID: OnBoot\r\n\r\n",
+                RequestKind::Notify,
+            ),
+            (
+                "GET Sentence SHIORI/2.6\r\nCharset: UTF-8\r\n\r\n",
+                RequestKind::Shiori2,
+            ),
+            (
+                "NOTIFY OwnerGhostName SHIORI/2.0\r\nCharset: UTF-8\r\n\r\n",
+                RequestKind::Shiori2,
+            ),
+            (
+                "PUT SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n",
+                RequestKind::Unreadable,
+            ),
+            ("", RequestKind::Unreadable),
+            (
+                "GET SHIORI/3.0\r\nCharset UTF-8\r\n\r\n",
+                RequestKind::Unreadable,
+            ),
+        ];
+        for (req, expected) in cases {
+            assert_eq!(classify_request(req), expected, "request: {req:?}");
+        }
     }
 
     /// default_204（R5.6 等）: 安全網 204 のバイト列が **リファクタ前 VM 産 204** と同一で

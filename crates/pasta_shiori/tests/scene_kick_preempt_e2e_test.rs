@@ -5,8 +5,8 @@
 //! # 何を貫通実証するか（actor/SHIORI レベルの観測可能な特性化）
 //! 既存の Lua ユニット（`virtual_dispatcher_kick_force_test.lua`＝force ワンショット、
 //! `virtual_dispatcher_kick_hook_test.lua`＝preempt、`actor_kick_test.rs`＝last-wins）を、
-//! **実 sink→MAILBOX→executor→Lua→OnSecondChange の全経路上で観測可能な応答さくらスクリプト
-//! として固定**する。3 つの独立シナリオを 1 本の `#[test]` に直列に詰める（`static MAILBOX`
+//! **実 sink→LEGACY→executor→Lua→OnSecondChange の全経路上で観測可能な応答さくらスクリプト
+//! として固定**する。3 つの独立シナリオを 1 本の `#[test]` に直列に詰める（`static LEGACY`
 //! はプロセスグローバルゆえ 6.1/7.2 と同方針で別バイナリ・単一テスト）:
 //!
 //!  1. **preempt-and-abort（R5.1/5.2/5.3）**: 進行中のマルチビート会話（前シーン）を走らせて
@@ -234,12 +234,12 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
 
 /// task 7.3: preempt-and-abort と割り込みゲートを 1 本貫通で特性化する E2E 結合テスト。
 ///
-/// 単一テスト・全シナリオ直列（`static MAILBOX` 共有のため）。
+/// 単一テスト・全シナリオ直列（`static LEGACY` 共有のため）。
 #[test]
 fn kick_preempt_and_force_gate_end_to_end() {
     let (load_dir, _temp) = build_preempt_kick_ghost_dir();
 
-    // --- load（spawn_actor＝FFI load 相当・kick_sink 束縛＋MAILBOX store） ---
+    // --- load（spawn_actor＝FFI load 相当・kick_sink 束縛＋LEGACY store） ---
     let loaded = spawn_actor(0, load_dir.clone());
     assert!(
         loaded,

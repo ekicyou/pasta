@@ -15,6 +15,7 @@ mod tracing_init;
 
 pub use logger::PastaLogger;
 pub use registry::{
-    GlobalLoggerRegistry, LoadDirGuard, RoutingWriter, get_current_load_dir, set_current_load_dir,
+    ClaimToken, GlobalLoggerRegistry, LoadDirGuard, RoutingWriter, get_current_load_dir,
+    set_current_load_dir,
 };
-pub use tracing_init::{init_tracing_with_reload, update_tracing_filter};
+pub use tracing_init::{init_tracing, update_tracing_filter};

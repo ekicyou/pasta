@@ -1,7 +1,9 @@
 use crate::error::*;
 use crate::lua_request;
 use pasta_lua::mlua::{Function, Table};
-use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime, RuntimeConfig};
+use pasta_lua::{
+    ClaimToken, GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime, RuntimeConfig,
+};
 use std::{ffi::*, path::*};
 use tracing::{debug, error, info, trace, warn};
 
@@ -41,11 +43,33 @@ pub struct PastaShiori {
 
     /// Cached SHIORI.unload function
     unload_fn: Option<Function>,
+
+    /// VM を作るときに渡す kick の送り先（持ち主が外から渡す。既定は無し＝kick の道は働かない）
+    kick_sink: Option<pasta_lua::debug::KickSink>,
+
+    /// ディレクトリの占有の札（持ち主が外から渡す）。在れば VM の片付けで札で外し、無ければディレクトリで外す
+    claim: Option<ClaimToken>,
+}
+
+impl PastaShiori {
+    /// kick の送り先を渡して作る。`load` はこの送り先を VM へ渡す（旧来の置き場の送り先は呼ばない）。
+    pub fn with_kick_sink(kick_sink: Option<pasta_lua::debug::KickSink>) -> Self {
+        // `Drop` を持つので `..Self::default()` は使えない
+        let mut shiori = Self::default();
+        shiori.kick_sink = kick_sink;
+        shiori
+    }
+
+    /// ディレクトリの占有の札を渡す。VM の片付けは、札の世代が今の世代のときだけ登録を外す
+    /// （手放された古い VM が、占有を引き継いだ新しい持ち主の登録を消さない・7.1・7.2）。
+    pub fn set_claim(&mut self, claim: Option<ClaimToken>) {
+        self.claim = claim;
+    }
 }
 
 // 旧来の `unsafe impl Send for PastaShiori` / `unsafe impl Sync` は task 5.1（R8.1/R8.3）で
 // **撤去**した。VM（`!Send` な mlua ランタイム）は本番アクタースレッド（`actor::thread`）へ
-// pin され、`static MAILBOX`（`actor::lifecycle`）越しのメッセージ送信でのみアクセスされる。
+// pin され、`static LEGACY`（`actor::lifecycle`）越しのメッセージ送信でのみアクセスされる。
 // `PastaShiori` がスレッドを越境しない構造的不変条件によりスレッド安全性を担保するため、
 // `unsafe` の健全性仮定（「ホストのメインスレッドからのみ呼ばれる」運用前提）は不要になった。
 // `PastaShiori` は `!Send`（mlua 由来）のままでよい——アクタースレッド上でのみ構築・所有される。
@@ -63,12 +87,6 @@ impl Shiori for PastaShiori {
         // Convert load_dir to PathBuf
         let load_dir_path: PathBuf = load_dir.as_ref().into();
 
-        // Validate load_dir exists
-        if !load_dir_path.exists() {
-            error!(path = %load_dir_path.display(), "Load directory not found");
-            return Ok(false);
-        }
-
         // If already loaded, cleanup previous instance
         if self.runtime.is_some() {
             info!("Releasing existing runtime for reload");
@@ -76,9 +94,16 @@ impl Shiori for PastaShiori {
             self.last_load_error = None;
         }
 
-        // Save hinst and load_dir
+        // Save hinst and load_dir（有無を確かめる前に覚える。ディレクトリが無いときも、
+        // VM の片付けでそのディレクトリのログの登録・占有が外れるように）
         self.hinst = hinst;
         self.load_dir = Some(load_dir_path.clone());
+
+        // Validate load_dir exists
+        if !load_dir_path.exists() {
+            error!(path = %load_dir_path.display(), "Load directory not found");
+            return Ok(false);
+        }
 
         // Stage 1: Early logger initialization (before PastaLoader::load)
         // Create a default logger so all load-phase logs are captured to file
@@ -86,7 +111,7 @@ impl Shiori for PastaShiori {
             let logger = std::sync::Arc::new(logger);
             GlobalLoggerRegistry::instance().register(load_dir_path.clone(), logger);
         }
-        pasta_lua::init_tracing_with_reload(&pasta_lua::LoggingConfig::default());
+        pasta_lua::init_tracing();
 
         // Set load_dir context for logging
         let _guard = LoadDirGuard::new(load_dir_path.clone());
@@ -97,13 +122,11 @@ impl Shiori for PastaShiori {
             "Starting PastaShiori load"
         );
 
-        // VM 構築前に `MAILBOX` 投函クロージャを scene-kick sink として束縛する
-        // （`MailboxKickInjector`・pasta-scene-kick 2.4）。`load_with_config` の内側で
-        // `RuntimeConfig` が VM（`PastaLuaRuntime`）へ渡る前に sink が積まれるため、
-        // 後続 task（2.x）が `enable` 経由で socket-bridge へ透過させられる。
+        // VM 構築前に、持ち主から渡された kick の送り先を scene-kick sink として束縛する
+        // （pasta-scene-kick 2.4・shiori4-v3-portable 5.5）。`load_with_config` の内側で
+        // `RuntimeConfig` が VM（`PastaLuaRuntime`）へ渡る前に sink が積まれる。
         // pasta.toml `[debug]` ＋ env の debug 解決は `load_with_config` 内で従来どおり行われる。
-        let runtime_config =
-            RuntimeConfig::new().with_kick_sink(Some(crate::actor::lifecycle::kick_sink()));
+        let runtime_config = RuntimeConfig::new().with_kick_sink(self.kick_sink.clone());
 
         // Load runtime via PastaLoader (Stage 1.5 logger update happens inside)
         match PastaLoader::load_with_config(&load_dir_path, runtime_config) {
@@ -216,7 +239,11 @@ impl PastaShiori {
 
         if let Some(ref load_dir) = self.load_dir {
             info!(load_dir = %load_dir.display(), "Unregistering logger");
-            GlobalLoggerRegistry::instance().unregister(load_dir);
+            // 札は一度きり。読み直しの後に古い世代の札で外し損ねないよう、使ったら手放す。
+            match self.claim.take() {
+                Some(token) => GlobalLoggerRegistry::instance().release_claim(&token),
+                None => GlobalLoggerRegistry::instance().unregister(load_dir),
+            }
         }
     }
 

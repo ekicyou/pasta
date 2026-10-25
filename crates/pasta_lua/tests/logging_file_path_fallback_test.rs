@@ -12,7 +12,7 @@ use pasta_lua::loader::PastaLoader;
 
 #[test]
 fn invalid_file_path_falls_back_to_default_log_file() {
-    pasta_lua::init_tracing_with_reload(&pasta_lua::LoggingConfig::default());
+    pasta_lua::init_tracing();
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
     std::fs::write(

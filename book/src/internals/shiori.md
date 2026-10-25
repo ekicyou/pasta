@@ -12,13 +12,21 @@
 
 ## 目的と責務
 
-SHIORI 層は、ベースウェア（SSP など）が呼ぶ DLL の関数でリクエストを受け取り、Lua VM を所有する専用スレッドへ渡し、Lua 側でイベントを振り分けて作った応答を返す。
+SHIORI 層は、ベースウェア（SSP など）が呼ぶライブラリの関数でリクエストを受け取り、Lua VM を所有する専用スレッドへ渡し、Lua 側でイベントを振り分けて作った応答を返す。
+
+入口は 2 つある。どちらも同じ芯の型 `ActorInstance` につながり、同じアクターの処理を通る。
+
+| 入口 | 書き出す関数 | OS | インスタンス |
+| ---- | ------------ | -- | ------------ |
+| 旧来の SHIORI/3.0 の入口 | `DllMain`・`loadu`・`load`・`request`・`unload`（HGLOBAL で受け渡す） | Windows だけ | プロセスに 1 つ（置き場 `LEGACY`） |
+| shiori4 の版 3 | `shiori_get_api`（版 3 のテーブルの `load`・`request`・`notify`・`unload`） | Windows・Linux・macOS | `load` のたびに 1 つ（ハンドルをホストが持つ） |
 
 この章が責務を持つのは次の事項である。
 
-- FFI 境界: エクスポートする関数（`DllMain`・`loadu`・`load`・`request`・`unload`）、HGLOBAL の所有と解放、設置パスとリクエストの文字コード、`catch_unwind` による panic の封じ込め
+- FFI 境界: 旧来の入口（HGLOBAL の所有と解放、設置パスとリクエストの文字コード、`catch_unwind` による panic の封じ込め）と、版 3 の入口（要求の見分け。ABI の検査は `shiori4_abi` が行う）
 - リクエスト文字列の解析と、Lua に渡すリクエストの表の組み立て
-- アクターランタイム: VM を専用スレッドに固定し、mailbox（単一のキュー）経由でだけ触る仕組み。GET と NOTIFY の受け渡し（marshaling）、起動と再読み込み、終了処理（teardown）
+- アクターランタイム: インスタンスごとに VM を専用スレッドに固定し、そのインスタンスの mailbox（単一のキュー）経由でだけ触る仕組み。GET と NOTIFY の受け渡し（marshaling）、起動と再読み込み、終了処理（teardown）、ゴーストのディレクトリの占有
+- プロセスに 1 つ残す状態と、それぞれを残す理由
 - Lua 側の SHIORI エントリ（`SHIORI.load`・`SHIORI.request`・`SHIORI.unload`・`SHIORI.kick`）と、`REG`・既定ハンドラ・シーン関数フォールバックによるイベントの振り分け
 - 非同期トーク（`get_property` のコールバック）が SHIORI のリクエストとしてどう往復するか
 - 仮想イベントディスパッチャ（OnTalk・OnHour とトーク頻度）
@@ -39,40 +47,51 @@ SHIORI 層は、ベースウェア（SSP など）が呼ぶ DLL の関数でリ�
 ### スレッドとデータの経路
 
 ```text
-ホストのスレッド（FFI 入口）                    アクタースレッド "pasta-actor"
-──────────────────────────                      ───────────────────────────────
-loadu / load ── spawn_actor ──────────────────→ thread::spawn → block_on(async …)
-     │           （構築の完了を待つ）             PastaShiori::load（VM を構築）
-     │      ←── (スレッド ID, 成否, DAP アドレス) ─┘
-     │           MAILBOX.store(Sender)            while let Ok(msg) = rx.recv_async().await
-request ── marshal_request
-     │      determine_method（pest で GET/NOTIFY を判定）
-     │      GET:    try_send(Get{req, reply}) ───→ shiori.request(生文字列)
-     │              recv_timeout(5 秒) ←────────── reply.send(Reply::Value(応答))
-     │      NOTIFY: try_send(Notify{req}) → 即 204 → shiori.request(生文字列)（応答は捨てる）
-unload ── teardown_actor
-            MAILBOX.swap(None)
-            send(Stop{done}) ───────────────────→ ループを抜ける → drop(PastaShiori) → drop(rx)
-            recv_timeout(5 秒) ←────────────────── done.send(())
-            ActorThread::detach（join しない）
+ホストのスレッド                                    アクタースレッド "pasta-actor"（インスタンスごとに 1 本）
+────────────────                                    ──────────────────────────────────────────
+旧来: loadu / load ── lifecycle::spawn_actor ─┐
+版 3: load ── PastaV3::load ──────────────────┤
+                                              ▼
+                      ActorInstance::spawn_with
+                        REGISTRY.try_claim(設置パス)   ディレクトリの占有
+                        mailbox() と kick の送り先
+                        spawn_actor_thread_with ────→ thread::spawn
+                        （構築の完了を待つ）            PastaShiori::load（VM を構築）
+                              ←── (スレッド ID, 成否, DAP アドレス)
+                      旧来: LEGACY.store(インスタンス)    while let Ok(msg) = rx.recv()
+                      版 3: PastaV3 がインスタンスを持つ
+旧来: request ── marshal_request ── ActorInstance::request
+                                     determine_method（pest で GET/NOTIFY を判定）
+版 3: request ── classify_request ── GET は get・NOTIFY は notify・ほかは 400
+       GET:    try_send(Get{req, reply}) ────────────→ shiori.request(生文字列)
+               recv_timeout(5 秒) ←─────────────────── reply.send(Reply::Value(応答))
+       NOTIFY: try_send(Notify{req}) → 即 204 ──────→ shiori.request(生文字列)（応答は捨てる）
+旧来: unload ── teardown_actor（DllMain は teardown_actor_detached）
+版 3: unload ── ActorInstance の Drop
+       send(Stop{done}) ─────────────────────────────→ ループを抜ける → drop(PastaShiori) → drop(rx)
+       recv_timeout(5 秒) ←──────────────────────────── done.send(())
+       ack が届いた: join（DllMain の道だけ join せず手放す）
+       届かない:     手放す（warn）
 
-デバッグ通信のスレッド ── KickSink → try_send(Kick{scene}) → shiori.kick(scene)
+デバッグ通信のスレッド ── そのインスタンスの KickSink → try_send(Kick{scene}) → shiori.kick(scene)
 ```
 
-VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、アクタースレッドで作られ、そこで使われ、そこで破棄される。スレッドをまたぐのは、生のリクエスト文字列・応答文字列・シーン名・応答用のチャネルの送信端など `Send` な値だけである。
+VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、アクタースレッドで作られ、そこで使われ、そこで破棄される。スレッドをまたぐのは、生のリクエスト文字列・応答文字列・シーン名・応答用のチャネルの送信端など `Send` な値と、`Send + Sync` な `ActorInstance` だけである。アクタースレッドは同期の `recv()` だけで待ち、OS のウィンドウやメッセージの仕組みを使わないので、どの OS でも同じ形で動く。
 
 ### Rust 側（pasta_shiori）
 
 | ファイル | 役割 |
 | -------- | ---- |
-| `crates/pasta_shiori/src/windows.rs` | エクスポートする関数。`loadu`・`load` の共通本体 `load_entry`、`loadu` 済みの印 `LOADU_INITIALIZED`、各入口の `catch_unwind`、応答の HGLOBAL 化 |
+| `crates/pasta_shiori/src/windows.rs` | 旧来の入口（`#[cfg(windows)]`）。`loadu`・`load` の共通本体 `load_entry`、`loadu` 済みの印 `LOADU_INITIALIZED`、`unload` と `DllMain` の共通の後始末 `teardown`、各入口の `catch_unwind`、応答の HGLOBAL 化。戻り値は C の `BOOL`（`i32`）、長さは C の `long` |
+| `crates/pasta_shiori/src/v3.rs` | 版 3 の入口（全部の OS）。`shiori_get_api` と版 3 のテーブル `API_V3`、`shiori4_abi::Shiori` を実装する `PastaV3`（`ActorInstance` を 1 つ持つ）、応答の開始行から状態の数を読む `status_of` |
 | `crates/pasta_shiori/src/util/hglobal/` | `ShioriString`（HGLOBAL の取り込みと解放、`GMEM_FIXED` での確保、UTF-8・ANSI としての読み出し）。ANSI の変換は `MultiByteToWideChar`（`CP_ACP`）による |
-| `crates/pasta_shiori/src/actor/lifecycle.rs` | `static MAILBOX`（`ArcSwapOption<Sender<ActorMsg>>`）と `ACTOR_HANDLE`（`Mutex<Option<ActorThread>>`）、FFI 入口が呼ぶ `spawn_actor`・`marshal_request`・`teardown_actor`、キックの投函口 `kick_sink` |
+| `crates/pasta_shiori/src/actor/instance.rs` | 芯の型 `ActorInstance`（mailbox の送信端・アクタースレッドのハンドル・設置パス・要求の連番）。起動 `spawn`・`spawn_with`（ディレクトリの占有 `ClaimMode`）、`request`・`get`・`notify`・`kick`、後始末 `shutdown`（`JoinPolicy`）と `Drop`、インスタンスごとの kick の送り先 |
+| `crates/pasta_shiori/src/actor/lifecycle.rs` | 旧来の入口の置き場 `static LEGACY`（`ArcSwapOption<ActorInstance>`）と、旧来の入口が呼ぶ `spawn_actor`・`marshal_request`・`teardown_actor`・`teardown_actor_detached` |
 | `crates/pasta_shiori/src/actor/mailbox.rs` | mailbox を流れるメッセージ `ActorMsg`（`Get`・`Notify`・`Stop`・`Kick`。`#[non_exhaustive]`）、`MailboxRequest`（`seq` と生のリクエスト文字列）、`Reply`、mailbox の生成（flume の unbounded） |
-| `crates/pasta_shiori/src/actor/thread.rs` | アクタースレッドの起動 `spawn_actor_thread` と、メッセージを処理するループ。`ActorThread`（スレッドのハンドル・ロードの成否・DAP の待受アドレス） |
-| `crates/pasta_shiori/src/actor/marshaling.rs` | メソッドの判定 `determine_method`、`marshal_get`・`marshal_notify`、安全網の応答 `default_204`、GET の待ち時間の上限 `GET_TIMEOUT`（5 秒） |
-| `crates/pasta_shiori/src/actor/teardown.rs` | `Stop{done}` を送って完了の通知を待つ `teardown_via_sender` と結果 `TeardownReport`。再読み込みを繰り返して OS のハンドル数を測る `ReloadProbe`（テストが使う） |
-| `crates/pasta_shiori/src/shiori.rs` | `Shiori` トレイトと `PastaShiori`。ランタイムの構築、`SHIORI.load`・`SHIORI.request`・`SHIORI.unload` の関数のキャッシュ、`SHIORI.kick` の呼び出し、`Drop` での後始末 |
+| `crates/pasta_shiori/src/actor/thread.rs` | アクタースレッドの起動 `spawn_actor_thread_with`（失敗を返す）と、同期の `recv()` でメッセージを処理するループ。`ActorThread`（スレッドのハンドル・ロードの成否・DAP の待受アドレス。`join`・`detach`） |
+| `crates/pasta_shiori/src/actor/marshaling.rs` | 旧来の入口のメソッドの判定 `determine_method`、版 3 の要求の見分け `classify_request`（`RequestKind`）、`marshal_get`・`marshal_notify`、安全網の応答 `default_204`、GET の待ち時間の上限 `GET_TIMEOUT`（5 秒） |
+| `crates/pasta_shiori/src/actor/teardown.rs` | `Stop{done}` を送って完了の通知を待つ `teardown_via_sender` と結果 `TeardownReport`（`acked`・`already_done`・`anomaly`・`joined`）。再読み込みを繰り返して OS のハンドル数を測る `ReloadProbe`（テストが使う） |
+| `crates/pasta_shiori/src/shiori.rs` | `Shiori` トレイトと `PastaShiori`。ランタイムの構築、`SHIORI.load`・`SHIORI.request`・`SHIORI.unload` の関数のキャッシュ、`SHIORI.kick` の呼び出し、ディレクトリの占有の札（`set_claim`）、`Drop` での後始末 |
 | `crates/pasta_shiori/src/lua_request.rs` | リクエスト文字列を Lua の表にする `parse_request` と、日時の表を作る `lua_date`・`lua_date_from` |
 | `crates/pasta_shiori/src/util/parsers/` | SHIORI/3.0 と SHIORI/2.x のリクエストの pest 文法（`crates/pasta_shiori/src/util/parsers/req_parser.pest`）と、そこから生成されるパーサ |
 | `crates/pasta_shiori/src/error.rs` | `MyError` と、500 応答・400 応答の文字列を作る `to_shiori_response`・`to_shiori_400_response` |
@@ -110,6 +129,8 @@ VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、�
 
 ### load とアクターの起動
 
+#### 旧来の入口
+
 `loadu` と `load` は、設置パスの文字コードだけが異なる 2 つの入口で、どちらも `load_entry` を通る。`loadu` は UTF-8、`load` はシステムの ANSI コードページ（`CP_ACP`）として設置パスを読む。
 
 ```text
@@ -117,7 +138,7 @@ load_entry(entry, hdir, len, encoding)
  1. hdir が null → false
  2. ShioriString::capture(hdir, len)   以後のどの経路でも Drop で GlobalFree される
  3. load かつ LOADU_INITIALIZED → 何もせず true（loadu 済みの状態を保つ）
- 4. len == 0 → false
+ 4. len == 0 → false（C の long の負の長さは 0 に読む）
  5. catch_unwind(load_impl)            panic は false
 load_impl
  a. 設置パスを UTF-8（to_utf8_str）か ANSI（to_ansi_str）で読む。失敗 → false
@@ -126,7 +147,7 @@ load_impl
  d. 同じ設置パスで LoadDirGuard を張り直し、入口名と成否を 1 行ログに出す
 ```
 
-- `LOADU_INITIALIZED` をロードの失敗時にも立てるのは、続いて `load` が呼ばれたときに、ANSI で欠落したパスによる別の失敗で `loadu` の失敗の原因を上書きしないためである。印は `unload` で下ろす。利用者から見た扱いは [起動シーケンスとモジュール解決](../reference/startup.md#loadu-を呼ばないホストでは非-ansi-の設置パスを扱えない) を参照する。
+- `LOADU_INITIALIZED` をロードの失敗時にも立てるのは、続いて `load` が呼ばれたときに、ANSI で欠落したパスによる別の失敗で `loadu` の失敗の原因を上書きしないためである。印は `unload`（と `DllMain` の FreeLibrary の detach）で下ろす。利用者から見た扱いは [起動シーケンスとモジュール解決](../reference/startup.md#loadu-を呼ばないホストでは非-ansi-の設置パスを扱えない) を参照する。
 - `SHIORI.load` に渡す `hinst` は、FFI の経路では常に 0 である（`DllMain` が受け取るモジュールハンドルは保持しない）。
 - d でガードを張り直すのは、ログのファイルへの振り分けがスレッドごとの設置パスで決まり、アクタースレッドで張ったガードが FFI 入口のスレッドには及ばないためである（[ロギングとエンコーディング](logging-encoding.md)）。
 
@@ -134,28 +155,67 @@ load_impl
 
 ```text
 spawn_actor(hinst, load_dir)
- 1. teardown_actor()                     前のアクターがあれば終了させる（再読み込み）
- 2. (tx, rx) = mailbox()                 新しいチャネル
- 3. spawn_actor_thread(hinst, load_dir, rx)
-      スレッド "pasta-actor" を起こし、その上の block_on で
-        PastaShiori::default().load(hinst, load_dir)
+ 1. 前のインスタンスの設置パスを手元に取る
+ 2. 置き場の後始末（teardown_actor と同じ。ack が届けば join）  前のインスタンスがあれば終わらせる（再読み込み）
+ 3. 2 が打ち切り（ack が来ずにスレッドを手放した）で、1 と同じ設置パスなら ClaimMode::TakeOver、
+    そうでなければ ClaimMode::Exclusive
+ 4. ActorInstance::spawn_with(hinst, load_dir, mode)。失敗 → false（置き場は空のまま）
+ 5. LEGACY.store(Some(Arc::new(インスタンス)))
+ 6. 成否（インスタンスの loaded）を返す
+```
+
+3 の引き継ぎは、手放したスレッドの VM がまだ持つ占有を新しい世代で引き継ぎ、今の SSP での再読み込みの振る舞いを保つ。手放された古い VM が後で片付けを終えても、札の世代が違うので新しい持ち主の項目は消えない（[ディレクトリの占有](#ディレクトリの占有)）。
+
+#### 版 3 の入口
+
+`shiori_get_api(3)` は版 3 のテーブル `API_V3`（プロセスの間ずっと同じ static）を返し、3 以外（4 を含む）には NULL を返す。テーブルの関数は `shiori4_abi` が実装し、`copy_from_slice` の有無・UTF-8 の検査・パニックの捕捉・応答の写しを行ってから、`PastaV3` の `Shiori` の実装を呼ぶ。
+
+```text
+PastaV3::load(mode, dir)
+ 1. mode が V3 でなければ SHIORI_E_UNSUPPORTED
+ 2. dir が絶対パスでないか、ディレクトリでない → SHIORI_E_INVALID_ARG（ログは出さない）
+ 3. ActorInstance::spawn(0, dir)          ClaimMode::Exclusive。失敗 → 500（NULL）
+ 4. 同じ設置パスで LoadDirGuard を張り、入口名 v3 と成否を 1 行ログに出す
+ 5. インスタンスを返す（辞書・Lua・SHIORI.load の失敗でも返す）
+```
+
+2 でカレントディレクトリに頼らないのは、ホストのカレントディレクトリがゴーストのディレクトリと限らないためである。版 3 は再読み込みの印も置き場も持たず、`load` のたびに新しいインスタンスを作る。旧来の入口のインスタンスとは別のインスタンスとして並ぶ。
+
+#### ActorInstance の起動
+
+`ActorInstance::spawn_with` は、どちらの入口からも次の順に動く。
+
+```text
+ActorInstance::spawn_with(hinst, load_dir, mode)
+ 1. 占有: Exclusive → REGISTRY.try_claim(load_dir)。項目が既にあれば
+            その設置パスのログに warn を出して Err(DirInUse)
+          TakeOver  → REGISTRY.take_over(load_dir)。引き継いだことを warn
+ 2. (tx, rx) = mailbox()                 このインスタンスの新しいチャネル
+ 3. kick の送り先を作る                   tx の弱い参照だけを持つ
+ 4. spawn_actor_thread_with(hinst, load_dir, rx, 送り先, 札)
+      スレッド "pasta-actor" を起こし、その上で
+        LoadDirGuard を張る（スレッドの終わりまで）
+        PastaShiori::with_kick_sink(送り先) に札を渡し、load(hinst, load_dir)
         (スレッド ID, 成否, DAP の待受アドレス) を bounded(1) で送り返す
         メッセージループへ入る
-      呼び出し側は送り返しを recv() で待つ   → VM の構築が終わるまで戻らない
- 4. MAILBOX.store(Some(Arc::new(tx)))
- 5. ACTOR_HANDLE にスレッドのハンドルを保持する
- 6. 成否を返す
+      呼び出し側は送り返しを recv() で待つ   → VM の構築と SHIORI.load が終わるまで戻らない
+      送り返しの前にスレッドが終わった      → そのスレッドを join して io::ErrorKind::Other
+ 5. 4 が失敗 → 既定の PastaLogger を登録してから error を出し、占有を外して
+              Err(NotReady)（スレッドが送り返す前に終わった）か Err(Thread)（起こせない）
+ 6. ActorInstance { tx, スレッドのハンドル, load_dir, seq } を返す
 ```
+
+5 でロガーをその場で作るのは、VM のロガーがまだ無いときにも、立ち上がれなかった理由をゴーストのログに残すためである。
 
 `PastaShiori::load` はアクタースレッドの上で次を行う。
 
-1. 設置パスが存在しなければ `false` を返す（エラーの理由は残らない）。
-2. 既定の設定でロガーを `GlobalLoggerRegistry` に登録し、tracing を初期化し、`LoadDirGuard` を張る。
-3. `RuntimeConfig::new().with_kick_sink(Some(kick_sink()))` を作り、`PastaLoader::load_with_config` でランタイムを構築する。失敗したらエラーの文字列を `last_load_error` に残して `false` を返す。
+1. 設置パスを覚え、存在しなければ `false` を返す（エラーの理由は残らない。覚えておくのは、VM の片付けでそのディレクトリの占有を外すため）。
+2. 既定の設定でロガーを `GlobalLoggerRegistry` に登録し（占有で作られた項目にロガーが入る）、`init_tracing()` で購読者を入れ（プロセスで最初の 1 回だけ）、`LoadDirGuard` を張る。
+3. `RuntimeConfig::new().with_kick_sink(このインスタンスの送り先)` を作り、`PastaLoader::load_with_config` でランタイムを構築する。失敗したらエラーの文字列を `last_load_error` に残して `false` を返す。
 4. `SHIORI` 表から `load`・`request`・`unload` の関数を取り出してキャッシュする。リクエストのたびに表を引かないためである。どれも省略でき、無い `load` は成功として扱い（5）、無い `request` には 204 を返し（後述）、無い `unload` は呼ばない。`unload` 以外が無いときは warn ログを出す。
 5. `SHIORI.load(hinst, 設置パスの文字列)` を呼ぶ。関数が無ければ成功とみなす。`false` を返すかエラーなら `false`。
 
-ロードが失敗しても、アクタースレッドは起動したまま `MAILBOX` に登録され、以後のリクエストを受け付ける。GET の応答は失敗の段階で異なる。3 のランタイムの構築に失敗した場合は、残した理由を 500 応答で返す。1 で設置パスが無かった場合は、理由の無い 500 応答（`Not initialized error`）を返す。5 で `SHIORI.load` が失敗した場合はランタイムが残っているため、リクエストは通常どおり `SHIORI.request` で処理される（[アクタースレッドのメッセージループ](#アクタースレッドのメッセージループ) の `PastaShiori::request`）。
+ロードが失敗しても、アクタースレッドは起動したままインスタンスに残り（旧来の入口では `LEGACY` に入り、版 3 ではインスタンスを返す）、以後のリクエストを受け付ける。GET の応答は失敗の段階で異なる。3 のランタイムの構築に失敗した場合は、残した理由を 500 応答で返す。1 で設置パスが無かった場合は、理由の無い 500 応答（`Not initialized error`）を返す。5 で `SHIORI.load` が失敗した場合はランタイムが残っているため、リクエストは通常どおり `SHIORI.request` で処理される（[アクタースレッドのメッセージループ](#アクタースレッドのメッセージループ) の `PastaShiori::request`）。
 
 ### request と GET・NOTIFY の振り分け
 
@@ -170,25 +230,36 @@ request_impl
  c. 応答を GlobalAlloc(GMEM_FIXED) の領域へ写し、len に長さを入れて返す
     確保に失敗したら null と len = 0
 marshal_request
- i.   MAILBOX.load_full()。空（load 前・unload 後）→ default_204
- ii.  seq を採番する（ログで順序を追うための連番）
- iii. determine_method：pest の req 規則で解析し、最初に現れた get / notify を採る
-      解析できない → default_204
- iv.  GET    → marshal_get
-      NOTIFY → marshal_notify
+ i.   LEGACY.load_full()。空（load 前・unload 後）→ default_204
+ ii.  ActorInstance::request
+        determine_method：pest の req 規則で解析し、最初に現れた get / notify を採る
+        解析できない → default_204
+        GET    → get    （seq を採番して marshal_get）
+        NOTIFY → notify （seq を採番して marshal_notify）
 ```
 
+版 3 の `request`・`notify` は、`classify_request` で要求を見分けてから渡す。
+
+| 見分け（`RequestKind`） | `request` | `notify` |
+| ----------------------- | --------- | -------- |
+| `Get`（`GET SHIORI/3.0`） | `ActorInstance::get` の応答の全文。戻り値の状態の数は、開始行 `SHIORI/3.0 NNN` の NNN（`status_of`）。読めなければ 500 にして warn を出し、本文はそのまま返す | アクターへ送らず 400 |
+| `Notify` | `ActorInstance::notify`（即 204 の全文）。戻り値は 204 | `ActorInstance::notify`。戻り値は 204 |
+| `Shiori2`（SHIORI/2.x のヘッダ）・`Unreadable`（今の文法で読めない） | アクターへ送らず、理由を `X-ERROR-REASON` に入れた 400 の全文 | アクターへ送らず 400 |
+
+弾いた要求は、そのインスタンスのログに debug を 1 行出す。旧来の入口は `determine_method` を使い続け、読めない要求に 204 を返す振る舞いを変えない。
+
+- `seq` はインスタンスごとの連番で、ログで順序を追うためだけに使う。
 - `marshal_get` は `bounded(1)` の応答用チャネルを作って `ActorMsg::Get` に同梱し、`try_send` で投入してから `recv_timeout(GET_TIMEOUT)` で待つ。値が届けばそれを返し、応答用チャネルが送られずに破棄された（`Disconnected`）か、5 秒を過ぎた（`Timeout`）か、`try_send` に失敗したなら `default_204` を返す。
 - `marshal_notify` は `ActorMsg::Notify` を `try_send` し、成否に関わらずすぐ `default_204` を返す。アクターの処理は待たない。
 - メソッドの判定は VM に投入する前に、ホストのスレッドで行う。同じリクエスト文字列は、アクタースレッドで `parse_request` がもう一度解析する。
-- 応答の HGLOBAL はホストが解放する。DLL は解放しない。
+- 旧来の入口の応答の HGLOBAL はホストが解放する。DLL は解放しない。版 3 の応答は `shiori4_abi` がホストの `copy_from_slice` で写す。
 
 ### アクタースレッドのメッセージループ
 
-アクタースレッドは `wintf-winmsg-executor` の `block_on` で、そのスレッドの Windows メッセージループの上で非同期のブロックを動かす。ブロックは `rx.recv_async().await` だけで待ち、別のスレッドの `try_send` が flume の Waker を通じてループを起こす。
+アクタースレッドは、同期の `rx.recv()` だけで待つ単一のループを回す。別のスレッドの `try_send`・`send` が `recv()` を起こす。非同期の実行器・OS のウィンドウ・メッセージの仕組みは使わない。
 
 ```text
-while let Ok(msg) = rx.recv_async().await
+while let Ok(msg) = rx.recv()
   Get { req, reply }  → shiori.request(&req.raw)
                           Ok(応答)   → reply.send(Reply::Value(応答))
                           Err(e)     → reply.send(Reply::Value(e.to_shiori_response()))  500 応答
@@ -199,7 +270,7 @@ while let Ok(msg) = rx.recv_async().await
   drop(shiori)        PastaShiori の Drop（後述）
   drop(rx)            以後の Stop の再送が Disconnected になる
   done.send(())       全資源を解放した後に完了を通知する
-block_on が戻る       スレッドの終了時に、executor のメッセージ専用ウィンドウ（thread_local）が破棄される
+スレッドが終わる      LoadDirGuard を外す（スレッドの局所の値だけ。待つ所は無い）
 ```
 
 `PastaShiori::request` は、ランタイムが無ければ `MyError::Load`（ロードの失敗の理由）か `MyError::NotInitialized` を返す。ランタイムがあれば `LoadDirGuard` を張り、次の順で `SHIORI.request` を呼ぶ。
@@ -218,15 +289,25 @@ block_on が戻る       スレッドの終了時に、executor のメッセー�
 ### unload・DllMain と teardown
 
 ```text
-unload()
+旧来: unload()                          → teardown("unload", teardown_actor)
+旧来: DllMain（FreeLibrary の detach）  → teardown("DllMain", teardown_actor_detached)
+teardown(入口名, 窓口)
  1. LOADU_INITIALIZED = false
- 2. catch_unwind(teardown_actor)        異常があれば warn ログ
- 3. 常に true
-teardown_actor()
- a. tx = MAILBOX.swap(None)             以後の送信を断つ
- b. ACTOR_HANDLE からハンドルを取り出す
- c. tx があれば teardown_via_sender(tx, 5 秒)、無ければ「終了済み」
- d. ハンドルがあれば detach（join しない）
+ 2. catch_unwind(窓口)                  異常があれば warn ログ
+ 3. 常に 1（TRUE）
+teardown_actor()          = 置き場の後始末(JoinPolicy::JoinAfterAck, 5 秒)
+teardown_actor_detached() = 置き場の後始末(JoinPolicy::Detach, 5 秒)
+置き場の後始末(policy, timeout)
+ a. インスタンス = LEGACY.swap(None)     以後の送信を断つ。空なら already_done（冪等）
+ b. Arc::try_unwrap が成功 → ActorInstance::shutdown_with_timeout(policy, timeout)
+    失敗（別のスレッドで要求が走っている） → request_stop（Stop と ack の待ちだけ）。
+      最後の参照の Drop でスレッドを手放す
+版 3: unload（shiori4_abi が PastaV3 を Drop） → ActorInstance の Drop
+      まだ片付けていなければ shutdown と同じ手順を JoinPolicy::JoinAfterAck で行う
+ActorInstance の後始末(policy, timeout)
+ i.  teardown_via_sender(tx, timeout)
+ ii. ack が届き、policy が JoinAfterAck → ActorThread::join（joined = true）
+     それ以外                          → detach（手放す）。ack が来なかったなら warn「actor thread abandoned」
 teardown_via_sender(tx, timeout)
  - send(Stop{done}) が失敗（受信側がもう無い）→ already_done（何もしない）
  - done を recv_timeout で待つ
@@ -235,31 +316,37 @@ teardown_via_sender(tx, timeout)
      Disconnected → anomaly（warn ログ）
 ```
 
+- 後始末の決まりは、ack を待ち、届いたら join する、である。join するのは ack が届いたときだけで、ack の後にアクタースレッドがするのは受け口を閉じた後の ack の送信とスレッドの局所の値の片付けだけなので、join は上限なしでも止まらない。そのため `unload` が返るとき、アクタースレッドはライブラリのコードを出ている。
+- `DllMain` の道だけは join しない（`JoinPolicy::Detach`）。`DllMain` はローダーロックを持ったまま呼ばれ、その中ではスレッドの終わりを待てないためである。ack までは待つので、VM の破棄は済んでいる。
+- ack が 5 秒で来なければスレッドを手放す。手放したスレッドの VM が持つディレクトリの占有は、そのスレッドが VM を片付けるまで残る。版 3 から同じディレクトリをすぐ読み直すと断られる。旧来の入口の再読み込みだけは引き継ぐ（[load とアクターの起動](#旧来の入口)）。
+- `try_unwrap` が失敗するのは、片付けと同時に別のスレッドで要求が走っているとき（SHIORI の単一スレッドの規約に反する呼び方）だけである。最後の参照の Drop が送る `Stop` は、先の `Stop` でループを抜けたアクターに届かず already_done になるため、その Drop が join で待つことは無い（`DllMain` の道でも待たない）。
 - `Stop` は他のメッセージと同じ FIFO を通るため、先に積まれたメッセージを処理し終えてからループを抜ける。
 - `PastaShiori` の `Drop` は、キャッシュした `SHIORI.unload` を呼び（`call_lua_unload`）、続けて `release_runtime` でランタイムを手放す。`release_runtime` は次の順に進む。
   1. 設置パスがあれば `LoadDirGuard` を張る（メソッドを抜けるまで保つ）。
   2. キャッシュした Lua 関数を捨てる（VM を参照しているため、ランタイムより先に捨てる）。
   3. ランタイムを破棄する。ここで永続化データが保存され（[永続化](execution-model.md#永続化)）、DAP のバックエンドも VM の一部として片付く。
   4. info「Unregistering logger」を出す。
-  5. ロガーの登録を外す。最後の参照が落ち、フラッシュしてログファイルが閉じる。
+  5. 占有の札があれば `release_claim(札)`（札の世代が項目の今の世代と同じときだけ項目を消す）、無ければ `unregister(設置パス)` で、ロガーの登録と占有を外す。最後の参照が落ち、フラッシュしてログファイルが閉じる。
 
   登録を外すのを最後にするのは、`SHIORI.unload` の結果・永続化データの保存の失敗・登録解除の通知を、ファイルを閉じる前に書くためである（[FFI 入口と終了処理のログ](#ffi-入口と終了処理のログ)）。
-- 完了の通知は、VM の破棄と mailbox の受信側の破棄が終わってから送る。通知を受け取った時点で、VM と DAP バックエンドの解放は済んでいる。executor のメッセージ専用ウィンドウ（`wintf-winmsg-executor` の thread_local）は、その後 `block_on` が戻ってスレッドが終わるときに破棄される。
-- `DllMain` は `DLL_PROCESS_DETACH` のうち `FreeLibrary` によるもの（`lpReserved` が null）で `unload()` を呼び、それ以外の通知では何もしない。プロセスの終了による `DLL_PROCESS_DETACH`（`lpReserved` が null でない）では、他のスレッドが既に止められていてアクターが応答できないため、teardown せずに `true` を返す。そのため、`unload` を呼ばれずにホストのプロセスが終わったときは、`SHIORI.unload` も永続化データの保存も走らない。`DllMain` はローダーロックを持ったまま呼ばれるため、そこでスレッドを起こさない。スレッドは `load` を起点に起こす。
-- 再読み込み（`unload` の後の `load`、または `load` の再呼び出し）は、`spawn_actor` の 1 で前のアクターを終わらせ、新しいスレッド・チャネル・VM を作る。`PastaShiori::load` の中にある、既存のランタイムを捨てて作り直す分岐（info「Releasing existing runtime for reload」→ `release_runtime` → `last_load_error` を消す。`SHIORI.unload` は呼ばない）は、FFI の経路では通らない（アクターごとに新しい `PastaShiori` を作るため）。
+- 完了の通知は、VM の破棄と mailbox の受信側の破棄が終わってから送る。通知を受け取った時点で、VM・DAP バックエンド・ディレクトリの占有の解放は済んでいる。
+- `DllMain` は `DLL_PROCESS_DETACH` のうち `FreeLibrary` によるもの（`lpReserved` が null）で `teardown_actor_detached` の後始末を行い、それ以外の通知では何もしない。プロセスの終了による `DLL_PROCESS_DETACH`（`lpReserved` が null でない）では、他のスレッドが既に止められていてアクターが応答できないため、teardown せずに 1 を返す。そのため、`unload` を呼ばれずにホストのプロセスが終わったときは、`SHIORI.unload` も永続化データの保存も走らない。`DllMain` はローダーロックを持ったまま呼ばれるため、そこでスレッドを起こさない。スレッドは `load` を起点に起こす。`DllMain` が片付けるのは旧来の入口のインスタンスだけで、版 3 のインスタンスはホストの `unload` が片付ける。
+- 再読み込み（`unload` の後の `load`、または `load` の再呼び出し）は、`spawn_actor` の 2 で前のインスタンスを終わらせ、新しいスレッド・チャネル・VM を作る。`PastaShiori::load` の中にある、既存のランタイムを捨てて作り直す分岐（info「Releasing existing runtime for reload」→ `release_runtime` → `last_load_error` を消す。`SHIORI.unload` は呼ばない）は、FFI の経路では通らない（インスタンスごとに新しい `PastaShiori` を作るため）。
 
 ### FFI 入口と終了処理のログ
 
-ログの振り分けの規則は [ロギングとエンコーディング](logging-encoding.md#振り分けの規則) が書く。この節は、SHIORI の各入口と終了処理のログがその規則でどうなるかを書く。pasta.dll の登録簿のロガーは 0 個か 1 個である。
+ログの振り分けの規則は [ロギングとエンコーディング](logging-encoding.md#振り分けの規則) が書く。この節は、SHIORI の各入口と終了処理のログがその規則でどうなるかを書く。旧来の入口だけを使うホスト（SSP）では、登録簿のロガーは 0 個か 1 個である。版 3 のインスタンスが並ぶと 2 個以上になり、文脈の無いログは捨てる。
 
 | 入口・処理 | スレッドの文脈 | 扱い |
 | ---------- | -------------- | ---- |
 | アクタースレッド（メッセージループの観測ログ、`PastaShiori` の各メソッドのログ） | スレッドの入口で設置パスの `LoadDirGuard` を張り、スレッドの終わりまで保つ | 自分のロガーへ届く |
-| `loadu`・`load`（`load_entry`） | 無し。`load_impl` は入口名と成否の 1 行を出す間だけ張り直す | 最初のロード前の引数の誤りや設置パスを読めないときのログは、登録が無いので捨てる。`loadu` 済みで無視した `load` の warn は、登録されたロガーへ届く |
-| `request` | 無し | 不正なリクエストの warn、境界での panic の error、観測用の debug・trace は、ロガーが登録されていれば届く。`load` の前・`unload` の後は捨てる |
-| `unload` | 無し | teardown の異常の warn は後述 |
-| `DllMain` の detach（`FreeLibrary`） | 無し | `unload()` を呼ぶので、`unload` と同じ |
+| `ActorInstance` の起動と後始末（占有を断った warn・引き継いだ warn・起動の失敗の error・スレッドを手放した warn） | 出す間だけ設置パスの `LoadDirGuard` を張る | そのディレクトリのロガーへ届く。起動の失敗は、その場で既定のロガーを登録してから出す |
+| 旧来の `loadu`・`load`（`load_entry`） | 無し。`load_impl` は入口名と成否の 1 行を出す間だけ張り直す | 最初のロード前の引数の誤りや設置パスを読めないときのログは、登録が無いので捨てる。`loadu` 済みで無視した `load` の warn は、登録されたロガーがちょうど 1 つなら届く |
+| 旧来の `request` | 無し | 不正なリクエストの warn、境界での panic の error、観測用の debug・trace は、登録されたロガーがちょうど 1 つなら届く。`load` の前・`unload` の後は捨てる |
+| 旧来の `unload` | 無し | teardown の異常の warn は後述 |
+| `DllMain` の detach（`FreeLibrary`） | 無し | `unload` と同じ（join しないことだけが違う） |
 | `DllMain` の detach（プロセスの終了） | — | 何もしないので、ログも出ない。`SHIORI.unload` と永続化データの保存も走らない |
+| 版 3 の `load`・`request`・`notify` | 入口の 1 行・弾いた要求の debug・開始行を読めない warn を出す間だけ、インスタンスの設置パスで張る | そのインスタンスのロガーへ届く。絶対パスでない・ディレクトリが無いときは置き場が無いのでログを出さない |
 
 終了処理（`unload`、または `FreeLibrary` による detach）のログは、出る時点で次のように分かれる。
 
@@ -273,14 +360,52 @@ FFI 入口のスレッド: send(Stop{done})
 アクタースレッド: drop(rx) → done.send(())
   debug「actor.done」                     … 捨てる
 FFI 入口のスレッド: recv_timeout(5 秒)
-  届いた       → debug「done ack received」 … 捨てる
+  届いた       → debug「done ack received」 … 捨てる。続けて join（DllMain は手放す）
   Timeout      → warn                       … 届く（ロガーはまだ登録されている）
+                 warn「actor thread abandoned」… 届く（設置パスの文脈を張って出す）
   Disconnected → warn                       … 登録解除の後なら捨てる
 ```
 
-- 完了の通知（done ack）の後のログは、ロガーが 1 つも登録されていないので捨てる。done ack を送る位置は変えないため、通知を受け取った時点で VM・DAP バックエンド・ログファイルの解放が済んでいる、という不変条件は保たれる。
-- Timeout のとき、アクターは終了処理の途中で、ロガーは登録されたままである。FFI 入口のスレッドの warn は唯一のロガーへ届く。Disconnected は巻き戻すプロファイルでの panic でしか起きず、そのときロガーが既に登録を外されていれば warn は捨てる。
-- ログを残すために、`unload` の戻り値（常に `true`）・待ち時間の上限（5 秒）・応答の内容は変えない。
+- 完了の通知（done ack）の後のログは、そのディレクトリのロガーがもう登録されていないので捨てる。done ack を送る位置は変えないため、通知を受け取った時点で VM・DAP バックエンド・ログファイルの解放が済んでいる、という不変条件は保たれる。
+- Timeout のとき、アクターは終了処理の途中で、ロガーは登録されたままである。FFI 入口のスレッドの文脈の無い warn は、ロガーがちょうど 1 つなら届く。Disconnected は巻き戻すプロファイルでの panic でしか起きず、そのときロガーが既に登録を外されていれば warn は捨てる。
+- ログを残すために、`unload` の戻り値（常に 1）・待ち時間の上限（5 秒）・応答の内容は変えない。
+
+### ディレクトリの占有
+
+同じゴーストのディレクトリを 2 つのインスタンスが読むと、セーブとログのファイルを取り合う。そのため、生きているインスタンスどうしは同じディレクトリを読まない。占有は、ロガーの登録簿 `GlobalLoggerRegistry`（`REGISTRY`）の項目で表す。項目が在ること＝そのディレクトリが占有されていることで、占有のためにプロセスに 1 つの状態を新しく足さない。
+
+- 1 項目は、ロガー（まだ無いこともある）・量の設定・世代の数を持つ。鍵は設置パスの `PathBuf` で、正規化せずに比べる。
+- `try_claim` は項目が無いときだけ「ロガー無し・既定の量」の項目を新しい世代で足し、札（`ClaimToken`。鍵と世代）を返す。項目があれば `None` で、起動は `DirInUse` で断る。
+- `take_over` は項目の世代を新しくして札を返す（ロガーと量の設定は引き継ぐ）。使うのは旧来の入口の再読み込みだけである。
+- `release_claim` は、札の世代が項目の今の世代と同じときだけ項目を消す。世代の数は表に 1 つの連番で、項目を消しても戻さない。項目ごとの数にすると、消して作り直した項目の世代が古い札と重なり、手放された古い VM が今の持ち主の項目を消してしまうためである。
+- 札を持つのは VM（`PastaShiori`）で、`release_runtime` の最後に返す。起動に失敗したときは `ActorInstance::spawn_with` が返す。
+
+旧来の入口の `load` が、版 3 のインスタンスが占有しているディレクトリを指したときは FALSE を返し、アクターを起こさない（以後の GET は 204）。
+
+### プロセスに 1 つ残す状態
+
+インスタンスの状態（VM・アクタースレッド・mailbox・辞書・変数・セーブ・ログの出し先・要求の連番・kick の送り先）は、どれもインスタンスごとに持つ。プロセスに 1 つ残すのは次のものだけである。
+
+| 状態 | 場所 | 残す理由 |
+| ---- | ---- | -------- |
+| `LEGACY`（`ArcSwapOption<ActorInstance>`） | `crates/pasta_shiori/src/actor/lifecycle.rs` | 旧来の入口は、呼び出し側にインスタンスのハンドルを返せない ABI であるため。旧来の入口の中に閉じ込め、芯・アクター・版 3 の入口は参照しない |
+| `LOADU_INITIALIZED`（`AtomicBool`） | `crates/pasta_shiori/src/windows.rs` | 同じく旧来の入口のハンドルの無い ABI のため（`loadu` の後の `load` を何もしないことにする印）。旧来の入口の中に閉じ込める |
+| tracing の購読者 | `crates/pasta_lua/src/logging/tracing_init.rs` の `init_tracing` | Rust の tracing の既定の購読者は、プロセスに 1 つの仕組みであるため |
+| `REGISTRY`（`GlobalLoggerRegistry`） | `crates/pasta_lua/src/logging/registry.rs` | 1 つの購読者から、ログをゴーストのディレクトリごとに振り分けるため。ディレクトリの占有と世代の連番もここに持つ |
+| `UNIQUE_COUNTER`（`AtomicU64`） | `crates/pasta_lua/src/loader/extract.rs` | 自己展開の一時・退避ディレクトリの名前の接尾辞を作る数を振るだけで、振る舞いに効かない |
+
+- 版 3 のテーブル `API_V3` は変わらない定数で、状態ではない。
+- ログの文脈 `CURRENT_LOAD_DIR` はスレッドごとの値（`thread_local!`）で、プロセスに 1 つではない。
+- DAP の待受のポートの重なりは OS のポートで見分け、プロセスの状態を持たない（後から読んだほうが警告を出してデバッグなしで立ち上がる）。
+
+### ログの量の判定
+
+購読者は `registry().with(fmt::layer().with_writer(GlobalLoggerRegistry).with_filter(RegistryFilter))` の 1 つで、プロセスに 1 つの量の設定は持たない。量の設定（`EnvFilter`）は `REGISTRY` の項目ごとに持ち、`update_tracing_filter(load_dir, config)` がその項目の量の設定を作り直す（[ロギングとエンコーディング](logging-encoding.md#ログフィルタ)）。
+
+- `RegistryFilter::enabled` は、書き込み先を選ぶのと同じ決まりで項目を選び、その項目の量の設定で判定する。スレッドの文脈があればその項目、無ければロガーを持つ項目がちょうど 1 つのときだけその項目である。選べなければ出さない。ほかのゴーストの設定へ逃げない。
+- 判定はスレッドの文脈で変わるので、`callsite_enabled` は `Interest::sometimes()` を返し、コールサイトごとに覚えさせない。`max_level_hint` は全部の項目の量の最大（項目が無ければ OFF）で、それより細かいイベントは購読者に届く前に止まる。表を変えたら、ロックを外してから `rebuild_interest_cache()` で作り直す（ロックを持ったまま呼ぶと、`max_level_hint` が同じロックを取って止まる）。
+- 1 つの `EnvFilter` を項目ごとに `Filter::enabled` で呼ぶだけなので、スパンの中身で絞る指定（`[span{field=…}]` のような動的な指定）は効かない。ターゲットと量の指定（`warn,pasta_lua=debug` など）は効く。
+- 同じ理由で、`tracing::enabled!` はディレクトリごとの断りを映さない。答えは全部の項目の量の最大だけで決まる。実際の書き出しは、選んだ項目の量の設定に従う。
 
 ### Lua 側の SHIORI エントリとイベント配送
 
@@ -463,7 +588,12 @@ REG.OnSecondChange（既定。鎖の底）
 
 ### DLL のビルド構成
 
-`crates/pasta_shiori/Cargo.toml` はライブラリ名を `pasta`、`crate-type` を `cdylib` と `rlib` にしている。`cdylib` が pasta.dll になり、`rlib` は統合テストが Rust から使うためのものである（`crates/pasta_shiori/src/lib.rs` は `load`・`loadu`・`request`・`unload` を再エクスポートし、テストが出荷シンボルそのものを呼べるようにしている）。`crates/pasta_shiori/src/windows.rs` と `crates/pasta_shiori/src/util/hglobal/` は `#[cfg(windows)]` で、Windows 以外のビルドは FFI の関数を持たない。
+`crates/pasta_shiori/Cargo.toml` はライブラリ名を `pasta`、`crate-type` を `cdylib` と `rlib` にしている。`cdylib` が Windows では pasta.dll、Linux では `libpasta.so`、macOS では `libpasta.dylib` になり、`rlib` は統合テストが Rust から使うためのものである（`crates/pasta_shiori/src/lib.rs` は `shiori_get_api` と、Windows では `load`・`loadu`・`request`・`unload` を再エクスポートし、テストが出荷シンボルそのものを呼べるようにしている）。
+
+- `crates/pasta_shiori/src/windows.rs` と `crates/pasta_shiori/src/util/hglobal/` は `#[cfg(windows)]` で、Windows 以外のビルドは旧来の入口を持たない。
+- `crates/pasta_shiori/src/v3.rs` と `crates/pasta_shiori/src/actor/` は全部の OS でコンパイルする。Linux・macOS の共有ライブラリが書き出すのは `shiori_get_api` だけである。
+- 依存のうち Windows だけのものは `windows-sys` で、`[target.'cfg(windows)'.dependencies]` に置く。版 3 の ABI は `shiori4_abi`、旧来の入口の置き場は `arc-swap`、mailbox は `flume` が担う。アクターの実行に OS ごとの実行器は使わない。
+- CI（`.github/workflows/build.yml`）は、Windows のほかに Linux・macOS でリリースビルドとワークスペースのテストを回し、3 つの OS で `shiori4-testhost` による版 3 の 1 往復を確かめる。
 
 リリースビルドの設定はルートの [Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml) の `[profile.release]` にあり、ワークスペースの全クレートに効く。pasta.dll の大きさを小さくするための設定である。
 
@@ -475,7 +605,7 @@ REG.OnSecondChange（既定。鎖の底）
 | `panic` | `"abort"` | panic で巻き戻さず中止する。巻き戻しの表を持たない |
 | `strip` | `true` | シンボルを取り除く |
 
-`panic = "abort"` のため、リリースビルドの pasta.dll では panic がホストのプロセスごと中止させる。FFI 入口の `catch_unwind` が効くのは、巻き戻すプロファイル（dev・test）だけである。
+`panic = "abort"` のため、リリースビルドでは panic がホストのプロセスごと中止させる。旧来の入口の `catch_unwind` と、版 3 の入口がパニックを `SHIORI_E_PANIC` で返す `shiori4_abi` の捕捉が効くのは、巻き戻すプロファイル（dev・test）だけである。リリースでは、どちらの入口でもパニックでプロセスが終わる。この扱いは変えない。
 
 ルートの `.cargo/config.toml` は、`i686-pc-windows-msvc` と `x86_64-pc-windows-msvc` の両方に `-Ctarget-feature=+crt-static` を与え、MSVC の CRT を静的にリンクする。pasta.dll は VC++ 再頒布可能パッケージ（`vcruntime140.dll` など）に依存しない。Cargo は `.cargo/config.toml` を作業ディレクトリから上へ探すため、ルートから `cargo build -p pasta_shiori` を実行する CI でも効くよう、クレートの下ではなくルートに置いている。
 
@@ -487,28 +617,31 @@ REG.OnSecondChange（既定。鎖の底）
 | ---- | ----------------- | -------- | ---- |
 | ホスト → pasta.dll（`loadu`・`load`） | ホスト → `load_entry` | 設置パスの HGLOBAL と長さ | 受け取った時点で DLL が所有し、どの経路でも解放する |
 | ホスト ↔ pasta.dll（`request`） | ホスト → `request` → ホスト | リクエストの HGLOBAL と長さ（入力）、応答の HGLOBAL と長さ（戻り値と `len`） | 入力は DLL が解放する。応答（`GMEM_FIXED`）はホストが解放する |
-| FFI 入口のスレッド → アクタースレッド | `marshal_*`・`teardown_via_sender`・`kick_sink` → mailbox | `ActorMsg`（生のリクエスト文字列と `seq`、応答用・完了通知用の送信端、シーン名） | メッセージは move される。VM はアクタースレッドから出ない。mailbox の送信端は `MAILBOX` が、受信端はアクタースレッドが持つ |
-| アクタースレッド → FFI 入口のスレッド | 応答用チャネル・起動の報告用チャネル | `Reply::Value(応答文字列)`、`(ThreadId, bool, Option<SocketAddr>)` | 文字列と `Send` な値だけが渡る |
-| `pasta_shiori` → `pasta_lua`（構築） | `PastaShiori::load` → `PastaLoader::load_with_config` | 設置パスと `RuntimeConfig`（`KickSink` を載せる） | `PastaShiori` が `PastaLuaRuntime` とキャッシュした Lua 関数を所有する |
-| `pasta_lua` → `pasta_shiori`（キック） | デバッグ通信のスレッド → `KickSink` | `KickRequest { scene }` | クロージャは `static MAILBOX` だけに依存し、`try_send` で投函する。`MAILBOX` が空なら捨てる |
+| ホスト ↔ 版 3 の入口 | ホスト → `shiori4_abi` → `PastaV3` | 設置パス・要求の UTF-8 の文字列、応答の全文と状態の数 | インスタンスのハンドルはホストが持ち、`unload` で返す。応答はホストの `copy_from_slice` で写す |
+| 入口のスレッド → アクタースレッド | `ActorInstance` の `get`・`notify`・`kick`・後始末 → mailbox | `ActorMsg`（生のリクエスト文字列と `seq`、応答用・完了通知用の送信端、シーン名） | メッセージは move される。VM はアクタースレッドから出ない。mailbox の送信端は `ActorInstance` が、受信端はアクタースレッドが持つ。`ActorInstance` は旧来の入口では `LEGACY` が、版 3 では `PastaV3` が持つ |
+| アクタースレッド → 入口のスレッド | 応答用チャネル・起動の報告用チャネル | `Reply::Value(応答文字列)`、`(ThreadId, bool, Option<SocketAddr>)` | 文字列と `Send` な値だけが渡る |
+| `pasta_shiori` → `pasta_lua`（構築） | `PastaShiori::load` → `PastaLoader::load_with_config` | 設置パスと `RuntimeConfig`（`KickSink` を載せる） | `PastaShiori` が `PastaLuaRuntime`・キャッシュした Lua 関数・占有の札を所有する |
+| `pasta_lua` → `pasta_shiori`（キック） | デバッグ通信のスレッド → `KickSink` | `KickRequest { scene }` | クロージャはそのインスタンスの mailbox の送信端の弱い参照だけを持ち、`try_send` で投函する。インスタンスが片付いた後や送れないときは捨てる。DAP がつながっているインスタンスにだけ届く |
 | Rust → Lua（リクエスト） | `PastaShiori` → `SHIORI.request` | `parse_request` が作った表 | 表は VM が所有し、ACT の `req` として残る |
 | Lua → Rust（応答） | `SHIORI.request` → `PastaShiori` | SHIORI 応答の文字列の全体 | 文字列の複製が Rust に渡る |
 | `pasta_lua` のコア → レンダラ | `register_sakura_script_module` → `RendererInjection` | VM と `TalkConfig` | 返った表は `package.loaded` に置かれて VM が所有する |
 
 ## 不変条件と制約
 
-- VM（`PastaShiori`・`PastaLuaRuntime`）はアクタースレッドで作られ、使われ、破棄される。`PastaShiori` に `unsafe impl Send`・`Sync` は無く、スレッドをまたぐのは `Send` な値だけである。
-- mailbox は 1 本で、消費するのはアクタースレッドの `recv_async` のループ 1 つだけである。`select!` は使わない。新しい種類のメッセージは、別のチャネルではなく `ActorMsg` の新しい variant として足す。これにより VM への同時アクセスは構造上起こらず、メッセージは投入順に処理される。NOTIFY はすぐ 204 を返すが、その処理が終わるまで後続の GET は処理されない。
-- 送信の経路（`marshal_request`・`kick_into_mailbox`）は `MAILBOX` の `load_full` だけで送信端を得て、Mutex を取らない。`ACTOR_HANDLE` の Mutex は起動と終了のときだけ触る。
-- ホストのスレッドを際限なく待たせない。GET の応答待ちと終了の完了待ちはそれぞれ 5 秒で打ち切る。応答を返せない場合はすべて `default_204` を返す。
+- VM（`PastaShiori`・`PastaLuaRuntime`）はアクタースレッドで作られ、使われ、破棄される。`PastaShiori` に `unsafe impl Send`・`Sync` は無く、スレッドをまたぐのは `Send` な値と `Send + Sync` な `ActorInstance` だけである。
+- インスタンス 1 つにアクタースレッド 1 本・mailbox 1 本・VM 1 つである。mailbox を消費するのはアクタースレッドの同期 `recv()` のループ 1 つだけで、`select!` は使わない。新しい種類のメッセージは、別のチャネルではなく `ActorMsg` の新しい variant として足す。これにより VM への同時アクセスは構造上起こらず、メッセージは投入順に処理される。NOTIFY はすぐ 204 を返すが、その処理が終わるまで後続の GET は処理されない。
+- インスタンスの状態は、ほかのインスタンスへ漏れない。プロセスに 1 つ残す状態は [プロセスに 1 つ残す状態](#プロセスに-1-つ残す状態) に挙げたものだけである。
+- 生きているインスタンスどうしは、同じゴーストのディレクトリを読まない（[ディレクトリの占有](#ディレクトリの占有)）。
+- 旧来の入口の送信の経路（`marshal_request`）は `LEGACY` の `load_full` だけでインスタンスを得て、ロックを取らない。kick はインスタンスごとの送り先（mailbox の送信端の弱い参照）を通り、`LEGACY` を経由しない。`store`・`swap` するのは起動と終了のときだけである。
+- ホストのスレッドを際限なく待たせない。GET の応答待ちと終了の完了待ちはそれぞれ 5 秒で打ち切る。応答を返せない場合はすべて `default_204` を返す。終了の完了待ちの後の join は、ack が届いたときだけ行うので止まらない。
 - リクエストの処理のエラー（ロードの失敗・未ロード・`SHIORI.request` の失敗）は 500 応答になり、設定にかかわらずバルーンに何も出ない。204 は応答を返せなかった場合だけの安全網である。`SHIORI.request` の `xpcall` の中で止まったエラーは、表記を出す設定で ID が `On` で始まる要求なら表記の 200、それ以外は `RES.err` の 500 になる。NOTIFY ではどちらもホストへ届かず、`default_204` が返る（[止まるエラーの控えと応答](#止まるエラーの控えと応答)）。
 - GET が 5 秒を過ぎて 204 を返しても、アクタースレッドの処理は止めない（LuaJIT の実行は途中で止められない）。その処理は最後まで進み、応答は受け取り手が無いため捨てられる。VM の状態はその処理の結果どおりに更新される。
 - 入力の HGLOBAL は DLL が必ず解放し、応答の HGLOBAL はホストが解放する。`GlobalAlloc` の失敗は null のまま使わず、null の応答と長さ 0 にする。
-- 各 FFI 入口は `catch_unwind` で panic をホストへ伝えない。ただしリリースでは `panic = "abort"` のため、正常な経路では panic を起こさない書き方をする（`crates/pasta_shiori/src/actor/marshaling.rs` の正常経路に `unwrap`・`expect` が無いことをテストが確かめる。リクエストの解析は再帰しない）。
-- `DllMain` ではスレッドを起こさない。アクタースレッドは `load` を起点に起こす。
-- 終了処理は何度呼んでも安全である（`unload` の二重呼び出し、`unload` と `DllMain` の detach の重なり）。スレッドは join せず detach する。完了の通知は VM の破棄と mailbox の受信側の破棄が済んでから送る。
+- 旧来の入口は `catch_unwind` で、版 3 の入口は `shiori4_abi` の捕捉（`SHIORI_E_PANIC`）で panic をホストへ伝えない。ただし、これが効くのは巻き戻すビルドだけで、リリースでは `panic = "abort"` のためプロセスが終わる。そのため正常な経路では panic を起こさない書き方をする（`crates/pasta_shiori/src/actor/marshaling.rs` の正常経路に `unwrap`・`expect` が無いことをテストが確かめる。リクエストの解析は再帰しない）。
+- `DllMain` ではスレッドを起こさず、スレッドの終わりも待たない。アクタースレッドは `load` を起点に起こす。
+- 終了処理は何度呼んでも安全である（`unload` の二重呼び出し、`unload` と `DllMain` の detach の重なり）。ack が届けばスレッドを join し（`DllMain` の道だけ手放す）、届かなければ手放す。完了の通知は VM の破棄と mailbox の受信側の破棄が済んでから送る。
 - ロガーの登録を外すのは、ランタイムを手放す処理（`release_runtime`）の最後である。完了の通知の後に出たログは捨てる。
-- `default_204` のバイト列は `RES.no_content()` と同じであり、FFI 入口の応答のバイト列はテスト `crates/pasta_shiori/tests/byte_invariant_test.rs` が固定している。再読み込みを繰り返しても OS のハンドルが増えないことは `crates/pasta_shiori/tests/actor_reload_leak_test.rs` が確かめる。
+- `default_204` のバイト列は `RES.no_content()` と同じであり、FFI 入口の応答のバイト列はテスト `crates/pasta_shiori/tests/byte_invariant_test.rs` が固定している。版 3 の GET が旧来の入口と同じバイト列を返すことは `crates/pasta_shiori/tests/shiori4_v3_entry_test.rs` が、2 つのインスタンスが混ざらないことは `crates/pasta_shiori/tests/multi_instance_test.rs` が、後始末の決まり（join・手放し）は `crates/pasta_shiori/tests/actor_instance_test.rs` が確かめる。再読み込みを繰り返しても OS のハンドルが増えないことは `crates/pasta_shiori/tests/actor_reload_leak_test.rs` が確かめる。
 - 仮想イベントディスパッチャの状態は保存されず、再読み込みのたびに初めからになる。
 - 静的 CRT の設定は、ワークスペースのルートから実行したビルドにだけ効く（ルートの `.cargo/config.toml`）。
 
@@ -524,7 +657,7 @@ REG.OnSecondChange（既定。鎖の底）
 
 リリースプロファイルはルートの [Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml) にある。テストは `crates/pasta_shiori/tests/`・`crates/pasta_shiori/src/windows_tests.rs`・`crates/pasta_shiori/src/shiori_lifecycle_tests.rs`・`crates/pasta_shiori/src/shiori_request_tests.rs` にある。
 
-本文で参照した主なファイルは次のとおりである。FFI 入口は `crates/pasta_shiori/src/windows.rs`、アクターランタイムは `crates/pasta_shiori/src/actor/`、リクエストの解析は `crates/pasta_shiori/src/lua_request.rs` と `crates/pasta_shiori/src/util/parsers/req_parser.pest`、Lua 側の振り分けは `crates/pasta_lua/pasta_scripts/pasta/shiori/entry.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`、仮想イベントは `crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua` にある。`@pasta_sakura_script` の登録を呼ぶ側は `crates/pasta_lua/src/runtime/module_registry.rs`・`crates/pasta_lua/src/runtime/factory.rs` である。
+本文で参照した主なファイルは次のとおりである。旧来の入口は `crates/pasta_shiori/src/windows.rs`、版 3 の入口は `crates/pasta_shiori/src/v3.rs`、芯の型は `crates/pasta_shiori/src/actor/instance.rs`、アクターランタイムは `crates/pasta_shiori/src/actor/`、ディレクトリの占有とログの量の判定は `crates/pasta_lua/src/logging/registry.rs`・`crates/pasta_lua/src/logging/tracing_init.rs`、リクエストの解析は `crates/pasta_shiori/src/lua_request.rs` と `crates/pasta_shiori/src/util/parsers/req_parser.pest`、Lua 側の振り分けは `crates/pasta_lua/pasta_scripts/pasta/shiori/entry.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`、仮想イベントは `crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua` にある。`@pasta_sakura_script` の登録を呼ぶ側は `crates/pasta_lua/src/runtime/module_registry.rs`・`crates/pasta_lua/src/runtime/factory.rs` である。
 
 ## 経緯
 

@@ -18,7 +18,7 @@
 //!  6. NOTIFY は 204 のまま（安全網の維持）。
 //!
 //! # 直列実行（プロセス全域 static を共有するため）
-//! `lifecycle::MAILBOX` はプロセスグローバルである。本ファイルは **1 つの `#[test]`** に
+//! `lifecycle::LEGACY` はプロセスグローバルである。本ファイルは **1 つの `#[test]`** に
 //! 3 ケースを直列に詰め、各ケースの終わりに `teardown_actor`（unload 相当）してから
 //! 次のケースを spawn する（既存 `ffi_actor_lifecycle_test.rs` と同方式）。
 //!
@@ -138,7 +138,7 @@ fn assert_reason_contains(case: &str, reason: &str, markers: &[&str]) {
 /// 1 ケース分を本番経路で駆動する。
 ///
 /// `spawn_actor`（load）→ GET → NOTIFY → `teardown_actor`（unload）まで完結させ、
-/// 次ケースが汚れた `MAILBOX` を引き継がないようにする。
+/// 次ケースが汚れた `LEGACY` を引き継がないようにする。
 fn run_case(case: &str, ghost: &TempDir, expect_loaded: bool, markers: &[&str]) {
     let loaded = spawn_actor(0, ghost.path().to_path_buf());
     assert_eq!(
@@ -165,7 +165,7 @@ fn run_case(case: &str, ghost: &TempDir, expect_loaded: bool, markers: &[&str]) 
     );
 }
 
-/// (a)(b)(c) を 1 本のテストで直列に検証する（プロセス全域 `MAILBOX` 共有のため）。
+/// (a)(b)(c) を 1 本のテストで直列に検証する（プロセス全域 `LEGACY` 共有のため）。
 #[test]
 fn load_failures_and_request_errors_are_visible_through_the_actor_boundary() {
     // --- ケース (a): SHIORI 応答モジュールのロード失敗（要件 4.1 / 4.5 / 5.5） ---

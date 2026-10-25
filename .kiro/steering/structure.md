@@ -347,7 +347,7 @@ pasta (workspace)
 ├── pasta_dsl           # DSLパーサー層（Pest PEG → AST変換）
 ├── pasta_core          # 言語非依存層（レジストリ）
 ├── pasta_lua           # Luaバックエンド層（pasta_dsl + pasta_core依存）
-├── pasta_shiori        # SHIORI DLLインターフェース層（src/actor/ = アクタースレッド・flume mailbox・marshaling・teardown・static MAILBOX 所有）
+├── pasta_shiori        # SHIORI DLLインターフェース層（旧来の入口 windows.rs〔Windows だけ〕と版 3 の入口 v3.rs〔全 OS〕・src/actor/ = インスタンスごとのアクタースレッド・flume mailbox・marshaling・teardown・旧来の置き場 static LEGACY）
 ├── pasta_lsp           # LSP実装層（WASM/Native対応・pasta_check の検査の核を WASM で公開）
 ├── pasta_check         # 辞書の検査の核（ライブラリ・pasta_dsl + pasta_core依存）＋CLI（validate・release）
 └── pasta_sample_ghost  # サンプルゴースト「hello-pasta」（publish=false）
