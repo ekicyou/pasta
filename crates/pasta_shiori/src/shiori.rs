@@ -41,6 +41,19 @@ pub struct PastaShiori {
 
     /// Cached SHIORI.unload function
     unload_fn: Option<Function>,
+
+    /// VM を作るときに渡す kick の送り先（持ち主が外から渡す。既定は無し＝kick の道は働かない）
+    kick_sink: Option<pasta_lua::debug::KickSink>,
+}
+
+impl PastaShiori {
+    /// kick の送り先を渡して作る。`load` はこの送り先を VM へ渡す（旧来の置き場の送り先は呼ばない）。
+    pub fn with_kick_sink(kick_sink: Option<pasta_lua::debug::KickSink>) -> Self {
+        // `Drop` を持つので `..Self::default()` は使えない
+        let mut shiori = Self::default();
+        shiori.kick_sink = kick_sink;
+        shiori
+    }
 }
 
 // 旧来の `unsafe impl Send for PastaShiori` / `unsafe impl Sync` は task 5.1（R8.1/R8.3）で
@@ -63,12 +76,6 @@ impl Shiori for PastaShiori {
         // Convert load_dir to PathBuf
         let load_dir_path: PathBuf = load_dir.as_ref().into();
 
-        // Validate load_dir exists
-        if !load_dir_path.exists() {
-            error!(path = %load_dir_path.display(), "Load directory not found");
-            return Ok(false);
-        }
-
         // If already loaded, cleanup previous instance
         if self.runtime.is_some() {
             info!("Releasing existing runtime for reload");
@@ -76,9 +83,16 @@ impl Shiori for PastaShiori {
             self.last_load_error = None;
         }
 
-        // Save hinst and load_dir
+        // Save hinst and load_dir（有無を確かめる前に覚える。ディレクトリが無いときも、
+        // VM の片付けでそのディレクトリのログの登録・占有が外れるように）
         self.hinst = hinst;
         self.load_dir = Some(load_dir_path.clone());
+
+        // Validate load_dir exists
+        if !load_dir_path.exists() {
+            error!(path = %load_dir_path.display(), "Load directory not found");
+            return Ok(false);
+        }
 
         // Stage 1: Early logger initialization (before PastaLoader::load)
         // Create a default logger so all load-phase logs are captured to file
@@ -97,13 +111,11 @@ impl Shiori for PastaShiori {
             "Starting PastaShiori load"
         );
 
-        // VM 構築前に `MAILBOX` 投函クロージャを scene-kick sink として束縛する
-        // （`MailboxKickInjector`・pasta-scene-kick 2.4）。`load_with_config` の内側で
-        // `RuntimeConfig` が VM（`PastaLuaRuntime`）へ渡る前に sink が積まれるため、
-        // 後続 task（2.x）が `enable` 経由で socket-bridge へ透過させられる。
+        // VM 構築前に、持ち主から渡された kick の送り先を scene-kick sink として束縛する
+        // （pasta-scene-kick 2.4・shiori4-v3-portable 5.5）。`load_with_config` の内側で
+        // `RuntimeConfig` が VM（`PastaLuaRuntime`）へ渡る前に sink が積まれる。
         // pasta.toml `[debug]` ＋ env の debug 解決は `load_with_config` 内で従来どおり行われる。
-        let runtime_config =
-            RuntimeConfig::new().with_kick_sink(Some(crate::actor::lifecycle::kick_sink()));
+        let runtime_config = RuntimeConfig::new().with_kick_sink(self.kick_sink.clone());
 
         // Load runtime via PastaLoader (Stage 1.5 logger update happens inside)
         match PastaLoader::load_with_config(&load_dir_path, runtime_config) {

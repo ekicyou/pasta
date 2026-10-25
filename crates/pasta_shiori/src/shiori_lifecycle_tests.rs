@@ -108,6 +108,32 @@ fn test_load_nonexistent_directory_returns_false() {
     assert!(shiori.runtime.is_none());
 }
 
+/// ディレクトリが無いときも、ディレクトリは有無を確かめる前に覚えられ、VM の片付けで
+/// そのディレクトリのログの登録が外れる（先にアクターの持ち主が登録・占有した項目を残さない）。
+#[test]
+fn test_load_nonexistent_directory_unregisters_logger_on_drop() {
+    let temp = TempDir::new().unwrap();
+    let missing = temp.path().join("missing_ghost_dir");
+    let logger = pasta_lua::PastaLogger::new(temp.path(), None).unwrap();
+    GlobalLoggerRegistry::instance().register(missing.clone(), std::sync::Arc::new(logger));
+
+    let mut shiori = PastaShiori::default();
+    assert!(!shiori.load(0, missing.as_os_str()).unwrap());
+    drop(shiori);
+
+    assert!(
+        GlobalLoggerRegistry::instance().get(&missing).is_none(),
+        "logger registration for a missing load_dir must be removed on cleanup"
+    );
+}
+
+/// 既定の作り方では kick の送り先は無い（kick の道は働かない）。
+#[test]
+fn test_default_has_no_kick_sink() {
+    assert!(PastaShiori::default().kick_sink.is_none());
+    assert!(PastaShiori::with_kick_sink(None).kick_sink.is_none());
+}
+
 #[test]
 fn test_request_after_load_failure_returns_load_error() {
     let temp = TempDir::new().unwrap();

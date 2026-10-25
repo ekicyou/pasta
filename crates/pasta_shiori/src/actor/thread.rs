@@ -145,7 +145,9 @@ pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg
             // future は `!Send` な PastaShiori を所有し、recv_async().await のみで待機。
             wintf_winmsg_executor::block_on(async move {
                 // (1) VM をこのスレッドで構築・pin（!Send ゆえ越境不可）。
-                let mut shiori = PastaShiori::default();
+                // 今は旧来の置き場（`MAILBOX`）への kick の送り先を渡す（振る舞いは変わらない）。
+                let mut shiori =
+                    PastaShiori::with_kick_sink(Some(crate::actor::lifecycle::kick_sink()));
                 let loaded = shiori
                     .load(hinst, load_dir.as_os_str())
                     .unwrap_or(false);
