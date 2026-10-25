@@ -34,7 +34,7 @@
   - 置き場の中の単体テスト（kick の届き・置き場が空のときの kick・アクター無しの後始末の冪等）を、置き場が空のときと実際に起こした芯の型のときの形に書き直す（確かめる中身は同じ）。生の送信端で kick の届きを確かめる試験は、芯の型の kick の送り先の試験として 1.3 の側へ移す
   - 旧来の置き場を呼ぶ既存の試験（12 ファイル）と `shiori_*`・`byte_invariant_test` が期待を変えずに通る
   - _Requirements: 5.7, 7.1, 7.2, 7.4_
-- [ ] 1.5 芯の型の後始末の決まりを試す試験と、試験用のゴーストを作る
+- [x] 1.5 芯の型の後始末の決まりを試す試験と、試験用のゴーストを作る
   - 試験用のゴーストを作る: 呼ばれた回数を返す ID・壊れた開始行を返す ID・1 秒ほど回り続ける ID を持つ
   - 芯の型を直に起動し、「ack の後に join」の後始末が「ack あり・join 済み」、「手放す」の後始末が「ack あり・join なし」で返ること
   - 回り続ける ID を NOTIFY で積み、上限を 100 ミリ秒に注入した後始末が「ack なし・join なし」で返り、手放しの警告が出ること
@@ -186,3 +186,4 @@
 - 1.3: spawn の失敗時に既定の PastaLogger を登録する手順（design の spawn 手順 3・2.5）は占有と一緒に 3.3 で足す。`shutdown_with_timeout` は結合試験から呼ぶため pub（`marshal_get_with_timeout` と同じ作り）。
 - 1.4: 旧来の置き場は `static LEGACY: ArcSwapOption<ActorInstance>` だけになった。「static MAILBOX」「lifecycle::MAILBOX」という古い言い方が windows.rs・windows_tests.rs・marshaling.rs・teardown.rs・mailbox.rs・shiori.rs・lib.rs・actor/mod.rs・tests/ffi_actor_lifecycle_test.rs・tests/ffi_extern_session_e2e_test.rs・tests/scene_kick_gate_e2e_test.rs・pasta_lua/src/debug/kick.rs に残る。2.1 の文言の直しで一緒に直す。
 - 1.4: 置き場の後始末で持ち主になれない（規約に反する同時の呼び方）とき、最後の参照の Drop は JoinAfterAck を試みる。5.1 で DllMain 用の join しない窓口を足すとき、この道が loader lock の中で join しないかを見直す。
+- 1.5: 試験用のゴースト `tests/fixtures/v3_probe/` の ID は `OnProbeCount`（Lua に届いた要求の数・その要求も含む）・`OnProbeBadStatus`（開始行 `SHIORI/3.0 2x0 OK`）・`OnProbeSpin`（1 秒回って 204）。4.3 はこの名前を使う。
