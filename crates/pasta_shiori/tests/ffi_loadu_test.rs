@@ -38,10 +38,11 @@ use windows_sys::Win32::System::Memory::{GMEM_FIXED, GlobalAlloc};
 // `loadu` は `#[unsafe(no_mangle)]` されたシンボルを C ABI でそのまま宣言して呼ぶ
 // （ホストから見える名前と呼び出し規約で到達することを同時に確かめる）。
 use pasta::{load, request, unload};
+use std::ffi::c_long;
 
 unsafe extern "C" {
     /// SHIORI DLL 共通仕様の `loadu`（設置パスを UTF-8 で受け取る初期化入口・要件 2.4）。
-    fn loadu(hdir: HGLOBAL, len: usize) -> bool;
+    fn loadu(hdir: HGLOBAL, len: c_long) -> i32;
 }
 
 /// 正常応答のゴールデン。`shiori_lifecycle` フィクスチャの `entry.lua` が
@@ -80,7 +81,7 @@ fn alloc_hglobal(bytes: &[u8]) -> HGLOBAL {
 /// `request` が返した応答 HGLOBAL（呼び出し側所有）を UTF-8 として読み、解放する。
 fn read_and_free_response(h: HGLOBAL, len: usize) -> String {
     assert!(!h.is_null(), "response HGLOBAL must not be null");
-    // SAFETY: 応答は h が len バイトの有効ブロックを指す（emit_response_into の契約）。
+    // SAFETY: 応答は h が len バイトの有効ブロックを指す（emit_response の契約）。
     let s = unsafe {
         let bytes = std::slice::from_raw_parts(h as *const u8, len);
         String::from_utf8(bytes.to_vec()).expect("response must be valid UTF-8")
@@ -108,9 +109,9 @@ fn drive_request() -> String {
     let req = normalize_request(GET_REQUEST);
     let bytes = req.as_bytes();
     let hreq = alloc_hglobal(bytes);
-    let mut len: usize = bytes.len();
+    let mut len: c_long = bytes.len().try_into().unwrap();
     let hres = request(hreq, &mut len);
-    read_and_free_response(hres, len)
+    read_and_free_response(hres, len.try_into().unwrap())
 }
 
 /// 設置パスを UTF-8 バイト列として `loadu` へ渡す（要件 2.4）。
@@ -122,7 +123,7 @@ fn drive_loadu(dir: &Path) -> bool {
         .to_vec();
     let hdir = alloc_hglobal(&utf8);
     // SAFETY: hdir は utf8.len() バイトの有効 UTF-8 ブロック。所有は入口側へ移譲される。
-    unsafe { loadu(hdir, utf8.len()) }
+    unsafe { loadu(hdir, utf8.len().try_into().unwrap()) == 1 }
 }
 
 /// 設置パスをシステム ANSI（CP_ACP）へ変換して従来入口 `load` へ渡す。
@@ -132,7 +133,7 @@ fn drive_loadu(dir: &Path) -> bool {
 fn drive_load(dir: &Path) -> bool {
     let ansi = path_to_ansi_bytes(dir);
     let hdir = alloc_hglobal(&ansi);
-    load(hdir, ansi.len())
+    load(hdir, ansi.len().try_into().unwrap()) == 1
 }
 
 /// パスを本番 `to_ansi_str`（CP_ACP デコード）と対称な `WideCharToMultiByte`/CP_ACP で
@@ -267,7 +268,7 @@ fn loadu_entry_drives_a_non_ansi_install_path_end_to_end() {
     );
 
     // --- 段 3: 終了処理 ---
-    assert!(unload(), "unload は常に true を返す");
+    assert_eq!(unload(), 1, "unload は常に true を返す");
 
     // 段 1 の初期化が `loadu` 経由だったことがログから判別できる。
     // （非同期 writer のため、ロガーが解放される unload の後に読む）
@@ -290,7 +291,7 @@ fn loadu_entry_drives_a_non_ansi_install_path_end_to_end() {
     );
 
     // --- 段 5: unload 後の load 単独は従来どおりロードする（要件 2.6） ---
-    assert!(unload(), "unload は常に true を返す");
+    assert_eq!(unload(), 1, "unload は常に true を返す");
     let ascii_root = TempDir::new().expect("create temp dir");
     let ascii_dir = install_ghost(&ascii_root, "ascii_install_path");
     assert!(
@@ -305,8 +306,9 @@ fn loadu_entry_drives_a_non_ansi_install_path_end_to_end() {
     );
 
     // 後始末: プロセス終了でアクターが漏れないように最終 unload（冪等）。
-    assert!(
+    assert_eq!(
         unload(),
+        1,
         "final unload must remain a safe no-op returning true"
     );
 

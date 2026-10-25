@@ -13,7 +13,14 @@
 //!   `ActorInstance` を LEGACY へ格納）。スレッド spawn は **load 起点**で行い loader lock を
 //!   回避する（R4.4）。
 //! - `request`→ [`lifecycle::marshal_request`]（GET=block-on-reply／NOTIFY=即 204）。
-//! - `unload` / `DllMain detach` → [`lifecycle::teardown_actor`]（`Stop{done}` ack → detach）。
+//! - `unload` → [`lifecycle::teardown_actor`]（`Stop{done}` ack の後に join・7.6）。
+//! - `DllMain` の FreeLibrary の detach → [`lifecycle::teardown_actor_detached`]（ack の後に
+//!   スレッドを手放す。loader lock の中では join できない）。
+//!
+//! # FFI の型（7.3）
+//! 戻り値は C の `BOOL`（32 ビットの int・1／0）、長さは C の `long`（Windows では x86・x64 とも
+//! 32 ビット）。x86 では `usize` と同じ幅なので SSP から見た振る舞いは変わらない。負の長さは 0 と
+//! 同じに扱い、応答の長さが `long` に収まらなければ null と 0 を返す。
 //!
 //! # 初期化入口は 2 つ（要件 2.4/2.5/2.6・設計 ShioriLoadEntry）
 //! DLL 共通仕様は設置パスを UTF-8 で渡す [`loadu`]（SSP 2.6.92 以降・`load` より優先して
@@ -32,7 +39,9 @@
 //! （要件 4.9・task 2.2 で変更済み。204 は panic／reply 喪失時の安全網のみ）。
 
 use crate::actor::lifecycle;
+use crate::actor::teardown::TeardownReport;
 use crate::util::hglobal::*;
+use std::ffi::c_long;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,26 +63,27 @@ use windows_sys::Win32::Foundation::*;
 /// DllMain attach ではアクタースレッドを spawn しない（DllMain は loader lock 保持下で
 /// 呼ばれ、スレッド生成は deadlock を招きうる）。スレッド spawn は SHIORI `load` 起点で
 /// 行う。FreeLibrary による detach（`reserved` が null）ではアクターを teardown する
-/// （VM・スレッド・チャネルの解放）。プロセス終了による detach（`reserved` が非 null）では
-/// 何もしない（`SHIORI.unload` と保存は走らない）。
+/// （VM・スレッド・チャネルの解放。loader lock の中なのでスレッドの終わりは待たない）。
+/// プロセス終了による detach（`reserved` が非 null）では何もしない（`SHIORI.unload` と
+/// 保存は走らない）。
 #[unsafe(no_mangle)]
 extern "system" fn DllMain(
     _hinst: isize,
     call_reason: u32,
     reserved: *mut std::ffi::c_void,
-) -> bool {
+) -> i32 {
     const DLL_PROCESS_DETACH: u32 = 0;
 
     if call_reason == DLL_PROCESS_DETACH && !reserved.is_null() {
         // プロセス終了中（他スレッドは既に停止済み）。アクターは応答できず teardown は
         // タイムアウトまで待つだけなので、何もせず OS に後始末を任せる。
-        true
+        1
     } else if call_reason == DLL_PROCESS_DETACH {
-        // FreeLibrary による detach: アクタースレッドを teardown（unload と重なっても冪等 no-op で安全）。
-        unload()
+        // FreeLibrary による detach: join しない後始末（unload と重なっても冪等 no-op で安全）。
+        teardown("DllMain", lifecycle::teardown_actor_detached)
     } else {
         // attach を含む他の通知では何もしない（spawn は load 起点・loader lock 回避）。
-        true
+        1
     }
 }
 
@@ -106,8 +116,8 @@ enum DirEncoding {
 ///
 /// `#[unsafe(no_mangle)]` is required for the SHIORI host to find this symbol.
 #[unsafe(no_mangle)]
-pub extern "C" fn loadu(hdir: HGLOBAL, len: usize) -> bool {
-    load_entry("loadu", hdir, len, DirEncoding::Utf8)
+pub extern "C" fn loadu(hdir: HGLOBAL, len: c_long) -> i32 {
+    load_entry("loadu", hdir, len_from_c(len), DirEncoding::Utf8).into()
 }
 
 /// SHIORI load entry point
@@ -126,8 +136,8 @@ pub extern "C" fn loadu(hdir: HGLOBAL, len: usize) -> bool {
 ///
 /// `#[unsafe(no_mangle)]` is required for the SHIORI host to find this symbol.
 #[unsafe(no_mangle)]
-pub extern "C" fn load(hdir: HGLOBAL, len: usize) -> bool {
-    load_entry("load", hdir, len, DirEncoding::Ansi)
+pub extern "C" fn load(hdir: HGLOBAL, len: c_long) -> i32 {
+    load_entry("load", hdir, len_from_c(len), DirEncoding::Ansi).into()
 }
 
 /// 2 つの初期化入口の共通本体（デコード方式のみが異なる・設計 ShioriLoadEntry）。
@@ -219,24 +229,29 @@ fn decode_dir(
 ///
 /// `#[unsafe(no_mangle)]` is required for the SHIORI host to find this symbol.
 #[unsafe(no_mangle)]
-pub extern "C" fn unload() -> bool {
+pub extern "C" fn unload() -> i32 {
+    teardown("unload", lifecycle::teardown_actor)
+}
+
+/// `unload` と `DllMain` の detach の共通の後始末（窓口だけが異なる・常に 1 を返す）。
+fn teardown(entry: &str, teardown_actor: fn() -> TeardownReport) -> i32 {
     // loadu 初期化フラグを下ろす（以後の load は従来どおり ANSI でロードする・要件 2.5/2.6）。
     LOADU_INITIALIZED.store(false, Ordering::SeqCst);
     // teardown は冪等（二重 teardown／unload×detach 競合でも安全）。panic は封じる。
     let result = catch_unwind(AssertUnwindSafe(|| {
-        let report = lifecycle::teardown_actor();
+        let report = teardown_actor();
         if let Some(anomaly) = report.anomaly {
-            warn!("[pasta_shiori::unload] teardown anomaly: {anomaly}");
+            warn!("[pasta_shiori::{entry}] teardown anomaly: {anomaly}");
         }
     }));
     if let Err(p) = result {
         error!(
-            "[pasta_shiori::unload] panic at SHIORI boundary: {}",
+            "[pasta_shiori::{entry}] panic at SHIORI boundary: {}",
             panic_msg(&p)
         );
     }
-    // SHIORI 契約上 unload は常に true（既存の always-true 姿勢を維持）。
-    true
+    // SHIORI 契約上 unload は常に TRUE（既存の always-true 姿勢を維持）。
+    1
 }
 
 /// SHIORI request entry point
@@ -247,36 +262,47 @@ pub extern "C" fn unload() -> bool {
 /// The caller must ensure:
 /// - `req` is a valid HGLOBAL containing a UTF-8 encoded SHIORI request,
 ///   or null (in which case this function returns null with `*len = 0`)
-/// - `len` is a valid mutable reference; on entry it holds the byte length
-///   of `req`, on return it is set to the byte length of the response
+/// - `len` is null (this function then frees `req` and returns null) or a valid
+///   pointer; on entry it holds the byte length of `req` (negative is treated
+///   as 0), on return it is set to the byte length of the response
 /// - The returned HGLOBAL is owned by the caller (must be freed by caller)
 /// - The input HGLOBAL `req` will be freed by the callee (ownership transfer)
 ///
 /// `#[unsafe(no_mangle)]` is required for the SHIORI host to find this symbol.
 #[unsafe(no_mangle)]
-pub extern "C" fn request(req: HGLOBAL, len: &mut usize) -> HGLOBAL {
+#[expect(
+    clippy::not_unsafe_ptr_arg_deref,
+    reason = "C の ABI の書き出し。ポインタの正しさはホストとの契約（Safety）で、ほかの入口の HGLOBAL と同じく unsafe にしない"
+)]
+pub extern "C" fn request(req: HGLOBAL, len: *mut c_long) -> HGLOBAL {
+    // SAFETY: 非 null の `len` はホストが有効な `long` を指す契約（上の Safety）。
+    let Some(len) = (unsafe { len.as_mut() }) else {
+        warn!("request called with null length pointer");
+        if !req.is_null() {
+            // 所有は受けた時点で移るので、長さが分からなくても解放する。
+            drop(ShioriString::capture(req, 0));
+        }
+        return ptr::null_mut();
+    };
     if req.is_null() {
         warn!("request called with null HGLOBAL");
         *len = 0;
         return ptr::null_mut();
     }
     // ownership transfer: capture frees the incoming HGLOBAL on every path.
-    let hreq = ShioriString::capture(req, *len);
+    let hreq = ShioriString::capture(req, len_from_c(*len));
     let result = catch_unwind(AssertUnwindSafe(|| request_impl(&hreq)));
-    match result {
-        Ok((res, res_len)) => {
-            *len = res_len;
-            res
-        }
-        Err(p) => {
-            error!(
-                "[pasta_shiori::request] panic at SHIORI boundary: {}",
-                panic_msg(&p)
-            );
-            // panic 時も 204 を返し（marshaling の安全網と同一バイト）、ホストへ unwind しない。
-            emit_response(&crate::actor::marshaling::default_204(), len)
-        }
-    }
+    let (res, res_len) = result.unwrap_or_else(|p| {
+        error!(
+            "[pasta_shiori::request] panic at SHIORI boundary: {}",
+            panic_msg(&p)
+        );
+        // panic 時も 204 を返し（marshaling の安全網と同一バイト）、ホストへ unwind しない。
+        emit_response(&crate::actor::marshaling::default_204())
+    });
+    let (res, res_len) = len_to_c(res, res_len);
+    *len = res_len;
+    res
 }
 
 /// request 本体: UTF-8 デコード → marshaling → 応答 HGLOBAL 化。
@@ -287,33 +313,38 @@ fn request_impl(hreq: &ShioriString) -> (HGLOBAL, usize) {
             // 不正バイト列: 安全網 204（旧実装は 500 を返したが、本番アクター経路は
             // SHIORI スレッドを無限待機させず必ず文字列を返す契約に統一する・R5.6）。
             warn!("[pasta_shiori::request] utf8 decode failed: {e}");
-            let mut len = 0usize;
-            return emit_response_into(&crate::actor::marshaling::default_204(), &mut len);
+            return emit_response(&crate::actor::marshaling::default_204());
         }
     };
     let response = lifecycle::marshal_request(req);
-    let mut len = 0usize;
-    emit_response_into(&response, &mut len)
+    emit_response(&response)
 }
 
-/// 応答文字列を HGLOBAL（nofree・呼び出し側所有）へ載せ、`*len` を更新して返す。
+/// 応答文字列を HGLOBAL（nofree・呼び出し側所有）へ載せて `(handle, len)` を返す。
 /// 確保失敗時は null+len0（ホストは null を「応答なし」と解釈する）。
-fn emit_response(response: &str, len: &mut usize) -> HGLOBAL {
-    let (h, l) = emit_response_into(response, len);
-    *len = l;
-    h
+fn emit_response(response: &str) -> (HGLOBAL, usize) {
+    match ShioriString::clone_from_str_nofree(response) {
+        Ok(hres) => hres.value(),
+        Err(_) => (ptr::null_mut(), 0),
+    }
 }
 
-/// 応答文字列を HGLOBAL 化して `(handle, len)` を返す（`len` out も更新）。
-fn emit_response_into(response: &str, len: &mut usize) -> (HGLOBAL, usize) {
-    match ShioriString::clone_from_str_nofree(response) {
-        Ok(hres) => {
-            let (h, l) = hres.value();
-            *len = l;
-            (h, l)
-        }
+/// C の `long` で受けた長さを `usize` にする。負は 0 と同じに扱う（7.3）。
+fn len_from_c(len: c_long) -> usize {
+    usize::try_from(len).unwrap_or(0)
+}
+
+/// 応答の長さを C の `long` にする。収まらなければ応答を解放して null と 0 を返す
+/// （確保の失敗と同じ道・7.3）。
+fn len_to_c(h: HGLOBAL, len: usize) -> (HGLOBAL, c_long) {
+    match c_long::try_from(len) {
+        Ok(len) => (h, len),
         Err(_) => {
-            *len = 0;
+            error!("[pasta_shiori::request] response length {len} does not fit C long");
+            if !h.is_null() {
+                // SAFETY: h は emit_response が確保した呼び出し側所有の HGLOBAL で、まだ誰にも渡していない。
+                unsafe { GlobalFree(h) };
+            }
             (ptr::null_mut(), 0)
         }
     }

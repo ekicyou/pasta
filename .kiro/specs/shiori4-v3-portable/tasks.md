@@ -128,7 +128,7 @@
   - 試験: 旧来の窓口の後始末が「join 済み」、join しない窓口が「join なし」で返る
   - _Depends: 1.4_
   - _Requirements: 7.6, 4.4_
-- [ ] 5.2 旧来の書き出しの型を C の `BOOL` と `long` に合わせる
+- [x] 5.2 旧来の書き出しの型を C の `BOOL` と `long` に合わせる
   - `DllMain`・`loadu`・`load`・`unload` の戻り値を 32 ビットの int（1／0）、`loadu`・`load` の長さと `request` の長さ（受けと返し）を C の `long` にする
   - 負の長さは 0 と同じに扱い、応答の長さが `long` に収まらなければ null と長さ 0 を返し、`request` の長さの指す先が null なら null を返す
   - `DllMain` の FreeLibrary の片付けは join しない窓口を、`unload` は join する窓口を呼ぶ
