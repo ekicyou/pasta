@@ -295,6 +295,7 @@ fn legacy_and_v3_side_by_side_unload_one_keeps_the_other() {
 
 /// 版 3 の unload が返った時点で、そのアクタースレッドは終わっている（4.4）。
 /// `SHIORI.unload` を 0.3 秒回らせ、終わりを待たずに返ればスレッドが残るようにする。
+// macOS はスレッド名で数え上げる簡単な API が無いので除く（join 自体は actor_instance_test の `joined` が全 OS で確かめる）。
 #[cfg(any(windows, target_os = "linux"))]
 #[test]
 fn v3_unload_leaves_no_actor_thread() {

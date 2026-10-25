@@ -13,14 +13,15 @@
 //! 3. `done` ack を送る、
 //!
 //! という順序で teardown する。その後ループを抜けたスレッドが終了する。SHIORI 側は `done_rx.recv_timeout` で **有界に** ack を
-//! 待ち、ack 受信＝全資源解放済みを確認してからスレッドを **detach** する
-//! （[`thread::ActorThread::detach`]）。
+//! 待ち、ack 受信＝全資源解放済みを確認する。
 //!
-//! # `JoinHandle`／二重 join を採らない理由（設計補足・R7.4）
-//! 完了確認は done ack で行うため、`JoinHandle::join`・`Arc<AtomicBool>` shutdown フラグ・
-//! `take()` 二重 join 回避の小細工は **不要**（join 自体を廃止）。これにより AC4 の
-//! 「二重 join 回避」は構造的に成立する。スレッドは detach し、ack の後に自然
-//! 終了する。
+//! # ack の後の join／detach（仕様 `shiori4-v3-portable` 4.2・4.4・7.6）
+//! ack の後にスレッドをどう扱うかは芯の型 `ActorInstance` の後始末の決まりが選ぶ:
+//! unload は ack の後に join し、`DllMain` の FreeLibrary は join せずに detach し、
+//! ack が来なければ手放す（abandon）。本モジュールの低い層の [`teardown_actor`]
+//! （reload 反復のリーク検査が使う）は join せず、常に detach する
+//! （[`thread::ActorThread::detach`]）。完了確認は done ack で行うので、
+//! `Arc<AtomicBool>` shutdown フラグ・`take()` 二重 join 回避の小細工は持たない（R7.4）。
 //!
 //! # 冪等性（R7.4）
 //! done ack を受けた後の二重 teardown は、mailbox の receiver が既に drop されている
@@ -79,7 +80,9 @@ impl TeardownReport {
     }
 }
 
-/// アクタースレッドを teardown する（本番経路・design.md「reload teardown」）。
+/// アクタースレッドを join せずに teardown する（reload 反復のリーク検査の経路）。
+///
+/// 本番の unload（ack の後に join）は `ActorInstance` の後始末が受け持つ。
 ///
 /// `tx`（mailbox 送信端）から `ActorMsg::Stop { done }` を送り、`timeout` 付きで done ack
 /// を待つ。ack 受信＝アクターが残メッセージ drain・VM 破棄・debug teardown を終えた合図

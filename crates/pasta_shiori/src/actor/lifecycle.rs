@@ -125,8 +125,10 @@ fn teardown_slot(
         Ok(instance) => instance.shutdown_with_timeout(policy, timeout),
         // 片付けと同時に別のスレッドで要求が走っている（単一スレッドの規約に反する呼び方）。
         // 停止の要求だけをして、最後の参照の Drop でスレッドを手放す（join は保証しない）。
-        // Drop の Stop は先の Stop でループを抜けたアクターに ack されないので、Drop が join する
-        // ことは無い（`DllMain` の道の loader lock の中でも join で待たない）。
+        // `request_stop` が ack を受けていれば、Drop の Stop は閉じた mailbox に届かず
+        // already-done になるので、Drop は待たずに手放す（`DllMain` の道の loader lock の中でも
+        // join で待たない）。ack が timeout していたときだけ、最後の Drop が ack を最大 5 秒
+        // 待ち、届けば join する（規約に反する同時の呼び出しでだけ起きる残りの端）。
         Err(shared) => shared.request_stop(),
     }
 }
@@ -146,7 +148,9 @@ fn kick_into(slot: &ArcSwapOption<ActorInstance>, req: KickRequest) -> bool {
     sent
 }
 
-/// 旧来の入口の kick の送り先（置き場の芯の型へ委ねる）。
+/// 置き場の `ActorInstance` へ kick を積む窓口（試験と互換のために残す）。
+///
+/// 本番の kick は各 `ActorInstance` が自分の送り先（`kick_sink_for`）で受けるので、ここは通らない。
 ///
 /// クロージャは [`LEGACY`]（`'static`）だけに頼るので `'static` かつ `Send + Sync`。
 pub fn kick_sink() -> KickSink {

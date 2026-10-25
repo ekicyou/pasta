@@ -8,12 +8,11 @@
 //!
 //! 駆動する経路（本番ライフサイクル自由関数を使用＝ FFI 入口と同一結線）:
 //!  1. `spawn_actor`（FFI `load` 相当）: アクタースレッド上で実ゴースト VM をロードし、
-//!     `PastaShiori::load` 内で `RuntimeConfig::with_kick_sink(lifecycle::kick_sink())` が
-//!     束縛され、`static LEGACY` にアクターの `ActorInstance` が store される（requirements 2.4）。
-//!  2. **実 sink クロージャ** `lifecycle::kick_sink()` を `KickRequest{ scene }` で呼ぶ。これは
-//!     `pasta/playScene` inbound ハンドラ（`try_play_scene_kick`）が注入済み sink を呼ぶのと
-//!     同一のクロージャであり、`LEGACY` を lock-free に読み `ActorMsg::Kick` を `try_send` する。
-//!     → DAP inbound から sink を呼ぶのと同じ「sink→LEGACY」段を本番クロージャで踏む。
+//!     `static LEGACY` にアクターの `ActorInstance` が store される（requirements 2.4）。
+//!  2. 置き場の窓口の sink `lifecycle::kick_sink()` を `KickRequest{ scene }` で呼ぶ。`LEGACY` を
+//!     lock-free に読み `ActorMsg::Kick` を `try_send` し、ここから先はアクターの `Kick` 腕を通る。
+//!     本番の DAP の道（`pasta/playScene` inbound が各インスタンス自身の sink を呼ぶ）は
+//!     `multi_instance_test::dap_kick_reaches_only_its_own_instance` が確かめる。
 //!  3. executor `Kick` 腕（`thread.rs`）が同一 FIFO 上で `PastaShiori::kick(scene)`→Lua
 //!     `SHIORI.kick(scene)`→`KICK.install` を呼び、`STORE.kick_pending`/`kick_force` を設置する
 //!     （requirements 3.1: 受理処理は resume をブロックしない＝フラグ設置のみ）。
@@ -22,8 +21,8 @@
 //!
 //! # 停止ループ非経由（停止非依存）の確認
 //! キックは `SessionCommand`/stop_loop を一切経由しない。本テストは debug をブレークさせない通常
-//! 実行状態（DAP セッション無し・`PASTA_DEBUG` 中和）で、socket-bridge inbound と同型の「sink→
-//! LEGACY」段を本番 sink で踏むことにより、キックが停止ループに依存せず届くことを示す。さらに
+//! 実行状態（DAP セッション無し・`PASTA_DEBUG` 中和）で、置き場の窓口の「sink→
+//! LEGACY」段を踏むことにより、キックが停止ループに依存せず届くことを示す。さらに
 //! キック GET は `Status: talking`（通常はブロック対象）で送り、`kick_force` ワンショット突破で
 //! 初回ビートが割り込み配信されることを併せて実証する（requirements 5.1/5.5 の force ゲート）。
 //!
@@ -151,9 +150,9 @@ fn kick_to_next_on_second_change_delivers_first_beat_end_to_end() {
     //   通常状態を作る。キックはこの後に注入する。）
     let _init = on_second_change("balloon(0=0)");
 
-    // --- フェーズ 3: 実 sink（lifecycle::kick_sink）でキックを注入 ---
-    // これは `pasta/playScene` inbound ハンドラが注入済み sink を呼ぶのと同一クロージャ。
-    // sink→LEGACY.load→ActorMsg::Kick→executor Kick 腕→SHIORI.kick→KICK.install を貫く。
+    // --- フェーズ 3: 置き場の窓口の sink（lifecycle::kick_sink）でキックを注入 ---
+    // sink→LEGACY.load→ActorMsg::Kick→executor Kick 腕→SHIORI.kick→KICK.install を貫く
+    // （本番の DAP の道＝インスタンス自身の sink は multi_instance_test が確かめる）。
     // 停止ループ（SessionCommand）は一切経由しない（停止非依存・socket-bridge inbound 同型）。
     let sink = pasta::actor::lifecycle::kick_sink();
     sink(KickRequest {

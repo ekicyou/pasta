@@ -87,7 +87,7 @@ impl ActorThread {
         self.debug_local_addr
     }
 
-    /// アクタースレッドを join する（テスト／teardown 用）。
+    /// アクタースレッドを join する（unload の後始末＝ack の後の join・テスト用）。
     ///
     /// 呼び出し側は事前に [`ActorMsg::Stop`] を mailbox へ送り、ループを抜けさせて
     /// おくこと（さもなくば `recv()` が永久に待ち続けて join できない）。
@@ -98,12 +98,12 @@ impl ActorThread {
         }
     }
 
-    /// アクタースレッドを **detach** する（本番 teardown 用・design.md「Teardown」）。
+    /// アクタースレッドを **detach** する（join しない後始末用・design.md「後始末の決まり」）。
     ///
-    /// 本番 teardown は `JoinHandle` で join せず、`ActorMsg::Stop { done }` の done ack
-    /// で完了を確認する（ack 受信時に VM 破棄・cleanup 完了済み）。本メソッドは
-    /// `JoinHandle` を join せずに drop してスレッドを detach する。`take()` 二重 join の
-    /// 小細工も持たない（join 自体を廃止）。`done` ack を受け取った後に呼ぶこと。
+    /// 完了は `ActorMsg::Stop { done }` の done ack で確認する（ack 受信時に VM 破棄・cleanup
+    /// 完了済み）。unload は ack の後に [`join`](Self::join) し、本メソッドを使うのは `DllMain`
+    /// の FreeLibrary（loader lock の中で待てない）と、ack が来ずに手放すとき、reload 反復の
+    /// リーク検査の経路。`JoinHandle` を join せずに drop してスレッドを detach する。
     ///
     /// OS スレッドは ack の後に自然終了し、ハンドルは drop で解放される
     /// （reload リーク検査がスレッドハンドルの非リークを実測で裏取りする）。
@@ -271,7 +271,7 @@ pub fn spawn_actor_thread_with(
                 // 観測ログ点（R10.4）: cleanup 完了後に done ack を送出（全資源解放済み）。
                 tracing::debug!(seam = "actor.done", "actor sent done ack after VM/resource cleanup");
             }
-            // ここでスレッドが終わる。スレッドは SHIORI 側が detach 済み。
+            // ここでスレッドが終わる。SHIORI 側は ack の後に join するか（unload）、detach 済み。
         })?;
 
     // VM 構築完了（実行スレッド id・ロード成否・debug DAP 束縛アドレス）を待つ。

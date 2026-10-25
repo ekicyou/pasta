@@ -30,8 +30,8 @@ pub mod thread;
 pub mod marshaling;
 
 /// 本番 teardown（task 4.1）。`ActorMsg::Stop { done }` 制御メッセージで drain→VM 破棄・
-/// debug teardown→done ack を成立させ、SHIORI 側は ack を有界に待って
-/// スレッドを detach する（join 廃止・冪等・異常記録）。reload 反復のリーク検査
+/// debug teardown→done ack を成立させ、SHIORI 側は ack を有界に待つ（冪等・異常記録）。
+/// ack の後の join／detach は芯の型（`instance`）の後始末の決まりが選ぶ。reload 反復のリーク検査
 /// （`GetProcessHandleCount`/`GetGuiResources`）も提供する。task 5.1 で FFI 入口
 /// （`windows.rs` の load/unload）へ配線され、既定ビルドでコンパイルされる。
 pub mod teardown;

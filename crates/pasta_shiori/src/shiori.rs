@@ -239,8 +239,9 @@ impl PastaShiori {
 
         if let Some(ref load_dir) = self.load_dir {
             info!(load_dir = %load_dir.display(), "Unregistering logger");
-            match &self.claim {
-                Some(token) => GlobalLoggerRegistry::instance().release_claim(token),
+            // 札は一度きり。読み直しの後に古い世代の札で外し損ねないよう、使ったら手放す。
+            match self.claim.take() {
+                Some(token) => GlobalLoggerRegistry::instance().release_claim(&token),
                 None => GlobalLoggerRegistry::instance().unregister(load_dir),
             }
         }

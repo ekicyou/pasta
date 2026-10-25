@@ -3,7 +3,7 @@
 //! ＋ Error Handling（`kick.unresolved` / `kick.drop`）・`MailboxKickInjector`（D6 no-op））。
 //!
 //! # 何を観測可能に固定するか（actor/SHIORI レベルの E2E ゲート）
-//! 既存ユニットを **跨ぐ全経路（実 sink→LEGACY→executor→Lua→OnSecondChange）上で観測可能な
+//! 既存ユニットを **跨ぐ全経路（置き場の窓口の sink→LEGACY→executor→Lua→OnSecondChange）上で観測可能な
 //! 応答さくらスクリプト／ライフサイクル不変**として補完する。本ファイルは 3 ゲートのうち
 //! actor/SHIORI レベルで最も自然に観測できる 2 つ（未解決破棄・teardown 競合 drop）を 1 本の
 //! `#[test]` に直列に詰める（`static LEGACY` はプロセスグローバルゆえ 6.1/7.2/7.3 と同方針で
@@ -16,8 +16,8 @@
 //!    OnSecondChange が **通常応答（キックビート無し・進行中会話の継続が不変）** であること。
 //!    進行中のマルチビート会話を先に走らせておき、未解決キックがそれを一切変えない（後続ビートが
 //!    通常ペースでそのまま継続する）ことで「co_scene 不変」を観測可能にする。
-//!  - **teardown 競合 drop（R3.5 / D6）**: `teardown_actor()`（`LEGACY.swap(None)`）後に実 sink
-//!    クロージャ（`kick_sink()`）を呼ぶ → **panic せず** no-op（LEGACY 不在で送信されない・
+//!  - **teardown 競合 drop（R3.5 / D6）**: `teardown_actor()`（`LEGACY.swap(None)`）後に置き場の
+//!    窓口の sink（`kick_sink()`）を呼ぶ → **panic せず** no-op（LEGACY 不在で送信されない・
 //!    `kick.drop` ベストエフォート）。観測: panic しないこと＋LEGACY が None のまま（後続の
 //!    `marshal_request` がアクター不在の 204 を返すことで LEGACY 不在を観測）。
 
@@ -160,7 +160,8 @@ fn on_second_change(status: &str, offset_secs: i64) -> String {
     )))
 }
 
-/// キック注入（実 sink＝`pasta/playScene` inbound ハンドラと同一クロージャ）。
+/// キック注入（置き場の窓口の sink。ここから先はアクターの `Kick` 腕を通る。本番の DAP の道＝
+/// インスタンス自身の sink は `multi_instance_test::dap_kick_reaches_only_its_own_instance`）。
 ///
 /// キックはシーン表の登録名に完全一致で引くため、作者が書いた名前ではなく登録名
 /// （1 個目の定義＝作者名・`_`・通し番号 `1`）を載せる。
@@ -244,7 +245,7 @@ fn kick_unresolved_and_teardown_drop_gates_end_to_end() {
 
     // =====================================================================
     // ゲート B: teardown 競合 drop（R3.5 / D6）
-    //  teardown_actor()（LEGACY.swap(None)）後に実 sink クロージャを呼ぶ → panic せず no-op
+    //  teardown_actor()（LEGACY.swap(None)）後に置き場の窓口の sink を呼ぶ → panic せず no-op
     //  （LEGACY 不在で送信されない・kick.drop ベストエフォート）。観測: panic しないこと＋
     //  LEGACY が None のまま（teardown 後の marshal_request がアクター不在の 204 を返す）。
     // =====================================================================
@@ -252,7 +253,7 @@ fn kick_unresolved_and_teardown_drop_gates_end_to_end() {
     // teardown（LEGACY.swap(None)）= アクター不在状態を作る。
     let _ = teardown_actor();
 
-    // teardown 後に実 sink を呼ぶ → panic せず黙って破棄される（kick.drop・ベストエフォート）。
+    // teardown 後に置き場の窓口の sink を呼ぶ → panic せず黙って破棄される（kick.drop・ベストエフォート）。
     // （この行が panic すれば drop ゲートが破れている＝load-bearing。）
     kick(DROP_SCENE);
 
