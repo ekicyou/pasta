@@ -142,12 +142,12 @@
   - 該当の試験が Windows で通り、Linux・macOS で落ちない形になっている（CI での確認は 6.4）
   - _Boundary: pasta_lua tests_
   - _Requirements: 9.4_
-- [ ] 6.2 (P) `pasta_check` の `..` の形の検査の順を直す
+- [x] 6.2 (P) `pasta_check` の `..` の形の検査の順を直す
   - `..` の形の検査が、Linux・macOS でも他の検査より先に効くように順を直す
   - 該当の試験が Windows で通り、Linux・macOS で落ちない形になっている（CI での確認は 6.4）
   - _Boundary: pasta_check_
   - _Requirements: 9.4_
-- [ ] 6.3 `pasta_shiori` の Linux・macOS で落ちる試験を直す
+- [x] 6.3 `pasta_shiori` の Linux・macOS で落ちる試験を直す
   - 2.3 で分けた一覧に沿って、移植できるものは直し、Windows だけの働き（HGLOBAL・ANSI のコードページ・Windows の資源の測りなど）は理由のコメントつきで Windows だけに囲う
   - Windows での期待は変えない
   - _Depends: 2.3, 5.2_
@@ -193,3 +193,5 @@
 - 4.3: design.md の「unload の後にスレッドが残らない」は shiori4_v3_entry_test では確かめていない（join の振る舞いは actor_instance_test が持つ）。kiro-validate-impl はここを覆われているとみなさない。
 - 4.4: multi_instance_test の `v3_unload_leaves_no_actor_thread` は、旧来の後始末が join しない間（5.1 まで）、終わりきらない旧来のアクターのスレッド ID を Windows が使い回すとまれに誤って落ちうる。5.1 の後に塞がったことを確かめる。v3_probe に `OnProbeSlowUnload`（次の unload を 0.3 秒回す）を足した。
 - 5.1: この段の後、DllMain の FreeLibrary の道はまだ `teardown_actor()`（join する）を呼ぶ。5.2 で `teardown_actor_detached()` に向け、windows.rs のモジュールの説明（16 行目）も直す。5.2 を入れずに main へ入れない。
+- 6.2: 原因は POSIX の `std::path::absolute` が `..` を字面で畳まないこと。`--release` と `--target` が同じ場所と判定されず、前回の nar を消してから落ちていた（試験の前提ではなく製品の不具合）。`resolve` で、まだ無い部品の `..` を字面で畳んで直した。
+- 6.3: 2.3 の測りで `pasta_shiori` の Linux・macOS の落ちる試験は 0 本だったので、直すものも囲うものも無い（research.md 8 節）。6.4 の CI で毎回確かめる。

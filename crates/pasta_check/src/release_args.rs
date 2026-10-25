@@ -8,7 +8,7 @@ use crate::path_error;
 use std::fs;
 use std::io;
 use std::iter;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 /// a から見た b: 同じ・a が b を含む・a が b の中
 #[derive(Debug, PartialEq)]
@@ -82,14 +82,27 @@ fn reject(a_option: &str, a: &Path, rel: &Relation, b_option: &str, b: &Path) ->
     )
 }
 
-/// 比べるための形: absolute にし、在る一番近い祖先を canonicalize して、残りの部品を書かれたまま足す
-// shortcut: Windows 以外では、まだ無い部分の .. を畳まない。CI が Windows 以外で試験を回すようになったら、残りの部品を字面で畳む
+/// 比べるための形: absolute にし、在る一番近い祖先を canonicalize して、残りの部品を足す。
+/// 残りの部品の .. は字面で畳む（Windows では absolute が畳み済み・Linux と macOS では畳まないため）
 fn resolve(path: &Path) -> io::Result<PathBuf> {
     let abs = std::path::absolute(path).map_err(|e| path_error(e, "read", path))?;
     for ancestor in abs.ancestors() {
         if let Ok(canonical) = fs::canonicalize(ancestor) {
             // ancestor は abs の祖先なので strip_prefix は失敗しない
-            return Ok(canonical.join(abs.strip_prefix(ancestor).unwrap()));
+            let rest = abs.strip_prefix(ancestor).unwrap();
+            if !rest.components().any(|c| c == Component::ParentDir) {
+                return Ok(canonical.join(rest));
+            }
+            // まだ無い部品は symlink でありえないので字面で畳める。畳むと在る部分が増えうるので解き直す
+            let mut folded = canonical;
+            for c in rest.components() {
+                if c == Component::ParentDir {
+                    folded.pop();
+                } else {
+                    folded.push(c);
+                }
+            }
+            return resolve(&folded);
         }
     }
     // 在らないドライブなど: 在るパスとは関係を持ちえない
