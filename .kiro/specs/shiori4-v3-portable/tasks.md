@@ -197,3 +197,6 @@
 - 6.3: 2.3 の測りで `pasta_shiori` の Linux・macOS の落ちる試験は 0 本だったので、直すものも囲うものも無い（research.md 8 節）。6.4 の CI で毎回確かめる。
 - 6.4: 6475c181 の build.yml で run 40165427644 が 8 ジョブすべて緑（Linux・macOS のワークスペースの試験は失敗 0・3 OS で版 3 の 1 往復が 200）。
 - 8: 05d86fbf で手元の x64・x86 の `cargo test --all`（各 132 の test result が ok）・x64 の clippy・fmt が通り、依存の木に wintf・windows-future は無い。CI run 40167210411 は 8 ジョブすべて緑。
+- 完了時にその場で解決: shiori4 を 0.1.1 に上げた（`shiori4_abi` のロック・CI の試験用ホスト）。72c383d9。
+- 完了時にその場で解決: ロガーの `tracing_appender::non_blocking` のワーカースレッドが unload 直後の FreeLibrary で外れたコードの上に残り落ちていた（shiori4-testhost の版 3 の往復で手元ほぼ毎回 exit 139。0.1.0 のホストでも同じで、前の緑は運）。同期で書く形にした。あわせて macOS で揺れた GET timeout の試験の遅れを 2 秒に広げた。40de6233。
+- 完了時の申し送り: `shiori4-v4-host` の brief へ（芯の型・自前の `shiori_get_api`・unload の後にスレッドを残さない約束・ログの振り分け・試験用ホスト 0.1.1）。

@@ -172,3 +172,11 @@ shiori4 の 0.1.0 が 2026-10-24 に出た（crates.io の `shiori4_abi`・`shio
   - 試験用のホスト `shiori4-testhost`（`shiori4_host` の example）は、`--entry` を省くと版 4 から試し、`-H "名前: 値"` でヘッダを足せる。版 4 を足したら、CI の段（`shiori4-v3-portable` が足す）で版 4 も 1 往復させられる。
   - 書き出しのマクロ `export_shiori!` は、版 4 を求められると版 4 のテーブルを返し、`SUPPORTS_V3` なら版 3 も返す。版 4 を足すこの spec で、`shiori4-v3-portable` の自前の `shiori_get_api`（版 3 だけを返す）を、このマクロに替えてよい。
 - **旧来の入口の段の分け方**（`shiori4-v3-portable` の 2026-10-24 の節で決めた）: HGLOBAL の入口は shiori4 のクレートへ移さず pasta に残す。この spec で、従来の口と版 3 の口の開始行と `Charset` の変換に `shiori4::v3::{parse_request, response}` を使えるかを測る（使えば変換は shiori4 に寄る）。`shiori4::v3::parse_request` は SHIORI/2.x の開始行（今の pest の `header2`）を 400 にするので、従来の口で 2.x を受け続けるかも、ここで決める。
+
+## 申し送り（shiori4-v3-portable より・2026-10-25）
+
+- **芯の型**: 版 3 の口と旧来の入口は、どちらも `actor/instance.rs` の `ActorInstance`（1 インスタンス＝1 アクタースレッド・`spawn_with(ClaimMode)`・`get`・`notify`・`kick`・`shutdown(JoinPolicy)`）の上にある。版 4 はこの型に足す（あちらの design.md の Revalidation Triggers）。旧来の入口の置き場は `static LEGACY: ArcSwapOption<ActorInstance>` だけ。
+- **書き出し**: `shiori_get_api` は `v3.rs` に自前で書き、版 3 だけにテーブルを返す（版 4 は NULL）。`export_shiori!` へ替えるとき、CI の 1 往復の段（`build.yml`。`--entry v3` と省いた形）と、版 4 が NULL であることの試験（`tests/shiori4_v3_entry_test.rs`）を直す。
+- **unload の後にスレッドを残さない**: 版 3 の unload（`ActorInstance` の Drop）は Stop の ack の後に join する。ロガーも書き出し用のスレッドを持たなくなった（`tracing_appender::non_blocking` をやめて同期で書く。ワーカースレッドは guard を落としても join されず、ホストが unload の直後に pasta.dll を解放すると外れたコードの上で落ちていた。shiori4-testhost でほぼ毎回 exit 139）。版 4 で中継やホストへの log の転送のためにスレッドを足すなら、unload の中で join するか、DLL の外のコードだけで動く形にする。
+- **ログ**: 登録簿の項目はディレクトリごとにロガー・量の設定・占有を持つ（`try_claim`・`take_over`・`release_claim`）。ホストの `log` へ転送するなら、この振り分け（`CURRENT_LOAD_DIR`）の後ろに足すかを設計で決める。
+- **試験用のホスト**: CI は `shiori4_host` 0.1.1 の `shiori4-testhost` を使う（0.1.1 は x86 の Windows に `--entry legacy` を足した。版 3 の道筋は 0.1.0 と同じ）。
