@@ -13,7 +13,7 @@ const BASE_TOML: &str = "[loader]\ndebug_mode = true\n";
 
 #[test]
 fn tracing_filter_follows_logging_config_on_every_load() {
-    pasta_lua::init_tracing_with_reload(&pasta_lua::LoggingConfig::default());
+    pasta_lua::init_tracing();
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
     let toml = base_dir.join("pasta.toml");

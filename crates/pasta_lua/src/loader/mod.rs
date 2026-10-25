@@ -271,7 +271,7 @@ impl PastaLoader {
 
         // Always update the tracing filter: a reload without `[logging]` resets it
         // to the default, and a logger creation failure still applies level/filter.
-        crate::logging::update_tracing_filter(&logging_config);
+        crate::logging::update_tracing_filter(base_dir, &logging_config);
 
         let registry = crate::logging::GlobalLoggerRegistry::instance();
         let logger = match crate::logging::PastaLogger::new(base_dir, Some(&logging_config)) {

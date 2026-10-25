@@ -100,7 +100,7 @@ impl Shiori for PastaShiori {
             let logger = std::sync::Arc::new(logger);
             GlobalLoggerRegistry::instance().register(load_dir_path.clone(), logger);
         }
-        pasta_lua::init_tracing_with_reload(&pasta_lua::LoggingConfig::default());
+        pasta_lua::init_tracing();
 
         // Set load_dir context for logging
         let _guard = LoadDirGuard::new(load_dir_path.clone());

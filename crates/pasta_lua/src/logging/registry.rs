@@ -246,10 +246,6 @@ impl GlobalLoggerRegistry {
     }
 
     /// 項目の量の設定を替える（項目が無ければ作る）。
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "購読者のフィルタ（3.2）からつなぐ")
-    )]
     pub(crate) fn set_filter(&self, load_dir: &Path, filter: EnvFilter) {
         let replaced = std::mem::replace(
             &mut self.table().entry_or_default(load_dir.to_path_buf()).filter,
@@ -260,10 +256,6 @@ impl GlobalLoggerRegistry {
     }
 
     /// スレッドの文脈で選んだ項目の量の設定でイベントを判定する。選べなければ出さない。
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "購読者のフィルタ（3.2）からつなぐ")
-    )]
     pub(crate) fn event_enabled<S>(&self, meta: &Metadata<'_>, cx: &Context<'_, S>) -> bool {
         CURRENT_LOAD_DIR.with(|cell| {
             self.table()
@@ -273,10 +265,6 @@ impl GlobalLoggerRegistry {
     }
 
     /// 全部の項目の量の最大（項目が無ければ OFF。分からない項目が 1 つでもあれば `None`）。
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "購読者のフィルタ（3.2）からつなぐ")
-    )]
     pub(crate) fn max_level_hint(&self) -> Option<LevelFilter> {
         self.table()
             .entries
