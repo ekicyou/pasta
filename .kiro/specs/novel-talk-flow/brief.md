@@ -265,3 +265,13 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - **見つけた穴・古くなった記述**:
   - 前回の節の `init.lua` 268 行・読み込みの行 78〜82 行 → 371 行・85〜90 行。2026-10-18 の節の `sakura_builder.lua` の `BUILDER.build` 414 行・`last_actor` 464 行・`\e` 536 行 → 432・482・554 行。
   - 2026-10-18 と前回の節の「`talk-grapheme-clusters` と `sakura_script/` で重なる」は、完了したので外れた。roadmap の Phase 13 の共有接点（369 行）と台帳の `talk-grapheme-clusters` の行（442 行）にも、同じ古い重なりが残っている。
+
+
+## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
+
+- `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
+- 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
+  - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
+  - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
+- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- この spec への影響: 「条件つきの選択肢」の論点で確かめる先が `scene-condition-attributes` になった。あちらは選択肢の行そのものを隠さない（Out）。選択肢の飛び先の候補を選ぶときには、条件が効く。

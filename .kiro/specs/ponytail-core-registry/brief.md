@@ -106,3 +106,12 @@
   - Current State 4 の「`fast_radix_trie` と `memchr` が消える」は誤り。`memchr` は構文解析の部品（pest）・正規表現・futures なども使うので、`Cargo.lock` に残る。消えるのは `fast_radix_trie` だけ。
   - `fast_radix_trie` を外すときは、`tech.md` の依存の表のほかに、`crates/pasta_core/README.md` の依存の表（92 行）も直す。
   - roadmap の「0.5.0 の 3 本とも、ファイルが重ならない」は、この spec には当たらない（`scene-attribute-store` と `scene_registry.rs` を共有する）。
+
+
+## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
+
+- `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
+- 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
+  - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
+  - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
+- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。

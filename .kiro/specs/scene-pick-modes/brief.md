@@ -116,3 +116,17 @@
 
 - 重みも順番も書かないシーンと単語の選び方は、今のシャッフル＆順次消費のまま変えない。
 - 規模は 9〜11 タスクの見込み（単語の重みを範囲に入れたため。2026-10-21）。
+
+
+## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
+
+- `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
+- 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
+  - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
+  - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
+- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- この spec への影響（候補の袋を共有する。同じウェーブに置かない。先に入る側が袋の形を決める）:
+  - 条件を満たさない候補は、消費済みにせず袋に残して飛ばす。条件を満たした時点から今の巡に混ざる。重みで増やした札も同じ扱いになる。
+  - `＆順番` は、条件を満たさない番号を飛ばして、次に大きい番号へ進む。
+  - `＆優先：数` で残った候補の中で、重みと順番を使う。`＆順番` の有るものと無いものが混ざっているかの検査は、優先で残った中に当てる。
+  - Out にある「一度だけ」のシーンは、`scene-condition-attributes` の `＆優先` と `＆＄＊済み＝０` と本文の代入で書く。

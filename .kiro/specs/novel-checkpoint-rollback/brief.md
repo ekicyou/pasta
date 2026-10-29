@@ -225,3 +225,12 @@
 ## 申し送り（mlua-stdlib-removal より・2026-10-24）
 
 - `OnPastaSetSaveVariable` の契約が変わった: 値は JSON として読まず、Reference1 の文字列を Reference2 の型（省けば `string`・`number`・`boolean`・`delete`）で読む。消すのは `delete` のときだけ（`null` では消えない）。上の `external_control.lua` の行番号は古い。`pasta.save` を外から書き換えることは変わらない。参照先: `.kiro/specs/completed/mlua-stdlib-removal/design.md` の SetSaveVariableHandler。
+
+
+## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
+
+- `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
+- 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
+  - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
+  - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
+- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。

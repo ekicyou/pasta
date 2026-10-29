@@ -140,3 +140,13 @@
 - `[scene.alias]` の読み方が変わった。既定の表は 7 件（`OnTalk = ["会話"]` に、メニューのシーン 3 件 `sakura.recommendsites`・`kero.recommendsites`・`sakura.portalsites` とボタンの名前 3 件）。書いたキーだけ既定を置き換え、空の配列でそのキーの既定を消し、見出しだけなら既定のまま、既定の別名とぶつかれば読み込みエラー（`SceneAliasTable::with_written`、`SceneAliasError::ConflictsWithDefault`・`TargetIsDefaultAlias`）。置き換えの規則（完全一致・1 段・グローバルシーン名だけ・登録と検索の両方）は変わっていない。
 - 論点: 完全一致のモードと別名の置き換えの順番を決めるときは、この 7 件の既定を前提にする。メニューのシーンは `SEARCH:search_scene_exact(id)` で ID そのもの（置き換え後の名前）を完全一致で引いている（`pasta/shiori/event/recommend.lua`）。
 - 参照: `.kiro/specs/completed/recommend-menu-scenes/design.md` の「AliasTable」「MenuReceiver・InPlaceRun」。
+
+
+## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
+
+- `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
+- 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
+  - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
+  - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
+- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- この spec への影響: `act:call` の 3 つ目の引数 `attrs` を絞り込みのために空けておく約束は、呼ぶ側の条件を作らないので要らなくなった。`＞＞` の完全一致の候補にも、場面の側の条件が効く。
