@@ -150,3 +150,8 @@
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
 - 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
 - この spec への影響: `act:call` の 3 つ目の引数 `attrs` を絞り込みのために空けておく約束は、呼ぶ側の条件を作らないので要らなくなった。`＞＞` の完全一致の候補にも、場面の側の条件が効く。
+
+## 申し送り（2026-10-29 の版の組み替えより）
+
+- 0.5.0 は「属性関係の整備」になったが、この spec は属性ではないので入れていない。版は判断待ちのまま。0.6.0（ノベルゲーム。0.5.0 から順延）の `novel-talk-flow` が前提にするので、遅くとも 0.6.0 に入れる。`scene-condition-attributes` とは検索の道を共有するので、同じウェーブに置かない。
+- ゴースト側の見立て（2026-10-29、ghost_dev「ぱすた開発」）: 入っていれば助かるが、必須ではない。入れるなら 0.5.0 の属性の 3 本の後（4 番目）、0.6.0 でも構わない。emo2（`scripts/pasta/shiori/event/boot.lua`・`install.pasta` 79 行の注記）と窓際のぱすたさん（`dic/event.pasta` 226〜238 行）は、`OnInstallCompleteAll` を DSL のシーンにできず Lua の REG で受けているが、今は動いていて困っていない。

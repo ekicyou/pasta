@@ -92,3 +92,7 @@
 
 - 変数の保存の範囲（セーブごとと全セーブ共通の書き方・今の `＄＊x` との両立・保存できない値）は、`novel-checkpoint-rollback` から `novel-variable-scope` へ分けた。「Upstream」の「変数の保存の範囲」は `novel-variable-scope` と読む。
 - `save.lua`・`persistence.rs`・`lifecycle.rs` は、先に `novel-variable-scope` が触る。この spec はその後に置き、2 つの範囲を分けて持つ口を使う。全セーブ共通の分を書く時機（書いたらすぐか、区切りごとか）は、線の引き方を `novel-variable-scope` と揃える。
+
+## 申し送り（2026-10-29 の版の組み替えより）
+
+- ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.4（ponytail）の次に入る。

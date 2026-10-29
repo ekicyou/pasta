@@ -94,3 +94,7 @@ areka が出すのは部品だけで、ノベルゲームのシステム画面�
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
 - 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
 - この spec への影響: Upstream のフラグによる分岐は、`scene-condition-attributes` の場面の側の条件で書く（`＊告白　＆＄＊好感度＝「高」`＋`＞告白`。どれにも当たらない場面は条件の無いシーン）。
+
+## 申し送り（2026-10-29 の版の組み替えより）
+
+- ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.4（ponytail）の次に入る。

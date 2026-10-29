@@ -278,3 +278,8 @@ ghost_dev の「ぱすた開発」セッションは、**外見として記録�
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
 - 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
 - この spec への影響: `＄` で始まる属性は条件である。柱から台本へ流す語彙の名前とは取り合わない（`＄` で始まる名前を語彙に入れない）。
+
+## 申し送り（2026-10-29 の版の組み替えより）
+
+- ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.4（ponytail）の次に入る。
+- 柱の属性の土台 `scene-attribute-store` は 0.5.0 で先に入る。その要件は、この spec の柱の属性も読み手として材料にする（`roadmap.md` の「0.5.0 の範囲」）。

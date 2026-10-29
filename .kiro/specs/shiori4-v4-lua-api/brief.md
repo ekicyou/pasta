@@ -115,3 +115,7 @@
 - shiori4 の 0.1.0 が 2026-10-24 に crates.io へ出た（`host-protocol` を含む。shiori4 の PR や教科書の「0.0.3」は 0.1.0 のこと）。上の「先に要るもの」の「shiori4 の `host-protocol` が crates.io に出ること」は満ちた。残るのは `shiori4-v4-host` と、実機の areka v0.2.0。
 - ホストとの語の正本は shiori4 の `doc/host-protocol.md`。プロパティの読みは `ID: getproperty`、書き込みは `ID: setproperty`（0.0.1 の `property` から改めた。`shiori4-v4-host` の brief の 2026-10-24 の節）。教科書 `doc/textbook/vocabulary.md` に語の表がある。
 - 0.1.0 の二進互換でない変更（応答の `out` をホストが作る・`copy_from_slice`）は Rust の入口の話で、この spec の Lua と DSL の口には効かない。
+
+## 申し送り（2026-10-29 の版の組み替えより）
+
+- ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.4（ponytail）の次に入る。

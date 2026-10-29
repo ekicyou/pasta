@@ -122,3 +122,7 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 
 - SHIORI/3.0 の書き出しの型は、`shiori4-v3-portable` で全部直ることになった（あちらの R7.3。開発者の決定）。`load`・`loadu`・`unload` の戻り値は i32 の 1／0、`load`・`loadu` の長さと `request` の長さは C の `long`。この spec の「x64 版を出す前に型を直す」は、あちらが入れば満ちる。この spec が `windows.rs` を持つ必要は無い。
 - あちらは Windows 以外の配布物を出さない（CI で Linux・macOS のビルドとテストを守るだけ。Windows の版 3 の 1 往復は x64 だけ）。Windows の x64 版の `pasta.x64.dll` を出すなら、shiori4 のファイル名の決まり（`pasta.x64.dll` → `pasta.dll`）を見ること。
+
+## 申し送り（2026-10-29 の版の組み替えより）
+
+- ノベルゲームを 0.5.0 から 0.6.0 へ順延し、0.5.0 は「属性関係の整備」になった（開発者の決定）。この spec の推奨の版は、areka・shiori4 の版 4 の対応と揃えて 0.6.0 に変わる（版は判断待ちのまま）。
