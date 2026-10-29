@@ -180,3 +180,7 @@ shiori4 の 0.1.0 が 2026-10-24 に出た（crates.io の `shiori4_abi`・`shio
 - **unload の後にスレッドを残さない**: 版 3 の unload（`ActorInstance` の Drop）は Stop の ack の後に join する。ロガーも書き出し用のスレッドを持たなくなった（`tracing_appender::non_blocking` をやめて同期で書く。ワーカースレッドは guard を落としても join されず、ホストが unload の直後に pasta.dll を解放すると外れたコードの上で落ちていた。shiori4-testhost でほぼ毎回 exit 139）。版 4 で中継やホストへの log の転送のためにスレッドを足すなら、unload の中で join するか、DLL の外のコードだけで動く形にする。
 - **ログ**: 登録簿の項目はディレクトリごとにロガー・量の設定・占有を持つ（`try_claim`・`take_over`・`release_claim`）。ホストの `log` へ転送するなら、この振り分け（`CURRENT_LOAD_DIR`）の後ろに足すかを設計で決める。
 - **試験用のホスト**: CI は `shiori4_host` 0.1.1 の `shiori4-testhost` を使う（0.1.1 は x86 の Windows に `--entry legacy` を足した。版 3 の道筋は 0.1.0 と同じ）。
+
+## 申し送り（2026-10-29 の版の組み替えより）
+
+- ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.4（ponytail）の次に入る。

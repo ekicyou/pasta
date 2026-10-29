@@ -241,3 +241,9 @@ Call ターゲットの後ろに `＆key＝value` 形式のフィルターを付
 - この spec への影響: 属性の読み手が 1 人増える。`＄` で始まる属性（`＆＄＊経験値≧500`・`＆＄＊初回待ち`）は条件で、`scene-condition-attributes` が候補を選ぶときに読む。宣言の属性（`＄` で始まらないもの）の意味は変わらない。宣言の属性 `＆優先：数` も増える。要件の材料は次の 2 つである。
   - 倉に条件も入れて読み手が分けるか、宣言と条件を分けて運ぶか。
   - 全角の数字の読み方と、ファイルの先頭の属性の受け継ぎの規則。`scene-condition-attributes` も条件と `＆優先` にこの規則を使う。
+
+## 申し送り（2026-10-29 の版の組み替えより）
+
+- 0.5.0 が「属性関係の整備」になり、この spec はそこに入った（開発者の決定。ノベルゲームは 0.6.0 へ順延）。順は `scene-attribute-store` → `scene-condition-attributes` → `scene-pick-modes` で、0.4.4（ponytail）を出した後から始める（「ポニーテールが片付いたら属性に手を出しましょう」）。
+- 読み手は `scene-condition-attributes`・`scene-pick-modes`（どちらも 0.5.0）と、0.6.0 の `cue-command-runtime`（柱の属性）。0.6.0 の読み手も要件の材料に含め、倉の形が後で作り直しにならないようにする。
+- 0.4.4 の ponytail のうち 5 本（`ponytail-dsl-parser`・`ponytail-lua-transpiler`・`ponytail-core-registry`・`ponytail-lua-loader`・`ponytail-lua-scripts`）とファイルを共有する。それらが入った後の main で測り直す。

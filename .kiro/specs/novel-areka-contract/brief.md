@@ -208,3 +208,7 @@ areka の側の作業が一番重い。依頼が遅れるほど、0.5.0 が遅�
 - **見つけた穴・古くなった記述**:
   - 「Approach」の「文章」の「文字の速度、色、大きさ」は、色と大きさを pasta がアクターごとに `\f[…]` で出せるようになったので、要件では「areka が `\f[…]` を解釈すること」の依頼として書く。
   - 「pasta の現在地」の行番号（`crates/pasta_shiori/src/actor/marshaling.rs` 232 行付近・71 行）は今も合っている（`crates/pasta_shiori/src` は前回から変わっていない）。
+
+## 申し送り（2026-10-29 の版の組み替えより）
+
+- ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.4（ponytail）の次に入る。
