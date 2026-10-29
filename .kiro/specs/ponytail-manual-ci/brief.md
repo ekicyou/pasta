@@ -175,3 +175,12 @@
 - **見つけた穴・古くなった記述**
   - 配るスキルは 3 本になったが、リンクの検査 `book/tools/link-check.mjs` 280 行の `CHECKED_SKILLS` は 2 本（`pasta-ghost-authoring`・`pasta-lua-coding`）だけで、`manual.yml` の path filter（26〜46 行）にも `.claude/skills/pasta-check/**` が無い。`pasta-check` のスキルのリンクと鮮度を誰も見ていない。ギャップ分析で、この spec に入れるかを決める。
   - 3 番の行番号は上のとおり、また 20 行ずれた。`manual.yml` 191〜192 行の Setup Pages の注記の誤りは前のまま（2 番。直すのは設計以降）。
+
+
+## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
+
+- `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
+- 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
+  - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
+  - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
+- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。

@@ -171,3 +171,12 @@
   - `virtual_dispatcher.lua` 251〜253 行の説明「`set_co_scene` 置換で前 co_scene を閉じる」は古い。今はキックのコルーチンに付けた `STORE.co_preempt` の印で捨て、LuaJIT には `close` が無い。監査の指摘に入れる。
   - 申し送り（`external-control-events` の設計の Non-Goals）: `scene_play.lua` と `external_control.lua` に共通する部品（名前の引き当てと、見つからないときの失敗の表記）の取り出しは、この spec の題材にする。
   - 申し送り（`chain-talk-interrupt` の tasks.md の注記）: `EVENT.drive` の `_interrupted` の枝は `STORE.co_callback` を戻さない。`get_property` の組み立てが台詞として数えられるように変わるなら、ここを見直す。
+
+
+## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
+
+- `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
+- 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
+  - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
+  - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
+- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。

@@ -96,6 +96,10 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 - `pasta-sstp-live-output`（SSTP/`\![raise]` による push 出力）— 目的はシーンキックで達成済み。新しい動機が生じたら、その動機から新規に起票する。
 - `pasta-authoring-window`（`*.pasta` 編集・プレビュー専用ウィンドウ）— VSCode で実現済み。VSCode 非依存のオーサリング環境が必要になったら再検討する。
 
+### 統合して閉じたもの（2026-10-29）
+
+- `call-attribute-filter`（呼ぶ側の `＞シーン＆k＝v`）— 2026-10-29 の discovery（ghost_dev「ぱすた開発」の要件メモ。窓際のぱすたさん「開示の階段」）で、条件は場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）と決め、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。2 つは役目が重なる。呼ぶ前にローカル変数を入れれば（`＄気分＝「高」` → `＞告白`、受ける側は `＊告白　＆＄気分＝「高」`）、場面の側の条件だけで呼ぶ場所ごとに絞れるので、呼ぶ側に条件を書く書き方は、ローカル変数では書けない事例が出るまで作らない。旧 brief は git の `1c88e1e5` で読める。この roadmap の古い節に残る `call-attribute-filter` は、`scene-condition-attributes` と読み替える（Call の文法・`parse_action.rs`・`element_gen.rs` の Call は触らない見込みなので、ファイルの重なりは減る）。
+
 ## 0.4.3 の範囲（2026-10-23 開発者の決定・2026-10-24 組み替え）
 
 0.4.2 を出した後の版。2026-10-23 に、0.4.2 から `shiori4-v3-portable` を移し（「まだ実施できない」「これは 0.4.3」）、版の決まっていなかった `recommend-menu-scenes` と、隙間の spec だった ponytail の 10 本を入れた。2026-10-24 に組み替えた（開発者の決定）。致命的な不具合の `toml-serialization` を最優先で入れ、mlua 0.12 へ上げる 2 本（`mlua-stdlib-removal`・`mlua-0-12-upgrade`）を入れた（「次のリリースのタイミングで、mlua 上げちゃいたい」）。ponytail は 0.4.4 へ移し（「ポニーテールは 0.0.1 後ろからの着手に変更」）、作者のフォルダを消す Must fix を持つ `ponytail-check-release` だけを残した。`shiori4-v3-portable` は、始められるようになるまで最後に置く。
@@ -316,7 +320,7 @@ Wave 3（見込み）リリース（0.4.3 の spec は 0 本）
 | Wave | spec（並走可） | 種別 | ソースの持ち場 |
 | ---- | -------------- | ---- | -------------- |
 | 0.5.0 の先頭 | scene-attribute-store | 機能 | 宣言行の属性のパース（`parse_scene.rs`・`ast/scene.rs`）、`scope_gen.rs`・`context.rs`・`transpiler.rs`、`scene.lua`、`finalize.rs`、`pasta_core` のシーン登録（`scene_registry.rs`・`scene_types.rs`）、見本の期待値ファイル、マニュアル（`block-structure.md`・`script-api.md`・`registry-search.md`・`transpiler.md`） |
-| 0.5.0（`scene-attribute-store` の後） | call-attribute-filter | 機能 | Call の文法（`grammar.pest`・`parse_action.rs`・`ast/action.rs`・`partial.rs`）、`element_gen.rs`（Call）、`act.lua`（`call`・`find_handler`）、`scene.lua`（`SCENE.search`・`co_exec`）、`search/`、`pasta_core` の `scene_table.rs`・`scene_types.rs`、LSP（`visit_action.rs`）、VSCode の文法定義、`pasta_check validate`（候補が複数残る検査を足すなら） |
+| 版は未定（推奨 0.5.0。`scene-attribute-store` の後） | scene-condition-attributes（2026-10-29 に `call-attribute-filter` を統合） | 機能 | 属性の文法（`grammar.pest` の属性の規則・属性の構文木・`partial.rs`）、`act.lua`（`find_handler`・`find_scene`）、`scene.lua`（`SCENE.search`・`co_exec`）、`search/`、`pasta_core` の `scene_table.rs`・`scene_types.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、LSP、VSCode の文法定義、`pasta_check validate`、マニュアル（入門の 7 段目を含む） |
 | 版は未定 | scene-anchor-link | 機能 | `call-attribute-filter` と同じ文法・生成・`act.lua`・エディタのファイルに加え、`sakura_builder.lua`、`shiori/event/choice_select.lua`、`sakura_script/`（表示名を Lua の側で台詞として通してから `\_a` で包む案なら触らない）、VSCode 拡張の `wordRefDecorator.ts`、`pasta_check validate`（`references.rs`） |
 
 Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coercion`、失敗の出力の 3 本（`failure-output-unification`・`shiori-test-support-runtime`・`runtime-error-balloon`）は完了した（「完了フェーズ」の Phase 11）。
@@ -385,7 +389,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 | 4 | cue-command-runtime（ト書きと柱。2026-10-17 に `scene-stage-attributes` をまとめた） | Fable | 17〜21（超えるならト書きと柱に分け直す） | `scene-attribute-store`（柱の分）。語彙の名前は `novel-areka-contract` から引く |
 | 5 | shell-element-click | Opus | 5〜8 | `novel-areka-contract`（完全一致の場面選びは `touch-poke-shortcuts` が入れてある）。`scene-anchor-link` とは `choice_select.lua` を共有する |
 | 6 | novel-talk-flow | Fable | 17〜21（超えるなら出力の分（Fable）と場面の流れの分（Opus）に分ける） | `cue-command-runtime`、`novel-areka-contract` |
-| 7 | call-attribute-filter（既存） | Fable | 19〜21 | `scene-attribute-store` |
+| 7 | scene-condition-attributes（2026-10-29 に `call-attribute-filter` を統合。版は開発者の判断待ちで、推奨はこの席） | Opus | 14〜18 | `scene-attribute-store`。`scene-pick-modes` と候補の袋を共有するので同じウェーブに置かない |
 | 8 | novel-checkpoint-rollback | Fable | 13〜15 | `novel-talk-flow`、`novel-variable-scope` |
 | 9 | novel-save-slots | Opus | 8〜12 | `novel-checkpoint-rollback` |
 | 10 | hello-novel-sample | Opus | 15〜18 | 2〜9 の全部と、areka の側の実装 |
@@ -412,7 +416,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - 条件つきの選択肢（フラグが立っているときだけ出す）— `novel-talk-flow` の要件で、要るかどうかを決める。
 - 背景を柱にどう書くか（アクター指定行に並べるか、属性にするか）— `cue-command-runtime` の要件（柱の分）。
 - ノベルを 1 本の配布物としてどう起動するか、動画が要るか — `novel-areka-contract` の要件。
-- 数のしきい値（好感度が 50 以上、など）の書き方 — `call-attribute-filter` の要件。
+- 数のしきい値（好感度が 50 以上、など）の書き方 — 2026-10-29 に決めた。場面の側に `＆＄＊好感度≧50` と書く（`scene-condition-attributes`）。
 
 ## 版がまだ決まっていないもの
 
@@ -420,6 +424,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 
 - `pasta-dll-multiarch`（2026-10-23 起票）: x64 版と arm64 版の pasta.dll をビルドし、32bit 版と同じリリースで出す。見本ゴーストの .nar には、areka の探し方（x64 は `pasta.x64.dll` → `pasta.dll`、arm64 は `pasta.arm64.dll` → `pasta.x64.dll` → `pasta.dll`）に合う名前で同梱する。接尾辞の無い `pasta.dll` は SSP 向けの 32bit 版のまま。`pasta_check` は名前も arch も気にしないので今のまま使える。手を入れるのは `release.ps1`・`.cargo/config.toml`（aarch64 の `crt-static`）・配布物とリリース CI の検査・マニュアル（`[loader] ffi` で作者の DLL の arch が合わないと読めない注意）。aarch64 で LuaJIT がビルドできるかは確かめていない。`shiori4-v3-portable` の後（areka は shiori4 の入口で読むため）。版は開発者が後で決める（2026-10-23）。推奨は 0.5.0（2026-10-24 の棚卸）。
 - `scene-exact-match`・`scene-pick-modes`（2026-10-21 起票。ghost_dev のヒアリング）: 中身は台帳の行にある。
+- `scene-condition-attributes`（2026-10-29 起票。`call-attribute-filter` を統合）: 推奨は 0.5.0 の 7 番（上の「Phase 13」の順番）。会えた日数をエンジンが数える別 spec を起票するか（推奨: 起票する）と、その変数の名前も開発者の判断待ち（brief の「決まらなかったこと」）。
 - `scene-anchor-link`（2026-10-08 起票）: 中身は上の「Phase 11 の残り」の「文中のシーンリンク」にある。
 - `vsce-4-upgrade`・`pest-2-9-4-upgrade`（2026-10-24 起票）: 中身は下の「依存の更新」にある。
 
@@ -459,12 +464,12 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] novel-variable-scope -- 変数の保存の範囲を、セーブごとと全セーブ共通の 2 つに分ける書き方。今の `＄＊x` と保存ファイルとの互換、保存できない値の扱い（2026-10-17 の棚卸で `novel-checkpoint-rollback` から分割）。Dependencies: none
 - [ ] cue-command-runtime -- キューコマンド行 `！命令＠対象（引数）` を、実行時に `\![…]` として台本へ流す。日本語の名前の別名表、引数の穴（数字で始まる引数など）の手当て。柱に書いた `＆属性` とアクター指定行も、場面に入ったときに台本へ流す（受け継ぎと、Call から戻ったときの打ち直し）。2026-10-17 に `scene-stage-attributes` をまとめた。Dependencies: scene-attribute-store
 - [ ] shell-element-click -- エレメントのクリック（名前つき）を、選択肢と同じ振り分けで場面へ届ける。シェルとして組んだシステム画面を、場面が動かせるようにする。Dependencies: novel-areka-contract（`scene-anchor-link` と `choice_select.lua` を触る順番に注意）
-- [ ] call-attribute-filter -- Call の属性フィルター構文（`＞シーン＆k＝v`・比較演算子・複数条件）と実行時の絞り込み。Dependencies: scene-attribute-store
-- [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアル、`pasta_check validate` の飛び先の検査まで揃える（2026-10-08 起票）。版は未定。Dependencies: call-attribute-filter
+- [ ] scene-condition-attributes -- 場面の側に条件を書いて候補を絞る。`＄` で始まる属性が条件（`＆＄＊経験値≧500`・`＆＄ｒ０＝「changed」`・フラグ `＆＄＊初回待ち`）で、演算子は `≧ ≦ ＞ ＜ ＝ ≠`、右辺は書いた値だけ、値なしは 0 か空文字列、全部落ちたら素通り（204）。外れた札は袋に残して今の巡に混ぜる。`＆優先：数`、イベントのシーンを選ぶ前の自動転記、`pasta_check validate` の注意、trace のログ（2026-10-29 起票。ghost_dev「ぱすた開発」の要件メモ。`call-attribute-filter` を統合して閉じた）。版は未定（推奨 0.5.0）。`scene-pick-modes` と同じウェーブに置かない。Dependencies: scene-attribute-store
+- [ ] scene-anchor-link -- 台詞の中の `＠？シーン名`（`「表示名」` も付けられる）を、さくらスクリプトのアンカー `\_a` として出す。クリックで、`OnAnchorSelectEx` からそのシーンへ飛ぶ。選択肢の振り分けを共有し、LSP・VSCode の着色とマニュアル、`pasta_check validate` の飛び先の検査まで揃える（2026-10-08 起票）。版は未定。Dependencies: scene-condition-attributes（`call-attribute-filter` を 2026-10-29 に統合。機能の依存は無く、`act.lua`・VSCode の文法定義・検査の段を共有する順番だけ）
 - [ ] novel-talk-flow -- ノベル向けの出力に切り替える設定。台詞ごとのクリック待ち、話者名と声と変わらない行 ID、ランダムトークと時報の停止、起動時の場面、「次の場面へ」、完全一致の場面選びの切り替え（2026-10-21 に仕組みを `scene-exact-match` へ移した。こちらは設定を入れるだけ）。Dependencies: novel-areka-contract, cue-command-runtime, scene-exact-match
 - [ ] novel-checkpoint-rollback -- 台本に目印の ID を埋め、応答ごとに状態と台本を控える。areka が知らせた ID の時点へ戻す（変数の保存の範囲は 2026-10-17 に `novel-variable-scope` へ分けた）。Dependencies: novel-talk-flow, novel-variable-scope
 - [ ] novel-save-slots -- スロットを選ぶセーブとロード。控えをスロットへ読み書きし、スロットの中身（日時・章の名前）を場面から読めるようにする。Dependencies: novel-checkpoint-rollback
-- [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-variable-scope, novel-checkpoint-rollback, novel-save-slots, shell-element-click, call-attribute-filter（areka の側の実装も要る）
+- [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.5.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-variable-scope, novel-checkpoint-rollback, novel-save-slots, shell-element-click, scene-condition-attributes（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
 - [ ] ponytail-dsl-parser -- 解析を辞書の大きさに比例させる（span の行と桁を pest の行の索引で取る）。大きな数の字句を、どこでも同じ規則（i64、だめなら f64）にする。深い括弧の入れ子を構文の誤りにする。作られない誤りの型と `PastaFile.span` を消す。0.4.4（2026-10-19 起票。ponytail 監査。2026-10-22 に隙間の spec へ改め、2026-10-23 に 0.4.3 へ戻し、2026-10-24 に 0.4.4 へ移した）。Dependencies: none
 - [ ] ponytail-core-registry -- シーン表・単語表の死んだ API と誤りの型を消し、`fast_radix_trie` を `BTreeMap` に替える。属性の絞り込みは残す（0.5.0 が使う）。0.4.4（2026-10-24 に 0.4.3 から移した）。Dependencies: none
@@ -486,17 +491,17 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 2026-10-10 の discovery で、0.5.0 の道筋に乗せた既存の spec。各 brief の「申し送り（2026-10-10 の discovery・0.5.0 のノベルゲームより）」の節に書いた。
 
 - [ ] scene-attribute-store -- 属性の読み手に、演出（`cue-command-runtime` の柱の分。2026-10-17 に `scene-stage-attributes` をまとめた）が加わる。順番を保てる倉の形、ローカルシーンと名前なしの `＊` への受け継ぎを、要件の材料にする。0.5.0 の先頭に置く。Dependencies: none
-- [ ] call-attribute-filter -- フラグによる分岐の本命になる。条件の値に変数を書けること、「それ以外」の場面、数のしきい値、候補が複数残るときの扱いを、要件で決める。Dependencies: scene-attribute-store
+- [x] call-attribute-filter -- （2026-10-29 に `scene-condition-attributes` へ統合して閉じた。下の論点は、場面の側の条件・`＆優先`・素通りで決めた）フラグによる分岐の本命になる。条件の値に変数を書けること、「それ以外」の場面、数のしきい値、候補が複数残るときの扱いを、要件で決める。Dependencies: scene-attribute-store
 
 2026-10-21 の discovery「PastaDSL機能ヒアリング」（ghost_dev の「emo2 開発」「ぱすた開発」セッションへの聞き取り）で、次の brief に「申し送り（2026-10-21 の discovery「PastaDSL機能ヒアリング」より）」の節を足した。
 
-- [ ] call-attribute-filter -- イベントの Reference・保存の変数で振り分け、合わなければ 204 にする実例（2 つの値の等しさ・空・値の前方一致・かつ・数の範囲・一度だけ）。両ゴーストでいちばん数の多い要望。Dependencies: scene-attribute-store
+- [x] call-attribute-filter -- （2026-10-29 に `scene-condition-attributes` へ統合して閉じた。実例は同 brief の Problem から参照する）イベントの Reference・保存の変数で振り分け、合わなければ 204 にする実例（2 つの値の等しさ・空・値の前方一致・かつ・数の範囲・一度だけ）。両ゴーストでいちばん数の多い要望。Dependencies: scene-attribute-store
 - [ ] cue-command-runtime -- 外見として記録させない生のさくらスクリプト（今は `act:raw_script`）の実例。`！命令` の出力を外見に記録するかを要件で決める。Dependencies: scene-attribute-store
 - [ ] scene-attribute-store -- 属性の新しい読み手 `scene-pick-modes`（重み・巡回）。Dependencies: none
 
 ## Direct Implementation Candidates
 
-- [ ] イベントのシーンでの Reference の自動の転記 -- SHIORI イベントから動くシーンでは、`＞transfer_req_to_var` を書かなくても `＄ｒ０`〜`＄ｒ９` が入るようにする。今は転記のためだけに Lua を経由する場面がある（emo2 の `OnInstallRefuse`、2026-10-21 のヒアリング）。Lua の変更は数行だが、挙動が変わる。マニュアル `grammar/variables.md` に加え、入門の 7 段目（`getting-started/07-greeting.md` の「書き忘れると `＄ｒ０` は空のままになる」など）と段階辞書 `dic/07-greeting.pasta`・`STAGES.md` の扱いを決める必要がある（2026-10-22 棚卸）。`call-attribute-filter` の要件が Reference を直接書く形にするなら、そちらに含めて閉じる。
+- [x] イベントのシーンでの Reference の自動の転記 -- （2026-10-29 に `scene-condition-attributes` へ取り込んだ。イベントのシーンを選ぶ前に Reference と日時を転記する）SHIORI イベントから動くシーンでは、`＞transfer_req_to_var` を書かなくても `＄ｒ０`〜`＄ｒ９` が入るようにする。今は転記のためだけに Lua を経由する場面がある（emo2 の `OnInstallRefuse`、2026-10-21 のヒアリング）。Lua の変更は数行だが、挙動が変わる。マニュアル `grammar/variables.md` に加え、入門の 7 段目（`getting-started/07-greeting.md` の「書き忘れると `＄ｒ０` は空のままになる」など）と段階辞書 `dic/07-greeting.pasta`・`STAGES.md` の扱いを決める必要がある（2026-10-22 棚卸）。`call-attribute-filter` の要件が Reference を直接書く形にするなら、そちらに含めて閉じる。
 
 ## バックログ（brief なし・保留）
 
@@ -509,7 +514,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - Call の戻り値と変数代入（R3）— `＄x＝＞シーン`。DSL では定義せず、ランタイム設計の領域。`＄x＝＠＊関数（）` で代替できる。
 - さくらスクリプトの `\]`・`\%`（R4）— 角括弧内の `]` と `\%` を DSL から書けるようにするか。現行は `\]` を特別扱いせず、`\%` はパースエラー。
 - 継続行内の空行の糖衣構文（R6）— 行継続の途中の空行を改行として出力する。現行は何も出力しない。
-- 単語参照への属性フィルター（`＠単語名＆category＝food`）— 単語に属性を付ける構文が無い。`call-attribute-filter` の後に検討する。
+- 単語参照への属性フィルター（`＠単語名＆category＝food`）— 単語に属性を付ける構文が無い。`scene-condition-attributes` の後に検討する。
 - 既定の別名の追加（`時報 → OnHour` など。2026-10-10 棚卸、`scene-name-alias` の範囲外）— 既定は `会話 → OnTalk` の 1 件だけにした。
 
 ### トランスパイラ最適化の候補

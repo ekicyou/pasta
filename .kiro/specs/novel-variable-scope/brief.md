@@ -103,3 +103,13 @@
 - 今あるセーブは引き継がない（読めなくなる。リリースノートで詫びる）。TOML で書けない値は、そのキーだけ保存せず警告のログを出し、ほかのキーは保存する。読めない `save.toml` は `save.toml.broken` へ移し、空のセーブから始める。
 - この brief の「丸ごと JSON にして `profile/pasta/save/save.json`」「JSON にできない値」「今の `save.json` も、そのまま読める」などは、`toml-serialization` が入った後の TOML のセーブに読み替える。要件定義は、`toml-serialization` が入った後の main で始める（推奨の順。roadmap の「依存の更新」）。
 - 議題 5（保存できない値）は、`toml-serialization` の決まり（キーごとに外して警告）を出発点にする。
+
+
+## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
+
+- `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
+- 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
+  - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
+  - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
+- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- この spec への影響: Adjacent の例 `＞告白＆好感度＝＄＊好感度` は無くなり、場面の側の `＊告白　＆＄＊好感度＝「高」` になった。保存の範囲の書き方が増えたら、条件の変数もその書き方に従う。
