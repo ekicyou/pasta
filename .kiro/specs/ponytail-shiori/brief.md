@@ -1,6 +1,6 @@
 # Brief: ponytail-shiori
 
-> **ステータス**: 未着手（2026-10-19 の `/kiro-discovery` で起票。`/ponytail:ponytail-audit` の指摘より）。0.4.4（2026-10-24 開発者の決定「ポニーテールは 0.0.1 後ろからの着手に変更」。経緯: 2026-10-19 に 0.4.3、2026-10-22 に版に縛らない隙間、2026-10-23 に 0.4.3）。0.4.3 の mlua 0.12 の後の main で測り直す。同じ監査の 10 本と同じウェーブで並走できる。
+> **ステータス**: 未着手（2026-10-19 の `/kiro-discovery` で起票。`/ponytail:ponytail-audit` の指摘より）。0.4.5（2026-10-24 開発者の決定「ポニーテールは 0.0.1 後ろからの着手に変更」。経緯: 2026-10-19 に 0.4.3、2026-10-22 に版に縛らない隙間、2026-10-23 に 0.4.3）。0.4.3 の mlua 0.12 の後の main で測り直す。同じ監査の 10 本と同じウェーブで並走できる。
 
 ## 進め方（2026-10-19 開発者の決定）
 
@@ -147,7 +147,7 @@
 - **前提の変化**
   - `crates/pasta_shiori` に入ったのは PR #187 だけ。ctor を 0.2 → 1.0 にし（`Cargo.toml` 50 行の dev 依存）、テスト 14 ファイル（`src/shiori_request_tests.rs` と `tests/` の 13）の 1 行を `#[ctor::ctor(unsafe)]` に直した。本体のソースは変わっていない。新しいテストに `PASTA_DEBUG` を中和する守りを足すときは、この新しい書き方にする。
   - アクタースレッドのメッセージループ wintf-winmsg-executor は 0.0.5 になった（ルートの `Cargo.toml` 48 行。pasta は `block_on` しか使わず、振る舞いは同じ）。`shiori4-v3-portable` が外す見込みは前のまま。
-  - 2026-10-24 に、この spec は 0.4.4（`shiori4-v3-portable` の後）になった。10-23 の再測定の行番号（`windows.rs` 109・129・222・257 行、`shiori.rs` 66〜70 行、`thread.rs` 250〜258 行、`lifecycle.rs` の `marshal_request` 124 行・`teardown_actor` 150 行、`req_parser.pest` 44 行の `_tag`）は今も合っている。
+  - 2026-10-24 に、この spec は 0.4.5（`shiori4-v3-portable` の後）になった。10-23 の再測定の行番号（`windows.rs` 109・129・222・257 行、`shiori.rs` 66〜70 行、`thread.rs` 250〜258 行、`lifecycle.rs` の `marshal_request` 124 行・`teardown_actor` 150 行、`req_parser.pest` 44 行の `_tag`）は今も合っている。
 - **触るファイル**: 前のとおり `crates/pasta_shiori/**`（`Cargo.toml` の `exclude` を含む）、`book/src/internals/shiori.md`、`crates/pasta_shiori/README.md`。1,000 行に近いものは無い（いちばん大きいのは `tests/call_execution_correctness_e2e_test.rs` の 687 行。10-23 の「`shiori_lifecycle_tests.rs` の 596 行」は `src` の中だけの話）。
 - **規模**: 14〜18（`shiori4-v3-portable` が 4 番の `BOOL` と 5 番を持っていけば 12〜15）のまま。
 - **先に要るもの**

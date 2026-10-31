@@ -691,6 +691,49 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
         end
     end)
 
+    -- 季節変換確認（date-var-season-sekku: 気象の区分・月 1-12 全パターン）
+    test("converts month to 季節 by meteorological seasons", function()
+        local seasons = { "冬", "冬", "春", "春", "春", "夏", "夏", "夏", "秋", "秋", "秋", "冬" }
+
+        for month = 1, 12 do
+            local req = {
+                id = "OnSecondChange",
+                date = { year = 2026, month = month, day = 15, hour = 0, min = 0, sec = 0, wday = 0 },
+            }
+            local act = new_act(req)
+            act:transfer_date_to_var()
+
+            expect(act.var["季節"]):toBe(seasons[month])
+        end
+    end)
+
+    -- 節句変換確認（date-var-season-sekku: 五節句の日だけ名前・前後の日は「なし」）
+    test("converts the five sekku days to 節句 and other days to なし", function()
+        local test_cases = {
+            { month = 1, day = 7, expected = "人日" },
+            { month = 3, day = 3, expected = "上巳" },
+            { month = 5, day = 5, expected = "端午" },
+            { month = 7, day = 7, expected = "七夕" },
+            { month = 9, day = 9, expected = "重陽" },
+            { month = 1, day = 6, expected = "なし" },
+            { month = 3, day = 4, expected = "なし" },
+            { month = 7, day = 8, expected = "なし" },
+            { month = 11, day = 11, expected = "なし" },
+            { month = 12, day = 31, expected = "なし" },
+        }
+
+        for _, tc in ipairs(test_cases) do
+            local req = {
+                id = "OnSecondChange",
+                date = { year = 2026, month = tc.month, day = tc.day, hour = 0, min = 0, sec = 0, wday = 0 },
+            }
+            local act = new_act(req)
+            act:transfer_date_to_var()
+
+            expect(act.var["節句"]):toBe(tc.expected)
+        end
+    end)
+
     -- メソッドチェーン用に self を返す
     test("returns self for method chaining", function()
         local req = {
@@ -749,6 +792,24 @@ describe("SHIORI_ACT - transfer_date_to_var() 仮想の日時", function()
         expect(act.var["日"]):toBe("2日")
         -- req.date は書き換えない
         expect(req.date.hour):toBe(14)
+    end)
+
+    test("ずれありで 季節・節句 が仮想の日付から決まる", function()
+        local CLOCK = require("pasta.shiori.clock")
+        CLOCK._reset()
+        -- 実際は 2026-02-01（冬・なし）、仮想は 2026-07-07（夏・七夕）
+        CLOCK.observe({
+            id = "OnPastaClock",
+            date = real_req().date,
+            reference = { [0] = "2026", "7", "7", "9", "0", "0" },
+        })
+
+        local act = new_act(real_req())
+        act:transfer_date_to_var()
+        CLOCK._reset()
+
+        expect(act.var["季節"]):toBe("夏")
+        expect(act.var["節句"]):toBe("七夕")
     end)
 
     test("ずれ 0 では今と同じ値になる", function()
