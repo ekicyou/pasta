@@ -146,6 +146,28 @@ fn x_pasta_time_ignores_virtual_time() {
     assert_os_hour(&mut env, v);
 }
 
+/// `＞「季節_」＆＄季節`・`＞「節句_」＆＄節句` が X-Pasta-Time の日付で振り分けられる（date-var-season-sekku）
+#[test]
+fn season_and_sekku_route_by_x_pasta_time() {
+    let mut env = ShioriTestEnv::new(FIXTURE);
+    let cases = [
+        ("2025-07-07T03:00:00Z", "季節は夏。", Some("節句は七夕。")),
+        // 節句でない日は ＄節句 が「なし」で、空の ＊節句_なし が呼ばれて失敗表記が出ない
+        ("2025-11-15T03:00:00Z", "季節は秋。", None),
+    ];
+    for (time, season, sekku) in cases {
+        let resp = get(&mut env, &format!("ID: 振り分け\nX-Pasta-Time: {time}\n"));
+        assert_eq!(resp.status_code, 200, "{time}: {:?}", resp.value);
+        let text = value(&resp);
+        assert!(text.contains(season), "{time}: no {season}: {text}");
+        match sekku {
+            Some(s) => assert!(text.contains(s), "{time}: no {s}: {text}"),
+            None => assert!(!text.contains("節句は"), "{time}: unexpected 節句: {text}"),
+        }
+        assert!(!text.contains('【'), "{time}: failure notation: {text}");
+    }
+}
+
 /// 読めない値の返事は 204 で、続く応答は OS の時計のまま（2.9）
 #[test]
 fn unreadable_reply_falls_back_to_os_clock() {

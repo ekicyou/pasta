@@ -109,6 +109,12 @@ end
 local WEEKDAYS_JA = { "日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日" }
 local WEEKDAYS_EN = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }
 
+--- 季節テーブル（month 1-12 → 気象の区分。date-var-season-sekku）
+local SEASONS_JA = { "冬", "冬", "春", "春", "春", "夏", "夏", "夏", "秋", "秋", "秋", "冬" }
+
+--- 五節句テーブル（month*100+day → 名前）。ほかの日は「なし」（空だと「節句_」の前方一致で全節句が候補になる）
+local SEKKU_JA = { [107] = "人日", [303] = "上巳", [505] = "端午", [707] = "七夕", [909] = "重陽" }
+
 --- 12時間制変換
 --- @param hour number 24時間制の時 (0-23)
 --- @return string 午前/午後付き12時間制文字列
@@ -170,6 +176,14 @@ function SHIORI_ACT_IMPL.transfer_date_to_var(self)
     -- 12時間制変換
     if date.hour then
         self.var["時１２"] = to_12hour_format(date.hour)
+    end
+
+    -- 季節・節句変換
+    if date.month then
+        self.var["季節"] = SEASONS_JA[date.month]
+        if date.day then
+            self.var["節句"] = SEKKU_JA[date.month * 100 + date.day] or "なし"
+        end
     end
 
     return self

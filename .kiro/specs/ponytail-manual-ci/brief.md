@@ -1,6 +1,6 @@
 # Brief: ponytail-manual-ci
 
-> **ステータス**: 未着手（2026-10-19 の `/kiro-discovery` で起票。`/ponytail:ponytail-audit` の指摘より）。0.4.4（2026-10-24 開発者の決定「ポニーテールは 0.0.1 後ろからの着手に変更」。経緯: 2026-10-19 に 0.4.3、2026-10-22 に版に縛らない隙間、2026-10-23 に 0.4.3）。0.4.3 の mlua 0.12 の後の main で測り直す。同じ監査の 10 本と同じウェーブで並走できる。
+> **ステータス**: 未着手（2026-10-19 の `/kiro-discovery` で起票。`/ponytail:ponytail-audit` の指摘より）。0.4.5（2026-10-24 開発者の決定「ポニーテールは 0.0.1 後ろからの着手に変更」。経緯: 2026-10-19 に 0.4.3、2026-10-22 に版に縛らない隙間、2026-10-23 に 0.4.3）。0.4.3 の mlua 0.12 の後の main で測り直す。同じ監査の 10 本と同じウェーブで並走できる。
 
 ## 進め方（2026-10-19 開発者の決定）
 
@@ -168,7 +168,7 @@
 - **先に要るもの**
   - 働きの上では無い。合わせるときは、build の job の `pasta-skills.zip` の検査（165〜177 行。`git ls-tree` の失敗で止まる 171 行を含む）・upload の 226〜230 行・`github-release.ps1` 72 行の 6 つの名前・`release-scripts-test.ps1` の項目 11（246 行）を保つ。鮮度の照合を関門に足すなら、build の job の 120〜121 行との重なりを整理する。
   - 0.4.3 の 6 本との重なり: `shiori4-v3-portable` と `build.yml` を共有する（あちらは Linux の job で cargo を回す。こちらは ubuntu の job を 1 つ足す）。同じウェーブに置かない。ほかの 5 本（`toml-serialization`・`mlua-stdlib-removal`・`recommend-menu-scenes`・`ponytail-check-release`・`mlua-0-12-upgrade`）とはソースを共有しない。マニュアルの章を足す spec が出たら、章の数の 3 つの検査と `talk.mjs` の写しの整理がぶつかりうる。
-  - 0.4.4 以降: `pasta-dll-multiarch`（`release.yml`・`build.yml`）、`vsce-4-upgrade`（`release.yml`・`release-setup-check.yml`。Node 22 を待つ）と同じウェーブに置かない。リリースの実行中は `release.yml` を main へ入れない。
+  - 0.4.5 以降: `pasta-dll-multiarch`（`release.yml`・`build.yml`）、`vsce-4-upgrade`（`release.yml`・`release-setup-check.yml`。Node 22 を待つ）と同じウェーブに置かない。リリースの実行中は `release.yml` を main へ入れない。
 - **種別**: 基盤（検査の置き場所・権限・action の版の固定）。
 - **要件定義のモデル**: Opus。
 - **分割の案**: 不要。

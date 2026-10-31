@@ -281,5 +281,5 @@ ghost_dev の「ぱすた開発」セッションは、**外見として記録�
 
 ## 申し送り（2026-10-29 の版の組み替えより）
 
-- ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.4（ponytail）の次に入る。
+- ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.5（ponytail）の次に入る。
 - 柱の属性の土台 `scene-attribute-store` は 0.5.0 で先に入る。その要件は、この spec の柱の属性も読み手として材料にする（`roadmap.md` の「0.5.0 の範囲」）。

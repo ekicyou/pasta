@@ -80,7 +80,7 @@ Node 22 への移行を先に済ませ（`ponytail-manual-ci` が「Node 22 に�
 - **触るファイル**: `editors/vscode/package.json`（316 行の 1 行）・`package-lock.json`、Node 22 をこちらでするなら `release.yml` 25 行・`release-setup-check.yml` 35 行。公開の道がだめなら `release.yml` の `publish-vsce`（391 行〜）・`release-setup-check.yml`・`.github/scripts/release/publish-vsix.ps1`（120 行）・`release` スキル・`tech.md` のリリースの節。
 - **規模**: 4〜7 タスク（公開の道が通れば 4、OIDC の口へ移すなら 7 ほど）。
 - **先に要るもの**
-  - 働きの上では `ponytail-manual-ci`（0.4.4。`release.yml`・`release-setup-check.yml` の Node 22）。
+  - 働きの上では `ponytail-manual-ci`（0.4.5。`release.yml`・`release-setup-check.yml` の Node 22）。
   - 0.4.3 の 6 本とは、どれともソースを共有しない（`editors/vscode/package*.json`・`release.yml`・`release-setup-check.yml`・`publish-vsix.ps1` を触る spec は 0.4.3 に無い）。
   - ほか: `ponytail-editor-tooling` と `editors/vscode/package.json`（あちらは `host` の項目、250・281・293 行を消す）を共有する。同じウェーブに置かない。`ponytail-manual-ci`・`pasta-dll-multiarch` とは `release.yml`。リリースの実行中は `release.yml` を main へ入れない。
 - **種別**: 基盤（道具の版を上げる。開発者の依頼で `/update` から起票）。

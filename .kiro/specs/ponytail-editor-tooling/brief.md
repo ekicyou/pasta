@@ -1,6 +1,6 @@
 # Brief: ponytail-editor-tooling
 
-> **ステータス**: 未着手（2026-10-19 の `/kiro-discovery` で起票。`/ponytail:ponytail-audit` の指摘より）。0.4.4（2026-10-24 開発者の決定「ポニーテールは 0.0.1 後ろからの着手に変更」。経緯: 2026-10-19 に 0.4.3、2026-10-22 に版に縛らない隙間、2026-10-23 に 0.4.3）。0.4.3 の mlua 0.12 の後の main で測り直す。同じ監査の 10 本と同じウェーブで並走できる。
+> **ステータス**: 未着手（2026-10-19 の `/kiro-discovery` で起票。`/ponytail:ponytail-audit` の指摘より）。0.4.5（2026-10-24 開発者の決定「ポニーテールは 0.0.1 後ろからの着手に変更」。経緯: 2026-10-19 に 0.4.3、2026-10-22 に版に縛らない隙間、2026-10-23 に 0.4.3）。0.4.3 の mlua 0.12 の後の main で測り直す。同じ監査の 10 本と同じウェーブで並走できる。
 
 ## 進め方（2026-10-19 開発者の決定）
 
@@ -160,7 +160,7 @@ VSCode で辞書を書くゴーストの作者が困る。
 
 - **前提の変化**
   - 監査（2026-10-19）の後に持ち場へ入ったのは、版の上げ（v0.4.2 の `package.json` の `version`）と PR #187 だけ。PR #187 は `editors/vscode/package.json` の esbuild を 0.24 → 0.28.2 にし（317 行。pasta は CLI の `--bundle` しか使わない）、`package-lock.json` を update と audit fix で大きく書き換えた（jsdom などの勧告を消した）。`crates/pasta_lsp`・`crates/pasta_dsl/src/partial.rs`・`editors/vscode/src`・`syntaxes` は変わっていない。
-  - 2026-10-24 に、この spec は 0.4.4（0.4.3 の後）になった。mlua 0.12 へ上げた後の main で測り直す。
+  - 2026-10-24 に、この spec は 0.4.5（0.4.3 の後）になった。mlua 0.12 へ上げた後の main で測り直す。
 - **触るファイル**: `crates/pasta_lsp/**`（`server.rs` 184 行・`document.rs` 327 行・`error.rs` 48 行・`analysis/mod.rs` 131 行・`transport.rs` 487 行・`Cargo.toml`・`tests/` 17 ファイル）、`crates/pasta_dsl/src/partial.rs`（477 行）、`crates/pasta_check/src/validate/{syntax,report}.rs`（`report.rs` 475 行。`code()` は 105 行）、`editors/vscode/`（`package.json` の `host` の 250・281・293 行、tmLanguage、`src/*.ts`、`scripts/build-wasm.bat`、`src/test/*`）、ルートの `Cargo.toml`（59 行の tower-lsp）・`Cargo.lock`、マニュアルの `debug/` の 3 頁、`tech.md`・`structure.md`。1,000 行に近いものは無い。
 - **規模**: 16〜19 タスク（13 の指摘と、テスト・文書の追従）。
 - **先に要るもの**

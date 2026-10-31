@@ -133,5 +133,5 @@
 
 ## 申し送り（2026-10-29 の版の組み替えより）
 
-- 0.5.0 が「属性関係の整備」になり、この spec はそこに入った（開発者の決定。ノベルゲームは 0.6.0 へ順延）。順は `scene-attribute-store` → `scene-condition-attributes` → `scene-pick-modes` で、0.4.4（ponytail）を出した後から始める（「ポニーテールが片付いたら属性に手を出しましょう」）。
+- 0.5.0 が「属性関係の整備」になり、この spec はそこに入った（開発者の決定。ノベルゲームは 0.6.0 へ順延）。順は `scene-attribute-store` → `scene-condition-attributes` → `scene-pick-modes` で、0.4.5（ponytail）を出した後から始める（「ポニーテールが片付いたら属性に手を出しましょう」）。
 - `scene-condition-attributes` と候補の袋を共有するので、その後に置く（同じウェーブに置かない）。
