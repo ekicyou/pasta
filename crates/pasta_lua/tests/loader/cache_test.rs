@@ -4,6 +4,7 @@
 
 use pasta_lua::loader::{CURRENT_VERSION, CacheManager};
 use std::fs;
+use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
 
 /// 別名表の指紋（テスト用の固定値）。
@@ -201,48 +202,98 @@ fn test_needs_transpile_no_cache() {
     assert!(manager.needs_transpile(&source).unwrap());
 }
 
-#[test]
-fn test_needs_transpile_cache_older() {
-    let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir(FP).unwrap();
-
-    // Create source file
-    let dic_dir = temp.path().join("dic");
-    fs::create_dir_all(&dic_dir).unwrap();
-    let source = dic_dir.join("test.pasta");
-
-    // Create cache first (older)
-    let cache_path = manager.source_to_cache_path(&source);
-    fs::create_dir_all(cache_path.parent().unwrap()).unwrap();
-    fs::write(&cache_path, "-- cached").unwrap();
-
-    // Wait a bit and create source (newer)
-    std::thread::sleep(std::time::Duration::from_millis(50));
-    fs::write(&source, "# updated").unwrap();
-
-    // Source is newer
-    assert!(manager.needs_transpile(&source).unwrap());
-}
-
-#[test]
-fn test_needs_transpile_cache_newer() {
-    let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir(FP).unwrap();
-
-    // Create source file first
+/// 一時ゴーストに元とキャッシュを作り、元の時刻を `source_mtime` に、キャッシュの時刻を
+/// `cache_mtime` にする。
+fn source_and_cache_with_mtimes(
+    temp: &TempDir,
+    manager: &CacheManager,
+    source_mtime: SystemTime,
+    cache_mtime: SystemTime,
+) -> std::path::PathBuf {
     let dic_dir = temp.path().join("dic");
     fs::create_dir_all(&dic_dir).unwrap();
     let source = dic_dir.join("test.pasta");
     fs::write(&source, "# test").unwrap();
-
-    // Wait a bit and create cache (newer)
-    std::thread::sleep(std::time::Duration::from_millis(50));
     let cache_path = manager.source_to_cache_path(&source);
     fs::create_dir_all(cache_path.parent().unwrap()).unwrap();
     fs::write(&cache_path, "-- cached").unwrap();
+    set_mtime(&source, source_mtime);
+    set_mtime(&cache_path, cache_mtime);
+    source
+}
 
-    // Cache is newer
+fn set_mtime(path: &std::path::Path, mtime: SystemTime) {
+    fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(mtime)
+        .unwrap();
+}
+
+const DAY: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// 元がキャッシュより新しければ変換する（1.1）。
+#[test]
+fn test_needs_transpile_cache_older() {
+    let (temp, manager) = create_test_cache_manager();
+    manager.prepare_cache_dir(FP).unwrap();
+    let now = SystemTime::now();
+    let source = source_and_cache_with_mtimes(&temp, &manager, now, now - DAY);
+
+    assert!(manager.needs_transpile(&source).unwrap());
+}
+
+/// キャッシュが新しくても、時刻が違えば変換する。元を前日の版に戻したとき（1.1・1.5）。
+#[test]
+fn test_needs_transpile_cache_newer() {
+    let (temp, manager) = create_test_cache_manager();
+    manager.prepare_cache_dir(FP).unwrap();
+    let now = SystemTime::now();
+    let source = source_and_cache_with_mtimes(&temp, &manager, now - DAY, now);
+
+    assert!(manager.needs_transpile(&source).unwrap());
+}
+
+/// 時刻が等しければ省く（1.3）。
+#[test]
+fn test_needs_transpile_equal_mtime_skips() {
+    let (temp, manager) = create_test_cache_manager();
+    manager.prepare_cache_dir(FP).unwrap();
+    let then = SystemTime::now() - DAY;
+    let source = source_and_cache_with_mtimes(&temp, &manager, then, then);
+
     assert!(!manager.needs_transpile(&source).unwrap());
+}
+
+/// `stamp_cache` の後は、元が変わらない限り変換を省く（1.7）。
+#[test]
+fn test_stamp_cache_aligns_cache_mtime() {
+    let (temp, manager) = create_test_cache_manager();
+    manager.prepare_cache_dir(FP).unwrap();
+    let now = SystemTime::now();
+    let source = source_and_cache_with_mtimes(&temp, &manager, now - DAY, now);
+    let source_mtime = fs::metadata(&source).unwrap().modified().unwrap();
+
+    manager.stamp_cache(&source, source_mtime).unwrap();
+
+    let cache_mtime = fs::metadata(manager.source_to_cache_path(&source))
+        .unwrap()
+        .modified()
+        .unwrap();
+    assert_eq!(cache_mtime, source_mtime);
+    assert!(!manager.needs_transpile(&source).unwrap());
+}
+
+/// キャッシュが無いときの `stamp_cache` は誤りで、キャッシュのファイルを作らない（1.7）。
+#[test]
+fn test_stamp_cache_without_cache_errors() {
+    let (temp, manager) = create_test_cache_manager();
+    manager.prepare_cache_dir(FP).unwrap();
+    let source = temp.path().join("dic/test.pasta");
+
+    assert!(manager.stamp_cache(&source, SystemTime::now()).is_err());
+    assert!(!manager.source_to_cache_path(&source).exists());
 }
 
 // ========================================================================

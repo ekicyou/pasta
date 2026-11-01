@@ -10,6 +10,7 @@ use crate::transpiler::LuaTranspiler;
 
 use std::fs;
 use std::path::Path;
+use std::time::SystemTime;
 use tracing::{debug, error, warn};
 
 /// Process statistics for logging.
@@ -134,6 +135,9 @@ impl PastaLoader {
                 continue;
             }
 
+            // 元の時刻は内容を読む前に取る（読んだ後の書き換えを次の起動で拾うため）
+            let source_mtime = source_mtime(file_path);
+
             // Read and parse
             let content = match fs::read_to_string(file_path) {
                 Ok(c) => c,
@@ -194,9 +198,12 @@ impl PastaLoader {
             };
 
             // Save to cache
-            if let Err(e) = cache_manager.save_cache(file_path, &lua_code) {
-                warn!(file = %file_path.display(), error = %e, "Failed to save cache");
-                // Continue anyway - cache write failure is not fatal
+            match cache_manager.save_cache(file_path, &lua_code) {
+                Ok(_) => stamp_cache(cache_manager, file_path, source_mtime),
+                Err(e) => {
+                    warn!(file = %file_path.display(), error = %e, "Failed to save cache");
+                    // Continue anyway - cache write failure is not fatal
+                }
             }
 
             stats.transpiled += 1;
@@ -216,6 +223,8 @@ impl PastaLoader {
                 debug!(file = %file_path.display(), "Skipped .lua (cache up-to-date)");
                 continue;
             }
+
+            let source_mtime = source_mtime(file_path);
 
             // Read .lua file content directly (no parse/transpile)
             let content = match fs::read_to_string(file_path) {
@@ -249,6 +258,7 @@ impl PastaLoader {
                 stats.failed += 1;
                 continue;
             }
+            stamp_cache(cache_manager, file_path, source_mtime);
 
             stats.copied += 1;
             debug!(file = %file_path.display(), module = %module_name, "Copied .lua");
@@ -272,5 +282,25 @@ impl PastaLoader {
         }
 
         Ok((combined_context, module_names, stats))
+    }
+}
+
+/// 元の更新時刻。取れなければ `None`（写しを省き、次の起動でも変換し直す）。
+fn source_mtime(file_path: &Path) -> Option<SystemTime> {
+    fs::metadata(file_path).and_then(|m| m.modified()).ok()
+}
+
+/// 書いたキャッシュの時刻を元にそろえる。失敗しても読み込みは続ける（1.7）。
+fn stamp_cache(cache_manager: &CacheManager, file_path: &Path, source_mtime: Option<SystemTime>) {
+    let Some(mtime) = source_mtime else {
+        debug!(file = %file_path.display(), "Source mtime unavailable; cache mtime not aligned");
+        return;
+    };
+    if let Err(e) = cache_manager.stamp_cache(file_path, mtime) {
+        warn!(
+            file = %file_path.display(),
+            error = %e,
+            "Failed to align cache mtime; the file will be transpiled again on next startup"
+        );
     }
 }

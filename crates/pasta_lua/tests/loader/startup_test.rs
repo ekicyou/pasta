@@ -517,3 +517,65 @@ fn test_config_load_with_file() {
         Some(&toml::Value::String("TestGhost".to_string()))
     );
 }
+
+// ============================================================================
+// Cache Freshness Tests (ponytail-lua-loader 2.1)
+// ============================================================================
+
+/// `EVENT.fire` でイベント（未登録ならイベント名と同じ名前のシーン）を起こし、応答を返す。
+fn fire_event(runtime: &pasta_lua::PastaLuaRuntime, id: &str) -> String {
+    let script = format!(
+        r#"local EVENT = require "pasta.shiori.event"
+return EVENT.fire({{ id = "{id}", method = "get", version = 30 }})"#
+    );
+    value_as_str(&runtime.exec(&script).unwrap()).unwrap()
+}
+
+/// 内容を書き直し、更新時刻を前日にする（前日の版に戻した辞書）。
+fn roll_back_to_yesterday(path: &std::path::Path, content: &str) {
+    std::fs::write(path, content).unwrap();
+    let yesterday = std::time::SystemTime::now() - std::time::Duration::from_secs(24 * 60 * 60);
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(yesterday)
+        .unwrap();
+}
+
+/// 辞書（`.pasta` と `.lua`）を前日の時刻の別の内容に戻して起動し直すと、戻した内容で動き、
+/// キャッシュの時刻が元にそろって 2 回目の起動では変換が省かれる（1.1・1.2・1.3・1.5・1.7・9.2）。
+#[test]
+fn test_rolled_back_dictionaries_run_restored_content() {
+    let temp = common::create_temp_with_pasta("＊OnRollback\n　さくら：「今日の台詞」\n");
+    let base = temp.path();
+    let pasta = base.join("dic/test/hello.pasta");
+    let lua = base.join("dic/test/roll.lua");
+    std::fs::write(&lua, "_G.ROLLBACK = \"today\"\n").unwrap();
+
+    let runtime = PastaLoader::load(base).unwrap();
+    assert!(fire_event(&runtime, "OnRollback").contains("今日の台詞"));
+    drop(runtime);
+
+    roll_back_to_yesterday(&pasta, "＊OnRollback\n　さくら：「前日の台詞」\n");
+    roll_back_to_yesterday(&lua, "_G.ROLLBACK = \"yesterday\"\n");
+
+    let cache = pasta_lua::loader::CacheManager::new(base.to_path_buf(), "profile/pasta/cache/lua");
+    for _ in 0..2 {
+        let runtime = PastaLoader::load(base).unwrap();
+        let response = fire_event(&runtime, "OnRollback");
+        assert!(response.contains("前日の台詞"), "{response:?}");
+        assert_eq!(
+            value_as_str(&runtime.exec("return _G.ROLLBACK").unwrap()).as_deref(),
+            Some("yesterday")
+        );
+        // 時刻がそろったので、次の起動では変換も写しも省かれる
+        for source in [&pasta, &lua] {
+            assert!(
+                !cache.needs_transpile(source).unwrap(),
+                "{}",
+                source.display()
+            );
+        }
+    }
+}
