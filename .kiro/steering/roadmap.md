@@ -9,7 +9,7 @@ pasta は、日本語 DSL（Pasta DSL）で書いた辞書を Lua へトラン�
 - **0.4.3: セーブの TOML 化・mlua 0.12・おすすめメニュー・shiori4 の SHIORI3 互換モード**（2026-10-23・2026-10-24 開発者の決定）。致命的な不具合の `toml-serialization`（最優先）、mlua 0.12 へ上げる 2 本（`mlua-stdlib-removal`・`mlua-0-12-upgrade`。開発者「次のリリースのタイミングで、mlua 上げちゃいたい」）、`recommend-menu-scenes`、ponytail のうち作者のフォルダを消す Must fix を持つ `ponytail-check-release`、0.4.2 から移した `shiori4-v3-portable`（まだ実施できないので、0.4.3 の最後）を入れる（下の「0.4.3 の範囲」）。2026-10-24 に 4 本が入り、同じ日に `mlua-0-12-upgrade` も入った。2026-10-25 に `shiori4-v3-portable` が入った。残りはリリース。
 - **0.4.4: 日時変数の `＄季節`・`＄節句`**（2026-10-31 開発者の決定「ロードマップは緊急で、次のマイナーバージョンを差し込む感じで」）。窓際のぱすたさんの季節トークを Lua なしで振り分けるため。`date-var-season-sekku` の 1 本だけを入れ、同じセッションで実装からリリースまで進める（下の「0.4.4 の範囲」）。ponytail を 0.4.5 へ繰り下げた（2026-10-31。それより前の記録で 0.4.4 と書いていた版）。
 - **0.4.5: ponytail 監査の指摘の修正**（2026-10-24 開発者の決定「ポニーテールは 0.0.1 後ろからの着手に変更」）。`ponytail-check-release` を除く 9 本（下の「ponytail 監査の指摘の修正」）。`ponytail-lua-loader` の「読めないセーブを `.broken` に退避する」は、`toml-serialization` へ移した。
-- **0.5.0: 属性関係の整備**（2026-10-29 開発者の決定「今存在する 0.5.0（ノベルゲーム）は 0.6.0 に順延し、0.5.0 に属性関係の整備を置く」「ポニーテールが片付いたら属性に手を出す」）。`scene-attribute-store` → `scene-condition-attributes`・`scene-pick-modes` の 3 本。0.4.5 を出した後から始める（下の「0.5.0 の範囲」）。
+- **0.5.0: 属性関係の整備**（2026-10-29 開発者の決定「今存在する 0.5.0（ノベルゲーム）は 0.6.0 に順延し、0.5.0 に属性関係の整備を置く」「ポニーテールが片付いたら属性に手を出す」）。`scene-attribute-store` → `scene-condition-attributes`・`scene-pick-modes` の 3 本に、2026-11-01 に `scene-count` を足して 4 本（開発者「版は属性関係のリリースに混ぜましょう」）。0.4.5 を出した後から始める（下の「0.5.0 の範囲」）。
 - **版がまだ決まっていないもの**: 2026-10-21 に起票した `scene-exact-match`、2026-10-23 に起票した `pasta-dll-multiarch`、2026-10-24 に起票した `vsce-4-upgrade`・`pest-2-9-4-upgrade`（どちらも 0.4.3 には入れない。下の「依存の更新」）。まとめは下の「版がまだ決まっていないもの」にある。
 - **Phase 13: areka でノベルゲーム（0.6.0。2026-10-29 に 0.5.0 から順延）**。2026-10-10 の discovery で、合格ライン・通り道・台本の書き方・巻き戻しの方式を決め、spec を起こした（2026-10-17 の時点で 11 本）。属性の 2 本（`scene-attribute-store`・`scene-condition-attributes`）は、2026-10-29 に 0.5.0 へ移した。
 - **Phase 11 の残り**: 文中のシーンリンク（`scene-anchor-link`）。どの版に入れるかは、まだ決めていない（下の棚卸の「開発者の判断が要るもの」）。
@@ -160,7 +160,8 @@ ponytail 監査の指摘を直す 9 本（`ponytail-check-release` を除く）�
 | 1 | scene-attribute-store | Fable | 15〜18 | 0.4.5 のリリース。属性の倉の形と Lua から読む口・受け継ぎ・値の型を決める。読み手は `scene-condition-attributes`（条件と `＆優先`）・`scene-pick-modes`（`＆重み`・`＆順番`）と、0.6.0 の `cue-command-runtime`（柱の属性）の 3 つ。0.6.0 の読み手も要件の材料に含める |
 | 2 | scene-condition-attributes | Opus | 14〜18 | `scene-attribute-store` |
 | 3 | scene-pick-modes | Opus | 9〜11 | `scene-attribute-store`。2 番と候補の袋を共有するので、同じウェーブに置かない（2 番の後に置く） |
-| 4 | 0.5.0 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
+| 4 | scene-count（2026-11-01 起票・同日に 0.5.0 へ） | Opus | 3〜5 | なし（属性は使わない）。2・3 番とは `search/context.rs` を共有するので同じウェーブに置かない。1 番とはファイルが重ならない見込みなので、1 番と並べてよい（入る前に測り直す） |
+| 5 | 0.5.0 のリリース（`release` スキル） | Opus | — | 上の全部の後 |
 
 - `scene-exact-match`（`＞＞` の完全一致）は属性ではないので、この版に入れていない。ゴースト側の見立て（2026-10-29）は「入っていれば助かるが必須ではない。入れるなら 0.5.0 の 3 本の後（4 番目）。0.6.0 でも構わない」（emo2 と窓際のぱすたさんは `OnInstallCompleteAll` を DSL のシーンにできず Lua の REG で受けているが、今は動いていて困っていない）。版は判断待ちのままで、0.6.0 の `novel-talk-flow` が前提にするので、遅くとも 0.6.0 に入れる。`scene-condition-attributes` とは検索の道を共有するので、同じウェーブに置かない。
 
