@@ -6,7 +6,6 @@
 use super::PastaLuaRuntime;
 use super::lua_require;
 use super::register_finalize_scene;
-use super::renderer_injection::RendererInjection;
 use crate::context::TranspileContext;
 use crate::debug::source_map::SourceMap;
 use crate::loader::{LoaderContext, PastaConfig, TranspileResult};
@@ -193,17 +192,8 @@ impl PastaLuaRuntime {
         // Register @pasta_log module for Lua logging bridge
         Self::register_log_module(&runtime.lua)?;
 
-        // Register @pasta_sakura_script module via the adapter-injected renderer.
-        //
-        // R3 論理デカップリング: コアはさくら描画を無条件 hard-code 起点としては
-        // 保持せず、注入シーム（RendererInjection）経由で登録する。既定（SHIORI 宿主）
-        // は SHIORI さくらレンダラで既存挙動・バイト不変（R3.5/R3.6）。現行は常に
-        // この既定を渡し、アダプタ（pasta_shiori）から差し替える経路は無い。
-        Self::register_sakura_script_module(
-            &runtime.lua,
-            &runtime.config,
-            RendererInjection::default(),
-        )?;
+        // Register @pasta_sakura_script module
+        Self::register_sakura_script_module(&runtime.lua, &runtime.config)?;
 
         // Register internal @pasta_debug module (production entry only; scene-play-event 2.3)
         Self::register_debug_module(
