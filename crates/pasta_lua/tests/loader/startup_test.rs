@@ -579,3 +579,30 @@ fn test_rolled_back_dictionaries_run_restored_content() {
         }
     }
 }
+
+// ============================================================================
+// Cache Write Failure Tests (ponytail-lua-loader 2.2)
+// ============================================================================
+
+/// `.pasta` のキャッシュが書けないと読み込みが失敗し、エラーにその `.pasta` のパスが入る（1.6・9.2）。
+#[test]
+fn test_pasta_cache_write_failure_fails_load_with_path() {
+    let temp = common::create_temp_with_pasta("＊OnCacheBlocked\n　さくら：「台詞」\n");
+    let base = temp.path();
+    // エラーの表示と比べるので、区切りは OS の形にそろえる
+    let pasta = base.join("dic").join("test").join("hello.pasta");
+    // 1 回目の起動でキャッシュのフォルダを作ってから、キャッシュのファイルの位置をフォルダでふさぐ
+    drop(PastaLoader::load(base).unwrap());
+    let cache = pasta_lua::loader::CacheManager::new(base.to_path_buf(), "profile/pasta/cache/lua");
+    let cache_file = cache.source_to_cache_path(&pasta);
+    std::fs::remove_file(&cache_file).unwrap();
+    std::fs::create_dir(&cache_file).unwrap();
+
+    let err = PastaLoader::load(base).err().expect("load must fail");
+    assert!(
+        matches!(err, LoaderError::PartialTranspileError { .. }),
+        "{err:?}"
+    );
+    let message = err.to_string();
+    assert!(message.contains(&pasta.display().to_string()), "{message}");
+}

@@ -197,14 +197,16 @@ impl PastaLoader {
                 }
             };
 
-            // Save to cache
-            match cache_manager.save_cache(file_path, &lua_code) {
-                Ok(_) => stamp_cache(cache_manager, file_path, source_mtime),
-                Err(e) => {
-                    warn!(file = %file_path.display(), error = %e, "Failed to save cache");
-                    // Continue anyway - cache write failure is not fatal
-                }
+            // Save to cache (a failure fails the load, same as the .lua copy)
+            if let Err(e) = cache_manager.save_cache(file_path, &lua_code) {
+                failures.push(TranspileFailure {
+                    source_path: file_path.clone(),
+                    error: format!("Cache write error: {}", e),
+                });
+                stats.failed += 1;
+                continue;
             }
+            stamp_cache(cache_manager, file_path, source_mtime);
 
             stats.transpiled += 1;
             debug!(file = %file_path.display(), module = %module_name, "Transpiled");
