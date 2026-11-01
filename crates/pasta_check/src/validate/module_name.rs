@@ -6,36 +6,35 @@ use std::path::Path;
 use super::discovery::{DictFile, Discovered};
 use super::{Finding, FindingKind, msg};
 
-/// 判定はモジュール名だけで行う（4.4）。報告のパスは実物の綴り
+/// 判定はモジュール名だけで行う（4.4）。比べるのは大文字と小文字を畳んだ名前、報告は実際の名前と実物の綴り
 pub(crate) fn check(discovered: &Discovered) -> Vec<Finding> {
     let pasta = by_module(&discovered.pasta);
     let lua = by_module(&discovered.lua);
     let mut findings = Vec::new();
-    for (module, files) in &pasta {
+    for files in pasta.values() {
         collisions(
             &mut findings,
-            module,
             files,
             FindingKind::ModulePastaCollision,
             msg::module_pasta_collision,
         );
     }
-    for (module, files) in &lua {
+    for (folded, files) in &lua {
         collisions(
             &mut findings,
-            module,
             files,
             FindingKind::ModuleLuaCollision,
             msg::module_lua_collision,
         );
-        if let Some(pastas) = pasta.get(module) {
-            for file in files {
+        if let Some(pastas) = pasta.get(folded) {
+            let pasta_paths: Vec<&str> = pastas.iter().map(|(_, p)| *p).collect();
+            for (module, file) in files {
                 findings.push(Finding::new(
                     FindingKind::ModuleLuaShadowed,
                     *file,
                     None,
                     None,
-                    msg::module_lua_shadowed(module, pastas),
+                    msg::module_lua_shadowed(module, &pasta_paths),
                 ));
             }
         }
@@ -43,30 +42,34 @@ pub(crate) fn check(discovered: &Discovered) -> Vec<Finding> {
     findings
 }
 
-/// モジュール名ごとの実物のパス
-fn by_module(files: &[DictFile]) -> BTreeMap<String, Vec<&str>> {
-    let mut map: BTreeMap<String, Vec<&str>> = BTreeMap::new();
+/// 畳んだモジュール名ごとの (実際のモジュール名, 実物のパス)
+fn by_module(files: &[DictFile]) -> BTreeMap<String, Vec<(String, &str)>> {
+    let mut map: BTreeMap<String, Vec<(String, &str)>> = BTreeMap::new();
     for f in files {
-        map.entry(module_name_of(&f.dll_path))
+        let module = module_name_of(&f.dll_path);
+        map.entry(module.to_lowercase())
             .or_default()
-            .push(&f.path);
+            .push((module, &f.path));
     }
     map
 }
 
-/// 2 つ以上なら関わる各ファイルに、自分以外のパスを示して付ける
+/// 2 つ以上なら関わる各ファイルに、自分のモジュール名と自分以外のパスを示して付ける
 fn collisions(
     findings: &mut Vec<Finding>,
-    module: &str,
-    files: &[&str],
+    files: &[(String, &str)],
     code: FindingKind,
     message: fn(&str, &[&str]) -> String,
 ) {
     if files.len() < 2 {
         return;
     }
-    for file in files {
-        let others: Vec<&str> = files.iter().copied().filter(|o| o != file).collect();
+    for (module, file) in files {
+        let others: Vec<&str> = files
+            .iter()
+            .map(|(_, p)| *p)
+            .filter(|o| o != file)
+            .collect();
         findings.push(Finding::new(
             code,
             *file,

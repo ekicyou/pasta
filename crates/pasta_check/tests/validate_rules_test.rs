@@ -132,6 +132,51 @@ fn module_name_uses_pasta_dll_path() {
     );
 }
 
+/// 大文字と小文字だけ違う名前も重なりとして比べる。報告には各ファイルの実際のモジュール名を使う（2.8）
+#[test]
+fn case_only_difference_collides() {
+    let found = module_findings(&["dic/A-b.pasta", "dic/a_b.pasta"]);
+    let codes: Vec<_> = found.iter().map(|(p, c, _)| (p.as_str(), *c)).collect();
+    assert_eq!(
+        codes,
+        vec![
+            ("dic/A-b.pasta", FindingKind::ModulePastaCollision),
+            ("dic/a_b.pasta", FindingKind::ModulePastaCollision),
+        ]
+    );
+    assert!(found[0].2.contains("pasta.scene.A_b "), "{}", found[0].2);
+    assert!(found[0].2.contains("ghost/master/dic/a_b.pasta"));
+    assert!(found[1].2.contains("pasta.scene.a_b "), "{}", found[1].2);
+    assert!(found[1].2.contains("ghost/master/dic/A-b.pasta"));
+
+    let found = module_findings(&["dic/main.pasta", "dic/X-y.lua", "dic/x_y.lua"]);
+    let codes: Vec<_> = found.iter().map(|(p, c, _)| (p.as_str(), *c)).collect();
+    assert_eq!(
+        codes,
+        vec![
+            ("dic/X-y.lua", FindingKind::ModuleLuaCollision),
+            ("dic/x_y.lua", FindingKind::ModuleLuaCollision),
+        ]
+    );
+    assert!(found[0].2.contains("pasta.scene.X_y "), "{}", found[0].2);
+    assert!(found[0].2.contains("ghost/master/dic/x_y.lua"));
+    assert!(found[1].2.contains("pasta.scene.x_y "), "{}", found[1].2);
+    assert!(found[1].2.contains("ghost/master/dic/X-y.lua"));
+}
+
+/// 隠す判定も畳んだ名前で引く
+#[test]
+fn case_only_difference_shadows_lua() {
+    let found = module_findings(&["dic/Talk.pasta", "dic/talk.lua"]);
+    assert_eq!(found.len(), 1, "{found:?}");
+    let (path, code, message) = &found[0];
+    assert_eq!(path, "dic/talk.lua");
+    assert_eq!(*code, FindingKind::ModuleLuaShadowed);
+    assert_eq!(code.severity(), Severity::Warning);
+    assert!(message.contains("pasta.scene.talk "), "{message}");
+    assert!(message.contains("ghost/master/dic/Talk.pasta"), "{message}");
+}
+
 /// 構文・読めないファイルの問題だけを返す
 fn syntax_findings(files: Vec<(&str, FileText)>) -> Vec<pasta_check::validate::Finding> {
     let input = GhostInput {
