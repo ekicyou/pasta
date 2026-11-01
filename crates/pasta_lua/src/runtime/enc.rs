@@ -20,7 +20,7 @@
 //! end
 //! ```
 
-use crate::encoding::{Encoder, Encoding};
+use crate::encoding::{ansi_to_utf8, utf8_to_ansi};
 use mlua::{Lua, LuaString, Result as LuaResult, Table, Value};
 
 /// Module version.
@@ -89,7 +89,7 @@ fn to_ansi_impl(lua: &Lua, value: Value) -> LuaResult<(Option<LuaString>, Option
     };
 
     // Convert UTF-8 to ANSI
-    match Encoding::ANSI.to_bytes(utf8_str) {
+    match utf8_to_ansi(utf8_str) {
         Ok(ansi_bytes) => {
             let lua_string = lua.create_string(&ansi_bytes)?;
             Ok((Some(lua_string), None))
@@ -124,7 +124,7 @@ fn to_utf8_impl(lua: &Lua, value: Value) -> LuaResult<(Option<LuaString>, Option
     let ansi_bytes = ansi_str.as_bytes();
 
     // Convert ANSI to UTF-8
-    match Encoding::ANSI.to_string(&ansi_bytes) {
+    match ansi_to_utf8(&ansi_bytes) {
         Ok(utf8_string) => {
             let lua_string = lua.create_string(&utf8_string)?;
             Ok((Some(lua_string), None))

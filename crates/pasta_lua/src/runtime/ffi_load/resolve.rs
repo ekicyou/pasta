@@ -3,7 +3,7 @@
 //! ファイルシステムには std（`is_file`・`std::path::absolute`）だけで触る。
 //! 8.3 名とシンボリックリンクは解かない（`fs::canonicalize` は使わない）。
 
-use crate::encoding::{Encoder, Encoding};
+use crate::encoding::{ansi_to_utf8, utf8_to_ansi};
 use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
@@ -92,8 +92,8 @@ pub(super) fn with_extension_rule(name: &str) -> String {
 ///
 /// 往復で比べるので、似た文字への黙った置き換え（best-fit）も表せない扱いになる。
 pub(super) fn ansi_file_name(file_name: &str) -> Option<Vec<u8>> {
-    let bytes = Encoding::ANSI.to_bytes(file_name).ok()?;
-    let back = Encoding::ANSI.to_string(&bytes).ok()?;
+    let bytes = utf8_to_ansi(file_name).ok()?;
+    let back = ansi_to_utf8(&bytes).ok()?;
     (back == file_name).then_some(bytes)
 }
 
@@ -285,15 +285,15 @@ mod tests {
         assert_eq!(ansi_file_name("foo.dll"), Some(b"foo.dll".to_vec()));
         // CI と開発機の ANSI は CP932（または UTF-8）。日本語はその範囲に入る。
         let jp = ansi_file_name("日本語.dll").expect("CP の範囲の日本語は表せる");
-        assert_eq!(Encoding::ANSI.to_string(&jp).unwrap(), "日本語.dll");
+        assert_eq!(ansi_to_utf8(&jp).unwrap(), "日本語.dll");
 
-        let utf8_acp = Encoding::ANSI.to_bytes("😀").ok().as_deref() == Some("😀".as_bytes());
+        let utf8_acp = utf8_to_ansi("😀").ok().as_deref() == Some("😀".as_bytes());
         if utf8_acp {
             assert!(ansi_file_name("😀.dll").is_some());
         } else {
             assert_eq!(ansi_file_name("😀.dll"), None);
             // best-fit（似た文字への黙った置き換え）も表せない扱い。
-            let cp932 = Encoding::ANSI.to_bytes("あ").ok() == Some(vec![0x82, 0xA0]);
+            let cp932 = utf8_to_ansi("あ").ok() == Some(vec![0x82, 0xA0]);
             if cp932 {
                 assert_eq!(ansi_file_name("é.dll"), None);
             }
