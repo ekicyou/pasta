@@ -371,7 +371,7 @@ impl PastaLoader {
 
 **Implementation Notes**
 - Validation: `.pasta` のキャッシュの書き込みの失敗は、キャッシュのファイルの位置に同じ名前のフォルダを作って起こす（OS によらない）。
-- Risks: `stamp_cache` の失敗の分岐は、テストで起こしにくい（Open Question 6）。
+- Risks: `stamp_cache` の失敗の分岐は、テストで起こしにくい（設計議題 6 で、自動テストを置かずレビューで確かめると確定）。
 
 #### ModuleCollisionGuard
 
@@ -384,7 +384,7 @@ impl PastaLoader {
 - `discover_all_files` の中で、`init.*` の検査の後、`.lua` を隠す前に行う（隠される `.lua` 同士も数える。`pasta_check` の `module-lua-collision` と同じ数え方。2.3）。
 - 名前は `CacheManager::source_to_module_name`（今と同じ規則。`pasta_check` の `module_name_of` とパリティのテストで揃う）。比べるのは `module_name.to_lowercase()`（畳んだ名前）。
 - `.pasta` 群・`.lua` 群のそれぞれで、畳んだ名前ごとに 2 つ以上のファイルがある組をすべて集める。組の並びは畳んだ名前の昇順、組の中はファイルの発見の順（昇順）。1 つでもあれば `LoaderError::ModuleNameCollision` を返す。
-- 隠す判定（2.4）は、`.lua` の畳んだ名前が `.pasta` の畳んだ名前の集合にあれば、今の警告（`Module name conflict: .pasta file takes priority, .lua file ignored`）で外す。【前提】大文字と小文字だけ違う `.pasta` と `.lua` も「同じモジュール名」として隠す（Open Question 1）。
+- 隠す判定（2.4）は、`.lua` の畳んだ名前が `.pasta` の畳んだ名前の集合にあれば、今の警告（`Module name conflict: .pasta file takes priority, .lua file ignored`）で外す。大文字と小文字だけ違う `.pasta` と `.lua` も「同じモジュール名」として隠す（設計議題 1 で確定）。
 - エラーに載せるファイルの名前は `CacheManager::get_relative_path`（ゴーストのフォルダから見た形。Windows では `dic\会話-朝.pasta`）。モジュール名は各ファイルの実際の名前（畳む前）。
 - 衝突しない組み合わせ（日本語・サブフォルダ）は、今と同じ一覧を返す（2.6）。
 
@@ -411,7 +411,7 @@ fn colliding_groups(files: &[PathBuf], cache_manager: &CacheManager) -> Vec<Vec<
 
 **Implementation Notes**
 - Validation: 同じフォルダに大文字と小文字だけ違う 2 つのファイルは Windows・macOS では置けないので、テストは `-`・`.` と `_` の違いや、サブフォルダの名前の違いで組む（`dic/A-b.pasta` と `dic/a_b.pasta`）。どの OS でも同じに走る。
-- Risks: `to_lowercase` が NTFS より広く同じとみなす文字（ケルビン記号など）は、エラーに倒れる（Open Question 3）。
+- Risks: `to_lowercase` が NTFS より広く同じとみなす文字（ケルビン記号など）は、エラーに倒れる（設計議題 3 で、Unicode の `to_lowercase` と確定）。
 
 #### PackagePathCharGuard
 
@@ -440,7 +440,7 @@ impl LoaderContext {
     pub fn check_package_path_chars(&self) -> Result<(), LoaderError>;
 
     // 変えない: from_config, absolute_search_paths, generate_package_path
-    // 消す: new（使い手はテストだけ。Open Question 4）
+    // 消す: new（使い手はテストだけ。設計議題 4 で確定）
 }
 ```
 - Postconditions: `Ok` のとき、`generate_package_path()` の各テンプレートは、`;` で割れず、`?` を 1 つだけ（テンプレートの印として）持つ。
@@ -491,7 +491,7 @@ pub struct CollidingFile {
 - 表示の形（`format_collisions`）：組の中のモジュール名がすべて同じなら `{module}: {path}, {path}`、違う（大文字と小文字だけ違う）なら `{path} ({module}), {path} ({module})`。組どうしは ` / ` でつなぐ。1 行で、改行を含まない（`pasta_shiori` の `single_line` の前に 1 行である）。
   - 例：`Module name collision: pasta.scene.会話_朝: dic\会話-朝.pasta, dic\会話_朝.pasta`
   - 例：`Module name collision: dic\A-b.pasta (pasta.scene.A_b), dic\a_b.pasta (pasta.scene.a_b)`
-- 【前提】文は、今の `LoaderError` に揃えて英語にする（Open Question 2）。
+- 文は、今の `LoaderError` に揃えて英語にする（設計議題 2 で確定）。
 - `CollidingFile` は `loader::error` に置き、`loader` から `pub use` する（`lib.rs` へは足さない。`LoaderError` を `match` する呼び手は `pasta_lua::loader::CollidingFile` で引ける）。
 - 1.6 は新しい種類を作らず、`.lua` の道と同じ `TranspileFailure`（`Cache write error: …`）→ `PartialTranspileError` に揃える。
 
@@ -529,7 +529,7 @@ impl PastaLuaRuntime {
 }
 ```
 - Postconditions: `main` の実行中と、`scene_dic.lua` の中の辞書のトップレベルでは、`@pasta_search` の検索は（正しい引数なら）値を返さない。`finalize_scene` の後は、今と同じく全辞書が対象。
-- 引数の誤り（空のシーン名など）は、finalize の前後を問わず今と同じくエラーである（research.md の実験 2。Open Question 5）。
+- 引数の誤り（空のシーン名など）は、finalize の前後を問わず今と同じくエラーである（research.md の実験 2。設計議題 5 で確定）。
 
 #### SakuraModuleRegistration
 
@@ -571,7 +571,7 @@ pub fn ansi_to_utf8(data: &[u8]) -> std::io::Result<String>;
 ```
 - Invariants: 今の `Encoding::ANSI.to_bytes`・`to_string` と同じ Win32 の呼び方（コードページ・フラグ・`default_char = None`）を保つので、`@enc.to_ansi`・`to_utf8` と `ffi.load` の名前の扱い（`ffi_load/resolve.rs` の往復の確かめ）の結果は変わらない。
 - 消す：`trait Encoder`・`enum Encoding`（`ANSI`・`OEM`）・`GetOEMCP` の呼び出し・`lib.rs` の `pub use encoding::{Encoder, Encoding}`。`pub mod encoding` は残す（`tests/ffi/compare_test.rs` が使う）。
-- 【前提】形は 2 つの関数とする（値が 1 つの enum を残す案は採らない。Open Question 4 にまとめる）。
+- 形は 2 つの関数とする（値が 1 つの enum を残す案は採らない。設計議題 4 で確定）。
 
 ### pasta_check
 
@@ -585,7 +585,7 @@ pub fn ansi_to_utf8(data: &[u8]) -> std::io::Result<String>;
 **Responsibilities & Constraints**
 - `by_module` は畳んだ名前（`module_name_of(..).to_lowercase()`）をキーにし、値に「実際のモジュール名と実物のパス」の組を持つ。
 - `collisions` の報告文は、各ファイルの実際のモジュール名と、ほかのファイルのパスで作る（`msg::module_pasta_collision(module, others)` などの文は変えない）。
-- 隠す判定は `pasta.get(folded)` で引く（【前提】Open Question 1。ローダーと同じ）。
+- 隠す判定は `pasta.get(folded)` で引く（設計議題 1 で確定。ローダーと同じ）。
 - `module_name_of` は変えない。
 
 **Contracts**: Service [x]
@@ -704,16 +704,16 @@ fn by_module(files: &[DictFile]) -> BTreeMap<String /* folded */, Vec<(String /*
 | `.claude/skills/pasta-lua-coding/references/` | `lua/modules/` を直した後に `node book/tools/gen-skill-refs.mjs` で作り直し、同じ変更に入れる | 8.4 |
 | `README.md`・`.kiro/steering/tech.md` | 実装の時点で「公開クレートの pub API を予告なく消すことがある」断り書きが無ければ、1 回だけ書く | 8.5 |
 
-## Open Questions / Risks
+## Decisions / Risks
 
-設計ディスカッションで決める事柄。どれも設計の本文では【前提】の案で書いてあり、決まれば該当の箇所だけを直せば足りる。
+2026-11-01 の設計ディスカッションで、次の 7 つを確定した（開発者が全議題を推奨案で承認。根拠は research.md の「設計ディスカッションの確定」）。
 
-1. **大文字と小文字だけ違う `.pasta` と `.lua`（例 `dic/A.pasta` と `dic/a.lua`）の扱い**。要件 2.4 は「同じモジュール名」、2.7 は「2 つ以上の辞書」で、種類をまたぐ組を明示していない。【前提】「同じ」とみなして `.pasta` が隠す（警告。`pasta_check` は `module-lua-shadowed`）。Windows ではキャッシュの 1 つのファイルを奪い合う組なので、隠さずに放置する案は無い。代案は、読み込みエラーにする（`pasta_check` もエラーのコードを足す）。
-2. **新しい `LoaderError` の 3 種類の文の言葉**。【前提】今の `LoaderError` と `X-ERROR-REASON` の値に揃えて英語。代案は、`pasta_check` の文（「モジュール名 {module} が {others} と同じです。どちらかの辞書の内容が失われます」）に寄せた日本語。
-3. **大文字と小文字の畳み方**。【前提】両側とも Unicode の `str::to_lowercase()`（全角の英字なども NTFS と同じく同一視。ケルビン記号などはエラーへ倒れる）。代案は ASCII だけ（`to_ascii_lowercase`。全角の英字の奪い合いを見逃す）。
-4. **撤去の細部**。【前提】`LoaderContext::new` は消す（使い手がテストだけになる）。`exec_file` は残す（ランタイムの公開 API で、古い構築の道ではない）。`Encoder`/`Encoding` は 2 つの関数（`utf8_to_ansi`・`ansi_to_utf8`）にする（値が 1 つの enum を残す案は採らない）。
-5. **finalize 前の引数の誤り**。要件 3.2 は「エラーにはしない」。【前提】正しい引数の検索についての決めごとと読み、空のシーン名などの引数の誤りは finalize の後と同じくエラーのまま（実験 2）。マニュアルにもそう書く。
-6. **`stamp_cache` の失敗の分岐（1.7）の自動テスト**。キャッシュを書けて時刻だけを設定できない状態は、どの OS でも作りにくい。【前提】分岐は `warn!` の 1 行だけなので、自動テストは置かずレビューで確かめる。代案は、時刻の設定を関数の引数で差し替えられる形にしてテストする（ponytail に反する差し替えの継ぎ目が増える）。
+1. **大文字と小文字だけ違う `.pasta` と `.lua`（例 `dic/A.pasta` と `dic/a.lua`）の扱い**。要件 2.4 は「同じモジュール名」、2.7 は「2 つ以上の辞書」で、種類をまたぐ組を明示していない。確定：「同じ」とみなして `.pasta` が隠す（警告。`pasta_check` は `module-lua-shadowed`）。Windows ではキャッシュの 1 つのファイルを奪い合う組なので、隠さずに放置する案は無い。代案は、読み込みエラーにする（`pasta_check` もエラーのコードを足す）。
+2. **新しい `LoaderError` の 3 種類の文の言葉**。確定：今の `LoaderError` と `X-ERROR-REASON` の値に揃えて英語。代案は、`pasta_check` の文（「モジュール名 {module} が {others} と同じです。どちらかの辞書の内容が失われます」）に寄せた日本語。
+3. **大文字と小文字の畳み方**。確定：両側とも Unicode の `str::to_lowercase()`（全角の英字なども NTFS と同じく同一視。ケルビン記号などはエラーへ倒れる）。代案は ASCII だけ（`to_ascii_lowercase`。全角の英字の奪い合いを見逃す）。
+4. **撤去の細部**。確定：`LoaderContext::new` は消す（使い手がテストだけになる）。`exec_file` は残す（ランタイムの公開 API で、古い構築の道ではない）。`Encoder`/`Encoding` は 2 つの関数（`utf8_to_ansi`・`ansi_to_utf8`）にする（値が 1 つの enum を残す案は採らない）。
+5. **finalize 前の引数の誤り**。要件 3.2 は「エラーにはしない」。確定：正しい引数の検索についての決めごとと読み、空のシーン名などの引数の誤りは finalize の後と同じくエラーのまま（実験 2）。マニュアルにもそう書く。
+6. **`stamp_cache` の失敗の分岐（1.7）の自動テスト**。キャッシュを書けて時刻だけを設定できない状態は、どの OS でも作りにくい。確定：分岐は `warn!` の 1 行だけなので、自動テストは置かずレビューで確かめる。代案は、時刻の設定を関数の引数で差し替えられる形にしてテストする（ponytail に反する差し替えの継ぎ目が増える）。
 7. **`ponytail-lua-transpiler` への申し送り**（済み）。この spec で `TranspileContext::merge_from` の本番の使い手が無くなることと、`lib.rs` の再輸出の行を共有することを、相手の brief の「申し送り（2026-11-01）」に書いた。消すか残すかは相手が決める。
 
 **Risks**

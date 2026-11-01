@@ -58,7 +58,7 @@
 1. If 2 つ以上の `.pasta` が同じモジュール名になる（例：`dic/会話-朝.pasta` と `dic/会話_朝.pasta` は、どちらも `pasta.scene.会話_朝`）, then the Pasta Loader shall 辞書の変換と Lua の実行より前に読み込みエラーにし、エラーの理由にモジュール名と、関わるすべてのファイルの名前（ゴーストのフォルダから見た形）を含める。
 2. If 辞書のフォルダの 2 つ以上の `.lua` が同じモジュール名になる, then the Pasta Loader shall 1 と同じく読み込みエラーにし、モジュール名と関わるすべてのファイルの名前をエラーの理由に含める。
 3. The Pasta Loader shall ファイルのパスからモジュール名を決める規則を、`pasta_check validate` と同じにする。`pasta_check` が `module-pasta-collision`・`module-lua-collision` のエラーにする組み合わせと、ローダーが読み込みエラーにする組み合わせは一致する。
-4. While `.pasta` と辞書の `.lua` が同じモジュール名になる, the Pasta Loader shall 今と同じく `.pasta` を採り、その `.lua` を警告つきで読み込まない（`pasta_check` の `module-lua-shadowed` が警告であるのと揃う）。
+4. While `.pasta` と辞書の `.lua` が同じモジュール名（大文字と小文字の違いを除く）になる, the Pasta Loader shall 今と同じく `.pasta` を採り、その `.lua` を警告つきで読み込まない（`pasta_check` の `module-lua-shadowed` が警告であるのと揃う）。
 5. When 衝突で読み込みエラーになった, the Pasta Loader shall そのエラーを、ほかの読み込みエラーと同じ経路（ログと、`pasta_shiori` が返す `X-ERROR-REASON`）で作者へ届ける。
 6. The Pasta Loader shall 同じモジュール名にならない辞書の組み合わせ（日本語の名前・サブフォルダを含む）を、今と同じく読み込む。
 7. If 2 つ以上の辞書のモジュール名が、大文字と小文字の違いを除いて同じになる（例：`dic/A-b.pasta` の `pasta.scene.A_b` と `dic/a_b.pasta` の `pasta.scene.a_b`。Windows ではキャッシュの 1 つのファイルを奪い合う）, then the Pasta Loader shall 1 と同じく読み込みエラーにし、モジュール名と関わるすべてのファイルの名前をエラーの理由に含める。この扱いは OS によらない。
@@ -71,7 +71,7 @@
 #### Acceptance Criteria
 
 1. While シーン辞書の finalize の前である（`main.lua` の実行中・シーン辞書の読み込み中の Lua ブロックのトップレベル）, the `@pasta_search` module shall キャッシュの状態や直前に編集した辞書によらず、同じ結果を返す。
-2. While シーン辞書の finalize の前である, the `@pasta_search` module shall どのシーン・単語の検索にも「見つからない」を返す（エラーにはしない。今の「結果は使えない」というマニュアルの断りを、決まった結果に変える）。
+2. While シーン辞書の finalize の前である, the `@pasta_search` module shall 正しい引数で行ったどのシーン・単語の検索にも「見つからない」を返す（エラーにはしない。今の「結果は使えない」というマニュアルの断りを、決まった結果に変える。空のシーン名などの引数の誤りは、finalize の後と同じくエラーのままとする）。
 3. When `main.lua` に `SEARCH:search_scene("OnBoot")` と書いたゴーストを、辞書を編集した直後と、編集せずにもう一度起動した, the `@pasta_search` module shall どちらの起動でも同じ結果（見つからない）を返す。
 4. When シーン辞書の finalize が終わった, the `@pasta_search` module shall 今と同じく、すべての辞書のシーンと単語を検索の対象にする。
 

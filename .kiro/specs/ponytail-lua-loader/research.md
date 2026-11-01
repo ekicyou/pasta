@@ -289,3 +289,13 @@ brief に無く、直す必要がある頁（N6）。
 ## 申し送り（設計で見つけたもの・他 spec へ）
 
 - **`ponytail-lua-transpiler` へ**: この spec で `loader/process.rs` が `TranspileContext::merge_from` を呼ばなくなる。本番の使い手が無くなるので、`src/context.rs` の持ち主として、消すか残すかを決めてほしい（この spec は `src/context.rs` に触らない）。この spec は `.kiro/specs/ponytail-lua-loader/` の外を書けないため、相手の brief への追記は設計ディスカッションで行う（Open Question）。
+
+## 設計ディスカッションの確定（2026-11-01。開発者が全議題を推奨案で承認）
+
+1. **大文字と小文字だけ違う `.pasta` と `.lua`**：「同じモジュール名」とみなし、`.pasta` が `.lua` を警告つきで隠す。`pasta_check` は `module-lua-shadowed`（警告）。根拠：名前がまったく同じ `.pasta` と `.lua` の今の扱いと揃う。Windows でキャッシュを奪い合う組なので、放置はしない。要件 2.4 に「大文字と小文字の違いを除く」を書き足した。
+2. **新しいエラー 3 種類の文**：英語。根拠：今の `LoaderError` と `X-ERROR-REASON` の値がすべて英語で、3 種類だけ日本語にすると 1 つのログの中で言葉が混ざる。読み込みエラー全体の日本語化は、別の判断として扱う。
+3. **畳み方**：両側とも Unicode の `str::to_lowercase()`。根拠：NTFS の扱いに近く、全角の英字の衝突も捕まえる。NTFS より広く同じとみなす文字は、エラーの側（安全側）に倒れる。
+4. **撤去の細部**：`LoaderContext::new` は消す。`exec_file` は残す（ランタイムの公開 API で、古い構築の道ではない）。`Encoder`/`Encoding` は `utf8_to_ansi`・`ansi_to_utf8` の 2 つの関数にする。根拠：`OEM` を消すと値が 1 つの enum が残るだけになる。
+5. **finalize 前の引数の誤り**：エラーのまま。要件 3.2 は正しい引数の検索の決めごとと読み、そう書き直した。根拠：finalize の前後で挙動が揃う（実験 2）。
+6. **`stamp_cache` の失敗の分岐**：自動テストを置かず、レビューで確かめる。根拠：分岐は `warn!` の 1 行で、失敗しても次の起動で変換し直す安全側に倒れる。テストのための差し替えの継ぎ目は、この spec の目的（使われない継ぎ目を消す）と逆向きである。
+7. **`ponytail-lua-transpiler` への申し送り**：済み（相手の brief の「申し送り（2026-11-01）」）。
