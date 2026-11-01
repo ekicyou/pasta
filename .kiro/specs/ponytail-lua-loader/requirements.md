@@ -23,7 +23,7 @@
 - **Out of scope**
   - 読めないセーブの退避（監査の 1 番）。2026-10-24 に `toml-serialization` へ移り、PR #200 で入った。`runtime/persistence.rs`・`runtime/lifecycle.rs`・`pasta-persistence.md` には触らない。
   - `ponytail-lua-transpiler` が持つもの：`src/code_gen/`・`src/normalize.rs`・`src/config.rs`・`src/context.rs`（`TranspileContext`）・`src/transpiler.rs`。`loader/context.rs`（`LoaderContext`）は、この spec が持つ。
-  - `src/debug/`（`ponytail-lua-debug`）、`pasta_scripts/`（`ponytail-lua-scripts`）、`search/context.rs`（`ponytail-core-registry`）、`sakura_script/`（`talk-grapheme-clusters`）、`pasta_shiori` の `enc.rs`（`ponytail-shiori`）。
+  - `src/debug/`（`ponytail-lua-debug`）、`pasta_scripts/`（`ponytail-lua-scripts`）、`search/context.rs`（`ponytail-core-registry`）、`sakura_script/`（`talk-grapheme-clusters` で完了。要件 5.3 のとおり、出力をバイト単位で保つ相手）、`pasta_shiori` の `enc.rs`（`ponytail-shiori`）。
   - `runtime/searcher.rs` の FFI の道（`lua-cmodule-robustness` で完了）。
   - `pasta_check` の側の衝突の規則は変えない（ローダーが合わせる相手）。
 - **Adjacent expectations**
