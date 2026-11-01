@@ -327,14 +327,3 @@ impl PastaLoader {
         Ok(())
     }
 }
-
-/// Result of transpiling a single pasta file.
-#[derive(Debug, Clone)]
-pub struct TranspileResult {
-    /// Module name derived from source path
-    pub module_name: String,
-    /// Generated Lua code
-    pub lua_code: String,
-    /// Original source file path
-    pub source_path: std::path::PathBuf,
-}

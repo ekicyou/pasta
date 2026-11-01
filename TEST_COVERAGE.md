@@ -128,7 +128,7 @@
 | GLOBAL フォールバック統合             | `global_fallback_integration_test.lua`                            | ✅ 完了 | 7テスト（event-handler-call-equivalence）                        |
 | EVENT.fire チェイントーク統合         | `global_chaintalk_integration_test.lua`                           | ✅ 完了 | 5テスト（yield-continuation-token）                              |
 | @pasta_log ログブリッジ               | `log_module_test.rs`<br>`log_integration_test.rs`                 | ✅ 完了 | 24+7テスト（lua-logging）                                        |
-| PastaLuaRuntime 公開 API・@pasta_log 境界 | `runtime_api_test.rs`                                         | ✅ 完了 | 20+2+2テスト（review-improvement-loop 3.16〜3.18 — exec_file/exec_named/register_module/from_loader/@pasta_config 変換・深さゲート回帰・深さ境界ペア） |
+| PastaLuaRuntime 公開 API・@pasta_log 境界 | `runtime_api_test.rs`                                         | ✅ 完了 | 20+2+2テスト（review-improvement-loop 3.16〜3.18 — exec_file/exec_named/register_module/@pasta_config 変換・深さゲート回帰・深さ境界ペア） |
 | @pasta_log スタックレベル検証         | `log_stack_level_test.rs`                                         | ✅ 完了 | 2テスト（lua-logging）                                           |
 | スポット位置永続化（STORE連携）       | `persist_spot_position_test.lua`                                  | ✅ 完了 | 8テスト（persist-spot-position）                                 |
 | sakura_builder スポット処理           | `sakura_builder_test.lua`                                         | ✅ 完了 | スポット切替検証（上記 121 テストに含む）                         |

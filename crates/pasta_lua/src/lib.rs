@@ -53,7 +53,7 @@ pub use debug::{DebugConfig, DebugError, DebugHandle, SourceMode, enable as enab
 pub use error::{ConfigError, TranspileError};
 pub use loader::{
     CacheManager, DebugFileConfig, LoaderConfig, LoaderContext, LoaderError, LoggingConfig,
-    PastaConfig, PastaLoader, TalkConfig, TranspileFailure, TranspileResult, default_debug_port,
+    PastaConfig, PastaLoader, TalkConfig, TranspileFailure, default_debug_port,
 };
 pub use logging::{
     ClaimToken, GlobalLoggerRegistry, LoadDirGuard, PastaLogger, get_current_load_dir,
