@@ -124,6 +124,16 @@ pub enum LoaderError {
     /// `groups` has one or more groups, each with two or more files.
     #[error("Module name collision: {}", format_collisions(groups))]
     ModuleNameCollision { groups: Vec<Vec<CollidingFile>> },
+
+    /// The absolute ghost folder path has a package.path separator or marker.
+    #[error("Ghost folder path contains '{ch}', which Lua package.path cannot hold: '{path}'")]
+    GhostDirPathChar { ch: char, path: String },
+
+    /// A `[loader] lua_search_paths` entry has a package.path separator or marker.
+    #[error(
+        "[loader] lua_search_paths entry contains '{ch}', which Lua package.path cannot hold: '{entry}'"
+    )]
+    LuaSearchPathChar { ch: char, entry: String },
 }
 
 /// Format collision groups into one line for Display.

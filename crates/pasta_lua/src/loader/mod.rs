@@ -125,6 +125,10 @@ impl PastaLoader {
             "Scene alias table"
         );
 
+        // Stage 1.7: Reject ';' and '?' that would break package.path
+        let loader_context = LoaderContext::from_config(base_dir, &config);
+        loader_context.check_package_path_chars()?;
+
         // Phase 2: Prepare directories and cache (with version check)
         debug!("Phase 2: Preparing directories and cache");
         Self::prepare_directories(base_dir, &config.loader)?;
@@ -233,7 +237,6 @@ impl PastaLoader {
 
         // Phase 6: Initialize runtime and load scene_dic
         debug!("Phase 6: Initializing runtime");
-        let loader_context = LoaderContext::from_config(base_dir, &config);
         // Search side gets the same table as the declaration side (6.2).
         let runtime_config = runtime_config
             .with_scene_aliases(config.scene_aliases.clone())

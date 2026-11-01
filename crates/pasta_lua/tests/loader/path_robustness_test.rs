@@ -202,3 +202,55 @@ fn long_and_non_ansi_install_path_resolves_all_layers() {
 
     assert_module_resolution_is_path_shape_independent(&base_dir);
 }
+
+/// `package.path` の区切りの `;` を含むフォルダのゴーストは、専用の読み込みエラーになる
+/// （要件 4.1・4.4）。
+#[test]
+fn ghost_dir_with_semicolon_is_rejected() {
+    let temp = tempfile::TempDir::new().expect("一時ディレクトリの作成に失敗");
+    let base_dir = temp.path().join("a;b").join("ghost").join("master");
+    copy_fixture_into("minimal", &base_dir);
+
+    let err = PastaLoader::load(&base_dir)
+        .err()
+        .expect("読み込みは失敗するはず");
+    let expected_path = std::path::absolute(&base_dir)
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
+    match &err {
+        pasta_lua::loader::LoaderError::GhostDirPathChar { ch, path } => {
+            assert_eq!(*ch, ';');
+            assert_eq!(*path, expected_path);
+        }
+        other => panic!("GhostDirPathChar のはず: {other:?}"),
+    }
+    let msg = err.to_string();
+    assert!(msg.contains("';'") && msg.contains(&expected_path), "{msg}");
+}
+
+/// `lua_search_paths` の項目の `;`・`?` は、専用の読み込みエラーになる（要件 4.2・4.4）。
+#[test]
+fn lua_search_path_entry_with_semicolon_or_question_is_rejected() {
+    for (entry, want) in [("lib;x", ';'), ("lib?", '?')] {
+        let temp = tempfile::TempDir::new().expect("一時ディレクトリの作成に失敗");
+        copy_fixture_into("minimal", temp.path());
+        std::fs::write(
+            temp.path().join("pasta.toml"),
+            format!("[loader]\nlua_search_paths = [\"{entry}\"]\n"),
+        )
+        .expect("pasta.toml の書き込みに失敗");
+
+        let err = PastaLoader::load(temp.path())
+            .err()
+            .expect("読み込みは失敗するはず");
+        match &err {
+            pasta_lua::loader::LoaderError::LuaSearchPathChar { ch, entry: got } => {
+                assert_eq!(*ch, want);
+                assert_eq!(got, entry);
+            }
+            other => panic!("LuaSearchPathChar のはず（{entry}）: {other:?}"),
+        }
+        assert!(err.to_string().contains(&format!("'{entry}'")), "{err}");
+    }
+}
