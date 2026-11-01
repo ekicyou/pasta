@@ -91,7 +91,7 @@
   - _Requirements: 2.3, 2.8, 9.4_
 
 - [ ] 5. マニュアル・steering・生成物を、直した挙動と構成に合わせる
-- [ ] 5.1 挙動を変えた直しの頁を直し、スキルの参照を作り直す
+- [x] 5.1 挙動を変えた直しの頁を直し、スキルの参照を作り直す
   - キャッシュの判定と書き込みの失敗（`internals/transpiler.md`）、衝突と `package.path` の検査（`internals/loader.md`）、`;`・`?` のパスと読み分けの表（`reference/startup.md`）、finalize の前の検索（`lua/modules/pasta-search.md`・`lua/modules/index.md`・`internals/internal-modules.md`）、衝突の比べ方（`debug/validate.md`）を書き直す
   - `gen-skill-refs.mjs` で生成物を作り直して同じ変更に入れる
   - `gen-skill-refs.mjs --check`・`link-check.mjs`・`verify-content.mjs` が通る

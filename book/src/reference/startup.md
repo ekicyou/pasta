@@ -39,11 +39,20 @@ Lua の `require` が解決するモジュールは、次の 5 つのディレ�
 
 ### 設置パスの長さ・文字種に依存しない
 
-モジュールの解決は、ゴーストの設置場所がどれほど深くても、パスにどのような文字が含まれていても同じ結果になる。
+モジュールの解決は、ゴーストの設置場所がどれほど深くても、パスにどのような文字が含まれていても（`;` と `?` を除く）同じ結果になる。
 
 - 絶対パスが 260 文字を超える場所に設置しても `require` は成功する。ランタイムは独自のパス長上限を持たない。
 - システムの ANSI コードページで表現できない文字（利用者名やフォルダ名に含まれる各国語の文字など）がパスに含まれても `require` は成功する。
 - モジュールが見つからなかった場合のエラーメッセージには、探索した候補パスが `no file '…'` の行として**探索順に**並ぶ。非 ASCII の文字も欠落・置換されずにそのまま表記される。どこを探したかがそのまま読み取れる。
+
+例外は `;` と `?` である。Lua の検索パス（`package.path`）は `;` を区切り、`?` をモジュール名を入れる場所として使うため、これらの文字を含むパスは検索パスに入れられない。ゴーストのフォルダ（`ghost/master`）の絶対パスか、`pasta.toml` の `[loader] lua_search_paths` の項目に `;` か `?` が含まれると、辞書の読み込みより前に読み込みエラーになる。エラーの理由には、問題の文字と、そのパスまたは項目が入る。
+
+```text
+Ghost folder path contains ';', which Lua package.path cannot hold: 'C:\SSP\ghost\a;b\ghost\master'
+[loader] lua_search_paths entry contains '?', which Lua package.path cannot hold: 'lib?'
+```
+
+ゴーストのフォルダ名か `lua_search_paths` の項目から、その文字を外す。
 
 ただし、これはランタイムが解決するモジュール（`require`）についての保証である。ゴースト作者のコードが直接呼ぶ Lua 標準のファイル入出力は対象外である（第 3 節を参照）。
 
@@ -182,6 +191,8 @@ X-ERROR-REASON: Load error: ... failed to load startup module 'pasta.shiori.entr
 | `module 'X' not found:` ＋ `no file '…'` の並び | モジュール未検出 | `no file` の行が**実際に探したパスの全リスト**である。意図した置き場所が並んでいるか、ファイル名・モジュール名の綴りが一致しているかを照合する |
 | `error loading module 'X' from file '…'` | ファイルは見つかったが、構文エラーまたは読み込みに失敗した | 示されたファイルを確認する |
 | `Partial transpilation failure: …` ＋ ログに `Parse error: ファイル:行:列: 内容` | `.pasta` ファイルの文法エラー（パースエラー） | 示されたファイルの行・列を修正する（下記「パースエラー」） |
+| `Module name collision: …` | 2 つ以上の `.pasta`、または辞書のフォルダの 2 つ以上の `.lua` が、同じモジュール名になる。大文字と小文字だけの違いも同じ名前として扱う | 示されたファイルのどれかの名前を変える（下記「モジュール名の衝突」） |
+| `which Lua package.path cannot hold` | ゴーストのフォルダのパスか `lua_search_paths` の項目に `;` か `?` が含まれる（第 1 節） | フォルダ名か項目から、その文字を外す |
 
 `no file '…'` の並びは、第 1 節の優先順位とファイル名パターンの組み合わせがそのまま出力されたものである。置いたつもりのファイルがリストのどのパスとも一致しないなら、置き場所かモジュール名のどちらかが間違っている。
 
@@ -194,6 +205,17 @@ Parse error: ファイル:行:列: 内容
 ```
 
 行と列は 1 から数える。`内容` には、該当する行の抜粋と、その位置で期待される要素の一覧が複数行で続く。`X-ERROR-REASON` とロード失敗の行（`PastaShiori load failed`）には、`Partial transpilation failure: 成功数 succeeded, 失敗数 failed [ファイルのパス]` の形で失敗したファイルの一覧だけが載り、行・列は載らない。行・列はログファイルの `Process failure` 行で確かめる。
+
+#### モジュール名の衝突
+
+辞書のファイル名からはモジュール名が作られる。違うファイルが同じモジュール名になると、片方の内容が失われるため、辞書の変換と Lua の実行より前に読み込みエラーになる。`Module name collision:` の後には、ぶつかったモジュール名とファイル（ゴーストのフォルダから見たパス）が並ぶ。大文字と小文字だけが違う組は、ファイルごとにモジュール名が付く。組が複数あれば ` / ` でつながる。
+
+```text
+Module name collision: pasta.scene.会話_朝: dic\会話-朝.pasta, dic\会話_朝.pasta
+Module name collision: dic\A-b.pasta (pasta.scene.A_b), dic\a_b.pasta (pasta.scene.a_b)
+```
+
+モジュール名の作り方は [辞書の検査](../debug/validate.md#モジュール名) にある。`pasta_check validate` は同じ組を `module-pasta-collision`・`module-lua-collision` の誤りとして報告するので、ゴーストを起動する前に見つけられる。
 
 ## 5. DLL を FFI で使う
 
