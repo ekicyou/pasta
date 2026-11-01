@@ -1,7 +1,7 @@
 <!--
 このファイルは執筆者向けの内部ドキュメントです。
 SUMMARY.md には載せず、mdBook のビルド対象（公開サイト）には含めません。
-すべての内容章（introduction / getting-started / grammar / lua / reference / internals）は、
+すべての内容章（introduction / getting-started / grammar / lua / reference / internals / notes）は、
 本書の「基準ボイスサンプル」と「権威と生成」に準拠して執筆すること。
 内部設計パート（internals）の章は、加えて第 6 節「内部設計パートの執筆規約」に準拠すること。
 章の導入・締めの掛け合いは、第 7 節「台詞部品（Claudia とアンソニー）」に準拠すること。
