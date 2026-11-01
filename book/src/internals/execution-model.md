@@ -40,7 +40,7 @@
 | ファイル | 役割 |
 | -------- | ---- |
 | `crates/pasta_lua/src/runtime/mod.rs` | 構造体の定義と、VM を作る `new`・`with_config`・`with_config_and_source_map` |
-| `crates/pasta_lua/src/runtime/factory.rs` | ローダが使う構築経路 `from_loader_with_scene_dic`（本番）と `from_loader`（旧経路。テストが使う）、起動モジュールの `require` と致命扱い |
+| `crates/pasta_lua/src/runtime/factory.rs` | ローダが使う構築経路 `from_loader_with_scene_dic`、起動モジュールの `require` と致命扱い |
 | `crates/pasta_lua/src/runtime/module_registry.rs` | `package.path` と searcher の設置、`@pasta_config`・`@enc`・`@pasta_persistence`・`@pasta_sakura_script`・`@pasta_log` の登録（`package.loaded` への格納） |
 | `crates/pasta_lua/src/runtime/exec.rs` | 任意の Lua コードの実行（`exec`・`exec_named`・`exec_file`）と、VM・設定・ロガー・デバッグ状態の参照 |
 | `crates/pasta_lua/src/runtime/lifecycle.rs` | `Drop` での永続化データの保存 |
@@ -48,7 +48,6 @@
 | `crates/pasta_lua/src/runtime/finalize.rs` | `finalize_scene` の Rust 実装（[シーン・単語レジストリとシーン検索](registry-search.md#辞書確定rust-側)） |
 | `crates/pasta_lua/src/runtime/runtime_config.rs`・`crates/pasta_lua/src/runtime/searcher.rs` | ライブラリ構成（`RuntimeConfig`）と `require` のファイル解決（[ローダ自己展開とモジュール解決](loader.md)） |
 | `crates/pasta_lua/src/runtime/log.rs`・`crates/pasta_lua/src/runtime/enc.rs` | `@pasta_log`・`@enc` の実装（[ロギングとエンコーディング](logging-encoding.md)） |
-| `crates/pasta_lua/src/runtime/renderer_injection.rs` | `@pasta_sakura_script` を注入されたレンダラで登録する継ぎ目（[SHIORI 層](shiori.md)） |
 
 `PastaLuaRuntime` は VM のほかに、インスタンスのロガー、`pasta.toml` の設定（`PastaConfig`）、ゴーストのベースディレクトリ、デバッグバックエンドのハンドル、デバッグ用のソースマップを持つ。設定とベースディレクトリは、`Drop` で永続化データを保存するために保持している。
 
@@ -124,7 +123,7 @@ from_loader_with_scene_dic
        std_package を欠けば ConfigError::MissingRequiredLibrary で失敗（VM を作らない）
     b. libs を mlua の StdLib に変換し、Lua::unsafe_new_with で VM を作る
        math があれば、時刻とプロセス ID から作った種で math.randomseed を呼ぶ
-    c. @pasta_search を登録（トランスパイル時の TranspileContext のレジストリと、RuntimeConfig の別名表から）
+    c. @pasta_search を登録（空の登録表と、RuntimeConfig の別名表から。8 の finalize_scene が作り直す）
     d. @pasta_log を登録（libs に依らず常に）
     e. @toml を登録（libs に依らず常に）
     f. debug::enable を 1 回だけ呼ぶ（無効なら何もしない）
@@ -141,7 +140,7 @@ from_loader_with_scene_dic
 - 1 の `with_config_and_source_map` は `PastaLuaRuntime::new`・`with_config` の実体でもあり、そこで作った VM は 2 以降の登録を持たない。`@pasta_log` は 1e と 4 の 2 回登録され、2 回目が置き換える。
 - 1a の必須ライブラリの検査（`RuntimeConfig::ensure_libs`）は、VM を作るすべての入口がここを通るため 1 か所にある。必須は `std_package` だけである。1c・1e と 3 が `package` 表を無条件に使うためである。`std_string`・`std_table`・`std_math`・`std_os` は検査しない。
 - 6〜8 は `require_startup_module` を通る。失敗は `module`・`fatal` 付きのエラーログと、`failed to load startup module '…'` の文脈を付けた `Err` になり、構築全体が失敗する。利用者から見た扱いは [起動シーケンス](../reference/startup.md#2-起動シーケンス) を参照する。
-- 8 の `pasta.scene_dic` が `finalize_scene()` を呼ぶと、`@pasta_search` が Lua 側の登録から作り直される（[辞書確定](registry-search.md#辞書確定)）。
+- 1c の `@pasta_search` は空の登録表から作るため、8 より前の検索はどれも見つからない。8 の `pasta.scene_dic` が `finalize_scene()` を呼ぶと、`@pasta_search` が Lua 側の登録から作り直される（[辞書確定](registry-search.md#辞書確定)）。
 - 3 の `@pasta_chunks` は、searcher が読み込んだファイルを書き足す表で、`pasta.shiori.stop` が止まるエラーの表記で場所を示すのにだけ使う（[require の解決（searcher）](loader.md#require-の解決searcher)）。
 - 4 の `@pasta_debug` は、0 で解決した設定の `enabled` の値と、1 で保持したソースマップと、ベースディレクトリ（`ghost/master/`）を持つ内部モジュールである（[位置でのシーンの再生](debug.md#位置でのシーンの再生)）。この入口だけが登録するため、`PastaLuaRuntime::new`・`with_config` の VM には無い。
 - 1 の後にランタイムがソースマップを持つのは、0 で解決した設定でデバッグが有効なときである。1f の `debug::enable` が待ち受けのポートを取れずに `None` を返しても、ソースマップは持ち続けるため、9 も行われる。無効なときはローダがソースマップを作らず、9 は行われない（[有効化の判定](debug.md#有効化の判定)）。

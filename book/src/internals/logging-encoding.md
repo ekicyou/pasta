@@ -63,12 +63,12 @@ RoutingWriter ── 決まった → PastaLogger::write → RollingFileAppender
 
 | ファイル | 主な型・関数 | 役割 |
 | -------- | ------------ | ---- |
-| `crates/pasta_lua/src/encoding/mod.rs` | `Encoder`・`Encoding` | 変換のトレイトと、コードページの種類（`ANSI`・`OEM`）の列挙 |
-| `crates/pasta_lua/src/encoding/windows.rs` | `Encoder for Encoding` | Windows の実装。`MultiByteToWideChar`・`WideCharToMultiByte` で変換する |
-| `crates/pasta_lua/src/encoding/unix.rs` | `Encoder for Encoding` | Windows 以外の実装。UTF-8 のまま通す |
+| `crates/pasta_lua/src/encoding/mod.rs` | `utf8_to_ansi`・`ansi_to_utf8` | OS に合った実装の 2 つの変換関数を再エクスポートする |
+| `crates/pasta_lua/src/encoding/windows.rs` | `utf8_to_ansi`・`ansi_to_utf8` | Windows の実装。`MultiByteToWideChar`・`WideCharToMultiByte` で変換する |
+| `crates/pasta_lua/src/encoding/unix.rs` | `utf8_to_ansi`・`ansi_to_utf8` | Windows 以外の実装。UTF-8 のまま通す |
 | `crates/pasta_lua/src/runtime/enc.rs` | `register`・`to_ansi_impl`・`to_utf8_impl` | `@enc` のモジュール表と 2 つの変換関数 |
 
-どちらの OS の実装を使うかは `#[cfg(windows)]` でビルド時に決まる。`Encoder` と `Encoding` はクレートのルートから再エクスポートされる。`Encoding::OEM`（`CP_OEMCP`）を使うのはテストだけである。
+どちらの OS の実装を使うかは `#[cfg(windows)]` でビルド時に決まる。2 つの関数を使うのは `@enc` と `ffi.load` の名前の扱い（`crates/pasta_lua/src/runtime/ffi_load/resolve.rs`）である。
 
 pasta_shiori は FFI の文字列を読むための変換を、`crates/pasta_shiori/src/util/hglobal/` に別に持つ（`enc.rs` と `windows_api.rs`）。`crates/pasta_lua/src/encoding/windows.rs` と同じく local-encoding-rs に由来する実装で、`crates/pasta_lua/src/encoding/` は使わない。
 
@@ -209,20 +209,20 @@ log.info(値)
 
 | 関数 | 処理 | 失敗の戻り値（`nil` と次のメッセージ） |
 | ---- | ---- | -------------------------------------- |
-| `to_ansi(s)` | 文字列でなければ失敗。Lua の文字列のバイト列を UTF-8 として検査し、`Encoding::ANSI.to_bytes` で変換して、結果のバイト列を Lua の文字列にする | `expected string, got 型名`・`invalid UTF-8 input: …`・`ANSI conversion failed: …` |
-| `to_utf8(s)` | 文字列でなければ失敗。バイト列をそのまま `Encoding::ANSI.to_string` に渡し、結果を Lua の文字列にする | `expected string, got 型名`・`UTF-8 conversion failed: …` |
+| `to_ansi(s)` | 文字列でなければ失敗。Lua の文字列のバイト列を UTF-8 として検査し、`utf8_to_ansi` で変換して、結果のバイト列を Lua の文字列にする | `expected string, got 型名`・`invalid UTF-8 input: …`・`ANSI conversion failed: …` |
+| `to_utf8(s)` | 文字列でなければ失敗。バイト列をそのまま `ansi_to_utf8` に渡し、結果を Lua の文字列にする | `expected string, got 型名`・`UTF-8 conversion failed: …` |
 
 どちらも成功時は `(結果, nil)` を、失敗時は `(nil, メッセージ)` を返し、失敗時は warn ログを出す。Lua の文字列を作れないなど mlua 自体のエラーだけが Lua のエラーになる。
 
 ### OS 別の変換の実装
 
-Windows の実装は、`Encoding` を `GetACP`（`ANSI`）か `GetOEMCP`（`OEM`）が返す実際のコードページに対応させる。コードページはシステムのロケール設定で決まる。
+Windows の実装は、`GetACP` が返す実際のコードページで変換する。コードページはシステムのロケール設定で決まる。
 
-- `to_string`（コードページ → UTF-8）: `MultiByteToWideChar` を `MB_ERR_INVALID_CHARS` 付きで呼び、UTF-16 を `String::from_utf16` で UTF-8 にする。コードページとして不正なバイト列はエラーになる。
-- `to_bytes`（UTF-8 → コードページ）: 文字列を UTF-16 にしてから `WideCharToMultiByte` を `WC_COMPOSITECHECK` 付きで呼ぶ。代替文字を指定せず、代替文字を使ったかどうかを受け取り、使っていたら（コードページで表せない文字があったら）`InvalidInput` のエラーにする。ただし、コードページが UTF-8（65001）のときは API を呼ばずに UTF-8 のバイト列をそのまま返す（65001 では `WC_COMPOSITECHECK` と代替文字の受け取りが許されないため）。
+- `ansi_to_utf8`（コードページ → UTF-8）: `MultiByteToWideChar` を `MB_ERR_INVALID_CHARS` 付きで呼び、UTF-16 を `String::from_utf16` で UTF-8 にする。コードページとして不正なバイト列はエラーになる。
+- `utf8_to_ansi`（UTF-8 → コードページ）: 文字列を UTF-16 にしてから `WideCharToMultiByte` を `WC_COMPOSITECHECK` 付きで呼ぶ。代替文字を指定せず、代替文字を使ったかどうかを受け取り、使っていたら（コードページで表せない文字があったら）`InvalidInput` のエラーにする。ただし、コードページが UTF-8（65001）のときは API を呼ばずに UTF-8 のバイト列をそのまま返す（65001 では `WC_COMPOSITECHECK` と代替文字の受け取りが許されないため）。
 - どちらの API も、1 回目で必要な長さを問い合わせ、確保したバッファに 2 回目で書かせる。入力の長さは `buffer_len_to_i32` で `i32` に収まるか確かめ、2 GiB 以上はエラーにする（`as` で変換すると負の値になり、API が入力を NUL 終端として読み進めるため）。空の入力は API を呼ばずに空を返す。
 
-Windows 以外の実装は、`to_bytes` で UTF-8 のバイト列をそのまま返し、`to_string` で `String::from_utf8` が通ればそのまま返す（不正な UTF-8 は `InvalidData` のエラー）。
+Windows 以外の実装は、`utf8_to_ansi` で UTF-8 のバイト列をそのまま返し、`ansi_to_utf8` で `String::from_utf8` が通ればそのまま返す（不正な UTF-8 は `InvalidData` のエラー）。
 
 ### SHIORI 境界での文字コード
 
@@ -246,7 +246,7 @@ VM の中の文字列（DSL から生成したコード、`scripts/` の Lua ソ
 | ローダ → ランタイム | `PastaLoader` → `PastaLuaRuntime::from_loader_with_scene_dic` | 段階 1.5 の `Arc<PastaLogger>`（無ければ `None`） | ランタイムは参照を保持するだけで、書き込みには使わない |
 | Rust → Lua | `crates/pasta_lua/src/runtime/module_registry.rs` → `package.loaded` | `@pasta_log`・`@enc` のモジュール表 | VM が持つ |
 | Lua → Rust（`@pasta_log`） | Lua の呼び出し → tracing | 任意の値 1 つ（2 つ目以降は無視）。呼び出し元の情報は Rust 側がスタックから取る | 文字列化した結果だけがイベントに載る |
-| Lua ↔ Rust（`@enc`） | Lua の文字列 ↔ `Encoding` | Lua の文字列のバイト列。UTF-8 かどうかを Lua 側は区別しない | 変換結果は新しい Lua の文字列 |
+| Lua ↔ Rust（`@enc`） | Lua の文字列 ↔ `utf8_to_ansi`・`ansi_to_utf8` | Lua の文字列のバイト列。UTF-8 かどうかを Lua 側は区別しない | 変換結果は新しい Lua の文字列 |
 | ホスト ↔ pasta_shiori | FFI | 上表の文字コードのバイト列（HGLOBAL） | [SHIORI 層](shiori.md#境界の受け渡し) |
 
 ## 不変条件と制約
@@ -258,7 +258,7 @@ VM の中の文字列（DSL から生成したコード、`scripts/` の Lua ソ
 - ログファイルのパスは、設置パスからの相対パスが `profile/` ディレクトリの下にあり `..` を含まないものに限られる。満たさない `file_path` は既定のログファイルに切り替わる。ファイルは追記で、ローテーションも切り詰めもしない。
 - 書き込みは呼び出したスレッドで同期に行い、行を捨てない。ロガーはスレッドを持たないので、unload の後に pasta.dll のコードの上で動くロガーのスレッドは残らない。
 - `@pasta_log` と `@enc` は、不正な入力で Lua のエラーを出さない。`@pasta_log` は必ず文字列にして記録し、`@enc` は `(nil, メッセージ)` を返す。
-- 文字コードの変換をするのは Windows だけである。Windows 以外では `Encoding` の両方の種類が UTF-8 のまま通す。
+- 文字コードの変換をするのは Windows だけである。Windows 以外では 2 つの関数が UTF-8 のまま通す。
 - `@enc` の結果は、変換を呼んだ時点のシステムの ANSI コードページに依存する。
 
 ## ソースの所在

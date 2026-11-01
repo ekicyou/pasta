@@ -9,7 +9,8 @@
 //!   同じで、名前が欠けないこと（6.5）を確かめる。
 
 use mlua::{Lua, Value};
-use pasta_lua::{Encoder, Encoding, PastaLoader};
+use pasta_lua::PastaLoader;
+use pasta_lua::encoding::ansi_to_utf8;
 
 use crate::common::NON_ANSI_DIR_NAME;
 use crate::dll_fixture::{FFI_TOML, bare_ffi_lua, lock, make_ghost};
@@ -69,7 +70,7 @@ fn compare(orig: &Lua, pasta: &Lua, code: &str, reason: Reason) -> String {
             assert_eq!(p_head, o_head, "位置・名前の部分のバイトが違う:\n{code}");
             match reason {
                 Reason::Utf8 => {
-                    let o_reason = Encoding::ANSI.to_string(o_reason).unwrap();
+                    let o_reason = ansi_to_utf8(o_reason).unwrap();
                     assert_eq!(show(p_reason), o_reason, "理由が違う:\n{code}");
                     assert_eq!(p_reason, o_reason.as_bytes());
                 }

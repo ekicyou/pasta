@@ -81,3 +81,7 @@
   - [トーク出力とアピアランス](internals/talk-output.md)
   - [デバッグ基盤とシーンキック](internals/debug.md)
   - [ロギングとエンコーディング](internals/logging-encoding.md)
+
+# 雑記
+
+- [cc-sdd で仕様駆動開発を回す](notes/cc-sdd.md)

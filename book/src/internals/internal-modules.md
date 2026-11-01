@@ -426,7 +426,7 @@ require("pasta").finalize_scene()
 - `pasta`（`pasta` モジュール）は、何もしないスタブの `PASTA.finalize_scene` を持つ。
 - ランタイムの構築は、`main`・`pasta.shiori.entry`・`pasta.scene_dic` を読み込む前に、Rust の `register_finalize_scene` でこのスタブを Rust の関数に置き換える。`pasta` がまだ読み込まれていなければ、その場で `require` してから置き換える。
 - そのため、ランタイムの上で `finalize_scene` を呼ぶと常に Rust 側の処理が動く。Rust を通さずに `pasta` を読み込む環境（単体テストなど）では、スタブが呼ばれて何も起きない。
-- `@pasta_search` は VM の構築時にも、トランスパイル時のレジストリから一度登録されている。`finalize_scene` はそれを、Lua 側の登録から作った検索表で置き換える。
+- `@pasta_search` は VM の構築時にも、空の登録表で一度登録されている。そのため `finalize_scene` の前の検索は、どれも見つからない。`finalize_scene` はそれを、Lua 側の登録から作り直した検索表で置き換える。
 
 ### 呼び出しタイミング
 

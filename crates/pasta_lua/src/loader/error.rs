@@ -7,8 +7,6 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
-use crate::TranspileError;
-
 /// Loader error type for the startup sequence.
 ///
 /// This error type covers all phases of the startup sequence:
@@ -30,19 +28,6 @@ pub enum LoaderError {
     /// Configuration file not found error.
     #[error("Configuration file not found: '{0}'")]
     ConfigNotFound(PathBuf),
-
-    /// Pasta file parsing error.
-    #[error("Failed to parse Pasta file: '{file}': {message}")]
-    Parse {
-        file: PathBuf,
-        message: String,
-        #[source]
-        source: Option<pasta_dsl::ParseError>,
-    },
-
-    /// Transpilation error.
-    #[error("Transpilation failed: {0}")]
-    Transpile(#[from] TranspileError),
 
     /// Lua runtime initialization error.
     #[error("Failed to initialize Lua runtime: {0}")]
@@ -119,6 +104,58 @@ pub enum LoaderError {
         failed: usize,
         failures: Vec<TranspileFailure>,
     },
+
+    /// Dictionary files that map to the same module name, ignoring case.
+    /// `groups` has one or more groups, each with two or more files.
+    #[error("Module name collision: {}", format_collisions(groups))]
+    ModuleNameCollision { groups: Vec<Vec<CollidingFile>> },
+
+    /// The absolute ghost folder path has a package.path separator or marker.
+    #[error("Ghost folder path contains '{ch}', which Lua package.path cannot hold: '{path}'")]
+    GhostDirPathChar { ch: char, path: String },
+
+    /// A `[loader] lua_search_paths` entry has a package.path separator or marker.
+    #[error(
+        "[loader] lua_search_paths entry contains '{ch}', which Lua package.path cannot hold: '{entry}'"
+    )]
+    LuaSearchPathChar { ch: char, entry: String },
+}
+
+/// Format collision groups into one line for Display.
+fn format_collisions(groups: &[Vec<CollidingFile>]) -> String {
+    groups
+        .iter()
+        .map(|group| {
+            let paths = |with_module: bool| {
+                group
+                    .iter()
+                    .map(|f| {
+                        if with_module {
+                            format!("{} ({})", f.path.display(), f.module_name)
+                        } else {
+                            f.path.display().to_string()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            if group.iter().all(|f| f.module_name == group[0].module_name) {
+                format!("{}: {}", group[0].module_name, paths(false))
+            } else {
+                paths(true)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" / ")
+}
+
+/// One file of a module name collision group.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CollidingFile {
+    /// Real module name before folding (e.g. `pasta.scene.会話_朝`).
+    pub module_name: String,
+    /// Path relative to the ghost folder (e.g. `dic\会話-朝.pasta`).
+    pub path: PathBuf,
 }
 
 /// Format failure file paths into a comma-separated list for Display.
@@ -153,28 +190,6 @@ impl LoaderError {
     /// Create a config not found error with file path.
     pub fn config_not_found(path: impl Into<PathBuf>) -> Self {
         LoaderError::ConfigNotFound(path.into())
-    }
-
-    /// Create a parse error with file path and message.
-    pub fn parse(path: impl Into<PathBuf>, message: impl Into<String>) -> Self {
-        LoaderError::Parse {
-            file: path.into(),
-            message: message.into(),
-            source: None,
-        }
-    }
-
-    /// Create a parse error with source error.
-    pub fn parse_with_source(
-        path: impl Into<PathBuf>,
-        message: impl Into<String>,
-        source: pasta_dsl::ParseError,
-    ) -> Self {
-        LoaderError::Parse {
-            file: path.into(),
-            message: message.into(),
-            source: Some(source),
-        }
     }
 
     /// Create a directory not found error.
@@ -263,15 +278,6 @@ mod tests {
         let msg = format!("{}", err);
         assert!(msg.contains("Startup directory not found"));
         assert!(msg.contains("/ghost/master"));
-    }
-
-    #[test]
-    fn test_parse_error_display() {
-        let err = LoaderError::parse("/path/to/test.pasta", "unexpected token");
-        let msg = format!("{}", err);
-        assert!(msg.contains("Failed to parse Pasta file"));
-        assert!(msg.contains("/path/to/test.pasta"));
-        assert!(msg.contains("unexpected token"));
     }
 
     #[test]
@@ -383,20 +389,61 @@ mod tests {
         assert!(std::error::Error::source(&err).is_none());
     }
 
-    #[test]
-    fn test_parse_error_source_none_vs_some() {
-        // parse() without source error -> source() is None
-        let err = LoaderError::parse("/path/test.pasta", "bad token");
-        assert!(std::error::Error::source(&err).is_none());
+    fn colliding(module_name: &str, path: &str) -> CollidingFile {
+        CollidingFile {
+            module_name: module_name.to_string(),
+            path: PathBuf::from(path),
+        }
+    }
 
-        // parse_with_source() -> source() carries the ParseError
-        let parse_err =
-            pasta_dsl::parse_str("＊壊れた\n  {{{{invalid syntax}}}}\n", "test.pasta").unwrap_err();
-        let err = LoaderError::parse_with_source("/path/test.pasta", "bad token", parse_err);
-        assert!(std::error::Error::source(&err).is_some());
-        let msg = format!("{}", err);
-        assert!(msg.contains("Failed to parse Pasta file"));
-        assert!(msg.contains("bad token"));
+    #[test]
+    fn test_module_name_collision_display_same_name() {
+        let err = LoaderError::ModuleNameCollision {
+            groups: vec![vec![
+                colliding("pasta.scene.会話_朝", "dic/会話-朝.pasta"),
+                colliding("pasta.scene.会話_朝", "dic/会話_朝.pasta"),
+            ]],
+        };
+        assert_eq!(
+            err.to_string(),
+            "Module name collision: pasta.scene.会話_朝: dic/会話-朝.pasta, dic/会話_朝.pasta"
+        );
+    }
+
+    #[test]
+    fn test_module_name_collision_display_case_only() {
+        let err = LoaderError::ModuleNameCollision {
+            groups: vec![vec![
+                colliding("pasta.scene.A_b", "dic/A-b.pasta"),
+                colliding("pasta.scene.a_b", "dic/a_b.pasta"),
+            ]],
+        };
+        assert_eq!(
+            err.to_string(),
+            "Module name collision: dic/A-b.pasta (pasta.scene.A_b), dic/a_b.pasta (pasta.scene.a_b)"
+        );
+    }
+
+    #[test]
+    fn test_module_name_collision_display_multiple_groups() {
+        let err = LoaderError::ModuleNameCollision {
+            groups: vec![
+                vec![
+                    colliding("pasta.scene.A_b", "dic/A-b.pasta"),
+                    colliding("pasta.scene.a_b", "dic/a_b.pasta"),
+                ],
+                vec![
+                    colliding("pasta.scene.x_y", "dic/x-y.lua"),
+                    colliding("pasta.scene.x_y", "dic/x.y.lua"),
+                ],
+            ],
+        };
+        let msg = err.to_string();
+        assert_eq!(
+            msg,
+            "Module name collision: dic/A-b.pasta (pasta.scene.A_b), dic/a_b.pasta (pasta.scene.a_b) / pasta.scene.x_y: dic/x-y.lua, dic/x.y.lua"
+        );
+        assert!(!msg.contains('\n'));
     }
 
     #[test]
@@ -416,16 +463,6 @@ mod tests {
         let msg = format!("{}", err);
         assert!(msg.contains("Failed to initialize Lua runtime"));
         assert!(msg.contains("boom"));
-    }
-
-    #[test]
-    fn test_transpile_error_from_conversion() {
-        let transpile_err =
-            crate::TranspileError::IoError(io::Error::new(io::ErrorKind::WriteZero, "out"));
-        let err: LoaderError = transpile_err.into();
-        assert!(matches!(err, LoaderError::Transpile(_)));
-        let msg = format!("{}", err);
-        assert!(msg.contains("Transpilation failed"));
     }
 
     #[test]

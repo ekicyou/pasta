@@ -517,3 +517,151 @@ fn test_config_load_with_file() {
         Some(&toml::Value::String("TestGhost".to_string()))
     );
 }
+
+// ============================================================================
+// Cache Freshness Tests (ponytail-lua-loader 2.1)
+// ============================================================================
+
+/// `EVENT.fire` でイベント（未登録ならイベント名と同じ名前のシーン）を起こし、応答を返す。
+fn fire_event(runtime: &pasta_lua::PastaLuaRuntime, id: &str) -> String {
+    let script = format!(
+        r#"local EVENT = require "pasta.shiori.event"
+return EVENT.fire({{ id = "{id}", method = "get", version = 30 }})"#
+    );
+    value_as_str(&runtime.exec(&script).unwrap()).unwrap()
+}
+
+/// 内容を書き直し、更新時刻を前日にする（前日の版に戻した辞書）。
+fn roll_back_to_yesterday(path: &std::path::Path, content: &str) {
+    std::fs::write(path, content).unwrap();
+    let yesterday = std::time::SystemTime::now() - std::time::Duration::from_secs(24 * 60 * 60);
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(yesterday)
+        .unwrap();
+}
+
+/// 辞書（`.pasta` と `.lua`）を前日の時刻の別の内容に戻して起動し直すと、戻した内容で動き、
+/// キャッシュの時刻が元にそろって 2 回目の起動では変換が省かれる（1.1・1.2・1.3・1.5・1.7・9.2）。
+#[test]
+fn test_rolled_back_dictionaries_run_restored_content() {
+    let temp = common::create_temp_with_pasta("＊OnRollback\n　さくら：「今日の台詞」\n");
+    let base = temp.path();
+    let pasta = base.join("dic/test/hello.pasta");
+    let lua = base.join("dic/test/roll.lua");
+    std::fs::write(&lua, "_G.ROLLBACK = \"today\"\n").unwrap();
+
+    let runtime = PastaLoader::load(base).unwrap();
+    assert!(fire_event(&runtime, "OnRollback").contains("今日の台詞"));
+    drop(runtime);
+
+    roll_back_to_yesterday(&pasta, "＊OnRollback\n　さくら：「前日の台詞」\n");
+    roll_back_to_yesterday(&lua, "_G.ROLLBACK = \"yesterday\"\n");
+
+    let cache = pasta_lua::loader::CacheManager::new(base.to_path_buf(), "profile/pasta/cache/lua");
+    for _ in 0..2 {
+        let runtime = PastaLoader::load(base).unwrap();
+        let response = fire_event(&runtime, "OnRollback");
+        assert!(response.contains("前日の台詞"), "{response:?}");
+        assert_eq!(
+            value_as_str(&runtime.exec("return _G.ROLLBACK").unwrap()).as_deref(),
+            Some("yesterday")
+        );
+        // 時刻がそろったので、次の起動では変換も写しも省かれる
+        for source in [&pasta, &lua] {
+            assert!(
+                !cache.needs_transpile(source).unwrap(),
+                "{}",
+                source.display()
+            );
+        }
+    }
+}
+
+// ============================================================================
+// Cache Write Failure Tests (ponytail-lua-loader 2.2)
+// ============================================================================
+
+/// `.pasta` のキャッシュが書けないと読み込みが失敗し、エラーにその `.pasta` のパスが入る（1.6・9.2）。
+#[test]
+fn test_pasta_cache_write_failure_fails_load_with_path() {
+    let temp = common::create_temp_with_pasta("＊OnCacheBlocked\n　さくら：「台詞」\n");
+    let base = temp.path();
+    // エラーの表示と比べるので、区切りは OS の形にそろえる
+    let pasta = base.join("dic").join("test").join("hello.pasta");
+    // 1 回目の起動でキャッシュのフォルダを作ってから、キャッシュのファイルの位置をフォルダでふさぐ
+    drop(PastaLoader::load(base).unwrap());
+    let cache = pasta_lua::loader::CacheManager::new(base.to_path_buf(), "profile/pasta/cache/lua");
+    let cache_file = cache.source_to_cache_path(&pasta);
+    std::fs::remove_file(&cache_file).unwrap();
+    std::fs::create_dir(&cache_file).unwrap();
+
+    let err = PastaLoader::load(base).err().expect("load must fail");
+    assert!(
+        matches!(err, LoaderError::PartialTranspileError { .. }),
+        "{err:?}"
+    );
+    let message = err.to_string();
+    assert!(message.contains(&pasta.display().to_string()), "{message}");
+}
+
+// ============================================================================
+// Search Before Finalize Tests (ponytail-lua-loader 2.5)
+// ============================================================================
+
+/// finalize の前（`main.lua` の実行中）の検索は、キャッシュが無い起動（全部を変換）でも
+/// 2 回目の起動（全部を省く）でも見つからず、finalize の後は見つかる（3.1〜3.4・9.2）。
+#[test]
+fn test_search_before_finalize_is_always_nil() {
+    let temp = common::create_temp_with_pasta("＊OnBoot\n　さくら：「起動」\n");
+    let base = temp.path();
+    std::fs::create_dir_all(base.join("scripts")).unwrap();
+    std::fs::write(
+        base.join("scripts/main.lua"),
+        "local SEARCH = require \"@pasta_search\"\n_G.PRE_FINALIZE = SEARCH:search_scene(\"OnBoot\")\n",
+    )
+    .unwrap();
+
+    for step in ["1:no cache", "2:cached"] {
+        let runtime = PastaLoader::load(base).unwrap_or_else(|e| panic!("[{step}] load: {e}"));
+        let pre = runtime.exec("return _G.PRE_FINALIZE").unwrap();
+        assert!(pre.is_nil(), "[{step}] finalize 前の検索: {pre:?}");
+        let post = runtime
+            .exec("return (require \"@pasta_search\"):search_scene(\"OnBoot\")")
+            .unwrap();
+        assert!(!post.is_nil(), "[{step}] finalize 後の検索");
+    }
+}
+
+// ============================================================================
+// Orphaned Cache Warning Tests (ponytail-lua-loader 3.3)
+// ============================================================================
+
+/// `debug_mode` のゴーストでも、孤立したキャッシュの警告はファイルにつき 1 行だけ出て、
+/// ファイルは消さずに残す（7.1〜7.3）。
+#[tracing_test::traced_test]
+#[test]
+fn test_orphaned_cache_warned_once_and_kept() {
+    let temp = common::create_temp_with_pasta("＊OnBoot\n　さくら：「起動」\n");
+    let base = temp.path();
+    PastaLoader::load(base).expect("first load");
+
+    let orphan = base.join("profile/pasta/cache/lua/pasta/scene/orphan_only.lua");
+    std::fs::write(&orphan, "-- orphan").unwrap();
+    PastaLoader::load(base).expect("second load");
+
+    logs_assert(|lines: &[&str]| {
+        let hits = lines
+            .iter()
+            .filter(|l| l.contains("Orphaned cache file") && l.contains("orphan_only.lua"))
+            .count();
+        if hits == 1 {
+            Ok(())
+        } else {
+            Err(format!("expected 1 orphaned-cache line, got {hits}"))
+        }
+    });
+    assert!(orphan.exists(), "orphaned cache must be kept");
+}

@@ -350,6 +350,207 @@ fn test_no_conflict_different_dirs() {
     );
 }
 
+/// Load and expect `ModuleNameCollision`; returns the groups as (module, path) pairs.
+fn load_expect_collision(base_dir: &std::path::Path) -> (String, Vec<Vec<(String, PathBuf)>>) {
+    match PastaLoader::load(base_dir) {
+        Err(err @ LoaderError::ModuleNameCollision { .. }) => {
+            let msg = err.to_string();
+            let LoaderError::ModuleNameCollision { groups } = err else {
+                unreachable!()
+            };
+            let groups = groups
+                .into_iter()
+                .map(|g| g.into_iter().map(|f| (f.module_name, f.path)).collect())
+                .collect();
+            (msg, groups)
+        }
+        Err(other) => panic!("Expected ModuleNameCollision, got: {}", other),
+        Ok(_) => panic!("Expected ModuleNameCollision, got Ok"),
+    }
+}
+
+fn dic(name: &str) -> PathBuf {
+    PathBuf::from("dic").join(name)
+}
+
+#[test]
+fn test_pasta_hyphen_underscore_collision_rejected() {
+    let temp = create_test_base();
+    let base_dir = temp.path();
+    fs::create_dir_all(base_dir.join("dic")).unwrap();
+    fs::write(
+        base_dir.join("dic/会話-朝.pasta"),
+        "＊朝１\n  ゴースト：「一」\n",
+    )
+    .unwrap();
+    fs::write(
+        base_dir.join("dic/会話_朝.pasta"),
+        "＊朝２\n  ゴースト：「二」\n",
+    )
+    .unwrap();
+
+    let (msg, groups) = load_expect_collision(base_dir);
+    let m = "pasta.scene.会話_朝".to_string();
+    assert_eq!(
+        groups,
+        vec![vec![
+            (m.clone(), dic("会話-朝.pasta")),
+            (m, dic("会話_朝.pasta"))
+        ]]
+    );
+    assert_eq!(
+        msg,
+        format!(
+            "Module name collision: pasta.scene.会話_朝: {}, {}",
+            dic("会話-朝.pasta").display(),
+            dic("会話_朝.pasta").display()
+        )
+    );
+}
+
+#[test]
+fn test_lua_hyphen_dot_collision_rejected() {
+    let temp = create_test_base();
+    let base_dir = temp.path();
+    fs::create_dir_all(base_dir.join("dic")).unwrap();
+    fs::write(base_dir.join("dic/x-y.lua"), "return {}\n").unwrap();
+    fs::write(base_dir.join("dic/x.y.lua"), "return {}\n").unwrap();
+
+    let (msg, groups) = load_expect_collision(base_dir);
+    let m = "pasta.scene.x_y".to_string();
+    assert_eq!(
+        groups,
+        vec![vec![(m.clone(), dic("x-y.lua")), (m, dic("x.y.lua"))]]
+    );
+    assert!(msg.contains(&dic("x-y.lua").display().to_string()), "{msg}");
+    assert!(msg.contains(&dic("x.y.lua").display().to_string()), "{msg}");
+}
+
+#[test]
+fn test_pasta_case_only_collision_rejected() {
+    let temp = create_test_base();
+    let base_dir = temp.path();
+    fs::create_dir_all(base_dir.join("dic")).unwrap();
+    fs::write(base_dir.join("dic/A-b.pasta"), "＊大\n  ゴースト：「A」\n").unwrap();
+    fs::write(base_dir.join("dic/a_b.pasta"), "＊小\n  ゴースト：「a」\n").unwrap();
+
+    let (msg, groups) = load_expect_collision(base_dir);
+    assert_eq!(
+        groups,
+        vec![vec![
+            ("pasta.scene.A_b".to_string(), dic("A-b.pasta")),
+            ("pasta.scene.a_b".to_string(), dic("a_b.pasta")),
+        ]]
+    );
+    assert_eq!(
+        msg,
+        format!(
+            "Module name collision: {} (pasta.scene.A_b), {} (pasta.scene.a_b)",
+            dic("A-b.pasta").display(),
+            dic("a_b.pasta").display()
+        )
+    );
+}
+
+#[test]
+fn test_shadowed_lua_files_collide_with_each_other() {
+    // All three are pasta.scene.q_r; the two .lua collide before being shadowed.
+    let temp = create_test_base();
+    let base_dir = temp.path();
+    fs::create_dir_all(base_dir.join("dic")).unwrap();
+    fs::write(
+        base_dir.join("dic/q-r.pasta"),
+        "＊キュー\n  ゴースト：「Q」\n",
+    )
+    .unwrap();
+    fs::write(base_dir.join("dic/q-r.lua"), "return {}\n").unwrap();
+    fs::write(base_dir.join("dic/q.r.lua"), "return {}\n").unwrap();
+
+    let (msg, groups) = load_expect_collision(base_dir);
+    let m = "pasta.scene.q_r".to_string();
+    assert_eq!(
+        groups,
+        vec![vec![(m.clone(), dic("q-r.lua")), (m, dic("q.r.lua"))]]
+    );
+    assert!(msg.contains("pasta.scene.q_r"), "{msg}");
+}
+
+#[test]
+fn test_all_collision_groups_in_one_error() {
+    let temp = create_test_base();
+    let base_dir = temp.path();
+    fs::create_dir_all(base_dir.join("dic")).unwrap();
+    fs::write(
+        base_dir.join("dic/z-z.pasta"),
+        "＊ゼット\n  ゴースト：「Z」\n",
+    )
+    .unwrap();
+    fs::write(
+        base_dir.join("dic/z_z.pasta"),
+        "＊ゼット２\n  ゴースト：「Z」\n",
+    )
+    .unwrap();
+    fs::write(base_dir.join("dic/m-m.lua"), "return {}\n").unwrap();
+    fs::write(base_dir.join("dic/m.m.lua"), "return {}\n").unwrap();
+
+    let (msg, groups) = load_expect_collision(base_dir);
+    let names: Vec<&str> = groups.iter().map(|g| g[0].0.as_str()).collect();
+    assert_eq!(names, vec!["pasta.scene.m_m", "pasta.scene.z_z"]);
+    assert!(msg.contains(" / "), "{msg}");
+}
+
+#[test]
+fn test_pasta_shadows_case_only_different_lua() {
+    // .pasta and .lua differing only in case are the same module: .pasta wins.
+    let temp = create_test_base();
+    let base_dir = temp.path();
+    fs::create_dir_all(base_dir.join("dic")).unwrap();
+    fs::write(base_dir.join("dic/A-b.pasta"), "＊大\n  ゴースト：「A」\n").unwrap();
+    fs::write(
+        base_dir.join("dic/a_b.lua"),
+        "-- lua side should be ignored\nreturn {}\n",
+    )
+    .unwrap();
+
+    let _runtime = PastaLoader::load(base_dir).unwrap();
+
+    let scene_dic =
+        fs::read_to_string(base_dir.join("profile/pasta/cache/lua/pasta/scene_dic.lua")).unwrap();
+    assert!(scene_dic.contains("\"pasta.scene.A_b\""), "{scene_dic}");
+    assert!(!scene_dic.contains("\"pasta.scene.a_b\""), "{scene_dic}");
+}
+
+#[test]
+fn test_non_colliding_japanese_and_subfolders_load() {
+    let temp = create_test_base();
+    let base_dir = temp.path();
+    fs::create_dir_all(base_dir.join("dic/朝")).unwrap();
+    fs::create_dir_all(base_dir.join("dic/夜")).unwrap();
+    fs::write(
+        base_dir.join("dic/朝/会話.pasta"),
+        "＊朝\n  ゴースト：「朝」\n",
+    )
+    .unwrap();
+    fs::write(
+        base_dir.join("dic/夜/会話.pasta"),
+        "＊夜\n  ゴースト：「夜」\n",
+    )
+    .unwrap();
+    fs::write(base_dir.join("dic/朝/道具.lua"), "return {}\n").unwrap();
+
+    let _runtime = PastaLoader::load(base_dir).unwrap();
+
+    let scene_dic =
+        fs::read_to_string(base_dir.join("profile/pasta/cache/lua/pasta/scene_dic.lua")).unwrap();
+    for m in [
+        "pasta.scene.朝.会話",
+        "pasta.scene.夜.会話",
+        "pasta.scene.朝.道具",
+    ] {
+        assert!(scene_dic.contains(m), "{m} missing in:\n{scene_dic}");
+    }
+}
+
 // ============================================================================
 // Task 4: .lua passthrough processing
 // ============================================================================

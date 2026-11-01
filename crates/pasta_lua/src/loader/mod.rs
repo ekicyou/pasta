@@ -42,7 +42,7 @@ pub use context::LoaderContext;
 /// 一致テスト用（pasta_check）: 辞書ファイルの集め方
 #[doc(hidden)]
 pub use discovery::discover_files;
-pub use error::{LoaderError, TranspileFailure};
+pub use error::{CollidingFile, LoaderError, TranspileFailure};
 
 use crate::config::TranspilerConfig;
 pub use crate::runtime::default_libs;
@@ -125,6 +125,10 @@ impl PastaLoader {
             "Scene alias table"
         );
 
+        // Stage 1.7: Reject ';' and '?' that would break package.path
+        let loader_context = LoaderContext::from_config(base_dir, &config);
+        loader_context.check_package_path_chars()?;
+
         // Phase 2: Prepare directories and cache (with version check)
         debug!("Phase 2: Preparing directories and cache");
         Self::prepare_directories(base_dir, &config.loader)?;
@@ -170,7 +174,7 @@ impl PastaLoader {
         // One transpiler shared by Phase 4 and Phase 5.5 so the declared scene
         // names (and debug join keys) always use the same alias table (6.2).
         let transpiler = Self::transpiler_for(&config);
-        let (context, module_names, stats) =
+        let (module_names, stats) =
             Self::process_incremental(&pasta_files, &lua_files, &cache_manager, &transpiler)?;
 
         // Log statistics in debug mode
@@ -190,16 +194,11 @@ impl PastaLoader {
             .chain(lua_files.iter())
             .cloned()
             .collect();
-        let orphans = cache_manager.find_orphaned_caches(&all_source_files);
-        if !orphans.is_empty() && config.loader.debug_mode {
-            for orphan in &orphans {
-                warn!(path = %orphan.display(), "Orphaned cache file detected");
-            }
-        }
+        cache_manager.find_orphaned_caches(&all_source_files);
 
         // Phase 5: Generate scene_dic.lua
         debug!("Phase 5: Generating scene_dic.lua");
-        let scene_dic_path = cache_manager.generate_scene_dic(&module_names)?;
+        cache_manager.generate_scene_dic(&module_names)?;
 
         // Phase 5.5: Build the aggregated `.pasta`↔`.lua` source map (task 4.4).
         //
@@ -233,18 +232,15 @@ impl PastaLoader {
 
         // Phase 6: Initialize runtime and load scene_dic
         debug!("Phase 6: Initializing runtime");
-        let loader_context = LoaderContext::from_config(base_dir, &config);
         // Search side gets the same table as the declaration side (6.2).
         let runtime_config = runtime_config
             .with_scene_aliases(config.scene_aliases.clone())
             .with_ffi(config.loader.ffi);
         let runtime = PastaLuaRuntime::from_loader_with_scene_dic(
-            context,
             loader_context,
             runtime_config,
             Some(config),
             logger,
-            &scene_dic_path,
             source_map,
         )?;
 
@@ -330,15 +326,4 @@ impl PastaLoader {
 
         Ok(())
     }
-}
-
-/// Result of transpiling a single pasta file.
-#[derive(Debug, Clone)]
-pub struct TranspileResult {
-    /// Module name derived from source path
-    pub module_name: String,
-    /// Generated Lua code
-    pub lua_code: String,
-    /// Original source file path
-    pub source_path: std::path::PathBuf,
 }

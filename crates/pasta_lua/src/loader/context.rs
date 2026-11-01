@@ -6,6 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use super::config::PastaConfig;
+use super::error::LoaderError;
 
 /// Context for runtime initialization from PastaLoader.
 ///
@@ -29,20 +30,6 @@ pub struct LoaderContext {
 }
 
 impl LoaderContext {
-    /// Create a new LoaderContext.
-    pub fn new(
-        base_dir: impl Into<PathBuf>,
-        lua_search_paths: Vec<String>,
-        custom_fields: toml::Table,
-    ) -> Self {
-        Self {
-            base_dir: base_dir.into(),
-            lua_search_paths,
-            custom_fields,
-            transpiled_output_dir: super::config::LoaderConfig::default().transpiled_output_dir,
-        }
-    }
-
     /// Create LoaderContext from PastaConfig.
     ///
     /// Makes `base_dir` absolute **without resolving 8.3 short names or
@@ -78,6 +65,29 @@ impl LoaderContext {
             custom_fields: config.custom_fields.clone(),
             transpiled_output_dir: config.loader.transpiled_output_dir.clone(),
         }
+    }
+
+    /// Reject ';' and '?' in the paths that go into `package.path`
+    /// (the ghost folder, then each `lua_search_paths` entry in written order).
+    /// Lua reads ';' as the template separator and '?' as the module-name marker.
+    pub fn check_package_path_chars(&self) -> Result<(), LoaderError> {
+        let find = |s: &str| s.chars().find(|c| matches!(c, ';' | '?'));
+        let path = self.base_dir.to_string_lossy();
+        if let Some(ch) = find(&path) {
+            return Err(LoaderError::GhostDirPathChar {
+                ch,
+                path: path.into_owned(),
+            });
+        }
+        for entry in &self.lua_search_paths {
+            if let Some(ch) = find(entry) {
+                return Err(LoaderError::LuaSearchPathChar {
+                    ch,
+                    entry: entry.clone(),
+                });
+            }
+        }
+        Ok(())
     }
 
     /// Generate absolute Lua module search paths.
@@ -120,26 +130,34 @@ impl LoaderContext {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_new() {
-        let ctx = LoaderContext::new(
-            "/ghost/master",
-            vec!["scripts".to_string(), "lib".to_string()],
-            toml::Table::new(),
-        );
+    /// 文字列だけで組む（ファイルシステムに触らない）。
+    fn ctx_with(base_dir: &str, lua_search_paths: &[&str]) -> LoaderContext {
+        LoaderContext {
+            base_dir: PathBuf::from(base_dir),
+            lua_search_paths: lua_search_paths.iter().map(|s| s.to_string()).collect(),
+            custom_fields: toml::Table::new(),
+            transpiled_output_dir: "profile/pasta/cache/lua".to_string(),
+        }
+    }
 
-        assert_eq!(ctx.base_dir, PathBuf::from("/ghost/master"));
+    #[test]
+    fn test_from_config_copies_loader_fields() {
+        let mut config = PastaConfig::default();
+        config.loader.lua_search_paths = vec!["scripts".to_string(), "lib".to_string()];
+        let ctx = LoaderContext::from_config(Path::new("/ghost/master"), &config);
+
+        assert_eq!(ctx.base_dir, std::path::absolute("/ghost/master").unwrap());
         assert_eq!(ctx.lua_search_paths, vec!["scripts", "lib"]);
+        assert_eq!(
+            ctx.transpiled_output_dir,
+            config.loader.transpiled_output_dir
+        );
         assert!(ctx.custom_fields.is_empty());
     }
 
     #[test]
     fn test_absolute_search_paths() {
-        let ctx = LoaderContext::new(
-            "/ghost/master",
-            vec!["profile/pasta/save/lua".to_string(), "scripts".to_string()],
-            toml::Table::new(),
-        );
+        let ctx = ctx_with("/ghost/master", &["profile/pasta/save/lua", "scripts"]);
 
         let paths = ctx.absolute_search_paths();
         assert_eq!(paths.len(), 2);
@@ -152,11 +170,7 @@ mod tests {
 
     #[test]
     fn test_generate_package_path() {
-        let ctx = LoaderContext::new(
-            "/ghost/master",
-            vec!["scripts".to_string(), "lib".to_string()],
-            toml::Table::new(),
-        );
+        let ctx = ctx_with("/ghost/master", &["scripts", "lib"]);
 
         let path = ctx.generate_package_path();
         assert!(path.contains("/ghost/master/scripts/?.lua"));
@@ -194,11 +208,7 @@ mod tests {
     #[test]
     fn test_generate_package_path_init_patterns_in_order() {
         // Each search path yields BOTH "?.lua" and "?/init.lua", in declared order.
-        let ctx = LoaderContext::new(
-            "/ghost/master",
-            vec!["scripts".to_string(), "lib".to_string()],
-            toml::Table::new(),
-        );
+        let ctx = ctx_with("/ghost/master", &["scripts", "lib"]);
 
         let path = ctx.generate_package_path();
         assert_eq!(
@@ -211,11 +221,7 @@ mod tests {
     #[test]
     fn test_generate_package_path_normalizes_backslashes() {
         // Backslash separators (Windows style) are normalized to "/" for Lua.
-        let ctx = LoaderContext::new(
-            r"C:\ghost\master",
-            vec!["scripts".to_string()],
-            toml::Table::new(),
-        );
+        let ctx = ctx_with(r"C:\ghost\master", &["scripts"]);
 
         let path = ctx.generate_package_path();
         assert!(!path.contains('\\'), "no backslashes expected: {}", path);
@@ -225,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_generate_package_path_empty_search_paths() {
-        let ctx = LoaderContext::new("/ghost/master", Vec::new(), toml::Table::new());
+        let ctx = ctx_with("/ghost/master", &[]);
         assert_eq!(ctx.generate_package_path(), "");
         assert!(ctx.absolute_search_paths().is_empty());
     }
@@ -274,5 +280,51 @@ mod tests {
             ctx.base_dir
                 .ends_with("definitely_nonexistent_loader_ctx_dir/sub")
         );
+    }
+
+    #[test]
+    fn check_package_path_chars_rejects_ghost_dir_chars() {
+        for (dir, want) in [
+            (r"C:\SSP\ghost\a?b\ghost\master", '?'),
+            ("/ghost/a;b/master", ';'),
+        ] {
+            match ctx_with(dir, &["scripts"]).check_package_path_chars() {
+                Err(LoaderError::GhostDirPathChar { ch, path }) => {
+                    assert_eq!(ch, want);
+                    assert_eq!(path, dir);
+                }
+                other => panic!("expected GhostDirPathChar for {dir}: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn check_package_path_chars_rejects_search_path_entries_in_order() {
+        // 最初の誤った項目の、最初に現れた文字を報告する。
+        let ctx = ctx_with("/ghost/master", &["scripts", "lib?;x", "a;b"]);
+        match ctx.check_package_path_chars() {
+            Err(LoaderError::LuaSearchPathChar { ch, entry }) => {
+                assert_eq!(ch, '?');
+                assert_eq!(entry, "lib?;x");
+            }
+            other => panic!("expected LuaSearchPathChar: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn check_package_path_chars_ghost_dir_first() {
+        let err = ctx_with("/ghost/a;b", &["lib?"])
+            .check_package_path_chars()
+            .unwrap_err();
+        assert!(matches!(err, LoaderError::GhostDirPathChar { ch: ';', .. }));
+    }
+
+    #[test]
+    fn check_package_path_chars_accepts_other_chars() {
+        let ctx = ctx_with(
+            r"C:\Users\RUNNER~1\AppData\Local\Temp\ゴースト 置き場\ghost\master",
+            &["profile/pasta/save/lua", "スクリプト 集", "scripts"],
+        );
+        assert!(ctx.check_package_path_chars().is_ok());
     }
 }

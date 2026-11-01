@@ -1,11 +1,10 @@
 //! Windows implementation of encoding module.
 //!
-//! Provides conversion between UTF-8 and Windows ANSI/OEM code pages
+//! Provides conversion between UTF-8 and the Windows ANSI code page
 //! using the Windows API functions MultiByteToWideChar and WideCharToMultiByte.
 //!
 //! Original: https://github.com/bozaro/local-encoding-rs/blob/master/src/windows.rs
 
-use super::{Encoder, Encoding};
 use std::ffi::OsStr;
 use std::io::{Error, ErrorKind, Result};
 use std::os::windows::ffi::OsStrExt;
@@ -31,30 +30,20 @@ const WC_COMPOSITECHECK_FLAG: u32 = 0x0000_0200;
 // Encoding implementation
 // ============================================================================
 
-impl Encoding {
-    /// Get the actual Windows code page for this encoding (resolved, never
-    /// CP_ACP / CP_OEMCP), so that a UTF-8 system code page can be detected.
-    fn codepage(&self) -> u32 {
-        // SAFETY: GetACP / GetOEMCP take no arguments and only read process state.
-        unsafe {
-            match self {
-                Encoding::ANSI => GetACP(),
-                Encoding::OEM => GetOEMCP(),
-            }
-        }
-    }
+/// ANSI → UTF-8 (GetACP のコードページ・MB_ERR_INVALID_CHARS つき)。
+pub fn ansi_to_utf8(data: &[u8]) -> Result<String> {
+    multi_byte_to_wide_char(ansi_codepage(), MB_ERR_INVALID_CHARS_FLAG, data)
 }
 
-impl Encoder for Encoding {
-    /// Convert from bytes (system encoding) to UTF-8 string.
-    fn to_string(&self, data: &[u8]) -> Result<String> {
-        multi_byte_to_wide_char(self.codepage(), MB_ERR_INVALID_CHARS_FLAG, data)
-    }
+/// UTF-8 → ANSI (GetACP のコードページ・置き換え文字なしで、表せない文字は失敗を返す)。
+pub fn utf8_to_ansi(data: &str) -> Result<Vec<u8>> {
+    string_to_multibyte(ansi_codepage(), data, None)
+}
 
-    /// Convert from UTF-8 string to bytes (system encoding).
-    fn to_bytes(&self, data: &str) -> Result<Vec<u8>> {
-        string_to_multibyte(self.codepage(), data, None)
-    }
+/// The resolved ANSI code page (never CP_ACP), so that a UTF-8 system code page can be detected.
+fn ansi_codepage() -> u32 {
+    // SAFETY: GetACP takes no arguments and only reads process state.
+    unsafe { GetACP() }
 }
 
 // ============================================================================
@@ -276,32 +265,20 @@ mod tests {
 
     #[test]
     fn test_ansi_to_string() {
-        let result = Encoding::ANSI.to_string(b"Test").unwrap();
+        let result = ansi_to_utf8(b"Test").unwrap();
         assert_eq!(result, "Test");
     }
 
     #[test]
     fn test_ansi_to_bytes() {
-        let result = Encoding::ANSI.to_bytes("Test").unwrap();
-        assert_eq!(result, b"Test");
-    }
-
-    #[test]
-    fn test_oem_to_string() {
-        let result = Encoding::OEM.to_string(b"Test").unwrap();
-        assert_eq!(result, "Test");
-    }
-
-    #[test]
-    fn test_oem_to_bytes() {
-        let result = Encoding::OEM.to_bytes("Test").unwrap();
+        let result = utf8_to_ansi("Test").unwrap();
         assert_eq!(result, b"Test");
     }
 
     #[test]
     fn test_empty_string() {
-        assert_eq!(Encoding::ANSI.to_string(b"").unwrap(), "");
-        assert_eq!(Encoding::ANSI.to_bytes("").unwrap(), b"");
+        assert_eq!(ansi_to_utf8(b"").unwrap(), "");
+        assert_eq!(utf8_to_ansi("").unwrap(), b"");
     }
 
     #[test]

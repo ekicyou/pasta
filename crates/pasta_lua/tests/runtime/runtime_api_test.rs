@@ -5,16 +5,13 @@
 //! - `exec_named` — チャンク名がエラーメッセージへ反映される契約
 //! - `register_module` — カスタムモジュール登録と require 連携・上書き
 //! - `with_config` — 不正ライブラリ名の ConfigError 伝播
-//! - `load_scene_dic` — ファイル読込・チャンク名・欠損エラー
-//! - `from_loader` — entry.lua の読込/不在スキップ/失敗伝搬、transpiled コードの実行/エラー伝播
+//! - `PastaLoader::load` — 変換した辞書の実行・辞書の実行時のエラーの文脈
 //! - `@pasta_config` — toml_to_lua の型変換（int/float/bool/datetime/array/nested）と
 //!   actor name 注入（モジュール登録境界での検証。loader 統合テストの増分）
 
-use crate::common::create_empty_context;
-use pasta_lua::context::TranspileContext;
-use pasta_lua::loader::{LoaderContext, TranspileResult};
+use crate::common::{copy_fixture_to_temp, create_empty_context, create_temp_with_pasta};
+use pasta_lua::loader::PastaLoader;
 use pasta_lua::{ConfigError, PastaLuaRuntime, RuntimeConfig};
-use std::path::Path;
 use tempfile::TempDir;
 
 // ============================================================================
@@ -257,227 +254,48 @@ fn test_mlua_stdlib_modules_are_not_requirable() {
         }
     }
 }
-
 // ============================================================================
-// load_scene_dic
-// ============================================================================
-
-/// load_scene_dic は指定ファイルを実行する。
-#[test]
-fn test_load_scene_dic_executes_file() {
-    let temp = TempDir::new().unwrap();
-    let dic_path = temp.path().join("scene_dic.lua");
-    std::fs::write(&dic_path, "SCENE_DIC_SENTINEL = 99").unwrap();
-
-    let runtime = PastaLuaRuntime::new(create_empty_context()).unwrap();
-    runtime.load_scene_dic(&dic_path).unwrap();
-
-    let value = runtime.exec("return SCENE_DIC_SENTINEL").unwrap();
-    assert_eq!(value.as_i64(), Some(99));
-}
-
-/// load_scene_dic のチャンク名は "pasta.scene_dic" としてエラーに現れる。
-#[test]
-fn test_load_scene_dic_error_carries_chunk_name() {
-    let temp = TempDir::new().unwrap();
-    let dic_path = temp.path().join("scene_dic.lua");
-    // 実行時エラー（nil への算術）で「<チャンク名>:<行>:」プレフィックスを観測する
-    std::fs::write(&dic_path, "local x = nil\nreturn x + 1").unwrap();
-
-    let runtime = PastaLuaRuntime::new(create_empty_context()).unwrap();
-    let err = runtime.load_scene_dic(&dic_path).unwrap_err();
-    let msg = err.to_string();
-
-    assert!(
-        msg.contains(r#"[string "pasta.scene_dic"]:2:"#),
-        "chunk name + line prefix should appear as [string \"pasta.scene_dic\"]:2: — {msg}"
-    );
-}
-
-/// load_scene_dic はファイル欠損でエラーを返す。
-#[test]
-fn test_load_scene_dic_missing_file_returns_error() {
-    let runtime = PastaLuaRuntime::new(create_empty_context()).unwrap();
-    let result = runtime.load_scene_dic(Path::new("definitely/missing/scene_dic.lua"));
-    assert!(result.is_err());
-}
-
-// ============================================================================
-// from_loader — entry.lua handling
+// 本番の読み込み — 変換した辞書の実行
 // ============================================================================
 
-/// base_dir/scripts/pasta/shiori/entry.lua が存在する場合、from_loader が実行する。
+/// `dic/*.pasta` の Lua のブロックは、読み込みのときに変換したモジュールとして実行される。
 #[test]
-fn test_from_loader_loads_entry_lua_when_present() {
-    let temp = TempDir::new().unwrap();
-    let entry_dir = temp.path().join("scripts/pasta/shiori");
-    std::fs::create_dir_all(&entry_dir).unwrap();
-    std::fs::write(entry_dir.join("entry.lua"), "CELL316_ENTRY_LOADED = true").unwrap();
+fn test_load_executes_transpiled_modules() {
+    let temp = create_temp_with_pasta(
+        "＊テスト\n  ゴースト：「こんにちは」\n```lua\nCELL316_TRANSPILED_A = 7\n```\n",
+    );
+    let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    let loader_context =
-        LoaderContext::new(temp.path(), vec!["scripts".to_string()], toml::Table::new());
-    let runtime = PastaLuaRuntime::from_loader(
-        TranspileContext::new(),
-        loader_context,
-        RuntimeConfig::new(),
-        &[],
-        None,
-    )
-    .unwrap();
-
-    let value = runtime.exec("return CELL316_ENTRY_LOADED == true").unwrap();
-    assert!(value.as_boolean().unwrap_or(false));
+    let value = runtime.exec("return CELL316_TRANSPILED_A").unwrap();
+    assert_eq!(value.as_i64(), Some(7));
 }
 
-/// entry.lua が存在して実行に失敗した場合、旧経路も致命として Err を返す（要件 5.6）。
+/// 辞書の実行時のエラーは読み込みエラーになり、モジュール名（チャンク名）と
+/// 起動モジュール `pasta.scene_dic` の文脈を持つ。
 #[test]
-fn test_from_loader_fails_when_existing_entry_lua_fails() {
-    let temp = TempDir::new().unwrap();
-    let entry_dir = temp.path().join("scripts/pasta/shiori");
-    std::fs::create_dir_all(&entry_dir).unwrap();
-    std::fs::write(entry_dir.join("entry.lua"), r#"error("entry broken")"#).unwrap();
-
-    let loader_context =
-        LoaderContext::new(temp.path(), vec!["scripts".to_string()], toml::Table::new());
-    let err = match PastaLuaRuntime::from_loader(
-        TranspileContext::new(),
-        loader_context,
-        RuntimeConfig::new(),
-        &[],
-        None,
-    ) {
-        Ok(_) => panic!("from_loader must fail when an existing entry.lua fails"),
-        Err(e) => e,
-    };
-    let msg = err.to_string();
-
-    assert!(
-        msg.contains("pasta.shiori.entry"),
-        "startup module name should appear in the context: {msg}"
-    );
-    assert!(
-        msg.contains("entry broken"),
-        "root cause should be preserved: {msg}"
-    );
-}
-
-/// entry.lua が存在しない場合、旧経路は従来どおりスキップして成功する（要件 5.6）。
-#[test]
-fn test_from_loader_skips_when_entry_lua_absent() {
-    let temp = TempDir::new().unwrap();
-
-    let loader_context =
-        LoaderContext::new(temp.path(), vec!["scripts".to_string()], toml::Table::new());
-    let runtime = PastaLuaRuntime::from_loader(
-        TranspileContext::new(),
-        loader_context,
-        RuntimeConfig::new(),
-        &[],
-        None,
-    );
-
-    assert!(
-        runtime.is_ok(),
-        "absent entry.lua must be skipped, not treated as a failure"
-    );
-}
-
-/// entry.lua が存在するのに読み取れない場合も致命として伝搬する（要件 5.6）。
-/// Windows ではパーミッション操作より確実なので、同名のディレクトリを置いて I/O 失敗を作る。
-#[test]
-fn test_from_loader_fails_when_entry_lua_is_unreadable() {
-    let temp = TempDir::new().unwrap();
-    // entry.lua をディレクトリとして作る: exists() は true だが read_to_string は失敗する
-    std::fs::create_dir_all(temp.path().join("scripts/pasta/shiori/entry.lua")).unwrap();
-
-    let loader_context =
-        LoaderContext::new(temp.path(), vec!["scripts".to_string()], toml::Table::new());
-    let err = match PastaLuaRuntime::from_loader(
-        TranspileContext::new(),
-        loader_context,
-        RuntimeConfig::new(),
-        &[],
-        None,
-    ) {
-        Ok(_) => panic!("from_loader must fail when an existing entry.lua cannot be read"),
-        Err(e) => e,
-    };
-
-    assert!(
-        err.to_string().contains("pasta.shiori.entry"),
-        "startup module name should appear in the context: {err}"
-    );
-}
-
-// ============================================================================
-// from_loader — transpiled module loading
-// ============================================================================
-
-/// transpiled に渡したコードがロード時に実行される。
-#[test]
-fn test_from_loader_executes_transpiled_modules() {
-    let transpiled = vec![
-        TranspileResult {
-            module_name: "cell316_mod_a".to_string(),
-            lua_code: "CELL316_TRANSPILED_A = 7".to_string(),
-            source_path: std::path::PathBuf::from("a.pasta"),
-        },
-        TranspileResult {
-            module_name: "cell316_mod_b".to_string(),
-            lua_code: "CELL316_TRANSPILED_B = CELL316_TRANSPILED_A + 1".to_string(),
-            source_path: std::path::PathBuf::from("b.pasta"),
-        },
-    ];
-
-    let loader_context = LoaderContext::new(
-        "/test/path",
-        vec!["scripts".to_string()],
-        toml::Table::new(),
-    );
-    let runtime = PastaLuaRuntime::from_loader(
-        TranspileContext::new(),
-        loader_context,
-        RuntimeConfig::new(),
-        &transpiled,
-        None,
-    )
-    .unwrap();
-
-    // 2 モジュールが宣言順に実行されたことを観測
-    let value = runtime.exec("return CELL316_TRANSPILED_B").unwrap();
-    assert_eq!(value.as_i64(), Some(8));
-}
-
-/// transpiled コードのエラーは from_loader から伝播し、モジュール名がチャンク名になる。
-#[test]
-fn test_from_loader_transpiled_error_propagates_with_module_name() {
+fn test_load_transpiled_error_propagates_with_module_name() {
     // 実行時エラー（nil への算術）でモジュール名がチャンク名として現れることを観測する
-    let transpiled = vec![TranspileResult {
-        module_name: "cell316_mod_err".to_string(),
-        lua_code: "local x = nil\nreturn x + 1".to_string(),
-        source_path: std::path::PathBuf::from("err.pasta"),
-    }];
-
-    let loader_context = LoaderContext::new(
-        "/test/path",
-        vec!["scripts".to_string()],
-        toml::Table::new(),
+    let temp = create_temp_with_pasta(
+        "＊テスト\n  ゴースト：「こんにちは」\n```lua\nlocal x = nil\nCELL316_ERR = x + 1\n```\n",
     );
-    let err = match PastaLuaRuntime::from_loader(
-        TranspileContext::new(),
-        loader_context,
-        RuntimeConfig::new(),
-        &transpiled,
-        None,
-    ) {
-        Ok(_) => panic!("from_loader should fail when transpiled code errors"),
-        Err(e) => e,
+    let msg = match PastaLoader::load(temp.path()) {
+        Ok(_) => panic!("load should fail when transpiled code errors"),
+        Err(e) => e.to_string(),
     };
-    let msg = err.to_string();
 
     assert!(
-        msg.contains("cell316_mod_err"),
+        msg.contains("failed to load startup module 'pasta.scene_dic'"),
+        "startup module context should appear: {msg}"
+    );
+    // モジュール `pasta.scene.test.hello` のチャンク名はキャッシュのファイルのパス（Windows では区切りが混ざる）
+    assert!(
+        msg.replace('\\', "/")
+            .contains("pasta/scene/test/hello.lua:"),
         "module name should appear as chunk name: {msg}"
+    );
+    assert!(
+        msg.contains("attempt to perform arithmetic"),
+        "root cause should be preserved: {msg}"
     );
 }
 
@@ -485,24 +303,22 @@ fn test_from_loader_transpiled_error_propagates_with_module_name() {
 // @pasta_config — toml_to_lua conversions & actor name injection
 // ============================================================================
 
-fn runtime_with_custom_fields(custom_fields: toml::Table) -> PastaLuaRuntime {
-    let loader_context =
-        LoaderContext::new("/test/path", vec!["scripts".to_string()], custom_fields);
-    PastaLuaRuntime::from_loader(
-        TranspileContext::new(),
-        loader_context,
-        RuntimeConfig::new(),
-        &[],
-        None,
+/// `pasta.toml` に独自の表を書いた一時ゴーストを本番の読み込みに通す。
+fn runtime_with_custom_fields(custom_toml: &str) -> (TempDir, PastaLuaRuntime) {
+    let temp = copy_fixture_to_temp("minimal");
+    std::fs::write(
+        temp.path().join("pasta.toml"),
+        format!("{custom_toml}\n[loader]\ndebug_mode = true\n"),
     )
-    .unwrap()
+    .unwrap();
+    let runtime = PastaLoader::load(temp.path()).unwrap();
+    (temp, runtime)
 }
-
 /// TOML の各値型（integer/float/bool/datetime/array/nested table）が
 /// @pasta_config 上で期待どおりの Lua 値に変換される。
 #[test]
 fn test_pasta_config_toml_value_conversions() {
-    let custom_fields: toml::Table = toml::from_str(
+    let (_temp, runtime) = runtime_with_custom_fields(
         r#"
         int_val = 42
         float_val = 1.5
@@ -513,10 +329,7 @@ fn test_pasta_config_toml_value_conversions() {
         [nested]
         inner = "deep"
         "#,
-    )
-    .unwrap();
-
-    let runtime = runtime_with_custom_fields(custom_fields);
+    );
     let value = runtime
         .exec(
             r#"
@@ -540,7 +353,7 @@ fn test_pasta_config_toml_value_conversions() {
 /// [actor.<キー>] サブテーブルへ name = キー名 が注入され、既存 name は上書きされる。
 #[test]
 fn test_pasta_config_actor_name_injection() {
-    let custom_fields: toml::Table = toml::from_str(
+    let (_temp, runtime) = runtime_with_custom_fields(
         r#"
         [actor."さくら"]
         spot = 0
@@ -549,10 +362,7 @@ fn test_pasta_config_actor_name_injection() {
         spot = 1
         name = "should_be_overwritten"
         "#,
-    )
-    .unwrap();
-
-    let runtime = runtime_with_custom_fields(custom_fields);
+    );
     let value = runtime
         .exec(
             r#"
@@ -570,9 +380,7 @@ fn test_pasta_config_actor_name_injection() {
 /// actor がテーブル以外の場合、name 注入は no-op で値はそのまま公開される。
 #[test]
 fn test_pasta_config_non_table_actor_is_noop() {
-    let custom_fields: toml::Table = toml::from_str(r#"actor = "not_a_table""#).unwrap();
-
-    let runtime = runtime_with_custom_fields(custom_fields);
+    let (_temp, runtime) = runtime_with_custom_fields(r#"actor = "not_a_table""#);
     let value = runtime
         .exec(
             r#"

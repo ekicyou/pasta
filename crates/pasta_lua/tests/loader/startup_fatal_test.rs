@@ -144,6 +144,13 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CaptureWriter {
 /// 検証できないことを実測で確認したため。ここではテストスレッドにだけ装着する
 /// fmt subscriber で生の描画結果を捕捉する。
 /// （`X-ERROR-REASON` は意図的に単一行である点と対照的であることに注意。）
+///
+/// `traced_test` は捕捉には使わず、グローバルの subscriber を必ず立てるためだけに付ける。
+/// 登録された subscriber がこのスレッドの 1 つだけだと、tracing-core は
+/// `rebuild_interest_cache` を呼んだスレッドの既定の subscriber だけでコールサイトの関心を
+/// 作り直す。並列の他テストの読み込みが（`GlobalLoggerRegistry` から）それを呼ぶと、
+/// 既定の無いそのスレッドの判定で全コールサイトが never になり、ここの error が捨てられる。
+#[tracing_test::traced_test]
 #[test]
 fn startup_failure_log_carries_module_fatal_and_multiline_cause() {
     let temp = ghost_with_script(

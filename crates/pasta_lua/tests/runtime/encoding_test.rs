@@ -4,20 +4,21 @@
 //! - package.path setting (UTF-8 無変換・要件 2.1)
 //! - @enc module UTF-8/ANSI conversion
 //! - Japanese path require support
+//!
+//! どのテストも一時ゴーストを本番の読み込み（`PastaLoader::load`）に通した VM で確かめる。
 
+use crate::common::{copy_fixture_into, copy_fixture_to_temp};
 use pasta_lua::context::TranspileContext;
-use pasta_lua::loader::LoaderContext;
+use pasta_lua::loader::{PastaLoader, default_lua_search_paths};
 use pasta_lua::runtime::{PastaLuaRuntime, RuntimeConfig};
+use std::path::Path;
+use tempfile::TempDir;
 
-/// Create a test runtime with @enc module registered.
-fn create_test_runtime() -> PastaLuaRuntime {
-    let context = TranspileContext::new();
-    let loader_context = LoaderContext::new(
-        "/test/path",
-        vec!["scripts".to_string()],
-        toml::Table::new(),
-    );
-    PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[], None).unwrap()
+/// 最小のゴーストを読み込んだ VM を作る（`TempDir` はテストの間持っておく）。
+fn create_test_runtime() -> (TempDir, PastaLuaRuntime) {
+    let temp = copy_fixture_to_temp("minimal");
+    let runtime = PastaLoader::load(temp.path()).unwrap();
+    (temp, runtime)
 }
 
 // ============================================================================
@@ -26,7 +27,7 @@ fn create_test_runtime() -> PastaLuaRuntime {
 
 #[test]
 fn test_enc_module_require() {
-    let runtime = create_test_runtime();
+    let (_temp, runtime) = create_test_runtime();
 
     // Should be able to require @enc module
     let result: mlua::Table = runtime
@@ -47,7 +48,7 @@ fn test_enc_module_require() {
 
 #[test]
 fn test_enc_to_ansi_ascii() {
-    let runtime = create_test_runtime();
+    let (_temp, runtime) = create_test_runtime();
 
     let script = r#"
         local enc = require "@enc"
@@ -64,7 +65,7 @@ fn test_enc_to_ansi_ascii() {
 
 #[test]
 fn test_enc_to_utf8_ascii() {
-    let runtime = create_test_runtime();
+    let (_temp, runtime) = create_test_runtime();
 
     let script = r#"
         local enc = require "@enc"
@@ -81,7 +82,7 @@ fn test_enc_to_utf8_ascii() {
 
 #[test]
 fn test_enc_type_error_handling() {
-    let runtime = create_test_runtime();
+    let (_temp, runtime) = create_test_runtime();
 
     // Test with number instead of string
     let script = r#"
@@ -100,7 +101,7 @@ fn test_enc_type_error_handling() {
 
 #[test]
 fn test_enc_nil_handling() {
-    let runtime = create_test_runtime();
+    let (_temp, runtime) = create_test_runtime();
 
     let script = r#"
         local enc = require "@enc"
@@ -120,7 +121,7 @@ fn test_enc_nil_handling() {
 /// （review-improvement-loop セル 3.16 / G1 追加: 入力検証エラーパス）。
 #[test]
 fn test_enc_to_ansi_invalid_utf8_input_error() {
-    let runtime = create_test_runtime();
+    let (_temp, runtime) = create_test_runtime();
 
     // "\255\254" は UTF-8 として不正なバイト列（Lua 文字列は任意バイトを保持できる）
     let script = r#"
@@ -145,7 +146,7 @@ fn test_enc_to_ansi_invalid_utf8_input_error() {
 #[cfg(windows)]
 #[test]
 fn test_enc_to_ansi_unmappable_char_error() {
-    let runtime = create_test_runtime();
+    let (_temp, runtime) = create_test_runtime();
 
     // "\240\159\152\128" = U+1F600 (😀)。CP932/CP1252 等の ANSI には存在しない
     let script = r#"
@@ -170,7 +171,7 @@ fn test_enc_to_ansi_unmappable_char_error() {
 #[cfg(windows)]
 #[test]
 fn test_enc_to_utf8_invalid_ansi_bytes_error() {
-    let runtime = create_test_runtime();
+    let (_temp, runtime) = create_test_runtime();
 
     // 0x81 単独は CP932 では後続バイト欠落、CP1252 では未定義 → どちらも不正
     let script = r#"
@@ -197,7 +198,7 @@ fn test_enc_to_utf8_invalid_ansi_bytes_error() {
 #[cfg(windows)]
 #[test]
 fn test_enc_roundtrip_japanese() {
-    let runtime = create_test_runtime();
+    let (_temp, runtime) = create_test_runtime();
 
     let script = r#"
         local enc = require "@enc"
@@ -231,7 +232,7 @@ fn test_enc_roundtrip_japanese() {
 #[cfg(windows)]
 #[test]
 fn test_enc_ansi_bytes_differ_from_utf8() {
-    let runtime = create_test_runtime();
+    let (_temp, runtime) = create_test_runtime();
 
     let script = r#"
         local enc = require "@enc"
@@ -258,67 +259,56 @@ fn test_enc_ansi_bytes_differ_from_utf8() {
 // Package path encoding tests
 // ============================================================================
 
+/// 既定の `lua_search_paths` の各項目を、ゴーストのフォルダの絶対パスで `/?.lua`・`/?/init.lua` に並べた値。
+fn expected_package_path(base: &Path) -> String {
+    let base = std::path::absolute(base).unwrap();
+    default_lua_search_paths()
+        .iter()
+        .flat_map(|p| {
+            let dir = base.join(p).to_string_lossy().replace('\\', "/");
+            [format!("{dir}/?.lua"), format!("{dir}/?/init.lua")]
+        })
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
 #[test]
 fn test_package_path_set_correctly() {
-    let context = TranspileContext::new();
-    let loader_context = LoaderContext::new(
-        "/test/base",
-        vec!["scripts".to_string(), "lib".to_string()],
-        toml::Table::new(),
+    let (temp, runtime) = create_test_runtime();
+
+    let path: mlua::LuaString = runtime
+        .exec("return package.path")
+        .unwrap()
+        .as_string()
+        .unwrap()
+        .clone();
+
+    // 検索パス設定は検索パスの各項目から組んだ文字列と**バイト同一**である（要件 2.1 / 3.1 / 3.2）。
+    assert_eq!(
+        path.as_bytes().as_ref(),
+        expected_package_path(temp.path()).as_bytes()
     );
-    let expected = loader_context.generate_package_path();
-
-    let runtime =
-        PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[], None)
-            .unwrap();
-
-    // Get package.path
-    let script = r#"return package.path"#;
-    let path: mlua::LuaString = runtime.exec(script).unwrap().as_string().unwrap().clone();
-
-    // 検索パス設定は `generate_package_path()` の文字列と**バイト同一**である
-    // （要件 2.1 / 3.1 / 3.2）。ASCII パスでは ANSI 変換していた変更前と同じ値になる。
-    assert_eq!(path.as_bytes().as_ref(), expected.as_bytes());
-
-    // Should contain expected patterns
-    let path_str = path.to_str().unwrap();
     assert!(
-        path_str.contains("scripts/?.lua"),
+        path.to_str().unwrap().contains("/scripts/?.lua"),
         "path should contain scripts/?.lua"
-    );
-    assert!(
-        path_str.contains("lib/?.lua"),
-        "path should contain lib/?.lua"
-    );
-    assert!(
-        path_str.contains("/test/base"),
-        "path should contain base dir"
     );
 }
 
-#[cfg(windows)]
 #[test]
 fn test_package_path_with_japanese_base() {
-    let context = TranspileContext::new();
-    let loader_context = LoaderContext::new(
-        "C:\\ユーザー\\テスト",
-        vec!["scripts".to_string()],
-        toml::Table::new(),
-    );
-    let expected = loader_context.generate_package_path();
+    let temp = TempDir::new().unwrap();
+    let base = temp.path().join("ユーザー").join("テスト");
+    copy_fixture_into("minimal", &base);
+    let runtime = PastaLoader::load(&base).unwrap();
 
-    let runtime =
-        PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[], None)
-            .unwrap();
-
-    // Should not panic, and package.path should be set
-    let script = r#"return package.path"#;
-    let result = runtime.exec(script);
-    assert!(result.is_ok(), "package.path should be set without error");
-
-    let path: mlua::LuaString = result.unwrap().as_string().unwrap().clone();
+    let path: mlua::LuaString = runtime
+        .exec("return package.path")
+        .unwrap()
+        .as_string()
+        .unwrap()
+        .clone();
     // 非 ANSI パスでも ANSI へ変換せず、UTF-8 のまま設定される（要件 2.1 / 3.8）。
-    // 変更前は ANSI バイト列だったため、ここは UTF-8 契約への更新である。
+    let expected = expected_package_path(&base);
     assert_eq!(path.as_bytes().as_ref(), expected.as_bytes());
     assert_eq!(
         path.to_str().unwrap(),
@@ -333,20 +323,9 @@ fn test_package_path_with_japanese_base() {
 
 #[test]
 fn test_pasta_config_module_still_works() {
-    let context = TranspileContext::new();
-
-    let mut custom_fields = toml::Table::new();
-    custom_fields.insert(
-        "ghost_name".to_string(),
-        toml::Value::String("TestGhost".to_string()),
-    );
-
-    let loader_context =
-        LoaderContext::new("/test/path", vec!["scripts".to_string()], custom_fields);
-
-    let runtime =
-        PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[], None)
-            .unwrap();
+    // pasta.toml に `ghost_name = "TestGhost"` を書いたゴースト
+    let temp = copy_fixture_to_temp("with_custom_config");
+    let runtime = PastaLoader::load(temp.path()).unwrap();
 
     // @pasta_config should still work
     let script = r#"

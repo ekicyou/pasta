@@ -125,14 +125,14 @@ impl CacheManager {
     /// Compares the source file's modification time with the cache file's.
     /// Returns true if:
     /// - Cache file doesn't exist
-    /// - Source file is newer than cache file
+    /// - Source and cache modification times differ (newer or older)
     ///
     /// # Arguments
     /// * `source_path` - Path to the .pasta source file
     ///
     /// # Returns
     /// * `Ok(true)` - Transpilation needed
-    /// * `Ok(false)` - Cache is up-to-date
+    /// * `Ok(false)` - Modification times are equal (cache is up-to-date)
     /// * `Err(LoaderError::MetadataError)` - Failed to get file metadata
     pub fn needs_transpile(&self, source_path: &Path) -> Result<bool, LoaderError> {
         let cache_path = self.source_to_cache_path(source_path);
@@ -149,12 +149,12 @@ impl CacheManager {
         // Get cache modification time
         let cache_mtime = Self::get_mtime(&cache_path)?;
 
-        // Compare timestamps
-        let needs = source_mtime > cache_mtime;
+        // 新旧を問わず、時刻が違えば変換し直す（前日の版に戻したときも拾う）
+        let needs = source_mtime != cache_mtime;
         if needs {
             debug!(
                 source = %source_path.display(),
-                "Source newer than cache, needs transpile"
+                "Source mtime differs from cache, needs transpile"
             );
         } else {
             debug!(
@@ -164,6 +164,17 @@ impl CacheManager {
         }
 
         Ok(needs)
+    }
+
+    /// Align the cache file's modification time with the source's.
+    ///
+    /// Call after [`Self::save_cache`] succeeded for the same `source_path`, with the
+    /// source mtime taken before reading its content. Does not create the cache file.
+    pub fn stamp_cache(&self, source_path: &Path, source_mtime: SystemTime) -> std::io::Result<()> {
+        fs::OpenOptions::new()
+            .write(true)
+            .open(self.source_to_cache_path(source_path))?
+            .set_modified(source_mtime)
     }
 
     /// Get file modification time.
@@ -327,21 +338,6 @@ impl CacheManager {
         fs::create_dir_all(&pasta_dir).map_err(|e| {
             LoaderError::scene_dic_generation("Failed to create pasta directory", Some(e))
         })?;
-
-        // Clean up old scene_dic.lua location (backward compatibility)
-        // Old location: cache_dir/scene_dic.lua (without pasta/ prefix)
-        let old_scene_dic_path = self.cache_dir.join("scene_dic.lua");
-        if old_scene_dic_path.exists() {
-            if let Err(e) = fs::remove_file(&old_scene_dic_path) {
-                warn!(
-                    path = %old_scene_dic_path.display(),
-                    error = %e,
-                    "Failed to remove old scene_dic.lua, continuing"
-                );
-            } else {
-                debug!(path = %old_scene_dic_path.display(), "Removed old scene_dic.lua");
-            }
-        }
 
         // New location: cache_dir/pasta/scene_dic.lua
         let scene_dic_path = pasta_dir.join("scene_dic.lua");

@@ -12,7 +12,7 @@ use pasta_check::validate::{
     Severity, TomlSource, module_name_of, pasta_dll_folders, pasta_dll_paths,
     select_dictionary_files, validate_ghost,
 };
-use pasta_lua::loader::{CacheManager, PastaLoader, discover_files};
+use pasta_lua::loader::{CacheManager, LoaderError, PastaLoader, discover_files};
 use tempfile::TempDir;
 
 /// PASTA_DEBUG が環境にあると読み込みが固定ポートを開いて落ちる。main の前（単一スレッド）で外す
@@ -112,12 +112,86 @@ fn module_name_matches_cache_manager() {
         "Dic/a.pasta",
         "x/dic/a.pasta",
         "dic/日本語/会話.pasta",
+        "dic/A-b.pasta",
+        "dic/a_B.pasta",
     ] {
         assert_eq!(
             module_name_of(rel),
             cache.source_to_module_name(&base.join(rel)),
             "{rel}"
         );
+    }
+    // 大文字と小文字だけ違う 2 つは、畳んだ名前が両側で等しい（2.7・2.8）
+    let fold_check = |rel: &str| module_name_of(rel).to_lowercase();
+    let fold_dll = |rel: &str| cache.source_to_module_name(&base.join(rel)).to_lowercase();
+    assert_eq!(fold_check("dic/A-b.pasta"), fold_check("dic/a_B.pasta"));
+    assert_eq!(fold_dll("dic/A-b.pasta"), fold_dll("dic/a_B.pasta"));
+}
+
+/// 衝突の読み込みエラー（LoaderError::ModuleNameCollision）と、検査の衝突のエラーが一致する（2.3・2.8）
+#[test]
+fn module_collision_matches_loader() {
+    let lua: &[u8] = b"return {}
+";
+    let cases: &[(&str, &[&str], bool)] = &[
+        // (見本, dic の下のファイル, ローダーが衝突で止まるか)
+        ("日本語の - と _", &["会話-朝.pasta", "会話_朝.pasta"], true),
+        (".lua の - と .", &["x-y.lua", "x.y.lua"], true),
+        ("大文字と小文字だけ違う", &["A-b.pasta", "a_b.pasta"], true),
+        (
+            ".pasta が隠す .lua どうしの衝突",
+            &["q-r.pasta", "q-r.lua", "q.r.lua"],
+            true,
+        ),
+        (
+            "日本語の別の名前",
+            &["会話-朝.pasta", "会話-夜.pasta"],
+            false,
+        ),
+        (
+            "サブフォルダと _",
+            &["x/y.pasta", "x_y.pasta", "x/y/z.lua"],
+            false,
+        ),
+        (
+            "日本語のサブフォルダ",
+            &["日本語/会話.pasta", "会話.pasta"],
+            false,
+        ),
+        (
+            ".pasta が .lua を隠すだけ",
+            &["q-r.pasta", "Q_r.lua"],
+            false,
+        ),
+    ];
+    for (name, names, collides) in cases {
+        let paths: Vec<String> = names.iter().map(|n| format!("dic/{n}")).collect();
+        let mut files: Vec<File> = vec![("pasta.toml", TOML.as_bytes())];
+        for p in &paths {
+            let body = if p.ends_with(".lua") {
+                lua
+            } else {
+                TALK.as_bytes()
+            };
+            files.push((p, body));
+        }
+        let temp = ghost(&files);
+        let result = PastaLoader::load(temp.path());
+        let load_collided = matches!(result, Err(LoaderError::ModuleNameCollision { .. }));
+        assert_eq!(load_collided, *collides, "見本の前提が違う: {name}");
+        if !collides {
+            assert!(result.is_ok(), "{name}: {:?}", result.err());
+        }
+
+        let report = check(temp.path());
+        let reported = report.findings.iter().any(|f| {
+            f.severity == Severity::Error
+                && matches!(
+                    f.code,
+                    FindingKind::ModulePastaCollision | FindingKind::ModuleLuaCollision
+                )
+        });
+        assert_eq!(reported, load_collided, "{name}: {:?}", report.findings);
     }
 }
 

@@ -83,7 +83,7 @@
 
 ### 辞書確定
 
-`@pasta_search` は 2 回登録される。1 回目は Lua VM の構築時（`crates/pasta_lua/src/runtime/mod.rs`）で、トランスパイル時の `TranspileContext` のレジストリから作られる。2 回目がここで述べる辞書確定で、検索の権威はこちらにある。どちらの登録も、`RuntimeConfig.scene_aliases` の同じ別名表を `SearchContext` に渡す。辞書確定へは、`register_finalize_scene` が受け取った表をクロージャに保持して渡す。ランタイムの構築（`crates/pasta_lua/src/runtime/factory.rs`）は、VM の構築とモジュールの登録の後に `register_finalize_scene` を呼び、`main`・`pasta.shiori.entry` を読み込んでから `pasta.scene_dic` を読み込む。`scene_dic.lua` は全シーンモジュールを `require` した後に `require("pasta").finalize_scene()` を呼び、ここで Rust の `finalize_scene_impl` が動く。
+`@pasta_search` は 2 回登録される。1 回目は Lua VM の構築時（`crates/pasta_lua/src/runtime/mod.rs`）で、空の登録表から作られる。そのため辞書確定の前の検索は、どれも見つからない。2 回目がここで述べる辞書確定で、検索の権威はこちらにある。どちらの登録も、`RuntimeConfig.scene_aliases` の同じ別名表を `SearchContext` に渡す。辞書確定へは、`register_finalize_scene` が受け取った表をクロージャに保持して渡す。ランタイムの構築（`crates/pasta_lua/src/runtime/factory.rs`）は、VM の構築とモジュールの登録の後に `register_finalize_scene` を呼び、`main`・`pasta.shiori.entry` を読み込んでから `pasta.scene_dic` を読み込む。`scene_dic.lua` は全シーンモジュールを `require` した後に `require("pasta").finalize_scene()` を呼び、ここで Rust の `finalize_scene_impl` が動く。
 
 ```text
 pasta.scene_dic
@@ -274,7 +274,7 @@ skip_methods が真のとき（動的参照）
 
 ## 不変条件と制約
 
-- 検索の権威は辞書確定後の `SearchContext` である。VM の構築から辞書確定までの間（`main.lua`・`entry.lua` の実行中）は、トランスパイル時のレジストリから作った `SearchContext` が登録されており、登録名の形式（`メイン_1`）と検索キー（通し番号を除いた照合用の名前）は確定後と同じだが、内容は確定後と異なる。トランスパイル時の通し番号はファイルごとに 1 から数えるため、複数のファイルにある同名のグローバルシーンは同じ登録名になる。キャッシュが使われて再トランスパイルされなかったファイルのシーンは入らない（[@pasta_search の利用できる時期](../lua/modules/pasta-search.md#利用できる時期)）。
+- 検索の権威は辞書確定後の `SearchContext` である。VM の構築から辞書確定までの間（`main.lua`・`entry.lua` の実行中）は、空の登録表から作った `SearchContext` が登録されており、正しい引数のどの検索も見つからない。キャッシュの状態によって内容は変わらない（[@pasta_search の利用できる時期](../lua/modules/pasta-search.md#利用できる時期)）。
 - 辞書確定は `package.loaded["@pasta_search"]` を新しいユーザーデータで置き換える。それ以前に `require` して保持した参照は古い `SearchContext` を指したままになる。ランタイムの Lua コードは、`SCENE.search` が呼び出し時に、`find_act_handler`・`find_actor_handler` が呼び出しごとに取得し直す。
 - Rust 側の検索は、1 回の呼び出しで 1 つのスコープだけを検索し、ローカルからグローバルへ移らない。
 - 第 2 引数なしの `search_scene`・`search_scene_exact` は、`:` で始まるローカルのキーを除外する。渡した名前の `:` はサニタイズで `_` になるため、`:` で始まる名前を渡しても、ローカルシーンは候補にならない。

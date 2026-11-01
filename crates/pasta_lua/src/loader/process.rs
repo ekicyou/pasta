@@ -4,12 +4,12 @@
 //! transpile/copy responsibilities split out of `loader/mod.rs` (C3).
 
 use super::discovery;
-use super::{CacheManager, LoaderError, PastaLoader, TranspileFailure};
-use crate::context::TranspileContext;
+use super::{CacheManager, CollidingFile, LoaderError, PastaLoader, TranspileFailure};
 use crate::transpiler::LuaTranspiler;
 
 use std::fs;
 use std::path::Path;
+use std::time::SystemTime;
 use tracing::{debug, error, warn};
 
 /// Process statistics for logging.
@@ -20,11 +20,31 @@ pub(super) struct ProcessStats {
     pub(super) copied: usize,
 }
 
+/// Groups of two or more files with the same folded module name, in file order.
+fn colliding_groups(
+    files: &[std::path::PathBuf],
+    cache_manager: &CacheManager,
+) -> Vec<Vec<CollidingFile>> {
+    let mut by_name: std::collections::BTreeMap<String, Vec<CollidingFile>> = Default::default();
+    for file in files {
+        let module_name = cache_manager.source_to_module_name(file);
+        by_name
+            .entry(module_name.to_lowercase())
+            .or_default()
+            .push(CollidingFile {
+                module_name,
+                path: cache_manager.get_relative_path(file).into(),
+            });
+    }
+    by_name.into_values().filter(|g| g.len() > 1).collect()
+}
+
 impl PastaLoader {
     /// Discover all files (.pasta and .lua) with conflict checking.
     ///
     /// Returns (pasta_files, lua_files) where lua_files has conflicts removed.
-    /// Also checks for invalid filenames (init.lua, init.pasta).
+    /// Also checks for invalid filenames (init.lua, init.pasta) and for
+    /// module name collisions ignoring case (`ModuleNameCollision`).
     pub(super) fn discover_all_files(
         base_dir: &Path,
         pasta_patterns: &[String],
@@ -74,10 +94,19 @@ impl PastaLoader {
             }
         }
 
-        // Build HashSet of .pasta module names for conflict detection
+        // Same folded module name within .pasta or within .lua (shadowed .lua included,
+        // the same counting as pasta_check's module-lua-collision)
+        let mut groups = colliding_groups(&pasta_files, cache_manager);
+        groups.extend(colliding_groups(&lua_files, cache_manager));
+        if !groups.is_empty() {
+            groups.sort_by_key(|g| g[0].module_name.to_lowercase());
+            return Err(LoaderError::ModuleNameCollision { groups });
+        }
+
+        // Build HashSet of folded .pasta module names for conflict detection
         let pasta_module_names: std::collections::HashSet<String> = pasta_files
             .iter()
-            .map(|f| cache_manager.source_to_module_name(f))
+            .map(|f| cache_manager.source_to_module_name(f).to_lowercase())
             .collect();
 
         // Filter out conflicting .lua files
@@ -85,7 +114,7 @@ impl PastaLoader {
         for lua_file in &lua_files {
             let module_name = cache_manager.source_to_module_name(lua_file);
 
-            if pasta_module_names.contains(&module_name) {
+            if pasta_module_names.contains(&module_name.to_lowercase()) {
                 warn!(
                     lua_file = %lua_file.display(),
                     module_name = %module_name,
@@ -107,8 +136,7 @@ impl PastaLoader {
         lua_files: &[std::path::PathBuf],
         cache_manager: &CacheManager,
         transpiler: &LuaTranspiler,
-    ) -> Result<(TranspileContext, Vec<String>, ProcessStats), LoaderError> {
-        let mut combined_context = TranspileContext::new();
+    ) -> Result<(Vec<String>, ProcessStats), LoaderError> {
         let total_count = pasta_files.len() + lua_files.len();
         let mut module_names = Vec::with_capacity(total_count);
         let mut failures = Vec::new();
@@ -133,6 +161,9 @@ impl PastaLoader {
                 debug!(file = %file_path.display(), "Skipped (cache up-to-date)");
                 continue;
             }
+
+            // 元の時刻は内容を読む前に取る（読んだ後の書き換えを次の起動で拾うため）
+            let source_mtime = source_mtime(file_path);
 
             // Read and parse
             let content = match fs::read_to_string(file_path) {
@@ -164,22 +195,17 @@ impl PastaLoader {
             // （runtime-error-balloon 2.5。例 `dic\天気.pasta`）
             pasta_file.path = cache_manager.get_relative_path(file_path).into();
 
-            // Transpile
+            // Transpile (the per-file context is dropped: before finalize
+            // @pasta_search always starts from an empty registry, 3.1)
             let mut output = Vec::new();
-            let file_context = match transpiler.transpile(&pasta_file, &mut output) {
-                Ok(ctx) => ctx,
-                Err(e) => {
-                    failures.push(TranspileFailure {
-                        source_path: file_path.clone(),
-                        error: format!("Transpile error: {}", e),
-                    });
-                    stats.failed += 1;
-                    continue;
-                }
-            };
-
-            // Merge registries
-            combined_context.merge_from(file_context);
+            if let Err(e) = transpiler.transpile(&pasta_file, &mut output) {
+                failures.push(TranspileFailure {
+                    source_path: file_path.clone(),
+                    error: format!("Transpile error: {}", e),
+                });
+                stats.failed += 1;
+                continue;
+            }
 
             let lua_code = match String::from_utf8(output) {
                 Ok(s) => s,
@@ -193,11 +219,16 @@ impl PastaLoader {
                 }
             };
 
-            // Save to cache
+            // Save to cache (a failure fails the load, same as the .lua copy)
             if let Err(e) = cache_manager.save_cache(file_path, &lua_code) {
-                warn!(file = %file_path.display(), error = %e, "Failed to save cache");
-                // Continue anyway - cache write failure is not fatal
+                failures.push(TranspileFailure {
+                    source_path: file_path.clone(),
+                    error: format!("Cache write error: {}", e),
+                });
+                stats.failed += 1;
+                continue;
             }
+            stamp_cache(cache_manager, file_path, source_mtime);
 
             stats.transpiled += 1;
             debug!(file = %file_path.display(), module = %module_name, "Transpiled");
@@ -216,6 +247,8 @@ impl PastaLoader {
                 debug!(file = %file_path.display(), "Skipped .lua (cache up-to-date)");
                 continue;
             }
+
+            let source_mtime = source_mtime(file_path);
 
             // Read .lua file content directly (no parse/transpile)
             let content = match fs::read_to_string(file_path) {
@@ -249,6 +282,7 @@ impl PastaLoader {
                 stats.failed += 1;
                 continue;
             }
+            stamp_cache(cache_manager, file_path, source_mtime);
 
             stats.copied += 1;
             debug!(file = %file_path.display(), module = %module_name, "Copied .lua");
@@ -271,6 +305,26 @@ impl PastaLoader {
             ));
         }
 
-        Ok((combined_context, module_names, stats))
+        Ok((module_names, stats))
+    }
+}
+
+/// 元の更新時刻。取れなければ `None`（写しを省き、次の起動でも変換し直す）。
+fn source_mtime(file_path: &Path) -> Option<SystemTime> {
+    fs::metadata(file_path).and_then(|m| m.modified()).ok()
+}
+
+/// 書いたキャッシュの時刻を元にそろえる。失敗しても読み込みは続ける（1.7）。
+fn stamp_cache(cache_manager: &CacheManager, file_path: &Path, source_mtime: Option<SystemTime>) {
+    let Some(mtime) = source_mtime else {
+        debug!(file = %file_path.display(), "Source mtime unavailable; cache mtime not aligned");
+        return;
+    };
+    if let Err(e) = cache_manager.stamp_cache(file_path, mtime) {
+        warn!(
+            file = %file_path.display(),
+            error = %e,
+            "Failed to align cache mtime; the file will be transpiled again on next startup"
+        );
     }
 }

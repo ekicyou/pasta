@@ -316,7 +316,7 @@ const GUIDE_SECTIONS = ['叶えたいこと', '新しく覚える表現', '辞�
 // D. ボイス（R7.1 導入/締めキャラ口調 / R7.2 本体普通文体 / R7.4 コード内に口調なし）
 // ============================================================
 // 章の一覧（各フォルダは非再帰・SUMMARY.md を除く）。D 系はこのフォルダ群、T 系はこれに debug/ を足す。
-const VOICE_DIRS = ['', 'grammar', 'lua', 'lua/modules', 'getting-started', 'reference', 'internals'];
+const VOICE_DIRS = ['', 'grammar', 'lua', 'lua/modules', 'getting-started', 'reference', 'internals', 'notes'];
 function listChapters(dirs) {
   const out = [];
   for (const dir of dirs) {

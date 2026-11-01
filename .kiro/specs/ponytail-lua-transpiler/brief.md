@@ -82,3 +82,8 @@
 - ブロックの行の対応（デバッガのソースの対応表）を壊さない。
 - 振る舞いを固めるテストを先に書き、1 つ直すごとに確かめて 1 コミットにする。
 - 品質の関門：`cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_lua`。cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。`sample.generated.lua` の改行だけの差分は戻す。
+
+## 申し送り（2026-11-01、`ponytail-lua-loader` の設計より）
+
+- `ponytail-lua-loader` は、finalize 前の `@pasta_search` に常に空の `TranspileContext` を渡す形にし、`loader/process.rs` の `process_incremental` で `TranspileContext::merge_from` を呼ばなくなる。入った後は、`merge_from` の本番の使い手が無くなる。消すか残すかは、この spec が決める（`src/context.rs` はこの spec の持ち場）。
+- `lib.rs` の再輸出の行を、`ponytail-lua-loader` と共有する（`presentation`・`Encoder`/`Encoding`・`TranspileResult` の行が消える）。後から入る側が合わせる。

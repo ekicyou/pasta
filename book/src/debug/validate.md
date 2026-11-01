@@ -151,10 +151,12 @@ ghost/master/pasta.toml:6: 誤り: [scene.alias] の別名「会話」が OnBoot
 - `.` と `-` を `_` に、フォルダの区切りを `.` に替える。
 - 前に `pasta.scene.` を付ける（`dic/a-b.pasta` → `pasta.scene.a_b`）。
 
+モジュール名どうしは、大文字と小文字の違いを除いて比べる（`pasta.scene.A_b` と `pasta.scene.a_b` は同じ名前とみなす。Windows ではキャッシュの 1 つのファイルを奪い合うため）。`pasta.dll` も同じ規則で比べ、`module-pasta-collision`・`module-lua-collision` になる組み合わせを、どれも読み込みエラーにする。
+
 | code | 分類 | 意味 | 直し方 |
 | ---- | ---- | ---- | ------ |
-| `module-pasta-collision` | 誤り | 2 つ以上の辞書ファイルのモジュール名が同じ。`pasta.dll` は知らせずに、どちらかの辞書の内容を失う | どちらかのファイルの名前を変える |
-| `module-lua-collision` | 誤り | 2 つ以上の辞書モジュール（`.lua`）のモジュール名が同じ。どちらかの `.lua` が読み込まれない | どちらかのファイルの名前を変える |
+| `module-pasta-collision` | 誤り | 2 つ以上の辞書ファイルのモジュール名が同じ。`pasta.dll` は読み込みエラーにして起動しない | どちらかのファイルの名前を変える |
+| `module-lua-collision` | 誤り | 2 つ以上の辞書モジュール（`.lua`）のモジュール名が同じ。`pasta.dll` は読み込みエラーにして起動しない | どちらかのファイルの名前を変える |
 | `module-lua-shadowed` | 注意 | 辞書モジュール（`.lua`）のモジュール名が辞書ファイル（`.pasta`）と同じため、その `.lua` は読み込まれない | `.lua` を読み込ませたいなら、ファイルの名前を変える |
 
 ### シーン名
