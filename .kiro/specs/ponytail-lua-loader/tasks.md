@@ -105,7 +105,7 @@
   - _Depends: 3.1, 3.2, 3.3, 3.4_
   - _Requirements: 8.2, 8.3, 8.5_
 
-- [ ] 6. 品質の関門と非退行の確かめ
+- [x] 6. 品質の関門と非退行の確かめ
   - `cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_lua -p pasta_shiori -p pasta_check` を、`NoDefaultCurrentDirectoryInExePath` を外して走らせる
   - 辞書の発見と読み込みの順、`init.pasta`・`init.lua` を断る扱い、版と別名表の指紋でキャッシュを丸ごと消す扱い、読み込みエラーの経路の既存のテストが通ることを確かめる
   - テストが書き換えた `sample.generated.lua` の改行の差分を戻し、変更に混ぜない
