@@ -138,7 +138,7 @@ ponytail 監査の指摘を直す 9 本（`ponytail-check-release` を除く）�
 
 | 順 | spec | 要件定義 | 規模 | 始められる時期 |
 | -- | ---- | -------- | ---- | -------------- |
-| 1 | ponytail-lua-loader | Opus | M | 0.4.3 の後（読めないセーブの退避は `toml-serialization` へ移した。残りはキャッシュ・モジュール名・検索・パス・死んだコード） |
+| 1 | ponytail-lua-loader | Opus | M | **済（2026-11-02 完了）**（読めないセーブの退避は `toml-serialization` へ移した。残りはキャッシュ・モジュール名・検索・パス・死んだコード） |
 | 2 | ponytail-dsl-parser | Opus | M | 0.4.3 の後 |
 | 3 | ponytail-core-registry | Opus | S-M | 0.4.3 の後（`Cargo.lock` の席は `ponytail-editor-tooling` が持つ） |
 | 4 | ponytail-lua-transpiler | Opus | S-M | 0.4.3 の後 |
@@ -501,7 +501,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
 - [ ] ponytail-dsl-parser -- 解析を辞書の大きさに比例させる（span の行と桁を pest の行の索引で取る）。大きな数の字句を、どこでも同じ規則（i64、だめなら f64）にする。深い括弧の入れ子を構文の誤りにする。作られない誤りの型と `PastaFile.span` を消す。0.4.5（2026-10-19 起票。ponytail 監査。2026-10-22 に隙間の spec へ改め、2026-10-23 に 0.4.3 へ戻し、2026-10-24 に 0.4.5 へ移した）。Dependencies: none
 - [ ] ponytail-core-registry -- シーン表・単語表の死んだ API と誤りの型を消し、`fast_radix_trie` を `BTreeMap` に替える。属性の絞り込みは残す（0.5.0 が使う）。0.4.5（2026-10-24 に 0.4.3 から移した）。Dependencies: none
-- [ ] ponytail-lua-loader -- キャッシュを日付の一致で判定する。同じモジュール名の辞書を読み込みのエラーにする。finalize 前の検索を一定にする。パスの `;`・`?` を断る。`presentation/`・`RendererInjection`・テストだけの構築の道を消す。読めないセーブの `.broken` への退避は、2026-10-24 に `toml-serialization` へ移した。0.4.5（2026-10-24 に 0.4.3 から移した）。Dependencies: none
+- [x] ponytail-lua-loader -- キャッシュを日付の一致で判定する。同じモジュール名の辞書を読み込みのエラーにする。finalize 前の検索を一定にする。パスの `;`・`?` を断る。`presentation/`・`RendererInjection`・テストだけの構築の道を消す。読めないセーブの `.broken` への退避は、2026-10-24 に `toml-serialization` へ移した。0.4.5（2026-10-24 に 0.4.3 から移した）。Dependencies: none
 - [ ] ponytail-lua-transpiler -- Lua ブロックの中身を書いたとおりに出す（字下げと空行）。効かない `LineEnding`・`comment_mode` と、死んだ文脈の状態を消す（ファイル属性は残す）。0.4.5（2026-10-24 に 0.4.3 から移した）。Dependencies: none
 - [ ] ponytail-lua-debug -- Lua 表示でも `.pasta` のブレークポイントを効かせる。ステップがコルーチンや切断で抜けなくなるのを直す。数の表示と、知らない DAP 要求への応答（unsupported）を直す。行ごとの費用を下げ、死んだコードを消す。0.4.5（2026-10-24 に 0.4.3 から移した）。Dependencies: none
 - [ ] ponytail-lua-scripts -- 数でない `hour_margin` を既定に戻す。応答の見出しの値の改行を空白にする。続きのトークの期限を呼んだ時刻から数える。包む関数の写しと `co_callback` を消す（`pasta.areka` は残す）。0.4.5（2026-10-24 に 0.4.3 から移した）。`set_co_scene` と `EVENT.fire` を先に直した 0.4.2 の 2 本は入った（2026-10-23）。Dependencies: none
