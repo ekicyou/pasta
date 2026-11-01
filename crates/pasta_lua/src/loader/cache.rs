@@ -339,21 +339,6 @@ impl CacheManager {
             LoaderError::scene_dic_generation("Failed to create pasta directory", Some(e))
         })?;
 
-        // Clean up old scene_dic.lua location (backward compatibility)
-        // Old location: cache_dir/scene_dic.lua (without pasta/ prefix)
-        let old_scene_dic_path = self.cache_dir.join("scene_dic.lua");
-        if old_scene_dic_path.exists() {
-            if let Err(e) = fs::remove_file(&old_scene_dic_path) {
-                warn!(
-                    path = %old_scene_dic_path.display(),
-                    error = %e,
-                    "Failed to remove old scene_dic.lua, continuing"
-                );
-            } else {
-                debug!(path = %old_scene_dic_path.display(), "Removed old scene_dic.lua");
-            }
-        }
-
         // New location: cache_dir/pasta/scene_dic.lua
         let scene_dic_path = pasta_dir.join("scene_dic.lua");
 

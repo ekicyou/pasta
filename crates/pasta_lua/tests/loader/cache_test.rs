@@ -624,26 +624,6 @@ fn test_find_orphaned_caches_skips_scene_dic_and_non_lua() {
     assert!(orphans[0].ends_with("orphan.lua"));
 }
 
-/// 旧配置（cache_dir 直下）の scene_dic.lua が generate_scene_dic で
-/// 後方互換クリーンアップされ、新配置 pasta/ 配下に生成されること。
-#[test]
-fn test_generate_scene_dic_removes_legacy_location() {
-    let (temp, manager) = create_test_cache_manager();
-    manager.prepare_cache_dir(FP).unwrap();
-
-    let cache_dir = temp.path().join("profile/pasta/cache/lua");
-    let legacy = cache_dir.join("scene_dic.lua");
-    fs::write(&legacy, "-- legacy location").unwrap();
-
-    let path = manager
-        .generate_scene_dic(&["pasta.scene.a".to_string()])
-        .unwrap();
-
-    assert!(!legacy.exists(), "legacy scene_dic.lua must be removed");
-    assert_eq!(path, cache_dir.join("pasta/scene_dic.lua"));
-    assert!(path.exists());
-}
-
 /// cache_dir() アクセサが base_dir + output_dir を指すこと。
 #[test]
 fn test_cache_dir_accessor() {

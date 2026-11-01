@@ -194,12 +194,7 @@ impl PastaLoader {
             .chain(lua_files.iter())
             .cloned()
             .collect();
-        let orphans = cache_manager.find_orphaned_caches(&all_source_files);
-        if !orphans.is_empty() && config.loader.debug_mode {
-            for orphan in &orphans {
-                warn!(path = %orphan.display(), "Orphaned cache file detected");
-            }
-        }
+        cache_manager.find_orphaned_caches(&all_source_files);
 
         // Phase 5: Generate scene_dic.lua
         debug!("Phase 5: Generating scene_dic.lua");

@@ -634,3 +634,34 @@ fn test_search_before_finalize_is_always_nil() {
         assert!(!post.is_nil(), "[{step}] finalize 後の検索");
     }
 }
+
+// ============================================================================
+// Orphaned Cache Warning Tests (ponytail-lua-loader 3.3)
+// ============================================================================
+
+/// `debug_mode` のゴーストでも、孤立したキャッシュの警告はファイルにつき 1 行だけ出て、
+/// ファイルは消さずに残す（7.1〜7.3）。
+#[tracing_test::traced_test]
+#[test]
+fn test_orphaned_cache_warned_once_and_kept() {
+    let temp = common::create_temp_with_pasta("＊OnBoot\n　さくら：「起動」\n");
+    let base = temp.path();
+    PastaLoader::load(base).expect("first load");
+
+    let orphan = base.join("profile/pasta/cache/lua/pasta/scene/orphan_only.lua");
+    std::fs::write(&orphan, "-- orphan").unwrap();
+    PastaLoader::load(base).expect("second load");
+
+    logs_assert(|lines: &[&str]| {
+        let hits = lines
+            .iter()
+            .filter(|l| l.contains("Orphaned cache file") && l.contains("orphan_only.lua"))
+            .count();
+        if hits == 1 {
+            Ok(())
+        } else {
+            Err(format!("expected 1 orphaned-cache line, got {hits}"))
+        }
+    });
+    assert!(orphan.exists(), "orphaned cache must be kept");
+}

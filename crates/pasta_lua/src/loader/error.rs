@@ -7,8 +7,6 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
-use crate::TranspileError;
-
 /// Loader error type for the startup sequence.
 ///
 /// This error type covers all phases of the startup sequence:
@@ -30,19 +28,6 @@ pub enum LoaderError {
     /// Configuration file not found error.
     #[error("Configuration file not found: '{0}'")]
     ConfigNotFound(PathBuf),
-
-    /// Pasta file parsing error.
-    #[error("Failed to parse Pasta file: '{file}': {message}")]
-    Parse {
-        file: PathBuf,
-        message: String,
-        #[source]
-        source: Option<pasta_dsl::ParseError>,
-    },
-
-    /// Transpilation error.
-    #[error("Transpilation failed: {0}")]
-    Transpile(#[from] TranspileError),
 
     /// Lua runtime initialization error.
     #[error("Failed to initialize Lua runtime: {0}")]
@@ -207,28 +192,6 @@ impl LoaderError {
         LoaderError::ConfigNotFound(path.into())
     }
 
-    /// Create a parse error with file path and message.
-    pub fn parse(path: impl Into<PathBuf>, message: impl Into<String>) -> Self {
-        LoaderError::Parse {
-            file: path.into(),
-            message: message.into(),
-            source: None,
-        }
-    }
-
-    /// Create a parse error with source error.
-    pub fn parse_with_source(
-        path: impl Into<PathBuf>,
-        message: impl Into<String>,
-        source: pasta_dsl::ParseError,
-    ) -> Self {
-        LoaderError::Parse {
-            file: path.into(),
-            message: message.into(),
-            source: Some(source),
-        }
-    }
-
     /// Create a directory not found error.
     pub fn directory_not_found(path: impl Into<PathBuf>) -> Self {
         LoaderError::DirectoryNotFound(path.into())
@@ -315,15 +278,6 @@ mod tests {
         let msg = format!("{}", err);
         assert!(msg.contains("Startup directory not found"));
         assert!(msg.contains("/ghost/master"));
-    }
-
-    #[test]
-    fn test_parse_error_display() {
-        let err = LoaderError::parse("/path/to/test.pasta", "unexpected token");
-        let msg = format!("{}", err);
-        assert!(msg.contains("Failed to parse Pasta file"));
-        assert!(msg.contains("/path/to/test.pasta"));
-        assert!(msg.contains("unexpected token"));
     }
 
     #[test]
@@ -493,22 +447,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_error_source_none_vs_some() {
-        // parse() without source error -> source() is None
-        let err = LoaderError::parse("/path/test.pasta", "bad token");
-        assert!(std::error::Error::source(&err).is_none());
-
-        // parse_with_source() -> source() carries the ParseError
-        let parse_err =
-            pasta_dsl::parse_str("＊壊れた\n  {{{{invalid syntax}}}}\n", "test.pasta").unwrap_err();
-        let err = LoaderError::parse_with_source("/path/test.pasta", "bad token", parse_err);
-        assert!(std::error::Error::source(&err).is_some());
-        let msg = format!("{}", err);
-        assert!(msg.contains("Failed to parse Pasta file"));
-        assert!(msg.contains("bad token"));
-    }
-
-    #[test]
     fn test_glob_pattern_error_from_conversion() {
         let pattern_err = glob::Pattern::new("[").unwrap_err();
         let err: LoaderError = pattern_err.into();
@@ -525,16 +463,6 @@ mod tests {
         let msg = format!("{}", err);
         assert!(msg.contains("Failed to initialize Lua runtime"));
         assert!(msg.contains("boom"));
-    }
-
-    #[test]
-    fn test_transpile_error_from_conversion() {
-        let transpile_err =
-            crate::TranspileError::IoError(io::Error::new(io::ErrorKind::WriteZero, "out"));
-        let err: LoaderError = transpile_err.into();
-        assert!(matches!(err, LoaderError::Transpile(_)));
-        let msg = format!("{}", err);
-        assert!(msg.contains("Transpilation failed"));
     }
 
     #[test]

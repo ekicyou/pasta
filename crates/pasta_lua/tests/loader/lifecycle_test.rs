@@ -330,51 +330,6 @@ fn test_scene_dic_new_path() {
 }
 
 #[test]
-fn test_scene_dic_old_path_cleanup() {
-    // Task 7.4: 旧パスが存在する場合、削除されることを確認
-    let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
-    let base_dir = temp.path();
-
-    // Create cache directory structure with old scene_dic.lua
-    let cache_dir = base_dir.join("profile/pasta/cache/lua");
-    std::fs::create_dir_all(&cache_dir).unwrap();
-
-    // Write current version to avoid cache clear
-    let version = env!("CARGO_PKG_VERSION");
-    std::fs::write(cache_dir.join(".cache_version"), version).unwrap();
-    // Write the default scene alias table fingerprint too (otherwise it will be cleared)
-    std::fs::write(
-        cache_dir.join(".scene_alias"),
-        pasta_core::SceneAliasTable::builtin_default().fingerprint(),
-    )
-    .unwrap();
-
-    // Create old scene_dic.lua at deprecated path
-    std::fs::write(
-        cache_dir.join("scene_dic.lua"),
-        "-- old scene_dic at deprecated path",
-    )
-    .unwrap();
-
-    // Load the runtime
-    let _runtime = PastaLoader::load(base_dir).unwrap();
-
-    // Verify old path is cleaned up
-    let old_path = cache_dir.join("scene_dic.lua");
-    assert!(
-        !old_path.exists(),
-        "Old scene_dic.lua at deprecated path should be deleted"
-    );
-
-    // Verify new path exists
-    let new_path = cache_dir.join("pasta/scene_dic.lua");
-    assert!(
-        new_path.exists(),
-        "scene_dic.lua should exist at new path cache/lua/pasta/scene_dic.lua"
-    );
-}
-
-#[test]
 fn test_scene_module_with_dot_in_file_name() {
     // `require` maps every `.` in a module name to a path separator, so a `.` in the
     // file stem must not survive into the module name (`dic/v1.2.pasta` → `v1_2`).
