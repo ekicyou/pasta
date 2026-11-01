@@ -125,13 +125,14 @@ impl PastaLuaRuntime {
     /// `module` / `fatal` フィールド付きの error ログと、起動モジュール名の文脈を
     /// 付けた `Err` で可視化される（要件 4.5 / 4.7 / 5.3 / 5.5）。
     ///
+    /// finalize 前の `@pasta_search` には常に空の登録表を渡す（キャッシュの状態によらず
+    /// 見つからない。3.1〜3.3）。finalize が Lua 側の登録から作り直す。
+    ///
     /// # Arguments
-    /// * `context` - TranspileContext with scene/word registries
     /// * `loader_context` - Configuration and paths from PastaLoader
     /// * `runtime_config` - Runtime configuration
     /// * `pasta_config` - Pasta configuration from pasta.toml
     /// * `logger` - Optional instance-specific logger (Arc-wrapped for sharing)
-    /// * `scene_dic_path` - Path to the generated scene_dic.lua (used for backward compatibility check)
     /// * `source_map` - Optional aggregated `.pasta`↔`.lua` source map built by the
     ///   loader AFTER transpile, ONLY when debugging is enabled (task 4.3/4.4).
     ///   `None` on the disabled (default) zero-cost path, where nothing is built or
@@ -141,12 +142,10 @@ impl PastaLuaRuntime {
     /// * `Ok(Self)` - Runtime initialized and scene_dic loaded
     /// * `Err(e)` - Initialization or scene_dic loading failed
     pub fn from_loader_with_scene_dic(
-        context: TranspileContext,
         loader_context: LoaderContext,
         runtime_config: RuntimeConfig,
         pasta_config: Option<PastaConfig>,
         logger: Option<Arc<PastaLogger>>,
-        _scene_dic_path: &Path,
         source_map: Option<Arc<SourceMap>>,
     ) -> LuaResult<Self> {
         // Derive the debug gate BEFORE building the VM (task 4.2/4.4): funnel the
@@ -169,7 +168,8 @@ impl PastaLuaRuntime {
 
         // Create base runtime (installs the debug hook exactly once iff enabled,
         // and holds + forwards the source map to enable when present).
-        let mut runtime = Self::with_config_and_source_map(context, runtime_config, source_map)?;
+        let mut runtime =
+            Self::with_config_and_source_map(TranspileContext::new(), runtime_config, source_map)?;
 
         // Set logger if provided
         runtime.logger = logger;

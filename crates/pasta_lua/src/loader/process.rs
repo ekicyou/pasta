@@ -5,7 +5,6 @@
 
 use super::discovery;
 use super::{CacheManager, CollidingFile, LoaderError, PastaLoader, TranspileFailure};
-use crate::context::TranspileContext;
 use crate::transpiler::LuaTranspiler;
 
 use std::fs;
@@ -137,8 +136,7 @@ impl PastaLoader {
         lua_files: &[std::path::PathBuf],
         cache_manager: &CacheManager,
         transpiler: &LuaTranspiler,
-    ) -> Result<(TranspileContext, Vec<String>, ProcessStats), LoaderError> {
-        let mut combined_context = TranspileContext::new();
+    ) -> Result<(Vec<String>, ProcessStats), LoaderError> {
         let total_count = pasta_files.len() + lua_files.len();
         let mut module_names = Vec::with_capacity(total_count);
         let mut failures = Vec::new();
@@ -197,22 +195,17 @@ impl PastaLoader {
             // （runtime-error-balloon 2.5。例 `dic\天気.pasta`）
             pasta_file.path = cache_manager.get_relative_path(file_path).into();
 
-            // Transpile
+            // Transpile (the per-file context is dropped: before finalize
+            // @pasta_search always starts from an empty registry, 3.1)
             let mut output = Vec::new();
-            let file_context = match transpiler.transpile(&pasta_file, &mut output) {
-                Ok(ctx) => ctx,
-                Err(e) => {
-                    failures.push(TranspileFailure {
-                        source_path: file_path.clone(),
-                        error: format!("Transpile error: {}", e),
-                    });
-                    stats.failed += 1;
-                    continue;
-                }
-            };
-
-            // Merge registries
-            combined_context.merge_from(file_context);
+            if let Err(e) = transpiler.transpile(&pasta_file, &mut output) {
+                failures.push(TranspileFailure {
+                    source_path: file_path.clone(),
+                    error: format!("Transpile error: {}", e),
+                });
+                stats.failed += 1;
+                continue;
+            }
 
             let lua_code = match String::from_utf8(output) {
                 Ok(s) => s,
@@ -312,7 +305,7 @@ impl PastaLoader {
             ));
         }
 
-        Ok((combined_context, module_names, stats))
+        Ok((module_names, stats))
     }
 }
 

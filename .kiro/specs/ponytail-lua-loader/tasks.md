@@ -41,7 +41,7 @@
   - 大文字と小文字だけ違う組が `module-pasta-collision`・`module-lua-collision` のエラーになり、既存の検査のテストはすべて通る
   - _Boundary: PastaCheckCollisionRule_
   - _Requirements: 2.7, 2.8_
-- [ ] 2.5 finalize の前の検索に、いつも空の登録表を渡す
+- [x] 2.5 finalize の前の検索に、いつも空の登録表を渡す
   - 先に、`main.lua` で `OnBoot` を検索した結果を残すゴーストを、キャッシュが無い状態と 2 回目の起動で読み込む統合テストを置き、今のコードでは 1 回目だけ見つかることを確かめる
   - 差分の変換で変換の文脈を集めて返すのをやめ、ランタイムの本番の構築の道から、使わなくなる文脈と `scene_dic` のパスの引数を外す（関数の名前は変えない）
   - どちらの起動でも finalize の前の検索は見つからず（nil）、finalize の後は今どおりすべての辞書が対象になる

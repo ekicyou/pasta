@@ -170,7 +170,7 @@ impl PastaLoader {
         // One transpiler shared by Phase 4 and Phase 5.5 so the declared scene
         // names (and debug join keys) always use the same alias table (6.2).
         let transpiler = Self::transpiler_for(&config);
-        let (context, module_names, stats) =
+        let (module_names, stats) =
             Self::process_incremental(&pasta_files, &lua_files, &cache_manager, &transpiler)?;
 
         // Log statistics in debug mode
@@ -199,7 +199,7 @@ impl PastaLoader {
 
         // Phase 5: Generate scene_dic.lua
         debug!("Phase 5: Generating scene_dic.lua");
-        let scene_dic_path = cache_manager.generate_scene_dic(&module_names)?;
+        cache_manager.generate_scene_dic(&module_names)?;
 
         // Phase 5.5: Build the aggregated `.pasta`↔`.lua` source map (task 4.4).
         //
@@ -239,12 +239,10 @@ impl PastaLoader {
             .with_scene_aliases(config.scene_aliases.clone())
             .with_ffi(config.loader.ffi);
         let runtime = PastaLuaRuntime::from_loader_with_scene_dic(
-            context,
             loader_context,
             runtime_config,
             Some(config),
             logger,
-            &scene_dic_path,
             source_map,
         )?;
 

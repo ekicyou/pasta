@@ -606,3 +606,31 @@ fn test_pasta_cache_write_failure_fails_load_with_path() {
     let message = err.to_string();
     assert!(message.contains(&pasta.display().to_string()), "{message}");
 }
+
+// ============================================================================
+// Search Before Finalize Tests (ponytail-lua-loader 2.5)
+// ============================================================================
+
+/// finalize の前（`main.lua` の実行中）の検索は、キャッシュが無い起動（全部を変換）でも
+/// 2 回目の起動（全部を省く）でも見つからず、finalize の後は見つかる（3.1〜3.4・9.2）。
+#[test]
+fn test_search_before_finalize_is_always_nil() {
+    let temp = common::create_temp_with_pasta("＊OnBoot\n　さくら：「起動」\n");
+    let base = temp.path();
+    std::fs::create_dir_all(base.join("scripts")).unwrap();
+    std::fs::write(
+        base.join("scripts/main.lua"),
+        "local SEARCH = require \"@pasta_search\"\n_G.PRE_FINALIZE = SEARCH:search_scene(\"OnBoot\")\n",
+    )
+    .unwrap();
+
+    for step in ["1:no cache", "2:cached"] {
+        let runtime = PastaLoader::load(base).unwrap_or_else(|e| panic!("[{step}] load: {e}"));
+        let pre = runtime.exec("return _G.PRE_FINALIZE").unwrap();
+        assert!(pre.is_nil(), "[{step}] finalize 前の検索: {pre:?}");
+        let post = runtime
+            .exec("return (require \"@pasta_search\"):search_scene(\"OnBoot\")")
+            .unwrap();
+        assert!(!post.is_nil(), "[{step}] finalize 後の検索");
+    }
+}
