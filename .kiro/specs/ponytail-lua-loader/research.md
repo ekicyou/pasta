@@ -176,3 +176,116 @@ brief に無く、直す必要がある頁（N6）。
 7. 孤立キャッシュの警告は、いつも出る方を残す（要件 7.2）。
 8. 公開 API の断り書きは、実装の時点で README と `tech.md` にまだ無ければ書く（要件 8.5 を、実装の時点で確かめられる形に書き直した）。
 9. マニュアルの範囲は、N6 の頁まで広げる（要件 8.1・8.2。もとから書いてあった）。
+
+---
+
+# 設計フェーズの調査（2026-11-01・`/kiro-spec-design -y`）
+
+## Summary（設計）
+
+- **Discovery Scope**: Extension（light discovery）。新しい依存は無い。外部の調べ（WebSearch）は要らなかった（使う標準の API は `std::fs::File::set_modified` と `str::to_lowercase` だけで、どちらも Rust 1.75 以降の安定版）。
+- **使ったスキル・規則**: `kiro-spec-design`（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）。ponytail（最小の完全な直し）を合成の物差しにした。ドメインのスキル（`pasta-lua-coding`）は、`@pasta_search` の戻り値の形を確かめるところでだけ参照した（コードで確かめたので読み込みは省いた）。
+- **Key Findings**:
+  - 「Research Needed」の 2 つは、使い捨ての実験（スクラッチの crate から `pasta_lua` を path 依存で使う）で解けた（下の「実験」）。
+  - `.lua` 同士の衝突は、**`.pasta` に隠される前の一覧**で数えないと `pasta_check` と組み合わせが食い違う（`pasta_check` は隠される `.lua` 同士も `module-lua-collision` にする）。今の `discover_all_files` は隠す `.lua` を先に落とすので、衝突の検査はその前に置く。
+  - `from_loader_with_scene_dic` の名前は `book/src/internals/debug.md`（:128・:444・:458）が使っている。名前を変えないことで、debug の章を直さずに済む。
+
+## Research Log（設計）
+
+### 実験 1：`set_modified` の往復（要件 1・Research Needed の 1 つ目）
+
+- **Context**: キャッシュに元の `.pasta` の更新時刻を写し、`!=` で比べる。読み戻しが一致しないファイルシステムでは、毎回変換し直すかもしれない。
+- **方法**: スクラッチ（`…/scratchpad/exp`）で NTFS（C:）に 2 つのファイルを作り、`File::options().write(true).open(cache)?.set_modified(src_mtime)` の後に読み戻した。
+- **Findings**:
+  - 同じファイルシステムの往復は一致した（`1793534830.2974563s` → 同じ）。
+  - 元を 1 日前に戻すと `!=` になり、写し直すとまた一致した（要件 1.1・1.5 の筋）。
+  - Windows の `SystemTime` は 100ns 刻みで、それより細かい値は作った時点で切られる（`123_456_789ns` を渡すと `.1234567s`）。NTFS も 100ns 刻みなので、Windows で NTFS どうしの往復は常に一致する。
+  - 読み取り専用のキャッシュには `set_modified` できない（`PermissionDenied`）。ただし同じ状態では `save_cache` の `fs::write` が先に失敗するので、要件 1.6（読み込みエラー）の側に入る。
+- **FAT32・exFAT（測れなかった）**: この機械の FAT32 は EFI の区画だけで、管理者の権限なしには使えない。理屈で詰めた。FAT32（2 秒刻み）・exFAT（10ms 刻み）から読んだ元の時刻は、そのファイルシステムで表せる値なので、**同じボリュームのキャッシュへ書けば一致する**。一致しないのは、`[loader] transpiled_output_dir` を元より粗い別のボリュームへ向けたときだけで、そのときは毎回変換し直す（安全な側。起動が遅くなるだけ）。キャッシュの既定の置き場所（`profile/pasta/cache/lua`）はゴーストのフォルダの中なので、ふつうは起きない。
+- **Implications**: Option A（`set_modified` と `!=`）で足りる。別の記録（Option B）は要らない。
+
+### 実験 2：空の登録表の `@pasta_search`（要件 3・Research Needed の 2 つ目）
+
+- **方法**: `PastaLuaRuntime::new(TranspileContext::new())` で VM を作り、`require "@pasta_search"` の各メソッドを呼んで、戻り値の個数と値を見た。
+- **Findings**:
+  - `search_scene("OnBoot")`・`search_scene("OnBoot", "親")`・`search_scene_exact("OnBoot")`・`search_word("挨拶")`・`search_word("挨拶", "親")` は、どれも**値を返さない（0 個＝ Lua では nil）**。エラーにならない。
+  - `search_local_scene_exact("A", "B")` は `nil, "global"`（親が無い）。finalize 後に親が無いときと同じ形。
+  - `search_scene("")` はエラー（`Invalid scene name: ''`）。引数の誤りは、finalize の前後を問わずエラーである（`tests/search/module_test.rs:353` と同じ）。
+- **Implications**: `merge_from` をやめて空の `TranspileContext` を渡せば、要件 3.2 の「見つからない」が `search/context.rs` に触らずに得られる。引数の誤り（空の名前）はエラーのまま残る。要件 3.2 の「エラーにはしない」は正しい引数の検索についての決めごとと読む（設計の前提・Open Question）。
+
+### 既存の境界の確かめ
+
+- `pasta_check` は `pasta_lua` に**通常の依存を持たない**（wasm でもビルドするため。`pasta_lua` は dev-dependency で、パリティのテストだけが使う）。大文字と小文字を区別しない比べ方は、両側に 1 行ずつ書き、パリティのテストで揃える（共有の関数は置けない）。
+- `pasta_shiori` は `LoaderError` を `format!("{}", e)` で `MyError::Load` に包み、`single_line` で 1 行にして `X-ERROR-REASON` へ入れ、`PastaShiori load failed` の error ログにも書く（`pasta_shiori/src/shiori.rs:132-154`・`error.rs:48-51`）。新しい種類の読み込みエラーは、この経路にそのまま乗る（要件 2.5・4.4）。
+- `TranspileContext::merge_from` の本番の使い手は `loader/process.rs:182` だけ。この spec がやめると、使い手は `src/context.rs` の単体テストだけになる。`src/context.rs` は `ponytail-lua-transpiler` の持ち場なので、この spec では消さない（申し送り）。
+- `LoaderContext::new` の使い手は、`context.rs` の単体テストと、移し替える 2 つのテストファイルだけ。
+- `tests/runtime/main.rs` は `tests/common/mod.rs` を `#[path]` で取り込み、その `#[ctor]` が `PASTA_DEBUG`・`PASTA_DEBUG_PORT` を外す。移したテストは同じテストバイナリに置けば要件 9.4 を満たす。
+- `PastaLoader::load` に渡すパスは、テストの補助（`tests/common/mod.rs:206`）も `pasta_shiori` も `std::path::absolute` の形で、`\\?\` の前置きを持たない。`?` の検査が既存のテストを落とすことは無い。
+
+## Architecture Pattern Evaluation（設計）
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+| ------ | ----------- | --------- | ------------------- | ----- |
+| A. 既存の部品の中で直す | `needs_transpile` を `!=` に、`save_cache` の後に時刻を写す。衝突・パスの検査は `discover_all_files`・`load_with_config` に足す。撤去は削除だけ | 新しいファイル・記録・依存が無い。差分が最小 | 粗いファイルシステムを別ボリュームにしたときに毎回変換（安全側） | **採用** |
+| B. 元の時刻（ハッシュ）を別の記録へ | キャッシュの横に表を置く | ファイルシステムに頼らない | 記録の形式・壊れたときの扱いが増える | 実験 1 で不要と分かった |
+| C. A＋時刻の設定の失敗でキャッシュを消す | 失敗したキャッシュを消して次も変換させる | 失敗のあと確実に変換 | 分岐が増える。そろわなかったキャッシュは時刻が違うので、消さなくても次の起動で必ず変換される | 要件 1.7 の確定（警告だけ）で不要 |
+
+## Design Decisions（設計）
+
+### Decision: キャッシュの時刻を写す口を `save_cache` と分ける
+
+- **Context**: 要件 1.6（書けなければ読み込みエラー）と 1.7（時刻をそろえられなければ警告）は、失敗の扱いが違う。
+- **Alternatives Considered**:
+  1. `save_cache` に元の時刻の引数を足し、中で写す — 失敗の種類を戻り値で分ける型が要る。テスト 15 か所の呼び出しが変わる。
+  2. `save_cache` の中で元の時刻を読み直す — 内容を読んでから時刻を読むまでに作者が保存すると、**古い内容に新しい時刻**が付き、次の編集まで古い変換が動く（要件 1 の不具合そのもの）。
+  3. 新しいメソッド `stamp_cache(source, mtime)` を足し、ローダーが `save_cache` の後に呼ぶ — **採用**。
+- **Selected Approach**: ローダーは、内容を読む**前に**元の時刻を取り、`save_cache` が成功した後に `stamp_cache` で写す。`save_cache` の失敗は `TranspileFailure`、`stamp_cache` の失敗は `warn!`。
+- **Rationale**: 2 つの失敗の扱いが 2 つの呼び出しにそのまま対応する。既存の `save_cache` のテストは変わらない。読む前に時刻を取るので、読んでいる間に保存されても、次の起動で時刻が違い、変換し直される（安全側）。
+- **Trade-offs**: `CacheManager` の公開メソッドが 1 つ増える（`save_cache` と `stamp_cache` の 2 段を守る呼び手はローダーだけ）。
+
+### Decision: 衝突の検査は「隠す前」の一覧で、畳んだ名前で数える
+
+- **Context**: 要件 2.3（`pasta_check` と同じ組み合わせ）・2.7（大文字と小文字）。
+- **Selected Approach**: `discover_all_files` で、`init.*` の検査の後・`.lua` を隠す前に、`.pasta` 同士・`.lua` 同士を `module_name.to_lowercase()` ごとに集める。2 つ以上の組が 1 つでもあれば、すべての組を 1 つの `LoaderError::ModuleNameCollision` にまとめて返す。`.pasta` と `.lua` の間（隠す判定）も畳んだ名前で比べる（【前提】Open Question）。
+- **Rationale**: `pasta_check` の `module_name::check` は、`.pasta` 群・`.lua` 群をそれぞれ全部（隠される `.lua` も含めて）数える。同じ数え方にしないと、要件 2.3 が崩れる。
+- **畳み方**: Unicode の `str::to_lowercase()`。NTFS は大文字の表（Unicode の単純な大文字化）で比べるので、全角の英字・ギリシャ文字・キリル文字も同じに扱う。ASCII だけにすると、`dic/Ａ-b.pasta` と `dic/ａ_b.pasta`（全角）が NTFS で同じキャッシュを奪い合うのを見逃す。`to_lowercase` が NTFS より広く同じとみなす文字（ケルビン記号など）は、エラー（安全側）に倒れる。
+
+### Decision: finalize 前の検索は「空の登録表」を渡すだけ
+
+- **Selected Approach**: `process_incremental` は `TranspileContext` を集めず返さない。`from_loader_with_scene_dic` は `context` の引数を持たず、中で `TranspileContext::new()` を `with_config_and_source_map` へ渡す。
+- **Rationale**: 実験 2 のとおり、空の表は「見つからない」を返す。`search/context.rs`（範囲外）にも `runtime/finalize.rs`（0.5.0 の `scene-attribute-store` が触る）にも触らない。
+
+### Decision: `;`・`?` の検査は設定を読んだ直後に 1 か所で
+
+- **Selected Approach**: `load_with_config` の段階 1.5（ロガー）の直後に `LoaderContext::from_config` を作り、`check_package_path_chars()` で、絶対パスにしたゴーストのフォルダと `lua_search_paths` の各項目を調べる。作った `LoaderContext` は段階 6 でそのまま使う。
+- **Rationale**: `package.path` に入るのは `LoaderContext::base_dir`（`std::path::absolute` の形）と `lua_search_paths` の各項目だけである。同じ値を、作る所と同じ部品で検査すれば、検査と実物が食い違わない。段階 2（キャッシュの準備）より前なので、辞書の変換と Lua の実行より前になる（要件 4.1）。ロガーの後なので、エラーはゴーストのログにも残る。
+- **Alternatives**: 入口（設定を読む前）でゴーストのフォルダだけ見る（brief の案）— `lua_search_paths` を見るために検査が 2 か所に割れる。
+
+### Decision: `Encoder` と `Encoding` を 2 つの関数にする
+
+- **Selected Approach**: `encoding::utf8_to_ansi(&str) -> io::Result<Vec<u8>>` と `encoding::ansi_to_utf8(&[u8]) -> io::Result<String>`。Windows は `GetACP()` のコードページ、他は UTF-8 の素通し。`Encoder`・`Encoding`・`Encoding::OEM`・`lib.rs` の再輸出を消す。
+- **Alternatives**: 値が 1 つ（`ANSI`）だけの `enum Encoding` に固有のメソッドを残す — 呼び出しの字面は変わらないが、選べない enum が残る（ponytail の「実装が 1 つの継ぎ目」）。
+- **Follow-up**: `pasta_shiori` の `src/util/hglobal/enc.rs` は自前の `Encoder`・`Encoding` を持ち、この変更の影響を受けない（範囲外の `ponytail-shiori`）。
+
+### Decision: 撤去で消すものと残すもの
+
+- 消す：`presentation/`・`renderer_injection.rs`・`from_loader`・`load_scene_dic`・`TranspileResult`・`_scene_dic_path`・`LoaderError::{Parse, Transpile}` と `parse`・`parse_with_source`・旧 `scene_dic.lua` の片付け・`loader/mod.rs` の 2 回目の孤立キャッシュの警告・`LoaderContext::new`（【前提】Open Question）。
+- 残す：`PastaLuaRuntime::new`・`with_config`・`exec`・`exec_file`・`exec_named`（ランタイムを組み立てて動かす公開の API で、多くのテストが頼る。抽象の重ねではない）。`from_loader_with_scene_dic` の名前（debug の章が使う）。`fatal_startup_module`（本番の `require_startup_module` が使う）。`find_orphaned_caches` の戻り値（テスト `lua_passthrough_test.rs:514` などが使う）。`TranspileContext::merge_from`（`ponytail-lua-transpiler` の持ち場）。
+
+## Synthesis（設計）
+
+- **Generalization**: 要件 2（衝突）と要件 4（パスの文字）は、どちらも「起動の前の検査で、作者が直す場所を名指しする読み込みエラー」である。`init.pasta` を断る `LoaderError::InvalidFileName` と同じ形（`LoaderError` の種類を足し、`pasta_shiori` の経路に乗せる）に揃え、共通の検査の枠は作らない（検査は 2 つだけで、置き場所も違う）。
+- **Build vs Adopt**: 時刻を写すのは標準の `File::set_modified`（新しい依存 `filetime` は要らない）。大文字と小文字の畳みは標準の `str::to_lowercase`。どちらも採用。
+- **Simplification**: 撤去で約 900 行（`presentation/` 418・`renderer_injection.rs` 213・`from_loader`/`load_scene_dic` 約 120・`TranspileResult`・`Parse`/`Transpile` とそのテスト・旧位置の片付け）が消える。新しく足すのは、`stamp_cache`・衝突の集め方・パスの文字の検査・`LoaderError` の 3 種類だけで、新しいファイルは作らない。
+
+## Risks & Mitigations（設計）
+
+- 既存のテストの意味が変わる（`cache_test.rs:228` の `test_needs_transpile_cache_newer` は「キャッシュが新しければ変換しない」を確かめている）— 「時刻が同じなら変換しない」「違えば新旧を問わず変換する」に書き直す。直す前に落ちるテストを先に置く（要件 9.2）。
+- 版を上げずに入れたとき、既存のキャッシュの時刻は書いたときの時刻なので、1 回だけ全部を変換し直す — 害は無い（以後は写した時刻で一致する）。リリースでは版が変わり、キャッシュは丸ごと消える。
+- `.lua` 同士の衝突の数え方を誤る（隠した後に数える）と `pasta_check` と食い違う — パリティのテストに、隠される `.lua` 同士の組を入れる。
+- `stamp_cache` の失敗（要件 1.7）はテストで起こしにくい — 失敗の分岐は `warn!` だけで、次の起動で時刻が違うので必ず変換し直される。レビューで確かめる（Open Question）。
+- `ponytail-lua-transpiler` と `lib.rs` の再輸出の行を共有する — 行が別なので、後から入る側が合わせる（要件の Adjacent expectations）。
+
+## 申し送り（設計で見つけたもの・他 spec へ）
+
+- **`ponytail-lua-transpiler` へ**: この spec で `loader/process.rs` が `TranspileContext::merge_from` を呼ばなくなる。本番の使い手が無くなるので、`src/context.rs` の持ち主として、消すか残すかを決めてほしい（この spec は `src/context.rs` に触らない）。この spec は `.kiro/specs/ponytail-lua-loader/` の外を書けないため、相手の brief への追記は設計ディスカッションで行う（Open Question）。
