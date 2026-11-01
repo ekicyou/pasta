@@ -12,20 +12,21 @@
 
 要件は「その領域の指摘が残らず直っている」ことと、挙動を変える直しの決めごとである。どう直すか（関数・ファイルの形）は設計で決める。
 
-> 【前提】の印を付けた条項は、brief.md だけでは決めきれず、最善の案で書いたものである。要件ディスカッションで確かめる（research.md の「要件ディスカッションへの持ち越し」に対応する）。
+> brief.md だけでは決めきれなかった 9 つの論点は、2026-11-01 の要件ディスカッションで、すべて推奨案のとおりに確定した（research.md の「要件ディスカッションへの持ち越し」）。
 
 ## Boundary Context
 
 - **In scope**
   - 監査の 2〜8 番（キャッシュの日付・同じモジュール名・finalize 前の検索・パスの `;`・使われない抽象・古い構築の道・小物）。
-  - ギャップ分析で増えた、同じ領域の指摘（要件 1.6・5.5・5.6 など。【前提】の印を付けた）。
+  - ギャップ分析で増えた、同じ領域の指摘（要件 1.6・1.7・2.7・4.2・5.5・5.6）。
+  - 大文字と小文字だけ違うモジュール名の衝突（要件 2.7・2.8）。症状が監査の 3 番と同じなので、この spec で直す。`pasta_check validate` の衝突の比べ方も、ローダーと揃えて直す。
   - 挙動を変える直しと撤去に合わせた、マニュアルの頁と `.kiro/steering/structure.md` の直し。
 - **Out of scope**
   - 読めないセーブの退避（監査の 1 番）。2026-10-24 に `toml-serialization` へ移り、PR #200 で入った。`runtime/persistence.rs`・`runtime/lifecycle.rs`・`pasta-persistence.md` には触らない。
   - `ponytail-lua-transpiler` が持つもの：`src/code_gen/`・`src/normalize.rs`・`src/config.rs`・`src/context.rs`（`TranspileContext`）・`src/transpiler.rs`。`loader/context.rs`（`LoaderContext`）は、この spec が持つ。
   - `src/debug/`（`ponytail-lua-debug`）、`pasta_scripts/`（`ponytail-lua-scripts`）、`search/context.rs`（`ponytail-core-registry`）、`sakura_script/`（`talk-grapheme-clusters` で完了。要件 5.3 のとおり、出力をバイト単位で保つ相手）、`pasta_shiori` の `enc.rs`（`ponytail-shiori`）。
   - `runtime/searcher.rs` の FFI の道（`lua-cmodule-robustness` で完了）。
-  - `pasta_check` の側の衝突の規則は変えない（ローダーが合わせる相手）。
+  - `pasta_check` のファイルのパスからモジュール名を決める規則は変えない（ローダーが合わせる相手）。変えるのは、決めた名前どうしを比べるときに大文字と小文字を区別しないことだけである（要件 2.8）。
 - **Adjacent expectations**
   - `pasta_shiori` は、ローダーの読み込みエラーを今の経路（ログと `X-ERROR-REASON: Load error: …`）でそのまま作者へ届ける。この spec は、その経路を変えない。
   - `ponytail-lua-transpiler` とは `lib.rs` の再輸出を共有する。行が別なので、後から入る側が合わせる。
@@ -45,7 +46,8 @@
 3. When `.pasta` または辞書の `.lua` の更新時刻が、前回の変換または写しのときと同じである, the Pasta Loader shall 変換または写しを省き、キャッシュの結果を使う。
 4. If 辞書のファイルかキャッシュの更新時刻を取得できない, then the Pasta Loader shall そのファイルを変換し直す（今と同じ）。
 5. When 作者がバックアップから前日の日付の `.pasta` を上書きで戻してゴーストを起動し直した, the Pasta Loader shall 戻した `.pasta` の内容でトークする。
-6. If `.pasta` の変換結果をキャッシュへ書けなかった, then the Pasta Loader shall そのファイルの名前つきの読み込みエラーにし、前の変換結果で動き続けない（今は警告だけで続け、古いキャッシュがあればそれが動く。辞書の `.lua` の写しの失敗は、今も読み込みエラーである）。 【前提】
+6. If `.pasta` の変換結果をキャッシュへ書けなかった, then the Pasta Loader shall そのファイルの名前つきの読み込みエラーにし、前の変換結果で動き続けない（今は警告だけで続け、古いキャッシュがあればそれが動く。辞書の `.lua` の写しの失敗は、今も読み込みエラーである）。
+7. If キャッシュの更新時刻を、変換元の辞書の更新時刻にそろえられなかった, then the Pasta Loader shall 警告をログに書いて読み込みを続ける（そろわなかったキャッシュは、次の起動で更新時刻が違うので必ず変換し直される）。
 
 ### Requirement 2: 同じモジュール名になる辞書は読み込みエラーにする
 
@@ -59,6 +61,8 @@
 4. While `.pasta` と辞書の `.lua` が同じモジュール名になる, the Pasta Loader shall 今と同じく `.pasta` を採り、その `.lua` を警告つきで読み込まない（`pasta_check` の `module-lua-shadowed` が警告であるのと揃う）。
 5. When 衝突で読み込みエラーになった, the Pasta Loader shall そのエラーを、ほかの読み込みエラーと同じ経路（ログと、`pasta_shiori` が返す `X-ERROR-REASON`）で作者へ届ける。
 6. The Pasta Loader shall 同じモジュール名にならない辞書の組み合わせ（日本語の名前・サブフォルダを含む）を、今と同じく読み込む。
+7. If 2 つ以上の辞書のモジュール名が、大文字と小文字の違いを除いて同じになる（例：`dic/A-b.pasta` の `pasta.scene.A_b` と `dic/a_b.pasta` の `pasta.scene.a_b`。Windows ではキャッシュの 1 つのファイルを奪い合う）, then the Pasta Loader shall 1 と同じく読み込みエラーにし、モジュール名と関わるすべてのファイルの名前をエラーの理由に含める。この扱いは OS によらない。
+8. The `pasta_check validate` shall 7 の組み合わせを、`module-pasta-collision`・`module-lua-collision` のエラーにする（3 の「ローダーと `pasta_check` は同じ組み合わせをエラーにする」を保つ）。
 
 ### Requirement 3: finalize 前の検索を、起動ごとに同じにする
 
@@ -67,7 +71,7 @@
 #### Acceptance Criteria
 
 1. While シーン辞書の finalize の前である（`main.lua` の実行中・シーン辞書の読み込み中の Lua ブロックのトップレベル）, the `@pasta_search` module shall キャッシュの状態や直前に編集した辞書によらず、同じ結果を返す。
-2. While シーン辞書の finalize の前である, the `@pasta_search` module shall どのシーン・単語の検索にも「見つからない」を返す（エラーにはしない。今の「結果は使えない」というマニュアルの断りを、決まった結果に変える）。 【前提】
+2. While シーン辞書の finalize の前である, the `@pasta_search` module shall どのシーン・単語の検索にも「見つからない」を返す（エラーにはしない。今の「結果は使えない」というマニュアルの断りを、決まった結果に変える）。
 3. When `main.lua` に `SEARCH:search_scene("OnBoot")` と書いたゴーストを、辞書を編集した直後と、編集せずにもう一度起動した, the `@pasta_search` module shall どちらの起動でも同じ結果（見つからない）を返す。
 4. When シーン辞書の finalize が終わった, the `@pasta_search` module shall 今と同じく、すべての辞書のシーンと単語を検索の対象にする。
 
@@ -78,7 +82,7 @@
 #### Acceptance Criteria
 
 1. If ゴーストのフォルダ（`ghost/master`）の絶対パスに `;` か `?` が含まれる（例：`C:\SSP\ghost\a;b\ghost\master`）, then the Pasta Loader shall 辞書の変換と Lua の実行より前に読み込みエラーにし、エラーの理由に問題の文字とパスを含める。
-2. If `pasta.toml` の `[loader]` の `lua_search_paths` の項目に `;` か `?` が含まれる, then the Pasta Loader shall 1 と同じく、問題の文字とその項目を理由に含めた読み込みエラーにする。 【前提】
+2. If `pasta.toml` の `[loader]` の `lua_search_paths` の項目に `;` か `?` が含まれる, then the Pasta Loader shall 1 と同じく、問題の文字とその項目を理由に含めた読み込みエラーにする。
 3. The Pasta Loader shall `;` と `?` を含まないパス（日本語・空白・長いパス・8.3 形式の短い名前を含む）を、今と同じく読み込む。
 4. When 1 または 2 の読み込みエラーになった, the Pasta Loader shall そのエラーを、ほかの読み込みエラーと同じ経路（ログと `X-ERROR-REASON`）で作者へ届ける。
 
@@ -91,9 +95,9 @@
 1. The pasta_lua crate shall `presentation` モジュール（`PresentationMarker`・`RenderBoundary` など）を提供しない。
 2. The pasta_lua crate shall `RendererInjection`・`SakuraRenderBoundary`・`default_sakura_renderer` を提供しない。
 3. When ランタイムが `@pasta_sakura_script` を登録する, the Pasta Lua Runtime shall `talk_to_script` の出力を、撤去の前とバイト単位で同じにする。
-4. The pasta_lua crate shall `Encoding::OEM` と、実装が 1 つだけの `Encoder` の抽象を提供しない。そのうえで、`@enc` の UTF-8 と ANSI の変換と、`ffi.load` の名前の扱いの結果は変えない。 【前提】
-5. The pasta_lua crate shall 本番で作られない読み込みエラーの種類（`LoaderError::Parse` とその作り方、`LoaderError::Transpile`）を提供しない（ギャップ分析で増えた指摘）。 【前提】
-6. The Pasta Loader shall 古い版のキャッシュの置き場所（`scene_dic.lua` の旧位置）を消す処理を持たない。版が変わるとキャッシュは丸ごと消えるので、この処理は働かない（ギャップ分析で増えた指摘）。 【前提】
+4. The pasta_lua crate shall `Encoding::OEM` と、実装が 1 つだけの `Encoder` の抽象を提供しない。そのうえで、`@enc` の UTF-8 と ANSI の変換と、`ffi.load` の名前の扱いの結果は変えない。
+5. The pasta_lua crate shall 本番で作られない読み込みエラーの種類（`LoaderError::Parse` とその作り方、`LoaderError::Transpile`）を提供しない（ギャップ分析で増えた指摘）。
+6. The Pasta Loader shall 古い版のキャッシュの置き場所（`scene_dic.lua` の旧位置）を消す処理を持たない。版が変わるとキャッシュは丸ごと消えるので、この処理は働かない（ギャップ分析で増えた指摘）。
 
 ### Requirement 6: テストだけが使う古い構築の道を無くす
 
@@ -113,7 +117,7 @@
 #### Acceptance Criteria
 
 1. When 元の辞書が無いキャッシュのファイルが見つかった, the Pasta Loader shall そのファイルごとに警告を 1 回だけログへ書く。
-2. The Pasta Loader shall 1 の警告を、`[loader] debug_mode` の値によらず出す（今、常に出ている方を残し、`debug_mode` のときだけ重ねて出す方を無くす）。 【前提】
+2. The Pasta Loader shall 1 の警告を、`[loader] debug_mode` の値によらず出す（今、常に出ている方を残し、`debug_mode` のときだけ重ねて出す方を無くす）。
 3. The Pasta Loader shall 孤立したキャッシュのファイルを読み込まず、消しもしない（今と同じ）。
 
 ### Requirement 8: マニュアルと steering を、直した挙動に合わせる
@@ -127,6 +131,7 @@
    - `internals/loader.md`（同じモジュール名の衝突・`package.path`）
    - `reference/startup.md`（`;`・`?` を含むパス）
    - `lua/modules/pasta-search.md`・`lua/modules/index.md`・`internals/internal-modules.md`（finalize 前の検索）
+   - `debug/validate.md`（`pasta_check` の衝突が、大文字と小文字の違いを除いて比べること。ローダーも同じ組み合わせを読み込みエラーにすること）
 2. When 要件 5〜6 の撤去が入る, the pasta manual shall 撤去したものの記述を消すか、今の構成に書き直す。少なくとも次の頁である。
    - `internals/shiori.md`（presentation とレンダラの注入の節・ファイルの表・継ぎ目の表・ソースの一覧）
    - `internals/talk-output.md`（その節への参照）
@@ -135,7 +140,7 @@
    - `index.md`（章の見張るパス）
 3. When 要件 5〜6 の撤去が入る, the `.kiro/steering/structure.md` shall `presentation/` と `renderer_injection.rs` の行を消し、今の構成を書く。
 4. When `lua/modules/` などスキルの参照の元になる頁を直した, the pasta manual shall `node book/tools/gen-skill-refs.mjs` を走らせ、生成物を同じ変更に入れる（`--check` で差分が無い）。
-5. Where この spec が、ponytail の 10 本のうち公開クレートの pub API を消す最初の 1 本として main に入る, the change shall README と `tech.md` に、公開 API を予告なく消すことがある断り書きを 1 回だけ書く。 【前提】
+5. If 実装の時点で、README と `tech.md` に「公開クレートの pub API を予告なく消すことがある」断り書きがまだ無い, then the change shall その断り書きを 1 回だけ書く（ponytail の spec のうち、先に main へ入った 1 本が書く）。
 
 ### Requirement 9: 直していない挙動を保ち、品質の関門を通す
 
@@ -145,5 +150,5 @@
 
 1. The Pasta Loader shall 要件 1〜7 のほかの起動の挙動を変えない。対象は、辞書の発見と読み込みの順、`init.pasta`・`init.lua` を断る扱い、版と別名表の指紋の変化でキャッシュを丸ごと消す扱い、読み込みエラーの経路である。
 2. When 挙動を変える直し（要件 1〜4）を入れる, the change shall 直す前の誤りを再現するテストを先に置き、直したあとにそのテストが通る。
-3. The change shall `cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_lua -p pasta_shiori` を通る。
+3. The change shall `cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_lua -p pasta_shiori -p pasta_check` を通る。
 4. If 新しいテストが環境変数 `PASTA_DEBUG` を読む道を通る, then the test shall その値を中和する守りを持ち、開発者の環境によって結果が変わらない。
