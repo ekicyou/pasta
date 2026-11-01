@@ -30,7 +30,7 @@ SHIORI 層は、ベースウェア（SSP など）が呼ぶライブラリの関
 - Lua 側の SHIORI エントリ（`SHIORI.load`・`SHIORI.request`・`SHIORI.unload`・`SHIORI.kick`）と、`REG`・既定ハンドラ・シーン関数フォールバックによるイベントの振り分け
 - 非同期トーク（`get_property` のコールバック）が SHIORI のリクエストとしてどう往復するか
 - 仮想イベントディスパッチャ（OnTalk・OnHour とトーク頻度）
-- presentation マーカーとレンダラ注入（`@pasta_sakura_script` の登録の継ぎ目）
+- `@pasta_sakura_script` の登録
 - DLL のビルド構成（リリースプロファイル・静的 CRT・バージョン情報）
 
 次の事項は他の章が権威を持ち、この章では再記述しない。
@@ -98,13 +98,6 @@ VM（`PastaLuaRuntime` を内包する `PastaShiori`）は `!Send` であり、�
 | `crates/pasta_shiori/build.rs` | pasta.dll に埋め込むバージョン情報（`VERSIONINFO`）の生成 |
 
 `crates/pasta_shiori/src/util/shiori.md` は SHIORI の外部仕様の写しで、実装からは参照されない。
-
-### Rust 側（pasta_lua）
-
-| ファイル | 役割 |
-| -------- | ---- |
-| `crates/pasta_lua/src/presentation/` | 宿主に依存しない出力の表現 `PresentationMarker`、トークの付随値を引く `TokenFields`、マーカー列を宿主の出力にする境界 `RenderBoundary` |
-| `crates/pasta_lua/src/runtime/renderer_injection.rs` | `@pasta_sakura_script` を作る関数を差し替え可能に包む `RendererInjection`、既定のレンダラ `default_sakura_renderer`、`RenderBoundary` の実装 `SakuraRenderBoundary` |
 
 ### Lua 側（`crates/pasta_lua/pasta_scripts/pasta/shiori/`）
 
@@ -572,19 +565,11 @@ REG.OnSecondChange（既定。鎖の底）
 - `default_204` のバイト列は、`RES.no_content()` が既定の `RES.env` で作る応答と同じである。
 - Rust の 500・400 の理由は `single_line` で 1 行にする。`stack traceback:` の行から後を捨て、残りの行を前後の空白を除いて半角スペースでつなぐ。改行を含まない理由はそのまま使う。
 
-### presentation マーカーとレンダラ注入
+### `@pasta_sakura_script` の登録
 
-`crates/pasta_lua/src/presentation/` は、エンジンの出力をさくらスクリプトのような宿主の形式に依存しない列として表すための型である。
+VM の構築の途中で、`register_sakura_script_module`（`crates/pasta_lua/src/runtime/module_registry.rs`）が `crate::sakura_script::register` を直接呼び、返った表を `package.loaded["@pasta_sakura_script"]` に置く。`register` には `pasta.toml` の `[talk]`（`TalkConfig`）を渡し、無ければ既定値を使う。
 
-- `PresentationMarker` は `Talk`・`ActorSwitch`・`Wait`・`Choice` と、それ以外を表す `Extension` を持つ（`#[non_exhaustive]`）。`classify` は Lua のトークンの `type` を分類し、`talk`・`sakura_script` を `Talk`、`actor` を `ActorSwitch`、`wait` を `Wait`、`choice` を `Choice`、それ以外を `Extension`（`kind = "passthrough:型名"`）にする。値は `TokenFields` の実装から引く。
-- `RenderBoundary` はマーカー列を宿主の出力へ畳み込む境界である。対応するマーカーは `render_known` が文字列を返し、対応しないマーカー（`None`）は `on_unknown` の既定動作（空文字列）で吸収する。`render_stream` は列を順に連結する。
-
-`@pasta_sakura_script` の登録は `RendererInjection` を通る。`RendererInjection` は `fn(&Lua, Option<&TalkConfig>) -> LuaResult<Table>` を 1 つ持つ薄い包みで、`register_sakura_script_module` がそれを呼んで返った表を `package.loaded["@pasta_sakura_script"]` に置く。既定（`RendererInjection::default`）は `default_sakura_renderer`、すなわち `crate::sakura_script::register` である。
-
-現行の実装では、次のとおり出荷経路のバイト列はマーカーを経由しない。
-
-- VM の構築（`from_loader_with_scene_dic`）は常に `RendererInjection::default()` を渡す。`pasta_shiori` から別のレンダラを渡す経路は無い。
-- 応答のさくらスクリプトは、VM の中で `pasta.shiori.sakura_builder` と `@pasta_sakura_script` が作る（[トーク出力とアピアランス](talk-output.md)）。Lua のトークを `PresentationMarker` に変換する処理は出荷経路に無く、`classify` と `SakuraRenderBoundary`（`Talk` の本文だけを返す）を使うのはテストだけである。
+応答のさくらスクリプトは、VM の中で `pasta.shiori.sakura_builder` と `@pasta_sakura_script` が作る（[トーク出力とアピアランス](talk-output.md)）。
 
 ### DLL のビルド構成
 
@@ -624,7 +609,7 @@ REG.OnSecondChange（既定。鎖の底）
 | `pasta_lua` → `pasta_shiori`（キック） | デバッグ通信のスレッド → `KickSink` | `KickRequest { scene }` | クロージャはそのインスタンスの mailbox の送信端の弱い参照だけを持ち、`try_send` で投函する。インスタンスが片付いた後や送れないときは捨てる。DAP がつながっているインスタンスにだけ届く |
 | Rust → Lua（リクエスト） | `PastaShiori` → `SHIORI.request` | `parse_request` が作った表 | 表は VM が所有し、ACT の `req` として残る |
 | Lua → Rust（応答） | `SHIORI.request` → `PastaShiori` | SHIORI 応答の文字列の全体 | 文字列の複製が Rust に渡る |
-| `pasta_lua` のコア → レンダラ | `register_sakura_script_module` → `RendererInjection` | VM と `TalkConfig` | 返った表は `package.loaded` に置かれて VM が所有する |
+| `pasta_lua` のコア → `@pasta_sakura_script` | `register_sakura_script_module` → `sakura_script::register` | VM と `TalkConfig` | 返った表は `package.loaded` に置かれて VM が所有する |
 
 ## 不変条件と制約
 
@@ -650,8 +635,6 @@ REG.OnSecondChange（既定。鎖の底）
 - `crates/pasta_shiori/src/`
 - `crates/pasta_shiori/build.rs`
 - `crates/pasta_shiori/Cargo.toml`
-- `crates/pasta_lua/src/presentation/`
-- `crates/pasta_lua/src/runtime/renderer_injection.rs`
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/`
 - `.cargo/config.toml`
 

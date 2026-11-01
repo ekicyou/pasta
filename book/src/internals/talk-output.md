@@ -25,7 +25,7 @@
 次の事項は他の章が権威を持ち、この章では再記述しない。
 
 - `build` がいつ呼ばれ、その戻り値がどう応答になるか（`act:yield()`・シーン終了時の `build`・再開のループ）は [ランタイム実行モデル](execution-model.md#イベントからシーンへ) で扱う。
-- `@pasta_sakura_script` を VM に登録する継ぎ目（`RendererInjection`）と presentation マーカーは [SHIORI 層](shiori.md#presentation-マーカーとレンダラ注入) で扱う。
+- `@pasta_sakura_script` を VM に登録する処理は [SHIORI 層](shiori.md#pasta_sakura_script-の登録) で扱う。
 - ACT のメソッドとフィールドの個々の仕様は [Lua ランタイム内部モジュール](internal-modules.md#act-の内部) で扱う。シーン関数がどの ACT のメソッドを呼ぶかは [トランスパイラ](transpiler.md#生成される-lua-コードの形) で扱う。
 - 文字の分類・ウェイトの値・budoux の幅の指定方法は [@pasta_sakura_script](../lua/modules/pasta-sakura-script.md) と [pasta.toml リファレンス](../reference/pasta-toml.md#talkトーク表示制御) が正である。段落区切りの改行量は [spot_newlines](../reference/pasta-toml.md#spot_newlines)、台詞の後の選択肢の前の改行量は [choice_newlines](../reference/pasta-toml.md#choice_newlines)、選択肢の後の改行量は [after_choice_newlines](../reference/pasta-toml.md#after_choice_newlines)、budoux の数え方は [budoux](../reference/pasta-toml.md#budoux)、スポットの決まり方は [バルーン連携](../grammar/actor-dictionary.md#バルーン連携)、外見の復旧の規則と記録できない指定は [同一スポット共有時の外見の復旧](../grammar/actor-dictionary.md#同一スポット共有時の外見の復旧)、装いの書き方と利用者から見た出し入れは [装い（font）](../reference/pasta-toml.md#装いfont) と [1 つのスポットを複数のアクターで共有する](../grammar/actor-dictionary.md#1-つのスポットを複数のアクターで共有する) が正である。
 - `font` の検査とタグ列への置き換えは [ローダ自己展開とモジュール解決](loader.md#設定読込) で扱う。
@@ -338,7 +338,6 @@ SSP 2.9.18 は、引数の無い `\c` の後の字を既定の表示で出す（
 - budoux の行の状態は、組立が 1 回のビルドの中でスポットごとに持ち（`columns`）、`talk_to_script` の 3 つ目の引数で渡す。1 回の呼び出しの中では、テキストの中の行を動かす単位（`\n`・`\n[…]`・引数の無い `\c`・`\_l[…]`）で数え直す。作者が書いたタグも、単語や関数が返して `talk` に結合されたタグも、`sakura_script` のテキストの中のタグも同じに読む。呼び出しの間では、組立が出す区切り（`put_break`）が 1 行、`newline` が `n` 行進め、`clear` が最初の行に戻し、`clear_spot` が全スポットの状態を捨てる。表情・ウェイト・`choice_timeout`・`raw_script`・`choice` は状態を変えない（`raw_script` のテキストの中の `\c` と、選択肢の表示の文字は数えない）。そのため、`sakura_script` や表情で区切られた `talk` も、同じスポットでは前の `talk` の終わりの行と字数を引き継ぐ。状態はビルドをまたがない。
 - `budoux` の無いアクターの `talk`・`sakura_script` も、行の状態を進める（改行は入れない）。同じスポットで相手役が `\n`・`\c` を書いたときに、行の番号がずれないためである。
 - 組立の 2 つの動き（`next_column`・`first_column`）は、Rust の `ColumnMove::Next`・`ColumnMove::First` の写しである。片方だけを直さない。同じ動きになることは `sakura_builder_test.lua` で確かめる。
-- 代わりのレンダラ（[presentation マーカーとレンダラ注入](shiori.md#presentation-マーカーとレンダラ注入)）が 3 つ目の引数を使わなければ、台詞の中の字数は数えられず、行の状態は組立の区切りの分だけ進む。出力は壊れない。
 - SSP が自分で折り返した分（1 語で上限を超えた行、`budoux` の無いアクターの台詞）は行の状態に入らないため、実際の行とずれうる。
 - 単位（タグ・エスケープ・囲み）はどれも budoux 改行の幅に数えない。エスケープと中身のある囲みはバルーンに字を表示するが、ほかのタグと同じく幅 0 として扱われる。そのため囲みが長いと、その行は幅の上限を超えることがある。
 - `budoux` の配列に整数にできない要素があると `talk_to_script` は Lua のエラーになる。`budoux` が空でない配列のときは、数値にできない `budoux_newlines` と、整数にできない要素のある `budoux_jump` も同じくエラーになる。ウェイトのキーは読めなければ既定値になる。

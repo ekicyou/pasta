@@ -85,6 +85,8 @@ pasta 本体（パーサ・トランスパイラ・ランタイム・SHIORI）�
 
 依存の向きは `pasta_shiori` → `pasta_lua` → `pasta_dsl`・`pasta_core` です。
 
+公開クレートの pub API は、予告なく消すことがあります。
+
 ### クイックスタート
 
 ```bash

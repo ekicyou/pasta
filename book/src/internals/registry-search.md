@@ -83,7 +83,7 @@
 
 ### 辞書確定
 
-`@pasta_search` は 2 回登録される。1 回目は Lua VM の構築時（`crates/pasta_lua/src/runtime/mod.rs`）で、トランスパイル時の `TranspileContext` のレジストリから作られる。2 回目がここで述べる辞書確定で、検索の権威はこちらにある。どちらの登録も、`RuntimeConfig.scene_aliases` の同じ別名表を `SearchContext` に渡す。辞書確定へは、`register_finalize_scene` が受け取った表をクロージャに保持して渡す。ランタイムの構築（`crates/pasta_lua/src/runtime/factory.rs`）は、VM の構築とモジュールの登録の後に `register_finalize_scene` を呼び、`main`・`pasta.shiori.entry` を読み込んでから `pasta.scene_dic` を読み込む。`scene_dic.lua` は全シーンモジュールを `require` した後に `require("pasta").finalize_scene()` を呼び、ここで Rust の `finalize_scene_impl` が動く。
+`@pasta_search` は 2 回登録される。1 回目は Lua VM の構築時（`crates/pasta_lua/src/runtime/mod.rs`）で、空の登録表から作られる。そのため辞書確定の前の検索は、どれも見つからない。2 回目がここで述べる辞書確定で、検索の権威はこちらにある。どちらの登録も、`RuntimeConfig.scene_aliases` の同じ別名表を `SearchContext` に渡す。辞書確定へは、`register_finalize_scene` が受け取った表をクロージャに保持して渡す。ランタイムの構築（`crates/pasta_lua/src/runtime/factory.rs`）は、VM の構築とモジュールの登録の後に `register_finalize_scene` を呼び、`main`・`pasta.shiori.entry` を読み込んでから `pasta.scene_dic` を読み込む。`scene_dic.lua` は全シーンモジュールを `require` した後に `require("pasta").finalize_scene()` を呼び、ここで Rust の `finalize_scene_impl` が動く。
 
 ```text
 pasta.scene_dic

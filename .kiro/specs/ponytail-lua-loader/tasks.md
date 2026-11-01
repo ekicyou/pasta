@@ -97,7 +97,7 @@
   - `gen-skill-refs.mjs --check`・`link-check.mjs`・`verify-content.mjs` が通る
   - _Depends: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
   - _Requirements: 8.1, 8.4_
-- [ ] 5.2 撤去した部品の記述を消し、steering と公開 API の断り書きを整える
+- [x] 5.2 撤去した部品の記述を消し、steering と公開 API の断り書きを整える
   - `internals/shiori.md`（責務・ファイルの表・節・継ぎ目の表・ソースの一覧）、`internals/talk-output.md` のリンク、`internals/execution-model.md`、`internals/logging-encoding.md`、`internals/index.md` の見張るパスを今の構成に直す
   - `.kiro/steering/structure.md` から `presentation/` と `renderer_injection.rs` の行を消す
   - 実装の時点で README と `tech.md` に公開 API の断り書きが無ければ、1 回だけ書く

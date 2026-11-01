@@ -175,6 +175,7 @@ pasta (workspace)
 - `publish = true` in Cargo.toml（`pasta_sample_ghost` は `publish = false`）
 - crates.io へ公開済み
 - 公開はリリースタグ `vX.Y.Z` の push で `release.yml` が Trusted Publishing で行う
+- 公開クレートの pub API は予告なく消すことがある
 
 ## デプロイメント
 

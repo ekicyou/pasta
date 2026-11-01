@@ -95,7 +95,6 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   ├── enc.rs              # ランタイムエンコーディング
 │       │   │   ├── persistence.rs      # 永続化
 │       │   │   ├── finalize.rs         # ファイナライズ処理
-│       │   │   ├── renderer_injection.rs # さくらレンダラのアダプタ注入シーム（既定=SHIORIさくら・バイト不変）
 │       │   │   ├── ffi_load/           # ffi.load の置き換え（Windows のときだけ）
 │       │   │   │   ├── mod.rs          # 設置・Lua のラッパ・理由の文言
 │       │   │   │   ├── resolve.rs      # 名前を読むパスへ解く純粋な規則
@@ -106,9 +105,6 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   ├── line_breaker.rs  # BudouX による自動改行
 │       │   │   ├── tokenizer.rs     # トークナイザー
 │       │   │   └── wait_inserter.rs # ウェイト挿入
-│       │   ├── presentation/  # 宿主非依存 presentation マーカー契約（talk/actor切替/wait/choice・拡張可能）
-│       │   │   ├── mod.rs           # PresentationEvent 型体系・RenderBoundary
-│       │   │   └── marker.rs        # 最小マーカー集合の型表現
 │       │   ├── search/       # 検索機能（Rust/Lua間バインディング）
 │       │   │   ├── mod.rs           # 検索API
 │       │   │   ├── context.rs       # 検索コンテキスト
