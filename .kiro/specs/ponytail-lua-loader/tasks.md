@@ -115,4 +115,4 @@
 ## Implementation Notes
 
 - 3.2: `encoding/unix.rs` は Windows の開発機ではビルドされない（読んで確かめただけ）。Linux・macOS での確かめは CI の build-unix に任せる。LuaJIT の C のクロスツールチェーンが無いので、手元の `cargo check --target …linux…` は通せない。
-- 3.4 のレビュー: `startup_fatal_test::startup_failure_log_carries_module_fatal_and_multiline_cause` が並列実行で 6 回中 3〜4 回落ちる（捕捉したログが空）。レビュー役は「HEAD でも同じ」と報告。main 由来か、この spec の変更で増えたかを 6 の関門の前に確かめ、根本から直す（起票に逃がさない）。
+- 3.4 のレビューで見つけた揺れるテスト（`startup_fatal_test::startup_failure_log_carries_module_fatal_and_multiline_cause`）は origin/main からの既存の不具合だった（絞って走らせると main で 18/20 落ちる）。原因は tracing のコールサイトの関心がプロセス全体で 1 つで、購読者がスレッド付きの 1 つだけだと、ほかのテストの読み込みが購読者の無いスレッドから関心を never に作り直すこと。テストに `#[traced_test]` を付けて全体の購読者を必ず立てる形で直した（0/40）。同じ捕まえ方のテストはほかに無い。
