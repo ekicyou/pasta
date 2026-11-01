@@ -4,7 +4,7 @@
 //! transpile/copy responsibilities split out of `loader/mod.rs` (C3).
 
 use super::discovery;
-use super::{CacheManager, LoaderError, PastaLoader, TranspileFailure};
+use super::{CacheManager, CollidingFile, LoaderError, PastaLoader, TranspileFailure};
 use crate::context::TranspileContext;
 use crate::transpiler::LuaTranspiler;
 
@@ -21,11 +21,31 @@ pub(super) struct ProcessStats {
     pub(super) copied: usize,
 }
 
+/// Groups of two or more files with the same folded module name, in file order.
+fn colliding_groups(
+    files: &[std::path::PathBuf],
+    cache_manager: &CacheManager,
+) -> Vec<Vec<CollidingFile>> {
+    let mut by_name: std::collections::BTreeMap<String, Vec<CollidingFile>> = Default::default();
+    for file in files {
+        let module_name = cache_manager.source_to_module_name(file);
+        by_name
+            .entry(module_name.to_lowercase())
+            .or_default()
+            .push(CollidingFile {
+                module_name,
+                path: cache_manager.get_relative_path(file).into(),
+            });
+    }
+    by_name.into_values().filter(|g| g.len() > 1).collect()
+}
+
 impl PastaLoader {
     /// Discover all files (.pasta and .lua) with conflict checking.
     ///
     /// Returns (pasta_files, lua_files) where lua_files has conflicts removed.
-    /// Also checks for invalid filenames (init.lua, init.pasta).
+    /// Also checks for invalid filenames (init.lua, init.pasta) and for
+    /// module name collisions ignoring case (`ModuleNameCollision`).
     pub(super) fn discover_all_files(
         base_dir: &Path,
         pasta_patterns: &[String],
@@ -75,10 +95,19 @@ impl PastaLoader {
             }
         }
 
-        // Build HashSet of .pasta module names for conflict detection
+        // Same folded module name within .pasta or within .lua (shadowed .lua included,
+        // the same counting as pasta_check's module-lua-collision)
+        let mut groups = colliding_groups(&pasta_files, cache_manager);
+        groups.extend(colliding_groups(&lua_files, cache_manager));
+        if !groups.is_empty() {
+            groups.sort_by_key(|g| g[0].module_name.to_lowercase());
+            return Err(LoaderError::ModuleNameCollision { groups });
+        }
+
+        // Build HashSet of folded .pasta module names for conflict detection
         let pasta_module_names: std::collections::HashSet<String> = pasta_files
             .iter()
-            .map(|f| cache_manager.source_to_module_name(f))
+            .map(|f| cache_manager.source_to_module_name(f).to_lowercase())
             .collect();
 
         // Filter out conflicting .lua files
@@ -86,7 +115,7 @@ impl PastaLoader {
         for lua_file in &lua_files {
             let module_name = cache_manager.source_to_module_name(lua_file);
 
-            if pasta_module_names.contains(&module_name) {
+            if pasta_module_names.contains(&module_name.to_lowercase()) {
                 warn!(
                     lua_file = %lua_file.display(),
                     module_name = %module_name,

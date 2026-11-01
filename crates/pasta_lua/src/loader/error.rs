@@ -119,6 +119,48 @@ pub enum LoaderError {
         failed: usize,
         failures: Vec<TranspileFailure>,
     },
+
+    /// Dictionary files that map to the same module name, ignoring case.
+    /// `groups` has one or more groups, each with two or more files.
+    #[error("Module name collision: {}", format_collisions(groups))]
+    ModuleNameCollision { groups: Vec<Vec<CollidingFile>> },
+}
+
+/// Format collision groups into one line for Display.
+fn format_collisions(groups: &[Vec<CollidingFile>]) -> String {
+    groups
+        .iter()
+        .map(|group| {
+            let paths = |with_module: bool| {
+                group
+                    .iter()
+                    .map(|f| {
+                        if with_module {
+                            format!("{} ({})", f.path.display(), f.module_name)
+                        } else {
+                            f.path.display().to_string()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            if group.iter().all(|f| f.module_name == group[0].module_name) {
+                format!("{}: {}", group[0].module_name, paths(false))
+            } else {
+                paths(true)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" / ")
+}
+
+/// One file of a module name collision group.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CollidingFile {
+    /// Real module name before folding (e.g. `pasta.scene.会話_朝`).
+    pub module_name: String,
+    /// Path relative to the ghost folder (e.g. `dic\会話-朝.pasta`).
+    pub path: PathBuf,
 }
 
 /// Format failure file paths into a comma-separated list for Display.
@@ -381,6 +423,63 @@ mod tests {
         assert!(msg.contains("no modules"));
         // Option<io::Error> = None -> no source in the chain
         assert!(std::error::Error::source(&err).is_none());
+    }
+
+    fn colliding(module_name: &str, path: &str) -> CollidingFile {
+        CollidingFile {
+            module_name: module_name.to_string(),
+            path: PathBuf::from(path),
+        }
+    }
+
+    #[test]
+    fn test_module_name_collision_display_same_name() {
+        let err = LoaderError::ModuleNameCollision {
+            groups: vec![vec![
+                colliding("pasta.scene.会話_朝", "dic/会話-朝.pasta"),
+                colliding("pasta.scene.会話_朝", "dic/会話_朝.pasta"),
+            ]],
+        };
+        assert_eq!(
+            err.to_string(),
+            "Module name collision: pasta.scene.会話_朝: dic/会話-朝.pasta, dic/会話_朝.pasta"
+        );
+    }
+
+    #[test]
+    fn test_module_name_collision_display_case_only() {
+        let err = LoaderError::ModuleNameCollision {
+            groups: vec![vec![
+                colliding("pasta.scene.A_b", "dic/A-b.pasta"),
+                colliding("pasta.scene.a_b", "dic/a_b.pasta"),
+            ]],
+        };
+        assert_eq!(
+            err.to_string(),
+            "Module name collision: dic/A-b.pasta (pasta.scene.A_b), dic/a_b.pasta (pasta.scene.a_b)"
+        );
+    }
+
+    #[test]
+    fn test_module_name_collision_display_multiple_groups() {
+        let err = LoaderError::ModuleNameCollision {
+            groups: vec![
+                vec![
+                    colliding("pasta.scene.A_b", "dic/A-b.pasta"),
+                    colliding("pasta.scene.a_b", "dic/a_b.pasta"),
+                ],
+                vec![
+                    colliding("pasta.scene.x_y", "dic/x-y.lua"),
+                    colliding("pasta.scene.x_y", "dic/x.y.lua"),
+                ],
+            ],
+        };
+        let msg = err.to_string();
+        assert_eq!(
+            msg,
+            "Module name collision: dic/A-b.pasta (pasta.scene.A_b), dic/a_b.pasta (pasta.scene.a_b) / pasta.scene.x_y: dic/x-y.lua, dic/x.y.lua"
+        );
+        assert!(!msg.contains('\n'));
     }
 
     #[test]

@@ -42,7 +42,7 @@ pub use context::LoaderContext;
 /// 一致テスト用（pasta_check）: 辞書ファイルの集め方
 #[doc(hidden)]
 pub use discovery::discover_files;
-pub use error::{LoaderError, TranspileFailure};
+pub use error::{CollidingFile, LoaderError, TranspileFailure};
 
 use crate::config::TranspilerConfig;
 pub use crate::runtime::default_libs;
