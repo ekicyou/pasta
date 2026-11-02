@@ -156,7 +156,7 @@
   - 書いた部品の名前が `crates/pasta_shiori` の今のコードにあり、消した部品の名前が章に残らない
   - _Boundary: DocSync（book/src/internals/shiori.md）_
   - _Requirements: 8.1, 8.2, 8.4_
-- [ ] 10.2 (P) クレートの README を直す
+- [x] 10.2 (P) クレートの README を直す
   - トレイトの節を消し、使用例と公開 API の表をトレイトも hinst も無い形に直し、消した公開 API を一覧から外す。新しい断り書きは足さない
   - README の使用例の呼び方が今の公開 API と一致する
   - _Boundary: DocSync（crates/pasta_shiori/README.md）_
