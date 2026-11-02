@@ -11,7 +11,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │   ├── tests/           # 外部化テスト（Phase A）
 │   │   └── src/
 │   │       ├── lib.rs       # クレートエントリーポイント
-│   │       ├── error.rs     # ParseError, ParseErrorInfo, ParseResult
+│   │       ├── error.rs     # ParseError
 │   │       └── parser/      # パーサーレイヤー（PEG → AST変換）
 │   │           ├── mod.rs   # パーサーAPI公開・エントリーポイント
 │   │           ├── parse_scene.rs    # シーン解析サブモジュール
@@ -379,7 +379,7 @@ pasta_dsl（パーサー） + pasta_core（レジストリ）
 
 ### 公開API (`pasta_dsl/lib.rs`)
 - **Parser**: `parse_str()`, `parse_file()`, AST型（PastaFile, Statement, Expr等）
-- **Error**: `ParseError`, `ParseErrorInfo`, `ParseResult`
+- **Error**: `ParseError`
 
 ### 公開API (`pasta_core/lib.rs`)
 - **Registry**: `SceneRegistry`, `WordDefRegistry`, `SceneTable`, `WordTable`

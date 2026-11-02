@@ -75,3 +75,9 @@ pest 2.9.4 に上げると、`pasta_lsp` の WASM のビルドが手元で落ち
 - 手元で `cargo build` などを走らせる前に、環境変数 `NoDefaultCurrentDirectoryInExePath` を外す。
 - 非対話では `npm run package` の `build:wasm` が AllSigned で落ちる。`build-wasm.ps1` を pwsh から走らせる。
 - `Cargo.lock` とルートの `Cargo.toml` は、ウェーブの中では 1 本の spec だけが触る。
+
+## 申し送り（2026-11-02、`ponytail-dsl-parser` の設計より）
+
+- pest 2.9.3 から、既定の native の対象で、スタックの残りを見て「stack limit reached」で解析を失敗させる守りが入った（`parser_state.rs` の `set_call_limit` の説明）。probe では、pest 2.9.5 の x64 debug・512 KiB のスレッドが、あふれずにこの誤りを返した。
+- `ponytail-dsl-parser` は、`parse_str` の入口で 1 行の括弧の重なりを 64 段に抑える走査を pest の前に置く。上げた後も、64 段までの辞書の結果は変わらない見込み。
+- `ponytail-dsl-parser` は span の始まりを `Pair::line_col()`（pest の `LineIndex`）から取る。上げるときは、`crates/pasta_dsl/tests/span_oracle_test.rs` を走らせ、行と桁の数え方が変わっていないことを確かめる。

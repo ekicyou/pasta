@@ -14,7 +14,7 @@ Pasta DSLの独立パーサークレート。Luaバックエンドやレジス�
 
 - **PEG文法パーサー**: Pest 2.8による堅牢な文法駆動パーサー
 - **完全なAST型定義**: `PastaFile`, `FileItem`, `GlobalSceneScope`, `Action` 等
-- **独立エラー型**: `ParseError`, `ParseErrorInfo` による詳細なパース診断
+- **独立エラー型**: `ParseError`（`SyntaxError`, `IoError`）による位置つきのパース診断
 - **ゼロバックエンド依存**: Lua、レジストリ、ランタイムへの依存なし
 - **ステートレス**: 複数スレッドから安全に呼び出し可能
 
@@ -57,9 +57,7 @@ for item in &ast.items {
 
 ### Error Types
 
-- `ParseError` — パースエラー（SyntaxError, PestError, IoError, MultipleErrors）
-- `ParseErrorInfo` — 個別パースエラー情報
-- `ParseResult<T>` — `Result<T, ParseError>` エイリアス
+- `ParseError` — パースエラー（`SyntaxError`: ファイル名・行・列つきの構文の誤り、`IoError`: ファイルの読み込みの誤り）
 - `PartialParseResult` / `PartialParseError` — 部分パース結果・行単位エラー
 
 ## Dependencies
