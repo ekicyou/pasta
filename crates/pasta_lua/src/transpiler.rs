@@ -235,7 +235,7 @@ impl LuaTranspiler {
 
         // Merge file attrs with scene attrs, generate Lua code
         let merged_attrs = context.merge_attrs(&scene.attrs);
-        codegen.generate_global_scene(scene, declared_name, counter, context, &merged_attrs)?;
+        codegen.generate_global_scene(scene, declared_name, counter, &merged_attrs)?;
 
         // Register named local scenes (start scene is part of global)
         // 通し番号は生成器と同じ local_scene_counters（照合用の名前ごと）を使う（2.12）。

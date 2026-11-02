@@ -1,6 +1,5 @@
 use super::*;
 use crate::code_gen::source_map::SourceMapSink;
-use crate::context::TranspileContext;
 use pasta_dsl::parser::{
     Action, ActionLine, CallScene, CallTarget, ChoiceNode, CodeBlock, CueArgToken, CueCommandNode,
     GlobalSceneScope, KeyWords, Span,
@@ -392,7 +391,6 @@ fn global_scene_with(
 #[test]
 fn global_and_local_scenes_record_join_keys_and_header_lines() {
     let mut sink = CapturingSceneSink::default();
-    let ctx = TranspileContext::new();
     let attrs = std::collections::HashMap::new();
 
     // 会話 at .pasta line 3, containing a named local 挨拶 at line 5, plus the
@@ -417,7 +415,7 @@ fn global_and_local_scenes_record_join_keys_and_header_lines() {
         let mut cg = LuaCodeGenerator::new(&mut output);
         cg.set_source_map(&mut sink);
         // counter == 1: first occurrence of base 会話 (matches runtime 会話_1).
-        cg.generate_global_scene(&scene, &scene.name, 1, &ctx, &attrs)
+        cg.generate_global_scene(&scene, &scene.name, 1, &attrs)
             .unwrap();
     }
 
@@ -441,7 +439,6 @@ fn global_and_local_scenes_record_join_keys_and_header_lines() {
 #[test]
 fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
     let mut sink = CapturingSceneSink::default();
-    let ctx = TranspileContext::new();
     let attrs = std::collections::HashMap::new();
 
     let first = global_scene_with("会話", 3, vec![]);
@@ -451,9 +448,9 @@ fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
         let mut output = Vec::new();
         let mut cg = LuaCodeGenerator::new(&mut output);
         cg.set_source_map(&mut sink);
-        cg.generate_global_scene(&first, &first.name, 1, &ctx, &attrs)
+        cg.generate_global_scene(&first, &first.name, 1, &attrs)
             .unwrap();
-        cg.generate_global_scene(&second, &second.name, 2, &ctx, &attrs)
+        cg.generate_global_scene(&second, &second.name, 2, &attrs)
             .unwrap();
     }
 
@@ -469,7 +466,6 @@ fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
 /// 照合用の名前ごとに数えるので、別々の関数（`挨拶_1_1`・`挨拶_1_2`）になり上書きされない。
 #[test]
 fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
-    let ctx = TranspileContext::new();
     let attrs = std::collections::HashMap::new();
     let scene = global_scene_with(
         "会話",
@@ -479,7 +475,7 @@ fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
             named_local_with_span("挨拶_1", 8),
         ],
     );
-    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, &scene.name, 1, &ctx, &attrs));
+    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, &scene.name, 1, &attrs));
     assert!(text.contains("function SCENE.挨拶_1_1(act, ...)"), "{text}");
     assert!(text.contains("function SCENE.挨拶_1_2(act, ...)"), "{text}");
     // init_scene には記号を直す前の書いた名前を渡す（runtime-error-balloon 2.4, 2.7）
@@ -498,7 +494,6 @@ fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
 /// 4 つ目の行の対応はトランスパイラが整形の後に埋めるので、生成器だけでは出ない（2.5）。
 #[test]
 fn init_scene_receives_written_global_name_not_alias() {
-    let ctx = TranspileContext::new();
     let attrs = std::collections::HashMap::new();
     let scene = global_scene_with(
         "会話",
@@ -514,7 +509,7 @@ fn init_scene_receives_written_global_name_not_alias() {
             named_local_with_span("挨拶", 5),
         ],
     );
-    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, "OnTalk", 1, &ctx, &attrs));
+    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, "OnTalk", 1, &attrs));
     assert!(text.contains(r#"PASTA.create_scene("OnTalk")"#), "{text}");
     let inits: Vec<&str> = text
         .lines()

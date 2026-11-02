@@ -5,7 +5,6 @@
 use pasta_dsl::parser::parse_str;
 use pasta_dsl::parser::{ActorScope, GlobalSceneScope, LocalSceneScope, Span};
 use pasta_lua::LuaTranspiler;
-use pasta_lua::TranspileContext;
 use pasta_lua::code_gen::LuaCodeGenerator;
 use pasta_lua::code_gen::source_map::SourceMapSink;
 
@@ -99,10 +98,9 @@ fn global_scene_header_records_definition_pasta_line() {
         // ローカルシーンを持たない最小グローバルシーン。span.start_line == 21（`＊メイン` 行）を想定。
         let mut scene = GlobalSceneScope::new("メイン".to_string());
         scene.span = span_at(21);
-        let context = TranspileContext::new();
         let file_attrs = std::collections::HashMap::new();
         codegen
-            .generate_global_scene(&scene, &scene.name, 0, &context, &file_attrs)
+            .generate_global_scene(&scene, &scene.name, 0, &file_attrs)
             .unwrap();
     }
 

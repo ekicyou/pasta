@@ -1,7 +1,7 @@
 //! Scope-level code generation: actors, global scenes, local scenes.
 
 use super::LuaCodeGenerator;
-use crate::context::{TranspileContext, local_scene_counters};
+use crate::context::local_scene_counters;
 use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
 use pasta_core::registry::SceneRegistry;
@@ -109,15 +109,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// * `declared_name` - 宣言名（別名を置き換えた後の名前。呼び出し側で 1 回だけ決める。
     ///   ここでは再度置き換えない）。基本名・突合キー・ローカルの親名はすべてこれから作る
     /// * `scene_counter` - Scene counter for name uniqueness
-    /// * `_context` - Transpile context (currently unused)
     /// * `_file_attrs` - Merged file+scene attributes (MAJOR-3, currently unused for future extension)
-    #[allow(unused_variables)]
     pub fn generate_global_scene(
         &mut self,
         scene: &GlobalSceneScope,
         declared_name: &str,
         scene_counter: usize,
-        _context: &TranspileContext,
         _file_attrs: &HashMap<String, AttrValue>,
     ) -> Result<(), TranspileError> {
         let sanitized_name = SceneRegistry::sanitize_name(declared_name);
