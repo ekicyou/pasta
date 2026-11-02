@@ -24,7 +24,7 @@ function normalize(text) {
 }
 
 // 1 文字が「CJK 等の語中連結対象（bigram 化する文字）」かどうか。
-// ひらがな・カタカナ・CJK 統合漢字・CJK 拡張・長音記号などを対象にする。
+// ひらがな・カタカナ・CJK 統合漢字・CJK 拡張 A・長音記号などを対象にする。
 function isCjk(ch) {
   const cp = ch.codePointAt(0);
   return (
@@ -33,8 +33,7 @@ function isCjk(ch) {
     (cp >= 0x4e00 && cp <= 0x9fff) || // CJK 統合漢字
     (cp >= 0xf900 && cp <= 0xfaff) || // CJK 互換漢字
     (cp >= 0xff66 && cp <= 0xff9f) || // 半角カタカナ
-    cp === 0x30fc || // 長音記号 ー
-    (cp >= 0x20000 && cp <= 0x2ffff) // CJK 拡張B以降
+    cp === 0x30fc // 長音記号 ー
   );
 }
 
