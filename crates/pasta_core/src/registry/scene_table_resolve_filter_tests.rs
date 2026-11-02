@@ -1,5 +1,6 @@
 use super::scene_table_candidate_tests::create_test_scene_info;
 use super::*;
+use crate::registry::SceneRegistry;
 use crate::registry::random::MockRandomSelector;
 
 // ======================================================================
@@ -10,7 +11,7 @@ use crate::registry::random::MockRandomSelector;
 fn test_resolve_scene_id_empty_key_is_invalid_scene() {
     // Empty search_key must return InvalidScene (not SceneNotFound)
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     let result = table.resolve_scene_id_unified("", "", &HashMap::new());
     match result {
@@ -22,7 +23,7 @@ fn test_resolve_scene_id_empty_key_is_invalid_scene() {
 #[test]
 fn test_resolve_scene_id_not_found() {
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     let result = table.resolve_scene_id_unified("", "存在しない", &HashMap::new());
     match result {

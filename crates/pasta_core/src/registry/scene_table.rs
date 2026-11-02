@@ -71,17 +71,6 @@ pub struct SceneTable {
 }
 
 impl SceneTable {
-    /// Create a new scene table with default random selector.
-    pub fn new(random_selector: Box<dyn RandomSelector>) -> Self {
-        Self {
-            labels: Vec::new(),
-            prefix_index: RadixMap::new(),
-            cache: HashMap::new(),
-            random_selector,
-            shuffle_enabled: true,
-        }
-    }
-
     /// Create a scene table from a SceneRegistry.
     ///
     /// This converts the SceneRegistry (filled at transpile time or rebuilt by the

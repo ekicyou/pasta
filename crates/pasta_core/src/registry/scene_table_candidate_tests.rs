@@ -5,6 +5,7 @@
 //! への直接アクセスが構造的に必要なため、#[path]パターンで分離
 
 use super::*;
+use crate::registry::SceneRegistry;
 use crate::registry::random::MockRandomSelector;
 
 pub(super) fn create_test_scene_info(id: usize, name: &str, fn_name: &str) -> SceneInfo {
@@ -57,7 +58,7 @@ fn create_test_local_scene_info(id: usize, name: &str, fn_name: &str, parent: &s
 fn test_collect_scene_candidates_local_search() {
     // Test: Local search should find scenes with :module:prefix pattern
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add local scene with :parent:local key format
     table.labels.push(create_test_local_scene_info(
@@ -82,7 +83,7 @@ fn test_collect_scene_candidates_local_search() {
 fn test_collect_scene_candidates_global_search() {
     // Test: Global search (empty module_name) should find scenes without : prefix
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add global scene with simple key
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
@@ -102,7 +103,7 @@ fn test_collect_scene_candidates_global_search() {
 fn test_collect_scene_candidates_local_only() {
     // Test: Local search only - no global fallback
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add global scene
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
@@ -134,7 +135,7 @@ fn test_collect_scene_candidates_local_only() {
 fn test_collect_scene_candidates_local_not_found_no_fallback() {
     // Test: No local found, should NOT fall back to global - return error
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add global scene only
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
@@ -155,7 +156,7 @@ fn test_collect_scene_candidates_local_not_found_no_fallback() {
 fn test_collect_scene_candidates_global_via_empty_module_name() {
     // Test: Empty module_name should search global only
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add global scene
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
@@ -175,7 +176,7 @@ fn test_collect_scene_candidates_global_via_empty_module_name() {
 fn test_collect_scene_candidates_prefix_match() {
     // Test: Prefix matching should work correctly
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add scenes with common prefix
     table
@@ -210,7 +211,7 @@ fn test_collect_scene_candidates_prefix_match() {
 fn test_collect_scene_candidates_not_found() {
     // Test: Should return error when no candidates found
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let table = SceneTable::new(selector);
+    let table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     let result = table.collect_scene_candidates("会話_1", "存在しないシーン");
     assert!(result.is_err());
@@ -226,7 +227,7 @@ fn test_collect_scene_candidates_not_found() {
 fn test_collect_scene_candidates_empty_prefix_error() {
     // Test: Empty prefix should return error
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let table = SceneTable::new(selector);
+    let table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     let result = table.collect_scene_candidates("会話_1", "");
     assert!(result.is_err());
@@ -242,7 +243,7 @@ fn test_collect_scene_candidates_empty_prefix_error() {
 fn test_collect_scene_candidates_exclude_local_from_global() {
     // Test: Global search should exclude local keys (starting with :)
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add a local scene
     table.labels.push(create_test_local_scene_info(
