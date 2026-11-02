@@ -157,7 +157,7 @@
 | B11 mdBook 0.5.3 と 0.5.4 | Should | 8.3-8.4 |
 | N1 フェンスの取り違え | Should（不具合） | 7.2 |
 | N2 検索の設定の食い違い | Should | 5.6 |
-| N3 検索の補助関数の写し | Should | 5.6 |
+| N3 検索の補助関数の写し | Should | 5.7 |
 | N4 作ったページの neutralizer | Should | 6.2 |
 | N5 パスの検査に `editors/` が無い | Should | 1.4 |
 | N6 自己テストが公開物を書き換える | Should | 7.4 |
@@ -169,9 +169,9 @@
 | N10 フェンスの中のリンク | Nice | 7.3 |
 | N11 通らない分岐 | Nice | 7.5 |
 | N12 目次の条件の写し | Nice | 6.3 |
-| N13 使われない export | Nice | 10.1 |
-| N14 URL の 2 か所 | Nice | 10.1 |
-| N15 ファイルの一覧の写し | Nice | 10.1 |
+| N13 使われない export | Nice | 10.8 |
+| N14 URL の 2 か所 | Nice | 10.8 |
+| N15 ファイルの一覧の写し | Nice | 10.8 |
 
 規模の見込み: 消す行が約 250（PoC の 183 行と 5 ファイルを含む）、足す行が約 80。
 
@@ -227,6 +227,8 @@
 - `tech.md` の直す行: L209（Manual ワークフローの起動の条件）・L210（権限）・L223（mdBook の版）。`ponytail-editor-tooling` が触る行とは別である。
 - `release.yml` の変更は、リリースの実行中に main へ入れない。同じウェーブに `pasta-dll-multiarch`・`vsce-4-upgrade`・`pest-2-9-4-upgrade` を置かない（brief のとおり）。
 - PoC を消すときは、tokenizer の単体の検査（`poc-test.mjs` L144-179）を先に `build-index-test` へ移す。
+- 軽い検査の置き場所（上の案 A〜C）は、要件の議論で設計の判断とした。要件は Requirement 1.5（Rust のビルドを待たない）だけを決める。
+- 固定する SHA・道具の hash・旧版と mdBook 0.5.4・Setup Pages を消した後の公開は、上の Research Needed のとおり設計で調べる。
 
 ## OPEN QUESTIONS（要件の議論で決める）
 
