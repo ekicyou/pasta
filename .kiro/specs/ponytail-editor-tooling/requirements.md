@@ -14,7 +14,7 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 
 > brief.md だけでは決めきれなかった論点は、2026-11-02 の要件ディスカッションで、すべて推奨案で確定した（research.md の「要件ディスカッションの決定」）。
 >
-> デバッグの `host` の廃止（監査の 10 番）は、この spec から外した（2026-11-02 開発者の承認）。0.5.1 で VSCode 拡張の DAP をやめ、SSP・areka の MCP を使う形に移す方針が出たため。DAP の側のファイルはそちらで消える。要件 10 は欠番にする。
+> デバッグの `host` の廃止（監査の 10 番）は、この spec から外した（2026-11-02 開発者の承認）。0.5.0 の別の spec `vscode-mcp-client` で、VSCode 拡張の DAP をやめ、SSP・areka の MCP を使う形に移す方針が出たため（開発者の判断）。DAP の側のファイルはそちらで消え、外した 3 点はあちらの brief が引き継ぐ。要件 10 は欠番にする。
 
 用語:
 
@@ -32,15 +32,15 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
   - ルートの `Cargo.toml`・`Cargo.lock`（tower-lsp の行。このウェーブではこの spec が席を持つ）。
 - **Out of scope**
   - 本文の解析（`pasta_dsl/src/parser/**`。`ponytail-dsl-parser`）。文法そのものは変えない。色と診断を文法に合わせる。
-  - デバッガの本体（`pasta_lua/src/debug`。`ponytail-lua-debug`）。待ち受けが 127.0.0.1 に固定であることは、あちらの持ち物で、この spec は前提にするだけである。
+  - デバッガの本体（`pasta_lua/src/debug`）。`ponytail-lua-debug` は PR#220 で閉じられ、DAP の撤去と残る部品の直しは別の spec へ回った。この spec は触らない。
   - マニュアルのハイライトの CI（`ponytail-manual-ci`）。文法の変更でマニュアルを再公開する path filter は、あちらで足す。
   - 選択肢の行の意味の色（今は「将来実装」で、色を足すのは機能の追加になる）。TextMate の色のずれだけを直す（要件 5.7）。
   - `pasta_lsp` のクレート名の変更。
-  - DAP の側（監査の 10 番の `host`・`package.json` の `debuggers`・`debugAttachTarget.ts`・`runSceneAtCursor.ts`・`reloadShiori.ts`・`book/src/debug/{source-level,troubleshooting,vscode-setup}.md`）。0.5.1 で DAP を MCP に移すときに、ファイルごと消える（2026-11-02 の要件ディスカッション）。
+  - DAP の側（監査の 10 番の `host`・`package.json` の `debuggers`・`debugAttachTarget.ts`・`runSceneAtCursor.ts`・`reloadShiori.ts`・`book/src/debug/{source-level,troubleshooting,vscode-setup}.md`）。`vscode-mcp-client` で DAP を MCP に移すときに、ファイルごと消える（2026-11-02 の要件ディスカッション）。
 - **Adjacent expectations**
   - `ponytail-dsl-parser` は、`parse_str` の誤りの形（行・桁・文）を保つ。入力のたびの診断は、その形を読む（要件 11.1）。`partial.rs` はこの spec が持つ。
   - `ponytail-core-registry` とは、ルートの `Cargo.toml`・`Cargo.lock` を共有する。消す行が別（tower-lsp と fast_radix_trie）なので、後から入る側が `Cargo.lock` を作り直す。
-  - `ponytail-lua-debug` とは、`book/src/debug/*.md` の別の節を触る。後から入る側が rebase で合わせる。`ponytail-manual-ci` とは、`tech.md` の別の行を触る。
+  - `vscode-mcp-client`（0.5.0。DAP を MCP に移す）とは、`editors/vscode` の `extension.ts`・`package.json`・`src/test/*` を共有しうる。同じウェーブに置くかは棚卸で決める。`ponytail-manual-ci` とは、`tech.md` の別の行を触る。
   - 「公開クレートの pub API は予告なく消すことがある」の断り書きは、`README.md:88`・`tech.md:178` に既にある（`ponytail-lua-loader` が書いた）。この spec は足さない。
 
 ## Requirements
@@ -162,7 +162,7 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 
 ### Requirement 10:（欠番）デバッグの `host` の廃止
 
-2026-11-02 の要件ディスカッションで、この spec から外した。0.5.1 で VSCode 拡張の DAP を MCP に移すときに、DAP の側のファイルごと消える。待ち受けは 127.0.0.1 に固定なので、それまで `host` が残っても害は無い。番号は、ほかの要件の参照を変えないために残す。
+2026-11-02 の要件ディスカッションで、この spec から外した。0.5.0 の `vscode-mcp-client` で VSCode 拡張の DAP を MCP に移すときに、DAP の側のファイルごと消える。待ち受けは 127.0.0.1 に固定なので、それまで `host` が残っても害は無い。番号は、ほかの要件の参照を変えないために残す。
 
 ### Requirement 11: 他の spec との約束を保つ
 

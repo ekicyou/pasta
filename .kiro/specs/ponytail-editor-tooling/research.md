@@ -205,9 +205,10 @@
 開発者が全議題を推奨案で承認した（「承認」）。
 
 - **議題 1（新しい議題）DAP まわりを外す**：監査の 10 番（`host`）・`reloadShiori.ts` の再輸出・`debug/` の 3 頁の `host` の記述を、この spec から外した。要件 10 は欠番。
-  - 経緯：セッション「Pasta DSL MCP移行検討」から、0.5.1 で VSCode 拡張の DAP をやめ、SSP・areka の MCP（`OnPastaScene` などのイベントを起こす）に移す方針が来た。DAP の側のファイル（`debugAdapterFactory.ts`・`debugAttachTarget.ts`・`reloadShiori.ts`・`runSceneAtCursor.ts`・`sourcePresentationToggle.ts`・`package.json` の `debuggers`）は、そちらで消える。
-  - 待ち受けは 127.0.0.1 に固定なので、0.5.0 で `host` が残っても害は無い。0.5.1 の方針が流れたら、この spec が入った後に別の spec で戻す。
-  - これで、この spec は `package.json` の `debuggers` に触らない。`extension.ts` は `fallbackMode`（N10）の行だけ触る。
+  - 経緯：セッション「Pasta DSL MCP移行検討」から、VSCode 拡張の DAP をやめ、SSP・areka の MCP（`OnPastaScene` などのイベントを起こす）に移す方針が来た。新しい spec `vscode-mcp-client`（0.5.0。開発者の判断）が受け持ち、外した 3 点はあちらの brief が引き継ぐ。DAP の側のファイル（`debugAdapterFactory.ts`・`debugAttachTarget.ts`・`reloadShiori.ts`・`runSceneAtCursor.ts`・`sourcePresentationToggle.ts`・`package.json` の `debuggers`）は、そちらで消える。
+  - 待ち受けは 127.0.0.1 に固定なので、`vscode-mcp-client` が入るまで `host` が残っても害は無い。
+  - これで、この spec は `package.json` の `debuggers` に触らない。`extension.ts` は `fallbackMode`（N10）の行だけ触る。`vscode-mcp-client` とは `extension.ts`・`package.json`・`src/test/*` を共有しうるので、ウェーブを組むときに確かめる。
+  - `ponytail-lua-debug` は PR#220 で閉じられ、spec のフォルダは main から消えた。申し送りは `vscode-mcp-client` の brief が受け取る。
 - **OQ-1** 誤りのあるシーンは、意味の色を付けず TextMate の色に任せる（要件 3.3）。
 - **OQ-2** 入力のたびの診断は、幅の無い点にする。位置の無い誤りは 1 行目の頭（要件 1.8・11.2）。
 - **OQ-3** 議題 1 で `host` を外したので、要らなくなった。
