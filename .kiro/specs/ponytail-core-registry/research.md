@@ -257,3 +257,14 @@
 
 - `C:\rust\cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fast_radix_trie-1.2.0\src\map.rs`（8 行の `RadixMap` の定義・553 行の `iter_prefix` の説明）
 - Rust 標準ライブラリ `BTreeMap::range`・`str` の `Ord`（バイト列の辞書順）
+
+### 設計ディスカッションの決定（2026-11-02、開発者「承認」）
+
+1. `crates/pasta_dsl/README.md` 73 行の `fast_radix_trie` を C15 で直す。要件 7.7 に当たる。1 語で済み、どの spec の持ち場でもない。
+2. C1 の候補の順のテストが今のコードで落ちたら、今の挙動を正として期待を直し、違いをここに残す。テストの目的は振る舞いを写し取ることである。期待は、モックの読み方とバイト順に照らして手で確かめてある。
+3. 前方一致の 1 行は、4 か所にそのまま書く。層を足さないためで、書き落としは U1・U2 が捕まえる。範囲の形は rustc で通ることを確かめた。
+4. 手で組むテスト表は、中の欄を直に組む形のまま残す。空の表は `from_scene_registry(SceneRegistry::new(), ..)` で作る。ID が昇順でない表 `[2,0,1]` を保つためである。
+5. `test_clear_cache_restarts_sequence` を消す。状態を消す道は `replace_selector` だけになり、その確かめは `test_replace_selector_clears_cache_keeps_entries` が持つ。
+6. 属性の不一致のテスト 2 本を、unified 版の 1 本にまとめる。`filters` の中身の確かめは unified 版へ移す。
+7. C16 で main を取り込むときは `git merge origin/main` を使う。rebase は積んだコミットを書き換えるので使わない。`sync_with_base_branch` は拒否される。
+8. `SOUL.md:434` には触らない。目指す姿の例えで、要件 7.7 の対象の外である。

@@ -146,7 +146,7 @@ graph LR
   - 200 行：`history` の項目を消す。
   - 208 行：`set_shuffle_enabled` の 2 文を消す。
   - （要件 10.2 の場合だけ）36 行の `merge_from` の一文を消す。
-- 【前提・OPEN QUESTION 1】`crates/pasta_dsl/README.md` 73 行の「（fast_radix_trie, rand）」を「（rand）」にする（要件 7.7 は README 全般を対象にする）。
+- `crates/pasta_dsl/README.md` 73 行の「（fast_radix_trie, rand）」を「（rand）」にする（要件 7.7 は README 全般を対象にする。どの spec の持ち場でもない。2026-11-02 の設計ディスカッションで決めた）。
 
 ### 変えないファイル（境界の確かめ用）
 
@@ -438,6 +438,8 @@ impl SearchContext {
 
 今の `RadixMap` で通ることを確かめてから、ほかの直しに入る。入れ物を替えるコミットでは、このテストを 1 文字も変えない。
 
+C1 で今のコードに対して落ちたときは、今の挙動を正とする。期待を今の挙動に直し、手の計算とどこが違ったかを research.md に残してから進む（振る舞いを写し取るテストなので、止めて相談しない）。
+
 - **U1 シーン**（`scene_table_candidate_tests.rs`。`from_scene_registry` で作る。今の補助 `candidate_fn_names` は並べ替えるので使わず、順のまま比べる）
   - 大域の登録を、わざと辞書順でない順にする：`挨拶_夜`・`挨拶`・`挨拶A`・`挨拶`・`挨拶1`・`挨拶あ`・`会話`・`Zebra`・`雑談`。
   - `会話` の下にローカルを `挨拶_夜`(1)・`挨拶`(1)・`挨拶`(2)・`挨拶A`(1) の順に登録する。
@@ -514,14 +516,23 @@ flowchart TD
 - C9 は `search/context.rs` の 3 つの腕の `NoMoreScenes` も同じコミットで外す（種類が無いと腕が書けない）。C11 は `search/context.rs` の `search_word` の第 3 引数も同じコミットで外す。
 - C6 を C8 より先に置き、`select_from_cache` の書き直しに切り替えの分かれ道が入らないようにする。
 - C14 は選ばれ方が変わりうる唯一の直しである。C1 のテストを変えずに通すことで確かめる。コードの説明の「RadixMap」（`scene_table.rs` 119 行など）はこのコミットで直す。
-- C15 は README・`tech.md`・`registry-search.md`・`Cargo.toml` の `description`（と、OPEN QUESTION 1 が採られれば `pasta_dsl/README.md`）。直す頁は `internals/*` だけなので、`gen-skill-refs.mjs` は要らない（11.5）。生成の元の頁に触れることになったら走らせる。
+- C15 は README・`tech.md`・`registry-search.md`・`Cargo.toml` の `description`・`pasta_dsl/README.md`。直す頁は `internals/*` だけなので、`gen-skill-refs.mjs` は要らない（11.5）。生成の元の頁に触れることになったら走らせる。
 - **C16（PR を作る直前）**：`git fetch origin main` のあと、`git grep -n "pub fn merge_from" origin/main -- crates/pasta_lua/src/context.rs` で確かめる。
   - 見つかる（相手がまだ）：`merge_from` とそのテストを残す。何もしない（10.1）。
-  - 見つからない（相手が先）：`main` を取り込み、`Cargo.lock` を作り直してから（10.5）、`SceneRegistry::merge_from`（テスト 3 つ）・`WordDefRegistry::merge_from`（テスト 2 つ）・`registry-search.md` 36 行の一文を消す 1 コミットを足す（10.2）。
+  - 見つからない（相手が先）：`git merge origin/main` で取り込み（rebase で積んだコミットを書き換えない。`sync_with_base_branch` は使わない）、`Cargo.lock` を作り直してから（10.5）、`SceneRegistry::merge_from`（テスト 3 つ）・`WordDefRegistry::merge_from`（テスト 2 つ）・`registry-search.md` 36 行の一文を消す 1 コミットを足す（10.2）。
   - どちらでも `crates/pasta_lua/src/context.rs` には触らない（10.3）。
 
 ## Open Questions / Risks
 
-- **OPEN QUESTION 1**（境界）：`crates/pasta_dsl/README.md` 73 行に `fast_radix_trie` の名前が残る。要件 7.7 は README 全般を対象にするが、要件 11 の文書の一覧にこのファイルは無い。設計は【前提】として C15 で「（rand）」に直す。持ち場の表（`ponytail-dsl-parser` は `pasta_dsl/src/parser/**`・`error.rs`・`lib.rs`）には入っていない。
+- 設計ディスカッション（2026-11-02）で、8 つの議題をすべて推奨案のとおりに決めた。
+  - `pasta_dsl/README.md` 73 行を C15 で直す。
+  - C1 が落ちたら、今の挙動を正とする。
+  - 前方一致の 1 行は、4 か所にそのまま書く。
+  - 手で組むテスト表は、中の欄を直に組む形のまま残す。
+  - `test_clear_cache_restarts_sequence` を消す。
+  - 属性の不一致のテストを 1 本にまとめる。
+  - C16 は `git merge origin/main` で取り込む。
+  - `SOUL.md` には触らない。
+  - 根拠は research.md にある。
 - **危険**：0.5.0 の検索の spec が、`RadixMap` の形を前提に設計を書いていれば読み直しが要る（Revalidation Triggers）。`scene-count` の brief はすでに `BTreeMap` を前提にしている。
 - **危険**：`Cargo.lock` を同じウェーブの `ponytail-editor-tooling` も変える。後から入る側が作り直す（10.5）。
