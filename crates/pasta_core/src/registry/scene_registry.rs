@@ -247,26 +247,6 @@ impl SceneRegistry {
         }
         (registered, None)
     }
-
-    /// Merge scenes and counters from another registry.
-    ///
-    /// Used by PastaLoader to combine registries from multiple files.
-    /// Scene IDs are reassigned during merge to maintain uniqueness.
-    pub fn merge_from(&mut self, other: SceneRegistry) {
-        for mut entry in other.scenes {
-            // Reassign ID based on current length
-            entry.id = (self.scenes.len() + 1) as i64;
-            self.scenes.push(entry);
-        }
-
-        // Merge name counters (take max value)
-        for (name, counter) in other.name_counters {
-            let current = self.name_counters.entry(name).or_insert(0);
-            if counter > *current {
-                *current = counter;
-            }
-        }
-    }
 }
 
 impl Default for SceneRegistry {
@@ -466,62 +446,6 @@ mod tests {
         // counter-based registration still starts at 1
         let (_, counter) = registry.register_global("会話", HashMap::new());
         assert_eq!(counter, 1);
-    }
-
-    #[test]
-    fn test_merge_from_reassigns_ids() {
-        let mut a = SceneRegistry::new();
-        a.register_global("会話", HashMap::new());
-
-        let mut b = SceneRegistry::new();
-        b.register_global("別会話", HashMap::new());
-        b.register_global("第三会話", HashMap::new());
-
-        a.merge_from(b);
-
-        // Merged scenes get sequential IDs continuing from existing scenes
-        let scenes = a.all_scenes();
-        assert_eq!(scenes.len(), 3);
-        assert_eq!(scenes[0].id, 1);
-        assert_eq!(scenes[1].id, 2);
-        assert_eq!(scenes[2].id, 3);
-        assert_eq!(scenes[1].name, "別会話");
-        assert_eq!(scenes[2].name, "第三会話");
-
-        // all_scenes is indexed by reassigned ID - 1
-        assert_eq!(a.all_scenes()[2].name, "第三会話");
-    }
-
-    #[test]
-    fn test_merge_from_takes_max_counter() {
-        let mut a = SceneRegistry::new();
-        a.register_global("会話", HashMap::new()); // counter "会話" = 1
-
-        let mut b = SceneRegistry::new();
-        b.register_global("会話", HashMap::new()); // counter "会話" = 1
-        b.register_global("会話", HashMap::new()); // counter "会話" = 2
-
-        a.merge_from(b);
-
-        // After merge, the counter must be max(1, 2) = 2, so next is 3
-        let (_, counter) = a.register_global("会話", HashMap::new());
-        assert_eq!(counter, 3);
-    }
-
-    #[test]
-    fn test_merge_from_keeps_higher_existing_counter() {
-        let mut a = SceneRegistry::new();
-        a.register_global("会話", HashMap::new()); // counter = 1
-        a.register_global("会話", HashMap::new()); // counter = 2
-
-        let mut b = SceneRegistry::new();
-        b.register_global("会話", HashMap::new()); // counter = 1
-
-        a.merge_from(b);
-
-        // Existing counter (2) is higher; next must be 3
-        let (_, counter) = a.register_global("会話", HashMap::new());
-        assert_eq!(counter, 3);
     }
 
     #[test]

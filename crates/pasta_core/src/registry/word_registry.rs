@@ -95,18 +95,6 @@ impl WordDefRegistry {
     pub fn into_entries(self) -> Vec<WordEntry> {
         self.entries
     }
-
-    /// Merge entries from another registry.
-    ///
-    /// Used by PastaLoader to combine registries from multiple files.
-    /// Entry IDs are reassigned during merge.
-    pub fn merge_from(&mut self, other: WordDefRegistry) {
-        for mut entry in other.entries {
-            // Reassign ID based on current length
-            entry.id = self.entries.len();
-            self.entries.push(entry);
-        }
-    }
 }
 
 impl Default for WordDefRegistry {
@@ -263,46 +251,6 @@ mod tests {
         assert_eq!(id, 0);
         let entries = registry.all_entries();
         assert_eq!(entries[0].values.len(), 3);
-    }
-
-    #[test]
-    fn test_merge_from_reassigns_ids() {
-        let mut a = WordDefRegistry::new();
-        a.register_global("挨拶", vec!["こんにちは".to_string()]);
-
-        let mut b = WordDefRegistry::new();
-        b.register_global("場所", vec!["東京".to_string()]);
-        b.register_local("会話", "挨拶", vec!["やあ".to_string()]);
-
-        a.merge_from(b);
-
-        let entries = a.all_entries();
-        assert_eq!(entries.len(), 3);
-        // IDs are reassigned sequentially (entry.id == Vec index)
-        assert_eq!(entries[0].id, 0);
-        assert_eq!(entries[1].id, 1);
-        assert_eq!(entries[2].id, 2);
-        // Keys and values preserved
-        assert_eq!(entries[1].key, "場所");
-        assert_eq!(entries[1].values, vec!["東京"]);
-        assert_eq!(entries[2].key, ":会話:挨拶");
-    }
-
-    #[test]
-    fn test_merge_from_empty_registry() {
-        let mut a = WordDefRegistry::new();
-        a.register_global("挨拶", vec!["こんにちは".to_string()]);
-
-        a.merge_from(WordDefRegistry::new());
-        assert_eq!(a.all_entries().len(), 1);
-
-        // Merging into an empty registry also works
-        let mut c = WordDefRegistry::new();
-        let mut d = WordDefRegistry::new();
-        d.register_global("天気", vec!["晴れ".to_string()]);
-        c.merge_from(d);
-        assert_eq!(c.all_entries().len(), 1);
-        assert_eq!(c.all_entries()[0].id, 0);
     }
 
     #[test]
