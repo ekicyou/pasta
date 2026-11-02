@@ -28,10 +28,6 @@ pub enum SceneTableError {
     #[error("Invalid scene name: '{scene}'")]
     InvalidScene { scene: String },
 
-    /// Random selection failed.
-    #[error("Random selection failed")]
-    RandomSelectionFailed,
-
     /// Duplicate scene name.
     #[error("Duplicate scene name: {name}")]
     DuplicateSceneName { name: String },
@@ -141,10 +137,6 @@ mod tests {
             }
             .to_string(),
             "Invalid scene name: ''"
-        );
-        assert_eq!(
-            SceneTableError::RandomSelectionFailed.to_string(),
-            "Random selection failed"
         );
         assert_eq!(
             SceneTableError::DuplicateSceneName {

@@ -11,9 +11,8 @@ use std::collections::HashMap;
 
 /// Cache key for scene resolution (module_name + search_key + sorted filters + exact).
 /// Extended to support unified scope search with module context.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct SceneCacheKey {
-    // Clone is required for Phase 3/4 borrow split pattern
     /// Module name (グローバルシーン名)
     module_name: String,
     /// Search key
@@ -184,7 +183,7 @@ impl SceneTable {
 
         // Phase 3-5: Cache-based sequential selection
         let cache_key = SceneCacheKey::new(module_name, search_key, filters, false, None);
-        self.select_from_cache(cache_key, filtered_ids)
+        Ok(self.select_from_cache(cache_key, filtered_ids))
     }
 
     /// Resolve scene ID by exact name match within one scope.
@@ -225,7 +224,7 @@ impl SceneTable {
 
         let filtered_ids = self.filter_by_attributes(candidate_ids, name, filters)?;
         let cache_key = SceneCacheKey::new(module_name, name, filters, true, None);
-        self.select_from_cache(cache_key, filtered_ids)
+        Ok(self.select_from_cache(cache_key, filtered_ids))
     }
 
     /// `name` と等しいキーの大域シーンのうち、`:{大域の登録名}:{local}` と等しいキーの
@@ -277,7 +276,7 @@ impl SceneTable {
 
         let filtered_ids = self.filter_by_attributes(owners, name, filters)?;
         let cache_key = SceneCacheKey::new("", name, filters, true, Some(local));
-        self.select_from_cache(cache_key, filtered_ids).map(Some)
+        Ok(Some(self.select_from_cache(cache_key, filtered_ids)))
     }
 
     /// Filter candidate IDs by attribute filters (Phase 2 of scene resolution).
@@ -319,42 +318,33 @@ impl SceneTable {
         &mut self,
         cache_key: SceneCacheKey,
         filtered_ids: Vec<SceneId>,
-    ) -> Result<SceneId, SceneTableError> {
-        // Phase 3: Get or create cache entry
-        let needs_reset = {
-            let cached = self.cache.entry(cache_key.clone()).or_insert_with(|| {
-                let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
-                self.random_selector.shuffle_usize(&mut id_values);
-                let ids = id_values.into_iter().map(SceneId).collect();
-                CachedSelection {
-                    candidates: ids,
-                    next_index: 0,
-                }
-            });
-            cached.next_index >= cached.candidates.len()
+    ) -> SceneId {
+        let random_selector = &mut self.random_selector;
+        let mut shuffled = || {
+            let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
+            random_selector.shuffle_usize(&mut id_values);
+            id_values.into_iter().map(SceneId).collect::<Vec<_>>()
         };
 
-        // Phase 4: Reset if needed (borrowing released above)
-        if needs_reset && let Some(cached) = self.cache.get_mut(&cache_key) {
-            cached.next_index = 0;
-            let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
-            self.random_selector.shuffle_usize(&mut id_values);
-            cached.candidates = id_values.into_iter().map(SceneId).collect();
-        }
-
-        // Phase 5: Sequential selection
+        // Phase 3: Get or create cache entry
         let cached = self
             .cache
-            .get_mut(&cache_key)
-            .ok_or(SceneTableError::RandomSelectionFailed)?;
-        let selected_id = cached
-            .candidates
-            .get(cached.next_index)
-            .copied()
-            .ok_or(SceneTableError::RandomSelectionFailed)?;
-        cached.next_index += 1;
+            .entry(cache_key)
+            .or_insert_with(|| CachedSelection {
+                candidates: shuffled(),
+                next_index: 0,
+            });
 
-        Ok(selected_id)
+        // Phase 4: Reset when all candidates have been consumed
+        if cached.next_index >= cached.candidates.len() {
+            cached.candidates = shuffled();
+            cached.next_index = 0;
+        }
+
+        // Phase 5: 一巡前なら next_index < len、一巡後は空でない filtered_ids で作り直して 0 なので添字は候補の中にある
+        let selected_id = cached.candidates[cached.next_index];
+        cached.next_index += 1;
+        selected_id
     }
 
     /// Get scene info by ID.
