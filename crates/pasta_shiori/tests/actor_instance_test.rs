@@ -1,8 +1,7 @@
 //! 芯の型 [`ActorInstance`] の後始末の決まりの試験（仕様 `shiori4-v3-portable`・4.2・4.4・7.6）。
 //!
 //! 芯の型を直に起こし、`TeardownReport` の `acked`・`joined` で後始末の決まりを確かめる:
-//! - 「ack の後に join」（[`JoinPolicy::JoinAfterAck`]）は ack あり・join 済み（4.4）。
-//! - 「手放す」（[`JoinPolicy::Detach`]）は ack あり・join なし。
+//! - 後始末は ack あり・join 済み（4.4）。
 //! - ack が上限の中に来なければ ack なし・join なしで返り、手放しの警告を出す（4.2）。
 //!
 //! - 同じディレクトリの 2 つ目のインスタンスは使用中の誤りになり、占有している側のログに理由を出す（6.2）。
@@ -17,7 +16,7 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use common::copy_fixture_to_temp;
-use pasta::actor::instance::{ActorInstance, JoinPolicy, SpawnError};
+use pasta::actor::instance::{ActorInstance, SpawnError};
 use pasta::actor::lifecycle;
 use pasta_lua::GlobalLoggerRegistry;
 
@@ -62,23 +61,9 @@ fn shutdown_join_after_ack_is_acked_and_joined() {
         "broken status line must come back as Lua returned it: {broken:?}"
     );
 
-    let report = instance.shutdown(JoinPolicy::JoinAfterAck);
+    let report = instance.shutdown();
     assert!(
         report.acked && report.joined && !report.already_done,
-        "{report:?}"
-    );
-}
-
-/// 「手放す」の後始末は、ack あり・join なしで返る。
-#[test]
-fn shutdown_detach_is_acked_and_not_joined() {
-    let ghost = copy_fixture_to_temp("v3_probe");
-    let instance = ActorInstance::spawn(0, ghost.path().to_path_buf()).expect("spawn");
-    assert!(instance.loaded(), "v3_probe must load");
-
-    let report = instance.shutdown(JoinPolicy::Detach);
-    assert!(
-        report.acked && !report.joined && !report.already_done,
         "{report:?}"
     );
 }
@@ -93,8 +78,7 @@ fn shutdown_times_out_on_spinning_actor_and_warns_abandon() {
 
     instance.notify(&notify("OnProbeSpin"));
     let started = Instant::now();
-    let report =
-        instance.shutdown_with_timeout(JoinPolicy::JoinAfterAck, Duration::from_millis(100));
+    let report = instance.shutdown_with_timeout(Duration::from_millis(100));
     let elapsed = started.elapsed();
 
     assert!(
@@ -140,11 +124,11 @@ fn second_instance_on_same_dir_is_dir_in_use_and_logged() {
         "the first instance must keep running: {count:?}"
     );
 
-    let report = first.shutdown(JoinPolicy::JoinAfterAck);
+    let report = first.shutdown();
     assert!(report.acked && report.joined, "{report:?}");
     // 片付けの後は占有が外れ、同じディレクトリをまた起こせる。
     let again = ActorInstance::spawn(0, ghost.path().to_path_buf()).expect("respawn after unload");
-    assert!(again.shutdown(JoinPolicy::JoinAfterAck).joined);
+    assert!(again.shutdown().joined);
 }
 
 /// 旧来の窓口で、回り続けるアクターの片付けが打ち切りに終わった直後に同じディレクトリを読むと
@@ -205,9 +189,4 @@ fn legacy_reload_after_timed_out_teardown_takes_over_claim() {
         registry.get(&dir).is_none(),
         "unloading the new instance must release the registration"
     );
-
-    // DllMain の道の窓口だけは join しない（loader lock の中では待てない）。
-    assert!(lifecycle::spawn_actor(0, dir.clone()), "v3_probe must load");
-    let report = lifecycle::teardown_actor_detached();
-    assert!(report.acked && !report.joined, "{report:?}");
 }

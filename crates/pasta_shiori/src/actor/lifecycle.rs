@@ -1,6 +1,6 @@
 //! 旧来の入口の置き場（LegacySlot・仕様 `shiori4-v3-portable`・design.md「LegacySlot」）。
 //!
-//! 旧来の SHIORI の入口（`windows.rs` の `load`／`request`／`unload`／`DllMain`）は、呼び出し側に
+//! 旧来の SHIORI の入口（`windows.rs` の `load`／`request`／`unload`）は、呼び出し側に
 //! インスタンスのハンドルを返せない ABI である。そのためこの入口だけは、プロセスに 1 つの
 //! 置き場 [`LEGACY`]（芯の型 [`ActorInstance`] を 1 つ持つ）を残す（5.7）。芯・アクター・版 3 の
 //! 口はグローバルな状態を持たず、ここを参照しない。
@@ -10,7 +10,6 @@
 //!   [`ActorInstance`] を起こして置き場へ入れる。
 //! - [`marshal_request`]: 置き場の芯の型へ要求を渡す。空なら 204（SHIORI スレッドを待たせない）。
 //! - [`teardown_actor`]: 置き場から取り出して後始末する（ack の後に join・7.6）。空なら冪等の no-op。
-//! - [`teardown_actor_detached`]: 同じだが join しない（`DllMain` の FreeLibrary の detach だけ）。
 //! - [`kick_sink`]: 置き場の芯の型へ kick を積む送り先。空なら `kick.drop` の診断ログで捨てる。
 //!
 //! # 送信の道にロックを置かない
@@ -25,7 +24,7 @@ use std::time::Duration;
 use arc_swap::ArcSwapOption;
 use pasta_lua::debug::{KickRequest, KickSink};
 
-use crate::actor::instance::{ActorInstance, ClaimMode, JoinPolicy, TEARDOWN_TIMEOUT};
+use crate::actor::instance::{ActorInstance, ClaimMode, TEARDOWN_TIMEOUT};
 use crate::actor::marshaling::default_204;
 use crate::actor::teardown::TeardownReport;
 
@@ -56,7 +55,7 @@ pub fn spawn_actor_with_teardown_timeout(
 ) -> bool {
     // 前のディレクトリは片付けの前に手元へ取る（新しいグローバルな状態は持たない）。
     let prev_dir = LEGACY.load().as_ref().map(|i| i.load_dir().to_path_buf());
-    let report = teardown_slot(&LEGACY, JoinPolicy::JoinAfterAck, teardown_timeout);
+    let report = teardown_slot(&LEGACY, teardown_timeout);
     let timed_out = !report.acked && !report.already_done;
     let mode = if timed_out && prev_dir.as_deref() == Some(load_dir.as_path()) {
         ClaimMode::TakeOver
@@ -96,21 +95,10 @@ fn request_into(slot: &ArcSwapOption<ActorInstance>, request: &str) -> String {
 /// 戻り値は後始末の結果（clean／冪等 no-op／異常を値で返す。ホストを巻き込まない）。
 /// ack が届けばアクタースレッドを join してから返る（ack が来なければ手放す）。
 pub fn teardown_actor() -> TeardownReport {
-    teardown_slot(&LEGACY, JoinPolicy::JoinAfterAck, TEARDOWN_TIMEOUT)
+    teardown_slot(&LEGACY, TEARDOWN_TIMEOUT)
 }
 
-/// 置き場のアクターを、join せずに後始末する（`DllMain` の FreeLibrary の detach だけ・7.6）。
-///
-/// loader lock の中ではアクタースレッドの終わりを待てないので、ack を受けたらスレッドを手放す。
-pub fn teardown_actor_detached() -> TeardownReport {
-    teardown_slot(&LEGACY, JoinPolicy::Detach, TEARDOWN_TIMEOUT)
-}
-
-fn teardown_slot(
-    slot: &ArcSwapOption<ActorInstance>,
-    policy: JoinPolicy,
-    timeout: Duration,
-) -> TeardownReport {
+fn teardown_slot(slot: &ArcSwapOption<ActorInstance>, timeout: Duration) -> TeardownReport {
     // 取り出し＝以後の送信を遮断（次の spawn まで置き場は空）。
     let Some(instance) = slot.swap(None) else {
         // 置き場が空（load 前 / 片付け済み）: 冪等 no-op。
@@ -122,7 +110,7 @@ fn teardown_slot(
         };
     };
     match Arc::try_unwrap(instance) {
-        Ok(instance) => instance.shutdown_with_timeout(policy, timeout),
+        Ok(instance) => instance.shutdown_with_timeout(timeout),
         // 片付けと同時に別のスレッドで要求が走っている（単一スレッドの規約に反する呼び方）。
         // 停止の要求だけをして、最後の参照の Drop でスレッドを片付ける。
         // `request_stop` が ack を受けていれば、Drop の Stop は閉じた mailbox に届かず
@@ -203,7 +191,7 @@ mod tests {
     fn teardown_without_actor_is_idempotent_noop() {
         let slot: ArcSwapOption<ActorInstance> = ArcSwapOption::const_empty();
         for _ in 0..2 {
-            let report = teardown_slot(&slot, JoinPolicy::Detach, TEARDOWN_TIMEOUT);
+            let report = teardown_slot(&slot, TEARDOWN_TIMEOUT);
             assert!(
                 report.already_done && !report.acked && report.anomaly.is_none(),
                 "teardown with no actor must be a safe idempotent no-op: {report:?}"
@@ -226,8 +214,8 @@ mod tests {
             }
         ));
 
-        let report = teardown_slot(&slot, JoinPolicy::Detach, TEARDOWN_TIMEOUT);
-        assert!(report.acked && !report.joined, "{report:?}");
+        let report = teardown_slot(&slot, TEARDOWN_TIMEOUT);
+        assert!(report.acked && report.joined, "{report:?}");
         assert!(slot.load().is_none(), "teardown must empty the slot");
         assert!(!kick_into(
             &slot,
@@ -236,7 +224,7 @@ mod tests {
             }
         ));
 
-        let report = teardown_slot(&slot, JoinPolicy::Detach, TEARDOWN_TIMEOUT);
+        let report = teardown_slot(&slot, TEARDOWN_TIMEOUT);
         assert!(report.already_done && !report.acked, "{report:?}");
     }
 
@@ -248,7 +236,7 @@ mod tests {
         let slot = ArcSwapOption::from_pointee(instance);
         let in_flight = slot.load_full().expect("instance");
 
-        let report = teardown_slot(&slot, JoinPolicy::Detach, TEARDOWN_TIMEOUT);
+        let report = teardown_slot(&slot, TEARDOWN_TIMEOUT);
         assert!(report.acked && !report.joined, "{report:?}");
         assert!(!in_flight.kick("OnLate".into()), "actor must be stopped");
         // 最後の参照の Drop で手放す（Stop 済みなので待たずに返る）。

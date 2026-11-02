@@ -17,8 +17,7 @@
 //!
 //! # ack の後の join／detach（仕様 `shiori4-v3-portable` 4.2・4.4・7.6）
 //! ack の後にスレッドをどう扱うかは芯の型 `ActorInstance` の後始末の決まりが選ぶ:
-//! unload は ack の後に join し、`DllMain` の FreeLibrary は join せずに detach し、
-//! ack が来なければ手放す（abandon）。本モジュールの低い層の [`teardown_actor`]
+//! unload は ack の後に join し、ack が来なければ手放す（abandon）。本モジュールの低い層の [`teardown_actor`]
 //! （reload 反復のリーク検査が使う）は join せず、常に detach する
 //! （[`thread::ActorThread::detach`]）。完了確認は done ack で行うので、
 //! `Arc<AtomicBool>` shutdown フラグ・`take()` 二重 join 回避の小細工は持たない（R7.4）。
@@ -26,8 +25,8 @@
 //! # 冪等性（R7.4）
 //! done ack を受けた後の二重 teardown は、mailbox の receiver が既に drop されている
 //! ため `Sender::send` が `Disconnected` を返す。これを **already-done** として扱い、
-//! 安全に no-op を返す（ハングも panic もしない）。本番 FFI 経路（task 5.1）で unload と
-//! `DllMain detach` が重なっても二重解放を起こさない構造的根拠。
+//! 安全に no-op を返す（ハングも panic もしない）。本番 FFI 経路（task 5.1）で unload が
+//! 重なっても二重解放を起こさない構造的根拠。
 //!
 //! # 異常記録（R7.5）
 //! ack が timeout した／途中で異常が生じた場合は [`tracing`] で記録し、
@@ -107,8 +106,8 @@ pub fn teardown_actor(
 /// mailbox 送信端のみで teardown（Stop{done}→ack 待ち）を試行する冪等経路。
 ///
 /// 本番 FFI 経路では `ActorThread` ハンドルを持たずに `static LEGACY`（task 5.1）の
-/// `Sender` 越しに teardown を撃つ場面があり、また二重 teardown（unload と `DllMain
-/// detach` の競合）も起こりうる。本関数はそのどちらでも安全に振る舞う:
+/// `Sender` 越しに teardown を撃つ場面があり、また二重 teardown（unload の重複）も
+/// 起こりうる。本関数はそのどちらでも安全に振る舞う:
 ///
 /// - mailbox receiver が drop 済み（アクター既終了）→ `Sender::send` が `Disconnected`
 ///   → **already-done** として no-op（`already_done=true`・hang/panic なし・R7.4）。

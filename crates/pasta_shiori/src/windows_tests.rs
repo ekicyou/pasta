@@ -280,7 +280,7 @@ fn dll_main_non_attach_paths() {
     // ATTACH は no-op で true（spawn は load 起点・loader lock 回避）。
     assert_eq!(DllMain(0, DLL_PROCESS_ATTACH, ptr::null_mut()), 1);
 
-    // DETACH は join しない後始末（teardown_actor_detached）へ委譲。アクター不在でも 1。
+    // DETACH も何もせず 1。
     assert_eq!(DllMain(0, DLL_PROCESS_DETACH, ptr::null_mut()), 1);
 
     // その他の通知コードは no-op で true。
@@ -307,10 +307,10 @@ fn legacy_slot_is_filled() -> bool {
     true
 }
 
-/// 特性化テスト 5（1.6・1.7）: FreeLibrary の detach（reserved が null）は今、置き場を空にする。
-/// task 7 で「detach の後も埋まったまま・unload で片付く」に改める。
+/// 特性化テスト 5（1.6・1.7）: FreeLibrary の detach（reserved が null）は置き場に触れず、
+/// 埋まったまま残る。片付けるのは unload だけ。
 #[test]
-fn dll_main_free_library_detach_empties_legacy_slot() {
+fn dll_main_free_library_detach_keeps_legacy_slot_until_unload() {
     let _guard = lock_global_state();
     const DLL_PROCESS_DETACH: u32 = 0;
     const DLL_PROCESS_ATTACH: u32 = 1;
@@ -324,12 +324,14 @@ fn dll_main_free_library_detach_empties_legacy_slot() {
 
     assert_eq!(DllMain(0, DLL_PROCESS_DETACH, ptr::null_mut()), 1);
     assert!(
-        !legacy_slot_is_filled(),
-        "FreeLibrary detach currently empties the slot"
+        legacy_slot_is_filled(),
+        "FreeLibrary detach must not touch the slot"
     );
-    assert!(!LOADU_INITIALIZED.load(Ordering::SeqCst));
+    assert!(LOADU_INITIALIZED.load(Ordering::SeqCst));
 
     assert_eq!(unload(), 1);
+    assert!(!legacy_slot_is_filled(), "unload must empty the slot");
+    assert!(!LOADU_INITIALIZED.load(Ordering::SeqCst));
 }
 
 /// プロセス終了による DETACH（reserved 非 null）は 1 を返すだけで teardown（unload）を呼ばない。

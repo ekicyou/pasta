@@ -4,8 +4,8 @@
 //! ディレクトリ・要求の連番だけを持ち、グローバルな状態を参照しない（ログの登録を除く・5.1）。
 //! 要求はそのインスタンスの mailbox だけを通り（5.2）、後始末はほかのインスタンスに触れない（4.3）。
 //!
-//! 後始末の決まり（design.md「後始末の決まり」）: Stop を送って ack を待ち、ack が届いて
-//! [`JoinPolicy::JoinAfterAck`] ならアクタースレッドを join する（受け口が既に閉じていたときも join）。それ以外は手放す（detach）。
+//! 後始末の決まり（design.md「後始末の決まり」）: Stop を送って ack を待ち、ack が届けば
+//! アクタースレッドを join する（受け口が既に閉じていたときも join）。それ以外は手放す（detach）。
 //! ack が来なければ手放したことを警告のログ（`seam = "instance.abandon"`）に出す（4.2）。
 
 use std::path::{Path, PathBuf};
@@ -29,15 +29,6 @@ use crate::util::parsers::req::ParseError;
 /// 後始末で ack を待つ上限（4.2）。通常運転では後始末は速やかに終わる。
 /// 万一アクターが ack を返さない場合でも呼び出し側（＝ホスト）を無限待機させない安全網。
 pub const TEARDOWN_TIMEOUT: Duration = Duration::from_secs(5);
-
-/// ack が届いた後にアクタースレッドを join するか（design.md「後始末の決まり」）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum JoinPolicy {
-    /// ack が届けば join してから返る（版 3 の unload・旧来の unload・4.4）。
-    JoinAfterAck,
-    /// join しない（`DllMain` の FreeLibrary の detach。loader lock の中では待てない）。
-    Detach,
-}
 
 /// 起動の前のディレクトリの占有のしかた（design.md「ActorInstance」・6.2）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -248,51 +239,45 @@ impl ActorInstance {
         teardown_via_sender(&self.tx, TEARDOWN_TIMEOUT)
     }
 
-    /// 後始末（4.1・4.2・4.4）。ack が届いて [`JoinPolicy::JoinAfterAck`] なら join してから返る。
-    pub fn shutdown(self, policy: JoinPolicy) -> TeardownReport {
-        self.shutdown_with_timeout(policy, TEARDOWN_TIMEOUT)
+    /// 後始末（4.1・4.2・4.4）。ack が届けば join してから返る。
+    pub fn shutdown(self) -> TeardownReport {
+        self.shutdown_with_timeout(TEARDOWN_TIMEOUT)
     }
 
     /// [`shutdown`](Self::shutdown) の、ack を待つ上限を差し替える形（試験から短い値を注入する口）。
-    pub fn shutdown_with_timeout(
-        mut self,
-        policy: JoinPolicy,
-        timeout: Duration,
-    ) -> TeardownReport {
-        self.finish(policy, timeout)
+    pub fn shutdown_with_timeout(mut self, timeout: Duration) -> TeardownReport {
+        self.finish(timeout)
     }
 
-    fn finish(&mut self, policy: JoinPolicy, timeout: Duration) -> TeardownReport {
+    fn finish(&mut self, timeout: Duration) -> TeardownReport {
         let mut report = teardown_via_sender(&self.tx, timeout);
         let Some(thread) = self.thread.take() else {
             return report;
         };
         // 受け口が既に閉じている（already_done）スレッドも、片付けを終えて約束を待つか panic で
         // 抜けたかなので join は止まらない。見捨てる（スレッドが参照を返す）のは ack が来ないときだけ。
-        if (report.acked || report.already_done) && policy == JoinPolicy::JoinAfterAck {
+        if report.acked || report.already_done {
             // ack の後のアクタースレッドは約束を待つだけなので、上限なしで join しても止まらない。
             let _ = thread.join();
             report.joined = true;
         } else {
             thread.detach();
-            if !report.acked && !report.already_done {
-                let _log_context = LoadDirGuard::new(self.load_dir.clone());
-                tracing::warn!(
-                    seam = "instance.abandon",
-                    load_dir = %self.load_dir.display(),
-                    "actor thread abandoned: no done ack within {timeout:?}"
-                );
-            }
+            let _log_context = LoadDirGuard::new(self.load_dir.clone());
+            tracing::warn!(
+                seam = "instance.abandon",
+                load_dir = %self.load_dir.display(),
+                "actor thread abandoned: no done ack within {timeout:?}"
+            );
         }
         report
     }
 }
 
 impl Drop for ActorInstance {
-    /// まだ片付けていなければ `shutdown(JoinAfterAck)` と同じことをする。
+    /// まだ片付けていなければ `shutdown()` と同じことをする。
     fn drop(&mut self) {
         if self.thread.is_some() {
-            self.finish(JoinPolicy::JoinAfterAck, TEARDOWN_TIMEOUT);
+            self.finish(TEARDOWN_TIMEOUT);
         }
     }
 }
@@ -347,7 +332,7 @@ mod tests {
         );
 
         // 二度目の後始末は冪等（already_done）で、受け口を閉じたスレッドを join する。
-        let report = instance.shutdown(JoinPolicy::JoinAfterAck);
+        let report = instance.shutdown();
         assert!(
             report.already_done && !report.acked && report.joined,
             "{report:?}"

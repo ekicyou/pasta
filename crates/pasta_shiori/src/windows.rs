@@ -14,8 +14,8 @@
 //!   回避する（R4.4）。
 //! - `request`→ [`lifecycle::marshal_request`]（GET=block-on-reply／NOTIFY=即 204）。
 //! - `unload` → [`lifecycle::teardown_actor`]（`Stop{done}` ack の後に join・7.6）。
-//! - `DllMain` の FreeLibrary の detach → [`lifecycle::teardown_actor_detached`]（ack の後に
-//!   スレッドを手放す。loader lock の中では join できない）。
+//! - `DllMain` → 何もしない（アクタースレッドがモジュールの参照を持つので、生きたアクターがいる間は
+//!   FreeLibrary の detach は来ない）。
 //!
 //! # FFI の型（7.3）
 //! 戻り値は C の `BOOL`（32 ビットの int・1／0）、長さは C の `long`（Windows では x86・x64 とも
@@ -39,7 +39,6 @@
 //! （要件 4.9・task 2.2 で変更済み。204 は panic／reply 喪失時の安全網のみ）。
 
 use crate::actor::lifecycle;
-use crate::actor::teardown::TeardownReport;
 use crate::util::hglobal::*;
 use std::ffi::c_long;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -49,7 +48,6 @@ use tracing::{error, info, warn};
 use windows_sys::Win32::Foundation::*;
 
 /// Windows DLL entry point
-/// Initializes SHIORI at DLL load/unload time.
 ///
 /// # Safety
 /// This function is called by the Windows loader. The caller must ensure:
@@ -59,32 +57,17 @@ use windows_sys::Win32::Foundation::*;
 ///
 /// `#[unsafe(no_mangle)]` is required for the Windows loader to find this symbol.
 ///
-/// # ロード起点 spawn / loader lock 回避（R4.4）
-/// DllMain attach ではアクタースレッドを spawn しない（DllMain は loader lock 保持下で
-/// 呼ばれ、スレッド生成は deadlock を招きうる）。スレッド spawn は SHIORI `load` 起点で
-/// 行う。FreeLibrary による detach（`reserved` が null）ではアクターを teardown する
-/// （VM・スレッド・チャネルの解放。loader lock の中なのでスレッドの終わりは待たない）。
-/// プロセス終了による detach（`reserved` が非 null）では何もしない（`SHIORI.unload` と
-/// 保存は走らない）。
+/// # 何もしない（R4.4・1.6・1.7）
+/// どの通知でも何もせず 1 を返す。スレッド spawn は SHIORI `load` 起点で行う（loader lock 回避）。
 #[unsafe(no_mangle)]
 extern "system" fn DllMain(
     _hinst: isize,
-    call_reason: u32,
-    reserved: *mut std::ffi::c_void,
+    _call_reason: u32,
+    _reserved: *mut std::ffi::c_void,
 ) -> i32 {
-    const DLL_PROCESS_DETACH: u32 = 0;
-
-    if call_reason == DLL_PROCESS_DETACH && !reserved.is_null() {
-        // プロセス終了中（他スレッドは既に停止済み）。アクターは応答できず teardown は
-        // タイムアウトまで待つだけなので、何もせず OS に後始末を任せる。
-        1
-    } else if call_reason == DLL_PROCESS_DETACH {
-        // FreeLibrary による detach: join しない後始末（unload と重なっても冪等 no-op で安全）。
-        teardown("DllMain", lifecycle::teardown_actor_detached)
-    } else {
-        // attach を含む他の通知では何もしない（spawn は load 起点・loader lock 回避）。
-        1
-    }
+    // アクタースレッドがモジュールの参照を持つので生きたアクターがいる間 FreeLibrary の detach は来ず、
+    // loader lock の中で Rust の後始末を走らせるのは危ないので、ここでは何もしない。
+    1
 }
 
 /// `loadu` で初期化済みかを保持するプロセス全域フラグ（要件 2.5・設計 ShioriLoadEntry）。
@@ -230,23 +213,18 @@ fn decode_dir(
 /// `#[unsafe(no_mangle)]` is required for the SHIORI host to find this symbol.
 #[unsafe(no_mangle)]
 pub extern "C" fn unload() -> i32 {
-    teardown("unload", lifecycle::teardown_actor)
-}
-
-/// `unload` と `DllMain` の detach の共通の後始末（窓口だけが異なる・常に 1 を返す）。
-fn teardown(entry: &str, teardown_actor: fn() -> TeardownReport) -> i32 {
     // loadu 初期化フラグを下ろす（以後の load は従来どおり ANSI でロードする・要件 2.5/2.6）。
     LOADU_INITIALIZED.store(false, Ordering::SeqCst);
-    // teardown は冪等（二重 teardown／unload×detach 競合でも安全）。panic は封じる。
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        let report = teardown_actor();
+    // teardown は冪等（二重 teardown でも安全）。panic は封じる。
+    let result = catch_unwind(|| {
+        let report = lifecycle::teardown_actor();
         if let Some(anomaly) = report.anomaly {
-            warn!("[pasta_shiori::{entry}] teardown anomaly: {anomaly}");
+            warn!("[pasta_shiori::unload] teardown anomaly: {anomaly}");
         }
-    }));
+    });
     if let Err(p) = result {
         error!(
-            "[pasta_shiori::{entry}] panic at SHIORI boundary: {}",
+            "[pasta_shiori::unload] panic at SHIORI boundary: {}",
             panic_msg(&p)
         );
     }

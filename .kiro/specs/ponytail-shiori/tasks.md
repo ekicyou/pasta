@@ -82,7 +82,7 @@
   - _Depends: 1.1_
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.8_
 
-- [ ] 7. DllMain を何もしない形にし、手放しの後始末の道を消す
+- [x] 7. DllMain を何もしない形にし、手放しの後始末の道を消す
   - DllMain はどの通知でも何もせず 1 を返す（理由を 1 行のコメントで残す）。detach 用の後始末の関数と、後始末の決まりの選択（JoinPolicy）を消し、unload の中の後始末を直に書く
   - load・loadu・unload・request の型・長さ・HGLOBAL の所有は変えない
   - 1.5 のテストを直した後の期待（detach の後も置き場は埋まったまま・unload で片付く）に改め、プロセスの終了と attach は 1 を返すだけのまま通る

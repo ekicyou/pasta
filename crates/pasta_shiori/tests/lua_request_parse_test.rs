@@ -632,7 +632,7 @@ mod empty_header_value_tests {
 /// SSP の記録（`doc/shiori-sample.log`）の 3 要求を入口へ送る。`doc/` は読まずに文字列として持つ。
 mod ssp_log_requests_tests {
     use super::common::copy_fixture_to_temp;
-    use pasta::actor::instance::{ActorInstance, JoinPolicy};
+    use pasta::actor::instance::ActorInstance;
     use pasta::shiori_get_api;
     use shiori4_abi::{SHIORI_ABI_VERSION_3, ShioriApi};
 
@@ -707,7 +707,7 @@ mod ssp_log_requests_tests {
             count.contains(&format!("\r\nValue: {}\r\n", DELIVERED + 1)),
             "{count:?}"
         );
-        assert!(instance.shutdown(JoinPolicy::JoinAfterAck).acked);
+        assert!(instance.shutdown().acked);
     }
 
     /// 版 3（`shiori_get_api`）。3 つとも Lua に届き、v3_probe の 204 が返る。

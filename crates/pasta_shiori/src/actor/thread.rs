@@ -113,9 +113,8 @@ impl ActorThread {
     /// アクタースレッドを **detach** する（join しない後始末用・design.md「後始末の決まり」）。
     ///
     /// 完了は `ActorMsg::Stop { done }` の done ack で確認する（ack 受信時に VM 破棄・cleanup
-    /// 完了済み）。unload は ack の後に [`join`](Self::join) し、本メソッドを使うのは `DllMain`
-    /// の FreeLibrary（loader lock の中で待てない）と、ack が来ずに手放すとき、reload 反復の
-    /// リーク検査の経路。`JoinHandle` を join せずに drop してスレッドを detach する。
+    /// 完了済み）。unload は ack の後に [`join`](Self::join) し、本メソッドを使うのは ack が来ずに
+    /// 手放すときと、reload 反復のリーク検査の経路。`JoinHandle` を join せずに drop してスレッドを detach する。
     ///
     /// 約束の送り手を落とすので、スレッドは片付けの後に自分で参照を返して終わり
     /// （`FreeLibraryAndExitThread`）、ハンドルは drop で解放される

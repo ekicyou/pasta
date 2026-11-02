@@ -322,7 +322,7 @@ fn v3_unload_leaves_no_actor_thread() {
 #[cfg(any(windows, target_os = "linux"))]
 #[test]
 fn abandoned_actor_thread_exits() {
-    use pasta::actor::instance::{ActorInstance, JoinPolicy};
+    use pasta::actor::instance::ActorInstance;
 
     let _serial = serial();
     let before = actor_thread_ids();
@@ -335,8 +335,7 @@ fn abandoned_actor_thread_exits() {
     assert_eq!(ours.len(), 1, "one actor thread per instance: {ours:?}");
 
     instance.notify("NOTIFY SHIORI/3.0\r\nCharset: UTF-8\r\nID: OnProbeSpin\r\n\r\n");
-    let report =
-        instance.shutdown_with_timeout(JoinPolicy::JoinAfterAck, Duration::from_millis(100));
+    let report = instance.shutdown_with_timeout(Duration::from_millis(100));
     assert!(!report.acked && !report.joined, "{report:?}");
 
     let start = Instant::now();
