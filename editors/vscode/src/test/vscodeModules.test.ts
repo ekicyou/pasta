@@ -12,7 +12,7 @@
 // Covered:
 //   - semanticTokensProvider.ts : PASTA_TOKEN_TYPES/MODIFIERS contracts,
 //     delta→absolute conversion, cache behaviour, error paths
-//   - diagnosticsManager.ts     : LSP→VSCode severity/range conversion, clear
+//   - diagnosticsManager.ts     : range conversion (always Error), clear
 //   - documentSync.ts           : open/change/close lifecycle, 200ms debounce,
 //     analysis-failure fallback, dispose
 //   - wasmBridge.ts             : init/dispose lifecycle, error wrapping,
@@ -304,7 +304,8 @@ function collectionOf(dm: DiagnosticsManager): mock.MockDiagnosticCollection {
   return (dm as unknown as { collection: mock.MockDiagnosticCollection }).collection;
 }
 
-test('setDiagnostics maps LSP severities 1..4 to VSCode severities', () => {
+// 入力のたびの診断は構文の誤りだけなので、重さは常に Error（N9）
+test('setDiagnostics always uses Error severity', () => {
   const dm = new DiagnosticsManager();
   const uri = mock.Uri.parse('file:///sev.pasta');
   const mk = (severity: number) => ({
@@ -312,25 +313,9 @@ test('setDiagnostics maps LSP severities 1..4 to VSCode severities', () => {
     message: `sev ${severity}`,
     severity,
   });
-  dm.setDiagnostics(uri as never, [mk(1), mk(2), mk(3), mk(4)]);
+  dm.setDiagnostics(uri as never, [mk(1), mk(2), mk(3), mk(4), mk(99)]);
   const got = collectionOf(dm).get(uri)!;
-  assert.strictEqual(got.length, 4);
-  assert.strictEqual(got[0].severity, mock.DiagnosticSeverity.Error);
-  assert.strictEqual(got[1].severity, mock.DiagnosticSeverity.Warning);
-  assert.strictEqual(got[2].severity, mock.DiagnosticSeverity.Information);
-  assert.strictEqual(got[3].severity, mock.DiagnosticSeverity.Hint);
-  dm.dispose();
-});
-
-test('setDiagnostics defaults unknown LSP severity to Error', () => {
-  const dm = new DiagnosticsManager();
-  const uri = mock.Uri.parse('file:///sev0.pasta');
-  dm.setDiagnostics(uri as never, [{
-    range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
-    message: 'weird severity',
-    severity: 99,
-  }]);
-  assert.strictEqual(collectionOf(dm).get(uri)![0].severity, mock.DiagnosticSeverity.Error);
+  assert.deepStrictEqual(got.map((d) => d.severity), Array(5).fill(mock.DiagnosticSeverity.Error));
   dm.dispose();
 });
 
@@ -351,7 +336,7 @@ test('setDiagnostics preserves range and message', () => {
   dm.dispose();
 });
 
-test('setDiagnostics replaces, clear deletes, clearAll empties', () => {
+test('setDiagnostics replaces, clear deletes', () => {
   const dm = new DiagnosticsManager();
   const a = mock.Uri.parse('file:///a.pasta');
   const b = mock.Uri.parse('file:///b.pasta');
@@ -367,8 +352,6 @@ test('setDiagnostics replaces, clear deletes, clearAll empties', () => {
   dm.clear(a as never);
   assert.strictEqual(collectionOf(dm).get(a), undefined);
   assert.strictEqual(collectionOf(dm).get(b)!.length, 1);
-  dm.clearAll();
-  assert.strictEqual(collectionOf(dm).size, 0);
   dm.dispose();
 });
 
@@ -904,7 +887,6 @@ test('activate loads the real WASM bridge and registers the debug + toggle wirin
   assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 1, watchers: 1 });
   const state = getActivationState();
   assert.strictEqual(state.wasmReady, true, 'real wasm/pasta_lsp_wasm_bg.wasm must load');
-  assert.strictEqual(state.fallbackMode, false);
   assert.ok(mock.registeredCommands.has(TOGGLE_COMMAND), 'toggle command must be registered');
   assert.strictEqual(mock.registeredDebugFactories.length, 1, 'debug adapter factory registered');
   assert.strictEqual(mock.registeredDebugConfigProviders.length, 1, 'debug config provider registered');
@@ -1016,7 +998,6 @@ test('WASM が読めないときは GhostValidator を作らず、activate は�
   const collectionsBefore = mock.createdDiagnosticCollections.length;
   const watchersBefore = mock.createdFileSystemWatchers.length;
   await activate(context as never);
-  assert.strictEqual(getActivationState().fallbackMode, true);
   assert.strictEqual(getActivationState().wasmReady, false);
   assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 0, watchers: 0 });
   deactivate();
