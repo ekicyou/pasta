@@ -219,7 +219,7 @@ ponytail 監査の指摘を直す 9 本（`ponytail-check-release` を除く）�
 
 ### 即時修正（spec なし・本棚卸で実施して閉じた）
 
-- マニュアルの章の数 — 雑記の章（`notes/cc-sdd.md`）が入って 64 章になったのに、章の数を決め打ちする 3 つの検査が 63 のままで、main の自己テストが 5 件落ちていた。`book/tools/verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs` を 64 にし、3 つとも通ることを確かめた。`book/tools/verify-content.mjs` の説明の「全 62 章」も 64 章に直した。この roadmap の「前提」の章の数の行も 64 にした。取り残しは 2 度目なので、再発を防ぐかを `ponytail-manual-ci` の議題にした（下の「開発者の判断が要るもの」）。
+- マニュアルの章の数 — 雑記の章（`notes/cc-sdd.md`）が入って 64 章になったのに、章の数を決め打ちする 3 つの検査が 63 のままで、main の自己テストが 5 件落ちていた。3 つの検査を 64 にする直しは、同じ日に PR#217 が先に入れた（この棚卸でも同じ直しをしていたので、PR#217 の形に合わせた）。`book/tools/verify-content.mjs` の説明の「全 62 章」も 64 章に直した。この roadmap の「前提」の章の数の行も 64 にした。取り残しは 2 度目なので、再発を防ぐかを `ponytail-manual-ci` の議題にした（下の「開発者の判断が要るもの」）。
 - この roadmap — 出した 0.4.3・0.4.4 の節を「完了フェーズ」へ畳み、0.4.5（途中）の行を足し、台帳の `[x]` の 4 行を消した。台帳に無かった `scene-count` の行を足した。`shiori4-v4-host`・`pasta-dll-multiarch` の Dependencies から入った `shiori4-v3-portable` を外した。「依存の更新」から入った 3 本の説明を畳み、「リリース」から済んだ 0.4.3 の本文の段取りを消した（実機の確かめは下の「人手の確認」へ移した）。ponytail の節の古い開始コマンド（9 本）を消した。
 - `steering/tech.md` — レンダラの注入の口（`presentation/`・`RendererInjection`）が `ponytail-lua-loader` で消えたのに、「アダプタ注入で論理デカップリング」と書いていた所を直した。
 - `steering/product.md` — 完了の数（192）、最終更新、現在地（v0.4.4・次は 0.4.5、その次が 0.5.0 と 0.6.0）。

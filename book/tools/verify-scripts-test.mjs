@@ -75,7 +75,7 @@ log('\n== verify-content.mjs（コンテンツ整合・網羅レビュー検証�
   for (const id of ['C-steps', 'C-order', 'C-tutorial-check']) {
     check(`${id} が PASS`, out.includes(`PASS  [${id}]`));
   }
-  // 台詞部品（T 系）が空回りしていない: 全 64 章（debug/ を含む・雑記を含む）の記法・導入・締めと、素材・規約が走る。
+  // 台詞部品（T 系）が空回りしていない: 全 64 章（debug/ を含む）の記法・導入・締めと、素材・規約が走る。
   // 件数は PASS・FAIL を問わず数える（合否は上の「FAIL 0 件」が見る）。
   const tcount = (id) => count(new RegExp(`(?:PASS|FAIL) {2}\\[${id}[:\\]]`, 'g'));
   for (const [id, n] of [['T-syntax', 64], ['T-intro', 64], ['T-outro', 64], ['T-assets', 1], ['T-authoring', 1]]) {
