@@ -130,7 +130,7 @@
   - `cargo test -p pasta_dsl` が通り、span の長さの関数がリポジトリに無い
   - _Requirements: 6.2, 8.3_
 
-- [ ] 11. 全体の確かめと品質の関門
+- [x] 11. 全体の確かめと品質の関門
 - [x] 11.1 (P) `pasta_check validate` が pasta.dll と同じ結果を出すことを確かめる
   - `validate_rules_test.rs` にテストを 1 本足す：
     - 大きすぎる数・アクターの番号・シーン引数の番号・括弧の重なり・演算子の数の辞書で、`syntax` の誤りが 1 つずつ出る。位置は `parse_str` と同じ行・桁で、文は `構文エラー: {文}`
@@ -153,7 +153,7 @@
   - _Boundary: NestingGuardTest, ParserLimitStackTest_
   - _Depends: 7.2_
   - _Requirements: 3.6_
-- [ ] 11.4 品質の関門を通し、変えないものを確かめる
+- [x] 11.4 品質の関門を通し、変えないものを確かめる
   - 関門を通す：`cargo fmt --check`・`cargo clippy --all-targets`（警告 0）・`cargo test -p pasta_dsl -p pasta_lua -p pasta_check -p pasta_lsp`・`node book/tools/gen-skill-refs.mjs --check`
   - `expr_parse_test.rs` の括弧式の回帰テストが残っていて、通る
   - main からの差分に、`partial.rs`・`grammar.pest`・`pasta_lua/src/code_gen/`・ルートの `Cargo.toml`・`Cargo.lock` が無い
@@ -166,3 +166,4 @@
 - 6: variables.md「優先順位と括弧」の上限の文は括弧の分だけ入れた。7.1 で設計 Docs の 1 文（括弧と演算子をまとめた確定文）に直し、transpiler.md にも演算子の分を足す
 - 11.2: 全部の直しの後の書き出し（target/ast-final、56 ファイル）と target/ast-baseline の `diff -r` は差分なし（出力 "DIFF: none"）
 - 11.3: i686・x86_64 × debug・release の 4 通りで nesting_guard_test 14・number_literal_test 16・span_oracle_test 2・parser_limit_stack_test 4 がすべて通った
+- 11.4: fmt --check OK・clippy --all-targets 警告 0・4 クレートのテスト 2599 通過／失敗 0（84 スイート）・gen-skill-refs --check OK・expr_parse_test の括弧式の回帰テスト通過・main からの差分に partial.rs・grammar.pest・code_gen/・Cargo.toml・Cargo.lock 無し・README と tech.md に断り書き無し
