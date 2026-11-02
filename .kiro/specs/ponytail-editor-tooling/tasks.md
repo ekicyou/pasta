@@ -126,8 +126,8 @@
   - 直した文書に `tower-lsp`・`server.rs`・`document.rs`・`PartialParseError` の語が残っていない
   - _Requirements: 13.3_
 
-- [ ] 8. 品質の関門を通す
-- [ ] 8.1 フォーマット・clippy・テスト・VSIX・マニュアルのハイライトの関門を通す
+- [x] 8. 品質の関門を通す
+- [x] 8.1 フォーマット・clippy・テスト・VSIX・マニュアルのハイライトの関門を通す
   - `cargo fmt --check`・clippy（警告 0）・`cargo test -p pasta_lsp -p pasta_dsl -p pasta_check`・拡張の `npm test`・マニュアルのハイライトの自己テスト（`book/node_modules` が無ければ main の作業コピーのものを使う）を走らせる
   - `build-wasm.ps1` で WASM を作り、`vsce package` で VSIX を作る
   - ゴースト全体の検査の起動の条件・集め方・表示に差分が無いことを `git diff` で確かめる
@@ -150,3 +150,4 @@
 - 5.3: 閉じのフェンスは行頭に限らない（pest の `code_contents = (!PEEK ~ ANY)+` が字下げや行の途中でも PEEK で止まる）ので、end に `^` を付けない（design の表の `^(\1)` より正典に近い）。開きの言語名の後ろの空白は不可（`eol = NEWLINE`）
 - 6.1: 箱は `findWordRefRanges`（wordRefDecorator.ts）が tmLanguage の規則を JS の RegExp（`u`＋`s`。`s` は Oniguruma の `.` が U+2028 にも当たるのに合わせる）にして作る。表は `src/test/fixtures/wordRefCases.ts` を 2 つのテストが共有
 - 6.4: 開いた・閉じた文書の syntax の出し分けは既存の `ghostValidator.test.ts`「開いている文書の syntax は出さず、閉じると出し、開くとまた外す」が固めている（出し分けを壊すと落ちることを確かめた）。テストは足していない
+- 8.1: 関門は全部通った。`cargo test --all` の初回に pasta_lua の runtime_toggle_e2e が TCP のタイミングで 1 件落ちたが、単独 8 回と `--no-fail-fast` の再実行では通った（この spec は pasta_lua に触れていない）
