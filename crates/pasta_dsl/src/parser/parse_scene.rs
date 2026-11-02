@@ -372,36 +372,15 @@ pub(crate) fn parse_cue_cmd_line(
 fn parse_cue_cmd_scope(pair: Pair<Rule>) -> Result<ScopedName, ParseError> {
     let span = Span::from_pair(&pair);
 
-    for inner in pair.into_inner() {
-        if inner.as_rule() == Rule::cue_scoped_ident {
-            let raw = inner.as_str();
-            // Split on ':' or '：' (full-width colon) to separate actor and name
-            if let Some(colon_pos) = raw.find([':', '：']) {
-                let actor = &raw[..colon_pos];
-                // colon_pos comes from find(), so the character is guaranteed to exist,
-                // but we use if-let for defensive safety.
-                if let Some(colon_char) = raw[colon_pos..].chars().next() {
-                    let name = &raw[colon_pos + colon_char.len_utf8()..];
-                    return Ok(ScopedName {
-                        actor: Some(actor.to_string()),
-                        name: name.to_string(),
-                        span,
-                    });
-                }
-            } else {
-                return Ok(ScopedName {
-                    actor: None,
-                    name: raw.to_string(),
-                    span,
-                });
-            }
-        }
-    }
-
-    // Fallback (should not be reached due to PEG grammar guarantees)
+    // `at` は黙る規則なので、子の文は `cue_scoped_ident` だけになる
+    let raw = pair.into_inner().as_str();
+    let (actor, name) = match raw.split_once([':', '：']) {
+        Some((actor, name)) => (Some(actor.to_string()), name),
+        None => (None, raw),
+    };
     Ok(ScopedName {
-        actor: None,
-        name: String::new(),
+        actor,
+        name: name.to_string(),
         span,
     })
 }

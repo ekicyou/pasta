@@ -224,7 +224,6 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, ParseError
                 let actor = parse_actor_scope(pair, filename)?;
                 file.items.push(FileItem::ActorScope(actor));
             }
-            Rule::EOI => {}
             _ => {}
         }
     }
