@@ -156,7 +156,6 @@ end
 --- @field scene_name string|nil 実行中のグローバルシーンの書いた名前（エラーの表記用）
 --- @field local_scene_name string|nil 実行中のローカルシーンの書いた名前（エラーの表記用）
 --- @field line_map string|nil 実行中のシーンの行の対応（読み解かずに控えるだけ）
---- @field scene_names table<SceneTable, string> シーンテーブル→グローバルシーンの書いた名前
 local ACT = {}
 
 --- ACT実装メタテーブル
@@ -191,7 +190,6 @@ function ACT.new(actors)
         var = {},
         token = {},
         current_scene = nil,
-        scene_names = {},
     }
     return setmetatable(obj, ACT_IMPL)
 end
@@ -213,7 +211,6 @@ function ACT_IMPL.init_scene(self, scene, scene_name, local_scene_name, line_map
     self.scene_name = scene_name
     self.local_scene_name = local_scene_name
     self.line_map = line_map
-    self.scene_names[scene] = scene_name
     -- 実行中のスレッドにこの act を対応させる（act を受け取らない ACT.num・ACT.str が引く）
     FAILURE.bind(self)
     return self.save, self.var
@@ -439,8 +436,7 @@ function ACT_IMPL.word(self, name, var_path)
         })
     end
     if type(handler) == "function" then
-        local scene = self.current_scene
-        return self:restore_scene(scene, handler(self))
+        return self:restore_scene(handler, self)
     end
     return tostring(handler)
 end
@@ -455,8 +451,7 @@ end
 local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
-        local scene = self.current_scene
-        return FAILURE.fn_succeeded(self, self:restore_scene(scene, handler(self, ...)))
+        return FAILURE.fn_succeeded(self, self:restore_scene(handler, self, ...))
     end
     FAILURE.set_fn_failed(self, true)
     return FAILURE.report(self, {
@@ -540,8 +535,7 @@ end
 function ACT_IMPL.global_fn(self, name, ...)
     local f = GLOBAL[name]
     if type(f) == "function" then
-        local scene = self.current_scene
-        return FAILURE.fn_succeeded(self, self:restore_scene(scene, f(self, ...)))
+        return FAILURE.fn_succeeded(self, self:restore_scene(f, self, ...))
     end
     FAILURE.set_fn_failed(self, true)
     return FAILURE.report(self, {
@@ -759,19 +753,20 @@ function ACT_IMPL.call_key(self, value, var_path, desc)
     return SKIP_CALL
 end
 
---- 実行中のシーンを scene に戻し、残りの引数をそのまま返す
---- グローバルシーンの書いた名前は scene_names から戻し、ローカル名と行の対応は空にする
---- （呼び出し前のローカルシーンは分からないので、粗くなっても別のシーンの名前を残さない）
+--- fn(...) を呼び、戻った後に実行中のシーン・書いた名前 2 つ・行の対応を呼び出し前の値へ戻し、fn の戻り値をすべて返す
+--- fn がエラーで抜けたときは戻さない（止まった場所の欄を STOP が読む）。STORE.last_global_scene は触らない
 --- @param self Act アクションオブジェクト
---- @param scene SceneTable|nil 戻す先（呼び出し前の act.current_scene）
---- @param ... any そのまま返す値
---- @return any ...
-function ACT_IMPL.restore_scene(self, scene, ...)
-    self.current_scene = scene
-    self.scene_name = scene and self.scene_names[scene]
-    self.local_scene_name = nil
-    self.line_map = nil
-    return ...
+--- @param fn function 呼ぶ関数
+--- @param ... any fn へ渡す引数
+--- @return any ... fn の戻り値
+function ACT_IMPL.restore_scene(self, fn, ...)
+    local scene, scene_name, local_scene_name, line_map =
+        self.current_scene, self.scene_name, self.local_scene_name, self.line_map
+    return (function(...)
+        self.current_scene = scene
+        self.scene_name, self.local_scene_name, self.line_map = scene_name, local_scene_name, line_map
+        return ...
+    end)(fn(...))
 end
 
 --- act:call と同じ引数で呼び、戻った後に実行中のシーンを呼び出し前のものへ戻す
@@ -786,13 +781,7 @@ end
 --- @param ... any 呼ばれた側へ渡す引数
 --- @return any ... 呼ばれた側の戻り値
 function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...)
-    local scene = self.current_scene
-    local scene_name, local_scene_name, line_map = self.scene_name, self.local_scene_name, self.line_map
-    return (function(...)
-        self.current_scene = scene
-        self.scene_name, self.local_scene_name, self.line_map = scene_name, local_scene_name, line_map
-        return ...
-    end)(self:call(global_scene_name, key, attrs, ...))
+    return self:restore_scene(self.call, self, global_scene_name, key, attrs, ...)
 end
 
 --- 失敗表記を出す: 警告があればログへ出し、【text】（中身はエスケープ済み）を raw_script トークンとして積む

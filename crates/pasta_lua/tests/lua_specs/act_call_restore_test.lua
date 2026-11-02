@@ -44,14 +44,20 @@ local function scene_handler(other, ...)
 end
 
 describe("act:restore_scene", function()
-    test("実行中のシーンを指定の値に戻し、残りの戻り値（nil を含む）をそのまま返す", function()
+    test("関数を呼び、戻った後に 4 つの欄を呼ぶ前の値へ戻し、戻り値（nil を含む）をすべて返す", function()
         with_captured_act(function(ACT)
             local act = ACT.new({})
             local A = {}
-            act.current_scene = {}
+            act:init_scene(A, "天気", "雨の日", "m1")
             local n, a, b, c = (function(...) return select("#", ...), ... end)(
-                act:restore_scene(A, 1, nil, "x"))
+                act:restore_scene(function(x)
+                    act:init_scene({}, "散歩", "公園", "m2")
+                    return x, nil, "x"
+                end, 1))
             expect(act.current_scene):toBe(A)
+            expect(act.scene_name):toBe("天気")
+            expect(act.local_scene_name):toBe("雨の日")
+            expect(act.line_map):toBe("m1")
             expect(n):toBe(3)
             expect(a):toBe(1)
             expect(b):toBe(nil)
@@ -59,12 +65,27 @@ describe("act:restore_scene", function()
         end)
     end)
 
-    test("戻す先が nil なら実行中のシーンは nil、戻り値なし", function()
+    test("関数が何も返さなければ戻り値なし", function()
         with_captured_act(function(ACT)
             local act = ACT.new({})
-            act.current_scene = {}
-            expect(select("#", act:restore_scene(nil))):toBe(0)
-            expect(act.current_scene):toBe(nil)
+            expect(select("#", act:restore_scene(function() end))):toBe(0)
+        end)
+    end)
+
+    test("関数がエラーで抜けたら戻さない（止まった場所の欄が残る）", function()
+        with_captured_act(function(ACT)
+            local act = ACT.new({})
+            local B = {}
+            act:init_scene({}, "天気", "雨の日", "m1")
+            local ok = pcall(act.restore_scene, act, function()
+                act:init_scene(B, "散歩", "公園", "m2")
+                error("boom")
+            end)
+            expect(ok):toBe(false)
+            expect(act.current_scene):toBe(B)
+            expect(act.scene_name):toBe("散歩")
+            expect(act.local_scene_name):toBe("公園")
+            expect(act.line_map):toBe("m2")
         end)
     end)
 end)
@@ -616,7 +637,7 @@ describe("式の関数呼び出し・＠＊関数・単語の関数ハンドラ�
 end)
 
 describe("act が書いた名前と行の対応を控える (runtime-error-balloon 2.3)", function()
-    test("init_scene が名前 2 つと行の対応を控え、シーンの表にグローバル名を書く・戻り値は今と同じ", function()
+    test("init_scene が名前 2 つと行の対応を控える・戻り値は今と同じ", function()
         with_captured_act(function(ACT)
             local act = ACT.new({})
             local A = { __global_name__ = "天気1" }
@@ -627,7 +648,6 @@ describe("act が書いた名前と行の対応を控える (runtime-error-ballo
             expect(act.scene_name):toBe("天気")
             expect(act.local_scene_name):toBe("雨の日")
             expect(act.line_map):toBe("dic/a.pasta|3:2")
-            expect(act.scene_names[A]):toBe("天気")
         end)
     end)
 
@@ -635,12 +655,10 @@ describe("act が書いた名前と行の対応を控える (runtime-error-ballo
         with_captured_act(function(ACT)
             local act = ACT.new({})
             act:init_scene({}, "天気", "雨の日", "m")
-            local B = {}
-            act:init_scene(B)
+            act:init_scene({})
             expect(act.scene_name):toBe(nil)
             expect(act.local_scene_name):toBe(nil)
             expect(act.line_map):toBe(nil)
-            expect(act.scene_names[B]):toBe(nil)
         end)
     end)
 
@@ -659,29 +677,61 @@ describe("act が書いた名前と行の対応を控える (runtime-error-ballo
         end)
     end)
 
-    test("restore_scene の後はグローバル名を表から戻し、ローカル名と行の対応は空（別のシーンの名前が残らない）", function()
+    test("単語の関数の後は名前 2 つと行の対応が呼ぶ前の値（中でシーンを始める関数・始めない関数）", function()
         with_captured_act(function(ACT)
             local act = ACT.new({})
-            local A = { __global_name__ = "A", w = function(a)
-                a:init_scene({ __global_name__ = "B" }, "散歩", "公園", "m2")
-                return "単語"
-            end }
+            local A = {
+                __global_name__ = "A",
+                starts = function(a)
+                    a:init_scene({ __global_name__ = "B" }, "散歩", "公園", "m2")
+                    return "始める"
+                end,
+                plain = function() return "始めない" end,
+            }
             act:init_scene(A, "天気", "雨の日", "m1")
-            expect(act:word("w")):toBe("単語")
+            expect(act:word("starts")):toBe("始める")
+            expect(act.current_scene):toBe(A)
             expect(act.scene_name):toBe("天気")
-            expect(act.local_scene_name):toBe(nil)
-            expect(act.line_map):toBe(nil)
+            expect(act.local_scene_name):toBe("雨の日")
+            expect(act.line_map):toBe("m1")
+            expect(act:word("plain")):toBe("始めない")
+            expect(act.current_scene):toBe(A)
+            expect(act.scene_name):toBe("天気")
+            expect(act.local_scene_name):toBe("雨の日")
+            expect(act.line_map):toBe("m1")
         end)
     end)
 
-    test("restore_scene の戻す先が表に無いシーンならグローバル名も空", function()
+    test("関数を呼ぶ道の後の行のエラーの表記に、ローカルシーン名と .pasta のファイルと行が出る (5.3)", function()
         with_captured_act(function(ACT)
-            local act = ACT.new({})
-            act:init_scene({}, "天気", "雨の日", "m1")
-            act:restore_scene({})
-            expect(act.scene_name):toBe(nil)
-            expect(act.local_scene_name):toBe(nil)
-            expect(act.line_map):toBe(nil)
+            local STOP = require("pasta.shiori.stop")
+            local GLOBAL = require("pasta.global")
+            local ACTOR = require("pasta.actor")
+            local CHUNK = "pasta\\scene\\天気.lua"
+            local starts = function(a)
+                a:init_scene({ __global_name__ = "散歩1" }, "散歩", "公園", "dic\\散歩.pasta|30:2")
+                return "x"
+            end
+            local actor = ACTOR.get_or_create("復元テスト俳優_stop")
+            local act = ACT.new({ ["復元テスト俳優_stop"] = actor })
+            local proxy = act["復元テスト俳優_stop"]
+            local A = { __global_name__ = "天気1", f = starts }
+            GLOBAL.__restore_stop_test_fn = starts
+            local paths = {
+                function() return act:expr_fn("f") end,                        -- ＠関数（）
+                function() return act:global_fn("__restore_stop_test_fn") end, -- ＠＊関数（）
+                function() return act:word("f") end,                           -- 単語の関数
+                function() return proxy:expr_fn("f") end,                      -- アクターの行の ＠関数（）
+                function() return proxy:word("f") end,                         -- アクターの行の単語
+            }
+            for _, path in ipairs(paths) do
+                act:init_scene(A, "天気", "雨の日", "dic\\天気.pasta|30:15")
+                path()
+                expect(STOP.subject(act)):toBe("＊天気・雨の日")
+                expect(STOP.detail(CHUNK .. ":30: boom", { [CHUNK] = true }, act.line_map))
+                    :toBe("dic\\天気.pasta:15: boom")
+            end
+            GLOBAL.__restore_stop_test_fn = nil
         end)
     end)
 end)

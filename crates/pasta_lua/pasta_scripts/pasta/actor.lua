@@ -189,8 +189,7 @@ end
 local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
-        local scene = self.act.current_scene
-        return FAILURE.fn_succeeded(self.act, drop_self(self, self.act:restore_scene(scene, handler(self.act, ...))))
+        return FAILURE.fn_succeeded(self.act, drop_self(self, self.act:restore_scene(handler, self.act, ...)))
     end
     FAILURE.set_fn_failed(self.act, true)
     return FAILURE.report(self.act, {
@@ -261,8 +260,7 @@ function PROXY_IMPL.word(self, name, var_path)
         })
     end
     if type(handler) == "function" then
-        local scene = self.act.current_scene
-        return drop_self(self, self.act:restore_scene(scene, handler(receiver)))
+        return drop_self(self, self.act:restore_scene(handler, receiver))
     end
     return tostring(handler)
 end

@@ -102,7 +102,6 @@ ACT は、シーン関数が第 1 引数で受け取るオブジェクトであ�
 | `scene_name` | 実行中のグローバルシーンの、辞書に書いた名前（`string\|nil`）。初期値は `nil` で、`init_scene` の第 2 引数を控える |
 | `local_scene_name` | 実行中のローカルシーンの、辞書に書いた名前（`string\|nil`）。初期値は `nil` で、`init_scene` の第 3 引数を控える |
 | `line_map` | 実行中のシーンの、生成コードの行と `.pasta` の行の対応（`string\|nil`）。初期値は `nil` で、`init_scene` の第 4 引数を読み解かずに控える |
-| `scene_names` | シーンテーブル → グローバルシーンの書いた名前。ACT ごとの新しい空の表で、`init_scene` が書き足し、`restore_scene` が引く |
 
 `SHIORI_ACT.new(actors, req)` は `ACT.new(actors)` で作った表に、`_spot_newlines`・`_choice_newlines`・`_after_choice_newlines`（`pasta.config` から読む `[ghost]` の `spot_newlines`・`choice_newlines`・`after_choice_newlines`。既定は 1.5・1.5・1.0）と `req`（SHIORI のリクエストの表）を足し、メタテーブルを `SHIORI_ACT_IMPL` に付け替える。`act.req` のフィールドは [act.req](../lua/shiori-events.md#actreq) が正である。
 
@@ -157,7 +156,7 @@ end
 
 1. `scene.__global_name__` があれば、`STORE.last_global_scene` に記録する。`pasta.scene` が作るシーンテーブルはすべて `__global_name__` を持つため、生成コードからの呼び出しでは常に記録される。
 2. `self.current_scene = scene` とする。
-3. `scene_name`・`local_scene_name`・`line_map` を同名のフィールドに書き（省略した引数は `nil`）、`self.scene_names[scene] = scene_name` とする。
+3. `scene_name`・`local_scene_name`・`line_map` を同名のフィールドに書く（省略した引数は `nil`）。
 4. `FAILURE.bind(self)` で、実行中のスレッドにこの ACT を対応させる（[失敗の報告](#失敗の報告pastafailure)）。
 5. `self.save, self.var` を返す。新しい表は作らない。
 
@@ -171,32 +170,28 @@ end
 `current_scene` の書き手は `init_scene` と、呼ぶ側の `call_restore`・`restore_scene` である。呼ばれた側のシーン関数が `init_scene` で自分のシーンを設定し、呼ぶ側が、戻った後に呼ぶ前の値に書き戻す。利用者から見た振る舞いは [Call から戻った後の名前解決](../grammar/call-jump.md#call-から戻った後の名前解決) と [call_restore](../lua/script-api.md#call_restoreglobal_scene_name-key-attrs-) が正である。
 
 ```lua
-function ACT_IMPL.restore_scene(self, scene, ...)
-    self.current_scene = scene
-    self.scene_name = scene and self.scene_names[scene]
-    self.local_scene_name = nil
-    self.line_map = nil
-    return ...
-end
-
-function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...)
-    local scene = self.current_scene
-    local scene_name, local_scene_name, line_map = self.scene_name, self.local_scene_name, self.line_map
+function ACT_IMPL.restore_scene(self, fn, ...)
+    local scene, scene_name, local_scene_name, line_map =
+        self.current_scene, self.scene_name, self.local_scene_name, self.line_map
     return (function(...)
         self.current_scene = scene
         self.scene_name, self.local_scene_name, self.line_map = scene_name, local_scene_name, line_map
         return ...
-    end)(self:call(global_scene_name, key, attrs, ...))
+    end)(fn(...))
+end
+
+function ACT_IMPL.call_restore(self, global_scene_name, key, attrs, ...)
+    return self:restore_scene(self.call, self, global_scene_name, key, attrs, ...)
 end
 ```
 
-- `call_restore` は、呼ぶ前の `current_scene`・`scene_name`・`local_scene_name`・`line_map` の 4 つをそのまま戻す。DSL の途中の Call から戻った後の行で止まると、止まるエラーの表記は呼び出し元のローカルシーンの名前と `.pasta` の行まで示せる。
-- `restore_scene` は、呼ぶ前のローカルシーンと行の対応を知らない。グローバルシーンの書いた名前だけを `scene_names[scene]` から戻し、`local_scene_name`・`line_map` を `nil` にする。関数から戻った後に止まると、表記は `＊天気` のようにグローバルシーンまでになり、`.pasta` の行も示さないが、呼んだ先のシーンの名前は出さない。
-- どちらも `STORE.last_global_scene` は触らない。残りの引数をそのまま返すため、呼んだ関数の複数の戻り値も保たれる。
+- `restore_scene` は `fn(...)` を呼び、戻った後に、呼ぶ前の `current_scene`・`scene_name`・`local_scene_name`・`line_map` の 4 つをそのまま戻す。途中の Call や関数から戻った後の行で止まると、止まるエラーの表記は呼び出し元のローカルシーンの名前と `.pasta` の行まで示せる。
+- `restore_scene` の引数は、前は `(scene, ...)`（戻す先のシーンテーブルと、そのまま返す値）だった。今は `(fn, ...)`（呼ぶ関数と、その引数）で、関数を呼ぶことまでを引き受ける。関数でない値を渡したときの専用のエラー文は無い。
+- `STORE.last_global_scene` は触らない。`fn` の戻り値をすべて返すため、呼んだ関数の複数の戻り値も保たれる。
 - 途中の Call（ローカルシーンの最後の項目でない Call）の生成コードは `act:call_restore(…)` である（[生成される Lua コードの形](transpiler.md#生成される-lua-コードの形)）。`call_restore` の中の `self:call(…)` は末尾位置ではないため、呼び出しのたびにフレームが 1 つ増える。呼ばれた側の中で `return act:call(…)` がつながっても深くならず、その連鎖から戻った時点で、外側の `call_restore` が 1 回だけ復元する。
 - 復元は、`act:call` の中で何が起きたか（シーン関数・Lua の関数を呼んだ、見つからなかった、キーが `nil`・「呼ばない」印だった）にかかわらず同じ経路で行う。呼ばれた側が `yield` で中断した場合は、コルーチンの再開後に戻った時点で行う。
-- 呼ばれた側が Lua のエラーで抜けた場合は復元しない。エラーはコルーチンごと失敗し（止まるエラー。[止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記)）、その ACT は止まった場所の名前を作るのに使われた後に捨てられる。
-- 関数を呼ぶ ACT のメソッドも同じ形で復元する。`pasta.act` の局所関数 `call_expr`（`expr_fn`・`expr_fn_var`）・`global_fn`・`word`（見つかったのが関数のとき）は、`local scene = self.current_scene` の後に `return self:restore_scene(scene, h(self, ...))` とする（`word` は引数を渡さず `h(self)`）。`pasta.actor` の `call_expr` とプロキシの `word` は、`self.act.current_scene` を保存して `drop_self(self, self.act:restore_scene(scene, h(…)))` とする。`pasta.actor` は `pasta.act` を `require` せず、プロキシが持つ `self.act` のメソッドを呼ぶ。
+- 呼ばれた側が Lua のエラーで抜けた場合は復元しない（`restore_scene` で呼んだ関数でも同じ）。エラーはコルーチンごと失敗し（止まるエラー。[止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記)）、その ACT は止まった場所の名前を作るのに使われた後に捨てられる。
+- 関数を呼ぶ ACT のメソッドも同じ部品で復元する。`pasta.act` の局所関数 `call_expr`（`expr_fn`・`expr_fn_var`）・`global_fn`・`word`（見つかったのが関数のとき）は `self:restore_scene(h, self, ...)` とする（`word` は引数を渡さず `self:restore_scene(h, self)`）。`pasta.actor` の `call_expr` とプロキシの `word` は `drop_self(self, self.act:restore_scene(h, 受け手, …))` とする。`pasta.actor` は `pasta.act` を `require` せず、プロキシが持つ `self.act` のメソッドを呼ぶ。
 - 末尾の Call（`return act:call(…)`）は復元しない。戻る行が無いため、呼ばれた側のシーンが実行中のまま、その Call を含むシーン関数が終わる。そのシーン関数を `call_restore` で呼んだ側があれば、その側が復元する。
 
 ### Call のキーと失敗表記（call_key・failure）
@@ -214,7 +209,7 @@ end
 
 ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call`・`call_restore` と `find_handler`・`find_act_handler` の引数・戻り値・警告は [検索と呼び出し](../lua/script-api.md#検索と呼び出し)（[word(name, var_path)](../lua/script-api.md#wordname-var_path)・[expr_fn_var(value, var_path, ...)](../lua/script-api.md#expr_fn_varvalue-var_path-) を含む）が、検索の各段の意味は [ローカル優先の検索順](registry-search.md#ローカル優先の検索順) が正である。ここでは実装の内部の構成だけを扱う。
 
-- `expr_fn(self, key, ...)` と `expr_fn_var(self, value, var_path, ...)` は、`pasta.act` の局所関数 `call_expr(self, key, skip_methods, ...)` を共有する。`expr_fn` は `call_expr(self, key, nil, ...)`、`expr_fn_var` はキーに直した後に `call_expr(self, キー, true, ...)` を呼ぶ。`call_expr` は `find_handler("expr", key, skip_methods)` が関数なら、`h(self, ...)` を呼んで `restore_scene` で `current_scene` を呼ぶ前の値に戻してから戻り値を返し、それ以外は「報告済み」の印（`FAILURE.set_fn_failed`）を真にし、接頭辞 `act:expr_fn` の警告（`handler not found`）とともに「関数が見つからない」を `FAILURE.report` で報告して `nil` を返す。関数が見つかったときは、関数が戻った後に印を偽にする。アクタープロキシは `pasta.actor` に同じ形の別の局所関数を持つ（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
+- `expr_fn(self, key, ...)` と `expr_fn_var(self, value, var_path, ...)` は、`pasta.act` の局所関数 `call_expr(self, key, skip_methods, ...)` を共有する。`expr_fn` は `call_expr(self, key, nil, ...)`、`expr_fn_var` はキーに直した後に `call_expr(self, キー, true, ...)` を呼ぶ。`call_expr` は `find_handler("expr", key, skip_methods)` が関数なら、`restore_scene` で `h(self, ...)` を呼び、実行中のシーンの文脈を呼ぶ前の値に戻してから戻り値を返し、それ以外は「報告済み」の印（`FAILURE.set_fn_failed`）を真にし、接頭辞 `act:expr_fn` の警告（`handler not found`）とともに「関数が見つからない」を `FAILURE.report` で報告して `nil` を返す。関数が見つかったときは、関数が戻った後に印を偽にする。アクタープロキシは `pasta.actor` に同じ形の別の局所関数を持つ（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
 - `skip_methods` を真にするのは、`var_path` を受け取った `word` と `expr_fn_var`（生成コードの動的参照）だけである。`find_scene`・`call` と、`var_path` の無い `word`・`expr_fn` は `skip_methods` を渡さない。`find_handler` は `find_act_handler` に引数をそのまま渡す。
 
 ### 生成コード用のメソッド（actor_proxy・global_fn）
@@ -223,7 +218,7 @@ ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call`・`call_resto
 
 - `actor_proxy(self, name)` は、`self.actors[name]` があれば `ACTOR.create_proxy(アクター, self)` を返す。無ければ `self.token` を末尾から見て、最初に当たる話者のトークン（`talk`・`sakura_script`・`actor` 付きの `raw_script`）の `actor.name` が `name` と同じならその `actor` の表を再利用してプロキシを作る。そうでなければ `{ name = name }`（メタテーブルなし）を作り、`FAILURE.mark_unregistered_actor` で未登録の印を付け、「未登録アクター」を `FAILURE.report` で報告して目印（`actor` 付きの `raw_script` トークン）を積んでからプロキシを作る。再利用によって同じ未登録の名前の連続する発言は同じ表を持ち、`build` のグループ化（表の同一性で判定する）で 1 つのグループになる（[グループ化トークン](talk-output.md#グループ化トークン)）。
 - その場限りのアクターは `STORE.actors`・`self.actors`・`STORE.actor_spots` のどれにも書かれず、ACT にもフィールドを足さない。状態は `self.token` の中にしか無いため、`build`・`yield` でトークンが空になると、次の発言で目印がまた付く。`name` だけの表のため、プロキシの検索の A1 は `name` にしか一致せず、A2 のアクター単語も無い（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
-- `global_fn(self, name, ...)` は `GLOBAL[name]` が関数なら、`f(self, ...)` を呼んで `restore_scene` で `current_scene` を戻してから戻り値をすべて返し、関数でなければ「報告済み」の印を真にし、「関数が見つからない」を `FAILURE.report` で報告して `nil` を返す。名前の解決の 5 段の検索（`find_act_handler`）は通らない。関数の中で起きたエラーは捕まえない。
+- `global_fn(self, name, ...)` は `GLOBAL[name]` が関数なら、`restore_scene` で `f(self, ...)` を呼び、実行中のシーンの文脈を戻してから戻り値をすべて返し、関数でなければ「報告済み」の印を真にし、「関数が見つからない」を `FAILURE.report` で報告して `nil` を返す。名前の解決の 5 段の検索（`find_act_handler`）は通らない。関数の中で起きたエラーは捕まえない。
 ### 被演算子の変換（ACT.num・ACT.str）
 
 式の算術と連結の生成コードが被演算子に使う `PASTA.num`・`PASTA.str` の実体である。引数・戻り値・警告の文言は [PASTA.num](../lua/script-api.md#pastanumop-v-desc)・[PASTA.str](../lua/script-api.md#pastastrv-desc) が、生成コードの形は [生成される Lua コードの形](transpiler.md#生成される-lua-コードの形) が正である。ここでは実装の内部の構成だけを扱う。
@@ -289,7 +284,7 @@ act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(var.x, "var.
 | `expr_fn(self, key, ...)` | 局所関数 `call_expr(self, key, nil, ...)` | 関数の戻り値、または `nil` |
 | `expr_fn_var(self, value, var_path, ...)` | `value` を `WORD.dynamic_key(value, var_path, "proxy:expr_fn", self.act)` でキーにし（`nil` ならそこで `nil` を返す）、`call_expr(self, キー, true, ...)` | 関数の戻り値、または `nil` |
 
-- `call_expr` は `pasta.actor` の局所関数で（`pasta.act` の同名の局所関数とは別）、`find_handler("expr", key, skip_methods)` の結果が関数なら `h(self.act, ...)`（第 1 引数は ACT）を呼び、`self.act:restore_scene` で `current_scene` を呼ぶ前の値に戻し、戻り値を `drop_self` で正規化して返す。プロキシの `word` も、関数を呼んだ後に同じく `current_scene` を戻す。関数でなければ「関数が見つからない」を `FAILURE.report(self.act, …)` で報告する（警告は `proxy:expr_fn - handler not found`）。「報告済み」の印の読み書きは ACT の `call_expr` と同じである。`"expr"` モードでは `find_actor_handler` が `nil` を返すため、見つかる関数は常に ACT の段のものである。
+- `call_expr` は `pasta.actor` の局所関数で（`pasta.act` の同名の局所関数とは別）、`find_handler("expr", key, skip_methods)` の結果が関数なら `self.act:restore_scene` で `h(self.act, ...)`（第 1 引数は ACT）を呼び、実行中のシーンの文脈を呼ぶ前の値に戻し、戻り値を `drop_self` で正規化して返す。プロキシの `word` も、関数を同じく `restore_scene` で呼ぶ。関数でなければ「関数が見つからない」を `FAILURE.report(self.act, …)` で報告する（警告は `proxy:expr_fn - handler not found`）。「報告済み」の印の読み書きは ACT の `call_expr` と同じである。`"expr"` モードでは `find_actor_handler` が `nil` を返すため、見つかる関数は常に ACT の段のものである。
 - `drop_self(self, r, ...)` は `pasta.actor` の局所関数で、先頭の戻り値 `r` が `self.act` または `self`（プロキシ）と `==` で等しければ `nil` を返し、そうでなければ `r, ...` を複数の戻り値も含めてそのまま返す。ACT・プロキシは `__eq` を持たないため、比較は同一性である。正規化はプロキシの `word`・`expr_fn`・`expr_fn_var` だけが行い、ACT の `word`・`expr_fn`・`expr_fn_var`・`global_fn` は関数の戻り値をそのまま返す。
 - A1 は通常の添字参照であるため、アクターオブジェクトのフィールド（`name`・`spot`・`pasta.toml` の `[actor.名前]` のキー）と、メタテーブル経由の `create_word` も一致の対象になる。`skip_methods` が真のとき（動的参照）は `rawget` で引くため、アクターオブジェクト自身のフィールドだけが対象になり、`create_word` などのメソッドには一致しない。
 - A2 が渡すスコープ名は元のアクター名から組み立てるが、`search_word` の入口でサニタイズされてから照合されるため、記号を含むアクター名（`さくら・改`）でも、`register_actor` がサニタイズした名前で登録したキー（`:__actor_さくら_改__:…`）に一致する（[照合規則の共有](registry-search.md#照合規則の共有)）。

@@ -380,16 +380,15 @@ act:call_key(value, var_path?, desc?) -> string | 「呼ばない」印
 - 失敗表記の文言は [実行時の失敗の出力](../reference/runtime-failures.md) のとおりである。
 - DSL の動的ターゲットは、`＞＄x` が `act:call_key(var.x, "var.x")`、`＞＠f（）` が `act:call_key(act:expr_fn("f"), nil, "@f()")`、それ以外の式が `act:call_key(式)` になる。
 
-#### restore_scene(scene, ...)
+#### restore_scene(fn, ...)
 
 ```lua
-act:restore_scene(scene, ...) -> ...
+act:restore_scene(fn, ...) -> ...
 ```
 
-- 実行中のシーンを `scene`（シーンテーブルまたは `nil`）にし、2 番目以降の引数をそのまま返す。
-- `word`・`expr_fn`・`expr_fn_var`・`global_fn` とアクタープロキシの `word`・`expr_fn`・`expr_fn_var` が、関数から戻った後に実行中のシーンを戻すのに使う（`call_restore` は自分で戻す）。
+- `fn(...)` を呼び、戻った後に、実行中のシーンと `init_scene` が控えたシーンの名前・行の対応を呼ぶ前の値に戻して、`fn` の戻り値をすべて返す。`fn` がエラーで抜けたときは戻さない。
+- `call_restore`・`word`・`expr_fn`・`expr_fn_var`・`global_fn` とアクタープロキシの `word`・`expr_fn`・`expr_fn_var` が、関数を呼ぶのに使う。関数から戻った後の行で止まっても、止まるエラーの表記は呼び出し元のローカルシーンの名前と `.pasta` の行を示す。
 - `init_scene` と違い、最後に `init_scene` を呼んだグローバルシーンの記録は変えない。
-- `init_scene` が控えたシーンの名前は、グローバルシーンの名前だけを、`scene` で `init_scene` を呼んだときに控えた名前に戻し、ローカルシーンの名前と行の対応は空にする。呼ぶ前のローカルシーンは分からないため、止まるエラーの表記は `＊天気` のようにグローバルシーンまでになるが、別のシーンの名前は出さない。
 
 #### failure(text, warning)
 
