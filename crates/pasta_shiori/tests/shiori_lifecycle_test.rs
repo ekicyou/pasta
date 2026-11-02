@@ -6,7 +6,7 @@
 mod common;
 
 use common::copy_fixture_to_temp;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 // ========================================================================
 // Task 3.1: SHIORI.load実行確認テスト

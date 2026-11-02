@@ -43,7 +43,7 @@ use pasta_lua::{ClaimToken, LoadDirGuard};
 
 use crate::actor::mailbox::ActorMsg;
 use crate::actor::module_ref::ModuleRef;
-use crate::shiori::{PastaShiori, Shiori};
+use crate::shiori::PastaShiori;
 
 /// アクタースレッドのハンドル。
 ///

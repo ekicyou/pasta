@@ -11,7 +11,7 @@ mod common;
 
 use common::copy_fixture_to_temp;
 use common::response::ShioriResponse;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 /// `balloon_warning` の行（None なら書かない）を足したゴーストでイベントを起こし、
 /// 応答と Lua 側のログの警告（文言だけ）を返す。

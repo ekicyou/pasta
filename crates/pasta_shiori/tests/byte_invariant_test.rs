@@ -34,7 +34,7 @@ mod common;
 #[path = "common/async_callback_support.rs"]
 mod async_callback_support;
 
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 use std::path::Path;
 use tempfile::TempDir;
 

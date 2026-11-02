@@ -8,7 +8,7 @@
 mod common;
 
 use common::copy_sample_ghost_to_temp;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 // ========================================================================
 // Task 3.2: PastaShiori::load のテスト

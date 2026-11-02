@@ -9,7 +9,7 @@
 #![allow(dead_code)]
 
 use crate::common::response::ShioriResponse;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 use std::path::Path;
 use tempfile::TempDir;
 

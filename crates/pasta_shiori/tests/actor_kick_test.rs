@@ -13,9 +13,9 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use pasta::PastaShiori;
 use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use pasta::actor::thread::spawn_actor_thread_with;
-use pasta::{PastaShiori, Shiori};
 use tempfile::TempDir;
 
 /// 開発セッションが export した DAP debug env を main 前に中和する（写経元:

@@ -11,7 +11,7 @@ mod common;
 
 use common::copy_fixture_to_temp;
 use common::response::ShioriResponse;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 /// 1 つのゴーストに、順にリクエストを送り、各応答の Value とゴーストのログファイルの中身を返す。
 ///

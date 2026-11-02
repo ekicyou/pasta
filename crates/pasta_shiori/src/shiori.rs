@@ -7,11 +7,6 @@ use pasta_lua::{
 use std::{ffi::*, path::*};
 use tracing::{debug, error, info, trace, warn};
 
-pub trait Shiori {
-    fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool>;
-    fn request<S: AsRef<str>>(&mut self, request: S) -> MyResult<String>;
-}
-
 /// PastaShiori - SHIORI implementation using pasta_lua engine.
 ///
 /// Manages the lifecycle of the Pasta script engine, including:
@@ -82,8 +77,8 @@ impl Drop for PastaShiori {
     }
 }
 
-impl Shiori for PastaShiori {
-    fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool> {
+impl PastaShiori {
+    pub fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool> {
         // Convert load_dir to PathBuf
         let load_dir_path: PathBuf = load_dir.as_ref().into();
 
@@ -162,9 +157,9 @@ impl Shiori for PastaShiori {
         }
     }
 
-    fn request<S: AsRef<str>>(&mut self, req: S) -> MyResult<String> {
+    pub fn request<S: AsRef<str>>(&mut self, req: S) -> MyResult<String> {
         // Check if runtime is initialized, with detailed error on load failure
-        let _runtime = self
+        let runtime = self
             .runtime
             .as_ref()
             .ok_or_else(|| match &self.last_load_error {
@@ -179,11 +174,9 @@ impl Shiori for PastaShiori {
         trace!(request_len = req.len(), "Processing SHIORI request");
 
         // Call SHIORI.request using cached function
-        self.call_lua_request(req)
+        self.call_lua_request(runtime, req)
     }
-}
 
-impl PastaShiori {
     /// Get a reference to the internal Lua runtime.
     /// Returns None if the runtime has not been initialized via load().
     pub fn runtime(&self) -> Option<&PastaLuaRuntime> {
@@ -295,7 +288,7 @@ impl PastaShiori {
     /// Parses request text and passes parsed table to Lua.
     /// Returns 204 response if function doesn't exist.
     /// Returns 400 Bad Request if request parsing fails.
-    fn call_lua_request(&self, request: &str) -> MyResult<String> {
+    fn call_lua_request(&self, runtime: &PastaLuaRuntime, request: &str) -> MyResult<String> {
         // Use cached request_fn directly
         let request_fn = match &self.request_fn {
             Some(f) => f,
@@ -305,8 +298,6 @@ impl PastaShiori {
             }
         };
 
-        // Get runtime for Lua context
-        let runtime = self.runtime.as_ref().ok_or(MyError::NotInitialized)?;
         let lua = runtime.lua();
 
         // Parse request text to Lua table
@@ -390,10 +381,10 @@ impl PastaShiori {
     /// Call SHIORI.unload function using cached function.
     /// Logs warning on error but does not propagate (safe for Drop).
     fn call_lua_unload(&self) {
-        // Check both unload_fn and runtime exist
-        let (unload_fn, _runtime) = match (&self.unload_fn, &self.runtime) {
-            (Some(f), Some(r)) => (f, r),
-            _ => {
+        // unload_fn が在るのは VM が在るときだけ（release_runtime が VM より先に消す）
+        let unload_fn = match &self.unload_fn {
+            Some(f) => f,
+            None => {
                 debug!("SHIORI.unload not available, skipping");
                 return;
             }

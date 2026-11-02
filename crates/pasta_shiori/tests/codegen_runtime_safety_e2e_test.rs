@@ -14,7 +14,7 @@ mod common;
 use common::copy_fixture_to_temp;
 use common::response::ShioriResponse;
 use common::test_env::ShioriTestEnv;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 /// イベント ID を指定して GET を送り、200 OK であることを確かめて Value を返す
 fn fire(event_id: &str) -> String {

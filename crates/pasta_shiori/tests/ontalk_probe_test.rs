@@ -4,7 +4,7 @@
 mod common;
 
 use common::copy_sample_ghost_to_temp;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 /// Probe 1: Check if the issue is time-based by examining Lua internal state.
 /// We directly manipulate the virtual_dispatcher state via Lua to verify

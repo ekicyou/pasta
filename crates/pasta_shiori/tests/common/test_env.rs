@@ -5,8 +5,8 @@
 
 use super::copy_fixture_to_temp;
 use super::response::{ShioriResponse, ShioriResponseError};
+use pasta::PastaShiori;
 use pasta::error::MyError;
-use pasta::{PastaShiori, Shiori};
 use std::path::Path;
 use tempfile::TempDir;
 

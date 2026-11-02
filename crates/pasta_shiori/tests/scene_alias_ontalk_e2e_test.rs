@@ -12,7 +12,7 @@ mod common;
 
 use common::copy_fixture_to_temp;
 use common::response::ShioriResponse;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 use tempfile::TempDir;
 
 const FIXTURE: &str = "scene_alias_ontalk";
