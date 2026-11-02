@@ -462,7 +462,7 @@ impl From<std::io::Error> for ParseError { /* 今のまま */ }
 #### AstRemoval
 
 - `PastaFile` を `path` と `items` だけにする。`build_ast` の `line_count`・`last_line_len`・`file.span` の 4 行を消す。
-- 読んでいたのは `error_api_test.rs:194-195` と `span_byte_offset_test.rs:177-179・203` だけ（`partial.rs` は `pasta_file.items` だけを読む。`pasta_lua`・`pasta_check`・`pasta_lsp` に使い手は無い）。
+- 読んでいたのは `error_api_test.rs:194-195` と `span_byte_offset_test.rs:177-179・203` だけ（`partial.rs` は `pasta_file.items` だけを読む。`pasta_lua`・`pasta_check`・`pasta_lsp` の本番のコードに使い手は無い）。`PastaFile` を字句で作るテストのコード（`pasta_lua/src/transpiler_tests.rs` の 6 か所・`pasta_lua/tests/transpiler/comparison_test.rs` の 3 か所。どちらも `code_gen/` の外）は、`span:` の行を消す。
 - テストの観点（5.2）：空行だけ・コメントだけの辞書の解析が成功して項目が無いこと、各節（グローバルシーン・アクション行）の `start_byte < end_byte` と `extract_source` が元の文に合うこと。
 
 #### SmallCleanups
