@@ -140,9 +140,12 @@ fn test_parse_str_crlf_line_endings() {
 fn test_parse_str_blank_lines_only() {
     let file = parse_str("\n\n\n", "blank.pasta").expect("should parse");
     assert!(file.items.is_empty());
-    // span は全ソースをカバーする
-    assert_eq!(file.span.start_line, 1);
-    assert_eq!(file.span.end_byte, 3);
+}
+
+#[test]
+fn test_parse_str_comments_only() {
+    let file = parse_str("# コメント\n\n# もう一つ\n", "comment.pasta").expect("should parse");
+    assert!(file.items.is_empty());
 }
 
 // ============================================================================

@@ -105,7 +105,7 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, ParseError> 
         syntax_error(filename, (line, column), &e.to_string())
     })?;
 
-    build_ast(pairs, filename, source)
+    build_ast(pairs, filename)
 }
 
 /// 1 行で閉じていない開き括弧を重ねられる段の数。pest の再帰は開き括弧 1 つで 1 段深くなる。
@@ -200,14 +200,9 @@ pub fn parse_file(path: &Path) -> Result<PastaFile, ParseError> {
 /// grammar.pest `file = ( file_scope | global_scene_scope | actor_scope )*` に準拠。
 /// 複数の file_scope、global_scene_scope、actor_scope を任意順序で処理し、
 /// 出現順序を items に保持します。
-fn build_ast(pairs: Pairs<Rule>, filename: &str, source: &str) -> Result<PastaFile, ParseError> {
+fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, ParseError> {
     let mut file = PastaFile::new(std::path::PathBuf::from(filename));
     let mut last_global_scene_name: Option<String> = None;
-
-    // Set file span to cover the entire source
-    let line_count = source.lines().count().max(1);
-    let last_line_len = source.lines().last().map(|l| l.len()).unwrap_or(0);
-    file.span = Span::new(1, 1, line_count, last_line_len + 1, 0, source.len());
 
     for pair in pairs {
         match pair.as_rule() {

@@ -105,7 +105,7 @@
   - `cargo test -p pasta_dsl -p pasta_lua -p pasta_check -p pasta_lsp` が通り、`pasta_dsl` の外に消した名前の使い手が無い
   - _Requirements: 4.1, 4.2, 7.2, 7.4, 8.3_
 
-- [ ] 9. ファイル全体の span を消す
+- [x] 9. ファイル全体の span を消す
   - `PastaFile` から、ファイル全体の span の欄とその計算を消す
   - `pasta_dsl` のテストを直す：
     - `error_api_test.rs` の該当テストを、「空行だけ・コメントだけの辞書の解析が成功し、項目が無い」に直す

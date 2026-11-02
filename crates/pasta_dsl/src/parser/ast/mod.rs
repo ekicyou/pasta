@@ -92,8 +92,6 @@ pub struct PastaFile {
     /// grammar.pest `( file_scope | global_scene_scope | actor_scope )*` に対応。
     /// 複数の file_scope・global_scene_scope・actor_scope を任意順序で格納。
     pub items: Vec<FileItem>,
-    /// Source location
-    pub span: Span,
 }
 
 impl PastaFile {
@@ -102,7 +100,6 @@ impl PastaFile {
         Self {
             path,
             items: Vec::new(),
-            span: Span::default(),
         }
     }
 }

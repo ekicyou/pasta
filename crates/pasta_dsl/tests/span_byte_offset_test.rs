@@ -4,7 +4,9 @@
 //! These tests verify the Span byte offset functionality specified in
 //! ast-source-span-mapping requirements.
 
-use pasta_dsl::parser::{FileItem, GlobalSceneScope, Span, SpanError, parse_str};
+use pasta_dsl::parser::{
+    ActionLine, FileItem, GlobalSceneScope, LocalSceneItem, Span, SpanError, parse_str,
+};
 
 /// Helper to get global scene scopes from PastaFile items
 fn get_global_scene_scopes(file: &pasta_dsl::parser::PastaFile) -> Vec<&GlobalSceneScope> {
@@ -18,6 +20,19 @@ fn get_global_scene_scopes(file: &pasta_dsl::parser::PastaFile) -> Vec<&GlobalSc
             }
         })
         .collect()
+}
+
+/// Helper to get the first action line of a global scene
+fn first_action_line(scene: &GlobalSceneScope) -> &ActionLine {
+    scene
+        .local_scenes
+        .iter()
+        .flat_map(|l| &l.items)
+        .find_map(|item| match item {
+            LocalSceneItem::ActionLine(a) => Some(a),
+            _ => None,
+        })
+        .expect("action line")
 }
 
 // ============================================================================
@@ -169,14 +184,16 @@ fn test_span_byte_len() {
 
 #[test]
 fn test_parser_span_has_byte_offsets_ascii() {
-    // ASCII スクリプトでバイトオフセット検証
+    // ASCII スクリプトで各節のバイトオフセット検証
     let source = "＊挨拶\n  Alice：Hello\n";
     let ast = parse_str(source, "test.pasta").unwrap();
 
-    // ファイル全体の Span を確認
-    assert!(ast.span.start_byte < ast.span.end_byte);
-    assert_eq!(ast.span.start_byte, 0);
-    assert!(ast.span.end_byte > 0);
+    let scene = get_global_scene_scopes(&ast)[0];
+    assert_eq!(scene.span.start_byte, 0);
+    assert!(scene.span.start_byte < scene.span.end_byte);
+
+    let action = first_action_line(scene);
+    assert!(action.span.start_byte < action.span.end_byte);
 }
 
 #[test]
@@ -195,13 +212,16 @@ fn test_parser_span_byte_offset_utf8() {
 
 #[test]
 fn test_parser_span_extract_source_matches_original() {
-    // パース結果の Span で元ソースを抽出できることを確認
+    // パース結果の各節の Span で元ソースを抽出できることを確認
     let source = "＊挨拶\n  Alice：Hello\n";
     let ast = parse_str(source, "test.pasta").unwrap();
 
-    // ファイル全体の抽出
-    let extracted = ast.span.extract_source(source);
-    assert!(extracted.is_ok());
-    // 抽出結果は元ソース全体と一致
-    assert_eq!(extracted.unwrap(), source);
+    let scene = get_global_scene_scopes(&ast)[0];
+    assert_eq!(scene.span.extract_source(source).unwrap(), source);
+
+    let action = first_action_line(scene);
+    assert_eq!(
+        action.span.extract_source(source).unwrap(),
+        "  Alice：Hello\n"
+    );
 }
