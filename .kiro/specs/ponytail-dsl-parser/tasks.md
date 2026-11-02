@@ -144,7 +144,7 @@
   - 差分が無いという出力を、タスクの証拠に残す（要件 2・3 で決めた変化は、リポジトリの辞書に現れない）
   - _Boundary: SpanOracleTest_
   - _Requirements: 3.3, 8.1_
-- [ ] 11.3 (P) x86 と x64 の、debug と release で深さのテストを走らせる
+- [x] 11.3 (P) x86 と x64 の、debug と release で深さのテストを走らせる
   - 先に準備を確かめる：`rustup target list --installed` に `i686-pc-windows-msvc` があること（無ければ足す）。`NoDefaultCurrentDirectoryInExePath` を外してあること（x86 の LuaJIT のビルドに要る）
   - 次の 2 つを、`i686-pc-windows-msvc`・`x86_64-pc-windows-msvc` のそれぞれで、debug と `--release` の 4 通り走らせる。x86 は省かない
     - `cargo test -p pasta_dsl --test nesting_guard_test --test span_oracle_test --test number_literal_test`
@@ -165,3 +165,4 @@
 - 5.1: 採番のテスト（`％a＝4294967295、b`）は saturating_add が前からあるので直す前も通る。今の振る舞いを固める回帰テストとして置いた（タスクの「2 つとも直す前に失敗」は不正確）
 - 6: variables.md「優先順位と括弧」の上限の文は括弧の分だけ入れた。7.1 で設計 Docs の 1 文（括弧と演算子をまとめた確定文）に直し、transpiler.md にも演算子の分を足す
 - 11.2: 全部の直しの後の書き出し（target/ast-final、56 ファイル）と target/ast-baseline の `diff -r` は差分なし（出力 "DIFF: none"）
+- 11.3: i686・x86_64 × debug・release の 4 通りで nesting_guard_test 14・number_literal_test 16・span_oracle_test 2・parser_limit_stack_test 4 がすべて通った
