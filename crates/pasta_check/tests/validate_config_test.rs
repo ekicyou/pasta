@@ -280,7 +280,7 @@ fn actor_font_errors_reported_per_attribute_line_in_three_forms() {
             found
                 .iter()
                 .all(|f| f.severity == pasta_check::validate::Severity::Error
-                    && f.code.code() == "config-actor-font"),
+                    && f.code == FindingKind::ConfigActorFont),
             "{name}"
         );
     }

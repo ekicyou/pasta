@@ -7,11 +7,6 @@ use pasta_lua::{
 use std::{ffi::*, path::*};
 use tracing::{debug, error, info, trace, warn};
 
-pub trait Shiori {
-    fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool>;
-    fn request<S: AsRef<str>>(&mut self, request: S) -> MyResult<String>;
-}
-
 /// PastaShiori - SHIORI implementation using pasta_lua engine.
 ///
 /// Manages the lifecycle of the Pasta script engine, including:
@@ -23,9 +18,6 @@ pub trait Shiori {
 /// (Stage 1.5). PastaShiori unregisters the logger on reload and drop.
 #[derive(Default)]
 pub struct PastaShiori {
-    /// Value passed to `SHIORI.load` as `hinst` (the FFI path always passes 0)
-    hinst: isize,
-
     /// Base directory for ghost scripts (master/ directory)
     load_dir: Option<PathBuf>,
 
@@ -82,8 +74,8 @@ impl Drop for PastaShiori {
     }
 }
 
-impl Shiori for PastaShiori {
-    fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool> {
+impl PastaShiori {
+    pub fn load<S: AsRef<OsStr>>(&mut self, load_dir: S) -> MyResult<bool> {
         // Convert load_dir to PathBuf
         let load_dir_path: PathBuf = load_dir.as_ref().into();
 
@@ -94,14 +86,18 @@ impl Shiori for PastaShiori {
             self.last_load_error = None;
         }
 
-        // Save hinst and load_dir（有無を確かめる前に覚える。ディレクトリが無いときも、
+        // Save load_dir（有無を確かめる前に覚える。ディレクトリが無いときも、
         // VM の片付けでそのディレクトリのログの登録・占有が外れるように）
-        self.hinst = hinst;
         self.load_dir = Some(load_dir_path.clone());
 
         // Validate load_dir exists
         if !load_dir_path.exists() {
             error!(path = %load_dir_path.display(), "Load directory not found");
+            // 以後の GET の 500 の理由に、探したパス（入口がデコードした形）を出す（ponytail-shiori 2.2・2.4）。
+            self.last_load_error = Some(format!(
+                "load directory not found: {}",
+                load_dir_path.display()
+            ));
             return Ok(false);
         }
 
@@ -118,7 +114,6 @@ impl Shiori for PastaShiori {
 
         info!(
             load_dir = %load_dir_path.display(),
-            hinst = hinst,
             "Starting PastaShiori load"
         );
 
@@ -138,7 +133,7 @@ impl Shiori for PastaShiori {
                 self.last_load_error = None;
 
                 // Call SHIORI.load if available (using cached function)
-                if !self.call_lua_load(hinst, &load_dir_path) {
+                if !self.call_lua_load(&load_dir_path) {
                     return Ok(false);
                 }
 
@@ -157,9 +152,9 @@ impl Shiori for PastaShiori {
         }
     }
 
-    fn request<S: AsRef<str>>(&mut self, req: S) -> MyResult<String> {
+    pub fn request<S: AsRef<str>>(&mut self, req: S) -> MyResult<String> {
         // Check if runtime is initialized, with detailed error on load failure
-        let _runtime = self
+        let runtime = self
             .runtime
             .as_ref()
             .ok_or_else(|| match &self.last_load_error {
@@ -174,11 +169,9 @@ impl Shiori for PastaShiori {
         trace!(request_len = req.len(), "Processing SHIORI request");
 
         // Call SHIORI.request using cached function
-        self.call_lua_request(req)
+        self.call_lua_request(runtime, req)
     }
-}
 
-impl PastaShiori {
     /// Get a reference to the internal Lua runtime.
     /// Returns None if the runtime has not been initialized via load().
     pub fn runtime(&self) -> Option<&PastaLuaRuntime> {
@@ -255,10 +248,10 @@ impl PastaShiori {
         self.unload_fn = None;
     }
 
-    /// Call SHIORI.load function with hinst and load_dir using cached function.
+    /// Call SHIORI.load function with hinst (always 0) and load_dir using cached function.
     /// Returns true if successful or if function doesn't exist (skip).
     /// Returns false if function returns false or errors.
-    fn call_lua_load(&self, hinst: isize, load_dir: &Path) -> bool {
+    fn call_lua_load(&self, load_dir: &Path) -> bool {
         // Use cached load_fn directly
         let load_fn = match &self.load_fn {
             Some(f) => f,
@@ -268,9 +261,9 @@ impl PastaShiori {
             }
         };
 
-        // Call SHIORI.load(hinst, load_dir)
+        // Call SHIORI.load(hinst, load_dir)。SHIORI の load は hinst を渡さないので、作者への約束どおり 0 を渡す
         let load_dir_str = load_dir.to_string_lossy().to_string();
-        match load_fn.call::<bool>((hinst, load_dir_str)) {
+        match load_fn.call::<bool>((0, load_dir_str)) {
             Ok(true) => {
                 info!("SHIORI.load called successfully");
                 true
@@ -290,18 +283,16 @@ impl PastaShiori {
     /// Parses request text and passes parsed table to Lua.
     /// Returns 204 response if function doesn't exist.
     /// Returns 400 Bad Request if request parsing fails.
-    fn call_lua_request(&self, request: &str) -> MyResult<String> {
+    fn call_lua_request(&self, runtime: &PastaLuaRuntime, request: &str) -> MyResult<String> {
         // Use cached request_fn directly
         let request_fn = match &self.request_fn {
             Some(f) => f,
             None => {
                 debug!("SHIORI.request not available, returning default 204 response");
-                return Ok(Self::default_204_response());
+                return Ok(crate::actor::marshaling::default_204());
             }
         };
 
-        // Get runtime for Lua context
-        let runtime = self.runtime.as_ref().ok_or(MyError::NotInitialized)?;
         let lua = runtime.lua();
 
         // Parse request text to Lua table
@@ -385,10 +376,10 @@ impl PastaShiori {
     /// Call SHIORI.unload function using cached function.
     /// Logs warning on error but does not propagate (safe for Drop).
     fn call_lua_unload(&self) {
-        // Check both unload_fn and runtime exist
-        let (unload_fn, _runtime) = match (&self.unload_fn, &self.runtime) {
-            (Some(f), Some(r)) => (f, r),
-            _ => {
+        // unload_fn が在るのは VM が在るときだけ（release_runtime が VM より先に消す）
+        let unload_fn = match &self.unload_fn {
+            Some(f) => f,
+            None => {
                 debug!("SHIORI.unload not available, skipping");
                 return;
             }
@@ -403,15 +394,6 @@ impl PastaShiori {
         } else {
             info!("SHIORI.unload called successfully");
         }
-    }
-
-    /// Generate default 204 No Content response.
-    fn default_204_response() -> String {
-        "SHIORI/3.0 204 No Content\r\n\
-         Charset: UTF-8\r\n\
-         Sender: Pasta\r\n\
-         \r\n"
-            .to_string()
     }
 }
 

@@ -101,3 +101,58 @@ fn test_mixed_valid_invalid_content() {
         result.diagnostics.len()
     );
 }
+
+/// 絶対行（0 始まり）ごとのトークン（行・桁・長さ・種類）
+fn abs_tokens(source: &str) -> Vec<(u32, u32, u32, u32)> {
+    let result = AnalysisEngine::analyze(source);
+    let (mut line, mut start) = (0u32, 0u32);
+    result
+        .tokens
+        .iter()
+        .map(|t| {
+            if t.delta_line == 0 {
+                start += t.delta_start;
+            } else {
+                line += t.delta_line;
+                start = t.delta_start;
+            }
+            (line, start, t.length, t.token_type)
+        })
+        .collect()
+}
+
+/// 1 つのシーンの誤りは、ほかの部分の色を変えず、そのシーンの行に色を付けない（要件 3.1・3.3）
+#[test]
+fn test_error_scene_keeps_other_tokens_and_has_none_itself() {
+    let build = |line5: &str| {
+        format!(
+            "＆作者：まず\n＠挨拶：こんにちは\n＊前\n　さくら：やあ\n＊壊れ\n{line5}\n＃ メモ\n％さくら\n　＄表情＝0\n＊後\n　さくら：またね\n"
+        )
+    };
+    let valid = build("　さくら：ふむ");
+    let broken = build("　＄＝");
+    assert!(AnalysisEngine::analyze(&valid).diagnostics.is_empty());
+    assert_eq!(AnalysisEngine::analyze(&broken).diagnostics.len(), 1);
+
+    // 誤りのシーンは 0 始まりの行 4〜6
+    let scene = 4..7u32;
+    let outside = |v: Vec<(u32, u32, u32, u32)>| {
+        v.into_iter()
+            .filter(|t| !scene.contains(&t.0))
+            .collect::<Vec<_>>()
+    };
+    let valid_tokens = abs_tokens(&valid);
+    for line in [0, 1, 2, 3, 7, 8, 9, 10] {
+        assert!(
+            valid_tokens.iter().any(|t| t.0 == line),
+            "誤りの無い辞書の行 {line} に色がある: {valid_tokens:?}"
+        );
+    }
+    let broken_tokens = abs_tokens(&broken);
+    let in_scene: Vec<_> = broken_tokens
+        .iter()
+        .filter(|t| scene.contains(&t.0))
+        .collect();
+    assert!(in_scene.is_empty(), "誤りのシーンに色が無い: {in_scene:?}");
+    assert_eq!(outside(broken_tokens), outside(valid_tokens));
+}

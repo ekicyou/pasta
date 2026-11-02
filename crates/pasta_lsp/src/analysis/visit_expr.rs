@@ -22,6 +22,7 @@ impl super::AnalysisEngine {
 
         // Parse sub-tokens from the span text using cursor-based scanning
         Self::tokenize_var_set_text(span_text, span_start_in_line, line, vs, tokens, line_text);
+        push_trailing_comment(source, line, vs.span.end_byte, tokens);
     }
 
     /// Tokenize the text content of a VarSet line into fine-grained semantic tokens.

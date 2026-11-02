@@ -32,8 +32,11 @@ impl super::AnalysisEngine {
                     Self::visit_cue_command(cue, source, tokens);
                 }
             }
-            LocalSceneItem::Choice(_) => {
-                // 選択肢行のセマンティックトークン生成（将来実装）
+            LocalSceneItem::Choice(choice) => {
+                // 選択肢の部品の色は足さない（要件 5.7）。行末のコメントだけ
+                if choice.span.is_valid() {
+                    Self::visit_choice_comment(choice, source, tokens);
+                }
             }
         }
     }
@@ -194,11 +197,40 @@ impl super::AnalysisEngine {
                 }
             }
         }
+
+        // 本体の終わり: 引数の閉じ括弧の後ろ。無ければスコープか名前の終わり（cursor）
+        let body_end = match span_text.get(cursor..).and_then(|r| r.chars().next()) {
+            Some(c @ ('(' | '（')) => find_close_paren(span_text, cursor + c.len_utf8())
+                .map_or(span_text.len(), |cp| cp + char_len_at(span_text, cp)),
+            _ => cursor,
+        };
+        let line_start = line_byte_offset(source, line);
+        push_trailing_comment(source, line, line_start + base_offset + body_end, tokens);
+    }
+
+    /// 選択肢の行（`＠？名前「見出し」`）の本体の終わりは、見出しの閉じの後ろ。
+    /// 見出しが無ければ名前の終わり（名前と見出しの間に空白は入らない）
+    fn visit_choice_comment(choice: &ChoiceNode, source: &str, tokens: &mut Vec<RawToken>) {
+        let (_, span_text, _) = Self::span_line_window(&choice.span, source);
+        let body = span_text.trim_start();
+        let Some(after_marker) = body
+            .strip_prefix(['＠', '@'])
+            .and_then(|r| r.strip_prefix(['？', '?']))
+        else {
+            return;
+        };
+        let mut end =
+            choice.span.start_byte + (span_text.len() - after_marker.len()) + choice.target.len();
+        if let Some(label) = &choice.label {
+            end += "「".len() + label.len() + "」".len();
+        }
+        push_trailing_comment(source, choice.span.start_line, end, tokens);
     }
 
     fn visit_call_scene(cs: &CallScene, source: &str, tokens: &mut Vec<RawToken>) {
         if cs.span.is_valid() {
             Self::add_token_from_span(&cs.span, source, token_type::CALL, 0, tokens);
+            push_trailing_comment(source, cs.span.start_line, cs.span.end_byte, tokens);
         }
     }
 

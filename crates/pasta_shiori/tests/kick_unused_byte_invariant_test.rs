@@ -34,7 +34,7 @@
 
 mod common;
 
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 /// SHIORI/3.0 リクエストを正規化（改行 → CRLF、終端 `\r\n\r\n` 付与）して
 /// FFI 入口 `PastaShiori::request` を直接叩き、**生の応答文字列（=バイト列）** を返す。
@@ -133,7 +133,7 @@ fn kick_unused_normal_responses_are_byte_invariant() {
     let temp = common::copy_sample_ghost_to_temp();
     let mut shiori = PastaShiori::default();
     let loaded = shiori
-        .load(1, temp.path().as_os_str())
+        .load(temp.path().as_os_str())
         .expect("load should not error");
     assert!(loaded, "load should return true");
 

@@ -33,11 +33,6 @@ export class DiagnosticsManager implements vscode.Disposable {
     this.collection.delete(uri);
   }
 
-  /** Clear all diagnostics */
-  clearAll(): void {
-    this.collection.clear();
-  }
-
   dispose(): void {
     this.collection.dispose();
   }
@@ -48,24 +43,7 @@ export class DiagnosticsManager implements vscode.Disposable {
       new vscode.Position(data.range.end.line, data.range.end.character)
     );
 
-    const severity = this.convertSeverity(data.severity);
-
-    return new vscode.Diagnostic(range, data.message, severity);
-  }
-
-  private convertSeverity(severity: number): vscode.DiagnosticSeverity {
-    // LSP DiagnosticSeverity: 1=Error, 2=Warning, 3=Information, 4=Hint
-    switch (severity) {
-      case 1:
-        return vscode.DiagnosticSeverity.Error;
-      case 2:
-        return vscode.DiagnosticSeverity.Warning;
-      case 3:
-        return vscode.DiagnosticSeverity.Information;
-      case 4:
-        return vscode.DiagnosticSeverity.Hint;
-      default:
-        return vscode.DiagnosticSeverity.Error;
-    }
+    // 入力のたびの診断は構文の誤りだけなので、重さは常に Error
+    return new vscode.Diagnostic(range, data.message, vscode.DiagnosticSeverity.Error);
   }
 }

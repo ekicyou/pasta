@@ -1,5 +1,7 @@
 //! Source text utility functions for line/offset calculations.
 
+use super::token_types::{RawToken, token_type, utf8_len_to_utf16, utf8_offset_to_utf16};
+
 // ============================================================================
 // Public Utilities
 // ============================================================================
@@ -47,6 +49,15 @@ fn get_line_text_and_offset(source: &str, line: usize) -> (&str, usize) {
 
     // Requested line not found — return empty
     ("", source.len())
+}
+
+/// 行の頭から `chars` 文字の UTF-16 の長さ。行より長ければ行の長さ
+pub(crate) fn char_column_to_utf16(line_text: &str, chars: usize) -> u32 {
+    line_text
+        .chars()
+        .take(chars)
+        .map(char::len_utf16)
+        .sum::<usize>() as u32
 }
 
 /// Find the next \n (or end of slice) starting from `start`.
@@ -116,17 +127,31 @@ pub(super) fn find_open_paren(text: &str) -> Option<usize> {
 /// `start` is the byte offset after the opening paren.
 pub(super) fn find_close_paren(text: &str, start: usize) -> Option<usize> {
     let mut depth = 1i32;
-    for (i, c) in text[start..].char_indices() {
+    let mut i = start;
+    // 文字列が始まれるのは項の頭だけ（`a「` の 「 はただの文字）
+    let mut at_term_head = true;
+    while let Some(c) = text[i..].chars().next() {
         match c {
+            // 文字列の中の括弧は数えない
+            '「' | '"' if at_term_head => {
+                i = string_literal_end(text, i);
+                at_term_head = false;
+                continue;
+            }
             '(' | '（' => depth += 1,
             ')' | '）' => {
                 depth -= 1;
                 if depth == 0 {
-                    return Some(start + i);
+                    return Some(i);
                 }
             }
             _ => {}
         }
+        if !c.is_whitespace() {
+            at_term_head = matches!(c, '(' | '（' | ',' | '、' | '，' | '=' | '＝' | ':' | '：')
+                || is_chain_op_char(c);
+        }
+        i += c.len_utf8();
     }
     None
 }
@@ -164,17 +189,7 @@ pub(super) fn find_chain_ops(text: &str) -> Vec<(usize, usize)> {
         let mut next = i + c.len_utf8();
         match c {
             _ if c.is_whitespace() => {}
-            '「' | '"' => {
-                // String literal: the fence is the run of opening chars,
-                // closed by the same number of closing chars.
-                let close = if c == '「' { '」' } else { '"' };
-                let fence = text[i..].chars().take_while(|&x| x == c).count();
-                let after_open = i + fence * c.len_utf8();
-                let closing = close.to_string().repeat(fence);
-                next = text[after_open..]
-                    .find(&closing)
-                    .map_or(after_open, |p| after_open + p + closing.len());
-            }
+            '「' | '"' => next = string_literal_end(text, i),
             '(' | '（' => depth += 1,
             ')' | '）' => depth -= 1,
             _ if depth == 0
@@ -197,6 +212,45 @@ pub(super) fn find_chain_ops(text: &str) -> Vec<(usize, usize)> {
         i = next;
     }
     ops
+}
+
+/// The byte position just after the string literal (`「…」` / `"…"`, any fence
+/// length) that opens at `i`: the fence is the run of opening chars, closed by
+/// the same number of closing chars. Unclosed: just after the opening fence.
+pub(super) fn string_literal_end(text: &str, i: usize) -> usize {
+    let c = text[i..].chars().next().unwrap_or('"');
+    let close = if c == '「' { '」' } else { '"' };
+    let fence = text[i..].chars().take_while(|&x| x == c).count();
+    let after_open = i + fence * c.len_utf8();
+    let closing = close.to_string().repeat(fence);
+    text[after_open..]
+        .find(&closing)
+        .map_or(after_open, |p| after_open + p + closing.len())
+}
+
+/// 行末のコメント: `from_byte`（ファイルの頭からのバイト・その行の本体の終わり）から
+/// 空白を飛ばし、次が `＃`・`#` なら行末までを 1 つの COMMENT にする。それ以外は何もしない
+pub(crate) fn push_trailing_comment(
+    source: &str,
+    line: usize,
+    from_byte: usize,
+    tokens: &mut Vec<RawToken>,
+) {
+    let line_text = get_line_text(source, line);
+    let from = from_byte
+        .saturating_sub(line_byte_offset(source, line))
+        .min(line_text.len());
+    let rest = line_text[from..].trim_start();
+    if rest.starts_with(['＃', '#']) {
+        let start = line_text.len() - rest.len();
+        tokens.push(RawToken {
+            line: (line - 1) as u32,
+            start_char: utf8_offset_to_utf16(line_text, start),
+            length: utf8_len_to_utf16(rest),
+            token_type: token_type::COMMENT,
+            modifiers: 0,
+        });
+    }
 }
 
 /// Find a dynamic reference `[＠@][＄$]` (plus `[＊*]` when `global`) followed by

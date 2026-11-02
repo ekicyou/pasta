@@ -2,6 +2,8 @@
 //!
 //! Tests for SHIORI request to Lua table conversion functionality.
 
+mod common;
+
 use pasta_lua::mlua::Lua;
 
 // Re-export lua_request module for testing (need to expose it)
@@ -212,11 +214,14 @@ mod shiori2_tests {
         let version: i32 = table.get("version").expect("version should exist");
 
         assert_eq!(method, "get");
-        assert!(
-            (20..=29).contains(&version),
-            "SHIORI/2.x version should be 20-29: {}",
-            version
-        );
+        assert_eq!(version, 26);
+
+        // 文法は版の数を 1 桁に限るので、両端の 2.0 と 2.9 は 20 と 29 になる。
+        for (minor, expected) in [("0", 20), ("9", 29)] {
+            let request = format!("GET Version SHIORI/2.{minor}\r\nCharset: UTF-8\r\n\r\n");
+            let table = parse_request(&lua, &request).expect("parse_request should succeed");
+            assert_eq!(table.get::<i32>("version").unwrap(), expected);
+        }
     }
 }
 
@@ -573,5 +578,280 @@ mod stack_safety_tests {
             })
             .expect("spawn worker");
         worker.join().expect("worker thread must not crash");
+    }
+}
+
+// ============================================================================
+// ponytail-shiori 1.3: 値の空いた見出しの行（`Key:`）の特性化テスト（3.1〜3.5・9.4）
+//
+// タスク 3 で直した後の期待（`Key:` と `Key:value` が解ける・
+// SSP の 3 要求が旧来と版 3 の両方で Lua に届く）。
+// ============================================================================
+
+mod empty_header_value_tests {
+    use super::*;
+    use pasta::lua_request::parse_request;
+
+    fn get_with(line: &str) -> String {
+        format!("GET SHIORI/3.0\r\nCharset: UTF-8\r\nID: OnTest\r\n{line}\r\n\r\n")
+    }
+
+    /// 解けたときの `(reference[0], dic["Reference0"])`。解けなければ `None`。
+    fn reference0(line: &str) -> Option<(String, String)> {
+        let lua = create_test_lua();
+        let table = parse_request(&lua, &get_with(line)).ok()?;
+        let reference: pasta_lua::mlua::Table = table.get("reference").unwrap();
+        let dic: pasta_lua::mlua::Table = table.get("dic").unwrap();
+        Some((reference.get(0).unwrap(), dic.get("Reference0").unwrap()))
+    }
+
+    /// コロンの直後で行が終わる見出しは値 `""`（3.1）。
+    #[test]
+    fn colon_then_line_end_is_empty() {
+        assert_eq!(
+            reference0("Reference0:"),
+            Some((String::new(), String::new()))
+        );
+    }
+
+    /// コロンの直後に空白の無い値はその値（3.3）。
+    #[test]
+    fn colon_then_value_without_space_is_value() {
+        assert_eq!(
+            reference0("Reference0:abc"),
+            Some(("abc".to_string(), "abc".to_string()))
+        );
+    }
+
+    /// コロンと空白 1 つの後の値は前後とも `abc`。
+    #[test]
+    fn colon_space_value_is_value() {
+        let (r0, dic) = reference0("Reference0: abc").expect("must parse");
+        assert_eq!(r0, "abc");
+        assert_eq!(dic, "abc");
+    }
+}
+
+/// SSP の記録（`doc/shiori-sample.log`）の 3 要求を入口へ送る。`doc/` は読まずに文字列として持つ。
+mod ssp_log_requests_tests {
+    use super::common::copy_fixture_to_temp;
+    use pasta::actor::instance::ActorInstance;
+    use pasta::shiori_get_api;
+    use shiori4_abi::{SHIORI_ABI_VERSION_3, ShioriApi};
+
+    /// Lua へ届く数（3 つとも届く）。
+    const DELIVERED: usize = 3;
+
+    fn crlf(lines: &[&str]) -> String {
+        let mut s = lines.join("\r\n");
+        s.push_str("\r\n\r\n");
+        s
+    }
+
+    /// 記録の 47 行（`Reference0:`）を含む OnInitialize。
+    fn on_initialize() -> String {
+        crlf(&[
+            "NOTIFY SHIORI/3.0",
+            "Charset: UTF-8",
+            "Sender: SSP",
+            "SecurityLevel: local",
+            "ID: OnInitialize",
+            "Reference0:",
+        ])
+    }
+
+    /// 記録の 720 行（`Reference2:`）を含む OnNotifyUserInfo。利用者の名前は仮の値。
+    fn on_notify_user_info() -> String {
+        crlf(&[
+            "NOTIFY SHIORI/3.0",
+            "Charset: UTF-8",
+            "Sender: SSP",
+            "SecurityLevel: local",
+            "ID: OnNotifyUserInfo",
+            "Reference0: 仮の名前",
+            "Reference1: 仮の名前",
+            "Reference2:",
+            "Reference3: undef",
+        ])
+    }
+
+    /// 記録の 1236 行（`Reference1:`）を含む GET OnTranslate。
+    fn on_translate() -> String {
+        crlf(&[
+            "GET SHIORI/3.0",
+            "ID: OnTranslate",
+            "Charset: UTF-8",
+            "Sender: SSP",
+            "SecurityLevel: local",
+            r"Reference0: \1\s[1512]\1\![bind,アクセサリ,CLOSED,0]\![set,otherghosttalk,true]\n\0\s[0]こんばんは。\w7\nユーザさんは晩ご飯食べた？\w9\n\n\s[5]まだだったら、\w4用意するよ。\w6\e",
+            "Reference1:",
+            "Reference2: OnBoot",
+            "Reference3: マスターシェル",
+        ])
+    }
+
+    fn probe_count() -> String {
+        "GET SHIORI/3.0\r\nCharset: UTF-8\r\nID: OnProbeCount\r\n\r\n".to_string()
+    }
+
+    /// 旧来の意味（`ActorInstance::request`）。3 つとも Lua に届き、v3_probe の 204 が返る。
+    #[test]
+    fn legacy_entry_ssp_log_requests() {
+        let ghost = copy_fixture_to_temp("v3_probe");
+        let instance = ActorInstance::spawn(ghost.path().to_path_buf()).expect("spawn");
+        assert!(instance.loaded(), "v3_probe must load");
+
+        for req in [on_initialize(), on_notify_user_info(), on_translate()] {
+            let res = instance.request(&req);
+            assert!(res.starts_with("SHIORI/3.0 204 No Content\r\n"), "{res:?}");
+        }
+        let count = instance.request(&probe_count());
+        assert!(
+            count.contains(&format!("\r\nValue: {}\r\n", DELIVERED + 1)),
+            "{count:?}"
+        );
+        assert!(instance.shutdown().acked);
+    }
+
+    /// 版 3（`shiori_get_api`）。3 つとも Lua に届き、v3_probe の 204 が返る。
+    #[test]
+    fn v3_entry_ssp_log_requests() {
+        let ghost = copy_fixture_to_temp("v3_probe");
+        // SAFETY: shiori_get_api はこの試験のバイナリに静的にリンクされ、テーブルは static。
+        let api = unsafe {
+            ShioriApi::from_raw(shiori_get_api(SHIORI_ABI_VERSION_3), SHIORI_ABI_VERSION_3)
+        }
+        .expect("v3 table must pass validation");
+        let mut inst = api
+            .load_v3(ghost.path().to_str().expect("utf-8 path"))
+            .expect("v3 load");
+
+        assert_eq!(inst.notify(&on_initialize()), Ok(204));
+        assert_eq!(inst.notify(&on_notify_user_info()), Ok(204));
+        assert_eq!(
+            inst.request(&on_translate()).expect("no ABI error").status,
+            204
+        );
+
+        let res = inst.request(&probe_count()).expect("no ABI error");
+        let body = String::from_utf8(res.body.to_vec()).expect("utf-8 body");
+        assert_eq!(res.status, 200);
+        assert!(
+            body.contains(&format!("\r\nValue: {}\r\n", DELIVERED + 1)),
+            "{body:?}"
+        );
+    }
+}
+
+// ============================================================================
+// 構文の段の req_1〜req_3 と同じ 3 つの要求を、出荷のパーサの値で確かめる
+// ============================================================================
+
+mod same_requests_as_syntax_tests {
+    use super::*;
+    use pasta::lua_request::parse_request;
+    use pasta_lua::mlua::{Table, Value};
+
+    fn dic_len(table: &Table) -> usize {
+        let dic: Table = table.get("dic").unwrap();
+        dic.pairs::<String, String>().count()
+    }
+
+    /// `test_data/shiori3-1.txt` と同じ GET。
+    #[test]
+    fn shiori3_get_version() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: version\r\n\
+            SecurityLevel: local\r\n\
+            Sender: SSP\r\n\
+            \r\n";
+        let t = parse_request(&lua, request).expect("parse_request should succeed");
+
+        assert_eq!(t.get::<i32>("version").unwrap(), 30);
+        assert_eq!(t.get::<String>("method").unwrap(), "get");
+        assert_eq!(t.get::<String>("id").unwrap(), "version");
+        assert_eq!(t.get::<String>("charset").unwrap(), "UTF-8");
+        assert_eq!(t.get::<String>("sender").unwrap(), "SSP");
+        assert_eq!(t.get::<String>("security_level").unwrap(), "local");
+        assert_eq!(t.get::<Option<String>>("status").unwrap(), None);
+        assert_eq!(t.get::<Option<String>>("base_id").unwrap(), None);
+        assert_eq!(
+            t.get::<Table>("reference")
+                .unwrap()
+                .pairs::<Value, Value>()
+                .count(),
+            0
+        );
+
+        let dic: Table = t.get("dic").unwrap();
+        assert_eq!(dic_len(&t), 4);
+        assert_eq!(dic.get::<String>("Charset").unwrap(), "UTF-8");
+        assert_eq!(dic.get::<String>("ID").unwrap(), "version");
+        assert_eq!(dic.get::<String>("SecurityLevel").unwrap(), "local");
+        assert_eq!(dic.get::<String>("Sender").unwrap(), "SSP");
+    }
+
+    /// `test_data/shiori3-2.txt` と同じ NOTIFY。
+    #[test]
+    fn shiori3_notify_ownerghostname() {
+        let lua = create_test_lua();
+        let request = "NOTIFY SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            Sender: SSP\r\n\
+            SecurityLevel: local\r\n\
+            ID: ownerghostname\r\n\
+            Reference0: セキュリティボール\r\n\
+            \r\n";
+        let t = parse_request(&lua, request).expect("parse_request should succeed");
+
+        assert_eq!(t.get::<i32>("version").unwrap(), 30);
+        assert_eq!(t.get::<String>("method").unwrap(), "notify");
+        assert_eq!(t.get::<String>("id").unwrap(), "ownerghostname");
+        assert_eq!(t.get::<String>("charset").unwrap(), "UTF-8");
+        assert_eq!(t.get::<String>("sender").unwrap(), "SSP");
+        assert_eq!(t.get::<String>("security_level").unwrap(), "local");
+        assert_eq!(t.get::<Option<String>>("status").unwrap(), None);
+        assert_eq!(t.get::<Option<String>>("base_id").unwrap(), None);
+
+        let reference: Table = t.get("reference").unwrap();
+        assert_eq!(reference.pairs::<Value, Value>().count(), 1);
+        assert_eq!(reference.get::<String>(0).unwrap(), "セキュリティボール");
+
+        let dic: Table = t.get("dic").unwrap();
+        assert_eq!(dic_len(&t), 5);
+        assert_eq!(
+            dic.get::<String>("Reference0").unwrap(),
+            "セキュリティボール"
+        );
+    }
+
+    /// `test_data/shiori2-1.txt` と同じ 2.6 の GET。
+    #[test]
+    fn shiori2_get_version() {
+        let lua = create_test_lua();
+        let request = "GET Version SHIORI/2.6\r\n\
+            Charset: UTF-8\r\n\
+            Sender: SSP\r\n\
+            \r\n";
+        let t = parse_request(&lua, request).expect("parse_request should succeed");
+
+        assert_eq!(t.get::<i32>("version").unwrap(), 26);
+        assert_eq!(t.get::<String>("method").unwrap(), "get");
+        assert_eq!(t.get::<String>("id").unwrap(), "Version");
+        assert_eq!(t.get::<String>("charset").unwrap(), "UTF-8");
+        assert_eq!(t.get::<String>("sender").unwrap(), "SSP");
+        assert_eq!(t.get::<Option<String>>("security_level").unwrap(), None);
+        assert_eq!(t.get::<Option<String>>("status").unwrap(), None);
+        assert_eq!(t.get::<Option<String>>("base_id").unwrap(), None);
+        assert_eq!(
+            t.get::<Table>("reference")
+                .unwrap()
+                .pairs::<Value, Value>()
+                .count(),
+            0
+        );
+        assert_eq!(dic_len(&t), 2);
     }
 }

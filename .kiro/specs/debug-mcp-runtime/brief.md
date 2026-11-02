@@ -192,3 +192,12 @@ pasta の開発の道具（VSCode の「▶ シーンを実行」・SHIORI の�
 - **`OnPastaScene`・`OnPastaSceneAt` の引数と応答は変えない**: ぱすた開発とスキルが使っている。
 - **`[debug]` を書いた既存のゴースト**（ghost_dev の DEBUG 版）が、読み込みエラーで止まらないこと。
 - **マニュアルの章の数**: 頁を消したり足したりするなら、章の数を決め打ちする検査を合わせる（`ponytail-manual-ci` が決め打ちをやめていれば要らない）。
+
+## 申し送り（ponytail-shiori より・2026-11-03）
+
+上の Current State の行番号と部品は、ponytail-shiori（0.4.5）で次のように変わった。撤去の範囲を測り直すときはこちらを正とする。
+
+- キックの Rust の側のうち、置き場へ kick を積む `lifecycle::kick_sink`・`kick_into` と `ActorInstance::kick` は既に消えた（上の `actor/instance.rs:83-98`・`actor/lifecycle.rs:137-160` は無い）。残るのは `ActorMsg::Kick`（`mailbox.rs`）、アクタースレッドの Kick の腕（`thread.rs`）、`PastaShiori::kick`（`shiori.rs`）、`kick_sink_for`（`instance.rs`。`pub` にした）。
+- `pasta_shiori/tests/` の kick の e2e 4 本（`scene_kick_*_e2e_test.rs`）は、自分の mailbox と `kick_sink_for` の送り先・`spawn_actor_thread_with` でアクターの道を回す形になった。kick を消すときは、この 4 本と `actor_kick_test.rs`・`multi_instance_test.rs` の `dap_kick_reaches_only_its_own_instance` が対象になる。
+- DAP の待受の番号を外から観る `ActorThread::debug_local_addr` は消えた。テストはゴーストのログの `debug backend listening addr=` の行から読む（`tests/common/mod.rs` の `listening_port`。`debug_preservation_test.rs`・`multi_instance_test.rs` が使う）。待ち受けを消すときは、この補助と使い手も一緒に直す。
+- `tests/common` の `#[ctor]` は `PASTA_DEBUG`・`PASTA_DEBUG_PORT`・`PASTA_LOG` を消す。固定ポートが無くなったら中和を外せるか（上の「load を叩く新しいテスト」の行）は、ここを見る。

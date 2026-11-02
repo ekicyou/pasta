@@ -1,4 +1,4 @@
-//! Semantic token analysis engine for the Pasta Language Server.
+//! Semantic token analysis engine for the Pasta WASM analyzer (VSCode extension).
 //!
 //! Converts pasta_dsl AST nodes into LSP semantic tokens with
 //! proper UTF-8 → UTF-16 position conversion.
@@ -13,19 +13,58 @@ mod visit_scope;
 pub use text_utils::{get_line_text, line_byte_offset};
 pub use token_types::*;
 
-use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
-
 // ============================================================================
 // Analysis Engine
 // ============================================================================
 
-/// 解析結果
-#[derive(Debug, Clone, Default)]
+/// 解析結果。直列化した形がそのまま JS へ渡る（欄の名前・順は拡張の型と同じ）
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct AnalysisResult {
     /// エンコード済みセマンティックトークン（LSP deltaエンコーディング）
-    pub tokens: Vec<tower_lsp::lsp_types::SemanticToken>,
+    pub tokens: Vec<SemanticToken>,
     /// パースエラーから生成されたDiagnostics
     pub diagnostics: Vec<Diagnostic>,
+}
+
+/// 診断
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Diagnostic {
+    pub range: Range,
+    pub message: String,
+    /// 常に 1（Error）。JS の形を保つために欄を残す
+    pub severity: u32,
+}
+
+/// 範囲
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct Range {
+    pub start: Position,
+    pub end: Position,
+}
+
+/// 位置（0 始まり・UTF-16）
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct Position {
+    pub line: u32,
+    pub character: u32,
+}
+
+/// 報告 1 件を、幅の無い点の Error の診断にする（行・桁が無ければ 1 行目の頭。要件 11.2）
+fn finding_to_diagnostic(finding: &pasta_check::validate::Finding, source: &str) -> Diagnostic {
+    let line = finding.line.map_or(0, |l| l.saturating_sub(1));
+    let character = finding.column.map_or(0, |c| {
+        let line_text = get_line_text(source, line as usize + 1);
+        text_utils::char_column_to_utf16(line_text, c.saturating_sub(1) as usize)
+    });
+    let point = Position { line, character };
+    Diagnostic {
+        range: Range {
+            start: point,
+            end: point,
+        },
+        message: finding.message.clone(),
+        severity: 1,
+    }
 }
 
 /// 解析エンジン
@@ -34,69 +73,33 @@ pub struct AnalysisEngine;
 impl AnalysisEngine {
     /// ドキュメント全体を解析し、トークンとDiagnosticsを生成する。
     ///
-    /// 呼び出し側（`server.rs` / `transport.rs`）は、この関数を
-    /// `catch_unwind` で包んで `pasta_dsl::parse_str` 由来のパニックを捕捉する。
-    /// ネイティブ側で `AssertUnwindSafe` を使っているのは、`analyze` が `source`
-    /// から新しい `AnalysisResult` を組み立てるだけの副作用のない純粋関数であり、
-    /// 共有可変状態を変更しないためである。途中でパニックしても不整合な状態を
-    /// 残さず、呼び出し側はエラーログを出して他ドキュメントの処理を継続できる。
+    /// 共有する状態を持たない純粋な関数。panic は包まない（wasm32 では
+    /// trap になり、拡張の try/catch が受ける）。
     pub fn analyze(source: &str) -> AnalysisResult {
-        // Ensure source ends with newline — the grammar requires every line
-        // to terminate with eol (NEWLINE). Editors like VSCode may omit it.
-        let source = if source.ends_with('\n') {
-            std::borrow::Cow::Borrowed(source)
-        } else {
-            std::borrow::Cow::Owned(format!("{}\n", source))
-        };
-        let source: &str = &source;
-
-        // Phase 0: Scan source lines for comment lines (AST does not preserve comments)
-        let mut raw_tokens = Self::scan_comment_lines(source);
-
-        // Phase 1: Full parse
-        match pasta_dsl::parse_str(source, "<lsp>") {
+        let mut raw_tokens = Vec::new();
+        // 受け取った文字のまま 1 回だけ解く（改行を補わない。保存時と同じ誤りを出す）
+        let (diagnostics, failed_lines) = match pasta_dsl::parse_str(source, "<lsp>") {
             Ok(pasta_file) => {
                 Self::visit_file_items(&pasta_file.items, source, &mut raw_tokens);
-                let tokens = encode_tokens(&mut raw_tokens);
-                AnalysisResult {
-                    tokens,
-                    diagnostics: vec![],
-                }
+                (vec![], vec![])
             }
-            Err(_) => {
-                // Phase 2/3: Partial parse
+            Err(e) => {
+                // 色だけを部分解析の AST から作る（部分解析の誤りは読まない）
                 let partial = pasta_dsl::parse_str_partial(source);
                 Self::visit_file_items(&partial.items, source, &mut raw_tokens);
-                let tokens = encode_tokens(&mut raw_tokens);
-
-                let diagnostics = partial
-                    .errors
-                    .iter()
-                    .map(|e| {
-                        let line = if e.line > 0 { e.line - 1 } else { 0 };
-                        Diagnostic {
-                            range: Range {
-                                start: Position {
-                                    line: line as u32,
-                                    character: 0,
-                                },
-                                end: Position {
-                                    line: line as u32,
-                                    character: 0,
-                                },
-                            },
-                            severity: Some(DiagnosticSeverity::ERROR),
-                            message: e.message.clone(),
-                            ..Default::default()
-                        }
-                    })
-                    .collect();
-
-                AnalysisResult {
-                    tokens,
-                    diagnostics,
-                }
+                let finding = pasta_check::validate::syntax_finding("<lsp>", e);
+                (
+                    vec![finding_to_diagnostic(&finding, source)],
+                    partial.failed_lines,
+                )
             }
+        };
+        let comments = Self::scan_comment_lines(source, &failed_lines, &raw_tokens);
+        raw_tokens.extend(comments);
+
+        AnalysisResult {
+            tokens: encode_tokens(&mut raw_tokens),
+            diagnostics,
         }
     }
 
@@ -104,15 +107,36 @@ impl AnalysisEngine {
     // Comment Line Scanner
     // ========================================================================
 
-    /// Scan source text line-by-line to detect comment lines.
-    /// Comments start with `#` or `＃` (optionally preceded by whitespace).
-    /// The parser grammar treats these as silent `blank_line` rules, so they
-    /// don't appear in the AST.  We detect them here and emit COMMENT tokens.
-    fn scan_comment_lines(source: &str) -> Vec<RawToken> {
+    /// 行全体のコメント（`#`・`＃` で始まる行）を COMMENT にする。コメントは AST に
+    /// 残らないので文字から拾う。部分解析が解けなかった行（`failed_lines`・1 始まり・
+    /// 半開区間）と、コードブロックの本文の行は除く。本文の行は、走査が出した
+    /// CODE_BLOCK（フェンスの行に 1 つずつ）を行の順に 2 つずつ組にして決める。
+    fn scan_comment_lines(
+        source: &str,
+        failed_lines: &[std::ops::Range<usize>],
+        visited: &[RawToken],
+    ) -> Vec<RawToken> {
+        let mut fences: Vec<u32> = visited
+            .iter()
+            .filter(|t| t.token_type == token_type::CODE_BLOCK)
+            .map(|t| t.line)
+            .collect();
+        fences.sort_unstable();
+        let in_code_body = |line: u32| {
+            fences
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .any(|[open, close]| *open < line && line < *close)
+        };
+        let skipped = |line_idx: usize| {
+            failed_lines.iter().any(|r| r.contains(&(line_idx + 1)))
+                || in_code_body(line_idx as u32)
+        };
         let mut tokens = Vec::new();
         for (line_idx, line_text) in source.lines().enumerate() {
             let trimmed = line_text.trim_start();
-            if trimmed.starts_with('＃') || trimmed.starts_with('#') {
+            if !skipped(line_idx) && (trimmed.starts_with('＃') || trimmed.starts_with('#')) {
                 // Emit a COMMENT token for the entire line
                 let line_len = utf8_len_to_utf16(line_text);
                 if line_len > 0 {
@@ -127,5 +151,42 @@ impl AnalysisEngine {
             }
         }
         tokens
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pasta_check::validate::{Finding, FindingKind};
+
+    /// 位置の無い報告は 1 行目の頭の点にする（要件 11.2）
+    #[test]
+    fn finding_without_position_goes_to_file_head() {
+        let finding = Finding::new(FindingKind::Syntax, "<lsp>", None, None, "構文エラー: x");
+        let d = finding_to_diagnostic(&finding, "＊挨拶\n  さくら：やあ\n");
+        let head = Position {
+            line: 0,
+            character: 0,
+        };
+        assert_eq!(
+            d,
+            Diagnostic {
+                range: Range {
+                    start: head,
+                    end: head
+                },
+                message: "構文エラー: x".into(),
+                severity: 1,
+            }
+        );
+    }
+
+    /// 行より長い桁は行の長さで止め、CRLF の `\r` は数えない
+    #[test]
+    fn column_past_line_end_is_clamped() {
+        let finding = Finding::new(FindingKind::Syntax, "<lsp>", Some(1), Some(99), "x");
+        let d = finding_to_diagnostic(&finding, "a𠮷\r\nb\r\n");
+        assert_eq!(d.range.start.character, 3);
+        assert_eq!(text_utils::char_column_to_utf16("a𠮷", 2), 3);
     }
 }

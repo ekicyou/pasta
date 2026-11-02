@@ -1,0 +1,3 @@
+[loader]
+debug_mode = true
+ffi = true

@@ -1,10 +1,9 @@
 //! キューコマンド行（!行）のパースロジックと行種推定のテスト
 //!
 //! Task 3: パースロジックテスト（parse_cue_cmd_line による AST 構築）
-//! Task 4: 行種推定・キューコマンド検出ヘルパーテスト
+//! Task 4: キューコマンド検出ヘルパーテスト
 
 use pasta_dsl::parser::*;
-use pasta_dsl::partial::infer_rule_from_line;
 
 // ============================================================================
 // Helper: extract CueCommandNodes from parsed source
@@ -345,37 +344,6 @@ fn test_parse_full_sample_scene_ast_construction() {
     assert_eq!(cmds[6].command, "select");
     assert!(cmds[6].scope.is_none());
     assert_eq!(cmds[6].args, vec![CueArgToken::Float(30.0)]);
-}
-
-// ============================================================================
-// Task 4: Line Type Inference Tests
-// ============================================================================
-
-#[test]
-fn test_infer_rule_halfwidth_exclamation() {
-    // !command → Rule::cue_cmd_line
-    let result = infer_rule_from_line("!command");
-    assert_eq!(result, Some(Rule::cue_cmd_line));
-}
-
-#[test]
-fn test_infer_rule_fullwidth_exclamation() {
-    // ！コマンド → Rule::cue_cmd_line
-    let result = infer_rule_from_line("！コマンド");
-    assert_eq!(result, Some(Rule::cue_cmd_line));
-}
-
-#[test]
-fn test_infer_rule_exclamation_with_leading_whitespace() {
-    // Leading whitespace should be ignored
-    let result = infer_rule_from_line("    !emote@笑顔(normal)");
-    assert_eq!(result, Some(Rule::cue_cmd_line));
-}
-
-#[test]
-fn test_infer_rule_exclamation_fullwidth_with_whitespace() {
-    let result = infer_rule_from_line("  ！選択待ち（30）");
-    assert_eq!(result, Some(Rule::cue_cmd_line));
 }
 
 // ============================================================================

@@ -178,3 +178,10 @@ VSCode で辞書を書くゴーストの作者が困る。
 
 - `ponytail-lua-debug` は、要件ディスカッションの後に閉じた（開発者の決定）。0.5.1 で VSCode デバッガー（DAP）の連携を捨て、SSP・areka の MCP 経由に移す方針が出たためである（roadmap の「統合して閉じたもの（2026-11-02）」）。`book/src/debug/*.md` の節を分け合う相手は、もう居ない。
 - この spec の DAP の側の直し（`debugAttachTarget.ts`・`runSceneAtCursor.ts`・`attach.host`）も、0.5.1 で書き直すか消すことになる見込みである。絞るかどうかは、セッション「Pasta DSL MCP移行検討」と開発者が決める。
+
+## 申し送り（ponytail-dsl-parser を閉じた、2026-11-03）
+
+- `parse_str` が、新しく 5 種の構文の誤りを返すようになった：大きすぎる数（小数でも表せない）・アクターの番号が 0〜4294967295 の外・シーン引数の番号が 0〜255 の外・1 行の括弧の重なりが 64 段を超える・1 つの式の演算子が 256 個を超える。文は日本語 1 行で、前置きは pest の誤りと同じ `Parse error in {file} at {l}:{c}: `（`ponytail-dsl-parser` の design.md「ParseEntry と SyntaxErrorHelper」の誤りの文の表）。
+- `pasta_lsp` は `parse_str` が `Err` を返すと部分解析へ移るので、これらは部分解析の診断に出る。どの行・桁に出るかを確かめるテストは無い（論点として渡す。直し方はこの spec が決める）。
+- 括弧の走査は pest の前に走り、台詞・コメント・Lua ブロックの行の括弧も数える。部分解析（`partial.rs`）に 65 段の行や演算子 1 万個の行を含む文書を渡しても落ちないことは、`crates/pasta_dsl/tests/nesting_guard_test.rs` が確かめている。
+- `ParseError` は `SyntaxError{file,line,column,message}` と `IoError` だけになった（形は保った）。

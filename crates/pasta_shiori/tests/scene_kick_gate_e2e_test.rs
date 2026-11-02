@@ -3,10 +3,10 @@
 //! ＋ Error Handling（`kick.unresolved` / `kick.drop`）・`MailboxKickInjector`（D6 no-op））。
 //!
 //! # 何を観測可能に固定するか（actor/SHIORI レベルの E2E ゲート）
-//! 既存ユニットを **跨ぐ全経路（置き場の窓口の sink→LEGACY→executor→Lua→OnSecondChange）上で観測可能な
+//! 既存ユニットを **跨ぐ全経路（本番の送り先→mailbox→executor→Lua→OnSecondChange）上で観測可能な
 //! 応答さくらスクリプト／ライフサイクル不変**として補完する。本ファイルは 3 ゲートのうち
 //! actor/SHIORI レベルで最も自然に観測できる 2 つ（未解決破棄・teardown 競合 drop）を 1 本の
-//! `#[test]` に直列に詰める（`static LEGACY` はプロセスグローバルゆえ 6.1/7.2/7.3 と同方針で
+//! `#[test]` に直列に詰める（6.1/7.2/7.3 と同方針で
 //! 別バイナリ・単一テスト）。残る「debug 無効＝非活性（R2.6）」は層が `pasta_lua` debug の
 //! enable ゲートなので、そちらの in-crate テスト（`disabled_enable_keeps_wired_kick_sink_inert`）で
 //! 観測する（task 7.4 scope の層分担に従う）。
@@ -16,15 +16,20 @@
 //!    OnSecondChange が **通常応答（キックビート無し・進行中会話の継続が不変）** であること。
 //!    進行中のマルチビート会話を先に走らせておき、未解決キックがそれを一切変えない（後続ビートが
 //!    通常ペースでそのまま継続する）ことで「co_scene 不変」を観測可能にする。
-//!  - **teardown 競合 drop（R3.5 / D6）**: `teardown_actor()`（`LEGACY.swap(None)`）後に置き場の
-//!    窓口の sink（`kick_sink()`）を呼ぶ → **panic せず** no-op（LEGACY 不在で送信されない・
-//!    `kick.drop` ベストエフォート）。観測: panic しないこと＋LEGACY が None のまま（後続の
-//!    `marshal_request` がアクター不在の 204 を返すことで LEGACY 不在を観測）。
+//!  - **teardown 競合 drop（R3.5 / D6）**: アクターを Stop で片付けた後（受け口が閉じた）に
+//!    本番の送り先（`kick_sink_for`）を呼ぶ → **panic せず** no-op（送れずに捨てる・
+//!    `kick.drop` ベストエフォート）。観測: panic しないこと＋後続の `marshal_get` がアクター
+//!    不在の 204 を返すこと。
 
 use std::path::{Path, PathBuf};
 
-use pasta::actor::lifecycle::{kick_sink, marshal_request, spawn_actor, teardown_actor};
-use pasta_lua::debug::KickRequest;
+use flume::Sender;
+use pasta::actor::instance::{TEARDOWN_TIMEOUT, kick_sink_for};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
+use pasta::actor::marshaling::marshal_get;
+use pasta::actor::teardown::teardown_via_sender;
+use pasta::actor::thread::{ActorThread, spawn_actor_thread_with};
+use pasta_lua::debug::{KickRequest, KickSink};
 use tempfile::TempDir;
 
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前に中和する
@@ -151,22 +156,22 @@ fn pasta_time_at(offset_secs: i64) -> String {
     format!("2025-07-15T12:{min:02}:{sec:02}Z")
 }
 
-/// OnSecondChange GET を `marshal_request`（FFI `request` 相当・同一 FIFO）経由で送る。
-fn on_second_change(status: &str, offset_secs: i64) -> String {
+/// OnSecondChange GET を自分の mailbox へ `marshal_get` で送る（kick と同じ FIFO）。
+fn on_second_change(tx: &Sender<ActorMsg>, status: &str, offset_secs: i64) -> String {
     let when = pasta_time_at(offset_secs);
-    marshal_request(&normalize_request(&format!(
+    let req = normalize_request(&format!(
         "GET SHIORI/3.0\nCharset: UTF-8\nSender: SSP\nSecurityLevel: local\n\
          Status: {status}\nID: OnSecondChange\nReference0: 1\nX-Pasta-Time: {when}\n",
-    )))
+    ));
+    marshal_get(tx, MailboxRequest::new(0, req))
 }
 
-/// キック注入（置き場の窓口の sink。ここから先はアクターの `Kick` 腕を通る。本番の DAP の道＝
+/// キック注入（本番の送り先。ここから先はアクターの `Kick` 腕を通る。本番の DAP の道＝
 /// インスタンス自身の sink は `multi_instance_test::dap_kick_reaches_only_its_own_instance`）。
 ///
 /// キックはシーン表の登録名に完全一致で引くため、作者が書いた名前ではなく登録名
 /// （1 個目の定義＝作者名・`_`・通し番号 `1`）を載せる。
-fn kick(scene: &str) {
-    let sink = kick_sink();
+fn kick(sink: &KickSink, scene: &str) {
     sink(KickRequest {
         scene: format!("{scene}_1"),
     });
@@ -177,21 +182,38 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
     haystack.matches(needle).count()
 }
 
+/// 自分の mailbox でアクタースレッドを起こし、本番と同じ送り先（`kick_sink_for`）を VM へ渡す。
+/// 返す送り先は VM が持つものと同じで、DAP の inbound が呼ぶのと同じ道でアクターの `Kick` 腕へ届く。
+fn start_actor(load_dir: PathBuf) -> (Sender<ActorMsg>, KickSink, ActorThread) {
+    let (tx, rx) = mailbox();
+    let sink = kick_sink_for(&tx);
+    let thread = spawn_actor_thread_with(load_dir, rx, Some(sink.clone()), None)
+        .expect("actor thread must spawn");
+    assert!(
+        thread.loaded(),
+        "the hello-pasta ghost VM must load on the actor thread"
+    );
+    (tx, sink, thread)
+}
+
+/// Stop の ack を受けてから join する（ack の後のスレッドは約束を待つだけなので止まらない）。
+fn stop_actor(tx: &Sender<ActorMsg>, thread: ActorThread) {
+    let report = teardown_via_sender(tx, TEARDOWN_TIMEOUT);
+    assert!(report.acked, "teardown must be acked: {report:?}");
+    thread.join().expect("actor thread must not panic");
+}
+
 /// task 7.4: 未解決破棄ゲート（R3.5）と teardown 競合 drop ゲート（R3.5 / D6）を 1 本貫通で
-/// 観測する E2E 結合テスト。単一テスト・全ゲート直列（`static LEGACY` 共有のため）。
+/// 観測する E2E 結合テスト。単一テスト・全ゲート直列。
 #[test]
 fn kick_unresolved_and_teardown_drop_gates_end_to_end() {
     let (load_dir, _temp) = build_gate_ghost_dir();
 
-    // --- load（spawn_actor＝FFI load 相当・kick_sink 束縛＋LEGACY store） ---
-    let loaded = spawn_actor(0, load_dir.clone());
-    assert!(
-        loaded,
-        "spawn_actor must load the hello-pasta ghost VM on the actor thread"
-    );
+    // --- load（自分の mailbox・本番の送り先を VM へ渡す） ---
+    let (tx, sink, thread) = start_actor(load_dir.clone());
 
     // --- init OnSecondChange（dispatcher 内部タイマ初期化・next_talk_time 設定） ---
-    let _init = on_second_change("idle", 0);
+    let _init = on_second_change(&tx, "idle", 0);
 
     // =====================================================================
     // ゲート A: 未解決シーンは進行中シーンを変えず破棄＋ログ（R3.5）
@@ -202,10 +224,10 @@ fn kick_unresolved_and_teardown_drop_gates_end_to_end() {
     // =====================================================================
 
     // 進行中会話をキック注入（これは実在シーンなので co_scene に据わる）。
-    kick(PREV_SCENE);
+    kick(&sink, PREV_SCENE);
 
     // tick: 前会話初回ビートが配信され、後続ビートは co_scene に残る。
-    let a_prev1 = on_second_change("idle", 10);
+    let a_prev1 = on_second_change(&tx, "idle", 10);
     assert!(
         a_prev1.contains("SHIORI/3.0 200 OK"),
         "gateA: prev conversation first beat must be delivered as 200 OK.\nactual: {a_prev1:?}"
@@ -222,10 +244,10 @@ fn kick_unresolved_and_teardown_drop_gates_end_to_end() {
     );
 
     // ここで **存在しないシーン** をキック → `KICK.try_dispatch` が nil → co_scene 不変・破棄。
-    kick(UNRESOLVED_SCENE);
+    kick(&sink, UNRESOLVED_SCENE);
 
     // tick: 未解決キックは進行中会話を変えない＝前会話の **後続ビートがそのまま通常継続** で出る。
-    let a_after = on_second_change("idle", 20);
+    let a_after = on_second_change(&tx, "idle", 20);
     assert!(
         a_after.contains("SHIORI/3.0 200 OK"),
         "gateA: prev conversation must keep continuing as 200 OK after unresolved kick.\nactual: {a_after:?}"
@@ -245,26 +267,27 @@ fn kick_unresolved_and_teardown_drop_gates_end_to_end() {
 
     // =====================================================================
     // ゲート B: teardown 競合 drop（R3.5 / D6）
-    //  teardown_actor()（LEGACY.swap(None)）後に置き場の窓口の sink を呼ぶ → panic せず no-op
-    //  （LEGACY 不在で送信されない・kick.drop ベストエフォート）。観測: panic しないこと＋
-    //  LEGACY が None のまま（teardown 後の marshal_request がアクター不在の 204 を返す）。
+    //  Stop で片付けた後（受け口が閉じた）に送り先を呼ぶ → panic せず no-op
+    //  （送れずに捨てる・kick.drop ベストエフォート）。観測: panic しないこと＋
+    //  片付けの後の marshal_get がアクター不在の 204 を返す。
     // =====================================================================
 
-    // teardown（LEGACY.swap(None)）= アクター不在状態を作る。
-    let _ = teardown_actor();
+    // Stop の ack の後に join する = アクター不在状態を作る。
+    stop_actor(&tx, thread);
 
-    // teardown 後に置き場の窓口の sink を呼ぶ → panic せず黙って破棄される（kick.drop・ベストエフォート）。
+    // 片付けの後に送り先を呼ぶ → panic せず黙って破棄される（kick.drop・ベストエフォート）。
     // （この行が panic すれば drop ゲートが破れている＝load-bearing。）
-    kick(DROP_SCENE);
+    kick(&sink, DROP_SCENE);
 
-    // 観測: LEGACY が None のまま（送信されていない）＝アクター不在 → marshal_request は 204。
-    let after_drop = on_second_change("idle", 30);
+    // 観測: 送れていない＝アクター不在 → marshal_get は 204。
+    let after_drop = on_second_change(&tx, "idle", 30);
     assert!(
         after_drop.contains("SHIORI/3.0 204 No Content"),
         "gateB: after teardown the actor is absent — kick must be dropped (no-op) and \
-         marshal_request must return 204 (LEGACY stays None).\nactual: {after_drop:?}"
+         marshal_get must return 204.\nactual: {after_drop:?}"
     );
 
     // 二重 teardown でもハング/panic しない（冪等・後始末）。
-    let _ = teardown_actor();
+    let again = teardown_via_sender(&tx, TEARDOWN_TIMEOUT);
+    assert!(again.already_done && !again.acked, "{again:?}");
 }

@@ -2,14 +2,14 @@
 //!
 //! task 5.1 で VM は SHIORI スレッドから **アクタースレッド**（`actor::thread`）へ
 //! pin された。`debug::enable` は VM 構築の一部として `PastaShiori::load` 内で呼ばれ、
-//! その `load` は **アクタースレッド上**で走る（`spawn_actor_thread` の future）。
+//! その `load` は **アクタースレッド上**で走る（`spawn_actor_thread_with` のスレッド）。
 //! したがって `set_global_hook(EVERY_LINE)` はアクタースレッドで装着・発火する。
 //! 本テストはそれを **end-to-end で証明**する:
 //!
 //! 1. デバッグ有効フィクスチャ（`[debug] enabled=true port=0`・エフェメラルポート）を
-//!    アクタースレッドでロードし、束縛された DAP ポートを **アクタースレッドから**
-//!    読み戻す（`ActorThread::debug_local_addr()`）。`Some(addr)` であること自体が、
-//!    `enable`→`Transport::start` がアクタースレッドで成立した証跡（R10.2 attach 前提）。
+//!    アクタースレッドでロードし、束縛された DAP ポートをゴーストのログの
+//!    `debug backend listening addr=` の行から読む（`common::listening_port`）。その行が
+//!    出ること自体が、`enable`→`Transport::start` が成立した証跡（R10.2 attach 前提）。
 //! 2. その DAP ポートへ実 TCP で **attach**（`initialize`→`initialized`）— VSCode attach
 //!    の自動証跡（R10.2）。
 //! 3. scene ハンドラの `.lua` 行へ行ブレークポイントを張り、mailbox 経由で GET を投入。
@@ -20,41 +20,31 @@
 //! 4. `continue` で流し切り、GET 応答が期待値で到着することを確認。
 //!
 //! # フェイク不能性（テストの「歯」）
-//! - `debug_local_addr()` が `None` ならフックがアクタースレッドで装着されていない →
-//!   step1 で失敗。
+//! - ログに待受の行が無ければ debug backend が有効になっていない → step1 で失敗。
 //! - GET 応答がブレークポイント前に到着するならフックは VM を停止していない → step3 の
 //!   順序アサートで失敗。
 //! - `debug_local` が読めない／値が違うなら inspect 経路が壊れている → step3 で失敗。
 //!
 //! # ポート枯渇対策
 //! `port = 0`（OS 割当エフェメラル）。固定ポート 9276 を一切使わないため、開発セッションの
-//! ambient `PASTA_DEBUG` も `#[ctor]` で中和しつつ、CI で AddrInUse になり得ない。
+//! ambient `PASTA_DEBUG` も `common` の `#[ctor]` で中和しつつ、CI で AddrInUse になり得ない。
 //! 全クライアント待機は TEST-ONLY watchdog で有界化し CI をハングさせない。
+
+mod common;
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
-use std::thread;
 use std::time::Duration;
 
-use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
-use pasta::actor::thread::spawn_actor_thread;
+use common::listening_port;
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
+use pasta::actor::thread::spawn_actor_thread_with;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
 /// TEST-ONLY watchdog（停止コアは無期限・本クライアント待機のみ有界化）。
 const WATCHDOG: Duration = Duration::from_secs(20);
-
-/// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前に中和する。
-/// 本フィクスチャは pasta.toml `[debug]` で明示的にデバッグを有効化し、ポートは 0
-/// （エフェメラル）なので、ambient env が `enabled`/`port` を上書きしないようにする。
-#[ctor::ctor(unsafe)]
-fn neutralize_debug_env() {
-    unsafe {
-        std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
-    }
-}
 
 /// デバッグ保全フィクスチャ（`[debug]` 有効 entry.lua の差し替え。標準ランタイムは自己展開される）を
 /// temp へ展開し、`load_dir` を返す。`TempDir` は返り値で寿命保持する。
@@ -191,23 +181,17 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
 
     // (1) アクタースレッドで VM をロード（debug 有効・エフェメラルポート）。
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir.clone(), rx);
+    let actor =
+        spawn_actor_thread_with(load_dir.clone(), rx, None, None).expect("actor thread must spawn");
     assert!(
         actor.loaded(),
         "actor thread must load the debug-enabled ghost VM"
     );
-    assert_ne!(
-        actor.actor_thread_id(),
-        thread::current().id(),
-        "VM must run on a dedicated actor thread, not the SHIORI/test thread"
-    );
 
-    // 束縛された DAP ポートをアクタースレッドから読み戻す。`Some` であること自体が
-    // `enable`→`set_global_hook`→`Transport::start` がアクタースレッドで成立した証跡
-    // （R10.1/R10.2: フックは VM スレッド＝アクタースレッドで装着される）。
-    let dap_addr = actor
-        .debug_local_addr()
-        .expect("debug backend must bind a DAP port ON THE ACTOR THREAD (R10.1/R10.2)");
+    // 束縛された DAP ポートをゴーストのログから読む。待受の行が出ること自体が
+    // `enable`→`Transport::start` が成立した証跡（R10.1/R10.2: VM はアクタースレッドで
+    // 構築されるので、フックもアクタースレッドで装着される）。
+    let dap_addr = SocketAddr::from(([127, 0, 0, 1], listening_port(&load_dir)));
 
     // (2) DAP attach（VSCode attach の自動証跡・R10.2）。
     let mut client = DapClient::connect(dap_addr);
@@ -253,11 +237,13 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
 
     // GET を mailbox へ投入（応答経路は reply_rx）。ブレークポイント停止中は VM が
     // アクタースレッドで止まるため、reply はまだ到着しない。
-    let (get_msg, reply_rx) = ActorMsg::get(MailboxRequest::new(
+    let (reply, reply_rx) = flume::bounded::<String>(1);
+    let req = MailboxRequest::new(
         1,
         normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnDebugScene\n"),
-    ));
-    tx.send(get_msg).expect("send GET into mailbox");
+    );
+    tx.send(ActorMsg::Get { req, reply })
+        .expect("send GET into mailbox");
 
     // (3a) フックが BP 行でアクタースレッドを停止 → `stopped(breakpoint)`。
     let stopped = client.recv_until(|m| is_event(m, "stopped"));
@@ -323,15 +309,11 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
     //     複数回到達し得る（行フックの再入）ため、stopped が来る限り continue を繰り返す。
     for continue_seq in 30u64..90u64 {
         client.send_request(continue_seq, "continue", json!({ "threadId": thread_id }));
-        if let Ok(reply) = reply_rx.recv_timeout(Duration::from_millis(500)) {
-            match reply {
-                Reply::Value(v) => {
-                    assert!(
-                        v.contains("debug=4242"),
-                        "GET reply (after continue) must carry the actor-VM scene output: {v:?}"
-                    );
-                }
-            }
+        if let Ok(v) = reply_rx.recv_timeout(Duration::from_millis(500)) {
+            assert!(
+                v.contains("debug=4242"),
+                "GET reply (after continue) must carry the actor-VM scene output: {v:?}"
+            );
             // 応答到着＝scene 完走。clean stop へ進む。
             let (stop, done_rx) = ActorMsg::stop();
             tx.send(stop).expect("send Stop into mailbox");

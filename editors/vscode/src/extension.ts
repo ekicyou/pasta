@@ -32,12 +32,10 @@ import {
 /** Activation state of the extension */
 export interface ActivationState {
   wasmReady: boolean;
-  fallbackMode: boolean;
 }
 
 const activationState: ActivationState = {
   wasmReady: false,
-  fallbackMode: false,
 };
 
 let wasmBridge: WasmBridge | undefined;
@@ -101,7 +99,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     outputChannel.appendLine('WASM bridge initialized successfully.');
   } catch (error) {
     activationState.wasmReady = false;
-    activationState.fallbackMode = true;
     outputChannel.appendLine(`WASM initialization failed: ${error}`);
     vscode.window.showErrorMessage(
       `Pasta WASM initialization failed: ${error}. Using TextMate grammar fallback.`
