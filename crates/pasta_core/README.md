@@ -10,7 +10,7 @@ DSLパーサーは独立クレート `pasta_dsl` に分離されており、
 
 ## アーキテクチャ
 
-登録を集めるレジストリ（`SceneRegistry`・`WordDefRegistry`）と、検索する検索表（`SceneTable`・`WordTable`）の 2 層です。`pasta_lua` はトランスパイル時にレジストリへシーンと単語を登録し、実行時の辞書確定で登録し直したレジストリから検索表を作ります。検索表は RadixMap による前方一致で候補を集め、`RandomSelector` でシャッフルした候補を一巡するまで重複なく順に使います。
+登録を集めるレジストリ（`SceneRegistry`・`WordDefRegistry`）と、検索する検索表（`SceneTable`・`WordTable`）の 2 層です。`pasta_lua` はトランスパイル時にレジストリへシーンと単語を登録し、実行時の辞書確定で登録し直したレジストリから検索表を作ります。検索表は前方一致の索引（`BTreeMap`）で候補を集め、`RandomSelector` でシャッフルした候補を一巡するまで重複なく順に使います。
 
 詳細は [内部設計: シーン・単語レジストリとシーン検索](https://ekicyou.github.io/pasta/internals/registry-search.html#pasta_core-のレジストリと検索表) を参照してください。
 
@@ -29,7 +29,6 @@ DSLパーサーは独立クレート `pasta_dsl` に分離されており、
 | `SceneEntry`      | シーン情報エントリ（レジストリ側） |
 | `SceneInfo`・`SceneId`・`SceneScope` | 検索表側のシーン情報・ID・スコープ |
 | `WordEntry`       | 単語情報エントリ                  |
-| `WordCacheKey`    | 単語の選択状態のキャッシュキー    |
 
 エラー型は `SceneTableError`・`WordTableError`（`pasta_core::error`。クレート直下にも再エクスポート）です。
 
@@ -89,7 +88,6 @@ println!("Selected: {}", word);
 | クレート        | バージョン | 用途                       |
 | --------------- | ---------- | -------------------------- |
 | thiserror       | 2          | エラー型定義               |
-| fast_radix_trie | 1.2.0      | 前方一致検索（SceneTable・WordTable） |
 | rand            | 0.10       | ランダム選択               |
 
 ## 関連クレート
