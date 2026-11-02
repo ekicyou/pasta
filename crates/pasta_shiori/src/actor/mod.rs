@@ -18,6 +18,9 @@
 
 pub mod mailbox;
 
+/// モジュールの参照（足す・返す・返してスレッドを終える）。アクタースレッドが pasta.dll を外させない。
+pub(crate) mod module_ref;
+
 /// 本番アクタースレッド（task 3.3）。`!Send` VM を pin し mailbox を同期 `recv()`
 /// のループで駆動する（OS のウィンドウやメッセージの仕組みを使わない）。task 5.1 で FFI 入口が
 /// 本スレッドへ切り替わり、既定（no-feature）ビルドでコンパイルされる。
