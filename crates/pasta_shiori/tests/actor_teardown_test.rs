@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
-use pasta::actor::teardown::teardown_actor;
+use pasta::actor::teardown::teardown_via_sender;
 use pasta::actor::thread::spawn_actor_thread;
 use tempfile::TempDir;
 
@@ -98,8 +98,9 @@ fn stop_done_ack_drains_then_tears_down_cleanly() {
     ));
     tx.send(get).expect("send GET into mailbox");
 
-    // teardown_actor: Stop{done} を送り、有界に done ack を待ち、スレッドを detach。
-    let report = teardown_actor(&tx, actor, Duration::from_secs(10));
+    // 送信端から Stop{done} を送り、有界に done ack を待ち、スレッドを手放す。
+    let report = teardown_via_sender(&tx, Duration::from_secs(10));
+    actor.detach();
 
     // 先行 GET は Stop の前に drain されて応答済みのはず（clean drain の証跡）。
     let pre_stop = reply_rx
@@ -112,12 +113,12 @@ fn stop_done_ack_drains_then_tears_down_cleanly() {
         "Stop must be acked within timeout (actor must drain, drop VM, clean up, then ack)"
     );
     assert!(
-        report.is_clean(),
-        "teardown must complete cleanly (done ack received, no anomaly)"
+        report.anomaly.is_none(),
+        "teardown must complete cleanly (done ack received, no anomaly): {report:?}"
     );
 }
 
-/// R7.4: 冪等 teardown。done ack 後にもう一度 `teardown_actor` 相当の Stop 送信を
+/// R7.4: 冪等 teardown。done ack 後にもう一度送信端から Stop 送信を
 /// 行っても、閉じたチャネルを already-done として安全に no-op（hang/panic なし）。
 #[test]
 fn second_teardown_after_done_is_safe_noop() {
@@ -127,13 +128,14 @@ fn second_teardown_after_done_is_safe_noop() {
     let actor = spawn_actor_thread(0, load_dir, rx);
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
-    let first = teardown_actor(&tx, actor, Duration::from_secs(10));
+    let first = teardown_via_sender(&tx, Duration::from_secs(10));
+    actor.detach();
     assert!(first.acked, "first teardown must be acked");
 
     // 二重 teardown: アクタースレッドは既に終了し receiver は drop 済み。Stop の
     // 再送は Disconnected になり、teardown は already-done として安全に no-op を返す
     // （ハングしないことを有界 timeout で担保。冪等）。
-    let second = teardown_idempotent_resend(&tx, Duration::from_secs(2));
+    let second = teardown_via_sender(&tx, Duration::from_secs(2));
     assert!(
         second.already_done,
         "second teardown after done must be a safe no-op (closed channel -> already done)"
@@ -142,14 +144,4 @@ fn second_teardown_after_done_is_safe_noop() {
         !second.acked,
         "no fresh ack is expected on the idempotent second teardown"
     );
-}
-
-/// 二重 teardown を直接（ActorThread を持たずに）試行するヘルパ。本番 FFI 経路では
-/// teardown は冪等であるべきなので、`teardown_actor` の「すでに done」分岐に相当する
-/// 動作を mailbox tx のみで再現する（receiver drop 済み → send 失敗 → already_done）。
-fn teardown_idempotent_resend(
-    tx: &flume::Sender<ActorMsg>,
-    timeout: Duration,
-) -> pasta::actor::teardown::TeardownReport {
-    pasta::actor::teardown::teardown_via_sender(tx, timeout)
 }

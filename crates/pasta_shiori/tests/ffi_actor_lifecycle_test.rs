@@ -130,7 +130,7 @@ fn ffi_ownership_model_load_request_unload_reload_cycle() {
     // --- フェーズ 4: unload（teardown_actor）→ アクター不在で 204 ---
     let report = teardown_actor();
     assert!(
-        report.is_clean(),
+        report.acked && report.anomaly.is_none(),
         "unload (teardown_actor) must cleanly tear down the actor (done ack): {report:?}"
     );
     let after_unload = marshal_request(&normalize_request(

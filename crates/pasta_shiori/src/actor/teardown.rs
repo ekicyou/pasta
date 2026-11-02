@@ -1,5 +1,4 @@
-//! 本番 teardown（`Stop{done}` ack）と reload リーク検査（task 4.1・
-//! R7.1/R7.2/R7.3/R7.4/R7.5）。
+//! 本番 teardown（`Stop{done}` ack）（task 4.1・R7.1/R7.4/R7.5）。
 //!
 //! design.md「Mailbox / Reply / Teardown」コンポーネントおよび「System Flows → reload
 //! teardown」の本番化。teardown は **`ActorMsg::Stop { done }` 制御メッセージ**を
@@ -17,10 +16,10 @@
 //!
 //! # ack の後の join／detach（仕様 `shiori4-v3-portable` 4.2・4.4・7.6）
 //! ack の後にスレッドをどう扱うかは芯の型 `ActorInstance` の後始末の決まりが選ぶ:
-//! unload は ack の後に join し、ack が来なければ手放す（abandon）。本モジュールの低い層の [`teardown_actor`]
-//! （reload 反復のリーク検査が使う）は join せず、常に detach する
-//! （[`thread::ActorThread::detach`]）。完了確認は done ack で行うので、
+//! unload は ack の後に join し、ack が来なければ手放す（abandon）。本モジュールは
+//! Stop と ack だけを受け持ち、スレッドには触れない。完了確認は done ack で行うので、
 //! `Arc<AtomicBool>` shutdown フラグ・`take()` 二重 join 回避の小細工は持たない（R7.4）。
+//! 再読み込みのリーク検査は `tests/actor_reload_leak_test.rs` が持つ（ponytail-shiori 6.1）。
 //!
 //! # 冪等性（R7.4）
 //! done ack を受けた後の二重 teardown は、mailbox の receiver が既に drop されている
@@ -32,18 +31,12 @@
 //! ack が timeout した／途中で異常が生じた場合は [`tracing`] で記録し、
 //! [`TeardownReport::anomaly`] に載せる。**panic も `unwrap`/`expect` も使わず**、
 //! 異常を呼び出し側へ値で返してホスト（SSP）プロセスを巻き込まない。
-//!
-//! 本モジュールはアクタースレッド（[`thread`]）と実 OS リソース
-//! 計測（`windows-sys/Win32_System_Threading`）を用いる。FFI 入口（`windows.rs` の
-//! `load`/`unload`）への配線は task 5.1 で完了し、本番（既定）出荷ビルドに含まれる。
 
-use std::path::Path;
 use std::time::Duration;
 
 use flume::Sender;
 
 use crate::actor::mailbox::ActorMsg;
-use crate::actor::thread::{ActorThread, spawn_actor_thread};
 
 /// teardown の結果レポート（R7.1/R7.4/R7.5）。
 ///
@@ -64,43 +57,8 @@ pub struct TeardownReport {
     /// アクタースレッドの join を終えたか（仕様 `shiori4-v3-portable` 4.4・7.6 の観測点）。
     ///
     /// ack が届き、後始末の決まりが「ack の後に join」のときだけ真
-    /// （`ActorInstance::shutdown`）。Stop と ack だけの道（本関数）では常に偽。
+    /// （`ActorInstance::shutdown`）。Stop と ack だけの道（[`teardown_via_sender`]）では常に偽。
     pub joined: bool,
-}
-
-impl TeardownReport {
-    /// clean teardown（done ack 受信・異常なし）だったか。
-    ///
-    /// 冪等 no-op（`already_done`）は「clean」ではないが「安全」ではある。リーク検査の
-    /// サイクル成功判定にはこの `is_clean()`（実際に ack を受けて teardown が走った）を
-    /// 用いる。
-    pub fn is_clean(&self) -> bool {
-        self.acked && self.anomaly.is_none()
-    }
-}
-
-/// アクタースレッドを join せずに teardown する（reload 反復のリーク検査の経路）。
-///
-/// 本番の unload（ack の後に join）は `ActorInstance` の後始末が受け持つ。
-///
-/// `tx`（mailbox 送信端）から `ActorMsg::Stop { done }` を送り、`timeout` 付きで done ack
-/// を待つ。ack 受信＝アクターが残メッセージ drain・VM 破棄・debug teardown を終えた合図
-/// なので、その後 `actor` を **detach** する（join しない）。
-///
-/// - ack 受信: `acked=true`・clean（[`TeardownReport::is_clean`]）。
-/// - Stop 送信が `Disconnected`（アクター既終了）: `already_done=true`（冪等 no-op）。
-/// - ack timeout / その他異常: `anomaly=Some(..)` を記録（[`tracing::warn`]）し、ホストを
-///   巻き込まずに返す（R7.5）。スレッドは detach する（join でブロックしない）。
-pub fn teardown_actor(
-    tx: &Sender<ActorMsg>,
-    actor: ActorThread,
-    timeout: Duration,
-) -> TeardownReport {
-    let report = teardown_via_sender(tx, timeout);
-    // done ack を受けたか否かに関わらずスレッドは detach する（join しない=R7.4）。
-    // ack 済みならループは抜け済み。timeout 異常時も join でハングさせない。
-    actor.detach();
-    report
 }
 
 /// mailbox 送信端のみで teardown（Stop{done}→ack 待ち）を試行する冪等経路。
@@ -182,202 +140,5 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
                 joined: false,
             }
         }
-    }
-}
-
-/// reload 反復の結果レポート（R7.2 の re-spawn ＋ R7.3 のリーク不在）。
-#[derive(Debug, Clone, Copy)]
-pub struct ReloadReport {
-    /// 実際に回した reload サイクル数（途中で hang/panic していなければ要求数と一致）。
-    pub cycles_run: usize,
-    /// うち clean に teardown（done ack 受信）したサイクル数。
-    pub clean_teardowns: usize,
-    /// 実 OS リソースのリーク指標（Windows のみ `Some`。非 Windows は `None`）。
-    pub leak_metric: Option<LeakMetric>,
-}
-
-/// reload 反復前後の実 OS リソースカウンタとその増分（R7.3）。
-///
-/// ベースラインは **ウォームアップ後** に採取する（一回性初期化を除外するため）。
-/// 計測は `GetProcessHandleCount` / `GetGuiResources(GR_USEROBJECTS)` による。
-#[derive(Debug, Clone, Copy)]
-pub struct LeakMetric {
-    /// ウォームアップ後・計測サイクル開始時のカーネルハンドル数。
-    pub kernel_handles_baseline: u32,
-    /// N サイクル完了後のカーネルハンドル数。
-    pub kernel_handles_final: u32,
-    /// カーネルハンドル数の増分（final - baseline）。
-    pub kernel_handle_growth: i64,
-    /// ウォームアップ後・計測サイクル開始時の USER オブジェクト数。
-    pub user_objects_baseline: u32,
-    /// N サイクル完了後の USER オブジェクト数。
-    pub user_objects_final: u32,
-    /// USER オブジェクト数の増分（final - baseline）。
-    pub user_object_growth: i64,
-}
-
-/// reload teardown の反復リーク検査ハーネス（design「Reload / Teardown Tests」）。
-///
-/// spawn→teardown（`Stop{done}` ack）→ 再 spawn のサイクルを反復し、各サイクルで
-/// アクタースレッド・VM・チャネルが漏れなく解放される
-/// （clean teardown）こと、サイクル間でリソースが累積しない（リーク／枯渇不在）ことを
-/// **done ack 後に** 実測する。
-pub struct ReloadProbe;
-
-impl ReloadProbe {
-    /// ウォームアップに使うサイクル数。最初の数回は実 VM 構築の一回性コストを
-    /// 吸収させ、ベースライン採取から除外する。
-    const WARMUP_CYCLES: usize = 2;
-
-    /// reload（spawn→teardown）サイクルを `n` 回反復し、各サイクルの teardown 結果と
-    /// 累積リーク指標を返す。
-    ///
-    /// 各サイクルは新規 `spawn_actor_thread`（新スレッド＋新 VM＋新チャネル）→
-    /// `teardown_actor`（`Stop{done}` ack→detach）。ack を受けてから次サイクルを spawn
-    /// するため、計測は **done ack 後** に行われる（解放完了後の実測）。
-    ///
-    /// - Postconditions: 全サイクルで done ack（clean teardown）・再 spawn 正常稼働。
-    /// - Invariants: スレッドハンドル／USER オブジェクト／port がサイクル間で枯渇しない。
-    pub fn run_cycles(load_dir: &Path, n: usize, timeout: Duration) -> ReloadReport {
-        // (1) ウォームアップ: 実 VM 構築の一回性コストを baseline から除外する。
-        for _ in 0..Self::WARMUP_CYCLES {
-            let _ = run_one_reload_cycle(load_dir, timeout);
-        }
-
-        // (2) ウォームアップ後のベースライン採取（計測サイクルの開始点）。
-        let baseline = sample_resources();
-
-        // (3) 計測対象の N サイクルを回す。
-        let mut clean_teardowns = 0usize;
-        for _ in 0..n {
-            if run_one_reload_cycle(load_dir, timeout) {
-                clean_teardowns += 1;
-            }
-        }
-
-        // (4) N サイクル後のリソースカウンタ採取と増分算出（done ack 後の実測）。
-        let final_sample = sample_resources();
-        let leak_metric = LeakMetric::from_samples(baseline, final_sample);
-
-        ReloadReport {
-            cycles_run: n,
-            clean_teardowns,
-            leak_metric,
-        }
-    }
-}
-
-/// reload を 1 回（spawn→teardown）回し、teardown が clean（done ack 受信）だったかを返す。
-fn run_one_reload_cycle(load_dir: &Path, timeout: Duration) -> bool {
-    let (tx, rx) = crate::actor::mailbox::mailbox();
-    let actor = spawn_actor_thread(0, load_dir.to_path_buf(), rx);
-    let report = teardown_actor(&tx, actor, timeout);
-    report.is_clean()
-}
-
-impl LeakMetric {
-    /// 2 つのスナップショットから増分指標を組み立てる。両方が実値を持つ
-    /// （＝Windows で計測成功）ときのみ `Some`。
-    fn from_samples(baseline: ResourceSample, final_sample: ResourceSample) -> Option<LeakMetric> {
-        let kernel_handles_baseline = baseline.kernel_handles?;
-        let kernel_handles_final = final_sample.kernel_handles?;
-        let user_objects_baseline = baseline.user_objects?;
-        let user_objects_final = final_sample.user_objects?;
-
-        Some(LeakMetric {
-            kernel_handles_baseline,
-            kernel_handles_final,
-            kernel_handle_growth: i64::from(kernel_handles_final)
-                - i64::from(kernel_handles_baseline),
-            user_objects_baseline,
-            user_objects_final,
-            user_object_growth: i64::from(user_objects_final) - i64::from(user_objects_baseline),
-        })
-    }
-}
-
-/// プラットフォーム非依存のリソーススナップショット（採取できなければ `None`）。
-#[derive(Debug, Clone, Copy)]
-struct ResourceSample {
-    /// カーネルハンドル数（Windows のみ）。
-    kernel_handles: Option<u32>,
-    /// USER オブジェクト数（Windows のみ）。
-    user_objects: Option<u32>,
-}
-
-/// 現在プロセスの実 OS リソースカウンタを採取する（PoC 計測アプローチの流用）。
-///
-/// Windows では `GetProcessHandleCount`（カーネルハンドル・スレッド／イベント／
-/// チャネル由来ハンドルが漏れれば増える）と `GetGuiResources(GR_USEROBJECTS)`
-/// （USER オブジェクト。アクターはウィンドウを作らないので増えないはず）を読む。非 Windows では
-/// 計測手段がないため `None`。
-#[cfg(windows)]
-fn sample_resources() -> ResourceSample {
-    use windows_sys::Win32::Foundation::{GetLastError, SetLastError};
-    use windows_sys::Win32::System::Threading::{
-        GR_USEROBJECTS, GetCurrentProcess, GetGuiResources, GetProcessHandleCount,
-    };
-
-    // SAFETY: `GetCurrentProcess` は擬似ハンドル（クローズ不要）を返す。
-    // `GetProcessHandleCount` には有効な out ポインタを渡す。いずれも純粋な
-    // 読み取り API で、プロセス状態を変更しない。
-    let process = unsafe { GetCurrentProcess() };
-
-    let kernel_handles = unsafe {
-        let mut count: u32 = 0;
-        if GetProcessHandleCount(process, &mut count) != 0 {
-            Some(count)
-        } else {
-            None
-        }
-    };
-
-    // SAFETY: `GetGuiResources` は読み取り専用。`SetLastError`/`GetLastError` は
-    // 呼び出しスレッドの誤りの番号を読み書きするだけ。アクターはウィンドウを作らないので
-    // 試験のプロセスでは本当に 0 個になりうる。0 は誤りの番号で読み分ける。
-    let user_objects = unsafe {
-        SetLastError(0);
-        let n = GetGuiResources(process, GR_USEROBJECTS);
-        user_objects_from(n, GetLastError())
-    };
-
-    ResourceSample {
-        kernel_handles,
-        user_objects,
-    }
-}
-
-/// `GetGuiResources` の戻り値と、その直後の `GetLastError` から USER オブジェクト数を読む。
-/// 0 は「USER オブジェクト 0 個」と「呼び出し失敗」の両方を表すので、誤りの番号で読み分ける
-/// （誤りの番号 0 なら本当に 0 個、それ以外は測れない）。
-#[cfg(windows)]
-fn user_objects_from(n: u32, last_error: u32) -> Option<u32> {
-    if n != 0 || last_error == 0 {
-        Some(n)
-    } else {
-        None
-    }
-}
-
-/// 非 Windows: 実ハンドル計測 API がないため常に計測不能（`None`）。
-#[cfg(not(windows))]
-fn sample_resources() -> ResourceSample {
-    ResourceSample {
-        kernel_handles: None,
-        user_objects: None,
-    }
-}
-
-#[cfg(all(test, windows))]
-mod tests {
-    use super::user_objects_from;
-
-    /// `GetGuiResources` の 0 を、`GetLastError` で「本当に 0」と「測れない」に読み分ける（8.4）。
-    /// USER オブジェクトが 0 のプロセス（誤りの番号 0）では `Some(0)` を返す。
-    #[test]
-    fn user_objects_zero_is_read_by_last_error() {
-        assert_eq!(user_objects_from(0, 0), Some(0));
-        assert_eq!(user_objects_from(0, 5), None);
-        assert_eq!(user_objects_from(3, 0), Some(3));
     }
 }

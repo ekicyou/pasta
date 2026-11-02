@@ -161,7 +161,7 @@ fn run_case(case: &str, loaded: bool, expect_loaded: bool, markers: &[&str]) {
 
     let report = teardown_actor();
     assert!(
-        report.is_clean() || report.already_done,
+        (report.acked && report.anomaly.is_none()) || report.already_done,
         "[{case}] unload はクリーンに終わるべき: {report:?}"
     );
 }

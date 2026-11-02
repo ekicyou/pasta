@@ -135,8 +135,8 @@ fn teardown_emits_stop_and_done_seams() {
 
     let report = teardown_via_sender(&tx, Duration::from_secs(10));
     assert!(
-        report.is_clean(),
-        "teardown must be clean (done ack received)"
+        report.acked && report.anomaly.is_none(),
+        "teardown must be clean (done ack received, no anomaly): {report:?}"
     );
     actor.join().expect("actor role thread must not panic");
 

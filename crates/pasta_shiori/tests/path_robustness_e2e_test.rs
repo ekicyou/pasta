@@ -107,7 +107,7 @@ fn drive_install(label: &str, base_dir: &Path) -> Vec<String> {
 
     let report = teardown_actor();
     assert!(
-        report.is_clean() || report.already_done,
+        (report.acked && report.anomaly.is_none()) || report.already_done,
         "[{label}] unload はクリーンに終わるべき: {report:?}"
     );
 
