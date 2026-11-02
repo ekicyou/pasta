@@ -171,9 +171,9 @@ fn test_comment_line_halfwidth_with_leading_whitespace() {
 }
 
 #[test]
-fn test_analyze_without_trailing_newline_matches_with_newline() {
-    // analyze は末尾改行なし入力（VSCode 等）に内部で改行を補完する（Cow::Owned 経路）。
-    // 末尾改行あり入力と同一のトークン列・診断になることを固定する。
+fn test_analyze_without_trailing_newline_keeps_tokens() {
+    // 全体の解析には改行を補わない（保存時と同じく誤り 1 件）。色は部分解析が
+    // 最後の塊に改行を補うので、末尾改行ありと同じトークン列になる。
     let without_nl = "＊挨拶\n　Alice：こんにちは";
     let with_nl = "＊挨拶\n　Alice：こんにちは\n";
     let r1 = AnalysisEngine::analyze(without_nl);
@@ -184,5 +184,6 @@ fn test_analyze_without_trailing_newline_matches_with_newline() {
         r1.tokens, r2.tokens,
         "トークン列が末尾改行の有無に依存しない"
     );
-    assert_eq!(r1.diagnostics.len(), r2.diagnostics.len());
+    assert_eq!(r1.diagnostics.len(), 1, "{:?}", r1.diagnostics);
+    assert!(r2.diagnostics.is_empty(), "{:?}", r2.diagnostics);
 }

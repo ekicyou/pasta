@@ -49,6 +49,24 @@ pub struct Position {
     pub character: u32,
 }
 
+/// 報告 1 件を、幅の無い点の Error の診断にする（行・桁が無ければ 1 行目の頭。要件 11.2）
+fn finding_to_diagnostic(finding: &pasta_check::validate::Finding, source: &str) -> Diagnostic {
+    let line = finding.line.map_or(0, |l| l.saturating_sub(1));
+    let character = finding.column.map_or(0, |c| {
+        let line_text = get_line_text(source, line as usize + 1);
+        text_utils::char_column_to_utf16(line_text, c.saturating_sub(1) as usize)
+    });
+    let point = Position { line, character };
+    Diagnostic {
+        range: Range {
+            start: point,
+            end: point,
+        },
+        message: finding.message.clone(),
+        severity: 1,
+    }
+}
+
 /// 解析エンジン
 pub struct AnalysisEngine;
 
@@ -58,61 +76,27 @@ impl AnalysisEngine {
     /// 共有する状態を持たない純粋な関数。panic は包まない（wasm32 では
     /// trap になり、拡張の try/catch が受ける）。
     pub fn analyze(source: &str) -> AnalysisResult {
-        // Ensure source ends with newline — the grammar requires every line
-        // to terminate with eol (NEWLINE). Editors like VSCode may omit it.
-        let source = if source.ends_with('\n') {
-            std::borrow::Cow::Borrowed(source)
-        } else {
-            std::borrow::Cow::Owned(format!("{}\n", source))
-        };
-        let source: &str = &source;
-
         // Phase 0: Scan source lines for comment lines (AST does not preserve comments)
         let mut raw_tokens = Self::scan_comment_lines(source);
 
-        // Phase 1: Full parse
-        match pasta_dsl::parse_str(source, "<lsp>") {
+        // 受け取った文字のまま 1 回だけ解く（改行を補わない。保存時と同じ誤りを出す）
+        let diagnostics = match pasta_dsl::parse_str(source, "<lsp>") {
             Ok(pasta_file) => {
                 Self::visit_file_items(&pasta_file.items, source, &mut raw_tokens);
-                let tokens = encode_tokens(&mut raw_tokens);
-                AnalysisResult {
-                    tokens,
-                    diagnostics: vec![],
-                }
+                vec![]
             }
-            Err(_) => {
-                // Phase 2/3: Partial parse
+            Err(e) => {
+                // 色だけを部分解析の AST から作る（部分解析の誤りは読まない）
                 let partial = pasta_dsl::parse_str_partial(source);
                 Self::visit_file_items(&partial.items, source, &mut raw_tokens);
-                let tokens = encode_tokens(&mut raw_tokens);
-
-                let diagnostics = partial
-                    .errors
-                    .iter()
-                    .map(|e| {
-                        let line = if e.line > 0 { e.line - 1 } else { 0 };
-                        Diagnostic {
-                            range: Range {
-                                start: Position {
-                                    line: line as u32,
-                                    character: 0,
-                                },
-                                end: Position {
-                                    line: line as u32,
-                                    character: 0,
-                                },
-                            },
-                            message: e.message.clone(),
-                            severity: 1,
-                        }
-                    })
-                    .collect();
-
-                AnalysisResult {
-                    tokens,
-                    diagnostics,
-                }
+                let finding = pasta_check::validate::syntax_finding("<lsp>", e);
+                vec![finding_to_diagnostic(&finding, source)]
             }
+        };
+
+        AnalysisResult {
+            tokens: encode_tokens(&mut raw_tokens),
+            diagnostics,
         }
     }
 
@@ -143,5 +127,42 @@ impl AnalysisEngine {
             }
         }
         tokens
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pasta_check::validate::{Finding, FindingKind};
+
+    /// 位置の無い報告は 1 行目の頭の点にする（要件 11.2）
+    #[test]
+    fn finding_without_position_goes_to_file_head() {
+        let finding = Finding::new(FindingKind::Syntax, "<lsp>", None, None, "構文エラー: x");
+        let d = finding_to_diagnostic(&finding, "＊挨拶\n  さくら：やあ\n");
+        let head = Position {
+            line: 0,
+            character: 0,
+        };
+        assert_eq!(
+            d,
+            Diagnostic {
+                range: Range {
+                    start: head,
+                    end: head
+                },
+                message: "構文エラー: x".into(),
+                severity: 1,
+            }
+        );
+    }
+
+    /// 行より長い桁は行の長さで止め、CRLF の `\r` は数えない
+    #[test]
+    fn column_past_line_end_is_clamped() {
+        let finding = Finding::new(FindingKind::Syntax, "<lsp>", Some(1), Some(99), "x");
+        let d = finding_to_diagnostic(&finding, "a𠮷\r\nb\r\n");
+        assert_eq!(d.range.start.character, 3);
+        assert_eq!(text_utils::char_column_to_utf16("a𠮷", 2), 3);
     }
 }

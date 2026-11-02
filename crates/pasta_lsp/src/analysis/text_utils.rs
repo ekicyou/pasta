@@ -49,6 +49,15 @@ fn get_line_text_and_offset(source: &str, line: usize) -> (&str, usize) {
     ("", source.len())
 }
 
+/// 行の頭から `chars` 文字の UTF-16 の長さ。行より長ければ行の長さ
+pub(crate) fn char_column_to_utf16(line_text: &str, chars: usize) -> u32 {
+    line_text
+        .chars()
+        .take(chars)
+        .map(char::len_utf16)
+        .sum::<usize>() as u32
+}
+
 /// Find the next \n (or end of slice) starting from `start`.
 #[inline]
 fn memchr_newline(bytes: &[u8], start: usize) -> usize {
