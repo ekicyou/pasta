@@ -199,7 +199,6 @@ end
 function M.check_talk(act)
     -- 間隔は飛びを差し引いた「なめらかな時計」で数える（実際に過ぎた時間）
     local current_unix = CLOCK.steady(act.req)
-    local cfg = get_config()
 
     -- 初回または次回トーク時刻未設定
     if next_talk_time == 0 then
@@ -211,6 +210,8 @@ function M.check_talk(act)
     if current_unix < next_talk_time then
         return nil
     end
+
+    local cfg = get_config()
 
     -- 時報マージンチェック（正時が近い場合はスキップ）。next_hour_unix は仮想の時刻で数える
     local time_to_hour = next_hour_unix - CLOCK.now(act.req)
@@ -260,8 +261,8 @@ function M.dispatch(act)
     -- check_talk/random talk より前段で保留シーンを起動する。try_dispatch が
     -- 非 nil co（解決済みキックシーン）を返したら、それを dispatch の結果として
     -- 返す。EVENT.fire が当該 co を EVENT.drive で初回ビートのみ配信し
-    -- （高々1ビート/GET・R3.4）、set_co_scene 置換で前 co_scene を閉じる
-    -- （preempt・自動復帰なし・R5.2/R5.3）。残りビートは次 tick の check_talk
+    -- （高々1ビート/GET・R3.4）、STORE.co_preempt の印で EVENT.drive が待っている
+    -- 続きを捨てる（preempt・自動復帰なし・R5.2/R5.3）。残りビートは次 tick の check_talk
     -- 継続（STORE.co_scene）が配信する（R4.1）。
     -- 保留なし（try_dispatch=nil）はフックが完全素通りし、既存 dispatch を
     -- バイト不変に保つ（押し出しせず pull 機会に限定・R6.3/R4.5）。
