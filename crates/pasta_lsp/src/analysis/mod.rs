@@ -1,4 +1,4 @@
-//! Semantic token analysis engine for the Pasta Language Server.
+//! Semantic token analysis engine for the Pasta WASM analyzer (VSCode extension).
 //!
 //! Converts pasta_dsl AST nodes into LSP semantic tokens with
 //! proper UTF-8 → UTF-16 position conversion.

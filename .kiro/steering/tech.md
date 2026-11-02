@@ -12,7 +12,7 @@
 - **pasta_core**: 言語非依存層（レジストリ）
 - **pasta_lua**: Luaバックエンド層（pasta_dsl + pasta_core依存）
 - **pasta_shiori**: SHIORI DLLインターフェース層
-- **pasta_lsp**: LSP実装層（tower-lsp, WASM/Native対応）
+- **pasta_lsp**: VSCode 拡張に埋め込む WASM の解析器（色・構文の診断・ゴースト全体の検査。publish=false）
 - **pasta_check**: 辞書の検査の核（ライブラリ・ファイルシステム非依存で WASM でも動く）＋CLIツール（`validate`＝辞書の検査、`release`＝検査を関門にしたゴーストパッケージング・NAR生成）
 - **pasta_sample_ghost**: サンプルゴースト「hello-pasta」（publish=false, 配布物作成。立ち絵はコミットした素材）
 
@@ -66,10 +66,8 @@
 **pasta_lsp:**
 - **pasta_dsl**: DSLパーサー層
 - **pasta_check**（`default-features = false`）: 辞書の検査の核。WASM の入口 `wasm_select_ghost_files`・`wasm_validate_ghost` から呼び、VSCode 拡張のゴースト全体の診断に使う
-- **tower-lsp 0.20**: LSPサーバーフレームワーク
-- **serde 1 / serde_json 1**: シリアライゼーション
-- **thiserror 2**: エラー型定義
-- **wasm-bindgen**: WASM対応（cfg(wasm32)）
+- **serde 1**（dev: serde_json 1）: シリアライゼーション
+- **wasm-bindgen / serde-wasm-bindgen**: WASM の入口（cfg(wasm32)）
 
 **pasta_check:**
 - **pasta_dsl / pasta_core**: 検査の核（pasta.dll と同じパーサー・シーン登録）
@@ -108,7 +106,7 @@ pasta (workspace)
 │   ├── Search          # Rust/Lua間検索バインディング
 │   └── Encoding        # プラットフォーム別エンコーディング
 ├── pasta_shiori        # SHIORI DLLインターフェース
-├── pasta_lsp           # LSP実装（WASM/Native）
+├── pasta_lsp           # WASM の解析器（VSCode 拡張に埋め込む）
 ├── pasta_check         # 辞書の検査の核＋CLI（validate・release＝NAR生成・更新ファイル）
 └── pasta_sample_ghost  # サンプルゴースト生成ツール
 ```
@@ -121,7 +119,7 @@ pasta (workspace)
 | pasta_lua          | Runtime      | Lua VM実行、コルーチン制御      |
 | pasta_lua          | Loader       | スクリプト読み込み・キャッシュ  |
 | pasta_shiori       | SHIORI       | DLLエクスポート、リクエスト処理 |
-| pasta_lsp          | LSP          | 構文ハイライト、診断、WASM対応  |
+| pasta_lsp          | Editor       | WASM の解析器（色・構文の診断・ゴースト全体の検査） |
 | pasta_check        | CLI          | 辞書の検査（核は WASM 共有）・リリースパッケージング・NAR生成 |
 | pasta_sample_ghost | Distribution | サンプルゴーストの素材・配布    |
 
@@ -172,7 +170,7 @@ pasta (workspace)
 - 依存関係ライセンス: 互換性確認済み
 
 ### 公開ポリシー
-- `publish = true` in Cargo.toml（`pasta_sample_ghost` は `publish = false`）
+- `publish = true` in Cargo.toml（`pasta_sample_ghost` と `pasta_lsp` は `publish = false`。`pasta_lsp` は VSCode 拡張に埋め込むだけで crates.io に出さない）
 - crates.io へ公開済み
 - 公開はリリースタグ `vX.Y.Z` の push で `release.yml` が Trusted Publishing で行う
 - 公開クレートの pub API は予告なく消すことがある
