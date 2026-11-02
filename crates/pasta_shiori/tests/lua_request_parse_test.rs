@@ -739,3 +739,116 @@ mod ssp_log_requests_tests {
         );
     }
 }
+
+// ============================================================================
+// 構文の段の req_1〜req_3 と同じ 3 つの要求を、出荷のパーサの値で確かめる
+// ============================================================================
+
+mod same_requests_as_syntax_tests {
+    use super::*;
+    use pasta::lua_request::parse_request;
+    use pasta_lua::mlua::{Table, Value};
+
+    fn dic_len(table: &Table) -> usize {
+        let dic: Table = table.get("dic").unwrap();
+        dic.pairs::<String, String>().count()
+    }
+
+    /// `test_data/shiori3-1.txt` と同じ GET。
+    #[test]
+    fn shiori3_get_version() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: version\r\n\
+            SecurityLevel: local\r\n\
+            Sender: SSP\r\n\
+            \r\n";
+        let t = parse_request(&lua, request).expect("parse_request should succeed");
+
+        assert_eq!(t.get::<i32>("version").unwrap(), 30);
+        assert_eq!(t.get::<String>("method").unwrap(), "get");
+        assert_eq!(t.get::<String>("id").unwrap(), "version");
+        assert_eq!(t.get::<String>("charset").unwrap(), "UTF-8");
+        assert_eq!(t.get::<String>("sender").unwrap(), "SSP");
+        assert_eq!(t.get::<String>("security_level").unwrap(), "local");
+        assert_eq!(t.get::<Option<String>>("status").unwrap(), None);
+        assert_eq!(t.get::<Option<String>>("base_id").unwrap(), None);
+        assert_eq!(
+            t.get::<Table>("reference")
+                .unwrap()
+                .pairs::<Value, Value>()
+                .count(),
+            0
+        );
+
+        let dic: Table = t.get("dic").unwrap();
+        assert_eq!(dic_len(&t), 4);
+        assert_eq!(dic.get::<String>("Charset").unwrap(), "UTF-8");
+        assert_eq!(dic.get::<String>("ID").unwrap(), "version");
+        assert_eq!(dic.get::<String>("SecurityLevel").unwrap(), "local");
+        assert_eq!(dic.get::<String>("Sender").unwrap(), "SSP");
+    }
+
+    /// `test_data/shiori3-2.txt` と同じ NOTIFY。
+    #[test]
+    fn shiori3_notify_ownerghostname() {
+        let lua = create_test_lua();
+        let request = "NOTIFY SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            Sender: SSP\r\n\
+            SecurityLevel: local\r\n\
+            ID: ownerghostname\r\n\
+            Reference0: セキュリティボール\r\n\
+            \r\n";
+        let t = parse_request(&lua, request).expect("parse_request should succeed");
+
+        assert_eq!(t.get::<i32>("version").unwrap(), 30);
+        assert_eq!(t.get::<String>("method").unwrap(), "notify");
+        assert_eq!(t.get::<String>("id").unwrap(), "ownerghostname");
+        assert_eq!(t.get::<String>("charset").unwrap(), "UTF-8");
+        assert_eq!(t.get::<String>("sender").unwrap(), "SSP");
+        assert_eq!(t.get::<String>("security_level").unwrap(), "local");
+        assert_eq!(t.get::<Option<String>>("status").unwrap(), None);
+        assert_eq!(t.get::<Option<String>>("base_id").unwrap(), None);
+
+        let reference: Table = t.get("reference").unwrap();
+        assert_eq!(reference.pairs::<Value, Value>().count(), 1);
+        assert_eq!(reference.get::<String>(0).unwrap(), "セキュリティボール");
+
+        let dic: Table = t.get("dic").unwrap();
+        assert_eq!(dic_len(&t), 5);
+        assert_eq!(
+            dic.get::<String>("Reference0").unwrap(),
+            "セキュリティボール"
+        );
+    }
+
+    /// `test_data/shiori2-1.txt` と同じ 2.6 の GET。
+    #[test]
+    fn shiori2_get_version() {
+        let lua = create_test_lua();
+        let request = "GET Version SHIORI/2.6\r\n\
+            Charset: UTF-8\r\n\
+            Sender: SSP\r\n\
+            \r\n";
+        let t = parse_request(&lua, request).expect("parse_request should succeed");
+
+        assert_eq!(t.get::<i32>("version").unwrap(), 26);
+        assert_eq!(t.get::<String>("method").unwrap(), "get");
+        assert_eq!(t.get::<String>("id").unwrap(), "Version");
+        assert_eq!(t.get::<String>("charset").unwrap(), "UTF-8");
+        assert_eq!(t.get::<String>("sender").unwrap(), "SSP");
+        assert_eq!(t.get::<Option<String>>("security_level").unwrap(), None);
+        assert_eq!(t.get::<Option<String>>("status").unwrap(), None);
+        assert_eq!(t.get::<Option<String>>("base_id").unwrap(), None);
+        assert_eq!(
+            t.get::<Table>("reference")
+                .unwrap()
+                .pairs::<Value, Value>()
+                .count(),
+            0
+        );
+        assert_eq!(dic_len(&t), 2);
+    }
+}
