@@ -321,6 +321,7 @@ impl SceneTable {
   - 大域（`module_name` が空）では、`k.starts_with(':')` のキーを飛ばす（7.5）。ローカルは `:module_name:prefix` で引く。
 - 完全一致：`prefix_index.get(key)`（`&str` で引ける）。大域の範囲で `:` で始まるキーを候補にしない規則は今のまま（7.4）。
 - 書き方は、2 つの表の 4 か所（シーンの大域・ローカル、単語の大域・ローカル）にそのまま書く。共通の関数や型は作らない。
+- 確かめ（2026-11-02 の設計ディスカッション）：この `range::<str, _>((Bound::Included(p), Bound::Unbounded))` の形は、`rustc --edition 2021` でそのまま通る。U1 の大域のキーを入れた `BTreeMap<String, _>` で `挨拶` を引くと `["挨拶", "挨拶1", "挨拶A", "挨拶_夜", "挨拶あ"]` になり、`雑談` は入らない。
 
 ##### State Management
 
@@ -450,6 +451,7 @@ impl SearchContext {
   - `collect_word_candidates("", "")` = `[0, z, a1, a2, a3, 1, A, 夜, あ, x]`（`:` は 0x3A で `0番` と `Zebra` の間に並ぶが、大域では飛ばす）。
   - `collect_word_candidates("会話_1", "挨拶")` = `[l1, l2]`。
   - 指定列 `[2, 0]` のモックで `search_word("", "挨拶")` を 7 回呼ぶと `[a3, a1, a2, 1, A, 夜, あ]`。
+- U1・U2 の指定列の期待は、`MockRandomSelector::shuffle_usize` の読み方に照らして確かめた（2026-11-02）。読み方は「列の位置を先に、残りは元の順」（`random.rs:80-97`）である。`[4, 0]` は 6 つの候補を `[4, 0, 1, 2, 3, 5]` に、`[2, 0]` は 7 つの候補を `[2, 0, 1, 3, 4, 5, 6]` に並べる。
 - 要件 12.1 のほかの振る舞いは、今あるテストがすでに固めている。U1・U2 と同じく、最初のコミットの時点で通ることを確かめ、移し替えで観点を落とさない。
   - 7.4：`test_resolve_scene_id_exact_ignores_longer_names_with_same_head`・`test_resolve_scene_id_exact_local_scope`・`test_resolve_global_owning_local_exact_no_global_and_no_owner`
   - 8.4：`test_resolve_scene_id_attribute_filter_selects_matching`（移す）・`test_resolve_scene_id_exact_attribute_filter`
