@@ -8,7 +8,7 @@
 //! 専用アクタースレッドが実 [`PastaShiori`] VM を生成・pin し、
 //! 単一の同期 `recv()` ループで mailbox（task 3.2）を消費する。SHIORI（テスト）
 //! スレッドから `ActorMsg::Get`/`Notify` を投入すると:
-//!  (a) VM 実行スレッド ID ＝アクタースレッド ID（テスト/送信スレッドと別）— R4.2/R4.5。
+//!  (a) VM がアクタースレッドで読み込まれる（別スレッドであることは VM の型 `!Send` が保証）。
 //!  (b) コルーチン継続が tick をまたいで動く（GET property yield → callback resume の
 //!      2 ラウンドで `co_scene` が VM 内に persist し継続）— R9.1/R9.2/R9.3/R9.4。
 //!  (c) 生成された SHIORI 応答が期待バイト列に一致 — R4.1/R4.3。
@@ -16,14 +16,13 @@
 //! # テストが「自明に真」でないことの担保
 //! Get 応答は `bounded(1)` の `recv_timeout` を有界で待つ。wake 統合が効かない／
 //! コルーチンが継続しなければ、Round2 で値が反映されず（または応答が来ず）テストは
-//! 失敗する。スレッド ID 比較は別スレッド実行を genuinely 観測する。
+//! 失敗する。
 
 use std::path::{Path, PathBuf};
-use std::thread;
 use std::time::Duration;
 
-use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
-use pasta::actor::thread::{spawn_actor_thread, spawn_actor_thread_with};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
+use pasta::actor::thread::spawn_actor_thread_with;
 use tempfile::TempDir;
 
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前
@@ -85,14 +84,13 @@ fn normalize_request(text: &str) -> String {
 
 /// mailbox 経由で GET を投入し、アクタースレッドの VM 応答を有界待ちで取得する。
 fn get_via_actor(tx: &flume::Sender<ActorMsg>, seq: u64, raw_request: &str) -> String {
-    let (msg, reply_rx) = ActorMsg::get(MailboxRequest::new(seq, normalize_request(raw_request)));
-    tx.send(msg).expect("send GET into mailbox");
-    match reply_rx
+    let (reply, reply_rx) = flume::bounded::<String>(1);
+    let req = MailboxRequest::new(seq, normalize_request(raw_request));
+    tx.send(ActorMsg::Get { req, reply })
+        .expect("send GET into mailbox");
+    reply_rx
         .recv_timeout(Duration::from_secs(10))
         .expect("GET reply must arrive within timeout (actor VM must run and reply)")
-    {
-        Reply::Value(v) => v,
-    }
 }
 
 // Round1/Round2 期待バイト列（byte_invariant_test の特性化ゴールデンと同一）。
@@ -117,15 +115,10 @@ fn actor_thread_pins_vm_and_continues_coroutine_across_messages() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir, rx);
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
 
-    // (a) VM 実行スレッド ID がテスト/送信スレッドと別であること（R4.2/R4.5）。
+    // (a) VM がアクタースレッドで読み込まれたこと。
     assert!(actor.loaded(), "actor thread must load the ghost VM");
-    assert_ne!(
-        actor.actor_thread_id(),
-        thread::current().id(),
-        "VM must run on a dedicated actor thread, not the SHIORI/test thread"
-    );
 
     // (b)(c) コルーチン継続 2 ラウンド。Round1 で get_property が yield、Round2 の
     // callback でコルーチンが resume され値が反映される（co_scene が VM 内に persist）。
@@ -165,15 +158,16 @@ fn actor_thread_processes_notify_then_get_in_fifo() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir, rx);
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     // NOTIFY（応答経路なし・即投入）。アクターは VM 上で処理する。
-    tx.send(ActorMsg::notify(MailboxRequest::new(
+    let req = MailboxRequest::new(
         1,
         normalize_request("NOTIFY SHIORI/3.0\nCharset: UTF-8\nID: OnUnrelatedEvent\n"),
-    )))
-    .expect("send NOTIFY into mailbox");
+    );
+    tx.send(ActorMsg::Notify { req })
+        .expect("send NOTIFY into mailbox");
 
     // 後続 GET は同一 FIFO で NOTIFY 処理完了後に返る。coroutine 開始イベントで
     // 200/yield 応答を取得し、VM がアクタースレッドで実際に駆動したことを確認する。
@@ -201,7 +195,7 @@ fn actor_thread_with_returns_ready_actor_as_ok() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(0, load_dir, rx, None, None)
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None)
         .expect("spawning the actor thread must succeed");
     assert!(
         actor.loaded(),

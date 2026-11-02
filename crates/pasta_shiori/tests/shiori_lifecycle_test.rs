@@ -6,7 +6,7 @@
 mod common;
 
 use common::copy_fixture_to_temp;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 // ========================================================================
 // Task 3.1: SHIORI.load実行確認テスト
@@ -20,7 +20,7 @@ fn test_shiori_load_sets_globals() {
     let mut shiori = PastaShiori::default();
 
     // Execute SHIORI.load
-    let load_result = shiori.load(42, temp.path().as_os_str());
+    let load_result = shiori.load(temp.path().as_os_str());
     assert!(load_result.is_ok(), "load() should succeed");
     assert!(load_result.unwrap(), "load() should return true");
 
@@ -35,7 +35,7 @@ fn test_shiori_load_sets_globals() {
     let loaded_hinst: i64 = shiori_table
         .get("loaded_hinst")
         .expect("SHIORI.loaded_hinst should be set");
-    assert_eq!(loaded_hinst, 42, "loaded_hinst should match passed value");
+    assert_eq!(loaded_hinst, 0, "SHIORI.load always receives hinst 0");
 
     // Verify SHIORI.load_dir was set
     let load_dir: String = shiori_table
@@ -57,7 +57,7 @@ fn test_shiori_request_increments_counter() {
     let mut shiori = PastaShiori::default();
 
     // Load
-    assert!(shiori.load(1, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // First request
     let _ = shiori
@@ -100,7 +100,7 @@ fn test_shiori_request_calls_pasta_scene() {
     let mut shiori = PastaShiori::default();
 
     // Load
-    assert!(shiori.load(1, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // Request - should trigger scene call with ID="テスト挨拶"
     let response = shiori
@@ -140,7 +140,7 @@ fn test_shiori_unload_creates_marker() {
 
     {
         let mut shiori = PastaShiori::default();
-        assert!(shiori.load(1, temp.path().as_os_str()).unwrap());
+        assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
         // Verify marker doesn't exist yet
         assert!(
@@ -180,7 +180,7 @@ fn test_shiori_lifecycle_lua_execution_verified() {
         // ================================================================
         // Phase 1: SHIORI.load - verify Lua globals are set
         // ================================================================
-        let load_result = shiori.load(999, temp.path().as_os_str());
+        let load_result = shiori.load(temp.path().as_os_str());
         assert!(load_result.is_ok(), "load() should succeed");
         assert!(load_result.unwrap(), "load() should return true");
 
@@ -194,7 +194,7 @@ fn test_shiori_lifecycle_lua_execution_verified() {
         let loaded_hinst: i64 = shiori_table
             .get("loaded_hinst")
             .expect("SHIORI.loaded_hinst should be set");
-        assert_eq!(loaded_hinst, 999, "loaded_hinst should be 999");
+        assert_eq!(loaded_hinst, 0, "SHIORI.load always receives hinst 0");
 
         // ================================================================
         // Phase 2: SHIORI.request - verify scene execution and counter

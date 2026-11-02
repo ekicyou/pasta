@@ -29,21 +29,21 @@
 //! # 配線（task 5.1 で完了）
 //! FFI 入口（`windows.rs` → [`crate::actor::lifecycle`] の置き場の芯の型 `ActorInstance`）が本スレッドへ
 //! 配線済み。GET の完全な timeout/204/drop marshaling 契約は [`crate::actor::marshaling`]
-//! （task 3.4）が担い、本スレッドの `Get` 応答は VM 応答文字列を [`Reply::Value`] で返す
-//! （エラー時も `MyError::to_shiori_response()` の 500 応答文字列を [`Reply::Value`] で返す・
+//! （task 3.4）が担い、本スレッドの `Get` 応答は VM 応答文字列を返す
+//! （エラー時も `MyError::to_shiori_response()` の 500 応答文字列を返す・
 //! 仕様 `lua-require-robustness` 4.3/4.4/4.8）。
 
 use std::io;
-use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::thread::{self, JoinHandle, ThreadId};
+use std::thread::{self, JoinHandle};
 
 use flume::Receiver;
 use pasta_lua::debug::KickSink;
 use pasta_lua::{ClaimToken, LoadDirGuard};
 
-use crate::actor::mailbox::{ActorMsg, Reply};
-use crate::shiori::{PastaShiori, Shiori};
+use crate::actor::mailbox::ActorMsg;
+use crate::actor::module_ref::ModuleRef;
+use crate::shiori::PastaShiori;
 
 /// アクタースレッドのハンドル。
 ///
@@ -52,75 +52,63 @@ use crate::shiori::{PastaShiori, Shiori};
 pub struct ActorThread {
     /// VM をホストする専用 OS スレッドの join ハンドル。
     handle: Option<JoinHandle<()>>,
-    /// VM を実行するスレッドの id（SHIORI スレッドと別であることの観測点・R4.2/R4.5）。
-    actor_thread_id: ThreadId,
     /// ロード成否（`SHIORI.load` 成功＝true）。失敗時もスレッドは drain を続ける
     /// （request は NotInitialized/Load エラーを返す）。
     loaded: bool,
-    /// アクタースレッド上で `debug::enable` が束縛した DAP リスナアドレス（R10.1/R10.2）。
-    ///
-    /// debug backend が **アクタースレッド上で**有効化された（＝`set_global_hook` が
-    /// アクタースレッドに装着された）ことの観測点。`pasta.toml [debug] enabled=true`
-    /// （port=0 でエフェメラル）のときのみ `Some`。debug 無効（既定・zero-cost）では
-    /// `None`（ポートを開かない・R5.5）。VM 本体は越境しないが、束縛アドレス
-    /// （`SocketAddr` は `Copy`・`Send`）はアクタースレッドから読み戻して観測できる。
-    debug_local_addr: Option<SocketAddr>,
+    /// join の約束の送り手（容量 1）。送ればスレッドは普通に戻り、落とすと「見捨てた」になる
+    /// （スレッドが参照を返して終わる）。
+    keep: flume::Sender<()>,
+    /// スレッドが走っている間 pasta.dll を外さない参照。返すのは join した親か、見捨てられたスレッドの一方だけ。
+    module: ModuleRef,
 }
 
 impl ActorThread {
-    /// VM を実行するアクタースレッドの id を返す（R4.2/R4.5 の観測点）。
-    pub fn actor_thread_id(&self) -> ThreadId {
-        self.actor_thread_id
-    }
-
     /// `SHIORI.load` がアクタースレッド上で成功したか。
     pub fn loaded(&self) -> bool {
         self.loaded
-    }
-
-    /// アクタースレッド上で debug backend が束縛した DAP リスナアドレス（R10.1/R10.2）。
-    ///
-    /// `Some(addr)` は `debug::enable` がアクタースレッド上で成立し、`set_global_hook`
-    /// がアクタースレッドに装着された証跡（VSCode は `addr` へ attach する）。debug 無効
-    /// （既定）では `None`（ポート不開放・zero-cost・R5.5）。
-    pub fn debug_local_addr(&self) -> Option<SocketAddr> {
-        self.debug_local_addr
     }
 
     /// アクタースレッドを join する（unload の後始末＝ack の後の join・テスト用）。
     ///
     /// 呼び出し側は事前に [`ActorMsg::Stop`] を mailbox へ送り、ループを抜けさせて
     /// おくこと（さもなくば `recv()` が永久に待ち続けて join できない）。
+    ///
+    /// 約束を送る → join → 参照を返す、の順（約束の前に join すると止まる）。スレッドが panic で
+    /// 終わっていても参照は返す（閉包は約束に届いていないので、返すのはここだけ）。
     pub fn join(mut self) -> thread::Result<()> {
-        match self.handle.take() {
+        let _ = self.keep.send(());
+        let result = match self.handle.take() {
             Some(h) => h.join(),
             None => Ok(()),
-        }
+        };
+        self.module.release();
+        result
     }
 
     /// アクタースレッドを **detach** する（join しない後始末用・design.md「後始末の決まり」）。
     ///
     /// 完了は `ActorMsg::Stop { done }` の done ack で確認する（ack 受信時に VM 破棄・cleanup
-    /// 完了済み）。unload は ack の後に [`join`](Self::join) し、本メソッドを使うのは `DllMain`
-    /// の FreeLibrary（loader lock の中で待てない）と、ack が来ずに手放すとき、reload 反復の
-    /// リーク検査の経路。`JoinHandle` を join せずに drop してスレッドを detach する。
+    /// 完了済み）。unload は ack の後に [`join`](Self::join) し、本メソッドを使うのは ack が来ずに
+    /// 手放すときと、reload 反復のリーク検査の経路。`JoinHandle` を join せずに drop してスレッドを detach する。
     ///
-    /// OS スレッドは ack の後に自然終了し、ハンドルは drop で解放される
+    /// 約束の送り手を落とすので、スレッドは片付けの後に自分で参照を返して終わり
+    /// （`FreeLibraryAndExitThread`）、ハンドルは drop で解放される
     /// （reload リーク検査がスレッドハンドルの非リークを実測で裏取りする）。
-    pub fn detach(mut self) {
+    pub fn detach(self) {
         // JoinHandle を drop すると Rust はスレッドを detach する（join しない）。
-        // done ack 済みなのでループは既に抜けており、スレッドは終了済みか終了間際。
-        drop(self.handle.take());
+        drop(self);
     }
 }
 
 /// 専用アクタースレッドを起動し、その上で `!Send` VM を生成・pin して mailbox を
-/// 駆動する。
+/// 駆動する（仕様 `shiori4-v3-portable` 2.3・2.4）。
 ///
 /// # 引数
-/// - `hinst` / `load_dir`: VM を構築する [`PastaShiori::load`] へ渡す（どちらも `Send`）。
+/// - `load_dir`: VM を構築する [`PastaShiori::load`] へ渡す（`Send`）。
 ///   VM 本体（`!Send`）はこのスレッド上で構築されるため越境しない。
 /// - `rx`: mailbox の consumer 側 [`Receiver`]（単一 consumer 不変条件）。
+/// - `kick_sink`: VM（[`PastaShiori::with_kick_sink`]）へ渡す kick の送り先。
+/// - `claim`: VM の片付けで外すディレクトリの占有の札（[`PastaShiori::set_claim`]）。
 ///
 /// # 動作
 /// スレッド上で VM を構築後、`while let Ok(msg) = rx.recv()` の単一の同期ループで
@@ -128,62 +116,40 @@ impl ActorThread {
 /// 仕組みも使わない）。
 ///
 /// # 戻り値
-/// [`ActorThread`]。`actor_thread_id()` で VM 実行スレッド id、`loaded()` でロード
-/// 成否を観測できる。`join()` 前に [`ActorMsg::Stop`] を送ること。
-pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg>) -> ActorThread {
-    // kick の送り先と占有の札は渡さない（持つのは芯の型 `ActorInstance`）。
-    spawn_actor_thread_with(hinst, load_dir, rx, None, None)
-        .expect("actor thread must spawn and report readiness")
-}
-
-/// [`spawn_actor_thread`] の、失敗を返す形（仕様 `shiori4-v3-portable` 2.3・2.4）。
-///
-/// - `kick_sink`: VM（[`PastaShiori::with_kick_sink`]）へ渡す kick の送り先。
-/// - `claim`: VM の片付けで外すディレクトリの占有の札（[`PastaShiori::set_claim`]）。
-///
-/// # 戻り値
-/// 返った時点で VM の構築と `SHIORI.load` の呼び出しは終わっている（2.3）。OS がスレッドを
+/// [`ActorThread`]（`loaded()` でロード成否を観測できる。`join()` 前に [`ActorMsg::Stop`] を
+/// 送ること）。返った時点で VM の構築と `SHIORI.load` の呼び出しは終わっている（2.3）。OS がスレッドを
 /// 起こせないときは `thread::Builder::spawn` の誤り、スレッドが ready を返す前に終わった
 /// ときは `io::ErrorKind::Other` の誤りを返す（パニックしない・2.4）。後者ではスレッドを
 /// join してから返し、資源を残さない。
 pub fn spawn_actor_thread_with(
-    hinst: isize,
     load_dir: PathBuf,
     rx: Receiver<ActorMsg>,
     kick_sink: Option<KickSink>,
     claim: Option<ClaimToken>,
 ) -> io::Result<ActorThread> {
-    // VM 実行スレッド id・ロード成否・debug DAP 束縛アドレスを呼び出し側へ返す小チャネル
-    // （いずれも `Send` な値のみ越境・VM 本体は越境しない）。`SocketAddr` は `Copy`。
-    let (ready_tx, ready_rx) = flume::bounded::<(ThreadId, bool, Option<SocketAddr>)>(1);
+    // 参照はスレッドを起こす前に取る（参照の無いアクタースレッドを作らない）。
+    let module = ModuleRef::acquire()?;
+    let (keep, keep_rx) = flume::bounded::<()>(1);
+    // ロード成否を呼び出し側へ返す小チャネル（VM 本体は越境しない）。
+    let (ready_tx, ready_rx) = flume::bounded::<bool>(1);
 
-    let handle = thread::Builder::new()
+    let spawned = thread::Builder::new()
         .name("pasta-actor".to_string())
         .spawn(move || {
             // ログの振り分けの文脈（仕様 `pasta-toml-logging-consistency` 4.2）。スレッドの
             // 終わりまで保ち、メッセージループの観測ログをロガーの数によらず自分のロガーへ
             // 届ける。done ack の後に出るログは登録解除の後なので捨てられる（4.7）。
-            let _log_context = LoadDirGuard::new(load_dir.clone());
+            let log_context = LoadDirGuard::new(load_dir.clone());
             // (1) VM をこのスレッドで構築・pin（!Send ゆえ越境不可）。
             let mut shiori = PastaShiori::with_kick_sink(kick_sink);
             shiori.set_claim(claim);
-            let loaded = shiori
-                .load(hinst, load_dir.as_os_str())
-                .unwrap_or(false);
-
-            // debug backend がアクタースレッド上で束縛した DAP アドレスを観測する
-            // （R10.1/R10.2）。`debug::enable` は VM 構築（`load` 内）の一部として
-            // **このアクタースレッド上で**呼ばれるため、`set_global_hook` はこの
-            // スレッドに装着される。`Some` はその成立証跡（debug 無効なら `None`）。
-            let debug_local_addr = shiori
-                .runtime()
-                .and_then(|r| r.debug_local_addr());
+            let loaded = shiori.load(load_dir.as_os_str()).unwrap_or(false);
 
             // 観測ログ点（R10.4・無効時ゼロコスト）: アクタースレッド起動・VM pin 完了。
             tracing::debug!(seam = "actor.spawn", loaded, "actor thread spawned; VM pinned on this thread");
 
-            // 実行スレッド id・ロード成否・debug 束縛アドレスを返す（VM 本体は越境しない）。
-            let _ = ready_tx.send((thread::current().id(), loaded, debug_local_addr));
+            // ロード成否を返す（VM 本体は越境しない）。
+            let _ = ready_tx.send(loaded);
 
             // (2) 単一 recv ループ（select! なし・手動 wake なし）。
             //     Stop で break → cleanup → done ack → スレッドが終わる。
@@ -201,21 +167,21 @@ pub fn spawn_actor_thread_with(
                         // 観測ログ点（R10.4・無効時ゼロコスト）: GET を mailbox から受信。
                         tracing::trace!(seam = "actor.recv", method = "get", seq, "actor received GET");
                         // timeout/異常→204 の marshaling 契約は 3.4（marshaling.rs）が担う。
-                        // ここは GET 応答を Reply::Value で **必ず 1 回**返す:
+                        // ここは GET 応答を **必ず 1 回**返す:
                         // 成功は VM 応答文字列、失敗は 500 + X-ERROR-REASON 応答文字列
                         // （仕様 `lua-require-robustness` 4.3/4.4/4.8・design.md
                         // `ActorErrorReply`）。ロード失敗（`MyError::Load`）・未ロード
                         // （`NotInitialized`）・Lua 実行エラー（`Script`）は同一分岐を通る。
                         match shiori.request(&req.raw) {
                             Ok(resp) => {
-                                let _ = reply.send(Reply::Value(resp));
+                                let _ = reply.send(resp);
                                 // 観測ログ点（R10.4）: VM 応答を reply で返した（exactly-once move）。
                                 tracing::trace!(seam = "actor.reply", method = "get", seq, "actor replied with VM response");
                             }
                             Err(e) => {
                                 // 旧実装は reply を drop して 204 へ読み替えていた（無言化）。
                                 // 現契約はエラーを 500 応答として返す（204 に読み替えない）。
-                                let _ = reply.send(Reply::Value(e.to_shiori_response()));
+                                let _ = reply.send(e.to_shiori_response());
                                 // 観測ログ点（R10.4）: エラーを 500 応答として返した
                                 // （`actor.drop` は reply を送れなかった場合に限定される）。
                                 tracing::debug!(seam = "actor.reply", method = "get", seq, error = true, reason = %e, "actor replied with 500 error response");
@@ -271,13 +237,32 @@ pub fn spawn_actor_thread_with(
                 // 観測ログ点（R10.4）: cleanup 完了後に done ack を送出（全資源解放済み）。
                 tracing::debug!(seam = "actor.done", "actor sent done ack after VM/resource cleanup");
             }
-            // ここでスレッドが終わる。SHIORI 側は ack の後に join するか（unload）、detach 済み。
-        })?;
+            // (5) 持つ値を落としてから join の約束を待つ（約束を待つ間は DLL のコードを走らせない）。
+            //     届けば普通に戻り、参照は join した親が返す。送り手が落ちていれば（見捨てられた）
+            //     参照を返してスレッドを終える（Windows では戻らない）。
+            drop(log_context);
+            drop(load_dir);
+            drop(ready_tx);
+            if keep_rx.recv().is_err() {
+                drop(keep_rx);
+                module.release_and_exit_thread();
+            }
+        });
+    let handle = match spawned {
+        Ok(handle) => handle,
+        Err(e) => {
+            // 閉包は走らないので、参照はここで返す。
+            module.release();
+            return Err(e);
+        }
+    };
 
-    // VM 構築完了（実行スレッド id・ロード成否・debug DAP 束縛アドレス）を待つ。
+    // VM 構築完了（ロード成否）を待つ。
     // ready の送り手が落ちた＝スレッドが ready の前に終わった（パニック等）。join して資源を残さない。
-    let Ok((actor_thread_id, loaded, debug_local_addr)) = ready_rx.recv() else {
+    // 閉包は約束に届いていないので、参照は join の後にここで返す。
+    let Ok(loaded) = ready_rx.recv() else {
         let _ = handle.join();
+        module.release();
         return Err(io::Error::other(
             "actor thread ended before reporting readiness",
         ));
@@ -285,8 +270,8 @@ pub fn spawn_actor_thread_with(
 
     Ok(ActorThread {
         handle: Some(handle),
-        actor_thread_id,
         loaded,
-        debug_local_addr,
+        keep,
+        module,
     })
 }

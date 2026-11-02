@@ -12,6 +12,7 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use common::copy_fixture_to_temp;
+use pasta::actor::instance::ActorInstance;
 use pasta::actor::lifecycle;
 use pasta::shiori_get_api;
 use pasta_lua::GlobalLoggerRegistry;
@@ -84,7 +85,7 @@ fn v3_get_matches_legacy_bytes_and_returns_start_line_code() {
     let ghost = copy_fixture_to_temp("v3_probe");
     let dir = ghost.path().to_path_buf();
 
-    assert!(lifecycle::spawn_actor(0, dir.clone()), "v3_probe must load");
+    assert!(lifecycle::spawn_actor(dir.clone()), "v3_probe must load");
     let legacy = lifecycle::marshal_request(&get("OnProbeCount"));
     assert!(lifecycle::teardown_actor().acked);
 
@@ -211,4 +212,72 @@ fn second_load_is_null_and_unload_releases_dir() {
     assert_no_registry_entry(dir);
     let mut again = load(dir).expect("reload right after unload");
     assert_eq!(request(&mut again, &get("OnProbeCount")).0, 200);
+}
+
+/// 2 行目にコロンが無い要求（後ろの行に目印）。
+const UNREADABLE: &str = "GET SHIORI/3.0\r\nCharset UTF-8\r\nID: SECRET_MARKER_4F2\r\n\r\n";
+/// 2.x の要求（旧来は Lua へ、版 3 は debug で弾く。どちらも warn にしない）。
+const SHIORI2: &str = "GET Sentence SHIORI/2.6\r\nCharset: UTF-8\r\n\r\n";
+const UNREADABLE_MSG: &str = "request could not be parsed";
+
+/// 解けない要求の warn の行がちょうど 1 つで、入口・位置・1 行目を含み、全文を含まないこと（3.8）。
+fn assert_one_unreadable_warn(ghost: &Path, entry: &str) {
+    let log = wait_log_contains(ghost, UNREADABLE_MSG);
+    let lines: Vec<&str> = log.lines().filter(|l| l.contains(UNREADABLE_MSG)).collect();
+    assert_eq!(lines.len(), 1, "exactly one warn line ({entry}):\n{log}");
+    let line = lines[0];
+    for needle in [
+        " WARN ",
+        "seam=\"request.unreadable\"",
+        &format!("entry=\"{entry}\""),
+        "line=2",
+        "col=",
+        "first_line=\"GET SHIORI/3.0\"",
+    ] {
+        assert!(
+            line.contains(needle),
+            "{needle:?} missing ({entry}): {line}"
+        );
+    }
+    assert!(
+        !log.contains("SECRET_MARKER_4F2"),
+        "the request body must not be logged ({entry}):\n{log}"
+    );
+}
+
+/// 解けない要求は、旧来の意味で 204・版 3 で 400 を返し、どちらもゴーストのログに warn を 1 行残す。
+/// 2.x の要求は warn を増やさない（3.6〜3.8）。2.x を先に送り、warn が現れた時点で 1 行だけかを見る。
+#[test]
+fn unreadable_request_warns_once_on_both_entries() {
+    // 旧来の意味（ActorInstance::request。旧来の窓口の置き場は使わない）
+    let ghost = copy_fixture_to_temp("v3_probe");
+    let instance = ActorInstance::spawn(ghost.path().to_path_buf()).expect("spawn");
+    assert!(instance.loaded(), "v3_probe must load");
+    instance.request(SHIORI2);
+    let body = instance.request(UNREADABLE);
+    assert!(
+        body.starts_with("SHIORI/3.0 204 No Content\r\n"),
+        "{body:?}"
+    );
+    assert_one_unreadable_warn(ghost.path(), "legacy");
+    drop(instance);
+
+    // 版 3（request と notify の両方）
+    for via_notify in [false, true] {
+        let ghost = copy_fixture_to_temp("v3_probe");
+        let mut inst = load(ghost.path()).expect("v3 load");
+        if via_notify {
+            assert_eq!(inst.notify(SHIORI2), Ok(400));
+            assert_eq!(inst.notify(UNREADABLE), Ok(400));
+        } else {
+            assert_eq!(request(&mut inst, SHIORI2).0, 400);
+            let (status, body) = request(&mut inst, UNREADABLE);
+            assert_eq!(status, 400);
+            assert!(
+                body.contains("X-ERROR-REASON: unreadable request"),
+                "{body:?}"
+            );
+        }
+        assert_one_unreadable_warn(ghost.path(), "v3");
+    }
 }

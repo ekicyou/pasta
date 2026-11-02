@@ -1,13 +1,13 @@
 #![cfg(windows)]
-pub(crate) mod enc;
 mod windows_api;
 
-use self::enc::{Encoder, Encoding};
+use self::windows_api::{MB_ERR_INVALID_CHARS, multi_byte_to_wide_char};
 use crate::error::{MyError, MyResult};
 use std::ffi::OsString;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use std::str;
 use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::Globalization::CP_ACP;
 use windows_sys::Win32::System::Memory::*;
 
 const GMEM_FIXED: u32 = 0;
@@ -19,14 +19,6 @@ pub(crate) struct ShioriString {
     len: usize,
     has_free: bool,
 }
-
-// SAFETY: ShioriString owns a single HGLOBAL handle. The handle is either:
-// - captured from the SHIORI host (has_free=true, will be freed on drop), or
-// - allocated by clone_from_slice_impl (has_free controlled by caller).
-// Transfer between threads is safe because ShioriString has exclusive ownership
-// of the HGLOBAL and does not alias it.
-unsafe impl Sync for ShioriString {}
-unsafe impl Send for ShioriString {}
 
 impl Drop for ShioriString {
     fn drop(&mut self) {
@@ -57,9 +49,7 @@ impl ShioriString {
     /// GMEM_FIXEDブロックを確保し、失敗（null）を明示エラーで返します。
     /// 3.37 (G3): GlobalAlloc は失敗時に null を返す（プロセス終了はしない）。
     /// 旧実装は null を `from_raw_parts_mut` へ渡しており未定義動作だった。
-    /// エラーは既存の `MyError::Script` に相乗りする（panic_to_error と同じ
-    /// 技法）: pasta_shiori は crates.io 公開済みで `MyError` は
-    /// non_exhaustive でないため、変種追加は semver-major（R3.5 違反）。
+    /// エラーは既存の `MyError::Script` に載せる。
     fn alloc_global(len: usize) -> MyResult<HGLOBAL> {
         // SAFETY: GlobalAlloc has no preconditions; the null (failure)
         // return is checked before any pointer use.
@@ -153,8 +143,7 @@ impl ShioriString {
     /// SHIORI::load()文字列の取り出しに利用する。
     pub(crate) fn to_ansi_str(&self) -> MyResult<OsString> {
         let bytes = self.as_bytes();
-        let s = Encoding::ANSI
-            .to_string(bytes)
+        let s = multi_byte_to_wide_char(CP_ACP, MB_ERR_INVALID_CHARS, bytes)
             .map_err(|_| MyError::EncodeAnsi)?;
         let os_str = OsString::from(s);
         Ok(os_str)
@@ -171,8 +160,7 @@ impl ShioriString {
 /// 3.37 (G3): GlobalAlloc failure must surface as an explicit Err, never as
 /// a null pointer flowing into `from_raw_parts_mut` (undefined behavior).
 /// A near-address-space-sized request makes GlobalAlloc fail deterministically.
-/// The error rides on the existing `Script` variant (adding a variant to the
-/// published non-`non_exhaustive` `MyError` would be semver-major).
+/// The error rides on the existing `Script` variant.
 /// RED evidence: with the null check removed (mutation), alloc_global returns
 /// Ok(null) and this assertion fails.
 #[test]
@@ -224,18 +212,18 @@ fn shiori_string_test() {
         assert_eq!(dst.to_utf8_str().unwrap(), text);
     }
     {
-        // 3.39 (G5): this block asserts CP932 (Shift_JIS) byte lengths, which
-        // only hold when the system ANSI code page is 932 (Japanese). On any
-        // other ACP, Encoding::ANSI.to_bytes cannot represent the kanji and
-        // errors, so the SJIS round-trip is skipped to keep the test
-        // locale-independent (3.35 follow-up). The production decode path
-        // (to_ansi_str) is locale-faithful by design: it always uses CP_ACP.
+        // 3.39 (G5): CP932 (Shift_JIS) bytes decode to the text only when the
+        // system ANSI code page is 932 (Japanese); on any other ACP the block is
+        // skipped to keep the test locale-independent. The production decode
+        // path (to_ansi_str) is locale-faithful by design: it always uses CP_ACP.
+        // 「適当なShioriString」の CP932 表現（適=93 4B・当=93 96・な=82 C8）。
+        const SJIS: &[u8] = b"\x93\x4B\x93\x96\x82\xC8ShioriString";
         let acp = unsafe { windows_sys::Win32::Globalization::GetACP() };
         if acp == 932 {
             let text = "適当なShioriString";
-            let sjis = Encoding::ANSI.to_bytes(text).unwrap();
+            let sjis = SJIS;
             assert_eq!(sjis.len(), 18);
-            let src = ShioriString::clone_from_slice_nofree(&sjis[..]).unwrap();
+            let src = ShioriString::clone_from_slice_nofree(sjis).unwrap();
             assert_eq!(src.len(), 18);
             let src_osstr = src.to_ansi_str().unwrap();
             assert_eq!(src_osstr.len(), 21);
