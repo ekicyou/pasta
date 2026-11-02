@@ -154,7 +154,7 @@
   - _Boundary: ReleaseWorkflow_
   - _Requirements: 1.6, 4.1, 4.3, 4.4, 4.5, 4.6, 4.7, 8.1, 8.5, 8.6, 10.3_
 
-- [ ] 8.5 steering の CI とマニュアルの行を実際に合わせる
+- [x] 8.5 steering の CI とマニュアルの行を実際に合わせる
   - `tech.md` の設計の 6 か所（build.yml の軽い検査・manual.yml の起動と流れ・権限・release の鮮度の照合・mdBook 0.5.4・リンク検証の 3 スキルと `editors/`）だけを直す
   - 完了の姿: `tech.md` の 6 か所が 8.1〜8.4 と 2.1・6.2 の実際と一致し、ほかの行に差分が無い
   - _Depends: 6.2, 8.1, 8.2, 8.3, 8.4_
