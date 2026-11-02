@@ -189,12 +189,6 @@ pub mod wasm {
     }
 }
 
-/// Native entry point stub (for future stdio-based transport)
-#[cfg(not(target_arch = "wasm32"))]
-pub mod native {
-    // Reserved for future native (stdio/TCP) transport implementation
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
