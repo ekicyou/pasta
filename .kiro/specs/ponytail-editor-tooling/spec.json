@@ -1,16 +1,16 @@
 {
   "feature_name": "ponytail-editor-tooling",
   "created_at": "2026-11-02T13:12:49Z",
-  "updated_at": "2026-11-02T13:16:09Z",
+  "updated_at": "2026-11-02T13:55:03Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {

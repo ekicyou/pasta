@@ -246,3 +246,170 @@
 8. **OQ-8 分けるか**
    - 推奨：分けない（17〜19 タスク）。
    - 理由：brief の決めごと（20 を超えたら分ける）に当たらない。設計で 20 を超えたら、上の表の束で分ける。
+
+---
+
+# 設計フェーズの調査（2026-11-02）
+
+`/kiro-spec-design ponytail-editor-tooling -y` の発見と統合の記録である。種別は Extension なので、軽い発見（`design-discovery-light.md`）で進めた。新しい依存は足さない（pasta_check の dev-dependencies の `serde_json` を除く。下の決定 D7）。
+
+## 使ったスキルと規則
+
+- `kiro-spec-design`（`rules/design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）と、テンプレート `.kiro/settings/templates/specs/{design,research}.md`。
+- `ponytail`（full）：最小の直し。使い道の無い型の写し・重さの 4 通り・`catch_unwind` を足し直さない、の判断に使った。
+- steering：`product.md`・`tech.md`・`structure.md`・`roadmap.md` の「ウェーブ（2026-11-02）」と同じウェーブの約束。
+- プロジェクトの記憶：Bash ツールのヒアドキュメントで二重のバックスラッシュが潰れる（スクラッチの JS は Write で書いた）。cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。
+
+## 調べたこと（Research Log）
+
+### R1. 宣言の行の属性と名前の span は、AST にあるか（持ち越しの Research Needed）
+
+- **きっかけ**: 要件 4.1・4.2（名前だけを名前の色に、属性を属性の色に）。
+- **調べた所**: `pasta_dsl/src/parser/parse_scene.rs` の `parse_global_scene_start`（73 行）・`parse_local_scene_scope`（194 行）、`grammar.pest` の `scene = _{ id ~ s ~ attrs? }`。一時のテストで `＊挨拶 ＆朝：1 ＃メモ` を解いた（テストは消した）。
+- **分かったこと**:
+  - 宣言の行の属性は、文法では受け付けるが、パーサが名前の `id` だけを拾って捨てる。`GlobalSceneScope.attrs`・`LocalSceneScope.attrs` には入らない。
+  - 名前の span も無い。`scene.span` はスコープ全体（宣言の行から次の区切りの手前まで）で、始まりは印の位置である。
+  - この捨てる動きは `scene-attribute-store`（0.5.0 のウェーブ 2）の brief が既に書いている（189 行）。
+- **設計への影響**: 宣言の行（`＊`・`・`・`％`）の名前・属性・行末のコメントは、解けた塊の行の文字を読んで決める。`scene-attribute-store` が AST に span を足したら、AST に替えてよい（再検証のきっかけ）。
+
+### R2. VSCode の Oniguruma は `\p{XID_Start}` を使えるか（持ち越しの Research Needed）
+
+- **調べた所**: main の作業コピーにある `editors/vscode/node_modules/vscode-oniguruma`（2.0.1。拡張の `tmGrammar.test.ts` が使う）と `book/node_modules/vscode-oniguruma`（マニュアルのハイライトが使う）。スクラッチの node で走らせた。
+- **分かったこと**:
+  - `\p{XID_Start}`・`\p{XID_Continue}`・`\p{ID_Start}`・`\p{ID_Continue}` を、どちらも使える。`𠮷`（サロゲートペア）も 1 文字として当たる。
+  - `^(`{3,})(?:[\p{XID_Start}_]\p{XID_Continue}*)?$` は ```` ````lua ```` と ```` ```日本 ```` に当たり、```` ```lua ````＋空白には当たらない（N5 の直し）。
+  - `(?:[＠@]{2})|([＠@][\p{XID_Start}_]\p{XID_Continue}*)` を左から当てると、`＠＠＠メール` は `＠＠` と `＠メール` に分かれる。`＠挨拶。こんにちは` は `＠挨拶` だけになる（N4 の直し）。
+  - JS の正規表現（`u` 旗）も同じ書き方で同じ結果になる。tmLanguage の `inline-sakura-script` の `match` は、JS の `u` 旗でそのまま compile できる（`v` 旗は不可）。
+- **設計への影響**: 名前の文字の集まりは、文法の `id`（`XID_START`・`XID_CONTINUE`、頭は `_` も可）に合わせて `[\p{XID_Start}_]\p{XID_Continue}*` と書く。箱は tmLanguage の台詞の規則を JSON から読んで JS の正規表現にできる（D6）。
+
+### R3. 改行で終わらないファイル（新しい指摘 N13）
+
+- **きっかけ**: 要件 1.5（改行で終わらない最後の行）と 2.3（保存した中身と同じなら、保存時と同じ診断）。
+- **調べた所**: 一時のテストで `parse_str` を走らせた。`pasta_lua/src/loader/process.rs:182`（pasta.dll の読み込み）と `pasta_check/src/validate/syntax.rs:13`（保存時の検査）は、読んだ文字をそのまま `parse_str` に渡す。`book/src/grammar/markers.md:39`。
+- **分かったこと**:
+  - `＊挨拶\n　さくら：やあ`（最後に改行が無い）は、`parse_str` が 2 行目の行末で誤りにする。最後の行が `＃c` でも誤りになる。pasta.dll も保存時の検査も、このファイルを読めない。
+  - 今の `AnalysisEngine::analyze` は、解く前に改行を補う。だから入力のたびの診断は何も出さない。開いている文書では保存時の syntax も隠す（`ghostValidator.ts:266`）。開いている間、作者には誤りが 1 件も見えない。
+  - マニュアル（`markers.md:39`）は「エディタ拡張の診断は末尾の改行を補って解析するため、この誤りを報告しない」と書いている。
+  - VSCode は既定で最後の改行を足さない（`files.insertFinalNewline` の既定は false）。拡張も `configurationDefaults` を持たない。
+- **設計への影響**: 要件 2.3 に合わせ、診断のための `parse_str` には改行を補わない。改行の無いファイルは、保存時と同じ位置・同じ文で 1 件出る。色の部分解析は、最後の塊に改行を補う（今の `try_parse_chunk` のまま）ので、色は残る。`markers.md:39` の文は直す必要がある（要件 13 の一覧の外。OPEN QUESTION）。文法が最後の改行を要らなくするかは、パーサの持ち場（`pasta_dsl/src/parser/**`）で、この spec では決めない。
+
+### R4. wasm32 で panic（trap）した後、同じインスタンスを呼んでよいか（持ち越しの Research Needed）
+
+- **調べた所**: ルートの `[profile.release]` の `panic = "abort"`（`Cargo.toml:85`）、`wasmBridge.ts:182-195`・`documentSync.ts:137-141`・`ghostValidator.ts:212` の try/catch。wasm-bindgen の生成物の作り。手元で WASM を作って trap させる実験はしていない。
+- **分かったこと**:
+  - wasm32-unknown-unknown の panic は、`unreachable` の trap になる。JS には `RuntimeError` として投げられ、拡張の try/catch が受ける。`catch_unwind` は効かない（9 番のとおり）。
+  - trap の後もインスタンスは呼べる。ただし、関数の後始末を飛ばすので、wasm-bindgen の影のスタックの位置や、確保した引数の文字列が戻らないことがある。続けて呼んだ結果は保証されない。
+  - 壊れたとしても、次の呼び出しも例外か形の誤りになり、同じ try/catch に落ちる。拡張は落ちず、TextMate の色が残る（要件 9.5）。
+- **設計への影響**: 読み直しの仕組みは足さない。今の try/catch を守りとし、`catch_unwind` の包みだけを消す。解析器の panic は、今の頑丈さのテスト（`analyze_robustness_test.rs`）で起きないことを確かめている。
+
+### R5. `npm run build:wasm` が非対話で通るか（持ち越しの Research Needed）
+
+- 設計では確かめない。実装の最後の関門（要件 14.3）で、まず `npm run build:wasm` を試し、だめなら brief の回避（`build-wasm.ps1` を pwsh で先に走らせ、`vsce package` を直に叩く）に戻す。
+
+### R6. 部分解析の塊の区切りと、続きの `＊`
+
+- **調べた所**: `partial.rs:99-108`・`grammar.pest` の `global_scene_continue_line = { global_marker ~ or_comment_eol }`・`parse_global_scene_start`（`last_name` を見る）。
+- **分かったこと**:
+  - 区切りになる行頭の文字は、字下げしない `＊`・`％`・`＆`・`＠` である（`＆`・`＠` は 0 桁目ならファイルの属性と単語定義、字下げすればシーンの中の行）。ローカルシーンの `・` は字下げが要るので区切りにならない。
+  - 名前の無い `＊`（続きのシーン）は、前の名前付きのシーンの名前を受け継ぐ。塊ごとに解くと前の名前が無いので、`Unnamed global scene at start of file` の誤りになる（一時のテストで再現）。
+  - Lua ブロックの本文の 0 桁目に `＊`・`％`・`＆`・`＠` が来ると、塊がブロックの途中で切れる。Lua の文の頭には来ない文字なので、まれである。
+- **設計への影響**: 区切りは「字下げする前の行頭の文字」で決め、名前の無い `＊` の行は区切りにしない（前の塊と一緒に解く）。Lua の本文の 0 桁目の印は追わない（`shortcut:` のコメントを残す）。
+
+### R7. 箱を意味の色から作るか、文字から作るか（設計に任された Option A・B）
+
+- **比べたこと**:
+  - B（意味の色の WORD から作る）は、文法の写しが増えない。けれども、WASM が読めないときと、誤りのあるシーン（要件 3.3 で意味の色を付けない）で箱が消える。書きかけの行があるたびに、そのシーンの箱が消えたり出たりする。台詞の単語参照を見分ける修飾子を凡例に足すことになり、関数呼び出しの WORD は引数まで覆うので、名前の範囲を別に決める必要もある。
+  - A（文字から作る）は、書きかけでも WASM が無くても箱が出る（今と同じ）。行の種類（Lua ブロック・アクション行・継続行）の判定を TS に持つ。
+  - A の台詞の中の規則（さくらスクリプト・エスケープ・単語参照・動的な単語参照）は、tmLanguage の `match` を JSON から読み込めば、写しを増やさずに TextMate と同じにできる（R2）。
+- **結論**: A を採る（D6）。
+
+## 統合（Synthesis）
+
+- **一般化**
+  - 要件 1・2・11 の診断は、どれも「保存時と同じ 1 件」の特別な場合である。保存時の `syntax_finding` を 1 つの出どころにし、入力のたびの診断はそれを位置だけ UTF-16 に直して使う。
+  - 要件 4.1〜4.3 の行末のコメントは、どの行でも「行の本体の終わりの後で、空白を飛ばした最初の `＃`・`#`」で決まる。行の種類ごとに違うのは本体の終わりの見つけ方だけなので、1 つの助け手（`push_trailing_comment`）にまとめる。
+  - 要件 5.1〜5.4 の箱と TextMate の色は、同じ規則の 2 つの使い道である。規則は tmLanguage に 1 つだけ置き、箱はそれを読む。
+- **作るか採るか**
+  - LSP の型（`tower-lsp`・`lsp-types`）は採らない。JS へ渡すのは `Wasm*` の形だけで、LSP の型は写しのためにしかない（OQ-4 の決定）。
+  - 凡例の一致は、実行時に WASM から凡例をもらう形（Option B）を採らない。起動の順とモックが増える。Rust のテストが TS のファイルを読んで比べる。
+  - 箱のために vscode-textmate を本番の依存に足すことはしない。JSON の 4 つの `match` を JS の正規表現にするだけで足りる。
+- **単純化**
+  - `PartialParseError` は型ごと消す。読み手は「どの行を色にしないか」だけを要るので、失敗した塊の行の範囲（`failed_lines`）だけを返す。文は `parse_str` の誤りから作るので要らない。
+  - 部分解析の第 1 段（全体を解く）も消す。呼び手（`analyze`）は全体で失敗したときにだけ呼ぶ（N1）。
+  - `AnalysisResult` と `WasmAnalysisResult` を 1 つにする。JS の名前は serde の rename で付け、Rust の欄の名前は今の LSP の名前のまま残す（テストの書き換えを減らすため）。
+  - 重さは常に Error。Rust の 4 通りの対応と、拡張の `convertSeverity` の 4 通りを消す（N9）。JS の形の `severity` の欄は残す（要件 9.4）。
+  - wasm の trap の後の読み直しは足さない（R4）。
+
+## 方式の比較（Architecture Pattern Evaluation）
+
+| 論点 | 案 | 長所 | 短所 | 採否 |
+| ---- | -- | ---- | ---- | ---- |
+| 診断 | `parse_str` の誤り 1 件＋`syntax_finding` | 保存時と同じ関数。2 回解かない | `pasta_check` の関数を 1 つ pub にする | 採る |
+| 部分解析 | 失敗した塊を飛ばす（範囲だけ返す） | 差分が最小。span の補正はそのまま | 誤りのシーンは TextMate の色だけ（OQ-1 で承認済み） | 採る |
+| 型 | `Wasm*` の形で直に持つ | 依存・写し・使われない重さが消える | テストの `use` の書き換え | 採る（OQ-4） |
+| 箱 | A：文字から（tm JSON を読む） | 書きかけ・WASM 無しでも出る。TextMate と同じ規則 | 行の種類の判定を TS に持つ | 採る |
+| 箱 | B：意味の色から | 文法の写しが無い | 書きかけで点滅・WASM 無しで消える・凡例に修飾子 | 採らない |
+| 凡例 | Rust のテストが TS を読む | 実行時の形を変えない | ファイルの場所に頼るテスト | 採る |
+| 凡例 | WASM が凡例を返す | 写しが無い | 起動の順・モックが増える | 採らない |
+
+## 設計の決定（Design Decisions）
+
+### D1. 入力のたびの診断は、`parse_str` の誤り 1 件から作る
+
+- **背景**: 要件 1・2.3・11.1・11.2。
+- **選んだ形**: `analyze` は、受け取った文字をそのまま `parse_str(source, "<lsp>")` に渡す（改行を補わない。R3）。失敗したら、`pasta_check::validate::syntax_finding` で `Finding` を作り、その行・桁を 0 始まりの行と UTF-16 の桁に直した点（幅 0）の診断を 1 件だけ返す。行が無い誤りは 1 行目の頭にする。
+- **理由**: 保存時と同じ関数で文を作るので、食い違いようがない。
+- **トレードオフ**: `pasta_check` の private の関数を pub にする（pub API が 1 つ増える）。改行で終わらないファイルに、今は出ない誤りが出る（R3。正しい挙動）。
+
+### D2. 部分解析は色のためだけにし、失敗した塊の行の範囲を返す
+
+- **選んだ形**: `parse_str_partial(source) -> PartialParseResult { items, failed_lines: Vec<Range<usize>> }`。区切りは字下げする前の行頭の文字（`＊`・`％`・`＆`・`＠`）で、名前の無い `＊` の行は区切りにしない。塊は `try_parse_chunk` で解き、解けた塊は span を補正して積み、解けない塊は行の範囲だけを積む。第 1 段・第 3 段・`chunk_lines`・`infer_rule_from_line`・`PartialParseError` を消す。
+- **理由**: 色を残すのに要るのは、解けた塊の AST と、色を付けない行の範囲だけである。
+- **フォローアップ**: 続きの `＊` の塊は、前の塊が解けないと一緒に色を失う（OPEN QUESTION）。
+
+### D3. 解析の結果は JS へ渡す形で直に持つ
+
+- **選んだ形**: `analysis` に `AnalysisResult { tokens: Vec<SemanticToken>, diagnostics: Vec<Diagnostic> }` と、`SemanticToken`・`Diagnostic`・`Range`・`Position` を serde の `Serialize` つきで置く。JS の名前（`deltaStartCharacter`・`tokenModifiers` など）は rename で付ける。`transport.rs` は WASM の 3 つの入口だけになる。
+- **トレードオフ**: brief の文言（`lsp-types` に替える）から外れる（OQ-4 で承認済み）。
+
+### D4. 宣言の行は、行の文字を読む
+
+- **選んだ形**: 解けた塊の宣言の行（`＊名前`・`＊`・`　・名前`・`％名前`）を、文法の `印 ~ id? ~ s ~ attrs? ~ or_comment_eol` に沿って読む小さな読み取り（`scan_decl_line`）を `visit_scope.rs` に置く。結果は「印と名前の終わり」「属性ごとの範囲」「行末のコメントの始まり」である。行はもう解けているので、引用（`「…」`・`"…"`）の中の `＃` を飛ばすだけで足りる。
+- **理由**: AST に名前と宣言の行の属性の span が無い（R1）。パーサは範囲外。
+
+### D5. 行末のコメントは、行の本体の終わりの後で探す
+
+- **選んだ形**: 助け手 `push_trailing_comment(source, line, from_byte)` が、その行の `from_byte` から空白を飛ばし、次が `＃`・`#` なら行末までを COMMENT にする。本体の終わりは、行の種類ごとに AST の span（属性・単語定義・変数代入・Call・アクター指定）か、行の読み取り（宣言・キュー・選択肢・閉じのフェンス）で決める。
+- **理由**: 値を囲まない単語定義では、`＃` 以降が値の span に入るので、何も出ない（要件 4.4 が自然に守られる）。アクション行・継続行には呼ばない。
+
+### D6. 箱は文字から作り、台詞の規則は tmLanguage から読む（Option A）
+
+- **選んだ形**: `wordRefDecorator.ts` に純関数 `findWordRefRanges(text)` を置く。規則はすべて tmLanguage の JSON から読む。行ごとに、Lua ブロックの中か（`lua-code-block` の `begin`・`end`。`end` の `\1` は開きの印で置き換える）、アクション行・継続行か（`action-line`・新しい `continue-action-line` の `match`。名前を `id` に合わせるので、ほかの行の規則と当たりが重ならない）を見る。台詞の部分には、`inline-sakura-script`・`inline-escape`・`inline-dynamic-ref`・`inline-word-ref` の `match` を 1 つにまとめた JS の正規表現を左から当て、単語参照と動的な単語参照の当たりだけを箱にする。
+- **理由**: R7。TextMate と箱が同じ規則になり、写しが増えない。
+- **フォローアップ**: JSON の `match` に JS で読めない Oniguruma の書き方を入れると、拡張のテストで compile に失敗する（気づける）。
+
+### D7. `FindingKind::code()`・`ALL` を消し、テストは serde の値と網羅の `match` で確かめる
+
+- **選んだ形**: `validate_report_test.rs` の重さの表のテストは、テストの中の `match`（ワイルドカード無し）で種類ごとの重さと code を返し、`serde_json::to_value(kind)` と比べる。種類を足すと `match` が compile できないので、`ALL` の長さの検査より強い。`validate_config_test.rs:283` は `f.code == FindingKind::ConfigActorFont` にする。`pasta_lsp/src/transport.rs` の `ALL` の回しは消す（`validate_report_test.rs` が持つ）。
+- **トレードオフ**: `pasta_check` の dev-dependencies に `serde_json`（workspace）を足す（OPEN QUESTION。代案は `toml` で直列化）。
+
+### D8. 意味の色の控えは、文書の版を鍵に持つ
+
+- **選んだ形**: `SemanticTokensProvider` は URI ごとに `{ version, tokens }` を持つ。求められた文書の版と控えの版が違えば、その場で解き直す。解析に失敗したら控えを消して `null` を返す。`DocumentSync` も失敗したら控えを消す。
+- **理由**: 要件 8。束ねの 200ms の間に VSCode が色を求めても、前の版を返さない。
+
+## 危険と手当て（Risks & Mitigations）
+
+- tmLanguage はマニュアルのハイライトも読む。scope の名前は変えない（`markup.inline.raw.string.pasta`・`meta.embedded.block.lua.content` など）。マニュアルの自己テスト（`tokenizer-test.mjs`・`highlight-html-test.mjs`）を関門にする。ワークツリーに `book/node_modules` が無いときは、main の作業コピーのものを借りて走らせる。
+- `Cargo.lock` は `ponytail-core-registry` と共有する。この spec は tower-lsp の行（ルートの `Cargo.toml:59`）だけを消し、後から入る側が作り直す。
+- `parse_str` の誤りの文の形（`Parse error in {file} at {line}:{column}: ` と、末尾の `\n  = 説明`）は `ponytail-dsl-parser` が保つ。形が変わると、`syntax_finding` の取り出しが保存時と入力時の両方で同じように壊れる。両方を同じ関数にしたので、食い違いは起きない。
+- 改行で終わらない辞書に、今まで出なかった誤りが出る（R3）。正しい挙動だが、作者には新しく見える。マニュアルの `markers.md:39` を直す（OPEN QUESTION）。
+- 箱の正規表現を tmLanguage から組み立てるので、tmLanguage の `match` を JS で読めない形にすると、拡張が箱を出せなくなる。拡張の単体テストで compile を確かめる。
+
+## 参考（References）
+
+- `crates/pasta_dsl/src/parser/grammar.pest`（`id`・`scene`・`or_comment_eol`・`code_open`・`code_close`・`at_escape`・`dollar_escape`・`sakura_escape`・`word_ref`・`word_ref_dynamic`）
+- `crates/pasta_check/src/validate/syntax.rs`（`syntax_finding`）
+- `book/src/grammar/block-structure.md:316-333`（行末のコメントを書ける行）・`book/src/grammar/markers.md:39`（最後の改行）
+- vscode-oniguruma 2.0.1・vscode-textmate 9（`tmGrammar.test.ts` とマニュアルのハイライトが使う）
+- ECMAScript の Unicode の性質のエスケープ（`\p{XID_Start}`・`\p{XID_Continue}` は `u` 旗で使える）
