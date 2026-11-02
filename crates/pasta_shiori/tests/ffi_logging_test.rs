@@ -24,7 +24,7 @@ use common::copy_fixture_to_temp;
 use pasta::actor::mailbox::mailbox;
 use pasta::actor::marshaling::default_204;
 use pasta::actor::teardown::teardown_via_sender;
-use pasta::actor::thread::spawn_actor_thread;
+use pasta::actor::thread::spawn_actor_thread_with;
 use pasta::{load, request, unload};
 use std::ffi::c_long;
 use tempfile::TempDir;
@@ -262,7 +262,8 @@ fn ffi_logs_reach_the_ghost_log_file() {
     std::fs::write(&entry, slow).expect("write entry.lua");
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, ghost.path().to_path_buf(), rx);
+    let actor = spawn_actor_thread_with(0, ghost.path().to_path_buf(), rx, None, None)
+        .expect("actor thread must spawn");
     assert!(
         actor.loaded(),
         "actor thread must load the slow-unload ghost"

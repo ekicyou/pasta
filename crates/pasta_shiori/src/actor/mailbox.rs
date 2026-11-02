@@ -29,7 +29,7 @@
 //! mailbox が運ぶのは `Send` な値だけである。リクエストは生の SHIORI リクエスト文字列
 //! （[`MailboxRequest`]）のまま運び、`!Send` な Lua リクエストテーブルへの変換は
 //! アクタースレッド上の `PastaShiori::request` が行う。応答は SHIORI 応答文字列
-//! （[`Reply`]）で返る。
+//! （`String`）で返る。
 
 use flume::{Receiver, Sender, bounded, unbounded};
 
@@ -57,18 +57,6 @@ impl MailboxRequest {
     }
 }
 
-/// GET 応答（design.md「Reply」）。
-///
-/// SHIORI 応答文字列の全体（`SHIORI.request` の戻り値、またはリクエスト処理エラー時の
-/// 500 応答）を運ぶ。exactly-once は flume の move/drop 意味論が自然に与える（独自
-/// `Responder` 不要）: アクターが `reply.send(Reply::Value(..))` すれば値、send せず
-/// drop すれば受信側の同期 `recv_timeout`（`marshaling.rs`）が `Disconnected`→204。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Reply {
-    /// SHIORI 応答文字列（ステータス行・ヘッダを含む全体）。
-    Value(String),
-}
-
 /// mailbox を流れるメッセージの判別共用体（design.md「Event Contract（Mailbox）」）。
 ///
 /// SHIORI marshaling の契約 3 種を表す:
@@ -92,8 +80,10 @@ pub enum ActorMsg {
     Get {
         /// VM へ渡す SHIORI リクエスト（生文字列。テーブル化はアクタースレッド側）。
         req: MailboxRequest,
-        /// GET 応答経路。アクターが `send` すれば値、drop すれば受信側 `recv_timeout`→204。
-        reply: Sender<Reply>,
+        /// GET 応答経路。SHIORI 応答文字列の全体（`SHIORI.request` の戻り値、または
+        /// リクエスト処理エラー時の 500 応答）を運ぶ。アクターが `send` すれば値、drop すれば
+        /// 受信側 `recv_timeout`→204（exactly-once は flume の move/drop 意味論が与える）。
+        reply: Sender<String>,
     },
     /// NOTIFY fire-and-forget メッセージ。応答経路を持たない。
     Notify {
@@ -118,30 +108,6 @@ pub enum ActorMsg {
 }
 
 impl ActorMsg {
-    /// GET 応答経路 (`reply`) を持つメッセージを構築する。
-    ///
-    /// 呼び出し側は返り値の [`Receiver`]（`bounded(1)`）で応答を待つ（task 3.4 の
-    /// `recv_timeout` 消費の素地）。task 3.2 では FIFO 投入と move/drop の確認に用いる。
-    pub fn get(req: MailboxRequest) -> (ActorMsg, Receiver<Reply>) {
-        let (reply, reply_rx) = bounded(1);
-        (ActorMsg::Get { req, reply }, reply_rx)
-    }
-
-    /// NOTIFY メッセージを構築する（応答経路なし）。
-    pub fn notify(req: MailboxRequest) -> ActorMsg {
-        ActorMsg::Notify { req }
-    }
-
-    /// シーンキックメッセージを構築する（fire-and-forget・応答経路なし）。
-    ///
-    /// アクタースレッド上で VM の `SHIORI.kick(scene)` を呼ぶ（仕様 `pasta-scene-kick`
-    /// 3.1）。`notify`/`stop` に倣い、応答経路を持たない。
-    pub fn kick(scene: impl Into<String>) -> ActorMsg {
-        ActorMsg::Kick {
-            scene: scene.into(),
-        }
-    }
-
     /// teardown 制御メッセージを構築する。
     ///
     /// 返り値の done [`Receiver`]（`bounded(1)`）で完了 ack を待つ（`teardown.rs` の
@@ -167,6 +133,27 @@ pub fn mailbox() -> (Sender<ActorMsg>, Receiver<ActorMsg>) {
 mod tests {
     use super::*;
     use std::thread;
+
+    /// NOTIFY メッセージ（テストの投入用）。
+    fn notify(seq: u64) -> ActorMsg {
+        ActorMsg::Notify {
+            req: MailboxRequest::new(seq, ""),
+        }
+    }
+
+    /// GET メッセージと、その応答の受け口（`bounded(1)`）。
+    fn get(seq: u64) -> (ActorMsg, Receiver<String>) {
+        let (reply, reply_rx) = bounded(1);
+        let req = MailboxRequest::new(seq, "");
+        (ActorMsg::Get { req, reply }, reply_rx)
+    }
+
+    /// シーンキックメッセージ。
+    fn kick(scene: &str) -> ActorMsg {
+        ActorMsg::Kick {
+            scene: scene.to_string(),
+        }
+    }
 
     /// 種別に依らず順序識別子 (`seq`) を取り出すテストヘルパ。
     ///
@@ -202,7 +189,7 @@ mod tests {
         const N: u64 = 100;
 
         for i in 1..=N {
-            tx.send(ActorMsg::notify(MailboxRequest::new(i, "")))
+            tx.send(notify(i))
                 .expect("send should succeed while receiver is alive");
         }
 
@@ -222,16 +209,14 @@ mod tests {
 
         // GET の応答経路（bounded(1)）は順序確認では使わないが、drop すると
         // exactly-once 経路が閉じるため保持しておく。
-        let (get_a, _rx_a) = ActorMsg::get(MailboxRequest::new(11, ""));
-        let (get_b, _rx_b) = ActorMsg::get(MailboxRequest::new(13, ""));
+        let (get_a, _rx_a) = get(11);
+        let (get_b, _rx_b) = get(13);
         let (stop, _done_rx) = ActorMsg::stop();
 
         // 種別を意図的に交互配置し、順序が種別ではなく投入順で決まることを示す。
-        tx.send(ActorMsg::notify(MailboxRequest::new(10, "")))
-            .unwrap();
+        tx.send(notify(10)).unwrap();
         tx.send(get_a).unwrap();
-        tx.send(ActorMsg::notify(MailboxRequest::new(12, "")))
-            .unwrap();
+        tx.send(notify(12)).unwrap();
         tx.send(get_b).unwrap();
         // Stop は同一 FIFO を通り、先行メッセージを drain 後に処理される（clean drain）。
         tx.send(stop).unwrap();
@@ -244,17 +229,6 @@ mod tests {
         );
     }
 
-    /// `ActorMsg::kick` コンストラクタ（仕様 `pasta-scene-kick` 3.1）: `Kick` variant を
-    /// シーン名付きで構築し、応答経路を持たない fire-and-forget であることを確認する。
-    #[test]
-    fn kick_constructs_fire_and_forget_with_scene() {
-        let msg = ActorMsg::kick("intro");
-        match msg {
-            ActorMsg::Kick { scene } => assert_eq!(scene, "intro"),
-            other => panic!("ActorMsg::kick must build a Kick variant, got {other:?}"),
-        }
-    }
-
     /// R6.1/R6.4（全 variant FIFO・Kick 混在）: Get/Notify/Stop/Kick を交互投入しても、
     /// 種別に依らず投入順がそのまま drain 順に保存される。Kick は NOTIFY 同型の
     /// fire-and-forget だが同一 FIFO を通り、投入位置どおりに処理される。
@@ -262,17 +236,16 @@ mod tests {
     fn kick_preserves_fifo_order_among_all_variants() {
         let (tx, rx) = mailbox();
 
-        let (get_a, _rx_a) = ActorMsg::get(MailboxRequest::new(20, ""));
+        let (get_a, _rx_a) = get(20);
         let (stop, _done_rx) = ActorMsg::stop();
 
         // 投入順: Notify(21) / Kick(intro) / Get(20) / Kick(outro) / Stop。種別を
         // 意図的に交互配置し、Kick が投入位置どおり drain されることを示す。
         // seq_of は Kick を u64::MAX-1、Stop を u64::MAX で表す（位置の識別子）。
-        tx.send(ActorMsg::notify(MailboxRequest::new(21, "")))
-            .unwrap();
-        tx.send(ActorMsg::kick("intro")).unwrap();
+        tx.send(notify(21)).unwrap();
+        tx.send(kick("intro")).unwrap();
         tx.send(get_a).unwrap();
-        tx.send(ActorMsg::kick("outro")).unwrap();
+        tx.send(kick("outro")).unwrap();
         tx.send(stop).unwrap();
 
         let order: Vec<u64> = drain(&rx).iter().map(seq_of).collect();
@@ -301,7 +274,7 @@ mod tests {
                     // seq = producer*1000 + i により、各 producer の投入順が
                     // consumer 側で単調増加として観測できるよう符号化する。
                     let seq = p * 1000 + i;
-                    txc.send(ActorMsg::notify(MailboxRequest::new(seq, "")))
+                    txc.send(notify(seq))
                         .expect("clone send must succeed while consumer is alive");
                 }
             }));
@@ -359,10 +332,8 @@ mod tests {
 
         // Sender は Send + Sync + Clone（lock-free static 共有の素地）。
         let tx2 = tx.clone();
-        tx.send(ActorMsg::notify(MailboxRequest::new(1, "")))
-            .unwrap();
-        tx2.send(ActorMsg::notify(MailboxRequest::new(2, "")))
-            .unwrap();
+        tx.send(notify(1)).unwrap();
+        tx2.send(notify(2)).unwrap();
 
         // 単一 consumer がすべてを 1 本の FIFO として受ける。
         let order: Vec<u64> = drain(&rx).iter().map(seq_of).collect();
@@ -385,11 +356,11 @@ mod tests {
         let (tx, rx) = mailbox();
 
         // ケース A: アクター役が reply を送る → 値が届く。
-        let (get_a, reply_rx_a) = ActorMsg::get(MailboxRequest::new(1, ""));
+        let (get_a, reply_rx_a) = get(1);
         tx.send(get_a).unwrap();
 
         // ケース B: アクター役が reply を送らず drop → 受信側は Disconnected。
-        let (get_b, reply_rx_b) = ActorMsg::get(MailboxRequest::new(2, ""));
+        let (get_b, reply_rx_b) = get(2);
         tx.send(get_b).unwrap();
         drop(tx);
 
@@ -400,13 +371,13 @@ mod tests {
             if let ActorMsg::Get { req, reply } = msg
                 && req.seq == 1
             {
-                reply.send(Reply::Value("ok".to_string())).unwrap();
+                reply.send("ok".to_string()).unwrap();
             }
         }
 
         assert_eq!(
             reply_rx_a.recv(),
-            Ok(Reply::Value("ok".to_string())),
+            Ok("ok".to_string()),
             "replied GET must deliver its value exactly once"
         );
         assert!(

@@ -20,9 +20,9 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use pasta::actor::teardown::teardown_via_sender;
-use pasta::actor::thread::spawn_actor_thread;
+use pasta::actor::thread::spawn_actor_thread_with;
 use tempfile::TempDir;
 
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前
@@ -87,26 +87,28 @@ fn stop_done_ack_drains_then_tears_down_cleanly() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir, rx);
+    let actor =
+        spawn_actor_thread_with(0, load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     // drain-before-stop: Stop の直前に GET を投入する。GET の応答は Stop より前に
     // 返らねばならない（同一 FIFO・先行メッセージ drain 後に Stop が処理される）。
-    let (get, reply_rx) = ActorMsg::get(MailboxRequest::new(
+    let (reply, reply_rx) = flume::bounded::<String>(1);
+    let req = MailboxRequest::new(
         1,
         normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n"),
-    ));
-    tx.send(get).expect("send GET into mailbox");
+    );
+    tx.send(ActorMsg::Get { req, reply })
+        .expect("send GET into mailbox");
 
     // 送信端から Stop{done} を送り、有界に done ack を待ち、スレッドを手放す。
     let report = teardown_via_sender(&tx, Duration::from_secs(10));
     actor.detach();
 
     // 先行 GET は Stop の前に drain されて応答済みのはず（clean drain の証跡）。
-    let pre_stop = reply_rx
+    reply_rx
         .recv_timeout(Duration::from_secs(10))
         .expect("GET enqueued before Stop must be drained and replied before teardown");
-    let Reply::Value(_) = pre_stop;
 
     assert!(
         report.acked,
@@ -125,7 +127,8 @@ fn second_teardown_after_done_is_safe_noop() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir, rx);
+    let actor =
+        spawn_actor_thread_with(0, load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     let first = teardown_via_sender(&tx, Duration::from_secs(10));

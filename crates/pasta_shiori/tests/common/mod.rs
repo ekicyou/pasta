@@ -6,6 +6,7 @@ pub mod response;
 pub mod test_env;
 
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
 /// Neutralize ambient DAP debug env vars before any test thread starts.
@@ -146,4 +147,37 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+// ============================================================================
+// ゴーストのログを読む補助
+// ============================================================================
+
+/// ゴーストのログのファイル（既定の `profile/pasta/logs/pasta.log`）を読む。無ければ空。
+pub fn read_log(ghost: &Path) -> String {
+    std::fs::read_to_string(ghost.join("profile/pasta/logs/pasta.log")).unwrap_or_default()
+}
+
+/// ログのファイルに `needle` が現れるのを待つ（書き込みは非同期の書き手を通るため）。
+pub fn wait_log_contains(ghost: &Path, needle: &str) -> String {
+    let start = Instant::now();
+    loop {
+        let log = read_log(ghost);
+        if log.contains(needle) || start.elapsed() > Duration::from_secs(10) {
+            return log;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// このゴーストのデバッグの待受が実際に使っているポート（`debug backend listening` の行から読む）。
+pub fn listening_port(ghost: &Path) -> u16 {
+    let log = wait_log_contains(ghost, "debug backend listening");
+    let line = log
+        .lines()
+        .find(|l| l.contains("debug backend listening"))
+        .unwrap_or_else(|| panic!("debug backend must listen:\n{log}"));
+    let addr = line.split("addr=").nth(1).expect("addr field");
+    let addr = addr.split_whitespace().next().expect("addr value");
+    addr.rsplit(':').next().unwrap().parse().expect("port")
 }

@@ -4,7 +4,7 @@
 //! teardown」の本番化。teardown は **`ActorMsg::Stop { done }` 制御メッセージ**を
 //! mailbox（単一 FIFO）へ送ることで成立する。Stop は同一 FIFO を通るため、先行
 //! メッセージは Stop の前に drain される（clean drain）。アクター（[`thread`] の
-//! `spawn_actor_thread` が回す単一の同期 `recv()` ループ）は Stop で:
+//! `spawn_actor_thread_with` が回す単一の同期 `recv()` ループ）は Stop で:
 //!
 //! 1. 残メッセージを drain 後（FIFO 順序が保証）、
 //! 2. VM（`PastaShiori` が内包する `!Send` Lua VM）を drop して debug backend teardown を

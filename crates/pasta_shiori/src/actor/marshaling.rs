@@ -6,7 +6,7 @@
 //!
 //! - **GET（R5.1）**: flume `bounded(1)` の reply tx を [`ActorMsg::Get`] に同梱して
 //!   `try_send`、同期 [`Receiver::recv_timeout`]`(GET_TIMEOUT)` でブロック受信。
-//!   `Ok(Value)`→応答文字列（VM 応答、またはリクエスト処理エラー由来の 500 応答）、
+//!   `Ok(応答)`→応答文字列（VM 応答、またはリクエスト処理エラー由来の 500 応答）、
 //!   `Timeout`/`Disconnected`→204。
 //! - **NOTIFY（R5.2）**: 応答経路なしで `try_send`、アクター完了を待たず **即 204**。
 //! - **drop→204（R5.3）**: アクターが reply を **送れない**（スレッド消滅・panic 等）まま
@@ -27,10 +27,8 @@
 //! - marshaling 自由関数は **呼び出し側が渡した `Sender`** に対して動作する。出荷経路では
 //!   `lifecycle::marshal_request` が `static LEGACY` の芯の型 `ActorInstance` から読んだ `Sender` を
 //!   `classify_request`・[`marshal_get`]・[`marshal_notify`] に渡す（`windows.rs` の
-//!   `request` から呼ばれる）。テストは `spawn_actor_thread` が返す mailbox の `Sender` を
-//!   直接渡して契約を隔離検証する。
-//! - 本モジュールの [`marshal_request`]（`Sender` と `seq` を引数に取る版）はテスト用の
-//!   ディスパッチで、出荷経路は `lifecycle::marshal_request` を使う。
+//!   `request` から呼ばれる）。テストは `spawn_actor_thread_with` に渡した mailbox の
+//!   `Sender` を [`marshal_get`]・[`marshal_notify`] へ直接渡して契約を隔離検証する。
 //!
 //! # GET タイムアウト閾値（R5.8/R5.9・RN4 決定）
 //! [`GET_TIMEOUT`] は **通常運転で決して発火しない安全網**である（R5.8: 通常経路バイト不変）。
@@ -56,7 +54,7 @@ use std::time::Duration;
 
 use flume::{Sender, bounded};
 
-use crate::actor::mailbox::{ActorMsg, MailboxRequest, Reply};
+use crate::actor::mailbox::{ActorMsg, MailboxRequest};
 use crate::util::parsers::req::{ParseError, Parser, Rule};
 use pest::Parser as _;
 use pest::Position;
@@ -180,7 +178,7 @@ pub fn marshal_get_with_timeout(
     timeout: Duration,
 ) -> String {
     // flume・同期 recv_timeout で受ける reply 経路（exactly-once は move/drop 意味論）。
-    let (reply_tx, reply_rx) = bounded::<Reply>(1);
+    let (reply_tx, reply_rx) = bounded::<String>(1);
 
     let seq = req.seq;
     // try_send 失敗＝アクタースレッド不在/異常/満杯（R5.6）。reply_tx はここで drop され、
@@ -215,7 +213,7 @@ pub fn marshal_get_with_timeout(
     // 同期 recv_timeout ゆえ flume の cancel 欠陥に無関係。
     match reply_rx.recv_timeout(timeout) {
         // 値到達: アクター VM が構築した応答文字列を返す（R5.1・通常経路バイト不変 R5.8）。
-        Ok(Reply::Value(s)) => {
+        Ok(s) => {
             // 観測ログ点（R10.4）: reply 値が SHIORI スレッドへ到達（exactly-once の move 側）。
             tracing::trace!(
                 seam = "actor.reply",
@@ -269,24 +267,6 @@ pub fn marshal_notify(tx: &Sender<ActorMsg>, req: MailboxRequest) -> String {
         "NOTIFY enqueued (fire-and-forget) -> 204"
     );
     default_204()
-}
-
-/// メソッド判定込みの marshaling ディスパッチ（R5.5・SHIORI スレッド入口想定）。
-///
-/// 生 request 文字列から **VM 投入前**にメソッドを決定し、GET=block-on-reply／NOTIFY=即
-/// 204 へ分岐する。メソッド未検出（不正リクエスト）は 204 に倒す（panic させない）。
-/// `seq` は mailbox の順序識別子（FIFO 観測用）。
-pub fn marshal_request(tx: &Sender<ActorMsg>, seq: u64, request: &str) -> String {
-    match classify_request(request) {
-        Ok(RequestKind::Get | RequestKind::Shiori2(ShioriMethod::Get)) => {
-            marshal_get(tx, MailboxRequest::new(seq, request.to_string()))
-        }
-        Ok(RequestKind::Notify | RequestKind::Shiori2(ShioriMethod::Notify)) => {
-            marshal_notify(tx, MailboxRequest::new(seq, request.to_string()))
-        }
-        // 不正リクエスト（解けない）: 安全側として 204（無限待機/パニックなし）。
-        Err(_) => default_204(),
-    }
 }
 
 #[cfg(test)]
@@ -371,7 +351,7 @@ mod tests {
         // アクター役: GET を drain し、req.raw をそのまま値として reply する。
         let actor = thread::spawn(move || {
             if let Ok(ActorMsg::Get { req, reply }) = rx.recv() {
-                let _ = reply.send(Reply::Value(format!("echo:{}", req.raw)));
+                let _ = reply.send(format!("echo:{}", req.raw));
             }
         });
 
@@ -483,11 +463,11 @@ mod tests {
             //         work は失われず最後まで完走する（co_scene 保存の構造的模擬）。
             if let Ok(ActorMsg::Get { req: _, reply }) = rx.recv() {
                 let _ = release_rx.recv();
-                let _ = reply.send(Reply::Value("late-but-completed".to_string()));
+                let _ = reply.send("late-but-completed".to_string());
             }
             // Round2: 通常速度で reply（次 tick での回復に相当）。
             if let Ok(ActorMsg::Get { req, reply }) = rx.recv() {
-                let _ = reply.send(Reply::Value(format!("recovered:{}", req.raw)));
+                let _ = reply.send(format!("recovered:{}", req.raw));
             }
         });
 
@@ -525,7 +505,7 @@ mod tests {
             while let Ok(msg) = rx.recv() {
                 match msg {
                     ActorMsg::Get { req, reply } => {
-                        let _ = reply.send(Reply::Value(req.raw));
+                        let _ = reply.send(req.raw);
                     }
                     ActorMsg::Stop { done } => {
                         let _ = done.send(());

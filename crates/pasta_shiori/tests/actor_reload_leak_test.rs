@@ -21,7 +21,7 @@ use std::time::Duration;
 
 use pasta::actor::mailbox::mailbox;
 use pasta::actor::teardown::teardown_via_sender;
-use pasta::actor::thread::spawn_actor_thread;
+use pasta::actor::thread::spawn_actor_thread_with;
 use tempfile::TempDir;
 
 /// reload 反復の結果レポート（R7.2 の re-spawn ＋ R7.3 のリーク不在）。
@@ -72,7 +72,7 @@ impl ReloadProbe {
     /// reload（spawn→teardown）サイクルを `n` 回反復し、各サイクルの teardown 結果と
     /// 累積リーク指標を返す。
     ///
-    /// 各サイクルは新規 `spawn_actor_thread`（新スレッド＋新 VM＋新チャネル）→
+    /// 各サイクルは新規 `spawn_actor_thread_with`（新スレッド＋新 VM＋新チャネル）→
     /// 送信端からの `teardown_via_sender`（`Stop{done}` ack）→ 手放し（detach）。ack を受けてから
     /// 次サイクルを spawn するため、計測は **done ack 後** に行われる（解放完了後の実測）。
     ///
@@ -110,7 +110,8 @@ impl ReloadProbe {
 /// reload を 1 回（spawn→teardown）回し、teardown が clean（ack が届き異常が無い）だったかを返す。
 fn run_one_reload_cycle(load_dir: &Path, timeout: Duration) -> bool {
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir.to_path_buf(), rx);
+    let actor = spawn_actor_thread_with(0, load_dir.to_path_buf(), rx, None, None)
+        .expect("actor thread must spawn");
     let report = teardown_via_sender(&tx, timeout);
     // ack の有無に関わらず手放す（join でハングさせない）。ack 済みならループは抜け済み。
     actor.detach();

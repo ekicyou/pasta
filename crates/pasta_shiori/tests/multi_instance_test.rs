@@ -15,7 +15,7 @@ use std::path::Path;
 use std::sync::{Arc, Barrier, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use common::copy_fixture_to_temp;
+use common::{copy_fixture_to_temp, listening_port, read_log, wait_log_contains};
 use pasta::actor::lifecycle;
 use pasta::shiori_get_api;
 use shiori4_abi::{SHIORI_ABI_VERSION_3, ShioriApi, ShioriInstance};
@@ -66,39 +66,11 @@ fn request(inst: &mut ShioriInstance<'_>, req: &str) -> (i32, String) {
     (res.status, body)
 }
 
-fn read_log(ghost: &Path) -> String {
-    std::fs::read_to_string(ghost.join("profile/pasta/logs/pasta.log")).unwrap_or_default()
-}
-
-/// ログのファイルに `needle` が現れるのを待つ（書き込みは非同期の書き手を通るため）。
-fn wait_log_contains(ghost: &Path, needle: &str) -> String {
-    let start = Instant::now();
-    loop {
-        let log = read_log(ghost);
-        if log.contains(needle) || start.elapsed() > Duration::from_secs(10) {
-            return log;
-        }
-        std::thread::sleep(Duration::from_millis(50));
-    }
-}
-
 /// ログの各行の量（`<時刻> <量> ...` の 2 つ目の語）。
 fn levels(log: &str) -> Vec<&str> {
     log.lines()
         .filter_map(|line| line.split_whitespace().nth(1))
         .collect()
-}
-
-/// このゴーストのデバッグの待受が実際に使っているポート（`debug backend listening` の行から読む）。
-fn listening_port(ghost: &Path) -> u16 {
-    let log = wait_log_contains(ghost, "debug backend listening");
-    let line = log
-        .lines()
-        .find(|l| l.contains("debug backend listening"))
-        .unwrap_or_else(|| panic!("debug backend must listen:\n{log}"));
-    let addr = line.split("addr=").nth(1).expect("addr field");
-    let addr = addr.split_whitespace().next().expect("addr value");
-    addr.rsplit(':').next().unwrap().parse().expect("port")
 }
 
 /// DAP の `pasta/reloadShiori` を送り、応答を受けるまで待つ（応答の前に kick の送り先が呼ばれる）。

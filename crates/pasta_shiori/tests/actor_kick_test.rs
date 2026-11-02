@@ -13,8 +13,8 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
-use pasta::actor::thread::spawn_actor_thread;
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
+use pasta::actor::thread::spawn_actor_thread_with;
 use pasta::{PastaShiori, Shiori};
 use tempfile::TempDir;
 
@@ -116,14 +116,13 @@ fn normalize_request(text: &str) -> String {
 }
 
 fn get_via_actor(tx: &flume::Sender<ActorMsg>, seq: u64, raw_request: &str) -> String {
-    let (msg, reply_rx) = ActorMsg::get(MailboxRequest::new(seq, normalize_request(raw_request)));
-    tx.send(msg).expect("send GET into mailbox");
-    match reply_rx
+    let (reply, reply_rx) = flume::bounded::<String>(1);
+    let req = MailboxRequest::new(seq, normalize_request(raw_request));
+    tx.send(ActorMsg::Get { req, reply })
+        .expect("send GET into mailbox");
+    reply_rx
         .recv_timeout(Duration::from_secs(10))
         .expect("GET reply must arrive within timeout")
-    {
-        Reply::Value(v) => v,
-    }
 }
 
 /// ブリッジ直呼び（actor 不要）: `PastaShiori::kick(scene)` が VM の `SHIORI.kick` を
@@ -199,12 +198,15 @@ fn actor_kick_arm_installs_pending_last_wins() {
     let (load_dir, _temp) = build_kick_dir();
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir, rx);
+    let actor =
+        spawn_actor_thread_with(0, load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     // 連続 Kick（応答経路なし・即投入）。同一 FIFO 上で投入順に処理される。
-    tx.send(ActorMsg::kick("intro")).expect("send Kick(intro)");
-    tx.send(ActorMsg::kick("outro")).expect("send Kick(outro)");
+    for scene in ["intro", "outro"] {
+        let scene = scene.to_string();
+        tx.send(ActorMsg::Kick { scene }).expect("send Kick");
+    }
 
     // 後続 GET は同一 FIFO で Kick 処理完了後に返り、STORE 状態をエコーする。
     let resp = get_via_actor(&tx, 1, "GET SHIORI/3.0\nCharset: UTF-8\nID: OnObserve\n");
@@ -247,10 +249,12 @@ return SHIORI
     .unwrap();
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir, rx);
+    let actor =
+        spawn_actor_thread_with(0, load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded());
 
-    tx.send(ActorMsg::kick("intro")).expect("send Kick");
+    let scene = "intro".to_string();
+    tx.send(ActorMsg::Kick { scene }).expect("send Kick");
 
     // アクタースレッドは生存し、後続 GET が同一 FIFO で返る。
     let resp = get_via_actor(&tx, 1, "GET SHIORI/3.0\nCharset: UTF-8\nID: OnObserve\n");
