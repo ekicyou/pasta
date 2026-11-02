@@ -117,26 +117,6 @@
 
 - `virtual_dispatcher.lua` の `dispatch` に、キックの後・`check_hour` の前の門（`if STORE.auto_talk_paused then return nil end`）を足した。公開の関数 `M.restart_timers(act)` も足した（`next_talk_time`・`next_hour_unix`・`seen_epoch` を書く）。`check_talk` には手を入れていない。行番号は測り直して合わせる。
 
-## 2026-10-23 棚卸の再測定（main 8fc9bdff）
-
-- **前提の変化**: 0.4.2 の 2 本が、この spec の領域（`crates/pasta_lua/pasta_scripts`）に新しいコードを足した。監査のやり直しでは、これも対象に入る。
-  - `ontalk-suppression`: 自動トークを止める・再開する関数（`shiori/entry.lua` 29〜48 行）、印 `STORE.auto_talk_paused`（`store.lua`）、ランダムトークと時報の門（`shiori/event/virtual_dispatcher.lua` 263〜267 行）と時計の決め直し `M.restart_timers`（282 行）、撫で・つつきの分岐（`shiori/event/mouse.lua` 143・165 行）、区切りの関数 `ACT_IMPL.yield`（`pasta/act.lua` 664 行）の見張り。`check_talk` には手が入っていない。止めている間は門で返るので、設定の読み直し（8 番）は止めている間は走らない。
-  - `scene-play-event`: 指名したシーンを再生する既定のハンドラ（新しいファイル `shiori/event/scene_play.lua` 107 行。読み込みは `shiori/event/init.lua` 82 行）、`scene.lua` の `SCENE.co_exec_exact` の広がりと、登録名の組から再生する `SCENE.co_exec_registered`（258 行）。
-  - 3 番（包む関数の写し）に効く: `SCENE.co_exec_registered` は、登録名の組から関数を引いて `wrap_scene` で包む。キック（`shiori/event/kick.lua` 59 行の `wrap_local_func`）と選択肢（`shiori/event/choice_select.lua` 25 行の `create_scene_coroutine`）は、登録名の組か検索の結果を持っているので、これを呼べば写しが消える。新しく `SCENE.wrap` を外へ出さずに済む見込み（再読み込みの `wrap_reload_func` 78 行は別の形なので残るかを確かめる）。
-- **触るファイル**: `virtual_dispatcher.lua` 328、`res.lua` 141（変わっていない）、`scene.lua` 266、`choice_select.lua` 80、`kick.lua` 163、`init.lua` 268（`set_co_scene` 101〜136 行・`EVENT.drive` 191 行から）、`callback.lua` 226、`store.lua` 131、`entry.lua` 153、`actor.lua` 291、`shiori/act.lua` 325、`pasta/act.lua` 837（1,000 行に近い。この spec は別名にする 1 か所と、区切りの関数を触るなら減らす向き）、`mouse.lua` 176、テスト `tests/lua_specs/`（Lua の spec は 4 本増えた）。新しいファイルは無い見込み。
-- **規模**: 10〜13 タスク（1〜9 番の直しと、監査のやり直しの増分。増えたコードの分は、写しの消し方が楽になった分とほぼ打ち消し合う）。
-- **先に要るもの**: 機能の上では無い。順番の約束が 2 つある。
-  - `chain-talk-interrupt` の後（`init.lua` の `set_co_scene`・`EVENT.drive` の決まりを、あちらが先に変える。4 番の整理は新しい決まりを保ったまま行う）。
-  - `reg-handler-chain` と同じウェーブに置かない（あちらは `init.lua` の `EVENT.fire`。こちらは同じファイルの `set_co_scene`・`EVENT.drive`）。どちらも 0.4.2 なので、「0.4.2 を出した後に入れる」決まりで自然に守られる。
-  - 0.5.0 との重なり: `novel-talk-flow`（`virtual_dispatcher.lua`・`init.lua`・`act.lua`・`scene.lua`）、`scene-attribute-store`（`scene.lua`）、`call-attribute-filter`・`scene-exact-match`・`cue-command-runtime`・`scene-anchor-link`（`act.lua`。`scene.lua` も一部）、`shell-element-click`（`choice_select.lua`・`init.lua`）、`novel-checkpoint-rollback`（`init.lua`・`virtual_dispatcher.lua`・`store.lua`）、`novel-variable-scope`（`virtual_dispatcher.lua` の保存の名前を動かす場合）、`recommend-menu-scenes`（`init.lua`・`scene.lua`）。
-- **種別**: バグ（数でない `hour_margin` で毎秒エラー、値の改行で応答が割れる、続きのトークの `get_property` がすぐ時間切れになる）。残りは写しと死んだ分岐の整理。
-- **要件定義のモデル**: Opus。決めごとは監査の指摘の直し方で、挙動を変える直しは brief で決まっている（改行は空白）。
-- **分割の案**: 不要。
-- **見つけた穴・古くなった記述**:
-  - 「Current State」の行番号: `hour_margin` は `virtual_dispatcher.lua` 121〜125・245〜247 行 → 84 行（設定の表）と 206 行（比べる所）、計算し直す行 251 → 211 行、毎秒の設定の読み直し 231 → 191 行（ほかに 100 行）。`set_co_scene` 96〜136 行 → 101〜136 行、203〜205 行 → 200・206 行。`store.lua` 77〜92 行 → 83 行あたり。`entry.lua` の `SHIORI.load` 45〜59 行 → 69〜84 行、`SHIORI.unload` 122〜131 行 → 140〜150 行。`shiori/act.lua` 291 → 292 行。
-  - 「Lua の spec 66 本は通る」は古い（4 本増えた）。
-  - ロードマップの台帳（`roadmap.md` 449 行）の「Dependencies: none」は、上の順番の約束（`chain-talk-interrupt`、`reg-handler-chain`）を書いていない。運用ルールの「同じファイルを触る順も Dependencies に書く」に合わせるなら足す。
-
 ## 申し送り（reg-handler-chain より、2026-10-23 完了時）
 
 - `shiori/event/init.lua` の `EVENT.fire` の、act を作ってハンドラを呼ぶ所が、鎖のループ（ハンドラごとに `create_act` と `STOP.hold_handler`）と底の `rawget(REG, req.id) or EVENT.no_entry` に変わった。冒頭の説明も伸びたので、このファイルの行番号は測り直す。型判定の枝・`set_co_scene`・`EVENT.drive` には触れていない。
@@ -150,29 +130,6 @@
 - 仕組み: `shiori/event/init.lua` の `set_co_scene(co, keep)`・`drive_kind(co)`・`run_interrupt_scene(act)`・`EVENT.drive`（種類を決める → act の欄 `_spoke`・`_on_speech`・`_interrupted` を整える → 再開 → 欄を外す → 台詞の印を読む）。台詞の判定は `sakura_builder.lua` の `BUILDER.speaks`、印は `shiori/act.lua` の `SHIORI_ACT_IMPL.build` が立てる。詳しくは `.kiro/specs/completed/chain-talk-interrupt/design.md` の「続きの決まり」と ContinuationRule。
 - 見直しが要る論点: 4 番の整理（`coroutine.close` の死んだ分岐・`STORE.co_callback`）で、`set_co_scene` の `keep` の引数と `_interrupted` の枝（`set_co_scene(nil, false)`）を保つこと。brief の L70 の案（`if consume_staged then co = nil end; set_co_scene(co)`）はもう今の形に合わない。`EVENT.drive` の手順の順は `tests/lua_specs/chain_talk_interrupt_test.lua` が守っている。
 
-## 2026-10-23 棚卸の再測定（main 82176f19）
-
-- **前提の変化**: 順番の約束の 2 本（`chain-talk-interrupt`・`reg-handler-chain`）が入った。0.4.2 の残りは `shiori4-v3-portable`（Rust だけ）で、この spec とファイルを共有しない。監査のやり直しの対象に新しいコードが増えた: `event/init.lua` 268 → 371 行（`drive_kind`・`run_interrupt_scene`・鎖のループ）、`event/register.lua` 117 行（メタテーブル）、新しいファイル `event/external_control.lua` 145 行、`shiori/act.lua` 344・`sakura_builder.lua` 558・`store.lua` 139・`callback.lua` 233・`kick.lua` 167・`scene_play.lua` 114。
-  - 1 番（Must fix）は残っている。`virtual_dispatcher.lua`（328 行。変わっていない）84 行が `ghost.hour_margin or 30`、206 行で比べ、計算し直す 211 行より前で返る。設定の読み直しは 100・191 行。
-  - 2 番は残っている（`res.lua` 52〜56 行。変わっていない）。
-  - 3 番: 写しが 1 つ増えた。`external_control.lua` 82〜85 行の `coroutine.create`（呼び先に引数を渡し `a:build()` を返す。形が違う）。キックの `wrap_local_func`（`kick.lua` 59〜72 行）と `wrap_reload_func`（80〜92 行）は `STORE.co_preempt[co] = true` の印を付けるようになった。`SCENE.co_exec_registered`（`scene.lua` 258 行）にまとめるときは、印を付ける行を呼ぶ側に残す。`choice_select.lua` 25〜35 行と `scene.lua` 186〜197 行の `wrap_scene` は変わっていない。
-  - 4 番: `set_co_scene(co, keep)` は 110〜154 行。死んだ `coroutine.close` の分岐は 112〜117・133・146〜150 行と `store.lua` 97〜105 行。`STORE.co_callback` は `keep` の枝（120〜125 行）でも読むようになった。`EVENT.drive`（257〜301 行）は 286 行で `consume_staged` の戻り値を捨てている。直すときはこの真偽を `keep` の枝と捨てる枝の両方へ渡し、`_interrupted` の枝（295 行の `set_co_scene(nil, false)`）を保つ。手順の順は `tests/lua_specs/chain_talk_interrupt_test.lua` が守る。`callback.lua` は 73・230 行、`store.lua` の説明は 22・90〜92 行。
-  - 7 番は残っている。期限は `shiori/act.lua` 309〜310 行の `CLOCK.steady(self.req)` で、`self` は区切る前の act（`pasta/act.lua` 664〜675 行の `ACT_IMPL.yield` が `self` を返し、再開の値を捨てる）。
-  - 5・6・9 番の場所は変わっていない（`entry.lua` 69・140 行、`actor.lua` 20〜53 行、`pasta/act.lua` 410 行の `find_handler`）。
-- **触るファイル**: 上のとおり。`pasta/act.lua` 837（1,000 行に近い。この spec は減らす向き）。新しいファイルは無い見込み。
-- **規模**: 11〜14 タスク（新しいコードの監査と、増えた写しの分で 1 つ増える）。
-- **先に要るもの**: 機能の上では無い（Dependencies の 2 本は完了）。ファイルの重なり（未完了）: `recommend-menu-scenes`（`init.lua`・`entry.lua`、`scene.lua` に足すならそれも）、`shell-element-click`（`choice_select.lua`・`init.lua`）、`scene-exact-match`（`choice_select.lua`・`init.lua`・`scene.lua`・`virtual_dispatcher.lua`）、`scene-anchor-link`（`choice_select.lua`・`init.lua`・`act.lua`・`sakura_builder.lua`）、`novel-talk-flow`・`novel-checkpoint-rollback`（`init.lua`・`virtual_dispatcher.lua`・`entry.lua` ほか）、`scene-attribute-store`・`scene-pick-modes`（`scene.lua`）、`call-attribute-filter`・`cue-command-runtime`（`act.lua` ほか）。`shiori4-v3-portable` とは重ならない。
-- **種別**: バグ（数でない `hour_margin` で毎秒エラー、値の改行で応答が割れる、続きのトークの `get_property` がすぐ時間切れ）。残りは写しと死んだ分岐の整理。
-- **要件定義のモデル**: Opus。
-- **分割の案**: 不要。
-- **見つけた穴・古くなった記述**
-  - roadmap の台帳（460 行）の Dependencies（`chain-talk-interrupt`・`reg-handler-chain`）は、どちらも完了した。
-  - Approach の「`if CALLBACK.consume_staged(co, act) then co = nil end; set_co_scene(co)`」は今の形に合わない（上の 4 番）。
-  - `virtual_dispatcher.lua` 251〜253 行の説明「`set_co_scene` 置換で前 co_scene を閉じる」は古い。今はキックのコルーチンに付けた `STORE.co_preempt` の印で捨て、LuaJIT には `close` が無い。監査の指摘に入れる。
-  - 申し送り（`external-control-events` の設計の Non-Goals）: `scene_play.lua` と `external_control.lua` に共通する部品（名前の引き当てと、見つからないときの失敗の表記）の取り出しは、この spec の題材にする。
-  - 申し送り（`chain-talk-interrupt` の tasks.md の注記）: `EVENT.drive` の `_interrupted` の枝は `STORE.co_callback` を戻さない。`get_property` の組み立てが台詞として数えられるように変わるなら、ここを見直す。
-
-
 ## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
 
 - `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
@@ -180,3 +137,18 @@
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
 - 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+
+## 2026-11-02 棚卸の再測定（main 491cc23c）
+
+- **前提の変化**: 前の測り直し（82176f19）の後、3 本がこの spec の領域に手を入れた。どれも監査のやり直しの対象に入る。
+  - `recommend-menu-scenes`: 新しいファイル `shiori/event/recommend.lua`（285 行。読み込みは `event/init.lua` 91 行）。130 行でシーン関数を `coroutine.create` でじかに動かす（写しの 5 つ目。その場で走らせて捨てる形）。119〜122 行の名前の引き当ては、下の共通の部品と同じ題材。
+  - `mlua-stdlib-removal`: `external_control.lua` 145 → 152 行（Reference の型の読み）。3 番の `coroutine.create` は 83 行。`date-var-season-sekku`: `shiori/act.lua` 344 → 358 行（`transfer_date_to_var` に季節・節句。7 番とは別の関数で重ならない）。
+  - 残っている（行は今の値）: 1 番 `virtual_dispatcher.lua`（328 行。変わっていない）84 行 `ghost.hour_margin or 30`、206 行で比べ、211 行の計算し直しより前で返る。設定の読み直しは 100・191 行。2 番 `res.lua` の `RES.build`（39 行から。変わっていない）。3 番 `kick.lua` 59〜72・80〜92 行（`STORE.co_preempt` の印は呼ぶ側に残す）・`choice_select.lua` 25〜35 行・`scene.lua` 186〜197 行。4 番 `set_co_scene(co, keep)` 111〜155 行、死んだ `close` の分岐 113〜118・134・147〜151 行と `store.lua` 97〜105 行、`EVENT.drive` 258 行から（287 行が `consume_staged` の戻り値を捨てる。296 行の `_interrupted` の枝 `set_co_scene(nil, false)` を保つ。手順の順は `chain_talk_interrupt_test.lua` が守る）、`callback.lua` 73・230 行。7 番は `shiori/act.lua` 324 行の `CLOCK.steady(self.req)`（`self` は区切る前の act。`pasta/act.lua` 664 行の `ACT_IMPL.yield` が再開の値を捨てる）。5・6・9 番は `entry.lua` 69・140 行、`actor.lua` 20〜53 行、`pasta/act.lua` 410 行。
+  - README と `tech.md` の断り書きは `ponytail-lua-loader` が書いた。この spec は書かない。
+- **触るファイル**: 上のファイルと `recommend.lua` 285、`init.lua` 372、`register.lua` 117、`scene_play.lua` 114、`sakura_builder.lua` 558（読むだけの見込み）、`pasta/act.lua` 837（1,000 行に近い。この spec は減らす向き）、`mouse.lua`、テスト `tests/lua_specs/`・`tests/shiori/virtual_event_config_resolution_test.rs`、マニュアル（Scope のとおり）。新しいファイルは無い見込み。
+- **規模**: 12〜15 タスク（`recommend.lua` の監査で 1 つ増える）。
+- **先に要るもの**: 機能の上では無い。ponytail のほかの 7 本とはソースが重ならない（`internals/shiori.md`・`execution-model.md` は `ponytail-shiori` と節が別）。`pasta/act.lua` は 1 ウェーブに 1 本の決まり。0.5.0 以降の重なり: `scene-attribute-store`・`scene-pick-modes`・`scene-condition-attributes`・`hello-novel-sample`（`scene.lua`・`act.lua`）、`scene-count`（`entry.lua`）、`scene-exact-match`・`scene-anchor-link`・`shell-element-click`・`cue-command-runtime`（`choice_select.lua`・`init.lua`・`act.lua` ほか）、`novel-talk-flow`・`novel-checkpoint-rollback`・`novel-variable-scope`（`init.lua`・`virtual_dispatcher.lua`・`store.lua` ほか）、`shiori4-v4-host`・`shiori4-v4-lua-api`（`kick.lua`・`scene_play.lua`・`init.lua`・`callback.lua`・`external_control.lua`・`shiori/act.lua`）。
+- **種別**: バグ（数でない `hour_margin` で毎秒エラー・値の改行で応答が割れる・続きのトークの `get_property` がすぐ時間切れ）。残りは写しと死んだ分岐の整理。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: Approach の「`if CALLBACK.consume_staged(co, act) then co = nil end; set_co_scene(co)`」は今の形に合わない（真偽を `keep` の枝と捨てる枝の両方へ渡す）。`virtual_dispatcher.lua` 252 行の説明「`set_co_scene` 置換で前 co_scene を閉じる」は古い（今は `STORE.co_preempt` の印で捨て、LuaJIT に `close` は無い）。申し送り（`external-control-events`）: `scene_play.lua`・`external_control.lua`（と `recommend.lua`）の名前の引き当てと、見つからないときの失敗の表記の共通の部品の取り出しは、この spec の題材。申し送り（`chain-talk-interrupt`）: `EVENT.drive` の `_interrupted` の枝は `STORE.co_callback` を戻さない。`get_property` の組み立てが台詞に数えられるように変わるなら見直す。

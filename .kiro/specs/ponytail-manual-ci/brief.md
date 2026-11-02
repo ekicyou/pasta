@@ -123,27 +123,6 @@
 - `github-release.ps1` の添付は 5 つ（配布物 4 つと詳しいリリースノート）。`release-scripts-test.ps1` の項目 10 が、`pasta_check.zip` だけが無いときに gh より前で終了コード 1 になることを確かめる（`github-release.ps1` は今はこのテストで試されている）。
 - 見直しの論点: 合わせるときに上の行を保つこと（本 spec の Revalidation Triggers）。
 
-## 2026-10-23 棚卸の再測定（main 8fc9bdff）
-
-- **前提の変化**
-  - pasta_check を単体で配る作業（pasta-check-release-asset）が 2026-10-22 に入った。この spec が先に入るのを待つ理由は無くなった。
-  - リリースの流れ `.github/workflows/release.yml` は 589 行になり、公開の資格を持つ job の行番号が 15 行ずれた（ツールの用意 259 行・キャッシュ 262 行・crates.io の認証 268〜308 行・Azure のログイン 410 行）。build の job（73・78 行）にも同じ可変のタグの action があるが、資格を持たない job なので、固定するかはギャップ分析で決める。
-  - `github-release.ps1` は添付が 5 つになり、リリースの補助スクリプトのテスト `release-scripts-test.ps1`（項目 10）が試すようになった。このテストは `build.yml` の最後の段（149 行）で走る。
-  - `manual.yml`・`release-setup-check.yml`・`book/tools`・`book/theme` は変わっていない。Node 20 は `manual.yml` 75 行・`release.yml` 25 行（共通の値 `NODE_VERSION`）・`release-setup-check.yml` 35 行。mdBook 0.5.3 は `manual.yml` 92 行と `tech.md` 221 行（brief の 220 行から 1 行ずれた）。
-- **触るファイル**: `.github/workflows/` の `build.yml`（149 行）・`manual.yml`（216 行）・`release.yml`（589 行）・`release-setup-check.yml`（122 行）、`book/tools/`（`highlight/highlight-html.mjs`・`talk/talk.mjs`・`bigram-index/poc-test.mjs`・`bigram-index/poc/`・`bigram-index/build-index-test.mjs` と、写しを比べる小さな検査）、`book/theme/head.hbs`、`tech.md`。`.github/scripts/release/*.ps1` はギャップ分析の監査の対象（前回は読んでいない）。1,000 行に近いものは無い。
-- **規模**: 11〜14 タスク。
-- **先に要るもの**
-  - 機能の上では無い。Specs の一覧の `Dependencies: pasta-check-release-asset` は、もう満たされている。合わせるときは、build の job の x64 のターゲット・キャッシュのキー `i686-x86_64-pc-windows-msvc`・`pasta_check.zip` の検査と upload の行・添付 5 つを保つ（申し送りのとおり）。
-  - 0.4.2 の残りと 0.5.0 の spec は `.github/` を触らない。重なりうるのは `book/tools` だけ。文法定義を変える spec（`call-attribute-filter`・`scene-exact-match`・`scene-anchor-link`）は、マニュアルの色付けのテスト（`book/tools/highlight/` の `tokenizer-test.mjs` など）を合わせることがある。この spec が触るのは `highlight-html.mjs` の終わりの判定（257〜269 行）で、別のファイル。
-  - 章を足す spec（`novel-areka-contract` が足すなら）は、章の数を決め打ちする 3 つの検査を直す。この spec の写しの整理（`talk.mjs` の `chapterRegions`）が `gen-skill-refs.mjs`・`gen-skill-refs-test.mjs` に及ぶなら、ぶつかる。
-  - 0.4.2 のリリースの間は、`release.yml` を main に入れない（リリースの席）。
-- **種別**: 基盤（検査の置き場所・権限・action の版の固定。Rust のファイルの名前を変える PR で main が後から赤くなる穴を塞ぐ）。
-- **要件定義のモデル**: Opus。
-- **分割の案**: 不要。
-- **見つけた穴・古くなった記述**
-  - 3 番の行番号（L244・L247・L253-293・L395）は、上のとおり 15 行ずれた。
-  - `manual.yml` 191〜197 行の Setup Pages の注記（`enablement: true` で Pages が有効になる）は誤り（2 番。直すのは設計以降）。
-
 ## 申し送り（pasta-skills-release-asset より）
 
 - `release.yml` の build の job の「Setup Node」の直後に、step「Check generated skill references」（`node book/tools/gen-skill-refs.mjs --check`）を足した。タグの時点で配るスキルの写しが最新であることを、長いビルドの前に保証するためである。関門（gate）に同じ照合を足すときは、この step との重複を整理する（どちらに残すかは本 spec の論点）。
@@ -155,28 +134,6 @@
 - `manual.yml` の Node は、PR #187 で 20 → 22 にした（jsdom 30 が Node ^22.22.2 以上を要るため。75 行）。上の再測定の「Node 20 は `manual.yml` 75 行」は古い。残る Node 20 は `release.yml` 25 行（`NODE_VERSION`）と `release-setup-check.yml` 35 行。
 - 2026-10-24 に起票した `vsce-4-upgrade`（vsce 4 は Node 22 を要る）は、この spec が `release.yml`・`release-setup-check.yml` を Node 22 にするのを待つ（`Dependencies: ponytail-manual-ci`）。この spec の範囲から Node 22 を外すときは、`vsce-4-upgrade` の brief の Scope に戻す。
 
-## 2026-10-24 棚卸の再測定（main c20ad104）
-
-- **前提の変化**
-  - pasta のスキル 3 本を配る作業（pasta-skills-release-asset）が入り、v0.4.2 を出した。配布物は 5 つ、GitHub Release の添付は 6 つ（配布物 5 つと詳しいリリースノート）。上の申し送りの「添付 5 つ」「配布物 4 つ」は古い。
-  - リリースの流れ `.github/workflows/release.yml` は 609 行になった。公開の資格を持つ job の行は、10-23 からさらに 20 行下へずれた（ツールの用意 279 行・キャッシュ 282 行・crates.io の認証 288〜328 行・Azure のログイン 430 行）。build の job の可変のタグ（73・78 行）は動いていない。
-  - build の job に、スキルの写しの鮮度の照合（120〜121 行 `gen-skill-refs.mjs --check`）が入った。1 番の 3 つの検査のうち、リリースで走らないのは `link-check` と `tutorial-check` の 2 つになった。
-  - マニュアルの流れ `manual.yml` は PR #187 で Node を 22 にした（75 行）だけで、ほかの行（権限 56〜59 行・mdBook 0.5.3 の 92 行・Rust の用意 131・134 行・Setup Pages 191〜197 行）は変わらない。`book/package.json` は jsdom 30（Node 22.22.2 以上が要る）になった。
-  - `book/tools`・`book/theme` は 10-23 から変わっていない。`tech.md` の mdBook の版の行は 222 行（10-23 の 221 行から 1 行ずれた）。
-- **触るファイル**: `.github/workflows/` の `build.yml`（149 行）・`manual.yml`（216 行）・`release.yml`（609 行）・`release-setup-check.yml`（122 行。Node は 35 行、Azure のログインは 43 行）、`book/tools/` の `highlight/highlight-html.mjs`・`talk/talk.mjs`（写しは 262〜274 行）・`bigram-index/poc-test.mjs`・`bigram-index/poc/`・`bigram-index/build-index-test.mjs`、写しを比べる小さな検査（新規）、`book/theme/head.hbs`（361 行）、`tech.md`。`.github/scripts/release/*.ps1`（いちばん大きいのは `release-scripts-test.ps1` の 266 行）は監査の対象。1,000 行に近いものは無い。
-- **規模**: 11〜14 タスクのまま。
-- **先に要るもの**
-  - 働きの上では無い。合わせるときは、build の job の `pasta-skills.zip` の検査（165〜177 行。`git ls-tree` の失敗で止まる 171 行を含む）・upload の 226〜230 行・`github-release.ps1` 72 行の 6 つの名前・`release-scripts-test.ps1` の項目 11（246 行）を保つ。鮮度の照合を関門に足すなら、build の job の 120〜121 行との重なりを整理する。
-  - 0.4.3 の 6 本との重なり: `shiori4-v3-portable` と `build.yml` を共有する（あちらは Linux の job で cargo を回す。こちらは ubuntu の job を 1 つ足す）。同じウェーブに置かない。ほかの 5 本（`toml-serialization`・`mlua-stdlib-removal`・`recommend-menu-scenes`・`ponytail-check-release`・`mlua-0-12-upgrade`）とはソースを共有しない。マニュアルの章を足す spec が出たら、章の数の 3 つの検査と `talk.mjs` の写しの整理がぶつかりうる。
-  - 0.4.5 以降: `pasta-dll-multiarch`（`release.yml`・`build.yml`）、`vsce-4-upgrade`（`release.yml`・`release-setup-check.yml`。Node 22 を待つ）と同じウェーブに置かない。リリースの実行中は `release.yml` を main へ入れない。
-- **種別**: 基盤（検査の置き場所・権限・action の版の固定）。
-- **要件定義のモデル**: Opus。
-- **分割の案**: 不要。
-- **見つけた穴・古くなった記述**
-  - 配るスキルは 3 本になったが、リンクの検査 `book/tools/link-check.mjs` 280 行の `CHECKED_SKILLS` は 2 本（`pasta-ghost-authoring`・`pasta-lua-coding`）だけで、`manual.yml` の path filter（26〜46 行）にも `.claude/skills/pasta-check/**` が無い。`pasta-check` のスキルのリンクと鮮度を誰も見ていない。ギャップ分析で、この spec に入れるかを決める。
-  - 3 番の行番号は上のとおり、また 20 行ずれた。`manual.yml` 191〜192 行の Setup Pages の注記の誤りは前のまま（2 番。直すのは設計以降）。
-
-
 ## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
 
 - `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
@@ -184,3 +141,20 @@
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
 - 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+
+## 2026-11-02 棚卸の再測定（main 491cc23c）
+
+- **前提の変化**
+  - `shiori4-v3-portable` が `build.yml` を 149 → 207 行にした。Windows の job に版 3 の 1 往復（67〜80 行）、新しい job `build-unix`（ubuntu と macOS。91〜130 行）。`build-unix` も可変のタグ（`dtolnay/rust-toolchain@stable`・`Swatinem/rust-cache@v2`）を使うが、資格を持たない job。ubuntu の job ができたので、Approach の「ubuntu の job を 1 つ足す」は、その ubuntu の行に 3 つの検査を載せるか、cargo を待たない小さな job を別に足すかを設計で選ぶ。リリースの関門（`release.yml` 56 行が `build.yml` を呼ぶ）でも `build-unix` が走るようになった。
+  - `release.yml`（609 行）・`manual.yml`（216 行）・`release-setup-check.yml`・`book/theme` は 10-24 から変わらない。行番号（公開の資格を持つ job の 279・282・288〜328・430 行、Node 20 の `release.yml` 25 行・`release-setup-check.yml` 35 行、mdBook 0.5.3 の `manual.yml` 92 行）もそのまま。`tech.md` の mdBook の行は 223 行（1 行ずれた）。`book/tools` は 3 行だけ（`gen-skill-refs.mjs`・`-test.mjs` の章 `mlua-stdlib.md`→`toml.md`、`verify-content.mjs` の `VOICE_DIRS` に `notes`）。
+  - 章を 1 つ足した（`book/src/notes/cc-sdd.md`・PR #216）ら、章の数を決め打ちする自己テスト 3 つ（`gen-skill-refs-test.mjs` 600 行・`talk/talk-test.mjs` 453 行・`verify-scripts-test.mjs` 81 行の 63）で main が赤になった（別に直している）。章の数の取り残しは 2026-10-17 に続いて 2 度目。CI を待たずにマージする運用なので、PR の manual.yml が赤でも止まらない。Scope の Out「章の数を決め打ちする 3 つの検査（受け入れ済みの約束）」を見直す議題にする（推奨: 数を `SUMMARY.md` から数えて比べ、決め打ちをやめる）。
+- **触るファイル**: `.github/workflows/` の `build.yml`（207 行）・`manual.yml`・`release.yml`・`release-setup-check.yml`、`book/tools/`（`highlight/highlight-html.mjs`・`talk/talk.mjs` の写し 262〜274 行・`bigram-index/poc-test.mjs`・`poc/`・`build-index-test.mjs`・写しを比べる小さな検査（新規）。上の議題を採るなら章の数の自己テスト 3 つ）、`book/theme/head.hbs`、`tech.md`。`.github/scripts/release/*.ps1` は監査の対象。1,000 行に近いものは無い。
+- **規模**: 11〜14 タスク（章の数の議題を採れば 12〜15）。
+- **先に要るもの**: 働きの上では無い。ほかの ponytail 7 本とはソースを共有しない（`ponytail-editor-tooling` とは `tech.md` の別の行）。`pasta-dll-multiarch`（`release.yml`・`build.yml`）・`vsce-4-upgrade`（`release.yml`・`release-setup-check.yml`。Node 22 をこの spec で待つ）・`pest-2-9-4-upgrade`（`build.yml` の `wasm` の job・`release.yml`）と同じウェーブに置かない。章を足す spec（`novel-areka-contract` など）は章の数の自己テストを触るので、議題を採るなら重なる。リリースの実行中は `release.yml` を main へ入れない。合わせるときに保つ行（`pasta-skills.zip` の検査・upload・`github-release.ps1` の 6 つの名前・`release-scripts-test.ps1` の項目 11・build の job の `gen-skill-refs --check`）は 10-24 のとおり。
+- **種別**: 基盤（検査の置き場所・権限・action の版の固定）。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**
+  - 1 番の「リリースで走らない 3 つ」は、`gen-skill-refs --check` が build の job（120〜121 行）に入ったので 2 つ（`link-check`・`tutorial-check`）（10-24 のとおり）。
+  - `pasta-check` のスキルは、`link-check.mjs` 280 行の `CHECKED_SKILLS`（2 本だけ）にも、`manual.yml` の path filter（26〜46 行）にも無い（10-24 のまま）。
+  - `verify-content.mjs` 23 行の「全 62 章」は今の章の数と合わない。`manual.yml` 191〜197 行の Setup Pages の注記の誤りは前のまま（2 番）。

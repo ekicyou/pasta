@@ -87,3 +87,18 @@
 
 - `ponytail-lua-loader` は、finalize 前の `@pasta_search` に常に空の `TranspileContext` を渡す形にし、`loader/process.rs` の `process_incremental` で `TranspileContext::merge_from` を呼ばなくなる。入った後は、`merge_from` の本番の使い手が無くなる。消すか残すかは、この spec が決める（`src/context.rs` はこの spec の持ち場）。
 - `lib.rs` の再輸出の行を、`ponytail-lua-loader` と共有する（`presentation`・`Encoder`/`Encoding`・`TranspileResult` の行が消える）。後から入る側が合わせる。
+
+## 2026-11-02 棚卸の再測定（main 491cc23c）
+
+- **前提の変化**
+  - この spec の領域（`code_gen/`・`normalize.rs`・`config.rs`・`context.rs`・`transpiler.rs`）は、2026-10-19 の監査から変わっていない（mlua 0.12 も `ponytail-lua-loader` も触れていない）。Current State の場所（`element_gen.rs` 474〜492 行・`normalize.rs` 108〜140 行・`context.rs` 17〜36・41 行・`transpiler.rs` 42・94 行）はそのまま。
+  - `ponytail-lua-loader` が入った。`lib.rs` の再輸出の `presentation`・`Encoder`/`Encoding`・`TranspileResult` は消えた。この spec が `lib.rs` で触るのは 50 行の `LineEnding` だけで、ほかの未完了の spec の brief は `lib.rs` を挙げていない。
+  - 申し送りの `merge_from`: `TranspileContext::merge_from`（`context.rs` 115〜126 行）は、テストも含めて呼び手が 0 になった。死んだ状態（3 番）に足して消す。消すと `pasta_core` の `SceneRegistry::merge_from`・`WordDefRegistry::merge_from` がテストだけになる。そちらは `ponytail-core-registry` の持ち場なので、後から入る側が消す（こちらが後ならこの spec が消す）。
+  - README と `tech.md` の断り書きは `ponytail-lua-loader` が書いた。この spec は書かない。
+- **触るファイル**: `code_gen/element_gen.rs` 564・`code_gen/mod.rs` 436・`code_gen/scope_gen.rs` 445 と `code_gen/*_tests.rs`、`normalize.rs` 463・`config.rs` 164・`context.rs` 454・`transpiler.rs` 339・`transpiler_tests.rs`・`lib.rs` 69、`tests/transpiler/`、`tests/fixtures/sample.generated.lua`、`book/src/internals/transpiler.md` 99〜102 行。1,000 行に近いものは無い。新しいファイルは無い見込み。
+- **規模**: 8〜10 タスク。
+- **先に要るもの**: 機能の上では無い。ponytail のほかの 7 本とはソースが重ならない（`ponytail-core-registry` とは上の `merge_from` の順だけ）。`element_gen.rs` は 1 ウェーブに 1 本の決まり。0.5.0 以降の `scene-attribute-store`・`cue-command-runtime`（`scope_gen.rs`・`context.rs`・`transpiler.rs`）、`scene-condition-attributes`・`scene-exact-match`（`context.rs` か `transpiler.rs` と `element_gen.rs`）、`scene-pick-modes`・`scene-anchor-link`・`hello-novel-sample`・`novel-talk-flow`・`novel-variable-scope`（`element_gen.rs` か `scope_gen.rs`）とは同じウェーブに置かない。
+- **種別**: バグ（Lua ブロックの長い文字列に空白が入り、空行が消える）。残りは効かない設定と死んだ状態の整理。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: `context.rs` 117 行の説明「Used by PastaLoader to combine contexts from multiple files.」は古い（ローダはもう呼ばない）。Adjacent の「`ponytail-lua-loader` と `lib.rs` の再輸出を共有する」は、あちらが入ったので済んだ。

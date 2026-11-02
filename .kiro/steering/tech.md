@@ -61,7 +61,7 @@
 - **shiori4_abi 0.1**: 版 3 の口（`shiori_get_api`）の ABI の検査（バッファの写し・UTF-8・パニックの捕捉）
 - **embed-resource 3**（build-dependency）: pasta.dll に VERSIONINFO（ファイル/製品バージョン）とアイコン（`res/pasta.ico`）を埋め込む（Windows ターゲットのみ）
 
-> **エンジン駆動モデル**: `pasta_lua` の `!Send` Lua VM を、インスタンス（`ActorInstance`）ごとに 1 本のアクタースレッドへ pin し、SHIORI スレッドとは flume mailbox の CH marshaling（GET=block-on-reply／NOTIFY=即204／drop・timeout→204）で通信する。アクタースレッドは OS に頼らない同期 `recv()` のループで回る。入口は 2 つ（旧来の HGLOBAL の `load`・`loadu`・`request`・`unload` は Windows だけ・置き場 `static LEGACY` に 1 つ／shiori4 の版 3 の `shiori_get_api` は全 OS・インスタンスごと）で、同じ芯につながる（`shiori4-v3-portable` で確立）。`unsafe impl Send/Sync` は構造的に撤去済み。さくらスクリプト描画は pasta_lua に物理維持（Lua 集約）し、レンダラはアダプタ注入で論理デカップリング（`pasta-actor-runtime` で確立）。
+> **エンジン駆動モデル**: `pasta_lua` の `!Send` Lua VM を、インスタンス（`ActorInstance`）ごとに 1 本のアクタースレッドへ pin し、SHIORI スレッドとは flume mailbox の CH marshaling（GET=block-on-reply／NOTIFY=即204／drop・timeout→204）で通信する。アクタースレッドは OS に頼らない同期 `recv()` のループで回る。入口は 2 つ（旧来の HGLOBAL の `load`・`loadu`・`request`・`unload` は Windows だけ・置き場 `static LEGACY` に 1 つ／shiori4 の版 3 の `shiori_get_api` は全 OS・インスタンスごと）で、同じ芯につながる（`shiori4-v3-portable` で確立）。`unsafe impl Send/Sync` は構造的に撤去済み。さくらスクリプト描画は pasta_lua に物理維持（Lua 集約。`pasta-actor-runtime` で確立）。レンダラを差し替える注入の口（`presentation/`・`RendererInjection`）は、使い手が無いので `ponytail-lua-loader` で撤去した。
 
 **pasta_lsp:**
 - **pasta_dsl**: DSLパーサー層
