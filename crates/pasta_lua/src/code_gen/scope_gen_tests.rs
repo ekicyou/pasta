@@ -313,6 +313,23 @@ fn choice_timeout_keeps_fractional_float_and_defaults_to_nil() {
     assert_eq!(ident_arg, "act:choice_timeout(nil)\n");
 }
 
+/// `!select` float seconds use one format without an i64 cast (9.2, 9.3):
+/// no saturation for huge values, and `-0.0` stays `0`.
+#[test]
+fn choice_timeout_float_seconds_do_not_saturate() {
+    for (secs, expected) in [
+        (10.0, "10"),
+        (2.5, "2.5"),
+        (1e19, "10000000000000000000"),
+        (-0.0, "0"),
+    ] {
+        let out = gen_to_string(|cg| {
+            cg.generate_local_scene_items(&[select_cmd("select", vec![CueArgToken::Float(secs)])])
+        });
+        assert_eq!(out, format!("act:choice_timeout({expected})\n"), "{secs}");
+    }
+}
+
 /// Non-`select` cue commands generate NO Lua output (handled elsewhere).
 #[test]
 fn non_select_cue_command_emits_nothing() {

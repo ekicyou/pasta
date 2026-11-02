@@ -387,14 +387,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         use pasta_dsl::parser::CueArgToken;
         let arg = match cmd.args.first() {
             Some(CueArgToken::Integer(n)) => n.to_string(),
-            Some(CueArgToken::Float(f)) => {
-                // Emit as integer if the value has no fractional part
-                if f.fract() == 0.0 {
-                    (*f as i64).to_string()
-                } else {
-                    f.to_string()
-                }
-            }
+            // `+ 0.0` turns `-0.0` into `0.0` so it prints `0`, not `-0`;
+            // Display already prints `10.0` as `10` without an i64 cast.
+            Some(CueArgToken::Float(f)) => (*f + 0.0).to_string(),
             _ => "nil".to_string(),
         };
         let out_line_before = self.out_line();
