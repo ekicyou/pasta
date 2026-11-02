@@ -2,15 +2,17 @@
 //!
 //! 本番と同じリクエスト経路——`lifecycle::spawn_actor`（FFI `load` 相当）で実 VM を
 //! アクタースレッドへ pin し、`lifecycle::marshal_request`（FFI `request` 相当）で
-//! アクター境界を跨いで応答を得る経路——を通して、以下 3 ケースを検証する（要件 6.3）。
+//! アクター境界を跨いで応答を得る経路——を通して、以下のケースを検証する（要件 6.3）。
 //!
 //!  (a) SHIORI 応答モジュール（`pasta.shiori.entry`）のロードに失敗するゴースト
 //!  (b) 利用者初期化スクリプト（`main`）のロードに失敗するゴースト
 //!  (c) ロードは成功するが `SHIORI.request` が複数行メッセージでエラーになるゴースト
+//!  (d) 旧来の入口 `load` に、存在しないフォルダを渡す（Windows のみ・ponytail-shiori 要件 2）
+//!  (e) 旧来の入口 `load` に、ANSI で表せない文字を含むパスを渡す（同上・ACP が 65001 なら飛ばす）
 //!
 //! 各ケースで確認するのは以下（要件 4.2 / 4.3 / 4.4 / 4.5 / 4.6 / 4.8 / 4.10 / 5.5）。
 //!
-//!  1. 初期化の成否: (a)(b) は `load` が false、(c) は true。
+//!  1. 初期化の成否: (a)(b)(d)(e) は `load` が false、(c) は true。
 //!  2. GET が 500 を返し、既定 204 へ読み替えられない。
 //!  3. `X-ERROR-REASON` の値に CR / LF を含まない（単一行）。
 //!  4. 理由に起動モジュール名と根本原因（(c) は複数行メッセージの各行）が含まれる。
@@ -19,7 +21,7 @@
 //!
 //! # 直列実行（プロセス全域 static を共有するため）
 //! `lifecycle::LEGACY` はプロセスグローバルである。本ファイルは **1 つの `#[test]`** に
-//! 3 ケースを直列に詰め、各ケースの終わりに `teardown_actor`（unload 相当）してから
+//! 全ケースを直列に詰め、各ケースの終わりに `teardown_actor`（unload 相当）してから
 //! 次のケースを spawn する（既存 `ffi_actor_lifecycle_test.rs` と同方式）。
 //!
 //! `mod common;` は `PASTA_DEBUG` / `PASTA_DEBUG_PORT` を main 前に中和する `#[ctor]` を
@@ -164,7 +166,7 @@ fn run_case(case: &str, loaded: bool, expect_loaded: bool, markers: &[&str]) {
     );
 }
 
-/// (a)(b)(c) を 1 本のテストで直列に検証する（プロセス全域 `LEGACY` 共有のため）。
+/// (a)〜(e) を 1 本のテストで直列に検証する（プロセス全域 `LEGACY` 共有のため）。
 #[test]
 fn load_failures_and_request_errors_are_visible_through_the_actor_boundary() {
     // --- ケース (a): SHIORI 応答モジュールのロード失敗（要件 4.1 / 4.5 / 5.5） ---
@@ -234,29 +236,34 @@ return SHIORI
 
 /// 旧来の入口 `load`（ANSI）にフォルダの無いパスを渡したときの 500（ponytail-shiori 要件 2.1〜2.4・9.4）。
 ///
-/// 直す前の振る舞いを固める特性化テスト。直した後は [`missing_dir::expected_reason`] だけを
-/// `Load error: load directory not found: <デコードしたパス>` に改める。
+/// GET の理由は `Load error: load directory not found: <入口がデコードしたパス>`。
+/// ANSI で表せない文字は、入口のデコードと同じく置き換わった形で出る。
 #[cfg(windows)]
 mod missing_dir {
     use super::run_case;
     use crate::common::{NON_ANSI_DIR_NAME, copy_fixture_into};
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use tempfile::TempDir;
-    use windows_sys::Win32::Globalization::{CP_ACP, GetACP, WideCharToMultiByte};
+    use windows_sys::Win32::Globalization::{
+        CP_ACP, GetACP, MultiByteToWideChar, WideCharToMultiByte,
+    };
     use windows_sys::Win32::System::Memory::{GMEM_FIXED, GlobalAlloc};
 
-    /// 直す前の理由（フォルダが無いことも探したパスも出ない）。
-    fn expected_reason(_dir: &Path) -> String {
-        "Not initialized error".to_string()
+    /// 直した後の理由：フォルダが無いことと、入口がデコードした形のパス。
+    fn expected_reason(dir: &Path) -> String {
+        format!(
+            "Load error: load directory not found: {}",
+            ansi_round_trip(dir).display()
+        )
     }
 
-    /// パスを CP_ACP へエンコードして出荷の `load` へ渡す（HGLOBAL は入口が解放する）。
-    /// 表せない文字は既定文字へ置き換わり、本番のホストが渡すバイト列と同じになる。
-    fn drive_ansi_load(dir: &Path) -> bool {
+    /// パスを CP_ACP へエンコードする。表せない文字は既定文字へ置き換わり、
+    /// 本番のホストが渡すバイト列と同じになる。
+    fn to_ansi(dir: &Path) -> Vec<u8> {
         use std::os::windows::ffi::OsStrExt;
         let wide: Vec<u16> = dir.as_os_str().encode_wide().collect();
         let in_len = i32::try_from(wide.len()).expect("path length must fit i32");
-        // SAFETY: 1 回目で必要長を測り、2 回目で GMEM_FIXED のブロックへ直接書く。
+        // SAFETY: 1 回目で必要長を測り、2 回目でその長さの Vec へ書く。
         unsafe {
             let call = |out: *mut u8, cap: i32| {
                 WideCharToMultiByte(
@@ -272,10 +279,41 @@ mod missing_dir {
             };
             let needed = call(std::ptr::null_mut(), 0);
             assert!(needed > 0, "WideCharToMultiByte length probe must succeed");
-            let h = GlobalAlloc(GMEM_FIXED, needed as usize);
+            let mut buf = vec![0u8; needed as usize];
+            assert_eq!(call(buf.as_mut_ptr(), needed), needed);
+            buf
+        }
+    }
+
+    /// 入口（`load`）と同じく CP_ACP のバイト列をデコードし直した形のパス。
+    fn ansi_round_trip(dir: &Path) -> PathBuf {
+        use std::os::windows::ffi::OsStringExt;
+        let ansi = to_ansi(dir);
+        let in_len = i32::try_from(ansi.len()).expect("path length must fit i32");
+        // SAFETY: 1 回目で必要長を測り、2 回目でその長さの Vec へ書く。
+        let wide = unsafe {
+            let needed =
+                MultiByteToWideChar(CP_ACP, 0, ansi.as_ptr(), in_len, std::ptr::null_mut(), 0);
+            assert!(needed > 0, "MultiByteToWideChar length probe must succeed");
+            let mut buf = vec![0u16; needed as usize];
+            assert_eq!(
+                MultiByteToWideChar(CP_ACP, 0, ansi.as_ptr(), in_len, buf.as_mut_ptr(), needed),
+                needed
+            );
+            buf
+        };
+        std::ffi::OsString::from_wide(&wide).into()
+    }
+
+    /// パスを CP_ACP へエンコードして出荷の `load` へ渡す（HGLOBAL は入口が解放する）。
+    fn drive_ansi_load(dir: &Path) -> bool {
+        let ansi = to_ansi(dir);
+        // SAFETY: GMEM_FIXED のブロックへバイト列を写して渡す。
+        unsafe {
+            let h = GlobalAlloc(GMEM_FIXED, ansi.len());
             assert!(!h.is_null(), "GlobalAlloc must succeed");
-            assert_eq!(call(h as *mut u8, needed), needed);
-            pasta::load(h, needed) == 1
+            std::ptr::copy_nonoverlapping(ansi.as_ptr(), h as *mut u8, ansi.len());
+            pasta::load(h, ansi.len() as i32) == 1
         }
     }
 
@@ -298,6 +336,11 @@ mod missing_dir {
         }
         let dir = root.path().join(NON_ANSI_DIR_NAME);
         copy_fixture_into("shiori_lifecycle", &dir);
+        // 理由のパスが、表せない文字の置き換わった形であることを前提として確かめる（2.4）。
+        assert!(
+            ansi_round_trip(&dir).to_string_lossy().contains('?'),
+            "非 ANSI の名前は CP_ACP で `?` へ置き換わるはず"
+        );
         run_missing_dir_case("e: non-ANSI missing dir", &dir);
     }
 }

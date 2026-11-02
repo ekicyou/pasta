@@ -102,6 +102,11 @@ impl Shiori for PastaShiori {
         // Validate load_dir exists
         if !load_dir_path.exists() {
             error!(path = %load_dir_path.display(), "Load directory not found");
+            // 以後の GET の 500 の理由に、探したパス（入口がデコードした形）を出す（ponytail-shiori 2.2・2.4）。
+            self.last_load_error = Some(format!(
+                "load directory not found: {}",
+                load_dir_path.display()
+            ));
             return Ok(false);
         }
 
