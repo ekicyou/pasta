@@ -121,7 +121,7 @@
   - _Boundary: ReleaseScripts_
   - _Requirements: 10.4, 10.5, 10.6, 10.9_
 
-- [ ] 8. ワークフローと steering
+- [x] 8. ワークフローと steering
 - [x] 8.1 (P) Build ワークフローにマニュアルの軽い検査の job を足す
   - `needs` を持たない job `manual-light`（name `manual-light-checks`）を足し、checkout・Node 22・軽い検査 3 つを `manual.yml` と同じ段の名前で走らせる
   - build の job の `upload-artifact` を v7 に上げる。第三者の action はタグのまま
@@ -161,7 +161,7 @@
   - _Requirements: 1.1, 1.4, 1.6, 2.4, 2.5, 3.6, 8.4_
 
 - [ ] 9. 検証と台帳
-- [ ] 9.1 手元で全部の検査とワークフローの確かめを通す
+- [x] 9.1 手元で全部の検査とワークフローの確かめを通す
   - 依存の無い自己テストと軽い検査 3 つ・本文の検査・`release-scripts-test.ps1` を走らせる。mdBook の出力が要る `verify-search`・`build-index-test` は一時のフォルダに作った出力で走らせる
   - `actionlint .github/workflows/*.yml` が 0 件。固定した SHA ごとに `gh api repos/<owner>/<repo>/commits/<sha>` が 200 で、行末のタグがその SHA を指す
   - `uses:` の grep で、release と setup check の第三者の action が全部 SHA、`build.yml` と `actions/*` がタグ、Node 20 の major が残っていないことを確かめる。`release.yml` の保つ行に hunk が無いことを確かめる
