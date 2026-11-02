@@ -30,7 +30,7 @@
 ### This Spec Owns
 
 - **span の計算**：`Span` の値を pest の `Pair` から作る方法（`parser/ast/span.rs`）と、17 か所の呼び出し（`parse_scene.rs`・`parse_action.rs`・`parse_elements.rs`・`parser/mod.rs`）。
-- **数の字句の値**：小数点の有無・i64 の範囲・有限の f64 の範囲で値を決める規則と、それを使う 4 か所（式の項・属性値・キューの引数）（`parse_elements.rs`・`parse_action.rs`・`parse_scene.rs`）。
+- **数の字句の値**：小数点の有無・i64 の範囲・有限の f64 の範囲で値を決める規則と、それを使う 3 か所（式の項・属性値・キューの引数）（`parse_elements.rs`・`parse_action.rs`・`parse_scene.rs`）。
 - **番号の範囲の検査**：アクターの番号（0〜4294967295、`parse_scene.rs`）とシーン引数の番号（0〜255、`parse_action.rs`）。
 - **深さと長さの守り**：`parse_str` の入口の括弧の重なりの走査（`parser/mod.rs`）と、1 つの式の二項演算子の数の検査（`parse_action.rs`・`parse_elements.rs`）。
 - **位置つきの誤りの作り方**：新しい誤りを `ParseError::SyntaxError` の今の形で作る補助（`parser/mod.rs`）と、それに要る `filename` の受け渡し。
@@ -547,7 +547,7 @@ impl From<std::io::Error> for ParseError { /* 今のまま */ }
 
 1 つ直すごとに確かめて 1 コミットにする（8.3）。どのコミットでも品質の関門が通る。挙動を変えるコミットは、そのコミットでマニュアルとスキルの参照も直す（7.1・7.3）。
 
-1. 固めるテスト（span の正解・速さ・AST の書き出し）を入れる。AST を書き出す（直す前の控え。スクラッチに置く）。
+1. 固めるテスト（span の正解・速さ・AST の書き出し）を入れる。この手順は単独の 1 コミットにする。AST を書き出す（直す前の控え。スクラッチに置き、手順 11 まで消さない）。
 2. `filename` の受け渡しと `syntax_error`（pest の誤りの写しを寄せる。挙動は変えない）。
 3. `Span::from_pair` で 17 か所を置き換え、`From<&pest::Span>` を消す（速さ。span の正解のテストが関門）。
 4. `number_value` と 4 か所、`Result<Option<_>>` の形（2.1〜2.6）。`literals.md`・`transpiler.md`。
@@ -557,7 +557,7 @@ impl From<std::io::Error> for ParseError { /* 今のまま */ }
 8. 誤りの型の撤去（4.1・4.2）と `error_api_test.rs`・README・`lib.rs` の説明（7.2）。
 9. `PastaFile.span` の撤去（5.1・5.2）と 2 つのテストの直し。
 10. 小物（6.1〜6.4）と `byte_len` のテスト。
-11. `pasta_check` のテスト（2.9・4.4）、AST を書き出して手順 1 の控えと比べる（8.1）、x86 の debug・release のテスト、品質の関門。
+11. `pasta_check` のテスト（2.9・4.4）、AST を書き出して手順 1 の控えと `diff -r` で比べ、差分が無いという出力をタスクの証拠に残す（8.1）、x86 の debug・release のテスト、品質の関門。
 
 戻すときは、そのコミットだけを revert すればよい。手順 3 と 6・7 は、ほかの手順に依らない。
 
