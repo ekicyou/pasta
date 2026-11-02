@@ -63,7 +63,7 @@ VSCode でゴーストをデバッグする作者が困っている（2026-10-19
 4. When ステップを始めたコルーチンが `yield` し、後で `resume` された, the Pasta Debug Backend shall 今と同じくそのステップを続け、`yield` をコルーチンの終わりとして扱わない。
 5. When ステップで止まっている間、または停止中に、クライアントが切断した（`disconnect` 要求・接続の切断のどちらでも）, the Pasta Debug Backend shall 実行の状態を「実行中（ステップなし）」に戻して VM を進め、以後の行でステップの判定を行わない。
 6. While ステップが進行中である, the Pasta Debug Backend shall 現在の行がステップを始めたコルーチンのものかを、コールスタック全体を数える前に判定し、別のコルーチンの行ではコールスタックを数えない（監査の 6 番）。
-7. If ステップを始めたコルーチンが中断（`yield` したまま）のまま参照を外されて捨てられた（`co_scene` の差し替えなど）, then the Pasta Debug Backend shall そのステップを、次にブレークポイントで止まるか切断されるまで保ち（その間も別のコルーチンの行では止まらない）、この残る限界をコードの該当の所に `shortcut:`（または `ponytail:`）の形の注釈で書く（brief の Approach）。
+7. If ステップを始めたコルーチンが中断（`yield` したまま）のまま参照を外されて捨てられた（`co_scene` の差し替えなど）, then the Pasta Debug Backend shall そのステップを、次にブレークポイントで止まるか切断されるまで保ち（その間も別のコルーチンの行では止まらない）、この残る限界をコードの該当の所に `shortcut: <限界>, <直す時機>` の形の注釈で書く（brief の Approach。リポジトリでは、残る限界は `shortcut:`、写さないと決めたものは `ponytail:` と書き分けている）。
 
 ### Requirement 3: 数を正しく表示する
 
@@ -84,7 +84,7 @@ VSCode でゴーストをデバッグする作者が困っている（2026-10-19
 
 1. When 対応していない要求（例：`pause`・`evaluate`・`setVariable`・`launch`）が届いた, the Pasta Debug Backend shall 待たせずに、その要求の `seq` と `command` に対応づけた `success: false`・`message: "unsupported"` の応答を返す（2026-10-19 開発者の決定）。
 2. When 作者が VSCode で一時停止のボタンを押した、ウォッチ式を足した、またはデバッグコンソールに式を打った, the Pasta Debug Backend shall 1 の応答を返し、VM の実行と停止の状態を変えない。
-3. Where 受け口が渡されていない, when `pasta/playSceneAt` か `pasta/reloadShiori` の要求が届いた, the Pasta Debug Backend shall 1 と同じ形の `success: false` の応答を返し、何も再生・リロードしない。【前提】今は応答を返さない（`research.md` N2）。本番の `pasta_shiori` は常に受け口を渡すので、作者の手元では起きにくい（持ち越し 3）。
+3. Where 受け口が渡されていない, when `pasta/playSceneAt` か `pasta/reloadShiori` の要求が届いた, the Pasta Debug Backend shall 1 と同じ形の `success: false` の応答を返し、何も再生・リロードしない。今は応答を返さない（`research.md` N2）。DAP はすべての要求に応答を求めるので、1 と同じ扱いにする。本番の `pasta_shiori` は常に受け口を渡すので、作者の手元では起きにくい。
 4. When `threads` 要求が、VM が止まっていないときに届いた, the Pasta Debug Backend shall 次に止まるまで待たせずに、今と同じ固定のスレッド（ID `1`・名前 `main`）で応答する。【前提】今は次に止まるまで応答しない（`research.md` N1）。VSCode は接続の直後に `threads` を送る（持ち越し 4）。
 5. The Pasta Debug Backend shall 失敗の応答（対応していない要求・受け口の無い要求・位置でのシーンの再生の失敗）を、1 つの形（`seq`・`type: "response"`・`request_seq`・`success: false`・`command`・`message`）で返す。位置でのシーンの再生の失敗の理由の文（「カーソル下にシーンがありません」など）は今と同じにする。
 6. When `pasta/playSceneAt` の `uri` が、ホスト名を持つ `file://` の URI（Windows の UNC のパス。例：`file://server/share/ghost/master/dic/会話.pasta`）である, the Pasta Debug Backend shall それを `\\server\share\ghost\master\dic\会話.pasta` の `.pasta` として引き当て、ホスト名を捨てた別のパスとして扱わない。【前提】今はホスト名を捨てて `\share\…` として引き、シーンが見つからない（`research.md` N13・持ち越し 8）。
