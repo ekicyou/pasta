@@ -145,7 +145,7 @@
   - _Boundary: ReleaseSetupCheck_
   - _Requirements: 4.2, 4.3, 8.2, 8.6_
 
-- [ ] 8.4 (P) Release ワークフローの action を固定し、道具の hash を確かめる
+- [x] 8.4 (P) Release ワークフローの action を固定し、道具の hash を確かめる
   - `NODE_VERSION` を 22 にし、`wasm-pack`・`cargo-about` の SHA-256 を env に置き、道具の段で展開の前に `Get-FileHash` で比べて違えば `throw` する
   - build・publish-crates・publish-vsce の job の第三者の action（`rust-toolchain`・`rust-cache`・`crates-io-auth-action` 5 か所・`Azure/login`）を設計の SHA と行末のタグのコメントにする。`toolchain: stable` は足さない
   - build の job の「Check generated skill references」の段とその注記を消し、`setup-node` v7・`upload-artifact` v7・`download-artifact` v8 に上げる
