@@ -691,7 +691,8 @@ windows-sys = { workspace = true, features = ["Win32_System_LibraryLoader"] }
 
 [target.'cfg(windows)'.dev-dependencies]
 # ToolHelp はアクタースレッドを数える。Threading はリーク検査（GetProcessHandleCount・GetGuiResources）。
-windows-sys = { workspace = true, features = ["Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading"] }
+# LibraryLoader は FreeLibrary の統合テストの子（LoadLibraryW・GetProcAddress・GetModuleHandleW）。
+windows-sys = { workspace = true, features = ["Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading", "Win32_System_LibraryLoader"] }
 ```
 
 - `cargo package --list -p pasta_shiori` に `doc/` と `logfile.txt` が無いことを確かめる。
