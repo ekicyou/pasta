@@ -1,5 +1,4 @@
 use super::*;
-use crate::config::LineEnding;
 use pasta_dsl::parser::{Arg, FnScope, SetValue, Span, VarScope, VarSet};
 
 fn gen_to_string<F>(f: F) -> String
@@ -8,7 +7,7 @@ where
 {
     let mut output = Vec::new();
     {
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         f(&mut cg).unwrap();
     }
     String::from_utf8(output).unwrap()
@@ -156,7 +155,7 @@ fn paren(e: Expr) -> Expr {
 /// Render the expression itself (not an expression statement).
 fn expr_text(expr: Expr) -> String {
     let mut output = Vec::new();
-    let cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+    let cg = LuaCodeGenerator::new(&mut output);
     cg.expr_to_string(&expr).unwrap()
 }
 

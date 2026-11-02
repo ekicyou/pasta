@@ -1,0 +1,67 @@
+---
+source: crates/pasta_lua/tests/transpiler/final_regression_test.rs
+expression: lua
+---
+local PASTA = require "pasta"
+local GLOBAL = require "pasta.global"
+
+PASTA.create_word("挨拶"):entry("おはよう", "こんにちは")
+do
+    local SCENE = PASTA.create_scene("メイン")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|8:4,12:4,13:4,14:4,15:5")
+
+        act:actor_proxy("さくら"):talk("「")
+        act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("挨拶"))
+        act:actor_proxy("さくら"):talk("」")
+        return act:call(SCENE.__global_name__, "サブ", {}, table.unpack(args))
+    end
+
+    function SCENE.空_1(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE, "メイン", "空", "test.pasta|18:7")
+    end
+
+    function SCENE.サブ_1(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE, "メイン", "サブ", "test.pasta|23:9,27:10")
+
+        act:actor_proxy("うにゅう"):talk("「サブです」")
+    end
+end
+
+do
+    local ACTOR = PASTA.create_actor("さくら")
+    ACTOR:create_word("一人称"):entry("私", "わたし")
+end
+
+do
+    local SCENE = PASTA.create_scene("単語だけ")
+
+    SCENE:create_word("天気"):entry("晴れ", "雨")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE, "単語だけ", nil, "test.pasta|41:18")
+    end
+end
+
+do
+    local SCENE = PASTA.create_scene("最後")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE, "最後", nil, "test.pasta|50:19,54:19")
+
+        act:actor_proxy("さくら"):talk("「最後です」")
+    end
+
+    function SCENE.末尾_1(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE, "最後", "末尾", "test.pasta|57:21,61:22")
+
+        act:actor_proxy("うにゅう"):talk("「おしまい」")
+    end
+end

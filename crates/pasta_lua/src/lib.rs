@@ -47,7 +47,7 @@ pub mod transpiler;
 
 // Re-export main types
 pub use code_gen::LuaCodeGenerator;
-pub use config::{LineEnding, TranspilerConfig};
+pub use config::TranspilerConfig;
 pub use context::TranspileContext;
 pub use debug::{DebugConfig, DebugError, DebugHandle, SourceMode, enable as enable_debug};
 pub use error::{ConfigError, TranspileError};

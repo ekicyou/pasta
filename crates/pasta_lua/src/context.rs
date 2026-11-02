@@ -3,7 +3,7 @@
 //! This module provides context management for the transpilation process.
 
 use pasta_core::registry::{SceneRegistry, WordDefRegistry};
-use pasta_dsl::parser::{Attr, AttrValue, GlobalSceneScope, LocalSceneScope};
+use pasta_dsl::parser::{Attr, AttrValue, LocalSceneScope};
 use std::collections::HashMap;
 
 /// Transpile context for sharing state during transpilation.
@@ -13,8 +13,6 @@ pub struct TranspileContext {
     pub scene_registry: SceneRegistry,
     /// Word definition registry for global/local word registration
     pub word_registry: WordDefRegistry,
-    /// Current module name being processed
-    pub current_module: Option<String>,
     /// File-level attributes accumulated from FileAttr items (MAJOR-1)
     file_attrs: HashMap<String, AttrValue>,
 }
@@ -23,23 +21,6 @@ impl TranspileContext {
     /// Create a new transpile context.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Set the current module name.
-    pub fn set_current_module(&mut self, module: String) {
-        self.current_module = Some(module);
-    }
-
-    /// Get the current module name.
-    pub fn get_current_module(&self) -> Option<&str> {
-        self.current_module.as_deref()
-    }
-
-    /// Register a global scene (Task 3.1).
-    ///
-    /// Registers the scene in SceneRegistry and returns (id, counter).
-    pub fn register_global_scene(&mut self, scene: &GlobalSceneScope) -> (i64, usize) {
-        self.register_global_scene_named(&scene.name, &scene.attrs)
     }
 
     /// 宣言名（別名を置き換えた後の名前）でグローバルシーンを登録する。
@@ -112,18 +93,6 @@ impl TranspileContext {
 
         result
     }
-
-    /// Merge registries from another TranspileContext.
-    ///
-    /// Used by PastaLoader to combine contexts from multiple files.
-    /// File attributes are not merged (they are file-specific).
-    pub fn merge_from(&mut self, other: TranspileContext) {
-        // Merge scene registry
-        self.scene_registry.merge_from(other.scene_registry);
-
-        // Merge word registry
-        self.word_registry.merge_from(other.word_registry);
-    }
 }
 
 /// グローバルシーンの中のローカルシーンの通し番号を、定義順に返す。
@@ -151,7 +120,7 @@ pub fn local_scene_counters(local_scenes: &[LocalSceneScope]) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pasta_dsl::parser::{KeyWords, Span};
+    use pasta_dsl::parser::{GlobalSceneScope, KeyWords, Span};
 
     fn create_test_scene(name: &str) -> GlobalSceneScope {
         GlobalSceneScope {
@@ -171,24 +140,11 @@ mod tests {
     }
 
     #[test]
-    fn test_context_new() {
-        let ctx = TranspileContext::new();
-        assert!(ctx.current_module.is_none());
-    }
-
-    #[test]
-    fn test_context_set_module() {
-        let mut ctx = TranspileContext::new();
-        ctx.set_current_module("メイン1".to_string());
-        assert_eq!(ctx.get_current_module(), Some("メイン1"));
-    }
-
-    #[test]
     fn test_register_global_scene() {
         let mut ctx = TranspileContext::new();
         let scene = create_test_scene("メイン");
 
-        let (id, counter) = ctx.register_global_scene(&scene);
+        let (id, counter) = ctx.register_global_scene_named(&scene.name, &scene.attrs);
         assert_eq!(id, 1);
         assert_eq!(counter, 1);
 
@@ -203,7 +159,7 @@ mod tests {
 
         // First register parent
         let parent = create_test_scene("メイン");
-        let (_, parent_counter) = ctx.register_global_scene(&parent);
+        let (_, parent_counter) = ctx.register_global_scene_named(&parent.name, &parent.attrs);
 
         // Then register local scene
         let local = create_test_local_scene("自己紹介");
@@ -381,56 +337,6 @@ mod tests {
             merged.get("version"),
             Some(&AttrValue::AttrString("1.0".to_string()))
         );
-    }
-
-    #[test]
-    fn test_get_current_module_none_by_default() {
-        let ctx = TranspileContext::new();
-        assert_eq!(ctx.get_current_module(), None);
-    }
-
-    #[test]
-    fn test_merge_from_combines_scene_and_word_registries() {
-        let mut ctx1 = TranspileContext::new();
-        ctx1.register_global_scene(&create_test_scene("メイン"));
-        ctx1.word_registry
-            .register_global("挨拶", vec!["こんにちは".to_string()]);
-
-        let mut ctx2 = TranspileContext::new();
-        ctx2.register_global_scene(&create_test_scene("サブ"));
-        ctx2.word_registry
-            .register_global("別れ", vec!["さようなら".to_string()]);
-
-        ctx1.merge_from(ctx2);
-
-        let scenes = ctx1.scene_registry.all_scenes();
-        assert_eq!(scenes.len(), 2, "scenes from both contexts must be merged");
-        let names: Vec<&str> = scenes.iter().map(|s| s.name.as_str()).collect();
-        assert!(names.contains(&"メイン"));
-        assert!(names.contains(&"サブ"));
-
-        let entries = ctx1.word_registry.all_entries();
-        assert_eq!(entries.len(), 2, "words from both contexts must be merged");
-        let keys: Vec<&str> = entries.iter().map(|e| e.key.as_str()).collect();
-        assert!(keys.contains(&"挨拶"));
-        assert!(keys.contains(&"別れ"));
-    }
-
-    #[test]
-    fn test_merge_from_does_not_merge_file_attrs() {
-        // File attributes are file-specific and must NOT leak across contexts.
-        let mut ctx1 = TranspileContext::new();
-        ctx1.accumulate_file_attr(&create_attr("author", "Alice"));
-
-        let mut ctx2 = TranspileContext::new();
-        ctx2.accumulate_file_attr(&create_attr("version", "2.0"));
-
-        ctx1.merge_from(ctx2);
-
-        let attrs = ctx1.file_attrs();
-        assert_eq!(attrs.len(), 1, "other context's file attrs must be dropped");
-        assert!(attrs.contains_key("author"));
-        assert!(!attrs.contains_key("version"));
     }
 
     #[test]

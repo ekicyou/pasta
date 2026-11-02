@@ -184,6 +184,7 @@ pasta の開発の道具（VSCode の「▶ シーンを実行」・SHIORI の�
 - `ponytail-lua-transpiler` からの申し送り
   - `source_map/mod.rs` 25 行の説明の `normalize_output` を `normalize_output_with_shift` に直す。
   - アクター辞書の単語定義の行（`ACTOR:create_word(…)`）もソースマップに載る（対応は増えるだけ）。
+  - `normalize_output_with_shift` が消すのは末尾の空白の行だけになり、実際の生成コードでは `LineShift` が恒等になる。`MapBuilderSink::finish`・`loader/source_map_build.rs` の「行がズレ得る」という説明の見直しが要る（`ponytail-lua-transpiler` の design.md「Revalidation Triggers」）。
 
 ## Constraints
 

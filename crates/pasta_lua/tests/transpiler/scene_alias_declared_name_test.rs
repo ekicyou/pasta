@@ -34,11 +34,11 @@ struct Output {
 
 fn transpile(source: &str, aliases: SceneAliasTable) -> Output {
     let file = parse_str(source, "alias.pasta").unwrap();
-    let transpiler = LuaTranspiler::new(TranspilerConfig::new().with_scene_aliases(aliases));
+    let transpiler = LuaTranspiler::new(TranspilerConfig::default().with_scene_aliases(aliases));
     let mut sink = KeySink::default();
     let mut out = Vec::new();
-    let context = transpiler
-        .transpile_with_sink(&file, &mut out, Some(&mut sink))
+    let (context, _) = transpiler
+        .transpile_with_source_map(&file, &mut out, Some(&mut sink))
         .unwrap();
     Output {
         lua: String::from_utf8(out).unwrap(),
@@ -220,14 +220,14 @@ fn empty_table_keeps_legacy_output() {
     let legacy = render(LuaTranspiler::default());
     assert_eq!(
         render(LuaTranspiler::new(
-            TranspilerConfig::new().with_scene_aliases(SceneAliasTable::empty())
+            TranspilerConfig::default().with_scene_aliases(SceneAliasTable::empty())
         )),
         legacy
     );
     // sample.pasta には別名に完全一致する宣言が無いので、既定表でも出力は変わらない。
     assert_eq!(
         render(LuaTranspiler::new(
-            TranspilerConfig::new().with_scene_aliases(SceneAliasTable::builtin_default())
+            TranspilerConfig::default().with_scene_aliases(SceneAliasTable::builtin_default())
         )),
         legacy
     );

@@ -10,9 +10,9 @@ do
     local ACTOR = PASTA.create_actor("さくら")
     ACTOR:create_word("一人称"):entry("私", "わたし", "あたし")
 
-    function ACTOR.時刻(act)
-        return "朝"
-    end
+function ACTOR.時刻(act)
+    return "朝"
+end
 end
 
 do
@@ -54,6 +54,6 @@ do
         act:actor_proxy("さくら"):talk("」")
     end
 
-    local total = 1 + 2
-    return total
+local total = 1 + 2
+return total
 end

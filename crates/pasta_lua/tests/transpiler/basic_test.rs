@@ -241,22 +241,6 @@ fn test_string_literalizer_in_transpile() {
     );
 }
 
-#[test]
-fn test_transpile_config_no_comments() {
-    let config = TranspilerConfig::without_comments();
-    let transpiler = LuaTranspiler::new(config);
-    let mut output = Vec::new();
-
-    let file = parse_str(SAMPLE_PASTA, "test.pasta").unwrap();
-
-    transpiler.transpile(&file, &mut output).unwrap();
-    let lua_code = String::from_utf8(output).unwrap();
-
-    // Config without comments should still produce valid code
-    assert!(lua_code.contains("PASTA.create_actor"));
-    assert!(lua_code.contains("PASTA.create_scene"));
-}
-
 /// Test case for the reference implementation sample.pasta
 #[test]
 fn test_transpile_reference_sample_structure() {
@@ -440,7 +424,7 @@ fn test_init_scene_receives_written_scene_names() {
 ";
     let file = parse_str(source, "names.pasta").unwrap();
     let transpiler = LuaTranspiler::new(
-        TranspilerConfig::new().with_scene_aliases(SceneAliasTable::builtin_default()),
+        TranspilerConfig::default().with_scene_aliases(SceneAliasTable::builtin_default()),
     );
     let mut output = Vec::new();
     transpiler.transpile(&file, &mut output).unwrap();
@@ -481,7 +465,7 @@ fn test_init_scene_receives_written_scene_names() {
 
 /// 生成コードの `init_scene` の 4 つ目の引数（1 行の文字列の定数）から行の対応を取り出す。
 /// 形は `"<.pasta のファイル>|<.lua の行>:<.pasta の行>,..."`。
-fn init_scene_line_maps(lua_code: &str) -> Vec<(String, Vec<(u32, u32)>)> {
+pub(crate) fn init_scene_line_maps(lua_code: &str) -> Vec<(String, Vec<(u32, u32)>)> {
     lua_code
         .lines()
         .filter(|l| l.contains("act:init_scene("))
@@ -525,7 +509,7 @@ end
 ";
     let file = parse_str(source, "dic/天気.pasta").unwrap();
     let transpiler = LuaTranspiler::new(
-        TranspilerConfig::new().with_scene_aliases(SceneAliasTable::builtin_default()),
+        TranspilerConfig::default().with_scene_aliases(SceneAliasTable::builtin_default()),
     );
 
     // デバッガを有効にしない読み込みと同じ経路
