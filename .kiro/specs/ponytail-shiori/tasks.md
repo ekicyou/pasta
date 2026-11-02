@@ -108,7 +108,7 @@
   - 短い上限を差し込む 3 つの口とテストのファイルは残す
   - 書き直したテスト（debug の保持・ログの文脈・アクターと VM・ハーネスなど）が通る
   - _Requirements: 6.2, 6.9, 6.10, 7.1_
-- [ ] 8.4 ANSI のデコードを 1 つの変換だけにする
+- [x] 8.4 ANSI のデコードを 1 つの変換だけにする
   - 実装が 1 つの変換のトレイトと、テストだけが使う変換（UTF-8 から ANSI・OEM のコードページ）を消し、デコードはシステムの ANSI コードページ・不正な文字は誤りの 1 つの変換を直に呼ぶ
   - 初期化していない領域を長さだけ伸ばす書き方を、0 で埋めた領域に替える
   - SJIS の往復のテストは CP932 のバイト列を定数で持ち、デコードだけを通す（ACP が 932 のときだけ）
@@ -167,3 +167,9 @@
   - 応答のバイト列・FFI の型と長さ・錠のテストが通り、特性化テストがすべて直した後の期待で通る
   - すべてのコマンドが成功し、結果を記録する
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 7.6, 9.1, 9.2, 9.3_
+
+## Implementation Notes
+
+- 10.1：book/src/internals/shiori.md に消した名前が残る（determine_method・default_204_response・ReloadProbe・Reply::Value・ready の組 (ThreadId, bool, Option<SocketAddr>)・JoinPolicy など）。章に残さないこと
+- 9.3：scene_kick_*_e2e_test.rs 4 本は spawn_actor_thread_with(0, …) で hinst を渡している。hinst を消すときに直す
+- 10.1：book/src/internals/logging-encoding.md 73 行目が pasta_shiori の変換を「enc.rs と windows_api.rs」と書いている。enc.rs は 8.4 で消したので一緒に直す

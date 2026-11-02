@@ -1,13 +1,13 @@
 #![cfg(windows)]
-pub(crate) mod enc;
 mod windows_api;
 
-use self::enc::{Encoder, Encoding};
+use self::windows_api::{MB_ERR_INVALID_CHARS, multi_byte_to_wide_char};
 use crate::error::{MyError, MyResult};
 use std::ffi::OsString;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 use std::str;
 use windows_sys::Win32::Foundation::*;
+use windows_sys::Win32::Globalization::CP_ACP;
 use windows_sys::Win32::System::Memory::*;
 
 const GMEM_FIXED: u32 = 0;
@@ -153,8 +153,7 @@ impl ShioriString {
     /// SHIORI::load()文字列の取り出しに利用する。
     pub(crate) fn to_ansi_str(&self) -> MyResult<OsString> {
         let bytes = self.as_bytes();
-        let s = Encoding::ANSI
-            .to_string(bytes)
+        let s = multi_byte_to_wide_char(CP_ACP, MB_ERR_INVALID_CHARS, bytes)
             .map_err(|_| MyError::EncodeAnsi)?;
         let os_str = OsString::from(s);
         Ok(os_str)
@@ -224,18 +223,18 @@ fn shiori_string_test() {
         assert_eq!(dst.to_utf8_str().unwrap(), text);
     }
     {
-        // 3.39 (G5): this block asserts CP932 (Shift_JIS) byte lengths, which
-        // only hold when the system ANSI code page is 932 (Japanese). On any
-        // other ACP, Encoding::ANSI.to_bytes cannot represent the kanji and
-        // errors, so the SJIS round-trip is skipped to keep the test
-        // locale-independent (3.35 follow-up). The production decode path
-        // (to_ansi_str) is locale-faithful by design: it always uses CP_ACP.
+        // 3.39 (G5): CP932 (Shift_JIS) bytes decode to the text only when the
+        // system ANSI code page is 932 (Japanese); on any other ACP the block is
+        // skipped to keep the test locale-independent. The production decode
+        // path (to_ansi_str) is locale-faithful by design: it always uses CP_ACP.
+        // 「適当なShioriString」の CP932 表現（適=93 4B・当=93 96・な=82 C8）。
+        const SJIS: &[u8] = b"\x93\x4B\x93\x96\x82\xC8ShioriString";
         let acp = unsafe { windows_sys::Win32::Globalization::GetACP() };
         if acp == 932 {
             let text = "適当なShioriString";
-            let sjis = Encoding::ANSI.to_bytes(text).unwrap();
+            let sjis = SJIS;
             assert_eq!(sjis.len(), 18);
-            let src = ShioriString::clone_from_slice_nofree(&sjis[..]).unwrap();
+            let src = ShioriString::clone_from_slice_nofree(sjis).unwrap();
             assert_eq!(src.len(), 18);
             let src_osstr = src.to_ansi_str().unwrap();
             assert_eq!(src_osstr.len(), 21);
