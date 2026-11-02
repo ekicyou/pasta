@@ -79,10 +79,8 @@ impl LuaTranspiler {
     ///
     /// # Byte-invariance (Requirement 7.1)
     ///
-    /// The only difference from the legacy path is that normalization goes through
-    /// [`normalize_output_with_shift`] instead of `normalize_output`. The two are
-    /// byte-identical by contract (`normalize_output(input)` is a thin wrapper over
-    /// `normalize_output_with_shift(input).0`), so the bytes written to `writer` are
+    /// Normalization goes through [`normalize_output_with_shift`], whose `.0` does
+    /// not depend on the sink, so the bytes written to `writer` are
     /// unchanged whether or not a sink is attached. When `sink` is `None` the
     /// producer seam is inert and the output equals the disabled (debug-off) output
     /// exactly.
@@ -132,8 +130,7 @@ impl LuaTranspiler {
 
         // Convert intermediate buffer to UTF-8 string and normalize. Use the
         // shift-returning normalize so the caller can rebase recorded pre-normalize
-        // lines onto final `.lua` lines (2.1). `.0` is byte-identical to the legacy
-        // `normalize_output`, so the bytes written below are unchanged (7.1).
+        // lines onto final `.lua` lines (2.1).
         let raw_output = String::from_utf8(intermediate_buffer)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         let (normalized_output, shift) = normalize_output_with_shift(&raw_output);

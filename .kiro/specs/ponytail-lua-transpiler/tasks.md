@@ -49,13 +49,13 @@
   - 消した名前が `crates/pasta_lua` から参照されず、出力と行の対応が変わらずに品質の関門が通り、1 コミットになっている
   - _Requirements: 4.1, 4.2, 4.6, 4.7_
 
-- [ ] 5. 重なった入口と包みを消す
+- [x] 5. 重なった入口と包みを消す
 - [x] 5.1 トランスパイラの重なった入口を消す
   - `with_defaults`・`transpile_with_sink`・`config()` を消し、記録無しの変換を記録付きの変換の上に置く
   - `transpile_with_sink` を使っていたテスト（約 28 か所）を、記録付きの変換か記録無しの変換に付け替える
   - 消した入口が参照されず、出力と行の対応が変わらずに品質の関門が通り、1 コミットになっている
   - _Requirements: 4.3, 4.7_
-- [ ] 5.2 後処理のテストだけの包みを消す
+- [x] 5.2 後処理のテストだけの包みを消す
   - 文字列だけを返す包みを消し、それを使っていたテストを行のずれも返す方へ付け替える
   - 包みが参照されず品質の関門が通り、1 コミットになっている
   - _Requirements: 4.4, 4.7_
@@ -114,3 +114,4 @@
 - 生成器で `self.writer` に直に書くと保留の空行を飛ばす。書き出しは `write_indent`／`write_raw`（とその後の `write_line_terminator`・`generate_expr`）を通す（2.1）。
 - cargo-insta は入っていない。スナップショットの受け入れは `INSTA_FORCE_PASS=1` で `.snap.new` を出し、差分を見て手で置き換える（`assertion_line:` の行は外す）（2.3）。
 - `debug_integration_test::runtime_teardown_emits_terminated_to_connected_client` が read timeout で 1 回だけ落ちることがある（この spec と無関係・単独では通る）。
+- `debug/` は例外 1 件のほかは触らない（タスク 11 が確かめる）。`debug/source_map/mod.rs` のモジュール説明に `normalize_output` の名前が 1 語残るが、説明文だけなので 5.2 では直さない（5.2）。
