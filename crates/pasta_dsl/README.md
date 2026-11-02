@@ -68,7 +68,7 @@ for item in &ast.items {
 | pest_derive | 2.8        | ビルド時パーサー生成 |
 | thiserror   | 2          | エラー型生成マクロ   |
 
-**注**: レジストリ関連（fast_radix_trie, rand）やLuaランタイム（mlua）への依存は一切ありません。
+**注**: レジストリ関連（rand）やLuaランタイム（mlua）への依存は一切ありません。
 
 ## Architecture
 

@@ -1,10 +1,11 @@
 //! SceneTable テスト (#[path] パターン)
 //!
 //! Phase A: registry/scene_table.rs のインラインテストを分離
-//! 例外理由: SceneTableの全privateフィールド（labels, prefix_index, cache, random_selector, shuffle_enabled）
+//! 例外理由: SceneTableの全privateフィールド（labels, prefix_index, cache, random_selector）
 //! への直接アクセスが構造的に必要なため、#[path]パターンで分離
 
 use super::*;
+use crate::registry::SceneRegistry;
 use crate::registry::random::MockRandomSelector;
 
 pub(super) fn create_test_scene_info(id: usize, name: &str, fn_name: &str) -> SceneInfo {
@@ -23,17 +24,12 @@ fn test_resolve_scene_id_basic() {
     let selector = Box::new(MockRandomSelector::new(vec![0]));
     let mut table = SceneTable {
         labels: vec![create_test_scene_info(0, "test", "test_1::__start__")],
-        prefix_index: {
-            let mut map = RadixMap::new();
-            map.insert(b"test_1::__start__", vec![SceneId(0)]);
-            map
-        },
+        prefix_index: BTreeMap::from([("test_1::__start__".to_string(), vec![SceneId(0)])]),
         cache: HashMap::new(),
         random_selector: selector,
-        shuffle_enabled: false,
     };
 
-    let result = table.resolve_scene_id("test", &HashMap::new());
+    let result = table.resolve_scene_id_unified("", "test", &HashMap::new());
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), SceneId(0));
 }
@@ -57,7 +53,7 @@ fn create_test_local_scene_info(id: usize, name: &str, fn_name: &str, parent: &s
 fn test_collect_scene_candidates_local_search() {
     // Test: Local search should find scenes with :module:prefix pattern
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add local scene with :parent:local key format
     table.labels.push(create_test_local_scene_info(
@@ -68,7 +64,7 @@ fn test_collect_scene_candidates_local_search() {
     ));
     table
         .prefix_index
-        .insert(":会話_1:選択肢".as_bytes(), vec![SceneId(0)]);
+        .insert(":会話_1:選択肢".to_string(), vec![SceneId(0)]);
 
     // Search from 会話_1 module
     let result = table.collect_scene_candidates("会話_1", "選択肢");
@@ -82,13 +78,13 @@ fn test_collect_scene_candidates_local_search() {
 fn test_collect_scene_candidates_global_search() {
     // Test: Global search (empty module_name) should find scenes without : prefix
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add global scene with simple key
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
     table
         .prefix_index
-        .insert("挨拶".as_bytes(), vec![SceneId(0)]);
+        .insert("挨拶".to_string(), vec![SceneId(0)]);
 
     // Search with empty module_name - should get global
     let result = table.collect_scene_candidates("", "挨拶");
@@ -102,13 +98,13 @@ fn test_collect_scene_candidates_global_search() {
 fn test_collect_scene_candidates_local_only() {
     // Test: Local search only - no global fallback
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add global scene
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
     table
         .prefix_index
-        .insert("挨拶".as_bytes(), vec![SceneId(0)]);
+        .insert("挨拶".to_string(), vec![SceneId(0)]);
 
     // Add local scene with same prefix
     table.labels.push(create_test_local_scene_info(
@@ -119,7 +115,7 @@ fn test_collect_scene_candidates_local_only() {
     ));
     table
         .prefix_index
-        .insert(":会話_1:挨拶".as_bytes(), vec![SceneId(1)]);
+        .insert(":会話_1:挨拶".to_string(), vec![SceneId(1)]);
 
     // Search from 会話_1 module - should get ONLY local
     let result = table.collect_scene_candidates("会話_1", "挨拶");
@@ -134,13 +130,13 @@ fn test_collect_scene_candidates_local_only() {
 fn test_collect_scene_candidates_local_not_found_no_fallback() {
     // Test: No local found, should NOT fall back to global - return error
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add global scene only
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
     table
         .prefix_index
-        .insert("挨拶".as_bytes(), vec![SceneId(0)]);
+        .insert("挨拶".to_string(), vec![SceneId(0)]);
 
     // Search from 会話_1 module - no local, should NOT fall back to global
     let result = table.collect_scene_candidates("会話_1", "挨拶");
@@ -155,13 +151,13 @@ fn test_collect_scene_candidates_local_not_found_no_fallback() {
 fn test_collect_scene_candidates_global_via_empty_module_name() {
     // Test: Empty module_name should search global only
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add global scene
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
     table
         .prefix_index
-        .insert("挨拶".as_bytes(), vec![SceneId(0)]);
+        .insert("挨拶".to_string(), vec![SceneId(0)]);
 
     // Search with empty module_name - should get global
     let result = table.collect_scene_candidates("", "挨拶");
@@ -175,7 +171,7 @@ fn test_collect_scene_candidates_global_via_empty_module_name() {
 fn test_collect_scene_candidates_prefix_match() {
     // Test: Prefix matching should work correctly
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add scenes with common prefix
     table
@@ -191,13 +187,13 @@ fn test_collect_scene_candidates_prefix_match() {
     // Insert with proper UTF-8 bytes
     table
         .prefix_index
-        .insert("挨拶_朝".as_bytes(), vec![SceneId(0)]);
+        .insert("挨拶_朝".to_string(), vec![SceneId(0)]);
     table
         .prefix_index
-        .insert("挨拶_昼".as_bytes(), vec![SceneId(1)]);
+        .insert("挨拶_昼".to_string(), vec![SceneId(1)]);
     table
         .prefix_index
-        .insert("挨拶_夜".as_bytes(), vec![SceneId(2)]);
+        .insert("挨拶_夜".to_string(), vec![SceneId(2)]);
 
     // Prefix search for "挨拶" should find all three
     let result = table.collect_scene_candidates("", "挨拶");
@@ -210,7 +206,7 @@ fn test_collect_scene_candidates_prefix_match() {
 fn test_collect_scene_candidates_not_found() {
     // Test: Should return error when no candidates found
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let table = SceneTable::new(selector);
+    let table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     let result = table.collect_scene_candidates("会話_1", "存在しないシーン");
     assert!(result.is_err());
@@ -226,7 +222,7 @@ fn test_collect_scene_candidates_not_found() {
 fn test_collect_scene_candidates_empty_prefix_error() {
     // Test: Empty prefix should return error
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let table = SceneTable::new(selector);
+    let table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     let result = table.collect_scene_candidates("会話_1", "");
     assert!(result.is_err());
@@ -242,7 +238,7 @@ fn test_collect_scene_candidates_empty_prefix_error() {
 fn test_collect_scene_candidates_exclude_local_from_global() {
     // Test: Global search should exclude local keys (starting with :)
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::new(selector);
+    let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
     // Add a local scene
     table.labels.push(create_test_local_scene_info(
@@ -253,7 +249,7 @@ fn test_collect_scene_candidates_exclude_local_from_global() {
     ));
     table
         .prefix_index
-        .insert(":他モジュール:選択肢".as_bytes(), vec![SceneId(0)]);
+        .insert(":他モジュール:選択肢".to_string(), vec![SceneId(0)]);
 
     // Search from different module - should NOT find the local scene of another module
     let result = table.collect_scene_candidates("会話_1", "選択肢");
@@ -295,7 +291,7 @@ fn test_from_scene_registry_key_conversion() {
     registry.register_local("選択肢", "会話", counter, 1, HashMap::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let table = SceneTable::from_scene_registry(registry, selector);
 
     // Verify search key conversion works with collect_scene_candidates
     // Global scene search
@@ -325,9 +321,8 @@ fn test_resolve_scene_id_unified_local_scene() {
     let (_, counter) = registry.register_global("会話", HashMap::new());
     registry.register_local("選択肢", "会話", counter, 1, HashMap::new());
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
-    table.set_shuffle_enabled(false);
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let mut table = SceneTable::from_scene_registry(registry, selector);
 
     // Resolve local scene from parent module
     let result = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
@@ -344,9 +339,8 @@ fn test_resolve_scene_id_unified_global_scene() {
     let mut registry = SceneRegistry::new();
     registry.register_global("挨拶", HashMap::new());
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
-    table.set_shuffle_enabled(false);
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let mut table = SceneTable::from_scene_registry(registry, selector);
 
     // Resolve global scene - must use empty module_name for global search
     let result = table.resolve_scene_id_unified("", "挨拶", &HashMap::new());
@@ -360,9 +354,8 @@ fn test_resolve_scene_id_unified_global_scene_no_fallback() {
     let mut registry = SceneRegistry::new();
     registry.register_global("挨拶", HashMap::new());
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
-    table.set_shuffle_enabled(false);
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let mut table = SceneTable::from_scene_registry(registry, selector);
 
     // Try to resolve global scene from a module - should fail (no fallback)
     let result = table.resolve_scene_id_unified("任意のモジュール", "挨拶", &HashMap::new());
@@ -380,9 +373,8 @@ fn test_resolve_scene_id_unified_local_found() {
     let (_, counter) = registry.register_global("会話", HashMap::new());
     registry.register_local("挨拶", "会話", counter, 1, HashMap::new());
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
-    table.set_shuffle_enabled(false);
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let mut table = SceneTable::from_scene_registry(registry, selector);
 
     // Resolve from 会話_1 - should find ONLY local (no fallback to global)
     let result = table.resolve_scene_id_unified("会話_1", "挨拶", &HashMap::new());
@@ -414,26 +406,24 @@ fn test_resolve_scene_id_cycling() {
             create_test_scene_info(1, "OnTalk2", "OnTalk"),
             create_test_scene_info(2, "OnTalk3", "OnTalk"),
         ],
-        prefix_index: {
-            let mut map = RadixMap::new();
-            map.insert(b"OnTalk", vec![SceneId(0), SceneId(1), SceneId(2)]);
-            map
-        },
+        prefix_index: BTreeMap::from([(
+            "OnTalk".to_string(),
+            vec![SceneId(0), SceneId(1), SceneId(2)],
+        )]),
         cache: HashMap::new(),
         random_selector: selector,
-        shuffle_enabled: false,
     };
 
     // 1回目〜3回目: 候補を順番に消費
-    let r1 = table.resolve_scene_id("OnTalk", &HashMap::new());
+    let r1 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
     assert!(r1.is_ok());
-    let r2 = table.resolve_scene_id("OnTalk", &HashMap::new());
+    let r2 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
     assert!(r2.is_ok());
-    let r3 = table.resolve_scene_id("OnTalk", &HashMap::new());
+    let r3 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
     assert!(r3.is_ok());
 
     // 4回目: 循環リセットが発生し、成功すること
-    let r4 = table.resolve_scene_id("OnTalk", &HashMap::new());
+    let r4 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
     assert!(
         r4.is_ok(),
         "4回目の呼び出しが失敗: 循環リセットが動作していない"
@@ -449,7 +439,7 @@ fn test_resolve_scene_id_cycling() {
 
     // さらに続行できることも検証（10回以上）
     for i in 5..=12 {
-        let r = table.resolve_scene_id("OnTalk", &HashMap::new());
+        let r = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
         assert!(r.is_ok(), "{}回目の呼び出しが失敗", i);
     }
 }
@@ -467,27 +457,25 @@ fn test_resolve_scene_id_cycling_reshuffles() {
             create_test_scene_info(1, "OnTalk2", "OnTalk"),
             create_test_scene_info(2, "OnTalk3", "OnTalk"),
         ],
-        prefix_index: {
-            let mut map = RadixMap::new();
-            map.insert(b"OnTalk", vec![SceneId(0), SceneId(1), SceneId(2)]);
-            map
-        },
+        prefix_index: BTreeMap::from([(
+            "OnTalk".to_string(),
+            vec![SceneId(0), SceneId(1), SceneId(2)],
+        )]),
         cache: HashMap::new(),
         random_selector: selector,
-        shuffle_enabled: true,
     };
 
     // 1周目の順序を記録
     let mut first_cycle = Vec::new();
     for _ in 0..3 {
-        let r = table.resolve_scene_id("OnTalk", &HashMap::new());
+        let r = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
         first_cycle.push(r.unwrap());
     }
 
     // 2周目（リセット後）の順序を記録
     let mut second_cycle = Vec::new();
     for _ in 0..3 {
-        let r = table.resolve_scene_id("OnTalk", &HashMap::new());
+        let r = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
         assert!(r.is_ok());
         second_cycle.push(r.unwrap());
     }
@@ -508,27 +496,33 @@ fn test_resolve_scene_id_cycling_preserves_candidates() {
             create_test_scene_info(1, "OnTalk2", "OnTalk"),
             create_test_scene_info(2, "OnTalk3", "OnTalk"),
         ],
-        prefix_index: {
-            let mut map = RadixMap::new();
-            map.insert(b"OnTalk", vec![SceneId(0), SceneId(1), SceneId(2)]);
-            map
-        },
+        prefix_index: BTreeMap::from([(
+            "OnTalk".to_string(),
+            vec![SceneId(0), SceneId(1), SceneId(2)],
+        )]),
         cache: HashMap::new(),
         random_selector: selector,
-        shuffle_enabled: false,
     };
 
     // 1周目: 全候補を収集
     let mut first_cycle: std::collections::HashSet<SceneId> = std::collections::HashSet::new();
     for _ in 0..3 {
-        first_cycle.insert(table.resolve_scene_id("OnTalk", &HashMap::new()).unwrap());
+        first_cycle.insert(
+            table
+                .resolve_scene_id_unified("", "OnTalk", &HashMap::new())
+                .unwrap(),
+        );
     }
     assert_eq!(first_cycle.len(), 3);
 
     // 2周目: リセット後の全候補を収集
     let mut second_cycle: std::collections::HashSet<SceneId> = std::collections::HashSet::new();
     for _ in 0..3 {
-        second_cycle.insert(table.resolve_scene_id("OnTalk", &HashMap::new()).unwrap());
+        second_cycle.insert(
+            table
+                .resolve_scene_id_unified("", "OnTalk", &HashMap::new())
+                .unwrap(),
+        );
     }
     assert_eq!(second_cycle.len(), 3);
 
@@ -549,9 +543,8 @@ fn test_resolve_scene_id_unified_cycling() {
     registry.register_local("選択肢A", "会話", counter, 1, HashMap::new());
     registry.register_local("選択肢B", "会話", counter, 2, HashMap::new());
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
-    table.set_shuffle_enabled(false);
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let mut table = SceneTable::from_scene_registry(registry, selector);
 
     // 1周目: 2件のローカル候補を消費
     let r1 = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
@@ -590,7 +583,7 @@ fn candidate_fn_names(table: &SceneTable, module_name: &str, prefix: &str) -> Ve
 }
 
 fn table_from(registry: crate::registry::SceneRegistry) -> SceneTable {
-    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0]))).unwrap()
+    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0])))
 }
 
 /// 2.2: `A`×11＋`A1` で、`A1` の検索の候補は `A1_1` だけ。
@@ -696,22 +689,128 @@ fn test_resolve_scene_id_selector_applies_to_candidate_order_each_round() {
             create_test_scene_info(1, "OnTalk2", "OnTalk"),
             create_test_scene_info(2, "OnTalk3", "OnTalk"),
         ],
-        prefix_index: {
-            let mut map = RadixMap::new();
-            map.insert(b"OnTalk", vec![SceneId(2), SceneId(0), SceneId(1)]);
-            map
-        },
+        prefix_index: BTreeMap::from([(
+            "OnTalk".to_string(),
+            vec![SceneId(2), SceneId(0), SceneId(1)],
+        )]),
         cache: HashMap::new(),
         random_selector: selector,
-        shuffle_enabled: true,
     };
 
     let expected = vec![SceneId(1), SceneId(2), SceneId(0)];
     let mut round = || -> Vec<SceneId> {
         (0..3)
-            .map(|_| table.resolve_scene_id("OnTalk", &HashMap::new()).unwrap())
+            .map(|_| {
+                table
+                    .resolve_scene_id_unified("", "OnTalk", &HashMap::new())
+                    .unwrap()
+            })
             .collect()
     };
     assert_eq!(round(), expected, "1 巡目");
     assert_eq!(round(), expected, "2 巡目");
+}
+
+// ======================================================================
+// 候補の順を固める（ponytail-core-registry 12.1・7.3・7.5・9.3）
+// 候補はキーのバイト列の辞書順、同じキーの中は登録順。並べ替えずに比べる。
+// ======================================================================
+
+/// 大域をわざと辞書順でない順に登録し、そのあと `会話` の下にローカルを足した表を作る。
+fn candidate_order_table(sequence: Vec<usize>) -> SceneTable {
+    use crate::registry::SceneRegistry;
+
+    let mut registry = SceneRegistry::new();
+    registry.register_global("挨拶_夜", HashMap::new());
+    registry.register_global("挨拶", HashMap::new());
+    registry.register_global("挨拶A", HashMap::new());
+    registry.register_global("挨拶", HashMap::new());
+    registry.register_global("挨拶1", HashMap::new());
+    registry.register_global("挨拶あ", HashMap::new());
+    let (_, counter) = registry.register_global("会話", HashMap::new());
+    registry.register_global("Zebra", HashMap::new());
+    registry.register_global("雑談", HashMap::new());
+    registry.register_local("挨拶_夜", "会話", counter, 1, HashMap::new());
+    registry.register_local("挨拶", "会話", counter, 1, HashMap::new());
+    registry.register_local("挨拶", "会話", counter, 2, HashMap::new());
+    registry.register_local("挨拶A", "会話", counter, 1, HashMap::new());
+
+    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(sequence)))
+}
+
+/// 候補の fn_name を集めた順のまま返す。
+fn ordered_candidate_fn_names(table: &SceneTable, module_name: &str, prefix: &str) -> Vec<String> {
+    table
+        .collect_scene_candidates(module_name, prefix)
+        .unwrap()
+        .iter()
+        .map(|&id| table.get_scene(id).unwrap().fn_name.clone())
+        .collect()
+}
+
+/// 7.3: 大域の候補はキーの辞書順、同じキーの中は登録順。範囲の前後とローカルは入らない。
+#[test]
+fn test_candidate_order_global_prefix() {
+    let table = candidate_order_table(vec![]);
+    assert_eq!(
+        ordered_candidate_fn_names(&table, "", "挨拶"),
+        vec![
+            "挨拶_1::__start__",
+            "挨拶_2::__start__",
+            "挨拶1_1::__start__",
+            "挨拶A_1::__start__",
+            "挨拶_夜_1::__start__",
+            "挨拶あ_1::__start__",
+        ]
+    );
+}
+
+/// 7.3: ローカルの候補も、キーの辞書順・同じキーの中は登録順。
+#[test]
+fn test_candidate_order_local_prefix() {
+    let table = candidate_order_table(vec![]);
+    assert_eq!(
+        ordered_candidate_fn_names(&table, "会話_1", "挨拶"),
+        vec![
+            "会話_1::挨拶_1",
+            "会話_1::挨拶_2",
+            "会話_1::挨拶A_1",
+            "会話_1::挨拶_夜_1",
+        ]
+    );
+}
+
+/// 7.5: 大域の検索は `:` で始まるキーを除く。
+#[test]
+fn test_candidate_order_global_excludes_local_keys() {
+    let table = candidate_order_table(vec![]);
+    match table.collect_scene_candidates("", ":会話_1:挨拶") {
+        Err(SceneTableError::SceneNotFound { scene }) => assert_eq!(scene, ":会話_1:挨拶"),
+        other => panic!("Expected SceneNotFound, got {:?}", other),
+    }
+}
+
+/// 9.3: 指定列 `[4, 0]` は、キーをまたぐ候補の並びの位置で選ぶ。
+#[test]
+fn test_candidate_order_sequence_selects_by_position() {
+    let mut table = candidate_order_table(vec![4, 0]);
+    let picked: Vec<String> = (0..6)
+        .map(|_| {
+            let id = table
+                .resolve_scene_id_unified("", "挨拶", &HashMap::new())
+                .unwrap();
+            table.get_scene(id).unwrap().fn_name.clone()
+        })
+        .collect();
+    assert_eq!(
+        picked,
+        vec![
+            "挨拶_夜_1::__start__",
+            "挨拶_1::__start__",
+            "挨拶_2::__start__",
+            "挨拶1_1::__start__",
+            "挨拶A_1::__start__",
+            "挨拶あ_1::__start__",
+        ]
+    );
 }

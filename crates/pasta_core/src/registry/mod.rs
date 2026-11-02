@@ -27,4 +27,4 @@ pub use scene_registry::{SceneEntry, SceneRegistry};
 pub use scene_table::SceneTable;
 pub use scene_types::{SceneId, SceneInfo, SceneScope};
 pub use word_registry::{WordDefRegistry, WordEntry};
-pub use word_table::{WordCacheKey, WordTable};
+pub use word_table::WordTable;

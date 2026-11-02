@@ -488,8 +488,7 @@ fn create_exact_search_lua(
         ctx.scene_registry,
         ctx.word_registry,
         aliases,
-    )
-    .unwrap();
+    );
     let lua = mlua::Lua::new();
     lua.globals()
         .set("SEARCH", lua.create_userdata(search).unwrap())

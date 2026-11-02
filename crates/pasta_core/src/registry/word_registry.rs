@@ -61,7 +61,7 @@ impl WordDefRegistry {
     /// The assigned entry ID.
     pub fn register_local(&mut self, module_name: &str, name: &str, values: Vec<String>) -> usize {
         let id = self.entries.len();
-        let sanitized_module = Self::sanitize_name(module_name);
+        let sanitized_module = SceneRegistry::sanitize_name(module_name);
         let key = format!(":{}:{}", sanitized_module, name);
         self.entries.push(WordEntry { id, key, values });
         id
@@ -80,7 +80,7 @@ impl WordDefRegistry {
     /// The assigned entry ID.
     pub fn register_actor(&mut self, actor_name: &str, name: &str, values: Vec<String>) -> usize {
         let id = self.entries.len();
-        let sanitized_actor = Self::sanitize_name(actor_name);
+        let sanitized_actor = SceneRegistry::sanitize_name(actor_name);
         let key = format!(":__actor_{}__:{}", sanitized_actor, name);
         self.entries.push(WordEntry { id, key, values });
         id
@@ -94,23 +94,6 @@ impl WordDefRegistry {
     /// Take ownership of all entries (for building WordTable).
     pub fn into_entries(self) -> Vec<WordEntry> {
         self.entries
-    }
-
-    /// Sanitize a name for use in keys (same logic as SceneRegistry).
-    pub fn sanitize_name(name: &str) -> String {
-        SceneRegistry::sanitize_name(name)
-    }
-
-    /// Merge entries from another registry.
-    ///
-    /// Used by PastaLoader to combine registries from multiple files.
-    /// Entry IDs are reassigned during merge.
-    pub fn merge_from(&mut self, other: WordDefRegistry) {
-        for mut entry in other.entries {
-            // Reassign ID based on current length
-            entry.id = self.entries.len();
-            self.entries.push(entry);
-        }
     }
 }
 
@@ -220,14 +203,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sanitize_name() {
-        assert_eq!(WordDefRegistry::sanitize_name("hello"), "hello");
-        assert_eq!(WordDefRegistry::sanitize_name("hello-world"), "hello_world");
-        assert_eq!(WordDefRegistry::sanitize_name("会話"), "会話");
-        assert_eq!(WordDefRegistry::sanitize_name("＊会話"), "_会話");
-    }
-
-    #[test]
     fn test_into_entries() {
         let mut registry = WordDefRegistry::new();
         registry.register_global("test", vec!["value".to_string()]);
@@ -276,46 +251,6 @@ mod tests {
         assert_eq!(id, 0);
         let entries = registry.all_entries();
         assert_eq!(entries[0].values.len(), 3);
-    }
-
-    #[test]
-    fn test_merge_from_reassigns_ids() {
-        let mut a = WordDefRegistry::new();
-        a.register_global("挨拶", vec!["こんにちは".to_string()]);
-
-        let mut b = WordDefRegistry::new();
-        b.register_global("場所", vec!["東京".to_string()]);
-        b.register_local("会話", "挨拶", vec!["やあ".to_string()]);
-
-        a.merge_from(b);
-
-        let entries = a.all_entries();
-        assert_eq!(entries.len(), 3);
-        // IDs are reassigned sequentially (entry.id == Vec index)
-        assert_eq!(entries[0].id, 0);
-        assert_eq!(entries[1].id, 1);
-        assert_eq!(entries[2].id, 2);
-        // Keys and values preserved
-        assert_eq!(entries[1].key, "場所");
-        assert_eq!(entries[1].values, vec!["東京"]);
-        assert_eq!(entries[2].key, ":会話:挨拶");
-    }
-
-    #[test]
-    fn test_merge_from_empty_registry() {
-        let mut a = WordDefRegistry::new();
-        a.register_global("挨拶", vec!["こんにちは".to_string()]);
-
-        a.merge_from(WordDefRegistry::new());
-        assert_eq!(a.all_entries().len(), 1);
-
-        // Merging into an empty registry also works
-        let mut c = WordDefRegistry::new();
-        let mut d = WordDefRegistry::new();
-        d.register_global("天気", vec!["晴れ".to_string()]);
-        c.merge_from(d);
-        assert_eq!(c.all_entries().len(), 1);
-        assert_eq!(c.all_entries()[0].id, 0);
     }
 
     #[test]

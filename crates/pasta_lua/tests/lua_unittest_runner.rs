@@ -52,8 +52,7 @@ fn run_lua_unit_tests() -> LuaResult<()> {
     // Register @pasta_search module with empty registries (required by pasta.scene)
     let ctx = TranspileContext::new();
     let search_context =
-        pasta_lua::search::SearchContext::new(ctx.scene_registry, ctx.word_registry)
-            .expect("Failed to create SearchContext");
+        pasta_lua::search::SearchContext::new(ctx.scene_registry, ctx.word_registry);
     loaded.set("@pasta_search", lua.create_userdata(search_context)?)?;
 
     // Register @pasta_sakura_script module (required by pasta.shiori.sakura_builder)

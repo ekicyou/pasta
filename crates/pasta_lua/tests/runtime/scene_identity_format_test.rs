@@ -177,7 +177,7 @@ fn transpile_time_registry_matches_finalized_scene_table() {
         ("挨拶", Some("会話_1"), 2),
     ];
 
-    let mut transpiled = SearchContext::new(registry, WordDefRegistry::new()).unwrap();
+    let mut transpiled = SearchContext::new(registry, WordDefRegistry::new());
     transpiled.set_scene_selector(Some(vec![0])).unwrap();
     let finalized: mlua::Function = lua
         .load(

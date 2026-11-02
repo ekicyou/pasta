@@ -47,7 +47,7 @@ pub fn loader(
     aliases: SceneAliasTable,
 ) -> LuaResult<mlua::AnyUserData> {
     // Create SearchContext from registries
-    let context = SearchContext::with_aliases(scene_registry, word_registry, aliases)?;
+    let context = SearchContext::with_aliases(scene_registry, word_registry, aliases);
 
     // Return the SearchContext directly as UserData
     // This allows SEARCH:method() calls to work correctly

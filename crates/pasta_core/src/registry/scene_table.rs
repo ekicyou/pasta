@@ -6,14 +6,13 @@
 use super::scene_types::*;
 use crate::error::SceneTableError;
 use crate::registry::random::RandomSelector;
-use fast_radix_trie::RadixMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::ops::Bound;
 
 /// Cache key for scene resolution (module_name + search_key + sorted filters + exact).
 /// Extended to support unified scope search with module context.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct SceneCacheKey {
-    // Clone is required for Phase 3/4 borrow split pattern
     /// Module name (グローバルシーン名)
     module_name: String,
     /// Search key
@@ -53,35 +52,21 @@ impl SceneCacheKey {
 struct CachedSelection {
     candidates: Vec<SceneId>,
     next_index: usize,
-    history: Vec<SceneId>,
 }
 
 /// scene table for managing script labels.
 pub struct SceneTable {
     /// ID-based storage for scenes (index = SceneId).
     labels: Vec<SceneInfo>,
-    /// Prefix index for forward-matching search (fn_name → [SceneId]).
-    prefix_index: RadixMap<Vec<SceneId>>,
+    /// Prefix index for forward-matching search (search key → [SceneId], registration order).
+    prefix_index: BTreeMap<String, Vec<SceneId>>,
     /// Cache for sequential scene consumption ((module_name, search_key, filters) → CachedSelection).
     cache: HashMap<SceneCacheKey, CachedSelection>,
     /// Random selector for scene selection.
     random_selector: Box<dyn RandomSelector>,
-    /// Whether to shuffle candidates (default: true, false for deterministic testing).
-    shuffle_enabled: bool,
 }
 
 impl SceneTable {
-    /// Create a new scene table with default random selector.
-    pub fn new(random_selector: Box<dyn RandomSelector>) -> Self {
-        Self {
-            labels: Vec::new(),
-            prefix_index: RadixMap::new(),
-            cache: HashMap::new(),
-            random_selector,
-            shuffle_enabled: true,
-        }
-    }
-
     /// Create a scene table from a SceneRegistry.
     ///
     /// This converts the SceneRegistry (filled at transpile time or rebuilt by the
@@ -95,7 +80,7 @@ impl SceneTable {
     pub fn from_scene_registry(
         registry: crate::registry::SceneRegistry,
         random_selector: Box<dyn RandomSelector>,
-    ) -> Result<Self, SceneTableError> {
+    ) -> Self {
         // Build Vec storage with ID assignment
         // Note: Internal IDs are 0-based Vec indices (SceneRegistry's 1-based IDs are not carried over)
         let labels: Vec<SceneInfo> = registry
@@ -116,31 +101,28 @@ impl SceneTable {
             })
             .collect();
 
-        // Build RadixMap prefix index with key conversion
+        // Build BTreeMap prefix index with key conversion
         // Unified key format with WordTable:
         // - Local: `:parent:local_name`
         // - Global: `global_name`
-        let mut prefix_index = RadixMap::new();
+        let mut prefix_index: BTreeMap<String, Vec<_>> = BTreeMap::new();
         for scene in &labels {
             // Convert fn_name to search key
             let search_key = Self::fn_name_to_search_key(&scene.fn_name, scene.parent.is_some());
 
-            let entry = prefix_index
-                .entry(search_key.as_bytes())
-                .or_insert_with(Vec::new);
+            let entry = prefix_index.entry(search_key).or_default();
 
             // Allow duplicates for search key (multiple scenes with same prefix)
             // fn_name uniqueness is not validated (SceneRegistry does not check it)
             entry.push(scene.id);
         }
 
-        Ok(Self {
+        Self {
             labels,
             prefix_index,
             cache: HashMap::new(),
             random_selector,
-            shuffle_enabled: true,
-        })
+        }
     }
 
     /// Convert fn_name to search key for prefix_index.
@@ -168,48 +150,6 @@ impl SceneTable {
             // Global scene: "会話_1::__start__" → "会話"
             SceneRegistry::split_registered_name(global).0.to_string()
         }
-    }
-
-    /// Resolve scene ID by search key and filters (search without module context).
-    ///
-    /// Unlike `collect_scene_candidates("", ..)`, keys starting with `:` (local
-    /// scenes) are not excluded; only a search key starting with `:` can match them.
-    ///
-    /// # Algorithm
-    /// 1. Prefix search using RadixMap (search_key → candidate IDs)
-    /// 2. Filter by attributes
-    /// 3. Cache-based sequential selection (no repeat until exhausted)
-    /// 4. Return selected SceneId
-    pub fn resolve_scene_id(
-        &mut self,
-        search_key: &str,
-        filters: &HashMap<String, String>,
-    ) -> Result<SceneId, SceneTableError> {
-        // Validate search_key
-        if search_key.is_empty() {
-            return Err(SceneTableError::InvalidScene {
-                scene: search_key.to_string(),
-            });
-        }
-
-        // Phase 1: Prefix search using RadixMap
-        let mut candidate_ids: Vec<SceneId> = Vec::new();
-        for (_key, ids) in self.prefix_index.iter_prefix(search_key.as_bytes()) {
-            candidate_ids.extend(ids.iter().copied());
-        }
-
-        if candidate_ids.is_empty() {
-            return Err(SceneTableError::SceneNotFound {
-                scene: search_key.to_string(),
-            });
-        }
-
-        // Phase 2: Filter by attributes
-        let filtered_ids = self.filter_by_attributes(candidate_ids, search_key, filters)?;
-
-        // Phase 3-5: Cache-based sequential selection
-        let cache_key = SceneCacheKey::new("", search_key, filters, false, None);
-        self.select_from_cache(cache_key, filtered_ids)
     }
 
     /// Resolve scene ID with module context.
@@ -241,7 +181,7 @@ impl SceneTable {
 
         // Phase 3-5: Cache-based sequential selection
         let cache_key = SceneCacheKey::new(module_name, search_key, filters, false, None);
-        self.select_from_cache(cache_key, filtered_ids)
+        Ok(self.select_from_cache(cache_key, filtered_ids))
     }
 
     /// Resolve scene ID by exact name match within one scope.
@@ -270,7 +210,7 @@ impl SceneTable {
             format!(":{}:{}", module_name, name)
         };
         // グローバルの範囲は `:` で始まるキー（ローカル）を含めない
-        let candidate_ids = match self.prefix_index.get(key.as_bytes()) {
+        let candidate_ids = match self.prefix_index.get(&key) {
             Some(ids) if !(module_name.is_empty() && key.starts_with(':')) => ids.clone(),
             _ => Vec::new(),
         };
@@ -282,7 +222,7 @@ impl SceneTable {
 
         let filtered_ids = self.filter_by_attributes(candidate_ids, name, filters)?;
         let cache_key = SceneCacheKey::new(module_name, name, filters, true, None);
-        self.select_from_cache(cache_key, filtered_ids)
+        Ok(self.select_from_cache(cache_key, filtered_ids))
     }
 
     /// `name` と等しいキーの大域シーンのうち、`:{大域の登録名}:{local}` と等しいキーの
@@ -306,7 +246,7 @@ impl SceneTable {
             });
         }
         // 大域の名前は `:` で始まらない（`:` で始まるキーはローカル）
-        let globals = match self.prefix_index.get(name.as_bytes()) {
+        let globals = match self.prefix_index.get(name) {
             Some(ids) if !name.starts_with(':') => ids.clone(),
             _ => Vec::new(),
         };
@@ -324,7 +264,7 @@ impl SceneTable {
                     .split_once("::")
                     .map_or(fn_name.as_str(), |(g, _)| g);
                 self.prefix_index
-                    .get(format!(":{}:{}", owner, local).as_bytes())
+                    .get(&format!(":{}:{}", owner, local))
                     .is_some_and(|ids| !ids.is_empty())
             })
             .collect();
@@ -334,7 +274,7 @@ impl SceneTable {
 
         let filtered_ids = self.filter_by_attributes(owners, name, filters)?;
         let cache_key = SceneCacheKey::new("", name, filters, true, Some(local));
-        self.select_from_cache(cache_key, filtered_ids).map(Some)
+        Ok(Some(self.select_from_cache(cache_key, filtered_ids)))
     }
 
     /// Filter candidate IDs by attribute filters (Phase 2 of scene resolution).
@@ -376,64 +316,38 @@ impl SceneTable {
         &mut self,
         cache_key: SceneCacheKey,
         filtered_ids: Vec<SceneId>,
-    ) -> Result<SceneId, SceneTableError> {
-        // Phase 3: Get or create cache entry
-        let needs_reset = {
-            let cached = self.cache.entry(cache_key.clone()).or_insert_with(|| {
-                let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
-                if self.shuffle_enabled {
-                    self.random_selector.shuffle_usize(&mut id_values);
-                }
-                let ids = id_values.into_iter().map(SceneId).collect();
-                CachedSelection {
-                    candidates: ids,
-                    next_index: 0,
-                    history: Vec::new(),
-                }
-            });
-            cached.next_index >= cached.candidates.len()
+    ) -> SceneId {
+        let random_selector = &mut self.random_selector;
+        let mut shuffled = || {
+            let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
+            random_selector.shuffle_usize(&mut id_values);
+            id_values.into_iter().map(SceneId).collect::<Vec<_>>()
         };
 
-        // Phase 4: Reset if needed (borrowing released above)
-        if needs_reset && let Some(cached) = self.cache.get_mut(&cache_key) {
-            cached.next_index = 0;
-            cached.history.clear();
-            if self.shuffle_enabled {
-                let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
-                self.random_selector.shuffle_usize(&mut id_values);
-                cached.candidates = id_values.into_iter().map(SceneId).collect();
-            }
-        }
-
-        // Phase 5: Sequential selection
+        // Phase 3: Get or create cache entry
         let cached = self
             .cache
-            .get_mut(&cache_key)
-            .ok_or(SceneTableError::RandomSelectionFailed)?;
-        let selected_id = cached
-            .candidates
-            .get(cached.next_index)
-            .copied()
-            .ok_or(SceneTableError::RandomSelectionFailed)?;
-        cached.next_index += 1;
-        cached.history.push(selected_id);
+            .entry(cache_key)
+            .or_insert_with(|| CachedSelection {
+                candidates: shuffled(),
+                next_index: 0,
+            });
 
-        Ok(selected_id)
+        // Phase 4: Reset when all candidates have been consumed
+        if cached.next_index >= cached.candidates.len() {
+            cached.candidates = shuffled();
+            cached.next_index = 0;
+        }
+
+        // Phase 5: 一巡前なら next_index < len、一巡後は空でない filtered_ids で作り直して 0 なので添字は候補の中にある
+        let selected_id = cached.candidates[cached.next_index];
+        cached.next_index += 1;
+        selected_id
     }
 
     /// Get scene info by ID.
     pub fn get_scene(&self, id: SceneId) -> Option<&SceneInfo> {
         self.labels.get(id.0)
-    }
-
-    /// Iterate over all scenes (for debugging).
-    pub fn labels_iter(&self) -> impl Iterator<Item = &SceneInfo> {
-        self.labels.iter()
-    }
-
-    /// Set shuffle enabled flag (for testing/debugging).
-    pub fn set_shuffle_enabled(&mut self, enabled: bool) {
-        self.shuffle_enabled = enabled;
     }
 
     /// Collect scene candidates for one scope (no local → global fallback).
@@ -470,9 +384,13 @@ impl SceneTable {
         // If module_name is empty, search global only
         if module_name.is_empty() {
             let mut global_candidates = Vec::new();
-            for (key, ids) in self.prefix_index.iter_prefix(prefix.as_bytes()) {
+            for (key, ids) in self
+                .prefix_index
+                .range::<str, _>((Bound::Included(prefix), Bound::Unbounded))
+                .take_while(|(k, _)| k.starts_with(prefix))
+            {
                 // Skip local keys (start with ':')
-                if !key.starts_with(b":") {
+                if !key.starts_with(':') {
                     global_candidates.extend(ids.iter().copied());
                 }
             }
@@ -489,7 +407,11 @@ impl SceneTable {
         // module_name is non-empty: search local only (no fallback)
         let local_search_key = format!(":{}:{}", module_name, prefix);
         let mut local_candidates = Vec::new();
-        for (_key, ids) in self.prefix_index.iter_prefix(local_search_key.as_bytes()) {
+        for (_key, ids) in self
+            .prefix_index
+            .range::<str, _>((Bound::Included(local_search_key.as_str()), Bound::Unbounded))
+            .take_while(|(k, _)| k.starts_with(local_search_key.as_str()))
+        {
             local_candidates.extend(ids.iter().copied());
         }
 
@@ -500,25 +422,6 @@ impl SceneTable {
         }
 
         Ok(local_candidates)
-    }
-
-    /// Find a scene by name, with optional attribute filters (returns fn_name).
-    ///
-    /// Not used by the runtime search (`@pasta_search` uses
-    /// resolve_scene_id_unified).
-    pub fn find_scene(
-        &mut self,
-        name: &str,
-        filters: &HashMap<String, String>,
-    ) -> Result<String, SceneTableError> {
-        // Use resolve_scene_id for the lookup
-        let scene_id = self.resolve_scene_id(name, filters)?;
-        let scene = self
-            .get_scene(scene_id)
-            .ok_or_else(|| SceneTableError::SceneNotFound {
-                scene: name.to_string(),
-            })?;
-        Ok(scene.fn_name.clone())
     }
 
     /// Replace the random selector and clear cached selections.

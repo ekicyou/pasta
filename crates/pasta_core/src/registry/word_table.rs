@@ -6,21 +6,21 @@
 use crate::error::WordTableError;
 
 use crate::registry::{WordDefRegistry, WordEntry, random::RandomSelector};
-use fast_radix_trie::RadixMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::ops::Bound;
 
 /// Cache key for word selection (module_name + search_key).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct WordCacheKey {
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct WordCacheKey {
     /// Module name (empty string for global scope)
-    pub module_name: String,
+    module_name: String,
     /// Search key
-    pub search_key: String,
+    search_key: String,
 }
 
 impl WordCacheKey {
     /// Create a new cache key.
-    pub fn new(module_name: &str, search_key: &str) -> Self {
+    fn new(module_name: &str, search_key: &str) -> Self {
         Self {
             module_name: module_name.to_string(),
             search_key: search_key.to_string(),
@@ -41,40 +41,25 @@ pub struct WordTable {
     /// Word entries (ID = Vec index).
     entries: Vec<WordEntry>,
     /// Prefix index (key → entry ID list).
-    prefix_index: RadixMap<Vec<usize>>,
+    prefix_index: BTreeMap<String, Vec<usize>>,
     /// Shuffle cache ((module, key) → CachedWordSelection).
     cached_selections: HashMap<WordCacheKey, CachedWordSelection>,
     /// Random selector.
     random_selector: Box<dyn RandomSelector>,
-    /// Whether to shuffle candidates (default: true).
-    shuffle_enabled: bool,
 }
 
 impl WordTable {
-    /// Create a new word table.
-    pub fn new(random_selector: Box<dyn RandomSelector>) -> Self {
-        Self {
-            entries: Vec::new(),
-            prefix_index: RadixMap::new(),
-            cached_selections: HashMap::new(),
-            random_selector,
-            shuffle_enabled: true,
-        }
-    }
-
     /// Build a word table from a WordDefRegistry.
     pub fn from_word_def_registry(
         registry: WordDefRegistry,
         random_selector: Box<dyn RandomSelector>,
     ) -> Self {
         let entries = registry.into_entries();
-        let mut prefix_index = RadixMap::new();
+        let mut prefix_index: BTreeMap<String, Vec<_>> = BTreeMap::new();
 
         // Build prefix index
         for entry in &entries {
-            let entry_list = prefix_index
-                .entry(entry.key.as_bytes())
-                .or_insert_with(Vec::new);
+            let entry_list = prefix_index.entry(entry.key.clone()).or_default();
             entry_list.push(entry.id);
         }
 
@@ -83,7 +68,6 @@ impl WordTable {
             prefix_index,
             cached_selections: HashMap::new(),
             random_selector,
-            shuffle_enabled: true,
         }
     }
 
@@ -112,9 +96,13 @@ impl WordTable {
         // If module_name is empty, search global only
         if module_name.is_empty() {
             let mut global_entry_ids: Vec<usize> = Vec::new();
-            for (matched_key, ids) in self.prefix_index.iter_prefix(key.as_bytes()) {
+            for (matched_key, ids) in self
+                .prefix_index
+                .range::<str, _>((Bound::Included(key), Bound::Unbounded))
+                .take_while(|(k, _)| k.starts_with(key))
+            {
                 // Skip local keys (start with ':')
-                if !matched_key.starts_with(b":") {
+                if !matched_key.starts_with(':') {
                     global_entry_ids.extend(ids.iter().copied());
                 }
             }
@@ -144,7 +132,11 @@ impl WordTable {
         // module_name is non-empty: search local only (no fallback)
         let local_key = format!(":{}:{}", module_name, key);
         let mut local_entry_ids: Vec<usize> = Vec::new();
-        for (_matched_key, ids) in self.prefix_index.iter_prefix(local_key.as_bytes()) {
+        for (_matched_key, ids) in self
+            .prefix_index
+            .range::<str, _>((Bound::Included(local_key.as_str()), Bound::Unbounded))
+            .take_while(|(k, _)| k.starts_with(local_key.as_str()))
+        {
             local_entry_ids.extend(ids.iter().copied());
         }
 
@@ -180,16 +172,10 @@ impl WordTable {
     /// # Arguments
     /// * `module_name` - Current module name (empty for global scope)
     /// * `key` - Search key
-    /// * `_filters` - Attribute filters (reserved for future use)
     ///
     /// # Returns
     /// Ok(word) on success, Err(WordNotFound) if no match
-    pub fn search_word(
-        &mut self,
-        module_name: &str,
-        key: &str,
-        _filters: &[String],
-    ) -> Result<String, WordTableError> {
+    pub fn search_word(&mut self, module_name: &str, key: &str) -> Result<String, WordTableError> {
         // Build cache key
         let cache_key = WordCacheKey::new(module_name, key);
 
@@ -206,9 +192,7 @@ impl WordTable {
 
         // Step 4: Shuffle and cache
         let mut word_indices: Vec<usize> = (0..all_words.len()).collect();
-        if self.shuffle_enabled {
-            self.random_selector.shuffle_usize(&mut word_indices);
-        }
+        self.random_selector.shuffle_usize(&mut word_indices);
         let shuffled_words: Vec<String> = word_indices
             .into_iter()
             .filter_map(|i| all_words.get(i).cloned())
@@ -231,21 +215,6 @@ impl WordTable {
         );
 
         Ok(result)
-    }
-
-    /// Set shuffle enabled flag (for testing).
-    pub fn set_shuffle_enabled(&mut self, enabled: bool) {
-        self.shuffle_enabled = enabled;
-    }
-
-    /// Get all entries (for testing/debugging).
-    pub fn entries(&self) -> &[WordEntry] {
-        &self.entries
-    }
-
-    /// Clear the selection cache (for testing).
-    pub fn clear_cache(&mut self) {
-        self.cached_selections.clear();
     }
 
     /// Replace the random selector and clear cached selections.
