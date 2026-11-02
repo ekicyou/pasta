@@ -168,16 +168,6 @@ fn test_span_is_valid() {
     assert!(!partial_span.is_valid());
 }
 
-#[test]
-fn test_span_byte_len() {
-    // byte_len() がバイト長を取得
-    let span = Span::new(1, 1, 2, 10, 5, 25);
-    assert_eq!(span.byte_len(), 20);
-
-    let empty_span = Span::default();
-    assert_eq!(empty_span.byte_len(), 0);
-}
-
 // ============================================================================
 // Task 6.2: パーサー統合テストの拡張
 // ============================================================================

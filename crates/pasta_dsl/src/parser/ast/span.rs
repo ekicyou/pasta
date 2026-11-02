@@ -136,9 +136,4 @@ impl Span {
         // A valid span must have non-zero end_byte
         self.end_byte > 0
     }
-
-    /// Get the byte length of this span.
-    pub fn byte_len(&self) -> usize {
-        self.end_byte.saturating_sub(self.start_byte)
-    }
 }
