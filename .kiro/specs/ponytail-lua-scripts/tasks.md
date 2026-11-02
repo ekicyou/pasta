@@ -4,8 +4,8 @@
 >
 > 並べて走らせる印 `(P)` は付けない。どのタスクも同じ Lua の spec の一式（1 つの VM で走る）と、`internals/` の同じ頁を順に書き換え、1 直し 1 コミットで戻せる順を守るため。
 
-- [ ] 1. 足場: 手元の関門をそろえ、何も確かめないテストを消す
-- [ ] 1.1 手元で `cargo test -p pasta_lua` と luacheck を通し、何も確かめない Rust のテストを消す
+- [x] 1. 足場: 手元の関門をそろえ、何も確かめないテストを消す
+- [x] 1.1 手元で `cargo test -p pasta_lua` と luacheck を通し、何も確かめない Rust のテストを消す
   - 直す前の `cargo test -p pasta_lua`・`cargo test -p pasta_check` と、luarocks の lfs・argparse をパスに足した同梱の luacheck が、手元で通ることを確かめる（以降のタスクの関門）
   - `node book/tools/gen-skill-refs.mjs --check` も直す前に通ることを確かめる。後のタスクで references を書くとき `.claude/skills` への書き込みを分類器が拒んだら、入った分と残りを示して開発者に許可を求める
   - `test_ontalk_hour_margin_skip` を消す。同じ振る舞いを Lua の spec の「hour_margin は仮想の正時までの残りで見る」が守っていることを確かめる
