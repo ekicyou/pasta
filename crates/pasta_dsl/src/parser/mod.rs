@@ -101,16 +101,24 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, ParseError> 
             pest::error::LineColLocation::Pos((l, c)) => (l, c),
             pest::error::LineColLocation::Span((l, c), _) => (l, c),
         };
-        let message = format!("Parse error in {} at {}:{}: {}", filename, line, column, e);
-        ParseError::SyntaxError {
-            file: filename.to_string(),
-            line,
-            column,
-            message,
-        }
+        syntax_error(filename, (line, column), &e.to_string())
     })?;
 
     build_ast(pairs, filename, source)
+}
+
+/// Build a positioned syntax error with the common `Parse error in {file} at {l}:{c}: ` prefix.
+pub(crate) fn syntax_error(filename: &str, line_col: (usize, usize), what: &str) -> ParseError {
+    let (line, column) = line_col;
+    ParseError::syntax_error(
+        filename,
+        line,
+        column,
+        format!(
+            "Parse error in {} at {}:{}: {}",
+            filename, line, column, what
+        ),
+    )
 }
 
 /// Parse a Pasta script file using pasta2.pest grammar.
@@ -319,6 +327,23 @@ mod tests {
         let plain = parse_str(source, "a.pasta").unwrap();
         let with_bom = parse_str(&format!("\u{FEFF}{source}"), "a.pasta").unwrap();
         assert_eq!(format!("{with_bom:?}"), format!("{plain:?}"));
+    }
+
+    #[test]
+    fn test_syntax_error_builds_prefixed_message() {
+        let err = syntax_error("dic/a.pasta", (2, 13), "範囲を超えています");
+        assert_eq!(
+            format!("{err:?}"),
+            format!(
+                "{:?}",
+                ParseError::SyntaxError {
+                    file: "dic/a.pasta".to_string(),
+                    line: 2,
+                    column: 13,
+                    message: "Parse error in dic/a.pasta at 2:13: 範囲を超えています".to_string(),
+                }
+            )
+        );
     }
 
     #[test]
