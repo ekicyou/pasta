@@ -5,8 +5,8 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-publish = true
-description = "Pasta DSL - Language Server Protocol implementation"
+publish = false
+description = "Pasta DSL - WebAssembly analyzer embedded in the VSCode extension"
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
@@ -21,9 +21,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 pasta_dsl.workspace = true
 pasta_check = { workspace = true }
-thiserror.workspace = true
 serde.workspace = true
-tower-lsp.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen.workspace = true

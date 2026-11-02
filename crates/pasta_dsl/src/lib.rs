@@ -31,4 +31,4 @@ pub mod partial;
 // Convenience re-exports
 pub use error::ParseError;
 pub use parser::{FileItem, PastaFile, parse_file, parse_str};
-pub use partial::{PartialParseError, PartialParseResult, parse_str_partial};
+pub use partial::{PartialParseResult, parse_str_partial};

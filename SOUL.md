@@ -24,7 +24,7 @@ pastaプロジェクトのドキュメントは、以下の優先順位と役割
 - [pasta_core/README.md](crates/pasta_core/README.md) - レジストリAPI
 - [pasta_lua/README.md](crates/pasta_lua/README.md) - Luaトランスパイラ・ランタイム
 - [pasta-lua-coding skill](.claude/skills/pasta-lua-coding/SKILL.md) - Lua APIリファレンス（references/に詳細）
-- [pasta_lsp/README.md](crates/pasta_lsp/README.md) - Language Server Protocol実装
+- [pasta_lsp/README.md](crates/pasta_lsp/README.md) - VSCode 拡張に埋め込む WASM の解析器
 - [pasta_shiori/README.md](crates/pasta_shiori/README.md) - SHIORI DLLインターフェース
 - [pasta_sample_ghost/README.md](crates/pasta_sample_ghost/README.md) - サンプルゴースト
 
