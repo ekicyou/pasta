@@ -185,3 +185,7 @@
 - 5.2: neutralizer の写しと正準の比べる行は 82 行（design.md の「77 行」は古い数え）。kiro-complete で design.md を 82 に直す。
 - 9.2: 2026-11-03 にブランチの上で Build（https://github.com/ekicyou/pasta/actions/runs/41537870051・manual-light-checks を含む全 job 緑）と Manual（https://github.com/ekicyou/pasta/actions/runs/41537874720・build-manual 緑・deploy-manual は skipped）を回した。
 - kiro-complete への申し送り: マージ後に Pages の新版と /classic/・main での release-setup-check.yml・次のリリースタグの公開の結果（upload-artifact v7 → download-artifact v8 の受け渡しを含む）を確かめる。roadmap.md の「CI は 0.5.3 に固定」の項目を閉じる。
+- 完了時にその場で解決: design.md の ContentVerify の `extractCodeFences` の文言を実装に合わせ、MirrorChecks の「77 行」を 82 行に直した。
+- 完了時にその場で解決: `gen-skill-refs-test.mjs` の `URL_BASE` の写しを `MANUAL_URL` の import にした。
+- 完了時にその場で解決: roadmap.md の古くなった行（章の数を合わせる注意・決め打ちの議題・vsce-4-upgrade の Node 20・テーマのテストの mdBook 0.5.3）を直した。
+- 完了時に申し送り: `vsce-4-upgrade`（Node 22 済み・SHA 固定・項目 12）と `pasta-dll-multiarch`（SHA 固定・道具の hash・artifact の版）の brief.md へ。

@@ -567,7 +567,7 @@ export const MANUAL_URL: 'https://ekicyou.github.io/pasta/';
 | 要件 | 7.2・10.8 |
 
 - `stripCodeFences(md)` を `maskFences(md)` にする（フェンスの行を空にし、行の数を保つ）。今の 4 か所の呼び出しは、行の配列か文字列として使うだけなので、そのまま動く。
-- `extractCodeFences(md)` を、`maskFences` の結果と元の行を並べて作り直す。`maskFences` が空にした行の連続を 1 つのフェンスとし、開きと閉じの行を除いた中身を返す。返す形（中身の文字列の配列）は今と同じ。
+- `extractCodeFences(md)` を、`maskFences` の結果と元の行を並べて作り直す。`maskFences` が空にした最初の行を開きとし、閉じは「開きから候補の行までに 1 行足して `maskFences` にかけ、足した行がフェンスの外に残る最初の行」とする（空にした行の連続では、空行 1 つを挟む 2 つのフェンスを分けられないため。実装 3.1 で改めた）。開きと閉じの行を除いた中身を返し、閉じないフェンスは文書の末尾までを中身とする。返す形（中身の文字列の配列）は今と同じ。
 - 自己確認を 1 つ足す（`assert('N-fence', …)`）。4 つのバッククォートの外側のフェンスの中に 3 つのバッククォートを書いた見本で、外側の後ろの見出しがフェンスの外に残り、中身が 1 つのフェンスになることを確かめる。
 - `listMarkdown` を消し、`listMarkdownFiles`（`link-check.mjs`）を使う。`REPO_ROOT` から見た相対パスに直して使う（N15）。
 - A-summary の `SUMMARY.md` の読みを `summaryChapters()` にする（N16）。
@@ -675,7 +675,7 @@ export function urlsContaining(indexObj: SearchIndexObj, word: string): string[]
   - 写し: `head.hbs` の `// --- BEGIN canonical hljs neutralizer` と `// --- END canonical hljs neutralizer ---` の間で、最初の `if (!win) {` から END の前まで。
   - 正準: `neutralizer.mjs` の `installHljsNeutralizer` の中で、最初の `if (!win) {` から、関数を閉じる最後の `}` の前まで。
   - 比べ方: 行ごとに前後の空白を除き、空行を除いた行の並びが等しいこと。違えば、最初に違う行の番号と両方の行を示して失敗する。印が無いときも失敗する。
-  - 2026-11-02 に、今の 2 つが一致すること（77 行）を確かめた。
+  - 2026-11-02 に、今の 2 つが一致することを確かめた（実装の 5.2 で数え直すと、比べる行は 82 行）。
 - `theme-sidebar-early-test.mjs` に 1 項目（約 6 行）（6.3）:
   - `head.hbs` と `claudia.js` から、`/width < (\d+) \|\| width >= (\d+)/` と `stored !== 'visible'` を取り出す。
   - 各ファイルに 1 回ずつあり、数の組が等しいこと。違えば両方の値を示して失敗する。
