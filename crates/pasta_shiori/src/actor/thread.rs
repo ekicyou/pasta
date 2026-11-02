@@ -43,6 +43,7 @@ use pasta_lua::debug::KickSink;
 use pasta_lua::{ClaimToken, LoadDirGuard};
 
 use crate::actor::mailbox::{ActorMsg, Reply};
+use crate::actor::module_ref::ModuleRef;
 use crate::shiori::{PastaShiori, Shiori};
 
 /// アクタースレッドのハンドル。
@@ -65,6 +66,11 @@ pub struct ActorThread {
     /// `None`（ポートを開かない・R5.5）。VM 本体は越境しないが、束縛アドレス
     /// （`SocketAddr` は `Copy`・`Send`）はアクタースレッドから読み戻して観測できる。
     debug_local_addr: Option<SocketAddr>,
+    /// join の約束の送り手（容量 1）。送ればスレッドは普通に戻り、落とすと「見捨てた」になる
+    /// （スレッドが参照を返して終わる）。
+    keep: flume::Sender<()>,
+    /// スレッドが走っている間 pasta.dll を外さない参照。返すのは join した親か、見捨てられたスレッドの一方だけ。
+    module: ModuleRef,
 }
 
 impl ActorThread {
@@ -91,11 +97,17 @@ impl ActorThread {
     ///
     /// 呼び出し側は事前に [`ActorMsg::Stop`] を mailbox へ送り、ループを抜けさせて
     /// おくこと（さもなくば `recv()` が永久に待ち続けて join できない）。
+    ///
+    /// 約束を送る → join → 参照を返す、の順（約束の前に join すると止まる）。スレッドが panic で
+    /// 終わっていても参照は返す（閉包は約束に届いていないので、返すのはここだけ）。
     pub fn join(mut self) -> thread::Result<()> {
-        match self.handle.take() {
+        let _ = self.keep.send(());
+        let result = match self.handle.take() {
             Some(h) => h.join(),
             None => Ok(()),
-        }
+        };
+        self.module.release();
+        result
     }
 
     /// アクタースレッドを **detach** する（join しない後始末用・design.md「後始末の決まり」）。
@@ -105,12 +117,12 @@ impl ActorThread {
     /// の FreeLibrary（loader lock の中で待てない）と、ack が来ずに手放すとき、reload 反復の
     /// リーク検査の経路。`JoinHandle` を join せずに drop してスレッドを detach する。
     ///
-    /// OS スレッドは ack の後に自然終了し、ハンドルは drop で解放される
+    /// 約束の送り手を落とすので、スレッドは片付けの後に自分で参照を返して終わり
+    /// （`FreeLibraryAndExitThread`）、ハンドルは drop で解放される
     /// （reload リーク検査がスレッドハンドルの非リークを実測で裏取りする）。
-    pub fn detach(mut self) {
+    pub fn detach(self) {
         // JoinHandle を drop すると Rust はスレッドを detach する（join しない）。
-        // done ack 済みなのでループは既に抜けており、スレッドは終了済みか終了間際。
-        drop(self.handle.take());
+        drop(self);
     }
 }
 
@@ -153,17 +165,20 @@ pub fn spawn_actor_thread_with(
     kick_sink: Option<KickSink>,
     claim: Option<ClaimToken>,
 ) -> io::Result<ActorThread> {
+    // 参照はスレッドを起こす前に取る（参照の無いアクタースレッドを作らない）。
+    let module = ModuleRef::acquire()?;
+    let (keep, keep_rx) = flume::bounded::<()>(1);
     // VM 実行スレッド id・ロード成否・debug DAP 束縛アドレスを呼び出し側へ返す小チャネル
     // （いずれも `Send` な値のみ越境・VM 本体は越境しない）。`SocketAddr` は `Copy`。
     let (ready_tx, ready_rx) = flume::bounded::<(ThreadId, bool, Option<SocketAddr>)>(1);
 
-    let handle = thread::Builder::new()
+    let spawned = thread::Builder::new()
         .name("pasta-actor".to_string())
         .spawn(move || {
             // ログの振り分けの文脈（仕様 `pasta-toml-logging-consistency` 4.2）。スレッドの
             // 終わりまで保ち、メッセージループの観測ログをロガーの数によらず自分のロガーへ
             // 届ける。done ack の後に出るログは登録解除の後なので捨てられる（4.7）。
-            let _log_context = LoadDirGuard::new(load_dir.clone());
+            let log_context = LoadDirGuard::new(load_dir.clone());
             // (1) VM をこのスレッドで構築・pin（!Send ゆえ越境不可）。
             let mut shiori = PastaShiori::with_kick_sink(kick_sink);
             shiori.set_claim(claim);
@@ -271,13 +286,32 @@ pub fn spawn_actor_thread_with(
                 // 観測ログ点（R10.4）: cleanup 完了後に done ack を送出（全資源解放済み）。
                 tracing::debug!(seam = "actor.done", "actor sent done ack after VM/resource cleanup");
             }
-            // ここでスレッドが終わる。SHIORI 側は ack の後に join するか（unload）、detach 済み。
-        })?;
+            // (5) 持つ値を落としてから join の約束を待つ（約束を待つ間は DLL のコードを走らせない）。
+            //     届けば普通に戻り、参照は join した親が返す。送り手が落ちていれば（見捨てられた）
+            //     参照を返してスレッドを終える（Windows では戻らない）。
+            drop(log_context);
+            drop(load_dir);
+            drop(ready_tx);
+            if keep_rx.recv().is_err() {
+                drop(keep_rx);
+                module.release_and_exit_thread();
+            }
+        });
+    let handle = match spawned {
+        Ok(handle) => handle,
+        Err(e) => {
+            // 閉包は走らないので、参照はここで返す。
+            module.release();
+            return Err(e);
+        }
+    };
 
     // VM 構築完了（実行スレッド id・ロード成否・debug DAP 束縛アドレス）を待つ。
     // ready の送り手が落ちた＝スレッドが ready の前に終わった（パニック等）。join して資源を残さない。
+    // 閉包は約束に届いていないので、参照は join の後にここで返す。
     let Ok((actor_thread_id, loaded, debug_local_addr)) = ready_rx.recv() else {
         let _ = handle.join();
+        module.release();
         return Err(io::Error::other(
             "actor thread ended before reporting readiness",
         ));
@@ -288,5 +322,7 @@ pub fn spawn_actor_thread_with(
         actor_thread_id,
         loaded,
         debug_local_addr,
+        keep,
+        module,
     })
 }

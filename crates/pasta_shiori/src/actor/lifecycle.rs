@@ -124,11 +124,11 @@ fn teardown_slot(
     match Arc::try_unwrap(instance) {
         Ok(instance) => instance.shutdown_with_timeout(policy, timeout),
         // 片付けと同時に別のスレッドで要求が走っている（単一スレッドの規約に反する呼び方）。
-        // 停止の要求だけをして、最後の参照の Drop でスレッドを手放す（join は保証しない）。
+        // 停止の要求だけをして、最後の参照の Drop でスレッドを片付ける。
         // `request_stop` が ack を受けていれば、Drop の Stop は閉じた mailbox に届かず
-        // already-done になるので、Drop は待たずに手放す（`DllMain` の道の loader lock の中でも
-        // join で待たない）。ack が timeout していたときだけ、最後の Drop が ack を最大 5 秒
-        // 待ち、届けば join する（規約に反する同時の呼び出しでだけ起きる残りの端）。
+        // already-done になり、約束を待つだけのスレッドを join して返る（止まらない）。
+        // ack が timeout していたときだけ、最後の Drop が ack を最大 5 秒待ち、届かなければ
+        // 手放す（規約に反する同時の呼び出しでだけ起きる残りの端）。
         Err(shared) => shared.request_stop(),
     }
 }

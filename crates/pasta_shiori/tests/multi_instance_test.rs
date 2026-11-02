@@ -317,6 +317,38 @@ fn v3_unload_leaves_no_actor_thread() {
     );
 }
 
+/// ack を待たずに手放したアクタースレッドは、遅れて片付けを終えると自分で参照を返して終わる（1.1・1.2）。
+/// 約束を待ったまま残らないこと（数え上げから 3 秒以内に消える）を確かめる。
+#[cfg(any(windows, target_os = "linux"))]
+#[test]
+fn abandoned_actor_thread_exits() {
+    use pasta::actor::instance::{ActorInstance, JoinPolicy};
+
+    let _serial = serial();
+    let before = actor_thread_ids();
+    let temp = copy_fixture_to_temp("v3_probe");
+    let instance = ActorInstance::spawn(0, temp.path().to_path_buf()).expect("spawn");
+    let ours: Vec<u32> = actor_thread_ids()
+        .into_iter()
+        .filter(|id| !before.contains(id))
+        .collect();
+    assert_eq!(ours.len(), 1, "one actor thread per instance: {ours:?}");
+
+    instance.notify("NOTIFY SHIORI/3.0\r\nCharset: UTF-8\r\nID: OnProbeSpin\r\n\r\n");
+    let report =
+        instance.shutdown_with_timeout(JoinPolicy::JoinAfterAck, Duration::from_millis(100));
+    assert!(!report.acked && !report.joined, "{report:?}");
+
+    let start = Instant::now();
+    while actor_thread_ids().contains(&ours[0]) {
+        assert!(
+            start.elapsed() < Duration::from_secs(3),
+            "abandoned actor thread must exit after its late cleanup"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
 /// このプロセスの `pasta-actor` という名のスレッドの ID。
 #[cfg(windows)]
 fn actor_thread_ids() -> Vec<u32> {

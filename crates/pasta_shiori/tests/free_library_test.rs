@@ -6,9 +6,9 @@
 //! `LoadLibraryW` し、`GetProcAddress` で入口を引いて駆動し、`FreeLibrary` にかかった時間と、外した後に
 //! モジュールが残っているかを標準出力に 1 行出す。親はその 1 行と子の終わり方を確かめる。
 //! 子のプロセスに分けるのは、テストの実行ファイルに静的にリンクした pasta とは別の、本物の DLL の
-//! 読み込みと解放をホストと同じ形で起こすため（落ちることがある場合 A を親から切り離すためでもある）。
+//! 読み込みと解放をホストと同じ形で起こすため。
 //!
-//! 今は直す前の期待（特性化テスト・要件 9.4）。直すタスク（6.2）で場合 A・B を直した後の期待に改める。
+//! 場合 A・B は直した後の期待（アクタースレッドが pasta.dll の参照を持つ・6.2）。場合 C は直す前と同じ。
 
 #![cfg(windows)]
 
@@ -153,13 +153,10 @@ fn child() {
     );
 }
 
-/// 子の結果：`FreeLibrary` にかかった時間・外した後にモジュールが残っているか・子の終わりのコード。
-/// 子が 1 行を出す前に落ちたときは `elapsed`・`loaded` が `None`、子の全体の時間が `wall`。
+/// 子の結果：`FreeLibrary` にかかった時間と、外した後にモジュールが残っているか。
 struct ChildResult {
-    elapsed: Option<Duration>,
-    loaded: Option<bool>,
-    code: Option<i32>,
-    wall: Duration,
+    elapsed: Duration,
+    loaded: bool,
 }
 
 fn run_child(role: &str) -> ChildResult {
@@ -196,48 +193,46 @@ fn run_child(role: &str) -> ChildResult {
         line.and_then(|l| l.split_whitespace().find_map(|w| w.strip_prefix(key)))
             .map(str::to_owned)
     };
-    let result = ChildResult {
-        elapsed: field("elapsed_ms=").map(|v| Duration::from_millis(v.parse().unwrap())),
-        loaded: field("module_loaded=").map(|v| v == "true"),
-        code: out.status.code(),
-        wall,
-    };
-    // 子が落ちてよいのは場合 A だけ（直す前）。ほかは 1 行を出して 0 で終わる。
-    if role != "A" {
-        assert!(
-            result.code == Some(0) && line.is_some(),
-            "case {role} child failed\nstdout:\n{stdout}\nstderr:\n{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+    // どの場合も子は 1 行を出して 0 で終わる。
+    assert!(
+        out.status.code() == Some(0) && line.is_some(),
+        "case {role} child failed\nstdout:\n{stdout}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    ChildResult {
+        elapsed: Duration::from_millis(field("elapsed_ms=").unwrap().parse().unwrap()),
+        loaded: field("module_loaded=").unwrap() == "true",
     }
-    result
 }
 
 /// 場合 A：旧来の入口・C モジュールあり・unload を呼ばずに外す（1.3）。
-/// 直す前：C モジュールの解放がローダーのロックを待ち、FreeLibrary が後始末の上限（5 秒）まで止まる。
-/// その後に生きたスレッドの下で pasta.dll が外れるので、子が落ちることは許す。
+/// アクタースレッドが参照を持つので、FreeLibrary は 1 減らすだけですぐ戻り、モジュールは外れない。
 #[test]
 fn case_a_legacy_with_c_module_free_without_unload() {
     let r = run_child("A");
-    // 子が 1 行を出す前に落ちたときは、子の全体の時間で確かめる。
-    let elapsed = r.elapsed.unwrap_or(r.wall);
     assert!(
-        elapsed >= Duration::from_secs(4),
-        "case A: FreeLibrary returned in {elapsed:?} (code={:?})",
-        r.code
+        r.elapsed < Duration::from_secs(1),
+        "case A: FreeLibrary took {:?}",
+        r.elapsed
     );
+    assert!(r.loaded, "case A: module must stay loaded");
 }
 
-/// 場合 B：版 3 のインスタンスを手放したまま外す（1.2・1.5）。直す前：モジュールが外れる。
+/// 場合 B：版 3 のインスタンスを手放したまま外す（1.2・1.5）。モジュールは外れず、すぐ戻る。
 #[test]
 fn case_b_v3_abandoned_instance_free() {
     let r = run_child("B");
-    assert_eq!(r.loaded, Some(false), "case B: module must be unloaded");
+    assert!(
+        r.elapsed < Duration::from_secs(1),
+        "case B: FreeLibrary took {:?}",
+        r.elapsed
+    );
+    assert!(r.loaded, "case B: module must stay loaded");
 }
 
 /// 場合 C：loadu → unload → 外す（1.8）。参照を返し忘れて DLL を残さないこと（直す前も後も同じ）。
 #[test]
 fn case_c_balanced_unload_then_free() {
     let r = run_child("C");
-    assert_eq!(r.loaded, Some(false), "case C: module must be unloaded");
+    assert!(!r.loaded, "case C: module must be unloaded");
 }

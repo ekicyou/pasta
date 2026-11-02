@@ -5,7 +5,7 @@
 //! 要求はそのインスタンスの mailbox だけを通り（5.2）、後始末はほかのインスタンスに触れない（4.3）。
 //!
 //! 後始末の決まり（design.md「後始末の決まり」）: Stop を送って ack を待ち、ack が届いて
-//! [`JoinPolicy::JoinAfterAck`] ならアクタースレッドを join する。それ以外は手放す（detach）。
+//! [`JoinPolicy::JoinAfterAck`] ならアクタースレッドを join する（受け口が既に閉じていたときも join）。それ以外は手放す（detach）。
 //! ack が来なければ手放したことを警告のログ（`seam = "instance.abandon"`）に出す（4.2）。
 
 use std::path::{Path, PathBuf};
@@ -267,8 +267,10 @@ impl ActorInstance {
         let Some(thread) = self.thread.take() else {
             return report;
         };
-        if report.acked && policy == JoinPolicy::JoinAfterAck {
-            // ack の後のアクタースレッドに待つ所は無いので、上限なしで join しても止まらない。
+        // 受け口が既に閉じている（already_done）スレッドも、片付けを終えて約束を待つか panic で
+        // 抜けたかなので join は止まらない。見捨てる（スレッドが参照を返す）のは ack が来ないときだけ。
+        if (report.acked || report.already_done) && policy == JoinPolicy::JoinAfterAck {
+            // ack の後のアクタースレッドは約束を待つだけなので、上限なしで join しても止まらない。
             let _ = thread.join();
             report.joined = true;
         } else {
@@ -344,10 +346,10 @@ mod tests {
             "kick must fail after the actor stopped"
         );
 
-        // 二度目の後始末は冪等（already_done）。
+        // 二度目の後始末は冪等（already_done）で、受け口を閉じたスレッドを join する。
         let report = instance.shutdown(JoinPolicy::JoinAfterAck);
         assert!(
-            report.already_done && !report.acked && !report.joined,
+            report.already_done && !report.acked && report.joined,
             "{report:?}"
         );
     }
