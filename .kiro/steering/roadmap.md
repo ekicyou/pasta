@@ -281,7 +281,7 @@ Opus
 - 1 ウェーブに 1 本だけのファイル: `code_gen/element_gen.rs` は `ponytail-lua-transpiler`、`pasta_scripts/pasta/act.lua` は `ponytail-lua-scripts`。
 - `ponytail-dsl-parser` は `parse_str` の誤りの形（行・桁・文）を保つ（`ponytail-editor-tooling` の診断が読む）。`pasta_dsl/src/partial.rs` は `ponytail-editor-tooling` の持ち場。
 - マニュアルの同じ頁の別の節（`internals/shiori.md`・`execution-model.md` は `ponytail-lua-scripts` と `ponytail-shiori`）、`tech.md`・`structure.md` の別の行、Lua のテストの一覧の 1 行、`gen-skill-refs` が作る references は、後から入る側が rebase で合わせる。
-- 章を足す spec は、章の数を決め打ちする 3 つの検査を合わせる（`ponytail-manual-ci` が決め打ちをやめるなら、その後は要らない）。
+- 章を足す spec が章の数を合わせる手間は無くなった（`ponytail-manual-ci` が 2026-11-03 に 3 つの検査を目次との突き合わせにした）。
 
 ### その先のウェーブ（2026-11-02 の見込み）
 
@@ -324,7 +324,7 @@ Opus
 ### 開発者の判断が要るもの（ウェーブは止めない）
 
 - **`scene-count` が `scene_table.rs` に触らずに数えられないとき**。ウェーブ 2 で `scene-attribute-store` と並べられなくなる。ウェーブ 3・4 は `search/context.rs` を共有するので入れず、ウェーブ 4 の後へ回ると、リリースが 1 ウェーブ遅れる。推奨は、設計の最初に確かめて、だめなら `scene-attribute-store` の `scene_table.rs` の変更が入った後に、同じウェーブの中で rebase して合わせる（どちらの spec の手順にも足さない。そうなったら棚卸で決める）。
-- **章の数の決め打ちをやめるか**。3 つの検査が章の数を決め打ちしているので、章を足すたびに取り残しで main が赤くなる（2026-10-17 と 2026-11-02 の 2 度。CI を待たずにマージするので、PR の赤では止まらない）。`ponytail-manual-ci` の議題にした。推奨は、`SUMMARY.md` から数える形にして、決め打ちをやめる。
+- ~~**章の数の決め打ちをやめるか**~~ — 決着（2026-11-03）。`ponytail-manual-ci` が、3 つの検査を `SUMMARY.md` の章との突き合わせにした。
 - 前回からの持ち越し（推奨は前回のまま）: `pasta-dll-multiarch` の版（推奨 0.6.0。先に要るものは無くなった）、`vsce-4-upgrade`・`pest-2-9-4-upgrade` の版、`scene-exact-match` の版（遅くとも 0.6.0）、`scene-anchor-link` の版、会えた日数を数える spec を起票するか（`scene-condition-attributes` の brief）、`SOUL.md` §2・§5 の記述、`steering/structure.md` の作り直し、ghost_dev の emo2 開発のフォルダに残る撮影の保存データとログ。
 
 ### 人手の確認が残っている項目
@@ -463,7 +463,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 2026-10-24 の `/update`（PR #187）で、互換の範囲の更新と、直しの小さい互換の無い更新（esbuild・ctor・socket2・wintf-winmsg-executor・jsdom）は入れた。直しが大きいか、確かめ方が要る 3 件を spec にした（開発者の依頼）。同じ日に、mlua 0.12 を止めている mlua-stdlib を外す spec と、JSON を追い出す `toml-serialization` を足して 5 本にした。同じ日の開発者の決定で、`toml-serialization`・`mlua-stdlib-removal`・`mlua-0-12-upgrade` を 0.4.3 に入れた（「次のリリースのタイミングで、mlua 上げちゃいたい」）。`vsce-4-upgrade`・`pest-2-9-4-upgrade` は 0.4.3 に入れない（版は未定）。
 
 - **`mlua-stdlib-removal`・`toml-serialization`・`mlua-0-12-upgrade`**: 0.4.3 で入った（「完了フェーズ」）。経緯と決定は各 spec の `.kiro/specs/completed/<name>/` にある。
-- **`vsce-4-upgrade`**: `@vscode/vsce` 3.9 → 4.0。Node 22 が要る（`release.yml`・`release-setup-check.yml` は Node 20）。`--azure-credential` の公開の道が 4.x でも通るかを、`release-setup-check.yml` で公開の前に確かめる。Node 22 を持つ `ponytail-manual-ci`（0.5.0）の後に入れる。
+- **`vsce-4-upgrade`**: `@vscode/vsce` 3.9 → 4.0。Node 22 が要る（`release.yml`・`release-setup-check.yml` は `ponytail-manual-ci` が 2026-11-03 に 22 にした）。`--azure-credential` の公開の道が 4.x でも通るかを、`release-setup-check.yml` で公開の前に確かめる。Node 22 を持つ `ponytail-manual-ci`（0.5.0）の後に入れる。
 - **`pest-2-9-4-upgrade`**: pest 2.9.2 → 2.9.4 以降。2.9.4 は `std` で stacker・psm を必ず引き込み、psm が wasm32 のビルドに clang を要るので、手元の `build-wasm.ps1` が落ちる。wasm32 向けの C コンパイラを手元と CI に用意するか、上流に直してもらうかを要件で比べる。`Cargo.lock` の席と `ponytail-dsl-parser`・`build.yml` の wasm の job を共有するので、0.5.0 の 1 つ目のウェーブには入れない。
 - **席**: `pest-2-9-4-upgrade` は `Cargo.lock` とルートの `Cargo.toml` を触る。`ponytail-editor-tooling`（席を持つ）・`ponytail-core-registry` とは、同じウェーブに置かない。`vsce-4-upgrade` はリリースの席（`release.yml`）を触るので、リリースの実行中は main へ入れない。
 
@@ -502,7 +502,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [x] ponytail-lua-scripts -- 数でない `hour_margin` を既定に戻す。応答の見出しの値の改行を空白にする。続きのトークの期限を呼んだ時刻から数える。包む関数の写しと `co_callback` を消す（`pasta.areka` は残す）。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。`set_co_scene` と `EVENT.fire` を先に直した 0.4.2 の 2 本は入った（2026-10-23）。Dependencies: none
 - [x] ponytail-shiori -- unload が、アクターのスレッドが DLL を出るまで（上限つきで）待つ。フォルダが無いときに理由を出す。`Key:` の行を受け付ける。FFI の型を C に合わせ、テストの競りを無くす。テストだけのコードとデータを出荷物から外す。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。Dependencies: none
 - [x] ponytail-editor-tooling -- 構文の誤りを本当の位置に 1 件だけ出し、部分解析がシーンを落とさないようにする。箱・行末コメント・Lua のフェンスの色を文法に合わせる。`pasta_lsp` を WASM の解析器だけにする（tower-lsp を撤去）。`host` を廃止する。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。Dependencies: none
-- [ ] ponytail-manual-ci -- マニュアルの 3 つの検査を、全部の push・PR とリリースの関門で走らせる。Pages の権限を deploy に絞る。公開の job の action を SHA で固定する。重複したビルド・PoC・写しを整理する。Node 22・mdBook 0.5.4 に揃える。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。`pasta-check-release-asset`（完了）が `release.yml`・`github-release.ps1` に足した段を保つ。Dependencies: none
+- [x] ponytail-manual-ci -- マニュアルの 3 つの検査を、全部の push・PR とリリースの関門で走らせる。Pages の権限を deploy に絞る。公開の job の action を SHA で固定する。重複したビルド・PoC・写しを整理する。Node 22・mdBook 0.5.4 に揃える。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。`pasta-check-release-asset`（完了）が `release.yml`・`github-release.ps1` に足した段を保つ。Dependencies: none
 - [ ] scene-count -- シーン名にぶら下がるシーンの数を、`＞` と同じ規則の前方一致と完全一致の 2 通りで読む GLOBAL 関数（英語名と日本語名）。`pasta_check validate` の組み込みの名前とマニュアルも足す（2026-11-01 起票。里々の「文「○○」の数」から、開発者の依頼）。0.5.0 の 4 番（2026-11-01 開発者の決定）。`scene-condition-attributes`・`scene-pick-modes`・`scene-exact-match` と同じウェーブに置かない（`search/context.rs`）。Dependencies: none（ファイルの順番で `ponytail-core-registry`・`ponytail-lua-scripts` の後。`scene-attribute-store` とは `scene_table.rs` に触らない約束で並べる）
 - [ ] scene-exact-match -- 完全一致でシーンを呼ぶ `＞＞シーン名`（同名が複数ならランダム。既存の `search_scene_exact` を使う）と、`pasta.toml` の `[scene] match = "exact"`（`＞`・イベントの受け口・OnTalk・時報・選択肢の飛び先を全部完全一致にする。既定は前方一致）を足す。既定のモードでも、イベントの受け口はイベント ID の直後が英大文字で続く候補（`＊OnInstallCompleteAll` など）を外す。`novel-talk-flow` の完全一致の切り替えを引き取る（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者が承認して `event-scene-exact-match` から広げた）。版は未定。`call-attribute-filter` と同じウェーブに置かない。Dependencies: none
 - [ ] scene-pick-modes -- 同名シーンの選び方に、重み（`＊OnTalk　＆重み：5`。1 巡の中で重みの数だけ出る）と順番（`＆順番：番号`、別名 `index`。番号の小さい順に出して最初へ戻る。最後に出した番号を保存する）を足す。単語の値にも重み（`＠挨拶：こんにちは＠３、やあ`）を足す。不正な値は読み込みエラー。今は複写と Lua で作っている（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者と書き方を決めた）。0.5.0 の 3 番（2026-10-29 開発者の決定）。`＆重み`・`＆順番` だけを先に特別扱いで読まない（属性の早い部分実装にしない）。`scene-condition-attributes` と同じウェーブに置かない。Dependencies: scene-attribute-store
@@ -580,7 +580,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - スリープの印が残る件（2026-10-18 棚卸、`tutorial-ssp-gaps` の調査メモ）— `OnSysSuspend` が来て `OnSysResume` が来ず、PC が眠らなかったとき、印は次に立て直すまで残る。害が無いので受け入れた。
 - バルーンが画面の左端で折り返るとき・縦に長いときの見え方（2026-10-17 棚卸、`getting-started-screenshots` の調査メモ。`hello-pasta-shell-art` からの持ち越し）— 実機で確かめていない。
 - 並列負荷で時々落ちる TCP のテスト（2026-10-07 棚卸、`act-token-grouping-fix`・`scene-identity-format` の実装メモ）— `runtime_toggle_e2e_*`・`hook_panic_*`。
-- マニュアルのメニューのテストが持つ mdBook の写し（2026-10-10 棚卸、`manual-claudia-theme` の実装メモ）— `book/tools/theme-menu-test.mjs` は、mdBook 0.5.4 の `book.js` のキー操作の処理を写して持つ。mdBook の版を上げるときに合わせる（CI は 0.5.3 に固定。0.5.0 の `ponytail-manual-ci` が 0.5.4 に揃える）。
+- マニュアルのメニューのテストが持つ mdBook の写し（2026-10-10 棚卸、`manual-claudia-theme` の実装メモ）— `book/tools/theme-menu-test.mjs` は、mdBook 0.5.4 の `book.js` のキー操作の処理を写して持つ。mdBook の版を上げるときに合わせる（CI も 0.5.4。`ponytail-manual-ci` が 2026-11-03 に揃えた）。
 - 配布版の hello-pasta に会話の変化を足すときの指針（2026-10-10 棚卸、`hello-pasta-tutorial-stages` の実装メモ）— emo2 開発からの知見「1 つの場面に 3 通り」は、段階の形を固定した辞書では満たせない。配布版に変化を足すことになったら、その動機から起票する。
 - pasta.dll が C の実行時ライブラリの入出力の関数を約 170 個書き出している（2026-10-22 棚卸、`lua-cmodule-robustness` の調査の範囲外）— LuaJIT の `msvcbuild.bat` の組み立ての設定（`_CRT_STDIO_INLINE` を `dllexport` にする）から来る。pasta のコードではなく、LuaJIT の組み立ての側にある。害は見つかっていない。ほかの DLL とぶつかる事例が出たら起票する。
 - budoux の自動改行の禁則（2026-10-05、ghost_dev「emo2 開発」からの申し送り）— `line_breaker.rs` の `break_lines_impl` は禁則を見ない。BudouX の語の区切りの直前で改行するだけである。
