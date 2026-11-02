@@ -378,6 +378,29 @@ mod tests {
     }
 
     #[test]
+    fn test_try_parse_expr_rejects_unhandled_rule_with_position() {
+        // 2 行目の話者名 `Alice`（id 規則）は式の項ではない
+        let source = "＊挨拶\n  Alice：こんにちは\n";
+        let pair = PastaParser2::parse(Rule::file, source)
+            .unwrap()
+            .flatten()
+            .find(|p| p.as_rule() == Rule::id && p.as_str() == "Alice")
+            .unwrap();
+        let err = try_parse_expr(pair, "dic/a.pasta").unwrap_err();
+        assert_eq!(
+            format!("{err:?}"),
+            format!(
+                "{:?}",
+                syntax_error(
+                    "dic/a.pasta",
+                    (2, 3),
+                    "内部の誤り：式の項として扱えない規則 id"
+                )
+            )
+        );
+    }
+
+    #[test]
     fn test_pest_parser_compiles() {
         // Verify that PastaParser2 can parse the file rule
         let result = PastaParser2::parse(Rule::file, "");

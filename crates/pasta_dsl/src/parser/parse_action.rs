@@ -447,23 +447,13 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>, filename: &str) -> Result<Option<
         Rule::paren_expr => {
             parse_expr_from_parts(pair, filename)?.map(|e| Expr::Paren(Box::new(e)))
         }
-        Rule::add_op
-        | Rule::sub_op
-        | Rule::mul_op
-        | Rule::div_op
-        | Rule::modulo_op
-        | Rule::concat_op => {
-            // Binary operators are handled at a higher level
-            None
-        }
-        _ => {
-            // Try recursively for nested expressions
-            for inner in pair.into_inner() {
-                if let Some(expr) = try_parse_expr(inner, filename)? {
-                    return Ok(Some(expr));
-                }
-            }
-            None
+        // 演算子は呼び出し元が bin_op_from_rule で先に分ける。項の位置に来る規則はすべて上で扱う
+        rule => {
+            return Err(syntax_error(
+                filename,
+                pair.line_col(),
+                &format!("内部の誤り：式の項として扱えない規則 {rule:?}"),
+            ));
         }
     };
     Ok(expr)
