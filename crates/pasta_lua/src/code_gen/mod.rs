@@ -8,7 +8,6 @@ mod expr_gen;
 mod scope_gen;
 pub mod source_map;
 
-use crate::config::LineEnding;
 use crate::error::TranspileError;
 
 use pasta_dsl::parser::Span;
@@ -34,8 +33,6 @@ pub struct LuaCodeGenerator<'a, W: Write> {
     writer: &'a mut W,
     /// Current indentation level
     indent_level: usize,
-    /// Line ending style
-    line_ending: LineEnding,
     /// 1-based line number of the most recently emitted output line.
     ///
     /// Starts at 0 (nothing emitted yet) and is incremented by exactly 1 for each
@@ -77,20 +74,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Self {
             writer,
             indent_level: 0,
-            line_ending: LineEnding::default(),
-            out_line: 0,
-            pending_blank_lines: 0,
-            source_map: None,
-            line_map_slots: Vec::new(),
-        }
-    }
-
-    /// Create a new Lua code generator with specified line ending.
-    pub fn with_line_ending(writer: &'a mut W, line_ending: LineEnding) -> Self {
-        Self {
-            writer,
-            indent_level: 0,
-            line_ending,
             out_line: 0,
             pending_blank_lines: 0,
             source_map: None,
@@ -189,7 +172,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Write all pending blank lines and advance `out_line` for each.
     fn flush_blank_lines(&mut self) -> Result<(), TranspileError> {
         while self.pending_blank_lines > 0 {
-            write!(self.writer, "{}", self.line_ending.as_str())?;
+            writeln!(self.writer)?;
             self.out_line += 1;
             self.pending_blank_lines -= 1;
         }
@@ -210,7 +193,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// so it advances `out_line` by 1.
     fn writeln(&mut self, s: &str) -> Result<(), TranspileError> {
         self.write_indent()?;
-        write!(self.writer, "{}{}", s, self.line_ending.as_str())?;
+        writeln!(self.writer, "{}", s)?;
         self.out_line += 1;
         Ok(())
     }
@@ -304,7 +287,7 @@ mod tests {
     fn out_line_advances_per_choke_point_and_matches_bytes() {
         let mut output = Vec::new();
         {
-            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            let mut cg = LuaCodeGenerator::new(&mut output);
             assert_eq!(cg.out_line(), 0, "no line emitted yet");
 
             cg.writeln("a").unwrap();
@@ -339,7 +322,7 @@ mod tests {
         let mut output = Vec::new();
         let final_out_line;
         {
-            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            let mut cg = LuaCodeGenerator::new(&mut output);
             cg.writeln("do").unwrap();
             cg.indent();
             cg.writeln("a").unwrap();
@@ -365,7 +348,7 @@ mod tests {
     fn indent_dedent_levels_and_saturation_at_zero() {
         let mut output = Vec::new();
         {
-            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            let mut cg = LuaCodeGenerator::new(&mut output);
             cg.dedent(); // saturates: still level 0
             cg.writeln("zero").unwrap();
             cg.indent();
@@ -387,7 +370,7 @@ mod tests {
     fn end_block_dedents_then_writes_end_without_blank_line() {
         let mut output = Vec::new();
         {
-            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            let mut cg = LuaCodeGenerator::new(&mut output);
             cg.writeln("do").unwrap();
             cg.indent();
             cg.writeln("body").unwrap();
@@ -397,30 +380,13 @@ mod tests {
         assert_eq!(text, "do\n    body\nend\n");
     }
 
-    /// CRLF line ending is honored by both `writeln` and `write_blank_line`,
-    /// and each terminator still advances `out_line` by exactly 1.
-    #[test]
-    fn with_line_ending_crlf_emits_crlf_terminators() {
-        let mut output = Vec::new();
-        let final_out_line;
-        {
-            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::CrLf);
-            cg.writeln("a").unwrap();
-            cg.write_blank_line().unwrap();
-            cg.writeln("b").unwrap();
-            final_out_line = cg.out_line();
-        }
-        assert_eq!(String::from_utf8(output).unwrap(), "a\r\n\r\nb\r\n");
-        assert_eq!(final_out_line, 3);
-    }
-
     /// `write_header` emits the exact two require lines; the separating blank
     /// line stays pending (byte-exact with LF endings).
     #[test]
     fn write_header_emits_exact_require_lines() {
         let mut output = Vec::new();
         {
-            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            let mut cg = LuaCodeGenerator::new(&mut output);
             cg.write_header().unwrap();
             assert_eq!(cg.out_line(), 2);
         }
@@ -438,7 +404,7 @@ mod tests {
         let mut sink = CapturingSink::default();
         let mut output = Vec::new();
         {
-            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            let mut cg = LuaCodeGenerator::new(&mut output);
             cg.set_source_map(&mut sink);
             cg.writeln("line1").unwrap();
             cg.record_span(Span::default()); // invalid: end_byte == 0 -> skipped
@@ -459,7 +425,7 @@ mod tests {
         let mut sink = CapturingSink::default();
         let mut output = Vec::new();
         {
-            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            let mut cg = LuaCodeGenerator::new(&mut output);
             cg.set_source_map(&mut sink);
             cg.writeln("line1").unwrap();
             cg.record_block_line(0); // invalid sentinel -> skipped
@@ -474,7 +440,7 @@ mod tests {
     fn recording_without_sink_is_inert() {
         let mut output = Vec::new();
         {
-            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            let mut cg = LuaCodeGenerator::new(&mut output);
             cg.writeln("a").unwrap();
             cg.record_span(Span::new(1, 1, 1, 2, 0, 5));
             cg.record_block_line(3);

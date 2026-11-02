@@ -1,6 +1,5 @@
 use super::*;
 use crate::code_gen::source_map::SourceMapSink;
-use crate::config::LineEnding;
 use pasta_dsl::parser::{Arg, Args, BinOp, CallTarget, FnScope};
 
 /// Test sink capturing each `(lua_line, pasta_line)` record.
@@ -21,7 +20,7 @@ where
 {
     let mut output = Vec::new();
     {
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         f(&mut cg).unwrap();
     }
     String::from_utf8(output).unwrap()
@@ -40,7 +39,7 @@ fn escape_with_single_char_sequence_emits_nothing() {
     let mut output = Vec::new();
     let final_out_line;
     {
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         cg.set_source_map(&mut sink);
         let action = Action::Escape {
             sequence: "@".to_string(), // no char at index 1
@@ -114,7 +113,7 @@ fn sakura_script_action_emits_sakura_script_call() {
 #[test]
 fn continue_action_without_prior_actor_is_invalid_continuation_error() {
     let mut output = Vec::new();
-    let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+    let mut cg = LuaCodeGenerator::new(&mut output);
     let cont = ContinueAction {
         actions: vec![Action::Talk {
             text: "続き".to_string(),
@@ -435,7 +434,7 @@ fn code_block_with_invalid_span_emits_lines_without_records() {
     let mut sink = CapturingSink::default();
     let mut output = Vec::new();
     {
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         cg.set_source_map(&mut sink);
         cg.generate_code_block(&CodeBlock {
             language: Some("lua".to_string()),

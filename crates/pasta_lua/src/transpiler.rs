@@ -146,8 +146,7 @@ impl LuaTranspiler {
             lines: BTreeMap::new(),
             inner: sink,
         };
-        let mut codegen =
-            LuaCodeGenerator::with_line_ending(&mut intermediate_buffer, self.config.line_ending);
+        let mut codegen = LuaCodeGenerator::new(&mut intermediate_buffer);
         codegen.set_source_map(&mut recorder);
 
         // Write header

@@ -26,7 +26,6 @@
 
 use pasta_dsl::parser::parse_str;
 use pasta_dsl::parser::{CodeBlock, Expr, KeyWords, SetValue, Span, VarScope, VarSet};
-use pasta_lua::LineEnding;
 use pasta_lua::LuaTranspiler;
 use pasta_lua::code_gen::LuaCodeGenerator;
 use pasta_lua::code_gen::source_map::SourceMapSink;
@@ -63,7 +62,7 @@ fn var_set_local_expr_records_its_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         let var_set = VarSet {
@@ -91,7 +90,7 @@ fn var_set_global_wordref_records_its_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         let var_set = VarSet {
@@ -120,7 +119,7 @@ fn var_set_property_records_its_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         let var_set = VarSet {
@@ -233,7 +232,7 @@ fn global_word_single_key_records_its_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         let word = KeyWords {
@@ -262,7 +261,7 @@ fn global_word_multi_key_maps_all_lines_to_same_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         // 3 キー → 3 出力行。すべて span_at(5).start_line == 5 へ写像されること。
@@ -294,7 +293,7 @@ fn local_word_records_its_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         let word = KeyWords {
@@ -328,7 +327,7 @@ fn code_block_maps_each_line_individually_with_fence_offset() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         // 開きフェンスが .pasta 行 12 にあると仮定（span.start_line = 12）。

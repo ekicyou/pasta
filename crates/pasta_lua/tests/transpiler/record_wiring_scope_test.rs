@@ -4,7 +4,6 @@
 
 use pasta_dsl::parser::parse_str;
 use pasta_dsl::parser::{ActorScope, GlobalSceneScope, LocalSceneScope, Span};
-use pasta_lua::LineEnding;
 use pasta_lua::LuaTranspiler;
 use pasta_lua::TranspileContext;
 use pasta_lua::code_gen::LuaCodeGenerator;
@@ -58,7 +57,7 @@ fn actor_header_records_definition_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         // span.start_line == 9（`％さくら` 定義ヘッダ行）を想定。
@@ -94,7 +93,7 @@ fn global_scene_header_records_definition_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         // ローカルシーンを持たない最小グローバルシーン。span.start_line == 21（`＊メイン` 行）を想定。
@@ -127,7 +126,7 @@ fn local_scene_header_records_definition_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         // 名前付きローカルシーン。span.start_line == 30（`・サブ会話` 行）を想定。

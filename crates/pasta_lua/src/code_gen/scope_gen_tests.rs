@@ -1,6 +1,5 @@
 use super::*;
 use crate::code_gen::source_map::SourceMapSink;
-use crate::config::LineEnding;
 use crate::context::TranspileContext;
 use pasta_dsl::parser::{
     Action, ActionLine, CallScene, CallTarget, ChoiceNode, CodeBlock, CueArgToken, CueCommandNode,
@@ -13,7 +12,7 @@ where
 {
     let mut output = Vec::new();
     {
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         f(&mut cg).unwrap();
     }
     String::from_utf8(output).unwrap()
@@ -415,7 +414,7 @@ fn global_and_local_scenes_record_join_keys_and_header_lines() {
 
     {
         let mut output = Vec::new();
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         cg.set_source_map(&mut sink);
         // counter == 1: first occurrence of base 会話 (matches runtime 会話_1).
         cg.generate_global_scene(&scene, &scene.name, 1, &ctx, &attrs)
@@ -450,7 +449,7 @@ fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
 
     {
         let mut output = Vec::new();
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         cg.set_source_map(&mut sink);
         cg.generate_global_scene(&first, &first.name, 1, &ctx, &attrs)
             .unwrap();

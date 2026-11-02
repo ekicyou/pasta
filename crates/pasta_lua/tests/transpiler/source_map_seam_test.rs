@@ -10,7 +10,6 @@
 //! - The `out_line` counter accurately tracks the number of generated output lines.
 
 use pasta_dsl::parser::{Action, Span};
-use pasta_lua::LineEnding;
 use pasta_lua::code_gen::LuaCodeGenerator;
 use pasta_lua::code_gen::source_map::SourceMapSink;
 
@@ -49,7 +48,7 @@ fn test_no_sink_is_byte_identical_and_records_nothing() {
     // No sink: the seam is inert. Output must match the plain path exactly.
     // Force LF so the byte assertion is platform-independent (Windows default is CRLF).
     let mut output = Vec::new();
-    let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+    let mut codegen = LuaCodeGenerator::new(&mut output);
 
     let action = Action::Talk {
         text: "こんにちは".to_string(),
@@ -73,7 +72,7 @@ fn test_capturing_sink_records_line_to_span_for_action_path() {
 
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         let action = Action::Talk {

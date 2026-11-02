@@ -36,7 +36,7 @@
   - 品質の関門が通り、2.1〜2.3 が 1 コミットになっている
   - _Requirements: 2.1, 2.2, 7.5, 7.6, 7.7, 8.5_
 
-- [ ] 3. 効かない変換の設定を消す
+- [x] 3. 効かない変換の設定を消す
   - 変換の設定を別名表と `Default` と別名表を与える作り方だけにし、改行の種類（`LineEnding` を含む）とコメントの有無の設定、`TranspilerConfig::new` を消す
   - 生成器の改行の種類の欄と作り方を消し、作り方を 1 つにする（改行はいつも LF）。`lib.rs` の再輸出から `LineEnding` を外す
   - 消した設定と作り方を使っていたテスト（CRLF のテストは消す）と `tests/` の呼び出しを、残る作り方へ付け替える
@@ -109,3 +109,8 @@
   - `git diff` で `debug/`・`loader/`・`runtime/`・`pasta_core`（タスク 10 の場合を除く）のソースに、例外 1 件のほかの変更が無いことを確かめる
   - ワークスペースの `cargo fmt --check`・`cargo clippy --all-targets`（警告 0）・`cargo test -p pasta_lua`（タスク 10 で消した場合は `-p pasta_core` も）が通る
   - _Requirements: 2.1, 2.2, 4.7, 7.5, 7.7, 8.5_
+
+## Implementation Notes
+- 生成器で `self.writer` に直に書くと保留の空行を飛ばす。書き出しは `write_indent`／`write_raw`（とその後の `write_line_terminator`・`generate_expr`）を通す（2.1）。
+- cargo-insta は入っていない。スナップショットの受け入れは `INSTA_FORCE_PASS=1` で `.snap.new` を出し、差分を見て手で置き換える（`assertion_line:` の行は外す）（2.3）。
+- `debug_integration_test::runtime_teardown_emits_terminated_to_connected_client` が read timeout で 1 回だけ落ちることがある（この spec と無関係・単独では通る）。

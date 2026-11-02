@@ -86,7 +86,7 @@ fn create_pasta_file(actors: Vec<ActorScope>, scenes: Vec<GlobalSceneScope>) -> 
 #[test]
 fn test_transpiler_default() {
     let transpiler = LuaTranspiler::default();
-    assert!(transpiler.config().comment_mode);
+    assert!(transpiler.config().scene_aliases.is_empty());
 }
 
 #[test]
@@ -390,8 +390,7 @@ fn test_transpile_multi_key_actor_word_lua_output() {
 fn test_with_defaults_matches_default() {
     let transpiler = LuaTranspiler::with_defaults();
     let default = TranspilerConfig::default();
-    assert_eq!(transpiler.config().comment_mode, default.comment_mode);
-    assert_eq!(transpiler.config().line_ending, default.line_ending);
+    assert_eq!(transpiler.config().scene_aliases, default.scene_aliases);
 }
 
 #[test]
@@ -459,16 +458,10 @@ fn test_transpile_writer_failure_yields_io_error() {
     }
 }
 
-/// Documents current behavior: output normalization converts all line endings
-/// to LF, so the final transpiled bytes are LF-only even when the transpiler
-/// is configured with CRLF line endings (CRLF applies to the intermediate
-/// code-generation buffer only).
+/// The transpiled bytes always use LF line endings.
 #[test]
-fn test_transpile_output_is_lf_only_even_with_crlf_config() {
-    use crate::config::LineEnding;
-
-    let config = TranspilerConfig::new().with_line_ending(LineEnding::CrLf);
-    let transpiler = LuaTranspiler::new(config);
+fn test_transpile_output_is_lf_only() {
+    let transpiler = LuaTranspiler::default();
     let file = create_pasta_file(vec![], vec![create_simple_scene("メイン")]);
     let mut output = Vec::new();
 
