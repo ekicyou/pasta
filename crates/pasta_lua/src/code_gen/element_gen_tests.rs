@@ -675,3 +675,12 @@ fn expr_statement_wraps_non_call_expressions_in_discard_block() {
         assert_eq!(stmt(expr), format!("{expected}\n"), "{label}");
     }
 }
+
+/// The highest scene argument `＄２５５` maps to `args[256]` without overflowing (9.1).
+#[test]
+fn resolve_var_path_args_255_is_args_256() {
+    assert_eq!(
+        LuaCodeGenerator::<Vec<u8>>::resolve_var_path("255", &VarScope::Args(255)).unwrap(),
+        "args[256]"
+    );
+}

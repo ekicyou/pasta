@@ -37,7 +37,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         match scope {
             VarScope::Local => Ok(format!("var.{}", name)),
             VarScope::Global => Ok(format!("save.{}", name)),
-            VarScope::Args(index) => Ok(format!("args[{}]", index + 1)),
+            VarScope::Args(index) => Ok(format!("args[{}]", u32::from(*index) + 1)),
             VarScope::Property => Err(TranspileError::property_in_expression()),
         }
     }
