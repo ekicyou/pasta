@@ -111,6 +111,13 @@ fn paren_depth_resets_per_line_and_crlf() {
         2,
         6 + 65,
     );
+    // 単独の `\r` は pest の line_col では改行にならず 1 桁と数える
+    // （`  さくら：やあ\r  さくら：` は 15 文字）
+    assert_paren_err(
+        format!("＊挨拶\n  さくら：やあ\r  さくら：{}\n", "（".repeat(65)),
+        2,
+        15 + 65,
+    );
 }
 
 #[test]

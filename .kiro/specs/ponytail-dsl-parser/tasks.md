@@ -167,3 +167,5 @@
 - 11.2: 全部の直しの後の書き出し（target/ast-final、56 ファイル）と target/ast-baseline の `diff -r` は差分なし（出力 "DIFF: none"）
 - 11.3: i686・x86_64 × debug・release の 4 通りで nesting_guard_test 14・number_literal_test 16・span_oracle_test 2・parser_limit_stack_test 4 がすべて通った
 - 11.4: fmt --check OK・clippy --all-targets 警告 0・4 クレートのテスト 2599 通過／失敗 0（84 スイート）・gen-skill-refs --check OK・expr_parse_test の括弧式の回帰テスト通過・main からの差分に partial.rs・grammar.pest・code_gen/・Cargo.toml・Cargo.lock 無し・README と tech.md に断り書き無し
+- 完了時にその場で解決: 括弧の走査が単独の `\r` を pest と同じく 1 桁と数えることを、nesting_guard_test.rs の `paren_depth_resets_per_line_and_crlf` で固めた（タスク 6 のレビューの提案）
+- 完了時に申し送り: `ponytail-editor-tooling` の brief.md へ、新しい構文の誤り 5 種が LSP の部分解析の診断に出ること
