@@ -19,7 +19,7 @@
 //     wasm-boundary result-shape validation
 //   - debugAdapterFactory.ts    : PastaDebugAdapterFactory descriptor and
 //     PastaDebugConfigurationProvider only-when-explicit normalisation
-//   - wordRefDecorator.ts       : @word-ref decoration ranges (regex behaviour)
+//   - wordRefDecorator.ts       : @word-ref decoration ranges (TextMate の文法の規則)
 //   - extension.ts              : activate (real WASM load), source-presentation
 //     toggle wiring (status bar, push-event-driven display, error surfaces)
 
@@ -41,7 +41,8 @@ import {
   PastaDebugAdapterFactory,
   PastaDebugConfigurationProvider,
 } from '../debugAdapterFactory';
-import { activateWordRefDecorator } from '../wordRefDecorator';
+import { activateWordRefDecorator, findWordRefRanges } from '../wordRefDecorator';
+import { WORD_REF_CASES } from './fixtures/wordRefCases';
 import { activate, deactivate, getActivationState } from '../extension';
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -717,8 +718,15 @@ test('config provider removes an absent/invalid sourcePresentation (no client de
 });
 
 // =============================================================================
-// wordRefDecorator (real) — regex/decoration behaviour
+// wordRefDecorator (real) — 箱の範囲は TextMate の文法の規則から（要件 5.1〜5.3）
 // =============================================================================
+
+for (const c of WORD_REF_CASES) {
+  test(`word-ref box: ${c.name}`, () => {
+    const spans = findWordRefRanges(c.text).map(([s, e]) => c.text.slice(s, e));
+    assert.deepStrictEqual(spans, c.boxes);
+  });
+}
 
 function fakeEditor(languageId: string, text: string) {
   const captured: { ranges: mock.Range[] | undefined; setCalls: number } = { ranges: undefined, setCalls: 0 };
@@ -736,8 +744,8 @@ function fakeEditor(languageId: string, text: string) {
 // call would register an extra listener on the shared mock emitters and make
 // the setDecorations call counts non-deterministic).
 
-test('word-ref decorator boxes ＠/@ references and stops at delimiters', () => {
-  const text = '＠笑顔　＠挨拶！ @hello world';
+test('word-ref decorator boxes ＠/@ references in talk and stops at delimiters', () => {
+  const text = '　さくら：＠笑顔　＠挨拶！ @hello world';
   const { editor, captured } = fakeEditor('pasta', text);
   mock.window.activeTextEditor = editor;
   activateWordRefDecorator(dummyContext() as never);
@@ -755,7 +763,7 @@ test('word-ref decorator ignores non-pasta documents', () => {
 });
 
 test('word-ref decorator re-applies on active-editor change and document edits', () => {
-  const text = 'さくら：＠通常　やふぅ。';
+  const text = '　さくら：＠通常　やふぅ。';
   const { editor, captured } = fakeEditor('pasta', text);
   mock.didChangeActiveTextEditorEmitter.fire(editor);
   assert.strictEqual(captured.setCalls, 1, 'editor switch must decorate');

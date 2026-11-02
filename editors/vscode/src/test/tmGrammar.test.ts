@@ -7,6 +7,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vsctm from 'vscode-textmate';
 import * as oniguruma from 'vscode-oniguruma';
+import { findWordRefRanges } from '../wordRefDecorator';
+import { WORD_REF_CASES } from './fixtures/wordRefCases';
 
 // ============================================================================
 // Test Infrastructure
@@ -923,6 +925,35 @@ async function runTests(): Promise<void> {
       'inline ＠func() must NOT carry any source.lua scope'
     );
   });
+
+  // --- 箱と単語参照の scope の範囲が同じ（要件 5.1〜5.4） ---
+  // findWordRefRanges の読み込み（文法の規則の JS での compile）も、ここで確かめる。
+  for (const c of WORD_REF_CASES) {
+    test(`箱と単語参照の scope の範囲が同じ: ${c.name}`, () => {
+      const scoped: Array<readonly [number, number]> = [];
+      let state = vsctm.INITIAL;
+      let offset = 0;
+      for (const raw of c.text.split('\n')) {
+        const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+        const r = tokenizeLine(line, state);
+        for (const t of r.tokens) {
+          // 単語定義の名前（meta.word.pasta の中）も同じ scope の名前なので除く
+          if (t.scopes.includes('markup.inline.raw.string.pasta') && !t.scopes.includes('meta.word.pasta')) scoped.push([offset + t.startIndex, offset + t.endIndex]);
+        }
+        state = r.ruleStack;
+        offset += raw.length + 1;
+      }
+      const boxes = findWordRefRanges(c.text);
+      expect(
+        JSON.stringify(boxes) === JSON.stringify(scoped),
+        `boxes ${JSON.stringify(boxes)} must equal word-ref scopes ${JSON.stringify(scoped)}`
+      );
+      expect(
+        JSON.stringify(boxes.map(([s, e]) => c.text.slice(s, e))) === JSON.stringify(c.boxes),
+        `boxes must be ${JSON.stringify(c.boxes)}`
+      );
+    });
+  }
 
   // --- Results ---
   console.log('\n=== TextMate Grammar Test Results ===\n');
