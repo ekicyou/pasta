@@ -119,3 +119,7 @@
 ## 申し送り（2026-10-29 の版の組み替えより）
 
 - ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.5（ponytail）の次に入る。
+
+## 申し送り（2026-11-02 の discovery「Pasta DSL MCP移行検討」より）
+
+- 0.5.0 の `debug-mcp-runtime` が、キック（`event/kick.lua`）を消す。チェイントークの続きを `STORE.co_preempt` の印で捨てる指名の再生は、`OnPastaScene`・`OnPastaSceneAt` だけになる。

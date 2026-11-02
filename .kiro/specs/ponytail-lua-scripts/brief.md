@@ -152,3 +152,9 @@
 - **要件定義のモデル**: Opus。
 - **分割の案**: 不要。
 - **見つけた穴・古くなった記述**: Approach の「`if CALLBACK.consume_staged(co, act) then co = nil end; set_co_scene(co)`」は今の形に合わない（真偽を `keep` の枝と捨てる枝の両方へ渡す）。`virtual_dispatcher.lua` 252 行の説明「`set_co_scene` 置換で前 co_scene を閉じる」は古い（今は `STORE.co_preempt` の印で捨て、LuaJIT に `close` は無い）。申し送り（`external-control-events`）: `scene_play.lua`・`external_control.lua`（と `recommend.lua`）の名前の引き当てと、見つからないときの失敗の表記の共通の部品の取り出しは、この spec の題材。申し送り（`chain-talk-interrupt`）: `EVENT.drive` の `_interrupted` の枝は `STORE.co_callback` を戻さない。`get_property` の組み立てが台詞に数えられるように変わるなら見直す。
+
+## 申し送り（2026-11-02 の discovery「Pasta DSL MCP移行検討」より）
+
+- 0.5.0 のウェーブ 3 の見込みの `debug-mcp-runtime` が、`pasta/shiori/event/kick.lua` を丸ごと消す。`SHIORI.kick`（`entry.lua`）と `STORE.kick_force`・`kick_pending`（`virtual_dispatcher.lua`）も消す。
+- この spec の `kick.lua` への指摘（`wrap_local_func`・`wrap_reload_func` の包む関数の写し）は、直しても捨てることになる。範囲から外してよい。ほかの包み（scene・choice_select）の写しを 1 つにまとめるなら、`kick.lua` を数に入れなくてよい。
+- `entry.lua`・`virtual_dispatcher.lua` への直しは、そのまま進めてよい。`debug-mcp-runtime` は、この spec が入った後の main で直す。
