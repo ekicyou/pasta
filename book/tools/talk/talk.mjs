@@ -255,25 +255,22 @@ export function faceStats(blocksByChapter, regionsByChapter = new Map()) {
 
 // CLI: node book/tools/talk/talk.mjs --stats（全章 = book/src 配下の SUMMARY.md 以外の .md。常に exit 0）
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1])) && process.argv.includes('--stats')) {
-  const src = path.join(REPO_ROOT, 'book/src');
-  const blocksByChapter = new Map();
-  const regionsByChapter = new Map();
-  for (const file of listMarkdownFiles(src).sort()) {
-    const chapter = path.relative(src, file).split(path.sep).join('/');
-    if (chapter === 'SUMMARY.md') continue;
-    const text = fs.readFileSync(file, 'utf8');
-    blocksByChapter.set(chapter, scanTalk(text).blocks);
-    // 導入=H1 の次行〜最初の ---・締め=最後の --- の次行〜末尾。区切りの規則は gen-skill-refs の extractBody と同じ。
-    // gen-skill-refs が talk.mjs を import するため、循環を避けてここに複製している。
-    const masked = maskFences(text).split('\n');
-    const seps = masked.flatMap((l, i) => (l === '---' ? [i] : []));
-    if (seps.length >= 2) {
-      regionsByChapter.set(chapter, {
-        intro: { start: 1, end: seps[0] },
-        outro: { start: seps[seps.length - 1] + 1, end: masked.length },
-      });
+  // gen-skill-refs が talk.mjs を import する循環のため、区切りの関数は CLI の枝の中だけで取る（トップレベル await は循環で止まる）。
+  import('../gen-skill-refs.mjs').then(({ chapterRegions }) => {
+    const src = path.join(REPO_ROOT, 'book/src');
+    const blocksByChapter = new Map();
+    const regionsByChapter = new Map();
+    for (const file of listMarkdownFiles(src).sort()) {
+      const chapter = path.relative(src, file).split(path.sep).join('/');
+      if (chapter === 'SUMMARY.md') continue;
+      const text = fs.readFileSync(file, 'utf8');
+      blocksByChapter.set(chapter, scanTalk(text).blocks);
+      try {
+        const { intro, outro } = chapterRegions(text, chapter);
+        regionsByChapter.set(chapter, { intro, outro });
+      } catch { /* 構造の無い章は導入・締めを数えない */ }
     }
-  }
-  console.log(faceStats(blocksByChapter, regionsByChapter));
-  process.exit(0);
+    console.log(faceStats(blocksByChapter, regionsByChapter));
+    process.exit(0);
+  });
 }
