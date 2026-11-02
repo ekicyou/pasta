@@ -199,7 +199,7 @@ describe("Integration - error handling", function()
         expect(STORE.co_scene):toBe(nil)
     end)
 
-    test("new coroutine closes existing suspended coroutine", function()
+    test("new coroutine drops existing suspended coroutine", function()
         setup()
 
         local old_co
@@ -224,22 +224,17 @@ describe("Integration - error handling", function()
             end)
         end
 
-        -- Fire second - should close the old coroutine
+        -- Fire second - drops the old coroutine
         EVENT.fire({ id = "OnSecond" })
 
-        if coroutine.close then
-            -- Old coroutine should be dead (closed)
-            expect(coroutine.status(old_co)):toBe("dead")
-        else
-            -- LuaJIT/Lua 5.1 does not provide coroutine.close().
-            expect(coroutine.status(old_co)):toBe("suspended")
-        end
+        -- 閉じずに参照を外すだけ（GC に任せる）
+        expect(coroutine.status(old_co)):toBe("suspended")
 
         -- STORE.co_scene should be nil (new coroutine completed)
         expect(STORE.co_scene):toBe(nil)
     end)
 
-    test("STORE.reset() closes suspended coroutine", function()
+    test("STORE.reset() drops suspended coroutine", function()
         setup()
 
         local co
@@ -256,15 +251,11 @@ describe("Integration - error handling", function()
         expect(STORE.co_scene):toBe(co)
         expect(coroutine.status(co)):toBe("suspended")
 
-        -- Reset should close and clear
+        -- Reset should clear the reference
         STORE.reset()
 
         expect(STORE.co_scene):toBe(nil)
-        if coroutine.close then
-            expect(coroutine.status(co)):toBe("dead")
-        else
-            -- LuaJIT/Lua 5.1 does not provide coroutine.close().
-            expect(coroutine.status(co)):toBe("suspended")
-        end
+        -- 閉じずに参照を外すだけ（GC に任せる）
+        expect(coroutine.status(co)):toBe("suspended")
     end)
 end)

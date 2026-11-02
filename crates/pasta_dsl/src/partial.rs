@@ -1,277 +1,115 @@
-//! Partial parse support for Pasta DSL.
+//! 色のための部分解析。
 //!
-//! Provides `parse_str_partial()` which attempts 3-phase fallback parsing:
-//! - Phase 1: Full parse via `parse_str()`
-//! - Phase 2: Scope boundary split and per-chunk parse
-//! - Phase 3: Line-by-line fallback with rule inference
+//! 全体が解けないときに、ソースを字下げする前の行頭で塊に区切り、塊ごとに解く。
+//! 解けた塊の AST（span は元のソースの座標）と、解けない塊の行の範囲を返す。
+
+use std::ops::Range;
 
 use crate::parser::ast::{
     Action, ActionLine, ActorScope, Args, Attr, CallScene, ChoiceNode, CodeBlock, ContinueAction,
     CueCommandNode, FileItem, GlobalSceneScope, KeyWords, LocalSceneItem, LocalSceneScope,
     SceneActorItem, Span, VarSet,
 };
-use crate::parser::{Rule, parse_str};
+use crate::parser::parse_str;
 
-/// 部分パース結果
+/// 部分解析の結果
 #[derive(Debug, Clone)]
 pub struct PartialParseResult {
-    /// パース成功した部分のASTアイテム
+    /// 解けた塊の AST（span は元のソースの座標）
     pub items: Vec<FileItem>,
-    /// 各行/スコープのパースエラー
-    pub errors: Vec<PartialParseError>,
+    /// 解けない塊の行（1 始まり・半開区間）。昇順で重ならない
+    pub failed_lines: Vec<Range<usize>>,
 }
 
-/// 部分パースエラー
-#[derive(Debug, Clone)]
-pub struct PartialParseError {
-    /// エラーが発生した行番号（1-based）
-    pub line: usize,
-    /// エラーメッセージ
-    pub message: String,
-    /// エラー範囲のSpan（取得できた場合）
-    pub span: Option<Span>,
-}
-
-/// 行頭パターンからpest Ruleを推論する
-pub fn infer_rule_from_line(line: &str) -> Option<Rule> {
-    let trimmed = line.trim_start();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    let first_char = trimmed.chars().next()?;
-    match first_char {
-        '＊' | '*' => Some(Rule::global_scene_scope),
-        '・' | '-' => Some(Rule::local_scene_line),
-        '＆' | '&' => Some(Rule::file_attr_line),
-        '＠' | '@' => Some(Rule::file_word_line),
-        '％' | '%' => Some(Rule::actor_scope),
-        '＄' | '$' => Some(Rule::var_set_line),
-        '＞' | '>' => Some(Rule::call_scene_line),
-        '!' | '！' => Some(Rule::cue_cmd_line),
-        '＃' | '#' => Some(Rule::or_comment_eol),
-        '`' if trimmed.starts_with("```") => Some(Rule::code_scope),
-        _ => {
-            // Check if it looks like an action line (identifier followed by colon)
-            if trimmed.contains('：') || trimmed.contains(':') {
-                Some(Rule::action_line)
-            } else {
-                None
-            }
+/// 塊の区切りになる行か。字下げする前の行頭の 1 文字で決める。
+///
+/// 名前の無い `＊` の行（続きのシーン）は、前の名前付きのシーンと一緒に解くため区切りにしない。
+/// shortcut: Lua ブロックの本文の 0 桁目の `＊`・`％`・`＆`・`＠` も区切りにする。
+/// Lua の文の頭には来ない文字なので追わない。困る例が出たら、フェンスを数えて区切りを止める。
+fn is_chunk_boundary(raw_line: &str) -> bool {
+    let mut chars = raw_line.chars();
+    match chars.next() {
+        Some('＊' | '*') => {
+            let rest = chars.as_str().trim_start();
+            !(rest.is_empty() || rest.starts_with(['＃', '#']))
         }
+        Some('％' | '%' | '＆' | '&' | '＠' | '@') => true,
+        _ => false,
     }
 }
 
-/// スコープ境界マーカーで分割するためのチャンク
+/// ソースを区切りの行で塊に分ける。
 ///
-/// `text` は元ソースの部分スライスであり、`\r\n` などの行終端を **そのまま保持** する。
-/// これにより `start_byte` を起点とした定数シフトだけで、チャンク内 span の
-/// バイトオフセットを元ソース座標へ正確に復元できる（CRLF でも 1 バイト/行ずれない）。
-#[derive(Debug)]
-struct SourceChunk<'a> {
-    /// チャンク本文。元ソースの部分スライス（行終端を保持）。
-    text: &'a str,
-    /// チャンク先頭の行番号（1-based、元ソース基準）
-    start_line: usize,
-    /// チャンク先頭のバイトオフセット（0-based、元ソース基準）
-    start_byte: usize,
-}
-
-/// ソースをスコープ境界マーカーで分割する
-///
-/// 各チャンクは元ソースの連続した部分スライスとして切り出され、行終端
-/// （`\n` / `\r\n`）を保持する。これにより呼び出し側はチャンク相対 span を
-/// `start_byte` / `start_line` の定数シフトでフルソース座標へ補正できる。
-fn split_by_scope_markers(source: &str) -> Vec<SourceChunk<'_>> {
+/// 塊は元のソースの部分の文字列で、行の終わり（`\n`・`\r\n`）を保つ。
+/// 戻り値は `(塊の本文, 先頭の行番号（1 始まり）, 先頭のバイト位置)`。
+fn split_chunks(source: &str) -> Vec<(&str, usize, usize)> {
     let mut chunks = Vec::new();
-    let mut chunk_start_byte: usize = 0;
-    let mut chunk_start_line: usize = 1;
-    let mut has_content = false;
-    let mut byte_pos: usize = 0;
-    let mut line_num: usize = 0;
+    let mut chunk_start_byte = 0;
+    let mut chunk_start_line = 1;
+    let mut byte_pos = 0;
 
-    // `split_inclusive('\n')` は行終端を残したまま行を列挙する（`\r\n` も保持）。
-    for raw_line in source.split_inclusive('\n') {
-        line_num += 1;
-        let line_start_byte = byte_pos;
+    for (idx, raw_line) in source.split_inclusive('\n').enumerate() {
+        if idx > 0 && is_chunk_boundary(raw_line) {
+            chunks.push((
+                &source[chunk_start_byte..byte_pos],
+                chunk_start_line,
+                chunk_start_byte,
+            ));
+            chunk_start_byte = byte_pos;
+            chunk_start_line = idx + 1;
+        }
         byte_pos += raw_line.len();
-
-        let trimmed = raw_line.trim_start();
-        let is_scope_boundary = if trimmed.is_empty() {
-            false
-        } else {
-            let first_char = trimmed.chars().next().unwrap_or(' ');
-            matches!(
-                first_char,
-                '＊' | '*' | '％' | '%' | '＆' | '&' | '＠' | '@'
-            )
-        };
-
-        if is_scope_boundary && has_content {
-            // 直前までのチャンクをフラッシュ（境界行は次チャンクの先頭になる）
-            chunks.push(SourceChunk {
-                text: &source[chunk_start_byte..line_start_byte],
-                start_line: chunk_start_line,
-                start_byte: chunk_start_byte,
-            });
-            has_content = false;
-        }
-
-        if !has_content {
-            chunk_start_byte = line_start_byte;
-            chunk_start_line = line_num;
-            has_content = true;
-        }
     }
-
-    // 末尾チャンクをフラッシュ
-    if has_content {
-        chunks.push(SourceChunk {
-            text: &source[chunk_start_byte..],
-            start_line: chunk_start_line,
-            start_byte: chunk_start_byte,
-        });
+    if chunk_start_byte < source.len() {
+        chunks.push((
+            &source[chunk_start_byte..],
+            chunk_start_line,
+            chunk_start_byte,
+        ));
     }
-
     chunks
 }
 
-/// 部分パースAPI — 3段階フォールバック戦略
+/// 塊ごとに解いて、色のための AST と解けない塊の行の範囲を返す。
 ///
-/// Phase 1: `parse_str()`による全体パースを試行
-/// Phase 2: スコープ境界分割 → 各チャンクを個別にパース
-/// Phase 3: 行単位フォールバック → 各行を個別にパース
+/// 全体を解く段は持たない。呼び手が全体の失敗を知っているときに呼ぶ
+/// （全体が正しいソースでも、塊ごとに解いた同じ AST を返す）。
 pub fn parse_str_partial(source: &str) -> PartialParseResult {
-    // Phase 1: Full Parse
-    if let Ok(pasta_file) = parse_str(source, "<partial>") {
-        return PartialParseResult {
-            items: pasta_file.items,
-            errors: vec![],
-        };
-    }
+    let mut items = Vec::new();
+    let mut failed_lines = Vec::new();
 
-    let mut partial_items = Vec::new();
-    let mut partial_errors = Vec::new();
-
-    // Phase 2: Scope Boundary Split
-    let chunks = split_by_scope_markers(source);
-    for chunk in chunks {
-        // チャンク相対 span をフルソース座標へ補正するためのオフセット。
-        let byte_offset = chunk.start_byte;
-        let line_offset = chunk.start_line - 1;
-
-        // Try to infer rule from the first line of the chunk
-        let first_line = chunk.text.lines().next().unwrap_or("");
-        let rule = infer_rule_from_line(first_line);
-
-        if rule.is_some() {
-            // Try parsing with a file-level wrapper for scope rules
-            let parse_result = try_parse_chunk(chunk.text);
-            match parse_result {
-                Ok(mut items) => {
-                    // チャンクは部分文字列としてパースされるため span がチャンク相対に
-                    // なる。フルソース座標へ補正してから積む。
-                    for item in &mut items {
-                        shift_file_item(item, byte_offset, line_offset);
-                    }
-                    partial_items.extend(items);
-                    continue;
+    for (text, start_line, start_byte) in split_chunks(source) {
+        match try_parse_chunk(text) {
+            Some(mut chunk_items) => {
+                for item in &mut chunk_items {
+                    shift_file_item(item, start_byte, start_line - 1);
                 }
-                Err(_) => {
-                    // Phase 3: Line-by-Line Fallback for this chunk
-                    for (line, line_num, line_start_byte) in chunk_lines(&chunk) {
-                        if line.trim().is_empty() {
-                            continue;
-                        }
-                        if infer_rule_from_line(line).is_some() {
-                            match try_parse_chunk(line) {
-                                Ok(mut items) => {
-                                    // 行単位パースも span が行相対になるため、行頭の
-                                    // フルソースバイト / 行番号で補正する。
-                                    for item in &mut items {
-                                        shift_file_item(item, line_start_byte, line_num - 1);
-                                    }
-                                    partial_items.extend(items);
-                                }
-                                Err(e) => {
-                                    partial_errors.push(PartialParseError {
-                                        line: line_num,
-                                        message: e.to_string(),
-                                        span: None,
-                                    });
-                                }
-                            }
-                        } else {
-                            partial_errors.push(PartialParseError {
-                                line: line_num,
-                                message: "Unable to infer parse rule for line".to_string(),
-                                span: None,
-                            });
-                        }
-                    }
-                }
+                items.extend(chunk_items);
             }
-        } else {
-            // No rule inferred for this chunk, try line-by-line
-            for (line, line_num, _) in chunk_lines(&chunk) {
-                if line.trim().is_empty() {
-                    continue;
-                }
-                partial_errors.push(PartialParseError {
-                    line: line_num,
-                    message: "Unable to infer parse rule for line".to_string(),
-                    span: None,
-                });
+            None => {
+                let line_count = text.split_inclusive('\n').count();
+                failed_lines.push(start_line..start_line + line_count);
             }
         }
     }
 
     PartialParseResult {
-        items: partial_items,
-        errors: partial_errors,
+        items,
+        failed_lines,
     }
 }
 
-/// チャンクをファイルとしてパースしてFileItemsを抽出
+/// 塊をファイルとして解いて FileItem を取り出す。
 ///
-/// grammar.pest の行ルールは末尾 `eol`（NEWLINE）を要求するため、チャンクが
-/// 改行で終わらない場合（末尾改行なしのソース最終チャンク等）のみ補う。
-/// 補う `\n` は本文の **後ろ** に付くだけなので、実トークンの span バイト
-/// オフセットには影響しない。
-fn try_parse_chunk(text: &str) -> Result<Vec<FileItem>, String> {
-    if text.ends_with('\n') {
-        match parse_str(text, "<partial>") {
-            Ok(file) => Ok(file.items),
-            Err(e) => Err(format!("{}", e)),
-        }
+/// 文法の行の規則は末尾の改行を要るため、改行で終わらない塊（改行で終わらない
+/// ソースの最後の塊）にだけ補う。補う `\n` は本文の後ろに付くので、span には響かない。
+fn try_parse_chunk(text: &str) -> Option<Vec<FileItem>> {
+    let parsed = if text.ends_with('\n') {
+        parse_str(text, "<partial>")
     } else {
-        let mut owned = String::with_capacity(text.len() + 1);
-        owned.push_str(text);
-        owned.push('\n');
-        match parse_str(&owned, "<partial>") {
-            Ok(file) => Ok(file.items),
-            Err(e) => Err(format!("{}", e)),
-        }
-    }
-}
-
-/// チャンク内の各行を `(行終端を除いた行文字列, 行番号(1-based, 元ソース基準),
-/// 行頭バイトオフセット(0-based, 元ソース基準))` として列挙する。
-///
-/// `chunk.text` は元ソースの部分スライスなので、行頭バイトはチャンク内の
-/// 累積オフセットに `chunk.start_byte` を足すだけで求まる。
-fn chunk_lines<'a>(chunk: &SourceChunk<'a>) -> Vec<(&'a str, usize, usize)> {
-    let mut out = Vec::new();
-    let mut byte_in_chunk: usize = 0;
-    for (idx, raw_line) in chunk.text.split_inclusive('\n').enumerate() {
-        let line_num = chunk.start_line + idx;
-        let line_start_byte = chunk.start_byte + byte_in_chunk;
-        byte_in_chunk += raw_line.len();
-        // 行終端（\n / \r\n）を除いた本文。行頭は維持する（バイト整合のため）。
-        let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
-        out.push((line, line_num, line_start_byte));
-    }
-    out
+        parse_str(&format!("{text}\n"), "<partial>")
+    };
+    parsed.ok().map(|file| file.items)
 }
 
 // ============================================================================

@@ -258,7 +258,7 @@ skip_methods が真のとき（動的参照）
 
 ### 検索結果からシーン関数へ
 
-`SCENE.search(name, global_scene_name)` は `@pasta_search` の `search_scene` が返した `(グローバル名, ローカル名)` で Lua 側のシーンテーブルから関数を引き、結果オブジェクトにして返す（手順と結果オブジェクトの形は [search と結果オブジェクト](internal-modules.md#search-と結果オブジェクト)）。Rust 側が返すのは名前だけであり、シーン関数そのものは Rust を通らない。`SCENE.co_exec` は `act:find_scene` で得た関数をコルーチンで包む。`SCENE.co_exec_exact(name, local_name)` は `search_scene_exact(name, nil)` か `search_local_scene_exact(name, local_name)` の結果を `SCENE.co_exec_registered` に渡し、`SCENE.get` で引いた関数を `co_exec` と同じ包み方（`wrap_scene`）でコルーチンにする（[co_exec_exact](internal-modules.md#co_exec_exact)・[co_exec_registered](internal-modules.md#co_exec_registered)）。コルーチンの実行は [ランタイム実行モデル](execution-model.md) で扱う。
+`SCENE.search(name, global_scene_name)` は `@pasta_search` の `search_scene` が返した `(グローバル名, ローカル名)` で Lua 側のシーンテーブルから関数を引き、結果オブジェクトにして返す（手順と結果オブジェクトの形は [search と結果オブジェクト](internal-modules.md#search-と結果オブジェクト)）。Rust 側が返すのは名前だけであり、シーン関数そのものは Rust を通らない。`SCENE.co_exec` は `act:find_scene` で得た関数をコルーチンで包む。`SCENE.co_exec_exact(name, local_name)` は `search_scene_exact(name, nil)` か `search_local_scene_exact(name, local_name)` の結果で `SCENE.get` を引く `SCENE.get_exact` の関数を、`SCENE.wrap` でコルーチンにする（[co_exec_exact](internal-modules.md#co_exec_exact)）。コルーチンの実行は [ランタイム実行モデル](execution-model.md) で扱う。
 
 ## 境界の受け渡し
 

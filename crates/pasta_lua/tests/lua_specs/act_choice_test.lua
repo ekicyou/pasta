@@ -106,9 +106,10 @@ describe("ACT - choice() の scope", function()
         local act = ACT.new(create_mock_actors())
         local caller = { __global_name__ = "呼び出し元" }
         act:init_scene(caller)
-        act:init_scene({ __global_name__ = "呼ばれた側" })
-        act:choice("t1", "d1")
-        act:restore_scene(caller)
+        act:restore_scene(function()
+            act:init_scene({ __global_name__ = "呼ばれた側" })
+            act:choice("t1", "d1")
+        end)
 
         act:choice("t2", "d2")
 

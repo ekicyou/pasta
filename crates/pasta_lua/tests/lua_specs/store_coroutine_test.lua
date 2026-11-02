@@ -67,7 +67,7 @@ describe("STORE.reset() - co_sceneクリーンアップ", function()
         expect(STORE.co_scene):toBe(nil)
     end)
 
-    test("reset()がsuspendedコルーチンをclose()する", function()
+    test("reset()がsuspendedコルーチンの参照を外す", function()
         setup()
         -- suspendedコルーチンを作成
         local co = coroutine.create(function()
@@ -83,13 +83,8 @@ describe("STORE.reset() - co_sceneクリーンアップ", function()
         -- reset()を呼び出し
         STORE.reset()
 
-        if coroutine.close then
-            -- coroutine.close()後はdead状態
-            expect(coroutine.status(co)):toBe("dead")
-        else
-            -- LuaJIT/Lua 5.1 does not provide coroutine.close().
-            expect(coroutine.status(co)):toBe("suspended")
-        end
+        -- 閉じずに参照を外すだけ（GC に任せる）
+        expect(coroutine.status(co)):toBe("suspended")
     end)
 
     test("reset()がdead状態のco_sceneでも安全に動作する", function()

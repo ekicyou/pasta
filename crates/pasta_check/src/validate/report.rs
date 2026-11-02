@@ -55,39 +55,6 @@ pub enum FindingKind {
 }
 
 impl FindingKind {
-    pub const ALL: [FindingKind; 27] = {
-        use FindingKind::*;
-        [
-            ConfigMissing,
-            ConfigSyntax,
-            ConfigLoaderType,
-            ConfigSceneAlias,
-            ConfigActorFont,
-            ConfigPatternInvalid,
-            PatternIgnored,
-            PatternNotPasta,
-            NoDictionaryFiles,
-            FolderMatchesPattern,
-            InitFileName,
-            FileNotUtf8,
-            FileUnreadable,
-            Syntax,
-            TranspileArgAssign,
-            TranspilePropertyInExpr,
-            TranspileContinuationWithoutActor,
-            ModulePastaCollision,
-            ModuleLuaCollision,
-            ModuleLuaShadowed,
-            GlobalSceneCollision,
-            LocalSceneCollision,
-            SceneShadowedByBuiltin,
-            CallTargetMissing,
-            ChoiceTargetMissing,
-            RecommendItemInvalid,
-            RecommendMenuTalk,
-        ]
-    };
-
     /// 固定の対応。オプションや状況で変えない（7.7）
     pub fn severity(self) -> Severity {
         use FindingKind::*;
@@ -104,40 +71,6 @@ impl FindingKind {
             | RecommendItemInvalid
             | RecommendMenuTalk => Severity::Warning,
             _ => Severity::Error,
-        }
-    }
-
-    /// 診断の code（例 "syntax"）。エディタの重複の判定に使う。serde の形と同じ
-    pub fn code(self) -> &'static str {
-        use FindingKind::*;
-        match self {
-            ConfigMissing => "config-missing",
-            ConfigSyntax => "config-syntax",
-            ConfigLoaderType => "config-loader-type",
-            ConfigSceneAlias => "config-scene-alias",
-            ConfigActorFont => "config-actor-font",
-            ConfigPatternInvalid => "config-pattern-invalid",
-            PatternIgnored => "pattern-ignored",
-            PatternNotPasta => "pattern-not-pasta",
-            NoDictionaryFiles => "no-dictionary-files",
-            FolderMatchesPattern => "folder-matches-pattern",
-            InitFileName => "init-file-name",
-            FileNotUtf8 => "file-not-utf8",
-            FileUnreadable => "file-unreadable",
-            Syntax => "syntax",
-            TranspileArgAssign => "transpile-arg-assign",
-            TranspilePropertyInExpr => "transpile-property-in-expr",
-            TranspileContinuationWithoutActor => "transpile-continuation-without-actor",
-            ModulePastaCollision => "module-pasta-collision",
-            ModuleLuaCollision => "module-lua-collision",
-            ModuleLuaShadowed => "module-lua-shadowed",
-            GlobalSceneCollision => "global-scene-collision",
-            LocalSceneCollision => "local-scene-collision",
-            SceneShadowedByBuiltin => "scene-shadowed-by-builtin",
-            CallTargetMissing => "call-target-missing",
-            ChoiceTargetMissing => "choice-target-missing",
-            RecommendItemInvalid => "recommend-item-invalid",
-            RecommendMenuTalk => "recommend-menu-talk",
         }
     }
 }

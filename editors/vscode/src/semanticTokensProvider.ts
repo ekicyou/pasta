@@ -6,8 +6,14 @@
 import * as vscode from 'vscode';
 import { WasmBridge, SemanticTokenData } from './wasmBridge';
 
+/** URI ごとの色の控え。版が文書の版と同じときだけ使う */
+interface CachedTokens {
+  readonly version: number;
+  readonly tokens: ReadonlyArray<SemanticTokenData>;
+}
+
 /**
- * Token types matching pasta_lsp analysis.rs TOKEN_TYPES (same order).
+ * Token types matching pasta_lsp token_types.rs TOKEN_TYPES (same order).
  */
 export const PASTA_TOKEN_TYPES: readonly string[] = [
   'comment',       // 0
@@ -30,7 +36,7 @@ export const PASTA_TOKEN_TYPES: readonly string[] = [
 ] as const;
 
 /**
- * Token modifiers matching pasta_lsp analysis.rs TOKEN_MODIFIERS (same order).
+ * Token modifiers matching pasta_lsp token_types.rs TOKEN_MODIFIERS (same order).
  */
 export const PASTA_TOKEN_MODIFIERS: readonly string[] = [
   'declaration',   // 0
@@ -52,7 +58,7 @@ export const PASTA_TOKENS_LEGEND = new vscode.SemanticTokensLegend(
  */
 export class SemanticTokensProvider implements vscode.DocumentSemanticTokensProvider {
   private readonly wasmBridge: WasmBridge;
-  private cachedTokens: Map<string, SemanticTokenData[]> = new Map();
+  private cachedTokens: Map<string, CachedTokens> = new Map();
 
   private readonly _onDidChangeSemanticTokens = new vscode.EventEmitter<void>();
   readonly onDidChangeSemanticTokens = this._onDidChangeSemanticTokens.event;
@@ -72,23 +78,25 @@ export class SemanticTokensProvider implements vscode.DocumentSemanticTokensProv
     const uri = document.uri.toString();
     const cached = this.cachedTokens.get(uri);
 
-    if (cached) {
-      return this.buildSemanticTokens(cached);
+    if (cached && cached.version === document.version) {
+      return this.buildSemanticTokens(cached.tokens);
     }
 
-    // Analyze on demand if no cached tokens
+    // 控えが無いか版が違えば、その場で解いて今の版として控える
     try {
       const result = this.wasmBridge.analyzeDocument(document.getText());
-      this.cachedTokens.set(uri, [...result.tokens]);
-      return this.buildSemanticTokens([...result.tokens]);
+      this.cachedTokens.set(uri, { version: document.version, tokens: [...result.tokens] });
+      return this.buildSemanticTokens(result.tokens);
     } catch {
+      // 前の版の色は返さない（TextMate に任せる）
+      this.cachedTokens.delete(uri);
       return null;
     }
   }
 
-  /** Update cached tokens for a document (called by DocumentSync) */
-  updateTokens(uri: string, tokens: ReadonlyArray<SemanticTokenData>): void {
-    this.cachedTokens.set(uri, [...tokens]);
+  /** DocumentSync が解析した結果を、その版と一緒に控える */
+  updateTokens(uri: string, version: number, tokens: ReadonlyArray<SemanticTokenData>): void {
+    this.cachedTokens.set(uri, { version, tokens: [...tokens] });
     this._onDidChangeSemanticTokens.fire();
   }
 
@@ -97,7 +105,7 @@ export class SemanticTokensProvider implements vscode.DocumentSemanticTokensProv
     this.cachedTokens.delete(uri);
   }
 
-  private buildSemanticTokens(tokens: SemanticTokenData[]): vscode.SemanticTokens {
+  private buildSemanticTokens(tokens: ReadonlyArray<SemanticTokenData>): vscode.SemanticTokens {
     const builder = new vscode.SemanticTokensBuilder(PASTA_TOKENS_LEGEND);
 
     // pasta_lsp returns delta-encoded values, but SemanticTokensBuilder.push()

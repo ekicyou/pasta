@@ -17,7 +17,7 @@
 2026-10-23（main `82176f19`）に確かめた。
 
 - **プロパティの読み出しは既にある**: `act:get_property`（`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua` 294 行）。DSL では `＄x＝＄％prop`（`book/src/grammar/variables.md` 294 行）。`\![get,property,…]` の台本を出してシーンを止め、`OnPastaCallBack{N}` で値が届いたら再開する。待ちの上限は既定 5 秒。
-- **待って再開する仕組みも既にある**: 待ちの表 `CALLBACK.pending`（`pasta_scripts/pasta/shiori/event/callback.lua`）。予約（`stage_pending`）→ 止まった直後に登録 → 一致したイベントで再開、期限切れは掃除して時間切れの応答を出す。止まったシーンは `STORE.co_callback` で印を付け、チェイントークの続きの置き場（`event/init.lua` の `set_co_scene`）とは別に持つ。
+- **待って再開する仕組みも既にある**: 待ちの表 `CALLBACK.pending`（`pasta_scripts/pasta/shiori/event/callback.lua`）。予約（`stage_pending`）→ 止まった直後に登録 → 一致したイベントで再開、期限切れは掃除して時間切れの応答を出す。止まったシーンは待ちの表だけが持ち、チェイントークの続きの置き場（`event/init.lua` の `set_co_scene`）とは別に持つ。
 - **チェイントーク**: キック・`OnPastaScene`・`OnPastaSceneAt` は `STORE.co_preempt` の印で続きを捨て、中断の台詞を出さない（`event/kick.lua`・`event/scene_play.lua`。`chain-talk-interrupt`）。
 - **ハンドラ**: `REG:register` で 1 つのイベントにハンドラを重ねられる（`reg-handler-chain`）。
 - **外からの呼び出し**: 外から `＞名前` の呼び出しとグローバル変数の代入ができるイベント（`event/external_control.lua`。`external-control-events`）。
@@ -40,7 +40,7 @@
 
 取り決めの要点（post の語・完了通知 `OnHostComplete` の `Tag`・`Status`・`Reference*`・割り込まれた側に OnBalloonBreak が出ないこと・OnHostComplete への応答の台本は `Option: nobreak` の SEND と同じに扱われること）は、`shiori4-v4-host` の brief の Approach にある。この spec は、その上に作者の口を載せる。
 
-- **既にある仕組みに乗せる**: 完了を待つシーンは、`get_property` と同じ待ちの表 `CALLBACK.pending` に入れる（Tag をキーにして、`OnHostComplete` で一致したものを再開する）。新しい待ちの仕組みを別に作らない。時間切れの掃除・`STORE.co_callback` の印・チェイントークとの関係も、今の決まりをそのまま使う。
+- **既にある仕組みに乗せる**: 完了を待つシーンは、`get_property` と同じ待ちの表 `CALLBACK.pending` に入れる（Tag をキーにして、`OnHostComplete` で一致したものを再開する）。新しい待ちの仕組みを別に作らない。時間切れの掃除・チェイントークとの関係も、今の決まりをそのまま使う。
 - **プロパティ**: 版 4 で読まれたときは、`get_property` の中で `shiori4-v4-host` の下回りの同期の読み出しを使い、台本を出さずに値を返す。版 3 と SHIORI/3.0 では今の待つ形のまま。作者の書き方（`＄％prop`）は変えない。
 - **書き方は DSL を先に**: SEND・NOTIFY・待つ書き方を、DSL から書けるようにする（Lua だけの口にしない）。名前と書き方は、外から `＞名前` を呼ぶ口と揃える。
 - **既定のハンドラ**: `OnHostComplete` の既定のハンドラ（待ちの表を引いて再開する）は、作者が `REG:register` で重ねたハンドラと並ぶ置き方にする。
@@ -119,3 +119,7 @@
 ## 申し送り（2026-10-29 の版の組み替えより）
 
 - ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.5（ponytail）の次に入る。
+
+## 申し送り（2026-11-02 の discovery「Pasta DSL MCP移行検討」より）
+
+- 0.5.0 の `debug-mcp-runtime` が、キック（`event/kick.lua`）を消す。チェイントークの続きを `STORE.co_preempt` の印で捨てる指名の再生は、`OnPastaScene`・`OnPastaSceneAt` だけになる。

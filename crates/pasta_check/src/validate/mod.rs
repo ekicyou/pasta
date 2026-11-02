@@ -21,6 +21,7 @@ use pasta_dsl::parser::Span;
 
 pub use input::{FileText, GhostInput, TomlSource};
 pub use report::{Finding, FindingKind, Report, Severity, SkipReason, Stats, msg};
+pub use syntax::syntax_finding;
 
 /// 一致テスト用: pasta.dll が見るパスからモジュール名を作る（`CacheManager::source_to_module_name` と同じ規則）
 #[doc(hidden)]

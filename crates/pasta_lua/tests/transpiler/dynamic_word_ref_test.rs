@@ -11,7 +11,6 @@ use crate::common;
 use common::e2e_helpers::transpile;
 use insta::assert_snapshot;
 use pasta_dsl::parser::{Action, Args, Span, VarScope, parse_str};
-use pasta_lua::LineEnding;
 use pasta_lua::LuaTranspiler;
 use pasta_lua::code_gen::LuaCodeGenerator;
 use pasta_lua::code_gen::source_map::SourceMapSink;
@@ -175,7 +174,7 @@ fn test_dynamic_actions_record_source_map() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
         for action in &actions {
             codegen.generate_action(action, "さくら").unwrap();

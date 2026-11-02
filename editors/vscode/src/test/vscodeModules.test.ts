@@ -12,14 +12,14 @@
 // Covered:
 //   - semanticTokensProvider.ts : PASTA_TOKEN_TYPES/MODIFIERS contracts,
 //     delta→absolute conversion, cache behaviour, error paths
-//   - diagnosticsManager.ts     : LSP→VSCode severity/range conversion, clear
+//   - diagnosticsManager.ts     : range conversion (always Error), clear
 //   - documentSync.ts           : open/change/close lifecycle, 200ms debounce,
 //     analysis-failure fallback, dispose
 //   - wasmBridge.ts             : init/dispose lifecycle, error wrapping,
 //     wasm-boundary result-shape validation
 //   - debugAdapterFactory.ts    : PastaDebugAdapterFactory descriptor and
 //     PastaDebugConfigurationProvider only-when-explicit normalisation
-//   - wordRefDecorator.ts       : @word-ref decoration ranges (regex behaviour)
+//   - wordRefDecorator.ts       : @word-ref decoration ranges (TextMate の文法の規則)
 //   - extension.ts              : activate (real WASM load), source-presentation
 //     toggle wiring (status bar, push-event-driven display, error surfaces)
 
@@ -41,7 +41,8 @@ import {
   PastaDebugAdapterFactory,
   PastaDebugConfigurationProvider,
 } from '../debugAdapterFactory';
-import { activateWordRefDecorator } from '../wordRefDecorator';
+import { activateWordRefDecorator, findWordRefRanges } from '../wordRefDecorator';
+import { WORD_REF_CASES } from './fixtures/wordRefCases';
 import { activate, deactivate, getActivationState } from '../extension';
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -96,10 +97,11 @@ function fakeBridge(opts: { ready?: boolean; result?: FakeAnalysisResult; fail?:
 }
 
 /** Minimal pasta TextDocument double for DocumentSync / providers. */
-function fakeDocument(uriStr: string, languageId: string, text: string) {
+function fakeDocument(uriStr: string, languageId: string, text: string, version = 1) {
   return {
     uri: mock.Uri.parse(uriStr),
     languageId,
+    version,
     getText: () => text,
     positionAt: (offset: number) => new mock.Position(0, offset),
   };
@@ -168,16 +170,7 @@ if (fs.existsSync(RUST_TOKEN_TYPES_PATH)) {
     const src = fs.readFileSync(RUST_TOKEN_TYPES_PATH, 'utf-8');
     const block = src.match(/pub const TOKEN_TYPES[^=]*=\s*&\[([\s\S]*?)\];/);
     assert.ok(block, 'TOKEN_TYPES const block should be found in token_types.rs');
-    const builtin: Record<string, string> = {
-      COMMENT: 'comment', NAMESPACE: 'namespace', DECORATOR: 'decorator',
-      VARIABLE: 'variable', OPERATOR: 'operator', NUMBER: 'number',
-    };
-    const names: string[] = [];
-    const re = /SemanticTokenType::(?:new\("([^"]+)"\)|([A-Z_]+))/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(block![1])) !== null) {
-      names.push(m[1] ?? builtin[m[2]] ?? `<unmapped:${m[2]}>`);
-    }
+    const names = [...block![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
     assert.deepStrictEqual([...PASTA_TOKEN_TYPES], names,
       'TS PASTA_TOKEN_TYPES must stay index-aligned with Rust TOKEN_TYPES');
   });
@@ -186,13 +179,7 @@ if (fs.existsSync(RUST_TOKEN_TYPES_PATH)) {
     const src = fs.readFileSync(RUST_TOKEN_TYPES_PATH, 'utf-8');
     const block = src.match(/pub const TOKEN_MODIFIERS[^=]*=\s*&\[([\s\S]*?)\];/);
     assert.ok(block, 'TOKEN_MODIFIERS const block should be found in token_types.rs');
-    const builtin: Record<string, string> = { DECLARATION: 'declaration', DEFINITION: 'definition' };
-    const names: string[] = [];
-    const re = /SemanticTokenModifier::(?:new\("([^"]+)"\)|([A-Z_]+))/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(block![1])) !== null) {
-      names.push(m[1] ?? builtin[m[2]] ?? `<unmapped:${m[2]}>`);
-    }
+    const names = [...block![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
     assert.deepStrictEqual([...PASTA_TOKEN_MODIFIERS], names);
   });
 }
@@ -258,7 +245,7 @@ test('updateTokens replaces the cache and fires onDidChangeSemanticTokens', () =
   let fired = 0;
   provider.onDidChangeSemanticTokens(() => { fired++; });
   const doc = fakeDocument('file:///update.pasta', 'pasta', 'text');
-  provider.updateTokens(doc.uri.toString(), [
+  provider.updateTokens(doc.uri.toString(), doc.version, [
     { deltaLine: 0, deltaStartCharacter: 1, length: 2, tokenType: 4, tokenModifiers: 0 },
   ]);
   assert.strictEqual(fired, 1, 'event must fire on updateTokens');
@@ -273,6 +260,42 @@ test('provider returns null when analysis throws (TextMate fallback)', () => {
   assert.strictEqual(provider.provideDocumentSemanticTokens(doc as never, dummyToken), null);
 });
 
+// 要件 8.1: 控えは版つき。違う版の控えは返さず、その場で解き直す
+test('provider does not serve tokens cached for a different document version', () => {
+  const fresh = { deltaLine: 0, deltaStartCharacter: 0, length: 3, tokenType: 1, tokenModifiers: 0 };
+  const bridge = fakeBridge({ result: { tokens: [fresh], diagnostics: [] } });
+  const provider = new SemanticTokensProvider(bridge as never);
+  const uri = 'file:///ver.pasta';
+  provider.updateTokens(mock.Uri.parse(uri).toString(), 1, [
+    { deltaLine: 0, deltaStartCharacter: 5, length: 1, tokenType: 4, tokenModifiers: 0 },
+  ]);
+  const v2 = fakeDocument(uri, 'pasta', 'new text', 2);
+  const tokens = provider.provideDocumentSemanticTokens(v2 as never, dummyToken) as mock.SemanticTokens;
+  assert.deepStrictEqual(bridge.calls, ['new text'], 'a stale version must be re-analyzed');
+  assert.deepStrictEqual(Array.from(tokens.data), [0, 0, 3, 1, 0]);
+  // 解き直した結果は v2 として控えるので、もう一度求められても解かない
+  provider.provideDocumentSemanticTokens(v2 as never, dummyToken);
+  assert.strictEqual(bridge.calls.length, 1, 'the re-analyzed result must be cached for v2');
+});
+
+// 要件 8.2: 今の版の解析に失敗したら、前の版の色を返さず控えも消す
+test('provider failure on a new version returns null and drops the previous version', () => {
+  const opts = { result: { tokens: [], diagnostics: [] }, fail: false };
+  const bridge = fakeBridge(opts);
+  const provider = new SemanticTokensProvider(bridge as never);
+  const uri = 'file:///ver-fail.pasta';
+  provider.provideDocumentSemanticTokens(fakeDocument(uri, 'pasta', 'v1', 1) as never, dummyToken);
+  opts.fail = true;
+  assert.strictEqual(
+    provider.provideDocumentSemanticTokens(fakeDocument(uri, 'pasta', 'v2', 2) as never, dummyToken),
+    null,
+    'the previous version must not be returned when the current one fails'
+  );
+  opts.fail = false;
+  provider.provideDocumentSemanticTokens(fakeDocument(uri, 'pasta', 'v1', 1) as never, dummyToken);
+  assert.deepStrictEqual(bridge.calls, ['v1', 'v2', 'v1'], 'the failed analysis must drop the cache');
+});
+
 // =============================================================================
 // DiagnosticsManager (real)
 // =============================================================================
@@ -281,7 +304,8 @@ function collectionOf(dm: DiagnosticsManager): mock.MockDiagnosticCollection {
   return (dm as unknown as { collection: mock.MockDiagnosticCollection }).collection;
 }
 
-test('setDiagnostics maps LSP severities 1..4 to VSCode severities', () => {
+// 入力のたびの診断は構文の誤りだけなので、重さは常に Error（N9）
+test('setDiagnostics always uses Error severity', () => {
   const dm = new DiagnosticsManager();
   const uri = mock.Uri.parse('file:///sev.pasta');
   const mk = (severity: number) => ({
@@ -289,25 +313,9 @@ test('setDiagnostics maps LSP severities 1..4 to VSCode severities', () => {
     message: `sev ${severity}`,
     severity,
   });
-  dm.setDiagnostics(uri as never, [mk(1), mk(2), mk(3), mk(4)]);
+  dm.setDiagnostics(uri as never, [mk(1), mk(2), mk(3), mk(4), mk(99)]);
   const got = collectionOf(dm).get(uri)!;
-  assert.strictEqual(got.length, 4);
-  assert.strictEqual(got[0].severity, mock.DiagnosticSeverity.Error);
-  assert.strictEqual(got[1].severity, mock.DiagnosticSeverity.Warning);
-  assert.strictEqual(got[2].severity, mock.DiagnosticSeverity.Information);
-  assert.strictEqual(got[3].severity, mock.DiagnosticSeverity.Hint);
-  dm.dispose();
-});
-
-test('setDiagnostics defaults unknown LSP severity to Error', () => {
-  const dm = new DiagnosticsManager();
-  const uri = mock.Uri.parse('file:///sev0.pasta');
-  dm.setDiagnostics(uri as never, [{
-    range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
-    message: 'weird severity',
-    severity: 99,
-  }]);
-  assert.strictEqual(collectionOf(dm).get(uri)![0].severity, mock.DiagnosticSeverity.Error);
+  assert.deepStrictEqual(got.map((d) => d.severity), Array(5).fill(mock.DiagnosticSeverity.Error));
   dm.dispose();
 });
 
@@ -328,7 +336,7 @@ test('setDiagnostics preserves range and message', () => {
   dm.dispose();
 });
 
-test('setDiagnostics replaces, clear deletes, clearAll empties', () => {
+test('setDiagnostics replaces, clear deletes', () => {
   const dm = new DiagnosticsManager();
   const a = mock.Uri.parse('file:///a.pasta');
   const b = mock.Uri.parse('file:///b.pasta');
@@ -344,8 +352,6 @@ test('setDiagnostics replaces, clear deletes, clearAll empties', () => {
   dm.clear(a as never);
   assert.strictEqual(collectionOf(dm).get(a), undefined);
   assert.strictEqual(collectionOf(dm).get(b)!.length, 1);
-  dm.clearAll();
-  assert.strictEqual(collectionOf(dm).size, 0);
   dm.dispose();
 });
 
@@ -445,6 +451,70 @@ test('analysis failure logs to the output channel and clears diagnostics', () =>
   assert.strictEqual(collectionOf(h.dm).get(doc.uri), undefined, 'diagnostics must be cleared on failure');
   h.sync.dispose();
   h.dm.dispose();
+});
+
+// 要件 8.2: 同期の解析に失敗したら、診断と一緒に色の控えも消す
+test('analysis failure in DocumentSync also drops the cached tokens', () => {
+  const opts = {
+    result: { tokens: [{ deltaLine: 0, deltaStartCharacter: 0, length: 1, tokenType: 1, tokenModifiers: 0 }], diagnostics: [] },
+    fail: false,
+  };
+  const h = makeSyncHarness(opts);
+  h.sync.activate(dummyContext() as never);
+  const v1 = fakeDocument('file:///sync-fail.pasta', 'pasta', 'v1', 1);
+  mock.didOpenTextDocumentEmitter.fire(v1);
+  opts.fail = true;
+  mock.didOpenTextDocumentEmitter.fire(fakeDocument('file:///sync-fail.pasta', 'pasta', 'v2', 2));
+  opts.fail = false;
+  // 控えが残っていれば v1 の色を解かずに返してしまう
+  h.provider.provideDocumentSemanticTokens(v1 as never, dummyToken);
+  assert.deepStrictEqual(h.bridge.calls, ['v1', 'v2', 'v1'], 'the failed sync must clear the token cache');
+  h.sync.dispose();
+  h.dm.dispose();
+});
+
+// 要件 9.5: wasm32 の panic は trap として JS の例外になる。拡張は落ちず、理由を書き、診断と控えを消す
+test('a wasm trap during sync is caught, logged, and clears diagnostics and tokens', () => {
+  let trap = false;
+  const bridge = bridgeWithWasmModule({
+    wasm_analyze: () => {
+      if (trap) {
+        // 本物は WebAssembly.RuntimeError: unreachable（tsconfig の lib に型が無いので名前だけ写す）
+        throw Object.assign(new Error('unreachable'), { name: 'RuntimeError' });
+      }
+      return {
+        tokens: [{ deltaLine: 0, deltaStartCharacter: 0, length: 1, tokenType: 1, tokenModifiers: 0 }],
+        diagnostics: [{
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+          message: 'diag',
+          severity: 1,
+        }],
+      };
+    },
+  });
+  const provider = new SemanticTokensProvider(bridge);
+  const dm = new DiagnosticsManager();
+  const logged: string[] = [];
+  const channel = { name: 'test', appendLine: (msg: string) => { logged.push(msg); }, dispose: () => {} };
+  const sync = new DocumentSync(bridge, provider, dm, channel as never);
+  sync.activate(dummyContext() as never);
+  const uri = 'file:///trap.pasta';
+  mock.didOpenTextDocumentEmitter.fire(fakeDocument(uri, 'pasta', 'ok', 1));
+  assert.ok(collectionOf(dm).get(mock.Uri.parse(uri)), 'diagnostics seeded');
+  trap = true;
+  assert.doesNotThrow(() => mock.didOpenTextDocumentEmitter.fire(fakeDocument(uri, 'pasta', 'boom', 1)));
+  assert.ok(
+    logged.some((l) => l.includes('Document analysis failed') && l.includes('unreachable')),
+    'the trap reason must reach the output channel'
+  );
+  assert.strictEqual(collectionOf(dm).get(mock.Uri.parse(uri)), undefined, 'diagnostics must be cleared');
+  assert.strictEqual(
+    (provider as unknown as { cachedTokens: Map<string, unknown> }).cachedTokens.has(mock.Uri.parse(uri).toString()),
+    false,
+    'token cache must be cleared'
+  );
+  sync.dispose();
+  dm.dispose();
 });
 
 test('no analysis is attempted while the bridge is not ready', () => {
@@ -732,8 +802,15 @@ test('config provider removes an absent/invalid sourcePresentation (no client de
 });
 
 // =============================================================================
-// wordRefDecorator (real) — regex/decoration behaviour
+// wordRefDecorator (real) — 箱の範囲は TextMate の文法の規則から（要件 5.1〜5.3）
 // =============================================================================
+
+for (const c of WORD_REF_CASES) {
+  test(`word-ref box: ${c.name}`, () => {
+    const spans = findWordRefRanges(c.text).map(([s, e]) => c.text.slice(s, e));
+    assert.deepStrictEqual(spans, c.boxes);
+  });
+}
 
 function fakeEditor(languageId: string, text: string) {
   const captured: { ranges: mock.Range[] | undefined; setCalls: number } = { ranges: undefined, setCalls: 0 };
@@ -751,8 +828,8 @@ function fakeEditor(languageId: string, text: string) {
 // call would register an extra listener on the shared mock emitters and make
 // the setDecorations call counts non-deterministic).
 
-test('word-ref decorator boxes ＠/@ references and stops at delimiters', () => {
-  const text = '＠笑顔　＠挨拶！ @hello world';
+test('word-ref decorator boxes ＠/@ references in talk and stops at delimiters', () => {
+  const text = '　さくら：＠笑顔　＠挨拶！ @hello world';
   const { editor, captured } = fakeEditor('pasta', text);
   mock.window.activeTextEditor = editor;
   activateWordRefDecorator(dummyContext() as never);
@@ -770,7 +847,7 @@ test('word-ref decorator ignores non-pasta documents', () => {
 });
 
 test('word-ref decorator re-applies on active-editor change and document edits', () => {
-  const text = 'さくら：＠通常　やふぅ。';
+  const text = '　さくら：＠通常　やふぅ。';
   const { editor, captured } = fakeEditor('pasta', text);
   mock.didChangeActiveTextEditorEmitter.fire(editor);
   assert.strictEqual(captured.setCalls, 1, 'editor switch must decorate');
@@ -810,7 +887,6 @@ test('activate loads the real WASM bridge and registers the debug + toggle wirin
   assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 1, watchers: 1 });
   const state = getActivationState();
   assert.strictEqual(state.wasmReady, true, 'real wasm/pasta_lsp_wasm_bg.wasm must load');
-  assert.strictEqual(state.fallbackMode, false);
   assert.ok(mock.registeredCommands.has(TOGGLE_COMMAND), 'toggle command must be registered');
   assert.strictEqual(mock.registeredDebugFactories.length, 1, 'debug adapter factory registered');
   assert.strictEqual(mock.registeredDebugConfigProviders.length, 1, 'debug config provider registered');
@@ -922,7 +998,6 @@ test('WASM が読めないときは GhostValidator を作らず、activate は�
   const collectionsBefore = mock.createdDiagnosticCollections.length;
   const watchersBefore = mock.createdFileSystemWatchers.length;
   await activate(context as never);
-  assert.strictEqual(getActivationState().fallbackMode, true);
   assert.strictEqual(getActivationState().wasmReady, false);
   assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 0, watchers: 0 });
   deactivate();

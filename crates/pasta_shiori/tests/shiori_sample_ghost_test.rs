@@ -8,7 +8,7 @@
 mod common;
 
 use common::copy_sample_ghost_to_temp;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 // ========================================================================
 // Task 3.2: PastaShiori::load のテスト
@@ -21,7 +21,7 @@ fn test_load_hello_pasta() {
     let temp = copy_sample_ghost_to_temp();
     let mut shiori = PastaShiori::default();
 
-    let result = shiori.load(1, temp.path().as_os_str());
+    let result = shiori.load(temp.path().as_os_str());
     assert!(result.is_ok(), "load() should not return error");
     assert!(result.unwrap(), "load() should return true on success");
 }
@@ -38,7 +38,7 @@ fn test_onboot_response() {
     let mut shiori = PastaShiori::default();
 
     // Load ghost
-    let load_result = shiori.load(1, temp.path().as_os_str());
+    let load_result = shiori.load(temp.path().as_os_str());
     assert!(load_result.is_ok(), "load() should succeed");
     assert!(load_result.unwrap(), "load() should return true");
 

@@ -219,54 +219,85 @@ fn notice_lists_skip_reasons_in_table_order() {
     assert!(!stats(2, 3, &[]).references_skipped());
 }
 
-/// すべての種類の分類と code を固定する（7.7）。種類を足したらここにも足す
+/// 種類ごとの分類と code（7.7・9.6）。ワイルドカードを使わないので、種類を足すとここが compile で落ちる
+fn expected(kind: FindingKind) -> (Severity, &'static str) {
+    use FindingKind::*;
+    use Severity::*;
+    match kind {
+        ConfigMissing => (Error, "config-missing"),
+        ConfigSyntax => (Error, "config-syntax"),
+        ConfigLoaderType => (Error, "config-loader-type"),
+        ConfigSceneAlias => (Error, "config-scene-alias"),
+        ConfigActorFont => (Error, "config-actor-font"),
+        ConfigPatternInvalid => (Error, "config-pattern-invalid"),
+        PatternIgnored => (Warning, "pattern-ignored"),
+        PatternNotPasta => (Warning, "pattern-not-pasta"),
+        NoDictionaryFiles => (Warning, "no-dictionary-files"),
+        FolderMatchesPattern => (Error, "folder-matches-pattern"),
+        InitFileName => (Error, "init-file-name"),
+        FileNotUtf8 => (Error, "file-not-utf8"),
+        FileUnreadable => (Error, "file-unreadable"),
+        Syntax => (Error, "syntax"),
+        TranspileArgAssign => (Error, "transpile-arg-assign"),
+        TranspilePropertyInExpr => (Error, "transpile-property-in-expr"),
+        TranspileContinuationWithoutActor => (Error, "transpile-continuation-without-actor"),
+        ModulePastaCollision => (Error, "module-pasta-collision"),
+        ModuleLuaCollision => (Error, "module-lua-collision"),
+        ModuleLuaShadowed => (Warning, "module-lua-shadowed"),
+        GlobalSceneCollision => (Warning, "global-scene-collision"),
+        LocalSceneCollision => (Warning, "local-scene-collision"),
+        SceneShadowedByBuiltin => (Warning, "scene-shadowed-by-builtin"),
+        CallTargetMissing => (Warning, "call-target-missing"),
+        ChoiceTargetMissing => (Warning, "choice-target-missing"),
+        RecommendItemInvalid => (Warning, "recommend-item-invalid"),
+        RecommendMenuTalk => (Warning, "recommend-menu-talk"),
+    }
+}
+
+/// すべての種類の分類と、保存時の報告に出る code の文字列を固定する（7.7・9.6）
 #[test]
 fn every_kind_has_fixed_severity_and_code() {
     use FindingKind::*;
-    use Severity::*;
-    let table = [
-        (ConfigMissing, Error, "config-missing"),
-        (ConfigSyntax, Error, "config-syntax"),
-        (ConfigLoaderType, Error, "config-loader-type"),
-        (ConfigSceneAlias, Error, "config-scene-alias"),
-        (ConfigActorFont, Error, "config-actor-font"),
-        (ConfigPatternInvalid, Error, "config-pattern-invalid"),
-        (PatternIgnored, Warning, "pattern-ignored"),
-        (PatternNotPasta, Warning, "pattern-not-pasta"),
-        (NoDictionaryFiles, Warning, "no-dictionary-files"),
-        (FolderMatchesPattern, Error, "folder-matches-pattern"),
-        (InitFileName, Error, "init-file-name"),
-        (FileNotUtf8, Error, "file-not-utf8"),
-        (FileUnreadable, Error, "file-unreadable"),
-        (Syntax, Error, "syntax"),
-        (TranspileArgAssign, Error, "transpile-arg-assign"),
-        (TranspilePropertyInExpr, Error, "transpile-property-in-expr"),
-        (
-            TranspileContinuationWithoutActor,
-            Error,
-            "transpile-continuation-without-actor",
-        ),
-        (ModulePastaCollision, Error, "module-pasta-collision"),
-        (ModuleLuaCollision, Error, "module-lua-collision"),
-        (ModuleLuaShadowed, Warning, "module-lua-shadowed"),
-        (GlobalSceneCollision, Warning, "global-scene-collision"),
-        (LocalSceneCollision, Warning, "local-scene-collision"),
-        (SceneShadowedByBuiltin, Warning, "scene-shadowed-by-builtin"),
-        (CallTargetMissing, Warning, "call-target-missing"),
-        (ChoiceTargetMissing, Warning, "choice-target-missing"),
-        (RecommendItemInvalid, Warning, "recommend-item-invalid"),
-        (RecommendMenuTalk, Warning, "recommend-menu-talk"),
+    let kinds = [
+        ConfigMissing,
+        ConfigSyntax,
+        ConfigLoaderType,
+        ConfigSceneAlias,
+        ConfigActorFont,
+        ConfigPatternInvalid,
+        PatternIgnored,
+        PatternNotPasta,
+        NoDictionaryFiles,
+        FolderMatchesPattern,
+        InitFileName,
+        FileNotUtf8,
+        FileUnreadable,
+        Syntax,
+        TranspileArgAssign,
+        TranspilePropertyInExpr,
+        TranspileContinuationWithoutActor,
+        ModulePastaCollision,
+        ModuleLuaCollision,
+        ModuleLuaShadowed,
+        GlobalSceneCollision,
+        LocalSceneCollision,
+        SceneShadowedByBuiltin,
+        CallTargetMissing,
+        ChoiceTargetMissing,
+        RecommendItemInvalid,
+        RecommendMenuTalk,
     ];
-    assert_eq!(table.len(), FindingKind::ALL.len());
-    assert_eq!(FindingKind::ALL.len(), 27);
-    for (kind, sev, code) in table {
+    let mut codes: Vec<&str> = kinds.iter().map(|k| expected(*k).1).collect();
+    codes.sort();
+    codes.dedup();
+    assert_eq!(codes.len(), 27);
+    for kind in kinds {
+        let (sev, code) = expected(kind);
         assert_eq!(kind.severity(), sev, "{code}");
-        assert_eq!(kind.code(), code);
+        assert_eq!(serde_json::to_value(kind).unwrap(), code);
         let f = Finding::new(kind, "pasta.toml", None, None, "m");
         assert_eq!(f.severity, sev);
-    }
-    for kind in FindingKind::ALL {
-        assert!(table.iter().any(|(k, _, _)| *k == kind));
+        assert_eq!(serde_json::to_value(&f).unwrap()["code"], code);
     }
 }
 

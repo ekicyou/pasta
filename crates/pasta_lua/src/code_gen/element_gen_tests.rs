@@ -1,6 +1,5 @@
 use super::*;
 use crate::code_gen::source_map::SourceMapSink;
-use crate::config::LineEnding;
 use pasta_dsl::parser::{Arg, Args, BinOp, CallTarget, FnScope};
 
 /// Test sink capturing each `(lua_line, pasta_line)` record.
@@ -21,7 +20,7 @@ where
 {
     let mut output = Vec::new();
     {
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         f(&mut cg).unwrap();
     }
     String::from_utf8(output).unwrap()
@@ -40,7 +39,7 @@ fn escape_with_single_char_sequence_emits_nothing() {
     let mut output = Vec::new();
     let final_out_line;
     {
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         cg.set_source_map(&mut sink);
         let action = Action::Escape {
             sequence: "@".to_string(), // no char at index 1
@@ -114,7 +113,7 @@ fn sakura_script_action_emits_sakura_script_call() {
 #[test]
 fn continue_action_without_prior_actor_is_invalid_continuation_error() {
     let mut output = Vec::new();
-    let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+    let mut cg = LuaCodeGenerator::new(&mut output);
     let cont = ContinueAction {
         actions: vec![Action::Talk {
             text: "続き".to_string(),
@@ -424,6 +423,38 @@ fn word_definition_prefixes_and_multi_name_lines() {
     );
 }
 
+/// Actor words share the generator: `ACTOR:create_word("key")` (colon).
+#[test]
+fn word_definition_actor_form() {
+    let kw = key_words(&["通常"], &["\\s[0]", "\\s[100]"]);
+    let actor = gen_to_string(|cg| cg.generate_word_definition(&kw, "ACTOR", ":"));
+    assert_eq!(
+        actor,
+        "ACTOR:create_word(\"通常\"):entry([=[\\s[0]]=], [=[\\s[100]]=])\n"
+    );
+}
+
+/// A value that cannot be literalized is a positioned `StringLiteralError`
+/// for global, scene and actor word definitions alike.
+#[test]
+fn word_definition_unliteralizable_value_errors_with_span() {
+    let kw = key_words(&["挨拶"], &["\\x]==========y"]);
+    for (receiver, separator) in [("PASTA", "."), ("SCENE", ":"), ("ACTOR", ":")] {
+        let mut output = Vec::new();
+        let mut cg = LuaCodeGenerator::new(&mut output);
+        match cg.generate_word_definition(&kw, receiver, separator) {
+            Err(TranspileError::StringLiteralError { span, .. }) => {
+                assert_eq!(
+                    (span.start_line, span.start_col, span.end_line, span.end_col),
+                    (3, 1, 3, 10),
+                    "{receiver}: error must carry the word definition span"
+                );
+            }
+            other => panic!("{receiver}: expected StringLiteralError, got {other:?}"),
+        }
+    }
+}
+
 // ------------------------------------------------------------------
 // Code blocks
 // ------------------------------------------------------------------
@@ -435,7 +466,7 @@ fn code_block_with_invalid_span_emits_lines_without_records() {
     let mut sink = CapturingSink::default();
     let mut output = Vec::new();
     {
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         cg.set_source_map(&mut sink);
         cg.generate_code_block(&CodeBlock {
             language: Some("lua".to_string()),
@@ -453,6 +484,27 @@ fn code_block_with_invalid_span_emits_lines_without_records() {
         sink.records.is_empty(),
         "invalid span must not pollute the source map, got {:?}",
         sink.records
+    );
+}
+
+/// Inside an indented block, code block content lines are emitted exactly as
+/// written: no indentation added, blank content lines written directly (not
+/// pending), so a blank line right before the closing `end` survives.
+#[test]
+fn code_block_is_not_indented_and_keeps_blank_lines_before_end() {
+    let text = gen_to_string(|cg| {
+        cg.writeln("do")?;
+        cg.indent();
+        cg.generate_code_block(&CodeBlock {
+            language: Some("lua".to_string()),
+            content: "local MSG = [[\nこんにちは\n\nend\n]]\n\n".to_string(),
+            span: Span::default(),
+        })?;
+        cg.end_block()
+    });
+    assert_eq!(
+        text, "do\nlocal MSG = [[\nこんにちは\n\nend\n]]\n\nend\n",
+        "block content must be verbatim, blank lines kept"
     );
 }
 
@@ -622,4 +674,13 @@ fn expr_statement_wraps_non_call_expressions_in_discard_block() {
         let label = format!("{:?}", expr);
         assert_eq!(stmt(expr), format!("{expected}\n"), "{label}");
     }
+}
+
+/// The highest scene argument `＄２５５` maps to `args[256]` without overflowing (9.1).
+#[test]
+fn resolve_var_path_args_255_is_args_256() {
+    assert_eq!(
+        LuaCodeGenerator::<Vec<u8>>::resolve_var_path("255", &VarScope::Args(255)).unwrap(),
+        "args[256]"
+    );
 }

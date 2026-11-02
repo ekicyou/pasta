@@ -9,9 +9,9 @@ do
     local ACTOR = PASTA.create_actor("さくら")
     ACTOR:create_word("一人称"):entry("私")
 
-    function ACTOR.時刻(act)
-        return "朝"
-    end
+function ACTOR.時刻(act)
+    return "朝"
+end
 end
 
 do

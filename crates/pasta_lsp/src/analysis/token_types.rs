@@ -1,39 +1,35 @@
 //! Semantic token type/modifier definitions and encoding utilities.
 
-use tower_lsp::lsp_types::{
-    SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend,
-};
-
 // ============================================================================
 // Token Type Definitions
 // ============================================================================
 
-/// Pasta DSL固有のセマンティックトークンタイプ
-pub const TOKEN_TYPES: &[SemanticTokenType] = &[
-    SemanticTokenType::COMMENT,             // 0: コメント (#/＃)
-    SemanticTokenType::NAMESPACE,           // 1: グローバルシーンマーカー (*/＊)
-    SemanticTokenType::new("scene"),        // 2: ローカルシーンマーカー (-/・)
-    SemanticTokenType::DECORATOR,           // 3: 属性マーカー (&/＆)
-    SemanticTokenType::new("word"),         // 4: 単語マーカー (@/＠)
-    SemanticTokenType::VARIABLE,            // 5: 変数マーカー ($/＄)
-    SemanticTokenType::new("call"),         // 6: Callマーカー (>/＞)
-    SemanticTokenType::new("actor"),        // 7: アクター辞書マーカー (%/％)
-    SemanticTokenType::new("actorName"),    // 8: アクター名 (：の前)
-    SemanticTokenType::new("codeBlock"),    // 9: Luaコードブロック
-    SemanticTokenType::new("talk"),         // 10: 文字列リテラル（Talk）
-    SemanticTokenType::new("sakuraScript"), // 11: さくらスクリプト
-    SemanticTokenType::new("escape"),       // 12: エスケープシーケンス
-    SemanticTokenType::OPERATOR,            // 13: コロン区切り
-    SemanticTokenType::NUMBER,              // 14: 数値リテラル
-    SemanticTokenType::new("cueMarker"),    // 15: キューコマンドマーカー (!/！)
-    SemanticTokenType::new("cueCommand"),   // 16: キューコマンド名
+/// Pasta DSL固有のセマンティックトークンタイプ（拡張の凡例と同じ並び）
+pub const TOKEN_TYPES: &[&str] = &[
+    "comment",      // 0: コメント (#/＃)
+    "namespace",    // 1: グローバルシーンマーカー (*/＊)
+    "scene",        // 2: ローカルシーンマーカー (-/・)
+    "decorator",    // 3: 属性マーカー (&/＆)
+    "word",         // 4: 単語マーカー (@/＠)
+    "variable",     // 5: 変数マーカー ($/＄)
+    "call",         // 6: Callマーカー (>/＞)
+    "actor",        // 7: アクター辞書マーカー (%/％)
+    "actorName",    // 8: アクター名 (：の前)
+    "codeBlock",    // 9: Luaコードブロック
+    "talk",         // 10: 文字列リテラル（Talk）
+    "sakuraScript", // 11: さくらスクリプト
+    "escape",       // 12: エスケープシーケンス
+    "operator",     // 13: コロン区切り
+    "number",       // 14: 数値リテラル
+    "cueMarker",    // 15: キューコマンドマーカー (!/！)
+    "cueCommand",   // 16: キューコマンド名
 ];
 
 /// トークンモディファイア
-pub const TOKEN_MODIFIERS: &[SemanticTokenModifier] = &[
-    SemanticTokenModifier::DECLARATION,   // 0: 宣言
-    SemanticTokenModifier::DEFINITION,    // 1: 定義
-    SemanticTokenModifier::new("global"), // 2: グローバルスコープ
+pub const TOKEN_MODIFIERS: &[&str] = &[
+    "declaration", // 0: 宣言
+    "definition",  // 1: 定義
+    "global",      // 2: グローバルスコープ
 ];
 
 /// Token type indices for convenience
@@ -57,12 +53,22 @@ pub mod token_type {
     pub const CUE_COMMAND: u32 = 16;
 }
 
-/// Generate the SemanticTokensLegend for registration with the LSP client.
-pub fn semantic_tokens_legend() -> SemanticTokensLegend {
-    SemanticTokensLegend {
-        token_types: TOKEN_TYPES.to_vec(),
-        token_modifiers: TOKEN_MODIFIERS.to_vec(),
-    }
+// ============================================================================
+// Semantic Token（LSP の delta エンコーディング・JS へ渡す形）
+// ============================================================================
+
+/// 1 つのセマンティックトークン。JS の名前は serde の rename で付ける
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct SemanticToken {
+    #[serde(rename = "deltaLine")]
+    pub delta_line: u32,
+    #[serde(rename = "deltaStartCharacter")]
+    pub delta_start: u32,
+    pub length: u32,
+    #[serde(rename = "tokenType")]
+    pub token_type: u32,
+    #[serde(rename = "tokenModifiers")]
+    pub token_modifiers_bitset: u32,
 }
 
 // ============================================================================

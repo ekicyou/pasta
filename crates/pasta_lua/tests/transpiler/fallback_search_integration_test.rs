@@ -238,7 +238,7 @@ fn test_t1_actor_function_exact_match() {
         -- Create mock act
         -- プロキシは関数ハンドラの後に act:restore_scene で文脈を戻す（call-execution-correctness 2.3）
         local act = { current_scene = nil }
-        function act:restore_scene(scene, ...) self.current_scene = scene; return ... end
+        function act:restore_scene(fn, ...) return fn(...) end
         local proxy = ACTOR.create_proxy(sakura, act)
         
         return proxy:word("時刻")
@@ -272,7 +272,7 @@ fn test_t12_function_priority_over_dict() {
         
         -- プロキシは関数ハンドラの後に act:restore_scene で文脈を戻す（call-execution-correctness 2.3）
         local act = { current_scene = nil }
-        function act:restore_scene(scene, ...) self.current_scene = scene; return ... end
+        function act:restore_scene(fn, ...) return fn(...) end
         local proxy = ACTOR.create_proxy(sakura, act)
         
         return proxy:word("天気")

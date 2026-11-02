@@ -10,7 +10,6 @@
 //! - The `out_line` counter accurately tracks the number of generated output lines.
 
 use pasta_dsl::parser::{Action, Span};
-use pasta_lua::LineEnding;
 use pasta_lua::code_gen::LuaCodeGenerator;
 use pasta_lua::code_gen::source_map::SourceMapSink;
 
@@ -49,7 +48,7 @@ fn test_no_sink_is_byte_identical_and_records_nothing() {
     // No sink: the seam is inert. Output must match the plain path exactly.
     // Force LF so the byte assertion is platform-independent (Windows default is CRLF).
     let mut output = Vec::new();
-    let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+    let mut codegen = LuaCodeGenerator::new(&mut output);
 
     let action = Action::Talk {
         text: "こんにちは".to_string(),
@@ -73,7 +72,7 @@ fn test_capturing_sink_records_line_to_span_for_action_path() {
 
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         let action = Action::Talk {
@@ -136,11 +135,11 @@ fn test_out_line_counter_matches_emitted_line_count() {
     let mut output = Vec::new();
     let mut codegen = LuaCodeGenerator::new(&mut output);
 
-    // Header emits 3 lines: two requires + one blank line.
+    // Header writes 2 lines (two requires); its trailing blank line is pending.
     codegen.write_header().unwrap();
-    assert_eq!(codegen.out_line(), 3, "header should emit 3 output lines");
+    assert_eq!(codegen.out_line(), 2, "header should emit 2 output lines");
 
-    // Each talk action emits exactly one line.
+    // The talk action flushes the pending blank line, then emits one line.
     codegen
         .generate_action(
             &Action::Talk {
@@ -176,7 +175,7 @@ fn test_concat_line_maps_to_its_pasta_line_like_arith() {
     let mut sink = CapturingSink::default();
     let mut output = Vec::new();
     LuaTranspiler::default()
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
     let lua = String::from_utf8(output).unwrap();
     let lua_lines: Vec<&str> = lua.lines().collect();

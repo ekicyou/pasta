@@ -315,3 +315,123 @@ describe("SHIORI_ACT_IMPL.get_property() - 時刻の飛びをまたぐ待ち時�
         if not ok then error(err, 0) end
     end)
 end)
+
+-- ============================================================================
+-- Group H: 続きの中の get_property の期限（ponytail-lua-scripts Task 4.1）
+-- Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
+-- 期限は、そのシーンを再開した要求（チェイントークの区切り・コールバックの応答・
+-- 時間切れ）のなめらかな時計から数える。act.req は替えない。
+-- ============================================================================
+
+describe("SHIORI_ACT_IMPL.get_property() - 続きの中の期限", function()
+    local function mk_date(u)
+        local t = os.date("*t", u)
+        return {
+            unix = u, year = t.year, month = t.month, day = t.day, hour = t.hour,
+            min = t.min, sec = t.sec, ns = 0, yday = t.yday, ordinal = t.yday,
+            wday = t.wday - 1, num_days_from_sunday = t.wday - 1,
+        }
+    end
+
+    -- t0 の OnTalk で区切ったシーンを t0 + 180 の OnSecondChange で再開し、get_property で待たせる。
+    -- body(act, out) はチェイントークの区切りの後に動くシーンの残り
+    local function run(body, check)
+        setup()
+        package.loaded["pasta.shiori.event.second_change"] = nil
+        package.loaded["pasta.shiori.event.register"] = nil
+        local CLOCK = require("pasta.shiori.clock")
+        CLOCK._reset()
+        local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        dispatcher._reset()
+        dispatcher._set_scene_executor(function() return nil end)
+        require("pasta.shiori.event.second_change")
+        local REG = require("pasta.shiori.event.register")
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local CALLBACK = require("pasta.shiori.event.callback")
+        local EVENT = require("pasta.shiori.event")
+
+        local real_time = os.time
+        local fake = 1000
+        os.time = function(t) -- luacheck: ignore 122
+            if t ~= nil then return real_time(t) end
+            return fake
+        end
+        local function req_at(id, u)
+            fake = u
+            return { id = id, status = "idle", date = mk_date(u) }
+        end
+        local function tick(u)
+            return REG.OnSecondChange(SHIORI_ACT.new(create_mock_actors(), req_at("OnSecondChange", u)))
+        end
+
+        local ok, err = pcall(function()
+            local req0 = req_at("OnTalk", 1000)
+            local act0 = SHIORI_ACT.new(create_mock_actors(), req0)
+            local out = {}
+            local co = coroutine.create(function(act)
+                table.insert(act.token, { type = "raw_script", text = "a" })
+                act:yield()
+                body(act, out)
+            end)
+            assert(EVENT.drive(co, act0, act0))
+            local act180 = SHIORI_ACT.new(create_mock_actors(), req_at("OnSecondChange", 1180))
+            assert(EVENT.drive(co, act180, act180))
+            check({ tick = tick, req_at = req_at, CALLBACK = CALLBACK, out = out })
+            -- act.req（日時の変数の元）は替わらない
+            expect(act0.req):toBe(req0)
+        end)
+        os.time = real_time -- luacheck: ignore 122
+        CLOCK._reset()
+        dispatcher._reset()
+        CALLBACK.reset()
+        if not ok then error(err, 0) end
+    end
+
+    test("再開した時刻から数え、期限内のコールバックの値で再開し、続けて呼ぶ期限もその時点から数える", function()
+        run(function(act, out)
+            out[1] = act:get_property("x", 5)
+            out[2] = act:get_property("y", 5)
+        end, function(h)
+            expect(h.tick(1181)):toBeNil()
+            expect(h.CALLBACK.pending["OnPastaCallBack1"]).not_:toBe(nil)
+            local cb = h.req_at("OnPastaCallBack1", 1183)
+            cb.reference = { [0] = "v" }
+            expect(h.CALLBACK.try_route(cb)).not_:toBeNil()
+            expect(h.out[1]):toBe("v")
+            -- 2 つ目の期限は 1183 + 5 = 1188
+            expect(h.tick(1188)):toBeNil()
+            expect(h.CALLBACK.pending["OnPastaCallBack2"]).not_:toBe(nil)
+            expect(h.tick(1189)).not_:toBeNil()
+            expect(h.CALLBACK.pending["OnPastaCallBack2"]):toBeNil()
+        end)
+    end)
+
+    test("再開してから待ちの秒数を過ぎると、時間切れの文で再開する", function()
+        run(function(act)
+            act:get_property("x", 5, "too late")
+        end, function(h)
+            expect(h.tick(1185)):toBeNil()
+            expect(h.CALLBACK.pending["OnPastaCallBack1"]).not_:toBe(nil)
+            local res = h.tick(1186)
+            expect(res).not_:toBeNil()
+            expect(res:find("too late", 1, true) ~= nil):toBe(true)
+            expect(h.CALLBACK.pending["OnPastaCallBack1"]):toBeNil()
+        end)
+    end)
+
+    test("静かな時間切れの後に続けて呼ぶ期限は、掃引した要求の時刻から数える", function()
+        run(function(act, out)
+            out[1] = act:get_property("x", 5, false)
+            out[2] = act:get_property("y", 5)
+        end, function(h)
+            -- 静かに打ち切られたシーンが続けて 2 つ目の get タグを出す
+            local res = h.tick(1186)
+            expect(res:find("OnPastaCallBack2", 1, true) ~= nil):toBe(true)
+            expect(h.CALLBACK.pending["OnPastaCallBack1"]):toBeNil()
+            -- 2 つ目の期限は 1186 + 5 = 1191
+            expect(h.tick(1191)):toBeNil()
+            expect(h.CALLBACK.pending["OnPastaCallBack2"]).not_:toBe(nil)
+            expect(h.tick(1192)).not_:toBeNil()
+        end)
+    end)
+end)
