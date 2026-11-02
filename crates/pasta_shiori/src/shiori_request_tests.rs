@@ -103,7 +103,7 @@ fn test_request_with_valid_shiori_request() {
     let temp = copy_shiori_lifecycle_fixture();
     let mut shiori = PastaShiori::default();
 
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // 有効なSHIORI/3.0リクエスト
     let valid_request = "GET SHIORI/3.0\r\n\
@@ -136,7 +136,7 @@ fn test_request_with_invalid_shiori_request_returns_400() {
     let temp = copy_shiori_lifecycle_fixture();
     let mut shiori = PastaShiori::default();
 
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // 完全に無効なリクエスト（パース失敗を引き起こす）
     let invalid_request = "THIS IS NOT A VALID SHIORI REQUEST";
@@ -217,7 +217,7 @@ end
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // Send a request with all fields populated
     let request = "GET SHIORI/3.0\r\n\
@@ -310,7 +310,7 @@ end
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    let result = shiori.load(0, temp.path().as_os_str());
+    let result = shiori.load(temp.path().as_os_str());
     assert!(result.is_ok(), "Lua-level load failure is not a Rust error");
     assert!(
         !result.unwrap(),
@@ -349,7 +349,7 @@ end
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    let result = shiori.load(0, temp.path().as_os_str());
+    let result = shiori.load(temp.path().as_os_str());
     assert!(result.is_ok());
     assert!(
         !result.unwrap(),
@@ -386,7 +386,7 @@ end
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     let err = shiori
         .request("GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n")
@@ -427,7 +427,7 @@ end
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     let err = shiori
         .request("GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n")
@@ -477,7 +477,7 @@ fn test_get_without_request_fn_returns_self_204() {
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
     assert!(shiori.request_fn.is_none());
 
     let response = shiori

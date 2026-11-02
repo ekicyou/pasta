@@ -15,7 +15,7 @@ fn probe_ontalk_via_lua_state() {
     let mut shiori = PastaShiori::default();
 
     // Load ghost
-    assert!(shiori.load(1, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // Send OnBoot first
     let boot_req = "GET SHIORI/3.0\r\n\

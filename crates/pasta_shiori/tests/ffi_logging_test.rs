@@ -262,7 +262,7 @@ fn ffi_logs_reach_the_ghost_log_file() {
     std::fs::write(&entry, slow).expect("write entry.lua");
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(0, ghost.path().to_path_buf(), rx, None, None)
+    let actor = spawn_actor_thread_with(ghost.path().to_path_buf(), rx, None, None)
         .expect("actor thread must spawn");
     assert!(
         actor.loaded(),

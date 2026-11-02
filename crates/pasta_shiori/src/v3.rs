@@ -56,8 +56,8 @@ impl Shiori for PastaV3 {
             return Err(SHIORI_E_INVALID_ARG);
         }
         // 立ち上がれない理由のログは spawn が出す（2.4・2.5）。
-        let instance = ActorInstance::spawn(0, load_dir.clone())
-            .map_err(|_| SHIORI_500_INTERNAL_SERVER_ERROR)?;
+        let instance =
+            ActorInstance::spawn(load_dir.clone()).map_err(|_| SHIORI_500_INTERNAL_SERVER_ERROR)?;
         // 辞書・Lua・SHIORI.load の失敗でもインスタンスを返す（2.7）。入口の記録は旧来の入口と同じく
         // load_dir の文脈を張り直して出す（入口スレッドにはアクタースレッドの文脈が及ばない）。
         let loaded = instance.loaded();

@@ -28,7 +28,7 @@ fn fire(event_id: &str, balloon_warning: Option<&str>) -> (ShioriResponse, Vec<S
         let mut shiori = PastaShiori::default();
         assert!(
             shiori
-                .load(0, temp.path().as_os_str())
+                .load(temp.path().as_os_str())
                 .expect("SHIORI load should not error"),
             "SHIORI load should return true"
         );

@@ -168,11 +168,8 @@ fn load_impl(entry: &str, hdir: &ShioriString, encoding: DirEncoding) -> bool {
         // アクター起動へ到達した時点で立てる（ロード失敗時も維持する・要件 2.5）。
         LOADU_INITIALIZED.store(true, Ordering::SeqCst);
     }
-    // hinst は本番アクター経路では VM 構築の付随情報。SHIORI 仕様上 load では渡されない
-    // ため 0 を渡す（旧実装も DllMain で受けた hinst を保持していたが、本番では
-    // load_dir のみが VM 構築に必須）。
     let dir_for_log = dir.clone();
-    let loaded = lifecycle::spawn_actor(0, dir);
+    let loaded = lifecycle::spawn_actor(dir);
     // どちらの初期化入口でロードされたかを記録する（ホスト差分の切り分け用）。
     //
     // 出力位置には 2 段階の制約がある。

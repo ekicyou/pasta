@@ -97,8 +97,8 @@ impl ActorInstance {
     ///
     /// 返った時点で VM の構築と `SHIORI.load` の呼び出しは終わっている（2.3）。辞書・Lua・
     /// `SHIORI.load` の失敗はインスタンスを返す（[`loaded`](Self::loaded) が偽）。
-    pub fn spawn(hinst: isize, load_dir: PathBuf) -> Result<Self, SpawnError> {
-        Self::spawn_with(hinst, load_dir, ClaimMode::Exclusive)
+    pub fn spawn(load_dir: PathBuf) -> Result<Self, SpawnError> {
+        Self::spawn_with(load_dir, ClaimMode::Exclusive)
     }
 
     /// [`spawn`](Self::spawn) の、ディレクトリの占有のしかたを選ぶ形。
@@ -106,11 +106,7 @@ impl ActorInstance {
     /// 起動の前にディレクトリを占有して札を得る。札はアクタースレッドの VM が持ち、VM の
     /// 片付けで札で外す。占有に失敗したら占有している側のログに理由を出し、
     /// [`SpawnError::DirInUse`] を返す（6.2・2.5）。
-    pub fn spawn_with(
-        hinst: isize,
-        load_dir: PathBuf,
-        mode: ClaimMode,
-    ) -> Result<Self, SpawnError> {
+    pub fn spawn_with(load_dir: PathBuf, mode: ClaimMode) -> Result<Self, SpawnError> {
         let registry = GlobalLoggerRegistry::instance();
         let token = match mode {
             ClaimMode::Exclusive => match registry.try_claim(load_dir.clone()) {
@@ -141,8 +137,7 @@ impl ActorInstance {
         let (tx, rx) = mailbox();
         // VM を作る前に kick の送り先を渡す（5.5）。
         let sink = kick_sink_for(&tx);
-        match spawn_actor_thread_with(hinst, load_dir.clone(), rx, Some(sink), Some(token.clone()))
-        {
+        match spawn_actor_thread_with(load_dir.clone(), rx, Some(sink), Some(token.clone())) {
             Ok(thread) => Ok(Self {
                 tx,
                 thread: Some(thread),
@@ -310,7 +305,7 @@ mod tests {
     #[test]
     fn instance_sender_accepts_kick_while_running_not_after_stop() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let instance = ActorInstance::spawn(0, dir.path().to_path_buf()).expect("spawn");
+        let instance = ActorInstance::spawn(dir.path().to_path_buf()).expect("spawn");
         assert_eq!(instance.load_dir(), dir.path());
 
         assert!(

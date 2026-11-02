@@ -695,7 +695,7 @@ mod ssp_log_requests_tests {
     #[test]
     fn legacy_entry_ssp_log_requests() {
         let ghost = copy_fixture_to_temp("v3_probe");
-        let instance = ActorInstance::spawn(0, ghost.path().to_path_buf()).expect("spawn");
+        let instance = ActorInstance::spawn(ghost.path().to_path_buf()).expect("spawn");
         assert!(instance.loaded(), "v3_probe must load");
 
         for req in [on_initialize(), on_notify_user_info(), on_translate()] {

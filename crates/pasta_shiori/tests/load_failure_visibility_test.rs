@@ -176,7 +176,7 @@ fn load_failures_and_request_errors_are_visible_through_the_actor_boundary() {
     );
     run_case(
         "a: entry load failure",
-        spawn_actor(0, entry_broken.path().to_path_buf()),
+        spawn_actor(entry_broken.path().to_path_buf()),
         false,
         &[
             // フォルダがあるときの失敗の理由の形は変えない（ponytail-shiori 要件 2.6）。
@@ -192,7 +192,7 @@ fn load_failures_and_request_errors_are_visible_through_the_actor_boundary() {
     let main_broken = ghost_with_script("main.lua", "PASTA_E2E_MAIN_A PASTA_E2E_MAIN_B\n");
     run_case(
         "b: main load failure",
-        spawn_actor(0, main_broken.path().to_path_buf()),
+        spawn_actor(main_broken.path().to_path_buf()),
         false,
         &[
             "Load error: ",
@@ -220,7 +220,7 @@ return SHIORI
     );
     run_case(
         "c: multi-line request error",
-        spawn_actor(0, request_error.path().to_path_buf()),
+        spawn_actor(request_error.path().to_path_buf()),
         true,
         &["PASTA_E2E_MULTILINE_FIRST", "PASTA_E2E_MULTILINE_SECOND"],
     );

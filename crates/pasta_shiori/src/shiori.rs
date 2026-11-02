@@ -18,9 +18,6 @@ use tracing::{debug, error, info, trace, warn};
 /// (Stage 1.5). PastaShiori unregisters the logger on reload and drop.
 #[derive(Default)]
 pub struct PastaShiori {
-    /// Value passed to `SHIORI.load` as `hinst` (the FFI path always passes 0)
-    hinst: isize,
-
     /// Base directory for ghost scripts (master/ directory)
     load_dir: Option<PathBuf>,
 
@@ -78,7 +75,7 @@ impl Drop for PastaShiori {
 }
 
 impl PastaShiori {
-    pub fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool> {
+    pub fn load<S: AsRef<OsStr>>(&mut self, load_dir: S) -> MyResult<bool> {
         // Convert load_dir to PathBuf
         let load_dir_path: PathBuf = load_dir.as_ref().into();
 
@@ -89,9 +86,8 @@ impl PastaShiori {
             self.last_load_error = None;
         }
 
-        // Save hinst and load_dir（有無を確かめる前に覚える。ディレクトリが無いときも、
+        // Save load_dir（有無を確かめる前に覚える。ディレクトリが無いときも、
         // VM の片付けでそのディレクトリのログの登録・占有が外れるように）
-        self.hinst = hinst;
         self.load_dir = Some(load_dir_path.clone());
 
         // Validate load_dir exists
@@ -118,7 +114,6 @@ impl PastaShiori {
 
         info!(
             load_dir = %load_dir_path.display(),
-            hinst = hinst,
             "Starting PastaShiori load"
         );
 
@@ -138,7 +133,7 @@ impl PastaShiori {
                 self.last_load_error = None;
 
                 // Call SHIORI.load if available (using cached function)
-                if !self.call_lua_load(hinst, &load_dir_path) {
+                if !self.call_lua_load(&load_dir_path) {
                     return Ok(false);
                 }
 
@@ -253,10 +248,10 @@ impl PastaShiori {
         self.unload_fn = None;
     }
 
-    /// Call SHIORI.load function with hinst and load_dir using cached function.
+    /// Call SHIORI.load function with hinst (always 0) and load_dir using cached function.
     /// Returns true if successful or if function doesn't exist (skip).
     /// Returns false if function returns false or errors.
-    fn call_lua_load(&self, hinst: isize, load_dir: &Path) -> bool {
+    fn call_lua_load(&self, load_dir: &Path) -> bool {
         // Use cached load_fn directly
         let load_fn = match &self.load_fn {
             Some(f) => f,
@@ -266,9 +261,9 @@ impl PastaShiori {
             }
         };
 
-        // Call SHIORI.load(hinst, load_dir)
+        // Call SHIORI.load(hinst, load_dir)。SHIORI の load は hinst を渡さないので、作者への約束どおり 0 を渡す
         let load_dir_str = load_dir.to_string_lossy().to_string();
-        match load_fn.call::<bool>((hinst, load_dir_str)) {
+        match load_fn.call::<bool>((0, load_dir_str)) {
             Ok(true) => {
                 info!("SHIORI.load called successfully");
                 true

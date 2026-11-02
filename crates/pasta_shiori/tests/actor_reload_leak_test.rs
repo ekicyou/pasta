@@ -110,7 +110,7 @@ impl ReloadProbe {
 /// reload を 1 回（spawn→teardown）回し、teardown が clean（ack が届き異常が無い）だったかを返す。
 fn run_one_reload_cycle(load_dir: &Path, timeout: Duration) -> bool {
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(0, load_dir.to_path_buf(), rx, None, None)
+    let actor = spawn_actor_thread_with(load_dir.to_path_buf(), rx, None, None)
         .expect("actor thread must spawn");
     let report = teardown_via_sender(&tx, timeout);
     // ack の有無に関わらず手放す（join でハングさせない）。ack 済みならループは抜け済み。

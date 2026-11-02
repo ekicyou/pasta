@@ -85,8 +85,7 @@ fn stop_done_ack_drains_then_tears_down_cleanly() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     let (tx, rx) = mailbox();
-    let actor =
-        spawn_actor_thread_with(0, load_dir, rx, None, None).expect("actor thread must spawn");
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     // drain-before-stop: Stop の直前に GET を投入する。GET の応答は Stop より前に
@@ -125,8 +124,7 @@ fn second_teardown_after_done_is_safe_noop() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     let (tx, rx) = mailbox();
-    let actor =
-        spawn_actor_thread_with(0, load_dir, rx, None, None).expect("actor thread must spawn");
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     let first = teardown_via_sender(&tx, Duration::from_secs(10));

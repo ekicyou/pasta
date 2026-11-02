@@ -93,7 +93,7 @@ fn normalize_request(text: &str) -> String {
 fn drive_install(label: &str, base_dir: &Path) -> Vec<String> {
     copy_fixture_into("shiori_lifecycle", base_dir);
 
-    let loaded = spawn_actor(0, base_dir.to_path_buf());
+    let loaded = spawn_actor(base_dir.to_path_buf());
     assert!(
         loaded,
         "[{label}] 設置パスの形に依存せずロードは成功するべき（要件 1.2 / 2.2）\n  設置先: {}",

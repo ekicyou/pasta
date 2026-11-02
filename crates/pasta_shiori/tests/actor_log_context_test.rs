@@ -43,10 +43,10 @@ fn actor_thread_logs_reach_own_logger_with_two_loggers_registered() {
     let b = trace_ghost();
 
     let (tx_a, rx_a) = mailbox();
-    let actor_a = spawn_actor_thread_with(0, a.path().to_path_buf(), rx_a, None, None)
+    let actor_a = spawn_actor_thread_with(a.path().to_path_buf(), rx_a, None, None)
         .expect("actor thread must spawn");
     let (tx_b, rx_b) = mailbox();
-    let actor_b = spawn_actor_thread_with(0, b.path().to_path_buf(), rx_b, None, None)
+    let actor_b = spawn_actor_thread_with(b.path().to_path_buf(), rx_b, None, None)
         .expect("actor thread must spawn");
     assert!(actor_a.loaded() && actor_b.loaded());
 

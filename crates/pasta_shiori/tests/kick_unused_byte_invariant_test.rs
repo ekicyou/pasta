@@ -133,7 +133,7 @@ fn kick_unused_normal_responses_are_byte_invariant() {
     let temp = common::copy_sample_ghost_to_temp();
     let mut shiori = PastaShiori::default();
     let loaded = shiori
-        .load(1, temp.path().as_os_str())
+        .load(temp.path().as_os_str())
         .expect("load should not error");
     assert!(loaded, "load should return true");
 

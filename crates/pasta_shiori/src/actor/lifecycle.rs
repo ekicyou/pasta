@@ -39,18 +39,14 @@ static LEGACY: ArcSwapOption<ActorInstance> = ArcSwapOption::const_empty();
 ///
 /// 前の片付けが打ち切りに終わり（ack が来ずにスレッドを手放した）同じディレクトリを読み直すときは、
 /// 手放したスレッドの VM がまだ持つ占有を引き継ぐ（今の SSP の再読み込みを保つ・7.1・7.2）。
-pub fn spawn_actor(hinst: isize, load_dir: PathBuf) -> bool {
-    spawn_actor_with_teardown_timeout(hinst, load_dir, TEARDOWN_TIMEOUT)
+pub fn spawn_actor(load_dir: PathBuf) -> bool {
+    spawn_actor_with_teardown_timeout(load_dir, TEARDOWN_TIMEOUT)
 }
 
 /// [`spawn_actor`] の、前のインスタンスの片付けで ack を待つ上限を差し替える形
 /// （試験から短い値を注入する内部の口。本番の上限は [`TEARDOWN_TIMEOUT`] のまま）。
 #[doc(hidden)]
-pub fn spawn_actor_with_teardown_timeout(
-    hinst: isize,
-    load_dir: PathBuf,
-    teardown_timeout: Duration,
-) -> bool {
+pub fn spawn_actor_with_teardown_timeout(load_dir: PathBuf, teardown_timeout: Duration) -> bool {
     // 前のディレクトリは片付けの前に手元へ取る（新しいグローバルな状態は持たない）。
     let prev_dir = LEGACY.load().as_ref().map(|i| i.load_dir().to_path_buf());
     let report = teardown_slot(&LEGACY, teardown_timeout);
@@ -61,7 +57,7 @@ pub fn spawn_actor_with_teardown_timeout(
         ClaimMode::Exclusive
     };
 
-    let Ok(instance) = ActorInstance::spawn_with(hinst, load_dir, mode) else {
+    let Ok(instance) = ActorInstance::spawn_with(load_dir, mode) else {
         // 理由は ActorInstance::spawn_with がログに出している。
         return false;
     };
@@ -163,7 +159,7 @@ mod tests {
     #[test]
     fn teardown_real_instance_empties_slot() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let instance = ActorInstance::spawn(0, dir.path().to_path_buf()).expect("spawn");
+        let instance = ActorInstance::spawn(dir.path().to_path_buf()).expect("spawn");
         let slot = ArcSwapOption::from_pointee(instance);
 
         let report = teardown_slot(&slot, TEARDOWN_TIMEOUT);
@@ -178,7 +174,7 @@ mod tests {
     #[test]
     fn teardown_with_shared_reference_only_requests_stop() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let instance = ActorInstance::spawn(0, dir.path().to_path_buf()).expect("spawn");
+        let instance = ActorInstance::spawn(dir.path().to_path_buf()).expect("spawn");
         let slot = ArcSwapOption::from_pointee(instance);
         let in_flight = slot.load_full().expect("instance");
 

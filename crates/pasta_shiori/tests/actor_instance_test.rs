@@ -46,7 +46,7 @@ fn wait_log_contains(ghost: &Path, needle: &str, deadline: Duration) -> String {
 #[test]
 fn shutdown_join_after_ack_is_acked_and_joined() {
     let ghost = copy_fixture_to_temp("v3_probe");
-    let instance = ActorInstance::spawn(0, ghost.path().to_path_buf()).expect("spawn");
+    let instance = ActorInstance::spawn(ghost.path().to_path_buf()).expect("spawn");
     assert!(instance.loaded(), "v3_probe must load");
 
     instance.notify(&notify("OnSomething"));
@@ -73,7 +73,7 @@ fn shutdown_join_after_ack_is_acked_and_joined() {
 #[test]
 fn shutdown_times_out_on_spinning_actor_and_warns_abandon() {
     let ghost = copy_fixture_to_temp("v3_probe");
-    let instance = ActorInstance::spawn(0, ghost.path().to_path_buf()).expect("spawn");
+    let instance = ActorInstance::spawn(ghost.path().to_path_buf()).expect("spawn");
     assert!(instance.loaded(), "v3_probe must load");
 
     instance.notify(&notify("OnProbeSpin"));
@@ -103,10 +103,10 @@ fn shutdown_times_out_on_spinning_actor_and_warns_abandon() {
 #[test]
 fn second_instance_on_same_dir_is_dir_in_use_and_logged() {
     let ghost = copy_fixture_to_temp("v3_probe");
-    let first = ActorInstance::spawn(0, ghost.path().to_path_buf()).expect("spawn");
+    let first = ActorInstance::spawn(ghost.path().to_path_buf()).expect("spawn");
     assert!(first.loaded(), "v3_probe must load");
 
-    let second = ActorInstance::spawn(0, ghost.path().to_path_buf());
+    let second = ActorInstance::spawn(ghost.path().to_path_buf());
     assert!(
         matches!(second, Err(SpawnError::DirInUse)),
         "second instance on the same dir must be refused: {:?}",
@@ -127,7 +127,7 @@ fn second_instance_on_same_dir_is_dir_in_use_and_logged() {
     let report = first.shutdown();
     assert!(report.acked && report.joined, "{report:?}");
     // 片付けの後は占有が外れ、同じディレクトリをまた起こせる。
-    let again = ActorInstance::spawn(0, ghost.path().to_path_buf()).expect("respawn after unload");
+    let again = ActorInstance::spawn(ghost.path().to_path_buf()).expect("respawn after unload");
     assert!(again.shutdown().joined);
 }
 
@@ -140,12 +140,12 @@ fn legacy_reload_after_timed_out_teardown_takes_over_claim() {
     let dir = ghost.path().to_path_buf();
     let registry = GlobalLoggerRegistry::instance();
 
-    assert!(lifecycle::spawn_actor(0, dir.clone()), "v3_probe must load");
+    assert!(lifecycle::spawn_actor(dir.clone()), "v3_probe must load");
     lifecycle::marshal_request(&notify("OnProbeSpin"));
 
     // 前の片付けは 100 ミリ秒で打ち切られ、手放した古いスレッドの VM がまだ占有を持つ。
     assert!(
-        lifecycle::spawn_actor_with_teardown_timeout(0, dir.clone(), Duration::from_millis(100)),
+        lifecycle::spawn_actor_with_teardown_timeout(dir.clone(), Duration::from_millis(100)),
         "reloading the same dir right after a timed-out teardown must succeed"
     );
     let log = wait_log_contains(ghost.path(), "claim taken over", Duration::from_secs(10));

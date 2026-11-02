@@ -40,7 +40,7 @@ fn fire_with_log(event_id: &str) -> (String, String) {
         let mut shiori = PastaShiori::default();
         assert!(
             shiori
-                .load(0, temp.path().as_os_str())
+                .load(temp.path().as_os_str())
                 .expect("SHIORI load should not error"),
             "SHIORI load should return true"
         );

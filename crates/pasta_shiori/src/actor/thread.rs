@@ -104,7 +104,7 @@ impl ActorThread {
 /// 駆動する（仕様 `shiori4-v3-portable` 2.3・2.4）。
 ///
 /// # 引数
-/// - `hinst` / `load_dir`: VM を構築する [`PastaShiori::load`] へ渡す（どちらも `Send`）。
+/// - `load_dir`: VM を構築する [`PastaShiori::load`] へ渡す（`Send`）。
 ///   VM 本体（`!Send`）はこのスレッド上で構築されるため越境しない。
 /// - `rx`: mailbox の consumer 側 [`Receiver`]（単一 consumer 不変条件）。
 /// - `kick_sink`: VM（[`PastaShiori::with_kick_sink`]）へ渡す kick の送り先。
@@ -122,7 +122,6 @@ impl ActorThread {
 /// ときは `io::ErrorKind::Other` の誤りを返す（パニックしない・2.4）。後者ではスレッドを
 /// join してから返し、資源を残さない。
 pub fn spawn_actor_thread_with(
-    hinst: isize,
     load_dir: PathBuf,
     rx: Receiver<ActorMsg>,
     kick_sink: Option<KickSink>,
@@ -144,9 +143,7 @@ pub fn spawn_actor_thread_with(
             // (1) VM をこのスレッドで構築・pin（!Send ゆえ越境不可）。
             let mut shiori = PastaShiori::with_kick_sink(kick_sink);
             shiori.set_claim(claim);
-            let loaded = shiori
-                .load(hinst, load_dir.as_os_str())
-                .unwrap_or(false);
+            let loaded = shiori.load(load_dir.as_os_str()).unwrap_or(false);
 
             // 観測ログ点（R10.4・無効時ゼロコスト）: アクタースレッド起動・VM pin 完了。
             tracing::debug!(seam = "actor.spawn", loaded, "actor thread spawned; VM pinned on this thread");

@@ -60,7 +60,7 @@ impl ShioriTestEnv {
         let temp_dir = copy_fixture_to_temp(fixture);
         let mut shiori = PastaShiori::default();
         let loaded = shiori
-            .load(0, temp_dir.path().as_os_str())
+            .load(temp_dir.path().as_os_str())
             .expect("SHIORI load should not error");
         assert!(loaded, "SHIORI load should return true");
 

@@ -132,7 +132,7 @@ fn pasta_shiori_kick_installs_pending_flags_last_wins() {
     let (load_dir, _temp) = build_kick_dir();
     let mut shiori = PastaShiori::default();
     assert!(
-        shiori.load(0, load_dir.as_os_str()).unwrap(),
+        shiori.load(load_dir.as_os_str()).unwrap(),
         "ghost VM must load"
     );
 
@@ -184,7 +184,7 @@ return SHIORI
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, load_dir.as_os_str()).unwrap());
+    assert!(shiori.load(load_dir.as_os_str()).unwrap());
 
     // SHIORI.kick 不在でも panic せず戻る（best-effort・swallow）。
     shiori.kick("intro");
@@ -198,8 +198,7 @@ fn actor_kick_arm_installs_pending_last_wins() {
     let (load_dir, _temp) = build_kick_dir();
 
     let (tx, rx) = mailbox();
-    let actor =
-        spawn_actor_thread_with(0, load_dir, rx, None, None).expect("actor thread must spawn");
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     // 連続 Kick（応答経路なし・即投入）。同一 FIFO 上で投入順に処理される。
@@ -249,8 +248,7 @@ return SHIORI
     .unwrap();
 
     let (tx, rx) = mailbox();
-    let actor =
-        spawn_actor_thread_with(0, load_dir, rx, None, None).expect("actor thread must spawn");
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded());
 
     let scene = "intro".to_string();

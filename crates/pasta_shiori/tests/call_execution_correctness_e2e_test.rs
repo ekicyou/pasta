@@ -40,7 +40,7 @@ fn load_and_request(dir: &std::path::Path, requests: &[&str]) -> Vec<String> {
     let mut shiori = PastaShiori::default();
     assert!(
         shiori
-            .load(0, dir.as_os_str())
+            .load(dir.as_os_str())
             .expect("SHIORI load should not error"),
         "SHIORI load should return true"
     );

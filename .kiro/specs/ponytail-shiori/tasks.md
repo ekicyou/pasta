@@ -138,7 +138,7 @@
   - 要求の処理でランタイムの有無を 2 度確かめる所を、確かめたランタイムを渡す形にし、unload の側の要らない確認を外す
   - トレイトを使っていたテストが `use` を外しただけの形で通る
   - _Requirements: 7.1, 7.2, 7.8_
-- [ ] 9.3 いつも 0 の hinst をアクターの道から消す
+- [x] 9.3 いつも 0 の hinst をアクターの道から消す
   - アクターの起動から `PastaShiori` の load まで（両方の入口・置き場・インスタンス・スレッド）の hinst の引数と欄を消し、Lua の `SHIORI.load` には定数の 0 を渡す
   - hinst を確かめるテストは、Lua に 0 が渡ることを確かめる形に直す
   - 全体のテストが通る
@@ -171,6 +171,5 @@
 ## Implementation Notes
 
 - 10.1：book/src/internals/shiori.md に消した名前が残る（determine_method・default_204_response・ReloadProbe・Reply::Value・ready の組 (ThreadId, bool, Option<SocketAddr>)・JoinPolicy など）。章に残さないこと
-- 9.3：scene_kick_*_e2e_test.rs 4 本は spawn_actor_thread_with(0, …) で hinst を渡している。hinst を消すときに直す
 - 10.1：book/src/internals/logging-encoding.md 73 行目が pasta_shiori の変換を「enc.rs と windows_api.rs」と書いている。enc.rs は 8.4 で消したので一緒に直す
 - 10.1：book/src/internals/shiori.md 90 行目が ActorMsg を #[non_exhaustive] と書いている（9.1 で消した）

@@ -183,7 +183,7 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
 fn start_actor(load_dir: PathBuf) -> (Sender<ActorMsg>, KickSink, ActorThread) {
     let (tx, rx) = mailbox();
     let sink = kick_sink_for(&tx);
-    let thread = spawn_actor_thread_with(0, load_dir, rx, Some(sink.clone()), None)
+    let thread = spawn_actor_thread_with(load_dir, rx, Some(sink.clone()), None)
         .expect("actor thread must spawn");
     assert!(
         thread.loaded(),

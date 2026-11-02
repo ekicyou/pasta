@@ -28,7 +28,7 @@ fn load(extra_toml: &str) -> (PastaShiori, TempDir) {
         std::fs::write(&toml, text).unwrap();
     }
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
     (shiori, temp)
 }
 

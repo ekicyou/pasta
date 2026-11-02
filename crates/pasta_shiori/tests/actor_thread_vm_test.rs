@@ -115,8 +115,7 @@ fn actor_thread_pins_vm_and_continues_coroutine_across_messages() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     let (tx, rx) = mailbox();
-    let actor =
-        spawn_actor_thread_with(0, load_dir, rx, None, None).expect("actor thread must spawn");
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
 
     // (a) VM がアクタースレッドで読み込まれたこと。
     assert!(actor.loaded(), "actor thread must load the ghost VM");
@@ -159,8 +158,7 @@ fn actor_thread_processes_notify_then_get_in_fifo() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     let (tx, rx) = mailbox();
-    let actor =
-        spawn_actor_thread_with(0, load_dir, rx, None, None).expect("actor thread must spawn");
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     // NOTIFY（応答経路なし・即投入）。アクターは VM 上で処理する。
@@ -197,7 +195,7 @@ fn actor_thread_with_returns_ready_actor_as_ok() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(0, load_dir, rx, None, None)
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None)
         .expect("spawning the actor thread must succeed");
     assert!(
         actor.loaded(),

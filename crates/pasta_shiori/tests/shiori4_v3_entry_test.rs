@@ -85,7 +85,7 @@ fn v3_get_matches_legacy_bytes_and_returns_start_line_code() {
     let ghost = copy_fixture_to_temp("v3_probe");
     let dir = ghost.path().to_path_buf();
 
-    assert!(lifecycle::spawn_actor(0, dir.clone()), "v3_probe must load");
+    assert!(lifecycle::spawn_actor(dir.clone()), "v3_probe must load");
     let legacy = lifecycle::marshal_request(&get("OnProbeCount"));
     assert!(lifecycle::teardown_actor().acked);
 
@@ -251,7 +251,7 @@ fn assert_one_unreadable_warn(ghost: &Path, entry: &str) {
 fn unreadable_request_warns_once_on_both_entries() {
     // 旧来の意味（ActorInstance::request。旧来の窓口の置き場は使わない）
     let ghost = copy_fixture_to_temp("v3_probe");
-    let instance = ActorInstance::spawn(0, ghost.path().to_path_buf()).expect("spawn");
+    let instance = ActorInstance::spawn(ghost.path().to_path_buf()).expect("spawn");
     assert!(instance.loaded(), "v3_probe must load");
     instance.request(SHIORI2);
     let body = instance.request(UNREADABLE);

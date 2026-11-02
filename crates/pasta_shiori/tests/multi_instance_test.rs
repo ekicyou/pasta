@@ -247,7 +247,7 @@ fn legacy_and_v3_side_by_side_unload_one_keeps_the_other() {
     let legacy_ghost = ghost("");
     let v3_ghost = ghost("");
 
-    assert!(lifecycle::spawn_actor(0, legacy_ghost.path().to_path_buf()));
+    assert!(lifecycle::spawn_actor(legacy_ghost.path().to_path_buf()));
     let mut v3 = load(v3_ghost.path()).expect("v3 beside legacy");
     lifecycle::marshal_request(&get("印甲"));
     request(&mut v3, &get("印乙"));
@@ -299,7 +299,7 @@ fn abandoned_actor_thread_exits() {
     let _serial = serial();
     let before = actor_thread_ids();
     let temp = copy_fixture_to_temp("v3_probe");
-    let instance = ActorInstance::spawn(0, temp.path().to_path_buf()).expect("spawn");
+    let instance = ActorInstance::spawn(temp.path().to_path_buf()).expect("spawn");
     let ours: Vec<u32> = actor_thread_ids()
         .into_iter()
         .filter(|id| !before.contains(id))
