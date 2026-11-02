@@ -102,3 +102,9 @@
 - **要件定義のモデル**: Opus。
 - **分割の案**: 不要。
 - **見つけた穴・古くなった記述**: `context.rs` 117 行の説明「Used by PastaLoader to combine contexts from multiple files.」は古い（ローダはもう呼ばない）。Adjacent の「`ponytail-lua-loader` と `lib.rs` の再輸出を共有する」は、あちらが入ったので済んだ。
+
+## 申し送り（2026-11-02、`ponytail-dsl-parser` の要件より）
+
+- **`＄２５５` で番号があふれる（バグ）**: `code_gen/element_gen.rs` 40 行付近の `format!("args[{}]", index + 1)` は、`index` が `u8` なので、`＄２５５` で debug はパニック、release は `args[0]`（常に値なし）になる。マニュアル（`grammar/variables.md` 93 行）は 0〜255 を使えると書いている。`u32::from(*index) + 1` などで直る。読んで確かめた（実行はしていない）。`ponytail-dsl-parser` は `＄２５６` 以上を構文の誤りにする（2026-11-02 確定）ので、届く番号は 0〜255 のまま。
+- **大きな数の `!select`（小）**: `code_gen/scope_gen.rs` 424〜430 行は `!select` の小数の引数を `(*f as i64)` で整数にする。`ponytail-dsl-parser` が「i64 に収まらない整数は、いちばん近い小数」にする（2026-11-02 確定）と、`!select(10000000000000000000)` が `9223372036854775807` に飽和して出る。害は小さい。
+- **span の値は変わらない**: `ponytail-dsl-parser` は解析を速くするが、AST の span の値は今と同じに保つ（要件 1.3）。ソースの対応表は直さずに済む。
