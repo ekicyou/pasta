@@ -163,3 +163,97 @@
 9. **`merge_from` の消し方の確かめの時期**（要件 10）。推奨：実装の最後（PR を作る直前）に、main に `TranspileContext::merge_from` があるかを見て決める。どちらの場合も `context.rs` には触らない。あちらが先に入っていれば、この spec が `pasta_core` の 2 つとテストとマニュアルの 1 文を消す。
 
 **確定（2026-11-02 の要件ディスカッション）**: 1〜8 は推奨案のとおりに確定した（開発者「承認」）。9 は設計フェーズで扱う（PR を作る直前に、main に `TranspileContext::merge_from` が残っているかを見て決める）。
+
+---
+
+# 設計フェーズの調査と決定（2026-11-02・`/kiro-spec-design -y`）
+
+## Summary（設計）
+
+- **Discovery Scope**: Extension（light discovery）。新しい依存は無く、外部の文書の調べは要らない。確かめたのはコードと、cargo の置き場の `fast_radix_trie-1.2.0` のソースだけである。
+- **使ったスキルと規則**: `kiro-spec-design`（`rules/design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）、`.kiro/settings/templates/specs/design.md`・`research.md`、steering の `product.md`・`tech.md`・`structure.md`・`roadmap.md`。開発者の方針（削除を優先・層を足さない・特性化テストを先に・1 抽出＝1 検証＝1 コミット・x86 と x64 の両方で走らせる）に沿った。
+- **Key Findings**:
+  - `RadixMap<V>` は `GenericRadixMap<Vec<u8>, V>`（`map.rs:8`）で、`iter_prefix` は「sorted by key」（`map.rs:553`）。キーはバイト列なので、順はバイト列の辞書順である。`String` の `Ord` も UTF-8 のバイト列の辞書順なので、`BTreeMap<String, _>` の範囲は同じ順になる。
+  - 前方一致は `range::<str, _>((Bound::Included(p), Bound::Unbounded)).take_while(|(k, _)| k.starts_with(p))` で O(log n + k) になる。`p` で始まる文字列は `p` 以上の並びの先頭に続けて並ぶ（`p` 以上で `p` で始まらない文字列は、`p` の途中の位置で `p` より大きい文字を持つので、`p` で始まるどの文字列よりも大きい）。
+  - 範囲の書き方は、`RangeFrom<&str>` ではなく `Bound` の組を使う（`(Bound<&T>, Bound<&T>)` は `T: ?Sized` で `RangeBounds<T>` を実装する。`str` で引くにはこの形が確かである）。手元のツールチェーン（rustc 1.99.1）には標準ライブラリのソースが無く、`RangeFrom<&str>` が通るかは確かめていない。
+
+## Research Log（設計）
+
+### 行番号と呼び手の数の確かめ（ワークツリー HEAD `208e5101`）
+
+- `scene_table.rs`：`new` 74〜83・`from_scene_registry` 95〜144・`resolve_scene_id` 173〜213・`select_from_cache` 375〜422（`ok_or(RandomSelectionFailed)` 412・417、`history` の書き込み 391・400・419）・`labels_iter` 429〜432・`set_shuffle_enabled` 434〜437・`find_scene` 505〜522。ギャップ分析と一致した。
+- `word_table.rs`：`WordCacheKey` 12〜29・`new` 53〜63・`_filters` 191・`set_shuffle_enabled` 236〜239・`entries`・`clear_cache` 241〜249。
+- `scene_registry.rs`：`fn_path` 22〜24（書き込み 79・125・165・184）・`get_scene` 207〜213・`merge_from` 271〜289。`word_registry.rs`：`sanitize_name` 99〜102・`merge_from` 104〜114。
+- `error.rs`：`SceneTableResult` 11・`RandomSelectionFailed` 31〜33・`DuplicateSceneName` 35〜37・`DuplicateScenePath` 39〜41・`NoMoreScenes` 43〜48・`WordTableResult` 52。消した種類の文言のテスト 145〜162・178〜183。
+- `pasta_lua/src/search/context.rs`：`new` 45〜50・`with_aliases` 54〜73（`?` は 62）・`NoMoreScenes` の腕 160・182・224・`search_word` の呼び出し 303。テストの `SearchContext::new`・`with_aliases` は 12 か所（462・562・613・674・739・771・831・840・856・877・929・967）。`search/mod.rs:50`・`search/error.rs:13-15`。
+- テストの外の呼び手：`tests/common/e2e_helpers.rs:69`・`:130`（`.expect`）、`tests/lua_unittest_runner.rs:55`（`.expect`）、`tests/runtime/scene_identity_format_test.rs:180`・`tests/search/scene_search_test.rs:487`（`.unwrap()`）。`pasta_check/src/validate/scenes.rs:104-106`。
+- `pasta_core` のテストの道具：`resolve_scene_id(` は `candidate_tests.rs` 11・`resolve_filter_tests.rs` 8、`SceneTable::new` は 9＋3、`set_shuffle_enabled` は 5＋6＋13（`word_table_test.rs`）＝24、`search_word(` は `word_table_test.rs` 27、構造体の式で表を組むテストは `candidate_tests.rs` 5・`resolve_filter_tests.rs` 1。
+- `set_shuffle_enabled(false)` を呼ぶテストのモックは、どれも並びを変えない列（`[0]`・`[0,1,2,3]`・`[0,1,2,3,4]`）だった。`MockRandomSelector` は先頭から有効な位置を置き、残りを元の順に並べる（`random.rs:80-97`）ので、`[0]` も `[]` も並びを変えない。行を消して `vec![]` にしても順は変わらない。
+- `pasta_core` の外で、消す API（`fn_path`・`WordCacheKey`・`set_shuffle_enabled`・`labels_iter`・`resolve_scene_id`・`SceneTable::new`・`WordTable::new`・`WordDefRegistry::sanitize_name`・`SceneRegistry::get_scene`）を使う所は無い。`SceneEntry` を構造体の式で作る所も `pasta_core` の外に無い。`pasta_lua/src/transpiler_tests.rs:170` は `SceneEntry.id` を読む（残すので影響しない）。
+- `TranspileContext::merge_from` は、今のワークツリー（main と同じ）の `pasta_lua/src/context.rs:120` にまだある。
+
+### 文書に残る名前
+
+- 要件 11 の 3 つ（`pasta_core/README.md`・`tech.md`・`registry-search.md`）のほかに、`crates/pasta_dsl/README.md:73`（「レジストリ関連（fast_radix_trie, rand）…への依存は一切ありません」）と `SOUL.md:434`（「Radix Trie等の高効率データ構造」）が見つかった。
+  - `pasta_dsl/README.md` は要件 7.7（README 全般）にかかるが、要件 11 の一覧と roadmap の持ち場の表に無い。設計は【前提】で「（rand）」に直し、設計ディスカッションで確かめる（OPEN QUESTION 1）。
+  - `SOUL.md` は目指す姿の例で、今の実装の説明ではない。要件 7.7 の対象（コードの説明・README・`tech.md`・マニュアル）に入らないので触らない。
+- `structure.md` の `error.rs # SceneTableError, WordTableError` と公開 API の一覧は、整理の後も正しい。直さない。
+
+## Architecture Pattern Evaluation（設計）
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A（採る） | 既存のファイルの中で削り、索引の入れ物だけ替える | 差分が最小。新しいファイルも型も無い | テストの移し替えが数十か所に散る（機械的） | C の順で進める |
+| B | 前方一致の索引を共通の型にまとめる | 規則を 1 か所で確かめられる | 新しい抽象を足す。2 つの表の ID の型と `:` の扱いが少しずつ違い、得が小さい | 要件ディスカッションで採らないと確定 |
+| A の中の小さな共通関数 | 前方一致の 1 行を `registry/mod.rs` などの関数にする | 4 か所の写しが 1 か所になる | 共通の部品が 1 つ増え、`word_table` が別のモジュールに頼る | 採らない。U1・U2 が 4 か所の書き落としを落とす |
+
+## Design Decisions（設計）
+
+### Decision: 候補の順を固めるテスト（持ち越し (a)）
+
+- **Context**: 入れ物を替えると、キーをまたぐ候補の順が変わる危険がある。今は順を固めるテストが無い（`candidate_fn_names` は並べ替えてから比べる）。
+- **Selected Approach**: シーン（`scene_table_candidate_tests.rs`）と単語（`tests/word_table_test.rs`）に 1 本ずつ、最初のコミットで置く。登録はわざと辞書順でない順にし、ASCII と日本語の混在（`挨拶1`・`挨拶A`・`Zebra`・`0番`）、接頭辞の組（`挨拶`・`挨拶_夜`）、同じキーに複数の ID（`挨拶` 2 つ）、`:` で始まるキー（ローカル）、範囲の後ろのキー（`雑談`）を入れる。順のまま比べ、指定列の位置で選ぶ確かめも 1 つずつ足す。
+- **Rationale**: 今の `RadixMap` で通ることを確かめてから替えれば、替えたコミットで落ちたときにすぐ分かる。`雑談` は `take_while` の書き落としを落とす。
+- **Follow-up**: 実装の最初のタスクで、今の `RadixMap` で通ることを確かめる。期待の並びは、キーのバイト列（`1`=0x31・`A`=0x41・`_`=0x5F・`あ`=E3・`挨`=E6・`雑`=E9）から作った。
+
+### Decision: `select_from_cache` の返し方（持ち越し (b)）
+
+- **Context**: 届かない `RandomSelectionFailed` を返す 2 つの `ok_or` を消す（要件 4.3）。
+- **Alternatives**: 1) `entry(..).or_insert_with(..)` の `&mut` をそのまま使い、`SceneId` を返す。2) 今の 3 段（作る・戻す・`get_mut`）を残し、`expect` にする。
+- **Selected Approach**: 1。欄 `random_selector` を直に使えば、`cache` の借用と分かれる（今の閉包も同じ形で通っている）。候補の位置は添字で読み、不変条件（同じキーの候補の数は変わらない）をコードに 1 行で書く。
+- **Rationale**: `get_mut` の引き直しと `SceneCacheKey` の `Clone` が要らなくなり、行が減る。
+
+### Decision: 手で組むテストの表（持ち越し (c)）
+
+- **Context**: `SceneTable::new` を消すと、空の表に手で足すテスト 12 か所と、構造体の式で組む 6 か所の形を決める必要がある。
+- **Alternatives**: 1) 中の欄を直に組む形を残し、入れ物の型だけ合わせる。空の表は `from_scene_registry(SceneRegistry::new(), ..)` で作る。2) すべて `from_scene_registry` で作る形に寄せる。
+- **Selected Approach**: 1。
+- **Rationale**: 差分が最小で、テストの意図（索引の中身そのもの）が変わらない。`candidate_tests.rs:688` は、索引の中の ID が昇順でない表（`[2, 0, 1]`）を使う。登録から作ると、同じキーの中の ID はいつも昇順になり、この表を作れない。
+
+### Decision: `merge_from` の判定の時期（持ち越し (d)）
+
+- **Selected Approach**: PR を作る直前に `git fetch origin main` → `git grep -n "pub fn merge_from" origin/main -- crates/pasta_lua/src/context.rs`。あれば残し、無ければ `main` を取り込んで `Cargo.lock` を作り直したうえで、2 つの `merge_from` とテスト 5 つとマニュアルの一文を消す 1 コミットを足す。どちらでも `context.rs` は触らない。
+
+### Decision: 前方一致は 4 か所にそのまま書く
+
+- **Context**: シーンの大域・ローカル、単語の大域・ローカルの 4 か所が、同じ範囲の書き方になる。
+- **Selected Approach**: 共通の関数を作らず、各所に 1 行で書く。
+- **Rationale**: 開発者の方針（層を足さない）と、ギャップ分析で Option B を退けた理由に合わせる。書き落としの危険は U1・U2 が落とす。
+
+## Synthesis（設計）
+
+- **Generalization**: 要件 1〜6 は、どれも「本番で使わない面を消す」の同じ形である。共通の仕組みは作らず、移行の順序（Migration Strategy）を 1 本の列にした。
+- **Build vs Adopt**: 前方一致の索引は、標準の `BTreeMap` を採る（新しい依存を足さず、外す）。`scene_alias.rs` がすでに使っている。
+- **Simplification**: `select_from_cache` の 3 段を 1 段に、`SceneCacheKey` の `Clone` を不要に、2 つの表から切り替えの欄を外す。新しい部品は 0。
+
+## Risks & Mitigations（設計）
+
+- 入れ物の差し替えで候補の順が変わる — U1・U2 を最初に置き、差し替えのコミットで変えずに通す。
+- テストの移し替えで観点を落とす — 観点ごとの移し先を設計の Testing Strategy に列挙した。
+- `Cargo.lock` が同じウェーブで衝突する — 後から入る側が作り直す（要件 10.5）。
+- 0.5.0 の検索の spec が古い索引の形を前提にする — Revalidation Triggers に書いた。`scene-count` の brief はすでに `BTreeMap` を前提にしている。
+
+## References（設計）
+
+- `C:\rust\cargo\registry\src\index.crates.io-1949cf8c6b5b557f\fast_radix_trie-1.2.0\src\map.rs`（8 行の `RadixMap` の定義・553 行の `iter_prefix` の説明）
+- Rust 標準ライブラリ `BTreeMap::range`・`str` の `Ord`（バイト列の辞書順）

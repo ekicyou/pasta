@@ -1,16 +1,16 @@
 {
   "feature_name": "ponytail-core-registry",
   "created_at": "2026-11-02T12:59:04Z",
-  "updated_at": "2026-11-02T13:01:38Z",
+  "updated_at": "2026-11-02T13:23:31Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {
