@@ -68,11 +68,6 @@ describe("WORD - create_local / create_word エイリアス", function()
         expect(STORE.local_words["spec346_sceneB"]["天気"][1][1]):toBe("雨")
     end)
 
-    test("get_local_words は登録済みシーンの辞書を返す", function()
-        WORD.create_local("spec346_sceneC", "場所"):entry("東京")
-        expect(WORD.get_local_words("spec346_sceneC")):toBe(STORE.local_words["spec346_sceneC"])
-    end)
-
     test("create_word は create_global の別名としてグローバル辞書へ登録する", function()
         WORD.create_word("spec346_alias"):entry("値")
         expect(STORE.global_words["spec346_alias"][1][1]):toBe("値")

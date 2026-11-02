@@ -360,9 +360,13 @@ describe("find_act_handler - nil return", function()
 end)
 
 -- ============================================================================
--- find_handler が find_act_handler への thin wrapper であること
+-- find_handler が find_act_handler と同じ関数であること
 -- ============================================================================
-describe("ACT_IMPL.find_handler (thin wrapper)", function()
+describe("ACT_IMPL.find_handler（find_act_handler と同じ関数）", function()
+    test("find_handler は find_act_handler と同じ関数", function()
+        expect(ACT.IMPL.find_handler):toBe(ACT.IMPL.find_act_handler)
+    end)
+
     test("find_handler('scene', key) が find_act_handler('scene', key) と同じ結果を返す", function()
         local act = ACT.new({})
         local handler = function() return "via_find_handler" end

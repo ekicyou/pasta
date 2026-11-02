@@ -14,7 +14,6 @@
 --- pasta.shiori.event（EVENT）は読み込み時にこのモジュールを require するため、
 --- こちらからは関数内で呼び出し時にだけ require する（読み込み時に require すると循環する）。
 
-local STORE = require("pasta.store")
 local log = require("@pasta_log")
 local RES = require("pasta.shiori.res")
 -- STOP は読み込み時に FAILURE・RES だけを require する（act・store は呼んだ時点）ので循環しない
@@ -70,7 +69,6 @@ function CALLBACK.consume_staged(co, act)
         timeout_at = staged.timeout_at,
         on_timeout = staged.on_timeout,
     }
-    STORE.co_callback = co
     return true
 end
 
@@ -115,7 +113,7 @@ function CALLBACK.try_route(req)
     -- 通常のイベントと同じ再開の手順（予約の消費・継続の更新を含む）で再開する
     -- EVENT は呼び出し時に読み込む（読み込み時に require すると循環する）
     local EVENT = require("pasta.shiori.event")
-    local ok, value = EVENT.drive(entry.co, entry.act, refs)
+    local ok, value = EVENT.drive(entry.co, entry.act, refs, nil, req)
     if not ok then
         error(value)
     end
@@ -166,8 +164,9 @@ end
 --- 待機 1 つをタイムアウトとして EVENT.drive で再開し、応答の候補を返す
 --- @param event_id string
 --- @param entry table pending から外した待機
+--- @param req table|nil 掃引した要求（再開したシーンの次の期限の数え始め）
 --- @return string|nil candidate 出力なら 200、エラーなら表記付きの 200（出さない設定では理由付きは 500・静かなものは nil）、それ以外は nil
-local function time_out(event_id, entry)
+local function time_out(event_id, entry, req)
     local reason = nil
     if type(entry.on_timeout) == "string" then
         reason = entry.on_timeout
@@ -175,7 +174,7 @@ local function time_out(event_id, entry)
     end
     -- EVENT は呼び出し時に読み込む（読み込み時に require すると循環する）
     local EVENT = require("pasta.shiori.event")
-    local ok, value = EVENT.drive(entry.co, entry.act, nil, reason)
+    local ok, value = EVENT.drive(entry.co, entry.act, nil, reason, req)
     -- 成否にかかわらず控えを取り出す（同じ要求の後の止まるエラーに古い控えを混ぜない）
     local hold = STOP.take()
     if not ok then
@@ -205,12 +204,13 @@ end
 --- 集める → 外す → 番号順に並べる → 順に EVENT.drive で再開する。
 --- 最初の候補を応答に採用し、2 番目以降は警告ログを出して捨てる。途中のエラーでも残りを続ける。
 --- @param now number 現在時刻（CLOCK.steady のなめらかな時計。req.date が無ければ os.time()）
+--- @param req table|nil 掃引した要求（省略可）。再開したシーンが続けて呼ぶ get_property の期限の数え始めになる
 --- @return string|nil response その回の応答（200 または 500 の全文）、応答が生まれなければ nil
-function CALLBACK.sweep(now)
+function CALLBACK.sweep(now, req)
     local response = nil
     local event_ids, entries = take_expired(now)
     for _, event_id in ipairs(event_ids) do
-        local candidate = time_out(event_id, entries[event_id])
+        local candidate = time_out(event_id, entries[event_id], req)
         if candidate then
             if response == nil then
                 response = candidate
@@ -227,7 +227,6 @@ function CALLBACK.reset()
     _next_id = 0
     _staged = nil
     CALLBACK.pending = {}
-    STORE.co_callback = nil
 end
 
 return CALLBACK

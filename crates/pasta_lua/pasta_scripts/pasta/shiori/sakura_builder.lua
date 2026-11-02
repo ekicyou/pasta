@@ -8,7 +8,7 @@ local BUILDER = {}
 
 local SAKURA_SCRIPT = require "@pasta_sakura_script"
 local log = require "@pasta_log"
-local buf = require("pasta.buf")
+local buf = require("string.buffer")
 local APPEARANCE = require("pasta.shiori.appearance")
 local STYLE = require("pasta.shiori.actor_style")
 local FAILURE = require("pasta.failure")
@@ -62,7 +62,7 @@ end
 --- スポット解決（未設定→0＋警告。未登録アクターは目印で報告済みなので警告しない）・`\p[spot]` 出力・復旧タグ出力・装いの出し入れのタグ出力のみを行い、
 --- 段落区切り改行の判定・出力・保留（pending）はすべて呼び出し側（BUILDER.build ループ）が担う。
 --- 復旧タグは talk 経路を通らないため has-text・pending に影響しない。
---- @param buffer table 出力バッファ（pasta.buf 互換）
+--- @param buffer table 出力バッファ（string.buffer）
 --- @param actor_spots table<string, integer> アクターごとのスポット位置マップ
 --- @param actor table 切り替え先アクター（非nil保証は呼び出し元）
 --- @param appearance table 外見状態（直接変更される）
@@ -240,7 +240,7 @@ end
 --- `\` を 1 つ足してエスケープの `\\` にしてから足す（片の頭のタグが前の `\` とつながって `\\` に化けるのを防ぐ）。
 --- put_raw は作者が書いた片（作者が書いた頭のままの台詞・raw_script）を、守らずにそのまま足す。
 --- 空の片は lone を変えない
---- @param inner table 出力バッファ（pasta.buf 互換）
+--- @param inner table 出力バッファ（string.buffer）
 --- @return table
 local function tracking_buffer(inner)
     local b = { lone = false }
@@ -330,7 +330,7 @@ local function head_written_by_author(inner, s)
 end
 
 --- actorグループ内の単一トークンをさくらスクリプトへ変換して出力し、外見状態に観測させる
---- @param buffer table 出力バッファ（pasta.buf 互換）
+--- @param buffer table 出力バッファ（string.buffer）
 --- @param actor table|nil グループの発言アクター
 --- @param inner table グループ内トークン
 --- @param appearance table 外見状態（直接変更される）
@@ -392,7 +392,6 @@ end
 --- @field spot_newlines number|nil スポット変更時の改行量（デフォルト1.5）
 --- @field choice_newlines number|nil 字の後の選択肢の前の改行量（デフォルト1.5）
 --- @field after_choice_newlines number|nil 選択肢の後の改行幅（既定 1.0。N が 100 なら `\n`）
---- @field buffer_factory (fun(): table)|nil 出力バッファの生成関数（デフォルト pasta.buf.new。テスト用）
 --- @field columns_out table|nil 渡すと終わりの列の状態（スポット ID → BudouxColumn）を書き出す（テスト用。公開の API ではない）
 
 --- 終わりの列の状態を columns_out に書き出す（無ければ何もしない。今までどおり捨てる）
@@ -434,7 +433,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
     local spot_newlines = config.spot_newlines or 1.5
     local choice_newlines = config.choice_newlines or 1.5
     local after_choice_newlines = config.after_choice_newlines or 1.0
-    local buffer = tracking_buffer((config.buffer_factory or buf.new)())
+    local buffer = tracking_buffer(buf.new())
 
     -- input_actor_spots を直接変更する（nilの場合は内部で空テーブルを作成）
     local actor_spots = input_actor_spots or {}

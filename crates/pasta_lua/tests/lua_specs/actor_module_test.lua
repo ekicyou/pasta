@@ -1,6 +1,6 @@
--- pasta.actor（ACTOR / ActorWordBuilder / プロキシポストプロセス）単体テスト
+-- pasta.actor（ACTOR / アクター単語のビルダー / プロキシポストプロセス）単体テスト
 -- review-improvement-loop cell 3.46 (G1): 既存 proxy_find_handler_test は検索段のみを
--- カバーしており、get_or_create のキャッシュ・ActorWordBuilder・
+-- カバーしており、get_or_create のキャッシュ・アクター単語のビルダー・
 -- proxy:word / proxy:expr_fn のポストプロセス分岐が未カバーだった
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
@@ -40,7 +40,7 @@ describe("ACTOR.get_or_create", function()
     end)
 end)
 
-describe("ACTOR - ActorWordBuilder（actor:create_word）", function()
+describe("ACTOR - アクター単語のビルダー（actor:create_word）", function()
     test("entry がアクター単語レジストリへ登録される", function()
         local actor = ACTOR.get_or_create("spec346_語り手")
         actor:create_word("好物"):entry("カレー", "ラーメン")

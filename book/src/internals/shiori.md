@@ -451,10 +451,10 @@ pasta.shiori.entry
 
 | 関数 | 動作 |
 | ---- | ---- |
-| `SHIORI.load(hinst, load_dir)` | `xpcall` の中で何もせず `true` を返す。エラーなら `print` して `false` |
+| `SHIORI.load(hinst, load_dir)` | 何もせず `true` を返す |
 | `SHIORI.request(req)` | `STOP.clear()` で前の要求の控えを空にしてから、`xpcall` の中で `EVENT.fire(req)` を呼ぶ。エラーは、文字列なら最初の 1 行を、そうでなければ `nil` を理由にし、控え（`STOP.take()`・`STOP.take_handler()`）と一緒に `STOP.response` に渡す。表記の応答が返ればそれを、`nil` なら `RES.err` で 500 応答を返す（`nil` の理由は `"Unknown error"` になる。[止まるエラーの控えと応答](#止まるエラーの控えと応答)） |
 | `SHIORI.kick(scene)` | `KICK.install(scene)` でキックを保留するだけで、シーンは動かさない |
-| `SHIORI.unload()` | `xpcall` の中で何もしない |
+| `SHIORI.unload()` | 何もしない |
 
 `EVENT.fire(req)` の振り分けは次の順である。
 
@@ -471,7 +471,7 @@ pasta.shiori.entry
 | `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ探索範囲の親を決める。`act.req.reference[2]`（`\q` の 3 番目の引数。選択肢を出したグローバルシーンの登録名）が文字列で `SCENE.get_global_table` で引けるグローバルシーンならそれを、そうでなければ `STORE.last_global_scene` を親にする。`act.req.reference[1]`（選択 ID）を `SCENE.search(選択 ID, 親)` で探し、無ければ `SCENE.search(選択 ID, nil)` でグローバルシーンを探し、見つかった関数をコルーチンに包んで返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
 | `REG.OnMouseDoubleClick` | `act.req.reference[3]`（スコープ番号）からアクター名を、`act.req.reference[4]`（部位）を部位として、ショートカットの 1〜8 段の名前を上から `SCENE.co_exec_exact` で探し、最初に見つかったコルーチンを返す。無ければ `SCENE.co_exec(act, "OnMouseDoubleClick")`。抑止は見ない |
 | `REG.OnMouseMove` | 撫での判定（`check_stroke`）を毎回回す。判定には部位・スコープ番号・なめらかな時計の時刻（`CLOCK.steady(act.req)` に `act.req.date.ns` を足した小数の秒）と、`virtual_dispatcher.is_blocked(act.req.status)` を渡す。撫でたと決めた回だけ、アクター名を引いて 1〜8 段を `SCENE.co_exec_exact` で探し、見つかればそのコルーチンを返す。それ以外は `SCENE.co_exec(act, "OnMouseMove")`。判定の状態はモジュールのローカル変数 1 つで、保存しない |
-| `REG.OnSecondChange` | `CALLBACK.sweep(CLOCK.steady(act.req) or os.time())` が応答を返せばそれを返し（その回は仮想イベントを出さない）、そうでなければ `virtual_dispatcher.dispatch(act)` がコルーチンを返せばそれを返す。何も出さない回は、Status がブロック対象なら `nil`、そうでなければ `CLOCK.take_probe(act.req)`（予約された仮想時刻の読み取りのスクリプトか `nil`）を返す。`sweep` の応答は、期限切れの待機を再開した結果（出力の 200、止まるエラーの表記の 200、または表記を出さない設定での理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す |
+| `REG.OnSecondChange` | `CALLBACK.sweep(CLOCK.steady(act.req) or os.time(), act.req)` が応答を返せばそれを返し（その回は仮想イベントを出さない）、そうでなければ `virtual_dispatcher.dispatch(act)` がコルーチンを返せばそれを返す。何も出さない回は、Status がブロック対象なら `nil`、そうでなければ `CLOCK.take_probe(act.req)`（予約された仮想時刻の読み取りのスクリプトか `nil`）を返す。`sweep` の応答は、期限切れの待機を再開した結果（出力の 200、止まるエラーの表記の 200、または表記を出さない設定での理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す |
 
 ### 非同期トーク
 
@@ -484,16 +484,16 @@ SHIORI はベースウェアが問い合わせるだけの通信であり、シ�
     応答の Value に \![get,property,OnPastaCallBack{N},名前…] を載せて中断
 リクエスト 2（SSP が発行する OnPastaCallBack{N}。値は Reference に入る）
   EVENT.fire → CALLBACK.try_route
-    待っているコルーチンを pending から外し、EVENT.drive で Reference の配列を渡して再開し、
+    待っているコルーチンを pending から外し、EVENT.drive で (Reference の配列, nil, 要求) を渡して再開し、
     その出力を応答にする
 期限切れ（OnSecondChange のたびに確認）
   OnSecondChange の既定ハンドラ → CALLBACK.sweep
-    期限切れの待機を集めて pending から外し、番号順に EVENT.drive で (nil, 理由) を渡して再開する
+    期限切れの待機を集めて pending から外し、番号順に EVENT.drive で (nil, 理由, 要求) を渡して再開する
     最初に生まれた応答（出力の 200、表記の 200、または表記を出さない設定での理由付きタイムアウトの 500）をその回の応答にする
 ```
 
 - アクターランタイムの上では、リクエスト 1 と 2 は別々の mailbox のメッセージとして順に処理される。待っているコルーチンは、その間 VM の `CALLBACK.pending` に保たれる。Rust 側はコルーチンを持たない。
-- 再開したシーンは、通常のイベントと同じ再開の手順（`EVENT.drive`）を通る。待ち合わせの状態の遷移（`consume_staged`・`STORE.co_callback`・`set_co_scene` との関係）は [コールバック待ちとの関係](execution-model.md#コールバック待ちとの関係) で、掃引の手順は [期限切れの掃引](execution-model.md#期限切れの掃引callbacksweep) で扱う。利用者から見た挙動は [OnPastaCallBack](../lua/shiori-events.md#onpastacallbackコールバック応答) が正である。
+- 再開したシーンは、通常のイベントと同じ再開の手順（`EVENT.drive`）を通る。待ち合わせの状態の遷移（`consume_staged`・`set_co_scene` との関係）は [コールバック待ちとの関係](execution-model.md#コールバック待ちとの関係) で、掃引の手順は [期限切れの掃引](execution-model.md#期限切れの掃引callbacksweep) で扱う。利用者から見た挙動は [OnPastaCallBack](../lua/shiori-events.md#onpastacallbackコールバック応答) が正である。
 
 ### 止まるエラーの控えと応答
 
@@ -527,7 +527,7 @@ dispatch(act)
 - 2 の `STORE.kick_force` は `KICK.install` が立てる。`dispatch` の入口が読んだ時点で消費するため、ブロックの判定を飛ばすのはキックの直後の 1 回だけである。4 はキックの保留を起動する段で、中身は [デバッグ基盤とシーンキック](debug.md) で扱う。
 - `check_hour` の現在時刻は `CLOCK.now(act.req)`（仮想時刻。下の「仮想時刻の時計」）である。`next_hour_unix` が 0 なら次の正時（`unix - unix % 3600 + 3600`）を記録するだけで終わる。`CLOCK.epoch()` が `seen_epoch` と違えば（時刻の飛びがあれば）、`seen_epoch` を更新し、現在時刻の 70 秒前（ローカル定数 `REBASE_GRACE`）から同じ式で次の正時を決め直す。現在時刻がそれに達していれば、同じ式で次の正時を記録し直し、`act:transfer_date_to_var()` で日時変数を転記してからシーンを探す。シーン名の `{HH}` は `CLOCK.date(act.req).hour` から作る。
 - `check_talk` は、`next_talk_time` が 0 なら次のトーク時刻を決めるだけで終わる。トーク時刻は `CLOCK.steady(act.req)`（飛びを差し引いた時計）で数え、仮想時刻の設定し直しに左右されない。正時までの残りを `hour_margin` と比べる判定は、`check_hour` が記録した `next_hour_unix` と `CLOCK.now(act.req)` の差を使う（仮想時刻で数える）。この判定で発行を見送るときは `next_talk_time` を変えないため、次の秒にまた判定する。発行するときは、シーンを探す前に `next_talk_time` を決め直す。
-- 次のトーク時刻は「現在時刻 + `math.random(最小間隔, 最大間隔)`」で決める。間隔は、決めるたびにローカル関数 `get_config` が `pasta.save` と `@pasta_config` を読み直して求める（キャッシュしない）。`hour_margin` は `[ghost].hour_margin`（無ければ 30）を、切り捨てや下限の補正をせずにそのまま使う。`[ghost]` の既定値の補完は [設定読込](loader.md#設定読込) で扱う。
+- 次のトーク時刻は「現在時刻 + `math.random(最小間隔, 最大間隔)`」で決める。間隔は、決めるたびにローカル関数 `get_config` が `pasta.save` と `@pasta_config` を読み直して求める（キャッシュしない）。`hour_margin` は `[ghost].hour_margin` が有限の数ならその値を、切り捨てや下限の補正をせずにそのまま使う。無いとき、数でないとき、NaN・無限大のときは 30 を使う（ローカル関数 `finite_or`）。`[ghost]` の既定値の補完は [設定読込](loader.md#設定読込) で扱う。
 - ブロック中（3 で終わる間）は `check_hour`・`check_talk` を呼ばないため、`next_hour_unix`・`next_talk_time` は進まない。そのため、ブロックが解けた最初の判定で、過ぎていた正時やトーク時刻の条件が成り立つ。
 - 5 の `STORE.auto_talk_paused` は、`GLOBAL.pause_auto_talk`／`resume_auto_talk`（`pasta/shiori/entry.lua`）が書く（[自動トークを止めている間](../lua/shiori-events.md#自動トークを止めている間)）。止めている間もブロック中と同じく時計は進まないが、再開の関数が公開の関数 `restart_timers(act)` を 1 回呼び、時計を決め直す。`next_talk_time` を 0 に戻し、`CLOCK.now(act.req)` が取れれば次の正時を求めて、今の `next_hour_unix` より後のとき、または `CLOCK.epoch()` が `seen_epoch` と違うときだけ置き換えて `seen_epoch` を記録する（取れなければ `next_hour_unix` を 0 にする）。そのため、ブロックと違い、止めている間に過ぎた正時は再開の後にも発行されない。`set_co_scene` を通らないので、中断中の継続は捨てずに残る。
 - 返したコルーチンは `EVENT.fire` が `EVENT.drive` で再開し、続きの決まりに従って `STORE.co_scene` を更新する。継続を再開するのは OnTalk だけである（`check_talk` が `STORE.co_scene` を返し、種類は "resume"）。OnHour のシーンは `SCENE.co_exec` で探した印の無いコルーチンなので、中断中の継続があればふつうの割り込み（"interrupt"）になり、台詞を出せば継続を捨て、出さなければ残す。キックのシーンは `KICK.try_dispatch` が返すコルーチンに `STORE.co_preempt` の印が付いているので "preempt" になり、台詞の有無によらず継続を捨てる（[継続トークと co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新)）。
@@ -571,7 +571,7 @@ REG.OnSecondChange（既定。鎖の底）
 - `X-Pasta-Time`: ヘッダのあるリクエストでは、合図を判定せず、返事を受け取っても無視し、読み取りも返さない。`now` は `req.date.unix` を、`date` は `req.date` をそのまま返す。
 - 読み出し: `now(req)` は `req.date.unix + _offset`、`date(req)` はずれを足した時刻から `os.date("*t")` で作った新しい日付の表（`act.req.date` と同じ形）を返す。ずれが 0 なら `req.date` をそのまま返し、`act.req.date` は書き換えない。日時変数の転記（`pasta.shiori.act` の `transfer_date_to_var`）は `CLOCK.date` を読む。`offset()` は `_offset` を返す。
 - 時刻の飛び: `observe` は OnSecondChange のたびに `d = now − _prev_now` を求め、`d` が −2 秒より小さいか 90 秒より大きければ（ローカル定数 `JUMP_BACK`・`JUMP_FORWARD`）飛びとして `_epoch` を 1 増やし、`_jump_total` に `d − 1` を足す。`_resumed` か `_suspended` が立っていれば数えずに `_suspended` を下ろす。飛ばない差で `_resumed` が立っていれば `_suspended` も下ろす（スリープせずに戻った場合に印を残さない）。どの場合も最後に `_resumed` を下ろして `_prev_now` を `now` にする。`OnSysSuspend` を見ると `_suspended` を、`OnSysResume` を見ると `_resumed` を立てる（スリープ明けは飛びにしない）。SSP 2.9.18 では、`OnSysSuspend` は復帰してから最初の OnSecondChange より前に届き、`OnSysResume` は最初の OnSecondChange より数秒遅れて届く（2026-10-18 実機）ので、両方を見る。`X-Pasta-Time` 付きのリクエストは飛びを見ず、`_prev_now` も変えない。ずれが変わったとき（読み取りの返事）も、次の OnSecondChange で `now` が飛ぶので同じ判定に入る。
-- なめらかな時計: `steady(req)` は `now(req) − _jump_total`（`X-Pasta-Time` があれば `req.date.unix`）を返す。おしゃべりの間隔（`check_talk`）、`act:get_property` の期限と `CALLBACK.sweep` に渡す今（`req.date` が無ければ `os.time()`）、撫での判定の時刻（`pasta.shiori.event.mouse`）はこれで数える。`epoch()` は `_epoch` を返し、ディスパッチャが `seen_epoch` と比べる。飛んでから次の OnSecondChange までの 1 秒足らずの間に始まった期限や撫では、補正前の時計で数える。
+- なめらかな時計: `steady(req)` は `now(req) − _jump_total`（`X-Pasta-Time` があれば `req.date.unix`）を返す。おしゃべりの間隔（`check_talk`）、`act:get_property` の期限（シーンを最後に再開した要求 `act._resume_req`、無ければ `act.req` の時刻から数える）と `CALLBACK.sweep` に渡す今（`req.date` が無ければ `os.time()`）、撫での判定の時刻（`pasta.shiori.event.mouse`）はこれで数える。`epoch()` は `_epoch` を返し、ディスパッチャが `seen_epoch` と比べる。飛んでから次の OnSecondChange までの 1 秒足らずの間に始まった期限や撫では、補正前の時計で数える。
 - 仮想時刻を使わずに OS の時計を手で 90 秒より進めたか 2 秒より戻したときも、飛びになる（10 時 30 分から 9 時 30 分へ戻すと 10 時に時報が出る。10 時 30 分から 12 時 10 分へ進めると 13 時まで時報が出ず、おしゃべりは残りの間隔を待つ）。
 - 見落とし: ずれの変化の秒の端数が毎分の許容幅（±2 秒）に入ると、毎分の合図では気づかない。そのときは仮想の正時の `OnHourTimeSignal` で気づき、決め直しの猶予（70 秒）で時報が数秒遅れて 1 回出る。仮想時刻を戻した（Reset）のを見落とすと、古いずれが最大 1 時間残り、実際の正時の `OnHourTimeSignal` で直る。ずれの変化が 1 時間の倍数に近いと気づけない。
 

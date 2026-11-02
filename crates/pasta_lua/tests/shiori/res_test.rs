@@ -357,3 +357,46 @@ fn test_defensive_nil_handling() {
         result
     );
 }
+
+// ============================================================================
+// Integration: シーンの変数の改行で応答が割れない（ponytail-lua-scripts 3.1、要件 2.4）
+// ============================================================================
+
+#[test]
+fn test_scene_variable_newline_keeps_single_line_value() {
+    let pasta = "\
+＊関数置き場
+```lua
+GLOBAL[\"改行を入れる\"] = function(act) act.var[\"値\"] = \"上\\n下\" end
+```
+　さくら：「置き場」
+
+＊OnTest
+　＞改行を入れる
+　さくら：はい＄値
+";
+    let temp = common::create_temp_with_pasta(pasta);
+    let runtime = pasta_lua::loader::PastaLoader::load(temp.path())
+        .unwrap_or_else(|e| panic!("ゴーストの読み込みに失敗: {e}"));
+    let value = runtime
+        .exec(
+            r#"local EVENT = require "pasta.shiori.event"
+return EVENT.fire({ id = "OnTest", method = "get", version = 30 })"#,
+        )
+        .expect("EVENT.fire に失敗");
+    let response = common::value_as_str(&value).expect("応答が文字列でない");
+
+    // 改行は CR LF の行の区切りだけ
+    let lines: Vec<&str> = response.split("\r\n").collect();
+    assert!(
+        lines.iter().all(|l| !l.contains('\n') && !l.contains('\r')),
+        "{response:?}"
+    );
+    let value_line = lines
+        .iter()
+        .find(|l| l.starts_with("Value: "))
+        .unwrap_or_else(|| panic!("Value がない: {response:?}"));
+    assert!(value_line.contains("はい上 下"), "{response:?}");
+    assert!(value_line.ends_with("\\e"), "{response:?}");
+    assert!(response.ends_with("\r\n\r\n"), "{response:?}");
+}

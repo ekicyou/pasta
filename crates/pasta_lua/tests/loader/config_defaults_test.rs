@@ -376,9 +376,9 @@ fn lua_fallback_literals_match_ssot() {
         "virtual_dispatcher.lua の talk_interval_max フォールバック ({}) が SSOT と不一致 (R5.5)",
         d.talk_interval_max
     );
-    // hour_margin: `ghost.hour_margin or 30` の形でフォールバック。
+    // hour_margin: `finite_or(ghost.hour_margin, 30)` の形でフォールバック。
     assert!(
-        vd_lua.contains(&format!("ghost.hour_margin or {}", d.hour_margin)),
+        vd_lua.contains(&format!("finite_or(ghost.hour_margin, {})", d.hour_margin)),
         "virtual_dispatcher.lua の hour_margin フォールバック ({}) が SSOT と不一致 (R5.5)",
         d.hour_margin
     );

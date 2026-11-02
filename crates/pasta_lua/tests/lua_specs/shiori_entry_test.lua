@@ -340,6 +340,38 @@ describe("SHIORI.request - 止まるエラーの表記の場所ごとの確か�
         expect(STORE.co_scene):toBe(nil)
     end)
 
+    test("何も出さない区切りが上限を超えると、シーン名を添えた表記になり続きは捨てる (ponytail 5.1)", function()
+        local off, on = run_both(function()
+            register_scene("OnEntryPlaceEmptyYield", function(act)
+                act:init_scene({}, "空回り")
+                -- 直す前も必ず終わるよう、上限より少し多く区切ってから台詞を出す
+                for _ = 1, 10005 do act:yield() end
+                act:raw_script("届かない")
+                return act:build()
+            end)
+            return request("OnEntryPlaceEmptyYield")
+        end)
+
+        expect_notation(off, on, "【スクリプトのエラー：＊空回り（何も出さない区切りが 10000 回続いた）】")
+        expect(STORE.co_scene):toBe(nil)
+    end)
+
+    test("何も出さない区切りが上限より少なければ、今と同じく台詞が出る (ponytail 5.2)", function()
+        local off, on = run_both(function()
+            register_scene("OnEntryPlaceFewEmptyYield", function(act)
+                act:init_scene({}, "空回り少し")
+                for _ = 1, 10 do act:yield() end
+                act:raw_script("出た")
+                return act:build()
+            end)
+            return request("OnEntryPlaceFewEmptyYield")
+        end)
+
+        expect_status(on, "SHIORI/3.0 200 OK")
+        expect(header_value(on, "Value")):toBe("出た\\e")
+        expect(off):toBe(on)
+    end)
+
     test("待ち合わせからの再開の中の例外は、コールバックの投げ直しの場所を表記に入れない", function()
         local off, on = run_both(function()
             register_scene("OnEntryPlaceWait", function(act)
@@ -496,7 +528,6 @@ describe("EVENT.fire - コールバックルーティング統合", function()
         -- consume_staged により pending 登録、set_co_scene は co_scene へ保持しない
         expect(CALLBACK.pending["OnPastaCallBack1"]).not_:toBe(nil)
         expect(STORE.co_scene):toBe(nil)
-        expect(STORE.co_callback):toBe(nil)
     end)
 
     test("到着したコールバックイベントは try_route 経由で待機コルーチンへ届く", function()
@@ -567,7 +598,6 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
 
         expect_ok(request("OnPastaCallBack1", { [0] = "v1" }), "前半:v1")
         expect(STORE.co_scene):toBe(scene_co)
-        expect(STORE.co_callback):toBe(nil)
 
         expect_ok(request("OnEntryContinue"), "後半")
         expect(STORE.co_scene):toBe(nil)
@@ -603,7 +633,6 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
         expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
         expect(CALLBACK.pending["OnPastaCallBack2"].co):toBe(scene_co)
         expect(STORE.co_scene):toBe(nil)
-        expect(STORE.co_callback):toBe(nil)
     end)
 
     --- コールバック待ちの間に、別のシーンの継続を作る
@@ -727,7 +756,6 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
 
         expect_ok(request("OnEntryAfterSweep"), "別のシーン")
         expect(CALLBACK.pending["OnPastaCallBack2"].co):toBe(scene_co)
-        expect(STORE.co_callback):toBe(nil)
         expect_sweep_response()
     end)
 
