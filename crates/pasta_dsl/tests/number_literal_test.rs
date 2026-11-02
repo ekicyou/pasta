@@ -8,7 +8,7 @@
 use pasta_dsl::ParseError;
 use pasta_dsl::parser::{
     Arg, AttrValue, BinOp, CallScene, CallTarget, CueArgToken, Expr, FileItem, LocalSceneItem,
-    PastaFile, SetValue, parse_str,
+    PastaFile, SetValue, VarScope, parse_str,
 };
 
 const BIG: &str = "10000000000000000000"; // i64 の上限を超える 20 桁
@@ -321,5 +321,47 @@ fn actor_number_at_u32_max_and_next_omitted_stays() {
             ("b".to_string(), 3),
             ("c".to_string(), 4)
         ]
+    );
+}
+
+// ============================================================================
+// シーン引数の番号の範囲（2.8）
+// ============================================================================
+
+fn arg_err(line: usize, col: usize, digits: &str) -> (usize, usize, String) {
+    (
+        line,
+        col,
+        format!(
+            "Parse error in num.pasta at {line}:{col}: シーン引数の番号 {digits} は 0〜255 の範囲を超えています"
+        ),
+    )
+}
+
+#[test]
+fn scene_arg_255_is_args() {
+    assert_eq!(
+        var_expr("＄２５５"),
+        Expr::VarRef {
+            name: "２５５".to_string(),
+            scope: VarScope::Args(255)
+        }
+    );
+    assert!(parse_str("＊s\n　さくら：＄２５５＠＄２５５\n", "num.pasta").is_ok());
+}
+
+#[test]
+fn scene_arg_beyond_255_is_syntax_error() {
+    // アクション行：`＄` の次の `２５６` の位置
+    assert_eq!(
+        syntax_err("＊s\n　さくら：＄２５６\n"),
+        arg_err(2, 7, "２５６")
+    );
+    // 式の項
+    assert_eq!(syntax_err("＊s\n　＄x＝＄256\n"), arg_err(2, 6, "256"));
+    // 動的な単語参照
+    assert_eq!(
+        syntax_err("＊s\n　さくら：＠＄２５６\n"),
+        arg_err(2, 8, "２５６")
     );
 }

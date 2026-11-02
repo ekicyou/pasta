@@ -169,11 +169,12 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>, filename: &str) -> Result<VarSet, 
             }
             Rule::word_ref_dynamic => {
                 // Explicit arm: the default arm would not yield the dynamic reference
-                word_ref_value =
-                    parse_dyn_name(inner)?.map(|(var_name, var_scope)| SetValue::DynamicWordRef {
+                word_ref_value = parse_dyn_name(inner, filename)?.map(|(var_name, var_scope)| {
+                    SetValue::DynamicWordRef {
                         var_name,
                         var_scope,
-                    });
+                    }
+                });
             }
             rule => {
                 if let Some(op) = bin_op_from_rule(rule) {

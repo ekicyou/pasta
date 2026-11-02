@@ -101,7 +101,7 @@ pub(crate) fn parse_actions(pair: Pair<Rule>, filename: &str) -> Result<Vec<Acti
                 }
             }
             Rule::var_ref_local => {
-                if let Some((name, scope)) = parse_var_ref_local_inner(inner)? {
+                if let Some((name, scope)) = parse_var_ref_local_inner(inner, filename)? {
                     actions.push(Action::VarRef {
                         name,
                         scope,
@@ -150,7 +150,7 @@ pub(crate) fn parse_actions(pair: Pair<Rule>, filename: &str) -> Result<Vec<Acti
                 });
             }
             Rule::word_ref_dynamic => {
-                if let Some((var_name, var_scope)) = parse_dyn_name(inner)? {
+                if let Some((var_name, var_scope)) = parse_dyn_name(inner, filename)? {
                     actions.push(Action::DynamicWordRef {
                         var_name,
                         var_scope,
@@ -212,10 +212,13 @@ pub(crate) fn parse_fn_call_inner(
 /// Extract `(var_name, var_scope)` from a pair containing `dyn_name_local` / `dyn_name_global`.
 ///
 /// `dyn_name_local` splits into Local / Args(n) by the same rule as `var_ref_local`.
-pub(crate) fn parse_dyn_name(pair: Pair<Rule>) -> Result<Option<(String, VarScope)>, ParseError> {
+pub(crate) fn parse_dyn_name(
+    pair: Pair<Rule>,
+    filename: &str,
+) -> Result<Option<(String, VarScope)>, ParseError> {
     for inner in pair.into_inner() {
         let found = match inner.as_rule() {
-            Rule::dyn_name_local => parse_var_ref_local_inner(inner)?,
+            Rule::dyn_name_local => parse_var_ref_local_inner(inner, filename)?,
             Rule::dyn_name_global => inner
                 .into_inner()
                 .find(|id| id.as_rule() == Rule::id)
@@ -236,7 +239,7 @@ pub(crate) fn parse_dyn_fn_call_inner(
 ) -> Result<(String, VarScope, Args), ParseError> {
     // The grammar requires a dyn_name; the fallback mirrors parse_fn_call_inner's empty name.
     let (var_name, var_scope) =
-        parse_dyn_name(pair.clone())?.unwrap_or((String::new(), VarScope::Local));
+        parse_dyn_name(pair.clone(), filename)?.unwrap_or((String::new(), VarScope::Local));
     let args = match pair.into_inner().find(|p| p.as_rule() == Rule::args) {
         Some(args) => parse_args(args, filename)?,
         None => Args::empty(),
@@ -378,9 +381,8 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>, filename: &str) -> Result<Option<
         }),
         Rule::string_contents => Some(Expr::String(pair.as_str().to_string())),
         Rule::string_blank => Some(Expr::BlankString),
-        Rule::var_ref_local => {
-            parse_var_ref_local_inner(pair)?.map(|(name, scope)| Expr::VarRef { name, scope })
-        }
+        Rule::var_ref_local => parse_var_ref_local_inner(pair, filename)?
+            .map(|(name, scope)| Expr::VarRef { name, scope }),
         Rule::var_ref_global => pair
             .into_inner()
             .find(|inner| inner.as_rule() == Rule::id)
@@ -448,7 +450,11 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>, filename: &str) -> Result<Option<
 /// Extract variable name and scope from a `var_ref_local` pair.
 ///
 /// Handles both named variables (`$var` → Local) and positional args (`$0` → Args(0)).
-fn parse_var_ref_local_inner(pair: Pair<Rule>) -> Result<Option<(String, VarScope)>, ParseError> {
+/// 0〜255 に収まらない番号は、番号の位置の構文の誤り。
+fn parse_var_ref_local_inner(
+    pair: Pair<Rule>,
+    filename: &str,
+) -> Result<Option<(String, VarScope)>, ParseError> {
     for var_id_pair in pair.into_inner() {
         if var_id_pair.as_rule() == Rule::var_id {
             for id_inner in var_id_pair.into_inner() {
@@ -457,9 +463,19 @@ fn parse_var_ref_local_inner(pair: Pair<Rule>) -> Result<Option<(String, VarScop
                         return Ok(Some((id_inner.as_str().to_string(), VarScope::Local)));
                     }
                     Rule::digit_id => {
+                        // 文法が数字だけを通すので、失敗は範囲の外だけ
                         let index = normalize_number_str(id_inner.as_str())
                             .parse::<u8>()
-                            .unwrap_or(0);
+                            .map_err(|_| {
+                                syntax_error(
+                                    filename,
+                                    id_inner.line_col(),
+                                    &format!(
+                                        "シーン引数の番号 {} は 0〜255 の範囲を超えています",
+                                        id_inner.as_str()
+                                    ),
+                                )
+                            })?;
                         return Ok(Some((id_inner.as_str().to_string(), VarScope::Args(index))));
                     }
                     _ => {}
