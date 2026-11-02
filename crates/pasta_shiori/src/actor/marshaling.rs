@@ -95,9 +95,8 @@ pub(crate) enum ShioriMethod {
 ///
 /// これにより NOTIFY の即 204（R5.2）も、GET の timeout/drop/異常/未初期化フォールバック
 /// （R5.3/R5.6/R5.7）も、**唯一の正準 204** を返し、出荷経路が R1.1（外部 SHIORI 挙動
-/// バイト不変）を満たす。Rust 安全網 `PastaShiori::default_204_response` は SHIORI.request
-/// 未登録時のみ通る経路でヘッダ 2 種だが、代表イベント列（NOTIFY/OnSecondChange）の
-/// pre-refactor 観測値は VM 産 204（SecurityLevel あり）であり、それがゴールデンの真値である。
+/// バイト不変）を満たす。SHIORI.request 未登録時の `PastaShiori::call_lua_request` も
+/// この 204 を返す（ponytail-shiori 5.1・5.2。Rust の側で作る 204 はこれ 1 つ）。
 ///
 /// timeout/drop/異常/未初期化のいずれでも SHIORI スレッドへ必ずこの応答を返し、
 /// 無限待機を生じさせない。

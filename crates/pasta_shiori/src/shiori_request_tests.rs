@@ -453,11 +453,15 @@ fn test_runtime_accessor_none_before_load() {
 // ponytail-shiori 1.4: SHIORI.request の無いゴーストへの自前の 204（特性化）
 // ========================================================================
 
-/// SHIORI.request の無いゴーストへの GET は、今は `Charset`・`Sender` の
-/// 2 つのヘッダだけの 204 を返す（`default_204_response`）。
-/// 期待のバイト列はこの定数 1 か所に置く（204 を 1 つにした後に差し替える）。
-const SELF_204_WITHOUT_REQUEST_FN: &str =
-    "SHIORI/3.0 204 No Content\r\nCharset: UTF-8\r\nSender: Pasta\r\n\r\n";
+/// SHIORI.request の無いゴーストへの GET は、ほかの自前の 204 と同じ
+/// `default_204()` を返す（5.1・5.2）。
+/// 期待のバイト列は `tests/byte_invariant_test.rs` の `GOLDEN_NOTIFY_204`
+/// （Lua の `RES.no_content()` が既定の設定で作る 204 を固めた値）の写し（5.3）。
+const SELF_204_WITHOUT_REQUEST_FN: &str = "SHIORI/3.0 204 No Content\r\n\
+Charset: UTF-8\r\n\
+Sender: Pasta\r\n\
+SecurityLevel: local\r\n\
+\r\n";
 
 #[test]
 fn test_get_without_request_fn_returns_self_204() {
@@ -480,6 +484,7 @@ fn test_get_without_request_fn_returns_self_204() {
         .request("GET SHIORI/3.0\r\nCharset: UTF-8\r\nSender: SSP\r\nID: OnBoot\r\n\r\n")
         .unwrap();
     assert_eq!(response, SELF_204_WITHOUT_REQUEST_FN);
+    assert_eq!(response, crate::actor::marshaling::default_204());
 }
 
 /// Copy shiori_lifecycle fixture to a temporary directory.

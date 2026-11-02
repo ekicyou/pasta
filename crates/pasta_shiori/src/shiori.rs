@@ -301,7 +301,7 @@ impl PastaShiori {
             Some(f) => f,
             None => {
                 debug!("SHIORI.request not available, returning default 204 response");
-                return Ok(Self::default_204_response());
+                return Ok(crate::actor::marshaling::default_204());
             }
         };
 
@@ -408,15 +408,6 @@ impl PastaShiori {
         } else {
             info!("SHIORI.unload called successfully");
         }
-    }
-
-    /// Generate default 204 No Content response.
-    fn default_204_response() -> String {
-        "SHIORI/3.0 204 No Content\r\n\
-         Charset: UTF-8\r\n\
-         Sender: Pasta\r\n\
-         \r\n"
-            .to_string()
     }
 }
 
