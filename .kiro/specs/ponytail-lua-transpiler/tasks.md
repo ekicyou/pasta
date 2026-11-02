@@ -98,11 +98,12 @@
   - `10.0` → `10`、`2.5` → `2.5`、`1e19` → `10000000000000000000`、`-0.0` → `0` の単体テストが通り、品質の関門が通り、1 コミットになっている
   - _Requirements: 9.2, 9.3_
 
-- [ ] 10. 条件つきで `pasta_core` の使い手の無い統合を消す
+- [x] 10. 条件つきで `pasta_core` の使い手の無い統合を消す
   - main を取り込み、`ponytail-core-registry` が先に main に入っているかを確かめる。入っていなければ `pasta_core` のファイルに触らず、コミットもせずに閉じる
   - 入っていて `merge_from` がまだ残っていれば、`SceneRegistry`・`WordDefRegistry` の `merge_from` とそのテスト、`book/src/internals/registry-search.md` の該当の 1 文を消す
   - どちらにしたかと確かめた main の SHA を、このタスクの下に 1 行の注記として tasks.md に書く（消した場合はコミットメッセージにも書く）。消した場合は `cargo test -p pasta_core -p pasta_lua` と clippy が通り、1 コミットになっている
   - _Requirements: 8.4_
+  - 注記: main（27a80a33）を取り込んで確かめた。`ponytail-core-registry` はまだ main に入っていない（completed に無く、`merge_from` も残る）ので、`pasta_core` には触らずに閉じた。
 
 - [ ] 11. 全体の確かめ
   - 特性化スナップショット・Lua ブロックを含まない既存のスナップショット・`sample.generated.lua`（改行を除いて）が、タスク 1 の時点と同じであることを確かめる
