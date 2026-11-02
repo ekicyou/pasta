@@ -2,10 +2,8 @@
 //! reload リーク検査（R7.2/R7.3）はプロセス全体カウンタを計測するため、兄弟テストと
 //! 並列に走らないよう専用バイナリ `actor_reload_leak_test.rs` に分離している。
 //!
-//! task 5.1 で FFI 出荷経路がアクター経路へ昇格し、
-//! `windows-sys/Win32_System_Threading`（実 `GetProcessHandleCount`/`GetGuiResources` 計測）が
-//! 既定ビルドの依存になったため、本テストは **既定（no-feature）ビルドで実行される**
-//! （旧 `actor-poc` ガードは撤去）。
+//! 本テストは **既定（no-feature）ビルドで実行される**（旧 `actor-poc` ガードは撤去）。
+//! `windows-sys/Win32_System_Threading`（リーク検査の計測）は dev-dependencies にある。
 //!
 //! # 何を証明するか（task 4.1 の observable 完了条件）
 //!  (a) `Stop{done}` を送ると、アクターが残メッセージ drain 後に VM 破棄・cleanup を

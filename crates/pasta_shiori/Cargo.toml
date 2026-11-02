@@ -10,6 +10,8 @@ repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
 keywords.workspace = true
+# SSP の記録（doc/）は crates.io のパッケージに入れない。
+exclude = ["doc/"]
 
 [lib]
 name = "pasta"
@@ -32,10 +34,9 @@ arc-swap.workspace = true
 shiori4_abi.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-# teardown のリーク検査（GetProcessHandleCount/GetGuiResources）に Win32_System_Threading を
-# 追加する。ベースの windows-sys（Foundation/Memory/Globalization）は workspace から継承。
+# ベースの windows-sys（Foundation/Memory/Globalization）は workspace から継承。
 # LibraryLoader はアクタースレッドが pasta.dll の参照を持つため（GetModuleHandleExW・FreeLibraryAndExitThread）。
-windows-sys = { workspace = true, features = ["Win32_System_Threading", "Win32_System_LibraryLoader"] }
+windows-sys = { workspace = true, features = ["Win32_System_LibraryLoader"] }
 
 [build-dependencies]
 # pasta.dll のプロパティ「詳細」にファイル/製品バージョンを出す VERSIONINFO と、アイコン（res/pasta.ico）を埋め込む。
@@ -59,6 +60,8 @@ tracing-test.workspace = true
 # 応答 HGLOBAL を read/free するために Win32 Memory/Globalization を直接利用する。
 # 本体は既に windows-sys を通常依存として持つため、dev 側はリンク可能化のための再宣言のみ。
 # ToolHelp は multi_instance_test がアクタースレッドを数えるため（unload の後に残らないこと）。
+# Threading は reload のリーク検査（GetProcessHandleCount・GetGuiResources）と、multi_instance_test の
+# スレッドの名前の読み取り（OpenThread・GetThreadDescription）のため。
 # LibraryLoader は free_library_test の子が pasta.dll を LoadLibraryW・GetProcAddress・FreeLibrary・
 # GetModuleHandleW で扱うため（pasta_lua の機能の合流に頼らない）。
-windows-sys = { workspace = true, features = ["Win32_System_Diagnostics_ToolHelp", "Win32_System_LibraryLoader"] }
+windows-sys = { workspace = true, features = ["Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading", "Win32_System_LibraryLoader"] }
