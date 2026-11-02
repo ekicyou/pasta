@@ -79,16 +79,15 @@ impl LuaTranspiler {
     ///
     /// # Byte-invariance (Requirement 7.1)
     ///
-    /// Normalization goes through [`normalize_output_with_shift`], whose `.0` does
-    /// not depend on the sink, so the bytes written to `writer` are
-    /// unchanged whether or not a sink is attached. When `sink` is `None` the
-    /// producer seam is inert and the output equals the disabled (debug-off) output
-    /// exactly.
+    /// The line recorder is always attached; `sink` is optional and only receives
+    /// the same records. Normalization ([`normalize_output_with_shift`]) only trims
+    /// the end of the output, so the bytes written to `writer` are the same whether
+    /// or not a sink is passed.
     ///
     /// # Arguments
     /// * `file` - The parsed PastaFile AST
     /// * `writer` - Output writer
-    /// * `sink` - Optional source-map recording sink (production loader attaches one)
+    /// * `sink` - Optional source-map recording sink (the loader attaches one)
     pub fn transpile_with_source_map<W: Write>(
         &self,
         file: &PastaFile,

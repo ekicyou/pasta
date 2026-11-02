@@ -314,7 +314,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Source-map seam (R4): this is the representative span-bearing path. The
     /// action's `.pasta` [`Span`](pasta_dsl::parser::Span) is recorded against the
     /// generated Lua line via [`record_span_since`](Self::record_span_since) when a
-    /// sink is attached (otherwise inert / byte-identical). Every variant emits
+    /// sink is attached (recording never changes the bytes). Every variant emits
     /// exactly one line except the rare empty-escape case, which records nothing.
     pub fn generate_action(&mut self, action: &Action, actor: &str) -> Result<(), TranspileError> {
         let span = action_span(action);

@@ -78,7 +78,7 @@
   - _Requirements: 6.3_
 
 - [ ] 8. 説明とマニュアルを今の道に合わせる
-- [ ] 8.1 ソースの説明を直す
+- [x] 8.1 ソースの説明を直す
   - 「本番ではシンクを付けない・記録は働かない」「legacy path」「`normalize_output` と byte-identical」などの古い説明を、「いつも行の記録を付け、呼び手のシンクは任意・後処理は末尾だけ」に直す。生成器の説明に、書き込みは保留の空行を通る書き出しだけで行うことを書く
   - 古い説明の語が `crates/pasta_lua/src` の transpiler 側（`code_gen/`・`normalize.rs`・`transpiler.rs`）に残らず、関門が通り、1 コミットになっている
   - _Requirements: 6.4_
