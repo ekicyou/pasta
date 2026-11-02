@@ -247,3 +247,146 @@ fn test_decl_without_comment_unchanged() {
     assert_eq!(line_tokens(source, 2), vec![(2, 5, SCENE)]);
     assert_eq!(line_tokens(source, 4), vec![(0, 4, ACTOR)]);
 }
+
+// ============================================================================
+// 宣言の行のほかの、行末のコメントを書ける行（要件 4.3・4.4・5.7・6.5）
+// ============================================================================
+
+use token_type::CODE_BLOCK;
+
+/// 指定した行（0 始まり）の COMMENT（桁・長さ）
+fn line_comments(source: &str, target: u32) -> Vec<(u32, u32)> {
+    line_tokens(source, target)
+        .into_iter()
+        .filter(|t| t.2 == COMMENT)
+        .map(|t| (t.0, t.1))
+        .collect()
+}
+
+#[test]
+fn test_trailing_comment_attr_lines() {
+    // ファイル・シーン・アクターの属性の行
+    assert_eq!(
+        line_comments("＆朝：1 ＃ メモ\n＊挨拶\n  Alice：OK\n", 0),
+        vec![(5, 4)]
+    );
+    assert_eq!(
+        line_comments("＊挨拶\n  ＆朝：1 ＆夜：2 ＃ メモ\n  Alice：OK\n", 1),
+        vec![(12, 4)]
+    );
+    assert_eq!(
+        line_comments("％さくら\n  ＆朝：1 ＃ メモ\n", 1),
+        vec![(7, 4)]
+    );
+}
+
+#[test]
+fn test_trailing_comment_fenced_word_def() {
+    assert_eq!(line_comments("＠挨拶：「やあ」 ＃ メモ\n", 0), vec![(9, 4)]);
+    assert_eq!(
+        line_comments(
+            "＊挨拶\n  ＠挨拶：「やあ」、「おう」 ＃ メモ\n  Alice：OK\n",
+            1
+        ),
+        vec![(16, 4)]
+    );
+}
+
+/// 囲まない単語の値・台詞の `＃` は本文（要件 4.4）
+#[test]
+fn test_hash_in_body_is_not_comment() {
+    assert_eq!(
+        line_comments("＊挨拶\n  ＠挨拶：やあ ＃ メモ\n  Alice：OK\n", 1),
+        vec![]
+    );
+    assert_eq!(line_comments("＠挨拶：やあ ＃ メモ\n", 0), vec![]);
+    assert_eq!(line_comments("＊挨拶\n  Alice：やあ ＃ 本文\n", 1), vec![]);
+    assert_eq!(
+        line_comments("＊挨拶\n  Alice：やあ\n  ：ほい ＃ 本文\n", 2),
+        vec![]
+    );
+}
+
+#[test]
+fn test_trailing_comment_scene_actors_line() {
+    assert_eq!(
+        line_comments("＊挨拶\n  ％さくら、うにゅう ＃ メモ\n  さくら：OK\n", 1),
+        vec![(12, 4)]
+    );
+    assert_eq!(
+        line_comments(
+            "＊挨拶\n  ％さくら、うにゅう＝3、 ＃ メモ\n  さくら：OK\n",
+            1
+        ),
+        vec![(15, 4)]
+    );
+}
+
+#[test]
+fn test_trailing_comment_var_set_and_call() {
+    assert_eq!(
+        line_comments("＊挨拶\n  ＄x＝1 ＃ メモ\n  Alice：OK\n", 1),
+        vec![(7, 4)]
+    );
+    assert_eq!(
+        line_comments("％さくら\n  ＄x＝1 ＃ メモ\n", 1),
+        vec![(7, 4)]
+    );
+    assert_eq!(
+        line_comments("＊挨拶\n  ＞次 ＃ メモ\n＊次\n  Alice：OK\n", 1),
+        vec![(5, 4)]
+    );
+}
+
+#[test]
+fn test_trailing_comment_cue_command() {
+    let cases = [
+        ("  ！待つ ＃ メモ", 6),
+        ("  ！待つ（1） ＃ メモ", 9),
+        ("  ！待つ（） ＃ メモ", 8),
+        ("  ！演出＠さくら ＃ メモ", 10),
+        ("  ！待つ（「）＃」） ＃ メモ", 12),
+    ];
+    for (line, col) in cases {
+        let source = format!("＊挨拶\n{line}\n  Alice：OK\n");
+        assert_eq!(line_comments(&source, 1), vec![(col, 4)], "{line}");
+    }
+}
+
+/// 選択肢の行は行末のコメントだけ（部品の色は足さない。要件 5.7）
+#[test]
+fn test_trailing_comment_choice_only() {
+    let tail = "＊次\n  Alice：OK\n";
+    assert_eq!(
+        line_tokens(
+            &format!("＊挨拶\n  ＠？次「行く ＃ 本文」 ＃ メモ\n{tail}"),
+            1
+        ),
+        vec![(15, 4, COMMENT)]
+    );
+    assert_eq!(
+        line_tokens(&format!("＊挨拶\n  ＠？次 ＃ メモ\n{tail}"), 1),
+        vec![(6, 4, COMMENT)]
+    );
+    assert_eq!(line_tokens(&format!("＊挨拶\n  ＠？次\n{tail}"), 1), vec![]);
+}
+
+/// 閉じのフェンスの CODE_BLOCK は連続する `` ` `` で止め、後ろのコメントを COMMENT にする
+#[test]
+fn test_trailing_comment_close_fence() {
+    let source = "＊挨拶\n  Alice：OK\n```lua\nprint(1)\n``` ＃ メモ\n";
+    assert_eq!(
+        line_tokens(source, 4),
+        vec![(0, 3, CODE_BLOCK), (4, 4, COMMENT)]
+    );
+    // 4 連で開いたら閉じも 4 連
+    let source = "＊挨拶\n  Alice：OK\n````lua\nprint(1)\n````＃ メモ\n";
+    assert_eq!(
+        line_tokens(source, 4),
+        vec![(0, 4, CODE_BLOCK), (4, 4, COMMENT)]
+    );
+    // コメントが無ければフェンスだけ（Lua の本文には色を付けない）
+    let source = "＊挨拶\n  Alice：OK\n```lua\nprint(1)\n```\n";
+    assert_eq!(line_tokens(source, 3), vec![]);
+    assert_eq!(line_tokens(source, 4), vec![(0, 3, CODE_BLOCK)]);
+}

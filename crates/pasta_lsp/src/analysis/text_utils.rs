@@ -127,17 +127,24 @@ pub(super) fn find_open_paren(text: &str) -> Option<usize> {
 /// `start` is the byte offset after the opening paren.
 pub(super) fn find_close_paren(text: &str, start: usize) -> Option<usize> {
     let mut depth = 1i32;
-    for (i, c) in text[start..].char_indices() {
+    let mut i = start;
+    while let Some(c) = text[i..].chars().next() {
         match c {
+            // 文字列の中の括弧は数えない
+            '「' | '"' => {
+                i = string_literal_end(text, i);
+                continue;
+            }
             '(' | '（' => depth += 1,
             ')' | '）' => {
                 depth -= 1;
                 if depth == 0 {
-                    return Some(start + i);
+                    return Some(i);
                 }
             }
             _ => {}
         }
+        i += c.len_utf8();
     }
     None
 }

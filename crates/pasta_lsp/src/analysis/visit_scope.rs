@@ -38,6 +38,9 @@ impl super::AnalysisEngine {
         for word in &scene.words {
             Self::visit_keywords(word, source, tokens);
         }
+        for item in &scene.actors {
+            Self::visit_scene_actor_item(item, source, tokens);
+        }
         for cb in &scene.code_blocks {
             Self::visit_code_block(cb, source, tokens);
         }
@@ -87,12 +90,29 @@ impl super::AnalysisEngine {
     fn visit_attr(attr: &Attr, source: &str, tokens: &mut Vec<RawToken>) {
         if attr.span.is_valid() {
             Self::add_token_from_span(&attr.span, source, token_type::DECORATOR, 0, tokens);
+            // 次の属性が続く間は `＆` が来るので、出るのは行の最後の属性の後ろだけ
+            push_trailing_comment(source, attr.span.start_line, attr.span.end_byte, tokens);
         }
+    }
+
+    /// アクター指定の行（`　％さくら、うにゅう`）は項目の色を出さず、行末のコメントだけ
+    fn visit_scene_actor_item(item: &SceneActorItem, source: &str, tokens: &mut Vec<RawToken>) {
+        if !item.span.is_valid() {
+            return;
+        }
+        // 項目の後ろの `、` は span に入らない（最後の項目の後ろの `、` も文法が許す）
+        let rest = source.get(item.span.end_byte..).unwrap_or("");
+        let after = rest.trim_start();
+        let after = after.strip_prefix(['、', '，', ',']).unwrap_or(after);
+        let from = source.len() - after.len();
+        push_trailing_comment(source, item.span.start_line, from, tokens);
     }
 
     fn visit_keywords(word: &KeyWords, source: &str, tokens: &mut Vec<RawToken>) {
         if word.span.is_valid() {
             Self::add_token_from_span(&word.span, source, token_type::WORD, 0, tokens);
+            // 囲まない値は `＃` 以降も span に入るので何も出ない（要件 4.4）
+            push_trailing_comment(source, word.span.start_line, word.span.end_byte, tokens);
         }
     }
 
@@ -116,8 +136,39 @@ impl super::AnalysisEngine {
         // A real fenced block has distinct open/close fence lines. Guard against a
         // degenerate single-line span to avoid emitting a duplicate token.
         if close_fence_line != open_fence_line {
-            Self::add_full_line_token(close_fence_line, source, token_type::CODE_BLOCK, 0, tokens);
+            Self::visit_close_fence(open_fence_line, close_fence_line, source, tokens);
         }
+    }
+
+    /// 閉じのフェンスの行: 開きと同じ数の `` ` `` だけを CODE_BLOCK にし、その後ろの
+    /// 行末のコメントを COMMENT にする（本文は開きと同じ数の `` ` `` を含まない）
+    fn visit_close_fence(
+        open_line: usize,
+        close_line: usize,
+        source: &str,
+        tokens: &mut Vec<RawToken>,
+    ) {
+        let fence_len = get_line_text(source, open_line)
+            .trim_start()
+            .chars()
+            .take_while(|&c| c == '`')
+            .count();
+        let line_text = get_line_text(source, close_line);
+        let found = (fence_len > 0).then(|| line_text.find(&"`".repeat(fence_len)));
+        let Some(start) = found.flatten() else {
+            Self::add_full_line_token(close_line, source, token_type::CODE_BLOCK, 0, tokens);
+            return;
+        };
+        let end = start + fence_len;
+        tokens.push(RawToken {
+            line: (close_line - 1) as u32,
+            start_char: utf8_offset_to_utf16(line_text, start),
+            length: (end - start) as u32,
+            token_type: token_type::CODE_BLOCK,
+            modifiers: 0,
+        });
+        let line_start = line_byte_offset(source, close_line);
+        push_trailing_comment(source, close_line, line_start + end, tokens);
     }
 
     /// Find the closing fence line for a code block: the largest (1-based) line
