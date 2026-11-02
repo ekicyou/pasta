@@ -61,7 +61,7 @@ impl WordDefRegistry {
     /// The assigned entry ID.
     pub fn register_local(&mut self, module_name: &str, name: &str, values: Vec<String>) -> usize {
         let id = self.entries.len();
-        let sanitized_module = Self::sanitize_name(module_name);
+        let sanitized_module = SceneRegistry::sanitize_name(module_name);
         let key = format!(":{}:{}", sanitized_module, name);
         self.entries.push(WordEntry { id, key, values });
         id
@@ -80,7 +80,7 @@ impl WordDefRegistry {
     /// The assigned entry ID.
     pub fn register_actor(&mut self, actor_name: &str, name: &str, values: Vec<String>) -> usize {
         let id = self.entries.len();
-        let sanitized_actor = Self::sanitize_name(actor_name);
+        let sanitized_actor = SceneRegistry::sanitize_name(actor_name);
         let key = format!(":__actor_{}__:{}", sanitized_actor, name);
         self.entries.push(WordEntry { id, key, values });
         id
@@ -94,11 +94,6 @@ impl WordDefRegistry {
     /// Take ownership of all entries (for building WordTable).
     pub fn into_entries(self) -> Vec<WordEntry> {
         self.entries
-    }
-
-    /// Sanitize a name for use in keys (same logic as SceneRegistry).
-    pub fn sanitize_name(name: &str) -> String {
-        SceneRegistry::sanitize_name(name)
     }
 
     /// Merge entries from another registry.
@@ -217,14 +212,6 @@ mod tests {
         }
 
         assert_eq!(registry.all_entries().len(), 10);
-    }
-
-    #[test]
-    fn test_sanitize_name() {
-        assert_eq!(WordDefRegistry::sanitize_name("hello"), "hello");
-        assert_eq!(WordDefRegistry::sanitize_name("hello-world"), "hello_world");
-        assert_eq!(WordDefRegistry::sanitize_name("会話"), "会話");
-        assert_eq!(WordDefRegistry::sanitize_name("＊会話"), "_会話");
     }
 
     #[test]
