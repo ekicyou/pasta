@@ -122,7 +122,7 @@
   - _Requirements: 10.4, 10.5, 10.6, 10.9_
 
 - [ ] 8. ワークフローと steering
-- [ ] 8.1 (P) Build ワークフローにマニュアルの軽い検査の job を足す
+- [x] 8.1 (P) Build ワークフローにマニュアルの軽い検査の job を足す
   - `needs` を持たない job `manual-light`（name `manual-light-checks`）を足し、checkout・Node 22・軽い検査 3 つを `manual.yml` と同じ段の名前で走らせる
   - build の job の `upload-artifact` を v7 に上げる。第三者の action はタグのまま
   - 完了の姿: `actionlint` が 0 件で、`build.yml` に軽い検査 3 つの段を持つ `needs` の無い job がある
