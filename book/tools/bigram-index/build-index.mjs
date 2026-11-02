@@ -22,7 +22,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { tokenize } from './tokenize.mjs';
 
 const require = createRequire(import.meta.url);
@@ -209,12 +208,12 @@ export function buildBigramIndex(bookOutDir, { write = true } = {}) {
 // CLI: node build-index.mjs <book-out-dir>
 // 成功時 exit 0、失敗時は例外を投げて非ゼロ終了（mdbook build 後段でビルド失敗扱い）。
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) {
-  // 既定パスはモジュール位置基準で book/book を指す。new URL().pathname は
-  // Windows でドライブ文字つき `/C:/...` を返し path.resolve が `C:\C:\...` に
-  // 壊れるため、fileURLToPath で正規に OS パスへ変換する（POSIX では同一挙動）。
-  const dir = process.argv[2] || path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)), '../../book',
-  );
+  // 引数は必須。既定のパスを持たない（テストが公開の出力へ書く道を残さない）。
+  const dir = process.argv[2];
+  if (!dir) {
+    console.error('usage: node build-index.mjs <book-out-dir>');
+    process.exit(1);
+  }
   try {
     const { searchIndexFile, sizeBytes, warnings } = buildBigramIndex(dir);
     const mb = (sizeBytes / 1024 / 1024).toFixed(2);
