@@ -8,9 +8,9 @@
     elasticlunr が用いる pipeline を reset 済みにしている。検索の整合には
     「クエリ側も索引と同一規則（2-gram）で分割」する必要がある（不一致は検索破綻）。
 
-  実装方式（v0.5.3 の制約に基づく選択）:
+  実装方式（v0.5.4 の制約に基づく選択）:
     当初設計は `theme/searcher.js` を置いて mdBook 既定 searcher を差し替える前提
-    だったが、mdBook v0.5.3 は検索ランタイム（searcher-<hash>.js）をテーマ
+    だったが、mdBook v0.5.4 は検索ランタイム（searcher-<hash>.js）をテーマ
     オーバーライド対象に含めず、`theme/searcher.js` を置いても無視して既定を出力する
     （空テーマで実測確認済み）。一方 `theme/head.hbs` は全ページ <head> に確実に
     取り込まれる正規のオーバーライド対象である。
@@ -74,8 +74,7 @@
             (cp >= 0x4e00 && cp <= 0x9fff) || // CJK 統合漢字
             (cp >= 0xf900 && cp <= 0xfaff) || // CJK 互換漢字
             (cp >= 0xff66 && cp <= 0xff9f) || // 半角カタカナ
-            cp === 0x30fc || // 長音記号 ー
-            (cp >= 0x20000 && cp <= 0x2ffff) // CJK 拡張B以降
+            cp === 0x30fc // 長音記号 ー
         );
     }
 

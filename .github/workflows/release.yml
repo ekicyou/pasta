@@ -22,7 +22,9 @@ concurrency:
 env:
   WASM_PACK_VERSION: '0.15.0'
   CARGO_ABOUT_VERSION: '0.9.2'
-  NODE_VERSION: '20'
+  WASM_PACK_SHA256: '518dc51180c7bc864699c9279b3bc99025bc109123e0249a34ba34d130a509bf'
+  CARGO_ABOUT_SHA256: '1c03e5890238562497c2d89a3b75b02560af349c1fc3e713d3284f532a5cd748'
+  NODE_VERSION: '22'
   RELEASE_ENVIRONMENT: release
 
 jobs:
@@ -70,12 +72,12 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: i686-pc-windows-msvc,x86_64-pc-windows-msvc
 
       - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: i686-x86_64-pc-windows-msvc
 
@@ -90,9 +92,9 @@ jobs:
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           $tools = @(
-            @{ Name = 'wasm-pack'; Version = $env:WASM_PACK_VERSION
+            @{ Name = 'wasm-pack'; Version = $env:WASM_PACK_VERSION; Sha256 = $env:WASM_PACK_SHA256
                Url = "https://github.com/rustwasm/wasm-pack/releases/download/v$env:WASM_PACK_VERSION/wasm-pack-v$env:WASM_PACK_VERSION-x86_64-pc-windows-msvc.tar.gz" }
-            @{ Name = 'cargo-about'; Version = $env:CARGO_ABOUT_VERSION
+            @{ Name = 'cargo-about'; Version = $env:CARGO_ABOUT_VERSION; Sha256 = $env:CARGO_ABOUT_SHA256
                Url = "https://github.com/EmbarkStudios/cargo-about/releases/download/$env:CARGO_ABOUT_VERSION/cargo-about-$env:CARGO_ABOUT_VERSION-x86_64-pc-windows-msvc.tar.gz" }
           )
           foreach ($t in $tools) {
@@ -100,6 +102,8 @@ jobs:
             New-Item -ItemType Directory -Force -Path $dir | Out-Null
             $archive = "$dir.tar.gz"
             Invoke-WebRequest -Uri $t.Url -OutFile $archive
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash
+            if ($hash -ne $t.Sha256) { throw "$($t.Name) の SHA-256 が決めた値と違う: $hash" }
             & "$env:SystemRoot\System32\tar.exe" -xzf $archive -C $dir
             $exe = Get-ChildItem -LiteralPath $dir -Recurse -Filter "$($t.Name).exe" | Select-Object -First 1
             if (-not $exe) { throw "$($t.Name).exe が $($t.Url) の中に無い" }
@@ -110,15 +114,11 @@ jobs:
           }
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: editors/vscode/package-lock.json
-
-      # 生成ファイルを pasta-skills.zip で配るので、タグの時点の鮮度をここで保証する（manual.yml は path filter 付きで、マージは CI を待たない）。
-      - name: Check generated skill references
-        run: node book/tools/gen-skill-refs.mjs --check
 
       # release.ps1 の cargo は --locked を持たないため、後段の Cargo.lock の不変検査で同等にする。
       - name: Build pasta.dll.zip, hello-pasta.nar, pasta_check.zip and pasta-skills.zip
@@ -220,7 +220,7 @@ jobs:
         run: git diff --exit-code -- Cargo.lock
 
       - name: Upload release-assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-assets
           path: |
@@ -276,16 +276,16 @@ jobs:
 
       # cargo publish の検証ビルド（ホストのターゲット）に使う。
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
 
       - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: publish
 
       - name: Auth crates.io (pasta_core)
         id: auth_core
-        uses: rust-lang/crates-io-auth-action@v1
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1
 
       - name: Publish pasta_core
         id: pub_core
@@ -295,7 +295,7 @@ jobs:
 
       - name: Auth crates.io (pasta_dsl)
         id: auth_dsl
-        uses: rust-lang/crates-io-auth-action@v1
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1
 
       - name: Publish pasta_dsl
         id: pub_dsl
@@ -305,7 +305,7 @@ jobs:
 
       - name: Auth crates.io (pasta_lua)
         id: auth_lua
-        uses: rust-lang/crates-io-auth-action@v1
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1
 
       - name: Publish pasta_lua
         id: pub_lua
@@ -315,7 +315,7 @@ jobs:
 
       - name: Auth crates.io (pasta_shiori)
         id: auth_shiori
-        uses: rust-lang/crates-io-auth-action@v1
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1
 
       - name: Publish pasta_shiori
         id: pub_shiori
@@ -325,7 +325,7 @@ jobs:
 
       - name: Auth crates.io (pasta_check)
         id: auth_check
-        uses: rust-lang/crates-io-auth-action@v1
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1
 
       - name: Publish pasta_check
         id: pub_check
@@ -410,13 +410,13 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download release-assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-assets
           path: release-assets
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -427,7 +427,7 @@ jobs:
 
       - name: Azure login (OIDC)
         id: login
-        uses: Azure/login@v3
+        uses: Azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -499,7 +499,7 @@ jobs:
           fetch-tags: true
 
       - name: Download release-assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-assets
           path: release-assets

@@ -21,6 +21,7 @@
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { summaryChapters } from './link-check.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -75,12 +76,19 @@ log('\n== verify-content.mjs（コンテンツ整合・網羅レビュー検証�
   for (const id of ['C-steps', 'C-order', 'C-tutorial-check']) {
     check(`${id} が PASS`, out.includes(`PASS  [${id}]`));
   }
-  // 台詞部品（T 系）が空回りしていない: 全 64 章（debug/ を含む）の記法・導入・締めと、素材・規約が走る。
+  // 台詞部品（T 系）が空回りしていない: 目次の全章（debug/ を含む）の記法・導入・締めと、素材・規約が走る。
   // 件数は PASS・FAIL を問わず数える（合否は上の「FAIL 0 件」が見る）。
   const tcount = (id) => count(new RegExp(`(?:PASS|FAIL) {2}\\[${id}[:\\]]`, 'g'));
-  for (const [id, n] of [['T-syntax', 64], ['T-intro', 64], ['T-outro', 64], ['T-assets', 1], ['T-authoring', 1]]) {
+  const toc = summaryChapters();
+  for (const [id, n] of [['T-syntax', toc.length], ['T-intro', toc.length], ['T-outro', toc.length], ['T-assets', 1], ['T-authoring', 1]]) {
     check(`${id} を ${n} 件実行`, tcount(id) === n, `${id}=${tcount(id)}`);
   }
+  // 検査した章の名前の集合が目次の章と一致する（検査のフォルダの外の章を見落とさない）。
+  const checked = [...out.matchAll(/(?:PASS|FAIL) {2}\[T-syntax:([^\]]+)\]/g)].map((m) => m[1]);
+  const unchecked = toc.filter((c) => !checked.includes(c));
+  const extra = checked.filter((c) => !toc.includes(c));
+  check('T-syntax の章の集合が目次の章と一致', unchecked.length === 0 && extra.length === 0,
+    `検査されない目次の章: [${unchecked.join(', ')}] / 目次に無い検査章: [${extra.join(', ')}]`);
   check('台詞部品の検査の走査対象にデバッグパートを含む', /\[T-syntax:debug\//.test(out));
 }
 

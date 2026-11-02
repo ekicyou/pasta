@@ -29,10 +29,10 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { LINK_RE, REPO_ROOT, maskFences } from './link-check.mjs';
+import { LINK_RE, MANUAL_URL, REPO_ROOT, maskFences } from './link-check.mjs';
 import { TALK_LINE_RE, scanTalk } from './talk/talk.mjs';
 
-export const MANUAL_BASE_URL = 'https://ekicyou.github.io/pasta/';
+export const MANUAL_BASE_URL = MANUAL_URL;
 
 const GA = 'pasta-ghost-authoring';
 const LC = 'pasta-lua-coding';
@@ -118,7 +118,6 @@ const INLINE_CODE_RE = /(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g;
 //   body  … 最初と最後のフェンス外の `---` の間から、前後の空行を除いた範囲（extractBody の本文）
 //   outro … 最後のフェンス外の `---` の次行〜末尾
 // 構造（H1・区切り 2 本以上）だけを見て bad-structure を投げる。台詞・口調は見ない（非生成章にも使うため）。
-// 区切りの規則を変えるときは、talk/talk.mjs の --stats にある複製（循環 import 回避）も合わせる。
 export function chapterRegions(chapterText, chapter) {
   const lines = chapterText.replace(/\r\n?/g, '\n').split('\n');
   const masked = maskFences(chapterText).split('\n');
@@ -177,8 +176,8 @@ export function extractBody(chapterText, chapter) {
 
 // ---- タスク 3.4: リンク書き換え・ヘッダ・書き出し・照合 ----
 
-export const GENERATED_MARK = '<!-- GENERATED FROM PASTA MANUAL - DO NOT EDIT -->';
-export const FIX_COMMAND = 'node book/tools/gen-skill-refs.mjs';
+const GENERATED_MARK = '<!-- GENERATED FROM PASTA MANUAL - DO NOT EDIT -->';
+const FIX_COMMAND = 'node book/tools/gen-skill-refs.mjs';
 const SKILLS = [...new Set(GENERATION_MAP.map((e) => e.skill))];
 const BY_CHAPTER = new Map(GENERATION_MAP.map((e) => [e.chapter, e]));
 const toHtml = (chapter) => chapter.replace(/\.md$/, '.html');

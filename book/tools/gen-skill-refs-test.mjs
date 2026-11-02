@@ -43,7 +43,7 @@ import {
   writeAll,
   checkAll,
 } from './gen-skill-refs.mjs';
-import { REPO_ROOT, LINK_RE, maskFences, listMarkdownFiles } from './link-check.mjs';
+import { REPO_ROOT, LINK_RE, MANUAL_URL, maskFences, listMarkdownFiles, summaryChapters } from './link-check.mjs';
 
 // --- 最小 assert ハーネス（依存ゼロ） ---
 let passed = 0;
@@ -271,7 +271,7 @@ for (const entry of GENERATION_MAP) {
 log('\n[F] rewriteLinks');
 const GA = 'pasta-ghost-authoring';
 const LC = 'pasta-lua-coding';
-const URL_BASE = 'https://ekicyou.github.io/pasta/';
+const URL_BASE = MANUAL_URL;
 {
   const search = { chapter: 'lua/modules/pasta-search.md', skill: LC };
   const rw = (body, entry = search) => rewriteLinks(body, entry);
@@ -597,7 +597,12 @@ function legacyBodyRange(text) {
   const src = path.join(REPO_ROOT, 'book/src');
   const chapters = listMarkdownFiles(src).map((f) => path.relative(src, f).split(path.sep).join('/'))
     .filter((c) => c !== 'SUMMARY.md').sort();
-  check('K-10 実リポジトリの章を 64 章見つける', chapters.length === 64, String(chapters.length));
+  // 章の数は決め打ちせず、book/src のファイルと目次の章を突き合わせ、差を名前で示す。
+  const toc = summaryChapters(REPO_ROOT);
+  const notInToc = chapters.filter((c) => !toc.includes(c));
+  const notInSrc = toc.filter((c) => !chapters.includes(c));
+  check('K-10 book/src の章のファイルと目次の章が一致', notInToc.length === 0 && notInSrc.length === 0,
+    `目次に無いファイル: [${notInToc.join(', ')}] / ファイルの無い目次の章: [${notInSrc.join(', ')}]`);
   for (const ch of chapters) {
     const text = fs.readFileSync(path.join(src, ch), 'utf8');
     const e = thrown(() => chapterRegions(text, ch));

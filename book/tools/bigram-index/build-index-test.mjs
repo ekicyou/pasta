@@ -5,16 +5,15 @@
 //   grammar / lua / reference 全章）の mdBook 出力に対し、ビルダが searchindex を
 //   2-gram 索引へ再生成し、語中 2 文字検索がヒットすることを実機で証明する。
 //
-//   - RED  : mdBook 標準索引（空白/語頭区切り）では語中 2 文字（例「ファレ」=
-//            リファレンスの語中）がヒットしない。
+//   - tokenize の単体の検査（索引・クエリの正準規則）。
 //   - GREEN: ビルダ実行後の bigram 索引 ＋ 共有 tokenize でクエリすると、
 //            語中 2 文字が当該語を含むページにヒットする。
 //   - 索引サイズが 10MB 閾値未満であることを実測出力する。
 //   - 再生成が決定論的（同一入力 → 同一バイト列）であることを確認する。
 //
-// 一連の `mdbook build book` → ビルダ → 本テスト が exit 0 となることを目指す。
-// ブラウザ searcher.js への注入はタスク 3.2 の担当ゆえ、本テストは Node 上で
-// mdBook 検索 UI と同一のクエリオプションを再現して 2.4 の成立を立証する。
+// 検索の設定は索引の search_options（ブラウザの searcher と同じ）を使う。
+// 公開の出力（book/book）には書かない。書く検査は一時のフォルダの写しに対して行い、
+// 終わりに book/book の索引のバイトが変わっていないことを確かめる。
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -30,6 +29,9 @@ import {
   rebuildBigramIndex,
   serializeSearchIndex,
   buildBigramIndex,
+  searchIndex,
+  corpusOf,
+  urlsContaining,
   SIZE_WARN_THRESHOLD_BYTES,
 } from './build-index.mjs';
 
@@ -49,6 +51,15 @@ function ensureBookBuilt() {
 }
 ensureBookBuilt();
 
+// 公開の出力の elasticlunr と索引を一時のフォルダへ写す。書く検査はこの写しに対して行う。
+const publishedIndexFile = resolveHashed(bookOut, /^searchindex-.*\.js$/);
+const publishedBefore = fs.readFileSync(publishedIndexFile);
+const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bigram-index-test-'));
+process.on('exit', () => fs.rmSync(workDir, { recursive: true, force: true }));
+for (const f of [resolveHashed(bookOut, /^elasticlunr-.*\.min\.js$/), publishedIndexFile]) {
+  fs.copyFileSync(f, path.join(workDir, path.basename(f)));
+}
+
 // --- 最小 assert ハーネス（依存ゼロ） ---
 let passed = 0;
 let failed = 0;
@@ -62,6 +73,38 @@ function check(name, cond, detail) {
     log(`  FAIL  ${name}${detail ? '  -- ' + detail : ''}`);
   }
 }
+
+// =========================================================================
+// tokenize unit: 索引・クエリ双方の正準規則（head.hbs ミラーと同一）を固定する。
+// =========================================================================
+log('--- tokenize unit ---');
+{
+  const checkTokens = (input, expected, label) => {
+    const got = tokenize(input);
+    check(`tokenize ${label}`,
+      JSON.stringify(got) === JSON.stringify(expected), JSON.stringify(got));
+  };
+  checkTokens('構造体', ['構造', '造体'], '"構造体" -> ["構造","造体"]');
+  checkTokens('造体', ['造体'], '"造体" -> ["造体"]');
+  checkTokens('Lua API', ['lua', 'api'], '"Lua API" は ASCII 語を保持');
+  checkTokens(null, [], 'null -> []（null ガード）');
+  checkTokens(undefined, [], 'undefined -> []（undefined ガード）');
+  checkTokens('', [], '空文字列 -> []');
+  checkTokens(123, ['123'], '数値 123 は String 化して語トークン');
+  checkTokens('猫', ['猫'], '単独 CJK 1 文字はそのまま 1 トークン');
+  checkTokens('a猫b', ['a', '猫', 'b'], 'ASCII に挟まれた単独 CJK の分割');
+  checkTokens('ＰＡＳＴＡ ０１', ['pasta', '01'], '全角英数の半角化＋小文字化');
+  checkTokens('ｱｲｳ', ['ｱｲ', 'ｲｳ'], '半角カタカナも bigram 化');
+  checkTokens('サーバー', ['サー', 'ーバ', 'バー'], '長音記号 ー は CJK ランに連結');
+  checkTokens('spec-driven', ['spec', 'driven'], 'ハイフンは語区切り');
+  checkTokens('foo\tbar\nbaz', ['foo', 'bar', 'baz'], 'タブ・改行も空白区切り');
+  checkTokens('構造体abc', ['構造', '造体', 'abc'], 'CJK/ASCII 境界でラン分離');
+  checkTokens('㐀㐁', ['㐀㐁'], 'CJK 拡張A（BMP 内）は bigram 化');
+  // 特性固定: 拡張 B の範囲の判定は無い（UTF-16 の 1 単位で回すため）。
+  // サロゲートペアは非 CJK ランとして 1 語トークンになる。head.hbs ミラーも同一規則。
+  checkTokens('𠀋𠀋', ['𠀋𠀋'], 'CJK 拡張B は 1 語トークン（特性固定）');
+}
+log('');
 
 // =========================================================================
 // UNIT: extractJsonLiteral / serializeSearchIndex / resolveHashed（3.63 G1 追加）
@@ -147,40 +190,17 @@ log('--- UNIT (extract / serialize / resolve) ---');
 }
 log('');
 
-// mdBook 標準検索 UI と同一のクエリオプション（searcher.js 由来）。
-const SEARCH_OPTIONS = {
-  bool: 'AND',
-  expand: true,
-  fields: {
-    title: { boost: 2 },
-    body: { boost: 1 },
-    breadcrumbs: { boost: 1 },
-  },
-};
-
-function searchUrls(elasticlunr, indexObj, query) {
-  const idx = elasticlunr.Index.load(indexObj.index);
-  const results = idx.search(query, SEARCH_OPTIONS);
-  return results.map((r) => indexObj.doc_urls[Number(r.ref)]);
-}
-
-// 索引内の全ドキュメント本文＋タイトルを連結したコーパス。
-function corpusOf(indexObj) {
-  const docs = indexObj.index.documentStore.docs;
-  return Object.values(docs)
-    .map((d) => `${d.title || ''} ${d.body || ''} ${d.breadcrumbs || ''}`)
-    .join(' ');
-}
+const searchUrls = (elasticlunr, indexObj, query) => searchIndex(elasticlunr, indexObj, query).urls;
 
 // =========================================================================
-// フィクスチャ取得（本番フルコンテンツ）
+// フィクスチャ取得（本番フルコンテンツの一時のフォルダの写し）
 // =========================================================================
-const elasticlunrFile = resolveHashed(bookOut, /^elasticlunr-.*\.min\.js$/);
-const searchIndexFile = resolveHashed(bookOut, /^searchindex-.*\.js$/);
+const elasticlunrFile = resolveHashed(workDir, /^elasticlunr-.*\.min\.js$/);
+const searchIndexFile = resolveHashed(workDir, /^searchindex-.*\.js$/);
 const elasticlunr = require(elasticlunrFile);
 const original = readSearchIndex(searchIndexFile);
 
-log('book out:', bookOut);
+log('book out:', bookOut, '(copied to', workDir + ')');
 log('  elasticlunr:', path.basename(elasticlunrFile));
 log('  searchindex:', path.basename(searchIndexFile));
 log('  doc count   :', original.doc_urls.length);
@@ -217,22 +237,6 @@ const CASES = [
 log('');
 
 // =========================================================================
-// RED PHASE: 標準索引では語中 2 文字がヒットしない
-// =========================================================================
-log('--- RED PHASE (mdBook 標準索引 / 語中2文字クエリ) ---');
-{
-  const savedTok = elasticlunr.tokenizer; // デフォルトのまま（ブラウザ既定相当）
-  elasticlunr.tokenizer = savedTok;
-  for (const c of CASES) {
-    const urls = searchUrls(elasticlunr, original, c.mid);
-    log(`  query "${c.mid}" -> hits: ${urls.length}`);
-    check(`RED: 標準索引では語中片「${c.mid}」がヒットしない`, urls.length === 0,
-      `urls=${JSON.stringify(urls.slice(0, 5))}`);
-  }
-}
-log('');
-
-// =========================================================================
 // GREEN PHASE: bigram 再生成索引 + 共有 tokenize で語中 2 文字がヒット
 // =========================================================================
 log('--- GREEN PHASE (bigram 再生成索引 + 共有 tokenize クエリ) ---');
@@ -251,11 +255,12 @@ let rebuilt;
         `urls=${JSON.stringify(midUrls.slice(0, 5))}`);
       check(`GREEN: 親語「${c.word}」がヒットする`, wordUrls.length > 0,
         `urls=${JSON.stringify(wordUrls.slice(0, 5))}`);
-      // 語中片のヒット集合は親語のヒット集合を包含するはず（同一語起源）。
-      const wordSet = new Set(wordUrls);
-      check(`GREEN: 「${c.mid}」のヒットが親語「${c.word}」のヒットを包含`,
-        wordUrls.length > 0 && [...wordSet].every((u) => midUrls.includes(u)),
-        `mid=${JSON.stringify(midUrls.slice(0, 5))} word=${JSON.stringify(wordUrls.slice(0, 5))}`);
+      // 親語を含む節は、全部が語中片のヒットに入る（検索の設定 OR/AND によらず成り立つ）。
+      const holders = urlsContaining(rebuilt, c.word);
+      const missing = holders.filter((u) => !midUrls.includes(u));
+      check(`GREEN: 親語「${c.word}」を含む節は全部が語中片「${c.mid}」のヒットに入る`,
+        holders.length > 0 && missing.length === 0,
+        `holders=${holders.length} missing=${JSON.stringify(missing.slice(0, 5))}`);
     }
   } finally {
     elasticlunr.tokenizer = savedTok;
@@ -289,7 +294,7 @@ log('');
 log('--- ROUND-TRIP (write -> re-read) ---');
 {
   // 実ファイルへ書き出してから読み戻す（buildBigramIndex の write 経路）。
-  const res = buildBigramIndex(bookOut, { write: true });
+  const res = buildBigramIndex(workDir, { write: true });
   log(`  written: ${path.basename(res.searchIndexFile)} size=${res.sizeBytes} overThreshold=${res.overThreshold}`);
   check('ROUND-TRIP: buildBigramIndex の報告サイズが閾値未満', !res.overThreshold,
     `size=${res.sizeBytes}`);
@@ -319,9 +324,9 @@ log('');
 log('--- DRY-RUN (write:false) & CLI contract ---');
 {
   // write:false はファイルを変更せずサイズのみ報告する（ドライラン契約）。
-  const file = resolveHashed(bookOut, /^searchindex-.*\.js$/);
+  const file = resolveHashed(workDir, /^searchindex-.*\.js$/);
   const before = fs.readFileSync(file);
-  const dry = buildBigramIndex(bookOut, { write: false });
+  const dry = buildBigramIndex(workDir, { write: false });
   const after = fs.readFileSync(file);
   check('DRY-RUN: write:false でファイルが変更されない', before.equals(after),
     `before=${before.length} after=${after.length}`);
@@ -330,34 +335,39 @@ log('--- DRY-RUN (write:false) & CLI contract ---');
 
   const buildIndexScript = path.resolve(here, 'build-index.mjs');
 
-  // CLI 引数なし: モジュール位置基準の既定パス（../../book = book/book）で動作する。
-  // 回帰固定（3.63 G3）: 旧実装は new URL().pathname を直接 path.resolve しており、
-  // Windows で `C:\C:\...` に壊れ ENOENT exit 1 だった（fileURLToPath 化で修正）。
+  // CLI を走らせ、終了コードと stderr を返す。stdio 明示で子プロセスの stderr が
+  // 本テスト出力へ漏れないようにする（既定では親の stderr へ転写され FAIL に見えるノイズになる）。
+  const runCli = (args) => {
+    try {
+      execFileSync('node', [buildIndexScript, ...args],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      return { status: 0, stderr: '' };
+    } catch (e) {
+      return { status: e.status, stderr: String(e.stderr || '') };
+    }
+  };
+
+  // CLI 引数なし: 既定のパスは無い。使い方を出して exit 1（公開の出力へ書く道を残さない）。
   {
-    const out = execFileSync('node', [buildIndexScript], { encoding: 'utf8' });
-    check('CLI: 引数なしで既定パス（book/book）に対し exit 0',
-      /bigram index written:/.test(out), out.slice(0, 200));
+    const { status, stderr } = runCli([]);
+    check('CLI: 引数なしで exit 1', status === 1, `status=${status}`);
+    check('CLI: 引数なしで使い方を stderr へ出力',
+      /usage: node build-index\.mjs <book-out-dir>/.test(stderr), stderr.slice(0, 200));
   }
 
   // CLI 失敗契約: 存在しないディレクトリ指定は非ゼロ終了＋診断メッセージ。
   {
-    let status = 0;
-    let stderr = '';
-    try {
-      // stdio 明示で子プロセスの stderr が本テスト出力へ漏れないようにする
-      // （既定では親の stderr へ転写され FAIL に見えるノイズになる）。
-      execFileSync('node', [buildIndexScript, path.join(bookOut, 'no-such-dir')],
-        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-    } catch (e) {
-      status = e.status;
-      stderr = String(e.stderr || '');
-    }
+    const { status, stderr } = runCli([path.join(workDir, 'no-such-dir')]);
     check('CLI: 不正ディレクトリで exit 1', status === 1, `status=${status}`);
     check('CLI: 失敗時に build-index failed 診断を stderr へ出力',
       /build-index failed:/.test(stderr), stderr.slice(0, 200));
   }
 }
 log('');
+
+// 公開の出力の索引は、テストの前後で 1 バイトも変わらない。
+check('PUBLISHED: book/book の索引のバイトがテストの前後で同じ',
+  publishedBefore.equals(fs.readFileSync(publishedIndexFile)), publishedIndexFile);
 
 log(`RESULT: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

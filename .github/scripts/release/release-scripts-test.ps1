@@ -1,7 +1,7 @@
 #Requires -Version 7
 <#
 .SYNOPSIS
-  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1・定型コマンド D の highlights-check.ps1・添付の欠けを見る github-release.ps1）を、一時の git リポジトリで実際に動かして確かめる。
+  リリースの補助スクリプト（release-notes.ps1・verify-tag.ps1・定型コマンド D の highlights-check.ps1・添付の欠けを見る github-release.ps1・公開済みなら飛ばす publish-vsix.ps1）を、一時の git リポジトリで実際に動かして確かめる。
 .DESCRIPTION
   一時のフォルダに git リポジトリを作り、決まった件名のコミットとタグ（v0.0.1・v0.0.2）を積んで、スクリプトを子の pwsh で呼ぶ。
   ネットワークと gh を使わない。一時のフォルダは終わりに消し、リポジトリの作業ツリーを変えない。
@@ -250,6 +250,16 @@ try {
         if ($r.Exit -ne 1) { "終了コード $($r.Exit)（1 のはず）: $($r.Output)" }
         if (-not $r.Output.Contains('pasta-skills.zip')) { "出力に pasta-skills.zip が無い: $($r.Output)" }
         if ($r.Output.Contains('pasta_check.zip')) { "出力に pasta_check.zip が出る（無いのは pasta-skills.zip だけのはず）: $($r.Output)" }
+    }
+
+    Test-Item 12 'publish-vsix.ps1 が、偽の vsce が公開済みと答えるとき、status=skipped・終了コード 0 で終わる' {
+        # 偽の vsce は show にだけ答える。publish を呼べば 1 で終わるので、公開に進めば分かる
+        # shortcut: -VsceCommand は空白で区切るので、一時のフォルダのパスに空白があると NG になる。そうなったら -VsceCommand を配列の引数に変える
+        $fake = Join-Path $tmp 'fake-vsce.ps1'
+        Write-Utf8 $fake "if (`$args[0] -eq 'show') { '{`"versions`":[{`"version`":`"0.0.2`"}]}'; exit 0 }`nWrite-Error `"想定外の呼び出し: `$args`"; exit 1`n"
+        $r = Invoke-Script publish-vsix.ps1 @('-VsixPath', 'no-such/*.vsix', '-Version', '0.0.2', '-Extension', 'test.ext', '-VsceCommand', $fake)
+        if ($r.Exit -ne 0) { "終了コード $($r.Exit)（0 のはず）: $($r.Output)" }
+        if (-not $r.Output.Contains('status=skipped')) { "出力に status=skipped が無い: $($r.Output)" }
     }
 }
 finally {

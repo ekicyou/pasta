@@ -80,7 +80,7 @@ jobs:
           shiori4-testhost "$dll" "$ghost"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pasta-dll-${{ matrix.arch }}
           path: target/${{ matrix.target }}/release/pasta.dll
@@ -205,3 +205,21 @@ jobs:
 
       - name: Release scripts test
         run: pwsh -NoProfile -File .github/scripts/release/release-scripts-test.ps1
+
+  # マニュアルの軽い検査（npm の依存なし・各 1 秒）。Rust を待たず、関門（gate）でも走る（ponytail-manual-ci 要件 1）。
+  manual-light:
+    name: manual-light-checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Skill references freshness
+        run: node book/tools/gen-skill-refs.mjs --check
+      - name: Link check
+        run: node book/tools/link-check.mjs
+      - name: Tutorial artifact match check
+        run: node book/tools/tutorial-check.mjs

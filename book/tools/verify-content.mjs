@@ -20,7 +20,7 @@
 //   F. バージョン（R9.1, R9.3, R9.4） — introduction の対象バージョンが Cargo.toml と一致・LuaJIT 2.1・将来変更注記
 //   I. 内部設計パート（pasta-runtime-internals-doc 1.2, 1.8, 2.7, 2.10, 2.11） — 10 章の存在・本文・
 //      章構造（extractBody）、題材章 8 章の必須 H2 7 種（この順）、機構語の網羅、概要章の対象外ツールと読者
-//   T. 台詞部品（manual-claudia-theme 4.7, 5.2, 7.1–7.3, 10.2, 10.3, 10.8） — 全 64 章（D 系の章＋debug/＋雑記）の
+//   T. 台詞部品（manual-claudia-theme 4.7, 5.2, 7.1–7.3, 10.2, 10.3, 10.8） — 全章（D 系の章＋debug/＋雑記）の
 //      記法（T-syntax）・導入と締めが二人の台詞だけ（T-intro・T-outro）、顔画像（T-assets）、執筆規約の追従（T-authoring）
 //
 // 成功で exit 0、失敗（1 件でも）で exit 1。
@@ -30,11 +30,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runTutorialCheck, listGuideChapters, findProseParagraphs } from './tutorial-check.mjs';
 import { GENERATION_MAP, findVoice, extractBody, chapterRegions } from './gen-skill-refs.mjs';
-import { maskFences } from './link-check.mjs';
+import { maskFences, listMarkdownFiles, summaryChapters } from './link-check.mjs';
 import { SPEAKERS, FACE_DIR, MAX_FACE_BYTES, scanTalk, checkRegion } from './talk/talk.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-export const REPO_ROOT = path.resolve(here, '../..');
+const REPO_ROOT = path.resolve(here, '../..');
 
 const SRC = 'book/src';
 
@@ -49,21 +49,25 @@ function exists(rel) {
   return fs.existsSync(abs(rel));
 }
 
-// コードフェンス（```...```）の中身を全抽出。言語注記は問わない。
+// コードフェンスの中身を全抽出。言語注記は問わない。判定は maskFences（CommonMark 準拠）に任せ、
+// 開きと閉じの行を除いた中身を返す。maskFences が空にした最初の行が開き。閉じは、開きからそこまでで切って
+// 後ろに 1 行足すと、その行がフェンスの外に残る行（空行だけを挟んで並ぶフェンスも分けるため）。
 function extractCodeFences(markdown) {
+  const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+  const masked = maskFences(markdown).split('\n');
   const fences = [];
-  const re = /```[^\n]*\n([\s\S]*?)```/g;
-  let m;
-  while ((m = re.exec(markdown)) !== null) {
-    fences.push(m[1]);
+  for (let i = 0; i < lines.length; i++) {
+    if (masked[i] === lines[i]) continue;
+    let j = i + 1;
+    while (j < lines.length && !maskFences([...lines.slice(i, j + 1), 'x'].join('\n')).endsWith('\nx')) j++;
+    fences.push(lines.slice(i + 1, j).map((l) => `${l}\n`).join(''));
+    i = j;
   }
   return fences;
 }
 
-// コードフェンスを除いた本文（=散文部）を返す。ボイス検査の対象。
-function stripCodeFences(markdown) {
-  return markdown.replace(/```[^\n]*\n[\s\S]*?```/g, '');
-}
+// コードフェンスの行を空にした本文（=散文部）を返す。ボイス検査の対象。
+const stripCodeFences = maskFences;
 
 // キャラ口調（Claudia 令嬢ボイス）の存在判定。マーカー集合（VOICE_MARKERS）と判定は
 // gen-skill-refs.mjs の findVoice に一本化する（生成器の voice-in-body と同じ規則）。
@@ -105,6 +109,19 @@ function assert(id, cond, passMsg, failMsg) {
   else fail(id, failMsg);
 }
 
+// N-fence: 4 つのバッククォートの外側のフェンスの中の 3 つのバッククォートで、フェンスを取り違えない（7.2）。
+{
+  const sample = ['````md', '```', '````', '', '## 後ろ', '```', 'x', '```', '', '```', 'y', '```', ''].join('\n');
+  const fences = extractCodeFences(sample);
+  assert(
+    'N-fence',
+    stripCodeFences(sample).split('\n').includes('## 後ろ')
+      && JSON.stringify(fences) === JSON.stringify(['```\n', 'x\n', 'y\n']),
+    `外側のフェンスの後ろの見出しがフェンスの外に残り、中身が 1 つのフェンスになる`,
+    `フェンスを取り違えた: 中身 ${JSON.stringify(fences)}`,
+  );
+}
+
 // ============================================================
 // A. 文法網羅（R4.1 全実装章の網羅）・権威（ssot 1.5, 9.7 doc/spec を案内しない / 4.2 目次到達）
 // ============================================================
@@ -128,22 +145,11 @@ for (const ch of GRAMMAR_CHAPTERS) {
   );
 }
 
-// book/src 配下の全 .md（再帰）。
-function listMarkdown(relDir) {
-  const out = [];
-  for (const ent of fs.readdirSync(abs(relDir), { withFileTypes: true })) {
-    const rel = `${relDir}/${ent.name}`;
-    if (ent.isDirectory()) out.push(...listMarkdown(rel));
-    else if (ent.isFile() && ent.name.endsWith('.md')) out.push(rel);
-  }
-  return out;
-}
-
 // A-nospec: マニュアルが廃止済みの doc/spec・GRAMMAR.md を（権威としても参照先としても）案内しない。
 {
   const FORBIDDEN = ['doc/spec', 'GRAMMAR.md'];
   const hits = [];
-  for (const rel of listMarkdown(SRC)) {
+  for (const rel of listMarkdownFiles(abs(SRC)).map((f) => path.relative(REPO_ROOT, f).replace(/\\/g, '/'))) {
     read(rel).split(/\r?\n/).forEach((line, i) => {
       for (const tok of FORBIDDEN) if (line.includes(tok)) hits.push(`${rel}:${i + 1} (${tok})`);
     });
@@ -158,10 +164,7 @@ function listMarkdown(relDir) {
 
 // A-summary: スキル生成対象の全章が目次（SUMMARY.md）からリンクされている。
 {
-  const summary = read(`${SRC}/SUMMARY.md`);
-  const linked = new Set(
-    [...summary.matchAll(/\]\(([^)\s#]+\.md)(?:#[^)]*)?\)/g)].map((m) => m[1].replace(/^\.\//, '')),
-  );
+  const linked = new Set(summaryChapters(REPO_ROOT));
   for (const { chapter } of GENERATION_MAP) {
     assert(
       `A-summary:${chapter}`,

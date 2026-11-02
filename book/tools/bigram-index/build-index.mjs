@@ -22,7 +22,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { tokenize } from './tokenize.mjs';
 
 const require = createRequire(import.meta.url);
@@ -143,6 +142,32 @@ export function serializeSearchIndex(indexObj) {
   return `window.search = Object.assign(window.search, JSON.parse(${literal}));`;
 }
 
+// 索引の search_options で検索する（ブラウザの searcher と同じ設定。設定は書き写さない）。
+// トークナイザは呼ぶ側が elasticlunr.tokenizer に入れる。
+export function searchIndex(elasticlunr, indexObj, query) {
+  const idx = elasticlunr.Index.load(indexObj.index);
+  const raw = idx.search(query, indexObj.search_options);
+  const refs = raw.map((r) => Number(r.ref));
+  const urls = refs.map((ref) => indexObj.doc_urls[ref]);
+  return { urls, refs, raw };
+}
+
+// 全ドキュメントの題・本文・パンくずを空白でつないだもの。
+export function corpusOf(indexObj) {
+  return Object.values(indexObj.index.documentStore.docs)
+    .map((d) => `${d.title || ''} ${d.body || ''} ${d.breadcrumbs || ''}`)
+    .join(' ');
+}
+
+// 題・本文・パンくずのどれかに word を含むドキュメントの URL。
+export function urlsContaining(indexObj, word) {
+  const docs = indexObj.index.documentStore.docs;
+  return Object.keys(docs)
+    .filter((id) => [docs[id].title, docs[id].body, docs[id].breadcrumbs]
+      .some((s) => (s || '').includes(word)))
+    .map((id) => indexObj.doc_urls[Number(id)]);
+}
+
 // 高レベル API: book 出力ディレクトリの searchindex を bigram 化して上書きする。
 // 索引サイズを 10MB 閾値で監視し、超過時は warnings に記録する（既定では非致命）。
 export function buildBigramIndex(bookOutDir, { write = true } = {}) {
@@ -183,12 +208,12 @@ export function buildBigramIndex(bookOutDir, { write = true } = {}) {
 // CLI: node build-index.mjs <book-out-dir>
 // 成功時 exit 0、失敗時は例外を投げて非ゼロ終了（mdbook build 後段でビルド失敗扱い）。
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) {
-  // 既定パスはモジュール位置基準で book/book を指す。new URL().pathname は
-  // Windows でドライブ文字つき `/C:/...` を返し path.resolve が `C:\C:\...` に
-  // 壊れるため、fileURLToPath で正規に OS パスへ変換する（POSIX では同一挙動）。
-  const dir = process.argv[2] || path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)), '../../book',
-  );
+  // 引数は必須。既定のパスを持たない（テストが公開の出力へ書く道を残さない）。
+  const dir = process.argv[2];
+  if (!dir) {
+    console.error('usage: node build-index.mjs <book-out-dir>');
+    process.exit(1);
+  }
   try {
     const { searchIndexFile, sizeBytes, warnings } = buildBigramIndex(dir);
     const mb = (sizeBytes / 1024 / 1024).toFixed(2);

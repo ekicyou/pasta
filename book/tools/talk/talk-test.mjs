@@ -28,6 +28,7 @@ import {
   checkRegion,
   faceStats,
 } from './talk.mjs';
+import { summaryChapters } from '../link-check.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -450,8 +451,9 @@ log('\n== (J) 表情の集計 ==');
   check('J-8 --stats は出現数と章ごとの表を出す',
     cli.stdout.includes('表情の出現数') && cli.stdout.includes('| 章 | 導入 | 締め |'), cli.stdout.slice(0, 200));
   const chapterRows = cli.stdout.split('\n').filter((l) => /^\| \S+\.md \|/.test(l));
-  check('J-9 --stats は全 64 章（debug を含む）を並べる',
-    chapterRows.length === 64 && chapterRows.some((l) => l.startsWith('| debug/')), String(chapterRows.length));
+  const tocCount = summaryChapters().length;
+  check(`J-9 --stats は目次の全 ${tocCount} 章（debug を含む）を並べる`,
+    chapterRows.length === tocCount && chapterRows.some((l) => l.startsWith('| debug/')), String(chapterRows.length));
 }
 
 // ============================================================

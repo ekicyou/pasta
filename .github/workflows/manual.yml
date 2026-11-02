@@ -1,11 +1,14 @@
 # .github/workflows/manual.yml
 # 利用者マニュアル（mdBook）を GitHub Pages へ公開する。
 # build.yml（Rust/WASM CI）とは独立。次の変更時のみ起動する:
-#   book/**・本ワークフロー・スキル 2 種（pasta-ghost-authoring / pasta-lua-coding）、
+#   book/**・本ワークフロー・スキル 3 種（pasta-ghost-authoring / pasta-lua-coding / pasta-check）、
 #   クレート README（crates/*/README.md）・ルートの README.md・SOUL.md（公開マニュアル URL の実在検査のため。
 #   pasta-runtime-internals-doc 要件 7.8・manual-link-anchor-check 要件 4）、
-#   hello-pasta の辞書（crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**。チュートリアルの照合のため）。
-# PR では検証（ビルド・検証スクリプト群）までを行い、Pages への公開は main push 時のみ。
+#   hello-pasta の辞書（crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**。チュートリアルの照合のため）、
+#   pasta の TextMate 文法（editors/vscode/syntaxes/**。着色に使うため）。
+# PR とブランチでは検証（ビルド・検証スクリプト群）までを行い、Pages への公開は main のときだけ
+# （main への push と main での手動実行。github-pages の environment が main だけに公開を許すため）。
+# 権限はワークフロー全体を contents: read とし、pages: write・id-token: write は deploy ジョブにだけ与える。
 #
 # パイプライン（manual-ssot-authority design「CI と公開」/ 要件 7.1, 7.2, 7.5, 7.6, 8.2, 10.4、
 # manual-claudia-theme 要件 8.7, 8.8）:
@@ -13,7 +16,7 @@
 #     -> mdbook build book -> 着色 -> 台詞部品の変換（talk-html）-> 日本語 bigram 索引を再生成
 #     -> node book/tools/link-check.mjs（本の中のリンクと見出し（#…）・読者に届く文書（クレートの README・
 #        ルートの README.md・SOUL.md・スキル）の公開マニュアル URL・スキル自己完結の検証。失敗で中断）
-#     -> チュートリアルの照合（入門の章 12 枚 ↔ hello-pasta の辞書）と構文検証（cargo test）
+#     -> チュートリアルの照合（入門の章 12 枚 ↔ hello-pasta の辞書。辞書の検査は build.yml の cargo test が受け持つ）
 #     -> 静的性・検索（この 2 つは --self-test で検査ロジック自身の
 #        自己テストも実行）・コンテンツ検証・ツール自己テスト
 #     -> 旧版の生成（固定コミット CLASSIC_REF の book/ を旧版のツールで book/book/classic へ。印刷用のページは作らない。
@@ -30,10 +33,12 @@ on:
       - '.github/workflows/manual.yml'
       - '.claude/skills/pasta-ghost-authoring/**'
       - '.claude/skills/pasta-lua-coding/**'
+      - '.claude/skills/pasta-check/**'
       - 'crates/*/README.md'
       - 'README.md'
       - 'SOUL.md'
       - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
+      - 'editors/vscode/syntaxes/**'
   pull_request:
     branches: [main]
     paths:
@@ -41,10 +46,12 @@ on:
       - '.github/workflows/manual.yml'
       - '.claude/skills/pasta-ghost-authoring/**'
       - '.claude/skills/pasta-lua-coding/**'
+      - '.claude/skills/pasta-check/**'
       - 'crates/*/README.md'
       - 'README.md'
       - 'SOUL.md'
       - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
+      - 'editors/vscode/syntaxes/**'
   workflow_dispatch:  # 手動実行
 
 # Pages の同時デプロイを直列化（実行中のデプロイはキャンセルしない）。
@@ -53,10 +60,9 @@ concurrency:
   group: ${{ github.event_name == 'pull_request' && format('manual-pr-{0}', github.ref) || 'pages' }}
   cancel-in-progress: false
 
+# 全体は読むだけ。公開の権限は deploy ジョブにだけ与える。
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
   build:
@@ -65,12 +71,14 @@ jobs:
     env:
       # 着せ替え前の版（classic/）を作る固定コミット（manual-claudia-theme 要件 11.1, 11.2）。定義はここ 1 か所。
       CLASSIC_REF: 6d4e868d799abb619f7db67611511f3196cd1ace
+      # 新版と旧版の両方を作る mdBook の版。公式の配布物（rust-lang/mdBook の release）を取る。
+      MDBOOK_VERSION: '0.5.4'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -87,9 +95,10 @@ jobs:
         run: npm ci
 
       - name: Setup mdBook
-        uses: peaceiris/actions-mdbook@v2
-        with:
-          mdbook-version: '0.5.3'
+        run: |
+          mkdir -p "$RUNNER_TEMP/mdbook"
+          curl -sSfL "https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C "$RUNNER_TEMP/mdbook"
+          echo "$RUNNER_TEMP/mdbook" >> "$GITHUB_PATH"
 
       - name: Build manual (mdBook)
         run: mdbook build book
@@ -125,23 +134,6 @@ jobs:
       # 崩れていれば exit 1 で公開中断。スクリプトはリポジトリルートを自己解決するため引数不要。
       - name: Tutorial artifact match check
         run: node book/tools/tutorial-check.mjs
-
-      # Rust ツールチェーン（その2の構文検証＝cargo run -p pasta_check 用）。
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@v2
-
-      # チュートリアル成果物ガード その2（要件 6.2 / pasta-check-validate-edges 要件 5.1・5.2）。
-      # hello-pasta の実ファイルを pasta_check validate で検査する。誤りがあれば終了コード 1 で段が落ち、
-      # 公開（deploy は needs: build）が止まる。注意では止めない。
-      # 注意 0 件は validate_cli_test.rs のテスト（build.yml で走る）が守る。
-      # 段階の辞書を読み込んで応答を確かめるテストは build.yml の cargo test --all で走る。
-      # その1で「チュートリアル == 実ファイル」を保証済みのため、チュートリアル成果物の
-      # 構文の正しさが transitively 担保される（フル SSP 実行なしの機械的ガード）。
-      - name: Tutorial syntax validation (pasta_check validate)
-        run: cargo run -q -p pasta_check -- validate --target crates/pasta_sample_ghost/ghosts/hello-pasta
 
       # 出力の静的性・検索・コンテンツ受入基準の検証（ビルド済み book/book を対象に --no-build）。
       # verify-static / verify-search の --self-test は本検査を行ったうえで、検査ロジック自身の
@@ -188,29 +180,27 @@ jobs:
           [ ! -e "$out/print.html" ] || { echo "::error::classic snapshot must not have print.html"; exit 1; }
           compgen -G "$out/searchindex*.js" > /dev/null || { echo "::error::classic snapshot is missing searchindex*.js"; exit 1; }
 
-      # enablement: true — リポジトリで Pages が未設定でも API 経由で
-      # 自動有効化を試みる（Source=GitHub Actions）。初回公開を手動設定なしで通す。
-      - name: Setup Pages
-        if: github.event_name != 'pull_request'
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
+      # 公開は main のときだけ（ブランチの手動実行では検査だけ走らせて緑で終える）。
+      # v4 から . で始まるファイルを既定で外すため、mdBook の .nojekyll を入れるよう指定する。
       - name: Upload Pages artifact
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./book/book
+          include-hidden-files: true
 
   deploy:
     name: deploy-manual
     needs: build
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

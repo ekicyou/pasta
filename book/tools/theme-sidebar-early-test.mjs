@@ -167,6 +167,14 @@ try {
 const early = head === null ? null : extractEarly(head);
 check('T-1 head.hbs に claudiaSidebarEarly の <script> がある', early !== null);
 
+// 開閉の条件は head.hbs と claudia.js の 2 か所に書く（1 か所にまとめると claudia.js が head.hbs に依存する）ので、食い違いを止める
+if (head !== null && js !== null) {
+  const cond = (src) => [[...src.matchAll(/width < (\d+) \|\| width >= (\d+)/g)].map((m) => `${m[1]}-${m[2]}`), src.split("stored !== 'visible'").length - 1];
+  const [h, c] = [cond(head), cond(js)];
+  check('T-2 head.hbs と claudia.js の開閉の条件（幅のしきい値・保存値 visible）が各 1 回ずつあって等しい',
+    h[0].length === 1 && c[0].length === 1 && h[0][0] === c[0][0] && h[1] === 1 && c[1] === 1, `head.hbs=${JSON.stringify(h)} claudia.js=${JSON.stringify(c)}`);
+}
+
 if (early !== null) {
   console.log('\n== (S) 幅 800・保存値 visible: 読み込みの終わる前に開いた状態へ戻す ==');
   {
