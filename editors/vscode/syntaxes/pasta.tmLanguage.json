@@ -19,6 +19,9 @@
             "include": "#attribute"
         },
         {
+            "include": "#choice"
+        },
+        {
             "include": "#word"
         },
         {
@@ -42,86 +45,156 @@
             "match": "^[\\s\u3000]*[\uff03#].*$",
             "name": "comment.line.pasta"
         },
+        "line-end-comment": {
+            "match": "[＃#].*$",
+            "name": "comment.line.pasta"
+        },
+        "decl-attr": {
+            "match": "([＆&])([\\p{XID_Start}_]\\p{XID_Continue}*[\\s　]*[：:][\\s　]*(?:「{4}(?:(?!」{4}).)+」{4}|「{3}(?:(?!」{3}).)+」{3}|「{2}(?:(?!」{2}).)+」{2}|「[^」]*」|(\"++)(?:(?!\\3).)+\\3|\"\"|[^\\s　：:＆&＃#]+))",
+            "captures": {
+                "1": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "2": {
+                    "name": "entity.other.attribute-name.pasta"
+                }
+            },
+            "name": "meta.attribute.pasta"
+        },
+        "decl-rest": {
+            "patterns": [
+                {
+                    "include": "#decl-attr"
+                },
+                {
+                    "include": "#line-end-comment"
+                }
+            ]
+        },
         "global-scene": {
-            "match": "^([＊*])(.+)?$",
+            "match": "^([＊*])([\\p{XID_Start}_]\\p{XID_Continue}*)?(.*)$",
             "captures": {
                 "1": {
                     "name": "keyword.other.marker.pasta"
                 },
                 "2": {
                     "name": "keyword.control.scene.pasta"
+                },
+                "3": {
+                    "patterns": [
+                        {
+                            "include": "#decl-rest"
+                        }
+                    ]
                 }
             },
             "name": "meta.scene.global.pasta"
         },
         "local-scene": {
-            "match": "^(\\s*)([・\\-])(.+)?$",
+            "match": "^(\\s*)([・\\-])([\\p{XID_Start}_]\\p{XID_Continue}*)?(.*)$",
             "captures": {
                 "2": {
                     "name": "keyword.other.marker.pasta"
                 },
                 "3": {
                     "name": "keyword.control.scene.pasta"
+                },
+                "4": {
+                    "patterns": [
+                        {
+                            "include": "#decl-rest"
+                        }
+                    ]
                 }
             },
             "name": "meta.scene.local.pasta"
         },
         "attribute": {
-            "match": "^(\\s*)([＆&])(.+)$",
+            "match": "^(\\s*)([＆&].*)$",
             "captures": {
                 "2": {
-                    "name": "keyword.other.marker.pasta"
-                },
-                "3": {
-                    "name": "entity.other.attribute-name.pasta"
+                    "patterns": [
+                        {
+                            "include": "#decl-rest"
+                        }
+                    ]
                 }
-            },
-            "name": "meta.attribute.pasta"
+            }
         },
-        "word": {
-            "match": "^(\\s*)([＠@])(.+)$",
-            "captures": {
-                "2": {
-                    "name": "keyword.other.marker.pasta"
-                },
-                "3": {
-                    "name": "markup.inline.raw.string.pasta"
-                }
-            },
-            "name": "meta.word.pasta"
-        },
-        "variable": {
-            "match": "^(\\s*)([＄$])(.+)$",
-            "captures": {
-                "2": {
-                    "name": "keyword.other.marker.pasta"
-                },
-                "3": {
-                    "name": "variable.other.pasta"
-                }
-            },
-            "name": "meta.variable.pasta"
-        },
-        "call": {
-            "match": "^(\\s*)([＞>])(.+)$",
+        "choice": {
+            "match": "^(\\s*)([＠@][？?])([\\p{XID_Start}_]\\p{XID_Continue}*)?(「[^」]*」)?[\\s　]*([＃#].*)?",
             "captures": {
                 "2": {
                     "name": "keyword.other.marker.pasta"
                 },
                 "3": {
                     "name": "keyword.control.pasta"
+                },
+                "4": {
+                    "name": "string.quoted.other.pasta"
+                },
+                "5": {
+                    "name": "comment.line.pasta"
+                }
+            },
+            "name": "meta.choice.pasta"
+        },
+        "word": {
+            "match": "^(\\s*)([＠@])(?![？?])([^：:]*[：:](?:[\\s　]*+(?>「{4}(?:(?!」{4}).)+」{4}|「{3}(?!「)(?:(?!」{3}).)+」{3}|「{2}(?!「)(?:(?!」{2}).)+」{2}|「(?!「)[^」]*」|(\"++)(?:(?!\\4).)+\\4|\"\"|\\\\_\\?.*?\\\\_\\?|\\\\_!.*?\\\\_!|\\\\(?:[spb][0-9]|w[1-9]|_{0,2}[0-9A-Za-z!+*?&-](?:\\[(?:\"(?:[^\"]|\"\")*\")?(?:(?:\\\\.|[^\\]\\\\,\"])(?:\\\\.|[^\\]\\\\,])*)?(?:,(?:\"(?:[^\"]|\"\")*\")?(?:(?:\\\\.|[^\\]\\\\,\"])(?:\\\\.|[^\\]\\\\,])*)?)*\\])?)|(?![「\"])(?:(?![\\s　]*[、，,]).)+)[\\s　]*+[、，,])*+[\\s　]*+(?>「{4}(?:(?!」{4}).)+」{4}|「{3}(?!「)(?:(?!」{3}).)+」{3}|「{2}(?!「)(?:(?!」{2}).)+」{2}|「(?!「)[^」]*」|(\"++)(?:(?!\\5).)+\\5|\"\"|\\\\_\\?.*?\\\\_\\?|\\\\_!.*?\\\\_!|\\\\(?:[spb][0-9]|w[1-9]|_{0,2}[0-9A-Za-z!+*?&-](?:\\[(?:\"(?:[^\"]|\"\")*\")?(?:(?:\\\\.|[^\\]\\\\,\"])(?:\\\\.|[^\\]\\\\,])*)?(?:,(?:\"(?:[^\"]|\"\")*\")?(?:(?:\\\\.|[^\\]\\\\,\"])(?:\\\\.|[^\\]\\\\,])*)?)*\\])?)|(?![「\"])(?:(?![\\s　]*[、，,]).)+)?+|.+)[\\s　]*([＃#].*)?$",
+            "captures": {
+                "2": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "3": {
+                    "name": "markup.inline.raw.string.pasta"
+                },
+                "6": {
+                    "name": "comment.line.pasta"
+                }
+            },
+            "name": "meta.word.pasta"
+        },
+        "variable": {
+            "match": "^(\\s*)([＄$])((?:「{4}(?:(?!」{4}).)+」{4}|「{3}(?:(?!」{3}).)+」{3}|「{2}(?:(?!」{2}).)+」{2}|「[^」]*」|(\"++)(?:(?!\\4).)+\\4|\"\"|[^＃#])*?)[\\s　]*([＃#].*)?$",
+            "captures": {
+                "2": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "3": {
+                    "name": "variable.other.pasta"
+                },
+                "5": {
+                    "name": "comment.line.pasta"
+                }
+            },
+            "name": "meta.variable.pasta"
+        },
+        "call": {
+            "match": "^(\\s*)([＞>])((?:「{4}(?:(?!」{4}).)+」{4}|「{3}(?:(?!」{3}).)+」{3}|「{2}(?:(?!」{2}).)+」{2}|「[^」]*」|(\"++)(?:(?!\\4).)+\\4|\"\"|[^＃#])*?)[\\s　]*([＃#].*)?$",
+            "captures": {
+                "2": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "3": {
+                    "name": "keyword.control.pasta"
+                },
+                "5": {
+                    "name": "comment.line.pasta"
                 }
             },
             "name": "meta.call.pasta"
         },
         "actor": {
-            "match": "^(\\s*)([％%])(.+)$",
+            "match": "^(\\s*)([％%])([^＃#]*?)[\\s　]*([＃#].*)?$",
             "captures": {
                 "2": {
                     "name": "keyword.other.marker.pasta"
                 },
                 "3": {
                     "name": "entity.name.class.pasta"
+                },
+                "4": {
+                    "name": "comment.line.pasta"
                 }
             },
             "name": "meta.actor.pasta"
@@ -214,7 +287,7 @@
             "name": "meta.talk.pasta"
         },
         "cue-command": {
-            "match": "^([\\s\u3000]*)([!！])([^@＠(（\\s\u3000]+)(?:([＠@])([^(（\\s\u3000]+))?(?:([（(])([^)）]*)?([）)])?)?",
+            "match": "^([\\s　]*)([!！])([\\p{XID_Start}_]\\p{XID_Continue}*)(?:([＠@])([^(（\\s　]+))?(?:([（(])((?:(?>「{4}(?:(?!」{4}).)+」{4}|「{3}(?!「)(?:(?!」{3}).)+」{3}|「{2}(?!「)(?:(?!」{2}).)+」{2}|「(?!「)[^」]*」|(\"++)(?:(?!\\8).)+\\8|「++|\"++)|[^)）])*+)?([）)])?)?(?:[\\s　]*([＃#].*))?",
             "captures": {
                 "2": {
                     "name": "keyword.other.marker.pasta"
@@ -247,14 +320,17 @@
                         }
                     ]
                 },
-                "8": {
+                "9": {
                     "name": "punctuation.bracket.end.pasta"
+                },
+                "10": {
+                    "name": "comment.line.pasta"
                 }
             },
             "name": "meta.cue-command.pasta"
         },
         "cue-arg-string": {
-            "match": "「[^」]*」|\"[^\"]*\"",
+            "match": "「{4}(?:(?!」{4}).)+」{4}|「{3}(?!「)(?:(?!」{3}).)+」{3}|「{2}(?!「)(?:(?!」{2}).)+」{2}|「(?!「)[^」]*」|(\"++)(?:(?!\\1).)+\\1|\"\"",
             "name": "string.quoted.other.pasta"
         },
         "cue-arg-number": {
