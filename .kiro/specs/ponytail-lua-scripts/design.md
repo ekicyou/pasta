@@ -378,7 +378,7 @@ local function as_value(v) end
 **Implementation Notes**
 - Integration: `EVENT.fire` の「`SHIORI/` で始まる文字列は応答全体」の決まりは変えない（公開の決まり）。受け手が応答全体を作って返すので、`fire` はそれを素通しする。
 - Validation: 項目名が `SHIORI/x` のメニューと、キャプションの単語が `SHIORI/x` のとき、`EVENT.fire` の応答が `200 OK` で `Value` に値が入ることを確かめる。
-- Risks: 決めごとの代案は Open Questions の 3。
+- Risks: 決めごとの代案は Assumption D6。
 
 #### CallbackRegistry（`pasta/shiori/event/callback.lua`）
 
@@ -583,7 +583,7 @@ function FAILURE.fn_succeeded(act, ...) end
 
 - 使い手: `scene_play.lua`・`external_control.lua`（`reply`・`is_name`・`quoted`・`bad_reference0`）、`recommend.lua`（`reply`）、`act.lua`・`actor.lua`（`fn_succeeded`）。記録の中身（種類・対象・説明・警告の文言）は 1 文字も変えない。
 - `pasta.failure` は読み込み時に何も `require` しない今の形を保つ（act はメソッドだけを呼ぶ）。
-- Risks: `pasta.failure` に SHIORI のイベントの言い回し（`Reference0`）が入る（Assumption D4・Open Questions の 4）。
+- Risks: `pasta.failure` に SHIORI のイベントの言い回し（`Reference0`）が入る（Assumption D4）。
 
 #### CallContext（`pasta/act.lua`・`pasta/actor.lua`）
 
