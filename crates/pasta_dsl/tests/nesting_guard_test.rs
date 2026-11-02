@@ -138,9 +138,9 @@ fn partial_parse_with_deep_line_does_not_crash() {
         );
         let result = on_1mib(move || {
             let r = parse_str_partial(&src);
-            r.errors.len()
+            r.failed_lines.len()
         });
-        assert!(result > 0, "{n} 段の行は誤りとして報告されるべし");
+        assert!(result > 0, "{n} 段の行は解けない塊として報告されるべし");
     }
 }
 
@@ -233,6 +233,6 @@ fn partial_parse_with_long_expr_line_does_not_crash() {
         "＊挨拶\n  さくら：こんにちは\n  ＄x＝{}\n＊別\n  さくら：またね\n",
         sum(10_000)
     );
-    let errors = on_1mib(move || parse_str_partial(&src).errors.len());
-    assert!(errors > 0, "1 万個の演算子の行は誤りとして報告されるべし");
+    let errors = on_1mib(move || parse_str_partial(&src).failed_lines.len());
+    assert!(errors > 0, "1 万個の演算子の行は解けない塊として報告されるべし");
 }
