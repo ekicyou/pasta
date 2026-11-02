@@ -10,8 +10,7 @@
 //! ため、終了フェンス行は `end_line` ではなく、テスト側で構築したソース文字列を
 //! 数えて求めた「実際の ``` 行」を期待値とする。
 
-use pasta_lsp::analysis::{AnalysisEngine, TOKEN_TYPES, token_type};
-use tower_lsp::lsp_types::{SemanticToken, SemanticTokenType};
+use pasta_lsp::analysis::{AnalysisEngine, SemanticToken, TOKEN_TYPES, token_type};
 
 /// delta エンコード済みトークン列を絶対位置 (line, start_char) へ復号する。
 ///
@@ -231,7 +230,7 @@ fn test_legend_codeblock_index_is_nine() {
     );
     assert_eq!(
         TOKEN_TYPES[token_type::CODE_BLOCK as usize],
-        SemanticTokenType::new("codeBlock"),
+        "codeBlock",
         "凡例 index 9 は codeBlock 種別である"
     );
 }
@@ -240,24 +239,24 @@ fn test_legend_codeblock_index_is_nine() {
 fn test_legend_order_is_stable() {
     // トークン種別の並び順が変わると、エディタ側の凡例マッピングが破綻し、
     // 全トークンの色が一斉にずれる。並び順全体を文字列表現で固定する。
-    let expected: &[SemanticTokenType] = &[
-        SemanticTokenType::COMMENT,             // 0
-        SemanticTokenType::NAMESPACE,           // 1
-        SemanticTokenType::new("scene"),        // 2
-        SemanticTokenType::DECORATOR,           // 3
-        SemanticTokenType::new("word"),         // 4
-        SemanticTokenType::VARIABLE,            // 5
-        SemanticTokenType::new("call"),         // 6
-        SemanticTokenType::new("actor"),        // 7
-        SemanticTokenType::new("actorName"),    // 8
-        SemanticTokenType::new("codeBlock"),    // 9
-        SemanticTokenType::new("talk"),         // 10
-        SemanticTokenType::new("sakuraScript"), // 11
-        SemanticTokenType::new("escape"),       // 12
-        SemanticTokenType::OPERATOR,            // 13
-        SemanticTokenType::NUMBER,              // 14
-        SemanticTokenType::new("cueMarker"),    // 15
-        SemanticTokenType::new("cueCommand"),   // 16
+    let expected: &[&str] = &[
+        "comment",      // 0
+        "namespace",    // 1
+        "scene",        // 2
+        "decorator",    // 3
+        "word",         // 4
+        "variable",     // 5
+        "call",         // 6
+        "actor",        // 7
+        "actorName",    // 8
+        "codeBlock",    // 9
+        "talk",         // 10
+        "sakuraScript", // 11
+        "escape",       // 12
+        "operator",     // 13
+        "number",       // 14
+        "cueMarker",    // 15
+        "cueCommand",   // 16
     ];
 
     assert_eq!(TOKEN_TYPES.len(), expected.len(), "トークン種別数が不変");

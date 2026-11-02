@@ -1,368 +1,66 @@
-//! Transport layer for the Pasta Language Server.
+//! WASM の入口。VSCode 拡張から呼ばれる 3 つの関数だけを持つ。
 //!
-//! Provides platform abstraction for WASM and native environments.
-//! WASM entry point exposes `wasm_analyze()` which wraps `AnalysisEngine::analyze()`
-//! and returns results as JS objects via `serde-wasm-bindgen`.
-
-use crate::analysis::AnalysisResult;
-use serde::Serialize;
-use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, SemanticToken};
-
-/// WASM-friendly semantic token data (mirrors tower-lsp SemanticToken fields)
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WasmSemanticToken {
-    pub delta_line: u32,
-    pub delta_start_character: u32,
-    pub length: u32,
-    pub token_type: u32,
-    pub token_modifiers: u32,
-}
-
-/// WASM-friendly diagnostic data (mirrors tower-lsp Diagnostic fields)
-#[derive(Debug, Clone, Serialize)]
-pub struct WasmDiagnostic {
-    pub range: WasmRange,
-    pub message: String,
-    pub severity: u32,
-}
-
-/// WASM-friendly range
-#[derive(Debug, Clone, Serialize)]
-pub struct WasmRange {
-    pub start: WasmPosition,
-    pub end: WasmPosition,
-}
-
-/// WASM-friendly position
-#[derive(Debug, Clone, Serialize)]
-pub struct WasmPosition {
-    pub line: u32,
-    pub character: u32,
-}
-
-/// WASM analysis result containing tokens and diagnostics
-#[derive(Debug, Clone, Serialize)]
-pub struct WasmAnalysisResult {
-    pub tokens: Vec<WasmSemanticToken>,
-    pub diagnostics: Vec<WasmDiagnostic>,
-}
-
-impl From<&SemanticToken> for WasmSemanticToken {
-    fn from(token: &SemanticToken) -> Self {
-        Self {
-            delta_line: token.delta_line,
-            delta_start_character: token.delta_start,
-            length: token.length,
-            token_type: token.token_type,
-            token_modifiers: token.token_modifiers_bitset,
-        }
-    }
-}
-
-impl From<&Diagnostic> for WasmDiagnostic {
-    fn from(diagnostic: &Diagnostic) -> Self {
-        let severity = match diagnostic.severity {
-            Some(DiagnosticSeverity::ERROR) => 1,
-            Some(DiagnosticSeverity::WARNING) => 2,
-            Some(DiagnosticSeverity::INFORMATION) => 3,
-            Some(DiagnosticSeverity::HINT) => 4,
-            _ => 1, // Default to Error
-        };
-
-        Self {
-            range: WasmRange {
-                start: WasmPosition {
-                    line: diagnostic.range.start.line,
-                    character: diagnostic.range.start.character,
-                },
-                end: WasmPosition {
-                    line: diagnostic.range.end.line,
-                    character: diagnostic.range.end.character,
-                },
-            },
-            message: diagnostic.message.clone(),
-            severity,
-        }
-    }
-}
-
-impl From<&AnalysisResult> for WasmAnalysisResult {
-    fn from(result: &AnalysisResult) -> Self {
-        Self {
-            tokens: result.tokens.iter().map(WasmSemanticToken::from).collect(),
-            diagnostics: result
-                .diagnostics
-                .iter()
-                .map(WasmDiagnostic::from)
-                .collect(),
-        }
-    }
-}
-
-impl WasmAnalysisResult {
-    /// Convert from AnalysisEngine result (tower-lsp types) to WASM-friendly types
-    pub fn from_analysis(result: &AnalysisResult) -> Self {
-        Self::from(result)
-    }
-}
+//! 結果は `serde-wasm-bindgen` で JS の値にして返す。
 
 /// WASM entry point (only compiled for wasm32 target)
 #[cfg(target_arch = "wasm32")]
 pub mod wasm {
-    use super::*;
     use crate::analysis::AnalysisEngine;
+    use pasta_check::validate::{FileText, GhostInput};
+    use serde::Serialize;
+    use std::collections::BTreeMap;
     use wasm_bindgen::prelude::*;
 
     /// Analyze a pasta source string and return semantic tokens + diagnostics.
     ///
-    /// This is the primary WASM entry point called from the VSCode extension.
-    /// Results are returned as a JS object via serde-wasm-bindgen.
-    ///
     /// `wasm-bindgen` converts JavaScript strings into Rust `&str`.
     /// JavaScript strings are UTF-16; unpaired surrogates are replaced with
     /// U+FFFD during conversion, so the Rust side always receives valid UTF-8.
-    /// Invalid byte sequences cannot reach `AnalysisEngine::analyze()`.
     ///
-    /// # Panics
-    /// Protected by `catch_unwind` — returns an empty result on parser panic.
+    /// 解析の結果をそのまま JS の値にする。直列化に失敗したら `null`。
     #[wasm_bindgen]
     pub fn wasm_analyze(source: &str) -> JsValue {
-        // `AnalysisEngine::analyze("")` is already expected to return an empty,
-        // non-panicking result, so an empty JS string safely maps to the same path.
-        // `catch_unwind` keeps any upstream parser panic from unwinding across the
-        // WASM ABI boundary and crashing the embedding JavaScript host.
-        let result = std::panic::catch_unwind(|| AnalysisEngine::analyze(source));
-
-        let analysis_result = match result {
-            Ok(r) => WasmAnalysisResult::from(&r),
-            Err(_) => WasmAnalysisResult {
-                tokens: vec![],
-                diagnostics: vec![],
-            },
-        };
-
-        // `WasmAnalysisResult` and all nested types derive `Serialize`, so
-        // `serde-wasm-bindgen` converts a statically defined Rust shape into a
-        // `JsValue`. If serialization still fails unexpectedly, return `null`
-        // instead of panicking across the WASM boundary.
-        serde_wasm_bindgen::to_value(&analysis_result).unwrap_or(JsValue::NULL)
+        serde_wasm_bindgen::to_value(&AnalysisEngine::analyze(source)).unwrap_or(JsValue::NULL)
     }
 
     /// `GhostInput`（camelCase）から、辞書ファイルとして読むべきパスの配列を返す。
-    /// 入力の形が違う・panic のときは `null`。
+    /// 入力の形が違うときは `null`。
     #[wasm_bindgen]
     pub fn wasm_select_ghost_files(input: JsValue) -> JsValue {
-        ghost_call(|| {
-            let input: GhostInput = serde_wasm_bindgen::from_value(input).ok()?;
-            to_js(&pasta_check::validate::select_dictionary_files(&input))
-        })
+        let Ok(input) = serde_wasm_bindgen::from_value::<GhostInput>(input) else {
+            return JsValue::NULL;
+        };
+        to_js(&pasta_check::validate::select_dictionary_files(&input))
     }
 
     /// `GhostInput` と `Record<string, FileText>` からゴースト全体を検査し、
-    /// 核の `Report` をそのまま返す。入力の形が違う・panic のときは `null`。
+    /// 核の `Report` をそのまま返す。入力の形が違うときは `null`。
     #[wasm_bindgen]
     pub fn wasm_validate_ghost(input: JsValue, files: JsValue) -> JsValue {
-        ghost_call(|| {
-            let input: GhostInput = serde_wasm_bindgen::from_value(input).ok()?;
-            let files: BTreeMap<String, FileText> = serde_wasm_bindgen::from_value(files).ok()?;
-            to_js(&pasta_check::validate::validate_ghost(&input, &files))
-        })
+        let (Ok(input), Ok(files)) = (
+            serde_wasm_bindgen::from_value::<GhostInput>(input),
+            serde_wasm_bindgen::from_value::<BTreeMap<String, FileText>>(files),
+        ) else {
+            return JsValue::NULL;
+        };
+        to_js(&pasta_check::validate::validate_ghost(&input, &files))
     }
 
-    use pasta_check::validate::{FileText, GhostInput};
-    use std::collections::BTreeMap;
-
-    /// panic を JS の境界の外へ出さず `null` にする
-    fn ghost_call(f: impl FnOnce() -> Option<JsValue>) -> JsValue {
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(f))
-            .ok()
-            .flatten()
-            .unwrap_or(JsValue::NULL)
-    }
-
-    /// `None` を `undefined` でなく `null` にする（`line: number | null`）
-    fn to_js<T: Serialize>(value: &T) -> Option<JsValue> {
+    /// `None` を `undefined` でなく `null` にする（`line: number | null`）。失敗したら `null`
+    fn to_js<T: Serialize>(value: &T) -> JsValue {
         value
             .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
-            .ok()
+            .unwrap_or(JsValue::NULL)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::analysis::AnalysisEngine;
+    use crate::analysis::{AnalysisResult, Diagnostic, Position, Range, SemanticToken};
 
+    /// `wasm_analyze` が JS へ渡す形（欄の名前・順・型）が今の拡張の型と同じこと
     #[test]
-    fn test_wasm_analysis_result_from_simple_scene() {
-        let source = "＊挨拶\n  Alice：こんにちは\n";
-        let result = AnalysisEngine::analyze(source);
-        let wasm_result = WasmAnalysisResult::from_analysis(&result);
-
-        assert!(!wasm_result.tokens.is_empty(), "should have tokens");
-        assert!(
-            wasm_result.diagnostics.is_empty(),
-            "should have no diagnostics"
-        );
-    }
-
-    #[test]
-    fn test_wasm_analysis_result_from_error() {
-        // Invalid syntax that triggers partial parse
-        let source = "＊\n";
-        let result = AnalysisEngine::analyze(source);
-        let wasm_result = WasmAnalysisResult::from_analysis(&result);
-
-        // Should produce some result (possibly with diagnostics)
-        // The exact behavior depends on pasta_dsl's handling
-        // Simply verify conversion doesn't panic
-        let _total = wasm_result.tokens.len() + wasm_result.diagnostics.len();
-    }
-
-    #[test]
-    fn test_wasm_analysis_result_empty_input() {
-        let source = "";
-        let result = AnalysisEngine::analyze(source);
-        let wasm_result = WasmAnalysisResult::from_analysis(&result);
-
-        assert!(
-            wasm_result.tokens.is_empty(),
-            "empty input should have no tokens"
-        );
-    }
-
-    #[test]
-    fn test_wasm_semantic_token_field_mapping() {
-        // Use a global scene which is reliably tokenized by AnalysisEngine
-        let source = "＊挨拶\n  Alice：こんにちは\n";
-        let result = AnalysisEngine::analyze(source);
-        let wasm_result = WasmAnalysisResult::from_analysis(&result);
-
-        assert!(
-            !wasm_result.tokens.is_empty(),
-            "scene should produce tokens"
-        );
-        let first = &wasm_result.tokens[0];
-        // Global scene marker => NAMESPACE => token_type 1
-        assert_eq!(
-            first.token_type, 1,
-            "global scene should be token type 1 (NAMESPACE)"
-        );
-        assert_eq!(first.delta_line, 0, "first token should be on line 0");
-        assert!(first.length > 0, "token length should be > 0");
-    }
-
-    #[test]
-    fn test_wasm_analysis_all_marker_types() {
-        // Use the same minimal document that works in semantic_token_test
-        // A single global scene with action line produces 5+ tokens:
-        //   NAMESPACE(1), SCENE(2), ACTOR_NAME(8), OPERATOR(13), STRING(10)
-        let source = "＊挨拶\n  Alice：こんにちは\n";
-        let result = AnalysisEngine::analyze(source);
-        let wasm_result = WasmAnalysisResult::from_analysis(&result);
-
-        assert!(
-            wasm_result.tokens.len() >= 3,
-            "should have multiple tokens (NAMESPACE, SCENE, ACTOR_NAME, etc.), got {}",
-            wasm_result.tokens.len()
-        );
-
-        // Verify token types are correctly mapped through WasmAnalysisResult
-        let token_types: Vec<u32> = wasm_result.tokens.iter().map(|t| t.token_type).collect();
-        assert!(
-            token_types.contains(&1), // NAMESPACE for global scene
-            "should contain NAMESPACE (1), got {:?}",
-            token_types
-        );
-    }
-
-    #[test]
-    fn test_wasm_diagnostic_severity_mapping() {
-        // Use a Diagnostic with known severity
-        use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
-
-        let analysis_result = crate::analysis::AnalysisResult {
-            tokens: vec![],
-            diagnostics: vec![Diagnostic {
-                range: Range {
-                    start: Position {
-                        line: 0,
-                        character: 0,
-                    },
-                    end: Position {
-                        line: 0,
-                        character: 5,
-                    },
-                },
-                severity: Some(DiagnosticSeverity::ERROR),
-                message: "test error".to_string(),
-                ..Default::default()
-            }],
-        };
-
-        let wasm_result = WasmAnalysisResult::from_analysis(&analysis_result);
-        assert_eq!(wasm_result.diagnostics.len(), 1);
-        assert_eq!(wasm_result.diagnostics[0].severity, 1); // Error = 1
-        assert_eq!(wasm_result.diagnostics[0].message, "test error");
-        assert_eq!(wasm_result.diagnostics[0].range.start.line, 0);
-        assert_eq!(wasm_result.diagnostics[0].range.end.character, 5);
-    }
-
-    #[test]
-    fn test_wasm_diagnostic_severity_mapping_information_hint_and_none() {
-        use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
-
-        let range = Range {
-            start: Position {
-                line: 0,
-                character: 0,
-            },
-            end: Position {
-                line: 0,
-                character: 1,
-            },
-        };
-        let make = |severity: Option<DiagnosticSeverity>| Diagnostic {
-            range,
-            severity,
-            message: "m".to_string(),
-            ..Default::default()
-        };
-
-        // INFORMATION → 3, HINT → 4, None → 1 (Error 既定) の全分岐を固定
-        assert_eq!(
-            WasmDiagnostic::from(&make(Some(DiagnosticSeverity::INFORMATION))).severity,
-            3
-        );
-        assert_eq!(
-            WasmDiagnostic::from(&make(Some(DiagnosticSeverity::HINT))).severity,
-            4
-        );
-        assert_eq!(WasmDiagnostic::from(&make(None)).severity, 1);
-    }
-
-    #[test]
-    fn test_wasm_analysis_result_serializable() {
-        let source = "＊テスト\n  Alice：こんにちは\n";
-        let result = AnalysisEngine::analyze(source);
-        let wasm_result = WasmAnalysisResult::from_analysis(&result);
-
-        // Verify it can be serialized to JSON (same as serde-wasm-bindgen path)
-        let json = serde_json::to_string(&wasm_result).expect("should serialize to JSON");
-        assert!(json.contains("tokens"), "JSON should contain tokens field");
-        assert!(
-            json.contains("diagnostics"),
-            "JSON should contain diagnostics field"
-        );
-    }
-
-    #[test]
-    fn test_wasm_analysis_result_json_shape_stable() {
-        use tower_lsp::lsp_types::{
-            Diagnostic, DiagnosticSeverity, Position, Range, SemanticToken,
-        };
-
+    fn test_analysis_result_json_shape_stable() {
         let analysis_result = AnalysisResult {
             tokens: vec![SemanticToken {
                 delta_line: 0,
@@ -382,18 +80,16 @@ mod tests {
                         character: 5,
                     },
                 },
-                severity: Some(DiagnosticSeverity::WARNING),
                 message: "test warning".to_string(),
-                ..Default::default()
+                severity: 1,
             }],
         };
 
-        let wasm_result = WasmAnalysisResult::from(&analysis_result);
-        let json = serde_json::to_string(&wasm_result).expect("should serialize to JSON");
+        let json = serde_json::to_string(&analysis_result).expect("should serialize to JSON");
 
         assert_eq!(
             json,
-            r#"{"tokens":[{"deltaLine":0,"deltaStartCharacter":1,"length":2,"tokenType":3,"tokenModifiers":4}],"diagnostics":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":5}},"message":"test warning","severity":2}]}"#
+            r#"{"tokens":[{"deltaLine":0,"deltaStartCharacter":1,"length":2,"tokenType":3,"tokenModifiers":4}],"diagnostics":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":5}},"message":"test warning","severity":1}]}"#
         );
     }
 

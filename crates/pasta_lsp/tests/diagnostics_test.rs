@@ -4,7 +4,6 @@
 //! PartialParseError → Diagnostics変換の正確性確認
 
 use pasta_lsp::analysis::AnalysisEngine;
-use tower_lsp::lsp_types::DiagnosticSeverity;
 
 #[test]
 fn test_parse_error_generates_diagnostics() {
@@ -21,11 +20,7 @@ fn test_diagnostics_have_error_severity() {
     let source = "不正な構文\n";
     let result = AnalysisEngine::analyze(source);
     for diag in &result.diagnostics {
-        assert_eq!(
-            diag.severity,
-            Some(DiagnosticSeverity::ERROR),
-            "Diagnostic severity is ERROR"
-        );
+        assert_eq!(diag.severity, 1, "Diagnostic severity is ERROR");
     }
 }
 

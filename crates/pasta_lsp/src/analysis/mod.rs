@@ -13,19 +13,40 @@ mod visit_scope;
 pub use text_utils::{get_line_text, line_byte_offset};
 pub use token_types::*;
 
-use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
-
 // ============================================================================
 // Analysis Engine
 // ============================================================================
 
-/// 解析結果
-#[derive(Debug, Clone, Default)]
+/// 解析結果。直列化した形がそのまま JS へ渡る（欄の名前・順は拡張の型と同じ）
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct AnalysisResult {
     /// エンコード済みセマンティックトークン（LSP deltaエンコーディング）
-    pub tokens: Vec<tower_lsp::lsp_types::SemanticToken>,
+    pub tokens: Vec<SemanticToken>,
     /// パースエラーから生成されたDiagnostics
     pub diagnostics: Vec<Diagnostic>,
+}
+
+/// 診断
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Diagnostic {
+    pub range: Range,
+    pub message: String,
+    /// 常に 1（Error）。JS の形を保つために欄を残す
+    pub severity: u32,
+}
+
+/// 範囲
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct Range {
+    pub start: Position,
+    pub end: Position,
+}
+
+/// 位置（0 始まり・UTF-16）
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct Position {
+    pub line: u32,
+    pub character: u32,
 }
 
 /// 解析エンジン
@@ -34,12 +55,8 @@ pub struct AnalysisEngine;
 impl AnalysisEngine {
     /// ドキュメント全体を解析し、トークンとDiagnosticsを生成する。
     ///
-    /// 呼び出し側（`server.rs` / `transport.rs`）は、この関数を
-    /// `catch_unwind` で包んで `pasta_dsl::parse_str` 由来のパニックを捕捉する。
-    /// ネイティブ側で `AssertUnwindSafe` を使っているのは、`analyze` が `source`
-    /// から新しい `AnalysisResult` を組み立てるだけの副作用のない純粋関数であり、
-    /// 共有可変状態を変更しないためである。途中でパニックしても不整合な状態を
-    /// 残さず、呼び出し側はエラーログを出して他ドキュメントの処理を継続できる。
+    /// 共有する状態を持たない純粋な関数。panic は包まない（wasm32 では
+    /// trap になり、拡張の try/catch が受ける）。
     pub fn analyze(source: &str) -> AnalysisResult {
         // Ensure source ends with newline — the grammar requires every line
         // to terminate with eol (NEWLINE). Editors like VSCode may omit it.
@@ -85,9 +102,8 @@ impl AnalysisEngine {
                                     character: 0,
                                 },
                             },
-                            severity: Some(DiagnosticSeverity::ERROR),
                             message: e.message.clone(),
-                            ..Default::default()
+                            severity: 1,
                         }
                     })
                     .collect();

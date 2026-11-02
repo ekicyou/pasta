@@ -12,14 +12,14 @@
   - `cargo test -p pasta_check` が通り、保存時の報告の `code` の文字列が今と同じであることを、serde の値の比較のテストが確かめている
   - _Requirements: 1.4, 9.6, 11.1_
 
-- [ ] 2. `pasta_lsp` を WASM の解析器だけにする
+- [x] 2. `pasta_lsp` を WASM の解析器だけにする
 - [x] 2.1 言語サーバ・文書管理・エラー型・native の入口と、それらだけを確かめるテストを消す
   - サーバ・文書管理・エラー型のモジュールと、native の空の入口を消す。ライブラリの入口は解析と WASM の 2 つのモジュールだけを公開する
   - サーバの起動・文書の同期・クラッシュからの回復の 3 つのテストを消す
   - この時点では解析の型がまだ tower-lsp の型を使うので、依存は残す（次のタスクで外す）
   - `cargo test -p pasta_lsp` が通り、消したファイルがクレートに残っていない
   - _Requirements: 9.1_
-- [ ] 2.2 解析の型を自前にし、tower-lsp・thiserror を外し、WASM の 3 つの入口だけにする
+- [x] 2.2 解析の型を自前にし、tower-lsp・thiserror を外し、WASM の 3 つの入口だけにする
   - 解析の結果・診断・範囲・位置・トークン・凡例を自前の型にし、JS へ渡す名前は今と同じになるよう直列化の名前を付ける
   - WASM の側の写しの型・変換・テストだけが使う変換・4 通りの重さの対応・`catch_unwind` の包みを消し、解析の結果をそのまま JS の値にする。形の誤りで `null` を返す動きは残す
   - クレートの設定から tower-lsp・thiserror を外して crates.io へ出さない設定にし、説明を WASM の解析器に直す。ルートの依存表から tower-lsp の行を消し、ロックファイルを作り直す（`release.yml` は触らない）
@@ -133,3 +133,7 @@
   - ゴースト全体の検査の起動の条件・集め方・表示に差分が無いことを `git diff` で確かめる
   - すべての関門が通り、VSIX のファイルができている
   - _Requirements: 14.2, 14.3, 14.4, 14.5_
+
+## Implementation Notes
+- 2.2: `token_types.rs` の凡例は `&[&str]` の文字列。`vscodeModules.test.ts` の凡例の照合は `"…"` を順に読む形にした。thiserror は `pasta_core`・`pasta_dsl` 経由の間接依存として `cargo tree` に残る（直接の依存でなければよいと読んだ）
+- 拡張のテストは作業木に `editors/vscode/node_modules` が無い。本体の作業コピーのものへ一時的なジャンクションを張って走らせ、ジャンクションだけを消す（`cmd /c rmdir` は分類器に拒否されるので PowerShell の `[IO.DirectoryInfo]::new(path).Delete()`）。e2e の前に `build-wasm.ps1 -Release` で wasm を作り直す

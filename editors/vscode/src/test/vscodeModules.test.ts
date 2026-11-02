@@ -168,16 +168,7 @@ if (fs.existsSync(RUST_TOKEN_TYPES_PATH)) {
     const src = fs.readFileSync(RUST_TOKEN_TYPES_PATH, 'utf-8');
     const block = src.match(/pub const TOKEN_TYPES[^=]*=\s*&\[([\s\S]*?)\];/);
     assert.ok(block, 'TOKEN_TYPES const block should be found in token_types.rs');
-    const builtin: Record<string, string> = {
-      COMMENT: 'comment', NAMESPACE: 'namespace', DECORATOR: 'decorator',
-      VARIABLE: 'variable', OPERATOR: 'operator', NUMBER: 'number',
-    };
-    const names: string[] = [];
-    const re = /SemanticTokenType::(?:new\("([^"]+)"\)|([A-Z_]+))/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(block![1])) !== null) {
-      names.push(m[1] ?? builtin[m[2]] ?? `<unmapped:${m[2]}>`);
-    }
+    const names = [...block![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
     assert.deepStrictEqual([...PASTA_TOKEN_TYPES], names,
       'TS PASTA_TOKEN_TYPES must stay index-aligned with Rust TOKEN_TYPES');
   });
@@ -186,13 +177,7 @@ if (fs.existsSync(RUST_TOKEN_TYPES_PATH)) {
     const src = fs.readFileSync(RUST_TOKEN_TYPES_PATH, 'utf-8');
     const block = src.match(/pub const TOKEN_MODIFIERS[^=]*=\s*&\[([\s\S]*?)\];/);
     assert.ok(block, 'TOKEN_MODIFIERS const block should be found in token_types.rs');
-    const builtin: Record<string, string> = { DECLARATION: 'declaration', DEFINITION: 'definition' };
-    const names: string[] = [];
-    const re = /SemanticTokenModifier::(?:new\("([^"]+)"\)|([A-Z_]+))/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(block![1])) !== null) {
-      names.push(m[1] ?? builtin[m[2]] ?? `<unmapped:${m[2]}>`);
-    }
+    const names = [...block![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
     assert.deepStrictEqual([...PASTA_TOKEN_MODIFIERS], names);
   });
 }
