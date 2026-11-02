@@ -174,3 +174,4 @@
 - 10.1：book/src/internals/logging-encoding.md 73 行目が pasta_shiori の変換を「enc.rs と windows_api.rs」と書いている。enc.rs は 8.4 で消したので一緒に直す
 - 10.1：book/src/internals/shiori.md 90 行目が ActorMsg を #[non_exhaustive] と書いている（9.1 で消した）
 - 11（2026-11-03）：fmt --check=0・clippy --all-targets 警告 0・cargo test -p pasta_shiori 2 回とも 44 バイナリ ok・i686 release ビルド=0・package --list に doc/ と logfile.txt なし
+- 完了時の棚卸（2026-11-03）：その場で解決 0 件（検証で見つけた teardown.rs の古いコメントは e75c3e11 で直し済み）・申し送り 2 件（shiori4-v4-host・debug-mcp-runtime の brief へ）・起票 0 件
