@@ -21,7 +21,7 @@
 //
 // 読者に届く文書のマニュアル URL 実在検査（同タスク 1.2・要件 7.5, 7.8 /
 // manual-link-anchor-check タスク 3.1・3.2・要件 4.1〜4.7）:
-//   crates/*/README.md → ルートの README.md → SOUL.md → 2 スキルの Markdown（生成ファイルも含む）の順に、
+//   crates/*/README.md → ルートの README.md → SOUL.md → 3 スキルの Markdown（生成ファイルも含む）の順に、
 //   フェンス外のリンクと裸の URL のうち公開マニュアル（MANUAL_URL）を指すものを
 //   checkReadmeManualLinks で book/src の章・見出しへ写像して照合し、[1] の区分に readme-manual-url として報告する
 //   （区分と文面は、どの文書でも同じ）。裸の URL は、空白・半角の括弧のほか、全角の括弧と句読点でも終わる。
@@ -285,8 +285,8 @@ export function headingSlugs(markdown) {
   return out;
 }
 
-// ---- スキル自己完結検査（2 スキル対象） ----
-export const CHECKED_SKILLS = Object.freeze(['pasta-ghost-authoring', 'pasta-lua-coding']);
+// ---- スキル自己完結検査（3 スキル対象） ----
+export const CHECKED_SKILLS = Object.freeze(['pasta-ghost-authoring', 'pasta-lua-coding', 'pasta-check']);
 export const FORBIDDEN_SKILL_TOKENS = Object.freeze(['doc/spec', 'GRAMMAR.md', 'book/src', 'crates/']);
 
 // アンカー集合: フェンス外見出しの slug ∪ `<a id|name="…">` の明示アンカー。
@@ -425,7 +425,7 @@ export function checkInternalsPaths(repoRoot = REPO_ROOT) {
 
 // ---- 読者に届く文書の公開マニュアル URL 実在検査（readme-manual-url） ----
 // pasta-runtime-internals-doc タスク 1.2（要件 7.5, 7.8, 1.6）・manual-link-anchor-check タスク 3.2（要件 4.4〜4.6）。
-// 対象: crates/*/README.md（名前順）・ルートの README.md・SOUL.md・2 スキル（CHECKED_SKILLS）の Markdown（パス順。生成ファイルも含む）。
+// 対象: crates/*/README.md（名前順）・ルートの README.md・SOUL.md・3 スキル（CHECKED_SKILLS）の Markdown（パス順。生成ファイルも含む）。
 // 対象のフェンス外・インラインコード外のインラインリンクと裸の URL のうち MANUAL_URL で始まるものを
 // 写像する: 残りが空・index.html → 合格（末尾 `/` は index.html を補う）。`<path>.html[#anchor]` → book/src/<path>.md が
 // 実在し、アンカーがあればその章の見出し slug ∪ 明示アンカーに含まれること（パーセントエンコードはデコードして照合）。

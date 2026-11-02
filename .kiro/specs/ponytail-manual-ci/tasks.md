@@ -100,7 +100,7 @@
   - _Boundary: MirrorChecks/Sidebar_
   - _Requirements: 6.3_
 
-- [ ] 6. 配るスキル pasta-check を検査に入れる
+- [x] 6. 配るスキル pasta-check を検査に入れる
 - [x] 6.1 `crates/` を引く 6 行を書き直す
   - 1 で得た許可のとおりに、設計の diff の 6 行を書き換える
   - パスでなく名前で書き直す（例「`pasta_check` クレートの `src/nar.rs`」）
@@ -108,7 +108,7 @@
   - _Depends: 1_
   - _Requirements: 2.6_
 
-- [ ] 6.2 リンクの検査に pasta-check を足す
+- [x] 6.2 リンクの検査に pasta-check を足す
   - 検査するスキルの一覧に `pasta-check` を足し、リンクの検査の自己テストの期待と注記を 3 スキルにする
   - 完了の姿: リンクの検査が 3 スキルで 0 件で通り、その自己テストが PASS する
   - _Requirements: 2.5_

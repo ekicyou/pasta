@@ -14,7 +14,7 @@
 //   - 同一入力 → 同一結果（決定性）。
 //   - maskFences が CommonMark 準拠でフェンス内の行を空行に置換する（行数は保つ）。
 //   - headingSlug が GitHub 方式の slug を返し、重複見出しを -1・-2 と付番する（3.2）。
-//   - checkSkillSelfContained が 2 スキルの規則 (a)〜(d) 違反を種別付きで検出し、
+//   - checkSkillSelfContained が 3 スキルの規則 (a)〜(d) 違反を種別付きで検出し、
 //     https・実在アンカー・明示アンカー（#s6-6）は許可する（3.2）。
 //   実リポジトリのスキル検査は P4（タスク 4.x）完了まで違反ありでよいため、
 //   (A)・(B-13) は book 部分（internal-md / github-repo-path / internals-path / readme-manual-url）が
@@ -31,7 +31,7 @@
 //   - detectBrokenLinks が本の中のリンク（`章.md#見出し`・`#見出し`）の見出しをリンク先の章のアンカーの集合と照合し、
 //     無ければ internal-anchor として報告する（行番号なし）。章のファイルが無いときは internal-md の 1 件だけ
 //     （manual-link-anchor-check タスク 2.1 / 要件 1.1〜1.5, 2.1, 2.2, 3.1〜3.6, 5.1, 5.5, 7.1〜7.3）。
-//   - checkReadmeManualLinks がクレートの README に加えて、ルートの README.md・SOUL.md・2 スキルの Markdown の
+//   - checkReadmeManualLinks がクレートの README に加えて、ルートの README.md・SOUL.md・3 スキルの Markdown の
 //     公開マニュアルの URL も、同じ区分（readme-manual-url）・同じ文面で検出する。対象の順は固定。
 //     .kiro/steering/roadmap.md は対象外（manual-link-anchor-check タスク 3.2 / 要件 4.4〜4.6, 5.5, 7.1）。
 //   - 自己テストの中の compareHeadingIds が、章ごとに headingSlugs の導く id の並びと、ビルドした出力（book/book/）の
@@ -439,8 +439,8 @@ log('\n== (D) headingSlug / headingSlugs（GitHub 方式） ==');
 // ============================================================
 log('\n== (E) checkSkillSelfContained（規則 a〜d） ==');
 {
-  check('CHECKED_SKILLS は 2 スキル',
-    JSON.stringify(CHECKED_SKILLS) === JSON.stringify(['pasta-ghost-authoring', 'pasta-lua-coding']));
+  check('CHECKED_SKILLS は 3 スキル',
+    JSON.stringify(CHECKED_SKILLS) === JSON.stringify(['pasta-ghost-authoring', 'pasta-lua-coding', 'pasta-check']));
   check('FORBIDDEN_SKILL_TOKENS は 4 語',
     JSON.stringify(FORBIDDEN_SKILL_TOKENS) === JSON.stringify(['doc/spec', 'GRAMMAR.md', 'book/src', 'crates/']));
 
@@ -813,7 +813,7 @@ log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュア
         '',
       ].join('\n');
       const CRATE = 'crates/pasta_core/README.md';
-      // 対象の順（固定）: クレートの README（名前順）→ ルートの README → SOUL.md → 2 スキル（CHECKED_SKILLS の順・パス順）。
+      // 対象の順（固定）: クレートの README（名前順）→ ルートの README → SOUL.md → 3 スキル（CHECKED_SKILLS の順・パス順）。
       const order = [
         CRATE,
         'crates/pasta_lua/README.md',
