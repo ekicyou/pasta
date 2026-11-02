@@ -11,7 +11,7 @@
 //!    完了させ、mailbox の receiver を閉じ、
 //! 3. `done` ack を送る、
 //!
-//! という順序で teardown する。その後ループを抜けたスレッドが終了する。SHIORI 側は `done_rx.recv_timeout` で **有界に** ack を
+//! という順序で teardown する。その後スレッドは join の約束を待ってから終わる。SHIORI 側は `done_rx.recv_timeout` で **有界に** ack を
 //! 待ち、ack 受信＝全資源解放済みを確認する。
 //!
 //! # ack の後の join／detach（仕様 `shiori4-v3-portable` 4.2・4.4・7.6）
