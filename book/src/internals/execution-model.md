@@ -244,14 +244,18 @@ EVENT.drive(co, act, ...)
 
 ```text
 ok, value = coroutine.resume(co, ...)      初回だけ引数を渡す（引数は呼び出し元ごとに異なる。後述の表）
+empty = 0
 loop
   ok が偽                       → (false, エラー) を返す
   value が nil でない           → (true, value) を返す
   value が nil で co が dead    → (true, nil) を返す（出力の無いシーン）
-  value が nil で co が suspended → ok, value = coroutine.resume(co)（引数なし）
+  value が nil で co が suspended → empty = empty + 1
+                                   empty > 10000 なら (false, "何も出さない区切りが 10000 回続いた") を返す
+                                   ok, value = coroutine.resume(co)（引数なし）
 ```
 
 - ACT の `build()` はトークが 0 件なら `nil` を返す。そのため、トークを積まずに `act:yield()` した中断（`yield` の直後の `yield` など）は、応答を返さず同じイベントの中で再開される。
+- 何も出さない区切りは、1 回の `resume_until_valid` の呼び出しにつき 10,000 回（`NIL_YIELD_LIMIT`）まで飛ばす。数は呼び出しごとに 0 から数える。超えたら再開をやめて失敗を返し、`EVENT.drive` はほかのエラーと同じ失敗の枝（`STOP.hold` → 予約を捨てる → 続きを捨てる）で受ける。そのため、何も出さずに区切り続けるシーンでもイベントは固まらずに返り、[止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記)が出る。中断のシーン（`run_interrupt_scene`）も同じ関数で再開するので、同じ上限が掛かる。
 - 2 回目以降の `resume` は引数を渡さない。継続したシーンの再開では、`EVENT.fire` が渡す新しい ACT が `coroutine.yield` の戻り値になる。`ACT_IMPL.yield` はその `req` を再開した要求として `_resume_req` に控えるだけで（`get_property` の期限の数え始め。[コールバック待ちとの関係](#コールバック待ちとの関係)）、継続したシーンは、最初の `resume` で受け取った ACT（`act.req` と日時の変数はそのときのイベントのもの）を使い続ける。引数なしの再開では控えを変えない。
 - このループは `EVENT.drive` の中で使われる。`EVENT.drive` を呼ぶのは次の 3 箇所であり、最初の `resume` に渡す引数だけが異なる。
 

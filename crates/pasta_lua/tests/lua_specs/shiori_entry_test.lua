@@ -340,6 +340,38 @@ describe("SHIORI.request - 止まるエラーの表記の場所ごとの確か�
         expect(STORE.co_scene):toBe(nil)
     end)
 
+    test("何も出さない区切りが上限を超えると、シーン名を添えた表記になり続きは捨てる (ponytail 5.1)", function()
+        local off, on = run_both(function()
+            register_scene("OnEntryPlaceEmptyYield", function(act)
+                act:init_scene({}, "空回り")
+                -- 直す前も必ず終わるよう、上限より少し多く区切ってから台詞を出す
+                for _ = 1, 10005 do act:yield() end
+                act:raw_script("届かない")
+                return act:build()
+            end)
+            return request("OnEntryPlaceEmptyYield")
+        end)
+
+        expect_notation(off, on, "【スクリプトのエラー：＊空回り（何も出さない区切りが 10000 回続いた）】")
+        expect(STORE.co_scene):toBe(nil)
+    end)
+
+    test("何も出さない区切りが上限より少なければ、今と同じく台詞が出る (ponytail 5.2)", function()
+        local off, on = run_both(function()
+            register_scene("OnEntryPlaceFewEmptyYield", function(act)
+                act:init_scene({}, "空回り少し")
+                for _ = 1, 10 do act:yield() end
+                act:raw_script("出た")
+                return act:build()
+            end)
+            return request("OnEntryPlaceFewEmptyYield")
+        end)
+
+        expect_status(on, "SHIORI/3.0 200 OK")
+        expect(header_value(on, "Value")):toBe("出た\\e")
+        expect(off):toBe(on)
+    end)
+
     test("待ち合わせからの再開の中の例外は、コールバックの投げ直しの場所を表記に入れない", function()
         local off, on = run_both(function()
             register_scene("OnEntryPlaceWait", function(act)

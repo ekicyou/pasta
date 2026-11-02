@@ -867,6 +867,21 @@ describe("中断の台詞 - 中断がエラーで止まったとき", function()
             expect(STORE.co_scene):toBeNil()
         end)
     end)
+
+    test("中断のシーンの何も出さない区切りにも同じ上限が掛かる (ponytail 5.1)", function()
+        with_env({ chudan = true }, function()
+            set_chudan(function(act)
+                act:init_scene({ __global_name__ = "cti_chudan_1" }, "チェイントーク中断")
+                -- 直す前も必ず終わるよう、上限より少し多く区切ってから終わる
+                for _ = 1, 10005 do act:yield() end
+            end)
+            start_chain()
+            local res = interrupt(function(act) talk(act, "REACTION") end)
+            expect(has(res, "＊チェイントーク中断（何も出さない区切りが 10000 回続いた）")):toBe(true)
+            expect(has(res, "REACTION")):toBe(false)
+            expect(STORE.co_scene):toBeNil()
+        end)
+    end)
 end)
 
 -- ============================================================================

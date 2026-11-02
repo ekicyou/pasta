@@ -132,7 +132,13 @@ local function drive_kind(co)
     return "interrupt"
 end
 
+--- 1 回の再開の中で、何も出さない区切りを飛ばしてよい回数（超えたら止まるエラー）
+local NIL_YIELD_LIMIT = 10000
+local NIL_YIELD_MESSAGE = "何も出さない区切りが 10000 回続いた"
+
 --- nil yieldをスキップして有効値またはdead状態まで繰り返しresumeする
+--- 何も出さない区切りが NIL_YIELD_LIMIT 回を超えたら、再開をやめて false, NIL_YIELD_MESSAGE を返す
+--- （数は呼び出しごとに 0 から数える）
 --- @param co thread コルーチン
 --- @param ... any 初回resume引数（通常はact）
 --- @return boolean ok 処理成功フラグ（エラー時false）
@@ -140,6 +146,7 @@ end
 local function resume_until_valid(co, ...)
     -- 初回resumeは引数を渡す
     local ok, value = coroutine.resume(co, ...)
+    local empty = 0
 
     -- ループ: nil yieldをスキップ
     while true do
@@ -158,7 +165,11 @@ local function resume_until_valid(co, ...)
             return ok, value
         end
 
-        -- nil + suspended: 引数なしで再度resume
+        -- nil + suspended: 上限までは引数なしで再度resume
+        empty = empty + 1
+        if empty > NIL_YIELD_LIMIT then
+            return false, NIL_YIELD_MESSAGE
+        end
         ok, value = coroutine.resume(co)
     end
 end
