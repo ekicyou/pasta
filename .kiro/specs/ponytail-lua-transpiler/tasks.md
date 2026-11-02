@@ -2,8 +2,8 @@
 
 > 進め方：1 つ直すごとにテストで確かめ、1 コミットにする（要件 7.7）。各コミットの前に、`NoDefaultCurrentDirectoryInExePath` を外したうえで `cargo fmt --check`・`cargo clippy -p pasta_lua --all-targets`（警告 0）・`cargo test -p pasta_lua` を通す。テストが書き換える `tests/fixtures/sample.generated.lua` の改行だけの差分は `git checkout --` で戻し、コミットに混ぜない。
 
-- [ ] 1. 直す前に今の出力を固める
-- [ ] 1.1 Lua ブロックを含まない辞書の変換結果を特性化スナップショットにする
+- [x] 1. 直す前に今の出力を固める
+- [x] 1.1 Lua ブロックを含まない辞書の変換結果を特性化スナップショットにする
   - 項目の無いローカルシーン・入れ子の閉じが続く所・アクター辞書だけの区切り・ファイルの最後のシーン・シーン単語だけのシーン・グローバル単語を 1 本の辞書に含める
   - 今のコードの出力をそのまま期待値として insta のスナップショットを 1 本足す（`tests/transpiler/final_regression_test.rs` に関数を足す。新しいファイルは作らない）
   - 直す前のコードで `cargo test -p pasta_lua` が通り、新しいスナップショットが 1 本コミットされている

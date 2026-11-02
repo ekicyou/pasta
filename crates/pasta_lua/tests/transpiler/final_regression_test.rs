@@ -319,3 +319,43 @@ fn r7_3_slice_harness_removed_production_paths_compile() {
          `source_map_slice: bool`; default presentation mode is .pasta (6.1)"
     );
 }
+
+// ============================================================================
+// ponytail-lua-transpiler 7.5 — Lua ブロックを含まない辞書の特性化（要件 2.1）
+// ============================================================================
+
+/// **ponytail-lua-transpiler 7.5 — Lua ブロックを含まない辞書の変換結果の特性化**。
+///
+/// 直す前のコードの出力をそのまま期待値として固める。項目の無いローカルシーン・入れ子の
+/// 閉じが続く所・アクター辞書だけの区切り・ファイルの最後のシーン・シーン単語だけのシーン・
+/// グローバル単語を 1 本の辞書に含める。直した後もこのスナップショットが変わらないこと（2.1）。
+#[test]
+fn ponytail_7_5_no_lua_block_characterization() {
+    let source = "\
+＠挨拶：おはよう、こんにちは
+
+＊メイン
+  さくら：「＠挨拶」
+  ＞サブ
+
+  ・空
+
+  ・サブ
+    うにゅう：「サブです」
+
+％さくら
+  ＠一人称：私、わたし
+
+＊単語だけ
+  ＠天気：晴れ、雨
+
+＊最後
+  さくら：「最後です」
+
+  ・末尾
+    うにゅう：「おしまい」
+";
+    let lua = transpile(source);
+    assert!(!lua.is_empty(), "must transpile to real Lua output");
+    assert_snapshot!("ponytail_7_5_no_lua_block_characterization", lua);
+}
