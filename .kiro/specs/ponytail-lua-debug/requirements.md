@@ -10,7 +10,7 @@ VSCode でゴーストをデバッグする作者が困っている（2026-10-19
 - **挙動を変える直し**：作者の手元で起きる困りごと（Lua 表示で `.pasta` のブレークポイントが死ぬ・ステップが抜けない・大きい数の表示・応答の無い要求・止まったクライアントでの片付けの固まり）。
 - **挙動を変えない撤去と軽量化**：行ごとの費用、テストだけ・誰も使わないコード、写し、往復しても何もしない道。
 
-要件は「その領域の監査の指摘が残らず直っている」ことと、挙動を変える直しの決めごとである。どう直すか（関数・ファイル・型の形）は設計で決める。brief.md だけで決めきれない論点は、【前提】と書いて推奨の形で要件にし、`research.md` の「要件ディスカッションへの持ち越し」に並べた。
+要件は「その領域の監査の指摘が残らず直っている」ことと、挙動を変える直しの決めごとである。どう直すか（関数・ファイル・型の形）は設計で決める。brief.md だけで決めきれなかった論点は、要件ディスカッション（2026-11-02）で全部を推奨案のとおり確定した（`research.md` の「要件ディスカッションへの持ち越し」）。
 
 用語：
 - **提示モード**：コールスタックや停止位置を `.pasta` の座標で見せるか（`.pasta` 提示）、生成 `.lua` の座標で見せるか（`.lua` 提示）。
@@ -29,6 +29,7 @@ VSCode でゴーストをデバッグする作者が困っている（2026-10-19
   - 単一の DLL・opt-in・127.0.0.1 固定の待ち受けの方針（確定済み）。待ち受けは 1 回の起動につき 1 接続という今の決まり（`troubleshooting.md` に書いてある）も変えない。
   - トランスパイラが作る行の対応（`ponytail-lua-transpiler` との約束で変えない）。サイドカー（`.map`）の書式（`toml-serialization` が決めた）。
   - DAP の機能の追加（一時停止・式の評価・変数の書き換え・表の中身の展開など）。対応していない要求に「unsupported」で答えるだけで、機能は足さない。
+  - コードのコメントの一斉の書き直し（完了した spec のタスク番号や経緯）。直しで偽になったコメントだけを直す（2026-11-02 の要件ディスカッションで確定）。
 - **Adjacent expectations**
   - `pasta_shiori` は、今と同じく受け口を渡してデバッグを有効にする。この spec は `pasta_shiori` に触らない。
   - デバッグの「設定の有効」（`@pasta_debug.enabled()`・ソースマップの保持）と「待ち受けの有無」（`debug_enabled()`）の 2 つを混ぜない（`scene-play-event` の申し送り）。
@@ -47,7 +48,7 @@ VSCode でゴーストをデバッグする作者が困っている（2026-10-19
 1. When 対応表を持っている間に、拡張子が `.pasta`（大文字と小文字を区別しない）のソースへ `setBreakpoints` 要求が届いた, the Pasta Debug Backend shall 提示モード（`.pasta` 提示・`.lua` 提示）によらず、各行を対応する生成 `.lua` の実行座標へ訳して登録し、`.pasta` 提示のときと同じ `verified` と行（対応の無い行は後ろの最も近い対応行）を応答で返す。
 2. When 提示モードを `.lua` に切り替えた後に、VSCode が `.pasta` のソースのブレークポイントを送り直した, the Pasta Debug Backend shall その `.pasta` 行に対応する `.lua` の行が実行されたときに、`reason: breakpoint` で止まる。
 3. When 提示モードを `.pasta` → `.lua` → `.pasta` と切り替え、そのたびにブレークポイントが送り直された, the Pasta Debug Backend shall 同じ `.pasta` 行のブレークポイントで、切り替えの前と同じ実行の位置に止まる。
-4. If 対応表を持っていない間に、拡張子が `.pasta` のソースへ `setBreakpoints` 要求が届いた, then the Pasta Debug Backend shall その各行を `verified: false` で返し、止まることのない座標を「確かめ済み」と応答しない。【前提】今は `verified: true` を返して当たらない（1 番と根が同じ・`research.md` N9）。brief は対応表が無い場合に触れていないので、推奨の形で書いた（持ち越し 1）。
+4. If 対応表を持っていない間に、拡張子が `.pasta` のソースへ `setBreakpoints` 要求が届いた, then the Pasta Debug Backend shall その各行を `verified: false` で返し、止まることのない座標を「確かめ済み」と応答しない。今は `verified: true` を返して当たらない（1 番と根が同じ・`research.md` N9。2026-11-02 の要件ディスカッションで確定）。
 5. When 拡張子が `.pasta` でないソースへ `setBreakpoints` 要求が届いた, the Pasta Debug Backend shall 今と同じく、渡されたパスと行をそのまま実行座標として登録し、全行を `verified: true` で返す。
 6. While 提示モードが `.lua` である, the Pasta Debug Backend shall `.pasta` のブレークポイントで止まった後の続行とステップを、今の `.lua` 提示と同じく `.lua` の粒度で行う（同じ `.pasta` 行での止まり直しの合体と `.pasta` 粒度のステップは、`.pasta` 提示のときだけ働く。今と同じ）。
 
@@ -85,9 +86,9 @@ VSCode でゴーストをデバッグする作者が困っている（2026-10-19
 1. When 対応していない要求（例：`pause`・`evaluate`・`setVariable`・`launch`）が届いた, the Pasta Debug Backend shall 待たせずに、その要求の `seq` と `command` に対応づけた `success: false`・`message: "unsupported"` の応答を返す（2026-10-19 開発者の決定）。
 2. When 作者が VSCode で一時停止のボタンを押した、ウォッチ式を足した、またはデバッグコンソールに式を打った, the Pasta Debug Backend shall 1 の応答を返し、VM の実行と停止の状態を変えない。
 3. Where 受け口が渡されていない, when `pasta/playSceneAt` か `pasta/reloadShiori` の要求が届いた, the Pasta Debug Backend shall 1 と同じ形の `success: false` の応答を返し、何も再生・リロードしない。今は応答を返さない（`research.md` N2）。DAP はすべての要求に応答を求めるので、1 と同じ扱いにする。本番の `pasta_shiori` は常に受け口を渡すので、作者の手元では起きにくい。
-4. When `threads` 要求が、VM が止まっていないときに届いた, the Pasta Debug Backend shall 次に止まるまで待たせずに、今と同じ固定のスレッド（ID `1`・名前 `main`）で応答する。【前提】今は次に止まるまで応答しない（`research.md` N1）。VSCode は接続の直後に `threads` を送る（持ち越し 4）。
+4. When `threads` 要求が、VM が止まっていないときに届いた, the Pasta Debug Backend shall 次に止まるまで待たせずに、今と同じ固定のスレッド（ID `1`・名前 `main`）で応答する。今は次に止まるまで応答しない（`research.md` N1。2026-11-02 の要件ディスカッションで確定）。
 5. The Pasta Debug Backend shall 失敗の応答（対応していない要求・受け口の無い要求・位置でのシーンの再生の失敗）を、1 つの形（`seq`・`type: "response"`・`request_seq`・`success: false`・`command`・`message`）で返す。位置でのシーンの再生の失敗の理由の文（「カーソル下にシーンがありません」など）は今と同じにする。
-6. When `pasta/playSceneAt` の `uri` が、ホスト名を持つ `file://` の URI（Windows の UNC のパス。例：`file://server/share/ghost/master/dic/会話.pasta`）である, the Pasta Debug Backend shall それを `\\server\share\ghost\master\dic\会話.pasta` の `.pasta` として引き当て、ホスト名を捨てた別のパスとして扱わない。【前提】今はホスト名を捨てて `\share\…` として引き、シーンが見つからない（`research.md` N13・持ち越し 8）。
+6. When `pasta/playSceneAt` の `uri` が、ホスト名を持つ `file://` の URI（Windows の UNC のパス。例：`file://server/share/ghost/master/dic/会話.pasta`）である, the Pasta Debug Backend shall それを `\\server\share\ghost\master\dic\会話.pasta` の `.pasta` として引き当て、ホスト名を捨てた別のパスとして扱わない。今はホスト名を捨てて `\share\…` として引き、シーンが見つからない（`research.md` N13。2026-11-02 の要件ディスカッションで確定）。
 7. The Pasta Debug Backend shall 今応答している要求（`initialize`・`attach`・`configurationDone`・`setBreakpoints`・`threads`・`stackTrace`・`scopes`・`variables`・`continue`・`next`・`stepIn`・`stepOut`・`disconnect`・`pasta/sourcePresentation`・受け口のある `pasta/playSceneAt` と `pasta/reloadShiori`）の応答とイベントの中身と順序を、4 の応答の時機を除いて変えない。
 
 ### Requirement 5: デバッグが有効なときの行ごとの費用を下げる
@@ -108,7 +109,7 @@ VSCode でゴーストをデバッグする作者が困っている（2026-10-19
 
 #### Acceptance Criteria
 
-1. If クライアントがフレームの途中（ヘッダの途中・ヘッダの後・本体の途中）で送るのを止めたまま、接続を保っている, then the Pasta Debug Backend shall デバッグの片付け（SHIORI の unload・読み込み直し）を、クライアントが接続していないときと同じく有限の時間で終える。【前提】上限は 1 秒とする（今の接続の無いときの片付けは 5ms の待ちの数回分）。値は持ち越し 6。
+1. If クライアントがフレームの途中（ヘッダの途中・ヘッダの後・本体の途中）で送るのを止めたまま、接続を保っている, then the Pasta Debug Backend shall デバッグの片付け（SHIORI の unload・読み込み直し）を、クライアントが接続していないときと同じく1 秒以内に終える（今の接続の無いときの片付けは 5ms の待ちの数回分。2026-11-02 の要件ディスカッションで確定）。
 2. If 1 行のヘッダが改行の無いまま上限の長さを超えた, then the Pasta Debug Backend shall その接続を閉じ、メモリを際限なく使わない。上限の値は設計で決める（本体の上限 16 MiB より小さい）。
 3. When 正常なクライアントが、1 つのフレームを TCP のいくつかの断片に分けて送った, the Pasta Debug Backend shall 今と同じく 1 つのフレームとして読む。
 4. When デバッグの片付けが終わった, the Pasta Debug Backend shall 今と同じく待ち受けのポートを解放しており、直後の読み込み直しで同じポートの待ち受けが立つ。
@@ -127,8 +128,8 @@ VSCode でゴーストをデバッグする作者が困っている（2026-10-19
 6. The Pasta Debug Backend shall `crates/pasta_lua/src/debug` の本番のコードに、`#[allow(dead_code)]`・`#[allow(unused_imports)]`（`cfg_attr` の形を含む）を残さない（監査の 8 番の `playscene.rs`・`scene_index.rs` と、`research.md` N4 の残り）。
 7. The 位置からシーンを引き当てる索引 shall 働きの無い登録（`insert_file`）を持たず、シーンの無いファイルと索引に無いファイルの位置で、今と同じく「シーンが無い」を返す（`research.md` N5）。
 8. The Pasta Debug Backend shall 本番で読まれない `Decoded::reload_shiori` の値を持たない（`research.md` N3）。
-9. The Pasta Debug Backend shall `research.md` N6〜N8 の小物（テストだけが使う `DebugConfig::from_file`、捨てるためだけに持つ `DebugHandle` の encoder の join handle、引数が 6 つの関数に付いた要らない `too_many_arguments` の許可、`capture_stack`・`capture_variables` の使わない `lua` の引数）を持たない。【前提】`from_file` を消すとテスト（`tests/loader/config_test.rs` など）を `resolve` か `from_env` へ移す（持ち越し 5）。
-10. The Pasta Debug Backend shall テストだけが使う対応表の公開の問い合わせ（`ChunkSourceMap::lua_lines_for_pasta`・`new`・`len`・`is_empty`、`MapBuilderSink::chunk_name`）と、`canonicalize_chunk_name` をそのまま呼ぶだけの `canonicalize_pasta_file` を持たない（`research.md` N11・N12）。【前提】監査の 8 番と同じ種類なので推奨の形で範囲に入れた。テストは本番の問い合わせ（`pasta_for_lua`・`resolve_pasta_to_lua`）へ移す（持ち越し 7）。
+9. The Pasta Debug Backend shall `research.md` N6〜N8 の小物（テストだけが使う `DebugConfig::from_file`、捨てるためだけに持つ `DebugHandle` の encoder の join handle、引数が 6 つの関数に付いた要らない `too_many_arguments` の許可、`capture_stack`・`capture_variables` の使わない `lua` の引数）を持たない。`from_file` のテスト（`tests/loader/config_test.rs` など）は `resolve` か `from_env` へ移す（2026-11-02 の要件ディスカッションで確定）。
+10. The Pasta Debug Backend shall テストだけが使う対応表の公開の問い合わせ（`ChunkSourceMap::lua_lines_for_pasta`・`new`・`len`・`is_empty`、`MapBuilderSink::chunk_name`）と、`canonicalize_chunk_name` をそのまま呼ぶだけの `canonicalize_pasta_file` を持たない（`research.md` N11・N12。監査の 8 番と同じ種類。2026-11-02 の要件ディスカッションで確定）。テストは本番の問い合わせ（`pasta_for_lua`・`resolve_pasta_to_lua`）へ移す。
 11. The Pasta Debug Backend shall 撤去の前後で、DAP の応答とイベント（要件 4 で変えるものを除く）・停止の判定・`@pasta_debug`・位置でのシーンの再生（`pasta/playSceneAt`・`OnPastaSceneAt`）の振る舞いを変えない。
 
 ### Requirement 8: マニュアルと説明を今のコードにそろえる
