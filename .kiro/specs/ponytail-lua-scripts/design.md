@@ -33,7 +33,7 @@
 - 関数を呼んだ後に戻す実行中のシーンの文脈（`ACT_IMPL.restore_scene` の新しい形）と、関数の戻り値の正規化（`ACTOR.drop_self`）。
 - 続きの中の `get_property` の期限の数え始め（区切りから再開されたときに act が控える、再開した要求）。
 - この領域を確かめるテスト（`tests/lua_specs/**` と、下に挙げた Rust のテスト）と、下に挙げたマニュアルの節。
-- `novel-checkpoint-rollback/brief.md` の `STORE.co_callback` の 1 行の直し（要件の In scope。実装のとき）。
+- `novel-checkpoint-rollback/brief.md`・`shiori4-v4-lua-api/brief.md` の `STORE.co_callback` の記述の直し（要件の In scope。実装のとき）。
 
 ### Out of Boundary
 
