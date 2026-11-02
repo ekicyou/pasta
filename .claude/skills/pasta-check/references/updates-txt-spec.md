@@ -151,8 +151,8 @@ file,descript.txt\x01f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3\x01size=789\x01date=2026-0
 
 ## 実装箇所
 
-- 生成: `crates/pasta_check/src/update_files.rs`
-- 同梱バルーンの判定: `crates/pasta_check/src/balloon.rs`
+- 生成: `pasta_check` クレートの `src/update_files.rs`
+- 同梱バルーンの判定: `pasta_check` クレートの `src/balloon.rs`
 - MD5 計算: `md5` クレート
 
 ## SSP 参考仕様

@@ -65,7 +65,7 @@ balloon/emo2-kakukaku/updates.txt
 
 ## 実装箇所
 
-- ソース: `crates/pasta_check/src/nar.rs`
+- ソース: `pasta_check` クレートの `src/nar.rs`
 - ZIP 書き込み: `zip` クレート (v8.6, deflate-only feature)
 - `profile/` ディレクトリは再帰走査時にスキップ
 - 段 1 で配布フォルダの準備の後に `--nar` の位置にある前回の nar を削除する（削除したときは `Removed previous <パス>` を表示）。段 6 で失敗したときは作りかけの nar を削除する。削除した後のどの段で失敗しても `--nar` の位置に nar は残らない。段 1 の前の引数の確かめ（入力のフォルダが無いときを含む）で止まったときは何も消さず、前回の nar は残る

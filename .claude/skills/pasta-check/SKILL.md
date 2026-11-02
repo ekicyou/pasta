@@ -1,6 +1,6 @@
 ---
 name: pasta-check
-description: 'pasta_check CLIツールのリファレンス。辞書の検査（validate サブコマンド）と、検査を関門にしたゴーストリリースビルド（release サブコマンド）を含む。USE FOR: pasta_check, pasta check, ghost release, ゴーストリリース, NAR作成, release.bat, release.ps1, pasta_check release, pasta_check validate, 辞書の検査, .nar, リリースビルド, ゴースト配布, updates.txt, build ghost, deploy ghost, publish ghost, リリース手順, pasta_check test, ゴースト検証. DO NOT USE FOR: pasta DSL文法（pasta-ghost-authoringを使用）, Lua API（pasta-lua-codingを使用）, crates.ioパブリッシュ（リリース CI。crates/pasta_sample_ghost/RELEASE.md を参照）.'
+description: 'pasta_check CLIツールのリファレンス。辞書の検査（validate サブコマンド）と、検査を関門にしたゴーストリリースビルド（release サブコマンド）を含む。USE FOR: pasta_check, pasta check, ghost release, ゴーストリリース, NAR作成, release.bat, release.ps1, pasta_check release, pasta_check validate, 辞書の検査, .nar, リリースビルド, ゴースト配布, updates.txt, build ghost, deploy ghost, publish ghost, リリース手順, pasta_check test, ゴースト検証. DO NOT USE FOR: pasta DSL文法（pasta-ghost-authoringを使用）, Lua API（pasta-lua-codingを使用）, crates.ioパブリッシュ（リリース CI。pasta リポジトリのサンプルゴーストの RELEASE.md を参照）.'
 argument-hint: 'サブコマンド名（release等）やゴースト名、オプションを指定'
 ---
 
@@ -157,7 +157,7 @@ workspace/                               # ワークスペースルート
 │   ├── pasta_check.zip                  # pasta_check.exe と THIRD_PARTY_LICENSES.txt（hello-pasta 固有・release.ps1 の段 3）
 │   ├── pasta-skills.zip                 # pasta のスキル 3 つと LICENSE（hello-pasta 固有・release.ps1 の段 6）
 │   └── pasta.dll.zip                    # 追加の配布物（hello-pasta 固有・release.ps1 の段 5）
-└── crates/pasta_sample_ghost/
+└── pasta_sample_ghost/                  # hello-pasta のプロジェクト（pasta リポジトリのクレート）
     ├── release.ps1                      # Setup + Release を統合したスクリプト
     └── ghosts/{ghost-name}/             # --target ゴースト開発フォルダー
 ```
@@ -177,7 +177,7 @@ SSP 仕様および NAR フォーマットの詳細:
 
 - 手元で `release.bat`・`release.ps1`（中で `pasta_check release` を呼ぶ）を実行して `release/` にできる成果物は、動作確認用である。コミットしない（`release/` は `.gitignore` で無視）。
 - 配布物（`pasta.dll.zip`・`pasta_check.zip`・`pasta-skills.zip`・`hello-pasta.nar`・VSIX）の公開は、リリースタグ `vX.Y.Z` の push を契機にリリース CI（`.github/workflows/release.yml`）が行う。CI はタグのソースから配布物を作り直し、GitHub Release（題名 `pasta vX.Y.Z`。本文は `doc/release-notes/vX.Y.Z.md` の見どころ）を作って、配布物と詳しいリリースノート（`release-notes-vX.Y.Z.md`）を添付する。
-- 手元で `gh release create` を実行しない。手順と失敗したときの回復は `crates/pasta_sample_ghost/RELEASE.md` を参照。
+- 手元で `gh release create` を実行しない。手順と失敗したときの回復は、pasta リポジトリのサンプルゴースト（`pasta_sample_ghost`）の `RELEASE.md` を参照。
 
 ## トラブルシューティング
 
