@@ -41,7 +41,7 @@ pub(crate) fn parse_global_scene_scope(
                 }
             }
             Rule::scene_actors_line => {
-                let items = parse_scene_actors_line(inner, &mut next_actor_number)?;
+                let items = parse_scene_actors_line(inner, &mut next_actor_number, filename)?;
                 actors.extend(items);
             }
             Rule::code_block => {
@@ -116,12 +116,14 @@ pub(crate) fn parse_global_scene_start(
 /// # Arguments
 /// * `pair` - Rule::scene_actors_lineのPair
 /// * `next_number` - 次の採番値（可変参照、更新される）
+/// * `filename` - 誤りに書くファイル名
 ///
 /// # Returns
 /// パースされたSceneActorItemのベクタ
 pub(crate) fn parse_scene_actors_line(
     pair: Pair<Rule>,
     next_number: &mut u32,
+    filename: &str,
 ) -> Result<Vec<SceneActorItem>, ParseError> {
     let mut items = Vec::new();
 
@@ -129,7 +131,7 @@ pub(crate) fn parse_scene_actors_line(
     // actors is a silent rule, so actors_item pairs appear directly
     for inner in pair.into_inner() {
         if inner.as_rule() == Rule::actors_item {
-            let item = parse_actors_item(inner, next_number)?;
+            let item = parse_actors_item(inner, next_number, filename)?;
             items.push(item);
         }
     }
@@ -144,9 +146,11 @@ pub(crate) fn parse_scene_actors_line(
 /// C#のenum採番ルール:
 /// - 番号指定あり: その番号を使用し、next_number = その番号 + 1
 /// - 番号指定なし: next_numberを使用し、next_number += 1
+/// - 0〜4294967295 に収まらない番号は、番号の位置の構文の誤り
 pub(crate) fn parse_actors_item(
     pair: Pair<Rule>,
     next_number: &mut u32,
+    filename: &str,
 ) -> Result<SceneActorItem, ParseError> {
     let span = Span::from_pair(&pair);
     let mut name = String::new();
@@ -160,7 +164,18 @@ pub(crate) fn parse_actors_item(
             Rule::digit_id => {
                 // 全角数字を半角に正規化してパース
                 let normalized = normalize_number_str(inner.as_str());
-                explicit_number = normalized.parse::<u32>().ok();
+                // 文法が数字だけを通すので、失敗は範囲の外だけ
+                let n = normalized.parse::<u32>().map_err(|_| {
+                    syntax_error(
+                        filename,
+                        inner.line_col(),
+                        &format!(
+                            "アクターの番号 {} は 0〜4294967295 の範囲を超えています",
+                            inner.as_str()
+                        ),
+                    )
+                })?;
+                explicit_number = Some(n);
             }
             _ => {}
         }

@@ -273,3 +273,53 @@ fn too_big_is_error_everywhere() {
         too_big_at(2, 8)
     );
 }
+
+// ============================================================================
+// アクターの番号の範囲（2.7）
+// ============================================================================
+
+fn actors(src: &str) -> Vec<(String, u32)> {
+    match &parse(src).items[0] {
+        FileItem::GlobalSceneScope(s) => s
+            .actors
+            .iter()
+            .map(|a| (a.name.clone(), a.number))
+            .collect(),
+        other => panic!("expected GlobalSceneScope, got {other:?}"),
+    }
+}
+
+#[test]
+fn actor_number_beyond_u32_is_syntax_error() {
+    // 2 行目の `4294967296` の始まり（全角の字も 1 桁と数える）
+    assert_eq!(
+        syntax_err("＊s\n　％a、b＝4294967296\n"),
+        (
+            2,
+            7,
+            "Parse error in num.pasta at 2:7: アクターの番号 4294967296 は 0〜4294967295 の範囲を超えています"
+                .to_string()
+        )
+    );
+    // 書いたとおりの数字（全角）を文に出す
+    assert_eq!(
+        syntax_err("＊s\n　％a＝４２９４９６７２９６\n").2,
+        "Parse error in num.pasta at 2:5: アクターの番号 ４２９４９６７２９６ は 0〜4294967295 の範囲を超えています"
+    );
+}
+
+#[test]
+fn actor_number_at_u32_max_and_next_omitted_stays() {
+    assert_eq!(
+        actors("＊s\n　％a＝4294967295、b\n"),
+        vec![("a".to_string(), u32::MAX), ("b".to_string(), u32::MAX)]
+    );
+    assert_eq!(
+        actors("＊s\n　％a、b＝3、c\n"),
+        vec![
+            ("a".to_string(), 0),
+            ("b".to_string(), 3),
+            ("c".to_string(), 4)
+        ]
+    );
+}
