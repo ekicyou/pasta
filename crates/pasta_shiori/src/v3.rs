@@ -36,9 +36,9 @@ pub struct PastaV3 {
 
 impl PastaV3 {
     /// 弾いた要求を、このインスタンスのログに 1 行残す。
-    fn reject(&self, kind: RequestKind, reason: &str) {
+    fn reject(&self, reason: &str) {
         let _log_context = LoadDirGuard::new(self.instance.load_dir().to_path_buf());
-        debug!(entry = "v3", ?kind, reason, "request rejected with 400");
+        debug!(entry = "v3", reason, "request rejected with 400");
     }
 }
 
@@ -67,44 +67,45 @@ impl Shiori for PastaV3 {
     }
 
     fn request(&mut self, req: &str) -> ShioriResponse {
-        let kind = classify_request(req);
-        let (status, body) = match kind {
-            RequestKind::Get => {
+        let (status, body) = match classify_request(req) {
+            Ok(RequestKind::Get) => {
                 let body = self.instance.get(req);
                 // status_of の警告をこのインスタンスのログへ出すための文脈。
                 let _log_context = LoadDirGuard::new(self.instance.load_dir().to_path_buf());
                 (status_of(&body), body)
             }
-            RequestKind::Notify => (SHIORI_204_NO_CONTENT, self.instance.notify(req)),
-            RequestKind::Shiori2 | RequestKind::Unreadable => {
-                let reason = reject_reason(kind);
-                self.reject(kind, reason);
-                (SHIORI_400_BAD_REQUEST, bad_request(reason))
+            Ok(RequestKind::Notify) => (SHIORI_204_NO_CONTENT, self.instance.notify(req)),
+            Ok(RequestKind::Shiori2(_)) => {
+                self.reject(REASON_SHIORI2);
+                (SHIORI_400_BAD_REQUEST, bad_request(REASON_SHIORI2))
+            }
+            Err(_) => {
+                self.reject(REASON_UNREADABLE);
+                (SHIORI_400_BAD_REQUEST, bad_request(REASON_UNREADABLE))
             }
         };
         ShioriResponse::with_status(status, body)
     }
 
     fn notify(&mut self, req: &str) -> ShioriStatus {
-        let kind = classify_request(req);
-        if kind == RequestKind::Notify {
-            self.instance.notify(req);
-            return SHIORI_204_NO_CONTENT;
-        }
         // GET・2.x・読めない要求はアクターへ送らない（3.4〜3.6）。
-        self.reject(kind, reject_reason(kind));
+        let reason = match classify_request(req) {
+            Ok(RequestKind::Notify) => {
+                self.instance.notify(req);
+                return SHIORI_204_NO_CONTENT;
+            }
+            Ok(RequestKind::Get) => "GET is not accepted by notify",
+            Ok(RequestKind::Shiori2(_)) => REASON_SHIORI2,
+            Err(_) => REASON_UNREADABLE,
+        };
+        self.reject(reason);
         SHIORI_400_BAD_REQUEST
     }
 }
 
 /// 弾く要求の理由（`X-ERROR-REASON` とログに出す）。
-fn reject_reason(kind: RequestKind) -> &'static str {
-    match kind {
-        RequestKind::Get => "GET is not accepted by notify",
-        RequestKind::Shiori2 => "SHIORI/2.x is not supported",
-        RequestKind::Notify | RequestKind::Unreadable => "unreadable request",
-    }
-}
+const REASON_SHIORI2: &str = "SHIORI/2.x is not supported";
+const REASON_UNREADABLE: &str = "unreadable request";
 
 /// 応答の開始行 `SHIORI/3.0 NNN` の NNN。読めなければ 500（本文は変えない・3.7）。
 fn status_of(response: &str) -> ShioriStatus {

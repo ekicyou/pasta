@@ -19,7 +19,7 @@ use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLogger};
 
 use crate::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use crate::actor::marshaling::{
-    ShioriMethod, default_204, determine_method, marshal_get, marshal_notify,
+    RequestKind, ShioriMethod, classify_request, default_204, marshal_get, marshal_notify,
 };
 use crate::actor::teardown::{TeardownReport, teardown_via_sender};
 use crate::actor::thread::{ActorThread, spawn_actor_thread_with};
@@ -194,12 +194,14 @@ impl ActorInstance {
         MailboxRequest::new(self.seq.fetch_add(1, Ordering::Relaxed), req.to_string())
     }
 
-    /// 旧来の意味の要求: メソッドを判定して GET／NOTIFY へ渡す。読めなければ 204。
+    /// 旧来の意味の要求: メソッドを判定して GET／NOTIFY へ渡す（2.x も Lua へ）。読めなければ 204。
     pub fn request(&self, req: &str) -> String {
-        match determine_method(req) {
-            Some(ShioriMethod::Get) => self.get(req),
-            Some(ShioriMethod::Notify) => self.notify(req),
-            None => default_204(),
+        match classify_request(req) {
+            Ok(RequestKind::Get | RequestKind::Shiori2(ShioriMethod::Get)) => self.get(req),
+            Ok(RequestKind::Notify | RequestKind::Shiori2(ShioriMethod::Notify)) => {
+                self.notify(req)
+            }
+            Err(_) => default_204(),
         }
     }
 
