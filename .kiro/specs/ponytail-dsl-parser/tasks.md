@@ -131,7 +131,7 @@
   - _Requirements: 6.2, 8.3_
 
 - [ ] 11. 全体の確かめと品質の関門
-- [ ] 11.1 (P) `pasta_check validate` が pasta.dll と同じ結果を出すことを確かめる
+- [x] 11.1 (P) `pasta_check validate` が pasta.dll と同じ結果を出すことを確かめる
   - `validate_rules_test.rs` にテストを 1 本足す：
     - 大きすぎる数・アクターの番号・シーン引数の番号・括弧の重なり・演算子の数の辞書で、`syntax` の誤りが 1 つずつ出る。位置は `parse_str` と同じ行・桁で、文は `構文エラー: {文}`
     - 20 桁の整数の辞書は、誤り無しになる
