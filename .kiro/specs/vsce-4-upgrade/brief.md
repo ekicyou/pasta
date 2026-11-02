@@ -89,3 +89,9 @@ Node 22 への移行を先に済ませ（`ponytail-manual-ci` が「Node 22 に�
 - **見つけた穴・古くなった記述**
   - `vsce publish --azure-credential` を実際に叩くのは `release.yml` ではなく `.github/scripts/release/publish-vsix.ps1`（`release.yml` 438 行が呼ぶ）。このスクリプトは vsce 3.x の振る舞いを前提にしている。`--pat` が既定で `VSCE_PAT` を読み `--azure-credential` より勝つ（75〜77 行で `VSCE_PAT` を消す）ことと、拡張が無いときに `vsce show` が `undefined` を出して 0 で終える（62 行）こと。Current State と Scope にこのスクリプトが無い。4.x でこの 2 つが変わっていないかを要件の前に確かめる。
   - 手元の `editors/vscode/node_modules` に入っている vsce が lock の 3.9.2 と違う版のことがある（このワークツリーでは 3.7.1）。手元で確かめるときは `npm ci` し直す。
+
+## 申し送り（ponytail-manual-ci より・2026-11-03）
+
+- Node 22 への移行は済んだ。`release.yml` の `NODE_VERSION` は `'22'`、`release-setup-check.yml` の `node-version` も `'22'`。`actions/setup-node` はどちらも v7。この spec で Node を上げる手間は無くなった（Scope の「Node の版」と Current State の Node 20 の行は古い）。
+- 公開の job の第三者の action は SHA で固定し、行末にタグのコメントを置く形になった（`Azure/login@a641126d… # v3` など。`release-setup-check.yml` も同じ）。`publish-vsce` の job を変えるときは、この形を保つ。
+- `publish-vsix.ps1` の「公開済みなら飛ばす」判定は、`release-scripts-test.ps1` の項目 12（偽の vsce が公開済みと答える）が試験するようになった。4.x で `vsce show` の出力が変わるなら、この項目の偽の vsce の答えも合わせる。

@@ -107,3 +107,9 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 - **要件定義のモデル**: Opus（前のまま）。
 - **分割の案**: 要らない。
 - **見つけた穴・古くなった記述**: Current State の行番号は古い（上の行が正しい）。Upstream の `ponytail-shiori` の型の直しは `shiori4-v3-portable` で済んだ。`.cargo/config.toml` 11 行「出荷ターゲットは x86（i686）・x64（x86_64）の両方」は x64 の `pasta_check.exe` のことで、x64 の pasta.dll は配っていない（すぐ直せる誤り）。CI で arm64 を作るには、arm64 の Windows の runner か x64 からのクロスビルドが要る。`embed-resource` の VERSIONINFO が arm64 で通るかも、LuaJIT と一緒に試す（前のまま）。
+
+## 申し送り（ponytail-manual-ci より・2026-11-03）
+
+- `release.yml` の第三者の action（`dtolnay/rust-toolchain`・`Swatinem/rust-cache`・`rust-lang/crates-io-auth-action`・`Azure/login`）は SHA で固定し、行末にタグのコメントを置く形になった。`rust-toolchain` は SHA で指すので、`targets:` に arm64 を足すときも `toolchain:` は足さない（その SHA の `action.yml` の既定が stable）。
+- 道具（`wasm-pack`・`cargo-about`）は env の SHA-256 と `Get-FileHash` で照合してから展開する。道具を足す・版を上げるときは、その SHA-256 も env に足す。
+- `build.yml` に job `manual-light`（マニュアルの軽い検査）が増えた。build の job の `upload-artifact` は v7、`release.yml` の `download-artifact` は v8。arm64 の行を足すときは、この版にそろえる。
