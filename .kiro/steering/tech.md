@@ -55,7 +55,7 @@
 - **time 0.3**: 時刻処理
 - **tracing 0.1**: ロギング（subscriber/appenderはpasta_luaに移管）
 - **thiserror 2**: エラー型定義
-- **windows-sys 0.61**: Windows DLL API（cfg(windows)・Win32_System_Threading 含む）
+- **windows-sys 0.61**: Windows DLL API（cfg(windows)・Win32_System_LibraryLoader。Threading は dev-dependencies だけ）
 - **flume 0.12**: アクター mailbox（アクタースレッドは同期 `recv()` のループ・応答待ちは `recv_timeout`・`Sender: Send+Sync+Clone`）
 - **arc-swap 1**: 旧来の入口の置き場 `static LEGACY` の lock-free スロット（送信パスに Mutex を置かない）
 - **shiori4_abi 0.1**: 版 3 の口（`shiori_get_api`）の ABI の検査（バッファの写し・UTF-8・パニックの捕捉）

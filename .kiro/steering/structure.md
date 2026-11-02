@@ -11,7 +11,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │   ├── tests/           # 外部化テスト（Phase A）
 │   │   └── src/
 │   │       ├── lib.rs       # クレートエントリーポイント
-│   │       ├── error.rs     # ParseError, ParseErrorInfo, ParseResult
+│   │       ├── error.rs     # ParseError
 │   │       └── parser/      # パーサーレイヤー（PEG → AST変換）
 │   │           ├── mod.rs   # パーサーAPI公開・エントリーポイント
 │   │           ├── parse_scene.rs    # シーン解析サブモジュール
@@ -340,7 +340,7 @@ pasta (workspace)
 ├── pasta_dsl           # DSLパーサー層（Pest PEG → AST変換）
 ├── pasta_core          # 言語非依存層（レジストリ）
 ├── pasta_lua           # Luaバックエンド層（pasta_dsl + pasta_core依存）
-├── pasta_shiori        # SHIORI DLLインターフェース層（旧来の入口 windows.rs〔Windows だけ〕と版 3 の入口 v3.rs〔全 OS〕・src/actor/ = インスタンスごとのアクタースレッド・flume mailbox・marshaling・teardown・旧来の置き場 static LEGACY）
+├── pasta_shiori        # SHIORI DLLインターフェース層（旧来の入口 windows.rs〔Windows だけ〕と版 3 の入口 v3.rs〔全 OS〕・src/actor/ = インスタンスごとのアクタースレッド・flume mailbox・marshaling・teardown・pasta.dll の参照 module_ref・旧来の置き場 static LEGACY）
 ├── pasta_lsp           # WASM の解析器（色・構文の診断・pasta_check の検査の核を WASM で公開）
 ├── pasta_check         # 辞書の検査の核（ライブラリ・pasta_dsl + pasta_core依存）＋CLI（validate・release）
 └── pasta_sample_ghost  # サンプルゴースト「hello-pasta」（publish=false）
@@ -376,7 +376,7 @@ pasta_dsl（パーサー） + pasta_core（レジストリ）
 
 ### 公開API (`pasta_dsl/lib.rs`)
 - **Parser**: `parse_str()`, `parse_file()`, AST型（PastaFile, Statement, Expr等）
-- **Error**: `ParseError`, `ParseErrorInfo`, `ParseResult`
+- **Error**: `ParseError`
 
 ### 公開API (`pasta_core/lib.rs`)
 - **Registry**: `SceneRegistry`, `WordDefRegistry`, `SceneTable`, `WordTable`

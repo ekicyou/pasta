@@ -1,6 +1,5 @@
 use crate::util::parsers;
 use std::str::Utf8Error;
-use std::sync::PoisonError;
 use thiserror::Error;
 
 pub type MyResult<T> = Result<T, MyError>;
@@ -12,9 +11,6 @@ pub enum MyError {
 
     #[error("Not initialized error")]
     NotInitialized,
-
-    #[error("Poison error")]
-    Poison,
 
     #[error("Shiori request parse error: '{0}'")]
     ParseRequest(Box<parsers::req::ParseError>),
@@ -35,12 +31,6 @@ pub enum MyError {
 impl From<parsers::req::ParseError> for MyError {
     fn from(error: parsers::req::ParseError) -> MyError {
         MyError::ParseRequest(Box::new(error))
-    }
-}
-
-impl<G> From<PoisonError<G>> for MyError {
-    fn from(_error: PoisonError<G>) -> MyError {
-        MyError::Poison
     }
 }
 
@@ -190,7 +180,6 @@ mod tests {
             MyError::Load("boot failed".to_string()).to_string(),
             "Load error: boot failed"
         );
-        assert_eq!(MyError::Poison.to_string(), "Poison error");
         assert_eq!(MyError::EncodeAnsi.to_string(), "ANSI encoding error");
         assert_eq!(
             MyError::Script {
@@ -214,13 +203,6 @@ mod tests {
         let err = MyError::from(utf8_err);
         assert!(matches!(err, MyError::EncodeUtf8(_)));
         assert_eq!(err.to_string(), "UTF8 encoding error");
-    }
-
-    #[test]
-    fn from_poison_error_maps_to_poison() {
-        let poison = std::sync::PoisonError::new(());
-        let err = MyError::from(poison);
-        assert_eq!(err, MyError::Poison);
     }
 
     #[test]

@@ -37,7 +37,7 @@
 use std::thread;
 use std::time::Duration;
 
-use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use pasta::actor::marshaling::{default_204, marshal_get_with_timeout, marshal_notify};
 
 // ===========================================================================
@@ -143,14 +143,14 @@ fn sim_driver_ticks_drive_production_marshaling_contract() {
         while let Ok(msg) = rx.recv() {
             match msg {
                 ActorMsg::Get { req, reply } => {
-                    let _ = reply.send(Reply::Value(format!("echo:{}", req.raw)));
+                    let _ = reply.send(format!("echo:{}", req.raw));
                 }
                 ActorMsg::Notify { .. } => { /* fire-and-forget・応答経路なし */ }
                 ActorMsg::Stop { done } => {
                     let _ = done.send(());
                     break;
                 }
-                _ => { /* #[non_exhaustive]: 将来の variant は無視 */ }
+                ActorMsg::Kick { .. } => {}
             }
         }
     });
@@ -205,8 +205,10 @@ fn production_mailbox_preserves_fifo_across_producers() {
         handles.push(thread::spawn(move || {
             for i in 0..PER_PRODUCER {
                 let seq = p * 1000 + i;
-                txc.send(ActorMsg::notify(MailboxRequest::new(seq, "")))
-                    .expect("clone send must succeed while consumer is alive");
+                txc.send(ActorMsg::Notify {
+                    req: MailboxRequest::new(seq, ""),
+                })
+                .expect("clone send must succeed while consumer is alive");
             }
         }));
     }
@@ -269,7 +271,7 @@ fn reply_move_then_value_or_204_on_drop_exactly_once() {
         let (tx, rx) = mailbox();
         let actor = thread::spawn(move || {
             if let Ok(ActorMsg::Get { req, reply }) = rx.recv() {
-                let _ = reply.send(Reply::Value(format!("v:{}", req.raw)));
+                let _ = reply.send(format!("v:{}", req.raw));
             }
         });
         let resp =
@@ -323,11 +325,11 @@ fn actor_work_survives_timeout_and_recovers_on_next_tick() {
         //         work は失われず最後まで完走する（co_scene 保存の構造的模擬）。
         if let Ok(ActorMsg::Get { req: _, reply }) = rx.recv() {
             thread::sleep(actor_delay);
-            let _ = reply.send(Reply::Value("late-but-completed".to_string()));
+            let _ = reply.send("late-but-completed".to_string());
         }
         // Round2: 通常速度で reply（次 tick による回復に相当）。
         if let Ok(ActorMsg::Get { req, reply }) = rx.recv() {
-            let _ = reply.send(Reply::Value(format!("recovered:{}", req.raw)));
+            let _ = reply.send(format!("recovered:{}", req.raw));
         }
     });
 

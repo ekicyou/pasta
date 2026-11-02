@@ -88,19 +88,11 @@ fn parse1(table: &Table, mut it: FlatPairs<'_, Rule>) -> MyResult<()> {
             Rule::header3 => table.set("version", 30)?,
             Rule::shiori2_id => table.set("id", pair.as_str())?,
             Rule::shiori2_ver => {
-                let version = {
-                    let nums: i32 = pair.as_str().parse().map_err(|_| MyError::Script {
-                        message: format!("Invalid SHIORI2 version number: '{}'", pair.as_str()),
-                    })?;
-                    if nums < 0 {
-                        20
-                    } else if nums > 9 {
-                        29
-                    } else {
-                        nums + 20
-                    }
-                };
-                table.set("version", version)?
+                // 文法（`ver`）が 1 桁に限るので 0〜9 しか来ない。
+                let nums: i32 = pair.as_str().parse().map_err(|_| MyError::Script {
+                    message: format!("Invalid SHIORI2 version number: '{}'", pair.as_str()),
+                })?;
+                table.set("version", nums + 20)?
             }
             _ => (),
         };

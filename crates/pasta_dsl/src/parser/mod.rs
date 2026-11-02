@@ -96,21 +96,65 @@ pub struct PastaParser2;
 /// ```
 pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, ParseError> {
     let source = source.strip_prefix('\u{FEFF}').unwrap_or(source);
+    check_paren_depth(source, filename)?;
     let pairs = PastaParser2::parse(Rule::file, source).map_err(|e| {
         let (line, column) = match e.line_col {
             pest::error::LineColLocation::Pos((l, c)) => (l, c),
             pest::error::LineColLocation::Span((l, c), _) => (l, c),
         };
-        let message = format!("Parse error in {} at {}:{}: {}", filename, line, column, e);
-        ParseError::SyntaxError {
-            file: filename.to_string(),
-            line,
-            column,
-            message,
-        }
+        syntax_error(filename, (line, column), &e.to_string())
     })?;
 
-    build_ast(pairs, filename, source)
+    build_ast(pairs, filename)
+}
+
+/// 1 行で閉じていない開き括弧を重ねられる段の数。pest の再帰は開き括弧 1 つで 1 段深くなる。
+pub(crate) const MAX_PAREN_DEPTH: usize = 64;
+
+/// 1 つの式に書ける二項演算子の数。鎖は演算子 1 つで 1 段深くなり、片付けとコード生成が再帰する。
+pub(crate) const MAX_EXPR_OPS: usize = 256;
+
+/// 1 行の閉じていない開き括弧の重なりが MAX_PAREN_DEPTH を超えたら、
+/// 超えた開き括弧の位置の SyntaxError を返す。
+///
+/// pest の前に走らせ、深い再帰でスタックがあふれるのを防ぐ。台詞・文字列・コメント・
+/// Lua ブロックの括弧も数える（数えすぎる向きにしかずれない）。行と桁は pest の行の索引と
+/// 同じく `'\n'` だけで行を分け、桁は文字の数で数える。
+pub(crate) fn check_paren_depth(source: &str, filename: &str) -> Result<(), ParseError> {
+    for (line_no, line) in source.split('\n').enumerate() {
+        let mut depth = 0usize;
+        for (col, ch) in line.chars().enumerate() {
+            match ch {
+                '（' | '(' => {
+                    depth += 1;
+                    if depth > MAX_PAREN_DEPTH {
+                        return Err(syntax_error(
+                            filename,
+                            (line_no + 1, col + 1),
+                            &format!("括弧の重なりが {MAX_PAREN_DEPTH} 段を超えています"),
+                        ));
+                    }
+                }
+                '）' | ')' => depth = depth.saturating_sub(1),
+                _ => {}
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Build a positioned syntax error with the common `Parse error in {file} at {l}:{c}: ` prefix.
+pub(crate) fn syntax_error(filename: &str, line_col: (usize, usize), what: &str) -> ParseError {
+    let (line, column) = line_col;
+    ParseError::SyntaxError {
+        file: filename.to_string(),
+        line,
+        column,
+        message: format!(
+            "Parse error in {} at {}:{}: {}",
+            filename, line, column, what
+        ),
+    }
 }
 
 /// Parse a Pasta script file using pasta2.pest grammar.
@@ -156,20 +200,15 @@ pub fn parse_file(path: &Path) -> Result<PastaFile, ParseError> {
 /// grammar.pest `file = ( file_scope | global_scene_scope | actor_scope )*` に準拠。
 /// 複数の file_scope、global_scene_scope、actor_scope を任意順序で処理し、
 /// 出現順序を items に保持します。
-fn build_ast(pairs: Pairs<Rule>, filename: &str, source: &str) -> Result<PastaFile, ParseError> {
+fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, ParseError> {
     let mut file = PastaFile::new(std::path::PathBuf::from(filename));
     let mut last_global_scene_name: Option<String> = None;
-
-    // Set file span to cover the entire source
-    let line_count = source.lines().count().max(1);
-    let last_line_len = source.lines().last().map(|l| l.len()).unwrap_or(0);
-    file.span = Span::new(1, 1, line_count, last_line_len + 1, 0, source.len());
 
     for pair in pairs {
         match pair.as_rule() {
             Rule::file_scope => {
                 // file_scope 内の attrs と words を個別の FileItem として追加
-                let scope = parse_file_scope(pair)?;
+                let scope = parse_file_scope(pair, filename)?;
                 for attr in scope.attrs {
                     file.items.push(FileItem::FileAttr(attr));
                 }
@@ -182,10 +221,9 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str, source: &str) -> Result<PastaFi
                 file.items.push(FileItem::GlobalSceneScope(scene));
             }
             Rule::actor_scope => {
-                let actor = parse_actor_scope(pair)?;
+                let actor = parse_actor_scope(pair, filename)?;
                 file.items.push(FileItem::ActorScope(actor));
             }
-            Rule::EOI => {}
             _ => {}
         }
     }
@@ -194,7 +232,7 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str, source: &str) -> Result<PastaFi
 }
 
 /// Parse file scope.
-fn parse_file_scope(pair: Pair<Rule>) -> Result<FileScope, ParseError> {
+fn parse_file_scope(pair: Pair<Rule>, filename: &str) -> Result<FileScope, ParseError> {
     let mut scope = FileScope::default();
 
     for inner in pair.into_inner() {
@@ -202,7 +240,7 @@ fn parse_file_scope(pair: Pair<Rule>) -> Result<FileScope, ParseError> {
             Rule::file_attr_line => {
                 for attr_pair in inner.into_inner() {
                     if attr_pair.as_rule() == Rule::attr {
-                        scope.attrs.push(parse_attr(attr_pair)?);
+                        scope.attrs.push(parse_attr(attr_pair, filename)?);
                     }
                 }
             }
@@ -224,8 +262,8 @@ fn parse_file_scope(pair: Pair<Rule>) -> Result<FileScope, ParseError> {
 ///
 /// grammar.pest `actor_scope = { actor_line ~ actor_scope_item* }` に対応。
 /// actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_line | code_scope | blank_line }
-fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
-    let span = Span::from(&pair.as_span());
+fn parse_actor_scope(pair: Pair<Rule>, filename: &str) -> Result<ActorScope, ParseError> {
+    let span = Span::from_pair(&pair);
     let mut name = String::new();
     let mut attrs = Vec::new();
     let mut words = Vec::new();
@@ -245,7 +283,7 @@ fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
             Rule::global_scene_attr_line => {
                 for attr_pair in inner.into_inner() {
                     if attr_pair.as_rule() == Rule::attr {
-                        attrs.push(parse_attr(attr_pair)?);
+                        attrs.push(parse_attr(attr_pair, filename)?);
                     }
                 }
             }
@@ -257,7 +295,7 @@ fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
                 }
             }
             Rule::var_set_local | Rule::var_set_global | Rule::var_set_none => {
-                var_sets.push(parse_var_set(inner)?);
+                var_sets.push(parse_var_set(inner, filename)?);
             }
             Rule::code_block => {
                 code_blocks.push(parse_code_block(inner)?);
@@ -319,6 +357,46 @@ mod tests {
         let plain = parse_str(source, "a.pasta").unwrap();
         let with_bom = parse_str(&format!("\u{FEFF}{source}"), "a.pasta").unwrap();
         assert_eq!(format!("{with_bom:?}"), format!("{plain:?}"));
+    }
+
+    #[test]
+    fn test_syntax_error_builds_prefixed_message() {
+        let err = syntax_error("dic/a.pasta", (2, 13), "範囲を超えています");
+        assert_eq!(
+            format!("{err:?}"),
+            format!(
+                "{:?}",
+                ParseError::SyntaxError {
+                    file: "dic/a.pasta".to_string(),
+                    line: 2,
+                    column: 13,
+                    message: "Parse error in dic/a.pasta at 2:13: 範囲を超えています".to_string(),
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn test_try_parse_expr_rejects_unhandled_rule_with_position() {
+        // 2 行目の話者名 `Alice`（id 規則）は式の項ではない
+        let source = "＊挨拶\n  Alice：こんにちは\n";
+        let pair = PastaParser2::parse(Rule::file, source)
+            .unwrap()
+            .flatten()
+            .find(|p| p.as_rule() == Rule::id && p.as_str() == "Alice")
+            .unwrap();
+        let err = try_parse_expr(pair, "dic/a.pasta").unwrap_err();
+        assert_eq!(
+            format!("{err:?}"),
+            format!(
+                "{:?}",
+                syntax_error(
+                    "dic/a.pasta",
+                    (2, 3),
+                    "内部の誤り：式の項として扱えない規則 id"
+                )
+            )
+        );
     }
 
     #[test]

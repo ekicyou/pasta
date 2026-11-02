@@ -450,3 +450,68 @@ fn transpile_errors_found_in_every_file_and_occurrence() {
         ]
     );
 }
+
+/// 数・番号・括弧・演算子の新しい誤りも、pasta.dll と同じ parse_str の位置と文で 1 つずつ出る（2.9・4.4）
+#[test]
+fn number_and_limit_errors_match_parse_str() {
+    let huge = format!("1{}", "0".repeat(399));
+    // (辞書, 文の頭)。文の頭で、狙った検査に当たったことを確かめる
+    let cases = [
+        (format!("＊s\n  ＄x＝{huge}\n"), "数が大きすぎます"),
+        ("＊s\n  ％a、b＝4294967296\n".to_string(), "アクターの番号"),
+        ("＊s\n  さくら：＄２５６\n".to_string(), "シーン引数の番号"),
+        (
+            format!("＊s\n  ＄x＝{}１{}\n", "（".repeat(65), "）".repeat(65)),
+            "括弧の重なり",
+        ),
+        (
+            format!("＊s\n  ＄x＝1{}\n", "＋1".repeat(257)),
+            "1 つの式の演算子",
+        ),
+    ];
+    for (src, head) in &cases {
+        let found = syntax_findings(vec![("dic/a.pasta", FileText::Text { text: src.clone() })]);
+        let Err(pasta_dsl::ParseError::SyntaxError {
+            file,
+            line,
+            column,
+            message,
+        }) = pasta_dsl::parse_str(src, "dic/a.pasta")
+        else {
+            panic!("構文エラーになるはず: {src}");
+        };
+        // 自前の誤りは pest の枠を持たないので、位置の前置きを外した文がそのまま付く
+        let what = message
+            .strip_prefix(&format!("Parse error in {file} at {line}:{column}: "))
+            .expect("位置の前置きがある");
+        assert!(what.starts_with(head), "{what}");
+        let got: Vec<_> = found
+            .iter()
+            .map(|f| (f.code, f.line, f.column, f.message.clone()))
+            .collect();
+        assert_eq!(
+            got,
+            vec![(
+                FindingKind::Syntax,
+                Some(line as u32),
+                Some(column as u32),
+                format!("構文エラー: {what}")
+            )],
+            "{src}"
+        );
+    }
+
+    // 20 桁の整数は小数として読めるので、誤り無し
+    let src = "＊s\n  ＄x＝10000000000000000000\n";
+    let input = GhostInput {
+        pasta_toml: TomlSource::Text { text: TOML.into() },
+        entries: vec!["dic/a.pasta".into()],
+        dirs: vec![],
+    };
+    let files = BTreeMap::from([(
+        "dic/a.pasta".to_string(),
+        FileText::Text { text: src.into() },
+    )]);
+    let report = validate_ghost(&input, &files);
+    assert!(report.findings.is_empty(), "{:?}", report.findings);
+}

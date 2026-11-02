@@ -9,7 +9,7 @@
 #![allow(dead_code)]
 
 use crate::common::response::ShioriResponse;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 use std::path::Path;
 use tempfile::TempDir;
 
@@ -35,7 +35,7 @@ impl AsyncCallbackEnv {
 
         let mut shiori = PastaShiori::default();
         let loaded = shiori
-            .load(0, temp_dir.path().as_os_str())
+            .load(temp_dir.path().as_os_str())
             .expect("SHIORI load should not error");
         assert!(loaded, "SHIORI load should return true");
 

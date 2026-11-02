@@ -7,7 +7,7 @@
 //!
 //! - **PEG-based parser**: Uses Pest 2.8 for grammar-driven parsing
 //! - **Complete AST**: Full AST type definitions for all Pasta DSL constructs
-//! - **Independent error types**: `ParseError` and `ParseErrorInfo` for parse diagnostics
+//! - **Independent error types**: `ParseError` (`SyntaxError`, `IoError`) for parse diagnostics
 //! - **Zero backend dependency**: No Lua, registry, or runtime dependencies
 //!
 //! # Example
@@ -29,6 +29,6 @@ pub mod parser;
 pub mod partial;
 
 // Convenience re-exports
-pub use error::{ParseError, ParseErrorInfo, ParseResult};
+pub use error::ParseError;
 pub use parser::{FileItem, PastaFile, parse_file, parse_str};
 pub use partial::{PartialParseResult, parse_str_partial};

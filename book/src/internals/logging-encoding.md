@@ -70,7 +70,7 @@ RoutingWriter ── 決まった → PastaLogger::write → RollingFileAppender
 
 どちらの OS の実装を使うかは `#[cfg(windows)]` でビルド時に決まる。2 つの関数を使うのは `@enc` と `ffi.load` の名前の扱い（`crates/pasta_lua/src/runtime/ffi_load/resolve.rs`）である。
 
-pasta_shiori は FFI の文字列を読むための変換を、`crates/pasta_shiori/src/util/hglobal/` に別に持つ（`enc.rs` と `windows_api.rs`）。`crates/pasta_lua/src/encoding/windows.rs` と同じく local-encoding-rs に由来する実装で、`crates/pasta_lua/src/encoding/` は使わない。
+pasta_shiori は FFI の文字列を読むための変換を、`crates/pasta_shiori/src/util/hglobal/` に別に持つ（`mod.rs` の `ShioriString::to_ansi_str` と `windows_api.rs` の `multi_byte_to_wide_char`）。`crates/pasta_lua/src/encoding/windows.rs` と同じく local-encoding-rs に由来する実装で、`crates/pasta_lua/src/encoding/` は使わない。
 
 ## 処理とデータの流れ
 

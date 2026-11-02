@@ -11,7 +11,7 @@ mod common;
 
 use common::copy_fixture_to_temp;
 use common::response::ShioriResponse;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 /// 1 つのゴーストに、順にリクエストを送り、各応答の Value とゴーストのログファイルの中身を返す。
 ///
@@ -40,7 +40,7 @@ fn load_and_request(dir: &std::path::Path, requests: &[&str]) -> Vec<String> {
     let mut shiori = PastaShiori::default();
     assert!(
         shiori
-            .load(0, dir.as_os_str())
+            .load(dir.as_os_str())
             .expect("SHIORI load should not error"),
         "SHIORI load should return true"
     );

@@ -12,9 +12,9 @@ mod common;
 
 use common::copy_fixture_to_temp;
 use common::response::ShioriResponse;
-use pasta::actor::mailbox::{ActorMsg, mailbox};
-use pasta::actor::marshaling::marshal_request;
-use pasta::actor::thread::spawn_actor_thread;
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
+use pasta::actor::marshaling::{marshal_get, marshal_notify};
+use pasta::actor::thread::spawn_actor_thread_with;
 
 /// `balloon_warning` の 3 通り（書かない・false・型違い）
 const UNSET: Option<&str> = None;
@@ -70,19 +70,20 @@ fn run(balloon_warning: Option<&str>, requests: &[(&str, &str)]) -> Run {
         std::fs::write(&path, toml).unwrap();
     }
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, temp.path().to_path_buf(), rx);
+    let actor = spawn_actor_thread_with(temp.path().to_path_buf(), rx, None, None)
+        .expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost");
     let raws = requests
         .iter()
         .enumerate()
         .map(|(seq, (method, id))| {
-            marshal_request(
-                &tx,
-                seq as u64,
-                &format!(
-                    "{method} SHIORI/3.0\r\nCharset: UTF-8\r\nSender: SSP\r\nID: {id}\r\n\r\n"
-                ),
-            )
+            let raw =
+                format!("{method} SHIORI/3.0\r\nCharset: UTF-8\r\nSender: SSP\r\nID: {id}\r\n\r\n");
+            let req = MailboxRequest::new(seq as u64, raw);
+            match *method {
+                "GET" => marshal_get(&tx, req),
+                _ => marshal_notify(&tx, req),
+            }
         })
         .collect();
     let (done, done_rx) = flume::bounded(1);
