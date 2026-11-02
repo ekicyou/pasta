@@ -150,3 +150,108 @@
 - 2・4・5 は、brief の決めごと（監査の指摘を残らず直す・ギャップ分析で増えた同じ領域の指摘は In・pub API を消してよい）で、仮定のとおり閉じた。議題にしない。
 - 3 は、持ち場の約束（`debug/` に触らない）で、仮定のとおり閉じた。`debug/source_map/mod.rs` 25 行の 1 語と、アクターの単語定義の対応が増えることは、`ponytail-lua-debug` の brief に申し送った。
 - 1 だけを議題にした。開発者が推奨案のとおり承認した（Lua ブロックを含まない辞書の出力はバイト単位で今と同じ。保てないと設計で分かったら案 B へ退く）。
+
+---
+
+# 設計フェーズの調べもの（2026-11-02、`/kiro-spec-design -y`）
+
+## Summary
+
+- **Feature**: `ponytail-lua-transpiler`
+- **Discovery Scope**: Extension（既存のトランスパイラの直しと撤去。light discovery。外の技術の調べものは無い）
+- **使ったスキルと規則**: `kiro-spec-design`（`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`・`design-principles.md`）、`.kiro/settings/templates/specs/design.md`、steering の `tech.md`・`structure.md`（品質の関門・pub API の扱い）、ponytail の「最小で完全な直し」の考え方（部品を増やさず、呼び所を変えない形を選ぶ）。
+- **Key Findings**:
+  - 「Research Needed」1 は試作で確かめた。空行を保留にして `end` の前で捨てる形で、Lua ブロックを含まないスナップショット 26 本と `sample.generated.lua` はバイト単位で同じ。変わるのは Lua ブロックを含む 3 本の、ブロックの内容の行の字下げだけ。案 B へは退かない。
+  - 消す規則（`end` の前の空行の削除）を固めているテストが `debug/` に 1 本ある（`src/debug/source_map_builder_tests.rs`）。8.5 の「分け方を設計で決める」に当たる（OPEN QUESTION 1）。
+  - 生成器が最後の保留の空行を書かないので、生成コードでは `normalize` が何も消さず、`LineShift` は恒等になる。形は保つ（要件の決めごと）。
+
+## Research Log
+
+### 空行の書き方を変えてもバイト単位で同じか（Research Needed 1）
+
+- **Context**: 要件 2.1（Lua ブロックを含まない辞書はバイト単位で同じ）。保てなければ案 B に退く約束。
+- **Sources Consulted**: `code_gen/mod.rs`（`write_blank_line`・`end_block`・`write_header`）、`scope_gen.rs` の `write_blank_line` の呼び所（78・170・178・314 行）、`normalize.rs` 106〜146 行、`expr_gen.rs` 126 行（`self.writer` への直の書き込み）。
+- **方法**: ワークツリーで次の 3 つだけを入れ、`env -u NoDefaultCurrentDirectoryInExePath cargo test -p pasta_lua --no-fail-fast`、続けて `INSTA_UPDATE=new INSTA_FORCE_PASS=1 cargo test -p pasta_lua --test transpiler` で全スナップショットの `.snap.new` を出して比べた。終わった後に `.snap.new` を消し、`git checkout -- crates/` で戻した（`crates/` の差分は空）。
+  1. `write_blank_line` は保留の数を 1 足すだけ。`write_indent`・`write_raw` の頭で保留を書き出す。`end_block` は `dedent` の後に保留を 0 にしてから `end` を書く。
+  2. `generate_code_block` を `write_raw(line)`＋`write_line_terminator()` にする。
+  3. `normalize_output_with_shift` の「次の空白でない行が `end` の空行を消す」繰り返しを消す。
+- **Findings**:
+  - スナップショット 29 本のうち 26 本は同じ。変わったのは `r7_1_off_path__kind_code_block`・`r7_1_off_path__fixture_zero_cost_all_syntax`・`zero_cost_off_path_all_syntax` の 3 本で、差分はブロックの内容の行の字下げだけ（例：`    function ACTOR.時刻(act)` → `function ACTOR.時刻(act)`）。
+  - `sample.generated.lua` は改行コードを除いて同じ（`git diff --ignore-cr-at-eol --stat` が空）。`sample.expected.lua` との一致のテストも通った。
+  - デバッグの e2e（`debug_break_coalesce.pasta` ほか）は通った。見本の Lua ブロックに空行が無いので行の番号は変わらない。
+  - 落ちたのはテスト 17 本（ライブラリの単体 14 本、`tests/transpiler` の 3 本＝スナップショット 2 本と `out_line` の 1 本）と doctest 1 本で、すべて直した振る舞い（生成器の生の出力の末尾の空行・`out_line` の数え方・`normalize` の削除・CRLF）を固めていたもの。うち 1 本が `debug/` にある。
+- **Implications**: 案 A で 2.1・2.2 は保てる。保留の空行は呼び所 6 つを変えずに入る（`mod.rs` の約 15 行）。`out_line()` の意味が「書いた行の数（保留を除く）」になる。
+
+### 行の対応（Research Needed 2〜4）
+
+- `LineMapSlot` の範囲の端は `out_line` で持つ。保留の空行の分だけ端が空行 1 つ分ずれることがあるが、`fill_line_maps` は記録の表を範囲で引くだけで、空行には記録が無い。試作で、`init_scene` の 4 つ目の引数を含む 26 本が同一だった。
+- 生成コードでは末尾の空行も書かないので、`normalize` が消す行は無く、`LineShift` は恒等になる。`debug/source_map`（`MapBuilderSink::finish`）と `loader/source_map_build.rs` は形のまま動く。
+- アクターの単語定義を共有の関数に寄せると記録が増えるだけで、既存の記録は変わらない（`ponytail-lua-debug` の brief に申し送り済み）。
+
+### キャッシュ（Research Needed 5）
+
+- book `internals/transpiler.md` の「トランスパイル結果キャッシュ」の手順 1 のとおり、`.cache_version` が `pasta_lua` の版と違えばキャッシュを丸ごと作り直す。直した版を出せば古い字下げの結果は使われない。この spec は仕組みに触らない。
+
+### 追加の指摘 2 件（2026-11-02、コーディネータより。要件はディスカッションで足す）
+
+- `element_gen.rs` 40 行 `VarScope::Args(index) => format!("args[{}]", index + 1)`：`index` は `u8`（`pasta_dsl` の `ast/action.rs` の `Args(u8)`）。`＄２５５` で `255 + 1` があふれる（debug ビルドは panic、release は `args[0]`＝いつも nil）。`VarScope::Args` の番号を数に直すのはここ 1 か所だけ（grep で確かめた。`pasta_check` の `transpile_rules.rs` は番号を使わない）。`ponytail-dsl-parser` が `＄２５６` 以上を文法の誤りにするので、ここには 0〜255 しか来ない。
+- `scope_gen.rs` 424〜430 行：`Float` の小数部が 0 なら `(*f as i64)`。`ponytail-dsl-parser` が i64 に入らない整数を f64 にするので、`!select(1e19)` は i64::MAX に飽和する。既存のテストの値は `select(10.0)`（→ `10`）・`2.5`（→ `2.5`）・整数だけで、`f.to_string()` でも同じ出力になる（Rust の f64 の Display は 10.0 を `10`、1e19 を `10000000000000000000` と書く）。`-0.0` だけが `0` から `-0` に変わる。実行時は `sakura_builder.lua` 311 行で `math.floor(inner.seconds * 1000)` を文字にするので、`-0` は さくらスクリプトに `-0` として出うる。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A1 保留の空行 | `write_blank_line` を保留にし、書き出しの前に出し、`end` の前で捨てる | 呼び所 6 つを変えない。`mod.rs` の 15 行ほど。試作でバイト同一を確認 | `out_line()` の意味が変わる。直の書き込みを足すと崩れる | **採用** |
+| A2 呼び所の組み替え | 各呼び所で「次の兄弟の前に空行」を書く | 状態を持たない | 6 か所＋分岐（最初の兄弟か）の手直し。直し漏れの危険 | 不採用（同じ結果で手数が多い） |
+| B 範囲の除外 | `normalize` にブロックの行の範囲を渡して除く | 生成器を変えない | 根が残り、受け渡しが増える | 退き先。使わない |
+
+## Design Decisions
+
+### Decision: 空行は保留して出す（案 A1）
+
+- **Context**: 2.1（バイト同一）と 1.3（ブロックの中の空行を消さない）を同時に満たす。
+- **Alternatives Considered**: A2・B（上の表）。
+- **Selected Approach**: `pending_blank_lines: u32`。`write_indent`・`write_raw` の頭で書き出し、`end_block` が捨てる。最後に残った保留は書かない。
+- **Rationale**: `normalize` が消していた空行は、どれも「生成器の空行で、次が `end_block` の `end`」か「末尾」だけだった（Lua ブロックを含まない出力で `trim() == "end"` の行は `end_block` だけ。`do local _ = … end` は 1 行）。保留はその 2 つをちょうど再現する。
+- **Trade-offs**: 部品は増えない。`out_line()` の意味が変わる（テストだけが外の使い手）。
+- **Follow-up**: `mod.rs` の単体テストで「書いたバイトの改行の数 = `out_line`」を守る。
+
+### Decision: `debug/` のテスト 1 本の入力だけをこの spec が直す（8.5 の分け方）
+
+- **Context**: `src/debug/source_map_builder_tests.rs` の `map_builder_sink_finish_rebases_to_final_lua_lines` は、本物の `normalize_output_with_shift` に `"l1\nl2\nl3\n\nend\n"` を渡し、`end` の前の空行が消えることを前提にしている。規則を消すとこのテストが落ちる。直さずに入れると main が赤になる。
+- **Alternatives Considered**: (1) この spec がテストの入力を末尾の空行の形にする。(2) `ponytail-lua-debug` に任せる（どちらが先に入るかで main が赤になる）。(3) 案 B に退く（根が残る）。
+- **Selected Approach**: (1)。本番コードと説明（25 行の 1 語を含む）は触らない。
+- **Rationale**: このテストが固めているのは、要件 1.3 が消す振る舞いそのもの。本番の `debug/` の持ち場には入らない。
+- **Follow-up**: コミットと同時に `ponytail-lua-debug` の brief へ申し送る（OPEN QUESTION 1）。
+
+### Synthesis
+
+- **Generalization**: 「1 行書いて、行が進んだら記録」の 11 か所は 1 つの関数 `record_span_since(before, span)` にまとまる（6.3）。単語定義 3 種類は `generate_word_definition(word, receiver, separator)` の 1 つ（6.2）。変数の経路は `resolve_var_path` の 1 つ（6.1）。
+- **Build vs. Adopt**: 新しい依存は無い。テストの実行は既存の `tests/common/e2e_helpers.rs` と `runtime_safety_test.rs` の道を使う。
+- **Simplification**: 部品・ファイルを足さない。`TranspilerConfig` は `#[derive(Default)]` で `impl Default` を消せる（`SceneAliasTable` が `Default` を derive している）。`transpile` は `transpile_with_source_map` の上に直接置き、間の入口を消す。`LineShift` は恒等になるが、要件の決めごとで形を保つ。
+
+## Risks & Mitigations
+
+- `self.writer` への直の書き込みを後から足すと保留が崩れる — `mod.rs` の説明に書き出しの関数の一覧を書き、単体テストで改行の数と `out_line` の一致を守る。
+- 同じウェーブで `element_gen.rs` を触るのはこの spec だけ（brief の決まり）— 守る。
+- `-0.0` の出力 — OPEN QUESTION 3 で今と同じ `0` を推奨。
+
+## 設計ディスカッションへの持ち越し（OPEN QUESTIONS）
+
+1. **`debug/` のテスト 1 本の入力を、この spec が直してよいか**（8.5）
+   - 仮定: 直す。本番の `debug/` と説明は触らない。
+   - 推奨: このまま。テストが固めているのは要件 1.3 が消す振る舞い（`end` の前の空行の削除）で、直さずに入れると `cargo test -p pasta_lua`（7.7 の関門）が通らない。`ponytail-lua-debug` に任せると、先に入る側で main が赤になる。
+   - 例: 今の入力 `"l1\nl2\nl3\n\nend\n"`（4 行目の空行が消え、`end` が 4 行目に上がる前提）を、`"l1\nl2\nl3\n\n\n"`（4・5 行目の末尾の空行が消える）にし、`record_line(4, 99)` の記録が最終の写像から外れること・1〜3 行目が同じ行に写ることを確かめる形にする。「途中の行が繰り上がる」確かめは、本物の `normalize` からは作れなくなる（`LineShift` の途中の削除は起きない）。
+2. **シーン引数の番号のあふれ（`＄２５５`）を、この spec で直すか**（追加の指摘。要件の番号はディスカッションで振る）
+   - 仮定: 直す。`resolve_var_path` の `VarScope::Args(index)` を `format!("args[{}]", u32::from(*index) + 1)` にし、`Args(255)` → `"args[256]"` の単体テストを 1 本足す。
+   - 推奨: このまま。同じ領域（`element_gen.rs`）の 1 行で、作者の書いた `＄２５５` が debug ビルドで panic・release で黙って nil になる不具合。`ponytail-dsl-parser` が 256 以上を文法の誤りにするので、ここは 0〜255 だけを正しく扱えばよい（`u32` に広げれば足りる）。
+   - 例: `＊会話` の中の `　さくら：＄２５５` が、今は release で `act:actor_proxy("さくら"):talk(args[0], "args[0]")`、直した後は `…talk(args[256], "args[256]")`。
+3. **`!select` の整数値の浮動小数の飽和を、この spec で直すか。`-0.0` は何を出すか**（追加の指摘）
+   - 仮定: 直す。小数部の判定をやめ、`(*f + 0.0).to_string()` の 1 つの書式にする（`-0.0 + 0.0` は `0.0` になるので、`-0.0` は今と同じく `0` を出す。この 1 行に理由のコメントを付ける）。単体テストを `10.0`→`10`・`2.5`→`2.5`・`1e19`→`10000000000000000000`・`-0.0`→`0` で足す。
+   - 推奨: このまま。分岐が消える（削除）うえ、既存のテストの出力は変わらない（`select(10.0)` → `10`、`2.5` → `2.5`）。`-0.0` を素の `to_string()` の `-0` にすると、実行時の `math.floor(seconds * 1000)` が `-0` のままさくらスクリプトに出うるので、今と同じ `0` に揃える方が安全。素の `f.to_string()`（`-0` を受け入れる）は、Lua の上では `-0 == 0` なので値としては同じで、こちらも許容できる代案。
+   - 例: `！select（1e19）`（パーサが f64 にする）が、今は `act:choice_timeout(9223372036854775807)`、直した後は `act:choice_timeout(10000000000000000000)`。`！select（10.0）` はどちらも `act:choice_timeout(10)`。
+   - 注: 大きな秒数は実行時に `math.floor(seconds * 1000)` が `1e+22` の形の文字になる（今の飽和でも `9.2233720368548e+21`）。実行時の書式は `runtime` の持ち場で、この spec の外。
+4. **`LuaCodeGenerator::out_line()` の意味の変更を受け入れるか**
+   - 仮定: 受け入れる。`out_line()` は「書いた行の数」で、保留中の空行を数えない。
+   - 推奨: このまま。記録はいつも書いた行の番号で行うので、最終の行番号と一致する（2.4）。外の使い手はテストだけで、pub API は変えてよい（2026-10-19 の開発者の決定）。
+   - 例: `write_header()` の直後は今 `3`、直した後は `2`。続けてアクションを 1 行書くと、どちらも `4`（空行がそこで書かれる）。
