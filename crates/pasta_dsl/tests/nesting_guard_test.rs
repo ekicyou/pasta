@@ -234,5 +234,8 @@ fn partial_parse_with_long_expr_line_does_not_crash() {
         sum(10_000)
     );
     let errors = on_1mib(move || parse_str_partial(&src).failed_lines.len());
-    assert!(errors > 0, "1 万個の演算子の行は解けない塊として報告されるべし");
+    assert!(
+        errors > 0,
+        "1 万個の演算子の行は解けない塊として報告されるべし"
+    );
 }
