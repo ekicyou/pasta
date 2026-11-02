@@ -72,7 +72,7 @@ pasta 本体（パーサ・トランスパイラ・ランタイム・SHIORI）�
 | [pasta_core](crates/pasta_core/README.md) | 言語に依存しないシーン・単語レジストリと、前方一致の検索表 |
 | [pasta_lua](crates/pasta_lua/README.md) | トランスパイラ、ローダ、Lua VM（LuaJIT 2.1）とランタイムモジュール、トーク出力、デバッグ基盤 |
 | [pasta_shiori](crates/pasta_shiori/README.md) | SHIORI DLL（`pasta.dll`）としての FFI 境界 |
-| [pasta_lsp](crates/pasta_lsp/README.md) | 言語サーバ（VSCode 拡張が WASM で使う） |
+| [pasta_lsp](crates/pasta_lsp/README.md) | VSCode 拡張に埋め込む WASM の解析器（色・構文の診断・ゴースト全体の検査。公開しないクレート） |
 | [pasta_check](crates/pasta_check/README.md) | 辞書の検査（`validate`）と、ゴーストの配布物を作る CLI（更新ファイル・NAR） |
 | [pasta_sample_ghost](crates/pasta_sample_ghost/README.md) | サンプルゴースト hello-pasta（入門ガイドの題材。公開しないクレート） |
 

@@ -146,32 +146,31 @@
 | load失敗→requestエラー伝搬            | `shiori_request_tests.rs`                                         | ✅ 完了 | 1テスト（load-error-logging）                                    |
 | 非同期コールバック統合（SHIORI層）    | `async_callback_simple_test.rs` / `async_callback_chain_test.rs`  | ✅ 完了 | 13テスト（shiori-async-talk、property-dsl-extension追加2テスト、callback-resume-unification追加1） |
 | OnChoiceSelectEx 自動ルーティング     | `choice_select_test.lua`（Luaテストスイート）                     | ✅ 完了 | 選択肢コールバック→シーン自動解決（Reference2 を最初の探索範囲に使い、不明・無しは直前のグローバルシーンへ。call-execution-correctness 追加3） |
-| Call の文脈の復元・失敗表記・動的キー | `act_call_restore_test.lua`                                       | ✅ 完了 | 36テスト（`act:restore_scene`・`act:call_restore`・`act:failure` とさくらスクリプトまでの出力（スコープ切替をはさむ位置と段落区切りの改行の位置を含む。失敗表記にウェイトが入らないこと）・`act:call_key` の値ごとの判定・`act:call` の失敗の分岐・式の関数呼び出し／`＠＊関数`／単語の関数ハンドラの後の文脈）（call-execution-correctness） |
+| Call の文脈の復元・失敗表記・動的キー | `act_call_restore_test.lua`                                       | ✅ 完了 | 46テスト（`act:restore_scene`・`act:call_restore`・`act:failure` とさくらスクリプトまでの出力（スコープ切替をはさむ位置と段落区切りの改行の位置を含む。失敗表記にウェイトが入らないこと）・`act:call_key` の値ごとの判定・`act:call` の失敗の分岐・式の関数呼び出し／`＠＊関数`／単語の関数ハンドラの後に 4 つの欄が呼ぶ前の値へ戻ること・5 つの道の後の行のエラーの表記・`ACTOR.drop_self` で ACT の段とプロキシの段の関数が act やどのプロキシを返しても空になること）（call-execution-correctness） |
 | 選択肢の探索範囲（`\q` 第 3 引数）   | `act_choice_test.lua`<br>`sakura_builder_test.lua`                | ✅ 完了 | 3＋5テスト（選択肢トークンに出したグローバルシーン名を載せる・`\q[表示,ジャンプ先,探索範囲]` の出力とエスケープ・On／script: では付けない）（call-execution-correctness） |
 | 選択肢の行の配置と `choice_newlines`   | `sakura_builder_test.lua`<br>`shiori_act_test.lua`<br>`loader/config_defaults_test.rs`<br>`loader/startup_test.rs` | ✅ 完了 | 15＋2＋Rust 側（選択肢の前後の区切りの完全一致・`act:choice`・台詞に書いた `\c` を消去に数える・既定値の 3 者一致・`pasta.toml` の値が出力へ届く）（choice-line-layout） |
 
-### 2.5 LSP層テスト（Language Server）
+### 2.5 解析器テスト（pasta_lsp・WASM の解析器）
 
 | 機能                             | テストファイル                | 状態   | 説明                                              |
 | -------------------------------- | ----------------------------- | ------ | ------------------------------------------------- |
-| セマンティックトークン識別       | `semantic_token_test.rs`      | ✅ 完了 | 9テスト（17トークンタイプ）                       |
-| Luaコードブロック codeBlock フェンス限定化 | `code_block_token_test.rs` | ✅ 完了 | 6テスト（pasta-vscode-lua-highlight・開始/終了フェンス行のみ出力・本文行非出力・無回帰・凡例不変ガード） |
+| セマンティックトークン識別       | `semantic_token_test.rs`      | ✅ 完了 | 25テスト（17トークンタイプ・行末のコメント）      |
+| Luaコードブロック codeBlock フェンス限定化 | `code_block_token_test.rs` | ✅ 完了 | 7テスト（pasta-vscode-lua-highlight・開始/終了フェンス行のみ出力・本文行非出力・無回帰・凡例不変ガード） |
 | 全角/半角マーカー同等認識        | `fullwidth_halfwidth_test.rs` | ✅ 完了 | 5テスト                                           |
 | 日本語識別子トークン化           | `japanese_identifier_test.rs` | ✅ 完了 | 5テスト                                           |
 | UTF-8→UTF-16位置変換             | `utf16_conversion_test.rs`    | ✅ 完了 | 12テスト（サロゲートペア含む）                    |
-| LSPライフサイクル統合            | `lsp_lifecycle_test.rs`       | ✅ 完了 | 4テスト                                           |
-| ドキュメント同期                 | `document_sync_test.rs`       | ✅ 完了 | 4テスト（増分更新含む）                           |
-| Diagnostics通知                  | `diagnostics_test.rs`         | ✅ 完了 | 8テスト（連結を含む式の診断を含む）               |
+| 構文の診断                       | `diagnostics_test.rs`         | ✅ 完了 | 12テスト（保存時の検査と同じ位置・文の 1 件・連結を含む式） |
 | 二項演算の連鎖トークン           | `binary_chain_token_test.rs`  | ✅ 完了 | 13テスト（左から1回走査・文字列内/＄＊/×÷・連結・属性の DECORATOR 不変） |
-| パーサークラッシュ回復           | `crash_recovery_test.rs`      | ✅ 完了 | 4テスト（catch_unwind保護）                       |
-| 部分パーストークン提供           | `partial_token_test.rs`       | ✅ 完了 | 5テスト（Phase 1→2→3フォールバック）              |
+| 部分パーストークン提供           | `partial_token_test.rs`       | ✅ 完了 | 7テスト（解けない塊のほかの色を残す）             |
 | キューコマンドトークン生成       | `cue_command_token_test.rs`   | ✅ 完了 | 10テスト（4形式・全角半角・引数種別・混在・診断） |
-| 部分パースAPI                    | `partial_parse_test.rs`       | ✅ 完了 | 28テスト（pasta_dslクレート）                     |
-| DocumentManager / AnalysisEngine | `analysis_test.rs`（外部化）  | ✅ 完了 | 15テスト（コメント走査・改行正規化含む）          |
+| 部分パースAPI                    | `partial_parse_test.rs`       | ✅ 完了 | 14テスト（pasta_dslクレート）                     |
+| AnalysisEngine                   | `analysis_test.rs`（外部化）  | ✅ 完了 | 15テスト（コメント走査・改行正規化含む）          |
 | 変数代入行トークン生成           | `var_set_token_test.rs`       | ✅ 完了 | 10テスト（マーカー/名前/演算子/RHS 各種・スコープ） |
 | 解析エンジン no-panic 境界       | `analyze_robustness_test.rs`  | ✅ 完了 | 1テスト（敵対的入力コーパス 40 種）               |
-| ドキュメント管理・位置変換境界   | `document.rs`（インライン）   | ✅ 完了 | 11テスト（逆転 range no-op ハードニング回帰含む） |
-| エラー型 Display 契約            | `error.rs`（インライン）      | ✅ 完了 | 2テスト                                           |
+| 変数代入行の多バイト文字         | `var_set_multibyte_panic_test.rs` | ✅ 完了 | 3テスト（panic しない）                       |
+| 動的な単語参照・関数呼び出し     | `dynamic_ref_token_test.rs`   | ✅ 完了 | 8テスト                                           |
+| 凡例の一致                       | `legend_sync_test.rs`         | ✅ 完了 | 2テスト（拡張の凡例と同じ順）                     |
+| 位置の無い誤り・桁の切り詰め     | `analysis/mod.rs`（インライン） | ✅ 完了 | 2テスト                                         |
 
 ### 2.7 VSCode拡張テスト（pasta-vscode-extension）
 
@@ -182,7 +181,7 @@
 | ソース表示トグル                  | `editors/vscode/src/test/sourcePresentationToggle.test.ts` | ✅ 完了 | 17テスト                                     |
 | VSCodeモジュール直接テスト        | `editors/vscode/src/test/vscodeModules.test.ts` | ✅ 完了 | 45テスト（esbuild --alias:vscode モックで実モジュール検証。旧 wasmBridge.test.ts / integration.test.ts は 3.57 で本テストへ統合・削除済み） |
 | E2E/ビルド検証                    | `editors/vscode/src/test/e2e.test.ts`         | ✅ 完了 | 30テスト（マニフェスト・文法・ビルド構成・フォールバック） |
-| WASM transport Rustテスト         | `crates/pasta_lsp/src/transport.rs`           | ✅ 完了 | 9テスト（WASM型変換・severity 全分岐・JSON 形状・シリアライズ） |
+| WASM transport Rustテスト         | `crates/pasta_lsp/src/transport.rs`           | ✅ 完了 | 2テスト（`wasm_analyze` の JSON 形状・ゴースト検査の入出力の形） |
 
 ### 2.6 統合テスト（E2E）
 
@@ -270,7 +269,7 @@
 | pasta_dsl    | 239       | 239       | 0     | 優秀（cue_cmd 63テスト含む、review-improvement-loop で ParseError API・式 AST 33テスト追加） |
 | pasta_core   | 105       | 105       | 0     | ⭐⭐⭐⭐⭐ 優秀（review-improvement-loop で境界回帰38テスト追加） |
 | pasta_lua    | 1240      | 1240      | 0     | 優秀（cue_command_passthrough 5テスト・mocks 8テスト含む、review-improvement-loop で code_gen 直接ユニット31・enc-log-search 38・FFI 長ガード回帰2・loader-core 27＋junction 回帰1・loader-io 21＋ハードニング回帰4・runtime API 28＋log 深さゲート回帰2＋境界ペア2・sakura_script エッジケース21・debug-core 未到達経路14＋Content-Length 上限ガード回帰1・debug-dap/breakpoints 劣化経路10・scopes frameId オーバーフロー飽和回帰1・debug-hook/inspect 未到達経路10・debug-session stop_loop ルーティング/純粋判定12＋scopes 飽和回帰1・debug-source_map 未到達経路11＋stale 残留是正回帰1・debug-wiring 未到達経路13テスト追加 1240/0） |
-| pasta_lsp    | 118       | 118       | 0     | ⭐⭐⭐⭐⭐ 優秀（review-improvement-loop 3.40 で var_set トークン・コメント走査ほか18テスト追加 92→110、3.41 で逆転 range ハードニング回帰＋敵対的入力コーパス2テスト追加 110→112、pasta-vscode-lua-highlight で codeBlock フェンス限定化6テスト追加 112→118） |
+| pasta_lsp    | 139       | 139       | 0     | ⭐⭐⭐⭐⭐ 優秀（review-improvement-loop 3.40 で var_set トークン・コメント走査ほか18テスト追加 92→110、3.41 で逆転 range ハードニング回帰＋敵対的入力コーパス2テスト追加 110→112、pasta-vscode-lua-highlight で codeBlock フェンス限定化6テスト追加 112→118、ponytail-editor-tooling で言語サーバの層とそのテストを消し WASM の解析器にした — 2026-11-03 実測 139） |
 | pasta_shiori | 157       | 157       | 0     | ⭐⭐⭐⭐⭐ 優秀（ShioriTestEnv・X-Pasta-Time、review-improvement-loop 3.35/3.37 で windows.rs FFI 層・エラーパス・HGLOBAL リーク回帰・スタック安全 37 テスト追加 120→157） |
 | pasta_sample_ghost | 38  | 38        | 0     | 優秀（review-improvement-loop 3.44/3.45 でスクリプト整合・画像構造ほか追加。Rust 実測 38/0） |
 | pasta-vscode | 141       | 141       | 0     | ⭐⭐⭐⭐⭐ 優秀（tmGrammar 33[pasta-vscode-lua-highlight 注入着色6テスト追加 27→33]＋debugAdapterFactory 16＋sourcePresentationToggle 17＋vscodeModules 45＋e2e 30 — npm run test 実測） |

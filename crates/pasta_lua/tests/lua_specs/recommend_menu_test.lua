@@ -962,3 +962,36 @@ describe("recommend_menu - ボタンの名前", function()
         load_receivers()
     end)
 end)
+
+describe("recommend_menu - SHIORI/ で始まる値", function()
+    --- イベントのモジュールを読み直して req を EVENT.fire に通す（終わったら元のものに戻す）
+    local function fire(search, id)
+        local res
+        with_loaded({
+            ["@pasta_search"] = search,
+            ["pasta.shiori.event"] = false,
+            ["pasta.shiori.event.register"] = false,
+            [MODULE] = false,
+        }, function()
+            res = require("pasta.shiori.event").fire({ id = id, method = "get", reference = {} })
+        end)
+        return res
+    end
+
+    test("項目名が SHIORI/x のメニューは 200 OK で Value に値が入る", function()
+        -- 前のスイートが pasta.scene を読み直しているので、今のものに登録する
+        require("pasta.scene").register("rms_shiori_1", "__start__", function(act)
+            act:call(nil, "おすすめ項目", {}, "SHIORI/x", "u")
+        end)
+        local res = fire(make_search({ ["sakura.recommendsites"] = { "rms_shiori_1" } }), "sakura.recommendsites")
+        expect(res:find("SHIORI/3.0 200 OK", 1, true) ~= nil):toBe(true)
+        expect(res:find("Value: SHIORI/x\1u\1\1\2", 1, true) ~= nil):toBe(true)
+    end)
+
+    test("キャプションの単語が SHIORI/x なら 200 OK で Value に値が入る", function()
+        local search = make_word_search({ ["おすすめボタン名"] = { "SHIORI/x" } }, DEFAULT_CAPTION_ALIASES)
+        local res = fire(search, "sakura.recommendbuttoncaption")
+        expect(res:find("SHIORI/3.0 200 OK", 1, true) ~= nil):toBe(true)
+        expect(res:find("Value: SHIORI/x\r\n", 1, true) ~= nil):toBe(true)
+    end)
+end)

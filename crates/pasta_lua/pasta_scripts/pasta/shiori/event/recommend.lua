@@ -99,6 +99,16 @@ local REG = require("pasta.shiori.event.register")
 local CALLBACK = require("pasta.shiori.event.callback")
 local STORE = require("pasta.store")
 local ACT = require("pasta.act")
+local RES = require("pasta.shiori.res")
+
+--- 受け手の値を Value として返す形にする。EVENT.fire は SHIORI/ で始まる文字列を応答全体とみなすので、
+--- そのときだけ RES.ok で包む（それ以外は v のまま）
+---@param v string|nil
+---@return string|nil
+local function as_value(v)
+    if type(v) == "string" and v:sub(1, 7) == "SHIORI/" then return RES.ok(v) end
+    return v
+end
 
 --- MenuMemory: リソースの ID → 最後に開いたときの並び（メモリ上だけ。OnRecommendsiteChoice が読む）
 ---@type table<string, RecommendItem[]>
@@ -110,16 +120,14 @@ local function cut()
 end
 
 --- メニューのシーンをその場で 1 回だけ動かし、積んだ項目を返す（シーンが無ければ nil）
---- EVENT.drive・set_co_scene・wrap_scene を通さない。続きのコルーチンは参照を外して捨てる。
+--- EVENT.drive・set_co_scene・SCENE.wrap を通さない。続きのコルーチンは参照を外して捨てる。
 --- STORE は last_global_scene の控えと戻しのほかに触れない（変数の代入は取り消さない）
 ---@param act ShioriAct
 ---@param id string
 ---@return RecommendItem[]|nil
 local function run_menu(act, id)
-    local global_name, local_name = require("@pasta_search"):search_scene_exact(id)
-    if not global_name then return nil end
-    local fn = require("pasta.scene").get(global_name, local_name)
-    if type(fn) ~= "function" then return nil end
+    local fn = require("pasta.scene").get_exact(id)
+    if not fn then return nil end
     local items = { id = id, calls = 0 }
     act._recommend_items = items
     -- インスタンスの欄で区切りを差し替える: 持ち越し（立ち位置・表情）に触れない組み立てと、
@@ -164,7 +172,7 @@ local function menu_receiver(id)
             return nil
         end
         last[id] = items
-        return encode(items)
+        return as_value(encode(items))
     end
 end
 
@@ -188,7 +196,7 @@ end
 -- ============================================================================
 
 --- ボタンの名前の受け手を作る。別名の辞書順に ＠名前 と同じ前方一致で単語を引き、
---- 最初に見つかった値をそのまま返す（無ければ nil で 204）。act:word は使わない（失敗の表記を積まない）
+--- 最初に見つかった値を as_value に通して返す（無ければ nil で 204）。act:word は使わない（失敗の表記を積まない）
 ---@param id string
 ---@return fun(act: ShioriAct): string|nil
 local function caption_receiver(id)
@@ -199,7 +207,7 @@ local function caption_receiver(id)
         local SEARCH = require("@pasta_search")
         for _, name in ipairs(names) do
             local word = SEARCH:search_word(name)
-            if word ~= nil then return word end
+            if word ~= nil then return as_value(word) end
         end
         return nil
     end
@@ -276,10 +284,9 @@ REG.OnRecommendsiteChoice = REG.OnRecommendsiteChoice or function(act)
     if co then return co end
     -- 書き間違いを ＊OnRecommendsiteChoice で隠さない
     local FAILURE = require("pasta.failure")
-    FAILURE.report(act, {
+    return FAILURE.reply(act, {
         label = FAILURE.LABEL.SCENE_NOT_FOUND,
         subject = "＊" .. item.scene,
         warning = "OnRecommendsiteChoice: scene not found: name='" .. item.scene .. "'",
     })
-    return act:build()
 end

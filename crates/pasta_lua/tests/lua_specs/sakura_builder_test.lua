@@ -1840,7 +1840,7 @@ end)
 -- ============================================================================
 -- sakura-builder-string-buffer: バッファ化検証 (Task 3.1)
 -- 設計 Testing Strategy「Integration Tests」項2-3 / 要件 2.4, 3.4, 3.5, 4.1, 4.2
--- 既に Task 2.1 で実装済みの挙動（バッファ化・buffer_factory 注入）を
+-- 既に Task 2.1 で実装済みの挙動（バッファ化）を
 -- 実行パスで検証する追加テスト。
 -- ============================================================================
 
@@ -1852,204 +1852,6 @@ describe("SAKURA_BUILDER - string-buffer: 空入力 (Task 3.1)", function()
         local result = BUILDER.build({}, {})
 
         expect(result):toBe("\\e")
-    end)
-
-    test("空入力はネイティブ/フォールバック両経路で \\e のみを返す", function()
-        local BUILDER = setup()
-        local buf = require("pasta.buf")
-
-        local native = BUILDER.build({}, {})
-        local fallback = BUILDER.build({}, { buffer_factory = buf.new_fallback })
-
-        expect(native):toBe("\\e")
-        expect(fallback):toBe("\\e")
-        -- 両経路でバイト一致
-        expect(fallback):toBe(native)
-    end)
-end)
-
-describe("SAKURA_BUILDER - string-buffer: フォールバック実走バイト一致 (Task 3.1)", function()
-    -- 要件 2.4 / 3.5 / 4.2:
-    -- (i) 既定（native buf）と (ii) buffer_factory=buf.new_fallback の出力がバイト一致すること。
-    -- spot 状態を使うため、両呼び出しで独立した actor_spots テーブルを渡し副作用を分離する。
-
-    -- 代表的な grouped_tokens を生成するファクトリ。
-    -- 呼び出しごとに新しいテーブルを返し、2回の build 間で入力の共有・汚染を避ける。
-    local function make_complex_tokens(actors)
-        return {
-            { type = "spot", actor = actors.sakura, spot = 0 },
-            { type = "spot", actor = actors.kero,   spot = 1 },
-            {
-                type = "actor",
-                actor = actors.sakura,
-                tokens = {
-                    { type = "talk",    actor = actors.sakura, text = "こんにちは。今日は、いい天気。" },
-                    { type = "surface", id = 5 },
-                    { type = "wait",    ms = 100 },
-                    { type = "newline", n = 2 },
-                }
-            },
-            {
-                type = "actor",
-                actor = actors.kero,
-                tokens = {
-                    { type = "talk",          actor = actors.kero, text = "Hi there" },
-                    { type = "sakura_script", actor = actors.kero, text = "\\w9" },
-                    { type = "clear" },
-                    { type = "choice_timeout", seconds = 5 },
-                    { type = "choice",        display = "はい]", target = "yes,route" },
-                    { type = "raw_script",    text = "\\![open,calendar]" },
-                }
-            },
-        }
-    end
-
-    test("複合入力（spot/talk/surface/wait/newline/choice 等）でバイト一致する", function()
-        local BUILDER, actors = setup()
-        local buf = require("pasta.buf")
-
-        local config = { spot_newlines = 1.5 }
-
-        -- (i) 既定（native buf）。独立した actor_spots を渡す
-        local native_spots = {}
-        local native = BUILDER.build(make_complex_tokens(actors), config, native_spots)
-
-        -- (ii) フォールバック注入。同じ config・独立した actor_spots
-        local fb_spots = {}
-        local fb_config = { spot_newlines = 1.5, buffer_factory = buf.new_fallback }
-        local fallback = BUILDER.build(make_complex_tokens(actors), fb_config, fb_spots)
-
-        -- 完全一致（バイト一致）
-        expect(fallback):toBe(native)
-        -- vacuous でないこと（実際に内容を持つ出力である）の確認
-        expect(#native > 2):toBeTruthy()
-        expect(native:sub(-2)):toBe("\\e")
-        -- 副作用（actor_spots 更新）も両経路で一致
-        expect(fb_spots["さくら"]):toBe(native_spots["さくら"])
-        expect(fb_spots["うにゅう"]):toBe(native_spots["うにゅう"])
-    end)
-
-    test("spot 変更・改行を含む入力でバイト一致する", function()
-        local BUILDER, actors = setup()
-        local buf = require("pasta.buf")
-
-        local function make_tokens()
-            return {
-                { type = "spot", actor = actors.sakura, spot = 0 },
-                { type = "spot", actor = actors.kero,   spot = 2 },
-                {
-                    type = "actor",
-                    actor = actors.sakura,
-                    tokens = {
-                        { type = "talk", actor = actors.sakura, text = "おはよう。" },
-                    }
-                },
-                {
-                    type = "actor",
-                    actor = actors.kero,
-                    tokens = {
-                        { type = "talk", actor = actors.kero, text = "おはよ、ございます。" },
-                        { type = "newline", n = 3 },
-                    }
-                },
-                { type = "clear_spot" },
-                {
-                    type = "actor",
-                    actor = actors.sakura,
-                    tokens = {
-                        { type = "talk", actor = actors.sakura, text = "またね。" },
-                    }
-                },
-            }
-        end
-
-        local config = { spot_newlines = 2.0 }
-
-        local native = BUILDER.build(make_tokens(), config, {})
-        local fallback = BUILDER.build(make_tokens(), { spot_newlines = 2.0, buffer_factory = buf.new_fallback }, {})
-
-        expect(fallback):toBe(native)
-        -- 意図した変更(R3.1/R4.4): 完全遅延方式では A(spot0)→B(spot2)→clear_spot→A(spot0) の
-        -- いずれの手番も has-text 偽（clear_spot でリセット）のため \n[200] は出ない。
-        -- このケースの主眼は native/fallback のバイト一致であり、vacuous でないことを別途確認する。
-        -- （\n[200] を含む往復ケースは別タスク Task 3.3 が担当する）
-        expect(native:find("\\n%[200%]")):toBeFalsy()
-        expect(#native > 2):toBeTruthy()
-        expect(native:find("おはよう")):toBeTruthy()
-        expect(native:sub(-2)):toBe("\\e")
-    end)
-
-    test("choice/raw_script/sakura_script を含む単一actor入力でバイト一致する", function()
-        local BUILDER, actors = setup()
-        local buf = require("pasta.buf")
-
-        local function make_tokens()
-            return {
-                {
-                    type = "actor",
-                    actor = actors.sakura,
-                    tokens = {
-                        { type = "talk",          actor = actors.sakura, text = "選んでね" },
-                        { type = "choice_timeout", seconds = 10 },
-                        { type = "choice",        display = "A,B]C\\D", target = "route]1" },
-                        { type = "sakura_script", actor = actors.sakura, text = "\\_w[200]" },
-                        { type = "raw_script",    text = "\\![open,notepad]" },
-                    }
-                },
-            }
-        end
-
-        local native = BUILDER.build(make_tokens(), {}, {})
-        local fallback = BUILDER.build(make_tokens(), { buffer_factory = buf.new_fallback }, {})
-
-        expect(fallback):toBe(native)
-        -- 出力が実際にエスケープ済みchoiceを含む（vacuousでない）
-        expect(native:find("\\!%[%*%]\\q%[A\\,B\\]C\\\\D,route\\]1%]")):toBeTruthy()
-        expect(native:sub(-2)):toBe("\\e")
-    end)
-
-    -- Task 3.3 (要件 6.5): \n[200] を実際に出す A→B→A 往復シナリオで
-    -- native/fallback 両経路のバイト一致を検証する。上の clear_spot 経路ケースは
-    -- has-text リセットのため \n[200] が出ず vacuous になり得るので、
-    -- \n[200] カバレッジをこの往復ケースが担う。
-    test("往復シナリオ（A→B→A, \\n[200] 実出力）でバイト一致する", function()
-        local BUILDER, actors = setup()
-        local buf = require("pasta.buf")
-
-        -- spot sakura=0, spot kero=1。戻り手番 A2 の直前で \n[200] がフラッシュされる。
-        local function make_tokens()
-            return {
-                { type = "spot", actor = actors.sakura, spot = 0 },
-                { type = "spot", actor = actors.kero,   spot = 1 },
-                {
-                    type = "actor",
-                    actor = actors.sakura,
-                    tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
-                },
-                {
-                    type = "actor",
-                    actor = actors.kero,
-                    tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
-                },
-                {
-                    type = "actor",
-                    actor = actors.sakura,
-                    -- 戻り手番。has-text 済みの spot0 へ戻るため直前に \n[200] が出る
-                    tokens = { { type = "talk", actor = actors.sakura, text = "A2" } }
-                },
-            }
-        end
-
-        local config = { spot_newlines = 2.0 }
-
-        local native = BUILDER.build(make_tokens(), config, {})
-        local fallback = BUILDER.build(make_tokens(), { spot_newlines = 2.0, buffer_factory = buf.new_fallback }, {})
-
-        -- native/fallback のバイト一致
-        expect(fallback):toBe(native)
-        -- vacuous でないこと: \n[200] が実際に出力に含まれる
-        expect(native:find("\\n%[200%]")):toBeTruthy()
-        expect(native:sub(-2)):toBe("\\e")
     end)
 end)
 
@@ -2860,9 +2662,8 @@ describe("SAKURA_BUILDER - choice-line-layout: 選択肢の行の配置", functi
         end
     end)
 
-    test("選択肢を含む並びで、既定のバッファと buf.new_fallback の出力が一致する", function()
+    test("選択肢を含む並びの出力", function()
         local BUILDER, actors = setup()
-        local buf = require("pasta.buf")
         local a, b = actors.sakura, actors.kero
         local function make_tokens()
             return {
@@ -2873,11 +2674,9 @@ describe("SAKURA_BUILDER - choice-line-layout: 選択肢の行の配置", functi
         end
 
         local native = BUILDER.build(make_tokens(), {}, spots())
-        local fallback = BUILDER.build(make_tokens(), { buffer_factory = buf.new_fallback }, spots())
 
         expect(native):toBe("\\p[0]どれ\\n[150]" .. Q1 .. "\\n" .. Q2 .. "\\nつづき"
             .. "\\p[1]はやく\\n[150]" .. Q1 .. "\\p[0]\\n[150]うーん\\e")
-        expect(fallback):toBe(native)
     end)
 
     -- ------------------------------------------------------------------------
@@ -3420,13 +3219,13 @@ describe("SAKURA_BUILDER - vertical-balloon-lines: 単独の \\ の後の区切�
         }, {}, spots())
         expect(out):toBe("\\p[0]天気\\\\\\n\\c\\e")
         -- エスケープした後の末尾は単独の \ ではない（続けて守っても足さない）
-        local b = BUILDER._internal.tracking_buffer(require("pasta.buf").new())
+        local b = BUILDER._internal.tracking_buffer(require("string.buffer").new())
         b:put("天気\\")
         b:put("\\n")
         b:put("\\c")
         expect(b:tostring()):toBe("天気\\\\\\n\\c")
         -- 作者が書いた片（put_raw）は守らない
-        local r = BUILDER._internal.tracking_buffer(require("pasta.buf").new())
+        local r = BUILDER._internal.tracking_buffer(require("string.buffer").new())
         r:put("天気\\")
         r:put_raw("\\s[1]")
         expect(r:tostring()):toBe("天気\\\\s[1]")

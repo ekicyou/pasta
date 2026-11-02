@@ -11,7 +11,7 @@ mod common;
 
 use common::copy_fixture_to_temp;
 use common::response::ShioriResponse;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 /// `balloon_warning` の行（None なら書かない）を足したゴーストでイベントを起こし、
 /// 応答と Lua 側のログの警告（文言だけ）を返す。
@@ -28,7 +28,7 @@ fn fire(event_id: &str, balloon_warning: Option<&str>) -> (ShioriResponse, Vec<S
         let mut shiori = PastaShiori::default();
         assert!(
             shiori
-                .load(0, temp.path().as_os_str())
+                .load(temp.path().as_os_str())
                 .expect("SHIORI load should not error"),
             "SHIORI load should return true"
         );

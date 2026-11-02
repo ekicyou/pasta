@@ -14,7 +14,7 @@ Pasta DSLの独立パーサークレート。Luaバックエンドやレジス�
 
 - **PEG文法パーサー**: Pest 2.8による堅牢な文法駆動パーサー
 - **完全なAST型定義**: `PastaFile`, `FileItem`, `GlobalSceneScope`, `Action` 等
-- **独立エラー型**: `ParseError`, `ParseErrorInfo` による詳細なパース診断
+- **独立エラー型**: `ParseError`（`SyntaxError`, `IoError`）による位置つきのパース診断
 - **ゼロバックエンド依存**: Lua、レジストリ、ランタイムへの依存なし
 - **ステートレス**: 複数スレッドから安全に呼び出し可能
 
@@ -42,7 +42,7 @@ for item in &ast.items {
 
 - `parse_str(source, filename)` — 文字列からDSLをパース
 - `parse_file(path)` — ファイルからDSLをパース
-- `parse_str_partial(source)` — 部分パース（3段階フォールバック: 全体→スコープ分割→行単位）
+- `parse_str_partial(source)` — 色のための部分パース（字下げする前の行頭の印で塊に分け、塊ごとに解く）
 
 ### AST Types
 
@@ -57,10 +57,8 @@ for item in &ast.items {
 
 ### Error Types
 
-- `ParseError` — パースエラー（SyntaxError, PestError, IoError, MultipleErrors）
-- `ParseErrorInfo` — 個別パースエラー情報
-- `ParseResult<T>` — `Result<T, ParseError>` エイリアス
-- `PartialParseResult` / `PartialParseError` — 部分パース結果・行単位エラー
+- `ParseError` — パースエラー（`SyntaxError`: ファイル名・行・列つきの構文の誤り、`IoError`: ファイルの読み込みの誤り）
+- `PartialParseResult` — 部分パース結果（解けた塊の AST `items` と解けない塊の行の範囲 `failed_lines`）
 
 ## Dependencies
 
@@ -74,7 +72,7 @@ for item in &ast.items {
 
 ## Architecture
 
-`parse_str` / `parse_file` parse the source with the Pest grammar (`grammar.pest`, the authoritative syntax) and convert the result, via `parser/parse_scene.rs`, `parser/parse_action.rs` and `parser/parse_elements.rs`, into the AST types under `parser/ast/`. `parse_str_partial` (`partial.rs`) falls back from a full parse to per-scope and then per-line parsing; it is used by the language server, not by the runtime transpiler. The crate has no runtime state; `pasta_lua` consumes the AST to generate Lua code.
+`parse_str` / `parse_file` parse the source with the Pest grammar (`grammar.pest`, the authoritative syntax) and convert the result, via `parser/parse_scene.rs`, `parser/parse_action.rs` and `parser/parse_elements.rs`, into the AST types under `parser/ast/`. `parse_str_partial` (`partial.rs`) splits the source into chunks at unindented line-head markers and parses each chunk; it is used only for coloring by the editor analyzer (`pasta_lsp`), not by the runtime transpiler. The crate has no runtime state; `pasta_lua` consumes the AST to generate Lua code.
 
 See [Internals: Parser and AST](https://ekicyou.github.io/pasta/internals/transpiler.html#パーサと-ast) for the source layout and how the parser feeds the transpiler (the manual is written in Japanese).
 

@@ -103,7 +103,7 @@ fn test_request_with_valid_shiori_request() {
     let temp = copy_shiori_lifecycle_fixture();
     let mut shiori = PastaShiori::default();
 
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // 有効なSHIORI/3.0リクエスト
     let valid_request = "GET SHIORI/3.0\r\n\
@@ -136,7 +136,7 @@ fn test_request_with_invalid_shiori_request_returns_400() {
     let temp = copy_shiori_lifecycle_fixture();
     let mut shiori = PastaShiori::default();
 
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // 完全に無効なリクエスト（パース失敗を引き起こす）
     let invalid_request = "THIS IS NOT A VALID SHIORI REQUEST";
@@ -217,7 +217,7 @@ end
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // Send a request with all fields populated
     let request = "GET SHIORI/3.0\r\n\
@@ -310,7 +310,7 @@ end
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    let result = shiori.load(0, temp.path().as_os_str());
+    let result = shiori.load(temp.path().as_os_str());
     assert!(result.is_ok(), "Lua-level load failure is not a Rust error");
     assert!(
         !result.unwrap(),
@@ -349,7 +349,7 @@ end
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    let result = shiori.load(0, temp.path().as_os_str());
+    let result = shiori.load(temp.path().as_os_str());
     assert!(result.is_ok());
     assert!(
         !result.unwrap(),
@@ -386,7 +386,7 @@ end
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     let err = shiori
         .request("GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n")
@@ -427,7 +427,7 @@ end
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     let err = shiori
         .request("GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n")
@@ -447,6 +447,44 @@ end
 fn test_runtime_accessor_none_before_load() {
     let shiori = PastaShiori::default();
     assert!(shiori.runtime().is_none());
+}
+
+// ========================================================================
+// ponytail-shiori 1.4: SHIORI.request の無いゴーストへの自前の 204（特性化）
+// ========================================================================
+
+/// SHIORI.request の無いゴーストへの GET は、ほかの自前の 204 と同じ
+/// `default_204()` を返す（5.1・5.2）。
+/// 期待のバイト列は `tests/byte_invariant_test.rs` の `GOLDEN_NOTIFY_204`
+/// （Lua の `RES.no_content()` が既定の設定で作る 204 を固めた値）の写し（5.3）。
+const SELF_204_WITHOUT_REQUEST_FN: &str = "SHIORI/3.0 204 No Content\r\n\
+Charset: UTF-8\r\n\
+Sender: Pasta\r\n\
+SecurityLevel: local\r\n\
+\r\n";
+
+#[test]
+fn test_get_without_request_fn_returns_self_204() {
+    let temp = copy_fixture_to_temp("minimal");
+
+    // scripts/ の entry.lua で SHIORI の関数を何も定義しない（自己展開の既定を抑える）
+    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &entry_lua_path,
+        "-- intentionally defines no SHIORI functions\n",
+    )
+    .unwrap();
+
+    let mut shiori = PastaShiori::default();
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
+    assert!(shiori.request_fn.is_none());
+
+    let response = shiori
+        .request("GET SHIORI/3.0\r\nCharset: UTF-8\r\nSender: SSP\r\nID: OnBoot\r\n\r\n")
+        .unwrap();
+    assert_eq!(response, SELF_204_WITHOUT_REQUEST_FN);
+    assert_eq!(response, crate::actor::marshaling::default_204());
 }
 
 /// Copy shiori_lifecycle fixture to a temporary directory.

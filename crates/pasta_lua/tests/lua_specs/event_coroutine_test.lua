@@ -255,6 +255,42 @@ describe("resume_until_valid - nil yieldスキップループ", function()
         expect(args_received[1]):toBe("first")
         expect(args_received[2]):toBe("nil") -- 2回目は引数なし
     end)
+
+    --- n 回何も出さずに区切ってから値を返すコルーチン（直す前も必ず終わる）
+    local function empty_yields_then(n, value)
+        return coroutine.create(function()
+            for _ = 1, n do coroutine.yield(nil) end
+            return value
+        end)
+    end
+
+    test("何も出さない区切りが 10,000 回までなら続ける (ponytail 5.2)", function()
+        setup()
+        local ok, value = EVENT._resume_until_valid(empty_yields_then(10000, "done"))
+        expect(ok):toBe(true)
+        expect(value):toBe("done")
+    end)
+
+    test("10,001 回目で失敗と決まった文を返す (ponytail 5.1)", function()
+        setup()
+        local co = empty_yields_then(10001, "done")
+        local ok, value = EVENT._resume_until_valid(co)
+        expect(ok):toBe(false)
+        expect(value):toBe("何も出さない区切りが 10000 回続いた")
+        expect(coroutine.status(co)):toBe("suspended")
+    end)
+
+    test("数は呼び出しごとに 0 から数える (ponytail 5.2)", function()
+        setup()
+        local co = coroutine.create(function()
+            for _ = 1, 6000 do coroutine.yield(nil) end
+            coroutine.yield("a")
+            for _ = 1, 6000 do coroutine.yield(nil) end
+            return "b"
+        end)
+        expect(select(2, EVENT._resume_until_valid(co))):toBe("a")
+        expect(select(2, EVENT._resume_until_valid(co))):toBe("b")
+    end)
 end)
 
 describe("EVENT.fire - 既存コルーチン置換", function()
@@ -265,7 +301,7 @@ describe("EVENT.fire - 既存コルーチン置換", function()
         EVENT, REG, STORE = reload_event_modules(false)
     end
 
-    test("新しいコルーチンが設定されると既存のコルーチンがcloseされる", function()
+    test("新しいコルーチンが設定されると既存のコルーチンの参照が外れる", function()
         setup()
 
         -- 既存のsuspendedコルーチンを設定
@@ -285,19 +321,14 @@ describe("EVENT.fire - 既存コルーチン置換", function()
         local req = { id = "TestEvent" }
         EVENT.fire(req)
 
-        if coroutine.close then
-            -- 旧コルーチンはcloseされてdead状態
-            expect(coroutine.status(old_co)):toBe("dead")
-        else
-            -- LuaJIT/Lua 5.1 does not provide coroutine.close().
-            expect(coroutine.status(old_co)):toBe("suspended")
-        end
+        -- 閉じずに参照を外すだけ（GC に任せる）
+        expect(coroutine.status(old_co)):toBe("suspended")
         -- 新しいコルーチンがSTORE.co_sceneに設定されている
         expect(type(STORE.co_scene)):toBe("thread")
         expect(STORE.co_scene ~= old_co):toBe(true)
     end)
 
-    test("同じコルーチンを再設定しようとしてもcloseしない", function()
+    test("同じコルーチンを再設定しても参照を外さない", function()
         setup()
 
         local the_co
@@ -365,7 +396,7 @@ describe("EVENT.fire - nil yieldスキップ統合", function()
         expect(result:find("immediate_result")):toBeTruthy()
     end)
 
-    test("エラー発生時にset_co_sceneでcloseされる (3.1, 3.2)", function()
+    test("エラー発生時にset_co_sceneで参照が外れる (3.1, 3.2)", function()
         setup()
         REG.TestEvent = function(act)
             return coroutine.create(function()

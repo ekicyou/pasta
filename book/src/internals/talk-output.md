@@ -65,7 +65,7 @@ pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_n
 | `pasta.shiori.sakura_builder`（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`） | グループ化トークンをさくらスクリプト文字列にする `BUILDER.build` と、字のある `talk` か `choice` があるかを答える `BUILDER.speaks`（`talk` の字の判定は下の `has_text`） |
 | `pasta.shiori.appearance`（`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`） | 外見状態の生成（`APPEARANCE.new`）・観測（`APPEARANCE.observe`）・復旧（`APPEARANCE.restore`）と、さくらスクリプトの単位の読み取り（`APPEARANCE.tag_at`。ビルダーが字の判定と `\c` の読み取りに使う）。状態を持たず、渡された状態の表をその場で更新する。`STORE` や `@pasta_*` を `require` しない |
 | `pasta.shiori.actor_style`（`crates/pasta_lua/pasta_scripts/pasta/shiori/actor_style.lua`） | 装いの状態の生成（`STYLE.new`）、話者の切り替えで出す戻すタグと装いのタグ（`STYLE.switch`）、内側のトークンの `\c`・`\x` の後の出し直し（`STYLE.through`）。状態を持たず、渡された状態の表をその場で更新する。タグの読み取りは `APPEARANCE.tag_at` だけを使い、`STORE` や `@pasta_*` を `require` しない |
-| `pasta.buf`（`crates/pasta_lua/pasta_scripts/pasta/buf.lua`） | 組立に使う文字列バッファ。LuaJIT の `string.buffer` があればそれを、無ければ同じ `put`・`tostring` を持つ最小実装を使う |
+| `string.buffer` | 組立に使う文字列バッファ。LuaJIT の String Buffer Library を代わりの実装なしで直接使う（`crates/pasta_lua/tests/string_buffer_availability_test.rs` が在ることを確かめる） |
 | `pasta.failure`（`crates/pasta_lua/pasta_scripts/pasta/failure.lua`） | 失敗表記の `raw_script` トークンを積む報告の出口。`sakura_builder` は未登録の印を読む（[失敗の報告（pasta.failure）](internal-modules.md#失敗の報告pastafailure)） |
 | `pasta.store`（`crates/pasta_lua/pasta_scripts/pasta/store.lua`） | ビルドをまたいで保持する `STORE.actor_spots`（アクター名 → スポット）と `STORE.appearance`（外見状態）を持つ |
 
@@ -141,7 +141,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 ### さくらスクリプトの組立
 
-`BUILDER.build(グループ化トークン, config, actor_spots, appearance)` は、`config.spot_newlines`（既定 1.5）・`config.choice_newlines`（既定 1.5）・`config.after_choice_newlines`（既定 1.0）と、`config.buffer_factory`（既定 `pasta.buf` の `new`。テストが差し替える）を使う。SHIORI 用の ACT は `actor_spots` に `STORE.actor_spots` を、`appearance` に `STORE.appearance` を渡し、`BUILDER.build` はどちらもその場で書き換える。`nil` を渡された場合は、そのビルドの中だけの空の表を使う。
+`BUILDER.build(グループ化トークン, config, actor_spots, appearance)` は、`config.spot_newlines`（既定 1.5）・`config.choice_newlines`（既定 1.5）・`config.after_choice_newlines`（既定 1.0）を使う。SHIORI 用の ACT は `actor_spots` に `STORE.actor_spots` を、`appearance` に `STORE.appearance` を渡し、`BUILDER.build` はどちらもその場で書き換える。`nil` を渡された場合は、そのビルドの中だけの空の表を使う。
 
 組立は、1 回のビルドの中だけで生きる次の状態を持つ。
 
@@ -347,7 +347,7 @@ SSP 2.9.18 は、引数の無い `\c` の後の字を既定の表示で出す（
 - 組立の状態のうち、`actor_spots` と外見状態はビルドをまたいで `STORE` に残り、`last_actor`・`spot_has_text`・`pending_break`・`spot_tail`・`columns` はビルドごとに作り直す。そのため段落区切りの改行と選択肢の前後の行の区切りと budoux の行の状態は 1 回の出力の中だけで判定され、外見の復旧はトークをまたいで判定される。
 - `clear_spot` は `actor_spots` を表ごと差し替えず、エントリを 1 つずつ消す。`STORE.actor_spots` と同じ表を指し続けるためである。外見状態は `clear_spot` では消さない。
 - アピアランスは pasta 自身が出力した文字列だけを観測する。ベースウェア側だけで起きた外見の変化は状態に入らない。
-- さくらスクリプトの単位の読み方の定義は 4 か所にある。Rust の `Tokenizer::SAKURA_TAG_PATTERN`（`crates/pasta_lua/src/sakura_script/tokenizer.rs`）が正で、Lua の `tag_at`（`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`）、DSL の文法の `sakura_script`・`sakura_escape` の規則（`crates/pasta_dsl/src/parser/grammar.pest`）、VS Code 拡張の文法定義の `inline-sakura-script`・`inline-escape`（`editors/vscode/syntaxes/pasta.tmLanguage.json`）がその写しである。正の正規表現は、後戻りの有無で一致が変わらない形にしてあるため、左から 1 回読むだけの写し（Lua・pest）と結果が一致する。
+- さくらスクリプトの単位の読み方の定義は 4 か所にある。Rust の `Tokenizer::SAKURA_TAG_PATTERN`（`crates/pasta_lua/src/sakura_script/tokenizer.rs`）が正で、Lua の `tag_at`（`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`）、DSL の文法の `sakura_script`・`sakura_escape` の規則（`crates/pasta_dsl/src/parser/grammar.pest`）、VS Code 拡張の文法定義の `inline-sakura-script`（`editors/vscode/syntaxes/pasta.tmLanguage.json`）がその写しである。拡張の `inline-escape` は、DSL の `sakura_escape`（`\\`・`\%`）と `at_escape`・`dollar_escape`（`＠＠`・`＄＄`）の写しである。正の正規表現は、後戻りの有無で一致が変わらない形にしてあるため、左から 1 回読むだけの写し（Lua・pest）と結果が一致する。
 - Rust・Lua・DSL の 3 つの読み取りは、適合テスト `crates/pasta_lua/tests/sakura_script/conformance_test.rs` の 1 つの事例の表（入力と期待する単位の並び）で、同じ位置で単位を切り出すことを確かめる。DSL だけが異なるのは、単位にならない `\` をパースエラーにすることである。また DSL は引数・引用・囲みを 1 行の中だけで読む。VS Code 拡張の文法定義は色分けだけに使われ、適合テストの対象ではない（`editors/vscode/src/test/tmGrammar.test.ts` で確かめる）。読み方を変えるときは 4 か所を同じ変更でそろえる。
 - 囲みはトークンをまたがない。後処理は 1 回の `talk_to_script` に渡したテキスト（結合後の `talk`、または 1 つの `sakura_script`）の中でだけ囲みを読み、字の判定と外見の観測もトークン（観測は出力した文字列）ごとに読むため、囲みの読み取りはトークンをまたぐ状態を持たない（トークンをまたいで持ち越すのは budoux の行の状態だけである）。開きと閉じを別々のトークンで積むと、それぞれが閉じの無い `\_?`（`\_!`）として、ただのタグに読まれる。
 - 字の判定と `\c` の読み取りは変換前のテキストに対して行い、外見の観測は後処理済みの出力文字列に対して行う。後処理が挿入する `\_w[…]`・改行は字の判定に入らない。
@@ -362,7 +362,7 @@ SSP 2.9.18 は、引数の無い `\c` の後の字を既定の表示で出す（
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/actor_style.lua`
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`
 
-本文で参照したその他のファイルは次のとおりである。トークンの蓄積とグループ化は `crates/pasta_lua/pasta_scripts/pasta/act.lua`、アクタープロキシは `crates/pasta_lua/pasta_scripts/pasta/actor.lua`、`STORE.actor_spots`・`STORE.appearance` は `crates/pasta_lua/pasta_scripts/pasta/store.lua`、文字列バッファは `crates/pasta_lua/pasta_scripts/pasta/buf.lua`、`TalkConfig` は `crates/pasta_lua/src/loader/config/sections.rs` にある。振る舞いのテストは `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua`（組立と字の判定）と `crates/pasta_lua/tests/lua_specs/appearance_test.lua`（外見の観測と復旧）、`crates/pasta_lua/tests/lua_specs/actor_style_test.lua`（装いの状態表と `\c`・`\x` の後の出し直し）にある。単位の読み方の写しは `crates/pasta_dsl/src/parser/grammar.pest` と `editors/vscode/syntaxes/pasta.tmLanguage.json` にあり、3 つの読み取りの適合テストは `crates/pasta_lua/tests/sakura_script/conformance_test.rs` にある。
+本文で参照したその他のファイルは次のとおりである。トークンの蓄積とグループ化は `crates/pasta_lua/pasta_scripts/pasta/act.lua`、アクタープロキシは `crates/pasta_lua/pasta_scripts/pasta/actor.lua`、`STORE.actor_spots`・`STORE.appearance` は `crates/pasta_lua/pasta_scripts/pasta/store.lua`、`TalkConfig` は `crates/pasta_lua/src/loader/config/sections.rs` にある。振る舞いのテストは `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua`（組立と字の判定）と `crates/pasta_lua/tests/lua_specs/appearance_test.lua`（外見の観測と復旧）、`crates/pasta_lua/tests/lua_specs/actor_style_test.lua`（装いの状態表と `\c`・`\x` の後の出し直し）にある。単位の読み方の写しは `crates/pasta_dsl/src/parser/grammar.pest` と `editors/vscode/syntaxes/pasta.tmLanguage.json` にあり、3 つの読み取りの適合テストは `crates/pasta_lua/tests/sakura_script/conformance_test.rs` にある。
 
 ## 経緯
 

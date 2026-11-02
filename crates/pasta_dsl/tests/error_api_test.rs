@@ -1,19 +1,19 @@
 //! ParseError API・parse_file・パースエラー経路の網羅テスト
 //!
-//! - error.rs: コンストラクタ・Display 形式・From<io::Error>・MultipleErrors
+//! - error.rs: SyntaxError・IoError の形と Display 形式・From<io::Error>
 //! - parser/mod.rs: parse_file（成功 / IO エラー）、parse_str の pest レベルエラー位置情報
 
+use pasta_dsl::ParseError;
 use pasta_dsl::parser::{FileItem, parse_file, parse_str};
-use pasta_dsl::{ParseError, ParseErrorInfo};
 use std::path::Path;
 
 // ============================================================================
-// ParseError コンストラクタと Display
+// ParseError の形と Display（parse_str が返す誤りで確かめる）
 // ============================================================================
 
 #[test]
-fn test_syntax_error_constructor_and_display() {
-    let err = ParseError::syntax_error("test.pasta", 3, 7, "unexpected token");
+fn test_syntax_error_shape_and_display() {
+    let err = parse_str("こんにちは\n", "shape.pasta").expect_err("raw text is an error");
     match &err {
         ParseError::SyntaxError {
             file,
@@ -21,31 +21,17 @@ fn test_syntax_error_constructor_and_display() {
             column,
             message,
         } => {
-            assert_eq!(file, "test.pasta");
-            assert_eq!(*line, 3);
-            assert_eq!(*column, 7);
-            assert_eq!(message, "unexpected token");
+            assert_eq!(file, "shape.pasta");
+            assert_eq!(*line, 1);
+            assert_eq!(*column, 1);
+            assert!(message.starts_with("Parse error in shape.pasta at 1:1: "));
         }
         other => panic!("Expected SyntaxError, got {:?}", other),
     }
-    assert_eq!(
-        err.to_string(),
-        "Parse error: test.pasta:3:7: unexpected token"
+    assert!(
+        err.to_string()
+            .starts_with("Parse error: shape.pasta:1:1: Parse error in shape.pasta at 1:1: ")
     );
-}
-
-#[test]
-fn test_pest_error_constructor_and_display() {
-    let err = ParseError::pest_error("grammar mismatch");
-    assert!(matches!(err, ParseError::PestError(_)));
-    assert_eq!(err.to_string(), "Pest parse error: grammar mismatch");
-}
-
-#[test]
-fn test_io_error_constructor_and_display() {
-    let err = ParseError::io_error("file not found");
-    assert!(matches!(err, ParseError::IoError(_)));
-    assert_eq!(err.to_string(), "IO error: file not found");
 }
 
 #[test]
@@ -56,48 +42,12 @@ fn test_from_std_io_error() {
         ParseError::IoError(msg) => assert!(msg.contains("missing")),
         other => panic!("Expected IoError, got {:?}", other),
     }
-}
-
-#[test]
-fn test_multiple_errors_display_reports_count() {
-    let errors = vec![
-        ParseErrorInfo {
-            file: "a.pasta".to_string(),
-            line: 1,
-            column: 1,
-            message: "err1".to_string(),
-        },
-        ParseErrorInfo {
-            file: "b.pasta".to_string(),
-            line: 2,
-            column: 5,
-            message: "err2".to_string(),
-        },
-    ];
-    let err = ParseError::MultipleErrors { errors };
-    assert_eq!(err.to_string(), "Multiple parse errors: 2 errors");
-}
-
-#[test]
-fn test_parse_error_info_equality() {
-    let a = ParseErrorInfo {
-        file: "x.pasta".to_string(),
-        line: 1,
-        column: 2,
-        message: "msg".to_string(),
-    };
-    let b = a.clone();
-    assert_eq!(a, b);
-    let c = ParseErrorInfo {
-        line: 9,
-        ..a.clone()
-    };
-    assert_ne!(a, c);
+    assert_eq!(err.to_string(), "IO error: missing");
 }
 
 #[test]
 fn test_parse_error_is_cloneable() {
-    let err = ParseError::syntax_error("f.pasta", 1, 1, "m");
+    let err = parse_str("こんにちは\n", "f.pasta").expect_err("raw text is an error");
     let cloned = err.clone();
     assert_eq!(err.to_string(), cloned.to_string());
 }
@@ -190,9 +140,12 @@ fn test_parse_str_crlf_line_endings() {
 fn test_parse_str_blank_lines_only() {
     let file = parse_str("\n\n\n", "blank.pasta").expect("should parse");
     assert!(file.items.is_empty());
-    // span は全ソースをカバーする
-    assert_eq!(file.span.start_line, 1);
-    assert_eq!(file.span.end_byte, 3);
+}
+
+#[test]
+fn test_parse_str_comments_only() {
+    let file = parse_str("# コメント\n\n# もう一つ\n", "comment.pasta").expect("should parse");
+    assert!(file.items.is_empty());
 }
 
 // ============================================================================

@@ -79,7 +79,6 @@ fn create_pasta_file(actors: Vec<ActorScope>, scenes: Vec<GlobalSceneScope>) -> 
     PastaFile {
         path: PathBuf::from("test.pasta"),
         items,
-        span: Span::default(),
     }
 }
 
@@ -215,7 +214,6 @@ fn test_transpile_with_global_words() {
             FileItem::GlobalWord(global_words),
             FileItem::GlobalSceneScope(scenes.into_iter().next().unwrap()),
         ],
-        span: Span::default(),
     };
     let mut output = Vec::new();
 
@@ -278,7 +276,6 @@ fn test_transpile_multi_key_global_word_registration() {
     let file = PastaFile {
         path: PathBuf::from("test.pasta"),
         items: vec![FileItem::GlobalWord(global_words)],
-        span: Span::default(),
     };
     let mut output = Vec::new();
 
@@ -330,7 +327,6 @@ fn test_transpile_multi_key_global_word_lua_output() {
     let file = PastaFile {
         path: PathBuf::from("test.pasta"),
         items: vec![FileItem::GlobalWord(global_words)],
-        span: Span::default(),
     };
     let mut output = Vec::new();
 
@@ -401,7 +397,6 @@ fn test_transpile_accumulates_file_attrs() {
             }),
             FileItem::GlobalSceneScope(create_simple_scene("メイン")),
         ],
-        span: Span::default(),
     };
     let mut output = Vec::new();
 
@@ -475,7 +470,6 @@ fn test_transpile_single_key_backward_compat_lua_output() {
     let file = PastaFile {
         path: PathBuf::from("test.pasta"),
         items: vec![FileItem::GlobalWord(global_words)],
-        span: Span::default(),
     };
     let mut output = Vec::new();
 

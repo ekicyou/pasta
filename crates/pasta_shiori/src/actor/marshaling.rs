@@ -6,7 +6,7 @@
 //!
 //! - **GET（R5.1）**: flume `bounded(1)` の reply tx を [`ActorMsg::Get`] に同梱して
 //!   `try_send`、同期 [`Receiver::recv_timeout`]`(GET_TIMEOUT)` でブロック受信。
-//!   `Ok(Value)`→応答文字列（VM 応答、またはリクエスト処理エラー由来の 500 応答）、
+//!   `Ok(応答)`→応答文字列（VM 応答、またはリクエスト処理エラー由来の 500 応答）、
 //!   `Timeout`/`Disconnected`→204。
 //! - **NOTIFY（R5.2）**: 応答経路なしで `try_send`、アクター完了を待たず **即 204**。
 //! - **drop→204（R5.3）**: アクターが reply を **送れない**（スレッド消滅・panic 等）まま
@@ -26,11 +26,9 @@
 //! # 呼び出し経路
 //! - marshaling 自由関数は **呼び出し側が渡した `Sender`** に対して動作する。出荷経路では
 //!   `lifecycle::marshal_request` が `static LEGACY` の芯の型 `ActorInstance` から読んだ `Sender` を
-//!   [`determine_method`]・[`marshal_get`]・[`marshal_notify`] に渡す（`windows.rs` の
-//!   `request` から呼ばれる）。テストは `spawn_actor_thread` が返す mailbox の `Sender` を
-//!   直接渡して契約を隔離検証する。
-//! - 本モジュールの [`marshal_request`]（`Sender` と `seq` を引数に取る版）はテスト用の
-//!   ディスパッチで、出荷経路は `lifecycle::marshal_request` を使う。
+//!   `classify_request`・[`marshal_get`]・[`marshal_notify`] に渡す（`windows.rs` の
+//!   `request` から呼ばれる）。テストは `spawn_actor_thread_with` に渡した mailbox の
+//!   `Sender` を [`marshal_get`]・[`marshal_notify`] へ直接渡して契約を隔離検証する。
 //!
 //! # GET タイムアウト閾値（R5.8/R5.9・RN4 決定）
 //! [`GET_TIMEOUT`] は **通常運転で決して発火しない安全網**である（R5.8: 通常経路バイト不変）。
@@ -56,9 +54,11 @@ use std::time::Duration;
 
 use flume::{Sender, bounded};
 
-use crate::actor::mailbox::{ActorMsg, MailboxRequest, Reply};
-use crate::util::parsers::req::{Parser, Rule};
+use crate::actor::mailbox::{ActorMsg, MailboxRequest};
+use crate::util::parsers::req::{ParseError, Parser, Rule};
 use pest::Parser as _;
+use pest::Position;
+use pest::error::ErrorVariant;
 
 /// GET の block-on-reply タイムアウト閾値（R5.8・RN4 決定値 = 5 秒）。
 ///
@@ -76,7 +76,7 @@ pub const GET_TIMEOUT: Duration = Duration::from_secs(5);
 /// 不変）。`lua_request.rs` と同じ `Rule::get`/`Rule::notify` を、Lua テーブルを介さず
 /// 出荷 pest パーサ（読み取り専用再利用）から取り出す。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ShioriMethod {
+pub(crate) enum ShioriMethod {
     /// GET（SHIORI/3.0 同期契約・block-on-reply）。
     Get,
     /// NOTIFY（fire-and-forget・即 204）。
@@ -93,9 +93,8 @@ pub enum ShioriMethod {
 ///
 /// これにより NOTIFY の即 204（R5.2）も、GET の timeout/drop/異常/未初期化フォールバック
 /// （R5.3/R5.6/R5.7）も、**唯一の正準 204** を返し、出荷経路が R1.1（外部 SHIORI 挙動
-/// バイト不変）を満たす。Rust 安全網 `PastaShiori::default_204_response` は SHIORI.request
-/// 未登録時のみ通る経路でヘッダ 2 種だが、代表イベント列（NOTIFY/OnSecondChange）の
-/// pre-refactor 観測値は VM 産 204（SecurityLevel あり）であり、それがゴールデンの真値である。
+/// バイト不変）を満たす。SHIORI.request 未登録時の `PastaShiori::call_lua_request` も
+/// この 204 を返す（ponytail-shiori 5.1・5.2。Rust の側で作る 204 はこれ 1 つ）。
 ///
 /// timeout/drop/異常/未初期化のいずれでも SHIORI スレッドへ必ずこの応答を返し、
 /// 無限待機を生じさせない。
@@ -108,60 +107,50 @@ pub fn default_204() -> String {
         .to_string()
 }
 
-/// request 文字列から SHIORI メソッド（GET/NOTIFY）を **VM 投入前**に決定する（R5.5）。
-///
-/// 出荷 pest パーサ（`crate::util::parsers::req::{Parser, Rule}`）を **読み取り専用**で
-/// 再利用し、`lua_request.rs:86-87`（`Rule::get`/`Rule::notify`）と同一の解釈を Lua VM を
-/// 介さず Rust の決定論ロジックとして得る。出荷 `.rs` は diff ゼロ。
-///
-/// 正常経路は panic-free（`Result`/`Option` のみ・`unwrap`/`expect`/索引なし）。パース
-/// 失敗やメソッド未検出は `None`（呼び出し側で 204 に倒す）。
-pub fn determine_method(request: &str) -> Option<ShioriMethod> {
-    let pairs = Parser::parse(Rule::req, request).ok()?.flatten();
-    for pair in pairs {
-        match pair.as_rule() {
-            Rule::get => return Some(ShioriMethod::Get),
-            Rule::notify => return Some(ShioriMethod::Notify),
-            _ => {}
-        }
-    }
-    None
-}
-
-/// 版 3 の口が受けた要求の見分け（shiori4-v3-portable 3.4〜3.6）。
+/// 要求の見分け（判定 1 つ・7.4）。2.x を Lua へ届けるか 400 にするかは入口が決める。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RequestKind {
+pub(crate) enum RequestKind {
     /// `GET SHIORI/3.0`。
     Get,
     /// `NOTIFY SHIORI/3.0`。
     Notify,
-    /// SHIORI/2.x のヘッダ（GET でも NOTIFY でも）。版 3 では 400。
-    Shiori2,
-    /// 今の文法で読めない要求（知らないメソッド・空・壊れたヘッダ）。版 3 では 400。
-    Unreadable,
+    /// SHIORI/2.x のヘッダ（旧来は Lua へ、版 3 は 400）。
+    Shiori2(ShioriMethod),
 }
 
-/// 版 3 の口のための要求の見分け（3.4〜3.6）。
+/// 要求のメソッドを **VM 投入前**に判定する（旧来と版 3 の入口で 1 つ・3.5・7.4）。
 ///
-/// 今の pest の文法（`Rule::req`）で読み、読めなければ `Unreadable`、`Rule::header2` が
-/// あれば `Shiori2`、そうでなければ `Rule::get`→`Get`・`Rule::notify`→`Notify`。
-/// 旧来の入口は [`determine_method`] を使い続ける（読めない要求の 204 は変えない）。
-pub fn classify_request(request: &str) -> RequestKind {
-    let Ok(pairs) = Parser::parse(Rule::req, request) else {
-        return RequestKind::Unreadable;
-    };
-    let mut kind = RequestKind::Unreadable;
-    // header2 はメソッドの後ろに来るので、ヘッダの中を最後まで見る。
+/// 出荷 pest パーサ（`Rule::req`）で 1 回なめ、`Rule::get`／`Rule::notify` でメソッドを覚え、
+/// `Rule::header2` なら `Shiori2(メソッド)` を返す。解けなければ pest の誤り（位置つき）を返す。
+/// 解けたのにメソッドが無い（文法上起きない）ときも panic せず誤りを返す。
+pub(crate) fn classify_request(request: &str) -> Result<RequestKind, Box<ParseError>> {
+    let pairs = Parser::parse(Rule::req, request).map_err(Box::new)?;
+    let mut method = None;
+    let mut shiori2 = false;
+    // header2 はメソッドの後ろに来るので、見出しの行の終わりまで見る。
     for pair in pairs.flatten() {
         match pair.as_rule() {
-            Rule::header2 => return RequestKind::Shiori2,
-            Rule::get => kind = RequestKind::Get,
-            Rule::notify => kind = RequestKind::Notify,
+            Rule::get => method = Some(ShioriMethod::Get),
+            Rule::notify => method = Some(ShioriMethod::Notify),
+            Rule::header2 => shiori2 = true,
             Rule::key_values => break,
             _ => {}
         }
     }
-    kind
+    let Some(method) = method else {
+        let variant = ErrorVariant::CustomError {
+            message: "request has no method".to_string(),
+        };
+        return Err(Box::new(ParseError::new_from_pos(
+            variant,
+            Position::from_start(request),
+        )));
+    };
+    Ok(match (shiori2, method) {
+        (true, m) => RequestKind::Shiori2(m),
+        (false, ShioriMethod::Get) => RequestKind::Get,
+        (false, ShioriMethod::Notify) => RequestKind::Notify,
+    })
 }
 
 /// GET marshaling（R5.1/R5.3/R5.6/R5.7）。
@@ -189,7 +178,7 @@ pub fn marshal_get_with_timeout(
     timeout: Duration,
 ) -> String {
     // flume・同期 recv_timeout で受ける reply 経路（exactly-once は move/drop 意味論）。
-    let (reply_tx, reply_rx) = bounded::<Reply>(1);
+    let (reply_tx, reply_rx) = bounded::<String>(1);
 
     let seq = req.seq;
     // try_send 失敗＝アクタースレッド不在/異常/満杯（R5.6）。reply_tx はここで drop され、
@@ -224,7 +213,7 @@ pub fn marshal_get_with_timeout(
     // 同期 recv_timeout ゆえ flume の cancel 欠陥に無関係。
     match reply_rx.recv_timeout(timeout) {
         // 値到達: アクター VM が構築した応答文字列を返す（R5.1・通常経路バイト不変 R5.8）。
-        Ok(Reply::Value(s)) => {
+        Ok(s) => {
             // 観測ログ点（R10.4）: reply 値が SHIORI スレッドへ到達（exactly-once の move 側）。
             tracing::trace!(
                 seam = "actor.reply",
@@ -280,22 +269,6 @@ pub fn marshal_notify(tx: &Sender<ActorMsg>, req: MailboxRequest) -> String {
     default_204()
 }
 
-/// メソッド判定込みの marshaling ディスパッチ（R5.5・SHIORI スレッド入口想定）。
-///
-/// 生 request 文字列から **VM 投入前**にメソッドを決定し、GET=block-on-reply／NOTIFY=即
-/// 204 へ分岐する。メソッド未検出（不正リクエスト）は 204 に倒す（panic させない）。
-/// `seq` は mailbox の順序識別子（FIFO 観測用）。
-pub fn marshal_request(tx: &Sender<ActorMsg>, seq: u64, request: &str) -> String {
-    match determine_method(request) {
-        Some(ShioriMethod::Get) => marshal_get(tx, MailboxRequest::new(seq, request.to_string())),
-        Some(ShioriMethod::Notify) => {
-            marshal_notify(tx, MailboxRequest::new(seq, request.to_string()))
-        }
-        // 不正リクエスト（メソッド未検出）: 安全側として 204（無限待機/パニックなし）。
-        None => default_204(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -303,51 +276,55 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    /// determine_method（R5.5）: GET/NOTIFY が VM を介さず Rust 側で確定する。
-    #[test]
-    fn determine_method_classifies_get_and_notify() {
-        let get = "GET SHIORI/3.0\r\nCharset: UTF-8\r\nID: version\r\nSender: SSP\r\n\r\n";
-        let notify = "NOTIFY SHIORI/3.0\r\nCharset: UTF-8\r\nID: OnBoot\r\nSender: SSP\r\n\r\n";
-        assert_eq!(determine_method(get), Some(ShioriMethod::Get));
-        assert_eq!(determine_method(notify), Some(ShioriMethod::Notify));
-        // 不正リクエストは None（呼び出し側で 204）。パニックしない。
-        assert_eq!(determine_method("not a shiori request"), None);
-    }
-
-    /// classify_request（版 3 の判定・3.4〜3.6）: 7 通りが期待どおりに分かれる。
-    /// 知らないメソッド（PUT）は今の文法で読めないので Unreadable。
+    /// classify_request（判定 1 つ・7.4）: 7 通りが期待どおりに分かれる。
+    /// 知らないメソッド（PUT）は今の文法で読めないので誤り。誤りは位置（行と列）を持つ。
     #[test]
     fn classify_request_splits_seven_cases() {
         let cases = [
             (
                 "GET SHIORI/3.0\r\nCharset: UTF-8\r\nID: version\r\n\r\n",
-                RequestKind::Get,
+                Some(RequestKind::Get),
             ),
             (
                 "NOTIFY SHIORI/3.0\r\nCharset: UTF-8\r\nID: OnBoot\r\n\r\n",
-                RequestKind::Notify,
+                Some(RequestKind::Notify),
             ),
             (
                 "GET Sentence SHIORI/2.6\r\nCharset: UTF-8\r\n\r\n",
-                RequestKind::Shiori2,
+                Some(RequestKind::Shiori2(ShioriMethod::Get)),
             ),
             (
                 "NOTIFY OwnerGhostName SHIORI/2.0\r\nCharset: UTF-8\r\n\r\n",
-                RequestKind::Shiori2,
+                Some(RequestKind::Shiori2(ShioriMethod::Notify)),
             ),
-            (
-                "PUT SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n",
-                RequestKind::Unreadable,
-            ),
-            ("", RequestKind::Unreadable),
-            (
-                "GET SHIORI/3.0\r\nCharset UTF-8\r\n\r\n",
-                RequestKind::Unreadable,
-            ),
+            ("PUT SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n", None),
+            ("", None),
+            ("GET SHIORI/3.0\r\nCharset UTF-8\r\n\r\n", None),
         ];
         for (req, expected) in cases {
-            assert_eq!(classify_request(req), expected, "request: {req:?}");
+            let got = classify_request(req);
+            match expected {
+                Some(kind) => assert_eq!(got.ok(), Some(kind), "request: {req:?}"),
+                None => {
+                    let Err(e) = got else {
+                        panic!("must be unreadable: {req:?}");
+                    };
+                    let (line, col) = match e.line_col {
+                        pest::error::LineColLocation::Pos(p) => p,
+                        pest::error::LineColLocation::Span(p, _) => p,
+                    };
+                    assert!(line >= 1 && col >= 1, "request: {req:?}");
+                }
+            }
         }
+    }
+
+    /// `Key:`（値が空）と `Key:value`（空白なし）を含む要求も解ける（3.1・3.3・3.5）。
+    #[test]
+    fn classify_request_accepts_empty_and_unspaced_values() {
+        let req = "NOTIFY SHIORI/3.0\r\nCharset: UTF-8\r\nID: OnInitialize\r\n\
+                   Reference0:\r\nReference1:abc\r\n\r\n";
+        assert_eq!(classify_request(req).ok(), Some(RequestKind::Notify));
     }
 
     /// default_204（R5.6 等）: 安全網 204 のバイト列が **リファクタ前 VM 産 204** と同一で
@@ -374,7 +351,7 @@ mod tests {
         // アクター役: GET を drain し、req.raw をそのまま値として reply する。
         let actor = thread::spawn(move || {
             if let Ok(ActorMsg::Get { req, reply }) = rx.recv() {
-                let _ = reply.send(Reply::Value(format!("echo:{}", req.raw)));
+                let _ = reply.send(format!("echo:{}", req.raw));
             }
         });
 
@@ -486,11 +463,11 @@ mod tests {
             //         work は失われず最後まで完走する（co_scene 保存の構造的模擬）。
             if let Ok(ActorMsg::Get { req: _, reply }) = rx.recv() {
                 let _ = release_rx.recv();
-                let _ = reply.send(Reply::Value("late-but-completed".to_string()));
+                let _ = reply.send("late-but-completed".to_string());
             }
             // Round2: 通常速度で reply（次 tick での回復に相当）。
             if let Ok(ActorMsg::Get { req, reply }) = rx.recv() {
-                let _ = reply.send(Reply::Value(format!("recovered:{}", req.raw)));
+                let _ = reply.send(format!("recovered:{}", req.raw));
             }
         });
 
@@ -528,7 +505,7 @@ mod tests {
             while let Ok(msg) = rx.recv() {
                 match msg {
                     ActorMsg::Get { req, reply } => {
-                        let _ = reply.send(Reply::Value(req.raw));
+                        let _ = reply.send(req.raw);
                     }
                     ActorMsg::Stop { done } => {
                         let _ = done.send(());

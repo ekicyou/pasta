@@ -19,7 +19,7 @@ mod windows;
 pub use v3::shiori_get_api;
 
 // Re-export for integration tests
-pub use shiori::{PastaShiori, Shiori};
+pub use shiori::PastaShiori;
 
 // 出荷 SHIORI extern FFI 入口（`#[unsafe(no_mangle)] extern "C"`）を Rust パスでも到達可能にする。
 // これらは SSP 等のホストが C ABI で呼ぶ出荷シンボルそのものであり、cdylib エクスポートが

@@ -8,7 +8,7 @@ pub(crate) fn parse_global_scene_scope(
     last_name: &mut Option<String>,
     filename: &str,
 ) -> Result<GlobalSceneScope, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut scene_name = String::new();
     let mut is_continuation = false;
     let mut attrs = Vec::new();
@@ -29,7 +29,7 @@ pub(crate) fn parse_global_scene_scope(
             Rule::global_scene_attr_line => {
                 for attr_pair in inner.into_inner() {
                     if attr_pair.as_rule() == Rule::attr {
-                        attrs.push(parse_attr(attr_pair)?);
+                        attrs.push(parse_attr(attr_pair, filename)?);
                     }
                 }
             }
@@ -41,17 +41,17 @@ pub(crate) fn parse_global_scene_scope(
                 }
             }
             Rule::scene_actors_line => {
-                let items = parse_scene_actors_line(inner, &mut next_actor_number)?;
+                let items = parse_scene_actors_line(inner, &mut next_actor_number, filename)?;
                 actors.extend(items);
             }
             Rule::code_block => {
                 code_blocks.push(parse_code_block(inner)?);
             }
             Rule::local_start_scene_scope => {
-                local_scenes.push(parse_local_start_scene_scope(inner)?);
+                local_scenes.push(parse_local_start_scene_scope(inner, filename)?);
             }
             Rule::local_scene_scope => {
-                local_scenes.push(parse_local_scene_scope(inner)?);
+                local_scenes.push(parse_local_scene_scope(inner, filename)?);
             }
             _ => {}
         }
@@ -116,12 +116,14 @@ pub(crate) fn parse_global_scene_start(
 /// # Arguments
 /// * `pair` - Rule::scene_actors_lineのPair
 /// * `next_number` - 次の採番値（可変参照、更新される）
+/// * `filename` - 誤りに書くファイル名
 ///
 /// # Returns
 /// パースされたSceneActorItemのベクタ
 pub(crate) fn parse_scene_actors_line(
     pair: Pair<Rule>,
     next_number: &mut u32,
+    filename: &str,
 ) -> Result<Vec<SceneActorItem>, ParseError> {
     let mut items = Vec::new();
 
@@ -129,7 +131,7 @@ pub(crate) fn parse_scene_actors_line(
     // actors is a silent rule, so actors_item pairs appear directly
     for inner in pair.into_inner() {
         if inner.as_rule() == Rule::actors_item {
-            let item = parse_actors_item(inner, next_number)?;
+            let item = parse_actors_item(inner, next_number, filename)?;
             items.push(item);
         }
     }
@@ -144,11 +146,13 @@ pub(crate) fn parse_scene_actors_line(
 /// C#のenum採番ルール:
 /// - 番号指定あり: その番号を使用し、next_number = その番号 + 1
 /// - 番号指定なし: next_numberを使用し、next_number += 1
+/// - 0〜4294967295 に収まらない番号は、番号の位置の構文の誤り
 pub(crate) fn parse_actors_item(
     pair: Pair<Rule>,
     next_number: &mut u32,
+    filename: &str,
 ) -> Result<SceneActorItem, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut name = String::new();
     let mut explicit_number: Option<u32> = None;
 
@@ -160,7 +164,18 @@ pub(crate) fn parse_actors_item(
             Rule::digit_id => {
                 // 全角数字を半角に正規化してパース
                 let normalized = normalize_number_str(inner.as_str());
-                explicit_number = normalized.parse::<u32>().ok();
+                // 文法が数字だけを通すので、失敗は範囲の外だけ
+                let n = normalized.parse::<u32>().map_err(|_| {
+                    syntax_error(
+                        filename,
+                        inner.line_col(),
+                        &format!(
+                            "アクターの番号 {} は 0〜4294967295 の範囲を超えています",
+                            inner.as_str()
+                        ),
+                    )
+                })?;
+                explicit_number = Some(n);
             }
             _ => {}
         }
@@ -178,21 +193,25 @@ pub(crate) fn parse_actors_item(
 /// Parse local start scene scope (no name).
 pub(crate) fn parse_local_start_scene_scope(
     pair: Pair<Rule>,
+    filename: &str,
 ) -> Result<LocalSceneScope, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut scope = LocalSceneScope::start();
     scope.span = span;
 
     for inner in pair.into_inner() {
-        parse_local_scene_item(inner, &mut scope)?;
+        parse_local_scene_item(inner, &mut scope, filename)?;
     }
 
     Ok(scope)
 }
 
 /// Parse local scene scope (with name).
-pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScope, ParseError> {
-    let span = Span::from(&pair.as_span());
+pub(crate) fn parse_local_scene_scope(
+    pair: Pair<Rule>,
+    filename: &str,
+) -> Result<LocalSceneScope, ParseError> {
+    let span = Span::from_pair(&pair);
     let mut scope = LocalSceneScope::start();
     scope.span = span;
 
@@ -205,7 +224,7 @@ pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScop
                 }
             }
         } else {
-            parse_local_scene_item(inner, &mut scope)?;
+            parse_local_scene_item(inner, &mut scope, filename)?;
         }
     }
 
@@ -216,6 +235,7 @@ pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScop
 fn parse_local_scene_item(
     inner: Pair<Rule>,
     scope: &mut LocalSceneScope,
+    filename: &str,
 ) -> Result<(), ParseError> {
     match inner.as_rule() {
         Rule::var_set_local
@@ -224,29 +244,33 @@ fn parse_local_scene_item(
         | Rule::var_set_property => {
             scope
                 .items
-                .push(LocalSceneItem::VarSet(parse_var_set(inner)?));
+                .push(LocalSceneItem::VarSet(parse_var_set(inner, filename)?));
         }
         Rule::call_scene => {
-            scope
-                .items
-                .push(LocalSceneItem::CallScene(parse_call_scene(inner)?));
+            scope.items.push(LocalSceneItem::CallScene(parse_call_scene(
+                inner, filename,
+            )?));
         }
         Rule::action_line => {
             scope
                 .items
-                .push(LocalSceneItem::ActionLine(parse_action_line(inner)?));
+                .push(LocalSceneItem::ActionLine(parse_action_line(
+                    inner, filename,
+                )?));
         }
         Rule::continue_action_line => {
             scope
                 .items
                 .push(LocalSceneItem::ContinueAction(parse_continue_action_line(
-                    inner,
+                    inner, filename,
                 )?));
         }
         Rule::cue_cmd_line => {
             scope
                 .items
-                .push(LocalSceneItem::CueCommand(parse_cue_cmd_line(inner)?));
+                .push(LocalSceneItem::CueCommand(parse_cue_cmd_line(
+                    inner, filename,
+                )?));
         }
         Rule::choice_line => {
             scope
@@ -271,7 +295,7 @@ fn parse_local_scene_item(
 /// `choice_line = { pad ~ word_marker ~ question_marker ~ id ~ choice_label? ~ or_comment_eol }`
 /// `choice_label = { slfence_ja1 ~ string_contents ~ strclose }`
 pub(crate) fn parse_choice_line(pair: Pair<Rule>) -> Result<ChoiceNode, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut target = String::new();
     let mut label = None;
 
@@ -306,8 +330,11 @@ pub(crate) fn parse_choice_line(pair: Pair<Rule>) -> Result<ChoiceNode, ParseErr
 ///
 /// grammar.pest:
 /// `cue_cmd_line = { pad ~ cue_cmd_marker ~ cue_cmd_name ~ cue_cmd_scope? ~ cue_cmd_args? ~ or_comment_eol }`
-pub(crate) fn parse_cue_cmd_line(pair: Pair<Rule>) -> Result<CueCommandNode, ParseError> {
-    let span = Span::from(&pair.as_span());
+pub(crate) fn parse_cue_cmd_line(
+    pair: Pair<Rule>,
+    filename: &str,
+) -> Result<CueCommandNode, ParseError> {
+    let span = Span::from_pair(&pair);
     let mut command = String::new();
     let mut scope = None;
     let mut args = Vec::new();
@@ -321,7 +348,7 @@ pub(crate) fn parse_cue_cmd_line(pair: Pair<Rule>) -> Result<CueCommandNode, Par
                 scope = Some(parse_cue_cmd_scope(inner)?);
             }
             Rule::cue_cmd_args => {
-                args = parse_cue_cmd_args(inner)?;
+                args = parse_cue_cmd_args(inner, filename)?;
             }
             _ => {}
         }
@@ -343,38 +370,17 @@ pub(crate) fn parse_cue_cmd_line(pair: Pair<Rule>) -> Result<CueCommandNode, Par
 ///
 /// `cue_scoped_ident` is atomic, so we get the full text and split on `:`.
 fn parse_cue_cmd_scope(pair: Pair<Rule>) -> Result<ScopedName, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
 
-    for inner in pair.into_inner() {
-        if inner.as_rule() == Rule::cue_scoped_ident {
-            let raw = inner.as_str();
-            // Split on ':' or '：' (full-width colon) to separate actor and name
-            if let Some(colon_pos) = raw.find([':', '：']) {
-                let actor = &raw[..colon_pos];
-                // colon_pos comes from find(), so the character is guaranteed to exist,
-                // but we use if-let for defensive safety.
-                if let Some(colon_char) = raw[colon_pos..].chars().next() {
-                    let name = &raw[colon_pos + colon_char.len_utf8()..];
-                    return Ok(ScopedName {
-                        actor: Some(actor.to_string()),
-                        name: name.to_string(),
-                        span,
-                    });
-                }
-            } else {
-                return Ok(ScopedName {
-                    actor: None,
-                    name: raw.to_string(),
-                    span,
-                });
-            }
-        }
-    }
-
-    // Fallback (should not be reached due to PEG grammar guarantees)
+    // `at` は黙る規則なので、子の文は `cue_scoped_ident` だけになる
+    let raw = pair.into_inner().as_str();
+    let (actor, name) = match raw.split_once([':', '：']) {
+        Some((actor, name)) => (Some(actor.to_string()), name),
+        None => (None, raw),
+    };
     Ok(ScopedName {
-        actor: None,
-        name: String::new(),
+        actor,
+        name: name.to_string(),
         span,
     })
 }
@@ -388,7 +394,7 @@ fn parse_cue_cmd_scope(pair: Pair<Rule>) -> Result<ScopedName, ParseError> {
 ///
 /// Since `cue_arg_list` and `cue_arg` are silent rules, the inner pairs of
 /// `cue_cmd_args` directly contain the matched argument rules.
-fn parse_cue_cmd_args(pair: Pair<Rule>) -> Result<Vec<CueArgToken>, ParseError> {
+fn parse_cue_cmd_args(pair: Pair<Rule>, filename: &str) -> Result<Vec<CueArgToken>, ParseError> {
     let mut tokens = Vec::new();
 
     for inner in pair.into_inner() {
@@ -402,12 +408,10 @@ fn parse_cue_cmd_args(pair: Pair<Rule>) -> Result<Vec<CueArgToken>, ParseError> 
                 }
             }
             Rule::number_literal => {
-                let normalized = normalize_number_str(inner.as_str());
-                if normalized.contains('.') {
-                    tokens.push(CueArgToken::Float(normalized.parse().unwrap_or(0.0)));
-                } else {
-                    tokens.push(CueArgToken::Integer(normalized.parse().unwrap_or(0)));
-                }
+                tokens.push(match number_value(&inner, filename)? {
+                    Number::Integer(i) => CueArgToken::Integer(i),
+                    Number::Float(f) => CueArgToken::Float(f),
+                });
             }
             Rule::string_contents => {
                 tokens.push(CueArgToken::StringLiteral(inner.as_str().to_string()));

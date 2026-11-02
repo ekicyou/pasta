@@ -23,7 +23,7 @@ local CLOCK = require("pasta.shiori.clock")
 REG.OnSecondChange = REG.OnSecondChange or function(act)
     -- コールバックのタイムアウト掃引を先に実行（応答は SHIORI/ で始まるため EVENT.fire が素通しする）
     -- 今は なめらかな時計（get_property の締め切りと同じ物差し）。req.date が無ければ OS の時計
-    local timeout_response = CALLBACK.sweep(CLOCK.steady(act.req) or os.time())
+    local timeout_response = CALLBACK.sweep(CLOCK.steady(act.req) or os.time(), act.req)
     if timeout_response then
         return timeout_response
     end

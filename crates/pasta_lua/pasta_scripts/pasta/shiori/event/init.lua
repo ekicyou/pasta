@@ -104,54 +104,16 @@ local function create_act(req)
 end
 
 --- STORE.co_sceneを統一管理するローカル関数
---- LuaJIT 2.1 には coroutine.close が無いため、以下の close 分岐は実行されず、
---- 破棄は参照を外すだけになる（破棄したコルーチンは GC が回収する）。
---- @param co thread|nil コルーチンまたはnil
+--- 破棄は参照を外すだけ（破棄したコルーチンは GC が回収する）。
+--- @param co thread|nil コルーチンまたはnil（suspended 以外は nil として扱う）
 --- @param keep boolean 真なら待っている続きをそのまま残し、co の残りは捨てる
 local function set_co_scene(co, keep)
-    -- 1. 引数検証（suspended以外はclose）
     if co and coroutine.status(co) ~= "suspended" then
-        if coroutine.close then
-            coroutine.close(co)
-        end
         co = nil
     end
-
-    -- 待っている続きを残す: co は待ちの表が持つか、どこにも置かずに捨てる
-    if keep then
-        if STORE.co_callback and co == STORE.co_callback then
-            STORE.co_callback = nil
-        end
-        return
+    if not keep then
+        STORE.co_scene = co
     end
-
-    -- NEW: コールバック登録済みコルーチン検出
-    if STORE.co_callback and co == STORE.co_callback then
-        -- コールバック待ちコルーチンは CALLBACK.pending で管理される
-        -- co_scene には登録しない、旧 co_scene と同一なら close もしない
-        if STORE.co_scene and STORE.co_scene ~= co then
-            -- 別の旧コルーチンがある場合は通常通り close
-            if coroutine.close then coroutine.close(STORE.co_scene) end
-        end
-        STORE.co_scene = nil
-        STORE.co_callback = nil
-        return
-    end
-
-    -- 2. 同一オブジェクトチェック
-    if STORE.co_scene == co then
-        return
-    end
-
-    -- 3. 旧コルーチンをclose（存在すれば無条件）
-    if STORE.co_scene then
-        if coroutine.close then
-            coroutine.close(STORE.co_scene)
-        end
-    end
-
-    -- 4. 上書き（coはsuspendedまたはnil確定）
-    STORE.co_scene = co
 end
 
 ---@alias DriveKind "resume"|"none"|"preempt"|"interrupt"
@@ -170,7 +132,13 @@ local function drive_kind(co)
     return "interrupt"
 end
 
+--- 1 回の再開の中で、何も出さない区切りを飛ばしてよい回数（超えたら止まるエラー）
+local NIL_YIELD_LIMIT = 10000
+local NIL_YIELD_MESSAGE = "何も出さない区切りが 10000 回続いた"
+
 --- nil yieldをスキップして有効値またはdead状態まで繰り返しresumeする
+--- 何も出さない区切りが NIL_YIELD_LIMIT 回を超えたら、再開をやめて false, NIL_YIELD_MESSAGE を返す
+--- （数は呼び出しごとに 0 から数える）
 --- @param co thread コルーチン
 --- @param ... any 初回resume引数（通常はact）
 --- @return boolean ok 処理成功フラグ（エラー時false）
@@ -178,6 +146,7 @@ end
 local function resume_until_valid(co, ...)
     -- 初回resumeは引数を渡す
     local ok, value = coroutine.resume(co, ...)
+    local empty = 0
 
     -- ループ: nil yieldをスキップ
     while true do
@@ -196,7 +165,11 @@ local function resume_until_valid(co, ...)
             return ok, value
         end
 
-        -- nil + suspended: 引数なしで再度resume
+        -- nil + suspended: 上限までは引数なしで再度resume
+        empty = empty + 1
+        if empty > NIL_YIELD_LIMIT then
+            return false, NIL_YIELD_MESSAGE
+        end
         ok, value = coroutine.resume(co)
     end
 end
@@ -279,12 +252,14 @@ function EVENT.drive(co, act, ...)
         STOP.hold(co, value)
         -- 予約の後、中断の前にエラーで終わったシーンの予約を残さない
         CALLBACK.discard_staged()
-        -- 5. dead のコルーチンを渡し継続を空にする
-        set_co_scene(co, false)
+        -- 5. 継続を空にする
+        set_co_scene(nil, false)
         return false, value
     end
-    -- 6. ステージング消費（待ちに入ったかを set_co_scene が STORE.co_callback で見るので先に行う）
-    CALLBACK.consume_staged(co, act)
+    -- 6. ステージング消費（待ちに入ったコルーチンは CALLBACK.pending だけが持つ）
+    if CALLBACK.consume_staged(co, act) then
+        co = nil
+    end
     -- 7. 台詞の印が無い素のコルーチンは、出力が空でないかで決める
     local spoke = scene_act and scene_act._spoke
     if spoke == nil then

@@ -26,42 +26,33 @@ Windows DLL（`pasta.dll`）として出力され、伺かベースウェアか�
 
 ## 公開API
 
-ライブラリ名は DLL 名に合わせて `pasta` です。Rust からは `pasta::` で参照します（`use pasta::{PastaShiori, Shiori};`）。
+ライブラリ名は DLL 名に合わせて `pasta` です。Rust からは `pasta::` で参照します（`use pasta::PastaShiori;`）。
 
 ### PastaShiori
 
 | メソッド                | 説明                                                          |
 | ----------------------- | ------------------------------------------------------------- |
-| `load(hinst, load_dir)` | ランタイム初期化（`Shiori` トレイト）                         |
-| `request(request)`      | SHIORI リクエスト処理（`Shiori` トレイト）                    |
+| `load(load_dir)`        | ランタイム初期化                                              |
+| `request(req)`          | SHIORI リクエスト処理                                         |
 | `runtime()`             | ロード済み Lua ランタイム参照（テスト用）                     |
 | `kick(scene)`           | Lua 側の `SHIORI.kick` を保護呼び出しする（デバッグ通信用）  |
 | `Default::default()`    | 新規インスタンス作成                                          |
 
 このほか、アクターランタイムの `actor`・エラー型の `error`・リクエスト解析の `lua_request` の各モジュールと、Windows ではエクスポート関数 `load`・`loadu`・`request`・`unload` を公開しています（統合テスト用）。
 
-### Shiori トレイト
-
-```rust
-pub trait Shiori {
-    fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool>;
-    fn request<S: AsRef<str>>(&mut self, request: S) -> MyResult<String>;
-}
-```
-
-`MyResult` は `error` モジュールの `MyError` を用いた Result 型エイリアスです。
+`load` は `MyResult<bool>`、`request` は `MyResult<String>` を返します。`MyResult` は `error` モジュールの `MyError` を用いた Result 型エイリアスです。
 
 ## 使用例
 
 ### Rust からの利用（テスト用）
 
 ```rust
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 let mut shiori = PastaShiori::default();
 
 // 初期化
-let success = shiori.load(0, "path/to/ghost/master").unwrap();
+let success = shiori.load("path/to/ghost/master").unwrap();
 assert!(success);
 
 // リクエスト送信

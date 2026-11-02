@@ -34,7 +34,7 @@ pub(crate) fn check(files: &[(String, FileText)]) -> (Vec<(String, PastaFile)>, 
 }
 
 /// 位置は行の頭に出すので、parse_str の文言から pest の短い説明（末尾の `  = expected id` の行）だけを取る（7.1 の 1 行）
-fn syntax_finding(path: &str, e: ParseError) -> Finding {
+pub fn syntax_finding(path: &str, e: ParseError) -> Finding {
     match e {
         ParseError::SyntaxError {
             file,

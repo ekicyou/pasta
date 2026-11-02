@@ -23,34 +23,6 @@ local function refused(act, event)
     return true
 end
 
---- 失敗: 表記とログの警告を出し、act:build() を返す（表記を出さない設定なら nil）
----@param act ShioriAct
----@param record FailureRecord
----@return string|nil
-local function fail(act, record)
-    FAILURE.report(act, record)
-    return act:build()
-end
-
---- ログの警告に出す引数の値（nil はそのまま、それ以外は引用符で囲む）
-local function quoted(value)
-    return value == nil and "nil" or ("'" .. tostring(value) .. "'")
-end
-
-local function is_name(value)
-    return type(value) == "string" and value ~= ""
-end
-
---- Reference0 が無い・空のときの失敗
-local function bad_reference0(act, event, value)
-    return fail(act, {
-        label = FAILURE.LABEL.BAD_NAME,
-        subject = event .. " Reference0",
-        detail = FAILURE.kind_of(value),
-        warning = event .. ": bad argument: Reference0=" .. quoted(value),
-    })
-end
-
 --- 引数: Reference1 から、値の無い最初の Reference の手前まで（文字列のまま。空も渡す）
 ---@param reference table<integer, string>
 ---@return string[] args, integer n
@@ -67,12 +39,12 @@ REG.OnPastaCallFunction = REG.OnPastaCallFunction or function(act)
     local event = "OnPastaCallFunction"
     if refused(act, event) then return nil end
     local name = act.req.reference[0]
-    if not is_name(name) then return bad_reference0(act, event, name) end
+    if not FAILURE.is_name(name) then return FAILURE.bad_reference0(act, event, name) end
 
     -- ＞名前 と同じ探し方（skip_methods は渡さない。act のメソッドにも届く）
     local handler = act:find_handler("scene", name)
     if type(handler) ~= "function" then
-        return fail(act, {
+        return FAILURE.reply(act, {
             label = FAILURE.LABEL.SCENE_NOT_FOUND,
             subject = event .. " ＞" .. name,
             warning = event .. ": handler not found: name='" .. name .. "'",
@@ -80,9 +52,8 @@ REG.OnPastaCallFunction = REG.OnPastaCallFunction or function(act)
     end
     local args, n = collect_args(act.req.reference)
     -- 呼び先はコルーチンの中で呼ぶ（区切っても続きが EVENT.fire の決まりで進む）。戻り値は捨てる
-    return coroutine.create(function(a)
+    return require("pasta.scene").wrap(function(a)
         handler(a, table.unpack(args, 1, n))
-        return a:build()
     end)
 end
 
@@ -119,18 +90,18 @@ REG.OnPastaSetSaveVariable = REG.OnPastaSetSaveVariable or function(act)
     local event = "OnPastaSetSaveVariable"
     if refused(act, event) then return nil end
     local name = act.req.reference[0]
-    if not is_name(name) then return bad_reference0(act, event, name) end
+    if not FAILURE.is_name(name) then return FAILURE.bad_reference0(act, event, name) end
 
     local subject = event .. " ＄＊" .. name
     -- 型の名前を Reference1 より先に見る
     local kind = act.req.reference[2]
     if kind == nil or kind == "" then kind = "string" end
     if not TYPES[kind] then
-        return fail(act, {
+        return FAILURE.reply(act, {
             label = FAILURE.LABEL.BAD_TYPE,
             subject = subject,
             detail = kind,
-            warning = event .. ": unknown type: name='" .. name .. "', Reference2=" .. quoted(kind),
+            warning = event .. ": unknown type: name='" .. name .. "', Reference2=" .. FAILURE.quoted(kind),
         })
     end
     local text = act.req.reference[1]
@@ -138,12 +109,12 @@ REG.OnPastaSetSaveVariable = REG.OnPastaSetSaveVariable or function(act)
     if label then
         -- 値は引用符で包まずにそのまま説明に出す（無い・空は種類の説明）
         local detail = text
-        if not is_name(text) then detail = FAILURE.kind_of(text) end
-        return fail(act, {
+        if not FAILURE.is_name(text) then detail = FAILURE.kind_of(text) end
+        return FAILURE.reply(act, {
             label = label,
             subject = subject,
             detail = detail,
-            warning = event .. ": " .. what .. ": name='" .. name .. "', Reference1=" .. quoted(text),
+            warning = event .. ": " .. what .. ": name='" .. name .. "', Reference1=" .. FAILURE.quoted(text),
         })
     end
     -- 名前は区切らず、予約変数も除かない。delete は value が nil なのでキーが消える。書き出しは終了時の自動保存に任せる

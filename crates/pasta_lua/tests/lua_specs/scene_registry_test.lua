@@ -86,11 +86,6 @@ describe("SCENE - シーンテーブルの create_word メタメソッド", func
 end)
 
 describe("SCENE - アクセサ", function()
-    test("get_global_name は __global_name__ を返す", function()
-        local tbl = SCENE.create_global_table("spec346_name")
-        expect(SCENE.get_global_name(tbl)):toBe("spec346_name")
-    end)
-
     test("get_start は __start__ シーン関数を返す（未登録は nil）", function()
         local start_fn = function() end
         SCENE.register("spec346_start", "__start__", start_fn)
@@ -223,5 +218,145 @@ describe("SCENE.co_exec", function()
         local ok, result = coroutine.resume(co, act)
         expect(ok):toBe(true)
         expect(result):toBeNil()
+    end)
+end)
+
+describe("SCENE.co_exec_exact", function()
+    --- @pasta_search を差し替えて fn を動かし、元に戻す
+    local function with_search(search, fn)
+        local saved_search = package.loaded["@pasta_search"]
+        package.loaded["@pasta_search"] = search
+        local ok, err = pcall(fn)
+        package.loaded["@pasta_search"] = saved_search
+        if not ok then error(err, 0) end
+    end
+
+    local search = {
+        search_scene_exact = function(_self, name, scope)
+            assert(scope == nil)
+            if name == "spec346_exact" then return "spec346_exact_1", "__start__" end
+            if name == "spec346_exact_unreg" then return "spec346_exact_unreg_1", "__start__" end
+            return nil
+        end,
+        search_local_scene_exact = function(_self, name, local_name)
+            if name ~= "spec346_exact" then return nil, "global" end
+            if local_name == "子" then return "spec346_exact_1", "子_1" end
+            if local_name == "未登録" then return "spec346_exact_1", "未登録_1" end
+            return nil, "local"
+        end,
+    }
+
+    test("包んだコルーチンは最初の再開の act と引数で関数を呼び、最後に組み立ての結果を返す", function()
+        local got = {}
+        SCENE.register("spec346_exact_1", "__start__", function(a, x, y)
+            got = { a = a, x = x, y = y }
+        end)
+        with_search(search, function()
+            local co, miss = SCENE.co_exec_exact("spec346_exact")
+            expect(type(co)):toBe("thread")
+            expect(miss):toBeNil()
+            local act = { build = function() return "BUILT" end }
+            local ok, result = coroutine.resume(co, act, "x1", "y1")
+            expect(ok):toBe(true)
+            expect(result):toBe("BUILT")
+            expect(got.a):toBe(act)
+            expect(got.x):toBe("x1")
+            expect(got.y):toBe("y1")
+            expect(coroutine.status(co)):toBe("dead")
+        end)
+    end)
+
+    test("ローカルを渡すと、その大域の中のローカルを包む", function()
+        local called = false
+        SCENE.register("spec346_exact_1", "子_1", function() called = true end)
+        with_search(search, function()
+            local co = SCENE.co_exec_exact("spec346_exact", "子")
+            coroutine.resume(co, { build = function() return nil end })
+            expect(called):toBe(true)
+        end)
+    end)
+
+    test("見つからなかった側を 2 つ目の値で返す", function()
+        with_search(search, function()
+            local co, miss = SCENE.co_exec_exact("spec346_none")
+            expect(co):toBeNil()
+            expect(miss):toBe("global")
+            co, miss = SCENE.co_exec_exact("spec346_exact_unreg")
+            expect(co):toBeNil()
+            expect(miss):toBe("global")
+            co, miss = SCENE.co_exec_exact("spec346_none", "子")
+            expect(co):toBeNil()
+            expect(miss):toBe("global")
+            co, miss = SCENE.co_exec_exact("spec346_exact", "無い")
+            expect(co):toBeNil()
+            expect(miss):toBe("local")
+            co, miss = SCENE.co_exec_exact("spec346_exact", "未登録")
+            expect(co):toBeNil()
+            expect(miss):toBe("local")
+        end)
+    end)
+
+    test("get_exact は関数を実行せずに返し、見つからなかった側は co_exec_exact と同じ", function()
+        local called = false
+        local fn = function() called = true end
+        SCENE.register("spec346_exact_1", "子_1", fn)
+        with_search(search, function()
+            expect(SCENE.get_exact("spec346_exact", "子")):toBe(fn)
+            expect(called):toBe(false)
+            local got, miss = SCENE.get_exact("spec346_none")
+            expect(got):toBeNil()
+            expect(miss):toBe("global")
+            got, miss = SCENE.get_exact("spec346_exact", "無い")
+            expect(got):toBeNil()
+            expect(miss):toBe("local")
+        end)
+    end)
+
+    test("co_exec_registered は関数でない値に nil を返す", function()
+        SCENE.register("spec346_exact_1", "値", "not a function")
+        expect(SCENE.co_exec_registered("spec346_exact_1", "値")):toBeNil()
+        expect(SCENE.co_exec_registered("spec346_exact_none", "__start__")):toBeNil()
+    end)
+end)
+
+describe("SCENE.wrap", function()
+    test("作るだけで関数は動かさない。再開で act と引数を渡し、関数の戻り値でなく組み立ての結果を返す", function()
+        local got
+        local co = SCENE.wrap(function(a, x)
+            got = { a = a, x = x }
+            return "IGNORED"
+        end)
+        expect(type(co)):toBe("thread")
+        expect(got):toBeNil()
+        local act = { build = function() return "BUILT" end }
+        local ok, result = coroutine.resume(co, act, 7)
+        expect(ok):toBe(true)
+        expect(result):toBe("BUILT")
+        expect(got.a):toBe(act)
+        expect(got.x):toBe(7)
+    end)
+
+    test("関数が区切ると、続きの再開の後に組み立てる", function()
+        local built = 0
+        local act = { build = function() built = built + 1; return "B" .. built end }
+        local co = SCENE.wrap(function() coroutine.yield("Y") end)
+        local _, first = coroutine.resume(co, act)
+        expect(first):toBe("Y")
+        expect(built):toBe(0)
+        local _, last = coroutine.resume(co)
+        expect(last):toBe("B1")
+        expect(coroutine.status(co)):toBe("dead")
+    end)
+end)
+
+describe("SCENE.register / create_scene - 全体のシーンの表", function()
+    test("register と create_scene は create_global_table と同じ表を使う", function()
+        local tbl = SCENE.create_global_table("spec346_shared_1")
+        SCENE.register("spec346_shared_1", "子", function() end)
+        expect(SCENE.get_global_table("spec346_shared_1")):toBe(tbl)
+        expect(tbl.__global_name__):toBe("spec346_shared_1")
+        local created = SCENE.create_scene("spec346_shared2")
+        expect(created):toBe(SCENE.get_global_table("spec346_shared2_1"))
+        expect(created.__global_name__):toBe("spec346_shared2_1")
     end)
 end)
