@@ -76,23 +76,26 @@ impl AnalysisEngine {
     /// 共有する状態を持たない純粋な関数。panic は包まない（wasm32 では
     /// trap になり、拡張の try/catch が受ける）。
     pub fn analyze(source: &str) -> AnalysisResult {
-        // Phase 0: Scan source lines for comment lines (AST does not preserve comments)
-        let mut raw_tokens = Self::scan_comment_lines(source);
-
+        let mut raw_tokens = Vec::new();
         // 受け取った文字のまま 1 回だけ解く（改行を補わない。保存時と同じ誤りを出す）
-        let diagnostics = match pasta_dsl::parse_str(source, "<lsp>") {
+        let (diagnostics, failed_lines) = match pasta_dsl::parse_str(source, "<lsp>") {
             Ok(pasta_file) => {
                 Self::visit_file_items(&pasta_file.items, source, &mut raw_tokens);
-                vec![]
+                (vec![], vec![])
             }
             Err(e) => {
                 // 色だけを部分解析の AST から作る（部分解析の誤りは読まない）
                 let partial = pasta_dsl::parse_str_partial(source);
                 Self::visit_file_items(&partial.items, source, &mut raw_tokens);
                 let finding = pasta_check::validate::syntax_finding("<lsp>", e);
-                vec![finding_to_diagnostic(&finding, source)]
+                (
+                    vec![finding_to_diagnostic(&finding, source)],
+                    partial.failed_lines,
+                )
             }
         };
+        let comments = Self::scan_comment_lines(source, &failed_lines, &raw_tokens);
+        raw_tokens.extend(comments);
 
         AnalysisResult {
             tokens: encode_tokens(&mut raw_tokens),
@@ -104,15 +107,36 @@ impl AnalysisEngine {
     // Comment Line Scanner
     // ========================================================================
 
-    /// Scan source text line-by-line to detect comment lines.
-    /// Comments start with `#` or `＃` (optionally preceded by whitespace).
-    /// The parser grammar treats these as silent `blank_line` rules, so they
-    /// don't appear in the AST.  We detect them here and emit COMMENT tokens.
-    fn scan_comment_lines(source: &str) -> Vec<RawToken> {
+    /// 行全体のコメント（`#`・`＃` で始まる行）を COMMENT にする。コメントは AST に
+    /// 残らないので文字から拾う。部分解析が解けなかった行（`failed_lines`・1 始まり・
+    /// 半開区間）と、コードブロックの本文の行は除く。本文の行は、走査が出した
+    /// CODE_BLOCK（フェンスの行に 1 つずつ）を行の順に 2 つずつ組にして決める。
+    fn scan_comment_lines(
+        source: &str,
+        failed_lines: &[std::ops::Range<usize>],
+        visited: &[RawToken],
+    ) -> Vec<RawToken> {
+        let mut fences: Vec<u32> = visited
+            .iter()
+            .filter(|t| t.token_type == token_type::CODE_BLOCK)
+            .map(|t| t.line)
+            .collect();
+        fences.sort_unstable();
+        let in_code_body = |line: u32| {
+            fences
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .any(|[open, close]| *open < line && line < *close)
+        };
+        let skipped = |line_idx: usize| {
+            failed_lines.iter().any(|r| r.contains(&(line_idx + 1)))
+                || in_code_body(line_idx as u32)
+        };
         let mut tokens = Vec::new();
         for (line_idx, line_text) in source.lines().enumerate() {
             let trimmed = line_text.trim_start();
-            if trimmed.starts_with('＃') || trimmed.starts_with('#') {
+            if !skipped(line_idx) && (trimmed.starts_with('＃') || trimmed.starts_with('#')) {
                 // Emit a COMMENT token for the entire line
                 let line_len = utf8_len_to_utf16(line_text);
                 if line_len > 0 {

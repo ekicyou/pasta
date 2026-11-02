@@ -269,3 +269,17 @@ fn test_legend_order_is_stable() {
     assert_eq!(token_type::ACTOR_NAME, 8, "codeBlock の直前は actorName(8)");
     assert_eq!(token_type::TALK, 10, "codeBlock の直後は talk(10)");
 }
+
+// ============================================================================
+// 観点5: Lua ブロックの中の `#`・`＃` で始まる行はコメントにしない（要件 4.5）
+// ============================================================================
+
+#[test]
+fn test_hash_line_inside_lua_block_is_not_comment() {
+    // 0: ＊ｓ / 1: ```lua / 2: # x / 3: ＃ y / 4: ``` / 5: ＃ 外
+    let source = "＊ｓ\n```lua\n# x\n＃ y\n```\n＃ 外\n";
+    let result = AnalysisEngine::analyze(source);
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+    let abs = decode_absolute(&result.tokens);
+    assert_eq!(lines_with_type(&abs, token_type::COMMENT), vec![5]);
+}
