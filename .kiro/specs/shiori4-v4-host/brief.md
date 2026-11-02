@@ -180,3 +180,7 @@ shiori4 の 0.1.0 が 2026-10-24 に出た（crates.io の `shiori4_abi`・`shio
 - **要件定義のモデル**: Opus（前のまま。`req.version` を入口の印に変えるのは Lua から見える値だが、案は 1 つに絞れている）。
 - **分割の案**: 要らない。20 を超えるなら、中の表現の作り直しを先の spec に分ける。
 - **見つけた穴・古くなった記述**: Current State の「`shiori4-v3-portable` が入れる（予定）」と基準の `c360adb2` は古い（入った）。Existing Spec Touchpoints の Adjacent に `shiori4-v3-portable`（完了。芯の型）が無い。SHIORI/2.x の開始行は、版 3 の口では 400 に決まった（`marshaling.rs` 138 行）。旧来の口で 2.x を受け続けるかは、残る議題。
+
+## 申し送り（ponytail-lua-debug を閉じた、2026-11-02）
+
+- 上の「先に要るもの」に挙げた `ponytail-lua-debug` は閉じた（roadmap の「統合して閉じたもの（2026-11-02）」）。`module_registry.rs` の重なりは無くなった。0.5.1 で DAP を捨てて、`pasta_lua/src/debug` の大半が消える見込みである。
