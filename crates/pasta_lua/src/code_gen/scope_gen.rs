@@ -33,16 +33,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Create actor — this is the scope definition HEADER line.
         // Source-map wiring (Requirements 1.1, 1.4, 1.5): record the actor scope's
         // `.pasta` span at the header `.lua` line so `span.start_line` (the `.pasta`
-        // `％アクター` definition header line) becomes a breakpoint target. Follows
-        // `generate_action`'s `out_line` delta-detection pattern.
+        // `％アクター` definition header line) becomes a breakpoint target.
         let out_line_before = self.out_line();
         self.writeln(&format!(
             "local ACTOR = PASTA.create_actor(\"{}\")",
             actor.name
         ))?;
-        if self.out_line() > out_line_before {
-            self.record_span(actor.span);
-        }
+        self.record_span_since(out_line_before, actor.span);
 
         // Generate word definitions (Requirement 2, actor-word-dictionary Task 3.1)
         // ACTOR:create_word() registers only in the actor word dictionary (STORE.actor_words, searched by
@@ -109,16 +106,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // This is the global scene definition HEADER line.
         // Source-map wiring (Requirements 1.1, 1.4, 1.5): record the global scene's
         // `.pasta` span at the header `.lua` line so `span.start_line` (the `.pasta`
-        // `＊シーン` definition header line) becomes a breakpoint target. Follows
-        // `generate_action`'s `out_line` delta-detection pattern.
+        // `＊シーン` definition header line) becomes a breakpoint target.
         let out_line_before = self.out_line();
         self.writeln(&format!(
             "local SCENE = PASTA.create_scene(\"{}\")",
             base_name
         ))?;
-        if self.out_line() > out_line_before {
-            self.record_span(scene.span);
-        }
+        self.record_span_since(out_line_before, scene.span);
 
         // Source-map scene recording (task 2.1, Requirements 3.1/3.3): flow the
         // global scene's deterministic join key + `.pasta` header span to the sink
@@ -239,13 +233,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Source-map wiring (Requirements 1.1, 1.4, 1.5): record the local scene's
         // `.pasta` span at the function header `.lua` line so `span.start_line` (the
         // `.pasta` `・シーン` definition header line, or the enclosing global scene
-        // header for the anonymous start scene) becomes a breakpoint target. Follows
-        // `generate_action`'s `out_line` delta-detection pattern.
+        // header for the anonymous start scene) becomes a breakpoint target.
         let out_line_before = self.out_line();
         self.writeln(&format!("function SCENE.{}(act, ...)", fn_name))?;
-        if self.out_line() > out_line_before {
-            self.record_span(scene.span);
-        }
+        self.record_span_since(out_line_before, scene.span);
         let fn_start = self.out_line;
 
         // Source-map scene recording (task 2.1): flow the local scene's deterministic
@@ -368,7 +359,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     /// Source-map wiring (Requirements 1.1, 1.4): records the choice's `.pasta`
     /// [`Span`](pasta_dsl::parser::Span) against the single output line it emits,
-    /// following `generate_action`'s `out_line` delta-detection pattern. Choice is a
+    /// via `record_span_since`. Choice is a
     /// branch construct (分岐), one of the major syntax kinds required by 1.4.
     fn generate_choice(
         &mut self,
@@ -379,9 +370,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         let display_lit = StringLiteralizer::literalize_with_span(display, &choice.span)?;
         let out_line_before = self.out_line();
         self.writeln(&format!("act:choice({}, {})", target_lit, display_lit))?;
-        if self.out_line() > out_line_before {
-            self.record_span(choice.span);
-        }
+        self.record_span_since(out_line_before, choice.span);
         Ok(())
     }
 
@@ -389,7 +378,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     /// Source-map wiring (Requirements 1.1, 1.4): records the cue command's `.pasta`
     /// [`Span`](pasta_dsl::parser::Span) against the single output line it emits,
-    /// following `generate_action`'s `out_line` delta-detection pattern. The `!select`
+    /// via `record_span_since`. The `!select`
     /// cue drives branch (分岐) timeout behavior, part of the major syntax kinds (1.4).
     fn generate_choice_timeout(
         &mut self,
@@ -410,9 +399,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         };
         let out_line_before = self.out_line();
         self.writeln(&format!("act:choice_timeout({})", arg))?;
-        if self.out_line() > out_line_before {
-            self.record_span(cmd.span);
-        }
+        self.record_span_since(out_line_before, cmd.span);
         Ok(())
     }
 }

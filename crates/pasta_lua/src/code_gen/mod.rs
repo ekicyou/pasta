@@ -104,23 +104,23 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         self.out_line
     }
 
-    /// Record `(out_line -> span)` if a sink is attached and the span is valid.
-    ///
-    /// Inert (no-op, zero-cost) when no sink is attached — the production default.
-    /// Invalid/default spans (`end_byte == 0`) are skipped so synthetic/headerless
-    /// output does not pollute the map.
+    /// The one recording rule for span-bearing elements (Requirement 6.3): if any
+    /// line was written since `before` (an earlier [`out_line`](Self::out_line)),
+    /// record `(out_line -> span)` for the last written line; otherwise record
+    /// nothing. Also skipped when no sink is attached (the production default) or
+    /// the span is invalid (`end_byte == 0`).
     ///
     /// # Coverage
     ///
-    /// Span-bearing constructs call this right after their `writeln`: scope
-    /// headers (actor / global scene / local scene), actions, var sets, calls,
-    /// choices, cue commands, and global / scene word definitions. Code blocks use
+    /// Scope headers (actor / global scene / local scene), actions, var sets,
+    /// calls, choices, cue commands, and word definitions. Code blocks use
     /// [`record_block_line`](Self::record_block_line) per content line instead. The
     /// post-transpile normalize line shift is applied by the consumer, using the
     /// [`LineShift`](crate::normalize::LineShift) returned by
     /// `LuaTranspiler::transpile_with_source_map`.
-    fn record_span(&mut self, span: Span) {
-        if let Some(sink) = self.source_map.as_deref_mut()
+    fn record_span_since(&mut self, before: u32, span: Span) {
+        if self.out_line > before
+            && let Some(sink) = self.source_map.as_deref_mut()
             && span.is_valid()
         {
             sink.record(self.out_line, span);
@@ -133,8 +133,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     /// Inert (no-op, zero-cost) when no sink is attached — the production default.
     /// Invalid/default spans (`end_byte == 0`) are skipped, mirroring
-    /// [`record_span`](Self::record_span), so synthetic/headerless scenes do not
-    /// pollute the scene index. Unlike `record_span`, this does NOT consume
+    /// [`record_span_since`](Self::record_span_since), so synthetic/headerless scenes do not
+    /// pollute the scene index. Unlike `record_span_since`, this does NOT consume
     /// `out_line`: the scene join is keyed by the `.pasta` span (header line range),
     /// not the emitted `.lua` line. The `scene_join_key` is built at the call site in
     /// `scope_gen.rs` (see its encoding doc) and must be reproducible at finalize
@@ -150,7 +150,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Record `(out_line -> pasta_line)` directly if a sink is attached.
     ///
     /// Inert (no-op, zero-cost) when no sink is attached — the production default.
-    /// Unlike [`record_span`](Self::record_span), this maps the most recently
+    /// Unlike [`record_span_since`](Self::record_span_since), this maps the most recently
     /// emitted output line to an explicit 1-based `.pasta` line rather than a span's
     /// `start_line`. It is the per-line mapping primitive used by multi-line elements
     /// whose output lines correspond 1:1 to distinct `.pasta` source lines — chiefly
@@ -160,7 +160,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// `pasta_line` must be 1-based. Callers compute it as
     /// `block.span.start_line + offset` (see `generate_code_block`). A `0` value is
     /// treated as invalid and skipped, mirroring the `span.is_valid()` guard in
-    /// `record_span` (the default/uninitialized line is not recorded).
+    /// `record_span_since` (the default/uninitialized line is not recorded).
     fn record_block_line(&mut self, pasta_line: u32) {
         if let Some(sink) = self.source_map.as_deref_mut()
             && pasta_line > 0
@@ -396,26 +396,47 @@ mod tests {
         );
     }
 
-    /// `record_span` guard: with a sink attached, an invalid span
+    /// `record_span_since` guard: with a sink attached, an invalid span
     /// (`end_byte == 0`, e.g. `Span::default()`) is skipped; a valid span is
     /// recorded against the current `out_line` using its `start_line`.
     #[test]
-    fn record_span_skips_invalid_span_and_records_valid_span() {
+    fn record_span_since_skips_invalid_span_and_records_valid_span() {
         let mut sink = CapturingSink::default();
         let mut output = Vec::new();
         {
             let mut cg = LuaCodeGenerator::new(&mut output);
             cg.set_source_map(&mut sink);
             cg.writeln("line1").unwrap();
-            cg.record_span(Span::default()); // invalid: end_byte == 0 -> skipped
+            cg.record_span_since(0, Span::default()); // invalid: end_byte == 0 -> skipped
             cg.writeln("line2").unwrap();
-            cg.record_span(Span::new(7, 1, 7, 5, 10, 20)); // valid
+            cg.record_span_since(1, Span::new(7, 1, 7, 5, 10, 20)); // valid
         }
         assert_eq!(
             sink.records,
             vec![(2, 7)],
             "only the valid span is recorded, mapped to out_line 2 -> pasta line 7"
         );
+    }
+
+    /// `record_span_since` rule (Requirement 6.3): nothing written since
+    /// `before` -> no record (a pending blank line is not a write); several lines
+    /// written -> the last written line is recorded.
+    #[test]
+    fn record_span_since_records_last_line_only_when_lines_were_written() {
+        let span = Span::new(4, 1, 4, 5, 10, 20);
+        let mut sink = CapturingSink::default();
+        let mut output = Vec::new();
+        {
+            let mut cg = LuaCodeGenerator::new(&mut output);
+            cg.set_source_map(&mut sink);
+            cg.writeln("a").unwrap();
+            let before = cg.out_line();
+            cg.write_blank_line().unwrap();
+            cg.record_span_since(before, span); // only a pending blank -> skipped
+            cg.write_raw("b\nc\n").unwrap(); // flushes the blank: lines 2..=4
+            cg.record_span_since(before, span);
+        }
+        assert_eq!(sink.records, vec![(4, 4)]);
     }
 
     /// `record_block_line` guard: `pasta_line == 0` is skipped; a positive
@@ -434,7 +455,7 @@ mod tests {
         assert_eq!(sink.records, vec![(1, 9)]);
     }
 
-    /// Without a sink attached, `record_span` / `record_block_line` are inert:
+    /// Without a sink attached, `record_span_since` / `record_block_line` are inert:
     /// no panic, and the emitted bytes are unaffected.
     #[test]
     fn recording_without_sink_is_inert() {
@@ -442,7 +463,7 @@ mod tests {
         {
             let mut cg = LuaCodeGenerator::new(&mut output);
             cg.writeln("a").unwrap();
-            cg.record_span(Span::new(1, 1, 1, 2, 0, 5));
+            cg.record_span_since(0, Span::new(1, 1, 1, 2, 0, 5));
             cg.record_block_line(3);
         }
         assert_eq!(String::from_utf8(output).unwrap(), "a\n");

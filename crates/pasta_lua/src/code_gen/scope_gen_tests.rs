@@ -334,7 +334,7 @@ fn non_select_cue_command_emits_nothing() {
 //
 // `generate_global_scene` / `generate_local_scene` must funnel each scene's
 // deterministic join key + `.pasta` span to the sink via `record_scene`,
-// adjacent to the existing `record_span` header recording. The join_key encoding
+// adjacent to the existing `record_span_since` header recording. The join_key encoding
 // (see scope_gen.rs `record_scene_span` doc) carries: global/local kind + nesting
 // level, the parent-global reference for locals, and per-base occurrence order
 // (globals' occurrence == runtime `create_scene` counter order). The captured

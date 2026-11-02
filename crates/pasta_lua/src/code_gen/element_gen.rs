@@ -57,11 +57,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Global: `save.変数名 = 値`
     ///
     /// Source-map wiring (Requirements 1.1, 1.3): records the assignment's `.pasta`
-    /// [`Span`] against the output line(s) it emits, following `generate_action`'s
-    /// `out_line` delta-detection pattern. Every branch emits exactly one line, but
-    /// the delta check makes recording robust to non-emitting paths (e.g. the error
-    /// branch). The `Property` branch delegates to `generate_property_set`, which is
-    /// covered by the same surrounding delta.
+    /// [`Span`] against the output line it emits via
+    /// [`record_span_since`](Self::record_span_since). The `Property` branch
+    /// delegates to `generate_property_set`, covered by the same `before` mark.
     pub fn generate_var_set(&mut self, var_set: &VarSet) -> Result<(), TranspileError> {
         let out_line_before = self.out_line();
         match &var_set.name {
@@ -72,9 +70,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     }
                     VarScope::Property => {
                         self.generate_property_set(name, &var_set.value)?;
-                        if self.out_line() > out_line_before {
-                            self.record_span(var_set.span);
-                        }
+                        self.record_span_since(out_line_before, var_set.span);
                         return Ok(());
                     }
                     VarScope::Args(_) => {
@@ -97,9 +93,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         "{} = act:get_property({})",
                         var_path, prop_literal
                     ))?;
-                    if self.out_line() > out_line_before {
-                        self.record_span(var_set.span);
-                    }
+                    self.record_span_since(out_line_before, var_set.span);
                     return Ok(());
                 }
 
@@ -158,9 +152,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         // Record the (out_line -> span) correspondence for the line just emitted
         // (Requirement 1.1). Skipped when no line was emitted or no sink is attached.
-        if self.out_line() > out_line_before {
-            self.record_span(var_set.span);
-        }
+        self.record_span_since(out_line_before, var_set.span);
 
         Ok(())
     }
@@ -208,8 +200,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// `<key>` is `"名前"` (static) or `act:call_key(…)` (dynamic, see [`Self::call_key`]).
     ///
     /// Source-map wiring (Requirement 1.1): records the call's `.pasta` [`Span`]
-    /// against the single output line it emits, following `generate_action`'s
-    /// `out_line` delta-detection pattern.
+    /// against the single output line it emits via
+    /// [`record_span_since`](Self::record_span_since).
     pub(super) fn generate_call_scene(
         &mut self,
         call_scene: &CallScene,
@@ -248,9 +240,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         // Record the (out_line -> span) correspondence for the line just emitted
         // (Requirement 1.1).
-        if self.out_line() > out_line_before {
-            self.record_span(call_scene.span);
-        }
+        self.record_span_since(out_line_before, call_scene.span);
 
         Ok(())
     }
@@ -323,11 +313,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     /// Source-map seam (R4): this is the representative span-bearing path. The
     /// action's `.pasta` [`Span`](pasta_dsl::parser::Span) is recorded against the
-    /// generated Lua line via [`record_span`](Self::record_span) when a sink is
-    /// attached (otherwise inert / byte-identical). Every variant emits exactly one
-    /// line except the rare empty-escape case, so we detect actual emission by the
-    /// `out_line` delta before recording, ensuring the span maps to the line that was
-    /// actually written.
+    /// generated Lua line via [`record_span_since`](Self::record_span_since) when a
+    /// sink is attached (otherwise inert / byte-identical). Every variant emits
+    /// exactly one line except the rare empty-escape case, which records nothing.
     pub fn generate_action(&mut self, action: &Action, actor: &str) -> Result<(), TranspileError> {
         let span = action_span(action);
         let out_line_before = self.out_line();
@@ -442,13 +430,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             }
         }
 
-        // Record the (out_line -> span) correspondence for the line(s) just emitted.
-        // Skipped automatically when no line was emitted (empty escape) or no sink is
-        // attached. `record_span` uses the current `out_line`, which now points at the
-        // last line written by this action.
-        if self.out_line() > out_line_before {
-            self.record_span(span);
-        }
+        // Record the (out_line -> span) correspondence for the last line just emitted.
+        // Skipped when no line was emitted (empty escape) or no sink is attached.
+        self.record_span_since(out_line_before, span);
 
         Ok(())
     }
@@ -475,7 +459,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     pub fn generate_code_block(&mut self, block: &CodeBlock) -> Result<(), TranspileError> {
         // The opening fence occupies `span.start_line`; content starts on the next
         // line. `+ 1` skips the fence; `+ offset` walks each content line. Only map
-        // when the span is valid, mirroring `record_span`'s guard so default/
+        // when the span is valid, mirroring `record_span_since`'s guard so default/
         // synthetic spans (start_line == 0) do not pollute the map.
         let content_start_line = if block.span.is_valid() {
             block.span.start_line as u32 + 1
@@ -509,7 +493,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Source-map wiring (Requirements 1.1, 1.3): one `.pasta` word definition with
     /// multiple key names emits one `.lua` line per name; ALL of those output lines
     /// map to the same definition `.pasta` [`Span`]. Recording happens per emitted
-    /// line (following `generate_action`'s per-line delta pattern), so every line is
+    /// line (one `record_span_since` per name), so every line is
     /// covered, not just the last.
     pub(super) fn generate_word_definition(
         &mut self,
@@ -539,9 +523,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             ))?;
             // Map this output line to the word definition's `.pasta` span. Every name
             // line maps to the same span (Requirement 1.3).
-            if self.out_line() > out_line_before {
-                self.record_span(word.span);
-            }
+            self.record_span_since(out_line_before, word.span);
         }
 
         Ok(())

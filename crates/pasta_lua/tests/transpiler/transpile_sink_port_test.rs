@@ -3,7 +3,7 @@
 //! 仕様参照:
 //! - requirements.md **1.1**: ソースマップ生成が有効である時、生成 `.lua` 行に由来 `.pasta`
 //!   位置を記録する（本タスクは「sink を transpile へ届ける口」を確立し、既存
-//!   `generate_action` の `record_span` 配線が提供 sink へ記録されることを実証する）。
+//!   `generate_action` の `record_span_since` 配線が提供 sink へ記録されることを実証する）。
 //! - requirements.md **3.1**: 構築したソースマップをメモリ内に保持し、ディスク中間
 //!   ファイルを必須としない（sink はメモリ内構造へ記録する `&mut dyn SourceMapSink`）。
 //! - requirements.md **7.1**: ソースマップ生成が無効（sink 非装着）である時、生成 `.lua`
@@ -53,7 +53,7 @@ impl SourceMapSink for CapturingSink {
     }
 }
 
-/// トーク（アクション）を含む代表 `.pasta`。`generate_action` の record_span 配線を踏む。
+/// トーク（アクション）を含む代表 `.pasta`。`generate_action` の record_span_since 配線を踏む。
 const TALK_FIXTURE: &str = "\
 ＊メイン
   さくら：「こんにちは」
