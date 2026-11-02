@@ -73,7 +73,7 @@ const _: fn() = || {
 ///
 /// 弱い参照なので、kick の送り先（VM が持つ）が mailbox の受け口を生かし続けない。
 /// インスタンスが送信端を手放した後は送れず、診断ログ（`seam = "kick.drop"`）を残して捨てる。
-fn kick_sink_for(tx: &Sender<ActorMsg>) -> KickSink {
+pub fn kick_sink_for(tx: &Sender<ActorMsg>) -> KickSink {
     let weak = tx.downgrade();
     Arc::new(move |req: KickRequest| {
         let sent = weak.upgrade().is_some_and(|tx| {
@@ -229,11 +229,6 @@ impl ActorInstance {
         marshal_notify(&self.tx, self.next_request(req))
     }
 
-    /// kick を積む。送れなければ（アクターが居ない・満杯）偽を返す。
-    pub fn kick(&self, scene: String) -> bool {
-        self.tx.try_send(ActorMsg::Kick { scene }).is_ok()
-    }
-
     /// Stop を送って ack を待つだけ（スレッドには触れない）。二度目は `already_done`。
     pub fn request_stop(&self) -> TeardownReport {
         teardown_via_sender(&self.tx, TEARDOWN_TIMEOUT)
@@ -311,15 +306,20 @@ mod tests {
         );
     }
 
-    /// 起こしたインスタンスの kick は、アクターが居る間は送れて真、片付けた後は送れずに偽。
+    /// 起こしたインスタンスの送信端は、アクターが居る間は kick を送れ、片付けた後は送れない。
     #[test]
-    fn instance_kick_true_while_running_false_after_stop() {
+    fn instance_sender_accepts_kick_while_running_not_after_stop() {
         let dir = tempfile::tempdir().expect("tempdir");
         let instance = ActorInstance::spawn(0, dir.path().to_path_buf()).expect("spawn");
         assert_eq!(instance.load_dir(), dir.path());
 
         assert!(
-            instance.kick("OnTestScene".into()),
+            instance
+                .tx
+                .try_send(ActorMsg::Kick {
+                    scene: "OnTestScene".into()
+                })
+                .is_ok(),
             "kick must be sent while the actor runs"
         );
 
@@ -327,7 +327,12 @@ mod tests {
         assert!(report.acked, "request_stop must be acked: {report:?}");
         assert!(!report.joined, "request_stop does not touch the thread");
         assert!(
-            !instance.kick("OnLate".into()),
+            instance
+                .tx
+                .try_send(ActorMsg::Kick {
+                    scene: "OnLate".into()
+                })
+                .is_err(),
             "kick must fail after the actor stopped"
         );
 

@@ -5,9 +5,9 @@
 //! # 何を貫通実証するか（actor/SHIORI レベルの観測可能な特性化）
 //! 既存の Lua ユニット（`virtual_dispatcher_kick_force_test.lua`＝force ワンショット、
 //! `virtual_dispatcher_kick_hook_test.lua`＝preempt、`actor_kick_test.rs`＝last-wins）を、
-//! **実 sink→LEGACY→executor→Lua→OnSecondChange の全経路上で観測可能な応答さくらスクリプト
-//! として固定**する。3 つの独立シナリオを 1 本の `#[test]` に直列に詰める（`static LEGACY`
-//! はプロセスグローバルゆえ 6.1/7.2 と同方針で別バイナリ・単一テスト）:
+//! **本番の送り先（`kick_sink_for`）→mailbox→executor→Lua→OnSecondChange の全経路上で観測可能な応答さくらスクリプト
+//! として固定**する。3 つの独立シナリオを 1 本の `#[test]` に直列に詰める（6.1/7.2 と同方針で
+//! 別バイナリ・単一テスト）:
 //!
 //!  1. **preempt-and-abort（R5.1/5.2/5.3）**: 進行中のマルチビート会話（前シーン）を走らせて
 //!     初回ビートを出させ、後続ビートを `co_scene` に残す → 別シーンをキック → キックシーンの
@@ -28,8 +28,13 @@
 
 use std::path::{Path, PathBuf};
 
-use pasta::actor::lifecycle::{marshal_request, spawn_actor, teardown_actor};
-use pasta_lua::debug::KickRequest;
+use flume::Sender;
+use pasta::actor::instance::{TEARDOWN_TIMEOUT, kick_sink_for};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
+use pasta::actor::marshaling::marshal_get;
+use pasta::actor::teardown::teardown_via_sender;
+use pasta::actor::thread::{ActorThread, spawn_actor_thread_with};
+use pasta_lua::debug::{KickRequest, KickSink};
 use tempfile::TempDir;
 
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前に中和する
@@ -206,22 +211,22 @@ fn pasta_time_at(offset_secs: i64) -> String {
     format!("2025-07-15T12:{min:02}:{sec:02}Z")
 }
 
-/// OnSecondChange GET を `marshal_request`（FFI `request` 相当・同一 FIFO）経由で送る。
+/// OnSecondChange GET を自分の mailbox へ `marshal_get` で送る（kick と同じ FIFO）。
 /// `X-Pasta-Time` で `req.date` を決定論的に固定し、`Status` を呼び出し側指定にする。
-fn on_second_change(status: &str, offset_secs: i64) -> String {
+fn on_second_change(tx: &Sender<ActorMsg>, status: &str, offset_secs: i64) -> String {
     let when = pasta_time_at(offset_secs);
-    marshal_request(&normalize_request(&format!(
+    let req = normalize_request(&format!(
         "GET SHIORI/3.0\nCharset: UTF-8\nSender: SSP\nSecurityLevel: local\n\
          Status: {status}\nID: OnSecondChange\nReference0: 1\nX-Pasta-Time: {when}\n",
-    )))
+    ));
+    marshal_get(tx, MailboxRequest::new(0, req))
 }
 
 /// キック注入（実 sink＝`pasta/playScene` inbound ハンドラと同一クロージャ）。
 ///
 /// キックはシーン表の登録名に完全一致で引くため、作者が書いた名前ではなく登録名
 /// （1 個目の定義＝作者名・`_`・通し番号 `1`）を載せる。
-fn kick(scene: &str) {
-    let sink = pasta::actor::lifecycle::kick_sink();
+fn kick(sink: &KickSink, scene: &str) {
     sink(KickRequest {
         scene: format!("{scene}_1"),
     });
@@ -232,23 +237,40 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
     haystack.matches(needle).count()
 }
 
+/// 自分の mailbox でアクタースレッドを起こし、本番と同じ送り先（`kick_sink_for`）を VM へ渡す。
+/// 返す送り先は VM が持つものと同じで、DAP の inbound が呼ぶのと同じ道でアクターの `Kick` 腕へ届く。
+fn start_actor(load_dir: PathBuf) -> (Sender<ActorMsg>, KickSink, ActorThread) {
+    let (tx, rx) = mailbox();
+    let sink = kick_sink_for(&tx);
+    let thread = spawn_actor_thread_with(0, load_dir, rx, Some(sink.clone()), None)
+        .expect("actor thread must spawn");
+    assert!(
+        thread.loaded(),
+        "the hello-pasta ghost VM must load on the actor thread"
+    );
+    (tx, sink, thread)
+}
+
+/// Stop の ack を受けてから join する（ack の後のスレッドは約束を待つだけなので止まらない）。
+fn stop_actor(tx: &Sender<ActorMsg>, thread: ActorThread) {
+    let report = teardown_via_sender(tx, TEARDOWN_TIMEOUT);
+    assert!(report.acked, "teardown must be acked: {report:?}");
+    thread.join().expect("actor thread must not panic");
+}
+
 /// task 7.3: preempt-and-abort と割り込みゲートを 1 本貫通で特性化する E2E 結合テスト。
 ///
-/// 単一テスト・全シナリオ直列（`static LEGACY` 共有のため）。
+/// 単一テスト・全シナリオ直列。
 #[test]
 fn kick_preempt_and_force_gate_end_to_end() {
     let (load_dir, _temp) = build_preempt_kick_ghost_dir();
 
-    // --- load（spawn_actor＝FFI load 相当・kick_sink 束縛＋LEGACY store） ---
-    let loaded = spawn_actor(0, load_dir.clone());
-    assert!(
-        loaded,
-        "spawn_actor must load the hello-pasta ghost VM on the actor thread"
-    );
+    // --- load（自分の mailbox・本番の送り先を VM へ渡す） ---
+    let (tx, sink, thread) = start_actor(load_dir.clone());
 
     // --- init OnSecondChange（dispatcher 内部タイマ初期化・next_talk_time 設定） ---
     // status=idle・基準時刻 12:10:00。ここで next_talk_time = base + TALK_INTERVAL が設定される。
-    let _init = on_second_change("idle", 0);
+    let _init = on_second_change(&tx, "idle", 0);
 
     // =====================================================================
     // シナリオ 1: preempt-and-abort（R5.1/5.2/5.3）
@@ -258,11 +280,11 @@ fn kick_preempt_and_force_gate_end_to_end() {
     // =====================================================================
 
     // 前シーンをキック注入。
-    kick(PREV_SCENE);
+    kick(&sink, PREV_SCENE);
 
     // tick: 前シーン初回ビートが配信され、後続ビートは co_scene に残る（idle で継続を許す）。
     // base+10 >= next_talk_time(base+10)。
-    let s1_prev1 = on_second_change("idle", 10);
+    let s1_prev1 = on_second_change(&tx, "idle", 10);
     assert!(
         s1_prev1.contains("SHIORI/3.0 200 OK"),
         "scenario1: prev scene first beat must be delivered as 200 OK.\nactual: {s1_prev1:?}"
@@ -279,11 +301,11 @@ fn kick_preempt_and_force_gate_end_to_end() {
     );
 
     // ここで別シーンをキック → 進行中の前 co_scene を preempt（set_co_scene 置換）。
-    kick(PREEMPT_SCENE);
+    kick(&sink, PREEMPT_SCENE);
 
     // tick: キックシーンの単一ビートが割り込み配信され、前シーン後続ビートは出ない。
     // base+20 >= next_talk_time（前 tick で更新済み）。
-    let s1_new = on_second_change("idle", 20);
+    let s1_new = on_second_change(&tx, "idle", 20);
     assert!(
         s1_new.contains("SHIORI/3.0 200 OK"),
         "scenario1: preempting kick beat must be delivered as 200 OK.\nactual: {s1_new:?}"
@@ -303,7 +325,7 @@ fn kick_preempt_and_force_gate_end_to_end() {
     // preempt-and-abort（自動復帰なし）の中核 assert: 以後どの tick でも前シーンの
     // 後続ビートは再出しない（前 co_scene は不到達・自動復帰されない）。
     for (i, off) in [30_i64, 40, 50].iter().enumerate() {
-        let resp = on_second_change("idle", *off);
+        let resp = on_second_change(&tx, "idle", *off);
         assert_eq!(
             count_occurrences(&resp, PREV_BEATS[1]),
             0,
@@ -326,11 +348,11 @@ fn kick_preempt_and_force_gate_end_to_end() {
     //  その後 idle にすると継続が進む（対比）。
     // =====================================================================
 
-    kick(FORCE_SCENE);
+    kick(&sink, FORCE_SCENE);
 
     // tick1: talking でも kick_force ワンショットで初回ビート割り込み配信。
     // base+60。
-    let s2_t1 = on_second_change("talking", 60);
+    let s2_t1 = on_second_change(&tx, "talking", 60);
     assert!(
         s2_t1.contains("SHIORI/3.0 200 OK"),
         "scenario2: force first beat must break through talking as 200 OK.\nactual: {s2_t1:?}"
@@ -349,7 +371,7 @@ fn kick_preempt_and_force_gate_end_to_end() {
     // tick2: talking のまま・時刻は next_talk_time を跨ぐ（base+80 >= 前 tick 更新の base+70）。
     // kick_force は消費済みなので talking が通常どおりブロック → 後続ビートは出ない。
     // （force が消費されていなければここで継続ビートが割り込み配信され落ちる＝load-bearing）。
-    let s2_t2 = on_second_change("talking", 80);
+    let s2_t2 = on_second_change(&tx, "talking", 80);
     assert_eq!(
         count_occurrences(&s2_t2, FORCE_BEATS[1]),
         0,
@@ -364,7 +386,7 @@ fn kick_preempt_and_force_gate_end_to_end() {
 
     // tick3: idle へ切り替えると通常ペースで継続が進み、2 ビート目が配信される（対比）。
     // base+100 >= next_talk_time（前 tick で base+80+10=base+90 に更新済み）。
-    let s2_t3 = on_second_change("idle", 100);
+    let s2_t3 = on_second_change(&tx, "idle", 100);
     assert!(
         s2_t3.contains("SHIORI/3.0 200 OK"),
         "scenario2: continuation must resume once idle as 200 OK.\nactual: {s2_t3:?}"
@@ -383,7 +405,7 @@ fn kick_preempt_and_force_gate_end_to_end() {
 
     // 直前シナリオの継続 co_scene を消化しておく（次 tick で取り違えないよう idle で空にする）。
     // FORCE_SCENE は 2 ビートで tick3 までに消費済み。base+120 でクリーンな通常応答（キック無し）。
-    let s3_drain = on_second_change("idle", 120);
+    let s3_drain = on_second_change(&tx, "idle", 120);
     assert_eq!(
         count_occurrences(&s3_drain, FORCE_BEATS[0]) + count_occurrences(&s3_drain, FORCE_BEATS[1]),
         0,
@@ -392,12 +414,12 @@ fn kick_preempt_and_force_gate_end_to_end() {
 
     // A をキック直後に B をキック（同一 OnSecondChange より前・dispatch 未実行）。
     // kick_pending は last-wins で B に上書きされる。
-    kick(LASTWINS_A_SCENE);
-    kick(LASTWINS_B_SCENE);
+    kick(&sink, LASTWINS_A_SCENE);
+    kick(&sink, LASTWINS_B_SCENE);
 
     // 次 tick: B の beat が出て A は出ない（A は co_scene に据えられず preempt）。
     // base+130 >= next_talk_time。
-    let s3 = on_second_change("idle", 130);
+    let s3 = on_second_change(&tx, "idle", 130);
     assert!(
         s3.contains("SHIORI/3.0 200 OK"),
         "scenario3: last kick (B) beat must be delivered as 200 OK.\nactual: {s3:?}"
@@ -414,7 +436,7 @@ fn kick_preempt_and_force_gate_end_to_end() {
     );
 
     // A は以後どの tick でも起動しない（kick_pending 上書きで完全に preempt・自動復帰なし）。
-    let s3_after = on_second_change("idle", 140);
+    let s3_after = on_second_change(&tx, "idle", 140);
     assert_eq!(
         count_occurrences(&s3_after, LASTWINS_A_BEAT),
         0,
@@ -422,5 +444,5 @@ fn kick_preempt_and_force_gate_end_to_end() {
     );
 
     // --- 後始末: teardown ---
-    let _ = teardown_actor();
+    stop_actor(&tx, thread);
 }

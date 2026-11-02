@@ -10,10 +10,9 @@
 //!   [`ActorInstance`] を起こして置き場へ入れる。
 //! - [`marshal_request`]: 置き場の芯の型へ要求を渡す。空なら 204（SHIORI スレッドを待たせない）。
 //! - [`teardown_actor`]: 置き場から取り出して後始末する（ack の後に join・7.6）。空なら冪等の no-op。
-//! - [`kick_sink`]: 置き場の芯の型へ kick を積む送り先。空なら `kick.drop` の診断ログで捨てる。
 //!
 //! # 送信の道にロックを置かない
-//! 置き場は [`ArcSwapOption`] で、送信の道（[`marshal_request`]・[`kick_sink`]）は `load_full()`
+//! 置き場は [`ArcSwapOption`] で、送信の道（[`marshal_request`]）は `load_full()`
 //! で `Arc` を写すだけである。差し替え（[`spawn_actor`]・[`teardown_actor`]）だけが `store`／`swap`
 //! する。VM はアクタースレッドから出ず、越境するのは `Send + Sync` な [`ActorInstance`] だけ。
 
@@ -22,7 +21,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use arc_swap::ArcSwapOption;
-use pasta_lua::debug::{KickRequest, KickSink};
 
 use crate::actor::instance::{ActorInstance, ClaimMode, TEARDOWN_TIMEOUT};
 use crate::actor::marshaling::default_204;
@@ -121,32 +119,6 @@ fn teardown_slot(slot: &ArcSwapOption<ActorInstance>, timeout: Duration) -> Tear
     }
 }
 
-/// 置き場の芯の型へ kick を積む。送れなければ診断ログ（`seam = "kick.drop"`）を残して偽。
-fn kick_into(slot: &ArcSwapOption<ActorInstance>, req: KickRequest) -> bool {
-    let sent = slot
-        .load_full()
-        .is_some_and(|instance| instance.kick(req.scene.clone()));
-    if !sent {
-        tracing::debug!(
-            seam = "kick.drop",
-            scene = %req.scene,
-            "kick dropped: legacy slot empty or mailbox full/disconnected -> discarded"
-        );
-    }
-    sent
-}
-
-/// 置き場の `ActorInstance` へ kick を積む窓口（試験と互換のために残す）。
-///
-/// 本番の kick は各 `ActorInstance` が自分の送り先（`kick_sink_for`）で受けるので、ここは通らない。
-///
-/// クロージャは [`LEGACY`]（`'static`）だけに頼るので `'static` かつ `Send + Sync`。
-pub fn kick_sink() -> KickSink {
-    Arc::new(|req| {
-        kick_into(&LEGACY, req);
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,19 +145,6 @@ mod tests {
         );
     }
 
-    /// 置き場が空のときの kick は panic せず送らない（片付けとの競合）。
-    #[test]
-    fn kick_on_empty_slot_is_noop() {
-        let slot: ArcSwapOption<ActorInstance> = ArcSwapOption::const_empty();
-        assert!(!kick_into(
-            &slot,
-            KickRequest {
-                scene: "OnTestScene".into(),
-            }
-        ));
-        assert!(slot.load().is_none(), "kick must not fill the slot");
-    }
-
     /// アクター無しの後始末は冪等の no-op（ハングなし）。
     #[test]
     fn teardown_without_actor_is_idempotent_noop() {
@@ -199,30 +158,17 @@ mod tests {
         }
     }
 
-    /// 実際に起こした芯の型を置き場に入れると kick が届き、後始末で置き場が空になると
-    /// 届かなくなる。二度目の後始末は冪等の no-op。
+    /// 実際に起こした芯の型を置き場に入れると、後始末で ack の後に join して置き場が空になる。
+    /// 二度目の後始末は冪等の no-op。
     #[test]
-    fn kick_reaches_real_instance_until_teardown() {
+    fn teardown_real_instance_empties_slot() {
         let dir = tempfile::tempdir().expect("tempdir");
         let instance = ActorInstance::spawn(0, dir.path().to_path_buf()).expect("spawn");
         let slot = ArcSwapOption::from_pointee(instance);
 
-        assert!(kick_into(
-            &slot,
-            KickRequest {
-                scene: "OnTestScene".into(),
-            }
-        ));
-
         let report = teardown_slot(&slot, TEARDOWN_TIMEOUT);
         assert!(report.acked && report.joined, "{report:?}");
         assert!(slot.load().is_none(), "teardown must empty the slot");
-        assert!(!kick_into(
-            &slot,
-            KickRequest {
-                scene: "OnLate".into(),
-            }
-        ));
 
         let report = teardown_slot(&slot, TEARDOWN_TIMEOUT);
         assert!(report.already_done && !report.acked, "{report:?}");
@@ -238,7 +184,10 @@ mod tests {
 
         let report = teardown_slot(&slot, TEARDOWN_TIMEOUT);
         assert!(report.acked && !report.joined, "{report:?}");
-        assert!(!in_flight.kick("OnLate".into()), "actor must be stopped");
+        assert!(
+            in_flight.request_stop().already_done,
+            "actor must be stopped"
+        );
         // 最後の参照の Drop で手放す（Stop 済みなので待たずに返る）。
         drop(in_flight);
     }
