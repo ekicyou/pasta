@@ -81,7 +81,7 @@ function decodeEntities(s) {
 }
 
 // =========================================================================
-// fixture HTML（mdBook v0.5.3 実出力形を再現）。
+// fixture HTML（mdBook v0.5.4 実出力形を再現）。
 //   - pasta ブロック A: コメント・マーカー・シーン・アクター・単語参照・Call・変数。
 //   - pasta ブロック B: 入れ子 ```lua（function/local/end・`&gt;=` 比較演算子）。
 //   - 非 pasta: language-rust ブロック・無指定 <code> ブロック・インライン <code>。
@@ -317,6 +317,30 @@ async function run() {
       `exit=${exitCode}`);
     check('6.2: 非ゼロ終了時に stderr へ診断を出力', stderr.length > 0,
       `stderr=${JSON.stringify(stderr.slice(0, 120))}`);
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // 着色 0 件で止める（7.1）: language-pasta の無い HTML だけのフォルダで CLI が非ゼロ終了。
+  // -----------------------------------------------------------------------
+  {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hl-zero-'));
+    fs.writeFileSync(path.join(tmp, 'index.html'),
+      '<html><body><pre><code class="language-rust">fn f() {}\n</code></pre></body></html>', 'utf8');
+    let exitCode = 0;
+    let stderr = '';
+    try {
+      execFileSync(process.execPath, [path.join(here, 'highlight-html.mjs'), tmp],
+        { stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (e) {
+      exitCode = e.status == null ? -1 : e.status;
+      stderr = e.stderr ? e.stderr.toString() : '';
+    }
+    check('7.1: language-pasta が 0 件のフォルダで CLI が非ゼロ終了', exitCode !== 0,
+      `exit=${exitCode}`);
+    check('7.1: 0 件で終わるとき stderr へ理由を出力', stderr.length > 0,
+      `stderr=${JSON.stringify(stderr.slice(0, 120))}`);
+    fs.rmSync(tmp, { recursive: true, force: true });
   }
   log('');
 

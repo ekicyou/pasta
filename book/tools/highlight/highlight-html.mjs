@@ -262,6 +262,11 @@ if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1])))
     const { filesProcessed, blocksColored, files } = hl.highlightHtmlFiles(dir);
     console.log(`highlight-html: scanned ${files.length} html file(s) under ${dir}`);
     console.log(`highlight-html: colored ${blocksColored} language-pasta block(s) across ${filesProcessed} file(s)`);
+    // 0 件は入力の取り違えか出力形の変化で着色が空回りしている（7.1）。
+    if (blocksColored === 0) {
+      console.error('highlight-html: language-pasta のブロックを 1 つも着色しなかった');
+      process.exitCode = 1;
+    }
   })().catch((e) => {
     console.error(`highlight-html failed: ${e && e.stack ? e.stack : e}`);
     process.exitCode = 1;
