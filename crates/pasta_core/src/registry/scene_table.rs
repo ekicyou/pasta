@@ -170,48 +170,6 @@ impl SceneTable {
         }
     }
 
-    /// Resolve scene ID by search key and filters (search without module context).
-    ///
-    /// Unlike `collect_scene_candidates("", ..)`, keys starting with `:` (local
-    /// scenes) are not excluded; only a search key starting with `:` can match them.
-    ///
-    /// # Algorithm
-    /// 1. Prefix search using RadixMap (search_key → candidate IDs)
-    /// 2. Filter by attributes
-    /// 3. Cache-based sequential selection (no repeat until exhausted)
-    /// 4. Return selected SceneId
-    pub fn resolve_scene_id(
-        &mut self,
-        search_key: &str,
-        filters: &HashMap<String, String>,
-    ) -> Result<SceneId, SceneTableError> {
-        // Validate search_key
-        if search_key.is_empty() {
-            return Err(SceneTableError::InvalidScene {
-                scene: search_key.to_string(),
-            });
-        }
-
-        // Phase 1: Prefix search using RadixMap
-        let mut candidate_ids: Vec<SceneId> = Vec::new();
-        for (_key, ids) in self.prefix_index.iter_prefix(search_key.as_bytes()) {
-            candidate_ids.extend(ids.iter().copied());
-        }
-
-        if candidate_ids.is_empty() {
-            return Err(SceneTableError::SceneNotFound {
-                scene: search_key.to_string(),
-            });
-        }
-
-        // Phase 2: Filter by attributes
-        let filtered_ids = self.filter_by_attributes(candidate_ids, search_key, filters)?;
-
-        // Phase 3-5: Cache-based sequential selection
-        let cache_key = SceneCacheKey::new("", search_key, filters, false, None);
-        self.select_from_cache(cache_key, filtered_ids)
-    }
-
     /// Resolve scene ID with module context.
     ///
     /// Searches local scenes of `module_name` only (global scenes when it is empty);
@@ -426,11 +384,6 @@ impl SceneTable {
         self.labels.get(id.0)
     }
 
-    /// Iterate over all scenes (for debugging).
-    pub fn labels_iter(&self) -> impl Iterator<Item = &SceneInfo> {
-        self.labels.iter()
-    }
-
     /// Set shuffle enabled flag (for testing/debugging).
     pub fn set_shuffle_enabled(&mut self, enabled: bool) {
         self.shuffle_enabled = enabled;
@@ -500,25 +453,6 @@ impl SceneTable {
         }
 
         Ok(local_candidates)
-    }
-
-    /// Find a scene by name, with optional attribute filters (returns fn_name).
-    ///
-    /// Not used by the runtime search (`@pasta_search` uses
-    /// resolve_scene_id_unified).
-    pub fn find_scene(
-        &mut self,
-        name: &str,
-        filters: &HashMap<String, String>,
-    ) -> Result<String, SceneTableError> {
-        // Use resolve_scene_id for the lookup
-        let scene_id = self.resolve_scene_id(name, filters)?;
-        let scene = self
-            .get_scene(scene_id)
-            .ok_or_else(|| SceneTableError::SceneNotFound {
-                scene: name.to_string(),
-            })?;
-        Ok(scene.fn_name.clone())
     }
 
     /// Replace the random selector and clear cached selections.

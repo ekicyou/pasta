@@ -59,9 +59,9 @@ registry.register_global("挨拶", HashMap::new());
 let mut table = SceneTable::from_scene_registry(
     registry,
     Box::new(DefaultRandomSelector::new()),
-).unwrap();
+);
 
-let scene_id = table.resolve_scene_id("挨拶", &HashMap::new()).unwrap();
+let scene_id = table.resolve_scene_id_unified("", "挨拶", &HashMap::new()).unwrap();
 let scene = table.get_scene(scene_id).unwrap();
 println!("Selected: {}", scene.fn_name);
 ```

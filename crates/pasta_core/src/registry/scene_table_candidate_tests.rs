@@ -33,7 +33,7 @@ fn test_resolve_scene_id_basic() {
         shuffle_enabled: false,
     };
 
-    let result = table.resolve_scene_id("test", &HashMap::new());
+    let result = table.resolve_scene_id_unified("", "test", &HashMap::new());
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), SceneId(0));
 }
@@ -425,15 +425,15 @@ fn test_resolve_scene_id_cycling() {
     };
 
     // 1回目〜3回目: 候補を順番に消費
-    let r1 = table.resolve_scene_id("OnTalk", &HashMap::new());
+    let r1 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
     assert!(r1.is_ok());
-    let r2 = table.resolve_scene_id("OnTalk", &HashMap::new());
+    let r2 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
     assert!(r2.is_ok());
-    let r3 = table.resolve_scene_id("OnTalk", &HashMap::new());
+    let r3 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
     assert!(r3.is_ok());
 
     // 4回目: 循環リセットが発生し、成功すること
-    let r4 = table.resolve_scene_id("OnTalk", &HashMap::new());
+    let r4 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
     assert!(
         r4.is_ok(),
         "4回目の呼び出しが失敗: 循環リセットが動作していない"
@@ -449,7 +449,7 @@ fn test_resolve_scene_id_cycling() {
 
     // さらに続行できることも検証（10回以上）
     for i in 5..=12 {
-        let r = table.resolve_scene_id("OnTalk", &HashMap::new());
+        let r = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
         assert!(r.is_ok(), "{}回目の呼び出しが失敗", i);
     }
 }
@@ -480,14 +480,14 @@ fn test_resolve_scene_id_cycling_reshuffles() {
     // 1周目の順序を記録
     let mut first_cycle = Vec::new();
     for _ in 0..3 {
-        let r = table.resolve_scene_id("OnTalk", &HashMap::new());
+        let r = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
         first_cycle.push(r.unwrap());
     }
 
     // 2周目（リセット後）の順序を記録
     let mut second_cycle = Vec::new();
     for _ in 0..3 {
-        let r = table.resolve_scene_id("OnTalk", &HashMap::new());
+        let r = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
         assert!(r.is_ok());
         second_cycle.push(r.unwrap());
     }
@@ -521,14 +521,22 @@ fn test_resolve_scene_id_cycling_preserves_candidates() {
     // 1周目: 全候補を収集
     let mut first_cycle: std::collections::HashSet<SceneId> = std::collections::HashSet::new();
     for _ in 0..3 {
-        first_cycle.insert(table.resolve_scene_id("OnTalk", &HashMap::new()).unwrap());
+        first_cycle.insert(
+            table
+                .resolve_scene_id_unified("", "OnTalk", &HashMap::new())
+                .unwrap(),
+        );
     }
     assert_eq!(first_cycle.len(), 3);
 
     // 2周目: リセット後の全候補を収集
     let mut second_cycle: std::collections::HashSet<SceneId> = std::collections::HashSet::new();
     for _ in 0..3 {
-        second_cycle.insert(table.resolve_scene_id("OnTalk", &HashMap::new()).unwrap());
+        second_cycle.insert(
+            table
+                .resolve_scene_id_unified("", "OnTalk", &HashMap::new())
+                .unwrap(),
+        );
     }
     assert_eq!(second_cycle.len(), 3);
 
@@ -709,7 +717,11 @@ fn test_resolve_scene_id_selector_applies_to_candidate_order_each_round() {
     let expected = vec![SceneId(1), SceneId(2), SceneId(0)];
     let mut round = || -> Vec<SceneId> {
         (0..3)
-            .map(|_| table.resolve_scene_id("OnTalk", &HashMap::new()).unwrap())
+            .map(|_| {
+                table
+                    .resolve_scene_id_unified("", "OnTalk", &HashMap::new())
+                    .unwrap()
+            })
             .collect()
     };
     assert_eq!(round(), expected, "1 巡目");
