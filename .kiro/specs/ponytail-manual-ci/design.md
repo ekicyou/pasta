@@ -112,7 +112,7 @@ bigram-index/tokenize.mjs ← bigram-index/build-index.mjs ← verify-search.mjs
 ```
 
 - 左のモジュールは右のモジュールを import しない。
-- 例外は 1 つ。`talk/talk.mjs` の `--stats` の CLI の枝だけが、`gen-skill-refs.mjs` を動的 import する（`await import()`）。静的な循環を作らないためである。モジュールの本体は `gen-skill-refs.mjs` を知らない。
+- 例外は 1 つ。`talk/talk.mjs` の `--stats` の CLI の枝だけが、`gen-skill-refs.mjs` を動的 import する（`import().then()`。トップレベルの `await` は循環で待ち合って止まるので使わない）。静的な循環を作らないためである。モジュールの本体は `gen-skill-refs.mjs` を知らない。
 
 ### Technology Stack
 
@@ -587,7 +587,8 @@ export const MANUAL_URL: 'https://ekicyou.github.io/pasta/';
   - `GENERATED_MARK`・`FIX_COMMAND` の `export` を外す（N13）。外から import するものは無い。
   - `chapterRegions` の注記の「talk/talk.mjs の --stats にある複製も合わせる」を消す（B9）。
 - `talk/talk.mjs` の `--stats` の枝（265〜274 行）:
-  - 写しを消し、`const { chapterRegions } = await import('../gen-skill-refs.mjs');` で取る。モジュールの頭で静的に import すると循環になるため、CLI の枝の中だけで動的に取る。
+  - 写しを消し、`import('../gen-skill-refs.mjs').then(({ chapterRegions }) => { …; process.exit(0); })` で取る。モジュールの頭で静的に import すると循環になるため、CLI の枝の中だけで動的に取る。
+  - トップレベルの `await import()` にはしない。`gen-skill-refs.mjs` が `talk.mjs` を import する循環の中で待ち合い、Node が「unsettled top-level await」で終了コード 13 で止まる（設計の検証で、同じ形の小さなモジュールで再現した。`.then` の形なら通る）。
   - 章ごとに `try { const { intro, outro } = chapterRegions(text, chapter); regionsByChapter.set(chapter, { intro, outro }); } catch { /* 構造の無い章は導入・締めを数えない */ }`。今の写しが「区切りが 2 本未満なら数えない」のと同じ扱いにする。
   - `chapterRegions` は H1 も見る。H1 の無い章は今も verify-content の T-intro で落ちるので、統計の違いは実害が無い。
 
