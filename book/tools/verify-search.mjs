@@ -28,8 +28,9 @@
 //
 // 使い方:
 //   node book/tools/verify-search.mjs            # 必要ならビルド＋bigram再生成して検証
-//   node book/tools/verify-search.mjs --no-build # 既存出力をそのまま検証（再生成のみ実施）
+//   node book/tools/verify-search.mjs --no-build # 既存出力をそのまま検証（索引は作り直さない・書き換えない）
 //   node book/tools/verify-search.mjs --self-test # 台詞の検索の検査ロジック自身の自己テストも実行
+//   手元では --no-build を付けない（素の mdbook build の出力は bigram の索引でないので落ちる）。
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,8 +44,12 @@ import {
   resolveHashed,
   readSearchIndex,
   rebuildBigramIndex,
+  searchIndex,
+  corpusOf,
+  urlsContaining,
   SIZE_WARN_THRESHOLD_BYTES,
 } from './bigram-index/build-index.mjs';
+import { summaryChapters } from './link-check.mjs';
 
 const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url)); // .../book/tools
@@ -83,43 +88,16 @@ function ensureBuiltAndIndexed() {
   if (!NO_BUILD || !hasOut) {
     log('Running `mdbook build book` for fresh static output...');
     execFileSync('mdbook', ['build', bookDir], { stdio: 'inherit', cwd: repoRoot });
+    // bigram 索引を再生成（mdbook 標準索引 → 2-gram 索引へ上書き）。ビルドしたときだけ。
+    log('Regenerating bigram search index via build-index.mjs...');
+    execFileSync('node', [buildIndexScript, bookOut], { stdio: 'inherit', cwd: repoRoot });
   } else {
-    log('Using existing output (--no-build):', bookOut);
+    log('Using existing output (--no-build, index not rewritten):', bookOut);
   }
-
-  // bigram 索引を再生成（mdbook 標準索引 → 2-gram 索引へ上書き）。
-  log('Regenerating bigram search index via build-index.mjs...');
-  execFileSync('node', [buildIndexScript, bookOut], { stdio: 'inherit', cwd: repoRoot });
 }
 
-// mdBook 標準検索 UI と同一のクエリオプション（searcher.js 由来）。
-const SEARCH_OPTIONS = {
-  bool: 'AND',
-  expand: true,
-  fields: {
-    title: { boost: 2 },
-    body: { boost: 1 },
-    breadcrumbs: { boost: 1 },
-  },
-};
-
-// elasticlunr 索引へクエリし、結果を {urls, refs} として返す。
-//   urls = 結果一覧（2.1）。refs→doc_urls 写像が遷移先（2.3）の実在性を表す。
-function searchResults(elasticlunr, indexObj, query) {
-  const idx = elasticlunr.Index.load(indexObj.index);
-  const results = idx.search(query, SEARCH_OPTIONS);
-  const refs = results.map((r) => Number(r.ref));
-  const urls = refs.map((ref) => indexObj.doc_urls[ref]);
-  return { urls, refs, raw: results };
-}
-
-// 索引内の全ドキュメント本文＋タイトルを連結したコーパス（母語の実在確認用）。
-function corpusOf(indexObj) {
-  const docs = indexObj.index.documentStore.docs;
-  return Object.values(docs)
-    .map((d) => `${d.title || ''} ${d.body || ''} ${d.breadcrumbs || ''}`)
-    .join(' ');
-}
+// 索引の search_options（ブラウザと同じ設定）で検索する。urls = 結果一覧（2.1）、refs = 遷移先（2.3）。
+const searchResults = searchIndex;
 
 // 台詞の検索語（要件 8.2 / 10.5）: 章の最初の台詞の本文から、インライン記法（コード・画像・
 // リンク記法・HTML タグ・強調）を除き、先頭の連続 4 文字以上の日本語片を返す。無ければ null。
@@ -215,14 +193,14 @@ for (const c of CASES) {
   check(`2.4: 語中3文字「${c.mid3}」がヒットする`, r3.urls.length > 0,
     `urls=${JSON.stringify(r3.urls.slice(0, 5))}`);
 
-  // 2.4(包含): 語中片のヒットは親語のヒットを包含するはず（同一語起源）。
-  const wordSet = new Set(word.urls);
-  check(`2.4: 語中2文字「${c.mid2}」が親語ヒットを包含`,
-    word.urls.length > 0 && [...wordSet].every((u) => r2.urls.includes(u)),
-    `mid2=${JSON.stringify(r2.urls.slice(0, 5))} word=${JSON.stringify(word.urls.slice(0, 5))}`);
-  check(`2.4: 語中3文字「${c.mid3}」が親語ヒットを包含`,
-    word.urls.length > 0 && [...wordSet].every((u) => r3.urls.includes(u)),
-    `mid3=${JSON.stringify(r3.urls.slice(0, 5))} word=${JSON.stringify(word.urls.slice(0, 5))}`);
+  // 2.4(包含): 親語を含む節は、全部が語中片のヒットに入る（検索の設定 OR/AND によらず成り立つ）。
+  const holders = urlsContaining(indexObj, c.word);
+  for (const [mid, r] of [[c.mid2, r2], [c.mid3, r3]]) {
+    const missing = holders.filter((u) => !r.urls.includes(u));
+    check(`2.4: 親語「${c.word}」を含む節は全部が語中片「${mid}」のヒットに入る`,
+      holders.length > 0 && missing.length === 0,
+      `holders=${holders.length} missing=${JSON.stringify(missing.slice(0, 5))}`);
+  }
 
   // 2.3: 結果 ref がすべて実在 doc_url（.html）へ写像でき、遷移可能であること。
   const okNav = r3.refs.length > 0 &&
@@ -255,9 +233,7 @@ log('');
 log('--- 8.2/10.5 台詞の本文が索引に入る（台詞の語で章がヒット）---');
 {
   const srcDir = path.join(bookDir, 'src');
-  const summary = fs.readFileSync(path.join(srcDir, 'SUMMARY.md'), 'utf8');
-  const chapters = [...new Set([...summary.matchAll(/\]\(([^)]+\.md)\)/g)].map((m) => m[1].trim()))];
-  for (const md of chapters) {
+  for (const md of summaryChapters(repoRoot)) {
     const q = talkQuery(fs.readFileSync(path.join(srcDir, md), 'utf8'));
     if (q === null) {
       check(`8.2: ${md} の最初の台詞の語で章がヒットする`, false,
@@ -311,12 +287,15 @@ log('--- 2.2/2.5 サーバー通信なし・クライアント完結 ---');
   let refRuntime = 0;
   let refSearcher = 0;
   let refTokenizer = 0;
+  let refNeutralizer = 0;
   for (const p of sampleHtmls) {
     const h = fs.readFileSync(p, 'utf8');
     if (/searchindex-[^"']*\.js/.test(h)) refIndex++;
     if (/elasticlunr-[^"']*\.min\.js/.test(h)) refRuntime++;
     if (/searcher-[^"']*\.js/.test(h)) refSearcher++;
     if (h.includes('BEGIN canonical bigram tokenize')) refTokenizer++;
+    const nb = h.indexOf('BEGIN canonical hljs neutralizer');
+    if (nb >= 0 && h.indexOf('END canonical hljs neutralizer', nb) > nb) refNeutralizer++;
   }
   check('2.5: 代表ページが索引(searchindex)を参照', refIndex === sampleHtmls.length,
     `${refIndex}/${sampleHtmls.length}`);
@@ -326,6 +305,8 @@ log('--- 2.2/2.5 サーバー通信なし・クライアント完結 ---');
     `${refSearcher}/${sampleHtmls.length}`);
   check('2.5: 代表ページにクエリ bigram tokenizer がインライン同梱されている',
     refTokenizer === sampleHtmls.length, `${refTokenizer}/${sampleHtmls.length}`);
+  check('6.2: 代表ページに hljs neutralizer の BEGIN・END の印がある',
+    refNeutralizer === sampleHtmls.length, `${refNeutralizer}/${sampleHtmls.length}`);
 }
 log('');
 
@@ -423,6 +404,7 @@ if (SELF_TEST) {
     talkQuery('# C\n\n> 【素】`ああああ` は **いい** OK\n') === null);
 
   const fake = {
+    search_options: indexObj.search_options, // 本物の索引の設定をそのまま渡す
     doc_urls: ['a.html#a', 'b.html#b'],
     index: {
       ref: 'id',

@@ -29,12 +29,12 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { transformDir } from './talk/talk-html.mjs';
 import { SPEAKERS } from './talk/talk.mjs';
+import { summaryChapters as readSummaryChapters } from './link-check.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const bookDir = path.resolve(here, '..'); // .../book
 const repoRoot = path.resolve(bookDir, '..'); // リポジトリルート
 const outDir = path.resolve(bookDir, 'book'); // .../book/book = mdBook HTML 出力
-const summaryFile = path.resolve(bookDir, 'src', 'SUMMARY.md');
 
 const args = new Set(process.argv.slice(2));
 const NO_BUILD = args.has('--no-build');
@@ -159,16 +159,7 @@ function resolveRef(fromRelDir, ref, root) {
 
 // SUMMARY.md から章ファイル (.md) を抽出し、対応する出力 HTML の相対パスへ写像する。
 function summaryChapters() {
-  const md = fs.readFileSync(summaryFile, 'utf8');
-  const re = /\]\(([^)]+\.md)\)/g;
-  const chapters = [];
-  let m;
-  while ((m = re.exec(md)) !== null) {
-    const mdPath = m[1].trim();
-    const htmlRel = mdPath.replace(/\.md$/, '.html');
-    chapters.push(htmlRel);
-  }
-  return [...new Set(chapters)];
+  return readSummaryChapters(repoRoot).map((md) => md.replace(/\.md$/, '.html'));
 }
 
 // =========================================================================
