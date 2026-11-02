@@ -44,6 +44,17 @@ local BLOCKED_STATUSES = {
     "minimizing",
 }
 
+--- v が有限の数ならそのまま、それ以外（数でない・NaN・±無限大）は default を返す
+---@param v any
+---@param default number
+---@return number
+local function finite_or(v, default)
+    if type(v) == "number" and v == v and v > -math.huge and v < math.huge then
+        return v
+    end
+    return default
+end
+
 --- 設定を読み込む（SAVE > toml > hardcoded の3段フォールバック）
 --- キャッシュなし：毎回 SAVE テーブルを読み直すことで実行時変更を即時反映
 ---@return table 設定テーブル
@@ -81,7 +92,7 @@ local function get_config()
     return {
         talk_interval_min = min,
         talk_interval_max = max,
-        hour_margin = ghost.hour_margin or 30,
+        hour_margin = finite_or(ghost.hour_margin, 30),
     }
 end
 

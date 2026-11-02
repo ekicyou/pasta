@@ -38,6 +38,32 @@ fn test_config_default_values() {
     assert!(result.unwrap().as_boolean().unwrap_or(false));
 }
 
+/// 数で有限でない hour_margin は既定の 30、有限の数はそのまま（要件 1.1・1.4・1.5・1.6）
+#[test]
+fn test_hour_margin_finite_number_or_default() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
+        local cases = {
+            { "30", 30 }, { true, 30 }, { {}, 30 },
+            { 0/0, 30 }, { math.huge, 30 }, { -math.huge, 30 },
+            { 12.5, 12.5 }, { 0, 0 }, { -5, -5 }, { nil, 30 },
+        }
+        local bad = {}
+        for i, c in ipairs(cases) do
+            package.loaded["@pasta_config"] = { ghost = { hour_margin = c[1] } }
+            local got = dispatcher._get_config().hour_margin
+            if got ~= c[2] then bad[#bad + 1] = i .. ":" .. tostring(c[1]) .. "->" .. tostring(got) end
+        end
+        return table.concat(bad, ", ")
+    "#,
+    );
+
+    assert_eq!(result.unwrap().as_string().unwrap().to_str().unwrap(), "");
+}
+
 #[test]
 fn test_skip_when_talking() {
     let runtime = create_runtime_with_pasta_path();

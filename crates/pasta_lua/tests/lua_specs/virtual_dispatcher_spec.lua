@@ -187,6 +187,39 @@ describe("check_talk function", function()
 
         expect(result):toBe(nil)
     end)
+
+    -- 数でない hour_margin（書き間違いの "30"）でも、正時の手前で投げずに間隔どおり振る舞う（要件 1.2・1.3）
+    local function with_string_margin(fn)
+        local saved = package.loaded["@pasta_config"]
+        package.loaded["@pasta_config"] = { ghost = { hour_margin = "30" } }
+        local ok, err = pcall(fn)
+        package.loaded["@pasta_config"] = saved
+        if not ok then error(err, 0) end
+    end
+
+    test("文字列の hour_margin でも、正時の 50 秒前にトークを返す", function()
+        with_string_margin(function()
+            setup()
+            local T0 = 1702648800 -- 正時ちょうど
+            dispatcher.dispatch(create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = T0 } }))
+            local act = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = T0 + 3550 } })
+            local ok, result = pcall(dispatcher.check_talk, act)
+            expect(ok):toBe(true)
+            expect(type(result)):toBe("thread")
+        end)
+    end)
+
+    test("文字列の hour_margin でも、正時の 10 秒前は投げずに既定の 30 秒で控える", function()
+        with_string_margin(function()
+            setup()
+            local T0 = 1702648800
+            dispatcher.dispatch(create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = T0 } }))
+            local act = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = T0 + 3590 } })
+            local ok, result = pcall(dispatcher.dispatch, act)
+            expect(ok):toBe(true)
+            expect(result):toBe(nil)
+        end)
+    end)
 end)
 
 describe("priority and integration", function()
