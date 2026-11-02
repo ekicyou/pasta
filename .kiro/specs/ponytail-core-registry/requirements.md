@@ -9,7 +9,7 @@
 
 要件は「その領域の指摘が残らず直っている」ことと、変えてはいけない挙動の決めごとである。どう直すか（関数・入れ物の形）は設計で決める。
 
-> 【前提】の付いた受け入れ基準は、brief.md だけでは決めきれず、ギャップ分析で増えた指摘を範囲に入れる前提で書いたものである。要件ディスカッションで確かめる（research.md の「要件ディスカッションへの持ち越し」）。
+> ギャップ分析で増えた指摘（要件 1.5・2.3・3.3・4.3・4.4・5.6・6・11.6）は、2026-11-02 の要件ディスカッションで、すべて範囲に入れると開発者が決めた（research.md の「要件ディスカッションへの持ち越し」の推奨案どおり）。
 
 ## Boundary Context
 
@@ -17,6 +17,7 @@
   - 監査の 1〜4（シーン表・シーンの登録の使われない API と欄、作られない誤りの型、単語表の使われない API、`fast_radix_trie`）。
   - ギャップ分析で増えた、同じ領域の指摘（要件 1.5・2.3・3.3・4.3・4.4・5.6・6・11.6）。
   - 呼び手を同じ変更で合わせる：`crates/pasta_lua/src/search/context.rs`・`crates/pasta_check/src/validate/scenes.rs`。
+  - 要件 3.3・4.4 のために、roadmap の持ち場の表に無いファイルも触る：`crates/pasta_lua/src/search/mod.rs`・`crates/pasta_lua/src/search/error.rs` と、`SearchContext::new`・`with_aliases` を呼ぶテスト（`tests/common/e2e_helpers.rs`・`tests/lua_unittest_runner.rs`・`tests/runtime/scene_identity_format_test.rs`・`tests/search/scene_search_test.rs`）。どれも同じウェーブのほかの spec の持ち場ではない（2026-11-02 に確かめた）。roadmap の持ち場の表は `kiro-complete` で書き足す。
   - 撤去に合わせた文書の直し：`crates/pasta_core/README.md`・`.kiro/steering/tech.md`・`book/src/internals/registry-search.md`。
 - **Out of scope**
   - シーンの属性の絞り込みの仕組み（2026-10-19 開発者の決定）。`filter_by_attributes`・`SceneCacheKey.filters`・解決の関数の `filters` の引数・`NoMatchingScene`・`attributes` の欄。0.5.0 の `scene-attribute-store`・`scene-condition-attributes` が使う。
@@ -40,7 +41,7 @@
 2. The pasta_core crate shall 関数名を返すシーンの検索（`SceneTable::find_scene`。Lua の `act:find_scene` とは別物）を提供しない。
 3. The pasta_core crate shall テストだけが使う全シーンの列挙（`SceneTable::labels_iter`）を提供しない。
 4. The pasta_core crate shall 順次消費の状態に、選んだシーンの履歴（`CachedSelection.history`）を持たない。
-5. The pasta_core crate shall 本番の呼び手の無い空のシーン表の作り方（`SceneTable::new`）を提供しない（ギャップ分析で増えた指摘。単語表の `new` と同じ種類）。 【前提】
+5. The pasta_core crate shall 本番の呼び手の無い空のシーン表の作り方（`SceneTable::new`）を提供しない（ギャップ分析で増えた指摘。単語表の `new` と同じ種類）。
 6. The pasta_core crate shall `SceneTable` の `from_scene_registry`・`resolve_scene_id_unified`・`resolve_scene_id_exact`・`resolve_global_owning_local_exact`・`collect_scene_candidates`・`get_scene`・`replace_selector` を、今と同じ意味で提供し続ける（`from_scene_registry` の返り値の形だけは要件 3 で変える）。
 
 ### Requirement 2: シーンの登録の使われない欄と API を無くす
@@ -51,7 +52,7 @@
 
 1. The pasta_core crate shall シーンの登録の項目に、`crate::` を前に付けた関数のパス（`SceneEntry.fn_path`）を持たない。
 2. When `register_global`・`register_local`・`register_global_raw` でシーンを登録した, the pasta_core crate shall 項目の `name`・`attributes`・`fn_name`・`parent` と、返す値（ID・通し番号）を、今と同じにする。
-3. The pasta_core crate shall テストだけが使う、ID からシーンの登録を引く関数（`SceneRegistry::get_scene`）を提供しない（ギャップ分析で増えた指摘）。項目の ID（`SceneEntry.id`）と、登録の関数が返す ID は残す（返り値の形を変えると、`ponytail-lua-transpiler` の持ち場の `pasta_lua/src/context.rs` に波及するため）。 【前提】
+3. The pasta_core crate shall テストだけが使う、ID からシーンの登録を引く関数（`SceneRegistry::get_scene`）を提供しない（ギャップ分析で増えた指摘）。項目の ID（`SceneEntry.id`）と、登録の関数が返す ID は残す（返り値の形を変えると、`ponytail-lua-transpiler` の持ち場の `pasta_lua/src/context.rs` に波及するため）。
 
 ### Requirement 3: 決して失敗しない作り方は、失敗を返さない
 
@@ -61,7 +62,7 @@
 
 1. The pasta_core crate shall シーンの登録からシーン表を作る関数（`SceneTable::from_scene_registry`）の結果を、失敗の型で包まずにシーン表そのものとして返す。
 2. The `pasta_check validate` shall シーン表を作る所（`crates/pasta_check/src/validate/scenes.rs` 104〜106 行）で、起こらない失敗のための `expect` を持たない。
-3. The pasta_lua crate shall `@pasta_search` の検索の文脈（`SearchContext`）の作り方（`new`・`with_aliases`）の結果を、失敗の型で包まずに返す（ギャップ分析で増えた指摘。作り方が失敗を返すのは `from_scene_registry` のためだけである）。呼び手（`search/mod.rs` の 1 か所とテスト）は同じ変更で合わせる。 【前提】
+3. The pasta_lua crate shall `@pasta_search` の検索の文脈（`SearchContext`）の作り方（`new`・`with_aliases`）の結果を、失敗の型で包まずに返す（ギャップ分析で増えた指摘。作り方が失敗を返すのは `from_scene_registry` のためだけである）。呼び手（`search/mod.rs` の 1 か所とテスト）は同じ変更で合わせる。
 4. When ランタイムの構築と辞書の確定で `@pasta_search` を登録する, the pasta_lua crate shall 登録の失敗の扱い（Lua の誤りとして返す）を、今と同じにする。
 
 ### Requirement 4: 作られない誤りの型を無くす
@@ -72,8 +73,8 @@
 
 1. The pasta_core crate shall シーンの検索の誤りに、どこでも作られない種類（`DuplicateSceneName`・`DuplicateScenePath`・`NoMoreScenes`）を持たない。
 2. The pasta_core crate shall 誰も使わない結果の型の別名（`SceneTableResult`・`WordTableResult`）を提供しない。
-3. The pasta_core crate shall 起こりえない「乱数の選択の失敗」（`RandomSelectionFailed`）を持たず、順次消費でシーンを選ぶ処理は、候補がある限り必ず 1 つを選ぶ（ギャップ分析で増えた指摘。候補は空のときに先に誤りになり、状態はその直前に作られるので、この誤りは作られる道があっても届かない）。 【前提】
-4. The pasta_lua crate shall `@pasta_search` の誤りに、どこでも作られない単語表の誤りの包み（`SearchError::WordTableError`）を持たない（ギャップ分析で増えた指摘。単語表の誤りは「見つからない」だけで、`search_word` は必ずそれを「見つからない」に写す）。 【前提】
+3. The pasta_core crate shall 起こりえない「乱数の選択の失敗」（`RandomSelectionFailed`）を持たず、順次消費でシーンを選ぶ処理は、候補がある限り必ず 1 つを選ぶ（ギャップ分析で増えた指摘。候補は空のときに先に誤りになり、状態はその直前に作られるので、この誤りは作られる道があっても届かない）。
+4. The pasta_lua crate shall `@pasta_search` の誤りに、どこでも作られない単語表の誤りの包み（`SearchError::WordTableError`）を持たない（ギャップ分析で増えた指摘。単語表の誤りは「見つからない」だけで、`search_word` は必ずそれを「見つからない」に写す）。
 5. When 1 で種類を消した, the pasta_lua crate shall `search/context.rs` の 3 つの match の腕（今の 160・182・224 行）から `NoMoreScenes` を外し、「見つからない」に写す種類を `SceneNotFound` と `NoMatchingScene` にする。
 6. The pasta_core crate shall 残る誤りの種類（`SceneNotFound`・`NoMatchingScene`・`InvalidScene`・`WordNotFound`）の文言を、今と同じにする（ログに出る文言は公開の約束である）。
 
@@ -88,7 +89,7 @@
 3. The pasta_core crate shall テストだけが使う、全項目の取り出し（`WordTable::entries`）と選択の状態の消去（`WordTable::clear_cache`）を提供しない。
 4. The pasta_core crate shall 単語表の中だけで使う選択の状態のキー（`WordCacheKey`）を、公開の型としてクレートの外へ出さない。
 5. The pasta_core crate shall 単語表の `from_word_def_registry`・`collect_word_candidates`・`search_word`・`replace_selector` を、今と同じ意味で提供し続ける。
-6. The pasta_core crate shall シーンの照合規則（`SceneRegistry::sanitize_name`）を呼ぶだけの単語の登録の写し（`WordDefRegistry::sanitize_name`）を提供しない（ギャップ分析で増えた指摘。呼び手は `word_registry.rs` の中だけである）。照合規則そのものは変えない。 【前提】
+6. The pasta_core crate shall シーンの照合規則（`SceneRegistry::sanitize_name`）を呼ぶだけの単語の登録の写し（`WordDefRegistry::sanitize_name`）を提供しない（ギャップ分析で増えた指摘。呼び手は `word_registry.rs` の中だけである）。照合規則そのものは変えない。
 
 ### Requirement 6: テストだけが使う並べ替えの切り替えを無くす
 
@@ -96,8 +97,8 @@
 
 #### Acceptance Criteria
 
-1. The pasta_core crate shall シーン表と単語表に、並べ替えをしない切り替え（`shuffle_enabled` の欄と `set_shuffle_enabled`）を持たない（ギャップ分析で増えた指摘。本番では常に並べ替え、テストだけが切る）。 【前提】
-2. When 切り替えを使っていたテストを移した, the pasta_core test suite shall 同じ観点（候補を集めた順のまま使う）を、指定列が空のモック（`MockRandomSelector::new(vec![])`。渡された順を変えない）で確かめる。 【前提】
+1. The pasta_core crate shall シーン表と単語表に、並べ替えをしない切り替え（`shuffle_enabled` の欄と `set_shuffle_enabled`）を持たない（ギャップ分析で増えた指摘。本番では常に並べ替え、テストだけが切る）。
+2. When 切り替えを使っていたテストを移した, the pasta_core test suite shall 同じ観点（候補を集めた順のまま使う）を、指定列が空のモック（`MockRandomSelector::new(vec![])`。渡された順を変えない）で確かめる。
 3. The pasta_core crate shall 並べ替えの抽象（`RandomSelector`・`DefaultRandomSelector`・`MockRandomSelector`）と、Lua からの指定列（`set_scene_selector`・`set_word_selector`）の意味を、今と同じにする。
 
 ### Requirement 7: 前方一致の入れ物から外部の依存を外す
@@ -161,12 +162,12 @@
    - 20・32・40・42・130・181 行の `RadixMap`・`fast_radix_trie`（依存は `thiserror`・`rand` だけになる）
    - 44 行の誤りの一覧（`RandomSelectionFailed` を外す。要件 4.3 を入れる場合）
    - 200 行の `history`
-   - 208 行の `set_shuffle_enabled`（要件 6 を入れる場合）
-   - 148 行の `WordDefRegistry::sanitize_name`（要件 5.6 を入れる場合）
+   - 208 行の `set_shuffle_enabled`
+   - 148 行の `WordDefRegistry::sanitize_name`
    - 36 行の `merge_from`（要件 10.2 の場合だけ）
 4. The change shall README と `tech.md` に、公開の pub API を消すことの断り書きを足さない（`ponytail-lua-loader` が書いた）。
 5. Where 直した頁がスキルの参照の生成の元（`grammar/*`・`reference/pasta-toml.md`・`reference/runtime-failures.md`・`lua/modules/*`）である, the change shall `node book/tools/gen-skill-refs.mjs` を走らせ、生成物を同じ変更に入れる（`internals/*` は生成の元ではないので、`registry-search.md` だけなら要らない）。
-6. The `crates/pasta_core/Cargo.toml` shall クレートの説明（`description`。crates.io に出る）から、もう持たない「DSL parsing」を消し、レジストリの層であることを書く（ギャップ分析で増えた指摘。パーサーは `pasta_dsl` へ移っている）。 【前提】
+6. The `crates/pasta_core/Cargo.toml` shall クレートの説明（`description`。crates.io に出る）から、もう持たない「DSL parsing」を消し、レジストリの層であることを書く（ギャップ分析で増えた指摘。パーサーは `pasta_dsl` へ移っている）。
 
 ### Requirement 12: 進め方と品質の関門
 

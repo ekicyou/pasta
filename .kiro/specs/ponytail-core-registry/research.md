@@ -161,3 +161,5 @@
 7. **`SearchContext::new`・`with_aliases` を、失敗の型で包まずに返すか**（N6・要件 3.3）。推奨：直す。`from_scene_registry` を直すと、同じ「決して失敗しない `Result`」が 1 段上に移るだけになる。呼び手は `search/mod.rs` の 1 か所とテスト 5 ファイルで、どれも同じウェーブのほかの spec の持ち場ではない。roadmap の持ち場の表（`pasta_core/**`・`search/context.rs`・`validate/scenes.rs`）に `search/mod.rs`・`search/error.rs` とテストを足すことになるので、開発者の了承が要る。
 8. **`Cargo.toml` の説明（`description`）を直すか**（要件 11.6）。推奨：直す。crates.io に「DSL parsing」と出るが、パーサーは `pasta_dsl` にある。1 行で済む。
 9. **`merge_from` の消し方の確かめの時期**（要件 10）。推奨：実装の最後（PR を作る直前）に、main に `TranspileContext::merge_from` があるかを見て決める。どちらの場合も `context.rs` には触らない。あちらが先に入っていれば、この spec が `pasta_core` の 2 つとテストとマニュアルの 1 文を消す。
+
+**確定（2026-11-02 の要件ディスカッション）**: 1〜8 は推奨案のとおりに確定した（開発者「承認」）。9 は設計フェーズで扱う（PR を作る直前に、main に `TranspileContext::merge_from` が残っているかを見て決める）。
