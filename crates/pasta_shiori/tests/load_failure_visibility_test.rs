@@ -137,10 +137,9 @@ fn assert_reason_contains(case: &str, reason: &str, markers: &[&str]) {
 
 /// 1 ケース分を本番経路で駆動する。
 ///
-/// `spawn_actor`（load）→ GET → NOTIFY → `teardown_actor`（unload）まで完結させ、
-/// 次ケースが汚れた `LEGACY` を引き継がないようにする。
-fn run_case(case: &str, ghost: &TempDir, expect_loaded: bool, markers: &[&str]) {
-    let loaded = spawn_actor(0, ghost.path().to_path_buf());
+/// 呼び手が済ませた load の戻り値 `loaded` を受け、GET → NOTIFY → `teardown_actor`
+/// （unload）まで完結させ、次ケースが汚れた `LEGACY` を引き継がないようにする。
+fn run_case(case: &str, loaded: bool, expect_loaded: bool, markers: &[&str]) {
     assert_eq!(
         loaded, expect_loaded,
         "[{case}] load の戻り値が期待と異なる（要件 4.2）"
@@ -175,9 +174,11 @@ fn load_failures_and_request_errors_are_visible_through_the_actor_boundary() {
     );
     run_case(
         "a: entry load failure",
-        &entry_broken,
+        spawn_actor(0, entry_broken.path().to_path_buf()),
         false,
         &[
+            // フォルダがあるときの失敗の理由の形は変えない（ponytail-shiori 要件 2.6）。
+            "Load error: ",
             "failed to load startup module 'pasta.shiori.entry'",
             "PASTA_E2E_ENTRY_MARKER",
         ],
@@ -189,9 +190,13 @@ fn load_failures_and_request_errors_are_visible_through_the_actor_boundary() {
     let main_broken = ghost_with_script("main.lua", "PASTA_E2E_MAIN_A PASTA_E2E_MAIN_B\n");
     run_case(
         "b: main load failure",
-        &main_broken,
+        spawn_actor(0, main_broken.path().to_path_buf()),
         false,
-        &["failed to load startup module 'main'", "PASTA_E2E_MAIN_B"],
+        &[
+            "Load error: ",
+            "failed to load startup module 'main'",
+            "PASTA_E2E_MAIN_B",
+        ],
     );
     drop(main_broken);
 
@@ -213,12 +218,86 @@ return SHIORI
     );
     run_case(
         "c: multi-line request error",
-        &request_error,
+        spawn_actor(0, request_error.path().to_path_buf()),
         true,
         &["PASTA_E2E_MULTILINE_FIRST", "PASTA_E2E_MULTILINE_SECOND"],
     );
     drop(request_error);
 
+    // --- ケース (d)(e): 旧来の入口 `load` にフォルダの無いパスを渡す（ponytail-shiori 要件 2.1〜2.4） ---
+    #[cfg(windows)]
+    missing_dir::run_cases();
+
     // 後始末: プロセス終了でアクターが漏れないように最終 teardown。
     let _ = teardown_actor();
+}
+
+/// 旧来の入口 `load`（ANSI）にフォルダの無いパスを渡したときの 500（ponytail-shiori 要件 2.1〜2.4・9.4）。
+///
+/// 直す前の振る舞いを固める特性化テスト。直した後は [`missing_dir::expected_reason`] だけを
+/// `Load error: load directory not found: <デコードしたパス>` に改める。
+#[cfg(windows)]
+mod missing_dir {
+    use super::run_case;
+    use crate::common::{NON_ANSI_DIR_NAME, copy_fixture_into};
+    use std::path::Path;
+    use tempfile::TempDir;
+    use windows_sys::Win32::Globalization::{CP_ACP, GetACP, WideCharToMultiByte};
+    use windows_sys::Win32::System::Memory::{GMEM_FIXED, GlobalAlloc};
+
+    /// 直す前の理由（フォルダが無いことも探したパスも出ない）。
+    fn expected_reason(_dir: &Path) -> String {
+        "Not initialized error".to_string()
+    }
+
+    /// パスを CP_ACP へエンコードして出荷の `load` へ渡す（HGLOBAL は入口が解放する）。
+    /// 表せない文字は既定文字へ置き換わり、本番のホストが渡すバイト列と同じになる。
+    fn drive_ansi_load(dir: &Path) -> bool {
+        use std::os::windows::ffi::OsStrExt;
+        let wide: Vec<u16> = dir.as_os_str().encode_wide().collect();
+        let in_len = i32::try_from(wide.len()).expect("path length must fit i32");
+        // SAFETY: 1 回目で必要長を測り、2 回目で GMEM_FIXED のブロックへ直接書く。
+        unsafe {
+            let call = |out: *mut u8, cap: i32| {
+                WideCharToMultiByte(
+                    CP_ACP,
+                    0,
+                    wide.as_ptr(),
+                    in_len,
+                    out,
+                    cap,
+                    std::ptr::null(),
+                    std::ptr::null_mut(),
+                )
+            };
+            let needed = call(std::ptr::null_mut(), 0);
+            assert!(needed > 0, "WideCharToMultiByte length probe must succeed");
+            let h = GlobalAlloc(GMEM_FIXED, needed as usize);
+            assert!(!h.is_null(), "GlobalAlloc must succeed");
+            assert_eq!(call(h as *mut u8, needed), needed);
+            pasta::load(h, needed) == 1
+        }
+    }
+
+    fn run_missing_dir_case(case: &str, dir: &Path) {
+        let reason = expected_reason(dir);
+        run_case(case, drive_ansi_load(dir), false, &[reason.as_str()]);
+    }
+
+    pub(super) fn run_cases() {
+        // (d) ASCII の、存在しないフォルダ。
+        let root = TempDir::new().expect("create temp dir");
+        run_missing_dir_case("d: missing dir", &root.path().join("no_such_ghost"));
+
+        // (e) ゴーストは置いてあるが、パスに ANSI で表せない文字があって `load` からは届かない。
+        // ACP が 65001（UTF-8）ならそのまま届いてしまうので飛ばす。
+        // SAFETY: 引数なしの読み取りだけ。
+        if unsafe { GetACP() } == 65001 {
+            eprintln!("[e: non-ANSI missing dir] skipped: ACP is 65001");
+            return;
+        }
+        let dir = root.path().join(NON_ANSI_DIR_NAME);
+        copy_fixture_into("shiori_lifecycle", &dir);
+        run_missing_dir_case("e: non-ANSI missing dir", &dir);
+    }
 }
