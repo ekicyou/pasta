@@ -4,7 +4,7 @@ use super::*;
 
 /// Parse call_scene.
 pub(crate) fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut target = None;
     let mut args = None;
 
@@ -34,7 +34,7 @@ pub(crate) fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, ParseError
 
 /// Parse action_line.
 pub(crate) fn parse_action_line(pair: Pair<Rule>) -> Result<ActionLine, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut actor = String::new();
     let mut actions = Vec::new();
 
@@ -59,7 +59,7 @@ pub(crate) fn parse_action_line(pair: Pair<Rule>) -> Result<ActionLine, ParseErr
 
 /// Parse continue_action_line.
 pub(crate) fn parse_continue_action_line(pair: Pair<Rule>) -> Result<ContinueAction, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut actions = Vec::new();
 
     for inner in pair.into_inner() {
@@ -76,7 +76,7 @@ pub(crate) fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError>
     let mut actions = Vec::new();
 
     for inner in pair.into_inner() {
-        let action_span = Span::from(&inner.as_span());
+        let action_span = Span::from_pair(&inner);
         match inner.as_rule() {
             Rule::talk => {
                 actions.push(Action::Talk {
@@ -230,7 +230,7 @@ pub(crate) fn parse_dyn_fn_call_inner(
 
 /// Parse args.
 pub(crate) fn parse_args(pair: Pair<Rule>) -> Result<Args, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut items = Vec::new();
 
     for inner in pair.into_inner() {

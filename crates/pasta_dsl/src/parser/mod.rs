@@ -233,7 +233,7 @@ fn parse_file_scope(pair: Pair<Rule>) -> Result<FileScope, ParseError> {
 /// grammar.pest `actor_scope = { actor_line ~ actor_scope_item* }` に対応。
 /// actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_line | code_scope | blank_line }
 fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut name = String::new();
     let mut attrs = Vec::new();
     let mut words = Vec::new();

@@ -8,7 +8,7 @@ pub(crate) fn parse_global_scene_scope(
     last_name: &mut Option<String>,
     filename: &str,
 ) -> Result<GlobalSceneScope, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut scene_name = String::new();
     let mut is_continuation = false;
     let mut attrs = Vec::new();
@@ -148,7 +148,7 @@ pub(crate) fn parse_actors_item(
     pair: Pair<Rule>,
     next_number: &mut u32,
 ) -> Result<SceneActorItem, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut name = String::new();
     let mut explicit_number: Option<u32> = None;
 
@@ -179,7 +179,7 @@ pub(crate) fn parse_actors_item(
 pub(crate) fn parse_local_start_scene_scope(
     pair: Pair<Rule>,
 ) -> Result<LocalSceneScope, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut scope = LocalSceneScope::start();
     scope.span = span;
 
@@ -192,7 +192,7 @@ pub(crate) fn parse_local_start_scene_scope(
 
 /// Parse local scene scope (with name).
 pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScope, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut scope = LocalSceneScope::start();
     scope.span = span;
 
@@ -271,7 +271,7 @@ fn parse_local_scene_item(
 /// `choice_line = { pad ~ word_marker ~ question_marker ~ id ~ choice_label? ~ or_comment_eol }`
 /// `choice_label = { slfence_ja1 ~ string_contents ~ strclose }`
 pub(crate) fn parse_choice_line(pair: Pair<Rule>) -> Result<ChoiceNode, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut target = String::new();
     let mut label = None;
 
@@ -307,7 +307,7 @@ pub(crate) fn parse_choice_line(pair: Pair<Rule>) -> Result<ChoiceNode, ParseErr
 /// grammar.pest:
 /// `cue_cmd_line = { pad ~ cue_cmd_marker ~ cue_cmd_name ~ cue_cmd_scope? ~ cue_cmd_args? ~ or_comment_eol }`
 pub(crate) fn parse_cue_cmd_line(pair: Pair<Rule>) -> Result<CueCommandNode, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut command = String::new();
     let mut scope = None;
     let mut args = Vec::new();
@@ -343,7 +343,7 @@ pub(crate) fn parse_cue_cmd_line(pair: Pair<Rule>) -> Result<CueCommandNode, Par
 ///
 /// `cue_scoped_ident` is atomic, so we get the full text and split on `:`.
 fn parse_cue_cmd_scope(pair: Pair<Rule>) -> Result<ScopedName, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
 
     for inner in pair.into_inner() {
         if inner.as_rule() == Rule::cue_scoped_ident {

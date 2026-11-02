@@ -4,7 +4,7 @@ use super::*;
 
 /// Parse attribute.
 pub(crate) fn parse_attr(pair: Pair<Rule>) -> Result<Attr, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut key = String::new();
     let mut value = AttrValue::AttrString(String::new());
 
@@ -48,7 +48,7 @@ pub(crate) fn parse_attr_number(s: &str) -> AttrValue {
 
 /// Parse key_words.
 pub(crate) fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut names = Vec::new();
     let mut words = Vec::new();
 
@@ -89,7 +89,7 @@ pub(crate) fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> 
 
 /// Parse code block.
 pub(crate) fn parse_code_block(pair: Pair<Rule>) -> Result<CodeBlock, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let mut language = None;
     let mut content = String::new();
 
@@ -114,7 +114,7 @@ pub(crate) fn parse_code_block(pair: Pair<Rule>) -> Result<CodeBlock, ParseError
 
 /// Parse var_set.
 pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
-    let span = Span::from(&pair.as_span());
+    let span = Span::from_pair(&pair);
     let scope = match pair.as_rule() {
         Rule::var_set_global => VarScope::Global,
         Rule::var_set_property => VarScope::Property,
