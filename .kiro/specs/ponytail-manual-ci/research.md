@@ -389,6 +389,8 @@
 
 ## OPEN QUESTIONS（設計。推奨案つき）
 
+> 2026-11-02 の設計の議論で、1〜7 を全部推奨案で確定した（design.md の「設計の決定」）。
+
 1. **`upload-pages-artifact@v5` の `include-hidden-files`** — 推奨: `true` を付ける。理由: 要件 3.5 の「今と同じ中身」を 1 行で保てる（`.nojekyll` が残る）。付けない案は、読者に違いは出ないが中身が変わる。
 2. **mdBook の取得を SHA-256 で確かめるか** — 推奨: 確かめない。理由: 決定 D の範囲は release の build の道具 2 つで、マニュアルは配布物でない。今の `peaceiris` も確かめていない。
 3. **`dtolnay/rust-toolchain` を SHA で指すとき `toolchain: stable` を明示するか** — 推奨: 明示しない。理由: 固定した commit の `action.yml` の既定が `stable` で、その commit は変わらない。

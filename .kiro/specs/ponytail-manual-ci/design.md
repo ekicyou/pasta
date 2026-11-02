@@ -809,6 +809,7 @@ export function urlsContaining(indexObj: SearchIndexObj, word: string): string[]
 ### ワークフロー
 
 - `actionlint .github/workflows/*.yml` が 0 件。
+- 固定した SHA ごとに `gh api repos/<owner>/<repo>/commits/<sha>` が 200 を返し、行末のコメントのタグが今その SHA を指すこと（4.1-4.4・設計の決定 3）。
 - `git diff origin/main -- .github/workflows/release.yml` に、保つ行（135〜235 行・公開の job の `run:`）の hunk が無い（10.3）。
 - `grep -n 'uses:' .github/workflows/*.yml` で、`release.yml` と `release-setup-check.yml` の第三者の action が全部 SHA と行末のタグのコメントであること（4.1-4.4）。`actions/*` と `build.yml` がタグであること（4.7）。Node 20 の major が残っていないこと（8.6）。
 - ブランチを push した後に `gh workflow run build.yml --ref <branch>` と `gh workflow run manual.yml --ref <branch>`（10.7）。
@@ -841,6 +842,15 @@ export function urlsContaining(indexObj: SearchIndexObj, word: string): string[]
   6. ブランチの上で `build.yml`・`manual.yml` を回す。
 - `release.yml` の変更は、リリースの実行中に main へ入れない。`pasta-dll-multiarch`・`vsce-4-upgrade`・`pest-2-9-4-upgrade` と同じウェーブに置かない。
 - 戻し方: どの直しも 1 つのコミットで戻せる。`release.yml` の SHA と hash は、元のタグに戻すだけで戻る。
+
+## 設計の決定（2026-11-02 の設計の議論。全議題を推奨案で確定）
+
+1. **mdBook と Pages の公開の条件**: mdBook 0.5.4 は公式の release から取り、download の SHA-256 は確かめない（決定 D の範囲は配布物を作る道具だけ）。upload と deploy は `github.ref == 'refs/heads/main'` のときだけ。`upload-pages-artifact@v5` に `include-hidden-files: true` を付ける。
+2. **検索のテスト**: 索引の `search_options`（OR）を使い、包含の検査を「親語を含む節は、全部が語中片のヒットに入る」に言い直す。
+3. **release.yml の確かめ方**: 実装のタスクに、actionlint 0 件・SHA ごとの `gh api …/commits/<sha>`・保つ行の diff 0・マージの後の main での `gh workflow run release-setup-check.yml` を、確かめの段として明示する。`upload-artifact@v7` → `download-artifact@v8` の受け渡しは次のリリースで確かめる。`rust-toolchain` に `toolchain: stable` は足さない。
+4. **pasta-check の 6 行**: 「`pasta_check` クレートの `src/nar.rs`」のように、パスでなく名前で書き直す（上の「配るスキルと steering」の diff のとおり）。開発者の許可を求める段を、タスクの早いうちに置く。`CHECKED_SKILLS` に足すのは 6 行を直した後。
+5. **偽の vsce**: `release-scripts-test.ps1` の項目は「公開済みなら skipped」の 1 つだけ（項目 12）。
+6. **build-index の CLI と旧版の着色**: CLI の引数を必須にする。旧版の着色は、実装の最後にブランチの上の `gh workflow run manual.yml --ref <branch>` で確かめる。
 
 ## Open Questions / Risks
 
