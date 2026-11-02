@@ -16,7 +16,7 @@
 - アクター辞書の単語定義を共有の規則に寄せ、ソースマップに載せる（5・6.2）。
 - 変数の経路・行の記録の規則を 1 か所にし、説明を今の道に合わせる（6.1・6.3・6.4）。
 - 振る舞いを先に固め、1 直し 1 コミットで進める（7）。マニュアルを直す（8.1）。
-- 追加の指摘 2 件（シーン引数の番号のあふれ・`!select` の大きな秒数。OPEN QUESTION 2・3）も同じ領域の直しとして扱う。
+- 同じ領域の数のあふれと飽和（シーン引数の番号・`!select` の大きな秒数）を直す（9.1〜9.3）。
 
 ### Non-Goals
 
@@ -25,7 +25,7 @@
 - `LineShift` と `normalize_output_with_shift` の形の変更・撤去（このウェーブの後の棚卸で測る）。
 - ローダのキャッシュの仕組み、`debug/`・`loader/`・`runtime/` の本番コード（8.5）。
 - README・`tech.md` の断り書き（8.3）。
-- 実行時（`sakura_builder.lua`）の秒数の書式（OPEN QUESTION 3 の注）。
+- 実行時（`sakura_builder.lua`）の秒数の書式（巨大な値は実行時に `1e+22` のように出る。9.2 の範囲外）。
 
 ## Boundary Commitments
 
@@ -37,12 +37,12 @@
 - `crates/pasta_lua/tests/transpiler/`・`tests/property_scope_codegen_test.rs` の呼び出しの付け替えと、3 つのスナップショットの作り直し。
 - 新しいテスト（Lua ブロックの素通し・実行・行の対応、アクターの単語定義の対応、ブロックを含まない辞書の特性化）。
 - `book/src/internals/transpiler.md` の該当の節。
-- 例外 1 件（8.5 の分け方。OPEN QUESTION 1）：`crates/pasta_lua/src/debug/source_map_builder_tests.rs` の 1 本のテストの入力だけ。
+- 例外 1 件（8.5）：`crates/pasta_lua/src/debug/source_map_builder_tests.rs` の 1 本のテストの入力だけ。
 
 ### Out of Boundary
 
 - `TranspileContext` のファイルの属性（`accumulate_file_attr`・`file_attrs`・`merge_attrs`）と `generate_global_scene` の `_file_attrs` 引数（4.6。`scene-attribute-store` が使う）。
-- `debug/` の本番コードと説明（`debug/source_map/mod.rs` 25 行の 1 語は `ponytail-lua-debug` が直す）、`loader/`・`runtime/`（ローダとランタイムが `TranspileContext` をファイルごとに捨てる作りは変えない）。
+- `debug/` の本番コードと説明（`debug/source_map/mod.rs` 25 行の 1 語は 0.5.1 の DAP 撤去 spec が直す。`ponytail-lua-debug` は 2026-11-02 に閉じた）、`loader/`・`runtime/`（ローダとランタイムが `TranspileContext` をファイルごとに捨てる作りは変えない）。
 - `pasta_core`（8.4 の条件の場合の `SceneRegistry::merge_from`・`WordDefRegistry::merge_from` の削除を除く）。
 - `pasta_dsl` の AST と span（値は変わらない）。
 - `string_literalizer.rs`、`book/src/grammar/block-structure.md`（8.2。書き換えない）。
@@ -57,9 +57,9 @@
 ### Revalidation Triggers
 
 - `LuaCodeGenerator::out_line()` の意味が変わる（保留中の空行を数えない。下の「状態」）。`code_gen` を直接呼ぶ外の使い手（今はテストだけ）は見直す。
-- `normalize_output_with_shift` が消す行は末尾の空白の行だけになり、実際の生成コードでは `LineShift` が恒等になる。`debug/source_map`（`MapBuilderSink::finish`）・`loader/source_map_build.rs` は形のまま動くが、`ponytail-lua-debug` は「ズレ得る」という説明を見直す。
+- `normalize_output_with_shift` が消す行は末尾の空白の行だけになり、実際の生成コードでは `LineShift` が恒等になる。`debug/source_map`（`MapBuilderSink::finish`）・`loader/source_map_build.rs` は形のまま動くが、「ズレ得る」という説明の見直しは 0.5.1 の DAP 撤去 spec へ申し送る。
 - pub API の削除（`LineEnding`・`TranspilerConfig::new`・`without_comments`・`with_line_ending`・`comment_mode`・`line_ending`、`LuaTranspiler::with_defaults`・`transpile_with_sink`・`config`、`normalize_output`、`TranspileContext` の `current_module`・`set_current_module`・`get_current_module`・`register_global_scene`・`merge_from`、`LuaCodeGenerator::with_line_ending`）。`pasta_shiori`・`pasta_check`・`benches` に使い手は無い（grep で確かめた）。
-- デバッグのソースマップの記録が増える（アクター辞書の単語定義の行）。`ponytail-lua-debug` のブレークポイント解決の期待値が増える。
+- デバッグのソースマップの記録が増える（アクター辞書の単語定義の行）。ソースマップの逆引きの結果が増えるだけで、今ある対応は変わらない。
 - Lua ブロックを含む辞書の生成コードが変わる。キャッシュは `pasta_lua` の版が上がると丸ごと作り直される（`.cache_version`）。
 
 ## Architecture
@@ -115,7 +115,7 @@ graph LR
 - スナップショット 29 本のうち、Lua ブロックを含まない 26 本はバイト単位で同じ。変わったのは Lua ブロックを含む 3 本（`r7_1_off_path__kind_code_block`・`r7_1_off_path__fixture_zero_cost_all_syntax`・`zero_cost_off_path_all_syntax`）で、差分はブロックの内容の行の字下げだけ。
 - `tests/fixtures/sample.generated.lua` は、改行コードを除いて同じ（`git diff --ignore-cr-at-eol` が空）。`sample.expected.lua` との一致のテストも通った。
 - デバッグの e2e（`debug_break_coalesce.pasta` ほか）は通った。見本のブロックに空行が無いので、行の番号は変わらない。
-- 落ちたのは、直した振る舞いを固めていた単体テストだけ（下の「Testing Strategy」の表）。その 1 本が `debug/` にある（OPEN QUESTION 1）。
+- 落ちたのは、直した振る舞いを固めていた単体テストだけ（下の「Testing Strategy」の表）。その 1 本が `debug/` にある（8.5 の例外）。
 
 → 案 A でバイト単位の一致は保てる。案 B へは退かない。
 
@@ -124,8 +124,8 @@ graph LR
 ### Modified Files
 
 - `crates/pasta_lua/src/code_gen/mod.rs` — 保留の空行（`pending_blank_lines`）、作り方を `new` 1 つに（`line_ending` の欄と `with_line_ending` を消す）、行の記録の小さな関数（`record_span_since`）、説明の直し（6.4）。
-- `crates/pasta_lua/src/code_gen/element_gen.rs` — `generate_code_block` を字下げなしに、`generate_word_definition` を `pub(super)` にして値を `literalize_with_span` で、`generate_var_set` の経路を `resolve_var_path` に、記録を `record_span_since` に、`resolve_var_path` の番号のあふれ（OPEN QUESTION 2）。
-- `crates/pasta_lua/src/code_gen/scope_gen.rs` — `generate_actor` の単語定義を共有の関数へ、`generate_global_scene` の `_context` 引数を消す、記録を `record_span_since` に、`!select` の秒数の書式（OPEN QUESTION 3）。
+- `crates/pasta_lua/src/code_gen/element_gen.rs` — `generate_code_block` を字下げなしに、`generate_word_definition` を `pub(super)` にして値を `literalize_with_span` で、`generate_var_set` の経路を `resolve_var_path` に、記録を `record_span_since` に、`resolve_var_path` の番号のあふれ（9.1）。
+- `crates/pasta_lua/src/code_gen/scope_gen.rs` — `generate_actor` の単語定義を共有の関数へ、`generate_global_scene` の `_context` 引数を消す、記録を `record_span_since` に、`!select` の秒数の書式（9.2・9.3）。
 - `crates/pasta_lua/src/code_gen/source_map.rs` — 説明だけ（「本番ではシンクを付けない」を消す。6.4）。
 - `crates/pasta_lua/src/code_gen/{mod.rs の tests, element_gen_tests.rs, scope_gen_tests.rs, expr_gen_tests.rs}` — 作り方の付け替え、保留の空行に合わせた期待、新しいテスト。
 - `crates/pasta_lua/src/normalize.rs` — 末尾の整えだけにする。`normalize_output` を消す。説明とテストを直す。
@@ -137,7 +137,7 @@ graph LR
 - `crates/pasta_lua/tests/transpiler/*.rs`（`record_wiring_element_test`・`record_wiring_scope_test`・`source_map_seam_test`・`transpile_sink_port_test`・`final_regression_test`・`scene_alias_declared_name_test`・`basic_test`・`dynamic_word_ref_test`・`code_generator_test`）と `tests/property_scope_codegen_test.rs` — 呼び出しの付け替え（`transpile_with_sink` 約 28 か所、`with_line_ending` 約 15 か所、`TranspilerConfig::new`・`without_comments`）。
 - `crates/pasta_lua/tests/transpiler/` に新しいテスト関数を足す（新しいファイルは作らず、既存の `final_regression_test.rs`・`runtime_safety_test.rs`・`record_wiring_scope_test.rs` に足す）。
 - `crates/pasta_lua/tests/transpiler/snapshots/` — 上の 3 本を作り直す。特性化の新しいスナップショット 1 本を足す。
-- `crates/pasta_lua/src/debug/source_map_builder_tests.rs` — 1 本のテストの入力だけ（OPEN QUESTION 1）。
+- `crates/pasta_lua/src/debug/source_map_builder_tests.rs` — 1 本のテストの入力だけ（8.5 の例外）。
 - `book/src/internals/transpiler.md` — 8.1 の各所。
 - 条件つき（8.4）：`crates/pasta_core/src/registry/scene_registry.rs`・`word_registry.rs` の `merge_from` とそのテスト、`book/src/internals/registry-search.md` 36 行の 1 文。
 
@@ -224,14 +224,10 @@ sequenceDiagram
 | 8.2 | `block-structure.md` は保つ | book | 触らない | — |
 | 8.3 | 断り書きを足さない | — | 触らない | — |
 | 8.4 | `pasta_core` の `merge_from` は入る順で | pasta_core（条件つき） | 削除 | 実装の順 |
-| 8.5 | ほかの持ち場に触らない | 境界 | 例外 1 件（OPEN QUESTION 1） | — |
-
-追加の指摘（要件の番号は要件ディスカッションで振る。ここでは番号を作らない）：
-
-| 追加の指摘 | Summary | Components | Interfaces |
-|------------|---------|------------|------------|
-| OPEN QUESTION 2 | `＄２５５` の番号のあふれ | element_gen | `resolve_var_path` |
-| OPEN QUESTION 3 | `!select` の大きな秒数の飽和 | scope_gen | `generate_choice_timeout` |
+| 8.5 | ほかの持ち場に触らない | 境界 | 例外 1 件（`source_map_builder_tests.rs` の入力） | 実装の順 |
+| 9.1 | `＄２５５` を `args[256]` に | element_gen | `resolve_var_path` | — |
+| 9.2 | `!select` の秒数を i64 に詰めない | scope_gen | `generate_choice_timeout` | — |
+| 9.3 | 今の `!select` の出力は同じ | scope_gen | 同上 | — |
 
 ## Components and Interfaces
 
@@ -323,7 +319,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 - `generate_code_block`：内容の各行を `write_raw(line)`＋`write_line_terminator()` で出す（字下げしない・空行も直に書く）。行ごとに `record_block_line(content_start_line + offset)`（今のまま）。説明の「without transformation」は事実になる。
 - `generate_word_definition(word, receiver, separator)` を `pub(super)` にし、グローバル（`"PASTA", "."`）・シーン（`"SCENE", ":"`）・アクター（`"ACTOR", ":"`）の 3 つが使う。値は `StringLiteralizer::literalize_with_span(w, &word.span)`（5.3）。名前は `literalize(name)`（文法の `id` は `"` も `\` も含まないので `"名前"` になり、アクターの今の `"{}"` とバイト単位で同じ。5.2）。行ごとに `record_span_since`（5.1）。
 - `generate_var_set`：`Local`・`Global` の経路は `resolve_var_path`（6.1）。`Property` と `Args` の枝は今のまま先に分ける。
-- `resolve_var_path`：`VarScope::Args(index)` は `format!("args[{}]", u32::from(*index) + 1)`（OPEN QUESTION 2）。
+- `resolve_var_path`：`VarScope::Args(index)` は `format!("args[{}]", u32::from(*index) + 1)`（9.1）。
 
 ```rust
 pub(super) fn generate_word_definition(
@@ -346,7 +342,7 @@ pub(super) fn resolve_var_path(name: &str, scope: &VarScope) -> Result<String, T
 **Responsibilities & Constraints**
 - `generate_actor`：単語定義の繰り返し（50〜72 行）を `for word_def in &actor.words { self.generate_word_definition(word_def, "ACTOR", ":")?; }` にする。空の単語定義を飛ばす規則は共有の関数にすでにある。Lua ブロックの扱い（言語識別子が `lua` のものだけ・前に区切りの空行）は今のまま（1.5・1.6）。
 - `generate_global_scene(scene, declared_name, scene_counter, _file_attrs)`：`_context: &TranspileContext` を消す。`_file_attrs` は残す（4.6）。`#[allow(unused_variables)]` は `_` で始まる引数には要らないので外す。
-- `generate_choice_timeout`：`Float` は小数部の判定をやめて 1 つの書式にする（OPEN QUESTION 3）。
+- `generate_choice_timeout`：`Float` は小数部の判定をやめて `(*f + 0.0).to_string()` の 1 つの書式にする（9.2・9.3。`-0.0 + 0.0` は `0.0` なので `-0.0` は今と同じく `0`。実行時の `math.floor` に `-0` を渡さない）。
 - 見出し・選択肢・タイムアウトの記録は `record_span_since`。
 
 ```rust
@@ -441,8 +437,8 @@ impl Default for LuaTranspiler { /* new(TranspilerConfig::default()) */ }
 ### 実装の順（7.5・7.7。1 直し 1 コミット）
 
 1. **特性化（直す前）**：Lua ブロックを含まない辞書を 1 本の insta スナップショットに固める（項目の無いローカルシーン・入れ子の閉じが続く所・アクター辞書だけの区切り・ファイルの最後のシーン・シーン単語だけのシーン・グローバル単語）。今の出力をそのまま期待値にする（2.1・7.5）。
-2. **Lua ブロックの直し**：保留の空行・`generate_code_block`・`normalize` の規則の撤去を 1 コミットにする（3 つは片方だけでは 1.1〜1.3 が満たせない）。同じコミットで、新しいテスト（7.1〜7.3）、3 本のスナップショットの作り直し（7.6）、直した振る舞いを固めていた単体テストの直し（下の表）、`debug/source_map_builder_tests.rs` の入力（OPEN QUESTION 1）。
-3. 設定の撤去（3）。4. 文脈の撤去（4.1・4.2）。5. 入口と包みの撤去（4.3〜4.5）。6. アクターの単語定義（5・6.2、7.4 のテスト）。7. 変数の経路と記録の規則（6.1・6.3）。8. 説明（6.4）とマニュアル（8.1）。9. 追加の指摘 2 件（OPEN QUESTION 2・3、それぞれ 1 コミット）。10. 条件つきの `pasta_core` の `merge_from`（8.4）。
+2. **Lua ブロックの直し**：保留の空行・`generate_code_block`・`normalize` の規則の撤去を 1 コミットにする（3 つは片方だけでは 1.1〜1.3 が満たせない）。同じコミットで、新しいテスト（7.1〜7.3）、3 本のスナップショットの作り直し（7.6）、直した振る舞いを固めていた単体テストの直し（下の表）、`debug/source_map_builder_tests.rs` の入力（8.5 の例外）。
+3. 設定の撤去（3）。4. 文脈の撤去（4.1・4.2）。5. 入口と包みの撤去（4.3〜4.5）。6. アクターの単語定義（5・6.2、7.4 のテスト）。7. 変数の経路と記録の規則（6.1・6.3）。8. 説明（6.4）とマニュアル（8.1）。9. 数のあふれと飽和（9.1・9.2、それぞれ 1 コミット）。10. 条件つきの `pasta_core` の `merge_from`（8.4）。
 - 各コミットで `cargo fmt --check`・`cargo clippy -p pasta_lua --all-targets`（警告 0）・`cargo test -p pasta_lua`。cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。`sample.generated.lua` の改行だけの差分は戻す（7.7）。
 
 ### Unit Tests
@@ -450,8 +446,8 @@ impl Default for LuaTranspiler { /* new(TranspilerConfig::default()) */ }
 - `code_gen/mod.rs`：保留の空行の約束（`write_blank_line` だけでは `out_line` が進まない・次の `writeln` で出る・`end_block` の前では捨てる・書いたバイトの改行の数 = `out_line`）。`write_header` は 2 行を書き、空行は保留。`end_block` は `"do\n    body\nend\n"`。
 - `element_gen_tests.rs`：`generate_code_block` が字下げ 1 段の中でも内容を字下げせずに出す・空行を `""` で出す。`generate_word_definition` の `"ACTOR", ":"` の形。
 - `normalize.rs`：`end` の前の空行が残る（`"a\n\nend\n"` → そのまま）。末尾の空行だけが消え、`LineShift` に載る。CRLF は LF。
-- `resolve_var_path`：`Args(255)` → `"args[256]"`（OPEN QUESTION 2）。
-- `generate_choice_timeout`：`Float(10.0)` → `10`、`Float(2.5)` → `2.5`、`Float(1e19)` → `10000000000000000000`、`Float(-0.0)` → OPEN QUESTION 3 の決定どおり。
+- `resolve_var_path`：`Args(255)` → `"args[256]"`（9.1）。
+- `generate_choice_timeout`：`Float(10.0)` → `10`、`Float(2.5)` → `2.5`、`Float(1e19)` → `10000000000000000000`、`Float(-0.0)` → `0`（9.2・9.3）。
 
 ### Integration Tests（tests/transpiler）
 
@@ -473,22 +469,17 @@ impl Default for LuaTranspiler { /* new(TranspilerConfig::default()) */ }
 | `scope_gen::tests::actor_skips_empty_words_and_non_lua_code_blocks` | 末尾を `end\n` に |
 | `normalize::tests` の `end` の前の空行の 5 本と `test_shift_*` の 3 本・doctest | 「残る」テスト 1 本と末尾のテストに置き換え、ほかは消す。`test_with_shift_byte_identical_to_legacy` は消す（包みが無い） |
 | `source_map_seam_test::test_out_line_counter_matches_emitted_line_count` | ヘッダの後は 2、アクションの後は 4（書いたバイトと一致） |
-| `debug::source_map::source_map_builder_tests::map_builder_sink_finish_rebases_to_final_lua_lines` | 入力を末尾の空行の形にする（OPEN QUESTION 1） |
+| `debug::source_map::source_map_builder_tests::map_builder_sink_finish_rebases_to_final_lua_lines` | 入力を末尾の空行の形にする（8.5 の例外） |
 | `final_regression_test::r7_1_off_path_matches_committed_snapshots`・`zero_cost_regression_test::test_zero_cost_off_path_all_syntax_byte_invariant` | 3 本のスナップショットを作り直す（7.6） |
 
 ## Migration Strategy
 
 - キャッシュ：直した版を出すと `pasta_lua` の版が上がり、`.cache_version` が違うのでキャッシュは丸ごと作り直される（今の仕組み。この spec は変えない）。字下げの入った古い変換結果は使われない。
-- 申し送り（コミットと同時に相手の brief へ書く）：`ponytail-lua-debug` の brief に、(a) `source_map_builder_tests.rs` の 1 本の入力をこの spec が直したこと（OPEN QUESTION 1）、(b) 生成コードでは `LineShift` が恒等になり、`debug/source_map/mod.rs` 25 行あたりの「ズレ得る」の説明が古くなること。
+- 申し送り（0.5.1 の DAP 撤去 spec へ。`ponytail-lua-debug` は閉じた）：(a) `source_map_builder_tests.rs` の 1 本の入力をこの spec が直したこと（8.5 の例外）、(b) 生成コードでは `LineShift` が恒等になり、`debug/source_map/mod.rs` 25 行あたりの「ズレ得る」の説明と `normalize_output` の 1 語が古くなること、(c) アクター辞書の単語定義の行もソースマップに載ること。2026-11-02 に共有メモ（`ponytail-lua-transpiler-to-lua-debug.md`）へ書いた。DAP 撤去 spec の brief ができていれば、kiro-complete でそこへ写す。
 
 ## Open Questions / Risks
 
-OPEN QUESTION の詳しい形（仮定・推奨・例）は research.md の「設計ディスカッションへの持ち越し」に置く。要点：
-
-1. `debug/` のテスト 1 本が、消す規則（`end` の前の空行の削除）を固めている。仮定：この spec がそのテストの入力だけを直す（8.5 の分け方）。
-2. `resolve_var_path` の `Args(u8)` のあふれ（`＄２５５`）。仮定：入れる。`u32::from(*index) + 1`。
-3. `!select` の整数値の浮動小数の飽和。仮定：入れる。小数部の判定をやめる。`-0.0` は今と同じく `0` を出す。
-4. `out_line()` の意味の変更（保留の空行を数えない）。仮定：受け入れる（pub API を変えてよい決定の範囲）。
+設計で出た OPEN QUESTION 1〜4 は、2026-11-02 の設計ディスカッションで仮定のとおりに閉じた（research.md の「設計ディスカッションへの持ち越し」の閉じ方）。1 は要件 8.5 の例外、2・3 は要件 9、4 は Revalidation Triggers に入れた。
 
 - Risk：保留の空行の書き出しを通らない書き込みを、後から誰かが足すと、空行の位置がずれる。軽減：`self.writer` に直接書くのは `write_indent`・`write_raw`・`writeln`・`flush_blank_lines`・`write_line_terminator`・`generate_expr`（いつも `write_indent` の後）だけ、と `mod.rs` の説明に書き、`mod.rs` の単体テストで「改行の数 = `out_line`」を守る。
 - Risk：同じウェーブの `element_gen.rs` はこの spec だけ（brief の決まり）。`lib.rs`・`transpiler.md` の別の行は後から入る側が合わせる。

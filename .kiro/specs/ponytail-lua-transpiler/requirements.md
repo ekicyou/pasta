@@ -19,12 +19,12 @@
 - **In scope**
   - 監査の 1〜4 番（Lua ブロックの中身の書き換え・死んだ変換の設定・`TranspileContext` の死んだ状態・素通し）。
   - 申し送り（2026-11-01、`ponytail-lua-loader` の設計より）の `TranspileContext::merge_from`。使い手が 0 になったので、死んだ状態に足して消す。`context.rs` 117 行の古い説明もいっしょに消える。
-  - ギャップ分析で増えた、同じ領域の指摘（要件 4.5・4.6、要件 5、要件 6）。
+  - ギャップ分析で増えた、同じ領域の指摘（要件 4.5・4.6、要件 5、要件 6）と、設計で `ponytail-dsl-parser` の申し送りから増えた指摘（要件 9）。
   - 直しに合わせたスナップショット（`tests/transpiler`・`src/code_gen/*_tests.rs`）と見本（`tests/fixtures/sample.generated.lua` ほか）の作り直し、マニュアル `book/src/internals/transpiler.md` の直し。
 - **Out of scope**
   - `TranspileContext` のファイルの属性の欄と関数（`accumulate_file_attr`・`file_attrs`・`merge_attrs`）と、`generate_global_scene` の `_file_attrs` 引数（2026-10-19 開発者の決定。0.5.0 の `scene-attribute-store` が、ファイルレベル属性の継承に使う）。
   - `loader/`・`runtime/`（`ponytail-lua-loader` で完了）。本番のローダとランタイムが `TranspileContext` をファイルごとに捨てていること自体は変えない。
-  - `debug/`（`ponytail-lua-debug` の持ち場）。デバッグのソースマップが読む行の対応の形（`LineShift` を含む）は変えない（research.md の持ち越し 3）。
+  - `debug/`。`ponytail-lua-debug` は 2026-11-02 に閉じ、残る部品（`source_map/` など）への指摘は 0.5.1 の DAP 撤去 spec が受け継ぐ。デバッグのソースマップが読む行の対応の形（`LineShift` を含む）は変えない（research.md の持ち越し 3）。例外は要件 8.5 のテスト 1 本の入力だけ。
   - `pasta_core` の `SceneRegistry::merge_from`・`WordDefRegistry::merge_from`（`ponytail-core-registry` の持ち場）。消す順は要件 8.4 のとおり。
   - `string_literalizer.rs`（文字列のリテラル化の規則）。要件 5.3 で、エラーの位置を保つ呼び方だけを揃える。
   - Lua ブロックの内容の検査（今と同じく、トランスパイラは中身を検査しない。誤りはロード時の Lua エラーになる）。
@@ -32,7 +32,7 @@
 - **Adjacent expectations**
   - `pasta_dsl` が渡す AST と span の値は変わらない（`ponytail-dsl-parser` は span の値を変えない）。
   - ローダのキャッシュは、キャッシュに記録した `pasta_lua` の版が変わると丸ごと作り直される（今の仕組み）。直った版を出すと版が上がるので、字下げの入った古い変換結果は使われない。この spec はキャッシュの仕組みを変えない。
-  - デバッガ（`ponytail-lua-debug`）は、`.pasta` の行と生成した `.lua` の行の対応を今と同じ形で受け取る。この spec は対応の中身を、要件 2.3〜2.4・要件 5 のとおりに保つか増やすだけで、形を変えない。
+  - デバッグのソースマップ（`debug/source_map`）は、`.pasta` の行と生成した `.lua` の行の対応を今と同じ形で受け取る。この spec は対応の中身を、要件 2.3〜2.4・要件 5 のとおりに保つか増やすだけで、形を変えない。
   - 同じウェーブの約束：`code_gen/element_gen.rs` は、このウェーブではこの spec だけが触る。`lib.rs` の再輸出の行・マニュアルの同じ頁の別の節は、後から入る側が合わせる。
 
 ## Requirements
@@ -133,4 +133,16 @@
 2. The マニュアル shall `book/src/grammar/block-structure.md` の「Lua ブロックの内容は検証されず、そのまま生成される Lua コードに出力される」を、直した後の事実として保つ（書き換えない）。
 3. The 変更 shall README と `.kiro/steering/tech.md` に pub API の断り書きを書き足さない（`ponytail-lua-loader` が書いた）。
 4. If この spec が `ponytail-core-registry` より後に main に入る, then the 変更 shall 使い手の無くなった `pasta_core` の `SceneRegistry::merge_from`・`WordDefRegistry::merge_from` も消す。先に入る場合は、`pasta_core` のファイルに触らない（あちらが消す）。
-5. The 変更 shall `debug/`・`loader/`・`runtime/`・`pasta_core`（要件 8.4 の場合を除く）のソースに触らない。触らずに直せない所が出たら、設計で持ち場の spec と分け方を決める。
+5. The 変更 shall `debug/`・`loader/`・`runtime/`・`pasta_core`（要件 8.4 の場合を除く）のソースに触らない。ただし `debug/source_map_builder_tests.rs` の `map_builder_sink_finish_rebases_to_final_lua_lines` の入力だけは、この spec が直す（要件 1.3 で消す「`end` の前の空行の削除」を固めているため。`debug/` の持ち場の spec は 2026-11-02 に閉じ、このウェーブに居ない）。
+
+### Requirement 9: 同じ領域の数のあふれと飽和を直す
+
+**Objective:** As a ゴーストの作者, I want シーンの引数の番号と `!select` の秒数が、書いたとおりの値で生成コードに出てほしい, so that 大きな番号や大きな秒数を書いたときに、黙って別の値になったり変換が落ちたりしない。
+
+> 2026-11-02 の設計で `ponytail-dsl-parser` の申し送りから足した（同じ領域の指摘。`ponytail-dsl-parser` は `＄２５６` 以上を構文の誤りにし、i64 に入らない整数を浮動小数にすると決めた）。
+
+#### Acceptance Criteria
+
+1. When 作者がシーンの引数 `＄０`〜`＄２５５` を書いた, the Pasta Transpiler shall `args[1]`〜`args[256]` を出す（今は `＄２５５` で、debug ビルドは変換が panic し、release ビルドは `args[0]` を出す）。
+2. When `!select` の秒数が小数部の無い浮動小数である, the Pasta Transpiler shall その値を i64 の範囲に詰めずに出す（例：`1e19` は `10000000000000000000`。今は `9223372036854775807`）。
+3. The Pasta Transpiler shall 9.2 の直しで、今の `!select` の出力（`10.0` は `10`、`2.5` は `2.5`、`-0.0` は `0`）を変えない。
