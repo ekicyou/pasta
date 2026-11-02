@@ -123,48 +123,30 @@ VSCode でゴーストをデバッグする作者が困る。
 - 品質の関門：`cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_lua`。
 - cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。`PASTA_DEBUG=1` がテストを壊さないこと（固定ポート 9276。`#[ctor]` で中和済み。新しいテストにも同じ守りを付ける）。
 
-## 2026-10-22 棚卸の再測定（main 6a8dc479）
-
-- **前提の変化**
-  - 監査の控えの後、2026-10-19 夜の直し（c4d0380e）が `crates/pasta_lua/src/debug/enable.rs`（260 行）と `debug_mod_tests.rs` を変えた。待ち受けの bind を Lua に触れる前に行い、取れなければ警告を出して、デバッグなしで起動を続ける（`Ok(None)`）。
-  - そのため 11 番の `unreachable!` は、L246〜256 から L120〜126（bind に失敗した枝）へ移った。`DebugError::Bind` は `enable` の外へ出なくなり、transport の中だけで使う。
-  - 新しく見つけた点: ポートが取れなかったときも、読み込み（`loader/mod.rs` L214〜232）は設定を見てソースの対応表と索引を作る。デバッグの持ち手は無いので、作った表が使われずに残る（`runtime/exec.rs` の `debug_enabled()` は偽、`debug_source_map()` は有り）。ギャップ分析の監査の候補にする。
-  - ほかの指摘の場所（`wiring/inbound.rs` L186〜201、`inspect.rs` L378〜388、`dap/decode.rs` L303、`transport/mod.rs` L147〜160・L236〜261・L436 など）は変わっていない。FFI の読み込みの作業（`lua-cmodule-robustness`）は `debug/` に触れていない。
-- **触るファイル**: `crates/pasta_lua/src/debug/**`（本番は約 8k 行。大きいのは `source_map/mod.rs` 675 行・`breakpoints.rs` 626 行・`types.rs` 581 行で、1,000 行に近いものは無い）、マニュアル `book/src/internals/debug.md`・`book/src/debug/source-level.md`。
-- **規模**: 14〜18 タスク（12 の指摘と、ギャップ分析で増える分）。
-- **先に要るもの**: 0.4.2 を出した後（隙間の作業）。`scene-play-event` が先に入る。共有するのは `debug/playscene.rs`（今は `#![allow(dead_code)]`。あちらが新しい呼び手を足すので、死んでいる所が変わる）と、ソースの対応表（`source_map/mod.rs` の `scene_at`・`scene_index`、`source_map/scene_index.rs`）。あちらがデバッグの有効を Lua に見せる口を足すなら、その決め方（設定か、持ち手か）も受け継ぐ。`runtime/exec.rs`・`runtime/factory.rs` は隙間の `ponytail-lua-loader` の持ち場なので、上の新しい点を直すなら境を決める。`book/src/debug/*.md` は `ponytail-editor-tooling` と別の節。
-- **種別**: バグ（Lua 表示で `.pasta` のブレークポイントが効かない、ステップが抜けない、など）。
-- **要件定義のモデル**: Opus。
-- **分割の案**: 今は不要。ギャップ分析で 20 を超えたら、正しさ（ブレークポイント・ステップ・数の表示・応答）と無駄（死んだコード・写し・行ごとの費用）の 2 つに分ける。
-- **見つけた穴・古くなった記述**
-  - `book/src/internals/debug.md` L445 の「`PASTA_DEBUG=1` だと、ロードを伴うテストがすべて固定ポートに bind しようとして `AddrInUse` で失敗する」は、c4d0380e の後は当たらない。今は、ポートを取れたテストだけがデバッグを有効にして走り、ほかはデバッグなしで読み込みが通る（壊れ方が変わった）。すぐ直せる文書の誤り。
-  - 11 番の `unreachable!` の場所（上記）。
-
 ## 申し送り（scene-play-event より、2026-10-22 完了時）
 
 - 上の「新しく見つけた点」（ポートが取れなくても表を作るのに使われない）は、scene-play-event で**仕様にした**。ランタイムは、設定でデバッグが有効なら、待ち受けが立たなくてもソースの対応表と索引を持ち続ける（`runtime/mod.rs` の `if config.debug.enabled`）。位置でシーンを再生する `OnPastaSceneAt` がこれを使う。直す対象ではない。
 - 内部用のモジュール `@pasta_debug`（`runtime/module_registry.rs` の `register_debug_module`）を足した。`enabled()` は**解決した設定の値**を返し、待ち受けの有無（`debug_enabled()`）は見ない。`scene_at(file, line)` は `debug/playscene.rs` の新しい `resolve_position` を呼ぶ。`playscene.rs` に呼び手が増えたので、`#![allow(dead_code)]` の外し方を見直すときはこれを数える。
 - `debug_enabled()`（`runtime/exec.rs`）と `debug_handle` の doc は「待ち受けの有無」を表す（doc は完了時に直した）。設定の有効と待ち受けの有無の 2 つがある、という前提で整理すること。
 
-## 2026-10-23 棚卸の再測定（main 8fc9bdff）
-
-- **前提の変化**
-  - scene-play-event が入った。`debug/` の中で変わったのは、位置でシーンを引く道具 `crates/pasta_lua/src/debug/playscene.rs` に関数 `resolve_position` が足されたこと（22 行）と、そのテスト（`playscene_tests.rs`・`debug_mod_tests.rs`）だけ。ほかの指摘の場所（ブレークポイントの訳 `wiring/inbound.rs` 186〜201 行、数の表示 `inspect.rs` 378〜388 行、知らない要求 `dap/decode.rs` 303 行、`transport/mod.rs`、`config.rs` など）は、行番号も変わっていない。
-  - `playscene.rs` の 2 つの関数は、どちらも本番の呼び手を持つ。`resolve_and_kick` は右クリックの実行の受け口（`wiring/inbound.rs` 357 行）、`resolve_position` は内部用のモジュール `@pasta_debug` の `scene_at`（`runtime/module_registry.rs` 203 行）が呼ぶ。ファイルの頭の注記（29〜30 行）も「本番のコードで各項目が使われている」と書く。8 番の「`playscene.rs` の `#![allow(dead_code)]`」は、許可を外すだけで済む見込み。
-  - 8 番の `insert_file`（`source_map/scene_index.rs` 171 行）は、索引を作る `source_map/scene_join.rs` の `join_records`（130 行）が本番で呼ぶ。名残りなのは許可（39 行）の方で、関数ではない。ギャップ分析で確かめ直す。
-  - 前回の「見つけた穴」の `book/src/internals/debug.md` の `PASTA_DEBUG=1` の記述は、scene-play-event の完了時に直された（今は 476 行で、今の振る舞いと合う）。
-  - デバッグの「有効」は 2 つある。設定の有効（`@pasta_debug.enabled()` とソースの対応表の保持）と、待ち受けの有無（`runtime/exec.rs` の `debug_enabled()` と `debug_handle`）。整理するときに、この 2 つを混ぜない（申し送りのとおり）。
-- **触るファイル**: `crates/pasta_lua/src/debug/**`（本番は約 8k 行。大きいのは `source_map/mod.rs` 675 行・`breakpoints.rs` 626 行・`types.rs` 581 行で、1,000 行に近いものは無い）、マニュアル `book/src/internals/debug.md`・`book/src/debug/source-level.md`。新しいファイルは無い見込み。
-- **規模**: 14〜18 タスク（変わらず。`playscene.rs` の分は軽くなった）。
-- **先に要るもの**: 機能の上では無い（scene-play-event は入った）。0.4.2 の残り（external-control-events・chain-talk-interrupt・reg-handler-chain・recommend-menu-scenes）と 0.5.0 の spec は `debug/` を触らないので、ソースは重ならない。0.5.0 の検査を足す spec が触るのは `book/src/debug/validate.md` で、別の頁。隙間の中では、`ponytail-lua-loader` と `runtime/` の境（`runtime/exec.rs` の `debug_source_mode()`、`runtime/module_registry.rs` の `@pasta_debug`）を決める。`ponytail-editor-tooling` とは `book/src/debug/*.md` の別の節。
-- **種別**: バグ（Lua 表示で `.pasta` のブレークポイントが効かない、ステップが抜けない、など）。
-- **要件定義のモデル**: Opus。
-- **分割の案**: 今は不要。ギャップ分析で 20 を超えたら、正しさ（ブレークポイント・ステップ・数の表示・応答）と無駄（死んだコード・写し・行ごとの費用）の 2 つに分ける（前回と同じ）。
-- **見つけた穴・古くなった記述**
-  - `playscene.rs` の頭の説明（1〜3 行）は `resolve_and_kick` だけを書き、足された `resolve_position` に触れていない。`#![allow(dead_code)]`（31 行）と `scene_index.rs` の同じ許可（39 行）は、注記どおり結線の前の名残り。
-  - 4 番の知らない要求の扱いは、マニュアル `book/src/internals/debug.md` 207 行の表（「その他: なし（無視する）」）にも書いてある。直すときにこの行も変える。
-
 ## 申し送り（2026-10-24 の棚卸より。サイドカーの TOML 化）
 
 - 0.4.3 の `toml-serialization` が、ソースマップのサイドカー（`.map`）を JSON から TOML に替える。サイドカーの読み書きはこの spec の持ち場（`crates/pasta_lua/src/debug/source_map/`）と重なりうるので、この spec は `toml-serialization` が入った後の main でギャップ分析をやり直す（roadmap の「0.4.5 の範囲」）。
 - 0.4.3 の `mlua-0-12-upgrade` が `mlua::` を参照するファイルを広く書き換えるので、`debug/**` もその後の形で測り直す。
+
+## 2026-11-02 棚卸の再測定（main 491cc23c）
+
+- **前提の変化**: 約束どおり、`toml-serialization`・`mlua-0-12-upgrade`（と `shiori4-v3-portable`）が入った後の main で測り直した。12 の指摘はどれも残る。
+  - `debug/` で変わったのは、サイドカー `source_map/sidecar.rs` の `serde_json`→`toml`（中身の形と、ランタイムがサイドカーを読まないことは同じ）、`mlua::Debug`→`mlua::debug::Debug` の `use` の行（`hook.rs`・`session/mod.rs`・`session/stop_loop.rs`）、`inspect.rs`・`kick.rs` の doc だけ。DAP の通信は JSON のまま（`dap/`・`transport/framing.rs`。TOML の方針の対象外）。
+  - 行番号: `inspect.rs` の数の表示は 3 行下へずれて 381〜391 行（`n as i64` は 385 行）。ほか（`wiring/inbound.rs` 194 行の `pasta_active() && is_pasta_source`、`dap/decode.rs` 303 行、`enable.rs` 124 行の `unreachable!`、`debug/config.rs` 98〜136 行の `resolve`）は変わらない。
+  - `ponytail-lua-loader` は入ったが、`runtime/exec.rs` 86 行の `debug_source_mode()`（テストだけが使う）は触らなかった。拾うかはこの spec のギャップ分析で決めてよい（境の相手はもう居ない）。デバッグの「有効」は 2 つ（設定の有効と待ち受けの有無）で、混ぜない（10-22 の申し送りのとおり）。
+- **触るファイル**: `crates/pasta_lua/src/debug/**`（本番は約 8k 行。大きいのは `source_map/mod.rs` 675 行・`breakpoints.rs` 626 行・`types.rs` 581 行で、1,000 行に近いものは無い）、マニュアル `book/src/internals/debug.md`・`book/src/debug/source-level.md`。新しいファイルは無い見込み。`pasta_lua/src/lib.rs` 52 行の再輸出の型を消すなら、`ponytail-lua-transpiler` と同じファイルの別の行（後から入る側が合わせる）。
+- **規模**: 14〜18 タスク（変わらず）。
+- **先に要るもの**: 働きの上では無い。ほかの ponytail 7 本とはソースを共有しない（`ponytail-lua-transpiler` の `config.rs` は `pasta_lua/src/config.rs` で、こちらの `debug/config.rs` とは別）。`ponytail-editor-tooling` とは `book/src/debug/*.md` の別の節。0.5.0 の `scene-count`・`scene-condition-attributes` が触る `book/src/debug/validate.md` は別の頁。
+- **種別**: バグ（Lua 表示で `.pasta` のブレークポイントが効かない・ステップが抜けない）。監査の指摘より。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 今は不要。ギャップ分析で 20 を超えたら、正しさ（ブレークポイント・ステップ・数の表示・応答）と無駄（死んだコード・写し・行ごとの費用）の 2 つに分ける。
+- **見つけた穴・古くなった記述**
+  - Current State 3 番の `inspect.rs` L378-388 は、上のとおり 381〜391 行。12 番の `config.rs` は `debug/config.rs`（`pasta_lua/src/config.rs` と取り違えやすい）。
+  - `playscene.rs` の頭の説明（1〜3 行）は `resolve_and_kick` だけを書き、`resolve_position` に触れない。`#![allow(dead_code)]`（`playscene.rs` 31 行・`source_map/scene_index.rs` 39 行）は結線の前の名残り（10-23 のまま）。
+  - 4 番の知らない要求は、マニュアル `book/src/internals/debug.md` 207 行の表（「その他: なし（無視する）」）も変える（10-23 のまま）。

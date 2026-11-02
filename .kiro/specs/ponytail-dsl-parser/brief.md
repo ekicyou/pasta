@@ -111,3 +111,14 @@
 - リファクタリングは安全で、戻せる形にする。振る舞いを固めるテストを先に書き、1 つ直すごとに確かめて 1 コミットにする。
 - 品質の関門：`cargo fmt --check`、`cargo clippy --all-targets`（警告 0）、`cargo test -p pasta_dsl -p pasta_lua -p pasta_check -p pasta_lsp`。
 - cargo の前に、環境変数 `NoDefaultCurrentDirectoryInExePath` を外す。外さないと、LuaJIT のビルドが exit 101 で落ちる。
+
+## 2026-11-02 棚卸の再測定（main 491cc23c）
+
+- **前提の変化**: 0.4.3・0.4.4 の 4 本（mlua 0.12・shiori4 の版 3・`ponytail-lua-loader`・季節と節句の日時変数）は `crates/pasta_dsl` に触れていない（最後の変更は 2026-10-05 の #69）。Current State の場所（span の変換 18 か所・数の字句の 4 か所・`error.rs` の型・`parser/mod.rs` 163〜166 行）はそのまま。Constraints の README と `tech.md` の断り書きは `ponytail-lua-loader` が書いた（`README.md` 88 行・`tech.md` 178 行）ので、この spec は書かない。ステータスの「mlua 0.12 の後の main で測り直す」は、この測り直しで済んだ。
+- **触るファイル**: `parser/ast/span.rs` 137・`parse_scene.rs` 426・`parse_action.rs` 456・`parse_elements.rs` 200・`parser/mod.rs` 330・`error.rs` 77・`lib.rs`（32 行の再輸出）、テスト `error_api_test.rs` 230・`span_byte_offset_test.rs` 207 と回帰テスト、`book/src/grammar/literals.md`。1,000 行に近いものは無い。誤りの型を減らしても、`pasta_check/src/validate/syntax.rs` は `other =>` で受けているので直さずに済む。
+- **規模**: 9〜12 タスク。
+- **先に要るもの**: 機能の上では無い。ponytail のほかの 7 本とはファイルが重ならない（`partial.rs` は `ponytail-editor-tooling`）。`pest-2-9-4-upgrade` とは同じウェーブに置かない（台帳の決まり）。0.5.0 以降の `scene-attribute-store`（`parse_scene.rs`）、`scene-condition-attributes`・`scene-pick-modes`・`scene-exact-match`・`scene-anchor-link`・`hello-novel-sample`・`novel-variable-scope`（`parse_action.rs`・`parse_elements.rs`）とも同じウェーブに置かない。
+- **種別**: バグ（大きい辞書で読み込みが 2 乗に遅い・大きな数が黙って化ける・深い括弧で SSP ごと落ちる）。
+- **要件定義のモデル**: Opus（決めごとはアクターの番号の扱いと深さの上限の 2 つで、どちらも案がある）。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: 無い。

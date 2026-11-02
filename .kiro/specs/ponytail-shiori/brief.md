@@ -127,38 +127,6 @@
 - 品質の関門：`cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_shiori`。i686 のビルドも通す。
 - cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。
 
-## 2026-10-23 棚卸の再測定（main 82176f19）
-
-- **前提の変化**: 2026-10-23 に `shiori4-v3-portable`（0.4.2）が起票された。`windows.rs`・`actor/` を共有し、0.4.2 のほうが先に入る。あちらの推奨どおりに進むと、この spec の土台が次のように変わる。
-  - 4 番（FFI の型）: `load`・`loadu`・`unload` の戻り値の `bool`→i32 の `BOOL` は、あちらの In に入る見込み（2026-10-23 に shiori4 の `shiori3-legacy-host` が「BOOL は 32bit の int で 0 以外が真」と確定）。残るのは `usize`→`c_long` だけ。`pasta-dll-multiarch` が x64 版を出す前にこれが要る。
-  - 1 番（unload と FreeLibrary の競り）: あちらは unload の待ちの上限を見直し、実行器の wintf を外す見込み。メッセージ専用ウィンドウの後始末は無くなるが、detach する限り競りは残る。直しはこの spec のまま。
-  - 5 番（MAILBOX のテストの競り）: あちらが `MAILBOX`・`ACTOR_HANDLE` をインスタンスへ移せば、消えるか形が変わる。
-  - 7・8 番（`teardown.rs` の測り・`marshal_request` の写し）: `lifecycle.rs` が書き直されるので、場所を測り直す。
-- **触るファイル**: 前のとおり `crates/pasta_shiori/**`（`Cargo.toml` の `exclude` を含む）、`book/src/internals/shiori.md`、`crates/pasta_shiori/README.md`。`crates/pasta_shiori/src` は 2026-10-19 から変わっていない（最後は #166）。1,000 行に近いものは無い（いちばん大きいのは `shiori_lifecycle_tests.rs` の 596 行）。
-- **規模**: 14〜18。あちらが 4 番の一部と 5 番を持っていけば、12〜15。
-- **先に要るもの**: 機能の上では無い。`shiori4-v3-portable` の後に入る（`windows.rs`・`actor/` を共有。同じウェーブに置かない）。ほかの重なり: `shiori4-v4-host`（`actor/`）、`pasta-dll-multiarch`（4 番の `c_long` をどちらが直すか）。`ponytail-lua-loader`・`ponytail-lua-scripts` とは `internals/shiori.md` の別の節（後から入る側が合わせる）。
-- **種別**: バグ（ゴーストを閉じると SSP が落ちうる・`Key:` の行が黙って 204）。監査の指摘より。
-- **要件定義のモデル**: Opus（前のまま）。
-- **分割の案**: 要らない。
-- **見つけた穴・古くなった記述**: Current State の行番号のうち、`lifecycle.rs` の 2 つは監査の日にもずれていた。`teardown_actor` は 150〜182 行（「L192-215」は `kick_into_mailbox`）、`marshal_request` は 124〜148 行（「L174-182」ではない）。`thread.rs` 250〜258 行・`shiori.rs` 66〜70 行・`windows.rs` 109・129・222・257 行・`req_parser.pest` の `_tag`（44 行）・`shiori-sample.log` 47 行の裸の `Reference0:` は合っている。ギャップ分析は `shiori4-v3-portable` が入った後の main で測り直す。Existing Spec Touchpoints の Adjacent に `shiori4-v3-portable`・`shiori4-v4-host`・`pasta-dll-multiarch` が無い。
-
-## 2026-10-24 棚卸の再測定（main c20ad104）
-
-- **前提の変化**
-  - `crates/pasta_shiori` に入ったのは PR #187 だけ。ctor を 0.2 → 1.0 にし（`Cargo.toml` 50 行の dev 依存）、テスト 14 ファイル（`src/shiori_request_tests.rs` と `tests/` の 13）の 1 行を `#[ctor::ctor(unsafe)]` に直した。本体のソースは変わっていない。新しいテストに `PASTA_DEBUG` を中和する守りを足すときは、この新しい書き方にする。
-  - アクタースレッドのメッセージループ wintf-winmsg-executor は 0.0.5 になった（ルートの `Cargo.toml` 48 行。pasta は `block_on` しか使わず、振る舞いは同じ）。`shiori4-v3-portable` が外す見込みは前のまま。
-  - 2026-10-24 に、この spec は 0.4.5（`shiori4-v3-portable` の後）になった。10-23 の再測定の行番号（`windows.rs` 109・129・222・257 行、`shiori.rs` 66〜70 行、`thread.rs` 250〜258 行、`lifecycle.rs` の `marshal_request` 124 行・`teardown_actor` 150 行、`req_parser.pest` 44 行の `_tag`）は今も合っている。
-- **触るファイル**: 前のとおり `crates/pasta_shiori/**`（`Cargo.toml` の `exclude` を含む）、`book/src/internals/shiori.md`、`crates/pasta_shiori/README.md`。1,000 行に近いものは無い（いちばん大きいのは `tests/call_execution_correctness_e2e_test.rs` の 687 行。10-23 の「`shiori_lifecycle_tests.rs` の 596 行」は `src` の中だけの話）。
-- **規模**: 14〜18（`shiori4-v3-portable` が 4 番の `BOOL` と 5 番を持っていけば 12〜15）のまま。
-- **先に要るもの**
-  - 働きの上では無い。`shiori4-v3-portable` が入った後の main でギャップ分析をやり直す（前のまま）。
-  - 0.4.3 の 6 本との重なり: `shiori4-v3-portable`（`windows.rs`・`actor/{lifecycle,thread,teardown,mod}.rs`・`pasta_shiori` の `Cargo.toml`・`README.md`・`tests/actor_*`。`internals/shiori.md` は節が別）、`mlua-0-12-upgrade`（`mlua::` を引く `src/error.rs`・`src/shiori.rs`・`src/lua_request.rs` とテスト 4 つ。`shiori.rs` は 2 番と 8 番、`error.rs` は 10 番の `MyError::Poison` の場所）。どちらも 0.4.3 に先に入り、こちらが合わせる。`toml-serialization`・`mlua-stdlib-removal`・`recommend-menu-scenes`・`ponytail-check-release` とは重ならない。
-  - ほか: `shiori4-v4-host`（`actor/`）、`pasta-dll-multiarch`（4 番の `c_long` をどちらが直すか）。
-- **種別**: バグ（ゴーストを閉じると SSP が落ちうる・`Key:` の行が黙って 204）。監査の指摘より。
-- **要件定義のモデル**: Opus（前のまま）。
-- **分割の案**: 要らない。
-- **見つけた穴・古くなった記述**: Existing Spec Touchpoints の Adjacent に `shiori4-v3-portable`・`shiori4-v4-host`・`pasta-dll-multiarch`・`mlua-0-12-upgrade` が無い（前の 3 つは 10-23 の再測定でも指摘済み）。Current State の `lifecycle.rs` の 2 つの行番号の誤りは 10-23 の再測定のとおり。
-
 ## 申し送り（shiori4-v3-portable の要件より・2026-10-25）
 
 `shiori4-v3-portable` の要件のディスカッションで、開発者が次を決めた（あちらの `requirements.md` の末尾の「要件のディスカッションで決めたこと」）。あちらが先に入るので、この spec のギャップ分析は、あちらが入った後の main で測り直すこと。
@@ -173,3 +141,16 @@
 - **2 番（フォルダが無いと理由の無い 500）**: あちらの版 3 の `load` は、ディレクトリが無いときに NULL を返す（R2.4。ログを置けないので理由は出さなくてよい）。旧来の入口の 500 の理由は、こちらに残る。
 - **3 番・6 番・9〜12 番**: あちらは触らない。
 - **規模**: 1 番の主な部分と 4 番が抜けるので、10-23 の見積もり（12〜15）より小さくなる見込み。
+
+## 2026-11-02 棚卸の再測定（main 491cc23c）
+
+- **前提の変化**: `shiori4-v3-portable` が入った（PR #206。芯の型 `ActorInstance`、旧来の入口の置き場 `static LEGACY: ArcSwapOption`、`DllMain` 用の `teardown_actor_detached`、ロガーは同期で書く、wintf を外した、Linux・macOS）。約束どおり測り直した。
+  - **閉じた**: 1 番の unload の道（`teardown_actor` は ack の後に join）、4 番（戻り値は i32、長さは `c_long`。`windows.rs` 119・139・232・277 行）、8 番の `marshal_request` の写し（`lifecycle.rs` 82 行は `ActorInstance::request` へ渡すだけ）、10 番の `actor_detach_on_poison`。5 番も、`lifecycle.rs` の単体テストは自分の置き場を作り、`windows_tests.rs` は鍵 1 つ（30 行の `FFI_GLOBAL_STATE`）になったので、ほぼ消えた（10-25 の申し送りの「こちらに残る」より良い。`tests/ffi_*` で確かめ直す）。9 番の出力の二重の受け渡しも、`request` が書き直されて無くなった見込み。
+  - **残る**: 1 番の「もう 1 つの場合」（`DllMain` の道。アクターは ack の前に `drop(shiori)` する（`thread.rs` 260 行）ので、Lua の C モジュールの FreeLibrary が loader lock で止まり、5 秒の上限の後に生きたスレッドの下で外れうる）、2 番（`shiori.rs` 103〜105 行。旧来の入口でディレクトリが無いと `last_load_error` を立てずに `Ok(false)`。版 3 は NULL を返すので対象外）、3 番（`req_parser.pest` 44 行の `_tag = ": "`）、6 番（`enc.rs` 102 行・`windows_api.rs` 126・191 行の `set_len`）、7 番（`teardown.rs` 197〜290 行の `LeakMetric`・`ReloadProbe`）、8 番の 204 の写し（`shiori.rs` 409 行と `marshaling.rs` 102 行）、10 番の残り 5 つ（`mailbox.rs` 67 行の `Reply`・`req_parser.rs` 2 行の `_GRAMMAR`・文法 48〜50 行・`hglobal/mod.rs` 28〜29 行の `unsafe impl`・`error.rs` 17 行の `Poison`）、11 番（`shiori.rs` 10 行）、12 番（`test_data/logfile.txt` 3322 行・`doc/`・`Cargo.toml` に `exclude` が無い）。
+- **触るファイル**: `crates/pasta_shiori/` の `windows.rs`（366 行）・`shiori.rs`（424 行）・`actor/{thread,teardown,mailbox,marshaling}.rs`・`util/**`・`error.rs`・`Cargo.toml`・`README.md` とテスト、`book/src/internals/shiori.md`（669 行。書き直されたので節の場所は測り直す）。新しい `v3.rs`（202 行）もギャップ分析の監査に入れる。1,000 行に近いものは無い（いちばん大きいのは `src/shiori_lifecycle_tests.rs` の 643 行）。
+- **規模**: 8〜11 タスク（10-23 の 12〜15 から下がった）。
+- **先に要るもの**: 働きの上では無い（`shiori4-v3-portable` は入った）。ほかの ponytail 7 本とはソースを共有しない（`ponytail-lua-scripts` とは `internals/shiori.md` の別の節）。`shiori4-v4-host`（`actor/`・`req_parser.pest`・`req.rs`・`error.rs`・`marshaling.rs`）と `pasta-dll-multiarch`（`windows.rs`）とは同じウェーブに置かない。0.6.0 の `novel-*`（`actor/marshaling.rs`・`lifecycle.rs`）・`shiori4-v4-lua-api`（`marshaling.rs`）も同じ。
+- **種別**: バグ（`DllMain` の道で SSP が止まり落ちうる・`Key:` の行が黙って 204・理由の無い 500）。監査の指摘より。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 要らない。
+- **見つけた穴・古くなった記述**: Current State の行番号は、1・4・5・8・9 番の場所が書き直しでずれた（上の「残る」の行を使う）。Approach の「ack の後に `WaitForSingleObject`」「テストの鍵を 1 つに」「型を `c_long`・i32 に」は、`shiori4-v3-portable` で済んだ。Existing Spec Touchpoints の Adjacent に `shiori4-v3-portable`（完了）・`shiori4-v4-host`・`pasta-dll-multiarch` が無い（10-23 から）。`pasta-dll-multiarch` の brief の「x64 版を出す前に `usize`→`c_long`・`bool`→`BOOL` が要る」は、もう満たされた。

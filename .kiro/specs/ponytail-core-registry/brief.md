@@ -85,29 +85,6 @@
 - 振る舞いを固めるテストを先に書き、1 つ直すごとに確かめて 1 コミットにする。
 - 品質の関門：`cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_core -p pasta_lua -p pasta_check`。cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す。
 
-## 2026-10-23 棚卸の再測定（main 8fc9bdff）
-
-- **前提の変化**
-  - 名前でシーンを再生するイベントの作業（scene-play-event）が、シーン表 `crates/pasta_core/src/registry/scene_table.rs` に「そのローカルを持つ大域を順送りで選ぶ」関数 `resolve_global_owning_local_exact` を足した。本番の検索 `crates/pasta_lua/src/search/context.rs` の `search_local_scene_exact` が呼ぶ。候補の控えのキー `SceneCacheKey` に欄 `owning_local` も増えた。この関数は前方一致の入れ物の `get` と、属性の絞り込み・控えからの順送りを使う。入れ物を `BTreeMap` に替えるときは、これも含める（`get` だけなので素直に移せる）。
-  - 監査が「使われない」とした API に、本番の呼び手が増えたものは無い。`resolve_scene_id`・`find_scene`・`labels_iter` はテストだけが呼ぶ。`fn_path`・`history` は書くだけ。単語表の `new`・`entries`・`clear_cache` はテストだけ。`_filters` の唯一の呼び手は `&[]` のまま。
-  - 作られない誤り `NoMoreScenes` を書く match の腕は、2 か所から 3 か所になった（`search/context.rs` 160・182・224 行。224 行は新しい関数の呼び手）。
-  - 行番号のずれ: `resolve_scene_id` は 173〜225 行、`find_scene` は 505〜522 行、`labels_iter` は 429〜432 行、`history` は 56 行。単語表・誤りの型・シーンの登録 `scene_registry.rs` は変わっていない。
-- **触るファイル**: `crates/pasta_core/src/registry/` の `scene_table.rs`（539 行）・`word_table.rs`（258 行）・`scene_registry.rs`（576 行）、`error.rs`・`lib.rs`・`Cargo.toml`、テスト 3 つ（`scene_table_candidate_tests.rs`・`scene_table_resolve_filter_tests.rs`・`tests/word_table_test.rs`）、`crates/pasta_lua/src/search/context.rs`（1,017 行で 1,000 行を超えた。本番の部分は 437 行で、残りは同じファイルのテスト）、`crates/pasta_check/src/validate/scenes.rs`、ルートの `Cargo.toml`・`Cargo.lock`、`tech.md`、`crates/pasta_core/README.md`。新しいファイルは無い見込み。
-- **規模**: 10〜13 タスク。
-- **先に要るもの**: 機能の上では無い。同じファイルを触る未完了の spec とは、同じウェーブに置けない。
-  - `scene-attribute-store`（0.5.0）: シーンの登録 `scene_registry.rs`（属性を複製する 150〜189 行）。この spec は同じファイルの `fn_path` の 4 か所を消す。
-  - `call-attribute-filter`（0.5.0）: `scene_table.rs` の絞り込みと控えのキー、`search/context.rs` の `search_scene`。この spec は同じファイルの入れ物と死んだ関数を触る。
-  - `scene-pick-modes`（版は未定）: 控えからの選び方と単語表。あちらの brief は「こちらが先に入る」と書く。
-  - `scene-exact-match`（版は未定）は、今ある完全一致の部品を使うだけの見込み。イベントの受け口で英大文字の続きを外す規則を Rust の検索に置くなら、`search/context.rs` がぶつかる。`recommend-menu-scenes`（0.4.2 の候補）は別名の表 `scene_alias.rs` を触る。ギャップ分析の監査で別名の表に指摘が出たら、ぶつかる。0.4.2 の残りの 3 本（external-control-events・chain-talk-interrupt・reg-handler-chain）は Lua だけで、重ならない。
-- **種別**: 基盤（作者に見える不具合は無い。読む人と直す人の手間を減らす）。
-- **要件定義のモデル**: Opus。
-- **分割の案**: 不要。
-- **見つけた穴・古くなった記述**
-  - Current State 4 の「`fast_radix_trie` と `memchr` が消える」は誤り。`memchr` は構文解析の部品（pest）・正規表現・futures なども使うので、`Cargo.lock` に残る。消えるのは `fast_radix_trie` だけ。
-  - `fast_radix_trie` を外すときは、`tech.md` の依存の表のほかに、`crates/pasta_core/README.md` の依存の表（92 行）も直す。
-  - roadmap の「0.5.0 の 3 本とも、ファイルが重ならない」は、この spec には当たらない（`scene-attribute-store` と `scene_registry.rs` を共有する）。
-
-
 ## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
 
 - `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
@@ -115,3 +92,18 @@
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
 - 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+
+## 2026-11-02 棚卸の再測定（main 491cc23c）
+
+- **前提の変化**
+  - シーン表・単語表・シーンの登録（`crates/pasta_core/src/registry/`）は、前の測り直し（8fc9bdff）から変わっていない。監査の場所（`resolve_scene_id` 173〜225 行・`find_scene` 505〜522 行・`labels_iter` 429〜432 行・`history` 56 行・`fn_path` の 4 か所・単語表の `new` 55 行・`entries`/`clear_cache` 241〜249 行・`_filters` の呼び手は `&[]`）と、`NoMoreScenes` を書く match の腕（`search/context.rs` 160・182・224 行）もそのまま。
+  - おすすめメニューの作業（`recommend-menu-scenes`）が、`error.rs` に別名の表の誤り 2 つ（本番で使う）を、`search/context.rs` に `scene_aliases` を足した。消す対象は変わらない。
+  - `ponytail-lua-loader` が読み込みで `TranspileContext::merge_from` を呼ばなくなった。`SceneRegistry::merge_from`（`scene_registry.rs` 275 行）と `WordDefRegistry::merge_from`（`word_registry.rs` 108 行）の本番の呼び手は、呼び手 0 になったその関数（`pasta_lua/src/context.rs` 120 行。`ponytail-lua-transpiler` の持ち場）だけ。あちらが消せば、この 2 つはテストだけになる。後から入る側が消す（こちらが後ならこの spec が消す）。
+  - README と `tech.md` の断り書きは `ponytail-lua-loader` が書いた（`README.md` 88 行・`tech.md` 178 行）。この spec は書かない。
+- **触るファイル**: `scene_table.rs` 539・`word_table.rs` 258・`scene_registry.rs` 576・`word_registry.rs`（`merge_from` を消すなら）・`error.rs` 196・`lib.rs`・`Cargo.toml`、テスト 3 つ（`scene_table_candidate_tests.rs`・`scene_table_resolve_filter_tests.rs`・`tests/word_table_test.rs`）、`pasta_lua/src/search/context.rs`（1,022 行で 1,000 行を超えたまま。本番の部分は約 440 行）、`pasta_check/src/validate/scenes.rs` 181、ルートの `Cargo.toml`・`Cargo.lock`、`tech.md` 27 行、`crates/pasta_core/README.md` 92 行。新しいファイルは無い見込み。
+- **規模**: 10〜14 タスク。
+- **先に要るもの**: 機能の上では無い。`Cargo.lock`・ルートの `Cargo.toml` は `ponytail-editor-tooling`（席を持つ）・`pest-2-9-4-upgrade` と共有し、後から入る側が作り直す。ponytail のほかの 7 本とはソースが重ならない。0.5.0 以降の `scene-count`（2026-11-01 起票。`scene_table.rs`・`search/context.rs`）・`scene-attribute-store`（`scene_registry.rs`・`scene_table.rs`・`search/context.rs`）・`scene-condition-attributes`・`scene-pick-modes`・`scene-exact-match`（`scene_table.rs`・`search/context.rs`）、`hello-novel-sample`・`shell-element-click`・`cue-command-runtime`（`search/context.rs`）とは同じウェーブに置かない。
+- **種別**: 基盤（作者に見える不具合は無い。読む人と直す人の手間を減らす）。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: Current State 4 の「`fast_radix_trie` と `memchr` が消える」は誤り（`memchr` は pest なども使うので `Cargo.lock` に残る。消えるのは `fast_radix_trie` だけ）。`fast_radix_trie` を外すときは、`tech.md` と `crates/pasta_core/README.md` の依存の表のほか、`scene_table.rs` 179 行などの説明の「RadixMap」も直す。
