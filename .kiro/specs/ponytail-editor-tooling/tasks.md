@@ -143,10 +143,10 @@
 - 4.2: `find_close_paren` は文字列（「…」・"…"）の中の括弧を数えない（キューの引数の `（「）」）` で本体の終わりを取り違えていた）
 - 5.1: TextMate の 1 行の規則は grammar.pest をそのまま写す（順に試す選択は `(?>A|B|C)`、PEG の `*`・`?` は `*+`・`?+`）。見つかった行ごとに継ぎ足すと収束しない（3 回差し戻し→デバッグで写し直して解決）。単語定義の値は 引用・さくらスクリプト・囲まない値 の 3 択で、さくらスクリプトで終わる値の後ろも行末のコメントになる（design の「引用で終わるときだけ」より広い）
 - 5.1: 印と名前の間の空白は文法では誤り（`＊ 挨拶` は名前の色にしない）
-- 人に上げる候補（範囲の外）: pest では `＠w：\hello`・`＠w：\n改行` が構文エラーになる（`sakura_script` が `\h` で確定し `word_nofenced` へ戻らない）。キューの `（a「）` は 4.2 の `find_close_paren` が値の途中の 「 も文字列の頭と読むので pest とずれる（極端な例）
+- 決着済み（範囲の外・直さない）: `＠w：\hello`・`＠w：\s[0]こんにちは` がパースエラーになるのは決まった仕様（`book/src/grammar/words.md` の「さくらスクリプトで始まる値はそこで終わる」、完了 spec `paragraph-break-tag-only-talk` の要件 10.7「受理するための規則は足さない」）。キューの `（a「）` のずれは完了時にその場で直した（下の行）
 - 5.2: Oniguruma の XID の表は pest の Unicode より古い。TextMate の名前の文字は全部 `[\p{XID_Continue}・･‌‍]` に揃える（JSON ではエスケープで書く）。inline の規則は repository の `inline` にまとめ、アクション行と継続行の両方から include する
 - 5.2: 既知の限界: 関数呼び出しの引数の中の文字列（`＠f（「s＠t」）`）の `＠t` は単語参照の色になる。引数として解けるかは式として解けるかで決まり、正規表現では写せない（意味の色が上に乗る）
-- 人に上げる候補（範囲の外）: 宣言の行の属性（`＊挨拶 ＆朝：1`）は文法では通るが、`parse_global_scene_start` が `id` しか読まず AST の `attrs` に入らない（黙って捨てられる）
+- 申し送り済み（範囲の外）: 宣言の行の属性（`＊挨拶 ＆朝：1`）は文法では通るが、`parse_global_scene_start` が `id` しか読まず AST の `attrs` に入らない（黙って捨てられる）（`scene-attribute-store` の brief に既に書かれている）
 - 5.3: 閉じのフェンスは行頭に限らない（pest の `code_contents = (!PEEK ~ ANY)+` が字下げや行の途中でも PEEK で止まる）ので、end に `^` を付けない（design の表の `^(\1)` より正典に近い）。開きの言語名の後ろの空白は不可（`eol = NEWLINE`）
 - 6.1: 箱は `findWordRefRanges`（wordRefDecorator.ts）が tmLanguage の規則を JS の RegExp（`u`＋`s`。`s` は Oniguruma の `.` が U+2028 にも当たるのに合わせる）にして作る。表は `src/test/fixtures/wordRefCases.ts` を 2 つのテストが共有
 - 6.4: 開いた・閉じた文書の syntax の出し分けは既存の `ghostValidator.test.ts`「開いている文書の syntax は出さず、閉じると出し、開くとまた外す」が固めている（出し分けを壊すと落ちることを確かめた）。テストは足していない
