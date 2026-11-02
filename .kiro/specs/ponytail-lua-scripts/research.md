@@ -44,7 +44,7 @@
 
 ### 指摘にしなかったもの（決めごと・範囲の外）
 
-- 正時の手前で見送ったトークの時刻を決め直さないこと（`virtual_dispatcher.lua` 204〜211 行）。監査は「時報のすぐ後に続けて話す」を挙げたが、`internals/shiori.md` 504 行に決まりとして書かれ、`virtual_dispatcher_spec.lua` 930〜940 行が守る。要件の OPEN QUESTION 1 に回した。
+- 正時の手前で見送ったトークの時刻を決め直さないこと（`virtual_dispatcher.lua` 204〜211 行）。監査は「時報のすぐ後に続けて話す」を挙げたが、`internals/shiori.md` 504 行に決まりとして書かれ、`virtual_dispatcher_spec.lua` 930〜940 行が守る。要件の決定 1 で「変えない」と決めた。
 - `REG.OnSecondChange` を上書きすると `CALLBACK.sweep` も止まること（`shiori-events.md` に書かれている）。
 - `X-Error-Reason` の `init.lua:`・`callback.lua:` の位置の前置き（`shiori_entry_test.lua` 339・356 行が守る）。
 - 空の `shiori/init.lua`・`pasta/areka/init.lua`（残す決定）。
@@ -92,7 +92,7 @@
 
 ## 6. 設計へ持ち越す調べもの（Research Needed）
 
-1. 続きの期限の「今の時刻」の取り方: brief の案（`CLOCK` が OnSecondChange で見た直近の時刻）か、`ACT_IMPL.yield` で再開の act の `req` を受け取る形か。前者は期限だけを直す（要件 3.6・A4）。後者は日時の変数も変わる。コールバックの道（refs の配列が来る）の扱いも決める。
+1. 続きの期限の「今の時刻」の取り方: brief の案（`CLOCK` が OnSecondChange で見た直近の時刻）か、`ACT_IMPL.yield` で再開の act の `req` を受け取る形か。要件の決定 2 で「期限だけを直す」と決めたので、後者を採るなら日時の変数を変えない形にする。コールバックの道（refs の配列が来る）の扱いも決める。
 2. `consume_staged` の真偽を `set_co_scene` へ渡す形が、`keep` の枝と捨てる枝の両方で今の決まりと同じになるか（brief の古い案「`if consume_staged then co = nil end; set_co_scene(co)`」は今の形に合わない）。`_interrupted` の枝の旗の残りの見込みを、テストで再現できるか先に確かめる。
 3. nil の区切りの上限の数と、表記に出すシーンの名前の取り方（`STOP` が読む欄）。
 4. `restore_scene` を 4 つの欄の控えに変えたとき、`STOP` の表記（`stop.lua` 67〜78・110〜115 行）がローカル名と行を正しく出すか。
