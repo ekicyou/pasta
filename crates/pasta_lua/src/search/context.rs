@@ -292,7 +292,7 @@ impl SearchContext {
             .map(SceneRegistry::sanitize_name)
             .unwrap_or_default();
 
-        match self.word_table.search_word(&module_name, name, &[]) {
+        match self.word_table.search_word(&module_name, name) {
             Ok(word) => Ok(Some(word)),
             Err(pasta_core::WordTableError::WordNotFound { .. }) => Ok(None),
         }

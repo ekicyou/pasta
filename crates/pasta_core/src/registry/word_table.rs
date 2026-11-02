@@ -11,16 +11,16 @@ use std::collections::HashMap;
 
 /// Cache key for word selection (module_name + search_key).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct WordCacheKey {
+struct WordCacheKey {
     /// Module name (empty string for global scope)
-    pub module_name: String,
+    module_name: String,
     /// Search key
-    pub search_key: String,
+    search_key: String,
 }
 
 impl WordCacheKey {
     /// Create a new cache key.
-    pub fn new(module_name: &str, search_key: &str) -> Self {
+    fn new(module_name: &str, search_key: &str) -> Self {
         Self {
             module_name: module_name.to_string(),
             search_key: search_key.to_string(),
@@ -49,16 +49,6 @@ pub struct WordTable {
 }
 
 impl WordTable {
-    /// Create a new word table.
-    pub fn new(random_selector: Box<dyn RandomSelector>) -> Self {
-        Self {
-            entries: Vec::new(),
-            prefix_index: RadixMap::new(),
-            cached_selections: HashMap::new(),
-            random_selector,
-        }
-    }
-
     /// Build a word table from a WordDefRegistry.
     pub fn from_word_def_registry(
         registry: WordDefRegistry,
@@ -176,16 +166,10 @@ impl WordTable {
     /// # Arguments
     /// * `module_name` - Current module name (empty for global scope)
     /// * `key` - Search key
-    /// * `_filters` - Attribute filters (reserved for future use)
     ///
     /// # Returns
     /// Ok(word) on success, Err(WordNotFound) if no match
-    pub fn search_word(
-        &mut self,
-        module_name: &str,
-        key: &str,
-        _filters: &[String],
-    ) -> Result<String, WordTableError> {
+    pub fn search_word(&mut self, module_name: &str, key: &str) -> Result<String, WordTableError> {
         // Build cache key
         let cache_key = WordCacheKey::new(module_name, key);
 
@@ -225,16 +209,6 @@ impl WordTable {
         );
 
         Ok(result)
-    }
-
-    /// Get all entries (for testing/debugging).
-    pub fn entries(&self) -> &[WordEntry] {
-        &self.entries
-    }
-
-    /// Clear the selection cache (for testing).
-    pub fn clear_cache(&mut self) {
-        self.cached_selections.clear();
     }
 
     /// Replace the random selector and clear cached selections.

@@ -29,6 +29,6 @@ pub use error::{
 };
 pub use registry::{
     DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable, SceneEntry,
-    SceneId, SceneInfo, SceneRegistry, SceneScope, SceneTable, WordCacheKey, WordDefRegistry,
-    WordEntry, WordTable,
+    SceneId, SceneInfo, SceneRegistry, SceneScope, SceneTable, WordDefRegistry, WordEntry,
+    WordTable,
 };

@@ -80,7 +80,7 @@ let mut table = WordTable::from_word_def_registry(
     registry,
     Box::new(DefaultRandomSelector::new()),
 );
-let word = table.search_word("", "挨拶", &[]).unwrap();
+let word = table.search_word("", "挨拶").unwrap();
 println!("Selected: {}", word);
 ```
 
