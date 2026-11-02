@@ -97,10 +97,11 @@ function fakeBridge(opts: { ready?: boolean; result?: FakeAnalysisResult; fail?:
 }
 
 /** Minimal pasta TextDocument double for DocumentSync / providers. */
-function fakeDocument(uriStr: string, languageId: string, text: string) {
+function fakeDocument(uriStr: string, languageId: string, text: string, version = 1) {
   return {
     uri: mock.Uri.parse(uriStr),
     languageId,
+    version,
     getText: () => text,
     positionAt: (offset: number) => new mock.Position(0, offset),
   };
@@ -244,7 +245,7 @@ test('updateTokens replaces the cache and fires onDidChangeSemanticTokens', () =
   let fired = 0;
   provider.onDidChangeSemanticTokens(() => { fired++; });
   const doc = fakeDocument('file:///update.pasta', 'pasta', 'text');
-  provider.updateTokens(doc.uri.toString(), [
+  provider.updateTokens(doc.uri.toString(), doc.version, [
     { deltaLine: 0, deltaStartCharacter: 1, length: 2, tokenType: 4, tokenModifiers: 0 },
   ]);
   assert.strictEqual(fired, 1, 'event must fire on updateTokens');
@@ -257,6 +258,42 @@ test('provider returns null when analysis throws (TextMate fallback)', () => {
   const provider = new SemanticTokensProvider(fakeBridge({ fail: true }) as never);
   const doc = fakeDocument('file:///fail.pasta', 'pasta', 'text');
   assert.strictEqual(provider.provideDocumentSemanticTokens(doc as never, dummyToken), null);
+});
+
+// 要件 8.1: 控えは版つき。違う版の控えは返さず、その場で解き直す
+test('provider does not serve tokens cached for a different document version', () => {
+  const fresh = { deltaLine: 0, deltaStartCharacter: 0, length: 3, tokenType: 1, tokenModifiers: 0 };
+  const bridge = fakeBridge({ result: { tokens: [fresh], diagnostics: [] } });
+  const provider = new SemanticTokensProvider(bridge as never);
+  const uri = 'file:///ver.pasta';
+  provider.updateTokens(mock.Uri.parse(uri).toString(), 1, [
+    { deltaLine: 0, deltaStartCharacter: 5, length: 1, tokenType: 4, tokenModifiers: 0 },
+  ]);
+  const v2 = fakeDocument(uri, 'pasta', 'new text', 2);
+  const tokens = provider.provideDocumentSemanticTokens(v2 as never, dummyToken) as mock.SemanticTokens;
+  assert.deepStrictEqual(bridge.calls, ['new text'], 'a stale version must be re-analyzed');
+  assert.deepStrictEqual(Array.from(tokens.data), [0, 0, 3, 1, 0]);
+  // 解き直した結果は v2 として控えるので、もう一度求められても解かない
+  provider.provideDocumentSemanticTokens(v2 as never, dummyToken);
+  assert.strictEqual(bridge.calls.length, 1, 'the re-analyzed result must be cached for v2');
+});
+
+// 要件 8.2: 今の版の解析に失敗したら、前の版の色を返さず控えも消す
+test('provider failure on a new version returns null and drops the previous version', () => {
+  const opts = { result: { tokens: [], diagnostics: [] }, fail: false };
+  const bridge = fakeBridge(opts);
+  const provider = new SemanticTokensProvider(bridge as never);
+  const uri = 'file:///ver-fail.pasta';
+  provider.provideDocumentSemanticTokens(fakeDocument(uri, 'pasta', 'v1', 1) as never, dummyToken);
+  opts.fail = true;
+  assert.strictEqual(
+    provider.provideDocumentSemanticTokens(fakeDocument(uri, 'pasta', 'v2', 2) as never, dummyToken),
+    null,
+    'the previous version must not be returned when the current one fails'
+  );
+  opts.fail = false;
+  provider.provideDocumentSemanticTokens(fakeDocument(uri, 'pasta', 'v1', 1) as never, dummyToken);
+  assert.deepStrictEqual(bridge.calls, ['v1', 'v2', 'v1'], 'the failed analysis must drop the cache');
 });
 
 // =============================================================================
@@ -431,6 +468,70 @@ test('analysis failure logs to the output channel and clears diagnostics', () =>
   assert.strictEqual(collectionOf(h.dm).get(doc.uri), undefined, 'diagnostics must be cleared on failure');
   h.sync.dispose();
   h.dm.dispose();
+});
+
+// 要件 8.2: 同期の解析に失敗したら、診断と一緒に色の控えも消す
+test('analysis failure in DocumentSync also drops the cached tokens', () => {
+  const opts = {
+    result: { tokens: [{ deltaLine: 0, deltaStartCharacter: 0, length: 1, tokenType: 1, tokenModifiers: 0 }], diagnostics: [] },
+    fail: false,
+  };
+  const h = makeSyncHarness(opts);
+  h.sync.activate(dummyContext() as never);
+  const v1 = fakeDocument('file:///sync-fail.pasta', 'pasta', 'v1', 1);
+  mock.didOpenTextDocumentEmitter.fire(v1);
+  opts.fail = true;
+  mock.didOpenTextDocumentEmitter.fire(fakeDocument('file:///sync-fail.pasta', 'pasta', 'v2', 2));
+  opts.fail = false;
+  // 控えが残っていれば v1 の色を解かずに返してしまう
+  h.provider.provideDocumentSemanticTokens(v1 as never, dummyToken);
+  assert.deepStrictEqual(h.bridge.calls, ['v1', 'v2', 'v1'], 'the failed sync must clear the token cache');
+  h.sync.dispose();
+  h.dm.dispose();
+});
+
+// 要件 9.5: wasm32 の panic は trap として JS の例外になる。拡張は落ちず、理由を書き、診断と控えを消す
+test('a wasm trap during sync is caught, logged, and clears diagnostics and tokens', () => {
+  let trap = false;
+  const bridge = bridgeWithWasmModule({
+    wasm_analyze: () => {
+      if (trap) {
+        // 本物は WebAssembly.RuntimeError: unreachable（tsconfig の lib に型が無いので名前だけ写す）
+        throw Object.assign(new Error('unreachable'), { name: 'RuntimeError' });
+      }
+      return {
+        tokens: [{ deltaLine: 0, deltaStartCharacter: 0, length: 1, tokenType: 1, tokenModifiers: 0 }],
+        diagnostics: [{
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+          message: 'diag',
+          severity: 1,
+        }],
+      };
+    },
+  });
+  const provider = new SemanticTokensProvider(bridge);
+  const dm = new DiagnosticsManager();
+  const logged: string[] = [];
+  const channel = { name: 'test', appendLine: (msg: string) => { logged.push(msg); }, dispose: () => {} };
+  const sync = new DocumentSync(bridge, provider, dm, channel as never);
+  sync.activate(dummyContext() as never);
+  const uri = 'file:///trap.pasta';
+  mock.didOpenTextDocumentEmitter.fire(fakeDocument(uri, 'pasta', 'ok', 1));
+  assert.ok(collectionOf(dm).get(mock.Uri.parse(uri)), 'diagnostics seeded');
+  trap = true;
+  assert.doesNotThrow(() => mock.didOpenTextDocumentEmitter.fire(fakeDocument(uri, 'pasta', 'boom', 1)));
+  assert.ok(
+    logged.some((l) => l.includes('Document analysis failed') && l.includes('unreachable')),
+    'the trap reason must reach the output channel'
+  );
+  assert.strictEqual(collectionOf(dm).get(mock.Uri.parse(uri)), undefined, 'diagnostics must be cleared');
+  assert.strictEqual(
+    (provider as unknown as { cachedTokens: Map<string, unknown> }).cachedTokens.has(mock.Uri.parse(uri).toString()),
+    false,
+    'token cache must be cleared'
+  );
+  sync.dispose();
+  dm.dispose();
 });
 
 test('no analysis is attempted while the bridge is not ready', () => {

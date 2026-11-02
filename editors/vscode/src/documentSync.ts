@@ -132,11 +132,13 @@ export class DocumentSync implements vscode.Disposable {
       const text = document.getText();
       const { tokens, diagnostics } = this.wasmBridge.analyzeDocument(text);
 
-      this.semanticTokensProvider.updateTokens(document.uri.toString(), tokens);
+      this.semanticTokensProvider.updateTokens(document.uri.toString(), document.version, tokens);
       this.diagnosticsManager.setDiagnostics(document.uri, diagnostics);
     } catch (error) {
+      // wasm32 の panic は trap としてここへ来る。守りはこの catch だけ
       this.outputChannel.appendLine(`Document analysis failed for ${document.uri}: ${error}`);
       this.diagnosticsManager.clear(document.uri);
+      this.semanticTokensProvider.clearTokens(document.uri.toString());
       // TextMate grammar highlights remain active as fallback
     }
   }
