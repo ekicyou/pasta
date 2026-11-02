@@ -139,7 +139,7 @@
   - `cargo test -p pasta_check` が通る
   - _Boundary: pasta_check tests_
   - _Requirements: 2.9, 4.4_
-- [ ] 11.2 (P) 直した後の AST を控えと比べる
+- [x] 11.2 (P) 直した後の AST を控えと比べる
   - 全部の直しの後に AST を書き出し、`target/ast-baseline/` と `diff -r` で比べる
   - 差分が無いという出力を、タスクの証拠に残す（要件 2・3 で決めた変化は、リポジトリの辞書に現れない）
   - _Boundary: SpanOracleTest_
@@ -164,3 +164,4 @@
 ## Implementation Notes
 - 5.1: 採番のテスト（`％a＝4294967295、b`）は saturating_add が前からあるので直す前も通る。今の振る舞いを固める回帰テストとして置いた（タスクの「2 つとも直す前に失敗」は不正確）
 - 6: variables.md「優先順位と括弧」の上限の文は括弧の分だけ入れた。7.1 で設計 Docs の 1 文（括弧と演算子をまとめた確定文）に直し、transpiler.md にも演算子の分を足す
+- 11.2: 全部の直しの後の書き出し（target/ast-final、56 ファイル）と target/ast-baseline の `diff -r` は差分なし（出力 "DIFF: none"）
