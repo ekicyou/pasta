@@ -167,20 +167,20 @@ function PROXY_IMPL.find_handler(self, mode, key, skip_methods)
     return self.act:find_act_handler(mode, key, skip_methods)
 end
 
---- 戻り値の正規化（expr・word 共通）
---- 先頭の戻り値が ACT またはプロキシ自身と同一なら値なし（nil）にする。
+--- 関数の戻り値の正規化（ACT の段・プロキシの段の word・expr 共通）
+--- 先頭の戻り値がその ACT か、どのプロキシでも値なし（nil）にする。
 --- それ以外は複数の戻り値も含めてそのまま返す。
---- @param self ActorProxy プロキシオブジェクト
+--- @param act Act アクションオブジェクト
 --- @param r any 先頭の戻り値
 --- @param ... any 残りの戻り値
 --- @return any ... 正規化した戻り値
-local function drop_self(self, r, ...)
-    if r == self.act or r == self then return nil end
+function ACTOR.drop_self(act, r, ...)
+    if r == act or getmetatable(r) == PROXY_IMPL then return nil end
     return r, ...
 end
 
 --- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(act, ...)、非function → 失敗の報告+nil
---- 見つかった段にかかわらず第 1 引数は常に ACT。戻り値は drop_self で正規化する
+--- 見つかった段にかかわらず第 1 引数は常に ACT。戻り値は ACTOR.drop_self で正規化する
 --- @param self ActorProxy プロキシオブジェクト
 --- @param key string 関数名
 --- @param skip_methods boolean|nil find_handler へ渡す
@@ -189,7 +189,7 @@ end
 local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
-        return FAILURE.fn_succeeded(self.act, drop_self(self, self.act:restore_scene(handler, self.act, ...)))
+        return FAILURE.fn_succeeded(self.act, ACTOR.drop_self(self.act, self.act:restore_scene(handler, self.act, ...)))
     end
     FAILURE.set_fn_failed(self.act, true)
     return FAILURE.report(self.act, {
@@ -232,7 +232,7 @@ end
 --- word（find_handler と同じ順序で検索 + word ポストプロセス）
 --- 検索順序は find_actor_handler(A1+A2) → act:find_act_handler(L1-L5)
 --- ポストプロセス: handler=nil → 失敗の報告+nil、その他 → tostring(h)
---- function は見つかった段で第 1 引数が変わる: アクターの段 → h(proxy)、act の段 → h(act)。戻り値は drop_self で正規化する
+--- function は見つかった段で第 1 引数が変わる: アクターの段 → h(proxy)、act の段 → h(act)。戻り値は ACTOR.drop_self で正規化する
 --- var_path があるとき（動的参照）は name を WORD.dynamic_key でキーにし、継承したメソッドに届かせずに検索する
 --- @param self ActorProxy プロキシオブジェクト
 --- @param name any 単語名（＠なし）。var_path があるときは参照変数の値
@@ -260,7 +260,7 @@ function PROXY_IMPL.word(self, name, var_path)
         })
     end
     if type(handler) == "function" then
-        return drop_self(self, self.act:restore_scene(handler, receiver))
+        return ACTOR.drop_self(self.act, self.act:restore_scene(handler, receiver))
     end
     return tostring(handler)
 end

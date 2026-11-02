@@ -436,7 +436,7 @@ function ACT_IMPL.word(self, name, var_path)
         })
     end
     if type(handler) == "function" then
-        return self:restore_scene(handler, self)
+        return ACTOR.drop_self(self, self:restore_scene(handler, self))
     end
     return tostring(handler)
 end
@@ -451,7 +451,7 @@ end
 local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
-        return FAILURE.fn_succeeded(self, self:restore_scene(handler, self, ...))
+        return FAILURE.fn_succeeded(self, ACTOR.drop_self(self, self:restore_scene(handler, self, ...)))
     end
     FAILURE.set_fn_failed(self, true)
     return FAILURE.report(self, {
@@ -535,7 +535,7 @@ end
 function ACT_IMPL.global_fn(self, name, ...)
     local f = GLOBAL[name]
     if type(f) == "function" then
-        return FAILURE.fn_succeeded(self, self:restore_scene(f, self, ...))
+        return FAILURE.fn_succeeded(self, ACTOR.drop_self(self, self:restore_scene(f, self, ...)))
     end
     FAILURE.set_fn_failed(self, true)
     return FAILURE.report(self, {

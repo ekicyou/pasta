@@ -735,3 +735,92 @@ describe("act が書いた名前と行の対応を控える (runtime-error-ballo
         end)
     end)
 end)
+
+-- ACT の段の関数の戻り値の正規化 (ponytail-lua-scripts 7.2)
+describe("ACTOR.drop_self と ACT の段の戻り値の正規化", function()
+    --- 生成コードと同じ形（話者:talk((…))）で 1 行を作り、talk のトークンの文字列をつないで返す
+    local function said(act)
+        local s = {}
+        for _, t in ipairs(act.token) do
+            if t.type == "talk" then s[#s + 1] = t.text end
+        end
+        return table.concat(s)
+    end
+
+    test("ACTOR.drop_self: act・どのプロキシも nil、それ以外は複数の値ごとそのまま", function()
+        with_captured_act(function(ACT)
+            local ACTOR = require("pasta.actor")
+            local act = ACT.new({
+                ["正規化俳優_甲"] = ACTOR.get_or_create("正規化俳優_甲"),
+                ["正規化俳優_乙"] = ACTOR.get_or_create("正規化俳優_乙"),
+            })
+            expect(pack(ACTOR.drop_self(act, act))):toBe(1)
+            expect(ACTOR.drop_self(act, act)):toBe(nil)
+            expect(ACTOR.drop_self(act, act["正規化俳優_甲"])):toBe(nil)
+            expect(ACTOR.drop_self(act, act["正規化俳優_乙"])):toBe(nil)
+            local n, r1, r2, r3 = pack(ACTOR.drop_self(act, "a", nil, "c"))
+            expect(n):toBe(3)
+            expect(r1):toBe("a")
+            expect(r2):toBe(nil)
+            expect(r3):toBe("c")
+            local t = {}
+            expect(ACTOR.drop_self(act, t)):toBe(t)
+        end)
+    end)
+
+    test("＠＊挨拶（）が act や act.名前 を返しても台詞に table: が出ない・複数の値は 2 つとも返る", function()
+        with_captured_act(function(ACT)
+            local ACTOR = require("pasta.actor")
+            local GLOBAL = require("pasta.global")
+            local act = ACT.new({ ["正規化俳優_さくら"] = ACTOR.get_or_create("正規化俳優_さくら") })
+            local p = act:actor_proxy("正規化俳優_さくら")
+            GLOBAL.__drop_self_test_act = function(a) return a:talk(nil, "やあ") end
+            GLOBAL.__drop_self_test_proxy = function(a) return a["正規化俳優_さくら"] end
+            GLOBAL.__drop_self_test_two = function() return "a", "b" end
+            p:talk((act:global_fn("__drop_self_test_act")))
+            p:talk((act:global_fn("__drop_self_test_proxy")))
+            local n, r1, r2 = pack(act:global_fn("__drop_self_test_two"))
+            GLOBAL.__drop_self_test_act = nil
+            GLOBAL.__drop_self_test_proxy = nil
+            GLOBAL.__drop_self_test_two = nil
+            expect(said(act)):toBe("やあ")
+            expect(n):toBe(2)
+            expect(r1):toBe("a")
+            expect(r2):toBe("b")
+        end)
+    end)
+
+    test("ACT の段の単語・式の関数も act やプロキシを返せば空にする", function()
+        with_captured_act(function(ACT)
+            local ACTOR = require("pasta.actor")
+            local act = ACT.new({ ["正規化俳優_単語"] = ACTOR.get_or_create("正規化俳優_単語") })
+            local A = { __global_name__ = "正規化A" }
+            A.f_act = function(a) return a end
+            A.f_proxy = function(a) return a["正規化俳優_単語"] end
+            act:init_scene(A)
+            expect(act:word("f_act")):toBe(nil)
+            expect(act:word("f_proxy")):toBe(nil)
+            expect(act:expr_fn("f_act")):toBe(nil)
+            expect(act:expr_fn("f_proxy")):toBe(nil)
+            expect(act:expr_fn_var("f_proxy", "var.f")):toBe(nil)
+        end)
+    end)
+
+    test("プロキシの段の関数が別のアクターのプロキシを返しても何も出ない (D3)", function()
+        with_captured_act(function(ACT)
+            local ACTOR = require("pasta.actor")
+            local sakura = ACTOR.get_or_create("正規化俳優_P甲")
+            local act = ACT.new({ ["正規化俳優_P甲"] = sakura, ["正規化俳優_P乙"] = ACTOR.get_or_create("正規化俳優_P乙") })
+            local A = { __global_name__ = "正規化B" }
+            A.f = function(a) return a["正規化俳優_P乙"] end
+            sakura.w = function(p) return p.act["正規化俳優_P乙"] end
+            act:init_scene(A)
+            local p = act:actor_proxy("正規化俳優_P甲")
+            p:talk((p:expr_fn("f")))
+            p:talk(p:word("w"))
+            p:talk(p:word("f"))
+            sakura.w = nil
+            expect(said(act)):toBe("")
+        end)
+    end)
+end)
