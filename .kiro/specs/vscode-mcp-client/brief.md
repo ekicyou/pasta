@@ -166,3 +166,18 @@ VSCode でゴーストを書く作者が困っている。
 - **送る前に相手を確かめる**: SSP と areka は同じ番号を奪い合うので、番号だけで相手を決めない。
 - **e2e**: ベースウェアの代わりに、手元で MCP を真似る小さな HTTP サーバーを立てて試す。SSP・areka の実機の確かめは、設計の最初の 2 点（HTTP の道・`reload` の応答の待ち）と、出す前の 1 回。
 - **マニュアルの章の数**: 頁を消すと、章の数を決め打ちする検査がずれる（`ponytail-manual-ci` が決め打ちをやめていれば要らない）。
+
+## 2026-11-03 棚卸の再測定（main c575febd）
+
+- **前提の変化**: 先に要った `ponytail-editor-tooling` は入った。`extension.ts` は 464 行になった（`fallbackMode` が消えて 3 行減った。DAP の部分は 54〜65・135〜247・252〜360・366〜447 行あたり）。`e2e.test.ts` の起動の状態の試験は消え、`package.json` は `test:grammar` の 1 行だけ変わった。DAP の部品（`onDebug:pasta` 32 行・`debug/toolBar` 72 行・`breakpoints` 235 行・`debuggers` 243 行・`debugType == 'pasta'` の `when`）と DAP の側のファイルは手つかずで、Current State は今も成り立つ。
+- **受け継ぐもの（`host`）は今も残る**: `package.json` 250・281・293 行、`debugAttachTarget.ts` 87〜88 行、`runSceneAtCursor.ts` 61・72 行、`reloadShiori.ts` 18〜22 行の再輸出、マニュアル `vscode-setup.md` 65・80 行・`source-level.md` 79 行・`troubleshooting.md` 88 行。
+- **章の数**: `ponytail-manual-ci` が章の数を目次から数えるようにした。Constraints の「章の数」は、`source-level.md`・`constraints.md` を消すときに `SUMMARY.md`（58・60 行）を直すだけで済む。
+- **触るファイル**: `editors/vscode/package.json` 324・`src/extension.ts` 464、消す `src/debugAdapterFactory.ts` 74・`debugAttachTarget.ts` 99・`sourcePresentationToggle.ts` 69、書き直す `runSceneAtCursor.ts` 106・`reloadShiori.ts` 106、MCP のクライアント（新しいファイル）、`ghostValidator.ts`（`findGhostMaster` を使う）、テスト（DAP 専用 6 本を消す。`contributions.test.ts`・`vscodeModules.test.ts`・`mock/vscode.ts` 477。MCP を真似るサーバーの e2e は新しいファイル）、`book/src/debug/` の 6 頁（`validate.md` は残す）、`SUMMARY.md` 56〜62 行、`editors/vscode/README.md` 14 行、ルートの `README.md`。`package-lock.json` と `syntaxes/pasta.tmLanguage.json` は触らない。
+- **規模**: 12〜16 タスクのまま。
+- **先に要るもの**: 機能の上では `debug-mcp-runtime` の `OnPastaDumpVariables` と門（決まりは brief にあるので、並べて設計してよい）。ファイルの重なり（未完了）: `vsce-4-upgrade`（`package.json`・`package-lock.json`。この spec の後）。属性の 3 本は `syntaxes/pasta.tmLanguage.json` と LSP だけを触るので重ならない。`scene-count` とも重ならない。`debug-mcp-runtime` とは `SUMMARY.md` の別の行だけ（許す）。ウェーブ 2 に置ける。
+- **種別**: 機能（拡張が、編集中のゴーストが動いているベースウェアへ送れない。シーンの実行とリロードが DAP に頼っている）。開発者が承認した移行。
+- **要件定義のモデル**: Opus。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**:
+  - 「スキルにも同じ手順を載せる」: `book/src/debug/` は、スキルの references を作る表（`book/tools/gen-skill-refs.mjs` 40〜63 行）に入っていない。マニュアルに書いてもスキルには流れない。表に頁を足すか、表にある頁（`lua/shiori-events.md` など。`debug-mcp-runtime` も触る頁の別の節）に書くかを、設計で決める。`SKILL.md` を手で直すのは分類器が拒む。
+  - SSP の HTTP の道（`/api/mcp/v1` か）は、まだ確かめていない（設計の最初に確かめる）。

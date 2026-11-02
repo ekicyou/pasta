@@ -117,3 +117,14 @@
 ## 申し送り（2026-10-29 の版の組み替えより）
 
 - ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.5（ponytail）の次に入る。
+
+## 2026-11-03 棚卸の再測定（main c575febd）
+
+- **前提の変化**: `＄＊x` が `save.x` になる決まりと、表の同一性・予約の名前・保存できない値の前提は変わらない。動いたのは置き場所と、文法を足すときの決まり。`ponytail-dsl-parser` はパーサを直し（`parse_elements.rs` 223・`parse_action.rs` 499）、括弧の深さ 64・演算子 256 の上限と、大きな数を構文の誤りにする決まりを足した。新しい書き方は、この上限と誤りの種類の中に置く。`ponytail-editor-tooling` は部分解析 `partial.rs` を 477 → 315 行に作り直し（失敗した行を `failed_lines` で返す）、LSP を WASM の解析だけにし、VSCode の着色を `grammar.pest` をそのまま写す形に書き直した（272 → 366 行。変数の規則は 160〜173 行、照合は `editors/vscode/src/test/tmGrammar.test.ts`）。書き方を足すなら、この写し方で着色に足す。`ponytail-lua-scripts` は表記の書き戻しを `failure.lua` 79〜80 行に動かした（233 → 282 行）。
+- **触るファイル**: 文法 `grammar.pest` 272（84・95・107 行は合っている）、パーサ `parse_elements.rs` 223・`parse_action.rs` 499・構文木 `ast/action.rs` 323・`partial.rs` 315、生成 `element_gen.rs` 553（`save.x` は 39 行）、`save.lua` 13・`runtime/persistence.rs` 697・`runtime/lifecycle.rs` 61、`failure.lua` 282、検査 `transpile_rules.rs` 188、LSP `visit_expr.rs` 484、VSCode の着色 366 と `tmGrammar.test.ts`、マニュアル `grammar/variables.md` 444・`lua/modules/pasta-persistence.md` 213・`getting-started/10-save.md` 122 と生成スキル、テスト。表を 2 つにするなら `act.lua` 812（188・216 行）と `scope_gen.rs` 404（262 行）、予約の名前を動かすなら `virtual_dispatcher.lua` 340（`pasta.save` を読むのは 62 行、間隔の名前は 88〜89 行）も。1,000 行に近いものは無い。
+- **規模**: 8〜10 のまま。
+- **先に要るもの**: 機能の上ではなし（`novel-talk-flow` を待たない。`toml-serialization` は入った）。ファイルの重なり（未完了）: 0.5.0 の `scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`（`grammar.pest`・`parse_action.rs`・`element_gen.rs`。`scene-condition-attributes` は VSCode の文法定義と LSP も）、新しく `debug-mcp-runtime`（`failure.lua` に `.pasta` の位置を添える。予約の名前を動かすなら `virtual_dispatcher.lua` も）、0.6.0 の `cue-command-runtime`（`grammar.pest`・`scope_gen.rs`）・`novel-save-slots`（`save.lua`・`persistence.rs`・`lifecycle.rs`。後に置く）・`novel-checkpoint-rollback`（予約の名前を動かす場合の `virtual_dispatcher.lua`。前後に置く）、版の決まっていない `scene-anchor-link`（文法・`element_gen.rs`・着色と LSP）。表を 2 つにするなら `act.lua`（1 つのウェーブに 1 つの spec）とも。
+- **種別**: 機能（保存の範囲を書き分ける方法が無い）。開発者の 0.5.0（今は 0.6.0）の決定（巻き戻しとセーブ）から。
+- **要件定義のモデル**: Fable のまま。今のゴーストの `＄＊x` が頼っている保存の形と DSL の意味に触り、取り消しにくい。書き方・どちらを今の `＄＊` にするか・両立・何を全セーブ共通にするか・保存できない値（`toml-serialization` のキーごとに外す決まりが出発点）が互いに絡み、推奨案がまだ無い（3 つ以上の絡む問い）。今回入った 7 本は、このどれも決めていない。
+- **分割の案**: 不要（8〜10）。
+- **見つけた穴・古くなった記述**: 「Current State」の行番号: `element_gen.rs` 71 行 → 69 行（書く側）、`parse_elements.rs` 119 行 → 141 行、`parse_action.rs` 111・212・369 行 → 117・225・413 行、`partial.rs` 462 行 → 300 行、`act.lua` 189・219 行 → 188・216 行、`scope_gen.rs` 294 行 → 262 行、`virtual_dispatcher.lua` 46・72〜73 行 → 62・88〜89 行、`failure.lua` 71・77 行 → 79・80 行、VSCode の着色 185・197 行 → 160〜173 行、`visit_expr.rs` 47・88・194・247 行 → 48・89・195・248 行。`save.json`・JSON の記述は、申し送りのとおり `save.toml`・TOML と読む。

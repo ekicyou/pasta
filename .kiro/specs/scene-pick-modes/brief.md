@@ -135,3 +135,16 @@
 
 - 0.5.0 が「属性関係の整備」になり、この spec はそこに入った（開発者の決定。ノベルゲームは 0.6.0 へ順延）。順は `scene-attribute-store` → `scene-condition-attributes` → `scene-pick-modes` で、0.4.5（ponytail）を出した後から始める（「ポニーテールが片付いたら属性に手を出しましょう」）。
 - `scene-condition-attributes` と候補の袋を共有するので、その後に置く（同じウェーブに置かない）。
+
+## 2026-11-03 棚卸の再測定（main c575febd）
+
+- **前提の変化**: `ponytail-core-registry` が入った。シーン表の索引は `BTreeMap` になり、選び方の部品は `RandomSelector::shuffle_usize` 1 つ（`crates/pasta_core/src/registry/random.rs` 14 行）、順次消費の控えは「候補の並び」と「次の位置」の 2 つだけになった（`scene_table.rs` の `select_from_cache` 315 行）。重みの「候補の ID を重みの数だけ並べる」形は、この控えにそのまま乗る。`ponytail-lua-scripts` で行が動いた。`attrs` を捨てる所は `scene.lua` 136・192 行と `act.lua` 668 行、`set_scene_selector` の説明は `lua/modules/pasta-search.md` 221 行から。`grammar.pest` 155・164 行は同じ。単語は Rust の `word_table.rs` で選ぶ（アクター辞書の単語も `search_word`。`actor.lua` 117 行）。
+- **触るファイル**: `grammar.pest` 272（単語の値の `＠整数`）、`pasta_dsl` の単語の解析（`parse_elements.rs` の `parse_key_words`）、`pasta_core` の `scene_table.rs` 442・`word_table.rs` 227・`word_registry.rs` 274、`search/context.rs` 1,009（1,000 行を超えている。足す試験は別のファイルへ）、順番の位置の保存の置き場、`pasta_check` の `validate/`、`pasta_lsp`・`editors/vscode/syntaxes/pasta.tmLanguage.json`、マニュアル（`grammar/words.md`・`grammar/block-structure.md`・`lua/modules/pasta-search.md`・`grammar/call-jump.md`）とスキルの `references/`。単語の重みを生成コードへ運ぶなら `element_gen.rs` の `generate_word_definition`（498 行）も触る。パーサで値を重みの数だけ並べれば触らない。`act.lua` は触らない見込み。
+- **規模**: 9〜11 タスクのまま。
+- **先に要るもの**: `scene-attribute-store`（属性を実行時に読めること・値の型・受け継ぎ）と `scene-condition-attributes`（候補の袋を共有する。`＆優先` で残った中で選ぶ）。ファイルの重なり（未完了）: その 2 本、`scene-count`・`scene-exact-match`（`search/context.rs`）、`novel-variable-scope`（順番の位置を置く保存の範囲）。
+- **種別**: 機能（同名シーンの選び方がシャッフルの 1 つしか無く、比率と順番を複写と Lua で作っている）。ゴースト側の聞き取りから。
+- **要件定義のモデル**: Opus。重み・順番・単語の重みの書き方と意味は 2026-10-21 に開発者が決めた。残る問い（位置の保存の置き場・変更履歴の書き方）は浅い。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**:
+  - 冒頭の「版は未定」と、Scope・Upstream / Downstream・Adjacent の `call-attribute-filter` は古い（版は 0.5.0 の 3 番。`call-attribute-filter` は `scene-condition-attributes` と読み替える。どちらも申し送りの節に書いてある）。
+  - Current State の行番号（`pasta-search.md` L159-195・`scene.lua` L148・L206・`act.lua` L678）は、上の行に動いた。

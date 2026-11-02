@@ -234,3 +234,15 @@ pasta は if を持たない。値によって出すシーンを変えるには�
 - 206 行の「絞り込み条件を受ける関数」は 3 つになった：`resolve_scene_id_unified`・`resolve_scene_id_exact`・`resolve_global_owning_local_exact`。`filter_by_attributes`・`filters` の引数・`SceneCacheKey.filters` はそのまま残してある（2026-10-19 の約束どおり）。
 - シーン表の前方一致の索引は `BTreeMap<String, Vec<SceneId>>` になった。順次消費の状態は「候補の並び」と「次の位置」の 2 つだけで、選んだ履歴は持たない。行番号は変わっているので、設計の前に main で読み直す。
 - 参照: `.kiro/specs/completed/ponytail-core-registry/design.md` の「Revalidation Triggers」「Components and Interfaces > SceneTable」。
+
+## 2026-11-03 棚卸の再測定（main c575febd）
+
+- **前提の変化**: 0.4.5 の隙間の spec（`ponytail-dsl-parser`・`ponytail-core-registry`・`ponytail-editor-tooling`・`ponytail-lua-scripts`）は全部入った。`ponytail-core-registry` の申し送り（上の節）のとおり、`resolve_scene_id`・`find_scene` の論点は閉じ、絞り込みを受ける関数は 3 つになった。属性の文法（`grammar.pest` 162〜166 行）は変わっていない。`ponytail-lua-scripts` で `scene.lua`・`act.lua` の行が動いた。
+- **行番号（main c575febd）**: `SCENE.search` 138 行（`SEARCH:search_scene` 148 行）、`SCENE.co_exec` 194 行、`act:find_scene` 668 行、`act:call` 683 行、`search_dictionary` 328 行（`SCENE.search(key, scene_name)` は 333 行で、act を渡していない。ローカル変数で条件を評価するなら、act を運ぶ道が要る）、`filter_by_attributes` 283 行、`search_scene_by` 124 行、`search_local_scene_exact` 197 行。`FAILURE.LABEL` は 12 種のまま。`lua/script-api.md` の「`attrs` は使わない」は 326・339 行。
+- **触るファイル**: `grammar.pest` 272、`pasta_dsl` の属性の解析（`parse_elements.rs` の `parse_attr`）と構文木、条件を生成コードへ運ぶなら `scope_gen.rs` 404、`scene.lua` 261、`act.lua` 812、`search/context.rs` 1,009（1,000 行を超えている。足す試験は別のファイルへ）、`scene_table.rs` 442、イベントの自動転記の置き場（イベントのシーンは全部 `SCENE.co_exec` を通る。時報の転記は今 `virtual_dispatcher.lua` 182 行）、`pasta_check` の `validate/`、`pasta_lsp`、`editors/vscode/syntaxes/pasta.tmLanguage.json`、マニュアルと入門の 7 段目、スキルの `references/`。`element_gen.rs` は触らない見込み（Call の文法を変えない）。
+- **規模**: 14〜18 タスクのまま（消す・残すの論点が閉じた分だけ軽い）。
+- **先に要るもの**: `scene-attribute-store`（宣言行の属性を実行時まで運ぶこと、値の型、受け継ぎ）。ファイルの重なり（未完了）: `scene-attribute-store`・`scene-pick-modes`・`scene-count`・`scene-exact-match`（`search/context.rs`・`scene.lua`・`act.lua`）、`cue-command-runtime`・`novel-talk-flow`（`act.lua`・`scene.lua`）、`novel-variable-scope`（文法）。`debug-mcp-runtime` とは、自動転記を `virtual_dispatcher.lua` に置くと重なる（あちらはキックの分岐 246〜272 行を消す）。`SCENE.co_exec` に置けば重ならない。
+- **種別**: 機能（Lua を使わずに、条件で出す場面を変える書き方が無い）。ゴースト側の要望から。書き方と意味は開発者が決めた。
+- **要件定義のモデル**: Opus。新しい DSL の書き方だが、書き方と意味は 2026-10-29 に開発者が推奨案を全部採って決めた。残る問い（評価の置き場・文法での見分け・`＆優先` の別名など）は、どれも推奨を付けられる。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: Constraints の「`act.lua` は 837 行」は古い（今は 812 行。1,000 行に近いことは変わらない）。`grammar.pest` 254 行の規則の名前 `file_scppe_item` は `file_scope_item` の書き間違い（出力に出ない規則なので害は無い。文法を触るこの spec が、ついでに直す。棚卸から）。

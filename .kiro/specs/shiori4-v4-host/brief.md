@@ -170,17 +170,6 @@ shiori4 の 0.1.0 が 2026-10-24 に出た（crates.io の `shiori4_abi`・`shio
 
 - ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.5（ponytail）の次に入る。
 
-## 2026-11-02 棚卸の再測定（main 491cc23c）
-
-- **前提の変化**: `shiori4-v3-portable`（0.4.3）が入り、先に要るもののうち pasta の側は満ちた（残りは実機の areka v0.2.0 だけ）。芯の型 `actor/instance.rs`（329 行。`spawn_with`・`get`・`notify`・`kick`・`shutdown`）と後始末の `actor/teardown.rs`（384 行）、版 3 の口 `src/v3.rs`（202 行。自前の `shiori_get_api` は版 3 だけを返し、`load` は `ShioriLoadMode::V3` 以外を断る。49 行）ができた。`marshaling.rs` は `determine_method`（131〜166 行。版 3 では SHIORI/2.x の開始行を 400 にする）が増えて 582 行。`GET_TIMEOUT` は 71 行のまま。依存は `shiori4_abi = "0.1"` だけで、`shiori4` 本体は依存に無い。CI は `shiori4_host` 0.1.1 の `shiori4-testhost` を入れて、x64 の行だけで版 3 を 1 往復させる（`build.yml` 66〜80 行）。`ponytail-lua-loader` が入り、`runtime/module_registry.rs`（252 行）の重なりは消えた。`act:get_property` は `shiori/act.lua` 308 行へ動いた（日時変数を足したため。上の分割の節の「294 行」は古い）。`version`・`name`・`craftman` に答えていないのは今も同じ。
-- **触るファイル**: `actor/{instance,thread,mailbox,marshaling,lifecycle,teardown}.rs`、`v3.rs`（`export_shiori!` へ替えるなら）か隣の新しい版 4 の口、`lua_request.rs`（159 行）・`util/parsers/{req_parser.pest,req.rs}`（54・197 行）・`error.rs`（406 行）・`pasta_lua/pasta_scripts/pasta/shiori/res.lua`（141 行）、要れば `event/kick.lua`、`pasta_lua` の下回りの口、`.github/workflows/build.yml`（版 4 の 1 往復）・`tests/shiori4_v3_entry_test.rs`（版 4 が NULL の試験）。1,000 行に近いものは無い。
-- **規模**: 15〜18。分割の節の 11〜13 に、2026-10-24 の節の中の表現の作り直し（pest のヘッダ部分の分離・RES と `error.rs`・ゴールデン・`req.version` の印）と、`export_shiori!` への切り替え・CI の版 4 の 1 往復を足した。
-- **先に要るもの**: 働きの上では実機の areka v0.2.0 だけ。ファイルの重なり: `ponytail-shiori`（`actor/`・`windows.rs`・`error.rs`・`lua_request.rs`・`req_parser.pest`。0.4.5 で先に入るので、入った後の main で測り直す）、`ponytail-lua-scripts`（`res.lua`・`kick.lua`）、`novel-talk-flow`（`kick.lua`）、`novel-checkpoint-rollback`（`marshaling.rs`）、`pasta-dll-multiarch`・`ponytail-manual-ci`（`build.yml`）、`ponytail-lua-debug`（下回りの口を `module_registry.rs` に置くなら）。
-- **種別**: 機能（版 4 に本格対応。開発者の方針）。
-- **要件定義のモデル**: Opus（前のまま。`req.version` を入口の印に変えるのは Lua から見える値だが、案は 1 つに絞れている）。
-- **分割の案**: 要らない。20 を超えるなら、中の表現の作り直しを先の spec に分ける。
-- **見つけた穴・古くなった記述**: Current State の「`shiori4-v3-portable` が入れる（予定）」と基準の `c360adb2` は古い（入った）。Existing Spec Touchpoints の Adjacent に `shiori4-v3-portable`（完了。芯の型）が無い。SHIORI/2.x の開始行は、版 3 の口では 400 に決まった（`marshaling.rs` 138 行）。旧来の口で 2.x を受け続けるかは、残る議題。
-
 ## 申し送り（ponytail-shiori より・2026-11-03）
 
 上の「芯の型」と再測定の節の記述のうち、ponytail-shiori（0.4.5）で次が変わった。測り直すときはこちらを正とする。
@@ -201,3 +190,14 @@ shiori4 の 0.1.0 が 2026-10-24 に出た（crates.io の `shiori4_abi`・`shio
 - 指名した再生は `OnPastaScene`・`OnPastaSceneAt` に一本化する。MCP の `raise_event` で起こせば、応答でそのまま台本を返す。
 - この brief の「キックの即時化」（Problem の 1 つ目・Desired Outcome の「MCP からのシーン再生（キック）が…すぐ出る」・触るファイルの `kick.lua`）は、対象が無くなる。要件を作るときに範囲から外す。post の SEND で台本を今すぐ出す仕組みそのもの（シーンと Lua から）は残る。
 - 上の 2026-11-02 の申し送りの「0.5.1 で DAP を捨てて」は、0.5.0 と読み替える。
+
+## 2026-11-03 棚卸の再測定（main c575febd）
+
+- **前提の変化**（前回 2026-11-02・`491cc23c` から）: `ponytail-shiori` が入った。上の申し送り（`ponytail-shiori` より）は main と合っている。`actor/` に `module_ref.rs`（123 行）が増え、`JoinPolicy`・`determine_method` は無く、要求の判定は `marshaling.rs` の `classify_request`（126 行。`RequestKind` 112 行）。`req_parser.pest` の `_tag` は 44 行、`req.rs` は 4 行の再輸出だけになった。`hinst` は Lua へ定数の 0（`shiori.rs` 264 行）。`GET_TIMEOUT` は今も `marshaling.rs` 71 行の 5 秒。`v3.rs`（206 行）の自前の `shiori_get_api`（24 行）は版 3 だけを返し、版 4 は NULL（185〜189 行の試験）。依存は今も `shiori4_abi` だけ。CI の版 3 の 1 往復は `build.yml` 68〜80 行（x64）と 121〜129 行（Linux・macOS）。`act:get_property` は `shiori/act.lua` 318 行。`res.lua`（154 行）はヘッダの改行を潰す `header` が増えたが、開始行と `Charset` を付ける全文の形のまま。`version`・`name`・`craftman` には今も答えていない。
+- **触るファイル**: `actor/{instance,thread,mailbox,marshaling,lifecycle,teardown,module_ref}.rs`（341・277・383・559・190・144・123 行）、`v3.rs`（`export_shiori!` へ替えるなら）か隣の新しい版 4 の口、`shiori.rs`、`lua_request.rs`（151）・`util/parsers/{req_parser.pest,req_parser.rs}`（51・456）・`error.rs`（388）・`pasta_lua/pasta_scripts/pasta/shiori/res.lua`（154）、`pasta_lua` の下回りの口、`.github/workflows/build.yml`（225。版 4 の 1 往復）・`tests/shiori4_v3_entry_test.rs`（283。版 4 が NULL の試験）。キックの即時化は範囲から外れるので `kick.lua` は触らない。1,000 行に近いものは無い。
+- **規模**: 14〜17（キックの即時化が、下の申し送り（`debug-mcp-runtime` の discovery より）で範囲から外れる分、1 つ減る）。
+- **先に要るもの**: 働きの上では実機の areka v0.2.0 だけ（`ponytail-shiori` が入り、ファイルの順番の待ちも解けた）。ファイルの重なり（未完了）: `debug-mcp-runtime`（`actor/{instance,mailbox,thread,lifecycle}.rs`・`shiori.rs` のキックの道を消す。先に入れると、キックの無い main で測れる）、`novel-checkpoint-rollback`・`novel-areka-contract`（`marshaling.rs`）、`novel-save-slots`・`novel-variable-scope`（`actor/lifecycle.rs`）、`pasta-dll-multiarch`（`build.yml`）。
+- **種別**: 機能（版 4 に本格対応。開発者の方針）。
+- **要件定義のモデル**: Opus（前のまま。スレッドと ABI の決まりは shiori4 の正本が決めていて、`req.version` を入口の印に変える案も 1 つに絞れている）。
+- **分割の案**: 要らない。20 を超えるなら、中の表現の作り直しを先の spec に分ける（前のまま）。
+- **見つけた穴・古くなった記述**: Current State の「`shiori4-v3-portable` が入れる（予定）」と基準の `c360adb2` は古い（入った）。Existing Spec Touchpoints の Adjacent に `shiori4-v3-portable`（完了。芯の型）が無い。旧来の口で SHIORI/2.x の開始行を受け続けるかは、残る議題（`classify_request` の `Shiori2`）。roadmap の台帳の行の「キックの即時化」は、対象が無くなった（下の申し送りのとおり）。

@@ -123,3 +123,14 @@
 ## 申し送り（2026-11-02 の discovery「Pasta DSL MCP移行検討」より）
 
 - 0.5.0 の `debug-mcp-runtime` が、キック（`event/kick.lua`）を消す。チェイントークの続きを `STORE.co_preempt` の印で捨てる指名の再生は、`OnPastaScene`・`OnPastaSceneAt` だけになる。
+
+## 2026-11-03 棚卸の再測定（main c575febd）
+
+- **前提の変化**（2026-10-23 の測り・`82176f19` から）: `shiori4-v4-host` は未着手のまま（下回りの口と印の名前はまだ決まっていない）。`ponytail-lua-scripts` が待ちの表の旗を消し、止まったシーンは待ちの表だけが持つ（Current State は同じコミットで直してある）。`act:get_property` は `shiori/act.lua` 318 行、`CALLBACK.pending` は `callback.lua` 30 行（`stage_pending` 44・`consume_staged` 60・`try_route` 92・`sweep` 209 行）、`builtins.rs` の `get_property` は 60 行、`＄％prop` の説明は `grammar/variables.md` 19・62 行。外からの呼び出し（`external_control.lua` 123 行）は `act:find_handler("scene", name)` と `SCENE.wrap` の形になった。`debug-mcp-runtime`（未完了）がキックを消すので、議題 4 の割り込みは `OnPastaScene`・`OnPastaSceneAt`（`scene_play.lua` 43・78 行の `STORE.co_preempt`）だけを考えればよくなる。
+- **触るファイル**: `shiori/act.lua`（371）、新しい `shiori/event/host_complete.lua`、`event/init.lua`（347）の読み込みの 1 行（今の末尾は 91 行の `recommend`）、要れば `event/callback.lua`（232）、DSL から呼ぶ関数、`pasta_check/src/validate/builtins.rs`（68）、Lua のテスト、マニュアル（`lua/*.md`・`internals/shiori.md` 694・`internals/execution-model.md` 504）。1,000 行に近いものは無い。
+- **規模**: 11〜13 のまま。
+- **先に要るもの**: 働きの上では `shiori4-v4-host`（未着手）と実機の areka v0.2.0。ファイルの重なり（未完了）: `novel-talk-flow`・`novel-checkpoint-rollback`（`shiori/act.lua`・`init.lua`・`callback.lua`）、`shell-element-click`（`init.lua` の読み込みの行）、`debug-mcp-runtime`（`external_control.lua`・`scene_play.lua`）。マニュアルの同じページの別の節は並べてよい。`recommend-menu-scenes`・`ponytail-lua-scripts` は入ったので外れた。
+- **種別**: 機能（版 4 の作者向けの口。開発者の方針）。
+- **要件定義のモデル**: Fable のまま。(i) SEND の完了を待って続きを書く DSL と Lua の書き方は、公開の取り決めで後から戻しにくい。(ii) その待ちの時の流れが Rust・Lua・SHIORI をまたぎ（`OnHostComplete` でのコルーチンの再開、`STORE.co_preempt` での割り込み、待ち中の unload、NOTIFY の後回しの中でプロパティを同期で読めないこと）、上の議題 1〜7 にはまだ推奨が無い。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: Current State の行番号（`get_property` 294 行・`variables.md` 294 行・`builtins.rs` 55 行）は古い（上の行が正しい）。「チェイントーク」の行の `event/kick.lua` は、`debug-mcp-runtime` が入ると無くなる。「土台: … `host-protocol` は shiori4 の main にまだ入っていない」は古い（0.1.0 で入った。上の節のとおり）。

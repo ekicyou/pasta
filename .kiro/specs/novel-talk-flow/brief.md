@@ -126,21 +126,6 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - 種類の追加・分類・出力の 1 行の形を変えるのは、`pasta-check-dic-validate` の design.md の Revalidation Triggers に当たる（CI・作者のスクリプト・マニュアル・`wasmBridge.ts` の形の検査に効く）。実行時と同じことを守る一致テスト `crates/pasta_check/tests/validate_parity_test.rs` も合わせて見直す。
 - ノベル向けの設定（完全一致の場面選びなど）に合わせた検査を足すかどうか・誤りか注意かは、この spec の要件で決める。
 
-## 2026-10-17 棚卸の再測定（main b4164100）
-
-- **前提の変化**:
-  - 名前が完全に一致する場面を選ぶ部品が入った（`touch-poke-shortcuts`。`crates/pasta_core/src/registry/scene_table.rs` の `resolve_scene_id_exact` 251 行、`crates/pasta_lua/src/search/context.rs` の `search_scene_exact` 105 行、`pasta_scripts/pasta/scene.lua` の `SCENE.co_exec_exact` 227 行。最後のものはグローバルシーンだけ）。残るのは、ノベル向けの設定のときに Call と選択肢の探し方をこれに切り替える仕組みだけ。
-  - 止まるエラーのバルーン表示（`runtime-error-balloon`）で、応答の出口が増えた。止まったときは `shiori/stop.lua` の `STOP.response` が、表記を載せた 200 の応答を作る（`shiori/entry.lua` 79〜101 行・`shiori/event/callback.lua` 173〜187 行）。「次の場面へ」の印をこの応答に付けない、と決める必要がある。
-  - act は、実行中の場面の「行の対応」（生成コードの行と `.pasta` の行の組。`act.line_map`）を持つようになった。ただし `.pasta` の行番号は台本を直すとずれるので、変わらない行 ID の元にはならない。
-- **触るファイル**: 設定の読み込み `crates/pasta_lua/src/loader/config/`（`sections.rs` 344）、出力の組み立て `shiori/sakura_builder.lua` 383、サーフェスの復旧 `shiori/appearance.lua` 567、1 字ごとの待ちと改行 `crates/pasta_lua/src/sakura_script/`（`mod.rs` 247・`wait_inserter.rs` 397・`line_breaker.rs` 462）、ランダムトークと時報 `shiori/event/virtual_dispatcher.lua` 288、起動 `shiori/event/boot.lua` 22、「次の場面へ」の受け口（新しいファイルと、`shiori/event/init.lua` に読み込みの 1 行）、場面の探し方 `act.lua` 829（1,000 行に近い）・`scene.lua` 240、行 ID を生成で埋めるなら `code_gen/scope_gen.rs` 445・`element_gen.rs` 564、検査を足すなら `crates/pasta_check/src/validate/`。
-- **規模**: 17〜21 タスク（設定 1、クリック待ち 2、組み立ての `\x` 対応 3、話者名 1〜2、行 ID と声 2、ランダムトークと時報の停止 1、起動の場面 1、次の場面へ 2、完全一致の切り替え 1、途中の `＞yield` 1、待ちと改行を挟まない 1、マニュアル 2、テスト 2）。完全一致の部品の分は減ったが、20 を超えうる。
-- **先に要るもの**: `cue-command-runtime`（同じ 3 か所を先に触る）、`novel-areka-contract`（名前）。ファイルの重なり: `cue-command-runtime`（`act.lua`・`sakura_builder.lua`・`loader/config/`、生成で埋めるなら `scope_gen.rs`）、`novel-checkpoint-rollback`（`sakura_builder.lua`・`appearance.lua`・`virtual_dispatcher.lua`・`init.lua`）、`scene-anchor-link`（`act.lua`・`sakura_builder.lua`・`sakura_script/`）、`call-attribute-filter`（`act.lua`・`scene.lua`、生成で埋めるなら `element_gen.rs`）、`tutorial-ssp-gaps`（`virtual_dispatcher.lua`・`boot.lua`）、`shell-element-click`（`init.lua` の読み込みの行・`scene.lua` に足す場合）、検査を足すなら `pasta-check-validate-edges`（`validate/`）。`scene-attribute-store` とは `scene.lua` か `scope_gen.rs` を触る場合だけ重なる。
-- **種別**: 機能（ノベル向けの出力の切り替えが無い）。開発者の 0.5.0 の目標（2026-10-10）から。
-- **要件定義のモデル**: Fable。決めるのは、areka が既読と声の引き当てのためにセーブをまたいで覚える「変わらない行 ID」の作り方と、ノベル向けの切り替えの形（後から変えにくい保存の形と設定の約束）。ID の作り方、2 段のクリック待ちと入れない行の書き方、「次の場面へ」の書き方と印、途中の `＞yield` の扱いの 4 つが互いに絡み、推奨案がまだ無い。
-- **分割の案**: 要件で 20 を超えたら、決めてあるとおり 2 本に分ける。`novel-talk-output`（出力の組み立て: 切り替えの設定・クリック待ち・`\x` への対応・話者名・行 ID と声・待ちと改行を挟まない。`loader/config/`・`sakura_builder.lua`・`appearance.lua`・`sakura_script/`・生成）と `novel-scene-flow`（場面の流れ: ランダムトークと時報の停止・起動の場面・次の場面へ・完全一致の切り替え・途中の `＞yield`。`virtual_dispatcher.lua`・`boot.lua`・新しい受け口・`act.lua`・`scene.lua`）。切り替えの設定は前の 1 本に置き、後の 1 本はそれを読む。後の 1 本は `tutorial-ssp-gaps` と同じ 2 ファイルを触る。
-- **見つけた穴・古くなった記述**:
-  - 行番号: 組み立てのアクターの切り替えは `sakura_builder.lua` 240 行 → 310 行、段落の区切りの改行は 245・263〜265 行 → 346〜347 行、`\e` は 284 行 → 379 行。前方一致の探し方は `act.lua` 366〜370 行 → `find_act_handler` 361〜402 行、`scene_table.rs` 185・270〜314 行 → 179 行・319〜350 行。止まっている場面を捨てる所は `shiori/event/init.lua` 124〜132 行 → 127〜134 行。Reference を変数へ移す関数は `shiori/act.lua` 161〜190 行 → 165〜194 行。`appearance.lua`・`virtual_dispatcher.lua`・`kick.lua`・`line_breaker.rs` の行番号は合っている。
-
 ## 申し送り（pasta-check-validate-edges より）
 
 - `pasta_check validate` の飛び先の検査は、辞書の中身が分からないとき（構文エラー・読めない辞書ファイル・pasta.toml の誤り）に丸ごと省く形になった。判定は `crates/pasta_check/src/validate/report.rs` の `skip_reasons`（統計の `skipReasons`）で、すべての段の報告がそろった後に 1 回だけ行う（`validate/mod.rs`）。
@@ -171,25 +156,6 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - 参照: `.kiro/specs/completed/actor-display-style/design.md`（ActorStyle・BuilderHook・Revalidation Triggers）、マニュアル `book/src/internals/talk-output.md` の「装いの出し入れ」。
 - 見直しが要る論点（この spec だけ）: 話者名を出すなら、装いのタグと同じ所（`emit_actor_switch` の装いの後）で出すか。話者名にも装いを効かせるか。
 
-## 2026-10-18 棚卸の再測定（main facd6cf4）
-
-- **前提の変化**:
-  - `\x`: 「組み立ては `\x` を知らない」は半分古い。装いの出し入れ（`shiori/actor_style.lua` 70〜76 行の `STYLE.through`）は、引数の無い `\x` でスコープが `\0` に戻ることを知り、装いを出し直す。残る穴は、同じアクターが続くと `\p` を出し直さない所（`sakura_builder.lua` 464 行の `last_actor ~= actor`）、段落の区切りの状態（`spot_has_text`・`pending_break`・`spot_tail`）、吹き出しごとの列（`columns`）、立ち絵の復旧（`appearance.lua`）、budoux の数え直し（`crates/pasta_lua/src/sakura_script/line_breaker.rs` 56〜66 行の `column_move` は `\n`・`\c`・`\_l` だけを列の動きに数える）。`\c` を読む所（`sakura_builder.lua` 149〜189 行の `clear_span`・`text_parts`）で `\x` も読めば、組み立ての側は 1 か所で直せる。
-  - 話者名: 1 つのスポットを複数のアクターで共有する形が正式になった（`actor-display-style`）。`\p[番号]` では話者が分からないので、話者名を載せる値打ちが上がった。出す所は、スポットが同じでも話者が替われば通る `emit_actor_switch`（72〜86 行）の装いの後が自然。表示用の名前は `[actor."名前"]` の表（`spot`・`font`・`budoux` がもうある）に置ける。ただし `font` の属性 `name` は書体の名前なので、話者名のキーと取り違えない名前にする。
-  - BudouX: 「台詞のトークンごとに数え直す」は直った（`vertical-balloon-lines`。1 回の出力の中で、吹き出しごとに列を持ち越す）。応答をまたいだ持ち越しは無い。
-  - ランダムトークと時報: 持ち主は今も `shiori/event/virtual_dispatcher.lua`（303 行）の `M.dispatch`（227〜271 行）。呼ぶのは `second_change.lua` の既定の OnSecondChange（23〜38 行）で、前にコールバックの時間切れ（`CALLBACK.sweep`）、後に仮想時刻の読み取り（`CLOCK.take_probe`）がある。止めるのは `dispatch` の `check_hour`・`check_talk` で、キック（`KICK.try_dispatch`）は残す。止まっている場面を返す所（215〜217 行）も `check_talk` の中なので、一緒に止まる。
-  - 新しい穴: 仮想時刻の読み取り `\![get,property,OnPastaClock,…]\e`（`shiori/clock.lua` 33〜34・176〜180 行）は、トーク中でない OnSecondChange に返る。読み手が台本を読んでいる間にこれが出て、吹き出しが消えないかを確かめ、ノベル向けの設定では出さない案を考える。撫で・つつきの既定の受け口（`shiori/event/mouse.lua`）も場面を起こす。
-- **触るファイル**: 設定 `loader/config/`（`mod.rs` 338・`sections.rs` 356。検査も足すなら `crates/pasta_check/src/validate/config.rs` 403）、`shiori/sakura_builder.lua` 540、`shiori/actor_style.lua` 90（`\x` の扱いを合わせるなら）、`shiori/appearance.lua` 567、`sakura_script/`（`mod.rs` 322、`\x` を列の動きに足すなら `line_breaker.rs` 1,134。本体は 289 行で、残りは中のテスト）、`virtual_dispatcher.lua` 303、`boot.lua` 22、受け口（新しいファイルと `init.lua` 267 の読み込みの 1 行）、`act.lua` 829・`scene.lua` 240、行 ID を生成で埋めるなら `scope_gen.rs` 445・`element_gen.rs` 564。
-- **1,000 行の見込み**: `sakura_builder.lua` は 120〜200 行足しても届かない。ただ `BUILDER.build` は複雑度 28 なので、クリック待ちと `\x` の状態は `actor_style.lua` に倣って別のモジュールに出す案がある。`act.lua` は `cue-command-runtime` の後にこの spec が足すと 1,000 行に近づく。テストは `sakura_builder_test.lua`（3,839 行）・`virtual_dispatcher_spec.lua`（1,016 行）に足さず、新しいファイルに置く。
-- **規模**: 17〜21 のまま（話者名の置き場所が見えた分と、`\x` の列・時計の読み取りの分が、ほぼ打ち消し合う）。
-- **先に要るもの**: `cue-command-runtime`（`act.lua`・`sakura_builder.lua`・`loader/config/` を先に触る）、`novel-areka-contract`（名前）。ファイルの重なり: `cue-command-runtime`、`novel-checkpoint-rollback`（`sakura_builder.lua`・`appearance.lua`・`virtual_dispatcher.lua`・`init.lua`）、`scene-anchor-link`（`act.lua`・`sakura_builder.lua`・`sakura_script/`）、`call-attribute-filter`（`act.lua`・`scene.lua`、生成なら `element_gen.rs`）、`talk-grapheme-clusters`（`sakura_script/` の `line_breaker.rs`・`wait_inserter.rs`。`\x` や待ちを挟まない分を足す場合）、`novel-variable-scope`（予約の名前を動かすなら `virtual_dispatcher.lua`、生成で埋めるなら `scope_gen.rs`・`element_gen.rs`）、`shell-element-click`（`init.lua` の読み込みの行・`scene.lua`）、`scene-attribute-store`（`scene.lua`・`scope_gen.rs` を触る場合）。`tutorial-ssp-gaps` は完了したので外れた。
-- **種別**: 機能（ノベル向けの出力の切り替えが無い）。開発者の 0.5.0 の目標（2026-10-10）から。
-- **要件定義のモデル**: Fable のまま。決めるのは、areka が既読と声の引き当てのために全セーブ共通で覚える「変わらない行 ID」の作り方（保存の形で、後から変えにくい）。ID の細かさが、クリック待ちの単位と入れない行の書き方・「次の場面へ」の書き方と印・途中の `＞yield` の扱いと絡み、どれにも推奨案がまだ無い（3 つ以上の絡む問い）。話者名は置き場所が見えたので、深い論点から外れた。
-- **分割の案**: 要件で 20 を超えたら、決めてあるとおり `novel-talk-output`（設定・クリック待ち・`\x`・話者名・行 ID と声・待ちと改行を挟まない）と `novel-scene-flow`（ランダムトークと時報の停止・起動の場面・次の場面へ・完全一致の切り替え・途中の `＞yield`）に分ける。後の 1 本は `tutorial-ssp-gaps` が完了したので、`virtual_dispatcher.lua`・`boot.lua` を誰とも取り合わない。要件定義は、前の 1 本が Fable、後の 1 本は Opus でよい（行 ID を持たず、残る問いは 2 つに絞って推奨案を付けられる）。
-- **見つけた穴・古くなった記述**:
-  - 「Current State」と「穴」の行番号: `\e` は 284 行 → `sakura_builder.lua` 536 行、間隔の丸めは `virtual_dispatcher.lua` 58〜70 行 → 63〜78 行、止まっている場面の再開は 202〜204 行 → 215〜217 行、アクターの切り替えは 240 行 → 464・468 行（`emit_actor_switch` は 72〜86 行）、段落の区切りは 245・263〜265 行 → 501〜503 行（`put_break`）、Reference を変数へ移す関数は `shiori/act.lua` 161〜190 行 → 171 行から。`line_breaker.rs` 129〜131 行の「トークンごとに数え直す」は直った。
-  - 前回の節: `sakura_builder.lua` の 310・346〜347・379 行 → 468・501〜503・536 行。ファイルの大きさは `sakura_builder.lua` 383 → 540、`virtual_dispatcher.lua` 288 → 303、`line_breaker.rs` 462 → 1,134、`sakura_script/mod.rs` 247 → 322、`sections.rs` 344 → 356。
-
 ## 申し送り（ontalk-suppression より、2026-10-19）
 
 - 0.4.2 の `ontalk-suppression` が、ランダムトークと時報を止めるスイッチを入れる。`GLOBAL` の `pause_auto_talk`／`resume_auto_talk`（別名 `自動トーク停止`／`自動トーク再開`）で、状態は `STORE` に持ち、`virtual_dispatcher.lua` の `dispatch` が見る。止めるのは OnTalk・OnHour・止まっている場面の続きで、キックは止めない。
@@ -211,25 +177,6 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - 止めている間に `＞チェイントーク`（`ACT_IMPL.yield`。`＞yield`・Lua の `act:yield()` も同じ所を通る）を呼ぶと、ログに警告を出して止めを解く（要件 2.8）。ノベルで常に止めたままチェイントークを使う形とは真っ向からぶつかるので、要件で扱いを決める論点になる。
 - 再開すると `virtual_dispatcher.restart_timers` がランダムトークの間隔と次の正時を決め直す。止めている間に過ぎた時報は出さない。
 
-## 2026-10-23 棚卸の再測定（main 8fc9bdff）
-
-- **前提の変化**:
-  - 自動トークを止めるスイッチが入った（`ontalk-suppression`）。印は `STORE.auto_talk_paused`（`crates/pasta_lua/pasta_scripts/pasta/store.lua`。保存しない）、止める・再開する関数は `GLOBAL.pause_auto_talk`／`resume_auto_talk`（`shiori/entry.lua` 29〜48 行。別名 `自動トーク停止`／`自動トーク再開`）。ランダムトークと時報の持ち主 `shiori/event/virtual_dispatcher.lua`（303 → 328 行）の `M.dispatch` は、キックの後・時報の前の門（263〜267 行）で止まる。止まっている場面の続きも止まり、捨てはしない。再開すると `M.restart_timers`（282 行）が間隔と次の正時を決め直す。「ノベル向けの設定ではこのスイッチを常に入れる」案は、そのまま使える。
-  - ただし、スイッチの効き目はランダムトークと時報だけではない。撫で・つつきの受け口（`shiori/event/mouse.lua` 143・165 行）は、止めている間は、つつきを 9 段目だけにし、撫でを決めない。区切りの関数 `ACT_IMPL.yield`（`pasta/act.lua` 664 行）は、止めている間に呼ばれると警告を出して再開する。ノベルで常に止めるなら、この 2 つ（撫で・つつきの近道を止めてよいか、`＞yield` で再開してしまう決まりをどうするか）を要件で決める。
-  - 指名したシーンを再生するイベント（`OnPastaScene`）と、完全一致の部品の広がり（`scene-play-event`）は、この spec の持ち場を変えない。完全一致の切り替えは `scene-exact-match` の設定を入れるだけ（2026-10-21 の申し送りのとおり）。
-  - 出力の組み立て `sakura_builder.lua`（540）・立ち絵の復旧 `appearance.lua`（567）・文の加工 `sakura_script/`・設定の読み込み `loader/config/` は、前回から変わっていない。
-- **触るファイル**: 2026-10-18 の節と同じ。行数が動いたのは `virtual_dispatcher.lua` 328、`act.lua` 837（1,000 行に近い）、`scene.lua` 266、`shiori/event/init.lua` 268（読み込みの行は 78〜82 行）。ほかは `loader/config/`（`mod.rs` 343・`sections.rs` 356）、`sakura_builder.lua` 540、`actor_style.lua` 90、`appearance.lua` 567、`sakura_script/`（`mod.rs` 322・`line_breaker.rs` 1,134。本体は 289 行で残りは中のテスト）、`boot.lua` 22、`mouse.lua` 176、生成で行 ID を埋めるなら `scope_gen.rs` 445・`element_gen.rs` 564。
-- **規模**: 16〜20 タスク（完全一致の切り替え 1 を外し、止めるスイッチとの整合（撫で・つつき・`＞yield`）の 1 を足した。止める仕組みそのものは作らないので、停止の 1 は軽くなる）。
-- **先に要るもの**: `novel-areka-contract`、`cue-command-runtime`、`scene-exact-match`。ファイルの重なり（前回のものに足す）:
-  - 0.4.2 の残り: `chain-talk-interrupt`（`init.lua` の `set_co_scene`・`EVENT.drive` と `act.lua`）、`reg-handler-chain`（`init.lua` の `EVENT.fire`）、`external-control-events`（`init.lua` の読み込みの 1 行。受け口を新しいファイルに置くなら、後から入る側が合わせる約束で並べられる）。
-  - 隙間の spec: `ponytail-lua-scripts`（`virtual_dispatcher.lua` の設定の読み・`init.lua`・`act.lua`・`scene.lua`）、`ponytail-lua-loader`（`loader/config/`）、行 ID を生成で埋めるなら `ponytail-lua-transpiler`（コード生成）。
-- **種別**: 機能（ノベル向けの出力の切り替えが無い）。開発者の 0.5.0 の目標（2026-10-10）から。
-- **要件定義のモデル**: Fable のまま。areka が既読と声の引き当てのために全セーブ共通で覚える「変わらない行 ID」は、後から変えにくい保存の形である。ID の細かさが、クリック待ちの単位・「次の場面へ」の書き方と印・途中の `＞yield` の扱い（今回、止めている間の `＞yield` が自動トークを再開する決まりも加わった）と絡み、推奨案がまだ無い。
-- **分割の案**: 2026-10-18 の節のとおり。要件で 20 を超えたら `novel-talk-output`（Fable）と `novel-scene-flow`（Opus）に分ける。止めるスイッチの整合は後の 1 本に入る。
-- **見つけた穴・古くなった記述**:
-  - 2026-10-18 の節の行番号: `virtual_dispatcher.lua` 303 → 328 行（`M.dispatch` は 227 行から。止まっている場面を返す所は `check_talk` の中の 215〜217 行で、門の後ろ）、`init.lua` 267 → 268 行。`act.lua` 829 → 837、`scene.lua` 240 → 266。
-  - 2026-10-22 の申し送りの「止めている間に `＞チェイントーク` を呼ぶと止めを解く」は、区切りの関数 `ACT_IMPL.yield` に入った（上の 2 点目）。
-
 ## 申し送り（talk-grapheme-clusters より、2026-10-23 完了時）
 
 - 台詞の「1 文字」が、コードポイントから拡張書記素クラスタ（見た目の 1 文字）に変わった。`sakura_script/tokenizer.rs` の `next_cluster`（2 つ目以降のコードポイントの `\` の手前で切る）が切り出しの正で、`line_breaker.rs` もこれを呼ぶ。
@@ -245,28 +192,6 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - 仕組み: `shiori/event/init.lua` の `set_co_scene(co, keep)`・`drive_kind(co)`・`run_interrupt_scene(act)`・`EVENT.drive`（種類を決める → act の欄 `_spoke`・`_on_speech`・`_interrupted` を整える → 再開 → 欄を外す → 台詞の印を読む）。台詞の判定は `sakura_builder.lua` の `BUILDER.speaks`、印は `shiori/act.lua` の `SHIORI_ACT_IMPL.build` が立てる。詳しくは `.kiro/specs/completed/chain-talk-interrupt/design.md` の「続きの決まり」と ContinuationRule。
 - 見直しが要る論点: 「止まっている場面が捨てられる」を前提にする所は、台詞を出したシーン・指名した再生・エラーの 3 つに狭まったことを前提に測り直すこと。`STORE.co_preempt`（弱い参照の表）が `STORE` に増え、`STORE.reset` で作り直される。
 
-## 2026-10-23 棚卸の再測定（main 82176f19）
-
-- **前提の変化**（前回 `8fc9bdff` から）:
-  - 書記素クラスタ（`talk-grapheme-clusters`）: 字の単位が見た目の 1 文字になった（`sakura_script/tokenizer.rs` の `next_cluster` 119 行、`CharSets::classify(&str)` 95 行）。`\x` は今も列の動きに数えない（`line_breaker.rs` の `column_move` 57〜67 行は `\n`・`\c`・`\_l` だけ）。budoux で `\x` の後を最初の列に戻すなら、ここに 1 つ足すだけで済む（`\c` と同じ動き）。`line_breaker.rs` は 1,155 行だが、本体は 1〜310 行で、残りは中のテスト。テストは中に足さず、`tests/sakura_script/`（`grapheme_test.rs` が手本）に置く。
-  - 「待ちと改行を挟まない」は、Rust を触らずに設定の既定で済む見込み。待ちは 50 ミリ秒以下なら `\_w` を出さず（`wait_inserter.rs` の `append_with_wait` 154 行・`flush_pending` 133 行）、アクターに budoux の幅が無ければ改行しない（`sakura_script/mod.rs` 132〜134 行）。ノベル向けの設定がこの既定を入れる形なら、`sakura_script/` に触るのは `\x` の 1 か所だけになる。
-  - チェイントークの続き（`chain-talk-interrupt`）: 続きを捨てるのは、台詞（字のある `talk` か `choice`。`sakura_builder.lua` の `BUILDER.speaks` 413 行）を出した割り込み・印の付いた指名の再生（`STORE.co_preempt`）・エラーの 3 つだけになった。表情だけのイベントや台詞を出さないクリックの受け口では、ノベルの続きは消えない。逆に、台詞を出すイベント（ダブルクリックのシーン・`OnPastaCallFunction`・作者の `REG` のハンドラ）が来ると続きは捨てられ、`＊チェイントーク中断` があればその台詞が代わりに出る。ノベルの間に、どのイベントの割り込みを許すかを要件で決める。
-  - 「次の場面へ」の受け口は、待っている続き（`STORE.co_scene`）をそのまま返せば、`EVENT.drive` が「再開」として扱う（`shiori/event/init.lua` の `drive_kind` 161 行。`virtual_dispatcher.lua` 215〜217 行が同じ返し方）。新しい場面を始めるなら、`kick.lua` 69 行・`scene_play.lua` 71 行と同じく `STORE.co_preempt[co] = true` を付ければ、待っている続きをはっきり捨て、中断の台詞も出ない。仕組みはもうあるので、作るのは受け口だけになる。
-  - 止めている間の `＞yield` が自動トークを再開する決まり（`pasta/act.lua` 664 行の `ACT_IMPL.yield`）は変わっていない。前回の論点のまま。
-- **触るファイル**: 行数が動いたのは `shiori/sakura_builder.lua` 540 → 558（`BUILDER.build` 432 行・`last_actor ~= actor` 482 行・`\e` 554 行。`emit_actor_switch` 72 行・`put_break` 278 行は動かず）と `shiori/event/init.lua` 268 → 371（読み込みの並びは 85〜90 行で、最後が `external_control`。受け口の 1 行はその後ろ）。`sakura_script/` は `\x` を列に数えるなら `line_breaker.rs` の `column_move` だけ。ほかは前回と同じ（`act.lua` 837・`scene.lua` 266・`virtual_dispatcher.lua` 328・`appearance.lua` 567・`actor_style.lua` 90・`loader/config/`（`mod.rs` 343・`sections.rs` 356）・`boot.lua` 22・`mouse.lua` 176、生成で行 ID を埋めるなら `scope_gen.rs` 445・`element_gen.rs` 564）。新しいファイルは受け口と、クリック待ちの状態を出すなら `actor_style.lua` に倣った別のモジュール。
-- **規模**: 16〜20 のまま。待ちと改行の分は設定の既定で軽くなり、割り込みの扱い（どのイベントに印を付けるか・止めるか）の分が足され、打ち消し合う。
-- **先に要るもの**: `novel-areka-contract`、`cue-command-runtime`、`scene-exact-match`（どれも未完了）。0.4.2 の 3 本と `talk-grapheme-clusters` は完了したので、重なりから外れた。ファイルの重なり:
-  - 0.5.0 の道筋: `cue-command-runtime`（`act.lua`・`sakura_builder.lua`・`loader/config/`）、`novel-checkpoint-rollback`（`sakura_builder.lua`・`appearance.lua`・`virtual_dispatcher.lua`・`init.lua`）、`call-attribute-filter`（`act.lua`・`scene.lua`）、`scene-exact-match`（`act.lua`・`init.lua`・`virtual_dispatcher.lua`・`loader/config/`）、`shell-element-click`（`init.lua`・`act.lua`）、`novel-variable-scope`（`virtual_dispatcher.lua`、生成なら `scope_gen.rs`・`element_gen.rs`）、`scene-attribute-store`（`scene.lua`・`scope_gen.rs` を触る場合）。
-  - 版の決まっていないもの: `scene-anchor-link`（`act.lua`・`sakura_builder.lua`）、`recommend-menu-scenes`（`init.lua` の読み込みの行・`loader/config/mod.rs`）。
-  - 隙間の spec: `ponytail-lua-scripts`（`virtual_dispatcher.lua`・`init.lua`・`act.lua`・`scene.lua`）、`ponytail-lua-loader`（`loader/config/`）、生成で行 ID を埋めるなら `ponytail-lua-transpiler`。
-- **種別**: 機能（ノベル向けの出力の切り替えが無い）。開発者の 0.5.0 の目標（2026-10-10）から。
-- **要件定義のモデル**: Fable のまま（分けるなら出力の分だけ）。決めるのは、areka が既読と声のために全セーブ共通で覚える「変わらない行 ID」の作り方で、後から変えにくい保存の形である。ID の細かさが、クリック待ちの単位・「次の場面へ」の書き方と印・途中の `＞yield` の扱いと絡み、推奨案がまだ無い（3 つ以上の絡む問い）。今回入った 4 本は、どれもこの ID を決めていない。割り込みの扱いは `co_preempt` の印という部品ができ、推奨案が立つので、深い論点に入れない。
-- **分割の案**: 2026-10-18 の節のとおり。20 を超えたら `novel-talk-output`（Fable。設定・クリック待ち・`\x`・話者名・行 ID と声・待ちと改行）と `novel-scene-flow`（Opus。ランダムトークと時報の停止・起動の場面・次の場面へ・途中の `＞yield`・割り込みの扱い）に分ける。`init.lua`・`virtual_dispatcher.lua`・`mouse.lua` は後の 1 本だけが持つ。
-- **見つけた穴・古くなった記述**:
-  - 前回の節の `init.lua` 268 行・読み込みの行 78〜82 行 → 371 行・85〜90 行。2026-10-18 の節の `sakura_builder.lua` の `BUILDER.build` 414 行・`last_actor` 464 行・`\e` 536 行 → 432・482・554 行。
-  - 2026-10-18 と前回の節の「`talk-grapheme-clusters` と `sakura_script/` で重なる」は、完了したので外れた。roadmap の Phase 13 の共有接点（369 行）と台帳の `talk-grapheme-clusters` の行（442 行）にも、同じ古い重なりが残っている。
-
-
 ## 申し送り（2026-10-29 の discovery「シーン属性による候補の絞り込み」より）
 
 - `call-attribute-filter` は閉じて、新しい spec `scene-condition-attributes` に統合した（開発者の決定）。この brief の `call-attribute-filter` は `scene-condition-attributes` と読み替える。
@@ -279,3 +204,19 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 ## 申し送り（2026-10-29 の版の組み替えより）
 
 - ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.5（ponytail）の次に入る。
+
+## 2026-11-03 棚卸の再測定（main c575febd）
+
+- **前提の変化**（0.5.0 の ponytail 7 本より）: 決まりは変わらず、置き場所が動いた。`act.lua` 837 → 812（区切りの関数 `ACT_IMPL.yield` は 641 行）、`scene.lua` 266 → 261（場面のコルーチンを作るのは `SCENE.wrap` 177 行の 1 つになった）、`shiori/event/init.lua` 371 → 347（`drive_kind` 124 行・`EVENT.drive` 231 行。何も出さない区切りは続けて飛ばし、10000 回続くと止まるエラー）、`virtual_dispatcher.lua` 328 → 340（間隔の読み込み 88〜89 行・止まっている場面を返す所 227〜229 行。設定の値が有限でなければ既定に戻す `finite_or` が増えた）、`sakura_builder.lua` 558 → 557（`string.buffer` を直に使う）。生成は `element_gen.rs` 564 → 553・`scope_gen.rs` 445 → 404（`ponytail-lua-transpiler`）。`sakura_script/`・`appearance.lua`・`actor_style.lua`・`loader/config/`（`mod.rs` 356・`sections.rs` 358）・`boot.lua`・`mouse.lua`・`kick.lua` は変わっていない。
+- **前の節から持ち越す前提**（2026-10-17〜10-23 の節）:
+  - `\x` を知っているのは装いの出し入れ（`actor_style.lua` の `STYLE.through`）だけ。残る穴は、同じアクターが続くと `\p` を出し直さない所（`sakura_builder.lua` 481 行の `last_actor ~= actor`）、段落の区切りの状態、吹き出しごとの列、立ち絵の復旧（`appearance.lua`）、budoux の列（`line_breaker.rs` の `column_move` 57〜67 行に `\x` を 1 つ足せば `\c` と同じ動き）。`\c` を読む所で `\x` も読めば、組み立ては 1 か所で直せる。
+  - 話者名は `emit_actor_switch`（72 行）の装いの後が自然。表示名は `[actor."名前"]` の表に置けるが、`font` の `name`（書体の名前）と取り違えないキーにする。待ちと改行を挟まない分は、設定の既定で済む見込み（50 ミリ秒以下は `\_w` を出さない `wait_inserter.rs`、budoux の幅が無ければ改行しない `sakura_script/mod.rs`）。
+  - 自動トークの止め（`STORE.auto_talk_paused`・`GLOBAL.pause_auto_talk`）はそのまま使える。止めている間は、撫で・つつき（`mouse.lua` 143・165 行）が変わり、`＞yield`（`ACT_IMPL.yield`）が警告を出して再開する。この 2 つと、トーク中でない OnSecondChange に返る時計の読み取り（`\![get,property,OnPastaClock,…]`）を、ノベルでどうするかを要件で決める。
+  - 続きを捨てるのは、台詞を出した割り込み・`STORE.co_preempt` の印の付いた指名の再生・エラーだけ。どのイベントの割り込みを許すかを要件で決める。「次の場面へ」の受け口は、待っている続きを返せば再開になり、新しい場面なら `STORE.co_preempt[co] = true` を付ける（手本は `scene_play.lua` 43・78 行。`kick.lua` は 0.5.0 の `debug-mcp-runtime` が消す）。
+- **触るファイル**: 設定 `loader/config/`（`mod.rs` 356・`sections.rs` 358。検査を足すなら `validate/config.rs` 455）、`shiori/sakura_builder.lua` 557（`BUILDER.build` 431 行・`\e` 553 行・`put_break` 278 行）、`actor_style.lua` 90、`appearance.lua` 567、`sakura_script/`（`\x` を列に数えるなら `line_breaker.rs` の `column_move` だけ）、`virtual_dispatcher.lua` 340、`boot.lua` 22、`mouse.lua` 176、受け口（新しいファイルと、`init.lua` の読み込みの並び 85〜91 行の後ろに 1 行）、`act.lua` 812・`scene.lua` 261、行 ID を生成で埋めるなら `scope_gen.rs` 404・`element_gen.rs` 553。クリック待ちの状態は `actor_style.lua` に倣った別のモジュールに出す案がある。テストは `sakura_builder_test.lua`（3,638 行）・`virtual_dispatcher_spec.lua` に足さず、新しいファイルに置く。
+- **規模**: 16〜20 のまま。
+- **先に要るもの**: `novel-areka-contract`、`cue-command-runtime`、`scene-exact-match`（どれも未完了）。ファイルの重なり: 0.5.0 の `debug-mcp-runtime`（新しく。`virtual_dispatcher.lua` のキックの門・`kick.lua`・`loader/config/sections.rs` の `[debug]`）・`scene-condition-attributes`（`act.lua`・`scene.lua`）・`scene-pick-modes`（`act.lua`・`scene.lua`）・`scene-attribute-store`（`scene.lua`・`scope_gen.rs` を触る場合）、0.6.0 の `cue-command-runtime`（`act.lua`・`sakura_builder.lua`・`loader/config/`）・`novel-checkpoint-rollback`（`sakura_builder.lua`・`appearance.lua`・`virtual_dispatcher.lua`・`init.lua`）・`shell-element-click`（`init.lua`・`act.lua`）・`novel-variable-scope`（`virtual_dispatcher.lua`、生成なら `scope_gen.rs`・`element_gen.rs`）、版の決まっていない `scene-anchor-link`（`act.lua`・`sakura_builder.lua`）・`scene-exact-match`（`act.lua`・`init.lua`・`virtual_dispatcher.lua`・`loader/config/`）。ponytail の 3 本は完了して外れた。
+- **種別**: 機能（ノベル向けの出力の切り替えが無い）。開発者の 0.5.0（今は 0.6.0）の目標（2026-10-10）から。
+- **要件定義のモデル**: Fable のまま（分けるなら出力の分だけ）。areka が既読と声のために全セーブ共通で覚える「変わらない行 ID」の作り方は、後から変えにくい保存の形である。ID の細かさが、クリック待ちの単位・「次の場面へ」の書き方と印・途中の `＞yield` の扱い（止めている間の再開の決まりを含む）と絡み、推奨案がまだ無い（3 つ以上の絡む問い）。今回入った 7 本は、どれもこの ID を決めていない。`.pasta` の行番号（`act.line_map`）は台本を直すとずれるので、ID の元にならない。
+- **分割の案**: 20 を超えたら `novel-talk-output`（Fable。設定・クリック待ち・`\x`・話者名・行 ID と声・待ちと改行）と `novel-scene-flow`（Opus。ランダムトークと時報の停止・起動の場面・次の場面へ・途中の `＞yield`・割り込みの扱い・止めるスイッチとの整合）に分ける。切り替えの設定は前の 1 本に置き、後の 1 本はそれを読む。`init.lua`・`virtual_dispatcher.lua`・`mouse.lua` は後の 1 本だけが持つ。
+- **見つけた穴・古くなった記述**: 「Current State」と「穴」の行番号は、上の行へさらに動いた（止まっている場面を捨てる所は `init.lua` の `set_co_scene` 110 行、Reference を変数へ移す関数は `shiori/act.lua` 205 行）。「完全一致で探す道は `kick.lua` にしか無い」は古い（`SCENE.co_exec_exact` があり、切り替えは `scene-exact-match` が持つ）。roadmap の Phase 13 の共有接点の `act.lua` 837 行・`sakura_builder.lua` 558 行は、812・557 行。

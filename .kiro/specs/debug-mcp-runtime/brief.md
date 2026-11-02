@@ -202,3 +202,18 @@ pasta の開発の道具（VSCode の「▶ シーンを実行」・SHIORI の�
 - `pasta_shiori/tests/` の kick の e2e 4 本（`scene_kick_*_e2e_test.rs`）は、自分の mailbox と `kick_sink_for` の送り先・`spawn_actor_thread_with` でアクターの道を回す形になった。kick を消すときは、この 4 本と `actor_kick_test.rs`・`multi_instance_test.rs` の `dap_kick_reaches_only_its_own_instance` が対象になる。
 - DAP の待受の番号を外から観る `ActorThread::debug_local_addr` は消えた。テストはゴーストのログの `debug backend listening addr=` の行から読む（`tests/common/mod.rs` の `listening_port`。`debug_preservation_test.rs`・`multi_instance_test.rs` が使う）。待ち受けを消すときは、この補助と使い手も一緒に直す。
 - `tests/common` の `#[ctor]` は `PASTA_DEBUG`・`PASTA_DEBUG_PORT`・`PASTA_LOG` を消す。固定ポートが無くなったら中和を外せるか（上の「load を叩く新しいテスト」の行）は、ここを見る。
+
+## 2026-11-03 棚卸の再測定（main c575febd）
+
+- **前提の変化**: 先に要った 3 本（`ponytail-shiori`・`ponytail-lua-scripts`・`ponytail-lua-transpiler`）は全部入った。`pasta_lua/src/debug`・`runtime/`・`loader/` は、テスト 1 本（`source_map_builder_tests.rs`）のほかは変わっていない。`pasta_shiori` の側は上の申し送り（ponytail-shiori）のとおり（`kick_sink_for` は `actor/instance.rs` 76 行、使う所は 139・284 行）。Lua の側の行が動いた。`entry.lua` の `KICK` は 12 行、`SHIORI.kick` は 112〜121 行（`SHIORI.load`・`unload` の中身は `ponytail-lua-scripts` が消した）、`virtual_dispatcher.lua` の門の分岐は 246〜272 行、`STORE.kick_*` は `store.lua` 78・82・105・106 行。`kick.lua` 167 行は手つかず（53 行の古い説明は、この spec がファイルごと消す約束で残してある）。
+- **章の数**: `ponytail-manual-ci` が章の数を目次（`SUMMARY.md`）から数えるようにした。Constraints の「章の数」は、頁を消す・足すときに `SUMMARY.md` を直すだけで済む（`internals/debug.md` の題は 82 行）。
+- **触るファイル**: Rust は `crates/pasta_lua/src/debug/`（DAP の部品とテストを消し、`source_map/`・`playscene.rs`・`config.rs` 221 を残す）、`runtime/exec.rs` 149（86 行）・`runtime/mod.rs` 259（81・233 行）・`runtime/factory.rs` 209（67 行の説明・146〜160 行のシーン索引）・`lib.rs` 69（52 行）・`loader/mod.rs` 329（214 行）・`loader/config/sections.rs` 358・`loader/source_map_build.rs` 172、`pasta_shiori` の `actor/mailbox.rs`・`thread.rs`・`instance.rs`・`shiori.rs`、テスト（`pasta_shiori/tests/` の kick 6 本・`debug_preservation_test.rs`・`multi_instance_test.rs`・`tests/common/mod.rs`、`pasta_lua/tests/runtime/` の `debug_*` 3 本、`lua_specs/` の kick 8 本と一覧）。Lua は `shiori/entry.lua` 130・`event/kick.lua`（消す）・`virtual_dispatcher.lua` 340・`store.lua` 127・`scene_play.lua` 86 か `external_control.lua` 123、位置を添えるなら `shiori/stop.lua` 212。`act.lua`・`element_gen.rs`・`scene.lua`・`search/context.rs` は触らない。1,000 行に近いものは無い。
+- **規模**: 12〜16 タスクのまま（下の 1 つ目の穴しだいで 1〜2 減る）。
+- **先に要るもの**: 機能の上では無い。ファイルの重なり（未完了）: `scene-count`（`entry.lua`。あちらが GLOBAL 関数を `pasta/global.lua` に置けば重ならない）、`scene-condition-attributes`（イベントの自動転記を `virtual_dispatcher.lua` に置くと重なる。`SCENE.co_exec` に置けば重ならない）、`scene-attribute-store`（属性をシーン表のフィールドに置くと `source_map/scene_join.rs` 87 行も直す要がある。`finalize_scene_impl` の署名を変えると `runtime/factory.rs` 120 行も動く。どちらもしなければ重ならない）、0.6.0 の `shiori4-v4-host`（`actor/`・キック）。`vscode-mcp-client` とはソースを共有しない（`SUMMARY.md` は別の行）。`scene-count`・`scene-attribute-store` の側の約束があれば、ウェーブ 2 に入れられる。
+- **種別**: 基盤（開発の道具の通り道を DAP から開発用のイベントへ替え、DAP とキックを消す）。開発者が承認した移行。
+- **要件定義のモデル**: Opus。撤去が主で、残す形（門・イベント・設定のキー）は brief で決まっている。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**:
+  - 実行時エラーのバルーンとログの警告は、もう `.pasta` の位置を出している。`runtime-error-balloon`（#132）の `shiori/stop.lua` の `STOP.detail`・`STOP.location`（127・111 行）が、`act:init_scene` の最後の引数の行の対応（`transpiler.rs` の `fill_line_maps` 259 行。デバッグの有無にかかわらず生成コードに埋まる）で、変換した Lua の行を `dic\天気.pasta:15` の形に直す。Problem の「作者は `.pasta` の行へ手で戻している」と Approach 4 は、行の対応で引けない行（シーンの関数の外。アクター辞書の単語定義など）に絞るか、要らないかを、要件の最初に確かめる。`LineShift` が恒等になったので、行の対応とソースマップは同じ行を指す。
+  - `source_map/mod.rs` 25 行の `normalize_output` は、まだ `normalize_output_with_shift` に直っていない（`ponytail-lua-transpiler` からの申し送りの 1 行目）。
+  - Current State の `actor/instance.rs:150`・`entry.lua:132`・`virtual_dispatcher.lua:234-257` は、上の行に動いた。
