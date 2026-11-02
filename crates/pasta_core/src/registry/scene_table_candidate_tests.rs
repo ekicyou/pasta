@@ -295,7 +295,7 @@ fn test_from_scene_registry_key_conversion() {
     registry.register_local("選択肢", "会話", counter, 1, HashMap::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
-    let table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let table = SceneTable::from_scene_registry(registry, selector);
 
     // Verify search key conversion works with collect_scene_candidates
     // Global scene search
@@ -326,7 +326,7 @@ fn test_resolve_scene_id_unified_local_scene() {
     registry.register_local("選択肢", "会話", counter, 1, HashMap::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let mut table = SceneTable::from_scene_registry(registry, selector);
     table.set_shuffle_enabled(false);
 
     // Resolve local scene from parent module
@@ -345,7 +345,7 @@ fn test_resolve_scene_id_unified_global_scene() {
     registry.register_global("挨拶", HashMap::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let mut table = SceneTable::from_scene_registry(registry, selector);
     table.set_shuffle_enabled(false);
 
     // Resolve global scene - must use empty module_name for global search
@@ -361,7 +361,7 @@ fn test_resolve_scene_id_unified_global_scene_no_fallback() {
     registry.register_global("挨拶", HashMap::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let mut table = SceneTable::from_scene_registry(registry, selector);
     table.set_shuffle_enabled(false);
 
     // Try to resolve global scene from a module - should fail (no fallback)
@@ -381,7 +381,7 @@ fn test_resolve_scene_id_unified_local_found() {
     registry.register_local("挨拶", "会話", counter, 1, HashMap::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let mut table = SceneTable::from_scene_registry(registry, selector);
     table.set_shuffle_enabled(false);
 
     // Resolve from 会話_1 - should find ONLY local (no fallback to global)
@@ -550,7 +550,7 @@ fn test_resolve_scene_id_unified_cycling() {
     registry.register_local("選択肢B", "会話", counter, 2, HashMap::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let mut table = SceneTable::from_scene_registry(registry, selector);
     table.set_shuffle_enabled(false);
 
     // 1周目: 2件のローカル候補を消費
@@ -590,7 +590,7 @@ fn candidate_fn_names(table: &SceneTable, module_name: &str, prefix: &str) -> Ve
 }
 
 fn table_from(registry: crate::registry::SceneRegistry) -> SceneTable {
-    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0]))).unwrap()
+    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0])))
 }
 
 /// 2.2: `A`×11＋`A1` で、`A1` の検索の候補は `A1_1` だけ。
@@ -740,7 +740,7 @@ fn candidate_order_table(sequence: Vec<usize>) -> SceneTable {
     registry.register_local("挨拶", "会話", counter, 2, HashMap::new());
     registry.register_local("挨拶A", "会話", counter, 1, HashMap::new());
 
-    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(sequence))).unwrap()
+    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(sequence)))
 }
 
 /// 候補の fn_name を集めた順のまま返す。

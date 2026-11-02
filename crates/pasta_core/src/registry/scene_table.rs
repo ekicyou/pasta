@@ -95,7 +95,7 @@ impl SceneTable {
     pub fn from_scene_registry(
         registry: crate::registry::SceneRegistry,
         random_selector: Box<dyn RandomSelector>,
-    ) -> Result<Self, SceneTableError> {
+    ) -> Self {
         // Build Vec storage with ID assignment
         // Note: Internal IDs are 0-based Vec indices (SceneRegistry's 1-based IDs are not carried over)
         let labels: Vec<SceneInfo> = registry
@@ -134,13 +134,13 @@ impl SceneTable {
             entry.push(scene.id);
         }
 
-        Ok(Self {
+        Self {
             labels,
             prefix_index,
             cache: HashMap::new(),
             random_selector,
             shuffle_enabled: true,
-        })
+        }
     }
 
     /// Convert fn_name to search key for prefix_index.

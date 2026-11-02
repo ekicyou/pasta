@@ -43,7 +43,7 @@ fn build_filtered_table() -> SceneTable {
     registry.register_global("挨拶", winter);
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let mut table = SceneTable::from_scene_registry(registry, selector);
     table.set_shuffle_enabled(false);
     table
 }
@@ -103,7 +103,7 @@ fn test_find_scene_returns_fn_name() {
     registry.register_global("会話", HashMap::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let mut table = SceneTable::from_scene_registry(registry, selector);
     table.set_shuffle_enabled(false);
 
     // Legacy method returns the fn_name string of the resolved scene
@@ -128,7 +128,7 @@ fn test_get_scene_out_of_range_returns_none() {
     registry.register_global("会話", HashMap::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let table = SceneTable::from_scene_registry(registry, selector);
 
     assert!(table.get_scene(SceneId(0)).is_some());
     assert!(table.get_scene(SceneId(99)).is_none());
@@ -143,7 +143,7 @@ fn test_labels_iter_yields_all_scenes() {
     registry.register_global("挨拶", HashMap::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let table = SceneTable::from_scene_registry(registry, selector);
 
     let names: Vec<_> = table.labels_iter().map(|s| s.name.clone()).collect();
     assert_eq!(names, vec!["会話", "挨拶"]);
@@ -196,7 +196,7 @@ fn test_from_scene_registry_groups_same_name_scenes() {
     registry.register_global("会話", HashMap::new()); // 会話_2
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let mut table = SceneTable::from_scene_registry(registry, selector);
     table.set_shuffle_enabled(false);
 
     let id1 = table.resolve_scene_id("会話", &HashMap::new()).unwrap();
@@ -216,7 +216,7 @@ fn test_resolve_scene_id_unified_cache_key_includes_module() {
     registry.register_local("選択肢", "会話B", counter2, 1, HashMap::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
+    let mut table = SceneTable::from_scene_registry(registry, selector);
     table.set_shuffle_enabled(false);
 
     // Resolve from 会話A_1
@@ -245,7 +245,7 @@ fn build_table(globals: &[&str], selector: Vec<usize>) -> SceneTable {
     for name in globals {
         registry.register_global(name, HashMap::new());
     }
-    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(selector))).unwrap()
+    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(selector)))
 }
 
 fn scene_name(table: &SceneTable, id: SceneId) -> String {
@@ -330,8 +330,7 @@ fn test_resolve_scene_id_exact_local_scope() {
     registry.register_local("選択肢", "会話", counter, 2, HashMap::new());
     registry.register_global("選択肢", HashMap::new());
     let mut table =
-        SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0])))
-            .unwrap();
+        SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0])));
     let empty = HashMap::new();
 
     // ローカルの範囲: 頭が同じローカルも、同じ名前のグローバルも選ばない
@@ -403,8 +402,7 @@ fn build_owning_table() -> SceneTable {
     registry.register_local("挨拶", "会話", c3, 1, HashMap::new());
     registry.register_global("雑談", HashMap::new());
     let mut table =
-        SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0])))
-            .unwrap();
+        SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0])));
     table.set_shuffle_enabled(false);
     table
 }

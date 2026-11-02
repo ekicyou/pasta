@@ -102,8 +102,7 @@ pub(crate) fn check(
     collisions(&mut findings, FindingKind::GlobalSceneCollision, &decls);
 
     let table =
-        SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![])))
-            .expect("from_scene_registry は失敗を返さない");
+        SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![])));
     (SceneModel { table, globals }, findings)
 }
 

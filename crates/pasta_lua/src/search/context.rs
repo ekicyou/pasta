@@ -56,10 +56,8 @@ impl SearchContext {
         word_registry: WordDefRegistry,
         scene_aliases: SceneAliasTable,
     ) -> Result<Self, SearchError> {
-        let scene_table = SceneTable::from_scene_registry(
-            scene_registry,
-            Box::new(DefaultRandomSelector::new()),
-        )?;
+        let scene_table =
+            SceneTable::from_scene_registry(scene_registry, Box::new(DefaultRandomSelector::new()));
         let word_table = WordTable::from_word_def_registry(
             word_registry,
             Box::new(DefaultRandomSelector::new()),
