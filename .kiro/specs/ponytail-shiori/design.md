@@ -601,7 +601,7 @@ extern "system" fn DllMain(_hinst: isize, _call_reason: u32, _reserved: *mut c_v
 **Implementation Notes**
 
 - Validation：`windows_tests.rs` の DllMain のテストは「どの通知でも 1・置き場に触れない」（`FreeLibrary` の detach を模した呼び出しの後も `LEGACY` が埋まったまま）に改める。
-- Risks：`load`（ANSI）だけを呼ぶホストが、`unload` なしの `FreeLibrary` の後に読み直すと、前の回の `LOADU_INITIALIZED` が残って `load` が何もしない（Open Questions の 4）。
+- Risks：前の回に `loadu` で読んだホストが、`unload` なしの `FreeLibrary` の後に `load`（ANSI）だけで読み直すと、前の回の `LOADU_INITIALIZED` が残って `load` が何もしない（Open Questions の 4。`loadu` で読み直すホストは当たらない）。
 
 #### V3Entry（v3.rs）
 
@@ -799,7 +799,7 @@ flowchart TB
 1. **D1 の形**：約束のチャネルで参照を返す人を決める形（D1-c）にした。代わりは、`unload` の道で生のスレッドのハンドルを `WaitForSingleObject` で待ち、スレッドはいつも `FreeLibraryAndExitThread` で終わる形（D1-b）。D1-b は要件 6.8 の「通常の依存で `Win32_System_Threading` を有効にしない」と食い違い、普段の道でも std の後始末を飛ばす。**推奨：D1-c。**
 2. **DllMain と JoinPolicy の撤去**：D1-c の下では `FreeLibrary` による detach に片付けるものが無いので、`DllMain` は何もせず、`teardown_actor_detached` と `JoinPolicy` を消すと仮定した。代わりは、守りとして今の `DllMain` の分岐を残す形（ローダーのロックの中で Rust の後始末を走らせる道が残る）。**推奨：撤去。**
 3. **版 3 で unload を呼ばずに外したホストの読み直し**：手放されたインスタンスが占有を持ち続けるので、同じディレクトリの版 3 の `load` は NULL になる（プロセスを再起動するまで）。生きた別のインスタンスと区別できない。議題 1 の「次の `load` まで」は旧来の入口では満たすが、版 3 では満たさない。**推奨：残りの危険として受け入れ、マニュアルに書く**（版 3 のホストの契約は `unload` を呼ぶこと。今は落ちうる）。
-4. **`load`（ANSI）だけを呼ぶホストの読み直し**：前の回の `LOADU_INITIALIZED` が残り、`load` が何もせずに TRUE を返して前のインスタンスが残る（`DLL_PROCESS_ATTACH` が走らないので印を下ろせない）。SSP は `loadu` を呼ぶので当たらない。**推奨：受け入れてマニュアルに書く。**
+4. **前の回に `loadu` で読み、次の回は `load`（ANSI）だけで読み直すホスト**：前の回の `LOADU_INITIALIZED` が残り、`load` が何もせずに TRUE を返して前のインスタンスが残る（`DLL_PROCESS_ATTACH` が走らないので印を下ろせない）。`loadu` で読み直すホスト（SSP）は、`teardown_slot` が前のインスタンスを片付けるので当たらない。**推奨：受け入れてマニュアルに書く。**
 5. **hinst**：`PastaShiori::load` の引数からも消し、Lua へは定数の 0 を渡すと仮定した（テストの 42・999 の確かめは 0 に直す）。代わりは引数を残し、アクターの道だけ 0 を渡す形（テストの差分が小さい）。**推奨：引数も消す。**
 6. **kick の e2e の道**：`kick_sink_for` を `pub` にし、自分の mailbox の送り先でアクターの道を通すと仮定した。DAP（`pasta/playSceneAt`）から通す形はより本番に近いが、4 本のテストに debug の有効化・ポートの読み取り・シーンの行の指定が要る。DAP からインスタンスの送り先までは `multi_instance_test` が既に確かめている。**推奨：`kick_sink_for` の形。**
 7. **観測の getter**：`actor_thread_id`・`debug_local_addr` を消し、ready のチャネルを `bool` にすると仮定した。スレッドが違うことは VM の型（`!Send`）が保証し、DAP のポートはログから読める（`multi_instance_test` の前例）。前提として、`debug_preservation` のフィクスチャの既定のロガーが info の `debug backend listening` をファイルへ書くこと（タスクで確かめる）。**推奨：消す。**
