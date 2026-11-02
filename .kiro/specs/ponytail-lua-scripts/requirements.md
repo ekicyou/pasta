@@ -48,7 +48,7 @@
 
 - **In scope**:
   - 上の指摘 1〜21 の修正と、その振る舞いを固めるテスト（`crates/pasta_lua/tests/lua_specs/**`、`crates/pasta_lua/tests/shiori/**` のうち、この領域を確かめるもの）。
-  - 挙動を変える直しに合わせたマニュアルの直し（`book/src/internals/shiori.md` の時計とトークの節、`book/src/lua/shiori-events.md` の設定の表と RES の表、`book/src/internals/execution-model.md`、`book/src/internals/internal-modules.md`）と、`gen-skill-refs` が作る references。
+  - 挙動を変える直しに合わせたマニュアルの直し（`book/src/internals/shiori.md` の時計とトークの節、`book/src/lua/shiori-events.md` の設定の表と RES の表、`book/src/reference/pasta-toml.md` の `hour_margin` の行、`book/src/internals/execution-model.md`、`book/src/internals/internal-modules.md`）と、`gen-skill-refs` が作る references。
   - `.kiro/specs/novel-checkpoint-rollback/brief.md` の `STORE.co_callback` の言及の直し（実装のとき）。
 - **Out of scope**:
   - 空の `pasta.areka`（`pasta/areka/init.lua`）。0.6.0 の `novel-areka-contract` の置き場として残す（2026-10-19 開発者の決定）。
@@ -107,7 +107,7 @@
 1. The Lua ランタイム shall シーンの関数をコルーチンに包み、終わりに組み立てた結果を返す手順を、1 か所にまとめる（指摘 3。キックの「指名した再生」の印は、呼ぶ側に残す。おすすめメニューの、組み立てを呼ばない動かし方は写しではないので残す）。
 2. The Lua ランタイム shall LuaJIT 2.1 で届かない `coroutine.close` の分岐を持たない（指摘 4）。
 3. The Lua ランタイム shall コールバック待ちに入ったかを、グローバルの旗を介さずに、続きの決め直しへ渡す（指摘 4）。
-4. While この整理を入れた後, the Lua ランタイム shall `chain-talk-interrupt` の続きの決まり（台詞を出さないシーンは続きに触れない・中断の台詞が出た回は続きを残さない・手順の順）を保つ。
+4. The Lua ランタイム shall この整理の後も、`chain-talk-interrupt` の続きの決まり（台詞を出さないシーンは続きに触れない・中断の台詞が出た回は続きを残さない・手順の順）を保つ。
 5. If 中断の台詞が出た回に、同じ再開がコールバック待ちを登録していた, the Lua ランタイム shall 後でそのシーンをコールバックで再開してチェイントークで区切ったとき、続きを取りこぼさない（今の旗の残り方による取りこぼしの見込みを、旗を無くすことで消す）。
 6. The Lua ランタイム shall `SHIORI.load` と `SHIORI.unload` を、`xpcall` で包まずに、今と同じ戻り値を返す形にする（指摘 5）。
 7. The Lua ランタイム shall アクターの単語の作成を、素通しの包みを介さずに行う（指摘 6）。
