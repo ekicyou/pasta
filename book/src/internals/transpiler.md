@@ -141,7 +141,9 @@ AST ノードは `Span`（開始・終了の行と桁、バイトオフセット
 
 ### パースと AST 構築時の正規化
 
-`parse_str` は pest で `file` 規則を解析し、失敗すれば `ParseError::SyntaxError` を返す。成功すれば `build_ast` が解析結果を記述順にたどって `PastaFile` を組み立てる。AST を組み立てる時点で、次の正規化を行う。
+`parse_str` は先頭の BOM を外した後、pest の前に `check_paren_depth`（`parser/mod.rs`）で各行の括弧の重なりを数える。`（`・`(` で 1 段深くなり、`）`・`)` で 1 段浅くなり（0 より下げない）、行が変わると 0 に戻る。台詞・文字列・コメント・Lua ブロックの中の括弧も数える。重なりが `MAX_PAREN_DEPTH`（64）を超えたら、65 段目の開き括弧の位置の構文の誤り（`ParseError::SyntaxError`）を返す。pest の再帰は開き括弧 1 つで 1 段深くなるので、この走査で解析と AST の片付けのスタックのあふれを防ぐ。行と桁は pest の行の索引と同じく、`'\n'` だけで行を分け、桁は文字の数で数える。
+
+走査を通れば、pest で `file` 規則を解析し、失敗すれば `ParseError::SyntaxError` を返す。成功すれば `build_ast` が解析結果を記述順にたどって `PastaFile` を組み立てる。AST を組み立てる時点で、次の正規化を行う。
 
 - `file_scope` の属性と単語定義を、それぞれ `FileItem::FileAttr`・`FileItem::GlobalWord` に平坦化し、他の項目との記述順を保つ。
 - 名前を省いたグローバルシーン（`＊` だけの行）は、直前のグローバルシーンの名前を引き継ぎ、`is_continuation` を真にする。ファイルの先頭で現れた場合はパースエラーにする。

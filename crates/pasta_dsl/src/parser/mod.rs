@@ -96,6 +96,7 @@ pub struct PastaParser2;
 /// ```
 pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, ParseError> {
     let source = source.strip_prefix('\u{FEFF}').unwrap_or(source);
+    check_paren_depth(source, filename)?;
     let pairs = PastaParser2::parse(Rule::file, source).map_err(|e| {
         let (line, column) = match e.line_col {
             pest::error::LineColLocation::Pos((l, c)) => (l, c),
@@ -105,6 +106,38 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, ParseError> 
     })?;
 
     build_ast(pairs, filename, source)
+}
+
+/// 1 行で閉じていない開き括弧を重ねられる段の数。pest の再帰は開き括弧 1 つで 1 段深くなる。
+pub(crate) const MAX_PAREN_DEPTH: usize = 64;
+
+/// 1 行の閉じていない開き括弧の重なりが MAX_PAREN_DEPTH を超えたら、
+/// 超えた開き括弧の位置の SyntaxError を返す。
+///
+/// pest の前に走らせ、深い再帰でスタックがあふれるのを防ぐ。台詞・文字列・コメント・
+/// Lua ブロックの括弧も数える（数えすぎる向きにしかずれない）。行と桁は pest の行の索引と
+/// 同じく `'\n'` だけで行を分け、桁は文字の数で数える。
+pub(crate) fn check_paren_depth(source: &str, filename: &str) -> Result<(), ParseError> {
+    for (line_no, line) in source.split('\n').enumerate() {
+        let mut depth = 0usize;
+        for (col, ch) in line.chars().enumerate() {
+            match ch {
+                '（' | '(' => {
+                    depth += 1;
+                    if depth > MAX_PAREN_DEPTH {
+                        return Err(syntax_error(
+                            filename,
+                            (line_no + 1, col + 1),
+                            &format!("括弧の重なりが {MAX_PAREN_DEPTH} 段を超えています"),
+                        ));
+                    }
+                }
+                '）' | ')' => depth = depth.saturating_sub(1),
+                _ => {}
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Build a positioned syntax error with the common `Parse error in {file} at {l}:{c}: ` prefix.
