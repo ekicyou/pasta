@@ -129,7 +129,7 @@
   - _Boundary: LightCheckJob_
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 4.7, 8.6_
 
-- [ ] 8.2 (P) Manual ワークフローの起動・権限・段を直す
+- [x] 8.2 (P) Manual ワークフローの起動・権限・段を直す
   - push と PR の path filter に `editors/vscode/syntaxes/**` と `.claude/skills/pasta-check/**` を足し、冒頭の注記を実際の条件と流れに合わせる
   - 全体の権限を `contents: read` だけにし、deploy の job にだけ `pages: write`・`id-token: write` を与える
   - `pasta_check` の再ビルドの 3 段と Setup Pages の段を消し、upload と deploy の条件を `github.ref == 'refs/heads/main'` にする
