@@ -177,7 +177,7 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str, source: &str) -> Result<PastaFi
         match pair.as_rule() {
             Rule::file_scope => {
                 // file_scope 内の attrs と words を個別の FileItem として追加
-                let scope = parse_file_scope(pair)?;
+                let scope = parse_file_scope(pair, filename)?;
                 for attr in scope.attrs {
                     file.items.push(FileItem::FileAttr(attr));
                 }
@@ -190,7 +190,7 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str, source: &str) -> Result<PastaFi
                 file.items.push(FileItem::GlobalSceneScope(scene));
             }
             Rule::actor_scope => {
-                let actor = parse_actor_scope(pair)?;
+                let actor = parse_actor_scope(pair, filename)?;
                 file.items.push(FileItem::ActorScope(actor));
             }
             Rule::EOI => {}
@@ -202,7 +202,7 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str, source: &str) -> Result<PastaFi
 }
 
 /// Parse file scope.
-fn parse_file_scope(pair: Pair<Rule>) -> Result<FileScope, ParseError> {
+fn parse_file_scope(pair: Pair<Rule>, filename: &str) -> Result<FileScope, ParseError> {
     let mut scope = FileScope::default();
 
     for inner in pair.into_inner() {
@@ -210,7 +210,7 @@ fn parse_file_scope(pair: Pair<Rule>) -> Result<FileScope, ParseError> {
             Rule::file_attr_line => {
                 for attr_pair in inner.into_inner() {
                     if attr_pair.as_rule() == Rule::attr {
-                        scope.attrs.push(parse_attr(attr_pair)?);
+                        scope.attrs.push(parse_attr(attr_pair, filename)?);
                     }
                 }
             }
@@ -232,7 +232,7 @@ fn parse_file_scope(pair: Pair<Rule>) -> Result<FileScope, ParseError> {
 ///
 /// grammar.pest `actor_scope = { actor_line ~ actor_scope_item* }` に対応。
 /// actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_line | code_scope | blank_line }
-fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
+fn parse_actor_scope(pair: Pair<Rule>, filename: &str) -> Result<ActorScope, ParseError> {
     let span = Span::from_pair(&pair);
     let mut name = String::new();
     let mut attrs = Vec::new();
@@ -253,7 +253,7 @@ fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
             Rule::global_scene_attr_line => {
                 for attr_pair in inner.into_inner() {
                     if attr_pair.as_rule() == Rule::attr {
-                        attrs.push(parse_attr(attr_pair)?);
+                        attrs.push(parse_attr(attr_pair, filename)?);
                     }
                 }
             }
@@ -265,7 +265,7 @@ fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
                 }
             }
             Rule::var_set_local | Rule::var_set_global | Rule::var_set_none => {
-                var_sets.push(parse_var_set(inner)?);
+                var_sets.push(parse_var_set(inner, filename)?);
             }
             Rule::code_block => {
                 code_blocks.push(parse_code_block(inner)?);

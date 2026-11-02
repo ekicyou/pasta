@@ -3,7 +3,7 @@
 use super::*;
 
 /// Parse attribute.
-pub(crate) fn parse_attr(pair: Pair<Rule>) -> Result<Attr, ParseError> {
+pub(crate) fn parse_attr(pair: Pair<Rule>, filename: &str) -> Result<Attr, ParseError> {
     let span = Span::from_pair(&pair);
     let mut key = String::new();
     let mut value = AttrValue::AttrString(String::new());
@@ -16,7 +16,10 @@ pub(crate) fn parse_attr(pair: Pair<Rule>) -> Result<Attr, ParseError> {
                         key = kv_inner.as_str().to_string();
                     }
                     Rule::number_literal => {
-                        value = parse_attr_number(kv_inner.as_str());
+                        value = match number_value(&kv_inner, filename)? {
+                            Number::Integer(i) => AttrValue::Integer(i),
+                            Number::Float(f) => AttrValue::Float(f),
+                        };
                     }
                     Rule::string_contents => {
                         value = AttrValue::String(kv_inner.as_str().to_string());
@@ -36,13 +39,31 @@ pub(crate) fn parse_attr(pair: Pair<Rule>) -> Result<Attr, ParseError> {
     Ok(Attr { key, value, span })
 }
 
-/// Parse attribute number value.
-pub(crate) fn parse_attr_number(s: &str) -> AttrValue {
-    let normalized = normalize_number_str(s);
-    if normalized.contains('.') {
-        AttrValue::Float(normalized.parse().unwrap_or(0.0))
-    } else {
-        AttrValue::Integer(normalized.parse().unwrap_or(0))
+/// 数の字句の値。
+pub(crate) enum Number {
+    Integer(i64),
+    Float(f64), // 常に有限
+}
+
+/// 数の字句（`Rule::number_literal`）の値。
+///
+/// 小数点が無く i64 に収まれば整数、収まらなければいちばん近い小数（Lua と同じ）、
+/// 小数点があれば小数。有限の小数に収まらなければ、字句の位置の構文の誤り。
+pub(crate) fn number_value(pair: &Pair<Rule>, filename: &str) -> Result<Number, ParseError> {
+    let normalized = normalize_number_str(pair.as_str());
+    if !normalized.contains('.')
+        && let Ok(i) = normalized.parse::<i64>()
+    {
+        return Ok(Number::Integer(i));
+    }
+    // 文法が数字だけを通すので parse は失敗しない。大きすぎると inf になる
+    match normalized.parse::<f64>() {
+        Ok(f) if f.is_finite() => Ok(Number::Float(f)),
+        _ => Err(syntax_error(
+            filename,
+            pair.line_col(),
+            "数が大きすぎます（小数で表せるのは、およそ 1.8×10^308 まで）",
+        )),
     }
 }
 
@@ -113,7 +134,7 @@ pub(crate) fn parse_code_block(pair: Pair<Rule>) -> Result<CodeBlock, ParseError
 }
 
 /// Parse var_set.
-pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
+pub(crate) fn parse_var_set(pair: Pair<Rule>, filename: &str) -> Result<VarSet, ParseError> {
     let span = Span::from_pair(&pair);
     let scope = match pair.as_rule() {
         Rule::var_set_global => VarScope::Global,
@@ -157,7 +178,7 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
             rule => {
                 if let Some(op) = bin_op_from_rule(rule) {
                     operators.push(op);
-                } else if let Some(expr) = try_parse_expr(inner)? {
+                } else if let Some(expr) = try_parse_expr(inner, filename)? {
                     // Parse as expression (term)
                     terms.push(expr);
                 }

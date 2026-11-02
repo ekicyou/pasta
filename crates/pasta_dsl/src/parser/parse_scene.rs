@@ -29,7 +29,7 @@ pub(crate) fn parse_global_scene_scope(
             Rule::global_scene_attr_line => {
                 for attr_pair in inner.into_inner() {
                     if attr_pair.as_rule() == Rule::attr {
-                        attrs.push(parse_attr(attr_pair)?);
+                        attrs.push(parse_attr(attr_pair, filename)?);
                     }
                 }
             }
@@ -48,10 +48,10 @@ pub(crate) fn parse_global_scene_scope(
                 code_blocks.push(parse_code_block(inner)?);
             }
             Rule::local_start_scene_scope => {
-                local_scenes.push(parse_local_start_scene_scope(inner)?);
+                local_scenes.push(parse_local_start_scene_scope(inner, filename)?);
             }
             Rule::local_scene_scope => {
-                local_scenes.push(parse_local_scene_scope(inner)?);
+                local_scenes.push(parse_local_scene_scope(inner, filename)?);
             }
             _ => {}
         }
@@ -178,20 +178,24 @@ pub(crate) fn parse_actors_item(
 /// Parse local start scene scope (no name).
 pub(crate) fn parse_local_start_scene_scope(
     pair: Pair<Rule>,
+    filename: &str,
 ) -> Result<LocalSceneScope, ParseError> {
     let span = Span::from_pair(&pair);
     let mut scope = LocalSceneScope::start();
     scope.span = span;
 
     for inner in pair.into_inner() {
-        parse_local_scene_item(inner, &mut scope)?;
+        parse_local_scene_item(inner, &mut scope, filename)?;
     }
 
     Ok(scope)
 }
 
 /// Parse local scene scope (with name).
-pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScope, ParseError> {
+pub(crate) fn parse_local_scene_scope(
+    pair: Pair<Rule>,
+    filename: &str,
+) -> Result<LocalSceneScope, ParseError> {
     let span = Span::from_pair(&pair);
     let mut scope = LocalSceneScope::start();
     scope.span = span;
@@ -205,7 +209,7 @@ pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScop
                 }
             }
         } else {
-            parse_local_scene_item(inner, &mut scope)?;
+            parse_local_scene_item(inner, &mut scope, filename)?;
         }
     }
 
@@ -216,6 +220,7 @@ pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScop
 fn parse_local_scene_item(
     inner: Pair<Rule>,
     scope: &mut LocalSceneScope,
+    filename: &str,
 ) -> Result<(), ParseError> {
     match inner.as_rule() {
         Rule::var_set_local
@@ -224,29 +229,33 @@ fn parse_local_scene_item(
         | Rule::var_set_property => {
             scope
                 .items
-                .push(LocalSceneItem::VarSet(parse_var_set(inner)?));
+                .push(LocalSceneItem::VarSet(parse_var_set(inner, filename)?));
         }
         Rule::call_scene => {
-            scope
-                .items
-                .push(LocalSceneItem::CallScene(parse_call_scene(inner)?));
+            scope.items.push(LocalSceneItem::CallScene(parse_call_scene(
+                inner, filename,
+            )?));
         }
         Rule::action_line => {
             scope
                 .items
-                .push(LocalSceneItem::ActionLine(parse_action_line(inner)?));
+                .push(LocalSceneItem::ActionLine(parse_action_line(
+                    inner, filename,
+                )?));
         }
         Rule::continue_action_line => {
             scope
                 .items
                 .push(LocalSceneItem::ContinueAction(parse_continue_action_line(
-                    inner,
+                    inner, filename,
                 )?));
         }
         Rule::cue_cmd_line => {
             scope
                 .items
-                .push(LocalSceneItem::CueCommand(parse_cue_cmd_line(inner)?));
+                .push(LocalSceneItem::CueCommand(parse_cue_cmd_line(
+                    inner, filename,
+                )?));
         }
         Rule::choice_line => {
             scope
@@ -306,7 +315,10 @@ pub(crate) fn parse_choice_line(pair: Pair<Rule>) -> Result<ChoiceNode, ParseErr
 ///
 /// grammar.pest:
 /// `cue_cmd_line = { pad ~ cue_cmd_marker ~ cue_cmd_name ~ cue_cmd_scope? ~ cue_cmd_args? ~ or_comment_eol }`
-pub(crate) fn parse_cue_cmd_line(pair: Pair<Rule>) -> Result<CueCommandNode, ParseError> {
+pub(crate) fn parse_cue_cmd_line(
+    pair: Pair<Rule>,
+    filename: &str,
+) -> Result<CueCommandNode, ParseError> {
     let span = Span::from_pair(&pair);
     let mut command = String::new();
     let mut scope = None;
@@ -321,7 +333,7 @@ pub(crate) fn parse_cue_cmd_line(pair: Pair<Rule>) -> Result<CueCommandNode, Par
                 scope = Some(parse_cue_cmd_scope(inner)?);
             }
             Rule::cue_cmd_args => {
-                args = parse_cue_cmd_args(inner)?;
+                args = parse_cue_cmd_args(inner, filename)?;
             }
             _ => {}
         }
@@ -388,7 +400,7 @@ fn parse_cue_cmd_scope(pair: Pair<Rule>) -> Result<ScopedName, ParseError> {
 ///
 /// Since `cue_arg_list` and `cue_arg` are silent rules, the inner pairs of
 /// `cue_cmd_args` directly contain the matched argument rules.
-fn parse_cue_cmd_args(pair: Pair<Rule>) -> Result<Vec<CueArgToken>, ParseError> {
+fn parse_cue_cmd_args(pair: Pair<Rule>, filename: &str) -> Result<Vec<CueArgToken>, ParseError> {
     let mut tokens = Vec::new();
 
     for inner in pair.into_inner() {
@@ -402,12 +414,10 @@ fn parse_cue_cmd_args(pair: Pair<Rule>) -> Result<Vec<CueArgToken>, ParseError> 
                 }
             }
             Rule::number_literal => {
-                let normalized = normalize_number_str(inner.as_str());
-                if normalized.contains('.') {
-                    tokens.push(CueArgToken::Float(normalized.parse().unwrap_or(0.0)));
-                } else {
-                    tokens.push(CueArgToken::Integer(normalized.parse().unwrap_or(0)));
-                }
+                tokens.push(match number_value(&inner, filename)? {
+                    Number::Integer(i) => CueArgToken::Integer(i),
+                    Number::Float(f) => CueArgToken::Float(f),
+                });
             }
             Rule::string_contents => {
                 tokens.push(CueArgToken::StringLiteral(inner.as_str().to_string()));

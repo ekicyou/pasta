@@ -3,7 +3,7 @@
 use super::*;
 
 /// Parse call_scene.
-pub(crate) fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, ParseError> {
+pub(crate) fn parse_call_scene(pair: Pair<Rule>, filename: &str) -> Result<CallScene, ParseError> {
     let span = Span::from_pair(&pair);
     let mut target = None;
     let mut args = None;
@@ -14,12 +14,12 @@ pub(crate) fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, ParseError
                 target = Some(CallTarget::Static(inner.as_str().to_string()));
             }
             Rule::call_target_expr => {
-                if let Some(expr) = parse_expr_from_parts(inner)? {
+                if let Some(expr) = parse_expr_from_parts(inner, filename)? {
                     target = Some(CallTarget::Dynamic(expr));
                 }
             }
             Rule::args => {
-                args = Some(parse_args(inner)?);
+                args = Some(parse_args(inner, filename)?);
             }
             _ => {}
         }
@@ -33,7 +33,10 @@ pub(crate) fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, ParseError
 }
 
 /// Parse action_line.
-pub(crate) fn parse_action_line(pair: Pair<Rule>) -> Result<ActionLine, ParseError> {
+pub(crate) fn parse_action_line(
+    pair: Pair<Rule>,
+    filename: &str,
+) -> Result<ActionLine, ParseError> {
     let span = Span::from_pair(&pair);
     let mut actor = String::new();
     let mut actions = Vec::new();
@@ -44,7 +47,7 @@ pub(crate) fn parse_action_line(pair: Pair<Rule>) -> Result<ActionLine, ParseErr
                 actor = inner.as_str().to_string();
             }
             Rule::actions => {
-                actions = parse_actions(inner)?;
+                actions = parse_actions(inner, filename)?;
             }
             _ => {}
         }
@@ -58,13 +61,16 @@ pub(crate) fn parse_action_line(pair: Pair<Rule>) -> Result<ActionLine, ParseErr
 }
 
 /// Parse continue_action_line.
-pub(crate) fn parse_continue_action_line(pair: Pair<Rule>) -> Result<ContinueAction, ParseError> {
+pub(crate) fn parse_continue_action_line(
+    pair: Pair<Rule>,
+    filename: &str,
+) -> Result<ContinueAction, ParseError> {
     let span = Span::from_pair(&pair);
     let mut actions = Vec::new();
 
     for inner in pair.into_inner() {
         if inner.as_rule() == Rule::actions {
-            actions = parse_actions(inner)?;
+            actions = parse_actions(inner, filename)?;
         }
     }
 
@@ -72,7 +78,7 @@ pub(crate) fn parse_continue_action_line(pair: Pair<Rule>) -> Result<ContinueAct
 }
 
 /// Parse actions.
-pub(crate) fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError> {
+pub(crate) fn parse_actions(pair: Pair<Rule>, filename: &str) -> Result<Vec<Action>, ParseError> {
     let mut actions = Vec::new();
 
     for inner in pair.into_inner() {
@@ -126,7 +132,7 @@ pub(crate) fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError>
                 }
             }
             Rule::fn_call_local => {
-                let (name, args) = parse_fn_call_inner(inner)?;
+                let (name, args) = parse_fn_call_inner(inner, filename)?;
                 actions.push(Action::FnCall {
                     name,
                     args,
@@ -135,7 +141,7 @@ pub(crate) fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError>
                 });
             }
             Rule::fn_call_global => {
-                let (name, args) = parse_fn_call_inner(inner)?;
+                let (name, args) = parse_fn_call_inner(inner, filename)?;
                 actions.push(Action::FnCall {
                     name,
                     args,
@@ -153,7 +159,7 @@ pub(crate) fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError>
                 }
             }
             Rule::fn_call_dynamic => {
-                let (var_name, var_scope, args) = parse_dyn_fn_call_inner(inner)?;
+                let (var_name, var_scope, args) = parse_dyn_fn_call_inner(inner, filename)?;
                 actions.push(Action::DynamicFnCall {
                     var_name,
                     var_scope,
@@ -181,7 +187,10 @@ pub(crate) fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError>
 }
 
 /// Parse function call inner parts.
-pub(crate) fn parse_fn_call_inner(pair: Pair<Rule>) -> Result<(String, Args), ParseError> {
+pub(crate) fn parse_fn_call_inner(
+    pair: Pair<Rule>,
+    filename: &str,
+) -> Result<(String, Args), ParseError> {
     let mut name = String::new();
     let mut args = Args::empty();
 
@@ -191,7 +200,7 @@ pub(crate) fn parse_fn_call_inner(pair: Pair<Rule>) -> Result<(String, Args), Pa
                 name = inner.as_str().to_string();
             }
             Rule::args => {
-                args = parse_args(inner)?;
+                args = parse_args(inner, filename)?;
             }
             _ => {}
         }
@@ -223,19 +232,20 @@ pub(crate) fn parse_dyn_name(pair: Pair<Rule>) -> Result<Option<(String, VarScop
 /// Parse `fn_call_dynamic` into `(var_name, var_scope, args)`.
 pub(crate) fn parse_dyn_fn_call_inner(
     pair: Pair<Rule>,
+    filename: &str,
 ) -> Result<(String, VarScope, Args), ParseError> {
     // The grammar requires a dyn_name; the fallback mirrors parse_fn_call_inner's empty name.
     let (var_name, var_scope) =
         parse_dyn_name(pair.clone())?.unwrap_or((String::new(), VarScope::Local));
     let args = match pair.into_inner().find(|p| p.as_rule() == Rule::args) {
-        Some(args) => parse_args(args)?,
+        Some(args) => parse_args(args, filename)?,
         None => Args::empty(),
     };
     Ok((var_name, var_scope, args))
 }
 
 /// Parse args.
-pub(crate) fn parse_args(pair: Pair<Rule>) -> Result<Args, ParseError> {
+pub(crate) fn parse_args(pair: Pair<Rule>, filename: &str) -> Result<Args, ParseError> {
     let span = Span::from_pair(&pair);
     let mut items = Vec::new();
 
@@ -245,12 +255,12 @@ pub(crate) fn parse_args(pair: Pair<Rule>) -> Result<Args, ParseError> {
                 // Collect all terms and operators for this positional argument
                 // Grammar: expr = term ~ bin*, where bin = bin_op ~ term
                 // Since expr and bin are silent rules, we get term, op, term, op, term...
-                if let Some(expr) = parse_expr_from_parts(inner)? {
+                if let Some(expr) = parse_expr_from_parts(inner, filename)? {
                     items.push(Arg::Positional(expr));
                 }
             }
             Rule::key_arg => {
-                let (key, value) = parse_key_arg(inner)?;
+                let (key, value) = parse_key_arg(inner, filename)?;
                 items.push(Arg::Keyword { key, value });
             }
             _ => {}
@@ -275,14 +285,17 @@ pub(crate) fn bin_op_from_rule(rule: Rule) -> Option<BinOp> {
 
 /// Parse an expression from parts (terms and binary operators).
 /// Handles the case where expr = term ~ (bin_op ~ term)* expands into multiple pairs.
-pub(crate) fn parse_expr_from_parts(pair: Pair<Rule>) -> Result<Option<Expr>, ParseError> {
+pub(crate) fn parse_expr_from_parts(
+    pair: Pair<Rule>,
+    filename: &str,
+) -> Result<Option<Expr>, ParseError> {
     let mut terms: Vec<Expr> = Vec::new();
     let mut operators: Vec<BinOp> = Vec::new();
 
     for expr_inner in pair.into_inner() {
         if let Some(op) = bin_op_from_rule(expr_inner.as_rule()) {
             operators.push(op);
-        } else if let Some(term) = try_parse_expr(expr_inner)? {
+        } else if let Some(term) = try_parse_expr(expr_inner, filename)? {
             terms.push(term);
         }
     }
@@ -295,7 +308,10 @@ pub(crate) fn parse_expr_from_parts(pair: Pair<Rule>) -> Result<Option<Expr>, Pa
 }
 
 /// Parse key_arg.
-pub(crate) fn parse_key_arg(pair: Pair<Rule>) -> Result<(String, Expr), ParseError> {
+pub(crate) fn parse_key_arg(
+    pair: Pair<Rule>,
+    filename: &str,
+) -> Result<(String, Expr), ParseError> {
     let mut key = String::new();
     let mut terms: Vec<Expr> = Vec::new();
     let mut operators: Vec<BinOp> = Vec::new();
@@ -313,7 +329,7 @@ pub(crate) fn parse_key_arg(pair: Pair<Rule>) -> Result<(String, Expr), ParseErr
                     rule => {
                         if let Some(op) = bin_op_from_rule(rule) {
                             operators.push(op);
-                        } else if let Some(expr) = try_parse_expr(kv_inner)? {
+                        } else if let Some(expr) = try_parse_expr(kv_inner, filename)? {
                             terms.push(expr);
                         }
                     }
@@ -354,16 +370,12 @@ pub(crate) fn build_left_assoc_expr(terms: Vec<Expr>, operators: Vec<BinOp>) -> 
 /// Try to parse an expression from a pair.
 ///
 /// `Ok(None)` は「項にならない」。中の誤りは飲まずに `Err` で返す。
-pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Result<Option<Expr>, ParseError> {
+pub(crate) fn try_parse_expr(pair: Pair<Rule>, filename: &str) -> Result<Option<Expr>, ParseError> {
     let expr = match pair.as_rule() {
-        Rule::number_literal => {
-            let normalized = normalize_number_str(pair.as_str());
-            if normalized.contains('.') {
-                normalized.parse().ok().map(Expr::Float)
-            } else {
-                normalized.parse().ok().map(Expr::Integer)
-            }
-        }
+        Rule::number_literal => Some(match number_value(&pair, filename)? {
+            Number::Integer(i) => Expr::Integer(i),
+            Number::Float(f) => Expr::Float(f),
+        }),
         Rule::string_contents => Some(Expr::String(pair.as_str().to_string())),
         Rule::string_blank => Some(Expr::BlankString),
         Rule::var_ref_local => {
@@ -384,7 +396,7 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Result<Option<Expr>, ParseErro
                 scope: VarScope::Property,
             }),
         Rule::fn_call_local => {
-            let (name, args) = parse_fn_call_inner(pair)?;
+            let (name, args) = parse_fn_call_inner(pair, filename)?;
             Some(Expr::FnCall {
                 name,
                 args,
@@ -392,7 +404,7 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Result<Option<Expr>, ParseErro
             })
         }
         Rule::fn_call_global => {
-            let (name, args) = parse_fn_call_inner(pair)?;
+            let (name, args) = parse_fn_call_inner(pair, filename)?;
             Some(Expr::FnCall {
                 name,
                 args,
@@ -401,14 +413,16 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Result<Option<Expr>, ParseErro
         }
         Rule::fn_call_dynamic => {
             // Explicit arm: the default arm would recurse into args and return the first argument
-            let (var_name, var_scope, args) = parse_dyn_fn_call_inner(pair)?;
+            let (var_name, var_scope, args) = parse_dyn_fn_call_inner(pair, filename)?;
             Some(Expr::DynamicFnCall {
                 var_name,
                 var_scope,
                 args,
             })
         }
-        Rule::paren_expr => parse_expr_from_parts(pair)?.map(|e| Expr::Paren(Box::new(e))),
+        Rule::paren_expr => {
+            parse_expr_from_parts(pair, filename)?.map(|e| Expr::Paren(Box::new(e)))
+        }
         Rule::add_op
         | Rule::sub_op
         | Rule::mul_op
@@ -421,7 +435,7 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Result<Option<Expr>, ParseErro
         _ => {
             // Try recursively for nested expressions
             for inner in pair.into_inner() {
-                if let Some(expr) = try_parse_expr(inner)? {
+                if let Some(expr) = try_parse_expr(inner, filename)? {
                     return Ok(Some(expr));
                 }
             }
