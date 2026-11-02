@@ -114,8 +114,8 @@
   - 使用例が呼ぶ関数がすべてランタイムに在る
   - _Requirements: 6.4_
 
-- [ ] 9. 全体の確かめ
-- [ ] 9.1 全部を入れた後に、関門と記述のそろいを確かめる
+- [x] 9. 全体の確かめ
+- [x] 9.1 全部を入れた後に、関門と記述のそろいを確かめる
   - `cargo test -p pasta_lua`・`cargo test -p pasta_check`・luacheck・`gen-skill-refs --check` がすべて通る
   - `STORE.co_callback`・消した部品の名前が、ランタイム・テスト・マニュアル・2 つの brief に残っていない
   - `chain-talk-interrupt`・`ontalk-suppression`・`reg-handler-chain` の確かめと、キックの spec が通る
@@ -125,3 +125,4 @@
 ## Implementation Notes
 
 - Lua の spec は 1 つの VM で走り、先の spec が `pasta.scene` などを読み直すので、ファイルの頭で取ったモジュールの局所変数は古くなりうる。後ろの describe では `require` し直し、シーン名も他と被らない名前にする（3.2）。
+- 9.1 の点検で、`scene-anchor-link`・`shell-element-click` の brief に `scene_names` と古い `restore_scene` の前提が残っていたので、今の形（4 つの欄を戻す・`(fn, ...)`）に直した。
