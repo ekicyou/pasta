@@ -124,7 +124,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 | -- | ---- | -------- | ---- | -------------- |
 | 1 | ponytail-lua-loader | Opus | M | **済（2026-11-02 完了）**（読めないセーブの退避は `toml-serialization` へ移した。残りはキャッシュ・モジュール名・検索・パス・死んだコード） |
 | 2 | ponytail-dsl-parser | Opus | 9〜12 | **ウェーブ 1（2026-11-02）** |
-| 3 | ponytail-core-registry | Opus | 10〜14 | **ウェーブ 1（2026-11-02）**（`Cargo.lock` は `ponytail-editor-tooling` と、消す行が違う。後から入る側が作り直す。`SceneRegistry::merge_from`・`WordDefRegistry::merge_from` は、`ponytail-lua-transpiler` より後に入ったときに消す） |
+| 3 | ponytail-core-registry | Opus | 10〜14 | **済（2026-11-03 完了）**（索引を `BTreeMap` に替えて `fast_radix_trie` を外した。`ponytail-lua-transpiler` より後に入ったので、`pasta_core` の 2 つの `merge_from` も消した。`scene-condition-attributes` の brief へ申し送り） |
 | 4 | ponytail-lua-transpiler | Opus | 8〜10 | **済（2026-11-02 完了）**（`TranspileContext::merge_from` を消した。`ponytail-core-registry` より先に入ったので、`pasta_core` の 2 つの `merge_from` は `ponytail-core-registry` が消す） |
 | 5 | ponytail-lua-debug | Opus | 14〜18 | **閉じた（2026-11-02）**（DAP を捨てるため。15・16 番が受け継ぐ。上の「統合して閉じたもの（2026-11-02）」） |
 | 6 | ponytail-lua-scripts | Opus | 12〜15 | **ウェーブ 1（2026-11-02）**（`recommend.lua` を監査の範囲に足した） |
@@ -497,7 +497,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] hello-novel-sample -- 見本のノベル。物語と、タイトル・セーブ・ロード・設定の場面一式とシェル。0.6.0 の合格を areka の実機で確かめる題材。Dependencies: cue-command-runtime, novel-talk-flow, novel-variable-scope, novel-checkpoint-rollback, novel-save-slots, shell-element-click, scene-condition-attributes（areka の側の実装も要る）
 - [ ] manual-novel-guide -- マニュアルに、ノベルゲームの作り方の部を足す。見本のノベルを題材に、柱・ト書き・台詞・分岐・システム画面・配布の順に導く。Dependencies: hello-novel-sample
 - [x] ponytail-dsl-parser -- 解析を辞書の大きさに比例させる（span の行と桁を pest の行の索引で取る）。大きな数の字句を、どこでも同じ規則（i64、だめなら f64）にする。深い括弧の入れ子を構文の誤りにする。作られない誤りの型と `PastaFile.span` を消す。0.5.0（2026-10-19 起票。ponytail 監査。2026-10-22 に隙間の spec へ改め、2026-10-23 に 0.4.3 へ戻し、2026-10-24 に 0.4.5 へ、2026-11-02 に 0.5.0 へ移した）。Dependencies: none
-- [ ] ponytail-core-registry -- シーン表・単語表の死んだ API と誤りの型を消し、`fast_radix_trie` を `BTreeMap` に替える。属性の絞り込みは残す（0.5.0 が使う）。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。Dependencies: none
+- [x] ponytail-core-registry -- シーン表・単語表の死んだ API と誤りの型を消し、`fast_radix_trie` を `BTreeMap` に替える。属性の絞り込みは残す（0.5.0 が使う）。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。Dependencies: none
 - [x] ponytail-lua-transpiler -- Lua ブロックの中身を書いたとおりに出す（字下げと空行）。効かない `LineEnding`・`comment_mode` と、死んだ文脈の状態を消す（ファイル属性は残す）。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。Dependencies: none
 - [x] ponytail-lua-scripts -- 数でない `hour_margin` を既定に戻す。応答の見出しの値の改行を空白にする。続きのトークの期限を呼んだ時刻から数える。包む関数の写しと `co_callback` を消す（`pasta.areka` は残す）。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。`set_co_scene` と `EVENT.fire` を先に直した 0.4.2 の 2 本は入った（2026-10-23）。Dependencies: none
 - [x] ponytail-shiori -- unload が、アクターのスレッドが DLL を出るまで（上限つきで）待つ。フォルダが無いときに理由を出す。`Key:` の行を受け付ける。FFI の型を C に合わせ、テストの競りを無くす。テストだけのコードとデータを出荷物から外す。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。Dependencies: none
