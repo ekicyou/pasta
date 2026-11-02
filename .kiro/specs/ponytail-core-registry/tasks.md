@@ -105,7 +105,7 @@
   - _Requirements: 7.7, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 12.2, 12.4_
 
 - [ ] 8. 同じウェーブの spec との境界を決め、最後の確かめをする
-- [ ] 8.1 PR を作る直前に、`merge_from` を残すか消すかを main の状態で決める（C16）
+- [x] 8.1 PR を作る直前に、`merge_from` を残すか消すかを main の状態で決める（C16）
   - main を取り込まずに取得し、トランスパイルの文脈に `merge_from` がまだあるかを main の上で確かめる
   - まだある：シーンの登録・単語の登録の `merge_from` とそのテストを残し、何もしない
   - もう無い：main を merge で取り込み（rebase で積んだコミットを書き換えない）、`Cargo.lock` を作り直して相手の消した行・足した行を保ち、2 つの `merge_from`（テスト 3 つと 2 つ）とマニュアルの `merge_from` の一文を消す 1 コミットを足す
@@ -122,3 +122,4 @@
 - C4 で `crates/pasta_core/README.md` の使用例を `resolve_scene_id_unified` に直し、C2 で取り残された `.unwrap()` も外した。README の例は消す API に合わせてその直しのコミットで直す（C15 は残りの記述だけ）。
 - C6〜C8 の後も `book/src/internals/registry-search.md` に `set_shuffle_enabled`（208 行）・`history`（200 行）・`RandomSelectionFailed`（44 行）の記述が残る。C15 で設計の行ごとの直しと突き合わせ、消した API・誤りの記述が残らないようにする。
 - C10 の全体テストの初回で `scene_alias_search_test::names_outside_global_scene_search_are_not_replaced` が `tests/common/mod.rs:236`（pasta_scripts の複写）の IO の unwrap で 1 度落ち、再実行で通った。登録の直しとは関係のない一時的な失敗。
+- C16 の判定（2026-11-03）：`git fetch origin main` のあと `git grep -n "pub fn merge_from" origin/main -- crates/pasta_lua/src/context.rs` が `crates/pasta_lua/src/context.rs:120:    pub fn merge_from(&mut self, other: TranspileContext) {` を返した（origin/main = 27a80a33）。相手の spec はまだ入っていないので、`SceneRegistry::merge_from`・`WordDefRegistry::merge_from`・そのテスト・マニュアルの一文を残し、何もしない（10.1）。`git diff origin/main...HEAD -- crates/pasta_lua/src/context.rs` は空。main の新しいコミット（ae04a28b..27a80a33）とこのブランチの変えたファイルの重なりも無い。kiro-complete で PR を作る直前に、同じコマンドでもう一度確かめる。
