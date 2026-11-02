@@ -150,3 +150,9 @@ VSCode でゴーストをデバッグする作者が困る。
   - Current State 3 番の `inspect.rs` L378-388 は、上のとおり 381〜391 行。12 番の `config.rs` は `debug/config.rs`（`pasta_lua/src/config.rs` と取り違えやすい）。
   - `playscene.rs` の頭の説明（1〜3 行）は `resolve_and_kick` だけを書き、`resolve_position` に触れない。`#![allow(dead_code)]`（`playscene.rs` 31 行・`source_map/scene_index.rs` 39 行）は結線の前の名残り（10-23 のまま）。
   - 4 番の知らない要求は、マニュアル `book/src/internals/debug.md` 207 行の表（「その他: なし（無視する）」）も変える（10-23 のまま）。
+
+## 申し送り（2026-11-02、`ponytail-lua-transpiler` の要件より）
+
+- `ponytail-lua-transpiler` は、テストだけが使う包み `normalize_output`（`pasta_lua/src/normalize.rs`）を消す。`LineShift` と `normalize_output_with_shift` の形は保つ（こちらの `source_map/mod.rs` と `loader/source_map_build.rs` が読むため）。
+- 消すと、`debug/source_map/mod.rs` 25 行の説明「producer の `out_line` は `normalize_output` **適用前**のバッファ行を数える」の 1 語が古くなる（リンクではないので doc のビルドは壊れない）。この spec が、その 1 語を `normalize_output_with_shift` に直す（`ponytail-lua-transpiler` は `debug/` に触らない約束。`normalize_output_with_shift` はどちらが先に入っても在るので、入る順によらない）。
+- `ponytail-lua-transpiler` は、アクター辞書の単語定義の行（`ACTOR:create_word(…)`）もソースマップに載せる。対応は増えるだけで、今ある対応は変わらない。ブレークポイントの解決の期待値が増える見込み。
