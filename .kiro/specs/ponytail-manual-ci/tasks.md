@@ -139,7 +139,7 @@
   - _Boundary: ManualWorkflow_
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 3.5, 5.1, 8.3, 8.6_
 
-- [ ] 8.3 (P) Release setup check を固定し Node 22 にする
+- [x] 8.3 (P) Release setup check を固定し Node 22 にする
   - `Azure/login` を設計の SHA と行末の `# v3` に、`setup-node` を v7・`node-version` を 22 にする
   - 完了の姿: `actionlint` が 0 件で、第三者の action が SHA と行末のタグのコメントだけになっている
   - _Boundary: ReleaseSetupCheck_
