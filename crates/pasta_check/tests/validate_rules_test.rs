@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use pasta_check::validate::{
     FileText, FindingKind, GhostInput, Severity, TomlSource, module_name_of,
-    select_dictionary_files, validate_ghost,
+    select_dictionary_files, syntax_finding, validate_ghost,
 };
 
 const TOML: &str = "[loader]\npasta_patterns = [\"dic/**/*.pasta\", \"*.pasta\"]\n";
@@ -249,6 +249,25 @@ fn syntax_error_is_one_line_with_short_pest_description() {
     assert_eq!(
         lines,
         vec!["ghost/master/dic/b-x.pasta:2:4: 誤り: 構文エラー: expected id".to_string()]
+    );
+}
+
+/// 公開の syntax_finding は、ゴースト全体の検査の syntax の報告と同じ 1 件を作る（1.4・11.1）
+#[test]
+fn public_syntax_finding_matches_validate_ghost() {
+    let src = "＊会話\n  ＠＠＠\n";
+    let found = syntax_findings(vec![("dic/b-x.pasta", FileText::Text { text: src.into() })]);
+    let e = pasta_dsl::parse_str(src, "dic/b-x.pasta").expect_err("構文エラーになるはず");
+    let f = syntax_finding("dic/b-x.pasta", e);
+    assert_eq!(found.len(), 1);
+    assert_eq!(
+        (f.code, f.line, f.column, &f.message),
+        (
+            found[0].code,
+            found[0].line,
+            found[0].column,
+            &found[0].message
+        )
     );
 }
 

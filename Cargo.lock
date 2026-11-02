@@ -887,6 +887,7 @@ dependencies = [
  "pasta_dsl",
  "pasta_lua",
  "serde",
+ "serde_json",
  "tempfile",
  "toml",
  "zip",

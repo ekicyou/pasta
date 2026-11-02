@@ -407,7 +407,7 @@ mod tests {
     #[test]
     fn test_ghost_validate_js_shape() {
         use pasta_check::validate::{
-            FileText, FindingKind, GhostInput, select_dictionary_files, validate_ghost,
+            FileText, GhostInput, select_dictionary_files, validate_ghost,
         };
         use std::collections::BTreeMap;
 
@@ -478,10 +478,5 @@ mod tests {
         assert_eq!(not_utf8["path"], "dic/b.pasta");
         assert!(not_utf8["line"].is_null());
         assert!(findings.iter().any(|f| f["code"] == "file-unreadable"));
-
-        // serde の kebab-case と code() が同じ
-        for kind in FindingKind::ALL {
-            assert_eq!(serde_json::to_value(kind).unwrap(), kind.code());
-        }
     }
 }
