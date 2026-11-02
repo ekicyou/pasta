@@ -184,3 +184,10 @@ shiori4 の 0.1.0 が 2026-10-24 に出た（crates.io の `shiori4_abi`・`shio
 ## 申し送り（ponytail-lua-debug を閉じた、2026-11-02）
 
 - 上の「先に要るもの」に挙げた `ponytail-lua-debug` は閉じた（roadmap の「統合して閉じたもの（2026-11-02）」）。`module_registry.rs` の重なりは無くなった。0.5.1 で DAP を捨てて、`pasta_lua/src/debug` の大半が消える見込みである。
+
+## 申し送り（2026-11-02 の discovery「Pasta DSL MCP移行検討」より）
+
+- 0.5.0 の `debug-mcp-runtime` が、DAP と一緒に**キックの経路を丸ごと消す**（`event/kick.lua`・`SHIORI.kick`・`STORE.kick_*`・`ActorMsg::Kick`・`kick_sink_for` ほか）。キックを生んでいたのは DAP の `pasta/playSceneAt`・`pasta/reloadShiori` だけである。
+- 指名した再生は `OnPastaScene`・`OnPastaSceneAt` に一本化する。MCP の `raise_event` で起こせば、応答でそのまま台本を返す。
+- この brief の「キックの即時化」（Problem の 1 つ目・Desired Outcome の「MCP からのシーン再生（キック）が…すぐ出る」・触るファイルの `kick.lua`）は、対象が無くなる。要件を作るときに範囲から外す。post の SEND で台本を今すぐ出す仕組みそのもの（シーンと Lua から）は残る。
+- 上の 2026-11-02 の申し送りの「0.5.1 で DAP を捨てて」は、0.5.0 と読み替える。
