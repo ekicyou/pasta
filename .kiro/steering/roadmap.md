@@ -128,7 +128,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 | 4 | ponytail-lua-transpiler | Opus | 8〜10 | **ウェーブ 1（2026-11-02）**（使い手の無くなった `TranspileContext::merge_from` を消す。`ponytail-core-registry` より後に入ったときは、`pasta_core` の 2 つの `merge_from` も消す） |
 | 5 | ponytail-lua-debug | Opus | 14〜18 | **閉じた（2026-11-02）**（DAP を捨てるため。15・16 番が受け継ぐ。上の「統合して閉じたもの（2026-11-02）」） |
 | 6 | ponytail-lua-scripts | Opus | 12〜15 | **ウェーブ 1（2026-11-02）**（`recommend.lua` を監査の範囲に足した） |
-| 7 | ponytail-editor-tooling | Opus | 16〜19 | **ウェーブ 1（2026-11-02）**（`Cargo.lock` の席を持つ） |
+| 7 | ponytail-editor-tooling | Opus | 16〜19 | **済（2026-11-03 完了）**（`Cargo.lock` の席を持つ） |
 | 8 | ponytail-manual-ci | Opus | 11〜15 | **ウェーブ 1（2026-11-02）**（Node 22 はこの spec が持つ。章の数の決め打ちをやめるかを議題にした） |
 | 9 | ponytail-shiori | Opus | 8〜11 | **ウェーブ 1（2026-11-02）**（`shiori4-v3-portable` が unload の待ち・FFI の型・テストの錠などを直したので小さくなった。DllMain の道の待ちなどが残る） |
 | 10 | scene-attribute-store | Fable | 15〜18 | ウェーブ 2 の見込み。2・3・4・6 番の後（`parse_scene.rs`・`scope_gen.rs`・`context.rs`・`transpiler.rs`・`scene_registry.rs`・`scene.lua` を共有する）。属性の倉の形と Lua から読む口・受け継ぎ・値の型を決める。読み手は `scene-condition-attributes`（条件と `＆優先`）・`scene-pick-modes`（`＆重み`・`＆順番`）と、0.6.0 の `cue-command-runtime`（柱の属性）の 3 つ。0.6.0 の読み手も要件の材料に含める |
@@ -172,7 +172,7 @@ Phase 12（初心者向けの入門ガイド）は、2026-10-17 の入門ガイ�
 | ponytail-lua-scripts | **`hour_margin` が文字列だと毎秒エラー**・応答の見出しの改行・包む関数の写し・`co_callback`・続きのトークの期限 | `pasta_lua/pasta_scripts/**`・`tests/lua_specs/**` | M | Opus |
 | ponytail-shiori | **unload と FreeLibrary の競り**・理由の無い 500・`Key:` の行が黙って 204・x64 の `long`・テストの競り・テストデータ | `pasta_shiori/**` | L | Opus |
 | ponytail-check-release（2026-10-24 完了） | **`release` が作者のフォルダを消す**・自分を入れ子に写す・.nar が自分を含む・効かない守り | `pasta_check/src/{release,release_args,copy,nar,update_files,main,balloon}.rs`・`pasta_check/tests/cli_test.rs`・`pasta_sample_ghost/{tests/**,src/scripts.rs}` | M | Opus |
-| ponytail-editor-tooling | **1 つの誤りでシーン全体に波線**・箱・行末コメント・Lua のフェンス・tower-lsp の撤去・`host` | `pasta_dsl/src/partial.rs`・`pasta_lsp/**`・`editors/vscode/**`・`pasta_check/src/validate/{syntax,report}.rs` | L | Opus |
+| ponytail-editor-tooling（2026-11-03 完了） | **1 つの誤りでシーン全体に波線**・箱・行末コメント・Lua のフェンス・tower-lsp の撤去・`host` | `pasta_dsl/src/partial.rs`・`pasta_lsp/**`・`editors/vscode/**`・`pasta_check/src/validate/{syntax,report}.rs` | L | Opus |
 | ponytail-manual-ci | マニュアルの検査が Rust の PR とリリースで走らない・Pages の権限・action の SHA 固定・重複したビルド | `.github/workflows/**`・`book/tools/**` | M | Opus |
 
 - **進め方**（2026-10-19 開発者の決定）
@@ -501,7 +501,7 @@ Wave 1〜3 の 12 本と、先行させた `scene-name-alias`・`expr-nil-coerci
 - [ ] ponytail-lua-transpiler -- Lua ブロックの中身を書いたとおりに出す（字下げと空行）。効かない `LineEnding`・`comment_mode` と、死んだ文脈の状態を消す（ファイル属性は残す）。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。Dependencies: none
 - [ ] ponytail-lua-scripts -- 数でない `hour_margin` を既定に戻す。応答の見出しの値の改行を空白にする。続きのトークの期限を呼んだ時刻から数える。包む関数の写しと `co_callback` を消す（`pasta.areka` は残す）。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。`set_co_scene` と `EVENT.fire` を先に直した 0.4.2 の 2 本は入った（2026-10-23）。Dependencies: none
 - [x] ponytail-shiori -- unload が、アクターのスレッドが DLL を出るまで（上限つきで）待つ。フォルダが無いときに理由を出す。`Key:` の行を受け付ける。FFI の型を C に合わせ、テストの競りを無くす。テストだけのコードとデータを出荷物から外す。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。Dependencies: none
-- [ ] ponytail-editor-tooling -- 構文の誤りを本当の位置に 1 件だけ出し、部分解析がシーンを落とさないようにする。箱・行末コメント・Lua のフェンスの色を文法に合わせる。`pasta_lsp` を WASM の解析器だけにする（tower-lsp を撤去）。`host` を廃止する。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。Dependencies: none
+- [x] ponytail-editor-tooling -- 構文の誤りを本当の位置に 1 件だけ出し、部分解析がシーンを落とさないようにする。箱・行末コメント・Lua のフェンスの色を文法に合わせる。`pasta_lsp` を WASM の解析器だけにする（tower-lsp を撤去）。`host` を廃止する。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。Dependencies: none
 - [ ] ponytail-manual-ci -- マニュアルの 3 つの検査を、全部の push・PR とリリースの関門で走らせる。Pages の権限を deploy に絞る。公開の job の action を SHA で固定する。重複したビルド・PoC・写しを整理する。Node 22・mdBook 0.5.4 に揃える。0.5.0（2026-10-24 に 0.4.3 から 0.4.5 へ、2026-11-02 に 0.4.5 を廃止して 0.5.0 へ移した）。`pasta-check-release-asset`（完了）が `release.yml`・`github-release.ps1` に足した段を保つ。Dependencies: none
 - [ ] scene-count -- シーン名にぶら下がるシーンの数を、`＞` と同じ規則の前方一致と完全一致の 2 通りで読む GLOBAL 関数（英語名と日本語名）。`pasta_check validate` の組み込みの名前とマニュアルも足す（2026-11-01 起票。里々の「文「○○」の数」から、開発者の依頼）。0.5.0 の 4 番（2026-11-01 開発者の決定）。`scene-condition-attributes`・`scene-pick-modes`・`scene-exact-match` と同じウェーブに置かない（`search/context.rs`）。Dependencies: none（ファイルの順番で `ponytail-core-registry`・`ponytail-lua-scripts` の後。`scene-attribute-store` とは `scene_table.rs` に触らない約束で並べる）
 - [ ] scene-exact-match -- 完全一致でシーンを呼ぶ `＞＞シーン名`（同名が複数ならランダム。既存の `search_scene_exact` を使う）と、`pasta.toml` の `[scene] match = "exact"`（`＞`・イベントの受け口・OnTalk・時報・選択肢の飛び先を全部完全一致にする。既定は前方一致）を足す。既定のモードでも、イベントの受け口はイベント ID の直後が英大文字で続く候補（`＊OnInstallCompleteAll` など）を外す。`novel-talk-flow` の完全一致の切り替えを引き取る（2026-10-21 起票。ghost_dev のヒアリング。同日に開発者が承認して `event-scene-exact-match` から広げた）。版は未定。`call-attribute-filter` と同じウェーブに置かない。Dependencies: none
