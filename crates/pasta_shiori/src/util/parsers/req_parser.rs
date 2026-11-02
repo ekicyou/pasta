@@ -1,6 +1,3 @@
-#[cfg(debug_assertions)]
-const _GRAMMAR: &str = include_str!("req_parser.pest");
-
 use pest_derive::*;
 
 // pest_derive generates Rule variants for all grammar rules.

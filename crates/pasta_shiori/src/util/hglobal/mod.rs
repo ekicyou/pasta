@@ -20,14 +20,6 @@ pub(crate) struct ShioriString {
     has_free: bool,
 }
 
-// SAFETY: ShioriString owns a single HGLOBAL handle. The handle is either:
-// - captured from the SHIORI host (has_free=true, will be freed on drop), or
-// - allocated by clone_from_slice_impl (has_free controlled by caller).
-// Transfer between threads is safe because ShioriString has exclusive ownership
-// of the HGLOBAL and does not alias it.
-unsafe impl Sync for ShioriString {}
-unsafe impl Send for ShioriString {}
-
 impl Drop for ShioriString {
     fn drop(&mut self) {
         if !self.has_free {
@@ -57,9 +49,7 @@ impl ShioriString {
     /// GMEM_FIXEDブロックを確保し、失敗（null）を明示エラーで返します。
     /// 3.37 (G3): GlobalAlloc は失敗時に null を返す（プロセス終了はしない）。
     /// 旧実装は null を `from_raw_parts_mut` へ渡しており未定義動作だった。
-    /// エラーは既存の `MyError::Script` に相乗りする（panic_to_error と同じ
-    /// 技法）: pasta_shiori は crates.io 公開済みで `MyError` は
-    /// non_exhaustive でないため、変種追加は semver-major（R3.5 違反）。
+    /// エラーは既存の `MyError::Script` に載せる。
     fn alloc_global(len: usize) -> MyResult<HGLOBAL> {
         // SAFETY: GlobalAlloc has no preconditions; the null (failure)
         // return is checked before any pointer use.
@@ -170,8 +160,7 @@ impl ShioriString {
 /// 3.37 (G3): GlobalAlloc failure must surface as an explicit Err, never as
 /// a null pointer flowing into `from_raw_parts_mut` (undefined behavior).
 /// A near-address-space-sized request makes GlobalAlloc fail deterministically.
-/// The error rides on the existing `Script` variant (adding a variant to the
-/// published non-`non_exhaustive` `MyError` would be semver-major).
+/// The error rides on the existing `Script` variant.
 /// RED evidence: with the null check removed (mutation), alloc_global returns
 /// Ok(null) and this assertion fails.
 #[test]

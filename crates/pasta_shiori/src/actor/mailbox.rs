@@ -69,12 +69,7 @@ impl MailboxRequest {
 ///   持たず、アクタースレッド上で VM の `SHIORI.kick(scene)` を呼んで保留フラグ
 ///   （`STORE.kick_pending`/`STORE.kick_force`）を設置する。複数 Kick は FIFO 順で処理され、
 ///   最後の `scene` が `kick_pending` を上書きする。
-///
-/// `#[non_exhaustive]` により、`Kick`（talk FIFO 投入・仕様 `pasta-scene-kick`）を
-/// 破壊的変更なしに追加した（別チャンネル＋`select!` ではなく **同一 mailbox への
-/// variant merge** が単一 consumer 不変条件を保つ唯一の拡張手段）。
 #[derive(Debug)]
-#[non_exhaustive]
 pub enum ActorMsg {
     /// GET 同期メッセージ。`reply` は flume `bounded(1)` の応答経路（exactly-once）。
     Get {

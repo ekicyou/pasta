@@ -127,7 +127,7 @@
   - _Requirements: 6.6, 6.8_
 
 - [ ] 9. 使われない部品と素通しを消す
-- [ ] 9.1 使われない型・規則・印・誤りを消す
+- [x] 9.1 使われない型・規則・印・誤りを消す
   - メッセージの型の非網羅の印とそれを semver で説明するコメントを消す（variant が 1 つの応答の型は 8.3 で消し済み）
   - 文法の文字列の取り込みと、使われない規則（`sp`・`eol`・`key_sep`）を消す
   - 応答の文字列の型の `unsafe impl Send`・`Sync` と、誤りの型の Poison の variant とその変換を消す
@@ -173,3 +173,4 @@
 - 10.1：book/src/internals/shiori.md に消した名前が残る（determine_method・default_204_response・ReloadProbe・Reply::Value・ready の組 (ThreadId, bool, Option<SocketAddr>)・JoinPolicy など）。章に残さないこと
 - 9.3：scene_kick_*_e2e_test.rs 4 本は spawn_actor_thread_with(0, …) で hinst を渡している。hinst を消すときに直す
 - 10.1：book/src/internals/logging-encoding.md 73 行目が pasta_shiori の変換を「enc.rs と windows_api.rs」と書いている。enc.rs は 8.4 で消したので一緒に直す
+- 10.1：book/src/internals/shiori.md 90 行目が ActorMsg を #[non_exhaustive] と書いている（9.1 で消した）
