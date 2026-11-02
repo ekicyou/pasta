@@ -214,11 +214,14 @@ mod shiori2_tests {
         let version: i32 = table.get("version").expect("version should exist");
 
         assert_eq!(method, "get");
-        assert!(
-            (20..=29).contains(&version),
-            "SHIORI/2.x version should be 20-29: {}",
-            version
-        );
+        assert_eq!(version, 26);
+
+        // 文法は版の数を 1 桁に限るので、両端の 2.0 と 2.9 は 20 と 29 になる。
+        for (minor, expected) in [("0", 20), ("9", 29)] {
+            let request = format!("GET Version SHIORI/2.{minor}\r\nCharset: UTF-8\r\n\r\n");
+            let table = parse_request(&lua, &request).expect("parse_request should succeed");
+            assert_eq!(table.get::<i32>("version").unwrap(), expected);
+        }
     }
 }
 
