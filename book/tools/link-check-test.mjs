@@ -60,6 +60,7 @@ import {
   checkSkillSelfContained,
   checkInternalsPaths,
   checkReadmeManualLinks,
+  summaryChapters,
   MANUAL_URL,
   INTERNALS_DIR,
   REPO_PATH_PREFIXES,
@@ -538,9 +539,9 @@ log('\n== (E) checkSkillSelfContained（規則 a〜d） ==');
 log('\n== (F) checkInternalsPaths（内部設計章のリポジトリ内パス実在） ==');
 {
   check('INTERNALS_DIR は book/src/internals', INTERNALS_DIR === 'book/src/internals');
-  check('REPO_PATH_PREFIXES は 6 接頭辞',
+  check('REPO_PATH_PREFIXES は 7 接頭辞（editors/ を含む）',
     JSON.stringify(REPO_PATH_PREFIXES)
-    === JSON.stringify(['crates/', 'book/', '.github/', '.cargo/', '.kiro/', '.claude/']),
+    === JSON.stringify(['crates/', 'editors/', 'book/', '.github/', '.cargo/', '.kiro/', '.claude/']),
     JSON.stringify(REPO_PATH_PREFIXES));
 
   // F-1: 内部設計章が無ければ検査しない（違反 0）。
@@ -1240,6 +1241,24 @@ log('\n== (I) 見出しの id の突き合わせ（ビルドした出力が在�
     if (ok === null) log(`  SKIP  ${name}`);
     else check(name, ok);
     for (const line of lines) log(line);
+  }
+}
+
+// ============================================================
+log('\n== (J) 章のフェンスの中のリンク・目次の章の並び（ponytail-manual-ci 要件 7.3, 9.1） ==');
+{
+  const root = makeSandbox();
+  try {
+    writeFile(root, 'book/src/grammar/markers.md', '# m\n\n```markdown\n[壊れた](nope.md) [x](#no-such)\n```\n');
+    const broken = runLinkCheck(root).broken;
+    check('J-1 章のフェンスの中の壊れたリンクは報告しない', broken.length === 0, JSON.stringify(broken));
+    writeFile(root, 'book/src/SUMMARY.md',
+      '# Summary\n\n[はじめに](./introduction.md)\n- [a](grammar/a.md#x)\n- [a2](./grammar/a.md)\n- [b](grammar/b.md)\n');
+    const got = summaryChapters(root);
+    check('J-2 summaryChapters は ./・アンカーを外し、重複を消して目次の順に返す',
+      JSON.stringify(got) === JSON.stringify(['introduction.md', 'grammar/a.md', 'grammar/b.md']), JSON.stringify(got));
+  } finally {
+    rmrf(root);
   }
 }
 

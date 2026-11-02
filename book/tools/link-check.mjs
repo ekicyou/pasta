@@ -1,7 +1,7 @@
 // link-check.mjs — マニュアル（book/src）のリンク切れ検出（git 非依存）
 // manual-ssot-authority タスク 3.1（要件 8.1, 8.4 / design「LinkCheck」）。
 //
-// 検出（book/src/**/*.md を走査）:
+// 検出（book/src/**/*.md のフェンス外を走査）:
 //   (a) book 内相対 .md リンクが実在ファイルを指すか、
 //   (b) リポジトリ内を指す GitHub blob/tree URL が
 //       ローカルに実在するか（オフラインでローカル照合）、
@@ -37,6 +37,7 @@
 //   maskFences … CommonMark 準拠でコードフェンス内の行を空行に置換（行数は保つ）
 // 共用 export（自己テスト link-check-test.mjs が import する）:
 //   BOOK_KINDS … 報告の [1]（リンク切れ）に入る種別の一覧
+//   summaryChapters … 目次（SUMMARY.md）の章のパスを目次の順・重複なしで返す
 //
 // ビルドした出力（book/book/）は読まない。出力の有無で結果は変わらない（manual-link-anchor-check 要件 6.2）。
 // 見出しの id を出力と突き合わせる確かめは、自己テスト（link-check-test.mjs の節 I）が持つ（同 要件 3.7, 7.6〜7.8）。
@@ -83,6 +84,14 @@ export function maskFences(markdown) {
     }
     return '';
   }).join('\n');
+}
+
+// ---- 目次（SUMMARY.md）の章の並び ----
+// book/src から見た章のパスを目次の順・重複なしで返す。先頭の `./` と `#…` は外す。
+// 目次が無ければ fs の例外のまま投げる。
+export function summaryChapters(repoRoot = REPO_ROOT) {
+  const summary = fs.readFileSync(path.resolve(repoRoot, 'book/src/SUMMARY.md'), 'utf8');
+  return [...new Set([...summary.matchAll(/\]\(([^)\s#]+\.md)(?:#[^)]*)?\)/g)].map((m) => m[1].replace(/^\.\//, '')))];
 }
 
 // ---- リンク切れ検出（book/src 対象） ----
@@ -153,7 +162,7 @@ export function detectBrokenLinks(repoRoot = REPO_ROOT) {
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
     const relFile = rel(file);
-    for (const rawTarget of extractLinks(text)) {
+    for (const rawTarget of extractLinks(maskFences(text))) {
       const target = stripFragment(rawTarget).trim();
       // フラグメントは、書かれたリンク先の最初の `#` より後ろを復号したもの。
       const h = rawTarget.indexOf('#');
@@ -389,7 +398,7 @@ export function checkSkillSelfContained(repoRoot = REPO_ROOT) {
 // 違反: repoRoot 外へ解決される（トラバーサル）、実在しない（末尾 `/` はディレクトリとして実在すること）。
 // `:行番号` 付き・ワイルドカード入りは OS（Windows の代替データストリーム等）に依らず実在しない扱い。
 export const INTERNALS_DIR = 'book/src/internals';
-export const REPO_PATH_PREFIXES = Object.freeze(['crates/', 'book/', '.github/', '.cargo/', '.kiro/', '.claude/']);
+export const REPO_PATH_PREFIXES = Object.freeze(['crates/', 'editors/', 'book/', '.github/', '.cargo/', '.kiro/', '.claude/']);
 const CODE_SPAN_RE = /(?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`)/g;
 
 export function checkInternalsPaths(repoRoot = REPO_ROOT) {
@@ -421,7 +430,7 @@ export function checkInternalsPaths(repoRoot = REPO_ROOT) {
 // 写像する: 残りが空・index.html → 合格（末尾 `/` は index.html を補う）。`<path>.html[#anchor]` → book/src/<path>.md が
 // 実在し、アンカーがあればその章の見出し slug ∪ 明示アンカーに含まれること（パーセントエンコードはデコードして照合）。
 // 違反: .html 以外で章に写像できない、book/src 外へ解決される（トラバーサル）、章が無い、見出しが無い。
-export const MANUAL_URL = 'https://ekicyou.github.io/pasta/'; // gen-skill-refs の MANUAL_BASE_URL と同値（import しない）
+export const MANUAL_URL = 'https://ekicyou.github.io/pasta/';
 const BARE_MANUAL_URL_RE = new RegExp(MANUAL_URL.replace(/\./g, '\\.') + '[^\\s<>()\\[\\]`"\'、。（）「」『』【】]*', 'g');
 
 function manualUrlProblem(repoRoot, url, anchorsOf) {
