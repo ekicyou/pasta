@@ -74,3 +74,8 @@
 ## 申し送り（2026-10-29 の版の組み替えより）
 
 - ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.5（ponytail）の次に入る。
+
+## 申し送り（2026-11-02 `ponytail-manual-ci` の要件の議論より）
+
+- `ponytail-manual-ci` が、章の数を決め打ちする 3 つの検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）をやめ、`SUMMARY.md` から数えて比べる形にする（同 spec の requirements.md の決定 A・Requirement 9）。
+- それが main に入った後なら、章を足すときに 3 つの検査の数を直さなくてよい。目次 `SUMMARY.md` に章を載せ、章のフォルダが口調の検査の見るフォルダ（`verify-content.mjs` の `VOICE_DIRS`）に入っていればよい。入る前なら、今までどおり数を合わせる。

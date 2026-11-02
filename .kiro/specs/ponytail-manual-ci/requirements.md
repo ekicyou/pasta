@@ -25,7 +25,8 @@
 - **In scope**:
   - 台帳の指摘（B1〜B11 と N1〜）の修正。
   - 指摘を直すのに要る、`tech.md` の CI とマニュアルの行（path filter・権限・mdBook の版）の書き直し。
-  - 章の数を決め打ちする自己テスト 3 つ（前提 A。下の Requirement 9）。
+  - 章の数を決め打ちする自己テスト 3 つ（決定 A。下の Requirement 9）。
+  - 配るスキル `pasta-check` の、`crates/` を引く 6 行の書き直し（決定 C。スキルの中身の検査に通すため）。
 - **Out of scope**:
   - マニュアルの本文（`book/src` の章の中身）。
   - Rust のクレート。
@@ -52,7 +53,7 @@
 3. If マニュアルの軽い検査のどれかが失敗したとき, the Build ワークフロー shall その実行を失敗にし、失敗した検査の名前と理由をログに出す。
 4. If 内部設計の章が引くリポジトリのパスが無くなったとき, the リンクの検査 shall そのパスを壊れたものとして報告する。これは `editors/` の下のパスでも同じである。
 5. The Build ワークフロー shall マニュアルの軽い検査を、Rust のビルドの終わりを待たずに走らせる。
-6. The Release ワークフロー shall 同じタグの 1 回の実行で、スキルの生成物の鮮度の照合を 2 度走らせない（前提 B。関門に照合が入れば、build の job の照合は重複になる）。
+6. The Release ワークフロー shall スキルの生成物の鮮度の照合を、関門（Build ワークフロー）でだけ走らせる。build の job の照合の段は持たない（決定 B。build の job は関門の後に走るので、長いビルドの前の保証は保たれる）。
 
 ### Requirement 2: マニュアルのパイプラインが、関係するファイルの変更で起動する
 
@@ -62,8 +63,10 @@
 
 1. When `editors/vscode/syntaxes/` の下のファイルを変える push か PR が起きたとき, the Manual ワークフロー shall 起動し、ハイライトの検査とテストを走らせる。
 2. When `editors/vscode/syntaxes/` の下のファイルを変える push が main に入ったとき, the Manual ワークフロー shall マニュアルを作り直して公開する。
-3. Where リンクの検査が配るスキル `pasta-check` を対象に含めるとき, the Manual ワークフロー shall `pasta-check` のスキルの変更でも起動する（前提 C）。
+3. When 配るスキル `pasta-check` のファイルを変える push か PR が起きたとき, the Manual ワークフロー shall 起動し、リンクの検査を走らせる（決定 C）。
 4. The Manual ワークフロー shall 起動の条件のコメントと `tech.md` の起動の条件の行を、実際の条件と合わせる。
+5. The リンクの検査 shall 配るスキル `pasta-check` を、ほかの配るスキルと同じ検査（相対リンク・見出し・公開マニュアルの URL・`crates/` などを引かない自己完結）にかける（決定 C）。
+6. The 配るスキル `pasta-check` shall リポジトリの中のパス（`crates/` の下）を引かない。今の 6 行（`SKILL.md` の 3 行・`nar-spec.md` の 1 行・`updates-txt-spec.md` の 2 行）は、公開の URL に変えるか消す（決定 C）。
 
 ### Requirement 3: Pages の権限は deploy の job だけが持つ
 
@@ -87,9 +90,10 @@
 1. The Release ワークフロー shall crates.io と Marketplace に公開する job で使う第三者の action を、commit の SHA で指す。
 2. The Release setup check ワークフロー shall OIDC で Azure に入る job で使う第三者の action を、commit の SHA で指す。
 3. The 固定した action の行 shall 元のタグを、行の末尾のコメントに残す。
-4. Where 配布物を作る job（Release ワークフローの build の job）も固定の対象に含めるとき, the Release ワークフロー shall その job の第三者の action も commit の SHA で指す（前提 D）。
-5. Where 配布物を作る job がビルドの道具をネットから取って来るとき, the Release ワークフロー shall 取って来たファイルが決まった中身であることを確かめ、違えば止める（前提 D）。
+4. The Release ワークフロー shall 配布物を作る job（build の job）の第三者の action も、commit の SHA で指す（決定 D）。
+5. If 配布物を作る job がネットから取って来たビルドの道具（`wasm-pack`・`cargo-about`）の SHA-256 が、決めた値と違うとき, the Release ワークフロー shall その job を止める（決定 D）。
 6. When 固定した action で公開の job が走るとき, the Release ワークフロー shall 今と同じ公開の結果（status・reason・summary）を出す。
+7. The Build ワークフローの action と、GitHub 自身の action（`actions/*`） shall タグのままにする（決定 D。資格も配布物も持たない、または GitHub が持つため）。
 
 ### Requirement 5: 重複したビルドと PoC を無くす
 
@@ -139,8 +143,9 @@
 3. The Manual ワークフロー shall 自己テストが前提にする mdBook の版（0.5.4）で、マニュアルと旧版を作る。
 4. The `tech.md` shall mdBook の版の行を、CI の版と合わせる。
 5. When Node と mdBook の版を変えた後で Release ワークフローと Manual ワークフローが走るとき, the ワークフロー shall 今と同じ配布物と、今と同じマニュアルを作る。
+6. If 監査の領域のワークフローが使う action が、寿命の切れた Node（20）の実行環境で動く版のとき, the ワークフロー shall その action を Node 22 以降で動く版に上げる（決定 4。どの action が当たるかは設計で調べる）。
 
-### Requirement 9: 章を足しても、自己テストを直さずに済む（前提 A）
+### Requirement 9: 章を足しても、自己テストを直さずに済む（決定 A）
 
 **Objective:** As a 開発者, I want 章を足すたびに自己テストの章の数を書き直さずに済むこと, so that 章を足した PR で main が赤くなることが、3 度目に起きない。
 
@@ -162,14 +167,16 @@
 3. The Release ワークフロー shall 配布物 5 つ（`pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip`・`pasta-skills.zip`）の検査と upload を、今のとおり保つ。`pasta-skills.zip` の中身の検査と、`git ls-tree` の失敗で止まる行も保つ。
 4. The `github-release.ps1` shall 添付の名前 6 つ（配布物 5 つと詳しいリリースノート）を、今のとおり保つ。
 5. The `release-scripts-test.ps1` shall 項目 10（`pasta_check.zip` だけが無い）と項目 11（`pasta-skills.zip` だけが無い）を保ち、直した後も全部の項目が ok になる。
-6. The リリースの補助スクリプト shall 誰も使わない引数を持たない。テストのための差し替えの口を持つなら、それを使うテストがある（前提 E）。
+6. The リリースの補助スクリプト shall 誰も使わない引数を持たない。`publish-crate.ps1` の `-ApiBase` は消す（決定 E）。
 7. When CI の変更をブランチで確かめたとき, the Build ワークフローと Manual ワークフロー shall そのブランチの上で成功する。
 8. The `book/tools` のスクリプト shall 外から使われない export を持たない。同じ値（公開マニュアルの URL）と同じ処理（Markdown のファイルの一覧）を、2 か所で決めない。
+9. When `release-scripts-test.ps1` が `publish-vsix.ps1` に `-VsceCommand` で偽の vsce を渡し、その版が公開済みと答えさせたとき, the `publish-vsix.ps1` shall 公開せずに skipped を出す。この項目はネットワークを使わない（決定 E）。
 
-## 前提（要件の議論で確かめる）
+## 決定（2026-11-02 の要件の議論。全議題を推奨案で確定）
 
-- **前提 A**: 章の数を決め打ちする自己テスト 3 つ（brief の Scope では Out）を、この spec で直す。2026-11-02 の再測定の推奨（`SUMMARY.md` から数えて比べる）に沿う。採らなければ Requirement 9 を外し、brief の Out に戻す。
-- **前提 B**: スキルの生成物の鮮度の照合は、関門（Build ワークフロー）に置き、Release ワークフローの build の job の照合は消す。同じタグのコミットで、関門は build の job より先に必ず走るため。
-- **前提 C**: 配るスキル `pasta-check` を、リンクの検査（相対リンク・見出し・公開マニュアルの URL）の対象に足す。スキルの自己完結の検査（`crates/` などを引かない）まで足すかは、スキルのファイル 6 行を直すことになるので、議論で決める。
-- **前提 D**: 固定の対象は、公開の資格を持つ job に加えて、配布物を作る Release ワークフローの build の job も含める。Build ワークフロー（資格も配布物も持たない）の action はタグのままにする。GitHub 自身の action（`actions/*`）はタグのままにする。
-- **前提 E**: 使われない引数（`publish-crate.ps1` の `-ApiBase`・`publish-vsix.ps1` の `-VsceCommand`）は、テストで使うか消す。どちらにするかは設計で決める。
+- **決定 A**（議題 1）: 章の数を決め打ちする自己テスト 3 つ（brief の Scope では Out だった）を、この spec で直す。`SUMMARY.md` から数え、ファイルの数と `verify-content` が見た章の数と比べる（Requirement 9）。比べるので、`VOICE_DIRS` に無いフォルダを足したときの守りは減らない。
+- **決定 B**（議題 2）: スキルの生成物の鮮度の照合は、関門（Build ワークフロー）にだけ置く。`release.yml` の build の job の照合の段（L119-121）は消す。`pasta-skills-release-asset` の申し送りの「保つ行」から、この段だけを外す（Requirement 1.6）。
+- **決定 C**（議題 5）: 配るスキル `pasta-check` を、ほかの配るスキルと同じリンクの検査（自己完結まで）にかけ、`crates/` を引く 6 行を直す（Requirement 2.3・2.5・2.6）。`.claude/skills` の編集は分類器が止めるので、実装のときに開発者の許可を求める。
+- **決定 D**（議題 3）: 固定するのは、公開の資格を持つ job と、配布物を作る `release.yml` の build の job の第三者の action と、ビルドの道具 2 つの SHA-256。`build.yml`（`build-unix` を含む）と `actions/*` はタグのまま（Requirement 4）。
+- **決定 4**（議題 4）: Node 20 の寿命の始末は、`node-version` の 2 か所と、Node 20 の実行環境で動く action の major の引き上げ（要るなら）の両方を、この spec で行う（Requirement 8.1・8.2・8.6）。
+- **決定 E**（議題 6）: `-ApiBase` は消す。`-VsceCommand` は、偽の vsce で「公開済みなら skipped」を確かめる `release-scripts-test.ps1` の項目に使う（Requirement 10.6・10.9）。

@@ -164,8 +164,8 @@
 | N7 配布物を作る job の可変のタグ | Should（危険） | 4.4 |
 | N8 道具の中身を確かめない | Should（危険） | 4.5 |
 | N9 使われない差し替えの口・公開の判定のテストが無い | Should | 10.6 |
-| N16 章の数の決め打ち | 議題 | 9 |
-| N17 `pasta-check` がリンクの検査の外 | Should | 2.3 |
+| N16 章の数の決め打ち | Should（決定 A） | 9 |
+| N17 `pasta-check` がリンクの検査の外 | Should | 2.3・2.5・2.6 |
 | N10 フェンスの中のリンク | Nice | 7.3 |
 | N11 通らない分岐 | Nice | 7.5 |
 | N12 目次の条件の写し | Nice | 6.3 |
@@ -230,13 +230,13 @@
 - 軽い検査の置き場所（上の案 A〜C）は、要件の議論で設計の判断とした。要件は Requirement 1.5（Rust のビルドを待たない）だけを決める。
 - 固定する SHA・道具の hash・旧版と mdBook 0.5.4・Setup Pages を消した後の公開は、上の Research Needed のとおり設計で調べる。
 
-## OPEN QUESTIONS（要件の議論で決める）
+## OPEN QUESTIONS の結論（2026-11-02 の要件の議論。全部を推奨案で確定）
 
-1. **章の数の議題を採るか**（前提 A・N16）。推奨: 採る。`SUMMARY.md` から数えて、ファイルの数と `verify-content` が見た章の数を比べる。章の数の取り残しで main が赤くなったのが 2 度あり、比べる形なら守りは減らない。
-2. **軽い検査をどこで走らせるか**（Requirement 1.5）。推奨: cargo の要らない小さな job を `build.yml` に足す（案 B）。1 分以内に落ち、Rust の失敗と混ざらない。
-3. **スキルの生成物の鮮度の照合をどこに残すか**（前提 B）。推奨: 関門（案 B の job）だけに残し、`release.yml` の build の job の段を消す。同じタグのコミットで、関門は必ず build より先に走る。
-4. **固定の範囲**（前提 D・N7・N8）。推奨: 公開の資格を持つ job と、配布物を作る `release.yml` の build の job の第三者の action を固定し、道具の hash も確かめる。`build.yml`（`build-unix` を含む）はタグのまま。配る物を作る job が、資格を持つ job と同じ危険を持つため。
-5. **Node 22**（B10）。推奨: この spec で `release.yml` L25 と `release-setup-check.yml` L35 を 22 にする。`vsce-4-upgrade` がこれを待っている。
-6. **`pasta-check` のスキルの検査**（前提 C・N17）。推奨: リンク・見出し・公開マニュアルの URL の検査と path filter には足す。自己完結の検査（スキルの 6 行を直す）は、開発者が決める。スキルのファイルの編集は止められやすく、配る文書の中身に関わるため。
-7. **使われない差し替えの口**（前提 E・N9）。推奨: `-ApiBase` は消し、`-VsceCommand` は偽の vsce で「公開済みなら skipped」を確かめる項目に使う。公開の判定にテストが 1 つも無いのを、ネットワークなしで 1 つ埋められる。
-8. **action の Node 20 の実行環境**（Research Needed 3）。推奨: 設計で調べて、直す必要があればこの spec に入れる。同じ「Node 20 の寿命」の話で、触るファイルも同じため。
+1. 章の数の議題は採る（requirements.md の決定 A・Requirement 9）。
+2. 軽い検査の置き場所は設計で決める（推奨は案 B のまま）。要件は Requirement 1.5 だけ。
+3. スキルの生成物の鮮度の照合は関門にだけ残し、`release.yml` L119-121 を消す（決定 B・Requirement 1.6）。
+4. 固定は、公開の資格を持つ job・`release.yml` の build の job の第三者の action・道具 2 つの SHA-256。`build.yml` と `actions/*` はタグのまま（決定 D・Requirement 4）。
+5. Node 22 はこの spec で行う（Requirement 8.1・8.2）。
+6. `pasta-check` のスキルは、自己完結の検査まで足し、`crates/` を引く 6 行を直す（決定 C・Requirement 2.3・2.5・2.6）。`.claude/skills` の編集は、実装のときに開発者の許可を求める。
+7. `-ApiBase` は消し、`-VsceCommand` は「公開済みなら skipped」の項目に使う（決定 E・Requirement 10.6・10.9）。
+8. Node 20 の実行環境の action は、設計で調べ、要るならこの spec で major を上げる（決定 4・Requirement 8.6）。
