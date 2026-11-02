@@ -160,7 +160,7 @@
   - _Depends: 6.2, 8.1, 8.2, 8.3, 8.4_
   - _Requirements: 1.1, 1.4, 1.6, 2.4, 2.5, 3.6, 8.4_
 
-- [ ] 9. 検証と台帳
+- [x] 9. 検証と台帳
 - [x] 9.1 手元で全部の検査とワークフローの確かめを通す
   - 依存の無い自己テストと軽い検査 3 つ・本文の検査・`release-scripts-test.ps1` を走らせる。mdBook の出力が要る `verify-search`・`build-index-test` は一時のフォルダに作った出力で走らせる
   - `actionlint .github/workflows/*.yml` が 0 件。固定した SHA ごとに `gh api repos/<owner>/<repo>/commits/<sha>` が 200 で、行末のタグがその SHA を指す
@@ -168,7 +168,7 @@
   - 完了の姿: 上の全部が通り、jsdom・vscode-textmate が要るテストだけが 9.2 に残っている
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.7, 8.6, 10.2, 10.3_
 
-- [ ] 9.2 ブランチの上で Build と Manual のワークフローを回す
+- [x] 9.2 ブランチの上で Build と Manual のワークフローを回す
   - ブランチの push を開発者に確かめてから、`gh workflow run build.yml --ref <branch>` と `gh workflow run manual.yml --ref <branch>` を走らせる
   - `build.yml` は `manual-light-checks` を含む全部の job が緑。`manual.yml` は build の job が緑（自己テスト全部・新版と旧版の 0.5.4 での生成と着色を含む）で、upload と deploy は飛ぶ
   - マージの後の確かめ（Pages の新版と `/classic/`・main での `release-setup-check.yml`・次のリリースタグの公開の結果）は、kiro-complete への申し送りとして残す
@@ -183,3 +183,5 @@
 ## Implementation Notes
 - 3.1: `maskFences` が空にした行の連続では空行 1 つを挟む 2 つのフェンスを分けられないため、`extractCodeFences` は閉じの行を `maskFences` に 1 行足して確かめる作りにした。kiro-complete で design.md の ContentVerify の文言を直す。
 - 5.2: neutralizer の写しと正準の比べる行は 82 行（design.md の「77 行」は古い数え）。kiro-complete で design.md を 82 に直す。
+- 9.2: 2026-11-03 にブランチの上で Build（https://github.com/ekicyou/pasta/actions/runs/41537870051・manual-light-checks を含む全 job 緑）と Manual（https://github.com/ekicyou/pasta/actions/runs/41537874720・build-manual 緑・deploy-manual は skipped）を回した。
+- kiro-complete への申し送り: マージ後に Pages の新版と /classic/・main での release-setup-check.yml・次のリリースタグの公開の結果（upload-artifact v7 → download-artifact v8 の受け渡しを含む）を確かめる。roadmap.md の「CI は 0.5.3 に固定」の項目を閉じる。
