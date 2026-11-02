@@ -66,8 +66,6 @@ pub struct SceneTable {
     cache: HashMap<SceneCacheKey, CachedSelection>,
     /// Random selector for scene selection.
     random_selector: Box<dyn RandomSelector>,
-    /// Whether to shuffle candidates (default: true, false for deterministic testing).
-    shuffle_enabled: bool,
 }
 
 impl SceneTable {
@@ -128,7 +126,6 @@ impl SceneTable {
             prefix_index,
             cache: HashMap::new(),
             random_selector,
-            shuffle_enabled: true,
         }
     }
 
@@ -328,9 +325,7 @@ impl SceneTable {
         let needs_reset = {
             let cached = self.cache.entry(cache_key.clone()).or_insert_with(|| {
                 let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
-                if self.shuffle_enabled {
-                    self.random_selector.shuffle_usize(&mut id_values);
-                }
+                self.random_selector.shuffle_usize(&mut id_values);
                 let ids = id_values.into_iter().map(SceneId).collect();
                 CachedSelection {
                     candidates: ids,
@@ -345,11 +340,9 @@ impl SceneTable {
         if needs_reset && let Some(cached) = self.cache.get_mut(&cache_key) {
             cached.next_index = 0;
             cached.history.clear();
-            if self.shuffle_enabled {
-                let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
-                self.random_selector.shuffle_usize(&mut id_values);
-                cached.candidates = id_values.into_iter().map(SceneId).collect();
-            }
+            let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
+            self.random_selector.shuffle_usize(&mut id_values);
+            cached.candidates = id_values.into_iter().map(SceneId).collect();
         }
 
         // Phase 5: Sequential selection
@@ -371,11 +364,6 @@ impl SceneTable {
     /// Get scene info by ID.
     pub fn get_scene(&self, id: SceneId) -> Option<&SceneInfo> {
         self.labels.get(id.0)
-    }
-
-    /// Set shuffle enabled flag (for testing/debugging).
-    pub fn set_shuffle_enabled(&mut self, enabled: bool) {
-        self.shuffle_enabled = enabled;
     }
 
     /// Collect scene candidates for one scope (no local → global fallback).

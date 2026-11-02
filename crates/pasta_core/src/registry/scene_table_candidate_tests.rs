@@ -1,7 +1,7 @@
 //! SceneTable テスト (#[path] パターン)
 //!
 //! Phase A: registry/scene_table.rs のインラインテストを分離
-//! 例外理由: SceneTableの全privateフィールド（labels, prefix_index, cache, random_selector, shuffle_enabled）
+//! 例外理由: SceneTableの全privateフィールド（labels, prefix_index, cache, random_selector）
 //! への直接アクセスが構造的に必要なため、#[path]パターンで分離
 
 use super::*;
@@ -31,7 +31,6 @@ fn test_resolve_scene_id_basic() {
         },
         cache: HashMap::new(),
         random_selector: selector,
-        shuffle_enabled: false,
     };
 
     let result = table.resolve_scene_id_unified("", "test", &HashMap::new());
@@ -326,9 +325,8 @@ fn test_resolve_scene_id_unified_local_scene() {
     let (_, counter) = registry.register_global("会話", HashMap::new());
     registry.register_local("選択肢", "会話", counter, 1, HashMap::new());
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Resolve local scene from parent module
     let result = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
@@ -345,9 +343,8 @@ fn test_resolve_scene_id_unified_global_scene() {
     let mut registry = SceneRegistry::new();
     registry.register_global("挨拶", HashMap::new());
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Resolve global scene - must use empty module_name for global search
     let result = table.resolve_scene_id_unified("", "挨拶", &HashMap::new());
@@ -361,9 +358,8 @@ fn test_resolve_scene_id_unified_global_scene_no_fallback() {
     let mut registry = SceneRegistry::new();
     registry.register_global("挨拶", HashMap::new());
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Try to resolve global scene from a module - should fail (no fallback)
     let result = table.resolve_scene_id_unified("任意のモジュール", "挨拶", &HashMap::new());
@@ -381,9 +377,8 @@ fn test_resolve_scene_id_unified_local_found() {
     let (_, counter) = registry.register_global("会話", HashMap::new());
     registry.register_local("挨拶", "会話", counter, 1, HashMap::new());
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Resolve from 会話_1 - should find ONLY local (no fallback to global)
     let result = table.resolve_scene_id_unified("会話_1", "挨拶", &HashMap::new());
@@ -422,7 +417,6 @@ fn test_resolve_scene_id_cycling() {
         },
         cache: HashMap::new(),
         random_selector: selector,
-        shuffle_enabled: false,
     };
 
     // 1回目〜3回目: 候補を順番に消費
@@ -475,7 +469,6 @@ fn test_resolve_scene_id_cycling_reshuffles() {
         },
         cache: HashMap::new(),
         random_selector: selector,
-        shuffle_enabled: true,
     };
 
     // 1周目の順序を記録
@@ -516,7 +509,6 @@ fn test_resolve_scene_id_cycling_preserves_candidates() {
         },
         cache: HashMap::new(),
         random_selector: selector,
-        shuffle_enabled: false,
     };
 
     // 1周目: 全候補を収集
@@ -558,9 +550,8 @@ fn test_resolve_scene_id_unified_cycling() {
     registry.register_local("選択肢A", "会話", counter, 1, HashMap::new());
     registry.register_local("選択肢B", "会話", counter, 2, HashMap::new());
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // 1周目: 2件のローカル候補を消費
     let r1 = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
@@ -712,7 +703,6 @@ fn test_resolve_scene_id_selector_applies_to_candidate_order_each_round() {
         },
         cache: HashMap::new(),
         random_selector: selector,
-        shuffle_enabled: true,
     };
 
     let expected = vec![SceneId(1), SceneId(2), SceneId(0)];

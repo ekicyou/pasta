@@ -46,8 +46,6 @@ pub struct WordTable {
     cached_selections: HashMap<WordCacheKey, CachedWordSelection>,
     /// Random selector.
     random_selector: Box<dyn RandomSelector>,
-    /// Whether to shuffle candidates (default: true).
-    shuffle_enabled: bool,
 }
 
 impl WordTable {
@@ -58,7 +56,6 @@ impl WordTable {
             prefix_index: RadixMap::new(),
             cached_selections: HashMap::new(),
             random_selector,
-            shuffle_enabled: true,
         }
     }
 
@@ -83,7 +80,6 @@ impl WordTable {
             prefix_index,
             cached_selections: HashMap::new(),
             random_selector,
-            shuffle_enabled: true,
         }
     }
 
@@ -206,9 +202,7 @@ impl WordTable {
 
         // Step 4: Shuffle and cache
         let mut word_indices: Vec<usize> = (0..all_words.len()).collect();
-        if self.shuffle_enabled {
-            self.random_selector.shuffle_usize(&mut word_indices);
-        }
+        self.random_selector.shuffle_usize(&mut word_indices);
         let shuffled_words: Vec<String> = word_indices
             .into_iter()
             .filter_map(|i| all_words.get(i).cloned())
@@ -231,11 +225,6 @@ impl WordTable {
         );
 
         Ok(result)
-    }
-
-    /// Set shuffle enabled flag (for testing).
-    pub fn set_shuffle_enabled(&mut self, enabled: bool) {
-        self.shuffle_enabled = enabled;
     }
 
     /// Get all entries (for testing/debugging).

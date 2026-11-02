@@ -43,10 +43,8 @@ fn build_filtered_table() -> SceneTable {
     registry.register_global("挨拶", spring);
     registry.register_global("挨拶", winter);
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector);
-    table.set_shuffle_enabled(false);
-    table
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    SceneTable::from_scene_registry(registry, selector)
 }
 
 #[test]
@@ -114,7 +112,6 @@ fn test_replace_selector_clears_cache() {
         },
         cache: HashMap::new(),
         random_selector: selector,
-        shuffle_enabled: false,
     };
 
     // Consume the first candidate of the cycle
@@ -148,9 +145,8 @@ fn test_from_scene_registry_groups_same_name_scenes() {
     registry.register_global("会話", HashMap::new()); // 会話_1
     registry.register_global("会話", HashMap::new()); // 会話_2
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     let id1 = table
         .resolve_scene_id_unified("", "会話", &HashMap::new())
@@ -172,9 +168,8 @@ fn test_resolve_scene_id_unified_cache_key_includes_module() {
     let (_, counter2) = registry.register_global("会話B", HashMap::new());
     registry.register_local("選択肢", "会話B", counter2, 1, HashMap::new());
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Resolve from 会話A_1
     let result_a = table.resolve_scene_id_unified("会話A_1", "選択肢", &HashMap::new());
@@ -261,8 +256,7 @@ fn test_resolve_scene_id_exact_consumes_same_name_scenes_per_cycle() {
 #[test]
 fn test_resolve_scene_id_exact_cache_does_not_mix_with_prefix() {
     // 同じ文字列「会話」でも、前方一致（会話・会話続き）と完全一致（会話）のキャッシュは別
-    let mut table = build_table(&["会話", "会話続き"], vec![0]);
-    table.set_shuffle_enabled(false);
+    let mut table = build_table(&["会話", "会話続き"], vec![]);
     let empty = HashMap::new();
 
     let first = table.resolve_scene_id_unified("", "会話", &empty).unwrap();
@@ -359,10 +353,7 @@ fn build_owning_table() -> SceneTable {
     let (_, c3) = registry.register_global("会話", HashMap::new());
     registry.register_local("挨拶", "会話", c3, 1, HashMap::new());
     registry.register_global("雑談", HashMap::new());
-    let mut table =
-        SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0])));
-    table.set_shuffle_enabled(false);
-    table
+    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![])))
 }
 
 fn owner_name(table: &SceneTable, id: SceneId) -> String {
