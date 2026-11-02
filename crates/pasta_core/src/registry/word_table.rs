@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound;
 
 /// Cache key for word selection (module_name + search_key).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct WordCacheKey {
     /// Module name (empty string for global scope)
     module_name: String,

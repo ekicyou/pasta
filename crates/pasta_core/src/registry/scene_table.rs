@@ -58,7 +58,7 @@ struct CachedSelection {
 pub struct SceneTable {
     /// ID-based storage for scenes (index = SceneId).
     labels: Vec<SceneInfo>,
-    /// Prefix index for forward-matching search (fn_name → [SceneId]).
+    /// Prefix index for forward-matching search (search key → [SceneId], registration order).
     prefix_index: BTreeMap<String, Vec<SceneId>>,
     /// Cache for sequential scene consumption ((module_name, search_key, filters) → CachedSelection).
     cache: HashMap<SceneCacheKey, CachedSelection>,
