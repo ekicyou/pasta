@@ -25,8 +25,7 @@ pub mod registry;
 // Convenience re-exports
 pub use actor_font::{ActorFont, FONT_ATTRIBUTES, FontInput, FontValue};
 pub use error::{
-    ActorFontError, FontValueProblem, SceneAliasError, SceneTableError, SceneTableResult,
-    WordTableError, WordTableResult,
+    ActorFontError, FontValueProblem, SceneAliasError, SceneTableError, WordTableError,
 };
 pub use registry::{
     DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable, SceneEntry,

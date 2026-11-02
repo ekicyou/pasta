@@ -151,8 +151,7 @@ impl SearchContext {
                 }
                 Err(
                     pasta_core::SceneTableError::SceneNotFound { .. }
-                    | pasta_core::SceneTableError::NoMatchingScene { .. }
-                    | pasta_core::SceneTableError::NoMoreScenes { .. },
+                    | pasta_core::SceneTableError::NoMatchingScene { .. },
                 ) => Ok(None),
                 Err(e) => Err(SearchError::SceneTableError(e)),
             }
@@ -173,8 +172,7 @@ impl SearchContext {
                 }
                 Err(
                     pasta_core::SceneTableError::SceneNotFound { .. }
-                    | pasta_core::SceneTableError::NoMatchingScene { .. }
-                    | pasta_core::SceneTableError::NoMoreScenes { .. },
+                    | pasta_core::SceneTableError::NoMatchingScene { .. },
                 ) => {
                     if let Some(target) = alias {
                         tracing::warn!(
@@ -215,8 +213,7 @@ impl SearchContext {
             Ok(None) => return Ok(LocalSceneMatch::NoLocal),
             Err(
                 pasta_core::SceneTableError::SceneNotFound { .. }
-                | pasta_core::SceneTableError::NoMatchingScene { .. }
-                | pasta_core::SceneTableError::NoMoreScenes { .. },
+                | pasta_core::SceneTableError::NoMatchingScene { .. },
             ) => {
                 if let Some(target) = alias {
                     tracing::warn!(
