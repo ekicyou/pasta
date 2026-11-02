@@ -84,4 +84,4 @@
 
 # 雑記
 
-- [cc-sdd で仕様駆動開発を回す](notes/cc-sdd.md)
+- [cc-sdd で回す pasta の開発ワークフロー](notes/cc-sdd.md)
