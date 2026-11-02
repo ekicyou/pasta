@@ -1,16 +1,16 @@
 {
   "feature_name": "ponytail-manual-ci",
   "created_at": "2026-11-02T12:51:03Z",
-  "updated_at": "2026-11-02T13:06:54Z",
+  "updated_at": "2026-11-02T13:37:27Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {

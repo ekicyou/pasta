@@ -10,6 +10,7 @@
   - 監査のやり直しで、新しい指摘が 17 件見つかった（N1〜N17）。大きいのは、本文の検査がコードフェンスを取り違えること（N1）、検索のテストがブラウザと違う設定で検索すること（N2）、配布物を作る job の action と道具が固定されていないこと（N7・N8）である。
   - マニュアルの軽い検査 3 つは、`book/node_modules` も `book/book` も無いワークツリーで、どれも 1 秒未満で通った（`gen-skill-refs --check` 0.2 秒・`link-check` 0.6 秒・`tutorial-check` 0.1 秒）。cargo の要らない小さな job に載せられる。
   - 直しはどれも小さい。消す行が足す行より多い。
+  - 設計（2026-11-02）で、Research Needed の 1〜3 を `gh api` で解き、4 は mdBook の生成と索引まで開発機で確かめた。検索の包含の検査が OR の設定では成り立たないこと（N2 の直しが少し増える）と、Pages の environment が main だけを許すこと（公開の条件を直す）が新しく分かった。末尾の「設計フェーズの調査」を参照。
 
 ## 監査の条件
 
@@ -240,3 +241,165 @@
 6. `pasta-check` のスキルは、自己完結の検査まで足し、`crates/` を引く 6 行を直す（決定 C・Requirement 2.3・2.5・2.6）。`.claude/skills` の編集は、実装のときに開発者の許可を求める。
 7. `-ApiBase` は消し、`-VsceCommand` は「公開済みなら skipped」の項目に使う（決定 E・Requirement 10.6・10.9）。
 8. Node 20 の実行環境の action は、設計で調べ、要るならこの spec で major を上げる（決定 4・Requirement 8.6）。
+
+## 設計フェーズの調査（2026-11-02・`/kiro-spec-design -y`）
+
+- **Discovery の種類**: Light（Extension）。新しい依存は無い。外す依存が 1 つ（`peaceiris/actions-mdbook`）。
+- **使ったスキル・規則**: `kiro-spec-design`（`design-principles`・`design-discovery-light`・`design-synthesis`・`design-review-gate`）、`ponytail`（一番小さい完全な直し・消す行を優先）。
+- **調べ方**: `gh api`（読むだけ）、`actionlint` 1.7.12、開発機の mdBook 0.5.4・Node 26・pwsh 7.6。リポジトリのファイルは変えず、スクラッチのフォルダに写して走らせた。
+
+### Research Needed の答え
+
+**1. 固定する SHA**（`gh api repos/<owner>/<repo>/git/ref/tags/<tag>` と `git/tags/<sha>` で注釈つきのタグをたどった。ブランチは `branches/<name>`）
+
+| action | 参照 | commit | 補足 |
+|--------|------|--------|------|
+| `dtolnay/rust-toolchain` | `stable`（ブランチ） | `b725eda525362e7cf34af9a7243cac1e3f01a7ec` | 2026-10-16 の commit。この SHA の `action.yml` で `toolchain` の既定が `stable`。SHA で指しても入力は要らない |
+| `Swatinem/rust-cache` | `v2`（注釈つきのタグ） | `d1527c8f67ef9af357290475d4af4b0fab8f12e0` | v2.9.3 と同じ |
+| `rust-lang/crates-io-auth-action` | `v1`（ブランチ。`v1` のタグは無い） | `3268eb413133e2960fa4ae0e963ca76380c54cd9` | `compare/v1.0.6...v1` が identical |
+| `Azure/login` | `v3`（注釈つきのタグ） | `a641126d1b8aa4d1fa005f4f92df94a3a4c4c906` | v3.1.0 と同じ |
+
+- ギャップ分析の「`@stable` を SHA で指すなら `toolchain: stable` が要る」は、`master` の SHA を使うときの話だった。`stable` のブランチの SHA なら既定が `stable` なので要らない。
+
+**2. 道具の hash**（どちらも 2 つの出所で一致した）
+
+| 道具 | SHA-256 | 出所 1 | 出所 2 |
+|------|---------|--------|--------|
+| `wasm-pack-v0.15.0-x86_64-pc-windows-msvc.tar.gz`（2,290,392 バイト） | `518dc51180c7bc864699c9279b3bc99025bc109123e0249a34ba34d130a509bf` | release の asset の `digest` | スクラッチに取って `sha256sum` で測った（実行していない） |
+| `cargo-about-0.9.2-x86_64-pc-windows-msvc.tar.gz`（6,186,529 バイト） | `1c03e5890238562497c2d89a3b75b02560af349c1fc3e713d3284f532a5cd748` | release の asset の `digest` | 公開の `.sha256` のファイル |
+
+- `wasm-pack` は `.sha256` のファイルを出していない。
+
+**3. Node 20 で動く action**（`gh api repos/<repo>/contents/action.yml?ref=<tag>` の `runs.using`）
+
+| action | 今 | runs.using | 最新の major（release） | その runs.using |
+|--------|----|-----------|------------------------|-----------------|
+| `actions/checkout` | v6 | node24 | — | — |
+| `actions/setup-node` | v4 | node20 | v7（v7.1.0・2026-10-08） | node24 |
+| `actions/upload-artifact` | v4 | node20 | v7（v7.0.2） | node24 |
+| `actions/download-artifact` | v4 | node20 | v8（v8.0.2） | node24 |
+| `actions/configure-pages` | v5 | node20 | v6 | node24（使わないので消す） |
+| `actions/upload-pages-artifact` | v3 | composite（中で `upload-artifact@v4`） | v5（v5.0.0） | composite（中で `upload-artifact@v7`） |
+| `actions/deploy-pages` | v4 | node20 | v5（v5.0.1） | node24 |
+| `peaceiris/actions-mdbook` | v2 | node20 | v2.0.0（2024-04-08。新しい release は無い） | node20。`main` は node24 だが release が無い |
+| `dtolnay/rust-toolchain` | stable | composite | — | — |
+| `Swatinem/rust-cache` | v2 | node24 | — | — |
+| `rust-lang/crates-io-auth-action` | v1 | node24 | — | — |
+| `Azure/login` | v3 | node24 | — | — |
+| `EmbarkStudios/cargo-deny-action` | v2 | docker | — | — |
+
+- GitHub の changelog（[Deprecation of Node 20 on GitHub Actions runners](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/) と、その後の編集）では、2026-06-16 からランナーが Node 24 を既定にし、2026-09-23 に Node 20 を外す予定だった。今日（2026-11-02）は両方の日を過ぎている。外したことが本当に起きたかは確かめていない（前提）。どちらにしても、node20 と書いた action は寿命の切れた実行環境を名指ししているので、上げる。
+- 上げる先の破壊的な変更（各 release のノートを読んだ）:
+  - `setup-node` v5: `packageManager` があると自動で cache。`book/package.json`・`editors/vscode/package.json` に無いので影響なし。v6 は自動 cache を npm に限っただけ。v7 は ESM 化と出力の追加。
+  - `upload-artifact` v5・v6: Node 24。v7: `archive` の入力の追加。
+  - `download-artifact` v5: ID で取るときの置き場所の変更（名前で取るので影響なし）。v7: Node 24。v8: hash の不一致を既定でエラー。
+  - `upload-pages-artifact` v4: `.` で始まるファイルを既定で外す。v5: `include-hidden-files` の入力を足した。mdBook の出力には `.nojekyll` がある（開発機で確かめた）。
+  - `deploy-pages` v5: Node 24。
+- `peaceiris/actions-mdbook` は、release の無い `main` の SHA に固定するより、公式の配布物（`rust-lang/mdBook` の v0.5.4 の `mdbook-v0.5.4-x86_64-unknown-linux-gnu.tar.gz`。2026-07-06 公開）を取るほうが、第三者の action が 1 つ減って小さい。
+
+**4. 旧版と mdBook 0.5.4**
+
+- `git archive <CLASSIC_REF> book` をスクラッチに取り出し、`MDBOOK_OUTPUT__HTML__PRINT__ENABLE=false mdbook build`（0.5.4）が通った。旧版の `build-index.mjs` も、その出力で索引を作り直せた（4.54 MB）。
+- 旧版の着色（`highlight-html.mjs`）は `vscode-textmate` が要るので、開発機では走らせていない。実装のときに、ブランチの上の `gh workflow run manual.yml --ref <branch>` で確かめる（OPEN QUESTIONS 5）。
+
+**5. Setup Pages を消した後の公開**
+
+- `configure-pages` の出力（`base_url` など）は、どの段も使っていない。`deploy-pages` は、`upload-pages-artifact` が上げた artifact `github-pages` だけを見る。消しても公開は変わらない見込み（前提）。マージの後の main への push で確かめる。
+
+### 設計で新しく分かったこと
+
+- **検索の包含の検査は、ブラウザの設定（OR）では成り立たない**。索引の `search_options` は `{"bool":"OR","expand":true,…}` だった（スクラッチに作った出力で確かめた）。`verify-search.mjs` と `build-index-test.mjs` の写しを OR で走らせると、「語中片のヒットが親語のヒットを包含する」が 8 件と 2 件落ちた。OR では、親語の片（例「レン」）だけを含む節も親語のヒットに入るためである。索引の不具合ではない。検査を「親語を題・本文・パンくずに含む節は、すべて語中片のヒットに入る」に直すと、両方とも全部通った（136 件・47 件）。ギャップ分析の N2 の「約 −27 行・+3 行」は、この検査の書き直しの分だけ増える。
+- **`github-pages` の environment は main だけに公開を許す**（`deployment-branch-policies` が `["main"]`）。今の `manual.yml` の条件（`github.event_name != 'pull_request'`）のままブランチで `workflow_dispatch` すると、deploy の job が止められて赤になる。条件を `github.ref == 'refs/heads/main'` にすれば、ブランチでは検査だけが走る（要件 10.7 の確かめ方が緑で終わる）。
+- **`pasta-check` を足して落ちるのは、ちょうど 6 行**。`link-check.mjs` の写しの `CHECKED_SKILLS` に `pasta-check` を、`REPO_PATH_PREFIXES` に `editors/` を足して走らせた。スキルの検査で 6 件（全部 `crates/`）、URL の検査で 0 件、内部設計の章のパスで 0 件。見出しへの相対リンク（`#同梱バルーン` など）は通った。
+- **禁止の語の検査は URL の中も見る**。公開の GitHub の URL（`…/blob/main/crates/…`）に変えても `crates/` で落ちる。6 行は「`pasta_check` クレートの `src/nar.rs`」のように、`crates/` の語を使わない書き方にする。
+- **N1 の直しで落ちる章は無い**。`verify-content.mjs` の写しで、`stripCodeFences` を `maskFences` に、`extractCodeFences` を `maskFences` の結果から作る形にして走らせると、今の章で全部 PASS（401 件）だった。
+- **neutralizer の写しは、行ごとの trim と空行の除去で一致する**（77 行）。比べる範囲は「最初の `if (!win) {` から END まで」。
+- **偽の vsce は、`-VsceCommand` に `.ps1` のパスを渡すだけで動く**。`& $vsceExe` が `.ps1` をそのまま実行する。開発機で `status=skipped`・終了コード 0 を確かめた。
+- `release-scripts-test.ps1` は今、開発機で項目 1〜11 が全部 ok。`actionlint` は今の 4 つのワークフローで 0 件。
+- `book.toml` は `create-missing` を決めていない（既定は作る）。目次にだけある章は `mdbook build` が空のファイルとして作るので、ビルドの後の自己テストでは見つからない。ビルドの前の `link-check` が見つける。
+
+## Architecture Pattern Evaluation（軽い検査の置き場所）
+
+| 案 | 中身 | 良い点 | 悪い点 | 判断 |
+|----|------|--------|--------|------|
+| A | `build-unix` の ubuntu の行に載せる | job が増えない | matrix の全部の段に条件。Rust の失敗と混ざる。Rust の後に走る（1.5 に反する） | 採らない |
+| B | `build.yml` に cargo の要らない job を足す。`manual.yml` の段は残す | 1 分以内に落ちる。関門でも走る。公開の関門も保つ | job が 1 つ増える（約 15 行） | **採る** |
+| C | B ＋ `manual.yml` の 3 段を消す | 二重に走らない | 公開の deploy が検査を待たなくなる | 採らない |
+
+- 写しの比べる検査（neutralizer・目次の条件）は、軽い job に置かない。写しも正準も `book/**` にあるので、変えれば必ず `manual.yml` が起動する。`neutralizer-test.mjs`（jsdom）と `theme-sidebar-early-test.mjs` に置くと、新しいファイルも段も要らない。
+
+## Design Decisions
+
+### Decision: 軽い検査は `build.yml` の新しい job（案 B）
+
+- **Context**: 要件 1.1〜1.3・1.5。
+- **Selected**: job `manual-light`（checkout・setup-node 22・3 つの段）。`needs` なし。
+- **Rationale**: Rust を待たず、関門（`release.yml` の gate）でも自動で走る。決定 B の「照合は関門だけ」も、この job で満たす。
+- **Trade-offs**: `manual.yml` と二重に走る（各 1 秒）。公開の関門を弱めないほうを採る。
+
+### Decision: 検索の設定は索引から取り、包含の検査を OR に合わせて書き直す
+
+- **Context**: 要件 5.6・5.7（N2・N3）。
+- **Alternatives**: 1) 設定の写しを OR に直す（写しが残る） 2) 索引の `search_options` を使い、包含の検査を直す。
+- **Selected**: 2。補助関数（`searchIndex`・`corpusOf`・`urlsContaining`）を `build-index.mjs` に 1 つずつ置く。
+- **Rationale**: ブラウザと同じ値を、書き写さずに使う。包含の検査は、設定によらず成り立つ形にする。
+- **Follow-up**: mdBook が `search_options` を変えたら見直す（design の Revalidation Triggers）。
+
+### Decision: mdBook は公式の配布物を取る
+
+- **Context**: 要件 8.3・8.6。`peaceiris/actions-mdbook` に Node 24 の release が無い。
+- **Alternatives**: 1) `peaceiris` の `main` の SHA に固定 2) 公式の tar.gz を `curl | tar` で取る。
+- **Selected**: 2（3 行）。
+- **Trade-offs**: SHA-256 は確かめない（決定 D の範囲の外。今の `peaceiris` も確かめていない）。
+
+### Decision: Pages の公開の条件を `github.ref == 'refs/heads/main'` にする
+
+- **Context**: 要件 3.4・10.7。environment は main だけを許す。
+- **Selected**: upload と deploy の `if` を置き換える（2 行）。PR は `refs/pull/…` なので今と同じく公開しない。
+
+### Decision: 公開の出力を書き換えない
+
+- **Context**: 要件 7.4（N6）。
+- **Selected**: `verify-search` は `--no-build` で作り直さない。`build-index-test` は 2 つのファイルを一時のフォルダへ写して書く。`build-index.mjs` の CLI は引数を必須にする（既定のパスを消すと、テストが `book/book` に書く道が無くなる）。
+- **Trade-offs**: 3.63 で足した「引数なしで既定のパスに exit 0」の回帰テストは、「引数なしで exit 1」に置き換わる。既定のパスのコードが無くなるので、守る物も無くなる。
+
+### Decision: 通らない分岐は消す（code point で回さない）
+
+- **Context**: 要件 7.5（N11）。
+- **Selected**: 両方の写しから 1 行ずつ消す。動きは変わらない。
+- **Rationale**: code point で回すと、拡張 B の分かち書きが変わり、索引と検索を同時に変える必要がある。直す得が小さい。
+
+### Decision: `pasta-check` の 6 行は「クレートの中のパス」の書き方にする
+
+- **Context**: 要件 2.6。URL も `crates/` を含むので使えない。
+- **Selected**: 「`pasta_check` クレートの `src/nar.rs`」「pasta リポジトリのサンプルゴーストの `RELEASE.md`」。場所の情報を消さない。
+
+### Synthesis（一般化・採用・簡略化）
+
+- **一般化**: 「`SUMMARY.md` の章の並び」を `summaryChapters` 1 つにする。3 つの章の数のテストと、3 つの読み方（`verify-content`・`verify-search`・`verify-static`）が同じ関数を使う。インターフェースだけを広げ、実装は今の正規表現 1 つ。
+- **採用**: 偽の vsce は、今ある `-VsceCommand` の口を使う（新しい口を作らない）。区切りの規則は `chapterRegions` を使う（写しを消す）。フェンスの判定は `maskFences` を使う。
+- **簡略化**: 消すもの — PoC（6 ファイル・約 200 行）、`pasta_check` の再ビルドの 3 段、Setup Pages、RED の段、検索の設定と補助関数の写し 3 組、区切りの写し、`listMarkdown`、`-ApiBase`、照合の段、使われない export 3 つ、`peaceiris` の action。足すもの — 軽い job（約 15 行）、比べる検査 2 つ（約 14 行）、偽の vsce の項目（約 10 行）、`summaryChapters`（約 8 行）、hash の照合（約 4 行）。
+
+## Risks & Mitigations（設計）
+
+- 旧版の着色が 0.5.4 で崩れる — ブランチの上の `manual.yml` で公開の前に分かる。崩れたら、旧版の段だけを別の版で作るかを議論する。
+- SHA の打ち間違い — `gh api repos/<repo>/commits/<sha>` で 1 つずつ在ることを確かめる。
+- `upload-artifact@v7` と `download-artifact@v8` の組み合わせ — 次のリリースで初めて本番の道を通る。落ちたら「失敗した job の再実行」の前に、片方を戻す。
+- `release.yml` はリリースの実行中に入れない（brief のとおり）。
+
+## OPEN QUESTIONS（設計。推奨案つき）
+
+1. **`upload-pages-artifact@v5` の `include-hidden-files`** — 推奨: `true` を付ける。理由: 要件 3.5 の「今と同じ中身」を 1 行で保てる（`.nojekyll` が残る）。付けない案は、読者に違いは出ないが中身が変わる。
+2. **mdBook の取得を SHA-256 で確かめるか** — 推奨: 確かめない。理由: 決定 D の範囲は release の build の道具 2 つで、マニュアルは配布物でない。今の `peaceiris` も確かめていない。
+3. **`dtolnay/rust-toolchain` を SHA で指すとき `toolchain: stable` を明示するか** — 推奨: 明示しない。理由: 固定した commit の `action.yml` の既定が `stable` で、その commit は変わらない。
+4. **偽の vsce の項目は「公開済みなら skipped」の 1 つだけか** — 推奨: 1 つだけ。理由: 要件 10.9 が求めるのはこの 1 つ。未公開の道は本物の vsce とネットワークが要る。
+5. **旧版の着色を 0.5.4 で確かめる時期** — 推奨: 実装の最後に、ブランチを push して `gh workflow run manual.yml --ref <branch>`。理由: 開発機では `vscode-textmate` を入れない（npm install しない）。mdBook の生成と索引は確かめ済み。
+6. **`upload-artifact@v7` と `download-artifact@v8` の組み合わせ** — 推奨: そのまま上げ、次のリリースで確かめる。理由: v4 以降の artifact は major をまたいで読める前提（試していない）。ブランチで release の道は試せない。
+7. **`build-index.mjs` の CLI の引数を必須にするか** — 推奨: 必須にする。理由: 呼ぶ側は全部引数を渡している。既定のパスを消すのが、テストが公開物に書かない一番小さい直しである。
+
+## References（設計）
+
+- [Deprecation of Node 20 on GitHub Actions runners](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/) — Node 24 の既定化と Node 20 を外す日。
+- `actions/setup-node`・`upload-artifact`・`download-artifact`・`upload-pages-artifact`・`deploy-pages` の GitHub の release のノート（各 major の x.0.0）— 破壊的な変更。
+- `rust-lang/mdBook` の release v0.5.4 — 公式の配布物。
+- `rustwasm/wasm-pack` v0.15.0・`EmbarkStudios/cargo-about` 0.9.2 の release の asset の `digest` — 道具の hash。
