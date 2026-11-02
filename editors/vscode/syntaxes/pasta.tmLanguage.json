@@ -38,6 +38,9 @@
         },
         {
             "include": "#action-line"
+        },
+        {
+            "include": "#continue-action-line"
         }
     ],
     "repository": {
@@ -50,7 +53,7 @@
             "name": "comment.line.pasta"
         },
         "decl-attr": {
-            "match": "([＆&])([\\p{XID_Start}_]\\p{XID_Continue}*[\\s　]*[：:][\\s　]*(?:「{4}(?:(?!」{4}).)+」{4}|「{3}(?:(?!」{3}).)+」{3}|「{2}(?:(?!」{2}).)+」{2}|「[^」]*」|(\"++)(?:(?!\\3).)+\\3|\"\"|[^\\s　：:＆&＃#]+))",
+            "match": "([＆&])([\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*[\\s　]*[：:][\\s　]*(?:「{4}(?:(?!」{4}).)+」{4}|「{3}(?:(?!」{3}).)+」{3}|「{2}(?:(?!」{2}).)+」{2}|「[^」]*」|(\"++)(?:(?!\\3).)+\\3|\"\"|[^\\s　：:＆&＃#]+))",
             "captures": {
                 "1": {
                     "name": "keyword.other.marker.pasta"
@@ -72,7 +75,7 @@
             ]
         },
         "global-scene": {
-            "match": "^([＊*])([\\p{XID_Start}_]\\p{XID_Continue}*)?(.*)$",
+            "match": "^([＊*])([\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*)?(.*)$",
             "captures": {
                 "1": {
                     "name": "keyword.other.marker.pasta"
@@ -91,7 +94,7 @@
             "name": "meta.scene.global.pasta"
         },
         "local-scene": {
-            "match": "^(\\s*)([・\\-])([\\p{XID_Start}_]\\p{XID_Continue}*)?(.*)$",
+            "match": "^(\\s*)([・\\-])([\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*)?(.*)$",
             "captures": {
                 "2": {
                     "name": "keyword.other.marker.pasta"
@@ -122,7 +125,7 @@
             }
         },
         "choice": {
-            "match": "^(\\s*)([＠@][？?])([\\p{XID_Start}_]\\p{XID_Continue}*)?(「[^」]*」)?[\\s　]*([＃#].*)?",
+            "match": "^(\\s*)([＠@][？?])([\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*)?(「[^」]*」)?[\\s　]*([＃#].*)?",
             "captures": {
                 "2": {
                     "name": "keyword.other.marker.pasta"
@@ -219,7 +222,7 @@
             "contentName": "meta.embedded.block.lua.content"
         },
         "action-line": {
-            "match": "^(\\s+)(\\S+?)\\s*([：:])(.*)$",
+            "match": "^([\\s　]+)([\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*)[\\s　]*([：:])(.*)$",
             "captures": {
                 "2": {
                     "name": "entity.name.type.actor.pasta"
@@ -230,56 +233,67 @@
                 "4": {
                     "patterns": [
                         {
-                            "include": "#inline-dynamic-ref"
-                        },
-                        {
-                            "include": "#inline-word-ref"
-                        },
-                        {
-                            "include": "#inline-var-ref"
-                        },
-                        {
-                            "include": "#inline-fn-call"
-                        },
-                        {
-                            "include": "#inline-sakura-script"
-                        },
-                        {
-                            "include": "#inline-escape"
-                        },
-                        {
-                            "include": "#inline-talk"
+                            "include": "#inline"
                         }
                     ]
                 }
             }
         },
-        "inline-dynamic-ref": {
-            "match": "(?<![＠@])(?:[＠@]{2})*([＠@][＄$][＊*]?[^＠@＄$\\\\\\s]+)",
+        "continue-action-line": {
+            "match": "^([\\s　]+)([：:])(.*)$",
             "captures": {
-                "1": {
-                    "name": "markup.inline.raw.string.pasta"
+                "2": {
+                    "name": "punctuation.separator.pasta"
+                },
+                "3": {
+                    "patterns": [
+                        {
+                            "include": "#inline"
+                        }
+                    ]
                 }
             }
         },
+        "inline": {
+            "patterns": [
+                {
+                    "include": "#inline-escape"
+                },
+                {
+                    "include": "#inline-sakura-script"
+                },
+                {
+                    "include": "#inline-dynamic-ref"
+                },
+                {
+                    "include": "#inline-word-ref"
+                },
+                {
+                    "include": "#inline-var-ref"
+                },
+                {
+                    "include": "#inline-talk"
+                }
+            ]
+        },
+        "inline-dynamic-ref": {
+            "match": "[＠@][＄$](?:[＊*][\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*|[\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*|[0-9０-９]+)",
+            "name": "markup.inline.raw.string.pasta"
+        },
         "inline-word-ref": {
-            "match": "[＠@]([^＠@＄$\\\\\\s]+)",
+            "match": "[＠@][＊*]?[\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*",
             "name": "markup.inline.raw.string.pasta"
         },
         "inline-var-ref": {
-            "match": "[＄$][＊*]?([^＠@＄$\\\\\\s]+)",
+            "match": "[＄$](?:[％%][A-Za-z][_.()0-9A-Za-z]*|[＊*][\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*|[\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*|[0-9０-９]+)",
             "name": "variable.other.reference.pasta"
-        },
-        "inline-fn-call": {
-            "match": "[＠@](\\w+)\\([^)]*\\)",
-            "name": "entity.name.function.call.pasta"
         },
         "inline-sakura-script": {
             "match": "\\\\_\\?.*?\\\\_\\?|\\\\_!.*?\\\\_!|\\\\(?:[spb][0-9]|w[1-9]|_{0,2}[0-9A-Za-z!+*?&-](?:\\[(?:\"(?:[^\"]|\"\")*\")?(?:(?:\\\\.|[^\\]\\\\,\"])(?:\\\\.|[^\\]\\\\,])*)?(?:,(?:\"(?:[^\"]|\"\")*\")?(?:(?:\\\\.|[^\\]\\\\,\"])(?:\\\\.|[^\\]\\\\,])*)?)*\\])?)",
             "name": "string.other.sakura-script.pasta"
         },
         "inline-escape": {
-            "match": "\\\\[\\\\%＠@＄$＞>]",
+            "match": "[＠@]{2}|[＄$]{2}|\\\\[\\\\%]",
             "name": "constant.character.escape.pasta"
         },
         "inline-talk": {
@@ -287,7 +301,7 @@
             "name": "meta.talk.pasta"
         },
         "cue-command": {
-            "match": "^([\\s　]*)([!！])([\\p{XID_Start}_]\\p{XID_Continue}*)(?:([＠@])([^(（\\s　]+))?(?:([（(])((?:(?>「{4}(?:(?!」{4}).)+」{4}|「{3}(?!「)(?:(?!」{3}).)+」{3}|「{2}(?!「)(?:(?!」{2}).)+」{2}|「(?!「)[^」]*」|(\"++)(?:(?!\\8).)+\\8|「++|\"++)|[^)）])*+)?([）)])?)?(?:[\\s　]*([＃#].*))?",
+            "match": "^([\\s　]*)([!！])([\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*)(?:([＠@])([^(（\\s　]+))?(?:([（(])((?:(?>「{4}(?:(?!」{4}).)+」{4}|「{3}(?!「)(?:(?!」{3}).)+」{3}|「{2}(?!「)(?:(?!」{2}).)+」{2}|「(?!「)[^」]*」|(\"++)(?:(?!\\8).)+\\8|「++|\"++)|[^)）])*+)?([）)])?)?(?:[\\s　]*([＃#].*))?",
             "captures": {
                 "2": {
                     "name": "keyword.other.marker.pasta"

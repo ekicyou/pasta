@@ -343,8 +343,8 @@ async function runTests(): Promise<void> {
     expect(scopeCoversExactly('　さくら：＠＄＊x　です', '＠＄＊x', WORD_SCOPE), '＠＄＊x should be one word-ref range');
   });
 
-  test('動的関数呼び出し ＠＄f（１） の ＠ から引数までが単語参照スコープ', () => {
-    expect(scopeCoversExactly('　さくら：＠＄f（１）　です', '＠＄f（１）', WORD_SCOPE), '＠＄f（１） should be one word-ref range');
+  test('動的関数呼び出し ＠＄f（１） は名前の ＠＄f だけが単語参照スコープ', () => {
+    expect(scopeCoversExactly('　さくら：＠＄f（１）　です', '＠＄f', WORD_SCOPE), 'only ＠＄f should be word-ref');
   });
 
   test('動的単語参照の全角半角混在（@$x・＠$＊x）が単語参照スコープ', () => {
@@ -372,16 +372,65 @@ async function runTests(): Promise<void> {
     expect(!hasScope(tokenizeLine(line).tokens, WORD_SCOPE), '＠＠＄x must not get word-ref scope');
   });
 
-  test('既存: エスケープ ＠＠単語・＄＄x の色分けは不変', () => {
-    const at = '　さくら：＠＠単語';
-    expect(scopeCoversExactly(at, '＠単語', WORD_SCOPE, at.indexOf('＠＠') + 1), '＠＠単語 keeps its existing word-ref range');
+  // --- 台詞の中の単語参照・エスケープ・変数参照の範囲（ponytail-editor-tooling 5.2・5.4〜5.6） ---
+  const SAKURA_SCOPE = 'string.other.sakura-script.pasta';
+  const ESCAPE_SCOPE = 'constant.character.escape.pasta';
+
+  test('単語参照は ＠ と名前の文字が続く所まで（＠挨拶。こんにちは）', () => {
+    expect(scopeCoversExactly('　さくら：＠挨拶。こんにちは', '＠挨拶', WORD_SCOPE), 'only ＠挨拶 is word-ref');
+    expect(scopeCoversExactly('　さくら：＠関数（１）です', '＠関数', WORD_SCOPE), 'function call: name only');
+    expect(scopeCoversExactly('　さくら：＠＊関数（）です', '＠＊関数', WORD_SCOPE), 'global function call: name only');
+    expect(scopeCoversExactly('　さくら：@greet!', '@greet', WORD_SCOPE), 'half-width word-ref');
+    // 文法の XID_Continue（Unicode 15.1 以降）は ・ を含む。Oniguruma の表は古いので名前の文字に足してある
+    expect(scopeCoversExactly('　さくら：＠ほげ・ふが。', '＠ほげ・ふが', WORD_SCOPE), '・ is a name character');
+  });
+
+  test('エスケープ ＠＠・＄＄ の後ろの文字を単語参照・変数参照にしない', () => {
+    const at = '　さくら：＠＠メール';
+    expect(scopeCoversExactly(at, '＠＠', ESCAPE_SCOPE), '＠＠ is escape');
+    expect(!hasScope(tokenizeLine(at).tokens, WORD_SCOPE), '＠＠メール has no word-ref');
+    const at3 = '　さくら：＠＠＠メール';
+    expect(scopeCoversExactly(at3, '＠＠', ESCAPE_SCOPE), '＠＠＠メール: leading ＠＠ is escape');
+    expect(scopeCoversExactly(at3, '＠メール', WORD_SCOPE, at3.indexOf('＠＠＠') + 2), '＠＠＠メール: only ＠メール is word-ref');
     const dollar = '　さくら：＄＄x';
-    expect(scopeCoversExactly(dollar, '＄x', VAR_REF_SCOPE, dollar.indexOf('＄＄') + 1), '＄＄x keeps its existing variable range');
+    expect(scopeCoversExactly(dollar, '＄＄', ESCAPE_SCOPE), '＄＄ is escape');
+    expect(!hasScope(tokenizeLine(dollar).tokens, VAR_REF_SCOPE), '＄＄x has no variable reference');
+    expect(scopeCoversExactly('　さくら：a＠@b', '＠@', ESCAPE_SCOPE), 'mixed-width ＠@ is escape');
+  });
+
+  test('文法のエスケープ（\\\\・\\%）だけをエスケープの色にする', () => {
+    expect(scopeCoversExactly('　さくら：a\\\\b', '\\\\', ESCAPE_SCOPE), '\\\\ is escape');
+    for (const ch of ['＠', '@', '＄', '$', '＞', '>']) {
+      const line = `　さくら：a\\${ch}b`;
+      expect(!hasScope(tokenizeLine(line).tokens, ESCAPE_SCOPE), `\\${ch} must not be escape`);
+    }
+  });
+
+  test('動的な単語参照・変数参照の名前は文法の名前（id・数字・＊id・プロパティ）', () => {
+    expect(scopeCoversExactly('　さくら：＠＄１です', '＠＄１', WORD_SCOPE), '＠＄１ digit var_id');
+    expect(scopeCoversExactly('　さくら：＠＄x。です', '＠＄x', WORD_SCOPE), '＠＄x stops at 。');
+    expect(scopeCoversExactly('　さくら：＄x。です', '＄x', VAR_REF_SCOPE), '＄x stops at 。');
+    expect(scopeCoversExactly('　さくら：＄２番', '＄２', VAR_REF_SCOPE), '＄２ digit var_id');
+    expect(scopeCoversExactly('　さくら：＄＊g、です', '＄＊g', VAR_REF_SCOPE), '＄＊g global');
+    expect(scopeCoversExactly('　さくら：＄％user.name です', '＄％user.name', VAR_REF_SCOPE), '＄％ property');
+  });
+
+  test('継続行の台詞にアクション行と同じ色を付ける', () => {
+    const c = '　：＠挨拶。＄x\\n＠＠';
+    expect(scopeCoversExactly(c, '：', 'punctuation.separator.pasta'), 'continuation colon');
+    expect(scopeCoversExactly(c, '＠挨拶', WORD_SCOPE), 'continuation word-ref');
+    expect(scopeCoversExactly(c, '＄x', VAR_REF_SCOPE), 'continuation var-ref');
+    expect(scopeCoversExactly(c, '\\n', SAKURA_SCOPE), 'continuation sakura-script');
+    expect(scopeCoversExactly(c, '＠＠', ESCAPE_SCOPE), 'continuation escape');
+    expect(hasScope(tokenizeLine('  :hello').tokens, 'meta.talk.pasta'), 'half-width continuation talk');
+  });
+
+  test('決して当たらない規則 inline-fn-call を持たない', () => {
+    const json = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', '..', 'syntaxes', 'pasta.tmLanguage.json'), 'utf-8'));
+    expect(!('inline-fn-call' in json.repository), 'inline-fn-call must be removed');
   });
 
   // --- Sakura Script / Escape Tests (paragraph-break-tag-only-talk 10.6) ---
-  const SAKURA_SCOPE = 'string.other.sakura-script.pasta';
-  const ESCAPE_SCOPE = 'constant.character.escape.pasta';
 
   test('さくらスクリプト \\nHello は \\n だけがタグ', () => {
     expect(scopeCoversExactly('　さくら：\\nHello', '\\n', SAKURA_SCOPE), '\\n only should be sakura-script');
@@ -548,6 +597,16 @@ async function runTests(): Promise<void> {
     const n = '　！名前＠x ＃c';
     expect(scopeCoversExactly(n, '名前', 'entity.name.function.cue.pasta'), 'cue name is an identifier');
     expect(scopeCoversExactly(n, '＃c', COMMENT_SCOPE), 'cue trailing comment after scope');
+  });
+
+  // 文法の XID_Continue は ・ を含む（台詞の単語参照と同じ名前の文字。Oniguruma の表が古い分を足してある）
+  test('宣言・属性・選択肢・キューの名前も ・ を名前の文字に含める', () => {
+    expect(scopeCoversExactly('＊挨拶・朝', '挨拶・朝', SCENE_SCOPE), 'global scene name with ・');
+    expect(scopeCoversExactly('　・a・b', 'a・b', SCENE_SCOPE), 'local scene name with ・');
+    expect(scopeCoversExactly('　＆朝・夜：1', '朝・夜：1', ATTR_SCOPE), 'attribute name with ・');
+    expect(scopeCoversExactly('＊挨拶・朝 ＆季節・春：1', '季節・春：1', ATTR_SCOPE), 'scene-line attribute name with ・');
+    expect(scopeCoversExactly('　＠？はい・いいえ「はい」', 'はい・いいえ', 'keyword.control.pasta'), 'choice target with ・');
+    expect(scopeCoversExactly('　！待つ・長く（1）', '待つ・長く', 'entity.name.function.cue.pasta'), 'cue name with ・');
   });
 
   test('単語定義の行: 囲んだ値の後ろだけが行末のコメント', () => {
@@ -803,7 +862,7 @@ async function runTests(): Promise<void> {
   // The injection selector is L:meta.embedded.block.lua.content — block-only — so
   // an inline ＠func() in an action line must receive NO source.lua scope. Its
   // pasta scope here is markup.inline.raw.string.pasta (inline-word-ref matches the
-  // ＠token before inline-fn-call); the load-bearing assertion is the ABSENCE of
+  // function name ＠func); the load-bearing assertion is the ABSENCE of
   // any Lua injection, with a pasta inline scope present to confirm it tokenized.
   test('観点4: アクション行内のインライン Lua（＠func()）に source.lua が注入されない', () => {
     const tokens = tokenizeLinesInjected(['　さくら：＠func()　こんにちは']);
