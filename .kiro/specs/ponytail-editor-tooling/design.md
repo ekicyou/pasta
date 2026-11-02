@@ -50,7 +50,7 @@
 ### Allowed Dependencies
 
 - `pasta_lsp` → `pasta_dsl`（`parse_str`・`parse_str_partial`・AST）・`pasta_check`（`default-features = false`。`syntax_finding`・`Finding`・ゴースト全体の検査）・`serde`。wasm32 では `wasm-bindgen`・`serde-wasm-bindgen`。dev は `serde_json`。
-- `pasta_check` の dev-dependencies に `serde_json`（workspace）を足す（D7。OPEN QUESTION）。
+- `pasta_check` の dev-dependencies に `serde_json`（workspace）を足す（D7。設計議題 7 で確定）。
 - 拡張 → `vscode` の API・WASM の生成物・`syntaxes/pasta.tmLanguage.json`（JSON の import。esbuild が束ねる）。本番の依存は足さない。
 - 依存の向き：`pasta_dsl` ← `pasta_check` ← `pasta_lsp` ← 拡張（WASM 越し）。`pasta_dsl` は `pasta_check` を知らない。`partial.rs` は `parser` の公開の関数だけを使う。
 
@@ -175,7 +175,7 @@ editors/vscode/scripts/build-wasm.bat  # 消す
 - `book/src/debug/validate.md` — 「エディタの診断」の「構文エラーの重複」の文。
 - `book/src/internals/talk-output.md` — 350 行の「単位の読み方の写し」の文。
 - `crates/pasta_lsp/README.md`・`TEST_COVERAGE.md`（75・185・273 行）・`.kiro/steering/tech.md`（15・66〜69・111・124 行）・`.kiro/steering/structure.md`（186〜205 行）。
-- （OPEN QUESTION）`book/src/grammar/markers.md:39`・`crates/pasta_dsl/README.md`（45・63・77 行）・`book/src/internals/transpiler.md:42`。直した挙動とずれる記述。
+- `book/src/grammar/markers.md:39`（「エディタ拡張の診断は…報告しない」を、入力のたびの診断も保存時と同じく報告する、に直す）・`crates/pasta_dsl/README.md`（45・63・77 行。部分解析の 3 段と `PartialParseError`）・`book/src/internals/transpiler.md:42`（「行単位で解析を続ける」）。直した挙動とずれる記述（設計議題 6 で確定）。`crates/pasta_dsl/README.md` は `ponytail-dsl-parser` も触りうる。行が別なので、後から入る側が rebase で合わせる。
 
 ## System Flows
 
@@ -511,7 +511,7 @@ pub(crate) fn push_trailing_comment(
 );
 ```
 
-- 選択肢の行は、行末のコメントの COMMENT だけを出す。選択肢の部品の色は足さない（要件 5.7。OPEN QUESTION）。
+- 選択肢の行は、行末のコメントの COMMENT だけを出す。選択肢の部品の色は足さない（要件 5.7。設計議題 5 で確定）。
 
 #### TokenLegend（`token_types.rs`）
 
@@ -576,7 +576,7 @@ pub struct SemanticToken {
 | `cue-command` | 名前を名前の文字に合わせ、最後に `line-end-comment` を足す |
 | `lua-code-block` | begin `^(`{3,})([\p{XID_Start}_]\p{XID_Continue}*)?$`、end `^(\1)[\s　]*([＃#].*)?$`。字下げと言語名の後ろの空白では開かない。endCaptures の 2 を `comment.line.pasta`。`contentName` は今のまま |
 | `action-line` | 名前を名前の文字（`[\p{XID_Start}_]\p{XID_Continue}*`）に合わせる |
-| `continue-action-line`（新しい規則） | `^([\s　]+)([：:])(.*)$`。台詞の部分に `action-line` と同じ inline の規則を当てる（OPEN QUESTION） |
+| `continue-action-line`（新しい規則） | `^([\s　]+)([：:])(.*)$`。台詞の部分に `action-line` と同じ inline の規則を当てる（設計議題 4 で確定） |
 | `inline-escape` | `[＠@]{2}`・`[＄$]{2}`・`\\[\\%]` だけ。inline の規則の頭に置く |
 | `inline-word-ref` | `[＠@][＊*]?[\p{XID_Start}_]\p{XID_Continue}*`（`word_ref` と、`fn_call_local`・`fn_call_global` の名前。関数呼び出しも名前だけ） |
 | `inline-dynamic-ref` | `[＠@][＄$](?:[＊*][\p{XID_Start}_]\p{XID_Continue}*\|[\p{XID_Start}_]\p{XID_Continue}*\|[0-9０-９]+)`（`dyn_name` の `var_id`・`＊id`。前の `(?<![＠@])(?:[＠@]{2})*` は、エスケープを先に当てるので消す） |
@@ -653,7 +653,7 @@ class SemanticTokensProvider {
 #### ExtensionCleanup
 
 - `scripts/build-wasm.bat` を消す（12.1）。`src/test/e2e.test.ts` の 200〜288 行を消す（12.2）。
-- `DiagnosticsManager.clearAll` と、テスト（`vscodeModules.test.ts:347`）を消す（12.3）。`convertSeverity` を消し、重さは常に Error にする（N9 の拡張の側。OPEN QUESTION）。
+- `DiagnosticsManager.clearAll` と、テスト（`vscodeModules.test.ts:347`）を消す（12.3）。`convertSeverity` を消し、重さは常に Error にする（N9 の拡張の側。設計議題 8 で確定）。
 - `extension.ts` の `ActivationState.fallbackMode` と、その書き込み（40・104 行）を消す。`vscodeModules.test.ts:925` を合わせる（12.3）。`getActivationState` は残す。
 
 #### LegendSyncTest（`crates/pasta_lsp/tests/legend_sync_test.rs`）
@@ -728,37 +728,40 @@ class SemanticTokensProvider {
 - 公開の形の変化は `pasta_dsl::PartialParseResult`（`errors` → `failed_lines`・`PartialParseError` の撤去）・`pasta_dsl::partial::infer_rule_from_line`・`pasta_check::validate::FindingKind::{ALL, code}`・`pasta_lsp` の `server`・`document`・`error`・`transport::Wasm*`。どれも読み手はワークスペースの中だけ。断り書きは `README.md:88`・`tech.md:178` に既にある。
 - `Cargo.lock` は、tower-lsp の行を消した後に作り直す。`ponytail-core-registry` が後から入るなら、あちらが作り直す。
 
-## Open Questions（設計ディスカッションへ）
+## 設計ディスカッションの決定（2026-11-02）
 
-設計は下の推奨案を前提に書いた。違う案に決まったら、その節を直す。
+開発者が全議題を推奨案で承認した（「承認」）。下の 8 件は、どれも推奨案で確定した。設計の本文は、これを前提に書いてある。
+
+- 議題 1 の付け足し：文法が最後の改行を要らなくするかは、この spec では決めない（パーサの持ち場）。拡張の `configurationDefaults` で `files.insertFinalNewline` を既定にする案は、機能の追加で `package.json` を `vscode-mcp-client` と取り合うので採らない。
+- 議題 3 の付け足し：箱の規則が JS で compile できることと、箱と TextMate の単語参照の範囲が同じことを、拡張のテストで確かめる（検証の指摘 3 の手当て）。
 
 1. **改行で終わらないファイル（R3・N13）**
-   - 推奨：入力のたびの診断も、保存時と同じく誤りを 1 件出す（要件 2.3 の帰結）。`book/src/grammar/markers.md:39` の「エディタ拡張の診断は…報告しない」を直す。文法が最後の改行を要らなくするかは、パーサの持ち場として開発者が決める（申し送り先の候補は `ponytail-dsl-parser`）。
+   - 確定：入力のたびの診断も、保存時と同じく誤りを 1 件出す（要件 2.3 の帰結）。`book/src/grammar/markers.md:39` の「エディタ拡張の診断は…報告しない」を直す。文法が最後の改行を要らなくするかは、パーサの持ち場として開発者が決める（この spec からは申し送らない）。
    - 理由：pasta.dll はこのファイルを読めない。今は開いている間、誤りが 1 件も見えない。
 2. **続きの `＊` の塊（D2・R6）**
-   - 推奨：名前の無い `＊` の行は区切りにせず、前の塊と一緒に解く。前のシーンに誤りがあると、続きのシーンも TextMate の色だけになる（要件 3.1 の端の例外）。
+   - 確定：名前の無い `＊` の行は区切りにせず、前の塊と一緒に解く。前のシーンに誤りがあると、続きのシーンも TextMate の色だけになる（要件 3.1 の端の例外）。
    - 代案：仮の名前付きの行を前に付けて解き、仮の項目を捨てる（正しいが、span の補正に引き算が要る）。
 3. **箱の方式（D6・R7）**
-   - 推奨：A（文字から作る。規則は tmLanguage の JSON から読む）。
+   - 確定：A（文字から作る。規則は tmLanguage の JSON から読む）。
    - 理由：書きかけの誤りがあるときと、WASM が読めないときも箱が消えない（今と同じ）。TextMate の色と同じ規則になり、写しが増えない。B（意味の色から作る）は、誤りのシーンで箱が点滅し、凡例に修飾子が要る。
 4. **継続行の TextMate の色と箱（TextMateGrammar）**
-   - 推奨：`continue-action-line` の規則を足し、継続行の台詞にもアクション行と同じ色と箱を付ける。
+   - 確定：`continue-action-line` の規則を足し、継続行の台詞にもアクション行と同じ色と箱を付ける。
    - 理由：今の TextMate は継続行（`　：…`）に当たる規則が無く、台詞の色が付かない。今の箱は継続行にも付くので、箱を台詞だけにすると継続行の箱が消えてしまう。
 5. **選択肢の行の行末コメント（TrailingComment）**
-   - 推奨：意味の色の COMMENT だけを出す（要件 4.3）。要件 5.7 の「意味の色を足さない」は、選択肢の部品（`＠？`・名前・見出し）のことと読む。
+   - 確定：意味の色の COMMENT だけを出す（要件 4.3）。要件 5.7 の「意味の色を足さない」は、選択肢の部品（`＠？`・名前・見出し）のことと読む。
 6. **要件 13 の一覧の外の文書**
-   - 推奨：同じ変更で直す。`book/src/grammar/markers.md:39`（1 の帰結）・`crates/pasta_dsl/README.md`（45・63・77 行。部分解析の 3 段と `PartialParseError`）・`book/src/internals/transpiler.md:42`（「行単位で解析を続ける」）。
+   - 確定：同じ変更で直す。`book/src/grammar/markers.md:39`（1 の帰結）・`crates/pasta_dsl/README.md`（45・63・77 行。部分解析の 3 段と `PartialParseError`）・`book/src/internals/transpiler.md:42`（「行単位で解析を続ける」）。
    - 理由：直した挙動と食い違う記述が残る。どれも 1〜2 文の直しで、ほかの spec の節と重ならない。
 7. **`pasta_check` の dev-dependencies に `serde_json` を足す（D7）**
-   - 推奨：足す（workspace の依存・テストだけ）。
+   - 確定：足す（workspace の依存・テストだけ）。
    - 代案：`toml::Value::try_from(kind)` で文字列にする（依存は増えないが、確かめていない）。
 8. **拡張の重さの 4 通り（ExtensionCleanup）**
-   - 推奨：`diagnosticsManager.ts` の `convertSeverity` も消し、常に Error にする（N9 の拡張の側）。
+   - 確定：`diagnosticsManager.ts` の `convertSeverity` も消し、常に Error にする（N9 の拡張の側）。
    - 理由：解析器は Error しか出さない。要件 9.7 は `pasta_lsp` の側だけを書くが、同じ同語反復である。
 
 ## Task Estimate
 
-- 見込みは 17〜18 タスク（pasta_check 1・partial 1・型と撤去 2・診断 1・色 3・凡例 1・TextMate 3・箱 1・控え 1・拡張の整理とテスト 2・文書 1・関門 1）。20 を超えないので、分けない（OQ-8 のとおり）。
+- 見込みは 17〜18 タスク（pasta_check 1・partial 1・型と撤去 2・診断 1・色 3・凡例 1・TextMate 3・箱 1・控え 1・拡張の整理とテスト 2・文書 1・関門 1）。20 を超えないので、分けない（要件ディスカッションの OQ-8 のとおり）。
 - 型と撤去の 2 つは、この順にする：先にサーバ・文書管理・エラー型・native・その 3 つのテストを消す（tower-lsp はまだ型のために残る）。次に解析の型を自前にし、tower-lsp・thiserror を外し、`Cargo.lock` を作り直す。逆の順では、`server.rs` が途中で compile できない。
 - 箱（D6）は TextMate の直し（`continue-action-line`・XID の名前・エスケープ）の後に置く。箱は TextMate の規則を読むので。
 - 20 を超えたら、research.md の案どおり「診断とサーバの撤去（`pasta_lsp`・`partial.rs`・`pasta_check` の 2 ファイル・`Cargo.lock`）」と「VSCode 拡張の色と整理（tmLanguage・`src/*.ts`）」の 2 本に分ける。境目のファイルは重ならない。

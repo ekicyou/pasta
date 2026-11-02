@@ -413,3 +413,14 @@
 - `book/src/grammar/block-structure.md:316-333`（行末のコメントを書ける行）・`book/src/grammar/markers.md:39`（最後の改行）
 - vscode-oniguruma 2.0.1・vscode-textmate 9（`tmGrammar.test.ts` とマニュアルのハイライトが使う）
 - ECMAScript の Unicode の性質のエスケープ（`\p{XID_Start}`・`\p{XID_Continue}` は `u` 旗で使える）
+
+## 設計ディスカッションの決定（2026-11-02）
+
+開発者が設計の全議題を推奨案で承認した（「承認」）。中身は design.md の「設計ディスカッションの決定」にある。
+
+- 改行で終わらないファイル（N13）は、入力のたびの診断でも保存時と同じ 1 件を出し、`markers.md:39` を直す。文法の変更は申し送らない。
+- 続きの `＊` は前の塊と一緒に解く（要件 3.1 の端の例外として受け入れる）。
+- 箱は方式 A（tmLanguage の JSON から規則を読む）。compile と範囲の一致をテストで守る。
+- `continue-action-line` を足す。選択肢の行は行末のコメントの COMMENT だけ。
+- 要件 13 の一覧の外の 3 文書（`markers.md:39`・`pasta_dsl/README.md`・`transpiler.md:42`）も直す。
+- `pasta_check` の dev に `serde_json` を足す。拡張の `convertSeverity` を消す。
