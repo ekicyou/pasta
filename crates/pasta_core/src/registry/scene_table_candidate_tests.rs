@@ -715,3 +715,107 @@ fn test_resolve_scene_id_selector_applies_to_candidate_order_each_round() {
     assert_eq!(round(), expected, "1 巡目");
     assert_eq!(round(), expected, "2 巡目");
 }
+
+// ======================================================================
+// 候補の順を固める（ponytail-core-registry 12.1・7.3・7.5・9.3）
+// 候補はキーのバイト列の辞書順、同じキーの中は登録順。並べ替えずに比べる。
+// ======================================================================
+
+/// 大域をわざと辞書順でない順に登録し、そのあと `会話` の下にローカルを足した表を作る。
+fn candidate_order_table(sequence: Vec<usize>) -> SceneTable {
+    use crate::registry::SceneRegistry;
+
+    let mut registry = SceneRegistry::new();
+    registry.register_global("挨拶_夜", HashMap::new());
+    registry.register_global("挨拶", HashMap::new());
+    registry.register_global("挨拶A", HashMap::new());
+    registry.register_global("挨拶", HashMap::new());
+    registry.register_global("挨拶1", HashMap::new());
+    registry.register_global("挨拶あ", HashMap::new());
+    let (_, counter) = registry.register_global("会話", HashMap::new());
+    registry.register_global("Zebra", HashMap::new());
+    registry.register_global("雑談", HashMap::new());
+    registry.register_local("挨拶_夜", "会話", counter, 1, HashMap::new());
+    registry.register_local("挨拶", "会話", counter, 1, HashMap::new());
+    registry.register_local("挨拶", "会話", counter, 2, HashMap::new());
+    registry.register_local("挨拶A", "会話", counter, 1, HashMap::new());
+
+    SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(sequence))).unwrap()
+}
+
+/// 候補の fn_name を集めた順のまま返す。
+fn ordered_candidate_fn_names(table: &SceneTable, module_name: &str, prefix: &str) -> Vec<String> {
+    table
+        .collect_scene_candidates(module_name, prefix)
+        .unwrap()
+        .iter()
+        .map(|&id| table.get_scene(id).unwrap().fn_name.clone())
+        .collect()
+}
+
+/// 7.3: 大域の候補はキーの辞書順、同じキーの中は登録順。範囲の前後とローカルは入らない。
+#[test]
+fn test_candidate_order_global_prefix() {
+    let table = candidate_order_table(vec![]);
+    assert_eq!(
+        ordered_candidate_fn_names(&table, "", "挨拶"),
+        vec![
+            "挨拶_1::__start__",
+            "挨拶_2::__start__",
+            "挨拶1_1::__start__",
+            "挨拶A_1::__start__",
+            "挨拶_夜_1::__start__",
+            "挨拶あ_1::__start__",
+        ]
+    );
+}
+
+/// 7.3: ローカルの候補も、キーの辞書順・同じキーの中は登録順。
+#[test]
+fn test_candidate_order_local_prefix() {
+    let table = candidate_order_table(vec![]);
+    assert_eq!(
+        ordered_candidate_fn_names(&table, "会話_1", "挨拶"),
+        vec![
+            "会話_1::挨拶_1",
+            "会話_1::挨拶_2",
+            "会話_1::挨拶A_1",
+            "会話_1::挨拶_夜_1",
+        ]
+    );
+}
+
+/// 7.5: 大域の検索は `:` で始まるキーを除く。
+#[test]
+fn test_candidate_order_global_excludes_local_keys() {
+    let table = candidate_order_table(vec![]);
+    match table.collect_scene_candidates("", ":会話_1:挨拶") {
+        Err(SceneTableError::SceneNotFound { scene }) => assert_eq!(scene, ":会話_1:挨拶"),
+        other => panic!("Expected SceneNotFound, got {:?}", other),
+    }
+}
+
+/// 9.3: 指定列 `[4, 0]` は、キーをまたぐ候補の並びの位置で選ぶ。
+#[test]
+fn test_candidate_order_sequence_selects_by_position() {
+    let mut table = candidate_order_table(vec![4, 0]);
+    let picked: Vec<String> = (0..6)
+        .map(|_| {
+            let id = table
+                .resolve_scene_id_unified("", "挨拶", &HashMap::new())
+                .unwrap();
+            table.get_scene(id).unwrap().fn_name.clone()
+        })
+        .collect();
+    assert_eq!(
+        picked,
+        vec![
+            "挨拶_夜_1::__start__",
+            "挨拶_1::__start__",
+            "挨拶_2::__start__",
+            "挨拶1_1::__start__",
+            "挨拶A_1::__start__",
+            "挨拶あ_1::__start__",
+        ]
+    );
+}

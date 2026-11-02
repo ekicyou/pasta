@@ -525,3 +525,64 @@ fn test_search_word_mock_sequence_applies_each_round() {
 
     assert_eq!(results, ["b", "a", "c", "b"]);
 }
+
+// 候補の順を固めるテスト（U2）：キーのバイト列の辞書順、同じキーの中は登録順。
+fn create_order_registry() -> WordDefRegistry {
+    let mut registry = WordDefRegistry::new();
+    let w = |s: &str| vec![s.to_string()];
+    registry.register_global("挨拶_夜", w("夜"));
+    registry.register_global("挨拶", vec!["a1".to_string(), "a2".to_string()]);
+    registry.register_local("会話_1", "挨拶", w("l1"));
+    registry.register_global("挨拶A", w("A"));
+    registry.register_global("挨拶", w("a3"));
+    registry.register_global("挨拶1", w("1"));
+    registry.register_global("挨拶あ", w("あ"));
+    registry.register_global("Zebra", w("z"));
+    registry.register_global("0番", w("0"));
+    registry.register_global("雑談", w("x"));
+    registry.register_local("会話_1", "挨拶_夜", w("l2"));
+    registry
+}
+
+#[test]
+fn test_collect_word_candidates_order_global_prefix() {
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let table = WordTable::from_word_def_registry(create_order_registry(), selector);
+
+    let candidates = table.collect_word_candidates("", "挨拶").unwrap();
+    assert_eq!(candidates, ["a1", "a2", "a3", "1", "A", "夜", "あ"]);
+}
+
+#[test]
+fn test_collect_word_candidates_order_global_empty_key() {
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let table = WordTable::from_word_def_registry(create_order_registry(), selector);
+
+    // ':'（0x3A）で始まるローカルのキーは `0番` と `Zebra` の間に並ぶが、大域では飛ばす
+    let candidates = table.collect_word_candidates("", "").unwrap();
+    assert_eq!(
+        candidates,
+        ["0", "z", "a1", "a2", "a3", "1", "A", "夜", "あ", "x"]
+    );
+}
+
+#[test]
+fn test_collect_word_candidates_order_local_prefix() {
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let table = WordTable::from_word_def_registry(create_order_registry(), selector);
+
+    let candidates = table.collect_word_candidates("会話_1", "挨拶").unwrap();
+    assert_eq!(candidates, ["l1", "l2"]);
+}
+
+#[test]
+fn test_search_word_mock_sequence_picks_by_candidate_position() {
+    // 指定列 [2, 0]：7 つの候補を [2, 0, 1, 3, 4, 5, 6] の位置の順に選ぶ
+    let selector = Box::new(MockRandomSelector::new(vec![2, 0]));
+    let mut table = WordTable::from_word_def_registry(create_order_registry(), selector);
+
+    let results: Vec<_> = (0..7)
+        .map(|_| table.search_word("", "挨拶", &[]).unwrap())
+        .collect();
+    assert_eq!(results, ["a3", "a1", "a2", "1", "A", "夜", "あ"]);
+}
