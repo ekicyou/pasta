@@ -228,7 +228,7 @@ flowchart TD
 | 10.2 | 相手が先なら `merge_from` を消す | SceneRegistry・WordDefRegistry・文書 | — | 移行の最後の手順 |
 | 10.3 | `pasta_lua/src/context.rs` を変えない | — | — | — |
 | 10.4 | ルートの `Cargo.toml`・`Cargo.lock` は 1 行・1 項目だけ | Cargo.toml・Cargo.lock | — | — |
-| 10.5 | 相手が先なら rebase で作り直す | Cargo.lock | — | 移行の最後の手順 |
+| 10.5 | 相手が先なら merge で取り込んで作り直す | Cargo.lock | — | 移行の最後の手順 |
 | 11.1 | `pasta_core` の README | 文書 | — | — |
 | 11.2 | `tech.md` | 文書 | — | — |
 | 11.3 | `registry-search.md` | 文書 | — | — |
@@ -475,7 +475,7 @@ C1 で今のコードに対して落ちたときは、今の挙動を正とす�
   - `test_clear_cache_restarts_sequence` は消す（状態を消す道は `replace_selector` だけになり、その確かめは `test_replace_selector_clears_cache_keeps_entries` が持つ）。そのテストの `entries().len()` の行は消す（続く `search_word` が "a" を返すことが、項目が残る確かめになる）。
   - `search_word` の第 3 引数 `&[]` を 27 か所で外す。
 - `WordDefRegistry::test_sanitize_name` は消す（`SceneRegistry::test_sanitize_name` が同じ規則を確かめる）。
-- `error.rs` の文言のテストから、消した種類の確かめ（146〜162・178〜183 行）を外す。残る 4 種類の確かめは残す。
+- `error.rs` の文言のテストから、消した種類の確かめを外す。`RandomSelectionFailed`（146〜148 行）は C8 で、`DuplicateSceneName`・`DuplicateScenePath`（149〜162 行）と `NoMoreScenes`（178〜183 行）は C9 で外す（種類を消すコミットで外さないとコンパイルが通らない）。残る 4 種類の確かめは残す。
 
 ### 結合とその先（9）
 

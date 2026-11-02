@@ -140,7 +140,7 @@
 
 ### Requirement 10: 同じウェーブの spec との境界を守る
 
-**Objective:** As a 同じウェーブの spec を並べて進める開発者, I want この spec が、ほかの spec の持ち場のファイルに触らず、共有するファイルでは決めた分だけを変えてほしい, so that どの順で main に入っても、後から入る側が rebase で合わせるだけで済む。
+**Objective:** As a 同じウェーブの spec を並べて進める開発者, I want この spec が、ほかの spec の持ち場のファイルに触らず、共有するファイルでは決めた分だけを変えてほしい, so that どの順で main に入っても、後から入る側が main を取り込んで合わせるだけで済む。
 
 #### Acceptance Criteria
 
@@ -148,7 +148,7 @@
 2. While この spec を main に入れる時点で、`ponytail-lua-transpiler` が `TranspileContext::merge_from` をすでに消している, the change shall `SceneRegistry::merge_from`・`WordDefRegistry::merge_from` とそのテストを消し、マニュアルの記述（`internals/registry-search.md` の `merge_from` の一文）も消す。
 3. The change shall `crates/pasta_lua/src/context.rs` を、1・2 のどちらの場合も変えない。
 4. The change shall ルートの `Cargo.toml`・`Cargo.lock` では、`fast_radix_trie` の行と項目を消すだけにする。
-5. If この spec を main に入れる時点で、`ponytail-editor-tooling` などがルートの `Cargo.toml`・`Cargo.lock` を先に変えている, then the change shall rebase で `Cargo.lock` を作り直し、相手が消した行・足した行を保つ。
+5. If この spec を main に入れる時点で、`ponytail-editor-tooling` などがルートの `Cargo.toml`・`Cargo.lock` を先に変えている, then the change shall main を merge で取り込んで `Cargo.lock` を作り直し（積んだコミットを rebase で書き換えない。2026-11-02 の設計ディスカッションで決めた）、相手が消した行・足した行を保つ。
 
 ### Requirement 11: 文書を今の構成に合わせる
 
