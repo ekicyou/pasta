@@ -116,3 +116,4 @@
 - cargo-insta は入っていない。スナップショットの受け入れは `INSTA_FORCE_PASS=1` で `.snap.new` を出し、差分を見て手で置き換える（`assertion_line:` の行は外す）（2.3）。
 - `debug_integration_test::runtime_teardown_emits_terminated_to_connected_client` が read timeout で 1 回だけ落ちることがある（この spec と無関係・単独では通る）。
 - `debug/` は例外 1 件のほかは触らない（タスク 11 が確かめる）。`debug/source_map/mod.rs` のモジュール説明に `normalize_output` の名前が 1 語残るが、説明文だけなので 5.2 では直さない（5.2）。
+- 完了時の棚卸: その場で解決 0 件・申し送り 1 件（`debug-mcp-runtime` の brief に `LineShift` が恒等になる件）・起票 0 件。`＄２５６` 以上と有限でない小数は、main の `ponytail-dsl-parser` がパーサで構文の誤りにしていた。
