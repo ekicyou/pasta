@@ -30,10 +30,7 @@ impl super::AnalysisEngine {
         if scene.span.is_valid() {
             // Only emit NAMESPACE token for the marker line (e.g., "＊メイン"),
             // NOT the entire scope. Otherwise it overshadows child tokens.
-            let token = Self::marker_line_token(&scene.span, source, token_type::NAMESPACE);
-            if token.length > 0 {
-                tokens.push(token);
-            }
+            Self::visit_decl_line(&scene.span, source, token_type::NAMESPACE, tokens);
         }
         for attr in &scene.attrs {
             Self::visit_attr(attr, source, tokens);
@@ -54,11 +51,7 @@ impl super::AnalysisEngine {
         // Anonymous local_start_scene_scope (name=None) has no marker line, and emitting
         // a SCENE token would overlap with the action line tokens within the scope.
         if scene.name.is_some() && scene.span.is_valid() {
-            tokens.push(Self::marker_line_token(
-                &scene.span,
-                source,
-                token_type::SCENE,
-            ));
+            Self::visit_decl_line(&scene.span, source, token_type::SCENE, tokens);
         }
         for attr in &scene.attrs {
             Self::visit_attr(attr, source, tokens);
@@ -75,10 +68,7 @@ impl super::AnalysisEngine {
         if actor.span.is_valid() {
             // Only emit ACTOR token for the marker line (e.g., "％さくら"),
             // NOT the entire scope. Otherwise it overshadows child tokens.
-            let token = Self::marker_line_token(&actor.span, source, token_type::ACTOR);
-            if token.length > 0 {
-                tokens.push(token);
-            }
+            Self::visit_decl_line(&actor.span, source, token_type::ACTOR, tokens);
         }
         for attr in &actor.attrs {
             Self::visit_attr(attr, source, tokens);
@@ -174,21 +164,76 @@ impl super::AnalysisEngine {
         });
     }
 
-    /// スコープマーカー行（＊/・/％）のトークンを構築する: span 開始位置から行末まで。
-    /// `length` は 0 になりうる（span 開始が行末以降）— 扱いは呼び出し側が決める。
-    fn marker_line_token(span: &Span, source: &str, token_type: u32) -> RawToken {
+    /// 宣言の行（`＊名前`・`＊`・`　・名前`・`％名前`）の、印と名前・属性ごと・行末の
+    /// コメントのトークンを出す。印は span の始まりから字下げを飛ばした所。
+    fn visit_decl_line(span: &Span, source: &str, marker_type: u32, tokens: &mut Vec<RawToken>) {
         let line = span.start_line;
         let line_text = get_line_text(source, line);
         let line_start = line_byte_offset(source, line);
-        let start_in_line = span.start_byte.saturating_sub(line_start);
-        let start_char = utf8_offset_to_utf16(line_text, start_in_line);
-        let line_len = utf8_len_to_utf16(line_text);
-        RawToken {
-            line: (line - 1) as u32,
-            start_char,
-            length: line_len.saturating_sub(start_char),
-            token_type,
-            modifiers: 0,
+        let from = span
+            .start_byte
+            .saturating_sub(line_start)
+            .min(line_text.len());
+        let marker_start = from + (line_text[from..].len() - line_text[from..].trim_start().len());
+        if marker_start >= line_text.len() {
+            return;
         }
+        let parts = scan_decl_line(line_text, marker_start);
+        let mut push = |range: std::ops::Range<usize>, token_type: u32| {
+            let start_char = utf8_offset_to_utf16(line_text, range.start);
+            tokens.push(RawToken {
+                line: (line - 1) as u32,
+                start_char,
+                length: utf8_offset_to_utf16(line_text, range.end) - start_char,
+                token_type,
+                modifiers: 0,
+            });
+        };
+        push(marker_start..parts.name_end, marker_type);
+        for attr in &parts.attrs {
+            push(attr.clone(), token_type::DECORATOR);
+        }
+        let body_end = parts.attrs.last().map_or(parts.name_end, |a| a.end);
+        push_trailing_comment(source, line, line_start + body_end, tokens);
     }
+}
+
+/// 宣言の行の、印と名前の終わりと、属性ごとの範囲（どれも行の中のバイト）
+struct DeclParts {
+    name_end: usize,
+    attrs: Vec<std::ops::Range<usize>>,
+}
+
+/// 解けた宣言の行を文法の `印 ~ id? ~ s ~ attrs? ~ or_comment_eol` どおりに読む。
+/// 名前は印の直後から空白・`＆`・`＃` の手前まで。属性は `＆ id s ： s 値`（値が
+/// `「`・`"` で始まるときだけ引用、ほかは `：`・`＆`・`＃`・空白の手前まで）。
+fn scan_decl_line(line_text: &str, marker_start: usize) -> DeclParts {
+    let is_attr = |c: char| matches!(c, '＆' | '&');
+    let is_hash = |c: char| matches!(c, '＃' | '#');
+    let is_kv = |c: char| matches!(c, '：' | ':');
+    let after_marker = marker_start + char_len_at(line_text, marker_start);
+    let name_end = line_text[after_marker..]
+        .find(|c: char| c.is_whitespace() || is_attr(c) || is_hash(c))
+        .map_or(line_text.len(), |p| after_marker + p);
+    let skip_ws = |i: usize| line_text.len() - line_text[i..].trim_start().len();
+    let mut attrs = Vec::new();
+    let mut i = skip_ws(name_end);
+    while line_text[i..].starts_with(is_attr) {
+        let start = i;
+        // id ~ s ~ kv_marker ~ s（id に `：` は入らない）
+        let Some(p) = line_text[i..].find(is_kv) else {
+            break;
+        };
+        i = skip_ws(i + p + char_len_at(line_text, i + p));
+        i = if line_text[i..].starts_with(['「', '"']) {
+            string_literal_end(line_text, i)
+        } else {
+            line_text[i..]
+                .find(|c: char| c.is_whitespace() || is_kv(c) || is_attr(c) || is_hash(c))
+                .map_or(line_text.len(), |p| i + p)
+        };
+        attrs.push(start..i);
+        i = skip_ws(i);
+    }
+    DeclParts { name_end, attrs }
 }
