@@ -105,7 +105,7 @@
   - _Requirements: 8.4_
   - 注記: main（27a80a33）を取り込んで確かめた。`ponytail-core-registry` はまだ main に入っていない（completed に無く、`merge_from` も残る）ので、`pasta_core` には触らずに閉じた。
 
-- [ ] 11. 全体の確かめ
+- [x] 11. 全体の確かめ
   - 特性化スナップショット・Lua ブロックを含まない既存のスナップショット・`sample.generated.lua`（改行を除いて）が、タスク 1 の時点と同じであることを確かめる
   - `git diff` で `debug/`・`loader/`・`runtime/`・`pasta_core`（タスク 10 の場合を除く）のソースに、例外 1 件のほかの変更が無いことを確かめる
   - ワークスペースの `cargo fmt --check`・`cargo clippy --all-targets`（警告 0）・`cargo test -p pasta_lua`（タスク 10 で消した場合は `-p pasta_core` も）が通る
