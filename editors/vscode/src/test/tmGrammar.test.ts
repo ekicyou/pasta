@@ -693,6 +693,50 @@ async function runTests(): Promise<void> {
     );
   });
 
+  // 行を順に読み、各行の (文字位置 → scope の並び) を返す。フェンスの開き・閉じの範囲を見る。
+  const fenceLines = (lines: string[]) => {
+    let stack = vsctm.INITIAL;
+    return lines.map((l) => {
+      const r = tokenizeLine(l, stack);
+      stack = r.ruleStack;
+      return (i: number) => r.tokens.find((t) => t.startIndex <= i && i < t.endIndex)?.scopes ?? [];
+    });
+  };
+  const BLOCK = 'meta.embedded.block.lua';
+  const OPEN = 'punctuation.definition.code.begin.pasta';
+  const CLOSE = 'punctuation.definition.code.end.pasta';
+
+  test('Luaブロック: 4 連のフェンスの中の 3 連は閉じにならない', () => {
+    const s = fenceLines(['````lua', '```', 'x', '````', 'a']);
+    expect(s[0](0).includes(OPEN) && s[0](3).includes(OPEN), '```` opens');
+    expect(!s[1](0).includes(CLOSE) && s[1](0).includes(BLOCK), '``` inside ```` is body');
+    expect(s[3](0).includes(CLOSE) && s[3](3).includes(CLOSE), '```` closes');
+    expect(!s[4](0).includes(BLOCK), 'after close is outside');
+  });
+
+  test('Luaブロック: 閉じの後ろの空白と行末のコメント', () => {
+    const s = fenceLines(['```lua', 'x', '```  ＃c', 'a']);
+    expect(s[2](0).includes(CLOSE) && s[2](2).includes(CLOSE) && !s[2](3).includes(CLOSE), 'close covers ```');
+    expect(s[2](5).includes(COMMENT_SCOPE) && s[2](6).includes(COMMENT_SCOPE), 'trailing comment');
+    expect(!s[3](0).includes(BLOCK), 'after close is outside');
+  });
+
+  test('Luaブロック: 字下げした閉じは閉じ・字下げした開きは開きでない', () => {
+    const s = fenceLines(['```lua', 'x', '　```', 'a']);
+    expect(s[2](1).includes(CLOSE), 'indented close closes');
+    expect(!s[3](0).includes(BLOCK), 'after indented close is outside');
+    const t = fenceLines(['  ```lua', 'x']);
+    expect(!t[0](2).includes(OPEN) && !t[1](0).includes(BLOCK), 'indented open does not open');
+  });
+
+  test('Luaブロック: 言語名の後ろに空白のある行は開きでない・言語名は任意の名前', () => {
+    const s = fenceLines(['```lua  ', 'x']);
+    expect(!s[0](0).includes(OPEN) && !s[1](0).includes(BLOCK), '```lua + spaces does not open');
+    const t = fenceLines(['```py', 'x']);
+    expect(t[0](0).includes(OPEN) && t[0](3).includes('entity.name.type.language.pasta'), '```py opens with language');
+    expect(!fenceLines(['``` lua', 'x'])[1](0).includes(BLOCK), '``` + space + name does not open');
+  });
+
   // --- Action Line Tests ---
   test('アクション行のアクター名認識', () => {
     const result = tokenizeLine('  Alice：こんにちは');

@@ -203,19 +203,22 @@
             "name": "meta.actor.pasta"
         },
         "lua-code-block": {
-            "begin": "^(\\s*)(```)(lua)?\\s*$",
-            "end": "^(\\s*)(```)\\s*$",
+            "begin": "^(`{3,})([\\p{XID_Start}_][\\p{XID_Continue}・･\u200c\u200d]*)?$",
+            "end": "(\\1)[\\s　]*([＃#].*)?$",
             "beginCaptures": {
-                "2": {
+                "1": {
                     "name": "punctuation.definition.code.begin.pasta"
                 },
-                "3": {
+                "2": {
                     "name": "entity.name.type.language.pasta"
                 }
             },
             "endCaptures": {
-                "2": {
+                "1": {
                     "name": "punctuation.definition.code.end.pasta"
+                },
+                "2": {
+                    "name": "comment.line.pasta"
                 }
             },
             "name": "meta.embedded.block.lua",
