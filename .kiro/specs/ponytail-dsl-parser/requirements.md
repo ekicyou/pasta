@@ -71,7 +71,7 @@
 3. While 括弧の重なりが 64 段以内で、1 つの式の二項演算子が 256 個以内である, the Pasta Parser shall 今と同じ AST を作る。リポジトリのすべての辞書・テストの辞書・マニュアルの例は、1 と 2 の誤りにならない（2026-11-02 の測定で、いちばん深いものは 8 段）。
 4. When 1 か 2 の誤りになる辞書を含むゴーストを pasta.dll が読み込む, the Pasta Parser shall プロセスを異常終了させず、ほかの構文の誤りと同じ経路の読み込みエラーとして作者へ届ける。
 5. When 1 か 2 の誤りになる文書を VSCode 拡張の解析（全体の解析と、それに続く部分解析）に渡す, the Pasta Parser shall 拡張の解析の処理を異常終了させない（部分解析は `parse_str` を呼ぶので、`partial.rs` を直さずに守られる）。
-6. The Pasta Parser shall 1 と 2 の上限を、release と debug のどちらの構成でも、1 MiB のスタックのスレッドの解析・AST の片付け・Lua への変換があふれない値にする。
+6. The Pasta Parser shall 1 と 2 の上限を、x86（pasta.dll の本番）と x64 の、release と debug のどちらの構成でも、1 MiB のスタックのスレッドの解析・AST の片付け・Lua への変換があふれない値にする。
 
 ### Requirement 4: 誤りの形を保ち、作られない誤りの型を無くす
 

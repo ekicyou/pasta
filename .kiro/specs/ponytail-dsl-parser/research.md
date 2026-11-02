@@ -188,6 +188,7 @@ probe は、スクラッチの使い捨てクレート（`pasta_dsl` を worktre
 - `try_parse_expr` の既定の腕（N4）に届く入力が本当に無いか。腕を `None` にして、全テストと全 `.pasta` の AST の比較で確かめる。
 - `pasta_lua` のコード生成（`expr_gen.rs` の再帰）が、括弧 64 段・演算子 256 個の式を、debug・1 MiB のスレッドで変換しきれるか。`cargo test -p pasta_lua` の中で 1 本確かめる（要件 3.6）。
 - VSCode 拡張の WASM（wasm32）のスタックの大きさと、上限の式の解析が通るか（要件 3.5）。
+- 上の深さの測定は x64 だけである。pasta.dll の本番は x86 なので、x86（`i686-pc-windows-msvc`）の release・debug でも上限の式が通ることを確かめる（要件 3.6。x86 のテストは省かない）。
 
 ## 要件ディスカッションへの持ち越し
 
