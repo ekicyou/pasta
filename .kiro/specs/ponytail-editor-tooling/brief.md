@@ -173,3 +173,8 @@ VSCode で辞書を書くゴーストの作者が困る。
 - **見つけた穴・古くなった記述**
   - 7 番の `release.yml:L329` は古い。crates.io へ出す 5 つは `release.yml` 294〜334 行で、`pasta_lsp` が無いのは同じ（10-24 のとおり）。
   - Scope の `tech.md`（L15・L65・L110・L123）は、今は 15 行・66〜69 行（tower-lsp は 69 行）・111 行・124 行。`structure.md`（L190-205）の `pasta_lsp` の木は 186〜205 行。
+
+## 申し送り（ponytail-lua-debug を閉じた、2026-11-02）
+
+- `ponytail-lua-debug` は、要件ディスカッションの後に閉じた（開発者の決定）。0.5.1 で VSCode デバッガー（DAP）の連携を捨て、SSP・areka の MCP 経由に移す方針が出たためである（roadmap の「統合して閉じたもの（2026-11-02）」）。`book/src/debug/*.md` の節を分け合う相手は、もう居ない。
+- この spec の DAP の側の直し（`debugAttachTarget.ts`・`runSceneAtCursor.ts`・`attach.host`）も、0.5.1 で書き直すか消すことになる見込みである。絞るかどうかは、セッション「Pasta DSL MCP移行検討」と開発者が決める。
