@@ -113,7 +113,7 @@
   - 完了の姿: リンクの検査が 3 スキルで 0 件で通り、その自己テストが PASS する
   - _Requirements: 2.5_
 
-- [ ] 7. (P) リリースの補助スクリプトの使われない口を消し、skipped の判定を試験する
+- [x] 7. (P) リリースの補助スクリプトの使われない口を消し、skipped の判定を試験する
   - `publish-crate.ps1` の `-ApiBase` の引数と注記を消し、スクリプトの中の定数で受ける
   - `release-scripts-test.ps1` の末尾に項目 12 を足す。一時のフォルダの偽の vsce が「公開済み」と答え、`publish-vsix.ps1` が `status=skipped`・終了コード 0 になること。`publish` を呼べば偽の vsce が 1 で終わる
   - 項目 1〜11 と `github-release.ps1` は変えず、冒頭の説明に `publish-vsix.ps1` を足す

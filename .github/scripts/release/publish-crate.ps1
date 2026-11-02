@@ -13,14 +13,13 @@ param(
     [Parameter(Mandatory)][string]$Crate,
     [Parameter(Mandatory)][string]$Version,
     [string[]]$DependsOn = @(),
-    [switch]$DryRun,
-    # 検証用に問い合わせ先の API の基点を差し替える。
-    [string]$ApiBase = 'https://crates.io'
+    [switch]$DryRun
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $UserAgent = 'pasta-release-ci (https://github.com/ekicyou/pasta)'
+$ApiBase = 'https://crates.io'
 $IndexBase = 'https://index.crates.io'
 $PollSeconds = 10
 $WaitLimit = [TimeSpan]::FromMinutes(5)   # 依存先の索引への反映待ち・公開後の版の確認、それぞれの上限
@@ -85,7 +84,7 @@ function Test-InIndex([string]$Name) {
 }
 
 try {
-    $crateUrl = "$($ApiBase.TrimEnd('/'))/api/v1/crates/$Crate"
+    $crateUrl = "$ApiBase/api/v1/crates/$Crate"
     $versionUrl = "$crateUrl/$Version"
 
     # (1) クレート自体が無い → 初回の公開は Trusted Publishing ではできない（4.6）
