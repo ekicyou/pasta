@@ -10,10 +10,6 @@ pub enum SearchError {
     #[error("Scene search error: {0}")]
     SceneTableError(#[from] pasta_core::SceneTableError),
 
-    /// Word table error from pasta_core
-    #[error("Word search error: {0}")]
-    WordTableError(#[from] pasta_core::WordTableError),
-
     /// Invalid argument type
     #[error("Invalid argument: {0}")]
     InvalidArgument(String),
