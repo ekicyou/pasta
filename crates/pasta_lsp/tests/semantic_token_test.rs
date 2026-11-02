@@ -346,6 +346,8 @@ fn test_trailing_comment_cue_command() {
         ("  ！待つ（） ＃ メモ", 8),
         ("  ！演出＠さくら ＃ メモ", 10),
         ("  ！待つ（「）＃」） ＃ メモ", 12),
+        // 項の途中の 「 は文字列の頭ではない（pest の cue_arg_id）
+        ("  ！待つ（a「） ＃ メ」", 10),
     ];
     for (line, col) in cases {
         let source = format!("＊挨拶\n{line}\n  Alice：OK\n");

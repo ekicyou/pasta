@@ -128,11 +128,14 @@ pub(super) fn find_open_paren(text: &str) -> Option<usize> {
 pub(super) fn find_close_paren(text: &str, start: usize) -> Option<usize> {
     let mut depth = 1i32;
     let mut i = start;
+    // 文字列が始まれるのは項の頭だけ（`a「` の 「 はただの文字）
+    let mut at_term_head = true;
     while let Some(c) = text[i..].chars().next() {
         match c {
             // 文字列の中の括弧は数えない
-            '「' | '"' => {
+            '「' | '"' if at_term_head => {
                 i = string_literal_end(text, i);
+                at_term_head = false;
                 continue;
             }
             '(' | '（' => depth += 1,
@@ -143,6 +146,10 @@ pub(super) fn find_close_paren(text: &str, start: usize) -> Option<usize> {
                 }
             }
             _ => {}
+        }
+        if !c.is_whitespace() {
+            at_term_head = matches!(c, '(' | '（' | ',' | '、' | '，' | '=' | '＝' | ':' | '：')
+                || is_chain_op_char(c);
         }
         i += c.len_utf8();
     }

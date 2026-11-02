@@ -151,3 +151,4 @@
 - 6.1: 箱は `findWordRefRanges`（wordRefDecorator.ts）が tmLanguage の規則を JS の RegExp（`u`＋`s`。`s` は Oniguruma の `.` が U+2028 にも当たるのに合わせる）にして作る。表は `src/test/fixtures/wordRefCases.ts` を 2 つのテストが共有
 - 6.4: 開いた・閉じた文書の syntax の出し分けは既存の `ghostValidator.test.ts`「開いている文書の syntax は出さず、閉じると出し、開くとまた外す」が固めている（出し分けを壊すと落ちることを確かめた）。テストは足していない
 - 8.1: 関門は全部通った。`cargo test --all` の初回に pasta_lua の runtime_toggle_e2e が TCP のタイミングで 1 件落ちたが、単独 8 回と `--no-fail-fast` の再実行では通った（この spec は pasta_lua に触れていない）
+- 完了時にその場で解決: キューの `（a「）` で `find_close_paren` が値の途中の 「 を文字列の頭と読み、pest とずれていた。文字列が始まれるのを項の頭（開き括弧・区切り・`＝`・`：`・演算子の後）だけにした
