@@ -41,13 +41,10 @@ nums        = @{ ( ('1'..'9') ~ ('0'..'9')* ) | "0" }
 ver         = @{ ASCII_DIGIT }
 get         =  { "GET" }
 notify      =  { "NOTIFY" }
-_tag        = _{ ": " }
+_tag        = _{ ":" ~ " "? }
 remain      = @{ ( !"\r" ~ !"\n" ~ ANY )* }
 
 // chars
-sp          = @{ _sp }
-eol         = @{ _eol }
-key_sep     = @{ _key_sep }
 _sp         = _{ " " }
 _eol        = _{ "\r\n" | "\n" | "\r" }
 _key_sep    = _{ "-" | "." }

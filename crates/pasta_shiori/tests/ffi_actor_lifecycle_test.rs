@@ -93,7 +93,7 @@ fn ffi_ownership_model_load_request_unload_reload_cycle() {
     let (load_dir, _temp) = build_async_callback_dir();
 
     // --- フェーズ 1: load（spawn_actor） ---
-    let loaded = spawn_actor(0, load_dir.clone());
+    let loaded = spawn_actor(load_dir.clone());
     assert!(
         loaded,
         "spawn_actor must load the ghost VM on the actor thread"
@@ -130,7 +130,7 @@ fn ffi_ownership_model_load_request_unload_reload_cycle() {
     // --- フェーズ 4: unload（teardown_actor）→ アクター不在で 204 ---
     let report = teardown_actor();
     assert!(
-        report.is_clean(),
+        report.acked && report.anomaly.is_none(),
         "unload (teardown_actor) must cleanly tear down the actor (done ack): {report:?}"
     );
     let after_unload = marshal_request(&normalize_request(
@@ -143,7 +143,7 @@ fn ffi_ownership_model_load_request_unload_reload_cycle() {
     );
 
     // --- フェーズ 5: reload（再 spawn_actor）→ 新スレッド＋新チャネルで応答不変 ---
-    let reloaded = spawn_actor(0, load_dir.clone());
+    let reloaded = spawn_actor(load_dir.clone());
     assert!(
         reloaded,
         "reload spawn_actor must load a fresh VM on a fresh actor thread"

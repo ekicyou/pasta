@@ -14,7 +14,7 @@ use std::path::Path;
 
 use common::copy_fixture_to_temp;
 use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
-use pasta::actor::thread::{ActorThread, spawn_actor_thread};
+use pasta::actor::thread::{ActorThread, spawn_actor_thread_with};
 use tempfile::TempDir;
 
 fn trace_ghost() -> TempDir {
@@ -43,9 +43,11 @@ fn actor_thread_logs_reach_own_logger_with_two_loggers_registered() {
     let b = trace_ghost();
 
     let (tx_a, rx_a) = mailbox();
-    let actor_a = spawn_actor_thread(0, a.path().to_path_buf(), rx_a);
+    let actor_a = spawn_actor_thread_with(a.path().to_path_buf(), rx_a, None, None)
+        .expect("actor thread must spawn");
     let (tx_b, rx_b) = mailbox();
-    let actor_b = spawn_actor_thread(0, b.path().to_path_buf(), rx_b);
+    let actor_b = spawn_actor_thread_with(b.path().to_path_buf(), rx_b, None, None)
+        .expect("actor thread must spawn");
     assert!(actor_a.loaded() && actor_b.loaded());
 
     // ロガーが 2 つ登録された状態で、A のアクタースレッドに受信と停止のログを出させる。

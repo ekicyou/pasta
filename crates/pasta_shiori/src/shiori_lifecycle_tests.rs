@@ -15,7 +15,7 @@ fn test_multiple_load_releases_previous_runtime() {
     let mut shiori = PastaShiori::default();
 
     // First load
-    let result1 = shiori.load(0, temp1.path().as_os_str());
+    let result1 = shiori.load(temp1.path().as_os_str());
     assert!(result1.is_ok());
     assert!(result1.unwrap());
     assert!(shiori.runtime.is_some());
@@ -24,7 +24,7 @@ fn test_multiple_load_releases_previous_runtime() {
     assert!(first_load_dir.is_some());
 
     // Second load - should release previous runtime
-    let result2 = shiori.load(0, temp2.path().as_os_str());
+    let result2 = shiori.load(temp2.path().as_os_str());
     assert!(result2.is_ok());
     assert!(result2.unwrap());
     assert!(shiori.runtime.is_some());
@@ -42,11 +42,11 @@ fn test_reload_same_directory() {
     let mut shiori = PastaShiori::default();
 
     // First load
-    let result1 = shiori.load(0, temp.path().as_os_str());
+    let result1 = shiori.load(temp.path().as_os_str());
     assert!(result1.unwrap());
 
     // Reload same directory - should work without error
-    let result2 = shiori.load(0, temp.path().as_os_str());
+    let result2 = shiori.load(temp.path().as_os_str());
     assert!(result2.unwrap());
     assert!(shiori.runtime.is_some());
 }
@@ -62,11 +62,10 @@ fn test_full_shiori_lifecycle() {
     let mut shiori = PastaShiori::default();
 
     // Phase 1: load()
-    let load_result = shiori.load(42, temp.path().as_os_str());
+    let load_result = shiori.load(temp.path().as_os_str());
     assert!(load_result.is_ok());
     assert!(load_result.unwrap());
     assert!(shiori.runtime.is_some());
-    assert_eq!(shiori.hinst, 42);
 
     // Phase 2: request() - entry.lua should provide SHIORI.request
     // Use valid SHIORI request format (GET method required for parsing)
@@ -102,7 +101,7 @@ fn test_load_nonexistent_directory_returns_false() {
     let mut shiori = PastaShiori::default();
     let nonexistent = PathBuf::from("/definitely/nonexistent/path");
 
-    let result = shiori.load(0, nonexistent.as_os_str());
+    let result = shiori.load(nonexistent.as_os_str());
     assert!(result.is_ok());
     assert!(!result.unwrap()); // Should return false, not error
     assert!(shiori.runtime.is_none());
@@ -118,7 +117,7 @@ fn test_load_nonexistent_directory_unregisters_logger_on_drop() {
     GlobalLoggerRegistry::instance().register(missing.clone(), std::sync::Arc::new(logger));
 
     let mut shiori = PastaShiori::default();
-    assert!(!shiori.load(0, missing.as_os_str()).unwrap());
+    assert!(!shiori.load(missing.as_os_str()).unwrap());
     drop(shiori);
 
     assert!(
@@ -138,8 +137,8 @@ fn test_reload_with_claim_unregisters_logger_on_drop() {
 
     let mut shiori = PastaShiori::default();
     shiori.set_claim(token);
-    assert!(shiori.load(0, dir.as_os_str()).unwrap());
-    assert!(shiori.load(0, dir.as_os_str()).unwrap());
+    assert!(shiori.load(dir.as_os_str()).unwrap());
+    assert!(shiori.load(dir.as_os_str()).unwrap());
     drop(shiori);
 
     assert!(
@@ -161,7 +160,7 @@ fn test_request_after_load_failure_returns_load_error() {
     // Create an empty directory (no pasta.toml) → PastaLoader::load will fail
     let mut shiori = PastaShiori::default();
 
-    let loaded = shiori.load(0, temp.path().as_os_str()).unwrap();
+    let loaded = shiori.load(temp.path().as_os_str()).unwrap();
     assert!(!loaded);
 
     // Request should return Load error with the failure message
@@ -187,8 +186,8 @@ fn test_multiple_instances_independent() {
     let mut shiori2 = PastaShiori::default();
 
     // Load both instances
-    assert!(shiori1.load(1, temp1.path().as_os_str()).unwrap());
-    assert!(shiori2.load(2, temp2.path().as_os_str()).unwrap());
+    assert!(shiori1.load(temp1.path().as_os_str()).unwrap());
+    assert!(shiori2.load(temp2.path().as_os_str()).unwrap());
 
     // Both should have independent runtimes
     assert!(shiori1.runtime.is_some());
@@ -203,10 +202,6 @@ fn test_multiple_instances_independent() {
     assert!(response1.contains("SHIORI/3.0 204 No Content"));
     assert!(response2.contains("SHIORI/3.0 204 No Content"));
 
-    // Different hinst values
-    assert_eq!(shiori1.hinst, 1);
-    assert_eq!(shiori2.hinst, 2);
-
     // Different load_dirs
     assert_ne!(shiori1.load_dir, shiori2.load_dir);
 }
@@ -220,8 +215,8 @@ fn test_multiple_instances_share_global_registry() {
     let mut shiori2 = PastaShiori::default();
 
     // Load both instances
-    shiori1.load(1, temp1.path().as_os_str()).unwrap();
-    shiori2.load(2, temp2.path().as_os_str()).unwrap();
+    shiori1.load(temp1.path().as_os_str()).unwrap();
+    shiori2.load(temp2.path().as_os_str()).unwrap();
 
     // GlobalLoggerRegistry should have both loggers registered
     // (we can't directly test this without exposing internals,
@@ -241,7 +236,7 @@ fn test_load_sets_shiori_flags_when_entry_lua_exists() {
     let temp = copy_fixture_to_temp("minimal");
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // entry.lua is present in pasta_scripts/, so cached functions should be Some
     assert!(shiori.load_fn.is_some(), "load_fn should be cached");
@@ -265,7 +260,7 @@ fn test_load_flags_false_without_entry_lua() {
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // override defines no SHIORI functions, so cached functions should be None
     assert!(
@@ -287,7 +282,7 @@ fn test_request_returns_204_from_lua() {
     let temp = copy_fixture_to_temp("minimal");
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // Use valid SHIORI request format for parsing
     let valid_request = "GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n";
@@ -315,7 +310,7 @@ fn test_request_returns_default_204_without_main_lua() {
     .unwrap();
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // Should still get 204 response (default fallback)
     let response = shiori.request("test").unwrap();
@@ -389,7 +384,7 @@ end
 
     {
         let mut shiori = PastaShiori::default();
-        assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+        assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
         // Verify unload_fn is cached
         assert!(shiori.unload_fn.is_some(), "unload_fn should be cached");
@@ -438,7 +433,7 @@ end
 
     {
         let mut shiori = PastaShiori::default();
-        assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+        assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
         // Verify unload_fn is cached
         assert!(shiori.unload_fn.is_some(), "unload_fn should be cached");
@@ -479,7 +474,7 @@ end
     let mut shiori = PastaShiori::default();
 
     // First load - should have both load and request functions
-    assert!(shiori.load(0, temp1.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp1.path().as_os_str()).unwrap());
     assert!(
         shiori.load_fn.is_some(),
         "First load: load_fn should be cached"
@@ -490,7 +485,7 @@ end
     );
 
     // Second load (reload) - should only have request function
-    assert!(shiori.load(0, temp2.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp2.path().as_os_str()).unwrap());
     assert!(
         shiori.load_fn.is_none(),
         "After reload: load_fn should be None (not defined in temp2)"
@@ -556,8 +551,8 @@ end
     let mut shiori2 = PastaShiori::default();
 
     // Load both instances
-    assert!(shiori1.load(1, temp1.path().as_os_str()).unwrap());
-    assert!(shiori2.load(2, temp2.path().as_os_str()).unwrap());
+    assert!(shiori1.load(temp1.path().as_os_str()).unwrap());
+    assert!(shiori2.load(temp2.path().as_os_str()).unwrap());
 
     // Instance 1 should have all functions cached
     assert!(shiori1.load_fn.is_some(), "shiori1.load_fn should be Some");
@@ -620,7 +615,7 @@ fn test_drop_logs_release_before_logger_unregistered() {
     let temp = copy_fixture_with_failing_persistence();
     {
         let mut shiori = PastaShiori::default();
-        assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+        assert!(shiori.load(temp.path().as_os_str()).unwrap());
     }
     assert_release_logged_in_order(&read_default_log(&temp));
 }
@@ -631,8 +626,8 @@ fn test_reload_logs_release_before_logger_unregistered() {
     let temp2 = copy_fixture_to_temp("minimal");
 
     let mut shiori = PastaShiori::default();
-    assert!(shiori.load(0, temp1.path().as_os_str()).unwrap());
-    assert!(shiori.load(0, temp2.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp1.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp2.path().as_os_str()).unwrap());
 
     // 旧設置パスのロガーは登録解除済み（ファイルは閉じている）
     assert!(

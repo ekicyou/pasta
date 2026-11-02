@@ -4,8 +4,8 @@
 //! ディレクトリ・要求の連番だけを持ち、グローバルな状態を参照しない（ログの登録を除く・5.1）。
 //! 要求はそのインスタンスの mailbox だけを通り（5.2）、後始末はほかのインスタンスに触れない（4.3）。
 //!
-//! 後始末の決まり（design.md「後始末の決まり」）: Stop を送って ack を待ち、ack が届いて
-//! [`JoinPolicy::JoinAfterAck`] ならアクタースレッドを join する。それ以外は手放す（detach）。
+//! 後始末の決まり（design.md「後始末の決まり」）: Stop を送って ack を待ち、ack が届けば
+//! アクタースレッドを join する（受け口が既に閉じていたときも join）。それ以外は手放す（detach）。
 //! ack が来なければ手放したことを警告のログ（`seam = "instance.abandon"`）に出す（4.2）。
 
 use std::path::{Path, PathBuf};
@@ -16,26 +16,19 @@ use std::time::Duration;
 use flume::Sender;
 use pasta_lua::debug::{KickRequest, KickSink};
 use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLogger};
+use pest::error::LineColLocation;
 
 use crate::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use crate::actor::marshaling::{
-    ShioriMethod, default_204, determine_method, marshal_get, marshal_notify,
+    RequestKind, ShioriMethod, classify_request, default_204, marshal_get, marshal_notify,
 };
 use crate::actor::teardown::{TeardownReport, teardown_via_sender};
 use crate::actor::thread::{ActorThread, spawn_actor_thread_with};
+use crate::util::parsers::req::ParseError;
 
 /// 後始末で ack を待つ上限（4.2）。通常運転では後始末は速やかに終わる。
 /// 万一アクターが ack を返さない場合でも呼び出し側（＝ホスト）を無限待機させない安全網。
 pub const TEARDOWN_TIMEOUT: Duration = Duration::from_secs(5);
-
-/// ack が届いた後にアクタースレッドを join するか（design.md「後始末の決まり」）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum JoinPolicy {
-    /// ack が届けば join してから返る（版 3 の unload・旧来の unload・4.4）。
-    JoinAfterAck,
-    /// join しない（`DllMain` の FreeLibrary の detach。loader lock の中では待てない）。
-    Detach,
-}
 
 /// 起動の前のディレクトリの占有のしかた（design.md「ActorInstance」・6.2）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,7 +73,7 @@ const _: fn() = || {
 ///
 /// 弱い参照なので、kick の送り先（VM が持つ）が mailbox の受け口を生かし続けない。
 /// インスタンスが送信端を手放した後は送れず、診断ログ（`seam = "kick.drop"`）を残して捨てる。
-fn kick_sink_for(tx: &Sender<ActorMsg>) -> KickSink {
+pub fn kick_sink_for(tx: &Sender<ActorMsg>) -> KickSink {
     let weak = tx.downgrade();
     Arc::new(move |req: KickRequest| {
         let sent = weak.upgrade().is_some_and(|tx| {
@@ -104,8 +97,8 @@ impl ActorInstance {
     ///
     /// 返った時点で VM の構築と `SHIORI.load` の呼び出しは終わっている（2.3）。辞書・Lua・
     /// `SHIORI.load` の失敗はインスタンスを返す（[`loaded`](Self::loaded) が偽）。
-    pub fn spawn(hinst: isize, load_dir: PathBuf) -> Result<Self, SpawnError> {
-        Self::spawn_with(hinst, load_dir, ClaimMode::Exclusive)
+    pub fn spawn(load_dir: PathBuf) -> Result<Self, SpawnError> {
+        Self::spawn_with(load_dir, ClaimMode::Exclusive)
     }
 
     /// [`spawn`](Self::spawn) の、ディレクトリの占有のしかたを選ぶ形。
@@ -113,11 +106,7 @@ impl ActorInstance {
     /// 起動の前にディレクトリを占有して札を得る。札はアクタースレッドの VM が持ち、VM の
     /// 片付けで札で外す。占有に失敗したら占有している側のログに理由を出し、
     /// [`SpawnError::DirInUse`] を返す（6.2・2.5）。
-    pub fn spawn_with(
-        hinst: isize,
-        load_dir: PathBuf,
-        mode: ClaimMode,
-    ) -> Result<Self, SpawnError> {
+    pub fn spawn_with(load_dir: PathBuf, mode: ClaimMode) -> Result<Self, SpawnError> {
         let registry = GlobalLoggerRegistry::instance();
         let token = match mode {
             ClaimMode::Exclusive => match registry.try_claim(load_dir.clone()) {
@@ -148,8 +137,7 @@ impl ActorInstance {
         let (tx, rx) = mailbox();
         // VM を作る前に kick の送り先を渡す（5.5）。
         let sink = kick_sink_for(&tx);
-        match spawn_actor_thread_with(hinst, load_dir.clone(), rx, Some(sink), Some(token.clone()))
-        {
+        match spawn_actor_thread_with(load_dir.clone(), rx, Some(sink), Some(token.clone())) {
             Ok(thread) => Ok(Self {
                 tx,
                 thread: Some(thread),
@@ -194,13 +182,36 @@ impl ActorInstance {
         MailboxRequest::new(self.seq.fetch_add(1, Ordering::Relaxed), req.to_string())
     }
 
-    /// 旧来の意味の要求: メソッドを判定して GET／NOTIFY へ渡す。読めなければ 204。
+    /// 旧来の意味の要求: メソッドを判定して GET／NOTIFY へ渡す（2.x も Lua へ）。読めなければ 204。
     pub fn request(&self, req: &str) -> String {
-        match determine_method(req) {
-            Some(ShioriMethod::Get) => self.get(req),
-            Some(ShioriMethod::Notify) => self.notify(req),
-            None => default_204(),
+        match classify_request(req) {
+            Ok(RequestKind::Get | RequestKind::Shiori2(ShioriMethod::Get)) => self.get(req),
+            Ok(RequestKind::Notify | RequestKind::Shiori2(ShioriMethod::Notify)) => {
+                self.notify(req)
+            }
+            Err(e) => {
+                self.warn_unreadable("legacy", req, &e);
+                default_204()
+            }
         }
+    }
+
+    /// 解けない要求を、このインスタンスのログに warn 1 行で残す（3.6〜3.8）。
+    /// 要求は利用者の名前を含みうるので、位置と 1 行目だけを載せ、全文は載せない。
+    pub(crate) fn warn_unreadable(&self, entry: &'static str, req: &str, err: &ParseError) {
+        let (line, col) = match err.line_col {
+            LineColLocation::Pos(p) | LineColLocation::Span(p, _) => p,
+        };
+        let first_line = req.lines().next().unwrap_or("");
+        let _log_context = LoadDirGuard::new(self.load_dir.clone());
+        tracing::warn!(
+            seam = "request.unreadable",
+            entry,
+            line,
+            col,
+            first_line,
+            "request could not be parsed"
+        );
     }
 
     /// GET: 応答を待つ（`GET_TIMEOUT` 5 秒の安全網・失敗は 204）。
@@ -213,59 +224,50 @@ impl ActorInstance {
         marshal_notify(&self.tx, self.next_request(req))
     }
 
-    /// kick を積む。送れなければ（アクターが居ない・満杯）偽を返す。
-    pub fn kick(&self, scene: String) -> bool {
-        self.tx.try_send(ActorMsg::Kick { scene }).is_ok()
-    }
-
     /// Stop を送って ack を待つだけ（スレッドには触れない）。二度目は `already_done`。
     pub fn request_stop(&self) -> TeardownReport {
         teardown_via_sender(&self.tx, TEARDOWN_TIMEOUT)
     }
 
-    /// 後始末（4.1・4.2・4.4）。ack が届いて [`JoinPolicy::JoinAfterAck`] なら join してから返る。
-    pub fn shutdown(self, policy: JoinPolicy) -> TeardownReport {
-        self.shutdown_with_timeout(policy, TEARDOWN_TIMEOUT)
+    /// 後始末（4.1・4.2・4.4）。ack が届けば join してから返る。
+    pub fn shutdown(self) -> TeardownReport {
+        self.shutdown_with_timeout(TEARDOWN_TIMEOUT)
     }
 
     /// [`shutdown`](Self::shutdown) の、ack を待つ上限を差し替える形（試験から短い値を注入する口）。
-    pub fn shutdown_with_timeout(
-        mut self,
-        policy: JoinPolicy,
-        timeout: Duration,
-    ) -> TeardownReport {
-        self.finish(policy, timeout)
+    pub fn shutdown_with_timeout(mut self, timeout: Duration) -> TeardownReport {
+        self.finish(timeout)
     }
 
-    fn finish(&mut self, policy: JoinPolicy, timeout: Duration) -> TeardownReport {
+    fn finish(&mut self, timeout: Duration) -> TeardownReport {
         let mut report = teardown_via_sender(&self.tx, timeout);
         let Some(thread) = self.thread.take() else {
             return report;
         };
-        if report.acked && policy == JoinPolicy::JoinAfterAck {
-            // ack の後のアクタースレッドに待つ所は無いので、上限なしで join しても止まらない。
+        // 受け口が既に閉じている（already_done）スレッドも、片付けを終えて約束を待つか panic で
+        // 抜けたかなので join は止まらない。見捨てる（スレッドが参照を返す）のは ack が来ないときだけ。
+        if report.acked || report.already_done {
+            // ack の後のアクタースレッドは約束を待つだけなので、上限なしで join しても止まらない。
             let _ = thread.join();
             report.joined = true;
         } else {
             thread.detach();
-            if !report.acked && !report.already_done {
-                let _log_context = LoadDirGuard::new(self.load_dir.clone());
-                tracing::warn!(
-                    seam = "instance.abandon",
-                    load_dir = %self.load_dir.display(),
-                    "actor thread abandoned: no done ack within {timeout:?}"
-                );
-            }
+            let _log_context = LoadDirGuard::new(self.load_dir.clone());
+            tracing::warn!(
+                seam = "instance.abandon",
+                load_dir = %self.load_dir.display(),
+                "actor thread abandoned: no done ack within {timeout:?}"
+            );
         }
         report
     }
 }
 
 impl Drop for ActorInstance {
-    /// まだ片付けていなければ `shutdown(JoinAfterAck)` と同じことをする。
+    /// まだ片付けていなければ `shutdown()` と同じことをする。
     fn drop(&mut self) {
         if self.thread.is_some() {
-            self.finish(JoinPolicy::JoinAfterAck, TEARDOWN_TIMEOUT);
+            self.finish(TEARDOWN_TIMEOUT);
         }
     }
 }
@@ -299,15 +301,20 @@ mod tests {
         );
     }
 
-    /// 起こしたインスタンスの kick は、アクターが居る間は送れて真、片付けた後は送れずに偽。
+    /// 起こしたインスタンスの送信端は、アクターが居る間は kick を送れ、片付けた後は送れない。
     #[test]
-    fn instance_kick_true_while_running_false_after_stop() {
+    fn instance_sender_accepts_kick_while_running_not_after_stop() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let instance = ActorInstance::spawn(0, dir.path().to_path_buf()).expect("spawn");
+        let instance = ActorInstance::spawn(dir.path().to_path_buf()).expect("spawn");
         assert_eq!(instance.load_dir(), dir.path());
 
         assert!(
-            instance.kick("OnTestScene".into()),
+            instance
+                .tx
+                .try_send(ActorMsg::Kick {
+                    scene: "OnTestScene".into()
+                })
+                .is_ok(),
             "kick must be sent while the actor runs"
         );
 
@@ -315,14 +322,19 @@ mod tests {
         assert!(report.acked, "request_stop must be acked: {report:?}");
         assert!(!report.joined, "request_stop does not touch the thread");
         assert!(
-            !instance.kick("OnLate".into()),
+            instance
+                .tx
+                .try_send(ActorMsg::Kick {
+                    scene: "OnLate".into()
+                })
+                .is_err(),
             "kick must fail after the actor stopped"
         );
 
-        // 二度目の後始末は冪等（already_done）。
-        let report = instance.shutdown(JoinPolicy::JoinAfterAck);
+        // 二度目の後始末は冪等（already_done）で、受け口を閉じたスレッドを join する。
+        let report = instance.shutdown();
         assert!(
-            report.already_done && !report.acked && !report.joined,
+            report.already_done && !report.acked && report.joined,
             "{report:?}"
         );
     }

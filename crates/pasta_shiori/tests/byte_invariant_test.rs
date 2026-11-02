@@ -34,7 +34,7 @@ mod common;
 #[path = "common/async_callback_support.rs"]
 mod async_callback_support;
 
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 use std::path::Path;
 use tempfile::TempDir;
 
@@ -139,7 +139,7 @@ fn load_async_callback() -> (PastaShiori, TempDir) {
 
     let mut shiori = PastaShiori::default();
     let loaded = shiori
-        .load(0, temp.path().as_os_str())
+        .load(temp.path().as_os_str())
         .expect("SHIORI load should not error");
     assert!(loaded, "SHIORI load should return true");
     (shiori, temp)
@@ -179,7 +179,7 @@ fn golden_onboot_response_bytes() {
     let temp = common::copy_sample_ghost_to_temp();
     let mut shiori = PastaShiori::default();
     let loaded = shiori
-        .load(1, temp.path().as_os_str())
+        .load(temp.path().as_os_str())
         .expect("load should not error");
     assert!(loaded, "load should return true");
 
