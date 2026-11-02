@@ -39,7 +39,7 @@
 | 規則ごとの組み立て | `crates/pasta_dsl/src/parser/parse_scene.rs`・`crates/pasta_dsl/src/parser/parse_action.rs`・`crates/pasta_dsl/src/parser/parse_elements.rs` | シーン・アクション・属性や単語定義などの要素を AST ノードへ変換する |
 | AST 型 | `crates/pasta_dsl/src/parser/ast/` | `PastaFile`・`FileItem`・`GlobalSceneScope`・`LocalSceneScope`・`LocalSceneItem`・`ActorScope`・`Action`・`Expr`・`Span` など |
 | パースエラー | `crates/pasta_dsl/src/error.rs` | `ParseError`（ファイル名・行・桁付きの構文エラー） |
-| 部分パース | `crates/pasta_dsl/src/partial.rs` | `parse_str_partial`。全体のパースに失敗したときにスコープ単位・行単位で解析を続ける。言語サーバ用であり、ランタイムのトランスパイルでは使わない |
+| 部分パース | `crates/pasta_dsl/src/partial.rs` | `parse_str_partial`。全体のパースに失敗したときに、字下げしない行頭の印でソースを塊に区切り、塊ごとに解析する。解けない塊は行の範囲だけを返す。エディタ拡張の色分け用であり、ランタイムのトランスパイルでは使わない |
 
 AST の骨格は次のとおりである。`PastaFile.items` はファイル内の項目を記述順に保持する。
 
