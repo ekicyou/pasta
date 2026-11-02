@@ -149,7 +149,7 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
             Rule::word_ref_dynamic => {
                 // Explicit arm: the default arm would not yield the dynamic reference
                 word_ref_value =
-                    parse_dyn_name(inner).map(|(var_name, var_scope)| SetValue::DynamicWordRef {
+                    parse_dyn_name(inner)?.map(|(var_name, var_scope)| SetValue::DynamicWordRef {
                         var_name,
                         var_scope,
                     });
@@ -157,7 +157,7 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
             rule => {
                 if let Some(op) = bin_op_from_rule(rule) {
                     operators.push(op);
-                } else if let Some(expr) = try_parse_expr(inner) {
+                } else if let Some(expr) = try_parse_expr(inner)? {
                     // Parse as expression (term)
                     terms.push(expr);
                 }

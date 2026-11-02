@@ -14,7 +14,7 @@ pub(crate) fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, ParseError
                 target = Some(CallTarget::Static(inner.as_str().to_string()));
             }
             Rule::call_target_expr => {
-                if let Some(expr) = parse_expr_from_parts(inner) {
+                if let Some(expr) = parse_expr_from_parts(inner)? {
                     target = Some(CallTarget::Dynamic(expr));
                 }
             }
@@ -95,7 +95,7 @@ pub(crate) fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError>
                 }
             }
             Rule::var_ref_local => {
-                if let Some((name, scope)) = parse_var_ref_local_inner(inner) {
+                if let Some((name, scope)) = parse_var_ref_local_inner(inner)? {
                     actions.push(Action::VarRef {
                         name,
                         scope,
@@ -144,7 +144,7 @@ pub(crate) fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError>
                 });
             }
             Rule::word_ref_dynamic => {
-                if let Some((var_name, var_scope)) = parse_dyn_name(inner) {
+                if let Some((var_name, var_scope)) = parse_dyn_name(inner)? {
                     actions.push(Action::DynamicWordRef {
                         var_name,
                         var_scope,
@@ -203,15 +203,21 @@ pub(crate) fn parse_fn_call_inner(pair: Pair<Rule>) -> Result<(String, Args), Pa
 /// Extract `(var_name, var_scope)` from a pair containing `dyn_name_local` / `dyn_name_global`.
 ///
 /// `dyn_name_local` splits into Local / Args(n) by the same rule as `var_ref_local`.
-pub(crate) fn parse_dyn_name(pair: Pair<Rule>) -> Option<(String, VarScope)> {
-    pair.into_inner().find_map(|inner| match inner.as_rule() {
-        Rule::dyn_name_local => parse_var_ref_local_inner(inner),
-        Rule::dyn_name_global => inner
-            .into_inner()
-            .find(|id| id.as_rule() == Rule::id)
-            .map(|id| (id.as_str().to_string(), VarScope::Global)),
-        _ => None,
-    })
+pub(crate) fn parse_dyn_name(pair: Pair<Rule>) -> Result<Option<(String, VarScope)>, ParseError> {
+    for inner in pair.into_inner() {
+        let found = match inner.as_rule() {
+            Rule::dyn_name_local => parse_var_ref_local_inner(inner)?,
+            Rule::dyn_name_global => inner
+                .into_inner()
+                .find(|id| id.as_rule() == Rule::id)
+                .map(|id| (id.as_str().to_string(), VarScope::Global)),
+            _ => None,
+        };
+        if found.is_some() {
+            return Ok(found);
+        }
+    }
+    Ok(None)
 }
 
 /// Parse `fn_call_dynamic` into `(var_name, var_scope, args)`.
@@ -220,7 +226,7 @@ pub(crate) fn parse_dyn_fn_call_inner(
 ) -> Result<(String, VarScope, Args), ParseError> {
     // The grammar requires a dyn_name; the fallback mirrors parse_fn_call_inner's empty name.
     let (var_name, var_scope) =
-        parse_dyn_name(pair.clone()).unwrap_or((String::new(), VarScope::Local));
+        parse_dyn_name(pair.clone())?.unwrap_or((String::new(), VarScope::Local));
     let args = match pair.into_inner().find(|p| p.as_rule() == Rule::args) {
         Some(args) => parse_args(args)?,
         None => Args::empty(),
@@ -239,7 +245,7 @@ pub(crate) fn parse_args(pair: Pair<Rule>) -> Result<Args, ParseError> {
                 // Collect all terms and operators for this positional argument
                 // Grammar: expr = term ~ bin*, where bin = bin_op ~ term
                 // Since expr and bin are silent rules, we get term, op, term, op, term...
-                if let Some(expr) = parse_expr_from_parts(inner) {
+                if let Some(expr) = parse_expr_from_parts(inner)? {
                     items.push(Arg::Positional(expr));
                 }
             }
@@ -269,23 +275,23 @@ pub(crate) fn bin_op_from_rule(rule: Rule) -> Option<BinOp> {
 
 /// Parse an expression from parts (terms and binary operators).
 /// Handles the case where expr = term ~ (bin_op ~ term)* expands into multiple pairs.
-pub(crate) fn parse_expr_from_parts(pair: Pair<Rule>) -> Option<Expr> {
+pub(crate) fn parse_expr_from_parts(pair: Pair<Rule>) -> Result<Option<Expr>, ParseError> {
     let mut terms: Vec<Expr> = Vec::new();
     let mut operators: Vec<BinOp> = Vec::new();
 
     for expr_inner in pair.into_inner() {
         if let Some(op) = bin_op_from_rule(expr_inner.as_rule()) {
             operators.push(op);
-        } else if let Some(term) = try_parse_expr(expr_inner) {
+        } else if let Some(term) = try_parse_expr(expr_inner)? {
             terms.push(term);
         }
     }
 
     if terms.is_empty() {
-        return None;
+        return Ok(None);
     }
 
-    Some(build_left_assoc_expr(terms, operators))
+    Ok(Some(build_left_assoc_expr(terms, operators)))
 }
 
 /// Parse key_arg.
@@ -307,7 +313,7 @@ pub(crate) fn parse_key_arg(pair: Pair<Rule>) -> Result<(String, Expr), ParseErr
                     rule => {
                         if let Some(op) = bin_op_from_rule(rule) {
                             operators.push(op);
-                        } else if let Some(expr) = try_parse_expr(kv_inner) {
+                        } else if let Some(expr) = try_parse_expr(kv_inner)? {
                             terms.push(expr);
                         }
                     }
@@ -346,45 +352,39 @@ pub(crate) fn build_left_assoc_expr(terms: Vec<Expr>, operators: Vec<BinOp>) -> 
 }
 
 /// Try to parse an expression from a pair.
-pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Option<Expr> {
-    match pair.as_rule() {
+///
+/// `Ok(None)` は「項にならない」。中の誤りは飲まずに `Err` で返す。
+pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Result<Option<Expr>, ParseError> {
+    let expr = match pair.as_rule() {
         Rule::number_literal => {
             let normalized = normalize_number_str(pair.as_str());
             if normalized.contains('.') {
-                Some(Expr::Float(normalized.parse().ok()?))
+                normalized.parse().ok().map(Expr::Float)
             } else {
-                Some(Expr::Integer(normalized.parse().ok()?))
+                normalized.parse().ok().map(Expr::Integer)
             }
         }
         Rule::string_contents => Some(Expr::String(pair.as_str().to_string())),
         Rule::string_blank => Some(Expr::BlankString),
         Rule::var_ref_local => {
-            parse_var_ref_local_inner(pair).map(|(name, scope)| Expr::VarRef { name, scope })
+            parse_var_ref_local_inner(pair)?.map(|(name, scope)| Expr::VarRef { name, scope })
         }
-        Rule::var_ref_global => {
-            for inner in pair.into_inner() {
-                if inner.as_rule() == Rule::id {
-                    return Some(Expr::VarRef {
-                        name: inner.as_str().to_string(),
-                        scope: VarScope::Global,
-                    });
-                }
-            }
-            None
-        }
-        Rule::var_ref_property => {
-            for inner in pair.into_inner() {
-                if inner.as_rule() == Rule::property_id {
-                    return Some(Expr::VarRef {
-                        name: inner.as_str().to_string(),
-                        scope: VarScope::Property,
-                    });
-                }
-            }
-            None
-        }
+        Rule::var_ref_global => pair
+            .into_inner()
+            .find(|inner| inner.as_rule() == Rule::id)
+            .map(|inner| Expr::VarRef {
+                name: inner.as_str().to_string(),
+                scope: VarScope::Global,
+            }),
+        Rule::var_ref_property => pair
+            .into_inner()
+            .find(|inner| inner.as_rule() == Rule::property_id)
+            .map(|inner| Expr::VarRef {
+                name: inner.as_str().to_string(),
+                scope: VarScope::Property,
+            }),
         Rule::fn_call_local => {
-            let (name, args) = parse_fn_call_inner(pair).ok()?;
+            let (name, args) = parse_fn_call_inner(pair)?;
             Some(Expr::FnCall {
                 name,
                 args,
@@ -392,7 +392,7 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Option<Expr> {
             })
         }
         Rule::fn_call_global => {
-            let (name, args) = parse_fn_call_inner(pair).ok()?;
+            let (name, args) = parse_fn_call_inner(pair)?;
             Some(Expr::FnCall {
                 name,
                 args,
@@ -401,14 +401,14 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Option<Expr> {
         }
         Rule::fn_call_dynamic => {
             // Explicit arm: the default arm would recurse into args and return the first argument
-            let (var_name, var_scope, args) = parse_dyn_fn_call_inner(pair).ok()?;
+            let (var_name, var_scope, args) = parse_dyn_fn_call_inner(pair)?;
             Some(Expr::DynamicFnCall {
                 var_name,
                 var_scope,
                 args,
             })
         }
-        Rule::paren_expr => parse_expr_from_parts(pair).map(|e| Expr::Paren(Box::new(e))),
+        Rule::paren_expr => parse_expr_from_parts(pair)?.map(|e| Expr::Paren(Box::new(e))),
         Rule::add_op
         | Rule::sub_op
         | Rule::mul_op
@@ -421,36 +421,37 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Option<Expr> {
         _ => {
             // Try recursively for nested expressions
             for inner in pair.into_inner() {
-                if let Some(expr) = try_parse_expr(inner) {
-                    return Some(expr);
+                if let Some(expr) = try_parse_expr(inner)? {
+                    return Ok(Some(expr));
                 }
             }
             None
         }
-    }
+    };
+    Ok(expr)
 }
 
 /// Extract variable name and scope from a `var_ref_local` pair.
 ///
 /// Handles both named variables (`$var` → Local) and positional args (`$0` → Args(0)).
-fn parse_var_ref_local_inner(pair: Pair<Rule>) -> Option<(String, VarScope)> {
+fn parse_var_ref_local_inner(pair: Pair<Rule>) -> Result<Option<(String, VarScope)>, ParseError> {
     for var_id_pair in pair.into_inner() {
         if var_id_pair.as_rule() == Rule::var_id {
             for id_inner in var_id_pair.into_inner() {
                 match id_inner.as_rule() {
                     Rule::id => {
-                        return Some((id_inner.as_str().to_string(), VarScope::Local));
+                        return Ok(Some((id_inner.as_str().to_string(), VarScope::Local)));
                     }
                     Rule::digit_id => {
                         let index = normalize_number_str(id_inner.as_str())
                             .parse::<u8>()
                             .unwrap_or(0);
-                        return Some((id_inner.as_str().to_string(), VarScope::Args(index)));
+                        return Ok(Some((id_inner.as_str().to_string(), VarScope::Args(index))));
                     }
                     _ => {}
                 }
             }
         }
     }
-    None
+    Ok(None)
 }
