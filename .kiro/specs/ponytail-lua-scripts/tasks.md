@@ -126,3 +126,6 @@
 
 - Lua の spec は 1 つの VM で走り、先の spec が `pasta.scene` などを読み直すので、ファイルの頭で取ったモジュールの局所変数は古くなりうる。後ろの describe では `require` し直し、シーン名も他と被らない名前にする（3.2）。
 - 9.1 の点検で、`scene-anchor-link`・`shell-element-click` の brief に `scene_names` と古い `restore_scene` の前提が残っていたので、今の形（4 つの欄を戻す・`(fn, ...)`）に直した。
+- 完了時にその場で解決: 実行モデルの頁の「2 回目以降の `resume` は引数を渡さない」が、何も出さない区切りを飛ばす再開のことだと分かるように書き直した（4.1 のレビューの指摘）。
+- 完了時の棚卸: その場で解決 1 件・申し送り 0 件・起票 0 件。`kick.lua:53` の古いコメントは決定 10（触らない・0.5.0 の `debug-mcp-runtime` がファイルごと消す）により残す。`act:restore_scene` の形の変化は決定 6 で受け入れ済み。
+- Internals Sync Gate: registry-search・execution-model・internal-modules・shiori・talk-output は更新済み。loader（`main.lua` はコメントだけの変更で、「空の表を返すだけ」の記述は今も正しい）と debug（`scene_play.lua` の中の失敗の部品を `pasta.failure` へ移しただけで、頁に書いてあるハンドラの役目は変わらない）は更新不要。
