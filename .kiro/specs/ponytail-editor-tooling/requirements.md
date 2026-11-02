@@ -7,12 +7,14 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 
 この spec は、2026-10-19 の監査が VSCode まわり（`crates/pasta_lsp`・`editors/vscode`・`crates/pasta_dsl/src/partial.rs`・`crates/pasta_check/src/validate/{syntax,report}.rs`）で見つけた 13 の指摘と、ギャップ分析で同じ領域に増えた指摘を、残らず直す。直す中身は 2 種類ある。
 
-- **挙動を変える直し**：作者の手元で見える困りごと。構文の誤りの波線、色（単語参照の箱・コメント・属性・フェンス・エスケープ）、`launch.json` の `host`、古い色が残るキャッシュ。
+- **挙動を変える直し**：作者の手元で見える困りごと。構文の誤りの波線、色（単語参照の箱・コメント・属性・フェンス・エスケープ）、古い色が残るキャッシュ。
 - **挙動を変えない撤去**：使われない言語サーバ・死んだコード・同語反復・テストだけが使う部品。
 
 要件は「その領域の指摘が残らず直っている」ことと、挙動を変える直しの決めごとである。どう直すか（関数・ファイル・正規表現の形）は設計で決める。
 
-> brief.md だけでは決めきれない論点は、【前提】と書いて最善の案で書いた。要件ディスカッションで確かめる（research.md の「要件ディスカッションへの持ち越し」）。
+> brief.md だけでは決めきれなかった論点は、2026-11-02 の要件ディスカッションで、すべて推奨案で確定した（research.md の「要件ディスカッションの決定」）。
+>
+> デバッグの `host` の廃止（監査の 10 番）は、この spec から外した（2026-11-02 開発者の承認）。0.5.1 で VSCode 拡張の DAP をやめ、SSP・areka の MCP を使う形に移す方針が出たため。DAP の側のファイルはそちらで消える。要件 10 は欠番にする。
 
 用語:
 
@@ -26,7 +28,7 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 - **In scope**
   - 監査の 1〜13 番と、ギャップ分析で増えた同じ領域の指摘（research.md の N1〜N12）。
   - 直しに合わせた、テスト（`crates/pasta_lsp/tests/*`・`crates/pasta_dsl/tests/partial_parse_test.rs`・`crates/pasta_dsl/tests/cue_cmd_parse_test.rs` の `infer_rule_from_line` の 4 つのテスト（350〜379 行）・`editors/vscode/src/test/*`）の直し。
-  - 直しに合わせた、マニュアル（`book/src/debug/{source-level,troubleshooting,vscode-setup}.md` の `host`、`debug/validate.md` の「エディタの診断」、`internals/talk-output.md` の写しの記述）・`crates/pasta_lsp/README.md`・`TEST_COVERAGE.md`・`.kiro/steering/tech.md`・`structure.md` の直し。
+  - 直しに合わせた、マニュアル（`debug/validate.md` の「エディタの診断」、`internals/talk-output.md` の写しの記述）・`crates/pasta_lsp/README.md`・`TEST_COVERAGE.md`・`.kiro/steering/tech.md`・`structure.md` の直し。
   - ルートの `Cargo.toml`・`Cargo.lock`（tower-lsp の行。このウェーブではこの spec が席を持つ）。
 - **Out of scope**
   - 本文の解析（`pasta_dsl/src/parser/**`。`ponytail-dsl-parser`）。文法そのものは変えない。色と診断を文法に合わせる。
@@ -34,6 +36,7 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
   - マニュアルのハイライトの CI（`ponytail-manual-ci`）。文法の変更でマニュアルを再公開する path filter は、あちらで足す。
   - 選択肢の行の意味の色（今は「将来実装」で、色を足すのは機能の追加になる）。TextMate の色のずれだけを直す（要件 5.7）。
   - `pasta_lsp` のクレート名の変更。
+  - DAP の側（監査の 10 番の `host`・`package.json` の `debuggers`・`debugAttachTarget.ts`・`runSceneAtCursor.ts`・`reloadShiori.ts`・`book/src/debug/{source-level,troubleshooting,vscode-setup}.md`）。0.5.1 で DAP を MCP に移すときに、ファイルごと消える（2026-11-02 の要件ディスカッション）。
 - **Adjacent expectations**
   - `ponytail-dsl-parser` は、`parse_str` の誤りの形（行・桁・文）を保つ。入力のたびの診断は、その形を読む（要件 11.1）。`partial.rs` はこの spec が持つ。
   - `ponytail-core-registry` とは、ルートの `Cargo.toml`・`Cargo.lock` を共有する。消す行が別（tower-lsp と fast_radix_trie）なので、後から入る側が `Cargo.lock` を作り直す。
@@ -62,7 +65,7 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 5. When 誤りがファイルの頭（1 行目）・最後の行・改行で終わらない最後の行・CRLF の行にある, the VSCode Extension shall 1〜4 と同じく、本当の位置に 1 件だけ出す。
 6. When 作者が誤りを直した, the VSCode Extension shall 次の解析で、その診断を消す。
 7. While `.pasta` に構文の誤りが無い, the VSCode Extension shall 構文の診断を出さない（今と同じ）。
-8. 【前提】The VSCode Extension shall 入力のたびの診断を、保存時の診断と同じく、幅の無い点の範囲で出す（OQ-2）。
+8. The VSCode Extension shall 入力のたびの診断を、保存時の診断と同じく、幅の無い点の範囲で出す。
 
 ### Requirement 2: 入力のたびの診断と保存時の診断を、重ねず食い違わせない
 
@@ -82,7 +85,7 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 
 1. When 1 つのシーンに構文の誤りがある, the Pasta Analyzer shall 誤りの前と後ろのシーン・アクター辞書・ファイルの単語定義・ファイルの属性に、誤りが無いときと同じ意味の色を付ける。
 2. When 誤りのあるシーンが、字下げした `　％さくら、うにゅう`・`　＠挨拶：こんにちは`・`　＠？はい「はい」`・`　＆朝：1` を含む, the Pasta Analyzer shall それらの行をシーンの区切りとみなさない。そのシーンのアクター・単語・項目を、ほかのシーンへ散らさない。
-3. 【前提】While シーンに構文の誤りがある, the Pasta Analyzer shall そのシーン（区切りの行から次の区切りの行の手前まで）に意味の色を付けず、TextMate の色に任せる（OQ-1）。
+3. While シーンに構文の誤りがある, the Pasta Analyzer shall そのシーン（区切りの行から次の区切りの行の手前まで）に意味の色を付けず、TextMate の色に任せる。
 4. The Pasta Analyzer shall 誤りが無い `.pasta` の意味の色を、今と同じにする（要件 4〜5 で直す所を除く）。
 
 ### Requirement 4: コメント・属性・名前の色を、文法に合わせる
@@ -106,11 +109,11 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 
 1. When アクション行の台詞に単語参照がある（例 `＠挨拶。こんにちは`）, the VSCode Extension shall 文法が単語参照として読む範囲（`＠` と、識別子の文字が続く所までの名前。例 `＠挨拶`）にだけ箱を付ける。
 2. If `＠` がエスケープの `＠＠` の一部である（例 `＠＠メール`）, then the VSCode Extension shall 箱を付けない。`＠＠＠メール` では、エスケープの後ろの `＠メール` にだけ箱を付ける。
-3. The VSCode Extension shall 単語定義の行・コメント（行全体と行末）・Lua ブロックの中・キューコマンドのスコープ（`！コマンド名＠スコープ`）の `＠` に、箱を付けない（OQ-5）。
+3. The VSCode Extension shall 単語定義の行・コメント（行全体と行末）・Lua ブロックの中・キューコマンドのスコープ（`！コマンド名＠スコープ`）の `＠` に、箱を付けない。台詞の中の関数呼び出し（`＠関数（…）`）の名前には、今と同じく箱を付ける。
 4. The TextMate Grammar shall 単語参照・動的な単語参照の色を、1〜2 と同じ範囲に付ける。
-5. The TextMate Grammar shall 文法のエスケープ（`＠＠`・`＄＄`・`\\`・`\%`）だけをエスケープの色にする。`＄＄x` の `＄x` を変数参照の色にしない。文法が受け付けない `\＠`・`\＄`・`\＞` などをエスケープの色にしない（OQ-7）。
+5. The TextMate Grammar shall 文法のエスケープ（`＠＠`・`＄＄`・`\\`・`\%`）だけをエスケープの色にする。`＄＄x` の `＄x` を変数参照の色にしない。文法が受け付けない `\＠`・`\＄`・`\＞` などをエスケープの色にしない。
 6. The TextMate Grammar shall 決して当たらない規則（`inline-fn-call`）を持たない。
-7. 【前提】When 選択肢の行（例 `　＠？はい「はい」`）がある, the TextMate Grammar shall その行を単語定義の色にしない（OQ-6）。
+7. When 選択肢の行（例 `　＠？はい「はい」`）がある, the TextMate Grammar shall その行を単語定義の色にしない。選択肢の行に意味の色は足さない。
 
 ### Requirement 6: Lua のフェンスの色を、文法に合わせる
 
@@ -121,7 +124,7 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 1. When 行頭から 3 つ以上続く `` ` `` と任意の言語名で Lua ブロックを開いた, the TextMate Grammar shall その次の行から、同じ数の `` ` `` の閉じのフェンスの手前までを Lua の色にする。
 2. When 閉じのフェンスの後ろに空白か行末のコメントがある（例 ```` ``` ＃おわり ````）, the TextMate Grammar shall そこでブロックを閉じる。
 3. When 4 つ以上の `` ` `` で開いた, the TextMate Grammar shall 中の 3 つの `` ` `` ではブロックを閉じない。
-4. 【前提】If 文法が受け付けない開きのフェンスである（字下げした `` ``` ``・言語名の後ろの空白）, then the TextMate Grammar shall それを Lua ブロックの開きにしない（N5）。
+4. If 文法が受け付けない開きのフェンスである（字下げした `` ``` ``・言語名の後ろの空白）, then the TextMate Grammar shall それを Lua ブロックの開きにしない（N5）。
 5. The Pasta Analyzer shall 開きと閉じのフェンスの行にだけ意味の色を付け、本文を Lua の色に任せる（今と同じ）。
 
 ### Requirement 7: 意味の色の凡例を、2 か所で食い違わせない
@@ -150,23 +153,16 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 #### Acceptance Criteria
 
 1. The pasta_lsp crate shall 言語サーバ（`server.rs`・`document.rs`・`error.rs`・native の空の入口）と、それらだけを確かめるテスト（`lsp_lifecycle_test.rs`・`document_sync_test.rs`・`crash_recovery_test.rs`）を持たない。
-2. The pasta_lsp crate shall `tower-lsp` と `thiserror` に依存しない。ルートの `Cargo.toml` は `tower-lsp` の行を持たない（OQ-4）。
+2. The pasta_lsp crate shall `tower-lsp` と `thiserror` に依存しない。`lsp-types` も足さず、解析の結果は JS へ渡す形（今の `Wasm*` の形）で持つ。ルートの `Cargo.toml` は `tower-lsp` の行を持たない。
 3. The pasta_lsp crate shall crates.io へ出さない設定（`publish = false`）にする。リリースの手順（`release.yml` の 5 つのクレート）は変えない。
 4. The pasta_lsp crate shall WASM の 3 つの入口（`wasm_analyze`・`wasm_select_ghost_files`・`wasm_validate_ghost`）の名前と、JS へ返す形（トークンと診断の形・ゴースト全体の報告の形）を、今と同じに保つ。
 5. If 解析器が panic した, then the VSCode Extension shall 拡張を落とさず、出力チャンネルに理由を書き、TextMate の色を残す（今の守り）。wasm32 で効かない `catch_unwind` の守りは持たない。
 6. The pasta_check crate shall serde の名前と重なる `FindingKind::code()` と、テストだけが使う `FindingKind::ALL` を持たない。報告の `code`（kebab-case の文字列）は、今と同じに保つ。
 7. The pasta_lsp crate shall テストだけが使う変換（`WasmAnalysisResult::from_analysis`）と、本番で出ない重さ（Warning・Information・Hint）の対応を持たない（N9）。
 
-### Requirement 10: デバッグの `host` を廃止する
+### Requirement 10:（欠番）デバッグの `host` の廃止
 
-**Objective:** As a ゴーストの作者, I want 使い道の無い `host` の設定が無くなってほしい, so that 別の値を書いてもつながらない理由に迷わない。
-
-#### Acceptance Criteria
-
-1. The VSCode Extension shall アタッチの構成の属性・最初の構成・構成の雛形に、`host` を出さない。
-2. When `launch.json` の `pasta` の構成に `host` が書いてある（値によらない）, the VSCode Extension shall 「許されない」と注意し、その値を使わない（OQ-3）。
-3. The VSCode Extension shall アタッチ・シーン再生の「デバッグ開始」・SHIORI リロードの後の再アタッチで、常に `127.0.0.1` の、構成の `port`（既定 9276）へつなぐ。
-4. The VSCode Extension shall `port` と `sourcePresentation` の扱いを、今と同じに保つ。
+2026-11-02 の要件ディスカッションで、この spec から外した。0.5.1 で VSCode 拡張の DAP を MCP に移すときに、DAP の側のファイルごと消える。待ち受けは 127.0.0.1 に固定なので、それまで `host` が残っても害は無い。番号は、ほかの要件の参照を変えないために残す。
 
 ### Requirement 11: 他の spec との約束を保つ
 
@@ -175,9 +171,9 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 #### Acceptance Criteria
 
 1. The VSCode Extension shall 入力のたびの診断を、`parse_str` の誤りの形（`SyntaxError` の行・桁・文。行と桁は 1 から数え、桁は 1 文字を 1 と数える。文の末尾に pest の `  = 説明` の行がある）から作る。`ponytail-dsl-parser` がこの形を保つことを前提にする。
-2. If `parse_str` が位置の無い誤りを返した, then the VSCode Extension shall 【前提】1 行目の頭に、`pasta_check validate` と同じ文で 1 件だけ出す（今の `parse_str` は文字列に対して位置の無い誤りを返さない）。
+2. If `parse_str` が位置の無い誤りを返した, then the VSCode Extension shall 1 行目の頭に、`pasta_check validate` と同じ文で 1 件だけ出す（今の `parse_str` は文字列に対して位置の無い誤りを返さない）。
 3. The change shall `partial.rs` のほかの `pasta_dsl/src/parser/**` を変えない。`pasta_dsl/tests/cue_cmd_parse_test.rs` は `infer_rule_from_line` の 4 つのテストだけを消す（`ponytail-dsl-parser` が同じファイルを触るなら、後から入る側が rebase で合わせる）。
-4. The change shall `book/src/debug/*.md` のうち、`host` と「エディタの診断」の節だけを変える。
+4. The change shall `book/src/debug/*.md` のうち、`debug/validate.md` の「エディタの診断」の節だけを変える。
 
 ### Requirement 12: 死んだコードと同語反復を無くす
 
@@ -187,7 +183,7 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 
 1. The VSCode Extension shall どこからも参照されない `scripts/build-wasm.bat` を持たない。
 2. The VSCode Extension shall 自分で作った値を確かめるだけのテスト（`src/test/e2e.test.ts` の 200〜288 行。起動の状態の写しとファイルの有無）を持たない。
-3. The VSCode Extension shall 使われない再輸出（`reloadShiori.ts` の 18〜22 行）・使われない `DiagnosticsManager.clearAll`・テストだけが読む起動の状態の `fallbackMode`（N10）を持たない。
+3. The VSCode Extension shall 使われない `DiagnosticsManager.clearAll`・テストだけが読む起動の状態の `fallbackMode`（N10）を持たない。
 4. The pasta_dsl crate shall 部分解析の中で、各行をファイル全体として解く段（第 3 段）・行の切り出し（`chunk_lines`）・行頭からの規則の推測（`infer_rule_from_line`）と、常に空の誤りの範囲（`PartialParseError.span`）を持たない（N3）。
 5. The pasta_lsp test suite shall 何も確かめない、または緩すぎる診断のテスト（`diagnostics_test.rs` の「100 行より前」「トークンか診断のどちらかがある」、`transport.rs` の `test_wasm_analysis_result_from_error`）を、本当の位置と件数を確かめるテストに置き換える（N8）。
 6. The VSCode Extension test suite shall 誤った今の色を固めるテスト（`tmGrammar.test.ts` の「既存: エスケープ ＠＠単語・＄＄x の色分けは不変」など）を、要件 4〜6 の色を確かめるテストに置き換える。
@@ -198,10 +194,9 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 
 #### Acceptance Criteria
 
-1. When 要件 10 が入る, the pasta manual shall `debug/vscode-setup.md`・`debug/source-level.md`・`debug/troubleshooting.md` の構成の例と表から `host` を消し、接続先が `127.0.0.1` に固定であることを書く。
-2. When 要件 1〜2 が入る, the pasta manual shall `debug/validate.md` の「エディタの診断」の「構文エラーの重複」に、入力のたびの診断が保存時と同じ位置・同じ文であることを書く。
-3. When 要件 5.5 が入る, the pasta manual shall `internals/talk-output.md` の「単位の読み方の写し」の記述（`inline-escape` を `sakura_escape` の写しとする行）を、直した後の規則に合わせる。
-4. When 要件 9 が入る, the change shall `crates/pasta_lsp/README.md`・`TEST_COVERAGE.md`（`pasta_lsp` の行）・`.kiro/steering/tech.md`（15・66〜69・111・124 行）・`.kiro/steering/structure.md`（186〜205 行）から、言語サーバと tower-lsp の記述を消し、今の構成を書く。
+1. When 要件 1〜2 が入る, the pasta manual shall `debug/validate.md` の「エディタの診断」の「構文エラーの重複」に、入力のたびの診断が保存時と同じ位置・同じ文であることを書く。
+2. When 要件 5.5 が入る, the pasta manual shall `internals/talk-output.md` の「単位の読み方の写し」の記述（`inline-escape` を `sakura_escape` の写しとする行）を、直した後の規則に合わせる。
+3. When 要件 9 が入る, the change shall `crates/pasta_lsp/README.md`・`TEST_COVERAGE.md`（`pasta_lsp` の行）・`.kiro/steering/tech.md`（15・66〜69・111・124 行）・`.kiro/steering/structure.md`（186〜205 行）から、言語サーバと tower-lsp の記述を消し、今の構成を書く。
 
 ### Requirement 14: 直していない挙動を保ち、品質の関門を通す
 
@@ -209,7 +204,7 @@ VSCode で辞書を書くゴーストの作者が困っている（2026-10-19 �
 
 #### Acceptance Criteria
 
-1. When 挙動を変える直し（要件 1〜6・8・10）を入れる, the change shall 直す前の誤りを再現するテストを先に置き、直したあとにそのテストが通る。
+1. When 挙動を変える直し（要件 1〜6・8）を入れる, the change shall 直す前の誤りを再現するテストを先に置き、直したあとにそのテストが通る。
 2. The change shall `cargo fmt --check`、clippy（警告 0）、`cargo test -p pasta_lsp -p pasta_dsl -p pasta_check`、拡張の `npm test` を通る。
 3. The change shall VSIX を作れる（`build-wasm.ps1` で WASM を作り、`vsce package` が通る）。
 4. Where `pasta.tmLanguage.json` を変える, the change shall マニュアルのハイライトの自己テスト（`book/tools/highlight/tokenizer-test.mjs`・`highlight-html-test.mjs`）を通す。

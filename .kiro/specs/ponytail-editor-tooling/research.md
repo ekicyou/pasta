@@ -13,7 +13,7 @@
     - 行末のコメントは、どの行でも、意味の色にも TextMate の色にもコメントの色が付かない（N2。4 番の広がり）。
   - brief のフェンスの開きの正規表現（`\s*$`）は、文法が受け付けない「言語名の後ろの空白」を受け付ける（N5）。
   - brief の Scope の `editors/vscode/wasm/README.md` は、wasm-pack が `crates/pasta_lsp/README.md` を写す生成物で、git の外・VSIX の外にある。直す物は無い（N12）。
-  - 規模は **17〜19 タスク**（下の「タスクの見積もり」）。20 を超えないので、**分けない**のを推奨する。
+  - 規模は **17〜19 タスク**（下の「タスクの見積もり」）。20 を超えないので、**分けない**のを推奨する。要件ディスカッションで `host`（10 番）を外したので、**16〜18 タスク**になる。
 
 ## 監査のやり直し（2026-10-19 の控えとの突き合わせ）
 
@@ -179,7 +179,7 @@
 | 束 | タスク |
 | -- | ------ |
 | 診断とサーバの撤去 | 1. 振る舞いを固めるテスト（1 件・位置・文・CRLF・最後の行） 2. 診断を `parse_str` から（`pasta_check` の文言を pub に） 3. 部分解析の境界と撤去（N1・N3） 4. 開いている文書の診断の重ならないことのテスト 5. コメントの意味の色（8・N2） 6. 名前・属性の意味の色（4） 7. サーバ・文書管理・エラー型の撤去と依存（`Cargo.toml`・`Cargo.lock`） 8. `transport.rs` の整理（9・N9・`from_analysis`・N8） 9. `FindingKind::code()`・`ALL`（13・N11） 10. 凡例の一致のテスト（6） |
-| VSCode 拡張の色と整理 | 11. TextMate の単語参照・エスケープ・`inline-fn-call`（3・N6・11） 12. TextMate の名前・属性・行末のコメント・選択肢（4・N2・N7） 13. TextMate のフェンス（5・N5） 14. 箱（3・N4） 15. キャッシュの版（12） 16. `host`（10）とマニュアル 3 頁 17. 死んだコード（11・N10） |
+| VSCode 拡張の色と整理 | 11. TextMate の単語参照・エスケープ・`inline-fn-call`（3・N6・11） 12. TextMate の名前・属性・行末のコメント・選択肢（4・N2・N7） 13. TextMate のフェンス（5・N5） 14. 箱（3・N4） 15. キャッシュの版（12） ~~16. `host`（10）とマニュアル 3 頁~~（外した） 17. 死んだコード（11・N10） |
 | 仕上げ | 18. README・`TEST_COVERAGE.md`・steering・`validate.md`・`talk-output.md` 19. VSIX とマニュアルのハイライトの自己テストを含む最終の関門 |
 
 20 を超えないので、brief の分割の案（「診断とサーバの撤去」と「VSCode 拡張の色と整理」）は採らずに 1 本で進めるのを推奨する。設計で 20 を超えたら、上の表の束で分ける（境目のファイルは `Cargo.lock`・tmLanguage で重ならない）。
@@ -194,13 +194,32 @@
 
 ## Research Needed（設計へ持ち越し）
 
-- 属性から外した `host` に、VSCode が `launch.json` で「Property host is not allowed」の注意を出すか（`debuggers[].configurationAttributes` の検査）。
+- ~~属性から外した `host` に、VSCode が `launch.json` で「Property host is not allowed」の注意を出すか~~（`host` を外したので要らない）。
 - VSCode の TextMate（Oniguruma）が、`\p{ID_Start}`・`\p{XID_Start}` などの Unicode の性質を使えるか。フェンスの言語名（`id`）と単語参照の名前を、文法の XID に合わせるため。
 - シーンの宣言の行の属性（`＊挨拶 ＆朝：1`）の span が、AST の `scene.attrs` に入っているか。入っていなければ、意味の色は行の文字から属性の位置を探す。
 - wasm32 で panic（trap）した後、同じ WASM のインスタンスを呼び続けてよいか。だめなら、`wasmBridge.ts` が読み直すかを決める。
 - `npm run build:wasm` が今の環境で非対話のまま通るか（brief の回避が要るか）。
 
-## 要件ディスカッションへの持ち越し
+## 要件ディスカッションの決定（2026-11-02）
+
+開発者が全議題を推奨案で承認した（「承認」）。
+
+- **議題 1（新しい議題）DAP まわりを外す**：監査の 10 番（`host`）・`reloadShiori.ts` の再輸出・`debug/` の 3 頁の `host` の記述を、この spec から外した。要件 10 は欠番。
+  - 経緯：セッション「Pasta DSL MCP移行検討」から、0.5.1 で VSCode 拡張の DAP をやめ、SSP・areka の MCP（`OnPastaScene` などのイベントを起こす）に移す方針が来た。DAP の側のファイル（`debugAdapterFactory.ts`・`debugAttachTarget.ts`・`reloadShiori.ts`・`runSceneAtCursor.ts`・`sourcePresentationToggle.ts`・`package.json` の `debuggers`）は、そちらで消える。
+  - 待ち受けは 127.0.0.1 に固定なので、0.5.0 で `host` が残っても害は無い。0.5.1 の方針が流れたら、この spec が入った後に別の spec で戻す。
+  - これで、この spec は `package.json` の `debuggers` に触らない。`extension.ts` は `fallbackMode`（N10）の行だけ触る。
+- **OQ-1** 誤りのあるシーンは、意味の色を付けず TextMate の色に任せる（要件 3.3）。
+- **OQ-2** 入力のたびの診断は、幅の無い点にする。位置の無い誤りは 1 行目の頭（要件 1.8・11.2）。
+- **OQ-3** 議題 1 で `host` を外したので、要らなくなった。
+- **OQ-4** `lsp-types` も足さない。解析の結果は `Wasm*` の形で直に持つ（要件 9.2）。
+- **OQ-5** 箱は台詞の中の単語参照と関数呼び出しの名前だけ（要件 5.3）。
+- **OQ-6** 選択肢の行は TextMate の規則だけを直す。意味の色は足さない（要件 5.7）。
+- **OQ-7** TextMate のエスケープは、この spec で直す（要件 5.5・13.2）。
+- **OQ-8** 分けない。
+
+以下は、ディスカッションの前の持ち越しの控え。
+
+## 要件ディスカッションへの持ち越し（控え）
 
 1. **OQ-1 誤りのあるシーンの色**（要件 3.3）
    - 推奨：そのシーン（区切りから次の区切りの手前まで）は意味の色を付けず、TextMate の色に任せる。

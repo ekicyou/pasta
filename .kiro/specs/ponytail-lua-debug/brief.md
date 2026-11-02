@@ -150,3 +150,8 @@ VSCode でゴーストをデバッグする作者が困る。
   - Current State 3 番の `inspect.rs` L378-388 は、上のとおり 381〜391 行。12 番の `config.rs` は `debug/config.rs`（`pasta_lua/src/config.rs` と取り違えやすい）。
   - `playscene.rs` の頭の説明（1〜3 行）は `resolve_and_kick` だけを書き、`resolve_position` に触れない。`#![allow(dead_code)]`（`playscene.rs` 31 行・`source_map/scene_index.rs` 39 行）は結線の前の名残り（10-23 のまま）。
   - 4 番の知らない要求は、マニュアル `book/src/internals/debug.md` 207 行の表（「その他: なし（無視する）」）も変える（10-23 のまま）。
+
+## 申し送り（2026-11-02・`ponytail-editor-tooling` の要件ディスカッションから）
+
+- `ponytail-editor-tooling` は、デバッグの `host` の廃止（同 spec の監査の 10 番）を範囲から外した（開発者の承認）。0.5.1 で VSCode 拡張の DAP を MCP に移すときに、DAP の側のファイルごと消える見込みのため。上の Scope の「`host` の廃止もそちら」は、もう当たらない。
+- `ponytail-editor-tooling` は、`book/src/debug/{source-level,troubleshooting,vscode-setup}.md` に触らない。`book/src/debug/` で触るのは `validate.md` の「エディタの診断」の節だけ。
