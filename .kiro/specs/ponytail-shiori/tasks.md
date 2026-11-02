@@ -162,7 +162,7 @@
   - _Boundary: DocSync（crates/pasta_shiori/README.md）_
   - _Requirements: 7.7, 8.3, 8.4_
 
-- [ ] 11. 最後の関門を通す
+- [x] 11. 最後の関門を通す
   - `cargo fmt --check`・`cargo clippy -p pasta_shiori --all-targets`（警告 0）・`cargo test -p pasta_shiori`（既定の並列の数で 2 回）・`cargo build -p pasta_shiori --release --target i686-pc-windows-msvc`・`cargo package --list -p pasta_shiori` をまとめて走らせる
   - 応答のバイト列・FFI の型と長さ・錠のテストが通り、特性化テストがすべて直した後の期待で通る
   - すべてのコマンドが成功し、結果を記録する
@@ -173,3 +173,4 @@
 - 10.1：book/src/internals/shiori.md に消した名前が残る（determine_method・default_204_response・ReloadProbe・Reply::Value・ready の組 (ThreadId, bool, Option<SocketAddr>)・JoinPolicy など）。章に残さないこと
 - 10.1：book/src/internals/logging-encoding.md 73 行目が pasta_shiori の変換を「enc.rs と windows_api.rs」と書いている。enc.rs は 8.4 で消したので一緒に直す
 - 10.1：book/src/internals/shiori.md 90 行目が ActorMsg を #[non_exhaustive] と書いている（9.1 で消した）
+- 11（2026-11-03）：fmt --check=0・clippy --all-targets 警告 0・cargo test -p pasta_shiori 2 回とも 44 バイナリ ok・i686 release ビルド=0・package --list に doc/ と logfile.txt なし
