@@ -30,7 +30,7 @@
 | 12 テストだけのパーサの写し・未使用のテストデータ・`exclude` | 残る | 6 |
 | ギャップ分析で増えた指摘（research.md の N1〜N11） | 残る | 3・6・7 |
 
-> brief.md だけでは決めきれなかった論点は、本文に「（仮定・Qn）」と書いて推奨の形で下書きし、research.md の「要件ディスカッションへの持ち越し」に並べた。
+> brief.md だけでは決めきれなかった論点（research.md の「要件ディスカッションへの持ち越し」の Q1〜Q9）は、2026-11-02 の要件のディスカッションで、開発者が全議題を推奨案で確定した。本文の「（議題 N で確定）」がその印で、決めたことは末尾の「要件のディスカッションで決めたこと」にまとめた。
 
 ## Boundary Context
 
@@ -60,10 +60,10 @@
 #### Acceptance Criteria
 
 1. When ホストが `unload` を呼んだ, the pasta.dll shall アクタースレッドが pasta.dll のコードを出てから `unload` を返す。後始末の完了の通知を待つのは上限（5 秒）までで、上限を過ぎたらスレッドを手放して警告をログに出し、`unload` を返す（`shiori4-v3-portable` で入った今の振る舞いを保つ）。
-2. If ホストが `unload` を呼ばずに `FreeLibrary` で pasta.dll を外した, then the pasta.dll shall ホストのプロセスを落とさない。pasta.dll が外れた後に pasta.dll のコードを走らせるスレッドを残さない。そのために、アクタースレッドが終わるまで pasta.dll がメモリに残ってもよい（仮定・Q9）。
+2. If ホストが `unload` を呼ばずに `FreeLibrary` で pasta.dll を外した, then the pasta.dll shall ホストのプロセスを落とさない。pasta.dll が外れた後に pasta.dll のコードを走らせるスレッドを残さない。そのために、アクタースレッドが終わるまで pasta.dll がメモリに残ってもよい（議題 1 で確定）。
 3. If ホストが `unload` を呼ばずに `FreeLibrary` で pasta.dll を外した, then the pasta.dll shall その `FreeLibrary` を上限（5 秒）を超えて止めない。辞書が Lua の C モジュールを読んでいる場合も同じである（今は C モジュールの解放がローダーのロックを待って 5 秒止まり、その後に生きたスレッドの下で pasta.dll が外れうる）。
-4. If ホストが `unload` を呼ばずに `FreeLibrary` で pasta.dll を外した, then the pasta.dll shall 2・3 を `SHIORI.unload` と永続化データの保存より優先する（その道では `SHIORI.unload` と保存が走らなくてよい。仮定・Q1）。
-5. The pasta.dll shall 2・3 を、旧来の入口のインスタンスと版 3 のインスタンスのどちらにも満たす（仮定・Q2）。
+4. If ホストが `unload` を呼ばずに `FreeLibrary` で pasta.dll を外した, then the pasta.dll shall 2・3 を `SHIORI.unload` と永続化データの保存より優先する（その道では `SHIORI.unload` と保存が走らなくてよい。議題 1 で確定）。
+5. The pasta.dll shall 2・3 を、旧来の入口のインスタンスと版 3 のインスタンスのどちらにも満たす（議題 1 で確定）。
 6. When プロセスの終了で pasta.dll が外れる, the pasta.dll shall 今と同じく何もしない（後始末もログも行わない）。
 7. The pasta.dll shall `DllMain` でスレッドを起こさない（今を保つ）。
 8. While ホストが `unload` を呼んでから pasta.dll を外す, the pasta.dll shall `SHIORI.unload`・永続化データの保存・終了のログを今と同じに行う。
@@ -89,12 +89,12 @@
 
 1. When 要求に、コロンの直後で行が終わる見出しの行（例：`Reference0:`）がある, the pasta.dll shall その見出しを値 `""` として受け付け、要求を Lua の `SHIORI.request` に届ける（`req.reference[0]` と `req.dic["Reference0"]` は `""`）。
 2. When 見出しの行がコロンと空白 1 つの後に値を持つ, the pasta.dll shall 今と同じ値を Lua に渡す。
-3. When 見出しの行がコロンの直後に空白を置かずに値を持つ（例：`Reference0:abc`）, the pasta.dll shall その値（`abc`）として受け付ける（仮定・Q3。1 の直しの帰結）。
+3. When 見出しの行がコロンの直後に空白を置かずに値を持つ（例：`Reference0:abc`）, the pasta.dll shall その値（`abc`）として受け付ける（議題 2 で確定。1 の直しの帰結）。
 4. When SSP の記録 `crates/pasta_shiori/doc/shiori-sample.log` にある、値の空いた見出しの行を含む 3 つの要求（47 行の `Reference0:` の OnInitialize、720 行の `Reference2:` の OnNotifyUserInfo、1236 行の `Reference1:` の GET OnTranslate）が旧来の入口に来た, the pasta.dll shall どれも Lua の `SHIORI.request` に届ける。この 3 つを確かめるテストは、要求を自分で文字列として持つ（`doc/` は要件 6.6 でパッケージから外れるので、テストから読まない）。
 5. The pasta.dll shall 1〜3 の受け付けを、旧来の入口と版 3 の入口で同じにする。
 6. If 旧来の入口に来た要求を解けない, then the pasta.dll shall 今と同じく 204 を返し、そのゴーストのログのファイルに警告を 1 行残す。
-7. If 版 3 の入口に来た要求を解けない, then the pasta.dll shall 今と同じく 400 を返し、6 と同じ警告を 1 行残す（仮定・Q4。今は debug）。
-8. When 6・7 の警告を残す, the pasta.dll shall 警告に、解けなかった位置（行と列）と、要求の 1 行目を含め、要求の全文は含めない（仮定・Q5）。
+7. If 版 3 の入口に来た要求を解けない, then the pasta.dll shall 今と同じく 400 を返し、6 と同じ警告を 1 行残す（議題 3 で確定。今は debug。SHIORI/2.x の要求と、`notify` に来た GET を弾くログは今の debug のまま）。
+8. When 6・7 の警告を残す, the pasta.dll shall 警告に、解けなかった位置（行と列）と、要求の 1 行目を含め、要求の全文は含めない（議題 3 で確定。要求は利用者の名前を含みうる）。
 
 ### Requirement 4: 閉じた指摘の振る舞いを保つ
 
@@ -124,7 +124,7 @@
 #### Acceptance Criteria
 
 1. The pasta_shiori の出荷のコード（テストのビルドでないときにコンパイルされるコード） shall 再読み込みの反復のリーク検査（`ReloadProbe`・`ReloadReport`・`LeakMetric`・OS の資源の数え上げ）と、それだけが使う後始末の道（`teardown::teardown_actor`・`TeardownReport::is_clean`）を含まない。
-2. The pasta_shiori の出荷のコード shall テストだけが使う写しと窓口（`marshaling::marshal_request`、旧来の置き場へ kick を積む `lifecycle::kick_sink`、research.md の N1・N2・N6 に挙げたもの）を含まない（どこまでを外すかは仮定・Q6）。
+2. The pasta_shiori の出荷のコード shall テストだけが使う写しと窓口（`marshaling::marshal_request`、旧来の置き場へ kick を積む `lifecycle::kick_sink`・`kick_into`・`ActorInstance::kick`、`ActorMsg::get`・`notify`・`kick` の作り手、`spawn_actor_thread`）を含まない（議題 4 で確定。観測の値（スレッド ID・DAP の待受）の残し方は設計で決める）。
 3. The pasta_shiori の出荷のコード shall ANSI の設置パスのデコードに要る 1 つの変換（システムの ANSI コードページ・不正な文字は誤り）だけを持ち、テストだけが使う変換（UTF-8 から ANSI への変換・OEM のコードページ）と、実装が 1 つの変換のトレイトを含まない。
 4. The pasta_shiori の出荷のコード shall 初期化していない領域を長さだけ伸ばして使う書き方（`Vec::set_len`）を使わない。
 5. When `load`（ANSI）に設置パスが渡された, the pasta.dll shall 今と同じ結果（同じパス・同じ誤り）にデコードする。
@@ -132,7 +132,7 @@
 7. The pasta_shiori の単体テスト shall テストの中にパーサの写し（`src/util/parsers/req.rs` の `ShioriRequest`）を持たず、出荷のパーサで同じ性質を確かめる。
 8. The pasta_shiori の通常の依存 shall テストの道具だけが使う OS の API の機能（`windows-sys` の `Win32_System_Threading`）を有効にしない。
 9. When 1・2 で移したり外したりした道具を使っていたテストを走らせる, the pasta_shiori のテスト shall 同じ性質（再読み込みを繰り返しても OS のハンドルが増えない、kick がシーンの最初の拍まで届く、など）を確かめ続ける。kick のテストは、本番で kick が通る道を通す。
-10. The pasta_shiori shall テストのファイル（`tests/`・`src/*_tests.rs`）と、試験から短い上限を差し込むための 1 行の口（`marshal_get_with_timeout`・`shutdown_with_timeout`・`spawn_actor_with_teardown_timeout`）を今のまま残す（仮定・Q7）。
+10. The pasta_shiori shall テストのファイル（`tests/`・`src/*_tests.rs`）と、試験から短い上限を差し込むための 1 行の口（`marshal_get_with_timeout`・`shutdown_with_timeout`・`spawn_actor_with_teardown_timeout`）を今のまま残す（議題 4 で確定。crates.io のパッケージから外すのは 6.6 の `doc/` とテストデータだけ）。
 
 ### Requirement 7: 使われない部品と素通しを消す
 
@@ -142,7 +142,7 @@
 
 1. The pasta_shiori shall 次を含まない：variant が 1 つだけの `Reply`、`_GRAMMAR` の `include_str!`、文法の使われない規則（`sp`・`eol`・`key_sep`）、`ShioriString` の `unsafe impl Send`・`unsafe impl Sync`、`MyError::Poison` と `From<PoisonError>`、実装が 1 つの `Shiori` トレイト。
 2. When `Shiori` トレイトを消した, the `PastaShiori` shall `load`・`request` を同じ形で呼べる（`use pasta::Shiori` が要らなくなるだけ）。
-3. The pasta_shiori shall アクターを起こす道（`spawn_actor` から `PastaShiori::load` まで）に、いつも 0 の `hinst` を引数として通さず、`PastaShiori` に読まれない `hinst` を持たない。Lua の `SHIORI.load(hinst, load_dir)` には今と同じく 0 を渡す（仮定・Q8）。
+3. The pasta_shiori shall アクターを起こす道（`spawn_actor` から `PastaShiori::load` まで）に、いつも 0 の `hinst` を引数として通さず、`PastaShiori` に読まれない `hinst` を持たない。Lua の `SHIORI.load(hinst, load_dir)` には今と同じく 0 を渡す（議題 5 で確定。`PastaShiori::load` の引数に残すかは設計で決める）。
 4. The pasta_shiori shall 要求のメソッドの判定を 1 つにする（今は `determine_method` と `classify_request` の 2 つ）。旧来の入口は SHIORI/2.x の要求を今と同じく Lua に届け、版 3 の入口は今と同じく 400 にする。
 5. The pasta_shiori shall 文法の上で起きない分岐（SHIORI/2.x の版の数の 0 未満と 9 超え）を持たない。
 6. When 1〜5 を消した, the pasta.dll shall ホストへ返す応答のバイト列を変えない（`byte_invariant_test` などの特性化テストが通る）。
@@ -170,3 +170,13 @@
 2. When 直しを終えた, the pasta_shiori shall `cargo test -p pasta_shiori` を通す（cargo の前に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す）。
 3. When 直しを終えた, the pasta.dll shall i686（配布する 32 ビット版）のビルドを通す。
 4. When 挙動を変える直し（要件 1・2・3・5）を入れる, the pasta_shiori shall 直す前の振る舞いを固めるテストを先に置き、直した後の振る舞いを確かめるテストに改める。
+
+## 要件のディスカッションで決めたこと（2026-11-02）
+
+開発者が、議題 1〜5 を推奨案のまま一括で承認した。
+
+1. **`unload` を呼ばずに外されたとき**（Q1・Q2・Q9 → 要件 1.2〜1.5）：ホストを落とさないこと・`FreeLibrary` を 5 秒を超えて止めないことを最優先にする。その道では `SHIORI.unload` と保存を約束しない。pasta.dll とアクター・VM が、プロセスの終わりか次の `load` まで残ってもよい。旧来の入口と版 3 のインスタンスの両方に効かせる。DLL をピン留めする案（D3）は、`unload` を呼ぶ SSP の振る舞いまで変えるので採らない。
+2. **`Key:value` を受け付ける**（Q3 → 要件 3.3）：文法の直し（`":" ~ " "?`）の帰結として受け付ける。
+3. **解けない要求の警告**（Q4・Q5 → 要件 3.6〜3.8）：旧来の入口と版 3 の入口の両方で warn にする。中身は、解けなかった位置（行と列）と要求の 1 行目だけで、全文は載せない。
+4. **テストだけのものの外し方**（Q6・Q7 → 要件 6.2・6.10）：出荷のコードから、テストだけの窓口・写し・作り手・包みを外す。kick のテストは本番の kick の道へ寄せる。`tests/`・`src/*_tests.rs`・短い上限の口は残し、crates.io のパッケージからは `doc/` と使われないテストデータだけを外す（リポジトリのクレートに `exclude` を使う前例は無く、`tests/` を入れるのは Rust の慣習）。
+5. **`hinst`**（Q8 → 要件 7.3）：アクターの道から消す。Lua の `SHIORI.load(hinst, load_dir)` には 0 を渡し続ける（作者に見える約束は変えない）。
