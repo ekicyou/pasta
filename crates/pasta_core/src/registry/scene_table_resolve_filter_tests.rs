@@ -105,11 +105,7 @@ fn test_replace_selector_clears_cache() {
             create_test_scene_info(0, "OnTalk1", "OnTalk"),
             create_test_scene_info(1, "OnTalk2", "OnTalk"),
         ],
-        prefix_index: {
-            let mut map = RadixMap::new();
-            map.insert(b"OnTalk", vec![SceneId(0), SceneId(1)]);
-            map
-        },
+        prefix_index: BTreeMap::from([("OnTalk".to_string(), vec![SceneId(0), SceneId(1)])]),
         cache: HashMap::new(),
         random_selector: selector,
     };

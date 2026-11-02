@@ -6,8 +6,8 @@
 use crate::error::WordTableError;
 
 use crate::registry::{WordDefRegistry, WordEntry, random::RandomSelector};
-use fast_radix_trie::RadixMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::ops::Bound;
 
 /// Cache key for word selection (module_name + search_key).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -41,7 +41,7 @@ pub struct WordTable {
     /// Word entries (ID = Vec index).
     entries: Vec<WordEntry>,
     /// Prefix index (key → entry ID list).
-    prefix_index: RadixMap<Vec<usize>>,
+    prefix_index: BTreeMap<String, Vec<usize>>,
     /// Shuffle cache ((module, key) → CachedWordSelection).
     cached_selections: HashMap<WordCacheKey, CachedWordSelection>,
     /// Random selector.
@@ -55,13 +55,11 @@ impl WordTable {
         random_selector: Box<dyn RandomSelector>,
     ) -> Self {
         let entries = registry.into_entries();
-        let mut prefix_index = RadixMap::new();
+        let mut prefix_index: BTreeMap<String, Vec<_>> = BTreeMap::new();
 
         // Build prefix index
         for entry in &entries {
-            let entry_list = prefix_index
-                .entry(entry.key.as_bytes())
-                .or_insert_with(Vec::new);
+            let entry_list = prefix_index.entry(entry.key.clone()).or_default();
             entry_list.push(entry.id);
         }
 
@@ -98,9 +96,13 @@ impl WordTable {
         // If module_name is empty, search global only
         if module_name.is_empty() {
             let mut global_entry_ids: Vec<usize> = Vec::new();
-            for (matched_key, ids) in self.prefix_index.iter_prefix(key.as_bytes()) {
+            for (matched_key, ids) in self
+                .prefix_index
+                .range::<str, _>((Bound::Included(key), Bound::Unbounded))
+                .take_while(|(k, _)| k.starts_with(key))
+            {
                 // Skip local keys (start with ':')
-                if !matched_key.starts_with(b":") {
+                if !matched_key.starts_with(':') {
                     global_entry_ids.extend(ids.iter().copied());
                 }
             }
@@ -130,7 +132,11 @@ impl WordTable {
         // module_name is non-empty: search local only (no fallback)
         let local_key = format!(":{}:{}", module_name, key);
         let mut local_entry_ids: Vec<usize> = Vec::new();
-        for (_matched_key, ids) in self.prefix_index.iter_prefix(local_key.as_bytes()) {
+        for (_matched_key, ids) in self
+            .prefix_index
+            .range::<str, _>((Bound::Included(local_key.as_str()), Bound::Unbounded))
+            .take_while(|(k, _)| k.starts_with(local_key.as_str()))
+        {
             local_entry_ids.extend(ids.iter().copied());
         }
 

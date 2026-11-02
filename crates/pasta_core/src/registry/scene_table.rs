@@ -6,8 +6,8 @@
 use super::scene_types::*;
 use crate::error::SceneTableError;
 use crate::registry::random::RandomSelector;
-use fast_radix_trie::RadixMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::ops::Bound;
 
 /// Cache key for scene resolution (module_name + search_key + sorted filters + exact).
 /// Extended to support unified scope search with module context.
@@ -59,7 +59,7 @@ pub struct SceneTable {
     /// ID-based storage for scenes (index = SceneId).
     labels: Vec<SceneInfo>,
     /// Prefix index for forward-matching search (fn_name → [SceneId]).
-    prefix_index: RadixMap<Vec<SceneId>>,
+    prefix_index: BTreeMap<String, Vec<SceneId>>,
     /// Cache for sequential scene consumption ((module_name, search_key, filters) → CachedSelection).
     cache: HashMap<SceneCacheKey, CachedSelection>,
     /// Random selector for scene selection.
@@ -101,18 +101,16 @@ impl SceneTable {
             })
             .collect();
 
-        // Build RadixMap prefix index with key conversion
+        // Build BTreeMap prefix index with key conversion
         // Unified key format with WordTable:
         // - Local: `:parent:local_name`
         // - Global: `global_name`
-        let mut prefix_index = RadixMap::new();
+        let mut prefix_index: BTreeMap<String, Vec<_>> = BTreeMap::new();
         for scene in &labels {
             // Convert fn_name to search key
             let search_key = Self::fn_name_to_search_key(&scene.fn_name, scene.parent.is_some());
 
-            let entry = prefix_index
-                .entry(search_key.as_bytes())
-                .or_insert_with(Vec::new);
+            let entry = prefix_index.entry(search_key).or_default();
 
             // Allow duplicates for search key (multiple scenes with same prefix)
             // fn_name uniqueness is not validated (SceneRegistry does not check it)
@@ -212,7 +210,7 @@ impl SceneTable {
             format!(":{}:{}", module_name, name)
         };
         // グローバルの範囲は `:` で始まるキー（ローカル）を含めない
-        let candidate_ids = match self.prefix_index.get(key.as_bytes()) {
+        let candidate_ids = match self.prefix_index.get(&key) {
             Some(ids) if !(module_name.is_empty() && key.starts_with(':')) => ids.clone(),
             _ => Vec::new(),
         };
@@ -248,7 +246,7 @@ impl SceneTable {
             });
         }
         // 大域の名前は `:` で始まらない（`:` で始まるキーはローカル）
-        let globals = match self.prefix_index.get(name.as_bytes()) {
+        let globals = match self.prefix_index.get(name) {
             Some(ids) if !name.starts_with(':') => ids.clone(),
             _ => Vec::new(),
         };
@@ -266,7 +264,7 @@ impl SceneTable {
                     .split_once("::")
                     .map_or(fn_name.as_str(), |(g, _)| g);
                 self.prefix_index
-                    .get(format!(":{}:{}", owner, local).as_bytes())
+                    .get(&format!(":{}:{}", owner, local))
                     .is_some_and(|ids| !ids.is_empty())
             })
             .collect();
@@ -386,9 +384,13 @@ impl SceneTable {
         // If module_name is empty, search global only
         if module_name.is_empty() {
             let mut global_candidates = Vec::new();
-            for (key, ids) in self.prefix_index.iter_prefix(prefix.as_bytes()) {
+            for (key, ids) in self
+                .prefix_index
+                .range::<str, _>((Bound::Included(prefix), Bound::Unbounded))
+                .take_while(|(k, _)| k.starts_with(prefix))
+            {
                 // Skip local keys (start with ':')
-                if !key.starts_with(b":") {
+                if !key.starts_with(':') {
                     global_candidates.extend(ids.iter().copied());
                 }
             }
@@ -405,7 +407,11 @@ impl SceneTable {
         // module_name is non-empty: search local only (no fallback)
         let local_search_key = format!(":{}:{}", module_name, prefix);
         let mut local_candidates = Vec::new();
-        for (_key, ids) in self.prefix_index.iter_prefix(local_search_key.as_bytes()) {
+        for (_key, ids) in self
+            .prefix_index
+            .range::<str, _>((Bound::Included(local_search_key.as_str()), Bound::Unbounded))
+            .take_while(|(k, _)| k.starts_with(local_search_key.as_str()))
+        {
             local_candidates.extend(ids.iter().copied());
         }
 

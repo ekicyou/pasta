@@ -24,11 +24,7 @@ fn test_resolve_scene_id_basic() {
     let selector = Box::new(MockRandomSelector::new(vec![0]));
     let mut table = SceneTable {
         labels: vec![create_test_scene_info(0, "test", "test_1::__start__")],
-        prefix_index: {
-            let mut map = RadixMap::new();
-            map.insert(b"test_1::__start__", vec![SceneId(0)]);
-            map
-        },
+        prefix_index: BTreeMap::from([("test_1::__start__".to_string(), vec![SceneId(0)])]),
         cache: HashMap::new(),
         random_selector: selector,
     };
@@ -68,7 +64,7 @@ fn test_collect_scene_candidates_local_search() {
     ));
     table
         .prefix_index
-        .insert(":会話_1:選択肢".as_bytes(), vec![SceneId(0)]);
+        .insert(":会話_1:選択肢".to_string(), vec![SceneId(0)]);
 
     // Search from 会話_1 module
     let result = table.collect_scene_candidates("会話_1", "選択肢");
@@ -88,7 +84,7 @@ fn test_collect_scene_candidates_global_search() {
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
     table
         .prefix_index
-        .insert("挨拶".as_bytes(), vec![SceneId(0)]);
+        .insert("挨拶".to_string(), vec![SceneId(0)]);
 
     // Search with empty module_name - should get global
     let result = table.collect_scene_candidates("", "挨拶");
@@ -108,7 +104,7 @@ fn test_collect_scene_candidates_local_only() {
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
     table
         .prefix_index
-        .insert("挨拶".as_bytes(), vec![SceneId(0)]);
+        .insert("挨拶".to_string(), vec![SceneId(0)]);
 
     // Add local scene with same prefix
     table.labels.push(create_test_local_scene_info(
@@ -119,7 +115,7 @@ fn test_collect_scene_candidates_local_only() {
     ));
     table
         .prefix_index
-        .insert(":会話_1:挨拶".as_bytes(), vec![SceneId(1)]);
+        .insert(":会話_1:挨拶".to_string(), vec![SceneId(1)]);
 
     // Search from 会話_1 module - should get ONLY local
     let result = table.collect_scene_candidates("会話_1", "挨拶");
@@ -140,7 +136,7 @@ fn test_collect_scene_candidates_local_not_found_no_fallback() {
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
     table
         .prefix_index
-        .insert("挨拶".as_bytes(), vec![SceneId(0)]);
+        .insert("挨拶".to_string(), vec![SceneId(0)]);
 
     // Search from 会話_1 module - no local, should NOT fall back to global
     let result = table.collect_scene_candidates("会話_1", "挨拶");
@@ -161,7 +157,7 @@ fn test_collect_scene_candidates_global_via_empty_module_name() {
     table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
     table
         .prefix_index
-        .insert("挨拶".as_bytes(), vec![SceneId(0)]);
+        .insert("挨拶".to_string(), vec![SceneId(0)]);
 
     // Search with empty module_name - should get global
     let result = table.collect_scene_candidates("", "挨拶");
@@ -191,13 +187,13 @@ fn test_collect_scene_candidates_prefix_match() {
     // Insert with proper UTF-8 bytes
     table
         .prefix_index
-        .insert("挨拶_朝".as_bytes(), vec![SceneId(0)]);
+        .insert("挨拶_朝".to_string(), vec![SceneId(0)]);
     table
         .prefix_index
-        .insert("挨拶_昼".as_bytes(), vec![SceneId(1)]);
+        .insert("挨拶_昼".to_string(), vec![SceneId(1)]);
     table
         .prefix_index
-        .insert("挨拶_夜".as_bytes(), vec![SceneId(2)]);
+        .insert("挨拶_夜".to_string(), vec![SceneId(2)]);
 
     // Prefix search for "挨拶" should find all three
     let result = table.collect_scene_candidates("", "挨拶");
@@ -253,7 +249,7 @@ fn test_collect_scene_candidates_exclude_local_from_global() {
     ));
     table
         .prefix_index
-        .insert(":他モジュール:選択肢".as_bytes(), vec![SceneId(0)]);
+        .insert(":他モジュール:選択肢".to_string(), vec![SceneId(0)]);
 
     // Search from different module - should NOT find the local scene of another module
     let result = table.collect_scene_candidates("会話_1", "選択肢");
@@ -410,11 +406,10 @@ fn test_resolve_scene_id_cycling() {
             create_test_scene_info(1, "OnTalk2", "OnTalk"),
             create_test_scene_info(2, "OnTalk3", "OnTalk"),
         ],
-        prefix_index: {
-            let mut map = RadixMap::new();
-            map.insert(b"OnTalk", vec![SceneId(0), SceneId(1), SceneId(2)]);
-            map
-        },
+        prefix_index: BTreeMap::from([(
+            "OnTalk".to_string(),
+            vec![SceneId(0), SceneId(1), SceneId(2)],
+        )]),
         cache: HashMap::new(),
         random_selector: selector,
     };
@@ -462,11 +457,10 @@ fn test_resolve_scene_id_cycling_reshuffles() {
             create_test_scene_info(1, "OnTalk2", "OnTalk"),
             create_test_scene_info(2, "OnTalk3", "OnTalk"),
         ],
-        prefix_index: {
-            let mut map = RadixMap::new();
-            map.insert(b"OnTalk", vec![SceneId(0), SceneId(1), SceneId(2)]);
-            map
-        },
+        prefix_index: BTreeMap::from([(
+            "OnTalk".to_string(),
+            vec![SceneId(0), SceneId(1), SceneId(2)],
+        )]),
         cache: HashMap::new(),
         random_selector: selector,
     };
@@ -502,11 +496,10 @@ fn test_resolve_scene_id_cycling_preserves_candidates() {
             create_test_scene_info(1, "OnTalk2", "OnTalk"),
             create_test_scene_info(2, "OnTalk3", "OnTalk"),
         ],
-        prefix_index: {
-            let mut map = RadixMap::new();
-            map.insert(b"OnTalk", vec![SceneId(0), SceneId(1), SceneId(2)]);
-            map
-        },
+        prefix_index: BTreeMap::from([(
+            "OnTalk".to_string(),
+            vec![SceneId(0), SceneId(1), SceneId(2)],
+        )]),
         cache: HashMap::new(),
         random_selector: selector,
     };
@@ -696,11 +689,10 @@ fn test_resolve_scene_id_selector_applies_to_candidate_order_each_round() {
             create_test_scene_info(1, "OnTalk2", "OnTalk"),
             create_test_scene_info(2, "OnTalk3", "OnTalk"),
         ],
-        prefix_index: {
-            let mut map = RadixMap::new();
-            map.insert(b"OnTalk", vec![SceneId(2), SceneId(0), SceneId(1)]);
-            map
-        },
+        prefix_index: BTreeMap::from([(
+            "OnTalk".to_string(),
+            vec![SceneId(2), SceneId(0), SceneId(1)],
+        )]),
         cache: HashMap::new(),
         random_selector: selector,
     };

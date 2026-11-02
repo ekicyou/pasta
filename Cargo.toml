@@ -20,7 +20,6 @@ keywords = ["shiori", "ghost", "ukagaka"]
 pest = "2.8.6"
 pest_derive = { version = "2.8.6", features = ["grammar-extras"] }
 thiserror = "2"
-fast_radix_trie = "1.2.0"
 rand = "0.10"
 tracing = "0.1"
 

@@ -293,15 +293,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fast_radix_trie"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7701a4d392aaead14b674de1c69f43ce2432d903981d851f7034bc1b0ba63983"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -896,7 +887,6 @@ dependencies = [
 name = "pasta_core"
 version = "0.4.4"
 dependencies = [
- "fast_radix_trie",
  "rand",
  "thiserror 2.0.21",
 ]
