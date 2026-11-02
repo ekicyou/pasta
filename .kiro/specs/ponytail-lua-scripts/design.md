@@ -42,6 +42,7 @@
 - `book/src/debug/validate.md` の組み込みの飛び先の一覧（同じ理由で変わらない）。
 - `EVENT.fire` の「`SHIORI/` で始まる文字列は応答全体」の決まり（公開の決まりのまま。指摘 14 は受け手の側で直す）。
 - README・`steering/tech.md` の断り書き、`scriptlibs/`、`pasta/areka/init.lua`。
+- `pasta/shiori/event/kick.lua` と、それを書いた内部の頁の記述（`internals/debug.md` 34 行の `wrap_local_func` など）。0.5.0 の `debug-mcp-runtime` がキックごと消す（設計の決定 10）。
 - 正時の手前で見送ったトークの決まり（決定 1）・続きの中の日時の変数（決定 2）。
 
 ### Allowed Dependencies
@@ -134,7 +135,6 @@ graph TB
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/second_change.lua` — `CALLBACK.sweep(…, act.req)` と、要求を 2 つ目の引数で渡す（指摘 7）。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua` — `hour_margin` を局所の `finite_or` で解決する。`check_talk` の `get_config` をトーク時刻に届いた後へ動かす。キックの説明の古いコメントを直す（指摘 1・8）。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua` — `create_scene_coroutine` を消し、`SCENE.wrap(result.func)` を返す（指摘 3）。
-- `crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua` — `wrap_local_func`・`wrap_reload_func` を消す。シーンは `SCENE.co_exec_registered`、再読み込みは `SCENE.wrap` で作り、印は局所の `preempt` で付ける（指摘 3）。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/external_control.lua` — 包みを `SCENE.wrap` に、`fail`・`quoted`・`is_name`・`bad_reference0` を `FAILURE` の部品に替える（指摘 3・10）。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/scene_play.lua` — `fail`・`quoted`・`is_name`・`bad_reference0` を `FAILURE` の部品に替える（指摘 10）。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/recommend.lua` — `run_menu` の引き当てを `SCENE.get_exact` に、`OnRecommendsiteChoice` の失敗を `FAILURE.reply` に替える。受け手の値が `SHIORI/` で始まるときだけ `RES.ok` で包む局所の `as_value` を足す（指摘 10・14）。
@@ -177,9 +177,10 @@ graph TB
 - `book/src/internals/shiori.md` — 設定の読み（505 行あたり）、時計の節の期限（549 行あたり）、既定ハンドラの表の `REG.OnSecondChange` の `sweep` の呼び方（449 行あたり）、コールバックの節の `co_callback` の言及と再開の値（458〜471 行あたり）。`ponytail-shiori` とは別の節。
 - `book/src/internals/execution-model.md` — コールバック待ちとの関係（旗の記述を消す）、`set_co_scene` の手順、`EVENT.drive` の手順 6 の説明、再開のループの上限、シーンコルーチンの作り方の表、`pasta.lua_version` の言及。
 - `book/src/internals/internal-modules.md` — `co_callback`・`co_preempt` の欄、シーン文脈の復元、`scene_names`、`call_expr`・`drop_self`、`ACTOR_WORD_BUILDER_IMPL`、`get_global_name`、単語の取り出し口、`pasta.buf`・`pasta.lua_version` の節。
-- `book/src/internals/talk-output.md`・`book/src/internals/index.md`・`book/src/internals/registry-search.md`・`book/src/internals/debug.md`（34 行の `wrap_local_func`。`ponytail-lua-debug` と別の節） — 消した部品の名前を今の名前に直す。
+- `book/src/internals/talk-output.md`・`book/src/internals/index.md`・`book/src/internals/registry-search.md` — 消した部品の名前を今の名前に直す（`internals/debug.md` のキックの記述は残す。設計の決定 10）。
 - `.claude/skills/*/references/*.md` — `node book/tools/gen-skill-refs.mjs` で作り直す（手で書かない）。
 - `.kiro/specs/novel-checkpoint-rollback/brief.md` — 24 行の `STORE.co_callback` を「待ちのコルーチンは `CALLBACK.pending` だけが持つ」に直す（実装のとき・要件 6.5）。
+- `.kiro/specs/shiori4-v4-lua-api/brief.md` — 20・43 行の `STORE.co_callback` の前提を、同じコミットで同じく直す（要件 6.5・設計の決定 8）。
 
 ## System Flows
 
@@ -533,7 +534,7 @@ function SCENE.create_scene(base_name, local_name, scene_func) end -- 最後は 
 - `SCENE.get_global_name` を消す（使い手はテストと内部の頁だけ）。
 - おすすめメニューの、組み立てを呼ばない動かし方（`recommend.lua` の `coroutine.create(fn)`）は写しではないので残す（4.1 の但し書き）。
 
-#### WrapCallers（`choice_select.lua`・`kick.lua`・`external_control.lua`）
+#### WrapCallers（`choice_select.lua`・`external_control.lua`）
 
 | Field | Detail |
 |-------|--------|
@@ -541,7 +542,7 @@ function SCENE.create_scene(base_name, local_name, scene_func) end -- 最後は 
 | Requirements | 4.1 |
 
 - `choice_select.lua`: `return SCENE.wrap(result.func)`。
-- `kick.lua`: 局所の `preempt(co)` が `STORE.co_preempt[co] = true` を付けて `co` を返す。再読み込みは `preempt(SCENE.wrap(function(a) a:raw_script("\\![reload,shiori]") end))`。シーンは `SCENE.co_exec_registered(parent or scene_name, local_name or "__start__")`（合成名 `:親:ローカル` の分け方は今の `string.match` のまま。合わなければ両方 `nil` で、大域の `__start__` を引く）が返れば `preempt` する。キックの印は呼ぶ側に残す（4.1 の但し書き）。`pasta.scene` は今と同じく `try_dispatch` の中で読む。解決できないときの警告は今と同じ。
+- `kick.lua` は触らない（設計の決定 10）。0.5.0 の `debug-mcp-runtime` がファイルごと消すので、`wrap_local_func`・`wrap_reload_func` は自前の包みのまま残る。`SCENE` の公開の部品は消さないので、そのまま動く。
 - `external_control.lua`: `return SCENE.wrap(function(a) handler(a, table.unpack(args, 1, n)) end)`。`pasta.scene` は関数の中で読む。
 
 #### EventFailureParts（`pasta/failure.lua`）
@@ -583,7 +584,7 @@ function FAILURE.fn_succeeded(act, ...) end
 
 - 使い手: `scene_play.lua`・`external_control.lua`（`reply`・`is_name`・`quoted`・`bad_reference0`）、`recommend.lua`（`reply`）、`act.lua`・`actor.lua`（`fn_succeeded`）。記録の中身（種類・対象・説明・警告の文言）は 1 文字も変えない。
 - `pasta.failure` は読み込み時に何も `require` しない今の形を保つ（act はメソッドだけを呼ぶ）。
-- Risks: `pasta.failure` に SHIORI のイベントの言い回し（`Reference0`）が入る（Assumption D4）。
+- Risks: `pasta.failure` に SHIORI のイベントの言い回し（`Reference0`）が入る（Assumption D4）。受け持ちが広がったことを `internal-modules.md` の `pasta.failure` の節に書く（設計の決定 3）。
 
 #### CallContext（`pasta/act.lua`・`pasta/actor.lua`）
 
@@ -620,7 +621,8 @@ function ACTOR.drop_self(act, r, ...) end
 **Implementation Notes**
 - Integration: `tests/transpiler/fallback_search_integration_test.rs` の見せかけの act（T1・T12）は `restore_scene(fn, ...)` を `return fn(...)` にする。
 - Validation（5.3）: `act_call_restore_test.lua` の 661〜686 行の確かめを、「`＊天気・雨の日` の中で単語の関数（中で `init_scene` する関数と、しない関数の両方）を呼んだ後、`scene_name`・`local_scene_name`・`line_map` が呼ぶ前の値」に書き換える（決定 5）。`STOP.response` が `＊天気・雨の日` と `dic\…pasta:N` を出す結合の確かめも足す（`＠関数（）`・`＠＊関数（）`・単語の関数・アクターの行の 4 つの道）。
-- Validation（5.4・5.5）: `function GLOBAL.挨拶(act) return act:talk(nil, "やあ") end` を `＠＊挨拶（）` で呼ぶと台詞に `table:` が出ない。`act.さくら` を返す関数も同じ。`return "a", "b"` は 2 つとも返る。
+- Validation（5.4・5.5）: `function GLOBAL.挨拶(act) return act:talk(nil, "やあ") end` を `＠＊挨拶（）` で呼ぶと台詞に `table:` が出ない。`act.さくら` を返す関数も同じ。`return "a", "b"` は 2 つとも返る。プロキシの段（`さくら：＠関数（）`）の関数が別のアクターのプロキシ（`act.うにゅう`）を返すと何も出ない確かめも足し、D3 の広がりを固める（設計の決定 5）。
+- Docs: `internal-modules.md` に、`restore_scene` の引数が `(scene, ...)` から `(fn, ...)` に変わったことをはっきり書く。関数でない引数のときの専用のエラー文は足さない（内部の API で、作者が呼ぶ見込みが無い。設計の決定 6）。
 - Risks: プロキシの段の正規化が、同じプロキシだけでなくすべてのプロキシに広がる（Assumption D3）。広がった分は、今は `table: 0x…` を出していた場合だけである。
 
 #### ActorWords（`pasta/actor.lua`）
@@ -683,7 +685,7 @@ function ACTOR.drop_self(act, r, ...) end
 1. 数でない `hour_margin` で、正時の手前の OnSecondChange が表記の応答を出さず、間隔どおりに OnTalk のシーンが出る（1.2・1.3）。
 2. `act.var.x = "上\n下"` を `＄x` で出すシーンの応答が 1 行の `Value` で `\e` で終わる（2.4）。おすすめメニューとキャプションの `SHIORI/` で始まる値（2.5）。
 3. 続きを 180 秒後に再開して呼ぶ `get_property` の期限・応答・時間切れ（3.1〜3.4）。
-4. 中断の台詞とコールバック待ちが同じ再開で起きた後、コールバックで再開して区切ったシーンが続きになる（4.5）。`chain_talk_interrupt_test.lua`・`callback_module_test.lua`・`shiori_entry_test.lua`・`kick_*_test.lua`・`choice_select_test.lua`・`external_control_event_test.lua`・`scene_play_event_test.lua`・`recommend_menu_test.lua` の既存の確かめがすべて通る（4.4・4.15）。
+4. 中断の台詞とコールバック待ちが同じ再開で起きた後、コールバックで再開して区切ったシーンが続きになる（4.5）。`chain_talk_interrupt_test.lua`・`callback_module_test.lua`・`shiori_entry_test.lua`・`kick_*_test.lua`（`kick.lua` は触らないが、通ることは確かめる）・`choice_select_test.lua`・`external_control_event_test.lua`・`scene_play_event_test.lua`・`recommend_menu_test.lua` の既存の確かめがすべて通る（4.4・4.15）。
 5. 何も出さずに区切り続けるシーンで、`SHIORI.request` が返り、応答の表記にシーン名が出る（5.1）。関数を呼んだ後の行の実行時のエラーの表記に `＊天気・雨の日` と `dic\…pasta:N` が出る（5.3）。
 
 ### Regression（整理の関門）
@@ -701,7 +703,7 @@ function ACTOR.drop_self(act, r, ...) end
 6. 続きの `get_property` の期限（7。`act.lua`・`shiori/act.lua`・`callback.lua`・`second_change.lua`）。`script-api.md`・`internals/shiori.md` の時計とコールバックの節・`execution-model.md` の掃引の節。
 7. 旗と `close` の分岐を消す（4）。内部の頁・`novel-checkpoint-rollback` の brief。
 8. 何も出さない区切りの上限（11）。`call-jump.md`・`execution-model.md`。
-9. `SCENE.wrap`・`get_exact` と呼び手、`co_exec`・`register`・`create_scene`（3・9 の後半・10 の引き当て・18 の 2 重の検査）。
+9. `SCENE.wrap`・`get_exact` と呼び手（`kick.lua` は除く）、`co_exec`・`register`・`create_scene`（3・9 の後半・10 の引き当て・18 の 2 重の検査）。
 10. `FAILURE` の部品と呼び手（10 の表記・18 の `fn_succeeded`）。
 11. `restore_scene` の新しい形と `scene_names` の削除（12）。内部の頁。
 12. ACT の段の戻り値の正規化（13）。`script-api.md`・`internal-modules.md`。
@@ -718,8 +720,20 @@ function ACTOR.drop_self(act, r, ...) end
 - **D5（上限の数と文）**: 上限は 10,000 回、文は `何も出さない区切りが 10000 回続いた`。
 - **D6（`SHIORI/` の値）**: 受け手は `SHIORI/` で始まる値だけを `RES.ok` で包む。ほかの値は今の戻り値のまま。
 
-## Open Questions / Risks
+## 設計の決定事項（2026-11-02 設計ディスカッションで、全議題を推奨案で確定）
 
-- `shiori4-v4-lua-api/brief.md`（20・43 行）も `STORE.co_callback` を前提にしている。要件 6.5 は `novel-checkpoint-rollback` だけを挙げる。実装のとき、同じコミットで直すかを決める（推奨: 直す）。
+1. 続きの期限の「今」は、シーンの act が自分を再開した要求を `_resume_req` に控えて数える（ResumeDeadline・D2）。brief の案（`CLOCK` が直近の時刻を持つ）は採らない。1 つの VM で走る Lua の spec の間で、モジュールの状態が持ち越されるため。
+2. 何も出さない区切りの上限は 10,000 回、文は `何も出さない区切りが 10000 回続いた`（D5）。
+3. イベントの失敗の部品は `pasta/failure.lua` に置き、受け持ちが広がったことを内部の頁に書く（D4）。
+4. メニューの受け手は、値が `SHIORI/` で始まるときだけ `RES.ok` で包む（D6）。
+5. `ACTOR.drop_self` は act とどのプロキシも空にする。広がった分（別のアクターのプロキシを返す場合）はテストで固める（D3）。
+6. `restore_scene` は名前を残して `(fn, ...)` の形にし、`internal-modules.md` に形の変化を書く。専用のエラー文は足さない。
+7. RES は渡された表を写してから書く（D1）。
+8. `shiori4-v4-lua-api/brief.md` の `STORE.co_callback` の前提も、`novel-checkpoint-rollback` の brief と同じコミットで直す（要件 6.5 に足した）。
+9. `sakura_builder.lua` の `config.buffer_factory` は、代わりのバッファと一緒に消す。
+10. `kick.lua` は範囲から外し、触らない。0.5.0 の `debug-mcp-runtime` がキックごと消す（brief の 2026-11-02 の申し送り）。包む手順をまとめる相手は `scene.lua`・`choice_select.lua`・`external_control.lua`。`entry.lua`・`virtual_dispatcher.lua` へのほかの直しは進める。
+
+## Risks
+
 - `gen-skill-refs` は `.claude/skills/*/references/` を書く。この環境では `.claude/skills` の書き込みを分類器が拒むことがある。拒まれたら、入った分と残りを示して開発者に許可を求める。
 - `tests/transpiler/fallback_search_integration_test.rs` は、同じウェーブの `ponytail-lua-transpiler` も触るかもしれない。見せかけの act の 2 行だけなので、後から入る側が rebase で合わせる。

@@ -253,3 +253,8 @@
 - `.claude/skills/kiro-spec-design/SKILL.md` と `rules/design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`（軽い調査・3 つの見方・レビューの関門）。
 - `pasta-lua-coding`（`MODULE`／`MODULE_IMPL` の分け方、`STORE` で循環を避ける規約、EmmyLua の型注釈）。新しい関数の契約の書き方に使った。
 - レビューの関門: 要件の ID 48 個がすべて設計に出ることを機械的に確かめた。境界・ファイルの計画・コンポーネントとファイルの対応を確かめた。1 回目の見直しで、コールバックの後の期限（当初は前提として残していた）を設計に取り込み、`Store` の欄を足した。
+
+## 設計ディスカッションの決定（2026-11-02）
+
+- 10 の議題をすべて推奨案で確定した。中身と理由は design.md の「設計の決定事項」。
+- 決定 10（`kick.lua` を範囲から外す）は、discovery「Pasta DSL MCP移行検討」（PR#221）の申し送りによる。`debug-mcp-runtime` がキックごと消すので、写しを直してもすぐ捨てることになる。

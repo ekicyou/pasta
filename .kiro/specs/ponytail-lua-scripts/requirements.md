@@ -24,7 +24,7 @@
 | ---- | ---- | ---- | ---- |
 | 1 | 数でない `[ghost].hour_margin` で、話す時刻に毎秒エラー | 挙動を変える | 1 |
 | 2 | 応答の見出しの値の CR/LF で応答が割れる | 挙動を変える | 2 |
-| 3 | シーンのコルーチンを包む関数の写し（`scene.lua`・`choice_select.lua`・`kick.lua` の 2 つ・`external_control.lua`） | 整理 | 4 |
+| 3 | シーンのコルーチンを包む関数の写し（`scene.lua`・`choice_select.lua`・`external_control.lua`。`kick.lua` の 2 つは `debug-mcp-runtime` がファイルごと消すので除く） | 整理 | 4 |
 | 4 | 届かない `coroutine.close` の分岐（`event/init.lua`・`store.lua`）と、余計な旗 `STORE.co_callback` | 整理 | 4 |
 | 5 | `SHIORI.load`・`SHIORI.unload` が空の関数を `xpcall` で包む | 整理 | 4 |
 | 6 | 素通しの包み `ActorWordBuilder` | 整理 | 4 |
@@ -49,7 +49,7 @@
 - **In scope**:
   - 上の指摘 1〜21 の修正と、その振る舞いを固めるテスト（`crates/pasta_lua/tests/lua_specs/**`、`crates/pasta_lua/tests/shiori/**` のうち、この領域を確かめるもの）。
   - 挙動を変える直しに合わせたマニュアルの直し（`book/src/internals/shiori.md` の時計とトークの節、`book/src/lua/shiori-events.md` の設定の表と RES の表、`book/src/reference/pasta-toml.md` の `hour_margin` の行、`book/src/internals/execution-model.md`、`book/src/internals/internal-modules.md`）と、`gen-skill-refs` が作る references。
-  - `.kiro/specs/novel-checkpoint-rollback/brief.md` の `STORE.co_callback` の言及の直し（実装のとき）。
+  - `.kiro/specs/novel-checkpoint-rollback/brief.md`・`.kiro/specs/shiori4-v4-lua-api/brief.md` の `STORE.co_callback` の言及の直し（実装のとき）。
 - **Out of scope**:
   - 空の `pasta.areka`（`pasta/areka/init.lua`）。0.6.0 の `novel-areka-contract` の置き場として残す（2026-10-19 開発者の決定）。
   - Rust 側（`crates/pasta_lua/src/**`。`ponytail-lua-loader`・`ponytail-lua-transpiler`・`ponytail-lua-debug` が持つ）。`apply_shiori_defaults` が型を見ないことも、Rust 側は変えない（Lua 側で既定に戻す）。
@@ -104,7 +104,7 @@
 **Objective:** As a pasta の Lua ランタイムを読む開発者, I want 写し・死んだ分岐・素通しの包み・使い手の無い部品が無いこと, so that 直すときに 1 か所を読めば済み、同じ直しを何か所にもしなくてよい
 
 #### Acceptance Criteria
-1. The Lua ランタイム shall シーンの関数をコルーチンに包み、終わりに組み立てた結果を返す手順を、1 か所にまとめる（指摘 3。キックの「指名した再生」の印は、呼ぶ側に残す。おすすめメニューの、組み立てを呼ばない動かし方は写しではないので残す）。
+1. The Lua ランタイム shall シーンの関数をコルーチンに包み、終わりに組み立てた結果を返す手順を、1 か所にまとめる（指摘 3。`kick.lua` は 0.5.0 の `debug-mcp-runtime` がファイルごと消すので数に入れず、触らない。おすすめメニューの、組み立てを呼ばない動かし方は写しではないので残す）。
 2. The Lua ランタイム shall LuaJIT 2.1 で届かない `coroutine.close` の分岐を持たない（指摘 4）。
 3. The Lua ランタイム shall コールバック待ちに入ったかを、グローバルの旗を介さずに、続きの決め直しへ渡す（指摘 4）。
 4. The Lua ランタイム shall この整理の後も、`chain-talk-interrupt` の続きの決まり（台詞を出さないシーンは続きに触れない・中断の台詞が出た回は続きを残さない・手順の順）を保つ。
@@ -138,7 +138,7 @@
 2. When マニュアルの章を直す, the pasta の開発者 shall `gen-skill-refs` を走らせ、スキルの references を章と同じ中身にする（`gen-skill-refs.mjs --check` が通る）。
 3. When 整理（要件 4）で部品や旗を消す, the pasta のマニュアル shall 内部の頁（`internal-modules.md`・`execution-model.md`）から、消した部品と旗（`STORE.co_callback` など）の記述を消し、今の手順を書く。
 4. The 既定の `main.lua` shall 使用例に、実在する関数だけを使う（指摘 16）。
-5. When `STORE.co_callback` を消す, the pasta の開発者 shall `novel-checkpoint-rollback` の brief の、`co_callback` を前提にした記述を直す。
+5. When `STORE.co_callback` を消す, the pasta の開発者 shall `novel-checkpoint-rollback` と `shiori4-v4-lua-api` の brief の、`co_callback` を前提にした記述を直す。
 
 ### Requirement 7: 直しの確かめ方
 **Objective:** As a pasta の開発者, I want 1 つ直すごとに振る舞いが確かめられること, so that 整理で振る舞いが変わっていないと言え、変わったときに 1 つ戻せば済む
