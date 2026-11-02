@@ -274,3 +274,106 @@ fn choice_timeout_records_cue_pasta_line_via_pipeline() {
         sink.records
     );
 }
+
+// ============================================================================
+// Lua ブロックの素通しと行の対応（ponytail-lua-transpiler 要件 7.1・7.3）
+//
+// アクター辞書（4〜8 行）とローカルシーン（16〜20 行）の Lua ブロックに、要件 1.2 の 5 行
+// （長い文字列と `end` の前の空行）を置く。
+// ============================================================================
+
+const LUA_BLOCK_SOURCE: &str = "\
+％さくら
+　＠通常：\\s[0]
+```lua
+local MSG = [[
+こんにちは
+
+end
+]]
+```
+
+＊会話
+　　さくら：こんにちは。
+　・朝・挨拶
+　　　さくら：おはよう。
+```lua
+local MSG = [[
+こんにちは
+
+end
+]]
+```
+";
+
+/// 要件 1.2 の 5 行（ブロックの内容）
+const BLOCK_LINES: [&str; 5] = ["local MSG = [[", "こんにちは", "", "end", "]]"];
+
+/// 生成コードの中で `BLOCK_LINES` が続いた行として現れる先頭の行（1 始まり）を全部返す。
+fn block_start_lines(lua: &str) -> Vec<u32> {
+    let lines: Vec<&str> = lua.lines().collect();
+    lines
+        .windows(BLOCK_LINES.len())
+        .enumerate()
+        .filter(|(_, w)| *w == BLOCK_LINES)
+        .map(|(i, _)| i as u32 + 1)
+        .collect()
+}
+
+/// 7.1（1.1・1.3）: アクター辞書とローカルシーンのブロックの内容が、字下げも空行の削除もなく、
+/// 続いた行としてそのまま出る。
+#[test]
+fn lua_block_content_is_emitted_verbatim_in_actor_and_local_scene() {
+    let lua = crate::common::e2e_helpers::transpile(LUA_BLOCK_SOURCE);
+    assert_eq!(
+        block_start_lines(&lua).len(),
+        2,
+        "1.1: both blocks must appear verbatim as consecutive lines\n{lua}"
+    );
+}
+
+/// 7.3（2.3・2.4）: ブロックの各行の `.lua` の行が `.pasta` のその行を指す。デバッグのシンクの
+/// 記録（最終の行に直した対応表）と `init_scene` に渡す対応の両方で、空行より後の行も合う。
+#[test]
+fn lua_block_lines_map_to_their_pasta_lines_in_sink_and_init_scene() {
+    use pasta_lua::debug::source_map::MapBuilderSink;
+
+    let file = parse_str(LUA_BLOCK_SOURCE, "block.pasta").expect("parse ok");
+    let mut sink = MapBuilderSink::new("block.pasta".to_string(), "chunk".to_string());
+    let mut output = Vec::new();
+    let (_, shift) = LuaTranspiler::default()
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
+        .expect("transpile ok");
+    let chunk = sink.finish(&shift);
+    let lua = String::from_utf8(output).unwrap();
+
+    let starts = block_start_lines(&lua);
+    assert_eq!(starts.len(), 2, "{lua}");
+    // アクター辞書のブロックは .pasta 4 行目から、ローカルシーンのブロックは 16 行目から
+    for (lua_start, pasta_start) in [(starts[0], 4), (starts[1], 16)] {
+        for k in 0..BLOCK_LINES.len() as u32 {
+            assert_eq!(
+                chunk.pasta_for_lua(lua_start + k).map(|p| p.line),
+                Some(pasta_start + k),
+                "sink: lua {} must map to pasta {}\n{lua}",
+                lua_start + k,
+                pasta_start + k
+            );
+        }
+    }
+
+    // ローカルシーンのブロックは、そのグローバルシーンの 2 つの init_scene の対応に入る
+    let maps = crate::basic_test::init_scene_line_maps(&lua);
+    assert_eq!(maps.len(), 2, "{lua}");
+    for (file, pairs) in &maps {
+        assert_eq!(file, "block.pasta");
+        for k in 0..BLOCK_LINES.len() as u32 {
+            assert!(
+                pairs.contains(&(starts[1] + k, 16 + k)),
+                "init_scene: ({}, {}) must be in {pairs:?}\n{lua}",
+                starts[1] + k,
+                16 + k
+            );
+        }
+    }
+}

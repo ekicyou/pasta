@@ -126,8 +126,8 @@ fn actor_skips_empty_words_and_non_lua_code_blocks() {
         text
     );
     assert!(
-        text.ends_with("end\n\n"),
-        "block closed via end_block: {}",
+        text.ends_with("end\n") && !text.ends_with("\n\n"),
+        "block closed via end_block without a trailing blank line: {}",
         text
     );
 }

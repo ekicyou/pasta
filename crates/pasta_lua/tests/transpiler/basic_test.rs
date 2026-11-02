@@ -481,7 +481,7 @@ fn test_init_scene_receives_written_scene_names() {
 
 /// 生成コードの `init_scene` の 4 つ目の引数（1 行の文字列の定数）から行の対応を取り出す。
 /// 形は `"<.pasta のファイル>|<.lua の行>:<.pasta の行>,..."`。
-fn init_scene_line_maps(lua_code: &str) -> Vec<(String, Vec<(u32, u32)>)> {
+pub(crate) fn init_scene_line_maps(lua_code: &str) -> Vec<(String, Vec<(u32, u32)>)> {
     lua_code
         .lines()
         .filter(|l| l.contains("act:init_scene("))

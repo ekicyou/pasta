@@ -39,10 +39,17 @@ pub struct LuaCodeGenerator<'a, W: Write> {
     /// 1-based line number of the most recently emitted output line.
     ///
     /// Starts at 0 (nothing emitted yet) and is incremented by exactly 1 for each
-    /// line terminator written through the emit choke points (`writeln`,
-    /// `write_blank_line`, the raw expression-statement terminator, and per embedded
-    /// `\n` in `write_raw`). Internal only: never alters emitted bytes.
+    /// line terminator actually written (`writeln`, flushed pending blank lines,
+    /// `write_line_terminator`, and per embedded `\n` in `write_raw`). Pending
+    /// blank lines are not counted until written, so the count always equals the
+    /// number of `\n` in the emitted bytes.
     out_line: u32,
+    /// 保留中の区切りの空行の数（次の書き出しで出す。`end` の前では捨てる）。
+    ///
+    /// `self.writer` へ直接書いてよいのは `write_indent`・`write_raw`（頭で保留を
+    /// 出す）と `write_line_terminator`・`generate_expr`（いつもそのどちらかの後）
+    /// だけ。ほかの所から書くと空行の位置がずれる。
+    pending_blank_lines: u32,
     /// Optional source-map sink (producer side of the `debug -> code_gen` seam).
     ///
     /// `None` for production transpile (byte-identical, zero-cost). When `Some`, the
@@ -72,6 +79,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             indent_level: 0,
             line_ending: LineEnding::default(),
             out_line: 0,
+            pending_blank_lines: 0,
             source_map: None,
             line_map_slots: Vec::new(),
         }
@@ -84,6 +92,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             indent_level: 0,
             line_ending,
             out_line: 0,
+            pending_blank_lines: 0,
             source_map: None,
             line_map_slots: Vec::new(),
         }
@@ -177,8 +186,19 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
     }
 
-    /// Write indentation at current level.
+    /// Write all pending blank lines and advance `out_line` for each.
+    fn flush_blank_lines(&mut self) -> Result<(), TranspileError> {
+        while self.pending_blank_lines > 0 {
+            write!(self.writer, "{}", self.line_ending.as_str())?;
+            self.out_line += 1;
+            self.pending_blank_lines -= 1;
+        }
+        Ok(())
+    }
+
+    /// Write indentation at current level (pending blank lines first).
     fn write_indent(&mut self) -> Result<(), TranspileError> {
+        self.flush_blank_lines()?;
         let indent = "    ".repeat(self.indent_level);
         write!(self.writer, "{}", indent)?;
         Ok(())
@@ -195,22 +215,21 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Write a blank line without indentation.
-    ///
-    /// Emits exactly one line terminator, so it advances `out_line` by 1.
+    /// Hold one separating blank line (written by the next write, dropped before
+    /// `end`). Does not advance `out_line` until written.
     fn write_blank_line(&mut self) -> Result<(), TranspileError> {
-        write!(self.writer, "{}", self.line_ending.as_str())?;
-        self.out_line += 1;
+        self.pending_blank_lines += 1;
         Ok(())
     }
 
-    /// Write without indentation.
+    /// Write without indentation (pending blank lines first).
     ///
     /// `s` may contain embedded newlines; `out_line` is advanced by the number of
     /// `\n` characters in `s` so the counter stays accurate regardless of content.
     /// (Current call sites pass fragments without a trailing terminator — the
     /// terminator is emitted separately via [`write_line_terminator`].)
     fn write_raw(&mut self, s: &str) -> Result<(), TranspileError> {
+        self.flush_blank_lines()?;
         write!(self.writer, "{}", s)?;
         self.out_line += s.matches('\n').count() as u32;
         Ok(())
@@ -239,11 +258,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
     }
 
-    /// Close a block: dedent, write `end`, and add a blank line.
+    /// Close a block: dedent, drop pending blank lines, write `end`, and hold a
+    /// separating blank line (so a blank appears only before a following sibling).
     ///
     /// Common pattern used by actor, global scene, and local scene generators.
     fn end_block(&mut self) -> Result<(), TranspileError> {
         self.dedent();
+        self.pending_blank_lines = 0;
         self.writeln("end")?;
         self.write_blank_line()?;
         Ok(())
@@ -274,10 +295,11 @@ mod tests {
         }
     }
 
-    /// `out_line` accounting contract: starts at 0; `writeln` and
-    /// `write_blank_line` advance by exactly 1; `write_raw` advances by the
-    /// number of embedded `\n` (0 for plain fragments); `write_line_terminator`
-    /// advances by 1. The emitted bytes must match the counter exactly.
+    /// `out_line` accounting contract: starts at 0; `writeln` advances by 1;
+    /// `write_blank_line` only holds a pending blank (no advance) that the next
+    /// write flushes; `write_raw` advances by the flushed blanks plus the number
+    /// of embedded `\n`; `write_line_terminator` advances by 1. The emitted bytes
+    /// must match the counter exactly.
     #[test]
     fn out_line_advances_per_choke_point_and_matches_bytes() {
         let mut output = Vec::new();
@@ -289,14 +311,10 @@ mod tests {
             assert_eq!(cg.out_line(), 1, "writeln advances by 1");
 
             cg.write_blank_line().unwrap();
-            assert_eq!(cg.out_line(), 2, "write_blank_line advances by 1");
+            assert_eq!(cg.out_line(), 1, "a pending blank line does not advance");
 
             cg.write_raw("frag").unwrap();
-            assert_eq!(
-                cg.out_line(),
-                2,
-                "write_raw without newline does not advance"
-            );
+            assert_eq!(cg.out_line(), 2, "write_raw flushes the pending blank");
 
             cg.write_raw("x\ny\nz").unwrap();
             assert_eq!(cg.out_line(), 4, "write_raw advances per embedded newline");
@@ -311,6 +329,34 @@ mod tests {
             5,
             "byte-level line count must equal final out_line"
         );
+    }
+
+    /// Pending blank lines: the next `writeln` writes all of them first;
+    /// `end_block` discards them before `end`; pending blanks left at the end of
+    /// generation are never written. Newline count always equals `out_line`.
+    #[test]
+    fn pending_blank_lines_flush_on_write_and_drop_before_end() {
+        let mut output = Vec::new();
+        let final_out_line;
+        {
+            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            cg.writeln("do").unwrap();
+            cg.indent();
+            cg.writeln("a").unwrap();
+            cg.write_blank_line().unwrap();
+            cg.write_blank_line().unwrap();
+            assert_eq!(cg.out_line(), 2, "pending blanks do not advance");
+            cg.writeln("b").unwrap();
+            assert_eq!(cg.out_line(), 5, "next writeln flushes both blanks");
+            cg.write_blank_line().unwrap();
+            cg.end_block().unwrap(); // drops the pending blank, holds one after `end`
+            cg.write_blank_line().unwrap();
+            final_out_line = cg.out_line();
+        }
+        let text = String::from_utf8(output).unwrap();
+        assert_eq!(text, "do\n    a\n\n\n    b\nend\n");
+        assert_eq!(final_out_line, 6);
+        assert_eq!(text.matches('\n').count() as u32, final_out_line);
     }
 
     /// `writeln` indents 4 spaces per level; `dedent` decreases one level and
@@ -335,10 +381,10 @@ mod tests {
         assert_eq!(text, "zero\n        two\n    one\nzero2\n");
     }
 
-    /// `end_block` closes a block: dedents one level, writes `end` at the new
-    /// level, then a blank line.
+    /// `end_block` closes a block: dedents one level and writes `end` at the new
+    /// level; the separating blank after `end` stays pending (not written).
     #[test]
-    fn end_block_dedents_then_writes_end_and_blank_line() {
+    fn end_block_dedents_then_writes_end_without_blank_line() {
         let mut output = Vec::new();
         {
             let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
@@ -348,7 +394,7 @@ mod tests {
             cg.end_block().unwrap();
         }
         let text = String::from_utf8(output).unwrap();
-        assert_eq!(text, "do\n    body\nend\n\n");
+        assert_eq!(text, "do\n    body\nend\n");
     }
 
     /// CRLF line ending is honored by both `writeln` and `write_blank_line`,
@@ -361,24 +407,26 @@ mod tests {
             let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::CrLf);
             cg.writeln("a").unwrap();
             cg.write_blank_line().unwrap();
+            cg.writeln("b").unwrap();
             final_out_line = cg.out_line();
         }
-        assert_eq!(String::from_utf8(output).unwrap(), "a\r\n\r\n");
-        assert_eq!(final_out_line, 2);
+        assert_eq!(String::from_utf8(output).unwrap(), "a\r\n\r\nb\r\n");
+        assert_eq!(final_out_line, 3);
     }
 
-    /// `write_header` emits the exact two require lines plus a trailing blank
-    /// line (byte-exact with LF endings).
+    /// `write_header` emits the exact two require lines; the separating blank
+    /// line stays pending (byte-exact with LF endings).
     #[test]
     fn write_header_emits_exact_require_lines() {
         let mut output = Vec::new();
         {
             let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
             cg.write_header().unwrap();
+            assert_eq!(cg.out_line(), 2);
         }
         assert_eq!(
             String::from_utf8(output).unwrap(),
-            "local PASTA = require \"pasta\"\nlocal GLOBAL = require \"pasta.global\"\n\n"
+            "local PASTA = require \"pasta\"\nlocal GLOBAL = require \"pasta.global\"\n"
         );
     }
 

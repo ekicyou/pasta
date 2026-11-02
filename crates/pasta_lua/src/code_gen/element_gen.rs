@@ -458,7 +458,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     /// Source-map wiring (Requirements 1.1, 1.3): the block is emitted one `.lua`
     /// line per `.pasta` content line (1:1 line correspondence — `content.lines()`
-    /// is each emitted via exactly one `writeln`). Each output line is mapped
+    /// is each emitted as one unindented line). Each output line is mapped
     /// INDIVIDUALLY to its originating `.pasta` line so in-block breakpoints resolve
     /// precisely, instead of collapsing the whole block onto a single span line.
     ///
@@ -481,9 +481,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         } else {
             0 // sentinel: record_block_line skips pasta_line == 0 (and subsequent)
         };
-        // Output code content with proper indentation
+        // Output each content line as written: no indentation, blank lines written
+        // directly (not pending) so they survive even right before `end`.
         for (offset, line) in block.content.lines().enumerate() {
-            self.writeln(line)?;
+            self.write_raw(line)?;
+            self.write_line_terminator()?;
             if content_start_line > 0 {
                 self.record_block_line(content_start_line + offset as u32);
             }

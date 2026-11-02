@@ -594,3 +594,42 @@ end
         ["warn|act:talk - undefined variable: 'var.未代入'"]
     );
 }
+
+// ========================================================================
+// Lua ブロックの長い文字列（ponytail-lua-transpiler 要件 1.2・7.2）
+// ========================================================================
+
+/// アクター辞書とローカルシーンの Lua ブロックの長い文字列は、実行すると作者が書いた中身になる。
+/// ブロックの 6 行目で値をグローバルに移して読む。
+#[test]
+fn test_lua_block_long_string_keeps_authored_content() {
+    let source = "\
+％さくら
+　＠通常：\\s[0]
+```lua
+local MSG = [[
+こんにちは
+
+end
+]]
+LT_ACTOR_MSG = MSG
+```
+
+＊会話
+　　さくら：こんにちは。
+　・朝・挨拶
+　　　さくら：おはよう。
+```lua
+local MSG = [[
+こんにちは
+
+end
+]]
+LT_SCENE_MSG = MSG
+```
+";
+    let lua = create_runtime_with_finalize().unwrap();
+    lua.load(transpile(source)).exec().unwrap();
+    assert_eq!(eval_str(&lua, "return LT_ACTOR_MSG"), "こんにちは\n\nend\n");
+    assert_eq!(eval_str(&lua, "return LT_SCENE_MSG"), "こんにちは\n\nend\n");
+}

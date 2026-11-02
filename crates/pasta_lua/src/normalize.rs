@@ -3,10 +3,10 @@
 //! This module provides output buffer normalization to remove trailing blank lines
 //! and ensure consistent EOF markers.
 
-/// Normalize output buffer by removing trailing blank lines and blank lines before `end`.
+/// Normalize output buffer by removing trailing blank lines.
 ///
 /// # Behavior
-/// 1. Removes blank lines immediately before `end` keywords
+/// 1. Normalizes CRLF to LF
 /// 2. Removes trailing whitespace (spaces, tabs, newlines)
 /// 3. Appends exactly one newline
 ///
@@ -15,8 +15,7 @@
 ///
 /// # Postconditions
 /// - Return value ends with exactly "\n"
-/// - Content blank lines not immediately before `end` are preserved
-/// - No blank line appears immediately before `end` keyword
+/// - Blank lines anywhere before the tail (including before `end`) are preserved
 ///
 /// # Examples
 /// ```
@@ -25,7 +24,7 @@
 /// assert_eq!(normalize_output("code\n\n\n"), "code\n");
 /// assert_eq!(normalize_output("code"), "code\n");
 /// assert_eq!(normalize_output("a\n\nb\n\n"), "a\n\nb\n");
-/// assert_eq!(normalize_output("    end\n\nend\n"), "    end\nend\n");
+/// assert_eq!(normalize_output("    end\n\nend\n"), "    end\n\nend\n");
 /// ```
 pub fn normalize_output(input: &str) -> String {
     // Thin wrapper: byte-identical to `normalize_output_with_shift(input).0`
@@ -35,8 +34,8 @@ pub fn normalize_output(input: &str) -> String {
 
 /// Old-line → new-line shift map produced by output normalization.
 ///
-/// Normalization is **deletion-only** (it removes blank lines immediately before
-/// an `end` keyword and trailing blank lines / trailing whitespace). This map
+/// Normalization is **deletion-only** (it removes only the trailing blank lines /
+/// trailing whitespace). This map
 /// records which pre-normalize line numbers were deleted so a consumer can rebase
 /// recorded pre-normalize line positions onto the final `.lua` line numbers
 /// (Requirement 2.1).
@@ -88,9 +87,8 @@ impl LineShift {
 ///
 /// # Postconditions
 /// - `.0` equals the legacy `normalize_output(input)` byte-for-byte.
-/// - `.1` records exactly the lines deleted (blank-before-`end` and trailing
-///   blank lines), so `map` resolves surviving lines and returns `None` for
-///   deleted ones.
+/// - `.1` records exactly the lines deleted (the trailing blank lines), so
+///   `map` resolves surviving lines and returns `None` for deleted ones.
 pub fn normalize_output_with_shift(input: &str) -> (String, LineShift) {
     // Normalize CRLF to LF first
     let input_lf = input.replace("\r\n", "\n");
@@ -98,87 +96,20 @@ pub fn normalize_output_with_shift(input: &str) -> (String, LineShift) {
     // Split into lines (preserving the content, not the line endings).
     // `lines[idx]` is pre-normalize line number `idx + 1` (1-based, == out_line).
     let lines: Vec<&str> = input_lf.lines().collect();
-    let mut result_lines: Vec<&str> = Vec::with_capacity(lines.len());
-    // Surviving pre-normalize line numbers (1-based), parallel to `result_lines`.
-    let mut surviving: Vec<u32> = Vec::with_capacity(lines.len());
-    let mut deleted: Vec<u32> = Vec::new();
 
-    // Process lines, removing blank lines before `end`
-    // Use a loop that can skip blank lines when followed by `end`
-    let mut i = 0;
-    while i < lines.len() {
-        let line = lines[i];
-        let trimmed = line.trim();
+    // Every line survives except the trailing whitespace-only lines: the last line
+    // that contains any non-whitespace character is kept, everything after it is
+    // deleted (all lines when none is kept). Ascending by construction.
+    let kept = lines
+        .iter()
+        .rposition(|l| !l.trim().is_empty())
+        .map_or(0, |k| k + 1);
+    let deleted: Vec<u32> = (kept + 1..=lines.len()).map(|n| n as u32).collect();
 
-        // Check if this is a blank line
-        if trimmed.is_empty() {
-            // Look ahead to find if any subsequent line starts with `end`
-            // (skipping any other blank lines)
-            let mut j = i + 1;
-            let mut found_end = false;
-
-            // Check only the immediate next non-blank line
-            while j < lines.len() {
-                let next_trimmed = lines[j].trim();
-                if next_trimmed.is_empty() {
-                    // Another blank line, skip it too
-                    j += 1;
-                    continue;
-                }
-                // Found a non-blank line, check if it starts with `end`
-                if next_trimmed == "end" {
-                    found_end = true;
-                }
-                break;
-            }
-
-            if found_end {
-                // Skip (delete) this blank line; record its 1-based number.
-                deleted.push((i + 1) as u32);
-                i += 1;
-                continue;
-            }
-        }
-
-        result_lines.push(line);
-        surviving.push((i + 1) as u32);
-        i += 1;
-    }
-
-    // Join lines back with LF
-    let processed = result_lines.join("\n");
-
-    // Trim trailing whitespace (spaces, tabs, carriage returns, newlines).
-    // This removes trailing whole blank lines (whole-line deletions) and trims
-    // in-line trailing whitespace on the last surviving content line (NOT a line
-    // deletion — it does not change the line count).
-    let trimmed = processed.trim_end_matches([' ', '\t', '\r', '\n']);
-
-    // Determine which surviving lines were dropped by the trailing trim. The trim
-    // removes trailing whitespace-only lines; the last line that contains any
-    // non-whitespace character survives. Everything after it is deleted.
-    let last_kept = result_lines.iter().rposition(|l| !l.trim().is_empty());
-    match last_kept {
-        Some(k) => {
-            // Lines result_lines[k+1..] are whole trailing blank lines: delete.
-            for &pre in &surviving[k + 1..] {
-                deleted.push(pre);
-            }
-        }
-        None => {
-            // All surviving lines are blank: the whole buffer trims to empty, so
-            // every surviving line is deleted (output is a lone "\n").
-            for &pre in &surviving {
-                deleted.push(pre);
-            }
-        }
-    }
-
-    // `deleted` must be ascending for binary search in `map`. The blank-before-end
-    // deletions were pushed in increasing order, then the trailing deletions (also
-    // increasing and all greater than any in-body deletion), so it is already
-    // sorted; sort defensively to guarantee the invariant.
-    deleted.sort_unstable();
+    // Trim trailing whitespace (spaces, tabs, carriage returns, newlines). This
+    // removes the trailing blank lines and trims in-line trailing whitespace on
+    // the last kept line (NOT a line deletion — it does not change the count).
+    let trimmed = input_lf.trim_end_matches([' ', '\t', '\r', '\n']);
 
     // Return with exactly one newline at end
     (format!("{}\n", trimmed), LineShift { deleted })
@@ -250,45 +181,17 @@ mod tests {
         assert_eq!(normalize_output(input), "line1\nline2\nline3\n");
     }
 
-    /// Test 11: Blank line before `end` should be removed
+    /// Test 11: Blank lines before `end` are kept (they may be Lua block
+    /// content, e.g. inside a long string); every line maps to itself.
     #[test]
-    fn test_normalize_blank_line_before_end() {
-        let input = "    end\n\nend\n";
-        assert_eq!(normalize_output(input), "    end\nend\n");
-    }
-
-    /// Test 12: Multiple blank lines before `end` should be reduced to none
-    #[test]
-    fn test_normalize_multiple_blank_lines_before_end() {
-        let input = "    end\n\n\nend\n";
-        // All blank lines before end are removed
-        assert_eq!(normalize_output(input), "    end\nend\n");
-    }
-
-    /// Test 13: Blank line before indented `end` should be removed (preserving indentation)
-    #[test]
-    fn test_normalize_blank_line_before_indented_end() {
-        let input = "code\n\n    end\n";
-        // Blank line before `    end` is removed, but indentation is preserved
-        assert_eq!(normalize_output(input), "code\n    end\n");
-    }
-
-    /// Test 14: Real Lua block pattern
-    #[test]
-    fn test_normalize_lua_do_block() {
-        let input = "do\n    function f()\n        return 1\n    end\n\nend\n";
+    fn test_normalize_keeps_blank_lines_before_end() {
+        let (s, shift) = normalize_output_with_shift("a\n\nend\n");
+        assert_eq!(s, "a\n\nend\n");
+        assert_eq!(shift, LineShift::default());
         assert_eq!(
-            normalize_output(input),
-            "do\n    function f()\n        return 1\n    end\nend\n"
+            normalize_output("    end\n\n\n    end\nend\n"),
+            "    end\n\n\n    end\nend\n"
         );
-    }
-
-    /// Test 15: Nested end blocks
-    #[test]
-    fn test_normalize_nested_end_blocks() {
-        let input = "    end\n\n    end\n\nend\n";
-        // Both blank lines before `end` are removed
-        assert_eq!(normalize_output(input), "    end\n    end\nend\n");
     }
 
     // --- LineShift tests (Requirement 2.1) ---
@@ -322,45 +225,6 @@ mod tests {
                 "byte mismatch for input {input:?}"
             );
         }
-    }
-
-    /// Blank line immediately before `end` is deleted; the surviving lines around
-    /// it map to the correct final line numbers, and the deleted line maps to None.
-    #[test]
-    fn test_shift_blank_before_end_mapping() {
-        // pre-normalize (1-based):
-        //   1: "code"
-        //   2: ""       <- deleted (blank before end)
-        //   3: "end"
-        let input = "code\n\nend\n";
-        let (s, shift) = normalize_output_with_shift(input);
-        assert_eq!(s, "code\nend\n");
-
-        assert_eq!(shift.map(1), Some(1)); // "code" stays line 1
-        assert_eq!(shift.map(2), None); // deleted blank line
-        assert_eq!(shift.map(3), Some(2)); // "end" shifts up to line 2
-    }
-
-    /// Multiple blank lines before `end` are all deleted; surviving lines shift by
-    /// the number of deletions before them and `map` stays monotonic.
-    #[test]
-    fn test_shift_multiple_blanks_before_end_mapping() {
-        // pre-normalize (1-based):
-        //   1: "    end"
-        //   2: ""        <- deleted
-        //   3: ""        <- deleted
-        //   4: "end"
-        let input = "    end\n\n\nend\n";
-        let (s, shift) = normalize_output_with_shift(input);
-        assert_eq!(s, "    end\nend\n");
-
-        assert_eq!(shift.map(1), Some(1));
-        assert_eq!(shift.map(2), None);
-        assert_eq!(shift.map(3), None);
-        assert_eq!(shift.map(4), Some(2));
-
-        // Monotonic over surviving lines: 1 < 2.
-        assert!(shift.map(1).unwrap() < shift.map(4).unwrap());
     }
 
     /// Trailing blank lines are deleted (whole-line) and map to None; in-line
@@ -397,32 +261,25 @@ mod tests {
         assert_eq!(shift.map(2), None); // trailing whitespace line deleted
     }
 
-    /// Combined deletions: blank-before-`end` in the body AND trailing blanks at
-    /// the tail; mapping rebases each surviving line correctly and monotonically.
+    /// A blank line in the body (even right before `end`) is kept; only the
+    /// trailing blanks at the tail are deleted.
     #[test]
-    fn test_shift_combined_body_and_trailing_deletions() {
+    fn test_shift_body_blank_kept_trailing_deleted() {
         // pre-normalize (1-based):
         //   1: "do"
         //   2: "    f()"
-        //   3: ""        <- deleted (blank before end)
+        //   3: ""        <- kept (body blank before end)
         //   4: "end"
         //   5: ""        <- deleted (trailing blank)
         //   6: ""        <- deleted (trailing blank)
         let input = "do\n    f()\n\nend\n\n\n";
         let (s, shift) = normalize_output_with_shift(input);
-        assert_eq!(s, "do\n    f()\nend\n");
+        assert_eq!(s, "do\n    f()\n\nend\n");
 
-        assert_eq!(shift.map(1), Some(1));
-        assert_eq!(shift.map(2), Some(2));
-        assert_eq!(shift.map(3), None);
-        assert_eq!(shift.map(4), Some(3));
+        let survivors: Vec<u32> = (1..=6).filter_map(|p| shift.map(p)).collect();
+        assert_eq!(survivors, vec![1, 2, 3, 4]);
         assert_eq!(shift.map(5), None);
         assert_eq!(shift.map(6), None);
-
-        // Monotonic across all surviving lines.
-        let survivors: Vec<u32> = (1..=6).filter_map(|p| shift.map(p)).collect();
-        assert_eq!(survivors, vec![1, 2, 3]);
-        assert!(survivors.windows(2).all(|w| w[0] < w[1]));
     }
 
     /// Empty input: the producer emits no lines, so there are zero recorded

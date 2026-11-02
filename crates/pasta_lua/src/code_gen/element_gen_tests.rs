@@ -456,6 +456,27 @@ fn code_block_with_invalid_span_emits_lines_without_records() {
     );
 }
 
+/// Inside an indented block, code block content lines are emitted exactly as
+/// written: no indentation added, blank content lines written directly (not
+/// pending), so a blank line right before the closing `end` survives.
+#[test]
+fn code_block_is_not_indented_and_keeps_blank_lines_before_end() {
+    let text = gen_to_string(|cg| {
+        cg.writeln("do")?;
+        cg.indent();
+        cg.generate_code_block(&CodeBlock {
+            language: Some("lua".to_string()),
+            content: "local MSG = [[\nこんにちは\n\nend\n]]\n\n".to_string(),
+            span: Span::default(),
+        })?;
+        cg.end_block()
+    });
+    assert_eq!(
+        text, "do\nlocal MSG = [[\nこんにちは\n\nend\n]]\n\nend\n",
+        "block content must be verbatim, blank lines kept"
+    );
+}
+
 // ------------------------------------------------------------------
 // Actor reference / global function call forms (runtime safety)
 // ------------------------------------------------------------------

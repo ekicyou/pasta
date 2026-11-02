@@ -136,11 +136,11 @@ fn test_out_line_counter_matches_emitted_line_count() {
     let mut output = Vec::new();
     let mut codegen = LuaCodeGenerator::new(&mut output);
 
-    // Header emits 3 lines: two requires + one blank line.
+    // Header writes 2 lines (two requires); its trailing blank line is pending.
     codegen.write_header().unwrap();
-    assert_eq!(codegen.out_line(), 3, "header should emit 3 output lines");
+    assert_eq!(codegen.out_line(), 2, "header should emit 2 output lines");
 
-    // Each talk action emits exactly one line.
+    // The talk action flushes the pending blank line, then emits one line.
     codegen
         .generate_action(
             &Action::Talk {
