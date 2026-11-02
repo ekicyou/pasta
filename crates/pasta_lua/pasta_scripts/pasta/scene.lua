@@ -58,12 +58,7 @@ end
 --- @param scene_func function シーン関数
 --- @return nil
 function SCENE.register(global_name, local_name, scene_func)
-    if not STORE.scenes[global_name] then
-        local scene_table = { __global_name__ = global_name }
-        setmetatable(scene_table, scene_table_mt)
-        STORE.scenes[global_name] = scene_table
-    end
-    STORE.scenes[global_name][local_name] = scene_func
+    SCENE.create_global_table(global_name)[local_name] = scene_func
 end
 
 --- グローバルシーンテーブルを作成
@@ -134,7 +129,7 @@ function SCENE.create_scene(base_name, local_name, scene_func)
     if scene_func and local_name then
         SCENE.register(global_name, local_name, scene_func)
     end
-    return SCENE.get_global_table(global_name) or SCENE.create_global_table(global_name)
+    return SCENE.create_global_table(global_name)
 end
 
 --- シーンを名前で検索（プレフィックス検索）
@@ -180,19 +175,17 @@ function SCENE.search(name, global_scene_name, attrs)
     }, scene_result_mt)
 end
 
---- シーン関数をコルーチンで包む（最後に必ず act:build() を呼び、その結果を返す）。
---- @param fn function シーン関数
+--- シーン関数をコルーチンで包む（実行しない）。
+---
+--- 最初の resume で受けた act と残りの引数で fn を呼び、最後に act:build() の結果を返す。
+--- fn の戻り値は捨てる。
+--- @param fn fun(act: Act, ...): any シーン関数
 --- @return thread シーンコルーチン
-local function wrap_scene(fn)
-    -- coroutine.resume 経由で渡される act を受ける
-    local function wrapped_fn(resumed_act, ...)
-        fn(resumed_act, ...)
-        local result = resumed_act:build()
-        if result ~= nil then
-            return result
-        end
-    end
-    return coroutine.create(wrapped_fn)
+function SCENE.wrap(fn)
+    return coroutine.create(function(act, ...)
+        fn(act, ...)
+        return act:build()
+    end)
 end
 
 --- シーン実行コルーチンを作成してコルーチンを返す。
@@ -207,27 +200,22 @@ end
 --- @return thread|nil シーンコルーチン、またはnil
 function SCENE.co_exec(act, name, global_scene_name, attrs)
     local fn = act:find_scene(name, global_scene_name, attrs)
-    if not fn then
-        return nil
-    end
-    -- シーン関数が有効な関数であることを確認
     if type(fn) ~= "function" then
         return nil
     end
-
-    return wrap_scene(fn)
+    return SCENE.wrap(fn)
 end
 
---- 完全一致でシーンを探し、コルーチンを返す（実行しない）。
+--- 完全一致でシーンの関数を引く（実行しない）。
 ---
 --- local_name が nil なら大域だけを探す。渡せば、その大域の中のローカルを書いた名前どおりに探す。
 --- 今のシーン・act のメソッド・GLOBAL の関数は見ない。
 ---
 --- @param name string 大域シーンの書いた名前（例: "つっつき反応女の子Head"）
 --- @param local_name string|nil ローカルシーンの書いた名前
---- @return thread|nil co シーンコルーチン。見つからなければ nil
---- @return "global"|"local"|nil miss co が nil のとき、見つからなかった側
-function SCENE.co_exec_exact(name, local_name)
+--- @return function|nil fn シーン関数。見つからなければ nil
+--- @return "global"|"local"|nil miss fn が nil のとき、見つからなかった側
+function SCENE.get_exact(name, local_name)
     local SEARCH = require("@pasta_search")
     local global_name, found_local, miss
     if local_name == nil then
@@ -243,11 +231,25 @@ function SCENE.co_exec_exact(name, local_name)
     if not global_name then
         return nil, miss
     end
-    local co = SCENE.co_exec_registered(global_name, found_local)
-    if not co then
+    local fn = SCENE.get(global_name, found_local)
+    if type(fn) ~= "function" then
         return nil, miss
     end
-    return co
+    return fn
+end
+
+--- 完全一致でシーンを探し、コルーチンを返す（実行しない）。引き方と 2 つ目の値は SCENE.get_exact と同じ。
+---
+--- @param name string 大域シーンの書いた名前
+--- @param local_name string|nil ローカルシーンの書いた名前
+--- @return thread|nil co シーンコルーチン。見つからなければ nil
+--- @return "global"|"local"|nil miss co が nil のとき、見つからなかった側
+function SCENE.co_exec_exact(name, local_name)
+    local fn, miss = SCENE.get_exact(name, local_name)
+    if not fn then
+        return nil, miss
+    end
+    return SCENE.wrap(fn)
 end
 
 --- 登録名の組（例: "会話_1", "__start__" / "会話_1", "挨拶_1"）からコルーチンを返す（実行しない）。
@@ -260,7 +262,7 @@ function SCENE.co_exec_registered(global_name, local_name)
     if type(fn) ~= "function" then
         return nil
     end
-    return wrap_scene(fn)
+    return SCENE.wrap(fn)
 end
 
 return SCENE

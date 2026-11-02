@@ -182,28 +182,27 @@ EVENT.fire(req)
 
 ### シーンコルーチンの作り方
 
-シーン関数をコルーチンにする箇所は、どれも同じ包み方をする。
+シーン関数をコルーチンに包むのは `SCENE.wrap`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`）の 1 か所である。キックだけは、同じ形の包みを `kick.lua` の中に持つ。
 
 ```lua
-local function wrapped_fn(resumed_act, ...)
-    fn(resumed_act, ...)               -- シーン関数本体
-    local result = resumed_act:build() -- 残りのトークを組み立てる
-    if result ~= nil then
-        return result                  -- コルーチンの最後の値になる
-    end
+function SCENE.wrap(fn)
+    return coroutine.create(function(act, ...)
+        fn(act, ...)          -- シーン関数本体
+        return act:build()    -- 残りのトークを組み立てる。コルーチンの最後の値になる
+    end)
 end
-return coroutine.create(wrapped_fn)
 ```
 
 | 箇所 | シーン関数の得方 |
 | ---- | ---------------- |
 | `SCENE.co_exec`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `act:find_scene(名前)`。`EVENT.no_entry`・既定の OnBoot・仮想イベント・明示的な OnChoiceSelectEx シーン・既定の OnMouseDoubleClick と OnMouseMove（ショートカットが見つからないとき）が使う |
-| `SCENE.co_exec_exact`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `search_scene_exact(名前, nil)` か `search_local_scene_exact(名前, ローカル名)` の結果で `SCENE.get`。完全一致のシーンだけ。既定の OnMouseDoubleClick・OnMouseMove がショートカットの 1〜8 段を探すのに、既定の OnPastaScene が名前で指名したシーンを探すのに使う（[co_exec_exact](internal-modules.md#co_exec_exact)） |
-| `SCENE.co_exec_registered`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | 登録名の組で `SCENE.get`。`co_exec_exact` が使うほか、既定の OnPastaSceneAt が位置から引いた組で使う（[co_exec_registered](internal-modules.md#co_exec_registered)） |
-| `create_scene_coroutine`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`） | `SCENE.search(選択 ID, 親)`、無ければ `SCENE.search(選択 ID, nil)`。親は Reference2 のグローバルシーン名（既知のグローバルシーンのとき）か `STORE.last_global_scene`（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)） |
-| `wrap_local_func`・`wrap_reload_func`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`） | シーン表から完全一致で引いたキック対象のシーン関数（`SCENE.get`・`SCENE.get_start`）、または SHIORI 再読み込みのタグだけを出す関数 |
+| `SCENE.co_exec_exact`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `SCENE.get_exact(名前, ローカル名)`（`search_scene_exact(名前, nil)` か `search_local_scene_exact(名前, ローカル名)` の結果で `SCENE.get`）。完全一致のシーンだけ。既定の OnMouseDoubleClick・OnMouseMove がショートカットの 1〜8 段を探すのに、既定の OnPastaScene が名前で指名したシーンを探すのに使う（[co_exec_exact](internal-modules.md#co_exec_exact)） |
+| `SCENE.co_exec_registered`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | 登録名の組で `SCENE.get`。既定の OnPastaSceneAt が位置から引いた組で使う（[co_exec_registered](internal-modules.md#co_exec_registered)） |
+| 既定の OnChoiceSelectEx（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`） | `SCENE.search(選択 ID, 親)`、無ければ `SCENE.search(選択 ID, nil)`。親は Reference2 のグローバルシーン名（既知のグローバルシーンのとき）か `STORE.last_global_scene`（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)） |
+| 既定の OnPastaCallFunction（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/external_control.lua`） | `act:find_handler("scene", Reference0)` で引いた関数を、Reference1 以降を添えて呼ぶ関数で包む |
+| `wrap_local_func`・`wrap_reload_func`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`）。`SCENE.wrap` でなく自前の包み | シーン表から完全一致で引いたキック対象のシーン関数（`SCENE.get`・`SCENE.get_start`）、または SHIORI 再読み込みのタグだけを出す関数 |
 
-- コルーチンは作るだけで、作った時点ではシーン関数は動かない。最初の `resume` で `EVENT.fire` が（`EVENT.drive` を通して）そのイベントの ACT を渡し、それが `resumed_act` になる。
+- コルーチンは作るだけで、作った時点ではシーン関数は動かない。最初の `resume` で `EVENT.fire` が（`EVENT.drive` を通して）そのイベントの ACT を渡し、それが包みの `act` になる。
 - シーン関数の戻り値は捨てられる。応答になるのは、途中の `yield` で渡した値か、最後の `build()` の値である。
 - Call（`act:call`・`act:call_restore`）で呼んだ先のシーン関数は、同じコルーチンの中の通常の関数呼び出しとして動く。呼び先での中断はコルーチン全体の中断になり、再開すると呼び先の続きから進む。途中の Call（`act:call_restore`）は、再開後に呼び先から戻った時点で `current_scene` を呼ぶ前の値に戻す（[シーン文脈の復元](internal-modules.md#シーン文脈の復元call_restorerestore_scene)）。
 
@@ -261,7 +260,7 @@ loop
 
 | 呼び出し元 | 最初の `resume` の引数 | シーン側で受け取る値 |
 | ---------- | ---------------------- | -------------------- |
-| `EVENT.fire`（ハンドラが返したコルーチン） | そのイベントの ACT | 新しく始まったシーンではシーン関数の第 1 引数（`resumed_act`）。継続したシーンでは `coroutine.yield` の戻り値になり、使われない |
+| `EVENT.fire`（ハンドラが返したコルーチン） | そのイベントの ACT | 新しく始まったシーンではシーン関数の第 1 引数（包みの `act`）。継続したシーンでは `coroutine.yield` の戻り値になり、使われない |
 | `CALLBACK.try_route` | `refs, nil, req`（`refs` は Reference を 1 始まりにした配列、`req` は届いた要求） | `get_property` の中の `coroutine.yield` の戻り値 |
 | `CALLBACK.sweep` | `nil, reason, req`（`reason` は `on_timeout` が文字列のときだけ。それ以外は `nil`。`req` は `sweep` に渡された要求で、省略されれば `nil`） | 同上。`get_property` は `reason` があれば `error(reason)` する |
 

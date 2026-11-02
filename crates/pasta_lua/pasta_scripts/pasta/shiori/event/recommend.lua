@@ -120,16 +120,14 @@ local function cut()
 end
 
 --- メニューのシーンをその場で 1 回だけ動かし、積んだ項目を返す（シーンが無ければ nil）
---- EVENT.drive・set_co_scene・wrap_scene を通さない。続きのコルーチンは参照を外して捨てる。
+--- EVENT.drive・set_co_scene・SCENE.wrap を通さない。続きのコルーチンは参照を外して捨てる。
 --- STORE は last_global_scene の控えと戻しのほかに触れない（変数の代入は取り消さない）
 ---@param act ShioriAct
 ---@param id string
 ---@return RecommendItem[]|nil
 local function run_menu(act, id)
-    local global_name, local_name = require("@pasta_search"):search_scene_exact(id)
-    if not global_name then return nil end
-    local fn = require("pasta.scene").get(global_name, local_name)
-    if type(fn) ~= "function" then return nil end
+    local fn = require("pasta.scene").get_exact(id)
+    if not fn then return nil end
     local items = { id = id, calls = 0 }
     act._recommend_items = items
     -- インスタンスの欄で区切りを差し替える: 持ち越し（立ち位置・表情）に触れない組み立てと、

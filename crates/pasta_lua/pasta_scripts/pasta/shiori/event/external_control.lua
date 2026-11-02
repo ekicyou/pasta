@@ -80,9 +80,8 @@ REG.OnPastaCallFunction = REG.OnPastaCallFunction or function(act)
     end
     local args, n = collect_args(act.req.reference)
     -- 呼び先はコルーチンの中で呼ぶ（区切っても続きが EVENT.fire の決まりで進む）。戻り値は捨てる
-    return coroutine.create(function(a)
+    return require("pasta.scene").wrap(function(a)
         handler(a, table.unpack(args, 1, n))
-        return a:build()
     end)
 end
 

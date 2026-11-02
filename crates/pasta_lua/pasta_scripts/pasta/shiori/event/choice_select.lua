@@ -17,23 +17,6 @@ local CHOICE_ID_REF_INDEX = 1
 --- 選択肢を出したグローバルシーン名の Reference インデックス（\q[title,id,scope] → Reference2）
 local CHOICE_SCOPE_REF_INDEX = 2
 
---- SCENE.co_exec と同等のコルーチン作成（スコープ付き SCENE.search 用）
---- co_exec/find_scene は global_scene_name を透過しないため、
---- SCENE.search を直接呼んでコルーチン化する。
---- @param search_result SceneSearchResult SCENE.search の戻り値
---- @return thread シーンコルーチン（act は EVENT.fire の初回 resume 時に渡される）
-local function create_scene_coroutine(search_result)
-    local fn = search_result.func
-    local function wrapped_fn(act, ...)
-        fn(act, ...)
-        local result = act:build()
-        if result ~= nil then
-            return result
-        end
-    end
-    return coroutine.create(wrapped_fn)
-end
-
 ---OnChoiceSelectEx デフォルトハンドラ
 ---明示シーン優先 → 選択ID前方一致検索 → 非マッチ時 nil（204 委譲）
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス可能）
@@ -73,8 +56,8 @@ REG.OnChoiceSelectEx = REG.OnChoiceSelectEx or function(act)
         return nil
     end
 
-    -- 4. コルーチン化して返す（SCENE.co_exec と同じラッパーパターン）
-    return create_scene_coroutine(result)
+    -- 4. コルーチン化して返す（act は EVENT.fire の初回 resume 時に渡される）
+    return SCENE.wrap(result.func)
 end
 
 return REG
