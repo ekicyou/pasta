@@ -449,6 +449,39 @@ fn test_runtime_accessor_none_before_load() {
     assert!(shiori.runtime().is_none());
 }
 
+// ========================================================================
+// ponytail-shiori 1.4: SHIORI.request の無いゴーストへの自前の 204（特性化）
+// ========================================================================
+
+/// SHIORI.request の無いゴーストへの GET は、今は `Charset`・`Sender` の
+/// 2 つのヘッダだけの 204 を返す（`default_204_response`）。
+/// 期待のバイト列はこの定数 1 か所に置く（204 を 1 つにした後に差し替える）。
+const SELF_204_WITHOUT_REQUEST_FN: &str =
+    "SHIORI/3.0 204 No Content\r\nCharset: UTF-8\r\nSender: Pasta\r\n\r\n";
+
+#[test]
+fn test_get_without_request_fn_returns_self_204() {
+    let temp = copy_fixture_to_temp("minimal");
+
+    // scripts/ の entry.lua で SHIORI の関数を何も定義しない（自己展開の既定を抑える）
+    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &entry_lua_path,
+        "-- intentionally defines no SHIORI functions\n",
+    )
+    .unwrap();
+
+    let mut shiori = PastaShiori::default();
+    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+    assert!(shiori.request_fn.is_none());
+
+    let response = shiori
+        .request("GET SHIORI/3.0\r\nCharset: UTF-8\r\nSender: SSP\r\nID: OnBoot\r\n\r\n")
+        .unwrap();
+    assert_eq!(response, SELF_204_WITHOUT_REQUEST_FN);
+}
+
 /// Copy shiori_lifecycle fixture to a temporary directory.
 fn copy_shiori_lifecycle_fixture() -> TempDir {
     let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/shiori_lifecycle");
