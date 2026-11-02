@@ -149,7 +149,7 @@ graph TB
 - `crates/pasta_dsl/tests/parse_speed_test.rs` — 速さのテスト（1.1・1.2）。時間を測るので、ほかのテストと同じプロセスで並んで走らないよう、1 本だけの別のテストのファイルにする。
 - `crates/pasta_dsl/tests/number_literal_test.rs` — 数の値・番号の範囲・誤りの位置と文言のテスト（要件 2・4.3）。
 - `crates/pasta_dsl/tests/nesting_guard_test.rs` — 括弧の重なりと演算子の数の上限のテスト。1 MiB のスタックのスレッドで、解析・片付け・部分解析（`parse_str_partial`）を走らせる（要件 3）。
-- `crates/pasta_lua/tests/parser_limit_stack_test.rs` — 上限ちょうどの式を、1 MiB のスタックのスレッドでトランスパイルし、あふれないことを確かめる（要件 3.6。`code_gen/` は変えない）。
+- `crates/pasta_lua/tests/parser_limit_stack_test.rs` — 上限ちょうどの式を、1 MiB のスタックのスレッドでトランスパイルし、あふれないことを確かめる（要件 3.6。`code_gen/` は変えない）。同じファイルに、65 段の括弧の行を含む辞書のゴーストを、既存のローダのテストと同じ形で読み込み、プロセスを落とさず構文の誤りの読み込みエラーで返ることを確かめるテストを 1 本置く（要件 3.4。議題 8）。
 
 ## System Flows
 
@@ -174,7 +174,7 @@ flowchart TD
 ```
 
 - 括弧の走査は pest の前に走る。pest の再帰は開き括弧 1 つにつき 1 段で、式は 1 行の中で閉じる（`s` は改行を含まず、文字列も行をまたげない）。だから 1 行ずつ数えれば、再帰の深さの上限になる。台詞・文字列・コメント・Lua ブロックの括弧も数える（3.1 の確定）。数えすぎる向きにしかずれないので、あふれは必ず防げる。
-- 走査が pest の前に走るので、65 段以上の行より前に文法の誤りがある辞書では、深い括弧の誤りが出る（前提。OPEN QUESTION 7）。直す前の pest は、前の行の誤りで止まって深い行まで進まないので、この辞書は落ちずに前の行の文法の誤りを返していた。この辞書だけは 1.4 と 3.1 の両方が当てはまり、誤りは 1 つしか返せないので、3.1 を採る（3.3 と同じく、1.4 は 64 段以内の辞書についての約束と読む）。64 段以内の辞書の文法の誤りは、位置も文言も今と同じである（1.4）。
+- 走査が pest の前に走るので、65 段以上の行より前に文法の誤りがある辞書では、深い括弧の誤りが出る（2026-11-02 確定。議題 7）。直す前の pest は、前の行の誤りで止まって深い行まで進まないので、この辞書は落ちずに前の行の文法の誤りを返していた。この辞書だけは 1.4 と 3.1 の両方が当てはまり、誤りは 1 つしか返せないので、3.1 を採る（3.3 と同じく、1.4 は 64 段以内の辞書についての約束と読む）。64 段以内の辞書の文法の誤りは、位置も文言も今と同じである（1.4）。
 - 演算子の検査は、式の鎖を組む前（`build_left_assoc_expr` の前）に走るので、深い木は作られない。値の誤りは、AST を組む順（記述順）で最初の 1 つを返す。
 
 ## Requirements Traceability
@@ -197,7 +197,7 @@ flowchart TD
 | 3.1 | 括弧 64 段を超えると誤り | ParenGuard | `check_paren_depth` | 走査 |
 | 3.2 | 演算子 256 個を超えると誤り | OpGuard | `check_op_count` | 式の分岐 |
 | 3.3 | 上限の中は今と同じ AST | ParenGuard・OpGuard・SpanOracleTest | — | — |
-| 3.4 | pasta.dll が落ちず読み込みエラー | ParenGuard・OpGuard（`pasta_lua` は直さない） | `parse_str` | — |
+| 3.4 | pasta.dll が落ちず読み込みエラー | ParenGuard・OpGuard・ParserLimitStackTest（`pasta_lua` のソースは直さない） | `parse_str` | — |
 | 3.5 | VSCode 拡張の解析が落ちない | ParenGuard・OpGuard（`partial.rs` は直さない） | `parse_str` | — |
 | 3.6 | x86・x64、release・debug の 1 MiB で落ちない | ParenGuard・OpGuard・NestingGuardTest・ParserLimitStackTest | 定数 `MAX_PAREN_DEPTH`・`MAX_EXPR_OPS` | — |
 | 4.1 | 作られない型を提供しない | ErrorTypes | `ParseError` | — |
@@ -315,7 +315,7 @@ pub(crate) fn syntax_error(filename: &str, line_col: (usize, usize), what: &str)
 ```
 - Postconditions: `line` と `column` は 1 から数えた行と桁（桁は文字の数）。BOM を外した文での位置で、pest の誤りの位置とそろう。
 
-**新しい誤りの文（前提。OPEN QUESTION 2）**
+**新しい誤りの文（2026-11-02 確定。議題 2）**
 
 | 誤り | 位置 | `what` |
 |------|------|--------|
@@ -359,7 +359,7 @@ pub(crate) fn check_paren_depth(source: &str, filename: &str) -> Result<(), Pars
 | Requirements | 3.2, 3.3, 3.4, 3.5, 3.6 |
 
 **Responsibilities & Constraints**
-- 「1 つの式」は、式を書ける位置（変数の代入の右辺・Call の動的ターゲット・関数呼び出しと Call の 1 つの引数）に書いた式の全体で、その中の括弧と関数呼び出しの引数の中の式を含む（前提。OPEN QUESTION 1）。
+- 「1 つの式」は、式を書ける位置（変数の代入の右辺・Call の動的ターゲット・関数呼び出しと Call の 1 つの引数）に書いた式の全体で、その中の括弧と関数呼び出しの引数の中の式を含む（2026-11-02 確定。議題 1）。
 - 式の鎖を組む 3 つの関数（`parse_var_set`・`parse_expr_from_parts`・`parse_key_arg`）の頭で、渡された `Pair` の子孫を `Pairs::flatten` で記述順にたどり、演算子の規則（`add_op`・`sub_op`・`mul_op`・`div_op`・`modulo_op`・`concat_op`）を数える。257 個目でその演算子の位置の誤りを返す。
 - 外側の式が内側の式を含むので、外側の検査が先に走って先に止まる。内側の鎖でもう一度数えるが、手間は「式の長さ × 入れ子の深さ（64 段まで）」で済む。
 - 鎖を組む前に止まるので、深い木は作られない。
@@ -432,7 +432,7 @@ pub(crate) fn number_value(pair: &Pair<Rule>, filename: &str) -> Result<Number, 
 **Responsibilities & Constraints**
 - 戻り値を `Option<T>` から `Result<Option<T>, ParseError>` に変える関数：`try_parse_expr`・`parse_expr_from_parts`・`parse_var_ref_local_inner`・`parse_dyn_name`。`None` の意味（項にならない）は今のまま。
 - `try_parse_expr` の `parse_fn_call_inner(pair).ok()?`・`parse_dyn_fn_call_inner(pair).ok()?`（3 か所）は `?` で上へ返す。
-- `try_parse_expr` の演算子の腕（呼び出し元が先に `bin_op_from_rule` で分けるので届かない）と既定の腕（扱いの無い規則の中をたどり、最初の値を項にする）を、1 つの腕にまとめ、位置つきの誤り（`内部の誤り：…`）を返す（6.1。前提。OPEN QUESTION 5）。今の文法で項の位置に来る規則（`paren_expr`・`fn_call_local`・`fn_call_global`・`fn_call_dynamic`・`var_ref_local`・`var_ref_global`・`var_ref_property`・`number_literal`・`string_contents`・`string_blank`）は、すべて明示の腕があるので、AST は変わらない（Research Log）。
+- `try_parse_expr` の演算子の腕（呼び出し元が先に `bin_op_from_rule` で分けるので届かない）と既定の腕（扱いの無い規則の中をたどり、最初の値を項にする）を、1 つの腕にまとめ、位置つきの誤り（`内部の誤り：…`）を返す（6.1。2026-11-02 確定。議題 5）。今の文法で項の位置に来る規則（`paren_expr`・`fn_call_local`・`fn_call_global`・`fn_call_dynamic`・`var_ref_local`・`var_ref_global`・`var_ref_property`・`number_literal`・`string_contents`・`string_blank`）は、すべて明示の腕があるので、AST は変わらない（Research Log）。
 - `filename: &str` を足す関数（`parse_global_scene_scope` と同じ形）：`parse_file_scope`・`parse_actor_scope`・`parse_attr`・`parse_var_set`・`parse_scene_actors_line`・`parse_actors_item`・`parse_local_start_scene_scope`・`parse_local_scene_scope`・`parse_local_scene_item`・`parse_cue_cmd_line`・`parse_cue_cmd_args`・`parse_call_scene`・`parse_action_line`・`parse_continue_action_line`・`parse_actions`・`parse_fn_call_inner`・`parse_dyn_fn_call_inner`・`parse_dyn_name`・`parse_args`・`parse_key_arg`・`parse_expr_from_parts`・`try_parse_expr`・`parse_var_ref_local_inner`。すべて `pub(crate)` か非公開で、`pasta_dsl` の外からは呼ばれない。
 
 **Implementation Notes**
@@ -474,7 +474,7 @@ impl From<std::io::Error> for ParseError { /* 今のまま */ }
 
 #### Docs
 
-- 7.1 の頁を、挙動を変える直しと同じコミットで直す。`literals.md` の文は要件 7.1 の確定のとおり。`variables.md` の上限の文（前提）：「1 行の中で閉じていない括弧を重ねられるのは 64 段まで、1 つの式に書ける演算子は 256 個までである。超えると構文の誤りになる。数えるのは、台詞・文字列・コメント・Lua ブロックの中を含む、その行のすべての括弧である。」
+- 7.1 の頁を、挙動を変える直しと同じコミットで直す。`literals.md` の文は要件 7.1 の確定のとおり。`variables.md` の上限の文（2026-11-02 確定）：「1 行の中で閉じていない括弧を重ねられるのは 64 段まで、1 つの式に書ける演算子は 256 個までである。超えると構文の誤りになる。数えるのは、台詞・文字列・コメント・Lua ブロックの中を含む、その行のすべての括弧である。」
 - `internals/transpiler.md` には、`number_value` の規則・番号の範囲の検査・`check_paren_depth` と `check_op_count` の位置と上限を、今の箇条書きの形で足す。
 - 7.2：README の「独立エラー型」と「Error Types」、`lib.rs` の `ParseErrorInfo` の行を、`ParseError`（`SyntaxError`・`IoError`）に書き直す。
 - 7.3：`node book/tools/gen-skill-refs.mjs` で作り直し、`--check` で差分が無いことを確かめる。
@@ -506,8 +506,8 @@ impl From<std::io::Error> for ParseError { /* 今のまま */ }
 ### 固めるテスト（先に入れる。span_oracle_test.rs）
 
 - **span の正解**（1.3・3.3）：リポジトリの全 `.pasta`（`CARGO_MANIFEST_DIR` の 2 つ上の `crates/` と `.kiro/` の下を歩き、`target`・`node_modules` を除く。2026-11-02 で 56 本はすべてこの 2 つの下にある。ルートから歩くと、本体の作業ツリーでは `.claude/worktrees/` の別のワークツリーの複製まで拾うので、ルートからは歩かない。解析に成功したものだけ）と、端の辞書（`"＊挨拶\r\n  さくら：こんにちは\r\n  ＄x＝（１＋２）\n"`・BOM つき・絵文字 `🎈` と全角を含む行・単独の `\r` を含む台詞・最後の改行の無い辞書）で、AST の `{:?}` から `Span { … }` をすべて拾い、既定の span（全部 0）を除いて、行と桁が `pest::Position::new(src, byte).unwrap().line_col()` と一致することを確かめる。拾った span が 1 つ以上あることも確かめる。
-- **AST の書き出し**（8.1。`#[ignore]`）：環境変数 `PASTA_AST_DUMP_DIR` のフォルダへ、全 `.pasta` の `items` の `{:#?}`（誤りなら `Err` の `{:?}`）を書く。直す前に 1 回、全部の直しの後に 1 回書き出し、`diff -r` で差分が無いことを確かめる（前提。OPEN QUESTION 3）。
-- **速さ**（1.1・1.2。parse_speed_test.rs）：通常のテストで、同じ形の辞書 2,000 行と 8,000 行をそれぞれ 3 回解析した最短の時間の比が 8 倍以内であること。`#[ignore]` のテストで、release の 8,000 行が 1 秒未満、32,000 行と 8,000 行の比が 8 倍以内であること（`cargo test -p pasta_dsl --release --test parse_speed_test -- --ignored`。前提。OPEN QUESTION 4）。
+- **AST の書き出し**（8.1。`#[ignore]`）：環境変数 `PASTA_AST_DUMP_DIR` のフォルダへ、全 `.pasta` の `items` の `{:#?}`（誤りなら `Err` の `{:?}`）を書く。直す前に 1 回、全部の直しの後に 1 回書き出し、`diff -r` で差分が無いことを確かめる（2026-11-02 確定。議題 3）。
+- **速さ**（1.1・1.2。parse_speed_test.rs）：通常のテストで、同じ形の辞書 2,000 行と 8,000 行をそれぞれ 3 回解析した最短の時間の比が 8 倍以内であること。`#[ignore]` のテストで、release の 8,000 行が 1 秒未満、32,000 行と 8,000 行の比が 8 倍以内であること（`cargo test -p pasta_dsl --release --test parse_speed_test -- --ignored`。2026-11-02 確定。議題 4）。
 - **誤りの形**（1.4）：今の `error_api_test.rs` の `parse_str` の誤りのテスト（位置・`SyntaxError`）を残す。
 
 ### 単体・統合テスト（number_literal_test.rs）
@@ -526,8 +526,9 @@ impl From<std::io::Error> for ParseError { /* 今のまま */ }
 - 演算子 256 個（括弧 64 段の内側に置いた上限ちょうどの形を含む）は通り、257 個は 257 個目の位置の誤り。括弧をまたいで合わせて 257 個も誤り。2 つの関数呼び出しの引数に 200 個ずつは通る。1 万個もプロセスを落とさず誤り（3.2・3.3）。
 - `parse_str_partial` に 65 段の行と 1 万個の演算子の行を含む文書を渡しても落ちないこと（3.5。`partial.rs` は変えない）。
 - `parser_limit_stack_test.rs`：上限ちょうどの 5 つの形（関数呼び出し 64 段・括弧 64 段・動的な関数呼び出し 64 段・アクション行の関数呼び出し 64 段・Call の引数の中の 63 段。どれも演算子 256 個）を、1 MiB のスレッドで `LuaTranspiler::default().transpile` まで走らせる（3.6）。
+- `parser_limit_stack_test.rs` のローダのテスト：65 段の括弧の行を含む辞書のゴーストを読み込むと、プロセスが落ちず、`parse_str` と同じ行・桁の構文の誤りで読み込みエラーになる（3.4）。
 - x86 は省かない。期待は x86 と x64 で同じなので、`cfg(target_pointer_width)` で分けない。確かめる手順：`cargo test -p pasta_dsl --test nesting_guard_test --test span_oracle_test --test number_literal_test` と `cargo test -p pasta_lua --test parser_limit_stack_test` を、`--target i686-pc-windows-msvc`・`--target x86_64-pc-windows-msvc` のそれぞれで、debug と `--release` の 4 通り走らせる。
-- VSCode 拡張の WASM（`wasm-pack build --release`、wasm32 のスタックは既定の 1 MiB。`build-wasm.ps1` は変えていない）は、上の native の release の余裕（x64 release は 256 KiB でも通る）から通る見込みとし、実機では測らない（前提。OPEN QUESTION 6）。
+- VSCode 拡張の WASM（`wasm-pack build --release`、wasm32 のスタックは既定の 1 MiB。`build-wasm.ps1` は変えていない）は、上の native の release の余裕（x64 release は 256 KiB でも通る）から通る見込みとし、実機では測らない（2026-11-02 確定。議題 6）。
 
 ### `pasta_check`（validate_rules_test.rs）
 
@@ -563,7 +564,7 @@ impl From<std::io::Error> for ParseError { /* 今のまま */ }
 
 ## Open Questions / Risks
 
-設計の前提（【前提】）として推奨案で書き、設計ディスカッションで確かめる。
+2026-11-02 の設計ディスカッションで、1〜8 をすべて推奨案で確定した（開発者の一括承認）。
 
 1. **演算子 256 個を数える「1 つの式」の範囲**（3.2）
    - 案：(a) 式を書ける位置に書いた式の全体（括弧と、中の関数呼び出しの引数の式を含む）、(b) 文法の `expr` の 1 つの鎖ごと（括弧の中は別の式）、(c) 1 行ごと。
@@ -589,6 +590,10 @@ impl From<std::io::Error> for ParseError { /* 今のまま */ }
    - 案：(a) 深い括弧の誤り（走査を pest の前に置くだけ）、(b) 深い行の前までを pest に通し、そこで誤りが出ればそれを返す、(c) 走査で見つけた深い行を空の行に置き換えて pest に通し、文法の誤りが前にあればそれを返す。
    - 推奨：(a)。3.1 は「64 段を超えたら 65 段目の位置の誤り」を求めていて、(a) はそれをそのまま満たす。(b)・(c) は pest の誤りの文言（期待した規則の一覧）が、切った・置き換えた文のせいで今と変わらないことを証明できない。作者は、どちらの誤りを直しても次の誤りが出るので、困らない。
    - 例：`＊挨拶\n  ＠\n  ＄x＝（…65 段…）\n` は、今は 2 行目の文法の誤り、(a) では 3 行目の括弧の誤り。
+
+8. **pasta.dll の読み込みで落ちないことを、テストで確かめるか**（3.4。設計レビューの指摘 3）
+   - 案：(a) `parser_limit_stack_test.rs` に、ローダから 65 段の括弧の辞書を読むテストを 1 本足す、(b) 同じ `parse_str` を通るという構造の説明だけにする。
+   - 確定：(a)。小さなテスト 1 本で、3.4 を構造の説明でなく実物で確かめられる。
 
 **他の spec への申し送り（この spec では直さない）**
 
