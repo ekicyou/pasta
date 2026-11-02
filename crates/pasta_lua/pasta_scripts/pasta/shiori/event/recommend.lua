@@ -284,10 +284,9 @@ REG.OnRecommendsiteChoice = REG.OnRecommendsiteChoice or function(act)
     if co then return co end
     -- 書き間違いを ＊OnRecommendsiteChoice で隠さない
     local FAILURE = require("pasta.failure")
-    FAILURE.report(act, {
+    return FAILURE.reply(act, {
         label = FAILURE.LABEL.SCENE_NOT_FOUND,
         subject = "＊" .. item.scene,
         warning = "OnRecommendsiteChoice: scene not found: name='" .. item.scene .. "'",
     })
-    return act:build()
 end

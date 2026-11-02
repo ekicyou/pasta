@@ -179,15 +179,6 @@ local function drop_self(self, r, ...)
     return r, ...
 end
 
---- 関数の参照が成功したとき、呼んだ関数が戻った後に「報告済み」の印を偽にし、戻り値をそのまま返す
---- @param act Act アクションオブジェクト
---- @param ... any 関数の戻り値
---- @return any ...
-local function fn_succeeded(act, ...)
-    FAILURE.set_fn_failed(act, false)
-    return ...
-end
-
 --- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(act, ...)、非function → 失敗の報告+nil
 --- 見つかった段にかかわらず第 1 引数は常に ACT。戻り値は drop_self で正規化する
 --- @param self ActorProxy プロキシオブジェクト
@@ -199,7 +190,7 @@ local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
         local scene = self.act.current_scene
-        return fn_succeeded(self.act, drop_self(self, self.act:restore_scene(scene, handler(self.act, ...))))
+        return FAILURE.fn_succeeded(self.act, drop_self(self, self.act:restore_scene(scene, handler(self.act, ...))))
     end
     FAILURE.set_fn_failed(self.act, true)
     return FAILURE.report(self.act, {

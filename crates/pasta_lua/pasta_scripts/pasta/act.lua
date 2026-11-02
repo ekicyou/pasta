@@ -445,16 +445,6 @@ function ACT_IMPL.word(self, name, var_path)
     return tostring(handler)
 end
 
---- 関数の参照が成功したとき、呼んだ関数が戻った後に「報告済み」の印を偽にし、戻り値をそのまま返す
---- （関数の中の別の参照が印を真にしても、戻った時点で偽に戻す）
---- @param act Act アクションオブジェクト
---- @param ... any 関数の戻り値
---- @return any ...
-local function fn_succeeded(act, ...)
-    FAILURE.set_fn_failed(act, false)
-    return ...
-end
-
 --- expr ポストプロセス（expr_fn・expr_fn_var 共通）: function → h(self, ...)、非function → 失敗の報告+nil
 --- どちらの場合も「報告済み」の印（FAILURE.set_fn_failed）を書く（act:call_key が重ねて報告しないため）
 --- @param self Act アクションオブジェクト
@@ -466,7 +456,7 @@ local function call_expr(self, key, skip_methods, ...)
     local handler = self:find_handler("expr", key, skip_methods)
     if type(handler) == "function" then
         local scene = self.current_scene
-        return fn_succeeded(self, self:restore_scene(scene, handler(self, ...)))
+        return FAILURE.fn_succeeded(self, self:restore_scene(scene, handler(self, ...)))
     end
     FAILURE.set_fn_failed(self, true)
     return FAILURE.report(self, {
@@ -551,7 +541,7 @@ function ACT_IMPL.global_fn(self, name, ...)
     local f = GLOBAL[name]
     if type(f) == "function" then
         local scene = self.current_scene
-        return fn_succeeded(self, self:restore_scene(scene, f(self, ...)))
+        return FAILURE.fn_succeeded(self, self:restore_scene(scene, f(self, ...)))
     end
     FAILURE.set_fn_failed(self, true)
     return FAILURE.report(self, {

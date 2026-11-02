@@ -178,6 +178,53 @@ function FAILURE.report(act, record)
     return nil
 end
 
+--- イベントの失敗: 報告し（FAILURE.report と同じ）、act:build() の結果を返す（表記を出さない設定なら nil のことがある）
+---@param act table
+---@param record FailureRecord
+---@return string|nil
+function FAILURE.reply(act, record)
+    FAILURE.report(act, record)
+    return act:build()
+end
+
+--- 名前になる値か（空でない文字列）
+---@param v any
+---@return boolean
+function FAILURE.is_name(v)
+    return type(v) == "string" and v ~= ""
+end
+
+--- ログの警告に出す引数の値（nil は "nil"、それ以外は引用符で囲む）
+---@param v any
+---@return string
+function FAILURE.quoted(v)
+    return v == nil and "nil" or ("'" .. tostring(v) .. "'")
+end
+
+--- イベントの Reference0 が無い・空のときの失敗（FAILURE.reply で返す）
+---@param act table
+---@param event string  イベントの名前
+---@param value any  Reference0 の値
+---@return string|nil
+function FAILURE.bad_reference0(act, event, value)
+    return FAILURE.reply(act, {
+        label = FAILURE.LABEL.BAD_NAME,
+        subject = event .. " Reference0",
+        detail = FAILURE.kind_of(value),
+        warning = event .. ": bad argument: Reference0=" .. FAILURE.quoted(value),
+    })
+end
+
+--- 関数の参照が成功したとき、呼んだ関数が戻った後に「報告済み」の印を偽にし、残りの引数をそのまま返す
+--- （関数の中の別の参照が印を真にしても、戻った時点で偽に戻す）
+---@param act table
+---@param ... any  関数の戻り値
+---@return any ...
+function FAILURE.fn_succeeded(act, ...)
+    FAILURE.set_fn_failed(act, false)
+    return ...
+end
+
 --- 実行中の act の対応表（スレッド → act）
 local RUNNING = setmetatable({}, { __mode = "k" })
 --- 直前の関数呼び出しが報告済みか（act → 真偽値）
