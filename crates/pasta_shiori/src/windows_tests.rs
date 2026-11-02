@@ -288,22 +288,72 @@ fn dll_main_non_attach_paths() {
     assert_eq!(DllMain(0, 99, ptr::null_mut()), 1);
 }
 
-/// プロセス終了による DETACH（reserved 非 null）は teardown（unload）を呼ばない。
+/// 旧来の置き場を埋める（実在しないフォルダの `loadu`。VM は起きず置き場だけ埋まる）。
+fn fill_legacy_slot() {
+    let missing = std::env::temp_dir().join("pasta_dllmain_missing_dir_for_test");
+    let (h, len) = alloc_str_handle(missing.to_str().expect("temp path must be UTF-8"));
+    assert_eq!(loadu(h, len), 0, "loadu with a missing dir must fail");
+}
+
+/// 置き場が埋まっているかを GET で見る（埋まっていれば 500、空なら安全網の 204）。
+fn legacy_slot_is_filled() -> bool {
+    let (h, mut len) = alloc_str_handle("GET SHIORI/3.0\r\nID: version\r\n\r\n");
+    let res = request(h, &mut len);
+    let body = read_and_free(res, len);
+    if body.as_bytes() == default_204().as_bytes() {
+        return false;
+    }
+    assert!(body.starts_with("SHIORI/3.0 500"), "unexpected: {body}");
+    true
+}
+
+/// 特性化テスト 5（1.6・1.7）: FreeLibrary の detach（reserved が null）は今、置き場を空にする。
+/// task 7 で「detach の後も埋まったまま・unload で片付く」に改める。
+#[test]
+fn dll_main_free_library_detach_empties_legacy_slot() {
+    let _guard = lock_global_state();
+    const DLL_PROCESS_DETACH: u32 = 0;
+    const DLL_PROCESS_ATTACH: u32 = 1;
+
+    fill_legacy_slot();
+    assert!(legacy_slot_is_filled(), "precondition: slot must be filled");
+
+    // attach は 1 を返すだけ（置き場に触れない）。
+    assert_eq!(DllMain(0, DLL_PROCESS_ATTACH, ptr::null_mut()), 1);
+    assert!(legacy_slot_is_filled(), "attach must not touch the slot");
+
+    assert_eq!(DllMain(0, DLL_PROCESS_DETACH, ptr::null_mut()), 1);
+    assert!(
+        !legacy_slot_is_filled(),
+        "FreeLibrary detach currently empties the slot"
+    );
+    assert!(!LOADU_INITIALIZED.load(Ordering::SeqCst));
+
+    assert_eq!(unload(), 1);
+}
+
+/// プロセス終了による DETACH（reserved 非 null）は 1 を返すだけで teardown（unload）を呼ばない。
 #[test]
 fn dll_main_process_termination_detach_skips_teardown() {
     let _guard = lock_global_state();
     const DLL_PROCESS_DETACH: u32 = 0;
     let mut marker = 0u8;
 
-    LOADU_INITIALIZED.store(true, Ordering::SeqCst);
+    fill_legacy_slot();
+    assert!(LOADU_INITIALIZED.load(Ordering::SeqCst));
     assert_eq!(
         DllMain(0, DLL_PROCESS_DETACH, (&mut marker as *mut u8).cast()),
         1
     );
-    // 後始末を通っていればフラグは下りている。
+    // 後始末を通っていればフラグは下り、置き場は空になっている。
     assert!(LOADU_INITIALIZED.load(Ordering::SeqCst));
+    assert!(
+        legacy_slot_is_filled(),
+        "termination detach must not touch the slot"
+    );
 
     assert_eq!(unload(), 1);
+    assert!(!legacy_slot_is_filled(), "cleanup: slot must be empty");
 }
 
 // ------------------------------------------------------------------

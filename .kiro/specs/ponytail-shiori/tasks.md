@@ -2,7 +2,7 @@
 
 > 進め方：設計の Migration Strategy（S1〜S10）の順に、1 つ直すごとに関門（`cargo fmt --check`・`cargo clippy -p pasta_shiori --all-targets` の警告 0・`cargo test -p pasta_shiori`・i686 のリリースビルド）を通して 1 コミットにする。cargo の前に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す。挙動を変える直し（要件 1・2・3・5）は、1 の特性化テストで直す前を固めてから、直すタスクでそのテストを直した後の期待に改める。すべて同じクレートの同じファイル群を順に触るので、並列の印 `(P)` は文書の 2 本だけに付ける。
 
-- [ ] 1. 直す前の振る舞いを固める特性化テストを置く
+- [x] 1. 直す前の振る舞いを固める特性化テストを置く
 - [x] 1.1 unload を呼ばずに外す統合テストの足場を作り、前提を確かめる
   - 親のテストが同じテストの実行ファイルを子のプロセスとして起こし（役は環境変数で指示・`PASTA_DEBUG` などは外す）、子は実行ファイルの隣の pasta.dll を読み込んで入口を引く形にする。子の役が無いときは何もせずに通る
   - dev-dependencies の `windows-sys` に `Win32_System_LibraryLoader` の機能を足す（子が `LoadLibraryW`・`GetProcAddress`・`FreeLibrary`・`GetModuleHandleW` を使う。`pasta_lua` の機能の合流に頼らない）
@@ -27,7 +27,7 @@
   - `SHIORI.request` の無いゴーストへの GET が、今は `Charset`・`Sender` の 2 つのヘッダの 204 を返すことを固める
   - 新しいテストが今のコードで通る
   - _Requirements: 5.1, 5.2, 9.4_
-- [ ] 1.5 DllMain の特性化テストを置く
+- [x] 1.5 DllMain の特性化テストを置く
   - 旧来の置き場を埋めてから `FreeLibrary` の detach を模した通知を送ると、今は置き場が空になることを固める
   - プロセスの終了の通知と attach が 1 を返すだけであることを確かめる
   - 新しいテストが今のコードで通る
