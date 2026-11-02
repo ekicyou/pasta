@@ -58,4 +58,6 @@ tracing-test.workspace = true
 # 応答 HGLOBAL を read/free するために Win32 Memory/Globalization を直接利用する。
 # 本体は既に windows-sys を通常依存として持つため、dev 側はリンク可能化のための再宣言のみ。
 # ToolHelp は multi_instance_test がアクタースレッドを数えるため（unload の後に残らないこと）。
-windows-sys = { workspace = true, features = ["Win32_System_Diagnostics_ToolHelp"] }
+# LibraryLoader は free_library_test の子が pasta.dll を LoadLibraryW・GetProcAddress・FreeLibrary・
+# GetModuleHandleW で扱うため（pasta_lua の機能の合流に頼らない）。
+windows-sys = { workspace = true, features = ["Win32_System_Diagnostics_ToolHelp", "Win32_System_LibraryLoader"] }
