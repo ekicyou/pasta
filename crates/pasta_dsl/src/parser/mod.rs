@@ -146,15 +146,15 @@ pub(crate) fn check_paren_depth(source: &str, filename: &str) -> Result<(), Pars
 /// Build a positioned syntax error with the common `Parse error in {file} at {l}:{c}: ` prefix.
 pub(crate) fn syntax_error(filename: &str, line_col: (usize, usize), what: &str) -> ParseError {
     let (line, column) = line_col;
-    ParseError::syntax_error(
-        filename,
+    ParseError::SyntaxError {
+        file: filename.to_string(),
         line,
         column,
-        format!(
+        message: format!(
             "Parse error in {} at {}:{}: {}",
             filename, line, column, what
         ),
-    )
+    }
 }
 
 /// Parse a Pasta script file using pasta2.pest grammar.
