@@ -216,3 +216,145 @@
    - 仮定（要件 7.3）：アクターの道から消す。Lua の `SHIORI.load(hinst, load_dir)` には 0 を渡し続ける（作者に見える約束は変えない）。`PastaShiori::load` の引数に残すかは設計で決める。
 9. **Q9：`unload` を呼ばずに外されたとき、pasta.dll がメモリに残ってよいか**
    - 仮定（要件 1.2）：よい。D1 では、アクターと VM がプロセスの終わりまで（または同じ DLL が読み直されて次の `load` が来るまで）残り、DLL のファイルも開いたままになる。落ちるよりよい。`unload` を呼ぶ SSP では残らない（要件 1.8）。
+
+---
+
+# 設計フェーズの調査（2026-11-02）
+
+## Summary
+
+- **Feature**：`ponytail-shiori`
+- **Discovery Scope**：Extension（既存の `crates/pasta_shiori` の中の直しと撤去。新しい外部の依存は無い）。進め方は light discovery（`design-discovery-light.md`）で、`DllMain` の道だけ std と Windows のローダーの振る舞いを深く調べた。
+- **使ったスキル・規則**：`kiro-spec-design`（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）、`kiro-validate-design`（`design-review.md`）、ponytail（いちばん小さい完全な変更）。steering は `tech.md`・`structure.md` の `pasta_shiori` の行を読んだ。
+- **Key Findings**：
+  1. research の D1 の素の形（スレッドがいつも `FreeLibraryAndExitThread` で終わる）は、`std::thread::JoinHandle::join` と両立しない。閉包から戻らずに終わったスレッドを join すると、std が `expect("threads should not terminate unexpectedly")` で panic する（リリースは `panic = "abort"` なので、ホストごと落ちる）。
+  2. 「参照を返すのは、join を終えた親か、見捨てられたスレッドのどちらか一方」と決める約束のチャネルを足すと、普段の道（unload → ack → join）は std のまま、見捨てた道だけがスレッド自身で参照を返して終われる。`Win32_System_Threading`（`WaitForSingleObject`）も要らない。
+  3. D1 の下では、`FreeLibrary` による `DLL_PROCESS_DETACH` は、参照を持つアクタースレッドが 1 本も無いときにしか来ない。`DllMain` は何もしなくてよく、`JoinPolicy::Detach` と `teardown_actor_detached` は使い手を失う。
+
+## Research Log
+
+### std の join とスレッドの終わり
+
+- **Context**：research の D1 の Research Needed（`FreeLibraryAndExitThread` と `JoinHandle::join` の両立）。
+- **Sources Consulted**：ツールチェーン（rustc 1.99.1）の std のソース `library/std/src/thread/lifecycle.rs`・`join_handle.rs`・`os/windows/thread.rs`・`sys/thread_local/guard/windows.rs`。
+- **Findings**：
+  - スレッドの入口 `rust_start` は、閉包の結果を `their_packet.result` に書いてから `their_packet`（`Arc<Packet>`）を落とす。
+  - `JoinInner::join` は OS のスレッドの終わりを待った後、`Arc::get_mut(&mut self.packet).expect("threads should not terminate unexpectedly")` で結果を取り出す。閉包から戻らずに `ExitThread` したスレッドでは `Arc` が 2 つのままなので、ここで panic する。
+  - `JoinHandle::is_finished` も `Arc::strong_count == 1` を見るので、同じく真にならない。
+  - `JoinHandle` は `AsRawHandle` を持つ。生のハンドルで `WaitForSingleObject` すれば終わりを待てるが、`windows-sys` の `Win32_System_Threading` が要る（要件 6.8 が通常の依存から外すと決めた機能）。
+  - Windows のスレッドローカルの後始末は、今の std では FLS（`FlsAlloc` の後始末の関数）で行う。後始末の関数が DLL の中にあると、DLL が外れた後のスレッドの終わりで外れたコードを呼ぶので、std は DLL のときだけ `atexit` に `FlsFree` を登録し、DLL が外れるときに後始末を済ませる。コメントに「DLL を外してよいのは、ほかのスレッドが DLL の Rust のコードを走らせていないときだけ」とある。
+- **Implications**：
+  - スレッドを「いつも」`FreeLibraryAndExitThread` で終わらせる形は採れない（join が panic する）。生のハンドルを待つ形は、要件 6.8 の字面と食い違う。
+  - 普段の道ではスレッドを閉包から普通に戻し、std の join を使う。参照を DLL の中から返すのは、もう誰も join しない（見捨てた）スレッドだけにする。その道で `ExitThread` が std の後始末を飛ばしても、見捨てた `JoinHandle` は既に落としてあり、残るのは `Packet` などの小さな `Arc` の漏れだけ。
+  - D1 は、アクタースレッドが走っている間は DLL が外れないことを保証する。std の「外れるときに、ほかのスレッドが Rust のコードを走らせていない」の前提を、アクタースレッドについて満たす。
+
+### Windows のローダーの振る舞い（D1 の前提）
+
+- **Findings**：
+  - `GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, 関数の番地)` は、その番地を含むモジュールの参照を 1 つ足す（`UNCHANGED_REFCOUNT` を付けない）。std 自身も `cleanup_is_unloadable` で同じ API を使っている。
+  - `FreeLibraryAndExitThread` は、参照を返してから、DLL のコードへ戻らずにスレッドを終える。参照が 0 になれば、その中で `DLL_PROCESS_DETACH`（`lpReserved` が null）がそのスレッドの上で走り、DLL が外れる。
+  - 参照が 0 にならない `FreeLibrary` は、`DllMain` を呼ばずにすぐ戻る。
+  - 外れていない DLL を `LoadLibrary` し直すと、参照が増えるだけで `DLL_PROCESS_ATTACH` は走らない。static（`LEGACY`・`LOADU_INITIALIZED`・ログの登録簿・占有の札）はそのまま残る。
+  - `FreeLibrary` は `Win32::Foundation`、`GetModuleHandleExW`・`FreeLibraryAndExitThread`・`GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS` は `Win32::System::LibraryLoader` にある（`windows-sys` 0.61）。`pasta_lua` が既に `Win32_System_LibraryLoader` を有効にしているので、バイナリは変わらない。
+
+### unload を呼ばずに外された後の、次の load
+
+- **Context**：議題 1 の「次の `load` まで残ってもよい」の中身。
+- **Findings**（D1 の下）：
+  - ホストの `FreeLibrary` は参照を 1 つ減らすだけで戻る。アクタースレッドは mailbox の `recv()` で待ったまま残り、VM・ログの登録・ディレクトリの占有も残る。
+  - 同じパスの pasta.dll を読み直して `loadu` が来ると、`spawn_actor` の最初の `teardown_slot` が前のインスタンスに `Stop` を送る。前のアクターは普段どおり `SHIORI.unload` と保存をしてから ack し、join の後に参照を返す。新しいインスタンスは占有を普通に取れる（`ClaimMode::Exclusive`）。つまり、次の `load` のときに、遅れて前の後始末が走る。
+  - `load`（ANSI）だけを呼ぶホストでは、前の回の `LOADU_INITIALIZED` が立ったまま残るので、`load` は何もせずに TRUE を返し、前のインスタンスが置き場に残る。`DLL_PROCESS_ATTACH` が走らないので、印を下ろす場所が無い。SSP は `loadu` を先に呼ぶので当たらない。
+  - 版 3 のインスタンスは、ホストが手放したまま残る。同じディレクトリを版 3 で読み直すと、残ったインスタンスが占有を持っているので `SpawnError::DirInUse` になり、`load` は NULL を返す。生きた別のインスタンスと区別できないので、占有を奪えない。今（D1 の前）は、外れた DLL の下にスレッドが残り、何かのきっかけで落ちうる。
+
+### FreeLibrary の統合テストを作れるか
+
+- **Findings**：
+  - `cargo test` は、ライブラリの単位を `cdylib` と `rlib` の両方で 1 度にビルドする。`target/debug/deps/pasta.dll` が、統合テストの実行ファイル（同じ `deps/`）の隣にできることを確かめた（このワークツリーの `deps/pasta.dll` と `libpasta.rlib` の時刻が同じ）。テストは `std::env::current_exe()` の親のフォルダから `pasta.dll` を `LoadLibraryW` できる。
+  - テストの実行ファイルには rlib の pasta が静的に入っているが、`LoadLibraryW` した pasta.dll は別のモジュールで、static・LuaJIT・ログの購読者はすべて別になる。
+  - 直す前の旧来の入口の道は、`DllMain` の中で 5 秒待った後に、外れた DLL の下でアクターが動いて落ちうる。テストのプロセスごと落ちるので、子のプロセス（同じテストの実行ファイルを、環境変数を付けて自分の `#[test]` 1 本だけで起こす）に閉じ込める。
+  - Lua の C モジュールの代わりに、`[loader] ffi = true` のゴーストで `ffi.load` にシステムの DLL（例：`version`）を読ませる。VM の片付け（`DllPins` の Drop）がその DLL を `FreeLibrary` するので、ローダーのロックを待つ道は同じになる。`cl.exe` で DLL を作る `pasta_lua` の `dll_fixture.rs` の形は要らない。
+  - 観測できる値：`FreeLibrary` にかかった時間、`GetModuleHandleW(パス)` が null か（外れたか）、子のプロセスの終わり方。直す前は「版 3 では外れる・旧来の入口と C モジュールでは 5 秒近くかかる」、直した後は「すぐ戻り・外れない」。`unload` の後の `FreeLibrary` では、直す前も後も外れる（参照の釣り合いの確かめ）。
+
+### 判定を 1 つにする・警告の位置
+
+- **Findings**：
+  - 文法では `header = method ~ " " ~ (header3 | header2)` なので、平らにした組の並びは `get`／`notify` が先、`header2`／`header3` が後に来る。1 回なめれば、メソッドと版の両方が分かる。旧来の入口の 2.x は、今 `determine_method` が GET／NOTIFY を返すので、`Shiori2(メソッド)` として同じ道へ送れば変わらない。
+  - 解けたのにメソッドが無いことは文法上起きない。起きても panic せず、読めない要求（`pest::error::ErrorVariant::CustomError`）として扱えばよい。
+  - `pest::error::Error` は公開の欄 `line_col: LineColLocation`（`Pos((行, 列))` か `Span(始め, 終わり)`）を持つ。始めの行と列を使う。
+  - `pest::error::Error<Rule>` は大きいので、`Result` の誤りに直に置くと clippy の `result_large_err` に当たる。`MyError::ParseRequest` と同じく `Box` に入れる。
+  - 旧来の入口の判定は FFI のスレッドの上（`ActorInstance::request`）で走る。`ActorInstance` は `load_dir` を持つので、その場で `LoadDirGuard` を張れば、ゴーストのログのファイルへ出る（`v3.rs` の `reject` と同じ形）。フォルダが無くてロガーが登録されていないときは捨てられる（それでよい）。
+  - SSP の記録の 720 行の OnNotifyUserInfo は、`Reference0`・`Reference1` に利用者の名前を持つ。テストで写すときは名前を仮の値に替える。
+
+### テストだけの部品の行き先と、観測の値
+
+- **Findings**（使い手を数えた）：
+  - `ReloadProbe` 一式は `tests/actor_reload_leak_test.rs` だけが使う。そのファイルへ移し、`Win32_System_Threading` を dev-dependencies へ移す。
+  - `teardown::teardown_actor`（いつも detach）は `tests/actor_teardown_test.rs` だけ。`teardown_via_sender` と `ActorThread::detach` の 2 行で置き換わる。`TeardownReport::is_clean` は 6 つのテストが使うが、`acked && anomaly.is_none()` の 1 式で置き換わる。
+  - `marshaling::marshal_request`（写し）は `tests/actor_marshaling_test.rs` だけ。`marshal_get`／`marshal_notify` を直に使う。
+  - `ActorMsg::get`・`notify`・`kick` の作り手は 5 つのテストが使う。variant を直に作るか、`marshal_get`・`marshal_notify` を使う。
+  - `spawn_actor_thread`（`expect` の包み）は 9 つのテストが使う。`spawn_actor_thread_with(…, None, None).expect(…)` をテストが書く。
+  - `actor_thread_id` は `actor_thread_vm_test`・`debug_preservation_test` が「テストのスレッドと違う」ことを確かめるだけ。VM（`!Send`）を閉包の中で作る形が型で保証しているので、要らない。`multi_instance_test` は ToolHelp で数えており、この値を使わない。
+  - `debug_local_addr` は `debug_preservation_test` だけが使う。`multi_instance_test` の `listening_port` は、ゴーストのログの `debug backend listening addr=…` の行からポートを読んでいる。同じ読み方にすれば、ready のチャネルはロードの成否（`bool`）だけを運べばよい。
+  - kick：本番の kick は DAP → `KickSink`（`kick_sink_for` の弱い送信端）→ `ActorMsg::Kick` → アクター。DAP からインスタンスの送り先までは `multi_instance_test` の `dap_kick_reaches_only_its_own_instance` が確かめている。シーンの kick の e2e 4 本は、`kick_sink_for` を `pub` にして、自分の mailbox の送り先をそのまま使えば、本番の送り先とアクターの道を通る。新しいテストの窓口は要らない。
+  - `PastaShiori.hinst` を読むのは単体テストだけ。`tests/shiori_lifecycle_test.rs` は `PastaShiori::load(42, …)`・`load(999, …)` が Lua へ届くことを確かめているが、本番は必ず 0 を渡す。
+
+## Architecture Pattern Evaluation（DllMain の道）
+
+| 案 | 中身 | よいところ | 弱いところ |
+| -- | ---- | ---------- | ---------- |
+| D1-a | スレッドがいつも `FreeLibraryAndExitThread` で終わる | 形が単純 | std の join が panic する（`expect`）。採れない |
+| D1-b | D1-a に加え、`unload` の道は join の代わりに生のハンドルを `WaitForSingleObject` で待つ | join を使わないので panic しない | `Win32_System_Threading` が通常の依存に要る（6.8 の字面と食い違う）。普段の道でも毎回 std の後始末を飛ばし、`Packet` を漏らす。非 Windows と道が分かれる |
+| D1-c（採る） | 親がモジュールの参照を 1 つ取ってスレッドに持たせ、スレッドは ack の後に「join の約束」を待つ。約束が来れば普通に戻り、親が join の後に参照を返す。約束の送り手が落ちていれば（見捨てられた）、スレッドが `FreeLibraryAndExitThread` で参照を返して終わる | 普段の道は今の std の join のまま。見捨てた道だけが特別。`Threading` が要らない。OS で道が分かれない（非 Windows は参照が無く、戻るだけ） | 約束のチャネルが 1 つ増える。見捨てた道で小さな漏れが残る |
+| D2 | `DllMain` の道で VM を片付けずに ack させる | 5 秒止まらない | ack の後のスレッドの終わりと外れる時の競りが残る（1.2 を満たさない） |
+| D3 | 初めの `load` でピン留め | 1 行 | `unload` を呼ぶ SSP でも外れない（1.8 に反する）。議題 1 で採らないと確定 |
+
+## Design Decisions
+
+### Decision：DllMain の道は D1-c（約束のチャネルつきのモジュールの参照）
+
+- **Context**：要件 1.2〜1.5、議題 1。
+- **Alternatives Considered**：上の表の D1-a・D1-b・D2・D3。
+- **Selected Approach**：`spawn_actor_thread_with` が、スレッドを起こす前に `GetModuleHandleExW(FROM_ADDRESS)` で参照を 1 つ取る。`ActorThread` は約束の送り手を持ち、スレッドは受け手を持つ。`ActorThread::join` は約束を送ってから join し、参照を `FreeLibrary` で返す。`ActorThread::detach`（と、join も detach もせずに落とすこと）は送り手を落とすだけで、参照はスレッドが返す。スレッドは片付けと ack を終え、持っている値をすべて落としてから約束を待つ。
+- **Rationale**：参照を返すのはいつも 1 人に決まり、2 度返すことも、生きたスレッドの下で外れることも無い。普段の道の振る舞い（ack の後に join・ログ・`SHIORI.unload`・保存）は変わらない。
+- **Trade-offs**：見捨てた道で、std の `Packet` と `Thread` の `Arc`（合わせて 200 バイトほど）が漏れる。見捨てたスレッドが永遠に戻らなければ、DLL はプロセスの終わりまで外れない（安全な側に倒れる）。
+- **Follow-up**：子のプロセスの `FreeLibrary` テストで、直す前と後の振る舞いを確かめる。見捨てたスレッドが終わることを ToolHelp で確かめる。
+
+### Decision：DllMain は何もしない・JoinPolicy を消す
+
+- **Context**：D1-c の下では、`FreeLibrary` による `DLL_PROCESS_DETACH` は、参照を持つ `ActorThread` が 1 つも無いとき（＝置き場が空で、版 3 のインスタンスも無いとき）にしか来ない。
+- **Selected Approach**：`DllMain` はどの通知でも 1 を返す。`teardown_actor_detached`・`JoinPolicy`（`Detach` だけが join しない道だった）を消し、`ActorInstance::shutdown` は「ack が届けば join、届かなければ手放す」だけにする。`LOADU_INITIALIZED` は DLL が外れれば static ごと消えるので、`DllMain` で下ろさない。
+- **Rationale**：ローダーのロックの中で Rust の後始末（`arc_swap` のスレッドローカル・ログ）を走らせる道が無くなる。使い手の無い分岐を残さない。
+- **あわせて**：`already_done`（受け口が既に閉じている）のときも join する。受け口を閉じたスレッドは、片付けを終えて約束を待つだけか、panic で閉包を抜けたかのどちらかなので、join は止まらない。見捨てる道（スレッドが参照を返して終わる道）を、ack が来ないときだけに絞る。
+
+### Decision：判定は `classify_request` 1 つ・誤りは位置つきで返す
+
+- **Selected Approach**：`classify_request(&str) -> Result<RequestKind, Box<ParseError>>`、`RequestKind = Get | Notify | Shiori2(ShioriMethod)`。旧来の入口は `Shiori2(m)` を `m` として扱う。解けなければ、両方の入口が `ActorInstance::warn_unreadable` で warn を 1 行出す。`determine_method` は消す。
+
+### Decision：テストだけの部品は、使い手のテストへ移すか、本番の道へ寄せる
+
+- **Selected Approach**：research の T1（`ReloadProbe` 一式を `tests/actor_reload_leak_test.rs` へ）と T2（`marshal_request` の写し・`kick_sink`・`kick_into`・`ActorInstance::kick`・`ActorMsg` の作り手・`spawn_actor_thread`・観測の getter を消す）。`#[cfg(test)]` へ移すもの（T3）は無い。kick の e2e は `kick_sink_for` を `pub` にして本番の送り先を使う。
+
+### Decision：hinst は PastaShiori::load からも消す
+
+- **Selected Approach**：`PastaShiori::load(load_dir)`。`call_lua_load` は Lua の `SHIORI.load` へ定数の 0 を渡す。`hinst` を値で確かめていたテストは 0 を確かめる。
+- **Rationale**：本番は必ず 0。値を通せる口を残すと、テストが本番に無い値を確かめ続ける。
+
+### Synthesis（一般化・採るか作るか・簡単にする）
+
+- **一般化**：旧来の入口と版 3 の入口の違いは「2.x を Lua へ届けるか 400 か」だけなので、判定を 1 つにして、違いを呼び出し側の 1 行に置く。解けない要求の警告も、両方の入口が `ActorInstance` の 1 つの関数を呼ぶ。
+- **採るか作るか**：スレッドの終わりとモジュールの寿命は、Windows の `GetModuleHandleExW`・`FreeLibraryAndExitThread`（この用途のための API）を採る。待ちの仕組みは既存の flume のチャネルを採り、生のハンドルの待ちは作らない。行と列は pest の `line_col` を採る。
+- **簡単にする**：`JoinPolicy`・`teardown_actor_detached`・`DllMain` の分岐・`Encoder`／`CodePage`・`Reply`・`Shiori` トレイト・`hinst`・観測の getter を消す。新しく足すのは `ModuleRef`（約 40 行）と約束のチャネル（数行）だけ。
+
+## Risks & Mitigations
+
+- **D1-c は、std の DLL の後始末の作り（FLS と `atexit`）とローダーの振る舞いに頼る** — 子のプロセスの `FreeLibrary` テストで直す前と後を固める。SSP の実機（`ssp-ghost-test-launch`）でも任意で確かめる。
+- **`pasta_lua` の debug のスレッド（`[debug] enabled` のときだけ）は、アクターの参照では守られない** — VM の片付けで join される前提。この spec の外（`pasta_lua`）。設計の残りの危険として書く。
+- **版 3 で `unload` を呼ばずに外したホストが、同じディレクトリを読み直すと NULL になる** — 開発者の判断（設計のディスカッション）。落ちるよりよい。
+- **`load`（ANSI）だけを呼ぶホストで、前の回の `LOADU_INITIALIZED` が残る** — SSP は `loadu` を呼ぶので当たらない。マニュアルに書く。
+- **テストのファイルの書き換えが多い（約 25 本）** — 機械的な撤去は 1 つずつのコミットにし、各コミットで `cargo test -p pasta_shiori` を通す。`shiori4-v4-host` とは同じウェーブに置かない（要件の Adjacent）。
+
+## References
+
+- rustc 1.99.1 の std のソース：`library/std/src/thread/lifecycle.rs`（`JoinInner::join`）、`library/std/src/sys/thread_local/guard/windows.rs`（FLS と `atexit` の `FlsFree`）、`library/std/src/os/windows/thread.rs`（`JoinHandle` の `AsRawHandle`）。
+- Microsoft の文書：`GetModuleHandleExW`（`GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS`）、`FreeLibraryAndExitThread`、`DllMain` のベストプラクティス（ローダーのロックの中で待たない）。
+- `crates/pasta_lua/src/runtime/ffi_load/win32.rs`（`DllPins` の Drop が `FreeLibrary` する・`load_system_dll`）。
