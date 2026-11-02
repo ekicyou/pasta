@@ -103,17 +103,15 @@
 - 既存の検索の動き（巡回の状態・候補の控え）を変えない。数えても `＞` の次の選びに影響しない。
 - 規模は 3〜5 タスクの見込み（数え方 1、GLOBAL 関数と検査 1、テスト 1、マニュアル 1）。
 
-## 2026-11-02 棚卸の再測定（main 491cc23c）
+## 2026-11-03 棚卸の再測定（main c575febd）
 
-- **前提の変化**: 起票（2026-11-01・`6aabf087`）から、この spec のソース（`scene_table.rs`・`search/context.rs`・`shiori/entry.lua`・`validate/builtins.rs`・`validate/references.rs`）は変わっていない。Current State の行番号はどれも合っている（`collect_scene_candidates` 458 行・`resolve_scene_id_exact` 255 行・`search_scene`／`search_scene_exact` 105・119 行・別名と正規化 166〜168 行・`entry.lua` 35 行・`call-jump.md` 265 行・`validate.md` 170 行）。メソッドの登録（`add_methods`）は 358 行から。`ponytail-lua-loader` が `lua/modules/pasta-search.md` の「`finalize_scene()` より前」の 1 文を直しただけで、数え方に効く変化は無い。
-- **触るファイル**: `crates/pasta_lua/src/search/context.rs` 1,022（443 行から中のテスト。1,000 行を超えているので、足す試験は別のファイルに置く）、GLOBAL 関数の置き場（`shiori/entry.lua` 153 か、`shiori/event/recommend.lua` 285 のような新しいファイル）、`crates/pasta_check/src/validate/builtins.rs` 68、要るなら `crates/pasta_core/src/registry/scene_table.rs` 539、マニュアル `grammar/call-jump.md` 702・`debug/validate.md` 257・`@pasta_search` に口を書くなら `lua/modules/pasta-search.md` 266、スキルの `references/` の再生成。新しいファイルは置き場を分けた場合だけ。
+- **前提の変化**: `ponytail-core-registry` が入り、シーン表の索引が `BTreeMap` になった。数えるのに使う公開の関数は残った。前方一致の候補は `SceneTable::collect_scene_candidates(module_name, prefix)`（`scene_table.rs` 372 行。0 件は `SceneNotFound`、空の名前は `InvalidScene`）、候補の情報は `get_scene(id)`（349 行）。完全一致の `resolve_scene_id_exact`（195 行）は、非公開の索引を `get` で引く。`ponytail-lua-scripts` は `entry.lua` の `SHIORI.load`・`unload` の中身を消したが、GLOBAL 関数の置き方は変わらない。Current State の行番号は動いた: `collect_scene_candidates` 458→372 行、`resolve_scene_id_exact` 255→195 行、`search_scene`／`search_scene_exact` 105・119→100・114 行、別名と正規化 166〜168→161・162 行、`add_methods` 358→350 行。
+- **完全一致の数は `scene_table.rs` を触らずに数えられる**（設計の最初に確かめることの答え）: `collect_scene_candidates("", 名前)` の候補のうち、`SceneRegistry::split_registered_name(&get_scene(id).name).0 == 名前` のものを数える。実行時のシーン表は `finalize` が `register_global_raw` で作るので、`name` は通し番号つきの登録名（`雑談_1`）である。通し番号を外して比べれば、索引のキー（`fn_name_to_search_key`）と同じになる。どの関数も `pub` なので、`search/context.rs` の中だけで済む。`scene-attribute-store` と同じウェーブに置ける。
+- **触るファイル**: `crates/pasta_lua/src/search/context.rs` 1,009（435 行から中のテスト。1,000 行を超えているので、足す試験は別のファイルに置く）、GLOBAL 関数の置き場、`crates/pasta_check/src/validate/builtins.rs` 68（`GLOBAL_NAMES` の数と上の説明）、マニュアル `grammar/call-jump.md` 703・`debug/validate.md` 257・口を書くなら `lua/modules/pasta-search.md` 266、スキルの `references/` の再生成。`scene_table.rs` は触らない。
+- **置き場の推奨**: `crates/pasta_lua/pasta_scripts/pasta/global.lua`（29 行。`yield`・`チェイントーク` が既にある。数えるのに SHIORI は要らない）。`shiori/entry.lua`（130 行）に置かなければ、`debug-mcp-runtime`（`entry.lua` の `KICK`・`SHIORI.kick` を消す）と重ならない。
 - **規模**: 3〜5 タスクのまま（数え方 1、GLOBAL 関数と検査 1、テスト 1、マニュアルと references 1）。
-- **先に要るもの**: 機能の上では無い。ファイルの重なり（未完了）:
-  - 0.4.5 の `ponytail-core-registry`（`scene_table.rs`・`search/context.rs`。シーン表の索引を `BTreeMap` に替え、作られない誤り `NoMoreScenes` の腕を消す）と `ponytail-lua-scripts`（`entry.lua` に置く場合）。どちらも 0.5.0 より先に入るので、入った後の main で索引の形と `search/context.rs` を見直してから設計する。
-  - 0.5.0 の `scene-condition-attributes`・`scene-pick-modes`（`search/context.rs`・`scene_table.rs`）と、版未定の `scene-exact-match`（`search/context.rs`）。同じウェーブに置かない。
-  - `scene-attribute-store` とは、この spec が `scene_table.rs` を触らなければ重ならない。あちらが属性の型を変えると、`SceneInfo.attributes` を読む `scene_table.rs`（113・355 行）も変わる見込みである。前方一致の数は今ある公開の `collect_scene_candidates("", 名前)` で数えられる（0 件は `SceneNotFound`、空の名前は `InvalidScene` で返るので、それぞれ 0 と失敗に写す）。完全一致の数も `scene_table.rs` に関数を足さずに数えられるか（候補の `get_scene(id).name` を比べるなど）を設計の最初に確かめ、足さずに済めば 1 番と並べてよい。
-  - `builtins.rs` は、版の違う `shiori4-v4-lua-api` も触る。
+- **先に要るもの**: 機能の上では無い。ファイルの重なり（未完了）: `scene-condition-attributes`・`scene-pick-modes`・`scene-exact-match`（`search/context.rs`）とは同じウェーブに置かない。`scene-attribute-store` とは、あちらが読み出しの口を `search/context.rs` に置かなければ重ならない。`debug-mcp-runtime` とは、置き場を `entry.lua` にしなければ重ならない。`vscode-mcp-client` とは重ならない。`builtins.rs` は、版の違う `shiori4-v4-lua-api` も触る。
 - **種別**: 機能（シーン名にぶら下がるシーンの数を辞書から読む口が無い）。開発者の依頼から（「pasta にもシーン名ごとのトークの数を数える方法が欲しい」）。
 - **要件定義のモデル**: Opus。公開の GLOBAL 関数を足すが、形（関数 2 つ・英日の名前）と数え方（`＞` と同じ・グローバルだけ・別名を当ててから正規化・0 件は 0）は 2026-11-01 に開発者が承認済みで、残る問い（数値の引数を文字列として受けるか・置き場のファイル）は浅く、推奨を付けられる。
 - **分割の案**: 不要。
-- **見つけた穴・古くなった記述**: 無し。
+- **見つけた穴・古くなった記述**: 前の測り直しの「候補の `get_scene(id).name` を比べる」は、そのままでは通し番号つきの `雑談_1` と比べてしまう。上のとおり通し番号を外して比べる。

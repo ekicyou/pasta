@@ -173,41 +173,9 @@ areka の側の作業が一番重い。依頼が遅れるほど、0.5.0 が遅�
 - 調査ノートの「記憶」の印の記述を、根拠にしない。
 - この spec はソースを触らない。0.4.1 の作業と並んで進められる。マニュアルに章を足す場合だけ、目次（`SUMMARY.md`）と章の数を決め打ちする検査が、ほかの spec と重なる。
 
-## 2026-10-17 棚卸の再測定（main b4164100）
-
-- **前提の変化**: 0.4.0 が出た。止まるエラーのバルーン表示（`runtime-error-balloon`）で、スクリプトが止まったときも、pasta は 200 の応答に `【スクリプトのエラー：…】`・`【時間切れ：…】` の表記を載せ、理由を `X-Error-Reason` の行に入れて返すようになった（`crates/pasta_lua/pasta_scripts/pasta/shiori/stop.lua`・`shiori/res.lua` 124 行）。areka から見ると、失敗の表記も普通の台本として届く。取り決めの文書に「失敗の表記は普通の台本で届くので、特別に扱わなくてよい」と書くかを、要件で決める。名前が完全に一致する場面を 1 つ選ぶ部品（`pasta_scripts/pasta/scene.lua` の `SCENE.co_exec_exact`）と、撫で・つつきの既定の受け口（`shiori/event/mouse.lua`）も入った。イベントの名前を決めるときの材料になる。
-- **触るファイル**: 取り決めの文書・依頼書・対応表だけ。pasta の Rust・Lua・文法・テストは触らないことを確かめた。置き場所は要件の最初の議題のまま（マニュアルの内部設計の部 `book/src/internals/` に章を足すか、リポジトリの `doc/`。今の `doc/` には `release-notes/` しか無い）。マニュアルに章を足すなら、目次 `book/src/SUMMARY.md` と、章の数を決め打ちする 3 つの検査（`book/tools/verify-scripts-test.mjs` 81 行・`book/tools/talk/talk-test.mjs` 453 行・`book/tools/gen-skill-refs-test.mjs` 600 行。今は 63 章）を 64 に合わせる。
-- **規模**: 6〜9 タスク（文書の節 3〜4、依頼書の束 1〜2、対応表と手順 1、areka のセッションへの受け渡し 1、確かめ 1）。
-- **先に要るもの**: なし。どの未完了の spec ともソースを共有しないので、0.4.1 の `pasta-check-validate-edges` とも、0.5.0 のどの spec とも並べられる。章を足す場合だけ、同じ時期に章を足す spec と 3 つの数がぶつかる（未完了の spec では `manual-novel-guide` だけで、ずっと後）。
-- **種別**: 文書（コードを書かない取り決めと依頼）。開発者の 0.5.0 の目標（2026-10-10）から起こした。
-- **要件定義のモデル**: Opus（2026-10-16 の見直しのまま）。名前と線引きは areka との約束だが、版の番号を持つ書き直せる文書で、議題にも推奨案を付けられる。
-- **分割の案**: 不要。
-- **見つけた穴・古くなった記述**:
-  - 「Problem」の「`cue-command-runtime` ほか 7 本」は、2026-10-17 に柱の分（`scene-stage-attributes`）をまとめたので「ほか 6 本」になった（下流の一覧は 7 本）。2026-10-17 に直した。
-  - 「Constraints」の「0.4.0 の作業と並んで進められる」は、0.4.0 が出たので「0.4.1 の作業と並んで」と読む。2026-10-17 に直した。
-  - 「pasta の現在地」の行番号（NOTIFY に 204 を返す所 `crates/pasta_shiori/src/actor/marshaling.rs` 232 行付近、5 秒の待ち 71 行）は今も合っている。
-  - `shell-element-click` は、完全一致の部品が入ったので `novel-talk-flow` を待たなくなった。エレメントのクリックのイベントの名前は、早めに決めると後続が先に進める。
-
 ## 申し送り（2026-10-17 の棚卸の分割より）
 
 - `novel-checkpoint-rollback` から、変数の保存の範囲の分を `novel-variable-scope` へ分けた。areka は変数を見ないので、`novel-variable-scope` はこの spec の名前を使わない。「Downstream」には入れず、「Problem」の「ほか 6 本」にも数えない。
-
-## 2026-10-18 棚卸の再測定（main facd6cf4）
-
-- **前提の変化**:
-  - pasta が台本に出すタグが増えた。アクターごとの装い（`actor-display-style`）で、pasta.toml の `[actor."名前"].font` を書いたアクターが話すと、話者の切り替えと、引数の無い `\c`・`\x` の後に、`\f[属性,値]` の列と戻す `\f[default]` が出る（`crates/pasta_lua/pasta_scripts/pasta/shiori/actor_style.lua`）。属性は `crates/pasta_core/src/actor_font.rs` の 12 個（color・name・height・bold・italic・underline・strike・sub・sup・outline・shadowcolor・shadowstyle）。取り決めの「文章」の色と大きさは、areka が SSP と同じ `\f[…]` を解釈することを前提にでき、areka がどこまで持つかを依頼に入れる。`font` の `name` は書体の名前なので、「話者名の欄」と取り違えない呼び方にする。
-  - 1 つのスポット（`\0`）を複数のアクターで共有する形が正式になった。スコープの番号では話者が分からないので、話者名の欄に書く名前を台本に載せる取り決めの値打ちが上がった（載せ方は `novel-talk-flow`）。
-  - 仮想時刻の読み取り（`tutorial-ssp-gaps`）: pasta は、毎分・毎時の合図が見込みの時機から外れると、トーク中でない OnSecondChange に `\![get,property,OnPastaClock,system.year,system.month,system.day,system.hour,system.minute,system.second]\e` だけの台本を返す（`shiori/clock.lua` 33〜34 行）。areka がこの台本をどう扱うか（`system.*` を返すか、吹き出しを消さないか）を取り決めに書く。返さなければ pasta は OS の時計のままで、害は無い。ノベル向けの設定で出さないかは `novel-talk-flow` が決める。
-  - 縦書きのバルーン（`vertical-balloon-lines`）: budoux の改行は `\n[N]`（`budoux_newlines`。100 なら `\n`）で出て、作者が書く `\_l[x,y]` で列を飛ぶ。areka は縦書きを持つが、`\n[N]` と `\_l` の扱いを確かめる項目に入れる。
-- **触るファイル**: 取り決めの文書・依頼書・対応表だけ。pasta の Rust・Lua・文法・テストは触らない。マニュアルに章を足すなら、目次 `book/src/SUMMARY.md` と、章の数を決め打ちする 3 つの検査（`book/tools/verify-scripts-test.mjs` 81 行・`book/tools/talk/talk-test.mjs` 453〜454 行・`book/tools/gen-skill-refs-test.mjs` 600 行。今も 63 章）を 64 に合わせる。
-- **規模**: 7〜9（前回の 6〜9 に、「pasta が出すタグ」の節に装い・時計の読み取り・縦書きの改行を足す分）。
-- **先に要るもの**: なし。どの未完了の spec ともソースを共有しない（新しく起票した `lua-cmodule-robustness`・`talk-grapheme-clusters` とも）。章を足す場合だけ、章を足す spec と 3 つの数がぶつかる（未完了では `manual-novel-guide` だけ）。
-- **種別**: 文書（コードを書かない取り決めと依頼）。開発者の 0.5.0 の目標（2026-10-10）から起こした。
-- **要件定義のモデル**: Opus のまま。名前と線引きは areka との約束だが、版の番号を持つ書き直せる文書で、議題に推奨案を付けられる。DSL の意味・保存の形・公開の Lua の約束のどれでもない。
-- **分割の案**: 不要。
-- **見つけた穴・古くなった記述**:
-  - 「Approach」の「文章」の「文字の速度、色、大きさ」は、色と大きさを pasta がアクターごとに `\f[…]` で出せるようになったので、要件では「areka が `\f[…]` を解釈すること」の依頼として書く。
-  - 「pasta の現在地」の行番号（`crates/pasta_shiori/src/actor/marshaling.rs` 232 行付近・71 行）は今も合っている（`crates/pasta_shiori/src` は前回から変わっていない）。
 
 ## 申し送り（2026-10-29 の版の組み替えより）
 
@@ -217,3 +185,19 @@ areka の側の作業が一番重い。依頼が遅れるほど、0.5.0 が遅�
 
 - `ponytail-manual-ci` が、章の数を決め打ちする 3 つの検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）をやめ、`SUMMARY.md` から数えて比べる形にする（同 spec の requirements.md の決定 A・Requirement 9）。
 - それが main に入った後なら、章を足すときに 3 つの検査の数を直さなくてよい。目次 `SUMMARY.md` に章を載せ、章のフォルダが口調の検査の見るフォルダ（`verify-content.mjs` の `VOICE_DIRS`）に入っていればよい。入る前なら、今までどおり数を合わせる。
+
+## 2026-11-03 棚卸の再測定（main c575febd）
+
+- **前提の変化**: `ponytail-manual-ci` が入り、3 つの検査の「全部の章の数」は目次 `SUMMARY.md` から数える形になった（上の申し送りの「入った後」の側）。マニュアルに章を足しても、その 3 つの数は直さなくてよい。ただし内部設計の部に章を足すなら、内部設計の章の一覧（`book/tools/verify-content.mjs` 505〜508 行の `INTERNALS_CHAPTERS`）と、部ごとの決め打ちの数（`book/tools/verify-scripts-test.mjs` 63 行の 10 章・65 行の題材章 8 章）が動く。`ponytail-shiori` は `crates/pasta_shiori` を片付けたが、NOTIFY に即 204 を返すこと（`actor/marshaling.rs` 257 行の `marshal_notify`）と、GET が 5 秒で 204 になること（71 行の `GET_TIMEOUT`）は変わらない。
+- **前の節から持ち越す取り決めの材料**（2026-10-17・10-18 の節）:
+  - 止まったときも、pasta は 200 の応答に `【スクリプトのエラー：…】`・`【時間切れ：…】` を載せ、理由を `X-Error-Reason` の行に入れる（`shiori/stop.lua`・`shiori/res.lua`）。「失敗の表記は普通の台本で届くので、特別に扱わなくてよい」と書くかを要件で決める。完全一致の部品（`SCENE.co_exec_exact`）と撫で・つつきの受け口（`shiori/event/mouse.lua`）は、イベントの名前を決める材料になる。
+  - pasta が出すタグ: アクターごとの装いの `\f[属性,値]` と戻す `\f[default]`（`shiori/actor_style.lua`。属性は `crates/pasta_core/src/actor_font.rs` の 12 個。`font` の `name` は書体の名前なので、話者名の欄と取り違えない呼び方にする）、トーク中でない OnSecondChange の `\![get,property,OnPastaClock,system.year,…]\e`（`shiori/clock.lua` 33〜34 行。返さなければ pasta は OS の時計のままで害は無い）、縦書きの budoux の改行 `\n[N]` と作者の `\_l[x,y]`。どれも areka の扱いを確かめる項目に入れる。
+  - 1 つのスポットを複数のアクターで共有する形が正式なので、話者名の欄に書く名前を台本に載せる取り決めの値打ちが高い（載せ方は `novel-talk-flow`）。「Approach」の「文章」の色と大きさは、「areka が `\f[…]` を解釈すること」の依頼として書く。
+  - エレメントのクリックのイベントの名前は、早めに決めると `shell-element-click` が先に進める。
+- **触るファイル**: 取り決めの文書・依頼書・対応表だけ。pasta の Rust・Lua・文法・テストは触らない。置き場所は要件の最初の議題のまま（マニュアルの内部設計の部 `book/src/internals/` に章を足すか、リポジトリの `doc/`）。マニュアルに足すなら、目次 `book/src/SUMMARY.md` と、上の内部設計の一覧と数。
+- **規模**: 7〜9 のまま。
+- **先に要るもの**: なし。ソースを共有する未完了の spec は無い。目次 `SUMMARY.md` は `manual-novel-guide`・`vscode-mcp-client`・`debug-mcp-runtime` も触るが、別の節なので並べられる。
+- **種別**: 文書（コードを書かない取り決めと依頼）。開発者の 0.5.0（今は 0.6.0）の目標（2026-10-10）から起こした。
+- **要件定義のモデル**: Opus のまま。名前と線引きは areka との約束だが、版の番号を持つ書き直せる文書で、議題に推奨案を付けられる。DSL の意味・保存の形・公開の Lua の約束のどれでもない。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: 「pasta の現在地」の「NOTIFY に 204 を返す所 `crates/pasta_shiori/src/actor/marshaling.rs` 232 行付近」→ 257 行の `marshal_notify`（71 行の 5 秒は合っている）。前の節の「3 つの検査の数を 64 に合わせる」は、上のとおり要らなくなった。

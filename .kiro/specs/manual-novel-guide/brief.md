@@ -79,3 +79,14 @@
 
 - `ponytail-manual-ci` が、章の数を決め打ちする 3 つの検査（`verify-scripts-test.mjs`・`talk/talk-test.mjs`・`gen-skill-refs-test.mjs`）をやめ、`SUMMARY.md` から数えて比べる形にする（同 spec の requirements.md の決定 A・Requirement 9）。
 - それが main に入った後なら、章を足すときに 3 つの検査の数を直さなくてよい。目次 `SUMMARY.md` に章を載せ、章のフォルダが口調の検査の見るフォルダ（`verify-content.mjs` の `VOICE_DIRS`）に入っていればよい。入る前なら、今までどおり数を合わせる。
+
+## 2026-11-03 棚卸の再測定（main c575febd）
+
+- **前提の変化**: `ponytail-manual-ci` が main に入った（#228）。3 つの検査の「全部の章の数」は、目次 `SUMMARY.md` から数える形になった（`book/tools/verify-scripts-test.mjs` 82〜91 行・`talk/talk-test.mjs` 455〜458 行・`gen-skill-refs-test.mjs` 600〜605 行。数えるのは `link-check.mjs` の `summaryChapters`）。上の申し送りの「入った後」の側で読む。新しい部のフォルダを作るなら、口調の検査の見るフォルダ（`verify-content.mjs` 322 行の `VOICE_DIRS`）に足す。
+- **触るファイル**: 章の本文（新しいファイル）、`book/src/SUMMARY.md`、`verify-content.mjs`（新しい部なら `VOICE_DIRS`）、本文と見本の辞書の照合（`tutorial-check.mjs` の流儀）、スキル references の再生成。ソースは触らない。
+- **規模**: 8〜12 のまま。
+- **先に要るもの**: `hello-novel-sample`（題材）。ファイルの重なり（未完了）: 目次 `SUMMARY.md` の別の節を触る `vscode-mcp-client`・`debug-mcp-runtime`・`novel-areka-contract`（章を足す場合）だけで、どれも許される重なり。
+- **種別**: 文書（ノベルゲームの作り方の章が無い）。開発者の 0.5.0（今は 0.6.0）の目標から。
+- **要件定義のモデル**: Opus。置き場所・章の割り方・絵・シェルの説明との分担は、書き直せる文書の決めごとで、DSL の意味・保存の形・公開の Lua の約束のどれでもない。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: 部ごとの決め打ちの数は、まだ残る（`verify-scripts-test.mjs` 72 行の段の章 13・74 行の入門 16）。入門ガイドの続きに章を足すなら、この 2 つを合わせる。別の部にするなら要らない。「Current State」3 点目・「Scope」の「章の数を決め打ちする検査の更新」は、目次に載せることと、この 2 つの数のことと読む。

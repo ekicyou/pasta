@@ -96,20 +96,19 @@ shiori4 の名前の決まり（2026-10-23 の shiori4 の開発者の裁定。a
 
 - ノベルゲームを 0.5.0 から 0.6.0 へ順延し、0.5.0 は「属性関係の整備」になった（開発者の決定）。この spec の推奨の版は、areka・shiori4 の版 4 の対応と揃えて 0.6.0 に変わる（版は判断待ちのまま）。
 
-## 2026-11-02 棚卸の再測定（main 491cc23c）
-
-- **前提の変化**: `shiori4-v3-portable` が入り、働きの上の先に要るものは満ちた。SHIORI/3.0 の書き出しの型も直った（`windows.rs` 44 行で `c_long`、`load`・`loadu`・`unload` は `-> i32`、`request` の長さは `*mut c_long`）。この spec は `windows.rs` を持たない。`build.yml` は 207 行になった。x64 の pasta.dll は今も matrix（i686・x86_64）で作られて `pasta-dll-x64` として upload され、x64 の行だけで `shiori4-testhost`（0.1.1）の版 3 の 1 往復が走る（66〜80 行）。Linux・macOS の job も増えた（89 行〜）。arm64 の行と `aarch64` の言及は、どこにも無いまま。`ponytail-check-release`（完了）との重なりは消えた。mlua 0.12 が入ったので、aarch64 の LuaJIT のビルドは今試せる（まだ試していない。要件の前に試す）。
-- **今も合っている行番号**（`release.ps1`・`release.yml`・`github-release.ps1`・`.cargo/config.toml`・`about.toml` は変わっていない）: `release.ps1`（409 行）の 32bit のビルド 73 行・DLL の写し 98〜110 行・段 5 は 249〜273 行（名前 266 行）。`release.yml`（609 行）の targets 75 行・cache の key 80 行・`pasta.dll.zip` の検査 145〜148 行・.nar の検査 182 行・upload 226〜230 行。添付の名前は `github-release.ps1` 72 行。
-- **触るファイル**: `.cargo/config.toml`、`release.ps1`、`release.yml`、`github-release.ps1`・`release-scripts-test.ps1`・`release` スキルの `release-state.ps1`（配布物の形を変えるなら）、`build.yml`（arm64 の行を足すなら）、`about.toml`（17 行の targets）、`.gitignore`、`pasta_sample_ghost/tests/` の `pasta.dll` を見る 4 つ、マニュアル。1,000 行に近いものは無い。
-- **規模**: 9〜12 のまま。
-- **先に要るもの**: 働きの上では無い。ファイルの重なり: `ponytail-manual-ci`（`release.yml`・`build.yml`）、`vsce-4-upgrade`（`release.yml`）、`shiori4-v4-host`（`build.yml` に版 4 の 1 往復を足すなら）。リリースの実行中は `release.ps1`・`release.yml` を main へ入れない。
-- **種別**: 機能（areka の 64bit・arm64 向けの配布物）。
-- **要件定義のモデル**: Opus（前のまま）。
-- **分割の案**: 要らない。
-- **見つけた穴・古くなった記述**: Current State の行番号は古い（上の行が正しい）。Upstream の `ponytail-shiori` の型の直しは `shiori4-v3-portable` で済んだ。`.cargo/config.toml` 11 行「出荷ターゲットは x86（i686）・x64（x86_64）の両方」は x64 の `pasta_check.exe` のことで、x64 の pasta.dll は配っていない（すぐ直せる誤り）。CI で arm64 を作るには、arm64 の Windows の runner か x64 からのクロスビルドが要る。`embed-resource` の VERSIONINFO が arm64 で通るかも、LuaJIT と一緒に試す（前のまま）。
-
 ## 申し送り（ponytail-manual-ci より・2026-11-03）
 
 - `release.yml` の第三者の action（`dtolnay/rust-toolchain`・`Swatinem/rust-cache`・`rust-lang/crates-io-auth-action`・`Azure/login`）は SHA で固定し、行末にタグのコメントを置く形になった。`rust-toolchain` は SHA で指すので、`targets:` に arm64 を足すときも `toolchain:` は足さない（その SHA の `action.yml` の既定が stable）。
 - 道具（`wasm-pack`・`cargo-about`）は env の SHA-256 と `Get-FileHash` で照合してから展開する。道具を足す・版を上げるときは、その SHA-256 も env に足す。
 - `build.yml` に job `manual-light`（マニュアルの軽い検査）が増えた。build の job の `upload-artifact` は v7、`release.yml` の `download-artifact` は v8。arm64 の行を足すときは、この版にそろえる。
+
+## 2026-11-03 棚卸の再測定（main c575febd）
+
+- **前提の変化**: 先に入るはずだった `ponytail-manual-ci`・`ponytail-shiori` は入った。上の申し送り（`ponytail-manual-ci` より）は main と合っている。`release.yml`（609 行）の `rust-toolchain` は SHA で `# stable`（75 行）、targets は 77 行で i686・x86_64、cache の key は 82 行、wasm-pack・cargo-about の SHA-256 は env の 25・26 行、`upload-artifact@v7` は 223 行、`download-artifact@v8` は 413・502 行。`pasta.dll.zip` の検査 145〜148 行・.nar の検査 182 行は動いていない。`build.yml` は 225 行（job `manual-light` が増えた）で、matrix は 20・22 行、x64 の版 3 の 1 往復は 68〜80 行、`pasta-dll-x64` の upload は 83〜86 行。`ponytail-shiori` は `windows.rs` の DllMain を「何もせず 1 を返す」にした（この spec は `windows.rs` を持たない）。`release.ps1`（409 行。32bit のビルド 73 行・DLL の写し 98〜110 行・段 5 は 249〜273 行）・`github-release.ps1`（添付の名前 72 行）・`.cargo/config.toml`・`about.toml` は変わっていない。aarch64・arm64 の言及は今もどこにも無い。
+- **触るファイル**: `.cargo/config.toml`、`release.ps1`、`release.yml`、`github-release.ps1`・`release-scripts-test.ps1`（276 行）・`release` スキルの `release-state.ps1`（配布物の形を変えるなら）、`build.yml`（arm64 の行を足すなら）、`about.toml`（17 行の targets）、`.gitignore`、`pasta_sample_ghost/tests/` の `pasta.dll` を見る 4 つ、マニュアル。1,000 行に近いものは無い。
+- **規模**: 9〜12 のまま。
+- **先に要るもの**: 働きの上では無い。ファイルの重なり（未完了）: `vsce-4-upgrade`（`release.yml`）、`shiori4-v4-host`（`build.yml` に版 4 の 1 往復を足すなら）、CI に clang を入れるなら `pest-2-9-4-upgrade`（`build.yml`・`release.yml`）、`hello-novel-sample`（見本ゴーストのテスト `pasta_sample_ghost/tests/` を触るなら）。リリースの実行中は `release.ps1`・`release.yml` を main へ入れない。
+- **種別**: 機能（areka の 64bit・arm64 向けの配布物）。
+- **要件定義のモデル**: Opus（前のまま）。
+- **分割の案**: 要らない。
+- **見つけた穴・古くなった記述**: Current State の行番号は古い（上の行が正しい）。`.cargo/config.toml` 11 行「出荷ターゲットは x86（i686）・x64（x86_64）の両方」は x64 の `pasta_check.exe` のことで、x64 の pasta.dll は配っていない（すぐ直せる誤り。前回から残る）。CI で arm64 を作るには、arm64 の Windows の runner か x64 からのクロスビルドが要る。aarch64 の LuaJIT と `embed-resource` の VERSIONINFO は、要件の前に試す（前のまま）。
