@@ -19,6 +19,7 @@ local STORE = require("pasta.store")
 --- @field _spoke boolean|nil この再開の間に組み立てた出力に台詞があったか（nil は組み立てていない、false は組み立てて台詞なし）
 --- @field _on_speech (fun(act: table): table[]|nil)|nil 台詞を見つけたときに呼ぶ中断の流し方（割り込みのときだけ掛かる）
 --- @field _interrupted boolean|nil この再開で中断の台詞を反応の代わりに出したか
+--- @field _resume_req ShioriRequest|nil このシーンを最後に再開した要求（チェイントークの区切り・コールバックの応答・時間切れ）。get_property の期限の数え始め
 local SHIORI_ACT = {}
 
 --- SHIORI_ACT実装メタテーブル
@@ -299,6 +300,15 @@ local function normalize_property_names(name_or_names)
     return names, n
 end
 
+--- get_property の待ちの数え始め（なめらかな時計。req.date が無ければ OS の時計）
+--- このシーンを最後に再開した要求（無ければ元の要求）の時刻から数える
+--- @param self ShioriAct
+--- @return number
+local function wait_start(self)
+    local req = self._resume_req or self.req
+    return (req and CLOCK.steady(req)) or os.time()
+end
+
 --- SSPプロパティ読み取りタグ（\![get,property,{id},{names...}]）を蓄積し、yield で値を受け取る
 --- @param self ShioriAct アクションオブジェクト
 --- @param name_or_names string|string[] プロパティ名または名前の配列
@@ -319,10 +329,9 @@ function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_mess
         timeout_message = "callback timeout: get_property"
     end
 
-    -- イベント ID 生成 + ステージング（締め切りは なめらかな時計。req.date が無ければ OS の時計）
+    -- イベント ID 生成 + ステージング
     local event_id = CALLBACK.next_event_id()
-    local now = (self.req and CLOCK.steady(self.req)) or os.time()
-    CALLBACK.stage_pending(event_id, now + timeout, timeout_message)
+    CALLBACK.stage_pending(event_id, wait_start(self) + timeout, timeout_message)
 
     -- トークンバッファ退避
     local saved_tokens = self.token
@@ -337,7 +346,11 @@ function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_mess
     table.insert(self.token, { type = "raw_script", text = tag })
 
     -- yield（get タグのみのスクリプトを送信）
-    local refs, reason = coroutine.yield(self:build())
+    -- by: 再開した要求（コールバックの応答・時間切れの掃引）。続けて呼ぶ期限はその時点から数える
+    local refs, reason, by = coroutine.yield(self:build())
+    if by then
+        self._resume_req = by
+    end
 
     -- トークンバッファ復元（成功・失敗いずれの経路でも）
     self.token = saved_tokens

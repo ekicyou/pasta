@@ -669,8 +669,11 @@ function ACT_IMPL.yield(self)
             .. "止めた区間の区切りには選択肢やイベントを使ってください。")
         require("pasta.global").resume_auto_talk(self)
     end
-    local result = self:build()
-    coroutine.yield(result)
+    local resumed = coroutine.yield(self:build())
+    -- 続きの get_property の期限は、再開した要求から数える（引数なしの再開では控えを変えない）
+    if type(resumed) == "table" then
+        self._resume_req = resumed.req
+    end
     return self
 end
 

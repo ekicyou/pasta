@@ -252,14 +252,14 @@ loop
 ```
 
 - ACT の `build()` はトークが 0 件なら `nil` を返す。そのため、トークを積まずに `act:yield()` した中断（`yield` の直後の `yield` など）は、応答を返さず同じイベントの中で再開される。
-- 2 回目以降の `resume` は引数を渡さない。継続したシーンの再開でも、`EVENT.fire` が渡す新しい ACT は `coroutine.yield` の戻り値になるだけで、`ACT_IMPL.yield` はそれを使わない。継続したシーンは、最初の `resume` で受け取った ACT（`act.req` はそのときのイベントのもの）を使い続ける。
+- 2 回目以降の `resume` は引数を渡さない。継続したシーンの再開では、`EVENT.fire` が渡す新しい ACT が `coroutine.yield` の戻り値になる。`ACT_IMPL.yield` はその `req` を再開した要求として `_resume_req` に控えるだけで（`get_property` の期限の数え始め。[コールバック待ちとの関係](#コールバック待ちとの関係)）、継続したシーンは、最初の `resume` で受け取った ACT（`act.req` と日時の変数はそのときのイベントのもの）を使い続ける。引数なしの再開では控えを変えない。
 - このループは `EVENT.drive` の中で使われる。`EVENT.drive` を呼ぶのは次の 3 箇所であり、最初の `resume` に渡す引数だけが異なる。
 
 | 呼び出し元 | 最初の `resume` の引数 | シーン側で受け取る値 |
 | ---------- | ---------------------- | -------------------- |
 | `EVENT.fire`（ハンドラが返したコルーチン） | そのイベントの ACT | 新しく始まったシーンではシーン関数の第 1 引数（`resumed_act`）。継続したシーンでは `coroutine.yield` の戻り値になり、使われない |
-| `CALLBACK.try_route` | `refs`（Reference を 1 始まりにした配列） | `get_property` の中の `coroutine.yield` の戻り値 |
-| `CALLBACK.sweep` | `nil, reason`（`reason` は `on_timeout` が文字列のときだけ。それ以外は `nil`） | 同上。`get_property` は `reason` があれば `error(reason)` する |
+| `CALLBACK.try_route` | `refs, nil, req`（`refs` は Reference を 1 始まりにした配列、`req` は届いた要求） | `get_property` の中の `coroutine.yield` の戻り値 |
+| `CALLBACK.sweep` | `nil, reason, req`（`reason` は `on_timeout` が文字列のときだけ。それ以外は `nil`。`req` は `sweep` に渡された要求で、省略されれば `nil`） | 同上。`get_property` は `reason` があれば `error(reason)` する |
 
 ### 継続トーク（チェイントーク）と co_scene の更新
 
@@ -377,7 +377,7 @@ EVENT.drive（どの呼び出し元から再開していても同じ）
                                      keep が偽なら co_scene も nil にする（keep が真なら触れない）
         ↓ 後のリクエスト
 EVENT.fire → CALLBACK.try_route(req)
-  pending[req.id] があれば外して EVENT.drive(co, entry.act, Reference の配列)
+  pending[req.id] があれば外して EVENT.drive(co, entry.act, Reference の配列, nil, req)
   ok が偽 → error(value)
   ok が真 → return RES.ok(value)     value が nil か "" なら 204
 ```
@@ -386,20 +386,21 @@ EVENT.fire → CALLBACK.try_route(req)
 - 待ちに入った回の `STORE.co_scene` は、[続きの決まり](#継続トークチェイントークと-co_scene-の更新)の表のとおりに決まる。get タグは台詞に数えないので、台詞を出さずに待ちに入った割り込みは待っている続きを残す（`keep` が真）。待っている続きそのものが待ちに入ったとき（"resume"）は `STORE.co_scene` を空にし、待っている間に次の自然なおしゃべりが同じコルーチンを再開しないようにする。続きが無い回・指名した再生の回も `keep` は偽なので空になる。
 - コールバックで再開したシーンは、戻った回の `EVENT.drive` で、通常のイベントと同じ規則で扱われる。待ちに入った回に続きを残していれば、戻った回の種類は "interrupt" になり、台詞を出せば続きを捨てて中断の台詞を流す。台詞を出さなければ続きは残る。指名した再生のコルーチンは印が残っているので "preempt" になる。出力の無い中断は同じリクエストの中で進み、チェイントークで中断すれば表のとおりに `STORE.co_scene` が決まり（続きになれば、次の自然なおしゃべり（仮想ディスパッチャが起こす OnTalk）の機会に続きが出る）、続けて `get_property` すれば新しい待機として登録される。
 - 再開したシーンのエラーは、`pending` にも `STORE.co_scene` にも残らず、`SHIORI.request` が応答にする（表記を出す設定で ID が `On` で始まる要求なら表記付きの `200 OK`、それ以外は 500。[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)）。
+- 期限は、`get_property` を呼んだシーンの ACT の `_resume_req`（無ければ `act.req`）の `CLOCK.steady` に待ちの秒数を足した時刻である。`_resume_req` は、そのシーンを最後に再開した要求で、チェイントークの続きの再開では `ACT_IMPL.yield` が、コールバックの応答と時間切れの再開では `get_property` が 3 つ目の戻り値（再開した要求）から書く。最初の区切りでは無いので、期限はその要求の時刻から数える。`act.req` は替えない。
 - `req.id` と一致する待機が無ければ `try_route` は `nil` を返し、`EVENT.fire` は通常の振り分けに進む。掃引で外した待機に遅れて届いた結果も、この扱いになる。
 
 ### 期限切れの掃引（CALLBACK.sweep）
 
-期限を過ぎた待機は、OnSecondChange の既定ハンドラ（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/second_change.lua`）が毎回呼ぶ `CALLBACK.sweep(CLOCK.steady(act.req) or os.time())`（飛びを差し引いた時計。[仮想時刻の時計](shiori.md#仮想時刻の時計pastashioriclock)）が、タイムアウトとして再開する。
+期限を過ぎた待機は、OnSecondChange の既定ハンドラ（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/second_change.lua`）が毎回呼ぶ `CALLBACK.sweep(CLOCK.steady(act.req) or os.time(), act.req)`（飛びを差し引いた時計。[仮想時刻の時計](shiori.md#仮想時刻の時計pastashioriclock)）が、タイムアウトとして再開する。
 
 ```text
-CALLBACK.sweep(now)
+CALLBACK.sweep(now, req)          req は省略できる
  1. 集める  pending を走査し、now > timeout_at の待機を一覧にする（この間は再開しない）
  2. 外す    一覧の待機をすべて pending から外す
  3. 並べる  イベント名の番号（OnPastaCallBack{N} の N）の小さい順。番号の無い名前は末尾に名前の文字列順
  4. 再開    一覧の順に、待機ごとに
               on_timeout が文字列なら reason = on_timeout とし、イベント名と理由を警告ログに出す
-              ok, value = EVENT.drive(entry.co, entry.act, nil, reason)
+              ok, value = EVENT.drive(entry.co, entry.act, nil, reason, req)
               結果から応答の候補を決める（下表）
               まだ応答が無ければ候補を採用し、既にあれば候補を捨てて警告ログを出す
  5. 採用した応答、または nil を返す
@@ -412,6 +413,7 @@ CALLBACK.sweep(now)
 | `ok` が真で出力あり | どちらでも | `RES.ok(出力)` |
 | `ok` が真で出力なし（`nil` か `""`） | どちらでも | なし |
 
+- `req` は、再開したシーンが続けて呼ぶ `get_property` の期限の数え始めになる。作者が上書きしたハンドラが 1 引数で `sweep` を呼んでも動くが、そのときは静かなタイムアウトの後に続けて呼ぶ期限だけ、前に再開した要求から数える。
 - 収集と取り外しを再開より前に済ませるため、再開中に登録された待機（タイムアウトを捕まえて続けて `get_property` したシーンなど）は同じ回には扱われない。走査中の表への挿入も起きない。
 - 待機は再開の前に `pending` から外すため、1 つの待機が 2 回処理されることはない。途中の待機がエラーで終わっても、残りの待機の処理を続ける。候補を捨てた待機も `EVENT.drive` を通っているため、予約と継続は規則どおりに更新されている。
 - 既定ハンドラは、`sweep` が応答を返せばそれを返し、仮想イベント（OnTalk・OnHour）を出さない。応答は `SHIORI/` で始まる全文なので、`EVENT.fire` が包まずにその回の応答にする。`sweep` が `nil` を返した回だけ `virtual_dispatcher.dispatch` に進む。
