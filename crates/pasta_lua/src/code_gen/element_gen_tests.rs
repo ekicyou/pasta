@@ -423,6 +423,38 @@ fn word_definition_prefixes_and_multi_name_lines() {
     );
 }
 
+/// Actor words share the generator: `ACTOR:create_word("key")` (colon).
+#[test]
+fn word_definition_actor_form() {
+    let kw = key_words(&["通常"], &["\\s[0]", "\\s[100]"]);
+    let actor = gen_to_string(|cg| cg.generate_word_definition(&kw, "ACTOR", ":"));
+    assert_eq!(
+        actor,
+        "ACTOR:create_word(\"通常\"):entry([=[\\s[0]]=], [=[\\s[100]]=])\n"
+    );
+}
+
+/// A value that cannot be literalized is a positioned `StringLiteralError`
+/// for global, scene and actor word definitions alike.
+#[test]
+fn word_definition_unliteralizable_value_errors_with_span() {
+    let kw = key_words(&["挨拶"], &["\\x]==========y"]);
+    for (receiver, separator) in [("PASTA", "."), ("SCENE", ":"), ("ACTOR", ":")] {
+        let mut output = Vec::new();
+        let mut cg = LuaCodeGenerator::new(&mut output);
+        match cg.generate_word_definition(&kw, receiver, separator) {
+            Err(TranspileError::StringLiteralError { span, .. }) => {
+                assert_eq!(
+                    (span.start_line, span.start_col, span.end_line, span.end_col),
+                    (3, 1, 3, 10),
+                    "{receiver}: error must carry the word definition span"
+                );
+            }
+            other => panic!("{receiver}: expected StringLiteralError, got {other:?}"),
+        }
+    }
+}
+
 // ------------------------------------------------------------------
 // Code blocks
 // ------------------------------------------------------------------

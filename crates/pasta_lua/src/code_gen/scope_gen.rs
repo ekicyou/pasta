@@ -48,27 +48,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // ACTOR:create_word() registers only in the actor word dictionary (STORE.actor_words, searched by
         // the A2 prefix match); it does not set a field on the actor object
         for word_def in &actor.words {
-            if word_def.words.is_empty() {
-                continue;
-            }
-
-            // Literalize all words in the array
-            let literals: Result<Vec<String>, _> = word_def
-                .words
-                .iter()
-                .map(|w| StringLiteralizer::literalize_with_span(w, &word_def.span))
-                .collect();
-            let literals = literals?;
-
-            // Use symmetric API: ACTOR:create_word(key):entry(...)
-            // This pattern matches SCENE:create_word(key):entry(...)
-            let entry_args = literals.join(", ");
-            for name in &word_def.names {
-                self.writeln(&format!(
-                    "ACTOR:create_word(\"{}\"):entry({})",
-                    name, entry_args
-                ))?;
-            }
+            self.generate_word_definition(word_def, "ACTOR", ":")?;
         }
 
         // Generate code blocks (Requirement 4.関数定義)

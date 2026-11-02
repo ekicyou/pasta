@@ -374,3 +374,31 @@ fn lua_block_lines_map_to_their_pasta_lines_in_sink_and_init_scene() {
         }
     }
 }
+
+/// アクター辞書の単語定義の各行が、`.pasta` の単語定義の行へ対応づく（ponytail-lua-transpiler 5.1・7.4）。
+#[test]
+fn actor_word_definition_lines_map_to_their_pasta_lines() {
+    // 行1: ％さくら, 行2: ＠通常, 行3: ＠照れ
+    let source = "％さくら\n　＠通常：\\s[0]、\\s[100]\n　＠照れ：\\s[1]\n";
+    let file = parse_str(source, "actor.pasta").expect("parse ok");
+
+    let mut sink = LinePairSink::default();
+    let mut output = Vec::new();
+    LuaTranspiler::default()
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
+        .expect("transpile ok");
+
+    let lua = String::from_utf8(output).unwrap();
+    for (key, pasta_line) in [("通常", 2), ("照れ", 3)] {
+        let lua_line = lua
+            .lines()
+            .position(|l| l.contains(&format!("ACTOR:create_word(\"{key}\")")))
+            .map(|i| i as u32 + 1)
+            .unwrap_or_else(|| panic!("output must contain ACTOR:create_word(\"{key}\")\n{lua}"));
+        assert!(
+            sink.records.contains(&(lua_line, pasta_line)),
+            "5.1: actor word {key} line {lua_line} must map to .pasta line {pasta_line}; records = {:?}",
+            sink.records
+        );
+    }
+}

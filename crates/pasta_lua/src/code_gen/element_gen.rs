@@ -500,13 +500,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// The `prefix` includes the full method call syntax, e.g.:
     /// - `PASTA.create_word("key")` for global words (dot syntax)
     /// - `SCENE:create_word("key")` for scene-local words (colon syntax)
+    /// - `ACTOR:create_word("key")` for actor dictionary words (colon syntax)
+    ///
+    /// A value that cannot be literalized is a `StringLiteralError` carrying the
+    /// definition's span, for all three kinds.
     ///
     /// Source-map wiring (Requirements 1.1, 1.3): one `.pasta` word definition with
     /// multiple key names emits one `.lua` line per name; ALL of those output lines
     /// map to the same definition `.pasta` [`Span`]. Recording happens per emitted
     /// line (following `generate_action`'s per-line delta pattern), so every line is
     /// covered, not just the last.
-    fn generate_word_definition(
+    pub(super) fn generate_word_definition(
         &mut self,
         word: &KeyWords,
         receiver: &str,
@@ -519,7 +523,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         let values: Vec<String> = word
             .words
             .iter()
-            .map(|w| StringLiteralizer::literalize(w))
+            .map(|w| StringLiteralizer::literalize_with_span(w, &word.span))
             .collect::<Result<Vec<_>, _>>()?;
         let entry = values.join(", ");
 
