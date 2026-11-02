@@ -327,7 +327,6 @@ STORE.scenes = {
 | `get_global_table(global_name)` | `STORE.scenes[global_name]` を返す |
 | `get(global_name, local_name)` | シーン関数を返す。無ければ `nil` |
 | `get_start(global_name)` | `get(global_name, "__start__")` |
-| `get_global_name(scene_table)` | `scene_table.__global_name__` を返す |
 | `get_all_scenes()` | `STORE.scenes` そのもの（複製しない）を返す |
 | `search(name, global_scene_name, attrs)` | 前方一致の検索でシーンを探し、結果オブジェクトを返す（後述） |
 | `wrap(fn)` | シーン関数をコルーチンに包んで返す（後述） |
@@ -496,51 +495,3 @@ Rust 側は `pasta.word` の `get_all_words()` を呼ぶ。この関数は、STO
 
 - ビルダーの生成時に `_registry[key]` が無ければ空の配列を作る。そのため、`entry` を呼ばずに作っただけのビルダーでも、値リストを 1 つも持たないキーが残る。
 - `entry(...)` は `table.insert(_registry[_key], { ... })` を行って自身を返す。同じキーのビルダーを何度作っても、同じ配列に値リストが足されていく。
-- `get_global_words()`・`get_local_words(scene_name)`・`get_actor_words(actor_name)` は STORE の該当する表をそのまま返す。
-
-## ユーティリティモジュール
-
-### pasta.buf
-
-`pasta.buf` は、文字列を連結するためのバッファを作るモジュールである。LuaJIT の String Buffer Library（`string.buffer`）があればそれを使い、無ければ同じメソッドを持つ最小実装を使う。`pasta.shiori.sakura_builder` がさくらスクリプトの組立に使う（[さくらスクリプトの組立](https://ekicyou.github.io/pasta/internals/talk-output.html#さくらスクリプトの組立)）。
-
-```lua
-local buf = require("pasta.buf")
-local b = buf.new()
-b:put("Hello"):put(", "):put("World")
-local s = b:tostring()  -- "Hello, World"
-```
-
-| API | 内容 |
-| --- | ---- |
-| `buf.new()` | バッファを作る。LuaJIT のときは `string.buffer` の `new` そのもの、それ以外は `new_fallback` |
-| `buf.backend` | 採用したバックエンド（`"luajit"` か `"fallback"`） |
-| `buf.new_fallback()` | 最小実装のバッファを明示的に作る（環境に依らないテストのため） |
-| `buffer:put(s)` | 文字列を追記して自身を返す |
-| `buffer:tostring()` | 追記した順に連結した文字列を返す。バッファの中身は消えない |
-
-- バックエンドの選択は、モジュールの読み込み時に 1 回だけ `pcall(require, "string.buffer")` で行う。`require` に失敗しても、`new` が関数でなくても、例外は送出せず最小実装を選ぶ。
-- LuaJIT のときは `string.buffer` のオブジェクトをラップせず生成関数を直接束ねるため、間接呼び出しの負担は無い。呼び出し側は `put`・`tostring` 以外のメソッドに依存しない。
-- 最小実装は内部の配列 `_parts` に追記し、`tostring` で `table.concat` する。
-
-### pasta.lua_version
-
-`pasta.lua_version` は、実行中のランタイムの種類（標準 Lua か LuaJIT か）と版を 1 つの整数で返す。
-
-```lua
-local lua_version = require("pasta.lua_version")
-local v = lua_version.get()   -- このランタイム（LuaJIT 2.1）では 221
-if v >= 200 then
-    -- LuaJIT 固有の機能（string.buffer など）を使える
-end
-```
-
-| 戻り値 | 意味 |
-| ------ | ---- |
-| `1xy` | 標準 Lua x.y（例: `154` は Lua 5.4、`155` は Lua 5.5） |
-| `2xy` | LuaJIT x.y（例: `220` は LuaJIT 2.0、`221` は LuaJIT 2.1） |
-
-- 種類は `rawget(_G, "jit")` の有無で判定する。LuaJIT でも `_VERSION` は `"Lua 5.1"` を返すため、種類の判定には使わない。
-- LuaJIT の版は `jit.version_num`（例 `20100`）から求め、数値でなければ `jit.version`（`"LuaJIT 2.1.…"`）の `major.minor` を解析する。どちらも得られなければ `221` を返す。
-- 標準 Lua の版は `_VERSION` の `major.minor` を解析し、得られなければ `151` を返す。
-- 例外を送出せず、常に整数を返す。

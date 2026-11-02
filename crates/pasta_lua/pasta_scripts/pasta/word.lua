@@ -96,26 +96,6 @@ function WORD.get_all_words()
     }
 end
 
---- グローバル単語辞書を取得
---- @return table {key → values[][]} 形式の辞書
-function WORD.get_global_words()
-    return STORE.global_words
-end
-
---- ローカル単語辞書を取得
---- @param scene_name string シーン名
---- @return table|nil {key → values[][]} 形式の辞書
-function WORD.get_local_words(scene_name)
-    return STORE.local_words[scene_name]
-end
-
---- アクター単語辞書を取得
---- @param actor_name string アクター名
---- @return table|nil {key → values[][]} 形式の辞書
-function WORD.get_actor_words(actor_name)
-    return STORE.actor_words[actor_name]
-end
-
 --- グローバル単語ビルダーを作成（公開API）
 --- create_global のエイリアス
 --- @param key string 単語キー

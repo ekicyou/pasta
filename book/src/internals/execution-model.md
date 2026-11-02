@@ -473,7 +473,7 @@ VM の構築      register_persistence_module → persistence::register
 - `coroutine.close` が無い。中断中のコルーチンを「破棄する」とは、参照を外して GC に回収させることである（`set_co_scene` と `STORE.reset` は閉じる処理を持たず、参照を外すだけである）。破棄したコルーチンは、`yield` より後のコードを二度と実行しない（後始末のコードも動かない）。
 - to-be-closed 変数（`<close>`）が無い。`__close` メタメソッドは自動では呼ばれない。
 - コルーチンの中断は Lua の関数の中でだけ行える。Rust の関数（`@pasta_*` の関数など）から呼ばれた Lua の関数の内側で `yield` すると、C 呼び出しの境界をまたぐためエラーになる。
-- `_VERSION` は `"Lua 5.1"` を返す。ランタイムの種類と版は `pasta.lua_version` が `jit` の有無で判定する。
+- `_VERSION` は `"Lua 5.1"` を返す。LuaJIT かどうかは `jit` の有無で分かる。
 - Lua 5.2 互換により `table.unpack` などが使える。生成コードと `pasta.shiori.act` はこれを使う。
 
 ## ソースの所在

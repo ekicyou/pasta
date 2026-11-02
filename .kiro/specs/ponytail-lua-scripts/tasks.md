@@ -102,7 +102,7 @@
   - _Requirements: 4.6, 4.7, 4.10, 4.12, 4.15, 6.3_
 
 - [ ] 8. 使い手の無い部品と使用例
-- [ ] 8.1 代わりのバッファ・`pasta.lua_version`・使い手の無い取り出し口を消す
+- [x] 8.1 代わりのバッファ・`pasta.lua_version`・使い手の無い取り出し口を消す
   - さくらスクリプトの組み立ては LuaJIT のバッファを直接使い、テスト専用の差し込み口を消す。2 つのモジュールとそのテスト、テストの一覧の 2 行、バッファの一致の確かめを消す
   - 取り出し口 `WORD.get_global_words`・`WORD.get_local_words`・`WORD.get_actor_words`・`SCENE.get_global_name` と、その確かめを消す（`WORD.get_all_words` は Rust が呼ぶので残す）
   - バッファの在ることの Rust のテストを、LuaJIT のバッファを直接確かめる形にする

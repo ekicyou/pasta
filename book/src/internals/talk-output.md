@@ -65,7 +65,7 @@ pasta.shiori.sakura_builder  BUILDER.build(グループ化トークン, { spot_n
 | `pasta.shiori.sakura_builder`（`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`） | グループ化トークンをさくらスクリプト文字列にする `BUILDER.build` と、字のある `talk` か `choice` があるかを答える `BUILDER.speaks`（`talk` の字の判定は下の `has_text`） |
 | `pasta.shiori.appearance`（`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`） | 外見状態の生成（`APPEARANCE.new`）・観測（`APPEARANCE.observe`）・復旧（`APPEARANCE.restore`）と、さくらスクリプトの単位の読み取り（`APPEARANCE.tag_at`。ビルダーが字の判定と `\c` の読み取りに使う）。状態を持たず、渡された状態の表をその場で更新する。`STORE` や `@pasta_*` を `require` しない |
 | `pasta.shiori.actor_style`（`crates/pasta_lua/pasta_scripts/pasta/shiori/actor_style.lua`） | 装いの状態の生成（`STYLE.new`）、話者の切り替えで出す戻すタグと装いのタグ（`STYLE.switch`）、内側のトークンの `\c`・`\x` の後の出し直し（`STYLE.through`）。状態を持たず、渡された状態の表をその場で更新する。タグの読み取りは `APPEARANCE.tag_at` だけを使い、`STORE` や `@pasta_*` を `require` しない |
-| `pasta.buf`（`crates/pasta_lua/pasta_scripts/pasta/buf.lua`） | 組立に使う文字列バッファ。LuaJIT の `string.buffer` があればそれを、無ければ同じ `put`・`tostring` を持つ最小実装を使う |
+| `string.buffer` | 組立に使う文字列バッファ。LuaJIT の String Buffer Library を代わりの実装なしで直接使う（`crates/pasta_lua/tests/string_buffer_availability_test.rs` が在ることを確かめる） |
 | `pasta.failure`（`crates/pasta_lua/pasta_scripts/pasta/failure.lua`） | 失敗表記の `raw_script` トークンを積む報告の出口。`sakura_builder` は未登録の印を読む（[失敗の報告（pasta.failure）](internal-modules.md#失敗の報告pastafailure)） |
 | `pasta.store`（`crates/pasta_lua/pasta_scripts/pasta/store.lua`） | ビルドをまたいで保持する `STORE.actor_spots`（アクター名 → スポット）と `STORE.appearance`（外見状態）を持つ |
 
@@ -141,7 +141,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 
 ### さくらスクリプトの組立
 
-`BUILDER.build(グループ化トークン, config, actor_spots, appearance)` は、`config.spot_newlines`（既定 1.5）・`config.choice_newlines`（既定 1.5）・`config.after_choice_newlines`（既定 1.0）と、`config.buffer_factory`（既定 `pasta.buf` の `new`。テストが差し替える）を使う。SHIORI 用の ACT は `actor_spots` に `STORE.actor_spots` を、`appearance` に `STORE.appearance` を渡し、`BUILDER.build` はどちらもその場で書き換える。`nil` を渡された場合は、そのビルドの中だけの空の表を使う。
+`BUILDER.build(グループ化トークン, config, actor_spots, appearance)` は、`config.spot_newlines`（既定 1.5）・`config.choice_newlines`（既定 1.5）・`config.after_choice_newlines`（既定 1.0）を使う。SHIORI 用の ACT は `actor_spots` に `STORE.actor_spots` を、`appearance` に `STORE.appearance` を渡し、`BUILDER.build` はどちらもその場で書き換える。`nil` を渡された場合は、そのビルドの中だけの空の表を使う。
 
 組立は、1 回のビルドの中だけで生きる次の状態を持つ。
 
@@ -362,7 +362,7 @@ SSP 2.9.18 は、引数の無い `\c` の後の字を既定の表示で出す（
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/actor_style.lua`
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`
 
-本文で参照したその他のファイルは次のとおりである。トークンの蓄積とグループ化は `crates/pasta_lua/pasta_scripts/pasta/act.lua`、アクタープロキシは `crates/pasta_lua/pasta_scripts/pasta/actor.lua`、`STORE.actor_spots`・`STORE.appearance` は `crates/pasta_lua/pasta_scripts/pasta/store.lua`、文字列バッファは `crates/pasta_lua/pasta_scripts/pasta/buf.lua`、`TalkConfig` は `crates/pasta_lua/src/loader/config/sections.rs` にある。振る舞いのテストは `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua`（組立と字の判定）と `crates/pasta_lua/tests/lua_specs/appearance_test.lua`（外見の観測と復旧）、`crates/pasta_lua/tests/lua_specs/actor_style_test.lua`（装いの状態表と `\c`・`\x` の後の出し直し）にある。単位の読み方の写しは `crates/pasta_dsl/src/parser/grammar.pest` と `editors/vscode/syntaxes/pasta.tmLanguage.json` にあり、3 つの読み取りの適合テストは `crates/pasta_lua/tests/sakura_script/conformance_test.rs` にある。
+本文で参照したその他のファイルは次のとおりである。トークンの蓄積とグループ化は `crates/pasta_lua/pasta_scripts/pasta/act.lua`、アクタープロキシは `crates/pasta_lua/pasta_scripts/pasta/actor.lua`、`STORE.actor_spots`・`STORE.appearance` は `crates/pasta_lua/pasta_scripts/pasta/store.lua`、`TalkConfig` は `crates/pasta_lua/src/loader/config/sections.rs` にある。振る舞いのテストは `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua`（組立と字の判定）と `crates/pasta_lua/tests/lua_specs/appearance_test.lua`（外見の観測と復旧）、`crates/pasta_lua/tests/lua_specs/actor_style_test.lua`（装いの状態表と `\c`・`\x` の後の出し直し）にある。単位の読み方の写しは `crates/pasta_dsl/src/parser/grammar.pest` と `editors/vscode/syntaxes/pasta.tmLanguage.json` にあり、3 つの読み取りの適合テストは `crates/pasta_lua/tests/sakura_script/conformance_test.rs` にある。
 
 ## 経緯
 

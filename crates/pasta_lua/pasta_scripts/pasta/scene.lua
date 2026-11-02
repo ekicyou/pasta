@@ -92,13 +92,6 @@ function SCENE.get(global_name, local_name)
     return nil
 end
 
---- グローバルシーン名を取得
---- @param scene_table SceneTable シーンテーブル
---- @return string|nil グローバルシーン名、またはnil
-function SCENE.get_global_name(scene_table)
-    return scene_table.__global_name__
-end
-
 --- エントリーポイント（__start__）を取得
 --- @param global_name string グローバルシーン名
 --- @return function|nil __start__シーン関数、またはnil

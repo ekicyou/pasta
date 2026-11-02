@@ -86,11 +86,6 @@ describe("SCENE - シーンテーブルの create_word メタメソッド", func
 end)
 
 describe("SCENE - アクセサ", function()
-    test("get_global_name は __global_name__ を返す", function()
-        local tbl = SCENE.create_global_table("spec346_name")
-        expect(SCENE.get_global_name(tbl)):toBe("spec346_name")
-    end)
-
     test("get_start は __start__ シーン関数を返す（未登録は nil）", function()
         local start_fn = function() end
         SCENE.register("spec346_start", "__start__", start_fn)
