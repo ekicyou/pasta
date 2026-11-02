@@ -67,8 +67,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         match &var_set.name {
             Some(name) => {
                 let var_path = match var_set.scope {
-                    VarScope::Local => format!("var.{}", name),
-                    VarScope::Global => format!("save.{}", name),
+                    VarScope::Local | VarScope::Global => {
+                        Self::resolve_var_path(name, &var_set.scope)?
+                    }
                     VarScope::Property => {
                         self.generate_property_set(name, &var_set.value)?;
                         if self.out_line() > out_line_before {
