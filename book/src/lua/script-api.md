@@ -163,7 +163,7 @@ act:get_property(name_or_names, timeout?, timeout_message?) -> string | nil, ...
 - `name_or_names` が `nil`・空文字列・空の配列のとき、配列に `nil` や空文字列の名前があるとき、文字列でも表でもないときは `error` になる。
 - 呼ぶと `\![get,property,OnPastaCallBack{N},名前,…]` のタグだけを応答として返してシーンを中断し、ベースウェアから結果が届くと再開して値を返す（[OnPastaCallBack](shiori-events.md#onpastacallbackコールバック応答)）。
 - 呼ぶ前に積んだトークンは、中断の応答には含まれない。再開した後にそのまま残り、以降に積んだトークンと一緒に出力される。
-- `timeout` 秒を過ぎても結果が届かないと、シーンの中で `timeout_message` を理由とするエラーが発生し、シーンはそこで終わる（警告ログが出る）。期限は呼び出し時の時刻に `timeout` を足した時刻で、時刻の設定し直しによる飛びを差し引いた時計で数える（[時刻の飛び](shiori-events.md#時刻の飛び)）。判定は OnSecondChange の既定ハンドラが行う。
+- `timeout` 秒を過ぎても結果が届かないと、シーンの中で `timeout_message` を理由とするエラーが発生し、シーンはそこで終わる（警告ログが出る）。期限は呼んだ時点の時刻に `timeout` を足した時刻で（チェイントークの続きの中なら続きを再開した要求の時刻、結果やタイムアウトで戻った後に続けて呼ぶならその要求の時刻から数える）、時刻の設定し直しによる飛びを差し引いた時計で数える（[時刻の飛び](shiori-events.md#時刻の飛び)）。判定は OnSecondChange の既定ハンドラが行う。
 - 名前は `set_property` と同じ規則でエスケープされる。
 - DSL の `＄x＝＄％名前` は `var.x = act:get_property("名前")` になる（[プロパティ変数](../grammar/variables.md#プロパティ変数)）。
 
@@ -225,7 +225,7 @@ act:surface(5):wait(500):talk(act.さくら.actor, "驚いた！"):newline()
 | `act.さくら.actor` | アクターオブジェクト | — |
 | `act.さくら.act` | 元の ACT | — |
 
-- `word`・`expr_fn`・`expr_fn_var` は、呼んだ関数の先頭の戻り値が ACT またはそのプロキシそのものなら `nil` を返す。それ以外の戻り値は、複数の値も含めてそのまま返す。ACT の `word`・`expr_fn`・`expr_fn_var`・`global_fn` は戻り値を変えない（[関数スコープの展開先](../grammar/variables.md#関数スコープの展開先)）。
+- `word`・`expr_fn`・`expr_fn_var` が呼んだ関数の戻り値は、ACT の同じ名前のメソッドと同じ規則で扱う（[関数の戻り値の扱い](#関数の戻り値の扱い)）。
 - `talk`・`sakura_script` は `nil` を返すため、プロキシの呼び出しは続けて書けない。
 - メソッド名（`talk`・`wait`・`yield` など）やフィールド名（`save`・`var`・`actors` など）と同じ名前のアクターは、`act.名前` ではプロキシにならない。
 - 生成コードは、アクション行の発言とアクター付きの単語参照・関数呼び出しを、`act.名前` ではなく [actor_proxy](#actor_proxyname) で得たプロキシで書く（`ぱすた：こんにちは` は `act:actor_proxy("ぱすた"):talk("こんにちは")`）。名前を文字列で渡すため、メソッド名・フィールド名と同じ名前のアクターも、アクション行では話せる。
@@ -245,7 +245,15 @@ act:surface(5):wait(500):talk(act.さくら.actor, "驚いた！"):newline()
 - `@pasta_search` を読み込めない環境（テストなど）では、2 段目と 5 段目を飛ばす。
 - 5 段目でグローバルシーンを探すときは、範囲を指定しない [search_scene](modules/pasta-search.md#search_scenename-global_scene_name) を使うため、検索キーが pasta.toml の別名表の別名と完全に一致すると、置き換え先の名前で探す（[シーン名の別名](../grammar/call-jump.md#シーン名の別名)）。既定の別名表のもとでは、`act:call(nil, "会話", nil)` は `act:call(nil, "OnTalk", nil)` と同じ候補（`＊OnTalk` と `＊会話` で宣言したシーンを含む）から選ぶ。2 段目（ローカルシーン）と単語の検索は置き換えない。
 - `word`・`expr_fn`・`expr_fn_var`・`call_restore` と、アクタープロキシの `word`・`expr_fn`・`expr_fn_var` は、見つけた関数から戻った後、実行中のシーンを呼ぶ前のシーンに戻す。関数の中で別のシーンが `init_scene` を呼んでも、戻った後の名前の検索は呼び出し元のシーンを基準にする。`call` は戻さない（[call](#callglobal_scene_name-key-attrs-)）。
+- 見つけた関数の戻り値は [関数の戻り値の扱い](#関数の戻り値の扱い) のとおりに返す。
 - 変数の値を名前にする動的参照（`var_path` を渡した `word` と `expr_fn_var`。DSL の [動的単語参照](../grammar/words.md#動的単語参照)）は、3 段目を探さず、1 段目はシーンテーブル自身のキー（`__global_name__`・シーン関数・Lua ブロックで定義した関数）だけを探す。4 段目の `GLOBAL` は探すため、値が `GLOBAL` に登録された名前（ランタイムが登録する `yield`・`チェイントーク` を含む）と同じなら、その関数が見つかって呼ばれる。
+
+#### 関数の戻り値の扱い
+
+`word`・`expr_fn`・`expr_fn_var`・`global_fn` と、アクタープロキシの `word`・`expr_fn`・`expr_fn_var` は、呼んだ関数の戻り値を同じ規則で返す。
+
+- 先頭の戻り値がその act か、どのアクタープロキシ（`act.さくら` など。別のアクターのものも含む）なら、`nil` を 1 つだけ返す。`act:talk(…)` を `return` で返す関数や `return act.さくら` で終わる関数をアクション行で呼んでも、台詞に `table: 0x…` が出ない。
+- それ以外の戻り値は、複数の値（途中の `nil` を含む）もそのまま返す。`return "a", "b"` なら 2 つとも返る。
 
 #### word(name, var_path)
 
@@ -260,7 +268,7 @@ act:word(name, var_path?) -> string | nil
 
 - `var_path` が `nil` のとき、`name` が `nil` か空文字列なら、何もせずに `nil` を返す。
 - `var_path` があるときは、`name` を `WORD.dynamic_key` で単語名に直してから探す（[WORD.dynamic_key](#worddynamic_keyvalue-var_path-via-act)）。直せない値なら、失敗を報告して探さずに `nil` を返す。探すときは動的参照の探し方（[検索と呼び出し](#検索と呼び出し)）になる。
-- `"word"` モードで探し、見つかったのが関数なら `関数(act)` を呼んでその戻り値をそのまま返す。関数以外の値なら `tostring` した文字列を返す。
+- `"word"` モードで探し、見つかったのが関数なら `関数(act)` を呼んでその戻り値を返す（[関数の戻り値の扱い](#関数の戻り値の扱い)）。関数以外の値なら `tostring` した文字列を返す。
 - 見つからなければ失敗を報告して `nil` を返す。
 - DSL の `＄x＝＠単語` は `var.x = act:word("単語")`、`＄x＝＠＄y` は `var.x = act:word(var.y, "var.y")` になる。アクション行の `＠単語`・`＠＄y` はアクタープロキシの `word` を使う（[DSL と Lua の対応表](../grammar/variables.md#dsl-と-lua-の対応表)）。
 
@@ -380,16 +388,15 @@ act:call_key(value, var_path?, desc?) -> string | 「呼ばない」印
 - 失敗表記の文言は [実行時の失敗の出力](../reference/runtime-failures.md) のとおりである。
 - DSL の動的ターゲットは、`＞＄x` が `act:call_key(var.x, "var.x")`、`＞＠f（）` が `act:call_key(act:expr_fn("f"), nil, "@f()")`、それ以外の式が `act:call_key(式)` になる。
 
-#### restore_scene(scene, ...)
+#### restore_scene(fn, ...)
 
 ```lua
-act:restore_scene(scene, ...) -> ...
+act:restore_scene(fn, ...) -> ...
 ```
 
-- 実行中のシーンを `scene`（シーンテーブルまたは `nil`）にし、2 番目以降の引数をそのまま返す。
-- `word`・`expr_fn`・`expr_fn_var`・`global_fn` とアクタープロキシの `word`・`expr_fn`・`expr_fn_var` が、関数から戻った後に実行中のシーンを戻すのに使う（`call_restore` は自分で戻す）。
+- `fn(...)` を呼び、戻った後に、実行中のシーンと `init_scene` が控えたシーンの名前・行の対応を呼ぶ前の値に戻して、`fn` の戻り値をすべて返す。`fn` がエラーで抜けたときは戻さない。
+- `call_restore`・`word`・`expr_fn`・`expr_fn_var`・`global_fn` とアクタープロキシの `word`・`expr_fn`・`expr_fn_var` が、関数を呼ぶのに使う。関数から戻った後の行で止まっても、止まるエラーの表記は呼び出し元のローカルシーンの名前と `.pasta` の行を示す。
 - `init_scene` と違い、最後に `init_scene` を呼んだグローバルシーンの記録は変えない。
-- `init_scene` が控えたシーンの名前は、グローバルシーンの名前だけを、`scene` で `init_scene` を呼んだときに控えた名前に戻し、ローカルシーンの名前と行の対応は空にする。呼ぶ前のローカルシーンは分からないため、止まるエラーの表記は `＊天気` のようにグローバルシーンまでになるが、別のシーンの名前は出さない。
 
 #### failure(text, warning)
 
@@ -430,7 +437,7 @@ act:actor_proxy(name) -> ActorProxy
 act:global_fn(name, ...) -> any
 ```
 
-- `GLOBAL[name]` が関数なら `関数(act, ...)` を呼び、その戻り値をすべて返す。関数の中で起きたエラーは、そのまま伝わる。
+- `GLOBAL[name]` が関数なら `関数(act, ...)` を呼び、その戻り値をすべて返す（[関数の戻り値の扱い](#関数の戻り値の扱い)）。関数の中で起きたエラーは、そのまま伝わる。
 - 無いとき、関数でない値のときは、警告ログ `act:global_fn - function not found: key='名前'` とともに関数が見つからない失敗を報告して `nil` を返す。
 - 5 段の検索は行わず、`GLOBAL` だけを見る。
 - 関数から戻った後、実行中のシーンを呼ぶ前のシーンに戻す（[検索と呼び出し](#検索と呼び出し)）。

@@ -227,3 +227,10 @@ pasta は if を持たない。値によって出すシーンを変えるには�
 - この spec で決めること: 条件で絞った「今出せる数」を足すか（足すなら別の関数名にするか、`シーン数` の意味を変えるか）。足さないなら、マニュアルの `シーン数` の節に「条件は見ない」と一言書く。
 - ファイルの重なり: `scene-count` は `search/context.rs`（数を返すメソッド）と、要るなら `scene_table.rs` を触る。同じウェーブに置かない。
 - 参照: `.kiro/specs/scene-count/brief.md`。
+
+## 申し送り（2026-11-03・`ponytail-core-registry` より）
+
+- 128 行の論点（`resolve_scene_id`・`find_scene` を消すか残すか）は閉じた。`ponytail-core-registry` が両方を消した。`labels_iter`・`SceneTable::new`・`set_shuffle_enabled` も無い。
+- 206 行の「絞り込み条件を受ける関数」は 3 つになった：`resolve_scene_id_unified`・`resolve_scene_id_exact`・`resolve_global_owning_local_exact`。`filter_by_attributes`・`filters` の引数・`SceneCacheKey.filters` はそのまま残してある（2026-10-19 の約束どおり）。
+- シーン表の前方一致の索引は `BTreeMap<String, Vec<SceneId>>` になった。順次消費の状態は「候補の並び」と「次の位置」の 2 つだけで、選んだ履歴は持たない。行番号は変わっているので、設計の前に main で読み直す。
+- 参照: `.kiro/specs/completed/ponytail-core-registry/design.md` の「Revalidation Triggers」「Components and Interfaces > SceneTable」。

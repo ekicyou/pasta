@@ -20,7 +20,6 @@ keywords = ["shiori", "ghost", "ukagaka"]
 pest = "2.8.6"
 pest_derive = { version = "2.8.6", features = ["grammar-extras"] }
 thiserror = "2"
-fast_radix_trie = "1.2.0"
 rand = "0.10"
 tracing = "0.1"
 
@@ -56,7 +55,6 @@ md5 = "0.8"
 zip = { version = "9.0", default-features = false, features = ["deflate"] }
 
 # pasta_lsp dependencies
-tower-lsp = { version = "0.20", default-features = false, features = ["runtime-agnostic"] }
 wasm-bindgen = "0.2"
 serde-wasm-bindgen = "0.6"
 

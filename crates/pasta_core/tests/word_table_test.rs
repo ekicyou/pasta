@@ -26,7 +26,19 @@ fn test_from_word_def_registry() {
     let selector = Box::new(MockRandomSelector::new(vec![0]));
     let table = WordTable::from_word_def_registry(registry, selector);
 
-    assert_eq!(table.entries().len(), 5);
+    // 5 つのキーがどれも引ける
+    for (module, key) in [
+        ("", "挨拶"),
+        ("", "場所"),
+        ("", "場所_日本"),
+        ("会話_1", "挨拶"),
+        ("会話_1", "場所"),
+    ] {
+        assert!(
+            table.collect_word_candidates(module, key).is_ok(),
+            "key not found: {module}:{key}"
+        );
+    }
 }
 
 #[test]
@@ -144,12 +156,11 @@ fn test_collect_word_candidates_not_found() {
 #[test]
 fn test_search_word_global_exact() {
     let registry = create_test_registry();
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Exact match for global word
-    let result = table.search_word("", "挨拶", &[]);
+    let result = table.search_word("", "挨拶");
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "こんにちは");
 }
@@ -157,12 +168,11 @@ fn test_search_word_global_exact() {
 #[test]
 fn test_search_word_global_prefix() {
     let registry = create_test_registry();
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Prefix match: "場所" matches both "場所" and "場所_日本"
-    let result = table.search_word("", "場所", &[]);
+    let result = table.search_word("", "場所");
     assert!(result.is_ok());
     // Should get word from merged list (東京, 大阪, 京都)
     let word = result.unwrap();
@@ -172,12 +182,11 @@ fn test_search_word_global_prefix() {
 #[test]
 fn test_search_word_local() {
     let registry = create_test_registry();
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Fallback strategy: Local search found, global NOT included
-    let result = table.search_word("会話_1", "挨拶", &[]);
+    let result = table.search_word("会話_1", "挨拶");
     assert!(result.is_ok());
     // Should get ONLY from local (やあ) - fallback strategy
     let word = result.unwrap();
@@ -190,7 +199,7 @@ fn test_search_word_not_found() {
     let selector = Box::new(MockRandomSelector::new(vec![0]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
-    let result = table.search_word("", "存在しない", &[]);
+    let result = table.search_word("", "存在しない");
     assert!(result.is_err());
     match result {
         Err(WordTableError::WordNotFound { key }) => assert_eq!(key, "存在しない"),
@@ -206,14 +215,13 @@ fn test_search_word_cache_sequential() {
         vec!["a".to_string(), "b".to_string(), "c".to_string()],
     );
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Sequential calls should return different words until exhausted
-    let r1 = table.search_word("", "test", &[]).unwrap();
-    let r2 = table.search_word("", "test", &[]).unwrap();
-    let r3 = table.search_word("", "test", &[]).unwrap();
+    let r1 = table.search_word("", "test").unwrap();
+    let r2 = table.search_word("", "test").unwrap();
+    let r3 = table.search_word("", "test").unwrap();
 
     assert_eq!(r1, "a");
     assert_eq!(r2, "b");
@@ -225,16 +233,15 @@ fn test_search_word_cache_reshuffle() {
     let mut registry = WordDefRegistry::new();
     registry.register_global("test", vec!["a".to_string(), "b".to_string()]);
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Exhaust cache
-    let _ = table.search_word("", "test", &[]).unwrap();
-    let _ = table.search_word("", "test", &[]).unwrap();
+    let _ = table.search_word("", "test").unwrap();
+    let _ = table.search_word("", "test").unwrap();
 
     // Next call should reshuffle and start over
-    let r3 = table.search_word("", "test", &[]).unwrap();
+    let r3 = table.search_word("", "test").unwrap();
     assert_eq!(r3, "a"); // Back to first (no shuffle)
 }
 
@@ -245,13 +252,12 @@ fn test_cache_key_separation() {
     registry.register_local("mod1", "word", vec!["local1".to_string()]);
     registry.register_local("mod2", "word", vec!["local2".to_string()]);
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Different modules should have separate caches
-    let r1 = table.search_word("mod1", "word", &[]).unwrap();
-    let r2 = table.search_word("mod2", "word", &[]).unwrap();
+    let r1 = table.search_word("mod1", "word").unwrap();
+    let r2 = table.search_word("mod2", "word").unwrap();
 
     // Fallback strategy: local found, global NOT included
     // mod1 search: ONLY local1 (fallback)
@@ -266,12 +272,11 @@ fn test_local_does_not_match_global_prefix() {
     registry.register_global("abc", vec!["global_abc".to_string()]);
     registry.register_local("mod", "abc", vec!["local_abc".to_string()]);
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Global search should not include local entries
-    let result = table.search_word("", "abc", &[]).unwrap();
+    let result = table.search_word("", "abc").unwrap();
     assert_eq!(result, "global_abc");
 }
 
@@ -290,12 +295,11 @@ fn test_search_word_merge_duplicate_entries() {
         vec!["はろー".to_string(), "ぐっもーにん".to_string()],
     );
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Search for "挨拶" should find both entries and merge all 4 words
-    let result = table.search_word("", "挨拶", &[]);
+    let result = table.search_word("", "挨拶");
     assert!(result.is_ok());
 
     // Verify that we get one of the 4 expected words
@@ -321,15 +325,14 @@ fn test_search_word_merge_duplicate_entries_all_words_reachable() {
         vec!["はろー".to_string(), "ぐっもーにん".to_string()],
     );
 
-    let selector = Box::new(MockRandomSelector::new(vec![0, 1, 2, 3]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Sequential calls should exhaust all 4 words
-    let r1 = table.search_word("", "挨拶", &[]).unwrap();
-    let r2 = table.search_word("", "挨拶", &[]).unwrap();
-    let r3 = table.search_word("", "挨拶", &[]).unwrap();
-    let r4 = table.search_word("", "挨拶", &[]).unwrap();
+    let r1 = table.search_word("", "挨拶").unwrap();
+    let r2 = table.search_word("", "挨拶").unwrap();
+    let r3 = table.search_word("", "挨拶").unwrap();
+    let r4 = table.search_word("", "挨拶").unwrap();
 
     // Collect results
     let results = [r1, r2, r3, r4];
@@ -353,12 +356,11 @@ fn test_search_word_merge_duplicate_local_entries() {
         vec!["おす".to_string(), "ういっす".to_string()],
     );
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Search for local word should find both entries
-    let result = table.search_word("会話", "挨拶", &[]);
+    let result = table.search_word("会話", "挨拶");
     assert!(result.is_ok());
 
     let word = result.unwrap();
@@ -372,33 +374,11 @@ fn test_search_word_merge_duplicate_local_entries() {
 #[test]
 fn test_new_word_table_is_empty() {
     let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = WordTable::new(selector);
+    let mut table = WordTable::from_word_def_registry(WordDefRegistry::new(), selector);
 
-    assert!(table.entries().is_empty());
     // Any search on an empty table is WordNotFound
-    let result = table.search_word("", "anything", &[]);
+    let result = table.search_word("", "anything");
     assert!(matches!(result, Err(WordTableError::WordNotFound { .. })));
-}
-
-#[test]
-fn test_clear_cache_restarts_sequence() {
-    let mut registry = WordDefRegistry::new();
-    registry.register_global(
-        "test",
-        vec!["a".to_string(), "b".to_string(), "c".to_string()],
-    );
-
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
-    let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
-
-    // Consume part of the sequence
-    assert_eq!(table.search_word("", "test", &[]).unwrap(), "a");
-    assert_eq!(table.search_word("", "test", &[]).unwrap(), "b");
-
-    // clear_cache discards consumption state — sequence restarts
-    table.clear_cache();
-    assert_eq!(table.search_word("", "test", &[]).unwrap(), "a");
 }
 
 #[test]
@@ -406,18 +386,16 @@ fn test_replace_selector_clears_cache_keeps_entries() {
     let mut registry = WordDefRegistry::new();
     registry.register_global("test", vec!["a".to_string(), "b".to_string()]);
 
-    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // Consume part of the sequence
-    assert_eq!(table.search_word("", "test", &[]).unwrap(), "a");
+    assert_eq!(table.search_word("", "test").unwrap(), "a");
 
     // Replace the selector — cache must be cleared, entries preserved
     table.replace_selector(Box::new(MockRandomSelector::new(vec![0])));
-    assert_eq!(table.entries().len(), 1);
     assert_eq!(
-        table.search_word("", "test", &[]).unwrap(),
+        table.search_word("", "test").unwrap(),
         "a",
         "cache was not cleared by replace_selector"
     );
@@ -488,13 +466,12 @@ fn test_search_word_merge_duplicate_with_global() {
         vec!["c".to_string(), "d".to_string(), "e".to_string()],
     );
 
-    let selector = Box::new(MockRandomSelector::new(vec![0, 1, 2, 3, 4]));
+    let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = WordTable::from_word_def_registry(registry, selector);
-    table.set_shuffle_enabled(false);
 
     // All 5 calls should succeed
     let results: Vec<_> = (0..5)
-        .map(|_| table.search_word("", "word", &[]).unwrap())
+        .map(|_| table.search_word("", "word").unwrap())
         .collect();
 
     // Check all 5 words are reachable
@@ -508,7 +485,7 @@ fn test_search_word_merge_duplicate_with_global() {
 
 #[test]
 fn test_search_word_mock_sequence_applies_each_round() {
-    // Mock [1] with shuffle enabled: the 2nd candidate comes first, the rest
+    // Mock [1]: the 2nd candidate comes first, the rest
     // follow in candidate order, and the next round applies [1] again.
     let mut registry = WordDefRegistry::new();
     registry.register_global(
@@ -520,8 +497,69 @@ fn test_search_word_mock_sequence_applies_each_round() {
     let mut table = WordTable::from_word_def_registry(registry, selector);
 
     let results: Vec<_> = (0..4)
-        .map(|_| table.search_word("", "test", &[]).unwrap())
+        .map(|_| table.search_word("", "test").unwrap())
         .collect();
 
     assert_eq!(results, ["b", "a", "c", "b"]);
+}
+
+// 候補の順を固めるテスト（U2）：キーのバイト列の辞書順、同じキーの中は登録順。
+fn create_order_registry() -> WordDefRegistry {
+    let mut registry = WordDefRegistry::new();
+    let w = |s: &str| vec![s.to_string()];
+    registry.register_global("挨拶_夜", w("夜"));
+    registry.register_global("挨拶", vec!["a1".to_string(), "a2".to_string()]);
+    registry.register_local("会話_1", "挨拶", w("l1"));
+    registry.register_global("挨拶A", w("A"));
+    registry.register_global("挨拶", w("a3"));
+    registry.register_global("挨拶1", w("1"));
+    registry.register_global("挨拶あ", w("あ"));
+    registry.register_global("Zebra", w("z"));
+    registry.register_global("0番", w("0"));
+    registry.register_global("雑談", w("x"));
+    registry.register_local("会話_1", "挨拶_夜", w("l2"));
+    registry
+}
+
+#[test]
+fn test_collect_word_candidates_order_global_prefix() {
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let table = WordTable::from_word_def_registry(create_order_registry(), selector);
+
+    let candidates = table.collect_word_candidates("", "挨拶").unwrap();
+    assert_eq!(candidates, ["a1", "a2", "a3", "1", "A", "夜", "あ"]);
+}
+
+#[test]
+fn test_collect_word_candidates_order_global_empty_key() {
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let table = WordTable::from_word_def_registry(create_order_registry(), selector);
+
+    // ':'（0x3A）で始まるローカルのキーは `0番` と `Zebra` の間に並ぶが、大域では飛ばす
+    let candidates = table.collect_word_candidates("", "").unwrap();
+    assert_eq!(
+        candidates,
+        ["0", "z", "a1", "a2", "a3", "1", "A", "夜", "あ", "x"]
+    );
+}
+
+#[test]
+fn test_collect_word_candidates_order_local_prefix() {
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let table = WordTable::from_word_def_registry(create_order_registry(), selector);
+
+    let candidates = table.collect_word_candidates("会話_1", "挨拶").unwrap();
+    assert_eq!(candidates, ["l1", "l2"]);
+}
+
+#[test]
+fn test_search_word_mock_sequence_picks_by_candidate_position() {
+    // 指定列 [2, 0]：7 つの候補を [2, 0, 1, 3, 4, 5, 6] の位置の順に選ぶ
+    let selector = Box::new(MockRandomSelector::new(vec![2, 0]));
+    let mut table = WordTable::from_word_def_registry(create_order_registry(), selector);
+
+    let results: Vec<_> = (0..7)
+        .map(|_| table.search_word("", "挨拶").unwrap())
+        .collect();
+    assert_eq!(results, ["a3", "a1", "a2", "1", "A", "夜", "あ"]);
 }

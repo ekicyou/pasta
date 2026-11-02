@@ -42,10 +42,7 @@ impl SearchContext {
     ///
     /// Converts SceneRegistry and WordDefRegistry into runtime tables
     /// with default random selectors.
-    pub fn new(
-        scene_registry: SceneRegistry,
-        word_registry: WordDefRegistry,
-    ) -> Result<Self, SearchError> {
+    pub fn new(scene_registry: SceneRegistry, word_registry: WordDefRegistry) -> Self {
         Self::with_aliases(scene_registry, word_registry, SceneAliasTable::empty())
     }
 
@@ -55,21 +52,19 @@ impl SearchContext {
         scene_registry: SceneRegistry,
         word_registry: WordDefRegistry,
         scene_aliases: SceneAliasTable,
-    ) -> Result<Self, SearchError> {
-        let scene_table = SceneTable::from_scene_registry(
-            scene_registry,
-            Box::new(DefaultRandomSelector::new()),
-        )?;
+    ) -> Self {
+        let scene_table =
+            SceneTable::from_scene_registry(scene_registry, Box::new(DefaultRandomSelector::new()));
         let word_table = WordTable::from_word_def_registry(
             word_registry,
             Box::new(DefaultRandomSelector::new()),
         );
 
-        Ok(Self {
+        Self {
             scene_table,
             word_table,
             scene_aliases,
-        })
+        }
     }
 
     /// Search for a scene.
@@ -156,8 +151,7 @@ impl SearchContext {
                 }
                 Err(
                     pasta_core::SceneTableError::SceneNotFound { .. }
-                    | pasta_core::SceneTableError::NoMatchingScene { .. }
-                    | pasta_core::SceneTableError::NoMoreScenes { .. },
+                    | pasta_core::SceneTableError::NoMatchingScene { .. },
                 ) => Ok(None),
                 Err(e) => Err(SearchError::SceneTableError(e)),
             }
@@ -178,8 +172,7 @@ impl SearchContext {
                 }
                 Err(
                     pasta_core::SceneTableError::SceneNotFound { .. }
-                    | pasta_core::SceneTableError::NoMatchingScene { .. }
-                    | pasta_core::SceneTableError::NoMoreScenes { .. },
+                    | pasta_core::SceneTableError::NoMatchingScene { .. },
                 ) => {
                     if let Some(target) = alias {
                         tracing::warn!(
@@ -220,8 +213,7 @@ impl SearchContext {
             Ok(None) => return Ok(LocalSceneMatch::NoLocal),
             Err(
                 pasta_core::SceneTableError::SceneNotFound { .. }
-                | pasta_core::SceneTableError::NoMatchingScene { .. }
-                | pasta_core::SceneTableError::NoMoreScenes { .. },
+                | pasta_core::SceneTableError::NoMatchingScene { .. },
             ) => {
                 if let Some(target) = alias {
                     tracing::warn!(
@@ -300,7 +292,7 @@ impl SearchContext {
             .map(SceneRegistry::sanitize_name)
             .unwrap_or_default();
 
-        match self.word_table.search_word(&module_name, name, &[]) {
+        match self.word_table.search_word(&module_name, name) {
             Ok(word) => Ok(Some(word)),
             Err(pasta_core::WordTableError::WordNotFound { .. }) => Ok(None),
         }
@@ -459,7 +451,7 @@ mod tests {
         word_registry.register_global("場所", vec!["東京".to_string(), "大阪".to_string()]);
         word_registry.register_local("メイン_1", "挨拶", vec!["やあ".to_string()]);
 
-        SearchContext::new(scene_registry, word_registry).unwrap()
+        SearchContext::new(scene_registry, word_registry)
     }
 
     #[test]
@@ -559,7 +551,7 @@ mod tests {
 
         [transpiled, finalized]
             .into_iter()
-            .map(|r| SearchContext::new(r, WordDefRegistry::new()).unwrap())
+            .map(|r| SearchContext::new(r, WordDefRegistry::new()))
             .collect()
     }
 
@@ -610,7 +602,7 @@ mod tests {
                 registry.register_global("会話・朝", HashMap::new());
                 registry.register_global("会話_朝", HashMap::new());
             }
-            let mut ctx = SearchContext::new(registry, WordDefRegistry::new()).unwrap();
+            let mut ctx = SearchContext::new(registry, WordDefRegistry::new());
             ctx.set_scene_selector(Some(vec![0])).unwrap();
             ctx
         };
@@ -671,7 +663,7 @@ mod tests {
         for (actor, name, value) in words {
             word_registry.register_actor(actor, name, vec![value.to_string()]);
         }
-        let mut ctx = SearchContext::new(SceneRegistry::new(), word_registry).unwrap();
+        let mut ctx = SearchContext::new(SceneRegistry::new(), word_registry);
         ctx.set_word_selector(Some(vec![0])).unwrap();
         ctx
     }
@@ -736,7 +728,7 @@ mod tests {
             scenes.register_local(&local, &global, counter, 1, HashMap::new());
             let mut words = WordDefRegistry::new();
             words.register_actor(&actor, "通常", vec!["\\s[0]".to_string()]);
-            let mut ctx = SearchContext::new(scenes, words).unwrap();
+            let mut ctx = SearchContext::new(scenes, words);
 
             let (parent, _) = ctx
                 .search_scene(&global, None)
@@ -768,7 +760,7 @@ mod tests {
         let mut words = WordDefRegistry::new();
         words.register_global("会話", vec!["こんにちは".to_string()]);
 
-        let mut ctx = SearchContext::with_aliases(scenes, words, aliases).unwrap();
+        let mut ctx = SearchContext::with_aliases(scenes, words, aliases);
         ctx.set_scene_selector(Some(vec![0])).unwrap();
         ctx.set_word_selector(Some(vec![0])).unwrap();
         ctx
@@ -828,7 +820,7 @@ mod tests {
 
         let mut scenes = SceneRegistry::new();
         scenes.register_global("OnTalk", HashMap::new());
-        let mut ctx = SearchContext::new(scenes, WordDefRegistry::new()).unwrap();
+        let mut ctx = SearchContext::new(scenes, WordDefRegistry::new());
         assert_eq!(ctx.search_scene("会話", None).unwrap(), None);
         assert!(ctx.search_scene("OnTalk", None).unwrap().is_some());
     }
@@ -841,8 +833,7 @@ mod tests {
             SceneRegistry::new(),
             WordDefRegistry::new(),
             SceneAliasTable::builtin_default(),
-        )
-        .unwrap();
+        );
         assert_eq!(ctx.search_scene("会話", None).unwrap(), None);
         assert!(logs_contain("Scene not found (alias applied)"));
         assert!(logs_contain("name=会話"));
@@ -857,8 +848,7 @@ mod tests {
             SceneRegistry::new(),
             WordDefRegistry::new(),
             SceneAliasTable::builtin_default(),
-        )
-        .unwrap();
+        );
         assert_eq!(ctx.search_scene("存在しない", None).unwrap(), None);
         assert!(!logs_contain("alias applied"));
     }
@@ -878,8 +868,7 @@ mod tests {
             scenes,
             WordDefRegistry::new(),
             SceneAliasTable::builtin_default(),
-        )
-        .unwrap();
+        );
         ctx.set_scene_selector(Some(vec![0])).unwrap();
         ctx
     }
@@ -930,8 +919,7 @@ mod tests {
             scenes,
             WordDefRegistry::new(),
             SceneAliasTable::builtin_default(),
-        )
-        .unwrap();
+        );
         assert_eq!(
             ctx.search_local_scene_exact("OnTalk", "会話").unwrap(),
             LocalSceneMatch::NoLocal
@@ -968,8 +956,7 @@ mod tests {
             SceneRegistry::new(),
             WordDefRegistry::new(),
             SceneAliasTable::builtin_default(),
-        )
-        .unwrap();
+        );
         assert_eq!(
             ctx.search_local_scene_exact("会話", "挨拶").unwrap(),
             LocalSceneMatch::NoGlobal

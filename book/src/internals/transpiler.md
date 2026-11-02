@@ -39,7 +39,7 @@
 | 規則ごとの組み立て | `crates/pasta_dsl/src/parser/parse_scene.rs`・`crates/pasta_dsl/src/parser/parse_action.rs`・`crates/pasta_dsl/src/parser/parse_elements.rs` | シーン・アクション・属性や単語定義などの要素を AST ノードへ変換する |
 | AST 型 | `crates/pasta_dsl/src/parser/ast/` | `PastaFile`・`FileItem`・`GlobalSceneScope`・`LocalSceneScope`・`LocalSceneItem`・`ActorScope`・`Action`・`Expr`・`Span` など |
 | パースエラー | `crates/pasta_dsl/src/error.rs` | `ParseError`（ファイル名・行・桁付きの構文エラー） |
-| 部分パース | `crates/pasta_dsl/src/partial.rs` | `parse_str_partial`。全体のパースに失敗したときにスコープ単位・行単位で解析を続ける。言語サーバ用であり、ランタイムのトランスパイルでは使わない |
+| 部分パース | `crates/pasta_dsl/src/partial.rs` | `parse_str_partial`。全体のパースに失敗したときに、字下げしない行頭の印でソースを塊に区切り、塊ごとに解析する。解けない塊は行の範囲だけを返す。エディタ拡張の色分け用であり、ランタイムのトランスパイルでは使わない |
 
 AST の骨格は次のとおりである。`PastaFile.items` はファイル内の項目を記述順に保持する。
 
@@ -94,12 +94,12 @@ AST ノードは `Span`（開始・終了の行と桁、バイトオフセット
 | 要素単位の生成 | `crates/pasta_lua/src/code_gen/element_gen.rs` | アクション・変数代入・Call・単語定義・Lua ブロック、変数の経路と動的参照の引数 |
 | 式の生成 | `crates/pasta_lua/src/code_gen/expr_gen.rs` | 式の値・関数呼び出し・引数リストと、算術・連結の連鎖の組み直し |
 | ソースマップのシンク | `crates/pasta_lua/src/code_gen/source_map.rs` | 生成器が対応を記録する先の `SourceMapSink` トレイト |
-| 出力の正規化 | `crates/pasta_lua/src/normalize.rs` | `normalize_output`・`normalize_output_with_shift` と、削除行の記録 `LineShift` |
+| 出力の正規化 | `crates/pasta_lua/src/normalize.rs` | `normalize_output_with_shift` と、削除行の記録 `LineShift` |
 | 文字列リテラル化 | `crates/pasta_lua/src/string_literalizer.rs` | `StringLiteralizer`。文字列を Lua のリテラル表記に変換する |
-| 設定 | `crates/pasta_lua/src/config.rs` | `TranspilerConfig`（`comment_mode`・`line_ending`・`scene_aliases`）と `LineEnding` |
+| 設定 | `crates/pasta_lua/src/config.rs` | `TranspilerConfig`（`scene_aliases`） |
 | エラー | `crates/pasta_lua/src/error.rs` | `TranspileError` |
 
-`TranspilerConfig` の `line_ending` は中間バッファの改行にだけ効き、出力の正規化で LF に統一されるため、書き出されるバイト列には影響しない。`comment_mode` は現行のコード生成からは参照されない。`scene_aliases` はグローバルシーン名の別名表で、既定は空の表（置き換えない）である。ローダは pasta.toml から決めた別名表を渡す（[登録と生成](#登録と生成単一走査)）。
+`TranspilerConfig` の設定は `scene_aliases` だけである。`scene_aliases` はグローバルシーン名の別名表で、既定は空の表（置き換えない）である。ローダは pasta.toml から決めた別名表を渡す（[登録と生成](#登録と生成単一走査)）。
 
 ### キャッシュ
 
@@ -141,13 +141,19 @@ AST ノードは `Span`（開始・終了の行と桁、バイトオフセット
 
 ### パースと AST 構築時の正規化
 
-`parse_str` は pest で `file` 規則を解析し、失敗すれば `ParseError::SyntaxError` を返す。成功すれば `build_ast` が解析結果を記述順にたどって `PastaFile` を組み立てる。AST を組み立てる時点で、次の正規化を行う。
+`parse_str` は先頭の BOM を外した後、pest の前に `check_paren_depth`（`parser/mod.rs`）で各行の括弧の重なりを数える。`（`・`(` で 1 段深くなり、`）`・`)` で 1 段浅くなり（0 より下げない）、行が変わると 0 に戻る。台詞・文字列・コメント・Lua ブロックの中の括弧も数える。重なりが `MAX_PAREN_DEPTH`（64）を超えたら、65 段目の開き括弧の位置の構文の誤り（`ParseError::SyntaxError`）を返す。pest の再帰は開き括弧 1 つで 1 段深くなるので、この走査で解析と AST の片付けのスタックのあふれを防ぐ。行と桁は pest の行の索引と同じく、`'\n'` だけで行を分け、桁は文字の数で数える。
+
+式の鎖を組む 3 つの関数（`parse_var_set`・`parse_expr_from_parts`・`parse_key_arg`）は、鎖を組む前に `check_op_count`（`parser/parse_action.rs`）で、渡された節の子孫の二項演算子（`＋`・`－`・`＊`・`／`・`％`・`＆`）を記述順に数える。1 つの式は、式を書ける位置（変数代入の右辺・Call の動的ターゲット・関数呼び出しと Call の 1 つの引数）に書いた式の全体で、その中の括弧と関数呼び出しの引数の中の式を含む。数が `MAX_EXPR_OPS`（256）を超えたら、257 個目の演算子の位置の構文の誤り（`ParseError::SyntaxError`）を返す。左結合の鎖は演算子 1 つで 1 段深くなり、AST の片付けとコード生成はその深さだけ再帰するので、この検査で深い木を作らせない。
+
+括弧の走査を通れば、pest で `file` 規則を解析し、失敗すれば `ParseError::SyntaxError` を返す。成功すれば `build_ast` が解析結果を記述順にたどって `PastaFile` を組み立てる。AST を組み立てる時点で、次の正規化を行う。
 
 - `file_scope` の属性と単語定義を、それぞれ `FileItem::FileAttr`・`FileItem::GlobalWord` に平坦化し、他の項目との記述順を保つ。
 - 名前を省いたグローバルシーン（`＊` だけの行）は、直前のグローバルシーンの名前を引き継ぎ、`is_continuation` を真にする。ファイルの先頭で現れた場合はパースエラーにする。
 - 全角の数字・マイナス・小数点を半角に直してから数値として解釈する（`normalize_number_str`）。式の数値、属性値、アクター番号、キューコマンドの引数、`＄０` などの引数番号が対象である。
+- 数の字句（`number_literal`）の値は、式・属性値・キューコマンドの引数のどこでも `number_value` の 1 つの規則で決める。小数点が無く `i64` に収まれば整数、収まらなければいちばん近い小数（Lua と同じ）、小数点があれば小数である。有限の小数に収まらない数は、字句の始まり（符号を含む）の位置の構文の誤り（`ParseError::SyntaxError`）にする。
 - 空の引用（`string_blank` 規則の `「」`・`""`）は、囲み文字ではなく空文字列として記録する。単語値は `""` の候補、属性値は `AttrValue::String("")`、キューコマンドの引数は空の文字列リテラル、式は `Expr::BlankString` になる。
-- シーンのアクター指定行のアクター番号を採番する。番号を明示した項目はその値、省いた項目は直前の番号に 1 を足した値（先頭で省いた場合は 0）になる。
+- シーンのアクター指定行のアクター番号を採番する。番号を明示した項目はその値、省いた項目は直前の番号に 1 を足した値（先頭で省いた場合は 0）になる。明示した番号が 0〜4294967295（`u32`）に収まらなければ、番号（`digit_id`）の始まりの位置の構文の誤り（`ParseError::SyntaxError`）にする。4294967295 の次に省いた番号は 4294967295 に留まる。
+- 引数番号（`＄０` などの数字の名前）は `VarScope::Args(番号)` になる（`parse_action.rs` の `parse_var_ref_local_inner`。アクション行・式の項・動的な単語参照と関数呼び出しの名前のどれもここを通る）。番号が 0〜255（`u8`）に収まらなければ、番号（`digit_id`、`＄` の次）の始まりの位置の構文の誤り（`ParseError::SyntaxError`）にする。
 
 ### 登録と生成（単一走査）
 
@@ -206,6 +212,7 @@ end
 - **アクター辞書**: `local ACTOR = PASTA.create_actor("名前")` に続けて、単語定義ごと・名前ごとに `ACTOR:create_word(名前):entry(値, …)` を出力する。配下の Lua ブロックは、言語識別子が `lua` のものだけを出力する。属性行と変数代入行は出力しない。
 - **グローバルシーン**: `PASTA.create_scene` には、シーン名のうち Unicode の英字・数字（`char::is_alphanumeric`。かな・漢字を含む）と `_` 以外の文字を `_` に置き換えた基本名を渡す（`SceneRegistry::sanitize_name`）。番号は付けない。シーンレベルの単語定義は `SCENE:create_word(名前):entry(値, …)` として関数定義より前に出力する。グローバルシーンとローカルシーンに置いた Lua ブロックは、そのグローバルシーンのすべての関数定義の後に、言語識別子にかかわらず出力する。
 - **ローカルシーン**: 暗黙の開始ブロックは常に `SCENE.__start__` になり、名前付きローカルシーンは `照合用の名前_通し番号` の関数になる（`SceneRegistry::registered_name`。`・選択・A` は `選択_A_1`）。照合用の名前はローカルシーン名をサニタイズしたもので、通し番号は同じグローバルシーンの中で照合用の名前ごとに数える出現順（1 始まり）である（`crates/pasta_lua/src/context.rs` の `local_scene_counters`）。`・挨拶・1` と `・挨拶_1` はどちらも照合用の名前が `挨拶_1` なので、`挨拶_1_1` と `挨拶_1_2` になる。トランスパイル時のレジストリの `register_local` も同じ通し番号を使うため、レジストリのローカルシーンの登録名は生成した関数名と一致する。どの関数も `local args = { ... }` と `local save, var = act:init_scene(SCENE, …)` で始まる（[init_scene の引数](#init_scene-の引数)）。`__start__` でシーンにアクター指定行がある場合は、続けて `act:clear_spot()` と、アクターごとの `act:set_spot(名前, 番号)` を出力する。
+- **Lua ブロック**: 内容の行を書いたとおりに出力する。インデントを足さず、内容の中の空行（`end` の直前の空行も）も残す。
 
 ローカルシーンの項目は、次の形に変換される。
 
@@ -320,13 +327,14 @@ AST の文字列（発言・単語の値・名前など）は `StringLiteralizer
 
 ### 出力の正規化
 
+生成器は、ブロックの間を区切る空行をすぐには書かず、保留にしておく。保留の空行は次に何かを書くときに出力し、ブロックを閉じる `end` を書く前なら捨てる。そのため、生成器が足した空行が `end` の直前に残ることはない。Lua ブロックの内容の空行は保留にせず、そのまま書く。
+
 中間バッファに生成したコードは、`normalize_output_with_shift` で正規化してから書き出す。
 
 1. CRLF を LF に変換する。
-2. 空白だけの行のうち、その後に続く最初の空白でない行が `end` だけの行であるものを削除する（ブロックの閉じ直前の空行を除く）。
-3. 末尾の空白・改行を取り除き、最後に改行を 1 つだけ付ける。
+2. 末尾の空白・改行を取り除き、最後に改行を 1 つだけ付ける。
 
-正規化は行の削除だけを行い、行の挿入・結合はしない。削除した行の番号（正規化前の 1 始まりの番号）は `LineShift` に記録され、正規化前の行番号を最終的な `.lua` の行番号へ写すのに使われる。`normalize_output` は同じ処理の文字列だけを返す薄い包みであり、出力のバイト列はどちらを通しても同一である。
+正規化が触るのは末尾だけで、途中の行（`end` の直前の空行を含む）はそのまま残す。正規化は行の削除だけを行い、行の挿入・結合はしない。削除した行（末尾の空白だけの行）の番号（正規化前の 1 始まりの番号）は `LineShift` に記録され、正規化前の行番号を最終的な `.lua` の行番号へ写すのに使われる。
 
 ### トランスパイル結果キャッシュ
 
@@ -346,15 +354,14 @@ AST の文字列（発言・単語の値・名前など）は `StringLiteralizer
 
 ### ソースマップ生成の出入口
 
-トランスパイラの入口は、ソースマップの記録の有無で 3 つある。
+トランスパイラの入口は、ソースマップの記録の有無で 2 つある。
 
 | 入口 | シンク | 戻り値 | 呼び出し元 |
 | ---- | ------ | ------ | ---------- |
 | `transpile` | なし | `TranspileContext` | ローダの増分処理 |
-| `transpile_with_sink` | 任意 | `TranspileContext` | `transpile` が経由する |
-| `transpile_with_source_map` | 任意 | `TranspileContext` と `LineShift` | 上の 2 つの実体。デバッグ時のソースマップ構築 |
+| `transpile_with_source_map` | 任意 | `TranspileContext` と `LineShift` | `transpile` の実体。デバッグ時のソースマップ構築 |
 
-`LuaCodeGenerator` は、出力した行数を `out_line` で数え、シンクが付いていれば、`Span` を持つ構文要素（スコープの見出し・アクション・変数代入・Call・選択肢・キューコマンド・グローバルとシーンの単語定義）を出力した直後に「生成した Lua の行 → `.pasta` の位置」の対応を記録する。Lua ブロックは内容の行ごとに `.pasta` の行と対応づける。`transpile_with_source_map` は、渡されたシンクの前に `LineRecorder` を挟んで生成器に付ける。`LineRecorder` は行の対応だけをトランスパイルの間の表に持ち（[init_scene の引数](#init_scene-の引数)）、シンクが渡されていればそのまま流す。シンクが無ければ、デバッグ用のソースマップは作らない。
+`LuaCodeGenerator` は、出力した行数を `out_line` で数え、`Span` を持つ構文要素（スコープの見出し・アクション・変数代入・Call・選択肢・キューコマンド・グローバル・シーン・アクター辞書の単語定義）を出力した直後に「生成した Lua の行 → `.pasta` の位置」の対応を記録する。記録の規則は `record_span_since` の 1 つで、要素を出力する前の `out_line` から行が進んでいれば最後に書いた行を記録し、進んでいなければ（保留の空行しか無いなど）記録しない。Lua ブロックは内容の行ごとに `.pasta` の行と対応づける。`transpile_with_source_map` は、渡されたシンクの前に `LineRecorder` を挟んで生成器に付ける。`LineRecorder` は行の対応だけをトランスパイルの間の表に持ち（[init_scene の引数](#init_scene-の引数)）、シンクが渡されていればそのまま流す。シンクが無ければ、デバッグ用のソースマップは作らない。
 
 シンクの有無で出力のバイト列は変わらない。デバッグが有効なとき、ローダはトランスパイルの後に全 `.pasta` をもう一度パースし、シンクを付けて `transpile_with_source_map` で生成し直し、返された `LineShift` で記録を最終的な行番号へ写す。生成し直しには、増分処理と同じ 1 つのトランスパイラ（同じ別名表を持つ）を使うため、ソースマップとデバッグの突合キーの宣言名はキャッシュの `.lua` と一致する。ソースマップの構造・サイドカー・解決は [デバッグ基盤とシーンキック](debug.md) で扱う。
 
@@ -373,7 +380,8 @@ AST の文字列（発言・単語の値・名前など）は `StringLiteralizer
 - 生成される Lua コードは、ランタイムの Lua 方言である LuaJIT 2.1 で実行できる形でなければならない。生成コードは `table.unpack` を使うため、Lua 5.2 互換を有効にした LuaJIT（ルートの [Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml) の `mlua` の `luajit52` 機能）を前提とする。
 - ローカルシーンの関数名は Lua の識別子としてそのまま出力される（`SCENE.サブ_1`）。LuaJIT が 0x80 以上のバイトを識別子の文字として受け付けることを前提にしている。アクター名と `＠＊` の関数名は識別子にせず、文字列リテラルにして渡す（`act:actor_proxy("ぱすた")`・`act:global_fn("名前", …)`）。文法の識別子は `"` や `\` を含まないため、`"…"` の中にもそのまま埋め込む。
 - 名前付きローカルシーンの関数名には常に `_番号` が付くため、利用者のローカルシーン名が `SCENE.__start__`・`SCENE.__global_name__` と衝突することはない。
-- シンクを付けても付けなくても、`normalize_output` を通しても `normalize_output_with_shift` を通しても、書き出されるバイト列は同一である。出力の正規化は行の削除だけを行う。
+- シンクを付けても付けなくても、書き出されるバイト列は同一である。出力の正規化は末尾の行の削除だけを行う。
+- Lua ブロックの内容は、インデントを足さず、空行も含めて書いたとおりに出力する。生成器が区切りに足す空行は、`end` の直前には出力しない。
 - 末尾呼び出しの `return act:call(…)` は、ローカルシーンの最後の項目が Call のときにだけ出力する。それ以外の Call は `act:call_restore(…)` になる。どちらも Call 1 つにつき 1 行である。
 - 継続行には、同じローカルシーン内で先行するアクション行が必要である。親のグローバルシーンや別のローカルシーンからは引き継がない。
 - ロングブラケットの `=` は最大 10 個である。

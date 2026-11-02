@@ -286,8 +286,9 @@ local RES = require("pasta.shiori.res")
 | `RES.warn(reason, dic)` | 204 No Content | `X-Warn-Reason` ヘッダに `reason` を入れる |
 | `RES.build(code, dic)` | `code` | 任意のステータス（`"200 OK"` など）で応答を作る。上の関数はすべてこれを使う |
 
-- `dic` は追加するヘッダの表（ヘッダ名 → 値）で、省略できる。`RES.ok`・`RES.err`・`RES.warn` は、渡された `dic` の表に `Value` などを書き込んでから使う。
+- `dic` は追加するヘッダの表（ヘッダ名 → 値）で、省略できる。`RES.ok`・`RES.err`・`RES.warn` は、渡された `dic` の表を書き換えない（写した表に `Value` などを足して使う）。同じ表を後の応答に使い回しても、前の `Value` や理由のヘッダは混ざらない。
 - 応答は、1 行目が `SHIORI/3.0 ステータス`、続いて `Charset`・`Sender`・`SecurityLevel` の 3 ヘッダ、`dic` のヘッダ、最後に空行という形になる。行末は CR LF。`dic` のヘッダの並び順は定まらない。
+- ヘッダの値に入った CR と LF は、1 文字ごとに半角の空白 1 つになる（CR LF の組は空白 2 つ）。値に改行が入っても応答は割れず、`Value` は 1 行のまま末尾の `\e` も残る。改行の無い値はそのまま出る。
 - 3 つの標準ヘッダの値は `RES.env` の表から取る。既定値は `charset = "UTF-8"`・`sender = "Pasta"`・`security_level = "local"` で、書き換えるとそれ以降のすべての応答に反映される。
 
 ```lua
@@ -1294,7 +1295,7 @@ SSP が 90 秒より長く OnSecondChange を送らなかったとき（デバ�
 | ---- | -- | ------ | ---- |
 | `talk_interval_min` | 整数 | `180` | ランダムトークの最小間隔（秒） |
 | `talk_interval_max` | 整数 | `300` | ランダムトークの最大間隔（秒） |
-| `hour_margin` | 整数 | `30` | 正時の何秒前からランダムトークを控えるか（秒） |
+| `hour_margin` | 整数 | `30` | 正時の何秒前からランダムトークを控えるか（秒）。数でない値・NaN・無限大は `30` になる |
 
 ```toml
 [ghost]

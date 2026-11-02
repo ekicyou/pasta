@@ -17,7 +17,7 @@
 この章が責務を持つのは次の事項である。
 
 - `pasta_core` のレジストリ（`SceneRegistry`・`WordDefRegistry`）と検索表（`SceneTable`・`WordTable`）、乱数の抽象（`RandomSelector`）
-- 検索キーの形式と、登録と検索が共有する照合規則（サニタイズ）、RadixMap による前方一致での候補の収集
+- 検索キーの形式と、登録と検索が共有する照合規則（サニタイズ）、前方一致の索引（`BTreeMap`）による候補の収集
 - 候補が複数あるときの選択（シャッフルと順次消費）と、その状態の持ち方
 - ローカル優先の検索順を、Lua 側の検索手順が `@pasta_search` の呼び出しでどう組み立てているか
 - 実行時の辞書確定のうち Rust 側の処理（`finalize_scene` による Lua 側の収集とレジストリの再構築）と、Lua 側との受け渡し
@@ -29,19 +29,19 @@
 
 ### pasta_core のレジストリと検索表
 
-`pasta_core` は Lua に依存しないレジストリ層である。依存は `thiserror`・`fast_radix_trie`・`rand` だけである。
+`pasta_core` は Lua に依存しないレジストリ層である。依存は `thiserror`・`rand` だけである。
 
 | 型 | 所在 | 役割 |
 | -- | ---- | ---- |
-| `SceneRegistry`・`SceneEntry` | `crates/pasta_core/src/registry/scene_registry.rs` | シーンを登録順の `Vec` に集め、1 始まりの ID を振る。`register_global`・`register_local` はトランスパイル時の登録で、`register_global` は同名のグローバルシーンにサニタイズ後の名前ごとのカウンタで通し番号を振り、`register_local` は呼び出し側が渡すローカルの通し番号を使う。`register_global_raw` は辞書確定での登録で、通し番号付きの登録名をそのまま受け取る。`registered_name` は登録名を作り、`split_registered_name` は登録名を（名前, 通し番号）に分ける（[登録名の構成](#登録名の構成)）。`merge_from` はファイルごとのレジストリを統合する。`sanitize_name` は名前の英数字と `_` 以外を `_` に置き換える。登録と検索が共有する照合規則である（[照合規則の共有](#照合規則の共有)） |
+| `SceneRegistry`・`SceneEntry` | `crates/pasta_core/src/registry/scene_registry.rs` | シーンを登録順の `Vec` に集め、1 始まりの ID を振る。`register_global`・`register_local` はトランスパイル時の登録で、`register_global` は同名のグローバルシーンにサニタイズ後の名前ごとのカウンタで通し番号を振り、`register_local` は呼び出し側が渡すローカルの通し番号を使う。`register_global_raw` は辞書確定での登録で、通し番号付きの登録名をそのまま受け取る。`registered_name` は登録名を作り、`split_registered_name` は登録名を（名前, 通し番号）に分ける（[登録名の構成](#登録名の構成)）。`sanitize_name` は名前の英数字と `_` 以外を `_` に置き換える。登録と検索が共有する照合規則である（[照合規則の共有](#照合規則の共有)） |
 | `SceneAliasTable` | `crates/pasta_core/src/registry/scene_alias.rs` | グローバルシーン名の別名表（別名 → 置き換え先）。`resolve` は書いた名前が別名に完全一致したときだけ置き換え先を返す（1 段だけ）。`fingerprint` はキャッシュの判定に使う正準な文字列を返す（[トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ)）。`builtin_default` は内蔵の既定表（`DEFAULT_ENTRIES` の 7 件）を返し、`with_written` は `[scene.alias]` に書いた行をキーごとに既定表へ重ねる（書いた行だけを先に検証し、次に残った既定と合わせて検証する。既定とのぶつかりは `ConflictsWithDefault`・`TargetIsDefaultAlias`）。規則は [シーン名の別名](../grammar/call-jump.md#シーン名の別名) が正である |
 | `ActorFont`・`FontInput`・`FontValue`・`FONT_ATTRIBUTES` | `crates/pasta_core/src/actor_font.rs` | `pasta.toml` のアクターの装い（`font`）の検査と、`\f[属性名,値]` を書いた順に連ねたタグ列への変換。レジストリと検索表からは使わない。pasta.dll の設定読込（[ローダ自己展開とモジュール解決](loader.md#設定読込)）と `pasta_check validate` が、どちらもこの規則を使う。誤りは `crates/pasta_core/src/error.rs` の `ActorFontError`・`FontValueProblem` で返す。規則は [装い（font）](../reference/pasta-toml.md#装いfont) が正である |
 | `SceneId`・`SceneScope`・`SceneInfo` | `crates/pasta_core/src/registry/scene_types.rs` | 検索表が持つシーン情報。`SceneId` は `SceneTable` 内の 0 始まりの添字である |
-| `SceneTable` | `crates/pasta_core/src/registry/scene_table.rs` | シーンの検索表。`SceneInfo` の `Vec`、前方一致の索引（`RadixMap<Vec<SceneId>>`）、選択状態のキャッシュ、`RandomSelector` を持つ。前方一致の `resolve_scene_id_unified` と完全一致の `resolve_scene_id_exact` の 2 つの解決と、指定したローカルシーンを持つグローバルシーンだけから選ぶ `resolve_global_owning_local_exact` を持つ |
+| `SceneTable` | `crates/pasta_core/src/registry/scene_table.rs` | シーンの検索表。`SceneInfo` の `Vec`、前方一致の索引（`BTreeMap<String, Vec<SceneId>>`）、選択状態のキャッシュ、`RandomSelector` を持つ。前方一致の `resolve_scene_id_unified` と完全一致の `resolve_scene_id_exact` の 2 つの解決と、指定したローカルシーンを持つグローバルシーンだけから選ぶ `resolve_global_owning_local_exact` を持つ |
 | `WordDefRegistry`・`WordEntry` | `crates/pasta_core/src/registry/word_registry.rs` | 単語の定義を、検索キーと値のリストの組（`WordEntry`）として登録順に集める。グローバル・ローカル・アクターの 3 種の登録関数がキーの形式を決める |
-| `WordTable`・`WordCacheKey` | `crates/pasta_core/src/registry/word_table.rs` | 単語の検索表。`WordEntry` の `Vec`、前方一致の索引（`RadixMap<Vec<usize>>`）、選択状態のキャッシュ、`RandomSelector` を持つ |
+| `WordTable`・`WordCacheKey` | `crates/pasta_core/src/registry/word_table.rs` | 単語の検索表。`WordEntry` の `Vec`、前方一致の索引（`BTreeMap<String, Vec<usize>>`）、選択状態のキャッシュ、`RandomSelector` を持つ |
 | `RandomSelector`・`DefaultRandomSelector`・`MockRandomSelector` | `crates/pasta_core/src/registry/random.rs` | 乱数の抽象。トレイトが持つのは配列の並べ替え（`shuffle_usize`）1 つだけである。既定の実装はシステムの乱数で種を決めた `StdRng` でシャッフルし、モックは `shuffle_usize` で、渡された配列を指定列（位置の並び）に従って並べ替える |
-| `SceneTableError`・`WordTableError` | `crates/pasta_core/src/error.rs` | 検索の失敗。シーンは `SceneNotFound`・`NoMatchingScene`・`InvalidScene`・`RandomSelectionFailed` などを返し、単語は `WordNotFound` だけを返す |
+| `SceneTableError`・`WordTableError` | `crates/pasta_core/src/error.rs` | 検索の失敗。シーンは `SceneNotFound`・`NoMatchingScene`・`InvalidScene` の 3 つを返し、単語は `WordNotFound` だけを返す |
 
 レジストリは登録を集める側、検索表は検索する側である。`SceneTable::from_scene_registry`・`WordTable::from_word_def_registry` がレジストリを消費して検索表を作り、作った後の検索表は選択状態のキャッシュと `RandomSelector` 以外を変更しない。
 
@@ -127,7 +127,7 @@ pasta.scene_dic
 
 ### 検索キーの形式
 
-検索表は、レジストリの各項目から次の形式の検索キーを作り、RadixMap に入れる。シーンは `SceneTable::from_scene_registry` が関数名（`fn_name`）から `fn_name_to_search_key` で変換し、単語は `WordDefRegistry` の登録時にキーが決まる。辞書確定後の例を示す。
+検索表は、レジストリの各項目から次の形式の検索キーを作り、前方一致の索引（`BTreeMap`）に入れる。シーンは `SceneTable::from_scene_registry` が関数名（`fn_name`）から `fn_name_to_search_key` で変換し、単語は `WordDefRegistry` の登録時にキーが決まる。辞書確定後の例を示す。
 
 | 種類 | 関数名（シーン） | 検索キー | 登録 |
 | ---- | ---------------- | -------- | ---- |
@@ -145,7 +145,7 @@ pasta.scene_dic
 
 ### 照合規則の共有
 
-登録と検索は、同じ照合規則 `SceneRegistry::sanitize_name` を共有する。`sanitize_name` は、Unicode の英字・数字（`char::is_alphanumeric`。かな・漢字を含む）と `_` 以外の文字を 1 文字ずつ `_` に置き換える（`WordDefRegistry::sanitize_name` は同じ関数を呼ぶ）。利用者向けの章が「照合用の名前」と呼ぶものは、この関数でサニタイズした名前である（[シーン名の照合](../grammar/call-jump.md#シーン名の照合)）。
+登録と検索は、同じ照合規則 `SceneRegistry::sanitize_name` を共有する。`sanitize_name` は、Unicode の英字・数字（`char::is_alphanumeric`。かな・漢字を含む）と `_` 以外の文字を 1 文字ずつ `_` に置き換える（`WordDefRegistry` の登録も同じ関数を呼ぶ）。利用者向けの章が「照合用の名前」と呼ぶものは、この関数でサニタイズした名前である（[シーン名の照合](../grammar/call-jump.md#シーン名の照合)）。
 
 | 側 | サニタイズする名前 | サニタイズする所 |
 | -- | ------------------ | ---------------- |
@@ -178,7 +178,7 @@ pasta.scene_dic
 - `search_scene_exact` は、索引をキーで直接引き（`prefix_index.get`）、検索キーと等しいキーの項目だけを候補にする。`＊つっつき反応胸` と `＊つっつき反応胸右` があるとき、`search_scene("つっつき反応胸")` は両方を候補にするが、`search_scene_exact("つっつき反応胸")` は `＊つっつき反応胸` だけを候補にする。同じキーの中の順・属性フィルタ・選択の方式は前方一致と同じである。利用者向けの規則は [search_scene_exact](../lua/modules/pasta-search.md#search_scene_exactname-global_scene_name) が正である。
 - `search_local_scene_exact` の 2 つの引数は、どちらも作者が書く名前としてサニタイズする（第 2 引数ありの `search_scene_exact` のように、親を登録名で受けることはしない）。別名表で置き換えるのはグローバル名だけである。1 段目でローカルシーンを持つかの判定は、各候補の関数名から登録名（最初の `::` の前）を取り出し、索引に `:登録名:ローカル名` のキーがあるかを `prefix_index.get` で見る。グローバルシーンが無ければ `SceneNotFound` を返し、`SearchContext` は Lua へ `nil, "global"` を返す（置き換えたときは `search_scene` と同じ警告ログも出す）。グローバルシーンはあるが、どれもローカルシーンを持たなければ `Ok(None)` を返し、`SearchContext` は `nil, "local"` を返す。利用者向けの規則は [search_local_scene_exact](../lua/modules/pasta-search.md#search_local_scene_exactglobal_name-local_name) が正である。
 - どの経路も、ローカルに候補が無いときにグローバルへ移ることはない。ローカルからグローバルへの順序は Lua 側の検索手順が組み立てる（後述「ローカル優先の検索順」）。
-- 候補は RadixMap の `iter_prefix` が列挙する順に集まる。RadixMap はキーのバイト列の辞書順で列挙する。同じキーに複数の項目があれば、その中は登録順である。辞書確定の登録順は（名前, 通し番号）の昇順であるため（[辞書確定](#辞書確定)）、同名シーンは通し番号の小さい順に並ぶ。
+- 候補は、索引を検索キーから順に、キーが検索キーで始まる間だけ読む順に集まる。`BTreeMap` はキーのバイト列の辞書順で並ぶ。同じキーに複数の項目があれば、その中は登録順である。辞書確定の登録順は（名前, 通し番号）の昇順であるため（[辞書確定](#辞書確定)）、同名シーンは通し番号の小さい順に並ぶ。
 - 単語の候補は項目ではなく値である。前方一致したすべての項目の値のリストを、上の順で 1 本につなげたものが候補になる。
 - シーンでは、候補を集めた後に属性フィルタ（`filter_by_attributes`）をかける。`SearchContext` は常に空のフィルタを渡し、辞書確定は属性を空で登録するため、実行時の検索ではフィルタは候補を減らさない。
 - シーン名が空文字列なら `InvalidScene` になる。単語名は空文字列を検査しない。
@@ -197,7 +197,6 @@ pasta.scene_dic
 | 一巡した後 | その呼び出しで集めた候補（収集した順）をシャッフルし直して先頭から使う | 候補を集め直してシャッフルし、新しいキャッシュで置き換える |
 
 - 一巡するまで同じ候補は選ばれない。一巡の境目では、前の巡の最後と次の巡の最初が同じになりうる。
-- シーンのキャッシュは選んだ ID の履歴（`history`）も記録するが、選択には使わない。
 - キャッシュは `SearchContext` の寿命の間、イベントをまたいで保たれる。辞書確定で `SearchContext` が作り直されると消える。
 - 前方一致と完全一致は `exact` でキャッシュのキーが異なる。同じ名前を `search_scene` と `search_scene_exact` で引いても、候補の集まりが異なるため、2 つの選択状態は独立に進む。
 - `resolve_global_owning_local_exact` は `owning_local` でキャッシュのキーが異なる。同じグローバル名を `search_scene_exact` で引いても、ローカル名の違う `search_local_scene_exact` で引いても、選択状態はそれぞれ独立に進む。
@@ -205,7 +204,7 @@ pasta.scene_dic
 
 乱数は `RandomSelector` の `shuffle_usize` だけを通して使う。検索表は巡の始まり（初回と一巡した後）ごとに、候補を収集した順に並べた配列を `shuffle_usize` に渡し、並べ替えた結果をその巡の順にする。シーンは候補の ID の配列を、単語は候補の値の添字（0 から候補数 − 1）の配列を渡す。`SearchContext` の構築（`with_aliases`。`new` は空の別名表で `with_aliases` を呼ぶ）は、シーンと単語にそれぞれ別の `DefaultRandomSelector` を与える。Lua の `set_scene_selector(n1, …)`・`set_word_selector(n1, …)` は、引数があれば `MockRandomSelector`、無ければ新しい `DefaultRandomSelector` を作り、検索表の `replace_selector` で差し替える。差し替えはキャッシュを消す。引数は差し替えの前に `parse_selector_args` が検査し、負の整数は `expected non-negative integer argument`、整数でない引数は `expected integer argument` の Lua エラーにする。エラーのときは差し替えず、キャッシュも消さない。
 
-`MockRandomSelector` は Lua に渡された整数の列（指定列）を持つ。`shuffle_usize` は指定列の整数を、渡された配列の 0 始まりの位置として読む（配列の値としては読まない）。有効な位置の値を指定列の順に先に置き、残りを元の順（収集した順）に並べる。配列の長さ以上の位置と、その呼び出しですでに置いた位置は読み飛ばす。並べ替えは呼び出しごとに指定列の先頭から始まり、モックは指定列のほかに状態を持たない。そのため、キャッシュのキーごと（検索ごと）にも巡ごとにも同じ順が当てはまる。これが利用者向け章の、候補の並びの位置による指定（[set_scene_selector(...) / set_word_selector(...)](../lua/modules/pasta-search.md#set_scene_selector--set_word_selector)）の仕組みである。検索表にはシャッフルの有無を切り替える `set_shuffle_enabled` もあり、`false` のときは `shuffle_usize` を呼ばないため、候補は収集した順のまま使われ、指定列は効かない。`set_shuffle_enabled` は Lua からは呼べない（テスト用）。
+`MockRandomSelector` は Lua に渡された整数の列（指定列）を持つ。`shuffle_usize` は指定列の整数を、渡された配列の 0 始まりの位置として読む（配列の値としては読まない）。有効な位置の値を指定列の順に先に置き、残りを元の順（収集した順）に並べる。配列の長さ以上の位置と、その呼び出しですでに置いた位置は読み飛ばす。並べ替えは呼び出しごとに指定列の先頭から始まり、モックは指定列のほかに状態を持たない。そのため、キャッシュのキーごと（検索ごと）にも巡ごとにも同じ順が当てはまる。これが利用者向け章の、候補の並びの位置による指定（[set_scene_selector(...) / set_word_selector(...)](../lua/modules/pasta-search.md#set_scene_selector--set_word_selector)）の仕組みである。
 
 ### ローカル優先の検索順
 
@@ -259,7 +258,7 @@ skip_methods が真のとき（動的参照）
 
 ### 検索結果からシーン関数へ
 
-`SCENE.search(name, global_scene_name)` は `@pasta_search` の `search_scene` が返した `(グローバル名, ローカル名)` で Lua 側のシーンテーブルから関数を引き、結果オブジェクトにして返す（手順と結果オブジェクトの形は [search と結果オブジェクト](internal-modules.md#search-と結果オブジェクト)）。Rust 側が返すのは名前だけであり、シーン関数そのものは Rust を通らない。`SCENE.co_exec` は `act:find_scene` で得た関数をコルーチンで包む。`SCENE.co_exec_exact(name, local_name)` は `search_scene_exact(name, nil)` か `search_local_scene_exact(name, local_name)` の結果を `SCENE.co_exec_registered` に渡し、`SCENE.get` で引いた関数を `co_exec` と同じ包み方（`wrap_scene`）でコルーチンにする（[co_exec_exact](internal-modules.md#co_exec_exact)・[co_exec_registered](internal-modules.md#co_exec_registered)）。コルーチンの実行は [ランタイム実行モデル](execution-model.md) で扱う。
+`SCENE.search(name, global_scene_name)` は `@pasta_search` の `search_scene` が返した `(グローバル名, ローカル名)` で Lua 側のシーンテーブルから関数を引き、結果オブジェクトにして返す（手順と結果オブジェクトの形は [search と結果オブジェクト](internal-modules.md#search-と結果オブジェクト)）。Rust 側が返すのは名前だけであり、シーン関数そのものは Rust を通らない。`SCENE.co_exec` は `act:find_scene` で得た関数をコルーチンで包む。`SCENE.co_exec_exact(name, local_name)` は `search_scene_exact(name, nil)` か `search_local_scene_exact(name, local_name)` の結果で `SCENE.get` を引く `SCENE.get_exact` の関数を、`SCENE.wrap` でコルーチンにする（[co_exec_exact](internal-modules.md#co_exec_exact)）。コルーチンの実行は [ランタイム実行モデル](execution-model.md) で扱う。
 
 ## 境界の受け渡し
 

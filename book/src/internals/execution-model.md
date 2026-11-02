@@ -107,7 +107,7 @@ ACT・STORE・PROXY・SCENE・SAVE の内部構造は [Lua ランタイム内部
 | `STORE.co_scene` | 中断した（`suspended` の）継続待ちのコルーチン 1 つ、または `nil` | 仮想イベントの OnTalk で再開されるか、別のシーンの再開の結果で捨てられるまで（台詞を出した割り込み・指名した再生・エラー。[続きの決まり](#継続トークチェイントークと-co_scene-の更新)） |
 | `CALLBACK.pending[イベント名]` | `get_property` のコールバックを待つコルーチン | 該当するコールバックが届くか、タイムアウトで掃引されるまで |
 
-`STORE.co_callback` は、`CALLBACK.consume_staged` がコールバック待ちとして登録したコルーチンを、`EVENT.drive` の直後の `set_co_scene` に知らせるための印である。`set_co_scene` は、渡されたコルーチンがこの印と一致したときだけ `nil` に戻す。`act:get_property` は予約（`stage_pending`）の直後に必ず get タグを出力として中断するため、`consume_staged` が登録するコルーチンは suspended であり、続く `set_co_scene` が印を `nil` に戻す（予約の後、中断の前にエラーで終わった場合は `consume_staged` を呼ばず、`discard_staged` が予約を捨てる。おすすめメニューのシーンを動かした後も、`pasta.shiori.event.recommend` が `discard_staged` で予約を捨てる）。したがって `EVENT.drive` を抜けた時点で印は常に `nil` である。
+`CALLBACK.consume_staged` は、コールバック待ちとして登録したかを真偽で返す。`EVENT.drive` は真のとき `co` を `nil` にしてから `set_co_scene` に渡すので、待ちのコルーチンを持つのは `CALLBACK.pending` だけである。`act:get_property` は予約（`stage_pending`）の直後に必ず get タグを出力として中断するため、`consume_staged` が登録するコルーチンは suspended である（予約の後、中断の前にエラーで終わった場合は `consume_staged` を呼ばず、`discard_staged` が予約を捨てる。おすすめメニューのシーンを動かした後も、`pasta.shiori.event.recommend` が `discard_staged` で予約を捨てる）。
 
 ## 処理とデータの流れ
 
@@ -182,28 +182,27 @@ EVENT.fire(req)
 
 ### シーンコルーチンの作り方
 
-シーン関数をコルーチンにする箇所は、どれも同じ包み方をする。
+シーン関数をコルーチンに包むのは `SCENE.wrap`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`）の 1 か所である。キックだけは、同じ形の包みを `kick.lua` の中に持つ。
 
 ```lua
-local function wrapped_fn(resumed_act, ...)
-    fn(resumed_act, ...)               -- シーン関数本体
-    local result = resumed_act:build() -- 残りのトークを組み立てる
-    if result ~= nil then
-        return result                  -- コルーチンの最後の値になる
-    end
+function SCENE.wrap(fn)
+    return coroutine.create(function(act, ...)
+        fn(act, ...)          -- シーン関数本体
+        return act:build()    -- 残りのトークを組み立てる。コルーチンの最後の値になる
+    end)
 end
-return coroutine.create(wrapped_fn)
 ```
 
 | 箇所 | シーン関数の得方 |
 | ---- | ---------------- |
 | `SCENE.co_exec`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `act:find_scene(名前)`。`EVENT.no_entry`・既定の OnBoot・仮想イベント・明示的な OnChoiceSelectEx シーン・既定の OnMouseDoubleClick と OnMouseMove（ショートカットが見つからないとき）が使う |
-| `SCENE.co_exec_exact`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `search_scene_exact(名前, nil)` か `search_local_scene_exact(名前, ローカル名)` の結果で `SCENE.get`。完全一致のシーンだけ。既定の OnMouseDoubleClick・OnMouseMove がショートカットの 1〜8 段を探すのに、既定の OnPastaScene が名前で指名したシーンを探すのに使う（[co_exec_exact](internal-modules.md#co_exec_exact)） |
-| `SCENE.co_exec_registered`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | 登録名の組で `SCENE.get`。`co_exec_exact` が使うほか、既定の OnPastaSceneAt が位置から引いた組で使う（[co_exec_registered](internal-modules.md#co_exec_registered)） |
-| `create_scene_coroutine`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`） | `SCENE.search(選択 ID, 親)`、無ければ `SCENE.search(選択 ID, nil)`。親は Reference2 のグローバルシーン名（既知のグローバルシーンのとき）か `STORE.last_global_scene`（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)） |
-| `wrap_local_func`・`wrap_reload_func`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`） | シーン表から完全一致で引いたキック対象のシーン関数（`SCENE.get`・`SCENE.get_start`）、または SHIORI 再読み込みのタグだけを出す関数 |
+| `SCENE.co_exec_exact`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `SCENE.get_exact(名前, ローカル名)`（`search_scene_exact(名前, nil)` か `search_local_scene_exact(名前, ローカル名)` の結果で `SCENE.get`）。完全一致のシーンだけ。既定の OnMouseDoubleClick・OnMouseMove がショートカットの 1〜8 段を探すのに、既定の OnPastaScene が名前で指名したシーンを探すのに使う（[co_exec_exact](internal-modules.md#co_exec_exact)） |
+| `SCENE.co_exec_registered`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | 登録名の組で `SCENE.get`。既定の OnPastaSceneAt が位置から引いた組で使う（[co_exec_registered](internal-modules.md#co_exec_registered)） |
+| 既定の OnChoiceSelectEx（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`） | `SCENE.search(選択 ID, 親)`、無ければ `SCENE.search(選択 ID, nil)`。親は Reference2 のグローバルシーン名（既知のグローバルシーンのとき）か `STORE.last_global_scene`（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)） |
+| 既定の OnPastaCallFunction（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/external_control.lua`） | `act:find_handler("scene", Reference0)` で引いた関数を、Reference1 以降を添えて呼ぶ関数で包む |
+| `wrap_local_func`・`wrap_reload_func`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`）。`SCENE.wrap` でなく自前の包み | シーン表から完全一致で引いたキック対象のシーン関数（`SCENE.get`・`SCENE.get_start`）、または SHIORI 再読み込みのタグだけを出す関数 |
 
-- コルーチンは作るだけで、作った時点ではシーン関数は動かない。最初の `resume` で `EVENT.fire` が（`EVENT.drive` を通して）そのイベントの ACT を渡し、それが `resumed_act` になる。
+- コルーチンは作るだけで、作った時点ではシーン関数は動かない。最初の `resume` で `EVENT.fire` が（`EVENT.drive` を通して）そのイベントの ACT を渡し、それが包みの `act` になる。
 - シーン関数の戻り値は捨てられる。応答になるのは、途中の `yield` で渡した値か、最後の `build()` の値である。
 - Call（`act:call`・`act:call_restore`）で呼んだ先のシーン関数は、同じコルーチンの中の通常の関数呼び出しとして動く。呼び先での中断はコルーチン全体の中断になり、再開すると呼び先の続きから進む。途中の Call（`act:call_restore`）は、再開後に呼び先から戻った時点で `current_scene` を呼ぶ前の値に戻す（[シーン文脈の復元](internal-modules.md#シーン文脈の復元call_restorerestore_scene)）。
 
@@ -220,9 +219,9 @@ EVENT.drive(co, act, ...)
  4. scene_act = FAILURE.act_of(co) or act      target と scene_act の _on_speech を nil に戻す（成否によらず）
  5. ok が偽 → STOP.hold(co, value)             止まったコルーチンの act とエラーの値を控える
              CALLBACK.discard_staged()        中断の前にエラーで終わったシーンの予約を捨てる
-             set_co_scene(co, false)          co は dead。STORE.co_scene も空になる
+             set_co_scene(nil, false)         STORE.co_scene を空にする
              return false, value
- 6. CALLBACK.consume_staged(co, act)           予約があれば待機として登録（後述）
+ 6. CALLBACK.consume_staged(co, act)           予約があれば待機として登録し、真が返れば co = nil（後述）
  7. spoke = scene_act._spoke                   印が nil（組み立てていない）なら value が nil でも "" でもないか
  8. scene_act._interrupted が真 → set_co_scene(nil, false)
     それ以外                    → set_co_scene(co, kind == "interrupt" and not spoke)
@@ -233,7 +232,7 @@ EVENT.drive(co, act, ...)
 - 1 は再開の前に行う。再開の中で `STORE.co_scene` が変わる前の状態で種類を決めるためである。
 - 2 の `target` は、新しく始まるシーンではまだ `FAILURE.act_of(co)` が無いので、最初の `resume` に渡す ACT になる（`EVENT.fire` は `EVENT.drive(result, act, act)` と呼ぶので、シーンが積む ACT と同じ）。4 の `scene_act` は、再開の中で `init_scene` が記録した ACT である。印の意味は [台詞の印と中断のシーン](#台詞の印と中断のシーン) で扱う。
 - 4 で欄の関数を外すのは、失敗の後に `STOP.response` が `act:build()` を呼んでも、中断のシーンを動かさないためである。
-- 6 から 8 の間には、台詞の印を読むこと（7）のほかに処理を挟まない。予約の消費と継続の更新は必ず組で行われる。6 を先に行うのは、`set_co_scene` が `STORE.co_callback` で待ちに入ったかを見るためである。
+- 6 から 8 の間には、台詞の印を読むこと（7）のほかに処理を挟まない。予約の消費と継続の更新は必ず組で行われる。6 を先に行うのは、待ちに入った `co` を `set_co_scene` に渡さないためである（待ちのコルーチンは `CALLBACK.pending` だけが持つ）。
 - 7 で ACT の印が無いのは、ACT を通らない素のコルーチン（テストやゴーストが Lua で作ったもの）である。出力が空でなければ台詞に数える。
 - `act` は、`get_property` で中断したときに待機へ登録する ACT である。`EVENT.fire` ではそのイベントの ACT、`try_route`・`sweep` では待機を登録したときの ACT（`entry.act`）を渡す。
 - `resume_until_valid`・`drive_kind`・`set_co_scene`・`run_interrupt_scene` は `init.lua` のローカル関数である。`callback.lua` は `EVENT` を呼び出し時に `require` して `EVENT.drive` を使う（読み込み時に `require` すると循環する）。
@@ -244,22 +243,26 @@ EVENT.drive(co, act, ...)
 
 ```text
 ok, value = coroutine.resume(co, ...)      初回だけ引数を渡す（引数は呼び出し元ごとに異なる。後述の表）
+empty = 0
 loop
   ok が偽                       → (false, エラー) を返す
   value が nil でない           → (true, value) を返す
   value が nil で co が dead    → (true, nil) を返す（出力の無いシーン）
-  value が nil で co が suspended → ok, value = coroutine.resume(co)（引数なし）
+  value が nil で co が suspended → empty = empty + 1
+                                   empty > 10000 なら (false, "何も出さない区切りが 10000 回続いた") を返す
+                                   ok, value = coroutine.resume(co)（引数なし）
 ```
 
 - ACT の `build()` はトークが 0 件なら `nil` を返す。そのため、トークを積まずに `act:yield()` した中断（`yield` の直後の `yield` など）は、応答を返さず同じイベントの中で再開される。
-- 2 回目以降の `resume` は引数を渡さない。継続したシーンの再開でも、`EVENT.fire` が渡す新しい ACT は `coroutine.yield` の戻り値になるだけで、`ACT_IMPL.yield` はそれを使わない。継続したシーンは、最初の `resume` で受け取った ACT（`act.req` はそのときのイベントのもの）を使い続ける。
+- 何も出さない区切りは、1 回の `resume_until_valid` の呼び出しにつき 10,000 回（`NIL_YIELD_LIMIT`）まで飛ばす。数は呼び出しごとに 0 から数える。超えたら再開をやめて失敗を返し、`EVENT.drive` はほかのエラーと同じ失敗の枝（`STOP.hold` → 予約を捨てる → 続きを捨てる）で受ける。そのため、何も出さずに区切り続けるシーンでもイベントは固まらずに返り、[止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記)が出る。中断のシーン（`run_interrupt_scene`）も同じ関数で再開するので、同じ上限が掛かる。
+- このループの中の 2 回目以降の `resume`（何も出さない区切りを飛ばす再開）は引数を渡さない。最初の `resume` に渡す値は下の表のとおり呼び出し元ごとに違う。継続したシーンの再開では、`EVENT.fire` が渡す新しい ACT が `coroutine.yield` の戻り値になる。`ACT_IMPL.yield` はその `req` を再開した要求として `_resume_req` に控えるだけで（`get_property` の期限の数え始め。[コールバック待ちとの関係](#コールバック待ちとの関係)）、継続したシーンは、最初の `resume` で受け取った ACT（`act.req` と日時の変数はそのときのイベントのもの）を使い続ける。引数なしの再開では控えを変えない。
 - このループは `EVENT.drive` の中で使われる。`EVENT.drive` を呼ぶのは次の 3 箇所であり、最初の `resume` に渡す引数だけが異なる。
 
 | 呼び出し元 | 最初の `resume` の引数 | シーン側で受け取る値 |
 | ---------- | ---------------------- | -------------------- |
-| `EVENT.fire`（ハンドラが返したコルーチン） | そのイベントの ACT | 新しく始まったシーンではシーン関数の第 1 引数（`resumed_act`）。継続したシーンでは `coroutine.yield` の戻り値になり、使われない |
-| `CALLBACK.try_route` | `refs`（Reference を 1 始まりにした配列） | `get_property` の中の `coroutine.yield` の戻り値 |
-| `CALLBACK.sweep` | `nil, reason`（`reason` は `on_timeout` が文字列のときだけ。それ以外は `nil`） | 同上。`get_property` は `reason` があれば `error(reason)` する |
+| `EVENT.fire`（ハンドラが返したコルーチン） | そのイベントの ACT | 新しく始まったシーンではシーン関数の第 1 引数（包みの `act`）。継続したシーンでは `coroutine.yield` の戻り値になり、使われない |
+| `CALLBACK.try_route` | `refs, nil, req`（`refs` は Reference を 1 始まりにした配列、`req` は届いた要求） | `get_property` の中の `coroutine.yield` の戻り値 |
+| `CALLBACK.sweep` | `nil, reason, req`（`reason` は `on_timeout` が文字列のときだけ。それ以外は `nil`。`req` は `sweep` に渡された要求で、省略されれば `nil`） | 同上。`get_property` は `reason` があれば `error(reason)` する |
 
 ### 継続トーク（チェイントーク）と co_scene の更新
 
@@ -276,15 +279,8 @@ drive_kind(co)                       判定の順はこのとおり
 
 set_co_scene(co, keep)
  1. co が suspended でなければ co = nil として扱う（dead のコルーチンは残さない）
- 2. keep が真なら STORE.co_scene には触れずに終わる。co が STORE.co_callback と同じなら
-      印だけ nil に戻す（co は CALLBACK.pending が持つ）。それ以外の co の残りは
-      どこにも置かないので捨てられる
- 3. co が STORE.co_callback と同じなら（コールバック待ちとして登録済み）
-      STORE.co_scene が別のコルーチンなら破棄し、STORE.co_scene = nil、
-      STORE.co_callback = nil として終わる
- 4. STORE.co_scene と co が同じなら何もしない（継続中のコルーチンがまだ続く）
- 5. STORE.co_scene があれば破棄する
- 6. STORE.co_scene = co
+ 2. keep が真なら STORE.co_scene には触れずに終わる（co の残りはどこにも置かないので捨てられる）
+ 3. それ以外は STORE.co_scene = co（前の続きは参照を外して捨てる）
 ```
 
 `STORE.co_scene` をランタイムの中で書くのは `set_co_scene` だけである（`STORE.reset` も `nil` に戻す）。`STORE.co_preempt` は、キーを弱い参照にした表（`table<thread, true>`）で、指名した再生のコルーチンに付ける「はっきり捨てる」の印である。付けるのは `kick.lua` の `wrap_local_func`・`wrap_reload_func` が作るコルーチンと、`scene_play.lua` の `OnPastaScene`・`OnPastaSceneAt` が返すコルーチンだけで、読むのは `drive_kind` だけである。印はコルーチンごとに 1 つで消さないため、キックのシーンがコールバック待ちから戻った回も "preempt" になる。キックのシーンが区切って続きになった後は、`co == STORE.co_scene` が先に当たるので "resume" になる。
@@ -300,8 +296,8 @@ set_co_scene(co, keep)
 | `interrupt` | 台詞あり・中断が `nil` を返した | `set_co_scene(co, false)` | 待っている続きを捨てる。区切れば `co` の残りが続きになる | 動かしたが出さない（反応をそのまま出す） |
 | `interrupt` | 台詞なし・最後まで動いた | `set_co_scene(co, true)` | 待っている続きを残す | 動かさない |
 | `interrupt` | 台詞なし・区切った | `set_co_scene(co, true)` | 待っている続きを残す。`co` の残りは捨てる | 動かさない |
-| `interrupt` | 台詞なし・コールバック待ちに入った | `set_co_scene(co, true)` | 待っている続きを残す。`co` は `CALLBACK.pending` が持つ | 動かさない |
-| どれでも | エラー | `set_co_scene(co, false)` | `co` は dead なので `nil`。待っている続きも捨てる | 動かさない（エラーの前に動いていても応答に載らない） |
+| `interrupt` | 台詞なし・コールバック待ちに入った | `set_co_scene(nil, true)` | 待っている続きを残す。`co` は `CALLBACK.pending` が持つ | 動かさない |
+| どれでも | エラー | `set_co_scene(nil, false)` | `nil`。待っている続きも捨てる | 動かさない（エラーの前に動いていても応答に載らない） |
 
 この規則から次のことが成り立つ。
 
@@ -309,7 +305,7 @@ set_co_scene(co, keep)
 - 中断のシーンを動かすのは、種類が "interrupt" で、組み立てが台詞を見つけたときだけである。続きが無い回・続きの再開・指名した再生・台詞を出さない回では、中断のシーンを探しもしない。
 - 継続を再開するのは仮想イベントの OnTalk だけである。`check_talk`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua`）は、トークの時刻に達したとき `STORE.co_scene` があれば新しいシーンを探さずにそれを返す。外から起こした `OnTalk`（`EVENT.no_entry` が `SCENE.co_exec` で探したシーン）は、ほかのイベントと同じく "interrupt" である。OnHour は OnTalk より先に判定されるが、`check_hour` が `SCENE.co_exec` で探したコルーチンに印は無く、ふつうの割り込みとして扱われる（時報のシーンが台詞を出せば続きを捨てる）。シーンキックは印の付いたコルーチンを返すので "preempt" になる。自動トークを止めている間（`STORE.auto_talk_paused`）は `check_talk` まで進まないため、継続は再開されず、捨てられもしない。
 - 文字列か `nil` を返すハンドラ（`REG` の関数など）は `STORE.co_scene` を変えない。
-- シーンの実行中にエラーが起きると、そのコルーチンは dead になり、`set_co_scene(co, false)` で既存の継続も破棄される。中断のシーンのエラーも、割り込んだシーンのコルーチンの中で投げ直されるので、同じ枝を通る。エラーは、`EVENT.fire` と `CALLBACK.try_route` の経路では `SHIORI.request` の `xpcall` へ伝わり、`CALLBACK.sweep` では応答の候補になる（後述）。
+- シーンの実行中にエラーが起きると、そのコルーチンは dead になり、`set_co_scene(nil, false)` で既存の継続も破棄される。中断のシーンのエラーも、割り込んだシーンのコルーチンの中で投げ直されるので、同じ枝を通る。エラーは、`EVENT.fire` と `CALLBACK.try_route` の経路では `SHIORI.request` の `xpcall` へ伝わり、`CALLBACK.sweep` では応答の候補になる（後述）。
 
 ### 台詞の印と中断のシーン
 
@@ -371,13 +367,12 @@ run_interrupt_scene(act)
   coroutine.yield(get タグだけのスクリプト)
         ↓ resume_until_valid が値を受け取る
 EVENT.drive（どの呼び出し元から再開していても同じ）
-  CALLBACK.consume_staged(co, act)   予約があれば pending[イベント名] = {co, act, …}
-                                     STORE.co_callback = co
-  set_co_scene(co, keep)             co_callback と一致 → co_scene には入れず、印を nil に戻す
-                                     keep が偽なら co_scene も nil にする（keep が真なら触れない）
+  CALLBACK.consume_staged(co, act)   予約があれば pending[イベント名] = {co, act, …} として真を返す
+                                     真なら co = nil（待ちのコルーチンは pending だけが持つ）
+  set_co_scene(nil, keep)            keep が偽なら co_scene を nil にする（keep が真なら触れない）
         ↓ 後のリクエスト
 EVENT.fire → CALLBACK.try_route(req)
-  pending[req.id] があれば外して EVENT.drive(co, entry.act, Reference の配列)
+  pending[req.id] があれば外して EVENT.drive(co, entry.act, Reference の配列, nil, req)
   ok が偽 → error(value)
   ok が真 → return RES.ok(value)     value が nil か "" なら 204
 ```
@@ -386,20 +381,21 @@ EVENT.fire → CALLBACK.try_route(req)
 - 待ちに入った回の `STORE.co_scene` は、[続きの決まり](#継続トークチェイントークと-co_scene-の更新)の表のとおりに決まる。get タグは台詞に数えないので、台詞を出さずに待ちに入った割り込みは待っている続きを残す（`keep` が真）。待っている続きそのものが待ちに入ったとき（"resume"）は `STORE.co_scene` を空にし、待っている間に次の自然なおしゃべりが同じコルーチンを再開しないようにする。続きが無い回・指名した再生の回も `keep` は偽なので空になる。
 - コールバックで再開したシーンは、戻った回の `EVENT.drive` で、通常のイベントと同じ規則で扱われる。待ちに入った回に続きを残していれば、戻った回の種類は "interrupt" になり、台詞を出せば続きを捨てて中断の台詞を流す。台詞を出さなければ続きは残る。指名した再生のコルーチンは印が残っているので "preempt" になる。出力の無い中断は同じリクエストの中で進み、チェイントークで中断すれば表のとおりに `STORE.co_scene` が決まり（続きになれば、次の自然なおしゃべり（仮想ディスパッチャが起こす OnTalk）の機会に続きが出る）、続けて `get_property` すれば新しい待機として登録される。
 - 再開したシーンのエラーは、`pending` にも `STORE.co_scene` にも残らず、`SHIORI.request` が応答にする（表記を出す設定で ID が `On` で始まる要求なら表記付きの `200 OK`、それ以外は 500。[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)）。
+- 期限は、`get_property` を呼んだシーンの ACT の `_resume_req`（無ければ `act.req`）の `CLOCK.steady` に待ちの秒数を足した時刻である。`_resume_req` は、そのシーンを最後に再開した要求で、チェイントークの続きの再開では `ACT_IMPL.yield` が、コールバックの応答と時間切れの再開では `get_property` が 3 つ目の戻り値（再開した要求）から書く。最初の区切りでは無いので、期限はその要求の時刻から数える。`act.req` は替えない。
 - `req.id` と一致する待機が無ければ `try_route` は `nil` を返し、`EVENT.fire` は通常の振り分けに進む。掃引で外した待機に遅れて届いた結果も、この扱いになる。
 
 ### 期限切れの掃引（CALLBACK.sweep）
 
-期限を過ぎた待機は、OnSecondChange の既定ハンドラ（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/second_change.lua`）が毎回呼ぶ `CALLBACK.sweep(CLOCK.steady(act.req) or os.time())`（飛びを差し引いた時計。[仮想時刻の時計](shiori.md#仮想時刻の時計pastashioriclock)）が、タイムアウトとして再開する。
+期限を過ぎた待機は、OnSecondChange の既定ハンドラ（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/second_change.lua`）が毎回呼ぶ `CALLBACK.sweep(CLOCK.steady(act.req) or os.time(), act.req)`（飛びを差し引いた時計。[仮想時刻の時計](shiori.md#仮想時刻の時計pastashioriclock)）が、タイムアウトとして再開する。
 
 ```text
-CALLBACK.sweep(now)
+CALLBACK.sweep(now, req)          req は省略できる
  1. 集める  pending を走査し、now > timeout_at の待機を一覧にする（この間は再開しない）
  2. 外す    一覧の待機をすべて pending から外す
  3. 並べる  イベント名の番号（OnPastaCallBack{N} の N）の小さい順。番号の無い名前は末尾に名前の文字列順
  4. 再開    一覧の順に、待機ごとに
               on_timeout が文字列なら reason = on_timeout とし、イベント名と理由を警告ログに出す
-              ok, value = EVENT.drive(entry.co, entry.act, nil, reason)
+              ok, value = EVENT.drive(entry.co, entry.act, nil, reason, req)
               結果から応答の候補を決める（下表）
               まだ応答が無ければ候補を採用し、既にあれば候補を捨てて警告ログを出す
  5. 採用した応答、または nil を返す
@@ -412,6 +408,7 @@ CALLBACK.sweep(now)
 | `ok` が真で出力あり | どちらでも | `RES.ok(出力)` |
 | `ok` が真で出力なし（`nil` か `""`） | どちらでも | なし |
 
+- `req` は、再開したシーンが続けて呼ぶ `get_property` の期限の数え始めになる。作者が上書きしたハンドラが 1 引数で `sweep` を呼んでも動くが、そのときは静かなタイムアウトの後に続けて呼ぶ期限だけ、前に再開した要求から数える。
 - 収集と取り外しを再開より前に済ませるため、再開中に登録された待機（タイムアウトを捕まえて続けて `get_property` したシーンなど）は同じ回には扱われない。走査中の表への挿入も起きない。
 - 待機は再開の前に `pending` から外すため、1 つの待機が 2 回処理されることはない。途中の待機がエラーで終わっても、残りの待機の処理を続ける。候補を捨てた待機も `EVENT.drive` を通っているため、予約と継続は規則どおりに更新されている。
 - 既定ハンドラは、`sweep` が応答を返せばそれを返し、仮想イベント（OnTalk・OnHour）を出さない。応答は `SHIORI/` で始まる全文なので、`EVENT.fire` が包まずにその回の応答にする。`sweep` が `nil` を返した回だけ `virtual_dispatcher.dispatch` に進む。
@@ -473,10 +470,10 @@ VM の構築      register_persistence_module → persistence::register
 
 ランタイムの Lua は、Lua 5.2 互換を有効にした LuaJIT 2.1（mlua の `luajit52`。[Cargo.toml](https://github.com/ekicyou/pasta/blob/main/Cargo.toml) のワークスペース依存）である。実行モデルに関わる制約は次のとおりである。
 
-- `coroutine.close` が無い。`set_co_scene` と `STORE.reset` は `if coroutine.close then` で分岐しているため、LuaJIT では閉じる処理は実行されない。中断中のコルーチンを「破棄する」とは、参照を外して GC に回収させることである。破棄したコルーチンは、`yield` より後のコードを二度と実行しない（後始末のコードも動かない）。
+- `coroutine.close` が無い。中断中のコルーチンを「破棄する」とは、参照を外して GC に回収させることである（`set_co_scene` と `STORE.reset` は閉じる処理を持たず、参照を外すだけである）。破棄したコルーチンは、`yield` より後のコードを二度と実行しない（後始末のコードも動かない）。
 - to-be-closed 変数（`<close>`）が無い。`__close` メタメソッドは自動では呼ばれない。
 - コルーチンの中断は Lua の関数の中でだけ行える。Rust の関数（`@pasta_*` の関数など）から呼ばれた Lua の関数の内側で `yield` すると、C 呼び出しの境界をまたぐためエラーになる。
-- `_VERSION` は `"Lua 5.1"` を返す。ランタイムの種類と版は `pasta.lua_version` が `jit` の有無で判定する。
+- `_VERSION` は `"Lua 5.1"` を返す。LuaJIT かどうかは `jit` の有無で分かる。
 - Lua 5.2 互換により `table.unpack` などが使える。生成コードと `pasta.shiori.act` はこれを使う。
 
 ## ソースの所在

@@ -19,10 +19,6 @@ pub struct SceneEntry {
     /// always empty when rebuilt by the runtime finalize).
     pub attributes: HashMap<String, String>,
 
-    /// `fn_name` with a `crate::` prefix (e.g., "crate::会話_1::__start__").
-    /// Not read by the runtime search, which uses `fn_name`.
-    pub fn_path: String,
-
     /// Scene function name in `global::local` form (e.g., "会話_1::__start__").
     pub fn_name: String,
 
@@ -76,13 +72,11 @@ impl SceneRegistry {
         let id = (self.scenes.len() + 1) as i64;
 
         let fn_name = format!("{}::__start__", Self::registered_name(name, counter));
-        let fn_path = format!("crate::{}", fn_name);
 
         let entry = SceneEntry {
             id,
             name: name.to_string(),
             attributes,
-            fn_path,
             fn_name,
             parent: None,
         };
@@ -114,21 +108,19 @@ impl SceneRegistry {
     ) -> i64 {
         let id = (self.scenes.len() + 1) as i64;
 
-        // Local scene function path: parent module + local function
-        // Format: crate::親_番号::子_番号
+        // Local scene function name: parent module + local function
+        // Format: 親_番号::子_番号
         // local_counter is the same number CodeGenerator's generate_local_scene uses
         let fn_name = format!(
             "{}::{}",
             Self::registered_name(parent_name, parent_counter),
             Self::registered_name(name, local_counter)
         );
-        let fn_path = format!("crate::{}", fn_name);
 
         let entry = SceneEntry {
             id,
             name: name.to_string(),
             attributes,
-            fn_path,
             fn_name,
             parent: Some(parent_name.to_string()),
         };
@@ -162,13 +154,11 @@ impl SceneRegistry {
 
         // fn_name format: "FullName::__start__"
         let fn_name = format!("{}::__start__", full_name);
-        let fn_path = format!("crate::{}", fn_name);
 
         let entry = SceneEntry {
             id,
             name: full_name.to_string(),
             attributes: attributes.clone(),
-            fn_path,
             fn_name,
             parent: None,
         };
@@ -181,13 +171,11 @@ impl SceneRegistry {
             if local_name != "__start__" {
                 let local_id = (self.scenes.len() + 1) as i64;
                 let local_fn_name = format!("{}::{}", full_name, local_name);
-                let local_fn_path = format!("crate::{}", local_fn_name);
 
                 let local_entry = SceneEntry {
                     id: local_id,
                     name: local_name.clone(),
                     attributes: attributes.clone(),
-                    fn_path: local_fn_path,
                     fn_name: local_fn_name,
                     parent: Some(full_name.to_string()),
                 };
@@ -202,14 +190,6 @@ impl SceneRegistry {
     /// Get all registered scenes in ID order.
     pub fn all_scenes(&self) -> Vec<&SceneEntry> {
         self.scenes.iter().collect()
-    }
-
-    /// Get a scene by ID.
-    pub fn get_scene(&self, id: i64) -> Option<&SceneEntry> {
-        if id < 1 {
-            return None;
-        }
-        self.scenes.get((id - 1) as usize)
     }
 
     /// Increment the counter for a scene name and return the new value.
@@ -267,26 +247,6 @@ impl SceneRegistry {
         }
         (registered, None)
     }
-
-    /// Merge scenes and counters from another registry.
-    ///
-    /// Used by PastaLoader to combine registries from multiple files.
-    /// Scene IDs are reassigned during merge to maintain uniqueness.
-    pub fn merge_from(&mut self, other: SceneRegistry) {
-        for mut entry in other.scenes {
-            // Reassign ID based on current length
-            entry.id = (self.scenes.len() + 1) as i64;
-            self.scenes.push(entry);
-        }
-
-        // Merge name counters (take max value)
-        for (name, counter) in other.name_counters {
-            let current = self.name_counters.entry(name).or_insert(0);
-            if counter > *current {
-                *current = counter;
-            }
-        }
-    }
 }
 
 impl Default for SceneRegistry {
@@ -307,9 +267,9 @@ mod tests {
         assert_eq!(id1, 1);
         assert_eq!(counter1, 1);
 
-        let scene = registry.get_scene(id1).unwrap();
+        let scene = registry.all_scenes()[id1 as usize - 1];
         assert_eq!(scene.name, "会話");
-        assert_eq!(scene.fn_path, "crate::会話_1::__start__");
+        assert_eq!(scene.fn_name, "会話_1::__start__");
         assert_eq!(scene.parent, None);
     }
 
@@ -341,11 +301,11 @@ mod tests {
         assert_eq!(id2, 2);
         assert_eq!(counter2, 2);
 
-        let label1 = registry.get_scene(id1).unwrap();
-        let label2 = registry.get_scene(id2).unwrap();
+        let label1 = registry.all_scenes()[id1 as usize - 1];
+        let label2 = registry.all_scenes()[id2 as usize - 1];
 
-        assert_eq!(label1.fn_path, "crate::会話_1::__start__");
-        assert_eq!(label2.fn_path, "crate::会話_2::__start__");
+        assert_eq!(label1.fn_name, "会話_1::__start__");
+        assert_eq!(label2.fn_name, "会話_2::__start__");
     }
 
     #[test]
@@ -361,11 +321,11 @@ mod tests {
         assert_eq!(parent_id, 1);
         assert_eq!(local_id, 2);
 
-        let local_label = registry.get_scene(local_id).unwrap();
+        let local_label = registry.all_scenes()[local_id as usize - 1];
         assert_eq!(local_label.name, "選択肢");
         assert_eq!(local_label.parent, Some("会話".to_string()));
-        // Local scene function is in parent module: crate::親_番号::子名_番号
-        assert_eq!(local_label.fn_path, "crate::会話_1::選択肢_1");
+        // Local scene function is in parent module: 親_番号::子名_番号
+        assert_eq!(local_label.fn_name, "会話_1::選択肢_1");
     }
 
     #[test]
@@ -423,20 +383,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_scene_invalid_ids() {
-        let mut registry = SceneRegistry::new();
-        registry.register_global("会話", HashMap::new());
-
-        // id < 1 must return None (IDs are 1-based)
-        assert!(registry.get_scene(0).is_none());
-        assert!(registry.get_scene(-1).is_none());
-        // out-of-range ID must return None
-        assert!(registry.get_scene(2).is_none());
-        // valid ID still works
-        assert!(registry.get_scene(1).is_some());
-    }
-
-    #[test]
     fn test_register_global_raw_basic() {
         let mut registry = SceneRegistry::new();
 
@@ -444,10 +390,9 @@ mod tests {
         let id = registry.register_global_raw("OnBoot_1", &[], HashMap::new());
         assert_eq!(id, 1);
 
-        let scene = registry.get_scene(id).unwrap();
+        let scene = registry.all_scenes()[id as usize - 1];
         assert_eq!(scene.name, "OnBoot_1");
         assert_eq!(scene.fn_name, "OnBoot_1::__start__");
-        assert_eq!(scene.fn_path, "crate::OnBoot_1::__start__");
         assert_eq!(scene.parent, None);
     }
 
@@ -465,10 +410,9 @@ mod tests {
         let scenes = registry.all_scenes();
         assert_eq!(scenes.len(), 2); // global + 1 local (not 3)
 
-        let local = registry.get_scene(2).unwrap();
+        let local = registry.all_scenes()[1];
         assert_eq!(local.name, "__選択肢_1__");
         assert_eq!(local.fn_name, "会話_1::__選択肢_1__");
-        assert_eq!(local.fn_path, "crate::会話_1::__選択肢_1__");
         assert_eq!(local.parent, Some("会話_1".to_string()));
     }
 
@@ -483,11 +427,11 @@ mod tests {
 
         // Both global and local scenes carry the same attributes
         assert_eq!(
-            registry.get_scene(1).unwrap().attributes.get("季節"),
+            registry.all_scenes()[0].attributes.get("季節"),
             Some(&"春".to_string())
         );
         assert_eq!(
-            registry.get_scene(2).unwrap().attributes.get("季節"),
+            registry.all_scenes()[1].attributes.get("季節"),
             Some(&"春".to_string())
         );
     }
@@ -505,69 +449,13 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_from_reassigns_ids() {
-        let mut a = SceneRegistry::new();
-        a.register_global("会話", HashMap::new());
-
-        let mut b = SceneRegistry::new();
-        b.register_global("別会話", HashMap::new());
-        b.register_global("第三会話", HashMap::new());
-
-        a.merge_from(b);
-
-        // Merged scenes get sequential IDs continuing from existing scenes
-        let scenes = a.all_scenes();
-        assert_eq!(scenes.len(), 3);
-        assert_eq!(scenes[0].id, 1);
-        assert_eq!(scenes[1].id, 2);
-        assert_eq!(scenes[2].id, 3);
-        assert_eq!(scenes[1].name, "別会話");
-        assert_eq!(scenes[2].name, "第三会話");
-
-        // get_scene works with reassigned IDs
-        assert_eq!(a.get_scene(3).unwrap().name, "第三会話");
-    }
-
-    #[test]
-    fn test_merge_from_takes_max_counter() {
-        let mut a = SceneRegistry::new();
-        a.register_global("会話", HashMap::new()); // counter "会話" = 1
-
-        let mut b = SceneRegistry::new();
-        b.register_global("会話", HashMap::new()); // counter "会話" = 1
-        b.register_global("会話", HashMap::new()); // counter "会話" = 2
-
-        a.merge_from(b);
-
-        // After merge, the counter must be max(1, 2) = 2, so next is 3
-        let (_, counter) = a.register_global("会話", HashMap::new());
-        assert_eq!(counter, 3);
-    }
-
-    #[test]
-    fn test_merge_from_keeps_higher_existing_counter() {
-        let mut a = SceneRegistry::new();
-        a.register_global("会話", HashMap::new()); // counter = 1
-        a.register_global("会話", HashMap::new()); // counter = 2
-
-        let mut b = SceneRegistry::new();
-        b.register_global("会話", HashMap::new()); // counter = 1
-
-        a.merge_from(b);
-
-        // Existing counter (2) is higher; next must be 3
-        let (_, counter) = a.register_global("会話", HashMap::new());
-        assert_eq!(counter, 3);
-    }
-
-    #[test]
     fn test_register_local_sanitizes_names() {
         let mut registry = SceneRegistry::new();
         let (_, counter) = registry.register_global("親-シーン", HashMap::new());
         let local_id =
             registry.register_local("子-シーン", "親-シーン", counter, 1, HashMap::new());
 
-        let local = registry.get_scene(local_id).unwrap();
+        let local = registry.all_scenes()[local_id as usize - 1];
         // Both parent and child names are sanitized in fn_name; original name preserved
         assert_eq!(local.fn_name, "親_シーン_1::子_シーン_1");
         assert_eq!(local.name, "子-シーン");

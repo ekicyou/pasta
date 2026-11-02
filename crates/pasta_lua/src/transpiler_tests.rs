@@ -79,14 +79,7 @@ fn create_pasta_file(actors: Vec<ActorScope>, scenes: Vec<GlobalSceneScope>) -> 
     PastaFile {
         path: PathBuf::from("test.pasta"),
         items,
-        span: Span::default(),
     }
-}
-
-#[test]
-fn test_transpiler_default() {
-    let transpiler = LuaTranspiler::default();
-    assert!(transpiler.config().comment_mode);
 }
 
 #[test]
@@ -221,7 +214,6 @@ fn test_transpile_with_global_words() {
             FileItem::GlobalWord(global_words),
             FileItem::GlobalSceneScope(scenes.into_iter().next().unwrap()),
         ],
-        span: Span::default(),
     };
     let mut output = Vec::new();
 
@@ -284,7 +276,6 @@ fn test_transpile_multi_key_global_word_registration() {
     let file = PastaFile {
         path: PathBuf::from("test.pasta"),
         items: vec![FileItem::GlobalWord(global_words)],
-        span: Span::default(),
     };
     let mut output = Vec::new();
 
@@ -336,7 +327,6 @@ fn test_transpile_multi_key_global_word_lua_output() {
     let file = PastaFile {
         path: PathBuf::from("test.pasta"),
         items: vec![FileItem::GlobalWord(global_words)],
-        span: Span::default(),
     };
     let mut output = Vec::new();
 
@@ -387,14 +377,6 @@ fn test_transpile_multi_key_actor_word_lua_output() {
 }
 
 #[test]
-fn test_with_defaults_matches_default() {
-    let transpiler = LuaTranspiler::with_defaults();
-    let default = TranspilerConfig::default();
-    assert_eq!(transpiler.config().comment_mode, default.comment_mode);
-    assert_eq!(transpiler.config().line_ending, default.line_ending);
-}
-
-#[test]
 fn test_transpile_accumulates_file_attrs() {
     use pasta_dsl::parser::{Attr, AttrValue};
 
@@ -415,7 +397,6 @@ fn test_transpile_accumulates_file_attrs() {
             }),
             FileItem::GlobalSceneScope(create_simple_scene("メイン")),
         ],
-        span: Span::default(),
     };
     let mut output = Vec::new();
 
@@ -459,16 +440,10 @@ fn test_transpile_writer_failure_yields_io_error() {
     }
 }
 
-/// Documents current behavior: output normalization converts all line endings
-/// to LF, so the final transpiled bytes are LF-only even when the transpiler
-/// is configured with CRLF line endings (CRLF applies to the intermediate
-/// code-generation buffer only).
+/// The transpiled bytes always use LF line endings.
 #[test]
-fn test_transpile_output_is_lf_only_even_with_crlf_config() {
-    use crate::config::LineEnding;
-
-    let config = TranspilerConfig::new().with_line_ending(LineEnding::CrLf);
-    let transpiler = LuaTranspiler::new(config);
+fn test_transpile_output_is_lf_only() {
+    let transpiler = LuaTranspiler::default();
     let file = create_pasta_file(vec![], vec![create_simple_scene("メイン")]);
     let mut output = Vec::new();
 
@@ -495,7 +470,6 @@ fn test_transpile_single_key_backward_compat_lua_output() {
     let file = PastaFile {
         path: PathBuf::from("test.pasta"),
         items: vec![FileItem::GlobalWord(global_words)],
-        span: Span::default(),
     };
     let mut output = Vec::new();
 

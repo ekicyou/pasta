@@ -320,7 +320,6 @@ fn test_file_attr_shadowing() {
     let file = PastaFile {
         path: PathBuf::from("test.pasta"),
         items: vec![attr1, attr2, scene],
-        span: Span::default(),
     };
 
     let transpiler = LuaTranspiler::default();
@@ -375,7 +374,6 @@ fn test_actor_does_not_inherit_file_attrs() {
     let file = PastaFile {
         path: PathBuf::from("test.pasta"),
         items: vec![file_attr, actor, scene],
-        span: Span::default(),
     };
 
     let transpiler = LuaTranspiler::default();
@@ -430,7 +428,6 @@ fn test_global_word_registration_order() {
     let file = PastaFile {
         path: PathBuf::from("test.pasta"),
         items: vec![word1, word2, scene],
-        span: Span::default(),
     };
 
     let transpiler = LuaTranspiler::default();

@@ -25,7 +25,7 @@
 use std::thread;
 use std::time::Duration;
 
-use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use pasta::actor::marshaling::{default_204, marshal_get_with_timeout, marshal_notify};
 use pasta::actor::teardown::teardown_via_sender;
 
@@ -37,7 +37,7 @@ fn get_path_emits_try_send_recv_and_reply_seams() {
 
     let actor = thread::spawn(move || {
         if let Ok(ActorMsg::Get { req, reply }) = rx.recv() {
-            let _ = reply.send(Reply::Value(format!("echo:{}", req.raw)));
+            let _ = reply.send(format!("echo:{}", req.raw));
         }
     });
 
@@ -89,7 +89,7 @@ fn get_timeout_emits_timeout_seam_and_204() {
     let actor = thread::spawn(move || {
         if let Ok(ActorMsg::Get { req: _, reply }) = rx.recv() {
             thread::sleep(actor_delay);
-            let _ = reply.send(Reply::Value("late".to_string()));
+            let _ = reply.send("late".to_string());
         }
     });
 
@@ -135,8 +135,8 @@ fn teardown_emits_stop_and_done_seams() {
 
     let report = teardown_via_sender(&tx, Duration::from_secs(10));
     assert!(
-        report.is_clean(),
-        "teardown must be clean (done ack received)"
+        report.acked && report.anomaly.is_none(),
+        "teardown must be clean (done ack received, no anomaly): {report:?}"
     );
     actor.join().expect("actor role thread must not panic");
 

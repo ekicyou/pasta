@@ -14,10 +14,8 @@
 ---
 --- -- ユーザー定義のアクター辞書を登録
 --- local WORD = require("pasta.word")
---- WORD.register_actor_dictionary("俺", {
----     一人称 = {"俺", "おれ", "オレ"},
----     二人称 = {"お前", "君"},
---- })
+--- WORD.create_actor("俺", "一人称"):entry("俺", "おれ", "オレ")
+--- WORD.create_actor("俺", "二人称"):entry("お前", "君")
 ---
 --- -- カスタム初期化処理
 --- print("ゴースト初期化完了")

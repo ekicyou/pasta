@@ -1,6 +1,3 @@
-#[cfg(debug_assertions)]
-const _GRAMMAR: &str = include_str!("req_parser.pest");
-
 use pest_derive::*;
 
 // pest_derive generates Rule variants for all grammar rules.
@@ -278,6 +275,26 @@ mod tests {
         let pair = &items[1];
         assert_eq!(pair.as_rule(), Rule::value);
         assert_eq!(pair.as_str(), "XYZですよ");
+    }
+
+    /// 区切りはコロンと任意の空白 1 つ（`Key:` は `""`・`Key:value` は `value`）。
+    #[test]
+    fn key_value_separator() {
+        for (src, want) in [
+            ("Reference0: abc\r\n", "abc"),
+            ("Reference0:abc\r\n", "abc"),
+            ("Reference0:\r\n", ""),
+            ("Reference0: \r\n", ""),
+            ("Reference0:  abc\r\n", " abc"),
+        ] {
+            let pair = ShioriRequestParser::parse(Rule::key_value, src)
+                .unwrap_or_else(|e| panic!("{src:?}: {e}"))
+                .next()
+                .unwrap();
+            let value = pair.into_inner().nth(1).unwrap();
+            assert_eq!(value.as_rule(), Rule::value, "{src:?}");
+            assert_eq!(value.as_str(), want, "{src:?}");
+        }
     }
 
     #[test]

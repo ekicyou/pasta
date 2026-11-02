@@ -19,7 +19,6 @@
 --- @field app_ctx table アプリケーション実行中の汎用コンテキストデータ
 --- @field appearance table 外見状態（セッション常駐・非永続）
 --- @field auto_talk_paused boolean 自動トークを止めている印（セッション常駐・非永続・既定 false）
---- @field co_callback thread|nil コールバック待ちとして登録したコルーチンの印（下記参照）
 --- @field co_preempt table<thread, true> 開発者が指名した再生（キック・シーン再生）のコルーチンの印
 local STORE = {}
 
@@ -87,22 +86,11 @@ STORE.kick_force = false
 --- @type boolean
 STORE.auto_talk_paused = false
 
--- STORE.co_callback（thread|nil）はこのモジュールでは初期化しない（未設定は nil）。
--- pasta.shiori.event.callback の CALLBACK.consume_staged が設定し、
--- pasta.shiori.event の set_co_scene と CALLBACK.reset が nil に戻す。STORE.reset は触らない。
-
 --- 全データをリセット
 --- @return nil
 function STORE.reset()
-    -- co_sceneのクリーンアップ（coroutine.close がある環境では suspended コルーチンを close）。
-    -- LuaJIT 2.1 には coroutine.close が無いため close 分岐は実行されず、参照を外すだけになる
-    -- （破棄したコルーチンは GC が回収する）。
-    if STORE.co_scene then
-        if coroutine.close and coroutine.status(STORE.co_scene) == "suspended" then
-            coroutine.close(STORE.co_scene)
-        end
-        STORE.co_scene = nil
-    end
+    -- 続きの参照を外すだけ（捨てたコルーチンは GC が回収する）
+    STORE.co_scene = nil
 
     STORE.actors = {}
     STORE.actor_spots = {}

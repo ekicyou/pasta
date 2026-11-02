@@ -10,9 +10,9 @@
 //!  - **残りビートは既存 `check_talk` 継続（`STORE.co_scene`）で 1 tick 1 ビートずつ順序どおり**
 //!    （R4.1）。`is_blocked` に従うビート間ペース（継続 tick は idle で進める）。
 //!
-//! # 単一テスト・全フェーズ直列（`static LEGACY` 共有のため）
-//! `lifecycle::LEGACY` はプロセスグローバル。6.1（`scene_kick_e2e_test.rs`）と同方針で、本
-//! ファイルは **1 つの `#[test]`** に全フェーズを直列に詰める（別バイナリゆえ LEGACY は隔離）。
+//! # 単一テスト・全フェーズ直列
+//! 6.1（`scene_kick_e2e_test.rs`）と同方針で、本ファイルは **1 つの `#[test]`** に全フェーズを
+//! 直列に詰める。アクターは自分の mailbox と本番の送り先（`kick_sink_for`）で起こす。
 //!
 //! # 決定論性の担保（X-Pasta-Time による時刻注入＋固定 talk 間隔）
 //! 継続ビート（2 ビート目以降）は `check_talk` が `current_unix >= next_talk_time` のときのみ
@@ -28,8 +28,13 @@
 
 use std::path::{Path, PathBuf};
 
-use pasta::actor::lifecycle::{marshal_request, spawn_actor, teardown_actor};
-use pasta_lua::debug::KickRequest;
+use flume::Sender;
+use pasta::actor::instance::{TEARDOWN_TIMEOUT, kick_sink_for};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
+use pasta::actor::marshaling::marshal_get;
+use pasta::actor::teardown::teardown_via_sender;
+use pasta::actor::thread::{ActorThread, spawn_actor_thread_with};
+use pasta_lua::debug::{KickRequest, KickSink};
 use tempfile::TempDir;
 
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前に中和する
@@ -157,14 +162,15 @@ fn pasta_time_at(offset_secs: i64) -> String {
     format!("2025-07-15T12:05:{sec:02}Z")
 }
 
-/// OnSecondChange GET を `marshal_request`（FFI `request` 相当・同一 FIFO）経由で送る。
+/// OnSecondChange GET を自分の mailbox へ `marshal_get` で送る（kick と同じ FIFO）。
 /// `X-Pasta-Time` で `req.date` を決定論的に固定し、`Status` を呼び出し側指定にする。
-fn on_second_change(status: &str, offset_secs: i64) -> String {
+fn on_second_change(tx: &Sender<ActorMsg>, status: &str, offset_secs: i64) -> String {
     let when = pasta_time_at(offset_secs);
-    marshal_request(&normalize_request(&format!(
+    let req = normalize_request(&format!(
         "GET SHIORI/3.0\nCharset: UTF-8\nSender: SSP\nSecurityLevel: local\n\
          Status: {status}\nID: OnSecondChange\nReference0: 1\nX-Pasta-Time: {when}\n",
-    )))
+    ));
+    marshal_get(tx, MailboxRequest::new(0, req))
 }
 
 /// 応答さくらスクリプト内に固定文字列が **ちょうど 1 回**現れることを検証する（二重出力検出）。
@@ -172,26 +178,42 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
     haystack.matches(needle).count()
 }
 
+/// 自分の mailbox でアクタースレッドを起こし、本番と同じ送り先（`kick_sink_for`）を VM へ渡す。
+/// 返す送り先は VM が持つものと同じで、DAP の inbound が呼ぶのと同じ道でアクターの `Kick` 腕へ届く。
+fn start_actor(load_dir: PathBuf) -> (Sender<ActorMsg>, KickSink, ActorThread) {
+    let (tx, rx) = mailbox();
+    let sink = kick_sink_for(&tx);
+    let thread = spawn_actor_thread_with(load_dir, rx, Some(sink.clone()), None)
+        .expect("actor thread must spawn");
+    assert!(
+        thread.loaded(),
+        "the hello-pasta ghost VM must load on the actor thread"
+    );
+    (tx, sink, thread)
+}
+
+/// Stop の ack を受けてから join する（ack の後のスレッドは約束を待つだけなので止まらない）。
+fn stop_actor(tx: &Sender<ActorMsg>, thread: ActorThread) {
+    let report = teardown_via_sender(tx, TEARDOWN_TIMEOUT);
+    assert!(report.acked, "teardown must be acked: {report:?}");
+    thread.join().expect("actor thread must not panic");
+}
+
 /// task 7.2: マルチ yield シーンのキック→継続配信を 1 本貫通する E2E 結合テスト。
 ///
-/// 単一テスト・全フェーズ直列（`static LEGACY` 共有のため）。
+/// 単一テスト・全フェーズ直列。
 #[test]
 fn kick_multibeat_scene_delivers_one_beat_per_tick_in_order_end_to_end() {
     let (load_dir, _temp) = build_multibeat_kick_ghost_dir();
 
-    // --- フェーズ 1: load（spawn_actor＝FFI load 相当・kick_sink 束縛＋LEGACY store） ---
-    let loaded = spawn_actor(0, load_dir.clone());
-    assert!(
-        loaded,
-        "spawn_actor must load the hello-pasta ghost VM on the actor thread"
-    );
+    // --- フェーズ 1: load（自分の mailbox・本番の送り先を VM へ渡す） ---
+    let (tx, sink, thread) = start_actor(load_dir.clone());
 
     // --- フェーズ 2: init OnSecondChange（dispatcher 内部タイマ初期化・next_talk_time 設定） ---
     // status=idle・基準時刻 12:05:00。ここで next_talk_time = base + TALK_INTERVAL が設定される。
-    let _init = on_second_change("idle", 0);
+    let _init = on_second_change(&tx, "idle", 0);
 
-    // --- フェーズ 3: 実 sink（lifecycle::kick_sink）でマルチビートシーンをキック注入 ---
-    let sink = pasta::actor::lifecycle::kick_sink();
+    // --- フェーズ 3: 本番の送り先（kick_sink_for）でマルチビートシーンをキック注入 ---
     sink(KickRequest {
         // キックはシーン表の登録名に完全一致で引く（作者名・`_`・通し番号 `1` が登録名）。
         scene: format!("{KICK_SCENE}_1"),
@@ -199,7 +221,7 @@ fn kick_multibeat_scene_delivers_one_beat_per_tick_in_order_end_to_end() {
 
     // --- フェーズ 4: tick 1 — 初回ビートが割り込み配信される（talking でも kick_force 突破） ---
     // X-Pasta-Time は base+5（next_talk_time 未到達だがキックフックは check_talk より前段・force 突破）。
-    let resp1 = on_second_change("talking", 5);
+    let resp1 = on_second_change(&tx, "talking", 5);
     assert!(
         resp1.contains("SHIORI/3.0 200 OK"),
         "tick1 (kick first beat) must be delivered as 200 OK.\nactual: {resp1:?}"
@@ -223,7 +245,7 @@ fn kick_multibeat_scene_delivers_one_beat_per_tick_in_order_end_to_end() {
 
     // --- フェーズ 5: tick 2 — 既存 check_talk 継続でビート 2 が配信される（idle で継続を進める） ---
     // base+20 >= next_talk_time(base+10)。継続 resume で 2 ビート目が出る。
-    let resp2 = on_second_change("idle", 20);
+    let resp2 = on_second_change(&tx, "idle", 20);
     assert!(
         resp2.contains("SHIORI/3.0 200 OK"),
         "tick2 (continuation beat 2) must be delivered as 200 OK.\nactual: {resp2:?}"
@@ -246,7 +268,7 @@ fn kick_multibeat_scene_delivers_one_beat_per_tick_in_order_end_to_end() {
 
     // --- フェーズ 6: tick 3 — 継続でビート 3（最終ビート）が配信される ---
     // base+40 >= 前 tick で更新された next_talk_time(base+20+10=base+30)。
-    let resp3 = on_second_change("idle", 40);
+    let resp3 = on_second_change(&tx, "idle", 40);
     assert!(
         resp3.contains("SHIORI/3.0 200 OK"),
         "tick3 (continuation beat 3) must be delivered as 200 OK.\nactual: {resp3:?}"
@@ -270,7 +292,7 @@ fn kick_multibeat_scene_delivers_one_beat_per_tick_in_order_end_to_end() {
     // --- フェーズ 7: tick 4 — 最終ビート後は通常応答へ戻る（co stuck が無い） ---
     // base+55 で継続 co_scene は消費済み（co dead → STORE.co_scene=nil）。キック由来文字列は
     // 一切現れない（stuck していれば最終ビートを再放出するか継続が残る）。
-    let resp4 = on_second_change("idle", 55);
+    let resp4 = on_second_change(&tx, "idle", 55);
     for beat in BEAT_TEXTS {
         assert_eq!(
             count_occurrences(&resp4, beat),
@@ -280,5 +302,5 @@ fn kick_multibeat_scene_delivers_one_beat_per_tick_in_order_end_to_end() {
     }
 
     // --- 後始末: teardown ---
-    let _ = teardown_actor();
+    stop_actor(&tx, thread);
 }

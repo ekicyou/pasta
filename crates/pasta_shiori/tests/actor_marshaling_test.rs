@@ -6,7 +6,7 @@
 //!
 //! # 何を証明するか（task 3.4 の observable 完了条件）
 //! task 3.3 の実アクタースレッド（VM pin）に対し、本番 marshaling 自由関数
-//! （`marshal_get`/`marshal_notify`/`marshal_request`）を通して:
+//! （`marshal_get`/`marshal_notify`）を通して:
 //!  (a) GET が実 VM 応答値を **タイムアウト内**に返し、その応答バイト列が byte-invariant
 //!      ゴールデンと不変であること（R5.1/R5.8・R1.1 整合）。
 //!  (b) NOTIFY が即 204 を返し、アクターの完了を待たないこと（R5.2）。
@@ -31,9 +31,8 @@ use std::time::Duration;
 use pasta::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use pasta::actor::marshaling::{
     GET_TIMEOUT, default_204, marshal_get, marshal_get_with_timeout, marshal_notify,
-    marshal_request,
 };
-use pasta::actor::thread::spawn_actor_thread;
+use pasta::actor::thread::spawn_actor_thread_with;
 use tempfile::TempDir;
 
 /// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前
@@ -123,7 +122,7 @@ fn stop(tx: &flume::Sender<ActorMsg>) {
 fn marshal_get_through_actor_returns_byte_invariant_golden_and_continues_coroutine() {
     let (load_dir, _temp) = build_async_callback_dir();
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir, rx);
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     // Round1: get_property が yield → get タグ応答（marshaling 経由・ゴールデン一致）。
@@ -170,7 +169,7 @@ fn marshal_get_through_actor_returns_byte_invariant_golden_and_continues_corouti
 fn marshal_notify_through_actor_returns_204_then_get_in_fifo() {
     let (load_dir, _temp) = build_async_callback_dir();
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir, rx);
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     let notify_resp = marshal_notify(
@@ -207,35 +206,6 @@ fn marshal_notify_through_actor_returns_204_then_get_in_fifo() {
         .expect("actor thread must join cleanly after Stop");
 }
 
-/// (a') メソッド判定込みディスパッチ `marshal_request`（R5.5）が、GET をアクター VM へ
-/// 振り分けてゴールデン応答を返す。RN4 決定で `GET_TIMEOUT` を秒オーダーの安全網へ引き上げた
-/// ため、通常運転の GET は **必ずゴールデン値**を返す（204 へ化けない＝バイト不変・R5.8）。
-#[test]
-fn marshal_request_dispatches_get_returns_golden() {
-    let (load_dir, _temp) = build_async_callback_dir();
-    let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir, rx);
-    assert!(actor.loaded(), "actor thread must load the ghost VM");
-
-    // marshal_request は GET をディスパッチし、本番 GET_TIMEOUT（安全網・5 秒）で待つ。
-    // 通常運転では実 VM 応答（ゴールデン）が必ず返る——タイムアウトは発火しない（R5.8）。
-    let resp = marshal_request(
-        &tx,
-        1,
-        &normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n"),
-    );
-    assert_eq!(
-        resp.as_bytes(),
-        EXPECT_ROUND1.as_bytes(),
-        "marshal_request GET must return the byte-invariant golden (timeout must NOT fire)\nactual: {resp:?}"
-    );
-
-    stop(&tx);
-    actor
-        .join()
-        .expect("actor thread must join cleanly after Stop");
-}
-
 /// (a'') 本番 `marshal_get`（本番 `GET_TIMEOUT`）が通常運転でゴールデン値を返す（R5.1/R5.8）。
 /// RN4 決定で `GET_TIMEOUT` は実 GET が決して接近しない秒オーダーの安全網（5 秒）であり、
 /// 通常 GET は **必ず値**を返す（204 へ化けず byte-invariant）。閾値が安全網サイズであることも確認。
@@ -248,7 +218,7 @@ fn marshal_get_production_timeout_returns_golden_value() {
 
     let (load_dir, _temp) = build_async_callback_dir();
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir, rx);
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     let resp = marshal_get(
@@ -273,7 +243,7 @@ fn marshal_get_production_timeout_returns_golden_value() {
 /// (d) drop→204（R5.3）: アクタースレッドが reply を送らず消滅した場合、受信側の
 /// `recv_timeout` が `Disconnected` を観測して 204 になる（無限待機なし）。
 ///
-/// 実 thread.rs は VM 応答（パース失敗時の 400 含む）を `Reply::Value` で送るため、
+/// 実 thread.rs は VM 応答（パース失敗時の 400 含む）を必ず reply で送るため、
 /// 「reply を送らず drop」を実 VM 経路で誘発するのは決定論的でない（VM 内部パニックを
 /// 要する）。そこで本テストは drop の原因を **アクタースレッド消滅**で与える: GET 投入後に
 /// receiver 側（アクタースレッドが所有する `rx`）を含むスレッドを stop させ reply 経路が
@@ -307,7 +277,7 @@ fn marshal_get_disconnected_reply_yields_204() {
 fn marshal_get_relays_vm_400_for_parse_failure() {
     let (load_dir, _temp) = build_async_callback_dir();
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, load_dir, rx);
+    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     let resp = marshal_get_with_timeout(
@@ -340,10 +310,6 @@ fn marshal_into_closed_mailbox_yields_204() {
     let notify_resp = marshal_notify(&tx, MailboxRequest::new(2, "X".to_string()));
     assert_eq!(notify_resp.as_bytes(), default_204().as_bytes());
 
-    // marshal_request（不正/閉鎖いずれも 204）。
-    let req_resp = marshal_request(&tx, 3, "garbage");
-    assert_eq!(req_resp.as_bytes(), default_204().as_bytes());
-
     drop(tx);
 }
 
@@ -358,7 +324,8 @@ fn marshal_into_closed_mailbox_yields_204() {
 fn marshal_get_on_load_failed_actor_returns_500_with_single_line_reason() {
     let temp = TempDir::new().expect("create temp dir");
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread(0, temp.path().to_path_buf(), rx);
+    let actor = spawn_actor_thread_with(temp.path().to_path_buf(), rx, None, None)
+        .expect("actor thread must spawn");
     assert!(
         !actor.loaded(),
         "fixture precondition: the actor VM must fail to load from an empty dir"

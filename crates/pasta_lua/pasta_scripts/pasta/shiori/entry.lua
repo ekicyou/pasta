@@ -65,22 +65,9 @@ end
 ---
 --- @param hinst integer DLL インスタンスハンドル（FFI 経路では常に 0）
 --- @param load_dir string ロードディレクトリパス (ghost/master/)
---- @return boolean success 常に true を返却（将来の初期化処理の拡張ポイント）
+--- @return boolean success 常に true
 function SHIORI.load(hinst, load_dir)
-    local ok, result = xpcall(function()
-        -- 将来の拡張ポイント:
-        -- - 設定ファイルの読み込み
-        -- - セーブデータの復元
-        -- - リソースの初期化
-        return true
-    end, error_handler)
-
-    if ok then
-        return result
-    else
-        print("[SHIORI.load] Error: " .. tostring(result))
-        return false
-    end
+    return true
 end
 
 --- SHIORI/3.0 リクエストを処理
@@ -136,18 +123,8 @@ end
 --- SHIORI unload イベントを処理
 --- ベースウェアによって SHIORI DLL がアンロードされる時に呼び出されます。
 ---
---- DLL が解放される前にクリーンアップ処理を実行します。
+--- 何もしない（永続化データの保存は、Rust 側がランタイムを破棄するときに行う）。
 function SHIORI.unload()
-    local ok, err = xpcall(function()
-        -- 将来の拡張ポイント:
-        -- - セーブデータの永続化
-        -- - リソースの解放
-        -- - ロギングの終了処理
-    end, error_handler)
-
-    if not ok then
-        print("[SHIORI.unload] Error: " .. tostring(err))
-    end
 end
 
 return SHIORI

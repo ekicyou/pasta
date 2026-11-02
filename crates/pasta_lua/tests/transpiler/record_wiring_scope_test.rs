@@ -4,9 +4,7 @@
 
 use pasta_dsl::parser::parse_str;
 use pasta_dsl::parser::{ActorScope, GlobalSceneScope, LocalSceneScope, Span};
-use pasta_lua::LineEnding;
 use pasta_lua::LuaTranspiler;
-use pasta_lua::TranspileContext;
 use pasta_lua::code_gen::LuaCodeGenerator;
 use pasta_lua::code_gen::source_map::SourceMapSink;
 
@@ -48,7 +46,7 @@ fn span_at(line: usize) -> Span {
 // 検証戦略: 3 型の scope は公開 `generate_*` を直接呼べるため、明示 span を与えた AST ノードを
 // 渡し、捕捉 sink が「ヘッダ `.lua` 行 → 定義ヘッダ `.pasta` 行」を記録することを表明する。
 // `generate_choice` / `generate_choice_timeout`（分岐, 1.4）は private のため、実 `.pasta` を
-// `transpile_with_sink` に通し、`act:choice(...)` / `act:choice_timeout(...)` 出力行が分岐
+// `transpile_with_source_map` に通し、`act:choice(...)` / `act:choice_timeout(...)` 出力行が分岐
 // `.pasta` 行へ対応づくことを表明する。
 // ============================================================================
 
@@ -58,7 +56,7 @@ fn actor_header_records_definition_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         // span.start_line == 9（`％さくら` 定義ヘッダ行）を想定。
@@ -94,16 +92,15 @@ fn global_scene_header_records_definition_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         // ローカルシーンを持たない最小グローバルシーン。span.start_line == 21（`＊メイン` 行）を想定。
         let mut scene = GlobalSceneScope::new("メイン".to_string());
         scene.span = span_at(21);
-        let context = TranspileContext::new();
         let file_attrs = std::collections::HashMap::new();
         codegen
-            .generate_global_scene(&scene, &scene.name, 0, &context, &file_attrs)
+            .generate_global_scene(&scene, &scene.name, 0, &file_attrs)
             .unwrap();
     }
 
@@ -127,7 +124,7 @@ fn local_scene_header_records_definition_pasta_line() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     {
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut codegen = LuaCodeGenerator::new(&mut output);
         codegen.set_source_map(&mut sink);
 
         // 名前付きローカルシーン。span.start_line == 30（`・サブ会話` 行）を想定。
@@ -158,7 +155,7 @@ fn local_scene_header_records_definition_pasta_line() {
 
 /// 統合: スタートシーン（無名）ヘッダ（`function SCENE.__start__(act, ...)`）も定義ヘッダ行へ対応づく（1.5）。
 ///
-/// 実 `.pasta` を `transpile_with_sink` に通し、グローバルシーン定義行とスタートシーン関数ヘッダ行が
+/// 実 `.pasta` を `transpile_with_source_map` に通し、グローバルシーン定義行とスタートシーン関数ヘッダ行が
 /// それぞれ実 span 由来の `.pasta` 定義ヘッダ行へ対応づくことを実証する。
 #[test]
 fn integration_scope_headers_map_to_real_pasta_lines() {
@@ -169,7 +166,7 @@ fn integration_scope_headers_map_to_real_pasta_lines() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     LuaTranspiler::default()
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
 
     let lua = String::from_utf8(output).unwrap();
@@ -219,7 +216,7 @@ fn integration_scope_headers_map_to_real_pasta_lines() {
 
 /// 分岐（choice, 1.4）: `act:choice(...)` 出力行が分岐 `.pasta` 行へ対応づく。
 ///
-/// `generate_choice` は private のため、実 `.pasta` を `transpile_with_sink` に通して検証する。
+/// `generate_choice` は private のため、実 `.pasta` を `transpile_with_source_map` に通して検証する。
 #[test]
 fn choice_records_choice_pasta_line_via_pipeline() {
     // 行1: 空, 行2: ＊選択シーン, 行3: ＠？挨拶「あいさつする」（分岐行）
@@ -229,7 +226,7 @@ fn choice_records_choice_pasta_line_via_pipeline() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     LuaTranspiler::default()
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
 
     let lua = String::from_utf8(output).unwrap();
@@ -248,7 +245,7 @@ fn choice_records_choice_pasta_line_via_pipeline() {
 
 /// 分岐タイムアウト（!select cue, 1.4）: `act:choice_timeout(...)` 出力行が cue `.pasta` 行へ対応づく。
 ///
-/// `generate_choice_timeout` は private のため、実 `.pasta` を `transpile_with_sink` に通して検証する。
+/// `generate_choice_timeout` は private のため、実 `.pasta` を `transpile_with_source_map` に通して検証する。
 #[test]
 fn choice_timeout_records_cue_pasta_line_via_pipeline() {
     // 行1: 空, 行2: ＊選択シーン, 行3: !select(5)（select cue 行）, 行4: ＠？挨拶
@@ -258,7 +255,7 @@ fn choice_timeout_records_cue_pasta_line_via_pipeline() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     LuaTranspiler::default()
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
 
     let lua = String::from_utf8(output).unwrap();
@@ -273,4 +270,135 @@ fn choice_timeout_records_cue_pasta_line_via_pipeline() {
         "1.4: choice_timeout output line {timeout_lua_line} must map to .pasta cue line 3; records = {:?}",
         sink.records
     );
+}
+
+// ============================================================================
+// Lua ブロックの素通しと行の対応（ponytail-lua-transpiler 要件 7.1・7.3）
+//
+// アクター辞書（4〜8 行）とローカルシーン（16〜20 行）の Lua ブロックに、要件 1.2 の 5 行
+// （長い文字列と `end` の前の空行）を置く。
+// ============================================================================
+
+const LUA_BLOCK_SOURCE: &str = "\
+％さくら
+　＠通常：\\s[0]
+```lua
+local MSG = [[
+こんにちは
+
+end
+]]
+```
+
+＊会話
+　　さくら：こんにちは。
+　・朝・挨拶
+　　　さくら：おはよう。
+```lua
+local MSG = [[
+こんにちは
+
+end
+]]
+```
+";
+
+/// 要件 1.2 の 5 行（ブロックの内容）
+const BLOCK_LINES: [&str; 5] = ["local MSG = [[", "こんにちは", "", "end", "]]"];
+
+/// 生成コードの中で `BLOCK_LINES` が続いた行として現れる先頭の行（1 始まり）を全部返す。
+fn block_start_lines(lua: &str) -> Vec<u32> {
+    let lines: Vec<&str> = lua.lines().collect();
+    lines
+        .windows(BLOCK_LINES.len())
+        .enumerate()
+        .filter(|(_, w)| *w == BLOCK_LINES)
+        .map(|(i, _)| i as u32 + 1)
+        .collect()
+}
+
+/// 7.1（1.1・1.3）: アクター辞書とローカルシーンのブロックの内容が、字下げも空行の削除もなく、
+/// 続いた行としてそのまま出る。
+#[test]
+fn lua_block_content_is_emitted_verbatim_in_actor_and_local_scene() {
+    let lua = crate::common::e2e_helpers::transpile(LUA_BLOCK_SOURCE);
+    assert_eq!(
+        block_start_lines(&lua).len(),
+        2,
+        "1.1: both blocks must appear verbatim as consecutive lines\n{lua}"
+    );
+}
+
+/// 7.3（2.3・2.4）: ブロックの各行の `.lua` の行が `.pasta` のその行を指す。デバッグのシンクの
+/// 記録（最終の行に直した対応表）と `init_scene` に渡す対応の両方で、空行より後の行も合う。
+#[test]
+fn lua_block_lines_map_to_their_pasta_lines_in_sink_and_init_scene() {
+    use pasta_lua::debug::source_map::MapBuilderSink;
+
+    let file = parse_str(LUA_BLOCK_SOURCE, "block.pasta").expect("parse ok");
+    let mut sink = MapBuilderSink::new("block.pasta".to_string(), "chunk".to_string());
+    let mut output = Vec::new();
+    let (_, shift) = LuaTranspiler::default()
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
+        .expect("transpile ok");
+    let chunk = sink.finish(&shift);
+    let lua = String::from_utf8(output).unwrap();
+
+    let starts = block_start_lines(&lua);
+    assert_eq!(starts.len(), 2, "{lua}");
+    // アクター辞書のブロックは .pasta 4 行目から、ローカルシーンのブロックは 16 行目から
+    for (lua_start, pasta_start) in [(starts[0], 4), (starts[1], 16)] {
+        for k in 0..BLOCK_LINES.len() as u32 {
+            assert_eq!(
+                chunk.pasta_for_lua(lua_start + k).map(|p| p.line),
+                Some(pasta_start + k),
+                "sink: lua {} must map to pasta {}\n{lua}",
+                lua_start + k,
+                pasta_start + k
+            );
+        }
+    }
+
+    // ローカルシーンのブロックは、そのグローバルシーンの 2 つの init_scene の対応に入る
+    let maps = crate::basic_test::init_scene_line_maps(&lua);
+    assert_eq!(maps.len(), 2, "{lua}");
+    for (file, pairs) in &maps {
+        assert_eq!(file, "block.pasta");
+        for k in 0..BLOCK_LINES.len() as u32 {
+            assert!(
+                pairs.contains(&(starts[1] + k, 16 + k)),
+                "init_scene: ({}, {}) must be in {pairs:?}\n{lua}",
+                starts[1] + k,
+                16 + k
+            );
+        }
+    }
+}
+
+/// アクター辞書の単語定義の各行が、`.pasta` の単語定義の行へ対応づく（ponytail-lua-transpiler 5.1・7.4）。
+#[test]
+fn actor_word_definition_lines_map_to_their_pasta_lines() {
+    // 行1: ％さくら, 行2: ＠通常, 行3: ＠照れ
+    let source = "％さくら\n　＠通常：\\s[0]、\\s[100]\n　＠照れ：\\s[1]\n";
+    let file = parse_str(source, "actor.pasta").expect("parse ok");
+
+    let mut sink = LinePairSink::default();
+    let mut output = Vec::new();
+    LuaTranspiler::default()
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
+        .expect("transpile ok");
+
+    let lua = String::from_utf8(output).unwrap();
+    for (key, pasta_line) in [("通常", 2), ("照れ", 3)] {
+        let lua_line = lua
+            .lines()
+            .position(|l| l.contains(&format!("ACTOR:create_word(\"{key}\")")))
+            .map(|i| i as u32 + 1)
+            .unwrap_or_else(|| panic!("output must contain ACTOR:create_word(\"{key}\")\n{lua}"));
+        assert!(
+            sink.records.contains(&(lua_line, pasta_line)),
+            "5.1: actor word {key} line {lua_line} must map to .pasta line {pasta_line}; records = {:?}",
+            sink.records
+        );
+    }
 }

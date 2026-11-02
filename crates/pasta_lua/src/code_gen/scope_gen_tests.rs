@@ -1,7 +1,5 @@
 use super::*;
 use crate::code_gen::source_map::SourceMapSink;
-use crate::config::LineEnding;
-use crate::context::TranspileContext;
 use pasta_dsl::parser::{
     Action, ActionLine, CallScene, CallTarget, ChoiceNode, CodeBlock, CueArgToken, CueCommandNode,
     GlobalSceneScope, KeyWords, Span,
@@ -13,7 +11,7 @@ where
 {
     let mut output = Vec::new();
     {
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         f(&mut cg).unwrap();
     }
     String::from_utf8(output).unwrap()
@@ -126,8 +124,8 @@ fn actor_skips_empty_words_and_non_lua_code_blocks() {
         text
     );
     assert!(
-        text.ends_with("end\n\n"),
-        "block closed via end_block: {}",
+        text.ends_with("end\n") && !text.ends_with("\n\n"),
+        "block closed via end_block without a trailing blank line: {}",
         text
     );
 }
@@ -315,6 +313,23 @@ fn choice_timeout_keeps_fractional_float_and_defaults_to_nil() {
     assert_eq!(ident_arg, "act:choice_timeout(nil)\n");
 }
 
+/// `!select` float seconds use one format without an i64 cast (9.2, 9.3):
+/// no saturation for huge values, and `-0.0` stays `0`.
+#[test]
+fn choice_timeout_float_seconds_do_not_saturate() {
+    for (secs, expected) in [
+        (10.0, "10"),
+        (2.5, "2.5"),
+        (1e19, "10000000000000000000"),
+        (-0.0, "0"),
+    ] {
+        let out = gen_to_string(|cg| {
+            cg.generate_local_scene_items(&[select_cmd("select", vec![CueArgToken::Float(secs)])])
+        });
+        assert_eq!(out, format!("act:choice_timeout({expected})\n"), "{secs}");
+    }
+}
+
 /// Non-`select` cue commands generate NO Lua output (handled elsewhere).
 #[test]
 fn non_select_cue_command_emits_nothing() {
@@ -336,7 +351,7 @@ fn non_select_cue_command_emits_nothing() {
 //
 // `generate_global_scene` / `generate_local_scene` must funnel each scene's
 // deterministic join key + `.pasta` span to the sink via `record_scene`,
-// adjacent to the existing `record_span` header recording. The join_key encoding
+// adjacent to the existing `record_span_since` header recording. The join_key encoding
 // (see scope_gen.rs `record_scene_span` doc) carries: global/local kind + nesting
 // level, the parent-global reference for locals, and per-base occurrence order
 // (globals' occurrence == runtime `create_scene` counter order). The captured
@@ -393,7 +408,6 @@ fn global_scene_with(
 #[test]
 fn global_and_local_scenes_record_join_keys_and_header_lines() {
     let mut sink = CapturingSceneSink::default();
-    let ctx = TranspileContext::new();
     let attrs = std::collections::HashMap::new();
 
     // 会話 at .pasta line 3, containing a named local 挨拶 at line 5, plus the
@@ -415,10 +429,10 @@ fn global_and_local_scenes_record_join_keys_and_header_lines() {
 
     {
         let mut output = Vec::new();
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         cg.set_source_map(&mut sink);
         // counter == 1: first occurrence of base 会話 (matches runtime 会話_1).
-        cg.generate_global_scene(&scene, &scene.name, 1, &ctx, &attrs)
+        cg.generate_global_scene(&scene, &scene.name, 1, &attrs)
             .unwrap();
     }
 
@@ -442,7 +456,6 @@ fn global_and_local_scenes_record_join_keys_and_header_lines() {
 #[test]
 fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
     let mut sink = CapturingSceneSink::default();
-    let ctx = TranspileContext::new();
     let attrs = std::collections::HashMap::new();
 
     let first = global_scene_with("会話", 3, vec![]);
@@ -450,11 +463,11 @@ fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
 
     {
         let mut output = Vec::new();
-        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        let mut cg = LuaCodeGenerator::new(&mut output);
         cg.set_source_map(&mut sink);
-        cg.generate_global_scene(&first, &first.name, 1, &ctx, &attrs)
+        cg.generate_global_scene(&first, &first.name, 1, &attrs)
             .unwrap();
-        cg.generate_global_scene(&second, &second.name, 2, &ctx, &attrs)
+        cg.generate_global_scene(&second, &second.name, 2, &attrs)
             .unwrap();
     }
 
@@ -470,7 +483,6 @@ fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
 /// 照合用の名前ごとに数えるので、別々の関数（`挨拶_1_1`・`挨拶_1_2`）になり上書きされない。
 #[test]
 fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
-    let ctx = TranspileContext::new();
     let attrs = std::collections::HashMap::new();
     let scene = global_scene_with(
         "会話",
@@ -480,7 +492,7 @@ fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
             named_local_with_span("挨拶_1", 8),
         ],
     );
-    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, &scene.name, 1, &ctx, &attrs));
+    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, &scene.name, 1, &attrs));
     assert!(text.contains("function SCENE.挨拶_1_1(act, ...)"), "{text}");
     assert!(text.contains("function SCENE.挨拶_1_2(act, ...)"), "{text}");
     // init_scene には記号を直す前の書いた名前を渡す（runtime-error-balloon 2.4, 2.7）
@@ -499,7 +511,6 @@ fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
 /// 4 つ目の行の対応はトランスパイラが整形の後に埋めるので、生成器だけでは出ない（2.5）。
 #[test]
 fn init_scene_receives_written_global_name_not_alias() {
-    let ctx = TranspileContext::new();
     let attrs = std::collections::HashMap::new();
     let scene = global_scene_with(
         "会話",
@@ -515,7 +526,7 @@ fn init_scene_receives_written_global_name_not_alias() {
             named_local_with_span("挨拶", 5),
         ],
     );
-    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, "OnTalk", 1, &ctx, &attrs));
+    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, "OnTalk", 1, &attrs));
     assert!(text.contains(r#"PASTA.create_scene("OnTalk")"#), "{text}");
     let inits: Vec<&str> = text
         .lines()

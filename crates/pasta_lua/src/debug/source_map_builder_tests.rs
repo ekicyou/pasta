@@ -20,29 +20,29 @@ use pasta_dsl::parser::Span;
 ///
 /// 実 `normalize_output_with_shift` で本物の `LineShift` を得る（テスト用の
 /// LineShift 直接構築は不可＝`deleted` 非公開のため、実 normalize 経路を使う）。
-/// 入力 `"l1\nl2\nl3\n\nend\n"` の pre-normalize 行（1 始まり）:
+/// 入力 `"l1\nl2\nl3\nend\n\n"` の pre-normalize 行（1 始まり）:
 ///   1: "l1"  -> 最終 1
 ///   2: "l2"  -> 最終 2
 ///   3: "l3"  -> 最終 3
-///   4: ""    -> 削除（`end` 直前の空行）-> None
-///   5: "end" -> 最終 4
+///   4: "end" -> 最終 4
+///   5: ""    -> 削除（末尾の空行）-> None
 #[test]
 fn map_builder_sink_finish_rebases_to_final_lua_lines() {
-    let input = "l1\nl2\nl3\n\nend\n";
+    let input = "l1\nl2\nl3\nend\n\n";
     let (out, shift) = normalize_output_with_shift(input);
-    // 前提の確認: 空行(pre 4)が削除され "end" が最終 4 行へ繰り上がる。
+    // 前提の確認: 末尾の空行(pre 5)が削除される。
     assert_eq!(out, "l1\nl2\nl3\nend\n");
     assert_eq!(shift.map(1), Some(1));
-    assert_eq!(shift.map(4), None); // 削除行
-    assert_eq!(shift.map(5), Some(4)); // "end" が繰り上がる
+    assert_eq!(shift.map(4), Some(4));
+    assert_eq!(shift.map(5), None); // 削除行
 
     let mut sink = MapBuilderSink::new("dict.pasta".to_string(), "chunk-a".to_string());
     // producer は pre-normalize の out_line を記録する。
     sink.record_line(1, 10); // pre 1 -> .pasta 10
     sink.record_line(2, 11); // pre 2 -> .pasta 11
     sink.record_line(3, 12); // pre 3 -> .pasta 12
-    sink.record_line(4, 99); // pre 4（削除行）-> finish で除外されるべき
-    sink.record_line(5, 20); // pre 5 -> .pasta 20（"end" 行）
+    sink.record_line(4, 20); // pre 4 -> .pasta 20（"end" 行）
+    sink.record_line(5, 99); // pre 5（削除行）-> finish で除外されるべき
 
     let map = sink.finish(&shift);
 
@@ -50,14 +50,12 @@ fn map_builder_sink_finish_rebases_to_final_lua_lines() {
     assert_eq!(map.pasta_for_lua(1), Some(&pos(10)));
     assert_eq!(map.pasta_for_lua(2), Some(&pos(11)));
     assert_eq!(map.pasta_for_lua(3), Some(&pos(12)));
-    // pre 5 は最終 4 へ繰り上がる。
     assert_eq!(map.pasta_for_lua(4), Some(&pos(20)));
-    // 削除行（pre 4）の記録は除外され、最終 .lua には現れない。
+    // 削除行（pre 5）の記録は除外され、最終 .lua には現れない。
     assert!(
         map.pasta_for_lua(5).is_none(),
         "削除行に紐づく記録は最終写像に残ってはならない（2.1）"
     );
-    // 削除によって生じる旧位置（pre 5 のままの行 5）は存在しない。
     assert_eq!(map.len(), 4);
 }
 

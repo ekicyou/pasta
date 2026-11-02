@@ -22,7 +22,7 @@
 //! 最終確認する統合ゲートである。各入力について 2 方向で OFF 経路バイトを基準と突合する:
 //!
 //! 1. **sink 破棄バイト等価（7.1・観測専用性の teeth）**: 本番既定の薄いラッパ `transpile`
-//!    （sink 非装着）の出力と、`transpile_with_sink(Some(&mut sink))`（sink を装着して記録を
+//!    （sink 非装着）の出力と、`transpile_with_source_map(Some(&mut sink))`（sink を装着して記録を
 //!    収集 → 破棄）の出力が **完全にバイト一致** することを表明する。これは「ソースマップ機構を
 //!    装着しても生成バイトは 1 バイトも変わらない」＝ OFF 経路ゼロコストの本質を直接突く。配線が
 //!    誤って出力を変えればここが落ちる（タウトロジーではない）。
@@ -79,7 +79,7 @@ fn transpile_with_discarding_sink(source: &str) -> (Vec<u8>, usize) {
     let mut sink = DiscardingSink::default();
     let mut output = Vec::new();
     transpiler
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile (sink path) ok");
     (output, sink.records.len())
 }
@@ -162,7 +162,7 @@ fn broad_fixtures() -> Vec<(&'static str, String)> {
 /// **7.1 — sink 装着でも OFF 経路とバイト一致（広い網羅・観測専用性の teeth）**。
 ///
 /// 代表入力集合の各入力について、`transpile`（sink 非装着・本番既定）の出力と
-/// `transpile_with_sink(Some(&mut sink))`（ソースマップ機構を踏んで記録を収集 → 破棄）の
+/// `transpile_with_source_map(Some(&mut sink))`（ソースマップ機構を踏んで記録を収集 → 破棄）の
 /// 出力が **完全にバイト一致** することを表明する。ソースマップ配線（producer の `record_*`）が
 /// 誤って 1 バイトでも生成出力を変えればここが落ちる（OFF 経路ゼロコスト = 観測専用の本質）。
 ///
@@ -318,4 +318,44 @@ fn r7_3_slice_harness_removed_production_paths_compile() {
         "7.3: DebugConfig must expose `source_mode` (SourceMode) replacing the removed dead \
          `source_map_slice: bool`; default presentation mode is .pasta (6.1)"
     );
+}
+
+// ============================================================================
+// ponytail-lua-transpiler 7.5 — Lua ブロックを含まない辞書の特性化（要件 2.1）
+// ============================================================================
+
+/// **ponytail-lua-transpiler 7.5 — Lua ブロックを含まない辞書の変換結果の特性化**。
+///
+/// 直す前のコードの出力をそのまま期待値として固める。項目の無いローカルシーン・入れ子の
+/// 閉じが続く所・アクター辞書だけの区切り・ファイルの最後のシーン・シーン単語だけのシーン・
+/// グローバル単語を 1 本の辞書に含める。直した後もこのスナップショットが変わらないこと（2.1）。
+#[test]
+fn ponytail_7_5_no_lua_block_characterization() {
+    let source = "\
+＠挨拶：おはよう、こんにちは
+
+＊メイン
+  さくら：「＠挨拶」
+  ＞サブ
+
+  ・空
+
+  ・サブ
+    うにゅう：「サブです」
+
+％さくら
+  ＠一人称：私、わたし
+
+＊単語だけ
+  ＠天気：晴れ、雨
+
+＊最後
+  さくら：「最後です」
+
+  ・末尾
+    うにゅう：「おしまい」
+";
+    let lua = transpile(source);
+    assert!(!lua.is_empty(), "must transpile to real Lua output");
+    assert_snapshot!("ponytail_7_5_no_lua_block_characterization", lua);
 }

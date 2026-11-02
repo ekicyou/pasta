@@ -4,7 +4,7 @@
 mod common;
 
 use common::copy_sample_ghost_to_temp;
-use pasta::{PastaShiori, Shiori};
+use pasta::PastaShiori;
 
 /// Probe 1: Check if the issue is time-based by examining Lua internal state.
 /// We directly manipulate the virtual_dispatcher state via Lua to verify
@@ -15,7 +15,7 @@ fn probe_ontalk_via_lua_state() {
     let mut shiori = PastaShiori::default();
 
     // Load ghost
-    assert!(shiori.load(1, temp.path().as_os_str()).unwrap());
+    assert!(shiori.load(temp.path().as_os_str()).unwrap());
 
     // Send OnBoot first
     let boot_req = "GET SHIORI/3.0\r\n\

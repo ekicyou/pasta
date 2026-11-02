@@ -63,6 +63,32 @@ impl Span {
         }
     }
 
+    /// Build a span from a pest `Pair` without rescanning the input from its start.
+    ///
+    /// The start comes from pest's line index; the end is counted only within
+    /// the pair's own text, matching `pest::Position::line_col` (`"\r\n"` is one
+    /// line break, a lone `'\r'` is one column).
+    pub(crate) fn from_pair<R: pest::RuleType>(pair: &pest::iterators::Pair<'_, R>) -> Self {
+        let (start_line, start_col) = pair.line_col();
+        let text = pair.as_str();
+        let (end_line, end_col) = match text.rfind('\n') {
+            None => (start_line, start_col + text.chars().count()),
+            Some(last) => (
+                start_line + text.bytes().filter(|&b| b == b'\n').count(),
+                text[last + 1..].chars().count() + 1,
+            ),
+        };
+        let span = pair.as_span();
+        Self::new(
+            start_line,
+            start_col,
+            end_line,
+            end_col,
+            span.start(),
+            span.end(),
+        )
+    }
+
     /// Extract the corresponding source code substring from the original source.
     ///
     /// # Arguments
@@ -109,29 +135,5 @@ impl Span {
     pub fn is_valid(&self) -> bool {
         // A valid span must have non-zero end_byte
         self.end_byte > 0
-    }
-
-    /// Get the byte length of this span.
-    pub fn byte_len(&self) -> usize {
-        self.end_byte.saturating_sub(self.start_byte)
-    }
-}
-
-impl<'i> From<&pest::Span<'i>> for Span {
-    /// Convert a pest::Span to our Span type.
-    ///
-    /// This extracts line/column positions (1-based) and byte offsets (0-based)
-    /// from the pest Span.
-    fn from(pest_span: &pest::Span<'i>) -> Self {
-        let (start_line, start_col) = pest_span.start_pos().line_col();
-        let (end_line, end_col) = pest_span.end_pos().line_col();
-        Self::new(
-            start_line,
-            start_col,
-            end_line,
-            end_col,
-            pest_span.start(),
-            pest_span.end(),
-        )
     }
 }
