@@ -62,7 +62,7 @@
 1. When ホストが `unload` を呼んだ, the pasta.dll shall アクタースレッドが pasta.dll のコードを出てから `unload` を返す。後始末の完了の通知を待つのは上限（5 秒）までで、上限を過ぎたらスレッドを手放して警告をログに出し、`unload` を返す（`shiori4-v3-portable` で入った今の振る舞いを保つ）。
 2. If ホストが `unload` を呼ばずに `FreeLibrary` で pasta.dll を外した, then the pasta.dll shall ホストのプロセスを落とさない。pasta.dll が外れた後に pasta.dll のコードを走らせるスレッドを残さない。そのために、アクタースレッドが終わるまで pasta.dll がメモリに残ってもよい（仮定・Q9）。
 3. If ホストが `unload` を呼ばずに `FreeLibrary` で pasta.dll を外した, then the pasta.dll shall その `FreeLibrary` を上限（5 秒）を超えて止めない。辞書が Lua の C モジュールを読んでいる場合も同じである（今は C モジュールの解放がローダーのロックを待って 5 秒止まり、その後に生きたスレッドの下で pasta.dll が外れうる）。
-4. While ホストが `unload` を呼ばずに pasta.dll を外した, the pasta.dll shall `SHIORI.unload` と永続化データの保存が走ることを約束しない（仮定・Q1。2・3 を満たすことを優先する）。
+4. If ホストが `unload` を呼ばずに `FreeLibrary` で pasta.dll を外した, then the pasta.dll shall 2・3 を `SHIORI.unload` と永続化データの保存より優先する（その道では `SHIORI.unload` と保存が走らなくてよい。仮定・Q1）。
 5. The pasta.dll shall 2・3 を、旧来の入口のインスタンスと版 3 のインスタンスのどちらにも満たす（仮定・Q2）。
 6. When プロセスの終了で pasta.dll が外れる, the pasta.dll shall 今と同じく何もしない（後始末もログも行わない）。
 7. The pasta.dll shall `DllMain` でスレッドを起こさない（今を保つ）。
@@ -90,7 +90,7 @@
 1. When 要求に、コロンの直後で行が終わる見出しの行（例：`Reference0:`）がある, the pasta.dll shall その見出しを値 `""` として受け付け、要求を Lua の `SHIORI.request` に届ける（`req.reference[0]` と `req.dic["Reference0"]` は `""`）。
 2. When 見出しの行がコロンと空白 1 つの後に値を持つ, the pasta.dll shall 今と同じ値を Lua に渡す。
 3. When 見出しの行がコロンの直後に空白を置かずに値を持つ（例：`Reference0:abc`）, the pasta.dll shall その値（`abc`）として受け付ける（仮定・Q3。1 の直しの帰結）。
-4. When SSP の記録 `crates/pasta_shiori/doc/shiori-sample.log` にある、値の空いた見出しの行を含む 3 つの要求（47 行の `Reference0:` の OnInitialize、720 行の `Reference2:` の OnNotifyUserInfo、1236 行の `Reference1:` の GET OnTranslate）が旧来の入口に来た, the pasta.dll shall どれも Lua の `SHIORI.request` に届ける。
+4. When SSP の記録 `crates/pasta_shiori/doc/shiori-sample.log` にある、値の空いた見出しの行を含む 3 つの要求（47 行の `Reference0:` の OnInitialize、720 行の `Reference2:` の OnNotifyUserInfo、1236 行の `Reference1:` の GET OnTranslate）が旧来の入口に来た, the pasta.dll shall どれも Lua の `SHIORI.request` に届ける。この 3 つを確かめるテストは、要求を自分で文字列として持つ（`doc/` は要件 6.6 でパッケージから外れるので、テストから読まない）。
 5. The pasta.dll shall 1〜3 の受け付けを、旧来の入口と版 3 の入口で同じにする。
 6. If 旧来の入口に来た要求を解けない, then the pasta.dll shall 今と同じく 204 を返し、そのゴーストのログのファイルに警告を 1 行残す。
 7. If 版 3 の入口に来た要求を解けない, then the pasta.dll shall 今と同じく 400 を返し、6 と同じ警告を 1 行残す（仮定・Q4。今は debug）。
