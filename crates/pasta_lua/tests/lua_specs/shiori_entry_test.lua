@@ -496,7 +496,6 @@ describe("EVENT.fire - コールバックルーティング統合", function()
         -- consume_staged により pending 登録、set_co_scene は co_scene へ保持しない
         expect(CALLBACK.pending["OnPastaCallBack1"]).not_:toBe(nil)
         expect(STORE.co_scene):toBe(nil)
-        expect(STORE.co_callback):toBe(nil)
     end)
 
     test("到着したコールバックイベントは try_route 経由で待機コルーチンへ届く", function()
@@ -567,7 +566,6 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
 
         expect_ok(request("OnPastaCallBack1", { [0] = "v1" }), "前半:v1")
         expect(STORE.co_scene):toBe(scene_co)
-        expect(STORE.co_callback):toBe(nil)
 
         expect_ok(request("OnEntryContinue"), "後半")
         expect(STORE.co_scene):toBe(nil)
@@ -603,7 +601,6 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
         expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
         expect(CALLBACK.pending["OnPastaCallBack2"].co):toBe(scene_co)
         expect(STORE.co_scene):toBe(nil)
-        expect(STORE.co_callback):toBe(nil)
     end)
 
     --- コールバック待ちの間に、別のシーンの継続を作る
@@ -727,7 +724,6 @@ describe("SHIORI.request - コールバック・掃引の再開", function()
 
         expect_ok(request("OnEntryAfterSweep"), "別のシーン")
         expect(CALLBACK.pending["OnPastaCallBack2"].co):toBe(scene_co)
-        expect(STORE.co_callback):toBe(nil)
         expect_sweep_response()
     end)
 

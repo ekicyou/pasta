@@ -14,7 +14,6 @@
 --- pasta.shiori.event（EVENT）は読み込み時にこのモジュールを require するため、
 --- こちらからは関数内で呼び出し時にだけ require する（読み込み時に require すると循環する）。
 
-local STORE = require("pasta.store")
 local log = require("@pasta_log")
 local RES = require("pasta.shiori.res")
 -- STOP は読み込み時に FAILURE・RES だけを require する（act・store は呼んだ時点）ので循環しない
@@ -70,7 +69,6 @@ function CALLBACK.consume_staged(co, act)
         timeout_at = staged.timeout_at,
         on_timeout = staged.on_timeout,
     }
-    STORE.co_callback = co
     return true
 end
 
@@ -229,7 +227,6 @@ function CALLBACK.reset()
     _next_id = 0
     _staged = nil
     CALLBACK.pending = {}
-    STORE.co_callback = nil
 end
 
 return CALLBACK

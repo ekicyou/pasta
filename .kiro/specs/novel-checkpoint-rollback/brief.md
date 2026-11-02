@@ -21,7 +21,7 @@
   - `STORE.appearance` — 覚えているサーフェスと同じなら `\s[…]` を出さない（`shiori/appearance.lua` 392〜395 行）。キーに整数・空文字列、値に `false` があり、そのままでは JSON にならない（204〜209・247・254 行）。
 - **`pasta.save` は表の同一性を保つ**: `act.save`・生成コードの `local save`・`virtual_dispatcher.lua` 46 行・終了時の保存が、同じ表を握っている。戻すときは、表を取り替えずに中身を入れ替える。
 - **`pasta.save` には、遊びの進み具合でない設定も入っている**: `pasta_talk_interval_min/max`（`virtual_dispatcher.lua` 72〜73 行）。丸ごと戻すと、これも戻る。
-- **走りかけは控えられない**: `STORE.co_scene`、`CALLBACK.pending[*].co`、`STORE.co_callback`。戻した後に古い `co_scene` が残ると、タイマーが再開する（`virtual_dispatcher.lua` 202〜204 行）。`set_co_scene` はファイルの中でしか呼べない（`shiori/event/init.lua` 97 行）。
+- **走りかけは控えられない**: `STORE.co_scene`、`CALLBACK.pending[*].co`（待ちのコルーチンは `CALLBACK.pending` だけが持つ）。戻した後に古い `co_scene` が残ると、タイマーが再開する（`virtual_dispatcher.lua` 202〜204 行）。`set_co_scene` はファイルの中でしか呼べない（`shiori/event/init.lua` 97 行）。
 - **台本そのものを取れる場所が 1 つではない**: 応答の値は 5 か所で包まれる（`shiori/event/init.lua` 231・235・237 行、`callback.lua` 113・179 行）。1 か所に絞れるのは `shiori/entry.lua` 79〜89 行だが、そこではヘッダーつきの応答全体しか見えない。
 - **区切りにしてはいけない応答がある**: プロパティの読み出し（`act:get_property`）は、`\![get,property,…]` だけの台本を返す（`shiori/act.lua` 288〜296 行）。
 - **届かなかった応答**: GET が 5 秒を超えると、DLL は 204 を返すが、Lua は走り続ける（`crates/pasta_shiori/src/actor/marshaling.rs` 71・213〜223 行）。宿主が受け取っていない応答を、区切りとして控えるおそれがある。

@@ -104,54 +104,16 @@ local function create_act(req)
 end
 
 --- STORE.co_sceneを統一管理するローカル関数
---- LuaJIT 2.1 には coroutine.close が無いため、以下の close 分岐は実行されず、
---- 破棄は参照を外すだけになる（破棄したコルーチンは GC が回収する）。
---- @param co thread|nil コルーチンまたはnil
+--- 破棄は参照を外すだけ（破棄したコルーチンは GC が回収する）。
+--- @param co thread|nil コルーチンまたはnil（suspended 以外は nil として扱う）
 --- @param keep boolean 真なら待っている続きをそのまま残し、co の残りは捨てる
 local function set_co_scene(co, keep)
-    -- 1. 引数検証（suspended以外はclose）
     if co and coroutine.status(co) ~= "suspended" then
-        if coroutine.close then
-            coroutine.close(co)
-        end
         co = nil
     end
-
-    -- 待っている続きを残す: co は待ちの表が持つか、どこにも置かずに捨てる
-    if keep then
-        if STORE.co_callback and co == STORE.co_callback then
-            STORE.co_callback = nil
-        end
-        return
+    if not keep then
+        STORE.co_scene = co
     end
-
-    -- NEW: コールバック登録済みコルーチン検出
-    if STORE.co_callback and co == STORE.co_callback then
-        -- コールバック待ちコルーチンは CALLBACK.pending で管理される
-        -- co_scene には登録しない、旧 co_scene と同一なら close もしない
-        if STORE.co_scene and STORE.co_scene ~= co then
-            -- 別の旧コルーチンがある場合は通常通り close
-            if coroutine.close then coroutine.close(STORE.co_scene) end
-        end
-        STORE.co_scene = nil
-        STORE.co_callback = nil
-        return
-    end
-
-    -- 2. 同一オブジェクトチェック
-    if STORE.co_scene == co then
-        return
-    end
-
-    -- 3. 旧コルーチンをclose（存在すれば無条件）
-    if STORE.co_scene then
-        if coroutine.close then
-            coroutine.close(STORE.co_scene)
-        end
-    end
-
-    -- 4. 上書き（coはsuspendedまたはnil確定）
-    STORE.co_scene = co
 end
 
 ---@alias DriveKind "resume"|"none"|"preempt"|"interrupt"
@@ -279,12 +241,14 @@ function EVENT.drive(co, act, ...)
         STOP.hold(co, value)
         -- 予約の後、中断の前にエラーで終わったシーンの予約を残さない
         CALLBACK.discard_staged()
-        -- 5. dead のコルーチンを渡し継続を空にする
-        set_co_scene(co, false)
+        -- 5. 継続を空にする
+        set_co_scene(nil, false)
         return false, value
     end
-    -- 6. ステージング消費（待ちに入ったかを set_co_scene が STORE.co_callback で見るので先に行う）
-    CALLBACK.consume_staged(co, act)
+    -- 6. ステージング消費（待ちに入ったコルーチンは CALLBACK.pending だけが持つ）
+    if CALLBACK.consume_staged(co, act) then
+        co = nil
+    end
     -- 7. 台詞の印が無い素のコルーチンは、出力が空でないかで決める
     local spoke = scene_act and scene_act._spoke
     if spoke == nil then

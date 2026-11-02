@@ -34,7 +34,6 @@ local STORE = require("pasta.store")
 | `kick_pending` | `string\|nil` | 保留中のキック対象のシーン名 | `KICK.install` が書き、`KICK.try_dispatch` が消費する（[キックの保留と起動](https://ekicyou.github.io/pasta/internals/debug.html#キックの保留と起動kicklua)） |
 | `kick_force` | `boolean` | キックの割り込み許可（既定 `false`） | `KICK.install` が立て、仮想イベントの `dispatch` の入口が 1 回で下ろす |
 | `auto_talk_paused` | `boolean` | 自動トークを止めている印（既定 `false`）。回数は数えず、永続化しない | `GLOBAL.pause_auto_talk` が立て、`GLOBAL.resume_auto_talk` と `STORE.reset` が下ろす。仮想イベントの `dispatch`・`ACT_IMPL.yield`・つつき撫での既定ハンドラが読む（[自動トークを止めている間](shiori-events.md#自動トークを止めている間)） |
-| `co_callback` | `thread\|nil` | コールバック待ちとして登録したコルーチンの印 | `pasta.store` は初期化しない（未設定のときは `nil`）。`CALLBACK.consume_staged` が書き、直後の `set_co_scene`（どちらも `EVENT.drive` の中）が `nil` に戻す。`CALLBACK.reset` も `nil` に戻す（[コールバック待ちとの関係](https://ekicyou.github.io/pasta/internals/execution-model.html#コールバック待ちとの関係)） |
 
 単語の 3 つのフィールドの値の形は [finalize_scene](#finalize_scene) の「単語収集データ構造」で扱う。
 
@@ -55,10 +54,10 @@ local STORE = require("pasta.store")
 STORE.reset()
 ```
 
-- `co_scene` は、`coroutine.close` があり中断中なら閉じてから `nil` にする。LuaJIT 2.1 には `coroutine.close` が無いため、ランタイムでは閉じる処理は実行されず、参照を外すだけになる（[LuaJIT 2.1 の制約](https://ekicyou.github.io/pasta/internals/execution-model.html#luajit-21-の制約)）。
+- `co_scene` は、参照を外して `nil` にするだけである（LuaJIT 2.1 には `coroutine.close` が無い。[LuaJIT 2.1 の制約](https://ekicyou.github.io/pasta/internals/execution-model.html#luajit-21-の制約)）。
 - `actors`・`actor_spots`・`scenes`・`app_ctx`・`counters`・`global_words`・`local_words`・`actor_words`・`appearance` を新しい空の表（`appearance` は空の 4 つの表を持つ表）にし、`last_global_scene`・`kick_pending` を `nil`、`kick_force`・`auto_talk_paused` を `false` にし、`co_preempt` をキーを弱い参照にした新しい表にする。仮想イベントの時計は決め直さない。
 - `@pasta_config` からの初期化はやり直さない。`actors`・`actor_spots` は空の表になる。
-- `co_callback` は変えない。コールバックの状態を消すのは `CALLBACK.reset()` である。
+- コールバックの待ちは変えない。待ちの状態を消すのは `CALLBACK.reset()` である。
 - フィールドの表を新しい表に置き換えるため、すでに作られた ACT が持つ `act.app_ctx`・`act.actors` は古い表を指したまま残る。
 
 ### 循環参照回避の原則
