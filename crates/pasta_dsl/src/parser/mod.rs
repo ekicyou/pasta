@@ -111,6 +111,9 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, ParseError> 
 /// 1 行で閉じていない開き括弧を重ねられる段の数。pest の再帰は開き括弧 1 つで 1 段深くなる。
 pub(crate) const MAX_PAREN_DEPTH: usize = 64;
 
+/// 1 つの式に書ける二項演算子の数。鎖は演算子 1 つで 1 段深くなり、片付けとコード生成が再帰する。
+pub(crate) const MAX_EXPR_OPS: usize = 256;
+
 /// 1 行の閉じていない開き括弧の重なりが MAX_PAREN_DEPTH を超えたら、
 /// 超えた開き括弧の位置の SyntaxError を返す。
 ///

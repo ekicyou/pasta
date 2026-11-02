@@ -135,6 +135,7 @@ pub(crate) fn parse_code_block(pair: Pair<Rule>) -> Result<CodeBlock, ParseError
 
 /// Parse var_set.
 pub(crate) fn parse_var_set(pair: Pair<Rule>, filename: &str) -> Result<VarSet, ParseError> {
+    check_op_count(&pair, filename)?;
     let span = Span::from_pair(&pair);
     let scope = match pair.as_rule() {
         Rule::var_set_global => VarScope::Global,

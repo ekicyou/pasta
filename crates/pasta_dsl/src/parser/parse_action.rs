@@ -286,12 +286,33 @@ pub(crate) fn bin_op_from_rule(rule: Rule) -> Option<BinOp> {
     }
 }
 
+/// `pair` の子孫の二項演算子が MAX_EXPR_OPS を超えたら、
+/// 超えた演算子の位置の SyntaxError を返す。
+///
+/// 式の鎖を組む前に呼び、深い木を作らせない。括弧と関数呼び出しの引数の中も同じ式として数える。
+pub(crate) fn check_op_count(pair: &Pair<Rule>, filename: &str) -> Result<(), ParseError> {
+    let mut ops = pair
+        .clone()
+        .into_inner()
+        .flatten()
+        .filter(|p| bin_op_from_rule(p.as_rule()).is_some());
+    match ops.nth(MAX_EXPR_OPS) {
+        Some(op) => Err(syntax_error(
+            filename,
+            op.line_col(),
+            &format!("1 つの式の演算子が {MAX_EXPR_OPS} 個を超えています"),
+        )),
+        None => Ok(()),
+    }
+}
+
 /// Parse an expression from parts (terms and binary operators).
 /// Handles the case where expr = term ~ (bin_op ~ term)* expands into multiple pairs.
 pub(crate) fn parse_expr_from_parts(
     pair: Pair<Rule>,
     filename: &str,
 ) -> Result<Option<Expr>, ParseError> {
+    check_op_count(&pair, filename)?;
     let mut terms: Vec<Expr> = Vec::new();
     let mut operators: Vec<BinOp> = Vec::new();
 
@@ -315,6 +336,7 @@ pub(crate) fn parse_key_arg(
     pair: Pair<Rule>,
     filename: &str,
 ) -> Result<(String, Expr), ParseError> {
+    check_op_count(&pair, filename)?;
     let mut key = String::new();
     let mut terms: Vec<Expr> = Vec::new();
     let mut operators: Vec<BinOp> = Vec::new();
