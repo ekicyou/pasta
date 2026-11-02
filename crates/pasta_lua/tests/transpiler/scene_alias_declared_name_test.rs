@@ -37,8 +37,8 @@ fn transpile(source: &str, aliases: SceneAliasTable) -> Output {
     let transpiler = LuaTranspiler::new(TranspilerConfig::default().with_scene_aliases(aliases));
     let mut sink = KeySink::default();
     let mut out = Vec::new();
-    let context = transpiler
-        .transpile_with_sink(&file, &mut out, Some(&mut sink))
+    let (context, _) = transpiler
+        .transpile_with_source_map(&file, &mut out, Some(&mut sink))
         .unwrap();
     Output {
         lua: String::from_utf8(out).unwrap(),

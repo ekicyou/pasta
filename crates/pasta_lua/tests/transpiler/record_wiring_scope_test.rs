@@ -46,7 +46,7 @@ fn span_at(line: usize) -> Span {
 // 検証戦略: 3 型の scope は公開 `generate_*` を直接呼べるため、明示 span を与えた AST ノードを
 // 渡し、捕捉 sink が「ヘッダ `.lua` 行 → 定義ヘッダ `.pasta` 行」を記録することを表明する。
 // `generate_choice` / `generate_choice_timeout`（分岐, 1.4）は private のため、実 `.pasta` を
-// `transpile_with_sink` に通し、`act:choice(...)` / `act:choice_timeout(...)` 出力行が分岐
+// `transpile_with_source_map` に通し、`act:choice(...)` / `act:choice_timeout(...)` 出力行が分岐
 // `.pasta` 行へ対応づくことを表明する。
 // ============================================================================
 
@@ -155,7 +155,7 @@ fn local_scene_header_records_definition_pasta_line() {
 
 /// 統合: スタートシーン（無名）ヘッダ（`function SCENE.__start__(act, ...)`）も定義ヘッダ行へ対応づく（1.5）。
 ///
-/// 実 `.pasta` を `transpile_with_sink` に通し、グローバルシーン定義行とスタートシーン関数ヘッダ行が
+/// 実 `.pasta` を `transpile_with_source_map` に通し、グローバルシーン定義行とスタートシーン関数ヘッダ行が
 /// それぞれ実 span 由来の `.pasta` 定義ヘッダ行へ対応づくことを実証する。
 #[test]
 fn integration_scope_headers_map_to_real_pasta_lines() {
@@ -166,7 +166,7 @@ fn integration_scope_headers_map_to_real_pasta_lines() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     LuaTranspiler::default()
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
 
     let lua = String::from_utf8(output).unwrap();
@@ -216,7 +216,7 @@ fn integration_scope_headers_map_to_real_pasta_lines() {
 
 /// 分岐（choice, 1.4）: `act:choice(...)` 出力行が分岐 `.pasta` 行へ対応づく。
 ///
-/// `generate_choice` は private のため、実 `.pasta` を `transpile_with_sink` に通して検証する。
+/// `generate_choice` は private のため、実 `.pasta` を `transpile_with_source_map` に通して検証する。
 #[test]
 fn choice_records_choice_pasta_line_via_pipeline() {
     // 行1: 空, 行2: ＊選択シーン, 行3: ＠？挨拶「あいさつする」（分岐行）
@@ -226,7 +226,7 @@ fn choice_records_choice_pasta_line_via_pipeline() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     LuaTranspiler::default()
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
 
     let lua = String::from_utf8(output).unwrap();
@@ -245,7 +245,7 @@ fn choice_records_choice_pasta_line_via_pipeline() {
 
 /// 分岐タイムアウト（!select cue, 1.4）: `act:choice_timeout(...)` 出力行が cue `.pasta` 行へ対応づく。
 ///
-/// `generate_choice_timeout` は private のため、実 `.pasta` を `transpile_with_sink` に通して検証する。
+/// `generate_choice_timeout` は private のため、実 `.pasta` を `transpile_with_source_map` に通して検証する。
 #[test]
 fn choice_timeout_records_cue_pasta_line_via_pipeline() {
     // 行1: 空, 行2: ＊選択シーン, 行3: !select(5)（select cue 行）, 行4: ＠？挨拶
@@ -255,7 +255,7 @@ fn choice_timeout_records_cue_pasta_line_via_pipeline() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     LuaTranspiler::default()
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
 
     let lua = String::from_utf8(output).unwrap();

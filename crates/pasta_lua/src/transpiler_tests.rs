@@ -84,12 +84,6 @@ fn create_pasta_file(actors: Vec<ActorScope>, scenes: Vec<GlobalSceneScope>) -> 
 }
 
 #[test]
-fn test_transpiler_default() {
-    let transpiler = LuaTranspiler::default();
-    assert!(transpiler.config().scene_aliases.is_empty());
-}
-
-#[test]
 fn test_transpile_empty() {
     let transpiler = LuaTranspiler::default();
     let mut output = Vec::new();
@@ -384,13 +378,6 @@ fn test_transpile_multi_key_actor_word_lua_output() {
         lua_code.contains("ACTOR:create_word(\"普通\"):entry([=[\\s[0]]=])"),
         "普通キーの create_word: {lua_code}"
     );
-}
-
-#[test]
-fn test_with_defaults_matches_default() {
-    let transpiler = LuaTranspiler::with_defaults();
-    let default = TranspilerConfig::default();
-    assert_eq!(transpiler.config().scene_aliases, default.scene_aliases);
 }
 
 #[test]

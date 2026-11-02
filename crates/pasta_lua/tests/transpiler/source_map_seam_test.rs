@@ -175,7 +175,7 @@ fn test_concat_line_maps_to_its_pasta_line_like_arith() {
     let mut sink = CapturingSink::default();
     let mut output = Vec::new();
     LuaTranspiler::default()
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
     let lua = String::from_utf8(output).unwrap();
     let lua_lines: Vec<&str> = lua.lines().collect();

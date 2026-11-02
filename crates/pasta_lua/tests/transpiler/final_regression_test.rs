@@ -22,7 +22,7 @@
 //! 最終確認する統合ゲートである。各入力について 2 方向で OFF 経路バイトを基準と突合する:
 //!
 //! 1. **sink 破棄バイト等価（7.1・観測専用性の teeth）**: 本番既定の薄いラッパ `transpile`
-//!    （sink 非装着）の出力と、`transpile_with_sink(Some(&mut sink))`（sink を装着して記録を
+//!    （sink 非装着）の出力と、`transpile_with_source_map(Some(&mut sink))`（sink を装着して記録を
 //!    収集 → 破棄）の出力が **完全にバイト一致** することを表明する。これは「ソースマップ機構を
 //!    装着しても生成バイトは 1 バイトも変わらない」＝ OFF 経路ゼロコストの本質を直接突く。配線が
 //!    誤って出力を変えればここが落ちる（タウトロジーではない）。
@@ -79,7 +79,7 @@ fn transpile_with_discarding_sink(source: &str) -> (Vec<u8>, usize) {
     let mut sink = DiscardingSink::default();
     let mut output = Vec::new();
     transpiler
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile (sink path) ok");
     (output, sink.records.len())
 }
@@ -162,7 +162,7 @@ fn broad_fixtures() -> Vec<(&'static str, String)> {
 /// **7.1 — sink 装着でも OFF 経路とバイト一致（広い網羅・観測専用性の teeth）**。
 ///
 /// 代表入力集合の各入力について、`transpile`（sink 非装着・本番既定）の出力と
-/// `transpile_with_sink(Some(&mut sink))`（ソースマップ機構を踏んで記録を収集 → 破棄）の
+/// `transpile_with_source_map(Some(&mut sink))`（ソースマップ機構を踏んで記録を収集 → 破棄）の
 /// 出力が **完全にバイト一致** することを表明する。ソースマップ配線（producer の `record_*`）が
 /// 誤って 1 バイトでも生成出力を変えればここが落ちる（OFF 経路ゼロコスト = 観測専用の本質）。
 ///

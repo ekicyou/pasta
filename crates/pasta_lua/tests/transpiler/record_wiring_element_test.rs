@@ -20,7 +20,7 @@
 //! - 単体テスト: 構築した AST ノードに明示 `.pasta` span を与え、直接 `generate_*` を呼び、
 //!   捕捉 sink が「記録された `.lua` 行 → 期待 `.pasta` 行」を一致させることを表明する。
 //!   各 `generate_*` の record 配線を点で証明する。
-//! - 統合テスト: 実 `.pasta` フィクスチャを `transpile_with_sink` に通し、パーサ由来の実 span に
+//! - 統合テスト: 実 `.pasta` フィクスチャを `transpile_with_source_map` に通し、パーサ由来の実 span に
 //!   対してコードブロックの **行ごと** 写像（フェンス行を跨いだ `+1` オフセット）が正しいことを
 //!   実証する。
 
@@ -144,7 +144,7 @@ fn var_set_property_records_its_pasta_line() {
 // 1.1 — シーン呼び出し（call_scene）の record 配線
 //
 // `generate_call_scene` は pub(super)（直接呼べない）ため、実 `.pasta` を
-// transpile_with_sink に通し、`act:call(...)` 出力行が呼び出し `.pasta` 行へ対応づくことを
+// transpile_with_source_map に通し、`act:call(...)` 出力行が呼び出し `.pasta` 行へ対応づくことを
 // 表明する。呼び出し行の `.pasta` 行番号は固定フィクスチャで既知。
 // ============================================================================
 
@@ -159,7 +159,7 @@ fn call_scene_records_call_pasta_line_via_pipeline() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     LuaTranspiler::default()
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
 
     let lua = String::from_utf8(output).unwrap();
@@ -190,7 +190,7 @@ fn mid_call_scene_records_call_restore_line_via_pipeline() {
     let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     LuaTranspiler::default()
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
 
     let lua = String::from_utf8(output).unwrap();
@@ -355,7 +355,7 @@ fn code_block_maps_each_line_individually_with_fence_offset() {
 }
 
 // ============================================================================
-// 統合: 実 `.pasta` を transpile_with_sink に通し、実 span でコードブロック行写像を検証
+// 統合: 実 `.pasta` を transpile_with_source_map に通し、実 span でコードブロック行写像を検証
 // ============================================================================
 
 /// 実フィクスチャ（`zero_cost_all_syntax.pasta`）を実トランスパイルし、パーサ由来の実 span に
@@ -376,7 +376,7 @@ fn integration_code_block_lines_map_to_real_pasta_lines() {
     let mut output = Vec::new();
     let transpiler = LuaTranspiler::default();
     transpiler
-        .transpile_with_sink(&file, &mut output, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
 
     // 記録された由来 .pasta 行の集合を抽出。
@@ -422,13 +422,13 @@ fn integration_sink_none_is_byte_identical_to_sink_some() {
 
     let mut out_none = Vec::new();
     transpiler
-        .transpile_with_sink(&file, &mut out_none, None)
+        .transpile_with_source_map(&file, &mut out_none, None)
         .expect("transpile ok");
 
     let mut sink = LinePairSink::default();
     let mut out_some = Vec::new();
     transpiler
-        .transpile_with_sink(&file, &mut out_some, Some(&mut sink))
+        .transpile_with_source_map(&file, &mut out_some, Some(&mut sink))
         .expect("transpile ok");
 
     assert_eq!(
