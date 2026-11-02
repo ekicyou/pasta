@@ -358,3 +358,14 @@
 - rustc 1.99.1 の std のソース：`library/std/src/thread/lifecycle.rs`（`JoinInner::join`）、`library/std/src/sys/thread_local/guard/windows.rs`（FLS と `atexit` の `FlsFree`）、`library/std/src/os/windows/thread.rs`（`JoinHandle` の `AsRawHandle`）。
 - Microsoft の文書：`GetModuleHandleExW`（`GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS`）、`FreeLibraryAndExitThread`、`DllMain` のベストプラクティス（ローダーのロックの中で待たない）。
 - `crates/pasta_lua/src/runtime/ffi_load/win32.rs`（`DllPins` の Drop が `FreeLibrary` する・`load_system_dll`）。
+
+## 設計のディスカッションの決定（2026-11-02）
+
+開発者が、設計の議題 1〜6 を推奨案のまま一括で承認した（design.md の Open Questions の 1〜8）。
+
+- **D1-c を採る・`DllMain` は何もしない**：普段の `unload` の道を std の `join` のまま保ち、特別な道（`FreeLibraryAndExitThread`）を見捨てたスレッドだけに閉じ込められるため。素の D1 は、閉包から戻らないスレッドの `join` が panic する（std の `JoinInner::join`）ので採れない。D1-b は普段の道でも std の後始末を飛ばし、要件 6.8 と食い違う。
+- **読み直しの残りの危険を受け入れる**：版 3 は手放されたインスタンスと生きたものを見分けられない。今は同じ場面で落ちうるので、NULL のほうがよい。SSP は `unload` を呼び、`loadu` で読み直すので当たらない。マニュアルに書く。
+- **`hinst` は `PastaShiori::load` の引数からも消す**：テストの 42・999 は本番に無い値で、素通しの段を残さないため。
+- **kick の e2e は `kick_sink_for` の送り先で通す**：本番の VM と同じ送り先で、DAP からインスタンスまでは `multi_instance_test` が確かめ済みのため。
+- **観測の getter を消す**：スレッドが違うことは VM の型が保証し、DAP のポートはログから読めるため。
+- **`free_library_test` を要件 1 の最初の関門にする**：D1-c は std の内部とローダーの振る舞いに頼り、単体テストでは再現できないため。

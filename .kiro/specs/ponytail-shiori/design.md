@@ -704,7 +704,7 @@ windows-sys = { workspace = true, features = ["Win32_System_Diagnostics_ToolHelp
   - 「Rust 側」の表：`windows.rs`（`teardown` の共通の関数を外す）・`lifecycle.rs`（`teardown_actor_detached` を外す）・`marshaling.rs`（判定 1 つ）・`teardown.rs`（`ReloadProbe` の行を消す）、`actor/module_ref.rs` の行を足す。
   - 「load とアクターの起動」：`hinst` の行（Lua には 0）、`spawn_actor(load_dir)` などの引数、`LOADU_INITIALIZED` を下ろすのは `unload` だけ、フォルダが無いときの 500 の理由。
   - 「request と GET・NOTIFY の振り分け」：判定 1 つ、`Key:` の行、解けない要求の warn（欄の名前）。
-  - 「unload・DllMain と teardown」と「FFI 入口と終了処理のログ」：モジュールの参照と約束、`DllMain` は何もしない、`unload` を呼ばずに外されたとき（落とさない・止めない・`SHIORI.unload` と保存は走らない・次の `loadu` で前の後始末が走る）、見捨てたスレッドが参照を返して終わること。
+  - 「unload・DllMain と teardown」と「FFI 入口と終了処理のログ」：モジュールの参照と約束、`DllMain` は何もしない、`unload` を呼ばずに外されたとき（落とさない・止めない・`SHIORI.unload` と保存は走らない・次の `loadu` で前の後始末が走る）、見捨てたスレッドが参照を返して終わること。残りの危険の 2 つ（版 3 で同じフォルダを読み直すとプロセスの終わりまで NULL・前の回に `loadu` で読み、次は `load` だけで読み直すと何もしない）も書く（Open Questions の 3・4）。
   - 「応答文字列の出どころ」の表：`PastaShiori::default_204_response` の行を消し、`default_204` の行に「`SHIORI.request` が定義されていない」を足す。
   - 「不変条件と制約」：`DllMain` と join の行、`ReloadProbe` を含むテストの所在の行。
 - `crates/pasta_shiori/README.md`：`use pasta::{PastaShiori, Shiori};` → `use pasta::PastaShiori;`。表の `load(hinst, load_dir)` → `load(load_dir)`、「（`Shiori` トレイト）」を外す。「Shiori トレイト」の節を消す。使用例の `shiori.load(0, …)` → `shiori.load(…)`。新しい断り書きは足さない（8.4）。
@@ -794,16 +794,16 @@ flowchart TB
 
 ## Open Questions / Risks
 
-設計のディスカッションで決める。各項目は、書いた仮定と推奨を持つ。
+2026-11-02 の設計のディスカッションで、開発者が全議題を推奨案のまま一括で承認した（議題 1＝ここの 1・2、議題 2＝3・4、議題 3＝5、議題 4＝6、議題 5＝7、議題 6＝8）。
 
-1. **D1 の形**：約束のチャネルで参照を返す人を決める形（D1-c）にした。代わりは、`unload` の道で生のスレッドのハンドルを `WaitForSingleObject` で待ち、スレッドはいつも `FreeLibraryAndExitThread` で終わる形（D1-b）。D1-b は要件 6.8 の「通常の依存で `Win32_System_Threading` を有効にしない」と食い違い、普段の道でも std の後始末を飛ばす。**推奨：D1-c。**
-2. **DllMain と JoinPolicy の撤去**：D1-c の下では `FreeLibrary` による detach に片付けるものが無いので、`DllMain` は何もせず、`teardown_actor_detached` と `JoinPolicy` を消すと仮定した。代わりは、守りとして今の `DllMain` の分岐を残す形（ローダーのロックの中で Rust の後始末を走らせる道が残る）。**推奨：撤去。**
-3. **版 3 で unload を呼ばずに外したホストの読み直し**：手放されたインスタンスが占有を持ち続けるので、同じディレクトリの版 3 の `load` は NULL になる（プロセスを再起動するまで）。生きた別のインスタンスと区別できない。議題 1 の「次の `load` まで」は旧来の入口では満たすが、版 3 では満たさない。**推奨：残りの危険として受け入れ、マニュアルに書く**（版 3 のホストの契約は `unload` を呼ぶこと。今は落ちうる）。
-4. **前の回に `loadu` で読み、次の回は `load`（ANSI）だけで読み直すホスト**：前の回の `LOADU_INITIALIZED` が残り、`load` が何もせずに TRUE を返して前のインスタンスが残る（`DLL_PROCESS_ATTACH` が走らないので印を下ろせない）。`loadu` で読み直すホスト（SSP）は、`teardown_slot` が前のインスタンスを片付けるので当たらない。**推奨：受け入れてマニュアルに書く。**
-5. **hinst**：`PastaShiori::load` の引数からも消し、Lua へは定数の 0 を渡すと仮定した（テストの 42・999 の確かめは 0 に直す）。代わりは引数を残し、アクターの道だけ 0 を渡す形（テストの差分が小さい）。**推奨：引数も消す。**
-6. **kick の e2e の道**：`kick_sink_for` を `pub` にし、自分の mailbox の送り先でアクターの道を通すと仮定した。DAP（`pasta/playSceneAt`）から通す形はより本番に近いが、4 本のテストに debug の有効化・ポートの読み取り・シーンの行の指定が要る。DAP からインスタンスの送り先までは `multi_instance_test` が既に確かめている。**推奨：`kick_sink_for` の形。**
-7. **観測の getter**：`actor_thread_id`・`debug_local_addr` を消し、ready のチャネルを `bool` にすると仮定した。スレッドが違うことは VM の型（`!Send`）が保証し、DAP のポートはログから読める（`multi_instance_test` の前例）。前提として、`debug_preservation` のフィクスチャの既定のロガーが info の `debug backend listening` をファイルへ書くこと（タスクで確かめる）。**推奨：消す。**
-8. **FreeLibrary の統合テストの前提**：`cargo test` が `target/<profile>/deps/pasta.dll` をテストの実行ファイルの隣に作ること（このワークツリーで確かめた）と、`ffi.load` でシステムの DLL（例 `version`）を読めること（`ffi_load` の `load_system_dll`）を前提にした。前提が崩れたときは、C モジュールの場合 A を外し、場合 B・C だけで 1.2 を確かめ、1.3 の C モジュールは SSP の実機で確かめる。**推奨：この形で進める。**
+1. **D1 の形**：約束のチャネルで参照を返す人を決める形（D1-c）にした。代わりは、`unload` の道で生のスレッドのハンドルを `WaitForSingleObject` で待ち、スレッドはいつも `FreeLibraryAndExitThread` で終わる形（D1-b）。D1-b は要件 6.8 の「通常の依存で `Win32_System_Threading` を有効にしない」と食い違い、普段の道でも std の後始末を飛ばす。**確定：D1-c。**
+2. **DllMain と JoinPolicy の撤去**：D1-c の下では `FreeLibrary` による detach に片付けるものが無いので、`DllMain` は何もせず、`teardown_actor_detached` と `JoinPolicy` を消すと仮定した。代わりは、守りとして今の `DllMain` の分岐を残す形（ローダーのロックの中で Rust の後始末を走らせる道が残る）。**確定：撤去。**
+3. **版 3 で unload を呼ばずに外したホストの読み直し**：手放されたインスタンスが占有を持ち続けるので、同じディレクトリの版 3 の `load` は NULL になる（プロセスを再起動するまで）。生きた別のインスタンスと区別できない。議題 1 の「次の `load` まで」は旧来の入口では満たすが、版 3 では満たさない。**確定：残りの危険として受け入れ、マニュアルに書く**（版 3 のホストの契約は `unload` を呼ぶこと。今は落ちうる）。
+4. **前の回に `loadu` で読み、次の回は `load`（ANSI）だけで読み直すホスト**：前の回の `LOADU_INITIALIZED` が残り、`load` が何もせずに TRUE を返して前のインスタンスが残る（`DLL_PROCESS_ATTACH` が走らないので印を下ろせない）。`loadu` で読み直すホスト（SSP）は、`teardown_slot` が前のインスタンスを片付けるので当たらない。**確定：受け入れてマニュアルに書く。**
+5. **hinst**：`PastaShiori::load` の引数からも消し、Lua へは定数の 0 を渡すと仮定した（テストの 42・999 の確かめは 0 に直す）。代わりは引数を残し、アクターの道だけ 0 を渡す形（テストの差分が小さい）。**確定：引数も消す。**
+6. **kick の e2e の道**：`kick_sink_for` を `pub` にし、自分の mailbox の送り先でアクターの道を通すと仮定した。DAP（`pasta/playSceneAt`）から通す形はより本番に近いが、4 本のテストに debug の有効化・ポートの読み取り・シーンの行の指定が要る。DAP からインスタンスの送り先までは `multi_instance_test` が既に確かめている。**確定：`kick_sink_for` の形。**
+7. **観測の getter**：`actor_thread_id`・`debug_local_addr` を消し、ready のチャネルを `bool` にすると仮定した。スレッドが違うことは VM の型（`!Send`）が保証し、DAP のポートはログから読める（`multi_instance_test` の前例）。前提として、`debug_preservation` のフィクスチャの既定のロガーが info の `debug backend listening` をファイルへ書くこと（タスクで確かめる）。**確定：消す。**
+8. **FreeLibrary の統合テストの前提**：`cargo test` が `target/<profile>/deps/pasta.dll` をテストの実行ファイルの隣に作ること（このワークツリーで確かめた）と、`ffi.load` でシステムの DLL（例 `version`）を読めること（`ffi_load` の `load_system_dll`）を前提にした。前提が崩れたときは、C モジュールの場合 A を外し、場合 B・C だけで 1.2 を確かめ、1.3 の C モジュールは SSP の実機で確かめる。**確定：この形で進め、要件 1 のタスクの最初の関門にする**（見捨てたスレッドがスレッドの数え上げから消えることも確かめる・設計の検証の重大な指摘 1）。
 
 残りの危険（設計で受け入れるもの）：
 
