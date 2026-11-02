@@ -205,7 +205,7 @@ end
 ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call`・`call_restore` と `find_handler`・`find_act_handler` の引数・戻り値・警告は [検索と呼び出し](script-api.md#検索と呼び出し)（[word(name, var_path)](script-api.md#wordname-var_path)・[expr_fn_var(value, var_path, ...)](script-api.md#expr_fn_varvalue-var_path-) を含む）が、検索の各段の意味は [ローカル優先の検索順](https://ekicyou.github.io/pasta/internals/registry-search.html#ローカル優先の検索順) が正である。ここでは実装の内部の構成だけを扱う。
 
 - `expr_fn(self, key, ...)` と `expr_fn_var(self, value, var_path, ...)` は、`pasta.act` の局所関数 `call_expr(self, key, skip_methods, ...)` を共有する。`expr_fn` は `call_expr(self, key, nil, ...)`、`expr_fn_var` はキーに直した後に `call_expr(self, キー, true, ...)` を呼ぶ。`call_expr` は `find_handler("expr", key, skip_methods)` が関数なら、`restore_scene` で `h(self, ...)` を呼び、実行中のシーンの文脈を呼ぶ前の値に戻してから戻り値を返し、それ以外は「報告済み」の印（`FAILURE.set_fn_failed`）を真にし、接頭辞 `act:expr_fn` の警告（`handler not found`）とともに「関数が見つからない」を `FAILURE.report` で報告して `nil` を返す。関数が見つかったときは、関数が戻った後に印を偽にする。アクタープロキシは `pasta.actor` に同じ形の別の局所関数を持つ（[PROXY_IMPL のメソッド](#proxy_impl-のメソッド)）。
-- `skip_methods` を真にするのは、`var_path` を受け取った `word` と `expr_fn_var`（生成コードの動的参照）だけである。`find_scene`・`call` と、`var_path` の無い `word`・`expr_fn` は `skip_methods` を渡さない。`find_handler` は `find_act_handler` に引数をそのまま渡す。
+- `skip_methods` を真にするのは、`var_path` を受け取った `word` と `expr_fn_var`（生成コードの動的参照）だけである。`find_scene`・`call` と、`var_path` の無い `word`・`expr_fn` は `skip_methods` を渡さない。`find_handler` は `find_act_handler` と同じ関数である（`ACT_IMPL.find_handler = ACT_IMPL.find_act_handler`）。呼ぶ側は `self:find_handler` で引くので、インスタンスに `find_handler` を置けばその上書きが効く。
 
 ### 生成コード用のメソッド（actor_proxy・global_fn）
 
@@ -261,7 +261,7 @@ act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(var.x, "var.
 | `ACTOR.create_proxy(actor, act)` | アクタープロキシを作る（次節） |
 | `ACTOR.drop_self(act, r, ...)` | 関数の戻り値の正規化。`r` が `act` かプロキシなら `nil`、それ以外は `r, ...` をそのまま返す（[プロキシの構造と生成](#プロキシの構造と生成)） |
 
-- `create_word` が返すビルダー（`ACTOR_WORD_BUILDER_IMPL`）は、内部に `WORD.create_actor(アクター名, キー)` のビルダーを `_word_builder` として持ち、`entry(...)` を値が 1 つ以上あるときだけそれに渡して自身を返す。登録先は `STORE.actor_words` だけであり、アクターオブジェクトのフィールドには値を設定しない。
+- `create_word` は `WORD.create_actor(アクター名, キー)` のビルダーをそのまま返す。そのビルダーの `entry(...)` は、値が 1 つ以上あるときだけ登録して自身を返す。登録先は `STORE.actor_words` だけであり、アクターオブジェクトのフィールドには値を設定しない。
 - `pasta.actor` は読み込み時に、`STORE.actors` の要素のうち表であるもの（`@pasta_config` の `actor` から来たアクター）に、`name` が無ければ表のキーを `name` として補い、メタテーブル `ACTOR_IMPL` を付ける。そのため `pasta.toml` の `[actor.名前]` に書いたキー（`spot` など）は、アクターオブジェクトのフィールドとして見える。
 
 ### プロキシの構造と生成

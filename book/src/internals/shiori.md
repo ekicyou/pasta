@@ -426,10 +426,10 @@ pasta.shiori.entry
 
 | 関数 | 動作 |
 | ---- | ---- |
-| `SHIORI.load(hinst, load_dir)` | `xpcall` の中で何もせず `true` を返す。エラーなら `print` して `false` |
+| `SHIORI.load(hinst, load_dir)` | 何もせず `true` を返す |
 | `SHIORI.request(req)` | `STOP.clear()` で前の要求の控えを空にしてから、`xpcall` の中で `EVENT.fire(req)` を呼ぶ。エラーは、文字列なら最初の 1 行を、そうでなければ `nil` を理由にし、控え（`STOP.take()`・`STOP.take_handler()`）と一緒に `STOP.response` に渡す。表記の応答が返ればそれを、`nil` なら `RES.err` で 500 応答を返す（`nil` の理由は `"Unknown error"` になる。[止まるエラーの控えと応答](#止まるエラーの控えと応答)） |
 | `SHIORI.kick(scene)` | `KICK.install(scene)` でキックを保留するだけで、シーンは動かさない |
-| `SHIORI.unload()` | `xpcall` の中で何もしない |
+| `SHIORI.unload()` | 何もしない |
 
 `EVENT.fire(req)` の振り分けは次の順である。
 

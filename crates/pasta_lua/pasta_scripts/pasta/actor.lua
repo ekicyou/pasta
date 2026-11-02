@@ -17,39 +17,13 @@ local ACTOR = {}
 local ACTOR_IMPL = {}
 ACTOR_IMPL.__index = ACTOR_IMPL
 
--------------------------------------------
--- ACTOR_WORD_BUILDER_IMPL - アクター単語ビルダー
--------------------------------------------
-
---- ActorWordBuilderクラス実装メタテーブル（WordBuilderを拡張）
---- WORD.create_actor のビルダー経由で STORE.actor_words に登録する（アクターのフィールドには設定しない）
---- @class ActorWordBuilder
---- @field _word_builder WordBuilder 内部のWordBuilder
-local ACTOR_WORD_BUILDER_IMPL = {}
-ACTOR_WORD_BUILDER_IMPL.__index = ACTOR_WORD_BUILDER_IMPL
-
---- 値を追加（アクター単語辞書への登録だけを行う）
---- @param self ActorWordBuilder ビルダーオブジェクト
---- @param ... string 可変長引数で値を受け取る
---- @return ActorWordBuilder メソッドチェーン用に自身を返す
-function ACTOR_WORD_BUILDER_IMPL.entry(self, ...)
-    local values = { ... }
-    if #values > 0 then
-        -- Rust WordTableにのみ登録（シャッフル＆順次消費はWordTableが担当）
-        self._word_builder:entry(...)
-    end
-    return self
-end
-
 --- アクター単語ビルダーを作成（ACTOR:create_word("key") 形式）
+--- STORE.actor_words に登録する（アクターのフィールドには設定しない）
 --- @param self Actor アクターオブジェクト
 --- @param key string 単語キー
---- @return ActorWordBuilder ビルダーオブジェクト
+--- @return WordBuilder WORD.create_actor のビルダー
 function ACTOR_IMPL.create_word(self, key)
-    local builder = {
-        _word_builder = WORD.create_actor(self.name, key),
-    }
-    return setmetatable(builder, ACTOR_WORD_BUILDER_IMPL)
+    return WORD.create_actor(self.name, key)
 end
 
 --- アクターを取得または新規作成

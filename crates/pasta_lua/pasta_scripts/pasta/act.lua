@@ -398,15 +398,8 @@ function ACT_IMPL.find_act_handler(self, mode, key, skip_methods)
     return nil
 end
 
---- find_act_handler への thin wrapper（ACT_IMPL.find_handler）
---- @param self Act アクションオブジェクト
---- @param mode string "word" | "scene" | "expr"
---- @param key string 検索キー
---- @param skip_methods boolean|nil find_act_handler へそのまま渡す
---- @return any|nil
-function ACT_IMPL.find_handler(self, mode, key, skip_methods)
-    return self:find_act_handler(mode, key, skip_methods)
-end
+--- find_act_handler と同じ関数（呼ぶ側は self:find_handler で引くので、インスタンスでの上書きが効く）
+ACT_IMPL.find_handler = ACT_IMPL.find_act_handler
 
 --- 単語取得（find_handler + word ポストプロセス）
 --- 検索順序は find_act_handler の5段階フォールバック（L1〜L5、word モード）
@@ -646,12 +639,12 @@ end
 --- @param self Act アクションオブジェクト
 --- @return Act self メソッドチェーン用
 function ACT_IMPL.yield(self)
-    -- 循環 require を避けるため、ストア・ログ・GLOBAL は呼び出しの時点で引く
-    if require("pasta.store").auto_talk_paused then
+    if STORE.auto_talk_paused then
+        -- ログはテストが差し替えるので呼んだ時点で引く
         require("@pasta_log").warn(
             "自動トーク停止の間にチェイントークが呼ばれたので、自動トークを再開しました。"
             .. "止めた区間の区切りには選択肢やイベントを使ってください。")
-        require("pasta.global").resume_auto_talk(self)
+        GLOBAL.resume_auto_talk(self)
     end
     local resumed = coroutine.yield(self:build())
     -- 続きの get_property の期限は、再開した要求から数える（引数なしの再開では控えを変えない）
