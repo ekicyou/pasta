@@ -235,3 +235,106 @@ probe は、スクラッチの使い捨てクレート（`pasta_dsl` を worktre
     - `ponytail-lua-transpiler`：`code_gen/element_gen.rs:40` の `format!("args[{}]", index + 1)` は、`index` が `u8` なので `＄２５５` で桁があふれる（debug はパニック、release は `args[0]` になり、常に値なしになる）。マニュアルは 0〜255 を使えると書いている。`u32::from(*index) + 1` などで直す。読んで確かめた（実行はしていない）。
     - `ponytail-lua-transpiler`：`code_gen/scope_gen.rs:424-430` の `!select` の小数の引数は、`(*f as i64)` で整数にする。この spec で `!select(10000000000000000000)` が `Float(1e19)` になると、`9223372036854775807` に飽和して出る。害は小さいが、要件 2.2 の後に見えるようになる。
     - `ponytail-editor-tooling`：要件 3 の守りは `parse_str` の入口に入るので、部分解析（`partial.rs`）も守られる。部分解析が、この誤りをどの行に出すかは、その spec の診断の直し（1 つの誤りで全体に波線）の中で扱う。
+
+## 設計フェーズの調査（2026-11-02・`/kiro-spec-design -y`）
+
+- **Discovery Scope**: Extension（light discovery）。新しい依存も外部の API も無く、既存の `pasta_dsl` の部品の中で閉じる。
+- **使ったスキルと指針**: `kiro-spec-design`（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）、テンプレート `.kiro/settings/templates/specs/design.md`・`research.md`。steering は `tech.md`（pest 2.8.6・テストの置き場）と `roadmap.md`（同じウェーブの約束）。ponytail の指針（いちばん小さい完全な直し・既存の形を守る）。
+- **測った所**: ワークツリーの HEAD `b8e2e276`。probe はスクラッチの `probe`（`pasta_dsl` だけ）と `probe2`（`pasta_dsl`＋`pasta_lua`、pest を `=2.9.2` に固定）。
+
+### Research Needed の結論
+
+| 項目 | 結論 | 根拠 |
+| ---- | ---- | ---- |
+| `Pair::line_col()` が pest 2.8.6 にあるか | **ある**。下限を上げる必要は無い（`Cargo.toml`・`Cargo.lock` に触らない） | `C:\rust\cargo\registry\src\…\pest-2.8.6\src\iterators\pair.rs:290` に `line_col`、`line_index.rs` の `LineIndex` は 2.9.2 と書式の 1 行を除いて同じ（`diff`）。`Position::line_col` も 2.8.6 と 2.9.2 で同じ |
+| `LineIndex` と `Position::line_col` の数え方が同じか | **同じ**。`"\r\n"` は 1 つの改行、単独の `'\r'` は 1 桁、桁は文字の数 | 両方のソースを読んだ。`LineIndex` は `'\n'` の後ろを行の頭にし、行の頭から `chars().count()`。`Position::line_col` は `'\r'` の次が `'\n'` なら改行、それ以外の `'\r'` は桁を 1 つ進める。位置が `'\r'` と `'\n'` の間でも、どちらも `'\r'` を 1 桁と数える |
+| `try_parse_expr` の既定の腕に届く入力 | **無い** | `grammar.pest` を読んだ。呼び出し元（`parse_var_set`・`parse_expr_from_parts`・`parse_key_arg`）が渡す子は、`expr`・`bin`・`term`・`string_literal`・`string_fenced`・`strfence` がすべて無音の規則なので、`paren_expr`・`fn_call_local`・`fn_call_global`・`fn_call_dynamic`・`var_ref_local`・`var_ref_global`・`var_ref_property`・`number_literal`・`string_contents`・`string_blank` と演算子の規則だけ。どれも明示の腕がある（演算子は呼び出し元が先に分ける）。`id`・`property_id`・`word_ref`・`word_ref_dynamic` は呼び出し元が先に扱う |
+| `pasta_lua` のコード生成が上限の式を 1 MiB で変換しきれるか | **しきれる**（debug の x64・x86） | probe2（pest 2.9.2）で、上限ちょうどの 5 つの形（関数呼び出し 64 段・括弧 64 段・動的な関数呼び出し 64 段・アクション行の関数呼び出し 64 段・Call の引数の中の 63 段。どれも内側に演算子 256 個）を `parse_str` → `LuaTranspiler::default().transpile` → 片付け。x64 debug・x86 debug とも 1024 KiB と 768 KiB で全部通った。release は測っていない |
+| x86 の深さ | **通る** | probe（`parse_str` と片付け）で、上の 5 つの形が x86 debug・release の 1 MiB で通った。x86 debug は 384 KiB でも通り、256 KiB であふれた。x64 debug は 640 KiB で通り、512 KiB であふれた。x64 release は 256 KiB で通り、128 KiB であふれた |
+| VSCode 拡張の WASM のスタック | **測っていない（前提）** | `editors/vscode/scripts/build-wasm.ps1` は `wasm-pack build --release` で、スタックの大きさを変えていない（wasm32 の既定の 1 MiB）。native の release の余裕から通る見込みとした（設計の OPEN QUESTION 6） |
+
+### Research Log
+
+#### pest の行の索引
+
+- **Context**: 要件 1 の速さ。`Pair::line_col` が下限の 2.8.6 にあるかと、値が今と同じか。
+- **Findings**: `Pairs::new` が `LineIndex::new(&input[..last_input_pos])` を 1 回だけ作り、`into_inner`・`flatten` は同じ `Rc<LineIndex>` を渡す。`Pair::line_col` は `self.pos(self.start)` の位置を二分探索し、行の頭からの文字を数える。終わりの位置の API は無いので、`as_str()` の中を数える。
+- **Implications**: `Span::from_pair` で 17 か所を置き換えるだけで済み、下限の変更（ウェーブの約束で `ponytail-editor-tooling` の席）は要らない。
+
+#### pest 2.9.3 から入ったスタックの守り
+
+- **Context**: probe2 を最初に作ったとき、`Cargo.lock` が無く pest 2.9.5 が選ばれ、x64 debug・512 KiB で、あふれる代わりに `stack limit reached` の解析の誤りが返った。
+- **Sources**: `pest-2.9.5/src/parser_state.rs:95-125`（`set_call_limit` の説明：既定の native の対象では、スタックの残りを自動で見て「stack limit reached」で失敗させる。`no_std` と既定でない対象は `stack-guard` の機能が要る）。2.9.3・2.9.4 にも同じ文言がある。2.9.2 には無い。
+- **Implications**: 今の `Cargo.lock`（2.9.2）には効かない。この spec の括弧の走査は、pest の守りに頼らない（版に依らず、AST の片付けとコード生成も守る）。`pest-2-9-4-upgrade` への申し送りに書いた（design.md の Open Questions）。
+
+#### 大きな小数の Lua への書き方
+
+- **Context**: 要件 2.2 で `Float(1e19)` などがコード生成に届く。
+- **Findings**: `code_gen/expr_gen.rs:147` は `write!(buf, "{}", f)`。Rust の `f64` の `Display` は指数を使わず、`1e19` を `10000000000000000000` と書く。Lua はそれを同じ 64 ビットの浮動小数点数として読む。有限でない値は要件 2.5 で解析の誤りになるので、`inf` は届かない。
+- **Implications**: `code_gen/`（`ponytail-lua-transpiler` の持ち場）を直さずに済む。
+
+#### 誤りの位置に要るファイル名
+
+- **Context**: 新しい誤りは `Parse error in {file} at …` で始める（4.3）。今 `filename` を受け取る解析の関数は `parse_global_scene_scope`・`parse_global_scene_start` だけ。
+- **Findings**: 範囲の検査が要る関数（属性・アクターの番号・キューの引数・式の項・シーン引数の番号・演算子の数）の呼び出し元をたどると、ほぼすべての解析の関数が通り道になる（23 個）。すべて `pub(crate)` か非公開で、`pasta_dsl` の外から呼ぶ所は無い（`partial.rs` は `parse_str` だけを呼ぶ）。
+- **Implications**: 下の「Design Decisions」の `filename` の受け渡し。
+
+### Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A（採用） | 既存の部品の中で直す。`Span::from_pair`・`number_value`・入口の走査・式の検査 | 変更が `pasta_dsl` の中で閉じ、呼び出し元を直さない | `try_parse_expr` などの戻り値の形と、`filename` の引数が変わる | ギャップ分析の推奨のまま |
+| B | `parse_str` で行頭の索引を作り、全関数に渡す | pest の版に依らない | 全関数の引数が増え、pest の索引と二重 | 下限の問題が無いと分かったので利点が消えた |
+| C | 始まりは `Pair::line_col`、終わりは自前の索引 | 終わりの計算が O(log n) | 深さ 5〜6 倍の手間に実害が無い | 採らない |
+
+### Design Decisions
+
+#### Decision: `filename` を引数で渡す
+
+- **Context**: 深い所の誤りに、ファイル名と前置きが要る。
+- **Alternatives Considered**:
+  1. 23 個の関数に `filename: &str` を足す（`parse_global_scene_scope` と同じ形）。
+  2. 深い所は `file` が空の `SyntaxError` を作り、`parse_str` で埋めて前置きを付ける。
+  3. ファイル名を持つ文脈の構造体を渡す。
+- **Selected Approach**: 1。
+- **Rationale**: 今のコードの形のまま、型で漏れが見つかる。2 は引数が増えないが、「空の `file` は未完成」という隠れた決まりになり、`parse_str(src, "")` で `parse_global_scene_start` の誤り（前置きが無い）にまで前置きが付いて文言が変わる。3 は中身が 1 つの欄だけで、1 と同じ行数の変更になる。
+- **Trade-offs**: 引数の追加の行数が多い。挙動を変えないコミット（Migration Strategy の手順 2）に切り分ける。
+
+#### Decision: 演算子の数は「式を書ける位置に書いた式の全体」で数える
+
+- **Context**: 要件 3.2「1 つの式の二項演算子が 256 個を超える」。3.6 は 1 MiB であふれないこと。
+- **Alternatives Considered**: (a) 式の全体（括弧と引数の中を含む）、(b) 文法の `expr` の鎖ごと、(c) 1 行ごと。
+- **Selected Approach**: (a)。鎖を組む 3 つの関数の頭で、`Pairs::flatten` で子孫の演算子を数える。外側が先に止まる。
+- **Rationale**: (b) は括弧 64 段 × 256 個で木の深さが約 16,000 になり、片付けが 1 MiB の release で 10,000 個の鎖であふれた測定に届く。(c) は台詞の行に関数呼び出しを 2 つ書くと合わさり、3.3 を破る。
+- **Follow-up**: 設計ディスカッションで確かめる（design.md の OPEN QUESTION 1）。
+
+#### Decision: 数の値は 2 つの腕の内部の型で返す
+
+- **Context**: brief の `number_value(s) -> Expr` は、属性値（`AttrValue`）とキューの引数（`CueArgToken`）にそのまま使えない。
+- **Selected Approach**: `enum Number { Integer(i64), Float(f64) }` を返し、3 つの使い手が 2 腕の `match` で自分の型に写す。誤りの位置を出すため、文字列でなく `Pair` を受ける。
+- **Rationale**: `Expr` を返して属性値で写し直すと、届かない腕が要る。
+
+#### Decision: span の値は「控え」でなく「正解の計算」で守る
+
+- **Context**: 要件 1.3「すべての span を直す前と同じ値に」。
+- **Selected Approach**: テストの中で、AST の `{:?}` から span を拾い、バイトの位置から pest の `Position::line_col`（直す前の計算そのもの）で出した行と桁と比べる。
+- **Rationale**: バイトの位置は pest がそのまま返すので変わらない。直す前の値は「バイトの位置から `Position::line_col` で出した値」と同じなので、控えを置かずに常に同じことを確かめられ、後の spec が AST の型を変えても崩れない。
+- **Trade-offs**: `{:?}` の書式に頼る。`Span` の `Debug` は derive なので、欄の名前を変えない限り崩れない。
+
+### Synthesis
+
+- **Generalization**: 範囲の外の値・深さ・長さの誤りと pest の誤りを、1 つの補助 `syntax_error` で作る（4.3 の形を 1 か所で守る）。4 か所の数の読み方を `number_value` 1 つにする。番号（`digit_id`）の 2 か所は、型（`u32`・`u8`）と文が違うだけなので、補助を作らず各所で 1 行の `map_err` にする。
+- **Build vs. Adopt**:
+  - 行と桁：pest の `LineIndex`（`Pair::line_col`）を採る。自前の索引（Option B）は作らない。
+  - 深さの守り：pest 2.x の `set_call_limit` は累計を数えるので採らない。pest 2.9.3 以降の stack guard は今の版（2.9.2）に無く、AST の片付けとコード生成も守らないので頼らない。入口の走査を作る（10 行ほど）。
+  - 数の値：`str::parse::<i64>`・`str::parse::<f64>`（いちばん近い値への丸め）・`f64::is_finite` を採る。
+- **Simplification**:
+  - 新しいモジュール・層・公開 API は作らない。新しい部品はすべて既存のファイルの `pub(crate)` の関数で、テストのほかに新しいファイルは無い。
+  - 全辞書の AST の控えはリポジトリに置かない（`#[ignore]` の書き出しで、直す前と後を 1 回比べる）。
+  - `try_parse_expr` の演算子の腕と既定の腕を 1 つにまとめる。`parse_attr_number` を消す。`build_ast` の `Rule::EOI` の腕を消す。
+
+#### 設計の関門で直したこと
+
+- 1 回目の下書きは「深い括弧の行より前に文法の誤りがある辞書は、直す前は落ちていた」と書いていた。pest は前の行の誤りで繰り返しを抜け、深い行まで進まないので、この辞書は直す前も落ちずに前の行の誤りを返す。走査を pest の前に置くと、この辞書だけ返す誤りが変わる。1.4 と 3.1 の両方が当てはまる辞書として、3.1 を採る前提を書き、design.md の OPEN QUESTION 7 にした。
+- 速さのテストを、時間を測るので、別のテストのファイル（`parse_speed_test.rs`）に分けた（同じプロセスの並列のテストとぶつからないように）。
+- span の正解のテストが歩く場所を、リポジトリのルートでなく `crates/` と `.kiro/` にした（本体の作業ツリーでは、ルートの下の `.claude/worktrees/` に別のワークツリーの複製がある）。
