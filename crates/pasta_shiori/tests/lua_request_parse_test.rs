@@ -581,7 +581,7 @@ mod stack_safety_tests {
 // ============================================================================
 // ponytail-shiori 1.3: 値の空いた見出しの行（`Key:`）の特性化テスト（3.1〜3.5・9.4）
 //
-// 直す前の振る舞いを固める。タスク 3 で期待を改める（`Key:` と `Key:value` が解ける・
+// タスク 3 で直した後の期待（`Key:` と `Key:value` が解ける・
 // SSP の 3 要求が旧来と版 3 の両方で Lua に届く）。
 // ============================================================================
 
@@ -602,16 +602,22 @@ mod empty_header_value_tests {
         Some((reference.get(0).unwrap(), dic.get("Reference0").unwrap()))
     }
 
-    /// 直す前：コロンの直後で行が終わる見出しは解けない（直した後は `""`）。
+    /// コロンの直後で行が終わる見出しは値 `""`（3.1）。
     #[test]
-    fn colon_then_line_end_is_parse_error() {
-        assert_eq!(reference0("Reference0:"), None);
+    fn colon_then_line_end_is_empty() {
+        assert_eq!(
+            reference0("Reference0:"),
+            Some((String::new(), String::new()))
+        );
     }
 
-    /// 直す前：コロンの直後に空白の無い値は解けない（直した後は `abc`）。
+    /// コロンの直後に空白の無い値はその値（3.3）。
     #[test]
-    fn colon_then_value_without_space_is_parse_error() {
-        assert_eq!(reference0("Reference0:abc"), None);
+    fn colon_then_value_without_space_is_value() {
+        assert_eq!(
+            reference0("Reference0:abc"),
+            Some(("abc".to_string(), "abc".to_string()))
+        );
     }
 
     /// コロンと空白 1 つの後の値は前後とも `abc`。
@@ -630,8 +636,8 @@ mod ssp_log_requests_tests {
     use pasta::shiori_get_api;
     use shiori4_abi::{SHIORI_ABI_VERSION_3, ShioriApi};
 
-    /// 直す前に Lua へ届く数（直した後は 3）。
-    const DELIVERED: usize = 0;
+    /// Lua へ届く数（3 つとも届く）。
+    const DELIVERED: usize = 3;
 
     fn crlf(lines: &[&str]) -> String {
         let mut s = lines.join("\r\n");
@@ -685,7 +691,7 @@ mod ssp_log_requests_tests {
         "GET SHIORI/3.0\r\nCharset: UTF-8\r\nID: OnProbeCount\r\n\r\n".to_string()
     }
 
-    /// 旧来の意味（`ActorInstance::request`）。直す前：3 つとも 204 で Lua に届かない。
+    /// 旧来の意味（`ActorInstance::request`）。3 つとも Lua に届き、v3_probe の 204 が返る。
     #[test]
     fn legacy_entry_ssp_log_requests() {
         let ghost = copy_fixture_to_temp("v3_probe");
@@ -704,7 +710,7 @@ mod ssp_log_requests_tests {
         assert!(instance.shutdown(JoinPolicy::JoinAfterAck).acked);
     }
 
-    /// 版 3（`shiori_get_api`）。直す前：3 つとも 400 で Lua に届かない。
+    /// 版 3（`shiori_get_api`）。3 つとも Lua に届き、v3_probe の 204 が返る。
     #[test]
     fn v3_entry_ssp_log_requests() {
         let ghost = copy_fixture_to_temp("v3_probe");
@@ -717,11 +723,11 @@ mod ssp_log_requests_tests {
             .load_v3(ghost.path().to_str().expect("utf-8 path"))
             .expect("v3 load");
 
-        assert_eq!(inst.notify(&on_initialize()), Ok(400));
-        assert_eq!(inst.notify(&on_notify_user_info()), Ok(400));
+        assert_eq!(inst.notify(&on_initialize()), Ok(204));
+        assert_eq!(inst.notify(&on_notify_user_info()), Ok(204));
         assert_eq!(
             inst.request(&on_translate()).expect("no ABI error").status,
-            400
+            204
         );
 
         let res = inst.request(&probe_count()).expect("no ABI error");

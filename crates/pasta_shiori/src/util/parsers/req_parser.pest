@@ -41,7 +41,7 @@ nums        = @{ ( ('1'..'9') ~ ('0'..'9')* ) | "0" }
 ver         = @{ ASCII_DIGIT }
 get         =  { "GET" }
 notify      =  { "NOTIFY" }
-_tag        = _{ ": " }
+_tag        = _{ ":" ~ " "? }
 remain      = @{ ( !"\r" ~ !"\n" ~ ANY )* }
 
 // chars
