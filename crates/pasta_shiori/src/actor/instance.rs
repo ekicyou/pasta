@@ -16,6 +16,7 @@ use std::time::Duration;
 use flume::Sender;
 use pasta_lua::debug::{KickRequest, KickSink};
 use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLogger};
+use pest::error::LineColLocation;
 
 use crate::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
 use crate::actor::marshaling::{
@@ -23,6 +24,7 @@ use crate::actor::marshaling::{
 };
 use crate::actor::teardown::{TeardownReport, teardown_via_sender};
 use crate::actor::thread::{ActorThread, spawn_actor_thread_with};
+use crate::util::parsers::req::ParseError;
 
 /// 後始末で ack を待つ上限（4.2）。通常運転では後始末は速やかに終わる。
 /// 万一アクターが ack を返さない場合でも呼び出し側（＝ホスト）を無限待機させない安全網。
@@ -201,8 +203,29 @@ impl ActorInstance {
             Ok(RequestKind::Notify | RequestKind::Shiori2(ShioriMethod::Notify)) => {
                 self.notify(req)
             }
-            Err(_) => default_204(),
+            Err(e) => {
+                self.warn_unreadable("legacy", req, &e);
+                default_204()
+            }
         }
+    }
+
+    /// 解けない要求を、このインスタンスのログに warn 1 行で残す（3.6〜3.8）。
+    /// 要求は利用者の名前を含みうるので、位置と 1 行目だけを載せ、全文は載せない。
+    pub(crate) fn warn_unreadable(&self, entry: &'static str, req: &str, err: &ParseError) {
+        let (line, col) = match err.line_col {
+            LineColLocation::Pos(p) | LineColLocation::Span(p, _) => p,
+        };
+        let first_line = req.lines().next().unwrap_or("");
+        let _log_context = LoadDirGuard::new(self.load_dir.clone());
+        tracing::warn!(
+            seam = "request.unreadable",
+            entry,
+            line,
+            col,
+            first_line,
+            "request could not be parsed"
+        );
     }
 
     /// GET: 応答を待つ（`GET_TIMEOUT` 5 秒の安全網・失敗は 204）。

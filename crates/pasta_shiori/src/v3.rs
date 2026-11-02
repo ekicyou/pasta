@@ -79,8 +79,8 @@ impl Shiori for PastaV3 {
                 self.reject(REASON_SHIORI2);
                 (SHIORI_400_BAD_REQUEST, bad_request(REASON_SHIORI2))
             }
-            Err(_) => {
-                self.reject(REASON_UNREADABLE);
+            Err(e) => {
+                self.instance.warn_unreadable("v3", req, &e);
                 (SHIORI_400_BAD_REQUEST, bad_request(REASON_UNREADABLE))
             }
         };
@@ -96,7 +96,10 @@ impl Shiori for PastaV3 {
             }
             Ok(RequestKind::Get) => "GET is not accepted by notify",
             Ok(RequestKind::Shiori2(_)) => REASON_SHIORI2,
-            Err(_) => REASON_UNREADABLE,
+            Err(e) => {
+                self.instance.warn_unreadable("v3", req, &e);
+                return SHIORI_400_BAD_REQUEST;
+            }
         };
         self.reject(reason);
         SHIORI_400_BAD_REQUEST
