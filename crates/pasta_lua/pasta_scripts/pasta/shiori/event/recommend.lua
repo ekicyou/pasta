@@ -99,6 +99,16 @@ local REG = require("pasta.shiori.event.register")
 local CALLBACK = require("pasta.shiori.event.callback")
 local STORE = require("pasta.store")
 local ACT = require("pasta.act")
+local RES = require("pasta.shiori.res")
+
+--- 受け手の値を Value として返す形にする。EVENT.fire は SHIORI/ で始まる文字列を応答全体とみなすので、
+--- そのときだけ RES.ok で包む（それ以外は v のまま）
+---@param v string|nil
+---@return string|nil
+local function as_value(v)
+    if type(v) == "string" and v:sub(1, 7) == "SHIORI/" then return RES.ok(v) end
+    return v
+end
 
 --- MenuMemory: リソースの ID → 最後に開いたときの並び（メモリ上だけ。OnRecommendsiteChoice が読む）
 ---@type table<string, RecommendItem[]>
@@ -164,7 +174,7 @@ local function menu_receiver(id)
             return nil
         end
         last[id] = items
-        return encode(items)
+        return as_value(encode(items))
     end
 end
 
@@ -188,7 +198,7 @@ end
 -- ============================================================================
 
 --- ボタンの名前の受け手を作る。別名の辞書順に ＠名前 と同じ前方一致で単語を引き、
---- 最初に見つかった値をそのまま返す（無ければ nil で 204）。act:word は使わない（失敗の表記を積まない）
+--- 最初に見つかった値を as_value に通して返す（無ければ nil で 204）。act:word は使わない（失敗の表記を積まない）
 ---@param id string
 ---@return fun(act: ShioriAct): string|nil
 local function caption_receiver(id)
@@ -199,7 +209,7 @@ local function caption_receiver(id)
         local SEARCH = require("@pasta_search")
         for _, name in ipairs(names) do
             local word = SEARCH:search_word(name)
-            if word ~= nil then return word end
+            if word ~= nil then return as_value(word) end
         end
         return nil
     end
