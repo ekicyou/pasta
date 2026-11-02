@@ -86,7 +86,7 @@
   - _Boundary: HighlightCli_
   - _Requirements: 7.1, 8.3_
 
-- [ ] 5.2 (P) neutralizer の写しと正準を比べる
+- [x] 5.2 (P) neutralizer の写しと正準を比べる
   - `head.hbs` の BEGIN と END の印の間と、正準の関数の本体を、前後の空白と空行を除いた行の並びで比べる項目を足す
   - 違えば最初に違う行の番号と両方の行を示して失敗し、印が無いときも失敗する。わざと 1 行変えた文字列で比べる関数が失敗を返すことも確かめる
   - 完了の姿: 今の 2 つが一致して PASS し、1 行変えた見本で失敗を返す（jsdom が要るので、依存の無いワークツリーでは手元で確かめられず、9.2 の CI で確かめる）
@@ -182,3 +182,4 @@
 
 ## Implementation Notes
 - 3.1: `maskFences` が空にした行の連続では空行 1 つを挟む 2 つのフェンスを分けられないため、`extractCodeFences` は閉じの行を `maskFences` に 1 行足して確かめる作りにした。kiro-complete で design.md の ContentVerify の文言を直す。
+- 5.2: neutralizer の写しと正準の比べる行は 82 行（design.md の「77 行」は古い数え）。kiro-complete で design.md を 82 に直す。

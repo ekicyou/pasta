@@ -29,6 +29,7 @@
 // 実行: `node book/tools/highlight/neutralizer-test.mjs`（exit 0 = 全 PASS）。
 // jsdom は book/node_modules に導入済み（タスク 1.1）。
 
+import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { installHljsNeutralizer } from './neutralizer.mjs';
 
@@ -138,6 +139,21 @@ function pick(doc) {
 // ポーリングフォールバック検証用の待機ヘルパ（ケース J）。
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// head.hbs の BEGIN〜END の印の間（最初の `if (!win) {` から）と正準の本体を、
+// 前後の空白と空行を除いた行の並びで比べる（要件 6.1）。
+function compareMirror(hbs, canonBody) {
+  const b = hbs.indexOf('// --- BEGIN canonical hljs neutralizer');
+  const e = hbs.indexOf('// --- END canonical hljs neutralizer ---');
+  if (b < 0 || e < b) return { ok: false, detail: 'head.hbs に BEGIN・END の印が無い' };
+  const lines = (t) => t.split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== '');
+  const m = lines(hbs.slice(hbs.indexOf('if (!win) {', b), e));
+  const c = lines(canonBody);
+  for (let i = 0; i < Math.max(m.length, c.length); i++) {
+    if (m[i] !== c[i]) return { ok: false, detail: `${i + 1} 行目: 写し=${m[i]} / 正準=${c[i]}` };
+  }
+  return { ok: true, detail: '' };
 }
 
 async function run() {
@@ -555,6 +571,21 @@ async function run() {
       fake.spy.block.length === 1 && /\blanguage-rust\b/.test(fake.spy.block[0]),
       `spy.block=${JSON.stringify(fake.spy.block)}`,
     );
+  }
+  log('');
+
+  // =========================================================================
+  // ケース K: head.hbs の写しと正準の関数本体が一致する（要件 6.1）。
+  // =========================================================================
+  {
+    const hbs = readFileSync(new URL('../../theme/head.hbs', import.meta.url), 'utf8');
+    const canon = String(installHljsNeutralizer);
+    const c = canon.slice(canon.indexOf('if (!win) {'), canon.lastIndexOf('}'));
+    const r = compareMirror(hbs, c);
+    check('K: head.hbs の neutralizer の写しが正準と一致する', r.ok, r.detail);
+    const bad = compareMirror(hbs, c.replace('return;', 'return 1;'));
+    check('K: 1 行変えた正準では比べる関数が失敗を返す', !bad.ok, bad.detail);
+    check('K: 印が無ければ失敗を返す', !compareMirror('', c).ok);
   }
   log('');
 
