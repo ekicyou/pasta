@@ -43,7 +43,7 @@ import {
   writeAll,
   checkAll,
 } from './gen-skill-refs.mjs';
-import { REPO_ROOT, LINK_RE, maskFences, listMarkdownFiles, summaryChapters } from './link-check.mjs';
+import { REPO_ROOT, LINK_RE, MANUAL_URL, maskFences, listMarkdownFiles, summaryChapters } from './link-check.mjs';
 
 // --- 最小 assert ハーネス（依存ゼロ） ---
 let passed = 0;
@@ -271,7 +271,7 @@ for (const entry of GENERATION_MAP) {
 log('\n[F] rewriteLinks');
 const GA = 'pasta-ghost-authoring';
 const LC = 'pasta-lua-coding';
-const URL_BASE = 'https://ekicyou.github.io/pasta/';
+const URL_BASE = MANUAL_URL;
 {
   const search = { chapter: 'lua/modules/pasta-search.md', skill: LC };
   const rw = (body, entry = search) => rewriteLinks(body, entry);
