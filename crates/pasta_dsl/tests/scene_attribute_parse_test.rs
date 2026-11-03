@@ -319,3 +319,61 @@ fn partial_parse_shifts_declaration_attr_spans() {
         "＆優先：3"
     );
 }
+
+// ============================================================================
+// ファイル属性の 2 行目（Requirement 3.3）
+// ============================================================================
+
+fn second_file_attr_error(src: &str) -> (usize, usize, String) {
+    match parse_str(src, "test.pasta") {
+        Err(pasta_dsl::ParseError::SyntaxError {
+            line,
+            column,
+            message,
+            ..
+        }) => (line, column, message),
+        other => panic!("expected SyntaxError, got {other:?}"),
+    }
+}
+
+#[test]
+fn consecutive_file_attr_lines_are_error() {
+    let (line, column, message) =
+        second_file_attr_error("＆背景：教室\n＆時間：朝\n＊会話\n　Alice：やあ\n");
+    assert_eq!((line, column), (2, 1));
+    assert!(
+        message.contains(
+            "ファイル属性の行が続いています。ファイル属性は 1 行にまとめて書きます（前の行: 1 行目）"
+        ),
+        "{message}"
+    );
+}
+
+#[test]
+fn file_attr_lines_around_actor_and_word_are_error() {
+    let (line, _, message) = second_file_attr_error(
+        "＆a：1\n％さくら\n　＠通常：にこ\n＠挨拶：やあ\n\n＆b：2\n＊会話\n　さくら：やあ\n",
+    );
+    assert_eq!(line, 6);
+    assert!(message.contains("（前の行: 1 行目）"), "{message}");
+}
+
+#[test]
+fn file_attr_lines_separated_by_global_scene_are_ok() {
+    let file = parse_str(
+        "＆a：1\n＊会話\n　Alice：やあ\n＆b：2\n＊別\n　Alice：うん\n",
+        "test.pasta",
+    )
+    .unwrap();
+    let attrs = file
+        .items
+        .iter()
+        .filter(|i| matches!(i, FileItem::FileAttr(_)))
+        .count();
+    assert_eq!(attrs, 2);
+}
+
+#[test]
+fn several_attrs_on_one_file_attr_line_are_ok() {
+    assert!(parse_str("＆a：1＆b：2\n＊会話\n　Alice：やあ\n", "test.pasta").is_ok());
+}

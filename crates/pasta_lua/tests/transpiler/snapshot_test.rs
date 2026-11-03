@@ -81,8 +81,8 @@ fn test_scene_with_call_snapshot() {
 #[test]
 fn test_scene_with_attributes_snapshot() {
     let source = r#"
-＆天気：晴れ
-＆場所：東京
+＆天気：晴れ＆場所：東京
+
 
 ＊メイン
   ＆時間帯：朝

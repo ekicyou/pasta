@@ -76,8 +76,8 @@ fn test_comment_line_explicit_parse() {
 #[test]
 fn test_attribute_inheritance() {
     let source = r#"
-＆天気：晴れ
-＆場所：公園
+＆天気：晴れ＆場所：公園
+
 
 ＊メイン
   ＆場所：学校

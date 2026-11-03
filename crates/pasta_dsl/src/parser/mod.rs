@@ -203,10 +203,28 @@ pub fn parse_file(path: &Path) -> Result<PastaFile, ParseError> {
 fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, ParseError> {
     let mut file = PastaFile::new(std::path::PathBuf::from(filename));
     let mut last_global_scene_name: Option<String> = None;
+    // 最後のグローバルシーンの後に見たファイル属性の行（アクター辞書・グローバル単語では忘れない）
+    let mut file_attr_line: Option<usize> = None;
 
     for pair in pairs {
         match pair.as_rule() {
             Rule::file_scope => {
+                for line in pair.clone().into_inner() {
+                    if line.as_rule() != Rule::file_attr_line {
+                        continue;
+                    }
+                    let (n, _) = line.line_col();
+                    if let Some(prev) = file_attr_line {
+                        return Err(syntax_error(
+                            filename,
+                            (n, 1),
+                            &format!(
+                                "ファイル属性の行が続いています。ファイル属性は 1 行にまとめて書きます（前の行: {prev} 行目）"
+                            ),
+                        ));
+                    }
+                    file_attr_line = Some(n);
+                }
                 // file_scope 内の attrs と words を個別の FileItem として追加
                 let scope = parse_file_scope(pair, filename)?;
                 for attr in scope.attrs {
@@ -219,6 +237,7 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, ParseError
             Rule::global_scene_scope => {
                 let scene = parse_global_scene_scope(pair, &mut last_global_scene_name, filename)?;
                 file.items.push(FileItem::GlobalSceneScope(scene));
+                file_attr_line = None;
             }
             Rule::actor_scope => {
                 let actor = parse_actor_scope(pair, filename)?;
