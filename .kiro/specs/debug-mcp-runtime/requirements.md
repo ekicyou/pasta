@@ -33,7 +33,7 @@ brief の項目と要件の対応は次のとおり。
 
 そこで Approach 4 は「行の対応で引けない行を、デバッグが有効なときだけソースマップで引く」に絞り、上の誤りはデバッグの有無によらずこの spec で直す（要件 6。議題 1・2）。
 
-> brief.md だけでは決めきれなかった論点は、本文に「（仮定・議題 N）」と書き、最良の案で書いた。議題は末尾の「要件ディスカッションへの持ち越し」にまとめた。
+> brief.md だけでは決めきれなかった論点は、要件ディスカッション（2026-11-03）で全部を推奨案で確定した。本文の「（議題 N で確定）」が、末尾の「要件ディスカッションで確定したこと」の番号を指す。
 
 ## Boundary Context
 
@@ -50,7 +50,7 @@ brief の項目と要件の対応は次のとおり。
   - 式を評価して返すイベント（バックログ）。保存変数でない変数（`＄名前`・モジュールの中の状態）の書き出し。
   - 本番（デバッグが無効）でのソースマップ。ソースマップを後から作ること。
   - リロード専用のイベント（`OnPastaReload` など）と、「次の読み込みだけ有効」の仕組み。
-  - 読み込みのときの Lua のエラー（Lua のブロックの構文の誤りなど）の位置（仮定・議題 8）。
+  - 読み込みのときの Lua のエラー（Lua のブロックの構文の誤りなど）の位置（議題 8 で確定）。
   - `OnPastaCallFunction`・`OnPastaSetSaveVariable` の振る舞い。
   - `[loader] debug_mode`（名前が似ているが、読み込みの統計のログの設定で別物）。
 - **Adjacent expectations**
@@ -72,7 +72,7 @@ brief の項目と要件の対応は次のとおり。
 2. While デバッグが有効, the pasta.dll shall Lua の VM に行フックを付けず、JIT を止めない（無効のときと同じく JIT が働く）。
 3. When デバッグを有効にしたゴーストを 2 体、同じベースウェアか 2 つのベースウェアで起こした, the pasta.dll shall どちらも読み込みを終え、どちらでも開発用のイベントを許す。
 4. The pasta.dll shall DAP の要求（`initialize`・`setBreakpoints`・`pasta/playSceneAt`・`pasta/reloadShiori` など）を受ける口を持たない。
-5. When デバッグが有効な状態で読み込みを終えた, the pasta.dll shall 待ち受けのログ（`debug backend listening`・`debug transport bind failed`）を出さず、代わりに開発用のイベントを許したことを info のログに 1 行出す（仮定・議題 6）。
+5. When デバッグが有効な状態で読み込みを終えた, the pasta.dll shall 待ち受けのログ（`debug backend listening`・`debug transport bind failed`）を出さず、代わりに開発用のイベントを許したことを info のログに 1 行出す（議題 6 で確定）。
 
 ### Requirement 2: キックの経路を無くす
 
@@ -93,7 +93,7 @@ brief の項目と要件の対応は次のとおり。
 
 1. The pasta.dll shall デバッグの有効を、`pasta.toml` の `[debug] enabled`（既定は false）と環境変数 `PASTA_DEBUG`（設定されていれば `[debug] enabled` より優先）だけで決める。
 2. When SHIORI を読み込む（リロードを含む）, the pasta.dll shall `[debug] enabled` をそのときの `pasta.toml` から読み直す（ベースウェアを起こし直さなくても、リロードで有効・無効が切り替わる）。
-3. If `[debug]` に、意味の無くなったキー（`port`・`present_as`・`source_map_sidecar`）が書かれたままである, then the pasta.dll shall 読み込みを止めずに続け、そのキーを `pasta.toml` の今の「知らないキー」と同じに読み飛ばす（警告も出さない。仮定・議題 4）。
+3. If `[debug]` に、意味の無くなったキー（`port`・`present_as`・`source_map_sidecar`）が書かれたままである, then the pasta.dll shall 読み込みを止めずに続け、そのキーを `pasta.toml` の今の「知らないキー」と同じに読み飛ばす（警告も出さない。議題 4 で確定）。
 4. If 環境変数 `PASTA_DEBUG_PORT`・`PASTA_DEBUG_SOURCE_MODE`・`PASTA_DEBUG_SOURCE_MAP_SIDECAR` が設定されている, then the pasta.dll shall それを読まない（振る舞いは設定されていないときと同じ）。
 5. While デバッグが有効, the pasta.dll shall 読み込みのときに、読み込んだ全部の `.pasta` のソースマップと、位置からシーンを引くための索引を作る（今と同じ）。
 6. While デバッグが無効, the pasta.dll shall ソースマップと索引を作らない。
@@ -109,7 +109,7 @@ brief の項目と要件の対応は次のとおり。
 1. While デバッグが有効, when `OnPastaScene`・`OnPastaSceneAt` を受けた, the pasta.dll shall 今と同じ引数（Reference0・Reference1）を受け、今と同じ応答（再生したシーンの台本をその要求の応答で返す。見つからないとき・引数の誤りは今の表記と警告）を返す。
 2. While デバッグが無効, when 開発用のイベント（`OnPastaScene`・`OnPastaSceneAt`・`OnPastaDumpVariables`）を受けた, the pasta.dll shall 何もせずに 204 を返し、ログに `<イベント名>: debug is disabled; …` の警告を 1 行書く。
 3. If 開発用のイベントの SecurityLevel が external である, then the pasta.dll shall 何もせずに 204 を返し、ログに `<イベント名>: SecurityLevel external is refused; …` の警告を 1 行書く。
-4. The pasta.dll shall `OnPastaSceneAt` の Reference0 を、ファイルのパス（`ghost/master/` からの相対パスか、UNC を含む絶対パス。区切りは `/` と `\` のどちらでもよい）として扱い、`file://` の URI の剥がしとパーセントの復号をしない（仮定・議題 5）。
+4. The pasta.dll shall `OnPastaSceneAt` の Reference0 を、ファイルのパス（`ghost/master/` からの相対パスか、UNC を含む絶対パス。区切りは `/` と `\` のどちらでもよい）として扱い、`file://` の URI の剥がしとパーセントの復号をしない（議題 5 で確定）。
 5. The pasta.dll shall `OnPastaCallFunction`・`OnPastaSetSaveVariable` の門（デバッグの有無によらず働き、external は断る）を変えない。
 6. Where ゴーストが開発用のイベントのハンドラを先に登録している, the pasta.dll shall 既定のハンドラで上書きしない（今の決まりと同じ）。
 
@@ -123,7 +123,7 @@ brief の項目と要件の対応は次のとおり。
 2. When `OnPastaDumpVariables` を処理し終えた, the pasta.dll shall 何も喋らずに 204 を返す。ファイルは 204 を返す前に書き終えている（応答の直後に読めば、そのときの値がある）。
 3. The pasta.dll shall 書き出しを、セーブ（`save.toml`）と同じ変換の規則で行い、`[persistence] obfuscate` の設定にかかわらず、テキストの TOML で書く。
 4. If 保存変数に TOML に書けない値（関数など）がある, then the pasta.dll shall その値を飛ばして残りを書き、飛ばしたキーと理由をログの警告に書く（セーブと同じ）。
-5. If ファイルを書けない（フォルダが作れない・書き込みが拒まれた）, then the pasta.dll shall ログに警告（パスと理由）を 1 行書いて 204 を返し、書きかけのファイルを残さない（仮定・議題 7）。
+5. If ファイルを書けない（フォルダが作れない・書き込みが拒まれた）, then the pasta.dll shall ログに警告（パスと理由）を 1 行書いて 204 を返し、書きかけのファイルを残さず、前のファイルも消さない（議題 7 で確定）。
 6. The pasta.dll shall `OnPastaDumpVariables` を受けても、保存変数・`save.toml`・チェイントークの中断している続きを変えない。
 
 例（保存変数が `＄＊好感度＝３`・`＄＊名前＝「まさお」` のとき）：
@@ -141,7 +141,7 @@ brief の項目と要件の対応は次のとおり。
 
 1. The pasta.dll shall 止まるエラーの表記とログの警告で、シーン関数の行と、同じグローバルシーンの Lua のブロックの行を、デバッグの有無によらず、今と同じく `.pasta` のファイルと行（`dic\天気.pasta:5:`）で出す。
 2. If 止まった行が、実行中のシーンとは別の `.pasta` から変換した Lua にある, then the pasta.dll shall 実行中のシーンの行の対応から場所を出さない（別のファイルの行を、実行中のシーンのファイルの行として出さない。デバッグの有無によらない。議題 2）。
-3. While デバッグが有効, if 止まった行が辞書から変換した Lua にあって、実行中のシーンの行の対応で引けない（別のグローバルシーン・別のファイルの Lua のブロックの関数の中など）, then the pasta.dll shall 読み込みのときに作ったソースマップでその行を引き、引けたら 1 と同じ形で `.pasta` のファイルと行を出す（仮定・議題 1）。
+3. While デバッグが有効, if 止まった行が辞書から変換した Lua にあって、実行中のシーンの行の対応で引けない（別のグローバルシーン・別のファイルの Lua のブロックの関数の中など）, then the pasta.dll shall 読み込みのときに作ったソースマップでその行を引き、引けたら 1 と同じ形で `.pasta` のファイルと行を出す（議題 1 で確定）。
 4. If 止まった行を `.pasta` の行に引けない（デバッグが無効で行の対応に無い・作者の `.lua`・標準ランタイム）, then the pasta.dll shall 今の文言のまま出す（作者の `.lua` はそのファイルと行、それ以外は場所を出さない）。
 5. The pasta.dll shall 応答の `X-Error-Reason`、止まった場所（表記の対象）の書き方、止まらない実行時の失敗の表記（行番号を含まない）を変えない。
 
@@ -151,7 +151,7 @@ brief の項目と要件の対応は次のとおり。
 
 #### Acceptance Criteria
 
-1. The pasta_lua shall 残す部品に、DAP・キック・提示モード・サイドカーのためだけのコード・型・設定の欄・公開の口（`DebugHandle`・`SourceMode`・`KickSink`・`KickRequest`・`enable_debug` の再輸出・`debug_local_addr`・`debug_source_mode` など）を残さない（仮定・議題 9）。
+1. The pasta_lua shall 残す部品に、DAP・キック・提示モード・サイドカーのためだけのコード・型・設定の欄・公開の口（`DebugHandle`・`SourceMode`・`KickSink`・`KickRequest`・`enable_debug` の再輸出・`debug_local_addr`・`debug_source_mode` など）を残さない（議題 9 で確定）。
 2. The pasta_lua shall 残す部品に、使い手の無い項目を隠す属性（`#![allow(dead_code)]`・`#[allow(dead_code)]`・`#[allow(unused_imports)]`）を残さない（受け継いだ N4。`playscene.rs` 31 行・`source_map/scene_index.rs` 39 行・`source_map/mod.rs` 518・638・647 行）。
 3. The pasta_lua shall ソースマップの公開の問い合わせのうち本番の使い手が無いもの（`ChunkSourceMap::new`・`len`・`is_empty`・`lua_lines_for_pasta`・`MapBuilderSink::chunk_name`・`SourceMap::scene_index`）と、別の関数をそのまま呼ぶだけの `canonicalize_pasta_file` を残さない（N11・N12）。
 4. The pasta_lua shall 働きの無い呼び出し（`scene_join.rs` 130 行の `insert_file`）と、その上の誤ったコメントを残さない（N5）。
@@ -182,21 +182,21 @@ brief の項目と要件の対応は次のとおり。
 
 1. The pasta のテスト shall DAP とキックだけを確かめるテスト（`pasta_lua/src/debug/` の DAP・セッション・フック・transport・wiring のテスト、`pasta_lua/tests/runtime/` の `debug_*`・`runtime_toggle_e2e_*` とそのフィクスチャ、`pasta_shiori/tests/` の kick の 6 本・`debug_preservation_test.rs` とそのフィクスチャ・`multi_instance_test.rs` の DAP の部分、`lua_specs/` の kick の 8 本と一覧の行）を消し、残す振る舞い（ソースマップ・索引・開発用のイベント・位置）のテストを残す。
 2. The pasta のテスト shall 要件 1 の 1・3（ポートを取らない・有効な 2 体が並ぶ）、要件 3 の 2〜4、要件 5、要件 6 の 2・3 を確かめるテストを持つ。
-3. The pasta のテスト shall 環境の `PASTA_DEBUG`・`PASTA_LOG` に左右されない（中和は `PASTA_DEBUG`・`PASTA_LOG` を残し、意味の無くなった `PASTA_DEBUG_PORT` を外す。仮定・議題 3）。
+3. The pasta のテスト shall 環境の `PASTA_DEBUG`・`PASTA_LOG` に左右されない（中和は `PASTA_DEBUG`・`PASTA_LOG` を残し、意味の無くなった `PASTA_DEBUG_PORT` を外す。議題 3 で確定）。
 4. When 直しを終えた, the pasta のワークスペース shall `cargo fmt --check`・clippy（警告 0）・`cargo test --workspace`・Lua のテスト・luacheck を通す（cargo の前に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す）。
 5. When 直しを終えた, the pasta.dll shall i686（配布する 32 ビット版）のビルドとテストを通す（x86 を省かない）。
 
-## 要件ディスカッションへの持ち越し
+## 要件ディスカッションで確定したこと（2026-11-03）
 
-brief.md だけでは決めきれなかった論点。本文はどれも推奨案で書いた。根拠は research.md にある。
+brief.md だけでは決めきれなかった論点。開発者が 10 件とも推奨案で承認した（2026-11-03）。根拠は research.md にある。
 
-1. **Approach 4 の絞り方**（要件 6.3）：推奨は「デバッグが有効なときだけ、行の対応で引けない行をソースマップで引く」に絞って残す。止まるエラーの位置は行の対応でもう出ており、残るのは別のグローバルシーン・別のファイルの Lua のブロックの関数の中だけである。もう 1 つの案は、6.3 を落として 6.2 だけを直す（タスクが 1 減る）。
-2. **別のファイルの行を出す誤り**（要件 6.2）：推奨は、この spec でデバッグの有無によらず直す。`stop.lua` の `pasta_location` が止まったチャンクを見ないので、番号が重なると違うファイルの行を出す。根が同じなので別の spec へ送らない。
-3. **テストの中和**（要件 9.3）：推奨は、`PASTA_DEBUG`・`PASTA_LOG` の中和を残し、`PASTA_DEBUG_PORT` の行だけ外す。ポートが無くなっても、`PASTA_DEBUG=1` は開発用のイベントとソースマップを有効にするので、「無効なら 204」を確かめるテストなどが環境で変わる。中和は 4 つのクレートにある（brief は `pasta_sample_ghost` だけを挙げる）。
-4. **古いキーの扱い**（要件 3.3）：推奨は、今の「知らないキー」と同じに黙って読み飛ばす（警告を出さない）。`[debug]` を読む道（`PastaConfig::get_custom_config`）は `[logging]`・`[persistence]`・`[talk]` と同じで、知らないキーを黙って読み飛ばす（`deny_unknown_fields` はどこにも無い）。それに合わせる。
-5. **`OnPastaSceneAt` の URI の扱い**（要件 4.4）：推奨は、`file://` の剥がしとパーセントの復号をやめ、パスとしてだけ扱う。マニュアルはパスしか書いておらず、URI は DAP の名残りである。パスに `%41` のような並びがあると、今は別のファイルに直してしまう。UNC の URI の誤り（N13）も、URI を受けなくなれば消える。
-6. **有効なときの起動のログ**（要件 1.5）：推奨は、`debug backend listening` の代わりに、開発用のイベントを許したことを info で 1 行出す。利用者の章（`vscode-mcp-client`）のトラブルシューティングが、有効かどうかをログで確かめる手がかりにできる。
-7. **書き出しに失敗したとき**（要件 5.5）：推奨は、警告を 1 行書いて 204 を返し、書きかけのファイルを残さない（前のファイルは消さない）。前のファイルを消すかは選べる。
-8. **読み込みのときの Lua のエラーの位置**（範囲外）：推奨は、この spec の範囲外にし、バックログに残す。Lua のブロックの構文の誤りなどは、読み込みの失敗として変換したキャッシュの行で出る。止まるエラー（実行時）とは道が別である。
-9. **`pasta_lua` の公開の API を消すこと**（要件 7.1）：推奨は、0.5.0 で予告なく消す。`pasta_lua` は crates.io に出しているが、0.x の版上げで、ルートの README 88 行の断り書き（公開クレートの pub API は予告なく消すことがある）のとおりである。
-10. **`pasta_check validate` の組み込みの名前**（brief の Scope の In）：推奨は「直さない」。組み込みの名前は Call の飛び先（GLOBAL の関数・act のメソッド）だけで、`On` で始まる飛び先は見ない。`OnPastaDumpVariables` はイベントなので足す要が無い。
+1. **Approach 4 の絞り方**（要件 6.3）：確定。「デバッグが有効なときだけ、行の対応で引けない行をソースマップで引く」に絞って残す。止まるエラーの位置は行の対応でもう出ており、残るのは別のグローバルシーン・別のファイルの Lua のブロックの関数の中だけである。6.3 を落として 6.2 だけを直す案は採らなかった。
+2. **別のファイルの行を出す誤り**（要件 6.2）：確定。この spec でデバッグの有無によらず直す。`stop.lua` の `pasta_location` が止まったチャンクを見ないので、番号が重なると違うファイルの行を出す。根が同じなので別の spec へ送らない。
+3. **テストの中和**（要件 9.3）：確定。`PASTA_DEBUG`・`PASTA_LOG` の中和を残し、`PASTA_DEBUG_PORT` の行だけ外す。ポートが無くなっても、`PASTA_DEBUG=1` は開発用のイベントとソースマップを有効にするので、「無効なら 204」を確かめるテストなどが環境で変わる。中和は 4 つのクレートにある（brief は `pasta_sample_ghost` だけを挙げる）。
+4. **古いキーの扱い**（要件 3.3）：確定。今の「知らないキー」と同じに黙って読み飛ばす（警告を出さない）。`[debug]` を読む道（`PastaConfig::get_custom_config`）は `[logging]`・`[persistence]`・`[talk]` と同じで、知らないキーを黙って読み飛ばす（`deny_unknown_fields` はどこにも無い）。それに合わせる。
+5. **`OnPastaSceneAt` の URI の扱い**（要件 4.4）：確定。`file://` の剥がしとパーセントの復号をやめ、パスとしてだけ扱う。マニュアルはパスしか書いておらず、URI は DAP の名残りである。パスに `%41` のような並びがあると、今は別のファイルに直してしまう。UNC の URI の誤り（N13）も、URI を受けなくなれば消える。
+6. **有効なときの起動のログ**（要件 1.5）：確定。`debug backend listening` の代わりに、開発用のイベントを許したことを info で 1 行出す。利用者の章（`vscode-mcp-client`）のトラブルシューティングが、有効かどうかをログで確かめる手がかりにできる。
+7. **書き出しに失敗したとき**（要件 5.5）：確定。警告を 1 行書いて 204 を返し、書きかけのファイルを残さない（前のファイルは消さない）。
+8. **読み込みのときの Lua のエラーの位置**（範囲外）：確定。この spec の範囲外にし、バックログに残す。Lua のブロックの構文の誤りなどは、読み込みの失敗として変換したキャッシュの行で出る。止まるエラー（実行時）とは道が別である。
+9. **`pasta_lua` の公開の API を消すこと**（要件 7.1）：確定。0.5.0 で予告なく消す。`pasta_lua` は crates.io に出しているが、0.x の版上げで、ルートの README 88 行の断り書き（公開クレートの pub API は予告なく消すことがある）のとおりである。
+10. **`pasta_check validate` の組み込みの名前**（brief の Scope の In）：確定。直さない。組み込みの名前は Call の飛び先（GLOBAL の関数・act のメソッド）だけで、`On` で始まる飛び先は見ない。`OnPastaDumpVariables` はイベントなので足す要が無い。

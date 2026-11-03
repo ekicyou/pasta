@@ -8,7 +8,7 @@
 - **brief の 1 つ目の穴は本当だった**：止まるエラーの位置は、行の対応でもう出ている。ソースマップの新しい使い手（Approach 4）が要るのは、行の対応で引けない行（別のグローバルシーン・別のファイルの Lua のブロックの関数）だけである。加えて、別のファイルのときに**違うファイルの行を出す**誤りを見つけた（`stop.lua` 90〜99 行）。
 - **波及の大きいところ**：`spawn_actor_thread_with`（`pasta_shiori/src/actor/thread.rs`）が kick の送り先を引数に取り、kick と関係の無いテストが 8 本使う。`PASTA_DEBUG` の中和の `#[ctor]` は 17 ファイルに写しがある。どちらも消すだけだが、本数が多い。
 - **推奨**：Option A（今の部品の中で消し、残す。`OnPastaDumpVariables` は `scene_play.lua` の門を共有する）。規模は M〜L、危険は中の下。brief の見積もり 12〜16 タスクに収まる。
-- **持ち越し**：requirements.md の末尾の議題 1〜10。設計で調べる項目は下の「Research Needed」。
+- **議題**：requirements.md の末尾の議題 1〜10 は、要件ディスカッション（2026-11-03）で全部を推奨案で確定した。設計で調べる項目は下の「Research Needed」。
 
 ## brief の今の状態の確かめ
 
@@ -115,6 +115,6 @@
 - steering の古い記述：`tech.md` 36 行（`serde_json` は DAP のメッセージ）・44 行（`socket2`）・256 行（`@pasta_debug` の行）、`structure.md` 61〜73 行（`debug/` の木）・319・331 行、`product.md` の「VSCode 拡張・デバッグ基盤」の節。kiro-complete のスキルの同期で直す。
 - `ponytail-lua-debug` の N1〜N3・N7〜N10（`threads`・受け口の無い要求・`Decoded::reload_shiori`・encoder の join handle・`capture_*` の引数・対応表の無いブレークポイント・`debug_source_mode` の説明）は、部品ごと消えるので直す要が無い。N13（UNC の URI）は議題 5 しだいで消える。
 
-## 要件ディスカッションへの持ち越し
+## 要件ディスカッションの結果
 
-requirements.md の末尾の議題 1〜10 を見る。根拠は上の各節にある。
+requirements.md の末尾の議題 1〜10 は、2026-11-03 に開発者が全部を推奨案で承認した。根拠は上の各節にある。
