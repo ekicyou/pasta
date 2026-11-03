@@ -10,11 +10,13 @@
 //!   (pasta2.pest specification change from pasta.pest)
 
 mod action;
+mod attr_merge;
 mod cue;
 mod scene;
 mod span;
 
 pub use action::*;
+pub use attr_merge::*;
 pub use cue::*;
 pub use scene::*;
 pub use span::*;
