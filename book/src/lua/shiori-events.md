@@ -754,24 +754,82 @@ end
 
 ### MCP からの呼び方
 
-SSP の MCP サーバーの `raise_event` は、イベントを SHIORI に送り、返った台本を再生して、ツールの結果にも台本を載せる。`event` にイベント名を、`references` に Reference0 から順の値を文字列で渡す。
+AI エージェントが SSP・areka の MCP の道具を直に呼んで、辞書を試す手順である。VSCode の拡張の 3 つのコマンドも、同じ順で道具を呼ぶ（[開発支援アクション](../debug/dev-actions.md)）。MCP の窓口の番号は [SSP と areka の MCP の窓口](../debug/vscode-setup.md#ssp-と-areka-の-mcp-の窓口) にある。
+
+`raise_event` は、イベントを SHIORI に送り、返った台本を再生して、ツールの結果にも台本を載せる。`event` にイベント名を、`references` に Reference0 から順の値を文字列で渡す。
+
+**相手を確かめる**
 
 ```text
-reload(target = "shiori")
-
-raise_event(event = "OnPastaScene", references = ["会話"])
-raise_event(event = "OnPastaScene", references = ["会話", "挨拶"])
-raise_event(event = "OnPastaSceneAt", references = ["dic/boot.pasta", "42"])
+get_property(property_name = "baseware.name", ghost_name = "<ルート>")
 ```
 
-- 1 行目は、辞書を読み込み直す呼び出しである。
-- 2 行目は `＊会話` を、3 行目は `＊会話` の中の `・挨拶` を、4 行目は `dic/boot.pasta` の 42 行目のシーンを再生する。
-- 再生したときは、ツールの結果に、最初のチェイントークまでの台本が載る。見つからないときと引数の誤りでは、失敗の表記が載る。何も載らないとき（204）は、pasta のログで理由を見る。
+- どの道具にも、`ghost_name` にゴーストのルートフォルダ（`ghost/master/` を持つフォルダ）の絶対パスを渡す。違うゴーストへ送らないためである。
+- 最初に `get_property` で `baseware.name` を聞く。`SSP`・`areka` のような名前が返れば、そのゴーストはその相手で動いている。
+- `NG:Cannot find active ghost from specified name` が返れば、そのゴーストはその相手で動いていない。ほかの道具を呼ばず、ほかの相手を確かめる。
 
-辞書を書き換えたあとは、2 つのイベントを呼ぶ前に、MCP の `reload` に `target = "shiori"` を渡して SHIORI を読み込み直す。これは呼び出す側の務めである。`reload` は読み込み直しを頼むだけで、終わるのを待たない。終わる前に `raise_event` を呼ぶと、イベントは SHIORI に届かず、台本も載らない。MCP の `get_status` が答えるようになってから呼ぶ。
+**読み込み直して、終わりを待つ**
+
+```text
+get_log(log_type = "error", ghost_name = "<ルート>", max_count = 1)
+reload(target = "shiori", ghost_name = "<ルート>")
+get_log(log_type = "error", ghost_name = "<ルート>", since_id = <覚えた番号>)
+```
+
+辞書を書き換えたあとは、イベントを送る前に、MCP の `reload` に `target = "shiori"` を渡して SHIORI を読み込み直す。これは呼び出す側の務めである。
 
 - シーンの一覧と、行からシーンを引くための表は、SHIORI の読み込みのときに作られ、辞書のファイルを書き換えても変わらない。
 - 読み込み直さないと、書き足したシーンや名前を変えたシーンは見つからず、`OnPastaSceneAt` の行は書き換える前の辞書の行として引かれる。行がずれると、狙ったものとは違うシーンが、失敗も出さずに再生されることがある。
+
+`reload` は読み込み直しを頼むだけで、終わるのを待たない。終わる前に `raise_event` を呼ぶと、イベントは SHIORI に届かず、台本も載らない。
+
+- `reload` を呼ぶ前に、pasta のログ（既定は `ghost/master/profile/pasta/logs/pasta.log`。場所は [`[logging]`](../reference/pasta-toml.md#loggingログ出力) の `file_path` で変わる）の終わりの位置を覚える。
+- `reload` の後は、pasta のログに増えた行に `SHIORI load entry completed` の行が出るまで待つ。この行が読み込みの終わりの印である。`loaded=true` なら読み込めた。`loaded=false` なら読み込めていない。
+- 印の行が出ないときは、[読み込みの終わりを確かめられない](../debug/troubleshooting.md#読み込みの終わりを確かめられない)を見る。
+
+**誤りを数える**
+
+- `reload` を呼ぶ前に、`get_log` に `log_type = "error"`・`max_count = 1` を渡して、ベースウェアの誤りの記録の最後の番号を覚える。記録は `#番号 時刻 [表示の語] 名前 : 本文` の形の行で、`#120` なら 120 である。`(no log entries)` なら 0 とする。
+- 終わりの印が出たら、`get_log` に `log_type = "error"`・`since_id = <覚えた番号>` を渡して、読み込み直しで増えた記録だけを取る。表示の語に `warn` を含まない記録を誤りと数える。
+- pasta のログの増えた行のうち、印の行より前の `ERROR` の行も誤りと数える。
+- 誤りがあれば、シーンを送らずに辞書を直す。警告だけなら送ってよい。
+
+**シーンを再生する**
+
+```text
+raise_event(event = "OnPastaScene", references = ["会話"], ghost_name = "<ルート>")
+raise_event(event = "OnPastaScene", references = ["会話", "挨拶"], ghost_name = "<ルート>")
+raise_event(event = "OnPastaSceneAt", references = ["dic/boot.pasta", "42"], ghost_name = "<ルート>")
+```
+
+- 1 行目は `＊会話` を、2 行目は `＊会話` の中の `・挨拶` を、3 行目は `dic/boot.pasta` の 42 行目のシーンを再生する。
+- [OnPastaScene](#onpastascene名前でシーンを再生) は、名前を完全一致で探す。`会話` で `＊会話2` は再生しない。同じ名前のシーンが複数あれば、その中から 1 つを選ぶ。狙った 1 つを確かに再生したいときは、ほかと重ならない名前で指名するか、[OnPastaSceneAt](#onpastasceneat位置でシーンを再生) で位置を指す。
+- 再生したときは、ツールの結果に、最初のチェイントークまでの台本が載る。見つからないときと引数の誤りでは、失敗の表記が載る。
+- 何も載らないとき（`OK:the ghost returned no script.`。204）は、pasta のログで理由を見る（[シーンを再生するイベントの共通の決まり](#シーンを再生するイベントの共通の決まり)）。
+
+**応答が無いとき**
+
+`raise_event` の結果に `No response from server`（areka では `did not respond within`）が出ても、ゴーストがシーンを再生しなかったとは限らない。台本は、ベースウェアの台本の記録から読み直す。
+
+```text
+get_log(log_type = "script", ghost_name = "<ルート>", max_count = 1)
+raise_event(event = "OnPastaSceneAt", references = ["dic/boot.pasta", "42"], ghost_name = "<ルート>")
+get_log(log_type = "script", ghost_name = "<ルート>", since_id = <覚えた番号>)
+```
+
+- `raise_event` を送る前に、`log_type = "script"`・`max_count = 1` で、台本の記録の最後の番号を覚える。
+- 応答が無ければ、`since_id = <覚えた番号>` で増えた記録を数秒のあいだ引き直す。表示の語にイベント名を含む記録（`[Ghost:OnPastaSceneAt]` の形）が、そのイベントで再生した台本である。
+- 増えた記録に無ければ、再生したかは確かめられない。
+
+**変数を書く・読み出す**
+
+```text
+raise_event(event = "OnPastaSetSaveVariable", references = ["pasta_talk_interval_min", "60", "number"], ghost_name = "<ルート>")
+raise_event(event = "OnPastaDumpVariables", references = [], ghost_name = "<ルート>")
+```
+
+- 1 行目は、グローバル変数 `＄＊pasta_talk_interval_min` に数値の `60` を代入する。引数と型の決まりは [OnPastaSetSaveVariable](#onpastasetsavevariableグローバル変数に代入) にある。
+- 2 行目は、今の保存変数（`＄＊名前`）をファイルに書き出させる。値はツールの結果に載らない。書き出したファイルの場所は [保存変数を表示](../debug/dev-actions.md#保存変数を表示) にある。読み込み直さずに送れば、動いている間の値が見える。
 
 ### OnPastaCallFunction（＞名前を外から呼ぶ）
 

@@ -133,7 +133,7 @@
   - 終わったとき: 2 頁に 3 つのコマンドと上の場合がそれぞれ書かれ、9276・attach・ブレークポイントの手順が残っていない。
   - _Boundary: ManualChapter（dev-actions・troubleshooting）_
   - _Requirements: 9.2, 9.4, 9.8, 9.9, 9.10_
-- [ ] 7.3 (P) AI エージェントの手順を `shiori-events.md` の節に書き、スキルへ流す
+- [x] 7.3 (P) AI エージェントの手順を `shiori-events.md` の節に書き、スキルへ流す
   - 「MCP からの呼び方」節だけを書き直す: 相手の確かめ（`get_property(baseware.name, ghost_name=<ルート>)`）・`ghost_name` にルートの絶対パス・`reload(target="shiori")` と `pasta.log` の `SHIORI load entry completed` までの待ち（今の `get_status` の 1 文を置き換える）・`get_log(error, since_id)` での誤りの数え方・`OnPastaScene`（完全一致の名前）と `OnPastaSceneAt`・`OnPastaSetSaveVariable` と `OnPastaDumpVariables`（引数と書き出す場所は各節へリンクし、決まりを写さない）・「No response from server」のときの `get_log(script, since_id)`。
   - 同じ頁の別の節は触らない。`node book/tools/gen-skill-refs.mjs` で `pasta-lua-coding` の references を作り直す（`SKILL.md` は手で直さない）。
   - 終わったとき: `gen-skill-refs.mjs --check` が通り、references の節がマニュアルと同じ中身になっている。
