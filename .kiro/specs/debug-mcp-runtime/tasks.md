@@ -153,7 +153,7 @@
   - 完了の姿: `crates/` に `ChunkSourceMap`・`resolve_lua_to_pasta`・`resolve_pasta_to_lua` が無く、`cargo test -p pasta_lua` と clippy が通る
   - _Requirements: 7.2, 7.3, 9.1_
 
-- [ ] 8.4 シーンマップの周りの説明を今の形に直す
+- [x] 8.4 シーンマップの周りの説明を今の形に直す
   - `source_map/mod.rs`・`loader/source_map_build.rs`・`code_gen/source_map.rs`・`transpiler.rs` の説明から、行の対応表・逆引き・`LineShift` での付け替えの話を除き、シーンマップがシーンの宣言だけを控えることを書く。`transpiler.rs` の署名と `fill_line_maps` は変えない
   - 完了の姿: 4 つのファイルの説明に `ChunkSourceMap`・逆引き・`normalize_output` の誤った名前が無く、`cargo doc -p pasta_lua --no-deps` が警告無しで通る
   - _Requirements: 7.7_

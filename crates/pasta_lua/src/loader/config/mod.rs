@@ -15,11 +15,11 @@ use super::LoaderError;
 /// Contains loader-specific settings and custom user fields.
 #[derive(Debug, Clone)]
 pub struct PastaConfig {
-    /// Loader-specific configuration ([loader] section)
+    /// Loader-specific configuration (`[loader]` section)
     pub loader: LoaderConfig,
 
     /// All other fields/sections (custom user configuration)
-    /// Note: The [loader] section is explicitly excluded.
+    /// Note: The `[loader]` section is explicitly excluded.
     /// `[scene]` stays here as written (the alias table is NOT filled in).
     pub custom_fields: toml::Table,
 
@@ -249,22 +249,22 @@ impl PastaConfig {
             .and_then(|v| v.clone().try_into().ok())
     }
 
-    /// Get logging configuration from [logging] section.
+    /// Get logging configuration from `[logging]` section.
     pub fn logging(&self) -> Option<LoggingConfig> {
         self.get_custom_config("logging")
     }
 
-    /// Get persistence configuration from [persistence] section.
+    /// Get persistence configuration from `[persistence]` section.
     pub fn persistence(&self) -> Option<PersistenceConfig> {
         self.get_custom_config("persistence")
     }
 
-    /// Get talk configuration from [talk] section.
+    /// Get talk configuration from `[talk]` section.
     pub fn talk(&self) -> Option<TalkConfig> {
         self.get_custom_config("talk")
     }
 
-    /// Get debug configuration from [debug] section.
+    /// Get debug configuration from `[debug]` section.
     ///
     /// Returns `None` if the `[debug]` section is absent. When present, missing
     /// fields fall back to their serde defaults (`enabled = false`).
@@ -282,7 +282,7 @@ impl PastaConfig {
     }
 }
 
-/// Loader-specific configuration ([loader] section).
+/// Loader-specific configuration (`[loader]` section).
 #[derive(Debug, Clone, Deserialize)]
 pub struct LoaderConfig {
     /// Pasta file discovery patterns (default: ["dic/**/*.pasta"])

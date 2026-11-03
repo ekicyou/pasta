@@ -16,8 +16,7 @@ impl PastaLoader {
     /// [`LuaTranspiler::transpile`] のまま）。
     ///
     /// `.pasta` ごとに読み直して解析し、[`MapBuilderSink`] を付けて変換し直し（出力は
-    /// 捨てる）、控えた記録を [`SourceMap::insert_scenes`] に入れる。宣言の行は `.pasta`
-    /// の行なので、`LineShift` の付け替えは要らない。読めない・解析できない・変換できない
+    /// 捨てる）、控えた記録を [`SourceMap::insert_scenes`] に入れる。読めない・解析できない・変換できない
     /// ファイルは警告して飛ばす（本当の失敗は Phase 4 の変換が出す）。
     ///
     /// `transpiler` は生成 `.lua` と同じもの（照合の鍵が同じ別名の表を使うため）。

@@ -8,7 +8,7 @@
 
 use serde::Deserialize;
 
-/// Logging configuration from [logging] section in pasta.toml.
+/// Logging configuration from `[logging]` section in pasta.toml.
 ///
 /// Configures the instance-specific log file path and log level filtering.
 #[derive(Debug, Clone, Deserialize)]
@@ -61,7 +61,7 @@ fn default_log_level() -> String {
     "info".to_string()
 }
 
-/// Persistence configuration from [persistence] section in pasta.toml.
+/// Persistence configuration from `[persistence]` section in pasta.toml.
 ///
 /// Configures persistent data storage with optional obfuscation.
 #[derive(Debug, Clone, Deserialize)]
@@ -113,7 +113,7 @@ impl PersistenceConfig {
     }
 }
 
-/// Talk configuration from [talk] section in pasta.toml.
+/// Talk configuration from `[talk]` section in pasta.toml.
 ///
 /// Configures sakura script wait insertion for natural conversation tempo.
 ///
@@ -196,7 +196,7 @@ impl Default for TalkConfig {
 ///
 /// This struct is a **value supply source only**: it provides the default
 /// values for the later `apply_shiori_defaults` completion step. It is
-/// intentionally NOT wired into [`PastaConfig::parse`] and does not extract
+/// intentionally NOT wired into `PastaConfig::parse` and does not extract
 /// `[ghost]` out of `custom_fields` — the `[ghost]` section keeps flowing
 /// through to Lua via `custom_fields` (the `@pasta_config` exposure path stays
 /// unchanged).

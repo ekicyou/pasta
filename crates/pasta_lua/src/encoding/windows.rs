@@ -3,7 +3,7 @@
 //! Provides conversion between UTF-8 and the Windows ANSI code page
 //! using the Windows API functions MultiByteToWideChar and WideCharToMultiByte.
 //!
-//! Original: https://github.com/bozaro/local-encoding-rs/blob/master/src/windows.rs
+//! Original: <https://github.com/bozaro/local-encoding-rs/blob/master/src/windows.rs>
 
 use std::ffi::OsStr;
 use std::io::{Error, ErrorKind, Result};

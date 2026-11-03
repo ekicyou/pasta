@@ -22,7 +22,7 @@ pub struct LoaderContext {
     pub lua_search_paths: Vec<String>,
 
     /// Custom configuration fields from pasta.toml
-    /// (everything except [loader] section)
+    /// (everything except `[loader]` section)
     pub custom_fields: toml::Table,
 
     /// 変換した Lua のキャッシュの置き場所（base_dir 相対・`[loader] transpiled_output_dir`）。
@@ -59,12 +59,10 @@ impl LoaderContext {
     ///
     /// `std::fs::canonicalize()` resolves Windows 8.3 short names to their long
     /// form (e.g. a temp dir handed in as `C:\Users\RUNNER~1\...` becomes
-    /// `C:\Users\runneradmin\...`) and symlinks. That made `package.path`
-    /// (→ runtime chunk names) diverge from the cache/source-map/breakpoint form,
-    /// so `should_pause` never matched and breakpoints silently never fired when
-    /// the base path differed from its canonical form — reproducible on CI (whose
-    /// `%TEMP%` is an 8.3 short name) and possible for any real ghost installed
-    /// under an 8.3-generating path. `std::path::absolute` makes the path absolute
+    /// `C:\Users\runneradmin\...`) and symlinks, so `package.path` (→ runtime
+    /// chunk names) would diverge from the cache paths and the scene map keys when
+    /// the base path differs from its canonical form — e.g. on CI, whose `%TEMP%`
+    /// is an 8.3 short name. `std::path::absolute` makes the path absolute
     /// (resolving `.`/`..`) while preserving the exact short/long form, keeping
     /// every path identity consistent. It also never emits the `\\?\`
     /// extended-length prefix, so no stripping is needed.
@@ -268,8 +266,8 @@ mod tests {
 
     #[test]
     fn test_from_config_preserves_path_form_without_resolving_short_names() {
-        // `std::path::absolute` must NOT resolve 8.3 short names or symlinks (the
-        // regression guard for the breakpoint chunk-identity mismatch): the base
+        // `std::path::absolute` must NOT resolve 8.3 short names or symlinks (keeps
+        // chunk names, cache paths and scene map keys in one form): the base
         // must remain byte-for-byte the input's form once absolute. An already
         // absolute input is therefore returned unchanged.
         let temp = tempfile::TempDir::new().unwrap();

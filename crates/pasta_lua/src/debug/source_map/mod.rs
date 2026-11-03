@@ -13,7 +13,7 @@ pub use crate::code_gen::source_map::SourceMapSink;
 ///
 /// code_gen が宣言順（global ヘッダ → その local 群）に呼ぶ
 /// [`record_scene`](SourceMapSink::record_scene) の `(照合の鍵, .pasta の宣言の行)` を
-/// そのまま積む。宣言の行は `.pasta` の行なので `LineShift` の付け替えは要らない。
+/// そのまま積む。宣言の行は `.pasta` の行のまま使う。
 #[derive(Default)]
 pub struct MapBuilderSink {
     scenes: Vec<(String, u32)>,
@@ -32,7 +32,7 @@ impl SourceMapSink for MapBuilderSink {
             .push((scene_join_key.to_string(), span.start_line as u32));
     }
 
-    // 行の対応表は持たない。
+    // 行の記録は使わない。
     fn record_line(&mut self, _lua_line: u32, _pasta_line: u32) {}
 }
 
