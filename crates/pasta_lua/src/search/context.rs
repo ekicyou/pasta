@@ -545,7 +545,10 @@ mod tests {
         let mut finalized = SceneRegistry::new();
         finalized.register_global_raw(
             SYMBOL_GLOBAL,
-            &["__start__".to_string(), "選択_A_1".to_string()],
+            &[
+                ("__start__".to_string(), Vec::new()),
+                ("選択_A_1".to_string(), Vec::new()),
+            ],
             Vec::new(),
         );
 

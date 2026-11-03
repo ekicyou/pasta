@@ -179,7 +179,8 @@ fn build_scene_registry(scenes: &[(String, String)]) -> SceneRegistry {
     for (global_name, mut local_names) in globals {
         local_names.sort_by(|a, b| scene_order_key(a).cmp(&scene_order_key(b)));
         // Use register_global_raw to preserve the full name with counter
-        registry.register_global_raw(global_name, &local_names, Vec::new());
+        let locals: Vec<_> = local_names.into_iter().map(|n| (n, Vec::new())).collect();
+        registry.register_global_raw(global_name, &locals, Vec::new());
     }
 
     registry

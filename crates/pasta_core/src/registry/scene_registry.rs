@@ -135,8 +135,9 @@ impl SceneRegistry {
     /// # Arguments
     ///
     /// * `full_name` - Full scene name with counter (e.g., "OnBoot_1")
-    /// * `local_names` - List of local function names (e.g., ["__start__", "選択肢_1"])
-    /// * `attributes` - Attributes for filtering (applied to the global and its locals)
+    /// * `locals` - (local function name, its attributes) pairs (e.g., `("選択肢_1", vec![])`);
+    ///   `__start__` is skipped. The parent's attributes are not copied onto locals.
+    /// * `attributes` - Attributes of the global scene (its `__start__`)
     ///
     /// # Returns
     ///
@@ -144,7 +145,7 @@ impl SceneRegistry {
     pub fn register_global_raw(
         &mut self,
         full_name: &str,
-        local_names: &[String],
+        locals: &[(String, Vec<SceneAttr>)],
         attributes: Vec<SceneAttr>,
     ) -> i64 {
         let id = (self.scenes.len() + 1) as i64;
@@ -155,7 +156,7 @@ impl SceneRegistry {
         let entry = SceneEntry {
             id,
             name: full_name.to_string(),
-            attributes: attributes.clone(),
+            attributes,
             fn_name,
             parent: None,
         };
@@ -164,7 +165,7 @@ impl SceneRegistry {
         let global_id = id;
 
         // Register local scenes (excluding __start__)
-        for local_name in local_names.iter() {
+        for (local_name, local_attrs) in locals {
             if local_name != "__start__" {
                 let local_id = (self.scenes.len() + 1) as i64;
                 let local_fn_name = format!("{}::{}", full_name, local_name);
@@ -172,7 +173,7 @@ impl SceneRegistry {
                 let local_entry = SceneEntry {
                     id: local_id,
                     name: local_name.clone(),
-                    attributes: attributes.clone(),
+                    attributes: local_attrs.clone(),
                     fn_name: local_fn_name,
                     parent: Some(full_name.to_string()),
                 };
@@ -398,7 +399,10 @@ mod tests {
     fn test_register_global_raw_with_locals_excludes_start() {
         let mut registry = SceneRegistry::new();
 
-        let locals = vec!["__start__".to_string(), "__選択肢_1__".to_string()];
+        let locals = vec![
+            ("__start__".to_string(), Vec::new()),
+            ("__選択肢_1__".to_string(), Vec::new()),
+        ];
         let global_id = registry.register_global_raw("会話_1", &locals, Vec::new());
 
         // Returns the GLOBAL scene's ID
@@ -415,19 +419,27 @@ mod tests {
     }
 
     #[test]
-    fn test_register_global_raw_propagates_attributes_to_locals() {
+    fn test_register_global_raw_does_not_copy_parent_attributes_to_locals() {
         let mut registry = SceneRegistry::new();
 
         let attrs = vec![SceneAttr::Decl {
             key: "季節".to_string(),
             value: SceneAttrValue::String("春".to_string()),
         }];
-        let locals = vec!["item_1".to_string()];
+        let local_attrs = vec![SceneAttr::Flag {
+            key: "済み".to_string(),
+        }];
+        let locals = vec![
+            ("item_1".to_string(), Vec::new()),
+            ("item_2".to_string(), local_attrs.clone()),
+        ];
         registry.register_global_raw("Scene1", &locals, attrs.clone());
 
-        // Both global and local scenes carry the same attributes
-        assert_eq!(registry.all_scenes()[0].attributes, attrs);
-        assert_eq!(registry.all_scenes()[1].attributes, attrs);
+        // The global keeps its own; each local carries only what it was given (3.8)
+        let scenes = registry.all_scenes();
+        assert_eq!(scenes[0].attributes, attrs);
+        assert_eq!(scenes[1].attributes, Vec::new());
+        assert_eq!(scenes[2].attributes, local_attrs);
     }
 
     #[test]

@@ -85,6 +85,74 @@ fn test_resolve_scene_id_unified_attribute_filter_no_match() {
     }
 }
 
+/// 宣言の項目だけで AND 一致する。同じ名前の条件・フラグは比べない。
+/// 整数になった小数は整数の表記（`2`）で比べる（2.5・7.3・4.2）
+#[test]
+fn test_resolve_scene_id_attribute_filter_and_over_decl_items() {
+    use crate::registry::{CmpOp, SceneAttr, SceneAttrValue};
+
+    let level = |f: f64| SceneAttr::Decl {
+        key: "段".to_string(),
+        value: SceneAttrValue::from_f64(f),
+    };
+    let mut registry = SceneRegistry::new();
+    // 0: 季節=冬 だけ（段が無い）
+    registry.register_global("挨拶", vec![season("冬")]);
+    // 1: 季節=冬・段=2（小数 2.0 から）→ 一致
+    registry.register_global("挨拶", vec![season("冬"), level(2.0)]);
+    // 2: 季節=春・段=2
+    registry.register_global("挨拶", vec![season("春"), level(2.0)]);
+    // 3: 段 は条件とフラグだけ（宣言ではない）
+    registry.register_global(
+        "挨拶",
+        vec![
+            season("冬"),
+            SceneAttr::Cond {
+                key: "段".to_string(),
+                op: CmpOp::Eq,
+                value: SceneAttrValue::Integer(2),
+            },
+            SceneAttr::Flag {
+                key: "段".to_string(),
+            },
+        ],
+    );
+
+    let mut filters = HashMap::new();
+    filters.insert("季節".to_string(), "冬".to_string());
+    filters.insert("段".to_string(), "2".to_string());
+
+    let selector = Box::new(MockRandomSelector::new(vec![]));
+    let mut table = SceneTable::from_scene_registry(registry, selector);
+    for _ in 0..3 {
+        let id = table
+            .resolve_scene_id_unified("", "挨拶", &filters)
+            .unwrap();
+        assert_eq!(id, SceneId(1));
+    }
+}
+
+/// 空のフィルタは属性があっても候補を減らさない（2.5・7.3）
+#[test]
+fn test_resolve_scene_id_empty_filter_keeps_all_candidates() {
+    let mut registry = SceneRegistry::new();
+    registry.register_global("挨拶", vec![season("春")]);
+    registry.register_global("挨拶", Vec::new());
+    registry.register_global("挨拶", vec![season("冬")]);
+
+    let selector = Box::new(MockRandomSelector::new(vec![0, 0, 0]));
+    let mut table = SceneTable::from_scene_registry(registry, selector);
+    let mut seen: Vec<SceneId> = (0..3)
+        .map(|_| {
+            table
+                .resolve_scene_id_unified("", "挨拶", &HashMap::new())
+                .unwrap()
+        })
+        .collect();
+    seen.sort_by_key(|id| id.0);
+    assert_eq!(seen, vec![SceneId(0), SceneId(1), SceneId(2)]);
+}
+
 #[test]
 fn test_get_scene_out_of_range_returns_none() {
     use crate::registry::SceneRegistry;
