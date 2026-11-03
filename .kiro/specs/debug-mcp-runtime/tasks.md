@@ -134,7 +134,7 @@
   - _Requirements: 6.1, 6.2, 6.3, 9.2_
 
 - [ ] 8. ソースマップをシーンマップに縮める
-- [ ] 8.1 位置からシーンを引く索引の「チャンク → `.pasta`」を、読み込んだファイルの表から引く
+- [x] 8.1 位置からシーンを引く索引の「チャンク → `.pasta`」を、読み込んだファイルの表から引く
   - 索引の突合が、関数の定義元のチャンクから `.pasta` のパスを返す関数を引数で受けるようにし、ファクトリが 7.1 の口を閉じた関数（ゴーストのフォルダに結んで返す）を渡す
   - 完了の姿: 2 つのファイルの同じ名前のシーンがそれぞれのファイルで引けるテストを含め、`scene_identity_index_test.rs` が通る
   - _Depends: 7.1_
@@ -223,3 +223,4 @@
 - 4.2: `tests/chunk_name_validation_test.rs`（8.3 で消す予定）は jit.off・set_hook を使っていたため 4.2 で前倒しで消した。
 - 6.1: `persistence::dump_table` に一時の `#[allow(dead_code)]`（shortcut: コメント付き）がある。6.2 で `@pasta_debug` に結んだら外す。
 - 7.1: `searcher::pasta_file_of` に一時の `expect(dead_code)` がある。8.1 で使ったら外す。`@pasta_chunks` の値のパスはまだ OS の区切りのまま（`\` へのそろえは 7.2）。
+- 8.1: `SourceMap::pasta_file_for_chunk` と `chunk_files` は本番から呼ばれなくなった（pub なので警告は出ない）。8.3 で消す。

@@ -295,10 +295,6 @@ fn record_chunk(lua: &Lua, module_name: &str, candidate: &str) -> LuaResult<()> 
 /// 読み込んだ候補の全体のパス（`Function::info().source` から `@` を除いた形）から、
 /// その `.pasta` のパス（ゴーストのフォルダーから見た形）を返す。
 /// `.pasta` から変換したキャッシュでなければ None（作者の `.lua`・`dic/` の `.lua` の写し・表の無い VM）。
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "シーンの索引の突合（8.1）が使う")
-)]
 pub(crate) fn pasta_file_of(lua: &Lua, candidate: &str) -> Option<String> {
     lua.app_data_ref::<ChunkTable>()?
         .pasta_of

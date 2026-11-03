@@ -134,7 +134,14 @@ impl PastaLuaRuntime {
         // 不変（requirements 7.1 通常モード非破壊）。突合失敗（記録空・identity 不一致）
         // は非致命（best-effort）: 空/部分索引のまま続行し、起動を妨げない。
         if let Some(ref source_map) = runtime.source_map {
-            match crate::debug::source_map::build_scene_index(&runtime.lua, source_map) {
+            let lua = &runtime.lua;
+            let base_dir = &loader_context.base_dir;
+            // 記録のキーは base_dir から見つけた `.pasta` のパスなので、相対パスを結び直す。
+            let pasta_file_of = |src: &str| {
+                super::searcher::pasta_file_of(lua, src.strip_prefix('@').unwrap_or(src))
+                    .map(|rel| base_dir.join(rel).to_string_lossy().into_owned())
+            };
+            match crate::debug::source_map::build_scene_index(lua, source_map, pasta_file_of) {
                 Ok(index) => {
                     // write-once: 初回のみ成功。二重充填（Err）は本番経路では起こらない。
                     if source_map.set_scene_index(index).is_err() {
