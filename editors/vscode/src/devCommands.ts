@@ -24,7 +24,7 @@ const BAD_DOCUMENT = 'ゴーストを特定できません（ディスク上の 
 const NOT_IN_GHOST = 'ゴーストのフォルダの中のファイルではありません';
 const BUSY = 'このゴーストへのコマンドが進んでいます';
 const NOT_FOUND = 'このゴーストが動いている SSP・areka が見つかりません';
-const NOT_FOUND_CHECKS = '確かめること: ベースウェアでこのゴーストを起動しているか・SSP の MCP の窓口が有効か';
+const NOT_FOUND_CHECKS = '確かめること: ベースウェアでこのゴーストを起動しているか・ベースウェアの MCP の窓口が有効か';
 const SAVE_FAILED = '保存できなかったファイルがあるので止めました';
 
 /** 誤りの通知で出す失敗（7.3。それ以外の止まり方は警告） */
