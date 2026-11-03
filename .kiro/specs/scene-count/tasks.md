@@ -70,7 +70,7 @@
   - _Depends: 5.1_
   - _Requirements: 7.5_
 
-- [ ] 6. 最後の確かめ
+- [x] 6. 最後の確かめ
   - `cargo test -p pasta_lua`・`cargo test -p pasta_check`・`cargo clippy --workspace`・luacheck を通す（`NoDefaultCurrentDirectoryInExePath` を外して）。x86 でも同じ試験が走る
   - テストが書き換えた `sample.generated.lua` の改行だけの差分は戻す
   - 完了の状態: 上のすべてが通り、作業ツリーに意図しない差分が無い
