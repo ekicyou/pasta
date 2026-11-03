@@ -134,6 +134,50 @@ export function identify(port: number, root: string, timeoutMs = SCAN_TIMEOUT_MS
   return askName(port, root, timeoutMs);
 }
 
+export interface LogEntry { id: number; label: string; name: string; text: string }
+
+const LOG_HEAD = /^#(\d+) \S+ \S+ \[(.*?)\] (.*?) : ([\s\S]*)$/;
+
+/** get_log body (`#id time [label] name : text`, continuation lines start with a tab). (no log entries) is []. */
+export function parseLogEntries(text: string): LogEntry[] {
+  const entries: LogEntry[] = [];
+  for (const line of text.replace(/\r?\n$/, '').split(/\r?\n/)) {
+    const m = LOG_HEAD.exec(line);
+    if (m) entries.push({ id: Number(m[1]), label: m[2], name: m[3], text: m[4] });
+    else if (entries.length > 0) entries[entries.length - 1].text += '\n' + line.replace(/^\t/, '');
+  }
+  return entries;
+}
+
+/** Newest id via get_log(max_count=1); 0 when there are no records. */
+export async function lastLogId(port: number, logType: 'error' | 'script', root: string): Promise<number | CallResult> {
+  const r = await callTool(port, 'get_log', { log_type: logType, ghost_name: root, max_count: 1 });
+  if (r.kind !== 'ok') return r;
+  const last = parseLogEntries(r.text).pop();
+  if (last) return last.id;
+  return r.text.trim() === '(no log entries)' ? 0 : { kind: 'badShape', detail: `unexpected get_log text: ${r.text}` };
+}
+
+export type RaiseEventReply =
+  | { kind: 'script'; script: string }  // after the `Script: ` line head
+  | { kind: 'noScript' }                // `OK:the ghost returned no script.`
+  | { kind: 'noResponse'; detail: string }
+  | { kind: 'failed'; result: CallResult };
+
+/** Relay (mcp.exe) and areka's own time limit report no response as text. */
+const NO_RESPONSE = /No response from server|did not respond within/;
+
+export function readRaiseEvent(result: CallResult): RaiseEventReply {
+  if (result.kind === 'noResponse') return { kind: 'noResponse', detail: result.detail };
+  if (result.kind !== 'ok' && result.kind !== 'ng') return { kind: 'failed', result };
+  if (NO_RESPONSE.test(result.text)) return { kind: 'noResponse', detail: result.text };
+  if (result.kind === 'ng') return { kind: 'failed', result };
+  const m = /(?:^|\n)Script: ([\s\S]*)$/.exec(result.text);
+  if (m) return { kind: 'script', script: m[1].replace(/\r?\n$/, '') };
+  if (result.text.startsWith('OK:the ghost returned no script')) return { kind: 'noScript' };
+  return { kind: 'failed', result };
+}
+
 /** Probes all ports at once and returns the responders in `ports` order, one per baseware name. */
 export async function findBasewares(
   root: string, ports: readonly number[] = CANDIDATE_PORTS, timeoutMs = SCAN_TIMEOUT_MS,

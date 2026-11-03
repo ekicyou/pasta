@@ -2,13 +2,17 @@
 //   npx esbuild src/test/mcpClient.test.ts --bundle --platform=node --format=cjs --outfile=out/test/mcpClient.test.js && node out/test/mcpClient.test.js
 //
 // Requirements: 2.2 (ghost_name is the root path), 3.9 (127.0.0.1 only), 7.3 (errors come back typed),
-// 3.1 / 3.2 / 3.6 / 3.8 (finding and re-checking the baseware, task 3.2).
+// 3.1 / 3.2 / 3.6 / 3.8 (finding and re-checking the baseware, task 3.2),
+// 4.7 / 4.8 (reading get_log and the raise_event answer, task 3.3).
 
 import * as assert from 'assert';
 import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
-import { callTool, HOST, MCP_PATH, CALL_TIMEOUT_MS, CANDIDATE_PORTS, SCAN_TIMEOUT_MS, probe, identify, findBasewares } from '../mcpClient';
+import {
+  callTool, HOST, MCP_PATH, CALL_TIMEOUT_MS, CANDIDATE_PORTS, SCAN_TIMEOUT_MS, probe, identify, findBasewares,
+  parseLogEntries, lastLogId, readRaiseEvent,
+} from '../mcpClient';
 import { startFakeMcpServer } from './fakeMcpServer';
 
 let passed = 0;
@@ -137,6 +141,7 @@ async function main() {
   }
 
   await discoveryTests(root);
+  await logAndEventTests(root);
 
   console.log(`\nmcpClient: ${passed} passed, ${failed} failed\n`);
   if (failed > 0) process.exit(1);
@@ -209,6 +214,94 @@ async function discoveryTests(root: string) {
     });
   } finally {
     await Promise.all([ssp, areka, sspTwin, silent, idle].map((s) => s.close()));
+  }
+}
+
+async function logAndEventTests(root: string) {
+  await test('parseLogEntries: (no log entries) is []', async () => {
+    assert.deepStrictEqual(parseLogEntries('(no log entries)'), []);
+  });
+
+  await test('trailing newline is not kept in the last record or the script', async () => {
+    assert.deepStrictEqual(parseLogEntries('#1 2026/11/03 10:00 [Ghost:x] g : a\r\n').map((x) => x.text), ['a']);
+    assert.deepStrictEqual(readRaiseEvent({ kind: 'ok', text: 'OK:played.\r\nScript: \\0hi\\e\r\n' }), { kind: 'script', script: '\\0hi\\e' });
+  });
+
+  await test('parseLogEntries: header fields, tab continuation lines, CRLF, " : " inside the text', async () => {
+    const text = '#3 2026/11/03 10:29 [Ghost:OnPastaSceneAt] えも2 DEBUG : \\0first\r\n\tsecond\n\tthird\n#7 2026/11/03 10:30 [SHIORI] emo : x : y';
+    assert.deepStrictEqual(parseLogEntries(text), [
+      { id: 3, label: 'Ghost:OnPastaSceneAt', name: 'えも2 DEBUG', text: '\\0first\nsecond\nthird' },
+      { id: 7, label: 'SHIORI', name: 'emo', text: 'x : y' },
+    ]);
+  });
+
+  const srv = await startFakeMcpServer({ runningRoots: [root] });
+  const raise = (ghost = root) =>
+    callTool(srv.port, 'raise_event', { event: 'OnPastaSceneAt', references: ['a.pasta', '1'], ghost_name: ghost });
+  try {
+    await test('lastLogId: 0 with no records, else the newest id of that type (max_count=1)', async () => {
+      assert.strictEqual(await lastLogId(srv.port, 'script', root), 0);
+      srv.addLog('script', 'Ghost:OnBoot', 'a\nb');
+      const e = srv.addLog('error', 'SHIORI', 'err');
+      const s = srv.addLog('script', 'Ghost:OnPastaSceneAt', 'c');
+      assert.strictEqual(await lastLogId(srv.port, 'script', root), s);
+      assert.strictEqual(await lastLogId(srv.port, 'error', root), e);
+      assert.deepStrictEqual(srv.state.calls[srv.state.calls.length - 1].arguments,
+        { log_type: 'error', ghost_name: root, max_count: 1 });
+    });
+
+    await test('lastLogId: a failed call comes back as the CallResult', async () => {
+      const gone = await rawServer(200, '');
+      await gone.close();
+      const r = await lastLogId(gone.port, 'error', root);
+      assert.ok(typeof r !== 'number' && r.kind === 'unreachable', JSON.stringify(r));
+      const odd = await rawServer(200, JSON.stringify({ jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: 'garbage' }] } }));
+      try {
+        const b = await lastLogId(odd.port, 'error', root);
+        assert.ok(typeof b !== 'number' && b.kind === 'badShape', JSON.stringify(b));
+      } finally {
+        await odd.close();
+      }
+    });
+
+    await test('parseLogEntries reads multi-line records from the fake get_log', async () => {
+      const r = await callTool(srv.port, 'get_log', { log_type: 'script', ghost_name: root });
+      assert.ok(r.kind === 'ok', JSON.stringify(r));
+      assert.deepStrictEqual(parseLogEntries(r.text).map((x) => x.text), ['a\nb', 'c']);
+    });
+
+    await test('readRaiseEvent: script (text after the Script: line)', async () => {
+      srv.state.raiseEvent = { mode: 'script', script: '\\0\\s[0]hi\\e' };
+      assert.deepStrictEqual(readRaiseEvent(await raise()), { kind: 'script', script: '\\0\\s[0]hi\\e' });
+    });
+
+    await test('readRaiseEvent: no script', async () => {
+      srv.state.raiseEvent = { mode: 'noScript' };
+      assert.deepStrictEqual(readRaiseEvent(await raise()), { kind: 'noScript' });
+    });
+
+    for (const mode of ['drop', 'empty'] as const) {
+      await test(`readRaiseEvent: no response (${mode})`, async () => {
+        srv.state.raiseEvent = { mode };
+        assert.strictEqual(readRaiseEvent(await raise()).kind, 'noResponse');
+      });
+    }
+
+    await test('readRaiseEvent: "No response from server" / "did not respond within" in ok or ng are no response', async () => {
+      assert.strictEqual(readRaiseEvent({ kind: 'ok', text: 'No response from server' }).kind, 'noResponse');
+      assert.strictEqual(readRaiseEvent({ kind: 'ng', text: 'NG:areka did not respond within 10 seconds' }).kind, 'noResponse');
+    });
+
+    await test('readRaiseEvent: failure keeps the CallResult', async () => {
+      const r = await raise(path.join(root, 'x'));
+      assert.deepStrictEqual(readRaiseEvent(r), { kind: 'failed', result: r });
+      const u = { kind: 'unreachable', detail: 'ECONNREFUSED' } as const;
+      assert.deepStrictEqual(readRaiseEvent(u), { kind: 'failed', result: u });
+      const odd = { kind: 'ok', text: 'OK:something else' } as const;
+      assert.deepStrictEqual(readRaiseEvent(odd), { kind: 'failed', result: odd });
+    });
+  } finally {
+    await srv.close();
   }
 }
 
