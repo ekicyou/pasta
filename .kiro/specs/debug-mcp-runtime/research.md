@@ -118,3 +118,132 @@
 ## 要件ディスカッションの結果
 
 requirements.md の末尾の議題 1〜10 は、2026-11-03 に開発者が全部を推奨案で承認した。根拠は上の各節にある。
+
+## 設計フェーズの調べ（2026-11-03・kiro-spec-design）
+
+参照したスキルとガイド: `kiro-spec-design`（`rules/design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）、`kiro-validate-design`（`rules/design-review.md`）。発見は「既存の拡張」として軽い調べ（Light Discovery）で行った。新しい外部の依存は無い。
+
+### Summary（設計）
+
+- **Feature**: `debug-mcp-runtime`
+- **Discovery Scope**: Extension（撤去が主の既存の拡張）
+- **Key Findings**:
+  - 「デバッグが有効か」はソースマップの有無と 1 対 1 に揃えられる。ローダは有効なときだけ `Some` を作り、`build_source_map` は失敗を飛ばすだけで必ず `Some` を返す。`RuntimeConfig::debug` と 2 回目の解決（`factory.rs`）は要らない。
+  - 縮んだチャンク名からの引き（調べ 1）は、Rust の `ChunkTable::seen`（キー → 最初の候補の全体のパス）が既に持っている。Lua に全体のパスを出さずに済む。
+  - チャンクがどの `.pasta` か（調べ 2）は、モジュール名からは戻せないが、ローダが `.pasta` ごとのモジュール名を知っているので、表を渡せば searcher が控えられる。キャッシュの中身は変わらない。
+
+### 調べ 1: 縮んだチャンク名からソースマップを引く道（要件 6.3）
+
+- **Sources**: `runtime/searcher.rs` 175〜263 行（`LUA_IDSIZE`・`error_form`・`ChunkTable`・`record_chunk`）、`debug/source_map/mod.rs` 316 行（`canonicalize_chunk_name`）・550 行（`resolve_lua_to_pasta`）、`loader/source_map_build.rs`（チャンク名は `CacheManager::source_to_cache_path`）、`loader/context.rs` 35〜68 行（`base_dir` は `std::path::absolute` で、8.3 の名前を解かない）。
+- **Findings**: `ChunkTable::seen: HashMap<Vec<u8>, String>` が、エラー文の形のキーから、そのキーを最初に作った候補（`package.path` を埋めた全体のパス）を引ける。重複は Lua の表で `false` になり、`stop.lua` が引かない。候補のパスとソースマップのキーは、どちらも同じ `base_dir` から作られ、`canonicalize_chunk_name`（`@`・`\`→`/`・Windows の大小）で揃う。DAP のブレークポイントが同じ一致に頼っていた。
+- **Implications**: `searcher::chunk_path(lua, key)` を足し、`@pasta_debug.pasta_line(chunk, line)` が `resolve_lua_to_pasta` を呼ぶ。`SourceMap` に新しい問い合わせは要らない。一致が崩れたときに黙って引けなくなる危険は、結合テスト（6.3）で守る。
+
+### 調べ 2: `@pasta_chunks` の辞書の印の値（要件 6.2）
+
+- **Sources**: `loader/cache.rs` 249〜276 行（`source_to_module_name`・`source_to_cache_path`）・300 行（`get_relative_path`）、`loader/process.rs` 150〜200 行（行の対応の `.pasta` は `get_relative_path` の形）、`loader/mod.rs` 125〜250 行（`LoaderContext` は Phase 1.7 で作り、Phase 6 でファクトリに渡る）、`runtime/searcher.rs` 115〜147 行（`find_module` はモジュール名を持つ）、`shiori/stop.lua` 86〜119 行。
+- **Findings**: モジュール名は `.`・`-` を `_` にするので、キャッシュのパスから `.pasta` に戻せない。ローダは Phase 4 で `.pasta` ごとにモジュール名を作るので、モジュール名 → `.pasta` のパス（`get_relative_path`）の表を `LoaderContext` に積めば、`record_chunk` がモジュール名で引ける。行の対応の `.pasta` のパスも同じ `get_relative_path` から作られるので、`\` に揃えるだけで比べられる。値の型は、作者の `.lua` の文字列と見分けるため表 `{ pasta = … }` にした（`.pasta` の拡張子で見分ける案は、`[loader] pasta_patterns` が拡張子を縛らないので採らない）。`dic/` の `.lua` はキャッシュに写され、今は `true` になって行の対応で引かれる（違う行を出しうる）。表に入れなければ場所を出さない。
+- **Implications**: `LoaderContext::pasta_sources`・`register_chunk_table` の引数・`record_chunk` のモジュール名の引数を足す。`fill_line_maps`・`act.lua`・キャッシュの版は変えない。
+
+### 調べ 3: JIT が止まらないことの確かめ方（要件 1.2）
+
+- **Sources**: `runtime/runtime_config.rs` 15 行（`default_libs` は `std_all`）、`debug/debug_mod_tests.rs` 205〜236・341〜345 行（ALL_SAFE の VM で `jit.status()` を呼んでいる）。
+- **Findings**: 既定の VM で `jit.status()` が呼べる。今のテストは、デバッグを有効にすると偽になることを確かめている。
+- **Implications**: 有効なゴーストを読み込んだ VM で `jit.status()` が真であることを確かめる。フックを付けないことは、フックの部品（`hook.rs`・`enable.rs`）が無くなることと、grep（`set_hook`・`jit.off`）で確かめる。x86 の LuaJIT も JIT を持つので、期待は分けない見込み。
+
+### 調べ 4: 書き出しの原子性（要件 5.5）
+
+- **Sources**: `runtime/persistence.rs` 260〜313 行（`save_to_file`）・680〜691 行（`quarantine` の「rename は Windows でも行き先を置き換える」）。Rust の `std::fs::rename` の説明（Windows では在るファイルを置き換える）。
+- **Findings**: `save_to_file` は、親のフォルダを作り、`<path>.tmp` に書いて `sync_all` し、`rename` で置き換える。`rename` の失敗のときだけ一時ファイルを消し、書き込み・`sync_all` の失敗では一時ファイルが残る。最後のファイルは `rename` まで触らないので、前のファイルは消えない。読み手が共有の削除を許さずに開いていると、Windows の `rename` は拒まれる。
+- **Implications**: `dump_table` は `save_to_file(&doc, path, false)` を使う。`save_to_file` を、書き込み・`sync_all` の失敗でも一時ファイルを消すように直す（`save.toml` にも効く小さな直し）。
+
+### 調べ 5: 有効な 2 体が並ぶことの確かめ（要件 1.3）
+
+- **Sources**: `pasta_shiori/tests/multi_instance_test.rs` 156〜241 行、`tests/fixtures/multi_instance/dic/multi.pasta`（`＊会話` などの大域シーン）。
+- **Findings**: 今の `log_levels_and_debug_port_stay_per_instance` は、同じポートを指した後の方が警告を出すことを確かめている。ポートが無くなれば、2 体とも `[debug] enabled = true` で読み込みが通り、どちらも `OnPastaScene` に 200 で答えることが「並ぶ」の確かめになる。
+- **Implications**: テストを書き直す。ログの量の確かめはそのまま残し、ポートの確かめを「両方のログに info の 1 行があり、待ち受けのログが無い」に替える。`dap_kick_reaches_only_its_own_instance` は消す。
+
+### 調べ 6: SSP の `raise_event` の 204
+
+- **Findings**: この spec の境の外（`vscode-mcp-client` が確かめる）。この spec が約束するのは、ハンドラの中で書き出しを同期に終えてから 204 を返すことだけ。
+
+### そのほかに見つけたこと
+
+- `pasta_lua/tests/scene_alias_search_test.rs` 330 行の埋め込みの Lua が `KICK.try_dispatch` を使う（ギャップ分析の一覧に無かった）。キックの分を外す。
+- `pasta_sample_ghost/tests/tutorial_stages_test.rs` 370 行の `E2E_PREFIXES`（`Kick`・`Gate`）は、消す e2e（`scene_kick_*`）のシーン名との衝突を避けるためのもの。使い手が無くなる。
+- `pasta_lua/tests/transpiler/final_regression_test.rs` 257・292 行に、`enable`・`SourceMode` を確かめる 2 本がある。消す。
+- `pasta_lua/tests/scene_play_event_test.rs` 251 行の「待ち受けを塞いでも位置で再生できる」は、`debug_enabled()` が待ち受けの有無を返すことを前提にしている。ポートの話を外して直す。
+- DAP を消すと、`SourceMap` の逆引き（`reverse`・`resolve_pasta_to_lua`・`nearest_pasta_line_with_mapping`）と `ChunkSourceMap::from_forward` も本番の使い手を失う（使い手はブレークポイントとサイドカーだった）。
+- `PASTA_DEBUG_PORT` の中和の写しは、`pasta_shiori/src/shiori_request_tests.rs` にもある（`src` の中）。
+
+## Architecture Pattern Evaluation（設計）
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A: 今の部品の中で消し、残す | `debug/` の DAP を消し、`config`・`playscene`・`source_map` を残す。Lua の門は `scene_play.lua` | 新しいファイルがほぼ無い。残す部品のテストがそのまま守り | 「debug」の名前が残る | 採った（ギャップ分析の推奨のまま） |
+| B: 開発用の部品を作り直す | `debug/` を `dev/` などにし、`@pasta_debug` の名前を変える | 名前と中身が揃う | 名前の変更が `vscode-mcp-client`・マニュアル・スキルに波及する | 採らない |
+| C: Lua だけ集める | 3 つのイベントを新しいファイルへ | 門が 1 か所 | `scene_play.lua` に 1 つ足すだけで済む | 採らない |
+
+## Design Decisions
+
+### Decision: 「デバッグが有効か」をソースマップの有無で持つ
+
+- **Context**: 要件 7.5・7.6。今は解決が 2 回（ローダとファクトリ）で、`debug_enabled()` は待ち受けの有無を返す。
+- **Alternatives Considered**:
+  1. `DebugConfig { enabled }` を残し、`RuntimeConfig::debug` に積む。
+  2. `PastaLuaRuntime` に `debug_enabled: bool` を足し、ソースマップと別に持つ。
+  3. ソースマップの有無だけで持つ。
+- **Selected Approach**: 3。ローダが `resolve_enabled` を 1 回だけ呼び、真のときだけ `Some(Arc<SourceMap>)` をファクトリに渡す。`debug_enabled()` と `@pasta_debug.enabled()` はその有無を返す。
+- **Rationale**: 2 つの値を持つと食い違いうる。有効 ⇔ ソースマップがある、は作り方で決まる（3.5・3.6）。`RuntimeConfig` から `debug`・`kick_sink` が消え、`Debug` の手書きも要らなくなる。
+- **Trade-offs**: ローダを通らない VM でデバッグを有効にする道が無くなる（使い手は DAP のテストだけ）。
+- **Follow-up**: 設計ディスカッションで確かめる（design.md の前提 A2）。
+
+### Decision: 6.3 の引きは「チャンク名と行」で Rust に渡す
+
+- **Context**: 要件 6.3、調べ 1。
+- **Alternatives Considered**:
+  1. `@pasta_chunks` の値に全体のパスを持たせ、Lua から渡す。
+  2. `.pasta` のパスと行で引く新しい問い合わせを `SourceMap` に足す。
+  3. 縮んだチャンク名と行を渡し、Rust が `ChunkTable::seen` で全体のパスに戻して `resolve_lua_to_pasta` を呼ぶ。
+- **Selected Approach**: 3（`@pasta_debug.pasta_line`・`searcher::chunk_path`）。
+- **Rationale**: 既にある表と問い合わせだけで済む。返すのは行だけで、ファイルは `stop.lua` が `@pasta_chunks` の値から出すので、ソースマップの絶対パスを相対に直す手間も無い。
+- **Trade-offs**: `@pasta_debug` が searcher の表を読む（同じ `runtime` の中の `pub(crate)`）。
+
+### Decision: 辞書のチャンクの値を `{ pasta = … }` にする
+
+- **Context**: 要件 6.2、調べ 2。
+- **Selected Approach**: ローダがモジュール名 → `.pasta` のパスの表（`LoaderContext::pasta_sources`）を渡し、`record_chunk` が表の値を控える。表に無いキャッシュは控えない。
+- **Rationale**: 行の対応の書式とキャッシュの中身を変えずに、チャンクの `.pasta` が分かる。`act.lua`・`transpiler.rs` に触れない。
+- **Trade-offs**: `LoaderContext` に欄が増える（pub の struct）。
+
+### Decision: `OnPastaDumpVariables` は `scene_play.lua` と `@pasta_debug` に置く
+
+- **Context**: 要件 5、brief の Approach 5。
+- **Selected Approach**: ハンドラは `scene_play.lua` で `allowed()` を共有する。書き出しは `@pasta_debug.dump_variables(save)` → `persistence::dump_table` → `save_to_file(…, false)`。
+- **Rationale**: 門が 1 か所のまま。変換はセーブと同じ関数で、外したキーの警告も共有する。セーブの門（`SaveGate`）は通らないので、読めないセーブがあっても書き出せ、`save.toml` に触れない。
+- **Trade-offs**: `allowed()` の警告の後半を引数にする（`scene not played` と `variables not dumped`）。
+
+### Decision: `OnPastaSceneAt` の Reference0 はパスとしてだけ扱う
+
+- **Context**: 要件 4.4（議題 5）。
+- **Selected Approach**: `resolve_position` は `std::path::absolute(base_dir.join(file))` だけにし、`uri_to_pasta_path` とその下の 4 つの関数を消す。
+- **Rationale**: `%41` を別のファイルに直す誤りと、UNC の URI のホスト名が消える誤り（N13）が、道ごと消える。
+
+### Decision: DAP だけが使っていた残す部品の口も消す
+
+- **Context**: 要件 7.1・7.3。
+- **Selected Approach**: 7.3 の一覧に加え、`SourceMap` の逆引き（ブレークポイントだけが使った）と sidecar の再輸出を消す。`ChunkSourceMap::from_forward` はテストの補助が使うので `#[cfg(test)]` にする。
+- **Rationale**: 7.1 の「DAP のためだけのコードを残さない」。後の spec が読む量が減る。
+- **Follow-up**: 設計ディスカッションで確かめる（design.md の前提 A1）。
+
+## Synthesis（設計の 3 つの見方）
+
+- **Generalization**: 3 つの開発用のイベントは「デバッグが有効で external でなければ許す」の同じ門の変種なので、`allowed(act, event, outcome)` 1 つにした。止まるエラーの場所は「チャンク → 出どころ（作者の `.lua`／`.pasta`／不明）→ 行」の 1 つの引きで、行の対応とソースマップはその中の 2 つの引き方にした。
+- **Build vs Adopt**: 書き出しは `persistence.rs` の変換と `save_to_file` をそのまま使う（新しい書式・依存を足さない。シリアライズは TOML の方針）。原子性は std の `rename`。チャンク名の全体のパスは searcher の既存の表を使う。
+- **Simplification**: `DebugConfig` の型・`RuntimeConfig::debug`・2 回目の解決・`with_debug*`・`SourceMode`・sidecar・逆引き・URI の復号を消した。新しい型は足さない（`LoaderContext` の欄 1 つと関数 3 つ）。
+
+## Risks & Mitigations（設計）
+
+- 候補のパスとソースマップのキーが一致しないと 6.3 が黙って引けない — 結合テスト（`runtime_error_balloon_e2e_test.rs` の有効の 1 本）で守る。
+- 撤去の差分が大きく、途中でビルドが壊れる — design.md の Implementation Order のとおり、どの段でもビルドが通る順に切る。`runtime_config.rs` の `kick_sink` と `pasta_shiori` は同じタスクにする。
+- `.claude/skills/` の references の作り直しが分類器に拒まれる — 入った分と残りを示して開発者に頼む（メモリの方針）。
+- 環境変数を置くテスト（3.4）がほかのテストに漏れる — 専用のテストのバイナリにする。
