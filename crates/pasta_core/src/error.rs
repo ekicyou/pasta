@@ -4,7 +4,6 @@
 //! SceneAliasError, ActorFontError).
 //! Parse-related errors (ParseError) are defined in the `pasta_dsl` crate.
 
-use std::collections::HashMap;
 use thiserror::Error;
 
 /// Scene table lookup errors.
@@ -14,12 +13,9 @@ pub enum SceneTableError {
     #[error("Scene not found: {scene}")]
     SceneNotFound { scene: String },
 
-    /// No matching scene with filters.
-    #[error("No matching scene: '{scene}' with filters {filters:?}")]
-    NoMatchingScene {
-        scene: String,
-        filters: HashMap<String, String>,
-    },
+    /// 名前に合うシーンはあるが、条件を満たす候補が 1 つも無い
+    #[error("No matching scene: '{scene}'")]
+    NoMatchingScene { scene: String },
 
     /// Invalid scene name.
     #[error("Invalid scene name: '{scene}'")]
@@ -120,17 +116,14 @@ mod tests {
     }
 
     #[test]
-    fn test_scene_table_error_display_with_filters() {
-        let mut filters = HashMap::new();
-        filters.insert("季節".to_string(), "春".to_string());
-
-        let msg = SceneTableError::NoMatchingScene {
-            scene: "挨拶".to_string(),
-            filters,
-        }
-        .to_string();
-        assert!(msg.starts_with("No matching scene: '挨拶' with filters"));
-        assert!(msg.contains("季節"));
+    fn test_scene_table_error_display_no_matching_scene() {
+        assert_eq!(
+            SceneTableError::NoMatchingScene {
+                scene: "挨拶".to_string()
+            }
+            .to_string(),
+            "No matching scene: '挨拶'"
+        );
     }
 
     #[test]

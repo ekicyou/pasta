@@ -29,7 +29,7 @@ fn test_resolve_scene_id_basic() {
         random_selector: selector,
     };
 
-    let result = table.resolve_scene_id_unified("", "test", &HashMap::new());
+    let result = table.resolve_scene_id_unified("", "test", None);
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), SceneId(0));
 }
@@ -325,7 +325,7 @@ fn test_resolve_scene_id_unified_local_scene() {
     let mut table = SceneTable::from_scene_registry(registry, selector);
 
     // Resolve local scene from parent module
-    let result = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
+    let result = table.resolve_scene_id_unified("会話_1", "選択肢", None);
     assert!(result.is_ok());
     let scene_id = result.unwrap();
     let scene = table.get_scene(scene_id).unwrap();
@@ -343,7 +343,7 @@ fn test_resolve_scene_id_unified_global_scene() {
     let mut table = SceneTable::from_scene_registry(registry, selector);
 
     // Resolve global scene - must use empty module_name for global search
-    let result = table.resolve_scene_id_unified("", "挨拶", &HashMap::new());
+    let result = table.resolve_scene_id_unified("", "挨拶", None);
     assert!(result.is_ok());
 }
 
@@ -358,7 +358,7 @@ fn test_resolve_scene_id_unified_global_scene_no_fallback() {
     let mut table = SceneTable::from_scene_registry(registry, selector);
 
     // Try to resolve global scene from a module - should fail (no fallback)
-    let result = table.resolve_scene_id_unified("任意のモジュール", "挨拶", &HashMap::new());
+    let result = table.resolve_scene_id_unified("任意のモジュール", "挨拶", None);
     assert!(result.is_err());
 }
 
@@ -377,7 +377,7 @@ fn test_resolve_scene_id_unified_local_found() {
     let mut table = SceneTable::from_scene_registry(registry, selector);
 
     // Resolve from 会話_1 - should find ONLY local (no fallback to global)
-    let result = table.resolve_scene_id_unified("会話_1", "挨拶", &HashMap::new());
+    let result = table.resolve_scene_id_unified("会話_1", "挨拶", None);
     assert!(result.is_ok());
     let scene_id = result.unwrap();
     let scene = table.get_scene(scene_id).unwrap();
@@ -385,7 +385,7 @@ fn test_resolve_scene_id_unified_local_found() {
     assert!(scene.parent.is_some());
 
     // Call again - should succeed due to cycling reset (1 local candidate cycles)
-    let result2 = table.resolve_scene_id_unified("会話_1", "挨拶", &HashMap::new());
+    let result2 = table.resolve_scene_id_unified("会話_1", "挨拶", None);
     assert!(result2.is_ok()); // Cycling reset returns the same scene
     let scene_id2 = result2.unwrap();
     let scene2 = table.get_scene(scene_id2).unwrap();
@@ -415,15 +415,15 @@ fn test_resolve_scene_id_cycling() {
     };
 
     // 1回目〜3回目: 候補を順番に消費
-    let r1 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
+    let r1 = table.resolve_scene_id_unified("", "OnTalk", None);
     assert!(r1.is_ok());
-    let r2 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
+    let r2 = table.resolve_scene_id_unified("", "OnTalk", None);
     assert!(r2.is_ok());
-    let r3 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
+    let r3 = table.resolve_scene_id_unified("", "OnTalk", None);
     assert!(r3.is_ok());
 
     // 4回目: 循環リセットが発生し、成功すること
-    let r4 = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
+    let r4 = table.resolve_scene_id_unified("", "OnTalk", None);
     assert!(
         r4.is_ok(),
         "4回目の呼び出しが失敗: 循環リセットが動作していない"
@@ -439,7 +439,7 @@ fn test_resolve_scene_id_cycling() {
 
     // さらに続行できることも検証（10回以上）
     for i in 5..=12 {
-        let r = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
+        let r = table.resolve_scene_id_unified("", "OnTalk", None);
         assert!(r.is_ok(), "{}回目の呼び出しが失敗", i);
     }
 }
@@ -468,14 +468,14 @@ fn test_resolve_scene_id_cycling_reshuffles() {
     // 1周目の順序を記録
     let mut first_cycle = Vec::new();
     for _ in 0..3 {
-        let r = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
+        let r = table.resolve_scene_id_unified("", "OnTalk", None);
         first_cycle.push(r.unwrap());
     }
 
     // 2周目（リセット後）の順序を記録
     let mut second_cycle = Vec::new();
     for _ in 0..3 {
-        let r = table.resolve_scene_id_unified("", "OnTalk", &HashMap::new());
+        let r = table.resolve_scene_id_unified("", "OnTalk", None);
         assert!(r.is_ok());
         second_cycle.push(r.unwrap());
     }
@@ -507,22 +507,14 @@ fn test_resolve_scene_id_cycling_preserves_candidates() {
     // 1周目: 全候補を収集
     let mut first_cycle: std::collections::HashSet<SceneId> = std::collections::HashSet::new();
     for _ in 0..3 {
-        first_cycle.insert(
-            table
-                .resolve_scene_id_unified("", "OnTalk", &HashMap::new())
-                .unwrap(),
-        );
+        first_cycle.insert(table.resolve_scene_id_unified("", "OnTalk", None).unwrap());
     }
     assert_eq!(first_cycle.len(), 3);
 
     // 2周目: リセット後の全候補を収集
     let mut second_cycle: std::collections::HashSet<SceneId> = std::collections::HashSet::new();
     for _ in 0..3 {
-        second_cycle.insert(
-            table
-                .resolve_scene_id_unified("", "OnTalk", &HashMap::new())
-                .unwrap(),
-        );
+        second_cycle.insert(table.resolve_scene_id_unified("", "OnTalk", None).unwrap());
     }
     assert_eq!(second_cycle.len(), 3);
 
@@ -547,13 +539,13 @@ fn test_resolve_scene_id_unified_cycling() {
     let mut table = SceneTable::from_scene_registry(registry, selector);
 
     // 1周目: 2件のローカル候補を消費
-    let r1 = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
+    let r1 = table.resolve_scene_id_unified("会話_1", "選択肢", None);
     assert!(r1.is_ok());
-    let r2 = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
+    let r2 = table.resolve_scene_id_unified("会話_1", "選択肢", None);
     assert!(r2.is_ok());
 
     // 3回目: 循環リセットが発生し、成功すること
-    let r3 = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
+    let r3 = table.resolve_scene_id_unified("会話_1", "選択肢", None);
     assert!(
         r3.is_ok(),
         "unified版で3回目の呼び出しが失敗: 循環リセットが動作していない"
@@ -700,11 +692,7 @@ fn test_resolve_scene_id_selector_applies_to_candidate_order_each_round() {
     let expected = vec![SceneId(1), SceneId(2), SceneId(0)];
     let mut round = || -> Vec<SceneId> {
         (0..3)
-            .map(|_| {
-                table
-                    .resolve_scene_id_unified("", "OnTalk", &HashMap::new())
-                    .unwrap()
-            })
+            .map(|_| table.resolve_scene_id_unified("", "OnTalk", None).unwrap())
             .collect()
     };
     assert_eq!(round(), expected, "1 巡目");
@@ -796,9 +784,7 @@ fn test_candidate_order_sequence_selects_by_position() {
     let mut table = candidate_order_table(vec![4, 0]);
     let picked: Vec<String> = (0..6)
         .map(|_| {
-            let id = table
-                .resolve_scene_id_unified("", "挨拶", &HashMap::new())
-                .unwrap();
+            let id = table.resolve_scene_id_unified("", "挨拶", None).unwrap();
             table.get_scene(id).unwrap().fn_name.clone()
         })
         .collect();

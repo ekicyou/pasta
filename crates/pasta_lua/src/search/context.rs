@@ -9,7 +9,6 @@ use pasta_core::registry::{
     DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable, SceneRegistry,
     SceneTable, WordDefRegistry, WordTable,
 };
-use std::collections::HashMap;
 
 /// [`SearchContext::search_local_scene_exact`] の結果。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,7 +126,6 @@ impl SearchContext {
         global_scene_name: Option<&str>,
         exact: bool,
     ) -> Result<Option<(String, String)>, SearchError> {
-        let filters = HashMap::new();
         let resolve = if exact {
             SceneTable::resolve_scene_id_exact
         } else {
@@ -138,7 +136,7 @@ impl SearchContext {
         if let Some(parent) = global_scene_name {
             let name = &SceneRegistry::sanitize_name(name);
             // Local-only search within the parent scope (no global fallback)
-            match resolve(&mut self.scene_table, parent, name, &filters) {
+            match resolve(&mut self.scene_table, parent, name, None) {
                 Ok(scene_id) => {
                     let scene = self.scene_table.get_scene(scene_id).ok_or_else(|| {
                         SearchError::InvalidArgument("Scene ID not found".to_string())
@@ -160,7 +158,7 @@ impl SearchContext {
             // An exact alias match is replaced before sanitizing.
             let alias = self.scene_aliases.resolve(name);
             let key = SceneRegistry::sanitize_name(alias.unwrap_or(name));
-            match resolve(&mut self.scene_table, "", &key, &filters) {
+            match resolve(&mut self.scene_table, "", &key, None) {
                 Ok(scene_id) => {
                     let scene = self.scene_table.get_scene(scene_id).ok_or_else(|| {
                         SearchError::InvalidArgument("Scene ID not found".to_string())
@@ -237,33 +235,32 @@ impl SearchContext {
         global_name: &str,
         local_name: &str,
     ) -> Result<LocalSceneMatch, SearchError> {
-        let filters = HashMap::new();
         let alias = self.scene_aliases.resolve(global_name);
         let global_key = SceneRegistry::sanitize_name(alias.unwrap_or(global_name));
         let local_key = SceneRegistry::sanitize_name(local_name);
 
-        let global_id = match self.scene_table.resolve_global_owning_local_exact(
-            &global_key,
-            &local_key,
-            &filters,
-        ) {
-            Ok(Some(id)) => id,
-            Ok(None) => return Ok(LocalSceneMatch::NoLocal),
-            Err(
-                pasta_core::SceneTableError::SceneNotFound { .. }
-                | pasta_core::SceneTableError::NoMatchingScene { .. },
-            ) => {
-                if let Some(target) = alias {
-                    tracing::warn!(
-                        name = %global_name,
-                        resolved = %target,
-                        "Scene not found (alias applied)"
-                    );
+        let global_id =
+            match self
+                .scene_table
+                .resolve_global_owning_local_exact(&global_key, &local_key, None)
+            {
+                Ok(Some(id)) => id,
+                Ok(None) => return Ok(LocalSceneMatch::NoLocal),
+                Err(
+                    pasta_core::SceneTableError::SceneNotFound { .. }
+                    | pasta_core::SceneTableError::NoMatchingScene { .. },
+                ) => {
+                    if let Some(target) = alias {
+                        tracing::warn!(
+                            name = %global_name,
+                            resolved = %target,
+                            "Scene not found (alias applied)"
+                        );
+                    }
+                    return Ok(LocalSceneMatch::NoGlobal);
                 }
-                return Ok(LocalSceneMatch::NoGlobal);
-            }
-            Err(e) => return Err(SearchError::SceneTableError(e)),
-        };
+                Err(e) => return Err(SearchError::SceneTableError(e)),
+            };
         let parent = self
             .scene_table
             .get_scene(global_id)

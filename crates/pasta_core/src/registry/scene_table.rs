@@ -9,16 +9,17 @@ use crate::registry::random::RandomSelector;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound;
 
-/// Cache key for scene resolution (module_name + search_key + sorted filters + exact).
-/// Extended to support unified scope search with module context.
+/// 候補 1 つの条件を評価する述語。真なら満たす
+pub type CondFn<'a> = &'a mut dyn FnMut(&SceneInfo) -> bool;
+
+/// Cache key for scene resolution (module_name + search_key + exact + owning_local).
+/// 変数の値（述語）は鍵に含めない。
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct SceneCacheKey {
     /// Module name (グローバルシーン名)
     module_name: String,
     /// Search key
     search_key: String,
-    /// Sorted filters
-    filters: Vec<(String, String)>,
     /// Exact-match search (kept apart from the prefix search's cache)
     exact: bool,
     /// 持ち主のローカルの名前（そのローカルを持つ大域の順送りだけ。ほかは None）
@@ -26,22 +27,10 @@ struct SceneCacheKey {
 }
 
 impl SceneCacheKey {
-    fn new(
-        module_name: &str,
-        search_key: &str,
-        filters: &HashMap<String, String>,
-        exact: bool,
-        owning_local: Option<&str>,
-    ) -> Self {
-        let mut filter_vec: Vec<_> = filters
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-        filter_vec.sort();
+    fn new(module_name: &str, search_key: &str, exact: bool, owning_local: Option<&str>) -> Self {
         Self {
             module_name: module_name.to_string(),
             search_key: search_key.to_string(),
-            filters: filter_vec,
             exact,
             owning_local: owning_local.map(str::to_string),
         }
@@ -60,7 +49,7 @@ pub struct SceneTable {
     labels: Vec<SceneInfo>,
     /// Prefix index for forward-matching search (search key → [SceneId], registration order).
     prefix_index: BTreeMap<String, Vec<SceneId>>,
-    /// Cache for sequential scene consumption ((module_name, search_key, filters) → CachedSelection).
+    /// Cache for sequential scene consumption ((module_name, search_key, exact, owning_local) → CachedSelection).
     cache: HashMap<SceneCacheKey, CachedSelection>,
     /// Random selector for scene selection.
     random_selector: Box<dyn RandomSelector>,
@@ -159,28 +148,28 @@ impl SceneTable {
     ///
     /// # Algorithm
     /// 1. Collect candidates (collect_scene_candidates)
-    /// 2. Filter by attributes
+    /// 2. Keep candidates that satisfy `cond` (all when `None`)
     /// 3. Cache-based sequential selection (no repeat until exhausted)
     /// 4. Return selected SceneId
     ///
     /// # Arguments
     /// * `module_name` - Current module name (parent global scene)
     /// * `search_key` - Search prefix
-    /// * `filters` - Attribute filters
+    /// * `cond` - 候補 1 つの条件を評価する述語（`None` なら条件を見ない）
     pub fn resolve_scene_id_unified(
         &mut self,
         module_name: &str,
         search_key: &str,
-        filters: &HashMap<String, String>,
+        cond: Option<CondFn<'_>>,
     ) -> Result<SceneId, SceneTableError> {
         // Phase 1: Collect candidates from a single scope (no fallback)
         let candidate_ids = self.collect_scene_candidates(module_name, search_key)?;
 
-        // Phase 2: Filter by attributes
-        let filtered_ids = self.filter_by_attributes(candidate_ids, search_key, filters)?;
+        // Phase 2: Keep candidates that satisfy the predicate
+        let filtered_ids = self.filter_by_cond(candidate_ids, search_key, cond)?;
 
         // Phase 3-5: Cache-based sequential selection
-        let cache_key = SceneCacheKey::new(module_name, search_key, filters, false, None);
+        let cache_key = SceneCacheKey::new(module_name, search_key, false, None);
         Ok(self.select_from_cache(cache_key, filtered_ids))
     }
 
@@ -189,14 +178,14 @@ impl SceneTable {
     /// The scope is the same as `collect_scene_candidates` (global when
     /// `module_name` is empty, excluding keys starting with `:`; otherwise
     /// `:module_name:name` locals only, no fallback), but only scenes whose
-    /// key equals the search key are candidates. Attribute filtering and the
+    /// key equals the search key are candidates. The predicate filter and the
     /// no-repeat sequential selection are shared with the prefix search; the
     /// cache is kept separate from it (`SceneCacheKey::exact`).
     pub fn resolve_scene_id_exact(
         &mut self,
         module_name: &str,
         name: &str,
-        filters: &HashMap<String, String>,
+        cond: Option<CondFn<'_>>,
     ) -> Result<SceneId, SceneTableError> {
         if name.is_empty() {
             return Err(SceneTableError::InvalidScene {
@@ -220,8 +209,8 @@ impl SceneTable {
             });
         }
 
-        let filtered_ids = self.filter_by_attributes(candidate_ids, name, filters)?;
-        let cache_key = SceneCacheKey::new(module_name, name, filters, true, None);
+        let filtered_ids = self.filter_by_cond(candidate_ids, name, cond)?;
+        let cache_key = SceneCacheKey::new(module_name, name, true, None);
         Ok(self.select_from_cache(cache_key, filtered_ids))
     }
 
@@ -238,7 +227,7 @@ impl SceneTable {
         &mut self,
         name: &str,
         local: &str,
-        filters: &HashMap<String, String>,
+        cond: Option<CondFn<'_>>,
     ) -> Result<Option<SceneId>, SceneTableError> {
         if name.is_empty() || local.is_empty() {
             return Err(SceneTableError::InvalidScene {
@@ -272,43 +261,32 @@ impl SceneTable {
             return Ok(None);
         }
 
-        let filtered_ids = self.filter_by_attributes(owners, name, filters)?;
-        let cache_key = SceneCacheKey::new("", name, filters, true, Some(local));
+        let filtered_ids = self.filter_by_cond(owners, name, cond)?;
+        let cache_key = SceneCacheKey::new("", name, true, Some(local));
         Ok(Some(self.select_from_cache(cache_key, filtered_ids)))
     }
 
-    /// Filter candidate IDs by attribute filters (Phase 2 of scene resolution).
+    /// Keep candidate IDs that satisfy `cond` (Phase 2 of scene resolution).
     ///
-    /// Returns NoMatchingScene if no candidate satisfies all filters.
-    fn filter_by_attributes(
+    /// Returns NoMatchingScene if no candidate satisfies it.
+    /// shortcut: 満たす候補を毎回絞るだけで巡の並びは述語を見ない、優先の段つきの抽選（1.3）で置き換える
+    fn filter_by_cond(
         &self,
         candidate_ids: Vec<SceneId>,
         search_key: &str,
-        filters: &HashMap<String, String>,
+        cond: Option<CondFn<'_>>,
     ) -> Result<Vec<SceneId>, SceneTableError> {
+        let Some(cond) = cond else {
+            return Ok(candidate_ids);
+        };
         let filtered_ids: Vec<SceneId> = candidate_ids
             .into_iter()
-            .filter(|&id| {
-                let scene = &self.labels[id.0];
-                // 同じ名前の宣言が並ぶときは後の値（HashMap に入れていた頃の後勝ちと同じ）
-                filters.iter().all(|(key, value)| {
-                    scene
-                        .attributes
-                        .iter()
-                        .rev()
-                        .find_map(|a| match a {
-                            SceneAttr::Decl { key: k, value: v } if k == key => Some(v),
-                            _ => None,
-                        })
-                        .is_some_and(|v| v.to_string() == *value)
-                })
-            })
+            .filter(|&id| cond(&self.labels[id.0]))
             .collect();
 
         if filtered_ids.is_empty() {
             return Err(SceneTableError::NoMatchingScene {
                 scene: search_key.to_string(),
-                filters: filters.clone(),
             });
         }
 

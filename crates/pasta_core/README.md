@@ -47,12 +47,11 @@ DSLパーサーは独立クレート `pasta_dsl` に分離されており、
 ### シーンテーブルの構築と検索
 
 ```rust
-use std::collections::HashMap;
 use pasta_core::registry::{SceneRegistry, SceneTable, DefaultRandomSelector};
 
 // トランスパイル時にシーンを登録
 let mut registry = SceneRegistry::new();
-registry.register_global("挨拶", HashMap::new());
+registry.register_global("挨拶", Vec::new());
 
 // Runtime: SceneTable へ変換して前方一致検索
 let mut table = SceneTable::from_scene_registry(
@@ -60,7 +59,8 @@ let mut table = SceneTable::from_scene_registry(
     Box::new(DefaultRandomSelector::new()),
 );
 
-let scene_id = table.resolve_scene_id_unified("", "挨拶", &HashMap::new()).unwrap();
+// 3 つ目の引数は候補 1 つの条件を評価する述語（CondFn）。None なら条件を見ない
+let scene_id = table.resolve_scene_id_unified("", "挨拶", None).unwrap();
 let scene = table.get_scene(scene_id).unwrap();
 println!("Selected: {}", scene.fn_name);
 ```

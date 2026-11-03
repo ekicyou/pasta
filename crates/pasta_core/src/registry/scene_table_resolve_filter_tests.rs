@@ -13,7 +13,7 @@ fn test_resolve_scene_id_empty_key_is_invalid_scene() {
     let selector = Box::new(MockRandomSelector::new(vec![0]));
     let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
-    let result = table.resolve_scene_id_unified("", "", &HashMap::new());
+    let result = table.resolve_scene_id_unified("", "", None);
     match result {
         Err(SceneTableError::InvalidScene { scene }) => assert_eq!(scene, ""),
         other => panic!("Expected InvalidScene, got {:?}", other.map(|_| ())),
@@ -25,7 +25,7 @@ fn test_resolve_scene_id_not_found() {
     let selector = Box::new(MockRandomSelector::new(vec![0]));
     let mut table = SceneTable::from_scene_registry(SceneRegistry::new(), selector);
 
-    let result = table.resolve_scene_id_unified("", "存在しない", &HashMap::new());
+    let result = table.resolve_scene_id_unified("", "存在しない", None);
     match result {
         Err(SceneTableError::SceneNotFound { scene }) => assert_eq!(scene, "存在しない"),
         other => panic!("Expected SceneNotFound, got {:?}", other.map(|_| ())),
@@ -36,6 +36,27 @@ fn season(value: &str) -> crate::registry::SceneAttr {
     crate::registry::SceneAttr::Decl {
         key: "季節".to_string(),
         value: crate::registry::SceneAttrValue::String(value.to_string()),
+    }
+}
+
+/// 宣言の項目が全部等しい候補だけ満たす述語（同じ名前の宣言は後の値）
+fn decl_eq(pairs: &[(&str, &str)]) -> impl FnMut(&SceneInfo) -> bool {
+    let pairs: Vec<(String, String)> = pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    move |scene| {
+        pairs.iter().all(|(key, value)| {
+            scene
+                .attributes
+                .iter()
+                .rev()
+                .find_map(|a| match a {
+                    crate::registry::SceneAttr::Decl { key: k, value: v } if k == key => Some(v),
+                    _ => None,
+                })
+                .is_some_and(|v| v.to_string() == *value)
+        })
     }
 }
 
@@ -54,13 +75,12 @@ fn build_filtered_table() -> SceneTable {
 fn test_resolve_scene_id_attribute_filter_selects_matching() {
     let mut table = build_filtered_table();
 
-    let mut filters = HashMap::new();
-    filters.insert("季節".to_string(), "冬".to_string());
+    let mut winter = decl_eq(&[("季節", "冬")]);
 
     // Only the winter scene matches; repeated calls keep returning it
     for _ in 0..3 {
         let id = table
-            .resolve_scene_id_unified("", "挨拶", &filters)
+            .resolve_scene_id_unified("", "挨拶", Some(&mut winter))
             .unwrap();
         let scene = table.get_scene(id).unwrap();
         assert_eq!(scene.attributes, vec![season("冬")]);
@@ -71,16 +91,12 @@ fn test_resolve_scene_id_attribute_filter_selects_matching() {
 fn test_resolve_scene_id_unified_attribute_filter_no_match() {
     let mut table = build_filtered_table();
 
-    let mut filters = HashMap::new();
-    filters.insert("季節".to_string(), "夏".to_string());
+    let mut summer = decl_eq(&[("季節", "夏")]);
 
-    // Candidates exist (prefix matches) but filters reject all of them
-    let result = table.resolve_scene_id_unified("", "挨拶", &filters);
+    // Candidates exist (prefix matches) but the predicate rejects all of them
+    let result = table.resolve_scene_id_unified("", "挨拶", Some(&mut summer));
     match result {
-        Err(SceneTableError::NoMatchingScene { scene, filters: f }) => {
-            assert_eq!(scene, "挨拶");
-            assert_eq!(f.get("季節"), Some(&"夏".to_string()));
-        }
+        Err(SceneTableError::NoMatchingScene { scene }) => assert_eq!(scene, "挨拶"),
         other => panic!("Expected NoMatchingScene, got {:?}", other.map(|_| ())),
     }
 }
@@ -118,21 +134,19 @@ fn test_resolve_scene_id_attribute_filter_and_over_decl_items() {
         ],
     );
 
-    let mut filters = HashMap::new();
-    filters.insert("季節".to_string(), "冬".to_string());
-    filters.insert("段".to_string(), "2".to_string());
+    let mut cond = decl_eq(&[("季節", "冬"), ("段", "2")]);
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
     for _ in 0..3 {
         let id = table
-            .resolve_scene_id_unified("", "挨拶", &filters)
+            .resolve_scene_id_unified("", "挨拶", Some(&mut cond))
             .unwrap();
         assert_eq!(id, SceneId(1));
     }
 }
 
-/// 空のフィルタは属性があっても候補を減らさない（2.5・7.3）
+/// 述語なしは属性があっても候補を減らさない（2.5・7.3）
 #[test]
 fn test_resolve_scene_id_empty_filter_keeps_all_candidates() {
     let mut registry = SceneRegistry::new();
@@ -143,11 +157,7 @@ fn test_resolve_scene_id_empty_filter_keeps_all_candidates() {
     let selector = Box::new(MockRandomSelector::new(vec![0, 0, 0]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
     let mut seen: Vec<SceneId> = (0..3)
-        .map(|_| {
-            table
-                .resolve_scene_id_unified("", "挨拶", &HashMap::new())
-                .unwrap()
-        })
+        .map(|_| table.resolve_scene_id_unified("", "挨拶", None).unwrap())
         .collect();
     seen.sort_by_key(|id| id.0);
     assert_eq!(seen, vec![SceneId(0), SceneId(1), SceneId(2)]);
@@ -182,16 +192,12 @@ fn test_replace_selector_clears_cache() {
     };
 
     // Consume the first candidate of the cycle
-    let first = table
-        .resolve_scene_id_unified("", "OnTalk", &HashMap::new())
-        .unwrap();
+    let first = table.resolve_scene_id_unified("", "OnTalk", None).unwrap();
     assert_eq!(first, SceneId(0));
 
     // Replace selector — cache must be cleared, cycle restarts at the beginning
     table.replace_selector(Box::new(MockRandomSelector::new(vec![0])));
-    let after = table
-        .resolve_scene_id_unified("", "OnTalk", &HashMap::new())
-        .unwrap();
+    let after = table.resolve_scene_id_unified("", "OnTalk", None).unwrap();
     assert_eq!(
         after,
         SceneId(0),
@@ -215,12 +221,8 @@ fn test_from_scene_registry_groups_same_name_scenes() {
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
 
-    let id1 = table
-        .resolve_scene_id_unified("", "会話", &HashMap::new())
-        .unwrap();
-    let id2 = table
-        .resolve_scene_id_unified("", "会話", &HashMap::new())
-        .unwrap();
+    let id1 = table.resolve_scene_id_unified("", "会話", None).unwrap();
+    let id2 = table.resolve_scene_id_unified("", "会話", None).unwrap();
     assert_ne!(id1, id2, "sequential consumption must visit both scenes");
 }
 
@@ -239,11 +241,11 @@ fn test_resolve_scene_id_unified_cache_key_includes_module() {
     let mut table = SceneTable::from_scene_registry(registry, selector);
 
     // Resolve from 会話A_1
-    let result_a = table.resolve_scene_id_unified("会話A_1", "選択肢", &HashMap::new());
+    let result_a = table.resolve_scene_id_unified("会話A_1", "選択肢", None);
     assert!(result_a.is_ok());
 
     // Resolve from 会話B_1 - should use different cache key
-    let result_b = table.resolve_scene_id_unified("会話B_1", "選択肢", &HashMap::new());
+    let result_b = table.resolve_scene_id_unified("会話B_1", "選択肢", None);
     assert!(result_b.is_ok());
 
     // Both should succeed (different cache keys)
@@ -277,13 +279,13 @@ fn test_resolve_scene_id_exact_ignores_longer_names_with_same_head() {
     let mut table = build_table(&["つっつき反応胸右", "つっつき反応胸"], vec![0]);
     for _ in 0..4 {
         let id = table
-            .resolve_scene_id_exact("", "つっつき反応胸", &HashMap::new())
+            .resolve_scene_id_exact("", "つっつき反応胸", None)
             .unwrap();
         assert_eq!(scene_name(&table, id), "つっつき反応胸");
     }
 
     // 頭だけの名前では見つからない（前方一致しない）
-    let result = table.resolve_scene_id_exact("", "つっつき反応", &HashMap::new());
+    let result = table.resolve_scene_id_exact("", "つっつき反応", None);
     match result {
         Err(SceneTableError::SceneNotFound { scene }) => assert_eq!(scene, "つっつき反応"),
         other => panic!("Expected SceneNotFound, got {:?}", other.map(|_| ())),
@@ -309,7 +311,7 @@ fn test_resolve_scene_id_exact_consumes_same_name_scenes_per_cycle() {
         let mut picked: Vec<SceneId> = (0..3)
             .map(|_| {
                 table
-                    .resolve_scene_id_exact("", "撫で反応頭", &HashMap::new())
+                    .resolve_scene_id_exact("", "撫で反応頭", None)
                     .unwrap()
             })
             .collect();
@@ -324,18 +326,17 @@ fn test_resolve_scene_id_exact_consumes_same_name_scenes_per_cycle() {
 fn test_resolve_scene_id_exact_cache_does_not_mix_with_prefix() {
     // 同じ文字列「会話」でも、前方一致（会話・会話続き）と完全一致（会話）のキャッシュは別
     let mut table = build_table(&["会話", "会話続き"], vec![]);
-    let empty = HashMap::new();
 
-    let first = table.resolve_scene_id_unified("", "会話", &empty).unwrap();
+    let first = table.resolve_scene_id_unified("", "会話", None).unwrap();
     assert_eq!(scene_name(&table, first), "会話");
 
     for _ in 0..2 {
-        let id = table.resolve_scene_id_exact("", "会話", &empty).unwrap();
+        let id = table.resolve_scene_id_exact("", "会話", None).unwrap();
         assert_eq!(scene_name(&table, id), "会話");
     }
 
     // 完全一致の呼び出しが前方一致の巡回を進めていない
-    let second = table.resolve_scene_id_unified("", "会話", &empty).unwrap();
+    let second = table.resolve_scene_id_unified("", "会話", None).unwrap();
     assert_eq!(scene_name(&table, second), "会話続き");
 }
 
@@ -350,12 +351,11 @@ fn test_resolve_scene_id_exact_local_scope() {
     registry.register_global("選択肢", Vec::new());
     let mut table =
         SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0])));
-    let empty = HashMap::new();
 
     // ローカルの範囲: 頭が同じローカルも、同じ名前のグローバルも選ばない
     for _ in 0..3 {
         let id = table
-            .resolve_scene_id_exact("会話_1", "選択肢", &empty)
+            .resolve_scene_id_exact("会話_1", "選択肢", None)
             .unwrap();
         let scene = table.get_scene(id).unwrap();
         assert_eq!(scene.name, "選択肢");
@@ -363,11 +363,11 @@ fn test_resolve_scene_id_exact_local_scope() {
     }
 
     // グローバルの範囲: ローカルを選ばない
-    let id = table.resolve_scene_id_exact("", "選択肢", &empty).unwrap();
+    let id = table.resolve_scene_id_exact("", "選択肢", None).unwrap();
     assert_eq!(table.get_scene(id).unwrap().scope, SceneScope::Global);
 
     // ローカルに無い名前はグローバルへ落ちない
-    let result = table.resolve_scene_id_exact("会話_1", "会話", &empty);
+    let result = table.resolve_scene_id_exact("会話_1", "会話", None);
     assert!(matches!(result, Err(SceneTableError::SceneNotFound { .. })));
 }
 
@@ -375,7 +375,7 @@ fn test_resolve_scene_id_exact_local_scope() {
 fn test_resolve_scene_id_exact_empty_name_is_invalid_scene() {
     let mut table = build_table(&["会話"], vec![0]);
     for module in ["", "会話_1"] {
-        let result = table.resolve_scene_id_exact(module, "", &HashMap::new());
+        let result = table.resolve_scene_id_exact(module, "", None);
         match result {
             Err(SceneTableError::InvalidScene { scene }) => assert_eq!(scene, ""),
             other => panic!("Expected InvalidScene, got {:?}", other.map(|_| ())),
@@ -387,14 +387,14 @@ fn test_resolve_scene_id_exact_empty_name_is_invalid_scene() {
 fn test_resolve_scene_id_exact_attribute_filter() {
     let mut table = build_filtered_table();
 
-    let mut winter = HashMap::new();
-    winter.insert("季節".to_string(), "冬".to_string());
-    let id = table.resolve_scene_id_exact("", "挨拶", &winter).unwrap();
+    let mut winter = decl_eq(&[("季節", "冬")]);
+    let id = table
+        .resolve_scene_id_exact("", "挨拶", Some(&mut winter))
+        .unwrap();
     assert_eq!(table.get_scene(id).unwrap().attributes, vec![season("冬")]);
 
-    let mut summer = HashMap::new();
-    summer.insert("季節".to_string(), "夏".to_string());
-    let result = table.resolve_scene_id_exact("", "挨拶", &summer);
+    let mut summer = decl_eq(&[("季節", "夏")]);
+    let result = table.resolve_scene_id_exact("", "挨拶", Some(&mut summer));
     assert!(matches!(
         result,
         Err(SceneTableError::NoMatchingScene { .. })
@@ -429,13 +429,12 @@ fn owner_name(table: &SceneTable, id: SceneId) -> String {
 #[test]
 fn test_resolve_global_owning_local_exact_picks_only_owners_per_cycle() {
     let mut table = build_owning_table();
-    let empty = HashMap::new();
 
     for _cycle in 0..2 {
         let mut picked: Vec<String> = (0..2)
             .map(|_| {
                 let id = table
-                    .resolve_global_owning_local_exact("会話", "挨拶", &empty)
+                    .resolve_global_owning_local_exact("会話", "挨拶", None)
                     .unwrap()
                     .expect("挨拶を持つ大域がある");
                 owner_name(&table, id)
@@ -453,10 +452,9 @@ fn test_resolve_global_owning_local_exact_picks_only_owners_per_cycle() {
 #[test]
 fn test_resolve_global_owning_local_exact_no_global_and_no_owner() {
     let mut table = build_owning_table();
-    let empty = HashMap::new();
 
     // 大域が無い
-    let result = table.resolve_global_owning_local_exact("存在しない", "挨拶", &empty);
+    let result = table.resolve_global_owning_local_exact("存在しない", "挨拶", None);
     match result {
         Err(SceneTableError::SceneNotFound { scene }) => assert_eq!(scene, "存在しない"),
         other => panic!("Expected SceneNotFound, got {:?}", other),
@@ -465,20 +463,20 @@ fn test_resolve_global_owning_local_exact_no_global_and_no_owner() {
     // 大域はあるがどれも持たない（頭が同じローカル「挨拶続き」も数えない）
     assert_eq!(
         table
-            .resolve_global_owning_local_exact("会話", "挨", &empty)
+            .resolve_global_owning_local_exact("会話", "挨", None)
             .unwrap(),
         None
     );
     assert_eq!(
         table
-            .resolve_global_owning_local_exact("雑談", "挨拶", &empty)
+            .resolve_global_owning_local_exact("雑談", "挨拶", None)
             .unwrap(),
         None
     );
 
     // 名前が空
     for (name, local) in [("", "挨拶"), ("会話", "")] {
-        let result = table.resolve_global_owning_local_exact(name, local, &empty);
+        let result = table.resolve_global_owning_local_exact(name, local, None);
         assert!(
             matches!(result, Err(SceneTableError::InvalidScene { .. })),
             "({name:?}, {local:?}) は不正なシーン"
@@ -490,17 +488,16 @@ fn test_resolve_global_owning_local_exact_no_global_and_no_owner() {
 fn test_resolve_global_owning_local_exact_cache_independent_of_exact() {
     // ふつうの完全一致（1,2,3 の順送り）と状態が混ざらない
     let mut table = build_owning_table();
-    let empty = HashMap::new();
 
     let mut owning = Vec::new();
     let mut exact = Vec::new();
     for _ in 0..3 {
         let id = table
-            .resolve_global_owning_local_exact("会話", "挨拶", &empty)
+            .resolve_global_owning_local_exact("会話", "挨拶", None)
             .unwrap()
             .unwrap();
         owning.push(owner_name(&table, id));
-        let id = table.resolve_scene_id_exact("", "会話", &empty).unwrap();
+        let id = table.resolve_scene_id_exact("", "会話", None).unwrap();
         exact.push(owner_name(&table, id));
     }
     assert_eq!(owning, vec!["会話_1", "会話_3", "会話_1"]);
