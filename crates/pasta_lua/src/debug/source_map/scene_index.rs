@@ -33,11 +33,6 @@
 //! フォールバックは「クリック行以上の開始行」を `range(line..)` の先頭で引く。いずれも
 //! `BTreeMap` の対数オーダ操作であり、SHIORI GET 処理ブロックを延ばさない（8.3）。
 
-// NOTE: 構築側（ランタイム構築時の `scene_join::build_scene_index`）と参照側
-// （`SourceMap::scene_at` → `playscene::resolve_position`）には結線済み。下の
-// dead_code 許可は結線前に置いたものである。
-#![allow(dead_code)]
-
 use std::collections::{BTreeMap, HashMap};
 
 use super::canonicalize_pasta_file;
@@ -163,16 +158,6 @@ pub struct SceneIdentityIndexBuilder {
 }
 
 impl SceneIdentityIndexBuilder {
-    /// `.pasta` ファイルを索引に登録する（シーンが 0 件でも空エントリを作る）。
-    ///
-    /// シーンの無いファイル（空ファイル相当）も `scene_at` が未検出を返す対象として
-    /// 明示的に存在させたい場合に用いる。`add_scene` も内部でファイルを生成するため、
-    /// シーンを 1 件以上投入する場合は本メソッドの事前呼び出しは必須ではない。
-    pub fn insert_file(&mut self, pasta_file: &str) {
-        let file_key = canonicalize_pasta_file(pasta_file);
-        self.files.entry(file_key).or_default();
-    }
-
     /// 1 シーンの確定済み行範囲・入れ子レベル・識別子・親を投入する。
     ///
     /// `start_line` / `end_line` は両端 inclusive・1 始まり。`end_line` は「次の同

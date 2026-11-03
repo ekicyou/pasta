@@ -126,9 +126,6 @@ fn join_records(
     let mut builder = SceneIdentityIndex::builder();
 
     for (pasta_file, records) in scene_records {
-        // このファイルは（シーンが空でも）索引に存在させる（未検出を正しく返すため）。
-        builder.insert_file(pasta_file);
-
         // (base, 順位) → このファイルの実行時グローバル登録名。
         let globals = globals_by_file
             .get(pasta_file)
