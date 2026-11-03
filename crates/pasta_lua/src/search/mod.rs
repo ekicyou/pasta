@@ -22,7 +22,7 @@ mod context;
 mod error;
 mod scene_cond;
 
-pub use context::{LocalSceneMatch, SearchContext};
+pub use context::{LocalSceneMatch, SceneLookup, SearchContext};
 pub use error::SearchError;
 
 use mlua::{Lua, Result as LuaResult, Table};

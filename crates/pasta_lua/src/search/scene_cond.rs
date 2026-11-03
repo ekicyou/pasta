@@ -150,7 +150,6 @@ fn cond_text(attr: &SceneAttr) -> String {
 
 /// 変数表から述語を作る。`name` はログに出す探した名前。
 /// 条件の無いシーンは表を読まずに真、条件は書いた順に見て最初の外れで止める（かつ）。
-#[allow(dead_code)] // 2.3 で SearchContext の条件つき検索から使う
 pub(crate) fn cond_predicate<'a>(
     name: &'a str,
     var: Option<Table>,

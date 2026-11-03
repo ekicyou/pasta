@@ -7,4 +7,5 @@
 mod common;
 
 mod module_test;
+mod scene_cond_search_test;
 mod scene_search_test;
