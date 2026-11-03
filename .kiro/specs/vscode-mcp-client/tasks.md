@@ -52,7 +52,7 @@
   - _Requirements: 4.7, 4.8_
 
 - [ ] 4. ゴーストのファイル
-- [ ] 4.1 (P) ゴーストのルートと表示名を決める
+- [x] 4.1 (P) ゴーストのルートと表示名を決める
   - 3 の MCP のクライアントとは別のファイルなので、3.1〜3.3 と並んで進めてよい。4.2・4.3 は同じファイルを書くので 4.1 の後に順に進める。
   - 既存の `ghost/master` の探し方が返すフォルダが、ファイルのフォルダから上へ 3 つまでの間にあり、`descript.txt` を持つときだけ、その 2 つ上をルートにする（`ghost`・`master`・`descript.txt` の大文字・小文字は区別しない）。覚えと重なりの鍵として、ルートを小文字にした値も持つ。
   - 表示名は `descript.txt` の `name` の値。`charset` が UTF-8 なら UTF-8、ほかは Shift_JIS で読み、BOM を外す。読めない・無い・空ならルートのフォルダ名。
@@ -171,3 +171,4 @@
 - 2.1: fakeMcpServer は startFakeMcpServer(init?) が {port,state,addLog,close} を返し、state を直に書き換えて振る舞いを変える。自己確かめは src/test/fakeMcpServer.selfcheck.ts（6.3 で列に入れるか決める）。「200 で本文が空」を出すモードは未実装（要るなら raiseEvent.mode に足す）。
 - 2.2: mock の showQuickPick は setNextQuickPickSelection(ラベル) で 1 回だけ選ぶ（未設定は閉じた扱い）。文書は createTextDocument(path,{isDirty,languageId,saveResult})。記録は配列で slice(before) で見る。
 - 3.1: mcpClient.ts の内部 rpc() は 3.2 の initialize で使える。単体試験は src/test/mcpClient.test.ts（6.3 で test:unit に足す）。fakeMcpServer に raiseEvent.mode=empty（200 で本文が空）を足した。
+- 4.1: ghostFiles.ts の resolveGhost(fileFsPath, masterPath) は master のパスを受ける。糊（6.1）は resolveGhost(uri.fsPath, findGhostMaster(uri)?.fsPath)（ghostValidator.ts）で呼ぶ。試験は src/test/ghostFiles.test.ts（vscode の alias 不要）。
