@@ -225,3 +225,6 @@
 - 7.1: `searcher::pasta_file_of` に一時の `expect(dead_code)` がある。8.1 で使ったら外す。`@pasta_chunks` の値のパスはまだ OS の区切りのまま（`\` へのそろえは 7.2）。
 - 8.1: `SourceMap::pasta_file_for_chunk` と `chunk_files` は本番から呼ばれなくなった（pub なので警告は出ない）。8.3 で消す。
 - 8.2: `line_mapping_roundtrip_unchanged_with_index_present` と `src/debug/source_map_builder_tests.rs` は 8.3 を前倒しして消した（後者の削除は誤って 9.2 のコミット 86cb99d4 に入った）。`build_source_map` は `cache_manager` を受けない。
+- 完了時にその場で解決: `pasta_core` の `scene_registry.rs` のコメントに残っていたキックの言い方を、シーンマップと `OnPastaSceneAt` の言い方に直した（本 spec の外のクレート）。
+- 完了時にその場で解決: design.md の New Files に `v3_load_entry_log_test.rs` を足した。
+- 完了時に残したもの: `code_gen/element_gen.rs:447` のコメントの「breakpoints」は、ウェーブの約束（このウェーブではどの spec も `element_gen.rs` に触らない）のため直していない。次にこのファイルを触る spec で 1 語直せばよい。

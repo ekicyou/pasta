@@ -152,6 +152,7 @@ crates/pasta_lua/src/debug/
 
 ### New Files（テストだけ）
 
+- `crates/pasta_shiori/tests/v3_load_entry_log_test.rs` — 版 3 の入口が、絞ったログの設定でも読み込みの終わりの行を書く結合テスト（10.1・10.2）。
 - `crates/pasta_lua/tests/debug_env_ignored_test.rs` — 古い環境変数を置いたプロセスで読み込む結合テスト（3.4）。環境を変えるので、ほかのテストと別のバイナリにする。
 - `crates/pasta_shiori/tests/fixtures/runtime_error_balloon/dic/` に 2 つ目の `.pasta`（別のファイルの Lua のブロックの `GLOBAL` 関数）と `道具.lua`（止まる関数を持つ作者の `.lua`）— 6.2・6.3 の結合テスト用。
 
