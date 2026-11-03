@@ -53,14 +53,13 @@
 
 ```pasta
 ＊OnGhostChanging
-　＞transfer_req_to_var
 　女の子：＠キラキラ　＄ｒ０　、バトンタッチだよ！
 ```
 
 - pasta のマニュアルのイベント一覧（[主要イベント](../lua/shiori-events.md#主要イベント)）に無いイベントも、同じ名前のシーンを書けば応答できる
 - どんなイベントがあるかは、[UKADOC の SHIORI Event 一覧](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html) で調べられる
 - `OnGhostChanging` は、pasta のマニュアルの一覧に無いイベントである。説明は UKADOC の [OnGhostChanging](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnGhostChanging) の項にある
-- 上の 2 行目の `＞transfer_req_to_var` と、台詞の中の `＄ｒ０` は、次の節で扱う
+- 台詞の中の `＄ｒ０` は、次の節で扱う
 - UKADOC の項には、イベントがいつ来るかと、イベントに付いてくる付加情報（`Reference0`、`Reference1` …）の意味が書いてある
 - この章で初めて扱う 4 つのイベントの出典は、次の表のとおりである
 
@@ -75,17 +74,16 @@
 
 > 【クローディア】イベントには、付加情報が付いてきますの。迎え入れの `OnGhostChanged` なら、`Reference0` に直前のゴーストの名前が入っていますわ。これを台詞に使えば、お相手の名前を呼んで挨拶できますのよ。
 
-> 【したり顔】取り出し方は、たったの 1 行ですわ。シーンの先頭で `＞transfer_req_to_var` を呼ぶと、付加情報が `＄ｒ０` から `＄ｒ９` までの変数に入りますの。
+> 【したり顔】取り出すために書き足すものは、何もありませんわ。イベントのシーンでは、付加情報が最初から `＄ｒ０` から `＄ｒ９` までの変数に入っていますの。
 
 ```pasta
 ＊OnGhostChanged
-　＞transfer_req_to_var
 　女の子：＠笑顔　＄ｒ０　から、バトンを受け取ったよ！
 　男の子：＠笑顔　ここからは、ぼくたちの番だね。
 ```
 
-- イベントには、付加情報（`Reference0`、`Reference1` …）が付いてくる。付加情報は、自動では変数に入らない
-- `　＞transfer_req_to_var` — シーンの先頭にこの行を書くと、付加情報が `＄ｒ０`〜`＄ｒ９` に入る。行の頭を字下げして書く
+- イベントには、付加情報（`Reference0`、`Reference1` …）が付いてくる
+- イベントのシーンでは、Reference が最初から `＄ｒ０`〜`＄ｒ９` に入っている。シーンが呼ばれる前に、pasta が入れておく
 - `＄ｒ０`〜`＄ｒ９` — `Reference0`〜`Reference9` の値が入る変数である。`ｒ` と数字は全角である
 - 変数の後ろには空白を置いて、続く台詞と区切る。6 段目の `＄時１２` と同じである
 - `＊OnGhostChanged` の `＄ｒ０` には、直前のゴーストの本体側の名前が入る。emo2 から切り替わってきたときは `むらさき` である
@@ -94,11 +92,9 @@
 - 本体側の名前は、そのゴーストの `descript.txt` の `sakura.name` である
 - それぞれの `Reference` に何が入るかは、イベントごとに異なる。UKADOC のイベントの項で調べる
 
-> 【アンソニー】お嬢様、その 1 行を書き忘れますと、どうなるのでございましょう。
+> 【アンソニー】お嬢様、付加情報を取り出す呪文のようなものは、要らないのでございますか。
 
-> 【落胆】名前の入らない、間の抜けた挨拶になってしまいますわ……。付加情報は、ひとりでには変数に入りませんのよ。
-
-- `＞transfer_req_to_var` を書き忘れると、`＄ｒ０` は空のままになる。上の女の子の台詞は「から、バトンを受け取ったよ！」になる
+> 【にっこり】要りませんわ。シーンを書けば、それだけで名前を呼んで挨拶できますのよ。
 
 ### ベースウェアに聞く
 
@@ -147,18 +143,16 @@
 ＃ pasta のマニュアルのイベント一覧に無いイベントも、同じ名前のシーンを書けば応答できる。
 ＃ どんなイベントがあるかは UKADOC の一覧で調べられる（https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnGhostChanging）。
 ＃ イベントには付加情報（Reference0、Reference1 …）が付いてくる。
-＃ シーンの先頭で ＞transfer_req_to_var を呼ぶと、付加情報が ＄ｒ０〜＄ｒ９ に入る。変数の後ろには空白を置いて区切る。
+＃ イベントのシーンでは、付加情報が最初から ＄ｒ０〜＄ｒ９ に入っている。変数の後ろには空白を置いて区切る。
 
 ＃ ほかのゴーストから切り替わってきたとき（迎え入れ）。
 ＃ ＄ｒ０ には、直前のゴーストの本体側の名前が入る（emo2 から切り替わってきたときは「むらさき」）。
 ＃ このシーンで話すと、続けて OnBoot は来ない。何も話さずに終えると（204）、ベースウェアは次に OnBoot を送ってくる。
 ＊OnGhostChanged
-　＞transfer_req_to_var
 　女の子：＠笑顔　＄ｒ０　から、バトンを受け取ったよ！
 　男の子：＠笑顔　ここからは、ぼくたちの番だね。
 
 ＊OnGhostChanged
-　＞transfer_req_to_var
 　女の子：＠キラキラ　＄ｒ０　と交代で来たよ！
 　男の子：＠通常　ユーザーさん、よろしくね。
 
@@ -166,12 +160,10 @@
 ＃ ＄ｒ０ には、切り替え先のゴーストの本体側の名前が入る。相手に向けて一言で引き継ぐ。
 ＃ このシーンで話すと、続けて OnClose は来ない。何も話さずに終えると（204）、ベースウェアは次に OnClose を送ってくる。
 ＊OnGhostChanging
-　＞transfer_req_to_var
 　女の子：＠笑顔　＄ｒ０　、あとはよろしくね！
 　男の子：＠通常　ユーザーさん、またね。
 
 ＊OnGhostChanging
-　＞transfer_req_to_var
 　女の子：＠キラキラ　＄ｒ０　、バトンタッチだよ！
 
 ＃ 初めて起動したときは、OnBoot の代わりに OnFirstBoot が来る。
@@ -293,7 +285,7 @@
 
 - [SHIORI イベントとハンドラ（イベントの一覧と、応答の仕組み）](../lua/shiori-events.md)
 - [シーン関数フォールバック（イベントと同じ名前のシーンを探す仕組み）](../lua/shiori-events.md#シーン関数フォールバック)
-- [リクエスト変数（Reference）（`＞transfer_req_to_var` と `＄ｒ０`〜`＄ｒ９`）](../grammar/variables.md#リクエスト変数reference)
+- [リクエスト変数（Reference）（`＄ｒ０`〜`＄ｒ９`）](../grammar/variables.md#リクエスト変数reference)
 - [プロパティ変数（`＄％baseware.name`）](../grammar/variables.md#プロパティ変数)
 - [UKADOC の OnGhostChanging](https://ssp.shillest.net/ukadoc/manual/list_shiori_event.html#OnGhostChanging)
 

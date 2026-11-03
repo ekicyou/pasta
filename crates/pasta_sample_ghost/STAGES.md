@@ -19,7 +19,7 @@
 | 9 | 選ばせたい | 選択肢を出して選ばれた先へ進む | [選択肢行](../../book/src/grammar/block-structure.md#選択肢行) `＠？ジャンプ先「表示」`、[キューコマンド](../../book/src/grammar/block-structure.md#キューコマンド行) `!select(秒)`、選ばれた ID のシーンへの[自動ルーティング](../../book/src/lua/shiori-events.md#onchoiceselectex) | `OnChoiceSelectEx` | `09-choice.pasta` |
 | 10 | 覚えていてほしい | 終了しても残る値 | [グローバル変数](../../book/src/grammar/variables.md#グローバル変数) `＄＊回数`、算術の代入 `＄＊回数＝＄＊回数＋１`（未代入の変数は算術で 0 とみなされる。[値が無いときの扱い](../../book/src/grammar/variables.md#値が無いときの扱い)） | — | `10-save.pasta` |
 | 11 | 話を続けたい・分岐させたい | 話の続き・ランダムジャンプ | `＞シーン名`（[Call](../../book/src/grammar/call-jump.md)）、同名・[前方一致](../../book/src/grammar/call-jump.md#前方一致によるターゲット解決)の候補からのランダム選択、[ローカルシーン](../../book/src/grammar/block-structure.md#ローカルシーン) `・`、[`＞チェイントーク`](../../book/src/grammar/call-jump.md#チェイントーク)、ローカル優先の[スコープ解決](../../book/src/grammar/call-jump.md#スコープ解決アルゴリズム) | — | `11-jump.pasta` |
-| 12 | もっと凝ったことをしたい | Lua の関数を呼ぶ | シーン内の ```` ```lua ```` ブロック（[Lua ブロックの配置](../../book/src/grammar/block-structure.md#lua-ブロックの配置)）、`function SCENE.名前(act)`、`＞＠名前（）`（[条件分岐の実現](../../book/src/grammar/call-jump.md#条件分岐の実現)の書き方） | — | `12-lua.pasta` |
+| 12 | もっと凝ったことをしたい | Lua の関数を呼ぶ | シーン内の ```` ```lua ```` ブロック（[Lua ブロックの配置](../../book/src/grammar/block-structure.md#lua-ブロックの配置)）、`function SCENE.名前(act)`、`＞＠名前（）`（[動的ターゲット](../../book/src/grammar/call-jump.md#call-ターゲットの形式)） | — | `12-lua.pasta` |
 | 13 | 配布したい | `.nar` にする | SSP の NAR 作成機能（6 段目で有効にした開発者用機能の「フォルダをドロップした際に更新ファイルやNARを作成」を ON にしてフォルダをドロップ） | — | — |
 
 - 辞書を持つ段階は 1〜12 段目。13 段目は手順だけの段階で、辞書の差分を持たない（`.nar` にする中身は 12 段目と同じ）。
