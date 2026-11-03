@@ -1,16 +1,16 @@
 {
   "feature_name": "scene-attribute-store",
   "created_at": "2026-11-02T23:53:11Z",
-  "updated_at": "2026-11-02T23:53:11Z",
+  "updated_at": "2026-11-03T01:42:43Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {

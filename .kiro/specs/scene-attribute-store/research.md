@@ -103,3 +103,115 @@
 - **着色**（Requirement 7.5）。`editors/vscode/syntaxes/pasta.tmLanguage.json` は `grammar.pest` を写す作りで `tmGrammar.test.ts` が照合する（`ponytail-editor-tooling`）。条件の形と名前なしの `＊` の属性を同じ写し方で足す。`pasta_lsp` の `visit_scope.rs` も宣言行の属性を着色しているので、条件の形に追従させる。
 - **規模の見直し**: 文法と構文木 2・着色 1 が増えて 18〜21。`scene-condition-attributes` から同じ分が減るので、0.5.0 全体では増えない。設計で 20 をはっきり超えるなら、着色（LSP・VSCode）を後ろのタスクにまとめる。
 - **設計で決めること（追加）**: 条件の項目を生成 Lua に出す形（宣言と同じ 1 行に混ぜるか）。Rust のシーン表で条件を持つ型（`filter_by_attributes` の `HashMap<String, String>` との合わせ方は Option A か C のまま）。
+
+## 7. 設計フェーズの調査と決定（2026-11-03・`/kiro-spec-design -y`）
+
+> 1〜5 節の「Requirement N」は要件ディスカッションの前の番号である。今の requirements.md では、ファイル属性の受け継ぎが 3、型が 4、実行時の保持が 5、Lua の口が 6、互換が 7、マニュアルが 8 に当たる。この節から後は今の番号で書く。
+
+### 要約
+
+- **調査の種類**: 既存の仕組みの延長（Light discovery）。新しい依存は足さない（`indexmap` も足さない）。外部のライブラリ・API の調査は要らない（Web の調査はしていない）。
+- **使った手順**: `kiro-spec-design` の `design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`。文法とランタイムの権威はマニュアル（`book/src/grammar/block-structure.md#属性`・`book/src/lua/script-api.md`）と現行のコードとし、ドメインのスキル（`pasta-ghost-authoring`・`pasta-lua-coding`）は読んでいない（どちらもマニュアルの写しで、新しい決まりを持たない）。
+- **大事な発見**:
+  1. 構文木はファイル属性を 1 つずつ `FileItem::FileAttr` に平らにする（`parser/mod.rs` 209〜217）。行の切れ目は残らないが、要件 3.3（シーンを挟まずに 2 行続いたらパースエラー）がパーサで効けば、「グローバルシーンの後に来た最初の `FileAttr` で組を捨てる」だけで要件 3.2 の置き換えになる。構文木の形を変えずに済む。
+  2. `act` は実行中のシーンの**登録名**をグローバルだけ持つ（`act.current_scene.__global_name__`）。ローカルは**書いた名前**（`act.local_scene_name`。`act.lua` 205〜217）しか持たず、登録名（`選択肢_1`）を持たない。同じ名前のローカル（`・選択肢` が 2 つ）は、書いた名前では区別できない。要件 6.5 のローカルの場合は、生成コードを変えずには満たせない（下の決定 6・設計の未決 1）。
+  3. `pasta_lsp` の `visit_decl_line`（`visit_scope.rs` 219〜243）は、宣言行の属性を構文木でなく文字から拾っている（パーサが捨てていたため）。パーサが宣言行の属性を残すと、`visit_global_scene` の `scene.attrs` の走査（35〜37）と二重に色が出る。宣言行の文字の走査から属性を外し、構文木の属性で色を出す形に揃える。
+  4. VSCode の文法定義の `global-scene`（`pasta.tmLanguage.json` 78〜95）は名前を省ける形で、残りを `decl-rest` に流している。名前なしの `＊` 行の属性（`＊＆順番：２０`）は**今の定義のままで着色される**。足すのは条件の形（`＆＄…`）だけである。
+  5. 2 行のファイル属性を使うテストが 2 本ある（`tests/transpiler/final_regression_test.rs` 133 の `kind_scene_attributes`、`tests/runtime/syntax_test.rs` 76〜の `test_attribute_inheritance`）。要件 3.3 でパースエラーになるので、1 行に書き直す。見本の辞書（`sample.pasta` 14 行）は 1 行なので形はそのままで、生成物だけ変わる。属性を持つ `.pasta` のフィクスチャは `sample.pasta` だけ（2026-11-03 の grep）。
+
+### 調査の記録
+
+#### 宣言行の属性の取り込み
+
+- **きっかけ**: 要件 1.1・1.2・1.5。
+- **見たもの**: `grammar.pest` 173（`scene = _{ id ~ s ~ attrs? }`）、238〜239・244、`parse_scene.rs` 73〜108・210〜232。
+- **分かったこと**: `scene` は黙る規則なので、`attr` の対は `global_scene_line`・`local_scene_line` の子に直に並ぶ。`parse_global_scene_start` と `parse_local_scene_scope` は `id` だけ読んで残りを捨てている。`global_scene_continue_line` は `global_marker ~ or_comment_eol` で、`＊` の後に `s ~ attrs?` を足す余地がある。
+- **影響**: `parse_global_scene_start` の戻りに宣言行の属性を足し、呼び出し側で `attrs` の先頭に積む。初期部の属性行（29〜35）は後に積まれるので、要件 1.3 の順（宣言行 → 初期部）は自然に出る。
+
+#### 条件の形の文法
+
+- **きっかけ**: 要件 2.1〜2.3・2.6。
+- **見たもの**: `grammar.pest` 81〜84（`var_ref_*`）・106〜108（`dyn_name_*`）・162〜166（`attr`）。
+- **分かったこと**: 既存の `dyn_name_local` は `var_id`（`id | digit_id`）なので `＄０`（引数番号）も通す。要件 2.1 の変数はローカルの `＄名前` とグローバルの `＄＊名前` だけなので、属性用に `id` だけを受ける規則を 2 つ足す。`attr_string` は `＄` で始まる文字列も通すので、条件の値の前に `!var_marker` を置けば要件 2.6（右辺に変数はパースエラー）になる。`attr_string` の除外の列（`kv_marker | attr_marker | comment_marker`）は**変えない**。6 節は比較演算子も除外する案を書いたが、そうすると今の宣言の値（`＆k：a＝b` は `a＝b`）が壊れる。条件の値の終わりは空白・`＆`・`＃` で決まるので、除外を足さなくても読み分けは崩れない。
+- **影響**: 比較演算子は `≧ ≦ ≠ >= <= != ＞ ＜ ＝ > < =` の順に試す（2 文字の半角を 1 文字より先に）。
+
+#### Lua → Rust の運び方と値の型
+
+- **きっかけ**: 要件 4.1・4.2・5.1・5.3。
+- **見たもの**: `runtime/finalize.rs` 44〜79・163〜186、`code_gen/expr_gen.rs` 144〜149（`Expr::Float` は `write!("{}", f)`。`1.0` は `1` と書かれる）、`runtime/log.rs` 91〜92（mlua の `Value::Integer`・`Value::Number` を両方受ける例）。
+- **分かったこと**: LuaJIT の数は倍精度の 1 種類で、`1.0` と `1` を区別できない。辞書確定は Lua の倉から Rust の表を作り直すので、Rust の表で整数と小数を分ける手がかりは「整数値かどうか」しか無い。キャッシュから読み込むときはトランスパイルを通らないので、構文木の型を辞書確定へ持ち越す道は無い（3 節の Option B を採らない理由と同じ）。
+- **影響**: Rust の値の型は `Integer(i64)`・`Float(f64)`・`String(String)` の 3 つにし、小数は「整数値で i64 に収まれば `Integer`」の 1 つの規則（`SceneAttrValue::from_f64`）で決める。トランスパイル時（`pasta_check` を含む）と辞書確定の両方がこの規則を通るので、2 つの表は同じ値になる。`＆率：1.0` は Rust では `Integer(1)`、Lua では `1`（設計の未決 2）。2^53 を超える整数は Lua で精度が落ちる（`shortcut:` として記す）。
+
+#### 倉の置き場と偽のシーン
+
+- **きっかけ**: 要件 5.4。
+- **見たもの**: `scene.lua` 67〜74（シーン表は `{ __global_name__ = … }`）、`finalize.rs` 64〜66、`debug/source_map/scene_join.rs` 87、`store.lua` 35・91〜108。
+- **分かったこと**: シーン表に属性のフィールドを置くと、`collect_scenes` と `scene_join.rs` の両方が、`__global_name__` 以外のキーをシーン関数として数える。
+- **影響**: 倉は `STORE.scene_attrs[グローバルの登録名][ローカルの登録名]` の別表にする（3 節の Option A の (a)）。`STORE.reset()` で空にする。辞書確定は `require("pasta.store").scene_attrs` を直に読む（`SCENE` に読み出し用の関数を足さない）。
+
+#### 一致テストの口
+
+- **きっかけ**: 要件 7.4。
+- **見たもの**: `pasta_check/src/validate/mod.rs` 26〜56（`module_name_of`・`pasta_dll_paths` などの `#[doc(hidden)]` の一致テスト用の口）、`tests/validate_parity_test.rs`（772 行。600 行の目安を超えている）。
+- **影響**: 一致テスト用の口 `scene_attrs` を同じ形で足し、テストは別ファイル `validate_attr_parity_test.rs` に置く。pasta.dll 側は、読み込んだ VM で `SCENE.attrs` を呼んで比べる（既存の `static_call_lookup_matches_runtime` と同じ、Lua を評価して比べる形）。
+
+## 8. 設計の比較と決定
+
+### 倉の形の比較
+
+| 案 | 内容 | 強み | 弱み | 採否 |
+| -- | ---- | ---- | ---- | ---- |
+| A | Rust のシーン表の `attributes` を順あり・型ありの `Vec<SceneAttr>` に置き換える。`filter_by_attributes` は宣言の項目の文字列で比べるよう合わせる | 形が 1 つ。読み手は 1 つの型だけ見ればよい | `register_global`・`register_local` の呼び出し（テストに約 130 か所）を `HashMap::new()` → `Vec::new()` に機械的に直す | 採る |
+| C | `HashMap<String, String>` の写しを残し、型ありを横に足す | 既存のテストを触らない | 同じ属性を 2 つの形で持ち、後の spec に消す約束が要る。要件 5.5 の「見分けの決まりは 1 本」に反しやすい | 採らない |
+
+### 決定 1: 受け継ぎと重なりの規則を `pasta_dsl` の 1 か所に置く
+
+- **背景**: 要件 3・7.4。トランスパイラ（`pasta_lua`）と検査（`pasta_check`）が同じ規則で属性を作らないと、一致テストが落ちる。
+- **候補**: (1) `pasta_dsl` に構文木の関数として置く。(2) `pasta_core` に倉の型の関数として置き、ファイル属性の置き換えは両方に書く。(3) 両方に書いて一致テストだけで守る。
+- **採用**: (1)。`PastaFile::global_scene_attrs()`（n 番目のグローバルシーンの、受け継ぎと畳みを済ませた構文木の属性の並び）と `merge_attrs(inherited, own)` を `parser/ast/attr_merge.rs` に置く。構文木 → 倉の項目の写し（20 行ほど）は `pasta_lua` と `pasta_check` にそれぞれ置く（`pasta_core` は `pasta_dsl` に依存しないので、写しの関数を共有できない）。写しのずれは一致テストが拾う。
+- **理由**: 難しいのは置き換えと畳みであり、それを 1 か所に置けば、両方に残るのは機械的な型の写しだけになる。
+
+### 決定 2: 構文木の `Attr` は `key` と `body` に分ける
+
+- **背景**: 要件 2.1・2.3・5.5。宣言・条件・フラグを書いた順に 1 本の並びで持つ。
+- **候補**: (1) `Attr { key, body: AttrBody, span }`（`AttrBody::{Decl(AttrValue), Cond { op, value }, Flag}`）。(2) 今の `value` を残して `kind` を足す（フラグの値が「無いのに有る」形になる）。(3) `Attr` を enum にする（`key`・`span` の読み手が全部変わる）。
+- **採用**: (1)。`Attr::value()`（宣言と条件の値。フラグは `None`）を足し、`attr.value` を読む既存のテスト（`pasta_dsl/tests` の 4 本ほど）は `attr.value()` に直す。
+- **トレードオフ**: `Attr { key, value, span }` を組み立てるコード（7 か所。ほとんどテスト）を直す。
+
+### 決定 3: 条件とフラグの名前は全角の印に揃えた文字列で持つ
+
+- **背景**: 要件 5.5・6.2（`key = "＄…"`）。
+- **採用**: 構文木と倉の `key` は `＄名前`・`＄＊名前`（`$`・`*` で書いても全角の `＄`・`＊` に揃える。名前の部分は書いたまま）。変数の別は `key` の先頭が `＄＊` かどうかで分かる。
+- **理由**: 読み手の見分けが「先頭が `＄`」の 1 本で済む（要件 5.5）。半角で書いた条件と全角で書いた条件が、同じ変数として並ぶ。（設計の未決 3）
+
+### 決定 4: 生成 Lua はシーンの `do` ブロックの頭に 1 シーン 1 行を足す
+
+- **背景**: 要件 7.1・7.2・5.1。
+- **候補**: (1) `local SCENE = PASTA.create_scene(…)` の直後に `PASTA.set_scene_attrs(SCENE, "登録名", { … })` を、属性のあるシーン（グローバルは `__start__`、ローカルは関数名）ごとに 1 行。(2) `act:init_scene` の引数に足す（毎回の呼び出しで運ぶことになり、属性の無いシーンとは引数の数がずれる）。(3) シーン表のフィールドにする（偽のシーンが出る）。
+- **採用**: (1)。属性の無いシーンには 1 行も足さないので、属性を持たない辞書の生成物はバイト不変（要件 7.1）。シーン関数の本体と `init_scene` の行は変わらない（要件 7.2）。
+
+### 決定 5: ファイル属性の 2 行目はパーサの組み立て（`build_ast`）で止める
+
+- **背景**: 要件 3.3。
+- **候補**: (1) 文法で `file_scope` の中の属性行を 1 つにする。(2) `build_ast` で「前のグローバルシーンの後に属性行を見たか」を数える。
+- **採用**: (2)。`file` は `( file_scope | global_scene_scope | actor_scope )*` の繰り返しなので、文法で `file_scope` の中を 1 行にしても、次の繰り返しで 2 つ目の `file_scope` が始まって通ってしまう（アクター辞書を挟む場合も同じ）。組み立ての段なら 1 つの状態で数えられ、誤りの位置と前の行の行番号を書ける。数え直すのはグローバルシーンの後だけ（要件 3.3 の文言どおり。アクター辞書を挟んでも 2 行目は誤り。設計の未決 4）。
+
+### 決定 6: Lua の口のローカル名は登録名（関数名）
+
+- **背景**: 要件 5.1・6.1・6.5。
+- **分かったこと**: `act` はローカルの登録名を持たない（発見 2）。
+- **採用（仮）**: `SCENE.attrs(global_name, local_name)` の `local_name` は、`SCENE.get` と同じ登録名（`選択肢_1`。`nil` と `"__start__"` はグローバル自身）。実行中のグローバルシーンは `SCENE.attrs(act.current_scene.__global_name__, nil)` で読める。実行中のローカルシーンを `act` だけから読む方法は、この設計では用意しない。（設計の未決 1。要件 6.5 の文言の手直しが要るかもしれない）
+
+### 簡単にしたこと（Synthesis）
+
+- **簡素化**: `SCENE` に足す関数は、生成コードが呼ぶ `SCENE.set_attrs` と、読み手の `SCENE.attrs` の 2 つ。辞書確定は `STORE.scene_attrs` を直に読み、読み出し用の関数を足さない。`indexmap` を足さない。宣言の畳みは `Vec` の線形探索（1 シーンの属性は数個）。
+- **一般化**: 宣言・条件・フラグを 1 つの並びの 3 種の項目にしたので、後続の 3 つの読み手（`scene-condition-attributes`・`scene-pick-modes`・`cue-command-runtime`）は同じ並びを読む。評価・重み・演出の形は先取りしない（`SceneAttr` に評価の関数を置かない）。
+- **Build vs Adopt**: 外部の仕組みで置き換えられる部分は無い（DSL の属性の運搬は pasta の内部の流れ）。TOML などへの書き出しも要らない（生成 Lua の表の字句で足りる）。
+
+## 9. リスクと手当て
+
+- 2 行のファイル属性を書いている既存のゴーストは、更新でパースエラーになる（要件 3.3 の意図した変化）。属性は今まで効いていなかったので影響は小さいが、マニュアルの「よくある間違い」に書く。
+- `register_global`・`register_local` の引数の型の変更は、テストに約 130 か所の機械的な直しを生む。1 タスクにまとめ、`HashMap::new()` → `Vec::new()` の置き換えだけにする。
+- 2^53 を超える整数は Lua で精度が落ちる。重みや優先の範囲では起きない（`shortcut:` のコメントを置く）。
+- `pasta_lsp` の宣言行の走査を構文木の属性へ切り替えるので、部分解析（構文エラーのある文書）のときの宣言行の色が変わらないかを、既存の `partial_token_test.rs` と `semantic_token_test.rs` 186〜278 で確かめる。
+- `pasta_scripts`（`scene.lua`・`store.lua`・`init.lua`）を変えるので、自己展開の基準ダイジェストが変わる。ビルドで作り直される（手で触る所は無い）。
