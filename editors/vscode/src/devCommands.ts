@@ -25,6 +25,7 @@ const NOT_IN_GHOST = 'ゴーストのフォルダの中のファイルではあ�
 const BUSY = 'このゴーストへのコマンドが進んでいます';
 const NOT_FOUND = 'このゴーストが動いている SSP・areka が見つかりません';
 const NOT_FOUND_CHECKS = '確かめること: ベースウェアでこのゴーストを起動しているか・SSP の MCP の窓口が有効か';
+const SAVE_FAILED = '保存できなかったファイルがあるので止めました';
 
 /** 誤りの通知で出す失敗（7.3。それ以外の止まり方は警告） */
 const ERROR_KINDS: ReadonlySet<CallResult['kind']> = new Set(['unreachable', 'badShape', 'rpcError', 'ng']);
@@ -35,6 +36,7 @@ interface Command {
   readonly id: string;
   readonly title: string;
   readonly accepts: (doc: vscode.TextDocument) => boolean;
+  readonly saves: boolean; // 読み込み直す 2 つだけが保存する（4.2・5.2・6.4）
   readonly run: (ctx: FlowContext, editor: vscode.TextEditor) => Promise<Report>;
 }
 
@@ -44,7 +46,7 @@ const isGhostSource = (doc: vscode.TextDocument) =>
 
 const COMMANDS: readonly Command[] = [
   {
-    id: 'pasta.runSceneAtCursor', title: '▶ シーンを実行', accepts: isPasta,
+    id: 'pasta.runSceneAtCursor', title: '▶ シーンを実行', accepts: isPasta, saves: true,
     run: async (ctx, editor) => {
       const o = await runScene(ctx, editor.document.uri.fsPath, editor.selection.active.line + 1);
       const failure = o.kind === 'failed' ? o.result : o.reload.kind === 'refused' ? o.reload.result : undefined;
@@ -52,20 +54,38 @@ const COMMANDS: readonly Command[] = [
     },
   },
   {
-    id: 'pasta.reloadShiori', title: 'SHIORI をリロード', accepts: isGhostSource,
+    id: 'pasta.reloadShiori', title: 'SHIORI をリロード', accepts: isGhostSource, saves: true,
     run: async (ctx) => {
       const o = await reloadAndWait(ctx);
       return { ...formatReload(o), failure: o.kind === 'refused' ? o.result : undefined };
     },
   },
   {
-    id: 'pasta.showSaveVariables', title: '保存変数を表示', accepts: isGhostSource,
+    id: 'pasta.showSaveVariables', title: '保存変数を表示', accepts: isGhostSource, saves: false,
     run: async (ctx) => {
       const o = await dumpVariables(ctx);
       return { ...formatDump(o), failure: o.kind === 'failed' ? o.result : undefined };
     },
   },
 ];
+
+/** ルートの下（大文字・小文字を問わない）の未保存の .pasta・.lua・pasta.toml を全部保存し、保存できなかったパスを返す */
+async function saveGhostDocuments(root: string): Promise<string[]> {
+  const base = path.resolve(root).toLowerCase() + path.sep;
+  const targets = vscode.workspace.textDocuments.filter((d) => {
+    const file = d.uri.fsPath;
+    const ext = path.extname(file).toLowerCase();
+    return d.isDirty && d.uri.scheme === 'file' && path.resolve(file).toLowerCase().startsWith(base)
+      && (ext === '.pasta' || ext === '.lua' || path.basename(file).toLowerCase() === 'pasta.toml');
+  });
+  const failed: string[] = [];
+  for (const d of targets) {
+    if (!(await d.save().then((ok) => ok, () => false))) {
+      failed.push(d.uri.fsPath);
+    }
+  }
+  return failed;
+}
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const clock = (d = new Date()) => `[${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}]`;
@@ -148,6 +168,12 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps: Part
         return;
       }
       write([`${clock()} ${cmd.title} — ${ghost.displayName}（${ghost.root}）→ ${endpoint.basewareName} ${HOST}:${endpoint.port}`]);
+      // 古い辞書を読ませない（4.2・5.2）。確かめずに保存し、1 つでも保存できなければ送らない
+      const unsaved = cmd.saves ? await saveGhostDocuments(ghost.root) : [];
+      if (unsaved.length > 0) {
+        stop([SAVE_FAILED, ...unsaved.map((f) => `  ${f}`)], `${SAVE_FAILED}: ${unsaved.join('、')}`);
+        return;
+      }
       const progress = { location: vscode.ProgressLocation.Window, title: `Pasta: ${cmd.title}` };
       const report = await vscode.window.withProgress(progress, () => cmd.run({ endpoint, ghost, timing, sleep }, editor));
       if (report.notice) {
