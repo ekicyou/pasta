@@ -1,6 +1,6 @@
 // Test-only stand-in for the SSP / areka MCP endpoint (POST /api/mcp/v1).
 // Wire shapes follow the real SSP 2.9.28 / areka answers recorded in
-// .kiro/specs/vscode-mcp-client/research.md. Node built-ins only.
+// .kiro/specs/completed/vscode-mcp-client/research.md. Node built-ins only.
 
 import * as fs from 'fs';
 import * as http from 'http';

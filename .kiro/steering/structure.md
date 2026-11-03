@@ -57,21 +57,13 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   ├── scope_gen.rs    # スコープ生成（分割impl）
 │       │   │   ├── element_gen.rs  # 要素生成（分割impl）
 │       │   │   ├── expr_gen.rs     # 式生成（分割impl。値・関数呼び出し・引数・算術/連結の連鎖の組み直し）
-│       │   │   └── source_map.rs   # .pastaソースマップ記録シーム（SourceMapSink/PastaPos）
-│       │   ├── debug/      # VSCode Luaデバッグバックエンド（DAP・既定無効/ゼロコスト・SHIORI非依存）
-│       │   │   ├── mod.rs          # DebugConfig/enable()/DebugHandle/DebugError・有効化ゲート
-│       │   │   ├── config.rs / enable.rs / error.rs / handle.rs # 設定・有効化・エラー・ハンドル（フラットモジュール）
-│       │   │   ├── types.rs        # 共有DTO（SessionCommand/Event・FrameInfo・ThreadId等）
-│       │   │   ├── breakpoints.rs  # BreakpointSet（Arc<Mutex>共有）
-│       │   │   ├── hook.rs         # set_global_hook＋jit.off・LineHookシーム
-│       │   │   ├── inspect.rs      # FrameInspector（mlua::ffi・コルーチンstate走査）
-│       │   │   ├── source_mode.rs  # ソース表示モード（.pasta/Lua ビュー切替）
-│       │   │   ├── session/        # 停止状態機械（mod/anchor/stepping/stop_loop に分解）
-│       │   │   ├── dap/            # DAP最小サブセット（codec/decode/encode/pending/resolver・serde_json手書き）
-│       │   │   ├── transport/      # TCP＋Content-Lengthフレーミング（mod/framing・I/O専用）
-│       │   │   ├── wiring/         # transport↔dap↔session↔hook結線（mod/bridge/inbound/resolver）
-│       │   │   └── source_map/     # .pasta本番ソースマップ（mod/sidecar・正規化キー・任意サイドカー）
-│       │   │   # 注: 上記に対応する src 内テスト（*_tests.rs）・共有ヘルパ（*_test_support.rs）が多数併置（後述「src/ 内テスト配置方針」）
+│       │   │   └── source_map.rs   # 記録のシーム（SourceMapSink。行の記録とシーンの宣言）
+│       │   ├── debug/      # 開発用のイベントの部品（`[debug] enabled` のときだけ働く・SHIORI非依存。DAP は 2026-11-03 に撤去）
+│       │   │   ├── mod.rs          # 入口（resolve_enabled・source_map の再輸出）
+│       │   │   ├── config.rs       # 有効の解決（PASTA_DEBUG ＞ [debug] enabled ＞ false）
+│       │   │   ├── playscene.rs    # OnPastaSceneAt の位置の引き（@pasta_debug.scene_at）
+│       │   │   └── source_map/     # シーンマップ（mod/scene_index/scene_join。シーンの宣言の記録と索引）
+│       │   │   # 注: 対応する src 内テスト（*_tests.rs）を併置（後述「src/ 内テスト配置方針」）
 │       │   ├── context.rs   # トランスパイルコンテキスト
 │       │   ├── error.rs     # エラー型
 │       │   ├── encoding/    # エンコーディング処理（プラットフォーム別分割）
@@ -322,7 +314,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 **既存の適用例**:
 - `pasta_core/src/registry/scene_table_candidate_tests.rs`・`scene_table_resolve_filter_tests.rs`（SceneTable の labels, prefix_index への直接アクセス）
 - `pasta_shiori/src/shiori_lifecycle_tests.rs`・`shiori_request_tests.rs`（ShioriService の cache への直接アクセス）
-- `pasta_lua/src/debug/` 配下（`*_tests.rs` 多数。デバッグ状態機械・DAP・wiring の内部状態を直接検証）
+- `pasta_lua/src/debug/` 配下（`playscene_tests.rs`・`source_map/scene_index_tests.rs`・`scene_join_tests.rs`。シーンマップの内部状態を直接検証）
 
 **命名規約（src 内テスト）**:
 - テストモジュール本体: `<feature>_tests.rs`（複数形 `_tests`。`tests/` 配下の統合テスト `<feature>_test.rs`（単数形）と区別する）
@@ -334,7 +326,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 ### ファイルサイズ方針（俯瞰可能性）
 
 - **目安上限 600 行**: Rust ソース・テストファイルは 1 ファイルあたり概ね 600 行未満を保つ（`oversized-file-decomposition` で全ファイルを俯瞰可能サイズへ振る舞い不変分解した。2026-10-24 の時点で、1,000 行を超えるのは `pasta_lua` の `sakura_script/line_breaker.rs`（1,155 行。本体は約 310 行で、残りはテスト）と `search/context.rs`（1,017 行。本体は約 437 行で、残りはテスト）、`pasta_check` の `balloon.rs`（1,070 行。後半はテスト）の 3 つ。600 行を超えるファイルは 30 近くある）。
-- **分解の方向**: 肥大化したファイルは、フラットな単一ファイル → 同名のディレクトリモジュール（`mod.rs` + 責務別サブモジュール）へ展開する。例: `debug/dap.rs` → `debug/dap/{mod,codec,decode,encode,pending,resolver}.rs`。
+- **分解の方向**: 肥大化したファイルは、フラットな単一ファイル → 同名のディレクトリモジュール（`mod.rs` + 責務別サブモジュール）へ展開する。例: `debug/dap.rs` → `debug/dap/{mod,codec,decode,encode,pending,resolver}.rs`（DAP は 2026-11-03 に撤去した。分け方の例として残す）。
 - **不変条件**: 分解はあくまで振る舞い不変（pub API・テスト結果を変えない）。新規実装でこの上限のために責務をまたぐ分割をしない。
 
 ## モジュール構成
