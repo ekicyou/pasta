@@ -35,7 +35,6 @@ Windows DLL（`pasta.dll`）として出力され、伺かベースウェアか�
 | `load(load_dir)`        | ランタイム初期化                                              |
 | `request(req)`          | SHIORI リクエスト処理                                         |
 | `runtime()`             | ロード済み Lua ランタイム参照（テスト用）                     |
-| `kick(scene)`           | Lua 側の `SHIORI.kick` を保護呼び出しする（デバッグ通信用）  |
 | `Default::default()`    | 新規インスタンス作成                                          |
 
 このほか、アクターランタイムの `actor`・エラー型の `error`・リクエスト解析の `lua_request` の各モジュールと、Windows ではエクスポート関数 `load`・`loadu`・`request`・`unload` を公開しています（統合テスト用）。

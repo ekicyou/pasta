@@ -150,7 +150,6 @@ fn sim_driver_ticks_drive_production_marshaling_contract() {
                     let _ = done.send(());
                     break;
                 }
-                ActorMsg::Kick { .. } => {}
             }
         }
     });

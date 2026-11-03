@@ -182,7 +182,7 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
     // (1) アクタースレッドで VM をロード（debug 有効・エフェメラルポート）。
     let (tx, rx) = mailbox();
     let actor =
-        spawn_actor_thread_with(load_dir.clone(), rx, None, None).expect("actor thread must spawn");
+        spawn_actor_thread_with(load_dir.clone(), rx, None).expect("actor thread must spawn");
     assert!(
         actor.loaded(),
         "actor thread must load the debug-enabled ghost VM"

@@ -38,7 +38,6 @@ use std::path::PathBuf;
 use std::thread::{self, JoinHandle};
 
 use flume::Receiver;
-use pasta_lua::debug::KickSink;
 use pasta_lua::{ClaimToken, LoadDirGuard};
 
 use crate::actor::mailbox::ActorMsg;
@@ -107,7 +106,6 @@ impl ActorThread {
 /// - `load_dir`: VM を構築する [`PastaShiori::load`] へ渡す（`Send`）。
 ///   VM 本体（`!Send`）はこのスレッド上で構築されるため越境しない。
 /// - `rx`: mailbox の consumer 側 [`Receiver`]（単一 consumer 不変条件）。
-/// - `kick_sink`: VM（[`PastaShiori::with_kick_sink`]）へ渡す kick の送り先。
 /// - `claim`: VM の片付けで外すディレクトリの占有の札（[`PastaShiori::set_claim`]）。
 ///
 /// # 動作
@@ -124,7 +122,6 @@ impl ActorThread {
 pub fn spawn_actor_thread_with(
     load_dir: PathBuf,
     rx: Receiver<ActorMsg>,
-    kick_sink: Option<KickSink>,
     claim: Option<ClaimToken>,
 ) -> io::Result<ActorThread> {
     // 参照はスレッドを起こす前に取る（参照の無いアクタースレッドを作らない）。
@@ -141,7 +138,7 @@ pub fn spawn_actor_thread_with(
             // 届ける。done ack の後に出るログは登録解除の後なので捨てられる（4.7）。
             let log_context = LoadDirGuard::new(load_dir.clone());
             // (1) VM をこのスレッドで構築・pin（!Send ゆえ越境不可）。
-            let mut shiori = PastaShiori::with_kick_sink(kick_sink);
+            let mut shiori = PastaShiori::default();
             shiori.set_claim(claim);
             let loaded = shiori.load(load_dir.as_os_str()).unwrap_or(false);
 
@@ -194,17 +191,6 @@ pub fn spawn_actor_thread_with(
                         // 観測ログ点（R10.4）: NOTIFY を mailbox から受信（応答経路なし）。
                         tracing::trace!(seam = "actor.recv", method = "notify", seq = req.seq, "actor received NOTIFY");
                         let _ = shiori.request(&req.raw);
-                    }
-                    // KICK fire-and-forget（仕様 `pasta-scene-kick` 3.1）: VM 上で
-                    // SHIORI.kick(scene) を呼び、保留フラグ（kick_pending/kick_force）を
-                    // 設置する。NOTIFY 同型で応答経路を持たず、戻り値も捨てる。複数 Kick
-                    // は同一 FIFO 上で投入順に処理され、最後の scene が kick_pending を
-                    // 上書きする。kick は protected call（shiori.rs 側で pcall 相当）ゆえ
-                    // SHIORI.kick 不在・エラーでもアクタースレッドは落ちない。
-                    ActorMsg::Kick { scene } => {
-                        // 観測ログ点（R10.4・無効時ゼロコスト）: Kick を mailbox から受信。
-                        tracing::trace!(seam = "actor.recv", method = "kick", scene = %scene, "actor received KICK");
-                        shiori.kick(&scene);
                     }
                     // teardown: ack 経路を保持してループを抜ける。Stop は同一 FIFO を
                     // 通るため、ここに到達した時点で先行メッセージは drain 済み

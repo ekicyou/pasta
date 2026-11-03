@@ -19,7 +19,7 @@
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 9.2_
 
 - [ ] 2. キックの経路を撤去する（Rust）
-- [ ] 2.1 pasta_shiori のアクターと SHIORI からキックを外す
+- [x] 2.1 pasta_shiori のアクターと SHIORI からキックを外す
   - アクターのキックのメッセージとその腕、キックの送り先を作る関数、`PastaShiori` のキックの送り先の欄・設定の口・キックの関数と説明を消す
   - アクターのスレッドを起こす関数の引数からキックの送り先を外し（3 つにする）、スレッドは既定の `PastaShiori`、読み込みは既定の `RuntimeConfig` を使う
   - その関数を呼ぶテスト（キックと関係の無いものも）の引数を直す。アクターの単体テストのキックの分・テストのハーネスのキックの腕・`shiori_lifecycle_tests.rs` の `test_default_has_no_kick_sink`・`actor_thread_vm_test.rs` のキックの説明を消す
@@ -218,3 +218,4 @@
 
 ## Implementation Notes
 - 1.1: 読み込みの終わりの指示を足すと max_level_hint が info より下がらないため、`tracing::enabled!(INFO)` は層ごとのフィルタでも true になる。ログの絞り込みを確かめるテストは `enabled!` でなく pasta.log の中身か DEBUG で見分ける。
+- 2.1: `multi_instance_test::dap_kick_reaches_only_its_own_instance` は 2.1 の後 2.2 で消すまで赤い（キックの経路が無いため）。

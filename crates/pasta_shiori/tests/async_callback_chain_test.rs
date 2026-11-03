@@ -81,8 +81,8 @@ ID: OnResumeChain
 // ============================================================================
 // Scenario: get_property → チェイントーク（callback-resume-unification 1.3, 6.1）
 // コールバックの応答に前半、次の OnTalk の機会に後半が出る。
-// OnTalk は OnSecondChange → 仮想ディスパッチャで起こす（scene_kick_multibeat_e2e_test.rs
-// と同じく X-Pasta-Time で時刻を固定し、talk 間隔はフィクスチャの pasta.toml で 10 秒に固定）。
+// OnTalk は OnSecondChange → 仮想ディスパッチャで起こす（X-Pasta-Time で時刻を固定し、
+// talk 間隔はフィクスチャの pasta.toml で 10 秒に固定）。
 // ============================================================================
 
 /// X-Pasta-Time を固定した OnSecondChange（仮想ディスパッチャ経由の OnTalk 判定）を送る

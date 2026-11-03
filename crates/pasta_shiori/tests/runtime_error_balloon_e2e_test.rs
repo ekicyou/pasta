@@ -70,7 +70,7 @@ fn run(balloon_warning: Option<&str>, requests: &[(&str, &str)]) -> Run {
         std::fs::write(&path, toml).unwrap();
     }
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(temp.path().to_path_buf(), rx, None, None)
+    let actor = spawn_actor_thread_with(temp.path().to_path_buf(), rx, None)
         .expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost");
     let raws = requests
