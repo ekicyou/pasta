@@ -268,7 +268,7 @@ STOP.location(chunk, line, chunks, line_map)
 - [pasta-scene-kick-from-cursor](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/pasta-scene-kick-from-cursor) — シーン identity 索引
 - [scene-play-event](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/scene-play-event) — `OnPastaScene`・`OnPastaSceneAt` と `@pasta_debug`
 - [runtime-error-balloon](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/runtime-error-balloon) — 止まるエラーの表記と場所
-- [debug-mcp-runtime](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/debug-mcp-runtime) — 開発用のイベントの門・シーンマップ・`OnPastaDumpVariables`・止まるエラーの場所の決め方
+- [debug-mcp-runtime](https://github.com/ekicyou/pasta/tree/main/.kiro/specs/completed/debug-mcp-runtime) — 開発用のイベントの門・シーンマップ・`OnPastaDumpVariables`・止まるエラーの場所の決め方
 
 ---
 
