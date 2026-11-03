@@ -154,7 +154,7 @@
   - _Requirements: 9.1, 9.7, 9.8, 9.9_
 
 - [ ] 8. 確かめ
-- [ ] 8.1 全体の試験と残りの確かめ
+- [x] 8.1 全体の試験と残りの確かめ
   - 拡張の `npm test` の全部と、マニュアルの検証（7.5 の 4 つ）を走らせる。
   - 拡張・マニュアル・README に DAP の部品の名前（`debuggers`・`onDebug`・`sourcePresentation`・`debugAdapter`・9276）が残っていないことを `grep` で確かめる。`package-lock.json` と本番の依存が変わっていないことを確かめる。
   - 終わったとき: 上の全部が通り、残りの名前の `grep` が空である。
@@ -180,3 +180,4 @@
 - 6.1: 本物の vscode.Uri では ghost_name に送るルートがドライブ文字小文字の fsPath（c:\...）になる。ベースウェアが大文字・小文字を区別して照らさないかを 8.2 の実機で確かめる。e2e は src/test/devCommands.e2e.test.ts（6.3 で test:e2e に足す）。
 - 6.3: 7.2 で dev-actions.md の古い表記「SHIORIリロード」を「SHIORI をリロード」に直す。
 - 7.1: debug-mcp-runtime は brief.md しか無く info の行の文言は未決。マニュアルは仮の言い方「開発用のイベントを許したことを示す info の行」で書いた（7.2 もこれに揃える）。あちらで文言が決まったら引用を足す。
+- 8.1: 残りの名前の grep は、拡張（src・package.json・README）・book/src/debug/・ルートの README・DEBUGGING.md で空。book/src/internals/debug.md と reference/pasta-toml.md の [debug] の表に残る 9276・sourcePresentation は、今の pasta.dll にまだある DAP の説明で debug-mcp-runtime の持ち場（設計 187・819 行。brief へ申し送り済み）。npm test・lint・tsc・マニュアルの 4 つの検査は通り、package-lock.json と依存は 8bab2af9 から変わっていない。
