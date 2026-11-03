@@ -273,6 +273,7 @@ end
 - 文は、グローバルシーン自身（`"__start__"`。受け継いだ並び）のぶんと、属性のある名前付きローカルシーン（生成した関数名。宣言行の属性だけ）のぶんを、この順に並べる。属性の無いシーンのぶんは出さない。
 - 項目は、宣言が `{ key = 名前, value = 値 }`、条件が `{ key = "＄…", op = "正規形の演算子", value = 値 }`、フラグが `{ key = "＄…" }` である。数は式の数値と同じ表記、文字列は `StringLiteralizer` のリテラルで書く。
 - 行を足さずに同じ行へ続けるため、生成コードの行の数と `init_scene` に渡す行の対応は、属性の有無で変わらない。
+- 文を作る前に、`優先`・`priority` の宣言の値を確かめる。値が整数（倉の規則で整数になる小数を含む。`pasta_core` の `priority_value`）でなければ、属性の位置の `TranspileError::InvalidPriority` で変換を止める（`「1」` の引用は文字列なので誤り）。
 - `PASTA.set_scene_attrs` は `SCENE.set_attrs` そのもので、生成コードのための関数である。倉に書いた並びは、辞書確定が Rust の登録へ運び（[辞書確定](registry-search.md#辞書確定)）、`SCENE.attrs` が Lua から読む（[SCENE.attrs](../lua/script-api.md#sceneattrsglobal_name-local_name)）。
 
 #### init_scene の引数
