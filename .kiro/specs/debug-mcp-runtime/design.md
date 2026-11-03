@@ -70,7 +70,7 @@ raise_event("OnPastaDumpVariables",  [])                          → profile/pa
 ### Revalidation Triggers
 
 - `OnPastaSceneAt` の Reference0 の受け方（パスだけ。URI を受けない）→ `vscode-mcp-client`。
-- `OnPastaDumpVariables` の書き出す先（`ghost/master/profile/pasta/debug/variables.toml`）・応答（204）・書式（TOML）→ `vscode-mcp-client`。
+- `OnPastaDumpVariables` の書き出す先（`ghost/master/profile/pasta/debug/variables.toml`）・応答（204）・書式（TOML）→ `vscode-mcp-client`。デバッグが無効なときも、書けなかったときも 204 で、前のファイルが残る。読む側は、送る前と後でファイルの更新時刻を比べて、新しく書かれたかを確かめる。
 - ログの文言: 無効・external の警告（`<イベント名>: debug is disabled; …`・`<イベント名>: SecurityLevel external is refused; …`）と、有効なときの info の 1 行（`Debug enabled: development events are allowed`）→ `vscode-mcp-client` のトラブルシューティング。
 - `@pasta_chunks` の値の形（`true` が無くなる）→ `@pasta_chunks` を読む後の spec。
 - `RuntimeConfig`・`PastaLuaRuntime` の pub の口の削除（`debug`・`kick_sink`・`with_debug*`・`with_kick_sink`・`debug_local_addr`・`debug_source_mode`）→ `pasta_lua` を使う外のクレート（0.5.0 で予告なく消す。議題 9）。
@@ -623,11 +623,11 @@ function STOP.location(chunk, line, chunks, line_map, pasta_line) end
 4. 整え（残す部品）: `playscene.rs`（URI を外す）、`source_map/` の整理と説明、`scene_join.rs`・`scene_index.rs`、有効なときの info の 1 行、中和の写しの `PASTA_DEBUG_PORT`。
 5. 整え（`OnPastaDumpVariables`）: `dump_table`・`save_to_file` の一時ファイル・`@pasta_debug.dump_variables`・`scene_play.lua`。
 6. 整え（止まるエラーの場所）: `pasta_sources`・`@pasta_chunks` の値・`chunk_path`・`@pasta_debug.pasta_line`・`stop.lua`。
-7. テストの足し（1.3・3.2〜3.4・1.2 の結合テスト・`multi_instance_test.rs` の書き直し）。4〜6 のそれぞれのタスクに入れてもよい。
+7. テストの足し（1.3・3.2〜3.4・1.2 の結合テスト・`multi_instance_test.rs` の書き直し）。9.2 のテストは、その振る舞いを作るタスク（1〜6）に入れる。ここに残すのは、どのタスクにも属さない確かめ（1.2 の `jit.status()`・3.4 の新しいバイナリ）だけである。
 8. マニュアルと references（8.1〜8.7）。
 9. 関門（9.4・9.5）。
 
-1〜3 は互いに独立に近いが、`runtime_config.rs` の `kick_sink` を 1 で消すと 2 の `pasta_shiori` が壊れるので、1 と 2 は同じタスクか 2 を先にする。
+1〜3 は互いに独立に近いが、`runtime_config.rs` の `kick_sink` を 1 で消すと 2 の `pasta_shiori` が壊れる。そこで 2 を先にする（`pasta_shiori` が kick の送り先を渡さなくなってから、`pasta_lua` の欄を消す）。1 は大きいので、ビルドが通る切れ目（結線を外す → DAP の部品とテストを消す → 設定を縮める → 依存を外す）でタスクを分ける。
 
 ## Open Questions / Risks
 
