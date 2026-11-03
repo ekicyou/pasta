@@ -173,7 +173,7 @@
   - _Boundary: pasta_lua の新しいテストのバイナリ_
   - _Requirements: 3.4, 9.2_
 
-- [ ] 9.3 (P) デバッグを有効にした 2 体が並ぶことを確かめる
+- [x] 9.3 (P) デバッグを有効にした 2 体が並ぶことを確かめる
   - `multi_instance_test.rs` のポートの 1 本を、2 体とも `enabled = true` で読み込み、どちらも `OnPastaScene` に 200 で自分のシーンを返し、どちらのログにも有効の info の 1 行があり、待ち受けのログが無い、に直す。ログの量の確かめは残す
   - 完了の姿: `multi_instance_test.rs` が通る
   - _Boundary: pasta_shiori の結合テスト_

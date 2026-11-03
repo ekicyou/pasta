@@ -117,22 +117,60 @@ fn variables_and_chain_talk_do_not_mix_across_threads() {
     }
 }
 
-/// `[logging]` の量は自分のログだけに効く（5.3・5.4）。
+/// SecurityLevel local の `OnPastaScene`（Reference0 にシーン名）。
+fn on_pasta_scene(scene: &str) -> String {
+    format!(
+        "GET SHIORI/3.0\r\nCharset: UTF-8\r\nSender: SSP\r\nSecurityLevel: local\r\n\
+         ID: OnPastaScene\r\nReference0: {scene}\r\n\r\n"
+    )
+}
+
+/// デバッグを有効にした 2 体が並び、どちらも開発用のイベントを許し、待ち受けのログを出さない
+/// （debug-mcp-runtime 1.1・1.3・1.5）。`[logging]` の出し先と量は自分のログだけに効く（5.3・5.4）。
+/// B の量は info にする（warn だと有効の info の行まで絞られ、1.5 を確かめられない）。
 #[test]
-fn log_levels_and_debug_port_stay_per_instance() {
+fn two_debug_enabled_instances_stand_side_by_side() {
+    const ENABLED: &str = "Debug enabled: development events are allowed";
     let _serial = serial();
-    let a = ghost("\n[logging]\nlevel = \"debug\"\n");
+    let a = ghost("\n[logging]\nlevel = \"debug\"\n\n[debug]\nenabled = true\n");
     let mut inst_a = load(a.path()).expect("first instance");
-    let b = ghost("\n[logging]\nlevel = \"warn\"\n");
+    let b = ghost("\n[logging]\nlevel = \"info\"\n\n[debug]\nenabled = true\n");
     let mut inst_b = load(b.path()).expect("the later instance must still load");
-    assert_eq!(request(&mut inst_b, &get("印を見る")).0, 200);
-    assert_eq!(request(&mut inst_a, &get("印を見る")).0, 200);
+
+    // どちらも OnPastaScene に 200 で自分のシーンを返し、変数は自分の VM にだけ残る（1.3）。
+    for (inst, mark, other) in [(&mut inst_a, "甲", "乙"), (&mut inst_b, "乙", "甲")] {
+        let (status, body) = request(inst, &on_pasta_scene(&format!("印{mark}")));
+        assert_eq!(status, 200, "{mark}: {body:?}");
+        assert!(
+            body.contains(&format!("{mark}にしたよ")),
+            "{mark}: {body:?}"
+        );
+        let look = request(inst, &get("印を見る")).1;
+        assert!(
+            look.contains(&format!("印は{mark}")) && !look.contains(other),
+            "{mark}: {look:?}"
+        );
+    }
 
     // unload で各ゴーストのロガーが外れ、書き手が書き終えてから読む。
     drop(inst_a);
     drop(inst_b);
     let log_a = read_log(a.path());
     let log_b = read_log(b.path());
+
+    for (name, log) in [("A", &log_a), ("B", &log_b)] {
+        // 有効の info が 1 行あり、待ち受けのログが無い（1.1・1.5）。
+        let enabled: Vec<&str> = log.lines().filter(|l| l.contains(ENABLED)).collect();
+        assert!(
+            enabled.len() == 1 && enabled[0].contains("INFO"),
+            "{name}: one info line {ENABLED:?}:\n{log}"
+        );
+        assert!(
+            !log.contains("debug backend listening")
+                && !log.contains("debug transport bind failed"),
+            "{name}: no listener log:\n{log}"
+        );
+    }
 
     // 出し先: それぞれのファイルに相手のディレクトリの行が無い（5.3）。
     let (dir_a, dir_b) = (
@@ -151,21 +189,6 @@ fn log_levels_and_debug_port_stay_per_instance() {
     // 量（5.4）: A は debug を書き、B は debug を書かない。
     assert!(levels(&log_a).contains(&"DEBUG"), "A logs debug:\n{log_a}");
     assert!(!levels(&log_b).contains(&"DEBUG"), "B:\n{log_b}");
-    // B の pasta.toml を読む前の 2 行（読み込みの開始）は既定の量で出る。読んだ後は warn 以上だけ
-    // （読み込みの終わりの行だけは量によらず info で出る。debug-mcp-runtime 要件 10.2）。
-    let after_config = log_b
-        .split_once("Starting pasta loader")
-        .and_then(|(_, rest)| rest.split_once('\n'))
-        .map(|(_, rest)| rest)
-        .unwrap_or_else(|| panic!("B loader start line:\n{log_b}"));
-    assert!(
-        after_config
-            .lines()
-            .filter(|l| !l.contains("SHIORI load entry completed"))
-            .filter_map(|l| l.split_whitespace().nth(1))
-            .all(|l| matches!(l, "WARN" | "ERROR")),
-        "B logs warn and above only after reading pasta.toml:\n{log_b}"
-    );
 }
 
 /// 旧来の窓口のインスタンスと版 3 のインスタンスが並び、片方の unload がもう片方の応答を
