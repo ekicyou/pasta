@@ -2,12 +2,16 @@
 //!
 //! 実物は pasta_lua の pasta_scripts。一致テストが実行時の `GLOBAL` と act の関数の名前を列挙して照らす。
 
-/// `GLOBAL` の関数（`yield`・`チェイントーク` は `pasta/global.lua`、
+/// `GLOBAL` の関数（`yield`・`チェイントーク`・シーン数・シーン数完全一致は `pasta/global.lua`、
 /// ゴースト終了と自動トークの停止・再開は `pasta/shiori/entry.lua`、
 /// おすすめメニューの項目・区切りは `pasta/shiori/event/recommend.lua`）
-pub const GLOBAL_NAMES: [&str; 12] = [
+pub const GLOBAL_NAMES: [&str; 16] = [
     "yield",
     "チェイントーク",
+    "scene_count",
+    "シーン数",
+    "scene_count_exact",
+    "シーン数完全一致",
     "close_ghost",
     "ゴースト終了",
     "pause_auto_talk",
