@@ -1,5 +1,5 @@
 --- @module pasta.shiori.stop
---- 止まるエラー（シーン・ハンドラが Lua のエラーで止まった・時間切れ）の表記
+--- 止まるエラー（シーン・ハンドラが Lua のエラーで止まった・時間切れ・FAILURE.raise の記録）の表記
 ---
 --- 場所の見分けとエラー文の整えは純粋な関数。読み込んだ Lua のファイルの表（`@pasta_chunks`）と、
 --- act が控えた行の対応（`act.line_map`）を引数で受け取る。
@@ -176,6 +176,24 @@ local function build_value(act, text)
     return text
 end
 
+--- 表記の種類・対象・説明
+---@param report StopReport
+---@param act table|nil  止まった場所の act
+---@param err any        エラーの値（控えがあれば控えの値）
+---@return string label, string|nil subject, string|nil detail
+local function parts(report, act, err)
+    if report.timeout ~= nil then
+        return FAILURE.LABEL.TIMEOUT, report.timeout, nil
+    elseif FAILURE.is_raised(err) then
+        -- 記録を運ぶ止まるエラー: 種類と対象は記録、説明は止まった場所
+        return err.label, err.subject, STOP.subject(act)
+    elseif type(err) == "string" then
+        return FAILURE.LABEL.SCRIPT_ERROR, STOP.subject(act) or report.fallback,
+            STOP.detail(err, nil, act and act.line_map)
+    end
+    return FAILURE.LABEL.SCRIPT_ERROR, nil, nil
+end
+
 --- 止まるエラー 1 件の、表記を出す応答の全文
 --- 出さないとき（shown が偽・表記を出さない設定）と組み立てに失敗したときは nil（呼び出し元が今の応答を返す）。
 --- 警告（report.warning）は、表記を出すかどうかにかかわらず 1 回出す
@@ -185,18 +203,12 @@ function STOP.response(report)
     local ok, res = pcall(function()
         local hold = report.hold
         local act = hold and hold.act or report.handler
-        local label, subject, detail
-        if report.timeout ~= nil then
-            label, subject = FAILURE.LABEL.TIMEOUT, report.timeout
-        else
-            label = FAILURE.LABEL.SCRIPT_ERROR
-            local err
-            if hold then err = hold.err else err = report.err end
-            if type(err) == "string" then
-                subject = STOP.subject(act) or report.fallback
-                detail = STOP.detail(err, nil, act and act.line_map)
-            end
-        end
+        local err
+        if hold then err = hold.err else err = report.err end
+        local label, subject, detail = parts(report, act, err)
+        local reason = report.reason
+        -- 理由が渡されなければ記録の文（表記を出さない場合の 500 と同じ）
+        if reason == nil and FAILURE.is_raised(err) then reason = tostring(err) end
         local warning = report.warning
         if warning then
             local body = FAILURE.body(label, subject, detail)
@@ -206,7 +218,6 @@ function STOP.response(report)
         end
         local text = FAILURE.notation({ label = label, subject = subject, detail = detail, warning = warning })
         if not text or not report.shown then return nil end
-        local reason = report.reason
         if reason == nil or reason == "" then reason = "Unknown error" end
         return RES.build(STOP.STATUS, { Value = build_value(act, text), ["X-Error-Reason"] = reason })
     end)

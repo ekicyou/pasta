@@ -341,10 +341,16 @@ describe("FAILURE.LABEL と要件 3.1 の文言", function()
     local FAILURE = require("pasta.failure")
     local L = FAILURE.LABEL
 
-    test("種類の名前の表は 12 種", function()
+    test("種類の名前の表は 13 種", function()
         local n = 0
         for _ in pairs(L) do n = n + 1 end
-        expect(n):toBe(12)
+        expect(n):toBe(13)
+    end)
+
+    test("条件に合うシーンが無い（13 種目）", function()
+        expect(L.SCENE_UNMET):toBe("条件に合うシーンが無い")
+        expect(FAILURE.format(L.SCENE_UNMET, "＞告白", "＊放課後"))
+            :toBe("【条件に合うシーンが無い：＞告白（＊放課後）】")
     end)
 
     test("型の名前にならない値（JSON の種類は無い）", function()
@@ -670,5 +676,36 @@ describe("FAILURE のイベントの部品（reply・is_name・quoted・bad_refe
         expect(b):toBe(nil)
         expect(c):toBe(3)
         expect(FAILURE.take_fn_failed(act)):toBe(false)
+    end)
+end)
+
+describe("FAILURE.raise・FAILURE.is_raised（記録を運ぶ止まるエラー）", function()
+    local FAILURE = require("pasta.failure")
+    local L = FAILURE.LABEL
+
+    test("記録の表をそのまま投げ、is_raised で見分けられる・tostring は表記の中身", function()
+        local record = { label = L.SCENE_UNMET, subject = "＞告白" }
+        local ok, err = pcall(FAILURE.raise, record)
+        expect(ok):toBe(false)
+        expect(err == record):toBe(true)
+        expect(FAILURE.is_raised(err)):toBe(true)
+        expect(tostring(err)):toBe("条件に合うシーンが無い：＞告白")
+    end)
+
+    test("コルーチンの中から投げても記録のまま届く", function()
+        local co = coroutine.create(function()
+            FAILURE.raise({ label = L.SCENE_UNMET, subject = "＞告白" })
+        end)
+        local ok, err = coroutine.resume(co)
+        expect(ok):toBe(false)
+        expect(FAILURE.is_raised(err)):toBe(true)
+        expect(err.subject):toBe("＞告白")
+    end)
+
+    test("投げた値でないものは偽", function()
+        expect(FAILURE.is_raised(nil)):toBe(false)
+        expect(FAILURE.is_raised("条件に合うシーンが無い：＞告白")):toBe(false)
+        expect(FAILURE.is_raised({ label = L.SCENE_UNMET, subject = "＞告白" })):toBe(false)
+        expect(FAILURE.is_raised(setmetatable({}, {}))):toBe(false)
     end)
 end)

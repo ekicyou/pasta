@@ -400,3 +400,111 @@ describe("STOP.response（表記付きの応答）", function()
         end)
     end)
 end)
+
+-- ============================================================================
+-- 記録を運ぶ止まるエラー (scene-condition-attributes 3.1・3.7)
+-- ============================================================================
+
+describe("STOP.response（条件に合うシーンが無い）", function()
+    local FAILURE = require("pasta.failure")
+
+    --- FAILURE.raise が投げた記録
+    local function unmet()
+        local _, err = pcall(FAILURE.raise, { label = FAILURE.LABEL.SCENE_UNMET, subject = "＞告白" })
+        return err
+    end
+
+    --- 放課後で止まった act
+    local function after_school_act()
+        local act = require("pasta.shiori.act").new(actors())
+        act.scene_name = "放課後"
+        return act
+    end
+
+    test("シーンで止まった: 記録のラベルと対象、止まったシーンで表記を作る", function()
+        with_env(nil, function(warns)
+            local res = STOP.response({
+                reason = "条件に合うシーンが無い：＞告白", hold = { act = after_school_act(), err = unmet() },
+                fallback = "OnTalk", shown = true, warning = true,
+            })
+            expect(res:sub(1, #"SHIORI/3.0 200 OK\r\n")):toBe("SHIORI/3.0 200 OK\r\n")
+            expect(contains(value_of(res), "【条件に合うシーンが無い：＞告白（＊放課後）】")):toBe(true)
+            expect(reason_of(res)):toBe("条件に合うシーンが無い：＞告白")
+            expect(#warns):toBe(1)
+            expect(warns[1]):toBe("条件に合うシーンが無い：＞告白（＊放課後）")
+        end)
+    end)
+
+    test("止まった場所が分からなければ説明なし", function()
+        with_env(nil, function()
+            local value = value_of(STOP.response({ reason = "R", err = unmet(), fallback = "OnBoot", shown = true }))
+            expect(contains(value, "【条件に合うシーンが無い：＞告白】")):toBe(true)
+        end)
+    end)
+
+    test("理由が渡されなければ記録の文", function()
+        with_env(nil, function()
+            local res = STOP.response({ hold = { act = after_school_act(), err = unmet() }, shown = true })
+            expect(reason_of(res)):toBe("条件に合うシーンが無い：＞告白")
+        end)
+    end)
+end)
+
+describe("SHIORI.request（記録を投げた要求）", function()
+    local FAILURE = require("pasta.failure")
+    local ENTRY = require("pasta.shiori.entry")
+    local REG = require("pasta.shiori.event.register")
+
+    --- id のハンドラを fn にして要求を送り、ハンドラを外す
+    local function request(id, fn)
+        REG[id] = fn
+        local ok, res = pcall(ENTRY.request, {
+            id = id, method = "get", version = 30, reference = {}, security_level = "local",
+        })
+        REG[id] = nil
+        if not ok then error(res, 0) end
+        return res
+    end
+
+    local function raise_unmet()
+        FAILURE.raise({ label = FAILURE.LABEL.SCENE_UNMET, subject = "＞告白" })
+    end
+
+    --- 放課後のシーンのコルーチン（中で投げる）
+    local function scene(act)
+        return coroutine.create(function()
+            act.scene_name = "放課後"
+            FAILURE.bind(act)
+            raise_unmet()
+        end)
+    end
+
+    test("シーンの中で投げた: 表記付きの応答で、止まったシーンを示す", function()
+        with_env(nil, function()
+            local res = request("OnScaUnmetScene", scene)
+            expect(res:sub(1, #"SHIORI/3.0 200 OK\r\n")):toBe("SHIORI/3.0 200 OK\r\n")
+            expect(contains(value_of(res), "【条件に合うシーンが無い：＞告白（＊放課後）】")):toBe(true)
+            expect(reason_of(res)):toBe("条件に合うシーンが無い：＞告白")
+        end)
+    end)
+
+    test("ハンドラで投げた: 表記付きの応答", function()
+        with_env(nil, function()
+            local res = request("OnScaUnmetHandler", raise_unmet)
+            expect(contains(value_of(res), "【条件に合うシーンが無い：＞告白】")):toBe(true)
+        end)
+    end)
+
+    test("表記を出さない設定・On で始まらない要求では 500 で、理由は記録の文", function()
+        with_env(false, function()
+            local res = request("OnScaUnmetOff", scene)
+            expect(res:sub(1, #"SHIORI/3.0 500")):toBe("SHIORI/3.0 500")
+            expect(reason_of(res)):toBe("条件に合うシーンが無い：＞告白")
+        end)
+        with_env(nil, function()
+            local res = request("scaUnmetNotOn", raise_unmet)
+            expect(res:sub(1, #"SHIORI/3.0 500")):toBe("SHIORI/3.0 500")
+            expect(reason_of(res)):toBe("条件に合うシーンが無い：＞告白")
+        end)
+    end)
+end)
