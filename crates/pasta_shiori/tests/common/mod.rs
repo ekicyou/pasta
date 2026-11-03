@@ -169,15 +169,3 @@ pub fn wait_log_contains(ghost: &Path, needle: &str) -> String {
         std::thread::sleep(Duration::from_millis(50));
     }
 }
-
-/// このゴーストのデバッグの待受が実際に使っているポート（`debug backend listening` の行から読む）。
-pub fn listening_port(ghost: &Path) -> u16 {
-    let log = wait_log_contains(ghost, "debug backend listening");
-    let line = log
-        .lines()
-        .find(|l| l.contains("debug backend listening"))
-        .unwrap_or_else(|| panic!("debug backend must listen:\n{log}"));
-    let addr = line.split("addr=").nth(1).expect("addr field");
-    let addr = addr.split_whitespace().next().expect("addr value");
-    addr.rsplit(':').next().unwrap().parse().expect("port")
-}

@@ -27,7 +27,7 @@
   - 完了の姿: `pasta_shiori` にキックの型と関数が無く、`cargo test -p pasta_shiori` が通る
   - _Requirements: 2.1, 9.1_
 
-- [ ] 2.2 pasta_shiori の DAP のテストとフィクスチャを消す
+- [x] 2.2 pasta_shiori の DAP のテストとフィクスチャを消す
   - `debug_preservation_test.rs` とそのフィクスチャ、`multi_instance_test.rs` の DAP のキックとリロードの 2 本、テストの共通部品の待ち受けのポートの関数を消す
   - `multi_instance_test.rs` のポートを確かめる 1 本は、9.3 で書き直すまで残す（DAP のポートを見なくなるよう最小に直す）
   - 完了の姿: `pasta_shiori` のテストから DAP のポートと要求を使う箇所が無くなり、テストが通る

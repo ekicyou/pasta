@@ -1,7 +1,7 @@
-//! 2 つのインスタンスの隔たりの試験（仕様 `shiori4-v3-portable`・4.3・4.4・5.1〜5.6・6.1・6.3・6.4）。
+//! 2 つのインスタンスの隔たりの試験（仕様 `shiori4-v3-portable`・4.3・4.4・5.1〜5.4・6.1・6.3・6.4）。
 //!
 //! `shiori_get_api(3)` のテーブルを `shiori4_abi` で呼び、2 つのゴースト（別の一時ディレクトリ）を
-//! 並べて、変数・チェイントークの続き・ログの出し先と量・デバッグのポート・kick の送り先が
+//! 並べて、変数・チェイントークの続き・ログの出し先と量が
 //! インスタンスごとに分かれていることを確かめる。
 //!
 //! この試験のバイナリの `#[test]` は、[`serial`] で 1 本ずつ走らせる。旧来の窓口の置き場は
@@ -9,13 +9,11 @@
 
 mod common;
 
-use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpStream;
 use std::path::Path;
 use std::sync::{Arc, Barrier, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use common::{copy_fixture_to_temp, listening_port, read_log, wait_log_contains};
+use common::{copy_fixture_to_temp, read_log};
 use pasta::actor::lifecycle;
 use pasta::shiori_get_api;
 use shiori4_abi::{SHIORI_ABI_VERSION_3, ShioriApi, ShioriInstance};
@@ -73,40 +71,6 @@ fn levels(log: &str) -> Vec<&str> {
         .collect()
 }
 
-/// DAP の `pasta/reloadShiori` を送り、応答を受けるまで待つ（応答の前に kick の送り先が呼ばれる）。
-fn dap_reload_shiori(port: u16) {
-    let stream = TcpStream::connect(("127.0.0.1", port)).expect("connect DAP");
-    stream
-        .set_read_timeout(Some(Duration::from_secs(10)))
-        .expect("read timeout");
-    let mut writer = stream.try_clone().expect("clone socket");
-    let body = r#"{"seq":1,"type":"request","command":"pasta/reloadShiori","arguments":{}}"#;
-    write!(writer, "Content-Length: {}\r\n\r\n{body}", body.len()).expect("write DAP frame");
-
-    let mut reader = BufReader::new(stream);
-    loop {
-        let mut len = 0;
-        loop {
-            let mut line = String::new();
-            assert_ne!(
-                reader.read_line(&mut line).expect("read header"),
-                0,
-                "DAP closed"
-            );
-            match line.trim_end().strip_prefix("Content-Length:") {
-                Some(v) => len = v.trim().parse().expect("length"),
-                None if line.trim_end().is_empty() => break,
-                None => {}
-            }
-        }
-        let mut frame = vec![0; len];
-        reader.read_exact(&mut frame).expect("read body");
-        if String::from_utf8_lossy(&frame).contains(r#""command":"pasta/reloadShiori""#) {
-            return;
-        }
-    }
-}
-
 /// 2 つの版 3 のインスタンスを別々のスレッドで読み、変数とチェイントークの続きが混ざらない
 /// （5.1・5.2・6.1・6.3）。両方が書いてから読み、両方が前半を出してから後半を出す。
 #[test]
@@ -153,20 +117,14 @@ fn variables_and_chain_talk_do_not_mix_across_threads() {
     }
 }
 
-/// `[logging]` の量は自分のログだけに効き（5.3・5.4）、同じデバッグのポートを指した後の方は
-/// 警告を出してデバッグなしで立ち上がる（5.6）。
+/// `[logging]` の量は自分のログだけに効く（5.3・5.4）。
 #[test]
 fn log_levels_and_debug_port_stay_per_instance() {
     let _serial = serial();
-    let a = ghost("\n[logging]\nlevel = \"debug\"\n\n[debug]\nenabled = true\nport = 0\n");
+    let a = ghost("\n[logging]\nlevel = \"debug\"\n");
     let mut inst_a = load(a.path()).expect("first instance");
-    let port = listening_port(a.path());
-
-    let b = ghost(&format!(
-        "\n[logging]\nlevel = \"warn\"\n\n[debug]\nenabled = true\nport = {port}\n"
-    ));
+    let b = ghost("\n[logging]\nlevel = \"warn\"\n");
     let mut inst_b = load(b.path()).expect("the later instance must still load");
-    wait_log_contains(b.path(), "debug transport bind failed");
     assert_eq!(request(&mut inst_b, &get("印を見る")).0, 200);
     assert_eq!(request(&mut inst_a, &get("印を見る")).0, 200);
 
@@ -208,38 +166,6 @@ fn log_levels_and_debug_port_stay_per_instance() {
             .all(|l| matches!(l, "WARN" | "ERROR")),
         "B logs warn and above only after reading pasta.toml:\n{log_b}"
     );
-
-    // デバッグのポート（5.6）: 後の B だけが警告を出し、A は待ち受けたまま。
-    assert!(
-        !log_a.contains("debug transport bind failed"),
-        "A:\n{log_a}"
-    );
-    assert!(
-        log_b.contains("debug transport bind failed; starting without debugging"),
-        "B must warn about the port:\n{log_b}"
-    );
-    assert!(!log_b.contains("debug backend listening"), "B:\n{log_b}");
-}
-
-/// DAP の kick は、そのデバッガがつながっているインスタンスの VM だけに届く（5.5）。
-#[test]
-fn dap_kick_reaches_only_its_own_instance() {
-    let _serial = serial();
-    let debug = "\n[debug]\nenabled = true\nport = 0\n";
-    let a = ghost(debug);
-    let b = ghost(debug);
-    let mut inst_a = load(a.path()).expect("A");
-    let mut inst_b = load(b.path()).expect("B");
-    // 初回の OnSecondChange は内部の時計を決めるだけ。
-    request(&mut inst_a, &on_second_change(0));
-    request(&mut inst_b, &on_second_change(0));
-
-    dap_reload_shiori(listening_port(a.path()));
-
-    let (_, resp_b) = request(&mut inst_b, &on_second_change(1));
-    assert!(!resp_b.contains(r"\![reload,shiori]"), "B: {resp_b:?}");
-    let (_, resp_a) = request(&mut inst_a, &on_second_change(1));
-    assert!(resp_a.contains(r"\![reload,shiori]"), "A: {resp_a:?}");
 }
 
 /// 旧来の窓口のインスタンスと版 3 のインスタンスが並び、片方の unload がもう片方の応答を
