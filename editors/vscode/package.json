@@ -36,12 +36,19 @@
             {
                 "command": "pasta.runSceneAtCursor",
                 "title": "▶ シーンを実行",
+                "category": "Pasta",
                 "icon": "$(play)"
             },
             {
                 "command": "pasta.reloadShiori",
-                "title": "SHIORIリロード",
+                "title": "SHIORI をリロード",
+                "category": "Pasta",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "pasta.showSaveVariables",
+                "title": "保存変数を表示",
+                "category": "Pasta"
             }
         ],
         "menus": {
@@ -54,7 +61,12 @@
                 {
                     "command": "pasta.reloadShiori",
                     "group": "navigation@2",
-                    "when": "resourceLangId == pasta"
+                    "when": "resourceLangId == pasta || resourceLangId == lua || resourceFilename =~ /^pasta\\.toml$/i"
+                },
+                {
+                    "command": "pasta.showSaveVariables",
+                    "group": "navigation@3",
+                    "when": "resourceLangId == pasta || resourceLangId == lua || resourceFilename =~ /^pasta\\.toml$/i"
                 }
             ]
         },
@@ -216,8 +228,8 @@
         "watch": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
         "lint": "eslint src",
         "test:grammar": "esbuild ./src/test/tmGrammar.test.ts --bundle --outfile=out/test/tmGrammar.test.js --format=cjs --platform=node --sourcemap --alias:vscode=./src/test/mock/vscode.ts && node out/test/tmGrammar.test.js",
-        "test:unit": "esbuild ./src/test/runSceneAtCursor.test.ts --bundle --outfile=out/test/runSceneAtCursor.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/reloadShiori.test.ts --bundle --outfile=out/test/reloadShiori.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/vscodeModules.test.ts --bundle --outfile=out/test/vscodeModules.test.js --format=cjs --platform=node --sourcemap --alias:vscode=./src/test/mock/vscode.ts && esbuild ./src/test/ghostValidator.test.ts --bundle --outfile=out/test/ghostValidator.test.js --format=cjs --platform=node --sourcemap --alias:vscode=./src/test/mock/vscode.ts && esbuild ./src/test/contributions.test.ts --bundle --outfile=out/test/contributions.test.js --format=cjs --platform=node --sourcemap && node out/test/runSceneAtCursor.test.js && node out/test/reloadShiori.test.js && node out/test/contributions.test.js && node out/test/vscodeModules.test.js && node out/test/ghostValidator.test.js",
-        "test:e2e": "esbuild ./src/test/e2e.test.ts --bundle --outfile=out/test/e2e.test.js --format=cjs --platform=node --sourcemap && node out/test/e2e.test.js",
+        "test:unit": "esbuild ./src/test/mcpClient.test.ts --bundle --outfile=out/test/mcpClient.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/ghostFiles.test.ts --bundle --outfile=out/test/ghostFiles.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/dumpVariables.test.ts --bundle --outfile=out/test/dumpVariables.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/fakeMcpServer.selfcheck.ts --bundle --outfile=out/test/fakeMcpServer.selfcheck.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/runSceneAtCursor.test.ts --bundle --outfile=out/test/runSceneAtCursor.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/reloadShiori.test.ts --bundle --outfile=out/test/reloadShiori.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/vscodeModules.test.ts --bundle --outfile=out/test/vscodeModules.test.js --format=cjs --platform=node --sourcemap --alias:vscode=./src/test/mock/vscode.ts && esbuild ./src/test/ghostValidator.test.ts --bundle --outfile=out/test/ghostValidator.test.js --format=cjs --platform=node --sourcemap --alias:vscode=./src/test/mock/vscode.ts && esbuild ./src/test/contributions.test.ts --bundle --outfile=out/test/contributions.test.js --format=cjs --platform=node --sourcemap && node out/test/runSceneAtCursor.test.js && node out/test/reloadShiori.test.js && node out/test/mcpClient.test.js && node out/test/ghostFiles.test.js && node out/test/dumpVariables.test.js && node out/test/fakeMcpServer.selfcheck.js && node out/test/contributions.test.js && node out/test/vscodeModules.test.js && node out/test/ghostValidator.test.js",
+        "test:e2e": "esbuild ./src/test/e2e.test.ts --bundle --outfile=out/test/e2e.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/devCommands.e2e.test.ts --bundle --outfile=out/test/devCommands.e2e.test.js --format=cjs --platform=node --sourcemap --alias:vscode=./src/test/mock/vscode.ts && node out/test/e2e.test.js && node out/test/devCommands.e2e.test.js",
         "test": "npm run test:grammar && npm run test:unit && npm run test:e2e",
         "prepackage": "npm run build:wasm && npm run compile",
         "package": "vsce package",

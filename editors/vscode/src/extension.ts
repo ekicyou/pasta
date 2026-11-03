@@ -10,6 +10,7 @@ import { SemanticTokensProvider, PASTA_TOKENS_LEGEND } from './semanticTokensPro
 import { DiagnosticsManager } from './diagnosticsManager';
 import { GhostValidator } from './ghostValidator';
 import { activateWordRefDecorator } from './wordRefDecorator';
+import { registerDevCommands } from './devCommands';
 
 /** Activation state of the extension */
 export interface ActivationState {
@@ -32,6 +33,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Initialize word-ref box decorations
   activateWordRefDecorator(context);
+
+  // 3 つの開発コマンド（WASM が読めなくても働くので、WASM の起動より前に登録する）
+  registerDevCommands(context);
 
   // Initialize diagnostics manager
   diagnosticsManager = new DiagnosticsManager();

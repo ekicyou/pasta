@@ -69,6 +69,24 @@ test('declares no DAP parts: debuggers, breakpoints, onDebug, debug/toolBar, deb
   );
 });
 
+test('declares the 3 dev commands (category Pasta) and their right-click order and conditions (R4.1/R5.1/R6.1)', () => {
+  const ghostSource = 'resourceLangId == pasta || resourceLangId == lua || resourceFilename =~ /^pasta\\.toml$/i';
+  assert.deepStrictEqual(
+    pkg.contributes.commands.map((c: any) => [c.command, c.category]),
+    [['pasta.runSceneAtCursor', 'Pasta'], ['pasta.reloadShiori', 'Pasta'], ['pasta.showSaveVariables', 'Pasta']]
+  );
+  assert.deepStrictEqual(
+    pkg.contributes.menus['editor/context'].map((c: any) => [c.command, c.group, c.when]),
+    [
+      ['pasta.runSceneAtCursor', 'navigation@1', 'resourceLangId == pasta'],
+      ['pasta.reloadShiori', 'navigation@2', ghostSource],
+      ['pasta.showSaveVariables', 'navigation@3', ghostSource],
+    ]
+  );
+  assert.strictEqual(pkg.contributes.menus.commandPalette, undefined, 'the 3 commands show in the palette with no condition');
+  assert.deepStrictEqual(pkg.activationEvents, ['onLanguage:pasta']);
+});
+
 test('pasta language is registered', () => {
   const lang = pkg.contributes.languages[0];
   assert.strictEqual(lang.id, 'pasta');

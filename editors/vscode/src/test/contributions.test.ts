@@ -116,6 +116,46 @@ test('editor/context runSceneAtCursor is shown for .pasta and is NOT debug-gated
 });
 
 // =============================================================================
+// The 3 dev commands: declarations, right-click order and conditions, palette
+// (vscode-mcp-client R1.4 / R4.1 / R5.1 / R6.1 / R8.3)
+// =============================================================================
+
+const DUMP_COMMAND = 'pasta.showSaveVariables';
+const GHOST_SOURCE_WHEN =
+  'resourceLangId == pasta || resourceLangId == lua || resourceFilename =~ /^pasta\\.toml$/i';
+
+test('contributes.commands is exactly the 3 dev commands, all in category Pasta', () => {
+  assert.deepStrictEqual(
+    pkg.contributes.commands.map((c) => [c.command, c.title, (c as { category?: string }).category]),
+    [
+      [RUN_COMMAND, '▶ シーンを実行', 'Pasta'],
+      [RELOAD_COMMAND, 'SHIORI をリロード', 'Pasta'],
+      [DUMP_COMMAND, '保存変数を表示', 'Pasta'],
+    ],
+  );
+});
+
+test('editor/context lists the 3 commands in order with their when-clauses (R4.1/R5.1/R6.1)', () => {
+  assert.deepStrictEqual(
+    menu('editor/context').map((c) => [c.command, c.group, c.when]),
+    [
+      [RUN_COMMAND, 'navigation@1', 'resourceLangId == pasta'],
+      [RELOAD_COMMAND, 'navigation@2', GHOST_SOURCE_WHEN],
+      [DUMP_COMMAND, 'navigation@3', GHOST_SOURCE_WHEN],
+    ],
+  );
+});
+
+test('the 3 commands show in the command palette with no condition', () => {
+  const gated = menu('commandPalette').filter((c) => [RUN_COMMAND, RELOAD_COMMAND, DUMP_COMMAND].includes(c.command));
+  assert.deepStrictEqual(gated, [], 'no commandPalette entry may hide or gate the 3 commands');
+});
+
+test('activationEvents is only onLanguage:pasta', () => {
+  assert.deepStrictEqual(pkg.activationEvents, ['onLanguage:pasta']);
+});
+
+// =============================================================================
 // DAP declarations fully removed (vscode-mcp-client R1.1-1.4 / R8.3)
 // =============================================================================
 

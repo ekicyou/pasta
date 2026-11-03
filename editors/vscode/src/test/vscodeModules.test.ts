@@ -877,11 +877,20 @@ function ghostValidatorCreated(fromCollection: number, fromWatcher: number): { c
   };
 }
 
+// 3 つのコマンドは activate が 1 回で登録する（4.1・5.1・6.1）
+const DEV_COMMANDS = ['pasta.runSceneAtCursor', 'pasta.reloadShiori', 'pasta.showSaveVariables'];
+function assertDevCommandsRegistered(): void {
+  for (const id of DEV_COMMANDS) {
+    assert.ok(mock.registeredCommands.has(id), `${id} must be registered by activate`);
+  }
+}
+
 test('activate loads the real WASM bridge and registers the ghost validator', async () => {
   mock.workspace.textDocuments = [];
   const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(ROOT) };
   const collectionsBefore = mock.createdDiagnosticCollections.length;
   const watchersBefore = mock.createdFileSystemWatchers.length;
+  mock.registeredCommands.clear();
   await activate(context as never);
   // WASM が読めたら GhostValidator を作って登録する（11.12）
   assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 1, watchers: 1 });
@@ -889,6 +898,7 @@ test('activate loads the real WASM bridge and registers the ghost validator', as
   assert.strictEqual(state.wasmReady, true, 'real wasm/pasta_lsp_wasm_bg.wasm must load');
   // DAP の提示モードの切り替えはもう登録しない（要件 1.3）
   assert.ok(!mock.registeredCommands.has('pasta.debug.toggleSourcePresentation'), 'DAP toggle command must not be registered');
+  assertDevCommandsRegistered();
 });
 
 test('deactivate disposes cleanly', () => {
@@ -900,9 +910,11 @@ test('WASM が読めないときは GhostValidator を作らず、activate は�
   const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(path.join(ROOT, 'no-such-dir')) };
   const collectionsBefore = mock.createdDiagnosticCollections.length;
   const watchersBefore = mock.createdFileSystemWatchers.length;
+  mock.registeredCommands.clear();
   await activate(context as never);
   assert.strictEqual(getActivationState().wasmReady, false);
   assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 0, watchers: 0 });
+  assertDevCommandsRegistered(); // WASM と関係なく登録する（1.5）
   deactivate();
 });
 
