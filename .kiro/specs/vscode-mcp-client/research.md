@@ -400,3 +400,26 @@
 2. **実機の確かめ**: タスクを作る前に行う。普段の SSP で えも2DEBUG を（あれば areka も）起こし、Open Questions 1〜4 を確かめて、この research.md に記録する。結果で流れの形が変わり得るので、タスクの作り直しを避けるため。
 3. **送り方**: 大域の `fetch` ではなく `node:http`。「届かない」と「送った後に切れた（応答が無い）」をソケットの出来事で見分けられる。VSCode の `fetch` のプロキシの仕組みにも乗らない。依存は増えない。
 4. **`[logging] file_path`**: 表の書き方・点で区切ったキー・1 行のインラインテーブルの 3 つを読む。どれでも読めないときは、黙って倒さずに出力に添え書きを出す。TOML の読み手を足すのは「依存を増やさない」に反するので採らない。
+
+## 実機の確かめ（2026-11-03・SSP 2.9.28（20261102-2）＋えも2DEBUG）
+
+相手は普段の SSP（`ssp.exe /u 1`）で、ゴーストのルートは `C:\home\maz\git\ghost_dev\debug\emo2-debug`。拡張と同じく `node:http` から `POST http://127.0.0.1:{port}/api/mcp/v1` で送った。areka は動いていなかった（Claude Code の areka の道具が「9801・9821 は ssp-mcp-server が答えた」と返した）。
+
+| 確かめたこと | 結果 |
+| --- | --- |
+| 道 | `/api/mcp/v1` で答える。`initialize` は `serverInfo.name = "ssp-mcp-server"`・`version = "2.9.28"`・`protocolVersion = "2025-06-18"`。答えの頭に `Mcp-Session-Id` は無い（`connection: close`・`content-type: application/json`）。`Accept` を付けなくても SSP は断らない（areka は 406） |
+| 番号 | **1 つの SSP が 9801 と 9821 の両方に答えた**。9802 は `ECONNREFUSED`（すぐ返る） |
+| `get_property(baseware.name, ghost_name=<ルート>)` | `SSP`。`/` 区切り・小文字・末尾の `\` でも同じく `SSP`。動いていないパスは `NG:Cannot find active ghost from specified name`（`isError: true`）。知らない property は `NG:Cannot find such property name.`。`system.pid`・`baseware.pid` は無い |
+| `get_status(ghost_name=<ルート>)` | 暇なときは空の文 |
+| `get_log(error, max_count=1)` | 記録が無いと `(no log entries)` |
+| `get_log(script)` | `#29 2026/11/03 10:29 [Ghost:OnPastaSceneAt] えも2DEBUG : <台本>`。表示の語にイベント名が入る。`\` は正しくエスケープされた JSON だった |
+| `reload(target="shiori", ghost_name=<ルート>)` | 5 ms で `OK:reload requested. It runs asynchronously; errors while loading (dictionary errors etc.) will be recorded to the error log. Wait until get_status answers again, then check get_log tool (log_type=error, since_id=0)`。終わりを待たない |
+| 終わりの印 | `reload` が答えてから 414 ms 後に `pasta.log` へ `INFO pasta::windows: SHIORI load entry completed entry="loadu" loaded=true`。その前に `SHIORI.unload called successfully`・`Starting PastaShiori load` が出る |
+| `raise_event(OnPastaSceneAt, [<skit.pasta の絶対パス>, "17"])` | 11 ms で `OK:the ghost returned a script and it is being played.\r\nScript: <台本>`。「No response from server」は出なかった（中継 `mcp.exe` の文で、直の HTTP には出ない見込み） |
+| 同じ `.pasta` の 1 行目（注釈の行）で `OnPastaSceneAt` | 台本が返った（どのシーンを選ぶかは `debug-mcp-runtime` の持ち場。拡張は返ったものを出すだけ） |
+
+設計に入れたこと:
+
+- `findBasewares` は、同じ `baseware.name` の相手を 1 つにまとめ、最初の番号を残す（9801・9821 の重なり）。
+- `findPlayedScript` は `Ghost:OnPastaSceneAt` の記録だけを選ぶ。
+- Open Questions 1・3 は解決。2 は一部解決（直の HTTP では出ない見込みだが、要件 4.8 の手当ては残す）。4 は「この機械では開いていた」。

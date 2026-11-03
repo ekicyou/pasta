@@ -449,6 +449,7 @@ export function readRaiseEvent(result: CallResult): RaiseEventReply;
 
 - Preconditions: `port` は 1〜65535。`root` は空でない絶対パス。
 - Postconditions: `callTool` は投げない（失敗も `CallResult` で返す）。`findBasewares` は最長でおよそ `SCAN_TIMEOUT_MS` で終わる（20 個を同時に聞く）。
+- `findBasewares` は、`basewareName` が同じ相手を 1 つにまとめ、候補の順で最初の番号を残す。SSP 2.9.28 は 1 つのプロセスで 9801 と 9821 の両方に答える（2026-11-03 の実機）ので、まとめないと同じ SSP が選択に 2 つ並ぶ。コードには `shortcut: 同じ名前の別のプロセス（SSP 2 つ）が同じゴーストを動かすと最初の 1 つに寄る。プロセスを見分ける property が SSP に出たら替える` と書く（SSP に pid の property は無い）。
 - `unreachable` にするもの: `req.on('error')` の `ECONNREFUSED`・`ECONNRESET` で、要求を書き終える前のもの。
 - `noResponse` にするもの: 要求を書き終えた後、答えの頭が来る前の接続の切れ（`socket` の `close`）、200 で本文が空、`req.setTimeout` の時間切れ（`req.destroy()` で切る）。`readRaiseEvent` は、`ok`・`ng` の文が `No response from server` か `did not respond within` を含むときも `noResponse` にする（中継・areka の上限の文）。
 - `identify`・`probe` は `ok` で本文が空でないときだけ `Endpoint` を返す。`ng`（`NG:Cannot find active ghost from specified name` など）・`unreachable`・`noResponse`・`badShape` は無し。
@@ -466,7 +467,7 @@ export function readRaiseEvent(result: CallResult): RaiseEventReply;
 | --- | --- | --- |
 | `get_property(baseware.name, ghost_name=<ルート>)` | `SSP`／`areka`（素の値） | `NG:Cannot find active ghost from specified name` |
 | `get_log` | 古い順の行。0 件は `(no log entries)` | `NG:Unknown log_type …` |
-| `reload(target="shiori")` | areka: `OK:reload requested. It runs asynchronously; …`。SSP: 未実測（拡張は文を見ない） | `NG:…` |
+| `reload(target="shiori")` | SSP・areka とも `OK:reload requested. It runs asynchronously; …`（SSP は 2026-11-03 に実測。5 ms で答え、終わりを待たない。拡張は文を見ない） | `NG:…` |
 | `raise_event` | `OK:the ghost returned a script and it is being played.` ＋ `Script: <台本>` の行／`OK:the ghost returned no script.` | areka: `NG:areka did not respond within 10 seconds` |
 
 **Implementation Notes**
@@ -622,7 +623,7 @@ export type SceneOutcome =
   | { kind: 'failed'; result: CallResult; reload: ReloadOutcome };          // 7.3
 
 export function runScene(ctx: FlowContext, fileFsPath: string, line1: number): Promise<SceneOutcome>;
-/** 応答が無いときの引き直し。表示の語に OnPastaSceneAt を含む記録を先に選び、無ければ since 後の最初の記録 */
+/** 応答が無いときの引き直し。表示の語が `Ghost:OnPastaSceneAt` の記録のうち最後のもの（SSP 2.9.28 の実測の形。無ければ undefined） */
 export function findPlayedScript(entries: readonly LogEntry[]): string | undefined;
 export function formatScene(outcome: SceneOutcome): { lines: string[]; notice?: string };
 ```
@@ -763,7 +764,7 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps?: Par
 
 ### Unit Tests（素の node）
 
-- `mcpClient.test.ts`: 札（`Accept`・`Content-Type`）が付く、`Origin` が付かない／`readRaiseEvent` が `Script:` の行・`no script`・`No response from server`・`did not respond within` を見分ける／`parseLogEntries` の続きの行と `(no log entries)`／不正なエスケープの JSON の読み直し／`findBasewares` が答えない番号（受けて黙る真似）で `SCAN_TIMEOUT_MS` 程度で終わり、候補の順を保つ（3.1・3.8）。
+- `mcpClient.test.ts`: 札（`Accept`・`Content-Type`）が付く、`Origin` が付かない／`readRaiseEvent` が `Script:` の行・`no script`・`No response from server`・`did not respond within` を見分ける／`parseLogEntries` の続きの行と `(no log entries)`／不正なエスケープの JSON の読み直し／`findBasewares` が答えない番号（受けて黙る真似）で `SCAN_TIMEOUT_MS` 程度で終わり、候補の順を保つ（3.1・3.8）／同じ名前の相手（真似るサーバーを 2 つの番号で立てる）を 1 つにまとめる。
 - `ghostFiles.test.ts`: 深さ 0〜3 は見つかり 4 は外れる・descript 無しは外れる（2.1）／UTF-8・Shift_JIS・無しの `name`（2.3）／`file_path` の正しい値と外れた値（5.6）／`readNewLines` が書きかけの行を残す／`loadCompletion` の `true`・`false`。
 - `reloadShiori.test.ts`: 印で終わる・時間切れ・`loaded=false`・誤りと警告の数え分け・`pasta.log` が読めない（5.4・5.5・5.7・5.8）。偽の `callTool` と一時のログで、本物の時計を使わない（`sleep` を差し込む）。
 - `runSceneAtCursor.test.ts`: `sceneReferences` の行は 1 から（4.6）／`blocksPlayback` で送らない（4.4・4.5）／応答が無いときの引き直しと `findPlayedScript` の選び方（4.8・4.9）／204 の理由の行（4.10）。
@@ -816,15 +817,16 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps?: Par
 - **G 節**: `DEBUG_CHAPTERS = ['index', 'vscode-setup', 'dev-actions', 'troubleshooting']`。`FACTS = ['PASTA_DEBUG', '.pasta', 'OnPastaSceneAt', '[debug]', 'MCP', 'baseware.name']`（`9276`・`attach`・`sourcePresentation` を外す）。
 - **`shiori-events.md` の節**（10.1・10.3）: 相手の確かめ（`get_property(baseware.name, ghost_name=<ルート>)`）・`ghost_name` にルートの絶対パス・`reload(target="shiori")` と終わりの待ち（`pasta.log` の `SHIORI load entry completed`。今の「`get_status` が答えるようになってから」の 1 文を置き換える）・`get_log(error, since_id)` での誤りの数え方・`OnPastaScene`（完全一致の名前）と `OnPastaSceneAt`・`OnPastaSetSaveVariable` と `OnPastaDumpVariables`（引数と書き出す場所は各節へリンクし、ここで決まりを写さない）・「No response from server」のときの `get_log(script, since_id)`。書いた後に `node book/tools/gen-skill-refs.mjs` で `pasta-lua-coding` の references を作り直す。
 - **先に入るときの最小の直し**（9.9。`debug-mcp-runtime` が先に入っていればしない）: `reference/pasta-toml.md:807` の `source-level.md#提示モードの切替` へのリンクを外す、`internals/debug.md` の `source-level.md`・`constraints.md` へのリンク（126・273・392 行）を外すか `dev-actions.md` へ向ける、`DEBUGGING.md` 12〜15 行の頁の一覧から 2 頁を外す。直したら `gen-skill-refs.mjs` で references を作り直す（`pasta-ghost-authoring/references/pasta-toml.md:802` が引いている）。
-- **タスクを作る前の実機の確かめ**（設計の議論 2）: 普段の SSP で えも2DEBUG（`[debug] enabled = true`）を、あれば areka も起こし、Open Questions の 1〜4 を MCP で確かめて research.md に記録し、外れた所の設計を直してからタスクを作る。送るのは読むだけの道具と `reload(shiori)`・`OnPastaSceneAt` だけ。
+- **タスクを作る前の実機の確かめ**（設計の議論 2）: 2026-11-03 に SSP 2.9.28＋えも2DEBUG で済ませた（research.md「実機の確かめ」）。areka は動いていなかった。
 - **出す前の実機の 1 回**（brief）: 3 つのコマンドを拡張から通して確かめ、動画を撮る。
 
 ## Open Questions / Risks
 
-1. **SSP の `reload` が終わりを待つか・答えの文**（未実測）。仮の決め: 拡張は答えの文に頼らず、`pasta.log` の印で待つ。推奨: 出す前の実機の 1 回で SSP の答えを記録し、マニュアルの節に書く。待ちの方式は変えない。
-2. **SSP の HTTP の `raise_event` が「応答が無い」になる形**（中継の「No response from server」が、本体の空の本文か、切断か、遅い応答か）。仮の決め: 切断・空の本文・15 秒の時間切れ・文の 4 つを全部「応答が無い」とする。推奨: 実機で `OnPastaSceneAt` を 20 回ほど送り、どの形が出るかを research.md に記録する。
-3. **`get_log(script)` の表示の語に、イベント名（`OnPastaSceneAt`）が入るか**（未実測）。仮の決め: 入っていればそれを、無ければ `since_id` の後の最初の記録を、この再生の台本とする。推奨: 実機で確かめ、入らないなら `findPlayedScript` を「最初の記録」だけにして簡単にする。
-4. **SSP の MCP の窓口が既定で開いているか**（SSTP の HTTP サーバーの設定が要るか）。仮の決め: 見つからないときの知らせとマニュアルに「SSP の設定で MCP（SSTP の HTTP）を有効にしているか」を書く。推奨: 実機で既定の設定を確かめ、マニュアルの文を確定する。
+1. ~~SSP の `reload` が終わりを待つか~~ → 解決（2026-11-03 の実機。research.md）: 待たない。答えの文は areka と同じ。印の行は答えの 0.4 秒後に出た。設計の待ち方のまま。
+2. **SSP の HTTP の `raise_event` が「応答が無い」になる形** → 一部解決: 直の HTTP では 2 回とも 11 ms で台本ごと答えた。「No response from server」は中継 `mcp.exe` の文で、直の HTTP ではまず出ない。それでも要件 4.8 のとおり、切断・空の本文・時間切れ・文の 4 つを「応答が無い」として残す（作りは小さい）。
+3. ~~`get_log(script)` の表示の語にイベント名が入るか~~ → 解決: `[Ghost:OnPastaSceneAt]` の形で入る。`findPlayedScript` はこの語の記録だけを選ぶ（「最初の記録」の控えは持たない）。SSP 2.9.28 の `get_log(script)` は `\` を正しくエスケープした。読み直しの手当ては古い SSP（2.9.05〜2.9.07）向けに残す。
+4. **SSP の MCP の窓口が既定で開いているか** → この機械では開いていた（9801・9821）。既定の設定かは未確認。仮の決め: 見つからないときの知らせとマニュアルに「SSP の設定で MCP（SSTP の HTTP）を有効にしているか」を書く。
+- areka は 2026-11-03 も動いておらず、areka のソースと実測の記録だけで決めている。出す前の実機の 1 回で確かめる。
 5. ~~VSCode のプロキシの設定と大域の `fetch`~~ → 解決（設計の議論 3）: 初めから `node:http` を使う。
 6. **VSCode 1.85（Electron 25）での `TextDecoder('shift_jis')`**。手元の 1.144 では動いた。仮の決め: 使う。読めなければ表示名がフォルダ名になるだけで、送り先には影響しない。推奨: 追わない（`vsce-4-upgrade` で `engines` を上げるときに消える問い）。
 7. **`[logging] level` を `warn` 以上にしたゴースト・`filter` で外したゴースト**では印の行が出ず、毎回時間切れになる → 決定（設計の議論 1）: `debug-mcp-runtime` に、`SHIORI load entry completed` の行を `level`・`filter` に関係なく必ず `pasta.log` に出すよう申し送る（pasta.dll の側の持ち場。この spec では触らない）。拡張は、時間切れの知らせとマニュアルの troubleshooting に「`pasta.toml` の `[logging]` の `level`・`filter` を確かめる」を添える（あちらが入る前のゴースト向け）。
