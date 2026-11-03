@@ -54,14 +54,39 @@ impl SceneAttrValue {
     }
 }
 
-/// Integer・Float は数の表記、String はそのまま
+/// Integer は数の表記、Float は LuaJIT の tostring と同じ表記、String はそのまま
 impl std::fmt::Display for SceneAttrValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SceneAttrValue::Integer(v) => write!(f, "{}", v),
-            SceneAttrValue::Float(v) => write!(f, "{}", v),
+            SceneAttrValue::Float(v) => f.write_str(&lua_number(*v)),
             SceneAttrValue::String(v) => f.write_str(v),
         }
+    }
+}
+
+/// C の `%.14g`（LuaJIT の tostring）。14 桁に丸めてから指数で固定表記か指数表記かを決める
+fn lua_number(v: f64) -> String {
+    // DSL からは出ない（大きすぎる数は読み込みエラー）が、Lua と同じ見え方にしておく
+    if !v.is_finite() {
+        let sign = if v.is_sign_negative() { "-" } else { "" };
+        return format!("{sign}{}", if v.is_nan() { "nan" } else { "inf" });
+    }
+    let trim = |s: &str| {
+        if s.contains('.') {
+            s.trim_end_matches('0').trim_end_matches('.').to_string()
+        } else {
+            s.to_string()
+        }
+    };
+    let sci = format!("{:.13e}", v);
+    let (mantissa, exp) = sci.split_once('e').expect("LowerExp always has 'e'");
+    let exp: i32 = exp.parse().expect("LowerExp exponent is an integer");
+    if (-4..14).contains(&exp) {
+        trim(&format!("{:.*}", (13 - exp) as usize, v))
+    } else {
+        let sign = if exp < 0 { '-' } else { '+' };
+        format!("{}e{sign}{:02}", trim(mantissa), exp.abs())
     }
 }
 
@@ -158,6 +183,32 @@ mod tests {
         assert_eq!(SceneAttrValue::Integer(-2).to_string(), "-2");
         assert_eq!(SceneAttrValue::Float(1.5).to_string(), "1.5");
         assert_eq!(SceneAttrValue::Float(0.25).to_string(), "0.25");
+        assert_eq!(SceneAttrValue::Float(0.5).to_string(), "0.5");
+        assert_eq!(SceneAttrValue::Float(-1.5).to_string(), "-1.5");
+        // 以下は LuaJIT の tostring（%.14g）と同じ表記
+        assert_eq!(SceneAttrValue::Float(1e20).to_string(), "1e+20");
+        assert_eq!(
+            SceneAttrValue::Float(0.123456789012345).to_string(),
+            "0.12345678901234"
+        );
+        assert_eq!(SceneAttrValue::Float(1e-5).to_string(), "1e-05");
+        assert_eq!(SceneAttrValue::Float(0.0001).to_string(), "0.0001");
+        assert_eq!(SceneAttrValue::Float(1e14).to_string(), "1e+14");
+        assert_eq!(
+            SceneAttrValue::Float(12345678901234.0).to_string(),
+            "12345678901234"
+        );
+        // 14 桁に丸めてから桁を決める
+        assert_eq!(
+            SceneAttrValue::Float(99999999999999.99).to_string(),
+            "1e+14"
+        );
+        assert_eq!(SceneAttrValue::Float(1.5e300).to_string(), "1.5e+300");
+        assert_eq!(SceneAttrValue::Float(-2.5e-7).to_string(), "-2.5e-07");
+        assert_eq!(SceneAttrValue::Float(-0.0).to_string(), "-0");
+        assert_eq!(SceneAttrValue::Float(f64::INFINITY).to_string(), "inf");
+        assert_eq!(SceneAttrValue::Float(f64::NEG_INFINITY).to_string(), "-inf");
+        assert_eq!(SceneAttrValue::Float(f64::NAN).to_string(), "nan");
         assert_eq!(SceneAttrValue::String("夏".into()).to_string(), "夏");
         assert_eq!(SceneAttrValue::String(String::new()).to_string(), "");
     }
