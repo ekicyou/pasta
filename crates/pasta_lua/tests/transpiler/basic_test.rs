@@ -486,12 +486,10 @@ pub(crate) fn init_scene_line_maps(lua_code: &str) -> Vec<(String, Vec<(u32, u32
         .collect()
 }
 
-/// `init_scene` の行の対応は、同じ `.pasta` から作ったデバッガの対応表と同じ `.pasta` の行を
-/// 指し、シーンの Lua のブロックの行も含む。行は増えない（runtime-error-balloon 2.5, 5.7）。
+/// `init_scene` の行の対応は、ローカルシーンの関数の行とシーンの Lua のブロックの行を
+/// `.pasta` の行へ結ぶ。シンクを付けても生成コードは変わらない（runtime-error-balloon 2.5, 5.7）。
 #[test]
-fn test_init_scene_line_map_matches_debugger_source_map() {
-    use pasta_lua::debug::source_map::MapBuilderSink;
-
+fn test_init_scene_line_map_points_to_pasta_lines() {
     let source = "\
 ％さくら
 　＠通常：\\s[0]
@@ -512,18 +510,17 @@ end
         TranspilerConfig::default().with_scene_aliases(SceneAliasTable::builtin_default()),
     );
 
-    // デバッガを有効にしない読み込みと同じ経路
+    // シンクを付けない読み込みと同じ経路
     let mut plain = Vec::new();
     transpiler.transpile(&file, &mut plain).unwrap();
 
-    // デバッガの対応表（同じ .pasta から作る）
-    let mut sink = MapBuilderSink::new("dic/天気.pasta".to_string(), "chunk".to_string());
+    // シーンマップのシンクを付けた経路
+    let mut sink = pasta_lua::debug::source_map::MapBuilderSink::default();
     let mut out = Vec::new();
-    let (_, shift) = transpiler
+    transpiler
         .transpile_with_source_map(&file, &mut out, Some(&mut sink))
         .unwrap();
-    assert_eq!(plain, out, "対応表を作っても生成コードは変わらない");
-    let chunk = sink.finish(&shift);
+    assert_eq!(plain, out, "シンクを付けても生成コードは変わらない");
     let lua_code = String::from_utf8(out).unwrap();
     let lines: Vec<&str> = lua_code.lines().collect();
 
@@ -542,21 +539,11 @@ end
     for (file, pairs) in &maps {
         assert_eq!(file, "dic/天気.pasta");
         assert!(!pairs.is_empty(), "{lua_code}");
-        for &(lua_line, pasta_line) in pairs {
-            assert_eq!(
-                chunk.pasta_for_lua(lua_line).map(|p| p.line),
-                Some(pasta_line),
-                "lua {lua_line} はデバッガの対応表と同じ .pasta の行を指す\n{lua_code}"
-            );
-        }
     }
 
-    // 行は増えない: デバッガの対応表の行（normalize の後の最終の行）が生成コードの行と合う
     let line_of = |needle: &str| lines.iter().position(|l| l.contains(needle)).unwrap() as u32 + 1;
     let header = line_of("function SCENE.朝_挨拶_1(act, ...)");
-    assert_eq!(chunk.pasta_for_lua(header).map(|p| p.line), Some(6));
     let broken = line_of("return data.x");
-    assert_eq!(chunk.pasta_for_lua(broken).map(|p| p.line), Some(11));
 
     // ローカルシーンの対応は自分のシーン関数の行と Lua のブロックの行を持つ
     assert!(maps[1].1.contains(&(header, 6)), "{lua_code}");

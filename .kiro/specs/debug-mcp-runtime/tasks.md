@@ -140,7 +140,7 @@
   - _Depends: 7.1_
   - _Requirements: 3.5_
 
-- [ ] 8.2 シンクとローダの Phase 5.5 を、シーンの宣言だけを控える形にする
+- [x] 8.2 シンクとローダの Phase 5.5 を、シーンの宣言だけを控える形にする
   - シーンマップに、1 つの `.pasta` のシーンの記録を入れる口を足す。シンクを、シーンの宣言だけを控え、行の記録を捨てる形にする
   - ローダの Phase 5.5 は記録をシーンマップに入れるだけにする（チャンク名と行の付け替えを外す）。有効なときだけ作り、無効なら作らない
   - 行の引きを確かめていたテスト（`loader_source_map_build_test.rs` の 2 本・`source_map_handoff_test.rs` の 1 本・索引のテストの 2 本）を、シーンの記録と `scene_at` の確かめに直す。キャッシュのバイト不変のテストは残す
@@ -224,3 +224,4 @@
 - 6.1: `persistence::dump_table` に一時の `#[allow(dead_code)]`（shortcut: コメント付き）がある。6.2 で `@pasta_debug` に結んだら外す。
 - 7.1: `searcher::pasta_file_of` に一時の `expect(dead_code)` がある。8.1 で使ったら外す。`@pasta_chunks` の値のパスはまだ OS の区切りのまま（`\` へのそろえは 7.2）。
 - 8.1: `SourceMap::pasta_file_for_chunk` と `chunk_files` は本番から呼ばれなくなった（pub なので警告は出ない）。8.3 で消す。
+- 8.2: `line_mapping_roundtrip_unchanged_with_index_present` と `src/debug/source_map_builder_tests.rs` は 8.3 を前倒しして消した（後者の削除は誤って 9.2 のコミット 86cb99d4 に入った）。`build_source_map` は `cache_manager` を受けない。

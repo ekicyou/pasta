@@ -1,9 +1,6 @@
-//! Loader-side source-map build orchestration.
-//!
-//! Sibling submodule of [`super`] holding the multi-chunk `.pasta`↔`.lua`
-//! [`SourceMap`] build responsibility split out of `loader/mod.rs` (C3).
+//! ローダの Phase 5.5（シーンマップを作る）。`loader/mod.rs` から分けた兄弟モジュール。
 
-use super::{CacheManager, PastaLoader};
+use super::PastaLoader;
 use crate::debug::source_map::{MapBuilderSink, SourceMap};
 use crate::transpiler::LuaTranspiler;
 
@@ -12,127 +9,114 @@ use std::sync::Arc;
 use tracing::{debug, warn};
 
 impl PastaLoader {
-    /// Build and aggregate the multi-chunk `.pasta`↔`.lua` [`SourceMap`] for the
-    /// discovered `.pasta` files (task 4.3 — `SourceMapBuilder`).
+    /// 見つけた `.pasta` ごとにシーンの宣言の記録を控え、シーンマップを作る（Phase 5.5）。
     ///
-    /// This is the loader-side source-map build orchestration (design "Flow 1",
-    /// File Structure Plan `loader/mod.rs` line 166). For EACH `.pasta` file it:
+    /// ローダはデバッグが有効なときだけ呼ぶ。無効なら呼ばないので、シンクも付かず
+    /// [`SourceMap`] も作らない（Phase 4 の生成 `.lua` はシンク無しの
+    /// [`LuaTranspiler::transpile`] のまま）。
     ///
-    /// 1. Re-parses the source and creates a [`MapBuilderSink::new(pasta_file,
-    ///    chunk_name)`], where `chunk_name` is derived from the SAME loader cache
-    ///    path construction the runtime require/hook path uses
-    ///    ([`CacheManager::source_to_cache_path`] — task 1.1's confirmed naming
-    ///    strategy; `set_name` is NOT needed because the hook source and this key
-    ///    match after [`crate::debug::source_map::canonicalize_chunk_name`]).
-    /// 2. Transpiles with the sink attached via
-    ///    [`LuaTranspiler::transpile_with_source_map`], which records pre-normalize
-    ///    `(.lua line -> .pasta span)` correspondences (Requirement 1.1) and returns
-    ///    the normalize [`crate::normalize::LineShift`].
-    /// 3. Calls `sink.finish(&shift)` to rebase the records onto the final `.lua`
-    ///    line numbers (Requirement 2.1), yielding a per-chunk
-    ///    [`crate::debug::source_map::ChunkSourceMap`].
-    /// 4. Inserts the chunk into the aggregate [`SourceMap`] keyed by chunk name
-    ///    ([`SourceMap::insert_chunk`] canonicalizes the key internally — task 3.4).
+    /// `.pasta` ごとに読み直して解析し、[`MapBuilderSink`] を付けて変換し直し（出力は
+    /// 捨てる）、控えた記録を [`SourceMap::insert_scenes`] に入れる。宣言の行は `.pasta`
+    /// の行なので、`LineShift` の付け替えは要らない。読めない・解析できない・変換できない
+    /// ファイルは警告して飛ばす（本当の失敗は Phase 4 の変換が出す）。
     ///
-    /// The result is held as an `Arc<SourceMap>` (immutable shared reference, design
-    /// "Architecture" `Arc<SourceMap>` 不変共有 — Requirement 3.1, in-memory, no
-    /// mandatory intermediate file). The runtime holds this `Arc` as its scene map.
-    ///
-    /// # Debug gating (Requirements 3.1, 7.1)
-    ///
-    /// This is invoked by the loader ONLY when debugging is enabled. On the disabled
-    /// (default) path the loader does NOT call this, so no sink is attached during
-    /// transpilation, no [`SourceMap`] is allocated, and the generated `.lua` bytes
-    /// stay byte-invariant (the production transpile in
-    /// [`process_incremental`](Self::process_incremental) uses the sink-less
-    /// [`LuaTranspiler::transpile`]).
-    ///
-    /// Files that fail to read/parse/transpile are skipped with a warning (the map
-    /// is best-effort and non-fatal; the primary transpile path in
-    /// `process_incremental` is the one that surfaces hard failures).
-    ///
-    /// `transpiler` must be the one used for the generated `.lua` (the loader
-    /// shares a single instance), so the scene join keys use the same alias table.
+    /// `transpiler` は生成 `.lua` と同じもの（照合の鍵が同じ別名の表を使うため）。
     pub fn build_source_map(
         pasta_files: &[std::path::PathBuf],
-        cache_manager: &CacheManager,
         transpiler: &LuaTranspiler,
     ) -> Arc<SourceMap> {
-        Arc::new(build_source_map_inner(
-            pasta_files,
-            cache_manager,
-            transpiler,
-        ))
-    }
-}
+        let mut source_map = SourceMap::new();
+        for file_path in pasta_files {
+            let content = match fs::read_to_string(file_path) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!(file = %file_path.display(), error = %e, "source-map: skip (read error)");
+                    continue;
+                }
+            };
 
-/// Core multi-chunk source-map build.
-///
-/// See [`PastaLoader::build_source_map`] for the contract. Kept as a private free
-/// function so the build logic stays separate from the `Arc` wrapping; tests
-/// exercise it through [`PastaLoader::build_source_map`].
-fn build_source_map_inner(
-    pasta_files: &[std::path::PathBuf],
-    cache_manager: &CacheManager,
-    transpiler: &LuaTranspiler,
-) -> SourceMap {
-    let mut source_map = SourceMap::new();
-    let mut chunk_count = 0usize;
+            let filename = file_path.to_string_lossy().to_string();
+            let pasta_file = match pasta_dsl::parse_str(&content, &filename) {
+                Ok(pf) => pf,
+                Err(e) => {
+                    warn!(file = %file_path.display(), error = %e, "source-map: skip (parse error)");
+                    continue;
+                }
+            };
 
-    for file_path in pasta_files {
-        // Read the .pasta source.
-        let content = match fs::read_to_string(file_path) {
-            Ok(c) => c,
-            Err(e) => {
-                warn!(file = %file_path.display(), error = %e, "source-map: skip (read error)");
-                continue;
-            }
-        };
-
-        let filename = file_path.to_string_lossy().to_string();
-        let pasta_file = match pasta_dsl::parse_str(&content, &filename) {
-            Ok(pf) => pf,
-            Err(e) => {
-                warn!(file = %file_path.display(), error = %e, "source-map: skip (parse error)");
-                continue;
-            }
-        };
-
-        // Chunk name = SAME loader cache path construction the runtime require/hook
-        // path reports (task 1.1). `insert_chunk` canonicalizes this internally so
-        // it matches the `@<absolute .lua path>` hook source after normalization.
-        let chunk_name = cache_manager
-            .source_to_cache_path(file_path)
-            .to_string_lossy()
-            .to_string();
-
-        // Attach the recording sink and transpile, capturing the normalize shift.
-        let mut sink = MapBuilderSink::new(filename.clone(), chunk_name.clone());
-        let mut output = Vec::new();
-        let shift = match transpiler.transpile_with_source_map(
-            &pasta_file,
-            &mut output,
-            Some(&mut sink),
-        ) {
-            Ok((_ctx, shift)) => shift,
-            Err(e) => {
+            let mut sink = MapBuilderSink::default();
+            if let Err(e) =
+                transpiler.transpile_with_source_map(&pasta_file, &mut Vec::new(), Some(&mut sink))
+            {
                 warn!(file = %file_path.display(), error = %e, "source-map: skip (transpile error)");
                 continue;
             }
-        };
+            source_map.insert_scenes(&filename, sink.into_scenes());
+        }
 
-        // Rebase pre-normalize records onto final `.lua` lines (2.1) and aggregate
-        // the per-chunk map by chunk name (3.4).
-        let chunk_map = sink.finish(&shift);
+        debug!(files = pasta_files.len(), "source-map: built scene map");
+        Arc::new(source_map)
+    }
+}
 
-        source_map.insert_chunk(chunk_name, filename, chunk_map);
-        chunk_count += 1;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_pasta(base: &std::path::Path, rel: &str, src: &str) -> std::path::PathBuf {
+        let path = base.join(rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, src).unwrap();
+        path
     }
 
-    debug!(
-        chunks = chunk_count,
-        files = pasta_files.len(),
-        "source-map: built aggregate map"
-    );
-    source_map
+    /// 3.5: 2 つの `.pasta` を通すと、ファイルごとにシーンの宣言の記録が入る。
+    #[test]
+    fn loader_builds_scene_records_per_pasta_file() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let a = write_pasta(
+            temp.path(),
+            "dic/a.pasta",
+            "＊あいさつ\n  さくら：「おはよう！」\n  ・朝\n    さくら：「げんき？」\n",
+        );
+        let b = write_pasta(
+            temp.path(),
+            "dic/b.pasta",
+            "\n＊おやすみ\n  さくら：「おやすみ。」\n",
+        );
+
+        let map = PastaLoader::build_source_map(&[a, b], &LuaTranspiler::default());
+
+        let records = map.scene_records();
+        assert_eq!(records.len(), 2, "{records:?}");
+        // 鍵は正規化した `.pasta` のパス（区切りは `/`）。値は宣言順の (照合の鍵, 宣言の行)。
+        let scenes = |name: &str| {
+            let (_, scenes) = records.iter().find(|(k, _)| k.ends_with(name)).unwrap();
+            scenes
+                .iter()
+                .map(|(k, l)| (k.as_str(), *l))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            scenes("/a.pasta"),
+            [
+                ("G:あいさつ#1", 1),
+                ("L:あいさつ#1:__start__", 2),
+                ("L:あいさつ#1:朝_1", 3)
+            ],
+            "{records:?}"
+        );
+        assert_eq!(
+            scenes("/b.pasta"),
+            [("G:おやすみ#1", 2), ("L:おやすみ#1:__start__", 3)],
+            "{records:?}"
+        );
+    }
+
+    /// 何も渡さなければシーンの記録は空。
+    #[test]
+    fn no_scene_records_when_no_files_passed() {
+        let map = PastaLoader::build_source_map(&[], &LuaTranspiler::default());
+        assert!(map.scene_records().is_empty());
+    }
 }

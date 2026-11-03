@@ -222,7 +222,7 @@ impl PastaLoader {
         // transpile → build map → enable-with-map (requirement 3.1).
         let debug_enabled = crate::debug::resolve_enabled(config.debug().as_ref());
         let source_map = if debug_enabled {
-            let map = Self::build_source_map(&pasta_files, &cache_manager, &transpiler);
+            let map = Self::build_source_map(&pasta_files, &transpiler);
             debug!("Phase 5.5: Built source map for debug session");
             Some(map)
         } else {

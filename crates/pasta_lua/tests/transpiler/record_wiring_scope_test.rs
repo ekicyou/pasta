@@ -329,19 +329,22 @@ fn lua_block_content_is_emitted_verbatim_in_actor_and_local_scene() {
     );
 }
 
-/// 7.3（2.3・2.4）: ブロックの各行の `.lua` の行が `.pasta` のその行を指す。デバッグのシンクの
+/// 7.3（2.3・2.4）: ブロックの各行の `.lua` の行が `.pasta` のその行を指す。シンクの
 /// 記録（最終の行に直した対応表）と `init_scene` に渡す対応の両方で、空行より後の行も合う。
 #[test]
 fn lua_block_lines_map_to_their_pasta_lines_in_sink_and_init_scene() {
-    use pasta_lua::debug::source_map::MapBuilderSink;
-
     let file = parse_str(LUA_BLOCK_SOURCE, "block.pasta").expect("parse ok");
-    let mut sink = MapBuilderSink::new("block.pasta".to_string(), "chunk".to_string());
+    let mut sink = LinePairSink::default();
     let mut output = Vec::new();
     let (_, shift) = LuaTranspiler::default()
         .transpile_with_source_map(&file, &mut output, Some(&mut sink))
         .expect("transpile ok");
-    let chunk = sink.finish(&shift);
+    // 記録を normalize の後の最終の行に直す（同じ行は後勝ち）。
+    let chunk: std::collections::BTreeMap<u32, u32> = sink
+        .records
+        .iter()
+        .filter_map(|&(l, p)| shift.map(l).map(|f| (f, p)))
+        .collect();
     let lua = String::from_utf8(output).unwrap();
 
     let starts = block_start_lines(&lua);
@@ -350,7 +353,7 @@ fn lua_block_lines_map_to_their_pasta_lines_in_sink_and_init_scene() {
     for (lua_start, pasta_start) in [(starts[0], 4), (starts[1], 16)] {
         for k in 0..BLOCK_LINES.len() as u32 {
             assert_eq!(
-                chunk.pasta_for_lua(lua_start + k).map(|p| p.line),
+                chunk.get(&(lua_start + k)).copied(),
                 Some(pasta_start + k),
                 "sink: lua {} must map to pasta {}\n{lua}",
                 lua_start + k,

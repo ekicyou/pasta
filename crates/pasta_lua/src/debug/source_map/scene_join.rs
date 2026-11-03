@@ -102,7 +102,7 @@ pub(crate) fn build_scene_index(
             .and_then(|f| f.info().source)
             .and_then(|chunk| pasta_file_of(&chunk));
         if let Some(pasta_file) = pasta_file {
-            // 記録のキー（`insert_chunk` の正規形）にそろえる。
+            // 記録のキー（`insert_scenes` の正規形）にそろえる。
             globals_by_file
                 .entry(canonicalize_pasta_file(&pasta_file))
                 .or_default()

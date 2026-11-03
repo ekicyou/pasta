@@ -12,7 +12,7 @@
 use std::path::Path;
 
 use pasta_lua::RuntimeConfig;
-use pasta_lua::loader::{CacheManager, PastaLoader};
+use pasta_lua::loader::PastaLoader;
 
 /// テスト用に base_dir を作り、`.pasta` と指定の pasta.toml を配置する。
 /// pasta_scripts / scriptlibs はクレートルートからコピーしてランタイム初期化を成立させる。
@@ -90,22 +90,11 @@ port = 0
         .debug_source_map()
         .expect("3.1: enabled debug runtime must hold the aggregated Arc<SourceMap>");
 
-    // (3) マップは実際に当該 `.pasta` のチャンクを含む（空マップではない）。
-    //     チャンク名キーはローダと同じ `CacheManager::source_to_cache_path` 由来で
-    //     再構築する（ハードコードしない）。少なくとも 1 つの `.lua` 行が `.pasta`
-    //     位置へ前方解決できる。
+    // (3) マップはその `.pasta` のシーンを引ける（空のマップではない）。
     let pasta_file = temp.path().join("dic/test/hello.pasta");
-    let cache_manager = CacheManager::new(temp.path().to_path_buf(), "profile/pasta/cache/lua");
-    let chunk = cache_manager
-        .source_to_cache_path(&pasta_file)
-        .to_string_lossy()
-        .to_string();
-    let resolved_any = (1u32..=200)
-        .filter_map(|lua_line| map.resolve_lua_to_pasta(&chunk, lua_line))
-        .next();
     assert!(
-        resolved_any.is_some(),
-        "3.1: held map must contain the transpiled chunk's mappings (chunk={chunk}, file={})",
+        map.scene_at(&pasta_file.to_string_lossy(), 2).is_some(),
+        "3.5: held map must resolve the scene at {}:2",
         pasta_file.display()
     );
 }

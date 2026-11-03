@@ -169,10 +169,9 @@ fn finalize_join_resolves_runtime_identities_for_global_and_local() {
     );
 }
 
-/// 5: 通常モード（debug 無効）非破壊。索引は構築されず（`scene_at` は常に None）、
-/// 行マッピング双方向 resolve は debug 有効時と同一（挙動不変）。
+/// 5: 通常モード（debug 無効）では、シーンマップも索引も作らない。
 #[test]
-fn normal_mode_builds_no_index_and_line_mapping_is_unchanged() {
+fn normal_mode_builds_no_index() {
     // debug 無効でロード: source map 自体が構築されない（None）。
     let temp_off = tempfile::TempDir::new().expect("temp dir");
     let base_off = temp_off.path();
@@ -187,33 +186,6 @@ fn normal_mode_builds_no_index_and_line_mapping_is_unchanged() {
     assert!(
         runtime_off.debug_source_map().is_none(),
         "debug 無効では SourceMap を構築・保持しない（索引も無い・7.1）"
-    );
-
-    // debug 有効側で同一フィクスチャの行マッピングを取得し、無効でも不変であることを
-    // 「無効では map が無い ＝ 旧来の .lua 実行に一切干渉しない」ことで担保する。
-    // さらに有効側の双方向 resolve が正しく機能する（索引追加が既存マッピングを壊さない）。
-    let temp_on = tempfile::TempDir::new().expect("temp dir");
-    let base_on = temp_on.path();
-    let pasta_on = make_base_dir(base_on, true);
-    let pasta_on_key = pasta_on.to_string_lossy().to_string();
-    let runtime_on = PastaLoader::load_with_config(base_on, RuntimeConfig::new())
-        .expect("debug-enabled runtime must load");
-    let map_on = runtime_on
-        .debug_source_map()
-        .expect("enabled runtime holds map");
-
-    // グローバル宣言行（行 7）は生成 .lua の create_scene 行へ対応する（既存行マッピング）。
-    let global_decl_lua = map_on.resolve_pasta_to_lua(&pasta_on_key, 7);
-    assert!(
-        !global_decl_lua.is_empty(),
-        "索引追加後も既存の `.pasta`→`.lua` 逆引きは機能する（行マッピング不変・7.1）: {global_decl_lua:?}"
-    );
-    // 逆方向も整合: その .lua 行を .pasta へ戻すと元の .pasta ファイルを指す。
-    let (chunk, lua_line) = global_decl_lua[0].clone();
-    let back = map_on.resolve_lua_to_pasta(&chunk, lua_line);
-    assert!(
-        back.is_some(),
-        "索引追加後も `.lua`→`.pasta` 前方解決は機能する（双方向不変）"
     );
 }
 
@@ -339,68 +311,6 @@ fn resolved_position_pair_matches_runtime_scene() {
             "({g}, {l}) は collect_scenes(SSOT) に存在する: {scenes:?}"
         );
     }
-}
-/// 6.1-(2) 行マッピング後方非破壊の回帰（requirements 3.4）。
-///
-/// **debug 有効・索引充填済み** の同一ランタイムで、既知の `.pasta` 宣言行について
-/// `resolve_pasta_to_lua`（逆引き）→ `resolve_lua_to_pasta`（前方）のラウンドトリップが
-/// 元の `.pasta` 位置へ戻ることを固定する。索引（`scene_at` が `Some` を返す）が
-/// **同居** しても行マッピング双方向 resolve が一切変質しないことを表明する。
-///
-/// 2.2 の `normal_mode_*` は debug **無効**側（map 自体が無い）で非干渉を示すのに対し、
-/// 本テストは索引が **存在する** 状態での行マッピング不変を直接固定する点で補完関係。
-///
-/// 真正性（RED の論拠）: もし索引追加が `forward`/`reverse` を汚染（行ズレ・キー喪失）
-/// すれば、ラウンドトリップは元行へ戻らず `assert_eq!` が落ちる。
-#[test]
-fn line_mapping_roundtrip_unchanged_with_index_present() {
-    let temp = tempfile::TempDir::new().expect("temp dir");
-    let base = temp.path();
-    let pasta_file = make_base_dir(base, true);
-    let pasta_key = pasta_file.to_string_lossy().to_string();
-
-    let runtime = PastaLoader::load_with_config(base, RuntimeConfig::new())
-        .expect("debug-enabled runtime must load");
-    let map = runtime
-        .debug_source_map()
-        .expect("enabled runtime holds map");
-
-    // 前提: 索引は **充填済み**（同居している）。
-    assert!(
-        map.scene_at(&pasta_key, LINE_GLOBAL1_BODY).is_some(),
-        "本テストは索引が存在する状態での行マッピング不変を固定する（前提確認）"
-    );
-
-    // 既知の `.pasta` 宣言行群（global #1 宣言・local 宣言・global #2 宣言）。
-    // それぞれ生成 `.lua` 行へ対応を持つはず（create_scene 行）。
-    for pasta_line in [7u32, 11u32, 14u32] {
-        let lua_targets = map.resolve_pasta_to_lua(&pasta_key, pasta_line);
-        assert!(
-            !lua_targets.is_empty(),
-            "`.pasta` 行 {pasta_line} は索引同居下でも `.lua` 行へ逆引きできる（3.4）"
-        );
-
-        // 逆引きで得た各 (chunk, lua_line) を前方解決すると、元の `.pasta` 行へ戻る。
-        for (chunk, lua_line) in &lua_targets {
-            let pos = map
-                .resolve_lua_to_pasta(chunk, *lua_line)
-                .expect("逆引きで得た `.lua` 行は前方解決で `.pasta` 位置へ戻る（双方向整合）");
-            assert_eq!(
-                pos.line, pasta_line,
-                "ラウンドトリップは元の `.pasta` 行 {pasta_line} へ戻る（行マッピング不変・3.4）"
-            );
-        }
-    }
-
-    // 索引クエリと行マッピングクエリが互いに干渉しないこと（同一行で双方が機能する）。
-    // local 宣言行は scene_at で identity を返しつつ、行マッピングも逆引き可能。
-    let local_id = map.scene_at(&pasta_key, LINE_LOCAL_BODY);
-    assert!(local_id.is_some(), "索引クエリは同居下でも機能する");
-    let local_decl_lua = map.resolve_pasta_to_lua(&pasta_key, 11);
-    assert!(
-        !local_decl_lua.is_empty(),
-        "同一マップ上で行マッピングクエリも同居下で機能する（相互非干渉・3.4）"
-    );
 }
 
 // ===========================================================================
@@ -682,8 +592,7 @@ fn same_named_scenes_in_two_files_resolve_to_their_own_file() {
 const ALIAS_MIXED_FIXTURE: &str = include_str!("fixtures/scene_alias_mixed.pasta");
 
 /// 7.1/7.2/7.3: 各宣言行・本体行が宣言どおりの identity に対応づき、その位置の引きの組で
-/// シーン表から引いたシーンが同名の他候補ではなくその行のシーンであり、
-/// 本体行にブレークポイントを置ける（`.pasta`→`.lua`→`.pasta` が元の行へ戻る）。
+/// シーン表から引いたシーンが同名の他候補ではなくその行のシーンである。
 #[test]
 fn aliased_and_real_name_scenes_in_one_file_map_to_their_own_identities() {
     let temp = tempfile::TempDir::new().expect("temp dir");
@@ -761,20 +670,5 @@ fn aliased_and_real_name_scenes_in_one_file_map_to_their_own_identities() {
             played.starts_with(text),
             "行 {line} の再生は宣言のシーン（{text}）を指す（7.2）: {played}"
         );
-    }
-
-    // 7.1: 別名で宣言したシーン配下の本体行にブレークポイントを置ける。
-    for line in [3u32, 7, 13] {
-        let targets = map.resolve_pasta_to_lua(&key, line);
-        assert!(!targets.is_empty(), "行 {line} は `.lua` 行へ逆引きできる");
-        for (chunk, lua_line) in &targets {
-            let pos = map
-                .resolve_lua_to_pasta(chunk, *lua_line)
-                .expect("逆引きした `.lua` 行は `.pasta` へ戻る");
-            assert_eq!(
-                pos.line, line,
-                "行 {line} のブレークポイントはその行で止まる"
-            );
-        }
     }
 }

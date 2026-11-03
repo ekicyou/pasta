@@ -13,7 +13,7 @@
 //! 1. [`MapBuilderSink`] がその通知を **pre-normalize** の `lua_line → PastaPos` として
 //!    蓄積する。`.pasta` 行は `span.start_line` を **直接**採用する（byte 走査廃止・
 //!    research.md D-3）。
-//! 2. トランスパイル完了後、[`MapBuilderSink::finish`] が `normalize_output_with_shift`
+//! 2. トランスパイル完了後、`MapBuilderSink::finish` が `normalize_output_with_shift`
 //!    の返す [`LineShift`] を適用し、各 pre-normalize 行を **最終 `.lua` 行**へ rebase
 //!    した 1 チャンクの [`ChunkSourceMap`] を確定する（normalize 行ズレ補正）。
 //! 3. [`SourceMap`] が複数チャンクの [`ChunkSourceMap`] を **正規化チャンク名**で集約し、
@@ -23,7 +23,7 @@
 //! # normalize 行ズレ補正
 //!
 //! producer の `out_line` は `normalize_output` **適用前**のバッファ行を数えるため、
-//! 最終 `.lua` の行番号と一般にはズレ得る。[`MapBuilderSink::finish`] が
+//! 最終 `.lua` の行番号と一般にはズレ得る。`MapBuilderSink::finish` が
 //! [`LineShift`] を介して pre-normalize 行 → 最終 `.lua` 行へ rebase し、normalize が
 //! 削除した行に紐づく記録は最終写像から除外する（requirements 2.1）。
 
@@ -31,7 +31,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::OnceLock;
 
 pub use crate::code_gen::source_map::{PastaPos, SourceMapSink};
-use crate::normalize::LineShift;
 
 /// チャンク（1 つの生成 `.lua` ファイル）を識別するキー。
 ///
@@ -59,10 +58,8 @@ pub type ChunkName = String;
 /// される場合は last-write-wins・キー一意性が担保）。`BTreeMap` は決定的反復順
 /// （キー昇順）を持つため、逆引きの提示順序の安定性（8.3）も自然に満たす。
 ///
-/// トランスパイル完了後は不変（design 434）。生成（producer → `ChunkSourceMap` の
-/// ビルドパイプライン・`finish(shift)` rebase）は同モジュールの
-/// [`MapBuilderSink::finish`] が担い、[`from_forward`](Self::from_forward) は既知
-/// forward からの直接構築（`finish` 内部・テスト）に供する。
+/// トランスパイル完了後は不変（design 434）。[`from_forward`](Self::from_forward) で既知の
+/// forward から構築する。
 #[derive(Debug, Clone, Default)]
 pub struct ChunkSourceMap {
     /// 最終 `.lua` 行（1 始まり）→ 対応する `.pasta` 位置。
@@ -71,13 +68,6 @@ pub struct ChunkSourceMap {
     /// [`lua_lines_for_pasta`](Self::lua_lines_for_pasta) の返り値が `.lua` 行の昇順
     /// かつ決定的になる（requirements 8.3）。
     forward: BTreeMap<u32, PastaPos>,
-    /// シーン記録（`(join_key, .pasta 宣言行)`・**宣言順**）。task 2.2 の finalize join
-    /// が runtime 実 identity と突合して [`SceneIdentityIndex`] を確定するための素材。
-    ///
-    /// `MapBuilderSink::record_scene` が code_gen の宣言順に蓄積する（debug-gated・
-    /// sink 未接続の本番経路では空）。`.pasta` 宣言行は `normalize` の `LineShift` 対象
-    /// **外**（`.lua` 行ではない）であり `finish` でも rebase しない。
-    scene_records: Vec<(String, u32)>,
 }
 
 impl ChunkSourceMap {
@@ -89,34 +79,9 @@ impl ChunkSourceMap {
     /// 既知の前方写像（最終 `.lua` 行 → `.pasta` 位置）から構築する。
     ///
     /// `BTreeMap` のキー一意性により 1 `.lua` 行 → 高々 1 `.pasta` 位置の不変条件
-    /// （requirements 8.1）が担保される。producer からの本番ビルドパイプラインは
-    /// [`MapBuilderSink::finish`] が担い、本コンストラクタは `finish` から `forward`
-    /// を直接渡す内部用途とテストに供する。
+    /// （requirements 8.1）が担保される。
     pub fn from_forward(forward: BTreeMap<u32, PastaPos>) -> Self {
-        Self {
-            forward,
-            scene_records: Vec::new(),
-        }
-    }
-
-    /// `from_forward` にシーン記録（`(join_key, .pasta 宣言行)`・宣言順）を併せて構築する
-    /// （`MapBuilderSink::finish` が producer 側の蓄積を引き渡す内部用途）。
-    pub(super) fn from_forward_with_scenes(
-        forward: BTreeMap<u32, PastaPos>,
-        scene_records: Vec<(String, u32)>,
-    ) -> Self {
-        Self {
-            forward,
-            scene_records,
-        }
-    }
-
-    /// このチャンクが蓄積したシーン記録（`(join_key, .pasta 宣言行)`・宣言順）を借用する。
-    ///
-    /// task 2.2 の finalize join が runtime 実 identity と突合するために走査する。sink
-    /// 未接続の本番経路（debug 無効）では空。
-    pub(super) fn scene_records(&self) -> &[(String, u32)] {
-        &self.scene_records
+        Self { forward }
     }
 
     /// 記録済みの対応件数（最終 `.lua` 行の数）。
@@ -153,139 +118,31 @@ impl ChunkSourceMap {
     }
 }
 
-/// producer の `record` コールバックから 1 チャンクのマップを構築する
-/// [`SourceMapSink`] 実装（design "MapBuilderSink" 389-423）。
+/// シーンの宣言だけを控えるシンク。行の記録は捨てる。
 ///
-/// # 役割
-///
-/// producer（[`crate::code_gen::LuaCodeGenerator`] の `generate_*`）が、`normalize`
-/// **適用前**の中間バッファ行 `out_line`（1 始まり）を `.pasta` span と共に `record`
-/// する（前提条件・design 421）。`MapBuilderSink` はこれを **pre-normalize** の
-/// `lua_line → PastaPos` として [`pre_norm`](Self::pre_norm) に蓄積する。
-///
-/// トランスパイル完了後、`normalize_output_with_shift` が返す [`LineShift`] を
-/// [`finish`](Self::finish) に渡すと、各 pre-normalize 行を **最終 `.lua` 行**へ
-/// rebase した [`ChunkSourceMap`] を確定する（Flow 1・design 204-213）。
-///
-/// # `.pasta` 行の採用（research.md D-3）
-///
-/// `.pasta` 行は `span.start_line`（または code_block の行オフセット）を **直接**
-/// 採用する。`span.start_byte` から `\n` を数えるバイト走査方式は採らない。
-/// trait 既定の [`record`](SourceMapSink::record) が `record_line(lua_line,
-/// span.start_line)` へ委譲するため、本実装は core の
-/// [`record_line`](SourceMapSink::record_line) のみを提供する。
-///
-/// # 不変条件（requirements 8.1）
-///
-/// - **同一 pre-normalize 行は last-write-wins**: `pre_norm` は `BTreeMap` であり、
-///   同一 `lua_line` キーへの再 `record_line` は後勝ちで上書きする（決定論的・
-///   design 423）。
-/// - **rebase 後の最終行の衝突解決**: 仮に複数の pre-normalize 行が同一の最終 `.lua`
-///   行へ rebase された場合、[`finish`](Self::finish) は `pre_norm` を **キー昇順**
-///   （pre-line 昇順）で反復して forward `BTreeMap` へ挿入するため、**最大の
-///   pre-line が後勝ち**となる（決定論的・8.1）。ただし [`LineShift::map`] は生存行
-///   上で単調増加かつ単射であるため、生存する 2 つの異なる pre-line が同一最終行へ
-///   衝突することは構造上起こり得ない（衝突解決規則は防御的かつ決定論的な後勝ちとして
-///   定義する）。
+/// code_gen が宣言順（global ヘッダ → その local 群）に呼ぶ
+/// [`record_scene`](SourceMapSink::record_scene) の `(照合の鍵, .pasta の宣言の行)` を
+/// そのまま積む。宣言の行は `.pasta` の行なので `LineShift` の付け替えは要らない。
+#[derive(Default)]
 pub struct MapBuilderSink {
-    /// 元 `.pasta` ファイルパス（[`PastaPos::file`] に載せる）。
-    pasta_file: String,
-    /// このチャンク（生成 `.lua` ファイル）を識別するキー（design "Source Identity"）。
-    ///
-    /// マルチチャンク集約 [`SourceMap`] への登録
-    /// （[`SourceMap::insert_chunk`]・loader の `build_source_map`）でこのキーを
-    /// 用いる。`finish` の戻り値 [`ChunkSourceMap`] 自体はチャンク名を保持しないため、
-    /// 本フィールドは集約側が参照する識別子として保持する。
-    chunk_name: ChunkName,
-    /// pre-normalize の `lua_line`（1 始まり・`out_line`）→ `.pasta` 位置。
-    ///
-    /// `BTreeMap` を用いるのは (1) 同一 pre-line の last-write-wins（キー一意性・8.1）
-    /// と (2) `finish` の rebase 反復が pre-line 昇順で決定論的になるため。
-    pre_norm: BTreeMap<u32, PastaPos>,
-    /// シーン記録（`(join_key, .pasta 宣言行)`・**宣言順**）。task 2.2 用の素材。
-    ///
-    /// [`record_scene`](SourceMapSink::record_scene) が code_gen の宣言順
-    /// （global ヘッダ → 各 local）に push する。`.pasta` 宣言行は `LineShift` 対象外
-    /// （`.lua` 行ではない）なので `finish` の rebase はかけず、宣言順のまま
-    /// [`ChunkSourceMap`] へ引き渡す。
-    scene_records: Vec<(String, u32)>,
+    scenes: Vec<(String, u32)>,
 }
 
 impl MapBuilderSink {
-    /// `.pasta` ファイルパスとチャンク名から空のシンクを構築する。
-    pub fn new(pasta_file: String, chunk_name: ChunkName) -> Self {
-        Self {
-            pasta_file,
-            chunk_name,
-            pre_norm: BTreeMap::new(),
-            scene_records: Vec::new(),
-        }
-    }
-
-    /// このシンクが構築するチャンクの識別キーを借用する。
-    pub fn chunk_name(&self) -> &ChunkName {
-        &self.chunk_name
-    }
-
-    /// normalize の [`LineShift`] を適用し、最終 [`ChunkSourceMap`] を確定する
-    /// （design 409-410, 422・requirements 2.1）。
-    ///
-    /// `pre_norm` の各 `(pre_line, pos)` を [`LineShift::map`] で **最終 `.lua` 行**へ
-    /// rebase する:
-    ///
-    /// - `Some(final_line)`: forward マップへ `final_line → pos` を挿入する。
-    /// - `None`（normalize が削除した行）: 由来 `.pasta` の無い空行であり、最終 `.lua`
-    ///   には存在しないため **除外**する（design 422・requirements 2.1）。
-    ///
-    /// `pre_norm` を **キー昇順**で反復するため、仮に複数 pre-line が同一最終行へ
-    /// rebase されても **最大 pre-line が後勝ち**で決定論的（8.1）。生存行上の
-    /// `LineShift::map` は単射なので通常この衝突は発生しない。
-    pub fn finish(self, shift: &LineShift) -> ChunkSourceMap {
-        let mut forward: BTreeMap<u32, PastaPos> = BTreeMap::new();
-        // BTreeMap::into_iter() yields entries in ascending key (pre-line) order,
-        // so a collided final line is resolved deterministically to the largest
-        // pre-line (last-write-wins・8.1).
-        for (pre_line, pos) in self.pre_norm {
-            if let Some(final_line) = shift.map(pre_line) {
-                forward.insert(final_line, pos);
-            }
-            // 削除行（None）は最終 .lua に存在しないため除外（requirements 2.1）。
-        }
-        // シーン記録は `.pasta` 宣言行（`.lua` 行ではない）なので LineShift 対象外。
-        // 宣言順のまま引き渡し、finalize join（task 2.2）が突合する。
-        ChunkSourceMap::from_forward_with_scenes(forward, self.scene_records)
+    /// 控えたシーンの記録を宣言順で返す。
+    pub fn into_scenes(self) -> Vec<(String, u32)> {
+        self.scenes
     }
 }
 
 impl SourceMapSink for MapBuilderSink {
-    /// シーン宣言の突合キー `scene_join_key` と `.pasta` 宣言行を **宣言順**に蓄積する
-    /// （task 2.2・requirements 3.1/3.3）。
-    ///
-    /// `span.start_line`（`.pasta` の `＊シーン`/`・シーン` 宣言ヘッダ行・1 始まり）を採り、
-    /// `(join_key, start_line)` を push する。code_gen は global ヘッダ → その local 群の
-    /// 順で呼ぶため、蓄積順 = 宣言順 = per-base 出現順（runtime `create_scene` 連番順）に
-    /// 一致し、finalize join がそのまま per-base 出現順で runtime identity と突合できる。
-    /// 行マッピング記録（`pre_norm`）には一切触れない（3.4 非破壊）。
     fn record_scene(&mut self, scene_join_key: &str, span: pasta_dsl::parser::Span) {
-        self.scene_records
+        self.scenes
             .push((scene_join_key.to_string(), span.start_line as u32));
     }
 
-    /// pre-normalize の `lua_line` → `.pasta` 位置を `pre_norm` へ挿入する（core 操作・
-    /// design 414-416）。同一 `lua_line` への再記録は last-write-wins で上書き（8.1）。
-    ///
-    /// `.pasta` 行は呼び出し側（trait 既定の `record` 経由なら `span.start_line`）が
-    /// 与えた `pasta_line` を **直接**採用する（byte 走査廃止・research.md D-3）。
-    fn record_line(&mut self, lua_line: u32, pasta_line: u32) {
-        self.pre_norm.insert(
-            lua_line,
-            PastaPos {
-                file: self.pasta_file.clone(),
-                line: pasta_line,
-            },
-        );
-    }
-    // record(lua_line, span) は trait 既定（record_line(lua_line, span.start_line)）を使用。
+    // 行の対応表は持たない。
+    fn record_line(&mut self, _lua_line: u32, _pasta_line: u32) {}
 }
 
 /// チャンク名キーの **正規化**（design "Source Identity（議題2 確定）" 437-440 /
@@ -393,9 +250,8 @@ pub struct SourceMap {
     /// シーン記録の集約: **正規化 `.pasta` ファイル** → `(join_key, .pasta 宣言行)` の
     /// 宣言順リスト（task 2.2 finalize join の素材）。
     ///
-    /// [`insert_chunk`](Self::insert_chunk) が各チャンクの
-    /// [`ChunkSourceMap::scene_records`] を、元の `.pasta` ファイルキーで集約する。sink
-    /// 未接続の本番経路（debug 無効）では `build_source_map` 自体が呼ばれず、ここは空。
+    /// [`insert_scenes`](Self::insert_scenes) が `.pasta` ごとに入れる。debug 無効では
+    /// `build_source_map` 自体が呼ばれず、ここは空。
     scene_records: HashMap<String, Vec<(String, u32)>>,
     /// 確定済みシーン同一性索引（[`SceneIdentityIndex`]）の **write-once スロット**。
     ///
@@ -433,8 +289,7 @@ impl SourceMap {
         Self::default()
     }
 
-    /// 1 チャンクを集約へ登録する（loader の `build_source_map` が per-`.pasta` の
-    /// `finish` 結果を投入する builder API）。
+    /// 1 チャンクを集約へ登録する。
     ///
     /// `chunk_name`（生フック源／ローダ由来パス）を [`canonicalize_chunk_name`] で
     /// 正規化して [`chunks`](Self::chunks) のキーとし、`pasta_file` を
@@ -471,9 +326,6 @@ impl SourceMap {
         // チャンク → `.pasta` ファイルの対応を記録する（再投入時は上書き）。
         self.chunk_files.insert(chunk_key.clone(), file_key.clone());
 
-        // シーン記録の集約キー（reverse へ move する前にクローンを確保）。
-        let scene_file_key = file_key.clone();
-
         // 逆引き索引を、このチャンクの前方写像（`.lua` 行昇順の `BTreeMap`）から構築。
         let per_file = self.reverse.entry(file_key).or_default();
         // `forward` の反復は `.lua` 行昇順（BTreeMap）。各 `.pasta` 行へ
@@ -489,15 +341,13 @@ impl SourceMap {
             entries.sort();
         }
 
-        // シーン記録を `.pasta` ファイルキーで集約（task 2.2 finalize join の素材）。
-        // 1 `.pasta` = 1 チャンク（loader 経路）なので宣言順をそのまま保つ。再投入時は
-        // forward の上書きと整合させ旧記録を置換する。
-        if !map.scene_records().is_empty() {
-            self.scene_records
-                .insert(scene_file_key, map.scene_records().to_vec());
-        }
-
         self.chunks.insert(chunk_key, map);
+    }
+
+    /// 1 つの `.pasta` のシーンの記録を入れる（同じファイルは置き換え）。
+    pub fn insert_scenes(&mut self, pasta_file: &str, scenes: Vec<(String, u32)>) {
+        self.scene_records
+            .insert(canonicalize_pasta_file(pasta_file), scenes);
     }
 
     /// 集約済みシーン記録を **正規化 `.pasta` ファイルキー → `(join_key, .pasta 宣言行)`
@@ -646,8 +496,3 @@ mod source_map_test_support;
 #[cfg(test)]
 #[path = "../source_map_resolve_tests.rs"]
 mod source_map_resolve_tests;
-
-/// 構築系: `MapBuilderSink`（記録 → `finish` 補正）。
-#[cfg(test)]
-#[path = "../source_map_builder_tests.rs"]
-mod source_map_builder_tests;
