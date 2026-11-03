@@ -45,7 +45,7 @@ export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
   const { endpoint: { port }, ghost: { root, master }, timing } = ctx;
   const pastaLog = pastaLogPath(master, await readText(path.join(master, 'pasta.toml')));
   let cursor = await openLogCursor(pastaLog.path);
-  const sinceId = await lastLogId(port, 'error', root);
+  const sinceId = await lastLogId(port, 'error', root, timing.callTimeoutMs);
   if (typeof sinceId !== 'number') {
     return { kind: 'refused', result: sinceId };
   }

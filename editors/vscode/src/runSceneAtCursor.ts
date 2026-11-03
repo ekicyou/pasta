@@ -37,7 +37,7 @@ export async function runScene(ctx: FlowContext, fileFsPath: string, line1: numb
     return { kind: 'notPlayed', reload };
   }
   const { endpoint: { port }, ghost: { root }, timing } = ctx;
-  const sinceId = await lastLogId(port, 'script', root);
+  const sinceId = await lastLogId(port, 'script', root, timing.callTimeoutMs);
   if (typeof sinceId !== 'number') {
     return { kind: 'failed', result: sinceId, reload };
   }

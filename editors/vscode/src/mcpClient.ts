@@ -159,8 +159,8 @@ export function parseLogEntries(text: string): LogEntry[] {
 }
 
 /** Newest id via get_log(max_count=1); 0 when there are no records. */
-export async function lastLogId(port: number, logType: 'error' | 'script', root: string): Promise<number | CallResult> {
-  const r = await callTool(port, 'get_log', { log_type: logType, ghost_name: root, max_count: 1 });
+export async function lastLogId(port: number, logType: 'error' | 'script', root: string, timeoutMs = CALL_TIMEOUT_MS): Promise<number | CallResult> {
+  const r = await callTool(port, 'get_log', { log_type: logType, ghost_name: root, max_count: 1 }, timeoutMs);
   if (r.kind !== 'ok') return r;
   const last = parseLogEntries(r.text).pop();
   if (last) return last.id;
