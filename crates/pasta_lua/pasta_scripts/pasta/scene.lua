@@ -99,6 +99,49 @@ function SCENE.get_start(global_name)
     return SCENE.get(global_name, "__start__")
 end
 
+--- @class SceneAttrItem
+--- @field key string 宣言は名前、条件・フラグは "＄名前" / "＄＊名前"
+--- @field op string|nil 条件だけ: ">=" "<=" ">" "<" "=" "!="
+--- @field value number|string|nil 宣言と条件だけ
+
+--- シーンの属性を倉に書く（生成コードが PASTA.set_scene_attrs として呼ぶ）
+--- @param scene_table SceneTable PASTA.create_scene の戻り
+--- @param local_name string "__start__" またはローカルの関数名（例: "選択肢_1"）
+--- @param items SceneAttrItem[] 書いた順の項目
+--- @return nil
+function SCENE.set_attrs(scene_table, local_name, items)
+    local global_name = scene_table.__global_name__
+    local by_local = STORE.scene_attrs[global_name]
+    if not by_local then
+        by_local = {}
+        STORE.scene_attrs[global_name] = by_local
+    end
+    by_local[local_name] = items
+end
+
+--- シーンの属性を書いた順の配列で返す（新しい配列と新しい項目の表。倉は書き換わらない）
+--- @param global_name string グローバルの登録名（例: "会話_1"）
+--- @param local_name string|nil ローカルの登録名（例: "選択肢_1"）。nil と "__start__" はグローバル自身
+--- @return SceneAttrItem[]|nil 登録の無いシーンと文字列でない引数は nil、属性が無ければ {}
+function SCENE.attrs(global_name, local_name)
+    if local_name == nil then
+        local_name = "__start__"
+    end
+    if type(global_name) ~= "string" or type(local_name) ~= "string" then
+        return nil
+    end
+    if type(SCENE.get(global_name, local_name)) ~= "function" then
+        return nil
+    end
+    local by_local = STORE.scene_attrs[global_name]
+    local items = by_local and by_local[local_name] or {}
+    local result = {}
+    for i, item in ipairs(items) do
+        result[i] = { key = item.key, op = item.op, value = item.value }
+    end
+    return result
+end
+
 --- 全シーン情報を取得
 --- @return table {global_name: {local_name: func}} 形式のシーンレジストリ
 function SCENE.get_all_scenes()

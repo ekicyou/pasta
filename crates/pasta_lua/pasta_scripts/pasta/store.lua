@@ -12,6 +12,7 @@
 --- @field actors table<string, Actor> アクターキャッシュ（名前→アクター）
 --- @field actor_spots table<string, integer> アクターごとのスポット位置マップ（名前→スポットID）
 --- @field scenes table<string, table> シーンレジストリ（グローバル名→{ローカル名→シーン関数}）
+--- @field scene_attrs table<string, table<string, table[]>> シーンの属性（グローバルの登録名→{ローカルの登録名→項目[]}）
 --- @field counters table<string, number> シーン名カウンタ（ベース名→カウンタ値）
 --- @field global_words table<string, table> グローバル単語レジストリ（key → values[][]）
 --- @field local_words table<string, table> ローカル単語レジストリ（scene_name → {key → values[][]}）
@@ -33,6 +34,11 @@ STORE.actor_spots = {}
 --- シーンレジストリ（グローバル名→{ローカル名→シーン関数}）
 --- @type table<string, table>
 STORE.scenes = {}
+
+--- シーンの属性（グローバルの登録名→{ローカルの登録名（グローバル自身は "__start__"）→項目[]}）
+--- シーン表（STORE.scenes）とは別の表に置き、シーンの一覧に偽のシーンを出さない。
+--- @type table<string, table<string, table[]>>
+STORE.scene_attrs = {}
 
 --- シーン名カウンタ（ベース名→カウンタ値）
 --- @type table<string, number>
@@ -95,6 +101,7 @@ function STORE.reset()
     STORE.actors = {}
     STORE.actor_spots = {}
     STORE.scenes = {}
+    STORE.scene_attrs = {}
     STORE.app_ctx = {}
     STORE.counters = {}
     STORE.global_words = {}

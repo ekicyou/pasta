@@ -22,6 +22,11 @@ PASTA.create_actor = ACTOR.get_or_create
 --- @type fun(base_name: string, local_name?: string, scene_func?: function): SceneTable
 PASTA.create_scene = SCENE.create_scene
 
+--- シーンの属性を倉に書く（生成コードが create_scene の行に続けて呼ぶ）
+--- @see pasta.scene.set_attrs
+--- @type fun(scene_table: SceneTable, local_name: string, items: SceneAttrItem[])
+PASTA.set_scene_attrs = SCENE.set_attrs
+
 --- グローバル単語ビルダーを作成
 --- @see pasta.word.create_word
 --- @type fun(key: string): WordBuilder

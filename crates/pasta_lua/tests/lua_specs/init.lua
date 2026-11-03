@@ -78,6 +78,7 @@ local specs = {
     "external_control_event_test",        -- 外からの操作のイベントの既定のハンドラのテスト (external-control-events 1.2)
     "reg_handler_chain_test",             -- REG:register で重ねたハンドラ（鎖）のテスト (reg-handler-chain 1.1, 2.x)
     "recommend_menu_test",                -- おすすめメニューの組み込みと既定のハンドラのテスト (recommend-menu-scenes 3.1)
+    "scene_attrs_test",                   -- SCENE.attrs・set_attrs・STORE.scene_attrs のテスト (scene-attribute-store 4.2)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
