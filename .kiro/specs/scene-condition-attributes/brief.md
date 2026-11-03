@@ -259,3 +259,11 @@ pasta は if を持たない。値によって出すシーンを変えるには�
 - **条件の変数の `key` の表記**: 印だけ全角にそろえ、名前は書いたまま（`＆$*exp>=5` → `key = "＄＊exp"`、`＆＄hour>5` → `key = "＄hour"`）。評価で変数を引くときは、`＄＊` ならグローバル、`＄` ならローカルの名前として読む。`＄０` などの引数番号は条件に書けない（パースエラー）。
 - **値の型**: 整数の値になる小数（`1.0`）は整数と同じに扱われる。Rust の表は `SceneAttr::Cond { key, op: CmpOp, value: SceneAttrValue }`（`pasta_core`）。`filter_by_attributes` は宣言の項目だけを今までどおりの AND 一致で比べ、意味は変えていない（作り直すならこの spec）。
 - ファイル属性の 2 行目は、アクター辞書を挟んでもパースエラー（グローバルシーンの後だけ数え直す）。
+
+## 申し送り（2026-11-03・`scene-attribute-store` の完了より）
+
+- **辞書確定で属性が `@pasta_search` まで届くことの端から端の確認が無い**: `finalize_scene_impl` は `collect_scene_attrs` の結果を `build_scene_registry` に渡して Rust のシーン表に入れるが、`@pasta_search` が属性を外に出さないので、この呼び出しを直接見るテストは無い（`finalize_scene_test.rs` は同じ関数で表を組み立てて比べている）。属性で絞り込む口を入れるこの spec で、絞り込みの結果から端から端までを確かめるテストを足すこと。
+- **値の表記**: Rust の `SceneAttrValue` の Display は、整数も小数も LuaJIT の `tostring`（`%.14g`）と同じ見え方にそろえた（`1e20` → `1e+20`、15 桁以上の整数は指数表記）。`filter_by_attributes` の比べ方もこの表記で行う。条件の評価で数を比べるときは、表記でなく値で比べること。
+- **Lua の数は倍精度**: 2^53 を超える整数は Lua に入った時点で丸まる。pasta_check の側は i64 のまま持つ。評価を pasta_check でも真似るなら、この差に注意する。
+- `crates/pasta_lua/src/runtime/finalize.rs` の `build_scene_registry` は統合テストから呼ぶため `pub` になっている（設計では非公開）。
+- 参照: `.kiro/specs/completed/scene-attribute-store/design.md`（SceneAttrTypes・Finalize の節）、同 `tasks.md` の Implementation Notes。
