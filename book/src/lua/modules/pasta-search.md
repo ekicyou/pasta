@@ -151,7 +151,7 @@ SEARCH:search_local_scene_exact(global_name, local_name) -> global_name, local_n
 
 `global_name` か `local_name` に空文字列を渡すと、Lua のエラー（`Scene search error: Invalid scene name: ''`）になる。
 
-デバッグ用のイベント `OnPastaScene` の既定ハンドラは、Reference1 を渡されたとき、この関数でローカルシーンを探す（[OnPastaScene](../shiori-events.md#onpastascene名前でシーンを再生)）。
+開発用のイベント `OnPastaScene` の既定ハンドラは、Reference1 を渡されたとき、この関数でローカルシーンを探す（[OnPastaScene](../shiori-events.md#onpastascene名前でシーンを再生)）。
 
 ```lua
 local SEARCH = require "@pasta_search"

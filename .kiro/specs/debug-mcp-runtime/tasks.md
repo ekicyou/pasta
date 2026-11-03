@@ -193,7 +193,7 @@
   - 完了の姿: 2 つの頁に DAP・ポート・URI の記述が無い
   - _Requirements: 8.2, 8.3, 10.2_
 
-- [ ] 10.3 ほかの頁と `DEBUGGING.md` からキックと DAP の記述を消す
+- [x] 10.3 ほかの頁と `DEBUGGING.md` からキックと DAP の記述を消す
   - `internals/` の 8 頁、`reference/startup.md`、`reference/runtime-failures.md`（場所の表と、別のファイルの行を出さないこと・`dic/` の `.lua` はそのファイルと行で出ること）、`lua/modules/pasta-search.md`・`lua/patterns.md`・`grammar/call-jump.md`・`introduction.md`、ルートの `DEBUGGING.md` を直す。`@pasta_chunks` の値の説明も直す。利用者の章 `book/src/debug/` は触らない
   - 完了の姿: これらの頁に `kick`・DAP・9276 の記述が無く、`book/src/debug/` に差分が無い
   - _Requirements: 8.4, 8.5_

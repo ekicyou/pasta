@@ -25,7 +25,7 @@
 
 次の事項は他の章が権威を持ち、この章では再記述しない。
 
-- 開発用のイベントの引数・応答・失敗の出方は、利用者向けの [OnPastaScene](../lua/shiori-events.md#onpastascene名前でシーンを再生)・[OnPastaSceneAt](../lua/shiori-events.md#onpastasceneat位置でシーンを再生)・[シーンを再生するイベントの共通の決まり](../lua/shiori-events.md#シーンを再生するイベントの共通の決まり) が正である。`[debug]` の書き方は [pasta.toml リファレンス](../reference/pasta-toml.md) が正である。
+- 開発用のイベントの引数・応答・失敗の出方は、利用者向けの [OnPastaScene](../lua/shiori-events.md#onpastascene名前でシーンを再生)・[OnPastaSceneAt](../lua/shiori-events.md#onpastasceneat位置でシーンを再生)・[OnPastaDumpVariables](../lua/shiori-events.md#onpastadumpvariablesグローバル変数を書き出す)・[開発用のイベントの共通の決まり](../lua/shiori-events.md#開発用のイベントの共通の決まり) が正である。`[debug]` の書き方は [pasta.toml リファレンス](../reference/pasta-toml.md) が正である。
 - 止まるエラーの表記の形と、場所が出る・出ない場合の一覧は [止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記) が正である。表記を作って応答にするまでは [止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答) で扱う。
 - 生成器がシンクへ対応を記録する入口（`transpile_with_source_map`・`SourceMapSink`）は [ソースマップ生成の出入口](transpiler.md#ソースマップ生成の出入口) で扱う。
 - ローダの段階構成の中でシーンマップを作る位置（段階 5.5）は [起動の段階構成](loader.md#起動の段階構成) で、`@pasta_chunks` を書き足す searcher は [require の解決（searcher）](loader.md#require-の解決searcher) で扱う。
