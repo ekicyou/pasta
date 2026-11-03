@@ -91,3 +91,15 @@
   - DSL の Lua ブロックからモジュールへ届く名前。生成コードの `local SCENE = PASTA.create_scene(…)` はシーン表であって `pasta.scene` モジュールではないので、ブロックの中では `require("pasta.scene")` か `PASTA` 経由の別名が要る（`act.scene_name`・`act.local_scene_name` が実行中の登録名を持つ）
 - **要件ディスカッションに送る問い**: requirements.md の「未決事項」1〜11。特に 1（ローカルへの受け継ぎ）・2（名前なし `＊`）・6（条件と倉の共有）・9（口の形）は倉の形を変えるので、設計の前に決める。
 - **申し送り**: Option C を採るなら、`scene-condition-attributes` の brief に「文字列の写しを消す」を書く。Requirement 2.6 を採るなら、`cue-command-runtime` の brief に「親の柱は親の登録名で読む」を書く。
+
+## 6. 要件ディスカッション後の追記（2026-11-03）
+
+議題の確定で、設計に渡す材料が次のように変わった。上の節の「Option A」は有効のまま。
+
+- **条件の形をこの spec で収集する**（議題 5）。`grammar.pest` 162〜166 の `attr` に、`＆＄変数 演算子 値` と `＆＄変数`（フラグ）の枝を足す。属性の中でだけ `＞`（Call の印）と `＝`（代入の印）を比較として読む見分けを、文法で書く（`attr_string` は `kv_marker | attr_marker | comment_marker` を除外しているので、比較演算子の列も同じ場所で除外する）。構文木の `AttrValue` の隣に、項目の種類（宣言・条件・フラグ）と演算子（半角の正規形 6 種）を持つ形を足す。右辺に変数は書けない。実測（2026-11-03）: 今はどの位置でも条件の形はパースエラー（`＊雑談＆＄＊変数＞１００` は 1:5、ファイル先頭は 1:2）。
+- **名前なしの `＊` に属性を書ける**（議題 2）。`global_scene_continue_line`（239）に `attrs?` を足す。受け継ぎは名前だけ（`parse_scene.rs` 88〜91 はそのまま）。
+- **ファイル属性は 1 行で置き換え**（議題 4）。`context.rs` 72 の `accumulate_file_attr` は「累積」から「置き換え」に変える（後の行が前の組を捨てる）。シーンを挟まずに 2 行続いたらパースエラー。`file_scope`（253〜254）の中で属性行を高々 1 つに制限する。`internals/transpiler.md` 164・171 の「累積」の記述を直す。ついでに `file_scppe_item` の書き間違いを直す（`scene-condition-attributes` の棚卸で見つけたもの。文法を触るこの spec へ移した）。
+- **重なりの畳み方**（議題 3・4）。宣言の属性だけ「同じ名前は先に書いた位置に 1 つ、値は後出し」で畳む。条件とフラグは畳まない。並びは「ファイル属性 → 宣言行 → 初期部」。`merge_attrs`（87〜93）をこの規則で書き直す。
+- **着色**（Requirement 7.5）。`editors/vscode/syntaxes/pasta.tmLanguage.json` は `grammar.pest` を写す作りで `tmGrammar.test.ts` が照合する（`ponytail-editor-tooling`）。条件の形と名前なしの `＊` の属性を同じ写し方で足す。`pasta_lsp` の `visit_scope.rs` も宣言行の属性を着色しているので、条件の形に追従させる。
+- **規模の見直し**: 文法と構文木 2・着色 1 が増えて 18〜21。`scene-condition-attributes` から同じ分が減るので、0.5.0 全体では増えない。設計で 20 をはっきり超えるなら、着色（LSP・VSCode）を後ろのタスクにまとめる。
+- **設計で決めること（追加）**: 条件の項目を生成 Lua に出す形（宣言と同じ 1 行に混ぜるか）。Rust のシーン表で条件を持つ型（`filter_by_attributes` の `HashMap<String, String>` との合わせ方は Option A か C のまま）。
