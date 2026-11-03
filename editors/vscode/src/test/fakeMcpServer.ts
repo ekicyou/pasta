@@ -30,6 +30,8 @@ export interface FakeState {
   pastaLogPath?: string;
   /** raise_event answer. script/drop also record a script log under `Ghost:<event>`. empty = 200 with no body. */
   raiseEvent: { mode: RaiseEventMode; script?: string };
+  /** Raw lines appended to pasta.log on raise_event, before answering (e.g. the OnPastaSceneAt: warn). */
+  raiseEventLog: string[];
   /** OnPastaDumpVariables writes <ghost_name>/ghost/master/profile/pasta/debug/variables.toml. */
   writeVariables: boolean;
   variablesText: string;
@@ -80,6 +82,7 @@ export async function startFakeMcpServer(init: Partial<FakeState> = {}): Promise
     reloadLog: ['loadedTrue'],
     reloadDelayMs: 0,
     raiseEvent: { mode: 'script', script: '\\0\\s[0]fake script\\e' },
+    raiseEventLog: [],
     writeVariables: true,
     variablesText: '[fake]\nvalue = 1\n',
     unescapedBackslashInScriptLog: false,
@@ -101,6 +104,7 @@ export async function startFakeMcpServer(init: Partial<FakeState> = {}): Promise
   const isRunning = (ghost: unknown) =>
     typeof ghost === 'string' && state.runningRoots.some((r) => normRoot(r) === normRoot(ghost));
   const masterOf = (ghost: string) => path.join(ghost, 'ghost', 'master');
+  const pastaLogOf = (ghost: string) => state.pastaLogPath ?? path.join(masterOf(ghost), 'profile', 'pasta', 'logs', 'pasta.log');
 
   type ToolAnswer = { text: string; isError?: boolean } | 'drop' | 'silent' | 'empty';
 
@@ -127,7 +131,7 @@ export async function startFakeMcpServer(init: Partial<FakeState> = {}): Promise
         if (a.target !== 'shiori') return ng(`NG:Unknown target ${String(a.target)}`);
         if (!isRunning(a.ghost_name)) return notRunning();
         const lines = state.reloadLog.map(pastaLogLine);
-        const file = state.pastaLogPath ?? path.join(masterOf(a.ghost_name), 'profile', 'pasta', 'logs', 'pasta.log');
+        const file = pastaLogOf(a.ghost_name);
         if (lines.length > 0) setTimeout(() => append(file, lines), state.reloadDelayMs);
         return {
           text: 'OK:reload requested. It runs asynchronously; errors while loading (dictionary errors etc.) will be recorded to the error log. Wait until get_status answers again, then check get_log tool (log_type=error, since_id=0)',
@@ -135,6 +139,7 @@ export async function startFakeMcpServer(init: Partial<FakeState> = {}): Promise
       }
       case 'raise_event': {
         if (!isRunning(a.ghost_name)) return notRunning();
+        if (state.raiseEventLog.length > 0) append(pastaLogOf(a.ghost_name), state.raiseEventLog);
         if (a.event === 'OnPastaDumpVariables' && state.writeVariables) {
           const file = path.join(masterOf(a.ghost_name), 'profile', 'pasta', 'debug', 'variables.toml');
           fs.mkdirSync(path.dirname(file), { recursive: true });

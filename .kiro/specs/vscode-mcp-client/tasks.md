@@ -79,7 +79,7 @@
   - 今の DAP 向けの中身と試験を置き換える。試験には、pasta.dll のソースの 2 か所に `SHIORI load entry completed` と `loaded` の文字列があることを確かめる契約の 1 件を入れる。
   - 終わったとき: 単体の試験で、印で終わる・時間切れ・`loaded=false`・誤りと警告の数え分け・`pasta.log` が読めない・契約の 1 件が通る。
   - _Requirements: 4.3, 4.4, 4.5, 5.3, 5.4, 5.5, 5.7, 5.8, 5.9_
-- [ ] 5.2 シーンの再生と台本の取り出しを作る
+- [x] 5.2 シーンの再生と台本の取り出しを作る
   - 読み込み直しの結果が「再生してよくない」なら送らない。よければ台本の記録の最後の番号を覚え、`OnPastaSceneAt` を Reference0 に `.pasta` の絶対パス、Reference1 に 1 から数えた行で送る。
   - 応答が無いときは、台本の記録を上限（5 秒）まで引き直し、表示の語が `Ghost:OnPastaSceneAt` の記録のうち最後のものを台本にする。無ければ「確かめられなかった」にする。
   - 台本なし（204）のときは、`[debug] enabled = true` の案内と、`pasta.log` の増えた分の `OnPastaSceneAt:` の警告の行を添える。失敗の表記の台本はそのまま出す。
@@ -175,3 +175,4 @@
 - 4.2: file_path の判定は pasta の logger.rs と同じく部品で判じる（\ も区切り・profile/dir/ は通す）。文字列の startsWith で判じない。
 - 4.3: readNewLines は pasta.log がまだ無いときも undefined（読めない）を返す。5.1 の待ちでは引き直し続け、最後の結果で「読めない」を決める。
 - 5.1: reloadShiori.ts は design の名前どおり（reloadAndWait・blocksPlayback・formatReload ほか）に加え describeResult(CallResult) を export。5.2・5.3 の要約で使ってよい。試験は本物の HTTP の fakeMcpServer に向けて走る。
+- 5.2: pasta.log は logger.rs の Mutex<RollingFileAppender> に同期で書かれるので、204 の直後に 1 回読めば理由の行が揃う。fakeMcpServer に raiseEventLog（raise_event のとき pasta.log へ書く行）を足した。

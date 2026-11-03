@@ -1,106 +1,108 @@
-// Pure run-scene-at-cursor request logic for the Pasta debug adapter (Task 5.1).
+// RunScene - 読み込み直しの後、OnPastaSceneAt を送り、台本を取り出す
+// （vscode-mcp-client の設計の RunScene。要件 4.4〜4.10）
 //
-// This module is deliberately FREE of the `vscode` runtime so it can be
-// imported and exercised by plain node unit tests (the test bundle does not
-// provide a `vscode` module). The `vscode`-aware wiring (command registration,
-// active-editor/cursor read, connection guard, dirty check, customRequest
-// dispatch, start-debugging guidance, error reporting) lives in `extension.ts`
-// and depends on the helpers defined here. This mirrors the separation already
-// used by `sourcePresentationToggle.ts` / `debugAttachTarget.ts`.
-//
-// Requirements covered (client-side): 1.2, 1.3, 4.1, 6.3.
+// vscode に触らない純粋なモジュール。時計を持たず、待ちは ctx.sleep の回数で数える。
 
-import { DEFAULT_DEBUG_HOST, DEFAULT_DEBUG_PORT } from './debugAttachTarget';
+import { CallResult, LogEntry, callTool, lastLogId, parseLogEntries, readRaiseEvent } from './mcpClient';
+import { openLogCursor, parsePastaLogLine, readNewLines } from './ghostFiles';
+import { FlowContext, ReloadOutcome, blocksPlayback, describeResult, formatReload, reloadAndWait } from './reloadShiori';
 
-/**
- * The DAP customRequest command name used to send a position-based scene kick
- * to the engine.
- *
- * MUST match the case-sensitive command string the Rust backend decodes
- * (`crates/pasta_lua/src/debug/dap/decode.rs`: `pasta/playSceneAt`). This
- * equality is the cross-language contract (requirements 4.1 / 4.4).
- */
-export const requestCommand = 'pasta/playSceneAt' as const;
-
-/** The position payload `{ uri, line }` sent to the engine. */
-export interface PlaySceneAtPayload {
-  uri: string;
-  line: number;
+/** [fsPath, String(line1)]。line1 は 1 から数えた行（4.6） */
+export function sceneReferences(fileFsPath: string, line1: number): readonly [string, string] {
+  return [fileFsPath, String(line1)];
 }
 
-/**
- * Build the customRequest argument payload `{ uri, line }` sent to the backend
- * (requirements 1.2 / 1.3 / 4.1).
- *
- * The `line` is the engine-facing **1-based** line number (the Rust scene
- * index is 1-based). VSCode `Position.line` is 0-based, so the call site MUST
- * convert (`selection.active.line + 1`) before calling this helper — this
- * helper does NOT add the offset; it forwards the line verbatim. The 1-based
- * convention is pinned by the unit tests.
- */
-export function setPayload(uri: string, line: number): PlaySceneAtPayload {
-  return { uri, line };
-}
+export type SceneOutcome =
+  | { kind: 'notPlayed'; reload: ReloadOutcome }                                 // 4.4・4.5
+  | { kind: 'played'; script: string; viaLog: boolean; reload: ReloadOutcome }   // 4.7・4.8
+  | { kind: 'noScript'; reasons: readonly string[]; reload: ReloadOutcome }      // 4.10（pasta.log の OnPastaSceneAt: の警告）
+  | { kind: 'unconfirmed'; detail: string; reload: ReloadOutcome }               // 4.9
+  | { kind: 'failed'; result: CallResult; reload: ReloadOutcome };               // 7.3
 
-/** Minimal shape of a `launch.json` debug configuration entry we inspect. */
-export interface LaunchConfig {
-  type?: unknown;
-  request?: unknown;
-  name?: unknown;
-  [key: string]: unknown;
-}
+const PLAYED_LABEL = 'Ghost:OnPastaSceneAt';
 
-/**
- * A resolved Pasta debug configuration suitable for `vscode.debug.startDebugging`.
- * Either a verbatim workspace `pasta` config, or the built-in default attach.
- */
-export interface ResolvedPastaDebugConfig {
-  type: 'pasta';
-  request: string;
-  name: string;
-  host?: string;
-  port?: number;
-  [key: string]: unknown;
-}
-
-/** The built-in default attach configuration (`127.0.0.1:9276`). */
-export function defaultPastaAttachConfig(): ResolvedPastaDebugConfig {
-  return {
-    type: 'pasta',
-    request: 'attach',
-    name: 'Attach to Pasta Debug Backend',
-    host: DEFAULT_DEBUG_HOST,
-    port: DEFAULT_DEBUG_PORT,
-  };
-}
-
-/**
- * Resolve the debug configuration used to start/re-attach a Pasta session
- * (requirement 6.3; shared with task 5.2's re-attach).
- *
- * Pure and `vscode`-free so it is node-testable. The call site reads the
- * workspace `launch.json` configurations (`workspace.getConfiguration('launch')
- * .get('configurations')`) and passes them here:
- * - Prefer the FIRST workspace config whose `type` is `'pasta'` (forwarded
- *   verbatim), so an author's custom host/port/name is honoured.
- * - Otherwise fall back to the built-in default attach to
- *   `127.0.0.1:DEFAULT_DEBUG_PORT`.
- *
- * Total and never throws; a non-array / undefined input falls back to default.
- */
-export function resolvePastaDebugConfig(
-  launchConfigs: unknown,
-): ResolvedPastaDebugConfig {
-  if (Array.isArray(launchConfigs)) {
-    const pasta = launchConfigs.find(
-      (c): c is LaunchConfig =>
-        typeof c === 'object' &&
-        c !== null &&
-        (c as LaunchConfig).type === 'pasta',
-    );
-    if (pasta) {
-      return pasta as unknown as ResolvedPastaDebugConfig;
+/** 応答が無いときの引き直し。表示の語が Ghost:OnPastaSceneAt の記録のうち最後のもの（無ければ undefined） */
+export function findPlayedScript(entries: readonly LogEntry[]): string | undefined {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].label === PLAYED_LABEL) {
+      return entries[i].text;
     }
   }
-  return defaultPastaAttachConfig();
+  return undefined;
+}
+
+export async function runScene(ctx: FlowContext, fileFsPath: string, line1: number): Promise<SceneOutcome> {
+  const reload = await reloadAndWait(ctx);
+  if (reload.kind !== 'done' || blocksPlayback(reload)) {
+    return { kind: 'notPlayed', reload };
+  }
+  const { endpoint: { port }, ghost: { root }, timing } = ctx;
+  const sinceId = await lastLogId(port, 'script', root);
+  if (typeof sinceId !== 'number') {
+    return { kind: 'failed', result: sinceId, reload };
+  }
+  const cursor = await openLogCursor(reload.pastaLog.path); // この再生で増えた分だけを理由に使う
+  const reply = readRaiseEvent(await callTool(port, 'raise_event', {
+    event: 'OnPastaSceneAt', references: sceneReferences(fileFsPath, line1), ghost_name: root,
+  }, timing.callTimeoutMs));
+
+  switch (reply.kind) {
+    case 'script':
+      return { kind: 'played', script: reply.script, viaLog: false, reload };
+    case 'failed':
+      return { kind: 'failed', result: reply.result, reload };
+    case 'noScript': {
+      const lines = (await readNewLines(cursor))?.lines ?? [];
+      const reasons = lines.filter((l) => parsePastaLogLine(l).level === 'WARN' && l.includes('OnPastaSceneAt:'));
+      return { kind: 'noScript', reasons, reload };
+    }
+  }
+
+  // 応答が無い（4.8）: 送る前の番号より後の台本の記録を上限まで引き直す
+  let last = reply.detail;
+  const maxSleeps = Math.ceil(timing.scriptLogWaitMs / timing.pollIntervalMs);
+  for (let slept = 0; ; slept++) {
+    const r = await callTool(port, 'get_log', { log_type: 'script', ghost_name: root, since_id: sinceId }, timing.callTimeoutMs);
+    if (r.kind === 'ok') {
+      const script = findPlayedScript(parseLogEntries(r.text));
+      if (script !== undefined) {
+        return { kind: 'played', script, viaLog: true, reload };
+      }
+    } else {
+      last = describeResult(r);
+    }
+    if (slept >= maxSleeps) {
+      return { kind: 'unconfirmed', detail: last, reload };
+    }
+    await ctx.sleep(timing.pollIntervalMs);
+  }
+}
+
+const NO_SCRIPT_GUIDE = 'ゴーストは台本を返しませんでした（204）。pasta.toml に [debug] enabled = true を書いて、SHIORI をリロードしてください。';
+const UNCONFIRMED = '台本を確かめられませんでした';
+
+export function formatScene(outcome: SceneOutcome): { lines: string[]; notice?: string } {
+  const reload = formatReload(outcome.reload);
+  const lines = [...reload.lines];
+  switch (outcome.kind) {
+    case 'notPlayed':
+      lines.push('シーンを再生しませんでした');
+      return { lines, notice: reload.notice ?? 'シーンを再生しませんでした' };
+    case 'played':
+      lines.push(outcome.viaLog ? '台本（応答が無かったため、再生の記録から）:' : '台本:', outcome.script);
+      return { lines };
+    case 'noScript':
+      lines.push(NO_SCRIPT_GUIDE, ...outcome.reasons.map((r) => `  ${r}`));
+      return { lines, notice: 'pasta.toml に [debug] enabled = true を書いてリロードしてください' };
+    case 'unconfirmed': {
+      const text = `${UNCONFIRMED}（応答が無く、再生の記録にも見つかりませんでした: ${outcome.detail}）`;
+      lines.push(text);
+      return { lines, notice: UNCONFIRMED };
+    }
+    case 'failed': {
+      const text = `シーンの再生を頼めませんでした: ${describeResult(outcome.result)}`;
+      lines.push(text);
+      return { lines, notice: text };
+    }
+  }
 }
