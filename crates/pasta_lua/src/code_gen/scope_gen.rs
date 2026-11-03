@@ -6,9 +6,8 @@ use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
 use pasta_core::registry::SceneRegistry;
 use pasta_dsl::parser::{
-    ActorScope, AttrValue, GlobalSceneScope, LocalSceneItem, LocalSceneScope, SceneActorItem,
+    ActorScope, Attr, GlobalSceneScope, LocalSceneItem, LocalSceneScope, SceneActorItem,
 };
-use std::collections::HashMap;
 use std::io::Write;
 
 impl<'a, W: Write> LuaCodeGenerator<'a, W> {
@@ -86,13 +85,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// * `declared_name` - 宣言名（別名を置き換えた後の名前。呼び出し側で 1 回だけ決める。
     ///   ここでは再度置き換えない）。基本名・突合キー・ローカルの親名はすべてこれから作る
     /// * `scene_counter` - Scene counter for name uniqueness
-    /// * `_file_attrs` - Merged file+scene attributes (MAJOR-3, currently unused for future extension)
+    /// * `_attrs` - 受け継ぎと畳みの後のシーンの属性の並び（まだ生成物には出さない）
     pub fn generate_global_scene(
         &mut self,
         scene: &GlobalSceneScope,
         declared_name: &str,
         scene_counter: usize,
-        _file_attrs: &HashMap<String, AttrValue>,
+        _attrs: &[Attr],
     ) -> Result<(), TranspileError> {
         let sanitized_name = SceneRegistry::sanitize_name(declared_name);
         // Use base name only - counter is assigned by Lua runtime (Requirement 8.5)

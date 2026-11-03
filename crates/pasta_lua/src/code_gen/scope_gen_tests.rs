@@ -408,7 +408,7 @@ fn global_scene_with(
 #[test]
 fn global_and_local_scenes_record_join_keys_and_header_lines() {
     let mut sink = CapturingSceneSink::default();
-    let attrs = std::collections::HashMap::new();
+    let attrs = Vec::<pasta_dsl::parser::Attr>::new();
 
     // 会話 at .pasta line 3, containing a named local 挨拶 at line 5, plus the
     // anonymous start scene (line == global header span line, counter 0).
@@ -456,7 +456,7 @@ fn global_and_local_scenes_record_join_keys_and_header_lines() {
 #[test]
 fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
     let mut sink = CapturingSceneSink::default();
-    let attrs = std::collections::HashMap::new();
+    let attrs = Vec::<pasta_dsl::parser::Attr>::new();
 
     let first = global_scene_with("会話", 3, vec![]);
     let second = global_scene_with("会話", 10, vec![]);
@@ -483,7 +483,7 @@ fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
 /// 照合用の名前ごとに数えるので、別々の関数（`挨拶_1_1`・`挨拶_1_2`）になり上書きされない。
 #[test]
 fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
-    let attrs = std::collections::HashMap::new();
+    let attrs = Vec::<pasta_dsl::parser::Attr>::new();
     let scene = global_scene_with(
         "会話",
         3,
@@ -511,7 +511,7 @@ fn local_scenes_with_same_sanitized_name_get_distinct_counters() {
 /// 4 つ目の行の対応はトランスパイラが整形の後に埋めるので、生成器だけでは出ない（2.5）。
 #[test]
 fn init_scene_receives_written_global_name_not_alias() {
-    let attrs = std::collections::HashMap::new();
+    let attrs = Vec::<pasta_dsl::parser::Attr>::new();
     let scene = global_scene_with(
         "会話",
         3,

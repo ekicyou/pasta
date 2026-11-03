@@ -98,7 +98,7 @@ fn global_scene_header_records_definition_pasta_line() {
         // ローカルシーンを持たない最小グローバルシーン。span.start_line == 21（`＊メイン` 行）を想定。
         let mut scene = GlobalSceneScope::new("メイン".to_string());
         scene.span = span_at(21);
-        let file_attrs = std::collections::HashMap::new();
+        let file_attrs = Vec::<pasta_dsl::parser::Attr>::new();
         codegen
             .generate_global_scene(&scene, &scene.name, 0, &file_attrs)
             .unwrap();
