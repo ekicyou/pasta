@@ -18,13 +18,24 @@ use tracing_subscriber::prelude::*;
 use super::GlobalLoggerRegistry;
 use crate::loader::LoggingConfig;
 
+/// SHIORI の読み込みの終わりの行の target。ログの設定によらず info を通す。
+pub const LOAD_ENTRY_TARGET: &str = "pasta::load_entry";
+
 /// Build an `EnvFilter` from `LoggingConfig`.
 ///
 /// Priority: PASTA_LOG env var > config.filter > config.level.
 /// A `PASTA_LOG` that is unset or unparsable is skipped; an unparsable
 /// config directive falls back to "info".
+/// どの枝でも [`LOAD_ENTRY_TARGET`] の info は通す。
 pub(super) fn build_filter(config: &LoggingConfig) -> EnvFilter {
-    EnvFilter::try_from_env("PASTA_LOG")
+    build_filter_from(std::env::var("PASTA_LOG").ok().as_deref(), config)
+}
+
+/// 読んだ `PASTA_LOG` の値（`pasta_log`）と `config` から `EnvFilter` を作る。
+fn build_filter_from(pasta_log: Option<&str>, config: &LoggingConfig) -> EnvFilter {
+    pasta_log
+        .ok_or(())
+        .and_then(|s| EnvFilter::try_new(s).map_err(drop))
         .or_else(|_| EnvFilter::try_new(config.to_filter_directive()))
         .unwrap_or_else(|e| {
             eprintln!(
@@ -34,6 +45,12 @@ pub(super) fn build_filter(config: &LoggingConfig) -> EnvFilter {
             );
             EnvFilter::new("info")
         })
+        // 後から足した指示が作者の同じ target の指示に勝つ
+        .add_directive(
+            format!("{LOAD_ENTRY_TARGET}=info")
+                .parse()
+                .expect("固定の指示"),
+        )
 }
 
 /// 登録の項目の量の設定で判定する層のフィルタ。
@@ -82,6 +99,78 @@ pub fn update_tracing_filter(load_dir: &Path, config: &LoggingConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tracing_subscriber::Layer;
+
+    struct CountLayer(Arc<AtomicUsize>);
+
+    impl<S: tracing::Subscriber> Layer<S> for CountLayer {
+        fn on_event(&self, _event: &tracing::Event<'_>, _cx: Context<'_, S>) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    /// `filter` で（読み込みの終わりの行の info, ほかの target の info）が通るか
+    fn info_passes(filter: EnvFilter) -> (bool, bool) {
+        let count = Arc::new(AtomicUsize::new(0));
+        let subscriber =
+            tracing_subscriber::registry().with(CountLayer(count.clone()).with_filter(filter));
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::info!(target: LOAD_ENTRY_TARGET, "probe");
+            let entry = count.swap(0, Ordering::SeqCst) == 1;
+            tracing::info!(target: "pasta_lua::other", "probe");
+            (entry, count.load(Ordering::SeqCst) == 1)
+        })
+    }
+
+    fn level(level: &str) -> LoggingConfig {
+        LoggingConfig {
+            level: level.to_string(),
+            ..LoggingConfig::default()
+        }
+    }
+
+    #[test]
+    fn test_load_entry_info_passes_level_warn() {
+        assert_eq!(
+            info_passes(build_filter_from(None, &level("warn"))),
+            (true, false)
+        );
+    }
+
+    #[test]
+    fn test_load_entry_info_passes_pasta_log() {
+        let f = build_filter_from(Some("error"), &level("info"));
+        assert_eq!(info_passes(f), (true, false));
+        let f = build_filter_from(Some("pasta_lua=debug,warn"), &level("info"));
+        assert_eq!(info_passes(f), (true, true));
+    }
+
+    #[test]
+    fn test_load_entry_info_passes_author_off() {
+        let config = LoggingConfig {
+            filter: Some(format!("{LOAD_ENTRY_TARGET}=off,warn")),
+            ..LoggingConfig::default()
+        };
+        assert_eq!(info_passes(build_filter_from(None, &config)), (true, false));
+    }
+
+    #[test]
+    fn test_load_entry_info_passes_fallback() {
+        let config = LoggingConfig {
+            filter: Some("===not a directive===".to_string()),
+            ..LoggingConfig::default()
+        };
+        // 既定の info に落ちるので、ほかの target の info も通る
+        assert_eq!(info_passes(build_filter_from(None, &config)), (true, true));
+    }
+
+    #[test]
+    fn test_unparsable_pasta_log_falls_back_to_config() {
+        let f = build_filter_from(Some("===not a directive==="), &level("warn"));
+        assert_eq!(info_passes(f), (true, false));
+    }
 
     /// Exercise the full two-stage lifecycle in a single test so the call
     /// order is deterministic (the subscriber is process-global).

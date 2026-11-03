@@ -3,7 +3,7 @@
 > 順は design.md の Implementation Order のとおり。読み込みの終わりの行（要件 10）を先にし、キックの Rust → キックの Lua → DAP の撤去 → 整え → テストの足し → マニュアル → 関門の順にする。どのタスクの終わりでも `cargo build --workspace` と、そのタスクが触ったテストが通る。cargo の前に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す。同じウェーブの約束で `act.lua`・`scene.lua`・`search/`・`code_gen/element_gen.rs` には触らない。
 
 - [ ] 1. 読み込みの終わりの行を、ログの設定によらず書く
-- [ ] 1.1 読み込みの終わりの行の target を決め、ログのフィルタがいつもその target の info を通すようにする
+- [x] 1.1 読み込みの終わりの行の target を決め、ログのフィルタがいつもその target の info を通すようにする
   - target の名前 `pasta::load_entry` を定数にし、`pasta_lua::logging` から外のクレートにも使える形で出す
   - フィルタの組み立ての最後に、その target の info を通す指示を足す（`PASTA_LOG`・`[logging]`・失敗のときの既定のどの枝でも）
   - フィルタの組み立てを、環境変数を読む所と、読んだ `PASTA_LOG` の値を引数で受けて組み立てる所に分ける（単体テストが環境変数に触らないため）
@@ -215,3 +215,6 @@
   - `i686-pc-windows-msvc` でビルドとテストを通す。32・64 ビットで期待が違うものが出たら `cfg(target_pointer_width)` で分け、省かない
   - 完了の姿: i686 の `cargo test --workspace` が通る
   - _Requirements: 9.5_
+
+## Implementation Notes
+- 1.1: 読み込みの終わりの指示を足すと max_level_hint が info より下がらないため、`tracing::enabled!(INFO)` は層ごとのフィルタでも true になる。ログの絞り込みを確かめるテストは `enabled!` でなく pasta.log の中身か DEBUG で見分ける。
