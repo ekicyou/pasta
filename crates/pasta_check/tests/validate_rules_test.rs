@@ -334,6 +334,7 @@ fn transpile_findings(text: &str) -> Vec<(FindingKind, Option<u32>, Option<u32>,
                 FindingKind::TranspileArgAssign
                     | FindingKind::TranspilePropertyInExpr
                     | FindingKind::TranspileContinuationWithoutActor
+                    | FindingKind::TranspileInvalidPriority
             )
         })
         .inspect(|f| {
@@ -449,6 +450,52 @@ fn transpile_errors_found_in_every_file_and_occurrence() {
             (FindingKind::TranspileContinuationWithoutActor, Some(5)),
         ]
     );
+}
+
+/// `＆優先` の値が整数でなければ、pasta.dll と同じく誤り。位置は属性の位置（5.6）
+#[test]
+fn invalid_priority_is_error_at_attribute() {
+    let err = |line, col, msg: &str| {
+        vec![(
+            FindingKind::TranspileInvalidPriority,
+            Some(line),
+            Some(col),
+            msg.to_string(),
+        )]
+    };
+    assert_eq!(
+        transpile_findings("＊場面　＆優先：高い\n  さくら：はい。\n"),
+        err(1, 5, "＆優先 の値は整数で書きます: 高い")
+    );
+    assert_eq!(
+        transpile_findings("＊場面　＆priority：「高い」\n  さくら：はい。\n"),
+        err(1, 5, "＆priority の値は整数で書きます: 「高い」")
+    );
+    assert_eq!(
+        transpile_findings("＊場面　＆優先：1.5\n  さくら：はい。\n"),
+        err(1, 5, "＆優先 の値は整数で書きます: 1.5")
+    );
+    // ローカルシーンの属性
+    assert_eq!(
+        transpile_findings("＊場面\n  さくら：はい。\n  ・次　＆優先：高い\n  さくら：うん。\n"),
+        err(3, 6, "＆優先 の値は整数で書きます: 高い")
+    );
+    // ファイル属性は、受け継ぐシーンがいくつあっても属性の位置に 1 つ
+    assert_eq!(
+        transpile_findings("＆優先：高い\n＊一\n  さくら：はい。\n＊二\n  さくら：うん。\n"),
+        err(1, 1, "＆優先 の値は整数で書きます: 高い")
+    );
+    // 整数・負の数・全角の数字・整数の値になる小数・後勝ちで整数になる宣言・ほかの名前は誤りでない
+    for header in [
+        "＊場面　＆優先：-1",
+        "＊場面　＆優先：１",
+        "＊場面　＆優先：1.0",
+        "＊場面　＆優先：高い　＆優先：2",
+        "＊場面　＆重み：高い",
+    ] {
+        let text = format!("{header}\n  さくら：はい。\n");
+        assert!(transpile_findings(&text).is_empty(), "{header}");
+    }
 }
 
 /// 数・番号・括弧・演算子の新しい誤りも、pasta.dll と同じ parse_str の位置と文で 1 つずつ出る（2.9・4.4）

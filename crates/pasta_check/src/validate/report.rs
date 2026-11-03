@@ -42,12 +42,15 @@ pub enum FindingKind {
     TranspileArgAssign,
     TranspilePropertyInExpr,
     TranspileContinuationWithoutActor,
+    TranspileInvalidPriority,
     ModulePastaCollision,
     ModuleLuaCollision,
     ModuleLuaShadowed,
     GlobalSceneCollision,
     LocalSceneCollision,
     SceneShadowedByBuiltin,
+    SceneShadowedByPriority,
+    CondVarUnassigned,
     CallTargetMissing,
     ChoiceTargetMissing,
     RecommendItemInvalid,
@@ -66,6 +69,8 @@ impl FindingKind {
             | GlobalSceneCollision
             | LocalSceneCollision
             | SceneShadowedByBuiltin
+            | SceneShadowedByPriority
+            | CondVarUnassigned
             | CallTargetMissing
             | ChoiceTargetMissing
             | RecommendItemInvalid
@@ -384,6 +389,10 @@ pub mod msg {
     pub fn transpile_continuation_without_actor() -> String {
         "アクターの無い継続行です。前の行にアクター行が必要です".into()
     }
+    /// `key` は書いた名前（優先・priority）、`value` は書いたままの値（引用した文字列は「」ごと）
+    pub fn transpile_invalid_priority(key: &str, value: &str) -> String {
+        format!("＆{key} の値は整数で書きます: {value}")
+    }
     /// 重なったほかのファイルが 2 つ以上なら「、」で並べる（モジュール名の 3 つの文言で同じ）
     pub fn module_pasta_collision(module: &str, others: &[&str]) -> String {
         format!(
@@ -418,6 +427,24 @@ pub mod msg {
     }
     pub fn scene_shadowed_by_builtin(name: &str) -> String {
         format!("シーン「{name}」は組み込みの飛び先と同じ名前のため、＞{name} では呼ばれません")
+    }
+    /// 塞いでいるのは、条件もフラグも無い優先 `priority` のシーン
+    pub fn scene_shadowed_by_priority(
+        name: &str,
+        priority: i64,
+        blocker_path: &str,
+        blocker_line: u32,
+    ) -> String {
+        format!(
+            "シーン「{name}」は、条件の無い ＆優先：{priority} の同じ名前のシーン（{}:{blocker_line}）があるため選ばれません",
+            ghost_path(blocker_path)
+        )
+    }
+    /// `name` は ＄＊ を除いた変数の名前
+    pub fn cond_var_unassigned(name: &str) -> String {
+        format!(
+            "条件の変数 ＄＊{name} に辞書のどこでも代入していません（Lua で代入していれば問題ありません）"
+        )
     }
     pub fn call_target_missing(key: &str) -> String {
         format!(

@@ -241,12 +241,15 @@ fn expected(kind: FindingKind) -> (Severity, &'static str) {
         TranspileArgAssign => (Error, "transpile-arg-assign"),
         TranspilePropertyInExpr => (Error, "transpile-property-in-expr"),
         TranspileContinuationWithoutActor => (Error, "transpile-continuation-without-actor"),
+        TranspileInvalidPriority => (Error, "transpile-invalid-priority"),
         ModulePastaCollision => (Error, "module-pasta-collision"),
         ModuleLuaCollision => (Error, "module-lua-collision"),
         ModuleLuaShadowed => (Warning, "module-lua-shadowed"),
         GlobalSceneCollision => (Warning, "global-scene-collision"),
         LocalSceneCollision => (Warning, "local-scene-collision"),
         SceneShadowedByBuiltin => (Warning, "scene-shadowed-by-builtin"),
+        SceneShadowedByPriority => (Warning, "scene-shadowed-by-priority"),
+        CondVarUnassigned => (Warning, "cond-var-unassigned"),
         CallTargetMissing => (Warning, "call-target-missing"),
         ChoiceTargetMissing => (Warning, "choice-target-missing"),
         RecommendItemInvalid => (Warning, "recommend-item-invalid"),
@@ -276,12 +279,15 @@ fn every_kind_has_fixed_severity_and_code() {
         TranspileArgAssign,
         TranspilePropertyInExpr,
         TranspileContinuationWithoutActor,
+        TranspileInvalidPriority,
         ModulePastaCollision,
         ModuleLuaCollision,
         ModuleLuaShadowed,
         GlobalSceneCollision,
         LocalSceneCollision,
         SceneShadowedByBuiltin,
+        SceneShadowedByPriority,
+        CondVarUnassigned,
         CallTargetMissing,
         ChoiceTargetMissing,
         RecommendItemInvalid,
@@ -290,7 +296,7 @@ fn every_kind_has_fixed_severity_and_code() {
     let mut codes: Vec<&str> = kinds.iter().map(|k| expected(*k).1).collect();
     codes.sort();
     codes.dedup();
-    assert_eq!(codes.len(), 27);
+    assert_eq!(codes.len(), 30);
     for kind in kinds {
         let (sev, code) = expected(kind);
         assert_eq!(kind.severity(), sev, "{code}");

@@ -1,13 +1,17 @@
-//! 構文としては読めるが pasta_lua のトランスパイルが失敗する 3 つの書き方を見つける段（3.5）。
+//! 構文としては読めるが pasta_lua のトランスパイルが失敗する書き方を見つける段（3.5）。
+//! 3 つの書き方と、`＆優先` の値の誤り（scene-condition-attributes 5.6）。
 //!
 //! 条件は pasta_lua の `code_gen`（`element_gen.rs`・`expr_gen.rs`・`scope_gen.rs`）と同じ。
 //! pasta_lua は最初の 1 つで止まるが、ここでは見つけたものを全部報告する（失敗するかどうかは同じ）。
 
+use pasta_core::registry::{PRIORITY_KEYS, priority_value};
 use pasta_dsl::PastaFile;
 use pasta_dsl::parser::{
-    Action, Args, CallTarget, Expr, FileItem, LocalSceneItem, SetValue, Span, VarScope, VarSet,
+    Action, Args, AttrBody, AttrValue, CallTarget, Expr, FileItem, LocalSceneItem, SetValue, Span,
+    VarScope, VarSet, merge_attrs,
 };
 
+use super::scenes::scene_attr_value;
 use super::{FileText, Finding, FindingKind, col_after_indent, msg};
 
 /// `texts` は継続行の列を求めるのに使う
@@ -74,8 +78,55 @@ pub(crate) fn check(parsed: &[(String, PastaFile)], texts: &[(String, FileText)]
                 }
             }
         }
+        priority_errors(path, file, &mut findings);
     }
     findings
+}
+
+/// `append_set_scene_attrs`（scope_gen.rs）: 受け継ぎと畳みの後の宣言で、`＆優先` の値が整数でなければ誤り。
+/// 名前の無い開始のブロックの属性は書き出されないので見ない。受け継いだファイル属性は位置ごとに 1 つ
+fn priority_errors(path: &str, file: &PastaFile, findings: &mut Vec<Finding>) {
+    let scenes = file.items.iter().filter_map(|item| match item {
+        FileItem::GlobalSceneScope(scene) => Some(scene),
+        _ => None,
+    });
+    let mut reported: Vec<Span> = Vec::new();
+    for (scene, attrs) in scenes.zip(file.global_scene_attrs()) {
+        let locals = scene
+            .local_scenes
+            .iter()
+            .filter(|local| local.name.is_some())
+            .map(|local| merge_attrs(&[], &local.attrs));
+        for attr in std::iter::once(attrs).chain(locals).flatten() {
+            let AttrBody::Decl(value) = &attr.body else {
+                continue;
+            };
+            if !PRIORITY_KEYS.contains(&attr.key.as_str())
+                || priority_value(&scene_attr_value(value)).is_some()
+                || reported.contains(&attr.span)
+            {
+                continue;
+            }
+            reported.push(attr.span);
+            findings.push(Finding::new(
+                FindingKind::TranspileInvalidPriority,
+                path,
+                Some(attr.span.start_line as u32),
+                Some(attr.span.start_col as u32),
+                msg::transpile_invalid_priority(&attr.key, &attr_value_text(value)),
+            ));
+        }
+    }
+}
+
+/// scope_gen.rs の attr_value_text と同じ: 書いたままの値（引用した文字列は `「」` ごと）
+fn attr_value_text(v: &AttrValue) -> String {
+    match v {
+        AttrValue::Integer(n) => n.to_string(),
+        AttrValue::Float(f) => f.to_string(),
+        AttrValue::String(s) => format!("「{s}」"),
+        AttrValue::AttrString(s) => s.clone(),
+    }
 }
 
 /// `generate_var_set`: 引数への代入は誤り。プロパティの参照は、ローカル・グローバル変数への
