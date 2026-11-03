@@ -290,18 +290,18 @@ fn test_file_item_order_preserved() {
 /// 同じキーの属性が再出現すると後勝ちで上書きされることを確認
 #[test]
 fn test_file_attr_shadowing() {
-    use pasta_dsl::parser::{Attr, AttrValue, FileItem, PastaFile, Span};
+    use pasta_dsl::parser::{Attr, AttrBody, AttrValue, FileItem, PastaFile, Span};
     use std::path::PathBuf;
 
     // 手動でPastaFileを構築（FileAttrを含む）
     let attr1 = FileItem::FileAttr(Attr {
         key: "author".to_string(),
-        value: AttrValue::AttrString("Alice".to_string()),
+        body: AttrBody::Decl(AttrValue::AttrString("Alice".to_string())),
         span: Span::default(),
     });
     let attr2 = FileItem::FileAttr(Attr {
         key: "author".to_string(),
-        value: AttrValue::AttrString("Bob".to_string()), // シャドーイング
+        body: AttrBody::Decl(AttrValue::AttrString("Bob".to_string())), // シャドーイング
         span: Span::default(),
     });
 
@@ -339,13 +339,13 @@ fn test_file_attr_shadowing() {
 /// MAJOR-4: アクターがファイル属性を継承しないことの検証
 #[test]
 fn test_actor_does_not_inherit_file_attrs() {
-    use pasta_dsl::parser::{Attr, AttrValue, FileItem, PastaFile, Span};
+    use pasta_dsl::parser::{Attr, AttrBody, AttrValue, FileItem, PastaFile, Span};
     use std::path::PathBuf;
 
     // ファイル属性 → アクター → シーン の順序
     let file_attr = FileItem::FileAttr(Attr {
         key: "author".to_string(),
-        value: AttrValue::AttrString("Alice".to_string()),
+        body: AttrBody::Decl(AttrValue::AttrString("Alice".to_string())),
         span: Span::default(),
     });
 

@@ -279,8 +279,8 @@ fn quote_char_after_first_char_is_part_of_attr_value() {
         let file = parse_ok(&src);
         match &all_attrs(&file)[..] {
             [attr] => assert_eq!(
-                attr.value,
-                AttrValue::AttrString("a「b".to_string()),
+                attr.value(),
+                Some(&AttrValue::AttrString("a「b".to_string())),
                 "context: {}, source: {src:?}",
                 ctx.0
             ),
@@ -313,8 +313,8 @@ fn blank_quote_in_attr_value_is_empty_string() {
             let file = parse_ok(&src);
             match &all_attrs(&file)[..] {
                 [attr] => assert_eq!(
-                    attr.value,
-                    AttrValue::String(String::new()),
+                    attr.value(),
+                    Some(&AttrValue::String(String::new())),
                     "context: {}, source: {src:?}",
                     ctx.0
                 ),

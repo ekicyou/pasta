@@ -381,7 +381,7 @@ fn test_concat_leaves_line_head_attributes_unchanged() {
         .items
         .iter()
         .filter_map(|i| match i {
-            FileItem::FileAttr(a) => Some((a.key.clone(), a.value.clone())),
+            FileItem::FileAttr(a) => Some((a.key.clone(), a.value().unwrap().clone())),
             _ => None,
         })
         .collect();
@@ -395,7 +395,7 @@ fn test_concat_leaves_line_head_attributes_unchanged() {
     let scene = first_global_scene(&file);
     assert_eq!(scene.attrs.len(), 1);
     assert_eq!(
-        (scene.attrs[0].key.as_str(), &scene.attrs[0].value),
+        (scene.attrs[0].key.as_str(), scene.attrs[0].value().unwrap()),
         ("季節", &AttrValue::AttrString("春".into()))
     );
 }

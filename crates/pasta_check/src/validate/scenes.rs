@@ -156,7 +156,7 @@ fn finding(code: FindingKind, path: &str, span: Span, message: String) -> Findin
 fn attr_map(attrs: &[Attr]) -> HashMap<String, String> {
     attrs
         .iter()
-        .map(|a| (a.key.clone(), a.value.to_string()))
+        .filter_map(|a| Some((a.key.clone(), a.value()?.to_string())))
         .collect()
 }
 

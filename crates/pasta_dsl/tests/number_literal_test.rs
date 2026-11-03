@@ -60,7 +60,7 @@ fn cue_args(line: &str) -> Vec<CueArgToken> {
 fn attr_value(lit: &str) -> AttrValue {
     let file = parse(&format!("＆n：{lit}\n"));
     match &file.items[0] {
-        FileItem::FileAttr(a) => a.value.clone(),
+        FileItem::FileAttr(a) => a.value().unwrap().clone(),
         other => panic!("expected FileAttr, got {other:?}"),
     }
 }

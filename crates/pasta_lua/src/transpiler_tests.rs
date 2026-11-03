@@ -378,7 +378,7 @@ fn test_transpile_multi_key_actor_word_lua_output() {
 
 #[test]
 fn test_transpile_accumulates_file_attrs() {
-    use pasta_dsl::parser::{Attr, AttrValue};
+    use pasta_dsl::parser::{Attr, AttrBody, AttrValue};
 
     let transpiler = LuaTranspiler::default();
     let file = PastaFile {
@@ -386,13 +386,13 @@ fn test_transpile_accumulates_file_attrs() {
         items: vec![
             FileItem::FileAttr(Attr {
                 key: "author".to_string(),
-                value: AttrValue::AttrString("Alice".to_string()),
+                body: AttrBody::Decl(AttrValue::AttrString("Alice".to_string())),
                 span: Span::default(),
             }),
             // Same key later in document order overwrites (shadowing).
             FileItem::FileAttr(Attr {
                 key: "author".to_string(),
-                value: AttrValue::AttrString("Bob".to_string()),
+                body: AttrBody::Decl(AttrValue::AttrString("Bob".to_string())),
                 span: Span::default(),
             }),
             FileItem::GlobalSceneScope(create_simple_scene("メイン")),

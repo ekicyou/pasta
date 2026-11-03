@@ -29,7 +29,7 @@ impl TranspileContext {
     pub fn register_global_scene_named(&mut self, name: &str, attrs: &[Attr]) -> (i64, usize) {
         let attrs: HashMap<String, String> = attrs
             .iter()
-            .map(|a| (a.key.clone(), a.value.to_string()))
+            .filter_map(|a| Some((a.key.clone(), a.value()?.to_string())))
             .collect();
         self.scene_registry.register_global(name, attrs)
     }
@@ -50,7 +50,7 @@ impl TranspileContext {
         let attrs: HashMap<String, String> = local_scene
             .attrs
             .iter()
-            .map(|a| (a.key.clone(), a.value.to_string()))
+            .filter_map(|a| Some((a.key.clone(), a.value()?.to_string())))
             .collect();
 
         // Use scene name if present, otherwise use "__start__"
@@ -70,7 +70,9 @@ impl TranspileContext {
     /// appears multiple times, the later value overwrites the earlier one
     /// (shadowing semantics).
     pub fn accumulate_file_attr(&mut self, attr: &Attr) {
-        self.file_attrs.insert(attr.key.clone(), attr.value.clone());
+        if let Some(value) = attr.value() {
+            self.file_attrs.insert(attr.key.clone(), value.clone());
+        }
     }
 
     /// Get accumulated file-level attributes.
@@ -88,7 +90,9 @@ impl TranspileContext {
         let mut result = self.file_attrs.clone();
 
         for attr in scene_attrs {
-            result.insert(attr.key.clone(), attr.value.clone());
+            if let Some(value) = attr.value() {
+                result.insert(attr.key.clone(), value.clone());
+            }
         }
 
         result
@@ -256,12 +260,12 @@ mod tests {
     // MAJOR-1: ファイル属性累積・マージ機能のテスト
     // =========================================================================
 
-    use pasta_dsl::parser::{Attr, AttrValue};
+    use pasta_dsl::parser::{Attr, AttrBody, AttrValue};
 
     fn create_attr(key: &str, value: &str) -> Attr {
         Attr {
             key: key.to_string(),
-            value: AttrValue::AttrString(value.to_string()),
+            body: AttrBody::Decl(AttrValue::AttrString(value.to_string())),
             span: Span::default(),
         }
     }

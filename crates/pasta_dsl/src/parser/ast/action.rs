@@ -116,17 +116,63 @@ pub struct CallScene {
 // Attr - Attribute
 // ============================================================================
 
-/// Attribute key-value pair.
+/// Attribute item.
 ///
 /// Corresponds to the `attr` rule: `&key：value`
 #[derive(Debug, Clone)]
 pub struct Attr {
-    /// Attribute key
+    /// 宣言は名前。条件・フラグは変数（`＄名前`・`＄＊名前`。印は全角に揃える）
     pub key: String,
-    /// Attribute value
-    pub value: AttrValue,
+    /// 項目の中身
+    pub body: AttrBody,
     /// Source location
     pub span: Span,
+}
+
+impl Attr {
+    /// 宣言と条件の値。フラグは None
+    pub fn value(&self) -> Option<&AttrValue> {
+        match &self.body {
+            AttrBody::Decl(v) | AttrBody::Cond { value: v, .. } => Some(v),
+            AttrBody::Flag => None,
+        }
+    }
+}
+
+/// 属性の項目の中身。
+#[derive(Debug, Clone, PartialEq)]
+pub enum AttrBody {
+    /// `＆名前：値`
+    Decl(AttrValue),
+    /// `＆＄変数 演算子 値`
+    Cond { op: CmpOp, value: AttrValue },
+    /// `＆＄変数`
+    Flag,
+}
+
+/// 条件の比較演算子。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CmpOp {
+    Ge,
+    Le,
+    Gt,
+    Lt,
+    Eq,
+    Ne,
+}
+
+impl CmpOp {
+    /// 正規形（`>=`・`<=`・`>`・`<`・`=`・`!=`）
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CmpOp::Ge => ">=",
+            CmpOp::Le => "<=",
+            CmpOp::Gt => ">",
+            CmpOp::Lt => "<",
+            CmpOp::Eq => "=",
+            CmpOp::Ne => "!=",
+        }
+    }
 }
 
 /// Attribute value types.

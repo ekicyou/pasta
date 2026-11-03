@@ -36,7 +36,11 @@ pub(crate) fn parse_attr(pair: Pair<Rule>, filename: &str) -> Result<Attr, Parse
         }
     }
 
-    Ok(Attr { key, value, span })
+    Ok(Attr {
+        key,
+        body: AttrBody::Decl(value),
+        span,
+    })
 }
 
 /// 数の字句の値。

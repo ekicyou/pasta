@@ -103,7 +103,7 @@ fn test_ast_types_clone() {
 
     let attr = Attr {
         key: "test".to_string(),
-        value: AttrValue::Integer(42),
+        body: AttrBody::Decl(AttrValue::Integer(42)),
         span: Span::default(),
     };
     let _attr2 = attr.clone();
