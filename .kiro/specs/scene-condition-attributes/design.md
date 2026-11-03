@@ -361,7 +361,7 @@ pub enum SceneTableError {
   3. `next_index` から見る。`tier` より低い優先の候補に来たら、この巡をやめる。満たす候補（`cond` が無ければどれでも）に来たら、それを返して次の位置を進める。満たさない候補は見ただけで次の位置を進める。
   4. 末尾か低い段に来たら、並びをシャッフルし直して並べ替え、`next_index = 0` で 3 をもう 1 回だけ行う。
 - 乱数: シャッフルは今と同じ「候補の並びの順の配列を `shuffle_usize` に渡す」1 回で、作るときと始め直すときだけ（4.1）。
-- 選んだ形の理由（`＆優先` の段の持ち方）: 1 本の並びを優先で並べ替える形（開発者の示唆の 1 つ目）にした。状態が今と同じ「並び＋次の位置」のまま、足すのは並べ替え 1 行と段の判定だけで済む。代わりの「段ごとに別の並び」は、上書きの前後で下の段の巡を保てるが、状態の形が変わり `scene-pick-modes` も段ごとに札を入れることになる。1 本の形の弱みは「上の段を出すたびに巡が始め直しになる（境目で直前の話が続けて出うる）」ことで、今の巡の境目の性質と同じ種類の弱みにとどまる（OPEN QUESTION 2）。
+- 選んだ形の理由（`＆優先` の段の持ち方）: 1 本の並びを優先で並べ替える形（開発者の示唆の 1 つ目）にした。状態が今と同じ「並び＋次の位置」のまま、足すのは並べ替え 1 行と段の判定だけで済む。代わりの「段ごとに別の並び」は、上書きの前後で下の段の巡を保てるが、状態の形が変わり `scene-pick-modes` も段ごとに札を入れることになる。1 本の形の弱みは「上の段を出すたびに巡が始め直しになる（境目で直前の話が続けて出うる）」ことで、今の巡の境目の性質と同じ種類の弱みにとどまる（2026-11-03 の設計ディスカッションで確定）。
 
 ##### Implementation Notes
 
@@ -464,12 +464,12 @@ function SCENE.search(name, global_scene_name, act) end
 - `search_dictionary(SEARCH, mode, key, scene_name, act)`: scene・expr モードで `SCENE.search(key, scene_name, act)` を呼び、見つからなければ `nil, miss` を返す。word モードは今のまま。
 - `find_act_handler(self, mode, key, skip_methods)` の戻り値: `handler` ／ `nil` ／ `nil, "unmet"`。L2 と L5 のどちらかが `"unmet"` で、どの段にも見つからなかったときだけ `"unmet"`（3.5）。`PROXY_IMPL.find_handler` は末尾の呼び出しなので 2 つ目の値もそのまま返る。
 - `act:call`: `local handler, miss = self:find_handler("scene", key)`。関数なら今のまま呼ぶ。`miss == "unmet"` なら `FAILURE.raise({ label = FAILURE.LABEL.SCENE_UNMET, subject = "＞" .. tostring(key) })`。それ以外は今の `SCENE_NOT_FOUND`。
-- expr モード（`＠名前（）` がシーンに当たる道）も同じ `SCENE.search` を通るので条件で絞られる。条件漏れのときは今の「関数が見つからない」のまま（新しい扱いを足さない。OPEN QUESTION 5）。
+- expr モード（`＠名前（）` がシーンに当たる道）も同じ `SCENE.search` を通るので条件で絞られる。条件漏れのときは今の「関数が見つからない」のまま（新しい扱いを足さない。2026-11-03 確定）。
 
 #### FailureStop（`pasta/failure.lua`・`shiori/stop.lua`・`shiori/entry.lua`）
 
 ```lua
-FAILURE.LABEL.SCENE_UNMET = "条件に合うシーンが無い"   -- 13 種目（名前は OPEN QUESTION 3）
+FAILURE.LABEL.SCENE_UNMET = "条件に合うシーンが無い"   -- 13 種目（2026-11-03 確定）
 
 --- 止まるエラーとして投げる（戻らない）。値は記録の表（メタ表で見分け、tostring は FAILURE.body）
 --- @param record { label: string, subject: string|nil }
@@ -502,7 +502,7 @@ end
 #### ChoiceSelect / ExternalControl
 
 - `choice_select.lua`: `SCENE.search(choice_id, scope, act)`、無ければ `SCENE.search(choice_id, nil, act)`。どちらも無く、どちらかが `"unmet"` なら `FAILURE.raise({ label = SCENE_UNMET, subject = "OnChoiceSelectEx ＞" .. choice_id })`（3.2）。どちらも名前が無ければ今の 204。先頭の `＊OnChoiceSelectEx` の明示シーンはイベントとして扱い、条件漏れなら次の振り分けへ進む（今の「無ければ次へ」と同じ）。
-- `external_control.lua`（`OnPastaCallFunction`）: `act:find_handler("scene", name)` が `nil, "unmet"` なら、今の「見つからない」と同じ形で `FAILURE.reply(act, { label = SCENE_UNMET, subject = event .. " ＞" .. name, warning = … })`（場面の続きを変えない今の決まりに合わせる。OPEN QUESTION 4）。
+- `external_control.lua`（`OnPastaCallFunction`）: `act:find_handler("scene", name)` が `nil, "unmet"` なら、今の「見つからない」と同じ形で `FAILURE.reply(act, { label = SCENE_UNMET, subject = event .. " ＞" .. name, warning = … })`（場面の続きを変えない今の決まりに合わせる。2026-11-03 確定）。
 
 ### pasta_check validate
 
@@ -596,6 +596,6 @@ end
 
 ## Open Questions / Risks
 
-- 未決の点は research.md の「設計ディスカッションへの申し送り」に、仮定・代わりの案・例とともに並べた（止まるエラーの意味・段の持ち方・ラベルの名前・`OnPastaCallFunction` の扱い・expr モード・名指しの優先）。
+- 設計ディスカッション（2026-11-03）で 7 件を全部推奨案で確定した: 条件漏れの Call は止まるエラー、優先は 1 本の並びを並べ替える形、ラベルは「条件に合うシーンが無い」、`OnPastaCallFunction` は止めずに表記の応答、`＠名前（）` は絞って漏れたら「関数が見つからない」、名指しの再生は条件も段も見ず優先の順、数として読む文字列は `-?[0-9]+(\.[0-9]+)?`。記録は research.md の末尾。
 - `gen-skill-refs.mjs` は `.claude/skills/` の下へ書く。この下の書き換えは分類器が止めることがある（ユーザーの記録）。止まったら入った分を示して許可を求める。
 - `filters` を消すのは `pasta_core` の公開 API の破壊的な変更（0.x の次の版で許される）。`README.md` と CHANGELOG の書き方は既存の版の運びに合わせる。
