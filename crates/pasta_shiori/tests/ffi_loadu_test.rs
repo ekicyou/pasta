@@ -18,7 +18,7 @@
 //! グローバルである。本ファイルは全段を 1 つの `#[test]` に直列に詰め、同一バイナリ内に
 //! 他のテストを置かない（順序非依存）。
 //!
-//! `mod common;` は `PASTA_DEBUG` / `PASTA_DEBUG_PORT` を main 前に中和する `#[ctor]` を
+//! `mod common;` は `PASTA_DEBUG` を main 前に中和する `#[ctor]` を
 //! 取り込むためにも必須である（要件 6.4）。`#[ignore]` は付けない（要件 6.6）。
 
 #![cfg(windows)]
@@ -243,6 +243,69 @@ fn assert_entry_logged(dir: &Path, expected_entry: &str) {
     );
 }
 
+/// `[logging]` を `logging` で絞ったゴーストを `name` へ設置してパスを返す。
+fn install_narrowed_ghost(root: &TempDir, name: &str, logging: &str) -> PathBuf {
+    let dir = install_ghost(root, name);
+    let toml = dir.join("pasta.toml");
+    let mut text = std::fs::read_to_string(&toml).expect("read pasta.toml");
+    text.push_str(&format!(
+        "
+[logging]
+{logging}
+"
+    ));
+    std::fs::write(&toml, text).expect("write pasta.toml");
+    dir
+}
+
+/// 読み込みの終わりの行が、ログを絞ったゴーストの `pasta.log` にも出て、ほかの info は
+/// 出ないことを表明する（要件 10.1・10.2・10.4）。unload の後に呼ぶ。
+fn assert_only_load_entry_info(dir: &Path, needle: &str) {
+    let log = common::wait_log_contains(dir, "SHIORI load entry completed");
+    assert!(
+        log.matches("SHIORI load entry completed").count() == 1 && log.contains(needle),
+        "絞った設定でも読み込みの終わりの行（{needle:?}）が出るべき（要件 10.1・10.2）
+log:
+{log}"
+    );
+    assert!(
+        // `[logging]` を読む前の起動の数行は既定の info で出る（今のまま）。読んだ後の info で見る
+        !log.contains("Startup sequence completed"),
+        "読み込みの終わりの行のほかの info は絞られたままであるべき（要件 10.4）
+log:
+{log}"
+    );
+}
+
+/// `[logging]` を絞ったゴーストでも、`loadu` の読み込みの終わりの行が 1 行出る
+/// （要件 10.1〜10.4）。辞書の壊れたゴーストでは `loaded=false` で出る。
+fn load_entry_line_survives_narrowed_logging() {
+    for logging in ["level = \"warn\"", "filter = \"pasta_lua=error\""] {
+        let root = TempDir::new().expect("create temp dir");
+        let dir = install_narrowed_ghost(&root, "narrowed", logging);
+        assert!(drive_loadu(&dir), "{logging} のゴーストも読み込めるべき");
+        assert_eq!(unload(), 1, "unload は常に true を返す");
+        assert_only_load_entry_info(&dir, "entry=\"loadu\" loaded=true");
+    }
+
+    let root = TempDir::new().expect("create temp dir");
+    let dir = install_narrowed_ghost(&root, "broken", "level = \"warn\"");
+    std::fs::write(
+        dir.join("dic/test/typo.pasta"),
+        "＊壊れたシーン
+  ゴースト：「閉じていない
+＄＝＝
+",
+    )
+    .expect("write typo dictionary");
+    assert!(
+        !drive_loadu(&dir),
+        "辞書の壊れたゴーストは読み込みに失敗するべき"
+    );
+    assert_eq!(unload(), 1, "unload は常に true を返す");
+    assert_only_load_entry_info(&dir, "entry=\"loadu\" loaded=false");
+}
+
 // ===========================================================================
 // 設計 Testing Strategy > E2E Tests 項 3 の系列（1 本の直列テスト）
 // ===========================================================================
@@ -315,4 +378,7 @@ fn loadu_entry_drives_a_non_ansi_install_path_end_to_end() {
     // 段 5 の初期化が従来入口 `load` 経由だったことがログから判別できる
     // （＝入口ログが 2 つの入口を取り違えていない）。
     assert_entry_logged(&ascii_dir, "load");
+
+    // プロセス全域 static を共有するので、同じ直列テストの続きで確かめる。
+    load_entry_line_survives_narrowed_logging();
 }

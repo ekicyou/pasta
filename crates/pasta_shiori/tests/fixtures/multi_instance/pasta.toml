@@ -1,6 +1,6 @@
 # multi_instance の試験用フィクスチャ（shiori4-v3-portable task 4.4）
 #
-# 標準ランタイムをそのまま使う。[logging] と [debug] は試験が一時コピーの末尾に書き足す。
+# 標準ランタイムをそのまま使う。[logging] と [debug] は試験が一時コピーの末尾に書き足す（[debug] enabled = true で 2 体を並べる試験もある）。
 
 [loader]
 pasta_patterns = ["dic/*.pasta"]

@@ -235,7 +235,13 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── semanticTokensProvider.ts # セマンティックトークン提供
 │       │   ├── diagnosticsManager.ts   # 診断情報管理
 │       │   ├── documentSync.ts         # ドキュメント同期（200msデバウンス）
-│       │   └── test/                   # テスト
+│       │   ├── devCommands.ts          # 開発の 3 コマンド（▶ シーンを実行・SHIORI をリロード・保存変数を表示）の入口。相手の確かめと覚え・保存・出力のパネル「Pasta 開発」
+│       │   ├── mcpClient.ts            # SSP・areka の MCP（127.0.0.1 の 9801/9821…）へ道具を 1 回呼ぶ・相手を探す・記録を読む（vscode に依存しない）
+│       │   ├── ghostFiles.ts           # ゴーストのルートと表示名・pasta.log の場所と増えた分・variables.toml（vscode に依存しない）
+│       │   ├── reloadShiori.ts         # 読み込み直しと終わりの印の待ち・誤りの要約
+│       │   ├── runSceneAtCursor.ts     # OnPastaSceneAt での再生と台本の取り出し
+│       │   ├── dumpVariables.ts        # OnPastaDumpVariables と新しさの確かめ
+│       │   └── test/                   # テスト（mock/vscode.ts と MCP の窓口を真似る fakeMcpServer.ts）
 │       ├── syntaxes/         # TextMate文法（全角/半角マーカー対応）
 │       ├── scripts/          # ビルドスクリプト（WASM等）
 │       └── wasm/             # pasta_lsp WASMバイナリ（ビルド生成物）

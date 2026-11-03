@@ -10,7 +10,7 @@
 //! 1 つの `#[test]` に直列に詰め、ゴーストを 1 つずつ順に読む（登録簿は常に 0 個か 1 個）。
 //! 段を足すときは同じテスト関数の末尾へ足し、他の `#[test]` を置かない。
 //!
-//! `mod common;` は `PASTA_DEBUG`・`PASTA_DEBUG_PORT`・`PASTA_LOG` を main 前に中和する
+//! `mod common;` は `PASTA_DEBUG`・`PASTA_LOG` を main 前に中和する
 //! `#[ctor]` を取り込むためにも必須である（`PASTA_LOG` が残るとフィルタが変わる）。
 
 #![cfg(windows)]
@@ -262,7 +262,7 @@ fn ffi_logs_reach_the_ghost_log_file() {
     std::fs::write(&entry, slow).expect("write entry.lua");
 
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(ghost.path().to_path_buf(), rx, None, None)
+    let actor = spawn_actor_thread_with(ghost.path().to_path_buf(), rx, None)
         .expect("actor thread must spawn");
     assert!(
         actor.loaded(),

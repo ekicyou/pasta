@@ -6,6 +6,7 @@
 use std::path::PathBuf;
 
 use pasta_lua::LoadDirGuard;
+use pasta_lua::logging::LOAD_ENTRY_TARGET;
 use shiori4_abi::{
     SHIORI_204_NO_CONTENT, SHIORI_400_BAD_REQUEST, SHIORI_500_INTERNAL_SERVER_ERROR,
     SHIORI_ABI_VERSION_3, SHIORI_E_INVALID_ARG, SHIORI_E_UNSUPPORTED, Shiori, ShioriApi,
@@ -62,7 +63,7 @@ impl Shiori for PastaV3 {
         // load_dir の文脈を張り直して出す（入口スレッドにはアクタースレッドの文脈が及ばない）。
         let loaded = instance.loaded();
         let _log_context = LoadDirGuard::new(load_dir);
-        info!(entry = "v3", loaded, "SHIORI load entry completed");
+        info!(target: LOAD_ENTRY_TARGET, entry = "v3", loaded, "SHIORI load entry completed");
         Ok(Self { instance })
     }
 

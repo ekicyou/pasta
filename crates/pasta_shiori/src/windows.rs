@@ -186,7 +186,7 @@ fn load_impl(entry: &str, hdir: &ShioriString, encoding: DirEncoding) -> bool {
     //
     // `loaded` も併記して、入口の選択とロード成否を 1 行で対応付けられるようにする。
     let _guard = pasta_lua::LoadDirGuard::new(dir_for_log);
-    info!(entry, loaded, "SHIORI load entry completed");
+    info!(target: pasta_lua::logging::LOAD_ENTRY_TARGET, entry, loaded, "SHIORI load entry completed");
     loaded
 }
 

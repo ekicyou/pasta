@@ -138,20 +138,6 @@ debug_mode = true
     assert!(config.debug().is_none());
 }
 
-/// [debug] の port 指定が反映されること（既定 9276 の上書き）。
-#[test]
-fn test_debug_config_custom_port_from_toml() {
-    let toml_str = r#"
-[debug]
-enabled = true
-port = 12345
-"#;
-    let config = PastaConfig::from_str(toml_str).unwrap();
-    let debug = config.debug().expect("[debug] section should parse");
-    assert!(debug.enabled);
-    assert_eq!(debug.port, 12345);
-}
-
 // ----- PersistenceConfig::effective_file_path 第3分岐 -----
 
 /// obfuscate=true かつ .toml でも .dat でもない拡張子は ".dat" が付加されること。

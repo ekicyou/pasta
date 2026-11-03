@@ -44,13 +44,12 @@ use windows_sys::Win32::System::Memory::{GMEM_FIXED, GlobalAlloc};
 use pasta::{load, request, unload};
 use std::ffi::c_long;
 
-/// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前に中和する
-/// （固定ポート枯渇でのテスト破壊を防ぐ・他統合テストと同一ガード）。
+/// 開発セッションが export した `PASTA_DEBUG` を main 前に中和する
+/// （デバッグの関門を開かない・他統合テストと同一ガード）。
 #[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
     }
 }
 

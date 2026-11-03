@@ -67,18 +67,6 @@ describe("DispatcherGate - 止めている間は時報・トーク・続きを�
         expect(STORE.co_scene):toBe(co)
     end)
 
-    test("止めている間もキックのシーンは返る（2.4）", function()
-        setup()
-        local KICK = require("pasta.shiori.event.kick")
-        local orig = KICK.try_dispatch
-        local kick_co = coroutine.create(function() end)
-        KICK.try_dispatch = function() return kick_co end
-        STORE.auto_talk_paused = true
-        local result = dispatcher.dispatch(act_at(BASE + HOUR))
-        KICK.try_dispatch = orig
-        expect(result):toBe(kick_co)
-    end)
-
     test("止めている間に過ぎた時報は再開の後に出ない（3.2）", function()
         setup()
         STORE.auto_talk_paused = true

@@ -66,16 +66,13 @@ impl LuaTranspiler {
             .map(|(context, _)| context)
     }
 
-    /// Transpile PastaFile to Lua code, recording into a source-map sink and
-    /// returning the normalize [`LineShift`] (source-map build path).
+    /// Transpile PastaFile to Lua code, passing the code generator's records to an
+    /// optional sink and returning the normalize [`LineShift`].
     ///
-    /// This is the loader-side integration entry for `pasta-source-map` task 4.3:
-    /// it is the SAME code-generation + normalize pipeline as
-    /// [`transpile`](Self::transpile), but it additionally
-    /// returns the [`LineShift`] produced by output normalization so the loader can
-    /// rebase the sink's pre-normalize records onto the final `.lua` line numbers
-    /// (`MapBuilderSink::finish(&shift)` — Requirement 2.1) and complete the
-    /// per-chunk [`crate::debug::source_map::ChunkSourceMap`].
+    /// The SAME code-generation + normalize pipeline as [`transpile`](Self::transpile).
+    /// The loader's scene-map build (Phase 5.5) passes a `MapBuilderSink`, which keeps
+    /// only the scene declarations (their `.pasta` lines need no shift). The shift is
+    /// used here to place the `init_scene` line maps on the final `.lua` lines.
     ///
     /// # Byte-invariance (Requirement 7.1)
     ///
@@ -98,8 +95,8 @@ impl LuaTranspiler {
 
         // Use intermediate buffer for code generation
         let mut intermediate_buffer: Vec<u8> = Vec::new();
-        // シーンの行の対応（runtime-error-balloon 2.5）のために、デバッガの対応表と同じ記録を
-        // いつも受け取る。渡されたシンクへはそのまま流す（デバッガの対応表は変わらない）。
+        // シーンの行の対応（runtime-error-balloon 2.5）のために、行の記録をいつも受け取る。
+        // 渡されたシンクへもそのまま流す。
         let mut recorder = LineRecorder {
             lines: BTreeMap::new(),
             inner: sink,
@@ -132,9 +129,8 @@ impl LuaTranspiler {
         }
         let slots = codegen.take_line_map_slots();
 
-        // Convert intermediate buffer to UTF-8 string and normalize. Use the
-        // shift-returning normalize so the caller can rebase recorded pre-normalize
-        // lines onto final `.lua` lines (2.1).
+        // Convert intermediate buffer to UTF-8 string and normalize. The shift maps
+        // recorded pre-normalize lines onto final `.lua` lines for the line maps.
         let raw_output = String::from_utf8(intermediate_buffer)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         let (normalized_output, shift) = normalize_output_with_shift(&raw_output);
@@ -230,7 +226,7 @@ impl LuaTranspiler {
     }
 }
 
-/// デバッガの対応表と同じ記録（`.lua` の行 → `.pasta` の行・同じ行は後勝ち）を受け取り、
+/// code_gen の行の記録（`.lua` の行 → `.pasta` の行・同じ行は後勝ち）を受け取り、
 /// 渡されたシンクがあればそのまま流す。
 struct LineRecorder<'s> {
     lines: BTreeMap<u32, u32>,

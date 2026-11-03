@@ -226,7 +226,7 @@ pasta は if を持たない。値によって出すシーンを変えるには�
 - 新しい spec `scene-count` が、`＠シーン数（名前）`（`＞` と同じ前方一致）と `＠シーン数完全一致（名前）` を GLOBAL 関数で入れる。どちらも「定義されている数」を返し、条件の属性で今は選ばれないシーンも数に入れる。
 - この spec で決めること: 条件で絞った「今出せる数」を足すか（足すなら別の関数名にするか、`シーン数` の意味を変えるか）。足さないなら、マニュアルの `シーン数` の節に「条件は見ない」と一言書く。
 - ファイルの重なり: `scene-count` は `search/context.rs`（数を返すメソッド）と、要るなら `scene_table.rs` を触る。同じウェーブに置かない。
-- 参照: `.kiro/specs/scene-count/brief.md`。
+- 参照: `.kiro/specs/completed/scene-count/brief.md`。
 
 ## 申し送り（2026-11-03・`ponytail-core-registry` より）
 

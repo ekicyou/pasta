@@ -8,7 +8,7 @@
 //! task 5.1 で FFI 出荷経路（`windows.rs`）が [`lifecycle`] の置き場（芯の型 1 つ）へ
 //! 配線され、本モジュール群はすべて **既定（no-feature）ビルドでコンパイル・リンク**される。
 //! `unsafe impl Send/Sync` は撤去済み（R8）。
-//! - [`mailbox`]: 単一直列 mailbox（flume unbounded・`ActorMsg{Get/Notify/Kick/Stop}`・
+//! - [`mailbox`]: 単一直列 mailbox（flume unbounded・`ActorMsg{Get/Notify/Stop}`・
 //!   単一 consumer・FIFO 順序保証・task 3.2）。
 //! - [`thread`]: アクタースレッド起動・`!Send` VM pin・同期 `recv()` 単一ループで実
 //!   `SHIORI.request` を駆動（task 3.3）。

@@ -14,7 +14,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use flume::Sender;
-use pasta_lua::debug::{KickRequest, KickSink};
 use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLogger};
 use pest::error::LineColLocation;
 
@@ -53,7 +52,7 @@ pub enum SpawnError {
 
 /// インスタンス 1 つ＝アクター 1 つ（5.1）。`Send + Sync`（VM はアクタースレッドから出ない・6.3）。
 pub struct ActorInstance {
-    /// mailbox の送信端（強い参照はこれ 1 つ。kick の送り先は弱い参照だけを持つ）。
+    /// mailbox の送信端。
     tx: Sender<ActorMsg>,
     /// アクタースレッドのハンドル。後始末を終えると `None`（Drop の二重の後始末を防ぐ）。
     thread: Option<ActorThread>,
@@ -68,29 +67,6 @@ const _: fn() = || {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<ActorInstance>();
 };
-
-/// 送信端の弱い参照を閉じ込めた kick の送り先を作る（5.5）。
-///
-/// 弱い参照なので、kick の送り先（VM が持つ）が mailbox の受け口を生かし続けない。
-/// インスタンスが送信端を手放した後は送れず、診断ログ（`seam = "kick.drop"`）を残して捨てる。
-pub fn kick_sink_for(tx: &Sender<ActorMsg>) -> KickSink {
-    let weak = tx.downgrade();
-    Arc::new(move |req: KickRequest| {
-        let sent = weak.upgrade().is_some_and(|tx| {
-            tx.try_send(ActorMsg::Kick {
-                scene: req.scene.clone(),
-            })
-            .is_ok()
-        });
-        if !sent {
-            tracing::debug!(
-                seam = "kick.drop",
-                scene = %req.scene,
-                "kick dropped: instance mailbox gone or full -> discarded"
-            );
-        }
-    })
-}
 
 impl ActorInstance {
     /// アクタースレッドを起こし、VM を構築して `SHIORI.load` を呼ぶ（[`ClaimMode::Exclusive`]）。
@@ -135,9 +111,7 @@ impl ActorInstance {
         };
 
         let (tx, rx) = mailbox();
-        // VM を作る前に kick の送り先を渡す（5.5）。
-        let sink = kick_sink_for(&tx);
-        match spawn_actor_thread_with(load_dir.clone(), rx, Some(sink), Some(token.clone())) {
+        match spawn_actor_thread_with(load_dir.clone(), rx, Some(token.clone())) {
             Ok(thread) => Ok(Self {
                 tx,
                 thread: Some(thread),
@@ -276,60 +250,16 @@ impl Drop for ActorInstance {
 mod tests {
     use super::*;
 
-    /// kick の送り先は、送信端が生きている間はアクター（受け口）に kick を届け、
-    /// 送信端を手放した後は送れずに捨てる（弱い参照が受け口を生かし続けない・5.5）。
+    /// 起こしたインスタンスは request_stop で ack を返し、その後の後始末は冪等に join する。
     #[test]
-    fn kick_sink_delivers_while_sender_alive_and_drops_after() {
-        let (tx, rx) = mailbox();
-        let sink = kick_sink_for(&tx);
-
-        sink(KickRequest {
-            scene: "OnTestScene".into(),
-        });
-        match rx.try_recv() {
-            Ok(ActorMsg::Kick { scene }) => assert_eq!(scene, "OnTestScene"),
-            other => panic!("expected ActorMsg::Kick, got {other:?}"),
-        }
-
-        drop(tx);
-        sink(KickRequest {
-            scene: "OnLate".into(),
-        });
-        assert!(
-            matches!(rx.try_recv(), Err(flume::TryRecvError::Disconnected)),
-            "the sink must not keep the mailbox alive nor deliver after the sender is gone"
-        );
-    }
-
-    /// 起こしたインスタンスの送信端は、アクターが居る間は kick を送れ、片付けた後は送れない。
-    #[test]
-    fn instance_sender_accepts_kick_while_running_not_after_stop() {
+    fn instance_request_stop_then_shutdown_joins() {
         let dir = tempfile::tempdir().expect("tempdir");
         let instance = ActorInstance::spawn(dir.path().to_path_buf()).expect("spawn");
         assert_eq!(instance.load_dir(), dir.path());
 
-        assert!(
-            instance
-                .tx
-                .try_send(ActorMsg::Kick {
-                    scene: "OnTestScene".into()
-                })
-                .is_ok(),
-            "kick must be sent while the actor runs"
-        );
-
         let report = instance.request_stop();
         assert!(report.acked, "request_stop must be acked: {report:?}");
         assert!(!report.joined, "request_stop does not touch the thread");
-        assert!(
-            instance
-                .tx
-                .try_send(ActorMsg::Kick {
-                    scene: "OnLate".into()
-                })
-                .is_err(),
-            "kick must fail after the actor stopped"
-        );
 
         // 二度目の後始末は冪等（already_done）で、受け口を閉じたスレッドを join する。
         let report = instance.shutdown();

@@ -587,6 +587,23 @@ return M
     assert!(cached.contains("return M"));
 }
 
+/// `dic/` の `.lua` の写しは元とバイトで同じ（複数の行・CRLF・LF の混在を含む）。
+/// 止まるエラーの行が元の `.lua` の行になる前提（6.3）。
+#[test]
+fn test_lua_copy_is_byte_identical_to_source() {
+    let temp = create_test_base();
+    let base_dir = temp.path();
+
+    let source = b"-- \xe9\x81\x93\xe5\x85\xb7\r\nlocal M = {}\r\n\r\nfunction M.f()\n  return 1\r\nend\n\nreturn M\r\n";
+    fs::create_dir_all(base_dir.join("dic")).unwrap();
+    fs::write(base_dir.join("dic/道具.lua"), source).unwrap();
+
+    let _runtime = PastaLoader::load(base_dir).unwrap();
+
+    let cached = fs::read(base_dir.join("profile/pasta/cache/lua/pasta/scene/道具.lua")).unwrap();
+    assert_eq!(cached, source.to_vec());
+}
+
 #[test]
 fn test_pasta_and_lua_mixed() {
     let temp = create_test_base();

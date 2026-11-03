@@ -140,13 +140,13 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 | 箇所 | 張る範囲 |
 | ---- | -------- |
 | アクタースレッドの入口（`spawn_actor_thread_with` のスレッド本体の先頭） | スレッドの終わりまで。メッセージループの観測ログ（`actor.spawn`・`actor.recv`・`actor.reply`・`actor.stop`）もこの文脈で出る |
-| `PastaShiori` の `load`（段階 1 の登録の後）・`request`・`kick`・`call_lua_unload`・`release_runtime` | 各メソッドを抜けるまで。アクタースレッドの文脈の内側で入れ子になる |
+| `PastaShiori` の `load`（段階 1 の登録の後）・`request`・`call_lua_unload`・`release_runtime` | 各メソッドを抜けるまで。アクタースレッドの文脈の内側で入れ子になる |
 | `PastaLoader::load_with_config`（設置パスの存在を確かめた直後） | 関数を抜けるまで。組み込みで複数のゴーストを読んでも、ローダのログは自分のロガーへ届く |
 | FFI 入口の `load_impl`（`load_entry` から呼ばれる） | `spawn_actor` が戻った後、入口名と成否の 1 行を出す間（理由は [SHIORI 層](shiori.md#load-とアクターの起動)） |
 | 版 3 の入口（`PastaV3` の `load`・`request`・`notify`） | 入口の 1 行・弾いた要求・開始行を読めない警告を出す間 |
 | `ActorInstance` の起動と後始末 | 占有を断った・引き継いだ・起動に失敗した・スレッドを手放したログを出す間 |
 
-文脈を持たないのは、ホストのスレッド（旧来の入口の `request`・`unload`・`load_entry`、`DllMain` の detach の後始末）と、デバッグバックエンドのスレッドである。これらのログは規則 2 で届く。
+文脈を持たないのは、ホストのスレッド（旧来の入口の `request`・`unload`・`load_entry`、`DllMain` の detach の後始末）である。これらのログは規則 2 で届く。
 
 ### 残るログと捨てるログ
 
@@ -155,7 +155,7 @@ SHIORI として読み込まれるとき、ロガーは 2 段階で用意され�
 | ログ | 扱い |
 | ---- | ---- |
 | ロガーが登録されている間の、アクタースレッド・ローダのログ | 文脈のとおり自分のロガーへ届く（規則 1） |
-| ロガーが登録されている間の、FFI 入口・デバッグバックエンドのログ（`request` の warn・panic の error・観測用の debug と trace、`loadu` 済みで無視した `load` の warn、`unload` の teardown の異常の warn など） | 唯一のロガーへ届く（規則 2） |
+| ロガーが登録されている間の、FFI 入口のログ（`request` の warn・panic の error・観測用の debug と trace、`loadu` 済みで無視した `load` の warn、`unload` の teardown の異常の warn など） | 唯一のロガーへ届く（規則 2） |
 | 終了処理の間のログ（`SHIORI.unload` の結果、永続化データの保存の失敗、登録解除の通知「Unregistering logger」） | 登録解除の前に出るので届く。登録解除がファイルを閉じる最後の手順である |
 | 最初の `load` の段階 1 より前のログ（入口の引数の誤り、設置パスを読めないなど） | 登録が 0 個なので捨てる（規則 3） |
 | 終了処理の完了の通知（done ack）の後のログ（アクタースレッドの `actor.done`、FFI 入口の「done ack received」） | 登録解除の後なので捨てる（規則 1・規則 3） |

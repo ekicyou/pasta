@@ -7,8 +7,8 @@
 //   - contributes.commands has pasta.runSceneAtCursor + pasta.reloadShiori.
 //   - editor/context: runSceneAtCursor ALWAYS shown for .pasta (NOT debug-gated)
 //     and ordered first in the navigation group (top display) — R1.1 / R6.1.
-//   - editor/context: reloadShiori gated on debugType == 'pasta' — R9.1.
-//   - debug/toolBar: reloadShiori gated on debugType == 'pasta' — R9.1.
+//   - no DAP declarations: debuggers, breakpoints, onDebug, debug/toolBar,
+//     debugType, toggleSourcePresentation (vscode-mcp-client R1.1-1.4 / R8.3).
 //   - the OLD pasta.debug.playScene is ABSENT from commands and all menus
 //     (sole position-based 動線) — R5.1 / R5.2.
 //
@@ -28,9 +28,12 @@ interface Contribution {
   when?: string;
 }
 interface PackageJson {
+  activationEvents?: string[];
   contributes: {
     commands: Contribution[];
     menus: Record<string, Contribution[]>;
+    debuggers?: unknown;
+    breakpoints?: unknown;
   };
 }
 
@@ -43,7 +46,7 @@ const RELOAD_COMMAND = 'pasta.reloadShiori';
 const OLD_COMMAND = 'pasta.debug.playScene';
 
 // =============================================================================
-// Sequential test runner (mirrors runSceneAtCursorCommand.test.ts)
+// Sequential test runner
 // =============================================================================
 
 let passed = 0;
@@ -113,25 +116,80 @@ test('editor/context runSceneAtCursor is shown for .pasta and is NOT debug-gated
 });
 
 // =============================================================================
-// editor/context + debug/toolBar — reloadShiori: connected-only (R9.1)
+// The 3 dev commands: declarations, right-click order and conditions, palette
+// (vscode-mcp-client R1.4 / R4.1 / R5.1 / R6.1 / R8.3)
 // =============================================================================
 
-test('editor/context reloadShiori is gated on debugType == pasta (connected-only) (R9.1)', () => {
-  const e = menuEntry('editor/context', RELOAD_COMMAND);
-  assert.ok(e, 'reloadShiori must contribute to editor/context');
-  assert.ok(
-    typeof e!.when === 'string' && e!.when!.includes("debugType == 'pasta'"),
-    `when must gate on debugType == 'pasta'; got ${JSON.stringify(e!.when)}`,
+const DUMP_COMMAND = 'pasta.showSaveVariables';
+const GHOST_SOURCE_WHEN =
+  'resourceLangId == pasta || resourceLangId == lua || resourceFilename =~ /^pasta\\.toml$/i';
+
+test('contributes.commands is exactly the 3 dev commands, all in category Pasta', () => {
+  assert.deepStrictEqual(
+    pkg.contributes.commands.map((c) => [c.command, c.title, (c as { category?: string }).category]),
+    [
+      [RUN_COMMAND, '▶ シーンを実行', 'Pasta'],
+      [RELOAD_COMMAND, 'SHIORI をリロード', 'Pasta'],
+      [DUMP_COMMAND, '保存変数を表示', 'Pasta'],
+    ],
   );
 });
 
-test('debug/toolBar exposes reloadShiori gated on debugType == pasta (R9.1)', () => {
-  const e = menuEntry('debug/toolBar', RELOAD_COMMAND);
-  assert.ok(e, 'reloadShiori must contribute to debug/toolBar');
-  assert.ok(
-    typeof e!.when === 'string' && e!.when!.includes("debugType == 'pasta'"),
-    `when must gate on debugType == 'pasta'; got ${JSON.stringify(e!.when)}`,
+test('editor/context lists the 3 commands in order with their when-clauses (R4.1/R5.1/R6.1)', () => {
+  assert.deepStrictEqual(
+    menu('editor/context').map((c) => [c.command, c.group, c.when]),
+    [
+      [RUN_COMMAND, 'navigation@1', 'resourceLangId == pasta'],
+      [RELOAD_COMMAND, 'navigation@2', GHOST_SOURCE_WHEN],
+      [DUMP_COMMAND, 'navigation@3', GHOST_SOURCE_WHEN],
+    ],
   );
+});
+
+test('the 3 commands show in the command palette with no condition', () => {
+  const gated = menu('commandPalette').filter((c) => [RUN_COMMAND, RELOAD_COMMAND, DUMP_COMMAND].includes(c.command));
+  assert.deepStrictEqual(gated, [], 'no commandPalette entry may hide or gate the 3 commands');
+});
+
+test('activationEvents is only onLanguage:pasta', () => {
+  assert.deepStrictEqual(pkg.activationEvents, ['onLanguage:pasta']);
+});
+
+// =============================================================================
+// DAP declarations fully removed (vscode-mcp-client R1.1-1.4 / R8.3)
+// =============================================================================
+
+test('contributes has no debuggers and no breakpoints (R1.1/R1.2)', () => {
+  assert.strictEqual(pkg.contributes.debuggers, undefined, 'contributes.debuggers must not exist');
+  assert.strictEqual(pkg.contributes.breakpoints, undefined, 'contributes.breakpoints must not exist');
+});
+
+test('activationEvents has no onDebug entry (R1.4)', () => {
+  const offending = (pkg.activationEvents ?? []).filter((e) => e.startsWith('onDebug'));
+  assert.deepStrictEqual(offending, [], `onDebug activation must not exist; found: ${offending.join(', ')}`);
+});
+
+test('menus has no debug/toolBar (R1.3/R1.4)', () => {
+  assert.strictEqual(pkg.contributes.menus['debug/toolBar'], undefined, 'debug/toolBar must not exist');
+});
+
+test('no menu when-clause uses debugType (R1.4)', () => {
+  const offending: string[] = [];
+  for (const [menuId, entries] of Object.entries(pkg.contributes.menus)) {
+    for (const c of entries) {
+      if (/debugType/.test(c.when ?? '')) offending.push(`${menuId}:${c.command}`);
+    }
+  }
+  assert.deepStrictEqual(offending, [], `debugType must not appear in any when; found: ${offending.join(', ')}`);
+});
+
+test('pasta.debug.toggleSourcePresentation is absent from commands and menus (R1.3)', () => {
+  const cmd = 'pasta.debug.toggleSourcePresentation';
+  assert.strictEqual(commandEntry(cmd), undefined, `${cmd} must not be a registered command`);
+  const offending = Object.entries(pkg.contributes.menus)
+    .filter(([, entries]) => entries.some((c) => c.command === cmd))
+    .map(([id]) => id);
+  assert.deepStrictEqual(offending, [], `${cmd} must not appear in any menu; found in: ${offending.join(', ')}`);
 });
 
 // =============================================================================

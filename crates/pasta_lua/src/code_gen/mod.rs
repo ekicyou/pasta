@@ -160,7 +160,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// emitted output line to an explicit 1-based `.pasta` line rather than a span's
     /// `start_line`. It is the per-line mapping primitive used by multi-line elements
     /// whose output lines correspond 1:1 to distinct `.pasta` source lines — chiefly
-    /// code blocks, where in-block breakpoint precision (Requirement 1.3) requires
+    /// code blocks, where in-block line precision requires
     /// each generated `.lua` line to resolve to its own originating `.pasta` line.
     ///
     /// `pasta_line` must be 1-based. Callers compute it as

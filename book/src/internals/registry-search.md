@@ -50,7 +50,7 @@
 | 要素 | 所在 | 役割 |
 | ---- | ---- | ---- |
 | `register`・`loader` | `crates/pasta_lua/src/search/mod.rs` | 2 つのレジストリから `SearchContext` を作り、Lua のユーザーデータとして `package.loaded["@pasta_search"]` に置く |
-| `SearchContext` | `crates/pasta_lua/src/search/context.rs` | `SceneTable` と `WordTable` を 1 組ずつ所有する。Lua へ `search_scene`・`search_scene_exact`・`search_local_scene_exact`・`search_word`・`set_scene_selector`・`set_word_selector`・`scene_aliases` の 7 メソッドを公開する。`scene_aliases` は別名表を「置き換え先 → 別名の配列（辞書順）」の新しい表で返す（読み取り専用）。`search_scene` と `search_scene_exact` は本体（`search_scene_by`）を共有し、前方一致か完全一致かだけが異なる。`search_scene`・`search_scene_exact` の名前と `search_word` のスコープは、`sanitize_name` でサニタイズしてから検索表に渡す。別名表（`SceneAliasTable`）を 1 つ持ち、第 2 引数なしの `search_scene`・`search_scene_exact` でだけ使う（[前方一致による候補の収集](#前方一致による候補の収集)） |
+| `SearchContext` | `crates/pasta_lua/src/search/context.rs` | `SceneTable` と `WordTable` を 1 組ずつ所有する。Lua へ `search_scene`・`search_scene_exact`・`search_local_scene_exact`・`search_word`・`set_scene_selector`・`set_word_selector`・`scene_aliases`・`count_scene`・`count_scene_exact` の 9 メソッドを公開する。`scene_aliases` は別名表を「置き換え先 → 別名の配列（辞書順）」の新しい表で返す（読み取り専用）。`search_scene` と `search_scene_exact` は本体（`search_scene_by`）を共有し、前方一致か完全一致かだけが異なる。`search_scene`・`search_scene_exact` の名前と `search_word` のスコープは、`sanitize_name` でサニタイズしてから検索表に渡す。別名表（`SceneAliasTable`）を 1 つ持ち、第 2 引数なしの `search_scene`・`search_scene_exact` でだけ使う（[前方一致による候補の収集](#前方一致による候補の収集)） |
 | `SearchError` | `crates/pasta_lua/src/search/error.rs` | `pasta_core` のエラーを包み、Lua の `RuntimeError` に変換する |
 
 `SearchContext` は Lua VM ごとに 1 つであり、複数のランタイムの間で共有しない。
@@ -181,6 +181,7 @@ pasta.scene_dic
 | `search_scene_exact(名前, nil)` | 別名表で `名前` を置き換え → `SceneTable::resolve_scene_id_exact("", サニタイズした名前)` | キーがサニタイズした（置き換えた後の）`名前` と等しいシーン。`:` で始まるキーは候補にしない |
 | `search_scene_exact(名前, 親)` | `SceneTable::resolve_scene_id_exact(親, サニタイズした名前)` | キーが `:親:サニタイズした名前` と等しいローカルシーンだけ |
 | `search_local_scene_exact(グローバル名, ローカル名)` | 別名表で `グローバル名` を置き換え → `SceneTable::resolve_global_owning_local_exact(サニタイズしたグローバル名, サニタイズしたローカル名)` で親を 1 つ選ぶ → `search_scene_exact(サニタイズしたローカル名, 選んだ親)` | 1 段目はキーがサニタイズした（置き換えた後の）`グローバル名` と等しいグローバルシーンのうち、`:登録名:サニタイズしたローカル名` と等しいキーのローカルシーンを持つものだけ。2 段目はそのグローバルシーンの中の、その名前のローカルシーンだけ |
+| `count_scene(名前)`・`count_scene_exact(名前)` | 別名表で `名前` を置き換え → `SceneTable::collect_scene_candidates("", サニタイズした名前)` の候補を数える。`count_scene_exact` は、候補のうち関数名の登録名から通し番号を除いた名前がサニタイズした名前と等しいものだけを数える | `search_scene(名前, nil)`・`search_scene_exact(名前, nil)` が選べる候補と同じ。`SceneNotFound` は `0` にし、警告ログは出さない |
 | `search_word(名前, nil)` | `WordTable::search_word("", 名前)` → `collect_word_candidates` | `名前` で前方一致したキーのうち `:` で始まらないものの値すべて |
 | `search_word(名前, 親)` | `WordTable::search_word(サニタイズした親, 名前)` → `collect_word_candidates` | `:サニタイズした親:名前` で前方一致したキーの値すべて |
 
@@ -188,6 +189,7 @@ pasta.scene_dic
 - `search_scene` の第 1 引数は、サニタイズしてからそのまま検索キーと前方一致させる。登録名から通し番号を除くことはしない。検索キーは通し番号を含まないため、登録名を渡してもその登録名のシーンは指さない。`search_scene("メイン_1")` は 1 つ目の `＊メイン`（検索キー `メイン`）ではなく、検索キーが `メイン_1` で始まるシーン（`＊メイン・1` など）を探す。第 2 引数を指定したときの第 1 引数（ローカルシーン名）も同じである。
 - `search_scene_exact` は、索引をキーで直接引き（`prefix_index.get`）、検索キーと等しいキーの項目だけを候補にする。`＊つっつき反応胸` と `＊つっつき反応胸右` があるとき、`search_scene("つっつき反応胸")` は両方を候補にするが、`search_scene_exact("つっつき反応胸")` は `＊つっつき反応胸` だけを候補にする。同じキーの中の順・属性フィルタ・選択の方式は前方一致と同じである。利用者向けの規則は [search_scene_exact](../lua/modules/pasta-search.md#search_scene_exactname-global_scene_name) が正である。
 - `search_local_scene_exact` の 2 つの引数は、どちらも作者が書く名前としてサニタイズする（第 2 引数ありの `search_scene_exact` のように、親を登録名で受けることはしない）。別名表で置き換えるのはグローバル名だけである。1 段目でローカルシーンを持つかの判定は、各候補の関数名から登録名（最初の `::` の前）を取り出し、索引に `:登録名:ローカル名` のキーがあるかを `prefix_index.get` で見る。グローバルシーンが無ければ `SceneNotFound` を返し、`SearchContext` は Lua へ `nil, "global"` を返す（置き換えたときは `search_scene` と同じ警告ログも出す）。グローバルシーンはあるが、どれもローカルシーンを持たなければ `Ok(None)` を返し、`SearchContext` は `nil, "local"` を返す。利用者向けの規則は [search_local_scene_exact](../lua/modules/pasta-search.md#search_local_scene_exactglobal_name-local_name) が正である。
+- `count_scene`・`count_scene_exact` は `&self` で読むだけで、候補のキャッシュ（順次消費の記録）にも属性フィルタにも触らない。数えても次の `search_scene` の選びは変わらない。利用者向けの規則は [count_scene](../lua/modules/pasta-search.md#count_scenename--count_scene_exactname) が正である。
 - どの経路も、ローカルに候補が無いときにグローバルへ移ることはない。ローカルからグローバルへの順序は Lua 側の検索手順が組み立てる（後述「ローカル優先の検索順」）。
 - 候補は、索引を検索キーから順に、キーが検索キーで始まる間だけ読む順に集まる。`BTreeMap` はキーのバイト列の辞書順で並ぶ。同じキーに複数の項目があれば、その中は登録順である。辞書確定の登録順は（名前, 通し番号）の昇順であるため（[辞書確定](#辞書確定)）、同名シーンは通し番号の小さい順に並ぶ。
 - 単語の候補は項目ではなく値である。前方一致したすべての項目の値のリストを、上の順で 1 本につなげたものが候補になる。
@@ -246,7 +248,7 @@ PROXY_IMPL.find_handler(mode, key, skip_methods)     act:actor_proxy("アクタ�
 - 見つかった値の後処理（関数なら呼ぶ、それ以外は文字列にする、見つからなければ失敗の報告）は `ACT_IMPL.word`・`ACT_IMPL.call`・`ACT_IMPL.expr_fn`・`ACT_IMPL.expr_fn_var` と、PROXY 側の `word`・`expr_fn`・`expr_fn_var` が行う（[名前の解決のメソッド](internal-modules.md#名前の解決のメソッド)）。
 - グローバル関数の呼び出し（`＠＊名前（…）`）の生成コード `act:global_fn("名前", …)` は、この検索手順を通らず `GLOBAL[名前]` だけを引く（[生成コード用のメソッド](internal-modules.md#生成コード用のメソッドactor_proxyglobal_fn)）。
 
-`ACT_IMPL.find_scene` は第 2 引数のグローバル名を使わず `find_handler("scene", key)` に委ねる。そのため、親を指定してローカルシーンを引く必要がある選択肢イベント（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`）は、`SCENE.search(名前, 親)` を直接呼んでコルーチンを作る。親は、選択肢を出したグローバルシーン（Reference2）か `STORE.last_global_scene` である（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)）。シーンキック（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`）は検索を使わず、シーン表のキーとの完全一致（`SCENE.get`・`SCENE.get_start`）で引く（[キックの保留と起動](debug.md#キックの保留と起動kicklua)）。`OnPastaSceneAt` の既定ハンドラも検索を使わず、位置から引いた登録名の組で `SCENE.co_exec_registered` を呼ぶ（[位置でのシーンの再生](debug.md#位置でのシーンの再生)）。
+`ACT_IMPL.find_scene` は第 2 引数のグローバル名を使わず `find_handler("scene", key)` に委ねる。そのため、親を指定してローカルシーンを引く必要がある選択肢イベント（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`）は、`SCENE.search(名前, 親)` を直接呼んでコルーチンを作る。親は、選択肢を出したグローバルシーン（Reference2）か `STORE.last_global_scene` である（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)）。`OnPastaSceneAt` の既定ハンドラは検索を使わず、位置から引いた登録名の組で `SCENE.co_exec_registered` を呼ぶ（[位置でのシーンの再生](debug.md#位置でのシーンの再生)）。
 
 ### 動的参照の検索
 

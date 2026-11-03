@@ -214,6 +214,14 @@ fn builtin_check_uses_name_after_alias() {
     assert_eq!(found[0].2, FindingKind::SceneShadowedByBuiltin);
 }
 
+/// シーン数の関数と同じ名前のシーンにも注意が出る（scene-count 6.2）
+#[test]
+fn scene_named_as_scene_count_is_warning() {
+    let found = scene_findings(TOML, &[("dic/talk.pasta", "＊シーン数\n  さくら：あ。\n")]);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].2, FindingKind::SceneShadowedByBuiltin);
+}
+
 #[test]
 fn file_with_syntax_error_registers_no_scenes() {
     let dics = [
@@ -255,6 +263,10 @@ fn builtin_names_are_listed() {
         [
             "yield",
             "チェイントーク",
+            "scene_count",
+            "シーン数",
+            "scene_count_exact",
+            "シーン数完全一致",
             "close_ghost",
             "ゴースト終了",
             "pause_auto_talk",
@@ -354,6 +366,13 @@ fn call_to_builtin_name_is_found() {
 #[test]
 fn call_to_recommend_builtin_is_found() {
     let text = "＊メニュー\n  ＞おすすめ項目（「a」、「https://a/」）\n  ＞おすすめ区切り\n  ＞recommend_item（「b」、「https://b/」）\n  ＞recommend_separator\n";
+    assert_eq!(reference_findings(TOML, text), vec![]);
+}
+
+/// シーン数の 4 つの名前は組み込みの飛び先として見つかる（scene-count 6.1）
+#[test]
+fn call_to_scene_count_builtin_is_found() {
+    let text = "＊会話\n  ＞シーン数（「a」）\n  ＞scene_count（「a」）\n  ＞シーン数完全一致（「a」）\n  ＞scene_count_exact（「a」）\n";
     assert_eq!(reference_findings(TOML, text), vec![]);
 }
 

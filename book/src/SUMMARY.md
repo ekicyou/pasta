@@ -55,10 +55,8 @@
 
 - [デバッグ概要](debug/index.md)
   - [VSCode 接続と拡張導入](debug/vscode-setup.md)
-  - [.pasta ソースレベルのデバッグ操作](debug/source-level.md)
-  - [開発支援アクション（シーン再生・SHIORIリロード）](debug/dev-actions.md)
-  - [構造的制約と緩和策](debug/constraints.md)
-  - [接続できないとき（トラブルシューティング）](debug/troubleshooting.md)
+  - [開発支援アクション（シーン再生・SHIORI をリロード・保存変数を表示）](debug/dev-actions.md)
+  - [うまく動かないとき（トラブルシューティング）](debug/troubleshooting.md)
   - [辞書を検査する（pasta_check validate）](debug/validate.md)
 
 # リファレンス
@@ -79,7 +77,7 @@
   - [ローダ自己展開とモジュール解決](internals/loader.md)
   - [SHIORI 層](internals/shiori.md)
   - [トーク出力とアピアランス](internals/talk-output.md)
-  - [デバッグ基盤とシーンキック](internals/debug.md)
+  - [開発用のイベントとシーンマップ](internals/debug.md)
   - [ロギングとエンコーディング](internals/logging-encoding.md)
 
 # 雑記

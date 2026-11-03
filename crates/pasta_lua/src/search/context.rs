@@ -188,6 +188,44 @@ impl SearchContext {
         }
     }
 
+    /// `＞名前` のグローバル検索（`search_scene(name, None)`）が選べる候補の数。
+    ///
+    /// 別名を当ててから揃える順は `search_scene_by` のグローバルの枝と同じ。
+    /// 読むだけで、巡回の控えも属性の絞り込みも通さない。無ければ `0`
+    /// （警告なし）。空の名前はエラー。
+    pub fn count_scene(&self, name: &str) -> Result<usize, SearchError> {
+        self.count_scene_by(name, false)
+    }
+
+    /// グローバルの完全一致の検索（`search_scene_exact(name, None)`）が選べる
+    /// 候補の数。規則は [`Self::count_scene`] と同じ。
+    pub fn count_scene_exact(&self, name: &str) -> Result<usize, SearchError> {
+        self.count_scene_by(name, true)
+    }
+
+    /// `count_scene`（`exact = false`）と `count_scene_exact`（`exact = true`）の本体。
+    fn count_scene_by(&self, name: &str, exact: bool) -> Result<usize, SearchError> {
+        let alias = self.scene_aliases.resolve(name);
+        let key = SceneRegistry::sanitize_name(alias.unwrap_or(name));
+        let ids = match self.scene_table.collect_scene_candidates("", &key) {
+            Ok(ids) => ids,
+            Err(pasta_core::SceneTableError::SceneNotFound { .. }) => return Ok(0),
+            Err(e) => return Err(SearchError::SceneTableError(e)),
+        };
+        if !exact {
+            return Ok(ids.len());
+        }
+        // 完全一致: 登録名（例 "雑談_1"）から通し番号を外した名前がキーと等しいもの
+        Ok(ids
+            .into_iter()
+            .filter_map(|id| self.scene_table.get_scene(id))
+            .filter(|scene| {
+                let (global_name, _) = Self::parse_fn_name(&scene.fn_name);
+                SceneRegistry::split_registered_name(&global_name).0 == key
+            })
+            .count())
+    }
+
     /// 大域とローカルの書いた名前から、そのローカルを持つ大域を順送りで選び、
     /// ローカルを完全一致で引く。
     ///
@@ -388,6 +426,16 @@ impl UserData for SearchContext {
                 LocalSceneMatch::NoLocal => (mlua::Value::Nil, "local").into_lua_multi(lua),
             },
         );
+
+        // count_scene(name) -> integer（＞名前 のグローバル検索の候補の数）
+        methods.add_method("count_scene", |_lua, this, name: String| {
+            this.count_scene(&name).map_err(mlua::Error::from)
+        });
+
+        // count_scene_exact(name) -> integer（完全一致の候補の数）
+        methods.add_method("count_scene_exact", |_lua, this, name: String| {
+            this.count_scene_exact(&name).map_err(mlua::Error::from)
+        });
 
         // search_word(name, global_scene_name?) -> string or nil
         methods.add_method_mut(

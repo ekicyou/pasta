@@ -174,7 +174,6 @@ fn run_child(role: &str) -> ChildResult {
         .env(ROLE_ENV, role)
         .env(DIR_ENV, ghost.path())
         .env_remove("PASTA_DEBUG")
-        .env_remove("PASTA_DEBUG_PORT")
         .env_remove("PASTA_LOG")
         .output()
         .expect("spawn child");

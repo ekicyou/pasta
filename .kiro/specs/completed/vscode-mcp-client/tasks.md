@@ -1,0 +1,186 @@
+# 実装計画
+
+- 試験の列（`package.json` の `test:unit`・`test:e2e`）を直すのは 1.1 と 6.3 だけにする。間のタスクは、自分の試験のファイルを esbuild で束ねて node で直に走らせて確かめる（同じ 1 行を並んで書き換えないため）。
+- 書き直す `reloadShiori.ts`・`runSceneAtCursor.ts` の試験は、今のファイル名のまま書き直すので、列に残ったまま走る。そのため、両方とその試験が定数を借りている `debugAttachTarget.ts` は 1.1 では消さず、5.2 で消す。
+- マニュアルの中身の検証（`verify-content.mjs`）は、G 節を直す 7.5 までは赤くてよい（今の G 節は `9276`・`attach`・`sourcePresentation` を求める）。7.1〜7.4 の確かめには使わない。
+
+- [x] 1. DAP の部品の撤去
+- [x] 1.1 拡張のコードと試験から DAP の糊を消す
+  - DAP の 2 つのファイル（アダプターの工場・提示モードの切り替え）を消し（attach の相手の定数のファイルは、まだ借りている所があるので 5.2 まで残す）、起動の処理から DAP の import・登録・糊（コマンドの実体を含む）を消す。WASM の起動・意味の色・診断・ゴースト全体の検査・単語参照の装飾の登録は触らない。
+  - DAP に向けた試験 4 本（アダプターの工場・提示モード・2 つのコマンドの試験）を消し、起動の試験から debug の試験を消す。試験の真似の vscode から debug の API・アダプターのサーバー・`startDebugging` の記録・`launch` の構成を消す。
+  - `test:unit` の列から消した試験を外す。宣言の `pasta.runSceneAtCursor`・`pasta.reloadShiori` は 6.3 で登録し直すまで、宣言だけ残ってよい。
+  - 終わったとき: `npm test` が通り、起動の処理と試験の真似の vscode に `debug` の API（`vscode.debug`・`DebugAdapterServer`・`startDebugging`）を使うコードが無い（5.2 まで残すファイルのコメントは数えない）。
+  - _Requirements: 1.3, 1.5, 8.4_
+- [x] 1.2 拡張の宣言から DAP の部品を消し、無いことを試験で確かめる
+  - `debuggers`・`breakpoints`・`pasta.debug.toggleSourcePresentation`・`commandPalette` の DAP の行・`debug/toolBar`・`activationEvents` の `onDebug:pasta` を消す。`editor/context` と `commandPalette` に残る `debugType` の条件を消す。
+  - 宣言の試験 2 本に、上のどれも無いこと・どの `when` にも `debugType` が無いことを確かめる項を足す（今の DAP の宣言を確かめる項は消す）。
+  - 終わったとき: `npm test` が通り、宣言の試験が `debuggers`・`breakpoints`・`onDebug`・`debug/toolBar`・`debugType` の不在を確かめている。
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 8.3_
+
+- [x] 2. 試験の土台
+- [x] 2.1 MCP の窓口を真似る試験用のサーバーを作る
+  - `127.0.0.1` の番号 0 で立ち、`POST /api/mcp/v1` だけを受ける。`Accept` に 2 つの型が無ければ 406、`Host` がループバックでなければ 403（areka と同じ）。
+  - 状態として、ベースウェアの名前・動いているルートの集合（大文字・小文字と区切りを同じとみなす）・誤りと台本の記録（通しの番号）・受けた `tools/call` の記録を持つ。
+  - 振る舞いを切り替えられる: `reload` で `pasta.log` に書く行（印 `loaded=true`／`false`・`ERROR`・`WARN`・書かない）、`raise_event` の答え（台本・台本なし・接続を切る・答えない）、`OnPastaDumpVariables` で `variables.toml` を書くか書かないか、`get_log(script)` で `\` をエスケープしない JSON を出すか。
+  - 受けて黙る（答えの頭を返さない）番号も立てられる。
+  - 終わったとき: 小さな自己確かめ（立てて `initialize` を送ると `serverInfo` が返り、`Accept` の欠けは 406・外れた `Host` は 403、`get_property` が動いているルートだけに名前を返す）が node で通る。
+  - _Requirements: 8.1, 8.2_
+- [x] 2.2 (P) 試験の真似の vscode に、3 つのコマンドの流れで使う API を足す
+  - `window.showQuickPick`（試験が決めた選択か、閉じたことを返す）・`window.withProgress` と `ProgressLocation`・出力のパネルの `show` と書いた行の記録・文書の `save()` の記録（成否を試験が決められる）・`workspace.textDocuments` の差し替えを足す。
+  - 終わったとき: 今の試験が全部通ったまま、新しい API を呼ぶと記録に残ることを確かめる小さな項が通る。
+  - _Boundary: mock/vscode_
+  - _Requirements: 8.1_
+
+- [x] 3. MCP のクライアント
+- [x] 3.1 道具を 1 回呼び、結果を型で返す
+  - 送り先のホストは定数の `127.0.0.1` だけで、番号は呼び手が渡す。ホストと番号を変える設定を持たない。
+  - `node:http` で `/api/mcp/v1` へ `POST` し、`Content-Type` と `Accept` の 2 つの札を付け、`Origin`・`Mcp-Session-Id` は付けない。接続は使い回さず、送り直さない。
+  - 結果を「成功・NG・JSON-RPC の誤り・届かない・応答が無い・形が違う」に分ける。届かないは要求を書き終える前の接続の失敗、応答が無いは書き終えた後の切断・空の本文・時間切れ（切って終える）。呼び出しは投げない。
+  - 答えの JSON が読めないときだけ、決まりに無い `\x` を直して読み直す。
+  - 終わったとき: 真似るサーバーを相手にした単体の試験で、札が付くこと・6 つの結果の分け方・読み直しが確かめられて通る。
+  - _Requirements: 2.2, 3.9, 7.3_
+- [x] 3.2 相手を探し、確かめる
+  - 候補の番号の列（9801・9821・9802・9822…9810・9830）を持つ。
+  - 1 つの番号へ `initialize` の後に `get_property(baseware.name, ghost_name=<ルート>)` を聞く問い合わせと、覚えた相手を `get_property` の 1 回で確かめる問い合わせを作る。成功で本文が空でないときだけ相手とする。
+  - 全部の番号へ同時に聞き、答えた相手を候補の順で返す。同じベースウェアの名前の相手は 1 つにまとめて最初の番号を残し、その限りを `shortcut:` のコメントで書く。答えない番号は一定の時間で打ち切る。
+  - 終わったとき: 単体の試験で、答えない番号があっても打ち切りの時間ほどで終わること・候補の順を保つこと・同じ名前の相手（2 つの番号で立てた真似るサーバー）が 1 つにまとまること・動いていないルートでは相手にならないことが通る。
+  - _Requirements: 3.1, 3.2, 3.6, 3.8_
+- [x] 3.3 記録と `raise_event` の答えを読む
+  - `get_log` の本文（`#id 時刻 [表示の語] 名前 : 本文`・続きの行はタブ・`(no log entries)`）を記録の列にし、最後の番号を引く問い合わせを作る（記録が無ければ 0）。
+  - `raise_event` の答えを「台本（`Script: ` の行より後）・台本なし・応答が無い・失敗」に分ける。成功や NG の文が `No response from server` か `did not respond within` を含むときも、応答が無いとする。
+  - 終わったとき: 単体の試験で、続きの行・記録 0 件・4 つの答えの分け方が確かめられて通る。
+  - _Requirements: 4.7, 4.8_
+
+- [x] 4. ゴーストのファイル
+- [x] 4.1 (P) ゴーストのルートと表示名を決める
+  - 3 の MCP のクライアントとは別のファイルなので、3.1〜3.3 と並んで進めてよい。4.2・4.3 は同じファイルを書くので 4.1 の後に順に進める。
+  - 既存の `ghost/master` の探し方が返すフォルダが、ファイルのフォルダから上へ 3 つまでの間にあり、`descript.txt` を持つときだけ、その 2 つ上をルートにする（`ghost`・`master`・`descript.txt` の大文字・小文字は区別しない）。覚えと重なりの鍵として、ルートを小文字にした値も持つ。
+  - 表示名は `descript.txt` の `name` の値。`charset` が UTF-8 なら UTF-8、ほかは Shift_JIS で読み、BOM を外す。読めない・無い・空ならルートのフォルダ名。
+  - 終わったとき: 一時フォルダの単体の試験で、深さ 0〜3 は見つかり 4 は外れる・descript 無しは外れる・UTF-8／Shift_JIS／`name` 無しの表示名が通る。
+  - _Boundary: GhostFiles_
+  - _Requirements: 2.1, 2.3_
+- [x] 4.2 `pasta.log` の場所を `pasta.toml` から決める
+  - `[logging]` の表の中・最上位の点で区切ったキー・1 行のインラインテーブルの 3 つの書き方で `file_path` を読む。基本の文字列とリテラルの文字列を読む。
+  - `profile/` で始まり、後にファイル名があり、`..` を含まず、絶対パスでない値だけを使う。書かれていない・`pasta.toml` が無いときは既定の `profile/pasta/logs/pasta.log`。書かれているのに読めない・条件に外れるときは既定を使い、添え書きを付ける。
+  - 終わったとき: 単体の試験で、3 つの書き方・外れた値（`../x`・`C:\x`・`Profile/x`・`profile/`）・読めない書き方（複数行のインラインテーブル）で添え書きが付くことが通る。
+  - _Requirements: 5.6_
+- [x] 4.3 `pasta.log` の増えた分と `variables.toml` を読む
+  - 読む前の大きさを覚え、そこから増えた完全な行だけを読む（最後の改行より後の書きかけは次の回に残す）。読めなければ「読めない」を返す。
+  - 行のレベル（ERROR・WARN・INFO・DEBUG・TRACE）を読み、`SHIORI load entry completed` の行から `loaded=true`／`false` を読む（ほかの値は読まない）。
+  - `variables.toml` の場所・更新時刻・中身を読む。書き込みはしない。
+  - 終わったとき: 単体の試験で、書きかけの行が残ること・レベルの読み分け・`loaded` の 2 つの値・無いファイルの更新時刻が「無し」になることが通る。
+  - _Requirements: 4.3, 5.7, 6.2, 6.3_
+
+- [x] 5. 3 つの流れ
+- [x] 5.1 SHIORI の読み込み直しと終わりの待ち・誤りの要約を作る
+  - 順は、`pasta.log` の場所を決める → 大きさを覚える → 誤りの記録の最後の番号 → `reload(target="shiori")` → 印が出るか上限（20 秒）まで間隔（250 ms）ごとに増えた分を読む → 番号より後の誤りの記録。時計と眠りは差し込めるようにし、試験は本物の時計を使わない。
+  - 数え方: `pasta.log` は印の行までの ERROR を誤り、WARN を警告とし、印が `loaded=false` ならその行も誤りにする。ベースウェアの記録は表示の語に `warn` を含むものを警告、ほかを誤りにする。
+  - 「再生してよくない」（時間切れ・`loaded=false`・誤りが 1 つ以上）の判定と、要約の文（数と行・0 件なら短い 1 行・時間切れなら `[logging]` の `level`・`filter` を確かめる案内とそこまでの要約・`pasta.log` が読めないときの添え書き・場所の添え書き）を作る。再生は頼まない。
+  - 今の DAP 向けの中身と試験を置き換える。試験には、pasta.dll のソースの 2 か所に `SHIORI load entry completed` と `loaded` の文字列があることを確かめる契約の 1 件を入れる。
+  - 終わったとき: 単体の試験で、印で終わる・時間切れ・`loaded=false`・誤りと警告の数え分け・`pasta.log` が読めない・契約の 1 件が通る。
+  - _Requirements: 4.3, 4.4, 4.5, 5.3, 5.4, 5.5, 5.7, 5.8, 5.9_
+- [x] 5.2 シーンの再生と台本の取り出しを作る
+  - 読み込み直しの結果が「再生してよくない」なら送らない。よければ台本の記録の最後の番号を覚え、`OnPastaSceneAt` を Reference0 に `.pasta` の絶対パス、Reference1 に 1 から数えた行で送る。
+  - 応答が無いときは、台本の記録を上限（5 秒）まで引き直し、表示の語が `Ghost:OnPastaSceneAt` の記録のうち最後のものを台本にする。無ければ「確かめられなかった」にする。
+  - 台本なし（204）のときは、`[debug] enabled = true` の案内と、`pasta.log` の増えた分の `OnPastaSceneAt:` の警告の行を添える。失敗の表記の台本はそのまま出す。
+  - 今の DAP 向けの中身と試験を置き換える。5.1 と合わせて借りる所が無くなった attach の相手の定数のファイルを消す。
+  - 終わったとき: `src/` に attach の相手の定数のファイルと、それを import する所が無く、単体の試験で、行が 1 から数えられる・再生してよくないときは送らない・応答が無いときの引き直しと選び方・確かめられないとき・204 の理由の行が通る。
+  - _Requirements: 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10_
+- [x] 5.3 (P) 保存変数の書き出しと新しさの確かめを作る
+  - 送る前の `variables.toml` の更新時刻を覚え、`OnPastaDumpVariables` を送る。答えが台本・台本なし・応答が無いのどれでも、上限（5 秒）まで更新時刻を見て、前より新しい（前は無かった）ときだけ中身を出す。
+  - 新しくならなければ古い中身を出さず、4.10 と同じ案内と、`pasta.log` の増えた分の `OnPastaDumpVariables:` の行を添える。届かない・形が違う・NG は失敗にする。
+  - 読み込み直しの流れから使うのは型だけにする。
+  - 終わったとき: 単体の試験で、新しい・古いまま・無いの 3 つが通る。
+  - _Boundary: DumpVariables_
+  - _Depends: 5.1_
+  - _Requirements: 6.2, 6.3_
+
+- [x] 6. vscode の糊と組み込み
+- [x] 6.1 コマンドの共通の入口（対象・ゴースト・相手・出力・重なり）を作る
+  - 今のエディタの文書が、ディスク上のファイルで名前があり、コマンドが受ける種類（「▶ シーンを実行」は `.pasta`、ほかは `.pasta`・`.lua`・`pasta.toml`）のときだけ進む。外れたら伝えて止まる。ゴーストのルートが無ければ、そのことと開いているパスを伝えて止まる。
+  - 相手は、覚えた相手を 1 回で確かめ、外れたら（答えない・NG・名前が違う）覚えを捨てて探し直す。0 個なら表示名・ルート・確かめることを添えて止まり、2 つ以上なら名前と番号を並べて選ばせ、閉じたら何も送らない。決まった相手をゴーストごとに、この窓の間だけ覚える。
+  - 出力のパネル「Pasta 開発」を 1 つだけ作り、コマンドごとに時刻・コマンド名・表示名・ルート・相手の名前と番号の頭の行を書き、フォーカスを奪わずに見せる。止まったときと案内は通知で短く出す（届かない・形が違うは誤りの通知）。成功は通知しない。
+  - 同じゴーストへのコマンドが進んでいる間は次を始めず伝える。やり取りの間だけ窓の進み具合を出し、ステータスバーの項目は作らない。試験は番号の列・時間・眠りを差し込める（利用者の設定は足さない）。
+  - 3 つのコマンドは、この時点で 5 の流れを呼んでよい（流れはできている）。試験では真似るサーバーの `reload` が印を書くので、流れは最後まで進む。
+  - 終わったとき: 3 つのコマンドの流れの試験（真似の vscode・真似るサーバー・一時のゴースト）で、相手が見つからない・2 つの相手で選ぶ／閉じる／2 回目は聞き直さない・覚えた番号に別のベースウェアが答える・同じゴーストへ 2 本の場合が通る。
+  - _Depends: 2.1, 2.2, 3.1, 3.2, 4.1, 5.1, 5.2, 5.3_
+  - _Requirements: 2.1, 2.4, 2.5, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 7.1, 7.2, 7.3, 7.4, 7.5_
+- [x] 6.2 3 つのコマンドの流れをつなぐ
+  - 「▶ シーンを実行」と「SHIORI をリロード」は、ルートの下の未保存の `.pasta`・`.lua`・`pasta.toml` を確かめずに全部保存し、1 つでも保存できなければ止まる。ルートの外の文書は保存しない。
+  - 「▶ シーンを実行」は毎回読み込み直してから再生の流れを、「SHIORI をリロード」は読み込み直しの流れを、「保存変数を表示」は保存も読み込み直しもせずに書き出しの流れを呼び、要約の行を出力に積む。読み込み直しを省く道を持たない。
+  - 終わったとき: 流れの試験で、読み込みの誤りが増えた・終わらない・応答が無い（記録から出る／出ない）・204・保存変数の書く／書かない（保存も `reload` もしない）・ルートの下だけ保存の場合が通る。
+  - _Requirements: 4.2, 4.3, 4.4, 4.5, 4.7, 4.8, 4.9, 4.10, 4.11, 5.2, 5.3, 5.4, 5.8, 6.2, 6.3, 6.4, 8.2_
+- [x] 6.3 起動と宣言に 3 つのコマンドを組み込み、試験の列を揃える
+  - 起動の処理で、WASM の起動と関係なく 3 つのコマンドを 1 回で登録する。
+  - 宣言のコマンドを 3 つ（どれも `Pasta` の分類）にし、`editor/context` に「▶ シーンを実行」（`.pasta`・先頭）・「SHIORI をリロード」・「保存変数を表示」（`.pasta`・`.lua`・`pasta.toml`）を並べる。コマンドパレットには 3 つとも条件なしで出す。`activationEvents` は `onLanguage:pasta` だけ。
+  - `test:unit` に新しい単体の試験（MCP のクライアント・ゴーストのファイル・保存変数）を足し、`test:e2e` に 3 つのコマンドの流れの試験（真似の vscode で束ねる）を足す。宣言の試験に 3 つのコマンドの並びと条件を、起動の試験に 3 つが登録されることを足す。
+  - 新しい依存を足さず、`package-lock.json` を変えない。
+  - 終わったとき: `npm test`（`test:grammar`・`test:unit`・`test:e2e`）が全部通り、`git diff --stat` に `package-lock.json` が無い。
+  - _Requirements: 1.4, 1.5, 4.1, 5.1, 6.1, 8.1, 8.3, 8.4_
+
+- [x] 7. マニュアル・スキル・README
+- [x] 7.1 (P) デバッグの章の入口と導入の頁を書き直す
+  - 章の入口は、拡張と AI エージェントが SSP・areka の MCP へ送り pasta.dll が答える全体像と、`[debug] enabled = true`（か `PASTA_DEBUG=1`）が要ること・書いた後に読み込み直すことを書く。見出し「デバッグの有効化」「pasta.toml による有効化」「環境変数による有効化」「優先順位」を残す。有効になったかの確かめは、`debug-mcp-runtime` の設計の新しい info の行の文言で書く（決まっていなければ、あちらの要件の言い方で書く）。「無効時のゼロコスト」「ポートを変更するときの注意」は消す。
+  - 導入の頁は、拡張の導入・SSP と areka の MCP の窓口（番号の列・127.0.0.1 だけ・設定は無い）・前の版から移るとき（`launch.json` の pasta の構成と `[debug]` の `port`・`present_as`・`source_map_sidecar` はもう効かず消してよい）を書く。
+  - attach・`launch.json` の手順・`host`・9276・ブレークポイント・ステップ・変数の inspect・提示モードを残さない。導入と締めの台詞の決まりを保つ。
+  - 終わったとき: 2 頁に上の言葉が残っておらず（`grep` で 9276・attach・sourcePresentation が出ない）、残す見出し 4 つがある。
+  - _Boundary: ManualChapter（index・vscode-setup）_
+  - _Requirements: 9.2, 9.3, 9.5, 9.8, 9.9, 9.10_
+- [x] 7.2 (P) 開発の操作と困ったときの頁を書き直す
+  - 開発の操作の頁は、見出し「シーン再生（▶ シーンを実行）」を残し、3 つのコマンドの動き（ゴーストの見つけ方・相手の選び方と覚え方・毎回の読み込み直し・誤りが増えたとき・応答が無いとき・204 のときの案内）を書く。AI エージェントの手順は `lua/shiori-events.md` の「MCP からの呼び方」節へリンクする。
+  - 困ったときの頁は、相手が見つからない（ゴーストの起動・MCP の窓口の有効化）・読み込みの終わりを確かめられない（`[logging]` の `level`・`filter`・`file_path` の添え書き）・204・応答が無い・`pasta.log` が読めない・古い `launch.json` の確かめ方と、デバッグが有効になったかを `debug-mcp-runtime` の新しい info の行で確かめる方法を書く。
+  - 導入と締めの台詞の決まりを保ち、消える頁への言及を残さない。
+  - 終わったとき: 2 頁に 3 つのコマンドと上の場合がそれぞれ書かれ、9276・attach・ブレークポイントの手順が残っていない。
+  - _Boundary: ManualChapter（dev-actions・troubleshooting）_
+  - _Requirements: 9.2, 9.4, 9.8, 9.9, 9.10_
+- [x] 7.3 (P) AI エージェントの手順を `shiori-events.md` の節に書き、スキルへ流す
+  - 「MCP からの呼び方」節だけを書き直す: 相手の確かめ（`get_property(baseware.name, ghost_name=<ルート>)`）・`ghost_name` にルートの絶対パス・`reload(target="shiori")` と `pasta.log` の `SHIORI load entry completed` までの待ち（今の `get_status` の 1 文を置き換える）・`get_log(error, since_id)` での誤りの数え方・`OnPastaScene`（完全一致の名前）と `OnPastaSceneAt`・`OnPastaSetSaveVariable` と `OnPastaDumpVariables`（引数と書き出す場所は各節へリンクし、決まりを写さない）・「No response from server」のときの `get_log(script, since_id)`。
+  - 同じ頁の別の節は触らない。`node book/tools/gen-skill-refs.mjs` で `pasta-lua-coding` の references を作り直す（`SKILL.md` は手で直さない）。
+  - 終わったとき: `gen-skill-refs.mjs --check` が通り、references の節がマニュアルと同じ中身になっている。
+  - _Boundary: AgentGuide_
+  - _Requirements: 10.1, 10.2, 10.3_
+- [x] 7.4 (P) README を 2 つ直す
+  - 拡張の README の機能の一覧から「デバッガ接続（DAP）・提示モードの切り替え」を消し、3 つのコマンドと、動いている SSP・areka へ MCP で送ることを書く。
+  - ルートの README のデバッグの章と VSCode 拡張の説明（38・47 行）から「`.pasta` の行で止めて調べる」「デバッガ接続」を消し、新しい働きに合わせる。
+  - 終わったとき: 2 つの README に DAP・ブレークポイント・提示モードの言葉が残っていない。
+  - _Boundary: Readmes_
+  - _Requirements: 11.1, 11.2_
+- [x] 7.5 頁を消し、目次と章の検査を合わせ、マニュアルの検証を通す
+  - `source-level.md` と `constraints.md` を消し、`SUMMARY.md` のデバッグの行から外す。`validate.md` は変えない。
+  - `verify-content.mjs` の G 節の頁の一覧を `index`・`vscode-setup`・`dev-actions`・`troubleshooting` にし、必須の言葉を `PASTA_DEBUG`・`.pasta`・`OnPastaSceneAt`・`[debug]`・`MCP`・`baseware.name` にする（`9276`・`attach`・`sourcePresentation` を外す）。
+  - その時の `main` に `debug-mcp-runtime` が入っていなければ、消す頁を引く行（`reference/pasta-toml.md` の提示モードの切替へのリンク・`internals/debug.md` の 2 頁へのリンク・`DEBUGGING.md` の頁の一覧）を最小に直し（外すか残る頁へ向ける）、`gen-skill-refs.mjs` で references を作り直してから `--check` をもう一度走らせる。入っていれば直さず rebase で合わせる。
+  - 終わったとき: `verify-content.mjs`・`link-check.mjs`・`gen-skill-refs.mjs --check`・`mdbook build` が通る。
+  - _Depends: 7.1, 7.2, 7.3_
+  - _Requirements: 9.1, 9.7, 9.8, 9.9_
+
+- [x] 8. 確かめ
+- [x] 8.1 全体の試験と残りの確かめ
+  - 拡張の `npm test` の全部と、マニュアルの検証（7.5 の 4 つ）を走らせる。
+  - 拡張・マニュアル・README に DAP の部品の名前（`debuggers`・`onDebug`・`sourcePresentation`・`debugAdapter`・9276）が残っていないことを `grep` で確かめる。`package-lock.json` と本番の依存が変わっていないことを確かめる。
+  - 終わったとき: 上の全部が通り、残りの名前の `grep` が空である。
+  - _Depends: 6.3, 7.4, 7.5_
+  - _Requirements: 1.5, 8.4, 9.8_
+- [x] 8.2 実機で 3 つのコマンドを通し、動画を撮り直す
+  - 開発の拡張を SSP（動いていれば areka も）で動いているゴーストに向け、3 つのコマンドを拡張から通す。areka が動いていなければ、確かめていないことを research.md に書く。
+  - 「シーンの実行 → 辞書の編集 → もう一度の実行」を撮り、`dev-actions.md` の動画を差し替える。
+  - 終わったとき: 動画が新しい流れのものに替わり、実機の結果（相手・台本・リロードの要約・保存変数）が research.md に記録されている。
+  - _Depends: 8.1_
+  - _Requirements: 9.6_
+
+## Implementation Notes
+- 2.1: fakeMcpServer は startFakeMcpServer(init?) が {port,state,addLog,close} を返し、state を直に書き換えて振る舞いを変える。自己確かめは src/test/fakeMcpServer.selfcheck.ts（6.3 で列に入れるか決める）。「200 で本文が空」を出すモードは未実装（要るなら raiseEvent.mode に足す）。
+- 2.2: mock の showQuickPick は setNextQuickPickSelection(ラベル) で 1 回だけ選ぶ（未設定は閉じた扱い）。文書は createTextDocument(path,{isDirty,languageId,saveResult})。記録は配列で slice(before) で見る。
+- 3.1: mcpClient.ts の内部 rpc() は 3.2 の initialize で使える。単体試験は src/test/mcpClient.test.ts（6.3 で test:unit に足す）。fakeMcpServer に raiseEvent.mode=empty（200 で本文が空）を足した。
+- 4.1: ghostFiles.ts の resolveGhost(fileFsPath, masterPath) は master のパスを受ける。糊（6.1）は resolveGhost(uri.fsPath, findGhostMaster(uri)?.fsPath)（ghostValidator.ts）で呼ぶ。試験は src/test/ghostFiles.test.ts（vscode の alias 不要）。
+- 4.2: file_path の判定は pasta の logger.rs と同じく部品で判じる（\ も区切り・profile/dir/ は通す）。文字列の startsWith で判じない。
+- 4.3: readNewLines は pasta.log がまだ無いときも undefined（読めない）を返す。5.1 の待ちでは引き直し続け、最後の結果で「読めない」を決める。
+- 5.1: reloadShiori.ts は design の名前どおり（reloadAndWait・blocksPlayback・formatReload ほか）。試験は本物の HTTP の fakeMcpServer に向けて走る。
+- 5.2: pasta.log は logger.rs の Mutex<RollingFileAppender> に同期で書かれるので、204 の直後に 1 回読めば理由の行が揃う。fakeMcpServer に raiseEventLog（raise_event のとき pasta.log へ書く行）を足した。
+- 5.3: 依存の向きを守る。共有の describeResult は mcpClient.ts、DEBUG_HINT は ghostFiles.ts に置く。dumpVariables は reloadShiori から import type だけ、runSceneAtCursor からは何も取らない。
+- 6.1: 本物の vscode.Uri では ghost_name に送るルートがドライブ文字小文字の fsPath（c:\...）になる。ベースウェアが大文字・小文字を区別して照らさないかを 8.2 の実機で確かめる。e2e は src/test/devCommands.e2e.test.ts（6.3 で test:e2e に足す）。
+- 6.3: 7.2 で dev-actions.md の古い表記「SHIORIリロード」を「SHIORI をリロード」に直す。
+- 7.1: debug-mcp-runtime は brief.md しか無く info の行の文言は未決。マニュアルは仮の言い方「開発用のイベントを許したことを示す info の行」で書いた（7.2 もこれに揃える）。あちらで文言が決まったら引用を足す。
+- 8.1: 残りの名前の grep は、拡張（src・package.json・README）・book/src/debug/・ルートの README・DEBUGGING.md で空。book/src/internals/debug.md と reference/pasta-toml.md の [debug] の表に残る 9276・sourcePresentation は、今の pasta.dll にまだある DAP の説明で debug-mcp-runtime の持ち場（設計 187・819 行。brief へ申し送り済み）。npm test・lint・tsc・マニュアルの 4 つの検査は通り、package-lock.json と依存は 8bab2af9 から変わっていない。
+- 完了時にその場で解決: lastLogId が流れの callTimeoutMs を受けていなかった（値は同じで実害なし）のを渡すようにした。
+- 完了時にその場で解決: 同じ名前のベースウェアを 1 つにまとめることを dev-actions.md に書いた。
+- 完了時の棚卸: probe が initialize の serverInfo.name を読まないのは直さない（相手の判定は baseware.name で足りる）。runScene の failed の分かれ道の単体試験は e2e の誤りの通知の試験で足りるとして足さない。

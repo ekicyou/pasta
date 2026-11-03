@@ -19,9 +19,13 @@ local AUTHOR_MIXED = short("C:\\ghost\\master/scripts\\sub/天気.lua")
 local LONG_REL = "scripts\\とても長い名前のフォルダーの中の\\さらに長い名前の天気のスクリプト.lua"
 local AUTHOR_LONG = short(GHOST .. "/" .. LONG_REL:gsub("\\", "/"))
 local DUP = short(GHOST .. "/scripts/dup.lua")
+local OTHER_CACHE = short(GHOST .. "/profile/pasta/cache/lua/pasta\\scene\\別.lua")
+local DIC_LUA = short(GHOST .. "/profile/pasta/cache/lua/pasta\\scene\\道具.lua")
 
 local CHUNKS = {
-    [CACHE] = true,
+    [CACHE] = { pasta = "dic\\天気.pasta" },
+    [OTHER_CACHE] = { pasta = "dic\\別.pasta" },
+    [DIC_LUA] = "dic\\道具.lua",
     [AUTHOR_SHORT] = "scripts\\天気.lua",
     ["scripts/plain.lua"] = "scripts\\plain.lua",
     [AUTHOR_MIXED] = "scripts\\sub\\天気.lua",
@@ -56,7 +60,19 @@ describe("STOP.location（場所の見分け）", function()
     end)
 
     test(".pasta のファイルの / は \\ にそろえる・ファイル名の | は最後の | で切る", function()
-        expect(STOP.location(CACHE, 5, CHUNKS, "dic/a|b.pasta|5:9")):toBe("dic\\a|b.pasta:9")
+        local chunks = { [CACHE] = { pasta = "dic\\a|b.pasta" } }
+        expect(STOP.location(CACHE, 5, chunks, "dic/a|b.pasta|5:9")):toBe("dic\\a|b.pasta:9")
+        chunks = { [CACHE] = { pasta = "dic/天気.pasta" } }
+        expect(STOP.location(CACHE, 30, chunks, LINE_MAP)):toBe("dic\\天気.pasta:15")
+    end)
+
+    test("別の .pasta のキャッシュの行は、行の番号が対応に重なっても出さない", function()
+        expect(STOP.location(OTHER_CACHE, 30, CHUNKS, LINE_MAP)):toBe(nil)
+        expect(STOP.location(OTHER_CACHE, 40, CHUNKS, LINE_MAP)):toBe(nil)
+    end)
+
+    test("dic/ の .lua の写しは元の .lua のパスと行", function()
+        expect(STOP.location(DIC_LUA, 6, CHUNKS, LINE_MAP)):toBe("dic\\道具.lua:6")
     end)
 
     test("対応に無い行・対応が無いときは nil", function()
@@ -92,6 +108,7 @@ describe("STOP.detail（エラー文の整え）", function()
         expect(STOP.detail(CACHE .. ":99: boom", CHUNKS, LINE_MAP)):toBe("boom")
         expect(STOP.detail('[string "entry.lua"]:10: boom', CHUNKS)):toBe("boom")
         expect(STOP.detail(DUP .. ":1: boom", CHUNKS)):toBe("boom")
+        expect(STOP.detail(OTHER_CACHE .. ":30: boom", CHUNKS, LINE_MAP)):toBe("boom")
     end)
 
     test("文中の 10:30: は取らない", function()
@@ -138,7 +155,7 @@ local function with_env(balloon, body)
         end,
     }
     package.loaded["@pasta_chunks"] = {
-        [CACHE] = true,
+        [CACHE] = { pasta = "dic\\天気.pasta" },
         ["scripts/boot.lua"] = "scripts\\boot.lua",
     }
     local ok, err = pcall(body, warns)

@@ -3,8 +3,6 @@
 //! RuntimeConfig controls which Lua standard libraries are enabled in the
 //! PastaLuaRuntime.
 
-use crate::debug::kick::KickSink;
-use crate::debug::{DebugConfig, DebugFileConfig};
 use crate::error::ConfigError;
 use mlua::{Function, Lua, Result as LuaResult, StdLib, Value};
 use pasta_core::registry::SceneAliasTable;
@@ -48,7 +46,7 @@ const REQUIRED_LIBS: &[&str] = &["std_package"];
 ///     "-std_debug".into(),
 /// ]);
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RuntimeConfig {
     /// Library configuration array.
     ///
@@ -71,29 +69,6 @@ pub struct RuntimeConfig {
     /// (e.g. `attempt to index global 'os' (a nil value)`).
     pub libs: Vec<String>,
 
-    /// Resolved debug backend configuration (task 4.2 — single enable choke point).
-    ///
-    /// This is the ONE place the runtime VM init reads to decide whether to call
-    /// [`crate::debug::enable`]. It defaults to **disabled** (`enabled = false`,
-    /// `listen = None`), so every existing `RuntimeConfig` constructor
-    /// (`new`/`minimal`/`full`/`from_libs`) is zero-cost: no
-    /// hook, no port, no `std_debug` exposure (R5.2 / R5.3 / R5.5). The loader
-    /// path overrides this via [`with_debug`](Self::with_debug) after resolving
-    /// pasta.toml `[debug]` + the `PASTA_DEBUG`/`PASTA_DEBUG_PORT` environment.
-    pub debug: DebugConfig,
-
-    /// Optional, host-injected scene-kick sink (`KickSinkSeam`, requirements
-    /// 2.4 / 2.6).
-    ///
-    /// `pasta_lua` holds this opaquely: an outer host (`pasta_shiori`) binds a
-    /// [`KickSink`] closure via [`with_kick_sink`](Self::with_kick_sink) before
-    /// VM construction so an inbound `playScene` debug request can be delivered
-    /// to the actor. It defaults to **`None`** (未注入), so every existing
-    /// constructor leaves the kick path inactive by type and by default value
-    /// (R2.6). Wiring the sink through `enable` into the socket-bridge is a later
-    /// task (2.x); this field is only the injection slot.
-    pub kick_sink: Option<KickSink>,
-
     /// Global scene name alias table (scene-name-alias).
     ///
     /// The runtime hands this ONE table to both `@pasta_search` registration
@@ -105,20 +80,6 @@ pub struct RuntimeConfig {
     pub scene_aliases: SceneAliasTable,
 }
 
-impl std::fmt::Debug for RuntimeConfig {
-    // Hand-written because `kick_sink: Option<KickSink>` wraps a `dyn Fn` trait
-    // object, which is not `Debug`. The sink is summarised as present/absent so
-    // the rest of the config still prints (mirrors the derived layout).
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RuntimeConfig")
-            .field("libs", &self.libs)
-            .field("debug", &self.debug)
-            .field("kick_sink", &self.kick_sink.as_ref().map(|_| "<sink>"))
-            .field("scene_aliases", &self.scene_aliases)
-            .finish()
-    }
-}
-
 impl RuntimeConfig {
     /// Create a new configuration with all safe libraries enabled (default).
     ///
@@ -126,8 +87,6 @@ impl RuntimeConfig {
     pub fn new() -> Self {
         Self {
             libs: default_libs(),
-            debug: DebugConfig::default(),
-            kick_sink: None,
             scene_aliases: SceneAliasTable::empty(),
         }
     }
@@ -138,8 +97,6 @@ impl RuntimeConfig {
     pub fn full() -> Self {
         Self {
             libs: vec!["std_all_unsafe".into()],
-            debug: DebugConfig::default(),
-            kick_sink: None,
             scene_aliases: SceneAliasTable::empty(),
         }
     }
@@ -150,8 +107,6 @@ impl RuntimeConfig {
     pub fn minimal() -> Self {
         Self {
             libs: vec!["std_all".into()],
-            debug: DebugConfig::default(),
-            kick_sink: None,
             scene_aliases: SceneAliasTable::empty(),
         }
     }
@@ -164,34 +119,8 @@ impl RuntimeConfig {
     pub fn from_libs(libs: Vec<String>) -> Self {
         Self {
             libs,
-            debug: DebugConfig::default(),
-            kick_sink: None,
             scene_aliases: SceneAliasTable::empty(),
         }
-    }
-
-    /// Attach a resolved [`DebugConfig`] to this configuration (builder).
-    ///
-    /// Used by the loader path (`PastaLuaRuntime::from_loader_with_scene_dic`) to
-    /// set the debug gate from pasta.toml `[debug]` + the environment, and by
-    /// tests to enable the backend. When `debug.enabled` is `false` this is a
-    /// no-op relative to the zero-cost default. Returns `self` for chaining.
-    pub fn with_debug(mut self, debug: DebugConfig) -> Self {
-        self.debug = debug;
-        self
-    }
-
-    /// Attach (or clear) the host-injected scene-kick sink (builder).
-    ///
-    /// `KickSinkSeam` (requirements 2.4 / 2.6): an outer host (`pasta_shiori`)
-    /// binds a [`KickSink`] closure here before VM construction so an inbound
-    /// `playScene` debug request can be delivered to the actor. Passing `None`
-    /// leaves (or restores) the default — the kick path stays inactive.
-    /// `pasta_lua` holds the sink opaquely and never inspects its body. Returns
-    /// `self` for chaining.
-    pub fn with_kick_sink(mut self, kick_sink: Option<KickSink>) -> Self {
-        self.kick_sink = kick_sink;
-        self
     }
 
     /// Set the global scene name alias table (builder).
@@ -210,19 +139,6 @@ impl RuntimeConfig {
             self.libs.push("std_ffi".into());
         }
         self
-    }
-
-    /// Resolve and attach the debug gate from a pasta.toml `[debug]` section plus
-    /// the process environment (`PASTA_DEBUG` / `PASTA_DEBUG_PORT`).
-    ///
-    /// This is the loader-side bridge the design calls `DebugConfig::from_runtime`
-    /// (design "DebugConfig & Gate"): it funnels the file `[debug]` config and the
-    /// environment through the single pure [`DebugConfig::resolve`] choke point and
-    /// stores the result on `self.debug`. Precedence (env overrides file overrides
-    /// defaults) and the `listen = None` when disabled invariant are owned by
-    /// `resolve`. Returns `self` for chaining.
-    pub fn with_debug_from_file_and_env(self, file: Option<&DebugFileConfig>) -> Self {
-        self.with_debug(DebugConfig::from_env(file))
     }
 
     /// Convert libs array to mlua::StdLib flags.
@@ -412,58 +328,6 @@ mod ensure_libs_tests {
                 ),
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod kick_sink_tests {
-    use super::*;
-    use crate::debug::kick::KickRequest;
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicBool, Ordering};
-
-    #[test]
-    fn default_runtime_config_has_no_kick_sink() {
-        // Requirement 2.6: debug 無効が既定 ⇒ キック経路は型・既定値で非活性。
-        // 全コンストラクタで sink 未注入（None）であること。
-        assert!(RuntimeConfig::new().kick_sink.is_none());
-        assert!(RuntimeConfig::full().kick_sink.is_none());
-        assert!(RuntimeConfig::minimal().kick_sink.is_none());
-        assert!(
-            RuntimeConfig::from_libs(vec!["std_all".into()])
-                .kick_sink
-                .is_none()
-        );
-        assert!(RuntimeConfig::default().kick_sink.is_none());
-    }
-
-    #[test]
-    fn with_kick_sink_holds_some_and_is_invocable() {
-        // Requirement 2.4: 注入された汎用 sink を RuntimeConfig が保持する。
-        let called = Arc::new(AtomicBool::new(false));
-        let flag = Arc::clone(&called);
-        let config =
-            RuntimeConfig::new().with_kick_sink(Some(Arc::new(move |req: KickRequest| {
-                assert_eq!(req.scene, "OnTest");
-                flag.store(true, Ordering::SeqCst);
-            })));
-
-        let sink = config.kick_sink.as_ref().expect("sink must be Some");
-        sink(KickRequest {
-            scene: "OnTest".into(),
-        });
-        assert!(
-            called.load(Ordering::SeqCst),
-            "injected sink must be called"
-        );
-    }
-
-    #[test]
-    fn with_kick_sink_none_clears_sink() {
-        let config = RuntimeConfig::new()
-            .with_kick_sink(Some(Arc::new(|_req: KickRequest| {})))
-            .with_kick_sink(None);
-        assert!(config.kick_sink.is_none());
     }
 }
 

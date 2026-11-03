@@ -110,8 +110,8 @@ impl ReloadProbe {
 /// reload を 1 回（spawn→teardown）回し、teardown が clean（ack が届き異常が無い）だったかを返す。
 fn run_one_reload_cycle(load_dir: &Path, timeout: Duration) -> bool {
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(load_dir.to_path_buf(), rx, None, None)
-        .expect("actor thread must spawn");
+    let actor =
+        spawn_actor_thread_with(load_dir.to_path_buf(), rx, None).expect("actor thread must spawn");
     let report = teardown_via_sender(&tx, timeout);
     // ack の有無に関わらず手放す（join でハングさせない）。ack 済みならループは抜け済み。
     actor.detach();
@@ -221,13 +221,12 @@ fn user_objects_zero_is_read_by_last_error() {
     assert_eq!(user_objects_from(3, 0), Some(3));
 }
 
-/// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前
+/// 開発セッションが export した `PASTA_DEBUG` を main 前
 /// （プロセスが単一スレッドの間）に中和する。写経元: `common/mod.rs`。
 #[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
     }
 }
 
