@@ -96,3 +96,101 @@
 `requirements.md` の「要件ディスカッションで決めること」1〜5 のほかに、次を伝える。
 
 - `brief.md` の Current State の「`builtins.rs` に無い名前を `＠…（…）` で呼ぶと無い関数として注意が出る」は今の検査と合わない（検査は `＞` と選択肢の飛び先だけを見る）。要件 6 は `＞` の Call と名前の重なりだけを約束した。`＠名前（…）` の関数名を検査するのは、この spec の外（今の検査の範囲を広げる別の話）。
+
+---
+
+# 設計フェーズの調査（2026-11-03）
+
+## Summary（設計）
+- **Discovery Scope**: Extension（軽い調査。`design-discovery-light.md`）。新しい依存も外部の API も無いので、Web の調査はしない。
+- **使った規則とスキル**: `kiro-spec-design` の `design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`。ゴーストの書き方・Lua の口の確かめに、`pasta-ghost-authoring`・`pasta-lua-coding` の references（マニュアルの写し）の該当章だけを見た（`call-jump.md` の特殊な呼び出しの表・`script-api.md` の `GLOBAL` の表）。
+- **Key Findings**:
+  - Call の生成コードは、呼んだシーンの引数を後ろに足す（`act:call(…, "名前", {}, 引数…, table.unpack(args))`）。引数付きで呼ばれたシーンの中の `＞シーン数（「雑談」）` には、そのシーンの引数も渡る。`＠シーン数（…）`（`expr_fn`）には足さない。余分な引数の警告（4.4）は、Call の形ではシーンの引数でも出る（`＞おすすめ項目` と同じ）。
+  - Call の戻り値は捨てられる（`SCENE.wrap` は `fn(act, ...)` の後に `act:build()` を返す。末尾の `return act:call(…)` の数値も使われない）。3.5 は置くだけで満たす。
+  - 完全一致の数は、前方一致の候補を `parse_fn_name(fn_name).0` の通し番号を外した名前で絞る。索引のキー（`fn_name_to_search_key`）と同じ材料なので、Lua で通し番号なしに登録したシーン（`register_global_raw("雑談", …)`）でも索引と一致する。
+  - 日本語と英語の名前に同じ関数を当てる今の書き方（`GLOBAL["チェイントーク"] = GLOBAL.yield`）では、関数は呼ばれた名前を知らない。4.1（失敗表記に呼んだ関数の名前）を満たすには、名前ごとに関数を作る。
+  - 今の `GLOBAL` の組み込みで、引数の誤りを `FAILURE.report` で報告するものは無い。手本はイベントの `FAILURE.bad_reference0`（`BAD_NAME`・`kind_of`・`"<名前>: bad argument: …=" .. quoted`）。
+
+## Research Log（設計）
+
+### Call・式・アクション行での戻り値の扱い
+- **Context**: 3.3〜3.5（数を台詞に出す・数値で返す・Call では何も出さない）。
+- **Sources Consulted**: `crates/pasta_lua/pasta_scripts/pasta/act.lua`（`ACT_IMPL.talk` 226 行・`call_expr` 444 行・`ACT_IMPL.call` 683 行）、`pasta/scene.lua`（`SCENE.wrap` 177 行）、`tests/fixtures/sample.generated.lua`（`expr_fn` と `call` の生成の形）。
+- **Findings**:
+  - アクション行の `＠シーン数（…）` は `act:…:talk((act:…:expr_fn("シーン数", …)))` になり、`talk` が `tostring` で積む（LuaJIT の整数の数値は `"5"`）。
+  - 変数代入の右辺は `var.n = act:expr_fn(…)` で、数値のまま入る。
+  - Call は `handler(self, ...)` を呼んで戻り値を返すが、シーン関数の戻り値は `SCENE.wrap` が捨てる。
+  - 引数の `＄x` は `var.x` の生の参照で、値が無くても報告しない（関数の中の報告と重ならない）。
+- **Implications**: 関数は数値を返すだけでよい。引数の誤りで `0` を返すと、アクション行では失敗表記の後に `0` が出る（要件ディスカッションの決定 1 の帰結。設計に書く）。
+
+### 失敗の報告の形
+- **Context**: 4.1・4.2・4.5・4.6。
+- **Sources Consulted**: `pasta/failure.lua`（`LABEL`・`kind_of`・`quoted`・`report`・`notation`・`enabled`）、`shiori/event/external_control.lua`・`scene_play.lua`（`bad_reference0` の使い方）、`shiori/event/recommend.lua`（余分な引数の `log.warn`）。
+- **Findings**: `FAILURE.report(act, record)` は、ログに警告を 1 行出し、`[logging] balloon_warning` が真なら表記を `act.token` に積み、act が `nil` ならログだけにする。`failure.lua` は読み込み時に何も require しない（ログと設定は呼んだ時点）ので、`global.lua` から require しても循環しない。
+- **Implications**: 新しい種類の名前は足さない（`BAD_NAME`「名前にならない値」を使う）。
+
+### `@pasta_search` を引く時期
+- **Context**: 3.7。
+- **Sources Consulted**: `crates/pasta_lua/src/search/mod.rs` 81 行（`package.loaded["@pasta_search"]` に置く）、`runtime/finalize.rs`、`pasta/scene.lua` 145・212 行。
+- **Findings**: `SCENE.search` は呼んだ時点で `require("@pasta_search")` を素のまま引く（無ければ Lua のエラー）。`find_act_handler` だけが `pcall` で包む。
+- **Implications**: 数の関数も呼んだ時点で素の `require` で引く（`SCENE.search` と同じ）。読み込みの前（`main.lua` の上の段）に呼んだときは Lua のエラーになる（要件の範囲の外。仮定として書く）。
+
+### 名前を列挙している場所
+- **Context**: 6.3・7.1〜7.5。
+- **Sources Consulted**: `おすすめ区切り` を全体から grep した。
+- **Findings**: 一覧があるのは `builtins.rs`・`validate_scenes_test.rs`・`book/src/grammar/call-jump.md`・`book/src/debug/validate.md`・`book/src/lua/script-api.md`（`GLOBAL` の表。おすすめの 2 つは今も載っていない）・生成の references・`.claude/skills/pasta-ghost-authoring/SKILL.md`（特殊 Call の手書きの行）・`steering/product.md`。`internals/registry-search.md` 256 行は「…を含む」の例示で、全部の一覧ではない（おすすめの 2 つも無い）。
+- **Implications**: 直すのは要件 6・7 が挙げた場所だけにする。`registry-search.md` は例示なので触らない（ギャップ分析の「決めること」の答え）。`SKILL.md` の手書きの行は要件に無く、分類器が書き込みを拒むことがあるので、この spec では触らない（OPEN QUESTION）。
+
+## Architecture Pattern Evaluation（設計）
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A: 今の部品を伸ばす | `SearchContext` に数のメソッド、`global.lua` に関数 | 触るファイルが少ない・`＞` と同じ部品を通る | 別名と揃えの 2 行が 3 か所目になる | 採る |
+| B: Lua だけで数える | `STORE.scenes` を回す | Rust に触らない | 照合用の名前・別名の規則の作り直しで `＞` とずれる | 採らない（brief の Problem そのもの） |
+| C: 候補の一覧を返す | 登録名の一覧を公開し `#` で数える | 後で名前が欲しいときに使える | 頼まれていない口を約束する | 採らない（YAGNI） |
+
+## Design Decisions（設計）
+
+### Decision: Rust のメソッドは 2 つ、本体は 1 つ
+- **Context**: 1.1・2.1・7.4。
+- **Alternatives Considered**:
+  1. `count_scene(name, exact)` 1 つ
+  2. `count_scene`／`count_scene_exact` の 2 つと、非公開の本体 `count_scene_by`
+- **Selected Approach**: 2。`search_scene`／`search_scene_exact`／`search_scene_by` の分け方と同じにする。Lua のメソッドも `count_scene(name)`・`count_scene_exact(name)` の 2 つ。
+- **Rationale**: 同じファイルの書き方に揃え、Lua の口で真偽値の引数を約束しない。
+- **Trade-offs**: 数行増える。
+
+### Decision: 完全一致は `fn_name` の前半の通し番号を外して比べる
+- **Context**: 2.1・2.2。`scene_table.rs` に触らない（同じウェーブの約束）。
+- **Alternatives Considered**: `get_scene(id).name` を比べる（brief の再測定の答え）／`fn_name` の `::` の前を比べる（ギャップ分析の小さな選択 2）／`scene_table.rs` に関数を足す（約束に反する）。
+- **Selected Approach**: `fn_name` の前半。索引のキーを作る `fn_name_to_search_key` と同じ材料なので、完全一致の検索（`prefix_index.get(key)`）の候補と一致する。
+- **Trade-offs**: 前方一致の候補を作ってから絞るので、短い名前では余計に回る。辞書の規模とトークの中の 1 回の呼び出しでは問題にならない。
+
+### Decision: 別名と揃えの 2 行は写す（共通の関数に出さない）
+- **Context**: 1.4・1.5・1.6。
+- **Selected Approach**: `search_local_scene_exact` と同じく 2 行を写す。共通の関数に出すと `search_scene_by`・`search_local_scene_exact` の書き換えになり、この spec の範囲を超える。数の口は別名を当てて見つからなくても警告を出さない（0 は正しい答え）。
+- **Trade-offs**: 規則が変わるとき 3 か所を直す。`scene-exact-match` などが検索の規則を変えるときの見直しの対象に挙げる（Revalidation Triggers）。
+
+### Decision: 名前ごとに関数を作る（同じ関数を 2 つの名前に当てない）
+- **Context**: 3.1・4.1（失敗表記に呼んだ関数の名前）。
+- **Alternatives Considered**:
+  1. 今の書き方どおり `GLOBAL["シーン数"] = GLOBAL.scene_count` にし、表記の名前を日本語の名前に固定する
+  2. 名前と使うメソッドから関数を作る小さな関数（`global.lua` の中の `local`）で、4 つの名前それぞれに関数を作る
+- **Selected Approach**: 2。動作は対の名前で同じで、表記とログに出る名前だけが呼んだ名前になる。
+- **Trade-offs**: `GLOBAL.scene_count ~= GLOBAL["シーン数"]`（同じ関数ではない）。マニュアルの `GLOBAL` の表は「同じ関数」でなく「同じ動作」と書く（OPEN QUESTION）。
+
+### Decision: 引数の確かめは Lua で、Rust のメソッドは空の名前をエラーにする
+- **Context**: 4.1〜4.4・7.4。
+- **Selected Approach**: 値の種類の確かめ・数値の `0`・余分な引数の警告は `global.lua` の関数で行う（ほかの組み込みと同じ層）。`@pasta_search` のメソッドは文字列を受け、0 件は `0`、空の名前は `search_scene` と同じく Lua のエラーにする（`InvalidScene`）。
+- **Rationale**: `@pasta_search` のほかのメソッドと同じ約束にし、作者向けの報告は DSL の口に置く。
+- **Trade-offs**: `SEARCH:count_scene("")` を直に呼ぶ Lua の作者はエラーを受ける（マニュアルに書く。OPEN QUESTION）。
+
+## Synthesis（設計）
+- **Generalization**: 前方一致と完全一致は、同じ「別名を当て・揃え・グローバルの候補を集め・（完全一致なら）絞って数える」の 2 つの形。本体 1 つに `exact` の切り替えで書く（`search_scene_by` と同じ）。
+- **Build vs Adopt**: 候補集め（`collect_scene_candidates`）・名前の分解（`split_registered_name`）・別名（`SceneAliasTable::resolve`）・揃え（`sanitize_name`）・報告（`FAILURE.report`）・名前の一致テスト（`validate_parity_test.rs`）をそのまま使う。新しく作るのは、数えるメソッドと関数を作る小さな関数だけ。
+- **Simplification**: 候補の一覧の口・属性の絞り込み・「今出せる数」・前に呼んだときの 0 の扱い・共通の別名の関数は作らない。Lua の試験（`lua_specs`）は足さず、実物の読み込みの Rust の統合試験 1 本にまとめる（DSL の 4 通りの呼び方と `@pasta_search` を同じ場で確かめられる）。
+
+## Risks & Mitigations（設計）
+- 引数付きで呼ばれたシーンの中の `＞シーン数（…）` で、余分な引数の警告が出る — `＞おすすめ項目` と同じ動きとして受け、マニュアルに書くかを議論で決める（OPEN QUESTION）。
+- 別名と揃えの規則が 3 か所になる — 試験で `＞名前` の候補と数が等しいことを確かめ、ずれを試験で拾う。
+- `GLOBAL_NAMES` の足し忘れ — `validate_parity_test.rs` の一致テストが落とす。
