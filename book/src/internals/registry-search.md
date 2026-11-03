@@ -36,7 +36,7 @@
 | `SceneRegistry`・`SceneEntry` | `crates/pasta_core/src/registry/scene_registry.rs` | シーンを登録順の `Vec` に集め、1 始まりの ID を振る。`register_global`・`register_local` はトランスパイル時の登録で、`register_global` は同名のグローバルシーンにサニタイズ後の名前ごとのカウンタで通し番号を振り、`register_local` は呼び出し側が渡すローカルの通し番号を使う。`register_global_raw` は辞書確定での登録で、通し番号付きの登録名をそのまま受け取る。`registered_name` は登録名を作り、`split_registered_name` は登録名を（名前, 通し番号）に分ける（[登録名の構成](#登録名の構成)）。`sanitize_name` は名前の英数字と `_` 以外を `_` に置き換える。登録と検索が共有する照合規則である（[照合規則の共有](#照合規則の共有)） |
 | `SceneAliasTable` | `crates/pasta_core/src/registry/scene_alias.rs` | グローバルシーン名の別名表（別名 → 置き換え先）。`resolve` は書いた名前が別名に完全一致したときだけ置き換え先を返す（1 段だけ）。`fingerprint` はキャッシュの判定に使う正準な文字列を返す（[トランスパイル結果キャッシュ](transpiler.md#トランスパイル結果キャッシュ)）。`builtin_default` は内蔵の既定表（`DEFAULT_ENTRIES` の 7 件）を返し、`with_written` は `[scene.alias]` に書いた行をキーごとに既定表へ重ねる（書いた行だけを先に検証し、次に残った既定と合わせて検証する。既定とのぶつかりは `ConflictsWithDefault`・`TargetIsDefaultAlias`）。規則は [シーン名の別名](../grammar/call-jump.md#シーン名の別名) が正である |
 | `ActorFont`・`FontInput`・`FontValue`・`FONT_ATTRIBUTES` | `crates/pasta_core/src/actor_font.rs` | `pasta.toml` のアクターの装い（`font`）の検査と、`\f[属性名,値]` を書いた順に連ねたタグ列への変換。レジストリと検索表からは使わない。pasta.dll の設定読込（[ローダ自己展開とモジュール解決](loader.md#設定読込)）と `pasta_check validate` が、どちらもこの規則を使う。誤りは `crates/pasta_core/src/error.rs` の `ActorFontError`・`FontValueProblem` で返す。規則は [装い（font）](../reference/pasta-toml.md#装いfont) が正である |
-| `SceneId`・`SceneScope`・`SceneInfo` | `crates/pasta_core/src/registry/scene_types.rs` | 検索表が持つシーン情報。`SceneId` は `SceneTable` 内の 0 始まりの添字である |
+| `SceneId`・`SceneScope`・`SceneInfo` | `crates/pasta_core/src/registry/scene_types.rs` | 検索表が持つシーン情報。`SceneId` は `SceneTable` 内の 0 始まりの添字である。`SceneInfo.attributes` はシーンの属性の書いた順の並びで、項目は `SceneAttr`（宣言・条件・フラグ）、値は `SceneAttrValue`（整数・小数・文字列）、条件の演算子は `CmpOp` である（同じファイル） |
 | `SceneTable` | `crates/pasta_core/src/registry/scene_table.rs` | シーンの検索表。`SceneInfo` の `Vec`、前方一致の索引（`BTreeMap<String, Vec<SceneId>>`）、選択状態のキャッシュ、`RandomSelector` を持つ。前方一致の `resolve_scene_id_unified` と完全一致の `resolve_scene_id_exact` の 2 つの解決と、指定したローカルシーンを持つグローバルシーンだけから選ぶ `resolve_global_owning_local_exact` を持つ |
 | `WordDefRegistry`・`WordEntry` | `crates/pasta_core/src/registry/word_registry.rs` | 単語の定義を、検索キーと値のリストの組（`WordEntry`）として登録順に集める。グローバル・ローカル・アクターの 3 種の登録関数がキーの形式を決める |
 | `WordTable`・`WordCacheKey` | `crates/pasta_core/src/registry/word_table.rs` | 単語の検索表。`WordEntry` の `Vec`、前方一致の索引（`BTreeMap<String, Vec<usize>>`）、選択状態のキャッシュ、`RandomSelector` を持つ |
@@ -89,22 +89,33 @@
 pasta.scene_dic
  ├ require("pasta.scene.…") × 全モジュール
  │   生成コードの実行 → pasta.scene / pasta.word が Lua 側のテーブルに登録
+ │                     PASTA.set_scene_attrs が STORE.scene_attrs に属性を書く
  └ require("pasta").finalize_scene()          … Rust: finalize_scene_impl
      1. collect_scenes: get_all_scenes() を走査
           {グローバル名: {__global_name__, ローカル名: 関数, …}}
           → __global_name__ を除く全キーを (グローバル名, ローカル名) の組に
           （1 件も無ければ警告ログ）
-     2. collect_words: get_all_words() の global / local / actor を走査
+     2. collect_scene_attrs: STORE.scene_attrs を走査（読むだけ）
+          {グローバル名: {ローカル名: {項目…}}} → (グローバル名, ローカル名) ごとの SceneAttr の並び
+          （写せない項目は警告ログを出して飛ばす。項目数はデバッグログ）
+     3. collect_words: get_all_words() の global / local / actor を走査
           {キー: {{値…}, {値…}}} → 値のリスト 1 つにつき WordCollectionEntry 1 つ
-     3. build_scene_registry: グローバル名ごとにまとめ、グローバル名・ローカル名とも
-                             （名前, 通し番号）の昇順に並べて register_global_raw（属性は空）
+     4. build_scene_registry: グローバル名ごとにまとめ、グローバル名・ローカル名とも
+                             （名前, 通し番号）の昇順に並べて register_global_raw
+                             （属性は 2 の並び。無いシーンは空の並び）
         build_word_registry: アクター → register_actor、ローカル → register_local、
                              それ以外 → register_global
-     4. search::register: SearchContext::with_aliases（両検索表を既定の乱数で構築し、別名表を持たせる）
+     5. search::register: SearchContext::with_aliases（両検索表を既定の乱数で構築し、別名表を持たせる）
           → package.loaded["@pasta_search"] を置き換える
 ```
 
 `register_global_raw` は、グローバル名（`メイン_1` のように通し番号を含む登録名）から `メイン_1::__start__` を作ってグローバルシーンとして登録し、`__start__` 以外のローカル名ごとに `メイン_1::選択肢_1` の形でローカルシーンを登録する。カウンタは使わず、名前を作り直さない。グローバル名の通し番号は Lua 側の `create_scene` が全モジュールを通して振ったものであり、ローカル名はトランスパイラが生成したシーン関数名（`選択肢_1` の形）と、Lua ブロックで定義した関数の名前である。
+
+シーンの属性は、生成コードが倉（`STORE.scene_attrs`）に書いた並びを、辞書確定が Rust の登録へ運ぶ（倉への書き方は [属性の文](transpiler.md#属性の文)）。トランスパイル時の `TranspileContext` の登録は VM へ渡らないため、実行時の `SceneInfo.attributes` はこの運搬だけで決まる。
+
+- `collect_scene_attrs`（`crates/pasta_lua/src/runtime/finalize.rs`）は、倉の項目を `SceneAttr` の 3 種に写す。`op` があれば条件、`key` が `＄` で始まり `op` が無ければフラグ、それ以外は宣言である。数は、整数の値で `i64` に収まれば整数、それ以外は小数になる（`SceneAttrValue::from_f64`）。`key` が文字列でない・値が数でも文字列でもない・`op` が正規形でない項目は、警告ログを出して飛ばす。
+- `build_scene_registry` は、各シーンの属性を（グローバル名, ローカル名）のキーで引いて `register_global_raw` に渡す。グローバルシーンはキー `__start__` の並び、ローカルシーンはその関数名の並びで、ローカルシーンに親の属性は足さない。倉に無いシーン（属性の無いシーン・Lua ブロックで定義した関数）は空の並びになる。属性の有無で登録するシーンの数と順は変わらない。
+- 倉は読むだけで書き換えない。そのため Lua の `SCENE.attrs`（[SCENE.attrs](../lua/script-api.md#sceneattrsglobal_name-local_name)）と Rust の登録は、項目ごとに同じ並びを持つ。
 
 登録の順序は `build_scene_registry` が決める。グローバル名を `scene_order_key` で並べ、同じグローバルシーンの中のローカル名も同じキーで並べてから登録する。`scene_order_key` は、`split_registered_name` で分けた（名前, 通し番号）と登録名そのものの組である。通し番号は数値で比べ、通し番号の無い名前（`__start__`・`加算ループ` など）は同じ名前の通し番号のある名前より前になる。（名前, 通し番号）が同じになる名前（`_01` と `_1` など）は登録名の文字列の順で決まる。この順序は `HashMap` の走査順や Lua の `pairs` の順に依存せず、同じ入力から同じ登録順になる。同じ検索キーに入る同名シーンが通し番号の小さい順に並ぶのはこの登録順による（`メイン_2` は `メイン_10` より前。[前方一致による候補の収集](#前方一致による候補の収集)）。
 
@@ -180,7 +191,7 @@ pasta.scene_dic
 - どの経路も、ローカルに候補が無いときにグローバルへ移ることはない。ローカルからグローバルへの順序は Lua 側の検索手順が組み立てる（後述「ローカル優先の検索順」）。
 - 候補は、索引を検索キーから順に、キーが検索キーで始まる間だけ読む順に集まる。`BTreeMap` はキーのバイト列の辞書順で並ぶ。同じキーに複数の項目があれば、その中は登録順である。辞書確定の登録順は（名前, 通し番号）の昇順であるため（[辞書確定](#辞書確定)）、同名シーンは通し番号の小さい順に並ぶ。
 - 単語の候補は項目ではなく値である。前方一致したすべての項目の値のリストを、上の順で 1 本につなげたものが候補になる。
-- シーンでは、候補を集めた後に属性フィルタ（`filter_by_attributes`）をかける。`SearchContext` は常に空のフィルタを渡し、辞書確定は属性を空で登録するため、実行時の検索ではフィルタは候補を減らさない。
+- シーンでは、候補を集めた後に属性フィルタ（`filter_by_attributes`）をかける。辞書確定はシーンを属性つきで登録するが、`SearchContext` は常に空のフィルタを渡すため、実行時の検索ではフィルタは候補を減らさない。
 - シーン名が空文字列なら `InvalidScene` になる。単語名は空文字列を検査しない。
 
 `search_scene` は、選ばれたシーンの関数名を最初の `::` で分け、`(グローバル名, ローカル名)` の 2 値を Lua へ返す。第 2 引数なしの検索ではローカル名を常に `__start__` にする。候補が無い・フィルタで全滅したなどの「見つからない」エラーは、Lua には値を返さない（受け取る側は `nil`）形になる。それ以外のエラー（空の名前など）は `Scene search error: …` の Lua エラーになる。`search_word` は見つかれば値の文字列、見つからなければ何も返さない。
@@ -281,7 +292,7 @@ skip_methods が真のとき（動的参照）
 - 候補の列挙順はキーのバイト列の辞書順で決まり、同じキーの中は登録順（辞書確定では（名前, 通し番号）の昇順）である。
 - 検索表は構築後に項目を追加・削除しない。変化するのは選択状態のキャッシュと `RandomSelector` だけである。
 - `SearchContext` は Lua VM ごとに 1 つであり、検索表の選択状態はその VM の中だけで共有される。
-- 実行時の検索では属性フィルタは効かない（属性は空で登録され、フィルタも空で渡される）。
+- 実行時の検索では属性フィルタは効かない（シーンは属性つきで登録されるが、フィルタは空で渡される）。属性は候補の選択を変えない。
 
 ## ソースの所在
 

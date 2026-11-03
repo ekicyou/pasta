@@ -88,7 +88,7 @@ AST ノードは `Span`（開始・終了の行と桁、バイトオフセット
 | 要素 | 所在 | 役割 |
 | ---- | ---- | ---- |
 | `LuaTranspiler` | `crates/pasta_lua/src/transpiler.rs` | 1 ファイル分の AST を受け取り、登録と生成の走査・出力の正規化を行う入口 |
-| `TranspileContext` | `crates/pasta_lua/src/context.rs` | 走査中の状態。`SceneRegistry`・`WordDefRegistry`（`pasta_core`）とファイル属性の累積を持つ |
+| `TranspileContext` | `crates/pasta_lua/src/context.rs` | 走査中の状態。`SceneRegistry`・`WordDefRegistry`（`pasta_core`）を持ち、受け継いだ属性でシーンを登録する |
 | `LuaCodeGenerator` | `crates/pasta_lua/src/code_gen/mod.rs` | 出力先・インデント・出力行番号（`out_line`）・ソースマップ用シンクを持つ生成器本体。ヘッダ出力と行出力の共通処理 |
 | スコープ単位の生成 | `crates/pasta_lua/src/code_gen/scope_gen.rs` | アクター辞書・グローバルシーン・ローカルシーンの Lua ブロック、末尾呼び出しの判定、選択肢 |
 | 要素単位の生成 | `crates/pasta_lua/src/code_gen/element_gen.rs` | アクション・変数代入・Call・単語定義・Lua ブロック、変数の経路と動的参照の引数 |
@@ -125,9 +125,10 @@ AST ノードは `Span`（開始・終了の行と桁、バイトオフセット
   require("pasta.scene_dic")
     ├ require("pasta.scene.…") × 全モジュール
     │   生成コードの実行で PASTA.create_actor / create_scene / create_word が
-    │   Lua 側のレジストリへ登録する
+    │   Lua 側のレジストリへ登録する（シーンの属性は PASTA.set_scene_attrs が
+    │   STORE.scene_attrs へ書く）
     └ require("pasta").finalize_scene()
-        Lua 側の登録を収集して SceneRegistry / WordDefRegistry を作り直し、
+        Lua 側の登録と属性を収集して SceneRegistry / WordDefRegistry を作り直し、
         @pasta_search を登録し直す
 ```
 
@@ -161,14 +162,16 @@ AST ノードは `Span`（開始・終了の行と桁、バイトオフセット
 
 | 項目 | 登録（`TranspileContext`） | 生成 |
 | ---- | -------------------------- | ---- |
-| `FileAttr` | ファイル属性に累積する。同じキーは後の値で上書きする | なし |
+| `FileAttr` | なし（受け継ぎは走査の前に `PastaFile::global_scene_attrs` が決める） | なし |
 | `GlobalWord` | 名前ごとにグローバル単語として登録する | `PASTA.create_word(名前):entry(値, …)` をファイルの最上位に出力する |
 | `ActorScope` | 名前ごとにアクター単語として登録する | アクターごとの `do` 〜 `end` ブロック |
-| `GlobalSceneScope` | 宣言名を決め、その名前でグローバルシーンを登録し、同名の出現順の番号を得る。シーンレベルの単語をそのシーンのローカル単語として登録する | ファイル属性とシーン属性を統合（シーンが優先）したうえで、シーンごとの `do` 〜 `end` ブロックを出力する。生成後、名前付きローカルシーンを、生成器と同じ `local_scene_counters` の通し番号で登録する |
+| `GlobalSceneScope` | 宣言名を決め、その名前と受け継いだ属性の並びでグローバルシーンを登録し、同名の出現順の番号を得る。シーンレベルの単語をそのシーンのローカル単語として登録する | 同じ属性の並びを渡して、シーンごとの `do` 〜 `end` ブロックを出力する。生成後、名前付きローカルシーンを、生成器と同じ `local_scene_counters` の通し番号と、その宣言行の属性で登録する |
 
 グローバルシーンの宣言名は、`process_global_scene` の冒頭で 1 回だけ決める。書いた名前（単独の `＊` 行ではパーサが引き継いだ名前）が `TranspilerConfig.scene_aliases` の別名に完全一致すれば置き換え先の名前、そうでなければ書いた名前である。登録・シーンレベルの単語のモジュール名・生成コードの `create_scene` の名前・名前付きローカルシーンの親の名前は、すべてこの宣言名から作る。そのため既定の表のもとで `＊会話` は `OnTalk` のシーンとして登録され、生成コードも `OnTalk` で `create_scene` を呼ぶ（規則は [シーン名の別名](../grammar/call-jump.md#シーン名の別名)）。
 
-ファイル属性はファイルごとの状態であり、別のファイルへは持ち越さない。統合した属性は生成器へ渡されるが、現行のコード生成は属性を出力に使わない。
+グローバルシーンの属性の並びは、走査の前に `PastaFile::global_scene_attrs`（`crates/pasta_dsl/src/parser/ast/attr_merge.rs`）がファイルの中のグローバルシーンごとに 1 本ずつ作り、走査は `GlobalSceneScope` に出会うたびに次の 1 本を使う。並びは、その位置のファイル属性の行 → シーンの属性（宣言行の付記 → 初期部の属性行）を `merge_attrs` で畳んだものである。ファイル属性の行は、次のファイル属性の行までのグローバルシーンに付き、次の行で丸ごと置き換わる（ファイル属性の行を 2 行続けて書くことはパーサが拒む）。ファイル属性は別のファイルへは持ち越さない。
+
+`merge_attrs(inherited, own)` は `inherited` → `own` の順に並べ、宣言は同じ名前を先の位置に 1 つ残して値を後のものにし、条件とフラグは畳まずに足す。ローカルシーンは何も受け継がず、`merge_attrs(&[], 宣言行の属性)` の並びになる。登録（`TranspileContext`）では、並びを `scene_attrs_of` で `SceneAttr`（宣言・条件・フラグ）に写して `SceneRegistry` に渡す。生成器は同じ並びを属性の文にする（[属性の文](#属性の文)）。利用者向けの規則は [属性](../grammar/block-structure.md#属性) が正である。
 
 ### 生成される Lua コードの形
 
@@ -210,7 +213,7 @@ end
 スコープごとの形は次のとおりである。
 
 - **アクター辞書**: `local ACTOR = PASTA.create_actor("名前")` に続けて、単語定義ごと・名前ごとに `ACTOR:create_word(名前):entry(値, …)` を出力する。配下の Lua ブロックは、言語識別子が `lua` のものだけを出力する。属性行と変数代入行は出力しない。
-- **グローバルシーン**: `PASTA.create_scene` には、シーン名のうち Unicode の英字・数字（`char::is_alphanumeric`。かな・漢字を含む）と `_` 以外の文字を `_` に置き換えた基本名を渡す（`SceneRegistry::sanitize_name`）。番号は付けない。シーンレベルの単語定義は `SCENE:create_word(名前):entry(値, …)` として関数定義より前に出力する。グローバルシーンとローカルシーンに置いた Lua ブロックは、そのグローバルシーンのすべての関数定義の後に、言語識別子にかかわらず出力する。
+- **グローバルシーン**: `PASTA.create_scene` には、シーン名のうち Unicode の英字・数字（`char::is_alphanumeric`。かな・漢字を含む）と `_` 以外の文字を `_` に置き換えた基本名を渡す（`SceneRegistry::sanitize_name`）。番号は付けない。シーンに属性があれば、同じ行の後ろに `; PASTA.set_scene_attrs(SCENE, "関数名", { 項目, … })` を続ける（[属性の文](#属性の文)）。シーンレベルの単語定義は `SCENE:create_word(名前):entry(値, …)` として関数定義より前に出力する。グローバルシーンとローカルシーンに置いた Lua ブロックは、そのグローバルシーンのすべての関数定義の後に、言語識別子にかかわらず出力する。
 - **ローカルシーン**: 暗黙の開始ブロックは常に `SCENE.__start__` になり、名前付きローカルシーンは `照合用の名前_通し番号` の関数になる（`SceneRegistry::registered_name`。`・選択・A` は `選択_A_1`）。照合用の名前はローカルシーン名をサニタイズしたもので、通し番号は同じグローバルシーンの中で照合用の名前ごとに数える出現順（1 始まり）である（`crates/pasta_lua/src/context.rs` の `local_scene_counters`）。`・挨拶・1` と `・挨拶_1` はどちらも照合用の名前が `挨拶_1` なので、`挨拶_1_1` と `挨拶_1_2` になる。トランスパイル時のレジストリの `register_local` も同じ通し番号を使うため、レジストリのローカルシーンの登録名は生成した関数名と一致する。どの関数も `local args = { ... }` と `local save, var = act:init_scene(SCENE, …)` で始まる（[init_scene の引数](#init_scene-の引数)）。`__start__` でシーンにアクター指定行がある場合は、続けて `act:clear_spot()` と、アクターごとの `act:set_spot(名前, 番号)` を出力する。
 - **Lua ブロック**: 内容の行を書いたとおりに出力する。インデントを足さず、内容の中の空行（`end` の直前の空行も）も残す。
 
@@ -258,6 +261,19 @@ end
 説明は、実行時の警告と失敗表記に被演算子の場所を出すための文字列リテラルである（`binary_operand` が `operand_desc` の結果を文字列リテラルにする）。変数参照は変数の経路（`"var.x"`・`"save.x"`・`"args[1]"`）、関数呼び出しは `"@名前()"`・`"@*名前()"`・`"@$変数の経路()"`、括弧は中身の説明になり、リテラルと入れ子の演算（算術・連結）には説明が無い。説明が無ければ説明の引数を省く。関数呼び出しには必ず説明があるため、関数の戻り値が変換の呼び出しの最後の引数になることはなく、関数が複数の値を返しても先頭の 1 つだけが渡る。`PASTA.num`・`PASTA.str` の実行時の振る舞い（`nil` を 0・空文字列にすること、変換できない値の報告）は [PASTA.num](../lua/script-api.md#pastanumop-v-desc)・[PASTA.str](../lua/script-api.md#pastastrv-desc) が正である。
 
 動的参照の生成（`element_gen.rs` の `dynamic_ref_args`）は、変数の値を `tostring` せずにそのまま渡し、変数の経路（`var.変数名`・`save.変数名`・`args[番号+1]`）を文字列リテラルにして続けて渡す。値の検査と検索キーへの変換は実行時に行う（[Lua ランタイム内部モジュール](internal-modules.md#動的参照のキーworddynamic_key)）。ここで生成した `act` のメソッドが実行時に何をするかは、[ランタイム実行モデル](execution-model.md) と [Lua ランタイム内部モジュール](internal-modules.md) で扱う。
+
+#### 属性の文
+
+属性のあるシーンでは、グローバルシーンの `create_scene` の行の後ろに、属性を倉（`STORE.scene_attrs`）へ書く文を続ける（`code_gen/scope_gen.rs` の `append_set_scene_attrs`）。次は、`＆季節：春` の後の `＊メイン`（初期部に `＆＄＊経験値≧500`、ローカルシーン `・選択肢＆優先：3`）の行である。
+
+```lua
+    local SCENE = PASTA.create_scene("メイン"); PASTA.set_scene_attrs(SCENE, "__start__", { { key = "季節", value = "春" }, { key = "＄＊経験値", op = ">=", value = 500 } }); PASTA.set_scene_attrs(SCENE, "選択肢_1", { { key = "優先", value = 3 } })
+```
+
+- 文は、グローバルシーン自身（`"__start__"`。受け継いだ並び）のぶんと、属性のある名前付きローカルシーン（生成した関数名。宣言行の属性だけ）のぶんを、この順に並べる。属性の無いシーンのぶんは出さない。
+- 項目は、宣言が `{ key = 名前, value = 値 }`、条件が `{ key = "＄…", op = "正規形の演算子", value = 値 }`、フラグが `{ key = "＄…" }` である。数は式の数値と同じ表記、文字列は `StringLiteralizer` のリテラルで書く。
+- 行を足さずに同じ行へ続けるため、生成コードの行の数と `init_scene` に渡す行の対応は、属性の有無で変わらない。
+- `PASTA.set_scene_attrs` は `SCENE.set_attrs` そのもので、生成コードのための関数である。倉に書いた並びは、辞書確定が Rust の登録へ運び（[辞書確定](registry-search.md#辞書確定)）、`SCENE.attrs` が Lua から読む（[SCENE.attrs](../lua/script-api.md#sceneattrsglobal_name-local_name)）。
 
 #### init_scene の引数
 

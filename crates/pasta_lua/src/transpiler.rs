@@ -40,8 +40,8 @@ impl LuaTranspiler {
 
     /// Transpile PastaFile to Lua code (MAJOR-2).
     ///
-    /// Processes FileItems in document order, accumulating file attributes
-    /// and generating code for actors and scenes.
+    /// Processes FileItems in document order, registering each global scene
+    /// with its inherited attributes and generating code for actors and scenes.
     ///
     /// # Arguments
     /// * `file` - The parsed PastaFile AST
