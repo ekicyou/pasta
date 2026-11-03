@@ -32,16 +32,19 @@ fn test_resolve_scene_id_not_found() {
     }
 }
 
+fn season(value: &str) -> crate::registry::SceneAttr {
+    crate::registry::SceneAttr::Decl {
+        key: "季節".to_string(),
+        value: crate::registry::SceneAttrValue::String(value.to_string()),
+    }
+}
+
 fn build_filtered_table() -> SceneTable {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    let mut spring = HashMap::new();
-    spring.insert("季節".to_string(), "春".to_string());
-    let mut winter = HashMap::new();
-    winter.insert("季節".to_string(), "冬".to_string());
-    registry.register_global("挨拶", spring);
-    registry.register_global("挨拶", winter);
+    registry.register_global("挨拶", vec![season("春")]);
+    registry.register_global("挨拶", vec![season("冬")]);
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
     SceneTable::from_scene_registry(registry, selector)
@@ -60,7 +63,7 @@ fn test_resolve_scene_id_attribute_filter_selects_matching() {
             .resolve_scene_id_unified("", "挨拶", &filters)
             .unwrap();
         let scene = table.get_scene(id).unwrap();
-        assert_eq!(scene.attributes.get("季節"), Some(&"冬".to_string()));
+        assert_eq!(scene.attributes, vec![season("冬")]);
     }
 }
 
@@ -87,7 +90,7 @@ fn test_get_scene_out_of_range_returns_none() {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    registry.register_global("会話", HashMap::new());
+    registry.register_global("会話", Vec::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![0]));
     let table = SceneTable::from_scene_registry(registry, selector);
@@ -138,8 +141,8 @@ fn test_from_scene_registry_groups_same_name_scenes() {
     // Two scenes with the same name share the search-key prefix and both
     // are reachable via sequential consumption
     let mut registry = SceneRegistry::new();
-    registry.register_global("会話", HashMap::new()); // 会話_1
-    registry.register_global("会話", HashMap::new()); // 会話_2
+    registry.register_global("会話", Vec::new()); // 会話_1
+    registry.register_global("会話", Vec::new()); // 会話_2
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
@@ -159,10 +162,10 @@ fn test_resolve_scene_id_unified_cache_key_includes_module() {
 
     // Create registry with same-named local scenes in different modules
     let mut registry = SceneRegistry::new();
-    let (_, counter1) = registry.register_global("会話A", HashMap::new());
-    registry.register_local("選択肢", "会話A", counter1, 1, HashMap::new());
-    let (_, counter2) = registry.register_global("会話B", HashMap::new());
-    registry.register_local("選択肢", "会話B", counter2, 1, HashMap::new());
+    let (_, counter1) = registry.register_global("会話A", Vec::new());
+    registry.register_local("選択肢", "会話A", counter1, 1, Vec::new());
+    let (_, counter2) = registry.register_global("会話B", Vec::new());
+    registry.register_local("選択肢", "会話B", counter2, 1, Vec::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
@@ -191,7 +194,7 @@ fn build_table(globals: &[&str], selector: Vec<usize>) -> SceneTable {
 
     let mut registry = SceneRegistry::new();
     for name in globals {
-        registry.register_global(name, HashMap::new());
+        registry.register_global(name, Vec::new());
     }
     SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(selector)))
 }
@@ -273,10 +276,10 @@ fn test_resolve_scene_id_exact_local_scope() {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    let (_, counter) = registry.register_global("会話", HashMap::new());
-    registry.register_local("選択肢続き", "会話", counter, 1, HashMap::new());
-    registry.register_local("選択肢", "会話", counter, 2, HashMap::new());
-    registry.register_global("選択肢", HashMap::new());
+    let (_, counter) = registry.register_global("会話", Vec::new());
+    registry.register_local("選択肢続き", "会話", counter, 1, Vec::new());
+    registry.register_local("選択肢", "会話", counter, 2, Vec::new());
+    registry.register_global("選択肢", Vec::new());
     let mut table =
         SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![0])));
     let empty = HashMap::new();
@@ -319,10 +322,7 @@ fn test_resolve_scene_id_exact_attribute_filter() {
     let mut winter = HashMap::new();
     winter.insert("季節".to_string(), "冬".to_string());
     let id = table.resolve_scene_id_exact("", "挨拶", &winter).unwrap();
-    assert_eq!(
-        table.get_scene(id).unwrap().attributes.get("季節"),
-        Some(&"冬".to_string())
-    );
+    assert_eq!(table.get_scene(id).unwrap().attributes, vec![season("冬")]);
 
     let mut summer = HashMap::new();
     summer.insert("季節".to_string(), "夏".to_string());
@@ -342,13 +342,13 @@ fn build_owning_table() -> SceneTable {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    let (_, c1) = registry.register_global("会話", HashMap::new());
-    registry.register_local("挨拶", "会話", c1, 1, HashMap::new());
-    let (_, c2) = registry.register_global("会話", HashMap::new());
-    registry.register_local("挨拶続き", "会話", c2, 1, HashMap::new());
-    let (_, c3) = registry.register_global("会話", HashMap::new());
-    registry.register_local("挨拶", "会話", c3, 1, HashMap::new());
-    registry.register_global("雑談", HashMap::new());
+    let (_, c1) = registry.register_global("会話", Vec::new());
+    registry.register_local("挨拶", "会話", c1, 1, Vec::new());
+    let (_, c2) = registry.register_global("会話", Vec::new());
+    registry.register_local("挨拶続き", "会話", c2, 1, Vec::new());
+    let (_, c3) = registry.register_global("会話", Vec::new());
+    registry.register_local("挨拶", "会話", c3, 1, Vec::new());
+    registry.register_global("雑談", Vec::new());
     SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![])))
 }
 

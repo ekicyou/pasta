@@ -2,9 +2,12 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use pasta_core::{MockRandomSelector, SceneAliasTable, SceneRegistry, SceneTable};
+use pasta_core::{
+    CmpOp, MockRandomSelector, SceneAliasTable, SceneAttr, SceneAttrValue, SceneRegistry,
+    SceneTable,
+};
 use pasta_dsl::PastaFile;
-use pasta_dsl::parser::{Attr, FileItem, Span};
+use pasta_dsl::parser::{Attr, AttrBody, AttrValue, FileItem, Span};
 
 use super::{Finding, FindingKind, builtins, msg};
 
@@ -45,7 +48,7 @@ pub(crate) fn check(
         });
         for scene in scenes {
             let declared = aliases.resolve(&scene.name).unwrap_or(&scene.name);
-            let (_, counter) = registry.register_global(declared, attr_map(&scene.attrs));
+            let (_, counter) = registry.register_global(declared, scene_attrs_of(&scene.attrs));
             for (local, local_counter) in scene.local_scenes.iter().zip(local_counters(scene)) {
                 if let Some(name) = &local.name {
                     registry.register_local(
@@ -53,7 +56,7 @@ pub(crate) fn check(
                         declared,
                         counter,
                         local_counter,
-                        attr_map(&local.attrs),
+                        scene_attrs_of(&local.attrs),
                     );
                 }
             }
@@ -152,12 +155,37 @@ fn finding(code: FindingKind, path: &str, span: Span, message: String) -> Findin
     )
 }
 
-/// pasta_lua の context.rs register_global_scene_named・register_local_scene と同じ属性の形
-fn attr_map(attrs: &[Attr]) -> HashMap<String, String> {
+/// 構文木の属性 → 倉の項目（pasta_lua の context.rs に同じ写しがある）
+pub(crate) fn scene_attrs_of(attrs: &[Attr]) -> Vec<SceneAttr> {
     attrs
         .iter()
-        .filter_map(|a| Some((a.key.clone(), a.value()?.to_string())))
+        .map(|a| {
+            let key = a.key.clone();
+            match &a.body {
+                AttrBody::Decl(v) => SceneAttr::Decl {
+                    key,
+                    value: scene_attr_value(v),
+                },
+                AttrBody::Cond { op, value } => SceneAttr::Cond {
+                    key,
+                    // 正規形の文字列 6 つが pasta_dsl と pasta_core の CmpOp の約束
+                    op: CmpOp::from_normalized(op.as_str())
+                        .expect("pasta_dsl と pasta_core の CmpOp の正規形は一致する"),
+                    value: scene_attr_value(value),
+                },
+                AttrBody::Flag => SceneAttr::Flag { key },
+            }
+        })
         .collect()
+}
+
+/// 値の型の規則（要件 4.5）: 小数は整数の値なら整数、引用の有無は区別しない
+fn scene_attr_value(v: &AttrValue) -> SceneAttrValue {
+    match v {
+        AttrValue::Integer(i) => SceneAttrValue::Integer(*i),
+        AttrValue::Float(f) => SceneAttrValue::from_f64(*f),
+        AttrValue::String(s) | AttrValue::AttrString(s) => SceneAttrValue::String(s.clone()),
+    }
 }
 
 /// pasta_lua の context.rs local_scene_counters と同じ: 照合用の名前ごとの通し番号（名前の無い開始のブロックは 0）

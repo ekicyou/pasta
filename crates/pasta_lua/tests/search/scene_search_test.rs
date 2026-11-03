@@ -7,7 +7,6 @@ use crate::common;
 
 use common::e2e_helpers::create_runtime_with_search;
 use pasta_lua::context::TranspileContext;
-use std::collections::HashMap;
 
 /// Helper to create a TranspileContext with test data for SCENE.search() testing.
 fn create_scene_search_context() -> TranspileContext {
@@ -17,14 +16,14 @@ fn create_scene_search_context() -> TranspileContext {
     // Format: "グローバル名_カウンタ" for fn_name, which becomes "グローバル名_カウンタ" in global_name
 
     // Register "メイン" as global scene (will become メイン_1)
-    let (_, counter) = ctx.scene_registry.register_global("メイン", HashMap::new());
+    let (_, counter) = ctx.scene_registry.register_global("メイン", Vec::new());
 
     // Register local scene under メイン
     ctx.scene_registry
-        .register_local("選択肢", "メイン", counter, 1, HashMap::new());
+        .register_local("選択肢", "メイン", counter, 1, Vec::new());
 
     // Register another global scene for testing
-    ctx.scene_registry.register_global("OnBoot", HashMap::new());
+    ctx.scene_registry.register_global("OnBoot", Vec::new());
 
     ctx
 }
@@ -482,7 +481,7 @@ fn create_exact_search_lua(
 ) -> mlua::Lua {
     let mut ctx = TranspileContext::new();
     for name in names {
-        ctx.scene_registry.register_global(name, HashMap::new());
+        ctx.scene_registry.register_global(name, Vec::new());
     }
     let search = pasta_lua::search::SearchContext::with_aliases(
         ctx.scene_registry,

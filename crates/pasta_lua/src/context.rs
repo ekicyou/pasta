@@ -2,8 +2,8 @@
 //!
 //! This module provides context management for the transpilation process.
 
-use pasta_core::registry::{SceneRegistry, WordDefRegistry};
-use pasta_dsl::parser::{Attr, AttrValue, LocalSceneScope};
+use pasta_core::registry::{CmpOp, SceneAttr, SceneAttrValue, SceneRegistry, WordDefRegistry};
+use pasta_dsl::parser::{Attr, AttrBody, AttrValue, LocalSceneScope};
 use std::collections::HashMap;
 
 /// Transpile context for sharing state during transpilation.
@@ -27,11 +27,8 @@ impl TranspileContext {
     ///
     /// 通し番号は照合用の名前ごとに採番される。Returns (id, counter).
     pub fn register_global_scene_named(&mut self, name: &str, attrs: &[Attr]) -> (i64, usize) {
-        let attrs: HashMap<String, String> = attrs
-            .iter()
-            .filter_map(|a| Some((a.key.clone(), a.value()?.to_string())))
-            .collect();
-        self.scene_registry.register_global(name, attrs)
+        self.scene_registry
+            .register_global(name, scene_attrs_of(attrs))
     }
 
     /// Register a local scene (Task 3.1).
@@ -47,11 +44,7 @@ impl TranspileContext {
         parent_counter: usize,
         local_counter: usize,
     ) -> i64 {
-        let attrs: HashMap<String, String> = local_scene
-            .attrs
-            .iter()
-            .filter_map(|a| Some((a.key.clone(), a.value()?.to_string())))
-            .collect();
+        let attrs = scene_attrs_of(&local_scene.attrs);
 
         // Use scene name if present, otherwise use "__start__"
         let name = local_scene.name.as_deref().unwrap_or("__start__");
@@ -119,6 +112,39 @@ pub fn local_scene_counters(local_scenes: &[LocalSceneScope]) -> Vec<usize> {
             None => 0,
         })
         .collect()
+}
+
+/// 構文木の属性 → 倉の項目（pasta_check の validate/scenes.rs に同じ写しがある）
+pub fn scene_attrs_of(attrs: &[Attr]) -> Vec<SceneAttr> {
+    attrs
+        .iter()
+        .map(|a| {
+            let key = a.key.clone();
+            match &a.body {
+                AttrBody::Decl(v) => SceneAttr::Decl {
+                    key,
+                    value: scene_attr_value(v),
+                },
+                AttrBody::Cond { op, value } => SceneAttr::Cond {
+                    key,
+                    // 正規形の文字列 6 つが pasta_dsl と pasta_core の CmpOp の約束
+                    op: CmpOp::from_normalized(op.as_str())
+                        .expect("pasta_dsl と pasta_core の CmpOp の正規形は一致する"),
+                    value: scene_attr_value(value),
+                },
+                AttrBody::Flag => SceneAttr::Flag { key },
+            }
+        })
+        .collect()
+}
+
+/// 値の型の規則（要件 4.5）: 小数は整数の値なら整数、引用の有無は区別しない
+fn scene_attr_value(v: &AttrValue) -> SceneAttrValue {
+    match v {
+        AttrValue::Integer(i) => SceneAttrValue::Integer(*i),
+        AttrValue::Float(f) => SceneAttrValue::from_f64(*f),
+        AttrValue::String(s) | AttrValue::AttrString(s) => SceneAttrValue::String(s.clone()),
+    }
 }
 
 #[cfg(test)]
@@ -359,6 +385,54 @@ mod tests {
         assert_eq!(
             merged.get("title"),
             Some(&AttrValue::AttrString("MyScene".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_scene_attrs_of_maps_all_three_kinds() {
+        use pasta_dsl::parser::CmpOp as DslCmpOp;
+        let attr = |key: &str, body| Attr {
+            key: key.to_string(),
+            body,
+            span: Span::default(),
+        };
+        let attrs = [
+            attr("季節", AttrBody::Decl(AttrValue::String("夏".into()))),
+            attr("率", AttrBody::Decl(AttrValue::Float(1.0))),
+            attr("重み", AttrBody::Decl(AttrValue::Float(0.5))),
+            attr(
+                "＄＊経験値",
+                AttrBody::Cond {
+                    op: DslCmpOp::Ge,
+                    value: AttrValue::Integer(500),
+                },
+            ),
+            attr("＄初回", AttrBody::Flag),
+        ];
+        assert_eq!(
+            scene_attrs_of(&attrs),
+            vec![
+                SceneAttr::Decl {
+                    key: "季節".into(),
+                    value: SceneAttrValue::String("夏".into()),
+                },
+                SceneAttr::Decl {
+                    key: "率".into(),
+                    value: SceneAttrValue::Integer(1),
+                },
+                SceneAttr::Decl {
+                    key: "重み".into(),
+                    value: SceneAttrValue::Float(0.5),
+                },
+                SceneAttr::Cond {
+                    key: "＄＊経験値".into(),
+                    op: CmpOp::Ge,
+                    value: SceneAttrValue::Integer(500),
+                },
+                SceneAttr::Flag {
+                    key: "＄初回".into()
+                },
+            ]
         );
     }
 }
