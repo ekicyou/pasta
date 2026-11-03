@@ -23,7 +23,8 @@ pasta の VSCode 拡張（以下「拡張」）の開発の道具を、DAP か�
   - ゴーストの特定と、ゴーストが動いているベースウェアの見つけ方・選び方
   - 3 つのコマンドと、その結果の出し方
   - 拡張の単体の試験と、MCP を真似るサーバーを使う e2e
-  - `book/src/debug/` の書き直し、AI エージェントの手順、`SUMMARY.md` のデバッグの行、`editors/vscode/README.md`、ルートの `README.md`
+  - `book/src/debug/` の書き直し、AI エージェントの手順（`lua/shiori-events.md` の「MCP からの呼び方」節）、`SUMMARY.md` のデバッグの行、`editors/vscode/README.md`、ルートの `README.md`
+  - 頁と言葉を消すのに合わせた、`book/tools/verify-content.mjs` の G 節（デバッグの章の検査）の直し
 - **Out of scope**
   - pasta.dll の側（DAP の待ち受けの撤去・門の縮小・`OnPastaDumpVariables` の実装。`debug-mcp-runtime`）
   - ブレークポイント・ステップ・変数のツリー・式の評価（DAP と一緒に捨てる）
@@ -62,11 +63,11 @@ pasta の VSCode 拡張（以下「拡張」）の開発の道具を、DAP か�
 
 #### Acceptance Criteria
 
-1. When 作者が `.pasta` のエディタで 3 つのコマンドのどれかを選んだ, the 拡張 shall その `.pasta` のフォルダから上へ 3 フォルダまでの間で、`descript.txt` を持つ `ghost/master` のフォルダを探し、その 2 つ上のフォルダをゴーストのルートとする（`ghost`・`master` の大文字・小文字は区別しない）。
+1. When 作者が 3 つのコマンドのどれかを選んだ, the 拡張 shall 今のエディタのファイルのフォルダから上へ 3 フォルダまでの間で、`descript.txt` を持つ `ghost/master` のフォルダを探し、その 2 つ上のフォルダをゴーストのルートとする（`ghost`・`master` の大文字・小文字は区別しない）。
 2. The 拡張 shall ベースウェアへゴーストを指名するときは、ゴーストのルートフォルダの絶対パスを使い、`descript.txt` の `name` を使わない。
 3. The 拡張 shall 出力と知らせに出すゴーストの表示名に `descript.txt` の `name` を使い、`name` を読めないときはルートフォルダの名前を使う。
-4. If ゴーストのルートが見つからない, then the 拡張 shall 「ゴーストのフォルダの中の `.pasta` ではない」ことと、開いているファイルのパスを伝え、ベースウェアへは何も送らずに止まる。
-5. If 今のエディタが、ディスクに保存された `.pasta` ではない（新規の名前の無い文書・別の言語のファイル）, then the 拡張 shall ゴーストを特定できないことを伝えて止まる。
+4. If ゴーストのルートが見つからない, then the 拡張 shall 「ゴーストのフォルダの中のファイルではない」ことと、開いているファイルのパスを伝え、ベースウェアへは何も送らずに止まる。
+5. If 今のエディタが、そのコマンドを選べるディスク上のファイルではない（「▶ シーンを実行」は `.pasta`、「SHIORI をリロード」と「保存変数を表示」は `.pasta`・`.lua`・`pasta.toml`。新規の名前の無い文書を含まない）, then the 拡張 shall ゴーストを特定できないことを伝えて止まる。
 
 ### Requirement 3: ベースウェアの見つけ方と選び方
 
@@ -91,7 +92,7 @@ pasta の VSCode 拡張（以下「拡張」）の開発の道具を、DAP か�
 #### Acceptance Criteria
 
 1. The 拡張 shall `.pasta` のエディタの右クリックのメニューの先頭に「▶ シーンを実行」を、いつでも出す。
-2. When 作者が「▶ シーンを実行」を選んだ and 文書に未保存の変更がある, the 拡張 shall 作者に確かめずに文書を保存してから進む。
+2. When 作者が「▶ シーンを実行」を選んだ and そのゴーストのルートの下の `.pasta`・`.lua`・`pasta.toml` に未保存の変更がある, the 拡張 shall 作者に確かめずにそれらを全部保存してから進む（読み込み直しはゴースト全体を読むので、画面のとおりに動かす）。
 3. When 保存が済み、相手が決まった, the 拡張 shall 相手へそのゴーストの SHIORI の読み込み直しを頼み、読み込みが終わるまで待つ。
 4. If 読み込みが一定の時間で終わらない, then the 拡張 shall 再生を頼まずに、読み込みの終わりを確かめられなかったことを伝える。
 5. If 読み込み直しの間に、そのゴーストの読み込みの誤りが増えた（Requirement 5 の 4 と同じ 2 つの記録で数える。警告だけなら再生する）, then the 拡張 shall 再生を頼まずに、増えた誤りの数と内容の要約を出力のパネルに出し、再生しなかったことを知らせる。
@@ -108,14 +109,15 @@ pasta の VSCode 拡張（以下「拡張」）の開発の道具を、DAP か�
 
 #### Acceptance Criteria
 
-1. The 拡張 shall `.pasta` のエディタの右クリックのメニューに「SHIORI をリロード」を、いつでも出す。
-2. When 作者が「SHIORI をリロード」を選んだ and 文書に未保存の変更がある, the 拡張 shall 作者に確かめずに文書を保存してから進む。
+1. The 拡張 shall 「SHIORI をリロード」を、コマンドパレットと、`.pasta`・`.lua`・`pasta.toml` のエディタの右クリックのメニューから、いつでも選べるようにする。
+2. When 作者が「SHIORI をリロード」を選んだ, the 拡張 shall 要件 4 の 2 と同じく、そのゴーストの未保存のファイルを確かめずに全部保存してから進む。
 3. When 保存が済み、相手が決まった, the 拡張 shall 相手へそのゴーストの SHIORI の読み込み直しを頼み、読み込みが終わるまで待つ。
 4. When 読み込みが終わった, the 拡張 shall 読み込み直しの間に増えた、ベースウェアの誤りの記録（そのゴーストの分）と、ゴーストの `pasta.log` の行を要約して出力のパネルに出す（誤りの数・警告の数と、その行）。
 5. When 増えた誤りと警告が無い, the 拡張 shall 読み込みが誤り無く終わったことを短く知らせる。
-6. If ゴーストの `pasta.log` が見つからない、または読めない, then the 拡張 shall ベースウェアの誤りの記録だけで要約し、`pasta.log` を読めなかったことを添える。
-7. If 読み込みが一定の時間で終わらない, then the 拡張 shall 読み込みの終わりを確かめられなかったことを伝え、そこまでに増えた分を要約する。
-8. The 拡張 shall 読み込み直しの後で、シーンを自分から再生しない。
+6. The 拡張 shall ゴーストの `pasta.log` の場所を、`pasta.toml` の `[logging] file_path` に従って決め、書かれていなければ既定の `profile/pasta/logs/pasta.log`（`ghost/master/` から）とする。
+7. If ゴーストの `pasta.log` が見つからない、または読めない, then the 拡張 shall ベースウェアの誤りの記録だけで要約し、`pasta.log` を読めなかったことを添える。
+8. If 読み込みが一定の時間で終わらない, then the 拡張 shall 読み込みの終わりを確かめられなかったことを伝え、そこまでに増えた分を要約する。
+9. The 拡張 shall 読み込み直しの後で、シーンを自分から再生しない。
 
 ### Requirement 6: 保存変数を表示
 
@@ -123,8 +125,8 @@ pasta の VSCode 拡張（以下「拡張」）の開発の道具を、DAP か�
 
 #### Acceptance Criteria
 
-1. The 拡張 shall 「保存変数を表示」を、コマンドパレットと `.pasta` のエディタの右クリックのメニューから選べるようにする。
-2. When 作者が「保存変数を表示」を選び、相手が決まった, the 拡張 shall 相手へ `OnPastaDumpVariables` を送り、ゴーストが書き出した `ghost/master/profile/pasta/debug/variables.toml` を読んで、その中身を出力のパネルに出す。
+1. The 拡張 shall 「保存変数を表示」を、コマンドパレットと、`.pasta`・`.lua`・`pasta.toml` のエディタの右クリックのメニューから選べるようにする。
+2. When 作者が「保存変数を表示」を選び、相手が決まった, the 拡張 shall 相手へ `OnPastaDumpVariables` を送り、ゴーストが書き出した `ghost/master/profile/pasta/debug/variables.toml` を読んで、その中身を出力のパネルに出す（エディタでは開かない。出力のパネルに積むので、前に出した値と比べられる）。
 3. If 送った後に `variables.toml` が無い、または送る前から書き換わっていない, then the 拡張 shall 古い中身を今の値として出さずに、Requirement 4 の 10 と同じデバッグを有効にする案内を出す。
 4. The 拡張 shall 「保存変数を表示」の前に SHIORI を読み込み直さず、未保存の文書も保存しない（動いている間の値を、そのまま見せる）。
 
@@ -137,7 +139,7 @@ pasta の VSCode 拡張（以下「拡張」）の開発の道具を、DAP か�
 1. The 拡張 shall 3 つのコマンドの結果（相手・ゴースト・台本・要約・案内）を、拡張の 1 つの出力のパネルに時刻の順に積む。
 2. When コマンドが失敗や案内で止まった, the 拡張 shall 通知で短く知らせ、詳しい内容を出力のパネルに出す。
 3. If 相手が誤りを返した（道具の誤り・つながらない・答えの形が違う）, then the 拡張 shall その文言を出力のパネルに出し、そのコマンドを止める。
-4. While コマンドが相手とやり取りしている, the 拡張 shall 進んでいることを作者に見せる。
+4. While コマンドが相手とやり取りしている, the 拡張 shall 進んでいることを作者に見せる。やり取りの無い間は何も出さず、送り先を常に出すステータスバーの項目は置かない。
 5. While 同じゴーストへのコマンドが進んでいる, the 拡張 shall そのゴーストへの次のコマンドを始めずに、進んでいるものがあることを伝える。
 
 ### Requirement 8: 試験
@@ -165,8 +167,8 @@ pasta の VSCode 拡張（以下「拡張」）の開発の道具を、DAP か�
 10. The 利用者のマニュアル shall デバッグが有効になったかの確かめ方を、`debug backend listening` の行ではなく、`debug-mcp-runtime` が出す新しい info の行で書く。
 6. The 利用者のマニュアル shall `dev-actions.md` の動画を、新しい流れ（シーンの実行・編集・もう一度の実行）を撮り直したものに替える。
 7. The 利用者のマニュアル shall `validate.md` を変えない。
-8. The 利用者のマニュアル shall 書き直した頁の導入と締めの台詞の決まりを保ち、マニュアルのリンクの検証と中身の検証が通る。
-9. The 利用者のマニュアル shall 他の章から引かれているデバッグの章のアンカー（「シーン再生（▶ シーンを実行）」・「デバッグの有効化」・「pasta.toml による有効化」・「優先順位」）を、同じ見出しで残す。
+8. The 利用者のマニュアル shall 書き直した頁の導入と締めの台詞の決まりを保ち、マニュアルのリンクの検証と中身の検証が通る。中身の検証のうちデバッグの章の検査（`book/tools/verify-content.mjs` の G 節）は、この spec が、頁の一覧（`index`・`vscode-setup`・`dev-actions`・`troubleshooting`）と、章に要る言葉（`PASTA_DEBUG`・`OnPastaSceneAt`・`[debug]` など。`9276`・`attach`・`sourcePresentation` を外す）に合わせて直す。
+9. The 利用者のマニュアル shall 他の章から引かれているデバッグの章のアンカー（「シーン再生（▶ シーンを実行）」・「デバッグの有効化」・「pasta.toml による有効化」・「優先順位」）を、同じ見出しで残す。それでも切れる、他の章から消す頁（`source-level.md`・`constraints.md`）へのリンクは、`debug-mcp-runtime` より先に入るときはこの spec が最小に直し（リンクを外すか、残る頁へ向ける）、後から入るときは rebase で合わせる。
 
 ### Requirement 10: AI エージェントから MCP で使う手順
 
@@ -175,7 +177,7 @@ pasta の VSCode 拡張（以下「拡張」）の開発の道具を、DAP か�
 #### Acceptance Criteria
 
 1. The 利用者のマニュアル shall 「AI エージェントから MCP で使う」手順を載せる。中身は、相手の確かめ（`get_property(baseware.name)`）、`ghost_name` にルートフォルダの絶対パスを渡すこと、`reload(target="shiori")` と終わるまでの待ち、`OnPastaScene`（完全一致の名前で 1 本を指名）と `OnPastaSceneAt`、`OnPastaSetSaveVariable` と `OnPastaDumpVariables`、「No response from server」のときの `get_log(script)` での読み直しである。
-2. The 手順 shall 配るスキル（`pasta-lua-coding` か `pasta-ghost-authoring`）の references に、マニュアルと同じ中身で届く。
+2. The 手順 shall `lua/shiori-events.md` の「MCP からの呼び方」節を正本にして書き、`book/src/debug/` の頁からはその節へリンクする。正本はスキルの references を作る表に在るので、生成器で `pasta-lua-coding` の references にマニュアルと同じ中身で届く（`SKILL.md` は手で直さない）。
 3. The 手順 shall `OnPastaSceneAt`・`OnPastaDumpVariables` の引数・書き出す場所・204 の決まりを、`debug-mcp-runtime` の決まりと食い違わずに書く。
 
 ### Requirement 11: README
