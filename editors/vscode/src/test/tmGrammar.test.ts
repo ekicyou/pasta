@@ -568,6 +568,23 @@ async function runTests(): Promise<void> {
     expect(scopeCoversExactly(l, '＃c', COMMENT_SCOPE), 'trailing comment after attributes');
   });
 
+  // 条件の形・旗・名前なしの ＊ の属性（scene-attribute-store 7.5）
+  test('属性の条件の形と旗は宣言の属性と同じ色', () => {
+    const c = '＊雑談＆＄＊変数＞１００';
+    expect(scopeCoversExactly(c, '雑談', SCENE_SCOPE), 'scene name stops before the condition');
+    expect(scopeCoversExactly(c, '＄＊変数＞１００', ATTR_SCOPE), `condition body: ${scopesAt(c, '＄').join(' ')}`);
+    expect(sameScopes(scopesAt(c, '＆'), ['source.pasta', 'meta.scene.global.pasta', 'meta.attribute.pasta', 'keyword.other.marker.pasta']), `＆: ${scopesAt(c, '＆').join(' ')}`);
+    const f = '　＆＄＊初回待ち';
+    expect(scopeCoversExactly(f, '＄＊初回待ち', ATTR_SCOPE), 'flag on an attribute line');
+    expect(sameScopes(scopesAt(f, '＆'), ['source.pasta', 'meta.attribute.pasta', 'keyword.other.marker.pasta']), `flag ＆: ${scopesAt(f, '＆').join(' ')}`);
+    const u = '＊　＆重み：５';
+    expect(scopeCoversExactly(u, '重み：５', ATTR_SCOPE), 'attribute on the unnamed ＊ line');
+    const h = '　・a ＆$x>=3 ＆＄y ≠ 「a b」 ＃c';
+    expect(scopeCoversExactly(h, '$x>=3', ATTR_SCOPE), 'half-width 2-char operator');
+    expect(scopeCoversExactly(h, '＄y ≠ 「a b」', ATTR_SCOPE), 'spaced operator with quoted value');
+    expect(scopeCoversExactly(h, '＃c', COMMENT_SCOPE), 'comment after conditions');
+  });
+
   test('アクターの行: 名前と行末のコメントを分ける', () => {
     expect(scopeCoversExactly('％さくら ＃c', 'さくら', 'entity.name.class.pasta'), 'actor dictionary name');
     expect(scopeCoversExactly('％さくら ＃c', '＃c', COMMENT_SCOPE), 'actor dictionary trailing comment');
