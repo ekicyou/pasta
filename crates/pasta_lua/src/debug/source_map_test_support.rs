@@ -1,6 +1,5 @@
 //! `source_map` インラインテスト分割（task 2.3・C1）で **クラスタ跨ぎ**に共有する
-//! テストヘルパー。`source_map_resolve_tests.rs` / `source_map_builder_tests.rs` /
-//! `source_map_sidecar_tests.rs` が `use super::source_map_test_support::*;` で参照する。
+//! テストヘルパー。`source_map_resolve_tests.rs` / `source_map_builder_tests.rs` が `use super::source_map_test_support::*;` で参照する。
 //!
 //! 本番可視性は不変。ここに集約するのは test-only ヘルパーのみで `pub(super)` に留める。
 

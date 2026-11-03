@@ -51,29 +51,16 @@ impl PastaLoader {
     /// is best-effort and non-fatal; the primary transpile path in
     /// `process_incremental` is the one that surfaces hard failures).
     ///
-    /// # Optional disk sidecar (task 6.1 — Requirement 3.2)
-    ///
-    /// When `sidecar` is `true` (the resolved `source_map_sidecar` flag — task 4.1,
-    /// `env > file > 既定 false`), each per-chunk [`ChunkSourceMap`] is ALSO written
-    /// to a `<generated.lua>.map` sidecar next to its generated `.lua`
-    /// ([`crate::debug::source_map::write_sidecar`]). The sidecar write is
-    /// NON-FATAL (design Error 611, 616 / Requirement 3.1): an I/O failure is logged
-    /// via `tracing::warn!` and the in-memory `SourceMap` build continues unaffected.
-    /// When `sidecar` is `false` (default) no `.map` file is written and the
-    /// in-memory map is the sole path.
-    ///
     /// `transpiler` must be the one used for the generated `.lua` (the loader
     /// shares a single instance), so the scene join keys use the same alias table.
     pub fn build_source_map(
         pasta_files: &[std::path::PathBuf],
         cache_manager: &CacheManager,
-        sidecar: bool,
         transpiler: &LuaTranspiler,
     ) -> Arc<SourceMap> {
         Arc::new(build_source_map_inner(
             pasta_files,
             cache_manager,
-            sidecar,
             transpiler,
         ))
     }
@@ -87,7 +74,6 @@ impl PastaLoader {
 fn build_source_map_inner(
     pasta_files: &[std::path::PathBuf],
     cache_manager: &CacheManager,
-    sidecar: bool,
     transpiler: &LuaTranspiler,
 ) -> SourceMap {
     let mut source_map = SourceMap::new();
@@ -138,25 +124,6 @@ fn build_source_map_inner(
         // Rebase pre-normalize records onto final `.lua` lines (2.1) and aggregate
         // the per-chunk map by chunk name (3.4).
         let chunk_map = sink.finish(&shift);
-
-        // Optional disk sidecar (task 6.1 / Requirement 3.2): when enabled, write a
-        // `<generated.lua>.map` next to the generated `.lua` (the same cache path the
-        // chunk name was derived from). NON-FATAL (design Error 611, 616 / 3.1): an
-        // I/O failure is logged and the in-memory map build continues unchanged.
-        if sidecar {
-            let lua_path = cache_manager.source_to_cache_path(file_path);
-            if let Err(e) =
-                crate::debug::source_map::write_sidecar(&lua_path, &filename, &chunk_map)
-            {
-                warn!(
-                    file = %lua_path.display(),
-                    error = %e,
-                    "source-map: sidecar write failed; continuing with in-memory map (non-fatal, 3.2/3.1)"
-                );
-            } else {
-                debug!(file = %lua_path.display(), "source-map: wrote sidecar (.lua.map)");
-            }
-        }
 
         source_map.insert_chunk(chunk_name, filename, chunk_map);
         chunk_count += 1;

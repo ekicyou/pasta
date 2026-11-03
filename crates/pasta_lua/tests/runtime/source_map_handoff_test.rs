@@ -1,21 +1,13 @@
 //! Task 4.4 — ランタイムへの集約ソースマップ受け渡し（統合）。
 //!
-//! 仕様参照:
-//! - requirements.md **3.1**（トランスパイル時にソースマップ生成が有効なとき、構築した
-//!   ソースマップをメモリ内に保持し、ブレークポイント解決/停止位置提示の双方向変換に
-//!   使用する）。本テストはオーケストレーション側、すなわち「トランスパイル→構築→
-//!   enable」の順でマップがランタイムへ到達・保持されることを表明する。
-//! - design.md File Structure Plan `runtime/mod.rs` 168（集約 `Arc<SourceMap>` を保持し
-//!   `with_config`→`enable()` へ受け渡し）/ `loader/config.rs` 170（`[debug]` 提示モード
-//!   + サイドカー供給）。
+//! 仕様参照: requirements.md 3.5・3.6（有効なときだけ読み込みでシーンマップを作り、
+//! ランタイムが持つ）。
 //!
 //! # 観測可能な「done」
 //!
-//! 1. **マップが順序通り enable へ到達（3.1）**: `[debug] enabled = true` の base_dir を
-//!    `PastaLoader::load_with_config` で読み込むと、ランタイムは（トランスパイル後に
-//!    構築した）集約 `Arc<SourceMap>` を保持し、デバッグハンドルも保持する。
-//! 2. **デバッグ無効時はマップ非構築（3.1/7.1）**: 既定（`[debug]` 無し）では
-//!    ランタイムはマップを保持しない（`None`）。ハンドルも無い（ゼロコスト）。
+//! 1. `[debug] enabled = true` の base_dir を `PastaLoader::load_with_config` で読み込むと、
+//!    ランタイムはトランスパイル後に作ったシーンマップ（`Arc<SourceMap>`）を持ち、有効である。
+//! 2. 既定（`[debug]` 無し）では、ランタイムはマップを持たず（`None`）、無効である。
 
 use std::path::Path;
 
@@ -67,12 +59,11 @@ fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 /// 3.1: デバッグ有効時、トランスパイル後に構築した集約 `Arc<SourceMap>` がランタイムへ
-/// 到達・保持され、enable へ受け渡される（ハンドル保持で enable 経路を表明）。
+/// 到達・保持される。
 #[test]
 fn enabled_debug_runtime_holds_aggregated_source_map_in_order() {
     let temp = tempfile::TempDir::new().unwrap();
-    // port 0 は pasta.toml では指定できないが、enabled だけで足りる（bind は
-    // 既定ポートだと競合し得るため、ここでは保持の有無のみを確認する）。
+    // 古い `port` のキーは読み飛ばされる（3.3）。
     make_base_dir(
         temp.path(),
         "\
@@ -88,14 +79,13 @@ port = 0
     let runtime = PastaLoader::load_with_config(temp.path(), RuntimeConfig::new())
         .expect("loader must build an enabled-debug runtime");
 
-    // (1) デバッグが有効化されている（enable が呼ばれハンドルを保持）。
+    // (1) デバッグが有効である（シーンマップを持つ）。
     assert!(
         runtime.debug_enabled(),
-        "3.1/4.2: enabled [debug] must install the backend (handle held)"
+        "3.1: enabled [debug] must enable debug"
     );
 
-    // (2) 集約ソースマップがランタイムに保持されている（トランスパイル後に構築され
-    //     enable へ渡された＝順序通り到達した証拠）。
+    // (2) 集約ソースマップがランタイムに保持されている。
     let map = runtime
         .debug_source_map()
         .expect("3.1: enabled debug runtime must hold the aggregated Arc<SourceMap>");
@@ -121,7 +111,6 @@ port = 0
 }
 
 /// 3.1/7.1: デバッグ無効（[debug] 無し）ではマップを構築・保持しない（None）。
-/// ハンドルも無い（ゼロコスト）。
 #[test]
 fn disabled_debug_runtime_holds_no_source_map() {
     let temp = tempfile::TempDir::new().unwrap();

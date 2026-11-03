@@ -2,7 +2,7 @@
 //!
 //! このモジュールは default features で常時コンパイルされる（feature gate なし・7.3）。
 //! マルチチャンク本番マップ（[`ChunkSourceMap`]/[`SourceMap`]/[`MapBuilderSink`]）と
-//! 双方向解決・任意ディスクサイドカー（[`write_sidecar`]/[`read_sidecar`]）を提供する。
+//! 双方向解決を提供する。
 //!
 //! # 構築フロー（design "MapBuilderSink → ChunkSourceMap → SourceMap"）
 //!
@@ -29,11 +29,6 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::OnceLock;
-// `Path`/`PathBuf` はサイドカー I/O を child `sidecar` へ分離後（task 7.5・C5）、本ハブ
-// 本番では未使用。外出しした `source_map_sidecar_tests` クラスタが `use super::*;` で
-// 参照するため、test-only で再導入する（本番 import を増やさない・public 不変）。
-#[cfg(test)]
-use std::path::{Path, PathBuf};
 
 pub use crate::code_gen::source_map::{PastaPos, SourceMapSink};
 use crate::normalize::LineShift;
@@ -613,18 +608,6 @@ pub(super) fn map_forward_iter(map: &ChunkSourceMap) -> impl Iterator<Item = (u3
 }
 
 // ===========================================================================
-// 任意ディスクサイドカー I/O（task 6.1・3.2）を child module へ分離（task 7.5・C5）。
-// `SidecarFile`/`SIDECAR_VERSION`/`sidecar_path_for_lua`/`write_sidecar`/
-// `read_sidecar` の **公開パス**（`crate::debug::source_map::*`）を維持するため、
-// child の公開項目をハブから glob 再エクスポートする（外部 consumer = loader の
-// `crate::debug::source_map::write_sidecar` 経路は不変）。
-// ===========================================================================
-mod sidecar;
-pub use sidecar::{
-    SIDECAR_VERSION, SidecarFile, read_sidecar, sidecar_path_for_lua, write_sidecar,
-};
-
-// ===========================================================================
 // シーン同一性索引（task 1.1・requirements 2.1/2.2/2.5/2.6/3.2）。
 // `.pasta` (ファイル, 行範囲) → シーン識別子の逆引き索引。行マッピング API
 // （`resolve_*`）には触れず、新規型として追加する（3.4 非破壊）。
@@ -668,8 +651,3 @@ mod source_map_resolve_tests;
 #[cfg(test)]
 #[path = "../source_map_builder_tests.rs"]
 mod source_map_builder_tests;
-
-/// サイドカー系: `SidecarWriter`（任意ディスク出力・往復同一性・非致命）。
-#[cfg(test)]
-#[path = "../source_map_sidecar_tests.rs"]
-mod source_map_sidecar_tests;

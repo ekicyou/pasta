@@ -35,8 +35,8 @@ pub use cache::{CURRENT_VERSION, CacheManager};
 pub use config::{
     DebugFileConfig, GhostConfig, LoaderConfig, LoggingConfig, PastaConfig, PersistenceConfig,
     SceneAliasSource, TalkConfig, default_after_choice_newlines, default_choice_newlines,
-    default_debug_port, default_hour_margin, default_log_file_path, default_lua_search_paths,
-    default_spot_newlines, default_talk_interval_max, default_talk_interval_min,
+    default_hour_margin, default_log_file_path, default_lua_search_paths, default_spot_newlines,
+    default_talk_interval_max, default_talk_interval_min,
 };
 pub use context::LoaderContext;
 /// 一致テスト用（pasta_check）: 辞書ファイルの集め方
@@ -202,28 +202,16 @@ impl PastaLoader {
 
         // Phase 5.5: Build the aggregated `.pasta`↔`.lua` source map (task 4.4).
         //
-        // Gate on the SAME resolved debug decision the runtime uses
-        // (`DebugConfig::from_env` over the pasta.toml `[debug]` section + the
-        // `PASTA_DEBUG*` environment), so the build happens iff debugging is
-        // enabled. On the disabled (default) path we do NOT call
+        // Gate on the single resolved debug decision
+        // (`resolve_enabled`: `PASTA_DEBUG` > pasta.toml `[debug] enabled` > false),
+        // so the build happens iff debugging is enabled. On the disabled (default) path we do NOT call
         // `build_source_map`: no sink is attached, no `SourceMap` is allocated, and
         // the generated `.lua` from Phase 4 stays byte-invariant (requirements 3.1
         // / 7.1). The map is built AFTER transpile (Phase 4) so the ordering is
         // transpile → build map → enable-with-map (requirement 3.1).
-        let debug_file = config.debug();
-        let resolved_debug = crate::debug::DebugConfig::from_env(debug_file.as_ref());
-        let debug_enabled = resolved_debug.enabled;
+        let debug_enabled = crate::debug::resolve_enabled(config.debug().as_ref());
         let source_map = if debug_enabled {
-            // Pass the resolved `source_map_sidecar` flag (task 4.1; env > file >
-            // 既定 false) so the build path also writes the optional on-disk
-            // `<lua>.map` sidecar next to each chunk (3.2). Disabled (default) →
-            // no sidecar is written and the in-memory map is the sole path (3.1).
-            let map = Self::build_source_map(
-                &pasta_files,
-                &cache_manager,
-                resolved_debug.source_map_sidecar,
-                &transpiler,
-            );
+            let map = Self::build_source_map(&pasta_files, &cache_manager, &transpiler);
             debug!("Phase 5.5: Built source map for debug session");
             Some(map)
         } else {

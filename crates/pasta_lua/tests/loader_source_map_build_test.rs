@@ -67,11 +67,9 @@ fn loader_builds_and_aggregates_multi_chunk_source_map() {
     let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
 
     // --- ローダのマップ構築経路（デバッグ有効時のみローダが呼ぶ） ---
-    // sidecar=false: メモリ既定経路のみ（このテストはサイドカーを検証しない）。
     let source_map = PastaLoader::build_source_map(
         &[file_a.clone(), file_b.clone()],
         &cache_manager,
-        false,
         &LuaTranspiler::default(),
     );
 
@@ -223,122 +221,9 @@ fn no_map_built_when_no_files_passed() {
     let cache_manager = CacheManager::new(base_dir, "profile/pasta/cache/lua");
 
     // デバッグ無効経路の模擬: 構築経路へ何も渡さない（ローダが呼ばない状況の極限）。
-    let source_map =
-        PastaLoader::build_source_map(&[], &cache_manager, false, &LuaTranspiler::default());
+    let source_map = PastaLoader::build_source_map(&[], &cache_manager, &LuaTranspiler::default());
 
     // チャンクが無いので前方解決は常に None、逆引きは常に空。
     assert!(source_map.resolve_lua_to_pasta("any-chunk", 1).is_none());
     assert!(source_map.resolve_pasta_to_lua("any.pasta", 1).is_empty());
-}
-
-/// 3.2（task 6.1）: サイドカー **有効時**、ローダのマップ構築経路は各生成 `.lua` の隣に
-/// `<lua>.map` を出力する。出力されたサイドカーを再読込すると、メモリ内集約 `SourceMap`
-/// の前方写像と一致する（往復同一性・3.2 完了条件）。
-#[test]
-fn loader_writes_sidecar_when_enabled_and_round_trips() {
-    use pasta_lua::debug::source_map::{read_sidecar, sidecar_path_for_lua};
-
-    let temp = tempfile::TempDir::new().expect("temp dir");
-    let base_dir = temp.path().to_path_buf();
-
-    let file_a = write_pasta(&base_dir, "dic/baseware/a.pasta", PASTA_A);
-    let file_b = write_pasta(&base_dir, "dic/baseware/b.pasta", PASTA_B);
-    let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
-    // サイドカーは生成 `.lua` の隣（cache 配下 pasta/scene/...）へ書くので親が要る。
-    cache_manager
-        .prepare_cache_dir("")
-        .expect("prepare cache dir");
-
-    // sidecar=true でマップ構築（ローダのデバッグ有効＋サイドカー有効経路）。
-    let source_map = PastaLoader::build_source_map(
-        &[file_a.clone(), file_b.clone()],
-        &cache_manager,
-        true,
-        &LuaTranspiler::default(),
-    );
-
-    for file in [&file_a, &file_b] {
-        let lua_path = cache_manager.source_to_cache_path(file);
-        let chunk = lua_path.to_string_lossy().to_string();
-
-        // (1) サイドカーが生成 `.lua` の隣に存在する。
-        let sidecar = sidecar_path_for_lua(&lua_path);
-        assert!(
-            sidecar.exists(),
-            "サイドカー有効時、{} が生成されること（3.2）",
-            sidecar.display()
-        );
-
-        // (1b) `.map` は TOML として読め、`version = 1`・`pasta_file`・`.lua` 行昇順の
-        // `pairs` を持つ（7.1/7.2/7.3）。
-        let raw = std::fs::read_to_string(&sidecar).expect("read sidecar");
-        let table: toml::Table = toml::from_str(&raw).expect("サイドカーは TOML として読める");
-        assert_eq!(table["version"].as_integer(), Some(1));
-        assert!(table["pasta_file"].is_str());
-        let lua_lines: Vec<i64> = table["pairs"]
-            .as_array()
-            .expect("pairs は配列")
-            .iter()
-            .map(|p| p.as_array().expect("ペアは配列")[0].as_integer().unwrap())
-            .collect();
-        assert!(
-            lua_lines.windows(2).all(|w| w[0] < w[1]),
-            "pairs は .lua 行の昇順（7.3）: {lua_lines:?}"
-        );
-
-        // (2) 再読込した写像がメモリ内集約マップの当該チャンクと一致する（往復同一性）。
-        let reread = read_sidecar(&lua_path).expect("read_sidecar");
-        // メモリ側で当該チャンクが持つ全 `.lua`→`.pasta` 対応を列挙し、サイドカー側と
-        // 同一であることを表明する（昇順走査で網羅）。
-        let mut compared = 0usize;
-        for lua_line in 1u32..=500 {
-            let mem = source_map.resolve_lua_to_pasta(&chunk, lua_line).cloned();
-            let disk = reread.pasta_for_lua(lua_line).cloned();
-            assert_eq!(
-                mem.as_ref().map(|p| p.line),
-                disk.as_ref().map(|p| p.line),
-                "再読込サイドカーの `.lua`{} → `.pasta` 行はメモリ写像と一致（3.2 往復）",
-                lua_line
-            );
-            if mem.is_some() {
-                compared += 1;
-            }
-        }
-        assert!(
-            compared > 0,
-            "当該チャンクは少なくとも 1 対応を持つ（サイドカーが空でない）"
-        );
-    }
-}
-
-/// 3.2 ゲーティング: サイドカー **無効時**（既定）、ローダのマップ構築経路は `.lua.map`
-/// を一切出力しない（メモリ既定経路のみ・3.1）。
-#[test]
-fn loader_writes_no_sidecar_when_disabled() {
-    use pasta_lua::debug::source_map::sidecar_path_for_lua;
-
-    let temp = tempfile::TempDir::new().expect("temp dir");
-    let base_dir = temp.path().to_path_buf();
-
-    let file_a = write_pasta(&base_dir, "dic/baseware/a.pasta", PASTA_A);
-    let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
-    cache_manager
-        .prepare_cache_dir("")
-        .expect("prepare cache dir");
-
-    // sidecar=false（既定）: メモリだけ。`.lua.map` は書かれない。
-    let _source_map = PastaLoader::build_source_map(
-        std::slice::from_ref(&file_a),
-        &cache_manager,
-        false,
-        &LuaTranspiler::default(),
-    );
-
-    let lua_path = cache_manager.source_to_cache_path(&file_a);
-    let sidecar = sidecar_path_for_lua(&lua_path);
-    assert!(
-        !sidecar.exists(),
-        "サイドカー無効時は `.lua.map` を出力しない（3.1・既定経路不変）: {}",
-        sidecar.display()
-    );
 }
