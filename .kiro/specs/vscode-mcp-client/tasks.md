@@ -119,7 +119,7 @@
   - _Requirements: 1.4, 1.5, 4.1, 5.1, 6.1, 8.1, 8.3, 8.4_
 
 - [ ] 7. マニュアル・スキル・README
-- [ ] 7.1 (P) デバッグの章の入口と導入の頁を書き直す
+- [x] 7.1 (P) デバッグの章の入口と導入の頁を書き直す
   - 章の入口は、拡張と AI エージェントが SSP・areka の MCP へ送り pasta.dll が答える全体像と、`[debug] enabled = true`（か `PASTA_DEBUG=1`）が要ること・書いた後に読み込み直すことを書く。見出し「デバッグの有効化」「pasta.toml による有効化」「環境変数による有効化」「優先順位」を残す。有効になったかの確かめは、`debug-mcp-runtime` の設計の新しい info の行の文言で書く（決まっていなければ、あちらの要件の言い方で書く）。「無効時のゼロコスト」「ポートを変更するときの注意」は消す。
   - 導入の頁は、拡張の導入・SSP と areka の MCP の窓口（番号の列・127.0.0.1 だけ・設定は無い）・前の版から移るとき（`launch.json` の pasta の構成と `[debug]` の `port`・`present_as`・`source_map_sidecar` はもう効かず消してよい）を書く。
   - attach・`launch.json` の手順・`host`・9276・ブレークポイント・ステップ・変数の inspect・提示モードを残さない。導入と締めの台詞の決まりを保つ。
@@ -179,3 +179,4 @@
 - 5.3: 依存の向きを守る。共有の describeResult は mcpClient.ts、DEBUG_HINT は ghostFiles.ts に置く。dumpVariables は reloadShiori から import type だけ、runSceneAtCursor からは何も取らない。
 - 6.1: 本物の vscode.Uri では ghost_name に送るルートがドライブ文字小文字の fsPath（c:\...）になる。ベースウェアが大文字・小文字を区別して照らさないかを 8.2 の実機で確かめる。e2e は src/test/devCommands.e2e.test.ts（6.3 で test:e2e に足す）。
 - 6.3: 7.2 で dev-actions.md の古い表記「SHIORIリロード」を「SHIORI をリロード」に直す。
+- 7.1: debug-mcp-runtime は brief.md しか無く info の行の文言は未決。マニュアルは仮の言い方「開発用のイベントを許したことを示す info の行」で書いた（7.2 もこれに揃える）。あちらで文言が決まったら引用を足す。
