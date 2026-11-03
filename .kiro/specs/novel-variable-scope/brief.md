@@ -133,5 +133,5 @@
 
 - イベントの act は、シーンを選ぶ前に `act.var` へ Reference（`＄ｒ０`〜・`r0`〜）と日時（`＄季節`・`＄節句`・`hour` など）が入る（`shiori/event/init.lua` の `create_act` が `transfer_req_to_var`・`transfer_date_to_var` を呼ぶ）。`＄` と `＄＊` の範囲を分けるときは、この自動で入る変数がどちらの表に属するかを決める。
 - 条件の評価（`crates/pasta_lua/src/search/scene_cond.rs`）は `＄＊名前` を `act.save`、`＄名前` を `act.var` から素の `raw_get` で引く。表の形や置き場所を変えるなら、ここも合わせる。
-- チェイントークの続きは自分の act のまま再開するので、新しいイベントの転記は続きの変数に届かない。チェイントーク中断の act（`init.lua` の `iact`）には転記が入らない。
+- チェイントークの続きは自分の act のまま再開するので、新しいイベントの転記は続きの変数に届かない。チェイントーク中断のシーンの act（`init.lua` の `iact`）も `create_act` で作るので、同じ転記が入る。
 - 参照: `.kiro/specs/scene-condition-attributes/design.md`（EventAutoTransfer・SceneCond の節）。

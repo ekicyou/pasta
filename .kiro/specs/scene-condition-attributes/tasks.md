@@ -160,3 +160,4 @@
 - 3.2: イベントの act に Reference が最初から入るので、`tests/runtime/syntax_test.rs` の「転記なし」の期待（Reference が無い）は 6.1 に合わせて書き換えた。5.3 の差分確認ではこのテストも「書き直してよい」側に数える。
 - 5.2: 段階辞書から転記の行を消したため、`node book/tools/tutorial-check.mjs` は 6.1 で `getting-started/07-greeting.md` のコードブロックと説明を直すまで 07-greeting だけ赤い。
 - 5.3: 2026-11-03 に x64・x86 とも `cargo test --all` 2877 件緑。既存テストの書き換えは許した範囲だけ（ほかに `validate_report_test.rs` の種類の表 27→30 は 4.1 で種類を足した結果で、並びのテストではない）。
+- 完了時にその場で解決: チェイントーク中断のシーンの act（`iact`）にも Reference と日時の自動転記が入るようにした（`create_act` で作る）。テストは `chain_talk_interrupt_test.lua`。

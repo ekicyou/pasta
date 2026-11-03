@@ -190,7 +190,7 @@ local function run_interrupt_scene(act)
     if not ico then
         return nil
     end
-    local iact = SHIORI_ACT.new(STORE.actors, act.req)
+    local iact = create_act(act.req)
     -- 文字列にせず、まとめたトークン列で受け取る（割り込んだ側の組み立てが差し替えて 1 回で文字列にする）
     iact.build = require("pasta.act").IMPL.build
     -- 最初に出力のある区切りまで。残りのコルーチンは参照を外して捨てる
