@@ -46,7 +46,7 @@ end
 - `SHIORI/` で始まらない文字列は、そのまま `Value` になる。さくらスクリプトへの変換やウェイトの挿入は行われない。
 - ハンドラが返した文字列は、`SHIORI/` で始まれば `Value` ではなく応答全体として扱われる。この規則はハンドラの戻り値だけに適用され、コルーチン（シーン）の出力には適用されない。
 - 200 以外の応答は、`RES` の関数で作った応答を返せば、そのステータスのままベースウェアへ届く。`RES.warn(理由)` で理由付きの 204、`RES.not_enough()` で 311、`RES.advice()` で 312、`RES.err(理由)` で 500 を返せる。
-- シーンの出力を応答にするには、シーンのコルーチンを返す。`SCENE.co_exec(act, 名前)` は、[シーン関数フォールバック](#シーン関数フォールバック)と同じ探し方でシーンを探し、見つかればそのコルーチンを、見つからなければ `nil` を返す。
+- シーンの出力を応答にするには、シーンのコルーチンを返す。`SCENE.co_exec(act, 名前)` は、[シーン関数フォールバック](#シーン関数フォールバック)と同じ探し方でシーンを探し、見つかればそのコルーチンを、見つからなければ `nil` を返す。候補の条件は `act` の変数で評価し、名前に合うシーンはあっても条件を満たす候補が無いときも `nil` を返す（止まらない）。
 - コルーチンの途中で[チェイントーク](https://ekicyou.github.io/pasta/grammar/call-jump.html#チェイントーク)により中断した場合、残りは次の自然なおしゃべり（仮想ディスパッチャが起こす OnTalk）の機会に出力される。外から起こした `OnTalk` では続きは出ない（[OnTalk](#ontalk)）。
 - `REG` のキーに置けるハンドラは、1 つのイベントに 1 つである。同じキーに代入し直すと、前のハンドラは置き換わる。1 つのイベントにハンドラを重ねるときは、`REG:register` を使う（[ハンドラを重ねる](#ハンドラを重ねるregregister)）。
 
@@ -261,6 +261,7 @@ end
 - `act.req.date` の値は、SSP のプロセスの中の OS の時計（`X-Pasta-Time` があればその日時）である。SSP によっては（2.9.18 の「現在時刻の仮想的変更」など）、この OS の時計そのものが仮想時刻になるため、`act.req.date` も仮想時刻に従う。そうでない SSP では、`act.req.date` は仮想時刻に従わない。
 - 時報の判定（[OnHour](#onhour)）と[日時変数](https://ekicyou.github.io/pasta/grammar/variables.html#日時変数)は、どちらの場合も仮想時刻に従う（[OnPastaClock](#onpastaclock仮想時刻の読み取り)）。おしゃべりの間隔・撫での判定・コールバックの待ち時間は、時刻の設定し直しによる飛びを差し引いて数える（[時刻の飛び](#時刻の飛び)）。
 - `act.req` は読み取り専用として扱う。書き換えたときの動作は定めない。
+- ハンドラに渡す `act` の `var` には、ハンドラを呼ぶ前に、Reference と日時の変数（`act.var.r0`・`act.var.hour` など）が入っている（[イベントのシーンを選ぶ前の転記](https://ekicyou.github.io/pasta/grammar/variables.html#イベントのシーンを選ぶ前の転記)）。`REG:register` で重ねたハンドラも、1 つずつ新しく作った `act` で同じものを受け取る。
 - DSL のシーンから Reference や日時を使うには、[エンジンが値を入れる変数](https://ekicyou.github.io/pasta/grammar/variables.html#エンジンが値を入れる変数)（[リクエスト変数](https://ekicyou.github.io/pasta/grammar/variables.html#リクエスト変数reference)・[日時変数](https://ekicyou.github.io/pasta/grammar/variables.html#日時変数)）を使う。
 
 ## RES
@@ -459,6 +460,10 @@ end
    - 選択肢を出したグローバルシーンは、`reference[2]` がグローバルシーンの登録名であればそのシーンである。Call で呼んだ別のグローバルシーンが出した選択肢はそのシーンの、Call から戻った後に出した選択肢は呼び出し元のシーンの配下から探す（[Call から戻った後の名前解決](https://ekicyou.github.io/pasta/grammar/call-jump.html#call-から戻った後の名前解決)）。1 つの応答に別々のシーンが出した選択肢があっても、選択肢ごとに探す範囲が決まる。
    - `reference[2]` が無いか、グローバルシーンの登録名でないとき（手書きのさくらスクリプトで出した選択肢、`reference[2]` を送らないベースウェアなど）は、最後に `init_scene` を呼んだグローバルシーンの配下から探す。このグローバルシーンは、Call から戻っても呼び出し元には戻らない。
 3. 見つからなければ 204 No Content を返す。
+
+- 1 と 2 の検索では、候補の条件をそのイベントの `act` の変数（Reference と日時の変数が入っている）で評価する（[条件で候補を絞る](https://ekicyou.github.io/pasta/grammar/block-structure.html#条件で候補を絞る)）。
+- 1 の `＊OnChoiceSelectEx` は、条件を満たす候補が無ければ無いものとして 2 へ進む。
+- 2 で、ローカルとグローバルのどちらにも選べるシーンが無く、どちらかが条件漏れ（名前に合うシーンはあるが条件を満たす候補が無い）だったときは、204 ではなく止まるエラー `【条件に合うシーンが無い：OnChoiceSelectEx ＞選択 ID】` になる（[条件に合うシーンが無いとき](https://ekicyou.github.io/pasta/grammar/call-jump.html#条件に合うシーンが無いとき)）。
 
 ```pasta
 ＊メニュー
@@ -885,6 +890,7 @@ raise_event(event = "OnPastaDumpVariables", references = [], ghost_name = "<ル�
 - `GLOBAL` の関数（`自動トーク停止`・`ゴースト終了` など）と、`act` のメソッドにも届く。
 - グローバルシーンは前方一致で探す。`初回` で `＊初回起動` も候補になる。候補が複数あれば、シャッフル＆順次消費で 1 つを選ぶ（[候補の選択](https://ekicyou.github.io/pasta/grammar/call-jump.html#候補の選択)）。呼ぶたびに順送りが進む。
 - 照合用の名前への揃え方と、`[scene.alias]` の別名の当て方は、`＞名前` と同じである（[シーン名の別名](https://ekicyou.github.io/pasta/grammar/call-jump.html#シーン名の別名)）。
+- 候補の条件は、このイベントの `act` の変数で評価する。グローバル変数（`＄＊名前`）はいつもどおり読め、ローカル変数には Reference と日時の変数が入っている（`＄ｒ０` は呼ぶ名前）。
 - ローカルシーンは探さない。ローカルシーンを指して再生するときは [OnPastaScene](#onpastascene名前でシーンを再生) を使う（[OnPastaCallFunction と OnPastaScene の違い](#onpastacallfunction-と-onpastascene-の違い)）。
 
 **引数**
@@ -902,11 +908,12 @@ raise_event(event = "OnPastaDumpVariables", references = [], ghost_name = "<ル�
 
 **失敗の出方**
 
-見つからないときと引数の誤りでは何も呼ばず、失敗の表記とログの警告を出す。表記の形と、表記を出さない設定（`balloon_warning = false`）で 204 No Content になることは、[シーンを再生するイベントの共通の決まり](#シーンを再生するイベントの共通の決まり)の「失敗の出方」と同じである。ただし、表記はデバッグの有無によらず出る。
+見つからないとき・条件を満たす候補が無いときと、引数の誤りでは何も呼ばず、失敗の表記とログの警告を出す。条件を満たす候補が無いときも止まるエラーにはしない。表記の形と、表記を出さない設定（`balloon_warning = false`）で 204 No Content になることは、[シーンを再生するイベントの共通の決まり](#シーンを再生するイベントの共通の決まり)の「失敗の出方」と同じである。ただし、表記はデバッグの有無によらず出る。
 
 | 場合 | 表記 | ログの警告 |
 | ---- | ---- | ---------- |
 | 名前が見つからない | `【シーンが見つからない：OnPastaCallFunction ＞無い名前】` | `OnPastaCallFunction: handler not found: name='無い名前'` |
+| 名前に合うシーンはあるが、条件を満たす候補が無い | `【条件に合うシーンが無い：OnPastaCallFunction ＞秘密】` | `OnPastaCallFunction: no scene meets the conditions: name='秘密'` |
 | Reference0 が無い | `【名前にならない値：OnPastaCallFunction Reference0（値なし）】` | `OnPastaCallFunction: bad argument: Reference0=nil` |
 | Reference0 が空の文字列 | `【名前にならない値：OnPastaCallFunction Reference0（空文字列）】` | `OnPastaCallFunction: bad argument: Reference0=''` |
 
@@ -1056,7 +1063,8 @@ raise_event(event = "OnPastaSetSaveVariable", references = ["会員番号", "", 
 - アクター名が決まらないときは、アクター名を含む段（1〜4）を飛ばす。
 - 部位が空（当たり判定の外）のつつきでは、部位を含む段（1・2・5・6）を飛ばす。部位が空のマウスの移動では、撫でたと決めない。
 - 9 段のどれにもシーンが無ければ 204 No Content を返す。
-- ショートカットのシーンの中でも、今までどおり [`＞transfer_req_to_var`](https://ekicyou.github.io/pasta/grammar/variables.html#リクエスト変数reference) で Reference を読める。
+- 1〜8 段は名前の完全一致で探し、条件を見ない。9 段（`OnMouseDoubleClick`・`OnMouseMove`）は [シーン関数フォールバック](#シーン関数フォールバック)と同じ探し方で、条件で絞る。
+- ショートカットのシーンでも、Reference と日時の変数は最初から入っている（[イベントのシーンを選ぶ前の転記](https://ekicyou.github.io/pasta/grammar/variables.html#イベントのシーンを選ぶ前の転記)）。`＞transfer_req_to_var` を呼ぶのは、途中で取り直したいときだけである。
 
 ```pasta
 ＊つっつき反応女の子Head
@@ -1149,6 +1157,7 @@ REG[イベント名] がある？
 
 - シーンの探し方は、Call と同じ 5 段の検索である（[スコープ解決アルゴリズム](https://ekicyou.github.io/pasta/grammar/call-jump.html#スコープ解決アルゴリズム)）。イベントの開始時点では実行中のグローバルシーンが無いため、3 段目以降（act のメソッド・`GLOBAL` テーブル・すべてのグローバルシーン）から探される。
 - グローバルシーンは前方一致で探される。同名のシーンを複数定義すると、シャッフル＆順次消費で 1 つが選ばれる。`＊OnBoot朝` のように、イベント名で始まる名前のシーンも候補になる。
+- 候補の条件は、Reference と日時の変数が入った `act` の変数で評価する（[条件で候補を絞る](https://ekicyou.github.io/pasta/grammar/block-structure.html#条件で候補を絞る)）。名前に合うシーンはあっても条件を満たす候補が無ければ、見つからないときと同じく 204 No Content を返す。失敗表記は出さない。
 - 見つかったシーンはコルーチンとして実行され、出力が `Value` になる。シーンがチェイントークで中断した場合、残りは次の自然なおしゃべり（仮想ディスパッチャが起こす OnTalk）の機会に出力される（[チェイントーク](https://ekicyou.github.io/pasta/grammar/call-jump.html#チェイントーク)）。
 
 DSL で書いたシーンは、イベント名と同じ名前にするだけでそのイベントに応答する。
@@ -1303,7 +1312,8 @@ end
 
 - `{HH}` は、仮想時刻の「時」を 0 埋めした 2 桁（`00`〜`23`）である。仮想時刻を使っていなければ `act.req.date.hour` と同じである。
 - 候補の探し方は[シーン関数フォールバック](#シーン関数フォールバック)と同じ（前方一致）。
-- 4 つの候補がどれも無ければ、時報は発行せず、その回は OnTalk の判定へ進む（[check_talk](#check_talkact)）。
+- ある候補の名前のシーンがあっても、条件を満たすものが無ければ、次の候補を試す。
+- 4 つの候補がどれも無ければ（どれも条件を満たさないときも）、時報は発行せず、その回は OnTalk の判定へ進む（[check_talk](#check_talkact)）。
 - `OnHour` という名前そのものは候補に無い。`＊OnHour` という名前のシーンは時報では実行されない。
 - 候補を探す前に、[日時変数](https://ekicyou.github.io/pasta/grammar/variables.html#日時変数)（`＄時` など）に仮想の日時の値が入る。
 

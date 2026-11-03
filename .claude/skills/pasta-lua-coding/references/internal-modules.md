@@ -233,6 +233,7 @@ ACT の `word`・`expr_fn`・`expr_fn_var`・`find_scene`・`call`・`call_resto
 - 記録（`FailureRecord`）は `label`（種類の名前。`FAILURE.LABEL` の値）・`subject`（対象）・`detail`（説明）・`warning`（ログの警告文）・`actor`（未登録アクターの目印のときのアクター）を持つ。報告のたびに作って捨てる。
 - `FAILURE.format(label, subject, detail)` は中身を `FAILURE.escape`（`\` → `\\`、`%` → `\%`、CR・LF → 空白）にかけてから `【` `】` で囲む。対象の名前は `FAILURE.var`（`var.x` → `＄x`・`save.x` → `＄＊x`・`args[1]` → `＄０`）と `FAILURE.fn`（`@f()` → `＠f（）` など）で辞書の書き方に直す。知らない形はそのまま返す。
 - イベントのハンドラと関数の呼び出しの部品も持つ。`FAILURE.reply(act, record)` は `FAILURE.report` と同じく報告してから `act:build()` の結果を返す（`OnPastaScene`・`OnPastaSceneAt`・`OnPastaCallFunction`・`OnPastaSetSaveVariable`・`OnRecommendsiteChoice` の失敗の応答）。`FAILURE.is_name(v)` は空でない文字列かを、`FAILURE.quoted(v)` はログの警告に出す引数の値（`nil` は `nil`、それ以外は `'値'`）を返す。`FAILURE.bad_reference0(act, event, value)` は `Reference0` が名前にならないときの失敗（種類は名前にならない値、対象は `イベント名 Reference0`）を `reply` で返す。`FAILURE.fn_succeeded(act, ...)` は、関数の参照が成功して呼んだ関数が戻った後に「報告済み」の印を偽にし、残りの引数をそのまま返す（`pasta.act`・`pasta.actor` の関数の呼び出しが使う）。SHIORI のイベントの言い回し（`Reference0`）が入るのは、名前の検査と失敗の表記を 1 か所にするためである。act はメソッドを呼ぶだけで、`require` はしない。
+- `FAILURE.raise(record)` は、記録の表にメタ表を付けて `error` で投げる（戻らない）。止まるエラーのうち「条件に合うシーンが無い」（`FAILURE.LABEL.SCENE_UNMET`）がこれを使う（`act:call` と既定の OnChoiceSelectEx）。`FAILURE.is_raised(v)` はその値かを見分け、`STOP.response` は記録の種類と対象を表記に、止まった場所を説明に使う。`tostring` は表記の中身（`種類：対象`）になる。
 - `FAILURE.enabled()` は報告のたびに `pasta.config` の `get("logging", "balloon_warning", true)` を読み、真偽値でなければ `true` を返す。`@pasta_log` と `pasta.config` は報告の時点で `require` するため、`pasta.failure` は読み込みの時点では他のモジュールを `require` しない。そのため `pasta.act`・`pasta.actor`・`pasta.word`・`pasta.shiori.sakura_builder` のどれから `require` しても循環は生じない。
 - 状態は弱参照の表 3 つで持ち、永続化しない。`RUNNING`（スレッド → 実行中の act。`init_scene` が `FAILURE.bind` で書き、`ACT.num`・`ACT.str` が `FAILURE.running_act` で引く）、`FN_FAILED`（act → 直前の関数の参照が報告済みか。`set_fn_failed`・`take_fn_failed`）、`UNREGISTERED`（アクターの表 → 未登録の印。`mark_unregistered_actor`・`is_unregistered_actor`。`sakura_builder` の `emit_actor_switch` が、印のあるアクターでは立ち位置の警告を出さないために読む）である。
 
@@ -329,7 +330,7 @@ STORE.scenes = {
 | `get_all_scenes()` | `STORE.scenes` そのもの（複製しない）を返す |
 | `set_attrs(scene_table, local_name, items)` | `STORE.scene_attrs[scene_table.__global_name__][local_name] = items` とする。`pasta` の `set_scene_attrs` はこの関数そのもので、生成コードが `create_scene` の行に続けて呼ぶ（[属性の文](https://ekicyou.github.io/pasta/internals/transpiler.html#属性の文)） |
 | `attrs(global_name, local_name)` | `STORE.scene_attrs` の項目を、新しい配列と新しい項目の表に写して返す。登録の無いシーンは `nil`、属性の無いシーンは `{}`（[SCENE.attrs](script-api.md#sceneattrsglobal_name-local_name)） |
-| `search(name, global_scene_name, attrs)` | 前方一致の検索でシーンを探し、結果オブジェクトを返す（後述） |
+| `search(name, global_scene_name, act)` | 前方一致の検索でシーンを探し、結果オブジェクトを返す。`act` を渡せば条件で絞る（後述） |
 | `wrap(fn)` | シーン関数をコルーチンに包んで返す（後述） |
 | `co_exec(act, name, global_scene_name, attrs)` | `act:find_scene` で探したシーン関数をコルーチンに包んで返す（後述） |
 | `get_exact(name, local_name)` | 完全一致の検索でグローバルシーンかローカルシーンの関数を引く（後述） |
@@ -341,11 +342,11 @@ STORE.scenes = {
 
 ### search と結果オブジェクト
 
-`SCENE.search(name, global_scene_name, attrs)` は次の順に処理する。`attrs` は使わない。
+`SCENE.search(name, global_scene_name, act)` は次の順に処理する。
 
 1. `name` が文字列でなければ `nil` を返す。
-2. `@pasta_search` を `require` し（呼び出し時に読み込む）、`SEARCH:search_scene(name, global_scene_name)` を呼ぶ。`global_scene_name` が `nil` ならグローバルシーンだけを探してローカル名 `"__start__"` を、文字列ならそのグローバルシーンの中のローカルシーンだけを探す。
-3. 見つからなければ `nil`。見つかった `(グローバルシーン名, ローカル名)` で `SCENE.get` を引き、関数が無ければ `nil` を返す。
+2. `@pasta_search` を `require` し（呼び出し時に読み込む）、`SEARCH:search_scene(name, global_scene_name, act and act.var, act and act.save)` を呼ぶ。`global_scene_name` が `nil` ならグローバルシーンだけを探してローカル名 `"__start__"` を、文字列ならそのグローバルシーンの中のローカルシーンだけを探す。`act` が `nil` なら 2 つの表も `nil` になり、Rust 側は述語を作らない（条件も優先の段も見ない）。
+3. 見つからなければ `nil` と、`search_scene` の 2 つ目の値（条件漏れなら `"unmet"`、名前が無ければ `nil`）を返す。見つかった `(グローバルシーン名, ローカル名)` で `SCENE.get` を引き、関数が無ければ `nil` を返す。
 4. 次の結果オブジェクトを返す。
 
 ```lua
@@ -356,7 +357,7 @@ STORE.scenes = {
 -- メタテーブルの __call により result(...) は result.func(...) と同じ
 ```
 
-前方一致の候補の集め方と選び方は [シーン・単語レジストリとシーン検索](https://ekicyou.github.io/pasta/internals/registry-search.html#前方一致による候補の収集) で扱う。ACT の名前の解決（L2・L5）は結果オブジェクトの `func` を使う。
+前方一致の候補の集め方と選び方は [シーン・単語レジストリとシーン検索](https://ekicyou.github.io/pasta/internals/registry-search.html#前方一致による候補の収集) で扱う。ACT の名前の解決（L2・L5）は、自分の ACT を渡して呼び、結果オブジェクトの `func` を使う。どの段にも見つからず L2 か L5 が `"unmet"` だったときは、`find_act_handler` が 2 つ目の値として `"unmet"` を返す。`ACT_IMPL.call` はそれを見て `FAILURE.raise({ label = FAILURE.LABEL.SCENE_UNMET, subject = "＞名前" })` で止まるエラーを投げ（[止まるエラーの控えと応答](https://ekicyou.github.io/pasta/internals/shiori.html#止まるエラーの控えと応答)）、`expr_fn` 系は見つからないときと同じ「関数が見つからない」を報告する。
 
 ### wrap
 
@@ -364,7 +365,7 @@ STORE.scenes = {
 
 ### co_exec
 
-`SCENE.co_exec(act, name, global_scene_name, attrs)` は、`act:find_scene(name, global_scene_name, attrs)` でシーン関数を探し、関数でなければ `nil` を、関数なら `SCENE.wrap` で包んだコルーチンを返す。`act:find_scene` は `global_scene_name` と `attrs` を使わず `find_handler("scene", name)` に委ねるため、`co_exec` で親のグローバルシーンを指定してローカルシーンを引くことはできない。第 1 引数の `act` は名前の解決にだけ使い、シーン関数には `coroutine.resume` で渡された ACT が渡る。コルーチンの包み方と再開は [シーンコルーチンの作り方](https://ekicyou.github.io/pasta/internals/execution-model.html#シーンコルーチンの作り方) で扱う。
+`SCENE.co_exec(act, name, global_scene_name, attrs)` は、`act:find_scene(name, global_scene_name, attrs)` でシーン関数を探し、関数でなければ `nil` を、関数なら `SCENE.wrap` で包んだコルーチンを返す。条件漏れ（`"unmet"`）も `nil` にするので、イベントは 204 になる。`act:find_scene` は `global_scene_name` と `attrs` を使わず `find_handler("scene", name)` に委ねるため、`co_exec` で親のグローバルシーンを指定してローカルシーンを引くことはできない。第 1 引数の `act` は名前の解決にだけ使い、シーン関数には `coroutine.resume` で渡された ACT が渡る。コルーチンの包み方と再開は [シーンコルーチンの作り方](https://ekicyou.github.io/pasta/internals/execution-model.html#シーンコルーチンの作り方) で扱う。
 
 ### co_exec_exact
 
