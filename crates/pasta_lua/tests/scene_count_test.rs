@@ -228,3 +228,213 @@ fn counting_does_not_change_next_selection() {
     let first_round: HashSet<_> = a[..5].iter().collect();
     assert_eq!(first_round.len(), 5, "{a:?}");
 }
+
+/// 呼び方と引数の誤りを確かめる辞書（`＊雑談` 3 本・`＊雑談_朝` 2 本に足す）。
+const CALL_PASTA: &str = "\
+＊雑談
+  さくら：雑談一
+
+＊雑談
+  さくら：雑談二
+
+＊雑談
+  さくら：雑談三
+
+＊雑談_朝
+  さくら：朝一
+
+＊雑談_朝
+  さくら：朝二
+
+＊行で
+  さくら：話題は＠シーン数（「雑談」）個、英語で＠scene_count（「雑談」）個、完全一致は＠シーン数完全一致（「雑談」）個と＠scene_count_exact（「雑談」）個
+
+＊代入で
+  ＄n＝＠シーン数（「雑談」）
+  ＄m＝＄n＋1
+  さくら：足して＄m、＠変数nの型（）
+
+＊呼んで
+  ＞シーン数（「雑談」）
+  さくら：続き
+
+＊続きだけ
+  さくら：続き
+
+＊Luaで
+  さくら：＠Lua数（）
+
+＊値なし
+  さくら：数は＠シーン数（＄x）個
+
+＊空文字列
+  ＄n＝＠シーン数（「」）
+  さくら：数は＄n
+
+＊真偽値
+  さくら：数は＠Lua真偽値（）個
+
+＊数値
+  さくら：数は＠シーン数（5）個
+
+＊余分
+  さくら：数は＠シーン数（「雑談」、「余分」）個
+
+＊引数付きで呼ぶ
+  ＞引数付き（「a」、「b」）
+
+＊引数付き
+  ＞シーン数（「雑談」）
+  さくら：引数付きの続き
+
+＊シーン数
+  さくら：シーンのほうです
+
+＊同名を呼ぶ
+  ＞シーン数（「雑談」）
+  さくら：組み込みでした
+";
+
+/// `CALL_PASTA` が使う Lua の関数。
+const CALL_MAIN_LUA: &str = r#"local GLOBAL = require "pasta.global"
+GLOBAL["変数nの型"] = function(act) return type(act.var.n) end
+GLOBAL["Lua数"] = function(act)
+    return GLOBAL.scene_count(act, "雑談") .. "," .. GLOBAL["シーン数"](act, "雑談") .. ","
+        .. GLOBAL.scene_count_exact(act, "雑談") .. "," .. GLOBAL["シーン数完全一致"](act, "雑談")
+end
+GLOBAL["Lua真偽値"] = function(act) return GLOBAL["シーン数"](act, true) end
+return {}
+"#;
+
+/// `needle` を含むログの行の数（`#[traced_test]` の関数の中で使う）。
+/// 保存ファイルが無い警告は数えない（初めて応答を作るときに出るため、数えた数の前後に紛れる）。
+macro_rules! log_lines {
+    ($needle:expr) => {{
+        let n = std::cell::Cell::new(0);
+        logs_assert(|lines| {
+            n.set(
+                lines
+                    .iter()
+                    .filter(|l| l.contains($needle) && !l.contains("Persistence file not found"))
+                    .count(),
+            );
+            Ok(())
+        });
+        n.get()
+    }};
+}
+
+/// 応答の `Value:` の中身。
+fn value_of(response: &str) -> &str {
+    let start = response.find("Value: ").expect("Value が無い") + "Value: ".len();
+    let rest = &response[start..];
+    &rest[..rest.find("\r\n").unwrap_or(rest.len())]
+}
+
+/// 3.3〜3.6・8.2: アクション行・変数代入と式・Call・Lua の 4 通りで同じ数（英語名と日本語名も同じ）。
+#[traced_test]
+#[test]
+fn four_call_styles_return_same_count() {
+    let (_temp, runtime) = load_ghost(CALL_PASTA, Some(CALL_MAIN_LUA));
+    // アクション行: 数がその位置の台詞の文字になる
+    assert_eq!(
+        value_of(&fire(&runtime, "行で")),
+        r"\p[0]話題は5個、\_w[450]英語で5個、\_w[450]完全一致は3個と3個\e"
+    );
+    // 代入の右辺: 数値が入り、`＄n＋1` が 6、Lua から読む `act.var.n` が数値
+    assert_eq!(
+        value_of(&fire(&runtime, "代入で")),
+        r"\p[0]足して6、\_w[450]number\e"
+    );
+    // Call: 台詞を出さず、続きを変えない
+    assert_eq!(
+        value_of(&fire(&runtime, "呼んで")),
+        value_of(&fire(&runtime, "続きだけ"))
+    );
+    // Lua: scene_count・シーン数・scene_count_exact・シーン数完全一致
+    assert_eq!(
+        value_of(&fire(&runtime, "Luaで")),
+        r"\p[0]5,\_w[450]5,\_w[450]3,\_w[450]3\e"
+    );
+    assert_eq!(log_lines!(" WARN "), 0);
+}
+
+/// 4.1・4.2: 値なし・空文字列・真偽値は失敗表記とログ 1 行を出して 0 を返す。
+#[traced_test]
+#[test]
+fn bad_arguments_report_and_return_zero() {
+    let (_temp, runtime) = load_ghost(CALL_PASTA, Some(CALL_MAIN_LUA));
+    let cases = [
+        (
+            "値なし",
+            r"\p[0]数は【名前にならない値：シーン数（値なし）】0個\e",
+            "シーン数: bad argument: name=nil",
+        ),
+        (
+            "空文字列",
+            r"【名前にならない値：シーン数（空文字列）】\p[0]数は0\e",
+            "シーン数: bad argument: name=''",
+        ),
+        (
+            "真偽値",
+            r"\p[0]数は【名前にならない値：シーン数（真偽値）】0個\e",
+            "シーン数: bad argument: name='true'",
+        ),
+    ];
+    for (id, value, warning) in cases {
+        let before = log_lines!(" WARN ");
+        assert_eq!(value_of(&fire(&runtime, id)), value, "{id}");
+        assert_eq!(log_lines!(" WARN "), before + 1, "{id}");
+        assert_eq!(log_lines!(warning), 1, "{id}");
+    }
+}
+
+/// 4.3・4.4: 数値の引数は報告なしの 0。余分な引数は 1 つ目で数え、引数付きで呼ばれたシーンの中から
+/// Call の形で呼んでも（呼んだシーンの引数が後ろに足される）何も出ない。
+#[traced_test]
+#[test]
+fn number_and_extra_arguments_are_silent() {
+    let (_temp, runtime) = load_ghost(CALL_PASTA, Some(CALL_MAIN_LUA));
+    assert_eq!(value_of(&fire(&runtime, "数値")), r"\p[0]数は0個\e");
+    assert_eq!(value_of(&fire(&runtime, "余分")), r"\p[0]数は5個\e");
+    assert_eq!(
+        value_of(&fire(&runtime, "引数付きで呼ぶ")),
+        r"\p[0]引数付きの続き\e"
+    );
+    assert_eq!(log_lines!(" WARN "), 0);
+    assert!(!logs_contain("bad argument"));
+}
+
+/// 4.5: `[logging] balloon_warning = false` なら表記を出さず、ログだけ出す。
+#[traced_test]
+#[test]
+fn balloon_warning_off_logs_only() {
+    let (_temp, runtime) = load_ghost(CALL_PASTA, Some(CALL_MAIN_LUA));
+    common::pin_balloon_warning_off(&runtime);
+    assert_eq!(value_of(&fire(&runtime, "値なし")), r"\p[0]数は0個\e");
+    assert_eq!(log_lines!("シーン数: bad argument: name=nil"), 1);
+}
+
+/// 4.6: act 無しで Lua から誤った引数を渡してもエラーにならず、ログだけ出して 0 を返す。
+#[traced_test]
+#[test]
+fn lua_call_without_act_logs_only() {
+    let (_temp, runtime) = load_ghost(CALL_PASTA, None);
+    let n = runtime
+        .lua()
+        .load(r#"return require("pasta.global").scene_count(nil, true)"#)
+        .call::<i64>(())
+        .expect("act 無しの呼び出しがエラーになった");
+    assert_eq!(n, 0);
+    assert_eq!(log_lines!("scene_count: bad argument: name='true'"), 1);
+}
+
+/// 5.4: `＊シーン数` を書いた辞書でも、`＞シーン数（「雑談」）` は組み込みの関数を呼ぶ。
+#[test]
+fn builtin_wins_over_scene_of_same_name() {
+    let (_temp, runtime) = load_ghost(CALL_PASTA, Some(CALL_MAIN_LUA));
+    assert_eq!(
+        value_of(&fire(&runtime, "同名を呼ぶ")),
+        r"\p[0]組み込みでした\e"
+    );
+}
