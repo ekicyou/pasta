@@ -239,6 +239,42 @@ fn test_decl_attr_mid_value_quote_is_plain() {
     );
 }
 
+/// 条件の形（`：` を持たない）も宣言行で属性の色になる（scene-attribute-store 要件 7.5）
+#[test]
+fn test_decl_condition_attr() {
+    let source = "＊雑談＆＄＊変数＞１００\n  Alice：OK\n";
+    assert_eq!(
+        line_tokens(source, 0),
+        vec![(0, 3, NAMESPACE), (3, 9, DECORATOR)]
+    );
+    let source = "＊挨拶\n  Alice：OK\n  ・ローカル ＆＄x≧5 ＃ c\n    Bob：OK\n";
+    assert_eq!(
+        line_tokens(source, 2),
+        vec![(2, 5, SCENE), (8, 5, DECORATOR), (14, 3, COMMENT)]
+    );
+}
+
+/// 名前なしの `＊` の属性（宣言・フラグ）が属性の色になる
+#[test]
+fn test_decl_unnamed_scene_attrs() {
+    let source = "＊挨拶\n  Alice：OK\n＊　＆重み：５ ＆＄初回\n  Bob：OK\n";
+    assert_eq!(
+        line_tokens(source, 2),
+        vec![(0, 1, NAMESPACE), (2, 5, DECORATOR), (8, 4, DECORATOR)]
+    );
+}
+
+/// 宣言行の属性と次の行の属性行は、それぞれの行に 1 つずつ（二重に出ない）
+#[test]
+fn test_decl_attr_and_attr_line_not_doubled() {
+    let source = "＊挨拶 ＆朝：1\n　＆夜：2\n  Alice：OK\n";
+    assert_eq!(
+        line_tokens(source, 0),
+        vec![(0, 3, NAMESPACE), (4, 4, DECORATOR)]
+    );
+    assert_eq!(line_tokens(source, 1), vec![(1, 4, DECORATOR)]);
+}
+
 /// 行末のコメントの無い宣言の行は、印（字下げを除く）から名前の終わりまで 1 つ
 #[test]
 fn test_decl_without_comment_unchanged() {
