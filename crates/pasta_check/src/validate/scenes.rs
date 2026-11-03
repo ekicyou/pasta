@@ -7,7 +7,7 @@ use pasta_core::{
     SceneTable,
 };
 use pasta_dsl::PastaFile;
-use pasta_dsl::parser::{Attr, AttrBody, AttrValue, FileItem, Span};
+use pasta_dsl::parser::{Attr, AttrBody, AttrValue, FileItem, Span, merge_attrs};
 
 use super::{Finding, FindingKind, builtins, msg};
 
@@ -46,9 +46,10 @@ pub(crate) fn check(
             FileItem::GlobalSceneScope(scene) => Some(scene),
             _ => None,
         });
-        for scene in scenes {
+        // n 番目のグローバルシーンの属性（ファイル属性の受け継ぎと畳みの後）
+        for (scene, attrs) in scenes.zip(file.global_scene_attrs()) {
             let declared = aliases.resolve(&scene.name).unwrap_or(&scene.name);
-            let (_, counter) = registry.register_global(declared, scene_attrs_of(&scene.attrs));
+            let (_, counter) = registry.register_global(declared, scene_attrs_of(&attrs));
             for (local, local_counter) in scene.local_scenes.iter().zip(local_counters(scene)) {
                 if let Some(name) = &local.name {
                     registry.register_local(
@@ -56,7 +57,8 @@ pub(crate) fn check(
                         declared,
                         counter,
                         local_counter,
-                        scene_attrs_of(&local.attrs),
+                        // ローカルはファイル属性も親の属性も受け継がない（宣言行の中だけ畳む）
+                        scene_attrs_of(&merge_attrs(&[], &local.attrs)),
                     );
                 }
             }
