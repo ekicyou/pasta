@@ -2,7 +2,7 @@
 
 > 順は design.md の Implementation Order のとおり。読み込みの終わりの行（要件 10）を先にし、キックの Rust → キックの Lua → DAP の撤去 → 整え → テストの足し → マニュアル → 関門の順にする。どのタスクの終わりでも `cargo build --workspace` と、そのタスクが触ったテストが通る。cargo の前に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す。同じウェーブの約束で `act.lua`・`scene.lua`・`search/`・`code_gen/element_gen.rs` には触らない。
 
-- [ ] 1. 読み込みの終わりの行を、ログの設定によらず書く
+- [x] 1. 読み込みの終わりの行を、ログの設定によらず書く
 - [x] 1.1 読み込みの終わりの行の target を決め、ログのフィルタがいつもその target の info を通すようにする
   - target の名前 `pasta::load_entry` を定数にし、`pasta_lua::logging` から外のクレートにも使える形で出す
   - フィルタの組み立ての最後に、その target の info を通す指示を足す（`PASTA_LOG`・`[logging]`・失敗のときの既定のどの枝でも）
@@ -18,7 +18,7 @@
   - 完了の姿: 2 つの入口の結合テストが通り、`pasta.log` に絞った設定でも終わりの行が 1 行ある
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 9.2_
 
-- [ ] 2. キックの経路を撤去する（Rust）
+- [x] 2. キックの経路を撤去する（Rust）
 - [x] 2.1 pasta_shiori のアクターと SHIORI からキックを外す
   - アクターのキックのメッセージとその腕、キックの送り先を作る関数、`PastaShiori` のキックの送り先の欄・設定の口・キックの関数と説明を消す
   - アクターのスレッドを起こす関数の引数からキックの送り先を外し（3 つにする）、スレッドは既定の `PastaShiori`、読み込みは既定の `RuntimeConfig` を使う
@@ -33,7 +33,7 @@
   - 完了の姿: `pasta_shiori` のテストから DAP のポートと要求を使う箇所が無くなり、テストが通る
   - _Requirements: 9.1_
 
-- [ ] 3. キックの経路を撤去する（Lua）
+- [x] 3. キックの経路を撤去する（Lua）
 - [x] 3.1 Lua のキックの部品を消し、時計のイベントの扱いをキックの無い形にする
   - `kick.lua` を消し、`entry.lua` からその require と `SHIORI.kick` を消す
   - 仮想ディスパッチャからキック割り込みの門とキック起動の分岐を消し、Status の抑止の門だけを残す
@@ -42,7 +42,7 @@
   - 完了の姿: `crates/` に `SHIORI.kick`・`kick_pending`・`kick_force` が無く、Lua のテストと luacheck が通り、自動トーク・時報・チェイントーク・一時停止・Status の抑止のテストが今のまま通る
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 9.1_
 
-- [ ] 4. DAP を撤去する（pasta_lua）
+- [x] 4. DAP を撤去する（pasta_lua）
 - [x] 4.1 ランタイムから DAP の結線を外し、「デバッグが有効か」をシーンマップの有無にする
   - ランタイムの待ち受けの持ち物とフック・`jit.off()`・待ち受けを起こす呼び出しを消し、受けたシーンマップをそのまま持つ
   - 待ち受けのアドレスと提示モードの問い合わせを消し、「デバッグが有効か」の問い合わせはシーンマップを持つかを返す
@@ -75,7 +75,7 @@
   - 完了の姿: `Cargo.toml` に `socket2` が無く、`cargo build --workspace --all-targets` が通る
   - _Requirements: 7.8_
 
-- [ ] 5. 残す部品を整える
+- [x] 5. 残す部品を整える
 - [x] 5.1 (P) 位置からシーンを引く索引の、働きの無い呼び出しと隠す属性を消す
   - 索引の突合の働きの無い `insert_file` の呼び出しと、その上の誤ったコメントを消す
   - 索引の型のファイルの `#![allow(dead_code)]` を外し、使い手の無い項目を消す
@@ -96,7 +96,7 @@
   - _Boundary: 各クレートのテストの中和_
   - _Requirements: 9.3_
 
-- [ ] 6. 保存変数を書き出す `OnPastaDumpVariables`
+- [x] 6. 保存変数を書き出す `OnPastaDumpVariables`
 - [x] 6.1 保存変数の表を、セーブと同じ変換でテキストの TOML に書く関数を足す
   - セーブの門を通さず、表を変えず、`obfuscate` によらずテキストで書く。書けない値はセーブと同じ文言で外して警告する（警告をセーブと共有する）
   - 一時ファイルに書いて置き換える書き方で、書き込み・`sync_all` の失敗でも一時ファイルを消す（`save.toml` にも効く）。親のフォルダを作る
@@ -111,7 +111,7 @@
   - 完了の姿: 結合テストと `OnPastaScene`・`OnPastaSceneAt` の既存テストが通る
   - _Requirements: 4.1, 4.2, 4.3, 4.6, 5.1, 5.2, 5.5, 5.6, 9.2_
 
-- [ ] 7. 止まるエラーの場所を正しくする
+- [x] 7. 止まるエラーの場所を正しくする
 - [x] 7.1 読み込んだファイルの表に、チャンクの元のファイルを渡し、`.pasta` のパスを引く口を足す
   - ローダの文脈に、辞書のモジュール名 → 元のファイル（`.pasta` か `dic/` の `.lua` か、ゴーストのフォルダから見たパス）の表を足し、Phase 4 の後に詰める
   - 読み込んだファイルの表に、その表と「候補の全体のパス → `.pasta`」の表を持たせる。`@pasta_chunks` の値はこのタスクでは変えない（`stop.lua` と同じタスクで替える）
@@ -133,7 +133,7 @@
   - 完了の姿: `runtime_error_balloon_e2e_test.rs` が通る
   - _Requirements: 6.1, 6.2, 6.3, 9.2_
 
-- [ ] 8. ソースマップをシーンマップに縮める
+- [x] 8. ソースマップをシーンマップに縮める
 - [x] 8.1 位置からシーンを引く索引の「チャンク → `.pasta`」を、読み込んだファイルの表から引く
   - 索引の突合が、関数の定義元のチャンクから `.pasta` のパスを返す関数を引数で受けるようにし、ファクトリが 7.1 の口を閉じた関数（ゴーストのフォルダに結んで返す）を渡す
   - 完了の姿: 2 つのファイルの同じ名前のシーンがそれぞれのファイルで引けるテストを含め、`scene_identity_index_test.rs` が通る
@@ -158,7 +158,7 @@
   - 完了の姿: 4 つのファイルの説明に `ChunkSourceMap`・逆引き・`normalize_output` の誤った名前が無く、`cargo doc -p pasta_lua --no-deps` が警告無しで通る
   - _Requirements: 7.7_
 
-- [ ] 9. どのタスクにも属さない結合テストを足す
+- [x] 9. どのタスクにも属さない結合テストを足す
 - [x] 9.1 (P) リロードでの切り替え・古いキー・JIT を確かめる
   - 同じフォルダを `enabled = true` → `false` → `true` で読み直し、`debug_enabled()` と `OnPastaScene` の 200・204 が切り替わる
   - `[debug]` に `port = "x"`・`present_as = "lua"`・`source_map_sidecar = true` を書いても読み込みが通り、有効で、警告が無く、`.lua.map` が無い
@@ -180,7 +180,7 @@
   - _Depends: 5.2_
   - _Requirements: 1.1, 1.3, 1.5, 9.2_
 
-- [ ] 10. マニュアルとスキルの references を新しい形に揃える
+- [x] 10. マニュアルとスキルの references を新しい形に揃える
 - [x] 10.1 `internals/debug.md` を「開発用のイベントとシーンマップ」の章に書き直す
   - 門・`@pasta_debug` の 3 つの関数・シーンマップの作り方・止まるエラーの場所の決め方・`variables.toml` を書き、DAP・キック・行フック・提示モード・サイドカーの記述を残さない。`SUMMARY.md` の internals の行の題を合わせる
   - 消える利用者の頁へのリンク（`#初期モードの指定`・`#サイドカー出力任意`・`constraints.md`）を外す
@@ -204,7 +204,7 @@
   - 完了の姿: マニュアルの検査が全部通る
   - _Requirements: 8.6, 8.7_
 
-- [ ] 11. 品質の関門を通す
+- [x] 11. 品質の関門を通す
 - [x] 11.1 撤去の確かめと、ワークスペースの関門
   - `crates/` に `TcpListener`・`socket2`・`jit.off`・`set_hook`・`KickSink`・`kick_pending`・`SHIORI.kick`・`ChunkSourceMap`・`resolve_lua_to_pasta`・`resolve_pasta_to_lua` が残らないことを grep で確かめる。`act.lua`・`scene.lua`・`search/`・`code_gen/element_gen.rs`・`external_control.lua` に差分が無い
   - `cargo fmt --check`・`cargo clippy --workspace --all-targets`（警告 0）・`cargo test --workspace`・Lua のテスト・luacheck を通す
