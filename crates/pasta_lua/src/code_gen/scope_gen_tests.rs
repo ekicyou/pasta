@@ -587,6 +587,7 @@ fn attrs_follow_create_scene_on_the_same_line() {
             },
         ),
         attr("重み", AttrBody::Decl(AttrValue::Float(1.5))),
+        attr("零", AttrBody::Decl(AttrValue::Float(-0.0))),
         attr("＄済み", AttrBody::Flag),
     ];
     let text = gen_to_string(|cg| cg.generate_global_scene(&scene, &scene.name, 1, &attrs));
@@ -601,7 +602,7 @@ fn attrs_follow_create_scene_on_the_same_line() {
             r#"local SCENE = PASTA.create_scene("会話"); "#,
             r#"PASTA.set_scene_attrs(SCENE, "__start__", { { key = "背景", value = "教室" }, "#,
             r#"{ key = "題", value = "" }, { key = "＄＊経験値", op = ">=", value = 500 }, "#,
-            r#"{ key = "重み", value = 1.5 }, { key = "＄済み" } }); "#,
+            r#"{ key = "重み", value = 1.5 }, { key = "零", value = 0 }, { key = "＄済み" } }); "#,
             r#"PASTA.set_scene_attrs(SCENE, "選択肢_1", { { key = "優先", value = 3 } })"#,
         ),
         "{text}"

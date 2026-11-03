@@ -144,3 +144,4 @@
 - 4.4 の finalize_scene_impl の呼び出しで属性を渡していることを直接見るテストは無い（@pasta_search が属性を出さないため）。属性で絞り込む口が入る spec（scene-condition-attributes）で端から端までの確認を足す。
 - 最終検証で Integer の Display も lua_number を通すようにした（15 桁以上の整数と 2^53 を超える整数で Lua の tostring と見え方がずれていた）。
 - finalize.rs の build_scene_registry は統合テストから呼ぶため pub にした（設計では非公開）。
+- 完了時にその場で解決: `＆z：-0.0` は Rust の表で整数 0・Lua で -0 と見え方がずれていたので、生成する Lua の数の字句で -0.0 を 0 にした（scope_gen.rs）。

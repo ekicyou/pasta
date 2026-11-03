@@ -444,6 +444,8 @@ fn append_set_scene_attrs(
 fn attr_value_literal(v: &AttrValue) -> Result<String, TranspileError> {
     Ok(match v {
         AttrValue::Integer(n) => n.to_string(),
+        // -0.0 は Rust の表では整数 0 になるので、Lua にも 0 を渡して見え方をそろえる
+        AttrValue::Float(f) if *f == 0.0 => "0".to_string(),
         AttrValue::Float(f) => f.to_string(),
         AttrValue::String(s) | AttrValue::AttrString(s) => StringLiteralizer::literalize(s)?,
     })
