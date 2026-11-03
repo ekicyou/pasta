@@ -49,7 +49,7 @@
 
 ### Allowed Dependencies
 
-- Node の組み込み: 大域の `fetch`・`AbortSignal.timeout`・`TextDecoder`・`node:fs/promises`・`node:path`。試験では `node:http`・`node:os`。
+- Node の組み込み: `node:http`（送る側。大域の `fetch` は使わない）・`TextDecoder`・`node:fs/promises`・`node:path`。試験では `node:http`・`node:os`。
 - `vscode` の API は `devCommands.ts` と `extension.ts` だけが使う。純粋なモジュールは `vscode` を import しない。
 - `ghostValidator.ts` の `findGhostMaster()`（糊から呼ぶ）。
 - `debug-mcp-runtime` の約束（Revalidation Triggers の 1〜3）。SSP・areka の MCP の道具 4 つ（`get_property`・`get_log`・`reload`・`raise_event`）。
@@ -61,7 +61,7 @@
 1. `OnPastaSceneAt` の引数（Reference0 はパス・Reference1 は 1 以上の半角数字）か、台本・失敗の表記・204 の返し方が変わる。
 2. `OnPastaDumpVariables` の書き出す場所（`ghost/master/profile/pasta/debug/variables.toml`）・「204 の前に書き終える」・「書けなければ前のファイルを残す」が変わる。
 3. `debug-mcp-runtime` の新しい info の行の文言が決まる・変わる（マニュアル 9.10）。
-4. pasta.dll の `SHIORI load entry completed`（`entry`・`loaded`）の行の文・レベル・target が変わるか、`pasta.log` の場所の決まり（`[logging] file_path`）が変わる。
+4. pasta.dll の `SHIORI load entry completed`（`entry`・`loaded`）の行の文・target が変わるか、`[logging] level`・`filter` に関係なく出るという約束（`debug-mcp-runtime` へ申し送り。設計の議論 1）が変わるか、`pasta.log` の場所の決まり（`[logging] file_path`）が変わる。
 5. SSP・areka の `raise_event`・`get_property`・`get_log` の答えの文、`ghost_name` のパスの照合、候補の番号の列、`Accept`・`Host`・`Origin` の検査が変わる。
 6. `findGhostMaster()` の返す形が変わる。
 7. マニュアルのアンカー（「シーン再生（▶ シーンを実行）」・「デバッグの有効化」・「pasta.toml による有効化」・「優先順位」）を変える。
@@ -123,7 +123,7 @@ graph LR
 | Layer | Choice / Version | Role in Feature | Notes |
 | --- | --- | --- | --- |
 | 拡張 | TypeScript 5.5・esbuild 0.28（今のまま） | 3 つのコマンドと MCP のクライアント | 新しい依存なし |
-| 実行の場 | VSCode `^1.85.0` の拡張ホスト（Electron 25・Node 18.15 以上） | 大域の `fetch`・`AbortSignal.timeout`・`TextDecoder('shift_jis')` | `engines.vscode` は上げない |
+| 実行の場 | VSCode `^1.85.0` の拡張ホスト（Electron 25・Node 18.15 以上） | `node:http`・`TextDecoder('shift_jis')` | `engines.vscode` は上げない |
 | 通信 | MCP（JSON-RPC 2.0 over HTTP POST・JSON の単発応答・無状態） | `initialize`・`tools/call` | 道は `/api/mcp/v1`。`Mcp-Session-Id` は使わない |
 | 試験 | node の素の実行・`node:http` | MCP を真似るサーバー | 番号は 0 で取る |
 | 文書 | mdBook（今のまま）・`book/tools/*.mjs` | 章の検査・スキルの生成 | 生成器は今のまま |
@@ -294,7 +294,7 @@ sequenceDiagram
 | 3.5 | ゴーストごとに覚える | DevCommands | `remembered: Map` | 相手を決める |
 | 3.6 | 外れたら捨てて聞き直す | DevCommands・McpClient | `identify` | 相手を決める |
 | 3.7 | 見つからなければ案内して止まる | DevCommands | `formatNotFound` | — |
-| 3.8 | 答えない相手で止まり続けない | McpClient | `SCAN_TIMEOUT_MS`・`AbortSignal.timeout` | 相手を決める |
+| 3.8 | 答えない相手で止まり続けない | McpClient | `SCAN_TIMEOUT_MS`・`req.setTimeout` | 相手を決める |
 | 3.9 | 127.0.0.1 だけ・設定なし | McpClient | `HOST` 定数 | — |
 | 4.1 | 右クリックの先頭にいつでも | PackageManifest | `editor/context` | — |
 | 4.2 | 未保存を確かめずに全部保存 | DevCommands | `saveGhostDocuments` | ▶ シーンを実行 |
@@ -349,7 +349,7 @@ sequenceDiagram
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 | --- | --- | --- | --- | --- | --- |
-| McpClient（`mcpClient.ts`） | 純粋・通信 | 127.0.0.1 の MCP の窓口を探し、道具を呼び、答えを読む | 2.2, 3.1, 3.2, 3.6, 3.8, 3.9, 4.7, 4.8, 7.3 | fetch（P0）・SSP／areka（P0） | Service, API |
+| McpClient（`mcpClient.ts`） | 純粋・通信 | 127.0.0.1 の MCP の窓口を探し、道具を呼び、答えを読む | 2.2, 3.1, 3.2, 3.6, 3.8, 3.9, 4.7, 4.8, 7.3 | node:http（P0）・SSP／areka（P0） | Service, API |
 | GhostFiles（`ghostFiles.ts`） | 純粋・ディスク | ゴーストのルート・表示名・`pasta.log`・`variables.toml` | 2.1, 2.3, 5.6, 5.7, 6.2, 6.3 | node:fs（P0） | Service |
 | ReloadShiori（`reloadShiori.ts`） | 純粋・流れ | 読み込み直しと終わりの待ち・誤りの要約 | 4.3, 4.4, 4.5, 5.3, 5.4, 5.5, 5.7, 5.8, 5.9 | McpClient（P0）・GhostFiles（P0） | Service |
 | RunScene（`runSceneAtCursor.ts`） | 純粋・流れ | `OnPastaSceneAt` と台本の取り出し | 4.4〜4.10 | ReloadShiori（P0）・McpClient（P0） | Service |
@@ -382,7 +382,7 @@ sequenceDiagram
 
 **Dependencies**
 
-- Outbound: 大域の `fetch`・`AbortSignal.timeout`（P0）。
+- Outbound: `node:http` の `request`（P0）。大域の `fetch` は使わない（設計の議論 3。「届かない」と「送った後に切れた」をソケットの出来事で見分けるため。VSCode の新しい版が `fetch` をプロキシへ回す仕組みにも乗らない）。
 - External: SSP（`baseware.name` = `SSP`）・areka（`areka`）の MCP の受け口（P0）。
 
 **Contracts**: Service [x] / API [x]
@@ -449,7 +449,8 @@ export function readRaiseEvent(result: CallResult): RaiseEventReply;
 
 - Preconditions: `port` は 1〜65535。`root` は空でない絶対パス。
 - Postconditions: `callTool` は投げない（失敗も `CallResult` で返す）。`findBasewares` は最長でおよそ `SCAN_TIMEOUT_MS` で終わる（20 個を同時に聞く）。
-- `noResponse` にするもの: 送った後の接続の切れ（`fetch` の失敗で原因が `ECONNREFUSED` でないもの）、200 で本文が空、`AbortSignal.timeout` の時間切れ。`readRaiseEvent` は、`ok`・`ng` の文が `No response from server` か `did not respond within` を含むときも `noResponse` にする（中継・areka の上限の文）。
+- `unreachable` にするもの: `req.on('error')` の `ECONNREFUSED`・`ECONNRESET` で、要求を書き終える前のもの。
+- `noResponse` にするもの: 要求を書き終えた後、答えの頭が来る前の接続の切れ（`socket` の `close`）、200 で本文が空、`req.setTimeout` の時間切れ（`req.destroy()` で切る）。`readRaiseEvent` は、`ok`・`ng` の文が `No response from server` か `did not respond within` を含むときも `noResponse` にする（中継・areka の上限の文）。
 - `identify`・`probe` は `ok` で本文が空でないときだけ `Endpoint` を返す。`ng`（`NG:Cannot find active ghost from specified name` など）・`unreachable`・`noResponse`・`badShape` は無し。
 
 ##### API Contract
@@ -472,7 +473,7 @@ export function readRaiseEvent(result: CallResult): RaiseEventReply;
 
 - Integration: 20 個への同時の問い合わせは `Promise.all`。`clientInfo.version` は固定の `"1"`（相手は見ない。拡張の版を読み込む仕組みを足さない）。
 - Validation: 真似るサーバーが areka と同じく `Accept` の欠け（406）・`Host` の外れ（403）を断るので、札の取りこぼしは試験で落ちる。
-- Risks: VSCode のプロキシの設定が大域の `fetch` に効く版で 127.0.0.1 が外へ回る恐れ（Open Question 5）。
+- `agent: false`（接続を使い回さない。1 回の呼び出しで 1 本の接続）。本文は `Buffer` を集めて UTF-8 で読む。
 
 ### ディスク
 
@@ -487,7 +488,12 @@ export function readRaiseEvent(result: CallResult): RaiseEventReply;
 
 - ルートは、`findGhostMaster()` の返す `ghost/master` が、ファイルのフォルダから上へ 3 つまでの間にあり、`descript.txt` を持つときだけ、その 2 つ上のフォルダ（2.1）。`ghost`・`master`・`descript.txt` の大文字・小文字は区別しない。
 - 表示名: `descript.txt` の `name,` の行の値。先頭の `charset,` の行が `UTF-8`（大文字・小文字を問わない）なら UTF-8、ほかは Shift_JIS で読む。BOM は外す。読めない・`name` が無い・空ならルートのフォルダ名（2.3）。
-- `pasta.log` の場所: `ghost/master/pasta.toml` の `[logging]` の表の中の `file_path = "…"`（基本の文字列か `'…'`）を読む。`profile/` で始まり、`profile/` の後にファイル名があり、`..` を含まず、絶対パスでない値だけを使い、ほかと `pasta.toml` が読めないときは既定の `profile/pasta/logs/pasta.log`（5.6）。
+- `pasta.log` の場所: `ghost/master/pasta.toml` から `[logging]` の `file_path` を読む（5.6）。読む書き方は 3 つ（設計の議論 4）:
+  1. `[logging]` の表の中の `file_path = "…"`
+  2. 表の外（最上位）の点で区切ったキー `logging.file_path = "…"`
+  3. 1 行のインラインテーブル `logging = { …, file_path = "…", … }`
+  
+  文字列は基本の文字列（`"…"`。`\\`・`\"` だけを戻す）かリテラル（`'…'`）。`profile/` で始まり、`profile/` の後にファイル名があり、`..` を含まず、絶対パスでない値だけを使う（pasta の `logger.rs` と同じ条件）。値が無い・`pasta.toml` が無いときは既定の `profile/pasta/logs/pasta.log`。`logging` と `file_path` が書かれているのに 3 つのどれでも読めない、または条件に外れるときは、既定の場所を使い、`PastaLogLocation.note` にその旨を入れて出力に出す（黙って倒さない）。
 - `pasta.log` は読む前の大きさを覚え、増えた分だけを読む（大きいファイルを毎回読まない）。最後の改行より後の書きかけの行は次の回に回す。
 - 書き込まない（読むだけ）。
 
@@ -508,7 +514,12 @@ export const MAX_ASCENT = 3;
 /** masterPath は findGhostMaster(uri)?.fsPath。外れたら undefined */
 export function resolveGhost(fileFsPath: string, masterPath: string | undefined): Promise<GhostTarget | undefined>;
 export function decodeDescriptName(bytes: Uint8Array): string | undefined;
-export function pastaLogPath(master: string, pastaTomlText: string | undefined): string;
+export interface PastaLogLocation {
+  readonly path: string;
+  /** file_path を読めず既定へ倒したときの添え書き（出力に出す）。読めた・書かれていないときは undefined */
+  readonly note?: string;
+}
+export function pastaLogPath(master: string, pastaTomlText: string | undefined): PastaLogLocation;
 
 export interface LogCursor { readonly path: string; readonly offset: number } // offset は読む前の大きさ（無ければ 0）
 export function openLogCursor(path: string): Promise<LogCursor>;
@@ -530,8 +541,8 @@ export function readText(path: string): Promise<string | undefined>;
 
 **Implementation Notes**
 
-- Validation: 試験は一時フォルダに `ghost/master` の木を作り、深さ 0〜4・descript の UTF-8／Shift_JIS／無し・`file_path` の正しい値と外れた値（`../x`・`C:\x`・`Profile/x`・`profile/`）を確かめる。
-- Risks: `pasta.toml` の `[logging]` を複数行の書き方（インラインテーブル `logging = { … }`）で書いたゴーストは既定へ倒れる。pasta の読み手と違う場所を見ることになるので、試験で既定へ倒れることを固定し、マニュアルの troubleshooting に「`pasta.log` が読めなかった」と出たときの確かめ方を書く。
+- Validation: 試験は一時フォルダに `ghost/master` の木を作り、深さ 0〜4・descript の UTF-8／Shift_JIS／無し・`file_path` の 3 つの書き方・正しい値と外れた値（`../x`・`C:\x`・`Profile/x`・`profile/`）・読めない書き方（複数行のインラインテーブルなど）で `note` が付くことを確かめる。
+- Risks: 3 つの外の書き方（複数行にまたがるインラインテーブルなど）は既定へ倒れるが、`note` で作者に見える。マニュアルの troubleshooting に、この添え書きが出たときの直し方を書く。
 
 ### 流れ
 
@@ -574,7 +585,7 @@ export type ReloadOutcome =
       errors: readonly LoadIssue[];
       warnings: readonly LoadIssue[];
       pastaLogReadable: boolean;
-      pastaLogPath: string;
+      pastaLog: PastaLogLocation;     // 場所と、file_path を読めなかったときの添え書き
     };
 
 export function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome>;
@@ -585,7 +596,7 @@ export function formatReload(outcome: ReloadOutcome): { lines: string[]; notice?
 
 - 順: `pasta.toml` を読んで `pasta.log` の場所を決める → `openLogCursor` → `lastLogId(error)` → `reload` → 印が出るか `loadTimeoutMs` まで `readNewLines` を `pollIntervalMs` ごとに → `get_log(error, since_id)`。
 - 数え方: `pasta.log` は印の行までの `ERROR`（誤り）と `WARN`（警告）。印が `loaded=false` なら、その行も誤りに数える。ベースウェアの記録は、表示の語に `warn`（大文字・小文字を問わない）を含むものを警告、ほかを誤りにする。
-- `formatReload`: 誤りと警告の数と行を出す（5.4）。どちらも 0 なら「読み込みは誤り無く終わりました」の 1 行（5.5）。時間切れなら「読み込みの終わりを確かめられませんでした（`pasta.log` に読み込みの終わりの行が出ませんでした）」と、そこまでの要約（5.8）。`pasta.log` が読めなければ、その旨とパスを添える（5.7）。
+- `formatReload`: 誤りと警告の数と行を出す（5.4）。どちらも 0 なら「読み込みは誤り無く終わりました」の 1 行（5.5）。時間切れなら「読み込みの終わりを確かめられませんでした（`pasta.log` に読み込みの終わりの行が出ませんでした。`pasta.toml` の `[logging]` の `level`・`filter` も確かめてください）」と、そこまでの要約（5.8）。`pasta.log` が読めなければ、その旨とパスを添える（5.7）。`pastaLog.note` があれば添える。
 - このモジュールは再生を頼まない（5.9）。
 
 #### RunScene
@@ -805,7 +816,8 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps?: Par
 - **G 節**: `DEBUG_CHAPTERS = ['index', 'vscode-setup', 'dev-actions', 'troubleshooting']`。`FACTS = ['PASTA_DEBUG', '.pasta', 'OnPastaSceneAt', '[debug]', 'MCP', 'baseware.name']`（`9276`・`attach`・`sourcePresentation` を外す）。
 - **`shiori-events.md` の節**（10.1・10.3）: 相手の確かめ（`get_property(baseware.name, ghost_name=<ルート>)`）・`ghost_name` にルートの絶対パス・`reload(target="shiori")` と終わりの待ち（`pasta.log` の `SHIORI load entry completed`。今の「`get_status` が答えるようになってから」の 1 文を置き換える）・`get_log(error, since_id)` での誤りの数え方・`OnPastaScene`（完全一致の名前）と `OnPastaSceneAt`・`OnPastaSetSaveVariable` と `OnPastaDumpVariables`（引数と書き出す場所は各節へリンクし、ここで決まりを写さない）・「No response from server」のときの `get_log(script, since_id)`。書いた後に `node book/tools/gen-skill-refs.mjs` で `pasta-lua-coding` の references を作り直す。
 - **先に入るときの最小の直し**（9.9。`debug-mcp-runtime` が先に入っていればしない）: `reference/pasta-toml.md:807` の `source-level.md#提示モードの切替` へのリンクを外す、`internals/debug.md` の `source-level.md`・`constraints.md` へのリンク（126・273・392 行）を外すか `dev-actions.md` へ向ける、`DEBUGGING.md` 12〜15 行の頁の一覧から 2 頁を外す。直したら `gen-skill-refs.mjs` で references を作り直す（`pasta-ghost-authoring/references/pasta-toml.md:802` が引いている）。
-- **出す前の実機の 1 回**（brief）: Open Questions の 1〜5 を SSP と areka で確かめ、動画を撮る。
+- **タスクを作る前の実機の確かめ**（設計の議論 2）: 普段の SSP で えも2DEBUG（`[debug] enabled = true`）を、あれば areka も起こし、Open Questions の 1〜4 を MCP で確かめて research.md に記録し、外れた所の設計を直してからタスクを作る。送るのは読むだけの道具と `reload(shiori)`・`OnPastaSceneAt` だけ。
+- **出す前の実機の 1 回**（brief）: 3 つのコマンドを拡張から通して確かめ、動画を撮る。
 
 ## Open Questions / Risks
 
@@ -813,7 +825,7 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps?: Par
 2. **SSP の HTTP の `raise_event` が「応答が無い」になる形**（中継の「No response from server」が、本体の空の本文か、切断か、遅い応答か）。仮の決め: 切断・空の本文・15 秒の時間切れ・文の 4 つを全部「応答が無い」とする。推奨: 実機で `OnPastaSceneAt` を 20 回ほど送り、どの形が出るかを research.md に記録する。
 3. **`get_log(script)` の表示の語に、イベント名（`OnPastaSceneAt`）が入るか**（未実測）。仮の決め: 入っていればそれを、無ければ `since_id` の後の最初の記録を、この再生の台本とする。推奨: 実機で確かめ、入らないなら `findPlayedScript` を「最初の記録」だけにして簡単にする。
 4. **SSP の MCP の窓口が既定で開いているか**（SSTP の HTTP サーバーの設定が要るか）。仮の決め: 見つからないときの知らせとマニュアルに「SSP の設定で MCP（SSTP の HTTP）を有効にしているか」を書く。推奨: 実機で既定の設定を確かめ、マニュアルの文を確定する。
-5. **VSCode のプロキシの設定と大域の `fetch`**。1.85 では効かないが、新しい版（`http.fetchAdditionalSupport`）で 127.0.0.1 がプロキシへ回る恐れ。仮の決め: 大域の `fetch` を使う。推奨: 出す前に、プロキシを設定した VSCode で 1 回試す。回るなら `McpClient` の中だけ `node:http` の直の呼び出しに替える（境は変わらない）。
+5. ~~VSCode のプロキシの設定と大域の `fetch`~~ → 解決（設計の議論 3）: 初めから `node:http` を使う。
 6. **VSCode 1.85（Electron 25）での `TextDecoder('shift_jis')`**。手元の 1.144 では動いた。仮の決め: 使う。読めなければ表示名がフォルダ名になるだけで、送り先には影響しない。推奨: 追わない（`vsce-4-upgrade` で `engines` を上げるときに消える問い）。
-7. **`[logging] level` を `warn` 以上にしたゴースト**では印の行が出ず、毎回時間切れになる。仮の決め: 時間切れの知らせとマニュアルで、ログの量を `info` 以上にするよう案内する。推奨: 実際に困る声が出たら、`debug-mcp-runtime` の新しい info の行と同じく、読み込みの終わりを warn 以上の 1 行でも出すよう pasta.dll の側へ起票する（この spec では pasta.dll を触らない）。
+7. **`[logging] level` を `warn` 以上にしたゴースト・`filter` で外したゴースト**では印の行が出ず、毎回時間切れになる → 決定（設計の議論 1）: `debug-mcp-runtime` に、`SHIORI load entry completed` の行を `level`・`filter` に関係なく必ず `pasta.log` に出すよう申し送る（pasta.dll の側の持ち場。この spec では触らない）。拡張は、時間切れの知らせとマニュアルの troubleshooting に「`pasta.toml` の `[logging]` の `level`・`filter` を確かめる」を添える（あちらが入る前のゴースト向け）。
 8. **`debug-mcp-runtime` の新しい info の行の文言**（9.10）は、あちらの設計で決まる。仮の決め: マニュアルの該当の 1 文を、あちらの design.md の文言で書く。先に入るなら、あちらの要件の言い方（「開発用のイベントを許したことを info で 1 行出す」）で書き、rebase で文言を合わせる。

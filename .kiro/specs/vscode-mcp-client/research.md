@@ -393,3 +393,10 @@
 - areka `crates/areka-mcp/src/dispatch.rs`・`gate.rs`・`tools/{get_log,reload,raise_event,get_active_ghost_list}.rs`、`crates/areka/src/mcp/reload.rs`
 - ukadoc「その他の機能」<https://ssp.shillest.net/ukadoc/ssphelp/other.html>（MCP の節。survey の出典）
 - `debug-mcp-runtime` の要件の決まり（side-session-notes `debug-mcp-runtime-requirements-decisions.md`・ブランチ `claude/kiro-start-debug-mcp-runtime-c5413c` の `a5b4f0ff`）
+
+## 設計の議論の結論（2026-11-03・開発者が全 4 議題を推奨案で承認）
+
+1. **読み込みの終わりの印**: `SHIORI load entry completed` は INFO なので、`[logging] level = "warn"` や `filter` で消える。直すなら出す側で 1 か所直すのが筋なので、`debug-mcp-runtime` に「この行は `level`・`filter` に関係なく必ず出す」を申し送る。拡張は、時間切れの知らせに `[logging]` の確かめを添える。
+2. **実機の確かめ**: タスクを作る前に行う。普段の SSP で えも2DEBUG を（あれば areka も）起こし、Open Questions 1〜4 を確かめて、この research.md に記録する。結果で流れの形が変わり得るので、タスクの作り直しを避けるため。
+3. **送り方**: 大域の `fetch` ではなく `node:http`。「届かない」と「送った後に切れた（応答が無い）」をソケットの出来事で見分けられる。VSCode の `fetch` のプロキシの仕組みにも乗らない。依存は増えない。
+4. **`[logging] file_path`**: 表の書き方・点で区切ったキー・1 行のインラインテーブルの 3 つを読む。どれでも読めないときは、黙って倒さずに出力に添え書きを出す。TOML の読み手を足すのは「依存を増やさない」に反するので採らない。
