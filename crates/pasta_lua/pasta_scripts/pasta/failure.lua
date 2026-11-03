@@ -21,6 +21,7 @@ FAILURE.LABEL = {
     TIMEOUT            = "時間切れ",
     BAD_TYPE           = "型の名前にならない値",
     NOT_ASSIGNABLE     = "代入できない値",
+    SCENE_UNMET        = "条件に合うシーンが無い",
 }
 
 local ESCAPE = { ["\\"] = "\\\\", ["%"] = "\\%", ["\r"] = " ", ["\n"] = " " }
@@ -185,6 +186,26 @@ end
 function FAILURE.reply(act, record)
     FAILURE.report(act, record)
     return act:build()
+end
+
+--- FAILURE.raise が投げた記録の目印（メタ表）。tostring は表記の中身
+local RAISED = {
+    __tostring = function(record)
+        return FAILURE.body(record.label, record.subject, record.detail)
+    end,
+}
+
+--- 止まるエラーとして記録を投げる（戻らない）。記録の表はそのまま投げる（文字列にしない）
+---@param record FailureRecord
+function FAILURE.raise(record)
+    error(setmetatable(record, RAISED))
+end
+
+--- FAILURE.raise が投げた値か
+---@param v any
+---@return boolean
+function FAILURE.is_raised(v)
+    return type(v) == "table" and getmetatable(v) == RAISED
 end
 
 --- 名前になる値か（空でない文字列）

@@ -143,6 +143,16 @@ describe("OnPastaCallFunction - 見つからない", function()
             expect(warns[1]):toBe("OnPastaCallFunction: handler not found: name='自動トーク停止'")
         end
     end)
+
+    test("条件漏れなら止めずに 条件に合うシーンが無い の表記と警告で、コルーチンを返さない（2.8）", function()
+        local result, warns = call(EVENT_CALL, { [0] = "好感度" }, {
+            find = function() return nil, "unmet" end,
+        })
+        expect(type(result)):toBe("string")
+        expect(contains(result, "【条件に合うシーンが無い：OnPastaCallFunction ＞好感度】")):toBe(true)
+        expect(#warns):toBe(1)
+        expect(warns[1]):toBe("OnPastaCallFunction: no scene meets the conditions: name='好感度'")
+    end)
 end)
 
 describe("OnPastaCallFunction - 呼び出し", function()

@@ -24,7 +24,10 @@ mod word_table;
 pub use random::{DefaultRandomSelector, MockRandomSelector, RandomSelector};
 pub use scene_alias::SceneAliasTable;
 pub use scene_registry::{SceneEntry, SceneRegistry};
-pub use scene_table::SceneTable;
-pub use scene_types::{CmpOp, SceneAttr, SceneAttrValue, SceneId, SceneInfo, SceneScope};
+pub use scene_table::{CondFn, SceneTable};
+pub use scene_types::{
+    CmpOp, PRIORITY_KEYS, SceneAttr, SceneAttrValue, SceneId, SceneInfo, SceneScope,
+    has_conditions, priority_value, scene_priority,
+};
 pub use word_registry::{WordDefRegistry, WordEntry};
 pub use word_table::WordTable;

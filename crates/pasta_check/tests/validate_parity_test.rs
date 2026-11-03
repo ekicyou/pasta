@@ -341,6 +341,7 @@ fn stops_loading(kind: FindingKind) -> bool {
             | TranspileArgAssign
             | TranspilePropertyInExpr
             | TranspileContinuationWithoutActor
+            | TranspileInvalidPriority
     )
 }
 
@@ -589,6 +590,17 @@ font = { name = "a\\b" }
             &[
                 ("pasta.toml", toml),
                 ("dic/a.pasta", "＊場面\n  ：続き\n".as_bytes()),
+            ],
+            true,
+        ),
+        (
+            "＆優先 の値が整数でない",
+            &[
+                ("pasta.toml", toml),
+                (
+                    "dic/a.pasta",
+                    "＊場面　＆優先：高い\n  さくら：はい。\n".as_bytes(),
+                ),
             ],
             true,
         ),

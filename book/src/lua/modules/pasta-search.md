@@ -40,6 +40,7 @@ DSL の単語参照（`act:word(name)`）、Call（`＞`）のシーン解決、
 - 候補を一巡するまで、同じ候補は選ばれない。一巡すると並べ直して最初から使う。
 - 並び順の記録は、検索の範囲（第 2 引数）と検索に使った名前の組ごとに持つ。照合用の名前に揃える引数（`search_scene` の第 1 引数、`search_word` の第 2 引数）は、揃えた後の名前で組を作る。グローバル単語に解決される DSL の `＠挨拶`（Lua の `act:word("挨拶")`）と `SEARCH:search_word("挨拶")` は、同じ記録を進める。
 - 記録はゴーストの実行中、イベントをまたいで保たれ、辞書の再読込で消える。
+- シーンの検索に `var`・`save` を渡したときは、条件を満たさない候補を見ただけで使ったものにし、優先の段より低い候補を出さない。並びの記録は表を渡したかどうかで分けない（[候補の選択](../../grammar/call-jump.md#候補の選択)）。
 
 前方一致で集まった候補を次の順に並べたものを、**候補の並び**と呼ぶ。`set_scene_selector`・`set_word_selector` に渡す整数は、候補の並びの位置を指す（[set_scene_selector(...) / set_word_selector(...)](#set_scene_selector--set_word_selector)）。
 
@@ -54,13 +55,15 @@ DSL の単語参照（`act:word(name)`）、Call（`＞`）のシーン解決、
 シーンを前方一致で検索する。
 
 ```lua
-SEARCH:search_scene(name, global_scene_name?) -> global_name, local_name | nil
+SEARCH:search_scene(name, global_scene_name?, var?, save?) -> global_name, local_name | nil | nil, "unmet"
 ```
 
 | パラメータ | 型 | 必須 | 説明 |
 | ---- | ---- | ---- | ---- |
 | `name` | string | ✅ | 検索するシーン名（照合用の名前に揃えてから前方一致） |
 | `global_scene_name` | string | ❌ | 指定すると、そのグローバルシーンのローカルシーンだけを検索する |
+| `var` | table | ❌ | 条件の `＄名前` を読む表（ふつうは `act.var`） |
+| `save` | table | ❌ | 条件の `＄＊名前` を読む表（ふつうは `act.save`） |
 
 `name` は、DSL の Call と同じく、照合用の名前（名前の中の文字と数字と `_` 以外の文字を `_` に置き換えた名前。[シーン名の照合](../../grammar/call-jump.md#シーン名の照合)）に揃えてから、シーン名の照合用の名前と前方一致させる。`"挨拶・朝"` も `"挨拶_朝"` も、照合用の名前 `挨拶_朝` で探す。照合用の名前が同じになるグローバルシーンは区別されず、同じ名前の候補になる。第 2 引数 `global_scene_name` には `global_name`（登録名）を渡す。第 2 引数は照合用の名前に揃えずに使う。
 
@@ -76,6 +79,11 @@ Lua ブロックで定義したシーン関数（`function SCENE.名前(act)`）
   - `global_name`: グローバルシーンの登録名。シーン名の照合用の名前の後ろに `_` と、照合用の名前が同じグローバルシーンの通し番号（1 から）を付けた名前である（例: 1 つ目の `＊メイン` は `"メイン_1"`、2 つ目は `"メイン_2"`。1 つ目の `＊挨拶・朝` は `"挨拶_朝_1"`）。別名で宣言したシーンの登録名は、置き換え後の名前から作られる。既定の別名表のもとで `＊OnTalk` の無いゴーストの 1 つ目の `＊会話` は `"OnTalk_1"` になり、`＊OnTalk` と `＊会話` を両方宣言すると、通し番号は両方を通して振られる。第 2 引数を指定したときは、第 2 引数と同じ名前が返る。
   - `local_name`: グローバルシーンの本体なら `"__start__"`。ローカルシーンなら、ローカルシーン名の照合用の名前の後ろに `_` と、同じグローバルシーン内の同名ローカルシーンの通し番号（1 から）を付けた名前（例: `"選択肢_1"`。`・選択・A` なら `"選択_A_1"`）。
 - 見つからないとき: 何も返さない（受け取った変数は `nil` になる）。
+- 名前に合うシーンはあるが、条件を満たす候補が 1 本も無いとき（条件漏れ）: `nil, "unmet"` の 2 値。`var` か `save` を渡したときだけ返る。
+
+**条件で絞る**: `var`・`save` のどちらかに表を渡すと、候補の条件とフラグをその表の値で評価し、満たす候補だけから優先の段で 1 つ選ぶ（[条件で候補を絞る](../../grammar/block-structure.md#条件で候補を絞る)・[優先](../../grammar/block-structure.md#優先)・[候補の選択](../../grammar/call-jump.md#候補の選択)）。渡さない方は空の表として扱う。
+
+**`var` と `save` の両方を渡さない（`nil`）と、条件も優先の段も見ない**。条件のある候補も、優先の低い候補も、条件の無い候補と同じに選ばれる。DSL の Call と同じ選び方にするときは、`act.var` と `act.save` を渡す（[SCENE.search](../script-api.md#scenesearchname-global_scene_name-act) に act を渡すのと同じ）。
 
 `name` に空文字列を渡すと、Lua のエラー（`Scene search error: Invalid scene name: ''`）になる。
 
@@ -99,6 +107,10 @@ local result = SEARCH:search_scene("存在しないシーン")
 if not result then
     print("Scene not found")
 end
+
+-- 条件で絞る（＊秘密　＆＄＊鍵＝１ だけがあり、＄＊鍵 が 1 でないとき）
+local g2, miss = SEARCH:search_scene("秘密", nil, act.var, act.save)
+print(g2, miss)  -- nil, "unmet"
 ```
 
 ### search_scene_exact(name, global_scene_name?)
@@ -106,10 +118,10 @@ end
 シーンを完全一致で検索する。
 
 ```lua
-SEARCH:search_scene_exact(name, global_scene_name?) -> global_name, local_name | nil
+SEARCH:search_scene_exact(name, global_scene_name?, var?, save?) -> global_name, local_name | nil | nil, "unmet"
 ```
 
-引数、照合用の名前への揃え方、別名表での置き換え、戻り値は [search_scene](#search_scenename-global_scene_name) と同じである。違うのは候補だけで、照合用の名前が `name`（揃えた後）と完全に等しいシーンだけが候補になる。`search_scene_exact("つっつき反応女")` は `＊つっつき反応女の子Head` を選ばない。候補が複数あれば `search_scene` と同じくシャッフル＆順次消費で 1 つを選ぶ。並び順の記録は `search_scene` とは別に持つ。
+引数（`var`・`save` による条件の絞り込みを含む）、照合用の名前への揃え方、別名表での置き換え、戻り値は [search_scene](#search_scenename-global_scene_name) と同じである。違うのは候補だけで、照合用の名前が `name`（揃えた後）と完全に等しいシーンだけが候補になる。`search_scene_exact("つっつき反応女")` は `＊つっつき反応女の子Head` を選ばない。候補が複数あれば `search_scene` と同じくシャッフル＆順次消費で 1 つを選ぶ。並び順の記録は `search_scene` とは別に持つ。
 
 つつき・撫での既定ハンドラは、この関数でショートカットのシーンを探す（[つつき・撫でのショートカット](../shiori-events.md#つつき撫でのショートカット)）。
 
@@ -181,7 +193,7 @@ SEARCH:count_scene_exact(name) -> integer
 - 数えるのはグローバルシーンだけである。ローカルシーンは数えない。第 2 引数は無い。
 - 一致するシーンが無ければ `0` を返す。警告ログ（`Scene not found`）も出さない。
 - 読むだけで、並び順の記録（[候補の選び方](#候補の選び方)）を変えない。数えた後の `search_scene` は、数えなかったときと同じ候補を選ぶ。
-- シーンに書いた属性で絞らない。定義されているシーンの全部を数える。
+- シーンに書いた属性で絞らない。条件・フラグ・`＆優先` も見ず、定義されているシーンの全部を数える。
 - `name` に空文字列を渡すと、Lua のエラー（`Scene search error: Invalid scene name: ''`）になる。
 
 ```lua

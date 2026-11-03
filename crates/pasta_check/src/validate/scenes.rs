@@ -182,7 +182,7 @@ pub(crate) fn scene_attrs_of(attrs: &[Attr]) -> Vec<SceneAttr> {
 }
 
 /// 値の型の規則（要件 4.5）: 小数は整数の値なら整数、引用の有無は区別しない
-fn scene_attr_value(v: &AttrValue) -> SceneAttrValue {
+pub(crate) fn scene_attr_value(v: &AttrValue) -> SceneAttrValue {
     match v {
         AttrValue::Integer(i) => SceneAttrValue::Integer(*i),
         AttrValue::Float(f) => SceneAttrValue::from_f64(*f),

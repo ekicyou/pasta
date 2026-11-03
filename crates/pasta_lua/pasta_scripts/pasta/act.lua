@@ -324,16 +324,16 @@ end
 --- @param mode string "word" | "scene" | "expr"
 --- @param key string 検索キー
 --- @param scene_name string|nil ローカル検索時のシーン名（nil でグローバル検索）
+--- @param act Act scene/expr モードで条件の評価に使う act
 --- @return any|nil 見つかったハンドラー、またはnil
-local function search_dictionary(SEARCH, mode, key, scene_name)
+--- @return "unmet"|nil miss scene/expr モードで条件漏れのとき "unmet"
+local function search_dictionary(SEARCH, mode, key, scene_name, act)
     if mode == "word" then
-        local result = SEARCH:search_word(key, scene_name)
-        if result ~= nil then return result end
-    else
-        local result = SCENE.search(key, scene_name)
-        if result then return result.func end
+        return SEARCH:search_word(key, scene_name)
     end
-    return nil
+    local result, miss = SCENE.search(key, scene_name, act)
+    if result then return result.func end
+    return nil, miss
 end
 
 --- ハンドラーフォールバック検索コア（5段階）
@@ -355,6 +355,7 @@ end
 --- @param key string 検索キー
 --- @param skip_methods boolean|nil true で継承したメソッドに届かせない。nil/false は既存どおり
 --- @return any|nil 見つかったハンドラー（関数または値）、またはnil
+--- @return "unmet"|nil miss どの段にも無く、L2・L5 のどちらかが条件漏れだったとき "unmet"
 function ACT_IMPL.find_act_handler(self, mode, key, skip_methods)
     -- @pasta_search 可用性チェック（オプショナルモジュールのため呼び出し毎に pcall で確認。
     -- require はロード済みキャッシュを返すため低コスト）
@@ -370,9 +371,11 @@ function ACT_IMPL.find_act_handler(self, mode, key, skip_methods)
     end
 
     -- L2: ローカル辞書前方一致（@pasta_search 利用可能かつ scene_name あり時のみ）
+    -- 条件漏れ（unmet）でも L3〜L5 へ進む
     local scene_name = self.current_scene and self.current_scene.__global_name__
+    local result, unmet
     if SEARCH and scene_name then
-        local result = search_dictionary(SEARCH, mode, key, scene_name)
+        result, unmet = search_dictionary(SEARCH, mode, key, scene_name, self)
         if result ~= nil then return result end
     end
 
@@ -391,11 +394,13 @@ function ACT_IMPL.find_act_handler(self, mode, key, skip_methods)
 
     -- L5: グローバル辞書前方一致（@pasta_search 利用可能時のみ・key をグローバル検索）
     if SEARCH then
-        local result = search_dictionary(SEARCH, mode, key, nil)
+        local miss
+        result, miss = search_dictionary(SEARCH, mode, key, nil, self)
         if result ~= nil then return result end
+        unmet = unmet or miss
     end
 
-    return nil
+    return nil, unmet
 end
 
 --- find_act_handler と同じ関数（呼ぶ側は self:find_handler で引くので、インスタンスでの上書きが効く）
@@ -694,11 +699,14 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
         return nil
     end
 
-    local handler = self:find_handler("scene", key)
+    local handler, miss = self:find_handler("scene", key)
 
     -- scene ポストプロセス
     if type(handler) == "function" then
         return handler(self, ...)
+    end
+    if miss == "unmet" then
+        FAILURE.raise({ label = FAILURE.LABEL.SCENE_UNMET, subject = "＞" .. tostring(key) })
     end
 
     -- key は書いた名前（別名の置き換えは検索の中で行い、両名のログはそこで出す）

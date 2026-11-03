@@ -111,7 +111,7 @@
 - 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
-- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/brief.md`。
 - この spec への影響: Adjacent の例 `＞告白＆好感度＝＄＊好感度` は無くなり、場面の側の `＊告白　＆＄＊好感度＝「高」` になった。保存の範囲の書き方が増えたら、条件の変数もその書き方に従う。
 
 ## 申し送り（2026-10-29 の版の組み替えより）
@@ -128,3 +128,10 @@
 - **要件定義のモデル**: Fable のまま。今のゴーストの `＄＊x` が頼っている保存の形と DSL の意味に触り、取り消しにくい。書き方・どちらを今の `＄＊` にするか・両立・何を全セーブ共通にするか・保存できない値（`toml-serialization` のキーごとに外す決まりが出発点）が互いに絡み、推奨案がまだ無い（3 つ以上の絡む問い）。今回入った 7 本は、このどれも決めていない。
 - **分割の案**: 不要（8〜10）。
 - **見つけた穴・古くなった記述**: 「Current State」の行番号: `element_gen.rs` 71 行 → 69 行（書く側）、`parse_elements.rs` 119 行 → 141 行、`parse_action.rs` 111・212・369 行 → 117・225・413 行、`partial.rs` 462 行 → 300 行、`act.lua` 189・219 行 → 188・216 行、`scope_gen.rs` 294 行 → 262 行、`virtual_dispatcher.lua` 46・72〜73 行 → 62・88〜89 行、`failure.lua` 71・77 行 → 79・80 行、VSCode の着色 185・197 行 → 160〜173 行、`visit_expr.rs` 47・88・194・247 行 → 48・89・195・248 行。`save.json`・JSON の記述は、申し送りのとおり `save.toml`・TOML と読む。
+
+## 申し送り（2026-11-03・`scene-condition-attributes` の実装より）
+
+- イベントの act は、シーンを選ぶ前に `act.var` へ Reference（`＄ｒ０`〜・`r0`〜）と日時（`＄季節`・`＄節句`・`hour` など）が入る（`shiori/event/init.lua` の `create_act` が `transfer_req_to_var`・`transfer_date_to_var` を呼ぶ）。`＄` と `＄＊` の範囲を分けるときは、この自動で入る変数がどちらの表に属するかを決める。
+- 条件の評価（`crates/pasta_lua/src/search/scene_cond.rs`）は `＄＊名前` を `act.save`、`＄名前` を `act.var` から素の `raw_get` で引く。表の形や置き場所を変えるなら、ここも合わせる。
+- チェイントークの続きは自分の act のまま再開するので、新しいイベントの転記は続きの変数に届かない。チェイントーク中断のシーンの act（`init.lua` の `iact`）も `create_act` で作るので、同じ転記が入る。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/design.md`（EventAutoTransfer・SceneCond の節）。

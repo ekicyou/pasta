@@ -40,7 +40,7 @@ pasta は if を持たない。値によって出すシーンを変えるには�
 ＊ボール巡回　＆順番：１０
 　＞ボール_繋がってる
 
-＊OnUpdateComplete　＆＄ｒ０＝「changed」
+＊OnUpdateComplete　＆優先：1　＆＄ｒ０＝「changed」
 　ぱすた：更新できました。
 ＊OnUpdateComplete
 　ぱすた：新しいものはありませんでした。

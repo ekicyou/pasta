@@ -43,6 +43,10 @@ pub enum TranspileError {
     #[error("Unsupported feature: {feature} at {span}")]
     Unsupported { feature: String, span: SpanDisplay },
 
+    /// `＆優先` の値が整数でない（要件 5.6）。value は書いた値
+    #[error("`＆優先` の値は整数で書く: `{value}` at {span}")]
+    InvalidPriority { value: String, span: SpanDisplay },
+
     /// Property reference used in expression context (not allowed).
     #[error("Property reference cannot be used in expressions; use variable assignment first")]
     PropertyInExpression,
@@ -77,6 +81,14 @@ impl TranspileError {
         TranspileError::Unsupported {
             span: SpanDisplay::from(*span),
             feature: feature.to_string(),
+        }
+    }
+
+    /// Create an InvalidPriority error.
+    pub fn invalid_priority(span: &Span, value: &str) -> Self {
+        TranspileError::InvalidPriority {
+            span: SpanDisplay::from(*span),
+            value: value.to_string(),
         }
     }
 

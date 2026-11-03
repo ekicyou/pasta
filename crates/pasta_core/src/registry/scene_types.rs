@@ -154,6 +154,38 @@ impl SceneAttr {
     }
 }
 
+/// `＆優先` の名前（日本語・英語の別名）
+pub const PRIORITY_KEYS: [&str; 2] = ["優先", "priority"];
+
+/// 優先として受け付ける値。Integer はそのまま。Float・String は None（整数の値になる小数は倉で Integer になっている）
+pub fn priority_value(value: &SceneAttrValue) -> Option<i64> {
+    match value {
+        SceneAttrValue::Integer(v) => Some(*v),
+        _ => None,
+    }
+}
+
+/// シーンの優先。宣言のうち PRIORITY_KEYS の最後のもの（書いた順の後勝ち）。無ければ 0。
+/// 不正な値（倉の外から入ったもの）は 0 とみなす。
+pub fn scene_priority(attrs: &[SceneAttr]) -> i64 {
+    attrs
+        .iter()
+        .rev()
+        .find_map(|attr| match attr {
+            SceneAttr::Decl { key, value } if PRIORITY_KEYS.contains(&key.as_str()) => Some(value),
+            _ => None,
+        })
+        // shortcut: Lua から入れた不正な優先は黙って 0、要望が出たら辞書確定で警告する
+        .map_or(0, |value| priority_value(value).unwrap_or(0))
+}
+
+/// 条件かフラグを 1 つでも持つか
+pub fn has_conditions(attrs: &[SceneAttr]) -> bool {
+    attrs
+        .iter()
+        .any(|attr| matches!(attr, SceneAttr::Cond { .. } | SceneAttr::Flag { .. }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,6 +272,103 @@ mod tests {
         assert_eq!(CmpOp::from_normalized("≧"), None);
         assert_eq!(CmpOp::from_normalized("=="), None);
         assert_eq!(CmpOp::from_normalized(""), None);
+    }
+
+    fn decl(key: &str, value: SceneAttrValue) -> SceneAttr {
+        SceneAttr::Decl {
+            key: key.into(),
+            value,
+        }
+    }
+
+    #[test]
+    fn priority_value_accepts_integer_only() {
+        assert_eq!(priority_value(&SceneAttrValue::Integer(3)), Some(3));
+        assert_eq!(priority_value(&SceneAttrValue::Integer(-2)), Some(-2));
+        assert_eq!(priority_value(&SceneAttrValue::Float(1.5)), None);
+        assert_eq!(priority_value(&SceneAttrValue::String("高い".into())), None);
+        assert_eq!(priority_value(&SceneAttrValue::String("1".into())), None);
+    }
+
+    #[test]
+    fn scene_priority_default_negative_alias_last_wins() {
+        assert_eq!(scene_priority(&[]), 0);
+        assert_eq!(
+            scene_priority(&[decl("季節", SceneAttrValue::Integer(9))]),
+            0
+        );
+        assert_eq!(
+            scene_priority(&[decl("優先", SceneAttrValue::Integer(-1))]),
+            -1
+        );
+        assert_eq!(
+            scene_priority(&[decl("priority", SceneAttrValue::Integer(5))]),
+            5
+        );
+        // 別名をまたいでも書いた順の後勝ち
+        assert_eq!(
+            scene_priority(&[
+                decl("優先", SceneAttrValue::Integer(1)),
+                decl("priority", SceneAttrValue::Integer(2)),
+            ]),
+            2
+        );
+        assert_eq!(
+            scene_priority(&[
+                decl("priority", SceneAttrValue::Integer(2)),
+                decl("優先", SceneAttrValue::Integer(1)),
+            ]),
+            1
+        );
+        // `＄優先` は条件で、宣言の優先ではない
+        assert_eq!(
+            scene_priority(&[SceneAttr::Cond {
+                key: "＄優先".into(),
+                op: CmpOp::Eq,
+                value: SceneAttrValue::Integer(7),
+            }]),
+            0
+        );
+    }
+
+    #[test]
+    fn scene_priority_invalid_value_is_zero() {
+        assert_eq!(
+            scene_priority(&[decl("優先", SceneAttrValue::Float(1.5))]),
+            0
+        );
+        assert_eq!(
+            scene_priority(&[decl("優先", SceneAttrValue::String("高い".into()))]),
+            0
+        );
+        // 後勝ちの最後が不正なら、前の正しい値ではなく 0
+        assert_eq!(
+            scene_priority(&[
+                decl("優先", SceneAttrValue::Integer(3)),
+                decl("priority", SceneAttrValue::String("x".into())),
+            ]),
+            0
+        );
+    }
+
+    #[test]
+    fn has_conditions_detects_cond_or_flag() {
+        assert!(!has_conditions(&[]));
+        assert!(!has_conditions(&[
+            decl("季節", SceneAttrValue::String("夏".into())),
+            decl("優先", SceneAttrValue::Integer(1)),
+        ]));
+        assert!(has_conditions(&[SceneAttr::Flag {
+            key: "＄＊初回".into()
+        }]));
+        assert!(has_conditions(&[
+            decl("季節", SceneAttrValue::String("夏".into())),
+            SceneAttr::Cond {
+                key: "＄経験値".into(),
+                op: CmpOp::Ge,
+                value: SceneAttrValue::Integer(10),
+            },
+        ]));
     }
 
     #[test]

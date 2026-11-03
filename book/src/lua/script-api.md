@@ -123,6 +123,9 @@ SHIORI のイベントでランタイムが渡す ACT は SHIORI 用の ACT で�
 | `act:transfer_date_to_var()` | `act.req.date` の日時を `var` の日時変数に入れる。`act.req` か `act.req.date` が無ければ何もしない（[日時変数](../grammar/variables.md#日時変数)） | `act` |
 | `act:transfer_req_to_var()` | Reference 0〜9 と `act.req.id`・`act.req.base_id` を `var` のリクエスト変数に入れる。`act.req` が無ければ何もしない（[リクエスト変数](../grammar/variables.md#リクエスト変数reference)） | `act` |
 
+- イベントのハンドラに渡す ACT は、ランタイムが作るときに `transfer_req_to_var` と `transfer_date_to_var` を 1 回ずつ呼んである（[イベントのシーンを選ぶ前の転記](../grammar/variables.md#イベントのシーンを選ぶ前の転記)）。ハンドラとイベントのシーンでは、`act.var.r0` や `act.var.hour` が最初から読める。
+- 2 つの転記の関数を自分で呼ぶのは、途中で値を取り直したいときである。本文で同じ名前に入れた値は、取り直すと上書きされる。
+
 #### set_property(name, value)
 
 ```lua
@@ -243,6 +246,7 @@ act:surface(5):wait(500):talk(act.さくら.actor, "驚いた！"):newline()
 - 以下のメソッドが「失敗を報告する」とは、ログに警告を 1 行出し、失敗表記を act に積むことである（[実行時の失敗の出力](../reference/runtime-failures.md)）。
 - 1 段目（実行中のシーンのシーンテーブル）・3 段目（act のメソッド。関数の値だけ）・4 段目（`GLOBAL` テーブル）は、どのモードでも同じである。
 - `@pasta_search` を読み込めない環境（テストなど）では、2 段目と 5 段目を飛ばす。
+- `"scene"`・`"expr"` モードの 2 段目と 5 段目は、その act の `var`・`save` で候補の条件を評価し、優先の段で選ぶ（[SCENE.search](#scenesearchname-global_scene_name-act) に act を渡す。[条件で候補を絞る](../grammar/block-structure.md#条件で候補を絞る)）。名前に合うシーンはあっても条件を満たす候補が無い段（条件漏れ）は、見つからなかったものとして次の段へ進む。
 - 5 段目でグローバルシーンを探すときは、範囲を指定しない [search_scene](modules/pasta-search.md#search_scenename-global_scene_name) を使うため、検索キーが pasta.toml の別名表の別名と完全に一致すると、置き換え先の名前で探す（[シーン名の別名](../grammar/call-jump.md#シーン名の別名)）。既定の別名表のもとでは、`act:call(nil, "会話", nil)` は `act:call(nil, "OnTalk", nil)` と同じ候補（`＊OnTalk` と `＊会話` で宣言したシーンを含む）から選ぶ。2 段目（ローカルシーン）と単語の検索は置き換えない。
 - `word`・`expr_fn`・`expr_fn_var`・`call_restore` と、アクタープロキシの `word`・`expr_fn`・`expr_fn_var` は、見つけた関数から戻った後、実行中のシーンを呼ぶ前のシーンに戻す。関数の中で別のシーンが `init_scene` を呼んでも、戻った後の名前の検索は呼び出し元のシーンを基準にする。`call` は戻さない（[call](#callglobal_scene_name-key-attrs-)）。
 - 見つけた関数の戻り値は [関数の戻り値の扱い](#関数の戻り値の扱い) のとおりに返す。
@@ -275,8 +279,8 @@ act:word(name, var_path?) -> string | nil
 #### find_handler(mode, key, skip_methods) と find_act_handler(mode, key, skip_methods)
 
 ```lua
-act:find_handler(mode, key, skip_methods?) -> any | nil
-act:find_act_handler(mode, key, skip_methods?) -> any | nil
+act:find_handler(mode, key, skip_methods?) -> any | nil, "unmet"?
+act:find_act_handler(mode, key, skip_methods?) -> any | nil, "unmet"?
 ```
 
 | パラメータ | 型 | 説明 |
@@ -289,6 +293,14 @@ act:find_act_handler(mode, key, skip_methods?) -> any | nil
 - ACT の `find_handler` は `find_act_handler` と同じ結果を返す。アクタープロキシの `find_handler` は、`"word"` モードのときアクター辞書を先に探す。
 - `"word"` モードの 2・5 段目は、単語辞書から候補の値（文字列）を 1 つ返す。候補のシャッフル＆順次消費はこの呼び出しでも 1 つ進む（[シャッフル＆順次消費](../grammar/words.md#シャッフル順次消費)）。
 - `"scene"`・`"expr"` モードの 2・5 段目は、見つかったシーンのシーン関数を返す。
+- どの段にも見つからず、2 段目か 5 段目が条件漏れだったときは、`nil` と 2 つ目の値 `"unmet"` を返す（`"scene"`・`"expr"` モードだけ）。名前に合うシーンが元から無いときは、`nil` だけを返す。
+
+```lua
+local fn, miss = act:find_handler("scene", "秘密")
+if miss == "unmet" then
+    -- ＊秘密 はあるが、今の変数ではどれも条件を満たさない
+end
+```
 
 #### expr_fn(key, ...)
 
@@ -297,7 +309,7 @@ act:expr_fn(key, ...) -> any
 ```
 
 - `"expr"` モードで探し、見つかったのが関数なら `関数(act, ...)` を呼んでその戻り値を返す。2・5 段目でシーンが見つかった場合も、そのシーン関数を同じく呼ぶ。
-- 関数以外の値が見つかったとき、または見つからないときは、失敗を報告して `nil` を返す。
+- 関数以外の値が見つかったとき、または見つからないときは、失敗を報告して `nil` を返す。名前に合うシーンはあっても条件を満たす候補が無いときも、見つからないときと同じ「関数が見つからない」の失敗になる（止まらない）。
 - DSL の式の中の `＠関数（…）` は `act:expr_fn("関数", …)` になる。アクション行の中ではアクタープロキシの `expr_fn` を使う（[関数スコープの展開先](../grammar/variables.md#関数スコープの展開先)）。
 
 #### expr_fn_var(value, var_path, ...)
@@ -319,10 +331,10 @@ act:expr_fn_var(value, var_path, ...) -> any
 #### find_scene(key)
 
 ```lua
-act:find_scene(key) -> function | nil
+act:find_scene(key) -> function | nil, "unmet"?
 ```
 
-- `"scene"` モードで探し、見つかった値（通常は関数）を呼ばずに返す。`act:find_handler("scene", key)` と同じである。
+- `"scene"` モードで探し、見つかった値（通常は関数）を呼ばずに返す。`act:find_handler("scene", key)` と同じで、条件漏れなら 2 つ目に `"unmet"` を返す。
 - 第 2・第 3 引数（`global_scene_name`・`attrs`）は受け取るが使わない。
 - `SCENE.co_exec(act, 名前)` は、この方法で名前を解決する（[REG](shiori-events.md#reg)）。
 
@@ -341,6 +353,7 @@ act:call(global_scene_name, key, attrs, ...) -> any
 
 - `"scene"` モードで `key` を探し、見つかったのが関数なら `関数(act, ...)` を呼んでその戻り値を返す。関数は末尾位置で呼ぶ（`return 関数(act, ...)`）ため、`return act:call(…)` の形で呼び出しをつないでも、呼び出しは深くならない。
 - 関数以外の値が見つかったとき、または見つからないときは、警告ログ `act:call - handler not found: key='名前', mode='scene', via=act` とともにシーンが見つからない失敗を報告して、`nil` を返す。Lua から直接呼んだ場合も、DSL の Call 行と同じく失敗表記を積む。
+- 名前に合うシーンはあっても条件を満たす候補が無い（`find_handler` の 2 つ目の値が `"unmet"`）ときは、戻らずに止まるエラー「条件に合うシーンが無い」を投げる。表記は `【条件に合うシーンが無い：＞名前（＊止まったシーン）】` になる（[条件に合うシーンが無いとき](../grammar/call-jump.md#条件に合うシーンが無いとき)）。Lua から直接呼んだ場合も同じく止まる。
 - `key` が `nil` のときは、検索せずに警告ログ `act:call - nil key (undefined variable?), skipping scene search` とともに名前にならない値の失敗を報告して `nil` を返す。
 - `key` が `call_key` の返した「呼ばない」印のときは、検索も警告もせずに `nil` を返す（警告と失敗表記は `call_key` が出している）。
 - 呼び出しはコルーチンを新しく作らず、実行中のシーンのコルーチンの中で行う。呼んだ先で `yield` すると、呼び出し元のシーンごと中断する。
@@ -668,10 +681,10 @@ save.talk_count = (save.talk_count or 0) + 1
 
 ## SCENE
 
-`pasta.scene` モジュール（`require "pasta.scene"`）の関数のうち、シーンの属性（[属性](../grammar/block-structure.md#属性)）を読む `SCENE.attrs` を扱う。
+`pasta.scene` モジュール（`require "pasta.scene"`）の関数のうち、シーンの属性（[属性](../grammar/block-structure.md#属性)）を読む `SCENE.attrs` と、名前でシーンを探す `SCENE.search` を扱う。
 
-- この節の `SCENE` は `require "pasta.scene"` が返すモジュールである。Lua ブロックの中の `SCENE` は、そのブロックが属するグローバルシーンのシーンテーブル（[init_scene](#init_scene)）であり、`attrs` を持たない。Lua ブロックからは `require("pasta.scene").attrs(…)` の形で呼ぶ。
-- 属性は、今のところシーンの選択と出力を変えない。属性に意味を与える仕組みは今後の版で入る。
+- この節の `SCENE` は `require "pasta.scene"` が返すモジュールである。Lua ブロックの中の `SCENE` は、そのブロックが属するグローバルシーンのシーンテーブル（[init_scene](#init_scene)）であり、`attrs`・`search` を持たない。Lua ブロックからは `require("pasta.scene").attrs(…)` の形で呼ぶ。
+- 属性のうち、条件・フラグ・`＆優先` は、名前で候補を選ぶときの選択を変える（[条件で候補を絞る](../grammar/block-structure.md#条件で候補を絞る)・[優先](../grammar/block-structure.md#優先)）。そのほかの宣言は、選択と出力を変えない。`SCENE.attrs` は書いた属性を読むだけで、選択には関わらない。
 
 ### SCENE.attrs(global_name, local_name)
 
@@ -741,6 +754,34 @@ local SEARCH = require "@pasta_search"
 local g, l = SEARCH:search_scene("選択肢", act.current_scene.__global_name__)
 if g then
     local attrs = require("pasta.scene").attrs(g, l)   -- 例: "メイン_1", "選択肢_1" の属性
+end
+```
+
+### SCENE.search(name, global_scene_name, act)
+
+```lua
+SCENE.search(name, global_scene_name?, act?) -> result | nil, "unmet"?
+```
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `name` | string | 探すシーン名（前方一致） |
+| `global_scene_name` | string または nil | グローバルシーンの登録名。渡すとその中のローカルシーンだけを、`nil` ならグローバルシーンだけを探す |
+| `act` | ACT または nil | 渡すと、`act.var`・`act.save` で候補の条件を評価する |
+
+- [search_scene](modules/pasta-search.md#search_scenename-global_scene_name) で探し、見つかったシーンの関数を結果オブジェクトにして返す。結果オブジェクトは `global_name`・`local_name`・`func` を持ち、`result(act)` と呼ぶと `func(act)` を呼ぶ。
+- `act` を渡すと、DSL の Call と同じく、条件を満たす候補だけから優先の段で選ぶ。**`act` を渡さないと、条件も優先の段も見ない**。条件のある候補も、優先の低い候補も選ばれる。
+- 見つからなければ `nil` を返す。名前に合うシーンはあっても条件を満たす候補が無ければ、`nil` と `"unmet"` を返す（`act` を渡したときだけ）。
+- `global_scene_name` を渡した検索は、ローカルに無くてもグローバルを探さない。ローカル・グローバルの順に探すのは [find_handler](#find_handlermode-key-skip_methods-と-find_act_handlermode-key-skip_methods) の 5 段である。
+- `name` が文字列でなければ `nil` を返す。
+
+```lua
+local SCENE = require "pasta.scene"
+local result, miss = SCENE.search("秘密", nil, act)
+if result then
+    result(act)              -- 条件を満たした ＊秘密 の 1 つを呼ぶ
+elseif miss == "unmet" then
+    -- ＊秘密 はあるが、今の変数ではどれも条件を満たさない
 end
 ```
 

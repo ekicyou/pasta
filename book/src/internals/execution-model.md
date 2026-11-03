@@ -155,11 +155,11 @@ EVENT.fire(req)
  1. CALLBACK.try_route(req)          待っているコールバックなら再開して応答を返す（後述）
     CLOCK.observe(req)               時計の返事（OnPastaClock）を受け取った回は 204
  2. 鎖（REG:register）の写し getmetatable(REG).handlers(req.id) を新しい順に
-      act = SHIORI_ACT.new(STORE.actors, req)        ハンドラごとに新しい ACT
+      act = create_act(req)                           ハンドラごとに新しい ACT（Reference と日時を var に転記済み）
       STOP.hold_handler(act)                          渡す act を控える（止まるエラーの表記のため）
       result = fn(act)                                真の値ならここで止める
  3. 全部見送れば（鎖が空でも）底を呼ぶ
-      act = SHIORI_ACT.new(STORE.actors, req)
+      act = create_act(req)
       STOP.hold_handler(act)
       result = (rawget(REG, req.id) or EVENT.no_entry)(act)    底の戻り値は真偽で見ない
  4. result の型で分岐（act は止めたハンドラか底のもの）
@@ -193,11 +193,11 @@ end
 
 | 箇所 | シーン関数の得方 |
 | ---- | ---------------- |
-| `SCENE.co_exec`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `act:find_scene(名前)`。`EVENT.no_entry`・既定の OnBoot・仮想イベント・明示的な OnChoiceSelectEx シーン・既定の OnMouseDoubleClick と OnMouseMove（ショートカットが見つからないとき）が使う |
+| `SCENE.co_exec`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `act:find_scene(名前)`（条件は `act` の変数で評価し、条件漏れも `nil`）。`EVENT.no_entry`・既定の OnBoot・仮想イベント・明示的な OnChoiceSelectEx シーン・既定の OnMouseDoubleClick と OnMouseMove（ショートカットが見つからないとき）が使う |
 | `SCENE.co_exec_exact`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | `SCENE.get_exact(名前, ローカル名)`（`search_scene_exact(名前, nil)` か `search_local_scene_exact(名前, ローカル名)` の結果で `SCENE.get`）。完全一致のシーンだけ。既定の OnMouseDoubleClick・OnMouseMove がショートカットの 1〜8 段を探すのに、既定の OnPastaScene が名前で指名したシーンを探すのに使う（[co_exec_exact](internal-modules.md#co_exec_exact)） |
 | `SCENE.co_exec_registered`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | 登録名の組で `SCENE.get`。既定の OnPastaSceneAt が位置から引いた組で使う（[co_exec_registered](internal-modules.md#co_exec_registered)） |
-| 既定の OnChoiceSelectEx（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`） | `SCENE.search(選択 ID, 親)`、無ければ `SCENE.search(選択 ID, nil)`。親は Reference2 のグローバルシーン名（既知のグローバルシーンのとき）か `STORE.last_global_scene`（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)） |
-| 既定の OnPastaCallFunction（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/external_control.lua`） | `act:find_handler("scene", Reference0)` で引いた関数を、Reference1 以降を添えて呼ぶ関数で包む |
+| 既定の OnChoiceSelectEx（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`） | `SCENE.search(選択 ID, 親, act)`、無ければ `SCENE.search(選択 ID, nil, act)`。どちらも無く条件漏れなら止まるエラー。親は Reference2 のグローバルシーン名（既知のグローバルシーンのとき）か `STORE.last_global_scene`（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)） |
+| 既定の OnPastaCallFunction（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/external_control.lua`） | `act:find_handler("scene", Reference0)` で引いた関数を、Reference1 以降を添えて呼ぶ関数で包む。条件漏れ（2 つ目の値が `"unmet"`）は包まずに `SCENE_UNMET` の表記の応答を返す |
 
 - コルーチンは作るだけで、作った時点ではシーン関数は動かない。最初の `resume` で `EVENT.fire` が（`EVENT.drive` を通して）そのイベントの ACT を渡し、それが包みの `act` になる。
 - シーン関数の戻り値は捨てられる。応答になるのは、途中の `yield` で渡した値か、最後の `build()` の値である。

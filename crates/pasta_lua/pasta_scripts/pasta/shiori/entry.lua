@@ -10,6 +10,7 @@
 local EVENT = require "pasta.shiori.event"
 local RES = require "pasta.shiori.res"
 local STOP = require "pasta.shiori.stop"
+local FAILURE = require "pasta.failure"
 
 -- グローバルシーン関数の登録
 local GLOBAL = require "pasta.global"
@@ -51,11 +52,12 @@ SHIORI = SHIORI or {}
 
 --- xpcall用エラーハンドラ
 --- @param err any エラーオブジェクト
---- @return string|nil エラーメッセージの最初の行
+--- @return string|table|nil エラーメッセージの最初の行（FAILURE.raise の記録は文字列にせずそのまま）
 local function error_handler(err)
     if type(err) == "string" then
         return err:match("^[^\n]+")
     end
+    if FAILURE.is_raised(err) then return err end
     return nil
 end
 
@@ -95,15 +97,16 @@ function SHIORI.request(req)
         return result
     else
         -- 表記を出すなら表記付きの応答、出さない（設定・On で始まらない ID・組み立ての失敗）なら今の 500
+        local reason = FAILURE.is_raised(result) and tostring(result) or result
         return STOP.response({
-            reason = result,
+            reason = reason,
             hold = STOP.take(),
             handler = STOP.take_handler(),
             err = result,
             fallback = req.id,
             warning = true,
             shown = type(req.id) == "string" and req.id:sub(1, 2) == "On",
-        }) or RES.err(result)
+        }) or RES.err(reason)
     end
 end
 

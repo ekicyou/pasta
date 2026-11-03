@@ -367,6 +367,29 @@ fn every_stage_loads_and_responds() {
     }
 }
 
+/// 7 段目の辞書は `＞transfer_req_to_var` を書かず、イベントのシーンに最初から入っている
+/// Reference0 を `＄ｒ０` で OnGhostChanged の台詞に出す（scene-condition-attributes 要件 6.1・9.7）。
+#[test]
+fn stage7_greeting_reads_reference_without_transfer() {
+    const FILE: &str = "07-greeting.pasta";
+    let source =
+        std::fs::read_to_string(dic_dir().join(FILE)).expect("07-greeting.pasta を読めない");
+    assert!(
+        !source.contains("＞transfer_req_to_var"),
+        "{FILE} に ＞transfer_req_to_var が残っている"
+    );
+
+    let rows = parse_stage_table(&read_stages_md());
+    let ghost = assemble_stage(&rows, 7);
+    let runtime = PastaLoader::load(ghost.path())
+        .unwrap_or_else(|e| panic!("stage 7 ({FILE}): load failed: {e}"));
+    let response = shiori_request(&runtime, "OnGhostChanged", &[(0, "むらさき".to_string())]);
+    assert!(
+        response.starts_with("SHIORI/3.0 200 OK") && response.contains("むらさき"),
+        "OnGhostChanged の応答に ＄ｒ０（むらさき）が出ていない:\n{response}"
+    );
+}
+
 /// 行頭の `＊名前` / `*名前` の名前を集める。単独の `＊` と Lua ブロックの中は除く。
 /// 名前は宣言行への属性の付記（`＆`）・行末コメント（`＃`）・空白の手前まで。
 fn global_scene_names(source: &str) -> Vec<String> {

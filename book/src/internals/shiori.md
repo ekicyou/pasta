@@ -451,8 +451,8 @@ pasta.shiori.entry
 `EVENT.fire(req)` の振り分けは次の順である。
 
 1. `CALLBACK.try_route(req)` が応答を返せば、それを返す（待っているコールバックの再開）。`CLOCK.observe(req)` が時計の返事（OnPastaClock）を受け取れば 204 を返す。この 2 つで返した回は、鎖も `REG` の値も呼ばない。
-2. 鎖（`REG:register` で重ねたハンドラ）の写しを `getmetatable(REG).handlers(req.id)` で 1 回だけ取り、新しく登録した順に呼ぶ。1 つ呼ぶたびに `act = SHIORI_ACT.new(STORE.actors, req)` を作り直して渡す。真の値を返したらそこで止め、その act と戻り値で 4 へ進む。`nil`・`false` なら次へ回る。写しを取った後の登録・外しは次のイベントから効く。作者から見た規則は [ハンドラを重ねる](../lua/shiori-events.md#ハンドラを重ねるregregister) が正である。
-3. 全部見送れば（鎖が空でも）、新しい `act` で底を呼ぶ。底は表の生の値 `rawget(REG, req.id)` で、無ければ `EVENT.no_entry` である。底の戻り値は真偽で見ない。`EVENT.no_entry` は `SCENE.co_exec(act, req.id)` でイベント名のシーンを探し、見つかればそのコルーチンを、無ければ `nil` を返す（`pasta.scene` は循環を避けるため呼び出し時に `require` する）。
+2. 鎖（`REG:register` で重ねたハンドラ）の写しを `getmetatable(REG).handlers(req.id)` で 1 回だけ取り、新しく登録した順に呼ぶ。1 つ呼ぶたびに `act = create_act(req)` を作り直して渡す。`create_act` は `SHIORI_ACT.new(STORE.actors, req)` に続けて `transfer_req_to_var`・`transfer_date_to_var` を 1 回ずつ呼び、シーンを選ぶ前に Reference と日時の変数を `var` に入れる（[イベントのシーンを選ぶ前の転記](../grammar/variables.md#イベントのシーンを選ぶ前の転記)）。真の値を返したらそこで止め、その act と戻り値で 4 へ進む。`nil`・`false` なら次へ回る。写しを取った後の登録・外しは次のイベントから効く。作者から見た規則は [ハンドラを重ねる](../lua/shiori-events.md#ハンドラを重ねるregregister) が正である。
+3. 全部見送れば（鎖が空でも）、`create_act` で作った新しい `act` で底を呼ぶ。底は表の生の値 `rawget(REG, req.id)` で、無ければ `EVENT.no_entry` である。底の戻り値は真偽で見ない。`EVENT.no_entry` は `SCENE.co_exec(act, req.id)` でイベント名のシーンを探し、見つかればそのコルーチンを、無ければ `nil` を返す（`pasta.scene` は循環を避けるため呼び出し時に `require` する）。
 4. 戻り値がコルーチンなら `EVENT.drive` で再開し、その出力を `RES.ok` で応答にする（出力は接頭辞にかかわらず常に `Value`）。`SHIORI/` で始まる文字列なら応答全体として包まずに返し、それ以外の文字列なら `RES.ok` で包み、それ以外（鎖の `true`・数・表を含む）なら 204 を返す。コルーチンの扱いは [イベントからシーンへ](execution-model.md#イベントからシーンへ) で扱う。
 
 既定ハンドラの中身は次のとおりである。アクター名の解決（`@pasta_config` の `spot` と `STORE.appearance.owners`）・候補の段・撫での判定の規則は [つつき・撫でのショートカット](../lua/shiori-events.md#つつき撫でのショートカット) が正である。
@@ -460,7 +460,7 @@ pasta.shiori.entry
 | ハンドラ | 動作 |
 | -------- | ---- |
 | `REG.OnBoot` | `SCENE.co_exec(act, act.req.id)`。シーン関数フォールバックと同じ |
-| `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ探索範囲の親を決める。`act.req.reference[2]`（`\q` の 3 番目の引数。選択肢を出したグローバルシーンの登録名）が文字列で `SCENE.get_global_table` で引けるグローバルシーンならそれを、そうでなければ `STORE.last_global_scene` を親にする。`act.req.reference[1]`（選択 ID）を `SCENE.search(選択 ID, 親)` で探し、無ければ `SCENE.search(選択 ID, nil)` でグローバルシーンを探し、見つかった関数をコルーチンに包んで返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
+| `REG.OnChoiceSelectEx` | まず `SCENE.co_exec(act, "OnChoiceSelectEx")`。無ければ探索範囲の親を決める。`act.req.reference[2]`（`\q` の 3 番目の引数。選択肢を出したグローバルシーンの登録名）が文字列で `SCENE.get_global_table` で引けるグローバルシーンならそれを、そうでなければ `STORE.last_global_scene` を親にする。`act.req.reference[1]`（選択 ID）を `SCENE.search(選択 ID, 親, act)` で探し、無ければ `SCENE.search(選択 ID, nil, act)` でグローバルシーンを探し、見つかった関数をコルーチンに包んで返す。どちらも見つからず、どちらかが `"unmet"` なら `FAILURE.raise` で `SCENE_UNMET`（対象 `OnChoiceSelectEx ＞選択 ID`）を投げ、名前が無いだけなら `nil`（204）を返す。`SCENE.co_exec` は親のグローバルシーンを渡せないため、検索を直接呼ぶ |
 | `REG.OnMouseDoubleClick` | `act.req.reference[3]`（スコープ番号）からアクター名を、`act.req.reference[4]`（部位）を部位として、ショートカットの 1〜8 段の名前を上から `SCENE.co_exec_exact` で探し、最初に見つかったコルーチンを返す。無ければ `SCENE.co_exec(act, "OnMouseDoubleClick")`。抑止は見ない |
 | `REG.OnMouseMove` | 撫での判定（`check_stroke`）を毎回回す。判定には部位・スコープ番号・なめらかな時計の時刻（`CLOCK.steady(act.req)` に `act.req.date.ns` を足した小数の秒）と、`virtual_dispatcher.is_blocked(act.req.status)` を渡す。撫でたと決めた回だけ、アクター名を引いて 1〜8 段を `SCENE.co_exec_exact` で探し、見つかればそのコルーチンを返す。それ以外は `SCENE.co_exec(act, "OnMouseMove")`。判定の状態はモジュールのローカル変数 1 つで、保存しない |
 | `REG.OnSecondChange` | `CALLBACK.sweep(CLOCK.steady(act.req) or os.time(), act.req)` が応答を返せばそれを返し（その回は仮想イベントを出さない）、そうでなければ `virtual_dispatcher.dispatch(act)` がコルーチンを返せばそれを返す。何も出さない回は、Status がブロック対象なら `nil`、そうでなければ `CLOCK.take_probe(act.req)`（予約された仮想時刻の読み取りのスクリプトか `nil`）を返す。`sweep` の応答は、期限切れの待機を再開した結果（出力の 200、止まるエラーの表記の 200、または表記を出さない設定での理由付きタイムアウトの 500）の全文であり、`EVENT.fire` が包まずに返す |
@@ -494,6 +494,7 @@ Lua のエラーでシーンやハンドラが止まったとき（止まるエ�
 - `EVENT.drive` は、コルーチンがエラーで終わると、`STOP.hold(co, err)` でそのコルーチンの act（`FAILURE.act_of(co)`）とエラーの値を控えてから `false` を返す。`EVENT.fire` は、`false` を受けたらそのエラーを投げ直す。
 - `EVENT.fire` は、ハンドラ（鎖のハンドラ・`REG` の関数・`EVENT.no_entry`）を 1 つ呼ぶ直前ごとに、渡す act を `STOP.hold_handler(act)` で控え直す。シーンの外（ハンドラの中）で止まったときは、止まったハンドラの act に積んだ台詞の後に表記が出る。見送った鎖のハンドラの act は控えが上書きされるので、その台詞は表記に混ざらない。
 - `SHIORI.request` は、要求の始めに `STOP.clear()` で両方の控えを空にする。エラーを受けたら `STOP.take()`・`STOP.take_handler()` で控えを取り出し、理由の行（エラー文の最初の行）・要求の ID・ID が `On` で始まるかと一緒に `STOP.response` に渡す。
+- エラーの値が `FAILURE.raise` の記録（`FAILURE.is_raised`）なら、`STOP.response` は記録の種類と対象をそのまま表記の種類と対象にし、止まった場所の名前を説明にする（`【条件に合うシーンが無い：＞秘密（＊OnMouseDoubleClick）】`）。理由の行は記録の `tostring`（`条件に合うシーンが無い：＞秘密`）になる。
 - `STOP.response` は、控えた act（シーンの失敗の act、無ければハンドラの act）から止まった場所の名前を作り、エラー文の場所を直し、ログに警告を 1 行出す（`FAILURE.notation`）。表記を出す設定で、ID が `On` で始まる要求なら、act の末尾に表記を `raw_script` として積んで組み立てた値を `Value` に、受けた理由を `X-Error-Reason` にした `RES.ok`（`200 OK`）の全文を返す。表記を出さない設定・ID が `On` で始まらない・組み立てに失敗したときは `nil` を返し、`SHIORI.request` はこれまでどおり `RES.err` の 500 を返す。
 - 期限切れの掃引（`CALLBACK.sweep`）は、待機ごとの `time_out` で `EVENT.drive` の直後に、成否にかかわらず `STOP.take()` で控えを取り出す（同じ要求の後の止まるエラーに古い控えを混ぜない）。理由付きの待機がエラーで終わると、`timeout_message` を理由と表記の対象にして `STOP.response` に渡し（`【時間切れ：…】`）、`nil` なら `RES.err(理由)` の 500 を候補にする（警告は再開の前に出した 1 行だけで、`STOP.response` は警告を出さない）。理由の無い待機がエラーで終わると、イベント名を前に付けた警告を出し、スクリプトのエラーの表記の応答を候補にする（表記を出さない設定では候補を作らない）。
 

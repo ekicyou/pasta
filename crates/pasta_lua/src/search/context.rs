@@ -4,12 +4,50 @@
 //! scene and word search state for each Lua runtime instance.
 
 use super::SearchError;
-use mlua::{IntoLuaMulti, MultiValue, UserData, UserDataMethods};
+use super::scene_cond::cond_predicate;
+use mlua::{IntoLuaMulti, MultiValue, Table, UserData, UserDataMethods};
 use pasta_core::registry::{
-    DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable, SceneRegistry,
-    SceneTable, WordDefRegistry, WordTable,
+    CondFn, DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable,
+    SceneRegistry, SceneTable, WordDefRegistry, WordTable,
 };
-use std::collections::HashMap;
+
+/// [`SearchContext::search_scene_where`] の結果。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SceneLookup {
+    /// 登録名の組（グローバルの検索なら local_name は `__start__`）。
+    Found {
+        global_name: String,
+        local_name: String,
+    },
+    /// その名前のシーンが無い。
+    NotFound,
+    /// 名前に合うシーンはあるが条件を満たす候補が無い
+    Unmet,
+}
+
+impl SceneLookup {
+    /// 条件なしの口の形（条件を渡さなければ Unmet にならない）
+    fn into_option(self) -> Option<(String, String)> {
+        match self {
+            SceneLookup::Found {
+                global_name,
+                local_name,
+            } => Some((global_name, local_name)),
+            SceneLookup::NotFound | SceneLookup::Unmet => None,
+        }
+    }
+
+    fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<MultiValue> {
+        match self {
+            SceneLookup::Found {
+                global_name,
+                local_name,
+            } => (global_name, local_name).into_lua_multi(lua),
+            SceneLookup::NotFound => Ok(MultiValue::new()),
+            SceneLookup::Unmet => (mlua::Value::Nil, "unmet").into_lua_multi(lua),
+        }
+    }
+}
 
 /// [`SearchContext::search_local_scene_exact`] の結果。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -102,7 +140,8 @@ impl SearchContext {
         name: &str,
         global_scene_name: Option<&str>,
     ) -> Result<Option<(String, String)>, SearchError> {
-        self.search_scene_by(name, global_scene_name, false)
+        self.search_scene_by(name, global_scene_name, false, None)
+            .map(SceneLookup::into_option)
     }
 
     /// Exact-match version of [`Self::search_scene`].
@@ -116,75 +155,88 @@ impl SearchContext {
         name: &str,
         global_scene_name: Option<&str>,
     ) -> Result<Option<(String, String)>, SearchError> {
-        self.search_scene_by(name, global_scene_name, true)
+        self.search_scene_by(name, global_scene_name, true, None)
+            .map(SceneLookup::into_option)
     }
 
-    /// Shared body of `search_scene` (`exact = false`, prefix match) and
-    /// `search_scene_exact` (`exact = true`).
+    /// 条件つきの [`Self::search_scene`]（`exact` なら [`Self::search_scene_exact`]）。
+    ///
+    /// `cond` を満たす候補だけから、優先の段で 1 つ選ぶ。名前に合うシーンはあるが
+    /// 満たす候補が無ければ [`SceneLookup::Unmet`]。
+    pub fn search_scene_where(
+        &mut self,
+        name: &str,
+        global_scene_name: Option<&str>,
+        exact: bool,
+        cond: CondFn<'_>,
+    ) -> Result<SceneLookup, SearchError> {
+        self.search_scene_by(name, global_scene_name, exact, Some(cond))
+    }
+
+    /// Shared body of `search_scene` (`exact = false`, prefix match),
+    /// `search_scene_exact` (`exact = true`) and `search_scene_where`.
     fn search_scene_by(
         &mut self,
         name: &str,
         global_scene_name: Option<&str>,
         exact: bool,
-    ) -> Result<Option<(String, String)>, SearchError> {
-        let filters = HashMap::new();
+        cond: Option<CondFn<'_>>,
+    ) -> Result<SceneLookup, SearchError> {
         let resolve = if exact {
             SceneTable::resolve_scene_id_exact
         } else {
             SceneTable::resolve_scene_id_unified
         };
 
-        // Determine search strategy based on global_scene_name
-        if let Some(parent) = global_scene_name {
-            let name = &SceneRegistry::sanitize_name(name);
-            // Local-only search within the parent scope (no global fallback)
-            match resolve(&mut self.scene_table, parent, name, &filters) {
-                Ok(scene_id) => {
-                    let scene = self.scene_table.get_scene(scene_id).ok_or_else(|| {
-                        SearchError::InvalidArgument("Scene ID not found".to_string())
-                    })?;
+        // Global search only when there is no parent (local keys starting with
+        // ':' are excluded); an exact alias match is replaced before sanitizing.
+        // With a parent, local-only search within it (no global fallback).
+        let alias = match global_scene_name {
+            Some(_) => None,
+            None => self.scene_aliases.resolve(name),
+        };
+        let key = SceneRegistry::sanitize_name(alias.unwrap_or(name));
+        match resolve(
+            &mut self.scene_table,
+            global_scene_name.unwrap_or(""),
+            &key,
+            cond,
+        ) {
+            Ok(scene_id) => {
+                let scene = self.scene_table.get_scene(scene_id).ok_or_else(|| {
+                    SearchError::InvalidArgument("Scene ID not found".to_string())
+                })?;
 
-                    // Extract global_name and local_name from fn_name
-                    // fn_name format: "グローバル名::ローカル名" (e.g. "メイン_1::選択肢_1")
-                    let (global_name, local_name) = Self::parse_fn_name(&scene.fn_name);
-                    Ok(Some((global_name, local_name)))
-                }
-                Err(
-                    pasta_core::SceneTableError::SceneNotFound { .. }
-                    | pasta_core::SceneTableError::NoMatchingScene { .. },
-                ) => Ok(None),
-                Err(e) => Err(SearchError::SceneTableError(e)),
+                // fn_name format: "グローバル名::ローカル名" (e.g. "メイン_1::選択肢_1")
+                let (global_name, local_name) = Self::parse_fn_name(&scene.fn_name);
+                let local_name = match global_scene_name {
+                    Some(_) => local_name,
+                    None => "__start__".to_string(),
+                };
+                Ok(SceneLookup::Found {
+                    global_name,
+                    local_name,
+                })
             }
-        } else {
-            // Global search only (local keys starting with ':' are excluded).
-            // An exact alias match is replaced before sanitizing.
-            let alias = self.scene_aliases.resolve(name);
-            let key = SceneRegistry::sanitize_name(alias.unwrap_or(name));
-            match resolve(&mut self.scene_table, "", &key, &filters) {
-                Ok(scene_id) => {
-                    let scene = self.scene_table.get_scene(scene_id).ok_or_else(|| {
-                        SearchError::InvalidArgument("Scene ID not found".to_string())
-                    })?;
-
-                    // Extract global_name from fn_name
-                    let (global_name, _) = Self::parse_fn_name(&scene.fn_name);
-                    Ok(Some((global_name, "__start__".to_string())))
-                }
-                Err(
-                    pasta_core::SceneTableError::SceneNotFound { .. }
-                    | pasta_core::SceneTableError::NoMatchingScene { .. },
-                ) => {
-                    if let Some(target) = alias {
-                        tracing::warn!(
-                            name = %name,
-                            resolved = %target,
-                            "Scene not found (alias applied)"
-                        );
-                    }
-                    Ok(None)
-                }
-                Err(e) => Err(SearchError::SceneTableError(e)),
+            Err(pasta_core::SceneTableError::NoMatchingScene { .. }) => {
+                tracing::trace!(
+                    target: "pasta_lua::search",
+                    name = %name,
+                    "No scene candidate meets the conditions"
+                );
+                Ok(SceneLookup::Unmet)
             }
+            Err(pasta_core::SceneTableError::SceneNotFound { .. }) => {
+                if let Some(target) = alias {
+                    tracing::warn!(
+                        name = %name,
+                        resolved = %target,
+                        "Scene not found (alias applied)"
+                    );
+                }
+                Ok(SceneLookup::NotFound)
+            }
+            Err(e) => Err(SearchError::SceneTableError(e)),
         }
     }
 
@@ -237,33 +289,32 @@ impl SearchContext {
         global_name: &str,
         local_name: &str,
     ) -> Result<LocalSceneMatch, SearchError> {
-        let filters = HashMap::new();
         let alias = self.scene_aliases.resolve(global_name);
         let global_key = SceneRegistry::sanitize_name(alias.unwrap_or(global_name));
         let local_key = SceneRegistry::sanitize_name(local_name);
 
-        let global_id = match self.scene_table.resolve_global_owning_local_exact(
-            &global_key,
-            &local_key,
-            &filters,
-        ) {
-            Ok(Some(id)) => id,
-            Ok(None) => return Ok(LocalSceneMatch::NoLocal),
-            Err(
-                pasta_core::SceneTableError::SceneNotFound { .. }
-                | pasta_core::SceneTableError::NoMatchingScene { .. },
-            ) => {
-                if let Some(target) = alias {
-                    tracing::warn!(
-                        name = %global_name,
-                        resolved = %target,
-                        "Scene not found (alias applied)"
-                    );
+        let global_id =
+            match self
+                .scene_table
+                .resolve_global_owning_local_exact(&global_key, &local_key, None)
+            {
+                Ok(Some(id)) => id,
+                Ok(None) => return Ok(LocalSceneMatch::NoLocal),
+                Err(
+                    pasta_core::SceneTableError::SceneNotFound { .. }
+                    | pasta_core::SceneTableError::NoMatchingScene { .. },
+                ) => {
+                    if let Some(target) = alias {
+                        tracing::warn!(
+                            name = %global_name,
+                            resolved = %target,
+                            "Scene not found (alias applied)"
+                        );
+                    }
+                    return Ok(LocalSceneMatch::NoGlobal);
                 }
-                return Ok(LocalSceneMatch::NoGlobal);
-            }
-            Err(e) => return Err(SearchError::SceneTableError(e)),
-        };
+                Err(e) => return Err(SearchError::SceneTableError(e)),
+            };
         let parent = self
             .scene_table
             .get_scene(global_id)
@@ -363,7 +414,26 @@ impl SearchContext {
             .replace_selector(Self::build_selector(sequence));
         Ok(())
     }
+
+    /// `var` と `save` の両方が nil なら述語を渡さない（条件も優先の段も見ない）。
+    /// どちらかが表なら述語を渡す（渡されない方は空の表として扱う）
+    fn search_scene_lua(
+        &mut self,
+        (name, gsn, var, save): SceneSearchArgs,
+        exact: bool,
+    ) -> mlua::Result<SceneLookup> {
+        let result = if var.is_none() && save.is_none() {
+            self.search_scene_by(&name, gsn.as_deref(), exact, None)
+        } else {
+            let mut cond = cond_predicate(&name, var, save);
+            self.search_scene_where(&name, gsn.as_deref(), exact, &mut cond)
+        };
+        result.map_err(mlua::Error::from)
+    }
 }
+
+/// Lua の `search_scene(name, gsn?, var?, save?)` の引数
+type SceneSearchArgs = (String, Option<String>, Option<Table>, Option<Table>);
 
 /// Parse Lua varargs into a selector sequence (all arguments must be
 /// non-negative integers). Values beyond `usize` become `usize::MAX`, which
@@ -386,29 +456,16 @@ fn parse_selector_args(args: &MultiValue) -> mlua::Result<Vec<usize>> {
 
 impl UserData for SearchContext {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
-        // search_scene(name, global_scene_name?) -> (global_name, local_name) or nil
-        methods.add_method_mut(
-            "search_scene",
-            |lua, this, (name, global_scene_name): (String, Option<String>)| match this
-                .search_scene(&name, global_scene_name.as_deref())
-            {
-                Ok(Some((global, local))) => (global, local).into_lua_multi(lua),
-                Ok(None) => Ok(MultiValue::new()),
-                Err(e) => Err(mlua::Error::from(e)),
-            },
-        );
+        // search_scene(name, global_scene_name?, var?, save?)
+        //   -> (global_name, local_name) or nil / nil, "unmet"
+        methods.add_method_mut("search_scene", |lua, this, args: SceneSearchArgs| {
+            this.search_scene_lua(args, false)?.into_lua(lua)
+        });
 
-        // search_scene_exact(name, global_scene_name?) -> (global_name, local_name) or nil
-        methods.add_method_mut(
-            "search_scene_exact",
-            |lua, this, (name, global_scene_name): (String, Option<String>)| match this
-                .search_scene_exact(&name, global_scene_name.as_deref())
-            {
-                Ok(Some((global, local))) => (global, local).into_lua_multi(lua),
-                Ok(None) => Ok(MultiValue::new()),
-                Err(e) => Err(mlua::Error::from(e)),
-            },
-        );
+        // search_scene_exact(name, global_scene_name?, var?, save?) -> search_scene と同じ
+        methods.add_method_mut("search_scene_exact", |lua, this, args: SceneSearchArgs| {
+            this.search_scene_lua(args, true)?.into_lua(lua)
+        });
 
         // search_local_scene_exact(global_name, local_name)
         //   -> (global_name, local_name) or nil, "global" / nil, "local"

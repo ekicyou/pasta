@@ -136,7 +136,7 @@
 - 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
-- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/brief.md`。
 
 ## 申し送り（2026-10-29 の版の組み替えより）
 
@@ -155,3 +155,11 @@
 - **要件定義のモデル**: Opus のまま。「どの画面の場面か」の決め方（画面を出した場面を覚える／areka に名前を運んでもらう）と、チェイントークとの関係（選択肢と同じ割り込みか、`STORE.co_preempt` の印を付けた指名の再生か）は、どちらも 2 案に絞れていて推奨を付けられる。
 - **分割の案**: 不要。
 - **見つけた穴・古くなった記述**: Current State の「2026-10-10 の検証で見つかった穴」の行番号（41〜78・25〜35 行）と「`init.lua` 226 行」は古い（上の行が正しい）。「どの画面の場面か」を覚える案で `STORE.last_global_scene` は使えない（中断の場面が走るとその名前になる。前のまま）。覚えるなら専用の置き場所にする。
+
+## 申し送り（2026-11-03・`scene-condition-attributes` の実装より）
+
+- `choice_select.lua` は飛び先を `SCENE.search(choice_id, scope, act)` → `SCENE.search(choice_id, nil, act)` の順に act を渡して探す。どちらも見つからず、どちらかが条件漏れ（2 つ目の戻り値 `"unmet"`）なら `FAILURE.raise({ label = SCENE_UNMET, subject = "OnChoiceSelectEx ＞ID" })` で止まる。名前が無ければ今の 204。振り分けを取り出すときは、この 3 つの結果（見つかった・名前が無い・条件漏れ）をそのまま運ぶ。
+- `SCENE.search(name, gsn, act)` の 3 つ目の引数は、使われていなかった `attrs` から act に替わった。act を渡すと `act.var`・`act.save` で条件と `＆優先` を評価し、渡さなければ条件も優先の段も見ない（名指しの再生の道。`get_exact`・`co_exec_exact` は今も条件を見ない）。
+- `SceneTable::resolve_*` は `filters` の代わりに述語 `Option<CondFn>` を受け、`SceneTableError::NoMatchingScene { scene }` は「名前に合うシーンはあるが条件を満たす候補が無い」の意味になった。
+- イベントの act は、作るとき（`init.lua` の `create_act`）に Reference と日時が `var` に入る。当たり判定の名前（Reference）はシーンの条件（`＆＄ｒ０＝「Head」` など）でも振り分けられる。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/design.md`（LuaSceneSearch・ChoiceSelect の節）。

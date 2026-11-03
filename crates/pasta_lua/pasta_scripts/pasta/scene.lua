@@ -176,9 +176,10 @@ end
 ---
 --- @param name string 検索するシーン名
 --- @param global_scene_name string|nil ローカル検索の場合のグローバルシーン名
---- @param attrs table|nil 属性テーブル（将来拡張用、現在は未使用）
+--- @param act Act|nil 渡せば act.var・act.save で条件を評価する。nil なら条件を見ない
 --- @return SceneSearchResult|nil 検索結果、またはnil
-function SCENE.search(name, global_scene_name, attrs)
+--- @return "unmet"|nil miss 結果が nil で、名前に合うシーンはあるが条件を満たす候補が無いとき "unmet"
+function SCENE.search(name, global_scene_name, act)
     -- 型チェック: name が文字列でない場合は nil を返す
     if type(name) ~= "string" then
         return nil
@@ -188,11 +189,11 @@ function SCENE.search(name, global_scene_name, attrs)
     local SEARCH = require("@pasta_search")
 
     -- @pasta_search を使用してシーンを検索
-    local global_name, local_name = SEARCH:search_scene(name, global_scene_name)
+    local global_name, local_name = SEARCH:search_scene(name, global_scene_name, act and act.var, act and act.save)
 
-    -- 検索結果がなければ nil を返す
+    -- 検索結果がなければ nil を返す（条件漏れなら 2 つ目は "unmet"）
     if not global_name then
-        return nil
+        return nil, local_name
     end
 
     -- Lua 側で登録されているシーン関数を取得

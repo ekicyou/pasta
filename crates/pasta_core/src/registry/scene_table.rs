@@ -6,19 +6,21 @@
 use super::scene_types::*;
 use crate::error::SceneTableError;
 use crate::registry::random::RandomSelector;
-use std::collections::{BTreeMap, HashMap};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Bound;
 
-/// Cache key for scene resolution (module_name + search_key + sorted filters + exact).
-/// Extended to support unified scope search with module context.
+/// 候補 1 つの条件を評価する述語。真なら満たす
+pub type CondFn<'a> = &'a mut dyn FnMut(&SceneInfo) -> bool;
+
+/// Cache key for scene resolution (module_name + search_key + exact + owning_local).
+/// 変数の値（述語）は鍵に含めない。
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct SceneCacheKey {
     /// Module name (グローバルシーン名)
     module_name: String,
     /// Search key
     search_key: String,
-    /// Sorted filters
-    filters: Vec<(String, String)>,
     /// Exact-match search (kept apart from the prefix search's cache)
     exact: bool,
     /// 持ち主のローカルの名前（そのローカルを持つ大域の順送りだけ。ほかは None）
@@ -26,22 +28,10 @@ struct SceneCacheKey {
 }
 
 impl SceneCacheKey {
-    fn new(
-        module_name: &str,
-        search_key: &str,
-        filters: &HashMap<String, String>,
-        exact: bool,
-        owning_local: Option<&str>,
-    ) -> Self {
-        let mut filter_vec: Vec<_> = filters
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-        filter_vec.sort();
+    fn new(module_name: &str, search_key: &str, exact: bool, owning_local: Option<&str>) -> Self {
         Self {
             module_name: module_name.to_string(),
             search_key: search_key.to_string(),
-            filters: filter_vec,
             exact,
             owning_local: owning_local.map(str::to_string),
         }
@@ -60,7 +50,7 @@ pub struct SceneTable {
     labels: Vec<SceneInfo>,
     /// Prefix index for forward-matching search (search key → [SceneId], registration order).
     prefix_index: BTreeMap<String, Vec<SceneId>>,
-    /// Cache for sequential scene consumption ((module_name, search_key, filters) → CachedSelection).
+    /// Cache for sequential scene consumption ((module_name, search_key, exact, owning_local) → CachedSelection).
     cache: HashMap<SceneCacheKey, CachedSelection>,
     /// Random selector for scene selection.
     random_selector: Box<dyn RandomSelector>,
@@ -159,29 +149,24 @@ impl SceneTable {
     ///
     /// # Algorithm
     /// 1. Collect candidates (collect_scene_candidates)
-    /// 2. Filter by attributes
-    /// 3. Cache-based sequential selection (no repeat until exhausted)
-    /// 4. Return selected SceneId
+    /// 2. 条件と優先の段で 1 つ選ぶ（`select_from_cache`）
     ///
     /// # Arguments
     /// * `module_name` - Current module name (parent global scene)
     /// * `search_key` - Search prefix
-    /// * `filters` - Attribute filters
+    /// * `cond` - 候補 1 つの条件を評価する述語（`None` なら条件を見ない）
     pub fn resolve_scene_id_unified(
         &mut self,
         module_name: &str,
         search_key: &str,
-        filters: &HashMap<String, String>,
+        cond: Option<CondFn<'_>>,
     ) -> Result<SceneId, SceneTableError> {
         // Phase 1: Collect candidates from a single scope (no fallback)
         let candidate_ids = self.collect_scene_candidates(module_name, search_key)?;
 
-        // Phase 2: Filter by attributes
-        let filtered_ids = self.filter_by_attributes(candidate_ids, search_key, filters)?;
-
-        // Phase 3-5: Cache-based sequential selection
-        let cache_key = SceneCacheKey::new(module_name, search_key, filters, false, None);
-        Ok(self.select_from_cache(cache_key, filtered_ids))
+        // Phase 2: 条件と優先の段で 1 つ選ぶ
+        let cache_key = SceneCacheKey::new(module_name, search_key, false, None);
+        self.select_from_cache(cache_key, candidate_ids, search_key, cond)
     }
 
     /// Resolve scene ID by exact name match within one scope.
@@ -189,14 +174,14 @@ impl SceneTable {
     /// The scope is the same as `collect_scene_candidates` (global when
     /// `module_name` is empty, excluding keys starting with `:`; otherwise
     /// `:module_name:name` locals only, no fallback), but only scenes whose
-    /// key equals the search key are candidates. Attribute filtering and the
+    /// key equals the search key are candidates. The condition/priority lottery and the
     /// no-repeat sequential selection are shared with the prefix search; the
     /// cache is kept separate from it (`SceneCacheKey::exact`).
     pub fn resolve_scene_id_exact(
         &mut self,
         module_name: &str,
         name: &str,
-        filters: &HashMap<String, String>,
+        cond: Option<CondFn<'_>>,
     ) -> Result<SceneId, SceneTableError> {
         if name.is_empty() {
             return Err(SceneTableError::InvalidScene {
@@ -220,9 +205,8 @@ impl SceneTable {
             });
         }
 
-        let filtered_ids = self.filter_by_attributes(candidate_ids, name, filters)?;
-        let cache_key = SceneCacheKey::new(module_name, name, filters, true, None);
-        Ok(self.select_from_cache(cache_key, filtered_ids))
+        let cache_key = SceneCacheKey::new(module_name, name, true, None);
+        self.select_from_cache(cache_key, candidate_ids, name, cond)
     }
 
     /// `name` と等しいキーの大域シーンのうち、`:{大域の登録名}:{local}` と等しいキーの
@@ -238,7 +222,7 @@ impl SceneTable {
         &mut self,
         name: &str,
         local: &str,
-        filters: &HashMap<String, String>,
+        cond: Option<CondFn<'_>>,
     ) -> Result<Option<SceneId>, SceneTableError> {
         if name.is_empty() || local.is_empty() {
             return Err(SceneTableError::InvalidScene {
@@ -272,86 +256,89 @@ impl SceneTable {
             return Ok(None);
         }
 
-        let filtered_ids = self.filter_by_attributes(owners, name, filters)?;
-        let cache_key = SceneCacheKey::new("", name, filters, true, Some(local));
-        Ok(Some(self.select_from_cache(cache_key, filtered_ids)))
+        let cache_key = SceneCacheKey::new("", name, true, Some(local));
+        self.select_from_cache(cache_key, owners, name, cond)
+            .map(Some)
     }
 
-    /// Filter candidate IDs by attribute filters (Phase 2 of scene resolution).
+    /// 名前の全候補の並びから、述語と優先の段で 1 つ選ぶ（並び＋次の位置の順送り）。
     ///
-    /// Returns NoMatchingScene if no candidate satisfies all filters.
-    fn filter_by_attributes(
-        &self,
-        candidate_ids: Vec<SceneId>,
-        search_key: &str,
-        filters: &HashMap<String, String>,
-    ) -> Result<Vec<SceneId>, SceneTableError> {
-        let filtered_ids: Vec<SceneId> = candidate_ids
-            .into_iter()
-            .filter(|&id| {
-                let scene = &self.labels[id.0];
-                // 同じ名前の宣言が並ぶときは後の値（HashMap に入れていた頃の後勝ちと同じ）
-                filters.iter().all(|(key, value)| {
-                    scene
-                        .attributes
-                        .iter()
-                        .rev()
-                        .find_map(|a| match a {
-                            SceneAttr::Decl { key: k, value: v } if k == key => Some(v),
-                            _ => None,
-                        })
-                        .is_some_and(|v| v.to_string() == *value)
-                })
-            })
-            .collect();
-
-        if filtered_ids.is_empty() {
-            return Err(SceneTableError::NoMatchingScene {
-                scene: search_key.to_string(),
-                filters: filters.clone(),
-            });
-        }
-
-        Ok(filtered_ids)
-    }
-
-    /// Common helper for cache-based sequential scene selection (Phase 3-5).
-    ///
-    /// # Algorithm
-    /// - Phase 3: Get or create cache entry with shuffled candidates
-    /// - Phase 4: Reset cache when all candidates have been consumed
-    /// - Phase 5: Return next candidate from cache
+    /// - 並びはシャッフル 1 回の後に優先の降順へ安定に並べ替える。シャッフルは作るときと始め直すときだけ
+    /// - `cond` があれば全候補を 1 回だけ評価し、満たす候補の最高の優先を今の段とする。
+    ///   満たす候補が無ければ次の位置を末尾にして NoMatchingScene
+    /// - 次の位置から見て、満たす候補を返す。満たさない候補は見ただけで使ったものにする。
+    ///   段より低い候補か末尾に来たら、1 回だけ始め直す
+    /// - `cond` が無ければ段も見ず、どの候補も満たすとする（名指し・今の挙動）
     fn select_from_cache(
         &mut self,
         cache_key: SceneCacheKey,
-        filtered_ids: Vec<SceneId>,
-    ) -> SceneId {
-        let random_selector = &mut self.random_selector;
-        let mut shuffled = || {
-            let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
-            random_selector.shuffle_usize(&mut id_values);
-            id_values.into_iter().map(SceneId).collect::<Vec<_>>()
+        candidate_ids: Vec<SceneId>,
+        search_key: &str,
+        cond: Option<CondFn<'_>>,
+    ) -> Result<SceneId, SceneTableError> {
+        let SceneTable {
+            labels,
+            cache,
+            random_selector,
+            ..
+        } = self;
+        let priority = |id: &SceneId| scene_priority(&labels[id.0].attributes);
+        let no_match = || SceneTableError::NoMatchingScene {
+            scene: search_key.to_string(),
         };
 
-        // Phase 3: Get or create cache entry
-        let cached = self
-            .cache
-            .entry(cache_key)
-            .or_insert_with(|| CachedSelection {
-                candidates: shuffled(),
-                next_index: 0,
-            });
+        // 1. 述語があれば全候補を 1 回だけ評価し、今の段を求める
+        let (ok, tier) = match cond {
+            None => (None, i64::MIN),
+            Some(cond) => {
+                let ok: HashSet<SceneId> = candidate_ids
+                    .iter()
+                    .copied()
+                    .filter(|id| cond(&labels[id.0]))
+                    .collect();
+                let Some(tier) = ok.iter().map(priority).max() else {
+                    // この巡は見終えた（並びがまだ無ければ作らない）
+                    if let Some(cached) = cache.get_mut(&cache_key) {
+                        cached.next_index = cached.candidates.len();
+                    }
+                    return Err(no_match());
+                };
+                (Some(ok), tier)
+            }
+        };
 
-        // Phase 4: Reset when all candidates have been consumed
-        if cached.next_index >= cached.candidates.len() {
-            cached.candidates = shuffled();
-            cached.next_index = 0;
+        let mut new_round = || {
+            let mut id_values: Vec<usize> = candidate_ids.iter().map(|id| id.0).collect();
+            random_selector.shuffle_usize(&mut id_values);
+            let mut ids: Vec<SceneId> = id_values.into_iter().map(SceneId).collect();
+            ids.sort_by_key(|id| Reverse(priority(id)));
+            ids
+        };
+
+        // 2. 並びが無ければ作る
+        let cached = cache.entry(cache_key).or_insert_with(|| CachedSelection {
+            candidates: new_round(),
+            next_index: 0,
+        });
+
+        // 3・4. 次の位置から見る。末尾か段より低い候補に来たら 1 回だけ始め直す
+        for round in 0..2 {
+            if round == 1 {
+                cached.candidates = new_round();
+                cached.next_index = 0;
+            }
+            while let Some(&id) = cached.candidates.get(cached.next_index) {
+                if priority(&id) < tier {
+                    break;
+                }
+                cached.next_index += 1;
+                if ok.as_ref().is_none_or(|ok| ok.contains(&id)) {
+                    return Ok(id);
+                }
+            }
         }
-
-        // Phase 5: 一巡前なら next_index < len、一巡後は空でない filtered_ids で作り直して 0 なので添字は候補の中にある
-        let selected_id = cached.candidates[cached.next_index];
-        cached.next_index += 1;
-        selected_id
+        // 始め直した巡には段の候補が必ずあるので来ない（空回りしない）
+        Err(no_match())
     }
 
     /// Get scene info by ID.

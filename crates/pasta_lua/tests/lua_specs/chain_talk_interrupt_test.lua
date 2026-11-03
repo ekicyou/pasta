@@ -678,6 +678,25 @@ local function set_chudan(fn)
 end
 
 describe("中断の台詞 - 中断があるとき", function()
+    test("中断のシーンの act にも Reference と日時が最初から入っている", function()
+        with_env({ names = { ["チェイントーク中断"] = "cti_chudan_1" } }, function()
+            local seen = {}
+            SCENE.register("cti_chudan_1", "__start__", function(act)
+                seen.r0, seen.year = act.var.r0, act.var.year
+                talk(act, "CHUDAN")
+            end)
+            start_chain()
+            register_scene("OnCtiInterrupt", "cti_int_1", function(act) talk(act, "REACTION") end)
+            local res = ENTRY.request({
+                id = "OnCtiInterrupt", method = "get", version = 30, reference = { [0] = "REF0" },
+                security_level = "local", date = { year = 2026, month = 11, day = 4, hour = 9 },
+            })
+            expect(has(res, "CHUDAN")):toBe(true)
+            expect(seen.r0):toBe("REF0")
+            expect(seen.year):toBe(2026)
+        end)
+    end)
+
     test("応答は中断の台詞だけの 1 本で、反応は出ず、続きは残らない", function()
         with_env({ chudan = true }, function()
             start_chain()
