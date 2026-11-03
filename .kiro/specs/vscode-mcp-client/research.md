@@ -423,3 +423,20 @@
 - `findBasewares` は、同じ `baseware.name` の相手を 1 つにまとめ、最初の番号を残す（9801・9821 の重なり）。
 - `findPlayedScript` は `Ghost:OnPastaSceneAt` の記録だけを選ぶ。
 - Open Questions 1・3 は解決。2 は一部解決（直の HTTP では出ない見込みだが、要件 4.8 の手当ては残す）。4 は「この機械では開いていた」。
+
+## 実装後の実機の確かめ（2026-11-03・タスク 8.2 の一部・SSP＋えも2DEBUG）
+
+拡張の 3 つの流れ（`reloadAndWait`・`runScene`・`dumpVariables`）と、相手を探す `findBasewares`・ゴーストを決める `resolveGhost` を、拡張と同じコードのまま node で束ねて、動いている SSP へ向けて通した（VSCode の画面からは通していない。下の「残り」）。
+
+- **相手**: `findBasewares(C:\home\maz\git\ghost_dev\debug\emo2-debug)` → `[{port: 9801, basewareName: "SSP"}]`。9801・9821 の重なりは 1 つにまとまった。areka は動いていなかった（確かめていない）。
+- **ゴースト**: `dic\boot.pasta` からルート `C:\home\maz\git\ghost_dev\debug\emo2-debug`、表示名「えも2DEBUG」。
+- **SHIORI をリロード**: `pasta.log` の印 `SHIORI load entry completed … loaded=true` で終わり、要約は「読み込みは誤り無く終わりました」。
+- **▶ シーンを実行**（`dic\boot.pasta` の 13 行の `＊起動朝`）: 読み込み直しの後に `OnPastaSceneAt` を送り、台本（`\p[0]\s[1000]…おっはよー！…\e`）が返った。このゴーストの `pasta.toml` には `[debug]` が無いが、204 にならなかった（今の pasta.dll にはまだ門が無い。門は `debug-mcp-runtime`）。
+- **保存変数を表示**: `variables.toml` は新しくならず、案内（`[debug] enabled = true`）が出た。`OnPastaDumpVariables` は `debug-mcp-runtime` が作る前なので、想定どおり。
+- **ドライブ文字の大小**: 本物の `vscode.Uri.fsPath` はドライブ文字が小文字（`c:\…`）になる。`get_property(baseware.name, ghost_name="c:\home\maz\git\ghost_dev\debug\emo2-debug")` に SSP は `SSP` と答えた（大文字・小文字を区別しない）。
+
+残り（開発者の手で行う）:
+
+- 開発の拡張（F5 の Extension Development Host）から、右クリックのメニューで 3 つのコマンドを通す。
+- 「シーンの実行 → 辞書の編集 → もう一度の実行」を撮り、`book/src/debug/dev-actions.md` の動画を差し替える。
+- areka が動く機械では、areka へも通す。
