@@ -79,7 +79,7 @@
   - [ローダ自己展開とモジュール解決](internals/loader.md)
   - [SHIORI 層](internals/shiori.md)
   - [トーク出力とアピアランス](internals/talk-output.md)
-  - [デバッグ基盤とシーンキック](internals/debug.md)
+  - [開発用のイベントとシーンマップ](internals/debug.md)
   - [ロギングとエンコーディング](internals/logging-encoding.md)
 
 # 雑記
