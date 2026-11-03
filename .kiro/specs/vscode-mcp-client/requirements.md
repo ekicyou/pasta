@@ -33,8 +33,9 @@ pasta の VSCode 拡張（以下「拡張」）の開発の道具を、DAP か�
   - マニュアルの internals とリファレンスの頁（`debug-mcp-runtime`）
 - **Adjacent expectations**
   - `debug-mcp-runtime`（pasta.dll）が次を約束する。拡張はこれに頼る。
-    - `OnPastaSceneAt`: Reference0 にファイル（絶対パスか `ghost/master/` からの相対パス）、Reference1 に行（1 以上の半角数字）。引数と応答は今のまま。再生したら台本を返し、見つからないときと引数の誤りでは失敗の表記を返す。
-    - `OnPastaDumpVariables`: 今の保存変数（`＄＊名前`）を `ghost/master/profile/pasta/debug/variables.toml` に書き出し、何も喋らずに 204 を返す。
+    - `OnPastaSceneAt`: Reference0 にファイル（絶対パスか `ghost/master/` からの相対パス。`file://` の URI は受けない）、Reference1 に行（1 以上の半角数字）。再生したら台本を返し、見つからないときと引数の誤りでは失敗の表記を返す。
+    - `OnPastaDumpVariables`: 今の保存変数（`＄＊名前`）を `ghost/master/profile/pasta/debug/variables.toml` にふつうの TOML で書き出し終えてから、何も喋らずに 204 を返す。書けなかったときは警告を出して 204 を返し、前のファイルを消さない（読む側が更新時刻で古さを見分ける）。
+    - デバッグが有効なことは、`debug backend listening` に代わる info の 1 行で `pasta.log` に出る（文言は `debug-mcp-runtime` の設計で決まる）。古い `[debug]` のキー（`port`・`present_as`・`source_map_sidecar`）は黙って読み飛ばされる。
     - どちらも `pasta.toml` の `[debug] enabled = true`（か `PASTA_DEBUG=1`）のときだけ働き、無効なときと SecurityLevel が external のときは 204 を返す。門は待ち受けを持たない。
   - SSP・areka が次を持つ。拡張はこれに頼り、直さない。
     - 127.0.0.1 だけで待ち受ける MCP の窓口。番号は 9801・9821 の早い者勝ちで、塞がっていれば 9802・9822…9810・9830 の 20 個のどれか。
@@ -160,7 +161,8 @@ pasta の VSCode 拡張（以下「拡張」）の開発の道具を、DAP か�
 2. The 利用者のマニュアル shall `index.md`・`vscode-setup.md`・`dev-actions.md`・`troubleshooting.md` を、拡張が SSP・areka の MCP へ送る形で書き直し、attach・`launch.json`・`host`・番号 9276・ブレークポイント・ステップ・変数の inspect・提示モードの手順を残さない。
 3. The 利用者のマニュアル shall シーンの再生と保存変数の表示には、`pasta.toml` の `[debug] enabled = true`（か `PASTA_DEBUG=1`）が要ること、書いた後に読み込み直すことを書く。
 4. The 利用者のマニュアル shall 3 つのコマンドの動き（ゴーストの見つけ方・相手の選び方と覚え方・毎回の読み込み直し・誤りが増えたとき・「No response from server」のとき・204 のときの案内）と、相手が見つからないときの確かめ方を書く。
-5. The 利用者のマニュアル shall 前の版の `launch.json` の pasta の構成はもう使えず、消してよいことを書く。
+5. The 利用者のマニュアル shall 前の版の `launch.json` の pasta の構成と、`pasta.toml` の `[debug]` の古いキー（`port`・`present_as`・`source_map_sidecar`）はもう効かず、消してよいことを書く。
+10. The 利用者のマニュアル shall デバッグが有効になったかの確かめ方を、`debug backend listening` の行ではなく、`debug-mcp-runtime` が出す新しい info の行で書く。
 6. The 利用者のマニュアル shall `dev-actions.md` の動画を、新しい流れ（シーンの実行・編集・もう一度の実行）を撮り直したものに替える。
 7. The 利用者のマニュアル shall `validate.md` を変えない。
 8. The 利用者のマニュアル shall 書き直した頁の導入と締めの台詞の決まりを保ち、マニュアルのリンクの検証と中身の検証が通る。
