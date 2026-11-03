@@ -211,3 +211,185 @@
 - 未決 6・7 → 進み具合はやり取りの間だけ出す。常に出す項目は置かない。同じゴーストへのコマンドは重ねない（要件 7.4・7.5）。
 - 未決 8 → 3.3 の (a)（要件 10.2）。
 - 未決 9・10 → G 節はこの spec が直す（要件 9.8）。アンカー 4 つを残す。残る切れ目は、先に入る側が最小に直す（要件 9.9）。
+
+---
+
+# 設計の段の調べ（2026-11-03・`/kiro-spec-design -y`）
+
+## Summary（設計の段）
+
+- **Discovery Scope**: Extension（light discovery）。拡張の中の撤去と、外のベースウェアとの通信の新設。新しい依存は無い。
+- **Key Findings**:
+  - この机では SSP も areka も動いていなかった（実機のプローブはつながらなかった）。代わりに、SSP の中継 `mcp.exe` の中の文字列と、areka の受け口のソース・実測の記録（`areka/doc/ssp-mcp/`）から、HTTP の道・セッション・道具の答えの形をほぼ決められた。
+  - 「No response from server」は SSP の本体の文ではなく、中継 `mcp.exe` の文である（本文が空か、応答の無いまま接続が閉じたとき）。拡張は HTTP で直に話すので、この文は届かない。代わりに「空の本文」「送った後に切れた」「時間切れ」として見える。
+  - `reload` は、areka では終わりを待たない（答えに `It runs asynchronously` と書く）。読み込みの終わりは、`pasta.log` の `SHIORI load entry completed … loaded=true|false` の行で見分けられる（pasta 自身の行。ベースウェアに依らない）。
+  - 動いているかの確かめは、`get_property(property_name="baseware.name", ghost_name=<ルートの絶対パス>)` の 1 回で済む。動いていれば `SSP`・`areka` の素の値、動いていなければ `NG:Cannot find active ghost from specified name`（SSP 2.9.07 の実測）。
+  - SSP 2.9.05 の `get_log`（`script`）は、台本の逆斜線をエスケープしない不正な JSON を返す（areka の記録 survey §4.2）。読む側に寛容な読み直しが要る。
+
+## Research Log（設計の段）
+
+### 実機のプローブ（2026-11-03 00:3x UTC）
+
+- **Context**: brief は「設計の最初に、SSP と areka の実機で確かめる」と書く。
+- **やったこと**
+  - `Get-NetTCPConnection -State Listen`（9790〜9840）: 待ち受け 0 件。`Get-Process`: `ssp.exe`・`areka.exe` は無し（`areka-mcp-bridge.exe` 2 つと `C:\wintools\ssp\data\mcp.exe` 2 つだけが動いている。どちらも中継で、本体ではない）。
+  - `curl -s -m 2 -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"initialize",…}' http://127.0.0.1:{9801,9821,9802,9822}/api/mcp/v1` → どれも答え無し（終了コード 28）。`GET http://127.0.0.1:9801/api/mcp/help` → 空。
+  - Claude Code の MCP（中継経由）: `mcp__ssp__get_active_ghost_list` → `Error: Server not available`。`mcp__areka__get_active_ghost_list` → `Server not available: areka-mcp-server not found on 127.0.0.1 ports 9801, 9821, 9802, 9822, …, 9810, 9830`。
+- **結果**: 実機では何も確かめられなかった。`reload`・`raise_event` は一度も送っていない（pasta のゴーストが動いていないので、送ってよい相手が無かった）。下の机の上の調べで置き換え、確かめられなかったことは design.md の Open Questions に残した。
+
+### SSP の HTTP の道（机の上の調べ）
+
+- **Sources**: `C:\wintools\ssp\data\mcp.exe`（94,208 バイト・2026-09-24）と `C:\wintools\ssp\ssp.exe` の ASCII の文字列。areka `doc/ssp-mcp/survey.md` §1・§6（SSP 2.9.05 の実測）。
+- **Findings**
+  - `mcp.exe` は `POST /api/mcp/v1 HTTP/1.1`・`Host: 127.0.0.1:9801`・`Content-Type: application/json`・`Accept: application/json, text/event-stream`・`Connection: close` を焼き込んでいる。`ssp.exe` にも `/api/mcp/v1`・`/api/mcp/help`・`/api/sstp/v1` がある。
+  - どちらにも `Mcp-Session-Id` の文字列は無い（ASCII・UTF-16 の両方で 0 件）。survey §2 も「SSE・`Mcp-Session-Id` を使わない＝無状態」。
+  - `No response from server`・`Invalid JSON response from server`・`Server not available` は `mcp.exe` にだけある（`ssp.exe` には無い）。
+- **Implications**: SSP の道は areka と同じ `/api/mcp/v1`。セッションの札は送り返さなくてよい。拡張の送り方は中継と同じ札にそろえる。
+
+### areka の受け口（ソース）
+
+- **Sources**: `C:\home\maz\git\areka\crates\areka-mcp\src\dispatch.rs`・`gate.rs`・`tools\*.rs`、`crates\areka\src\mcp\reload.rs`・`raise_event.rs`、`doc/ssp-mcp/transport-diff-areka.md`・`bridge-diff-areka.md`・`areka-tools.md`・`log-convention.md`。
+- **Findings**
+  - 無状態（`NeverSessionManager`・`legacy_session_mode(false)`）・JSON の単発応答。`initialize` を経ない `ping`・`tools/list` も 200 で、`Mcp-Session-Id` を返さない。
+  - `POST` の `Accept` に `application/json` と `text/event-stream` の両方が無いと 406。`Host` はループバックだけ（無しも 403）。`Origin` は無しかループバックだけ（ほかは 403）。本文の上限 4 MiB。
+  - `reload` の答え: `OK:reload requested. It runs asynchronously; errors while loading (dictionary errors etc.) will be recorded to the error log. Wait until get_status answers again, then check get_log tool (log_type=error, since_id=<n>)`。終わりを待たない。
+  - `raise_event` の答え: 台本があれば 1 行目 `OK:the ghost returned a script and it is being played.`、続けて `Script: <台本>` の行。無ければ `OK:the ghost returned no script.`（SSP 2.9.05 と同じ文。survey §3・§8.2）。
+  - ツールの上限 10 秒: `NG:areka did not respond within 10 seconds`（`isError: true`）。
+  - `baseware.name` は `areka`（`areka-ghost/src/config.rs`）。SSP は `SSP`（survey §7.1）。
+  - `get_log`: 古い順、1 行 `#<id> <yyyy/mm/dd hh:mm> [<表示の語>] <名> : <本文>`、続きの行はタブで始まる。0 件は `(no log entries)`。`max_count` は**新しい方から**の件数。番号は全種類の通し。`ghost_name` は名前かルートのフルパス。
+  - `ghost_name` のパスの照合: 大文字・小文字・区切り（`/`・`\`）・末尾の区切りを同じとみなす。ルートでない上位のフォルダは外れ（survey §7.2・§7.4。SSP と areka で同じ）。
+- **Implications**: 動いているかの確かめは `get_property(baseware.name, ghost_name=<ルート>)` の 1 回で済む。`get_active_ghost_list` は名前を返すので、ルートのパスでは引けない（brief の案から替えた。Design Decisions）。
+
+### 読み込みの終わりの見分け方
+
+- **Sources**: `crates/pasta_shiori/src/windows.rs:189`（`info!(entry, loaded, "SHIORI load entry completed")`）・`v3.rs:65`、`crates/pasta_lua/src/logging/logger.rs`（`Rotation::NEVER`・追記だけ）・`tracing_init.rs`（`with_ansi(false)`・`with_target(true)`・`with_level(true)`）。手元の `ghost_dev/debug/pasta-in-windows-debug/ghost/master/profile/pasta/logs/pasta.log`（48 MB・39 万行）。
+- **Findings**
+  - 行の形: `2026-11-02T13:50:23.883713Z  INFO pasta::windows: SHIORI load entry completed entry="loadu" loaded=true`。失敗では `loaded=false`（10-17・10-18 の実例あり）。
+  - 誤りと警告は `ERROR`・`WARN` の語で始まる（例 `  WARN pasta_lua::loader::cache: …`）。
+  - ログは回転しない追記のファイル。大きくなる（48 MB）ので、読む前の大きさを覚えて、増えた分だけを読む。
+- **Implications**: 終わりの印は pasta.dll の行で決める。SSP と areka のどちらでも、`reload` が待っても待たなくても同じに働く。`level` を `warn` 以上にしたゴーストでは印の行が出ないので、時間切れになる（Risks）。
+
+### `pasta.toml` の `[logging] file_path`
+
+- **Sources**: `book/src/reference/pasta-toml.md` 756〜783 行、`crates/pasta_lua/src/loader/config/sections.rs`。
+- **Findings**: 既定 `profile/pasta/logs/pasta.log`（`ghost/master/` から）。書けるのは `profile/` の下の相対パスだけ（`..` と絶対パスは不可。`profile` の大文字・小文字は区別する）。外れた値なら既定の場所へ書く。
+- **Implications**: 拡張は TOML の読み手を持たない（依存を増やさない）。`[logging]` の表の中の `file_path = "…"`（基本の文字列か、リテラルの文字列）の 1 行だけを読む小さな読み手にし、pasta と同じ条件で外れたら既定へ倒す。WASM（`pasta_check`）に入口を足す案は `crates/pasta_lsp` に手が出る上、WASM が読めないときに働かないので採らない。
+
+### `descript.txt` の文字コード
+
+- **Findings**: `ghost_dev` の DEBUG 版は `charset,UTF-8`。古いゴーストは `charset` の行が無く Shift_JIS のことがある。
+- **Implications**: 先頭の `charset,` の行（大文字・小文字を問わない）が `UTF-8` なら UTF-8、それ以外は `TextDecoder('shift_jis')`。読めなければ `name` は無しとし、ルートのフォルダの名前で表示する（要件 2.3）。
+
+### 拡張の Node（VSCode `^1.85.0`）
+
+- **Sources**: `editors/vscode/package.json`（`engines.vscode` `^1.85.0`・`@types/node` `^20`）、手元の VSCode 1.144.0（`ELECTRON_RUN_AS_NODE=1 Code.exe -e …`）、VSCode 1.85 の公開の版の事実（Electron 25.9・Node 18.15）。
+- **Findings**
+  - 手元の VSCode 1.144（Electron 43.8.3・Node 24.22.1）: `typeof fetch` は `function`、`typeof AbortSignal.timeout` は `function`、`new TextDecoder('shift_jis').decode([0x82,0xa0,0x8a,0xbf])` は `あ漢`。Electron は Chromium の ICU（`icudtl.dat`）を使う。
+  - VSCode 1.85 の Node 18.15: 組み込みの `fetch`（undici。既定で有効）と `AbortSignal.timeout`（Node 17.3 から）はある。Shift_JIS は Electron の ICU の data による（1.85 そのものでは試していない）。
+  - Node の `fetch` は `Origin` を付けない。`Host` は `127.0.0.1:<port>` になる（areka の検査を通る）。
+- **Implications**: `engines.vscode` は上げない。TypeScript の型は `@types/node` 20 の大域の `fetch`・`AbortSignal` で足りる（`tsconfig` の `lib` は `ES2022` のまま）。1.85 での Shift_JIS は Open Question に残し、読めなければ表示名をフォルダ名へ倒す（壊れない）。
+
+### 試験の型と CI
+
+- `editors/vscode` の試験は CI では回らない（`build.yml` に拡張の `npm test` は無い。`release.yml` は `npm run package` だけ）。関門は手元の `npm test`。
+- 今の型: 純粋なモジュールは素の node で試し、vscode に触る糊は `--alias:vscode=./src/test/mock/vscode.ts` で束ねる。`e2e.test.ts` は宣言とビルドの形を素の node で見る。
+- MCP を真似るサーバーは `node:http`（組み込み）で立てる。番号は 0（空いている番号）で取り、候補の列を試験から差し込む（利用者の設定にはしない）。机の 9801 で動く SSP と取り合わない。
+
+### スキルへの流し先と、消す頁へのリンク
+
+- `.claude/skills/pasta-ghost-authoring/references/pasta-toml.md:802` が `debug/source-level.html#提示モードの切替` を引く（`reference/pasta-toml.md:807` の生成物）。`source-level.md` を消すと、スキルのリンクの検証も落ちる。先に入る側は、元の頁を直して `node book/tools/gen-skill-refs.mjs` で作り直す（生成物なので `SKILL.md` の手直しに当たらない）。
+- `call-jump.md`・`shiori-events.md` の references は `debug/dev-actions.html#シーン再生-シーンを実行` を引く。見出し「シーン再生（▶ シーンを実行）」を残せば切れない。
+- `editors/vscode/CHANGELOG.md` は 0.1.5 から更新されていない（版の記録は `doc/release-notes/`）。DAP の撤去の 1 行は書かない。
+
+### 参照したスキル
+
+- `kiro-spec-design`（手順・`rules/design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）、`.kiro/settings/templates/specs/design.md`・`research.md`。
+- ponytail（最小の完全な変更。新しい部品は役目ごとに 1 本、設定を足さない）。
+- `kiro-validate-design`（`rules/design-review.md`）は検証の段で使う。
+
+## Architecture Pattern Evaluation（設計の段）
+
+| 案 | 中身 | 強み | 弱み | 判断 |
+| --- | --- | --- | --- | --- |
+| C'（採用） | 純粋なモジュール 5 本（`mcpClient`・`ghostFiles`・`reloadShiori`・`runSceneAtCursor`・`dumpVariables`）＋ vscode の糊 1 本（`devCommands`）。`extension.ts` は登録を 1 行呼ぶだけ | 今の分け方と試験の型のまま。ベースウェアの言うこと（`mcpClient`）とゴーストのディスクの上のこと（`ghostFiles`）を分け、3 つの流れが同じ部品を使う | 新しいファイルが 4 本 | ギャップ分析の案 C を、共有の部品が 2 つあると分かった所で 1 段だけ割った |
+| C（ギャップ分析の案） | `mcpClient` だけ新しく、ゴーストの特定は `ghostValidator.ts` に足す | ファイルが増えない | `ghostValidator.ts` は vscode を import するので、純粋な流れから使えない。`pasta.log` を読む部品の置き場が無い | 採らない |
+| A | 今の 2 ファイルに全部入れる | 差分が小さい | 3 つ目のコマンドの置き場が無い。番号の列と JSON-RPC が写しになる | 採らない |
+
+## Design Decisions（設計の段）
+
+### Decision: 動いているかは `get_property(baseware.name, ghost_name=<ルート>)` で確かめる
+
+- **Context**: 要件 3.1・3.2。brief は `get_active_ghost_list` で聞くと書いた。
+- **Alternatives**: (1) `get_active_ghost_list` の名前と descript の `name` を比べる。(2) `get_status(ghost_name=<ルート>)`。(3) `get_property(baseware.name, ghost_name=<ルート>)`。
+- **Selected**: (3)。
+- **Rationale**: (1) は名前でしか比べられず、本体と DEBUG 版・ワークツリーの写しを取り違える（brief が `name` を送らないと決めた理由と同じ）。(3) は 1 回の呼び出しで「このパスのゴーストが動いているか」と「相手の名前」の両方が分かる。`get_status` は暇なとき空の本文を返すので、答えの形が弱い。
+- **Follow-up**: SSP 2.9.07 の実測ではルートのパスで `SSP` が返った。動いていないパスでの文は実測の `NG:Cannot find active ghost from specified name`。
+
+### Decision: 候補の 20 個は並べて聞く
+
+- **Context**: 要件 3.1（順に聞く）・3.8（答えない相手で止まらない）。
+- **Selected**: 20 個へ同時に送り、答えを候補の順に並べ直す。1 つの番号の上限は 2 秒。
+- **Rationale**: 1 つずつ順に待つと最悪「上限 × 20」になる（areka の中継も同じ理由で並べて開く）。結果の並び（選択肢の順）は候補の順のまま保つ。
+
+### Decision: 探すときだけ `initialize` を送る
+
+- **Context**: brief は `initialize` → `tools/call`。SSP・areka はどちらも無状態で、セッションの札を使わない。
+- **Selected**: 探すとき、番号ごとに `initialize`（`protocolVersion` `2025-06-18`）を 1 回送ってから `tools/call`。覚えた相手への以後の呼び出しは `tools/call` だけ。`MCP-Protocol-Version` の札は付けない（旧式の扱いで素通し）。
+- **Rationale**: MCP の決まりに沿い、答えの `serverInfo` でも相手が MCP の受け口であることを確かめられる。無状態なので、毎回送り直す要は無い。
+
+### Decision: 読み込みの終わりは `pasta.log` の印の行で待つ
+
+- **Context**: 要件 4.3・4.4・5.3・5.8。areka の `reload` は待たない。SSP は未実測。
+- **Alternatives**: (1) `get_status` が答えるまで待つ。(2) `reload` の答えを信じる。(3) `pasta.log` の増えた分に `SHIORI load entry completed` の行が出るまで待つ。
+- **Selected**: (3)。印の `loaded=false` も「読み込みの誤り」に数える。
+- **Rationale**: (1) は直後に古い SHIORI が答えて見誤る恐れがある。(2) は areka で外れる。(3) は pasta.dll 自身の行なので、ベースウェアに依らず、成否まで分かる。増えた分の誤りと警告も、同じ読み取りで取れる。
+- **Trade-offs**: ログの量を `warn` 以上にしたゴーストでは印が出ず、時間切れになる。行の文は pasta の Rust の側にあり、文が変わると黙って壊れる → 拡張の試験が Rust のソースの文字列を読んで確かめる（Revalidation Triggers）。
+
+### Decision: 「応答が無い」は 4 つの形をまとめて扱う
+
+- **Context**: 要件 4.8・4.9。HTTP で直に話すと「No response from server」の文は届かない。
+- **Selected**: `raise_event` で、⑴ 送った後に接続が切れた、⑵ 200 で本文が空、⑶ 拡張の上限（15 秒）の時間切れ、⑷ 答えの文が `No response from server` か `did not respond within` を含む、のどれでも「応答が無い」とし、`get_log(log_type="script", ghost_name=<ルート>, since_id=<送る前の最後の番号>)` を 5 秒まで引き直して台本を探す。
+- **Rationale**: ぱすた開発の「No response」は中継が見た ⑴⑵ にあたる。areka の上限は ⑷。送り直しはしない（台本が 2 回流れる）。
+
+### Decision: SSP の不正な JSON は読み直す
+
+- **Context**: survey §4.2。`get_log`（`script`）の答えの JSON は、台本の `\` がエスケープされず読めない。
+- **Selected**: `JSON.parse` が失敗したときだけ、JSON の決まりに無い `\x` を `\\x` に直してもう一度読む。直しても読めなければ「答えの形が違う」（要件 7.3）。
+- **Trade-offs**: 台本の `\n`・`\t` などは JSON のエスケープとして読まれ、改行やタブになる（表示だけの崩れ）。
+
+### Decision: 結果は専用の出力のパネル「Pasta 開発」に積む
+
+- **Context**: 要件 7.1。研究の 8 節で設計へ回した。
+- **Selected**: 新しい出力のパネル「Pasta 開発」を 1 つ作り、3 つのコマンドの結果だけを、頭に `[HH:MM:SS]` を付けて積む。今の「Pasta Language」（WASM の起動・ゴースト全体の検査の記録）とは混ぜない。
+- **Rationale**: 作者が台本と要約を見返す場所に、拡張の内部の記録を混ぜない。足す行は 1 つ。
+
+### Decision: 撤去は 1 本で、DAP の部品を残さない
+
+- `package.json` の DAP の部品・3 ファイル・6 本の試験・mock の debug の部分を消す。`host` の廃止（`ponytail-editor-tooling` から受け継いだ監査 10 番・要件 12.3 の再輸出）は、ファイルごと消えるので片付く。
+- 撤去で `activationEvents` は `onLanguage:pasta` だけになる。コマンドパレットからの起動は、VSCode 1.74 からの「宣言したコマンドで起動する」働きで足りる。
+
+## Synthesis（設計の段）
+
+- **Generalization**: 3 つのコマンドは「ゴーストを決める → 相手を決める → 送る → ディスクで確かめる → 出す」の同じ形である。共通の部品を 2 つ（`mcpClient`・`ghostFiles`）にし、「▶ シーンを実行」は「SHIORI をリロード」の流れ（`reloadAndWait`）をそのまま呼ぶ。
+- **Build vs Adopt**: MCP の公式の TypeScript SDK（`@modelcontextprotocol/sdk`）は依存が増えるので採らない（brief の制約）。使うのは `initialize` と `tools/call` の 2 つだけで、どちらも JSON の単発応答である。TOML の読み手も採らず、`[logging] file_path` の 1 行だけを読む。HTTP は Node の組み込みの `fetch`、真似るサーバーは `node:http`。
+- **Simplification**: 進み具合は VSCode の `withProgress`（窓の下の帯。やり取りの間だけ）。ステータスバーの項目は作らない。ゴーストごとの覚えは窓の間だけの `Map`（保存しない）。時間の値は定数（設定にしない）。`CHANGELOG.md` は触らない。
+
+## Risks & Mitigations（設計の段）
+
+- `pasta.log` の印が出ないゴースト（`[logging] level = "warn"` など・`pasta.toml` が壊れてロガーを登録する前に止まる） → 時間切れの知らせに「`pasta.log` に読み込みの終わりの行が出なかった」ことと、ログの量の設定を確かめる案内を添える。ベースウェアの誤りの記録はそれでも要約する（要件 5.8）。
+- `pasta.log` の印の文が pasta の側で変わる → 拡張の試験が `crates/pasta_shiori/src/windows.rs`・`v3.rs` の文字列を読んで確かめる。
+- SSP の `reload` の答えの文と、`get_log` の `script` の表示の語（`Ghost:OnPastaSceneAt` か）が未実測 → 拡張は答えの文に頼らない（印で待つ）。台本の引き直しは、表示の語にイベント名が入る記録を先に選び、無ければ送った後の最初の記録を使う。出す前の実機の 1 回で確かめる。
+- SSP の MCP の窓口が既定で開いているかが未確認 → 見つからないときの知らせとマニュアルに、SSP の設定（SSTP サーバー・MCP）を確かめる案内を書く。
+- VSCode のプロキシの設定が組み込みの `fetch` に効く版（1.94 前後の `http.fetchAdditionalSupport`）で、127.0.0.1 がプロキシへ回る恐れ → ふつうはループバックを除く。出す前の実機の 1 回で確かめ、回るなら `node:http` の直の呼び出しに替える（Open Question）。
+
+## 設計の関門（design-review-gate）
+
+- 1 回目: 機械の照合は通った（要件の番号 67 個がすべて design.md と追跡の表にある・境の 4 節が埋まっている・ファイルの計画にパスがある・部品はすべてファイルを持つ）。判断で 4 つを直した: 依存の向きの書き方が逆だった／`dumpVariables` が `reloadShiori` の型に頼ることを図と文に足した／`clientInfo.version` に拡張の版を読み込む仕組み（要らない）を消して固定の値にした／流れの試験を `test:e2e` へ入れることを書いた。条件付きで触る持ち場の外のファイル（要件 9.9）と生成物を Modified Files に足した。
+- 2 回目: 直しの後の照合も通った。要件と設計の食い違い（spec の穴）は無かった。
+
+## References（設計の段）
+
+- areka `doc/ssp-mcp/survey.md`（SSP 2.9.05・2.9.07 の実測の正本）・`transport-diff-areka.md`・`bridge-diff-areka.md`・`areka-tools.md`・`log-convention.md`
+- areka `crates/areka-mcp/src/dispatch.rs`・`gate.rs`・`tools/{get_log,reload,raise_event,get_active_ghost_list}.rs`、`crates/areka/src/mcp/reload.rs`
+- ukadoc「その他の機能」<https://ssp.shillest.net/ukadoc/ssphelp/other.html>（MCP の節。survey の出典）
+- `debug-mcp-runtime` の要件の決まり（side-session-notes `debug-mcp-runtime-requirements-decisions.md`・ブランチ `claude/kiro-start-debug-mcp-runtime-c5413c` の `a5b4f0ff`）
