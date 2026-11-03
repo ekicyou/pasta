@@ -340,6 +340,56 @@ export const createdFileSystemWatchers: MockFileSystemWatcher[] = [];
 /** Every line written to an output channel created via window.createOutputChannel. */
 export const outputLines: Array<{ channel: string; message: string }> = [];
 
+/** Names of output channels on which show() was called (in order). */
+export const shownOutputChannels: string[] = [];
+
+// --- quick pick / progress / document save -------------------------------------
+
+/**
+ * Programmable result for the NEXT window.showQuickPick call: the label of the
+ * item the "author picked", or `undefined` to close the pick. Consumed once.
+ */
+export let nextQuickPickSelection: string | undefined = undefined;
+export function setNextQuickPickSelection(label: string | undefined): void {
+  nextQuickPickSelection = label;
+}
+/** Every showQuickPick call: the offered labels and the options passed. */
+export const quickPickCalls: Array<{ items: string[]; options: unknown }> = [];
+
+export enum ProgressLocation {
+  SourceControl = 1,
+  Window = 10,
+  Notification = 15,
+}
+/** Options of every window.withProgress call (in order). */
+export const progressCalls: unknown[] = [];
+
+/** Every TextDocument.save() call on documents made by createTextDocument. */
+export const savedDocuments: Array<{ path: string; ok: boolean }> = [];
+
+/**
+ * A fake open document for workspace.textDocuments. save() is recorded in
+ * savedDocuments and resolves `saveResult` (default true; true also clears isDirty).
+ */
+export function createTextDocument(path: string, opts: { isDirty?: boolean; languageId?: string; saveResult?: boolean } = {}) {
+  const uri = Uri.file(path);
+  const doc = {
+    uri,
+    fileName: uri.fsPath,
+    languageId: opts.languageId ?? 'pasta',
+    isDirty: opts.isDirty ?? true,
+    save: (): Promise<boolean> => {
+      const ok = opts.saveResult ?? true;
+      savedDocuments.push({ path: uri.path, ok });
+      if (ok) {
+        doc.isDirty = false;
+      }
+      return Promise.resolve(ok);
+    },
+  };
+  return doc;
+}
+
 // --- namespaces ---------------------------------------------------------------
 
 /** All diagnostic collections created via languages.createDiagnosticCollection (in order). */
@@ -374,8 +424,28 @@ export const window = {
   createOutputChannel: (name: string) => ({
     name,
     appendLine: (message: string) => { outputLines.push({ channel: name, message }); },
+    show: (_preserveFocus?: boolean) => { shownOutputChannels.push(name); },
     dispose: () => {},
   }),
+  showQuickPick: async <T extends string | { label: string }>(
+    items: readonly T[] | Thenable<readonly T[]>,
+    options?: unknown,
+  ): Promise<T | undefined> => {
+    const resolved = await items;
+    const labels = resolved.map((i) => (typeof i === 'string' ? i : i.label));
+    quickPickCalls.push({ items: labels, options });
+    const selection = nextQuickPickSelection;
+    nextQuickPickSelection = undefined;
+    const index = selection === undefined ? -1 : labels.indexOf(selection);
+    return index < 0 ? undefined : resolved[index];
+  },
+  withProgress: <R>(
+    options: unknown,
+    task: (progress: { report(value: { message?: string; increment?: number }): void }, token: unknown) => Thenable<R>,
+  ): Thenable<R> => {
+    progressCalls.push(options);
+    return task({ report: () => {} }, { isCancellationRequested: false, onCancellationRequested: new EventEmitter<unknown>().event });
+  },
   showErrorMessage: (message: string, ...items: string[]) => {
     shownMessages.push({ kind: 'error', message, items: items.length ? items : undefined });
     return Promise.resolve(undefined);

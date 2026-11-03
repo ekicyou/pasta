@@ -814,6 +814,56 @@ test('word-ref decorator re-applies on active-editor change and document edits',
 });
 
 // =============================================================================
+// mock/vscode — 3 つのコマンドの流れで使う API が記録を残す（タスク 2.2・要件 8.1）
+// =============================================================================
+
+test('mock: showQuickPick は決めた選択を返し、次は閉じた（undefined）になる', async () => {
+  const before = mock.quickPickCalls.length;
+  const items = [{ label: 'SSP（127.0.0.1:9801）' }, { label: 'areka（127.0.0.1:9821）' }];
+  mock.setNextQuickPickSelection('areka（127.0.0.1:9821）');
+  assert.strictEqual(await mock.window.showQuickPick(items, { placeHolder: 'p' }), items[1]);
+  assert.strictEqual(await mock.window.showQuickPick(items), undefined, 'selection is consumed once');
+  assert.strictEqual(mock.quickPickCalls.length, before + 2);
+  assert.deepStrictEqual(mock.quickPickCalls[before], { items: items.map((i) => i.label), options: { placeHolder: 'p' } });
+});
+
+test('mock: withProgress は記録して task の値を返す', async () => {
+  const before = mock.progressCalls.length;
+  const opts = { location: mock.ProgressLocation.Window, title: 'Pasta: x' };
+  const value = await mock.window.withProgress(opts, async (progress) => { progress.report({ message: 'm' }); return 42; });
+  assert.strictEqual(value, 42);
+  assert.deepStrictEqual(mock.progressCalls.slice(before), [opts]);
+  assert.strictEqual(mock.ProgressLocation.Window, 10);
+});
+
+test('mock: 出力のパネルの show と書いた行が残る', () => {
+  const ch = mock.window.createOutputChannel('Pasta-2.2');
+  const before = mock.shownOutputChannels.length;
+  ch.appendLine('line');
+  ch.show(true);
+  assert.deepStrictEqual(mock.shownOutputChannels.slice(before), ['Pasta-2.2']);
+  assert.deepStrictEqual(mock.outputLines[mock.outputLines.length - 1], { channel: 'Pasta-2.2', message: 'line' });
+});
+
+test('mock: 文書の save() は記録され、成否を試験が決められる。textDocuments は差し替えられる', async () => {
+  const ok = mock.createTextDocument('/g/ghost/master/dic/a.pasta');
+  const ng = mock.createTextDocument('/g/ghost/master/pasta.toml', { saveResult: false });
+  mock.workspace.textDocuments = [ok, ng];
+  assert.deepStrictEqual(mock.workspace.textDocuments.map((d) => d.fileName), [ok.fileName, ng.fileName]);
+  const before = mock.savedDocuments.length;
+  assert.strictEqual(ok.isDirty, true);
+  assert.strictEqual(await ok.save(), true);
+  assert.strictEqual(ok.isDirty, false);
+  assert.strictEqual(await ng.save(), false);
+  assert.strictEqual(ng.isDirty, true);
+  assert.deepStrictEqual(mock.savedDocuments.slice(before), [
+    { path: ok.uri.path, ok: true },
+    { path: ng.uri.path, ok: false },
+  ]);
+  mock.workspace.textDocuments = [];
+});
+
+// =============================================================================
 // extension.ts (real activate) — WASM init + ghost validator wiring
 // =============================================================================
 // Run LAST: activate registers persistent listeners on the shared mock emitters.

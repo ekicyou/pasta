@@ -17,7 +17,7 @@
   - 終わったとき: `npm test` が通り、宣言の試験が `debuggers`・`breakpoints`・`onDebug`・`debug/toolBar`・`debugType` の不在を確かめている。
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 8.3_
 
-- [ ] 2. 試験の土台
+- [x] 2. 試験の土台
 - [x] 2.1 MCP の窓口を真似る試験用のサーバーを作る
   - `127.0.0.1` の番号 0 で立ち、`POST /api/mcp/v1` だけを受ける。`Accept` に 2 つの型が無ければ 406、`Host` がループバックでなければ 403（areka と同じ）。
   - 状態として、ベースウェアの名前・動いているルートの集合（大文字・小文字と区切りを同じとみなす）・誤りと台本の記録（通しの番号）・受けた `tools/call` の記録を持つ。
@@ -25,7 +25,7 @@
   - 受けて黙る（答えの頭を返さない）番号も立てられる。
   - 終わったとき: 小さな自己確かめ（立てて `initialize` を送ると `serverInfo` が返り、`Accept` の欠けは 406・外れた `Host` は 403、`get_property` が動いているルートだけに名前を返す）が node で通る。
   - _Requirements: 8.1, 8.2_
-- [ ] 2.2 (P) 試験の真似の vscode に、3 つのコマンドの流れで使う API を足す
+- [x] 2.2 (P) 試験の真似の vscode に、3 つのコマンドの流れで使う API を足す
   - `window.showQuickPick`（試験が決めた選択か、閉じたことを返す）・`window.withProgress` と `ProgressLocation`・出力のパネルの `show` と書いた行の記録・文書の `save()` の記録（成否を試験が決められる）・`workspace.textDocuments` の差し替えを足す。
   - 終わったとき: 今の試験が全部通ったまま、新しい API を呼ぶと記録に残ることを確かめる小さな項が通る。
   - _Boundary: mock/vscode_
@@ -169,3 +169,4 @@
 
 ## Implementation Notes
 - 2.1: fakeMcpServer は startFakeMcpServer(init?) が {port,state,addLog,close} を返し、state を直に書き換えて振る舞いを変える。自己確かめは src/test/fakeMcpServer.selfcheck.ts（6.3 で列に入れるか決める）。「200 で本文が空」を出すモードは未実装（要るなら raiseEvent.mode に足す）。
+- 2.2: mock の showQuickPick は setNextQuickPickSelection(ラベル) で 1 回だけ選ぶ（未設定は閉じた扱い）。文書は createTextDocument(path,{isDirty,languageId,saveResult})。記録は配列で slice(before) で見る。
