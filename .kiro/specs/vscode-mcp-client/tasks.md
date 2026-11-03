@@ -118,7 +118,7 @@
   - 終わったとき: `npm test`（`test:grammar`・`test:unit`・`test:e2e`）が全部通り、`git diff --stat` に `package-lock.json` が無い。
   - _Requirements: 1.4, 1.5, 4.1, 5.1, 6.1, 8.1, 8.3, 8.4_
 
-- [ ] 7. マニュアル・スキル・README
+- [x] 7. マニュアル・スキル・README
 - [x] 7.1 (P) デバッグの章の入口と導入の頁を書き直す
   - 章の入口は、拡張と AI エージェントが SSP・areka の MCP へ送り pasta.dll が答える全体像と、`[debug] enabled = true`（か `PASTA_DEBUG=1`）が要ること・書いた後に読み込み直すことを書く。見出し「デバッグの有効化」「pasta.toml による有効化」「環境変数による有効化」「優先順位」を残す。有効になったかの確かめは、`debug-mcp-runtime` の設計の新しい info の行の文言で書く（決まっていなければ、あちらの要件の言い方で書く）。「無効時のゼロコスト」「ポートを変更するときの注意」は消す。
   - 導入の頁は、拡張の導入・SSP と areka の MCP の窓口（番号の列・127.0.0.1 だけ・設定は無い）・前の版から移るとき（`launch.json` の pasta の構成と `[debug]` の `port`・`present_as`・`source_map_sidecar` はもう効かず消してよい）を書く。
@@ -145,7 +145,7 @@
   - 終わったとき: 2 つの README に DAP・ブレークポイント・提示モードの言葉が残っていない。
   - _Boundary: Readmes_
   - _Requirements: 11.1, 11.2_
-- [ ] 7.5 頁を消し、目次と章の検査を合わせ、マニュアルの検証を通す
+- [x] 7.5 頁を消し、目次と章の検査を合わせ、マニュアルの検証を通す
   - `source-level.md` と `constraints.md` を消し、`SUMMARY.md` のデバッグの行から外す。`validate.md` は変えない。
   - `verify-content.mjs` の G 節の頁の一覧を `index`・`vscode-setup`・`dev-actions`・`troubleshooting` にし、必須の言葉を `PASTA_DEBUG`・`.pasta`・`OnPastaSceneAt`・`[debug]`・`MCP`・`baseware.name` にする（`9276`・`attach`・`sourcePresentation` を外す）。
   - その時の `main` に `debug-mcp-runtime` が入っていなければ、消す頁を引く行（`reference/pasta-toml.md` の提示モードの切替へのリンク・`internals/debug.md` の 2 頁へのリンク・`DEBUGGING.md` の頁の一覧）を最小に直し（外すか残る頁へ向ける）、`gen-skill-refs.mjs` で references を作り直してから `--check` をもう一度走らせる。入っていれば直さず rebase で合わせる。

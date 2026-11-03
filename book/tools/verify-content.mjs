@@ -439,7 +439,7 @@ function listChapters(dirs) {
 // ============================================================
 // isSubstantive / hasVoice / stripCodeFences / extractCodeFences / NARRATION_MARKERS を再利用し、
 // 文法章ループ（GRAMMAR_CHAPTERS）と同型のイディオムでアサートする。
-const DEBUG_CHAPTERS = ['index', 'vscode-setup', 'source-level', 'constraints', 'troubleshooting'];
+const DEBUG_CHAPTERS = ['index', 'vscode-setup', 'dev-actions', 'troubleshooting'];
 
 for (const ch of DEBUG_CHAPTERS) {
   const rel = `${SRC}/debug/${ch}.md`;
@@ -488,7 +488,7 @@ for (const ch of DEBUG_CHAPTERS) {
     .filter((rel) => exists(rel))
     .map((rel) => read(rel))
     .join('\n');
-  const FACTS = ['9276', 'PASTA_DEBUG', 'attach', '.pasta', 'sourcePresentation'];
+  const FACTS = ['PASTA_DEBUG', '.pasta', 'OnPastaSceneAt', '[debug]', 'MCP', 'baseware.name'];
   const missing = FACTS.filter((kw) => !allDebug.includes(kw));
   assert(
     'G-fact',

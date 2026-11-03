@@ -123,7 +123,7 @@ TCP 127.0.0.1:<port> ── DAP クライアント（1 接続だけ）
 有効化の判定は `DebugConfig::resolve` だけで行う。入力は `[debug]` の解析結果（`DebugFileConfig`）、環境変数 `PASTA_DEBUG`・`PASTA_DEBUG_PORT`・`PASTA_DEBUG_SOURCE_MODE`・`PASTA_DEBUG_SOURCE_MAP_SIDECAR` の解析結果、DAP の `attach` で渡された提示モードである。`resolve` は環境変数を読まない純粋な関数で、`from_env` が環境変数を読んで `resolve` に渡す。真偽値の環境変数は `parse_env_bool` で解析し、解釈できない値は「未指定」として扱う。
 
 - `enabled` が偽のとき、`listen` は必ず `None` になる。真のときだけ `127.0.0.1:<port>` の `SocketAddr` を作る。ホストは定数で、設定で変える経路は無い。
-- 各値の優先順位と既定値は利用者向け章が正である（[優先順位](../debug/index.md#優先順位)・[初期モードの指定](../debug/source-level.md#初期モードの指定)・[サイドカー出力（任意）](../debug/source-level.md#サイドカー出力任意)）。`from_env` の段階では `attach` の値は無く、`attach` による上書きは後述の wiring が実効モードに書き込む形で行う。
+- 各値の優先順位と既定値は利用者向け章が正である（[優先順位](../debug/index.md#優先順位)）。`from_env` の段階では `attach` の値は無く、`attach` による上書きは後述の wiring が実効モードに書き込む形で行う。
 
 判定はローダとランタイムで 2 回行うが、入力は同じである。ローダは段階 5.5 で `DebugConfig::from_env` を呼び、有効ならソースマップを作る。`PastaLuaRuntime::from_loader_with_scene_dic` は `RuntimeConfig::with_debug_from_file_and_env` で同じ解決を `RuntimeConfig::debug` に載せ、`with_config_and_source_map` が `debug::enable` を 1 回だけ呼ぶ。ランタイムがソースマップを保持するかは、待ち受けが立ったかではなく、解決した設定の `enabled` で決まる。有効なら、待ち受けのポートが取れず `debug::enable` が `None` を返したとき（警告を出してデバッグなしで続くとき）も、ソースマップを保持し、シーン identity 索引も作る。位置でのシーンの再生がこれを使う（[位置でのシーンの再生](#位置でのシーンの再生)）。無効ならローダがソースマップを作らないため、ランタイムは何も保持しない。
 
@@ -270,7 +270,7 @@ on_line_impl(lua, debug)
 | `SetBreakpoints` | `BreakpointSet` に適用して待ち続ける（bridge はこのコマンドを転送しないため、本番の経路では届かない） |
 | チャネルの切断 | VM を進める |
 
-停止理由として送るのは `breakpoint` と `step` だけである。停止中は VM のスレッドが止まるため、SHIORI ではアクタースレッドが止まり、後続のリクエストも処理されない。利用者から見たこの制約と緩和策は [構造的制約と緩和策](../debug/constraints.md) が正である。セッションと `BreakpointSet` はランタイムと同じ寿命で、リクエストをまたいで保たれる。
+停止理由として送るのは `breakpoint` と `step` だけである。停止中は VM のスレッドが止まるため、SHIORI ではアクタースレッドが止まり、後続のリクエストも処理されない。セッションと `BreakpointSet` はランタイムと同じ寿命で、リクエストをまたいで保たれる。
 
 ### ブレークポイント
 

@@ -804,7 +804,7 @@ present_as = "lua"
 ```
 
 - 環境変数（`PASTA_DEBUG`・`PASTA_DEBUG_PORT` など）が設定されていると、`[debug]` の値より優先される。
-- 有効化の手順と優先順位は [デバッグ概要](../debug/index.md#pastatoml-による有効化)、提示モードとサイドカーは [.pasta ソースレベルのデバッグ操作](../debug/source-level.md#提示モードの切替) を参照する。
+- 有効化の手順と優先順位は [デバッグ概要](../debug/index.md#pastatoml-による有効化)を参照する。
 
 ---
 
