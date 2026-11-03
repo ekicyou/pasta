@@ -228,3 +228,4 @@
 - 完了時にその場で解決: `pasta_core` の `scene_registry.rs` のコメントに残っていたキックの言い方を、シーンマップと `OnPastaSceneAt` の言い方に直した（本 spec の外のクレート）。
 - 完了時にその場で解決: design.md の New Files に `v3_load_entry_log_test.rs` を足した。
 - 完了時に残したもの: `code_gen/element_gen.rs:447` のコメントの「breakpoints」は、ウェーブの約束（このウェーブではどの spec も `element_gen.rs` に触らない）のため直していない。次にこのファイルを触る spec で 1 語直せばよい。
+- 完了時の棚卸: その場で解決 2 件・申し送り 1 件（`shiori4-v4-host` の brief へ、`spawn_actor_thread_with` の引数と `RuntimeConfig` の欄）・起票 0 件。
