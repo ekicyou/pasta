@@ -1,0 +1,63 @@
+＃ 別ファイル.pasta - 別の .pasta の Lua のブロックの GLOBAL 関数で止まる例（debug-mcp-runtime task 7.3）
+＃ 1 つ目のファイルの ＊OnCross から呼ぶ。止まった行の番号は 1 つ目のファイルの行の対応にも入る。
+
+＊別ファイルの関数
+```lua
+-- 下の空行は、止まる行（return data.別）の Lua の行の番号を ＊OnCross の行の対応（Lua の 67 行）に重ねるため
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function GLOBAL.別の関数(act)
+    local data = nil
+    return data.別
+end
+```

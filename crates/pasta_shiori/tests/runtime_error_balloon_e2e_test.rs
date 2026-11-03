@@ -7,6 +7,9 @@
 //! `[logging] balloon_warning` を書き足して（書かない・false・型違い）、
 //! 別名 `＊会話` のローカルシーンの Lua のブロック・作者の `scripts/天気.lua`・REG のハンドラ・
 //! `On` で始まらない ID・NOTIFY で止まる場合を起こす。
+//!
+//! 仕様 `debug-mcp-runtime` task 7.3（requirements 6.1, 6.2, 6.3, 9.2）で、別の `.pasta`
+//! （`dic/別ファイル.pasta`）の `GLOBAL` 関数と `dic/道具.lua` の関数で止まる場合を足した。
 
 mod common;
 
@@ -21,10 +24,11 @@ const UNSET: Option<&str> = None;
 const OFF: Option<&str> = Some("false");
 const MISTYPED: Option<&str> = Some("\"no\"");
 
-/// 要求の結果: 各要求の応答の全文と、ログの警告（文言だけ）
+/// 要求の結果: 各要求の応答の全文と、ログの警告（文言だけ）と、1 つ目の `.pasta` を変換した Lua
 struct Run {
     raws: Vec<String>,
     warns: Vec<String>,
+    scene_lua: String,
 }
 
 impl Run {
@@ -103,7 +107,16 @@ fn run(balloon_warning: Option<&str>, requests: &[(&str, &str)]) -> Run {
         // 呼び出し元の位置（一時ディレクトリのパスを含む）は除く
         .map(|(_, rest)| rest.split(" lua_source=").next().unwrap().to_string())
         .collect();
-    Run { raws, warns }
+    let scene_lua = std::fs::read_to_string(
+        temp.path()
+            .join("profile/pasta/cache/lua/pasta/scene/runtime_error_balloon.lua"),
+    )
+    .expect("transpiled cache of the first .pasta");
+    Run {
+        raws,
+        warns,
+        scene_lua,
+    }
 }
 
 /// GET を 1 つ送る
@@ -265,4 +278,60 @@ fn test_next_request_after_notation_is_normal() {
     let value = next.value.unwrap();
     assert!(value.contains("普通のトーク"), "{value}");
     assert!(!value.contains('【'), "{value}");
+}
+
+/// 1 つ目のファイルの ＊OnCross から呼んだ、別の `.pasta` の `GLOBAL` 関数で止まると、場所を出さない（6.2）。
+/// 止まった Lua の行の番号が ＊OnCross の行の対応にも入ることを先に確かめる（番号が重なっても違うファイルの行を出さない）
+#[test]
+fn test_global_fn_in_other_pasta_shows_no_location() {
+    let on = get(UNSET, "OnCross");
+    let off = get(OFF, "OnCross");
+
+    // 止まった行: 理由の行の `別ファイル.lua:<行>:`
+    let reason = off.resp(0).headers["X-Error-Reason"].clone();
+    let line = reason
+        .split_once("別ファイル.lua:")
+        .and_then(|(_, rest)| rest.split(':').next())
+        .unwrap_or_else(|| panic!("no stop line: {reason}"));
+    // 実行中のシーンの行の対応 "<.pasta>|<lua の行>:<pasta の行>,..."
+    let map = off
+        .scene_lua
+        .lines()
+        .find(|l| l.contains("init_scene(SCENE, \"OnCross\", nil, [["))
+        .and_then(|l| l.split_once("[[dic\\runtime_error_balloon.pasta|"))
+        .and_then(|(_, rest)| rest.split(']').next())
+        .unwrap_or_else(|| panic!("no line map of ＊OnCross:\n{}", off.scene_lua));
+    assert!(
+        map.split(',')
+            .any(|pair| pair.split(':').next() == Some(line)),
+        "stop line {line} must be in the line map {map}"
+    );
+
+    let notation = expect_notation(&on.resp(0), &off.resp(0), "別の途中");
+    assert_eq!(
+        notation,
+        "【スクリプトのエラー：＊OnCross（attempt to index local 'data' (a nil value)）】"
+    );
+    expect_one_warning(
+        &on,
+        "スクリプトのエラー：＊OnCross（attempt to index local 'data' (a nil value)）",
+    );
+}
+
+/// シーンから呼んだ `dic/道具.lua` の関数で止まると、`dic\道具.lua:N:` が出る（6.3）
+#[test]
+fn test_dic_lua_error_shows_its_location() {
+    let on = get(UNSET, "OnTool");
+    let off = get(OFF, "OnTool");
+    let notation = expect_notation(&on.resp(0), &off.resp(0), "道具の途中");
+    assert_eq!(
+        notation,
+        "【スクリプトのエラー：＊OnTool（dic\\\\道具.lua:6: \
+         attempt to index local 'tool' (a nil value)）】"
+    );
+    expect_one_warning(
+        &on,
+        "スクリプトのエラー：＊OnTool（dic\\道具.lua:6: \
+         attempt to index local 'tool' (a nil value)）",
+    );
 }
