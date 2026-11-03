@@ -159,7 +159,7 @@
   - _Requirements: 7.7_
 
 - [ ] 9. どのタスクにも属さない結合テストを足す
-- [ ] 9.1 (P) リロードでの切り替え・古いキー・JIT を確かめる
+- [x] 9.1 (P) リロードでの切り替え・古いキー・JIT を確かめる
   - 同じフォルダを `enabled = true` → `false` → `true` で読み直し、`debug_enabled()` と `OnPastaScene` の 200・204 が切り替わる
   - `[debug]` に `port = "x"`・`present_as = "lua"`・`source_map_sidecar = true` を書いても読み込みが通り、有効で、警告が無く、`.lua.map` が無い
   - 有効な VM で `jit.status()` が真

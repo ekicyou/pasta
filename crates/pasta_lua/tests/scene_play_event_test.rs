@@ -11,6 +11,8 @@
 //! - デバッグが無効なら 204、見つからないときは 200 で失敗の表記（要件 4.4・5.1・5.3・7.1・7.4、task 4.2）
 //! - `OnPastaDumpVariables` は有効なとき 204 で `variables.toml` を書き、無効・external なら
 //!   204 と警告で書かない（debug-mcp-runtime 4.2・4.3・5.1〜5.3・5.6）
+//! - リロードで有効・無効が切り替わり、JIT が働き、`[debug]` の古いキーは警告なく読み飛ばす
+//!   （debug-mcp-runtime 1.2・3.2・3.3・3.8）
 //!
 //! `PASTA_DEBUG` の中和は `common` の `#[ctor]` に従う。
 
@@ -383,6 +385,55 @@ fn debug_enabled_startup_log_line_only_when_enabled() {
         "{disabled_log}"
     );
     assert!(!disabled_log.contains(LINE), "{disabled_log}");
+}
+
+/// debug-mcp-runtime 3.2・1.2: 同じフォルダを有効 → 無効 → 有効で読み直すと、`debug_enabled()` と
+/// `OnPastaScene` の 200・204 が切り替わり、どの VM でも JIT が働く。
+#[test]
+fn reload_toggles_debug_and_keeps_jit() {
+    let temp = tempfile::TempDir::new().unwrap();
+    for enabled in [true, false, true] {
+        let runtime = load_ghost(
+            temp.path(),
+            &format!("[loader]\ndebug_mode = true\n\n[debug]\nenabled = {enabled}\n"),
+        );
+        assert_eq!(runtime.debug_enabled(), enabled, "debug_enabled()");
+        let response = request(&runtime, "OnPastaScene", &["再生大域"]);
+        if enabled {
+            assert!(value_of_200(&response).contains("大域の声"), "{response:?}");
+        } else {
+            assert_204(&response, "disabled after reload");
+        }
+        assert!(
+            lua_bool(&runtime, "return jit.status()"),
+            "JIT must be on (enabled = {enabled})"
+        );
+        drop(runtime);
+    }
+}
+
+/// debug-mcp-runtime 3.3・3.8: `[debug]` に古いキーが残っていても読み込みが通り、有効で、
+/// 警告が無く、`.lua.map` を作らない。
+#[test]
+fn old_debug_keys_are_skipped_silently() {
+    pasta_lua::init_tracing();
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_ghost(
+        temp.path(),
+        "[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\nport = \"x\"\npresent_as = \"lua\"\nsource_map_sidecar = true\n",
+    );
+    assert!(runtime.debug_enabled(), "debug_enabled() must be true");
+
+    // ランタイムと登録簿の両方が手放すとロガーが破棄され、ログがフラッシュされる。
+    drop(runtime);
+    pasta_lua::GlobalLoggerRegistry::instance().unregister(temp.path());
+    let log = std::fs::read_to_string(temp.path().join("profile/pasta/logs/pasta.log")).unwrap();
+    assert!(log.contains("Startup sequence completed"), "{log}");
+    assert!(!log.contains("WARN"), "no warning expected: {log}");
+
+    let pattern = format!("{}/**/*.lua.map", temp.path().display());
+    let maps: Vec<_> = glob::glob(&pattern).unwrap().collect();
+    assert!(maps.is_empty(), "no .lua.map expected: {maps:?}");
 }
 
 /// 書き出す先（ghost/master/ から見たパス）
