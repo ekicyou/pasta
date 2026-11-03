@@ -4,7 +4,7 @@
 // vscode に触らない純粋なモジュール。再生は頼まない（5.9）。時計を持たず、待ちは ctx.sleep の回数で数える。
 
 import * as path from 'path';
-import { CALL_TIMEOUT_MS, CallResult, Endpoint, callTool, lastLogId, parseLogEntries } from './mcpClient';
+import { CALL_TIMEOUT_MS, CallResult, Endpoint, callTool, describeResult, lastLogId, parseLogEntries } from './mcpClient';
 import {
   GhostTarget, PastaLogLocation, loadCompletion, openLogCursor, parsePastaLogLine, pastaLogPath, readNewLines, readText,
 } from './ghostFiles';
@@ -40,15 +40,6 @@ export type ReloadOutcome =
       pastaLogReadable: boolean;
       pastaLog: PastaLogLocation;     // 場所と、file_path を読めなかったときの添え書き
     };
-
-/** CallResult の失敗を 1 行で */
-export function describeResult(r: CallResult): string {
-  switch (r.kind) {
-    case 'ok': case 'ng': return r.text;
-    case 'rpcError': return `JSON-RPC error ${r.code}: ${r.message}`;
-    default: return r.detail;
-  }
-}
 
 export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
   const { endpoint: { port }, ghost: { root, master }, timing } = ctx;

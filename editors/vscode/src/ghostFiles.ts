@@ -88,6 +88,8 @@ export interface PastaLogLocation {
 }
 
 export const DEFAULT_PASTA_LOG = 'profile/pasta/logs/pasta.log';
+/** デバッグを有効にする案内の通知（RunScene の 4.10・DumpVariables の 6.3 が同じ文を使う） */
+export const DEBUG_HINT = 'pasta.toml に [debug] enabled = true を書いてリロードしてください';
 /**
  * pasta.log の場所（5.6）。pasta.toml の [logging] file_path を 3 つの書き方で読み、pasta の logger.rs と同じ条件
  * （最初の部品が profile で後に部品がある・`..` 無し・絶対パスでない）に合えば使う。書かれていなければ既定。書かれているのに読めない・外れるときは既定と note

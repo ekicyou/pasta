@@ -3,9 +3,9 @@
 //
 // vscode に触らない純粋なモジュール。時計を持たず、待ちは ctx.sleep の回数で数える。
 
-import { CallResult, LogEntry, callTool, lastLogId, parseLogEntries, readRaiseEvent } from './mcpClient';
-import { openLogCursor, parsePastaLogLine, readNewLines } from './ghostFiles';
-import { FlowContext, ReloadOutcome, blocksPlayback, describeResult, formatReload, reloadAndWait } from './reloadShiori';
+import { CallResult, LogEntry, callTool, describeResult, lastLogId, parseLogEntries, readRaiseEvent } from './mcpClient';
+import { DEBUG_HINT, openLogCursor, parsePastaLogLine, readNewLines } from './ghostFiles';
+import { FlowContext, ReloadOutcome, blocksPlayback, formatReload, reloadAndWait } from './reloadShiori';
 
 /** [fsPath, String(line1)]。line1 は 1 から数えた行（4.6） */
 export function sceneReferences(fileFsPath: string, line1: number): readonly [string, string] {
@@ -93,7 +93,7 @@ export function formatScene(outcome: SceneOutcome): { lines: string[]; notice?: 
       return { lines };
     case 'noScript':
       lines.push(NO_SCRIPT_GUIDE, ...outcome.reasons.map((r) => `  ${r}`));
-      return { lines, notice: 'pasta.toml に [debug] enabled = true を書いてリロードしてください' };
+      return { lines, notice: DEBUG_HINT };
     case 'unconfirmed': {
       const text = `${UNCONFIRMED}（応答が無く、再生の記録にも見つかりませんでした: ${outcome.detail}）`;
       lines.push(text);

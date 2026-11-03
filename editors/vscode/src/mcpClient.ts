@@ -32,6 +32,15 @@ export type CallResult =
   | { kind: 'noResponse'; detail: string }               // dropped after writing, empty body, or timeout
   | { kind: 'badShape'; detail: string };                // non-200, not JSON, or wrong result shape
 
+/** CallResult の失敗を 1 行で */
+export function describeResult(r: CallResult): string {
+  switch (r.kind) {
+    case 'ok': case 'ng': return r.text;
+    case 'rpcError': return `JSON-RPC error ${r.code}: ${r.message}`;
+    default: return r.detail;
+  }
+}
+
 let nextId = 1;
 
 /** The parts of a JSON-RPC answer this client reads. */
