@@ -193,16 +193,19 @@ fn log_levels_and_debug_port_stay_per_instance() {
     // 量（5.4）: A は debug を書き、B は debug を書かない。
     assert!(levels(&log_a).contains(&"DEBUG"), "A logs debug:\n{log_a}");
     assert!(!levels(&log_b).contains(&"DEBUG"), "B:\n{log_b}");
-    // B の pasta.toml を読む前の 2 行（読み込みの開始）は既定の量で出る。読んだ後は warn 以上だけ。
+    // B の pasta.toml を読む前の 2 行（読み込みの開始）は既定の量で出る。読んだ後は warn 以上だけ
+    // （読み込みの終わりの行だけは量によらず info で出る。debug-mcp-runtime 要件 10.2）。
     let after_config = log_b
         .split_once("Starting pasta loader")
         .and_then(|(_, rest)| rest.split_once('\n'))
         .map(|(_, rest)| rest)
         .unwrap_or_else(|| panic!("B loader start line:\n{log_b}"));
     assert!(
-        levels(after_config)
-            .iter()
-            .all(|l| matches!(*l, "WARN" | "ERROR")),
+        after_config
+            .lines()
+            .filter(|l| !l.contains("SHIORI load entry completed"))
+            .filter_map(|l| l.split_whitespace().nth(1))
+            .all(|l| matches!(l, "WARN" | "ERROR")),
         "B logs warn and above only after reading pasta.toml:\n{log_b}"
     );
 

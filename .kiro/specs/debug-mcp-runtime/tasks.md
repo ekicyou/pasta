@@ -11,7 +11,7 @@
   - 完了の姿: フィルタの単体テストが通り、ほかの target の絞り方の既存テストも通る
   - _Requirements: 10.2, 10.4_
 
-- [ ] 1.2 SHIORI の読み込みの入口 2 つが、その target で終わりの行を書くようにする
+- [x] 1.2 SHIORI の読み込みの入口 2 つが、その target で終わりの行を書くようにする
   - `windows.rs`・`v3.rs` の `SHIORI load entry completed` の行に target を付ける。文と `entry`・`loaded` の欄は変えない
   - `ffi_loadu_test.rs` に結合テストを足す: `[logging] level = "warn"` のゴーストと `filter = "pasta_lua=error"` のゴーストで、`pasta.log` に `SHIORI load entry completed`・`entry=`・`loaded=true` があり、`Startup sequence completed` などほかの info が無い。辞書の壊れたゴーストでは `loaded=false` の行がある
   - v3 の入口の同じ確かめを、新しい `crates/pasta_shiori/tests/v3_load_entry_log_test.rs` に 1 本足す（v3 の入口の読み込みのログを見るテストは今は無い）
