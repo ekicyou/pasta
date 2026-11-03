@@ -1,10 +1,10 @@
 //! Scope-level code generation: actors, global scenes, local scenes.
 
 use super::LuaCodeGenerator;
-use crate::context::local_scene_counters;
+use crate::context::{local_scene_counters, scene_attr_value};
 use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
-use pasta_core::registry::SceneRegistry;
+use pasta_core::registry::{PRIORITY_KEYS, SceneRegistry, priority_value};
 use pasta_dsl::parser::{
     ActorScope, Attr, AttrBody, AttrValue, GlobalSceneScope, LocalSceneItem, LocalSceneScope,
     SceneActorItem, merge_attrs,
@@ -422,6 +422,15 @@ fn append_set_scene_attrs(
     for a in attrs {
         let key = StringLiteralizer::literalize(&a.key)?;
         items.push(match &a.body {
+            AttrBody::Decl(v)
+                if PRIORITY_KEYS.contains(&a.key.as_str())
+                    && priority_value(&scene_attr_value(v)).is_none() =>
+            {
+                return Err(TranspileError::invalid_priority(
+                    &a.span,
+                    &attr_value_text(v),
+                ));
+            }
             AttrBody::Decl(v) => format!("{{ key = {}, value = {} }}", key, attr_value_literal(v)?),
             AttrBody::Cond { op, value } => format!(
                 "{{ key = {}, op = \"{}\", value = {} }}",
@@ -438,6 +447,16 @@ fn append_set_scene_attrs(
         items.join(", ")
     ));
     Ok(())
+}
+
+/// エラーの文に出す、書いたままの値（引用した文字列は `「」` ごと）
+fn attr_value_text(v: &AttrValue) -> String {
+    match v {
+        AttrValue::Integer(n) => n.to_string(),
+        AttrValue::Float(f) => f.to_string(),
+        AttrValue::String(s) => format!("「{s}」"),
+        AttrValue::AttrString(s) => s.clone(),
+    }
 }
 
 /// 値の字句。文字列は文字列化、数は `Expr::Integer`・`Expr::Float` と同じ `{}`。
