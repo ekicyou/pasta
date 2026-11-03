@@ -139,7 +139,7 @@
   - 終わったとき: `gen-skill-refs.mjs --check` が通り、references の節がマニュアルと同じ中身になっている。
   - _Boundary: AgentGuide_
   - _Requirements: 10.1, 10.2, 10.3_
-- [ ] 7.4 (P) README を 2 つ直す
+- [x] 7.4 (P) README を 2 つ直す
   - 拡張の README の機能の一覧から「デバッガ接続（DAP）・提示モードの切り替え」を消し、3 つのコマンドと、動いている SSP・areka へ MCP で送ることを書く。
   - ルートの README のデバッグの章と VSCode 拡張の説明（38・47 行）から「`.pasta` の行で止めて調べる」「デバッガ接続」を消し、新しい働きに合わせる。
   - 終わったとき: 2 つの README に DAP・ブレークポイント・提示モードの言葉が残っていない。
