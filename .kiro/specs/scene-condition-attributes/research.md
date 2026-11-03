@@ -135,3 +135,156 @@
 
 - 同じウェーブには自分 1 本だけ。後の `scene-pick-modes` と `scene_table.rs`（`select_from_cache`・`SceneCacheKey`・`filter_by_attributes`）・`search/context.rs`・`scene.lua`・`validate/report.rs` を共有する。袋の新しい形は、あちらが重みの札と順番を足せるように決める。
 - `search/context.rs` に足すテストは別のファイルに置く（ウェーブの約束）。`grammar.pest`・パーサ・`pasta_lsp`・VSCode の文法定義には触らない。
+
+---
+
+# 設計フェーズの調べと決定（2026-11-03・`/kiro-design` の生成。ワークツリーの base は main `72f7596c` ＋ `f6268329` のテストの差分だけ）
+
+## Summary
+
+- **Feature**: `scene-condition-attributes`
+- **Discovery Scope**: Extension（既存の検索の芯と Lua の経路の拡張。新しい依存なし。軽い調べ＝`design-discovery-light`）
+- **Key Findings**:
+  - 名前で選ぶ所は `act:find_act_handler` の L2・L5 と `choice_select.lua` の直の `SCENE.search` の 2 つの口に集まる。イベントのシーンは全部 `SCENE.co_exec` → `find_handler` を通る。名指しは `SCENE.get_exact` だけで、表を渡さなければ条件を見ない形で分けられる。
+  - 今の並び（`CachedSelection { candidates, next_index }`）は「次の位置より前＝見た」なので、「見て外れた候補もその巡では使った」（要件 4.4）は印を持たずに次の位置を進めるだけで書ける。並びの形を変えずに済む。
+  - Call の今の失敗（`SCENE_NOT_FOUND`）は止まらない。要件 3.1 の「止める（エラー停止）」は、今の「止まるエラー」（`EVENT.drive` → `STOP.hold` → `STOP.response`）に 3 種目の種類を足す形で入る。
+
+## Research Log
+
+### L1 `current_scene[key]` が条件の抜け道になるか（Research Needed 1）
+
+- **Sources**: `act.lua` `find_act_handler`（358〜399 行）、`scene.lua` `create_global_table`・`SCENE.register`、`scene_registry.rs` `registered_name`（230 行、`名前_番号`）。
+- **Findings**: `current_scene` は `STORE.scenes[グローバルの登録名]` の表で、鍵は `__global_name__`・`__start__`・ローカルの登録名（`締め_1` の形）・Lua ブロックの `SCENE.名前` の関数、メタ表の `create_word`。`＞締め` は `締め` を引くので L1 に当たらず L2 へ進む。当たるのは登録名を番号ごと書いた `＞締め_1` と Lua ブロックの関数だけ。
+- **Implications**: L1 は「名前で候補を選ぶ所」ではなく 1 本を名指しする段とみなし、条件を通さない（設計の Out of Boundary）。マニュアルの段の表の説明（「Lua ブロックで定義した関数など」）のままでよい。
+
+### チェイントークの続きの act（Research Needed 2）
+
+- **Sources**: `event/init.lua` `EVENT.fire`（300〜335 行）・`EVENT.drive`（231〜277 行）、`act.lua` `ACT_IMPL.yield`（641〜655 行）、`virtual_dispatcher.lua` `check_talk`（225〜230 行）。
+- **Findings**: 続き（`STORE.co_scene`）は `EVENT.drive(co, act, act)` で再開されるが、コルーチンの中のシーンは `init_scene` が返した自分の `save, var` を使い続ける。再開の値として渡る新しい act は `ACT_IMPL.yield` が `.req` を読むだけ。
+- **Implications**: 自動転記を `create_act` で新しい act に入れれば、続きの `var` は上書きされない（要件 6.5 は作りのまま満たす）。
+
+### Lua の値を Rust で読む型（Research Needed 3）
+
+- **Sources**: `runtime/finalize.rs` `scene_attr_from_item`（`#[allow(clippy::useless_conversion)]`。x86 では `mlua::Integer` が i32）、`persistence.rs`（`save` は素の表。配列だけ `array_metatable`）、`shiori/act.lua` `SHIORI_ACT.new`。
+- **Findings**: `var`・`save` は素の表なので `raw_get` で読める（メタメソッドを呼ばない）。数は `Integer` を `i64::from` で受けて f64 にし、`Number` はそのまま。2^53 を超える整数は Lua に入った時点で丸まっているので、右辺の `i64` も f64 にして比べれば Lua で書いたときと同じ結果になる。真偽値は 1・0。
+- **Implications**: 評価は f64 と文字列の 2 つの形に揃える `Operand` で書く。x86・x64 で同じ（`cfg` で分けない）。
+
+### trace をどちらのログに出すか（Research Needed 4）
+
+- **Sources**: `runtime/log.rs`（`@pasta_log` は Rust の `tracing` へ橋渡し）、`book/src/reference/pasta-toml.md` 175・761〜773 行（`[logging] filter` は tracing の EnvFilter の書式）。
+- **Findings**: Lua の `@pasta_log` も Rust の `tracing` も同じログファイルに出る。Rust の target（`pasta_lua::search`）で出せば `filter = "info,pasta_lua::search=trace"` で条件の trace だけを足せる。
+- **Implications**: 評価を Rust に置き、`tracing` で出す。`pasta_core` には `tracing` を足さない（評価と記録は `pasta_lua` の述語の中）。
+
+### 止まるエラーの運び方（設計で足した調べ）
+
+- **Sources**: `failure.lua`、`shiori/stop.lua`（`STOP.response` は種類を「時間切れ」か「スクリプトのエラー」に決める）、`shiori/entry.lua`（`error_handler` は文字列でないエラーを `nil` にする）、`event/callback.lua` の `time_out`、`book/src/reference/runtime-failures.md`「止まるエラーの表記」。
+- **Findings**: `EVENT.drive` は投げられた値をそのまま `STOP.hold` に控える（表でも残る）。`EVENT.fire` の `error(yielded_value)` も表なら位置を付けずにそのまま投げる。コルーチンの外（選択肢のハンドラ）で投げた値は `entry.lua` の `error_handler` を通るので、表を通すように直す必要がある。
+- **Implications**: `FAILURE.raise` がメタ表付きの記録を投げ、`STOP.response` がそれを見分けてラベルを使う。`entry.lua` は記録を通し、500 の理由は `tostring(記録)`。直すのは 3 ファイルで数行ずつ。
+
+### `＆優先` の不正な値を止める所
+
+- **Sources**: `code_gen/scope_gen.rs` `append_set_scene_attrs`（属性ごとの `span` がある）、`pasta_check/src/validate/transpile_rules.rs`（pasta_lua のトランスパイルが失敗する書き方を写す段）、`pasta_check/tests/validate_parity_test.rs`（読み込み・トランスパイルの成否の一致）。
+- **Findings**: 辞書確定（`finalize.rs`）では位置が分からない。トランスパイルでは属性の位置があり、pasta_check は同じ条件を `transpile_rules.rs` に写す決まりがある。
+- **Implications**: トランスパイルエラー＋pasta_check の誤り `transpile-invalid-priority` にする。値の判定は `pasta_core` の `priority_value` を両方が使う。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A' 述語を渡す（採用） | pasta_core の抽選が `FnMut(&SceneInfo) -> bool` を受け、pasta_lua が Lua の表で評価する述語を作る | 並びの規則が 1 か所。pasta_core に mlua・tracing を入れない。ログは Rust の target で絞れる | 述語の中の Lua 読み出しのエラーを扱えない（素の表の `raw_get` なので起きない） | gap 分析の A を、pasta_core の言語非依存に合わせて変えたもの |
+| A 値を pasta_core へ写す | 変数の値の列挙型を pasta_core に定義し、評価も pasta_core に置く | 評価の規則を pasta_check と共有できる | pasta_check は評価を使わない（検査は代入の有無だけ）。ログに tracing を足すか結果を返す仕組みが要る | 使い手の無い共有になる |
+| B Lua で評価 | Rust が並びの順を返し、Lua が選んで消費を伝える | Lua の型のまま評価できる | 並びの規則が 2 か所に割れ、1 回の選択で 2 往復 | 採らない |
+| C Lua の判定関数を Rust から呼ぶ | 検索の口に Lua の関数を渡す | 評価を Lua に置ける | 借用とエラーの伝え方が重い。ログが 2 か所 | 採らない |
+
+## Design Decisions
+
+### Decision: 評価の置き場と口
+
+- **Context**: 変数は Lua、並びは Rust（要件 1・2・4）。
+- **Alternatives**: 上の表の A・B・C。
+- **Selected Approach**: A'。`@pasta_search:search_scene(name, gsn, var, save)`。表を渡さなければ条件を見ない（名指し）。
+- **Rationale**: 並び・段・巡の規則を 1 か所に置き、`scene-pick-modes` が同じ所に重みと順番を足せる。Lua 側は act を運ぶだけで、`act.lua` に足すのは 15 行ほど（1,000 行の約束に触れない）。
+- **Trade-offs**: `@pasta_search` の引数が増える（省略すれば今のまま）。
+- **Follow-up**: Lua から `SEARCH:search_scene` を直に呼ぶゴーストは、表を渡さないと条件を見ないことをマニュアルに書く。
+
+### Decision: `＆優先` の段の持ち方（1 本の並び）
+
+- **Context**: 優先は独占（要件 5.7〜5.9）。開発者の示唆は「シャッフルの後に優先で安定に並べ替え、段より低い札に来たら巡をやり直す」と、代わりの「段ごとの並び」。
+- **Alternatives**: 1) 1 本の並び＋並べ替え 2) 段ごとに別の並びと次の位置。
+- **Selected Approach**: 1)。今の段は 1 回の選択ごとに全候補を評価して求める（状態に持たない）。
+- **Rationale**: 状態の形が今と同じ「並び＋次の位置」で、足すのは並べ替えと段の判定だけ。始め直しが 1 回で必ず選べることも、並べ替えから直ちに言える。
+- **Trade-offs**: 上の段を出すたびに下の段の巡が始め直しになる（巡の境目で直前の話が続けて出うる、今の境目と同じ種類の弱み）。段ごとの並びなら避けられる。
+- **Follow-up**: 設計ディスカッションで確かめる（OPEN QUESTION 2）。
+
+### Decision: 満たす候補が 1 つも無いときの並びの扱い
+
+- **Context**: 要件 4.4・4.6 を手順どおりに行うと「今の巡の残りを見る → 始め直す → 全部見る」で、終わった後は「新しい巡を全部見た」状態になる。
+- **Selected Approach**: 先に全候補を評価して空なら、並びの次の位置を末尾にするだけ（シャッフルしない）。次の選択で始め直しになるので、選ばれ方は手順どおりと同じ。乱数の消費が 1 回少ないだけ（固定の `MockRandomSelector` は毎回先頭から使うので、テストの結果も同じ）。
+- **Rationale**: 空回りしない（要件 4.6）ことが作りで明らか。
+
+### Decision: 条件漏れを止まるエラーにする
+
+- **Context**: 要件 3.1「条件漏れの失敗表記を出して止める（エラー停止）」。今の Call の失敗は止まらない。
+- **Alternatives**: 1) 止まるエラー（シーンが止まり続きは捨てる） 2) 今の `SCENE_NOT_FOUND` と同じ「表記を出して次の行へ」。
+- **Selected Approach**: 1)。`FAILURE.raise` で投げ、`STOP.response` が 13 種目のラベルで表記にする。
+- **Rationale**: 要件の「止める」「止まって見え」を文字どおりに読んだ。
+- **Follow-up**: OPEN QUESTION 1 で確かめる。2) なら `FAILURE.raise` と `stop.lua`・`entry.lua` の変更が要らず、`FAILURE.report` に置き換えるだけで済む。
+
+### Decision: 宣言の文字列の絞り込み（`filters`）を消す
+
+- **Context**: `filter_by_attributes` は本番でいつも空で呼ばれ、受け手の `call-attribute-filter` は閉じた。`ponytail-core-registry` が仕組みを残した理由はこの spec が使うためだった。
+- **Selected Approach**: 消して、同じ位置の引数を述語に替える。`NoMatchingScene` は「条件漏れ」の意味で使い直す。
+- **Rationale**: 使い手の無い 2 つ目の絞り込みを残さない。宣言の意味は変わらない（要件 10.1）。
+- **Trade-offs**: `pasta_core` の公開 API の破壊的な変更。`scene_table_resolve_filter_tests.rs` を書き直す。
+
+### Decision: 自動転記は `create_act` に置く
+
+- **Selected Approach**: `EVENT.fire` の `create_act` で `transfer_req_to_var`・`transfer_date_to_var` を呼ぶ。`SHIORI_ACT.new` には置かない（中断のシーン・止まるエラーの表記だけの act にまで入れない）。時報の前の転記は残す（同じ値の上書きで無害）。
+
+## Synthesis
+
+- **Generalization**: 「名前で候補を選ぶ」の全経路を、`SCENE.search(name, gsn, act)` と `find_act_handler` の 2 つ目の戻り値に揃えた。名指しは「表を渡さない」で同じ口の別の使い方になり、新しい関数を足さない。`scene-exact-match` の `＞＞` も表を渡すだけで条件が効く。
+- **Build vs Adopt**: 新しいライブラリは使わない。数の判定は正規表現を足さず数行の手書き（`-?[0-9]+(\.[0-9]+)?`）。止まるエラーは既存の `STOP` の仕組みに乗せる。
+- **Simplification**: 並びの状態は今の 2 つのまま（印の配列を持たない）。今の段は状態に持たず毎回求める。`filters` を消す。新しい Lua のファイルを作らない（評価は Rust）。
+
+## 使ったスキル・ガイド
+
+- `kiro-spec-design` の `design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`、`.kiro/settings/templates/specs/design.md`・`research.md`。
+- `kiro-validate-design` の `design-review.md`（設計の検証の報告に使った）。
+- ponytail（最小の変更）: 新しい部品を評価と検査の 2 つに絞った。
+
+## Risks & Mitigations
+
+- 並びの作り直しで、条件の無い名前の乱数の順が変わる — 述語なし・優先が同じなら今と同じ手順・同じ回数の `shuffle_usize` になることを単体テストで固定する（固定の乱数の既存のテストもそのまま通す）。
+- 止まるエラーの記録が表なので、文字列を前提にした所（`RES.err`・`error_handler`）で崩れる — `tostring` を `FAILURE.body` にし、`entry.lua` で理由を文字列にする。`callback.lua` の時間切れの経路も `STOP.response` を通るのでテストに 1 本入れる。
+- 自動転記で、自分で `＄季節` などに入れているゴーストの挙動が変わる — 本文の代入が後から勝つので、本文で入れているものは今のまま。選ぶ前の条件で読む値だけが変わる。マニュアルに注意を書く（要件 6.6）。
+- `gen-skill-refs.mjs` の書き先 `.claude/skills/` の書き換えが分類器に止められることがある — 止まったら入った分を示して許可を求める。
+
+## 設計ディスカッションへの申し送り（OPEN QUESTIONS）
+
+1. **「エラー停止」の意味**（要件 3.1・3.2）。仮定: 止まるエラー（シーンが止まり、チェイントークの続きは捨てる。表記 `【条件に合うシーンが無い：＞告白（＊放課後）】`）。代わりの案: 今の `【シーンが見つからない】` と同じく表記を出して Call の次の行へ進む（止まらない）。
+   ```pasta
+   ＊放課後
+   　＄気分＝「普通」
+   　＞告白
+   　さくら：（ここは出るか）
+   ＊告白　＆＄気分＝「高」
+   　さくら：……わたしも、好き。
+   ```
+   仮定では「【条件に合うシーンが無い：＞告白（＊放課後）】」で止まり、最後の行は出ない。代わりの案では表記の後に最後の行も出る。
+2. **`＆優先` の段の持ち方**（要件 5.7〜5.9）。仮定: 1 本の並びを優先の降順に安定に並べ替える。代わりの案: 段ごとに別の並び。違いは下の段の巡の続き方だけ（出るものの決まりは同じ）。
+   ```
+   ＊会話（優先 0）A・B・C、＊会話 ＆優先：1 ＆＄＊記念日（今日だけ立つ）K
+   巡: A → B →（記念日が立つ）K → K → …（翌日）
+     仮定: 新しい巡で A・B・C をシャッフルし直す（C を待たずに B がまた先に出うる）
+     代わりの案: 下の段の巡の続きの C から出る
+   ```
+3. **13 種目のラベルの名前**（要件 3.7）。仮定: `SCENE_UNMET = "条件に合うシーンが無い"`。代わりの案: `"条件漏れ"`（要件の言い方）、`"選べるシーンが無い"`。
+4. **`OnPastaCallFunction` の条件漏れ**（要件 2.8）。仮定: 止めずに、今の「見つからない」と同じ形の表記の応答（`【条件に合うシーンが無い：OnPastaCallFunction ＞告白】`）。代わりの案: Call と同じく止まるエラー。外からの呼び出しの今の決まり「失敗では表記とログの警告を出し、場面の続きを変えない」に合わせた。
+5. **expr モード（`＠名前（）` がシーンに当たる道）**。仮定: 同じ `SCENE.search` を通るので条件で絞り、条件漏れは今の「関数が見つからない」のまま（新しい扱いを足さない）。代わりの案: expr モードでは条件を見ない（`search_dictionary` で表を渡さない）。
+6. **名指しの再生と `＆優先`**（要件 2.9）。仮定: 名指し（表を渡さない）は条件も段も見ないが、並びは優先の降順に並ぶ（同じ名前の全部を順に出す。高い優先が各巡の先に出る）。代わりの案: 名指しでも段の独占を効かせる（`OnPastaScene` で優先の低い場面が出せなくなる）。
+   ```
+   ＊OnUpdateComplete ＆優先：1 ＆＄ｒ０＝「changed」 と ＊OnUpdateComplete
+   OnPastaScene OnUpdateComplete を 2 回 → 仮定: 1 回目は優先 1、2 回目は優先 0（両方を確かめられる）
+   ```
+7. **数として読む文字列の形**（要件 1.10）。仮定: `-?[0-9]+(\.[0-9]+)?`（`+5`・`.5`・`1.`・`1e3`・前後の空白は文字列）。代わりの案: 符号 `+` や指数も数にする。
