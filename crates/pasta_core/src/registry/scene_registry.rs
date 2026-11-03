@@ -17,7 +17,7 @@ pub struct SceneEntry {
     pub name: String,
 
     /// Attributes associated with this scene (used by SceneTable attribute filters;
-    /// always empty when rebuilt by the runtime finalize).
+    /// the runtime finalize carries them over from the Lua store).
     pub attributes: Vec<SceneAttr>,
 
     /// Scene function name in `global::local` form (e.g., "会話_1::__start__").

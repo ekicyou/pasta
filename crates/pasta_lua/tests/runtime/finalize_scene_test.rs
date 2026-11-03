@@ -642,3 +642,233 @@ fn test_empty_scene_alias_table_keeps_search_unchanged() {
     assert_eq!(before, None, "before finalize_scene");
     assert_eq!(after, None, "after finalize_scene");
 }
+
+// ============================================================================
+// scene-attribute-store 4.4: 辞書確定で Lua の倉から Rust のシーン表へ属性を運ぶ
+// ============================================================================
+
+const ATTR_SOURCE: &str = "＆＄＊経験値≧500＆背景：教室
+＊会話＆率：1.0＆重み：1.5
+　＆題：「」
+　Alice：やあ
+　・選択肢＆優先：3＆＄済み
+　Alice：うん
+＊会話＆作者：Bob
+　Alice：別
+％さくら
+　＆x：9
+";
+
+/// ATTR_SOURCE から属性だけを除いた同じ形の辞書
+const PLAIN_SOURCE: &str = "＊会話
+　Alice：やあ
+　・選択肢
+　Alice：うん
+＊会話
+　Alice：別
+％さくら
+";
+
+/// 辞書を読み込んで辞書確定まで済ませた VM
+fn finalized(source: &str) -> mlua::Lua {
+    let lua = create_runtime_with_finalize().unwrap();
+    lua.load(transpile(source)).exec().unwrap();
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+    lua
+}
+
+/// 辞書確定と同じ道で Rust のシーン表（登録）を作る
+fn rust_registry(lua: &mlua::Lua) -> pasta_core::registry::SceneRegistry {
+    use pasta_lua::runtime::finalize::{build_scene_registry, collect_scene_attrs, collect_scenes};
+    let scenes = collect_scenes(lua).unwrap();
+    let attrs = collect_scene_attrs(lua).unwrap();
+    build_scene_registry(&scenes, &attrs)
+}
+
+/// Lua の倉を「グローバル|ローカル|項目,…」の行で（行は並べ替え、項目は書いた順のまま）
+fn lua_store_dump(lua: &mlua::Lua) -> String {
+    lua.load(
+        r#"
+        local STORE = require "pasta.store"
+        local function fmt(it)
+            local s = it.key
+            if it.op ~= nil then s = s .. " " .. it.op end
+            if it.value ~= nil then
+                s = s .. " " .. type(it.value):sub(1, 1) .. ":" .. tostring(it.value)
+            end
+            return s
+        end
+        local out = {}
+        for g, by_local in pairs(STORE.scene_attrs) do
+            for l, items in pairs(by_local) do
+                local parts = {}
+                for _, it in ipairs(items) do parts[#parts + 1] = fmt(it) end
+                out[#out + 1] = g .. "|" .. l .. "|" .. table.concat(parts, ",")
+            end
+        end
+        table.sort(out)
+        return table.concat(out, "\n")
+    "#,
+    )
+    .eval()
+    .unwrap()
+}
+
+/// Rust の表を lua_store_dump と同じ形で（属性のあるシーンだけ）
+fn rust_dump(registry: &pasta_core::registry::SceneRegistry) -> String {
+    use pasta_core::registry::{SceneAttr, SceneAttrValue};
+    let val = |v: &SceneAttrValue| match v {
+        SceneAttrValue::String(s) => format!("s:{s}"),
+        n => format!("n:{n}"),
+    };
+    let mut out: Vec<String> = registry
+        .all_scenes()
+        .into_iter()
+        .filter(|e| !e.attributes.is_empty())
+        .map(|e| {
+            let (g, l) = match &e.parent {
+                Some(p) => (p.as_str(), e.name.as_str()),
+                None => (e.name.as_str(), "__start__"),
+            };
+            let items: Vec<String> = e
+                .attributes
+                .iter()
+                .map(|a| match a {
+                    SceneAttr::Decl { key, value } => format!("{key} {}", val(value)),
+                    SceneAttr::Cond { key, op, value } => {
+                        format!("{key} {} {}", op.as_str(), val(value))
+                    }
+                    SceneAttr::Flag { key } => key.clone(),
+                })
+                .collect();
+            format!("{g}|{l}|{}", items.join(","))
+        })
+        .collect();
+    out.sort();
+    out.join("\n")
+}
+
+fn attrs_of<'a>(
+    registry: &'a pasta_core::registry::SceneRegistry,
+    name: &str,
+    parent: Option<&str>,
+) -> &'a [pasta_core::registry::SceneAttr] {
+    &registry
+        .all_scenes()
+        .into_iter()
+        .find(|e| e.name == name && e.parent.as_deref() == parent)
+        .unwrap_or_else(|| panic!("scene {name} / {parent:?} not registered"))
+        .attributes
+}
+
+/// 5.3・4.2: Rust の表の属性は Lua の倉と同じ。整数の値になる小数は整数、項目は 3 種に写る。
+/// 辞書確定は倉を書き換えない（2 回確定しても倉は同じ）。
+#[test]
+fn test_scene_attrs_reach_rust_table_same_as_lua_store() {
+    use pasta_core::registry::{CmpOp, SceneAttr, SceneAttrValue};
+    let lua = finalized(ATTR_SOURCE);
+    let store_before = lua_store_dump(&lua);
+    let registry = rust_registry(&lua);
+
+    assert!(!store_before.is_empty());
+    assert_eq!(rust_dump(&registry), store_before);
+
+    let decl = |k: &str, v: SceneAttrValue| SceneAttr::Decl {
+        key: k.into(),
+        value: v,
+    };
+    let cond = SceneAttr::Cond {
+        key: "＄＊経験値".into(),
+        op: CmpOp::Ge,
+        value: SceneAttrValue::Integer(500),
+    };
+    assert_eq!(
+        attrs_of(&registry, "会話_1", None),
+        &[
+            cond.clone(),
+            decl("背景", SceneAttrValue::String("教室".into())),
+            decl("率", SceneAttrValue::Integer(1)),
+            decl("重み", SceneAttrValue::Float(1.5)),
+            decl("題", SceneAttrValue::String(String::new())),
+        ]
+    );
+    assert_eq!(
+        attrs_of(&registry, "選択肢_1", Some("会話_1")),
+        &[
+            decl("優先", SceneAttrValue::Integer(3)),
+            SceneAttr::Flag {
+                key: "＄済み".into()
+            },
+        ]
+    );
+
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+    assert_eq!(
+        lua_store_dump(&lua),
+        store_before,
+        "finalize must not rewrite the store"
+    );
+}
+
+/// 1.7: 同じ宣言名の 2 つの宣言の属性は混ざらない
+#[test]
+fn test_scene_attrs_same_name_declarations_do_not_mix() {
+    use pasta_core::registry::{CmpOp, SceneAttr, SceneAttrValue};
+    let registry = rust_registry(&finalized(ATTR_SOURCE));
+    assert_eq!(
+        attrs_of(&registry, "会話_2", None),
+        &[
+            SceneAttr::Cond {
+                key: "＄＊経験値".into(),
+                op: CmpOp::Ge,
+                value: SceneAttrValue::Integer(500),
+            },
+            SceneAttr::Decl {
+                key: "背景".into(),
+                value: SceneAttrValue::String("教室".into()),
+            },
+            SceneAttr::Decl {
+                key: "作者".into(),
+                value: SceneAttrValue::String("Bob".into()),
+            },
+        ]
+    );
+    assert!(
+        !attrs_of(&registry, "会話_1", None)
+            .iter()
+            .any(|a| a.key() == "作者")
+    );
+}
+
+/// 5.4: 属性の有無でシーンの数（と並び）が変わらない
+#[test]
+fn test_scene_attrs_do_not_change_scene_count() {
+    let order = |r: &pasta_core::registry::SceneRegistry| -> Vec<(String, Option<String>)> {
+        r.all_scenes()
+            .into_iter()
+            .map(|e| (e.name.clone(), e.parent.clone()))
+            .collect()
+    };
+    let with_attrs = rust_registry(&finalized(ATTR_SOURCE));
+    let plain = rust_registry(&finalized(PLAIN_SOURCE));
+    assert_eq!(order(&with_attrs), order(&plain));
+    assert_eq!(with_attrs.all_scenes().len(), 3);
+}
+
+/// 5.6: アクター辞書の配下の属性は倉にも Rust の表のどのシーンにも入らない
+#[test]
+fn test_actor_dictionary_attrs_go_nowhere() {
+    let lua = finalized(ATTR_SOURCE);
+    let registry = rust_registry(&lua);
+    assert!(
+        registry
+            .all_scenes()
+            .iter()
+            .all(|e| e.attributes.iter().all(|a| a.key() != "x"))
+    );
+    assert!(!lua_store_dump(&lua).contains("x "));
+}
