@@ -20,7 +20,6 @@ local RELOAD = {
     "pasta.shiori.event.second_change",
     "pasta.shiori.event.mouse",
     "pasta.shiori.event.scene_play",
-    "pasta.shiori.event.kick",
     "pasta.shiori.event.external_control",
     "pasta.shiori.event.virtual_dispatcher",
     "pasta.shiori.res",
@@ -43,7 +42,6 @@ end
 local ENTRY = require("pasta.shiori.entry")
 local REG = require("pasta.shiori.event.register")
 local CALLBACK = require("pasta.shiori.event.callback")
-local KICK = require("pasta.shiori.event.kick")
 local SCENE = require("pasta.scene")
 local STORE = require("pasta.store")
 local SHIORI_ACT = require("pasta.shiori.act")
@@ -433,40 +431,46 @@ end)
 -- 中断のシーンを検索に入れ、台詞を出しても中断の台詞が付かないことを確かめる
 -- ============================================================================
 
-describe("続きの決まり - キック・シーン再生ははっきり捨てる", function()
-    --- 保留のキックを KICK.try_dispatch で引き当てたコルーチンを返すハンドラ
-    local function register_kick(fn)
-        SCENE.register("cti_kick_1", "__start__", fn)
-        REG.OnCtiKick = function(act)
-            STORE.kick_pending = "cti_kick_1"
-            return KICK.try_dispatch(act)
+describe("続きの決まり - 印の付いた再生・シーン再生ははっきり捨てる", function()
+    --- STORE.co_preempt の印を付けたコルーチンを返すハンドラ（指名した再生の形）
+    local function register_preempt(fn)
+        REG.OnCtiPreempt = function()
+            local co = coroutine.create(function(act)
+                fn(act)
+                local result = act:build()
+                if result ~= nil then
+                    return result
+                end
+            end)
+            STORE.co_preempt[co] = true
+            return co
         end
     end
 
-    test("キックは台詞が無くても続きを捨てる", function()
+    test("印の付いた再生は台詞が無くても続きを捨てる", function()
         with_env({ chudan = true }, function()
             start_chain()
-            register_kick(function(act) talk(act, "\\s[5]") end)
-            request("OnCtiKick")
+            register_preempt(function(act) talk(act, "\\s[5]") end)
+            request("OnCtiPreempt")
             expect(STORE.co_scene):toBeNil()
             expect(chudan.ran):toBe(false)
         end)
     end)
 
-    test("キックが台詞を出しても中断の台詞を付けず、区切れば残りが続きになる", function()
+    test("印の付いた再生が台詞を出しても中断の台詞を付けず、区切れば残りが続きになる", function()
         with_env({ chudan = true }, function()
             local old = start_chain()
-            register_kick(function(act)
-                talk(act, "KICKED")
+            register_preempt(function(act)
+                talk(act, "PREEMPTED")
                 act:yield()
-                talk(act, "KICKREST")
+                talk(act, "PREEMPTREST")
             end)
-            local res = request("OnCtiKick")
-            expect(has(res, "KICKED")):toBe(true)
+            local res = request("OnCtiPreempt")
+            expect(has(res, "PREEMPTED")):toBe(true)
             expect(has(res, "CHUDAN")):toBe(false)
             expect(chudan.ran):toBe(false)
             expect(STORE.co_scene ~= old):toBe(true)
-            expect(has(request("OnCtiContinue"), "KICKREST")):toBe(true)
+            expect(has(request("OnCtiContinue"), "PREEMPTREST")):toBe(true)
         end)
     end)
 
@@ -893,19 +897,6 @@ describe("続きの決まり - 再生しなかった指名の再生", function()
         with_env({ chudan = true }, function()
             local co = start_chain()
             request("OnPastaScene", { [0] = "cti_missing" })
-            expect(STORE.co_scene):toBe(co)
-            expect(chudan.ran):toBe(false)
-        end)
-    end)
-
-    test("キックのシーンが引き当てられなければ続きはそのまま", function()
-        with_env({ chudan = true }, function()
-            local co = start_chain()
-            REG.OnCtiKickMiss = function(act)
-                STORE.kick_pending = "cti_kick_missing"
-                return KICK.try_dispatch(act)
-            end
-            request("OnCtiKickMiss")
             expect(STORE.co_scene):toBe(co)
             expect(chudan.ran):toBe(false)
         end)

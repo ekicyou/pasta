@@ -326,22 +326,18 @@ fn names_outside_global_scene_search_are_not_replaced() {
         let value = runtime
             .exec(
                 r#"local SCENE = require "pasta.scene"
-local STORE = require "pasta.store"
-local KICK = require "pasta.shiori.event.kick"
 local out = {}
 for _, id in ipairs({ "会話_1", "OnTalk_1" }) do
     local start = type(SCENE.get_start(id)) == "function"
-    STORE.kick_pending = id
-    local kicked = KICK.try_dispatch(nil) ~= nil
-    out[#out + 1] = id .. "=" .. tostring(start) .. "/" .. tostring(kicked)
+    out[#out + 1] = id .. "=" .. tostring(start)
 end
 return table.concat(out, ",")"#,
             )
             .unwrap();
         let expected = if table.aliases_kaiwa() {
-            "会話_1=false/false,OnTalk_1=true/true"
+            "会話_1=false,OnTalk_1=true"
         } else {
-            "会話_1=true/true,OnTalk_1=false/false"
+            "会話_1=true,OnTalk_1=false"
         };
         assert_eq!(value_as_str(&value).unwrap(), expected, "{table:?}");
     }

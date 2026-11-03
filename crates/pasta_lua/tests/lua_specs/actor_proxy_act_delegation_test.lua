@@ -8,7 +8,7 @@ local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
--- 依存閉包を整合した同一インスタンス集合として一括新規ロードする（kick_install_test と同じ規約）。
+-- 依存閉包を整合した同一インスタンス集合として一括新規ロードする（shiori_entry_test と同じ規約）。
 -- entry を最初に require し、GLOBAL.ゴースト終了 を登録した GLOBAL を act と共有させる。
 local RELOAD = {
     "pasta.shiori.entry",
@@ -19,7 +19,6 @@ local RELOAD = {
     "pasta.shiori.event.choice_select",
     "pasta.shiori.event.second_change",
     "pasta.shiori.event.virtual_dispatcher",
-    "pasta.shiori.event.kick",
     "pasta.shiori.res",
     "pasta.shiori.act",
     "pasta.shiori.sakura_builder",
