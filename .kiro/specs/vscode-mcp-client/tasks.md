@@ -59,7 +59,7 @@
   - 終わったとき: 一時フォルダの単体の試験で、深さ 0〜3 は見つかり 4 は外れる・descript 無しは外れる・UTF-8／Shift_JIS／`name` 無しの表示名が通る。
   - _Boundary: GhostFiles_
   - _Requirements: 2.1, 2.3_
-- [ ] 4.2 `pasta.log` の場所を `pasta.toml` から決める
+- [x] 4.2 `pasta.log` の場所を `pasta.toml` から決める
   - `[logging]` の表の中・最上位の点で区切ったキー・1 行のインラインテーブルの 3 つの書き方で `file_path` を読む。基本の文字列とリテラルの文字列を読む。
   - `profile/` で始まり、後にファイル名があり、`..` を含まず、絶対パスでない値だけを使う。書かれていない・`pasta.toml` が無いときは既定の `profile/pasta/logs/pasta.log`。書かれているのに読めない・条件に外れるときは既定を使い、添え書きを付ける。
   - 終わったとき: 単体の試験で、3 つの書き方・外れた値（`../x`・`C:\x`・`Profile/x`・`profile/`）・読めない書き方（複数行のインラインテーブル）で添え書きが付くことが通る。
@@ -172,3 +172,4 @@
 - 2.2: mock の showQuickPick は setNextQuickPickSelection(ラベル) で 1 回だけ選ぶ（未設定は閉じた扱い）。文書は createTextDocument(path,{isDirty,languageId,saveResult})。記録は配列で slice(before) で見る。
 - 3.1: mcpClient.ts の内部 rpc() は 3.2 の initialize で使える。単体試験は src/test/mcpClient.test.ts（6.3 で test:unit に足す）。fakeMcpServer に raiseEvent.mode=empty（200 で本文が空）を足した。
 - 4.1: ghostFiles.ts の resolveGhost(fileFsPath, masterPath) は master のパスを受ける。糊（6.1）は resolveGhost(uri.fsPath, findGhostMaster(uri)?.fsPath)（ghostValidator.ts）で呼ぶ。試験は src/test/ghostFiles.test.ts（vscode の alias 不要）。
+- 4.2: file_path の判定は pasta の logger.rs と同じく部品で判じる（\ も区切り・profile/dir/ は通す）。文字列の startsWith で判じない。
