@@ -297,9 +297,10 @@ fn test_global_fn_in_other_pasta_shows_no_location() {
     let map = off
         .scene_lua
         .lines()
-        .find(|l| l.contains("init_scene(SCENE, \"OnCross\", nil, [["))
-        .and_then(|l| l.split_once("[[dic\\runtime_error_balloon.pasta|"))
-        .and_then(|(_, rest)| rest.split(']').next())
+        .find(|l| l.contains("init_scene(SCENE, \"OnCross\", nil, "))
+        // パスは OS の区切りのまま: Windows は `[[dic\…]]`、他は `"dic/…"`
+        .and_then(|l| l.split_once("runtime_error_balloon.pasta|"))
+        .and_then(|(_, rest)| rest.split([']', '"']).next())
         .unwrap_or_else(|| panic!("no line map of ＊OnCross:\n{}", off.scene_lua));
     assert!(
         map.split(',')
