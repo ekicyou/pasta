@@ -96,11 +96,15 @@ local EVENT = {}
 
 -- 3. 内部関数
 
---- actオブジェクトを作成
+--- actオブジェクトを作成し、シーンを選ぶ前に Reference と日時をローカル変数へ 1 回だけ転記する
+--- 本文の代入は後から勝つ。チェイントークの続きは自分の act で再開するので、ここでの転記は届かない
 --- @param req table SHIORIリクエストテーブル
 --- @return ShioriAct actオブジェクト
 local function create_act(req)
-    return SHIORI_ACT.new(STORE.actors, req)
+    local act = SHIORI_ACT.new(STORE.actors, req)
+    act:transfer_req_to_var()
+    act:transfer_date_to_var()
+    return act
 end
 
 --- STORE.co_sceneを統一管理するローカル関数

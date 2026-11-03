@@ -341,7 +341,7 @@ fn test_e2e_chaintalk_transpile_and_execute() {
 
 /// DSL から転記メソッドを Call して、SHIORI リクエスト由来の変数
 /// （＄ｒＮ / ＄rN / ＄req_id）と日時変数（＄時１２ 等）を参照できること。
-/// 転記を呼ばないシーンでは値が入らないこと（利用者マニュアル記載の挙動）。
+/// 転記を呼ばないイベントのシーンにも、選ぶ前の自動転記で値が入ること（scene-condition-attributes 6.1）。
 #[test]
 fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
     let lua = create_runtime_with_finalize().unwrap();
@@ -396,12 +396,8 @@ fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
 
     let without = fire("転記なし");
     assert!(
-        !without.contains("Head"),
-        "transfer must be explicit: {without}"
-    );
-    assert!(
-        without.contains("部位＝【値の無い変数：＄ｒ４】。"),
-        "unset var must render the failure notation: {without}"
+        without.contains("部位＝Head"),
+        "event scenes get the automatic transfer: {without}"
     );
 }
 

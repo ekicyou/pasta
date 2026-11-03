@@ -63,7 +63,7 @@
   - _Boundary: FailureStop_
   - _Requirements: 3.1, 3.7_
 
-- [ ] 3.2 (P) イベントの act を作るときに Reference と日時を自動で転記する
+- [x] 3.2 (P) イベントの act を作るときに Reference と日時を自動で転記する
   - イベントのハンドラごと・底のハンドラに作る act のすべてで、選ぶ前に Reference と日時を 1 回入れる。本文の代入が後から勝つ
   - チェイントークの続きは自分の act のまま再開し、新しい act の転記が続きの変数を上書きしない
   - 2 つの転記の関数は今のまま残し、時報の前の日時の転記も残す
@@ -155,3 +155,6 @@
   - `--check` が一致を報告する
   - _Depends: 6.1, 6.2_
   - _Requirements: 9.8_
+
+## Implementation Notes
+- 3.2: イベントの act に Reference が最初から入るので、`tests/runtime/syntax_test.rs` の「転記なし」の期待（Reference が無い）は 6.1 に合わせて書き換えた。5.3 の差分確認ではこのテストも「書き直してよい」側に数える。
