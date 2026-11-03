@@ -681,7 +681,7 @@ pub enum DicSource {
 - `book/src/reference/pasta-toml.md` の `[debug]` 節を `enabled` だけにし、古いキーを読み飛ばすことと、環境変数は `PASTA_DEBUG` だけであることを書く。
 - `book/src/lua/shiori-events.md` に `OnPastaDumpVariables` の節（引数・書き出す先・応答・失敗）を足し、3 つのイベントに共通の「デバッグが有効なときだけ・external は断る」の決まりをまとめ、待ち受けの話を除く。`OnPastaSceneAt` の Reference0 から URI の話を除く。
 - `book/src/internals/` の `shiori`・`execution-model`・`loader`・`index`・`internal-modules`・`transpiler`・`registry-search`・`logging-encoding`、`book/src/reference/startup.md`・`reference/runtime-failures.md`（場所の表・193 行の説明を、別のファイルの行を出さないことと、`dic/` の `.lua` はそのファイルと行で出ることに直す）、`book/src/lua/modules/pasta-search.md`・`lua/patterns.md`・`grammar/call-jump.md`・`introduction.md`、ルートの `DEBUGGING.md`。`@pasta_chunks` の値の説明（`internal-modules.md`・`loader.md`）も直す。
-- 利用者の章 `book/src/debug/` は触らない。
+- 利用者の章 `book/src/debug/` は触らない。`vscode-mcp-client` は `debug/source-level.md`・`debug/constraints.md` を消し、`シーン再生-シーンを実行`・`デバッグの有効化`・`pastatoml-による有効化`・`優先順位` の 4 つのアンカーを残す。この spec の頁から消える頁へのリンク（`reference/pasta-toml.md` の `#提示モードの切替`、`internals/debug.md` の `#初期モードの指定`・`#サイドカー出力任意`・`constraints.md`）は書き直しで外す。先に入った側が最小に直し、後から入る側が rebase で合わせる。
 - `node book/tools/gen-skill-refs.mjs` で `.claude/skills/` の references を作り直す。書き込みが分類器に拒まれたら、入った分と残りを示して開発者に頼む。
 - マニュアルの検査（リンク・目次から数える章の数・references の drift）を通す。
 
