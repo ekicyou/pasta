@@ -217,3 +217,9 @@ pasta の開発の道具（VSCode の「▶ シーンを実行」・SHIORI の�
   - 実行時エラーのバルーンとログの警告は、もう `.pasta` の位置を出している。`runtime-error-balloon`（#132）の `shiori/stop.lua` の `STOP.detail`・`STOP.location`（127・111 行）が、`act:init_scene` の最後の引数の行の対応（`transpiler.rs` の `fill_line_maps` 259 行。デバッグの有無にかかわらず生成コードに埋まる）で、変換した Lua の行を `dic\天気.pasta:15` の形に直す。Problem の「作者は `.pasta` の行へ手で戻している」と Approach 4 は、行の対応で引けない行（シーンの関数の外。アクター辞書の単語定義など）に絞るか、要らないかを、要件の最初に確かめる。`LineShift` が恒等になったので、行の対応とソースマップは同じ行を指す。
   - `source_map/mod.rs` 25 行の `normalize_output` は、まだ `normalize_output_with_shift` に直っていない（`ponytail-lua-transpiler` からの申し送りの 1 行目）。
   - Current State の `actor/instance.rs:150`・`entry.lua:132`・`virtual_dispatcher.lua:234-257` は、上の行に動いた。
+
+## 申し送り（vscode-mcp-client より・2026-11-03）
+
+- **info の行の文言**: `vscode-mcp-client` のマニュアル（`book/src/debug/index.md` の「有効になったかの確かめ方」・`book/src/debug/troubleshooting.md`）は、デバッグが有効になったことを仮の言い方「開発用のイベントを許したことを示す info の行が 1 行出る」で書いた。この spec で行の文言を決めたら、2 頁にその文言の引用を足す。
+- **読み込みの終わりの印**: 今の pasta.dll は `SHIORI load entry completed … loaded=` を `info!` で書く（`pasta_shiori/src/windows.rs`・`v3.rs`）ので、`[logging] level`・`filter`・`PASTA_LOG` で外すと拡張は読み込みの終わりを確かめられない。`troubleshooting.md` はそう条件なしで書いてある。この spec で印の行を設定に関係なく出すようにしたら、`troubleshooting.md` のその項（と `dev-actions.md` の時間切れの案内）を直す。拡張は文と `loaded=` だけで判じるので、target を変えても拡張は直さなくてよい（`editors/vscode/src/test/reloadShiori.test.ts` の契約の試験は、文と `loaded` が 2 か所にあることだけを確かめる）。
+- **`PASTA_DEBUG_PORT`**: `book/src/debug/vscode-setup.md` の「前の版から移るとき」は、`PASTA_DEBUG_PORT` を「拡張はもう番号を合わせてつながないので要らない」と書いた。この spec で環境変数を消したら、文はそのままでよい。
