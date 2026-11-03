@@ -628,7 +628,7 @@ end
 | `GLOBAL.scene_count` | `scene_count(act, name)`。`＞name` のグローバルシーンの検索が選べる候補の数を返す（[count_scene](modules/pasta-search.md#count_scenename--count_scene_exactname)）。`name` が名前にならない値なら失敗を報告して `0` を、数値なら `0` を返す。`act` が `nil` なら、失敗はログにだけ出る。2 つ目より後の引数は使わない。出力は積まない（失敗表記を除く） |
 | `GLOBAL["シーン数"]` | `GLOBAL.scene_count` と同じ動作の関数。`＞シーン数（名前）`・`＠シーン数（名前）` が呼ぶ（[シーン数・シーン数完全一致](../grammar/call-jump.md#シーン数シーン数完全一致)） |
 | `GLOBAL.scene_count_exact` | `scene_count_exact(act, name)`。名前が `name` とちょうど等しいグローバルシーンの数を返す（[count_scene_exact](modules/pasta-search.md#count_scenename--count_scene_exactname)）。引数の扱いは `GLOBAL.scene_count` と同じ |
-| `GLOBAL["シーン数完全一致"]` | `GLOBAL.scene_count_exact` と同じ動作の関数。`＞シーン数完全一致（名前）`・`＠シーン数完全一致（名前）` が呼ぶ |
+| `GLOBAL["シーン数完全一致"]` | `GLOBAL.scene_count_exact` と同じ動作の関数。`＞シーン数完全一致（名前）`・`＠シーン数完全一致（名前）` が呼ぶ（[シーン数・シーン数完全一致](../grammar/call-jump.md#シーン数シーン数完全一致)） |
 | `GLOBAL.close_ghost` | `close_ghost(act, ms)`。`ms` が 1 以上の数値なら `act:wait(ms)` を積み、ゴーストを終了させる `\-` を `raw_script` で積む |
 | `GLOBAL["ゴースト終了"]` | `GLOBAL.close_ghost` と同じ関数。`＞ゴースト終了` が呼ぶ（[ゴースト終了](../grammar/call-jump.md#ゴースト終了)） |
 | `GLOBAL.pause_auto_talk` | `pause_auto_talk(act)`。ランダムトーク・時報などの自動トークを止める。出力は積まない |

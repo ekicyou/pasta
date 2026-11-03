@@ -79,3 +79,5 @@
 ## Implementation Notes
 - 読み込みのときに永続化の WARN（`Persistence file not found`）が必ず 1 行出る。「警告なし」は `!logs_contain("WARN")` でなく、数える前後の ` WARN ` 行数の比較と `Scene not found` が出ないことで確かめる（4.1）。
 - 保存ファイルが無い WARN は読み込みでなく初めて応答を作るときに出る。応答を作る試験ではその行だけを除いて数える（4.2 の `log_lines!`）。
+- 完了時にその場で解決: `script-api.md` の `GLOBAL["シーン数完全一致"]` の行に章へのリンクを足した（最終検証の Info）。
+- 完了時にその場で解決: `pasta-search.md`「検索の範囲」の「どのメソッドも第 2 引数で」を「第 2 引数を取るメソッドは」に直した（数のメソッドには第 2 引数が無い）。
