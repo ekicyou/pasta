@@ -198,7 +198,7 @@
   - 完了の姿: これらの頁に `kick`・DAP・9276 の記述が無く、`book/src/debug/` に差分が無い
   - _Requirements: 8.4, 8.5_
 
-- [ ] 10.4 スキルの references を作り直し、マニュアルの検査を通す
+- [x] 10.4 スキルの references を作り直し、マニュアルの検査を通す
   - `node book/tools/gen-skill-refs.mjs` で references を作り直す。書き込みが拒まれたら、入った分と残りを示して開発者に頼む
   - リンク・目次から数える章の数・references の drift の検査を通す
   - 完了の姿: マニュアルの検査が全部通る
