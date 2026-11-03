@@ -214,10 +214,11 @@ fn error_form(candidate: &str) -> Vec<u8> {
 ///
 /// キーは [`error_form`] の形、値は次のどれか。
 /// - 作者の `.lua`: ゴーストのフォルダーから見たパス（区切りは `\`。例 `scripts\天気.lua`）
-/// - 変換した Lua のキャッシュ: `true`（辞書の印）
+/// - `dic/` の `.lua` をキャッシュに写したもの: 元の `.lua` のパス（例 `dic\道具.lua`）
+/// - `.pasta` から変換したキャッシュ: 表 `{ pasta = "dic\\天気.pasta" }`
 /// - 2 つのファイルが同じキーになった: `false`（見分けられない。無いのと同じに扱う）
 ///
-/// 標準ランタイムとゴーストの外のファイルは控えない（重複の見分けには数える）。
+/// 標準ランタイム・ゴーストの外・`pasta_sources` に無いキャッシュは控えない（重複の見分けには数える）。
 pub(crate) fn register_chunk_table(
     lua: &Lua,
     ghost_dir: &Path,
@@ -264,7 +265,17 @@ fn record_chunk(lua: &Lua, module_name: &str, candidate: &str) -> LuaResult<()> 
                     return Ok(()); // ゴーストの外
                 };
                 if in_cache {
-                    Value::Boolean(true)
+                    match table.pasta_sources.get(module_name) {
+                        Some(DicSource::Pasta(pasta)) => {
+                            let entry = lua.create_table()?;
+                            entry.set("pasta", pasta.replace('/', "\\"))?;
+                            Value::Table(entry)
+                        }
+                        Some(DicSource::Lua(src)) => {
+                            Value::String(lua.create_string(src.replace('/', "\\"))?)
+                        }
+                        None => return Ok(()), // 元の分からないキャッシュ
+                    }
                 } else if rel.starts_with(RUNTIME_REL) {
                     return Ok(());
                 } else {
@@ -500,7 +511,7 @@ mod tests {
     }
 
     /// 探索関数が読み込んだファイルを表に控える（2.5 / 2.6）: 作者の `.lua` はゴーストから
-    /// 見たパス、変換した Lua のキャッシュは `true`、標準ランタイムは控えない。キーは
+    /// 見たパス、元の分からないキャッシュと標準ランタイムは控えない。キーは
     /// エラー文の位置の接頭辞と同じ形で、チャンク名は `@` ＋ 候補パスのまま。
     #[test]
     fn chunk_table_records_author_and_cache_but_not_runtime() {
@@ -536,7 +547,7 @@ mod tests {
                     lua.create_string("scripts\\天気.lua").unwrap(),
                 )),
             ),
-            ("pasta.scene.天気", Some(Value::Boolean(true))),
+            ("pasta.scene.天気", None),
             ("rt", None),
         ] {
             let err: mlua::LuaString = lua
@@ -616,7 +627,6 @@ mod tests {
 
     /// `.pasta` の候補にだけ `.pasta` のパスを返す（3.5・6.3）。`dic/` の `.lua` の写し・
     /// 作者の `.lua`・元の分からないキャッシュ・読み込んでいない候補には返さない。
-    /// `@pasta_chunks` の値（キャッシュは `true`）は変わらない。
     #[test]
     fn pasta_file_of_returns_only_pasta_sources() {
         let dir = tempfile::tempdir().unwrap();
@@ -662,10 +672,24 @@ mod tests {
         let root = ghost.to_string_lossy().replace('\\', "/");
         assert_eq!(pasta_file_of(&lua, &format!("{root}/dic/天気.pasta")), None);
 
-        let got: Value = chunk_table(&lua)
-            .raw_get(lua.create_string(error_form(&pasta)).unwrap())
-            .unwrap();
-        assert_eq!(got, Value::Boolean(true));
+        // `@pasta_chunks` の値（6.2・6.3）: `.pasta` は表、`dic/` の `.lua` の写しは元のパス、
+        // 表に無いキャッシュは控えない、`scripts/` の `.lua` は今のまま。区切りは `\`。
+        let chunks = chunk_table(&lua);
+        let value_of = |module: &str| -> String {
+            let got: Value = chunks
+                .raw_get(lua.create_string(error_form(&candidate(module))).unwrap())
+                .unwrap();
+            match got {
+                Value::Table(t) => format!("pasta={}", t.get::<String>("pasta").unwrap()),
+                Value::String(s) => s.to_str().unwrap().to_string(),
+                Value::Nil => "nil".to_string(),
+                other => format!("{other:?}"),
+            }
+        };
+        assert_eq!(value_of("pasta.scene.天気"), "pasta=dic\\天気.pasta");
+        assert_eq!(value_of("pasta.scene.道具"), "dic\\道具.lua");
+        assert_eq!(value_of("pasta.scene.未知"), "nil");
+        assert_eq!(value_of("作者"), "scripts\\作者.lua");
     }
 
     /// 表の無い VM では何も返さない。
