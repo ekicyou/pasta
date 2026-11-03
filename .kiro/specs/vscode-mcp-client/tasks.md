@@ -181,3 +181,6 @@
 - 6.3: 7.2 で dev-actions.md の古い表記「SHIORIリロード」を「SHIORI をリロード」に直す。
 - 7.1: debug-mcp-runtime は brief.md しか無く info の行の文言は未決。マニュアルは仮の言い方「開発用のイベントを許したことを示す info の行」で書いた（7.2 もこれに揃える）。あちらで文言が決まったら引用を足す。
 - 8.1: 残りの名前の grep は、拡張（src・package.json・README）・book/src/debug/・ルートの README・DEBUGGING.md で空。book/src/internals/debug.md と reference/pasta-toml.md の [debug] の表に残る 9276・sourcePresentation は、今の pasta.dll にまだある DAP の説明で debug-mcp-runtime の持ち場（設計 187・819 行。brief へ申し送り済み）。npm test・lint・tsc・マニュアルの 4 つの検査は通り、package-lock.json と依存は 8bab2af9 から変わっていない。
+- 完了時にその場で解決: lastLogId が流れの callTimeoutMs を受けていなかった（値は同じで実害なし）のを渡すようにした。
+- 完了時にその場で解決: 同じ名前のベースウェアを 1 つにまとめることを dev-actions.md に書いた。
+- 完了時の棚卸: probe が initialize の serverInfo.name を読まないのは直さない（相手の判定は baseware.name で足りる）。runScene の failed の分かれ道の単体試験は e2e の誤りの通知の試験で足りるとして足さない。
