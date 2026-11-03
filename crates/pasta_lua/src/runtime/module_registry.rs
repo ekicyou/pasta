@@ -190,7 +190,7 @@ impl PastaLuaRuntime {
 
     /// Register the internal `@pasta_debug` module（scene-play-event 2.1/4.1/4.2）。
     ///
-    /// 関数は 2 つだけ: `enabled()` は解決した設定の値（待ち受けの有無は見ない）、
+    /// 関数は 2 つだけ: `enabled()` はシーンマップの有無（`debug_enabled()` と同じ値）、
     /// `scene_at(file, line)` は位置を登録名の組 `(大域, ローカル)` に引く。マップが無い、
     /// 行が `1..=u32::MAX` の整数でない、見つからないときはエラーにせず nil を返す。
     /// 本番の入口（`from_loader_with_scene_dic`）だけが呼ぶ。

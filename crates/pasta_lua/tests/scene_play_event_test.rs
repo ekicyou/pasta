@@ -7,10 +7,10 @@
 //!   `STORE.co_scene` に置かれる（要件 1.1・1.2・3.1・3.2・3.3）
 //! - 同じ名前の大域が 2 つあり片方だけがローカルを持つとき、毎回再生できる（要件 1.8）
 //! - 相対パスと絶対パスで位置から再生できる（要件 2.1・2.3・2.4）
-//! - 待ち受けが立たなくてもソースマップが残り、位置で再生できる（要件 4.2・4.3、task 4.2）
+//! - 有効ならシーンマップがあり、`debug_enabled()` と `@pasta_debug.enabled()` が真になる（debug-mcp-runtime 7.6）
 //! - デバッグが無効なら 204、見つからないときは 200 で失敗の表記（要件 4.4・5.1・5.3・7.1・7.4、task 4.2）
 //!
-//! `PASTA_DEBUG` の中和は `common` の `#[ctor]` に従い、待ち受けのポートは `port = 0` にする。
+//! `PASTA_DEBUG` の中和は `common` の `#[ctor]` に従う。
 
 mod common;
 
@@ -60,7 +60,7 @@ const REL_PATH: &str = "dic/test/scene_play.pasta";
 fn load_debug_ghost(base: &Path) -> PastaLuaRuntime {
     load_ghost(
         base,
-        "[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\nport = 0\n",
+        "[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\n",
     )
 }
 
@@ -247,31 +247,26 @@ fn on_pasta_scene_at_plays_by_relative_and_absolute_path() {
     }
 }
 
-/// 4.2・4.3: 待ち受けのポートを先に塞いでも、ソースマップが残り、位置で再生できる。
+/// 4.2・4.3（debug-mcp-runtime 7.6）: 有効ならシーンマップがあり、`debug_enabled()` と
+/// `@pasta_debug.enabled()` がどちらも真で、位置で再生できる。
 #[test]
-fn on_pasta_scene_at_plays_when_listener_cannot_bind() {
+fn enabled_debug_holds_scene_map_and_reports_enabled() {
     let temp = tempfile::TempDir::new().unwrap();
-    // 空いたポートを先に塞ぐ（固定のポートは使わない）。読み込みが終わるまで持ち続ける
-    let blocker = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = blocker.local_addr().unwrap().port();
-    let runtime = load_ghost(
-        temp.path(),
-        &format!("[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\nport = {port}\n"),
-    );
+    let runtime = load_debug_ghost(temp.path());
 
-    assert!(!runtime.debug_enabled(), "listener must not be up");
     assert!(
         runtime.debug_source_map().is_some(),
-        "source map must be kept without a listener"
+        "scene map must be held"
+    );
+    assert!(runtime.debug_enabled(), "debug_enabled() must be true");
+    assert!(
+        lua_bool(&runtime, r#"return require("@pasta_debug").enabled()"#),
+        "@pasta_debug.enabled() must be true"
     );
 
     let line = LINE_GLOBAL_BODY.to_string();
     let value = value_of_200(&request(&runtime, "OnPastaSceneAt", &[REL_PATH, &line]));
-    assert!(
-        value.contains("大域の声"),
-        "plays by position without a listener: {value}"
-    );
-    drop(blocker);
+    assert!(value.contains("大域の声"), "plays by position: {value}");
 }
 
 /// 4.4・7.1: デバッグを無効にしたゴーストでは、2 つのイベントが 204 になる。
@@ -279,6 +274,15 @@ fn on_pasta_scene_at_plays_when_listener_cannot_bind() {
 fn scene_play_events_return_204_when_debug_disabled() {
     let temp = tempfile::TempDir::new().unwrap();
     let runtime = load_ghost(temp.path(), "[loader]\ndebug_mode = true\n");
+    assert!(
+        runtime.debug_source_map().is_none(),
+        "no scene map when disabled"
+    );
+    assert!(!runtime.debug_enabled(), "debug_enabled() must be false");
+    assert!(
+        !lua_bool(&runtime, r#"return require("@pasta_debug").enabled()"#),
+        "@pasta_debug.enabled() must be false"
+    );
 
     let line = LINE_GLOBAL_BODY.to_string();
     for (id, refs) in [

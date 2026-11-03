@@ -64,33 +64,8 @@ pub struct PastaLuaRuntime {
     config: Option<PastaConfig>,
     /// Base directory for resolving relative paths (persistence file, etc.).
     base_dir: Option<PathBuf>,
-    /// Runtime-scope debug backend handle (task 4.2).
-    ///
-    /// `Some` only when debugging was enabled at VM init (`config.debug.enabled`)
-    /// AND the listener could bind its port (a bind failure leaves it `None` while
-    /// `source_map` is still kept); the hook is installed exactly ONCE there and this handle owns the bridge
-    /// threads + transport + the runtime-scope `DebugSession`/`BreakpointSet`. It
-    /// is `None` on the disabled (default) zero-cost path — no hook, no port, no
-    /// `std_debug` (R5.2 / R5.3 / R5.5).
-    ///
-    /// Held at RUNTIME scope so breakpoint/session state set in one request
-    /// PERSISTS across subsequent requests (design "セッションライフサイクル"). Its
-    /// `Drop` (run after this struct's explicit `Drop` saves persistence) signals
-    /// `terminated` to any connected client and tears the transport/threads down
-    /// non-blockingly.
-    debug_handle: Option<crate::debug::DebugHandle>,
-    /// Aggregated `.pasta`↔`.lua` source map held at runtime scope (task 4.4).
-    ///
-    /// `Some` only when debugging is ENABLED in the resolved config
-    /// (`config.debug.enabled`) AND the loader built the map (after transpile) and
-    /// handed it to [`with_config`]→[`crate::debug::enable`] (requirements 3.1:
-    /// メモリ内保持 ＋ enable へ到達). It is kept even when the DAP listener could
-    /// not bind (no `debug_handle`; scene-play-event 4.3). When the listener is up,
-    /// the same `Arc` was cloned into the debug backend's wiring/session by `enable`; this field keeps a
-    /// runtime-scope clone so the map outlives a single request and is observable
-    /// (e.g. for diagnostics / sidecar). On the disabled (default) zero-cost path
-    /// it is `None` — the loader does not build a map and nothing is held
-    /// (requirements 7.1, byte-invariant).
+    /// シーンマップ。`Some` なのはローダがデバッグを有効と解決して作ったときだけで、
+    /// その有無が「デバッグが有効か」の唯一の値になる。ローダを通らない VM はいつも `None`。
     source_map: Option<Arc<SourceMap>>,
 }
 
@@ -123,28 +98,12 @@ impl PastaLuaRuntime {
     /// * `Ok(Self)` - Runtime initialized successfully
     /// * `Err(e)` - Lua VM or module registration failed
     pub fn with_config(context: TranspileContext, config: RuntimeConfig) -> LuaResult<Self> {
-        // No source map on the bare `with_config` entry point: callers that build
-        // the aggregated map (the loader, task 4.4) go through
-        // `with_config_and_source_map`. Passing `None` keeps the existing default
-        // `.lua` behavior (requirements 6.2 / 7.2) for ad-hoc / test runtimes.
+        // シーンマップを作るのはローダだけなので、この入口の VM はいつもデバッグが無効。
         Self::with_config_and_source_map(context, config, None)
     }
 
-    /// Like [`with_config`](Self::with_config) but additionally HANDS the
-    /// aggregated `.pasta`↔`.lua` source map to the debug enable choke point
-    /// (task 4.4).
-    ///
-    /// This is the runtime side of the design "runtime/mod.rs 168" handoff: the
-    /// loader builds the aggregated `Arc<SourceMap>` AFTER transpile (only when
-    /// debugging is enabled — task 4.3) and passes it here; this function holds it
-    /// at runtime scope and forwards it to [`crate::debug::enable`] together with
-    /// `config.debug` (which carries the resolved `source_mode`). The order is
-    /// therefore transpile/load → build map → enable-with-map (requirement 3.1).
-    ///
-    /// When `source_map` is `None` (debug disabled, or an ad-hoc runtime), this is
-    /// byte-for-byte the previous behavior: `enable` receives `None`, builds no
-    /// map wiring, and the disabled gate stays zero-cost (requirements 6.2 / 7.1 /
-    /// 7.2).
+    /// Like [`with_config`](Self::with_config) but holds the scene map the
+    /// loader built (only when debugging is enabled) as-is.
     pub(crate) fn with_config_and_source_map(
         context: TranspileContext,
         config: RuntimeConfig,
@@ -207,52 +166,11 @@ impl PastaLuaRuntime {
         // Register @toml module (always available, independent of RuntimeConfig.libs)
         Self::register_toml_module(&lua)?;
 
-        // Debug backend gate (task 4.2): the SINGLE enable choke point. After the
-        // VM is constructed and all modules are registered, install the debug hook
-        // exactly ONCE iff `config.debug.enabled`. When disabled (the default),
-        // `enable` returns `Ok(None)`: no hook, no port, no thread, no `std_debug`
-        // exposure, no `jit.off()` — true zero cost (R5.2 / R5.3 / R5.5). The
-        // returned handle lives at runtime scope so the `DebugSession` /
-        // `BreakpointSet` / transport persist across requests (design
-        // "セッションライフサイクル"). `DebugError` (`!Send`-safe, stringified) is
-        // mapped to `mlua::Error` at this boundary.
-        // Task 4.4: HAND the aggregated `.pasta` source map (built by the loader
-        // AFTER transpile, only when debugging is enabled) to the enable choke
-        // point. When enabled, `enable` clones the `Arc` into the backend
-        // wiring/session regardless of `config.debug.source_mode`; each consumer
-        // applies the `.pasta` behavior only while a map is present AND the
-        // effective mode is `Pasta`, so `Lua` mode / `None` map keeps the default
-        // `.lua` behavior (requirements 6.1 / 6.2 / 7.2). We keep a runtime-scope
-        // clone in `self.source_map` so the held map outlives a single request
-        // (requirement 3.1).
-        // pasta-scene-kick tasks 1.1 / 2.3: thread the host-injected kick sink
-        // (`RuntimeConfig.kick_sink`) through to the debug backend so an inbound
-        // `pasta/playSceneAt` / `pasta/reloadShiori` invokes it (R2.4). When debug
-        // is disabled or no sink was bound, the kick path stays inert (R2.6).
-        // Cloning is a refcount bump.
-        let debug_handle = crate::debug::enable(
-            &lua,
-            &config.debug,
-            source_map.clone(),
-            config.kick_sink.clone(),
-        )
-        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-
-        // 設定でデバッグが有効なら、待ち受けが立たなくて（ポートが取れず）handle が
-        // None でもマップを持ち続ける（scene-play-event 4.3：位置でのシーン再生と
-        // 索引の突合が使う）。無効のときはローダーがマップを作らず何も持たない（7.1）。
-        let source_map = if config.debug.enabled {
-            source_map
-        } else {
-            None
-        };
-
         Ok(Self {
             lua,
             logger: None,
             config: None,
             base_dir: None,
-            debug_handle,
             source_map,
         })
     }

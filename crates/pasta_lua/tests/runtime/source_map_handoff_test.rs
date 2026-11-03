@@ -1,13 +1,10 @@
-//! Task 4.4 — ランタイムへの集約ソースマップ受け渡しと提示モード供給（統合）。
+//! Task 4.4 — ランタイムへの集約ソースマップ受け渡し（統合）。
 //!
 //! 仕様参照:
 //! - requirements.md **3.1**（トランスパイル時にソースマップ生成が有効なとき、構築した
 //!   ソースマップをメモリ内に保持し、ブレークポイント解決/停止位置提示の双方向変換に
 //!   使用する）。本テストはオーケストレーション側、すなわち「トランスパイル→構築→
 //!   enable」の順でマップがランタイムへ到達・保持されることを表明する。
-//! - requirements.md **6.3**（作者がデバッグ構成で提示モードを指定すると、その
-//!   セッションに指定モードを適用する）。pasta.toml `[debug]` の提示モード/サイドカー
-//!   設定がファイル経由で resolve に供給され、解決済み設定へ反映されることを表明する。
 //! - design.md File Structure Plan `runtime/mod.rs` 168（集約 `Arc<SourceMap>` を保持し
 //!   `with_config`→`enable()` へ受け渡し）/ `loader/config.rs` 170（`[debug]` 提示モード
 //!   + サイドカー供給）。
@@ -19,13 +16,11 @@
 //!    構築した）集約 `Arc<SourceMap>` を保持し、デバッグハンドルも保持する。
 //! 2. **デバッグ無効時はマップ非構築（3.1/7.1）**: 既定（`[debug]` 無し）では
 //!    ランタイムはマップを保持しない（`None`）。ハンドルも無い（ゼロコスト）。
-//! 3. **ファイル提示モード反映（6.3）**: pasta.toml `[debug] present_as = "lua"` を
-//!    与えると、解決済みデバッグ設定の提示モードが `.lua` になる。
 
 use std::path::Path;
 
+use pasta_lua::RuntimeConfig;
 use pasta_lua::loader::{CacheManager, PastaLoader};
-use pasta_lua::{RuntimeConfig, SourceMode};
 
 /// テスト用に base_dir を作り、`.pasta` と指定の pasta.toml を配置する。
 /// pasta_scripts / scriptlibs はクレートルートからコピーしてランタイム初期化を成立させる。
@@ -148,34 +143,5 @@ debug_mode = true
     assert!(
         runtime.debug_source_map().is_none(),
         "3.1/7.1: disabled debug must NOT build/hold a source map"
-    );
-}
-
-/// 6.3: pasta.toml `[debug] present_as = "lua"` を与えると、解決済みデバッグ設定の
-/// 提示モードが `.lua` になる（env/attach 上書き無し）。
-#[test]
-fn file_present_as_lua_is_applied_to_resolved_debug_config() {
-    let temp = tempfile::TempDir::new().unwrap();
-    make_base_dir(
-        temp.path(),
-        "\
-[loader]
-debug_mode = true
-
-[debug]
-enabled = true
-port = 0
-present_as = \"lua\"
-",
-    );
-
-    let runtime = PastaLoader::load_with_config(temp.path(), RuntimeConfig::new())
-        .expect("loader must build runtime with present_as=lua");
-
-    assert!(runtime.debug_enabled(), "enabled debug runtime");
-    assert_eq!(
-        runtime.debug_source_mode(),
-        Some(SourceMode::Lua),
-        "6.3: pasta.toml [debug] present_as=\"lua\" must be applied to the session"
     );
 }

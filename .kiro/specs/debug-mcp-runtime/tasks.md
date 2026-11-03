@@ -43,7 +43,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 9.1_
 
 - [ ] 4. DAP を撤去する（pasta_lua）
-- [ ] 4.1 ランタイムから DAP の結線を外し、「デバッグが有効か」をシーンマップの有無にする
+- [x] 4.1 ランタイムから DAP の結線を外し、「デバッグが有効か」をシーンマップの有無にする
   - ランタイムの待ち受けの持ち物とフック・`jit.off()`・待ち受けを起こす呼び出しを消し、受けたシーンマップをそのまま持つ
   - 待ち受けのアドレスと提示モードの問い合わせを消し、「デバッグが有効か」の問い合わせはシーンマップを持つかを返す
   - `RuntimeConfig` のデバッグとキックの欄・設定の口・そのテストを消す。ファクトリの 2 回目の解決を消し、`@pasta_debug.enabled()` をシーンマップの有無から決める
@@ -219,3 +219,4 @@
 ## Implementation Notes
 - 1.1: 読み込みの終わりの指示を足すと max_level_hint が info より下がらないため、`tracing::enabled!(INFO)` は層ごとのフィルタでも true になる。ログの絞り込みを確かめるテストは `enabled!` でなく pasta.log の中身か DEBUG で見分ける。
 - 2.1: `multi_instance_test::dap_kick_reaches_only_its_own_instance` は 2.1 の後 2.2 で消すまで赤い（キックの経路が無いため）。
+- 4.1: `tests/fixtures/debug_break_coalesce.pasta` は `src/debug/wiring_pasta_break_coalesce_e2e.rs` が include_str! で読むため残した。4.2 で wiring と一緒に消す。`loader/source_map_build.rs` の `crate::debug::enable` への doc リンクと `tests/runtime/source_map_handoff_test.rs` 冒頭の「デバッグハンドル」の文言も 4.2/4.3 で直す。

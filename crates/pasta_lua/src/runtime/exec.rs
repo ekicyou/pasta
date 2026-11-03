@@ -4,7 +4,6 @@
 //! scripts and the read-only accessors (split impl pattern).
 
 use super::PastaLuaRuntime;
-use crate::debug::SourceMode;
 use crate::debug::source_map::SourceMap;
 use crate::loader::PastaConfig;
 use crate::logging::PastaLogger;
@@ -32,13 +31,10 @@ impl PastaLuaRuntime {
         self.lua.load(script).eval()
     }
 
-    /// Execute a Lua script string under an explicit chunk name (the `source`
-    /// reported to the debugger).
+    /// Execute a Lua script string under an explicit chunk name.
     ///
-    /// Identical to [`exec`](Self::exec) but sets the chunk name so a debugger
-    /// breakpoint keyed on that source (the generated `.lua` name) matches. The
-    /// transpiled-module load path already names its chunks; this is the analogous
-    /// entry point for ad-hoc / per-request script execution under a known source.
+    /// Identical to [`exec`](Self::exec) but sets the chunk name, which error
+    /// messages and tracebacks report as the source.
     ///
     /// # Safety (input source analysis)
     /// Same as [`exec`](Self::exec): callers pass transpiled Lua or Rust string
@@ -48,43 +44,14 @@ impl PastaLuaRuntime {
         self.lua.load(script).set_name(name).eval()
     }
 
-    /// The bound DAP listen address when the debug backend is active, else `None`.
-    ///
-    /// `Some(addr)` only when this runtime was built with `config.debug.enabled`
-    /// and the transport bound a port (the OS-assigned concrete port is readable
-    /// here even when port 0 was requested — R3.1). On the disabled default path
-    /// this is always `None` (no port is ever opened — R5.5), which doubles as the
-    /// zero-cost assertion hook for tests.
-    pub fn debug_local_addr(&self) -> Option<std::net::SocketAddr> {
-        self.debug_handle.as_ref().and_then(|h| h.local_addr())
-    }
-
-    /// Whether the debug backend is active for this runtime (a handle is held).
+    /// デバッグが有効か（シーンマップを持つか）。`@pasta_debug.enabled()` と同じ値。
     pub fn debug_enabled(&self) -> bool {
-        self.debug_handle.is_some()
+        self.source_map.is_some()
     }
 
-    /// The aggregated `.pasta`↔`.lua` source map held at runtime scope, or `None`.
-    ///
-    /// `Some` only when debugging is ENABLED in the resolved config and the loader
-    /// built and handed the map to the enable path (task 4.4 / requirement 3.1),
-    /// even if the DAP listener could not bind (scene-play-event 4.3). On the
-    /// disabled (default) zero-cost path this is always `None` — no map is built
-    /// (requirement 7.1). The returned `Arc` is a cheap refcount clone of the same
-    /// immutable map the debug backend wiring consumes.
+    /// シーンマップ。デバッグが有効なときだけ `Some`。
     pub fn debug_source_map(&self) -> Option<Arc<SourceMap>> {
         self.source_map.clone()
-    }
-
-    /// The resolved source-presentation mode for the active debug session, or
-    /// `None` when debugging is disabled.
-    ///
-    /// Reflects the precedence `DAP attach 引数 > env > pasta.toml [debug]
-    /// present_as > 既定 .pasta` resolved into `config.debug.source_mode`
-    /// (requirements 6.1 / 6.3). Reads from the held [`crate::debug::DebugHandle`]
-    /// so it mirrors exactly what `enable` was configured with.
-    pub fn debug_source_mode(&self) -> Option<SourceMode> {
-        self.debug_handle.as_ref().map(|h| h.config().source_mode)
     }
 
     /// Execute a Lua script from a file.

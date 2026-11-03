@@ -44,10 +44,8 @@ impl PastaLuaRuntime {
     /// * `runtime_config` - Runtime configuration
     /// * `pasta_config` - Pasta configuration from pasta.toml
     /// * `logger` - Optional instance-specific logger (Arc-wrapped for sharing)
-    /// * `source_map` - Optional aggregated `.pasta`↔`.lua` source map built by the
-    ///   loader AFTER transpile, ONLY when debugging is enabled (task 4.3/4.4).
-    ///   `None` on the disabled (default) zero-cost path, where nothing is built or
-    ///   held (requirements 3.1 / 7.1).
+    /// * `source_map` - シーンマップ。ローダがデバッグを有効と解決したときだけ `Some`。
+    ///   その有無が「デバッグが有効か」になる（`@pasta_debug.enabled()` も同じ値）。
     ///
     /// # Returns
     /// * `Ok(Self)` - Runtime initialized and scene_dic loaded
@@ -59,26 +57,11 @@ impl PastaLuaRuntime {
         logger: Option<Arc<PastaLogger>>,
         source_map: Option<Arc<SourceMap>>,
     ) -> LuaResult<Self> {
-        // Derive the debug gate BEFORE building the VM (task 4.2/4.4): funnel the
-        // pasta.toml `[debug]` section (`PastaConfig::debug()` — now carrying
-        // `present_as`/`source_map_sidecar`, task 4.4) plus the `PASTA_DEBUG*`
-        // environment through the single pure `DebugConfig::resolve` choke point and
-        // attach it to `runtime_config`. `with_config_and_source_map` then performs
-        // the SINGLE `debug::enable` at VM init, HANDING the aggregated source map
-        // (built by the loader after transpile) to it (requirement 3.1 ordering:
-        // transpile → build map → enable-with-map). When there is no `[debug]`
-        // section (and no env override) this resolves to the disabled, zero-cost
-        // default and `source_map` is `None` (R5.2 / R5.5 / 7.1).
-        let debug_file = pasta_config.as_ref().and_then(|c| c.debug());
-        let runtime_config = runtime_config.with_debug_from_file_and_env(debug_file.as_ref());
         // finalize_scene must re-register @pasta_search with the SAME alias table
         // as the initial registration inside `with_config_and_source_map`.
         let scene_aliases = runtime_config.scene_aliases.clone();
-        // `@pasta_debug.enabled()` は待ち受けの有無ではなく解決した設定の値を見る（4.2）。
-        let debug_enabled = runtime_config.debug.enabled;
 
-        // Create base runtime (installs the debug hook exactly once iff enabled,
-        // and holds + forwards the source map to enable when present).
+        // Create base runtime (holds the scene map when debugging is enabled).
         let mut runtime =
             Self::with_config_and_source_map(TranspileContext::new(), runtime_config, source_map)?;
 
@@ -110,7 +93,7 @@ impl PastaLuaRuntime {
         // Register internal @pasta_debug module (production entry only; scene-play-event 2.3)
         Self::register_debug_module(
             &runtime.lua,
-            debug_enabled,
+            runtime.debug_enabled(),
             runtime.source_map.clone(),
             &loader_context.base_dir,
         )?;
@@ -163,7 +146,7 @@ impl PastaLuaRuntime {
                     }
                 }
                 Err(e) => {
-                    // 突合自体の失敗は非致命: 索引なしでも通常実行・既存 kick は不変。
+                    // 突合自体の失敗は非致命: 索引なしでも通常実行は変わらない。
                     tracing::warn!(error = %e, "scene identity index join failed; continuing without index (task 2.2, best-effort)");
                 }
             }
