@@ -435,8 +435,12 @@
 - **保存変数を表示**: `variables.toml` は新しくならず、案内（`[debug] enabled = true`）が出た。`OnPastaDumpVariables` は `debug-mcp-runtime` が作る前なので、想定どおり。
 - **ドライブ文字の大小**: 本物の `vscode.Uri.fsPath` はドライブ文字が小文字（`c:\…`）になる。`get_property(baseware.name, ghost_name="c:\home\maz\git\ghost_dev\debug\emo2-debug")` に SSP は `SSP` と答えた（大文字・小文字を区別しない）。
 
-残り（開発者の手で行う）:
+VSCode の画面からの確かめ（2026-11-03 13:20〜13:23・開発者が操作）:
 
-- 開発の拡張（F5 の Extension Development Host）から、右クリックのメニューで 3 つのコマンドを通す。
-- 「シーンの実行 → 辞書の編集 → もう一度の実行」を撮り、`book/src/debug/dev-actions.md` の動画を差し替える。
-- areka が動く機械では、areka へも通す。
+- 開発の拡張（Extension Development Host）で emo2-debug を開き、右クリックのメニューから「▶ シーンを実行」（`boot.pasta` 13 行）→ 14 行の台詞を書き換えて再び「▶ シーンを実行」→「SHIORI をリロード」→「保存変数を表示」を通した。
+- 出力のパネル「Pasta 開発」に、コマンドごとの頭の行（時刻・コマンド名・えも2DEBUG（`c:\home\maz\git\ghost_dev\debug\emo2-debug`）→ SSP 127.0.0.1:9801）が出た。ルートはドライブ文字が小文字の fsPath のまま送られ、SSP は答えた。
+- ▶ シーンを実行: 毎回「読み込みは誤り無く終わりました」の後に台本が出て、ゴーストが喋った。書き換えた台詞は 2 回目の再生に反映された（未保存の文書は保存されて送られた）。
+- SHIORI をリロード: 「読み込みは誤り無く終わりました」。
+- 保存変数を表示: 「variables.toml は新しく書き出されませんでした」と案内（OnPastaDumpVariables は debug-mcp-runtime の後で働く）。
+- この流れを録画し、`book/src/debug/media/dev-actions-demo.mp4`（1440x900・1 分 51 秒）を差し替えた。
+- areka は動いていなかったので確かめていない。
