@@ -58,7 +58,8 @@ impl SceneAttrValue {
 impl std::fmt::Display for SceneAttrValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SceneAttrValue::Integer(v) => write!(f, "{}", v),
+            // Lua の数は倍精度なので、15 桁以上の整数も tostring と同じ見え方にする
+            SceneAttrValue::Integer(v) => f.write_str(&lua_number(*v as f64)),
             SceneAttrValue::Float(v) => f.write_str(&lua_number(*v)),
             SceneAttrValue::String(v) => f.write_str(v),
         }
@@ -181,6 +182,14 @@ mod tests {
     fn display_number_notation() {
         assert_eq!(SceneAttrValue::Integer(500).to_string(), "500");
         assert_eq!(SceneAttrValue::Integer(-2).to_string(), "-2");
+        assert_eq!(
+            SceneAttrValue::Integer(12345678901234).to_string(),
+            "12345678901234"
+        );
+        assert_eq!(
+            SceneAttrValue::Integer(123456789012345).to_string(),
+            "1.2345678901234e+14"
+        );
         assert_eq!(SceneAttrValue::Float(1.5).to_string(), "1.5");
         assert_eq!(SceneAttrValue::Float(0.25).to_string(), "0.25");
         assert_eq!(SceneAttrValue::Float(0.5).to_string(), "0.5");

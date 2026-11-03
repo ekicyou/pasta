@@ -142,3 +142,5 @@
 - 1.4 でテストの 2 行のファイル属性を 1 行にまとめるとき、2 行目は空行で残す（生成 Lua に行番号が入るのでスナップショットがずれる）。
 - SceneAttrValue の Float の Display は 5.2 で LuaJIT の tostring（%.14g）にそろえた。Lua へ出す数の字句（scope_gen.rs の f.to_string()）は正確に戻る表記のままで、Display と混ぜない。
 - 4.4 の finalize_scene_impl の呼び出しで属性を渡していることを直接見るテストは無い（@pasta_search が属性を出さないため）。属性で絞り込む口が入る spec（scene-condition-attributes）で端から端までの確認を足す。
+- 最終検証で Integer の Display も lua_number を通すようにした（15 桁以上の整数と 2^53 を超える整数で Lua の tostring と見え方がずれていた）。
+- finalize.rs の build_scene_registry は統合テストから呼ぶため pub にした（設計では非公開）。
