@@ -4,11 +4,13 @@
 --- SSP が発火する OnChoiceSelectEx を受信し、選択IDでシーンを自動ルーティングする。
 --- 明示的な ＊OnChoiceSelectEx シーンが存在すれば優先実行する。
 --- マッチシーンが見つかればコルーチンを返し、見つからなければ nil を返す（204 委譲）。
+--- 名前に合うシーンはあるが条件を満たす候補が無ければ止まるエラーを投げる（SCENE_UNMET）。
 --- ゴースト開発者は REG.OnChoiceSelectEx を上書きしてカスタムハンドラを設定可能。
 
 local REG = require("pasta.shiori.event.register")
 local SCENE = require("pasta.scene")
 local STORE = require("pasta.store")
+local FAILURE = require("pasta.failure")
 
 --- 選択IDの Reference インデックス
 --- ukadoc 仕様: \q[title,id] → Reference0=title, Reference1=id
@@ -22,7 +24,7 @@ local CHOICE_SCOPE_REF_INDEX = 2
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス可能）
 ---@return thread|nil シーンコルーチン、またはnil
 REG.OnChoiceSelectEx = REG.OnChoiceSelectEx or function(act)
-    -- 1. 明示的 ＊OnChoiceSelectEx シーンが存在すれば優先実行（3.5）
+    -- 1. 明示的 ＊OnChoiceSelectEx シーンが存在すれば優先実行（3.5）。イベントとして扱い、条件漏れなら次へ
     local explicit = SCENE.co_exec(act, "OnChoiceSelectEx", nil, nil)
     if explicit then
         return explicit
@@ -50,8 +52,16 @@ REG.OnChoiceSelectEx = REG.OnChoiceSelectEx or function(act)
     if not (type(scope) == "string" and SCENE.get_global_table(scope)) then
         scope = STORE.last_global_scene
     end
-    local result = SCENE.search(choice_id, scope)
-        or SCENE.search(choice_id, nil)
+    --    act を渡して条件で絞る。どちらにも無く、どちらかが条件漏れなら止まるエラー（名前が無ければ 204）
+    local result, miss = SCENE.search(choice_id, scope, act)
+    if not result then
+        local global_miss
+        result, global_miss = SCENE.search(choice_id, nil, act)
+        miss = miss or global_miss
+    end
+    if not result and miss == "unmet" then
+        FAILURE.raise({ label = FAILURE.LABEL.SCENE_UNMET, subject = "OnChoiceSelectEx ＞" .. choice_id })
+    end
     if not result or type(result.func) ~= "function" then
         return nil
     end

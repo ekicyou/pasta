@@ -42,7 +42,15 @@ REG.OnPastaCallFunction = REG.OnPastaCallFunction or function(act)
     if not FAILURE.is_name(name) then return FAILURE.bad_reference0(act, event, name) end
 
     -- ＞名前 と同じ探し方（skip_methods は渡さない。act のメソッドにも届く）
-    local handler = act:find_handler("scene", name)
+    local handler, miss = act:find_handler("scene", name)
+    -- 条件漏れも止めずに表記の応答にする（場面の続きを変えない）
+    if handler == nil and miss == "unmet" then
+        return FAILURE.reply(act, {
+            label = FAILURE.LABEL.SCENE_UNMET,
+            subject = event .. " ＞" .. name,
+            warning = event .. ": no scene meets the conditions: name='" .. name .. "'",
+        })
+    end
     if type(handler) ~= "function" then
         return FAILURE.reply(act, {
             label = FAILURE.LABEL.SCENE_NOT_FOUND,

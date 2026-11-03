@@ -385,6 +385,113 @@ describe("OnChoiceSelectEx auto-routing handler", function()
     end)
 
     -- ================================================================
+    -- scene-condition-attributes 3.4: 条件漏れ（2.6, 3.2）
+    -- ================================================================
+    --- scope（ローカルは名前・グローバルは "<global>"）ごとの戻り値 { result, miss } で SCENE.search を差し替える
+    local function stub_search(results, calls)
+        SCENE.search = function(name, global_scene_name, act)
+            local scope = global_scene_name or "<global>"
+            if calls then calls[#calls + 1] = { name = name, scope = scope, act = act } end
+            local r = results[name .. "@" .. scope] or {}
+            return r[1], r[2]
+        end
+    end
+    local UNMET = { nil, "unmet" }
+    local function hit(text)
+        return { { func = function(act) act.sakura:talk(text) end } }
+    end
+
+    --- ハンドラを呼び、投げた値を返す（投げなければ nil と戻り値）
+    local function raised_by(act)
+        local ok, err = pcall(REG.OnChoiceSelectEx, act)
+        if ok then return nil, err end
+        return err
+    end
+
+    test("passes act to both choice searches (2.6)", function()
+        setup()
+        local calls = {}
+        stub_search({}, calls)
+        STORE.last_global_scene = "Scope"
+        local act = SHIORI_ACT.new(make_actors(), make_req("c"))
+        REG.OnChoiceSelectEx(act)
+
+        local seen = {}
+        for _, c in ipairs(calls) do
+            if c.name == "c" then seen[#seen + 1] = c.act == act end
+        end
+        expect(table.concat({ tostring(seen[1]), tostring(seen[2]) }, ",")):toBe("true,true")
+        teardown()
+    end)
+
+    test("local unmet and global not found raises SCENE_UNMET stop error (3.2)", function()
+        setup()
+        stub_search({ ["c@Scope"] = UNMET })
+        STORE.last_global_scene = "Scope"
+        local err = raised_by(SHIORI_ACT.new(make_actors(), make_req("c")))
+
+        local FAILURE = require("pasta.failure")
+        expect(FAILURE.is_raised(err)):toBe(true)
+        expect(err.label):toBe(FAILURE.LABEL.SCENE_UNMET)
+        expect(err.subject):toBe("OnChoiceSelectEx ＞c")
+        teardown()
+    end)
+
+    test("local not found and global unmet raises SCENE_UNMET stop error (3.2)", function()
+        setup()
+        stub_search({ ["c@<global>"] = UNMET })
+        STORE.last_global_scene = "Scope"
+        local err = raised_by(SHIORI_ACT.new(make_actors(), make_req("c")))
+
+        expect(require("pasta.failure").is_raised(err)):toBe(true)
+        expect(err.subject):toBe("OnChoiceSelectEx ＞c")
+        teardown()
+    end)
+
+    test("local unmet but global found runs the global scene (2.6)", function()
+        setup()
+        stub_search({ ["c@Scope"] = UNMET, ["c@<global>"] = hit("global ok") })
+        STORE.last_global_scene = "Scope"
+        local act = SHIORI_ACT.new(make_actors(), make_req("c"))
+        local err, co = raised_by(act)
+
+        expect(err):toBe(nil)
+        expect(type(co)):toBe("thread")
+        local ok, value = coroutine.resume(co, act)
+        expect(ok):toBe(true)
+        expect(value:find("global ok")):toBeTruthy()
+        teardown()
+    end)
+
+    test("explicit OnChoiceSelectEx scene unmet goes on to choice routing (2.5, 3.3)", function()
+        setup()
+        stub_search({
+            ["OnChoiceSelectEx@<global>"] = UNMET,
+            ["c@<global>"] = hit("routed"),
+        })
+        STORE.last_global_scene = nil
+        local act = SHIORI_ACT.new(make_actors(), make_req("c"))
+        local err, co = raised_by(act)
+
+        expect(err):toBe(nil)
+        expect(type(co)):toBe("thread")
+        local ok, value = coroutine.resume(co, act)
+        expect(ok):toBe(true)
+        expect(value:find("routed")):toBeTruthy()
+        teardown()
+    end)
+
+    test("explicit scene unmet and choice not found stays 204 (3.3)", function()
+        setup()
+        stub_search({ ["OnChoiceSelectEx@<global>"] = UNMET })
+        local err, result = raised_by(SHIORI_ACT.new(make_actors(), make_req("c")))
+
+        expect(err):toBe(nil)
+        expect(result):toBe(nil)
+        teardown()
+    end)
+
+    -- ================================================================
     -- Handler registration
     -- ================================================================
     test("handler is registered as REG.OnChoiceSelectEx", function()
