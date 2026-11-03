@@ -528,7 +528,7 @@ end
 - `block-structure.md#属性`: 「まだ評価されず」を、条件・フラグ・比べ方・`＆優先`（独占の意味を最初に。使い所と `＆重み` との違い）の説明と例に書き換える（5.10・9.1）。
 - `call-jump.md`: 「候補の選択」に並び・巡・最大 1 巡待つこと・`＆優先` で急がせること（4.7）。「Call が失敗したとき」に条件漏れの止まるエラーとイベントの 204 と「見つからない」の違い（9.2）。段の表の 2 段目・5 段目に条件漏れの通り抜け（3.5）。「シーン数」に「条件も見ない」の一言（9.6）。
 - `variables.md`: エンジンが入れる変数に自動転記、自分で同じ名前に入れているゴーストへの注意、2 つの転記の関数は「取り直し」用（6.6・6.7・9.3）。
-- `script-api.md`・`lua/modules/pasta-search.md`・`lua/shiori-events.md`: `SCENE.search` の 3 つ目の引数、`search_scene` の `var`・`save`・`"unmet"`、イベントの act に最初から入る変数、選択肢・`OnPastaCallFunction` の条件漏れ（9.4）。
+- `script-api.md`・`lua/modules/pasta-search.md`・`lua/shiori-events.md`: `SCENE.search` の 3 つ目の引数、`search_scene` の `var`・`save`・`"unmet"`（**表を渡さなければ条件も優先の段も見ない**ことを明記する。Lua から直に呼ぶゴーストが黙って条件を飛ばさないため。テストは `scene_cond_search_test.rs` で固定する）、イベントの act に最初から入る変数、選択肢・`OnPastaCallFunction` の条件漏れ（9.4）。
 - `internals/registry-search.md`・`internals/internal-modules.md`: 絞り込みの記述を述語と並びの形に直す（9.5）。
 - `reference/runtime-failures.md`: 種類の表に「条件に合うシーンが無い」（止まるエラーの 3 種目）。
 - `debug/validate.md`: 報告の表に 3 つ（8.6）。
