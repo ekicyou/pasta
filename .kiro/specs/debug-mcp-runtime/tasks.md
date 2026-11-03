@@ -187,7 +187,7 @@
   - 完了の姿: 章が書き直され、`SUMMARY.md` の題が合う
   - _Requirements: 8.1, 8.5_
 
-- [ ] 10.2 リファレンスの設定とイベントの頁を直す
+- [x] 10.2 リファレンスの設定とイベントの頁を直す
   - `reference/pasta-toml.md` の `[debug]` 節を `enabled` だけにし、古いキーを読み飛ばすことと環境変数は `PASTA_DEBUG` だけであることを書く。`#提示モードの切替` へのリンクを外す。`[logging]` 節に、読み込みの終わりの行は `level`・`filter` によらず書くことを 1 行足す
   - `lua/shiori-events.md` に `OnPastaDumpVariables`（引数・書き出す先・応答・失敗）を足し、3 つのイベントの共通の決まりをまとめ、待ち受けと URI の話を除く
   - 完了の姿: 2 つの頁に DAP・ポート・URI の記述が無い

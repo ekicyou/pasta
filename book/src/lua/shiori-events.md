@@ -116,7 +116,7 @@ off()
 
 ### 既定ハンドラと上書き
 
-次の表のイベントとリソースの ID（12 行）には、pasta が既定のハンドラを `REG` に登録している。ゴーストが `REG` の同じキーにハンドラを代入すると、そのイベントでは既定ハンドラの代わりにゴーストのハンドラが呼ばれる。
+次の表のイベントとリソースの ID（13 行）には、pasta が既定のハンドラを `REG` に登録している。ゴーストが `REG` の同じキーにハンドラを代入すると、そのイベントでは既定ハンドラの代わりにゴーストのハンドラが呼ばれる。
 
 | イベント | 既定ハンドラの動作 |
 | -------- | ------------------ |
@@ -127,6 +127,7 @@ off()
 | `OnSecondChange` | コールバックのタイムアウト処理と、仮想ディスパッチャによる OnTalk・OnHour の発行を行う（[OnSecondChange](#onsecondchange)） |
 | `OnPastaScene` | デバッグが有効なとき、名前で指名したシーンを再生する（[OnPastaScene](#onpastascene名前でシーンを再生)） |
 | `OnPastaSceneAt` | デバッグが有効なとき、ファイルと行で指名したシーンを再生する（[OnPastaSceneAt](#onpastasceneat位置でシーンを再生)） |
+| `OnPastaDumpVariables` | デバッグが有効なとき、グローバル変数をファイルに書き出す（[OnPastaDumpVariables](#onpastadumpvariablesグローバル変数を書き出す)） |
 | `OnPastaCallFunction` | Reference0 の名前を、辞書の `＞名前` と同じ探し方で呼ぶ（[OnPastaCallFunction](#onpastacallfunction名前を外から呼ぶ)） |
 | `OnPastaSetSaveVariable` | Reference2 の型に従って Reference1 をグローバル変数に代入する（[OnPastaSetSaveVariable](#onpastasetsavevariableグローバル変数に代入)） |
 | `sakura.recommendsites`・`kero.recommendsites`・`sakura.portalsites`（と、別名表の置き換え先にある `char<数字>.recommendsites`） | メニューのシーンを動かし、`＞おすすめ項目`・`＞おすすめ区切り` で並べた項目をメニューの中身として返す（[おすすめメニュー](../grammar/call-jump.md#おすすめメニュー)・[リソースの問い合わせを受ける](#リソースの問い合わせを受ける)） |
@@ -345,6 +346,7 @@ end
 | 時計 | `OnPastaClock` | `REG` より先に処理される（仮想時刻の読み取り） |
 | デバッグ | `OnPastaScene` | あり（名前で指名したシーンを再生。デバッグが有効なときだけ） |
 | デバッグ | `OnPastaSceneAt` | あり（位置で指名したシーンを再生。デバッグが有効なときだけ） |
+| デバッグ | `OnPastaDumpVariables` | あり（グローバル変数をファイルに書き出す。デバッグが有効なときだけ） |
 | 外からの操作 | `OnPastaCallFunction` | あり（`＞名前` と同じ呼び出し。いつでも） |
 | 外からの操作 | `OnPastaSetSaveVariable` | あり（グローバル変数への代入。いつでも） |
 
@@ -563,7 +565,7 @@ end
 2. [仮想ディスパッチャ](#仮想ディスパッチャ)を呼び、OnHour（時報）・OnTalk（ランダムトーク）を発行する。
 3. 何も発行しなかった回で、Status に[ブロック対象のキーワード](#ブロック対象-status-キーワード)が無く、仮想時刻の読み取りを予約していれば、読み取りのさくらスクリプトを返す（[OnPastaClock](#onpastaclock仮想時刻の読み取り)）。
 
-`REG.OnSecondChange` を上書きすると、OnTalk・OnHour の発行、コールバックのタイムアウト処理、デバッグのシーン再生、仮想時刻の読み取りがすべて止まる。毎秒の処理を足すときは、`REG:register` で重ねる（[ハンドラを重ねる](#ハンドラを重ねるregregister)）か、既定ハンドラを変数に取っておき、上書きしたハンドラから呼び出す（代入の置き場所は [既定ハンドラと上書き](#既定ハンドラと上書き) のとおり）。
+`REG.OnSecondChange` を上書きすると、OnTalk・OnHour の発行、コールバックのタイムアウト処理、仮想時刻の読み取りがすべて止まる。毎秒の処理を足すときは、`REG:register` で重ねる（[ハンドラを重ねる](#ハンドラを重ねるregregister)）か、既定ハンドラを変数に取っておき、上書きしたハンドラから呼び出す（代入の置き場所は [既定ハンドラと上書き](#既定ハンドラと上書き) のとおり）。
 
 ```lua
 local REG = require("pasta.shiori.event.register")
@@ -660,7 +662,7 @@ end
 
 ### OnPastaScene（名前でシーンを再生）
 
-名前で指名したシーンを、その場で再生する。pasta の組み込みのイベントで、ベースウェアが自分から送ることはない。AI エージェントなどが、SSP の MCP サーバーの `raise_event` で送る（[MCP からの呼び方](#mcp-からの呼び方)）。デバッグを有効にしたときだけ動く（[シーンを再生するイベントの共通の決まり](#シーンを再生するイベントの共通の決まり)）。
+名前で指名したシーンを、その場で再生する。pasta の組み込みのイベントで、ベースウェアが自分から送ることはない。AI エージェントなどが、SSP の MCP サーバーの `raise_event` で送る（[MCP からの呼び方](#mcp-からの呼び方)）。デバッグを有効にしたときだけ動く（[開発用のイベントの共通の決まり](#開発用のイベントの共通の決まり)）。
 
 | Reference | 内容 |
 | --------- | ---- |
@@ -695,7 +697,7 @@ end
 
 ### OnPastaSceneAt（位置でシーンを再生）
 
-ファイルと行で指名したシーンを、その場で再生する。`OnPastaScene` と同じく pasta の組み込みのイベントで、デバッグを有効にしたときだけ動く（[シーンを再生するイベントの共通の決まり](#シーンを再生するイベントの共通の決まり)）。同じ名前のシーンが複数あっても、狙った 1 つを再生できる。
+ファイルと行で指名したシーンを、その場で再生する。`OnPastaScene` と同じく pasta の組み込みのイベントで、デバッグを有効にしたときだけ動く（[開発用のイベントの共通の決まり](#開発用のイベントの共通の決まり)）。同じ名前のシーンが複数あっても、狙った 1 つを再生できる。
 
 | Reference | 内容 |
 | --------- | ---- |
@@ -722,15 +724,7 @@ end
 
 ### シーンを再生するイベントの共通の決まり
 
-`OnPastaScene`・`OnPastaSceneAt` の 2 つに共通する決まりである。
-
-**デバッグが有効なときだけ動く**
-
-- `pasta.toml` の `[debug]` の `enabled = true` か、環境変数 `PASTA_DEBUG` でデバッグを有効にしたときだけ、シーンを再生する（[デバッグの有効化](../debug/index.md#デバッグの有効化)）。
-- 有効かどうかは設定だけで決まる。VSCode のデバッグの待ち受けが立たなかった（ポートが取れなかった）ときも再生する。
-- デバッグが無効なときは、シーンを再生せずに 204 No Content を返し、ログに警告 `OnPastaScene: debug is disabled; scene not played`（イベント名は届いたもの）を書く。
-- `SecurityLevel` が `external` のリクエストは、デバッグが有効でも再生せずに 204 No Content を返し、ログに警告 `OnPastaScene: SecurityLevel external is refused; scene not played` を書く。
-- 断るときは引数を見ないので、失敗の表記は出ない。204 の理由は、pasta のログ（既定は `profile/pasta/logs/pasta.log`）でだけ分かる。
+`OnPastaScene`・`OnPastaSceneAt` の 2 つに共通する決まりである。デバッグが有効なときだけ動くことなど、[OnPastaDumpVariables](#onpastadumpvariablesグローバル変数を書き出す) とも共通する決まりは、[開発用のイベントの共通の決まり](#開発用のイベントの共通の決まり)にある。
 
 **再生と続き**
 
@@ -747,10 +741,52 @@ end
 - 表記は既定でこのイベントの応答（200 OK の `Value`）に載る。表記を出さない設定（`[logging]` の `balloon_warning = false`）では 204 No Content になる。ログの警告は、どちらの設定でも出る。
 - `Value` の中では、表記に入ったパスの `\` が `\\` になる（さくらスクリプトとして働かないように直す）。
 
+### OnPastaDumpVariables（グローバル変数を書き出す）
+
+動いているゴーストのグローバル変数（`＄＊名前`。Lua の `save` の表）を、そのときの値で TOML のファイルに書き出す。喋らない。`OnPastaScene` と同じく pasta の組み込みのイベントで、デバッグを有効にしたときだけ動く（[開発用のイベントの共通の決まり](#開発用のイベントの共通の決まり)）。グローバル変数の保存（`save.toml`）はランタイムの終了時なので、動いている間の値は、このイベントで書き出して確かめる。
+
+- 引数は見ない。Reference は無くてよい。
+- 書き出す先は `ghost/master/profile/pasta/debug/variables.toml` である。前のファイルは置き換え、フォルダが無ければ作る。
+- 応答は、いつも 204 No Content である。ファイルは応答を返す前に書き終えているので、応答の直後に読めば、そのときの値がある。
+- 書き出しの変換はセーブと同じで、`[persistence]` の `obfuscate` によらず、いつもテキストの TOML で書く（[@pasta_persistence](modules/pasta-persistence.md)）。
+- TOML に書けない値（関数など）は、そのキーを飛ばして残りを書き、ログに警告 `key '名前' was not saved: 理由` を書く。セーブと同じである（[書ける値と書けない値](modules/pasta-persistence.md#書ける値と書けない値)）。
+- グローバル変数・`save.toml`・チェイントークで待っている続きは変えない。何度送っても、そのときの値でファイルを置き換えるだけである。
+
+ファイルを書けない（フォルダが作れない・書き込みが拒まれた）ときは、ログに警告を 1 行書いて 204 No Content を返す。書きかけのファイルは残さず、前のファイルも消さない。失敗の表記は出ない。
+
+| 場合 | 表記 | ログの警告 |
+| ---- | ---- | ---------- |
+| ファイルを書けない | （出ない） | `OnPastaDumpVariables: could not write <パス>: <理由>` |
+
+グローバル変数が `＄＊好感度＝３`・`＄＊名前＝「まさお」` のとき、`variables.toml` は次のようになる。
+
+```toml
+好感度 = 3
+名前 = "まさお"
+```
+
+### 開発用のイベントの共通の決まり
+
+`OnPastaScene`・`OnPastaSceneAt`・`OnPastaDumpVariables` の 3 つ（開発用のイベント）に共通する決まりである。
+
+**デバッグが有効なときだけ動く**
+
+- `pasta.toml` の `[debug]` の `enabled = true` か、環境変数 `PASTA_DEBUG` でデバッグを有効にしたときだけ働く（[[debug]](../reference/pasta-toml.md#debugデバッグ)・[デバッグの有効化](../debug/index.md#デバッグの有効化)）。
+- デバッグが無効なときは、何もせずに 204 No Content を返し、ログに警告を 1 行書く。
+- `SecurityLevel` が `external` のリクエストは、デバッグが有効でも何もせずに 204 No Content を返し、ログに警告を 1 行書く。
+- 断るときは引数を見ないので、失敗の表記は出ない。204 の理由は、pasta のログ（既定は `profile/pasta/logs/pasta.log`）でだけ分かる。
+
+警告のイベント名は届いたもの、後半はイベントごとに次のとおりである。
+
+| 場合 | ログの警告 |
+| ---- | ---------- |
+| デバッグが無効 | `OnPastaScene: debug is disabled; scene not played`（`OnPastaSceneAt` も `scene not played`）・`OnPastaDumpVariables: debug is disabled; variables not dumped` |
+| `SecurityLevel` が `external` | `OnPastaScene: SecurityLevel external is refused; scene not played`（`OnPastaSceneAt` も `scene not played`）・`OnPastaDumpVariables: SecurityLevel external is refused; variables not dumped` |
+
 **作者のハンドラとシーン関数フォールバック**
 
-- 2 つの既定ハンドラは、ゴーストが同じキーに登録したハンドラを上書きしない（[既定ハンドラと上書き](#既定ハンドラと上書き)）。
-- 2 つのイベントには既定ハンドラがあるので、[シーン関数フォールバック](#シーン関数フォールバック)は起きない。デバッグが無効なときも、`＊OnPastaScene` や `＊OnPastaScene朝` のような、イベント名で始まる名前のシーンを前方一致で再生することはない。
+- 3 つの既定ハンドラは、ゴーストが同じキーに登録したハンドラを上書きしない（[既定ハンドラと上書き](#既定ハンドラと上書き)）。
+- 3 つのイベントには既定ハンドラがあるので、[シーン関数フォールバック](#シーン関数フォールバック)は起きない。デバッグが無効なときも、`＊OnPastaScene` や `＊OnPastaScene朝` のような、イベント名で始まる名前のシーンを前方一致で再生することはない。
 
 ### MCP からの呼び方
 
@@ -762,13 +798,15 @@ reload(target = "shiori")
 raise_event(event = "OnPastaScene", references = ["会話"])
 raise_event(event = "OnPastaScene", references = ["会話", "挨拶"])
 raise_event(event = "OnPastaSceneAt", references = ["dic/boot.pasta", "42"])
+raise_event(event = "OnPastaDumpVariables")
 ```
 
 - 1 行目は、辞書を読み込み直す呼び出しである。
 - 2 行目は `＊会話` を、3 行目は `＊会話` の中の `・挨拶` を、4 行目は `dic/boot.pasta` の 42 行目のシーンを再生する。
 - 再生したときは、ツールの結果に、最初のチェイントークまでの台本が載る。見つからないときと引数の誤りでは、失敗の表記が載る。何も載らないとき（204）は、pasta のログで理由を見る。
+- 5 行目は、グローバル変数を `profile/pasta/debug/variables.toml` に書き出す。ツールの結果には何も載らないので、そのファイルを読む。
 
-辞書を書き換えたあとは、2 つのイベントを呼ぶ前に、MCP の `reload` に `target = "shiori"` を渡して SHIORI を読み込み直す。これは呼び出す側の務めである。`reload` は読み込み直しを頼むだけで、終わるのを待たない。終わる前に `raise_event` を呼ぶと、イベントは SHIORI に届かず、台本も載らない。MCP の `get_status` が答えるようになってから呼ぶ。
+辞書を書き換えたあとは、シーンを再生する 2 つのイベントを呼ぶ前に、MCP の `reload` に `target = "shiori"` を渡して SHIORI を読み込み直す。これは呼び出す側の務めである。`reload` は読み込み直しを頼むだけで、終わるのを待たない。終わる前に `raise_event` を呼ぶと、イベントは SHIORI に届かず、台本も載らない。MCP の `get_status` が答えるようになってから呼ぶ。
 
 - シーンの一覧と、行からシーンを引くための表は、SHIORI の読み込みのときに作られ、辞書のファイルを書き換えても変わらない。
 - 読み込み直さないと、書き足したシーンや名前を変えたシーンは見つからず、`OnPastaSceneAt` の行は書き換える前の辞書の行として引かれる。行がずれると、狙ったものとは違うシーンが、失敗も出さずに再生されることがある。
@@ -1137,10 +1175,9 @@ local co = dispatcher.dispatch(act)
 
 1. `act.req.date` が無ければ `nil` を返す。
 2. `act.req.status` に[ブロック対象のキーワード](#ブロック対象-status-キーワード)が含まれていれば `nil` を返す（`is_blocked` で判定）。
-3. デバッグの[シーン再生](../debug/dev-actions.md#シーン再生-シーンを実行)で再生を求められたシーンがあれば、そのシーンを返す。このときに限り、2 の判定を 1 回だけ無視する。
-4. [自動トークを止めている](#自動トークを止めている間)なら `nil` を返す。
-5. OnHour を判定する（[check_hour](#check_houract)）。発行するならそのシーンを返す。
-6. OnTalk を判定する（[check_talk](#check_talkact)）。
+3. [自動トークを止めている](#自動トークを止めている間)なら `nil` を返す。
+4. OnHour を判定する（[check_hour](#check_houract)）。発行するならそのシーンを返す。
+5. OnTalk を判定する（[check_talk](#check_talkact)）。
 
 ### ブロック対象 Status キーワード
 
@@ -1162,7 +1199,7 @@ local co = dispatcher.dispatch(act)
 
 ### 自動トークを止めている間
 
-[`＞自動トーク停止`](../grammar/call-jump.md#自動トーク停止自動トーク再開)で止めている間は、`dispatch` は OnHour・OnTalk の判定に進まず、止まっているシーンの続き（チェイントークで中断したシーンの残りと、シーン再生で再生したシーンの 2 回目以降の出力）も返さない。待っている続きは捨てない。判定の位置は Status による抑止とシーン再生の後なので、シーン再生で求めたシーンの最初の出力は出る。
+[`＞自動トーク停止`](../grammar/call-jump.md#自動トーク停止自動トーク再開)で止めている間は、`dispatch` は OnHour・OnTalk の判定に進まず、止まっているシーンの続き（チェイントークで中断したシーンの残り）も返さない。待っている続きは捨てない。
 
 Status による抑止とは、時報の扱いが違う。
 
