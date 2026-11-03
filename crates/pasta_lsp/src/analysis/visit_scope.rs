@@ -32,7 +32,12 @@ impl super::AnalysisEngine {
             // NOT the entire scope. Otherwise it overshadows child tokens.
             Self::visit_decl_line(&scene.span, source, token_type::NAMESPACE, tokens);
         }
-        for attr in &scene.attrs {
+        // 宣言行の属性は visit_decl_line が行から着色する（二重に出さない）
+        for attr in scene
+            .attrs
+            .iter()
+            .filter(|a| a.span.start_line != scene.span.start_line)
+        {
             Self::visit_attr(attr, source, tokens);
         }
         for word in &scene.words {
@@ -56,9 +61,7 @@ impl super::AnalysisEngine {
         if scene.name.is_some() && scene.span.is_valid() {
             Self::visit_decl_line(&scene.span, source, token_type::SCENE, tokens);
         }
-        for attr in &scene.attrs {
-            Self::visit_attr(attr, source, tokens);
-        }
+        // ローカルの属性は宣言行にしか無く、visit_decl_line が行から着色する
         for cb in &scene.code_blocks {
             Self::visit_code_block(cb, source, tokens);
         }
