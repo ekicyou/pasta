@@ -17,11 +17,8 @@
 //     analysis-failure fallback, dispose
 //   - wasmBridge.ts             : init/dispose lifecycle, error wrapping,
 //     wasm-boundary result-shape validation
-//   - debugAdapterFactory.ts    : PastaDebugAdapterFactory descriptor and
-//     PastaDebugConfigurationProvider only-when-explicit normalisation
 //   - wordRefDecorator.ts       : @word-ref decoration ranges (TextMate の文法の規則)
-//   - extension.ts              : activate (real WASM load), source-presentation
-//     toggle wiring (status bar, push-event-driven display, error surfaces)
+//   - extension.ts              : activate (real WASM load), ghost validator wiring
 
 import * as assert from 'assert';
 import * as fs from 'fs';
@@ -37,10 +34,6 @@ import { DiagnosticsManager } from '../diagnosticsManager';
 import { WasmBridge } from '../wasmBridge';
 import { DocumentSync } from '../documentSync';
 import { GhostValidator } from '../ghostValidator';
-import {
-  PastaDebugAdapterFactory,
-  PastaDebugConfigurationProvider,
-} from '../debugAdapterFactory';
 import { activateWordRefDecorator, findWordRefRanges } from '../wordRefDecorator';
 import { WORD_REF_CASES } from './fixtures/wordRefCases';
 import { activate, deactivate, getActivationState } from '../extension';
@@ -762,46 +755,6 @@ test('validateGhost throws when the bridge is not ready', () => {
 });
 
 // =============================================================================
-// Debug adapter factory + configuration provider (real classes)
-// =============================================================================
-
-test('PastaDebugAdapterFactory resolves the session config into a DebugAdapterServer', () => {
-  const factory = new PastaDebugAdapterFactory();
-  const session = { configuration: { type: 'pasta', request: 'attach', host: '10.0.0.5', port: '4321' } };
-  const desc = factory.createDebugAdapterDescriptor(session as never, undefined) as mock.DebugAdapterServer;
-  assert.ok(desc instanceof mock.DebugAdapterServer);
-  assert.strictEqual(desc.host, '10.0.0.5');
-  assert.strictEqual(desc.port, 4321);
-});
-
-test('PastaDebugAdapterFactory falls back to 127.0.0.1:9276 for an empty config', () => {
-  const factory = new PastaDebugAdapterFactory();
-  const desc = factory.createDebugAdapterDescriptor(
-    { configuration: {} } as never, undefined
-  ) as mock.DebugAdapterServer;
-  assert.strictEqual(desc.host, '127.0.0.1');
-  assert.strictEqual(desc.port, 9276);
-});
-
-test('config provider lower-cases and forwards an explicit sourcePresentation', () => {
-  const provider = new PastaDebugConfigurationProvider();
-  const config = { type: 'pasta', request: 'attach', name: 'x', sourcePresentation: 'LUA' };
-  const resolved = provider.resolveDebugConfiguration(undefined, config as never) as Record<string, unknown>;
-  assert.strictEqual(resolved, config, 'must return the same config object');
-  assert.strictEqual(resolved.sourcePresentation, 'lua');
-});
-
-test('config provider removes an absent/invalid sourcePresentation (no client default)', () => {
-  const provider = new PastaDebugConfigurationProvider();
-  const absent = { type: 'pasta', request: 'attach', name: 'x' };
-  const resolvedAbsent = provider.resolveDebugConfiguration(undefined, absent as never) as Record<string, unknown>;
-  assert.ok(!('sourcePresentation' in resolvedAbsent), 'absent key must stay absent');
-  const invalid = { type: 'pasta', request: 'attach', name: 'x', sourcePresentation: 'banana' };
-  const resolvedInvalid = provider.resolveDebugConfiguration(undefined, invalid as never) as Record<string, unknown>;
-  assert.ok(!('sourcePresentation' in resolvedInvalid), 'invalid value must be removed so the server decides');
-});
-
-// =============================================================================
 // wordRefDecorator (real) — 箱の範囲は TextMate の文法の規則から（要件 5.1〜5.3）
 // =============================================================================
 
@@ -861,12 +814,9 @@ test('word-ref decorator re-applies on active-editor change and document edits',
 });
 
 // =============================================================================
-// extension.ts (real activate) — WASM init + source-presentation toggle wiring
+// extension.ts (real activate) — WASM init + ghost validator wiring
 // =============================================================================
 // Run LAST: activate registers persistent listeners on the shared mock emitters.
-
-const TOGGLE_COMMAND = 'pasta.debug.toggleSourcePresentation';
-const TOGGLE_EVENT = 'pasta/sourcePresentation';
 
 const GHOST_WATCH_GLOB = '**/*';
 
@@ -877,7 +827,7 @@ function ghostValidatorCreated(fromCollection: number, fromWatcher: number): { c
   };
 }
 
-test('activate loads the real WASM bridge and registers the debug + toggle wiring', async () => {
+test('activate loads the real WASM bridge and registers the ghost validator', async () => {
   mock.workspace.textDocuments = [];
   const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(ROOT) };
   const collectionsBefore = mock.createdDiagnosticCollections.length;
@@ -887,105 +837,8 @@ test('activate loads the real WASM bridge and registers the debug + toggle wirin
   assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 1, watchers: 1 });
   const state = getActivationState();
   assert.strictEqual(state.wasmReady, true, 'real wasm/pasta_lsp_wasm_bg.wasm must load');
-  assert.ok(mock.registeredCommands.has(TOGGLE_COMMAND), 'toggle command must be registered');
-  assert.strictEqual(mock.registeredDebugFactories.length, 1, 'debug adapter factory registered');
-  assert.strictEqual(mock.registeredDebugConfigProviders.length, 1, 'debug config provider registered');
-  assert.strictEqual(mock.createdStatusBarItems.length, 1, 'one status bar item created');
-  assert.strictEqual(mock.createdStatusBarItems[0].command, TOGGLE_COMMAND, 'status bar click = 3rd entry point');
-  assert.strictEqual(mock.createdStatusBarItems[0].visible, false, 'hidden until a pasta session pushes a mode');
-});
-
-test('toggle without an active pasta session warns and sends nothing', async () => {
-  mock.debug.activeDebugSession = undefined;
-  mock.shownMessages.length = 0;
-  await mock.commands.executeCommand(TOGGLE_COMMAND);
-  assert.strictEqual(mock.shownMessages.length, 1);
-  assert.strictEqual(mock.shownMessages[0].kind, 'warning');
-  assert.ok(mock.shownMessages[0].message.includes('Pasta デバッグセッション'));
-});
-
-function makePastaSession() {
-  const session = {
-    type: 'pasta',
-    requests: [] as Array<{ command: string; args: unknown }>,
-    failNext: false,
-    customRequest: async (command: string, args: unknown) => {
-      if (session.failNext) {
-        throw new Error('backend unavailable');
-      }
-      session.requests.push({ command, args });
-      return {};
-    },
-  };
-  return session;
-}
-
-test('backend push event drives the status bar (single source of truth)', async () => {
-  const session = makePastaSession();
-  mock.debug.activeDebugSession = session;
-  const statusBar = mock.createdStatusBarItems[0];
-
-  // Attach-time initial push
-  mock.debugCustomEventEmitter.fire({ event: TOGGLE_EVENT, session, body: { mode: 'pasta' } });
-  assert.strictEqual(statusBar.visible, true, 'status bar shows for the active pasta session');
-  assert.strictEqual(statusBar.text, '$(eye) 提示: .pasta');
-
-  // Toggle command flips the tracked mode and sends the set request,
-  // WITHOUT optimistically updating the display.
-  await mock.commands.executeCommand(TOGGLE_COMMAND);
-  assert.deepStrictEqual(session.requests, [{ command: TOGGLE_EVENT, args: { mode: 'lua' } }]);
-  assert.strictEqual(statusBar.text, '$(eye) 提示: .pasta', 'display updates only via push events');
-
-  // Post-toggle push updates the display
-  mock.debugCustomEventEmitter.fire({ event: TOGGLE_EVENT, session, body: { mode: 'lua' } });
-  assert.strictEqual(statusBar.text, '$(eye) 提示: .lua');
-
-  // Malformed push bodies are ignored (requirement 1.4 client-side)
-  mock.debugCustomEventEmitter.fire({ event: TOGGLE_EVENT, session, body: { mode: 'xml' } });
-  mock.debugCustomEventEmitter.fire({ event: TOGGLE_EVENT, session, body: null });
-  assert.strictEqual(statusBar.text, '$(eye) 提示: .lua', 'invalid bodies must not change the display');
-
-  // Unrelated events are ignored
-  mock.debugCustomEventEmitter.fire({ event: 'other/event', session, body: { mode: 'pasta' } });
-  assert.strictEqual(statusBar.text, '$(eye) 提示: .lua');
-});
-
-test('failed customRequest surfaces an error message and keeps the display', async () => {
-  const session = makePastaSession();
-  mock.debug.activeDebugSession = session;
-  mock.debugCustomEventEmitter.fire({ event: TOGGLE_EVENT, session, body: { mode: 'lua' } });
-  const statusBar = mock.createdStatusBarItems[0];
-  session.failNext = true;
-  mock.shownMessages.length = 0;
-  await mock.commands.executeCommand(TOGGLE_COMMAND);
-  assert.strictEqual(mock.shownMessages.length, 1);
-  assert.strictEqual(mock.shownMessages[0].kind, 'error');
-  assert.ok(mock.shownMessages[0].message.includes('backend unavailable'));
-  assert.strictEqual(statusBar.text, '$(eye) 提示: .lua', 'no optimistic update on failure');
-});
-
-test('session termination resets the tracked mode and hides the status bar', () => {
-  const session = makePastaSession();
-  mock.debug.activeDebugSession = session;
-  mock.debugCustomEventEmitter.fire({ event: TOGGLE_EVENT, session, body: { mode: 'lua' } });
-  const statusBar = mock.createdStatusBarItems[0];
-  assert.strictEqual(statusBar.visible, true);
-  mock.debug.activeDebugSession = undefined;
-  mock.didTerminateDebugSessionEmitter.fire(session);
-  assert.strictEqual(statusBar.visible, false, 'status bar hides when the session ends');
-});
-
-test('switching to a non-pasta session hides the status bar and resets the mode', () => {
-  const session = makePastaSession();
-  mock.debug.activeDebugSession = session;
-  mock.debugCustomEventEmitter.fire({ event: TOGGLE_EVENT, session, body: { mode: 'pasta' } });
-  const statusBar = mock.createdStatusBarItems[0];
-  assert.strictEqual(statusBar.visible, true);
-  const nodeSession = { type: 'node' };
-  mock.debug.activeDebugSession = nodeSession;
-  mock.didChangeActiveDebugSessionEmitter.fire(nodeSession);
-  assert.strictEqual(statusBar.visible, false);
-  mock.debug.activeDebugSession = undefined;
+  // DAP の提示モードの切り替えはもう登録しない（要件 1.3）
+  assert.ok(!mock.registeredCommands.has('pasta.debug.toggleSourcePresentation'), 'DAP toggle command must not be registered');
 });
 
 test('deactivate disposes cleanly', () => {

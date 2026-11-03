@@ -43,7 +43,7 @@ const RELOAD_COMMAND = 'pasta.reloadShiori';
 const OLD_COMMAND = 'pasta.debug.playScene';
 
 // =============================================================================
-// Sequential test runner (mirrors runSceneAtCursorCommand.test.ts)
+// Sequential test runner
 // =============================================================================
 
 let passed = 0;

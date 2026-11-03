@@ -169,10 +169,6 @@ export enum StatusBarAlignment {
   Right = 2,
 }
 
-export class DebugAdapterServer {
-  constructor(readonly port: number, readonly host?: string) {}
-}
-
 export class MockStatusBarItem {
   text = '';
   tooltip: string | undefined;
@@ -197,7 +193,7 @@ export const createdStatusBarItems: MockStatusBarItem[] = [];
 /**
  * All user-facing messages shown via showErrorMessage / showWarningMessage.
  * `items` records the action button labels passed to the message (if any), so
- * tests can assert e.g. a "デバッグ開始" action was offered.
+ * tests can assert which actions were offered.
  */
 export const shownMessages: Array<{ kind: 'error' | 'warning'; message: string; items?: string[] }> = [];
 
@@ -209,29 +205,6 @@ export const shownMessages: Array<{ kind: 'error' | 'warning'; message: string; 
 export let nextWarningSelection: string | undefined = undefined;
 export function setNextWarningSelection(value: string | undefined): void {
   nextWarningSelection = value;
-}
-
-/** All vscode.debug.startDebugging calls (folder + resolved config). */
-export const startDebuggingCalls: Array<{ folder: unknown; config: any }> = [];
-
-/**
- * Programmable per-call results for vscode.debug.startDebugging, consumed in
- * order (one per call). Lets the reload re-attach tests drive fail-then-succeed
- * sequences deterministically. When the queue is empty, startDebugging resolves
- * `true` (the default success). Set via {@link setNextStartDebuggingResults}.
- */
-export let startDebuggingResults: boolean[] = [];
-export function setNextStartDebuggingResults(values: boolean[]): void {
-  startDebuggingResults = values.slice();
-}
-
-/**
- * Programmable `launch.json` `configurations` array returned by
- * workspace.getConfiguration('launch').get('configurations').
- */
-export let launchConfigurations: unknown = undefined;
-export function setLaunchConfigurations(value: unknown): void {
-  launchConfigurations = value;
 }
 
 /**
@@ -252,9 +225,6 @@ export const didChangeTextDocumentEmitter = new EventEmitter<any>();
 export const didCloseTextDocumentEmitter = new EventEmitter<any>();
 export const didSaveTextDocumentEmitter = new EventEmitter<any>();
 export const didChangeActiveTextEditorEmitter = new EventEmitter<any>();
-export const debugCustomEventEmitter = new EventEmitter<any>();
-export const didChangeActiveDebugSessionEmitter = new EventEmitter<any>();
-export const didTerminateDebugSessionEmitter = new EventEmitter<any>();
 
 // --- in-memory fake file system (workspace.fs) --------------------------------
 
@@ -397,11 +367,6 @@ export const workspace = {
     createdFileSystemWatchers.push(watcher);
     return watcher;
   },
-  // Minimal getConfiguration: only `launch.configurations` is consulted by the
-  // runSceneAtCursor / reload start-debugging config resolution.
-  getConfiguration: (_section?: string) => ({
-    get: (_key: string) => launchConfigurations,
-  }),
 };
 
 export const window = {
@@ -450,28 +415,4 @@ export const commands = {
     const fn = registeredCommands.get(id);
     return Promise.resolve(fn ? fn(...args) : undefined);
   },
-};
-
-/** Debug adapter factories / config providers registered by the extension. */
-export const registeredDebugFactories: any[] = [];
-export const registeredDebugConfigProviders: any[] = [];
-
-export const debug = {
-  activeDebugSession: undefined as any,
-  registerDebugAdapterDescriptorFactory: (_type: string, factory: any) => {
-    registeredDebugFactories.push(factory);
-    return { dispose: () => {} };
-  },
-  registerDebugConfigurationProvider: (_type: string, provider: any) => {
-    registeredDebugConfigProviders.push(provider);
-    return { dispose: () => {} };
-  },
-  startDebugging: (folder: unknown, config: any) => {
-    startDebuggingCalls.push({ folder, config });
-    const next = startDebuggingResults.length > 0 ? startDebuggingResults.shift()! : true;
-    return Promise.resolve(next);
-  },
-  onDidReceiveDebugSessionCustomEvent: debugCustomEventEmitter.event,
-  onDidChangeActiveDebugSession: didChangeActiveDebugSessionEmitter.event,
-  onDidTerminateDebugSession: didTerminateDebugSessionEmitter.event,
 };
