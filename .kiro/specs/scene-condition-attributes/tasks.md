@@ -117,7 +117,7 @@
   - _Depends: 2.2, 3.3, 3.4_
   - _Requirements: 2.3, 2.4, 2.5, 2.6, 2.8, 3.1, 3.2, 3.3, 3.4, 3.6, 4.3, 4.4, 4.5, 4.6, 5.1, 6.1, 6.5, 10.3, 10.4_
 
-- [ ] 5.2 入門 7 段目を自動転記の前提に直す
+- [x] 5.2 入門 7 段目を自動転記の前提に直す
   - 段階辞書から `＞transfer_req_to_var` の行を消し、`STAGES.md` と段階のテストを合わせる
   - 7 段目の辞書が転記の行なしで OnGhostChanged に `＄ｒ０` を出すことを段階のテストが確かめ、通る
   - _Depends: 3.2_
@@ -158,3 +158,4 @@
 
 ## Implementation Notes
 - 3.2: イベントの act に Reference が最初から入るので、`tests/runtime/syntax_test.rs` の「転記なし」の期待（Reference が無い）は 6.1 に合わせて書き換えた。5.3 の差分確認ではこのテストも「書き直してよい」側に数える。
+- 5.2: 段階辞書から転記の行を消したため、`node book/tools/tutorial-check.mjs` は 6.1 で `getting-started/07-greeting.md` のコードブロックと説明を直すまで 07-greeting だけ赤い。
