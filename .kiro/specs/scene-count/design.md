@@ -25,7 +25,7 @@
 
 ### This Spec Owns
 - `SearchContext` の数のメソッド（`count_scene`・`count_scene_exact`）と、その Lua の口（`@pasta_search` の `count_scene(name)`・`count_scene_exact(name)`）。数え方の定義（どの候補を数えるか）はここが持つ。
-- `GLOBAL` の 4 つの名前（`scene_count`・`シーン数`・`scene_count_exact`・`シーン数完全一致`）の関数。引数の確かめ（誤り・数値・余分な引数）と、その報告はここが持つ。
+- `GLOBAL` の 4 つの名前（`scene_count`・`シーン数`・`scene_count_exact`・`シーン数完全一致`）の関数。引数の確かめ（誤り・数値）と、その報告はここが持つ。余分な引数は使わない。
 - `pasta_check validate` の組み込みの名前の一覧への 4 つの名前の追加。
 - 自動テスト（新しい統合試験 1 本と、検査の試験の追記）、マニュアル 4 章の追記、references の作り直し。
 
@@ -40,7 +40,7 @@
 ### Allowed Dependencies
 - `pasta_core::registry`: `SceneTable::collect_scene_candidates`・`SceneTable::get_scene`・`SceneRegistry::sanitize_name`・`SceneRegistry::split_registered_name`・`SceneAliasTable::resolve`（すべて今の公開の関数。`&self` の読み取りだけ）。
 - `search/context.rs` の中の `SearchContext::parse_fn_name`（同じ型の非公開の関数）。
-- Lua: `pasta.failure`（`FAILURE.report`・`is_name`・`kind_of`・`quoted`・`LABEL.BAD_NAME`）、`@pasta_log`、`@pasta_search`。
+- Lua: `pasta.failure`（`FAILURE.report`・`is_name`・`kind_of`・`quoted`・`LABEL.BAD_NAME`）、`@pasta_search`。
 - 依存の向き: `pasta_core::registry` → `pasta_lua::search::SearchContext` → `@pasta_search`（Lua の口）→ `pasta.global` の関数 → `act.lua` の 4 段目が呼ぶ。`global.lua` は `act.lua` を require しない（`act.lua` が `global.lua` を require するため）。
 - 新しい crate・Lua の依存は足さない。
 
@@ -77,7 +77,7 @@ graph LR
 **Architecture Integration**:
 - Selected pattern: 今の部品を伸ばす（research.md の案 A）。数え方は Rust の `SearchContext` に、作者向けの口と引数の確かめは Lua の `GLOBAL` に置く。`search_scene`（Rust）と `SCENE.search`／組み込みの関数（Lua）の分け方と同じ。
 - Domain boundaries: 数え方（どの候補か）は `SearchContext` だけが持ち、`GLOBAL` の関数は名前を渡して数を受けるだけ。引数の誤りの報告は `GLOBAL` の関数だけが持つ。
-- Existing patterns preserved: `search_scene`／`search_scene_exact`／非公開の本体の 3 つ組、`GLOBAL` の英語名と日本語名の対（非 ASCII はブラケット記法）、`FAILURE.report` による報告、余分な引数の `log.warn`（`recommend_item`）、`@pasta_search` を呼んだ時点で `require` する書き方（`SCENE.search`）。
+- Existing patterns preserved: `search_scene`／`search_scene_exact`／非公開の本体の 3 つ組、`GLOBAL` の英語名と日本語名の対（非 ASCII はブラケット記法）、`FAILURE.report` による報告、余分な引数を黙って使わない書き方（`＞ゴースト終了`）、`@pasta_search` を呼んだ時点で `require` する書き方（`SCENE.search`）。
 - New components rationale: 数のメソッド（数だけを返す口が無い）、数の関数（DSL の口が無い）。
 - Steering compliance: 1 ファイル 600 行の目安（`context.rs` は既に超えているので、試験は外のファイル）、統合試験は `crates/<crate>/tests/<feature>_test.rs`、x86・x64 の両方で同じ試験が走る（ポインタ幅に依る期待は無い）。
 
@@ -93,7 +93,7 @@ graph LR
 ## File Structure Plan
 
 ### New Files
-- `crates/pasta_lua/tests/scene_count_test.rs`（SceneCountTests）— 実物の読み込み（`PastaLoader::load`、一時ゴースト）で、数え方・別名・揃え・ローカルを数えない・0 件・次の選びを変えない・DSL の 4 通りの呼び方・引数の誤り・数値・余分な引数・`balloon_warning = false`・act 無しの Lua からの呼び出し・`＊シーン数` を書いた辞書を確かめる。`mod common;` で `PASTA_DEBUG` 中和ガードを効かせる。
+- `crates/pasta_lua/tests/scene_count_test.rs`（SceneCountTests）— 実物の読み込み（`PastaLoader::load`、一時ゴースト）で、数え方・別名・揃え・ローカルを数えない・0 件・次の選びを変えない・DSL の 4 通りの呼び方・引数の誤り・数値・余分な引数（警告が出ない）・`balloon_warning = false`・act 無しの Lua からの呼び出し・`＊シーン数` を書いた辞書を確かめる。`mod common;` で `PASTA_DEBUG` 中和ガードを効かせる。
 
 ### Modified Files
 - `crates/pasta_lua/src/search/context.rs`（SceneCountSearch）— `SearchContext` に `count_scene`・`count_scene_exact`（公開）と非公開の本体 `count_scene_by` を足し、`add_methods` に Lua のメソッド `count_scene`・`count_scene_exact` を足す。中の試験には足さない。
@@ -104,6 +104,7 @@ graph LR
 - `book/src/debug/validate.md` — 組み込みの飛び先の一覧（`GLOBAL` の関数）に 4 つの名前。
 - `book/src/lua/script-api.md` — `GLOBAL` の表に 4 行（呼び方 `(act, 名前)`）。表の下の注記（`entry.lua` が登録する名前）の対象には入れない。
 - `book/src/lua/modules/pasta-search.md` — 「メソッド」の節に `count_scene(name)`・`count_scene_exact(name)` を 1 節で足す。
+- `.claude/skills/pasta-ghost-authoring/SKILL.md` — 「特殊Call」の手書きの一覧に `＞シーン数（名前）` / `＞シーン数完全一致（名前）` の 1 行（`＞名前` の候補の数と完全一致の数。詳細は references の call-jump.md へのリンク）。
 - `.claude/skills/pasta-ghost-authoring/references/call-jump.md`・`.claude/skills/pasta-lua-coding/references/script-api.md`・`.claude/skills/pasta-lua-coding/references/pasta-search.md` — `node book/tools/gen-skill-refs.mjs` で作り直す（手で書かない）。
 
 ## System Flows
@@ -117,9 +118,6 @@ sequenceDiagram
     participant T as SceneTable
     Scene->>Act: expr_fn or call with name
     Act->>G: fn act name extra
-    alt extra arguments
-        G->>G: log warn once
-    end
     alt name is number
         G-->>Act: 0
     else name is not a non-empty string
@@ -134,8 +132,8 @@ sequenceDiagram
     end
 ```
 
-- 確かめの順は「余分な引数の警告 → 数値 → 名前にならない値 → 数える」。余分な引数の警告は、ほかの判定にかかわらず 1 行出る。
-- Call の形（`＞シーン数（…）`）は、生成コードが呼んだシーンの引数（`table.unpack(args)`）を後ろに足すので、引数付きで呼ばれたシーンの中ではその引数も「余分な引数」として警告される（`＞おすすめ項目` と同じ。OPEN QUESTION 2）。
+- 確かめの順は「数値 → 名前にならない値 → 数える」。2 つ目より後の引数は見ない。
+- Call の形（`＞シーン数（…）`）は、生成コードが呼んだシーンの引数（`table.unpack(args)`）を後ろに足す。関数の側では作者が書いた余分な引数と区別できないので、余分な引数は黙って使わない（設計ディスカッションの決定 2）。
 - 数えるのは `&self` の読み取りだけで、巡回の控え（`select_from_cache` の状態）に触らない。
 
 ## Requirements Traceability
@@ -161,7 +159,7 @@ sequenceDiagram
 | 4.1 | 誤りを報告 | SceneCountGlobals | `FAILURE.report`（`BAD_NAME`・`kind_of`） | 名前にならない値の枝 |
 | 4.2 | 誤りでも 0 | SceneCountGlobals | 報告の後に `0` | 名前にならない値の枝 |
 | 4.3 | 数値は 0・報告なし | SceneCountGlobals | `type(name) == "number"` → `0` | 数値の枝 |
-| 4.4 | 余分な引数は警告 1 行 | SceneCountGlobals | `select("#", ...)` → `log.warn` | 余分な引数の枝 |
+| 4.4 | 余分な引数は黙って使わない | SceneCountGlobals | 引数 `...` を見ない | — |
 | 4.5 | `balloon_warning = false` | SceneCountGlobals | `FAILURE.report` が従う | 名前にならない値の枝 |
 | 4.6 | act 無しはログだけ | SceneCountGlobals | `FAILURE.report(nil, …)` | 名前にならない値の枝 |
 | 5.1 | 次の選びを変えない | SceneCountSearch | `&self` のみ・巡回の控えに触らない | — |
@@ -185,7 +183,7 @@ sequenceDiagram
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | SceneCountSearch | Rust `pasta_lua::search` | 書いた名前から、グローバルシーンの候補の数を返す | 1.1〜1.6, 2.1〜2.3, 3.7, 5.1〜5.3 | SceneTable (P0), SceneAliasTable (P0), SceneRegistry (P0) | Service |
-| SceneCountGlobals | Lua `pasta.global` | DSL・Lua の口。引数を確かめ、誤りを報告し、数を返す | 3.1〜3.7, 4.1〜4.6, 5.4 | `@pasta_search` (P0), `pasta.failure` (P0), `@pasta_log` (P1) | Service |
+| SceneCountGlobals | Lua `pasta.global` | DSL・Lua の口。引数を確かめ、誤りを報告し、数を返す | 3.1〜3.7, 4.1〜4.6, 5.4 | `@pasta_search` (P0), `pasta.failure` (P0) | Service |
 | BuiltinNames | Rust `pasta_check::validate` | 検査が知る組み込みの名前 | 6.1〜6.3 | 一致テスト (P1) | State |
 | ManualAndRefs | Docs | 2 つの関数・メソッドの説明と references | 7.1〜7.5 | `gen-skill-refs.mjs` (P1) | — |
 | SceneCountTests | Tests | 数え方・呼び方・誤り・検査を確かめる | 8.1〜8.3 | `PastaLoader`、`tracing_test` (P1) | — |
@@ -249,18 +247,17 @@ Lua の口（`add_methods`、`add_method` で `&self`）:
 | Requirements | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.4 |
 
 **Responsibilities & Constraints**
-- `global.lua` の中の `local` の小さな関数 `scene_counter(fn_name, method)` が、名前（表記とログに出す）と `@pasta_search` のメソッド名（`"count_scene"`／`"count_scene_exact"`）から関数を作る。4 つの名前それぞれに作って代入する。対の名前は同じ動作で、表記とログに出る名前だけが違う（**仮定 A**: 4.1 の「呼んだ関数の名前」を満たすため、同じ関数を 2 つの名前に当てる今の書き方を採らない。OPEN QUESTION 1）。
+- `global.lua` の中の `local` の小さな関数 `scene_counter(fn_name, method)` が、名前（表記とログに出す。呼んだ名前がそのまま出る）と `@pasta_search` のメソッド名（`"count_scene"`／`"count_scene_exact"`）から関数を作る。4 つの名前それぞれに作って代入する。対の名前は同じ動作で、表記とログに出る名前だけが違う（4.1 の「呼んだ関数の名前」を満たすため、同じ関数を 2 つの名前に当てる今の書き方を採らない。設計ディスカッションの決定 1）。
 - 作った関数 `fn(act, name, ...)` の手順:
-  1. `select("#", ...) > 0` なら `@pasta_log` に `"<fn_name>: <n> extra argument(s) ignored"` を 1 行出す（`recommend_item` と同じ文言の形）。
-  2. `type(name) == "number"` なら `0` を返す（報告なし）。
-  3. `FAILURE.is_name(name)` でなければ、`FAILURE.report(act, { label = FAILURE.LABEL.BAD_NAME, subject = fn_name, detail = FAILURE.kind_of(name), warning = fn_name .. ": bad argument: name=" .. FAILURE.quoted(name) })` で報告し、`0` を返す。表記は `【名前にならない値：シーン数（値なし）】` の形（**仮定 B**: 対象には `＠`・`＞` を付けない関数の名前を出す。Call と関数呼び出しのどちらで書いたかを関数は知らないため。OPEN QUESTION 1）。
-  4. `require("@pasta_search")` を呼んだ時点で引き、`SEARCH:<method>(name)` の数を返す。
+  1. `type(name) == "number"` なら `0` を返す（報告なし）。
+  2. `FAILURE.is_name(name)` でなければ、`FAILURE.report(act, { label = FAILURE.LABEL.BAD_NAME, subject = fn_name, detail = FAILURE.kind_of(name), warning = fn_name .. ": bad argument: name=" .. FAILURE.quoted(name) })` で報告し、`0` を返す。表記は `【名前にならない値：シーン数（値なし）】` の形（対象には `＠`・`＞` を付けない関数の名前を出す。Call と関数呼び出しのどちらで書いたかを関数は知らないため。設計ディスカッションの決定 1）。
+  3. `require("@pasta_search")` を呼んだ時点で引き、`SEARCH:<method>(name)` の数を返す。
 - 台詞のトークンを積まない（積むのは失敗表記だけ）。アクション行では戻り値の数を `talk` が文字にする。引数の誤りのときは、表記の後に `0` が出る（要件ディスカッションの決定 1 の帰結）。
 - 読み込みの前（`@pasta_search` が無いとき）に呼んだときは `require` のエラーになる（要件は読み込みの後だけを約束する。`SCENE.search` と同じ）。
 
 **Dependencies**
 - Inbound: `act.lua` の 4 段目（`GLOBAL[key]`）、作者の Lua (P0)
-- Outbound: `@pasta_search` の数のメソッド (P0)、`pasta.failure` (P0)、`@pasta_log` (P1)
+- Outbound: `@pasta_search` の数のメソッド (P0)、`pasta.failure` (P0)
 
 **Contracts**: Service [x]
 
@@ -268,7 +265,7 @@ Lua の口（`add_methods`、`add_method` で `&self`）:
 ```lua
 ---@param act table|nil   ACT（Lua から act 無しで呼んでもよい）
 ---@param name any        数える名前（空でない文字列。数値は 0）
----@param ... any         使わない（あればログに警告 1 行）
+---@param ... any         使わない（警告も出さない）
 ---@return integer        数（誤りのときも 0）
 GLOBAL.scene_count = scene_counter("scene_count", "count_scene")
 GLOBAL["シーン数"] = scene_counter("シーン数", "count_scene")
@@ -281,8 +278,8 @@ GLOBAL["シーン数完全一致"] = scene_counter("シーン数完全一致", "
 
 **Implementation Notes**
 - Integration: 非 ASCII の名前はブラケット記法（luacheck のため、今の `チェイントーク` と同じ）。
-- Validation: `scene_count_test.rs` の DSL の 4 通りの呼び方・誤り・数値・余分な引数・`balloon_warning = false`・act 無しの呼び出し。
-- Risks: Call の形では呼んだシーンの引数も渡るので、引数付きで呼ばれたシーンの中では余分な引数の警告が出る（OPEN QUESTION 2）。
+- Validation: `scene_count_test.rs` の DSL の 4 通りの呼び方・誤り・数値・余分な引数（警告なし）・`balloon_warning = false`・act 無しの呼び出し。
+- Risks: 作者が書いた余分な引数にも気づかせない（Call の形の誤検出を避けるための引き換え）。
 
 ### 検査層
 
@@ -293,7 +290,7 @@ GLOBAL["シーン数完全一致"] = scene_counter("シーン数完全一致", "
 ### ドキュメント層
 
 #### ManualAndRefs（summary）
-- `call-jump.md`: 「特殊な呼び出し」の表に `＞シーン数（名前）` / `＞scene_count（名前）` と `＞シーン数完全一致（名前）` / `＞scene_count_exact（名前）` の 2 行。数え方の節（Introduction の例・`＞名前` と同じ前方一致と完全一致・グローバルだけ・別名を当ててから照合用の名前に揃える・無ければ 0・数は定義されている全部の数で属性で変わらない・引数の誤りは表記と警告で 0・数値は 0・余分な引数は警告・Call では台詞を出さない）。アクション行での書き方の段落に `＠シーン数（「雑談」）` が数を文字として出すことを足す。
+- `call-jump.md`: 「特殊な呼び出し」の表に `＞シーン数（名前）` / `＞scene_count（名前）` と `＞シーン数完全一致（名前）` / `＞scene_count_exact（名前）` の 2 行。数え方の節（Introduction の例・`＞名前` と同じ前方一致と完全一致・グローバルだけ・別名を当ててから照合用の名前に揃える・無ければ 0・数は定義されている全部の数で属性で変わらない・引数の誤りは表記と警告で 0・数値は 0・余分な引数は使わない・Call では台詞を出さない）。アクション行での書き方の段落に `＠シーン数（「雑談」）` が数を文字として出すことを足す。
 - `validate.md`: 一覧に 4 つの名前。
 - `script-api.md`: `GLOBAL` の表に 4 行（`scene_count(act, name)` など。日本語の名前は「同じ動作の関数」）。
 - `pasta-search.md`: `### count_scene(name) / count_scene_exact(name)`（引数・戻り値・前方一致と完全一致・別名と揃え・グローバルだけ・0 件は 0・空の名前はエラー・巡回の状態を変えない・属性で絞らない）。
@@ -313,13 +310,13 @@ GLOBAL["シーン数完全一致"] = scene_counter("シーン数完全一致", "
 | 空の文字列 | 0 | `… name=''` | `【…（空文字列）】` |
 | 真偽値・表・関数 | 0 | `… name='true'` など | `【…（真偽値）】`・`（表）`・`（関数）` |
 | 数値 | 0 | なし | なし |
-| 余分な引数 | 1 つ目で数える | `<名前>: <n> extra argument(s) ignored` | なし |
+| 余分な引数 | 1 つ目で数える | なし | なし |
 | 一致なし（別名の後も） | 0 | なし | なし |
 | `balloon_warning = false` | 同上 | 同上 | 出さない |
 | act が `nil`（Lua から） | 同上 | 同上 | 出さない（積む先が無い） |
 
 ### Monitoring
-- ログは `@pasta_log` の warn だけ。新しいログの種類は足さない。
+- ログは `FAILURE.report` の warn だけ。新しいログの種類は足さない。
 
 ## Testing Strategy
 
@@ -328,7 +325,7 @@ GLOBAL["シーン数完全一致"] = scene_counter("シーン数完全一致", "
 2. `＞名前` の候補と等しい（1.2・2.2）: 同じ名前で `search_scene` を候補の数だけ回し、出た登録名の種類の数が `count_scene` と等しい（巡回は重ならないため）。
 3. 次の選びを変えない（5.1）: 2 つのランタイムに同じ `set_scene_selector` の並びを与え、片方だけ `＞雑談` の間に `count_scene`・`count_scene_exact` を挟んで、選ばれた登録名の並びが同じ。
 4. DSL の 4 通りの呼び方（3.3〜3.6・8.2）: アクション行 `話題は＠シーン数（「雑談」）個` が「話題は5個」、`＄n＝＠シーン数（「雑談」）` の後 `＄n＋1` が 6 で `act.var.n` が数値、`＞シーン数（「雑談」）` が台詞を出さない、Lua の `GLOBAL.scene_count(act, "雑談")`・`GLOBAL["シーン数完全一致"](act, "雑談")` が 5・3。英語名と日本語名で同じ数。
-5. 引数の誤り（4.1〜4.6・8.2）: 値なし（`＄x` 未定義）・空文字列・真偽値で、応答に `【名前にならない値：シーン数（値なし）】` などが出てログに 1 行、戻り値 0。数値 `＠シーン数（5）` は 0 で報告なし。2 つ目の引数で 1 つ目で数えログ 1 行。`[logging] balloon_warning = false` で表記なし・ログあり。Lua から `GLOBAL.scene_count(nil, true)` がエラーにならずログだけ。`＊シーン数` を書いた辞書で `＞シーン数（「雑談」）` がそのシーンを呼ばない（5.4）。
+5. 引数の誤り（4.1〜4.6・8.2）: 値なし（`＄x` 未定義）・空文字列・真偽値で、応答に `【名前にならない値：シーン数（値なし）】` などが出てログに 1 行、戻り値 0。数値 `＠シーン数（5）` は 0 で報告なし。2 つ目の引数があっても 1 つ目で数え、ログに何も出ない（Call の形で、引数付きで呼ばれたシーンの中から `＞シーン数（「雑談」）` を呼んでも警告が出ない）。`[logging] balloon_warning = false` で表記なし・ログあり。Lua から `GLOBAL.scene_count(nil, true)` がエラーにならずログだけ。`＊シーン数` を書いた辞書で `＞シーン数（「雑談」）` がそのシーンを呼ばない（5.4）。
 
 ### 検査の試験（`crates/pasta_check/tests/validate_scenes_test.rs`）
 1. `builtin_names_are_listed` の期待に 4 つの名前（6.1・8.3）。
@@ -339,10 +336,8 @@ GLOBAL["シーン数完全一致"] = scene_counter("シーン数完全一致", "
 ### ドキュメントの確かめ
 - `node book/tools/gen-skill-refs.mjs --check` が一致（7.5）。マニュアルの CI の検査（リンク・内容）が通る。
 
-## Open Questions / Risks
-- OPEN QUESTION 1・2 は、設計ディスカッションで決める（仮定 A・B は、決まるまでこの設計の前提とする）。3・4 は今の `SCENE.search`・`search_scene` と同じ扱いなので、議題にせず閉じた。
-  1. 失敗表記とログに出す名前: 名前ごとに関数を作り呼んだ名前を出す（仮定 A・B、推奨）か、今の書き方どおり同じ関数を当てて日本語の名前に固定するか。対象に `＠`・`＞` を付けるか。
-  2. Call の形で呼んだシーンの引数が後ろに足され、余分な引数の警告が出ること: `＞おすすめ項目` と同じとして受け、マニュアルに一言書く（推奨）か、扱いを変えるか（生成コードは境界の外）。
-  3. 読み込みの前に呼んだとき: `require` のエラーのまま（`SCENE.search` と同じ。閉じた）。
-  4. `SEARCH:count_scene("")` を Lua から直に呼んだとき: `search_scene` と同じエラー（閉じた）。
-- `.claude/skills/pasta-ghost-authoring/SKILL.md` の手書きの「特殊 Call」の行に `＞シーン数` を足すかは要件に無い。分類器が書き込みを拒むことがあるため、この設計では触らない（議論で足すと決めたら開発者の許可を得て足す）。
+## 設計ディスカッションの決定（2026-11-03）
+1. **失敗表記とログに出す名前**: 名前ごとに関数を作り、呼んだ名前をそのまま出す。対象に `＠`・`＞` は付けない。
+2. **余分な引数**: 黙って使わない（要件 4.4 も改めた）。Call の形では呼んだシーンの引数が後ろに足されるので、警告すると正しく書いた行に誤検出が出るため。
+3. **SKILL.md の手書きの行**: `.claude/skills/pasta-ghost-authoring/SKILL.md` の「特殊Call」の一覧に `＞シーン数（名前）` / `＞シーン数完全一致（名前）` の 1 行を足す（下の Modified Files）。書き込みを分類器が拒んだときは、回避せずに開発者に知らせる。
+4. 読み込みの前に呼んだとき（`require` のエラーのまま。`SCENE.search` と同じ）と、`SEARCH:count_scene("")` を Lua から直に呼んだとき（`search_scene` と同じエラー）は、今の扱いと同じなので議題にせず閉じた。
