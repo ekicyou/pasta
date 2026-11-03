@@ -28,17 +28,11 @@
         "Programming Languages"
     ],
     "activationEvents": [
-        "onLanguage:pasta",
-        "onDebug:pasta"
+        "onLanguage:pasta"
     ],
     "main": "./out/extension.js",
     "contributes": {
         "commands": [
-            {
-                "command": "pasta.debug.toggleSourcePresentation",
-                "title": "Pasta: 提示モードを切り替え (.pasta / .lua)",
-                "icon": "$(eye)"
-            },
             {
                 "command": "pasta.runSceneAtCursor",
                 "title": "▶ シーンを実行",
@@ -51,12 +45,6 @@
             }
         ],
         "menus": {
-            "commandPalette": [
-                {
-                    "command": "pasta.debug.toggleSourcePresentation",
-                    "when": "debugType == 'pasta'"
-                }
-            ],
             "editor/context": [
                 {
                     "command": "pasta.runSceneAtCursor",
@@ -66,17 +54,7 @@
                 {
                     "command": "pasta.reloadShiori",
                     "group": "navigation@2",
-                    "when": "resourceLangId == pasta && debugType == 'pasta'"
-                }
-            ],
-            "debug/toolBar": [
-                {
-                    "command": "pasta.debug.toggleSourcePresentation",
-                    "when": "debugType == 'pasta'"
-                },
-                {
-                    "command": "pasta.reloadShiori",
-                    "when": "debugType == 'pasta'"
+                    "when": "resourceLangId == pasta"
                 }
             ]
         },
@@ -230,71 +208,6 @@
                         "entity.name.function.cue.pasta"
                     ]
                 }
-            }
-        ],
-        "breakpoints": [
-            {
-                "language": "pasta"
-            },
-            {
-                "language": "lua"
-            }
-        ],
-        "debuggers": [
-            {
-                "type": "pasta",
-                "label": "Pasta Debug",
-                "configurationAttributes": {
-                    "attach": {
-                        "properties": {
-                            "host": {
-                                "type": "string",
-                                "description": "Host the Pasta debug backend is listening on.",
-                                "default": "127.0.0.1"
-                            },
-                            "port": {
-                                "type": "number",
-                                "description": "TCP port the Pasta debug backend is listening on.",
-                                "default": 9276
-                            },
-                            "sourcePresentation": {
-                                "type": "string",
-                                "enum": [
-                                    "pasta",
-                                    "lua"
-                                ],
-                                "enumDescriptions": [
-                                    "Present breakpoints, stops and call stacks in .pasta source coordinates (default).",
-                                    "Present them in the generated .lua coordinates."
-                                ],
-                                "description": "Source presentation mode for this debug session. 'pasta' shows your .pasta lines; 'lua' shows the generated .lua. Forwarded as-is to the backend; omit to use the backend's own setting (env > pasta.toml > default).",
-                                "default": "pasta"
-                            }
-                        }
-                    }
-                },
-                "initialConfigurations": [
-                    {
-                        "type": "pasta",
-                        "request": "attach",
-                        "name": "Attach to Pasta Debug Backend",
-                        "host": "127.0.0.1",
-                        "port": 9276
-                    }
-                ],
-                "configurationSnippets": [
-                    {
-                        "label": "Pasta: Attach",
-                        "description": "Attach to a running Pasta debug backend.",
-                        "body": {
-                            "type": "pasta",
-                            "request": "attach",
-                            "name": "Attach to Pasta Debug Backend",
-                            "host": "127.0.0.1",
-                            "port": 9276
-                        }
-                    }
-                ]
             }
         ]
     },

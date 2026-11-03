@@ -4,14 +4,14 @@
 - 書き直す `reloadShiori.ts`・`runSceneAtCursor.ts` の試験は、今のファイル名のまま書き直すので、列に残ったまま走る。そのため、両方とその試験が定数を借りている `debugAttachTarget.ts` は 1.1 では消さず、5.2 で消す。
 - マニュアルの中身の検証（`verify-content.mjs`）は、G 節を直す 7.5 までは赤くてよい（今の G 節は `9276`・`attach`・`sourcePresentation` を求める）。7.1〜7.4 の確かめには使わない。
 
-- [ ] 1. DAP の部品の撤去
+- [x] 1. DAP の部品の撤去
 - [x] 1.1 拡張のコードと試験から DAP の糊を消す
   - DAP の 2 つのファイル（アダプターの工場・提示モードの切り替え）を消し（attach の相手の定数のファイルは、まだ借りている所があるので 5.2 まで残す）、起動の処理から DAP の import・登録・糊（コマンドの実体を含む）を消す。WASM の起動・意味の色・診断・ゴースト全体の検査・単語参照の装飾の登録は触らない。
   - DAP に向けた試験 4 本（アダプターの工場・提示モード・2 つのコマンドの試験）を消し、起動の試験から debug の試験を消す。試験の真似の vscode から debug の API・アダプターのサーバー・`startDebugging` の記録・`launch` の構成を消す。
   - `test:unit` の列から消した試験を外す。宣言の `pasta.runSceneAtCursor`・`pasta.reloadShiori` は 6.3 で登録し直すまで、宣言だけ残ってよい。
   - 終わったとき: `npm test` が通り、起動の処理と試験の真似の vscode に `debug` の API（`vscode.debug`・`DebugAdapterServer`・`startDebugging`）を使うコードが無い（5.2 まで残すファイルのコメントは数えない）。
   - _Requirements: 1.3, 1.5, 8.4_
-- [ ] 1.2 拡張の宣言から DAP の部品を消し、無いことを試験で確かめる
+- [x] 1.2 拡張の宣言から DAP の部品を消し、無いことを試験で確かめる
   - `debuggers`・`breakpoints`・`pasta.debug.toggleSourcePresentation`・`commandPalette` の DAP の行・`debug/toolBar`・`activationEvents` の `onDebug:pasta` を消す。`editor/context` と `commandPalette` に残る `debugType` の条件を消す。
   - 宣言の試験 2 本に、上のどれも無いこと・どの `when` にも `debugType` が無いことを確かめる項を足す（今の DAP の宣言を確かめる項は消す）。
   - 終わったとき: `npm test` が通り、宣言の試験が `debuggers`・`breakpoints`・`onDebug`・`debug/toolBar`・`debugType` の不在を確かめている。
