@@ -96,7 +96,7 @@
   - _Requirements: 6.2, 6.3_
 
 - [ ] 6. vscode の糊と組み込み
-- [ ] 6.1 コマンドの共通の入口（対象・ゴースト・相手・出力・重なり）を作る
+- [x] 6.1 コマンドの共通の入口（対象・ゴースト・相手・出力・重なり）を作る
   - 今のエディタの文書が、ディスク上のファイルで名前があり、コマンドが受ける種類（「▶ シーンを実行」は `.pasta`、ほかは `.pasta`・`.lua`・`pasta.toml`）のときだけ進む。外れたら伝えて止まる。ゴーストのルートが無ければ、そのことと開いているパスを伝えて止まる。
   - 相手は、覚えた相手を 1 回で確かめ、外れたら（答えない・NG・名前が違う）覚えを捨てて探し直す。0 個なら表示名・ルート・確かめることを添えて止まり、2 つ以上なら名前と番号を並べて選ばせ、閉じたら何も送らない。決まった相手をゴーストごとに、この窓の間だけ覚える。
   - 出力のパネル「Pasta 開発」を 1 つだけ作り、コマンドごとに時刻・コマンド名・表示名・ルート・相手の名前と番号の頭の行を書き、フォーカスを奪わずに見せる。止まったときと案内は通知で短く出す（届かない・形が違うは誤りの通知）。成功は通知しない。
@@ -177,3 +177,4 @@
 - 5.1: reloadShiori.ts は design の名前どおり（reloadAndWait・blocksPlayback・formatReload ほか）。試験は本物の HTTP の fakeMcpServer に向けて走る。
 - 5.2: pasta.log は logger.rs の Mutex<RollingFileAppender> に同期で書かれるので、204 の直後に 1 回読めば理由の行が揃う。fakeMcpServer に raiseEventLog（raise_event のとき pasta.log へ書く行）を足した。
 - 5.3: 依存の向きを守る。共有の describeResult は mcpClient.ts、DEBUG_HINT は ghostFiles.ts に置く。dumpVariables は reloadShiori から import type だけ、runSceneAtCursor からは何も取らない。
+- 6.1: 本物の vscode.Uri では ghost_name に送るルートがドライブ文字小文字の fsPath（c:\...）になる。ベースウェアが大文字・小文字を区別して照らさないかを 8.2 の実機で確かめる。e2e は src/test/devCommands.e2e.test.ts（6.3 で test:e2e に足す）。
