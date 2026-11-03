@@ -72,7 +72,7 @@
   - _Requirements: 4.3, 5.7, 6.2, 6.3_
 
 - [ ] 5. 3 つの流れ
-- [ ] 5.1 SHIORI の読み込み直しと終わりの待ち・誤りの要約を作る
+- [x] 5.1 SHIORI の読み込み直しと終わりの待ち・誤りの要約を作る
   - 順は、`pasta.log` の場所を決める → 大きさを覚える → 誤りの記録の最後の番号 → `reload(target="shiori")` → 印が出るか上限（20 秒）まで間隔（250 ms）ごとに増えた分を読む → 番号より後の誤りの記録。時計と眠りは差し込めるようにし、試験は本物の時計を使わない。
   - 数え方: `pasta.log` は印の行までの ERROR を誤り、WARN を警告とし、印が `loaded=false` ならその行も誤りにする。ベースウェアの記録は表示の語に `warn` を含むものを警告、ほかを誤りにする。
   - 「再生してよくない」（時間切れ・`loaded=false`・誤りが 1 つ以上）の判定と、要約の文（数と行・0 件なら短い 1 行・時間切れなら `[logging]` の `level`・`filter` を確かめる案内とそこまでの要約・`pasta.log` が読めないときの添え書き・場所の添え書き）を作る。再生は頼まない。
@@ -174,3 +174,4 @@
 - 4.1: ghostFiles.ts の resolveGhost(fileFsPath, masterPath) は master のパスを受ける。糊（6.1）は resolveGhost(uri.fsPath, findGhostMaster(uri)?.fsPath)（ghostValidator.ts）で呼ぶ。試験は src/test/ghostFiles.test.ts（vscode の alias 不要）。
 - 4.2: file_path の判定は pasta の logger.rs と同じく部品で判じる（\ も区切り・profile/dir/ は通す）。文字列の startsWith で判じない。
 - 4.3: readNewLines は pasta.log がまだ無いときも undefined（読めない）を返す。5.1 の待ちでは引き直し続け、最後の結果で「読めない」を決める。
+- 5.1: reloadShiori.ts は design の名前どおり（reloadAndWait・blocksPlayback・formatReload ほか）に加え describeResult(CallResult) を export。5.2・5.3 の要約で使ってよい。試験は本物の HTTP の fakeMcpServer に向けて走る。

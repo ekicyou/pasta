@@ -1,106 +1,149 @@
-// Pure SHIORI-reload + re-attach policy for the Pasta debug adapter (Task 5.2).
+// ReloadShiori - SHIORI を読み込み直し、pasta.log の印で終わりを待ち、増えた誤りと警告を集める
+// （vscode-mcp-client の設計の ReloadShiori。要件 4.3・4.4・4.5・5.3・5.4・5.5・5.7・5.8・5.9）
 //
-// This module is deliberately FREE of the `vscode` runtime so it can be
-// imported and exercised by plain node unit tests (the test bundle does not
-// provide a `vscode` module). The `vscode`-aware wiring (command registration,
-// connection guard, dirty check, customRequest dispatch, detach detection,
-// wait/retry re-attach loop, error reporting) lives in `extension.ts` and
-// depends on the helpers defined here. This mirrors the separation already used
-// by `runSceneAtCursor.ts` (task 5.1).
-//
-// Requirements covered (client-side): 7.4, 9.1, 9.3, 9.4, 9.5.
+// vscode に触らない純粋なモジュール。再生は頼まない（5.9）。時計を持たず、待ちは ctx.sleep の回数で数える。
 
-// Re-export the start-debugging config resolution from task 5.1 so the
-// re-attach path uses the SAME workspace-`pasta`-preferred / default-`9276`
-// resolution as the "デバッグ開始" guidance (Decision 5 / OQ-4: DRY — do NOT
-// duplicate the resolver). The wiring imports `resolvePastaDebugConfig` from
-// here (or directly from runSceneAtCursor); either way there is one source.
-export {
-  resolvePastaDebugConfig,
-  defaultPastaAttachConfig,
-  type ResolvedPastaDebugConfig,
-} from './runSceneAtCursor';
+import * as path from 'path';
+import { CALL_TIMEOUT_MS, CallResult, Endpoint, callTool, lastLogId, parseLogEntries } from './mcpClient';
+import {
+  GhostTarget, PastaLogLocation, loadCompletion, openLogCursor, parsePastaLogLine, pastaLogPath, readNewLines, readText,
+} from './ghostFiles';
 
-/**
- * The DAP customRequest command name used to request a SHIORI reload.
- *
- * MUST match the case-sensitive command string the Rust backend decodes
- * (`crates/pasta_lua/src/debug/dap/decode.rs`: `pasta/reloadShiori`). This
- * equality is the cross-language contract (requirement 9.2). The engine reacts
- * by emitting `\![reload,shiori]` as sakura script output (NOT sent directly to
- * SSP); the reload detaches the debug session, triggering the re-attach below.
- */
-export const requestCommand = 'pasta/reloadShiori' as const;
+export interface Timing {
+  readonly loadTimeoutMs: number;     // 20000
+  readonly pollIntervalMs: number;    // 250
+  readonly scriptLogWaitMs: number;   // 5000（RunScene）
+  readonly dumpWaitMs: number;        // 5000（DumpVariables）
+  readonly callTimeoutMs: number;     // CALL_TIMEOUT_MS
+}
+export const DEFAULT_TIMING: Timing = {
+  loadTimeoutMs: 20000, pollIntervalMs: 250, scriptLogWaitMs: 5000, dumpWaitMs: 5000, callTimeoutMs: CALL_TIMEOUT_MS,
+};
 
-// ---------------------------------------------------------------------------
-// Re-attach wait/retry policy (Decision 5 ② / requirement 9.3 / 9.4)
-// ---------------------------------------------------------------------------
-//
-// After the reload request the engine emits `\![reload,shiori]`, SSP reloads
-// SHIORI, and the debug session detaches. The reload is asynchronous, so the
-// backend is not immediately ready to accept a new attach. The policy is:
-//   1. wait REATTACH_INITIAL_DELAY_MS for the reload to settle,
-//   2. attempt `startDebugging`,
-//   3. on failure, retry every REATTACH_RETRY_INTERVAL_MS,
-//   4. give up once total elapsed time reaches REATTACH_TIMEOUT_MS and surface
-//      a final failure to the author.
-// The concrete values are tuned conservatively per the design note ("リトライ
-// 上限/タイムアウトの具体値は実装時に調整"); they are exported so the wiring and
-// the unit tests share one source of truth.
-
-/** Initial wait after the reload request before the first attach attempt. */
-export const REATTACH_INITIAL_DELAY_MS = 3000;
-
-/** Interval between attach retries once the first attempt has failed. */
-export const REATTACH_RETRY_INTERVAL_MS = 1000;
-
-/** Total budget (from the first attempt) after which re-attach gives up. */
-export const REATTACH_TIMEOUT_MS = 15000;
-
-/**
- * Pure retry-schedule decision: given the elapsed time since the first attach
- * attempt (in ms), should the loop keep retrying?
- *
- * `true` while `elapsedMs < timeoutMs`; `false` once the budget is exhausted.
- * Total and never throws; a non-finite / negative elapsed value is treated as
- * "0 elapsed" (keep retrying) so a clock glitch never aborts early. Pinned by
- * the unit tests so the wiring's loop can be reasoned about without real timers.
- */
-export function shouldKeepRetrying(
-  elapsedMs: number,
-  timeoutMs: number = REATTACH_TIMEOUT_MS,
-): boolean {
-  const elapsed = Number.isFinite(elapsedMs) && elapsedMs > 0 ? elapsedMs : 0;
-  return elapsed < timeoutMs;
+export interface FlowContext {
+  readonly endpoint: Endpoint;
+  readonly ghost: GhostTarget;
+  readonly timing: Timing;
+  readonly sleep: (ms: number) => Promise<void>;
 }
 
-/**
- * Pure re-attach schedule: the ordered list of delays (ms) to wait BEFORE each
- * successive attach attempt, assuming every attempt fails (the worst case).
- *
- * The first entry is the initial settle delay; subsequent entries are the retry
- * interval, emitted until the cumulative wait would reach/exceed the timeout.
- * The wiring drives attempts lazily (stopping on the first success) — this pure
- * form exists so the bounded, terminating nature of the loop is unit-testable
- * without real timers. Always finite and non-empty (at least the initial wait).
- */
-export function reattachDelaySchedule(
-  initialDelayMs: number = REATTACH_INITIAL_DELAY_MS,
-  retryIntervalMs: number = REATTACH_RETRY_INTERVAL_MS,
-  timeoutMs: number = REATTACH_TIMEOUT_MS,
-): number[] {
-  const schedule = [initialDelayMs];
-  // `elapsed` tracks the wall time consumed by waits performed so far. We keep
-  // appending retry waits while the budget (measured from the first attempt,
-  // i.e. after the initial delay) has not been exhausted. A non-positive retry
-  // interval would loop forever, so guard it.
-  if (retryIntervalMs <= 0) {
-    return schedule;
+export interface LoadIssue { readonly source: 'pasta.log' | 'baseware'; readonly text: string }
+
+export type ReloadOutcome =
+  | { kind: 'refused'; result: CallResult }  // reload（か前の get_log）が NG・届かない・形が違う
+  | {
+      kind: 'done';
+      finished: boolean;              // 印を見たか（false＝時間切れ）
+      loaded: boolean | undefined;    // 印の loaded の値
+      errors: readonly LoadIssue[];
+      warnings: readonly LoadIssue[];
+      pastaLogReadable: boolean;
+      pastaLog: PastaLogLocation;     // 場所と、file_path を読めなかったときの添え書き
+    };
+
+/** CallResult の失敗を 1 行で */
+export function describeResult(r: CallResult): string {
+  switch (r.kind) {
+    case 'ok': case 'ng': return r.text;
+    case 'rpcError': return `JSON-RPC error ${r.code}: ${r.message}`;
+    default: return r.detail;
   }
-  let elapsed = 0;
-  while (shouldKeepRetrying(elapsed + retryIntervalMs, timeoutMs)) {
-    schedule.push(retryIntervalMs);
-    elapsed += retryIntervalMs;
+}
+
+export async function reloadAndWait(ctx: FlowContext): Promise<ReloadOutcome> {
+  const { endpoint: { port }, ghost: { root, master }, timing } = ctx;
+  const pastaLog = pastaLogPath(master, await readText(path.join(master, 'pasta.toml')));
+  let cursor = await openLogCursor(pastaLog.path);
+  const sinceId = await lastLogId(port, 'error', root);
+  if (typeof sinceId !== 'number') {
+    return { kind: 'refused', result: sinceId };
   }
-  return schedule;
+  const reload = await callTool(port, 'reload', { target: 'shiori', ghost_name: root }, timing.callTimeoutMs);
+  if (reload.kind !== 'ok') {
+    return { kind: 'refused', result: reload };
+  }
+
+  const errors: LoadIssue[] = [];
+  const warnings: LoadIssue[] = [];
+  let finished = false;
+  let loaded: boolean | undefined;
+  let pastaLogReadable = false;
+  const maxSleeps = Math.ceil(timing.loadTimeoutMs / timing.pollIntervalMs);
+  for (let slept = 0; ; slept++) {
+    const read = await readNewLines(cursor); // 無い間も引き直し、最後の結果で「読めない」を決める（5.7）
+    pastaLogReadable = read !== undefined;
+    for (const line of read?.lines ?? []) {
+      const mark = loadCompletion(line);
+      const level = parsePastaLogLine(line).level;
+      if (level === 'ERROR' || mark?.loaded === false) {
+        errors.push({ source: 'pasta.log', text: line });
+      } else if (level === 'WARN') {
+        warnings.push({ source: 'pasta.log', text: line });
+      }
+      if (mark) {
+        finished = true;
+        loaded = mark.loaded;
+        break; // 印より後の行は数えない
+      }
+    }
+    if (read) {
+      cursor = read.next;
+    }
+    if (finished || slept >= maxSleeps) {
+      break;
+    }
+    await ctx.sleep(timing.pollIntervalMs);
+  }
+
+  const after = await callTool(port, 'get_log', { log_type: 'error', ghost_name: root, since_id: sinceId }, timing.callTimeoutMs);
+  if (after.kind === 'ok') {
+    for (const e of parseLogEntries(after.text)) {
+      (/warn/i.test(e.label) ? warnings : errors).push({ source: 'baseware', text: `[${e.label}] ${e.text}` });
+    }
+  } else {
+    // 読めなければ誤りが無いとは言えないので、誤りに数えて再生を止める
+    errors.push({ source: 'baseware', text: `誤りの記録を読めませんでした: ${describeResult(after)}` });
+  }
+  return { kind: 'done', finished, loaded, errors, warnings, pastaLogReadable, pastaLog };
+}
+
+/** 再生してよくない（頼めなかった・時間切れ・loaded=false・誤りが 1 つ以上） */
+export function blocksPlayback(outcome: ReloadOutcome): boolean {
+  return outcome.kind === 'refused' || !outcome.finished || outcome.loaded === false || outcome.errors.length > 0;
+}
+
+const TIMEOUT_TEXT = '読み込みの終わりを確かめられませんでした';
+
+export function formatReload(outcome: ReloadOutcome): { lines: string[]; notice?: string } {
+  if (outcome.kind === 'refused') {
+    const text = `SHIORI の読み込み直しを頼めませんでした: ${describeResult(outcome.result)}`;
+    return { lines: [text], notice: text };
+  }
+  const { finished, errors, warnings } = outcome;
+  const lines: string[] = [];
+  if (!finished) {
+    lines.push(`${TIMEOUT_TEXT}（pasta.log に読み込みの終わりの行が出ませんでした。pasta.toml の [logging] の level・filter も確かめてください）`);
+  }
+  if (finished && errors.length === 0 && warnings.length === 0) {
+    lines.push('読み込みは誤り無く終わりました');
+  } else {
+    lines.push(`誤り ${errors.length} 件・警告 ${warnings.length} 件`);
+    const list = (head: string, issues: readonly LoadIssue[]) => {
+      if (issues.length > 0) {
+        lines.push(head, ...issues.map((i) => `  ${i.source === 'pasta.log' ? '[pasta.log]' : '[ベースウェア]'} ${i.text}`));
+      }
+    };
+    list('誤り:', errors);
+    list('警告:', warnings);
+  }
+  if (!outcome.pastaLogReadable) {
+    lines.push(`pasta.log を読めなかったため、ベースウェアの誤りの記録だけで要約しました（${outcome.pastaLog.path}）`);
+  }
+  if (outcome.pastaLog.note) {
+    lines.push(outcome.pastaLog.note);
+  }
+  const notice = !finished ? TIMEOUT_TEXT
+    : errors.length > 0 ? `読み込みの誤りが ${errors.length} 件あります`
+    : undefined;
+  return notice ? { lines, notice } : { lines };
 }
