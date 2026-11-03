@@ -32,8 +32,8 @@
 - **mlua 0.12**: Lua VMバインディング（LuaJIT 2.1, features: luajit52, vendored, serialize）
 - **regex 1.x**: 正規表現（さくらスクリプトタグ検出）
 - **thiserror 2**: エラー型定義
-- **toml 1.1.2**: pasta の既定の書式。設定ファイル（pasta.toml）・セーブデータ（`@pasta_persistence`）・ソースマップのサイドカー（`.map`）の読み書き、`@toml`（`decode`）、`@pasta_log` の表の 1 行の書き出し
-- **serde 1 / serde_json 1**: serde は TOML の型付きの読み書き。serde_json は DAP のメッセージ（JSON が DAP の決まり）だけに使う
+- **toml 1.1.2**: pasta の既定の書式。設定ファイル（pasta.toml）・セーブデータ（`@pasta_persistence`）の読み書き、`@toml`（`decode`）、`@pasta_log` の表の 1 行の書き出し
+- **serde 1**: TOML の型付きの読み書き（serde_json は DAP とともに `pasta_lua` から外れた。2026-11-03 `debug-mcp-runtime`）
 - **glob 0.3**: ファイルパターンマッチ
 - **flate2 1.x**: gzip圧縮（キャッシュ等）
 - **zip 9.0 (deflate)**: pasta_scripts 自己展開（起動時 zip 解凍）・ビルド時の決定論 zip 生成
@@ -41,7 +41,6 @@
 - **budouy 0.2.2**: 日本語改行位置推定（BudouX、vendored-models）
 - **unicode-width 0.2.2**: Unicode文字幅計算
 - **unicode-segmentation 1.13.3**: 書記素クラスタの切り出し（トークの文字の単位）
-- **socket2 0.6**: debug transport 待受ソケットの `SO_REUSEADDR` 設定（Windows 以外。Windows では二重 bind を許してしまうため立てない）・非ブロック化（reload 時の再バインド堅牢化）
 - **tracing 0.1 / tracing-appender 0.2 / tracing-subscriber 0.3**: ロギング・診断
 - **windows-sys 0.61**: Windows API（Shift_JISエンコーディング等、cfg(windows)・features: Win32_System_LibraryLoader, Win32_System_Diagnostics_Debug（ffi.load の置き換え）。dev-dependency では Win32_Storage_FileSystem, Win32_System_Registry（8.3 名・長いパスの設定の確かめ））
 - **cc 1**（dev-dependency）: FFI テスト用の DLL をテスト中にビルドする
@@ -253,7 +252,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
 | `@pasta_sakura_script` | さくらスクリプト変換                    |                            |
 | `@enc`                 | UTF-8⇔ANSI変換                          |                            |
 | `@pasta_log`           | ロギング（trace/debug/info/warn/error） |                            |
-| `@pasta_debug`         | デバッグの有効と、位置からのシーンの引き当て（内部。`OnPastaScene`・`OnPastaSceneAt` の既定ハンドラーが使う） | 本番の入口だけが登録 |
+| `@pasta_debug`         | デバッグの有効と、位置からのシーンの引き当て・保存変数の書き出し（内部。`OnPastaScene`・`OnPastaSceneAt`・`OnPastaDumpVariables` の既定ハンドラーが使う） | 本番の入口だけが登録 |
 | `@toml`                | TOML の文字列を表に読む（`decode`）     |                            |
 
 ### シーン関数定型パターン

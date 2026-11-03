@@ -444,8 +444,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Source-map wiring (Requirements 1.1, 1.3): the block is emitted one `.lua`
     /// line per `.pasta` content line (1:1 line correspondence — `content.lines()`
     /// is each emitted as one unindented line). Each output line is mapped
-    /// INDIVIDUALLY to its originating `.pasta` line so in-block breakpoints resolve
-    /// precisely, instead of collapsing the whole block onto a single span line.
+    /// INDIVIDUALLY to its originating `.pasta` line so in-block runtime errors point
+    /// at their own line, instead of collapsing the whole block onto a single span line.
     ///
     /// # Line offset
     ///

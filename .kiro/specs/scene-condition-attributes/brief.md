@@ -235,18 +235,6 @@ pasta は if を持たない。値によって出すシーンを変えるには�
 - シーン表の前方一致の索引は `BTreeMap<String, Vec<SceneId>>` になった。順次消費の状態は「候補の並び」と「次の位置」の 2 つだけで、選んだ履歴は持たない。行番号は変わっているので、設計の前に main で読み直す。
 - 参照: `.kiro/specs/completed/ponytail-core-registry/design.md` の「Revalidation Triggers」「Components and Interfaces > SceneTable」。
 
-## 2026-11-03 棚卸の再測定（main c575febd）
-
-- **前提の変化**: 0.4.5 の隙間の spec（`ponytail-dsl-parser`・`ponytail-core-registry`・`ponytail-editor-tooling`・`ponytail-lua-scripts`）は全部入った。`ponytail-core-registry` の申し送り（上の節）のとおり、`resolve_scene_id`・`find_scene` の論点は閉じ、絞り込みを受ける関数は 3 つになった。属性の文法（`grammar.pest` 162〜166 行）は変わっていない。`ponytail-lua-scripts` で `scene.lua`・`act.lua` の行が動いた。
-- **行番号（main c575febd）**: `SCENE.search` 138 行（`SEARCH:search_scene` 148 行）、`SCENE.co_exec` 194 行、`act:find_scene` 668 行、`act:call` 683 行、`search_dictionary` 328 行（`SCENE.search(key, scene_name)` は 333 行で、act を渡していない。ローカル変数で条件を評価するなら、act を運ぶ道が要る）、`filter_by_attributes` 283 行、`search_scene_by` 124 行、`search_local_scene_exact` 197 行。`FAILURE.LABEL` は 12 種のまま。`lua/script-api.md` の「`attrs` は使わない」は 326・339 行。
-- **触るファイル**: `grammar.pest` 272、`pasta_dsl` の属性の解析（`parse_elements.rs` の `parse_attr`）と構文木、条件を生成コードへ運ぶなら `scope_gen.rs` 404、`scene.lua` 261、`act.lua` 812、`search/context.rs` 1,009（1,000 行を超えている。足す試験は別のファイルへ）、`scene_table.rs` 442、イベントの自動転記の置き場（イベントのシーンは全部 `SCENE.co_exec` を通る。時報の転記は今 `virtual_dispatcher.lua` 182 行）、`pasta_check` の `validate/`、`pasta_lsp`、`editors/vscode/syntaxes/pasta.tmLanguage.json`、マニュアルと入門の 7 段目、スキルの `references/`。`element_gen.rs` は触らない見込み（Call の文法を変えない）。
-- **規模**: 14〜18 タスクのまま（消す・残すの論点が閉じた分だけ軽い）。
-- **先に要るもの**: `scene-attribute-store`（宣言行の属性を実行時まで運ぶこと、値の型、受け継ぎ）。ファイルの重なり（未完了）: `scene-attribute-store`・`scene-pick-modes`・`scene-count`・`scene-exact-match`（`search/context.rs`・`scene.lua`・`act.lua`）、`cue-command-runtime`・`novel-talk-flow`（`act.lua`・`scene.lua`）、`novel-variable-scope`（文法）。`debug-mcp-runtime` とは、自動転記を `virtual_dispatcher.lua` に置くと重なる（あちらはキックの分岐 246〜272 行を消す）。`SCENE.co_exec` に置けば重ならない。
-- **種別**: 機能（Lua を使わずに、条件で出す場面を変える書き方が無い）。ゴースト側の要望から。書き方と意味は開発者が決めた。
-- **要件定義のモデル**: Opus。新しい DSL の書き方だが、書き方と意味は 2026-10-29 に開発者が推奨案を全部採って決めた。残る問い（評価の置き場・文法での見分け・`＆優先` の別名など）は、どれも推奨を付けられる。
-- **分割の案**: 不要。
-- **見つけた穴・古くなった記述**: Constraints の「`act.lua` は 837 行」は古い（今は 812 行。1,000 行に近いことは変わらない）。`grammar.pest` 254 行の規則の名前 `file_scppe_item` は `file_scope_item` の書き間違い（出力に出ない規則なので害は無い。文法を触るこの spec が、ついでに直す。棚卸から）。
-
 ## 申し送り（2026-11-03・`scene-attribute-store` の要件ディスカッションより）
 
 - **条件の形の文法・構文木・運搬・倉・Lua の口・着色は `scene-attribute-store` が入れる**（開発者の決定。議題 5）。`＆＄変数 演算子 値`（6 種の演算子・全角と半角）と `＆＄変数`（フラグ）は、`scene-attribute-store` の後はパースが通り、倉に「書いたとおり」入る。**評価はしない**ので、候補の選択は変わらない（この spec が足すのは評価だけ）。この brief の Scope「条件の属性の文法、パーサ、構文木」と、触るファイルの `grammar.pest`・`parse_elements.rs`・`scope_gen.rs`・`pasta_lsp`・VSCode の文法定義は、`scene-attribute-store` へ移った。「要件フェーズで決めること」の「属性の中の `＞`・`＝` の見分けを文法でどう書くか」「全角と半角の受け付け」も、あちらの設計で決まる。`file_scppe_item` の書き間違いも、文法を触るあちらで直す。
@@ -267,3 +255,16 @@ pasta は if を持たない。値によって出すシーンを変えるには�
 - **Lua の数は倍精度**: 2^53 を超える整数は Lua に入った時点で丸まる。pasta_check の側は i64 のまま持つ。評価を pasta_check でも真似るなら、この差に注意する。
 - `crates/pasta_lua/src/runtime/finalize.rs` の `build_scene_registry` は統合テストから呼ぶため `pub` になっている（設計では非公開）。
 - 参照: `.kiro/specs/completed/scene-attribute-store/design.md`（SceneAttrTypes・Finalize の節）、同 `tasks.md` の Implementation Notes。
+
+## 2026-11-03 棚卸の再測定（main b03a1ca5）
+
+- **前提の変化**: `scene-attribute-store`（PR#234）・`scene-count`（PR#230）・`debug-mcp-runtime`（PR#233）が入り、先に要るものは全部そろった。条件の形の文法・構文木・運搬・倉・着色はあちらが入れた（`grammar.pest` 172〜174 行の `cmp_op`・`attr_cond`・`attr_flag`。`file_scppe_item` も直った）。倉は 1 つで、宣言・条件・フラグが同じ並びに入る。Rust は `SceneInfo.attributes: Vec<SceneAttr>`（`Decl`・`Cond { key, op, value }`・`Flag`。文字列の写しは残していないので、消す約束は無い）、Lua は `STORE.scene_attrs` を `SCENE.attrs(global, local)`（`scene.lua` 126 行）で読む。受け継ぎと重なりの規則は `pasta_dsl` の `merge_attrs` の 1 か所。`filter_by_attributes`（`scene_table.rs` 283 行）は `Decl` だけを文字列の表と比べる形で残り、作り直すのはこの spec。
+- **自動転記の置き場**: `virtual_dispatcher.lua` のキックの分岐は消えたので、「`debug-mcp-runtime` の後」の条件は無くなった（時報の転記は 180〜183 行に残る）。イベントのシーンは全部 `SCENE.co_exec`（237 行）を通るが、選択肢の飛び先は `choice_select.lua` 53 行が `SCENE.search` を直接呼ぶ。
+- **行番号（main b03a1ca5）**: `SCENE.search` 181 行、`act.lua` は変わらない（`find_scene` 668・`call` 683・`search_dictionary` の `SCENE.search` 333 行）、`search_scene_by` 124 行（空の `filters` 130 行）、`search_local_scene_exact` 235 行、`count_scene_by` 207 行、`select_from_cache` 324 行。
+- **触るファイル**: `scene.lua` 304、`act.lua` 812（act を検索へ運ぶなら）、`search/context.rs` 1,060（テストを含む。足すテストは別のファイルへ）、`scene_table.rs` 451（`filter_by_attributes`・`select_from_cache`・`SceneCacheKey`）、要るなら `scene_types.rs` 273、`pasta_check` の `validate/`（`report.rs` の `FindingKind`。条件は `mod.rs` 61 行の `scene_attrs` で読める）、マニュアル（`block-structure.md` 392 行「まだ評価されず」・`script-api.md` 326・339 行「`attrs` は使わない」・`call-jump.md` ほか）と入門の 7 段目、スキルの `references/`。`grammar.pest`・`parse_elements.rs`・`scope_gen.rs`・`pasta_lsp`・VSCode の文法定義は、もう触らない見込み。
+- **規模**: 11〜15 タスク（文法と構文木 2・着色 1 があちらへ移った分を引き、辞書確定から `@pasta_search` の絞り込みまでの端から端のテストを足す）。
+- **先に要るもの**: 無い（全部入った）。ファイルの重なり（未完了）: `scene-pick-modes`（`scene_table.rs` の `select_from_cache`・`SceneCacheKey`・`filter_by_attributes`、`search/context.rs`、`scene.lua`、`validate/report.rs`）。ほかに `scene-exact-match`・`cue-command-runtime`・`novel-talk-flow`・ノベルの残り・`scene-anchor-link`・`shell-element-click`（`scene.lua`・`search/context.rs`・`scene_table.rs`）があるが、どれもゴールの外か後。
+- **種別**: 機能（Lua を使わずに、条件で出す場面を変える書き方が無い）。ゴースト側の要望から。
+- **要件定義のモデル**: Opus。書き方と意味は開発者が決め、倉の形も入った。残る問い（評価の置き場＝Rust の袋に Lua の判定を渡すか Lua で絞るか・自動転記の範囲・`＆優先` の別名など）は、どれも推奨を付けられる。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: Constraints の「`act.lua` は 837 行」は古い（812 行）。Scope の「条件の属性の文法、パーサ、構文木」、Boundary Candidates の「文法とパーサ」、要件フェーズで決めることの「文法での見分け・全角と半角」「数の値の読み方・受け継ぎ」は、`scene-attribute-store` が済ませた（申し送りの節のとおり）。`シーン数` が条件を見るかはまだこの spec の議題で、`call-jump.md` 678 行の節には一言も無い。

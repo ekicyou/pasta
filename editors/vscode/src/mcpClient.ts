@@ -1,5 +1,5 @@
 // MCP client for the SSP / areka endpoint (POST http://127.0.0.1:{port}/api/mcp/v1).
-// Pure node: no vscode import. Wire shapes: .kiro/specs/vscode-mcp-client/research.md.
+// Pure node: no vscode import. Wire shapes: .kiro/specs/completed/vscode-mcp-client/research.md.
 
 import * as http from 'http';
 
