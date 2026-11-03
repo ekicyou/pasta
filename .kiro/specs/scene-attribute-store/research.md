@@ -88,5 +88,6 @@
   - `SceneInfo.attributes` の新しい型と、`filter_by_attributes` の合わせ方（A か C）
   - `register_global_raw` にローカルごとの属性を渡す口（Requirement 2.6 を採る場合）
   - 一致テスト（`pasta_check` ↔ pasta.dll）に属性の比較を足す位置
+  - DSL の Lua ブロックからモジュールへ届く名前。生成コードの `local SCENE = PASTA.create_scene(…)` はシーン表であって `pasta.scene` モジュールではないので、ブロックの中では `require("pasta.scene")` か `PASTA` 経由の別名が要る（`act.scene_name`・`act.local_scene_name` が実行中の登録名を持つ）
 - **要件ディスカッションに送る問い**: requirements.md の「未決事項」1〜11。特に 1（ローカルへの受け継ぎ）・2（名前なし `＊`）・6（条件と倉の共有）・9（口の形）は倉の形を変えるので、設計の前に決める。
 - **申し送り**: Option C を採るなら、`scene-condition-attributes` の brief に「文字列の写しを消す」を書く。Requirement 2.6 を採るなら、`cue-command-runtime` の brief に「親の柱は親の登録名で読む」を書く。
