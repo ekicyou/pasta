@@ -66,7 +66,7 @@
 | `[persistence]` | SHIORI デフォルト有（省略可） | （[[persistence]](#persistence永続化) 参照） |
 | `[logging]` | SHIORI デフォルト有（省略可） | （[[logging]](#loggingログ出力) 参照） |
 | `[logging]` › `balloon_warning` | SHIORI デフォルト有 | `true` |
-| `[debug]` | SHIORI デフォルト有（省略可） | `enabled = false` / `port = 9276` |
+| `[debug]` | SHIORI デフォルト有（省略可） | `enabled = false` |
 | `[package]` | **エンジンプロファイル専用** | （SHIORI では不要。[予約注記](#package-予約注記) 参照） |
 
 分類は一意で、同じセクション・キーが複数の分類に属することはない。
@@ -171,12 +171,9 @@ level = "info"                               # 既定 "info"
 # filter = "debug,pasta_shiori=info"         # 未設定（設定時は level より優先）
 balloon_warning = true                       # 既定 true（失敗表記をバルーンに出す。配る前に false）
 
-# --- 省略可（SHIORI デフォルト有）: デバッグバックエンド ---
+# --- 省略可（SHIORI デフォルト有）: デバッグ ---
 [debug]
-enabled = false             # 既定 false
-port = 9276                 # 既定 9276
-# present_as = "lua"        # 未設定（既定 .pasta）
-source_map_sidecar = false  # 既定 false
+enabled = false             # 既定 false（true で開発用のイベントが働く）
 
 # --- エンジンプロファイル専用: SHIORI 用途では記述不要（[package] 予約注記 参照） ---
 # [package] は SHIORI では使われない。書いても無視される。
@@ -770,6 +767,7 @@ filter = "debug,pasta_shiori=info"
 - 環境変数 `PASTA_LOG` が設定されていると、`filter`・`level` より優先される。
 - `balloon_warning` は `level`・`filter` と独立している。`false` でもログの警告は出て、ログに残るかどうかは `level`・`filter` が決める。`level = "error"` で警告がログに残らない設定でも、失敗表記を出すかどうかは `balloon_warning` だけで決まる。真偽値でないときは `true` になり、`[logging]` の他のキーは既定値に戻らない（[値の型が合わないとき](#値の型が合わないとき)）。表記の種類と出る位置は [実行時の失敗の出力](runtime-failures.md#表記の切り替え) を参照する。
 - Lua からのログ出力は [@pasta_log](https://ekicyou.github.io/pasta/lua/modules/pasta-log.html)、起動に失敗したときのログの読み方は [ゴーストが起動しない・喋らないとき](https://ekicyou.github.io/pasta/reference/startup.html#4-ゴーストが起動しない喋らないとき) を参照する。
+- 読み込みの終わりの行（`SHIORI load entry completed`）は、`level`・`filter`・`PASTA_LOG` によらず、読み込み（リロードを含む）のたびに必ず書く。ほかのログの絞り方は変わらない。
 - `balloon_warning` は、Lua のエラーでシーンや要求が止まったときの表記（`【スクリプトのエラー：…】`・`【時間切れ：…】`）も切り替える。`On` で始まるイベントの GET の要求で止まったとき、`true` では応答が表記付きの `200 OK` になり、`false` ではこれまでどおり表記の無い `500 Internal Server Error`（`X-Error-Reason` 付き）になる（[止まるエラーの表記](runtime-failures.md#止まるエラーの表記)）。
 - 既定の `true` のままでは、配ったゴーストの利用者のバルーンにも表記が出る。ゴーストを配る前に、次のように `false` にする。
 
@@ -780,26 +778,23 @@ balloon_warning = false
 
 ---
 
-### [debug]（デバッグバックエンド）
+### [debug]（デバッグ）
 
-pasta に組み込まれた DAP デバッグバックエンドを制御する。上級者向けのセクションである。**分類: SHIORI デフォルト有（省略可）**。省略するとデバッグは無効で、本番の動作に負荷をかけない。
+開発用のイベント（[OnPastaScene](https://ekicyou.github.io/pasta/lua/shiori-events.html#onpastascene名前でシーンを再生)・[OnPastaSceneAt](https://ekicyou.github.io/pasta/lua/shiori-events.html#onpastasceneat位置でシーンを再生)・[OnPastaDumpVariables](https://ekicyou.github.io/pasta/lua/shiori-events.html#onpastadumpvariablesグローバル変数を書き出す)）を働かせるかを決める。**分類: SHIORI デフォルト有（省略可）**。省略するとデバッグは無効で、開発用のイベントは何もせずに 204 No Content を返す。
 
 | キー | 型 | 既定値 | 説明 |
 | ---- | -- | ------ | ---- |
-| `enabled` | 真偽値 | `false` | デバッグバックエンドを有効にする |
-| `port` | 整数 | `9276` | DAP リスナーが待ち受ける TCP ポート |
-| `present_as` | 文字列 | （なし＝`.pasta`） | ソースの提示モード（`"pasta"` / `"lua"`） |
-| `source_map_sidecar` | 真偽値 | `false` | `.lua.map` サイドカーファイルも出力する |
+| `enabled` | 真偽値 | `false` | デバッグを有効にする。開発用のイベントが働き、読み込みのときに、位置からシーンを引く表を作る |
 
 ```toml
 [debug]
 enabled = true
-port = 9276
-present_as = "lua"
 ```
 
-- 環境変数（`PASTA_DEBUG`・`PASTA_DEBUG_PORT` など）が設定されていると、`[debug]` の値より優先される。
-- 有効化の手順と優先順位は [デバッグ概要](https://ekicyou.github.io/pasta/debug/index.html#pastatoml-による有効化)を参照する。
+- 環境変数 `PASTA_DEBUG` が設定されていると、`enabled` より優先される。`1`・`true`・`yes`・`on` で有効、`0`・`false`・`no`・`off`・空の文字列で無効になる（大文字・小文字と前後の空白は区別しない）。それ以外の値は、設定されていないのと同じに扱う。デバッグの設定を変える環境変数は `PASTA_DEBUG` だけである。
+- `enabled` は、SHIORI の読み込みのたびに読み直す。ベースウェアを起動し直さなくても、リロードで有効・無効が切り替わる。
+- 前の版の `port`・`present_as`・`source_map_sidecar` を書いたままでも、ほかの知らないキーと同じく読み飛ばし、読み込みは止まらない（警告も出ない）。
+- 有効化の手順と優先順位は [デバッグ概要](https://ekicyou.github.io/pasta/debug/index.html#pastatoml-による有効化) を参照する。
 
 ---
 

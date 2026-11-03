@@ -35,13 +35,12 @@ use pasta::actor::marshaling::{
 use pasta::actor::thread::spawn_actor_thread_with;
 use tempfile::TempDir;
 
-/// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前
+/// 開発セッションが export した `PASTA_DEBUG` を main 前
 /// （プロセスが単一スレッドの間）に中和する。写経元: `common/mod.rs`。
 #[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
     }
 }
 
@@ -122,7 +121,7 @@ fn stop(tx: &flume::Sender<ActorMsg>) {
 fn marshal_get_through_actor_returns_byte_invariant_golden_and_continues_coroutine() {
     let (load_dir, _temp) = build_async_callback_dir();
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
+    let actor = spawn_actor_thread_with(load_dir, rx, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     // Round1: get_property が yield → get タグ応答（marshaling 経由・ゴールデン一致）。
@@ -169,7 +168,7 @@ fn marshal_get_through_actor_returns_byte_invariant_golden_and_continues_corouti
 fn marshal_notify_through_actor_returns_204_then_get_in_fifo() {
     let (load_dir, _temp) = build_async_callback_dir();
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
+    let actor = spawn_actor_thread_with(load_dir, rx, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     let notify_resp = marshal_notify(
@@ -218,7 +217,7 @@ fn marshal_get_production_timeout_returns_golden_value() {
 
     let (load_dir, _temp) = build_async_callback_dir();
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
+    let actor = spawn_actor_thread_with(load_dir, rx, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     let resp = marshal_get(
@@ -277,7 +276,7 @@ fn marshal_get_disconnected_reply_yields_204() {
 fn marshal_get_relays_vm_400_for_parse_failure() {
     let (load_dir, _temp) = build_async_callback_dir();
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(load_dir, rx, None, None).expect("actor thread must spawn");
+    let actor = spawn_actor_thread_with(load_dir, rx, None).expect("actor thread must spawn");
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
     let resp = marshal_get_with_timeout(
@@ -324,7 +323,7 @@ fn marshal_into_closed_mailbox_yields_204() {
 fn marshal_get_on_load_failed_actor_returns_500_with_single_line_reason() {
     let temp = TempDir::new().expect("create temp dir");
     let (tx, rx) = mailbox();
-    let actor = spawn_actor_thread_with(temp.path().to_path_buf(), rx, None, None)
+    let actor = spawn_actor_thread_with(temp.path().to_path_buf(), rx, None)
         .expect("actor thread must spawn");
     assert!(
         !actor.loaded(),

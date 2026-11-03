@@ -19,7 +19,7 @@
 --- @field app_ctx table アプリケーション実行中の汎用コンテキストデータ
 --- @field appearance table 外見状態（セッション常駐・非永続）
 --- @field auto_talk_paused boolean 自動トークを止めている印（セッション常駐・非永続・既定 false）
---- @field co_preempt table<thread, true> 開発者が指名した再生（キック・シーン再生）のコルーチンの印
+--- @field co_preempt table<thread, true> 開発者が指名した再生（シーン再生）のコルーチンの印
 local STORE = {}
 
 --- アクターキャッシュ（名前→アクター）
@@ -63,7 +63,7 @@ STORE.appearance = { actors = {}, spots = {}, owners = {}, last_spots = {} }
 --- @type thread|nil
 STORE.co_scene = nil
 
---- 開発者が指名した再生（キック・シーン再生）のコルーチンの印（コルーチン→true）
+--- 開発者が指名した再生（シーン再生）のコルーチンの印（コルーチン→true）
 --- 印の付いたコルーチンが区切れば、止まっている続きをはっきり捨てる。
 --- キーを弱い参照にするので、捨てたコルーチンは GC で消える。
 --- @type table<thread, true>
@@ -72,14 +72,6 @@ STORE.co_preempt = setmetatable({}, { __mode = "k" })
 --- 最後に実行したグローバルシーン名（選択肢コールバックルーティング用）
 --- @type string|nil
 STORE.last_global_scene = nil
-
---- 保留中のキックシーン名（次の OnSecondChange で強制起動・無ければ nil）
---- @type string|nil
-STORE.kick_pending = nil
-
---- キック割り込み許可フラグ（is_blocked ワンショット突破用・既定 false）
---- @type boolean
-STORE.kick_force = false
 
 --- 自動トーク（ランダムトーク・時報・チェイントークの続き）を止めている印（既定 false）
 --- 回数は数えない真偽 1 つ。セッション常駐のみ。pasta.save（永続化）には置かない。
@@ -102,8 +94,6 @@ function STORE.reset()
     STORE.actor_words = {}
     STORE.appearance = { actors = {}, spots = {}, owners = {}, last_spots = {} }
     STORE.last_global_scene = nil
-    STORE.kick_pending = nil
-    STORE.kick_force = false
     STORE.auto_talk_paused = false
     STORE.co_preempt = setmetatable({}, { __mode = "k" })
 end

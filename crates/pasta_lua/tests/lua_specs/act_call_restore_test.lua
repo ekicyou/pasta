@@ -728,7 +728,7 @@ describe("act が書いた名前と行の対応を控える (runtime-error-ballo
                 act:init_scene(A, "天気", "雨の日", "dic\\天気.pasta|30:15")
                 path()
                 expect(STOP.subject(act)):toBe("＊天気・雨の日")
-                expect(STOP.detail(CHUNK .. ":30: boom", { [CHUNK] = true }, act.line_map))
+                expect(STOP.detail(CHUNK .. ":30: boom", { [CHUNK] = { pasta = "dic\\天気.pasta" } }, act.line_map))
                     :toBe("dic\\天気.pasta:15: boom")
             end
             GLOBAL.__restore_stop_test_fn = nil

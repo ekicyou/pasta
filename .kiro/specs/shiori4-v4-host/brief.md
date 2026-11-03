@@ -191,6 +191,11 @@ shiori4 の 0.1.0 が 2026-10-24 に出た（crates.io の `shiori4_abi`・`shio
 - この brief の「キックの即時化」（Problem の 1 つ目・Desired Outcome の「MCP からのシーン再生（キック）が…すぐ出る」・触るファイルの `kick.lua`）は、対象が無くなる。要件を作るときに範囲から外す。post の SEND で台本を今すぐ出す仕組みそのもの（シーンと Lua から）は残る。
 - 上の 2026-11-02 の申し送りの「0.5.1 で DAP を捨てて」は、0.5.0 と読み替える。
 
+## 申し送り（debug-mcp-runtime より・2026-11-03）
+
+- キックの経路は消えた。`spawn_actor_thread_with` の引数は `(load_dir, rx, claim)` の 3 つになり、スレッドは既定の `PastaShiori` と既定の `RuntimeConfig` を使う。`RuntimeConfig` に残る欄は `libs`・`scene_aliases` だけ（`kick_sink`・`debug` は無い）。版 4 の口で `RuntimeConfig` に差し込みを足すなら、ここから足す。
+- `ActorMsg` は Get・Notify・Stop の 3 つだけ。参照先は `.kiro/specs/completed/debug-mcp-runtime/design.md` の Revalidation Triggers。
+
 ## 2026-11-03 棚卸の再測定（main c575febd）
 
 - **前提の変化**（前回 2026-11-02・`491cc23c` から）: `ponytail-shiori` が入った。上の申し送り（`ponytail-shiori` より）は main と合っている。`actor/` に `module_ref.rs`（123 行）が増え、`JoinPolicy`・`determine_method` は無く、要求の判定は `marshaling.rs` の `classify_request`（126 行。`RequestKind` 112 行）。`req_parser.pest` の `_tag` は 44 行、`req.rs` は 4 行の再輸出だけになった。`hinst` は Lua へ定数の 0（`shiori.rs` 264 行）。`GET_TIMEOUT` は今も `marshaling.rs` 71 行の 5 秒。`v3.rs`（206 行）の自前の `shiori_get_api`（24 行）は版 3 だけを返し、版 4 は NULL（185〜189 行の試験）。依存は今も `shiori4_abi` だけ。CI の版 3 の 1 往復は `build.yml` 68〜80 行（x64）と 121〜129 行（Linux・macOS）。`act:get_property` は `shiori/act.lua` 318 行。`res.lua`（154 行）はヘッダの改行を潰す `header` が増えたが、開始行と `Charset` を付ける全文の形のまま。`version`・`name`・`craftman` には今も答えていない。

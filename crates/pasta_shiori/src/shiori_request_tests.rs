@@ -2,13 +2,12 @@ use super::*;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
-/// Neutralize ambient DAP debug env vars before any test thread starts.
+/// Neutralize ambient debug env vars before any test thread starts.
 ///
-/// The developer session may export `PASTA_DEBUG=1` / `PASTA_DEBUG_PORT=9276`.
+/// The developer session may export `PASTA_DEBUG=1`.
 /// Without this guard, every `PastaLoader::load` driven through SHIORI here would
-/// enable the DAP listener and bind that single fixed port; the multiple loads in
-/// this test binary then collide with `AddrInUse` and the tests fail. Tests must
-/// behave identically regardless of the session environment, so we clear these.
+/// open the debug gate and build a scene map. Tests must behave identically
+/// regardless of the session environment, so we clear these.
 ///
 /// `PASTA_LOG` is cleared too: it overrides the `[logging]` filter, so an
 /// ambient value would hide the log lines the lifecycle tests read back.
@@ -20,7 +19,6 @@ use tempfile::TempDir;
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
         std::env::remove_var("PASTA_LOG");
     }
 }

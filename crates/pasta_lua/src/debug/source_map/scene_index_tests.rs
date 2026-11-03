@@ -17,9 +17,7 @@ use super::*;
 /// 入れ子レベル（global=0, local=1, ...）と宣言開始行を与え、end_line は
 /// 「次の同レベル以上のシーン宣言の直前」を呼び出し側が明示して投入する。
 fn idx() -> SceneIdentityIndexBuilder {
-    let mut b = SceneIdentityIndex::builder();
-    b.insert_file("a.pasta");
-    b
+    SceneIdentityIndex::builder()
 }
 
 /// `(scene_id, parent)` を簡潔に組む比較用ヘルパー。

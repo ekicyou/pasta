@@ -33,7 +33,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Create actor — this is the scope definition HEADER line.
         // Source-map wiring (Requirements 1.1, 1.4, 1.5): record the actor scope's
         // `.pasta` span at the header `.lua` line so `span.start_line` (the `.pasta`
-        // `％アクター` definition header line) becomes a breakpoint target.
+        // `％アクター` definition header line) maps to a `.pasta` position.
         let out_line_before = self.out_line();
         self.writeln(&format!(
             "local ACTOR = PASTA.create_actor(\"{}\")",
@@ -106,7 +106,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // This is the global scene definition HEADER line.
         // Source-map wiring (Requirements 1.1, 1.4, 1.5): record the global scene's
         // `.pasta` span at the header `.lua` line so `span.start_line` (the `.pasta`
-        // `＊シーン` definition header line) becomes a breakpoint target.
+        // `＊シーン` definition header line) maps to a `.pasta` position.
         let out_line_before = self.out_line();
         self.writeln(&format!(
             "local SCENE = PASTA.create_scene(\"{}\")",
@@ -233,7 +233,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Source-map wiring (Requirements 1.1, 1.4, 1.5): record the local scene's
         // `.pasta` span at the function header `.lua` line so `span.start_line` (the
         // `.pasta` `・シーン` definition header line, or the enclosing global scene
-        // header for the anonymous start scene) becomes a breakpoint target.
+        // header for the anonymous start scene) maps to a `.pasta` position.
         let out_line_before = self.out_line();
         self.writeln(&format!("function SCENE.{}(act, ...)", fn_name))?;
         self.record_span_since(out_line_before, scene.span);

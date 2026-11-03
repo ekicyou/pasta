@@ -147,13 +147,6 @@ fn test_reload_with_claim_unregisters_logger_on_drop() {
     );
 }
 
-/// 既定の作り方では kick の送り先は無い（kick の道は働かない）。
-#[test]
-fn test_default_has_no_kick_sink() {
-    assert!(PastaShiori::default().kick_sink.is_none());
-    assert!(PastaShiori::with_kick_sink(None).kick_sink.is_none());
-}
-
 #[test]
 fn test_request_after_load_failure_returns_load_error() {
     let temp = TempDir::new().unwrap();

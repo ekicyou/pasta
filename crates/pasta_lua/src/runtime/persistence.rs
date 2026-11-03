@@ -221,6 +221,17 @@ pub(crate) fn save_table(
     if let Some(SaveGate::Closed(reason)) = lua.app_data_ref::<SaveGate>().as_deref() {
         return Err(PersistenceError::SaveDisabled(reason.clone()));
     }
+    save_to_file(&to_document_warning_dropped(lua, table), path, obfuscate)
+}
+
+/// 表を TOML にし（書けないキーは外して警告）、テキストで path に書く（一時ファイル → rename）。
+/// セーブの門（SaveGate）は見ない。表は変えない。
+pub(crate) fn dump_table(lua: &Lua, table: &Table, path: &Path) -> Result<(), PersistenceError> {
+    save_to_file(&to_document_warning_dropped(lua, table), path, false)
+}
+
+/// 表を TOML の文書にし、外したキーを 1 件ずつ警告する（セーブと書き出しで同じ文言）。
+fn to_document_warning_dropped(lua: &Lua, table: &Table) -> toml::Table {
     let (doc, dropped) = lua_table_to_toml_document(lua, table);
     for key in &dropped {
         tracing::warn!(
@@ -231,7 +242,7 @@ pub(crate) fn save_table(
             key.reason
         );
     }
-    save_to_file(&doc, path, obfuscate)
+    doc
 }
 
 /// Load data from a persistence file.
@@ -294,15 +305,16 @@ pub fn save_to_file(
     // Atomic write: write to temp file, then rename
     let temp_path = path.with_extension("tmp");
 
-    // Write to temp file
+    // 書き込み・sync_all・rename のどれで失敗しても書きかけの一時ファイルを残さない
     let mut file = File::create(&temp_path)?;
-    file.write_all(&bytes)?;
-    file.sync_all()?;
-    drop(file);
-
-    // Rename to final path
-    if let Err(e) = fs::rename(&temp_path, path) {
-        // Cleanup temp file on failure
+    let written = file
+        .write_all(&bytes)
+        .and_then(|()| file.sync_all())
+        .and_then(|()| {
+            drop(file);
+            fs::rename(&temp_path, path)
+        });
+    if let Err(e) = written {
         let _ = fs::remove_file(&temp_path);
         return Err(PersistenceError::IoError(e));
     }

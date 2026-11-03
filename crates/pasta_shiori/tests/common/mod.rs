@@ -9,14 +9,12 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
-/// Neutralize ambient DAP debug env vars before any test thread starts.
+/// Neutralize ambient debug env vars before any test thread starts.
 ///
-/// The developer session may export `PASTA_DEBUG=1` / `PASTA_DEBUG_PORT=9276`.
+/// The developer session may export `PASTA_DEBUG=1`.
 /// Without this guard, every `PastaLoader::load` driven through SHIORI here would
-/// enable the DAP listener and bind that single fixed port; the multiple loads in
-/// one integration-test binary then collide with `AddrInUse` and the tests fail.
-/// Tests must behave identically regardless of the session environment, so we
-/// clear these here.
+/// open the debug gate and build a scene map. Tests must behave identically
+/// regardless of the session environment, so we clear these here.
 ///
 /// `PASTA_LOG` is cleared for the same reason: it overrides the `[logging]`
 /// filter, so an ambient value (e.g. `PASTA_LOG=error`) would hide the log
@@ -29,7 +27,6 @@ use tempfile::TempDir;
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
         std::env::remove_var("PASTA_LOG");
     }
 }
@@ -168,16 +165,4 @@ pub fn wait_log_contains(ghost: &Path, needle: &str) -> String {
         }
         std::thread::sleep(Duration::from_millis(50));
     }
-}
-
-/// このゴーストのデバッグの待受が実際に使っているポート（`debug backend listening` の行から読む）。
-pub fn listening_port(ghost: &Path) -> u16 {
-    let log = wait_log_contains(ghost, "debug backend listening");
-    let line = log
-        .lines()
-        .find(|l| l.contains("debug backend listening"))
-        .unwrap_or_else(|| panic!("debug backend must listen:\n{log}"));
-    let addr = line.split("addr=").nth(1).expect("addr field");
-    let addr = addr.split_whitespace().next().expect("addr value");
-    addr.rsplit(':').next().unwrap().parse().expect("port")
 }

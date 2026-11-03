@@ -49,7 +49,7 @@
 | `crates/pasta_lua/src/runtime/runtime_config.rs`・`crates/pasta_lua/src/runtime/searcher.rs` | ライブラリ構成（`RuntimeConfig`）と `require` のファイル解決（[ローダ自己展開とモジュール解決](loader.md)） |
 | `crates/pasta_lua/src/runtime/log.rs`・`crates/pasta_lua/src/runtime/enc.rs` | `@pasta_log`・`@enc` の実装（[ロギングとエンコーディング](logging-encoding.md)） |
 
-`PastaLuaRuntime` は VM のほかに、インスタンスのロガー、`pasta.toml` の設定（`PastaConfig`）、ゴーストのベースディレクトリ、デバッグバックエンドのハンドル、デバッグ用のソースマップを持つ。設定とベースディレクトリは、`Drop` で永続化データを保存するために保持している。
+`PastaLuaRuntime` は VM のほかに、インスタンスのロガー、`pasta.toml` の設定（`PastaConfig`）、ゴーストのベースディレクトリと、デバッグが有効なときだけシーンマップ（`source_map`）を持つ。設定とベースディレクトリは、`Drop` で永続化データを保存するために保持している。
 
 ### Lua 側のモジュールの関係
 
@@ -62,7 +62,7 @@
         ├→ pasta.scene ──→ pasta.store, pasta.word, @pasta_search（search の呼び出し時）
         └→ pasta.word  ──→ pasta.store, pasta.failure
 
-pasta.shiori.entry（SHIORI.load / request / unload / kick）
+pasta.shiori.entry（SHIORI.load / request / unload）
   ├→ pasta.shiori.stop
   └→ pasta.shiori.event（EVENT.fire・EVENT.drive）
         ├→ pasta.shiori.act ──→ pasta.act ──→ pasta.actor, pasta.scene, pasta.global,
@@ -84,7 +84,7 @@ pasta.failure ──→ （@pasta_log・pasta.config を報告の時点で読む
 | モジュール | 実行モデルでの役割 |
 | ---------- | ------------------ |
 | `pasta`（`crates/pasta_lua/pasta_scripts/pasta/init.lua`） | 生成コードが呼ぶ `create_actor`・`create_scene`・`create_word` の窓口と、Rust が上書きする `finalize_scene` のスタブ |
-| `pasta.store` | ランタイムの共有状態の置き場。アクター・シーン・単語の Lua 側の登録表、外見の状態、継続中のコルーチン（`co_scene`）、選択肢とキックのための状態を持つ。他の `pasta.*` を `require` しないため、どのモジュールからも循環なく参照できる |
+| `pasta.store` | ランタイムの共有状態の置き場。アクター・シーン・単語の Lua 側の登録表、外見の状態、継続中のコルーチン（`co_scene`）、選択肢のための状態を持つ。他の `pasta.*` を `require` しないため、どのモジュールからも循環なく参照できる |
 | `pasta.scene` | シーン関数の登録と、検索結果からシーン関数を引く `SCENE.search`、シーン関数をコルーチンで包む `SCENE.co_exec`・`SCENE.co_exec_exact`・`SCENE.co_exec_registered` |
 | `pasta.word`・`pasta.actor` | 単語とアクターの登録。アクターのプロキシ（`act.アクター名`）は `pasta.actor` が作る |
 | `pasta.failure` | 実行時の失敗の報告の出口。ログの警告と失敗表記のトークンを作る（[実行時の失敗の出力](../reference/runtime-failures.md)・[失敗の報告（pasta.failure）](internal-modules.md#失敗の報告pastafailure)） |
@@ -117,7 +117,6 @@ ACT・STORE・PROXY・SCENE・SAVE の内部構造は [Lua ランタイム内部
 
 ```text
 from_loader_with_scene_dic
- 0. pasta.toml の [debug] と環境変数からデバッグ設定を解決し、RuntimeConfig に載せる
  1. with_config_and_source_map
     a. RuntimeConfig の libs を検証して警告（std_debug・std_all_unsafe）
        std_package を欠けば ConfigError::MissingRequiredLibrary で失敗（VM を作らない）
@@ -126,7 +125,6 @@ from_loader_with_scene_dic
     c. @pasta_search を登録（空の登録表と、RuntimeConfig の別名表から。8 の finalize_scene が作り直す）
     d. @pasta_log を登録（libs に依らず常に）
     e. @toml を登録（libs に依らず常に）
-    f. debug::enable を 1 回だけ呼ぶ（無効なら何もしない）
  2. ロガー・PastaConfig・ベースディレクトリを構造体に保持
  3. package.path を設定し、require の searcher を差し替え、@pasta_chunks（読み込んだファイルの表）を置く
  4. @pasta_config・@enc・@pasta_persistence・@pasta_log・@pasta_sakura_script・@pasta_debug を登録
@@ -134,7 +132,7 @@ from_loader_with_scene_dic
  6. require("main")
  7. require("pasta.shiori.entry")
  8. require("pasta.scene_dic")   … 全シーンモジュールの require と finalize_scene()
- 9. （ソースマップを持つときだけ）シーンの identity 索引を突き合わせてソースマップへ格納
+ 9. （シーンマップを持つときだけ）シーンの identity 索引を突き合わせてシーンマップへ格納
 ```
 
 - 1 の `with_config_and_source_map` は `PastaLuaRuntime::new`・`with_config` の実体でもあり、そこで作った VM は 2 以降の登録を持たない。`@pasta_log` は 1e と 4 の 2 回登録され、2 回目が置き換える。
@@ -142,8 +140,8 @@ from_loader_with_scene_dic
 - 6〜8 は `require_startup_module` を通る。失敗は `module`・`fatal` 付きのエラーログと、`failed to load startup module '…'` の文脈を付けた `Err` になり、構築全体が失敗する。利用者から見た扱いは [起動シーケンス](../reference/startup.md#2-起動シーケンス) を参照する。
 - 1c の `@pasta_search` は空の登録表から作るため、8 より前の検索はどれも見つからない。8 の `pasta.scene_dic` が `finalize_scene()` を呼ぶと、`@pasta_search` が Lua 側の登録から作り直される（[辞書確定](registry-search.md#辞書確定)）。
 - 3 の `@pasta_chunks` は、searcher が読み込んだファイルを書き足す表で、`pasta.shiori.stop` が止まるエラーの表記で場所を示すのにだけ使う（[require の解決（searcher）](loader.md#require-の解決searcher)）。
-- 4 の `@pasta_debug` は、0 で解決した設定の `enabled` の値と、1 で保持したソースマップと、ベースディレクトリ（`ghost/master/`）を持つ内部モジュールである（[位置でのシーンの再生](debug.md#位置でのシーンの再生)）。この入口だけが登録するため、`PastaLuaRuntime::new`・`with_config` の VM には無い。
-- 1 の後にランタイムがソースマップを持つのは、0 で解決した設定でデバッグが有効なときである。1f の `debug::enable` が待ち受けのポートを取れずに `None` を返しても、ソースマップは持ち続けるため、9 も行われる。無効なときはローダがソースマップを作らず、9 は行われない（[有効化の判定](debug.md#有効化の判定)）。
+- 4 の `@pasta_debug` は、1 で保持したシーンマップ（有無がデバッグの有効・無効）と、ベースディレクトリ（`ghost/master/`）を持つ内部モジュールである（[@pasta_debug](debug.md#pasta_debug)）。この入口だけが登録するため、`PastaLuaRuntime::new`・`with_config` の VM には無い。
+- ランタイムがシーンマップを持つのは、ローダが段階 5.5 でデバッグを有効と判定し、シーンマップを渡したときだけである。無効なときはローダがシーンマップを作らず、9 は行われない（[有効化の判定](debug.md#有効化の判定)）。
 - 4 の `@pasta_persistence` の登録はファイルを読まない。永続化ファイルを読むのは、後述のとおり `pasta.save` が最初に `require` されたときである。
 
 構築が終わった VM に対して、SHIORI 層は `SHIORI.load`・`SHIORI.request`・`SHIORI.unload` を取り出して保持し、`SHIORI.request` をリクエストごとに 1 回呼ぶ（`crates/pasta_shiori/src/shiori.rs`）。リクエストの文字列は Rust 側で Lua の表に解析されてから渡る。
@@ -178,11 +176,11 @@ EVENT.fire(req)
 - 文字列の分岐は、先頭 7 文字が `SHIORI/` と等しいかで判定する。`RES` の関数で作った応答（`RES.err` の 500 など）を返したハンドラは、そのステータスのまま応答になる。
 - コルーチンの出力にはこの規則を適用しない。出力は接頭辞にかかわらず常に `RES.ok` の `Value` になる（`CALLBACK.try_route`・`CALLBACK.sweep` の出力も同じ）。
 
-ハンドラがコルーチンを返す経路は、シーン関数フォールバック（`EVENT.no_entry`）、既定の OnBoot・OnChoiceSelectEx・OnMouseDoubleClick・OnMouseMove・OnPastaScene・OnPastaSceneAt・OnPastaCallFunction、OnSecondChange の仮想イベント（OnTalk・OnHour・シーンキック）と、コルーチンを返す利用者のハンドラ（`REG:register` で重ねた鎖のハンドラと `REG` の値）である。振り分けの詳細は [SHIORI 層](shiori.md) で、利用者から見た挙動は [SHIORI イベントとハンドラ](../lua/shiori-events.md#シーン関数フォールバック) で扱う。
+ハンドラがコルーチンを返す経路は、シーン関数フォールバック（`EVENT.no_entry`）、既定の OnBoot・OnChoiceSelectEx・OnMouseDoubleClick・OnMouseMove・OnPastaScene・OnPastaSceneAt・OnPastaCallFunction、OnSecondChange の仮想イベント（OnTalk・OnHour）と、コルーチンを返す利用者のハンドラ（`REG:register` で重ねた鎖のハンドラと `REG` の値）である。振り分けの詳細は [SHIORI 層](shiori.md) で、利用者から見た挙動は [SHIORI イベントとハンドラ](../lua/shiori-events.md#シーン関数フォールバック) で扱う。
 
 ### シーンコルーチンの作り方
 
-シーン関数をコルーチンに包むのは `SCENE.wrap`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`）の 1 か所である。キックだけは、同じ形の包みを `kick.lua` の中に持つ。
+シーン関数をコルーチンに包むのは `SCENE.wrap`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`）の 1 か所である。
 
 ```lua
 function SCENE.wrap(fn)
@@ -200,7 +198,6 @@ end
 | `SCENE.co_exec_registered`（`crates/pasta_lua/pasta_scripts/pasta/scene.lua`） | 登録名の組で `SCENE.get`。既定の OnPastaSceneAt が位置から引いた組で使う（[co_exec_registered](internal-modules.md#co_exec_registered)） |
 | 既定の OnChoiceSelectEx（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/choice_select.lua`） | `SCENE.search(選択 ID, 親)`、無ければ `SCENE.search(選択 ID, nil)`。親は Reference2 のグローバルシーン名（既知のグローバルシーンのとき）か `STORE.last_global_scene`（[既定ハンドラ](shiori.md#lua-側の-shiori-エントリとイベント配送)） |
 | 既定の OnPastaCallFunction（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/external_control.lua`） | `act:find_handler("scene", Reference0)` で引いた関数を、Reference1 以降を添えて呼ぶ関数で包む |
-| `wrap_local_func`・`wrap_reload_func`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`）。`SCENE.wrap` でなく自前の包み | シーン表から完全一致で引いたキック対象のシーン関数（`SCENE.get`・`SCENE.get_start`）、または SHIORI 再読み込みのタグだけを出す関数 |
 
 - コルーチンは作るだけで、作った時点ではシーン関数は動かない。最初の `resume` で `EVENT.fire` が（`EVENT.drive` を通して）そのイベントの ACT を渡し、それが包みの `act` になる。
 - シーン関数の戻り値は捨てられる。応答になるのは、途中の `yield` で渡した値か、最後の `build()` の値である。
@@ -274,7 +271,7 @@ loop
 drive_kind(co)                       判定の順はこのとおり
   STORE.co_scene が nil         → "none"       待っている続きが無い
   co == STORE.co_scene          → "resume"     待っている続きそのものの再開
-  STORE.co_preempt[co] が真     → "preempt"    開発者が指名した再生（キック・シーン再生）
+  STORE.co_preempt[co] が真     → "preempt"    開発者が指名した再生（シーン再生）
   それ以外                      → "interrupt"  続きを待っている間の割り込み
 
 set_co_scene(co, keep)
@@ -283,7 +280,7 @@ set_co_scene(co, keep)
  3. それ以外は STORE.co_scene = co（前の続きは参照を外して捨てる）
 ```
 
-`STORE.co_scene` をランタイムの中で書くのは `set_co_scene` だけである（`STORE.reset` も `nil` に戻す）。`STORE.co_preempt` は、キーを弱い参照にした表（`table<thread, true>`）で、指名した再生のコルーチンに付ける「はっきり捨てる」の印である。付けるのは `kick.lua` の `wrap_local_func`・`wrap_reload_func` が作るコルーチンと、`scene_play.lua` の `OnPastaScene`・`OnPastaSceneAt` が返すコルーチンだけで、読むのは `drive_kind` だけである。印はコルーチンごとに 1 つで消さないため、キックのシーンがコールバック待ちから戻った回も "preempt" になる。キックのシーンが区切って続きになった後は、`co == STORE.co_scene` が先に当たるので "resume" になる。
+`STORE.co_scene` をランタイムの中で書くのは `set_co_scene` だけである（`STORE.reset` も `nil` に戻す）。`STORE.co_preempt` は、キーを弱い参照にした表（`table<thread, true>`）で、指名した再生のコルーチンに付ける「はっきり捨てる」の印である。付けるのは `scene_play.lua` の `OnPastaScene`・`OnPastaSceneAt` が返すコルーチンだけで、読むのは `drive_kind` だけである。印はコルーチンごとに 1 つで消さないため、再生したシーンがコールバック待ちから戻った回も "preempt" になる。再生したシーンが区切って続きになった後は、`co == STORE.co_scene` が先に当たるので "resume" になる。
 
 `EVENT.drive` の 8 は、種類と再開の結果から次のように `STORE.co_scene` を決める。「台詞」は 7 の `spoke`、「中断」は `run_interrupt_scene`（[台詞の印と中断のシーン](#台詞の印と中断のシーン)）である。
 
@@ -303,7 +300,7 @@ set_co_scene(co, keep)
 
 - 中断したコルーチンは `STORE.co_scene` に 1 つだけ残る。待っている続きを捨てるのは、待っている続きそのものの再開・指名した再生・台詞を出した割り込み・エラーのどれかである。台詞を出さない割り込み（何も積まないハンドラのシーン、表情の単語・さくらスクリプト・`get_property` の get タグだけを出すシーン）は、待っている続きを残す。捨てた続きは参照を外すだけで、再開されない。
 - 中断のシーンを動かすのは、種類が "interrupt" で、組み立てが台詞を見つけたときだけである。続きが無い回・続きの再開・指名した再生・台詞を出さない回では、中断のシーンを探しもしない。
-- 継続を再開するのは仮想イベントの OnTalk だけである。`check_talk`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua`）は、トークの時刻に達したとき `STORE.co_scene` があれば新しいシーンを探さずにそれを返す。外から起こした `OnTalk`（`EVENT.no_entry` が `SCENE.co_exec` で探したシーン）は、ほかのイベントと同じく "interrupt" である。OnHour は OnTalk より先に判定されるが、`check_hour` が `SCENE.co_exec` で探したコルーチンに印は無く、ふつうの割り込みとして扱われる（時報のシーンが台詞を出せば続きを捨てる）。シーンキックは印の付いたコルーチンを返すので "preempt" になる。自動トークを止めている間（`STORE.auto_talk_paused`）は `check_talk` まで進まないため、継続は再開されず、捨てられもしない。
+- 継続を再開するのは仮想イベントの OnTalk だけである。`check_talk`（`crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua`）は、トークの時刻に達したとき `STORE.co_scene` があれば新しいシーンを探さずにそれを返す。外から起こした `OnTalk`（`EVENT.no_entry` が `SCENE.co_exec` で探したシーン）は、ほかのイベントと同じく "interrupt" である。OnHour は OnTalk より先に判定されるが、`check_hour` が `SCENE.co_exec` で探したコルーチンに印は無く、ふつうの割り込みとして扱われる（時報のシーンが台詞を出せば続きを捨てる）。自動トークを止めている間（`STORE.auto_talk_paused`）は `check_talk` まで進まないため、継続は再開されず、捨てられもしない。
 - 文字列か `nil` を返すハンドラ（`REG` の関数など）は `STORE.co_scene` を変えない。
 - シーンの実行中にエラーが起きると、そのコルーチンは dead になり、`set_co_scene(nil, false)` で既存の継続も破棄される。中断のシーンのエラーも、割り込んだシーンのコルーチンの中で投げ直されるので、同じ枝を通る。エラーは、`EVENT.fire` と `CALLBACK.try_route` の経路では `SHIORI.request` の `xpcall` へ伝わり、`CALLBACK.sweep` では応答の候補になる（後述）。
 
@@ -481,7 +478,7 @@ VM の構築      register_persistence_module → persistence::register
 - `crates/pasta_lua/src/runtime/`
 - `crates/pasta_lua/pasta_scripts/pasta/`
 
-本文で参照した主なファイルは次のとおりである。VM の構築は `crates/pasta_lua/src/runtime/mod.rs`・`crates/pasta_lua/src/runtime/factory.rs`・`crates/pasta_lua/src/runtime/module_registry.rs`、永続化は `crates/pasta_lua/src/runtime/persistence.rs`・`crates/pasta_lua/src/runtime/lifecycle.rs`・`crates/pasta_lua/pasta_scripts/pasta/save.lua`、イベントとコルーチンは `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/callback.lua`・`crates/pasta_lua/pasta_scripts/pasta/scene.lua`・`crates/pasta_lua/pasta_scripts/pasta/act.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`、台詞の判定は `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`、はっきり捨てる印は `crates/pasta_lua/pasta_scripts/pasta/store.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/scene_play.lua`、失敗の報告は `crates/pasta_lua/pasta_scripts/pasta/failure.lua` にある。`SHIORI.request` を呼ぶ側は `crates/pasta_shiori/src/shiori.rs`、構築を呼ぶローダは `crates/pasta_lua/src/loader/mod.rs` である。
+本文で参照した主なファイルは次のとおりである。VM の構築は `crates/pasta_lua/src/runtime/mod.rs`・`crates/pasta_lua/src/runtime/factory.rs`・`crates/pasta_lua/src/runtime/module_registry.rs`、永続化は `crates/pasta_lua/src/runtime/persistence.rs`・`crates/pasta_lua/src/runtime/lifecycle.rs`・`crates/pasta_lua/pasta_scripts/pasta/save.lua`、イベントとコルーチンは `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/callback.lua`・`crates/pasta_lua/pasta_scripts/pasta/scene.lua`・`crates/pasta_lua/pasta_scripts/pasta/act.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua`、台詞の判定は `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`、はっきり捨てる印は `crates/pasta_lua/pasta_scripts/pasta/store.lua`・`crates/pasta_lua/pasta_scripts/pasta/shiori/event/scene_play.lua`、失敗の報告は `crates/pasta_lua/pasta_scripts/pasta/failure.lua` にある。`SHIORI.request` を呼ぶ側は `crates/pasta_shiori/src/shiori.rs`、構築を呼ぶローダは `crates/pasta_lua/src/loader/mod.rs` である。
 
 ## 経緯
 

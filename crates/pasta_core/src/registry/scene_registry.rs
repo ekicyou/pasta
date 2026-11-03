@@ -195,7 +195,7 @@ impl SceneRegistry {
     /// Increment the counter for a scene name and return the new value.
     ///
     /// The counter is keyed on the **sanitized** name so that build-time counters
-    /// (module_name for WORD registration, the scene-kick `join_key`, and local
+    /// (module_name for WORD registration, the scene map's `join_key`, and local
     /// `parent_counter`) match the runtime, which keys its per-scene counter on the
     /// sanitized base name (`pasta/scene.lua` `get_or_increment_counter`, called with
     /// `base_name = sanitize_name(scene.name)`).
@@ -203,8 +203,8 @@ impl SceneRegistry {
     /// For non-colliding names this is byte-identical to raw keying (a raw name and
     /// its sanitization occur in lockstep). For names that distinctly sanitize to the
     /// same base (e.g. `会話·A` and `会話_A` → `会話_A`) it prevents a counter collision
-    /// that would otherwise produce duplicate `join_key`s / fn_names and a wrong-scene
-    /// kick at the cursor.
+    /// that would otherwise produce duplicate `join_key`s / fn_names and `OnPastaSceneAt`
+    /// playing the wrong scene.
     fn increment_counter(&mut self, name: &str) -> usize {
         let key = Self::sanitize_name(name);
         let counter = self.name_counters.entry(key).or_insert(0);

@@ -64,6 +64,7 @@ impl PastaLuaRuntime {
             lua,
             &loader_context.base_dir,
             &loader_context.transpiled_output_dir,
+            &loader_context.pasta_sources,
         )?;
 
         tracing::debug!(path = %path, "Set package.path");
@@ -190,9 +191,11 @@ impl PastaLuaRuntime {
 
     /// Register the internal `@pasta_debug` module（scene-play-event 2.1/4.1/4.2）。
     ///
-    /// 関数は 2 つだけ: `enabled()` は解決した設定の値（待ち受けの有無は見ない）、
+    /// 関数は 3 つ: `enabled()` はシーンマップの有無（`debug_enabled()` と同じ値）、
     /// `scene_at(file, line)` は位置を登録名の組 `(大域, ローカル)` に引く。マップが無い、
     /// 行が `1..=u32::MAX` の整数でない、見つからないときはエラーにせず nil を返す。
+    /// `dump_variables(save)` は表を `profile/pasta/debug/variables.toml` にテキストの TOML で書く。
+    /// 書けなければ警告を 1 行書くだけでエラーを上げない。有効かは見ない（門は scene_play.lua）。
     /// 本番の入口（`from_loader_with_scene_dic`）だけが呼ぶ。
     pub(crate) fn register_debug_module(
         lua: &Lua,
@@ -202,6 +205,15 @@ impl PastaLuaRuntime {
     ) -> LuaResult<()> {
         let table = lua.create_table()?;
         table.set("enabled", lua.create_function(move |_, ()| Ok(enabled))?)?;
+        let dump_path = base_dir.join("profile/pasta/debug/variables.toml");
+        let dump_variables = lua.create_function(move |lua, save: Table| {
+            if let Err(e) = persistence::dump_table(lua, &save, &dump_path) {
+                let path = dump_path.display();
+                tracing::warn!(%path, error = %e, "OnPastaDumpVariables: could not write {path}: {e}");
+            }
+            Ok(())
+        })?;
+        table.set("dump_variables", dump_variables)?;
         let base_dir = base_dir.to_path_buf();
         let scene_at = lua.create_function(move |_, (file, line): (String, Value)| {
             let line = match line {

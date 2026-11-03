@@ -42,7 +42,7 @@ pasta ランタイムは、ゴーストの `.pasta` 辞書を Lua コードへ�
 | -------- | ---- |
 | `pasta_dsl` | Pasta DSL の pest 文法・パーサと AST 定義 |
 | `pasta_core` | 言語に依存しないシーン・単語レジストリと、前方一致の検索表 |
-| `pasta_lua` | トランスパイラ、ローダ、Lua VM の構築とランタイムモジュール（`@pasta_*` と `pasta.*`）、トーク出力、デバッグ基盤、ロギングとエンコーディング |
+| `pasta_lua` | トランスパイラ、ローダ、Lua VM の構築とランタイムモジュール（`@pasta_*` と `pasta.*`）、トーク出力、開発用のイベントとシーンマップ、ロギングとエンコーディング |
 | `pasta_shiori` | SHIORI DLL（`pasta.dll`）としての FFI 境界と、VM を所有するアクターランタイム |
 
 依存の向きは `pasta_shiori` → `pasta_lua` → `pasta_dsl`・`pasta_core` である。`pasta_core` は Lua にも DSL にも依存しない。
@@ -56,7 +56,7 @@ pasta ランタイムは、ゴーストの `.pasta` 辞書を Lua コードへ�
 - [ローダ自己展開とモジュール解決](loader.md) — 起動の段階構成、設定読込、自己展開と版比較、ファイル検出とモジュール名、searcher
 - [SHIORI 層](shiori.md) — FFI 境界、アクターランタイム、イベント配送、非同期トーク、仮想イベントディスパッチャ（OnTalk・OnHour）、DLL のビルド構成
 - [トーク出力とアピアランス](talk-output.md) — トークンからさくらスクリプトへの組立、ウェイト挿入と budoux 改行、サーフェスと着せ替えの復旧
-- [デバッグ基盤とシーンキック](debug.md) — DAP バックエンド、デバッグ通信、セッション、ソースマップ、シーンキック
+- [開発用のイベントとシーンマップ](debug.md) — デバッグの有効化、開発用のイベントの門、`@pasta_debug`、シーンマップ、保存変数の書き出し、止まるエラーの場所
 - [ロギングとエンコーディング](logging-encoding.md) — ログの初期化と出力、`@pasta_log`、`@enc` と OS 別の文字コード変換
 
 ゴースト作者が `scripts/` から呼ぶランタイム API（ACT・WORD・GLOBAL・SAVE）の利用者向けリファレンスは、Lua パートの [スクリプト用ランタイム API](../lua/script-api.md) にある。このパートの [Lua ランタイム内部モジュール](internal-modules.md) は同じモジュールの内部の構造を扱う。
@@ -88,7 +88,7 @@ pasta ランタイムは、ゴーストの `.pasta` 辞書を Lua コードへ�
 | [ローダ自己展開とモジュール解決](loader.md) | `crates/pasta_lua/src/loader/`、`crates/pasta_lua/build.rs`、`crates/pasta_lua/build_zip.rs`、`crates/pasta_lua/src/runtime/searcher.rs`、`crates/pasta_lua/src/runtime/module_registry.rs`、`crates/pasta_lua/src/runtime/runtime_config.rs`、`crates/pasta_lua/pasta_scripts/main.lua`、`crates/pasta_lua/pasta_scripts/pasta/config.lua` |
 | [SHIORI 層](shiori.md) | `crates/pasta_shiori/src/`、`crates/pasta_shiori/build.rs`、`crates/pasta_shiori/Cargo.toml`、`crates/pasta_lua/pasta_scripts/pasta/shiori/`、`.cargo/config.toml` |
 | [トーク出力とアピアランス](talk-output.md) | `crates/pasta_lua/src/sakura_script/`、`crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`、`crates/pasta_lua/pasta_scripts/pasta/shiori/appearance.lua`、`crates/pasta_lua/pasta_scripts/pasta/shiori/actor_style.lua`、`crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua` |
-| [デバッグ基盤とシーンキック](debug.md) | `crates/pasta_lua/src/debug/`、`crates/pasta_lua/src/loader/source_map_build.rs`、`crates/pasta_lua/src/code_gen/source_map.rs`、`crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`、`crates/pasta_lua/pasta_scripts/pasta/shiori/event/scene_play.lua` |
+| [開発用のイベントとシーンマップ](debug.md) | `crates/pasta_lua/src/debug/`、`crates/pasta_lua/src/loader/source_map_build.rs`、`crates/pasta_lua/src/code_gen/source_map.rs`、`crates/pasta_lua/pasta_scripts/pasta/shiori/event/scene_play.lua`、`crates/pasta_lua/pasta_scripts/pasta/shiori/stop.lua` |
 | [ロギングとエンコーディング](logging-encoding.md) | `crates/pasta_lua/src/logging/`、`crates/pasta_lua/src/encoding/`、`crates/pasta_lua/src/runtime/log.rs`、`crates/pasta_lua/src/runtime/enc.rs` |
 
 範囲が重なる行（例: `crates/pasta_lua/src/runtime/` と `crates/pasta_lua/src/runtime/finalize.rs`）は意図的な重なりである。次のものは、章の記述に影響しない変更で照合が発火しないよう、表に載せない。

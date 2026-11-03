@@ -23,8 +23,8 @@
 //! # join（定義元ファイルごと・順位）
 //!
 //! 1. 実行時のグローバルシーンを、シーン表の関数（`__start__` を優先し、無ければ任意の
-//!    関数）の定義元チャンク（`Function::info().source`）から
-//!    [`SourceMap::pasta_file_for_chunk`] で `.pasta` ファイルに分ける。引けないシーン
+//!    関数）の定義元チャンク（`Function::info().source`）から、引数の関数（ファクトリが
+//!    読み込んだファイルの表 `searcher::pasta_file_of` を閉じたもの）で `.pasta` ファイルに分ける。引けないシーン
 //!    （利用者の `.lua` で作ったシーン・関数を持たないシーン）は対象にしない。
 //! 2. ファイルの中で登録名を `SceneRegistry::split_registered_name` で（名前, 通し番号）に
 //!    分け、名前ごとに通し番号の昇順に並べる。`G:会話#k` は、そのファイルの `会話` の
@@ -45,7 +45,7 @@ use std::collections::HashMap;
 use mlua::{Function, Lua, Table, Value};
 use pasta_core::registry::SceneRegistry;
 
-use super::{SceneIdentityIndex, SourceMap};
+use super::{SceneIdentityIndex, SourceMap, canonicalize_pasta_file};
 
 /// 1 シーン記録のパース結果（join 用の中間表現）。
 struct ParsedRecord {
@@ -62,11 +62,15 @@ struct ParsedRecord {
 /// finalize 後に呼び、runtime 実 identity と蓄積記録を突合して [`SceneIdentityIndex`] を
 /// 構築する（task 2.2 のコア）。
 ///
+/// `pasta_file_of` は関数の定義元のチャンク（`Function::info().source`）から `.pasta` の
+/// パスを返す（引けなければ None）。
+///
 /// シーン表から（登録名 → 定義元 `.pasta` ファイル）と（登録名 → 配下の関数名）を集め、
 /// [`join_records`] で突き合わせる。シーン表が空でも空索引を返す（`scene_at` は常に未検出）。
 pub(crate) fn build_scene_index(
     lua: &Lua,
     source_map: &SourceMap,
+    pasta_file_of: impl Fn(&str) -> Option<String>,
 ) -> mlua::Result<SceneIdentityIndex> {
     // SAFETY(injection): モジュール名はコンパイル時の文字列リテラル（collect_scenes と同じ）。
     let scene_module: Table = lua.load("return require('pasta.scene')").eval()?;
@@ -96,10 +100,11 @@ pub(crate) fn build_scene_index(
         }
         let pasta_file = probe
             .and_then(|f| f.info().source)
-            .and_then(|chunk| source_map.pasta_file_for_chunk(&chunk));
+            .and_then(|chunk| pasta_file_of(&chunk));
         if let Some(pasta_file) = pasta_file {
+            // 記録のキー（`insert_scenes` の正規形）にそろえる。
             globals_by_file
-                .entry(pasta_file.to_string())
+                .entry(canonicalize_pasta_file(&pasta_file))
                 .or_default()
                 .push(global_name.clone());
         }
@@ -126,9 +131,6 @@ fn join_records(
     let mut builder = SceneIdentityIndex::builder();
 
     for (pasta_file, records) in scene_records {
-        // このファイルは（シーンが空でも）索引に存在させる（未検出を正しく返すため）。
-        builder.insert_file(pasta_file);
-
         // (base, 順位) → このファイルの実行時グローバル登録名。
         let globals = globals_by_file
             .get(pasta_file)
@@ -215,8 +217,8 @@ fn parse_and_join(
         // `__start__` はグローバル本体そのもの（無名 start シーン）であり、その宣言行は
         // グローバルヘッダ行と一致する。索引には **別 level-1 エントリとして入れない**:
         // グローバル本体領域へのクリックはグローバル identity `(会話_1, None)` へ解決され、
-        // global kick（parent=None・global 分岐がシーン表から開始関数 `__start__`
-        // を引く）でちょうど `__start__` が再生される（kick 決定ノート）。よって
+        // global の再生（parent=None・シーン表から開始関数 `__start__`
+        // を引く）でちょうど `__start__` が再生される。よって
         // `__start__` を level-1 で持つとグローバル領域が誤って local 扱いされる。
         if fn_name == "__start__" {
             return ParsedRecord {

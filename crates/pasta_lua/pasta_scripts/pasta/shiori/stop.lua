@@ -83,25 +83,30 @@ local function default_chunks()
     return package.loaded["@pasta_chunks"]
 end
 
---- 行の対応 "<.pasta のファイル>|<lua の行>:<pasta の行>,..." から、Lua の行を "ファイル:行" に直す
+--- 行の対応 "<.pasta のファイル>|<lua の行>:<pasta の行>,..." が pasta のファイルのものなら、Lua の行を "ファイル:行" に直す
 ---@param line_map string|nil
 ---@param line number
+---@param pasta string  @pasta_chunks の値の .pasta のパス
 ---@return string|nil
-local function pasta_location(line_map, line)
+local function pasta_location(line_map, line, pasta)
     if type(line_map) ~= "string" then return nil end
     local file, list = line_map:match("^(.*)|(.*)$")
     if not file then return nil end
+    file = file:gsub("/", "\\")
+    -- 別の .pasta の行の番号を取り違えない
+    if file ~= (pasta:gsub("/", "\\")) then return nil end
     for lua_line, pasta_line in list:gmatch("(%d+):(%d+)") do
         if tonumber(lua_line) == line then
-            return file:gsub("/", "\\") .. ":" .. pasta_line
+            return file .. ":" .. pasta_line
         end
     end
     return nil
 end
 
 --- 位置の接頭辞のチャンクと行を、ゴーストのフォルダーから見た場所にする（純粋な関数）
---- 作者の .lua は "scripts\天気.lua:12"、変換した Lua のキャッシュは "dic\天気.pasta:15"。
---- 出さない場所・見分けられない場所（表に無い・重複・対応に無い行）は nil
+--- 作者の .lua（dic/ の .lua の写しを含む）は "scripts\天気.lua:12"、変換した Lua のキャッシュは
+--- 行の対応が同じ .pasta のときだけ "dic\天気.pasta:15"。
+--- 出さない場所・見分けられない場所（表に無い・重複・別の .pasta・対応に無い行）は nil
 ---@param chunk string  エラー文の "チャンク:行: " のチャンクの部分
 ---@param line number
 ---@param chunks table|nil  読み込んだ Lua のファイルの表（省略時は @pasta_chunks）
@@ -110,10 +115,10 @@ end
 function STOP.location(chunk, line, chunks, line_map)
     chunks = chunks or default_chunks()
     local entry = chunks and chunks[chunk]
-    if entry == true then
-        return pasta_location(line_map, line)
-    elseif type(entry) == "string" then
+    if type(entry) == "string" then
         return entry:gsub("/", "\\") .. ":" .. line
+    elseif type(entry) == "table" and type(entry.pasta) == "string" then
+        return pasta_location(line_map, line, entry.pasta)
     end
     return nil
 end

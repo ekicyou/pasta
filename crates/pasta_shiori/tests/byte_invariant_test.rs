@@ -27,7 +27,7 @@
 //!      get_property → コールバック resume の 2 ラウンド）
 //!   3. OnSecondChange（OnTalk ハンドラ未登録フィクスチャで決定論的に 204）
 //!   4. NOTIFY（無関係イベント → 即 204）
-//! - `PASTA_DEBUG` 系 env は `common` の `#[ctor]` で中和済み（固定ポート枯渇回避）。
+//! - `PASTA_DEBUG` 系 env は `common` の `#[ctor]` で中和済み（デバッグの関門を開かない）。
 
 mod common;
 

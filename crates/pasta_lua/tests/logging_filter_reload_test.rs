@@ -18,22 +18,24 @@ fn tracing_filter_follows_logging_config_on_every_load() {
     let base_dir = temp.path();
     let toml = base_dir.join("pasta.toml");
 
+    // 反映は量の上限（max_level_hint）で見る。読み込みの終わりの行の target はいつも info を
+    // 通すので上限は info より下がらない。そのため debug で見分ける。
     // `[logging]` の level が反映される。
-    std::fs::write(&toml, format!("{BASE_TOML}[logging]\nlevel = \"warn\"\n")).unwrap();
+    std::fs::write(&toml, format!("{BASE_TOML}[logging]\nlevel = \"debug\"\n")).unwrap();
     PastaLoader::load(base_dir).unwrap();
-    assert!(!tracing::enabled!(Level::INFO));
+    assert!(tracing::enabled!(Level::DEBUG));
 
     // `[logging]` を消して読み直すと既定（info）へ戻る。
     std::fs::write(&toml, BASE_TOML).unwrap();
     PastaLoader::load(base_dir).unwrap();
-    assert!(tracing::enabled!(Level::INFO));
+    assert!(!tracing::enabled!(Level::DEBUG));
 
     // ログファイルを作れない file_path でも level は反映される。
     std::fs::write(
         &toml,
-        format!("{BASE_TOML}[logging]\nlevel = \"warn\"\nfile_path = \"../outside.log\"\n"),
+        format!("{BASE_TOML}[logging]\nlevel = \"debug\"\nfile_path = \"../outside.log\"\n"),
     )
     .unwrap();
     PastaLoader::load(base_dir).unwrap();
-    assert!(!tracing::enabled!(Level::INFO));
+    assert!(tracing::enabled!(Level::DEBUG));
 }

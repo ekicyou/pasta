@@ -7,10 +7,14 @@
 //!   `STORE.co_scene` に置かれる（要件 1.1・1.2・3.1・3.2・3.3）
 //! - 同じ名前の大域が 2 つあり片方だけがローカルを持つとき、毎回再生できる（要件 1.8）
 //! - 相対パスと絶対パスで位置から再生できる（要件 2.1・2.3・2.4）
-//! - 待ち受けが立たなくてもソースマップが残り、位置で再生できる（要件 4.2・4.3、task 4.2）
+//! - 有効ならシーンマップがあり、`debug_enabled()` と `@pasta_debug.enabled()` が真になる（debug-mcp-runtime 7.6）
 //! - デバッグが無効なら 204、見つからないときは 200 で失敗の表記（要件 4.4・5.1・5.3・7.1・7.4、task 4.2）
+//! - `OnPastaDumpVariables` は有効なとき 204 で `variables.toml` を書き、無効・external なら
+//!   204 と警告で書かない（debug-mcp-runtime 4.2・4.3・5.1〜5.3・5.6）
+//! - リロードで有効・無効が切り替わり、JIT が働き、`[debug]` の古いキーは警告なく読み飛ばす
+//!   （debug-mcp-runtime 1.2・3.2・3.3・3.8）
 //!
-//! `PASTA_DEBUG` の中和は `common` の `#[ctor]` に従い、待ち受けのポートは `port = 0` にする。
+//! `PASTA_DEBUG` の中和は `common` の `#[ctor]` に従う。
 
 mod common;
 
@@ -60,7 +64,7 @@ const REL_PATH: &str = "dic/test/scene_play.pasta";
 fn load_debug_ghost(base: &Path) -> PastaLuaRuntime {
     load_ghost(
         base,
-        "[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\nport = 0\n",
+        "[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\n",
     )
 }
 
@@ -83,12 +87,17 @@ fn load_ghost(base: &Path, pasta_toml: &str) -> PastaLuaRuntime {
 
 /// `SHIORI.request` に GET のリクエスト（SecurityLevel: local）を渡し、応答の文字列を返す。
 fn request(runtime: &PastaLuaRuntime, id: &str, refs: &[&str]) -> String {
+    request_at_level(runtime, id, refs, "local")
+}
+
+/// `SHIORI.request` に GET のリクエストを、指定の SecurityLevel で渡し、応答の文字列を返す。
+fn request_at_level(runtime: &PastaLuaRuntime, id: &str, refs: &[&str], level: &str) -> String {
     let lua = runtime.lua();
     let req = lua.create_table().unwrap();
     req.set("id", id).unwrap();
     req.set("method", "get").unwrap();
     req.set("version", 30).unwrap();
-    req.set("security_level", "local").unwrap();
+    req.set("security_level", level).unwrap();
     req.set("dic", lua.create_table().unwrap()).unwrap();
     let reference = lua.create_table().unwrap();
     for (i, value) in refs.iter().enumerate() {
@@ -247,31 +256,26 @@ fn on_pasta_scene_at_plays_by_relative_and_absolute_path() {
     }
 }
 
-/// 4.2・4.3: 待ち受けのポートを先に塞いでも、ソースマップが残り、位置で再生できる。
+/// 4.2・4.3（debug-mcp-runtime 7.6）: 有効ならシーンマップがあり、`debug_enabled()` と
+/// `@pasta_debug.enabled()` がどちらも真で、位置で再生できる。
 #[test]
-fn on_pasta_scene_at_plays_when_listener_cannot_bind() {
+fn enabled_debug_holds_scene_map_and_reports_enabled() {
     let temp = tempfile::TempDir::new().unwrap();
-    // 空いたポートを先に塞ぐ（固定のポートは使わない）。読み込みが終わるまで持ち続ける
-    let blocker = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = blocker.local_addr().unwrap().port();
-    let runtime = load_ghost(
-        temp.path(),
-        &format!("[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\nport = {port}\n"),
-    );
+    let runtime = load_debug_ghost(temp.path());
 
-    assert!(!runtime.debug_enabled(), "listener must not be up");
     assert!(
         runtime.debug_source_map().is_some(),
-        "source map must be kept without a listener"
+        "scene map must be held"
+    );
+    assert!(runtime.debug_enabled(), "debug_enabled() must be true");
+    assert!(
+        lua_bool(&runtime, r#"return require("@pasta_debug").enabled()"#),
+        "@pasta_debug.enabled() must be true"
     );
 
     let line = LINE_GLOBAL_BODY.to_string();
     let value = value_of_200(&request(&runtime, "OnPastaSceneAt", &[REL_PATH, &line]));
-    assert!(
-        value.contains("大域の声"),
-        "plays by position without a listener: {value}"
-    );
-    drop(blocker);
+    assert!(value.contains("大域の声"), "plays by position: {value}");
 }
 
 /// 4.4・7.1: デバッグを無効にしたゴーストでは、2 つのイベントが 204 になる。
@@ -279,6 +283,15 @@ fn on_pasta_scene_at_plays_when_listener_cannot_bind() {
 fn scene_play_events_return_204_when_debug_disabled() {
     let temp = tempfile::TempDir::new().unwrap();
     let runtime = load_ghost(temp.path(), "[loader]\ndebug_mode = true\n");
+    assert!(
+        runtime.debug_source_map().is_none(),
+        "no scene map when disabled"
+    );
+    assert!(!runtime.debug_enabled(), "debug_enabled() must be false");
+    assert!(
+        !lua_bool(&runtime, r#"return require("@pasta_debug").enabled()"#),
+        "@pasta_debug.enabled() must be false"
+    );
 
     let line = LINE_GLOBAL_BODY.to_string();
     for (id, refs) in [
@@ -325,4 +338,256 @@ fn scene_play_events_return_failure_notice_when_not_found() {
         value.contains("【シーンが見つからない：OnPastaSceneAt dic/test/無い.pasta:1】"),
         "position not found: {value}"
     );
+}
+
+/// debug-mcp-runtime 1.5: 有効なゴーストのログには、`Startup sequence completed` の直前に
+/// 開発用のイベントを許したことの info が 1 行あり、無効なゴーストには無い。
+#[test]
+fn debug_enabled_startup_log_line_only_when_enabled() {
+    const LINE: &str = "Debug enabled: development events are allowed";
+    pasta_lua::init_tracing();
+
+    let read_log = |enabled: bool| {
+        let temp = tempfile::TempDir::new().unwrap();
+        let runtime = if enabled {
+            load_debug_ghost(temp.path())
+        } else {
+            load_ghost(temp.path(), "[loader]\ndebug_mode = true\n")
+        };
+        // ランタイムと登録簿の両方が手放すとロガーが破棄され、ログがフラッシュされる。
+        drop(runtime);
+        pasta_lua::GlobalLoggerRegistry::instance().unregister(temp.path());
+        std::fs::read_to_string(temp.path().join("profile/pasta/logs/pasta.log")).unwrap()
+    };
+
+    let enabled_log = read_log(true);
+    let lines: Vec<&str> = enabled_log.lines().collect();
+    let at = lines
+        .iter()
+        .position(|l| l.contains(LINE))
+        .unwrap_or_else(|| panic!("enabled ghost must log {LINE:?}: {enabled_log}"));
+    assert_eq!(
+        lines.iter().filter(|l| l.contains(LINE)).count(),
+        1,
+        "exactly one line: {enabled_log}"
+    );
+    assert!(lines[at].contains("INFO"), "info level: {}", lines[at]);
+    assert!(
+        lines
+            .get(at + 1)
+            .is_some_and(|l| l.contains("Startup sequence completed")),
+        "must come right before Startup sequence completed: {enabled_log}"
+    );
+
+    let disabled_log = read_log(false);
+    assert!(
+        disabled_log.contains("Startup sequence completed"),
+        "{disabled_log}"
+    );
+    assert!(!disabled_log.contains(LINE), "{disabled_log}");
+}
+
+/// debug-mcp-runtime 3.2・1.2: 同じフォルダを有効 → 無効 → 有効で読み直すと、`debug_enabled()` と
+/// `OnPastaScene` の 200・204 が切り替わり、どの VM でも JIT が働く。
+#[test]
+fn reload_toggles_debug_and_keeps_jit() {
+    let temp = tempfile::TempDir::new().unwrap();
+    for enabled in [true, false, true] {
+        let runtime = load_ghost(
+            temp.path(),
+            &format!("[loader]\ndebug_mode = true\n\n[debug]\nenabled = {enabled}\n"),
+        );
+        assert_eq!(runtime.debug_enabled(), enabled, "debug_enabled()");
+        let response = request(&runtime, "OnPastaScene", &["再生大域"]);
+        if enabled {
+            assert!(value_of_200(&response).contains("大域の声"), "{response:?}");
+        } else {
+            assert_204(&response, "disabled after reload");
+        }
+        assert!(
+            lua_bool(&runtime, "return jit.status()"),
+            "JIT must be on (enabled = {enabled})"
+        );
+        drop(runtime);
+    }
+}
+
+/// debug-mcp-runtime 3.3・3.8: `[debug]` に古いキーが残っていても読み込みが通り、有効で、
+/// 警告が無く、`.lua.map` を作らない。
+#[test]
+fn old_debug_keys_are_skipped_silently() {
+    pasta_lua::init_tracing();
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_ghost(
+        temp.path(),
+        "[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\nport = \"x\"\npresent_as = \"lua\"\nsource_map_sidecar = true\n",
+    );
+    assert!(runtime.debug_enabled(), "debug_enabled() must be true");
+
+    // ランタイムと登録簿の両方が手放すとロガーが破棄され、ログがフラッシュされる。
+    drop(runtime);
+    pasta_lua::GlobalLoggerRegistry::instance().unregister(temp.path());
+    let log = std::fs::read_to_string(temp.path().join("profile/pasta/logs/pasta.log")).unwrap();
+    assert!(log.contains("Startup sequence completed"), "{log}");
+    assert!(!log.contains("WARN"), "no warning expected: {log}");
+
+    let pattern = format!("{}/**/*.lua.map", temp.path().display());
+    let maps: Vec<_> = glob::glob(&pattern).unwrap().collect();
+    assert!(maps.is_empty(), "no .lua.map expected: {maps:?}");
+}
+
+/// 書き出す先（ghost/master/ から見たパス）
+const VARIABLES_TOML: &str = "profile/pasta/debug/variables.toml";
+
+/// 204 であることを確かめる。
+fn assert_204(response: &str, what: &str) {
+    assert_eq!(
+        response.lines().next(),
+        Some("SHIORI/3.0 204 No Content"),
+        "{what}: {response:?}"
+    );
+}
+
+/// セーブのファイル（`save.toml`・`save.dat`）が無いことを確かめる。
+fn assert_no_save_file(base: &Path) {
+    let files: Vec<_> = ["save.toml", "save.dat"]
+        .map(|name| base.join("profile/pasta/save").join(name))
+        .into_iter()
+        .filter(|p| p.exists())
+        .collect();
+    assert!(files.is_empty(), "save file must not be written: {files:?}");
+}
+
+/// 5.1・5.2・5.3・5.6: 有効なとき 204 で、保存変数を要件 5 の例のとおりテキストの TOML に書く。
+/// 2 回目で置き換わり、フォルダが無くても作り、`obfuscate = true` でもテキストで、
+/// `save.toml` を書かず、保存変数と場面の続きを変えない。
+#[test]
+fn on_pasta_dump_variables_writes_variables_toml_when_enabled() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_ghost(
+        temp.path(),
+        "[loader]
+debug_mode = true
+
+[debug]
+enabled = true
+
+[persistence]
+obfuscate = true
+",
+    );
+    let path = temp.path().join(VARIABLES_TOML);
+    assert!(
+        !path.parent().unwrap().exists(),
+        "debug folder must not exist before the dump"
+    );
+
+    runtime
+        .exec(
+            r#"
+            local save = require("pasta.save")
+            save.好感度 = 3
+            save.名前 = "まさお"
+            local STORE = require("pasta.store")
+            _G.__co = coroutine.create(function() coroutine.yield("続き") end)
+            STORE.co_scene = _G.__co
+            "#,
+        )
+        .unwrap();
+
+    assert_204(
+        &request(&runtime, "OnPastaDumpVariables", &[]),
+        "dump must be 204",
+    );
+    let text = std::fs::read_to_string(&path).expect("variables.toml must be written as text");
+    let doc: toml::Table = text.parse().unwrap();
+    assert_eq!(
+        doc.get("好感度").and_then(|v| v.as_integer()),
+        Some(3),
+        "{text}"
+    );
+    assert_eq!(
+        doc.get("名前").and_then(|v| v.as_str()),
+        Some("まさお"),
+        "{text}"
+    );
+    assert_eq!(doc.len(), 2, "only the save variables: {text}");
+
+    // 2 回目はそのときの値で置き換わる
+    runtime.exec(r#"require("pasta.save").好感度 = 4"#).unwrap();
+    assert_204(
+        &request(&runtime, "OnPastaDumpVariables", &[]),
+        "second dump must be 204",
+    );
+    let doc: toml::Table = std::fs::read_to_string(&path).unwrap().parse().unwrap();
+    assert_eq!(doc.get("好感度").and_then(|v| v.as_integer()), Some(4));
+
+    // 保存変数・場面の続きは変わらず、save.toml は書かれない
+    assert!(
+        lua_bool(
+            &runtime,
+            r#"
+            local save = require("pasta.save")
+            local STORE = require("pasta.store")
+            return save.好感度 == 4 and save.名前 == "まさお"
+                and STORE.co_scene == _G.__co
+                and coroutine.status(_G.__co) == "suspended"
+            "#,
+        ),
+        "save variables and continuation must be unchanged"
+    );
+    assert_no_save_file(temp.path());
+}
+
+/// 4.2・4.3: 無効なら・external なら 204 で、警告を書き、ファイルを書かない。
+#[test]
+fn on_pasta_dump_variables_refused_when_disabled_or_external() {
+    pasta_lua::init_tracing();
+
+    let disabled = tempfile::TempDir::new().unwrap();
+    let external = tempfile::TempDir::new().unwrap();
+    for (temp, pasta_toml, level, warning) in [
+        (
+            &disabled,
+            "[loader]
+debug_mode = true
+",
+            "local",
+            "OnPastaDumpVariables: debug is disabled; variables not dumped",
+        ),
+        (
+            &external,
+            "[loader]
+debug_mode = true
+
+[debug]
+enabled = true
+",
+            "external",
+            "OnPastaDumpVariables: SecurityLevel external is refused; variables not dumped",
+        ),
+    ] {
+        let runtime = load_ghost(temp.path(), pasta_toml);
+        {
+            let _log = pasta_lua::LoadDirGuard::new(temp.path().to_path_buf());
+            assert_204(
+                &request_at_level(&runtime, "OnPastaDumpVariables", &[], level),
+                level,
+            );
+        }
+        assert!(
+            !temp.path().join(VARIABLES_TOML).exists(),
+            "{level}: variables.toml must not be written"
+        );
+        // ランタイムと登録簿の両方が手放すとロガーが破棄され、ログがフラッシュされる。
+        drop(runtime);
+        pasta_lua::GlobalLoggerRegistry::instance().unregister(temp.path());
+        let log =
+            std::fs::read_to_string(temp.path().join("profile/pasta/logs/pasta.log")).unwrap();
+        assert_eq!(
+            log.lines().filter(|l| l.contains(warning)).count(),
+            1,
+            "{level}: one warning line {warning:?}: {log}"
+        );
+    }
 }

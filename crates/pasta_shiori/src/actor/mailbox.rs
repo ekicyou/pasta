@@ -15,7 +15,7 @@
 //!
 //! # 単一 consumer 不変条件（design.md Revalidation Trigger）
 //! mailbox は **単一の同期 `recv()` ループ**で消費し、`select!` を張らない。
-//! 将来の新メッセージ源（Kick 等）は別チャンネル＋`select!` ではなく [`ActorMsg`] の
+//! 将来の新メッセージ源は別チャンネル＋`select!` ではなく [`ActorMsg`] の
 //! variant として同一 mailbox へ merge する。この不変条件により flume の
 //! cancel 欠陥（#104/#135）に構造的に到達しない。
 //!
@@ -65,10 +65,6 @@ impl MailboxRequest {
 /// - [`ActorMsg::Notify`]: NOTIFY fire-and-forget。応答経路を持たず即 204 で終結する。
 /// - [`ActorMsg::Stop`]: teardown 制御メッセージ。`done`（flume `bounded(1)`）で完了 ack を
 ///   返す。先行メッセージを drain 後に同一 FIFO 上で処理される（clean drain）。
-/// - [`ActorMsg::Kick`]: シーンキック fire-and-forget（仕様 `pasta-scene-kick` 3.1）。応答経路を
-///   持たず、アクタースレッド上で VM の `SHIORI.kick(scene)` を呼んで保留フラグ
-///   （`STORE.kick_pending`/`STORE.kick_force`）を設置する。複数 Kick は FIFO 順で処理され、
-///   最後の `scene` が `kick_pending` を上書きする。
 #[derive(Debug)]
 pub enum ActorMsg {
     /// GET 同期メッセージ。`reply` は flume `bounded(1)` の応答経路（exactly-once）。
@@ -89,16 +85,6 @@ pub enum ActorMsg {
     Stop {
         /// teardown 完了 ack 経路（flume `bounded(1)`）。SHIORI 側は `recv_timeout` で有界に待つ。
         done: Sender<()>,
-    },
-    /// シーンキック fire-and-forget メッセージ（仕様 `pasta-scene-kick` 3.1）。
-    ///
-    /// アクタースレッド上で VM の `SHIORI.kick(scene)` を呼び、保留フラグ
-    /// （`STORE.kick_pending`/`STORE.kick_force`）を設置する。NOTIFY と同型の
-    /// fire-and-forget で応答経路を持たない。複数 Kick は同一 FIFO 上で投入順に
-    /// 処理され、最後の `scene` が `kick_pending` を上書きする。
-    Kick {
-        /// キック対象のシーン名（VM の `SHIORI.kick` へ渡す）。
-        scene: String,
     },
 }
 
@@ -143,24 +129,14 @@ mod tests {
         (ActorMsg::Get { req, reply }, reply_rx)
     }
 
-    /// シーンキックメッセージ。
-    fn kick(scene: &str) -> ActorMsg {
-        ActorMsg::Kick {
-            scene: scene.to_string(),
-        }
-    }
-
     /// 種別に依らず順序識別子 (`seq`) を取り出すテストヘルパ。
     ///
-    /// `Stop`/`Kick` は順序識別子を持たないため、テストでは予約値で表す。`Stop` は
-    /// `u64::MAX`（末尾終端マーカー）、`Kick` は `u64::MAX - 1`（FIFO 内の位置を
-    /// 識別子で区別せず、種別ではなく投入順で順序が決まることを示す用途）。
+    /// `Stop` は順序識別子を持たないため、テストでは予約値 `u64::MAX`（末尾終端マーカー）で表す。
     fn seq_of(msg: &ActorMsg) -> u64 {
         match msg {
             ActorMsg::Get { req, .. } => req.seq,
             ActorMsg::Notify { req } => req.seq,
             ActorMsg::Stop { .. } => u64::MAX,
-            ActorMsg::Kick { .. } => u64::MAX - 1,
         }
     }
 
@@ -221,33 +197,6 @@ mod tests {
             order,
             vec![10, 11, 12, 13, u64::MAX],
             "all variants must drain in enqueue order; Stop trails after prior messages"
-        );
-    }
-
-    /// R6.1/R6.4（全 variant FIFO・Kick 混在）: Get/Notify/Stop/Kick を交互投入しても、
-    /// 種別に依らず投入順がそのまま drain 順に保存される。Kick は NOTIFY 同型の
-    /// fire-and-forget だが同一 FIFO を通り、投入位置どおりに処理される。
-    #[test]
-    fn kick_preserves_fifo_order_among_all_variants() {
-        let (tx, rx) = mailbox();
-
-        let (get_a, _rx_a) = get(20);
-        let (stop, _done_rx) = ActorMsg::stop();
-
-        // 投入順: Notify(21) / Kick(intro) / Get(20) / Kick(outro) / Stop。種別を
-        // 意図的に交互配置し、Kick が投入位置どおり drain されることを示す。
-        // seq_of は Kick を u64::MAX-1、Stop を u64::MAX で表す（位置の識別子）。
-        tx.send(notify(21)).unwrap();
-        tx.send(kick("intro")).unwrap();
-        tx.send(get_a).unwrap();
-        tx.send(kick("outro")).unwrap();
-        tx.send(stop).unwrap();
-
-        let order: Vec<u64> = drain(&rx).iter().map(seq_of).collect();
-        assert_eq!(
-            order,
-            vec![21, u64::MAX - 1, 20, u64::MAX - 1, u64::MAX],
-            "Kick must drain in enqueue order among all variants (FIFO preserved)"
         );
     }
 

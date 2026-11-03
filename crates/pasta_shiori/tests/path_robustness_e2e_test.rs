@@ -29,7 +29,7 @@
 //! 順に駆動し、各設置先の最後に `teardown_actor` してから次を spawn する
 //! （既存 `load_failure_visibility_test.rs` / `ffi_actor_lifecycle_test.rs` と同方式）。
 //!
-//! `mod common;` は `PASTA_DEBUG` / `PASTA_DEBUG_PORT` を main 前に中和する `#[ctor]` を
+//! `mod common;` は `PASTA_DEBUG` を main 前に中和する `#[ctor]` を
 //! 取り込むためにも必須である（要件 6.4）。`#[ignore]` は付けない（要件 6.6）。
 
 mod common;

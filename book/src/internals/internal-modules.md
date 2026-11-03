@@ -34,10 +34,8 @@ local STORE = require("pasta.store")
 | `actor_words` | `table<string, table>` | アクター名 → { 単語キー → 値リストの配列 } | `pasta.word` の `create_actor` のビルダー |
 | `app_ctx` | `table` | セッション中の汎用の表 | ACT の生成時に同じ表が `act.app_ctx` に入る |
 | `co_scene` | `thread\|nil` | 中断中の継続待ちのコルーチン。台詞を出さない割り込みでは残り、台詞を出した割り込み・指名した再生・エラーで捨てられる | ランタイムの中では `pasta.shiori.event` の `set_co_scene` だけが書き、`EVENT.drive` が種類と台詞の印で呼ぶ。`STORE.reset` も `nil` に戻す（[継続トーク（チェイントーク）と co_scene の更新](execution-model.md#継続トークチェイントークと-co_scene-の更新)） |
-| `co_preempt` | `table<thread, true>` | 開発者が指名した再生（キック・シーン再生）のコルーチンの印（はっきり捨てる）。キーを弱い参照にした表で、捨てたコルーチンは GC で消える | `pasta.shiori.event.kick` の `wrap_local_func`・`wrap_reload_func` と、`pasta.shiori.event.scene_play` の `OnPastaScene`・`OnPastaSceneAt` が付ける。読むのは `pasta.shiori.event` の `drive_kind` だけ。`STORE.reset` が作り直す |
+| `co_preempt` | `table<thread, true>` | 開発者が指名した再生（シーン再生）のコルーチンの印（はっきり捨てる）。キーを弱い参照にした表で、捨てたコルーチンは GC で消える | `pasta.shiori.event.scene_play` の `OnPastaScene`・`OnPastaSceneAt` が付ける。読むのは `pasta.shiori.event` の `drive_kind` だけ。`STORE.reset` が作り直す |
 | `last_global_scene` | `string\|nil` | 最後に `init_scene` したシーンテーブルの `__global_name__` | `ACT_IMPL.init_scene` だけが書く（Call から戻っても戻さない）。OnChoiceSelectEx の既定ハンドラが、Reference2 から選択肢を出したグローバルシーンが得られないときの、選択 ID の検索の親に使う |
-| `kick_pending` | `string\|nil` | 保留中のキック対象のシーン名 | `KICK.install` が書き、`KICK.try_dispatch` が消費する（[キックの保留と起動](debug.md#キックの保留と起動kicklua)） |
-| `kick_force` | `boolean` | キックの割り込み許可（既定 `false`） | `KICK.install` が立て、仮想イベントの `dispatch` の入口が 1 回で下ろす |
 | `auto_talk_paused` | `boolean` | 自動トークを止めている印（既定 `false`）。回数は数えず、永続化しない | `GLOBAL.pause_auto_talk` が立て、`GLOBAL.resume_auto_talk` と `STORE.reset` が下ろす。仮想イベントの `dispatch`・`ACT_IMPL.yield`・つつき撫での既定ハンドラが読む（[自動トークを止めている間](../lua/shiori-events.md#自動トークを止めている間)） |
 
 単語の 3 つのフィールドの値の形は [finalize_scene](#finalize_scene) の「単語収集データ構造」で扱う。
@@ -60,7 +58,7 @@ STORE.reset()
 ```
 
 - `co_scene` は、参照を外して `nil` にするだけである（LuaJIT 2.1 には `coroutine.close` が無い。[LuaJIT 2.1 の制約](execution-model.md#luajit-21-の制約)）。
-- `actors`・`actor_spots`・`scenes`・`app_ctx`・`counters`・`global_words`・`local_words`・`actor_words`・`appearance` を新しい空の表（`appearance` は空の 4 つの表を持つ表）にし、`last_global_scene`・`kick_pending` を `nil`、`kick_force`・`auto_talk_paused` を `false` にし、`co_preempt` をキーを弱い参照にした新しい表にする。仮想イベントの時計は決め直さない。
+- `actors`・`actor_spots`・`scenes`・`app_ctx`・`counters`・`global_words`・`local_words`・`actor_words`・`appearance` を新しい空の表（`appearance` は空の 4 つの表を持つ表）にし、`last_global_scene` を `nil`、`auto_talk_paused` を `false` にし、`co_preempt` をキーを弱い参照にした新しい表にする。仮想イベントの時計は決め直さない。
 - `@pasta_config` からの初期化はやり直さない。`actors`・`actor_spots` は空の表になる。
 - コールバックの待ちは変えない。待ちの状態を消すのは `CALLBACK.reset()` である。
 - フィールドの表を新しい表に置き換えるため、すでに作られた ACT が持つ `act.app_ctx`・`act.actors` は古い表を指したまま残る。
@@ -161,7 +159,7 @@ end
 5. `self.save, self.var` を返す。新しい表は作らない。
 
 - トランスパイラは、すべてのシーン関数の先頭に `local save, var = act:init_scene(SCENE, 書いた名前…, 行の対応)` を生成する（[生成される Lua コードの形](transpiler.md#生成される-lua-コードの形)）。作者が Lua で書いたシーン関数と、引数を渡さない古いキャッシュでは、3 つのフィールドは `nil` になる。
-- `scene_name`・`local_scene_name`・`line_map` は、[止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記)にだけ使う。出力・名前の検索には使わず、止まるエラーが起きない要求では定数を受け取って控える以外の仕事をしない。止まったときに `pasta.shiori.stop` が、名前から止まった場所（`＊天気・雨の日`）を作り、行の対応を最後の `|` で切って読み解いて、変換した Lua の行を `.pasta` の行に直す（[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)）。名前が `nil` のときは、`current_scene.__global_name__` から通し番号を落とした名前を使う。エラー文のチャンクが作者の `.lua` か変換した Lua のキャッシュかは、Rust のモジュール探索関数が読み込んだファイルを書き足す表 `@pasta_chunks`（チャンク名 → ゴーストのフォルダーから見たパス、キャッシュは `true`、見分けられない重複は `false`）で見分ける。
+- `scene_name`・`local_scene_name`・`line_map` は、[止まるエラーの表記](../reference/runtime-failures.md#止まるエラーの表記)にだけ使う。出力・名前の検索には使わず、止まるエラーが起きない要求では定数を受け取って控える以外の仕事をしない。止まったときに `pasta.shiori.stop` が、名前から止まった場所（`＊天気・雨の日`）を作り、行の対応を最後の `|` で切って読み解いて、変換した Lua の行を `.pasta` の行に直す（[止まるエラーの控えと応答](shiori.md#止まるエラーの控えと応答)）。名前が `nil` のときは、`current_scene.__global_name__` から通し番号を落とした名前を使う。エラー文のチャンクが作者の `.lua` か変換した Lua のキャッシュかは、Rust のモジュール探索関数が読み込んだファイルを書き足す表 `@pasta_chunks` で見分ける。値は、作者の `.lua`（`dic/` の `.lua` の写しを含む）ならゴーストのフォルダーから見たそのファイルのパス、`.pasta` から変換したキャッシュなら表 `{ pasta = "dic\\天気.pasta" }`、見分けられない重複なら `false` で、標準ランタイムなどは表に無い。キャッシュの行は、行の対応のファイルが `pasta` と同じときだけ `.pasta` の行に直す（[止まるエラーの場所](debug.md#止まるエラーの場所)）。
 - `current_scene` は、単語参照・Call・式関数の名前の解決のうち、L1（`current_scene[key]` の完全一致）と L2（`current_scene.__global_name__` をスコープとするローカル辞書の前方一致）が使う（[ローカル優先の検索順](registry-search.md#ローカル優先の検索順)）。`init_scene` を呼ばない関数の中では、`current_scene` は直前に `init_scene` したシーンのままである。
 - `init_scene` は `current_scene`・書いた名前と行の対応・`last_global_scene` を上書きするだけで、自分では元へ戻さない。呼び出し元へ戻ったときに `current_scene` などを戻すのは呼ぶ側である（次節）。`last_global_scene` は戻さない。
 
@@ -317,7 +315,7 @@ STORE.scenes = {
 
 - グローバルシーン名（登録名）は、照合用の名前・区切りの `_`・通し番号の 3 つからなる（`base_name .. "_" .. 番号`）。照合用の名前はトランスパイラが渡す基本名（`sanitize_name` でサニタイズ済みのシーン名）で、通し番号は `create_scene` が照合用の名前ごとに 1 から振った番号である（1 つ目の `＊メイン` は `メイン_1`、1 つ目の `＊挨拶・朝` は `挨拶_朝_1`）。基本名は宣言名（pasta.toml の別名表で置き換えた後の名前）から作られるため、既定の別名表のもとで `＊OnTalk` の無いゴーストの 1 つ目の `＊会話` は `OnTalk_1` になる（[登録と生成](transpiler.md#登録と生成単一走査)）。区切りがあるため、`＊A1` の 1 つ目（`A1_1`）と `＊A` の 11 個目（`A_11`）は別の登録名になる。Rust 側で同じ形を作るのは `pasta_core` の `SceneRegistry::registered_name` である。
 - ローカルシーンのキー（生成コードの関数名）も同じ形の登録名である。照合用の名前は `・` の後に書いたローカルシーン名をサニタイズしたもので、通し番号は同じグローバルシーンの中で照合用の名前ごとに 1 から数える（`・選択肢` の 1 つ目は `選択肢_1`。`・挨拶・1` と `・挨拶_1` はどちらも照合用の名前が `挨拶_1` なので `挨拶_1_1`・`挨拶_1_2`）。無名の開始シーンは `__start__` である。
-- 登録名を（名前, 通し番号）に分けるのは Rust の `SceneRegistry::split_registered_name` だけであり、Lua 側には分ける関数は無い。最後の `_` の後ろが 1 文字以上の半角数字（`0`〜`9`）で、`_` の前が空でないときだけ分ける（`挨拶_朝_1` → （`挨拶_朝`, 1））。それ以外（`__start__`・`加算ループ`・`_1`・全角数字で終わる名前・`usize` に収まらない数字列）は分けず、名前の全体を通し番号なしとして扱う。Lua ブロックで直接定義した関数も同じ規則で分けるため、`step_2` は（`step`, 2）になる。分けた結果を使うのは、検索キーの作成（[検索キーの形式](registry-search.md#検索キーの形式)）、辞書確定の登録順（[辞書確定](registry-search.md#辞書確定)）、デバッガの突き合わせ（[シーン identity 索引](debug.md#シーン-identity-索引)）である。
+- 登録名を（名前, 通し番号）に分けるのは Rust の `SceneRegistry::split_registered_name` だけであり、Lua 側には分ける関数は無い。最後の `_` の後ろが 1 文字以上の半角数字（`0`〜`9`）で、`_` の前が空でないときだけ分ける（`挨拶_朝_1` → （`挨拶_朝`, 1））。それ以外（`__start__`・`加算ループ`・`_1`・全角数字で終わる名前・`usize` に収まらない数字列）は分けず、名前の全体を通し番号なしとして扱う。Lua ブロックで直接定義した関数も同じ規則で分けるため、`step_2` は（`step`, 2）になる。分けた結果を使うのは、検索キーの作成（[検索キーの形式](registry-search.md#検索キーの形式)）、辞書確定の登録順（[辞書確定](registry-search.md#辞書確定)）、位置からシーンを引く索引の突き合わせ（[シーン identity 索引](debug.md#シーン-identity-索引)）である。
 - `__global_name__` 以外のキーはすべてシーン関数として扱われ、辞書確定で `(グローバルシーン名, キー)` の組として集められる（[finalize_scene](#finalize_scene)）。
 - メタテーブルの `__index` が `SCENE_TABLE_IMPL` を指すため、`scene:create_word(キー)` は `WORD.create_local(scene.__global_name__, キー)` のビルダーを返す。生成コードの `SCENE:create_word(キー):entry(値, …)` がこれを使う。通常の添字参照（ACT の L1 の完全一致を含む）でも、キー `create_word` はこのメソッドに一致する。動的参照の L1 は `rawget` で引くため、シーンテーブル自身のキー（`__global_name__` とシーン関数）だけが対象になり、`create_word` には一致しない。
 
@@ -364,7 +362,7 @@ STORE.scenes = {
 
 ### wrap
 
-`SCENE.wrap(fn)` は、最初の `resume` で受けた ACT と残りの引数で `fn` を呼び、最後に `act:build()` の結果を返すコルーチンを返す。作るだけで、`fn` は動かさない。`fn` の戻り値は捨てる。`co_exec`・`co_exec_exact`・`co_exec_registered` と、既定の OnChoiceSelectEx・OnPastaCallFunction がこれで包む。キック（`pasta.shiori.event.kick`）は自前の同じ形の包みを使う。おすすめメニューを積むときの `run_menu`（`pasta.shiori.event.recommend`）は組み立てを呼ばないため、包まずに `coroutine.create` する。
+`SCENE.wrap(fn)` は、最初の `resume` で受けた ACT と残りの引数で `fn` を呼び、最後に `act:build()` の結果を返すコルーチンを返す。作るだけで、`fn` は動かさない。`fn` の戻り値は捨てる。`co_exec`・`co_exec_exact`・`co_exec_registered` と、既定の OnChoiceSelectEx・OnPastaCallFunction がこれで包む。おすすめメニューを積むときの `run_menu`（`pasta.shiori.event.recommend`）は組み立てを呼ばないため、包まずに `coroutine.create` する。
 
 ### co_exec
 
