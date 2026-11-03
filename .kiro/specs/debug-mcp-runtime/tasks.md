@@ -205,7 +205,7 @@
   - _Requirements: 8.6, 8.7_
 
 - [ ] 11. 品質の関門を通す
-- [ ] 11.1 撤去の確かめと、ワークスペースの関門
+- [x] 11.1 撤去の確かめと、ワークスペースの関門
   - `crates/` に `TcpListener`・`socket2`・`jit.off`・`set_hook`・`KickSink`・`kick_pending`・`SHIORI.kick`・`ChunkSourceMap`・`resolve_lua_to_pasta`・`resolve_pasta_to_lua` が残らないことを grep で確かめる。`act.lua`・`scene.lua`・`search/`・`code_gen/element_gen.rs`・`external_control.lua` に差分が無い
   - `cargo fmt --check`・`cargo clippy --workspace --all-targets`（警告 0）・`cargo test --workspace`・Lua のテスト・luacheck を通す
   - 完了の姿: 全部の関門が通る
