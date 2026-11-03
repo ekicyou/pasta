@@ -106,7 +106,7 @@
 - 先に入る側が CI を緑に保つ要がある。案は 2 つ（未決 10）。
   - (a) この spec が先に入るなら、その数行だけを最小に直す（リンクを外すか、新しい頁へ向ける）。後から入る `debug-mcp-runtime` が rebase で書き直す。
   - (b) `debug-mcp-runtime` が先に入るのを待つ。ウェーブで並べる意味が薄れる。
-- `#優先順位`（`index.md` 66 行）は、門の優先順位（env > `pasta.toml`）を書く節として残せば切れない。
+- `#優先順位`（`index.md` 66 行）は、門の優先順位（env > `pasta.toml`）を書く節として残せば切れない（要件 9.9 に足した）。
 
 ### 3.3 AI エージェントの手順をスキルへ流す道
 
@@ -192,3 +192,11 @@
 - `debug-mcp-runtime` が遅れて `OnPastaDumpVariables` が無い → 拡張は 204 と同じ扱い（ファイルが書かれない）になり、案内を出す。要件 6.3 のとおり古い中身は出さない。
 - マニュアルの CI が持ち場の外で落ちる → 3.1・3.2 の手当てをタスクに入れる。
 - 動画の撮り直しが実機の都合で遅れる → 出す前の実機の 1 回（brief）と同じ機会に撮る。
+
+## 8. 要件の議論で設計へ回した事項（2026-11-03）
+
+- 出力のパネルを今の「Pasta Language」に混ぜるか、別に作るか（要件 7.1）。
+- `CHANGELOG.md` に DAP の撤去を書くか。
+- 拡張の Node で `fetch`・`AbortSignal.timeout`・`TextDecoder('shift_jis')` が足りないとき、`engines.vscode` を上げるか（6 の 6）。
+- 「No response from server」の後に、この再生の台本をどう見分けるか（`get_log(script, since_id)` の使い方。要件 4.8・4.9）。
+- `pasta.toml` の `[logging] file_path` を、依存を増やさずにどう読むか（議題で決まった場合）。
