@@ -4,7 +4,7 @@
 
 **Purpose**: ゴースト作者が、シーン名にぶら下がるシーンの数を、`＞名前` と同じ前方一致（`＠シーン数（名前）`／`scene_count`）と完全一致（`＠シーン数完全一致（名前）`／`scene_count_exact`）の 2 通りで、辞書と Lua から読めるようにする。
 
-**Users**: 同じ名前のシーンを何本も書いて `＞名前` でランダムに選ばせている辞書の作者。台詞に「話題は 5 個あるよ」と出したり、Lua の関数で数を比べたりする。
+**Users**: 同じ名前のシーンを何本も書いて `＞名前` でランダムに選ばせている辞書の作者。台詞に「話題は 5 個あるよ」と出したりする。
 
 **Impact**: `@pasta_search` に数を返すメソッドを 2 つ、`GLOBAL` に組み込みの関数を 4 つの名前で足す。検索の規則・候補の巡回の状態・シーン表（`scene_table.rs`）は変えない。
 
@@ -256,7 +256,7 @@ Lua の口（`add_methods`、`add_method` で `&self`）:
   3. `FAILURE.is_name(name)` でなければ、`FAILURE.report(act, { label = FAILURE.LABEL.BAD_NAME, subject = fn_name, detail = FAILURE.kind_of(name), warning = fn_name .. ": bad argument: name=" .. FAILURE.quoted(name) })` で報告し、`0` を返す。表記は `【名前にならない値：シーン数（値なし）】` の形（**仮定 B**: 対象には `＠`・`＞` を付けない関数の名前を出す。Call と関数呼び出しのどちらで書いたかを関数は知らないため。OPEN QUESTION 1）。
   4. `require("@pasta_search")` を呼んだ時点で引き、`SEARCH:<method>(name)` の数を返す。
 - 台詞のトークンを積まない（積むのは失敗表記だけ）。アクション行では戻り値の数を `talk` が文字にする。引数の誤りのときは、表記の後に `0` が出る（要件ディスカッションの決定 1 の帰結）。
-- 読み込みの前（`@pasta_search` が無いとき）に呼んだときは `require` のエラーになる（**仮定 C**: 要件は読み込みの後だけを約束する。`SCENE.search` と同じ。OPEN QUESTION 3）。
+- 読み込みの前（`@pasta_search` が無いとき）に呼んだときは `require` のエラーになる（要件は読み込みの後だけを約束する。`SCENE.search` と同じ）。
 
 **Dependencies**
 - Inbound: `act.lua` の 4 段目（`GLOBAL[key]`）、作者の Lua (P0)
@@ -340,9 +340,9 @@ GLOBAL["シーン数完全一致"] = scene_counter("シーン数完全一致", "
 - `node book/tools/gen-skill-refs.mjs --check` が一致（7.5）。マニュアルの CI の検査（リンク・内容）が通る。
 
 ## Open Questions / Risks
-- OPEN QUESTION 1〜4 は、設計ディスカッションで決める（仮定 A〜C は、決まるまでこの設計の前提とする）。
+- OPEN QUESTION 1・2 は、設計ディスカッションで決める（仮定 A・B は、決まるまでこの設計の前提とする）。3・4 は今の `SCENE.search`・`search_scene` と同じ扱いなので、議題にせず閉じた。
   1. 失敗表記とログに出す名前: 名前ごとに関数を作り呼んだ名前を出す（仮定 A・B、推奨）か、今の書き方どおり同じ関数を当てて日本語の名前に固定するか。対象に `＠`・`＞` を付けるか。
   2. Call の形で呼んだシーンの引数が後ろに足され、余分な引数の警告が出ること: `＞おすすめ項目` と同じとして受け、マニュアルに一言書く（推奨）か、扱いを変えるか（生成コードは境界の外）。
-  3. 読み込みの前に呼んだとき: `require` のエラーのまま（仮定 C、推奨）か、0 にするか。
-  4. `SEARCH:count_scene("")` を Lua から直に呼んだとき: `search_scene` と同じエラー（推奨）か、0 にするか。
+  3. 読み込みの前に呼んだとき: `require` のエラーのまま（`SCENE.search` と同じ。閉じた）。
+  4. `SEARCH:count_scene("")` を Lua から直に呼んだとき: `search_scene` と同じエラー（閉じた）。
 - `.claude/skills/pasta-ghost-authoring/SKILL.md` の手書きの「特殊 Call」の行に `＞シーン数` を足すかは要件に無い。分類器が書き込みを拒むことがあるため、この設計では触らない（議論で足すと決めたら開発者の許可を得て足す）。
