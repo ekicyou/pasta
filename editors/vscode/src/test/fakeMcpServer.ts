@@ -7,7 +7,7 @@ import * as http from 'http';
 import * as path from 'path';
 
 export type ReloadLogLine = 'loadedTrue' | 'loadedFalse' | 'error' | 'warn';
-export type RaiseEventMode = 'script' | 'noScript' | 'drop' | 'silent';
+export type RaiseEventMode = 'script' | 'noScript' | 'drop' | 'silent' | 'empty';
 
 export interface FakeLogRecord {
   readonly id: number;
@@ -28,7 +28,7 @@ export interface FakeState {
   reloadDelayMs: number;
   /** pasta.log path; default <ghost_name>/ghost/master/profile/pasta/logs/pasta.log. */
   pastaLogPath?: string;
-  /** raise_event answer. script/drop also record a script log under `Ghost:<event>`. */
+  /** raise_event answer. script/drop also record a script log under `Ghost:<event>`. empty = 200 with no body. */
   raiseEvent: { mode: RaiseEventMode; script?: string };
   /** OnPastaDumpVariables writes <ghost_name>/ghost/master/profile/pasta/debug/variables.toml. */
   writeVariables: boolean;
@@ -102,7 +102,7 @@ export async function startFakeMcpServer(init: Partial<FakeState> = {}): Promise
     typeof ghost === 'string' && state.runningRoots.some((r) => normRoot(r) === normRoot(ghost));
   const masterOf = (ghost: string) => path.join(ghost, 'ghost', 'master');
 
-  type ToolAnswer = { text: string; isError?: boolean } | 'drop' | 'silent';
+  type ToolAnswer = { text: string; isError?: boolean } | 'drop' | 'silent' | 'empty';
 
   function runTool(name: string, a: Record<string, any>): ToolAnswer | undefined {
     const ng = (text: string) => ({ text, isError: true });
@@ -142,7 +142,7 @@ export async function startFakeMcpServer(init: Partial<FakeState> = {}): Promise
         }
         const { mode, script = '' } = state.raiseEvent;
         if (mode === 'script' || mode === 'drop') addLog('script', `Ghost:${a.event}`, script, path.basename(a.ghost_name));
-        if (mode === 'drop' || mode === 'silent') return mode;
+        if (mode === 'drop' || mode === 'silent' || mode === 'empty') return mode;
         if (mode === 'noScript') return { text: 'OK:the ghost returned no script.' };
         return { text: `OK:the ghost returned a script and it is being played.\r\nScript: ${script}` };
       }
@@ -187,6 +187,7 @@ export async function startFakeMcpServer(init: Partial<FakeState> = {}): Promise
       if (answer === undefined) { fail(-32602, `Unknown tool: ${name}`); return; }
       if (answer === 'silent') return;
       if (answer === 'drop') { req.socket.destroy(); return; }
+      if (answer === 'empty') { res.writeHead(200, { Connection: 'close' }).end(); return; }
       const body = { content: [{ type: 'text', text: answer.text }], isError: answer.isError ?? false };
       if (name === 'get_log' && args.log_type === 'script' && state.unescapedBackslashInScriptLog) {
         // stringify with a placeholder, then put the raw `\` back so the JSON is invalid like SSP's

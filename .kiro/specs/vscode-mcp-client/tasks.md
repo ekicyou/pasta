@@ -32,7 +32,7 @@
   - _Requirements: 8.1_
 
 - [ ] 3. MCP のクライアント
-- [ ] 3.1 道具を 1 回呼び、結果を型で返す
+- [x] 3.1 道具を 1 回呼び、結果を型で返す
   - 送り先のホストは定数の `127.0.0.1` だけで、番号は呼び手が渡す。ホストと番号を変える設定を持たない。
   - `node:http` で `/api/mcp/v1` へ `POST` し、`Content-Type` と `Accept` の 2 つの札を付け、`Origin`・`Mcp-Session-Id` は付けない。接続は使い回さず、送り直さない。
   - 結果を「成功・NG・JSON-RPC の誤り・届かない・応答が無い・形が違う」に分ける。届かないは要求を書き終える前の接続の失敗、応答が無いは書き終えた後の切断・空の本文・時間切れ（切って終える）。呼び出しは投げない。
@@ -170,3 +170,4 @@
 ## Implementation Notes
 - 2.1: fakeMcpServer は startFakeMcpServer(init?) が {port,state,addLog,close} を返し、state を直に書き換えて振る舞いを変える。自己確かめは src/test/fakeMcpServer.selfcheck.ts（6.3 で列に入れるか決める）。「200 で本文が空」を出すモードは未実装（要るなら raiseEvent.mode に足す）。
 - 2.2: mock の showQuickPick は setNextQuickPickSelection(ラベル) で 1 回だけ選ぶ（未設定は閉じた扱い）。文書は createTextDocument(path,{isDirty,languageId,saveResult})。記録は配列で slice(before) で見る。
+- 3.1: mcpClient.ts の内部 rpc() は 3.2 の initialize で使える。単体試験は src/test/mcpClient.test.ts（6.3 で test:unit に足す）。fakeMcpServer に raiseEvent.mode=empty（200 で本文が空）を足した。
