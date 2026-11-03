@@ -18,7 +18,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 8.3_
 
 - [ ] 2. 試験の土台
-- [ ] 2.1 MCP の窓口を真似る試験用のサーバーを作る
+- [x] 2.1 MCP の窓口を真似る試験用のサーバーを作る
   - `127.0.0.1` の番号 0 で立ち、`POST /api/mcp/v1` だけを受ける。`Accept` に 2 つの型が無ければ 406、`Host` がループバックでなければ 403（areka と同じ）。
   - 状態として、ベースウェアの名前・動いているルートの集合（大文字・小文字と区切りを同じとみなす）・誤りと台本の記録（通しの番号）・受けた `tools/call` の記録を持つ。
   - 振る舞いを切り替えられる: `reload` で `pasta.log` に書く行（印 `loaded=true`／`false`・`ERROR`・`WARN`・書かない）、`raise_event` の答え（台本・台本なし・接続を切る・答えない）、`OnPastaDumpVariables` で `variables.toml` を書くか書かないか、`get_log(script)` で `\` をエスケープしない JSON を出すか。
@@ -166,3 +166,6 @@
   - 終わったとき: 動画が新しい流れのものに替わり、実機の結果（相手・台本・リロードの要約・保存変数）が research.md に記録されている。
   - _Depends: 8.1_
   - _Requirements: 9.6_
+
+## Implementation Notes
+- 2.1: fakeMcpServer は startFakeMcpServer(init?) が {port,state,addLog,close} を返し、state を直に書き換えて振る舞いを変える。自己確かめは src/test/fakeMcpServer.selfcheck.ts（6.3 で列に入れるか決める）。「200 で本文が空」を出すモードは未実装（要るなら raiseEvent.mode に足す）。
