@@ -137,12 +137,13 @@
 
 #### Acceptance Criteria
 
-1. When SHIORI のイベントを受けてシーンを選ぶ, the pasta ランタイム shall 選ぶ前に、Reference の変数（`＄ｒ０`〜`＄ｒ９`・`＄r0`〜`＄r9`・`＄req_id`・`＄req_base_id`）と日時の変数（`＄year`・`＄hour`・`＄時`・`＄曜日`・`＄季節`・`＄節句` など、`＞transfer_date_to_var` が入れるもの全部）をローカル変数に入れる（仮定。範囲は未決の議題 6）。
-2. The pasta ランタイム shall 自動転記を、イベントの種類によらず同じ変数の組で行う（仮定。未決の議題 6）。
-3. When 本文で `＞transfer_req_to_var`・`＞transfer_date_to_var` を呼ぶ, the pasta ランタイム shall 今までどおり転記する（既存の辞書が壊れない）。
+1. When SHIORI のイベントを受けてシーンを選ぶ, the pasta ランタイム shall 選ぶ前に、Reference の変数（`＄ｒ０`〜`＄ｒ９`・`＄r0`〜`＄r9`・`＄req_id`・`＄req_base_id`）と日時の変数（`＄year`・`＄hour`・`＄時`・`＄曜日`・`＄季節`・`＄節句` など、`＞transfer_date_to_var` が入れるもの全部）をローカル変数に入れる。シーン検索まで遅らせることはせず、毎回入れる（イベントのシーンは本文より前に必ず検索されるので、遅らせても結果は同じ）。
+2. The pasta ランタイム shall 自動転記を、イベントの種類によらず同じ変数の組で行う。
+3. When 本文で `＞transfer_req_to_var`・`＞transfer_date_to_var` を呼ぶ, the pasta ランタイム shall 今までどおり転記する（既存の辞書が壊れない。2 つの関数は消さない）。
 4. When 本文でローカル変数に代入する（`＄季節＝「秋」`）, the pasta ランタイム shall その代入を自動転記の値より優先する（転記は選ぶ前の 1 回だけで、後から上書きしない）。
-5. While チェイントークの続きを出す, the pasta ランタイム shall 続きのローカル変数を自動転記で上書きしない（仮定。未決の議題 6）。
+5. While チェイントークの続きを出す, the pasta ランタイム shall 続きのローカル変数を自動転記で上書きしない。
 6. The マニュアル shall 自動転記でイベントのシーン全部に日時の変数（`＄季節`・`＄節句` を含む）が入ることと、自分で同じ名前の変数に入れているゴーストへの影響を注意として書く。
+7. The マニュアル shall `＞transfer_req_to_var`・`＞transfer_date_to_var` を入門と書き方の説明から外し、「途中で取り直したいとき（チェイントークの続きの中で今の時刻が欲しいときなど）」の道具として一言だけ残す。
 
 ### Requirement 7: ログ
 
@@ -179,7 +180,7 @@
 4. The マニュアル shall `lua/script-api.md` の「`attrs` は使わない」の記述を、今の挙動に合わせて直す。
 5. The マニュアル shall `internals/registry-search.md` の「絞り込み条件はいつも空」「属性の絞り込みは実行時に効かない」の記述を、今の挙動に合わせて直す。
 6. The マニュアル shall `grammar/call-jump.md` の `シーン数` の節に、条件を見ないこと（または見ること）を一言書く（未決の議題 7）。
-7. The 入門の 7 段目（`getting-started/07-greeting.md`・段階辞書・`STAGES.md`）shall 自動転記を前提に書き直す（`＞transfer_req_to_var` を書かなくても `＄ｒ０` が入ることを示す）（仮定。未決の議題 6）。
+7. The 入門の 7 段目（`getting-started/07-greeting.md`・段階辞書・`STAGES.md`）shall 自動転記を前提に書き直す（`＞transfer_req_to_var` の行を消し、イベントのシーンでは Reference が最初から入っていることを示す。段階辞書 `dic/07-greeting.pasta`・`STAGES.md`・段階の検査 `tutorial_stages_test.rs` も一緒に直す）。
 8. When マニュアルを変えた, the 生成スキル shall `node book/tools/gen-skill-refs.mjs` で `references/` を再生成し、マニュアルと一致する。
 
 ### Requirement 10: 互換と検証
@@ -203,7 +204,7 @@ brief で決まっていないことに、上の要件は次の仮定を置い�
 3. ~~`＆優先` の段の中で消費済みになったとき~~（2026-11-03 開発者の決定。Requirement 5.7・5.9・5.10・8.5）: 優先は独占の意味（低い段へ下りない）。名前は「優先」のまま。条件の無い優先の場面が低い段を塞ぐときの検査を足す。
 4. ~~`OnPastaCallFunction` の外からの `＞名前`~~（2026-11-03 推奨案で確定。Requirement 2.8・2.9）
 5. ~~`＆優先` の別名と値~~（2026-11-03 推奨案で確定。Requirement 5.4〜5.6）
-6. **自動転記の範囲**（Requirement 6.1・6.2・6.5・9.7）: 仮定は「すべてのイベントで、選ぶ前に Reference と日時の全部を入れる。チェイントークの続きには入れない。入門の 7 段目は `＞transfer_req_to_var` を書かない形に直す」。
+6. ~~自動転記の範囲~~（2026-11-03 開発者の決定。Requirement 6.1〜6.7・9.7）: すべてのイベントで、選ぶ前に毎回 Reference と日時の全部を入れる（遅延はしない）。チェイントークの続きには入れない。2 つの転記の関数は消さずに「取り直し」の道具として残す。入門の 7 段目は `＞transfer_req_to_var` を書かない形に直す。
 7. **`シーン数` と条件**（Requirement 9.6）: 仮定は「今出せる数は足さず、`シーン数` の節に『条件は見ない』と一言書く」。
 8. ~~素通りの記録~~（2026-11-03 推奨案で確定。Requirement 7.2）
 9. ~~検査の注意の名前と走らせる条件~~（2026-11-03 推奨案で確定。Requirement 8.1・8.4）
