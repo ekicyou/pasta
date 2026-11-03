@@ -4,7 +4,7 @@ use crate::registry::SceneRegistry;
 use crate::registry::random::MockRandomSelector;
 
 // ======================================================================
-// Tests for resolve_scene_id_unified error paths and attribute filtering (G1)
+// Tests for resolve_scene_id_unified error paths
 // ======================================================================
 
 #[test]
@@ -32,135 +32,175 @@ fn test_resolve_scene_id_not_found() {
     }
 }
 
-fn season(value: &str) -> crate::registry::SceneAttr {
-    crate::registry::SceneAttr::Decl {
-        key: "季節".to_string(),
-        value: crate::registry::SceneAttrValue::String(value.to_string()),
+// ======================================================================
+// 条件と優先の段で 1 つ選ぶ抽選（1 回の選択）
+// ======================================================================
+
+use crate::registry::{SceneAttr, SceneAttrValue};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// シャッフルの回数を数える（並べ方は MockRandomSelector に任せる）
+struct CountingSelector {
+    inner: MockRandomSelector,
+    shuffles: Arc<AtomicUsize>,
+}
+
+impl RandomSelector for CountingSelector {
+    fn shuffle_usize(&mut self, items: &mut [usize]) {
+        self.shuffles.fetch_add(1, Ordering::SeqCst);
+        self.inner.shuffle_usize(items);
     }
 }
 
-/// 宣言の項目が全部等しい候補だけ満たす述語（同じ名前の宣言は後の値）
-fn decl_eq(pairs: &[(&str, &str)]) -> impl FnMut(&SceneInfo) -> bool {
-    let pairs: Vec<(String, String)> = pairs
-        .iter()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect();
-    move |scene| {
-        pairs.iter().all(|(key, value)| {
-            scene
-                .attributes
-                .iter()
-                .rev()
-                .find_map(|a| match a {
-                    crate::registry::SceneAttr::Decl { key: k, value: v } if k == key => Some(v),
-                    _ => None,
-                })
-                .is_some_and(|v| v.to_string() == *value)
-        })
+fn priority(p: i64) -> SceneAttr {
+    SceneAttr::Decl {
+        key: "優先".to_string(),
+        value: SceneAttrValue::Integer(p),
     }
 }
 
-fn build_filtered_table() -> SceneTable {
-    use crate::registry::SceneRegistry;
-
+/// 大域「話」を優先つきで並べる（None は優先を書かない）。SceneId は登録順
+fn lottery_table(prios: &[Option<i64>], sequence: Vec<usize>) -> (SceneTable, Arc<AtomicUsize>) {
     let mut registry = SceneRegistry::new();
-    registry.register_global("挨拶", vec![season("春")]);
-    registry.register_global("挨拶", vec![season("冬")]);
-
-    let selector = Box::new(MockRandomSelector::new(vec![]));
-    SceneTable::from_scene_registry(registry, selector)
-}
-
-#[test]
-fn test_resolve_scene_id_attribute_filter_selects_matching() {
-    let mut table = build_filtered_table();
-
-    let mut winter = decl_eq(&[("季節", "冬")]);
-
-    // Only the winter scene matches; repeated calls keep returning it
-    for _ in 0..3 {
-        let id = table
-            .resolve_scene_id_unified("", "挨拶", Some(&mut winter))
-            .unwrap();
-        let scene = table.get_scene(id).unwrap();
-        assert_eq!(scene.attributes, vec![season("冬")]);
+    for p in prios {
+        registry.register_global("話", p.map(priority).into_iter().collect());
     }
+    let shuffles = Arc::new(AtomicUsize::new(0));
+    let selector = Box::new(CountingSelector {
+        inner: MockRandomSelector::new(sequence),
+        shuffles: shuffles.clone(),
+    });
+    (
+        SceneTable::from_scene_registry(registry, selector),
+        shuffles,
+    )
 }
 
-#[test]
-fn test_resolve_scene_id_unified_attribute_filter_no_match() {
-    let mut table = build_filtered_table();
-
-    let mut summer = decl_eq(&[("季節", "夏")]);
-
-    // Candidates exist (prefix matches) but the predicate rejects all of them
-    let result = table.resolve_scene_id_unified("", "挨拶", Some(&mut summer));
-    match result {
-        Err(SceneTableError::NoMatchingScene { scene }) => assert_eq!(scene, "挨拶"),
-        other => panic!("Expected NoMatchingScene, got {:?}", other.map(|_| ())),
-    }
-}
-
-/// 宣言の項目だけで AND 一致する。同じ名前の条件・フラグは比べない。
-/// 整数になった小数は整数の表記（`2`）で比べる（2.5・7.3・4.2）
-#[test]
-fn test_resolve_scene_id_attribute_filter_and_over_decl_items() {
-    use crate::registry::{CmpOp, SceneAttr, SceneAttrValue};
-
-    let level = |f: f64| SceneAttr::Decl {
-        key: "段".to_string(),
-        value: SceneAttrValue::from_f64(f),
+/// `allowed` の SceneId だけ満たす述語で 1 回選ぶ。述語は全候補をちょうど 1 回ずつ評価する
+fn pick(table: &mut SceneTable, allowed: &[usize]) -> Result<usize, SceneTableError> {
+    let mut evaluated = Vec::new();
+    let mut cond = |s: &SceneInfo| {
+        evaluated.push(s.id.0);
+        allowed.contains(&s.id.0)
     };
-    let mut registry = SceneRegistry::new();
-    // 0: 季節=冬 だけ（段が無い）
-    registry.register_global("挨拶", vec![season("冬")]);
-    // 1: 季節=冬・段=2（小数 2.0 から）→ 一致
-    registry.register_global("挨拶", vec![season("冬"), level(2.0)]);
-    // 2: 季節=春・段=2
-    registry.register_global("挨拶", vec![season("春"), level(2.0)]);
-    // 3: 段 は条件とフラグだけ（宣言ではない）
-    registry.register_global(
-        "挨拶",
-        vec![
-            season("冬"),
-            SceneAttr::Cond {
-                key: "段".to_string(),
-                op: CmpOp::Eq,
-                value: SceneAttrValue::Integer(2),
-            },
-            SceneAttr::Flag {
-                key: "段".to_string(),
-            },
-        ],
+    let result = table.resolve_scene_id_unified("", "話", Some(&mut cond));
+    let len = table.labels.len();
+    evaluated.sort();
+    assert_eq!(
+        evaluated,
+        (0..len).collect::<Vec<_>>(),
+        "全候補を 1 回だけ評価する"
+    );
+    result.map(|id| id.0)
+}
+
+/// 条件も優先も無い名前は、述語の有無に依らず今と同じ順（4.1・10.2）
+#[test]
+fn test_lottery_keeps_todays_order_without_conditions_or_priority() {
+    let (mut plain, shuffles) = lottery_table(&[None, None, None], vec![2, 0, 1]);
+    let picked: Vec<usize> = (0..6)
+        .map(|_| plain.resolve_scene_id_unified("", "話", None).unwrap().0)
+        .collect();
+    assert_eq!(picked, vec![2, 0, 1, 2, 0, 1]);
+    assert_eq!(
+        shuffles.load(Ordering::SeqCst),
+        2,
+        "作るときと始め直すときだけ"
     );
 
-    let mut cond = decl_eq(&[("季節", "冬"), ("段", "2")]);
-
-    let selector = Box::new(MockRandomSelector::new(vec![]));
-    let mut table = SceneTable::from_scene_registry(registry, selector);
-    for _ in 0..3 {
-        let id = table
-            .resolve_scene_id_unified("", "挨拶", Some(&mut cond))
-            .unwrap();
-        assert_eq!(id, SceneId(1));
-    }
+    let (mut with_cond, shuffles) = lottery_table(&[None, None, None], vec![2, 0, 1]);
+    let picked: Vec<usize> = (0..6)
+        .map(|_| pick(&mut with_cond, &[0, 1, 2]).unwrap())
+        .collect();
+    assert_eq!(picked, vec![2, 0, 1, 2, 0, 1]);
+    assert_eq!(shuffles.load(Ordering::SeqCst), 2);
 }
 
-/// 述語なしは属性があっても候補を減らさない（2.5・7.3）
+/// 見て満たさなかった候補はその巡で使ったものになる（4.3・4.4）
 #[test]
-fn test_resolve_scene_id_empty_filter_keeps_all_candidates() {
-    let mut registry = SceneRegistry::new();
-    registry.register_global("挨拶", vec![season("春")]);
-    registry.register_global("挨拶", Vec::new());
-    registry.register_global("挨拶", vec![season("冬")]);
+fn test_lottery_unsatisfied_seen_candidates_are_consumed() {
+    let (mut table, _) = lottery_table(&[None, None, None], vec![]);
+    assert_eq!(pick(&mut table, &[1, 2]).unwrap(), 1, "0 は見て外れた");
+    // 0 が満たすようになっても、この巡ではもう見ない
+    assert_eq!(pick(&mut table, &[0, 1, 2]).unwrap(), 2);
+    // 巡を見終えたので新しい巡で 0 から
+    assert_eq!(pick(&mut table, &[0, 1, 2]).unwrap(), 0);
+}
 
-    let selector = Box::new(MockRandomSelector::new(vec![0, 0, 0]));
-    let mut table = SceneTable::from_scene_registry(registry, selector);
-    let mut seen: Vec<SceneId> = (0..3)
-        .map(|_| table.resolve_scene_id_unified("", "挨拶", None).unwrap())
+/// 末尾まで満たす候補が無ければ 1 回だけ始め直して選ぶ（4.5・4.6）
+#[test]
+fn test_lottery_restarts_round_at_most_once() {
+    let (mut table, shuffles) = lottery_table(&[None, None, None], vec![]);
+    assert_eq!(pick(&mut table, &[0, 1, 2]).unwrap(), 0);
+    assert_eq!(pick(&mut table, &[0, 1, 2]).unwrap(), 1);
+    // 2 は外れて末尾 → 始め直して 0
+    assert_eq!(pick(&mut table, &[0]).unwrap(), 0);
+    assert_eq!(shuffles.load(Ordering::SeqCst), 2);
+    // 始め直した巡の続き
+    assert_eq!(pick(&mut table, &[0, 1, 2]).unwrap(), 1);
+}
+
+/// 満たす候補が無ければ NoMatchingScene。並びは作らず、次の位置は末尾になる（4.6）
+#[test]
+fn test_lottery_no_matching_then_next_call_starts_new_round() {
+    let (mut table, shuffles) = lottery_table(&[None, None, None], vec![]);
+    match pick(&mut table, &[]) {
+        Err(SceneTableError::NoMatchingScene { scene }) => assert_eq!(scene, "話"),
+        other => panic!("Expected NoMatchingScene, got {:?}", other),
+    }
+    assert_eq!(
+        shuffles.load(Ordering::SeqCst),
+        0,
+        "並びがまだ無ければ作らない"
+    );
+
+    assert_eq!(pick(&mut table, &[0, 1, 2]).unwrap(), 0);
+    assert_eq!(shuffles.load(Ordering::SeqCst), 1);
+    assert!(matches!(
+        pick(&mut table, &[]),
+        Err(SceneTableError::NoMatchingScene { .. })
+    ));
+    // 外れた選択でこの巡は見終えた。次は新しい巡の頭から
+    assert_eq!(pick(&mut table, &[0, 1, 2]).unwrap(), 0);
+    assert_eq!(shuffles.load(Ordering::SeqCst), 2);
+}
+
+/// 満たす候補の最高の優先の段だけから選び、段を使い切っても下りずに始め直す（5.1・5.2・5.7）
+#[test]
+fn test_lottery_tier_monopoly() {
+    // シャッフルで低い段（2）が頭に来ても、並べ替えで段の候補が前に来る
+    let (mut table, _) = lottery_table(&[Some(1), Some(1), None], vec![2, 0, 1]);
+    let picked: Vec<usize> = (0..6)
+        .map(|_| pick(&mut table, &[0, 1, 2]).unwrap())
         .collect();
-    seen.sort_by_key(|id| id.0);
-    assert_eq!(seen, vec![SceneId(0), SceneId(1), SceneId(2)]);
+    assert_eq!(picked, vec![0, 1, 0, 1, 0, 1]);
+
+    // 名指し（述語なし）は段を見ず、優先の順
+    let (mut named, _) = lottery_table(&[Some(1), Some(1), None], vec![2, 0, 1]);
+    let picked: Vec<usize> = (0..3)
+        .map(|_| named.resolve_scene_id_unified("", "話", None).unwrap().0)
+        .collect();
+    assert_eq!(picked, vec![0, 1, 2]);
+}
+
+/// 高い段が満たさなくなったら、次の選択から残りの最高の段（5.8）
+#[test]
+fn test_lottery_tier_falls_after_high_becomes_unsatisfied() {
+    let (mut table, _) = lottery_table(&[Some(1), None, None], vec![]);
+    assert_eq!(pick(&mut table, &[0, 1, 2]).unwrap(), 0);
+    assert_eq!(pick(&mut table, &[1, 2]).unwrap(), 1);
+    assert_eq!(pick(&mut table, &[1, 2]).unwrap(), 2);
+}
+
+/// 高い段が満たすようになったら、今の巡で見た候補でも次の選択でその段から（5.9）
+#[test]
+fn test_lottery_tier_rises_even_if_seen_in_round() {
+    let (mut table, shuffles) = lottery_table(&[Some(1), None, None], vec![]);
+    assert_eq!(pick(&mut table, &[1, 2]).unwrap(), 1, "0 は見て外れた");
+    // 位置は 2（優先 0）。段 1 より低いので始め直して 0
+    assert_eq!(pick(&mut table, &[0, 1, 2]).unwrap(), 0);
+    assert_eq!(shuffles.load(Ordering::SeqCst), 2);
 }
 
 #[test]
@@ -384,17 +424,19 @@ fn test_resolve_scene_id_exact_empty_name_is_invalid_scene() {
 }
 
 #[test]
-fn test_resolve_scene_id_exact_attribute_filter() {
-    let mut table = build_filtered_table();
+fn test_resolve_scene_id_exact_with_cond() {
+    let mut table = build_table(&["挨拶", "挨拶"], vec![]);
 
-    let mut winter = decl_eq(&[("季節", "冬")]);
-    let id = table
-        .resolve_scene_id_exact("", "挨拶", Some(&mut winter))
-        .unwrap();
-    assert_eq!(table.get_scene(id).unwrap().attributes, vec![season("冬")]);
+    let mut second = |s: &SceneInfo| s.id == SceneId(1);
+    for _ in 0..2 {
+        let id = table
+            .resolve_scene_id_exact("", "挨拶", Some(&mut second))
+            .unwrap();
+        assert_eq!(id, SceneId(1));
+    }
 
-    let mut summer = decl_eq(&[("季節", "夏")]);
-    let result = table.resolve_scene_id_exact("", "挨拶", Some(&mut summer));
+    let mut none = |_: &SceneInfo| false;
+    let result = table.resolve_scene_id_exact("", "挨拶", Some(&mut none));
     assert!(matches!(
         result,
         Err(SceneTableError::NoMatchingScene { .. })
