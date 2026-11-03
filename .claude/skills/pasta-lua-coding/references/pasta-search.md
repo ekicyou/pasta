@@ -159,6 +159,35 @@ else
 end
 ```
 
+### count_scene(name) / count_scene_exact(name)
+
+グローバルシーンの数を返す。`count_scene` は `search_scene(name)` が選べる候補の数、`count_scene_exact` は `search_scene_exact(name)` が選べる候補の数である。DSL の `＠シーン数（名前）`・`＠シーン数完全一致（名前）` は、この 2 つで数える（[シーン数・シーン数完全一致](https://ekicyou.github.io/pasta/grammar/call-jump.html#シーン数シーン数完全一致)）。
+
+```lua
+SEARCH:count_scene(name) -> integer
+SEARCH:count_scene_exact(name) -> integer
+```
+
+| パラメータ | 型 | 必須 | 説明 |
+| ---- | ---- | ---- | ---- |
+| `name` | string | ✅ | 数えるシーン名（別名表で置き換え、照合用の名前に揃えてから照合する） |
+
+- `name` の扱いは、第 2 引数を省いた [search_scene](#search_scenename-global_scene_name) と同じである。別名と完全に一致すれば置き換え先の名前にし、照合用の名前に揃える。そのうえで `count_scene` は前方一致、`count_scene_exact` は完全一致で照合する。
+- 数えるのはグローバルシーンだけである。ローカルシーンは数えない。第 2 引数は無い。
+- 一致するシーンが無ければ `0` を返す。警告ログ（`Scene not found`）も出さない。
+- 読むだけで、並び順の記録（[候補の選び方](#候補の選び方)）を変えない。数えた後の `search_scene` は、数えなかったときと同じ候補を選ぶ。
+- シーンに書いた属性で絞らない。定義されているシーンの全部を数える。
+- `name` に空文字列を渡すと、Lua のエラー（`Scene search error: Invalid scene name: ''`）になる。
+
+```lua
+local SEARCH = require "@pasta_search"
+
+-- ＊雑談 が 3 本、＊雑談_朝 が 2 本のとき
+print(SEARCH:count_scene("雑談"))        -- 5
+print(SEARCH:count_scene_exact("雑談"))  -- 3
+print(SEARCH:count_scene("無い名前"))    -- 0
+```
+
 ### search_word(name, global_scene_name?)
 
 単語を前方一致で検索し、候補の値を 1 つ返す。
