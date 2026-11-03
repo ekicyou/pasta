@@ -7,6 +7,10 @@ import * as http from 'http';
 export const HOST = '127.0.0.1';
 export const MCP_PATH = '/api/mcp/v1';
 export const CALL_TIMEOUT_MS = 15000;
+/** 9801, 9821, 9802, 9822, …, 9810, 9830 (same order as areka's port.rs). */
+export const CANDIDATE_PORTS: readonly number[] = Array.from({ length: 10 }, (_, i) => [9801 + i, 9821 + i]).flat();
+/** Cut-off for one candidate during a scan; all candidates are asked at once (requirement 3.8). */
+export const SCAN_TIMEOUT_MS = 2000;
 
 export interface ToolArgsMap {
   get_property: { property_name: 'baseware.name'; ghost_name: string };
@@ -103,4 +107,40 @@ export async function callTool<N extends ToolName>(
   const text = r.result.content?.[0]?.text;
   if (typeof text !== 'string') return { kind: 'badShape', detail: `unexpected result: ${JSON.stringify(r.result)}` };
   return r.result.isError === true ? { kind: 'ng', text } : { kind: 'ok', text };
+}
+
+export interface Endpoint {
+  readonly port: number;
+  readonly basewareName: string; // raw get_property(baseware.name) value
+}
+
+const askName = async (port: number, root: string, timeoutMs: number): Promise<Endpoint | undefined> => {
+  const r = await callTool(port, 'get_property', { property_name: 'baseware.name', ghost_name: root }, timeoutMs);
+  return r.kind === 'ok' && r.text !== '' ? { port, basewareName: r.text } : undefined;
+};
+
+/** initialize, then get_property(baseware.name, ghost_name=root). undefined when the ghost is not running there. */
+export async function probe(port: number, root: string, timeoutMs = SCAN_TIMEOUT_MS): Promise<Endpoint | undefined> {
+  const deadline = Date.now() + timeoutMs; // both round trips share one cut-off
+  const init = await rpc(port, 'initialize', {
+    protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'pasta-vscode', version: '1' },
+  }, timeoutMs);
+  if (init.kind !== 'result') return undefined;
+  return askName(port, root, Math.max(1, deadline - Date.now()));
+}
+
+/** Re-checks a remembered endpoint with a single get_property (no initialize). */
+export function identify(port: number, root: string, timeoutMs = SCAN_TIMEOUT_MS): Promise<Endpoint | undefined> {
+  return askName(port, root, timeoutMs);
+}
+
+/** Probes all ports at once and returns the responders in `ports` order, one per baseware name. */
+export async function findBasewares(
+  root: string, ports: readonly number[] = CANDIDATE_PORTS, timeoutMs = SCAN_TIMEOUT_MS,
+): Promise<Endpoint[]> {
+  const found = await Promise.all(ports.map((p) => probe(p, root, timeoutMs)));
+  const seen = new Set<string>();
+  // shortcut: 同じ名前の別のプロセス（SSP 2 つ）が同じゴーストを動かすと最初の 1 つに寄る。プロセスを見分ける property が SSP に出たら替える
+  // (SSP 2.9.28 answers on both 9801 and 9821 from one process, so without this the same SSP is listed twice.)
+  return found.filter((e): e is Endpoint => e !== undefined && !seen.has(e.basewareName) && !!seen.add(e.basewareName));
 }

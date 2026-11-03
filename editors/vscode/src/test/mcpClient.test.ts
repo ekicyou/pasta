@@ -1,13 +1,14 @@
 // Unit tests for the MCP client (task 3.1). Plain node against the fake endpoint:
 //   npx esbuild src/test/mcpClient.test.ts --bundle --platform=node --format=cjs --outfile=out/test/mcpClient.test.js && node out/test/mcpClient.test.js
 //
-// Requirements: 2.2 (ghost_name is the root path), 3.9 (127.0.0.1 only), 7.3 (errors come back typed).
+// Requirements: 2.2 (ghost_name is the root path), 3.9 (127.0.0.1 only), 7.3 (errors come back typed),
+// 3.1 / 3.2 / 3.6 / 3.8 (finding and re-checking the baseware, task 3.2).
 
 import * as assert from 'assert';
 import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
-import { callTool, HOST, MCP_PATH, CALL_TIMEOUT_MS } from '../mcpClient';
+import { callTool, HOST, MCP_PATH, CALL_TIMEOUT_MS, CANDIDATE_PORTS, SCAN_TIMEOUT_MS, probe, identify, findBasewares } from '../mcpClient';
 import { startFakeMcpServer } from './fakeMcpServer';
 
 let passed = 0;
@@ -135,8 +136,80 @@ async function main() {
     await srv.close();
   }
 
+  await discoveryTests(root);
+
   console.log(`\nmcpClient: ${passed} passed, ${failed} failed\n`);
   if (failed > 0) process.exit(1);
+}
+
+async function discoveryTests(root: string) {
+  await test('candidate ports: 9801, 9821, 9802, 9822 … 9810, 9830; scan cut-off 2 s', async () => {
+    assert.strictEqual(CANDIDATE_PORTS.length, 20);
+    assert.deepStrictEqual(CANDIDATE_PORTS.slice(0, 4), [9801, 9821, 9802, 9822]);
+    assert.deepStrictEqual(CANDIDATE_PORTS.slice(-2), [9810, 9830]);
+    assert.strictEqual(SCAN_TIMEOUT_MS, 2000);
+  });
+
+  const ssp = await startFakeMcpServer({ basewareName: 'SSP', runningRoots: [root] });
+  const areka = await startFakeMcpServer({ basewareName: 'areka', runningRoots: [root] });
+  const sspTwin = await startFakeMcpServer({ basewareName: 'SSP', runningRoots: [root] });
+  const silent = await startFakeMcpServer({ basewareName: 'SSP', runningRoots: [root], silent: true });
+  const idle = await startFakeMcpServer({ basewareName: 'areka', runningRoots: [] });
+  try {
+    await test('probe: initialize then get_property(baseware.name, ghost_name=root)', async () => {
+      const req = ssp.state.requests.length;
+      const calls = ssp.state.calls.length;
+      assert.deepStrictEqual(await probe(ssp.port, root), { port: ssp.port, basewareName: 'SSP' });
+      assert.strictEqual(ssp.state.requests.length, req + 2, 'two round trips');
+      assert.deepStrictEqual(ssp.state.calls.slice(calls), [
+        { name: 'get_property', arguments: { property_name: 'baseware.name', ghost_name: root } },
+      ]);
+    });
+
+    await test('identify: a single get_property, no initialize', async () => {
+      const req = areka.state.requests.length;
+      assert.deepStrictEqual(await identify(areka.port, root), { port: areka.port, basewareName: 'areka' });
+      assert.strictEqual(areka.state.requests.length, req + 1);
+    });
+
+    await test('a root that is not running there is no endpoint (probe, identify, scan)', async () => {
+      assert.strictEqual(await probe(idle.port, root), undefined);
+      assert.strictEqual(await identify(idle.port, root), undefined);
+      assert.deepStrictEqual(await findBasewares(root, [idle.port], 500), []);
+    });
+
+    await test('an empty baseware.name is no endpoint', async () => {
+      ssp.state.basewareName = '';
+      try {
+        assert.strictEqual(await identify(ssp.port, root), undefined);
+      } finally {
+        ssp.state.basewareName = 'SSP';
+      }
+    });
+
+    await test('scan keeps candidate order and skips silent / closed / idle ports within the cut-off', async () => {
+      const gone = await rawServer(200, '');
+      await gone.close();
+      const t0 = Date.now();
+      const found = await findBasewares(root, [silent.port, areka.port, gone.port, idle.port, ssp.port], 300);
+      const took = Date.now() - t0;
+      assert.deepStrictEqual(found, [
+        { port: areka.port, basewareName: 'areka' },
+        { port: ssp.port, basewareName: 'SSP' },
+      ]);
+      assert.ok(took < 1000, `finished near the 300 ms cut-off (took ${took} ms)`);
+    });
+
+    await test('scan merges endpoints with the same baseware name, keeping the first port', async () => {
+      const found = await findBasewares(root, [sspTwin.port, areka.port, ssp.port], 500);
+      assert.deepStrictEqual(found, [
+        { port: sspTwin.port, basewareName: 'SSP' },
+        { port: areka.port, basewareName: 'areka' },
+      ]);
+    });
+  } finally {
+    await Promise.all([ssp, areka, sspTwin, silent, idle].map((s) => s.close()));
+  }
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
