@@ -147,7 +147,7 @@
   - 完了の姿: 行の対応表がまだ型に在っても誰も書かず、直したテストと `scene_identity_index_test.rs` が通る
   - _Requirements: 3.5, 3.6, 9.1_
 
-- [ ] 8.3 シーンマップから行の対応表と逆引きを消す
+- [x] 8.3 シーンマップから行の対応表と逆引きを消す
   - シーンマップの型を、シーンの宣言の記録と索引だけにする。行の対応表・チャンクの表・逆引き・使い手の無い問い合わせ・`PastaPos`・隠す属性を消し、`.pasta` のパスの照合の正規化を 1 つの関数にする。手書きの `Clone` は使い手が無ければ消す
   - 行の対応表と逆引きだけのテスト（単体 3 つ・`chunk_name_validation_test.rs`・索引のテストの 1 本）を消す
   - 完了の姿: `crates/` に `ChunkSourceMap`・`resolve_lua_to_pasta`・`resolve_pasta_to_lua` が無く、`cargo test -p pasta_lua` と clippy が通る

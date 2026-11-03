@@ -74,8 +74,7 @@ impl LuaTranspiler {
     /// [`transpile`](Self::transpile), but it additionally
     /// returns the [`LineShift`] produced by output normalization so the loader can
     /// rebase the sink's pre-normalize records onto the final `.lua` line numbers
-    /// (`MapBuilderSink::finish(&shift)` — Requirement 2.1) and complete the
-    /// per-chunk [`crate::debug::source_map::ChunkSourceMap`].
+    /// (Requirement 2.1).
     ///
     /// # Byte-invariance (Requirement 7.1)
     ///

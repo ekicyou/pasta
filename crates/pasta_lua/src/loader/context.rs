@@ -53,11 +53,9 @@ impl LoaderContext {
     ///
     /// `base_dir` flows into `package.path`, which determines the chunk name Lua
     /// reports for every `require`d scene (`@<package.path with ? filled>`). The
-    /// debugger keys breakpoints on that chunk name via
-    /// [`canonicalize_chunk_name`](crate::debug::source_map::canonicalize_chunk_name)
-    /// (separator + case normalization only — it does NOT resolve 8.3 short
-    /// names). The cache paths, the aggregated source map, and the breakpoint
-    /// store all derive from the **raw** `base_dir` the loader was given.
+    /// scene map keys `.pasta` paths with separator + case normalization only
+    /// (it does NOT resolve 8.3 short names). The cache paths and the scene map
+    /// all derive from the **raw** `base_dir` the loader was given.
     ///
     /// `std::fs::canonicalize()` resolves Windows 8.3 short names to their long
     /// form (e.g. a temp dir handed in as `C:\Users\RUNNER~1\...` becomes
