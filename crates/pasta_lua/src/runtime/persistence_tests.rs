@@ -1135,3 +1135,85 @@ fn test_codec_does_not_call_pairs_metamethod() {
     let log = codec_strict(&format!("{PAIRS_TRAP} return trap()"), SAVE_MAX_DEPTH).unwrap();
     assert_eq!(log, toml::Value::Table(doc("a = 1")));
 }
+
+// ---------------------------------------------------------------------------
+// 保存変数の書き出し（dump_table）
+// ---------------------------------------------------------------------------
+
+/// 門が閉じていても、テキストの TOML で書き、表を変えない（5.1・5.3・5.6）。
+#[test]
+fn test_dump_table_writes_text_without_gate_and_keeps_table() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("variables.toml");
+    let lua = Lua::new();
+    lua.set_app_data(SaveGate::Closed("locked".into()));
+    let table: Table = lua
+        .load(r#"return { 好感度 = 3, 名前 = "まさお" }"#)
+        .eval()
+        .unwrap();
+
+    dump_table(&lua, &table, &path).unwrap();
+
+    let text = fs::read_to_string(&path).unwrap();
+    assert_eq!(
+        doc(&text),
+        doc(r#""好感度" = 3
+"名前" = "まさお""#)
+    );
+    assert_eq!(table.get::<i64>("好感度").unwrap(), 3);
+    assert_eq!(gate(&lua), Some(SaveGate::Closed("locked".into())));
+    assert!(!path.with_extension("tmp").exists());
+}
+
+/// 書けない値は外してセーブと同じ文言で警告し、残りを書く（5.4）。
+#[tracing_test::traced_test]
+#[test]
+fn test_dump_table_drops_function_and_warns() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("variables.toml");
+    let lua = Lua::new();
+    let table: Table = lua
+        .load("return { ok = 1, f = function() end }")
+        .eval()
+        .unwrap();
+
+    dump_table(&lua, &table, &path).unwrap();
+
+    assert_eq!(load_from_file(&path).unwrap(), doc("ok = 1"));
+    assert!(logs_contain(
+        "key 'f' was not saved: unsupported value type (function)"
+    ));
+}
+
+/// 在るファイルを置き換え、無いフォルダを作る（5.1）。
+#[test]
+fn test_dump_table_replaces_file_and_creates_folder() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("profile/pasta/debug/variables.toml");
+    let lua = Lua::new();
+    let first: Table = lua.load("return { a = 1 }").eval().unwrap();
+    dump_table(&lua, &first, &path).unwrap();
+    let second: Table = lua.load("return { b = 2 }").eval().unwrap();
+    dump_table(&lua, &second, &path).unwrap();
+
+    assert_eq!(load_from_file(&path).unwrap(), doc("b = 2"));
+}
+
+/// 一時ファイルを作れないときは Err で、前のファイルが残り、一時ファイルも残らない（5.5）。
+#[test]
+fn test_dump_table_unwritable_keeps_previous_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let path = temp_dir.path().join("variables.toml");
+    fs::write(&path, "keep = 1\n").unwrap();
+    let temp_path = path.with_extension("tmp");
+    fs::create_dir(&temp_path).unwrap();
+    let lua = Lua::new();
+    let table: Table = lua.load("return { a = 1 }").eval().unwrap();
+
+    assert!(matches!(
+        dump_table(&lua, &table, &path),
+        Err(PersistenceError::IoError(_))
+    ));
+    assert_eq!(fs::read_to_string(&path).unwrap(), "keep = 1\n");
+    assert!(!temp_path.is_file());
+}

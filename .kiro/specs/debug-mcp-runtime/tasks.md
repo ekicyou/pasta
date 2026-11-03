@@ -97,7 +97,7 @@
   - _Requirements: 9.3_
 
 - [ ] 6. 保存変数を書き出す `OnPastaDumpVariables`
-- [ ] 6.1 保存変数の表を、セーブと同じ変換でテキストの TOML に書く関数を足す
+- [x] 6.1 保存変数の表を、セーブと同じ変換でテキストの TOML に書く関数を足す
   - セーブの門を通さず、表を変えず、`obfuscate` によらずテキストで書く。書けない値はセーブと同じ文言で外して警告する（警告をセーブと共有する）
   - 一時ファイルに書いて置き換える書き方で、書き込み・`sync_all` の失敗でも一時ファイルを消す（`save.toml` にも効く）。親のフォルダを作る
   - 単体テスト: テキストで書く・関数の値を外して警告する・在るファイルを置き換える・フォルダを作る・書けないときは `Err` で前のファイルが残り一時ファイルが残らない
@@ -221,3 +221,4 @@
 - 2.1: `multi_instance_test::dap_kick_reaches_only_its_own_instance` は 2.1 の後 2.2 で消すまで赤い（キックの経路が無いため）。
 - 4.1: `tests/fixtures/debug_break_coalesce.pasta` は `src/debug/wiring_pasta_break_coalesce_e2e.rs` が include_str! で読むため残した。4.2 で wiring と一緒に消す。`loader/source_map_build.rs` の `crate::debug::enable` への doc リンクと `tests/runtime/source_map_handoff_test.rs` 冒頭の「デバッグハンドル」の文言も 4.2/4.3 で直す。
 - 4.2: `tests/chunk_name_validation_test.rs`（8.3 で消す予定）は jit.off・set_hook を使っていたため 4.2 で前倒しで消した。
+- 6.1: `persistence::dump_table` に一時の `#[allow(dead_code)]`（shortcut: コメント付き）がある。6.2 で `@pasta_debug` に結んだら外す。
