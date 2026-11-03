@@ -61,7 +61,7 @@ end
 -- 意図: SCENE変数を再利用してシーン定義（Requirement 1）
 --       "メイン1" はSceneRegistryで一意なモジュール名として解決
 do
-    local SCENE = PASTA.create_scene("メイン1")
+    local SCENE = PASTA.create_scene("メイン1"); PASTA.set_scene_attrs(SCENE, "__start__", { { key = "天気", value = "晴れ" } })
 
     -- 　＃ ローカル単語定義
     -- 　＠場所：東京、大阪、京都
@@ -271,7 +271,7 @@ end
 --       「＊メイン」にローカルシーン「会話分岐」が存在するため、
 --       グローバルシーン「＊会話分岐」は一意なモジュール名「会話分岐1」として生成（Requirement 3b）
 do
-    local SCENE = PASTA.create_scene("会話分岐1")
+    local SCENE = PASTA.create_scene("会話分岐1"); PASTA.set_scene_attrs(SCENE, "__start__", { { key = "天気", value = "晴れ" } })
 
     function SCENE.__start__(ctx, ...)
         local args = { ... }

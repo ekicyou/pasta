@@ -542,3 +542,102 @@ fn init_scene_receives_written_global_name_not_alias() {
         "{text}"
     );
 }
+
+// ------------------------------------------------------------------
+// scene-attribute-store 4.3: 属性の文を create_scene の行に続ける
+
+fn attr(key: &str, body: pasta_dsl::parser::AttrBody) -> pasta_dsl::parser::Attr {
+    pasta_dsl::parser::Attr {
+        key: key.to_string(),
+        body,
+        span: Span::default(),
+    }
+}
+
+/// 属性のあるグローバルと名前のあるローカルにだけ、同じ行の後ろへ `; ` で文が続く。
+/// 項目は宣言・条件・フラグの 3 形で、文字列は文字列化、整数・小数は数の字句のまま。
+#[test]
+fn attrs_follow_create_scene_on_the_same_line() {
+    use pasta_dsl::parser::{AttrBody, AttrValue, CmpOp};
+    let mut with_attr = named_local_with_span("選択肢", 5);
+    with_attr.attrs = vec![attr("優先", AttrBody::Decl(AttrValue::Integer(3)))];
+    let scene = global_scene_with(
+        "会話",
+        3,
+        vec![
+            LocalSceneScope {
+                name: None,
+                attrs: vec![],
+                items: vec![],
+                code_blocks: vec![],
+                span: Span::default(),
+            },
+            with_attr,
+            named_local_with_span("無し", 8),
+        ],
+    );
+    let attrs = vec![
+        attr("背景", AttrBody::Decl(AttrValue::AttrString("教室".into()))),
+        attr("題", AttrBody::Decl(AttrValue::String("".into()))),
+        attr(
+            "＄＊経験値",
+            AttrBody::Cond {
+                op: CmpOp::Ge,
+                value: AttrValue::Integer(500),
+            },
+        ),
+        attr("重み", AttrBody::Decl(AttrValue::Float(1.5))),
+        attr("＄済み", AttrBody::Flag),
+    ];
+    let text = gen_to_string(|cg| cg.generate_global_scene(&scene, &scene.name, 1, &attrs));
+    let line = text
+        .lines()
+        .find(|l| l.contains("PASTA.create_scene("))
+        .unwrap()
+        .trim();
+    assert_eq!(
+        line,
+        concat!(
+            r#"local SCENE = PASTA.create_scene("会話"); "#,
+            r#"PASTA.set_scene_attrs(SCENE, "__start__", { { key = "背景", value = "教室" }, "#,
+            r#"{ key = "題", value = "" }, { key = "＄＊経験値", op = ">=", value = 500 }, "#,
+            r#"{ key = "重み", value = 1.5 }, { key = "＄済み" } }); "#,
+            r#"PASTA.set_scene_attrs(SCENE, "選択肢_1", { { key = "優先", value = 3 } })"#,
+        ),
+        "{text}"
+    );
+}
+
+/// 属性の無いシーンは何も出さず、属性があっても行の数は変わらない。
+#[test]
+fn attrs_do_not_change_line_count_or_attrless_output() {
+    use pasta_dsl::parser::{AttrBody, AttrValue};
+    let mut local = named_local_with_span("挨拶", 5);
+    let scene = global_scene_with("会話", 3, vec![local.clone()]);
+    let none = Vec::<pasta_dsl::parser::Attr>::new();
+    let plain = gen_to_string(|cg| cg.generate_global_scene(&scene, &scene.name, 1, &none));
+    assert!(!plain.contains("set_scene_attrs"), "{plain}");
+    assert!(
+        plain
+            .lines()
+            .any(|l| l.trim() == r#"local SCENE = PASTA.create_scene("会話")"#),
+        "{plain}"
+    );
+
+    local.attrs = vec![attr("優先", AttrBody::Decl(AttrValue::Integer(1)))];
+    let scene2 = global_scene_with("会話", 3, vec![local]);
+    let g = vec![attr(
+        "背景",
+        AttrBody::Decl(AttrValue::AttrString("教室".into())),
+    )];
+    let rich = gen_to_string(|cg| cg.generate_global_scene(&scene2, &scene2.name, 1, &g));
+    assert_eq!(plain.lines().count(), rich.lines().count(), "{rich}");
+    // create_scene の行のほかは同じ
+    let differing: Vec<_> = plain
+        .lines()
+        .zip(rich.lines())
+        .filter(|(a, b)| a != b)
+        .collect();
+    assert_eq!(differing.len(), 1, "{differing:?}");
+    assert!(differing[0].1.contains("set_scene_attrs"), "{differing:?}");
+}

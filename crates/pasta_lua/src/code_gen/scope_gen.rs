@@ -6,7 +6,8 @@ use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
 use pasta_core::registry::SceneRegistry;
 use pasta_dsl::parser::{
-    ActorScope, Attr, GlobalSceneScope, LocalSceneItem, LocalSceneScope, SceneActorItem,
+    ActorScope, Attr, AttrBody, AttrValue, GlobalSceneScope, LocalSceneItem, LocalSceneScope,
+    SceneActorItem, merge_attrs,
 };
 use std::io::Write;
 
@@ -85,13 +86,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// * `declared_name` - 宣言名（別名を置き換えた後の名前。呼び出し側で 1 回だけ決める。
     ///   ここでは再度置き換えない）。基本名・突合キー・ローカルの親名はすべてこれから作る
     /// * `scene_counter` - Scene counter for name uniqueness
-    /// * `_attrs` - 受け継ぎと畳みの後のシーンの属性の並び（まだ生成物には出さない）
+    /// * `attrs` - 受け継ぎと畳みの後のシーンの属性の並び（`create_scene` の行に続けて出す）
     pub fn generate_global_scene(
         &mut self,
         scene: &GlobalSceneScope,
         declared_name: &str,
         scene_counter: usize,
-        _attrs: &[Attr],
+        attrs: &[Attr],
     ) -> Result<(), TranspileError> {
         let sanitized_name = SceneRegistry::sanitize_name(declared_name);
         // Use base name only - counter is assigned by Lua runtime (Requirement 8.5)
@@ -106,11 +107,22 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Source-map wiring (Requirements 1.1, 1.4, 1.5): record the global scene's
         // `.pasta` span at the header `.lua` line so `span.start_line` (the `.pasta`
         // `＊シーン` definition header line) becomes a breakpoint target.
+        // 属性の文は同じ行の後ろへ続ける。行を足すと init_scene の行の対応がずれる（設計の決定 6）。
+        let counters = local_scene_counters(&scene.local_scenes);
+        let mut header = format!("local SCENE = PASTA.create_scene(\"{}\")", base_name);
+        append_set_scene_attrs(&mut header, "__start__", attrs)?;
+        for (local_scene, &counter) in scene.local_scenes.iter().zip(&counters) {
+            if let Some(ref name) = local_scene.name {
+                let fn_name = SceneRegistry::registered_name(name, counter);
+                append_set_scene_attrs(
+                    &mut header,
+                    &fn_name,
+                    &merge_attrs(&[], &local_scene.attrs),
+                )?;
+            }
+        }
         let out_line_before = self.out_line();
-        self.writeln(&format!(
-            "local SCENE = PASTA.create_scene(\"{}\")",
-            base_name
-        ))?;
+        self.writeln(&header)?;
         self.record_span_since(out_line_before, scene.span);
 
         // Source-map scene recording (task 2.1, Requirements 3.1/3.3): flow the
@@ -150,7 +162,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         // ローカルシーンを照合用の名前ごとの通し番号（_1, _2, ...）で生成する。
         // トランスパイル時のレジストリの登録と同じ local_scene_counters を使う（2.12）。
-        let counters = local_scene_counters(&scene.local_scenes);
         let first_slot = self.line_map_slots.len();
         for (local_scene, counter) in scene.local_scenes.iter().zip(counters) {
             // Parent reference for the local join key: "{base}#{counter}" identifies
@@ -396,6 +407,46 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         self.record_span_since(out_line_before, cmd.span);
         Ok(())
     }
+}
+
+/// 属性があれば `; PASTA.set_scene_attrs(SCENE, "関数名", { … })` を `line` の後ろへ足す。
+fn append_set_scene_attrs(
+    line: &mut String,
+    fn_name: &str,
+    attrs: &[Attr],
+) -> Result<(), TranspileError> {
+    if attrs.is_empty() {
+        return Ok(());
+    }
+    let mut items = Vec::with_capacity(attrs.len());
+    for a in attrs {
+        let key = StringLiteralizer::literalize(&a.key)?;
+        items.push(match &a.body {
+            AttrBody::Decl(v) => format!("{{ key = {}, value = {} }}", key, attr_value_literal(v)?),
+            AttrBody::Cond { op, value } => format!(
+                "{{ key = {}, op = \"{}\", value = {} }}",
+                key,
+                op.as_str(),
+                attr_value_literal(value)?
+            ),
+            AttrBody::Flag => format!("{{ key = {} }}", key),
+        });
+    }
+    line.push_str(&format!(
+        "; PASTA.set_scene_attrs(SCENE, {}, {{ {} }})",
+        StringLiteralizer::literalize(fn_name)?,
+        items.join(", ")
+    ));
+    Ok(())
+}
+
+/// 値の字句。文字列は文字列化、数は `Expr::Integer`・`Expr::Float` と同じ `{}`。
+fn attr_value_literal(v: &AttrValue) -> Result<String, TranspileError> {
+    Ok(match v {
+        AttrValue::Integer(n) => n.to_string(),
+        AttrValue::Float(f) => f.to_string(),
+        AttrValue::String(s) | AttrValue::AttrString(s) => StringLiteralizer::literalize(s)?,
+    })
 }
 
 #[cfg(test)]
