@@ -26,7 +26,7 @@ fn test_no_entry_attempts_scene_fallback() {
     // The Lua side must use "OnTestEvent_1" as the global_name for SCENE.register
     let (_, counter) = ctx
         .scene_registry
-        .register_global("OnTestEvent", std::collections::HashMap::new());
+        .register_global("OnTestEvent", Vec::new());
 
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
     let scripts_dir = get_scripts_dir();
@@ -132,7 +132,7 @@ fn test_scene_fallback_catches_errors() {
     // register_global returns (global_name, counter), e.g., ("OnErrorScene", 1)
     let (_, counter) = ctx
         .scene_registry
-        .register_global("OnErrorScene", std::collections::HashMap::new());
+        .register_global("OnErrorScene", Vec::new());
 
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
     let scripts_dir = get_scripts_dir();

@@ -490,10 +490,10 @@ mod tests {
     /// - Local words (メイン_1): 挨拶 = [やあ]
     fn create_test_search_context() -> SearchContext {
         let mut scene_registry = SceneRegistry::new();
-        scene_registry.register_global("挨拶", HashMap::new());
-        scene_registry.register_global("挨拶", HashMap::new());
-        let (_, counter) = scene_registry.register_global("メイン", HashMap::new());
-        scene_registry.register_local("選択肢", "メイン", counter, 1, HashMap::new());
+        scene_registry.register_global("挨拶", Vec::new());
+        scene_registry.register_global("挨拶", Vec::new());
+        let (_, counter) = scene_registry.register_global("メイン", Vec::new());
+        scene_registry.register_local("選択肢", "メイン", counter, 1, Vec::new());
 
         let mut word_registry = WordDefRegistry::new();
         word_registry.register_global("場所", vec!["東京".to_string(), "大阪".to_string()]);
@@ -587,14 +587,17 @@ mod tests {
     /// yield the registered name [`SYMBOL_GLOBAL`].
     fn create_symbol_name_contexts() -> Vec<SearchContext> {
         let mut transpiled = SceneRegistry::new();
-        let (_, counter) = transpiled.register_global("会話・朝", HashMap::new());
-        transpiled.register_local("選択・A", "会話・朝", counter, 1, HashMap::new());
+        let (_, counter) = transpiled.register_global("会話・朝", Vec::new());
+        transpiled.register_local("選択・A", "会話・朝", counter, 1, Vec::new());
 
         let mut finalized = SceneRegistry::new();
         finalized.register_global_raw(
             SYMBOL_GLOBAL,
-            &["__start__".to_string(), "選択_A_1".to_string()],
-            HashMap::new(),
+            &[
+                ("__start__".to_string(), Vec::new()),
+                ("選択_A_1".to_string(), Vec::new()),
+            ],
+            Vec::new(),
         );
 
         [transpiled, finalized]
@@ -644,11 +647,11 @@ mod tests {
         let build = |finalized: bool| {
             let mut registry = SceneRegistry::new();
             if finalized {
-                registry.register_global_raw("会話_朝_1", &[], HashMap::new());
-                registry.register_global_raw("会話_朝_2", &[], HashMap::new());
+                registry.register_global_raw("会話_朝_1", &[], Vec::new());
+                registry.register_global_raw("会話_朝_2", &[], Vec::new());
             } else {
-                registry.register_global("会話・朝", HashMap::new());
-                registry.register_global("会話_朝", HashMap::new());
+                registry.register_global("会話・朝", Vec::new());
+                registry.register_global("会話_朝", Vec::new());
             }
             let mut ctx = SearchContext::new(registry, WordDefRegistry::new());
             ctx.set_scene_selector(Some(vec![0])).unwrap();
@@ -772,8 +775,8 @@ mod tests {
             let actor = format!("さくら{sym}改");
 
             let mut scenes = SceneRegistry::new();
-            let (_, counter) = scenes.register_global(&global, HashMap::new());
-            scenes.register_local(&local, &global, counter, 1, HashMap::new());
+            let (_, counter) = scenes.register_global(&global, Vec::new());
+            scenes.register_local(&local, &global, counter, 1, Vec::new());
             let mut words = WordDefRegistry::new();
             words.register_actor(&actor, "通常", vec!["\\s[0]".to_string()]);
             let mut ctx = SearchContext::new(scenes, words);
@@ -800,11 +803,11 @@ mod tests {
     /// global word `会話`, mock selectors.
     fn create_alias_context(aliases: SceneAliasTable) -> SearchContext {
         let mut scenes = SceneRegistry::new();
-        scenes.register_global("OnTalk", HashMap::new());
-        scenes.register_global("OnTalk朝", HashMap::new());
-        scenes.register_global("会話・朝", HashMap::new());
-        let (_, counter) = scenes.register_global("メイン", HashMap::new());
-        scenes.register_local("会話", "メイン", counter, 1, HashMap::new());
+        scenes.register_global("OnTalk", Vec::new());
+        scenes.register_global("OnTalk朝", Vec::new());
+        scenes.register_global("会話・朝", Vec::new());
+        let (_, counter) = scenes.register_global("メイン", Vec::new());
+        scenes.register_local("会話", "メイン", counter, 1, Vec::new());
         let mut words = WordDefRegistry::new();
         words.register_global("会話", vec!["こんにちは".to_string()]);
 
@@ -867,7 +870,7 @@ mod tests {
         assert_eq!(global_hits(&mut ctx, "会話", 3), ["会話_朝_1"]);
 
         let mut scenes = SceneRegistry::new();
-        scenes.register_global("OnTalk", HashMap::new());
+        scenes.register_global("OnTalk", Vec::new());
         let mut ctx = SearchContext::new(scenes, WordDefRegistry::new());
         assert_eq!(ctx.search_scene("会話", None).unwrap(), None);
         assert!(ctx.search_scene("OnTalk", None).unwrap().is_some());
@@ -906,12 +909,12 @@ mod tests {
     /// 順送りのモックを持つ文脈。
     fn create_local_search_context() -> SearchContext {
         let mut scenes = SceneRegistry::new();
-        scenes.register_global("会話・朝", HashMap::new());
-        let (_, counter) = scenes.register_global("会話・朝", HashMap::new());
-        scenes.register_local("挨拶・A", "会話・朝", counter, 1, HashMap::new());
-        scenes.register_local("挨拶・A", "会話・朝", counter, 2, HashMap::new());
-        let (_, counter) = scenes.register_global("OnTalk", HashMap::new());
-        scenes.register_local("挨拶", "OnTalk", counter, 1, HashMap::new());
+        scenes.register_global("会話・朝", Vec::new());
+        let (_, counter) = scenes.register_global("会話・朝", Vec::new());
+        scenes.register_local("挨拶・A", "会話・朝", counter, 1, Vec::new());
+        scenes.register_local("挨拶・A", "会話・朝", counter, 2, Vec::new());
+        let (_, counter) = scenes.register_global("OnTalk", Vec::new());
+        scenes.register_local("挨拶", "OnTalk", counter, 1, Vec::new());
         let mut ctx = SearchContext::with_aliases(
             scenes,
             WordDefRegistry::new(),
@@ -961,8 +964,8 @@ mod tests {
         );
         // ローカルの名前 `会話` は OnTalk に置き換わらない
         let mut scenes = SceneRegistry::new();
-        let (_, counter) = scenes.register_global("OnTalk", HashMap::new());
-        scenes.register_local("OnTalk", "OnTalk", counter, 1, HashMap::new());
+        let (_, counter) = scenes.register_global("OnTalk", Vec::new());
+        scenes.register_local("OnTalk", "OnTalk", counter, 1, Vec::new());
         let mut ctx = SearchContext::with_aliases(
             scenes,
             WordDefRegistry::new(),

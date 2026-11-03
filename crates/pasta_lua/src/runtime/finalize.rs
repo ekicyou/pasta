@@ -15,7 +15,9 @@
 //! - Req 7: 将来拡張への備え
 
 use mlua::{Function, Lua, Result as LuaResult, Table, Value};
-use pasta_core::registry::{SceneAliasTable, SceneRegistry, WordDefRegistry};
+use pasta_core::registry::{
+    CmpOp, SceneAliasTable, SceneAttr, SceneAttrValue, SceneRegistry, WordDefRegistry,
+};
 use std::collections::HashMap;
 
 /// Entry for collected word information.
@@ -152,6 +154,73 @@ pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
     Ok(entries)
 }
 
+/// Lua の倉 `STORE.scene_attrs` からシーンの属性を集める（5.1・5.3）。
+///
+/// キーは（グローバルの登録名, ローカルの関数名）。グローバル自身は `__start__`。
+/// 写せない項目は警告して飛ばす。倉は読むだけで書き換えない。
+pub fn collect_scene_attrs(lua: &Lua) -> LuaResult<HashMap<(String, String), Vec<SceneAttr>>> {
+    // SAFETY(injection): Module name is a compile-time string literal.
+    let store: Table = lua.load("return require('pasta.store')").eval()?;
+    let scene_attrs: Table = store.get("scene_attrs")?;
+
+    let mut out = HashMap::new();
+    for pair in scene_attrs.pairs::<String, Table>() {
+        let (global_name, by_local) = pair?;
+        for entry in by_local.pairs::<String, Table>() {
+            let (local_name, items) = entry?;
+            let mut attrs = Vec::new();
+            for item in items.sequence_values::<Value>() {
+                let item = item?;
+                let attr = match &item {
+                    Value::Table(t) => scene_attr_from_item(t),
+                    _ => None,
+                };
+                match attr {
+                    Some(attr) => attrs.push(attr),
+                    None => {
+                        let key = item.as_table().and_then(|t| t.get::<Value>("key").ok());
+                        tracing::warn!(
+                            global_name = %global_name,
+                            local_name = %local_name,
+                            key = ?key,
+                            "Skipped scene attribute item that cannot be mapped"
+                        );
+                    }
+                }
+            }
+            out.insert((global_name.clone(), local_name), attrs);
+        }
+    }
+    Ok(out)
+}
+
+/// 倉の 1 項目を 3 種へ写す。`op` があれば条件、`＄` で始まり `op` が無ければフラグ、
+/// それ以外は宣言。値が数・文字列でない、`op` が正規形でないなどは `None`。
+#[allow(clippy::useless_conversion)] // x86 では mlua::Integer が i32
+fn scene_attr_from_item(item: &Table) -> Option<SceneAttr> {
+    let key = match item.get::<Value>("key").ok()? {
+        Value::String(s) => s.to_str().ok()?.to_string(),
+        _ => return None,
+    };
+    let value = match item.get::<Value>("value").ok()? {
+        Value::Nil => None,
+        Value::Integer(i) => Some(SceneAttrValue::Integer(i64::from(i))),
+        Value::Number(n) => Some(SceneAttrValue::from_f64(n)),
+        Value::String(s) => Some(SceneAttrValue::String(s.to_str().ok()?.to_string())),
+        _ => return None,
+    };
+    match item.get::<Value>("op").ok()? {
+        Value::Nil if key.starts_with('＄') => Some(SceneAttr::Flag { key }),
+        Value::Nil => Some(SceneAttr::Decl { key, value: value? }),
+        Value::String(op) => Some(SceneAttr::Cond {
+            key,
+            op: CmpOp::from_normalized(&op.to_str().ok()?)?,
+            value: value?,
+        }),
+        _ => None,
+    }
+}
+
 /// Build SceneRegistry from collected scene data (Requirement 1.4, 5.3).
 ///
 /// Uses `register_global_raw` to preserve the full name with counter
@@ -160,7 +229,12 @@ pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
 /// 登録順は（名前, 通し番号）の昇順に決める（2.9）。グローバルを並べ、
 /// 同じグローバルの中のローカルも同じ規則で並べる。`HashMap` の走査順や
 /// Lua の `pairs` の順には依存しない。
-fn build_scene_registry(scenes: &[(String, String)]) -> SceneRegistry {
+///
+/// 属性は `attrs`（[`collect_scene_attrs`] の戻り）から引き、無いシーンは空の並び。
+pub fn build_scene_registry(
+    scenes: &[(String, String)],
+    attrs: &HashMap<(String, String), Vec<SceneAttr>>,
+) -> SceneRegistry {
     let mut registry = SceneRegistry::new();
 
     // Group by global scene name
@@ -179,7 +253,20 @@ fn build_scene_registry(scenes: &[(String, String)]) -> SceneRegistry {
     for (global_name, mut local_names) in globals {
         local_names.sort_by(|a, b| scene_order_key(a).cmp(&scene_order_key(b)));
         // Use register_global_raw to preserve the full name with counter
-        registry.register_global_raw(global_name, &local_names, HashMap::new());
+        let attrs_of = |local: &str| {
+            attrs
+                .get(&(global_name.to_string(), local.to_string()))
+                .cloned()
+                .unwrap_or_default()
+        };
+        let locals: Vec<_> = local_names
+            .into_iter()
+            .map(|n| {
+                let a = attrs_of(&n);
+                (n, a)
+            })
+            .collect();
+        registry.register_global_raw(global_name, &locals, attrs_of("__start__"));
     }
 
     registry
@@ -231,6 +318,12 @@ pub fn finalize_scene_impl(lua: &Lua, aliases: &SceneAliasTable) -> LuaResult<bo
         "Collected scenes from Lua registry"
     );
 
+    let scene_attrs = collect_scene_attrs(lua)?;
+    tracing::debug!(
+        scene_attr_count = scene_attrs.values().map(Vec::len).sum::<usize>(),
+        "Collected scene attributes from Lua store"
+    );
+
     // Collect words from Lua registry
     let word_entries = collect_words(lua)?;
     tracing::debug!(
@@ -239,7 +332,7 @@ pub fn finalize_scene_impl(lua: &Lua, aliases: &SceneAliasTable) -> LuaResult<bo
     );
 
     // Build registries
-    let scene_registry = build_scene_registry(&scenes);
+    let scene_registry = build_scene_registry(&scenes, &scene_attrs);
     let word_registry = build_word_registry(&word_entries);
 
     // Register @pasta_search module (Requirement 3.3, 3.4, 5.4)
@@ -347,12 +440,49 @@ mod tests {
         ];
 
         assert_eq!(
-            registration_order(&build_scene_registry(&scrambled)),
+            registration_order(&build_scene_registry(&scrambled, &HashMap::new())),
             expected
         );
         assert_eq!(
-            registration_order(&build_scene_registry(&reversed)),
+            registration_order(&build_scene_registry(&reversed, &HashMap::new())),
             expected
         );
+    }
+
+    /// 倉の項目の写し: 3 種に写り、写せない項目は None（飛ばされる）
+    #[test]
+    fn test_scene_attr_from_item_maps_three_kinds_and_rejects_bad_items() {
+        let lua = Lua::new();
+        let item = |src: &str| -> Option<SceneAttr> {
+            let t: Table = lua.load(format!("return {src}")).eval().unwrap();
+            scene_attr_from_item(&t)
+        };
+        assert_eq!(
+            item(r#"{ key = "率", value = 2.0 }"#),
+            Some(SceneAttr::Decl {
+                key: "率".into(),
+                value: SceneAttrValue::Integer(2)
+            })
+        );
+        assert_eq!(
+            item(r#"{ key = "＄x", op = "!=", value = "a" }"#),
+            Some(SceneAttr::Cond {
+                key: "＄x".into(),
+                op: CmpOp::Ne,
+                value: SceneAttrValue::String("a".into())
+            })
+        );
+        assert_eq!(
+            item(r#"{ key = "＄x" }"#),
+            Some(SceneAttr::Flag { key: "＄x".into() })
+        );
+        for bad in [
+            r#"{ key = "＄x", op = "≧", value = 1 }"#,
+            r#"{ key = "k", value = {} }"#,
+            r#"{ key = "k" }"#,
+            r#"{ value = 1 }"#,
+        ] {
+            assert_eq!(item(bad), None, "{bad}");
+        }
     }
 }

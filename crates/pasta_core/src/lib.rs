@@ -28,7 +28,7 @@ pub use error::{
     ActorFontError, FontValueProblem, SceneAliasError, SceneTableError, WordTableError,
 };
 pub use registry::{
-    DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable, SceneEntry,
-    SceneId, SceneInfo, SceneRegistry, SceneScope, SceneTable, WordDefRegistry, WordEntry,
-    WordTable,
+    CmpOp, DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable, SceneAttr,
+    SceneAttrValue, SceneEntry, SceneId, SceneInfo, SceneRegistry, SceneScope, SceneTable,
+    WordDefRegistry, WordEntry, WordTable,
 };

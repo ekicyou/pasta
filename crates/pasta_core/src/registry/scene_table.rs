@@ -290,9 +290,18 @@ impl SceneTable {
             .into_iter()
             .filter(|&id| {
                 let scene = &self.labels[id.0];
-                filters
-                    .iter()
-                    .all(|(key, value)| scene.attributes.get(key) == Some(value))
+                // 同じ名前の宣言が並ぶときは後の値（HashMap に入れていた頃の後勝ちと同じ）
+                filters.iter().all(|(key, value)| {
+                    scene
+                        .attributes
+                        .iter()
+                        .rev()
+                        .find_map(|a| match a {
+                            SceneAttr::Decl { key: k, value: v } if k == key => Some(v),
+                            _ => None,
+                        })
+                        .is_some_and(|v| v.to_string() == *value)
+                })
             })
             .collect();
 

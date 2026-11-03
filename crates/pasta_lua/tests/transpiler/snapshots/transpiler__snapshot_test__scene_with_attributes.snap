@@ -6,7 +6,7 @@ local PASTA = require "pasta"
 local GLOBAL = require "pasta.global"
 
 do
-    local SCENE = PASTA.create_scene("メイン")
+    local SCENE = PASTA.create_scene("メイン"); PASTA.set_scene_attrs(SCENE, "__start__", { { key = "天気", value = "晴れ" }, { key = "場所", value = "東京" }, { key = "時間帯", value = "朝" } })
 
     function SCENE.__start__(act, ...)
         local args = { ... }

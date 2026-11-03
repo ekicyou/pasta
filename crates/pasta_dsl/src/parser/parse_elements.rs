@@ -6,37 +6,88 @@ use super::*;
 pub(crate) fn parse_attr(pair: Pair<Rule>, filename: &str) -> Result<Attr, ParseError> {
     let span = Span::from_pair(&pair);
     let mut key = String::new();
-    let mut value = AttrValue::AttrString(String::new());
+    let mut body = AttrBody::Flag;
 
     for inner in pair.into_inner() {
-        if inner.as_rule() == Rule::key_attr {
-            for kv_inner in inner.into_inner() {
-                match kv_inner.as_rule() {
-                    Rule::id => {
+        match inner.as_rule() {
+            Rule::key_attr => {
+                let mut value = AttrValue::AttrString(String::new());
+                for kv_inner in inner.into_inner() {
+                    if kv_inner.as_rule() == Rule::id {
                         key = kv_inner.as_str().to_string();
+                    } else if let Some(v) = parse_attr_value(&kv_inner, filename)? {
+                        value = v;
                     }
-                    Rule::number_literal => {
-                        value = match number_value(&kv_inner, filename)? {
-                            Number::Integer(i) => AttrValue::Integer(i),
-                            Number::Float(f) => AttrValue::Float(f),
-                        };
+                }
+                body = AttrBody::Decl(value);
+            }
+            Rule::attr_cond => {
+                let mut op = CmpOp::Eq;
+                let mut value = AttrValue::AttrString(String::new());
+                for c in inner.into_inner() {
+                    match c.as_rule() {
+                        Rule::attr_var_global | Rule::attr_var_local => key = attr_var_key(&c),
+                        Rule::cmp_op => op = cmp_op(c.as_str()),
+                        _ => {
+                            if let Some(v) = parse_attr_value(&c, filename)? {
+                                value = v;
+                            }
+                        }
                     }
-                    Rule::string_contents => {
-                        value = AttrValue::String(kv_inner.as_str().to_string());
-                    }
-                    Rule::string_blank => {
-                        value = AttrValue::String(String::new());
-                    }
-                    Rule::attr_string => {
-                        value = AttrValue::AttrString(kv_inner.as_str().to_string());
-                    }
-                    _ => {}
+                }
+                body = AttrBody::Cond { op, value };
+            }
+            Rule::attr_flag => {
+                if let Some(var) = inner.into_inner().next() {
+                    key = attr_var_key(&var);
                 }
             }
+            _ => {}
         }
     }
 
-    Ok(Attr { key, value, span })
+    Ok(Attr { key, body, span })
+}
+
+/// 属性の値の字句。値でない子は None。
+fn parse_attr_value(pair: &Pair<Rule>, filename: &str) -> Result<Option<AttrValue>, ParseError> {
+    Ok(Some(match pair.as_rule() {
+        Rule::number_literal => match number_value(pair, filename)? {
+            Number::Integer(i) => AttrValue::Integer(i),
+            Number::Float(f) => AttrValue::Float(f),
+        },
+        Rule::string_contents => AttrValue::String(pair.as_str().to_string()),
+        Rule::string_blank => AttrValue::String(String::new()),
+        Rule::attr_string => AttrValue::AttrString(pair.as_str().to_string()),
+        _ => return Ok(None),
+    }))
+}
+
+/// 条件・フラグの変数の名前（印は全角に揃え、名前は書いたまま）。
+fn attr_var_key(pair: &Pair<Rule>) -> String {
+    let mark = if pair.as_rule() == Rule::attr_var_global {
+        "＄＊"
+    } else {
+        "＄"
+    };
+    let name = pair
+        .clone()
+        .into_inner()
+        .next()
+        .map_or("", |id| id.as_str());
+    format!("{mark}{name}")
+}
+
+/// 比較演算子の字句（`Rule::cmp_op`）を正規形の型へ。
+fn cmp_op(s: &str) -> CmpOp {
+    match s {
+        "≧" | ">=" => CmpOp::Ge,
+        "≦" | "<=" => CmpOp::Le,
+        "≠" | "!=" => CmpOp::Ne,
+        "＞" | ">" => CmpOp::Gt,
+        "＜" | "<" => CmpOp::Lt,
+        _ => CmpOp::Eq, // "＝" | "="（文法がこの 12 種しか通さない）
+    }
 }
 
 /// 数の字句の値。

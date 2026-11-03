@@ -64,8 +64,23 @@
             },
             "name": "meta.attribute.pasta"
         },
+        "cond-attr": {
+            "match": "([＆&])([＄$][＊*]?[\\p{XID_Start}_][\\p{XID_Continue}・･‌‍]*(?:[\\s　]*(?:≧|≦|≠|>=|<=|!=|＞|＜|＝|>|<|=)[\\s　]*(?:「{4}(?:(?!」{4}).)+」{4}|「{3}(?:(?!」{3}).)+」{3}|「{2}(?:(?!」{2}).)+」{2}|「[^」]*」|(\"++)(?:(?!\\3).)+\\3|\"\"|[^\\s　：:＆&＃#]+))?)",
+            "captures": {
+                "1": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "2": {
+                    "name": "entity.other.attribute-name.pasta"
+                }
+            },
+            "name": "meta.attribute.pasta"
+        },
         "decl-rest": {
             "patterns": [
+                {
+                    "include": "#cond-attr"
+                },
                 {
                     "include": "#decl-attr"
                 },

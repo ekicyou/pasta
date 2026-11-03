@@ -83,7 +83,7 @@ pasta.failure ──→ （@pasta_log・pasta.config を報告の時点で読む
 
 | モジュール | 実行モデルでの役割 |
 | ---------- | ------------------ |
-| `pasta`（`crates/pasta_lua/pasta_scripts/pasta/init.lua`） | 生成コードが呼ぶ `create_actor`・`create_scene`・`create_word` の窓口と、Rust が上書きする `finalize_scene` のスタブ |
+| `pasta`（`crates/pasta_lua/pasta_scripts/pasta/init.lua`） | 生成コードが呼ぶ `create_actor`・`create_scene`・`set_scene_attrs`・`create_word` の窓口と、Rust が上書きする `finalize_scene` のスタブ |
 | `pasta.store` | ランタイムの共有状態の置き場。アクター・シーン・単語の Lua 側の登録表、外見の状態、継続中のコルーチン（`co_scene`）、選択肢のための状態を持つ。他の `pasta.*` を `require` しないため、どのモジュールからも循環なく参照できる |
 | `pasta.scene` | シーン関数の登録と、検索結果からシーン関数を引く `SCENE.search`、シーン関数をコルーチンで包む `SCENE.co_exec`・`SCENE.co_exec_exact`・`SCENE.co_exec_registered` |
 | `pasta.word`・`pasta.actor` | 単語とアクターの登録。アクターのプロキシ（`act.アクター名`）は `pasta.actor` が作る |

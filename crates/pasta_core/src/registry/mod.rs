@@ -25,6 +25,6 @@ pub use random::{DefaultRandomSelector, MockRandomSelector, RandomSelector};
 pub use scene_alias::SceneAliasTable;
 pub use scene_registry::{SceneEntry, SceneRegistry};
 pub use scene_table::SceneTable;
-pub use scene_types::{SceneId, SceneInfo, SceneScope};
+pub use scene_types::{CmpOp, SceneAttr, SceneAttrValue, SceneId, SceneInfo, SceneScope};
 pub use word_registry::{WordDefRegistry, WordEntry};
 pub use word_table::WordTable;

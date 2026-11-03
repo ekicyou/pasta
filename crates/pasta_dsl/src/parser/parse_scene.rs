@@ -21,7 +21,9 @@ pub(crate) fn parse_global_scene_scope(
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::global_scene_start => {
-                let (name, cont) = parse_global_scene_start(inner, last_name, filename)?;
+                // 宣言行の属性が先、初期部の属性行が後に積まれる
+                let (name, cont) =
+                    parse_global_scene_start(inner, last_name, &mut attrs, filename)?;
                 scene_name = name.clone();
                 is_continuation = cont;
                 *last_name = Some(name);
@@ -70,26 +72,31 @@ pub(crate) fn parse_global_scene_scope(
 }
 
 /// Parse global scene start (line or continue line).
+///
+/// 宣言行の属性は `attrs` に積む。名前なしの `＊` は名前だけを受け継ぎ、
+/// 直前のシーンの属性は受け継がない。
 pub(crate) fn parse_global_scene_start(
     pair: Pair<Rule>,
     last_name: &Option<String>,
+    attrs: &mut Vec<Attr>,
     filename: &str,
 ) -> Result<(String, bool), ParseError> {
+    let mut result = (String::new(), false);
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::global_scene_line => {
                 // Named scene
                 for scene_inner in inner.into_inner() {
-                    if scene_inner.as_rule() == Rule::id {
-                        return Ok((scene_inner.as_str().to_string(), false));
+                    match scene_inner.as_rule() {
+                        Rule::id => result = (scene_inner.as_str().to_string(), false),
+                        Rule::attr => attrs.push(parse_attr(scene_inner, filename)?),
+                        _ => {}
                     }
                 }
             }
             Rule::global_scene_continue_line => {
                 // Continuation scene - inherit name from last
-                if let Some(name) = last_name {
-                    return Ok((name.clone(), true));
-                } else {
+                let Some(name) = last_name else {
                     let span = inner.as_span();
                     let (line, col) = span.start_pos().line_col();
                     return Err(ParseError::SyntaxError {
@@ -98,13 +105,19 @@ pub(crate) fn parse_global_scene_start(
                         column: col,
                         message: "Unnamed global scene at start of file. A named global scene must appear before any unnamed scenes.".to_string(),
                     });
+                };
+                result = (name.clone(), true);
+                for scene_inner in inner.into_inner() {
+                    if scene_inner.as_rule() == Rule::attr {
+                        attrs.push(parse_attr(scene_inner, filename)?);
+                    }
                 }
             }
             _ => {}
         }
     }
 
-    Ok((String::new(), false))
+    Ok(result)
 }
 
 /// Parse scene_actors_line to extract SceneActorItems.
@@ -218,9 +231,10 @@ pub(crate) fn parse_local_scene_scope(
     for inner in pair.into_inner() {
         if inner.as_rule() == Rule::local_scene_line {
             for scene_inner in inner.into_inner() {
-                if scene_inner.as_rule() == Rule::id {
-                    scope.name = Some(scene_inner.as_str().to_string());
-                    break;
+                match scene_inner.as_rule() {
+                    Rule::id => scope.name = Some(scene_inner.as_str().to_string()),
+                    Rule::attr => scope.attrs.push(parse_attr(scene_inner, filename)?),
+                    _ => {}
                 }
             }
         } else {

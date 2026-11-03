@@ -663,6 +663,84 @@ save.talk_count = (save.talk_count or 0) + 1
 
 `require("pasta.save")` が返す表は、`act.save`・`init_scene` の戻り値の `save` と同じ表である。ACT を受け取らない場所（`main.lua` のトップレベルなど）から永続化データを読み書きするときに使う。
 
+## SCENE
+
+`pasta.scene` モジュール（`require "pasta.scene"`）の関数のうち、シーンの属性（[属性](https://ekicyou.github.io/pasta/grammar/block-structure.html#属性)）を読む `SCENE.attrs` を扱う。
+
+- この節の `SCENE` は `require "pasta.scene"` が返すモジュールである。Lua ブロックの中の `SCENE` は、そのブロックが属するグローバルシーンのシーンテーブル（[init_scene](#init_scene)）であり、`attrs` を持たない。Lua ブロックからは `require("pasta.scene").attrs(…)` の形で呼ぶ。
+- 属性は、今のところシーンの選択と出力を変えない。属性に意味を与える仕組みは今後の版で入る。
+
+### SCENE.attrs(global_name, local_name)
+
+```lua
+SCENE.attrs(global_name, local_name?) -> table | nil
+```
+
+| パラメータ | 型 | 説明 |
+| ---------- | -- | ---- |
+| `global_name` | string | グローバルシーンの登録名（`"メイン_1"` など。[search_scene の戻り値](pasta-search.md#search_scenename-global_scene_name)） |
+| `local_name` | string または nil | ローカルシーンの登録名（`"選択肢_1"` など）。`nil` と `"__start__"` は、グローバルシーンそのものを指す |
+
+- 登録名は辞書に書いた名前ではない。`"メイン"` や `"選択肢"` を渡しても、そのシーンは指さない。
+- 指したシーンの属性を、書いた順の配列で返す（並びと重なりは [並びと重なり](https://ekicyou.github.io/pasta/grammar/block-structure.html#並びと重なり)）。グローバルシーンの配列にはファイル属性が入り、ローカルシーンの配列はその宣言行の属性だけからなる。
+- 呼ぶたびに新しい配列と新しい項目の表を返す。戻りを書き換えても、記録された属性と次の呼び出しの戻りは変わらない。
+
+| 戻り値 | 場合 |
+| ------ | ---- |
+| 項目の配列 | 登録のあるシーン |
+| 空の配列 `{}` | 登録のあるシーンで、属性が 1 つも無い |
+| `nil` | 登録の無いシーン。`global_name` が文字列でない、`local_name` が文字列でも `nil` でもない場合も同じ。エラーは出さない |
+
+配列の項目は、属性の種類によって次の 3 つの形になる。
+
+| 種類 | 辞書の書き方 | 項目 |
+| ---- | ------------ | ---- |
+| 宣言 | `＆天気：晴れ` | `{ key = "天気", value = "晴れ" }` |
+| 条件 | `＆＄＊経験値≧500` | `{ key = "＄＊経験値", op = ">=", value = 500 }` |
+| フラグ | `＆＄＊初回待ち` | `{ key = "＄＊初回待ち" }`（`op`・`value` は無い） |
+
+- 条件とフラグの `key` は、`＄名前`・`＄＊名前` の形の文字列である。印は半角の `$` で書いても全角の `＄`・`＊` になり、名前は書いたとおりである。
+- 条件の `op` は `">="`・`"<="`・`">"`・`"<"`・`"="`・`"!="` のどれかである。全角で書いた演算子（`≧`・`≠` など）も、この半角の形になる。
+- `value` は、整数・小数なら number、文字列なら string である（[値の型](https://ekicyou.github.io/pasta/grammar/block-structure.html#値の型)）。整数の値になる小数（`1.0`）は整数の 1 になる。
+
+#### 実行中のシーンの属性を読む
+
+実行中のグローバルシーンの属性は、ACT が持つシーンテーブルの登録名（`act.current_scene.__global_name__`）を渡して読む。実行中のシーンは、最後に `init_scene` を呼んだシーンである（[init_scene](#init_scene)）。
+
+````pasta
+＆季節：春
+＊メイン＆天気：晴れ
+    ＆＄＊経験値≧500
+    ぱすた：＠属性一覧（）
+
+```lua
+function SCENE.属性一覧(act)
+    local attrs = require("pasta.scene").attrs(act.current_scene.__global_name__)
+    local parts = {}
+    for _, item in ipairs(attrs) do
+        if item.op then
+            parts[#parts + 1] = item.key .. item.op .. tostring(item.value)   -- 条件
+        elseif item.value ~= nil then
+            parts[#parts + 1] = item.key .. "=" .. tostring(item.value)       -- 宣言
+        else
+            parts[#parts + 1] = item.key                                      -- フラグ
+        end
+    end
+    return table.concat(parts, " ")   -- "季節=春 天気=晴れ ＄＊経験値>=500"
+end
+```
+````
+
+ACT はローカルシーンの登録名を持たない（`act.local_scene_name` は書いた名前で、登録名ではない）。ローカルシーンの属性は、検索の結果の登録名（`global_name`・`local_name` の 2 つ）を渡して読む。検索は候補の選択（順次消費）を進める（[@pasta_search](pasta-search.md#search_scenename-global_scene_name)）。
+
+```lua
+local SEARCH = require "@pasta_search"
+local g, l = SEARCH:search_scene("選択肢", act.current_scene.__global_name__)
+if g then
+    local attrs = require("pasta.scene").attrs(g, l)   -- 例: "メイン_1", "選択肢_1" の属性
+end
+```
+
 ## PASTA
 
 `pasta` モジュール（`require "pasta"`）の関数のうち、式の算術と連結の生成コードが使う 2 つを扱う。DSL の式の算術と連結は、演算ごとに Lua の演算子を括弧で囲んだ `(左 演算子 右)` になり、被演算子はこの 2 つの関数で数値・文字列にしてから演算子に渡される（[DSL と Lua の対応表](https://ekicyou.github.io/pasta/grammar/variables.html#dsl-と-lua-の対応表)）。

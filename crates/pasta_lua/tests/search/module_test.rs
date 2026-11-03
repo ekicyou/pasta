@@ -4,20 +4,19 @@
 //! with PastaLuaRuntime and SearchContext.
 
 use pasta_lua::{PastaLuaRuntime, TranspileContext};
-use std::collections::HashMap;
 
 /// Helper to create a TranspileContext with test data.
 fn create_test_context() -> TranspileContext {
     let mut ctx = TranspileContext::new();
 
     // Register global scenes
-    ctx.scene_registry.register_global("挨拶", HashMap::new());
-    ctx.scene_registry.register_global("会話", HashMap::new());
+    ctx.scene_registry.register_global("挨拶", Vec::new());
+    ctx.scene_registry.register_global("会話", Vec::new());
 
     // Register a local scene under 会話
-    let (_, counter) = ctx.scene_registry.register_global("メイン", HashMap::new());
+    let (_, counter) = ctx.scene_registry.register_global("メイン", Vec::new());
     ctx.scene_registry
-        .register_local("選択肢", "メイン", counter, 1, HashMap::new());
+        .register_local("選択肢", "メイン", counter, 1, Vec::new());
 
     // Register global words
     ctx.word_registry.register_global(
@@ -415,7 +414,7 @@ fn exec_string(ctx: TranspileContext, code: &str) -> String {
 fn create_context_with_three_scenes() -> TranspileContext {
     let mut ctx = create_test_context();
     for _ in 0..3 {
-        ctx.scene_registry.register_global("雑談", HashMap::new());
+        ctx.scene_registry.register_global("雑談", Vec::new());
     }
     ctx
 }

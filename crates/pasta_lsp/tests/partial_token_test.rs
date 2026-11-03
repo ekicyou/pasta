@@ -156,3 +156,17 @@ fn test_error_scene_keeps_other_tokens_and_has_none_itself() {
     assert!(in_scene.is_empty(), "誤りのシーンに色が無い: {in_scene:?}");
     assert_eq!(outside(broken_tokens), outside(valid_tokens));
 }
+
+/// 部分パースでも、誤りの後のシーンの宣言行の属性は構文木の位置で 1 つずつ着色される
+#[test]
+fn test_partial_decl_attrs_after_error() {
+    let source =
+        "＊壊れ\n　＄＝\n＊後＆＄x≧5\n　さくら：やあ\n　・ローカル ＆朝：1\n　　さくら：ふむ\n";
+    assert_eq!(AnalysisEngine::analyze(source).diagnostics.len(), 1);
+    let decorators: Vec<_> = abs_tokens(source)
+        .into_iter()
+        .filter(|t| t.3 == pasta_lsp::analysis::token_type::DECORATOR)
+        .collect();
+    let d = pasta_lsp::analysis::token_type::DECORATOR;
+    assert_eq!(decorators, vec![(2, 2, 5, d), (4, 7, 4, d)]);
+}

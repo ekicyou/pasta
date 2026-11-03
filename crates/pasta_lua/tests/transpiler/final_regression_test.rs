@@ -130,7 +130,7 @@ fn broad_fixtures() -> Vec<(&'static str, String)> {
         ),
         (
             "kind_scene_attributes",
-            "＆天気：晴れ\n＆場所：東京\n\n＊メイン\n  ＆時間帯：朝\n  さくら：「今日の天気は晴れです」\n".to_string(),
+            "＆天気：晴れ＆場所：東京\n\n\n＊メイン\n  ＆時間帯：朝\n  さくら：「今日の天気は晴れです」\n".to_string(),
         ),
         (
             "kind_multiple_scenes",

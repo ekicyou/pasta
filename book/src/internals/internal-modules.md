@@ -29,6 +29,7 @@ local STORE = require("pasta.store")
 | `appearance` | `table` | 外見の状態 `{ actors, spots, owners, last_spots }`（アクターの既知状態・スポットの表示中状態・スポットの直前の発話アクター・アクターの前回の発話スポット）。セッション中だけ保持し、永続化しない | `pasta.shiori.act` の `build` が `sakura_builder` に渡す（[アピアランスの観測と復旧](talk-output.md#アピアランスの観測と復旧)） |
 | `scenes` | `table<string, SceneTable>` | グローバルシーン名 → シーンテーブル | `pasta.scene` が作り、`get_all_scenes` が返す |
 | `counters` | `table<string, number>` | シーンの基本名 → 最後に振った番号 | `pasta.scene` の `get_or_increment_counter` |
+| `scene_attrs` | `table<string, table>` | グローバルシーン名 → { ローカル名（グローバル自身は `__start__`）→ 属性の項目の配列 }。属性のあるシーンだけが入る。`scenes` とは別の表なので、シーンの集め方は変わらない | 生成コードの `PASTA.set_scene_attrs`（`pasta.scene` の `set_attrs`）だけが書く。`SCENE.attrs` と辞書確定の `collect_scene_attrs` が読む（[辞書確定](registry-search.md#辞書確定)）。`STORE.reset` が空にする |
 | `global_words` | `table<string, table>` | 単語キー → 値リストの配列 | `pasta.word` の `create_global` のビルダー |
 | `local_words` | `table<string, table>` | グローバルシーン名 → { 単語キー → 値リストの配列 } | `pasta.word` の `create_local` のビルダー |
 | `actor_words` | `table<string, table>` | アクター名 → { 単語キー → 値リストの配列 } | `pasta.word` の `create_actor` のビルダー |
@@ -331,6 +332,8 @@ STORE.scenes = {
 | `get(global_name, local_name)` | シーン関数を返す。無ければ `nil` |
 | `get_start(global_name)` | `get(global_name, "__start__")` |
 | `get_all_scenes()` | `STORE.scenes` そのもの（複製しない）を返す |
+| `set_attrs(scene_table, local_name, items)` | `STORE.scene_attrs[scene_table.__global_name__][local_name] = items` とする。`pasta` の `set_scene_attrs` はこの関数そのもので、生成コードが `create_scene` の行に続けて呼ぶ（[属性の文](transpiler.md#属性の文)） |
+| `attrs(global_name, local_name)` | `STORE.scene_attrs` の項目を、新しい配列と新しい項目の表に写して返す。登録の無いシーンは `nil`、属性の無いシーンは `{}`（[SCENE.attrs](../lua/script-api.md#sceneattrsglobal_name-local_name)） |
 | `search(name, global_scene_name, attrs)` | 前方一致の検索でシーンを探し、結果オブジェクトを返す（後述） |
 | `wrap(fn)` | シーン関数をコルーチンに包んで返す（後述） |
 | `co_exec(act, name, global_scene_name, attrs)` | `act:find_scene` で探したシーン関数をコルーチンに包んで返す（後述） |

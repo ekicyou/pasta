@@ -376,39 +376,81 @@ fn test_transpile_multi_key_actor_word_lua_output() {
     );
 }
 
+/// 登録された各シーンの (fn_name, 属性の字句) を登録順に返す
+fn registered_attrs(src: &str) -> Vec<(String, Vec<String>)> {
+    use pasta_core::registry::SceneAttr;
+
+    let file = pasta_dsl::parse_str(src, "test.pasta").unwrap();
+    let context = LuaTranspiler::default()
+        .transpile(&file, &mut Vec::new())
+        .unwrap();
+    context
+        .scene_registry
+        .all_scenes()
+        .into_iter()
+        .map(|e| {
+            let attrs = e
+                .attributes
+                .iter()
+                .map(|a| match a {
+                    SceneAttr::Decl { key, value } => format!("{key}={value}"),
+                    SceneAttr::Cond { key, op, value } => format!("{key}{}{value}", op.as_str()),
+                    SceneAttr::Flag { key } => key.clone(),
+                })
+                .collect();
+            (e.fn_name.clone(), attrs)
+        })
+        .collect()
+}
+
 #[test]
-fn test_transpile_accumulates_file_attrs() {
-    use pasta_dsl::parser::{Attr, AttrValue};
-
-    let transpiler = LuaTranspiler::default();
-    let file = PastaFile {
-        path: PathBuf::from("test.pasta"),
-        items: vec![
-            FileItem::FileAttr(Attr {
-                key: "author".to_string(),
-                value: AttrValue::AttrString("Alice".to_string()),
-                span: Span::default(),
-            }),
-            // Same key later in document order overwrites (shadowing).
-            FileItem::FileAttr(Attr {
-                key: "author".to_string(),
-                value: AttrValue::AttrString("Bob".to_string()),
-                span: Span::default(),
-            }),
-            FileItem::GlobalSceneScope(create_simple_scene("メイン")),
-        ],
-    };
-    let mut output = Vec::new();
-
-    let context = transpiler.transpile(&file, &mut output).unwrap();
-
-    let attrs = context.file_attrs();
-    assert_eq!(attrs.len(), 1);
-    assert_eq!(
-        attrs.get("author"),
-        Some(&AttrValue::AttrString("Bob".to_string())),
-        "later FileAttr must shadow the earlier one"
+fn test_transpile_file_attr_line_replaces_previous_set() {
+    // 後のファイル属性の行は前の組を捨てる（累積しない・要件 3.2）
+    let got = registered_attrs(
+        "＆author：Alice＆version：1\n＊メイン\n　さくら：やあ\n\n＆author：Bob\n＊メイン\n　さくら：ほい\n",
     );
+    assert_eq!(
+        got,
+        vec![
+            (
+                "メイン_1::__start__".to_string(),
+                vec!["author=Alice".to_string(), "version=1".to_string()]
+            ),
+            (
+                "メイン_2::__start__".to_string(),
+                vec!["author=Bob".to_string()]
+            ),
+        ]
+    );
+}
+
+#[test]
+fn test_transpile_same_declared_name_keeps_attrs_per_declaration() {
+    // 同じ宣言名の 2 つの宣言の属性は混ざらない（要件 1.7）。ローカルは受け継がず宣言行の中だけ畳む（要件 3.8）
+    let got = registered_attrs(
+        "＆f：1\n＊会話＆k：1\n　さくら：やあ\n　・選択＆p：3＆p：4\n　さくら：ほい\n＊会話＆＄＊x≧5\n　さくら：よう\n",
+    );
+    assert_eq!(
+        got,
+        vec![
+            (
+                "会話_1::__start__".to_string(),
+                vec!["f=1".to_string(), "k=1".to_string()]
+            ),
+            ("会話_1::選択_1".to_string(), vec!["p=4".to_string()]),
+            (
+                "会話_2::__start__".to_string(),
+                vec!["f=1".to_string(), "＄＊x>=5".to_string()]
+            ),
+        ]
+    );
+}
+
+#[test]
+fn test_transpile_actor_attrs_are_not_registered() {
+    // アクター辞書の配下の属性はどのシーンにも入らない（要件 5.6）
+    let got = registered_attrs("％さくら\n　＆x：9\n＊会話\n　さくら：やあ\n");
+    assert_eq!(got, vec![("会話_1::__start__".to_string(), vec![])]);
 }
 
 /// A writer that always fails, to exercise the IoError conversion path.

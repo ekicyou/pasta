@@ -56,6 +56,39 @@ pub fn pasta_dll_folders(input: &GhostInput) -> Vec<String> {
     folders
 }
 
+/// 一致テスト用: 登録した各シーンの属性。キーは（グローバルの登録名, ローカルの関数名。グローバル自身は "__start__"）
+#[doc(hidden)]
+pub fn scene_attrs(
+    input: &GhostInput,
+    files: &BTreeMap<String, FileText>,
+) -> BTreeMap<(String, String), Vec<pasta_core::SceneAttr>> {
+    let (config, _) = config::read_config(&input.pasta_toml);
+    let (discovered, _) = discovery::discover(input, &config);
+    let texts: Vec<(String, FileText)> = discovered
+        .pasta
+        .into_iter()
+        .map(|f| {
+            let text = file_text(files, &f.path);
+            (f.path, text)
+        })
+        .collect();
+    let (parsed, _) = syntax::check(&texts);
+    let (scenes, _) = scenes::check(&parsed, &config.aliases);
+    (0..)
+        .map_while(|i| scenes.table.get_scene(pasta_core::SceneId(i)))
+        .map(|s| {
+            let (global, local) = s
+                .fn_name
+                .split_once("::")
+                .expect("シーンの関数名は `グローバル::ローカル` の形");
+            (
+                (global.to_string(), local.to_string()),
+                s.attributes.clone(),
+            )
+        })
+        .collect()
+}
+
 fn discover(input: &GhostInput) -> (discovery::Discovered, Vec<Finding>) {
     let (config, _) = config::read_config(&input.pasta_toml);
     discovery::discover(input, &config)
@@ -126,6 +159,94 @@ fn file_text(files: &BTreeMap<String, FileText>, path: &str) -> FileText {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pasta_core::{CmpOp, SceneAttr, SceneAttrValue};
+
+    fn ghost(dics: &[(&str, &str)]) -> (GhostInput, BTreeMap<String, FileText>) {
+        let input = GhostInput {
+            pasta_toml: TomlSource::Text {
+                text: "[loader]\npasta_patterns = [\"dic/**/*.pasta\"]\n".into(),
+            },
+            entries: dics.iter().map(|(p, _)| p.to_string()).collect(),
+            dirs: vec![],
+        };
+        let files: BTreeMap<_, _> = dics
+            .iter()
+            .map(|(p, t)| {
+                (
+                    p.to_string(),
+                    FileText::Text {
+                        text: t.to_string(),
+                    },
+                )
+            })
+            .collect();
+        (input, files)
+    }
+
+    #[test]
+    fn two_file_attr_lines_are_a_syntax_error() {
+        let (input, files) = ghost(&[("dic/a.pasta", "＆a：1\n＆b：2\n＊雑談\n　Alice：あ\n")]);
+        let report = validate_ghost(&input, &files);
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == FindingKind::Syntax),
+            "{:?}",
+            report.findings
+        );
+    }
+
+    #[test]
+    fn scene_attrs_hook_returns_inherited_and_folded_attrs_per_scene() {
+        let (input, files) = ghost(&[
+            (
+                "dic/a.pasta",
+                "＆背景：教室＆＄＊初回\n＊雑談＆背景：屋上＆＄＊経験値≧500\n　Alice：やあ\n　・選択肢＆優先：1＆優先：3＆＄x\n　Alice：ほい\n＊＆重み：5\n　Alice：よう\n",
+            ),
+            ("dic/b.pasta", "＊別\n　Alice：あ\n"),
+        ]);
+
+        let decl = |k: &str, v: SceneAttrValue| SceneAttr::Decl {
+            key: k.into(),
+            value: v,
+        };
+        let flag = |k: &str| SceneAttr::Flag { key: k.into() };
+        let key = |g: &str, l: &str| (g.to_string(), l.to_string());
+        let expected: BTreeMap<_, _> = [
+            (
+                key("雑談_1", "__start__"),
+                vec![
+                    decl("背景", SceneAttrValue::String("屋上".into())),
+                    flag("＄＊初回"),
+                    SceneAttr::Cond {
+                        key: "＄＊経験値".into(),
+                        op: CmpOp::Ge,
+                        value: SceneAttrValue::Integer(500),
+                    },
+                ],
+            ),
+            // ローカルはファイル属性も親の属性も受け継がず、宣言行の中だけ畳む
+            (
+                key("雑談_1", "選択肢_1"),
+                vec![decl("優先", SceneAttrValue::Integer(3)), flag("＄x")],
+            ),
+            // 名前なしの `＊` は名前だけ受け継ぎ、属性はファイル属性から
+            (
+                key("雑談_2", "__start__"),
+                vec![
+                    decl("背景", SceneAttrValue::String("教室".into())),
+                    flag("＄＊初回"),
+                    decl("重み", SceneAttrValue::Integer(5)),
+                ],
+            ),
+            // ファイル属性はファイルをまたがない
+            (key("別_1", "__start__"), vec![]),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(scene_attrs(&input, &files), expected);
+    }
 
     #[test]
     fn file_not_passed_is_unreadable_not_loaded() {

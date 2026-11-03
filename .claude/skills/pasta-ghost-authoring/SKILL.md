@@ -74,7 +74,7 @@ metadata:
 | 変数             | `＄`   | `$`  | 変数代入・参照                       | `＄count＝1` / `＄％prop＝「値」`                                         | [variables.md](references/variables.md)                             |
 | 代入             | `＝`   | `=`  | 変数代入の区切り（`：` では代入不可） | `＄count＝1`                                                              | [variables.md](references/variables.md#変数の種類とスコープ)         |
 | Call             | `＞`   | `>`  | シーン呼び出し                       | `＞次の会話`                                                              | [call-jump.md](references/call-jump.md)                             |
-| 属性             | `＆`   | `&`  | メタデータ（処理には反映されない）。式の中では連結演算子 | `＆author：Alice`                                                         | [block-structure.md](references/block-structure.md#属性)・[markers.md](references/markers.md#属性マーカーと連結演算子) |
+| 属性             | `＆`   | `&`  | シーンの属性（書いた順に記録・`SCENE.attrs` で読める）。式の中では連結演算子 | `＆author：Alice`                                                         | [block-structure.md](references/block-structure.md#属性)・[markers.md](references/markers.md#属性マーカーと連結演算子) |
 | コメント         | `＃`   | `#`  | コメント行                           | `＃ メモ`                                                                 | [block-structure.md](references/block-structure.md#コメント)         |
 | アクター辞書     | `％`   | `%`  | アクター辞書定義・アクター指定行     | `％さくら`                                                                | [actor-dictionary.md](references/actor-dictionary.md)               |
 | キューコマンド   | `！`   | `!`  | 演出指示（`select` だけが有効）      | `！select(30)`                                                            | [block-structure.md](references/block-structure.md#キューコマンド行) |
@@ -281,8 +281,9 @@ end
 ### 3.9 Comments & Attributes（コメント・属性）
 
 - **コメント**: `＃` または `#` で始まる行。処理されない。インデントあり・なし両方可。アクション行・継続行の行末に書いた `＃` はコメントにならず台詞として出力される（行末コメントを書ける行は [block-structure.md](references/block-structure.md#コメント) を参照）
-- **属性**: `＆key：value` 形式のメタデータ。構文は受理されるが、シーンの選択・出力には反映されない
-- 属性行を置けるのは、グローバルシーンの初期部（宣言直後、アクション行などより前）・ファイルレベル・アクター辞書の配下。ローカルシーンには宣言行への付記（`・名前＆key：value`）としてだけ書ける
+- **属性**: `＆key：value` 形式。書いた順に記録され、Lua の `SCENE.attrs` で読める（シーンの選択・出力はまだ変えない）。条件 `＆＄変数≧値` とフラグ `＆＄変数` も書ける
+- 属性行を置けるのは、グローバルシーンの初期部（宣言直後、アクション行などより前）・ファイルレベル・アクター辞書の配下。宣言行（`＊名前＆key：value`・`＊＆key：value`・`・名前＆key：value`）にも付記できる。ローカルシーンは宣言行への付記だけ
+- ファイル属性は 1 行にまとめる（2 行続けるとパースエラー）。後の行は前の組を丸ごと置き換える。詳細は [block-structure.md](references/block-structure.md#属性)
 - アクション行や変数代入行の後に属性行は置けない
 
 ```pasta

@@ -4,6 +4,7 @@
 //! (each item is registered and then its code is generated), and rebuilt at
 //! runtime by `finalize_scene` from the Lua-side scene collection.
 
+use super::scene_types::SceneAttr;
 use std::collections::HashMap;
 
 /// A single scene entry (individual scene definition).
@@ -16,8 +17,8 @@ pub struct SceneEntry {
     pub name: String,
 
     /// Attributes associated with this scene (used by SceneTable attribute filters;
-    /// always empty when rebuilt by the runtime finalize).
-    pub attributes: HashMap<String, String>,
+    /// the runtime finalize carries them over from the Lua store).
+    pub attributes: Vec<SceneAttr>,
 
     /// Scene function name in `global::local` form (e.g., "会話_1::__start__").
     pub fn_name: String,
@@ -63,11 +64,7 @@ impl SceneRegistry {
     /// # Returns
     ///
     /// The assigned ID and counter for this scene.
-    pub fn register_global(
-        &mut self,
-        name: &str,
-        attributes: HashMap<String, String>,
-    ) -> (i64, usize) {
+    pub fn register_global(&mut self, name: &str, attributes: Vec<SceneAttr>) -> (i64, usize) {
         let counter = self.increment_counter(name);
         let id = (self.scenes.len() + 1) as i64;
 
@@ -104,7 +101,7 @@ impl SceneRegistry {
         parent_name: &str,
         parent_counter: usize,
         local_counter: usize,
-        attributes: HashMap<String, String>,
+        attributes: Vec<SceneAttr>,
     ) -> i64 {
         let id = (self.scenes.len() + 1) as i64;
 
@@ -138,8 +135,9 @@ impl SceneRegistry {
     /// # Arguments
     ///
     /// * `full_name` - Full scene name with counter (e.g., "OnBoot_1")
-    /// * `local_names` - List of local function names (e.g., ["__start__", "選択肢_1"])
-    /// * `attributes` - Attributes for filtering (applied to the global and its locals)
+    /// * `locals` - (local function name, its attributes) pairs (e.g., `("選択肢_1", vec![])`);
+    ///   `__start__` is skipped. The parent's attributes are not copied onto locals.
+    /// * `attributes` - Attributes of the global scene (its `__start__`)
     ///
     /// # Returns
     ///
@@ -147,8 +145,8 @@ impl SceneRegistry {
     pub fn register_global_raw(
         &mut self,
         full_name: &str,
-        local_names: &[String],
-        attributes: HashMap<String, String>,
+        locals: &[(String, Vec<SceneAttr>)],
+        attributes: Vec<SceneAttr>,
     ) -> i64 {
         let id = (self.scenes.len() + 1) as i64;
 
@@ -158,7 +156,7 @@ impl SceneRegistry {
         let entry = SceneEntry {
             id,
             name: full_name.to_string(),
-            attributes: attributes.clone(),
+            attributes,
             fn_name,
             parent: None,
         };
@@ -167,7 +165,7 @@ impl SceneRegistry {
         let global_id = id;
 
         // Register local scenes (excluding __start__)
-        for local_name in local_names.iter() {
+        for (local_name, local_attrs) in locals {
             if local_name != "__start__" {
                 let local_id = (self.scenes.len() + 1) as i64;
                 let local_fn_name = format!("{}::{}", full_name, local_name);
@@ -175,7 +173,7 @@ impl SceneRegistry {
                 let local_entry = SceneEntry {
                     id: local_id,
                     name: local_name.clone(),
-                    attributes: attributes.clone(),
+                    attributes: local_attrs.clone(),
                     fn_name: local_fn_name,
                     parent: Some(full_name.to_string()),
                 };
@@ -258,12 +256,13 @@ impl Default for SceneRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::registry::scene_types::SceneAttrValue;
 
     #[test]
     fn test_register_global_label() {
         let mut registry = SceneRegistry::new();
 
-        let (id1, counter1) = registry.register_global("会話", HashMap::new());
+        let (id1, counter1) = registry.register_global("会話", Vec::new());
         assert_eq!(id1, 1);
         assert_eq!(counter1, 1);
 
@@ -277,8 +276,8 @@ mod tests {
     fn test_register_multiple_global_labels() {
         let mut registry = SceneRegistry::new();
 
-        let (id1, _) = registry.register_global("会話", HashMap::new());
-        let (id2, _) = registry.register_global("別会話", HashMap::new());
+        let (id1, _) = registry.register_global("会話", Vec::new());
+        let (id2, _) = registry.register_global("別会話", Vec::new());
 
         assert_eq!(id1, 1);
         assert_eq!(id2, 2);
@@ -293,8 +292,8 @@ mod tests {
     fn test_register_duplicate_global_labels() {
         let mut registry = SceneRegistry::new();
 
-        let (id1, counter1) = registry.register_global("会話", HashMap::new());
-        let (id2, counter2) = registry.register_global("会話", HashMap::new());
+        let (id1, counter1) = registry.register_global("会話", Vec::new());
+        let (id2, counter2) = registry.register_global("会話", Vec::new());
 
         assert_eq!(id1, 1);
         assert_eq!(counter1, 1);
@@ -313,10 +312,10 @@ mod tests {
         let mut registry = SceneRegistry::new();
 
         // Register parent first
-        let (parent_id, parent_counter) = registry.register_global("会話", HashMap::new());
+        let (parent_id, parent_counter) = registry.register_global("会話", Vec::new());
 
         // Register local scene
-        let local_id = registry.register_local("選択肢", "会話", parent_counter, 1, HashMap::new());
+        let local_id = registry.register_local("選択肢", "会話", parent_counter, 1, Vec::new());
 
         assert_eq!(parent_id, 1);
         assert_eq!(local_id, 2);
@@ -387,7 +386,7 @@ mod tests {
         let mut registry = SceneRegistry::new();
 
         // full_name already contains the counter; no auto-increment
-        let id = registry.register_global_raw("OnBoot_1", &[], HashMap::new());
+        let id = registry.register_global_raw("OnBoot_1", &[], Vec::new());
         assert_eq!(id, 1);
 
         let scene = registry.all_scenes()[id as usize - 1];
@@ -400,8 +399,11 @@ mod tests {
     fn test_register_global_raw_with_locals_excludes_start() {
         let mut registry = SceneRegistry::new();
 
-        let locals = vec!["__start__".to_string(), "__選択肢_1__".to_string()];
-        let global_id = registry.register_global_raw("会話_1", &locals, HashMap::new());
+        let locals = vec![
+            ("__start__".to_string(), Vec::new()),
+            ("__選択肢_1__".to_string(), Vec::new()),
+        ];
+        let global_id = registry.register_global_raw("会話_1", &locals, Vec::new());
 
         // Returns the GLOBAL scene's ID
         assert_eq!(global_id, 1);
@@ -417,23 +419,27 @@ mod tests {
     }
 
     #[test]
-    fn test_register_global_raw_propagates_attributes_to_locals() {
+    fn test_register_global_raw_does_not_copy_parent_attributes_to_locals() {
         let mut registry = SceneRegistry::new();
 
-        let mut attrs = HashMap::new();
-        attrs.insert("季節".to_string(), "春".to_string());
-        let locals = vec!["item_1".to_string()];
-        registry.register_global_raw("Scene1", &locals, attrs);
+        let attrs = vec![SceneAttr::Decl {
+            key: "季節".to_string(),
+            value: SceneAttrValue::String("春".to_string()),
+        }];
+        let local_attrs = vec![SceneAttr::Flag {
+            key: "済み".to_string(),
+        }];
+        let locals = vec![
+            ("item_1".to_string(), Vec::new()),
+            ("item_2".to_string(), local_attrs.clone()),
+        ];
+        registry.register_global_raw("Scene1", &locals, attrs.clone());
 
-        // Both global and local scenes carry the same attributes
-        assert_eq!(
-            registry.all_scenes()[0].attributes.get("季節"),
-            Some(&"春".to_string())
-        );
-        assert_eq!(
-            registry.all_scenes()[1].attributes.get("季節"),
-            Some(&"春".to_string())
-        );
+        // The global keeps its own; each local carries only what it was given (3.8)
+        let scenes = registry.all_scenes();
+        assert_eq!(scenes[0].attributes, attrs);
+        assert_eq!(scenes[1].attributes, Vec::new());
+        assert_eq!(scenes[2].attributes, local_attrs);
     }
 
     #[test]
@@ -441,19 +447,18 @@ mod tests {
         let mut registry = SceneRegistry::new();
 
         // raw registration must not consume a counter for "会話"
-        registry.register_global_raw("会話_1", &[], HashMap::new());
+        registry.register_global_raw("会話_1", &[], Vec::new());
 
         // counter-based registration still starts at 1
-        let (_, counter) = registry.register_global("会話", HashMap::new());
+        let (_, counter) = registry.register_global("会話", Vec::new());
         assert_eq!(counter, 1);
     }
 
     #[test]
     fn test_register_local_sanitizes_names() {
         let mut registry = SceneRegistry::new();
-        let (_, counter) = registry.register_global("親-シーン", HashMap::new());
-        let local_id =
-            registry.register_local("子-シーン", "親-シーン", counter, 1, HashMap::new());
+        let (_, counter) = registry.register_global("親-シーン", Vec::new());
+        let local_id = registry.register_local("子-シーン", "親-シーン", counter, 1, Vec::new());
 
         let local = registry.all_scenes()[local_id as usize - 1];
         // Both parent and child names are sanitized in fn_name; original name preserved

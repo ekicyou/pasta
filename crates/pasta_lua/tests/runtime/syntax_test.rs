@@ -70,49 +70,61 @@ fn test_comment_line_explicit_parse() {
 
 /// Test attribute inheritance from file scope to scenes (Task 3.2)
 ///
-/// Verifies:
-/// - File-level attributes are inherited by scenes
-/// - Scene attributes override file attributes
+/// Verifies (scene-attribute-store 3.1・3.5・6.5):
+/// - File-level attributes are inherited by scenes, in written order
+/// - A scene attribute with the same name keeps the file position and takes the scene value
+/// - Inside a scene function, `act.current_scene.__global_name__` reads the running scene's attrs
 #[test]
 fn test_attribute_inheritance() {
     let source = r#"
-＆天気：晴れ
-＆場所：公園
+＆場所：公園＆天気：晴れ
+
+％さくら
+  ＠通常：\s[0]
 
 ＊メイン
   ＆場所：学校
-  さくら：「今日は＄天気です」
+  さくら：属性＝＠属性一覧（）。
+
+```lua
+function SCENE.属性一覧(act)
+    local items = require("pasta.scene").attrs(act.current_scene.__global_name__, nil)
+    local parts = {}
+    for _, item in ipairs(items) do
+        parts[#parts + 1] = item.key .. "=" .. tostring(item.value)
+    end
+    return table.concat(parts, "|")
+end
+```
 "#;
 
-    let lua_code = transpile(source);
+    let out = fire_scenes(source, &["メイン"]).remove(0);
+    assert!(
+        out.contains("属性＝場所=学校|天気=晴れ。"),
+        "running scene must read file attrs overlapped by scene attrs: {out}"
+    );
 
-    // File attributes should be merged into scene
-    // The transpiled code should reference both inherited and overridden attrs
-    assert!(lua_code.contains("create_scene"), "Should create scene");
-
-    // Verify the transpiled code compiles and runs
+    // The search result's registered name reads the same items.
     let lua = create_runtime_with_finalize().unwrap();
-    lua.load(&lua_code).exec().unwrap();
+    lua.load(transpile(source)).exec().unwrap();
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
-
-    // Scene should be searchable
-    let found: bool = lua
+    let joined: String = lua
         .load(
             r#"
         local SEARCH = require "@pasta_search"
         local name, _ = SEARCH:search_scene("メイン", nil)
-        return name ~= nil
+        local parts = {}
+        for _, item in ipairs(require("pasta.scene").attrs(name, nil)) do
+            parts[#parts + 1] = item.key .. "=" .. tostring(item.value)
+        end
+        return table.concat(parts, "|")
     "#,
         )
         .eval()
         .unwrap();
-
-    assert!(
-        found,
-        "Scene with inherited attributes should be searchable"
-    );
+    assert_eq!(joined, "場所=学校|天気=晴れ");
 }
 
 // ============================================================================

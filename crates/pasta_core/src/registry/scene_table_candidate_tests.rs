@@ -13,7 +13,7 @@ pub(super) fn create_test_scene_info(id: usize, name: &str, fn_name: &str) -> Sc
         id: SceneId(id),
         name: name.to_string(),
         scope: SceneScope::Global,
-        attributes: HashMap::new(),
+        attributes: Vec::new(),
         fn_name: fn_name.to_string(),
         parent: None,
     }
@@ -43,7 +43,7 @@ fn create_test_local_scene_info(id: usize, name: &str, fn_name: &str, parent: &s
         id: SceneId(id),
         name: name.to_string(),
         scope: SceneScope::Local,
-        attributes: HashMap::new(),
+        attributes: Vec::new(),
         fn_name: fn_name.to_string(),
         parent: Some(parent.to_string()),
     }
@@ -287,8 +287,8 @@ fn test_from_scene_registry_key_conversion() {
 
     // Create a registry with global and local scenes
     let mut registry = SceneRegistry::new();
-    let (_, counter) = registry.register_global("会話", HashMap::new());
-    registry.register_local("選択肢", "会話", counter, 1, HashMap::new());
+    let (_, counter) = registry.register_global("会話", Vec::new());
+    registry.register_local("選択肢", "会話", counter, 1, Vec::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let table = SceneTable::from_scene_registry(registry, selector);
@@ -318,8 +318,8 @@ fn test_resolve_scene_id_unified_local_scene() {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    let (_, counter) = registry.register_global("会話", HashMap::new());
-    registry.register_local("選択肢", "会話", counter, 1, HashMap::new());
+    let (_, counter) = registry.register_global("会話", Vec::new());
+    registry.register_local("選択肢", "会話", counter, 1, Vec::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
@@ -337,7 +337,7 @@ fn test_resolve_scene_id_unified_global_scene() {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    registry.register_global("挨拶", HashMap::new());
+    registry.register_global("挨拶", Vec::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
@@ -352,7 +352,7 @@ fn test_resolve_scene_id_unified_global_scene_no_fallback() {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    registry.register_global("挨拶", HashMap::new());
+    registry.register_global("挨拶", Vec::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
@@ -368,10 +368,10 @@ fn test_resolve_scene_id_unified_local_found() {
 
     let mut registry = SceneRegistry::new();
     // Global scene "挨拶" (should not be found when searching from module)
-    registry.register_global("挨拶", HashMap::new());
+    registry.register_global("挨拶", Vec::new());
     // Local scene "挨拶" in module 会話_1
-    let (_, counter) = registry.register_global("会話", HashMap::new());
-    registry.register_local("挨拶", "会話", counter, 1, HashMap::new());
+    let (_, counter) = registry.register_global("会話", Vec::new());
+    registry.register_local("挨拶", "会話", counter, 1, Vec::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
@@ -539,9 +539,9 @@ fn test_resolve_scene_id_unified_cycling() {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    let (_, counter) = registry.register_global("会話", HashMap::new());
-    registry.register_local("選択肢A", "会話", counter, 1, HashMap::new());
-    registry.register_local("選択肢B", "会話", counter, 2, HashMap::new());
+    let (_, counter) = registry.register_global("会話", Vec::new());
+    registry.register_local("選択肢A", "会話", counter, 1, Vec::new());
+    registry.register_local("選択肢B", "会話", counter, 2, Vec::new());
 
     let selector = Box::new(MockRandomSelector::new(vec![]));
     let mut table = SceneTable::from_scene_registry(registry, selector);
@@ -593,9 +593,9 @@ fn test_search_key_a1_does_not_match_eleventh_a() {
 
     let mut registry = SceneRegistry::new();
     for _ in 0..11 {
-        registry.register_global("A", HashMap::new());
+        registry.register_global("A", Vec::new());
     }
-    registry.register_global("A1", HashMap::new());
+    registry.register_global("A1", Vec::new());
     let table = table_from(registry);
 
     assert_eq!(
@@ -610,9 +610,9 @@ fn test_search_key_underscore_digit_name_does_not_match_counter() {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    registry.register_global("章", HashMap::new());
-    registry.register_global("章", HashMap::new());
-    registry.register_global("章_1", HashMap::new());
+    registry.register_global("章", Vec::new());
+    registry.register_global("章", Vec::new());
+    registry.register_global("章_1", Vec::new());
     let table = table_from(registry);
 
     assert_eq!(
@@ -627,11 +627,11 @@ fn test_search_key_local_underscore_digit_name_does_not_match_counter() {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    let (_, counter) = registry.register_global("会話", HashMap::new());
+    let (_, counter) = registry.register_global("会話", Vec::new());
     for i in 1..=10 {
-        registry.register_local("挨拶", "会話", counter, i, HashMap::new());
+        registry.register_local("挨拶", "会話", counter, i, Vec::new());
     }
-    registry.register_local("挨拶_1", "会話", counter, 1, HashMap::new());
+    registry.register_local("挨拶_1", "会話", counter, 1, Vec::new());
     let table = table_from(registry);
 
     assert_eq!(
@@ -648,8 +648,8 @@ fn test_search_key_registered_name_is_treated_as_name() {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    registry.register_global("メイン", HashMap::new());
-    registry.register_global("メイン", HashMap::new());
+    registry.register_global("メイン", Vec::new());
+    registry.register_global("メイン", Vec::new());
     let table = table_from(registry);
 
     assert!(candidate_fn_names(&table, "", "メイン_1").is_empty());
@@ -721,19 +721,19 @@ fn candidate_order_table(sequence: Vec<usize>) -> SceneTable {
     use crate::registry::SceneRegistry;
 
     let mut registry = SceneRegistry::new();
-    registry.register_global("挨拶_夜", HashMap::new());
-    registry.register_global("挨拶", HashMap::new());
-    registry.register_global("挨拶A", HashMap::new());
-    registry.register_global("挨拶", HashMap::new());
-    registry.register_global("挨拶1", HashMap::new());
-    registry.register_global("挨拶あ", HashMap::new());
-    let (_, counter) = registry.register_global("会話", HashMap::new());
-    registry.register_global("Zebra", HashMap::new());
-    registry.register_global("雑談", HashMap::new());
-    registry.register_local("挨拶_夜", "会話", counter, 1, HashMap::new());
-    registry.register_local("挨拶", "会話", counter, 1, HashMap::new());
-    registry.register_local("挨拶", "会話", counter, 2, HashMap::new());
-    registry.register_local("挨拶A", "会話", counter, 1, HashMap::new());
+    registry.register_global("挨拶_夜", Vec::new());
+    registry.register_global("挨拶", Vec::new());
+    registry.register_global("挨拶A", Vec::new());
+    registry.register_global("挨拶", Vec::new());
+    registry.register_global("挨拶1", Vec::new());
+    registry.register_global("挨拶あ", Vec::new());
+    let (_, counter) = registry.register_global("会話", Vec::new());
+    registry.register_global("Zebra", Vec::new());
+    registry.register_global("雑談", Vec::new());
+    registry.register_local("挨拶_夜", "会話", counter, 1, Vec::new());
+    registry.register_local("挨拶", "会話", counter, 1, Vec::new());
+    registry.register_local("挨拶", "会話", counter, 2, Vec::new());
+    registry.register_local("挨拶A", "会話", counter, 1, Vec::new());
 
     SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(sequence)))
 }

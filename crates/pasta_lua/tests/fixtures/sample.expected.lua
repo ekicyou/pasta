@@ -18,7 +18,7 @@ end
 
 PASTA.create_word("挨拶"):entry("こんにちは", "やあ", "ハロー")
 do
-    local SCENE = PASTA.create_scene("メイン")
+    local SCENE = PASTA.create_scene("メイン"); PASTA.set_scene_attrs(SCENE, "__start__", { { key = "天気", value = "晴れ" } })
 
     SCENE:create_word("場所"):entry("東京", "大阪", "京都")
     SCENE:create_word("天気"):entry("晴れ", "曇り", "雨")
@@ -134,7 +134,7 @@ do
 end
 
 do
-    local SCENE = PASTA.create_scene("会話分岐")
+    local SCENE = PASTA.create_scene("会話分岐"); PASTA.set_scene_attrs(SCENE, "__start__", { { key = "天気", value = "晴れ" } })
 
     function SCENE.__start__(act, ...)
         local args = { ... }

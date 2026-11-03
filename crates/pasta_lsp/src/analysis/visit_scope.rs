@@ -32,6 +32,7 @@ impl super::AnalysisEngine {
             // NOT the entire scope. Otherwise it overshadows child tokens.
             Self::visit_decl_line(&scene.span, source, token_type::NAMESPACE, tokens);
         }
+        // 宣言行の属性も構文木の位置で着色する（visit_decl_line は属性を出さない）
         for attr in &scene.attrs {
             Self::visit_attr(attr, source, tokens);
         }
@@ -89,7 +90,17 @@ impl super::AnalysisEngine {
 
     fn visit_attr(attr: &Attr, source: &str, tokens: &mut Vec<RawToken>) {
         if attr.span.is_valid() {
-            Self::add_token_from_span(&attr.span, source, token_type::DECORATOR, 0, tokens);
+            // 文法の attr は後ろの空白まで含むので、色は空白の手前まで
+            let end_byte = source
+                .get(attr.span.start_byte..attr.span.end_byte)
+                .map_or(attr.span.end_byte, |t| {
+                    attr.span.start_byte + t.trim_end().len()
+                });
+            let span = Span {
+                end_byte,
+                ..attr.span
+            };
+            Self::add_token_from_span(&span, source, token_type::DECORATOR, 0, tokens);
             // 次の属性が続く間は `＆` が来るので、出るのは行の最後の属性の後ろだけ
             push_trailing_comment(source, attr.span.start_line, attr.span.end_byte, tokens);
         }
@@ -215,8 +226,9 @@ impl super::AnalysisEngine {
         });
     }
 
-    /// 宣言の行（`＊名前`・`＊`・`　・名前`・`％名前`）の、印と名前・属性ごと・行末の
-    /// コメントのトークンを出す。印は span の始まりから字下げを飛ばした所。
+    /// 宣言の行（`＊名前`・`＊`・`　・名前`・`％名前`）の、印と名前と、名前の直後の行末の
+    /// コメントのトークンを出す。印は span の始まりから字下げを飛ばした所。属性は出さない
+    /// （`visit_attr` が構文木の位置で出し、最後の属性の後ろのコメントもそちらが出す）。
     fn visit_decl_line(span: &Span, source: &str, marker_type: u32, tokens: &mut Vec<RawToken>) {
         let line = span.start_line;
         let line_text = get_line_text(source, line);
@@ -229,62 +241,25 @@ impl super::AnalysisEngine {
         if marker_start >= line_text.len() {
             return;
         }
-        let parts = scan_decl_line(line_text, marker_start);
-        let mut push = |range: std::ops::Range<usize>, token_type: u32| {
-            let start_char = utf8_offset_to_utf16(line_text, range.start);
-            tokens.push(RawToken {
-                line: (line - 1) as u32,
-                start_char,
-                length: utf8_offset_to_utf16(line_text, range.end) - start_char,
-                token_type,
-                modifiers: 0,
-            });
-        };
-        push(marker_start..parts.name_end, marker_type);
-        for attr in &parts.attrs {
-            push(attr.clone(), token_type::DECORATOR);
-        }
-        let body_end = parts.attrs.last().map_or(parts.name_end, |a| a.end);
-        push_trailing_comment(source, line, line_start + body_end, tokens);
+        let name_end = decl_name_end(line_text, marker_start);
+        let start_char = utf8_offset_to_utf16(line_text, marker_start);
+        tokens.push(RawToken {
+            line: (line - 1) as u32,
+            start_char,
+            length: utf8_offset_to_utf16(line_text, name_end) - start_char,
+            token_type: marker_type,
+            modifiers: 0,
+        });
+        // 属性が続くなら後ろは `＆` なので、ここでは何も出ない
+        push_trailing_comment(source, line, line_start + name_end, tokens);
     }
 }
 
-/// 宣言の行の、印と名前の終わりと、属性ごとの範囲（どれも行の中のバイト）
-struct DeclParts {
-    name_end: usize,
-    attrs: Vec<std::ops::Range<usize>>,
-}
-
-/// 解けた宣言の行を文法の `印 ~ id? ~ s ~ attrs? ~ or_comment_eol` どおりに読む。
-/// 名前は印の直後から空白・`＆`・`＃` の手前まで。属性は `＆ id s ： s 値`（値が
-/// `「`・`"` で始まるときだけ引用、ほかは `：`・`＆`・`＃`・空白の手前まで）。
-fn scan_decl_line(line_text: &str, marker_start: usize) -> DeclParts {
-    let is_attr = |c: char| matches!(c, '＆' | '&');
-    let is_hash = |c: char| matches!(c, '＃' | '#');
-    let is_kv = |c: char| matches!(c, '：' | ':');
+/// 宣言の行の印と名前の終わり（行の中のバイト）。文法の `印 ~ id?` どおり、名前は
+/// 印の直後から空白・`＆`・`＃` の手前まで。
+fn decl_name_end(line_text: &str, marker_start: usize) -> usize {
     let after_marker = marker_start + char_len_at(line_text, marker_start);
-    let name_end = line_text[after_marker..]
-        .find(|c: char| c.is_whitespace() || is_attr(c) || is_hash(c))
-        .map_or(line_text.len(), |p| after_marker + p);
-    let skip_ws = |i: usize| line_text.len() - line_text[i..].trim_start().len();
-    let mut attrs = Vec::new();
-    let mut i = skip_ws(name_end);
-    while line_text[i..].starts_with(is_attr) {
-        let start = i;
-        // id ~ s ~ kv_marker ~ s（id に `：` は入らない）
-        let Some(p) = line_text[i..].find(is_kv) else {
-            break;
-        };
-        i = skip_ws(i + p + char_len_at(line_text, i + p));
-        i = if line_text[i..].starts_with(['「', '"']) {
-            string_literal_end(line_text, i)
-        } else {
-            line_text[i..]
-                .find(|c: char| c.is_whitespace() || is_kv(c) || is_attr(c) || is_hash(c))
-                .map_or(line_text.len(), |p| i + p)
-        };
-        attrs.push(start..i);
-        i = skip_ws(i);
-    }
-    DeclParts { name_end, attrs }
+    line_text[after_marker..]
+        .find(|c: char| c.is_whitespace() || matches!(c, '＆' | '&' | '＃' | '#'))
+        .map_or(line_text.len(), |p| after_marker + p)
 }

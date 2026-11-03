@@ -286,115 +286,78 @@ fn test_file_item_order_preserved() {
     );
 }
 
-/// MAJOR-4: ファイル属性シャドーイングの検証
-/// 同じキーの属性が再出現すると後勝ちで上書きされることを確認
+/// 登録された各グローバルシーンの宣言の属性 (key, 値の字句) を登録順に返す
+fn global_decl_attrs(source: &str) -> Vec<Vec<(String, String)>> {
+    use pasta_core::registry::SceneAttr;
+
+    let file = parse_str(source, "test.pasta").unwrap();
+    let context = LuaTranspiler::default()
+        .transpile(&file, &mut Vec::new())
+        .unwrap();
+    context
+        .scene_registry
+        .all_scenes()
+        .into_iter()
+        .filter(|e| e.parent.is_none())
+        .map(|e| {
+            e.attributes
+                .iter()
+                .filter_map(|a| match a {
+                    SceneAttr::Decl { key, value } => Some((key.clone(), value.to_string())),
+                    _ => None,
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// ファイル属性の行は後の行で丸ごと置き換わる（累積しない・要件 3.2）。
+/// 同じ行の中の同じ名前は後勝ちで 1 つに畳まれる
 #[test]
-fn test_file_attr_shadowing() {
-    use pasta_dsl::parser::{Attr, AttrValue, FileItem, PastaFile, Span};
-    use std::path::PathBuf;
-
-    // 手動でPastaFileを構築（FileAttrを含む）
-    let attr1 = FileItem::FileAttr(Attr {
-        key: "author".to_string(),
-        value: AttrValue::AttrString("Alice".to_string()),
-        span: Span::default(),
-    });
-    let attr2 = FileItem::FileAttr(Attr {
-        key: "author".to_string(),
-        value: AttrValue::AttrString("Bob".to_string()), // シャドーイング
-        span: Span::default(),
-    });
-
-    // 正しいPasta構文でシーンをパース
-    let scene_pasta = r#"
+fn test_file_attr_replaced_by_later_line() {
+    let source = r#"
+＆author：Alice＆author：Bob＆version：1
 ＊テスト
 　　さくら：こんにちは。
+
+＆title：二
+＊テスト
+　　さくら：こんばんは。
 "#;
-    let scene = parse_str(scene_pasta, "test.pasta")
-        .unwrap()
-        .items
-        .into_iter()
-        .next()
-        .unwrap();
-
-    let file = PastaFile {
-        path: PathBuf::from("test.pasta"),
-        items: vec![attr1, attr2, scene],
-    };
-
-    let transpiler = LuaTranspiler::default();
-    let mut output = Vec::new();
-    let context = transpiler.transpile(&file, &mut output).unwrap();
-
-    // file_attrs()でシャドーイングを確認
-    let attrs = context.file_attrs();
-    assert_eq!(attrs.len(), 1, "シャドーイングにより1つのキーのみ");
+    let s = |k: &str, v: &str| (k.to_string(), v.to_string());
     assert_eq!(
-        attrs.get("author"),
-        Some(&AttrValue::AttrString("Bob".to_string())),
-        "後勝ちでBobになるべき"
+        global_decl_attrs(source),
+        vec![
+            vec![s("author", "Bob"), s("version", "1")],
+            vec![s("title", "二")],
+        ],
+        "後の行は前の組を捨てる"
     );
 }
 
-/// MAJOR-4: アクターがファイル属性を継承しないことの検証
+/// MAJOR-4: アクター辞書を挟んでもファイル属性はシーンへ受け継がれ、
+/// アクター辞書の配下の属性はどのシーンにも入らない（要件 5.6）
 #[test]
 fn test_actor_does_not_inherit_file_attrs() {
-    use pasta_dsl::parser::{Attr, AttrValue, FileItem, PastaFile, Span};
-    use std::path::PathBuf;
-
-    // ファイル属性 → アクター → シーン の順序
-    let file_attr = FileItem::FileAttr(Attr {
-        key: "author".to_string(),
-        value: AttrValue::AttrString("Alice".to_string()),
-        span: Span::default(),
-    });
-
-    // アクターを含むPastaファイルをパース（表情定義なしでシンプルに）
-    let actor_pasta = r#"
+    let source = r#"
+＆author：Alice
 ％さくら
-"#;
-    let actor = parse_str(actor_pasta, "test.pasta")
-        .unwrap()
-        .items
-        .into_iter()
-        .next()
-        .unwrap();
-
-    let scene_pasta = r#"
+　＆mood：happy
 ＊メイン
 　　さくら：こんにちは。
 "#;
-    let scene = parse_str(scene_pasta, "test.pasta")
-        .unwrap()
-        .items
-        .into_iter()
-        .next()
-        .unwrap();
+    assert_eq!(
+        global_decl_attrs(source),
+        vec![vec![("author".to_string(), "Alice".to_string())]]
+    );
 
-    let file = PastaFile {
-        path: PathBuf::from("test.pasta"),
-        items: vec![file_attr, actor, scene],
-    };
-
-    let transpiler = LuaTranspiler::default();
+    let file = parse_str(source, "test.pasta").unwrap();
     let mut output = Vec::new();
-    let context = transpiler.transpile(&file, &mut output).unwrap();
-
-    // ファイル属性はコンテキストに累積されている
-    let attrs = context.file_attrs();
-    assert_eq!(attrs.len(), 1);
-
-    // 生成されたLuaコードにはアクター定義が含まれる
+    LuaTranspiler::default()
+        .transpile(&file, &mut output)
+        .unwrap();
     let lua_code = String::from_utf8(output).unwrap();
     assert!(lua_code.contains("create_actor(\"さくら\")"));
-
-    // アクターはファイル属性の影響を受けないことを確認
-    // （アクター内にauthor属性が出現しないこと）
-    // Luaコード生成時にアクターは独立して処理される
-    assert!(
-        !lua_code.contains("author = ") || !lua_code.contains("ACTOR.author"),
-        "アクターはファイル属性を継承しない"
-    );
 }
 
 /// MAJOR-4: グローバル単語がFileItem出現順に登録されることの検証

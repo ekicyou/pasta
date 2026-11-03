@@ -4,7 +4,7 @@
 //! Pasta AST to Lua code.
 
 use pasta_core::registry::SceneRegistry;
-use pasta_dsl::parser::{ActorScope, FileItem, GlobalSceneScope, KeyWords, PastaFile};
+use pasta_dsl::parser::{ActorScope, Attr, FileItem, GlobalSceneScope, KeyWords, PastaFile};
 
 use super::code_gen::source_map::SourceMapSink;
 use super::code_gen::{LineMapSlot, LuaCodeGenerator};
@@ -40,8 +40,8 @@ impl LuaTranspiler {
 
     /// Transpile PastaFile to Lua code (MAJOR-2).
     ///
-    /// Processes FileItems in document order, accumulating file attributes
-    /// and generating code for actors and scenes.
+    /// Processes FileItems in document order, registering each global scene
+    /// with its inherited attributes and generating code for actors and scenes.
     ///
     /// # Arguments
     /// * `file` - The parsed PastaFile AST
@@ -107,15 +107,20 @@ impl LuaTranspiler {
         // Write header
         codegen.write_header()?;
 
+        // n 番目のグローバルシーンの属性（ファイル属性の受け継ぎと畳みの後）
+        let mut scene_attrs = file.global_scene_attrs().into_iter();
+
         // Process FileItems in document order (MAJOR-2)
         for item in &file.items {
             match item {
-                FileItem::FileAttr(attr) => context.accumulate_file_attr(attr),
+                // 受け継ぎは global_scene_attrs が決める
+                FileItem::FileAttr(_) => {}
                 FileItem::GlobalWord(word) => {
                     Self::process_global_word(&mut context, &mut codegen, word)?;
                 }
                 FileItem::GlobalSceneScope(scene) => {
-                    self.process_global_scene(&mut context, &mut codegen, scene)?;
+                    let attrs = scene_attrs.next().unwrap_or_default();
+                    self.process_global_scene(&mut context, &mut codegen, scene, &attrs)?;
                 }
                 FileItem::ActorScope(actor) => {
                     Self::process_actor(&mut context, &mut codegen, actor)?;
@@ -158,7 +163,9 @@ impl LuaTranspiler {
         Ok(())
     }
 
-    /// Process GlobalSceneScope: register scene/words, merge attrs, generate code, register locals.
+    /// Process GlobalSceneScope: register scene/words, generate code, register locals.
+    ///
+    /// `attrs` は受け継ぎと畳みの後の、このシーンの属性の並び（`PastaFile::global_scene_attrs`）。
     ///
     /// 宣言名（別名表で置き換えた後の名前）をここで 1 回だけ決め、登録・単語のモジュール名・
     /// 生成コード・ローカルの親名のすべてに同じ値を渡す。単独の `＊` 行はパーサが受け継いだ
@@ -168,13 +175,14 @@ impl LuaTranspiler {
         context: &mut TranspileContext,
         codegen: &mut LuaCodeGenerator<W>,
         scene: &GlobalSceneScope,
+        attrs: &[Attr],
     ) -> Result<(), TranspileError> {
         let declared_name = self
             .config
             .scene_aliases
             .resolve(&scene.name)
             .unwrap_or(&scene.name);
-        let (_, counter) = context.register_global_scene_named(declared_name, &scene.attrs);
+        let (_, counter) = context.register_global_scene_named(declared_name, attrs);
 
         // Register scene-level word definitions in WordDefRegistry
         let module_name = SceneRegistry::registered_name(declared_name, counter);
@@ -186,9 +194,7 @@ impl LuaTranspiler {
             }
         }
 
-        // Merge file attrs with scene attrs, generate Lua code
-        let merged_attrs = context.merge_attrs(&scene.attrs);
-        codegen.generate_global_scene(scene, declared_name, counter, &merged_attrs)?;
+        codegen.generate_global_scene(scene, declared_name, counter, attrs)?;
 
         // Register named local scenes (start scene is part of global)
         // 通し番号は生成器と同じ local_scene_counters（照合用の名前ごと）を使う（2.12）。
