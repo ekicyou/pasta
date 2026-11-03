@@ -25,6 +25,7 @@ brief の項目と要件の対応は次のとおり。
 | 開発用のイベントの門 | `scene_play.lua` の `allowed()` が設定の値を見る（待ち受けの有無は見ない） | 4 |
 | 受け継ぐもの（`ponytail-lua-debug`・`ponytail-lua-transpiler`・`scene-play-event` から） | 残る | 7 |
 | Constraints（x86・中和・引数と応答・`[debug]` を書いた既存のゴースト・章の数） | — | 3・4・8・9 |
+| `vscode-mcp-client` からの申し送り（2026-11-03・設計のとき。開発者が承認） | 読み込みの終わりの行 `SHIORI load entry completed` は `info!`（`pasta_shiori/src/windows.rs` 189 行・`v3.rs` 65 行）で、`[logging] level = "warn"` や `filter` を書くと消える | 10 |
 
 **確かめたこと（brief の 1 つ目の穴）**：止まるエラーのバルーンとログの警告は、もう `.pasta` の位置を出している。`shiori/stop.lua` の `STOP.detail`（127 行）・`STOP.location`（110 行）が、`act:init_scene` の最後の引数の行の対応（`transpiler.rs` の `fill_line_maps` 259 行。デバッグの有無にかかわらず生成コードに埋まる）で、変換した Lua の行を `dic\天気.pasta:15` に直す。行の対応に入るのは、そのシーン関数の本体と、同じグローバルシーンの Lua のブロック（`scope_gen.rs` 183〜187 行）である。アクター辞書の単語定義（`ACTOR:create_word(…)`）は読み込みのときに走るデータの行で、実行時のエラーはそこから出ない。行の対応で引けないのは次の 2 つである。
 
@@ -45,6 +46,7 @@ brief の項目と要件の対応は次のとおり。
   - 残す部品（シーンマップ・設定）の死んだコードと誤った説明。シーンマップの行の対応表・逆引きの撤去。
   - マニュアルの internals とリファレンスの頁、ルートの `DEBUGGING.md`、スキルの references の作り直し。
   - テストの `PASTA_DEBUG` の中和の見直し（`pasta_lua`・`pasta_shiori`・`pasta_sample_ghost`・`pasta_check` の `tests/common` など）。
+  - 読み込みの終わりの行（`SHIORI load entry completed`）を、ログの設定によらず書くこと（`vscode-mcp-client` からの申し送り）。
 - **Out of scope**
   - VSCode 拡張の一切と、利用者の章 `book/src/debug/`・README・`SUMMARY.md` の利用者の章の行（`vscode-mcp-client`）。
   - 式を評価して返すイベント（バックログ）。保存変数でない変数（`＄名前`・モジュールの中の状態）の書き出し。
@@ -181,10 +183,21 @@ brief の項目と要件の対応は次のとおり。
 #### Acceptance Criteria
 
 1. The pasta のテスト shall DAP とキックだけを確かめるテスト（`pasta_lua/src/debug/` の DAP・セッション・フック・transport・wiring のテスト、`pasta_lua/tests/runtime/` の `debug_*`・`runtime_toggle_e2e_*` とそのフィクスチャ、`pasta_shiori/tests/` の kick の 6 本・`debug_preservation_test.rs` とそのフィクスチャ・`multi_instance_test.rs` の DAP の部分、`lua_specs/` の kick の 8 本と一覧の行）と、シーンマップから消す行の対応表・逆引きだけを確かめるテストを消し、残す振る舞い（シーンマップ・開発用のイベント・位置）のテストを残す。
-2. The pasta のテスト shall 要件 1 の 1・3（ポートを取らない・有効な 2 体が並ぶ）、要件 3 の 2〜4、要件 5、要件 6 の 2・3（別のファイルの行を出さない・`dic/` の `.lua` はそのファイルと行）を確かめるテストを持つ。
+2. The pasta のテスト shall 要件 1 の 1・3（ポートを取らない・有効な 2 体が並ぶ）、要件 3 の 2〜4、要件 5、要件 6 の 2・3（別のファイルの行を出さない・`dic/` の `.lua` はそのファイルと行）、要件 10 を確かめるテストを持つ。
 3. The pasta のテスト shall 環境の `PASTA_DEBUG`・`PASTA_LOG` に左右されない（中和は `PASTA_DEBUG`・`PASTA_LOG` を残し、意味の無くなった `PASTA_DEBUG_PORT` を外す。議題 3 で確定）。
 4. When 直しを終えた, the pasta のワークスペース shall `cargo fmt --check`・clippy（警告 0）・`cargo test --workspace`・Lua のテスト・luacheck を通す（cargo の前に環境変数 `NoDefaultCurrentDirectoryInExePath` を外す）。
 5. When 直しを終えた, the pasta.dll shall i686（配布する 32 ビット版）のビルドとテストを通す（x86 を省かない）。
+
+### Requirement 10: 読み込みの終わりの行をいつも書く
+
+**Objective:** As a VSCode の拡張（`vscode-mcp-client`）, I want SHIORI の読み込みが終わったことを、`pasta.log` の 1 行でいつも見分けたい, so that `[logging]` を絞ったゴーストでも「▶ シーンを実行」が読み込みの終わりを待てて、時間切れにならない。
+
+#### Acceptance Criteria
+
+1. When SHIORI の読み込み（`load`・`loadu`・SHIORI/3 の入口。リロードを含む）を終えた, the pasta.dll shall `pasta.log` に `SHIORI load entry completed` の行を、`entry` と `loaded` の欄を付けて 1 行書く。読み込みに失敗したとき（`loaded=false`）も書く。
+2. The pasta.dll shall 1 の行を、`[logging]` の `level`・`filter` と環境変数 `PASTA_LOG` がどうであっても書く。
+3. The pasta.dll shall 1 の行の文（`SHIORI load entry completed`）と、欄の名前（`entry`・`loaded`）を変えない。拡張のテストは、Rust のソースにこの文字列があるかを確かめる。
+4. The pasta.dll shall 1 の行のほかのログが `level`・`filter` で絞られることを変えない。
 
 ## 要件ディスカッションで確定したこと（2026-11-03）
 

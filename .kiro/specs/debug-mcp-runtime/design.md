@@ -77,6 +77,7 @@ raise_event("OnPastaDumpVariables",  [])                          → profile/pa
 - `OnPastaSceneAt` の Reference0 の受け方（パスだけ。URI を受けない）→ `vscode-mcp-client`。
 - `OnPastaDumpVariables` の書き出す先（`ghost/master/profile/pasta/debug/variables.toml`）・応答（204）・書式（TOML）→ `vscode-mcp-client`。デバッグが無効なときも、書けなかったときも 204 で、前のファイルが残る。読む側は、送る前と後でファイルの更新時刻を比べて、新しく書かれたかを確かめる。
 - ログの文言: 無効・external の警告（`<イベント名>: debug is disabled; …`・`<イベント名>: SecurityLevel external is refused; …`）と、有効なときの info の 1 行（`Debug enabled: development events are allowed`）→ `vscode-mcp-client` のトラブルシューティング。
+- 読み込みの終わりの行（文 `SHIORI load entry completed`・欄 `entry`・`loaded`・target `pasta::load_entry`）と、それを `[logging]`・`PASTA_LOG` によらず通すこと → `vscode-mcp-client`（この行を待って読み込みの終わりと見なす。拡張のテストは Rust のソースの文字列を見る）。
 - `@pasta_chunks` の値の形（`true` が無くなり、`.pasta` の表と、`dic/` の `.lua` の文字列になる）→ `@pasta_chunks` を読む後の spec。
 - `RuntimeConfig`・`PastaLuaRuntime` の pub の口の削除（`debug`・`kick_sink`・`with_debug*`・`with_kick_sink`・`debug_local_addr`・`debug_source_mode`）と、`debug::source_map` の pub の口の削除（`ChunkSourceMap`・`resolve_lua_to_pasta`・`resolve_pasta_to_lua`・`pasta_file_for_chunk`・`canonicalize_chunk_name`・`insert_chunk` など）→ `pasta_lua` を使う外のクレート（0.5.0 で予告なく消す。議題 9）。
 - `spawn_actor_thread_with` の引数（kick の送り先を外して 3 つ）→ `shiori4-v4-host`（0.6.0）。
@@ -188,6 +189,8 @@ crates/pasta_lua/src/debug/
 - `crates/pasta_lua/src/runtime/factory.rs`（整え）— `build_scene_index` に `pasta_file_of` を閉じた関数（ゴーストのフォルダーに結んで返す）を渡す。
 - `crates/pasta_lua/src/loader/context.rs` — `pasta_sources: HashMap<String, DicSource>`（モジュール名 → 元のファイル）と `enum DicSource { Pasta(String), Lua(String) }`（ゴーストのフォルダーから見たパス）を足す（既定は空）。
 - `crates/pasta_lua/src/loader/mod.rs` — Phase 4 の後に `pasta_sources` を詰める（`.pasta` は `Pasta`、`dic/` の `.lua` は `Lua`）。読み込みを終えたら、有効なときだけ info の 1 行を出す（1.5）。
+- `crates/pasta_lua/src/logging/tracing_init.rs` — `build_filter` が、組み立てた `EnvFilter`（`PASTA_LOG`・`[logging]`・失敗のときの既定のどれでも）の最後に `pasta::load_entry=info` の指示を足す。target の名前を `pub(crate)` の定数にし、`pasta_shiori` からも使えるよう `pasta_lua::logging` から `pub` で出す（10.2）。
+- `crates/pasta_shiori/src/windows.rs`（189 行）・`crates/pasta_shiori/src/v3.rs`（65 行）— 読み込みの終わりの `info!` に `target: LOAD_ENTRY_TARGET` を付ける。文と欄は変えない（10.1・10.3）。
 - `crates/pasta_lua/src/runtime/persistence.rs` — `dump_table` を足し、外したキーの警告を `save_table` と共有する。`save_to_file` が書きかけの一時ファイルを、書けなかったときにも消す。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/scene_play.lua` — `allowed(act, event, outcome)` にし、`OnPastaDumpVariables` を足す。冒頭の説明に 3 つのイベントの共通の決まりを書く。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/stop.lua` — `STOP.location` を、辞書の値 `{ pasta = … }` と行の対応のファイルを比べる形にする。引けなければ場所を出さない（引数は今のまま）。
@@ -306,6 +309,10 @@ sequenceDiagram
 | 9.3 | 環境に左右されない | 中和の写し | — | — |
 | 9.4 | fmt・clippy・test・Lua・luacheck | 関門 | — | — |
 | 9.5 | i686 のビルドとテスト | 関門 | — | — |
+| 10.1 | 読み込みの終わりに 1 行書く（`loaded=false` も） | 読み込みの終わりの行（`windows.rs`・`v3.rs`） | ログの文と欄 | — |
+| 10.2 | `level`・`filter`・`PASTA_LOG` によらず書く | `build_filter` の指示の足し | `pasta::load_entry=info` | — |
+| 10.3 | 文と欄の名前を変えない | `windows.rs`・`v3.rs`（target だけ足す） | ログの文と欄 | — |
+| 10.4 | ほかのログの絞り方を変えない | `build_filter`（その target だけを足す） | — | — |
 
 ## Components and Interfaces
 
@@ -323,6 +330,7 @@ sequenceDiagram
 | 残す部品の整理 | Rust `debug/` | 死んだコード・誤った説明を消す | 7.1, 7.2 | — | — |
 | マニュアル | book | DAP の無い形に揃える | 8.1–8.7 | gen-skill-refs（P1） | — |
 | テストと関門 | 全クレート | 守りと関門 | 9.1–9.5 | — | — |
+| 読み込みの終わりの行 | Rust `pasta_lua::logging`・`pasta_shiori` | ログの設定によらず、読み込みの終わりを 1 行書く | 10.1–10.4 | `EnvFilter`（P0） | Service |
 
 ### Rust: デバッグの門
 
@@ -587,6 +595,31 @@ function STOP.location(chunk, line, chunks, line_map) end
 - `STOP.response`・`STOP.subject`・`FAILURE.*`・`X-Error-Reason` は変えない（6.4）。
 - `stop.lua` は `@pasta_debug` を読まない。場所の決め方はデバッグの有無で変わらない。
 
+### Rust: 読み込みの終わりの行
+
+| Field | Detail |
+|-------|--------|
+| Intent | SHIORI の読み込みの終わりを、ログの設定によらず `pasta.log` に 1 行書く（`vscode-mcp-client` が待つ目印） |
+| Requirements | 10.1, 10.2, 10.3, 10.4 |
+
+**Contracts**: Service [x]
+
+```rust
+// pasta_lua::logging（pub で出す）
+pub const LOAD_ENTRY_TARGET: &str = "pasta::load_entry";
+
+// build_filter の最後（PASTA_LOG・[logging]・既定のどの枝で作った EnvFilter にも）
+filter.add_directive(format!("{LOAD_ENTRY_TARGET}=info").parse().expect("固定の指示"))
+
+// pasta_shiori/src/windows.rs・v3.rs（文と欄は今のまま）
+info!(target: LOAD_ENTRY_TARGET, entry, loaded, "SHIORI load entry completed");
+```
+
+- `EnvFilter` は target ごとに、いちばん細かい指示を使う。`level = "warn"` でも、`filter = "pasta_lua=debug,warn"` でも、この target だけは info を通す。ほかの target の絞り方は変わらない（10.4）。作者の `filter` に同じ target の指示があっても、後から足した指示が勝つ（10.2）。
+- ファイルへの振り分けは今のまま `LoadDirGuard` で決まる。登録の層（`RegistryFilter`）は load_dir ごとの `EnvFilter` で判定するので、ほかの層に手を入れなくてよい。`max_level_hint` は info まで上がりうるが、判定は層の `enabled` で行うので、ほかのログが増えることは無い。
+- 読み込みに失敗して `[logging]` を読めなかったときは、既定のフィルタ（`info`）で書かれる（今のまま）。
+- `loaded=false` の行は、どちらの入口も `loaded` を見ずに書く（今のまま）。
+
 ## Data Models
 
 ### Data Contracts & Integration
@@ -662,6 +695,9 @@ pub enum DicSource {
 - `pasta_shiori/tests/runtime_error_balloon_e2e_test.rs`（足す）: フィクスチャに 2 つ目の `.pasta` を足し、その Lua のブロックの `GLOBAL` 関数の中で止まるシーンを 1 つ目のファイルから呼ぶ。止まった Lua の行の番号が、1 つ目のファイルの実行中のシーンの行の対応に含まれることをテストの中で確かめてから要求する。場所を出さない（6.2。フィクスチャはデバッグが無効のまま。場所の決め方はデバッグの有無で変わらない）。フィクスチャに `dic/道具.lua`（止まる関数）を足し、それを呼ぶシーンで止まると `dic\道具.lua:<行>:` が出る（6.3）。今の `test_alias_scene_lua_block_error_shows_pasta_location` は残す（6.1）。
 - `scene_identity_index_test.rs` の `same_named_scenes_in_two_files_resolve_to_their_own_file`・`finalize_join_resolves_runtime_identities_for_global_and_local`（今のまま残す）: チャンク → `.pasta` の引きを `pasta_file_of` に替えても、2 つのファイルの同じ名前のシーンがそれぞれのファイルで引ける（3.5）。
 
+- `pasta_shiori/tests/ffi_loadu_test.rs`（足す）: `[logging] level = "warn"` のゴーストと、`filter = "pasta_lua=error"` のゴーストを `loadu` で読み込み、どちらの `pasta.log` にも `SHIORI load entry completed` と `entry=`・`loaded=true` があり、ほかの info の行（`Startup sequence completed` など）が無い（10.1・10.2・10.4）。辞書の壊れたゴーストでは `loaded=false` の行がある（10.1）。v3 の入口は、同じ確かめを v3 のテストに 1 本足す。
+- `pasta_lua/src/logging/tracing_init.rs` の単体テスト: `build_filter` の結果が、`warn`・`PASTA_LOG` の値・作者の `pasta::load_entry=off` のどれでも、その target の info を通し、ほかの target の info を通さない（10.2・10.4）。`PASTA_LOG` を触るので、`#[ctor]` の中和のあるバイナリでは値を置いて戻す形にする（ほかのテストと同時に走らない置き場を設計の後で選ぶ）。
+
 ### 関門
 
 - `cargo fmt --check`・`cargo clippy --workspace --all-targets`（警告 0）・`cargo test --workspace`・Lua のテスト・luacheck（9.4。cargo の前に `NoDefaultCurrentDirectoryInExePath` を外す）。
@@ -678,7 +714,7 @@ pub enum DicSource {
 ### マニュアル（8.1〜8.7）
 
 - `book/src/internals/debug.md` を「開発用のイベントとシーンマップ」に書き直す（門・`@pasta_debug` の 3 つの関数・シーンマップ（記録と索引）の作り方・止まるエラーの場所の決め方・`variables.toml`）。`SUMMARY.md` 82 行の題を合わせる。
-- `book/src/reference/pasta-toml.md` の `[debug]` 節を `enabled` だけにし、古いキーを読み飛ばすことと、環境変数は `PASTA_DEBUG` だけであることを書く。
+- `book/src/reference/pasta-toml.md` の `[debug]` 節を `enabled` だけにし、古いキーを読み飛ばすことと、環境変数は `PASTA_DEBUG` だけであることを書く。`[logging]` 節に、読み込みの終わりの行（`SHIORI load entry completed`）は `level`・`filter` によらずいつも書くことを 1 行足す（要件 10）。
 - `book/src/lua/shiori-events.md` に `OnPastaDumpVariables` の節（引数・書き出す先・応答・失敗）を足し、3 つのイベントに共通の「デバッグが有効なときだけ・external は断る」の決まりをまとめ、待ち受けの話を除く。`OnPastaSceneAt` の Reference0 から URI の話を除く。
 - `book/src/internals/` の `shiori`・`execution-model`・`loader`・`index`・`internal-modules`・`transpiler`・`registry-search`・`logging-encoding`、`book/src/reference/startup.md`・`reference/runtime-failures.md`（場所の表・193 行の説明を、別のファイルの行を出さないことと、`dic/` の `.lua` はそのファイルと行で出ることに直す）、`book/src/lua/modules/pasta-search.md`・`lua/patterns.md`・`grammar/call-jump.md`・`introduction.md`、ルートの `DEBUGGING.md`。`@pasta_chunks` の値の説明（`internal-modules.md`・`loader.md`）も直す。
 - 利用者の章 `book/src/debug/` は触らない。`vscode-mcp-client` は `debug/source-level.md`・`debug/constraints.md` を消し、`シーン再生-シーンを実行`・`デバッグの有効化`・`pastatoml-による有効化`・`優先順位` の 4 つのアンカーを残す。この spec の頁から消える頁へのリンク（`reference/pasta-toml.md` の `#提示モードの切替`、`internals/debug.md` の `#初期モードの指定`・`#サイドカー出力任意`・`constraints.md`）は書き直しで外す。先に入った側が最小に直し、後から入る側が rebase で合わせる。
@@ -699,6 +735,7 @@ pub enum DicSource {
 8. テストの足し（1.3・3.2〜3.4・1.2 の結合テスト・`multi_instance_test.rs` の書き直し）。9.2 のテストは、その振る舞いを作るタスク（1〜7）に入れる。ここに残すのは、どのタスクにも属さない確かめ（1.2 の `jit.status()`・3.4 の新しいバイナリ）だけである。
 9. マニュアルと references（8.1〜8.7）。
 10. 関門（9.4・9.5）。
+11. 読み込みの終わりの行（10.1〜10.4）: `LOAD_ENTRY_TARGET`・`build_filter` の指示・`windows.rs`・`v3.rs` の target とそのテスト。ほかのどの段とも独立なので、どこに入れてもよい（`vscode-mcp-client` が早く使えるよう、2 の前に置くのがよい）。
 
 1〜3 は互いに独立に近いが、`runtime_config.rs` の `kick_sink` を 1 で消すと 2 の `pasta_shiori` が壊れる。そこで 2 を先にする（`pasta_shiori` が kick の送り先を渡さなくなってから、`pasta_lua` の欄を消す）。1 は大きいので、ビルドが通る切れ目（結線を外す → DAP の部品とテストを消す → 設定を縮める → 依存を外す）でタスクを分ける。
 

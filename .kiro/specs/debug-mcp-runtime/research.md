@@ -274,3 +274,9 @@ requirements.md の末尾の議題 1〜10 は、2026-11-03 に開発者が全部
 - `SourceMapSink::record_line`・`record`: `transpiler.rs` 229〜253 行の `LineRecorder`（いつも付く。行の対応の材料）が実装する。呼ぶ側は `code_gen/mod.rs` 129〜135 行の `record_span_since`（`element_gen.rs` 73・96・155・243・435・526 行と `scope_gen.rs` から）と 170〜176 行の `record_block_line`。
 - `SourceMapSink::record_scene`: 既定は何もしない（`code_gen/source_map.rs` 86 行）。`LineRecorder` が渡されたシンクへ流し（`transpiler.rs` 249〜253 行）、`scope_gen.rs` が `record_scene_span`（`code_gen/mod.rs` 149〜155 行）で呼ぶ。シーンマップのシンクはこれだけを使う。
 - `transpile_with_source_map` が返す `LineShift` は、シーンマップでは使わなくなる（`transpile` も捨てている）。署名は変えない。
+
+## 読み込みの終わりの行（2026-11-03・vscode-mcp-client からの申し送り。開発者が承認）
+
+- 行を出す所は `pasta_shiori/src/windows.rs` 189 行と `v3.rs` 65 行の 2 つで、どちらも `info!`。ほかに `ffi_loadu_test.rs` 235 行がこの文を確かめる。
+- ファイルへのログは、load_dir ごとの `EnvFilter` で判定する（`logging/registry.rs` の `set_filter`・`event_enabled`）。`EnvFilter` を作るのは `logging/tracing_init.rs` の `build_filter` の 1 か所だけで、既定（`registry.rs` 90 行）と `update_tracing_filter` の両方がここを通る。`[logging]` は `filter` があればそれ、無ければ `level` を指示にする（`loader/config/sections.rs` の `to_filter_directive`）。
+- そこで `build_filter` の最後に、決まった target の info を通す指示を 1 つ足し、2 か所の `info!` にその target を付ける。ほかのログの絞り方は変わらない。新しい依存は要らない。
