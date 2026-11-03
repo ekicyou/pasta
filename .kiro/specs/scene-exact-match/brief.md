@@ -141,7 +141,7 @@
 - 新しい spec `scene-count` が、`＠シーン数（名前）`（`＞名前` が選ぶ候補の数）と `＠シーン数完全一致（名前）`（`search_scene_exact` が選ぶ候補の数。`＞＞名前` と同じになる約束）を GLOBAL 関数で入れる。どちらもグローバルシーンだけを数え、別名表を当ててから正規化する。
 - この spec で決めること: `[scene] match = "exact"` のモードで、`シーン数` も `＞` に合わせて完全一致の数にするか（推奨: する。「`＞` と同じ数」の約束を保つ）。`シーン数完全一致` はモードに関係なく完全一致のまま。
 - ファイルの重なり: `scene-count` は `search/context.rs` を触る。同じウェーブに置かない。
-- 参照: `.kiro/specs/scene-count/brief.md`。
+- 参照: `.kiro/specs/completed/scene-count/brief.md`。
 
 ## 2026-11-03 棚卸の再測定（main c575febd）
 
