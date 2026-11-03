@@ -78,7 +78,7 @@
 6. When 選択肢が選ばれて飛び先のシーンを名前で探す, the pasta ランタイム shall 条件で絞った候補から選ぶ。
 7. Where 実行時に完全一致で候補を選ぶ道がある（`scene-exact-match` の `＞＞` を含む）, the pasta ランタイム shall 前方一致と同じ規則で条件を評価して絞る。
 8. When 外からの `＞名前` の呼び出し（`OnPastaCallFunction`）が名前で候補を選ぶ, the pasta ランタイム shall Call と同じく条件で絞る（仮定。未決の議題 4）。
-9. The pasta ランタイム shall 外から 1 本を名指しする再生（`OnPastaScene`、撫で・つつきの近道）では条件を評価しない。
+9. The pasta ランタイム shall 外から 1 本を名指しする再生（`OnPastaScene`、撫で・つつきの近道、`チェイントーク中断`、おすすめメニューで選んだ項目のシーンの完全一致の引き）では条件を評価しない。おすすめメニューで項目にシーンが無く `＊OnRecommendsiteChoice` をイベント名で探すときは、2.5 のイベントとして絞る。
 10. The pasta ランタイム shall 選択肢の行そのものの表示と、単語の選択には条件を効かせない。
 11. While チェイントークの続きが残っている, the pasta ランタイム shall 続きを選び直さず、途中で条件の値が変わっても続きを出す。
 
@@ -180,8 +180,8 @@
 
 1. The pasta ランタイム shall 宣言の属性（`＄` で始まらないもの。`＆優先` を除く）の意味を変えない。
 2. While 辞書に条件もフラグも `＆優先` も無い, the pasta ランタイム shall シーンの選び方・応答・ログの注意を今と同じにする。
-3. The pasta の開発者 shall 辞書の読み込みから候補の絞り込みの結果までを、端から端で確かめるテストを持つ（`scene-attribute-store` からの申し送り）。
-4. The pasta の開発者 shall 本書の受け入れ条件のうち、窓際のぱすたさんの経路（Requirement 2.3）・呼び出し元のローカル変数（Requirement 2.4）・素通りと見つからないの違い（Requirement 3.1〜3.3）・袋の扱い（Requirement 4.3〜4.5）・自動転記による Reference の条件（Requirement 6.1）を、テストで確かめる。
+3. The pasta のテスト shall 辞書の読み込みから候補の絞り込みの結果までを、端から端で確かめる（`scene-attribute-store` からの申し送り）。
+4. The pasta のテスト shall 本書の受け入れ条件のうち、窓際のぱすたさんの経路（Requirement 2.3）・呼び出し元のローカル変数（Requirement 2.4）・素通りと見つからないの違い（Requirement 3.1〜3.3）・袋の扱い（Requirement 4.3〜4.5）・自動転記による Reference の条件（Requirement 6.1）を、テストで確かめる。
 5. The pasta ランタイム shall x86 と x64 の両方で、同じ受け入れ条件を満たす。
 
 ## 未決の議題（要件ディスカッションで決める）

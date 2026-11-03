@@ -127,7 +127,7 @@
 - チェイントークの続きが `EVENT.drive` でどの act に resume されるか（新しい act の `var` と続きの `var` の関係）。
 - Lua の値を Rust で読むとき（選択肢 A）の型の写し方: 倍精度の数・整数に見える小数・2^53 を超える整数・真偽値・`nil`。
 - trace のログを Rust の `tracing` と Lua の `@pasta_log` のどちらに出すと、`OnPastaSetSaveVariable` で試す作者が読みやすいか（`debug/` のマニュアルの今のログの読み方）。
-- `recommend.lua` 281 行の `SCENE.co_exec` と 283 行の完全一致の引きが、それぞれ要件 2.5（絞る）と 2.9（絞らない）のどちらに当たるか。
+- ~~`recommend.lua` 281 行の `SCENE.co_exec` と 283 行の完全一致の引きの分類~~ → 要件ディスカッションで閉じた。281 行（項目にシーンが無いときの `＊OnRecommendsiteChoice` の前方一致）は 2.5 で絞る、283 行（項目のシーンの完全一致）は 2.9 で絞らない。
 
 ### ファイルの重なり
 
