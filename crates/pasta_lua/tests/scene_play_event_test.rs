@@ -9,6 +9,8 @@
 //! - 相対パスと絶対パスで位置から再生できる（要件 2.1・2.3・2.4）
 //! - 有効ならシーンマップがあり、`debug_enabled()` と `@pasta_debug.enabled()` が真になる（debug-mcp-runtime 7.6）
 //! - デバッグが無効なら 204、見つからないときは 200 で失敗の表記（要件 4.4・5.1・5.3・7.1・7.4、task 4.2）
+//! - `OnPastaDumpVariables` は有効なとき 204 で `variables.toml` を書き、無効・external なら
+//!   204 と警告で書かない（debug-mcp-runtime 4.2・4.3・5.1〜5.3・5.6）
 //!
 //! `PASTA_DEBUG` の中和は `common` の `#[ctor]` に従う。
 
@@ -83,12 +85,17 @@ fn load_ghost(base: &Path, pasta_toml: &str) -> PastaLuaRuntime {
 
 /// `SHIORI.request` に GET のリクエスト（SecurityLevel: local）を渡し、応答の文字列を返す。
 fn request(runtime: &PastaLuaRuntime, id: &str, refs: &[&str]) -> String {
+    request_at_level(runtime, id, refs, "local")
+}
+
+/// `SHIORI.request` に GET のリクエストを、指定の SecurityLevel で渡し、応答の文字列を返す。
+fn request_at_level(runtime: &PastaLuaRuntime, id: &str, refs: &[&str], level: &str) -> String {
     let lua = runtime.lua();
     let req = lua.create_table().unwrap();
     req.set("id", id).unwrap();
     req.set("method", "get").unwrap();
     req.set("version", 30).unwrap();
-    req.set("security_level", "local").unwrap();
+    req.set("security_level", level).unwrap();
     req.set("dic", lua.create_table().unwrap()).unwrap();
     let reference = lua.create_table().unwrap();
     for (i, value) in refs.iter().enumerate() {
@@ -376,4 +383,160 @@ fn debug_enabled_startup_log_line_only_when_enabled() {
         "{disabled_log}"
     );
     assert!(!disabled_log.contains(LINE), "{disabled_log}");
+}
+
+/// 書き出す先（ghost/master/ から見たパス）
+const VARIABLES_TOML: &str = "profile/pasta/debug/variables.toml";
+
+/// 204 であることを確かめる。
+fn assert_204(response: &str, what: &str) {
+    assert_eq!(
+        response.lines().next(),
+        Some("SHIORI/3.0 204 No Content"),
+        "{what}: {response:?}"
+    );
+}
+
+/// セーブのファイル（`save.toml`・`save.dat`）が無いことを確かめる。
+fn assert_no_save_file(base: &Path) {
+    let files: Vec<_> = ["save.toml", "save.dat"]
+        .map(|name| base.join("profile/pasta/save").join(name))
+        .into_iter()
+        .filter(|p| p.exists())
+        .collect();
+    assert!(files.is_empty(), "save file must not be written: {files:?}");
+}
+
+/// 5.1・5.2・5.3・5.6: 有効なとき 204 で、保存変数を要件 5 の例のとおりテキストの TOML に書く。
+/// 2 回目で置き換わり、フォルダが無くても作り、`obfuscate = true` でもテキストで、
+/// `save.toml` を書かず、保存変数と場面の続きを変えない。
+#[test]
+fn on_pasta_dump_variables_writes_variables_toml_when_enabled() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_ghost(
+        temp.path(),
+        "[loader]
+debug_mode = true
+
+[debug]
+enabled = true
+
+[persistence]
+obfuscate = true
+",
+    );
+    let path = temp.path().join(VARIABLES_TOML);
+    assert!(
+        !path.parent().unwrap().exists(),
+        "debug folder must not exist before the dump"
+    );
+
+    runtime
+        .exec(
+            r#"
+            local save = require("pasta.save")
+            save.好感度 = 3
+            save.名前 = "まさお"
+            local STORE = require("pasta.store")
+            _G.__co = coroutine.create(function() coroutine.yield("続き") end)
+            STORE.co_scene = _G.__co
+            "#,
+        )
+        .unwrap();
+
+    assert_204(
+        &request(&runtime, "OnPastaDumpVariables", &[]),
+        "dump must be 204",
+    );
+    let text = std::fs::read_to_string(&path).expect("variables.toml must be written as text");
+    let doc: toml::Table = text.parse().unwrap();
+    assert_eq!(
+        doc.get("好感度").and_then(|v| v.as_integer()),
+        Some(3),
+        "{text}"
+    );
+    assert_eq!(
+        doc.get("名前").and_then(|v| v.as_str()),
+        Some("まさお"),
+        "{text}"
+    );
+    assert_eq!(doc.len(), 2, "only the save variables: {text}");
+
+    // 2 回目はそのときの値で置き換わる
+    runtime.exec(r#"require("pasta.save").好感度 = 4"#).unwrap();
+    assert_204(
+        &request(&runtime, "OnPastaDumpVariables", &[]),
+        "second dump must be 204",
+    );
+    let doc: toml::Table = std::fs::read_to_string(&path).unwrap().parse().unwrap();
+    assert_eq!(doc.get("好感度").and_then(|v| v.as_integer()), Some(4));
+
+    // 保存変数・場面の続きは変わらず、save.toml は書かれない
+    assert!(
+        lua_bool(
+            &runtime,
+            r#"
+            local save = require("pasta.save")
+            local STORE = require("pasta.store")
+            return save.好感度 == 4 and save.名前 == "まさお"
+                and STORE.co_scene == _G.__co
+                and coroutine.status(_G.__co) == "suspended"
+            "#,
+        ),
+        "save variables and continuation must be unchanged"
+    );
+    assert_no_save_file(temp.path());
+}
+
+/// 4.2・4.3: 無効なら・external なら 204 で、警告を書き、ファイルを書かない。
+#[test]
+fn on_pasta_dump_variables_refused_when_disabled_or_external() {
+    pasta_lua::init_tracing();
+
+    let disabled = tempfile::TempDir::new().unwrap();
+    let external = tempfile::TempDir::new().unwrap();
+    for (temp, pasta_toml, level, warning) in [
+        (
+            &disabled,
+            "[loader]
+debug_mode = true
+",
+            "local",
+            "OnPastaDumpVariables: debug is disabled; variables not dumped",
+        ),
+        (
+            &external,
+            "[loader]
+debug_mode = true
+
+[debug]
+enabled = true
+",
+            "external",
+            "OnPastaDumpVariables: SecurityLevel external is refused; variables not dumped",
+        ),
+    ] {
+        let runtime = load_ghost(temp.path(), pasta_toml);
+        {
+            let _log = pasta_lua::LoadDirGuard::new(temp.path().to_path_buf());
+            assert_204(
+                &request_at_level(&runtime, "OnPastaDumpVariables", &[], level),
+                level,
+            );
+        }
+        assert!(
+            !temp.path().join(VARIABLES_TOML).exists(),
+            "{level}: variables.toml must not be written"
+        );
+        // ランタイムと登録簿の両方が手放すとロガーが破棄され、ログがフラッシュされる。
+        drop(runtime);
+        pasta_lua::GlobalLoggerRegistry::instance().unregister(temp.path());
+        let log =
+            std::fs::read_to_string(temp.path().join("profile/pasta/logs/pasta.log")).unwrap();
+        assert_eq!(
+            log.lines().filter(|l| l.contains(warning)).count(),
+            1,
+            "{level}: one warning line {warning:?}: {log}"
+        );
+    }
 }

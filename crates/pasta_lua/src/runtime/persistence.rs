@@ -226,7 +226,6 @@ pub(crate) fn save_table(
 
 /// 表を TOML にし（書けないキーは外して警告）、テキストで path に書く（一時ファイル → rename）。
 /// セーブの門（SaveGate）は見ない。表は変えない。
-#[allow(dead_code)] // shortcut: 呼ぶのは 6.2 の @pasta_debug.dump_variables、繋いだら外す
 pub(crate) fn dump_table(lua: &Lua, table: &Table, path: &Path) -> Result<(), PersistenceError> {
     save_to_file(&to_document_warning_dropped(lua, table), path, false)
 }

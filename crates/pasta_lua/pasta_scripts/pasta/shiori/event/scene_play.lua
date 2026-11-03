@@ -1,13 +1,16 @@
 ---@module pasta.shiori.event.scene_play
---- シーンを指名して再生する既定のハンドラ（OnPastaScene・OnPastaSceneAt）
+--- 開発用のイベントの既定のハンドラ（OnPastaScene・OnPastaSceneAt・OnPastaDumpVariables）
 ---
 --- OnPastaScene:   Reference0 = 大域シーンの書いた名前、Reference1 = ローカルシーンの書いた名前（省略・空なら大域だけ）
 --- OnPastaSceneAt: Reference0 = ファイル（ghost/master/ からの相対パスか絶対パス）、Reference1 = 行（半角数字だけの 1 以上）
+--- OnPastaDumpVariables: 引数なし。保存変数を profile/pasta/debug/variables.toml に書き、喋らずに 204
 ---
---- デバッグが有効（@pasta_debug.enabled()）で、SecurityLevel が external でないときだけ働く。
+--- 3 つに共通の決まり: デバッグが有効（@pasta_debug.enabled()）で、SecurityLevel が external でないときだけ働く。
+--- 断るときは「<イベント名>: debug is disabled; …」か「<イベント名>: SecurityLevel external is refused; …」の
+--- 警告を 1 行書いて 204。ゴーストが先に登録していれば上書きしない。
 --- 再生するときはコルーチンに STORE.co_preempt の印（はっきり捨てる）を付けて返し、差し替え・1 ビート目・実行時エラーは EVENT.fire に任せる。
---- 失敗では表記とログの警告を出して act:build() を返し、場面の続きを変えない。Status は見ない。
---- ゴーストが先に登録していれば上書きしない。event/init.lua は require しない（循環させない）。
+--- 再生の失敗では表記とログの警告を出して act:build() を返し、場面の続きを変えない。Status は見ない。
+--- event/init.lua は require しない（循環させない）。
 
 local REG = require("pasta.shiori.event.register")
 local FAILURE = require("pasta.failure")
@@ -16,16 +19,17 @@ local STORE = require("pasta.store")
 --- 門: デバッグが有効で external でなければ @pasta_debug を返す。断るときは warn を出して nil
 ---@param act ShioriAct
 ---@param event string
+---@param outcome string 警告の後半（"scene not played" など）
 ---@return table|nil debug
-local function allowed(act, event)
+local function allowed(act, event, outcome)
     local log = require("@pasta_log")
     local ok, debug = pcall(require, "@pasta_debug")
     if not ok or type(debug) ~= "table" or not debug.enabled() then
-        log.warn(event .. ": debug is disabled; scene not played")
+        log.warn(event .. ": debug is disabled; " .. outcome)
         return nil
     end
     if act.req.security_level == "external" then
-        log.warn(event .. ": SecurityLevel external is refused; scene not played")
+        log.warn(event .. ": SecurityLevel external is refused; " .. outcome)
         return nil
     end
     return debug
@@ -33,7 +37,7 @@ end
 
 REG.OnPastaScene = REG.OnPastaScene or function(act)
     local event = "OnPastaScene"
-    if not allowed(act, event) then return nil end
+    if not allowed(act, event, "scene not played") then return nil end
     local name, local_name = act.req.reference[0], act.req.reference[1]
     if not FAILURE.is_name(name) then return FAILURE.bad_reference0(act, event, name) end
     if local_name == "" then local_name = nil end
@@ -57,7 +61,7 @@ end
 
 REG.OnPastaSceneAt = REG.OnPastaSceneAt or function(act)
     local event = "OnPastaSceneAt"
-    local debug = allowed(act, event)
+    local debug = allowed(act, event, "scene not played")
     if not debug then return nil end
     local file, line = act.req.reference[0], act.req.reference[1]
     if not FAILURE.is_name(file) then return FAILURE.bad_reference0(act, event, file) end
@@ -83,4 +87,10 @@ REG.OnPastaSceneAt = REG.OnPastaSceneAt or function(act)
         subject = event .. " " .. file .. ":" .. line,
         warning = event .. ": scene not found: file='" .. file .. "', line=" .. line,
     })
+end
+
+REG.OnPastaDumpVariables = REG.OnPastaDumpVariables or function(act)
+    local debug = allowed(act, "OnPastaDumpVariables", "variables not dumped")
+    if debug then debug.dump_variables(require("pasta.save")) end
+    return nil -- 喋らない（204）
 end
