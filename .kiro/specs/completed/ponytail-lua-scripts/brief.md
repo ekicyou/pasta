@@ -136,7 +136,7 @@
 - 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
-- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/brief.md`。
 
 ## 2026-11-02 棚卸の再測定（main 491cc23c）
 

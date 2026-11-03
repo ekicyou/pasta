@@ -128,7 +128,7 @@
 - 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
-- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/brief.md`。
 - この spec への影響: `act:call` の 3 つ目の引数 `attrs` を絞り込みのために空けておく約束は、呼ぶ側の条件を作らないので要らなくなった。`＞＞` の完全一致の候補にも、場面の側の条件が効く。
 
 ## 申し送り（2026-10-29 の版の組み替えより）
@@ -162,4 +162,4 @@
 - `＞＞` の完全一致にも条件の絞り込みが効く（`scene-condition-attributes` の Requirement 2.7）。`@pasta_search` の `search_scene_exact(name, gsn, var, save)` に act の `var`・`save` を渡せば、条件と `＆優先` で絞られる。表を渡さなければ条件も優先も見ない（名指しの再生の道）。
 - 戻り値は `global, local`／`nil`（名前が無い）／`nil, "unmet"`（条件に全部漏れた）。Call の条件漏れは止まるエラー（失敗表記の 13 種目 `SCENE_UNMET`＝「条件に合うシーンが無い」）、名前が無いときは今の `SCENE_NOT_FOUND`（止まらない）。`＞＞` もこの 2 つを分けて扱う。
 - `act.lua` の `find_act_handler` は `nil, "unmet"` を返し、2 段目（ローカル）で漏れたら 5 段目（グローバル）へ進む。`SceneTable::resolve_scene_id_exact` は `filters` の代わりに述語を受ける。
-- 参照: `.kiro/specs/scene-condition-attributes/design.md`（SearchContext・ActLookup の節）。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/design.md`（SearchContext・ActLookup の節）。

@@ -6,7 +6,7 @@ Pasta DSL の属性（`＆名前：値`）は、構文だけが受理され、�
 
 この spec は、属性を「書いたとおりに・書いた順で・型を保って」実行時まで運び、場面を選ぶ処理と場面に入った処理の両方が同じ属性を読めるようにする。属性の読み手は 3 つで、どれもこの spec の後に入る: `scene-condition-attributes`（`＄` で始まる条件と `＆優先`。選ぶときに読む）、`scene-pick-modes`（`＆重み`・`＆順番`。選ぶときに読む）、0.6.0 の `cue-command-runtime`（柱の属性。場面に入るときに書いた順で台本へ流す）。この spec は読み手の意味（絞り込み・重み・演出）を実装せず、属性の倉と受け継ぎの決まりだけを決める。条件の形は、この spec が**文法・構文木・運搬・倉・Lua の口まで通す**が、**評価はしない**（候補の選択は変えない）。
 
-出典: `.kiro/specs/scene-attribute-store/brief.md`（2026-11-03 の棚卸の再測定を含む）、`.kiro/specs/scene-condition-attributes/brief.md`（条件の書き方。2026-10-29 開発者の決定）。
+出典: `.kiro/specs/scene-attribute-store/brief.md`（2026-11-03 の棚卸の再測定を含む）、`.kiro/specs/completed/scene-condition-attributes/brief.md`（条件の書き方。2026-10-29 開発者の決定）。
 
 ## Introduction
 

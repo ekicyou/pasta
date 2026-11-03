@@ -124,7 +124,7 @@
 - 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
-- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/brief.md`。
 - この spec への影響（候補の袋を共有する。同じウェーブに置かない。先に入る側が袋の形を決める）:
   - 条件を満たさない候補は、消費済みにせず袋に残して飛ばす。条件を満たした時点から今の巡に混ざる。重みで増やした札も同じ扱いになる。
   - `＆順番` は、条件を満たさない番号を飛ばして、次に大きい番号へ進む。
@@ -162,4 +162,4 @@
 - **今の段**: 1 回の選択のたびに全候補の条件を評価し、満たす候補の最大の優先を「今の段」とする。今の段より低い札に来たら巡をやり直す。`＆重み`・`＆順番` は、この「今の段の中」に入れる（重み＝札の枚数、順番＝同じ段の中の並べ方）。
 - **`＆優先` は独占の意味**: 優先の高い場面が条件を満たしている間は、低い場面は出ない。マニュアルは「優先＝独占・重み＝出やすさ」と書き分ける。
 - **API の変更**: `SceneTable::resolve_scene_id_unified`・`resolve_scene_id_exact`・`resolve_global_owning_local_exact` は、`filters` の代わりに述語 `Option<CondFn>`（`&mut dyn FnMut(&SceneInfo) -> bool`）を受ける。`filter_by_attributes`・`SceneCacheKey.filters` は消す。`NoMatchingScene { scene }` は「名前に合うシーンはあるが条件を満たす候補が無い」の意味になる。優先の読み方は `scene_types.rs` の `scene_priority`・`PRIORITY_KEYS`。
-- 参照: `.kiro/specs/scene-condition-attributes/design.md`（SceneTable の節・「1 回の選択」の図）、同 `requirements.md` の Requirement 4・5。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/design.md`（SceneTable の節・「1 回の選択」の図）、同 `requirements.md` の Requirement 4・5。

@@ -111,7 +111,7 @@
 - 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
-- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/brief.md`。
 - この spec への影響: Adjacent の例 `＞告白＆好感度＝＄＊好感度` は無くなり、場面の側の `＊告白　＆＄＊好感度＝「高」` になった。保存の範囲の書き方が増えたら、条件の変数もその書き方に従う。
 
 ## 申し送り（2026-10-29 の版の組み替えより）
@@ -134,4 +134,4 @@
 - イベントの act は、シーンを選ぶ前に `act.var` へ Reference（`＄ｒ０`〜・`r0`〜）と日時（`＄季節`・`＄節句`・`hour` など）が入る（`shiori/event/init.lua` の `create_act` が `transfer_req_to_var`・`transfer_date_to_var` を呼ぶ）。`＄` と `＄＊` の範囲を分けるときは、この自動で入る変数がどちらの表に属するかを決める。
 - 条件の評価（`crates/pasta_lua/src/search/scene_cond.rs`）は `＄＊名前` を `act.save`、`＄名前` を `act.var` から素の `raw_get` で引く。表の形や置き場所を変えるなら、ここも合わせる。
 - チェイントークの続きは自分の act のまま再開するので、新しいイベントの転記は続きの変数に届かない。チェイントーク中断のシーンの act（`init.lua` の `iact`）も `create_act` で作るので、同じ転記が入る。
-- 参照: `.kiro/specs/scene-condition-attributes/design.md`（EventAutoTransfer・SceneCond の節）。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/design.md`（EventAutoTransfer・SceneCond の節）。

@@ -136,7 +136,7 @@
 - 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
-- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/brief.md`。
 
 ## 申し送り（2026-10-29 の版の組み替えより）
 
@@ -162,4 +162,4 @@
 - `SCENE.search(name, gsn, act)` の 3 つ目の引数は、使われていなかった `attrs` から act に替わった。act を渡すと `act.var`・`act.save` で条件と `＆優先` を評価し、渡さなければ条件も優先の段も見ない（名指しの再生の道。`get_exact`・`co_exec_exact` は今も条件を見ない）。
 - `SceneTable::resolve_*` は `filters` の代わりに述語 `Option<CondFn>` を受け、`SceneTableError::NoMatchingScene { scene }` は「名前に合うシーンはあるが条件を満たす候補が無い」の意味になった。
 - イベントの act は、作るとき（`init.lua` の `create_act`）に Reference と日時が `var` に入る。当たり判定の名前（Reference）はシーンの条件（`＆＄ｒ０＝「Head」` など）でも振り分けられる。
-- 参照: `.kiro/specs/scene-condition-attributes/design.md`（LuaSceneSearch・ChoiceSelect の節）。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/design.md`（LuaSceneSearch・ChoiceSelect の節）。

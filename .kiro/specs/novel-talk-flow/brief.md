@@ -198,7 +198,7 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
-- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/brief.md`。
 - この spec への影響: 「条件つきの選択肢」の論点で確かめる先が `scene-condition-attributes` になった。あちらは選択肢の行そのものを隠さない（Out）。選択肢の飛び先の候補を選ぶときには、条件が効く。
 
 ## 申し送り（2026-10-29 の版の組み替えより）

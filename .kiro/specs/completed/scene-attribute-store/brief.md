@@ -165,7 +165,7 @@ Call ターゲットの後ろに `＆key＝value` 形式のフィルターを付
 - 中身が変わった。条件は呼ぶ側（`＞シーン＆k＝v`）でなく、場面の側に書く（`＊雑談_今の部屋　＆＄＊経験値≧500`）。
   - 呼ぶ側の Call の文法（`call_scene`・`parse_action.rs`・`element_gen.rs` の Call）は触らない見込みである。
   - 触るのは、属性の文法、`scene.lua`・`act.lua` の検索の道、`search/context.rs`・`scene_table.rs`、イベントからシーンを起こす道（選ぶ前の自動転記）、`pasta_check validate`、LSP と VSCode の文法定義である。
-- 参照: `.kiro/specs/scene-condition-attributes/brief.md`。
+- 参照: `.kiro/specs/completed/scene-condition-attributes/brief.md`。
 - この spec への影響: 属性の読み手が 1 人増える。`＄` で始まる属性（`＆＄＊経験値≧500`・`＆＄＊初回待ち`）は条件で、`scene-condition-attributes` が候補を選ぶときに読む。宣言の属性（`＄` で始まらないもの）の意味は変わらない。宣言の属性 `＆優先：数` も増える。要件の材料は次の 2 つである。
   - 倉に条件も入れて読み手が分けるか、宣言と条件を分けて運ぶか。
   - 全角の数字の読み方と、ファイルの先頭の属性の受け継ぎの規則。`scene-condition-attributes` も条件と `＆優先` にこの規則を使う。
