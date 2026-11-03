@@ -112,7 +112,7 @@
   - _Requirements: 4.1, 4.2, 4.3, 4.6, 5.1, 5.2, 5.5, 5.6, 9.2_
 
 - [ ] 7. 止まるエラーの場所を正しくする
-- [ ] 7.1 読み込んだファイルの表に、チャンクの元のファイルを渡し、`.pasta` のパスを引く口を足す
+- [x] 7.1 読み込んだファイルの表に、チャンクの元のファイルを渡し、`.pasta` のパスを引く口を足す
   - ローダの文脈に、辞書のモジュール名 → 元のファイル（`.pasta` か `dic/` の `.lua` か、ゴーストのフォルダから見たパス）の表を足し、Phase 4 の後に詰める
   - 読み込んだファイルの表に、その表と「候補の全体のパス → `.pasta`」の表を持たせる。`@pasta_chunks` の値はこのタスクでは変えない（`stop.lua` と同じタスクで替える）
   - 候補の全体のパスから `.pasta` のパスを返す Rust の口を足す
@@ -222,3 +222,4 @@
 - 4.1: `tests/fixtures/debug_break_coalesce.pasta` は `src/debug/wiring_pasta_break_coalesce_e2e.rs` が include_str! で読むため残した。4.2 で wiring と一緒に消す。`loader/source_map_build.rs` の `crate::debug::enable` への doc リンクと `tests/runtime/source_map_handoff_test.rs` 冒頭の「デバッグハンドル」の文言も 4.2/4.3 で直す。
 - 4.2: `tests/chunk_name_validation_test.rs`（8.3 で消す予定）は jit.off・set_hook を使っていたため 4.2 で前倒しで消した。
 - 6.1: `persistence::dump_table` に一時の `#[allow(dead_code)]`（shortcut: コメント付き）がある。6.2 で `@pasta_debug` に結んだら外す。
+- 7.1: `searcher::pasta_file_of` に一時の `expect(dead_code)` がある。8.1 で使ったら外す。`@pasta_chunks` の値のパスはまだ OS の区切りのまま（`\` へのそろえは 7.2）。

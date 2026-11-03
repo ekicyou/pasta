@@ -3,6 +3,7 @@
 //! This module provides the LoaderContext structure that transfers
 //! configuration from PastaLoader to PastaLuaRuntime.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use super::config::PastaConfig;
@@ -27,6 +28,19 @@ pub struct LoaderContext {
     /// 変換した Lua のキャッシュの置き場所（base_dir 相対・`[loader] transpiled_output_dir`）。
     /// 探索関数が読み込んだファイルを辞書のキャッシュと見分けるのに使う。
     pub transpiled_output_dir: String,
+
+    /// 辞書のモジュール名（`pasta.scene.天気`）→ キャッシュの元のファイル。
+    /// ローダが Phase 4 の後に詰める（読み込みのたびに作り直す）。
+    pub pasta_sources: HashMap<String, DicSource>,
+}
+
+/// 辞書のキャッシュの元のファイル（ゴーストのフォルダーから見たパス）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DicSource {
+    /// 変換した `.pasta`
+    Pasta(String),
+    /// そのまま写した `dic/` の `.lua`
+    Lua(String),
 }
 
 impl LoaderContext {
@@ -64,6 +78,7 @@ impl LoaderContext {
             lua_search_paths: config.loader.lua_search_paths.clone(),
             custom_fields: config.custom_fields.clone(),
             transpiled_output_dir: config.loader.transpiled_output_dir.clone(),
+            pasta_sources: HashMap::new(),
         }
     }
 
@@ -137,6 +152,7 @@ mod tests {
             lua_search_paths: lua_search_paths.iter().map(|s| s.to_string()).collect(),
             custom_fields: toml::Table::new(),
             transpiled_output_dir: "profile/pasta/cache/lua".to_string(),
+            pasta_sources: HashMap::new(),
         }
     }
 

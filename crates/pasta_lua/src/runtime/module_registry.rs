@@ -64,6 +64,7 @@ impl PastaLuaRuntime {
             lua,
             &loader_context.base_dir,
             &loader_context.transpiled_output_dir,
+            &loader_context.pasta_sources,
         )?;
 
         tracing::debug!(path = %path, "Set package.path");

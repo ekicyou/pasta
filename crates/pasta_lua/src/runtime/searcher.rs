@@ -16,6 +16,7 @@
 //! （要件 1.6・3.7）。候補パス文字列は、ファイルを開くパス・チャンク識別子・
 //! エラーメッセージの 3 箇所に**そのまま**使われる。
 
+use crate::loader::DicSource;
 use mlua::{Function, Lua, Result as LuaResult, Table, Value};
 use std::collections::HashMap;
 use std::io::Read;
@@ -140,7 +141,7 @@ fn find_module(
                 .into_function()
             {
                 Ok(loader) => {
-                    record_chunk(lua, &candidate)?;
+                    record_chunk(lua, &module_name, &candidate)?;
                     Ok((Some(loader), None, false))
                 }
                 Err(e) => Ok((None, Some(load_error(&module_name, &candidate, &e)), true)),
@@ -189,6 +190,10 @@ struct ChunkTable {
     cache_rel: String,
     /// キー → そのキーを最初に作った候補パス。標準ランタイム・ゴーストの外も含む。
     seen: HashMap<Vec<u8>, String>,
+    /// 辞書のモジュール名 → キャッシュの元のファイル（`LoaderContext::pasta_sources`）。
+    pasta_sources: HashMap<String, DicSource>,
+    /// 読み込んだ `.pasta` のキャッシュの候補パス（全体）→ その `.pasta` のパス。
+    pasta_of: HashMap<String, String>,
 }
 
 /// 候補パスを、エラー文の位置の接頭辞に出る形（`@` を除いたチャンク名）にする。
@@ -213,13 +218,20 @@ fn error_form(candidate: &str) -> Vec<u8> {
 /// - 2 つのファイルが同じキーになった: `false`（見分けられない。無いのと同じに扱う）
 ///
 /// 標準ランタイムとゴーストの外のファイルは控えない（重複の見分けには数える）。
-pub(crate) fn register_chunk_table(lua: &Lua, ghost_dir: &Path, cache_dir: &str) -> LuaResult<()> {
+pub(crate) fn register_chunk_table(
+    lua: &Lua,
+    ghost_dir: &Path,
+    cache_dir: &str,
+    pasta_sources: &HashMap<String, DicSource>,
+) -> LuaResult<()> {
     let ghost_dir = ghost_dir.to_string_lossy().replace('\\', "/");
     let cache_rel = format!("{}/", cache_dir.replace('\\', "/").trim_matches('/'));
     lua.set_app_data(ChunkTable {
         ghost_dir: ghost_dir.trim_end_matches('/').to_string(),
         cache_rel,
         seen: HashMap::new(),
+        pasta_sources: pasta_sources.clone(),
+        pasta_of: HashMap::new(),
     });
     let package: Table = lua.globals().get("package")?;
     let loaded: Table = package.get("loaded")?;
@@ -227,25 +239,31 @@ pub(crate) fn register_chunk_table(lua: &Lua, ghost_dir: &Path, cache_dir: &str)
 }
 
 /// 読み込めた候補パスを表に控える（[`register_chunk_table`] の前なら何もしない）。
-fn record_chunk(lua: &Lua, candidate: &str) -> LuaResult<()> {
+fn record_chunk(lua: &Lua, module_name: &str, candidate: &str) -> LuaResult<()> {
     let key = error_form(candidate);
     let value = {
         let Some(mut table) = lua.app_data_mut::<ChunkTable>() else {
             return Ok(());
         };
+        let table = &mut *table;
+        let path = candidate.replace('\\', "/");
+        let rel = path
+            .strip_prefix(&table.ghost_dir)
+            .and_then(|p| p.strip_prefix('/'));
+        let in_cache = rel.is_some_and(|r| r.starts_with(&table.cache_rel));
+        // キーの重複に左右されないよう、全体のパスで控える。
+        if in_cache && let Some(DicSource::Pasta(pasta)) = table.pasta_sources.get(module_name) {
+            table.pasta_of.insert(candidate.to_string(), pasta.clone());
+        }
         match table.seen.get(&key) {
             Some(first) if first == candidate => return Ok(()),
             Some(_) => Value::Boolean(false),
             None => {
                 table.seen.insert(key.clone(), candidate.to_string());
-                let path = candidate.replace('\\', "/");
-                let Some(rel) = path
-                    .strip_prefix(&table.ghost_dir)
-                    .and_then(|p| p.strip_prefix('/'))
-                else {
+                let Some(rel) = rel else {
                     return Ok(()); // ゴーストの外
                 };
-                if rel.starts_with(&table.cache_rel) {
+                if in_cache {
                     Value::Boolean(true)
                 } else if rel.starts_with(RUNTIME_REL) {
                     return Ok(());
@@ -261,6 +279,20 @@ fn record_chunk(lua: &Lua, candidate: &str) -> LuaResult<()> {
         return Ok(());
     };
     chunks.raw_set(lua.create_string(&key)?, value)
+}
+
+/// 読み込んだ候補の全体のパス（`Function::info().source` から `@` を除いた形）から、
+/// その `.pasta` のパス（ゴーストのフォルダーから見た形）を返す。
+/// `.pasta` から変換したキャッシュでなければ None（作者の `.lua`・`dic/` の `.lua` の写し・表の無い VM）。
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "シーンの索引の突合（8.1）が使う")
+)]
+pub(crate) fn pasta_file_of(lua: &Lua, candidate: &str) -> Option<String> {
+    lua.app_data_ref::<ChunkTable>()?
+        .pasta_of
+        .get(candidate)
+        .cloned()
 }
 
 /// `package.loaders[2]` を Rust 実装の Lua ファイル searcher へ置換する。
@@ -582,11 +614,75 @@ mod tests {
         );
     }
 
+    /// `.pasta` の候補にだけ `.pasta` のパスを返す（3.5・6.3）。`dic/` の `.lua` の写し・
+    /// 作者の `.lua`・元の分からないキャッシュ・読み込んでいない候補には返さない。
+    /// `@pasta_chunks` の値（キャッシュは `true`）は変わらない。
+    #[test]
+    fn pasta_file_of_returns_only_pasta_sources() {
+        let dir = tempfile::tempdir().unwrap();
+        let ghost = dir.path().join("ghost");
+        for rel in [
+            "scripts/作者.lua",
+            "profile/pasta/cache/lua/pasta/scene/天気.lua",
+            "profile/pasta/cache/lua/pasta/scene/道具.lua",
+            "profile/pasta/cache/lua/pasta/scene/未知.lua",
+        ] {
+            let path = ghost.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, "return debug.getinfo(1, 'S').source").unwrap();
+        }
+        let sources = HashMap::from([
+            (
+                "pasta.scene.天気".to_string(),
+                DicSource::Pasta("dic/天気.pasta".to_string()),
+            ),
+            (
+                "pasta.scene.道具".to_string(),
+                DicSource::Lua("dic/道具.lua".to_string()),
+            ),
+        ]);
+        let lua = ghost_vm_with(&ghost, &sources);
+        let candidate = |module: &str| -> String {
+            let source: String = lua
+                .load(format!("return require('{module}')"))
+                .eval()
+                .unwrap();
+            source.strip_prefix('@').unwrap().to_string()
+        };
+
+        let pasta = candidate("pasta.scene.天気");
+        assert_eq!(
+            pasta_file_of(&lua, &pasta).as_deref(),
+            Some("dic/天気.pasta")
+        );
+        for module in ["pasta.scene.道具", "作者", "pasta.scene.未知"] {
+            let c = candidate(module);
+            assert_eq!(pasta_file_of(&lua, &c), None, "{module}");
+        }
+        let root = ghost.to_string_lossy().replace('\\', "/");
+        assert_eq!(pasta_file_of(&lua, &format!("{root}/dic/天気.pasta")), None);
+
+        let got: Value = chunk_table(&lua)
+            .raw_get(lua.create_string(error_form(&pasta)).unwrap())
+            .unwrap();
+        assert_eq!(got, Value::Boolean(true));
+    }
+
+    /// 表の無い VM では何も返さない。
+    #[test]
+    fn pasta_file_of_without_table_is_none() {
+        assert_eq!(pasta_file_of(&production_like_vm(), "x.lua"), None);
+    }
+
     /// 本番と同じ検索パス（`LoaderContext::generate_package_path` の形）と表を持つ VM。
     fn ghost_vm(ghost: &std::path::Path) -> Lua {
+        ghost_vm_with(ghost, &HashMap::new())
+    }
+
+    fn ghost_vm_with(ghost: &std::path::Path, sources: &HashMap<String, DicSource>) -> Lua {
         let lua = production_like_vm();
         install_module_searcher(&lua).unwrap();
-        register_chunk_table(&lua, ghost, "profile/pasta/cache/lua").unwrap();
+        register_chunk_table(&lua, ghost, "profile/pasta/cache/lua", sources).unwrap();
         let root = ghost.to_string_lossy().replace('\\', "/");
         let path = [
             "scripts",

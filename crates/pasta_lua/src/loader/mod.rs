@@ -38,7 +38,7 @@ pub use config::{
     default_hour_margin, default_log_file_path, default_lua_search_paths, default_spot_newlines,
     default_talk_interval_max, default_talk_interval_min,
 };
-pub use context::LoaderContext;
+pub use context::{DicSource, LoaderContext};
 /// 一致テスト用（pasta_check）: 辞書ファイルの集め方
 #[doc(hidden)]
 pub use discovery::discover_files;
@@ -126,7 +126,7 @@ impl PastaLoader {
         );
 
         // Stage 1.7: Reject ';' and '?' that would break package.path
-        let loader_context = LoaderContext::from_config(base_dir, &config);
+        let mut loader_context = LoaderContext::from_config(base_dir, &config);
         loader_context.check_package_path_chars()?;
 
         // Phase 2: Prepare directories and cache (with version check)
@@ -176,6 +176,17 @@ impl PastaLoader {
         let transpiler = Self::transpiler_for(&config);
         let (module_names, stats) =
             Self::process_incremental(&pasta_files, &lua_files, &cache_manager, &transpiler)?;
+
+        // チャンクの元のファイルを、読み込んだファイルの表へ渡す
+        let source = |f: &std::path::PathBuf, kind: fn(String) -> DicSource| {
+            let module = cache_manager.source_to_module_name(f);
+            (module, kind(cache_manager.get_relative_path(f)))
+        };
+        loader_context.pasta_sources = pasta_files
+            .iter()
+            .map(|f| source(f, DicSource::Pasta))
+            .chain(lua_files.iter().map(|f| source(f, DicSource::Lua)))
+            .collect();
 
         // Log statistics in debug mode
         if config.loader.debug_mode {
