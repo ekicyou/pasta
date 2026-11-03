@@ -3,13 +3,18 @@
 //
 // Requirements: 2.1 (root = two above ghost/master within 3 levels up, with descript.txt),
 // 2.3 (display name = descript name, else the root folder name),
-// 5.6 (pasta.log location from pasta.toml [logging] file_path, default + note when unusable).
+// 5.6 (pasta.log location from pasta.toml [logging] file_path, default + note when unusable),
+// 4.3 / 5.7 (pasta.log tail: only complete appended lines, levels, loaded=true|false, unreadable),
+// 6.2 / 6.3 (variables.toml location, mtime, contents; a missing file has no mtime).
 
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { resolveGhost, decodeDescriptName, MAX_ASCENT, pastaLogPath, DEFAULT_PASTA_LOG } from '../ghostFiles';
+import {
+  resolveGhost, decodeDescriptName, MAX_ASCENT, pastaLogPath, DEFAULT_PASTA_LOG,
+  openLogCursor, readNewLines, parsePastaLogLine, loadCompletion, variablesPath, mtimeOf, readText,
+} from '../ghostFiles';
 
 let passed = 0;
 let failed = 0;
@@ -154,6 +159,82 @@ async function main() {
       assert.strictEqual(r.path, def, toml);
       assert.ok(r.note, `note for ${JSON.stringify(toml)}`);
     }
+  });
+
+  // Lines shaped like tracing's fmt layer in pasta (ansi off, target on): `<time>  <LEVEL> <target>: <msg>`
+  const L = (level: string, msg: string) => `2026-11-03T01:02:03.456789Z ${level.padStart(5)} pasta_shiori::windows: ${msg}`;
+
+  await test('readNewLines reads only complete appended lines and keeps the partial line', async () => {
+    const log = path.join(tmp, 'tail', 'pasta.log');
+    fs.mkdirSync(path.dirname(log), { recursive: true });
+    fs.writeFileSync(log, 'old line\n');
+    const c0 = await openLogCursor(log);
+    assert.strictEqual(c0.offset, Buffer.byteLength('old line\n'));
+    fs.appendFileSync(log, 'あ1\r\nb2\npart');
+    const r1 = await readNewLines(c0);
+    assert.ok(r1);
+    assert.deepStrictEqual(r1.lines, ['あ1', 'b2']);
+    fs.appendFileSync(log, 'ial\n');
+    const r2 = await readNewLines(r1.next);
+    assert.ok(r2);
+    assert.deepStrictEqual(r2.lines, ['partial']);
+    const r3 = await readNewLines(r2.next);
+    assert.deepStrictEqual(r3?.lines, []);
+  });
+
+  await test('a log that does not exist yet starts at 0; unreadable gives undefined', async () => {
+    const log = path.join(tmp, 'tail', 'later.log');
+    const c = await openLogCursor(log);
+    assert.strictEqual(c.offset, 0);
+    assert.strictEqual(await readNewLines(c), undefined); // not there: unreadable
+    fs.writeFileSync(log, 'x\n');
+    assert.deepStrictEqual((await readNewLines(c))?.lines, ['x']);
+    assert.strictEqual(await readNewLines({ path: path.join(tmp, 'tail'), offset: 0 }), undefined); // a folder
+  });
+
+  await test('a log that shrank is read again from the start', async () => {
+    const log = path.join(tmp, 'tail', 'shrink.log');
+    fs.writeFileSync(log, 'long long line\n');
+    const c = await openLogCursor(log);
+    fs.writeFileSync(log, 'new\n');
+    assert.deepStrictEqual((await readNewLines(c))?.lines, ['new']);
+  });
+
+  await test('parsePastaLogLine reads the 5 levels', async () => {
+    for (const lv of ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'] as const) {
+      const line = L(lv, 'msg ERROR WARN');
+      assert.deepStrictEqual(parsePastaLogLine(line), { level: lv, text: line });
+    }
+    for (const line of ['', 'continued text', 'WARN at the start', '2026-11-03T01:02:03Z  NOTICE x: y', '2026-11-03T01:02:03Z  warn x: y']) {
+      assert.strictEqual(parsePastaLogLine(line).level, undefined, line);
+    }
+  });
+
+  await test('loadCompletion reads loaded=true and loaded=false only', async () => {
+    assert.deepStrictEqual(loadCompletion(L('INFO', 'SHIORI load entry completed entry="load" loaded=true')), { loaded: true });
+    assert.deepStrictEqual(loadCompletion(L('INFO', 'SHIORI load entry completed entry="v3" loaded=false')), { loaded: false });
+    for (const line of [
+      L('INFO', 'SHIORI load entry completed entry="load" loaded=1'),
+      L('INFO', 'SHIORI load entry completed entry="load" loaded=trueish'),
+      L('INFO', 'SHIORI load entry completed entry="load"'),
+      L('INFO', 'other line loaded=true'),
+    ]) {
+      assert.strictEqual(loadCompletion(line), undefined, line);
+    }
+  });
+
+  await test('variables.toml: location, mtime, contents; missing has no mtime', async () => {
+    const master = path.join(tmp, 'Vars', 'ghost', 'master');
+    const v = variablesPath(master);
+    assert.strictEqual(v, path.join(master, 'profile', 'pasta', 'debug', 'variables.toml'));
+    assert.strictEqual(await mtimeOf(v), undefined);
+    assert.strictEqual(await readText(v), undefined);
+    fs.mkdirSync(path.dirname(v), { recursive: true });
+    fs.writeFileSync(v, 'a = "あ"\n');
+    const m = await mtimeOf(v);
+    assert.strictEqual(typeof m, 'number');
+    assert.strictEqual(await readText(v), 'a = "あ"\n');
+    assert.strictEqual(fs.readFileSync(v, 'utf8'), 'a = "あ"\n'); // never written
   });
 
   fs.rmSync(tmp, { recursive: true, force: true });

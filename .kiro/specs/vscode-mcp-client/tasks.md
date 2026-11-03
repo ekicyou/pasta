@@ -51,7 +51,7 @@
   - 終わったとき: 単体の試験で、続きの行・記録 0 件・4 つの答えの分け方が確かめられて通る。
   - _Requirements: 4.7, 4.8_
 
-- [ ] 4. ゴーストのファイル
+- [x] 4. ゴーストのファイル
 - [x] 4.1 (P) ゴーストのルートと表示名を決める
   - 3 の MCP のクライアントとは別のファイルなので、3.1〜3.3 と並んで進めてよい。4.2・4.3 は同じファイルを書くので 4.1 の後に順に進める。
   - 既存の `ghost/master` の探し方が返すフォルダが、ファイルのフォルダから上へ 3 つまでの間にあり、`descript.txt` を持つときだけ、その 2 つ上をルートにする（`ghost`・`master`・`descript.txt` の大文字・小文字は区別しない）。覚えと重なりの鍵として、ルートを小文字にした値も持つ。
@@ -64,7 +64,7 @@
   - `profile/` で始まり、後にファイル名があり、`..` を含まず、絶対パスでない値だけを使う。書かれていない・`pasta.toml` が無いときは既定の `profile/pasta/logs/pasta.log`。書かれているのに読めない・条件に外れるときは既定を使い、添え書きを付ける。
   - 終わったとき: 単体の試験で、3 つの書き方・外れた値（`../x`・`C:\x`・`Profile/x`・`profile/`）・読めない書き方（複数行のインラインテーブル）で添え書きが付くことが通る。
   - _Requirements: 5.6_
-- [ ] 4.3 `pasta.log` の増えた分と `variables.toml` を読む
+- [x] 4.3 `pasta.log` の増えた分と `variables.toml` を読む
   - 読む前の大きさを覚え、そこから増えた完全な行だけを読む（最後の改行より後の書きかけは次の回に残す）。読めなければ「読めない」を返す。
   - 行のレベル（ERROR・WARN・INFO・DEBUG・TRACE）を読み、`SHIORI load entry completed` の行から `loaded=true`／`false` を読む（ほかの値は読まない）。
   - `variables.toml` の場所・更新時刻・中身を読む。書き込みはしない。
@@ -173,3 +173,4 @@
 - 3.1: mcpClient.ts の内部 rpc() は 3.2 の initialize で使える。単体試験は src/test/mcpClient.test.ts（6.3 で test:unit に足す）。fakeMcpServer に raiseEvent.mode=empty（200 で本文が空）を足した。
 - 4.1: ghostFiles.ts の resolveGhost(fileFsPath, masterPath) は master のパスを受ける。糊（6.1）は resolveGhost(uri.fsPath, findGhostMaster(uri)?.fsPath)（ghostValidator.ts）で呼ぶ。試験は src/test/ghostFiles.test.ts（vscode の alias 不要）。
 - 4.2: file_path の判定は pasta の logger.rs と同じく部品で判じる（\ も区切り・profile/dir/ は通す）。文字列の startsWith で判じない。
+- 4.3: readNewLines は pasta.log がまだ無いときも undefined（読めない）を返す。5.1 の待ちでは引き直し続け、最後の結果で「読めない」を決める。

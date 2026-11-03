@@ -1,6 +1,7 @@
 // GhostFiles - ゴーストのディスクの上のこと（vscode-mcp-client の設計の GhostFiles）
 //
-// vscode に触らない純粋なモジュール。ルート・descript の name（2.1・2.3）と pasta.log の場所（5.6）を決める。
+// vscode に触らない純粋なモジュール。ルート・descript の name（2.1・2.3）と pasta.log の場所（5.6）を決め、
+// pasta.log の増えた分（4.3・5.7）と variables.toml（6.2・6.3）を読む。
 // 書き込まない（読むだけ）。
 
 import { promises as fs } from 'fs';
@@ -183,4 +184,78 @@ function readString(s: string): string | null {
     }
   }
   return null;
+}
+
+export interface LogCursor { readonly path: string; readonly offset: number } // offset は読む前の大きさ（無ければ 0）
+
+/** 読む前の大きさを覚える。無い・読めないときは 0（後からできたファイルを頭から読む） */
+export async function openLogCursor(p: string): Promise<LogCursor> {
+  try {
+    return { path: p, offset: (await fs.stat(p)).size };
+  } catch {
+    return { path: p, offset: 0 };
+  }
+}
+
+/** offset から増えた分の完全な行（最後の改行より後は次の回に残す）。読めなければ undefined（5.7） */
+export async function readNewLines(cursor: LogCursor): Promise<{ lines: string[]; next: LogCursor } | undefined> {
+  let handle;
+  try {
+    handle = await fs.open(cursor.path, 'r');
+    const st = await handle.stat();
+    if (!st.isFile()) {
+      return undefined; // Windows ではフォルダも開けてしまう
+    }
+    const size = st.size;
+    const start = size < cursor.offset ? 0 : cursor.offset; // 縮んだ（作り直された）ら頭から
+    const buf = Buffer.alloc(size - start);
+    const { bytesRead } = await handle.read(buf, 0, buf.length, start);
+    const end = buf.subarray(0, bytesRead).lastIndexOf(0x0a) + 1; // 改行の後ろまで。無ければ 0
+    const lines = end === 0 ? [] : buf.subarray(0, end - 1).toString('utf8').split(/\r?\n/);
+    return { lines, next: { path: cursor.path, offset: start + end } };
+  } catch {
+    return undefined;
+  } finally {
+    await handle?.close();
+  }
+}
+
+export type PastaLogLevel = 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' | 'TRACE';
+export interface PastaLogLine { readonly level: PastaLogLevel | undefined; readonly text: string }
+
+/** tracing の fmt の行 `<時刻>  <LEVEL> <target>: <本文>` のレベル。形が違う行（続きの行など）は undefined */
+export function parsePastaLogLine(line: string): PastaLogLine {
+  const m = /^\S+\s+(ERROR|WARN|INFO|DEBUG|TRACE)\s/.exec(line);
+  return { level: m ? (m[1] as PastaLogLevel) : undefined, text: line };
+}
+
+/** `SHIORI load entry completed` の行なら loaded の値（true・false だけ）、ほかは undefined */
+export function loadCompletion(line: string): { loaded: boolean } | undefined {
+  if (!line.includes('SHIORI load entry completed')) {
+    return undefined;
+  }
+  const m = /(?:^|\s)loaded=(true|false)(?=\s|$)/.exec(line);
+  return m ? { loaded: m[1] === 'true' } : undefined;
+}
+
+export function variablesPath(master: string): string {
+  return path.join(master, 'profile', 'pasta', 'debug', 'variables.toml');
+}
+
+/** 更新時刻（ms）。無い・読めないときは undefined */
+export async function mtimeOf(p: string): Promise<number | undefined> {
+  try {
+    return (await fs.stat(p)).mtimeMs;
+  } catch {
+    return undefined;
+  }
+}
+
+/** UTF-8 の中身。無い・読めないときは undefined */
+export async function readText(p: string): Promise<string | undefined> {
+  try {
+    return await fs.readFile(p, 'utf8');
+  } catch {
+    return undefined;
+  }
 }
