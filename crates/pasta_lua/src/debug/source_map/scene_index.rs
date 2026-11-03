@@ -34,7 +34,7 @@
 //! `BTreeMap` の対数オーダ操作であり、SHIORI GET 処理ブロックを延ばさない（8.3）。
 
 // NOTE: 構築側（ランタイム構築時の `scene_join::build_scene_index`）と参照側
-// （`SourceMap::scene_at` → `playscene::resolve_and_kick`）には結線済み。下の
+// （`SourceMap::scene_at` → `playscene::resolve_position`）には結線済み。下の
 // dead_code 許可は結線前に置いたものである。
 #![allow(dead_code)]
 

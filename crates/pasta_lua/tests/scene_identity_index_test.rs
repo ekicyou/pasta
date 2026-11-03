@@ -273,82 +273,47 @@ fn pasta_debug_module_reports_enabled_and_resolves_positions() {
 // ===========================================================================
 // task 6.1 統合/回帰テスト（pasta-scene-kick-from-cursor・requirements 3.1/3.3/3.4/7.1）。
 //
-// task 2.2（`scene_identity_index_test::finalize_join_resolves_*`）は「位置 → 索引
-// identity」かつ「索引 identity == `collect_scenes`」を固定する。task 3.1 の
-// `playscene_tests` は **合成** SourceMap で `resolve_and_kick` の composite-string 組立を、
-// `kick_local_composite_test.lua` は Lua 単体で try_dispatch の
-// 分岐を固定する。いずれも「索引 identity が、実ランタイム上の kick の引き当ての
-// 解決対象に一致する」ことは END-TO-END では固定していない。
-//
-// 本 6.1 は単一の **実ロード済みランタイム** 上で次のループを閉じる:
-//   位置 → `SourceMap::scene_at`（索引 identity）
-//        → kick 取次が組むキック名（global: `OnTalk_1` / local: `:OnTalk_1:挨拶_1`）
-//        → シーン表（`STORE.scenes`）からの完全一致の引き当て（= kick.lua try_dispatch と同手順）
+// 単一の **実ロード済みランタイム** 上で次のループを閉じる:
+//   位置 → `@pasta_debug.scene_at`（`resolve_position`。登録名の組 `(大域, ローカル)`）
+//        → シーン表（`STORE.scenes`）からの完全一致の引き当て（`OnPastaSceneAt` と同手順）
 //        → 着地した runtime (global_name, local_name) が `collect_scenes`（SSOT）に一致。
-// これにより「索引 identity == kick の解決対象 == runtime 実シーン」を実機で
-// 突合する（3.1/3.3）。加えて debug 有効・索引充填済みの同一ランタイムで行マッピング
-// 双方向 resolve のラウンドトリップ不変を固定する（3.4 後方非破壊）。
+// これにより「位置の引きの組 == runtime 実シーン」を実機で突合する（3.1/3.3）。
+// 加えて debug 有効・索引充填済みの同一ランタイムで行マッピング双方向 resolve の
+// ラウンドトリップ不変を固定する（3.4 後方非破壊）。
 // ===========================================================================
 
-/// kick 取次（`debug::playscene::build_kick_scene`）と **同一契約**で確定 identity から
-/// キック名を組む（global → `scene_id`、local → `:{parent}:{scene_id}`）。
-///
-/// 本関数は production の private ヘルパと同じ規則をテスト側で再現し、`scene_at` が返す
-/// identity が kick 経路に渡されるキック名へどう写像されるかを固定する（playscene.rs
-/// `build_kick_scene` のドキュメント契約）。組んだキック名を [`kick_lookup_runtime`]
-/// がシーン表から完全一致で引き、ループを閉じる。
-fn kick_scene_key(id: &SceneIdentity) -> String {
-    match &id.parent {
-        Some(p) => format!(":{p}:{}", id.scene_id),
-        None => id.scene_id.clone(),
-    }
+/// `@pasta_debug.scene_at(file, line)` で位置を登録名の組に引く（見つからなければ `None`）。
+fn scene_at_pair(lua: &Lua, file: &str, line: u32) -> Option<(String, String)> {
+    let (g, l): (Option<String>, Option<String>) = lua
+        .load(r#"local f, l = ... return require("@pasta_debug").scene_at(f, l)"#)
+        .call((file, line))
+        .expect("@pasta_debug.scene_at must not error");
+    g.zip(l)
 }
 
-/// キック名を **実ロード済みランタイム** のシーン表から完全一致で引き当て、着地した
-/// runtime シーン `(global_name, local_name)` を返す（kick.lua try_dispatch と同手順）。
-///
-/// - `:parent:local` 形式（local-composite）: kick.lua と同じく `^:([^:]+):(.+)$` で
-///   parent/local_name に分解し、`SCENE.get(parent, local_name)` で引く。
-/// - 先頭 `:` 無し（global）: `SCENE.get_start(name)` で開始関数を引く。
-///
-/// 前方一致の検索（`SCENE.search`）は通らない。解決不能なら `None`
-/// （= kick が unresolved drop する位置）。
-fn kick_lookup_runtime(lua: &Lua, kick_name: &str) -> Option<(String, String)> {
-    let (global, local) = match kick_name
-        .strip_prefix(':')
-        .and_then(|rest| rest.split_once(':'))
-    {
-        Some((p, l)) => (p.to_string(), l.to_string()),
-        None => (kick_name.to_string(), "__start__".to_string()),
-    };
-    let found: bool = lua
-        .load(
-            r#"
-            local g, l = ...
-            local SCENE = require("pasta.scene")
-            local fn
-            if l == "__start__" then fn = SCENE.get_start(g) else fn = SCENE.get(g, l) end
-            return type(fn) == "function"
-        "#,
-        )
-        .call((global.as_str(), local.as_str()))
-        .expect("scene table lookup must not error");
-    found.then_some((global, local))
+/// シーン表に `(global, local)` の関数があるか（`OnPastaSceneAt` の引き当てと同手順）。
+fn scene_fn_exists(lua: &Lua, global: &str, local: &str) -> bool {
+    lua.load(
+        r#"
+        local g, l = ...
+        local SCENE = require("pasta.scene")
+        local fn
+        if l == "__start__" then fn = SCENE.get_start(g) else fn = SCENE.get(g, l) end
+        return type(fn) == "function"
+    "#,
+    )
+    .call((global, local))
+    .expect("scene table lookup must not error")
 }
 
-/// 6.1-(1) kick の引き当ての解決対象一致（requirements 3.1/3.3）。
+/// 6.1-(1) 位置の引きの組が runtime 実シーンに一致する（requirements 3.1/3.3）。
 ///
-/// 実ロード済みランタイム上で、既知の global / local 宣言領域の行から `scene_at` で
-/// identity を確定し、その identity をキック名へ写像し（global → `OnTalk_1`、
-/// local → `:OnTalk_1:挨拶_1`）、シーン表から完全一致で引いた着地シーンが `collect_scenes`
-/// （runtime SSOT）に存在することを END-TO-END で固定する。
-///
-/// 真正性（RED の論拠）: もし索引 identity と kick の引き当てが乖離すれば
-/// （例: local が global の `__start__` へ潰れる／parent 取り違え／scene_id 不一致）、
-/// 完全一致の引き当ては失敗するか `collect_scenes` の対応エントリと食い違い、本テストの
-/// `assert` は落ちる。
+/// 既知の global / local 宣言領域の行を `scene_at`（`resolve_position`）で組に引き
+/// （global → `(OnTalk_1, __start__)`、local → `(OnTalk_1, 挨拶_1)`）、シーン表から
+/// 完全一致で引けて `collect_scenes`（SSOT）に在ることを END-TO-END で固定する。
+/// 位置の引きと実シーンが乖離すれば（local が `__start__` へ潰れる・親の取り違え）落ちる。
 #[test]
-fn index_identity_matches_runtime_kick_lookup_target() {
+fn resolved_position_pair_matches_runtime_scene() {
     let temp = tempfile::TempDir::new().expect("temp dir");
     let base = temp.path();
     let pasta_file = make_base_dir(base, true);
@@ -356,90 +321,26 @@ fn index_identity_matches_runtime_kick_lookup_target() {
 
     let runtime = PastaLoader::load_with_config(base, RuntimeConfig::new())
         .expect("debug-enabled runtime must load");
-    let source_map = runtime
-        .debug_source_map()
-        .expect("enabled debug runtime holds the aggregated source map");
     let lua = runtime.lua();
-
-    // runtime SSOT。
     let scenes =
         pasta_lua::runtime::finalize::collect_scenes(lua).expect("collect_scenes must succeed");
 
-    // --- global: 本体領域行 → identity (OnTalk_1, None) → キック名 "OnTalk_1" ---
-    let global_id = source_map
-        .scene_at(&pasta_key, LINE_GLOBAL1_BODY)
-        .expect("global 本体行は identity へ解決する");
-    assert_eq!(
-        global_id,
-        ident("OnTalk_1", None),
-        "scene_at は global identity を返す"
-    );
-    let global_key = kick_scene_key(&global_id);
-    assert_eq!(global_key, "OnTalk_1", "global の キック名は素の scene_id");
+    let global = scene_at_pair(lua, &pasta_key, LINE_GLOBAL1_BODY).expect("global 本体行は引ける");
+    let local = scene_at_pair(lua, &pasta_key, LINE_LOCAL_BODY).expect("local 本体行は引ける");
+    assert_eq!(global, ("OnTalk_1".to_string(), "__start__".to_string()));
+    assert_eq!(local, ("OnTalk_1".to_string(), "挨拶_1".to_string()));
 
-    let (g_global, g_local) =
-        kick_lookup_runtime(lua, &global_key).expect("global キック名は runtime シーンへ着地する");
-    // global kick は __start__（無名 start シーン）へ着地するのが kick 決定ノートの契約。
-    assert_eq!(
-        g_global, "OnTalk_1",
-        "global kick の引き当ては索引 identity と同じ global へ着地する"
-    );
-    assert!(
-        scenes.iter().any(|(g, l)| *g == g_global && *l == g_local),
-        "global kick の着地 ({g_global}, {g_local}) は collect_scenes(SSOT) に存在する: {scenes:?}"
-    );
-    // 着地 global は索引 identity の scene_id と一致（kick 解決対象 == 索引 identity）。
-    assert_eq!(
-        g_global, global_id.scene_id,
-        "kick の引き当ての解決対象 global == 索引 identity の scene_id"
-    );
-
-    // --- local: 名前付き local 本体行 → identity (挨拶_1, Some(OnTalk_1)) → ":OnTalk_1:挨拶_1" ---
-    let local_id = source_map
-        .scene_at(&pasta_key, LINE_LOCAL_BODY)
-        .expect("local 本体行は identity へ解決する");
-    assert_eq!(
-        local_id,
-        ident("挨拶_1", Some("OnTalk_1")),
-        "scene_at は local identity を返す"
-    );
-    let local_key = kick_scene_key(&local_id);
-    assert_eq!(
-        local_key, ":OnTalk_1:挨拶_1",
-        "local の キック名は composite ':parent:local'"
-    );
-
-    let (l_global, l_local) = kick_lookup_runtime(lua, &local_key)
-        .expect("local-composite キック名は runtime シーンへ着地する");
-    // local 分岐は __start__ へ潰さず local 同一性を保持する（kick 決定ノート）。
-    assert_eq!(
-        (l_global.as_str(), l_local.as_str()),
-        ("OnTalk_1", "挨拶_1"),
-        "local kick の引き当ては索引 identity と同じ (OnTalk_1, 挨拶_1) へ着地する"
-    );
-    assert!(
-        scenes.iter().any(|(g, l)| *g == l_global && *l == l_local),
-        "local kick の着地 ({l_global}, {l_local}) は collect_scenes(SSOT) に存在する: {scenes:?}"
-    );
-    // 着地 (global, local) は索引 identity の (parent, scene_id) と一致。
-    assert_eq!(
-        l_global,
-        local_id.parent.clone().expect("local は parent を持つ"),
-        "kick の引き当ての解決対象 parent == 索引 identity の parent"
-    );
-    assert_eq!(
-        l_local, local_id.scene_id,
-        "kick の引き当ての解決対象 local == 索引 identity の scene_id"
-    );
-
-    // 念のため: global と local は別シーンへ解決している（潰れていない）。
-    assert_ne!(
-        (g_global.as_str(), g_local.as_str()),
-        (l_global.as_str(), l_local.as_str()),
-        "global kick(__start__) と local kick(挨拶_1) は別シーンへ解決する"
-    );
+    for (g, l) in [&global, &local] {
+        assert!(
+            scene_fn_exists(lua, g, l),
+            "({g}, {l}) はシーン表から引ける"
+        );
+        assert!(
+            scenes.iter().any(|(sg, sl)| sg == g && sl == l),
+            "({g}, {l}) は collect_scenes(SSOT) に存在する: {scenes:?}"
+        );
+    }
 }
-
 /// 6.1-(2) 行マッピング後方非破壊の回帰（requirements 3.4）。
 ///
 /// **debug 有効・索引充填済み** の同一ランタイムで、既知の `.pasta` 宣言行について
@@ -771,7 +672,7 @@ fn same_named_scenes_in_two_files_resolve_to_their_own_file() {
 //
 // 同じファイルに別名 `＊会話` と本名 `＊OnTalk` が混在しても、既定の別名表
 // （`OnTalk = ["会話"]`）のもとで各宣言は同じ base `OnTalk` の出現順で採番され
-// （`OnTalk_1`〜`OnTalk_3`）、各行の identity・kick 名・シーン表から引くシーンが
+// （`OnTalk_1`〜`OnTalk_3`）、各行の identity・位置の引きの組・シーン表から引くシーンが
 // その行の宣言のシーンになる。
 // ===========================================================================
 
@@ -781,7 +682,7 @@ fn same_named_scenes_in_two_files_resolve_to_their_own_file() {
 /// 12: ＊会話   → OnTalk_3（13: 本体）
 const ALIAS_MIXED_FIXTURE: &str = include_str!("fixtures/scene_alias_mixed.pasta");
 
-/// 7.1/7.2/7.3: 各宣言行・本体行が宣言どおりの identity に対応づき、その kick 名で
+/// 7.1/7.2/7.3: 各宣言行・本体行が宣言どおりの identity に対応づき、その位置の引きの組で
 /// シーン表から引いたシーンが同名の他候補ではなくその行のシーンであり、
 /// 本体行にブレークポイントを置ける（`.pasta`→`.lua`→`.pasta` が元の行へ戻る）。
 #[test]
@@ -799,28 +700,62 @@ fn aliased_and_real_name_scenes_in_one_file_map_to_their_own_identities() {
         .expect("enabled runtime holds map");
     let lua = runtime.lua();
 
-    // (行, 期待 identity, 期待 kick 名, その行のシーンだけが持つ台詞)
+    // (行, 期待 identity, 期待の位置の引きの組, その行のシーンだけが持つ台詞)
     let cases = [
-        (2, ident("OnTalk_1", None), "OnTalk_1", "「会話その1」"),
-        (3, ident("OnTalk_1", None), "OnTalk_1", "「会話その1」"),
+        (
+            2,
+            ident("OnTalk_1", None),
+            ("OnTalk_1", "__start__"),
+            "「会話その1」",
+        ),
+        (
+            3,
+            ident("OnTalk_1", None),
+            ("OnTalk_1", "__start__"),
+            "「会話その1」",
+        ),
         (
             7,
             ident("挨拶_1", Some("OnTalk_1")),
-            ":OnTalk_1:挨拶_1",
+            ("OnTalk_1", "挨拶_1"),
             "「会話1の挨拶」",
         ),
-        (9, ident("OnTalk_2", None), "OnTalk_2", "「本名のOnTalk」"),
-        (10, ident("OnTalk_2", None), "OnTalk_2", "「本名のOnTalk」"),
-        (12, ident("OnTalk_3", None), "OnTalk_3", "「会話その3」"),
-        (13, ident("OnTalk_3", None), "OnTalk_3", "「会話その3」"),
+        (
+            9,
+            ident("OnTalk_2", None),
+            ("OnTalk_2", "__start__"),
+            "「本名のOnTalk」",
+        ),
+        (
+            10,
+            ident("OnTalk_2", None),
+            ("OnTalk_2", "__start__"),
+            "「本名のOnTalk」",
+        ),
+        (
+            12,
+            ident("OnTalk_3", None),
+            ("OnTalk_3", "__start__"),
+            "「会話その3」",
+        ),
+        (
+            13,
+            ident("OnTalk_3", None),
+            ("OnTalk_3", "__start__"),
+            "「会話その3」",
+        ),
     ];
-    for (line, expected, kick, text) in cases {
+    for (line, expected, (g, l), text) in cases {
         let id = map.scene_at(&key, line);
         assert_eq!(id.as_ref(), Some(&expected), "行 {line} の identity（7.3）");
-        assert_eq!(kick_scene_key(&expected), kick, "行 {line} の kick 名");
+        assert_eq!(
+            scene_at_pair(lua, &key, line),
+            Some((g.to_string(), l.to_string())),
+            "行 {line} の位置の引きの組"
+        );
         assert!(
-            kick_lookup_runtime(lua, kick).is_some(),
-            "kick 名 {kick} はシーン表から完全一致で引ける"
+            scene_fn_exists(lua, g, l),
+            "({g}, {l}) はシーン表から完全一致で引ける"
         );
         let played = run_identity(lua, &expected);
         assert!(

@@ -513,7 +513,7 @@ impl SourceMap {
 
     /// 確定済みシーン同一性索引を借用する（resolver・task 3.1 用）。finalize join が
     /// まだ走っていない／何も突合できなかった場合は `None`。
-    // NOTE: 位置の解決（`playscene::resolve_and_kick`）は `scene_at` を使い、本関数は
+    // NOTE: 位置の解決（`playscene::resolve_position`）は `scene_at` を使い、本関数は
     // 本番コードから呼ばれない。そのため dead_code を明示許可している。
     #[allow(dead_code)]
     pub(crate) fn scene_index(&self) -> Option<&SceneIdentityIndex> {
@@ -631,7 +631,7 @@ pub use sidecar::{
 // ===========================================================================
 mod scene_index;
 // NOTE: 本索引は、構築側（ランタイム構築時の `scene_join::build_scene_index`）と
-// 参照側（`SourceMap::scene_at` → `playscene::resolve_and_kick`）に結線済み。
+// 参照側（`SourceMap::scene_at` → `playscene::resolve_position`）に結線済み。
 // `SceneIdentity`（解決結果 `(scene_id, parent)`）は resolver・統合テストが
 // `SourceMap::scene_at` の返り値として読むため公開する。索引型/ビルダは内部用途。
 pub use scene_index::SceneIdentity;

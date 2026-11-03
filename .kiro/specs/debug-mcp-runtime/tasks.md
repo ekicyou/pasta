@@ -53,7 +53,7 @@
   - 完了の姿: `cargo test -p pasta_lua --no-run` と `cargo build --workspace` が通り、ランタイムに待ち受け・フック・`jit.off()` の呼び出しが無く、`debug_enabled()` と `@pasta_debug.enabled()` が同じ値を返すテストが通る
   - _Requirements: 1.1, 1.2, 7.1, 7.6, 9.1_
 
-- [ ] 4.2 DAP の部品とそのテストを消し、`OnPastaSceneAt` の位置の引きをパスだけを受ける形にする
+- [x] 4.2 DAP の部品とそのテストを消し、`OnPastaSceneAt` の位置の引きをパスだけを受ける形にする
   - `debug/` の DAP・セッション・ブレークポイント・フック・inspect・transport・wiring・型・エラー・ハンドル・キックのファイルと、その単体テストを消す。提示モードのファイルは設定がまだ使うので 4.3 で消す
   - 位置の引き（`playscene.rs`）からキックの組み立て・結果の型・URI の剥がし・パーセントの復号・ドライブの直しと `#![allow(dead_code)]` を消し、パスをゴーストのフォルダに結んで絶対にするだけにする（消すキックのファイルを import しているので同じタスクで直す）
   - 位置の引きの単体テスト: 相対・絶対・UNC のパスで引ける。`file:///…` と `%41` を含むパスは文字のまま扱われる。`scene_identity_index_test.rs` のキックの名前の組み立てを、位置の引きの形の確かめに直す
@@ -220,3 +220,4 @@
 - 1.1: 読み込みの終わりの指示を足すと max_level_hint が info より下がらないため、`tracing::enabled!(INFO)` は層ごとのフィルタでも true になる。ログの絞り込みを確かめるテストは `enabled!` でなく pasta.log の中身か DEBUG で見分ける。
 - 2.1: `multi_instance_test::dap_kick_reaches_only_its_own_instance` は 2.1 の後 2.2 で消すまで赤い（キックの経路が無いため）。
 - 4.1: `tests/fixtures/debug_break_coalesce.pasta` は `src/debug/wiring_pasta_break_coalesce_e2e.rs` が include_str! で読むため残した。4.2 で wiring と一緒に消す。`loader/source_map_build.rs` の `crate::debug::enable` への doc リンクと `tests/runtime/source_map_handoff_test.rs` 冒頭の「デバッグハンドル」の文言も 4.2/4.3 で直す。
+- 4.2: `tests/chunk_name_validation_test.rs`（8.3 で消す予定）は jit.off・set_hook を使っていたため 4.2 で前倒しで消した。

@@ -1,12 +1,7 @@
 //! Source presentation mode value types for the debug session.
 //!
-//! Split out of `debug/mod.rs` (task 4.5): the [`SourceMode`] value enum and the
-//! shared, interior-mutable [`SharedSourceMode`] cell. The parent `mod.rs` keeps
-//! the `pub use source_mode::{SourceMode, SharedSourceMode};` re-export so the
-//! public surface is byte-identical.
-
-use std::sync::Arc;
-use std::sync::atomic::Ordering;
+//! Split out of `debug/mod.rs` (task 4.5): the [`SourceMode`] value enum. The
+//! parent `mod.rs` keeps the `pub use source_mode::SourceMode;` re-export.
 
 /// Source presentation mode for the debug session.
 ///
@@ -44,70 +39,5 @@ impl SourceMode {
                 SourceMode::default()
             }
         }
-    }
-
-    /// Encode a [`SourceMode`] as a `u8` for an [`AtomicU8`]-backed shared cell.
-    pub(super) fn as_u8(self) -> u8 {
-        match self {
-            SourceMode::Pasta => 0,
-            SourceMode::Lua => 1,
-        }
-    }
-
-    /// Decode a `u8` produced by [`as_u8`](Self::as_u8) back to a [`SourceMode`].
-    /// Any unexpected value defaults to [`SourceMode::Pasta`] (6.1).
-    pub(super) fn from_u8(v: u8) -> Self {
-        match v {
-            1 => SourceMode::Lua,
-            _ => SourceMode::Pasta,
-        }
-    }
-}
-
-/// A shared, interior-mutable EFFECTIVE present mode for one debug session
-/// (task 5.5 / requirements 6.3).
-///
-/// The resolved [`DebugConfig::source_mode`] (env > file > 既定) is baked at
-/// [`enable`] time, BEFORE the DAP `attach` request arrives. When that `attach`
-/// request carries an explicit `sourcePresentation` argument (the HIGHEST
-/// precedence, design 581: `attach > env > file > 既定`), the server must apply
-/// it to the CURRENT session — switching BOTH the `.pasta` source RESOLVER
-/// presentation (task 5.2) AND the `.pasta`-granular STEP granularity
-/// (task 5.4). Those two consumers live on DIFFERENT threads — the resolver on
-/// the socket-bridge thread (it owns the [`DapAdapter`]) and the stepper on the
-/// VM thread (inside the line hook) — so the effective mode is shared here.
-///
-/// Mirrors the established [`BreakpointSet`](crate::debug::breakpoints::BreakpointSet)
-/// pattern (a cheap `Arc` clone of settable-while-running shared state): the
-/// socket-bridge thread WRITES the new mode when the `attach` arg is received,
-/// and the VM-thread stepper READS it per line. An [`AtomicU8`] is sufficient
-/// (the value is `Copy`, a single scalar, with no compound invariant) and needs
-/// no lock on the hot per-line read path.
-///
-/// When the `attach` request carries NO `sourcePresentation`, the cell is left
-/// at the [`enable`]-time resolved mode, so the env > file > default decision
-/// stands (design 581: a client default must NOT override env/file).
-#[derive(Clone, Debug)]
-pub(crate) struct SharedSourceMode {
-    inner: Arc<std::sync::atomic::AtomicU8>,
-}
-
-impl SharedSourceMode {
-    /// Construct a shared cell initialised to `mode` (the [`enable`]-time
-    /// resolved mode).
-    pub(crate) fn new(mode: SourceMode) -> Self {
-        Self {
-            inner: Arc::new(std::sync::atomic::AtomicU8::new(mode.as_u8())),
-        }
-    }
-
-    /// Read the current effective present mode (VM-thread stepper / resolver).
-    pub(crate) fn get(&self) -> SourceMode {
-        SourceMode::from_u8(self.inner.load(Ordering::SeqCst))
-    }
-
-    /// Write a new effective present mode (socket bridge, on `attach`).
-    pub(crate) fn set(&self, mode: SourceMode) {
-        self.inner.store(mode.as_u8(), Ordering::SeqCst);
     }
 }

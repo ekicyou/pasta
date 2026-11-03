@@ -36,8 +36,7 @@ impl PastaLoader {
     ///
     /// The result is held as an `Arc<SourceMap>` (immutable shared reference, design
     /// "Architecture" `Arc<SourceMap>` 不変共有 — Requirement 3.1, in-memory, no
-    /// mandatory intermediate file). Task 4.4 threads this `Arc` into
-    /// [`crate::debug::enable`].
+    /// mandatory intermediate file). The runtime holds this `Arc` as its scene map.
     ///
     /// # Debug gating (Requirements 3.1, 7.1)
     ///
