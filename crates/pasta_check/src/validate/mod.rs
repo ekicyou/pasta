@@ -4,6 +4,7 @@
 //! パスはすべて ghost/master からの相対パスで、区切りは `/`。
 
 mod builtins;
+mod conditions;
 mod config;
 mod discovery;
 mod input;
@@ -96,9 +97,9 @@ fn discover(input: &GhostInput) -> (discovery::Discovered, Vec<Finding>) {
 
 /// ゴースト全体を検査する。`files` には select_dictionary_files が返した全パスの中身を入れる。
 ///
-/// 順番: 設定 → 集め方 → モジュール名・構文 → トランスパイル・シーン → 飛び先。
+/// 順番: 設定 → 集め方 → モジュール名・構文 → トランスパイル・シーン → 飛び先・条件。
 /// すべての段の報告がそろった後に省く理由を 1 回だけ決め、構文エラー・読めない辞書ファイル・
-/// pasta.toml の誤りが 1 つでもあれば飛び先の検査を丸ごと省く（1.1〜1.3）。
+/// pasta.toml の誤りが 1 つでもあれば飛び先と条件の検査を丸ごと省く（1.1〜1.3・8.4）。
 pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) -> Report {
     let (config, mut findings) = config::read_config(&input.pasta_toml);
 
@@ -125,6 +126,7 @@ pub fn validate_ghost(input: &GhostInput, files: &BTreeMap<String, FileText>) ->
         findings.extend(found);
         unchecked_dynamic_calls = dynamic;
         findings.extend(recommend::check(&scenes, &config.aliases, &parsed, &texts));
+        findings.extend(conditions::check(&scenes, &parsed));
     }
 
     Report::new(
