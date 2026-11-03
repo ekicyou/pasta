@@ -70,7 +70,7 @@
   - 完了の姿: 古い環境変数・提示モードを読む箇所が無く、`.lua.map` を書く箇所が無く、単体テストと `cargo test -p pasta_lua` が通る
   - _Requirements: 3.1, 3.3, 3.4, 3.8, 7.1, 7.5, 9.1_
 
-- [ ] 4.4 DAP だけが使っていた依存を外す
+- [x] 4.4 DAP だけが使っていた依存を外す
   - ルートと `pasta_lua` の `socket2`、`pasta_lua` の `serde_json`、`pasta_shiori` の dev の `serde_json` を外し、`Cargo.lock` は cargo に作り直させる。ルートの `serde_json` は残す。依存を足さない
   - 完了の姿: `Cargo.toml` に `socket2` が無く、`cargo build --workspace --all-targets` が通る
   - _Requirements: 7.8_
