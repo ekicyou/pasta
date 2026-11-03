@@ -83,7 +83,7 @@
   - _Boundary: debug::source_map の scene_join・scene_index_
   - _Requirements: 7.2, 7.4_
 
-- [ ] 5.2 (P) デバッグが有効なときの起動のログを 1 行出す
+- [x] 5.2 (P) デバッグが有効なときの起動のログを 1 行出す
   - 読み込みを終えて有効なら、`Startup sequence completed` の直前に info で `Debug enabled: development events are allowed` を出す。読み込みが途中で失敗したときは出さない
   - `scene_play_event_test.rs` の結合テストで、有効なゴーストのログにその 1 行があり、無効なゴーストには無いことを確かめる
   - 完了の姿: そのテストが通る

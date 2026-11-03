@@ -330,3 +330,50 @@ fn scene_play_events_return_failure_notice_when_not_found() {
         "position not found: {value}"
     );
 }
+
+/// debug-mcp-runtime 1.5: 有効なゴーストのログには、`Startup sequence completed` の直前に
+/// 開発用のイベントを許したことの info が 1 行あり、無効なゴーストには無い。
+#[test]
+fn debug_enabled_startup_log_line_only_when_enabled() {
+    const LINE: &str = "Debug enabled: development events are allowed";
+    pasta_lua::init_tracing();
+
+    let read_log = |enabled: bool| {
+        let temp = tempfile::TempDir::new().unwrap();
+        let runtime = if enabled {
+            load_debug_ghost(temp.path())
+        } else {
+            load_ghost(temp.path(), "[loader]\ndebug_mode = true\n")
+        };
+        // ランタイムと登録簿の両方が手放すとロガーが破棄され、ログがフラッシュされる。
+        drop(runtime);
+        pasta_lua::GlobalLoggerRegistry::instance().unregister(temp.path());
+        std::fs::read_to_string(temp.path().join("profile/pasta/logs/pasta.log")).unwrap()
+    };
+
+    let enabled_log = read_log(true);
+    let lines: Vec<&str> = enabled_log.lines().collect();
+    let at = lines
+        .iter()
+        .position(|l| l.contains(LINE))
+        .unwrap_or_else(|| panic!("enabled ghost must log {LINE:?}: {enabled_log}"));
+    assert_eq!(
+        lines.iter().filter(|l| l.contains(LINE)).count(),
+        1,
+        "exactly one line: {enabled_log}"
+    );
+    assert!(lines[at].contains("INFO"), "info level: {}", lines[at]);
+    assert!(
+        lines
+            .get(at + 1)
+            .is_some_and(|l| l.contains("Startup sequence completed")),
+        "must come right before Startup sequence completed: {enabled_log}"
+    );
+
+    let disabled_log = read_log(false);
+    assert!(
+        disabled_log.contains("Startup sequence completed"),
+        "{disabled_log}"
+    );
+    assert!(!disabled_log.contains(LINE), "{disabled_log}");
+}

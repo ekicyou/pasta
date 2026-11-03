@@ -232,6 +232,9 @@ impl PastaLoader {
             source_map,
         )?;
 
+        if runtime.debug_enabled() {
+            info!("Debug enabled: development events are allowed");
+        }
         info!(path = %base_dir.display(), "Startup sequence completed");
         Ok(runtime)
     }
