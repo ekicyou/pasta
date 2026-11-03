@@ -4,13 +4,12 @@ use std::path::Path;
 
 use tempfile::TempDir;
 
-/// 環境の PASTA_DEBUG・PASTA_DEBUG_PORT を main の前に外す（固定ポートの AddrInUse を避ける）。
+/// 環境の PASTA_DEBUG を main の前に外す（デバッグの関門が開いてシーンマップを作るのを避ける）。
 /// main の前（まだ 1 スレッド）なので Rust 2024 の unsafe な `remove_var` を競合なく呼べる。
 #[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
     }
 }
 

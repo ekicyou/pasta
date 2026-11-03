@@ -18,7 +18,7 @@
 //! グローバルである。本ファイルは全段を 1 つの `#[test]` に直列に詰め、同一バイナリ内に
 //! 他のテストを置かない（順序非依存）。
 //!
-//! `mod common;` は `PASTA_DEBUG` / `PASTA_DEBUG_PORT` を main 前に中和する `#[ctor]` を
+//! `mod common;` は `PASTA_DEBUG` を main 前に中和する `#[ctor]` を
 //! 取り込むためにも必須である（要件 6.4）。`#[ignore]` は付けない（要件 6.6）。
 
 #![cfg(windows)]

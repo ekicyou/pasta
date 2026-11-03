@@ -267,7 +267,7 @@ impl PastaConfig {
     /// Get debug configuration from [debug] section.
     ///
     /// Returns `None` if the `[debug]` section is absent. When present, missing
-    /// fields fall back to their serde defaults (`enabled = false`, `port = 9276`).
+    /// fields fall back to their serde defaults (`enabled = false`).
     pub fn debug(&self) -> Option<DebugFileConfig> {
         self.get_custom_config("debug")
     }

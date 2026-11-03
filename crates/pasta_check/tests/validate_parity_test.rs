@@ -15,12 +15,11 @@ use pasta_check::validate::{
 use pasta_lua::loader::{CacheManager, LoaderError, PastaLoader, discover_files};
 use tempfile::TempDir;
 
-/// PASTA_DEBUG が環境にあると読み込みが固定ポートを開いて落ちる。main の前（単一スレッド）で外す
+/// PASTA_DEBUG が環境にあるとデバッグの関門が開き、PASTA_LOG はログの絞りを変える。main の前（単一スレッド）で外す
 #[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
         std::env::remove_var("PASTA_LOG");
     }
 }

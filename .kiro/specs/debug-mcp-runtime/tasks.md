@@ -90,7 +90,7 @@
   - _Boundary: loader_
   - _Requirements: 1.5_
 
-- [ ] 5.3 (P) テストの環境の中和から、意味の無くなったポートの行を外す
+- [x] 5.3 (P) テストの環境の中和から、意味の無くなったポートの行を外す
   - 4 つのクレートの共通部品と個々のテスト（`scene_identity_index_test.rs` を含む。5.1 はこのファイルを走らせるだけで書き換えない）の `#[ctor]` の中和から `PASTA_DEBUG_PORT` の行を外し、`PASTA_DEBUG`・`PASTA_LOG` は残す。説明の「固定ポート」を直す
   - 完了の姿: `crates/` のテストに `PASTA_DEBUG_PORT` を消す行が無く、`PASTA_DEBUG=1` を置いた環境でも `cargo test --workspace` が通る
   - _Boundary: 各クレートのテストの中和_

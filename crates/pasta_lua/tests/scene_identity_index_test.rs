@@ -17,9 +17,9 @@ use pasta_lua::debug::source_map::SceneIdentity;
 use pasta_lua::mlua::Lua;
 use pasta_lua::{PastaLoader, RuntimeConfig};
 
-/// Neutralize ambient DAP debug env vars before any test thread starts.
+/// Neutralize ambient debug env vars before any test thread starts.
 ///
-/// The developer session may export `PASTA_DEBUG=1` / `PASTA_DEBUG_PORT=9276`.
+/// The developer session may export `PASTA_DEBUG=1`.
 /// Without this guard, the debug-disabled `PastaLoader::load_with_config` here
 /// would still enable the debug backend (making `debug_enabled()` true and
 /// building a `SourceMap`), so the "normal mode" assertions fail. Tests must
@@ -34,7 +34,6 @@ use pasta_lua::{PastaLoader, RuntimeConfig};
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
     }
 }
 

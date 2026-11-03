@@ -221,13 +221,12 @@ fn user_objects_zero_is_read_by_last_error() {
     assert_eq!(user_objects_from(3, 0), Some(3));
 }
 
-/// 開発セッションが export した `PASTA_DEBUG`／`PASTA_DEBUG_PORT` を main 前
+/// 開発セッションが export した `PASTA_DEBUG` を main 前
 /// （プロセスが単一スレッドの間）に中和する。写経元: `common/mod.rs`。
 #[ctor::ctor(unsafe)]
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
     }
 }
 

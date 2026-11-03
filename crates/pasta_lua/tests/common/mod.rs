@@ -10,15 +10,13 @@ pub mod e2e_helpers;
 use pasta_lua::{PastaLuaRuntime, TranspileContext};
 use std::path::PathBuf;
 
-/// Neutralize ambient DAP debug env vars before any test thread starts.
+/// Neutralize ambient debug env vars before any test thread starts.
 ///
-/// The developer session may export `PASTA_DEBUG=1` / `PASTA_DEBUG_PORT=9276`.
-/// Without this guard, every `PastaLoader::load` in a test binary would enable
-/// the DAP listener and bind that single fixed port; the many loads performed in
-/// one test process then collide with `AddrInUse`, failing tests
-/// non-deterministically (the failures surface as unrelated-looking errors such
-/// as `module 'i18n' not found`). Tests must behave identically regardless of the
-/// session environment, so we clear these here.
+/// The developer session may export `PASTA_DEBUG=1`.
+/// Without this guard, every `PastaLoader::load` in a test binary would open the
+/// debug gate and build a scene map, so results would depend on the session.
+/// Tests must behave identically regardless of the session environment, so we
+/// clear these here.
 ///
 /// `PASTA_LOG` is cleared for the same reason: it overrides the `[logging]`
 /// filter, so an ambient value (e.g. `PASTA_LOG=error`) would hide the log
@@ -31,7 +29,6 @@ use std::path::PathBuf;
 fn neutralize_debug_env() {
     unsafe {
         std::env::remove_var("PASTA_DEBUG");
-        std::env::remove_var("PASTA_DEBUG_PORT");
         std::env::remove_var("PASTA_LOG");
     }
 }
