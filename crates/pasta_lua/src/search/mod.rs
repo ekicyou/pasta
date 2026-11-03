@@ -20,6 +20,7 @@
 
 mod context;
 mod error;
+mod scene_cond;
 
 pub use context::{LocalSceneMatch, SearchContext};
 pub use error::SearchError;
