@@ -217,8 +217,8 @@ fn parse_and_join(
         // `__start__` はグローバル本体そのもの（無名 start シーン）であり、その宣言行は
         // グローバルヘッダ行と一致する。索引には **別 level-1 エントリとして入れない**:
         // グローバル本体領域へのクリックはグローバル identity `(会話_1, None)` へ解決され、
-        // global kick（parent=None・global 分岐がシーン表から開始関数 `__start__`
-        // を引く）でちょうど `__start__` が再生される（kick 決定ノート）。よって
+        // global の再生（parent=None・シーン表から開始関数 `__start__`
+        // を引く）でちょうど `__start__` が再生される。よって
         // `__start__` を level-1 で持つとグローバル領域が誤って local 扱いされる。
         if fn_name == "__start__" {
             return ParsedRecord {

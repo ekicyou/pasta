@@ -37,10 +37,10 @@ use super::canonicalize_pasta_file;
 
 /// 確定したシーン同一性（`scene_at` の返り値）。
 ///
-/// ランタイム実 identity を **(scene_id, parent)** で表す（task 2.2・kick 解決の
-/// 解決対象）。global は `scene_id=会話_1, parent=None`、local は
-/// `scene_id=挨拶_1, parent=Some(会話_1)`。kick の resolver（task 3.1）は parent の
-/// 有無で global 分岐 / local 分岐を選ぶため、両者を一体で返す。
+/// ランタイム実 identity を **(scene_id, parent)** で表す（位置からシーンを引いた
+/// 結果）。global は `scene_id=会話_1, parent=None`、local は
+/// `scene_id=挨拶_1, parent=Some(会話_1)`。`OnPastaSceneAt` の再生は parent の
+/// 有無で global / local を選ぶため、両者を一体で返す。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SceneIdentity {
     /// シーン識別子（global = `会話_1`、local = `挨拶_1`）。
@@ -161,8 +161,7 @@ impl SceneIdentityIndexBuilder {
     /// `start_line` / `end_line` は両端 inclusive・1 始まり。`end_line` は「次の同
     /// レベル以上宣言の直前 / ファイル末尾」を構築側が算出済みで渡す（requirements
     /// 2.1）。`level` は入れ子の深さ（global = 0, local = 1, ...）。`parent` は local の
-    /// 親グローバル（例 `会話_1`）で、global は `None`（task 2.2・kick の local 分岐
-    /// 解決に渡す）。同一ファイル内で同一 `start_line` を再投入した場合は last-write-wins
+    /// 親グローバル（例 `会話_1`）で、global は `None`（local の再生に渡す）。同一ファイル内で同一 `start_line` を再投入した場合は last-write-wins
     /// で上書きする。
     pub fn add_scene(
         &mut self,

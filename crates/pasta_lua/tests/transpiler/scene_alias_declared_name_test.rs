@@ -189,7 +189,7 @@ fn non_exact_and_local_names_are_not_replaced() {
     );
 }
 
-/// ブレークポイント行の対応は名前に依存しない（7.1）。
+/// 行の対応は名前に依存しない（7.1）。
 #[test]
 fn line_records_are_independent_of_aliases() {
     let with = transpile(KAIWA, SceneAliasTable::builtin_default());

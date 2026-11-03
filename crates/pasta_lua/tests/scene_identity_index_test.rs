@@ -326,7 +326,7 @@ fn resolved_position_pair_matches_runtime_scene() {
 //   - build 時: increment_counter は生名で別カウンタ → 双方 #1 → join_key は両方
 //     `G:会話_A#1` に衝突する。
 //   - runtime: sanitize base で採番 → `会話_A_1` / `会話_A_2`。
-// 結果、2 本目の cursor 領域が 1 本目（会話_A_1）へ MIS-RESOLVE する（wrong-scene kick）。
+// 結果、2 本目の cursor 領域が 1 本目（会話_A_1）へ MIS-RESOLVE する（別のシーンを再生してしまう）。
 //
 // 本テストは「同 base へ衝突する 2 本の global が、それぞれ distinct な runtime identity
 // （会話_A_1 / 会話_A_2）へ解決する」ことを固定する。fix 前は RED（2 本目が 会話_A_1 へ
@@ -420,7 +420,7 @@ fn sanitize_colliding_globals_resolve_to_distinct_runtime_identities() {
     assert_ne!(
         source_map.scene_at(&pasta_key, LINE_COLLISION_SCENE1_BODY),
         source_map.scene_at(&pasta_key, LINE_COLLISION_SCENE2_BODY),
-        "sanitize 衝突 2 本は別シーンへ解決する（wrong-scene kick の回帰防止）"
+        "sanitize 衝突 2 本は別シーンへ解決する（別のシーンを再生する誤りの回帰防止）"
     );
 }
 

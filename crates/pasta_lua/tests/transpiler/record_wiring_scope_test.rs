@@ -37,8 +37,8 @@ fn span_at(line: usize) -> Span {
 // - requirements.md **1.1**: 生成 `.lua` 行に由来 `.pasta` 位置を記録する。
 // - requirements.md **1.4**: 主要構文種別（スコープ・分岐を含む）を網羅して記録する。
 // - requirements.md **1.5**: scope定義（アクター/グローバルシーン/ローカルシーン）が `.lua` へ
-//   生成される時、その定義ヘッダ行を `.pasta` 位置へ記録し、定義ヘッダ行をブレークポイント対象に
-//   できるようにする（`span.start_line` ＝ `.pasta` 定義ヘッダ行）。
+//   生成される時、その定義ヘッダ行を `.pasta` 位置へ記録し、定義ヘッダ行を `.pasta` の位置で
+//   引けるようにする（`span.start_line` ＝ `.pasta` 定義ヘッダ行）。
 //
 // design.md "RecordWiring"（324 行）: scope `generate_*`（actor/global/local scene）は
 // scope ヘッダの `.lua` 出力行で `scope.span` を記録する（`span.start_line` ＝ 定義ヘッダ行）。

@@ -285,7 +285,7 @@ fn shiori_event_scene_lookup_uses_declared_alias() {
 }
 
 /// 4.7・4.8・10.3: ローカルシーン `・会話`・単語 `＠会話`・アクター `％会話` は置き換わらず、範囲を指定した
-/// 検索と登録名を直接受け取る入口（`SCENE.get_start`・キック）も置き換えない。
+/// 検索と登録名を直接受け取る入口（`SCENE.get_start`）も置き換えない。
 #[test]
 fn names_outside_global_scene_search_are_not_replaced() {
     for table in Table::ALL {
