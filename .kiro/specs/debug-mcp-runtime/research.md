@@ -247,3 +247,30 @@ requirements.md の末尾の議題 1〜10 は、2026-11-03 に開発者が全部
 - 撤去の差分が大きく、途中でビルドが壊れる — design.md の Implementation Order のとおり、どの段でもビルドが通る順に切る。`runtime_config.rs` の `kick_sink` と `pasta_shiori` は同じタスクにする。
 - `.claude/skills/` の references の作り直しが分類器に拒まれる — 入った分と残りを示して開発者に頼む（メモリの方針）。
 - 環境変数を置くテスト（3.4）がほかのテストに漏れる — 専用のテストのバイナリにする。
+
+## 設計ディスカッションの決定（2026-11-03）
+
+開発者が議題 1〜8 を確定した。議題 1 は要件ディスカッションの議題 1（6.3 を残す）を覆す。上の「Decision: 6.3 の引きは『チャンク名と行』で Rust に渡す」「調べ 1」は、この決定で要らなくなった（記録として残す）。要件の番号は、もとの 6.4・6.5 が 6.3・6.4 になった。
+
+1. **ソースマップをシーンマップに縮め、要件 6.3 を落とす**。
+   - 根拠（コード）: 位置からシーンを引く索引を作る `debug/source_map/scene_join.rs` の `build_scene_index`（67〜114 行）が `SourceMap` から使うのは、`scene_records()`（110 行。`.pasta` ごとのシーンの宣言の記録 `会話#1` → 宣言の行）と `pasta_file_for_chunk()`（99 行。関数の `info().source` のチャンク → `.pasta`）の 2 つだけで、行の対応表（`ChunkSourceMap` の前方・逆引き）を使わない。DAP を消すと、行の対応表の使い手は 6.3 の `@pasta_debug.pasta_line` だけになる。
+   - チャンク → `.pasta` は、6.2 のために足す `pasta_sources` から作る読み込んだファイルの表で引ける。関数の `info().source` は `@` と探索関数の候補のパスそのもの（`runtime/searcher.rs` 139 行の `set_name(format!("@{candidate}"))`）なので、`ChunkTable` に「候補の全体のパス → `.pasta`」を控えれば、縮んだキーの重複に左右されずに引ける（`searcher::pasta_file_of`）。返る `.pasta` は `base_dir` から見たパス（`get_relative_path`）なので、`base_dir` に結べば記録の鍵（Phase 5.5 の `.pasta` の絶対パス）に戻る。突合はファクトリ（`runtime/factory.rs` 154 行）にあり、`loader_context.base_dir` が手元にある。
+   - 消すもの: `ChunkSourceMap`・`MapBuilderSink` の行の記録と `finish(shift)`・`resolve_lua_to_pasta`・`pasta_file_for_chunk`・逆引き・`canonicalize_chunk_name`（中身を `canonicalize_pasta_file` に移す。`scene_index.rs` 43・124・172・193 行の呼び出しはそのまま）・`code_gen/source_map.rs` 35 行の `PastaPos`（使い手は `ChunkSourceMap` とサイドカーだけ）・`@pasta_debug.pasta_line`・`searcher::chunk_path`（設計で足すはずだったもの）・`stop.lua` の 6.3 の枝。テストは `source_map_resolve_tests.rs`・`source_map_builder_tests.rs`（6 本とも行の記録と `finish(shift)` の確かめ）・`source_map_test_support.rs`・`tests/chunk_name_validation_test.rs`、ほかのテストの行の引きの分。
+   - Phase 5.5 の再変換は残す。Phase 4（`process_incremental`）は更新の無いファイルを変換し直さないので、シーンの記録を得るには変換し直すしかない。シンクはシーンだけを控え、`record_line` を捨てる（`SourceMapSink::record_line` は既定を持たない必須の関数なので、空の実装を書く）。シーンの宣言の行は `.pasta` の行なので `LineShift` の付け替えが要らない（今の `finish` も、シーンの記録には `LineShift` を当てていない。`source_map/mod.rs` 259 行）。
+   - 名前: 型 `SourceMap`・`MapBuilderSink` とモジュール `debug::source_map` は変えない。使う所が 12 ファイル余り（`loader/mod.rs`・`source_map_build.rs`・`runtime/exec.rs`・`factory.rs`・`mod.rs`・`module_registry.rs`・`playscene.rs` とテスト）に広がり、変えても振る舞いは変わらない。説明とマニュアルで「シーンマップ」と呼ぶ。
+2. **有効を持つ値**: 「デバッグが有効か」は、ランタイムがシーンマップを持つか（`Option<Arc<SourceMap>>` が `Some` か）。別の bool を持たない。
+3. **`dic/` の `.lua` の写し**: `loader/process.rs` 236〜287 行は、`dic/` の `.lua` を `fs::read_to_string` で読み、`CacheManager::save_cache`（`cache.rs` 198〜240 行）が同じ中身を `fs::write` で書く。中身を変えないので、行の番号は元の `.lua` と同じである。`pasta_sources` に元の `.lua` のパスで入れ、`@pasta_chunks` の値を文字列にする（`scripts/` の `.lua` と同じ枝で `dic\道具.lua:6:` が出る。要件 6.3 の「作者の `.lua` はそのファイルと行」）。写しが元とバイトで同じことを `tests/loader/lua_passthrough_test.rs` に足して守る。`pasta_sources` の値は `enum DicSource { Pasta(String), Lua(String) }` で見分ける（`[loader] pasta_patterns` が拡張子を縛らないので、拡張子では見分けない）。同じモジュール名の `.pasta` と `.lua` はローダが `.pasta` を採る（`test_pasta_takes_priority_over_lua_on_conflict`）ので、表のキーは重ならない。
+4. **info の 1 行**: `Debug enabled: development events are allowed`。`Startup sequence completed` の直前。
+5. **`dump_variables` は有効かを見ない**: 門は `scene_play.lua` の `allowed()` だけ。
+6. **相対・絶対のキーの食い違い**: 行の対応表が無くなるので論点ごと消えた（設計の危険 R1 を外した）。
+7. **`save_to_file` の一時ファイルの後始末**: 書き込み・`sync_all` の失敗でも一時ファイルを消す。`save.toml` にも効かせる。
+8. **警告の後半**: `OnPastaDumpVariables` は `variables not dumped`。
+
+### `LineShift`・`record_line` の使い手（議題 1 の調べ）
+
+ソースマップ（シーンマップ）のほかに使い手があるので、どれも残す。`code_gen/element_gen.rs` に触れる必要は無い。
+
+- `normalize::LineShift`・`normalize_output_with_shift`: `transpiler.rs` 14 行で読み、`transpile_with_source_map` の 135 行で整形し、136〜142 行で `fill_line_maps`（259〜283 行。いつも生成コードに埋める行の対応）に渡す。デバッグの有無によらず使う。
+- `SourceMapSink::record_line`・`record`: `transpiler.rs` 229〜253 行の `LineRecorder`（いつも付く。行の対応の材料）が実装する。呼ぶ側は `code_gen/mod.rs` 129〜135 行の `record_span_since`（`element_gen.rs` 73・96・155・243・435・526 行と `scope_gen.rs` から）と 170〜176 行の `record_block_line`。
+- `SourceMapSink::record_scene`: 既定は何もしない（`code_gen/source_map.rs` 86 行）。`LineRecorder` が渡されたシンクへ流し（`transpiler.rs` 249〜253 行）、`scope_gen.rs` が `record_scene_span`（`code_gen/mod.rs` 149〜155 行）で呼ぶ。シーンマップのシンクはこれだけを使う。
+- `transpile_with_source_map` が返す `LineShift` は、シーンマップでは使わなくなる（`transpile` も捨てている）。署名は変えない。
