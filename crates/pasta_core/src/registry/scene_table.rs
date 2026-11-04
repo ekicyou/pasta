@@ -308,7 +308,12 @@ impl SceneTable {
         };
 
         let mut new_round = || {
-            let mut id_values: Vec<usize> = candidate_ids.iter().map(|id| id.0).collect();
+            // 重み N の候補は N 個並べる（重み 1 だけなら今と同じ配列・同じ乱数の消費）
+            // shortcut: 重みに上限が無いので並びのメモリは重みの合計に比例する（数億は尽きる）、実害が出たら累積重みのくじに替える
+            let mut id_values: Vec<usize> = candidate_ids
+                .iter()
+                .flat_map(|id| std::iter::repeat_n(id.0, scene_weight(&labels[id.0].attributes)))
+                .collect();
             random_selector.shuffle_usize(&mut id_values);
             let mut ids: Vec<SceneId> = id_values.into_iter().map(SceneId).collect();
             ids.sort_by_key(|id| Reverse(priority(id)));
@@ -436,3 +441,7 @@ mod scene_table_candidate_tests;
 #[cfg(test)]
 #[path = "scene_table_resolve_filter_tests.rs"]
 mod scene_table_resolve_filter_tests;
+
+#[cfg(test)]
+#[path = "scene_table_pick_tests.rs"]
+mod scene_table_pick_tests;
