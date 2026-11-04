@@ -242,6 +242,9 @@ fn expected(kind: FindingKind) -> (Severity, &'static str) {
         TranspilePropertyInExpr => (Error, "transpile-property-in-expr"),
         TranspileContinuationWithoutActor => (Error, "transpile-continuation-without-actor"),
         TranspileInvalidPriority => (Error, "transpile-invalid-priority"),
+        TranspileInvalidWeight => (Error, "transpile-invalid-weight"),
+        TranspileInvalidOrder => (Error, "transpile-invalid-order"),
+        TranspileWeightWithOrder => (Error, "transpile-weight-with-order"),
         ModulePastaCollision => (Error, "module-pasta-collision"),
         ModuleLuaCollision => (Error, "module-lua-collision"),
         ModuleLuaShadowed => (Warning, "module-lua-shadowed"),
@@ -249,8 +252,10 @@ fn expected(kind: FindingKind) -> (Severity, &'static str) {
         LocalSceneCollision => (Warning, "local-scene-collision"),
         SceneShadowedByBuiltin => (Warning, "scene-shadowed-by-builtin"),
         SceneShadowedByPriority => (Warning, "scene-shadowed-by-priority"),
+        SceneOrderDuplicate => (Error, "scene-order-duplicate"),
         CondVarUnassigned => (Warning, "cond-var-unassigned"),
         CallTargetMissing => (Warning, "call-target-missing"),
+        CallOrderMixed => (Error, "call-order-mixed"),
         ChoiceTargetMissing => (Warning, "choice-target-missing"),
         RecommendItemInvalid => (Warning, "recommend-item-invalid"),
         RecommendMenuTalk => (Warning, "recommend-menu-talk"),
@@ -280,6 +285,9 @@ fn every_kind_has_fixed_severity_and_code() {
         TranspilePropertyInExpr,
         TranspileContinuationWithoutActor,
         TranspileInvalidPriority,
+        TranspileInvalidWeight,
+        TranspileInvalidOrder,
+        TranspileWeightWithOrder,
         ModulePastaCollision,
         ModuleLuaCollision,
         ModuleLuaShadowed,
@@ -287,8 +295,10 @@ fn every_kind_has_fixed_severity_and_code() {
         LocalSceneCollision,
         SceneShadowedByBuiltin,
         SceneShadowedByPriority,
+        SceneOrderDuplicate,
         CondVarUnassigned,
         CallTargetMissing,
+        CallOrderMixed,
         ChoiceTargetMissing,
         RecommendItemInvalid,
         RecommendMenuTalk,
@@ -296,7 +306,7 @@ fn every_kind_has_fixed_severity_and_code() {
     let mut codes: Vec<&str> = kinds.iter().map(|k| expected(*k).1).collect();
     codes.sort();
     codes.dedup();
-    assert_eq!(codes.len(), 30);
+    assert_eq!(codes.len(), 35);
     for kind in kinds {
         let (sev, code) = expected(kind);
         assert_eq!(kind.severity(), sev, "{code}");

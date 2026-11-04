@@ -43,6 +43,9 @@ pub enum FindingKind {
     TranspilePropertyInExpr,
     TranspileContinuationWithoutActor,
     TranspileInvalidPriority,
+    TranspileInvalidWeight,
+    TranspileInvalidOrder,
+    TranspileWeightWithOrder,
     ModulePastaCollision,
     ModuleLuaCollision,
     ModuleLuaShadowed,
@@ -50,8 +53,10 @@ pub enum FindingKind {
     LocalSceneCollision,
     SceneShadowedByBuiltin,
     SceneShadowedByPriority,
+    SceneOrderDuplicate,
     CondVarUnassigned,
     CallTargetMissing,
+    CallOrderMixed,
     ChoiceTargetMissing,
     RecommendItemInvalid,
     RecommendMenuTalk,
@@ -393,6 +398,25 @@ pub mod msg {
     pub fn transpile_invalid_priority(key: &str, value: &str) -> String {
         format!("＆{key} の値は整数で書きます: {value}")
     }
+    /// `key` は書いた名前（重み・weight）、`value` は書いたままの値
+    pub fn transpile_invalid_weight(key: &str, value: &str) -> String {
+        format!("＆{key} の値は 1 以上の整数で書きます: {value}")
+    }
+    /// `key` は書いた名前（順番・index）、`value` は書いたままの値
+    pub fn transpile_invalid_order(key: &str, value: &str) -> String {
+        format!("＆{key} の値は整数で書きます: {value}")
+    }
+    /// 受け継ぎと畳みの後の宣言の、書いた名前と書いたままの値
+    pub fn transpile_weight_with_order(
+        weight_key: &str,
+        weight: &str,
+        order_key: &str,
+        order: &str,
+    ) -> String {
+        format!(
+            "＆{weight_key}：{weight} と ＆{order_key}：{order} は同じシーンに書けません。どちらか一方にしてください"
+        )
+    }
     /// 重なったほかのファイルが 2 つ以上なら「、」で並べる（モジュール名の 3 つの文言で同じ）
     pub fn module_pasta_collision(module: &str, others: &[&str]) -> String {
         format!(
@@ -425,6 +449,18 @@ pub mod msg {
             ghost_path(other_path)
         )
     }
+    /// 重なった相手は、同じ名前・同じ番号の最初のシーン
+    pub fn scene_order_duplicate(
+        name: &str,
+        order: i64,
+        first_path: &str,
+        first_line: u32,
+    ) -> String {
+        format!(
+            "シーン「{name}」の ＆順番：{order} が同じ名前のシーン（{}:{first_line}）と重なっています。番号は同じ名前の中で 1 つずつにしてください",
+            ghost_path(first_path)
+        )
+    }
     pub fn scene_shadowed_by_builtin(name: &str) -> String {
         format!("シーン「{name}」は組み込みの飛び先と同じ名前のため、＞{name} では呼ばれません")
     }
@@ -449,6 +485,17 @@ pub mod msg {
     pub fn call_target_missing(key: &str) -> String {
         format!(
             "Call の飛び先「{key}」が辞書のシーンにありません（Lua で定義していれば問題ありません）"
+        )
+    }
+    /// `unordered` は ＆順番 の無い候補の（パス, 行）。同じ ＆優先 の組の中で混ざっている
+    pub fn call_order_mixed(key: &str, unordered: &[(&str, u32)]) -> String {
+        let places: Vec<String> = unordered
+            .iter()
+            .map(|(path, line)| format!("{}:{line}", ghost_path(path)))
+            .collect();
+        format!(
+            "Call の飛び先「{key}」の候補に ＆順番 の有るものと無いもの（{}）が混ざっているため、順番どおりに選ばれずシャッフルで選ばれます",
+            places.join("、")
         )
     }
     pub fn choice_target_missing(target: &str) -> String {
