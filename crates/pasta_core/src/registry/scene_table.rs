@@ -22,6 +22,16 @@ pub enum PickWarning {
     OrderDuplicate { order: i64 },
 }
 
+/// 同じ名前の中で同じ番号を持つシーンの組
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderDuplicate {
+    /// prefix_index のキー（グローバルは照合用の名前、ローカルは `:親の登録名:名前`）
+    pub key: String,
+    pub order: i64,
+    /// 2 つ以上。SceneId の順
+    pub scenes: Vec<SceneId>,
+}
+
 /// Cache key for scene resolution (module_name + search_key + exact + owning_local).
 /// 変数の値（述語）は鍵に含めない。
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -488,6 +498,30 @@ impl SceneTable {
     /// 直前の選択でシャッフルへ戻った理由。読むと空になる
     pub fn take_pick_warning(&mut self) -> Option<PickWarning> {
         self.pick_warning.take()
+    }
+
+    /// 同じ名前の中の番号の重なり（無ければ空）。キーの順・番号の順・SceneId の順
+    pub fn duplicate_orders(&self) -> Vec<OrderDuplicate> {
+        let mut out = Vec::new();
+        for (key, ids) in &self.prefix_index {
+            let mut by_order: BTreeMap<i64, Vec<SceneId>> = BTreeMap::new();
+            for &id in ids {
+                if let Some(order) = scene_order(&self.labels[id.0].attributes) {
+                    by_order.entry(order).or_default().push(id);
+                }
+            }
+            out.extend(
+                by_order
+                    .into_iter()
+                    .filter(|(_, scenes)| scenes.len() > 1)
+                    .map(|(order, scenes)| OrderDuplicate {
+                        key: key.clone(),
+                        order,
+                        scenes,
+                    }),
+            );
+        }
+        out
     }
 }
 

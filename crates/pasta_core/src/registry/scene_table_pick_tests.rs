@@ -207,3 +207,42 @@ fn test_order_remembered_per_cache_key() {
     assert_eq!(exact.0, 0);
     assert_eq!(pick_n(&mut table, 1), vec![1]);
 }
+
+/// 同じ名前の中の番号の重なりを、グローバル（別名を置き換えた後の名前）とローカルで組にして返す（3.3）
+#[test]
+fn test_duplicate_orders_global_and_local() {
+    let mut registry = SceneRegistry::new();
+    // 別名 `会話` は登録の前に `OnTalk` へ置き換わるので、どちらも `OnTalk` で登録される
+    registry.register_global("OnTalk", order(10)); // 0: 会話 と書いたもの
+    registry.register_global("OnTalk", order(10)); // 1: OnTalk と書いたもの
+    registry.register_global("OnTalk", order(20)); // 2
+    registry.register_global("挨拶", order(10)); // 3: 名前が違えば重ならない
+    registry.register_local("選択", "話", 1, 1, order(5)); // 4
+    registry.register_local("選択", "話", 1, 2, order(5)); // 5
+    registry.register_local("選択", "話", 1, 3, order(5)); // 6
+    registry.register_local("選択", "話", 2, 1, order(5)); // 7: 親が違えば重ならない
+    let table =
+        SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![])));
+    assert_eq!(
+        table.duplicate_orders(),
+        vec![
+            OrderDuplicate {
+                key: ":話_1:選択".to_string(),
+                order: 5,
+                scenes: vec![SceneId(4), SceneId(5), SceneId(6)],
+            },
+            OrderDuplicate {
+                key: "OnTalk".to_string(),
+                order: 10,
+                scenes: vec![SceneId(0), SceneId(1)],
+            },
+        ]
+    );
+}
+
+/// 重なりが無ければ空。順番の無いシーンは数えない（3.3）
+#[test]
+fn test_duplicate_orders_empty_without_overlap() {
+    let (table, _) = table_with(vec![order(10), order(20), vec![], vec![]], vec![]);
+    assert_eq!(table.duplicate_orders(), vec![]);
+}
