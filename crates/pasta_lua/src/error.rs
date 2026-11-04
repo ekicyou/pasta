@@ -47,6 +47,18 @@ pub enum TranspileError {
     #[error("`＆優先` の値は整数で書く: `{value}` at {span}")]
     InvalidPriority { value: String, span: SpanDisplay },
 
+    /// `＆重み` の値が 1 以上の整数でない（scene-pick-modes 要件 4.2）。value は書いた値
+    #[error("`＆重み` の値は 1 以上の整数で書く: `{value}` at {span}")]
+    InvalidWeight { value: String, span: SpanDisplay },
+
+    /// `＆順番` の値が整数でない（scene-pick-modes 要件 4.4）。value は書いた値
+    #[error("`＆順番` の値は整数で書く: `{value}` at {span}")]
+    InvalidOrder { value: String, span: SpanDisplay },
+
+    /// 同じシーンに `＆重み` と `＆順番` の両方（scene-pick-modes 要件 3.2）。span は順番の属性
+    #[error("`＆重み` と `＆順番` は同じシーンに書けない at {span}")]
+    WeightWithOrder { span: SpanDisplay },
+
     /// Property reference used in expression context (not allowed).
     #[error("Property reference cannot be used in expressions; use variable assignment first")]
     PropertyInExpression,
@@ -89,6 +101,29 @@ impl TranspileError {
         TranspileError::InvalidPriority {
             span: SpanDisplay::from(*span),
             value: value.to_string(),
+        }
+    }
+
+    /// Create an InvalidWeight error.
+    pub fn invalid_weight(span: &Span, value: &str) -> Self {
+        TranspileError::InvalidWeight {
+            span: SpanDisplay::from(*span),
+            value: value.to_string(),
+        }
+    }
+
+    /// Create an InvalidOrder error.
+    pub fn invalid_order(span: &Span, value: &str) -> Self {
+        TranspileError::InvalidOrder {
+            span: SpanDisplay::from(*span),
+            value: value.to_string(),
+        }
+    }
+
+    /// Create a WeightWithOrder error.
+    pub fn weight_with_order(span: &Span) -> Self {
+        TranspileError::WeightWithOrder {
+            span: SpanDisplay::from(*span),
         }
     }
 

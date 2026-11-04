@@ -491,7 +491,7 @@ fn invalid_priority_is_error_at_attribute() {
         "＊場面　＆優先：１",
         "＊場面　＆優先：1.0",
         "＊場面　＆優先：高い　＆優先：2",
-        "＊場面　＆重み：高い",
+        "＊場面　＆率：高い",
     ] {
         let text = format!("{header}\n  さくら：はい。\n");
         assert!(transpile_findings(&text).is_empty(), "{header}");
