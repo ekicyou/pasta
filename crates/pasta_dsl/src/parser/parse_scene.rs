@@ -38,7 +38,7 @@ pub(crate) fn parse_global_scene_scope(
             Rule::global_scene_word_line => {
                 for kw_pair in inner.into_inner() {
                     if kw_pair.as_rule() == Rule::key_words {
-                        words.push(parse_key_words(kw_pair)?);
+                        words.push(parse_key_words(kw_pair, filename)?);
                     }
                 }
             }

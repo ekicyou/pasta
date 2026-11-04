@@ -119,10 +119,11 @@ pub(crate) fn number_value(pair: &Pair<Rule>, filename: &str) -> Result<Number, 
 }
 
 /// Parse key_words.
-pub(crate) fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> {
+pub(crate) fn parse_key_words(pair: Pair<Rule>, filename: &str) -> Result<KeyWords, ParseError> {
     let span = Span::from_pair(&pair);
     let mut names = Vec::new();
     let mut words = Vec::new();
+    let mut weight_spans = Vec::new();
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
@@ -134,22 +135,58 @@ pub(crate) fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> 
                 }
             }
             Rule::words => {
-                for word_inner in inner.into_inner() {
-                    match word_inner.as_rule() {
-                        Rule::string_contents => {
-                            words.push(word_inner.as_str().to_string());
+                for item in inner.into_inner() {
+                    // word_item = { word ~ word_weight? | word_weight }
+                    let item_text = item.as_str();
+                    let item_pos = item.as_span().start_pos().line_col();
+                    let mut value = None;
+                    let mut weight = None;
+                    for word_inner in item.into_inner() {
+                        match word_inner.as_rule() {
+                            Rule::string_blank => value = Some(String::new()),
+                            Rule::string_contents | Rule::word_nofenced | Rule::sakura_script => {
+                                value = Some(word_inner.as_str().to_string())
+                            }
+                            Rule::word_weight => weight = Some(word_inner),
+                            _ => {}
                         }
-                        Rule::string_blank => {
-                            words.push(String::new());
-                        }
-                        Rule::word_nofenced => {
-                            words.push(word_inner.as_str().to_string());
-                        }
-                        Rule::sakura_script => {
-                            words.push(word_inner.as_str().to_string());
-                        }
-                        _ => {}
                     }
+                    let value = value.unwrap_or_default();
+                    let Some(weight) = weight else {
+                        words.push(value);
+                        continue;
+                    };
+                    let weight_text = weight.as_str();
+                    let err = |what: String| {
+                        syntax_error(
+                            filename,
+                            item_pos,
+                            &format!("単語 `{}` の値 `{item_text}` {what}", names.join("、")),
+                        )
+                    };
+                    if value.is_empty() {
+                        return Err(err(format!(
+                            "は重みの `＠数` を除くと空になります（`{weight_text}` を文字として出すときは「」で囲みます）"
+                        )));
+                    }
+                    // `＠` は 1 文字なので、その後ろが数字
+                    let digits: String = weight_text.chars().skip(1).collect();
+                    let n: usize = match normalize_number_str(&digits).parse() {
+                        Ok(0) => {
+                            return Err(err(format!(
+                                "の重みは 1 以上の整数で書きます（`{weight_text}` を文字として出すときは「」で囲みます）"
+                            )));
+                        }
+                        Ok(n) => n,
+                        Err(_) => return Err(err("の重みが大きすぎます".to_string())),
+                    };
+                    // 並びが持てる要素の数の上限（ターゲットで決まり、空きメモリに依らない）。それより下のメモリ不足は設計の Risks どおり受け入れる
+                    let max_len = isize::MAX as usize / std::mem::size_of::<String>();
+                    if n > max_len - words.len() {
+                        return Err(err("の重みが大きすぎます".to_string()));
+                    }
+                    words.extend(std::iter::repeat_n(value, n));
+                    weight_spans.push(Span::from_pair(&weight));
                 }
             }
             _ => {}
@@ -159,7 +196,7 @@ pub(crate) fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> 
     Ok(KeyWords {
         names,
         words,
-        weight_spans: vec![],
+        weight_spans,
         span,
     })
 }

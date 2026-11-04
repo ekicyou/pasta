@@ -266,7 +266,7 @@ fn parse_file_scope(pair: Pair<Rule>, filename: &str) -> Result<FileScope, Parse
             Rule::file_word_line => {
                 for kw_pair in inner.into_inner() {
                     if kw_pair.as_rule() == Rule::key_words {
-                        scope.words.push(parse_key_words(kw_pair)?);
+                        scope.words.push(parse_key_words(kw_pair, filename)?);
                     }
                 }
             }
@@ -309,7 +309,7 @@ fn parse_actor_scope(pair: Pair<Rule>, filename: &str) -> Result<ActorScope, Par
             Rule::global_scene_word_line => {
                 for kw_pair in inner.into_inner() {
                     if kw_pair.as_rule() == Rule::key_words {
-                        words.push(parse_key_words(kw_pair)?);
+                        words.push(parse_key_words(kw_pair, filename)?);
                     }
                 }
             }
