@@ -168,15 +168,44 @@ pub fn priority_value(value: &SceneAttrValue) -> Option<i64> {
 /// シーンの優先。宣言のうち PRIORITY_KEYS の最後のもの（書いた順の後勝ち）。無ければ 0。
 /// 不正な値（倉の外から入ったもの）は 0 とみなす。
 pub fn scene_priority(attrs: &[SceneAttr]) -> i64 {
-    attrs
-        .iter()
-        .rev()
-        .find_map(|attr| match attr {
-            SceneAttr::Decl { key, value } if PRIORITY_KEYS.contains(&key.as_str()) => Some(value),
-            _ => None,
-        })
+    last_decl(attrs, &PRIORITY_KEYS)
         // shortcut: Lua から入れた不正な優先は黙って 0、要望が出たら辞書確定で警告する
         .map_or(0, |value| priority_value(value).unwrap_or(0))
+}
+
+/// 宣言のうち、名前が keys に入る最後のもの（書いた順の後勝ち）の値
+fn last_decl<'a>(attrs: &'a [SceneAttr], keys: &[&str]) -> Option<&'a SceneAttrValue> {
+    attrs.iter().rev().find_map(|attr| match attr {
+        SceneAttr::Decl { key, value } if keys.contains(&key.as_str()) => Some(value),
+        _ => None,
+    })
+}
+
+/// `＆重み` の名前（日本語・英語の別名）
+pub const WEIGHT_KEYS: [&str; 2] = ["重み", "weight"];
+
+/// `＆順番` の名前（日本語・英語の別名）
+pub const ORDER_KEYS: [&str; 2] = ["順番", "index"];
+
+/// 重みとして受け付ける値。1 以上の Integer だけ
+pub fn weight_value(value: &SceneAttrValue) -> Option<i64> {
+    priority_value(value).filter(|v| *v >= 1)
+}
+
+/// シーンの重み。宣言のうち WEIGHT_KEYS の最後のもの。無い・不正なら 1。
+/// i64 から usize へは飽和で写す（x86 は 32 ビット）
+pub fn scene_weight(attrs: &[SceneAttr]) -> usize {
+    last_decl(attrs, &WEIGHT_KEYS)
+        .and_then(weight_value)
+        // shortcut: Lua から入れた不正な重みは黙って 1、要望が出たら辞書確定で警告する
+        .map_or(1, |v| usize::try_from(v).unwrap_or(usize::MAX))
+}
+
+/// シーンの順番。宣言のうち ORDER_KEYS の最後のもの。値の判定は priority_value と同じ。
+/// 無い・不正なら None
+pub fn scene_order(attrs: &[SceneAttr]) -> Option<i64> {
+    // shortcut: Lua から入れた不正な順番は黙って無し、要望が出たら辞書確定で警告する
+    last_decl(attrs, &ORDER_KEYS).and_then(priority_value)
 }
 
 /// 条件かフラグを 1 つでも持つか
@@ -348,6 +377,135 @@ mod tests {
                 decl("priority", SceneAttrValue::String("x".into())),
             ]),
             0
+        );
+    }
+
+    #[test]
+    fn weight_value_accepts_positive_integer_only() {
+        assert_eq!(weight_value(&SceneAttrValue::Integer(1)), Some(1));
+        assert_eq!(weight_value(&SceneAttrValue::Integer(5)), Some(5));
+        assert_eq!(weight_value(&SceneAttrValue::Integer(0)), None);
+        assert_eq!(weight_value(&SceneAttrValue::Integer(-3)), None);
+        assert_eq!(weight_value(&SceneAttrValue::Float(1.5)), None);
+        assert_eq!(weight_value(&SceneAttrValue::String("多め".into())), None);
+        // 「」で囲んだ全角の数字は文字列のまま（囲まない全角の数字は倉で Integer になる）
+        assert_eq!(weight_value(&SceneAttrValue::String("５".into())), None);
+        // 整数の値になる小数は倉で Integer になる
+        assert_eq!(weight_value(&SceneAttrValue::from_f64(5.0)), Some(5));
+    }
+
+    #[test]
+    fn scene_weight_default_alias_last_wins_invalid() {
+        assert_eq!(scene_weight(&[]), 1);
+        assert_eq!(scene_weight(&[decl("優先", SceneAttrValue::Integer(9))]), 1);
+        assert_eq!(scene_weight(&[decl("重み", SceneAttrValue::Integer(5))]), 5);
+        assert_eq!(
+            scene_weight(&[decl("weight", SceneAttrValue::Integer(3))]),
+            3
+        );
+        assert_eq!(
+            scene_weight(&[
+                decl("重み", SceneAttrValue::Integer(2)),
+                decl("weight", SceneAttrValue::Integer(7)),
+            ]),
+            7
+        );
+        assert_eq!(
+            scene_weight(&[
+                decl("weight", SceneAttrValue::Integer(7)),
+                decl("重み", SceneAttrValue::Integer(2)),
+            ]),
+            2
+        );
+        assert_eq!(
+            scene_weight(&[decl("重み", SceneAttrValue::from_f64(5.0))]),
+            5
+        );
+        // 不正な値は 1。後勝ちの最後が不正なら前の正しい値ではなく 1
+        for bad in [
+            SceneAttrValue::Integer(0),
+            SceneAttrValue::Integer(-1),
+            SceneAttrValue::Float(1.5),
+            SceneAttrValue::String("５".into()),
+        ] {
+            assert_eq!(scene_weight(&[decl("重み", bad)]), 1);
+        }
+        assert_eq!(
+            scene_weight(&[
+                decl("重み", SceneAttrValue::Integer(4)),
+                decl("weight", SceneAttrValue::Integer(0)),
+            ]),
+            1
+        );
+        assert_eq!(
+            scene_weight(&[SceneAttr::Cond {
+                key: "＄重み".into(),
+                op: CmpOp::Eq,
+                value: SceneAttrValue::Integer(7),
+            }]),
+            1
+        );
+    }
+
+    #[test]
+    fn scene_weight_max_integer_saturates() {
+        let w = scene_weight(&[decl("重み", SceneAttrValue::Integer(i64::MAX))]);
+        #[cfg(target_pointer_width = "32")]
+        assert_eq!(w, u32::MAX as usize);
+        #[cfg(target_pointer_width = "64")]
+        assert_eq!(w, i64::MAX as usize);
+    }
+
+    #[test]
+    fn scene_order_default_alias_last_wins_invalid() {
+        assert_eq!(scene_order(&[]), None);
+        assert_eq!(
+            scene_order(&[decl("優先", SceneAttrValue::Integer(9))]),
+            None
+        );
+        assert_eq!(
+            scene_order(&[decl("順番", SceneAttrValue::Integer(10))]),
+            Some(10)
+        );
+        assert_eq!(
+            scene_order(&[decl("index", SceneAttrValue::Integer(0))]),
+            Some(0)
+        );
+        assert_eq!(
+            scene_order(&[decl("順番", SceneAttrValue::Integer(-2))]),
+            Some(-2)
+        );
+        assert_eq!(
+            scene_order(&[decl("順番", SceneAttrValue::from_f64(5.0))]),
+            Some(5)
+        );
+        assert_eq!(
+            scene_order(&[
+                decl("順番", SceneAttrValue::Integer(1)),
+                decl("index", SceneAttrValue::Integer(2)),
+            ]),
+            Some(2)
+        );
+        assert_eq!(
+            scene_order(&[
+                decl("index", SceneAttrValue::Integer(2)),
+                decl("順番", SceneAttrValue::Integer(1)),
+            ]),
+            Some(1)
+        );
+        for bad in [
+            SceneAttrValue::Float(1.5),
+            SceneAttrValue::String("最初".into()),
+            SceneAttrValue::String("５".into()),
+        ] {
+            assert_eq!(scene_order(&[decl("順番", bad)]), None);
+        }
+        assert_eq!(
+            scene_order(&[
+                decl("順番", SceneAttrValue::Integer(3)),
+                decl("index", SceneAttrValue::String("x".into())),
+            ]),
+            None
         );
     }
 

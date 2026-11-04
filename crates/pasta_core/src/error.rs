@@ -20,6 +20,14 @@ pub enum SceneTableError {
     /// Invalid scene name.
     #[error("Invalid scene name: '{scene}'")]
     InvalidScene { scene: String },
+
+    /// 同じ名前のシーンに同じ `＆順番` の番号が 2 つ以上ある（読み込みエラー）
+    #[error("`＆順番` の番号 {order} が同じ名前のシーン `{scene}` に 2 つ以上ある: {fn_names:?}")]
+    DuplicateOrder {
+        scene: String,
+        order: i64,
+        fn_names: Vec<String>,
+    },
 }
 
 /// Word table lookup errors.
@@ -123,6 +131,22 @@ mod tests {
             }
             .to_string(),
             "No matching scene: '挨拶'"
+        );
+    }
+
+    #[test]
+    fn test_scene_table_error_display_duplicate_order() {
+        assert_eq!(
+            SceneTableError::DuplicateOrder {
+                scene: "OnTalk".to_string(),
+                order: 10,
+                fn_names: vec![
+                    "OnTalk_1::__start__".to_string(),
+                    "OnTalk_2::__start__".to_string()
+                ],
+            }
+            .to_string(),
+            r#"`＆順番` の番号 10 が同じ名前のシーン `OnTalk` に 2 つ以上ある: ["OnTalk_1::__start__", "OnTalk_2::__start__"]"#
         );
     }
 

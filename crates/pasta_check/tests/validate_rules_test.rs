@@ -335,6 +335,9 @@ fn transpile_findings(text: &str) -> Vec<(FindingKind, Option<u32>, Option<u32>,
                     | FindingKind::TranspilePropertyInExpr
                     | FindingKind::TranspileContinuationWithoutActor
                     | FindingKind::TranspileInvalidPriority
+                    | FindingKind::TranspileInvalidWeight
+                    | FindingKind::TranspileInvalidOrder
+                    | FindingKind::TranspileWeightWithOrder
             )
         })
         .inspect(|f| {
@@ -491,9 +494,143 @@ fn invalid_priority_is_error_at_attribute() {
         "＊場面　＆優先：１",
         "＊場面　＆優先：1.0",
         "＊場面　＆優先：高い　＆優先：2",
-        "＊場面　＆重み：高い",
+        "＊場面　＆率：高い",
     ] {
         let text = format!("{header}\n  さくら：はい。\n");
+        assert!(transpile_findings(&text).is_empty(), "{header}");
+    }
+}
+
+/// `＆重み`・`＆順番` の値の誤りと両方書きも、pasta.dll と同じく誤り。ファイル・行・値つき（6.1・4.2・4.4・3.2）
+#[test]
+fn invalid_weight_order_and_weight_with_order_are_errors() {
+    let one = |kind, line, col, msg: &str| vec![(kind, Some(line), Some(col), msg.to_string())];
+    use FindingKind::{TranspileInvalidOrder, TranspileInvalidWeight, TranspileWeightWithOrder};
+    for (value, shown) in [
+        ("0", "0"),
+        ("-1", "-1"),
+        ("1.5", "1.5"),
+        ("多め", "多め"),
+        ("「3」", "「3」"),
+    ] {
+        assert_eq!(
+            transpile_findings(&format!(
+                "＊場面　＆重み：{value}
+  さくら：はい。
+"
+            )),
+            one(
+                TranspileInvalidWeight,
+                1,
+                5,
+                &format!("＆重み の値は 1 以上の整数で書きます: {shown}")
+            ),
+            "{value}"
+        );
+    }
+    assert_eq!(
+        transpile_findings(
+            "＊場面　＆index：最初
+  さくら：はい。
+"
+        ),
+        one(
+            TranspileInvalidOrder,
+            1,
+            5,
+            "＆index の値は整数で書きます: 最初"
+        )
+    );
+    // ローカルシーンの属性
+    assert_eq!(
+        transpile_findings(
+            "＊場面
+  さくら：はい。
+  ・次　＆順番：1.5
+  さくら：うん。
+"
+        ),
+        one(
+            TranspileInvalidOrder,
+            3,
+            6,
+            "＆順番 の値は整数で書きます: 1.5"
+        )
+    );
+    // 両方書きは順番の属性の位置。受け継いだ重みとシーンの順番も同じ
+    assert_eq!(
+        transpile_findings(
+            "＊場面　＆weight：2　＆順番：1
+  さくら：はい。
+"
+        ),
+        one(
+            TranspileWeightWithOrder,
+            1,
+            15,
+            "＆weight：2 と ＆順番：1 は同じシーンに書けません。どちらか一方にしてください"
+        )
+    );
+    assert_eq!(
+        transpile_findings(
+            "＆重み：3
+＊場面　＆順番：1
+  さくら：はい。
+"
+        ),
+        one(
+            TranspileWeightWithOrder,
+            2,
+            5,
+            "＆重み：3 と ＆順番：1 は同じシーンに書けません。どちらか一方にしてください"
+        )
+    );
+    // ファイル属性の誤りは、受け継ぐシーンがいくつあっても属性の位置に 1 つ
+    assert_eq!(
+        transpile_findings(
+            "＆順番：最初
+＊一
+  さくら：はい。
+＊二
+  さくら：うん。
+"
+        ),
+        one(
+            TranspileInvalidOrder,
+            1,
+            1,
+            "＆順番 の値は整数で書きます: 最初"
+        )
+    );
+    assert_eq!(
+        transpile_findings(
+            "＆順番：1
+＊一　＆重み：2
+  さくら：はい。
+＊二　＆重み：2
+  さくら：うん。
+"
+        ),
+        one(
+            TranspileWeightWithOrder,
+            1,
+            1,
+            "＆重み：2 と ＆順番：1 は同じシーンに書けません。どちらか一方にしてください"
+        )
+    );
+    // 受け付ける値と、後勝ちで 1 つになる宣言は誤りでない
+    for header in [
+        "＊場面　＆重み：５",
+        "＊場面　＆重み：5.0",
+        "＊場面　＆順番：0",
+        "＊場面　＆順番：-3",
+        "＊場面　＆重み：0　＆重み：2",
+    ] {
+        let text = format!(
+            "{header}
+  さくら：はい。
+"
+        );
         assert!(transpile_findings(&text).is_empty(), "{header}");
     }
 }

@@ -1,14 +1,15 @@
 //! 構文としては読めるが pasta_lua のトランスパイルが失敗する書き方を見つける段（3.5）。
-//! 3 つの書き方と、`＆優先` の値の誤り（scene-condition-attributes 5.6）。
+//! 3 つの書き方と、`＆優先` の値の誤り（scene-condition-attributes 5.6）、
+//! `＆重み`・`＆順番` の値の誤りと両方書き（scene-pick-modes 6.1）。
 //!
 //! 条件は pasta_lua の `code_gen`（`element_gen.rs`・`expr_gen.rs`・`scope_gen.rs`）と同じ。
 //! pasta_lua は最初の 1 つで止まるが、ここでは見つけたものを全部報告する（失敗するかどうかは同じ）。
 
-use pasta_core::registry::{PRIORITY_KEYS, priority_value};
+use pasta_core::registry::{ORDER_KEYS, PRIORITY_KEYS, WEIGHT_KEYS, priority_value, weight_value};
 use pasta_dsl::PastaFile;
 use pasta_dsl::parser::{
-    Action, Args, AttrBody, AttrValue, CallTarget, Expr, FileItem, LocalSceneItem, SetValue, Span,
-    VarScope, VarSet, merge_attrs,
+    Action, Args, Attr, AttrBody, AttrValue, CallTarget, Expr, FileItem, LocalSceneItem, SetValue,
+    Span, VarScope, VarSet, merge_attrs,
 };
 
 use super::scenes::scene_attr_value;
@@ -78,43 +79,74 @@ pub(crate) fn check(parsed: &[(String, PastaFile)], texts: &[(String, FileText)]
                 }
             }
         }
-        priority_errors(path, file, &mut findings);
+        attr_value_errors(path, file, &mut findings);
     }
     findings
 }
 
-/// `append_set_scene_attrs`（scope_gen.rs）: 受け継ぎと畳みの後の宣言で、`＆優先` の値が整数でなければ誤り。
+/// `append_set_scene_attrs`（scope_gen.rs）: 受け継ぎと畳みの後の宣言で、`＆優先`・`＆順番` の値が整数でない、
+/// `＆重み` の値が 1 以上の整数でない、`＆重み` と `＆順番` が両方ある（順番の位置）なら誤り。
 /// 名前の無い開始のブロックの属性は書き出されないので見ない。受け継いだファイル属性は位置ごとに 1 つ
-fn priority_errors(path: &str, file: &PastaFile, findings: &mut Vec<Finding>) {
+fn attr_value_errors(path: &str, file: &PastaFile, findings: &mut Vec<Finding>) {
     let scenes = file.items.iter().filter_map(|item| match item {
         FileItem::GlobalSceneScope(scene) => Some(scene),
         _ => None,
     });
-    let mut reported: Vec<Span> = Vec::new();
+    let mut reported: Vec<(FindingKind, Span)> = Vec::new();
+    let mut found = |kind: FindingKind, span: Span, message: String| {
+        if reported.contains(&(kind, span)) {
+            return;
+        }
+        reported.push((kind, span));
+        findings.push(Finding::new(
+            kind,
+            path,
+            Some(span.start_line as u32),
+            Some(span.start_col as u32),
+            message,
+        ));
+    };
     for (scene, attrs) in scenes.zip(file.global_scene_attrs()) {
         let locals = scene
             .local_scenes
             .iter()
             .filter(|local| local.name.is_some())
             .map(|local| merge_attrs(&[], &local.attrs));
-        for attr in std::iter::once(attrs).chain(locals).flatten() {
-            let AttrBody::Decl(value) = &attr.body else {
-                continue;
-            };
-            if !PRIORITY_KEYS.contains(&attr.key.as_str())
-                || priority_value(&scene_attr_value(value)).is_some()
-                || reported.contains(&attr.span)
-            {
-                continue;
+        for attrs in std::iter::once(attrs).chain(locals) {
+            let decls: Vec<(&Attr, &AttrValue)> = attrs
+                .iter()
+                .filter_map(|attr| match &attr.body {
+                    AttrBody::Decl(value) => Some((attr, value)),
+                    _ => None,
+                })
+                .collect();
+            for &(attr, value) in &decls {
+                let key = attr.key.as_str();
+                let v = scene_attr_value(value);
+                let written = attr_value_text(value);
+                if PRIORITY_KEYS.contains(&key) && priority_value(&v).is_none() {
+                    let message = msg::transpile_invalid_priority(key, &written);
+                    found(FindingKind::TranspileInvalidPriority, attr.span, message);
+                } else if WEIGHT_KEYS.contains(&key) && weight_value(&v).is_none() {
+                    let message = msg::transpile_invalid_weight(key, &written);
+                    found(FindingKind::TranspileInvalidWeight, attr.span, message);
+                } else if ORDER_KEYS.contains(&key) && priority_value(&v).is_none() {
+                    let message = msg::transpile_invalid_order(key, &written);
+                    found(FindingKind::TranspileInvalidOrder, attr.span, message);
+                }
             }
-            reported.push(attr.span);
-            findings.push(Finding::new(
-                FindingKind::TranspileInvalidPriority,
-                path,
-                Some(attr.span.start_line as u32),
-                Some(attr.span.start_col as u32),
-                msg::transpile_invalid_priority(&attr.key, &attr_value_text(value)),
-            ));
+            let first_of =
+                |keys: &[&str]| decls.iter().find(|(a, _)| keys.contains(&a.key.as_str()));
+            if let (Some((w, wv)), Some((o, ov))) = (first_of(&WEIGHT_KEYS), first_of(&ORDER_KEYS))
+            {
+                let message = msg::transpile_weight_with_order(
+                    &w.key,
+                    &attr_value_text(wv),
+                    &o.key,
+                    &attr_value_text(ov),
+                );
+                found(FindingKind::TranspileWeightWithOrder, o.span, message);
+            }
         }
     }
 }

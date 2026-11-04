@@ -7,8 +7,8 @@ use super::SearchError;
 use super::scene_cond::cond_predicate;
 use mlua::{IntoLuaMulti, MultiValue, Table, UserData, UserDataMethods};
 use pasta_core::registry::{
-    CondFn, DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneAliasTable,
-    SceneRegistry, SceneTable, WordDefRegistry, WordTable,
+    CondFn, DefaultRandomSelector, MockRandomSelector, PickWarning, RandomSelector,
+    SceneAliasTable, SceneRegistry, SceneTable, WordDefRegistry, WordTable,
 };
 
 /// [`SearchContext::search_scene_where`] の結果。
@@ -196,12 +196,14 @@ impl SearchContext {
             None => self.scene_aliases.resolve(name),
         };
         let key = SceneRegistry::sanitize_name(alias.unwrap_or(name));
-        match resolve(
+        let result = resolve(
             &mut self.scene_table,
             global_scene_name.unwrap_or(""),
             &key,
             cond,
-        ) {
+        );
+        Self::warn_pick_fallback(&mut self.scene_table, name);
+        match result {
             Ok(scene_id) => {
                 let scene = self.scene_table.get_scene(scene_id).ok_or_else(|| {
                     SearchError::InvalidArgument("Scene ID not found".to_string())
@@ -293,28 +295,28 @@ impl SearchContext {
         let global_key = SceneRegistry::sanitize_name(alias.unwrap_or(global_name));
         let local_key = SceneRegistry::sanitize_name(local_name);
 
-        let global_id =
-            match self
-                .scene_table
-                .resolve_global_owning_local_exact(&global_key, &local_key, None)
-            {
-                Ok(Some(id)) => id,
-                Ok(None) => return Ok(LocalSceneMatch::NoLocal),
-                Err(
-                    pasta_core::SceneTableError::SceneNotFound { .. }
-                    | pasta_core::SceneTableError::NoMatchingScene { .. },
-                ) => {
-                    if let Some(target) = alias {
-                        tracing::warn!(
-                            name = %global_name,
-                            resolved = %target,
-                            "Scene not found (alias applied)"
-                        );
-                    }
-                    return Ok(LocalSceneMatch::NoGlobal);
+        let result =
+            self.scene_table
+                .resolve_global_owning_local_exact(&global_key, &local_key, None);
+        Self::warn_pick_fallback(&mut self.scene_table, global_name);
+        let global_id = match result {
+            Ok(Some(id)) => id,
+            Ok(None) => return Ok(LocalSceneMatch::NoLocal),
+            Err(
+                pasta_core::SceneTableError::SceneNotFound { .. }
+                | pasta_core::SceneTableError::NoMatchingScene { .. },
+            ) => {
+                if let Some(target) = alias {
+                    tracing::warn!(
+                        name = %global_name,
+                        resolved = %target,
+                        "Scene not found (alias applied)"
+                    );
                 }
-                Err(e) => return Err(SearchError::SceneTableError(e)),
-            };
+                return Ok(LocalSceneMatch::NoGlobal);
+            }
+            Err(e) => return Err(SearchError::SceneTableError(e)),
+        };
         let parent = self
             .scene_table
             .get_scene(global_id)
@@ -329,6 +331,42 @@ impl SearchContext {
             }),
             None => Ok(LocalSceneMatch::NoLocal),
         }
+    }
+
+    /// 同じ名前の中の番号の重なりがあれば、最初の組を `DuplicateOrder` で返す（3.3）
+    pub fn check_scene_orders(&self) -> Result<(), SearchError> {
+        let Some(dup) = self.scene_table.duplicate_orders().into_iter().next() else {
+            return Ok(());
+        };
+        let scenes: Vec<_> = dup
+            .scenes
+            .iter()
+            .filter_map(|&id| self.scene_table.get_scene(id))
+            .collect();
+        Err(pasta_core::SceneTableError::DuplicateOrder {
+            // キーはグローバルなら照合用の名前、ローカルなら `:親の登録名:名前`
+            scene: dup.key.rsplit(':').next().unwrap_or_default().to_string(),
+            order: dup.order,
+            fn_names: scenes.iter().map(|s| s.fn_name.clone()).collect(),
+        }
+        .into())
+    }
+
+    /// 選んだ後の控え（順番を使わずシャッフルへ戻った理由）があれば注意のログに出す（3.1）
+    fn warn_pick_fallback(table: &mut SceneTable, name: &str) {
+        let reason = match table.take_pick_warning() {
+            None => return,
+            Some(PickWarning::OrderMixed) => "順番の有るものと無いものが混ざっている".to_string(),
+            Some(PickWarning::OrderDuplicate { order }) => {
+                format!("同じ番号 {order} が 2 つ以上ある")
+            }
+        };
+        tracing::warn!(
+            target: "pasta_lua::search",
+            name = %name,
+            reason = %reason,
+            "Scene order not used; picked by shuffle"
+        );
     }
 
     /// Parse fn_name to extract global_name and local_name in transpiler output format.

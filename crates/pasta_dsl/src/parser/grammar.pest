@@ -150,9 +150,14 @@ key_list    = { id ~ ( comma_sep ~ id )* }
 key_words   = { key_list ~ s ~ kv_marker ~ s ~ words }
 
 // ################################################# word_dic
-words         =  { word ~ ( comma_sep ~ word )* ~ comma_sep? }
+words         =  { word_item ~ ( comma_sep ~ word_item )* ~ comma_sep? }
+// 値 ＋ 重み（任意）。値の無い `＠数` も 1 項目として読み、パースで誤りにする
+word_item     =  { word ~ word_weight? | word_weight }
 word          = _{ string_literal | sakura_script | word_nofenced }
-word_nofenced = @{ !("「" | "\"") ~ (!(comma_sep | "\r" | "\n") ~ ANY)+ }
+word_weight   = @{ at ~ digit+ }
+word_end      = _{ s ~ ( comma | NEWLINE | EOI ) }
+// 囲まない値は末尾の `＠数`（後ろが値の終わり）の手前で止まる。途中の `＠` は値の文字
+word_nofenced = @{ !("「" | "\"") ~ (!(comma_sep | "\r" | "\n" | word_weight ~ word_end) ~ ANY)+ }
 
 // ################################################# actors
 actors       = _{ actors_item ~ ( comma_sep ~ actors_item )* ~ comma_sep? }

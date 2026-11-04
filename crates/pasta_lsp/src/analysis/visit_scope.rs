@@ -121,7 +121,27 @@ impl super::AnalysisEngine {
 
     fn visit_keywords(word: &KeyWords, source: &str, tokens: &mut Vec<RawToken>) {
         if word.span.is_valid() {
-            Self::add_token_from_span(&word.span, source, token_type::WORD, 0, tokens);
+            // 重みの `＠数` を NUMBER、その間を WORD で出す。値の途中の `＠` は weight_spans に入らないので WORD のまま（要件 7.1・7.2）
+            let (mut line, mut byte) = (word.span.start_line, word.span.start_byte);
+            for w in &word.weight_spans {
+                // add_token_from_span は行とバイトだけを読む
+                let gap = Span {
+                    start_line: line,
+                    start_byte: byte,
+                    end_line: w.start_line,
+                    end_byte: w.start_byte,
+                    ..*w
+                };
+                Self::add_token_from_span(&gap, source, token_type::WORD, 0, tokens);
+                Self::add_token_from_span(w, source, token_type::NUMBER, 0, tokens);
+                (line, byte) = (w.end_line, w.end_byte);
+            }
+            let rest = Span {
+                start_line: line,
+                start_byte: byte,
+                ..word.span
+            };
+            Self::add_token_from_span(&rest, source, token_type::WORD, 0, tokens);
             // 囲まない値は `＃` 以降も span に入るので何も出ない（要件 4.4）
             push_trailing_comment(source, word.span.start_line, word.span.end_byte, tokens);
         }

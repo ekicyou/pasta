@@ -667,6 +667,45 @@ async function runTests(): Promise<void> {
     }
   });
 
+  // 単語の重み（scene-pick-modes 7.1〜7.3）。文法の word_weight は値の終わり（空白のあと 、・行末）の直前の ＠数 だけ
+  test('単語定義の行: 値の後ろの重みの ＠数 は数の色・途中の ＠ は値の色', () => {
+    const NUM_SCOPE = 'constant.numeric.pasta';
+    const u = '　＠w：あ＠３、い＠２';
+    expect(scopeCoversExactly(u, '＠３', NUM_SCOPE), 'weight after an unfenced value');
+    expect(scopeCoversExactly(u, '＠２', NUM_SCOPE, u.indexOf('い')), 'weight after the last unfenced value');
+    expect(scopeCoversExactly(u, 'w：あ＠３、い＠２', WORD_SCOPE), 'weight stays inside the word body');
+    expect(scopeCoversExactly('  @w:a@3, b@12', '@3', NUM_SCOPE), 'half-width weight');
+    expect(scopeCoversExactly('  @w:a@3, b@12', '@12', NUM_SCOPE), 'half-width last weight');
+    const f = '　＠w：「a」＠3、"b"＠4、\\h＠5 ＃c';
+    expect(scopeCoversExactly(f, '＠3', NUM_SCOPE), 'weight after a 「」 value');
+    expect(scopeCoversExactly(f, '＠4', NUM_SCOPE), 'weight after a "" value');
+    expect(scopeCoversExactly(f, '＠5', NUM_SCOPE), 'weight after a sakura value');
+    expect(scopeCoversExactly(f, '＃c', COMMENT_SCOPE), 'comment after a weighted fenced value');
+    expect(scopeCoversExactly('　＠w：＠３、a', '＠３', NUM_SCOPE), 'weight alone');
+    expect(scopeCoversExactly('　＠w：a＠3 、b', '＠3', NUM_SCOPE), 'weight before spaces and a separator');
+    expect(scopeCoversExactly('　＠w：a＠3  ', '＠3', NUM_SCOPE), 'weight before trailing spaces');
+    const m = '　＠w：a＠b＠3＠4';
+    expect(scopeCoversExactly(m, '＠4', NUM_SCOPE), 'only the last ＠数 is the weight');
+    expect(scopeCoversExactly(m, 'w：a＠b＠3＠4', WORD_SCOPE), 'mid-value ＠ keeps the word scope');
+    for (const line of ['　＠w：a＠3b', '　＠w：a＠３ ＃メモ', '　＠w：「a＠3、b」', '　＠w：\\h[a＠3、b]', '　＠w：a＠b']) {
+      expect(!hasScope(tokenizeLine(line).tokens, NUM_SCOPE), `no weight: ${line}`);
+    }
+  });
+
+  test('＆重み・＆順番 の属性は今の宣言の属性と同じ色', () => {
+    for (const [line, attr, base] of [
+      ['＊挨拶 ＆重み：５', '重み：５', '＊挨拶 ＆朝：５'],
+      ['　・a ＆順番：１', '順番：１', '　・a ＆朝：１'],
+      ['　＆重み：５', '重み：５', '　＆朝：５'],
+      ['　＆順番：１', '順番：１', '　＆朝：１'],
+    ]) {
+      expect(scopeCoversExactly(line, attr, ATTR_SCOPE), `attribute body: ${line}`);
+      expect(sameScopes(scopesAt(line, '＆'), scopesAt(base, '＆')), `＆: ${line}`);
+      const v = attr.slice(-1);
+      expect(sameScopes(scopesAt(line, v), scopesAt(base, v)), `value: ${line}`);
+    }
+  });
+
   test('キューの行: 囲みの引数の中の ）・＃ を本体の終わりやコメントと取り違えない', () => {
     const f = '　！c（「「a」）」」） ＃d';
     expect(scopeCoversExactly(f, '「「a」）」」', 'string.quoted.other.pasta'), '「「…」」 arg is one string');

@@ -135,3 +135,10 @@
 - 条件の評価（`crates/pasta_lua/src/search/scene_cond.rs`）は `＄＊名前` を `act.save`、`＄名前` を `act.var` から素の `raw_get` で引く。表の形や置き場所を変えるなら、ここも合わせる。
 - チェイントークの続きは自分の act のまま再開するので、新しいイベントの転記は続きの変数に届かない。チェイントーク中断のシーンの act（`init.lua` の `iact`）も `create_act` で作るので、同じ転記が入る。
 - 参照: `.kiro/specs/completed/scene-condition-attributes/design.md`（EventAutoTransfer・SceneCond の節）。
+
+## 申し送り（2026-11-04・`scene-pick-modes` の実装より）
+
+- 単語の値の文法が変わった（`grammar.pest`）: `word_item = { word ~ word_weight? | word_weight }`・`word_weight = @{ at ~ digit+ }`・`word_end`。囲まない値（`word_nofenced`）は、値の終わりの直前の `＠数` の手前で止まる。文法を足すときは、この重みの後置とぶつけない。
+- 単語の構文木 `KeyWords` に `weight_spans: Vec<Span>` が増えた（`ast/action.rs`）。構文木を直に組み立てる所は空の欄が要り、`partial.rs` の位置ずらしもこの欄をずらす。
+- VSCode の着色は `word` の捕捉を 1 つ増やした（値の並びが捕捉 4、後方参照が \5・\6、コメントが 7）。`word` の正規表現を触るときは番号に注意する。
+- 参照: `.kiro/specs/completed/scene-pick-modes/design.md`（Grammar・ParseKeyWords・pasta_lsp・VSCode の節）。

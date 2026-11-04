@@ -336,7 +336,12 @@ pub fn finalize_scene_impl(lua: &Lua, aliases: &SceneAliasTable) -> LuaResult<bo
     let word_registry = build_word_registry(&word_entries);
 
     // Register @pasta_search module (Requirement 3.3, 3.4, 5.4)
-    crate::search::register(lua, scene_registry, word_registry, aliases.clone())?;
+    let search = crate::search::register(lua, scene_registry, word_registry, aliases.clone())?;
+    // 番号の重なりは読み込みエラー（3.3）。トランスパイル時の部品の生成では見ない
+    search
+        .borrow::<crate::search::SearchContext>()?
+        .check_scene_orders()
+        .map_err(mlua::Error::external)?;
 
     tracing::info!(
         scenes = scenes.len(),

@@ -684,7 +684,7 @@ save.talk_count = (save.talk_count or 0) + 1
 `pasta.scene` モジュール（`require "pasta.scene"`）の関数のうち、シーンの属性（[属性](../grammar/block-structure.md#属性)）を読む `SCENE.attrs` と、名前でシーンを探す `SCENE.search` を扱う。
 
 - この節の `SCENE` は `require "pasta.scene"` が返すモジュールである。Lua ブロックの中の `SCENE` は、そのブロックが属するグローバルシーンのシーンテーブル（[init_scene](#init_scene)）であり、`attrs`・`search` を持たない。Lua ブロックからは `require("pasta.scene").attrs(…)` の形で呼ぶ。
-- 属性のうち、条件・フラグ・`＆優先` は、名前で候補を選ぶときの選択を変える（[条件で候補を絞る](../grammar/block-structure.md#条件で候補を絞る)・[優先](../grammar/block-structure.md#優先)）。そのほかの宣言は、選択と出力を変えない。`SCENE.attrs` は書いた属性を読むだけで、選択には関わらない。
+- 属性のうち、条件・フラグ・`＆優先`・`＆重み`・`＆順番` は、名前で候補を選ぶときの選択を変える（[条件で候補を絞る](../grammar/block-structure.md#条件で候補を絞る)・[優先](../grammar/block-structure.md#優先)・[重み](../grammar/block-structure.md#重み)・[順番](../grammar/block-structure.md#順番)）。そのほかの宣言は、選択と出力を変えない。`SCENE.attrs` は書いた属性を読むだけで、選択には関わらない。
 
 ### SCENE.attrs(global_name, local_name)
 

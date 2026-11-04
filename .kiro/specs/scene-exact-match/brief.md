@@ -163,3 +163,10 @@
 - 戻り値は `global, local`／`nil`（名前が無い）／`nil, "unmet"`（条件に全部漏れた）。Call の条件漏れは止まるエラー（失敗表記の 13 種目 `SCENE_UNMET`＝「条件に合うシーンが無い」）、名前が無いときは今の `SCENE_NOT_FOUND`（止まらない）。`＞＞` もこの 2 つを分けて扱う。
 - `act.lua` の `find_act_handler` は `nil, "unmet"` を返し、2 段目（ローカル）で漏れたら 5 段目（グローバル）へ進む。`SceneTable::resolve_scene_id_exact` は `filters` の代わりに述語を受ける。
 - 参照: `.kiro/specs/completed/scene-condition-attributes/design.md`（SearchContext・ActLookup の節）。
+
+## 申し送り（2026-11-04・`scene-pick-modes` の実装より）
+
+- 名前で選ぶ道は全部 `SceneTable::select_from_cache`（`crates/pasta_core/src/registry/scene_table.rs`）を通り、そこで `＆重み`（並びに N 回乗せる）と `＆順番`（全部の候補に番号があれば番号の順・乱数を使わない）が効く。`＞＞` の完全一致もこの関数を通し、迂回しない（迂回すると重み・順番が効かなくなる）。
+- 順番の続きは並びの記録と同じ鍵（`SceneCacheKey`）ごとにメモリに持つ。完全一致と前方一致は別の鍵なので、別々に巡る。
+- 選んだ後に `take_pick_warning()` を読み、順番の有る・無いの混ざりや番号の重なりで戻ったときは `pasta_lua::search` の warn を出す（`search/context.rs` の `warn_pick_fallback`）。新しい入口を足すなら、ここも呼ぶ。
+- 参照: `.kiro/specs/completed/scene-pick-modes/design.md`（SceneTable・Finalize・SearchContext の節）。

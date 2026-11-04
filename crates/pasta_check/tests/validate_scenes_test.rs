@@ -36,6 +36,7 @@ fn scene_findings(toml: &str, dics: &[(&str, &str)]) -> Vec<(String, u32, Findin
                 FindingKind::GlobalSceneCollision
                     | FindingKind::LocalSceneCollision
                     | FindingKind::SceneShadowedByBuiltin
+                    | FindingKind::SceneOrderDuplicate
             )
         })
         .map(|f| (f.path, f.line.unwrap(), f.code, f.message))
@@ -149,6 +150,98 @@ fn local_match_name_collision_is_warning_within_one_global_scene() {
     assert_eq!(
         FindingKind::LocalSceneCollision.severity(),
         Severity::Warning
+    );
+}
+
+/// 同じ名前の番号の重なりは誤り。2 つ目以降に最初のシーンの位置を示す（6.1・3.3）
+#[test]
+fn duplicate_order_in_same_name_is_error_on_second_and_later() {
+    // グローバル（ファイルをまたぐ）
+    let found = scene_findings(
+        TOML,
+        &[
+            (
+                "dic/a.pasta",
+                "＊会話　＆順番：１
+  さくら：あ。
+＊会話　＆順番：２
+  さくら：い。
+",
+            ),
+            (
+                "dic/b.pasta",
+                "＊会話　＆index：1
+  さくら：う。
+",
+            ),
+        ],
+    );
+    assert_eq!(
+        found,
+        vec![(
+            "dic/b.pasta".into(),
+            1,
+            FindingKind::SceneOrderDuplicate,
+            "シーン「会話」の ＆順番：1 が同じ名前のシーン（ghost/master/dic/a.pasta:1）と重なっています。番号は同じ名前の中で 1 つずつにしてください".into()
+        )]
+    );
+    assert_eq!(FindingKind::SceneOrderDuplicate.severity(), Severity::Error);
+
+    // ローカル（同じ親の中だけ。別の親の同じ番号は重ならない）
+    let found = scene_findings(
+        TOML,
+        &[(
+            "dic/talk.pasta",
+            "＊会話
+  ・選択　＆順番：１
+  さくら：あ。
+  ・選択　＆順番：１
+  さくら：い。
+  ・選択　＆順番：１
+  さくら：う。
+＊雑談
+  ・選択　＆順番：１
+  さくら：え。
+",
+        )],
+    );
+    let lines: Vec<(u32, FindingKind)> = found.iter().map(|f| (f.1, f.2)).collect();
+    assert_eq!(
+        lines,
+        vec![
+            (4, FindingKind::SceneOrderDuplicate),
+            (6, FindingKind::SceneOrderDuplicate),
+        ],
+        "{found:?}"
+    );
+    assert!(
+        found[1].3.contains("（ghost/master/dic/talk.pasta:2）"),
+        "{found:?}"
+    );
+
+    // ファイル属性の受け継ぎ
+    let found = scene_findings(
+        TOML,
+        &[(
+            "dic/talk.pasta",
+            "＆順番：５
+＊会話
+  さくら：あ。
+＊会話
+  さくら：い。
+＊雑談
+  さくら：う。
+",
+        )],
+    );
+    assert_eq!(
+        found,
+        vec![(
+            "dic/talk.pasta".into(),
+            4,
+            FindingKind::SceneOrderDuplicate,
+            "シーン「会話」の ＆順番：5 が同じ名前のシーン（ghost/master/dic/talk.pasta:2）と重なっています。番号は同じ名前の中で 1 つずつにしてください".into()
+        )]
     );
 }
 
@@ -475,6 +568,83 @@ fn choice_does_not_use_builtin_names() {
     let found = reference_findings(TOML, text);
     assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(found[0].1, FindingKind::ChoiceTargetMissing);
+}
+
+/// 順番の混ざりだけを (行, 列, 理由) で返す
+fn order_mixed_findings(text: &str) -> Vec<(u32, u32, String)> {
+    report_of(TOML, &[("dic/talk.pasta", text)])
+        .findings
+        .into_iter()
+        .filter(|f| f.code == FindingKind::CallOrderMixed)
+        .map(|f| (f.line.unwrap(), f.column.unwrap(), f.message))
+        .collect()
+}
+
+/// 名前が決まった Call の候補の同じ ＆優先 の組に順番の有る・無いが混ざれば誤り。Call の位置に順番の無い候補を示す（6.2）
+#[test]
+fn call_candidates_mixing_order_is_error_at_call() {
+    // グローバル（文字列リテラルの Call も名前が決まっている）
+    let text = "＊会話
+  ＞挨拶
+  ＞（「挨拶」）
+＊挨拶　＆順番：１
+  さくら：あ。
+＊挨拶
+  さくら：い。
+＊挨拶　＆順番：２
+  さくら：う。
+";
+    let mixed = "Call の飛び先「挨拶」の候補に ＆順番 の有るものと無いもの（ghost/master/dic/talk.pasta:6）が混ざっているため、順番どおりに選ばれずシャッフルで選ばれます";
+    assert_eq!(
+        order_mixed_findings(text),
+        vec![(2, 3, mixed.into()), (3, 3, mixed.into())]
+    );
+    assert_eq!(FindingKind::CallOrderMixed.severity(), Severity::Error);
+
+    // ローカル（自分のグローバルシーンの配下）。順番の無い候補を全部並べる
+    let text = "＊会話
+  ＞選択
+  ・選択　＆順番：１
+    さくら：あ。
+  ・選択
+    さくら：い。
+  ・選択
+    さくら：う。
+";
+    let found = order_mixed_findings(text);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].0, 2);
+    assert!(
+        found[0]
+            .2
+            .contains("（ghost/master/dic/talk.pasta:5、ghost/master/dic/talk.pasta:7）"),
+        "{found:?}"
+    );
+}
+
+/// ＆優先 の値が違う候補は別の組なので混ざらない。名前が文字でない Call は見ない（6.2）
+#[test]
+fn call_order_mixed_is_per_priority_and_static_only() {
+    let text = "＊会話
+  ＞挨拶
+＊挨拶　＆優先：１　＆順番：１
+  さくら：あ。
+＊挨拶　＆優先：１　＆順番：２
+  さくら：い。
+＊挨拶
+  さくら：う。
+";
+    assert_eq!(order_mixed_findings(text), vec![]);
+
+    let text = "＊会話
+  ＄変数＝「挨拶」
+  ＞＄変数
+＊挨拶　＆順番：１
+  さくら：あ。
+＊挨拶
+  さくら：い。
+";
+    assert_eq!(order_mixed_findings(text), vec![]);
 }
 
 #[test]

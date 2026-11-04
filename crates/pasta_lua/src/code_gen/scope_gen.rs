@@ -4,7 +4,9 @@ use super::LuaCodeGenerator;
 use crate::context::{local_scene_counters, scene_attr_value};
 use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
-use pasta_core::registry::{PRIORITY_KEYS, SceneRegistry, priority_value};
+use pasta_core::registry::{
+    ORDER_KEYS, PRIORITY_KEYS, SceneRegistry, WEIGHT_KEYS, priority_value, weight_value,
+};
 use pasta_dsl::parser::{
     ActorScope, Attr, AttrBody, AttrValue, GlobalSceneScope, LocalSceneItem, LocalSceneScope,
     SceneActorItem, merge_attrs,
@@ -431,6 +433,18 @@ fn append_set_scene_attrs(
                     &attr_value_text(v),
                 ));
             }
+            AttrBody::Decl(v)
+                if WEIGHT_KEYS.contains(&a.key.as_str())
+                    && weight_value(&scene_attr_value(v)).is_none() =>
+            {
+                return Err(TranspileError::invalid_weight(&a.span, &attr_value_text(v)));
+            }
+            AttrBody::Decl(v)
+                if ORDER_KEYS.contains(&a.key.as_str())
+                    && priority_value(&scene_attr_value(v)).is_none() =>
+            {
+                return Err(TranspileError::invalid_order(&a.span, &attr_value_text(v)));
+            }
             AttrBody::Decl(v) => format!("{{ key = {}, value = {} }}", key, attr_value_literal(v)?),
             AttrBody::Cond { op, value } => format!(
                 "{{ key = {}, op = \"{}\", value = {} }}",
@@ -440,6 +454,15 @@ fn append_set_scene_attrs(
             ),
             AttrBody::Flag => format!("{{ key = {} }}", key),
         });
+    }
+    // 受け継ぎと畳みの後の並びなので、受け継いだ重み＋シーンの順番もここで両方見える
+    let is_decl_of = |a: &&Attr, keys: &[&str]| {
+        matches!(a.body, AttrBody::Decl(_)) && keys.contains(&a.key.as_str())
+    };
+    if attrs.iter().any(|a| is_decl_of(&a, &WEIGHT_KEYS))
+        && let Some(order) = attrs.iter().find(|a| is_decl_of(a, &ORDER_KEYS))
+    {
+        return Err(TranspileError::weight_with_order(&order.span));
     }
     line.push_str(&format!(
         "; PASTA.set_scene_attrs(SCENE, {}, {{ {} }})",

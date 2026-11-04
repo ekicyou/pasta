@@ -648,7 +648,7 @@ fn test_empty_scene_alias_table_keeps_search_unchanged() {
 // ============================================================================
 
 const ATTR_SOURCE: &str = "＆＄＊経験値≧500＆背景：教室
-＊会話＆率：1.0＆重み：1.5
+＊会話＆率：1.0＆倍率：1.5
 　＆題：「」
 　Alice：やあ
 　・選択肢＆優先：3＆＄済み
@@ -790,7 +790,7 @@ fn test_scene_attrs_reach_rust_table_same_as_lua_store() {
             cond.clone(),
             decl("背景", SceneAttrValue::String("教室".into())),
             decl("率", SceneAttrValue::Integer(1)),
-            decl("重み", SceneAttrValue::Float(1.5)),
+            decl("倍率", SceneAttrValue::Float(1.5)),
             decl("題", SceneAttrValue::String(String::new())),
         ]
     );

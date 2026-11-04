@@ -238,6 +238,7 @@ fn global_word_single_key_records_its_pasta_line() {
         let word = KeyWords {
             names: vec!["挨拶".to_string()],
             words: vec!["おはよう".to_string(), "こんにちは".to_string()],
+            weight_spans: vec![],
             span: span_at(3),
         };
         codegen.generate_global_word(&word).unwrap();
@@ -268,6 +269,7 @@ fn global_word_multi_key_maps_all_lines_to_same_pasta_line() {
         let word = KeyWords {
             names: vec!["朝".to_string(), "昼".to_string(), "夜".to_string()],
             words: vec!["はい".to_string()],
+            weight_spans: vec![],
             span: span_at(5),
         };
         codegen.generate_global_word(&word).unwrap();
@@ -299,6 +301,7 @@ fn local_word_records_its_pasta_line() {
         let word = KeyWords {
             names: vec!["場所".to_string()],
             words: vec!["東京".to_string()],
+            weight_spans: vec![],
             span: span_at(8),
         };
         codegen.generate_local_word(&word).unwrap();
