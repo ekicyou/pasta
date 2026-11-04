@@ -322,7 +322,7 @@ fn discovery_matches_discover_files_with_capitalized_dic_folder() {
 
 // ---- (c) 読み込みの成否 ----
 
-/// 読み込みを止める誤り（9.4）。飛び先・シーン・モジュール名の重なりは読み込みを止めない
+/// 読み込みを止める誤り（9.4・9.5）。飛び先・シーン・モジュール名の重なりは読み込みを止めない（＆順番 の番号の重なりは止める）
 fn stops_loading(kind: FindingKind) -> bool {
     use FindingKind::*;
     matches!(
@@ -342,6 +342,10 @@ fn stops_loading(kind: FindingKind) -> bool {
             | TranspilePropertyInExpr
             | TranspileContinuationWithoutActor
             | TranspileInvalidPriority
+            | TranspileInvalidWeight
+            | TranspileInvalidOrder
+            | TranspileWeightWithOrder
+            | SceneOrderDuplicate
     )
 }
 
@@ -613,6 +617,123 @@ font = { name = "a\\b" }
                 (
                     "dic/a.pasta",
                     "＊場面　＆優先：高い\n  さくら：はい。\n".as_bytes(),
+                ),
+            ],
+            true,
+        ),
+        // scene-pick-modes の読み込みを止める 4 種（9.5・6.1）
+        (
+            "＆重み の値が 1 以上の整数でない",
+            &[
+                ("pasta.toml", toml),
+                (
+                    "dic/a.pasta",
+                    "＊場面　＆重み：多め\n  さくら：はい。\n".as_bytes(),
+                ),
+            ],
+            true,
+        ),
+        (
+            "＆順番 の値が整数でない",
+            &[
+                ("pasta.toml", toml),
+                (
+                    "dic/a.pasta",
+                    "＊場面　＆順番：1.5\n  さくら：はい。\n".as_bytes(),
+                ),
+            ],
+            true,
+        ),
+        (
+            "＆重み と ＆順番 の両方書き",
+            &[
+                ("pasta.toml", toml),
+                (
+                    "dic/a.pasta",
+                    "＊場面　＆重み：２　＆順番：１\n  さくら：はい。\n".as_bytes(),
+                ),
+            ],
+            true,
+        ),
+        (
+            "受け継いだ ＆重み と シーンの ＆順番",
+            &[
+                ("pasta.toml", toml),
+                (
+                    "dic/a.pasta",
+                    "＆重み：２\n＊場面　＆順番：１\n  さくら：はい。\n".as_bytes(),
+                ),
+            ],
+            true,
+        ),
+        (
+            "同じ名前の ＆順番 の重なり",
+            &[
+                ("pasta.toml", toml),
+                (
+                    "dic/a.pasta",
+                    "＊挨拶　＆順番：１\n  さくら：あ。\n＊挨拶　＆順番：１\n  さくら：い。\n"
+                        .as_bytes(),
+                ),
+            ],
+            true,
+        ),
+        (
+            "別のファイルで同じ名前の ＆順番 の重なり",
+            &[
+                ("pasta.toml", toml),
+                ("dic/a.pasta", "＊挨拶　＆順番：１\n  さくら：あ。\n".as_bytes()),
+                ("dic/b.pasta", "＊挨拶　＆順番：１\n  さくら：い。\n".as_bytes()),
+            ],
+            true,
+        ),
+        (
+            "正しい ＆重み・＆順番 と単語の重み",
+            &[
+                ("pasta.toml", toml),
+                (
+                    "dic/a.pasta",
+                    "＠挨拶：こんにちは＠３、やあ\n＊場面　＆重み：２\n  さくら：はい。\n＊場面\n  さくら：うん。\n＊挨拶　＆順番：１\n  さくら：あ。\n＊挨拶　＆順番：２\n  さくら：い。\n"
+                        .as_bytes(),
+                ),
+            ],
+            false,
+        ),
+        // 単語の重みの構文エラー（6.4）
+        (
+            "単語の重みが ＠０",
+            &[
+                ("pasta.toml", toml),
+                ("dic/a.pasta", "＠挨拶：a＠０\n".as_bytes()),
+            ],
+            true,
+        ),
+        (
+            "単語の値が重みだけ",
+            &[
+                ("pasta.toml", toml),
+                ("dic/a.pasta", "＠挨拶：＠２\n".as_bytes()),
+            ],
+            true,
+        ),
+        (
+            "単語の重みが大きすぎる",
+            &[
+                ("pasta.toml", toml),
+                (
+                    "dic/a.pasta",
+                    "＠挨拶：a＠99999999999999999999999\n".as_bytes(),
+                ),
+            ],
+            true,
+        ),
+        (
+            "シーンの中の単語の重みが ＠０",
+            &[
+                ("pasta.toml", toml),
+                (
+                    "dic/a.pasta",
+                    "＊場面\n  ＠挨拶：a＠０\n  さくら：はい。\n".as_bytes(),
                 ),
             ],
             true,
