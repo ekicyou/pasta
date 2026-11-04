@@ -9,6 +9,7 @@ fn create_simple_actor(name: &str) -> ActorScope {
         words: vec![KeyWords {
             names: vec!["通常".to_string()],
             words: vec!["\\s[0]".to_string()],
+            weight_spans: vec![],
             span: Span::default(),
         }],
         var_sets: vec![],
@@ -42,6 +43,7 @@ fn create_scene_with_words(
         words: vec![KeyWords {
             names: vec![word_name.to_string()],
             words: word_values.iter().map(|s| s.to_string()).collect(),
+            weight_spans: vec![],
             span: Span::default(),
         }],
         actors: vec![],
@@ -203,6 +205,7 @@ fn test_transpile_with_global_words() {
     let global_words = KeyWords {
         names: vec!["挨拶".to_string()],
         words: vec!["こんにちは".to_string(), "やあ".to_string()],
+        weight_spans: vec![],
         span: Span::default(),
     };
     let scenes = vec![create_simple_scene("メイン")];
@@ -236,11 +239,13 @@ fn test_transpile_registers_actor_words() {
             KeyWords {
                 names: vec!["通常".to_string()],
                 words: vec!["\\s[0]".to_string(), "\\s[1]".to_string()],
+                weight_spans: vec![],
                 span: Span::default(),
             },
             KeyWords {
                 names: vec!["照れ".to_string()],
                 words: vec!["\\s[2]".to_string()],
+                weight_spans: vec![],
                 span: Span::default(),
             },
         ],
@@ -270,6 +275,7 @@ fn test_transpile_multi_key_global_word_registration() {
     let global_words = KeyWords {
         names: vec!["女性".to_string(), "水の妖精".to_string()],
         words: vec!["水無灯里".to_string(), "アリス・キャロル".to_string()],
+        weight_spans: vec![],
         span: Span::default(),
     };
 
@@ -298,6 +304,7 @@ fn test_transpile_multi_key_actor_word_registration() {
         words: vec![KeyWords {
             names: vec!["通常".to_string(), "普通".to_string()],
             words: vec!["\\s[0]".to_string()],
+            weight_spans: vec![],
             span: Span::default(),
         }],
         var_sets: vec![],
@@ -321,6 +328,7 @@ fn test_transpile_multi_key_global_word_lua_output() {
     let global_words = KeyWords {
         names: vec!["女性".to_string(), "水の妖精".to_string()],
         words: vec!["水無灯里".to_string(), "アリス・キャロル".to_string()],
+        weight_spans: vec![],
         span: Span::default(),
     };
 
@@ -354,6 +362,7 @@ fn test_transpile_multi_key_actor_word_lua_output() {
         words: vec![KeyWords {
             names: vec!["通常".to_string(), "普通".to_string()],
             words: vec!["\\s[0]".to_string()],
+            weight_spans: vec![],
             span: Span::default(),
         }],
         var_sets: vec![],
@@ -506,6 +515,7 @@ fn test_transpile_single_key_backward_compat_lua_output() {
     let global_words = KeyWords {
         names: vec!["挨拶".to_string()],
         words: vec!["こんにちは".to_string()],
+        weight_spans: vec![],
         span: Span::default(),
     };
 

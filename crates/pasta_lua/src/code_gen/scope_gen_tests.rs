@@ -67,11 +67,13 @@ fn actor_skips_empty_words_and_non_lua_code_blocks() {
             KeyWords {
                 names: vec!["空".to_string()],
                 words: vec![], // empty -> skipped entirely
+                weight_spans: vec![],
                 span: Span::default(),
             },
             KeyWords {
                 names: vec!["通常".to_string()],
                 words: vec!["\\s[0]".to_string()],
+                weight_spans: vec![],
                 span: Span::default(),
             },
         ],

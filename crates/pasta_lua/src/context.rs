@@ -196,6 +196,7 @@ mod tests {
         let kw = KeyWords {
             names: vec!["女性".to_string(), "水の妖精".to_string()],
             words: vec!["水無灯里".to_string(), "アリス・キャロル".to_string()],
+            weight_spans: vec![],
             span: Span::default(),
         };
         for name in &kw.names {
@@ -230,6 +231,7 @@ mod tests {
         let kw = KeyWords {
             names: vec!["場所".to_string(), "地名".to_string()],
             words: vec!["東京".to_string(), "大阪".to_string()],
+            weight_spans: vec![],
             span: Span::default(),
         };
         for name in &kw.names {

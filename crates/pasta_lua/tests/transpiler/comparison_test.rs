@@ -369,11 +369,13 @@ fn test_global_word_registration_order() {
     let word1 = FileItem::GlobalWord(KeyWords {
         names: vec!["挨拶1".to_string()],
         words: vec!["こんにちは".to_string()],
+        weight_spans: vec![],
         span: Span::default(),
     });
     let word2 = FileItem::GlobalWord(KeyWords {
         names: vec!["挨拶2".to_string()],
         words: vec!["やあ".to_string()],
+        weight_spans: vec![],
         span: Span::default(),
     });
 

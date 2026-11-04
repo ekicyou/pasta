@@ -149,6 +149,9 @@ fn shift_attr(attr: &mut Attr, b: usize, l: usize) {
 
 fn shift_keywords(kw: &mut KeyWords, b: usize, l: usize) {
     shift_span(&mut kw.span, b, l);
+    for s in &mut kw.weight_spans {
+        shift_span(s, b, l);
+    }
 }
 
 fn shift_scene_actor(actor: &mut SceneActorItem, b: usize, l: usize) {
@@ -311,5 +314,22 @@ mod tests {
         assert_eq!((s.start_byte, s.end_byte, s.start_line), (100, 110, 4));
         assert_eq!((args.span.start_byte, args.span.end_byte), (104, 108));
         assert_eq!(args.span.end_line, 4);
+    }
+
+    #[test]
+    fn shift_keywords_shifts_weight_spans() {
+        let mut kw = KeyWords {
+            names: vec!["挨拶".into()],
+            words: vec!["こんにちは".into()],
+            weight_spans: vec![Span::new(1, 5, 1, 7, 4, 8)],
+            span: Span::new(1, 1, 1, 10, 0, 20),
+        };
+        shift_keywords(&mut kw, 100, 3);
+        let w = kw.weight_spans[0];
+        assert_eq!(
+            (w.start_byte, w.end_byte, w.start_line, w.end_line),
+            (104, 108, 4, 4)
+        );
+        assert_eq!((kw.span.start_byte, kw.span.end_byte), (100, 120));
     }
 }

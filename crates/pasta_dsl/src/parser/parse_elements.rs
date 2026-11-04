@@ -156,7 +156,12 @@ pub(crate) fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> 
         }
     }
 
-    Ok(KeyWords { names, words, span })
+    Ok(KeyWords {
+        names,
+        words,
+        weight_spans: vec![],
+        span,
+    })
 }
 
 /// Parse code block.

@@ -210,8 +210,10 @@ impl std::fmt::Display for AttrValue {
 pub struct KeyWords {
     /// Key name list (at least one element guaranteed)
     pub names: Vec<String>,
-    /// List of word values
+    /// List of word values（重み N の値は N 個並ぶ）
     pub words: Vec<String>,
+    /// 重みの `＠数` の位置（書いた順。着色だけが読む）
+    pub weight_spans: Vec<Span>,
     /// Source location
     pub span: Span,
 }

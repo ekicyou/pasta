@@ -387,6 +387,7 @@ fn key_words(names: &[&str], words: &[&str]) -> KeyWords {
     KeyWords {
         names: names.iter().map(|s| s.to_string()).collect(),
         words: words.iter().map(|s| s.to_string()).collect(),
+        weight_spans: vec![],
         span: Span::new(3, 1, 3, 10, 30, 50),
     }
 }
