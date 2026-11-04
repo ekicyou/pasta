@@ -79,3 +79,111 @@
   - 全シーンが揃った時点のエラーが、読み込みエラーとして同じ形で見えるか（難所 3）
   - ローカルシーンの鍵を書いた名前で作れるか（難所 1）
   - `word_nofenced` の変更が今のテスト（`parser_test.rs` の単語の値）の出力を変えないか。リポジトリの `.pasta`（サンプルゴースト・入門の段階辞書・テストの辞書）には、`＠数` で終わる囲まない単語の値は無かった（2026-11-04 に grep で確かめた）。外のゴースト（emo2・窓際のぱすたさん）は未確認
+
+---
+
+# 設計フェーズの調査（2026-11-04）
+
+## Summary
+
+- **Feature**: `scene-pick-modes`
+- **Discovery Scope**: Extension（今のシーン表・パーサ・検査の核を延ばす。新しい依存は無い）。`kiro-spec-design` の light discovery で、拡張の口・今の型・互換を確かめた。
+- **Key Findings**:
+  - 順番の位置は保存しないと決まったので、gap 分析の「保存の表を Rust へ渡す口」は要らない。最後の番号は `SceneTable` の中に、並びの控えと同じ鍵 `SceneCacheKey` で持てば足りる。名指しの道に保存の表が届かない問題（難所 2）も消えた。
+  - `pasta_core` は `tracing` を持たず、`scene-condition-attributes` の設計が「`pasta_core` に `tracing`・`mlua` を足さない」と決めている。混ざりの注意は `SceneTable` の控え（`take_pick_warning`）に残し、`pasta_lua` の `SearchContext` が出す。
+  - 単語の重みをパーサで並べると、`create_word(k):entry(v1, …, vN)` の N が Lua の 1 回の呼び出しの上限に当たる。PUC Lua 5.4 で試すと 250 個は通り、260 個は「function or expression needs too many registers」で失敗した（LuaJIT の `LJ_MAX_SLOTS` も 250）。`＠３００` で読み込めなくなるので、コード生成で `:entry` を分ける必要がある。
+
+## Research Log
+
+### 抽出した候補と取り出しの境目
+
+- **Context**: 開発者の方針「抽出（名前・条件・優先）は済んでいる。この spec は取り出しだけ」を、コードのどこで切るか。
+- **Sources Consulted**: `crates/pasta_core/src/registry/scene_table.rs`（`select_from_cache` 272〜342 行）、`.kiro/specs/completed/scene-condition-attributes/design.md`。
+- **Findings**:
+  - 述語の評価と今の段（`ok`・`tier`）を求めた後、並びを作る前が境目になる。抽出した候補は「`ok` に入り、優先が `tier` と同じもの」。述語が無いとき（名指し・今の挙動）は段を見ないので、候補の全部。
+  - `ok` は ID の集合なので、並びに同じ ID が重みの数だけあっても壊れない。`MockRandomSelector` は位置で並べるので、重なった ID にも効く。
+- **Implications**: 重みは `new_round` の 1 か所、順番は `select_from_cache` の中の分かれ 1 つで済む。抽出の段は触らない。
+
+### 番号の重なりの検査の置き場
+
+- **Context**: 同じ名前の番号の重なり（3.3）はファイルをまたぐので、1 ファイルずつのトランスパイルでは見えない。
+- **Sources Consulted**: `runtime/finalize.rs`（`finalize_scene_impl`）、`search/mod.rs`（`loader`）、`loader/cache.rs` 368 行（`scene_dic.lua` の最後で `finalize_scene()` を呼ぶ）、`runtime/factory.rs`（`require_startup_module(&runtime.lua, "pasta.scene_dic")?`）。
+- **Findings**:
+  - `finalize_scene` が `Err` を返すと、起動のモジュール `pasta.scene_dic` の読み込みの失敗として止まる。今の読み込みの失敗と同じ道（gap 分析の Research Needed 1 の答え）。
+  - 「同じ名前」は `prefix_index` のキーと同じ単位になる（グローバルは別名を置き換えた後の照合用の名前、ローカルは `:親の登録名:名前`）。キーごとに番号を見れば、別名の畳みもローカルの範囲もそのまま当たる。
+  - `pasta_check` も実物の `SceneTable` を作っているので、同じ関数（`duplicate_orders`）を使える。SceneId から位置へは、登録と同じループで（パス, 位置）を積めば引ける。
+- **Implications**: 検査は `SceneTable::duplicate_orders` の 1 つ。実行時は `search::loader`、検査の核は `scenes.rs` が呼ぶ。判定の写しを作らない。
+
+### ローカルシーンの鍵（gap 分析の Research Needed 2）
+
+- **Findings**: 位置を保存しないので、鍵の文字列が保存ファイルに出ることは無い。並びの控えと同じ `SceneCacheKey`（登録名を含む）で覚えてよい。辞書を書き換えると再読み込みで消えるので、番号のずれも起きない。
+- **Implications**: 問いは消えた。
+
+### 単語の値の重みの文法
+
+- **Sources Consulted**: `grammar.pest` 150〜155 行、`parse_elements.rs` 122 行、`element_gen.rs` 498 行、`word.lua` 29 行（`entry` は自身を返す）、`pasta_lsp/src/analysis/visit_scope.rs` 122 行、`editors/vscode/syntaxes/pasta.tmLanguage.json` 160 行。
+- **Findings**:
+  - 値の後ろに `word_weight` を任意で足し、囲まない値は「`＠数` の後に値の終わり（空白・読点・改行・入力の終わり）が続く位置」の手前で止めれば、末尾だけを重みとして読める。値の途中の `＠３`（後ろに文字が続く）は今までどおり値になる。
+  - PEG の選択は一度成功すると戻らないので、値の無い `＠３` を受ける形は「値の終わりが続くとき」に限る（`＠３abc` を今までどおり囲まない値として読むため）。
+  - LSP は `KeyWords.span` 全体に `WORD` を 1 つ出している。重みだけ塗るには位置が要るので、構文木に `weight_spans` を足す。`KeyWords { … }` を直に書く所は 23 か所（多くはテスト）で、欄を足すだけ。
+  - TextMate の `word` は 1 本の正規表現で、囲み・さくらスクリプトの値の後ろに `＠３` が来る形を今は受けない。各形に重みの後置を足す。
+- **Implications**: コード生成・Lua・`WordTable` は、`:entry` の分割を除いて触らない。
+
+### 参照したスキルと指針
+
+- `kiro-spec-design` の `design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md` を当てた。
+- ドメインのスキル（`pasta-ghost-authoring`・`pasta-lua-coding`）の `references/` はマニュアルから生成した写しなので、権威のマニュアル（`book/src/grammar/words.md`・`block-structure.md`・`call-jump.md`・`lua/modules/pasta-search.md`）を直接読んだ。
+- ステアリングは `product.md`・`tech.md`・`structure.md`（600 行の目安・テストの置き場の規則）と、文法を触るので `grammar.md`。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A: `select_from_cache` に分かれを足す | 重みは `new_round`、順番は同じ関数の中の分かれ | 抽出の結果（`ok`・`tier`）をそのまま使える。足すのは 20 行ほど | 関数が少し長くなる | **採用** |
+| B: 順番を独立の純粋な関数に | 候補と覚えた番号を受けて選んだ ID を返す | 単体で試しやすい | 抽出した候補の求め方を分け合う口が増える。保存が無くなった今は利点が薄い | gap 分析の勧め。保存しないと決まったので見送り |
+| C: Lua 側で順番 | `SCENE.search` の手前で処理 | — | 抽出を Lua でやり直すことになる | 見送り（gap 分析と同じ） |
+
+## Design Decisions
+
+### Decision: 最後の番号はシーン表の中に持つ
+
+- **Context**: 2.4（メモリの中だけ・シャッフルの続きと同じ寿命）。
+- **Alternatives Considered**:
+  1. `CachedSelection` に `last_order` を足す — 控えを作るときに並びのシャッフルが走り、乱数を使ってしまう（8.4 に反する）。
+  2. `SceneTable` に別の表 `last_orders: HashMap<SceneCacheKey, i64>` — 並びと独立。
+- **Selected Approach**: 2。`replace_selector` で `cache` と一緒に消す。
+- **Trade-offs**: 表が 1 つ増えるが、順番の選択が乱数の列を消費しないことが保たれる。
+
+### Decision: 注意は控えに残し、`pasta_lua` が出す
+
+- **Context**: 3.1 の warn。`pasta_core` に `tracing` を足さない取り決め。
+- **Alternatives Considered**:
+  1. `pasta_core` に `tracing` を足す — 2 行で済むが、取り決めに反する。
+  2. `resolve_*` の戻り値を変える — 公開の 3 つの関数と多くのテストに響く。
+  3. `SceneTable` に直前の注意を 1 つ残し、`take_pick_warning` で読む — 公開の関数の形は変わらない。
+- **Selected Approach**: 3。`SearchContext` の 2 か所で読んで warn にする。
+
+### Decision: 値の誤りは `＆優先` の先例に並べる
+
+- **Context**: 3.2・4.2・4.4。
+- **Selected Approach**: `append_set_scene_attrs`（受け継ぎと畳みの後の並び）に重み・順番の値と両方書きの検査を足し、`pasta_check` の `priority_errors` を同じ判定に広げる。順番の値の判定は優先と同じ（整数なら受け付ける）なので `priority_value` を使う。
+
+### Decision: 単語の重みはパーサで並べ、`:entry` だけ分ける
+
+- **Context**: 5.1。開発者の方針は「パーサで並べてコード生成・Lua・単語表を触らない」。
+- **Findings**: 並べるだけでは Lua の引数の上限（約 250）に当たる。
+- **Selected Approach（前提。設計ディスカッションで確かめる）**: コード生成で値を 200 個ずつの `:entry(…)` に分け、同じ行に続ける。Lua と単語表は触らない。手で 250 個以上書いた単語（今は読み込めない）も読めるようになる。
+- **Alternatives**: 分けずに、値が多すぎる単語を読み込みエラーにする（パーサか検査で上限を決める）。
+
+## Synthesis
+
+- **一般化**: 重み・順番・優先は「宣言の最後の値を鍵の組で引く」同じ形なので、`scene_types.rs` の読み手が非公開の小さな関数を共有する。番号の重なりの検査は実行時と検査の核で同じ関数（`duplicate_orders`）にした。
+- **作るか採るか**: 新しい依存は無い。重み付きの抽選の道具（`rand::distributions::WeightedIndex` など）は「毎回の確率のくじ」で、開発者の決定（重み＝並びに乗せる回数）と違うので使わない。
+- **簡素化**: gap 分析の案 B（独立した順番の部品）と、保存の表の受け渡し・予約の名前・ローカルの鍵の作り方は、保存しないと決まったので全部落とした。単語の重みは構文木に値を並べるだけで、新しい型を作らない。
+
+## Risks & Mitigations
+
+- 囲まない単語の値の最後の `＠数` の意味が変わる — リポジトリの辞書には無いことを確かめた。squash の題の `!` とマニュアルで知らせる。外のゴースト（emo2・窓際のぱすたさん）は未確認。
+- 重みに上限が無い — 極端な値は並び・生成する Lua のメモリが比例して増える。開発者の決定（上限を設けない）に従い、マニュアルに「重みは並びに乗せる回数」とだけ書く。
+- TextMate の `word` の正規表現が長く、重みの後置を足すと読みにくい — `tmGrammar.test.ts` で 3 つの値の形と途中の `＠` を確かめる。
+- `.claude/skills/*/references/` の再生成は、作業の環境によっては書き込みが拒まれることがある — 生成の道具（`gen-skill-refs.mjs`）で作り、`--check` で一致を確かめる。拒まれたら開発者に許可を求める。
