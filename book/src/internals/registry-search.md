@@ -119,6 +119,8 @@ pasta.scene_dic
 
 登録の順序は `build_scene_registry` が決める。グローバル名を `scene_order_key` で並べ、同じグローバルシーンの中のローカル名も同じキーで並べてから登録する。`scene_order_key` は、`split_registered_name` で分けた（名前, 通し番号）と登録名そのものの組である。通し番号は数値で比べ、通し番号の無い名前（`__start__`・`加算ループ` など）は同じ名前の通し番号のある名前より前になる。（名前, 通し番号）が同じになる名前（`_01` と `_1` など）は登録名の文字列の順で決まる。この順序は `HashMap` の走査順や Lua の `pairs` の順に依存せず、同じ入力から同じ登録順になる。同じ検索キーに入る同名シーンが通し番号の小さい順に並ぶのはこの登録順による（`メイン_2` は `メイン_10` より前。[前方一致による候補の収集](#前方一致による候補の収集)）。
 
+辞書確定は `@pasta_search` を置き換えた後に `SearchContext::check_scene_orders` を呼ぶ。同じ検索キーに入る同名シーン（グローバルシーンは別名で畳んだ後の照合用の名前、ローカルシーンは親ごと）で `＆順番` の番号が重なれば（`SceneTable::duplicate_orders`）、`SceneTableError::DuplicateOrder` を `finalize_scene` の Lua エラーにして起動を止める。
+
 収集の失敗（Lua のエラー）は `finalize_scene` の Lua エラーになり、`pasta.scene_dic` の読み込みの失敗として起動を止める。起動モジュールの失敗の扱いは [ローダ自己展開とモジュール解決](loader.md) で扱う。
 
 ### 登録名の構成
@@ -209,6 +211,9 @@ pasta.scene_dic
 | 2 回目以降 | 次の位置から選ぶ | 候補を集め直さず、キャッシュの次の値を返す |
 | 一巡した後 | その呼び出しで集めた候補（収集した順）をシャッフルし直し、優先の降順に並べ替えて先頭から使う | 候補を集め直してシャッフルし、新しいキャッシュで置き換える |
 
+- 巡の始まりの並びは、候補の ID を重み（`scene_weight`。`＆重み`・`weight` の値、無ければ 1）の数だけ並べてから `shuffle_usize` に渡す。重みが全部 1 なら、渡す配列も乱数の消費も重みの無いときと同じである。
+- 並びを使う前に、順番の分かれを見る。述語を満たし今の段にある候補の `scene_order`（`＆順番`・`index` の値）を集め、全部に番号があり、番号が重ならなければ、キャッシュのキーごとの控え（`last_orders`）の番号より大きい最小の番号の候補を返し、控えを書き換える（無ければ最小の番号へ戻る）。乱数は使わない。番号の有る候補と無い候補が混ざるとき（`PickWarning::OrderMixed`）と、番号が重なるとき（`PickWarning::OrderDuplicate`）は、控えに理由を残してシャッフルの並びで選ぶ。`SearchContext` は選んだ後に `take_pick_warning` で理由を取り出し、target `pasta_lua::search` の warn に出す（`warn_pick_fallback`）。番号のある候補が 1 つも無ければ、今までどおり並びで選ぶ。
+- 番号の控えも、`replace_selector` の差し替えで消える。
 - 一巡するまで同じ候補は選ばれない。一巡の境目では、前の巡の最後と次の巡の最初が同じになりうる。
 - シーンの選択（`select_from_cache`）は、述語（`cond: Option<CondFn>`）を受ける。述語があれば、全候補を 1 回だけ評価し、満たす候補の最高の優先（`scene_priority`）を今の段とする。満たす候補が無ければ次の位置を末尾にして `NoMatchingScene` を返す（次の選択は新しい巡で始まる）。
 - 述語があるときは、次の位置から並びを見て、満たす候補を返す。満たさない候補は見ただけで使ったものにする。段より低い候補か末尾に来たら、1 回だけ巡を始め直す。始め直した巡には段の候補が必ずあるので、空回りしない。
@@ -319,7 +324,7 @@ skip_methods が真のとき（動的参照）
 - `crates/pasta_lua/pasta_scripts/pasta/scene.lua`
 - `crates/pasta_lua/pasta_scripts/pasta/word.lua`
 
-検索の入口として本文で参照した Lua 側の検索手順は `crates/pasta_lua/pasta_scripts/pasta/act.lua`・`crates/pasta_lua/pasta_scripts/pasta/actor.lua` に、`finalize_scene` のスタブは `crates/pasta_lua/pasta_scripts/pasta/init.lua` にあり、辞書確定を呼ぶ順序は `crates/pasta_lua/src/runtime/factory.rs` が決める。テストは `crates/pasta_core/tests/word_table_test.rs`、`SceneTable` のテストは `crates/pasta_core/src/registry/scene_table_candidate_tests.rs`・`crates/pasta_core/src/registry/scene_table_resolve_filter_tests.rs` にある。
+検索の入口として本文で参照した Lua 側の検索手順は `crates/pasta_lua/pasta_scripts/pasta/act.lua`・`crates/pasta_lua/pasta_scripts/pasta/actor.lua` に、`finalize_scene` のスタブは `crates/pasta_lua/pasta_scripts/pasta/init.lua` にあり、辞書確定を呼ぶ順序は `crates/pasta_lua/src/runtime/factory.rs` が決める。テストは `crates/pasta_core/tests/word_table_test.rs`、`SceneTable` のテストは `crates/pasta_core/src/registry/scene_table_candidate_tests.rs`・`crates/pasta_core/src/registry/scene_table_resolve_filter_tests.rs`・`crates/pasta_core/src/registry/scene_table_pick_tests.rs`（重みと順番）にある。
 
 ## 経緯
 
