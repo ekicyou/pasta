@@ -26,6 +26,8 @@ fn test_resolve_scene_id_basic() {
         labels: vec![create_test_scene_info(0, "test", "test_1::__start__")],
         prefix_index: BTreeMap::from([("test_1::__start__".to_string(), vec![SceneId(0)])]),
         cache: HashMap::new(),
+        last_orders: HashMap::new(),
+        pick_warning: None,
         random_selector: selector,
     };
 
@@ -411,6 +413,8 @@ fn test_resolve_scene_id_cycling() {
             vec![SceneId(0), SceneId(1), SceneId(2)],
         )]),
         cache: HashMap::new(),
+        last_orders: HashMap::new(),
+        pick_warning: None,
         random_selector: selector,
     };
 
@@ -462,6 +466,8 @@ fn test_resolve_scene_id_cycling_reshuffles() {
             vec![SceneId(0), SceneId(1), SceneId(2)],
         )]),
         cache: HashMap::new(),
+        last_orders: HashMap::new(),
+        pick_warning: None,
         random_selector: selector,
     };
 
@@ -501,6 +507,8 @@ fn test_resolve_scene_id_cycling_preserves_candidates() {
             vec![SceneId(0), SceneId(1), SceneId(2)],
         )]),
         cache: HashMap::new(),
+        last_orders: HashMap::new(),
+        pick_warning: None,
         random_selector: selector,
     };
 
@@ -686,6 +694,8 @@ fn test_resolve_scene_id_selector_applies_to_candidate_order_each_round() {
             vec![SceneId(2), SceneId(0), SceneId(1)],
         )]),
         cache: HashMap::new(),
+        last_orders: HashMap::new(),
+        pick_warning: None,
         random_selector: selector,
     };
 

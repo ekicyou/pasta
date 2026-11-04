@@ -228,6 +228,8 @@ fn test_replace_selector_clears_cache() {
         ],
         prefix_index: BTreeMap::from([("OnTalk".to_string(), vec![SceneId(0), SceneId(1)])]),
         cache: HashMap::new(),
+        last_orders: HashMap::new(),
+        pick_warning: None,
         random_selector: selector,
     };
 

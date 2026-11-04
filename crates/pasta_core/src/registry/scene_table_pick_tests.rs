@@ -103,3 +103,107 @@ fn test_weights_with_condition() {
         "同じ巡の 2 枚目なので始め直さない"
     );
 }
+
+fn order(n: i64) -> Vec<SceneAttr> {
+    vec![decl("順番", n)]
+}
+
+/// 全部に順番があれば番号の順に巡り、最初へ戻る。乱数を使わない（2.1・2.2・2.3・8.4）
+#[test]
+fn test_order_cycles_without_shuffle() {
+    let (mut table, calls) = table_with(vec![order(10), order(20), order(30)], vec![2, 1, 0]);
+    assert_eq!(pick_n(&mut table, 4), vec![0, 1, 2, 0]);
+    assert!(calls.lock().unwrap().is_empty(), "並びを作らない");
+    assert_eq!(table.take_pick_warning(), None);
+}
+
+/// 番号は飛んでいてよく、間に足した番号は間に入る。`index` も同じ意味（2.5・2.6）
+#[test]
+fn test_order_inserted_number_goes_between() {
+    let (mut table, _) = table_with(
+        vec![order(10), order(20), order(30), vec![decl("index", 15)]],
+        vec![],
+    );
+    assert_eq!(pick_n(&mut table, 5), vec![0, 3, 1, 2, 0]);
+}
+
+/// 出す順は番号だけで決まり、登録の順に左右されない（2.7）
+#[test]
+fn test_order_ignores_registration_order() {
+    let (mut table, _) = table_with(vec![order(30), order(10), order(20)], vec![]);
+    assert_eq!(pick_n(&mut table, 4), vec![1, 2, 0, 1]);
+}
+
+/// 条件で外れた番号は飛ばす（2.8）
+#[test]
+fn test_order_skips_excluded_by_condition() {
+    let (mut table, _) = table_with(vec![order(10), order(20), order(30)], vec![2, 1, 0]);
+    let picks: Vec<usize> = (0..3)
+        .map(|_| {
+            let mut not_20 = |s: &SceneInfo| s.id.0 != 1;
+            table
+                .resolve_scene_id_unified("", "話", Some(&mut not_20))
+                .unwrap()
+                .0
+        })
+        .collect();
+    assert_eq!(picks, vec![0, 2, 0]);
+}
+
+/// 一部だけに順番があれば理由を控えてシャッフルで選ぶ。控えは読むと空・選ぶたびに空（3.1）
+#[test]
+fn test_order_mixed_falls_back_to_shuffle() {
+    let (mut table, calls) = table_with(vec![order(10), vec![]], vec![1, 0]);
+    assert_eq!(pick_n(&mut table, 1), vec![1]);
+    assert_eq!(calls.lock().unwrap().len(), 1, "シャッフルで選ぶ");
+    assert_eq!(table.take_pick_warning(), Some(PickWarning::OrderMixed));
+    assert_eq!(table.take_pick_warning(), None, "読むと空になる");
+
+    // 注意を読まずに次の選択へ: 抽出が順番だけなら注意は残らない
+    pick_n(&mut table, 1);
+    let mut only_zero = |s: &SceneInfo| s.id.0 == 0;
+    let id = table
+        .resolve_scene_id_unified("", "話", Some(&mut only_zero))
+        .unwrap();
+    assert_eq!(id.0, 0);
+    assert_eq!(table.take_pick_warning(), None, "選ぶたびに空にする");
+}
+
+/// 番号が重なれば理由（番号）を控えてシャッフルで選ぶ（3.1）
+#[test]
+fn test_order_duplicate_falls_back_to_shuffle() {
+    let (mut table, calls) = table_with(vec![order(10), order(10), order(20)], vec![2, 0, 1]);
+    assert_eq!(pick_n(&mut table, 1), vec![2]);
+    assert_eq!(calls.lock().unwrap().len(), 1);
+    assert_eq!(
+        table.take_pick_warning(),
+        Some(PickWarning::OrderDuplicate { order: 10 })
+    );
+}
+
+/// どれにも順番が無ければ黙ってシャッフル（9.1）
+#[test]
+fn test_no_order_no_warning() {
+    let (mut table, _) = table_with(vec![vec![], vec![]], vec![]);
+    pick_n(&mut table, 1);
+    assert_eq!(table.take_pick_warning(), None);
+}
+
+/// 乱数の差し替えで覚えた番号も消え、最初からに戻る（2.4）
+#[test]
+fn test_replace_selector_resets_order() {
+    let (mut table, _) = table_with(vec![order(10), order(20), order(30)], vec![2, 1, 0]);
+    assert_eq!(pick_n(&mut table, 2), vec![0, 1]);
+    table.replace_selector(Box::new(MockRandomSelector::new(vec![2, 1, 0])));
+    assert_eq!(pick_n(&mut table, 1), vec![0]);
+}
+
+/// 前方一致と完全一致は別に覚える（鍵は並びの控えと同じ）
+#[test]
+fn test_order_remembered_per_cache_key() {
+    let (mut table, _) = table_with(vec![order(10), order(20)], vec![1, 0]);
+    assert_eq!(pick_n(&mut table, 1), vec![0]);
+    let exact = table.resolve_scene_id_exact("", "話", None).unwrap();
+    assert_eq!(exact.0, 0);
+    assert_eq!(pick_n(&mut table, 1), vec![1]);
+}

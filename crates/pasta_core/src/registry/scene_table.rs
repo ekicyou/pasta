@@ -13,6 +13,15 @@ use std::ops::Bound;
 /// 候補 1 つの条件を評価する述語。真なら満たす
 pub type CondFn<'a> = &'a mut dyn FnMut(&SceneInfo) -> bool;
 
+/// 順番で選べず、シャッフルへ戻った理由
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PickWarning {
+    /// 抽出した候補に `＆順番` の有るものと無いものが混ざっている
+    OrderMixed,
+    /// 抽出した候補に同じ番号が 2 つ以上ある（前方一致で別の名前から集まったとき）
+    OrderDuplicate { order: i64 },
+}
+
 /// Cache key for scene resolution (module_name + search_key + exact + owning_local).
 /// 変数の値（述語）は鍵に含めない。
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -52,6 +61,10 @@ pub struct SceneTable {
     prefix_index: BTreeMap<String, Vec<SceneId>>,
     /// Cache for sequential scene consumption ((module_name, search_key, exact, owning_local) → CachedSelection).
     cache: HashMap<SceneCacheKey, CachedSelection>,
+    /// 順番で最後に選んだ番号（鍵・寿命は cache と同じ。メモリの中だけ）
+    last_orders: HashMap<SceneCacheKey, i64>,
+    /// 直前の選択でシャッフルへ戻った理由
+    pick_warning: Option<PickWarning>,
     /// Random selector for scene selection.
     random_selector: Box<dyn RandomSelector>,
 }
@@ -111,6 +124,8 @@ impl SceneTable {
             labels,
             prefix_index,
             cache: HashMap::new(),
+            last_orders: HashMap::new(),
+            pick_warning: None,
             random_selector,
         }
     }
@@ -269,6 +284,8 @@ impl SceneTable {
     /// - 次の位置から見て、満たす候補を返す。満たさない候補は見ただけで使ったものにする。
     ///   段より低い候補か末尾に来たら、1 回だけ始め直す
     /// - `cond` が無ければ段も見ず、どの候補も満たすとする（名指し・今の挙動）
+    /// - 抽出した候補（満たす かつ 今の段）の全部に `＆順番` があり重ならなければ、
+    ///   覚えた番号より大きい最小の番号、無ければ最小の番号を返して覚える（並びに触らない）
     fn select_from_cache(
         &mut self,
         cache_key: SceneCacheKey,
@@ -279,9 +296,12 @@ impl SceneTable {
         let SceneTable {
             labels,
             cache,
+            last_orders,
+            pick_warning,
             random_selector,
             ..
         } = self;
+        *pick_warning = None;
         let priority = |id: &SceneId| scene_priority(&labels[id.0].attributes);
         let no_match = || SceneTableError::NoMatchingScene {
             scene: search_key.to_string(),
@@ -306,6 +326,37 @@ impl SceneTable {
                 (Some(ok), tier)
             }
         };
+
+        // 順番の分かれ: 抽出した候補の番号を集める
+        let mut ordered: Vec<(i64, SceneId)> = Vec::new();
+        let mut missing = false;
+        for &id in &candidate_ids {
+            if ok
+                .as_ref()
+                .is_some_and(|ok| !ok.contains(&id) || priority(&id) != tier)
+            {
+                continue;
+            }
+            match scene_order(&labels[id.0].attributes) {
+                Some(order) => ordered.push((order, id)),
+                None => missing = true,
+            }
+        }
+        if !ordered.is_empty() {
+            ordered.sort_unstable_by_key(|&(order, _)| order);
+            if missing {
+                *pick_warning = Some(PickWarning::OrderMixed);
+            } else if let Some(w) = ordered.windows(2).find(|w| w[0].0 == w[1].0) {
+                *pick_warning = Some(PickWarning::OrderDuplicate { order: w[0].0 });
+            } else {
+                let last = last_orders.get(&cache_key).copied();
+                let &(order, id) = last
+                    .and_then(|last| ordered.iter().find(|(o, _)| *o > last))
+                    .unwrap_or(&ordered[0]);
+                last_orders.insert(cache_key, order);
+                return Ok(id);
+            }
+        }
 
         let mut new_round = || {
             // 重み N の候補は N 個並べる（重み 1 だけなら今と同じ配列・同じ乱数の消費）
@@ -427,10 +478,16 @@ impl SceneTable {
 
     /// Replace the random selector and clear cached selections.
     ///
-    /// Keeps labels and prefix_index intact — only the selector and cache are reset.
+    /// Keeps labels and prefix_index intact — only the selector, cache and remembered orders are reset.
     pub fn replace_selector(&mut self, selector: Box<dyn RandomSelector>) {
         self.random_selector = selector;
         self.cache.clear();
+        self.last_orders.clear();
+    }
+
+    /// 直前の選択でシャッフルへ戻った理由。読むと空になる
+    pub fn take_pick_warning(&mut self) -> Option<PickWarning> {
+        self.pick_warning.take()
     }
 }
 
