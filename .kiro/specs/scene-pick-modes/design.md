@@ -238,7 +238,7 @@ flowchart TD
 | Grammar・ParseKeyWords | pasta_dsl | 単語の値の重みの文法と展開 | 5.1〜5.8, 9.2 | pest (P0) | Service |
 | ScopeGen | pasta_lua | 重み・順番の値の誤りと両方書きの読み込みエラー | 3.2, 4.2, 4.4 | SceneTypes (P0), merge_attrs (P0) | Service |
 | WordGen | pasta_lua | 値の多い単語の `:entry` の分割 | 5.1 | なし | Service |
-| SearchLoader・SearchContext | pasta_lua | 番号の重なりで読み込みを止める・注意のログ | 3.1, 3.3 | SceneTable (P0), tracing (P1) | Service |
+| Finalize・SearchContext | pasta_lua | 番号の重なりで読み込みを止める・注意のログ | 3.1, 3.3 | SceneTable (P0), tracing (P1) | Service |
 | ValidateChecks | pasta_check | 5 つの検査の種類 | 6.1〜6.4 | SceneTypes (P0), SceneTable (P0) | Service |
 | LspTokens・TmGrammar | pasta_lsp・VSCode | 重みの着色 | 7.1〜7.3 | KeyWords (P0) | — |
 | Manual・SkillRefs | book | 書き方の権威と生成スキル | 6.3, 8.1〜8.5 | gen-skill-refs (P1) | — |
@@ -288,7 +288,7 @@ pub fn scene_order(attrs: &[SceneAttr]) -> Option<i64>;
 - `duplicate_orders`: `prefix_index` のキーごと（グローバルは別名を置き換えた後の照合用の名前、ローカルは `:親の登録名:名前`。どちらも「同じ名前」の単位）に、同じ番号を持つシーンの組を返す。順は `prefix_index`（`BTreeMap`）の順、組の中は SceneId の順で決まる。
 
 **Dependencies**
-- Inbound: SearchContext・SearchLoader（P0）、pasta_check の scenes・references（P0）
+- Inbound: SearchContext・finalize_scene_impl（P0）、pasta_check の scenes・references（P0）
 - Outbound: SceneTypes（P0）、RandomSelector（今のまま）
 
 **Contracts**: Service [x] / State [x]
@@ -416,7 +416,7 @@ pub enum TranspileError {
 - 値を 200 個ずつに分け、`:entry(…):entry(…)` と同じ行に続ける（`entry` は自身を返す）。出力の行の数とソースマップの対応は変わらない。200 個以下の単語の出力は今と同じ。
 - 重みに上限を設けないと決めたので、重みで値が 250 個を超えても読み込めなければならない。そのためコード生成はこの 1 か所だけ触る（Lua と単語表は触らない）。
 
-#### SearchLoader・SearchContext
+#### Finalize・SearchContext
 
 | Field | Detail |
 |-------|--------|
