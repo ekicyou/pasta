@@ -152,6 +152,7 @@ AST ノードは `Span`（開始・終了の行と桁、バイトオフセット
 - 名前を省いたグローバルシーン（`＊` だけの行）は、直前のグローバルシーンの名前を引き継ぎ、`is_continuation` を真にする。ファイルの先頭で現れた場合はパースエラーにする。
 - 全角の数字・マイナス・小数点を半角に直してから数値として解釈する（`normalize_number_str`）。式の数値、属性値、アクター番号、キューコマンドの引数、`＄０` などの引数番号が対象である。
 - 数の字句（`number_literal`）の値は、式・属性値・キューコマンドの引数のどこでも `number_value` の 1 つの規則で決める。小数点が無く `i64` に収まれば整数、収まらなければいちばん近い小数（Lua と同じ）、小数点があれば小数である。有限の小数に収まらない数は、字句の始まり（符号を含む）の位置の構文の誤り（`ParseError::SyntaxError`）にする。
+- 単語の値の後ろの重み（`word_weight` 規則の `＠数`。囲んだ文字列・さくらスクリプト・囲まない値のどの後ろにも書ける）は、値を重みの数だけ `KeyWords.words` に並べて記録し、重みの位置を `KeyWords.weight_spans` に残す（`parse_elements.rs`）。重みが 1 以上の整数でないとき、重みを除くと値が空になるとき、並べた数が `isize::MAX as usize / size_of::<String>()` を超えるときは、構文の誤り（`ParseError::SyntaxError`）にする。書ける形は利用者向けの [値の重み](../grammar/words.md#値の重み) が正である。
 - 空の引用（`string_blank` 規則の `「」`・`""`）は、囲み文字ではなく空文字列として記録する。単語値は `""` の候補、属性値は `AttrValue::String("")`、キューコマンドの引数は空の文字列リテラル、式は `Expr::BlankString` になる。
 - シーンのアクター指定行のアクター番号を採番する。番号を明示した項目はその値、省いた項目は直前の番号に 1 を足した値（先頭で省いた場合は 0）になる。明示した番号が 0〜4294967295（`u32`）に収まらなければ、番号（`digit_id`）の始まりの位置の構文の誤り（`ParseError::SyntaxError`）にする。4294967295 の次に省いた番号は 4294967295 に留まる。
 - 引数番号（`＄０` などの数字の名前）は `VarScope::Args(番号)` になる（`parse_action.rs` の `parse_var_ref_local_inner`。アクション行・式の項・動的な単語参照と関数呼び出しの名前のどれもここを通る）。番号が 0〜255（`u8`）に収まらなければ、番号（`digit_id`、`＄` の次）の始まりの位置の構文の誤り（`ParseError::SyntaxError`）にする。
@@ -163,7 +164,7 @@ AST ノードは `Span`（開始・終了の行と桁、バイトオフセット
 | 項目 | 登録（`TranspileContext`） | 生成 |
 | ---- | -------------------------- | ---- |
 | `FileAttr` | なし（受け継ぎは走査の前に `PastaFile::global_scene_attrs` が決める） | なし |
-| `GlobalWord` | 名前ごとにグローバル単語として登録する | `PASTA.create_word(名前):entry(値, …)` をファイルの最上位に出力する |
+| `GlobalWord` | 名前ごとにグローバル単語として登録する | `PASTA.create_word(名前):entry(値, …)` をファイルの最上位に出力する。値が 200 個を超えるときは、200 個ずつの `:entry(…)` を同じ行に続ける（`element_gen.rs`。重みで値が増えても Lua の 1 回の呼び出しの引数の上限に当たらないため。アクター・シーンの単語も同じ） |
 | `ActorScope` | 名前ごとにアクター単語として登録する | アクターごとの `do` 〜 `end` ブロック |
 | `GlobalSceneScope` | 宣言名を決め、その名前と受け継いだ属性の並びでグローバルシーンを登録し、同名の出現順の番号を得る。シーンレベルの単語をそのシーンのローカル単語として登録する | 同じ属性の並びを渡して、シーンごとの `do` 〜 `end` ブロックを出力する。生成後、名前付きローカルシーンを、生成器と同じ `local_scene_counters` の通し番号と、その宣言行の属性で登録する |
 
@@ -274,6 +275,7 @@ end
 - 項目は、宣言が `{ key = 名前, value = 値 }`、条件が `{ key = "＄…", op = "正規形の演算子", value = 値 }`、フラグが `{ key = "＄…" }` である。数は式の数値と同じ表記、文字列は `StringLiteralizer` のリテラルで書く。
 - 行を足さずに同じ行へ続けるため、生成コードの行の数と `init_scene` に渡す行の対応は、属性の有無で変わらない。
 - 文を作る前に、`優先`・`priority` の宣言の値を確かめる。値が整数（倉の規則で整数になる小数を含む。`pasta_core` の `priority_value`）でなければ、属性の位置の `TranspileError::InvalidPriority` で変換を止める（`「1」` の引用は文字列なので誤り）。
+- 同じく、`重み`・`weight` の宣言の値が 1 以上の整数（`weight_value`）でなければ `TranspileError::InvalidWeight`、`順番`・`index` の宣言の値が整数（`priority_value` と同じ規則）でなければ `TranspileError::InvalidOrder` で止める。受け継いで畳んだ後の並びに重みと順番の宣言が両方あれば、順番の属性の位置の `TranspileError::WeightWithOrder` で止める。番号の重なりは、全ファイルの登録がそろう辞書確定で調べる（[辞書確定](registry-search.md#辞書確定)）。
 - `PASTA.set_scene_attrs` は `SCENE.set_attrs` そのもので、生成コードのための関数である。倉に書いた並びは、辞書確定が Rust の登録へ運び（[辞書確定](registry-search.md#辞書確定)）、`SCENE.attrs` が Lua から読む（[SCENE.attrs](../lua/script-api.md#sceneattrsglobal_name-local_name)）。
 
 #### init_scene の引数
