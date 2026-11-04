@@ -41,6 +41,8 @@ pub(crate) fn check(
     let mut findings = Vec::new();
     // 名前を書いたグローバルシーン（単独の `＊` でないもの）の globals での位置
     let mut named = Vec::new();
+    // SceneId の順（登録の順）の (パス, 書いた名前, 位置)。番号の重なりの報告に使う
+    let mut positions: Vec<(&str, &str, Span)> = Vec::new();
     for (path, file) in parsed {
         let scenes = file.items.iter().filter_map(|item| match item {
             FileItem::GlobalSceneScope(scene) => Some(scene),
@@ -50,8 +52,10 @@ pub(crate) fn check(
         for (scene, attrs) in scenes.zip(file.global_scene_attrs()) {
             let declared = aliases.resolve(&scene.name).unwrap_or(&scene.name);
             let (_, counter) = registry.register_global(declared, scene_attrs_of(&attrs));
+            positions.push((path, &scene.name, scene.span));
             for (local, local_counter) in scene.local_scenes.iter().zip(local_counters(scene)) {
                 if let Some(name) = &local.name {
+                    positions.push((path, name, local.span));
                     registry.register_local(
                         name,
                         declared,
@@ -108,6 +112,24 @@ pub(crate) fn check(
 
     let table =
         SceneTable::from_scene_registry(registry, Box::new(MockRandomSelector::new(vec![])));
+    // 実行時（pasta_lua の check_scene_orders）と同じ関数で判定する（6.1・3.3）
+    for dup in table.duplicate_orders() {
+        let (first_path, _, first_span) = positions[dup.scenes[0].0];
+        for id in &dup.scenes[1..] {
+            let (path, name, span) = positions[id.0];
+            findings.push(finding(
+                FindingKind::SceneOrderDuplicate,
+                path,
+                span,
+                msg::scene_order_duplicate(
+                    name,
+                    dup.order,
+                    first_path,
+                    first_span.start_line as u32,
+                ),
+            ));
+        }
+    }
     (SceneModel { table, globals }, findings)
 }
 

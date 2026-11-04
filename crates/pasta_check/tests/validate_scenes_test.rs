@@ -36,6 +36,7 @@ fn scene_findings(toml: &str, dics: &[(&str, &str)]) -> Vec<(String, u32, Findin
                 FindingKind::GlobalSceneCollision
                     | FindingKind::LocalSceneCollision
                     | FindingKind::SceneShadowedByBuiltin
+                    | FindingKind::SceneOrderDuplicate
             )
         })
         .map(|f| (f.path, f.line.unwrap(), f.code, f.message))
@@ -149,6 +150,98 @@ fn local_match_name_collision_is_warning_within_one_global_scene() {
     assert_eq!(
         FindingKind::LocalSceneCollision.severity(),
         Severity::Warning
+    );
+}
+
+/// 同じ名前の番号の重なりは誤り。2 つ目以降に最初のシーンの位置を示す（6.1・3.3）
+#[test]
+fn duplicate_order_in_same_name_is_error_on_second_and_later() {
+    // グローバル（ファイルをまたぐ）
+    let found = scene_findings(
+        TOML,
+        &[
+            (
+                "dic/a.pasta",
+                "＊会話　＆順番：１
+  さくら：あ。
+＊会話　＆順番：２
+  さくら：い。
+",
+            ),
+            (
+                "dic/b.pasta",
+                "＊会話　＆index：1
+  さくら：う。
+",
+            ),
+        ],
+    );
+    assert_eq!(
+        found,
+        vec![(
+            "dic/b.pasta".into(),
+            1,
+            FindingKind::SceneOrderDuplicate,
+            "シーン「会話」の ＆順番：1 が同じ名前のシーン（ghost/master/dic/a.pasta:1）と重なっています。番号は同じ名前の中で 1 つずつにしてください".into()
+        )]
+    );
+    assert_eq!(FindingKind::SceneOrderDuplicate.severity(), Severity::Error);
+
+    // ローカル（同じ親の中だけ。別の親の同じ番号は重ならない）
+    let found = scene_findings(
+        TOML,
+        &[(
+            "dic/talk.pasta",
+            "＊会話
+  ・選択　＆順番：１
+  さくら：あ。
+  ・選択　＆順番：１
+  さくら：い。
+  ・選択　＆順番：１
+  さくら：う。
+＊雑談
+  ・選択　＆順番：１
+  さくら：え。
+",
+        )],
+    );
+    let lines: Vec<(u32, FindingKind)> = found.iter().map(|f| (f.1, f.2)).collect();
+    assert_eq!(
+        lines,
+        vec![
+            (4, FindingKind::SceneOrderDuplicate),
+            (6, FindingKind::SceneOrderDuplicate),
+        ],
+        "{found:?}"
+    );
+    assert!(
+        found[1].3.contains("（ghost/master/dic/talk.pasta:2）"),
+        "{found:?}"
+    );
+
+    // ファイル属性の受け継ぎ
+    let found = scene_findings(
+        TOML,
+        &[(
+            "dic/talk.pasta",
+            "＆順番：５
+＊会話
+  さくら：あ。
+＊会話
+  さくら：い。
+＊雑談
+  さくら：う。
+",
+        )],
+    );
+    assert_eq!(
+        found,
+        vec![(
+            "dic/talk.pasta".into(),
+            4,
+            FindingKind::SceneOrderDuplicate,
+            "シーン「会話」の ＆順番：5 が同じ名前のシーン（ghost/master/dic/talk.pasta:2）と重なっています。番号は同じ名前の中で 1 つずつにしてください".into()
+        )]
     );
 }
 
