@@ -149,3 +149,4 @@
 - 新しい誤りの文は同じ crate の近くの誤りの調子にそろえる（pasta_dsl のパーサと pasta_check はです・ます調、pasta_lua の TranspileError は常体。3.2・4.1 で差し戻し）。
 - 重みの上限判定は空きメモリに依らない算術で行う（`try_reserve` の失敗を誤りにしない。設計の Risks どおりメモリ不足は受け入れる）。
 - 5.2 で `scenes.rs` の `check` の中の変数にした位置の控えは、5.3 で設計どおり `SceneModel.positions` に上げた（Call の候補の位置を引くため）。
+- 完了時の棚卸（2026-11-05）: その場で解決 2 件（内部設計章 `transpiler.md`・`registry-search.md` が単語の重み・重み/順番の検査・順番の選び方・番号の重なりの検査に追従していなかったので追記）／申し送り 2 件（`scene-exact-match`・`novel-variable-scope` の brief。最終検証のときに済）／起票 0 件。
