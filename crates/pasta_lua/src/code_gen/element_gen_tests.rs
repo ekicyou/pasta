@@ -435,6 +435,40 @@ fn word_definition_actor_form() {
     );
 }
 
+/// 値が 200 個までなら `:entry(…)` は 1 回（今までと同じ出力）。300 個なら
+/// 200 個と 100 個の 2 回の `:entry` に分かれ、同じ 1 行に続く（Requirement 5.1）。
+#[test]
+fn word_definition_splits_entry_every_200_values() {
+    let values = |n: usize| -> Vec<String> { (0..n).map(|i| format!("v{i}")).collect() };
+    let lit = |vs: &[String]| -> String {
+        vs.iter()
+            .map(|v| format!("\"{v}\""))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+
+    let v200 = values(200);
+    let refs: Vec<&str> = v200.iter().map(String::as_str).collect();
+    let out = gen_to_string(|cg| cg.generate_global_word(&key_words(&["語"], &refs)));
+    assert_eq!(
+        out,
+        format!("PASTA.create_word(\"語\"):entry({})\n", lit(&v200))
+    );
+
+    let v300 = values(300);
+    let refs: Vec<&str> = v300.iter().map(String::as_str).collect();
+    let out = gen_to_string(|cg| cg.generate_global_word(&key_words(&["語"], &refs)));
+    assert_eq!(
+        out,
+        format!(
+            "PASTA.create_word(\"語\"):entry({}):entry({})\n",
+            lit(&v300[..200]),
+            lit(&v300[200..])
+        )
+    );
+    assert_eq!(out.lines().count(), 1, "split entries stay on one line");
+}
+
 /// A value that cannot be literalized is a positioned `StringLiteralError`
 /// for global, scene and actor word definitions alike.
 #[test]

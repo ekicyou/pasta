@@ -480,7 +480,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
     /// Shared word definition generator parameterized by prefix.
     ///
-    /// Generates: `{prefix}:entry("value1", "value2", ...)`
+    /// Generates: `{prefix}:entry("value1", "value2", ...)`, split into one
+    /// `:entry(…)` per 200 values chained on the same line.
     ///
     /// The `prefix` includes the full method call syntax, e.g.:
     /// - `PASTA.create_word("key")` for global words (dot syntax)
@@ -510,12 +511,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             .iter()
             .map(|w| StringLiteralizer::literalize_with_span(w, &word.span))
             .collect::<Result<Vec<_>, _>>()?;
-        let entry = values.join(", ");
+        // 重みで値が増えても Lua の 1 回の呼び出しの上限（約 250）に当たらないよう、
+        // 200 個ずつの `:entry(…)` に分けて同じ行に続ける（`entry` は自身を返す）。
+        let entry = values
+            .chunks(200)
+            .map(|chunk| format!(":entry({})", chunk.join(", ")))
+            .collect::<String>();
 
         for name in &word.names {
             let out_line_before = self.out_line();
             self.writeln(&format!(
-                "{}{}create_word({}):entry({})",
+                "{}{}create_word({}){}",
                 receiver,
                 separator,
                 StringLiteralizer::literalize(name)?,
