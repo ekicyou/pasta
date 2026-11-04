@@ -169,4 +169,4 @@
 - 名前で選ぶ道は全部 `SceneTable::select_from_cache`（`crates/pasta_core/src/registry/scene_table.rs`）を通り、そこで `＆重み`（並びに N 回乗せる）と `＆順番`（全部の候補に番号があれば番号の順・乱数を使わない）が効く。`＞＞` の完全一致もこの関数を通し、迂回しない（迂回すると重み・順番が効かなくなる）。
 - 順番の続きは並びの記録と同じ鍵（`SceneCacheKey`）ごとにメモリに持つ。完全一致と前方一致は別の鍵なので、別々に巡る。
 - 選んだ後に `take_pick_warning()` を読み、順番の有る・無いの混ざりや番号の重なりで戻ったときは `pasta_lua::search` の warn を出す（`search/context.rs` の `warn_pick_fallback`）。新しい入口を足すなら、ここも呼ぶ。
-- 参照: `.kiro/specs/scene-pick-modes/design.md`（SceneTable・Finalize・SearchContext の節）。
+- 参照: `.kiro/specs/completed/scene-pick-modes/design.md`（SceneTable・Finalize・SearchContext の節）。

@@ -141,4 +141,4 @@
 - 単語の値の文法が変わった（`grammar.pest`）: `word_item = { word ~ word_weight? | word_weight }`・`word_weight = @{ at ~ digit+ }`・`word_end`。囲まない値（`word_nofenced`）は、値の終わりの直前の `＠数` の手前で止まる。文法を足すときは、この重みの後置とぶつけない。
 - 単語の構文木 `KeyWords` に `weight_spans: Vec<Span>` が増えた（`ast/action.rs`）。構文木を直に組み立てる所は空の欄が要り、`partial.rs` の位置ずらしもこの欄をずらす。
 - VSCode の着色は `word` の捕捉を 1 つ増やした（値の並びが捕捉 4、後方参照が \5・\6、コメントが 7）。`word` の正規表現を触るときは番号に注意する。
-- 参照: `.kiro/specs/scene-pick-modes/design.md`（Grammar・ParseKeyWords・pasta_lsp・VSCode の節）。
+- 参照: `.kiro/specs/completed/scene-pick-modes/design.md`（Grammar・ParseKeyWords・pasta_lsp・VSCode の節）。
