@@ -37,7 +37,7 @@
 
 - 候補の集め方（`collect_scene_candidates`）、条件の評価（`search/scene_cond.rs`）、今の段の求め方、`NoMatchingScene` の意味。
 - `count_scene`・`count_scene_exact`（重みで数を変えない。今のまま触らない。1.5）。
-- 名指しの道の選び方の規則（同じ `select_from_cache` を通るので、そこに候補が複数あれば同じく重み・順番が効く。道そのものは変えない）。
+- 名指しの道そのもの。名指しは候補が 1 本なので重み・順番は関係しない（どの道も同じ `select_from_cache` を通るので、別扱いの分かれは作らない）。
 - 単語の検索（`WordTable`）と Lua の単語の登録（`word.lua`）。
 - 保存ファイル（`pasta/save.lua`・`persistence.rs`）・予約の変数名。
 
@@ -82,8 +82,7 @@ graph TB
     AttrMerge[merge attrs] --> ScopeGen[append set scene attrs checks]
     ScopeGen --> Store[STORE scene attrs]
     Store --> Finalize[finalize scene impl]
-    Finalize --> Loader[search loader duplicate orders check]
-    Loader --> SceneTable[SceneTable select from cache]
+    Finalize[finalize scene impl duplicate orders check] --> SceneTable[SceneTable select from cache]
     SceneTable --> SearchCtx[SearchContext warn on fallback]
     Types[scene types weight and order readers] --> SceneTable
     Types --> ScopeGen
@@ -126,8 +125,8 @@ graph TB
 **pasta_lua**
 - `crates/pasta_lua/src/code_gen/scope_gen.rs` — `append_set_scene_attrs` に重み・順番の値の検査と、重みと順番の両方の検査を足す。
 - `crates/pasta_lua/src/error.rs` — `TranspileError::InvalidWeight`・`InvalidOrder`・`WeightWithOrder` と作り手の関数。
-- `crates/pasta_lua/src/code_gen/element_gen.rs` — `generate_word_definition` で値を 200 個ずつの `:entry(…)` に分けて同じ行に続ける（未決 1。前提として採る）。
-- `crates/pasta_lua/src/search/mod.rs` — `loader` で `SearchContext` を作った後に番号の重なりを検査し、あれば `LuaError` で読み込みを止める。
+- `crates/pasta_lua/src/code_gen/element_gen.rs` — `generate_word_definition` で値を 200 個ずつの `:entry(…)` に分けて同じ行に続ける（重みに上限が無いので要る）。
+- `crates/pasta_lua/src/runtime/finalize.rs` — `finalize_scene_impl` で `@pasta_search` を登録した後に番号の重なりを検査し、あれば `LuaError` で読み込みを止める（`search::loader` はトランスパイルの時点でも呼ばれるので、そこには置かない。検査を 1 回にする）。
 - `crates/pasta_lua/src/search/context.rs` — `check_scene_orders`、`resolve_*` の後に `take_pick_warning` を読んで warn を出す小さな関数（`search_scene_by`・`search_local_scene_exact` の 2 か所から呼ぶ）。テストは足さない（1,117 行。テストは別のファイル）。
 
 **pasta_check**
@@ -194,7 +193,7 @@ flowchart TD
 | 2.10 | 名前で選ぶ所すべて | SceneTable | 1.4 と同じ | |
 | 3.1 | 混ざり・重なりは注意してシャッフル | SceneTable, SearchContext | `PickWarning`・`take_pick_warning`・warn | 1 回の選択 |
 | 3.2 | 重みと順番の両方は読み込みエラー | ScopeGen, TranspileRules | `WeightWithOrder` | |
-| 3.3 | 同じ名前の番号の重なりは読み込みエラー | SceneTable, SearchLoader, ScenesCheck | `duplicate_orders`・`DuplicateOrder` | |
+| 3.3 | 同じ名前の番号の重なりは読み込みエラー | SceneTable, Finalize, ScenesCheck | `duplicate_orders`・`DuplicateOrder` | |
 | 4.1 | 重みは 1 以上の整数 | SceneTypes | `weight_value` | |
 | 4.2 | 重みの誤りは読み込みエラー | ScopeGen | `InvalidWeight` | |
 | 4.3 | 順番は整数（0・負も可） | SceneTypes | `priority_value` を使う | |
@@ -389,7 +388,7 @@ pub struct KeyWords {
 **Responsibilities & Constraints**
 - `append_set_scene_attrs` の今の優先の検査に並べる。宣言の名前が `WEIGHT_KEYS` で `weight_value` が `None` なら `InvalidWeight`、`ORDER_KEYS` で `priority_value` が `None` なら `InvalidOrder`（位置は属性の位置）。
 - 値の検査の後、重みの宣言と順番の宣言が両方あれば `WeightWithOrder`（位置は順番の属性の位置）。ファイル属性から受け継いだ重みとシーンの順番の組も、この時点の並びに両方あるので同じく誤り（決定事項）。
-- 同じ名前の中の番号の重なりはファイルをまたぐので、ここでは見ない（SearchLoader）。
+- 同じ名前の中の番号の重なりはファイルをまたぐので、ここでは見ない（`finalize_scene_impl`）。
 
 **Contracts**: Service [x]
 
@@ -415,7 +414,7 @@ pub enum TranspileError {
 **Responsibilities & Constraints**
 - 重みで値が増えると、`create_word(k):entry(v1, …, vN)` の N が Lua の 1 回の呼び出しの上限（約 250。PUC Lua 5.4 で 250 は通り 260 は「too many registers」で失敗することを確かめた。LuaJIT も同じ程度）を超えやすい。
 - 値を 200 個ずつに分け、`:entry(…):entry(…)` と同じ行に続ける（`entry` は自身を返す）。出力の行の数とソースマップの対応は変わらない。200 個以下の単語の出力は今と同じ。
-- **前提（未決 1）**: 開発者の方針は「パーサで並べて、コード生成・Lua・単語表は触らない」だったが、コード生成のこの 1 か所だけは触る必要がある。
+- 重みに上限を設けないと決めたので、重みで値が 250 個を超えても読み込めなければならない。そのためコード生成はこの 1 か所だけ触る（Lua と単語表は触らない）。
 
 #### SearchLoader・SearchContext
 
@@ -425,7 +424,7 @@ pub enum TranspileError {
 | Requirements | 3.1, 3.3 |
 
 **Responsibilities & Constraints**
-- `search::loader` は `SearchContext` を作った直後に `check_scene_orders` を呼び、`duplicate_orders` の最初の組を `SceneTableError::DuplicateOrder`（シーンの名前・番号・各シーンの関数名）にして `LuaError::external` で返す。`finalize_scene` が失敗し、起動のモジュール `pasta.scene_dic` の読み込みの失敗として止まる（今の読み込みの失敗と同じ道）。
+- `finalize_scene_impl` は `@pasta_search` を登録した直後に `check_scene_orders` を呼び、`duplicate_orders` の最初の組を `SceneTableError::DuplicateOrder`（シーンの名前・番号・各シーンの関数名）にして `LuaError::external` で返す。`finalize_scene` が失敗し、起動のモジュール `pasta.scene_dic` の読み込みの失敗として止まる（今の読み込みの失敗と同じ道）。
 - `search_scene_by` と `search_local_scene_exact` は `resolve_*` の後に `take_pick_warning` を読み、あれば `tracing::warn!(target: "pasta_lua::search", name, reason, …)` を出す。理由は「順番の有るものと無いものが混ざっている」「同じ番号 N が 2 つ以上ある」。
 
 **Contracts**: Service [x]
