@@ -16,6 +16,8 @@ pub(crate) struct SceneModel {
     pub table: SceneTable,
     /// グローバルシーン（構文木の順。単独の `＊` も 1 つ）
     pub globals: Vec<GlobalScene>,
+    /// SceneId の順（登録の順）の (パス, 位置)
+    pub positions: Vec<(String, Span)>,
 }
 
 pub(crate) struct GlobalScene {
@@ -130,7 +132,18 @@ pub(crate) fn check(
             ));
         }
     }
-    (SceneModel { table, globals }, findings)
+    let positions = positions
+        .into_iter()
+        .map(|(path, _, span)| (path.to_string(), span))
+        .collect();
+    (
+        SceneModel {
+            table,
+            globals,
+            positions,
+        },
+        findings,
+    )
 }
 
 /// (書いた名前, 比べる名前, パス, 位置)

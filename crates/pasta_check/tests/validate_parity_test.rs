@@ -369,6 +369,19 @@ fn load_failure_matches_errors() {
             false,
         ),
         (
+            // 誤りでも実行時は注意してシャッフルで選ぶ（6.2・3.1）
+            "Call の候補に ＆順番 の有る・無いが混ざる",
+            &[
+                ("pasta.toml", toml),
+                (
+                    "dic/a.pasta",
+                    "＊会話\n  ＞挨拶\n＊挨拶　＆順番：１\n  さくら：あ。\n＊挨拶\n  さくら：い。\n"
+                        .as_bytes(),
+                ),
+            ],
+            false,
+        ),
+        (
             "別名の表",
             &[
                 (
@@ -618,6 +631,27 @@ font = { name = "a\\b" }
             .collect();
         assert_eq!(!stopping.is_empty(), load_failed, "{name}: {stopping:?}");
     }
+}
+
+/// 順番の混ざりは誤りとして出すが、その誤りだけの辞書を pasta.dll は読み込める（6.2）
+#[test]
+fn call_order_mixed_only_dictionary_loads() {
+    let temp = ghost(&[
+        ("pasta.toml", TOML.as_bytes()),
+        (
+            "dic/a.pasta",
+            "＊会話\n  ＞挨拶\n＊挨拶　＆順番：１\n  さくら：あ。\n＊挨拶\n  さくら：い。\n"
+                .as_bytes(),
+        ),
+    ]);
+    assert!(PastaLoader::load(temp.path()).is_ok());
+    let errors: Vec<_> = check(temp.path())
+        .findings
+        .into_iter()
+        .filter(|f| f.severity == Severity::Error)
+        .map(|f| f.code)
+        .collect();
+    assert_eq!(errors, vec![FindingKind::CallOrderMixed]);
 }
 
 // ---- (d) トランスパイルの成否 ----

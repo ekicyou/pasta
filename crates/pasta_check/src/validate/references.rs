@@ -2,7 +2,10 @@
 //!
 //! 候補は辞書のシーンと組み込みの名前だけ。Lua の中身は読まない（6.9）。
 
-use pasta_core::{SceneAliasTable, SceneRegistry, SceneTable};
+use std::collections::BTreeMap;
+
+use pasta_core::registry::{scene_order, scene_priority};
+use pasta_core::{SceneAliasTable, SceneId, SceneRegistry, SceneTable, SceneTableError};
 use pasta_dsl::PastaFile;
 use pasta_dsl::parser::{CallTarget, Expr, FileItem, LocalSceneItem, Span};
 
@@ -40,18 +43,30 @@ pub(crate) fn check(
                             }
                         },
                     };
-                    // act.lua find_act_handler の L2（ローカル）・L3/L4（組み込み）・L5（グローバル）。
-                    // L1（current_scene の完全一致）は Lua の表なので見ない
-                    if !(found_local(&model.table, &global.registered, key)
-                        || builtins::is_builtin(key)
-                        || found_global(&model.table, aliases, key))
-                    {
-                        findings.push(finding(
+                    match call_candidates(model, &global.registered, aliases, key) {
+                        None => findings.push(finding(
                             FindingKind::CallTargetMissing,
                             path,
                             call.span,
                             msg::call_target_missing(key),
-                        ));
+                        )),
+                        Some(ids) => {
+                            for unordered in order_mixed(&model.table, &ids) {
+                                let places: Vec<(&str, u32)> = unordered
+                                    .iter()
+                                    .map(|id| {
+                                        let (path, span) = &model.positions[id.0];
+                                        (path.as_str(), span.start_line as u32)
+                                    })
+                                    .collect();
+                                findings.push(finding(
+                                    FindingKind::CallOrderMixed,
+                                    path,
+                                    call.span,
+                                    msg::call_order_mixed(key, &places),
+                                ));
+                            }
+                        }
                     }
                 }
                 LocalSceneItem::Choice(choice) => {
@@ -60,8 +75,8 @@ pub(crate) fn check(
                     if not_scene_choice(target) {
                         continue;
                     }
-                    if !(found_local(&model.table, &global.registered, target)
-                        || found_global(&model.table, aliases, target))
+                    if local_candidates(&model.table, &global.registered, target).is_err()
+                        && global_candidates(&model.table, aliases, target).is_err()
                     {
                         // 選択肢の行の span は字下げから始まるので、Call と同じく `＠？` の列にする
                         let mut span = choice.span;
@@ -81,19 +96,66 @@ pub(crate) fn check(
     (findings, dynamic)
 }
 
+/// Call の候補。act.lua find_act_handler の L2（ローカル）・L3/L4（組み込み）・L5（グローバル）の順で、
+/// 最初に見つかった所の候補を返す。組み込みは空、どこにも無ければ None。
+/// L1（current_scene の完全一致）は Lua の表なので見ない
+fn call_candidates(
+    model: &SceneModel,
+    registered: &str,
+    aliases: &SceneAliasTable,
+    key: &str,
+) -> Option<Vec<SceneId>> {
+    if let Ok(ids) = local_candidates(&model.table, registered, key) {
+        return Some(ids);
+    }
+    if builtins::is_builtin(key) {
+        return Some(Vec::new());
+    }
+    global_candidates(&model.table, aliases, key).ok()
+}
+
+/// 候補を ＆優先 の値で組に分け、＆順番 の有るものと無いものが混ざる組の、順番の無い候補（SceneId の順）。
+/// 条件は値が分からないので見ない（実行時の select_from_cache は条件を満たす最高の段で同じ判定をする）
+fn order_mixed(table: &SceneTable, ids: &[SceneId]) -> Vec<Vec<SceneId>> {
+    // 優先 → (順番の有る候補があるか, 順番の無い候補)
+    let mut groups: BTreeMap<i64, (bool, Vec<SceneId>)> = BTreeMap::new();
+    for &id in ids {
+        let Some(info) = table.get_scene(id) else {
+            continue;
+        };
+        let group = groups.entry(scene_priority(&info.attributes)).or_default();
+        match scene_order(&info.attributes) {
+            Some(_) => group.0 = true,
+            None => group.1.push(id),
+        }
+    }
+    groups
+        .into_values()
+        .filter(|(ordered, unordered)| *ordered && !unordered.is_empty())
+        .map(|(_, mut unordered)| {
+            unordered.sort_unstable_by_key(|id| id.0);
+            unordered
+        })
+        .collect()
+}
+
 /// pasta_lua の search_scene（ローカル）と同じ: 照合用の名前でそのグローバルシーンの配下を前方一致
-fn found_local(table: &SceneTable, registered: &str, key: &str) -> bool {
-    table
-        .collect_scene_candidates(registered, &SceneRegistry::sanitize_name(key))
-        .is_ok()
+fn local_candidates(
+    table: &SceneTable,
+    registered: &str,
+    key: &str,
+) -> Result<Vec<SceneId>, SceneTableError> {
+    table.collect_scene_candidates(registered, &SceneRegistry::sanitize_name(key))
 }
 
 /// pasta_lua の search_scene（グローバル）と同じ: 別名を置き換えてから照合用の名前で前方一致
-fn found_global(table: &SceneTable, aliases: &SceneAliasTable, key: &str) -> bool {
+fn global_candidates(
+    table: &SceneTable,
+    aliases: &SceneAliasTable,
+    key: &str,
+) -> Result<Vec<SceneId>, SceneTableError> {
     let key = aliases.resolve(key).unwrap_or(key);
-    table
-        .collect_scene_candidates("", &SceneRegistry::sanitize_name(key))
-        .is_ok()
+    table.collect_scene_candidates("", &SceneRegistry::sanitize_name(key))
 }
 
 /// 文字列リテラルだけの式（括弧で囲んだものも）。実行時は書いた名前で `act:call_key` になる（6.2）
