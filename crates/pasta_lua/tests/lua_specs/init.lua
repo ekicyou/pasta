@@ -13,6 +13,8 @@ local specs = {
     "act_test",                          -- pasta.act トークンバッファリファクタリング tests
     "act_grouping_test",                 -- pasta.act グループ化機能 tests (actor-talk-grouping)
     "sakura_builder_test",               -- pasta.shiori.sakura_builder トークン変換テスト
+    -- 本物の @pasta_sakura_script を使うので mocks_test（reset で消す）より前に置く
+    "line_newlines_test",                -- 行の頭の印と継ぎ目・組み立ての行の改行のテスト (actor-line-newlines)
     "shiori_act_test",                   -- pasta.shiori.act さくらスクリプトビルダーテスト
     "virtual_dispatcher_spec",           -- OnTalk/OnHour virtual event dispatcher tests
     "store_coroutine_test",              -- STORE.co_scene coroutine management tests
@@ -72,7 +74,6 @@ local specs = {
     "recommend_menu_test",                -- おすすめメニューの組み込みと既定のハンドラのテスト (recommend-menu-scenes 3.1)
     "scene_attrs_test",                   -- SCENE.attrs・set_attrs・STORE.scene_attrs のテスト (scene-attribute-store 4.2)
     "scene_condition_test",               -- イベントの act の自動転記・条件漏れの扱いのテスト (scene-condition-attributes 3.2)
-    "line_newlines_test",                 -- 行の頭の印と継ぎ目のテスト (actor-line-newlines)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

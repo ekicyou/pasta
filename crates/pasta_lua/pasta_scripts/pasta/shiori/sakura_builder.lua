@@ -214,6 +214,21 @@ local function first_column(column)
     column.jump = false
 end
 
+--- 単位が列をどう動かすか（Rust の line_breaker.rs の column_move の写し。片方だけ直さない）
+--- @param name string|nil APPEARANCE.tag_at の名前
+--- @param arg string|nil 引数
+--- @return "next"|"first"|"jump"|nil 次（\n・\n[…]）・最初（\c）・飛ぶ（\_l[…]）。動かない単位は nil
+local function column_move(name, arg)
+    if name == "n" then
+        return "next"
+    elseif name == "c" and arg == nil then
+        return "first"
+    elseif name == "_l" and arg ~= nil then
+        return "jump"
+    end
+    return nil
+end
+
 --- 文字列が単位にならない `\` で終わるか（APPEARANCE.tag_at と同じ読み方。エスケープ・囲みは除く）
 --- @param s string
 --- @return boolean
@@ -268,6 +283,7 @@ end
 BUILDER._internal = {
     next_column = next_column,
     first_column = first_column,
+    column_move = column_move,
     tracking_buffer = tracking_buffer,
 }
 
@@ -373,6 +389,17 @@ local function plain_newline_tag(ratio)
     end
     return tag
 end
+
+--- 行の改行のタグ（line_newlines）。N が 0 以下なら ""（入れない）、それ以外は plain_newline_tag と同じ
+--- @param ratio number 行の高さに対する倍率
+--- @return string
+local function line_newline_tag(ratio)
+    if math.floor(ratio * 100) <= 0 then
+        return ""
+    end
+    return plain_newline_tag(ratio)
+end
+BUILDER._internal.line_newline_tag = line_newline_tag
 
 --- 選択肢の直前に出す区切り
 --- @param tail "text"|"choice"|nil その吹き出しに最後に表示したもの

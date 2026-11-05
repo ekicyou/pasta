@@ -22,7 +22,7 @@
   - _Requirements: 2.1, 2.5_
 
 - [ ] 3. 行の改行の判定と差し込み（組み立て）
-- [ ] 3.1 列の動きの分類（Rust の写し）と改行のタグの換算を足す
+- [x] 3.1 列の動きの分類（Rust の写し）と改行のタグの換算を足す
   - 組み立てに、単位の名前と引数から「次」「最初」「飛ぶ」「動かない」を返す局所関数を足し、内部の口に出す（Rust の分類と片方だけ直さない旨を 1 行の注で残す）
   - 行の改行の幅から改行のタグを作る局所関数を足す（`N` が 0 以下なら空、100 なら `\n`、他は `\n[N]`。既存の換算を使う）
   - Rust の分類のテストと同じ単位の並びで、写しの分類が `talk_to_script` の列の動きと一致するテストと、換算（`1.8`・`1.0`・`0.5`・`0.009`・`-1`）のテストが通る
@@ -98,3 +98,4 @@
 
 ## Implementation Notes
 - act の行の改行の値は `self._line_newlines`、印は `self._seam_next`、継ぎ目は局所関数 `take_seam` でトークンの `seams = { 1 }` に付ける（2.1）。`book/src/debug/validate.md` の act のメソッドの手書きの一覧に `line` を足すのは 6.2 で（照合テストなし）。
+- `line_newlines_test` は本物の `talk_to_script` を使うので、`tests/lua_specs/init.lua` で `mocks_test` より前（`sakura_builder_test` の直後）に置く。`mocks.reset()` が `@pasta_sakura_script` を消して戻せないため（3.1）。

@@ -100,3 +100,85 @@ describe("merge_consecutive_talks - 継ぎ目の位置を残す (2.1, 2.5)", fun
         expect(tokens[1]):toEqual({ type = "talk", actor = sakura, text = "あい" })
     end)
 end)
+
+describe("組み立て - 列の動きの分類（Rust の column_move の写し）(4.1, 4.2)", function()
+    -- Rust の test_column_move_classification と同じ単位の並び
+    local moving = {
+        { "\\n", "next" },
+        { "\\n[180]", "next" },
+        { "\\n[half]", "next" },
+        { "\\c", "first" },
+        { "\\_l[-295,0]", "jump" },
+    }
+    local still = {
+        "\\c[line,1]", "\\x", "\\x[noclear]", "\\_q", "\\_w[50]", "\\s[1]", "\\0",
+        "\\p[1]", "\\b[2]", "\\\\", "\\%", "\\_?\\n\\_?", "\\_!\\c\\_!",
+    }
+
+    local function classify(unit)
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local APPEARANCE = require("pasta.shiori.appearance")
+        local name, arg = APPEARANCE.tag_at(unit, 1)
+        return BUILDER._internal.column_move(name, arg)
+    end
+
+    test("列を動かす単位を「次」「最初」「飛ぶ」に分ける", function()
+        for _, case in ipairs(moving) do
+            expect(classify(case[1])):toBe(case[2])
+        end
+    end)
+
+    test("列を動かさない単位は nil", function()
+        for _, unit in ipairs(still) do
+            expect(classify(unit)):toBeNil()
+        end
+    end)
+
+    test("分類が talk_to_script の列の動きと一致する", function()
+        local SAKURA_SCRIPT = require("@pasta_sakura_script")
+        local actor = { budoux = { 40 }, budoux_jump = { 6 } }
+        -- 分類ごとに、始めの列（line 3）から動いた後の line・jump（nil は jump を変えない）
+        local want_line = { next = 4, first = 1, jump = 1 }
+        local want_jump = { first = false, jump = true }
+        local units = {}
+        for _, case in ipairs(moving) do
+            units[#units + 1] = case[1]
+        end
+        for _, unit in ipairs(still) do
+            units[#units + 1] = unit
+        end
+        for _, start_jump in ipairs({ false, true }) do
+            for _, unit in ipairs(units) do
+                local column = { line = 3, width = 0, jump = start_jump }
+                SAKURA_SCRIPT.talk_to_script(actor, unit, column)
+                local m = classify(unit)
+                expect(column.line):toBe(want_line[m] or 3)
+                local jump = want_jump[m]
+                if jump == nil then
+                    jump = start_jump
+                end
+                expect(column.jump):toBe(jump)
+            end
+        end
+    end)
+end)
+
+describe("組み立て - 行の改行のタグ (1.3, 1.4)", function()
+    local function tag(ratio)
+        return require("pasta.shiori.sakura_builder")._internal.line_newline_tag(ratio)
+    end
+
+    test("N が 100 以外なら \\n[N]", function()
+        expect(tag(1.8)):toBe("\\n[180]")
+        expect(tag(0.5)):toBe("\\n[50]")
+    end)
+
+    test("N が 100 なら \\n", function()
+        expect(tag(1.0)):toBe("\\n")
+    end)
+
+    test("N が 0 以下なら空", function()
+        expect(tag(0.009)):toBe("")
+        expect(tag(-1)):toBe("")
+    end)
+end)
