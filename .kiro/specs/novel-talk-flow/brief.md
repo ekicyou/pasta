@@ -220,3 +220,10 @@ pasta の出力は、デスクトップマスコットの喋り方に合わせ�
 - **要件定義のモデル**: Fable のまま（分けるなら出力の分だけ）。areka が既読と声のために全セーブ共通で覚える「変わらない行 ID」の作り方は、後から変えにくい保存の形である。ID の細かさが、クリック待ちの単位・「次の場面へ」の書き方と印・途中の `＞yield` の扱い（止めている間の再開の決まりを含む）と絡み、推奨案がまだ無い（3 つ以上の絡む問い）。今回入った 7 本は、どれもこの ID を決めていない。`.pasta` の行番号（`act.line_map`）は台本を直すとずれるので、ID の元にならない。
 - **分割の案**: 20 を超えたら `novel-talk-output`（Fable。設定・クリック待ち・`\x`・話者名・行 ID と声・待ちと改行）と `novel-scene-flow`（Opus。ランダムトークと時報の停止・起動の場面・次の場面へ・途中の `＞yield`・割り込みの扱い・止めるスイッチとの整合）に分ける。切り替えの設定は前の 1 本に置き、後の 1 本はそれを読む。`init.lua`・`virtual_dispatcher.lua`・`mouse.lua` は後の 1 本だけが持つ。
 - **見つけた穴・古くなった記述**: 「Current State」と「穴」の行番号は、上の行へさらに動いた（止まっている場面を捨てる所は `init.lua` の `set_co_scene` 110 行、Reference を変数へ移す関数は `shiori/act.lua` 205 行）。「完全一致で探す道は `kick.lua` にしか無い」は古い（`SCENE.co_exec_exact` があり、切り替えは `scene-exact-match` が持つ）。roadmap の Phase 13 の共有接点の `act.lua` 837 行・`sakura_builder.lua` 558 行は、812・557 行。
+
+## 申し送り（actor-line-newlines より、2026-11-06）
+
+- **変わった事実（生成）**: トランスパイラ（`code_gen/element_gen.rs` の `generate_line_marker`）が、アクション行と継続行の 1 行ごとに、その行の呼び出しより前に `act:line()` を 1 行出すようになった（InvalidContinuation の検査の後。ソースマップはその行の位置）。生成 Lua の行番号がずれるので、行番号の重なりに頼るテスト材料は見直すこと。`pasta_check` の act のメソッドの一覧（`validate/builtins.rs` の `ACT_METHODS`）は 28 になった。
+- **変わった事実（トークン）**: `act:line()` は `[ghost] line_newlines` が 0 でないときだけ印 `_seam_next` を立てる。次の `talk`・`sakura_script` のトークンが `seams = { 1 }`（字のバイト位置。昇順・1 始まり）を持ち、続く同じ話し手のトークンをまとめるとき（`merge_consecutive_talks`）にも位置を足して保つ。`raw_script` は印を取らない。`act.lua` の局所関数 `take_seam` を参照。
+- **変わった事実（出力）**: `sakura_builder.lua` の列の状態に `joinable`・`line_pending` が加わった。継ぎ目の改行（`\n[N]`、N = floor(値×100)）は、トークンの字の中の継ぎ目の位置に `join_lines` が差し込む（`put_break` は通らない）。`next_column`・`first_column` がこの状態を消し、話し手の切り替え（S1）では `break_line` が切り替え先の状態を消す。詳細は `.kiro/specs/completed/actor-line-newlines/design.md` と `book/src/internals/talk-output.md`。
+- 見直しが要る論点: この spec で、字を出すトークンを足すなら `take_seam` で継ぎ目を取るか。改行・区切りを出す場所を足すなら、その後に `joinable`・`line_pending` を消すか（`next_column` を通せば消える）。行の頭の生成（`element_gen.rs`）を触るなら、`act:line()` の位置（呼び出しの前）を保つか。
