@@ -2,7 +2,7 @@
 
 ## 要約
 
-- **対象**: `[ghost] continuation_newlines`（既定 `0`）を足し、継続行（`ContinueAction`）の最初の見える字の前に `\n[N]` を 1 つ入れる。対象は継続行だけ（2026-11-05 の見直し後の brief）。
+- **対象**: `[ghost] line_newlines`（既定 `0`）を足し、継続行（`ContinueAction`）の最初の見える字の前に `\n[N]` を 1 つ入れる。対象は継続行だけ（2026-11-05 の見直し後の brief）。
 - **発見の規模**: 既存の拡張（Extension）。設定の読み込み・出力側の状態機械・生成する Lua の 3 か所に、既にある型（`spot_newlines` の遅延方式・`put_break`・`apply_shiori_defaults`）をなぞって足す。Rust の `talk_to_script`・budoux の折り方は変えない。
 - **主な難所**: 「既定 `0` で 1 バイトも変えない」（要件 6.1）と「設定しても、規則 6・7 で入れなかった境目は今と同じ」（要件 4.5）。今の `merge_consecutive_talks` は同じアクターの連続した `talk` を 1 つに結合してから `talk_to_script`（ウェイト・budoux）に渡すので、継続行の印が結合を切ると、改行を入れない所でもウェイトや budoux の折り位置が変わりうる。印は「結合を切らない」形で運ぶ必要がある。
 - **推奨の方向**: 案 B（印を結合後の台詞の中の「継ぎ目」として持ち、改行を入れると決めた継ぎ目でだけ台詞を分けて `put_break` を通す）。規則 6 の判定は Rust の `column_move` と同じ分類（`\n`・`\n[…]`→次の列、`\c`→最初の列、`\_l[…]`→飛ぶ）を Lua 側に写す形になり、`ColumnMove` の写しの決まり（片方だけ直さない）に入る。
@@ -10,7 +10,7 @@
 
 ## 書き方の案（ぱすた開発セッション提出）
 
-ぱすた開発セッション（ghost_dev）が出した「今 → 新しい版」の例の要約。想定の設定は `[ghost] continuation_newlines = 1.8`。表の下に、ぱすた開発セッションが書いた「出てほしいさくらスクリプト」を写す（`\![bind,…]` は表情の単語の出力の略。ぱすた開発セッションの注記: 「`\n` と表情の bind の前後はどちらでもよい」）。
+ぱすた開発セッション（ghost_dev）が出した「今 → 新しい版」の例の要約。想定の設定は `[ghost] line_newlines = 1.8`。表の下に、ぱすた開発セッションが書いた「出てほしいさくらスクリプト」を写す（`\![bind,…]` は表情の単語の出力の略。ぱすた開発セッションの注記: 「`\n` と表情の bind の前後はどちらでもよい」）。
 
 | 例 | 今の辞書 | 新しい版の辞書 | 出てほしい出力 |
 | -- | -------- | -------------- | -------------- |
@@ -26,7 +26,7 @@
 - (c) おじさんの所は今と同じ `…対策をね。\_w[1150]\n[180]\_u[0x3000]今日は…`（`\n` を二重にしない）。ぱすたの所は `\p[0]\n[180]\![bind,…]やあ、相変わらずエッチですね。\_w[1150]\n[180]\![bind,…]この部屋は空調完璧だから大丈夫。`（話し手の替わり目は `spot_newlines` の 1 つだけ）。
 - (d) レベルアップ: `\_w[2000]\c\![bind,…]ぱんぱかぱーん！\_w[700]\n[180]\![bind,…]レベルが上がりました！\_w[700]\_l[-283,0]\![bind,…]何が変わったのかは、\_w[550]\n[180]\![bind,…]内緒ですよ？`。`＊レベルアップ` は `＊OnBoot` から Call され、頭の行は書き直し行なので入らない。お天気: `…ですか？\_w[700]\n[180]\![bind,…]私の窓、ビルしかみえないんですよね。\_w[1150]\_l[-253,0]` に続いて今と同じ `choice_newlines` の改行と選択肢（行の末尾の `\_l` は「最初の字より前」ではないので、行の頭の改行は入る）。
 
-移行の見込み（ぱすた開発セッション）: ぱすたの継続行の頭の `＠改行`（相手役の分を除く、およそ 340 行）を台本で消し、`[ghost] continuation_newlines = 1.8` を書く。局所シーンの頭の 21 行と相手役の `＠改行` は残す。`tategaki.pasta:217` は試験用のシーンで、新しい版で改行が入ってよい。
+移行の見込み（ぱすた開発セッション）: ぱすたの継続行の頭の `＠改行`（相手役の分を除く、およそ 340 行）を台本で消し、`[ghost] line_newlines = 1.8` を書く。局所シーンの頭の 21 行と相手役の `＠改行` は残す。`tategaki.pasta:217` は試験用のシーンで、新しい版で改行が入ってよい。
 
 ## 現状の調査
 
@@ -41,9 +41,9 @@
 | `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua` `BUILDER.build` | `pending_break`（spot_newlines の保留）・`spot_has_text`・`spot_tail`（選択肢）・`columns`（budoux の列）の状態機械。区切りは `put_break` を通して列を進める。字の判定は `has_text`・`emits_text`、`\c` は `text_parts`・`clear_span` | 「継続行の保留」を足す場所。優先順位は `pending_break` ＞ `spot_tail == "choice"` ＞ 継続行の保留、で 1 つだけ出す（要件 3.5）。話し手の切り替え・`clear`・台詞の `\c`・`clear_spot`・選択肢で保留を捨てる |
 | 同 `newline_tag`・`plain_newline_tag` | `spot_newlines`・`choice_newlines` は常に `\n[N]`、`after_choice_newlines` は `N` が 100 なら `\n` | 要件 1.4（`N` が 100 なら `\n`）は `plain_newline_tag` と同じ換算。brief の「`spot_newlines` と同じ」は型と読み込みの話で、換算は `plain_newline_tag` を使う |
 | 同 `next_column`・`first_column` と Rust `line_breaker.rs` の `ColumnMove`・`column_move` | 列の動かし方の写し（片方だけ直さない） | 規則 6 の「位置を決めるタグ」は `column_move` が列を動かすと読む単位と同じ集合。Lua 側には分類の写しがまだ無い（`APPEARANCE.tag_at` で名前と引数は読める） |
-| `crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua` `SHIORI_ACT.new`・`build` | `CONFIG.get("ghost", "spot_newlines", 1.5)` などを読み、`BUILDER.build` の `config` に渡す | `continuation_newlines` を同じ経路で読み、渡す。既定のリテラル `0` を置く |
-| `crates/pasta_lua/src/loader/config/sections.rs` `GhostConfig`・`mod.rs` `apply_shiori_defaults` | `[ghost]` の既定値の正本（SSOT）。書かなかったキーを `@pasta_config` に補う | `continuation_newlines: f64 = 0.0` を足す。補った結果 `@pasta_config` の `ghost` に `continuation_newlines = 0.0` が現れる（出力は変わらない） |
-| `crates/pasta_lua/tests/loader/config_defaults_test.rs` | SSOT と、`act.lua` の既定リテラル・マニュアルの表の行・テンプレートの既定値が食い違わないかを検査する | 新しいキーも同じ検査に入れる。マニュアルの `[ghost]` の表の行とテンプレートに `continuation_newlines` と `0.0` 相当の表記が要る（表記の形は検査に合わせる） |
+| `crates/pasta_lua/pasta_scripts/pasta/shiori/act.lua` `SHIORI_ACT.new`・`build` | `CONFIG.get("ghost", "spot_newlines", 1.5)` などを読み、`BUILDER.build` の `config` に渡す | `line_newlines` を同じ経路で読み、渡す。既定のリテラル `0` を置く |
+| `crates/pasta_lua/src/loader/config/sections.rs` `GhostConfig`・`mod.rs` `apply_shiori_defaults` | `[ghost]` の既定値の正本（SSOT）。書かなかったキーを `@pasta_config` に補う | `line_newlines: f64 = 0.0` を足す。補った結果 `@pasta_config` の `ghost` に `line_newlines = 0.0` が現れる（出力は変わらない） |
+| `crates/pasta_lua/tests/loader/config_defaults_test.rs` | SSOT と、`act.lua` の既定リテラル・マニュアルの表の行・テンプレートの既定値が食い違わないかを検査する | 新しいキーも同じ検査に入れる。マニュアルの `[ghost]` の表の行とテンプレートに `line_newlines` と `0.0` 相当の表記が要る（表記の形は検査に合わせる） |
 | `crates/pasta_lua/src/loader/cache.rs` | 生成した Lua のキャッシュを、クレートの版（`CARGO_PKG_VERSION`）で無効にする | 0.5.1 への版上げで古いキャッシュは捨てられる。開発中（同じ版）は古いキャッシュが残りうる（テストへの影響を設計で確かめる） |
 | `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua` | builder の規則のテスト（spot_newlines・選択肢・budoux の列・`\c` など） | 規則 1〜11 のテストを足す場所 |
 | `crates/pasta_lua/tests/transpiler/*`・`src/code_gen/*_tests.rs`・`tests/fixtures/sample.expected.lua` | 生成する Lua の文字列を比べるテスト（`actor_proxy(` を含む比較が約 53 か所） | 印を出すのは継続行だけなので、影響は継続行を含むテストに限られる。`sample.pasta` には継続行が約 27 行あるので、`sample.expected.lua`（と、テストが書き換える `sample.generated.lua`）は変わる。改行コードだけの差分をコミットに混ぜない |
@@ -82,7 +82,7 @@
 3. **規則 6・7 は行をまたいで見る**: 継続行の頭のタグは、結合した台詞の中・別の `sakura_script` トークン（DSL の行に書いた `\n`・`\_l[…]`・`\c` は `sakura_script` になる）・`newline` トークンにまたがる。前の行の末尾の改行も同様。判定は「最後の見える字から次の見える字まで」の区間を、トークンの境目と結合した台詞の中の継ぎ目の両方で見る必要がある。
 4. **区切りの置き場所**: `spot_newlines` は字を出すトークンの直前（テキストの頭のタグより前）に出る。継続行の改行も同じ置き場所にすると、`　　：＠注目　みんなに…` は `\n[180]\s[注目]みんなに…` になる。手書きの `＠注目　＠改行　…` の出力は `\s[注目]\n[180]…` なので、見た目は同じだがバイトは違う（要件 6.3 は字と字の間と幅だけを求める）。ぱすた開発セッションは「`\n` と表情の bind の前後はどちらでもよい」としたので、作りの都合（`spot_newlines` と同じ置き場所が素直）で設計が決めてよい。
 5. **生成する Lua の形と行番号**: 印を別の Lua 行（例 `act:continuation()`）で出すと、以後の Lua の行番号がずれ、`line_map` の文字列・ソースマップ・デバッガの行の対応・比較用の生成物が変わる（`record_span_since` で継続行の span を記録すれば対応は保てる）。同じ行に載せる（例: 継続行の最初のアクションの `actor_proxy` に印の引数を足す、最初の呼び出しの前に `act:continuation();` を同じ行で置く）と行番号は変わらない。ただし最初のアクションが関数呼び出し（`expr_fn`）だと、関数の中で積まれた台詞に印が付く順序の問題がある。
-6. **既定のリテラルと SSOT の検査**: `act.lua` の `CONFIG.get("ghost", "continuation_newlines", 0)` の書き方（`0` か `0.0` か）と、`GhostConfig` の `f64` の表記（`{:?}` で `0.0`）を、`config_defaults_test` の照合に合わせる。
+6. **既定のリテラルと SSOT の検査**: `act.lua` の `CONFIG.get("ghost", "line_newlines", 0)` の書き方（`0` か `0.0` か）と、`GhostConfig` の `f64` の表記（`{:?}` で `0.0`）を、`config_defaults_test` の照合に合わせる。
 7. **隣の spec**: `cue-command-runtime` は場面に入ったときと Call から戻ったときにアクター指定行を台本へ流し、同じ生成の場所（`scope_gen.rs`・`element_gen.rs`）を触る。`scene-anchor-link` は `act.lua` を触る。同じウェーブに置かない（brief）。
 
 ## 実装の案
@@ -123,11 +123,11 @@
   2. hello-pasta の辞書（継続行のある `.pasta` が 6 ファイル）で、既定 `0` の出力が変わらないことを見本の出力のテストで確かめられるか。
   3. 開発中（同じ版のまま）の生成キャッシュが、印の無い古い Lua を返してテストを惑わせないか。
   4. ~~ぱすた開発セッションの「出てほしいさくらスクリプト」の原文を受け取る~~ → 受け取り済み（上の「書き方の案」に写した）。設計では、これを builder のテストの期待値に写す（`\![bind,…]` は実際の表情の単語の出力に置き換える）。
-- **印は値によらない形で出す（キャッシュ）**: ローダーは変わった `.pasta` だけを変換し直す（`process_incremental`）。`pasta.toml` の値を変えても生成済みの Lua は作り直されないので、生成する Lua に `continuation_newlines` の値や「入れる／入れない」の判定を焼き込んではいけない。印は継続行なら常に同じ形で出し、値と判定は実行時（act.lua・builder）で行う。
+- **印は値によらない形で出す（キャッシュ）**: ローダーは変わった `.pasta` だけを変換し直す（`process_incremental`）。`pasta.toml` の値を変えても生成済みの Lua は作り直されないので、生成する Lua に `line_newlines` の値や「入れる／入れない」の判定を焼き込んではいけない。印は継続行なら常に同じ形で出し、値と判定は実行時（act.lua・builder）で行う。
 - **簡単にできる候補（設計で比べる）**: 既定 `0`（`N` が 0 以下）のときは act.lua が結合（`merge_consecutive_talks`）の前に印を読み捨てる、とすれば、要件 6.1 のバイト同一は印の運び方によらず守れる。残る難所は「設定したゴーストで、規則 6・7 で入れなかった境目を今と同じにする」（要件 4.5）だけになる。行の頭の `＠改行` は単語なので、規則 6 は生成時には判定できず、実行時に見るしかない（単語の中身は実行時に決まる）。
 
 ## OPEN QUESTIONS
 
-1. **（確定: N が 0 以下なら入れない）`continuation_newlines` が負の値、または 100 倍して切り捨てると 0 になる値（`0.009` など）のとき、何を出すか。** brief は「既定 `0` は何も入れない」だけを決めている。`spot_newlines` の換算をそのまま当てると、`-0.5` は `\n[-50]`、`0.009` は `\n[0]` になる。
+1. **（確定: N が 0 以下なら入れない）`line_newlines` が負の値、または 100 倍して切り捨てると 0 になる値（`0.009` など）のとき、何を出すか。** brief は「既定 `0` は何も入れない」だけを決めている。`spot_newlines` の換算をそのまま当てると、`-0.5` は `\n[-50]`、`0.009` は `\n[0]` になる。
    - **推奨**: `N`（値を 100 倍して切り捨てた整数）が `0` 以下なら何も入れない（要件 1.3 に仮定として書いた）。`0` が「入れない」の意味なので、`0` より小さい値も同じに読むのが自然で、`\n[-50]`（ベースウェアによって行を戻す・無視するなど挙動が定まらない）を出さずに済む。
-   - **例**: `continuation_newlines = -1` → 継続行の前に何も入れない（`0` と同じ）。`continuation_newlines = 0.5` → `\n[50]`。
+   - **例**: `line_newlines = -1` → 継続行の前に何も入れない（`0` と同じ）。`line_newlines = 0.5` → `\n[50]`。
