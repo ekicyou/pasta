@@ -10,11 +10,13 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|7:3,11:3,12:4,13:4,14:5,15:5,16:6,17:7,18:8,19:9,20:10")
+        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|7:3,11:3,12:4,13:4,14:4,15:5,16:5,17:5,18:6,19:7,20:8,21:9,22:10")
 
         var.x = "挨拶"
+        act:line()
         act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word(var.x, "var.x"))
         act:actor_proxy("さくら"):talk("です")
+        act:line()
         act:actor_proxy("うにゅう"):talk(act:actor_proxy("うにゅう"):word(save.k, "save.k"))
         act:actor_proxy("うにゅう"):talk((act:actor_proxy("うにゅう"):expr_fn_var(args[1], "args[1]", 1, var.a)))
         var.y = act:word(save.k, "save.k")

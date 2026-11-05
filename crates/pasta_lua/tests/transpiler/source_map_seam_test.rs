@@ -274,9 +274,11 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE, \"メイン\", nil, \"test.pasta|7:2,11:2,12:3\")
+        local save, var = act:init_scene(SCENE, \"メイン\", nil, \"test.pasta|7:2,11:2,12:2,13:3,14:3\")
 
+        act:line()
         act:actor_proxy(\"さくら\"):talk(\"「こんにちは」\")
+        act:line()
         act:actor_proxy(\"うにゅう\"):talk(\"「やあ」\")
     end
 end

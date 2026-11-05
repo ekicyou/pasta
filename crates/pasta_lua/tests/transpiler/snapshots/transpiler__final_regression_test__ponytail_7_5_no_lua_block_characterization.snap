@@ -11,8 +11,9 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|8:4,12:4,13:4,14:4,15:5")
+        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|8:4,12:4,13:4,14:4,15:4,16:5")
 
+        act:line()
         act:actor_proxy("さくら"):talk("「")
         act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("挨拶"))
         act:actor_proxy("さくら"):talk("」")
@@ -21,13 +22,14 @@ do
 
     function SCENE.空_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE, "メイン", "空", "test.pasta|18:7")
+        local save, var = act:init_scene(SCENE, "メイン", "空", "test.pasta|19:7")
     end
 
     function SCENE.サブ_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE, "メイン", "サブ", "test.pasta|23:9,27:10")
+        local save, var = act:init_scene(SCENE, "メイン", "サブ", "test.pasta|24:9,28:10,29:10")
 
+        act:line()
         act:actor_proxy("うにゅう"):talk("「サブです」")
     end
 end
@@ -44,7 +46,7 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE, "単語だけ", nil, "test.pasta|41:18")
+        local save, var = act:init_scene(SCENE, "単語だけ", nil, "test.pasta|43:18")
     end
 end
 
@@ -53,15 +55,17 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE, "最後", nil, "test.pasta|50:19,54:19")
+        local save, var = act:init_scene(SCENE, "最後", nil, "test.pasta|52:19,56:19,57:19")
 
+        act:line()
         act:actor_proxy("さくら"):talk("「最後です」")
     end
 
     function SCENE.末尾_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE, "最後", "末尾", "test.pasta|57:21,61:22")
+        local save, var = act:init_scene(SCENE, "最後", "末尾", "test.pasta|60:21,64:22,65:22")
 
+        act:line()
         act:actor_proxy("うにゅう"):talk("「おしまい」")
     end
 end

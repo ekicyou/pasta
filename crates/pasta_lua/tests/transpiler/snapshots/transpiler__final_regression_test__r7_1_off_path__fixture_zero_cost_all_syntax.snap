@@ -27,16 +27,18 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|24:23,28:23,29:24,30:25,31:26,32:26,33:26,34:26,35:26,36:27,37:27,38:27,39:28,53:33,54:34")
+        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|24:23,28:23,29:24,30:25,31:26,32:26,33:26,34:26,35:26,36:26,37:27,38:27,39:27,40:27,41:28,56:33,57:34")
 
         var.カウンタ = "10"
         save.グローバル = "永続値"
         act:set_property("mood", "happy")
+        act:line()
         act:actor_proxy("さくら"):talk("「")
         act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("挨拶"))
         act:actor_proxy("さくら"):talk("！")
         act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("一人称は元気です"))
         act:actor_proxy("さくら"):talk("」")
+        act:line()
         act:actor_proxy("うにゅう"):talk("「")
         act:actor_proxy("うにゅう"):talk(act:actor_proxy("うにゅう"):word("場所にいるよ"))
         act:actor_proxy("うにゅう"):talk("」")
@@ -45,8 +47,9 @@ do
 
     function SCENE.サブ会話_1(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE, "メイン", "サブ会話", "test.pasta|42:30,46:31,47:31,48:31,49:31,50:31,53:33,54:34")
+        local save, var = act:init_scene(SCENE, "メイン", "サブ会話", "test.pasta|44:30,48:31,49:31,50:31,51:31,52:31,53:31,56:33,57:34")
 
+        act:line()
         act:actor_proxy("さくら"):talk("「カウンタは")
         act:actor_proxy("さくら"):talk(var.カウンタ, "var.カウンタ")
         act:actor_proxy("さくら"):talk("、グローバルは")

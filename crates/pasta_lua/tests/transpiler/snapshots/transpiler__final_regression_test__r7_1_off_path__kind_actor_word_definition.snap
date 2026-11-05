@@ -20,8 +20,9 @@ do
 
     function SCENE.__start__(act, ...)
         local args = { ... }
-        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|17:8,21:8,22:8,23:8")
+        local save, var = act:init_scene(SCENE, "メイン", nil, "test.pasta|17:8,21:8,22:8,23:8,24:8")
 
+        act:line()
         act:actor_proxy("さくら"):talk("「")
         act:actor_proxy("さくら"):talk(act:actor_proxy("さくら"):word("一人称は元気です"))
         act:actor_proxy("さくら"):talk("」")
