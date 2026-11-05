@@ -3,7 +3,8 @@
 
 ＊別ファイルの関数
 ```lua
--- 下の空行は、止まる行（return data.別）の Lua の行の番号を ＊OnCross の行の対応（Lua の 67 行）に重ねるため
+-- 下の空行は、止まる行（return data.別）の Lua の行の番号を ＊OnCross の行の対応（Lua の 68 行）に重ねるため
+
 
 
 
