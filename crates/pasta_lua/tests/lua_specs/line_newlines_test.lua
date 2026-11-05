@@ -185,11 +185,16 @@ end)
 
 -- 組み立てに行の改行の値を直接渡して読む（shiori act からの受け渡しは別の作業）。
 -- act の印は常に立ててトークンに継ぎ目を付け、組み立ての line_newlines だけを変える
-local function build_lines(line_newlines, fill)
+-- sakura_extra はさくらの設定に足す欄（budoux など）
+local function build_lines(line_newlines, fill, sakura_extra)
     local BUILDER = require("pasta.shiori.sakura_builder")
     local ACT = require("pasta.act")
+    local sakura = { name = "さくら", spot = 0 }
+    for k, v in pairs(sakura_extra or {}) do
+        sakura[k] = v
+    end
     local act = ACT.new({
-        sakura = { name = "さくら", spot = 0 },
+        sakura = sakura,
         kero = { name = "うにゅう", spot = 1 },
     })
     act._line_newlines = 1.8
@@ -326,5 +331,145 @@ describe("組み立て - 差し込んだ改行で列が進む (5.1)", function()
         end)
         expect(columns[0].line):toBe(2)
         expect(columns[0].width):toBe(only[0].width)
+    end)
+end)
+
+-- 4.1・4.2 で入れない継ぎ目は、line_newlines なしとバイトまで同じ（4.5）
+local function same_as_off(fill, sakura_extra)
+    local off = build_lines(nil, fill, sakura_extra)
+    expect(build_lines(1.8, fill, sakura_extra)):toBe(off)
+    return off
+end
+
+-- budoux のあるアクター（句読点のウェイトは既定のまま入る）
+local BUDOUX = { budoux = { 4 } }
+
+describe("組み立て - 行の頭の位置を決めるタグでは入れない (4.1, 4.5)", function()
+    local heads = {
+        { "\\n[180]\\_u[0x3000]", "相手役の継続行の ＠改行" },
+        { "\\![bind,a,b,1]\\n[180]", "表情の bind の後の ＠改行" },
+        { "\\_w[2000]\\c", "＠改ページ" },
+        { "\\_l[-283,0]", "＠左" },
+    }
+    for _, case in ipairs(heads) do
+        test(case[2] .. "（同じ台詞の頭）", function()
+            for _, extra in ipairs({ {}, BUDOUX }) do
+                same_as_off(function(act, s)
+                    act:line():talk(s, "長い記憶。"):line():talk(s, case[1] .. "続き、ね。")
+                end, extra)
+            end
+        end)
+        test(case[2] .. "（さくらスクリプトの頭）", function()
+            for _, extra in ipairs({ {}, BUDOUX }) do
+                same_as_off(function(act, s)
+                    act:line():talk(s, "長い記憶。"):line():sakura_script(s, case[1]):talk(s, "続き、ね。")
+                end, extra)
+            end
+        end)
+    end
+end)
+
+describe("組み立て - 前の出力が位置を決めるタグで終わるなら入れない (4.2, 4.3, 4.5)", function()
+    for _, tail in ipairs({ "\\n", "\\n[180]", "\\_l[-253,0]", "\\c" }) do
+        test(tail .. " が同じ台詞の末尾", function()
+            for _, extra in ipairs({ {}, BUDOUX }) do
+                same_as_off(function(act, s)
+                    act:line():talk(s, "長い記憶。" .. tail):line():talk(s, "続き、ね。")
+                end, extra)
+            end
+        end)
+        test(tail .. " が別のさくらスクリプト", function()
+            for _, extra in ipairs({ {}, BUDOUX }) do
+                same_as_off(function(act, s)
+                    act:line():talk(s, "長い記憶。"):sakura_script(s, tail):line():talk(s, "続き、ね。")
+                end, extra)
+            end
+        end)
+    end
+
+    test("改行のトークン・clear のトークン", function()
+        same_as_off(function(act, s)
+            act:line():talk(s, "長い記憶。"):newline():line():talk(s, "続き、ね。")
+        end, BUDOUX)
+        same_as_off(function(act, s)
+            act:line():talk(s, "長い記憶。"):clear():line():talk(s, "続き、ね。")
+        end, BUDOUX)
+    end)
+
+    test("位置のタグの後に見える字があれば、次の行の頭には入る", function()
+        local out = build_lines(1.8, function(act, s)
+            act:line():talk(s, "A\\nB"):line():talk(s, "C")
+        end)
+        expect(out):toBe("\\p[0]A\\nB\\n[180]C\\e")
+    end)
+
+    test("行の末尾の \\_l[-253,0] はその行自身の頭を止めず、次の行の頭は止める", function()
+        local out = build_lines(1.8, function(act, s)
+            act:line():talk(s, "X"):line():talk(s, "A\\_l[-253,0]"):line():talk(s, "B")
+        end)
+        expect(out):toBe("\\p[0]X\\n[180]A\\_l[-253,0]B\\e")
+    end)
+end)
+
+describe("組み立て - raw_script とエスケープ・囲み (4.4, 4.6)", function()
+    -- 2 つの行の間に raw_script をはさんだ出力
+    local function with_raw(raw, before, after)
+        return build_lines(1.8, function(act, s)
+            act:line():talk(s, before)
+            act:raw_script(raw)
+            act:line():talk(s, after)
+        end)
+    end
+
+    test("raw_script をはさんでも入る（見える字・位置のタグとして読まない）", function()
+        for _, raw in ipairs({ "\\0", "\\![bind,a,b,1]", "\\s[5]", "\\_w[100]", "\\n", "\\c", "\\_l[-283,0]" }) do
+            expect(with_raw(raw, "A", "B")):toBe("\\p[0]A" .. raw .. "\\n[180]B\\e")
+        end
+    end)
+
+    test("raw_script をはさんでも、入れない継ぎ目は入れないまま", function()
+        expect(with_raw("\\s[5]", "A\\n", "B")):toBe("\\p[0]A\\n\\s[5]B\\e")
+    end)
+
+    test("raw_script の字は吹き出しの字に数えない（最初の行には入らない）", function()
+        same_as_off(function(act, s)
+            act:raw_script("字")
+            act:line():talk(s, "B")
+        end)
+    end)
+
+    test("エスケープの \\\\n と囲みの中の \\n・\\c を位置のタグにしない", function()
+        for _, tail in ipairs({ "\\\\n", "\\_?\\n\\_?", "\\_!\\c\\_!" }) do
+            local out = build_lines(1.8, function(act, s)
+                act:line():talk(s, "A" .. tail):line():talk(s, "B")
+            end)
+            expect(out):toBe("\\p[0]A" .. tail .. "\\n[180]B\\e")
+        end
+    end)
+end)
+
+describe("組み立て - 手書きの ＠改行 と同じ出力 (6.3, 3.1)", function()
+    test("手書きの ＠改行 を消して設定した出力が、手書きの出力と同じ", function()
+        for _, extra in ipairs({ {}, BUDOUX }) do
+            local hand = build_lines(nil, function(act, s)
+                act:line():talk(s, "なら。")
+                act:line():sakura_script(s, "\\![bind,a,b,1]"):talk(s, "\\n[180]みんなに、ね。")
+            end, extra)
+            local set = build_lines(1.8, function(act, s)
+                act:line():talk(s, "なら。")
+                act:line():sakura_script(s, "\\![bind,a,b,1]"):talk(s, "みんなに、ね。")
+            end, extra)
+            expect(set):toBe(hand)
+            expect(select(2, hand:gsub("\\n%[180%]", ""))):toBe(1)
+        end
+    end)
+
+    test("話し手が戻った直後の表情だけの台詞（talk）で spot_newlines だけ", function()
+        local out = same_as_off(function(act, s, k)
+            act:line():talk(s, "A"):line():talk(k, "B")
+            act:line():talk(s, "\\s[5]"):line():talk(s, "C")
+        end, BUDOUX)
+        -- 同じ話し手の talk は 1 つに結合され、字のある台詞として頭に spot_newlines が出る
+        expect(out):toBe("\\p[0]A\\p[1]B\\p[0]\\n[150]\\s[5]C\\e")
     end)
 end)
