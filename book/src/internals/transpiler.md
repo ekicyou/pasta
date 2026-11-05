@@ -226,7 +226,7 @@ end
 | 変数代入（プロパティ） | `act:set_property(名前, 式)`。右辺が単語参照・動的単語参照なら、式の代わりに上と同じ `act:word(…)` を渡す |
 | 式文（`＄＝`） | 式が関数呼び出しそのもの（`act:expr_fn(…)`・`act:global_fn(…)`・`act:expr_fn_var(…)`）なら、その呼び出しを 1 文として出力する。それ以外の式（演算・括弧・リテラル・変数参照）は Lua の文にならないため、`do local _ = 式 end` で値を捨てる（`element_gen.rs` の `generate_var_set`） |
 | Call | ローカルシーンの最後の項目なら `return act:call(SCENE.__global_name__, キー, {}, 明示した引数…, table.unpack(args))`、それ以外なら `act:call_restore(SCENE.__global_name__, キー, {}, 明示した引数…, table.unpack(args))`（[末尾呼び出し](#末尾呼び出し)）。キーは、静的ターゲットなら `"名前"`、動的ターゲットなら `act:call_key(…)`（[動的コールのキー](#動的コールのキー)） |
-| アクション行・継続行 | アクションごとに 1 文。アクターは `act:actor_proxy("アクター")` で得たプロキシで書く。発言は `act:actor_proxy("アクター"):talk(文字列)`、単語参照は `act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(名前))`、動的単語参照は `act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(var.変数名, "var.変数名"))`、さくらスクリプトは `act:actor_proxy("アクター"):sakura_script(文字列)` |
+| アクション行・継続行 | 行の頭の印 `act:line()` の 1 行（[行の頭の印](#行の頭の印)）に続けて、アクションごとに 1 文。アクターは `act:actor_proxy("アクター")` で得たプロキシで書く。発言は `act:actor_proxy("アクター"):talk(文字列)`、単語参照は `act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(名前))`、動的単語参照は `act:actor_proxy("アクター"):talk(act:actor_proxy("アクター"):word(var.変数名, "var.変数名"))`、さくらスクリプトは `act:actor_proxy("アクター"):sakura_script(文字列)` |
 | 選択肢行 | `act:choice(ジャンプ先, 表示テキスト)` |
 | キューコマンド行 | `!select` だけを `act:choice_timeout(秒数)`（引数が数値でなければ `nil`）に変換する。他のキューコマンドは出力しない |
 
@@ -332,6 +332,22 @@ Lua は末尾位置の関数呼び出しで呼び出し元のスタックフレ�
 `last_actor` はローカルシーンごとに空から始まるため、先行するアクション行が無い位置の継続行は `TranspileError::InvalidContinuation` になる。
 
 これは生成コードを小さくする最適化ではなく、継続行の話者を決めるための構文上の処理である。生成されるのはアクションごとの `act:actor_proxy("アクター"):…` の文であり、同じアクターが続いても文は省略しない。連続する同じアクターの発言をまとめる処理は実行時のトーク組立が担う（[トーク出力とアピアランス](talk-output.md)）。
+
+#### 行の頭の印
+
+アクション行と継続行は、アクションの文の前に `act:line()` の 1 行を出す（`element_gen.rs` の `generate_line_marker`。呼ぶのは `generate_action_line` と `generate_continue_action` だけ）。継続行では、`InvalidContinuation` の確認の後に出す。エラーになる継続行は何も書かない。印の行は、その行の `Span` で `record_span_since` に記録する（印の行は、その行の `.pasta` の行に当たる）。変数代入・Call・選択肢・キューコマンド・空行・コメントには出さない。
+
+印は [line_newlines](../reference/pasta-toml.md#line_newlines) の値にも話し手にもよらず、いつも同じ形である。改行を入れるかは実行時に決める（[同じ話し手の行の改行](talk-output.md#同じ話し手の行の改行)）。
+
+`　ぱすた：なら。` の次の `　　　　：＠注目　みんなに会ってみたいかも。` は、次のように生成する。
+
+```lua
+act:line()
+act:actor_proxy("ぱすた"):talk("なら。")
+act:line()
+act:actor_proxy("ぱすた"):talk(act:actor_proxy("ぱすた"):word("注目"))
+act:actor_proxy("ぱすた"):talk("みんなに会ってみたいかも。")
+```
 
 #### 文字列リテラルの表記選択
 
