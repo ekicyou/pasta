@@ -88,6 +88,20 @@ local function group_by_actor(tokens)
     return result
 end
 
+--- 継ぎ目の位置に offset を足して dest へ加える（dest が nil なら新しい表を作る）
+--- @param dest integer[]|nil
+--- @param seams integer[]|nil
+--- @param offset integer
+--- @return integer[]|nil
+local function add_seams(dest, seams, offset)
+    if not seams then return dest end
+    dest = dest or {}
+    for _, p in ipairs(seams) do
+        table.insert(dest, p + offset)
+    end
+    return dest
+end
+
 --- グループ化トークン内の連続talkトークンを統合
 --- @param grouped table[] グループ化されたトークン配列
 --- @return table[] 統合済みトークン配列
@@ -103,14 +117,16 @@ local function merge_consecutive_talks(grouped)
             for _, inner in ipairs(token.tokens) do
                 if inner.type == "talk" then
                     if pending_talk then
-                        -- 連続talk: テキスト結合
+                        -- 連続talk: テキスト結合（継ぎ目は結合前の長さだけずらす）
+                        pending_talk.seams = add_seams(pending_talk.seams, inner.seams, #pending_talk.text)
                         pending_talk.text = pending_talk.text .. inner.text
                     else
-                        -- 新規talk開始
+                        -- 新規talk開始（継ぎ目は写して持ち、元の表を書き換えない）
                         pending_talk = {
                             type = "talk",
                             actor = inner.actor,
-                            text = inner.text
+                            text = inner.text,
+                            seams = add_seams(nil, inner.seams, 0)
                         }
                     end
                 else
