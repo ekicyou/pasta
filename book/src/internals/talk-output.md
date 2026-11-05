@@ -216,7 +216,7 @@ ACT のメソッドは、さくらスクリプトに依存しない表を `act.t
 - 列を動かす単位（`\n`・`\n[…]`・引数の無い `\c`・`\_l[…]`）を読んだとき: `line_pending` と `joinable` を消す。列を動かすかの見分けは局所関数 `column_move` で、Rust の `line_breaker.rs` の `column_move` の写しである。
 - それ以外の単位（表情・ウェイトなど）は状態を変えない。
 
-組立が出す区切り（`put_break` の中の `next_column`）、`newline` のトークン（`next_column`）、`clear` のトークン（`first_column`）は、どれも `joinable`・`line_pending` を消す。`clear_spot` は `columns` ごと捨てる。そのため、話し手の切り替えの改行・選択肢の前後の区切りを出した後は、この改行は出ない。1 つの字の前に出る区切りは、`spot_newlines`・`choice_newlines`・`after_choice_newlines`・この改行のうち 1 つだけになる。`raw_script`・`surface`・`wait`・`choice_timeout` は台詞を読まず、状態を変えない。状態はビルドをまたがない。差し込んだ改行は `talk_to_script` の中で列を動かす単位として数えるため、budoux はその後の字を次の行の字数 0 から数える。
+組立が出す区切り（`put_break` の中の `next_column`）、`newline` のトークン（`next_column`）、`clear` のトークン（`first_column`）は、どれも `joinable`・`line_pending` を消す。話し手の切り替え（S1）も、切り替え先のスポットの `joinable`・`line_pending` を消す（局所関数 `break_line`。列は動かさない）。`clear_spot` は `columns` ごと捨てる。そのため、話し手の切り替えの改行・選択肢の前後の区切りを出した後は、この改行は出ない。1 つの字の前に出る区切りは、`spot_newlines`・`choice_newlines`・`after_choice_newlines`・この改行のうち 1 つだけになる。`raw_script`・`surface`・`wait`・`choice_timeout` は台詞を読まず、状態を変えない。状態はビルドをまたがない。差し込んだ改行は `talk_to_script` の中で列を動かす単位として数えるため、budoux はその後の字を次の行の字数 0 から数える。
 
 #### 字の定義
 

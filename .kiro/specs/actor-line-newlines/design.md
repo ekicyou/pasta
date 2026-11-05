@@ -379,7 +379,7 @@ local function join_lines(inner, column, ratio) end
 
 - 事前条件: `inner.type` は `talk` か `sakura_script`。
 - 事後条件: 戻り値のテキストからこの機能が差し込んだタグを除くと `inner.text` と同じ。差し込みは高々「継ぎ目の数」まで。1 つの見える字の前には、字の無い行の分を除いて高々 1 つ。
-- 不変条件: `column.joinable` が真なら、そのスポットの吹き出しに字がある（`spot_has_text` が真）。このため、話し手の切り替えの後に字があれば必ず `spot_newlines` の `put_break` が最初の見える字より前に出て、行の状態を区切れにする（要件 3.1）。
+- 不変条件: `column.joinable` が真なら、そのスポットの吹き出しに字がある（`spot_has_text` が真）。このため、話し手の切り替えの後に字があれば必ず `spot_newlines` の `put_break` が最初の見える字より前に出て、行の状態を区切れにする（要件 3.1）。 ただし `put_break` が出るのは最初の見える字の直前なので、戻った直後に字の無い行が 2 つ以上続くと、その間の継ぎ目で行の改行が先に出てしまう。そのため S1（話し手の切り替え）で、切り替え先のスポットの `joinable`・`line_pending` も消す（`break_line`。実装後の最終検証で見つかり追加。`build` に 1 行足す例外）。
 
 **実装メモ**
 - 統合: `sakura_builder.lua` は約 560 行。足すのは局所関数 3〜4 つ（数十行）。`BUILDER._internal` に `column_move` を出し、Rust との一致をテストする。

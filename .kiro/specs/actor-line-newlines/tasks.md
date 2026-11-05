@@ -104,3 +104,4 @@
 - 4.1 の後、生成物を丸ごと比べる transpiler の 16 本（comparison・source_map_seam の R4.6 golden・final_regression 2 本・zero_cost・dynamic_word_ref・runtime_safety・snapshot 9 本）は印の行と line_map の文字列のずれだけで落ちる。4.2 で作り直す。
 - 4.x の印の行で生成 Lua の行番号がずれるため、行番号の重なりに頼るテスト材料（pasta_shiori の runtime_error_balloon の 別ファイル.pasta）を 1 行ずらした（b6f96e6b）。行番号に頼る他のテストがあれば同じずれを疑う。
 - 区切りの幅が 0 でも `newline_tag` は `\n[0]` を出して列を進めるので、話し手の切り替え・選択肢の後に行の改行は入らない。`put_break` が "" で早く戻るのは前に字が無いときだけで、そのとき `joinable` は偽（63eae24c で確認）。
+- 話し手の切り替え（S1）で切り替え先のスポットの行の状態を `break_line` で消す。戻った直後に字の無い行が 2 つ以上続くと `put_break` より先に継ぎ目で行の改行が出ていた（最終検証で発見）。

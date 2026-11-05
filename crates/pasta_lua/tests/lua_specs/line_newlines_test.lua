@@ -288,6 +288,17 @@ describe("組み立て - 行の改行を入れない所 (1.3, 3.1, 3.2, 3.3, 3.4
         expect(out):toBe("\\p[0]A\\p[1]B\\p[0]\\s[5]\\n[150]C\\e")
     end)
 
+    test("元の話し手へ戻った後に字の無い行が 2 つ続いても、spot_newlines だけ（3.1）", function()
+        same_as_off(function(act, s, k)
+            act:line():talk(s, "A"):line():talk(k, "B")
+            act:line():sakura_script(s, "\\s[5]"):line():sakura_script(s, "\\s[6]"):line():talk(s, "C")
+        end)
+        same_as_off(function(act, s, k)
+            act:line():talk(s, "A"):line():talk(k, "B")
+            act:line():talk(s, "\\s[5]"):line():sakura_script(s, "\\_w[500]"):line():talk(s, "C")
+        end)
+    end)
+
     test("選択肢の後は after_choice_newlines だけ", function()
         same_as_off(function(act, s)
             act:line():talk(s, "A"):choice("x"):line():talk(s, "B")

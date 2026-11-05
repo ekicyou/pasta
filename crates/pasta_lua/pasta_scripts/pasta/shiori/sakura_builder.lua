@@ -219,6 +219,15 @@ local function first_column(column)
     column.line_pending = nil
 end
 
+--- 列は動かさず、行の状態だけを区切れにする（話し手の切り替え。列がまだ無ければ何もしない）
+--- @param column table|nil 列の状態
+local function break_line(column)
+    if column ~= nil then
+        column.joinable = nil
+        column.line_pending = nil
+    end
+end
+
 --- 単位が列をどう動かすか（Rust の line_breaker.rs の column_move の写し。片方だけ直さない）
 --- @param name string|nil APPEARANCE.tag_at の名前
 --- @param arg string|nil 引数
@@ -606,6 +615,8 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                 -- 先出し版の last_spot ~= spot / last_spot == spot ガードは復活させない。
                 local spot = emit_actor_switch(buffer, actor_spots, actor, appearance, token.tokens, style)
                 pending_break = (spot_has_text[spot] == true)
+                -- 切り替えは行の状態の区切れ（字の無い行の継ぎ目で spot_newlines と重ねない。要件 3.1）
+                break_line(columns[spot])
                 last_spot = spot
                 last_actor = actor
             end
