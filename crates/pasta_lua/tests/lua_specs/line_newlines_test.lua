@@ -186,7 +186,7 @@ end)
 -- 組み立てに行の改行の値を直接渡して読む（shiori act からの受け渡しは別の作業）。
 -- act の印は常に立ててトークンに継ぎ目を付け、組み立ての line_newlines だけを変える
 -- sakura_extra はさくらの設定に足す欄（budoux など）
-local function build_lines(line_newlines, fill, sakura_extra)
+local function build_lines(line_newlines, fill, sakura_extra, config_extra)
     local BUILDER = require("pasta.shiori.sakura_builder")
     local ACT = require("pasta.act")
     local sakura = { name = "さくら", spot = 0 }
@@ -200,6 +200,9 @@ local function build_lines(line_newlines, fill, sakura_extra)
     act._line_newlines = 1.8
     fill(act, act.actors.sakura, act.actors.kero)
     local config = { line_newlines = line_newlines, columns_out = {} }
+    for k, v in pairs(config_extra or {}) do
+        config[k] = v
+    end
     local out = BUILDER.build(act:build(), config, { ["さくら"] = 0, ["うにゅう"] = 1 })
     return out, config.columns_out
 end
@@ -289,6 +292,24 @@ describe("組み立て - 行の改行を入れない所 (1.3, 3.1, 3.2, 3.3, 3.4
         same_as_off(function(act, s)
             act:line():talk(s, "A"):choice("x"):line():talk(s, "B")
         end)
+    end)
+
+    test("区切りの幅が 0 でも、話し手の切り替え・選択肢の後には入らない", function()
+        local zero = { spot_newlines = 0, choice_newlines = 0, after_choice_newlines = 0 }
+        local fills = {
+            function(act, s, k)
+                act:line():talk(s, "A"):line():talk(k, "B"):line():talk(s, "C")
+            end,
+            function(act, s)
+                act:line():talk(s, "A"):choice("x"):line():talk(s, "B")
+            end,
+            function(act, s)
+                act:line():talk(s, "A"):line():sakura_script(s, "\\s[5]"):choice("x"):line():talk(s, "B")
+            end,
+        }
+        for _, fill in ipairs(fills) do
+            expect(build_lines(1.8, fill, nil, zero)):toBe(build_lines(nil, fill, nil, zero))
+        end
     end)
 
     test("保留のまま選択肢が来たら choice_newlines だけ", function()
