@@ -262,6 +262,50 @@ fn tco_return_only_for_trailing_call_scene() {
     );
 }
 
+/// The line marker goes only before action lines and continuation lines:
+/// var sets, calls and choices get none (actor-line-newlines 2.3).
+#[test]
+fn line_marker_only_on_action_and_continuation_lines() {
+    use pasta_dsl::parser::{ContinueAction, Expr, SetValue, VarScope, VarSet};
+    let text = gen_to_string(|cg| {
+        cg.generate_local_scene_items(&[
+            LocalSceneItem::VarSet(VarSet {
+                name: Some("x".to_string()),
+                scope: VarScope::Local,
+                value: SetValue::Expr(Expr::Integer(1)),
+                span: Span::default(),
+            }),
+            talk_line("さくら", "やあ"),
+            LocalSceneItem::ContinueAction(ContinueAction {
+                actions: vec![Action::Talk {
+                    text: "続き".to_string(),
+                    span: Span::default(),
+                }],
+                span: Span::default(),
+            }),
+            choice_item("はい", None),
+            call_item("次"),
+        ])
+    });
+    let lines: Vec<&str> = text.lines().collect();
+    let markers: Vec<usize> = (0..lines.len())
+        .filter(|&i| lines[i] == "act:line()")
+        .collect();
+    assert_eq!(
+        markers.len(),
+        2,
+        "one marker per action/continuation line: {}",
+        text
+    );
+    for i in markers {
+        assert!(
+            lines[i + 1].starts_with("act:actor_proxy("),
+            "marker must directly precede the line's actions: {}",
+            text
+        );
+    }
+}
+
 // ------------------------------------------------------------------
 // Choice and !select cue command
 // ------------------------------------------------------------------

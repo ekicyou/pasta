@@ -279,6 +279,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ) -> Result<(), TranspileError> {
         let actor = &action_line.actor;
         *last_actor = Some(actor.clone());
+        self.generate_line_marker(action_line.span)?;
 
         // Generate actions
         for action in &action_line.actions {
@@ -300,12 +301,22 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 return Err(TranspileError::invalid_continuation(&continue_action.span));
             }
         };
+        self.generate_line_marker(continue_action.span)?;
 
         // Generate actions (speaker is inherited)
         for action in &continue_action.actions {
             self.generate_action(action, actor)?;
         }
 
+        Ok(())
+    }
+
+    /// Emit the value-independent line-head marker `act:line()` and record it
+    /// against the `.pasta` line's span (actor-line-newlines 2.2, 2.3).
+    fn generate_line_marker(&mut self, span: Span) -> Result<(), TranspileError> {
+        let out_line_before = self.out_line();
+        self.writeln("act:line()")?;
+        self.record_span_since(out_line_before, span);
         Ok(())
     }
 

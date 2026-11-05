@@ -127,6 +127,16 @@ fn continue_action_without_prior_actor_is_invalid_continuation_error() {
         "expected InvalidContinuation, got: {:?}",
         err
     );
+    assert_eq!(
+        cg.out_line(),
+        0,
+        "the error path writes nothing, not even the marker"
+    );
+    drop(cg);
+    assert!(
+        output.is_empty(),
+        "the error path writes nothing, not even the marker"
+    );
 }
 
 /// `generate_action_line` records its actor as `last_actor`, and a
@@ -160,9 +170,46 @@ fn continue_action_inherits_actor_from_preceding_action_line() {
     });
     assert_eq!(
         text,
-        "act:actor_proxy(\"うにゅう\"):talk(\"やあ\")\nact:actor_proxy(\"うにゅう\"):talk(\"続き\")\n",
-        "continuation must reuse the inherited speaker"
+        "act:line()\nact:actor_proxy(\"うにゅう\"):talk(\"やあ\")\nact:line()\nact:actor_proxy(\"うにゅう\"):talk(\"続き\")\n",
+        "each line starts with the marker; continuation reuses the inherited speaker"
     );
+}
+
+/// The marker line of an action line / continuation line is recorded against
+/// that line's own `.pasta` span (actor-line-newlines 2.2, 6.4).
+#[test]
+fn line_marker_is_recorded_with_its_line_span() {
+    let mut sink = CapturingSink::default();
+    let mut output = Vec::new();
+    {
+        let mut cg = LuaCodeGenerator::new(&mut output);
+        cg.set_source_map(&mut sink);
+        let mut last_actor: Option<String> = None;
+        cg.generate_action_line(
+            &ActionLine {
+                actor: "さくら".to_string(),
+                actions: vec![Action::Talk {
+                    text: "やあ".to_string(),
+                    span: Span::new(3, 4, 3, 6, 10, 16),
+                }],
+                span: Span::new(3, 1, 3, 6, 4, 16),
+            },
+            &mut last_actor,
+        )
+        .unwrap();
+        cg.generate_continue_action(
+            &ContinueAction {
+                actions: vec![Action::Talk {
+                    text: "続き".to_string(),
+                    span: Span::new(4, 4, 4, 6, 24, 30),
+                }],
+                span: Span::new(4, 1, 4, 6, 17, 30),
+            },
+            &last_actor,
+        )
+        .unwrap();
+    }
+    assert_eq!(sink.records, vec![(1, 3), (2, 3), (3, 4), (4, 4)]);
 }
 
 // ------------------------------------------------------------------

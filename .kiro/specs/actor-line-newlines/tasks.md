@@ -43,7 +43,7 @@
   - _Requirements: 3.1, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 6.3_
 
 - [ ] 4. 行の頭の印の生成（トランスパイラ）
-- [ ] 4.1 アクション行と継続行の頭に印の 1 行を出す
+- [x] 4.1 アクション行と継続行の頭に印の 1 行を出す
   - アクション行と継続行の生成で、アクションの前に値によらない印の 1 行を書き、その行の span で行の対応に記録する。継続行ではアクターの確認（`InvalidContinuation`）の後に書く
   - 変数代入・Call・選択肢・空行・コメントには出さない
   - アクション行・継続行の生成の単体テスト（アクション行の要素の生成のテスト）の期待値を印つきに直し、印がアクション行と継続行だけに出る・局所シーンの頭の継続行が今のエラーのまま・印の行が継続行の span に記録される、のテストが通る
@@ -101,3 +101,4 @@
 - `line_newlines_test` は本物の `talk_to_script` を使うので、`tests/lua_specs/init.lua` で `mocks_test` より前（`sakura_builder_test` の直後）に置く。`mocks.reset()` が `@pasta_sakura_script` を消して戻せないため（3.1）。
 - 印は `_seam_next` の真偽 1 つなので、台詞もさくらスクリプトも積まない行が 2 行続くと継ぎ目が 1 つにまとまる（3.2 レビュー）。`＠単語` の多くは talk に入るので普通の書き方では起きない。最終検証で 2.4 の実例と照らす。
 - lua_test の実行器はファイル内で最初に失敗したトップレベルの describe で `os.exit(1)` する。後ろの describe の RED を確かめるには describe を絞り込んで走らせる（3.3）。
+- 4.1 の後、生成物を丸ごと比べる transpiler の 16 本（comparison・source_map_seam の R4.6 golden・final_regression 2 本・zero_cost・dynamic_word_ref・runtime_safety・snapshot 9 本）は印の行と line_map の文字列のずれだけで落ちる。4.2 で作り直す。
