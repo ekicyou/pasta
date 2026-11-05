@@ -60,7 +60,7 @@ continuation_newlines = 1.8
 #### Acceptance Criteria
 1. The pasta shall `pasta.toml` の `[ghost]` の `continuation_newlines` を、継続行の改行の幅（行の高さに対する倍率）として読む。
 2. Where `continuation_newlines` が書かれていない, the pasta shall 既定値 `0` を使い、継続行の改行を入れない。
-3. Where `continuation_newlines` が、100 倍して小数点以下を切り捨てた整数 `N` が `0` 以下になる数値である（`0`・負の値・`0.009` など）, the pasta shall 継続行の改行を入れない（**仮定**: 負の値と `N` が 0 になる値を `0` と同じ「入れない」として扱う。要件ディスカッションで確かめる）。
+3. Where `continuation_newlines` が、100 倍して小数点以下を切り捨てた整数 `N` が `0` 以下になる数値である（`0`・負の値・`0.009` など）, the pasta shall 継続行の改行を入れない（2026-11-05 要件ディスカッションで確定: `0` が「入れない」の意味なので、`0` より小さい値も同じに読む。`\n[-50]` のような挙動の定まらない改行を出さない）。
 4. Where `continuation_newlines` が、`N` が `1` 以上になる数値である, the pasta shall 継続行の改行を、値を 100 倍して小数点以下を切り捨てた整数 `N` から作り、`N` が 100 なら `\n`、それ以外は `\n[N]` とする（例: `1.8` → `\n[180]`、`1.0` → `\n`）。
 5. If `continuation_newlines` に数でない値が書かれている, the pasta shall `spot_newlines` に数でない値を書いたときと同じに扱う。
 6. The pasta shall `continuation_newlines` を、`spot_newlines`・`choice_newlines`・`after_choice_newlines` と同じく、書かなかったときも既定値の入った `[ghost]` の設定として Lua から読めるようにする。
