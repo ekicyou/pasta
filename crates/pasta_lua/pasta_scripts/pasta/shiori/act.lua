@@ -15,6 +15,7 @@ local STORE = require("pasta.store")
 --- @field _spot_newlines number スポット切り替え時の改行数（デフォルト1.5）
 --- @field _choice_newlines number 字の後の選択肢の前の改行幅（デフォルト1.5）
 --- @field _after_choice_newlines number 選択肢の後の改行幅（デフォルト1.0）
+--- @field _line_newlines number 同じ話し手の行の頭の改行幅（デフォルト0.0）
 --- @field req ShioriRequest|nil SHIORIリクエストオブジェクト（読み取り専用として扱うこと）
 --- @field _spoke boolean|nil この再開の間に組み立てた出力に台詞があったか（nil は組み立てていない、false は組み立てて台詞なし）
 --- @field _on_speech (fun(act: table): table[]|nil)|nil 台詞を見つけたときに呼ぶ中断の流し方（割り込みのときだけ掛かる）
@@ -57,6 +58,8 @@ function SHIORI_ACT.new(actors, req)
     base._choice_newlines = CONFIG.get("ghost", "choice_newlines", 1.5)
     -- 同じく[ghost]セクションからafter_choice_newlinesを読み込み（デフォルト1.0）
     base._after_choice_newlines = CONFIG.get("ghost", "after_choice_newlines", 1.0)
+    -- 同じく[ghost]セクションからline_newlinesを読み込み（デフォルト0.0）。アクターごとの値は読まない
+    base._line_newlines = CONFIG.get("ghost", "line_newlines", 0.0)
     -- SHIORIリクエストオブジェクトを設定（任意）
     base.req = req
     return setmetatable(base, SHIORI_ACT_IMPL)
@@ -96,7 +99,8 @@ function SHIORI_ACT_IMPL.build(self)
     local script = BUILDER.build(token, {
         spot_newlines = self._spot_newlines,
         choice_newlines = self._choice_newlines,
-        after_choice_newlines = self._after_choice_newlines
+        after_choice_newlines = self._after_choice_newlines,
+        line_newlines = self._line_newlines
     }, STORE.actor_spots, STORE.appearance)
 
     return script

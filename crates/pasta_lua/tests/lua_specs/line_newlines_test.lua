@@ -473,3 +473,59 @@ describe("組み立て - 手書きの ＠改行 と同じ出力 (6.3, 3.1)", fun
         expect(out):toBe("\\p[0]A\\p[1]B\\p[0]\\n[150]\\s[5]C\\e")
     end)
 end)
+
+--- @pasta_config を stub に差し替えて pasta.config・pasta.shiori.act を新規ロードし、body を実行する（後で必ず復元）
+--- @param stub table @pasta_config の代替テーブル
+--- @param body fun(SHIORI_ACT: table)
+local function with_shiori_act(stub, body)
+    local names = { "@pasta_config", "pasta.config", "pasta.shiori.act" }
+    local saved = {}
+    for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+    package.loaded["pasta.config"] = nil
+    package.loaded["pasta.shiori.act"] = nil
+    package.loaded["@pasta_config"] = stub
+    local ok, err = pcall(function() body(require("pasta.shiori.act")) end)
+    for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+    if not ok then error(err, 0) end
+end
+
+--- 2 行の同じ話し手の台詞を積んで組み立てる
+--- @param sakura table|nil 話し手のアクター（省けば name・spot だけのもの）
+local function build_two_lines(SHIORI_ACT, sakura)
+    sakura = sakura or { name = "さくら", spot = 0 }
+    local act = SHIORI_ACT.new({ sakura = sakura })
+    act:line():talk(sakura, "一行目。"):line():talk(sakura, "二行目。")
+    return act:build(), act
+end
+
+describe("SHIORI の act - [ghost] line_newlines を読んで渡す (1.1, 1.5, 1.7)", function()
+    test("値を設定した act の出力に行の改行が入る", function()
+        with_shiori_act({ ghost = { line_newlines = 1.8 } }, function(SHIORI_ACT)
+            local script = build_two_lines(SHIORI_ACT)
+            expect(script):toBe("\\p[0]一行目。\\_w[950]\\n[180]二行目。\\_w[950]\\e")
+        end)
+    end)
+
+    test("書かなければ既定 0 で、改行は入らない", function()
+        with_shiori_act({ ghost = {} }, function(SHIORI_ACT)
+            local script, act = build_two_lines(SHIORI_ACT)
+            expect(act._line_newlines):toBe(0.0)
+            expect(script):toBe("\\p[0]一行目。\\_w[950]二行目。\\_w[950]\\e")
+        end)
+    end)
+
+    test("アクターごとの同名のキーは読まない", function()
+        local stub = { ghost = {}, actor = { ["さくら"] = { line_newlines = 1.8 } } }
+        with_shiori_act(stub, function(SHIORI_ACT)
+            local script = build_two_lines(SHIORI_ACT, { name = "さくら", spot = 0, line_newlines = 1.8 })
+            expect(script):toBe("\\p[0]一行目。\\_w[950]二行目。\\_w[950]\\e")
+        end)
+    end)
+
+    test("数でない値は改行を作る所で Lua のエラーになる（spot_newlines と同じ）", function()
+        with_shiori_act({ ghost = { line_newlines = "abc" } }, function(SHIORI_ACT)
+            local ok = pcall(build_two_lines, SHIORI_ACT)
+            expect(ok):toBe(false)
+        end)
+    end)
+end)
