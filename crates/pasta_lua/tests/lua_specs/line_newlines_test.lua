@@ -182,3 +182,149 @@ describe("組み立て - 行の改行のタグ (1.3, 1.4)", function()
         expect(tag(-1)):toBe("")
     end)
 end)
+
+-- 組み立てに行の改行の値を直接渡して読む（shiori act からの受け渡しは別の作業）。
+-- act の印は常に立ててトークンに継ぎ目を付け、組み立ての line_newlines だけを変える
+local function build_lines(line_newlines, fill)
+    local BUILDER = require("pasta.shiori.sakura_builder")
+    local ACT = require("pasta.act")
+    local act = ACT.new({
+        sakura = { name = "さくら", spot = 0 },
+        kero = { name = "うにゅう", spot = 1 },
+    })
+    act._line_newlines = 1.8
+    fill(act, act.actors.sakura, act.actors.kero)
+    local config = { line_newlines = line_newlines, columns_out = {} }
+    local out = BUILDER.build(act:build(), config, { ["さくら"] = 0, ["うにゅう"] = 1 })
+    return out, config.columns_out
+end
+
+describe("組み立て - 行の改行の差し込み (2.1, 2.2, 2.4, 2.5)", function()
+    test("同じ話し手の継ぎ目で 1 つ入る（結合した台詞の途中）", function()
+        local out = build_lines(1.8, function(act, s)
+            act:line():talk(s, "A"):line():talk(s, "B")
+        end)
+        expect(out):toBe("\\p[0]A\\n[180]B\\e")
+    end)
+
+    test("字の無い行の後に空の列ができる", function()
+        local out = build_lines(1.8, function(act, s)
+            act:line():talk(s, "なら"):line():talk(s, "\\s[5]"):line():talk(s, "次の話")
+        end)
+        expect(out):toBe("\\p[0]なら\\s[5]\\n[180]\\n[180]次の話\\e")
+    end)
+
+    test("字の無い行がさくらスクリプトでも同じ（保留を次の継ぎ目の位置に出す）", function()
+        local out = build_lines(1.8, function(act, s)
+            act:line():talk(s, "なら"):line():sakura_script(s, "\\s[5]"):line():talk(s, "次の話")
+        end)
+        expect(out):toBe("\\p[0]なら\\s[5]\\n[180]\\n[180]次の話\\e")
+    end)
+
+    test("さくらスクリプトの頭の継ぎ目でも、最初の見える字の前に入る", function()
+        local out = build_lines(1.8, function(act, s)
+            act:line():talk(s, "A"):line():sakura_script(s, "\\s[5]\\_u[0x3042]")
+        end)
+        expect(out):toBe("\\p[0]A\\s[5]\\n[180]\\_u[0x3042]\\e")
+    end)
+
+    test("Call 先の台詞の後の継ぎ目でも入る", function()
+        local out = build_lines(1.8, function(act, s)
+            act:line():talk(s, "A") -- 呼ぶ側の行
+            act:line():talk(s, "C") -- Call 先の行
+            act:line():talk(s, "B") -- 戻った後の行
+        end)
+        expect(out):toBe("\\p[0]A\\n[180]C\\n[180]B\\e")
+    end)
+
+    test("値が 1.0 なら \\n を入れる", function()
+        local out = build_lines(1.0, function(act, s)
+            act:line():talk(s, "A"):line():talk(s, "B")
+        end)
+        expect(out):toBe("\\p[0]A\\nB\\e")
+    end)
+end)
+
+describe("組み立て - 行の改行を入れない所 (1.3, 3.1, 3.2, 3.3, 3.4)", function()
+    local function same_as_off(fill)
+        local off = build_lines(nil, fill)
+        expect(build_lines(1.8, fill)):toBe(off)
+        return off
+    end
+
+    test("値が nil・0・N が 0 以下なら出力も列の表も今と同じ", function()
+        local function fill(act, s)
+            act:line():talk(s, "A"):line():talk(s, "B")
+        end
+        local off, columns = build_lines(nil, fill)
+        expect(off):toBe("\\p[0]AB\\e")
+        expect(columns[0]):toEqual({ line = 1, width = columns[0].width, jump = false })
+        local zero, zero_columns = build_lines(0, fill)
+        expect(zero):toBe(off)
+        expect(zero_columns[0]):toEqual(columns[0])
+        expect(build_lines(0.009, fill)):toBe(off)
+    end)
+
+    test("話し手の切り替えの後は spot_newlines だけ", function()
+        local out = same_as_off(function(act, s, k)
+            act:line():talk(s, "A"):line():talk(k, "B"):line():talk(s, "C")
+        end)
+        expect(out):toBe("\\p[0]A\\p[1]B\\p[0]\\n[150]C\\e")
+    end)
+
+    test("元の話し手へ戻った頭が表情だけでも、spot_newlines だけ（3.1 の不変条件）", function()
+        local out = same_as_off(function(act, s, k)
+            act:line():talk(s, "A"):line():talk(k, "B")
+            act:line():sakura_script(s, "\\s[5]"):line():talk(s, "C")
+        end)
+        expect(out):toBe("\\p[0]A\\p[1]B\\p[0]\\s[5]\\n[150]C\\e")
+    end)
+
+    test("選択肢の後は after_choice_newlines だけ", function()
+        same_as_off(function(act, s)
+            act:line():talk(s, "A"):choice("x"):line():talk(s, "B")
+        end)
+    end)
+
+    test("保留のまま選択肢が来たら choice_newlines だけ", function()
+        same_as_off(function(act, s)
+            act:line():talk(s, "A"):line():sakura_script(s, "\\s[5]"):choice("x")
+        end)
+    end)
+
+    test("\\c の後（台詞の中・clear のトークン）は入らない", function()
+        same_as_off(function(act, s)
+            act:line():talk(s, "A\\c"):line():talk(s, "B")
+        end)
+        same_as_off(function(act, s)
+            act:line():talk(s, "A"):clear():line():talk(s, "B")
+        end)
+    end)
+
+    test("出力の最初の行には入らない", function()
+        same_as_off(function(act, s)
+            act:line():sakura_script(s, "\\s[5]"):line():talk(s, "A")
+        end)
+    end)
+
+    test("スポットの割り当てを消した後は入らない", function()
+        same_as_off(function(act, s)
+            act:line():talk(s, "A")
+            act:clear_spot() -- self を返さない
+            act:line():talk(s, "B")
+        end)
+    end)
+end)
+
+describe("組み立て - 差し込んだ改行で列が進む (5.1)", function()
+    test("列が 1 つ進み、幅は 0 から数え直される", function()
+        local _, columns = build_lines(1.8, function(act, s)
+            act:line():talk(s, "AAAA"):line():talk(s, "BB")
+        end)
+        local _, only = build_lines(nil, function(act, s)
+            act:talk(s, "BB")
+        end)
+        expect(columns[0].line):toBe(2)
+        expect(columns[0].width):toBe(only[0].width)
+    end)
+end)
