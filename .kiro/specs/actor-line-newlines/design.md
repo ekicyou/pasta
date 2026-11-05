@@ -411,9 +411,11 @@ local function join_lines(inner, column, ratio) end
 - 列: 差し込んだ後の `columns_out` の `line` が 1 つ進み `width` が 0 から数え直される（5.1）。budoux の折り位置が手書きと同じ（5.2）。
 - act: `_line_newlines` が `0`・`nil` なら `continue_line` の後のトークンに `seams` が無い（6.1）。結合で `seams` が結合後の位置になる。`talk(nil)` の後の台詞へ持ち越す。
 - 写し: `column_move` の分類を、Rust の `test_column_move_classification` と同じ単位の並びで `talk_to_script` の列の動きと比べる。
+- 不変条件（3.1 の専用）: 話し手が替わって元の話し手へ戻った直後の最初のトークンが表情だけの台詞（`\s[…]` だけ）で、その頭に継ぎ目があるとき、`spot_newlines` の区切りだけが出て継続行の改行が重ならない。`joinable` が真なら吹き出しに字がある、という前提に頼る所なので、ここを壊す変更を検出する。
 
 ### 結合（Rust）
 - 生成: 継続行の前にだけ `act:continue_line()` が出る・アクション行には出ない・局所シーンの頭の継続行は `InvalidContinuation` のまま（2.2・6.4）。印の行が継続行の span に記録される。
+- ソースマップ: 印の行で継続行より後ろの Lua の行番号がずれるので、ソースマップと行の対応のテスト（`source_map_seam_test`・`record_wiring_*`）を、生成の変更を入れた最初の作業で回し、食い違いを早く見つける。
 - 設定: 省いた `[ghost]` で `line_newlines` が `0.0` で読める（1.2・1.6）。SSOT とマニュアルの表・テンプレート・`act.lua` のリテラルの一致（`config_defaults_test`）。
 - 検査: `pasta_check` の act のメソッドの一致テストが `continue_line` を含めて通る。
 
