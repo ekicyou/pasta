@@ -12,8 +12,8 @@ use crate::common;
 use common::copy_fixture_to_temp;
 use pasta_lua::loader::{
     GhostConfig, LoaderError, PastaConfig, PastaLoader, default_after_choice_newlines,
-    default_choice_newlines, default_hour_margin, default_spot_newlines, default_talk_interval_max,
-    default_talk_interval_min,
+    default_choice_newlines, default_hour_margin, default_line_newlines, default_spot_newlines,
+    default_talk_interval_max, default_talk_interval_min,
 };
 use std::path::PathBuf;
 
@@ -125,6 +125,12 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
         read_pasta_config_ghost_number(&minimal_runtime, "after_choice_newlines"),
         default_after_choice_newlines(),
     );
+    // actor-line-newlines 1.2 / 1.6: 省いた [ghost] で line_newlines の既定 0.0 が Lua から読める。
+    assert_eq!(
+        read_pasta_config_ghost_number(&minimal_runtime, "line_newlines"),
+        default_line_newlines(),
+    );
+    assert_eq!(default_line_newlines(), 0.0);
     assert_eq!(
         read_pasta_config_ghost_number(&minimal_runtime, "talk_interval_min"),
         default_talk_interval_min() as f64,

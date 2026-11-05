@@ -218,6 +218,9 @@ impl PastaConfig {
             ghost
                 .entry("after_choice_newlines")
                 .or_insert_with(|| toml::Value::Float(defaults.after_choice_newlines));
+            ghost
+                .entry("line_newlines")
+                .or_insert_with(|| toml::Value::Float(defaults.line_newlines));
         }
 
         // `[actor]` is the single SHIORI-required section (requirement 2.1). Its

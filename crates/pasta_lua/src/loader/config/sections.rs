@@ -189,7 +189,7 @@ impl Default for TalkConfig {
 /// Acts as the single source of truth (SSOT) for the SHIORI default values of
 /// the `[ghost]` section. The defaults (`talk_interval_min = 180`,
 /// `talk_interval_max = 300`, `hour_margin = 30`, `spot_newlines = 1.5`,
-/// `choice_newlines = 1.5`, `after_choice_newlines = 1.0`) match the current
+/// `choice_newlines = 1.5`, `after_choice_newlines = 1.0`, `line_newlines = 0.0`) match the current
 /// Lua literal fallbacks so that
 /// omitting `[ghost]` keeps the historical behavior (requirements 1.2 / 1.3 /
 /// 3.3).
@@ -227,6 +227,12 @@ pub struct GhostConfig {
     /// in the same balloon (as a ratio; `1.0` emits a plain `\n`).
     /// Default: 1.0
     pub after_choice_newlines: f64,
+
+    /// Width of the line break before each line of the same speaker
+    /// (continuation lines and repeated same-actor lines; as a ratio).
+    /// `0.0` inserts nothing.
+    /// Default: 0.0
+    pub line_newlines: f64,
 }
 
 impl Default for GhostConfig {
@@ -238,6 +244,7 @@ impl Default for GhostConfig {
             spot_newlines: default_spot_newlines(),
             choice_newlines: default_choice_newlines(),
             after_choice_newlines: default_after_choice_newlines(),
+            line_newlines: default_line_newlines(),
         }
     }
 }
@@ -270,6 +277,11 @@ pub const fn default_choice_newlines() -> f64 {
 /// Default `after_choice_newlines` (`1.0`).
 pub const fn default_after_choice_newlines() -> f64 {
     1.0
+}
+
+/// Default `line_newlines` (`0.0`).
+pub const fn default_line_newlines() -> f64 {
+    0.0
 }
 
 /// pasta.toml の `[debug]` 節。
