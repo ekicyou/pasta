@@ -25,7 +25,7 @@ pub const GLOBAL_NAMES: [&str; 16] = [
 ];
 
 /// act のメソッド（`pasta/act.lua` の `ACT_IMPL` の関数。メタメソッドの `__index` は除く）
-pub const ACT_METHODS: [&str; 27] = [
+pub const ACT_METHODS: [&str; 28] = [
     "init_scene",
     "talk",
     "sakura_script",
@@ -53,6 +53,7 @@ pub const ACT_METHODS: [&str; 27] = [
     "failure",
     "set_spot",
     "clear_spot",
+    "line",
 ];
 
 /// SHIORI 用の act のメソッド（`pasta/shiori/act.lua` の `SHIORI_ACT_IMPL` の関数。`__index` は除く）

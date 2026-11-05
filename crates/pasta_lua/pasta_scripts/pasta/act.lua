@@ -88,6 +88,20 @@ local function group_by_actor(tokens)
     return result
 end
 
+--- 継ぎ目の位置に offset を足して dest へ加える（dest が nil なら新しい表を作る）
+--- @param dest integer[]|nil
+--- @param seams integer[]|nil
+--- @param offset integer
+--- @return integer[]|nil
+local function add_seams(dest, seams, offset)
+    if not seams then return dest end
+    dest = dest or {}
+    for _, p in ipairs(seams) do
+        table.insert(dest, p + offset)
+    end
+    return dest
+end
+
 --- グループ化トークン内の連続talkトークンを統合
 --- @param grouped table[] グループ化されたトークン配列
 --- @return table[] 統合済みトークン配列
@@ -103,14 +117,16 @@ local function merge_consecutive_talks(grouped)
             for _, inner in ipairs(token.tokens) do
                 if inner.type == "talk" then
                     if pending_talk then
-                        -- 連続talk: テキスト結合
+                        -- 連続talk: テキスト結合（継ぎ目は結合前の長さだけずらす）
+                        pending_talk.seams = add_seams(pending_talk.seams, inner.seams, #pending_talk.text)
                         pending_talk.text = pending_talk.text .. inner.text
                     else
-                        -- 新規talk開始
+                        -- 新規talk開始（継ぎ目は写して持ち、元の表を書き換えない）
                         pending_talk = {
                             type = "talk",
                             actor = inner.actor,
-                            text = inner.text
+                            text = inner.text,
+                            seams = add_seams(nil, inner.seams, 0)
                         }
                     end
                 else
@@ -216,6 +232,27 @@ function ACT_IMPL.init_scene(self, scene, scene_name, local_scene_name, line_map
     return self.save, self.var
 end
 
+--- 立っている行の頭の印を取り出して消す（次に積む台詞の頭の継ぎ目にする）
+--- @param self Act
+--- @return integer[]|nil 継ぎ目の位置（印があれば { 1 }）
+local function take_seam(self)
+    if not self._seam_next then return nil end
+    self._seam_next = nil
+    return { 1 }
+end
+
+--- 行の頭の印（トランスパイラがアクション行と継続行の頭に出す）
+--- 行の改行の値が nil でも 0 でもないときだけ、次に積む台詞に継ぎ目を付ける
+--- @param self Act アクションオブジェクト
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.line(self)
+    local n = self._line_newlines
+    if n ~= nil and n ~= 0 then
+        self._seam_next = true
+    end
+    return self
+end
+
 --- talkトークン蓄積（状態レス化: actorトークン/spot_switch生成を削除）
 --- @param self Act アクションオブジェクト
 --- @param actor Actor アクターオブジェクト
@@ -235,7 +272,7 @@ function ACT_IMPL.talk(self, actor, text, var_name)
         end
         return self
     end
-    table.insert(self.token, { type = "talk", actor = actor, text = tostring(text) })
+    table.insert(self.token, { type = "talk", actor = actor, text = tostring(text), seams = take_seam(self) })
     return self
 end
 
@@ -245,7 +282,7 @@ end
 --- @param text string さくらスクリプトタグ文字列
 --- @return Act self メソッドチェーン用
 function ACT_IMPL.sakura_script(self, actor, text)
-    table.insert(self.token, { type = "sakura_script", actor = actor, text = text })
+    table.insert(self.token, { type = "sakura_script", actor = actor, text = text, seams = take_seam(self) })
     return self
 end
 

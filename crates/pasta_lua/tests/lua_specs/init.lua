@@ -13,6 +13,8 @@ local specs = {
     "act_test",                          -- pasta.act トークンバッファリファクタリング tests
     "act_grouping_test",                 -- pasta.act グループ化機能 tests (actor-talk-grouping)
     "sakura_builder_test",               -- pasta.shiori.sakura_builder トークン変換テスト
+    -- 本物の @pasta_sakura_script を使うので mocks_test（reset で消す）より前に置く
+    "line_newlines_test",                -- 行の頭の印と継ぎ目・組み立ての行の改行のテスト (actor-line-newlines)
     "shiori_act_test",                   -- pasta.shiori.act さくらスクリプトビルダーテスト
     "virtual_dispatcher_spec",           -- OnTalk/OnHour virtual event dispatcher tests
     "store_coroutine_test",              -- STORE.co_scene coroutine management tests

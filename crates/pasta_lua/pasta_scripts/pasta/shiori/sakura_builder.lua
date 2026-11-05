@@ -201,10 +201,13 @@ local function column_at(columns, spot)
     return column
 end
 
---- 次の列へ n 列進める（Rust の ColumnMove::Next の写し。片方だけ直さない）
+--- 次の列へ n 列進める（Rust の ColumnMove::Next の写し。片方だけ直さない）。
+--- 行の状態（Lua だけの欄 joinable・line_pending）は区切れにする
 local function next_column(column, n)
     column.line = column.line + n
     column.width = 0
+    column.joinable = nil
+    column.line_pending = nil
 end
 
 --- 最初の列へ戻す（Rust の ColumnMove::First の写し。片方だけ直さない）
@@ -212,6 +215,32 @@ local function first_column(column)
     column.line = 1
     column.width = 0
     column.jump = false
+    column.joinable = nil
+    column.line_pending = nil
+end
+
+--- 列は動かさず、行の状態だけを区切れにする（話し手の切り替え。列がまだ無ければ何もしない）
+--- @param column table|nil 列の状態
+local function break_line(column)
+    if column ~= nil then
+        column.joinable = nil
+        column.line_pending = nil
+    end
+end
+
+--- 単位が列をどう動かすか（Rust の line_breaker.rs の column_move の写し。片方だけ直さない）
+--- @param name string|nil APPEARANCE.tag_at の名前
+--- @param arg string|nil 引数
+--- @return "next"|"first"|"jump"|nil 次（\n・\n[…]）・最初（\c）・飛ぶ（\_l[…]）。動かない単位は nil
+local function column_move(name, arg)
+    if name == "n" then
+        return "next"
+    elseif name == "c" and arg == nil then
+        return "first"
+    elseif name == "_l" and arg ~= nil then
+        return "jump"
+    end
+    return nil
 end
 
 --- 文字列が単位にならない `\` で終わるか（APPEARANCE.tag_at と同じ読み方。エスケープ・囲みは除く）
@@ -268,8 +297,124 @@ end
 BUILDER._internal = {
     next_column = next_column,
     first_column = first_column,
+    column_move = column_move,
     tracking_buffer = tracking_buffer,
 }
+
+--- 幅つきの改行のタグ。spot_newlines と choice_newlines の両方がこれを使う
+--- @param ratio number 行の高さに対する倍率
+--- @return string `\n[N]`（N は ratio を 100 倍して小数点以下を切り捨てた整数）
+local function newline_tag(ratio)
+    return string.format("\\n[%d]", math.floor(ratio * 100))
+end
+
+--- 選択肢の後の改行のタグ。N が 100 なら今と同じ `\n`、それ以外は newline_tag と同じ `\n[N]`
+--- @param ratio number 行の高さに対する倍率（after_choice_newlines）
+--- @return string
+local function plain_newline_tag(ratio)
+    local tag = newline_tag(ratio)
+    if tag == "\\n[100]" then
+        return "\\n"
+    end
+    return tag
+end
+
+--- 行の改行のタグ（line_newlines）。N が 0 以下なら ""（入れない）、それ以外は plain_newline_tag と同じ
+--- @param ratio number 行の高さに対する倍率
+--- @return string
+local function line_newline_tag(ratio)
+    if math.floor(ratio * 100) <= 0 then
+        return ""
+    end
+    return plain_newline_tag(ratio)
+end
+BUILDER._internal.line_newline_tag = line_newline_tag
+
+--- 台詞の位置 pos から単位を 1 つ読む（読み方は has_text・script_shows_text と同じ）
+--- @param text string
+--- @param pos integer
+--- @param stop integer タグ以外の字の並びをここで止める（次の継ぎ目の位置）
+--- @param is_talk boolean talk なら真（タグ以外の字・単位にならない `\` も見える字に数える）
+--- @return integer next_pos 単位の直後の位置
+--- @return boolean visible 見える字か
+--- @return boolean moves 列を動かす単位か（column_move が「次」「最初」「飛ぶ」のどれか）
+local function read_unit(text, pos, stop, is_talk)
+    if text:byte(pos) ~= 92 then -- 92 は `\`
+        local i = text:find("\\", pos, true) or (#text + 1)
+        return math.min(i, stop), is_talk, false
+    end
+    local name, arg, next_pos, literal = APPEARANCE.tag_at(text, pos)
+    if name == nil then
+        return next_pos, is_talk, false
+    end
+    return next_pos, unit_shows_text(name, literal) == true, column_move(name, arg) ~= nil
+end
+
+--- 継ぎ目に達したときの行の状態。保留のまま来たら（字の無い行の後）その位置に改行を出し、保留は立てたまま
+--- @param column table 列の状態
+--- @param out string[] 差し込んだテキストの片
+--- @param tag string 改行のタグ
+local function reach_seam(column, out, tag)
+    if column.line_pending then
+        out[#out + 1] = tag
+    else
+        column.line_pending = column.joinable
+    end
+end
+
+--- 読んだ単位で行の状態を動かす。保留のまま見える字に来たら、その字の直前に改行を出す
+--- @param column table 列の状態
+--- @param out string[] 差し込んだテキストの片
+--- @param tag string 改行のタグ
+--- @param visible boolean
+--- @param moves boolean
+local function step_unit(column, out, tag, visible, moves)
+    if visible then
+        if column.line_pending then
+            out[#out + 1] = tag
+            column.line_pending = nil
+        end
+        column.joinable = true
+    elseif moves then
+        column.line_pending = nil
+        column.joinable = nil
+    end
+end
+
+--- 台詞に行の改行を差し込む（line_newlines が nil・0 なら台詞を読まない）
+--- @param inner table talk・sakura_script のトークン（seams: 行の頭のバイト位置の昇順）
+--- @param column table 話し手のスポットの列の状態（joinable・line_pending を読み書きする）
+--- @param ratio number|nil config.line_newlines
+--- @return any 変換に渡すテキスト（差し込まなければ inner.text をそのまま返す）
+local function join_lines(inner, column, ratio)
+    if ratio == nil or ratio == 0 or inner.text == nil then
+        return inner.text
+    end
+    local tag = line_newline_tag(ratio)
+    local text = tostring(inner.text)
+    local seams = inner.seams or {}
+    local is_talk = inner.type == "talk"
+    local out, k, pos = {}, 1, 1
+    while pos <= #text do
+        -- 単位の途中に落ちた継ぎ目は、その単位の後で達したとみなす
+        while seams[k] and seams[k] <= pos do
+            reach_seam(column, out, tag)
+            k = k + 1
+        end
+        local next_pos, visible, moves = read_unit(text, pos, seams[k] or (#text + 1), is_talk)
+        step_unit(column, out, tag, visible, moves)
+        out[#out + 1] = text:sub(pos, next_pos - 1)
+        pos = next_pos
+    end
+    for _ = k, #seams do -- テキストの終わり（#text + 1）の継ぎ目
+        reach_seam(column, out, tag)
+    end
+    local s = table.concat(out)
+    if s == text then
+        return inner.text
+    end
+    return s
+end
 
 --- 区切りを出して 1 列進める。区切りを出す所はすべてここを通す（決定 8）
 --- @param buffer table tracking_buffer
@@ -287,12 +432,13 @@ end
 --- @param actor table|nil グループの発言アクター
 --- @param inner table グループ内トークン
 --- @param column table 話し手のスポットの列の状態（talk・sakura_script・newline・clear が動かす）
+--- @param line_newlines number|nil 行の改行の幅（config.line_newlines）
 --- @return string 変換結果（下記以外の型のトークンは空文字列）
-local function inner_token_to_string(actor, inner, column)
+local function inner_token_to_string(actor, inner, column, line_newlines)
     local inner_type = inner.type
 
     if inner_type == "talk" or inner_type == "sakura_script" then
-        return SAKURA_SCRIPT.talk_to_script(actor, inner.text, column)
+        return SAKURA_SCRIPT.talk_to_script(actor, join_lines(inner, column, line_newlines), column)
     elseif inner_type == "surface" then
         return string.format("\\s[%s]", tostring(inner.id))
     elseif inner_type == "wait" then
@@ -337,8 +483,9 @@ end
 --- @param spot integer|nil 現在スコープの解決済みスポットID
 --- @param column table 話し手のスポットの列の状態
 --- @param style table 装いの状態（直接変更される）。変換後の文字列を出力の前に STYLE.through に通す
-local function emit_inner_token(buffer, actor, inner, appearance, spot, column, style)
-    local s = inner_token_to_string(actor, inner, column)
+--- @param line_newlines number|nil 行の改行の幅（config.line_newlines）
+local function emit_inner_token(buffer, actor, inner, appearance, spot, column, style, line_newlines)
+    local s = inner_token_to_string(actor, inner, column, line_newlines)
     -- 頭が作者の書いたものかは、装いを差し込む前の出力で決める
     local by_author = head_written_by_author(inner, s)
     s = STYLE.through(style, actor, spot, s)
@@ -354,24 +501,6 @@ local function emit_inner_token(buffer, actor, inner, appearance, spot, column, 
         speaker = nil
     end
     APPEARANCE.observe(appearance, speaker, spot, s)
-end
-
---- 幅つきの改行のタグ。spot_newlines と choice_newlines の両方がこれを使う
---- @param ratio number 行の高さに対する倍率
---- @return string `\n[N]`（N は ratio を 100 倍して小数点以下を切り捨てた整数）
-local function newline_tag(ratio)
-    return string.format("\\n[%d]", math.floor(ratio * 100))
-end
-
---- 選択肢の後の改行のタグ。N が 100 なら今と同じ `\n`、それ以外は newline_tag と同じ `\n[N]`
---- @param ratio number 行の高さに対する倍率（after_choice_newlines）
---- @return string
-local function plain_newline_tag(ratio)
-    local tag = newline_tag(ratio)
-    if tag == "\\n[100]" then
-        return "\\n"
-    end
-    return tag
 end
 
 --- 選択肢の直前に出す区切り
@@ -392,6 +521,7 @@ end
 --- @field spot_newlines number|nil スポット変更時の改行量（デフォルト1.5）
 --- @field choice_newlines number|nil 字の後の選択肢の前の改行量（デフォルト1.5）
 --- @field after_choice_newlines number|nil 選択肢の後の改行幅（既定 1.0。N が 100 なら `\n`）
+--- @field line_newlines number|nil 同じ話し手の行の頭の改行幅（nil・0 なら入れない）
 --- @field columns_out table|nil 渡すと終わりの列の状態（スポット ID → BudouxColumn）を書き出す（テスト用。公開の API ではない）
 
 --- 終わりの列の状態を columns_out に書き出す（無ければ何もしない。今までどおり捨てる）
@@ -433,6 +563,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
     local spot_newlines = config.spot_newlines or 1.5
     local choice_newlines = config.choice_newlines or 1.5
     local after_choice_newlines = config.after_choice_newlines or 1.0
+    local line_newlines = config.line_newlines
     local buffer = tracking_buffer(buf.new())
 
     -- input_actor_spots を直接変更する（nilの場合は内部で空テーブルを作成）
@@ -484,6 +615,8 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                 -- 先出し版の last_spot ~= spot / last_spot == spot ガードは復活させない。
                 local spot = emit_actor_switch(buffer, actor_spots, actor, appearance, token.tokens, style)
                 pending_break = (spot_has_text[spot] == true)
+                -- 切り替えは行の状態の区切れ（字の無い行の継ぎ目で spot_newlines と重ねない。要件 3.1）
+                break_line(columns[spot])
                 last_spot = spot
                 last_actor = actor
             end
@@ -498,7 +631,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                     -- 現在スポットの has-text を偽へリセットし pending を破棄する。
                     -- クリアで区切るべき先行テキストが消えるため、後続テキスト直前に改行を出さない。
                     -- 最後に表示したものも消す（消した吹き出しの最初の選択肢を区切らない）。
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines)
                     pending_break = false
                     if last_spot ~= nil then
                         spot_has_text[last_spot] = false
@@ -510,7 +643,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                     put_break(buffer, column,
                         choice_break(spot_tail[tail_spot], choice_newlines, after_choice_newlines))
                     spot_tail[tail_spot] = "choice"
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines)
                 elseif lead then
                     -- S3: 字を出すトークン（字のある talk・字を表示する sakura_script）。
                     -- 改行 → has-text 設定 → 本文 の順を厳守。
@@ -525,11 +658,11 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
                         spot_has_text[last_spot] = true
                     end
                     spot_tail[tail_spot] = "text"
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines)
                 else
                     -- S4: 字の無い talk・字を表示しない sakura_script・surface・wait・newline・
                     -- choice_timeout・raw_script。変換出力のみ（has-text・pending・最後に表示したもの不変）。
-                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style)
+                    emit_inner_token(buffer, actor, inner, appearance, last_spot, column, style, line_newlines)
                 end
                 if cleared then
                     -- S4d: 台詞に書いた `\c`（S3・S4 のどちらを通ったトークンにも当てる）。

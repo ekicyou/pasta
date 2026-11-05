@@ -199,3 +199,10 @@
 - **要件定義のモデル**: Fable のまま。控えは `novel-save-slots` がスロットへ書く保存の形で、areka が頼る。区切りの決まりは、Rust の 5 秒の待ち（届かなかった応答）・Lua のコルーチン（`＞yield`・プロパティの読み出しの途中・続きの決まり）・SHIORI の応答（止まるエラーの 200・時計の読み取り・v4 の応答の外の台本）にまたがる時の流れの決まりで、推奨案がまだ無い。今回の `ponytail-lua-scripts` は待ちの持ち方を簡単にしただけで、この決まりを決めていない。
 - **分割の案**: 不要（2026-10-17 に分けた後の 14〜16）。
 - **見つけた穴・古くなった記述**: 「Current State」の行番号が古い。`sakura_builder.lua` 226〜231 行 → 463〜471 行、`virtual_dispatcher.lua` 46 行 → 62 行・72〜73 行 → 88〜89 行・202〜204 行 → 227〜229 行、`init.lua` 97 行 → 110 行・231・235・237 行 → 324・327・330 行、`callback.lua` 113・179 行 → 121・198 行、`entry.lua` 79〜89 行 → 99 行あたり、`shiori/act.lua` 288〜296 行 → 312〜341 行、`marshaling.rs` 213〜223 行 → 238 行から、`scene_table.rs` 54・270〜314 行 → 64 行の `cache`・315 行の `select_from_cache`。mlua-stdlib-removal の申し送りの「`external_control.lua` の行番号は古い」は、89・121 行。
+
+## 申し送り（actor-line-newlines より、2026-11-06）
+
+- **変わった事実（生成）**: トランスパイラ（`code_gen/element_gen.rs` の `generate_line_marker`）が、アクション行と継続行の 1 行ごとに、その行の呼び出しより前に `act:line()` を 1 行出すようになった（InvalidContinuation の検査の後。ソースマップはその行の位置）。生成 Lua の行番号がずれるので、行番号の重なりに頼るテスト材料は見直すこと。`pasta_check` の act のメソッドの一覧（`validate/builtins.rs` の `ACT_METHODS`）は 28 になった。
+- **変わった事実（トークン）**: `act:line()` は `[ghost] line_newlines` が 0 でないときだけ印 `_seam_next` を立てる。次の `talk`・`sakura_script` のトークンが `seams = { 1 }`（字のバイト位置。昇順・1 始まり）を持ち、続く同じ話し手のトークンをまとめるとき（`merge_consecutive_talks`）にも位置を足して保つ。`raw_script` は印を取らない。`act.lua` の局所関数 `take_seam` を参照。
+- **変わった事実（出力）**: `sakura_builder.lua` の列の状態に `joinable`・`line_pending` が加わった。継ぎ目の改行（`\n[N]`、N = floor(値×100)）は、トークンの字の中の継ぎ目の位置に `join_lines` が差し込む（`put_break` は通らない）。`next_column`・`first_column` がこの状態を消し、話し手の切り替え（S1）では `break_line` が切り替え先の状態を消す。詳細は `.kiro/specs/completed/actor-line-newlines/design.md` と `book/src/internals/talk-output.md`。
+- 見直しが要る論点: この spec で、字を出すトークンを足すなら `take_seam` で継ぎ目を取るか。改行・区切りを出す場所を足すなら、その後に `joinable`・`line_pending` を消すか（`next_column` を通せば消える）。行の頭の生成（`element_gen.rs`）を触るなら、`act:line()` の位置（呼び出しの前）を保つか。

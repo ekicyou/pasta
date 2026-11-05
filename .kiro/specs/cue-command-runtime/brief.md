@@ -251,3 +251,10 @@ ghost_dev の「ぱすた開発」セッションは、**外見として記録�
 
 - **`act` から読めるのは実行中のグローバルシーンの属性だけ**: `SCENE.attrs(act.current_scene.__global_name__, nil)`。`act` はローカルの登録名（`選択肢_1`）を持たない（`act.local_scene_name` は書いた名前の `選択肢`）ので、ローカルシーンの属性は検索の結果の登録名（`global_name`・`local_name`）で読む。場面に入るところで柱を打つなら、検索の結果を持っている入口（`act:call` など）で読むことになる。`act.lua` に登録名を持たせるなら、この spec の設計で決める（`scene-attribute-store` は `act.lua` を触らない）。
 - 整数の値になる小数（`＆率：1.0`）は整数と同じに扱われる（Lua では 1）。
+
+## 申し送り（actor-line-newlines より、2026-11-06）
+
+- **変わった事実（生成）**: トランスパイラ（`code_gen/element_gen.rs` の `generate_line_marker`）が、アクション行と継続行の 1 行ごとに、その行の呼び出しより前に `act:line()` を 1 行出すようになった（InvalidContinuation の検査の後。ソースマップはその行の位置）。生成 Lua の行番号がずれるので、行番号の重なりに頼るテスト材料は見直すこと。`pasta_check` の act のメソッドの一覧（`validate/builtins.rs` の `ACT_METHODS`）は 28 になった。
+- **変わった事実（トークン）**: `act:line()` は `[ghost] line_newlines` が 0 でないときだけ印 `_seam_next` を立てる。次の `talk`・`sakura_script` のトークンが `seams = { 1 }`（字のバイト位置。昇順・1 始まり）を持ち、続く同じ話し手のトークンをまとめるとき（`merge_consecutive_talks`）にも位置を足して保つ。`raw_script` は印を取らない。`act.lua` の局所関数 `take_seam` を参照。
+- **変わった事実（出力）**: `sakura_builder.lua` の列の状態に `joinable`・`line_pending` が加わった。継ぎ目の改行（`\n[N]`、N = floor(値×100)）は、トークンの字の中の継ぎ目の位置に `join_lines` が差し込む（`put_break` は通らない）。`next_column`・`first_column` がこの状態を消し、話し手の切り替え（S1）では `break_line` が切り替え先の状態を消す。詳細は `.kiro/specs/completed/actor-line-newlines/design.md` と `book/src/internals/talk-output.md`。
+- 見直しが要る論点: この spec で、字を出すトークンを足すなら `take_seam` で継ぎ目を取るか。改行・区切りを出す場所を足すなら、その後に `joinable`・`line_pending` を消すか（`next_column` を通せば消える）。行の頭の生成（`element_gen.rs`）を触るなら、`act:line()` の位置（呼び出しの前）を保つか。
