@@ -372,7 +372,7 @@ fn builtin_names_are_listed() {
             "おすすめ区切り"
         ]
     );
-    assert_eq!(ACT_METHODS.len(), 27);
+    assert_eq!(ACT_METHODS.len(), 28);
     assert!(ACT_METHODS.contains(&"call_restore"));
     assert!(!ACT_METHODS.contains(&"__index"));
     assert_eq!(
