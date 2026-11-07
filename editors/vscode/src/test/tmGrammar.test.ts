@@ -97,7 +97,7 @@ const LUA_FIXTURE_PATH = path.resolve(__dirname, '..', '..', 'src', 'test', 'fix
 //
 // Task 2.1 created `editors/vscode/syntaxes/pasta-lua-injection.tmLanguage.json`
 // (scopeName `pasta-lua.injection`, injectionSelector
-// `L:meta.embedded.block.lua.content`, include source.lua). At runtime __dirname is
+// `meta.embedded.block.lua.content`, include source.lua). At runtime __dirname is
 // the esbuild bundle dir `out/test`, so resolve from the editors/vscode root the
 // same way the SSOT / fixture grammars are resolved above.
 const INJECTION_GRAMMAR_PATH = path.resolve(__dirname, '..', '..', 'syntaxes', 'pasta-lua-injection.tmLanguage.json');
@@ -923,16 +923,15 @@ async function runTests(): Promise<void> {
   // Begin fence (``` + language name) is asserted through the injected path: it
   // proves the injection preserves the host fence scopes while colouring the body.
   //
-  // End fence is asserted through the NON-injected single-grammar path
-  // (tokenizeLine). The read-only Lua fixture from task 1.1 treats a backtick as
-  // a `string.quoted.double.lua` delimiter, so under injection the closing ```
-  // is swallowed as Lua string content and the host `end` rule never fires —
-  // a quirk of the vendored fixture, not of the shipped grammars (real VS Code
-  // Lua closes its constructs). The end-fence scope is a property of the host
-  // SSOT grammar, which the injection (selector L:meta.embedded.block.lua.content)
-  // never overrides; the single-grammar path verifies that retention directly.
+  // End fence is asserted through the SAME injected path. The Lua grammar (the
+  // vendored fixture and VS Code's built-in one alike) treats a backtick as a
+  // `string.quoted.double.lua` delimiter, so on the closing ``` line the Lua
+  // string rule and the host `end` rule both match at column 0. The injection
+  // selector must therefore NOT carry the `L:` prefix: `L:` makes the injection
+  // win that tie, the fence is swallowed as a Lua string, the block never closes
+  // and every line after it is tokenized as Lua (shown uncoloured in VS Code).
   test('観点3: 開始/終了フェンス行に pasta スコープ（フェンス句読点・言語名）が保持される', () => {
-    const injected = tokenizeLinesInjected(['```lua', 'print("hello")', '```']);
+    const injected = tokenizeLinesInjected(['```lua', 'print("hello")', '```', '＊シーン']);
     const beginTokens = injected.filter((t) => t.line === 0);
     // begin fence: ``` punctuation + lua language name retained under injection.
     expect(
@@ -949,19 +948,24 @@ async function runTests(): Promise<void> {
       'begin fence line must NOT carry source.lua scopes'
     );
 
-    // end fence: ``` punctuation retained at the host SSOT level.
-    const open = tokenizeLine('```lua');
-    const body = tokenizeLine('print("hello")', open.ruleStack);
-    const close = tokenizeLine('```', body.ruleStack);
+    // end fence: ``` closes the block under injection (not eaten as a Lua string).
+    const closeTokens = injected.filter((t) => t.line === 2);
     expect(
-      hasScope(close.tokens, 'punctuation.definition.code.end.pasta'),
-      'end fence should retain punctuation.definition.code.end.pasta (host SSOT grammar)'
+      closeTokens.some((t) => t.scopes.includes('punctuation.definition.code.end.pasta')),
+      'end fence should retain punctuation.definition.code.end.pasta under injection'
+    );
+    expect(!hasLuaScope(closeTokens), 'end fence line must NOT carry source.lua scopes');
+    const afterTokens = injected.filter((t) => t.line === 3);
+    expect(
+      !afterTokens.some((t) => t.scopes.includes('meta.embedded.block.lua.content')) &&
+        !hasLuaScope(afterTokens),
+      'the line after the end fence must be back in plain pasta (block closed)'
     );
   });
 
   // (4) アクション行内のインライン Lua（＠func()）に source.lua が注入されない。
   //
-  // The injection selector is L:meta.embedded.block.lua.content — block-only — so
+  // The injection selector is meta.embedded.block.lua.content — block-only — so
   // an inline ＠func() in an action line must receive NO source.lua scope. Its
   // pasta scope here is markup.inline.raw.string.pasta (inline-word-ref matches the
   // function name ＠func); the load-bearing assertion is the ABSENCE of
