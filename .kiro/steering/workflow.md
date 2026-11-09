@@ -32,7 +32,7 @@ requirements → design → tasks → implementation → implementation-complete
 2. **Test Gate**: `cargo test --all` 成功
 3. **Doc Gate**: 仕様差分を反映
 4. **Steering Gate**: 既存ステアリングと整合
-5. **Soul Gate**: [SOUL.md](../../SOUL.md) との整合性確認（タスク生成時に自動追加）
+5. **Soul Gate**: [doc/SOUL.md](../../doc/SOUL.md) との整合性確認（タスク生成時に自動追加）
 6. **Manual Sync Gate（条件付き）**: マニュアル（`book/`）とスキル生成物の同期確認
 7. **Internals Sync Gate（条件付き）**: 内部設計章（`book/src/internals/`）と実装の追従確認
 
@@ -195,15 +195,15 @@ git add -A; git commit -m "chore(spec): <spec-name>をcompletedへ移動"
 
 実装完了後、以下のドキュメントとの整合性を確認・更新：
 
-1. [ ] SOUL.md - コアバリュー・設計原則との整合性確認
+1. [ ] doc/SOUL.md - コアバリュー・設計原則との整合性確認
 2. [ ] book/src/ - 利用者向け仕様（文法・公開 Lua API・pasta.toml）の該当章を更新し、`node book/tools/gen-skill-refs.mjs` でスキル生成ファイルを再生成（該当する場合）
-3. [ ] TEST_COVERAGE.md - 新規テストのマッピング追加
+3. [ ] doc/TEST_COVERAGE.md - 新規テストのマッピング追加
 4. [ ] クレートREADME - API変更の反映（該当する場合）
 5. [ ] steering/* - 該当領域のステアリング更新
 6. [ ] .claude/skills/pasta-ghost-authoring/ - DSL文法変更時に SKILL.md・手書きファイルを同期（該当する場合）
 7. [ ] .claude/skills/pasta-lua-coding/ - Lua API変更時に SKILL.md・手書きファイルを同期（該当する場合）
 
-特に、以下の場合は**SOUL.md更新が必須**：
+特に、以下の場合は**doc/SOUL.md更新が必須**：
 - コアバリュー（日本語フレンドリー、UNICODE識別子、yield型、宣言的フロー）に影響
 - 設計原則（行指向文法、前方一致、UI独立性）に影響
 - Phase 0完了基準（DoD）の進捗に影響
@@ -288,33 +288,33 @@ git add -A; git commit -m "chore(spec): <spec-name>をcompletedへ移動"
 
 | 変更種別             | 更新対象ドキュメント                                    |
 | -------------------- | ------------------------------------------------------- |
-| コアバリュー影響     | **SOUL.md（最優先）**、book/src/ の該当章＋スキル再生成 |
+| コアバリュー影響     | **doc/SOUL.md（最優先）**、book/src/ の該当章＋スキル再生成 |
 | 公開API変更          | クレートREADME、book/src/ の該当章＋スキル再生成        |
-| DSL文法変更          | book/src/grammar/ の該当章＋スキル再生成、steering/grammar.md、SOUL.md（設計原則） |
+| DSL文法変更          | book/src/grammar/ の該当章＋スキル再生成、steering/grammar.md、doc/SOUL.md（設計原則） |
 | ディレクトリ構造変更 | steering/structure.md、クレートREADME                   |
 | 依存関係変更         | steering/tech.md、クレートREADME                        |
 | 開発フロー変更       | steering/workflow.md、CLAUDE.md                         |
 | DSL文法変更          | .claude/skills/pasta-ghost-authoring/ (SKILL.md＋手書きファイル。生成ファイルは再生成) |
 | Lua API変更          | book/src/lua/ の該当章＋スキル再生成、.claude/skills/pasta-lua-coding/ (SKILL.md＋手書きファイル) |
 | 新クレート追加       | README.md（ドキュメントマップ）、クレートREADME新規作成 |
-| テストカバレッジ変更 | TEST_COVERAGE.md                                        |
+| テストカバレッジ変更 | doc/TEST_COVERAGE.md                                        |
 
 ### 保守責任
 
 | ドキュメント     | 更新トリガー                             |
 | ---------------- | ---------------------------------------- |
-| **SOUL.md**      | **コアバリュー・設計原則変更（最優先）** |
+| **doc/SOUL.md**      | **コアバリュー・設計原則変更（最優先）** |
 | README.md        | プロジェクト概要変更、新クレート追加     |
 | CLAUDE.md        | AI開発支援プロジェクト指示変更           |
 | book/src/        | 利用者向け仕様（文法・公開 Lua API・pasta.toml）の変更（権威） |
-| TEST_COVERAGE.md | テスト追加・削除・機能変更               |
+| doc/TEST_COVERAGE.md | テスト追加・削除・機能変更               |
 | クレートREADME   | クレートAPI/構造変更                     |
 | steering/*       | 対応領域の変更                           |
 
 ### 保守ルール
 
-1. **コアバリュー変更時**: まずSOUL.mdを更新、その後マニュアルの該当章（book/src/）を更新し、`node book/tools/gen-skill-refs.mjs` でスキル生成ファイルを再生成
+1. **コアバリュー変更時**: まずdoc/SOUL.mdを更新、その後マニュアルの該当章（book/src/）を更新し、`node book/tools/gen-skill-refs.mjs` でスキル生成ファイルを再生成
 2. **API変更時**: 対応するクレートREADMEの「公開API」セクションを更新
 3. **仕様変更時**: まずマニュアルの該当章（book/src/）を更新し、`node book/tools/gen-skill-refs.mjs` でスキル生成ファイルを再生成
-4. **テスト追加時**: TEST_COVERAGE.mdのマッピングを更新
+4. **テスト追加時**: doc/TEST_COVERAGE.mdのマッピングを更新
 5. **PR時確認**: ドキュメント更新漏れがないかDoDチェックリストで確認

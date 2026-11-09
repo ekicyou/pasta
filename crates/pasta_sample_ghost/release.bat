@@ -20,7 +20,7 @@ echo   hello-pasta Build ^& Release
 echo ========================================
 echo.
 
-powershell.exe -ExecutionPolicy Bypass -File "%~dp0crates\pasta_sample_ghost\release.ps1" %*
+powershell.exe -ExecutionPolicy Bypass -File "%~dp0release.ps1" %*
 
 if errorlevel 1 (
     echo.

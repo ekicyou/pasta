@@ -1,13 +1,13 @@
 # Product Steering
 Memories of pasta twine together—now and then a knot, yet always a delight.
 
-> **📖 プロジェクトビジョン・設計原則**: [SOUL.md](../../SOUL.md) を参照してください。  
+> **📖 プロジェクトビジョン・設計原則**: [SOUL.md](../../doc/SOUL.md) を参照してください。  
 > このドキュメントは開発ロードマップと進捗管理に特化しています。
 
 ## プロジェクト概要
 **pasta**は、「伺か」のようなデスクトップマスコットなどを実現するための対話スクリプトエンジンです。Pasta DSLをLuaにトランスパイルし、「ゴースト」基盤として機能します。
 
-**ビジョン・コアバリュー・設計原則**: [SOUL.md](../../SOUL.md) 参照
+**ビジョン・コアバリュー・設計原則**: [SOUL.md](../../doc/SOUL.md) 参照
 
 ## 機能の優先順位
 

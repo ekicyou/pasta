@@ -56,13 +56,13 @@ pasta 本体（パーサ・トランスパイラ・ランタイム・SHIORI）�
 
 | ドキュメント | 説明 |
 | ------------ | ---- |
-| [SOUL.md](SOUL.md) | ビジョン・コアバリュー・設計原則 |
+| [SOUL.md](doc/SOUL.md) | ビジョン・コアバリュー・設計原則 |
 | [マニュアルの内部設計パート](https://ekicyou.github.io/pasta/internals/index.html)（[`book/src/internals/`](book/src/internals/)） | 現行実装の内部構造（トランスパイル・レジストリ・実行モデル・ローダ・SHIORI 層・トーク出力・デバッグ基盤） |
 | [マニュアルの利用者向けパート](https://ekicyou.github.io/pasta/)（[`book/src/`](book/src/)） | 文法・公開 Lua API・`pasta.toml` の**唯一の権威**。スキル `references/` の規範部分は、マニュアルの章から生成する（`node book/tools/gen-skill-refs.mjs`） |
 | [book/AUTHORING.md](book/AUTHORING.md) | マニュアルの執筆規約（文体・台詞部品・パートごとの決まり） |
 | [.kiro/steering/](.kiro/steering/) | プロジェクト構造・技術スタック・開発ワークフロー・[ロードマップ](.kiro/steering/roadmap.md) |
 | [CLAUDE.md](CLAUDE.md) | AI 開発支援と Kiro 仕様駆動開発の概要（プロジェクト指示・コマンド一覧） |
-| [TEST_COVERAGE.md](TEST_COVERAGE.md) | テストと機能の対応 |
+| [TEST_COVERAGE.md](doc/TEST_COVERAGE.md) | テストと機能の対応 |
 
 ### クレート構成
 

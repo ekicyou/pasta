@@ -31,7 +31,7 @@
 //   - detectBrokenLinks が本の中のリンク（`章.md#見出し`・`#見出し`）の見出しをリンク先の章のアンカーの集合と照合し、
 //     無ければ internal-anchor として報告する（行番号なし）。章のファイルが無いときは internal-md の 1 件だけ
 //     （manual-link-anchor-check タスク 2.1 / 要件 1.1〜1.5, 2.1, 2.2, 3.1〜3.6, 5.1, 5.5, 7.1〜7.3）。
-//   - checkReadmeManualLinks がクレートの README に加えて、ルートの README.md・SOUL.md・3 スキルの Markdown の
+//   - checkReadmeManualLinks がクレートの README に加えて、ルートの README.md・doc/SOUL.md・3 スキルの Markdown の
 //     公開マニュアルの URL も、同じ区分（readme-manual-url）・同じ文面で検出する。対象の順は固定。
 //     .kiro/steering/roadmap.md は対象外（manual-link-anchor-check タスク 3.2 / 要件 4.4〜4.6, 5.5, 7.1）。
 //   - 自己テストの中の compareHeadingIds が、章ごとに headingSlugs の導く id の並びと、ビルドした出力（book/book/）の
@@ -795,7 +795,7 @@ log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュア
     check('G-5 manual.yml の paths（push・pull_request）に crates/*/README.md', n === 2, `count=${n}`);
   }
 
-  // G-6: 広げた対象（ルートの README・SOUL.md・2 スキルの Markdown）の公開 URL
+  // G-6: 広げた対象（ルートの README・doc/SOUL.md・2 スキルの Markdown）の公開 URL
   // （manual-link-anchor-check タスク 3.2 / 要件 4.4〜4.6, 5.5, 7.1）。
   {
     const root = makeSandbox();
@@ -813,12 +813,12 @@ log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュア
         '',
       ].join('\n');
       const CRATE = 'crates/pasta_core/README.md';
-      // 対象の順（固定）: クレートの README（名前順）→ ルートの README → SOUL.md → 3 スキル（CHECKED_SKILLS の順・パス順）。
+      // 対象の順（固定）: クレートの README（名前順）→ ルートの README → doc/SOUL.md → 3 スキル（CHECKED_SKILLS の順・パス順）。
       const order = [
         CRATE,
         'crates/pasta_lua/README.md',
         'README.md',
-        'SOUL.md',
+        'doc/SOUL.md',
         `${SK}/pasta-ghost-authoring/SKILL.md`,
         `${SK}/pasta-ghost-authoring/references/dsl.md`,
         `${SK}/pasta-lua-coding/SKILL.md`,
@@ -856,7 +856,7 @@ log('\n== (G) checkReadmeManualLinks（クレート README の公開マニュア
       const rep = reportLinkCheck(result);
       check('G-6 runLinkCheck に結合され、レポートの [1] 区分に 16 件が出る',
         result.broken.filter((b) => b.kind === 'readme-manual-url').length === 16
-        && /\[1\][^\n]*: 16 件/.test(rep) && rep.includes('BROKEN  SOUL.md'), rep);
+        && /\[1\][^\n]*: 16 件/.test(rep) && rep.includes('BROKEN  doc/SOUL.md'), rep);
     } finally {
       rmrf(root);
     }
