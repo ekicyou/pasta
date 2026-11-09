@@ -349,6 +349,7 @@ Wave 3（見込み）リリース（0.5.0 の spec は 0 本）
 - `scene-condition-attributes`（2026-10-29 起票。`call-attribute-filter` を統合）: 版は 2026-10-29 に 0.5.0 と決めた（上の「0.5.0 の範囲」）。会えた日数をエンジンが数える別 spec を起票するか（推奨: 起票する）と、その変数の名前も開発者の判断待ち（brief の「決まらなかったこと」）。
 - `scene-anchor-link`（2026-10-08 起票）: 中身は上の「Phase 11 の残り」の「文中のシーンリンク」にある。
 - `vsce-4-upgrade`・`pest-2-9-4-upgrade`（2026-10-24 起票）: 中身は下の「依存の更新」にある。
+- `vscode-scene-outline-play`（2026-11-09 起票）: 中身は台帳の行にある。
 
 ## 依存の更新（2026-10-24 起票）
 
@@ -392,6 +393,7 @@ Wave 3（見込み）リリース（0.5.0 の spec は 0 本）
 - [ ] vsce-4-upgrade -- `@vscode/vsce` を 4.x に上げる。リリース CI の Node は `ponytail-manual-ci` が 22 にした。`--azure-credential` の公開の道を `release-setup-check.yml` で確かめる。だめなら 4.x の OIDC の口へ移すかを決める（2026-10-24 起票。`/update` から）。版は未定。`pasta-dll-multiarch`（`release.yml`）と同じウェーブに置かない（`editors/vscode/package.json` を共有した `vscode-mcp-client` は 2026-11-03 に入った）。Dependencies: none（`ponytail-manual-ci` は入った）
 - [ ] pest-2-9-4-upgrade -- pest を 2.9.4 以降に上げても、手元と CI の 3 か所で `pasta_lsp` の WASM のビルドが通るようにする（psm が wasm32 に clang を要る）。wasm32 向けの C コンパイラの用意か、上流の直しかを決める（2026-10-24 起票。`/update` から）。版は未定。`Cargo.lock` の席を触る spec と同じウェーブに置かない（0.5.0 の `debug-mcp-runtime` は 2026-11-03 に入った）。Dependencies: none（ファイルの順番で後に置いた ponytail の 3 本は入った）
 - [x] actor-line-newlines -- 同じ話し手が続く行（継続行 `　：` と、同じアクターを書き直した行）の前に、`[actor."名前"] line_newlines` の幅の改行 `\n[値×100]` を入れる（未設定なら今のまま）。トランスパイラが行の頭の印を出し、出力側が spot_newlines と同じ遅延方式で次の字の直前に 1 つ入れる。話し手の切り替え・選択肢の前後は今の区切りを優先、行の最初の字より前に改行・`\_l`・`\c` があれば入れない、前の行が改行で終われば入れない、Call をまたいでも出力の並びで見る、budoux の列を 1 つ進める。`[ghost]` の既定値と、改行の後に付ける字下げは範囲外（2026-11-05 起票。ghost_dev「窓際のぱすたさん」の縦書きの辞書をネタ帳と同じ 1 行 1 列の形にするため）。0.5.1（2026-11-05 開発者の決定「早く欲しい」）。`cue-command-runtime` と同じウェーブに置かない（行の頭の生成の場所を共有する）。Dependencies: none
+- [ ] vscode-scene-outline-play -- VSCode 拡張で、`.pasta` の見出しの行（グローバル・ローカル）の上に CodeLens「▶ シーンを実行」を出し、押せばそのシーンを再生する。アウトライン・パンくず・`Ctrl+Shift+O`・スティッキースクロールに グローバル ＞ ローカル の 2 階層を出す。シーンの並びは `pasta_lsp` の解析結果に足して WASM で渡し、DocumentSymbol と CodeLens はそれを写すだけ。`pasta.runSceneAtCursor` は引数（uri・行）でも呼べるようにし、行からシーンを引くのは今の `OnPastaSceneAt` のまま。独自の設定 `pasta.codeLens.enabled` は作らない（`"[pasta]": { "editor.codeLens": false }` で消せる）（2026-11-09 起票。開発者の依頼）。版は未定。`vsce-4-upgrade`（`editors/vscode/package.json`）・`scene-anchor-link`（`pasta_lsp` の解析）と同じウェーブに置かない。Dependencies: none
 
 ## Existing Spec Updates
 
