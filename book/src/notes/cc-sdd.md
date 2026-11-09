@@ -8,11 +8,11 @@
 
 > 【したり顔】ちなみにこの記事は「伺か・伺的 [第1会場] アドベントカレンダー」の一編ですのよ。ほかの皆様の記事も、あわせてご覧あそばせ。
 
+---
+
 [＜昨日](https://gist.github.com/Tatakinov/1434986b65fa68bb2b3ae974db43a50b)　[明日＞](https://note.com/kanade_lab/n/n5eae783a0a98)
 
 <iframe src="https://adventar.org/calendars/12821/embed" width="100%" height="362"></iframe>
-
----
 
 ## この記事について
 
