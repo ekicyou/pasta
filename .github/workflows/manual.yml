@@ -2,7 +2,7 @@
 # 利用者マニュアル（mdBook）を GitHub Pages へ公開する。
 # build.yml（Rust/WASM CI）とは独立。次の変更時のみ起動する:
 #   book/**・本ワークフロー・スキル 3 種（pasta-ghost-authoring / pasta-lua-coding / pasta-check）、
-#   クレート README（crates/*/README.md）・ルートの README.md・SOUL.md（公開マニュアル URL の実在検査のため。
+#   クレート README（crates/*/README.md）・ルートの README.md・doc/SOUL.md（公開マニュアル URL の実在検査のため。
 #   pasta-runtime-internals-doc 要件 7.8・manual-link-anchor-check 要件 4）、
 #   hello-pasta の辞書（crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**。チュートリアルの照合のため）、
 #   pasta の TextMate 文法（editors/vscode/syntaxes/**。着色に使うため）。
@@ -15,7 +15,7 @@
 #   node book/tools/gen-skill-refs.mjs --check（スキル生成物の鮮度照合。不一致で中断）
 #     -> mdbook build book -> 着色 -> 台詞部品の変換（talk-html）-> 日本語 bigram 索引を再生成
 #     -> node book/tools/link-check.mjs（本の中のリンクと見出し（#…）・読者に届く文書（クレートの README・
-#        ルートの README.md・SOUL.md・スキル）の公開マニュアル URL・スキル自己完結の検証。失敗で中断）
+#        ルートの README.md・doc/SOUL.md・スキル）の公開マニュアル URL・スキル自己完結の検証。失敗で中断）
 #     -> チュートリアルの照合（入門の章 12 枚 ↔ hello-pasta の辞書。辞書の検査は build.yml の cargo test が受け持つ）
 #     -> 静的性・検索（この 2 つは --self-test で検査ロジック自身の
 #        自己テストも実行）・コンテンツ検証・ツール自己テスト
@@ -36,7 +36,7 @@ on:
       - '.claude/skills/pasta-check/**'
       - 'crates/*/README.md'
       - 'README.md'
-      - 'SOUL.md'
+      - 'doc/SOUL.md'
       - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
       - 'editors/vscode/syntaxes/**'
   pull_request:
@@ -49,7 +49,7 @@ on:
       - '.claude/skills/pasta-check/**'
       - 'crates/*/README.md'
       - 'README.md'
-      - 'SOUL.md'
+      - 'doc/SOUL.md'
       - 'crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/dic/**'
       - 'editors/vscode/syntaxes/**'
   workflow_dispatch:  # 手動実行

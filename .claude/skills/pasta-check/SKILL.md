@@ -143,7 +143,6 @@ pasta_check release `
 
 ```
 workspace/                               # ワークスペースルート
-├── release.bat                          # release.ps1 を呼ぶラッパースクリプト（任意・ワークスペースルートに置く）
 ├── release/                             # 生成物の出力先（.gitignore で無視・コミットしない）
 │   ├── {ghost-name}/                    # --release 出力先
 │   │   ├── ghost/master/                # ゴースト本体
@@ -158,6 +157,7 @@ workspace/                               # ワークスペースルート
 │   ├── pasta-skills.zip                 # pasta のスキル 3 つと LICENSE（hello-pasta 固有・release.ps1 の段 6）
 │   └── pasta.dll.zip                    # 追加の配布物（hello-pasta 固有・release.ps1 の段 5）
 └── pasta_sample_ghost/                  # hello-pasta のプロジェクト（pasta リポジトリのクレート）
+    ├── release.bat                      # release.ps1 を呼ぶラッパースクリプト（任意・ダブルクリック用）
     ├── release.ps1                      # Setup + Release を統合したスクリプト
     └── ghosts/{ghost-name}/             # --target ゴースト開発フォルダー
 ```

@@ -96,7 +96,7 @@ git push -f origin v{VERSION}
 
 ## 手元での release.ps1（動作確認用）
 
-手元の `release.ps1`（ワークスペースルートの `release.bat` からも呼べる）は、配布物が作れるかを確かめるためのものです。作った成果物（`release/` の中身、サンプルゴーストの `pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`scripts/` など）はコミットしません。公開に使う配布物は、CI がタグのコミットから作り直します。
+手元の `release.ps1`（同じフォルダの `release.bat` からも呼べる）は、配布物が作れるかを確かめるためのものです。作った成果物（`release/` の中身、サンプルゴーストの `pasta.dll`・`THIRD_PARTY_LICENSES.txt`・`scripts/` など）はコミットしません。公開に使う配布物は、CI がタグのコミットから作り直します。
 
 ```powershell
 cd crates\pasta_sample_ghost

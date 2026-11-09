@@ -9,32 +9,31 @@ _Memories of pasta twine together—now and then a knot, yet always a delight._
 pastaプロジェクトのドキュメントは、以下の優先順位と役割を持ちます：
 
 #### Level 0: Entry Point
-- **[README.md](README.md)** - プロジェクト概要（導入・アーキテクチャ）
+- **[README.md](../README.md)** - プロジェクト概要（導入・アーキテクチャ）
 
 #### Level 1: Constitution
 - **[SOUL.md](SOUL.md)** - プロジェクトの憲法（Why: ビジョン、コアバリュー、あるべき姿）
-- **[利用者マニュアル](book/src/)** - 利用者向け仕様（文法・公開 Lua API・`pasta.toml`）の唯一の権威（公開: https://ekicyou.github.io/pasta/）
-- **[CLAUDE.md](CLAUDE.md)** - AI開発支援（Kiro workflow、ステアリング）
+- **[利用者マニュアル](../book/src/)** - 利用者向け仕様（文法・公開 Lua API・`pasta.toml`）の唯一の権威（公開: https://ekicyou.github.io/pasta/）
+- **[CLAUDE.md](../CLAUDE.md)** - AI開発支援（Kiro workflow、ステアリング）
 
 #### Level 2: Implementation Layer
 実装層ドキュメント。技術的詳細と品質管理を担当。
 
 **クレートREADME**:
-- [pasta_dsl/README.md](crates/pasta_dsl/README.md) - DSLパーサーAPI
-- [pasta_core/README.md](crates/pasta_core/README.md) - レジストリAPI
-- [pasta_lua/README.md](crates/pasta_lua/README.md) - Luaトランスパイラ・ランタイム
-- [pasta-lua-coding skill](.claude/skills/pasta-lua-coding/SKILL.md) - Lua APIリファレンス（references/に詳細）
-- [pasta_lsp/README.md](crates/pasta_lsp/README.md) - VSCode 拡張に埋め込む WASM の解析器
-- [pasta_shiori/README.md](crates/pasta_shiori/README.md) - SHIORI DLLインターフェース
-- [pasta_sample_ghost/README.md](crates/pasta_sample_ghost/README.md) - サンプルゴースト
+- [pasta_dsl/README.md](../crates/pasta_dsl/README.md) - DSLパーサーAPI
+- [pasta_core/README.md](../crates/pasta_core/README.md) - レジストリAPI
+- [pasta_lua/README.md](../crates/pasta_lua/README.md) - Luaトランスパイラ・ランタイム
+- [pasta-lua-coding skill](../.claude/skills/pasta-lua-coding/SKILL.md) - Lua APIリファレンス（references/に詳細）
+- [pasta_lsp/README.md](../crates/pasta_lsp/README.md) - VSCode 拡張に埋め込む WASM の解析器
+- [pasta_shiori/README.md](../crates/pasta_shiori/README.md) - SHIORI DLLインターフェース
+- [pasta_sample_ghost/README.md](../crates/pasta_sample_ghost/README.md) - サンプルゴースト
 
 **品質管理ドキュメント**:
 - [TEST_COVERAGE.md](TEST_COVERAGE.md) - テストカバレッジマップ
 - [内部設計: トランスパイルパイプライン（生成時最適化）](https://ekicyou.github.io/pasta/internals/transpiler.html#生成時最適化) - トランスパイラ最適化の解説
-- [SCENE_TABLE_REVIEW.md](SCENE_TABLE_REVIEW.md) - シーンテーブル設計レビュー
 
 #### Level 3: Steering (AI向け)
-- [.kiro/steering/](/.kiro/steering/) - AI向けプロジェクトルール（完全性優先）
+- [.kiro/steering/](../.kiro/steering/) - AI向けプロジェクトルール（完全性優先）
 
 **ルール**: 仕様の衝突時はマニュアル（`book/src/`）を優先し、README・steering・スキル手書きを修正する（スキルの生成ファイルはマニュアル章を直して再生成する）
 

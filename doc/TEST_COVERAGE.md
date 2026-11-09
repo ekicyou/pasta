@@ -329,4 +329,4 @@
 
 **参照**:
 - [SOUL.md](SOUL.md) - プロジェクトの憲法
-- [.kiro/specs/completed/soul-document/gap-analysis.md](.kiro/specs/completed/soul-document/gap-analysis.md) - ギャップ分析レポート
+- [.kiro/specs/completed/soul-document/gap-analysis.md](../.kiro/specs/completed/soul-document/gap-analysis.md) - ギャップ分析レポート
