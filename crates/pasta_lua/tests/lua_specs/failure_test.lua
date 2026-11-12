@@ -341,10 +341,10 @@ describe("FAILURE.LABEL と要件 3.1 の文言", function()
     local FAILURE = require("pasta.failure")
     local L = FAILURE.LABEL
 
-    test("種類の名前の表は 13 種", function()
+    test("種類の名前の表は 14 種", function()
         local n = 0
         for _ in pairs(L) do n = n + 1 end
-        expect(n):toBe(13)
+        expect(n):toBe(14)
     end)
 
     test("条件に合うシーンが無い（13 種目）", function()
@@ -364,6 +364,10 @@ describe("FAILURE.LABEL と要件 3.1 の文言", function()
         expect(L.NOT_ASSIGNABLE):toBe("代入できない値")
         expect(FAILURE.format(L.NOT_ASSIGNABLE, "＄＊会員", "表"))
             :toBe("【代入できない値：＄＊会員（表）】")
+    end)
+
+    test("表にできない値（14 種目）", function()
+        expect(L.NOT_TABLE):toBe("表にできない値")
     end)
 
     test("スクリプトのエラー（実行時エラーで止まった）", function()
