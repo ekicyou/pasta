@@ -1,6 +1,6 @@
 # Brief: vscode-scene-outline-play
 
-> **ステータス**: 未着手（2026-11-09 の `/kiro-discovery` で起票。開発者の依頼「VSCode 拡張で、シーン再生への手数を減らして簡単に再生をキックしたい」）。版は未定。要件定義は Opus（Fable なし）。依頼にはコードの例が付いていたが、開発者の指示「大事なのは要件なので、コード例にとらわれず実装案を考えて」に従い、下の「Approach」は既存の作りに合わせて組み直した。
+> **ステータス**: 未着手（2026-11-09 の `/kiro-discovery` で起票。開発者の依頼「VSCode 拡張で、シーン再生への手数を減らして簡単に再生をキックしたい」）。版は 0.5.3（2026-11-12 の `/kiro-discovery`「pasta-recipe」で開発者が承認。下の「申し送り」）。要件定義は Opus（Fable なし）。依頼にはコードの例が付いていたが、開発者の指示「大事なのは要件なので、コード例にとらわれず実装案を考えて」に従い、下の「Approach」は既存の作りに合わせて組み直した。
 
 ## Problem
 
@@ -84,6 +84,13 @@
 
 - **Extends**: なし（`vscode-mcp-client`・`pasta-vscode-extension` は completed。その spec の範囲を広げるのでなく、新しい spec として足す）。
 - **Adjacent**: `scene-anchor-link`（VSCode の文法定義・LSP の着色を触る。`pasta_lsp` の解析の同じファイルに手が入るなら同じウェーブに置かない）。`vsce-4-upgrade`（`editors/vscode/package.json` を共有する。同じウェーブに置かない）。`pest-2-9-4-upgrade`（`pasta_lsp` の WASM のビルド）。
+
+## 申し送り（2026-11-12 の discovery「pasta-recipe」より）
+
+- **版を 0.5.3 にした**: VS Code を使わないエディタ `pasta-recipe` が、ファイルのツリーの下にシーンの並びを出すのに、この spec が足す `AnalysisResult.scenes` をそのまま使う。0.5.3 のウェーブ 1 に置く。
+- **`scenes` の利用者が 2 つになる**: VS Code 拡張（WASM の `wasm_analyze` 経由）と、`pasta-recipe`（Tauri の Rust の側が `pasta_lsp` をライブラリとして直接呼ぶ。WASM は通らない）。`scenes` の形は、VS Code の DocumentSymbol に寄せすぎず、木を写すだけで使える素の形（名前・種類・見出しの行・範囲・子）のままにする。位置は UTF-16・0 始まりで、トークン・診断と揃える。
+- **`AnalysisResult` は Rust の公開の型として使われる**: `pasta-recipe` の `src-tauri` が、別の Cargo ワークスペースから path 依存で `pasta_lsp` を引き、`AnalysisEngine::analyze` の結果を serde で JSON にする。`analyze` とその結果の型を、`pasta_lsp` の外から呼べる形（`pub`）に保つ。
+- **`devCommands.ts`・`runSceneAtCursor.ts`**: この spec が引数付きの呼び出しを足した後で、`pasta-recipe-dev-actions`（0.5.3 のウェーブ 3）が実行の流れを `editors/shared/` へ移す。移しやすいように、引数の受け取りは `devCommands.ts`（VS Code の糊）の側に置き、`runSceneAtCursor.ts` の `runScene(ctx, fsPath, line1)` の形は変えない。
 
 ## Constraints
 
