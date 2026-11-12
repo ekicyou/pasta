@@ -24,7 +24,7 @@
   - VS Code との糊は `devCommands.ts` だけ。
 - **使っている MCP の道具**: `get_property`・`get_log`・`reload`・`raise_event`。
 - **保存変数の書き換え**: ランタイムには `OnPastaSetSaveVariable` がある（`pasta_scripts/pasta/shiori/event/external_control.lua`）。Reference0＝名前、Reference1＝値、Reference2＝型（`number`・`string`・`boolean`・`delete`）。メモリの上で書き換え、ファイルへは終了時の自動保存で書く。拡張はこれを使っていない。
-- **ローカル変数を入れた実行**: 今は無い。`OnPastaScene`・`OnPastaSceneAt` は引数を取らない。0.5.3 で先に入る `scene-play-locals` が口を足す。
+- **ローカル変数を入れた実行**: 今は無い。`OnPastaScene`・`OnPastaSceneAt` は引数を取らない。0.5.3 で先に入る `scene-play-locals` が口を足す（2026-11-12 の要件で確定: Reference2 に TOML のインライン表。日本語のキーは引用符で包む `{ "名前" = "ぱすた" }`。値は文字列・数・真偽、日付・時刻は文字列として入る。配列・表は誤り。組み立てる側で TOML として正しく書く）。
 - ブラウザの中からは MCP にも保存変数のファイルにも届かない。ネイティブの層（Tauri の Rust の側）が要る。
 
 ## Desired Outcome

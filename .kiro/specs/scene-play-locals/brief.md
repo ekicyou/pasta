@@ -25,8 +25,8 @@
 **今の Reference の次に、ローカル変数を TOML のインライン表で 1 つ足す**（discovery で開発者が承認した推奨案）。
 
 ```text
-OnPastaSceneAt  Reference0=C:\…\ghost\master\dic\02-talk.pasta  Reference1=12  Reference2={ 名前 = "ぱすた", 回数 = 3 }
-OnPastaScene    Reference0=挨拶  Reference1=朝  Reference2={ 天気 = "雨" }
+OnPastaSceneAt  Reference0=C:\…\ghost\master\dic\02-talk.pasta  Reference1=12  Reference2={ "名前" = "ぱすた", "回数" = 3 }
+OnPastaScene    Reference0=挨拶  Reference1=朝  Reference2={ "天気" = "雨" }
 → シーンの最初の行の時点で ＄名前・＄回数（＄天気）に値が入っている
 ```
 

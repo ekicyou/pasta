@@ -19,7 +19,7 @@ OnPastaScene    Reference0=挨拶  Reference1=（空）  Reference2={ "天気" =
 → シーンの最初の行の時点で ＄名前・＄回数（＄天気）に値が入っている
 ```
 
-> **前提（仮置き・OPEN QUESTION 1）**: TOML では、日本語のキーは引用符で包む（`{ "名前" = "ぱすた" }`）。brief の例 `{ 名前 = "ぱすた" }` は、pasta の使う TOML の読み取り（toml 1.1.8）では読めない（2026-11-12 に確かめた）。この要件は、TOML の書き方をそのまま受け、引用符の無い日本語のキーは「TOML として読めない」誤りとする前提で書いている。
+> **決定（2026-11-12 の要件ディスカッション）**: Reference2 は TOML の書き方をそのまま受ける。日本語のキーは引用符で包む（`{ "名前" = "ぱすた" }`）。引用符の無い日本語のキー（`{ 名前 = "ぱすた" }`）は、pasta の使う TOML の読み取り（toml 1.1.8）では読めないので、「表にできない値」の誤り（Requirement 4.1）とする。独自に読み替えない（pasta の書式は TOML の方針）。
 
 ## Boundary Context
 
@@ -35,7 +35,7 @@ OnPastaScene    Reference0=挨拶  Reference1=（空）  Reference2={ "天気" =
   - `OnPastaSceneAt` の行からシーンを引く規則（シーンマップ）、名前でシーンを探す規則。
   - ローカル変数の名前の決まりそのもの（辞書の `＄名前` の決まりをそのまま使う）。
 - **Adjacent expectations**:
-  - `pasta-recipe-dev-actions`（0.5.3 のウェーブ 3）は、この要件の Reference2 の書き方どおりに文字列を組み立てて送る。日本語のキーを引用符で包むのは送る側の責め（OPEN QUESTION 1 の推奨のとき）。
+  - `pasta-recipe-dev-actions`（0.5.3 のウェーブ 3）は、この要件の Reference2 の書き方どおりに文字列を組み立てて送る。日本語のキーを引用符で包むのは送る側の責め。
   - 今の MCP の利用者（VS Code 拡張の「▶ シーンを実行」、ghost_dev の MCP の使い方）は Reference2 を送らないので、振る舞いは変わらない。
   - 並走する `vscode-scene-outline-play` は `pasta_lsp`・`editors/vscode` を触る。この spec はどちらにも触らない。
 
@@ -64,8 +64,8 @@ OnPastaScene    Reference0=挨拶  Reference1=（空）  Reference2={ "天気" =
 1. When 値が TOML の文字列のとき, the 既定ハンドラ shall その変数に文字列を入れる。
 2. When 値が TOML の整数か浮動小数点数のとき, the 既定ハンドラ shall その変数に数を入れる（`3` は辞書で `3` と出て、算術にも使える）。
 3. When 値が TOML の真偽値（`true`・`false`）のとき, the 既定ハンドラ shall その変数に真偽値を入れる。
-4. When 値が TOML の日付・時刻のとき, the 既定ハンドラ shall その変数に、その日付・時刻を TOML で書いたとおりの文字列（`1979-05-27` など）を入れる。（**前提（仮置き・OPEN QUESTION 3）**）
-5. If 値が TOML の配列か表（ドットで区切ったキー `"a".b = 1` で生まれる表を含む）のとき, the 既定ハンドラ shall それを扱えない型の誤り（Requirement 4）とする。（**前提（仮置き・OPEN QUESTION 2）**）
+4. When 値が TOML の日付・時刻のとき, the 既定ハンドラ shall その変数に、その日付・時刻を TOML で書いたとおりの文字列（`1979-05-27` など）を入れる（`@toml` の今の変換のまま）。
+5. If 値が TOML の配列か表（ドットで区切ったキー `"a".b = 1` で生まれる表を含む）のとき, the 既定ハンドラ shall それを扱えない型の誤り（Requirement 4）とする（辞書の `＄名前` に使い道が無い。要る人が出てから足す）。
 
 ### Requirement 3: Reference2 が無いときは今のまま
 
@@ -111,7 +111,7 @@ OnPastaScene    Reference0=挨拶  Reference1=（空）  Reference2={ "天気" =
 
 1. The マニュアル shall `OnPastaScene`・`OnPastaSceneAt` の節の Reference の表に Reference2（ローカル変数のインライン表。省略できる）を載せ、少なくとも 1 つの送り方の例と、そのシーンで値が読めることを示す。
 2. The マニュアル shall 2 つの節の誤りの表に、Requirement 4 の 3 種の誤りを、表記とログの警告の実例付きで載せる。
-3. The マニュアル shall シーンを再生するイベントの共通の決まりに、値の型（Requirement 2）・届く範囲（Requirement 1.3〜1.4）・`OnPastaScene` で Reference1 を空にしてグローバルシーンだけを指名する書き方（Requirement 3.3）・日本語のキーの書き方（OPEN QUESTION 1 の決着に従う）を載せる。
+3. The マニュアル shall シーンを再生するイベントの共通の決まりに、値の型（Requirement 2）・届く範囲（Requirement 1.3〜1.4）・`OnPastaScene` で Reference1 を空にしてグローバルシーンだけを指名する書き方（Requirement 3.3）・日本語のキーは引用符で包む書き方を載せる。
 4. When マニュアルを書き換えたとき, the スキルの参照資料 shall マニュアルから作り直され、マニュアルとの照合（`gen-skill-refs --check`）に通る。
 
 ### Requirement 7: 動作環境と互換性
