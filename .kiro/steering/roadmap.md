@@ -140,6 +140,25 @@ v0.5.0 の後の即時の版（開発者「版は即時（0.5.1）にしまし�
 | 1 | actor-line-newlines | Opus | — | すぐ（Dependencies: none）。`cue-command-runtime` と同じウェーブに置かない（行の頭の生成の場所を共有する） |
 | 2 | 0.5.1 のリリース（`release` スキル） | Opus | — | 1 番の後 |
 
+## 0.5.3 の範囲：VS Code を使わないエディタ pasta-recipe（2026-11-12 開発者の決定）
+
+v0.5.2 の次の版で、最優先（開発者「次のリリースにする。最優先事項」）。VS Code を入れたくない作者のために、pasta DSL を編集できる軽いアプリ（仮名 `pasta-recipe`）を出す。0.6.0（ノベル）は動かさない。
+
+- **形**: Tauri 2（2.12.x）＋ Vite ＋ Monaco の、Windows x64 の単一の exe（`tauri build --no-bundle`。WebView2 は OS のもの）。ゴーストのフォルダを exe にドラッグドロップすると、その `ghost/master` を開く。最近開いたフォルダはアプリの置き場に TOML で残す。リリースの成果物に `pasta-recipe.zip` を足す。
+- **解析**: Tauri の Rust の側が `pasta_lsp`・`pasta_check` をライブラリとして直接呼ぶ（exe に静的にリンク。WASM は通らない）。`editors/recipe/src-tauri` は別の Cargo ワークスペースにし、Tauri の依存をルートの `Cargo.lock` に混ぜない。
+- **ゴーストを動かす機能**: VS Code 拡張の実行の流れ（MCP クライアント・リロード・シーン実行・変数ダンプ）を `editors/shared/` に移して共有し、入出力だけを Node と Tauri で差し込む。保存変数の書き換え（今の `OnPastaSetSaveVariable`）と、ローカル変数を入れたシーンの実行（新しい口）を足す。
+- **退けた案**: Electron（100MB を超える）、PWA（127.0.0.1 の MCP に届かない）、Rust ネイティブの GUI（エディタ部品が無い）、フロントで WASM を動かす案（段が増える。開発者「WASM にはこだわらない」）、実行の流れを Rust へ移植する案（2 本になる）。
+- **範囲外**: 補完・ホバー・定義へ移動、Lua の構文診断とステップ実行、mac・Linux、インストーラ・署名・自動更新、`.nar` の作成。
+- **ウェーブの数**: spec のウェーブ 3 つとリリースで、4 つ。
+
+| 順 | spec | 要件定義 | 規模 | 始められる時期 |
+| -- | ---- | -------- | ---- | -------------- |
+| 1 | vscode-scene-outline-play | Opus | — | ウェーブ 1。解析結果にシーンの並び（`scenes`）を足す。`pasta-recipe` のツリーがそれを使う（2026-11-09 起票。版は未定だったのを 0.5.3 に入れた） |
+| 2 | scene-play-locals | Opus | — | ウェーブ 1。`OnPastaScene`・`OnPastaSceneAt` の Reference2 に TOML のインライン表でローカル変数を渡す口。1 番とは触るファイルが重ならない（こちらは `pasta_lua`） |
+| 3 | pasta-recipe | Opus | — | ウェーブ 2。アプリの本体（ツリー・エディタ・着色・診断・ゴースト全体の検査・`.lua`・保存・最近開いたもの・リリース CI・マニュアル）。1 番の後 |
+| 4 | pasta-recipe-dev-actions | Opus | — | ウェーブ 3。実行の流れを `editors/shared/` へ移し、アプリにシーンの ▶・リロード・保存変数の表と書き換え・ローカル変数を入れた実行を足す。1 番（`devCommands.ts`・`runSceneAtCursor.ts`）・2 番・3 番の後 |
+| 5 | 0.5.3 のリリース（`release` スキル） | Opus | — | 上の全部の後（ウェーブ 4） |
+
 ## 棚卸（2026-11-03・main `b03a1ca5`）
 
 同じ日の 1 回目（main `c575febd`）のウェーブの 4 本が、どれも入った。`scene-count`（PR#230）・`vscode-mcp-client`（PR#231）・`debug-mcp-runtime`（PR#233）・`scene-attribute-store`（PR#234）。ほかに、cc-sdd の記事の絵（PR#232。spec なし）が入った。未完了は 18 本（常駐の `review-improvement-loop` を除く）、完了は 203 本。作業中のブランチは無い（ほかのワークツリーとブランチは、どれも main に入った後のもの）。今のゴールは 0.5.0 である（v0.5.0 のタグはまだ無い）。前回の記録は git の履歴にある。
@@ -349,7 +368,6 @@ Wave 3（見込み）リリース（0.5.0 の spec は 0 本）
 - `scene-condition-attributes`（2026-10-29 起票。`call-attribute-filter` を統合）: 版は 2026-10-29 に 0.5.0 と決めた（上の「0.5.0 の範囲」）。会えた日数をエンジンが数える別 spec を起票するか（推奨: 起票する）と、その変数の名前も開発者の判断待ち（brief の「決まらなかったこと」）。
 - `scene-anchor-link`（2026-10-08 起票）: 中身は上の「Phase 11 の残り」の「文中のシーンリンク」にある。
 - `vsce-4-upgrade`・`pest-2-9-4-upgrade`（2026-10-24 起票）: 中身は下の「依存の更新」にある。
-- `vscode-scene-outline-play`（2026-11-09 起票）: 中身は台帳の行にある。
 
 ## 依存の更新（2026-10-24 起票）
 
@@ -393,7 +411,10 @@ Wave 3（見込み）リリース（0.5.0 の spec は 0 本）
 - [ ] vsce-4-upgrade -- `@vscode/vsce` を 4.x に上げる。リリース CI の Node は `ponytail-manual-ci` が 22 にした。`--azure-credential` の公開の道を `release-setup-check.yml` で確かめる。だめなら 4.x の OIDC の口へ移すかを決める（2026-10-24 起票。`/update` から）。版は未定。`pasta-dll-multiarch`（`release.yml`）と同じウェーブに置かない（`editors/vscode/package.json` を共有した `vscode-mcp-client` は 2026-11-03 に入った）。Dependencies: none（`ponytail-manual-ci` は入った）
 - [ ] pest-2-9-4-upgrade -- pest を 2.9.4 以降に上げても、手元と CI の 3 か所で `pasta_lsp` の WASM のビルドが通るようにする（psm が wasm32 に clang を要る）。wasm32 向けの C コンパイラの用意か、上流の直しかを決める（2026-10-24 起票。`/update` から）。版は未定。`Cargo.lock` の席を触る spec と同じウェーブに置かない（0.5.0 の `debug-mcp-runtime` は 2026-11-03 に入った）。Dependencies: none（ファイルの順番で後に置いた ponytail の 3 本は入った）
 - [x] actor-line-newlines -- 同じ話し手が続く行（継続行 `　：` と、同じアクターを書き直した行）の前に、`[actor."名前"] line_newlines` の幅の改行 `\n[値×100]` を入れる（未設定なら今のまま）。トランスパイラが行の頭の印を出し、出力側が spot_newlines と同じ遅延方式で次の字の直前に 1 つ入れる。話し手の切り替え・選択肢の前後は今の区切りを優先、行の最初の字より前に改行・`\_l`・`\c` があれば入れない、前の行が改行で終われば入れない、Call をまたいでも出力の並びで見る、budoux の列を 1 つ進める。`[ghost]` の既定値と、改行の後に付ける字下げは範囲外（2026-11-05 起票。ghost_dev「窓際のぱすたさん」の縦書きの辞書をネタ帳と同じ 1 行 1 列の形にするため）。0.5.1（2026-11-05 開発者の決定「早く欲しい」）。`cue-command-runtime` と同じウェーブに置かない（行の頭の生成の場所を共有する）。Dependencies: none
-- [ ] vscode-scene-outline-play -- VSCode 拡張で、`.pasta` の見出しの行（グローバル・ローカル）の上に CodeLens「▶ シーンを実行」を出し、押せばそのシーンを再生する。アウトライン・パンくず・`Ctrl+Shift+O`・スティッキースクロールに グローバル ＞ ローカル の 2 階層を出す。シーンの並びは `pasta_lsp` の解析結果に足して WASM で渡し、DocumentSymbol と CodeLens はそれを写すだけ。`pasta.runSceneAtCursor` は引数（uri・行）でも呼べるようにし、行からシーンを引くのは今の `OnPastaSceneAt` のまま。独自の設定 `pasta.codeLens.enabled` は作らない（`"[pasta]": { "editor.codeLens": false }` で消せる）（2026-11-09 起票。開発者の依頼）。版は未定。`vsce-4-upgrade`（`editors/vscode/package.json`）・`scene-anchor-link`（`pasta_lsp` の解析）と同じウェーブに置かない。Dependencies: none
+- [ ] vscode-scene-outline-play -- VSCode 拡張で、`.pasta` の見出しの行（グローバル・ローカル）の上に CodeLens「▶ シーンを実行」を出し、押せばそのシーンを再生する。アウトライン・パンくず・`Ctrl+Shift+O`・スティッキースクロールに グローバル ＞ ローカル の 2 階層を出す。シーンの並びは `pasta_lsp` の解析結果に足して WASM で渡し、DocumentSymbol と CodeLens はそれを写すだけ。`pasta.runSceneAtCursor` は引数（uri・行）でも呼べるようにし、行からシーンを引くのは今の `OnPastaSceneAt` のまま。独自の設定 `pasta.codeLens.enabled` は作らない（`"[pasta]": { "editor.codeLens": false }` で消せる）（2026-11-09 起票。開発者の依頼）。0.5.3 のウェーブ 1（2026-11-12 開発者の承認。`pasta-recipe` のツリーが `scenes` を使う）。`vsce-4-upgrade`（`editors/vscode/package.json`）・`scene-anchor-link`（`pasta_lsp` の解析）と同じウェーブに置かない。Dependencies: none
+- [ ] scene-play-locals -- `OnPastaScene`・`OnPastaSceneAt` の Reference2 に TOML のインライン表（`{ 名前 = "ぱすた", 回数 = 3 }`）を付けると、そのシーンがローカル変数に値が入った状態で始まる。付けなければ今のまま。誤りは今の `OnPastaSceneAt` と同じ形で知らせて鳴らさない。マニュアルの 2 つの節（2026-11-12 起票。`pasta-recipe` の discovery）。0.5.3 のウェーブ 1。`cue-command-runtime`・`novel-*`（`scene.lua`）と同じウェーブに置かない。Dependencies: none
+- [ ] pasta-recipe -- VS Code を使わない pasta DSL のエディタ（仮名）。Tauri 2 ＋ Vite ＋ Monaco の Windows x64 の単一の exe。ゴーストのフォルダのドラッグドロップで `ghost/master` を開き、最近開いたものを TOML で残す。ファイルとシーンのツリー、`.pasta` の着色（TextMate ＋ セマンティックトークン）と診断、ゴースト全体の検査、コードブロックの Lua の着色と `.lua` の編集、保存。解析は Rust の側で `pasta_lsp`・`pasta_check` を直接呼ぶ。`editors/recipe/`（`src-tauri` は別の Cargo ワークスペース）。リリースの成果物 `pasta-recipe.zip` とマニュアル（2026-11-12 起票。開発者の依頼「最優先事項」）。0.5.3 のウェーブ 2。`pasta-dll-multiarch`・`vsce-4-upgrade`（`release.yml`）と同じウェーブに置かない。Dependencies: vscode-scene-outline-play
+- [ ] pasta-recipe-dev-actions -- VS Code 拡張の実行の流れ（MCP クライアント・リロード・シーン実行・変数ダンプ）を `editors/shared/` へ移し、入出力（HTTP の POST・ファイルの読み取り・更新時刻）だけを Node と Tauri で差し込む。拡張の振る舞いは変えない。`pasta-recipe` に、シーンの ▶・リロード・出力の欄・保存変数の表（`OnPastaSetSaveVariable` で書き換え・削除。表は見るだけ）・ローカル変数を入れた実行を足す（2026-11-12 起票。`pasta-recipe` から分けた）。0.5.3 のウェーブ 3。Dependencies: pasta-recipe, scene-play-locals, vscode-scene-outline-play
 
 ## Existing Spec Updates
 
