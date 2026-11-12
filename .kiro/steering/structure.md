@@ -184,6 +184,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │       ├── analysis/    # 解析エンジン（ディレクトリモジュール）
 │   │       │   ├── mod.rs          # 解析API・全公開型 re-export
 │   │       │   ├── token_types.rs  # トークン型定義
+│   │       │   ├── scenes.rs       # シーンの並び（グローバル ＞ 名前のあるローカル・見出しと範囲。着色と同じ構文木から作る）
 │   │       │   ├── visit_scope.rs  # スコープ走査ビジター（旧 visitors.rs を分解）
 │   │       │   ├── visit_action.rs # アクション走査ビジター
 │   │       │   ├── visit_expr.rs   # 式走査ビジター
@@ -225,9 +226,10 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── wasmBridge.ts           # WASMモジュールブリッジ（解析・ゴースト全体の検査の入口と型）
 │       │   ├── ghostValidator.ts       # ゴースト全体の検査の診断（保存・ファイルの増減で起動・300ms で束ねる・source "pasta validate"）
 │       │   ├── semanticTokensProvider.ts # セマンティックトークン提供
+│       │   ├── sceneOutline.ts         # シーンの並びをアウトライン（DocumentSymbol）と見出しの上の「▶ シーンを実行」（CodeLens）に写す（WASM が読めたときだけ登録）
 │       │   ├── diagnosticsManager.ts   # 診断情報管理
 │       │   ├── documentSync.ts         # ドキュメント同期（200msデバウンス）
-│       │   ├── devCommands.ts          # 開発の 3 コマンド（▶ シーンを実行・SHIORI をリロード・保存変数を表示）の入口。相手の確かめと覚え・保存・出力のパネル「Pasta 開発」
+│       │   ├── devCommands.ts          # 開発の 3 コマンド（▶ シーンを実行・SHIORI をリロード・保存変数を表示）の入口（引数 (uri, 0 始まりの行) でも呼べる）。相手の確かめと覚え・保存・出力のパネル「Pasta 開発」
 │       │   ├── mcpClient.ts            # SSP・areka の MCP（127.0.0.1 の 9801/9821…）へ道具を 1 回呼ぶ・相手を探す・記録を読む（vscode に依存しない）
 │       │   ├── ghostFiles.ts           # ゴーストのルートと表示名・pasta.log の場所と増えた分・variables.toml（vscode に依存しない）
 │       │   ├── reloadShiori.ts         # 読み込み直しと終わりの印の待ち・誤りの要約
@@ -351,7 +353,7 @@ pasta (workspace)
 ├── pasta_core          # 言語非依存層（レジストリ）
 ├── pasta_lua           # Luaバックエンド層（pasta_dsl + pasta_core依存）
 ├── pasta_shiori        # SHIORI DLLインターフェース層（旧来の入口 windows.rs〔Windows だけ〕と版 3 の入口 v3.rs〔全 OS〕・src/actor/ = インスタンスごとのアクタースレッド・flume mailbox・marshaling・teardown・pasta.dll の参照 module_ref・旧来の置き場 static LEGACY）
-├── pasta_lsp           # WASM の解析器（色・構文の診断・pasta_check の検査の核を WASM で公開）
+├── pasta_lsp           # WASM の解析器（色・構文の診断・シーンの並び・pasta_check の検査の核を WASM で公開）
 ├── pasta_check         # 辞書の検査の核（ライブラリ・pasta_dsl + pasta_core依存）＋CLI（validate・release）
 └── pasta_sample_ghost  # サンプルゴースト「hello-pasta」（publish=false）
 ```
