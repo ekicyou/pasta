@@ -68,7 +68,7 @@
   - 完了の状態: `node book/tools/gen-skill-refs.mjs --check` が通る
   - _Requirements: 6.4_
 
-- [ ] 5. 最終の確認
+- [x] 5. 最終の確認
   - `NoDefaultCurrentDirectoryInExePath` を外して `cargo test -p pasta_dsl`・`cargo test -p pasta_lua`・`cargo clippy` を走らせ、luacheck を `scene_play.lua`・`failure.lua` にかける
   - `pasta_lua` のテストが書き換える `sample.generated.lua` の改行だけの差分は戻す
   - 完了の状態: 全部通り、今のテスト（`scene_play_event_test.rs` の今の関数・`lua_specs/scene_play_event_test.lua`）を書き換えていないことを差分で確かめた
