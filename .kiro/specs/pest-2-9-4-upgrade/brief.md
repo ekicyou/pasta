@@ -82,13 +82,13 @@ pest 2.9.4 に上げると、`pasta_lsp` の WASM のビルドが手元で落ち
 - `ponytail-dsl-parser` は、`parse_str` の入口で 1 行の括弧の重なりを 64 段に抑える走査を pest の前に置く。上げた後も、64 段までの辞書の結果は変わらない見込み。
 - `ponytail-dsl-parser` は span の始まりを `Pair::line_col()`（pest の `LineIndex`）から取る。上げるときは、`crates/pasta_dsl/tests/span_oracle_test.rs` を走らせ、行と桁の数え方が変わっていないことを確かめる。
 
-## 2026-11-03 棚卸の再測定（main c575febd）
+## 2026-11-12 棚卸の再測定（main 2381bf52）
 
-- **前提の変化**: 先に入るはずだった 3 本（`ponytail-dsl-parser`・`ponytail-core-registry`・`ponytail-editor-tooling`）は入った。pest の版は動いていない（ルートの `Cargo.toml` 20・21 行は `2.8.6`、`Cargo.lock` は 4 つとも 2.9.2、`stacker`・`psm` は lock に無い）。`build.yml` の job `wasm` は 162 行から（`cargo build -p pasta_lsp` 180 行・`cargo check -p pasta_check` 183 行・大きさの検査 190 行）。`pasta_lsp` は WASM の解析器だけになり、tower-lsp は無い。`release.yml` の wasm-pack は、env の SHA-256（23・25 行）で照合してから入れる形になった。上の申し送り（`ponytail-dsl-parser` より）は main と合っている（括弧の重なりの上限 `MAX_PAREN_DEPTH = 64` は `parser/mod.rs` 112 行、`span_oracle_test.rs` は 143 行で `Position::line_col` と比べる）。手元の clang・`CC_wasm32_unknown_unknown` の用意は、まだどこにも書かれていない（`tech.md`・`build-wasm.ps1`）。
-- **触るファイル**: ルートの `Cargo.toml`（20・21 行）・`Cargo.lock`、`editors/vscode/scripts/build-wasm.ps1`（129 行）、CI で clang を入れるなら `build.yml`（225 行）・`release.yml`（609 行）、`tech.md`。1,000 行に近いものは無い。
-- **規模**: 4〜6 タスク（初めて測った。版と lock 1、手元の前提と事前の確かめ 1〜2、CI の 3 か所 1〜2、文書 1）。
-- **先に要るもの**: 働きの上では無い（案 2 なら上流の直し）。ファイルの重なり（未完了）: `debug-mcp-runtime`（DAP の送受信を消せば、`socket2` などがルートの `Cargo.toml`・`Cargo.lock` から抜ける見込み）、`hello-novel-sample`（`Cargo.lock` を触るなら）、CI に手を入れるなら `pasta-dll-multiarch`（`build.yml`・`release.yml`）・`vsce-4-upgrade`（`release.yml`）。
+- **前提の変化**: pest の版は動いていない（ルートの `Cargo.toml` 20・21 行は `2.8.6`、`Cargo.lock` は 2.9.2、`stacker`・`psm` は lock に無い）。#249 はルートの `Cargo.toml` を変えておらず、その後の `Cargo.toml`・`Cargo.lock` の変化は版の数字（0.4.4 → 0.5.2）だけ。`build.yml` の job `wasm`（162 行。`cargo build -p pasta_lsp` 180 行・`cargo check -p pasta_check` 183 行）と、申し送りの `MAX_PAREN_DEPTH = 64`（`parser/mod.rs` 112 行）・`span_oracle_test.rs`（143 行）も前のまま。`debug-mcp-runtime` は入った（`socket2` は抜けた）。新しく、0.5.3 の `pasta-recipe` が `editors/recipe/src-tauri` を別の Cargo ワークスペース（自前の `Cargo.lock`）にし、`pasta_lsp`・`pasta_check` をネイティブで取り込む。
+- **触るファイル**: ルートの `Cargo.toml`（20・21 行）・`Cargo.lock`、`pasta-recipe` が先に入っていれば `editors/recipe/src-tauri/Cargo.lock`（pest をそちらでも上げる）、`editors/vscode/scripts/build-wasm.ps1`（129 行）、CI で clang を入れるなら `build.yml`（225 行）・`release.yml`（609 行）、`tech.md`。1,000 行に近いものは無い。
+- **規模**: 4〜6 タスク（`pasta-recipe` の lock を合わせても版と lock の 1 タスクの中）。
+- **先に要るもの**: 働きの上では無い（案 2 なら上流の直し）。ファイルの重なり（未完了）: `pasta-recipe`（`editors/recipe/src-tauri/Cargo.lock`。CI に手を入れるなら `build.yml`・`release.yml` も）、`hello-novel-sample`（`Cargo.lock` を触るなら）、CI に手を入れるなら `pasta-dll-multiarch`（`build.yml`・`release.yml`）・`vsce-4-upgrade`（`release.yml`）。
 - **種別**: 基盤（道具の版を上げる。開発者の依頼で `/update` から起票）。
 - **要件定義のモデル**: Opus（案は 3 つで推奨が付いていて、どれも後から戻せる）。
 - **分割の案**: 不要。
-- **見つけた穴・古くなった記述**: Current State の `build.yml` の行番号（122・125・132 行）は古い（上の行が正しい）。Adjacent の `ponytail-editor-tooling`・`ponytail-dsl-parser`・`ponytail-manual-ci`・`shiori4-v3-portable` は完了した。
+- **見つけた穴・古くなった記述**: Current State の `build.yml` の行番号（122・125・132 行）は古い（上の行が正しい）。Adjacent の `ponytail-editor-tooling`・`ponytail-dsl-parser`・`ponytail-manual-ci`・`shiori4-v3-portable` は完了した。`pasta-recipe` の exe は x64 のネイティブだけなので wasm32 の clang の問題は出ないが、上げた後は psm・stacker が exe にも入り、`THIRD_PARTY_LICENSES.txt` に出る。手元の clang・`CC_wasm32_unknown_unknown` の用意は、まだどこにも書かれていない（`tech.md`・`build-wasm.ps1`）。

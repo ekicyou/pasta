@@ -142,20 +142,6 @@
 
 - ノベルゲーム（Phase 13）は 0.5.0 から 0.6.0 へ順延した（開発者の決定）。この brief の「0.5.0」は、ノベルゲームの版のことで、今は 0.6.0 と読む。0.5.0 は「属性関係の整備」（`scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`）になり、0.4.5（ponytail）の次に入る。
 
-## 2026-11-03 棚卸の再測定（main c575febd）
-
-- **前提の変化**（前回 2026-10-23・`82176f19` から）
-  - `ponytail-lua-scripts`: `choice_select.lua` は 80 → 63 行。コルーチンを作る局所関数 `create_scene_coroutine` は消え、`SCENE.wrap`（`scene.lua` 177 行）に替わった（前回の見込みのとおり）。Reference の番号の決め打ちは 16〜18 行、受け口の本体は 24〜61 行、範囲を読めないときの `STORE.last_global_scene` は 49〜52 行、探し直しは 53〜54 行。振り分けの取り出しは、この形から始める。
-  - `init.lua` は 347 行。既定のハンドラの読み込みは 85〜91 行で、末尾は `recommend`（`external_control` の後ろ）。新しい受け口のファイルを置くなら、その後ろに 1 行。ハンドラには今も act だけを渡し、Reference は場面の引数にならない（`EVENT.drive(result, act, act)` 319 行）。`CLOCK.observe` は 293 行、`STOP.hold_handler` は 303・313 行。手本の撫で・つつき（`mouse.lua` 176 行、`SCENE.co_exec_exact` 120 行）と完全一致の部品（`SCENE.co_exec_exact` 240 行・`search_scene_exact` は `search/context.rs` 114 行）は、形が変わっていない。`REG` のメタテーブル（`register.lua` 115 行）の下でも、既定のハンドラの置き方 `REG.名前 = REG.名前 or 関数` はそのまま使える。
-  - `debug-mcp-runtime`（未完了）がキックを消すと、指名した再生の印 `STORE.co_preempt` を付けるのは `scene_play.lua` だけになる。
-- **触るファイル**: `choice_select.lua`（63。振り分けを関数として取り出す）、受け口を新しいファイルにするなら `init.lua`（347）に 1 行、範囲つきの完全一致の口を足すなら `scene.lua`（261）、テスト（`crates/pasta_lua/tests/lua_specs/`）、マニュアル（`lua/shiori-events.md` の 117 行からの既定ハンドラの表と新しい節）。`act.lua` は触らない。1,000 行に近いものは無い。
-- **規模**: 6〜8 タスクのまま。
-- **先に要るもの**: `novel-areka-contract`（未着手。イベントの名前と Reference の決まり）。ファイルの重なり（未完了）: `scene-anchor-link`（`choice_select.lua`。先に入る側が振り分けを取り出す）、`scene-exact-match`（`choice_select.lua`・`init.lua`・`scene.lua`）、`cue-command-runtime`（柱を `choice_select.lua` で打つ場合）、`novel-talk-flow`・`novel-checkpoint-rollback`（`init.lua`）、`scene.lua` に足すなら `scene-attribute-store`・`scene-condition-attributes`・`scene-pick-modes`・`novel-talk-flow`。`ponytail-lua-scripts`・`recommend-menu-scenes` は入ったので外れた。
-- **種別**: 機能（名前つきのクリックを場面へ届ける道が無い）。開発者の決定（システム画面はシェルで組む）から。
-- **要件定義のモデル**: Opus のまま。「どの画面の場面か」の決め方（画面を出した場面を覚える／areka に名前を運んでもらう）と、チェイントークとの関係（選択肢と同じ割り込みか、`STORE.co_preempt` の印を付けた指名の再生か）は、どちらも 2 案に絞れていて推奨を付けられる。
-- **分割の案**: 不要。
-- **見つけた穴・古くなった記述**: Current State の「2026-10-10 の検証で見つかった穴」の行番号（41〜78・25〜35 行）と「`init.lua` 226 行」は古い（上の行が正しい）。「どの画面の場面か」を覚える案で `STORE.last_global_scene` は使えない（中断の場面が走るとその名前になる。前のまま）。覚えるなら専用の置き場所にする。
-
 ## 申し送り（2026-11-03・`scene-condition-attributes` の実装より）
 
 - `choice_select.lua` は飛び先を `SCENE.search(choice_id, scope, act)` → `SCENE.search(choice_id, nil, act)` の順に act を渡して探す。どちらも見つからず、どちらかが条件漏れ（2 つ目の戻り値 `"unmet"`）なら `FAILURE.raise({ label = SCENE_UNMET, subject = "OnChoiceSelectEx ＞ID" })` で止まる。名前が無ければ今の 204。振り分けを取り出すときは、この 3 つの結果（見つかった・名前が無い・条件漏れ）をそのまま運ぶ。
@@ -163,3 +149,14 @@
 - `SceneTable::resolve_*` は `filters` の代わりに述語 `Option<CondFn>` を受け、`SceneTableError::NoMatchingScene { scene }` は「名前に合うシーンはあるが条件を満たす候補が無い」の意味になった。
 - イベントの act は、作るとき（`init.lua` の `create_act`）に Reference と日時が `var` に入る。当たり判定の名前（Reference）はシーンの条件（`＆＄ｒ０＝「Head」` など）でも振り分けられる。
 - 参照: `.kiro/specs/completed/scene-condition-attributes/design.md`（LuaSceneSearch・ChoiceSelect の節）。
+
+## 2026-11-12 棚卸の再測定（main 2381bf52）
+
+- **前提の変化**: `scene-condition-attributes` の分は上の申し送りのとおり。`choice_select.lua` は 63 → 73 行で、Reference の番号の決め打ちは 18・20 行、受け口の本体は 26〜71 行、範囲を読めないときの `STORE.last_global_scene` は 51〜54 行、act を渡した探し直しと条件漏れの `FAILURE.raise` は 55〜64 行。振り分けを取り出すときは、見つかった・名前が無い（204）・条件漏れ（止まるエラー）の 3 つを運ぶ。完全一致の部品（`SCENE.co_exec_exact` は `scene.lua` 284 行、`search_scene_exact` は `search/context.rs` 153 行）は今も条件を見ない。エレメントの名前を完全一致で選ぶ案なら、条件（`＆＄ｒ０＝…`）を効かせるかを要件で決める（`scene-exact-match` と揃える）。`scene-pick-modes` の `＆重み`・`＆順番` は名前で選ぶ道（`SCENE.search`）にだけ効く。`scene-play-locals` は指名の再生にローカル変数を足しただけで、`STORE.co_preempt` の印を付けるのは今も `scene_play.lua`（113・151 行）だけ。`init.lua` は 351 行で、既定のハンドラの読み込みの並びは 85〜91 行（末尾は `recommend`）、ハンドラに渡すのは今も act だけ（`EVENT.drive(result, act, act)` 323 行）。
+- **触るファイル**: `choice_select.lua` 73（振り分けを関数として取り出す）、受け口を新しいファイルにするなら `init.lua` 351 に 1 行、範囲つきの完全一致の口を足すなら `scene.lua` 305、テスト（`crates/pasta_lua/tests/lua_specs/`。一覧 `init.lua` に 1 行）、マニュアル（`book/src/lua/shiori-events.md` 1,509 行の 117 行からの既定ハンドラの表と新しい節）。`act.lua` は触らない。ソースに 1,000 行に近いものは無い。
+- **規模**: 6〜8 タスクのまま。
+- **先に要るもの**: `novel-areka-contract`（未着手。イベントの名前と Reference の決まり）。ファイルの重なり（未完了）: `scene-anchor-link`（`choice_select.lua`。先に入る側が振り分けを取り出す）、`scene-exact-match`（`choice_select.lua`・`init.lua`・`scene.lua`）、`cue-command-runtime`（柱を `choice_select.lua` で打つ場合）、`novel-talk-flow`・`novel-checkpoint-rollback`・`shiori4-v4-lua-api`（`init.lua`）、`scene.lua` に足すなら `novel-talk-flow`。0.5.0 の 3 本と `debug-mcp-runtime` は入って外れた。
+- **種別**: 機能（名前つきのクリックを場面へ届ける道が無い）。開発者の決定（システム画面はシェルで組む）から。
+- **要件定義のモデル**: Opus のまま。「どの画面の場面か」の決め方（画面を出した場面を覚える／areka に名前を運んでもらう）と、チェイントークとの関係（選択肢と同じ割り込みか、`STORE.co_preempt` の印を付けた指名の再生か）は、どちらも 2 案に絞れていて推奨を付けられる。完全一致で条件を見るかも、`scene-exact-match` に揃える 1 択で済む。
+- **分割の案**: 不要。
+- **見つけた穴・古くなった記述**: 「Current State」の「穴」の `choice_select.lua` 16〜18・41〜78・25〜35 行と「`init.lua` 226 行」は古い（上の行が正しい）。「Reference は場面の引数にならない」は今もそうだが、`create_act`（`init.lua` 104 行）が `＄ｒ０`〜へ写すので、場面の中で読め、条件で振り分けられる。「`search/context.rs` 105・302 行」は 153・289 行。「どの画面の場面か」を覚える案で `STORE.last_global_scene` は使えない（中断の場面が走るとその名前になる。前の節から持ち越し）。覚えるなら専用の置き場所にする。

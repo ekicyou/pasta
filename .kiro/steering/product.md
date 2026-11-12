@@ -21,7 +21,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
 - [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
 
-**完了仕様**: 203件（2026-11-03 時点・`.kiro/specs/completed/` に格納）
+**完了仕様**: 208件（2026-11-12 時点・`.kiro/specs/completed/` に格納）
 
 **主要成果**:
 - ✅ **act-impl-call** - `ACT_IMPL.call` 4段階優先順位検索実装
@@ -82,6 +82,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - ✅ **debug-startup-logging** - デバッグバックエンド起動時の info/warn 観測ログ
 - ✅ **vscode-extension-release** / **vscode-trailing-newline** - 拡張リリース・末尾改行整備
 - ✅ **debug-mcp-runtime** / **vscode-mcp-client** - DAP とキックを撤去し、開発の道具を SSP・areka の MCP へ移した（2026-11-03。上の DAP の部品は今は無い）
+- ✅ **vscode-scene-outline-play** - 見出しの上の「▶ シーンを実行」と、グローバル ＞ ローカルの 2 階層のアウトライン（シーンの並びは `pasta_lsp` の解析結果の `scenes`。2026-11-12）
 
 **保守性・基盤整備**:
 - ✅ **oversized-file-decomposition** - 巨大 Rust ファイルを俯瞰可能サイズへ振る舞い不変分解（分解した時点で全ファイル < 600 行）
@@ -107,4 +108,4 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [ ] arekaへの投入（`ukagaka-desktop-mascot`メタ仕様）
 - [ ] MCPまたはLLMとの連携
 
-**現在地**: 現行バージョン v0.4.4（2026-10-31 リリース）。v0.4.4 は、日時変数の `＄季節`・`＄節句` を足した緊急の版。その前の v0.4.3（2026-10-25 リリース）には、セーブの TOML 化（致命的な不具合の直し）、mlua 0.12 へ上げる 2 本（`mlua-stdlib-removal`・`mlua-0-12-upgrade`）、おすすめメニューをシーンで書く `recommend-menu-scenes`、作者のフォルダを消す不具合を直す `ponytail-check-release`、SHIORI3 互換モードで Windows 以外でも動かす `shiori4-v3-portable` が入った。その前の v0.4.2（2026-10-23 リリース）には、致命的でない不具合の 7 本（ゴーストから DLL の関数を FFI で呼ぶ・`pasta_check` の単体配布・シーンからの自動トークの停止と再開・MCP から指名したシーンの再生・外からの `＞名前` の呼び出しと変数の代入・`REG:register` によるハンドラの重ね・台詞を出さないイベントでチェイントークの続きが消えない直し）と、書記素クラスタ単位の自動ウェイトと改行、pasta のスキル 3 本を `pasta-skills.zip` にしてリリースに添える直しが入った。その前の v0.4.1（2026-10-18 リリース）には、辞書の検査の端のケース・入門ガイドと SSP のずれと、窓際のぱすたさんからの要望 2 本（アクターごとの表示の装い・縦書きのバルーンの列の扱い）が入った。その前の v0.4.0（2026-10-17 リリース。主題は「入門者にやさしく」）は、初めて辞書を書く人が迷わず進めて、書き間違えたときに原因が分かることを優先した版で、hello-pasta の新しいシェル、9 段目の選択肢の直し、撫で・つつきの反応のショートカット、実行時の失敗の出力の一本化、止まるエラーのバルーン表示、SSP を起動しない辞書の検査（`pasta_check validate`）、シェルの説明の章、入門ガイドの絵が入った。次は 0.5.0（範囲は [roadmap.md](roadmap.md) の「0.5.0 の範囲」。ponytail 監査の指摘を直す 8 本（2026-11-03 までに全部入った。`ponytail-lua-debug` は DAP を捨てるので閉じた）と、属性関係の整備の 4 本（シーンの属性を実行時に意味を持つものにする 3 本と、シーンの数を読む `scene-count`）。2026-11-02 に 0.4.5 を廃止してまとめた。同じ日に、VSCode の開発の道具を DAP から SSP・areka の MCP へ移す 2 本も足した。2026-11-03 に、属性の 2 本（`scene-attribute-store`・`scene-count`）と MCP の 2 本が入り、残りは属性の 2 本（`scene-condition-attributes`・`scene-pick-modes`））、その次が 0.6.0 の目標（別リポジトリで開発中の areka でノベルゲームが作れるようになること。2026-10-29 に 0.5.0 から順延）。リリースの CI 化と CI での初回リリース（v0.3.8）は完了した
+**現在地**: 現行バージョン v0.5.2（2026-11-07 リリース）。v0.5.2 は、VSCode の着色で Lua ブロックの閉じ柵より後ろが白くなる不具合を直した版。その前の v0.5.1（2026-11-06）には、同じ話し手が続く行の前に設定の幅で改行を入れる `actor-line-newlines` が入った。その前の v0.5.0（2026-11-05。主題は ponytail 監査の指摘の修正と属性関係の整備）には、ponytail の 8 本、シーンの属性の倉・条件・選び方（`＆重み`・`＆順番`）・シーンの数、DAP の撤去と MCP への移行が入った。次は 0.5.3（範囲は [roadmap.md](roadmap.md) の「0.5.3 の範囲」。VS Code を使わないエディタ `pasta-recipe`。2026-11-12 に、先に要る 2 本（`vscode-scene-outline-play`・`scene-play-locals`）が入った）。その前の v0.4.4（2026-10-31 リリース）は、日時変数の `＄季節`・`＄節句` を足した緊急の版。その前の v0.4.3（2026-10-25 リリース）には、セーブの TOML 化（致命的な不具合の直し）、mlua 0.12 へ上げる 2 本（`mlua-stdlib-removal`・`mlua-0-12-upgrade`）、おすすめメニューをシーンで書く `recommend-menu-scenes`、作者のフォルダを消す不具合を直す `ponytail-check-release`、SHIORI3 互換モードで Windows 以外でも動かす `shiori4-v3-portable` が入った。その前の v0.4.2（2026-10-23 リリース）には、致命的でない不具合の 7 本（ゴーストから DLL の関数を FFI で呼ぶ・`pasta_check` の単体配布・シーンからの自動トークの停止と再開・MCP から指名したシーンの再生・外からの `＞名前` の呼び出しと変数の代入・`REG:register` によるハンドラの重ね・台詞を出さないイベントでチェイントークの続きが消えない直し）と、書記素クラスタ単位の自動ウェイトと改行、pasta のスキル 3 本を `pasta-skills.zip` にしてリリースに添える直しが入った。その前の v0.4.1（2026-10-18 リリース）には、辞書の検査の端のケース・入門ガイドと SSP のずれと、窓際のぱすたさんからの要望 2 本（アクターごとの表示の装い・縦書きのバルーンの列の扱い）が入った。その前の v0.4.0（2026-10-17 リリース。主題は「入門者にやさしく」）は、初めて辞書を書く人が迷わず進めて、書き間違えたときに原因が分かることを優先した版で、hello-pasta の新しいシェル、9 段目の選択肢の直し、撫で・つつきの反応のショートカット、実行時の失敗の出力の一本化、止まるエラーのバルーン表示、SSP を起動しない辞書の検査（`pasta_check validate`）、シェルの説明の章、入門ガイドの絵が入った。0.5.3 の後は 0.6.0 の目標（別リポジトリで開発中の areka でノベルゲームが作れるようになること。2026-10-29 に 0.5.0 から順延）。リリースの CI 化と CI での初回リリース（v0.3.8）は完了した

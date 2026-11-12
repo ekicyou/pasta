@@ -104,3 +104,18 @@ pasta DSL の編集支援は、今は VS Code 拡張 `ekicyou.pasta-vscode`（v0
 - `scenes` は実装済み。Rust からは `pasta_lsp::analysis::AnalysisEngine::analyze` の `AnalysisResult.scenes: Vec<SceneNode>`（`SceneNode`・`SceneKind` は `pasta_lsp::analysis` から公開）。JSON の欄は `tokens`・`diagnostics`・`scenes` の順、項目は `name`・`kind`（`"global"`／`"local"`）・`heading`・`range`・`children`。行は 0 始まり・列は UTF-16。形は `crates/pasta_lsp/src/transport.rs` の形の試験が文字列で固定している。
 - 範囲の式は pasta.dll の行からシーンを引く表と同じ（次の見出しの前の行まで）。シーンの後ろのアクター辞書・単語定義の塊は前のシーンの範囲に入る。構文の誤りのあるシーンは並びに出ず、範囲は出た見出しだけで決まる（詳しくは `completed/vscode-scene-outline-play/design.md` の Open Questions / Risks の Known limit）。
 - 見出しの行からの再生は `OnPastaSceneAt` に `ファイルの絶対パス, 1 始まりの行` を渡す今の形のまま。
+
+## 2026-11-12 棚卸の再測定（main 2381bf52）
+
+- **前提の変化**: 起票の後に `vscode-scene-outline-play`（#252）と `scene-play-locals`（#253）が入った。`AnalysisResult.scenes`（`SceneNode`・`SceneKind`。`pasta_lsp::analysis` から公開・`serde::Serialize` 付き）が在るので、Tauri のコマンドは `AnalysisEngine::analyze` の結果をそのまま返せる（`transport.rs` の `wasm_*` は `cfg(target_arch = "wasm32")` だけ）。Current State の「シーンの並び: 今の解析結果には無い」は古い（上の申し送りが正しい）。ルートの `Cargo.toml` は #249 では変わっておらず（その後の変化は版の数字だけ）、`members = ["crates/*"]` なので、`editors/recipe/src-tauri` を自前の `[workspace]` にする案はそのまま通る。`pasta_lsp` は `workspace = "../.."` を書いた path 依存として引ける（`crate-type` に `rlib` がある）。
+- **触るファイル**: 新しく `editors/recipe/`（`src/`・`src-tauri/` の `Cargo.toml`・`Cargo.lock`・`tauri.conf.json`、`package.json`）。既存は `.github/workflows/release.yml`（609 行）・`build.yml`（225 行）、添付を足すので `github-release.ps1`（72 行の名前の並び）・`.claude/skills/release/scripts/release-state.ps1`（84 行）・`release-scripts-test.ps1`（項目 10 の 6 つ）、`.gitignore`、マニュアルの新しい章と `SUMMARY.md`。1,000 行に近いものは無い。
+- **規模**: 18〜21 タスク（土台と静的 CRT の確かめ 1、Rust のコマンド 4〜5、Vite・Monaco・worker 1、着色 2、診断 1、ツリー 2、タブ・保存・外の変更 2〜3、開き方と最近開いたもの 2、全体の検査の一覧 1、リリース CI と第三者の表示 2、マニュアル 1）。
+- **先に要るもの**: 働きの上では無い（`vscode-scene-outline-play` は入った）。ファイルの重なり（未完了）: `vsce-4-upgrade`（`release.yml`）、`pasta-dll-multiarch`（`release.yml`・`build.yml`・`github-release.ps1`・`release-state.ps1`・`release-scripts-test.ps1`・`.gitignore`）、CI に clang を入れるなら `pest-2-9-4-upgrade`（`build.yml`・`release.yml`）。どれも版が未定でウェーブ 2 に入らないので、今は塞がない。`pasta-recipe-dev-actions` はこの後（`editors/recipe/`・マニュアルの章）。
+- **種別**: 機能（VS Code を使わない編集のアプリ。開発者の依頼）。
+- **要件定義のモデル**: Opus（形・解析の置き場・ワークスペースは discovery で決まった）。
+- **分割の案**: 今は分けない（`pasta-recipe-dev-actions` を一度切り出した）。要件で 22 を超えたら、リリース CI の部分（`release.yml`・`build.yml` のビルドと中身の検査、`github-release.ps1`・`release-state.ps1`・`release-scripts-test.ps1`、`THIRD_PARTY_LICENSES.txt`、マニュアルの入手の節。4 タスクほど）を `pasta-recipe-release` として後ろのウェーブへ出す。
+- **見つけた穴・古くなった記述**
+  - 凡例は Rust の `pasta_lsp::analysis::TOKEN_TYPES`・`TOKEN_MODIFIERS`（`token_types.rs` 8・29 行の公開の定数）にもある。アプリが Rust のコマンドで凡例を取れば、拡張の `semanticTokensProvider.ts` を触らずに 1 か所にできる。
+  - ゴースト全体の検査でファイルを集める処理（`collect`）は `pasta_check` のバイナリの側（`validate_cmd.rs`。`pub(crate)`）にあり、ライブラリから呼べない。拡張は TS の `ghostValidator.ts`（373 行）で集めている。Rust で書き直すか、`pasta_check` のライブラリへ移すかを要件で決める（移すなら `pasta_check` も触る）。
+  - 配布物を足すときに合わせる所は、Scope の `release.yml`・`build.yml` だけでなく、`github-release.ps1`・`release-state.ps1`・`release-scripts-test.ps1`・リリースノートもある。添付は 6 → 7 になる。
+  - 別のワークスペースには、ルートの `[profile.release]`（`opt-level = "z"`・`lto`・`panic = "abort"`・`strip`）と `[workspace.dependencies]` が効かない。`.cargo/config.toml` の `+crt-static` は、カレントディレクトリから上へ探すので効く。`about.toml` の `accepted` に MPL-2.0 は無く、exe に埋め込む JS（Monaco・shiki）の表示は `cargo about` では作れない。`deny.toml` も別の `Cargo.lock` を見ない。
