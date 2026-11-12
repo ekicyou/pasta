@@ -127,3 +127,10 @@ interface GhostIO {
 - **見つけた穴・古くなった記述**
   - 入出力の面の見込み（`post`・`readText`・`mtime` の 3 つ）では足りない。移す 5 つは `fs.readdir`・バイト列の `readFile`（`descript.txt` の名前の読み取り）・`fs.stat` の大きさ・`fs.open` してずらして読む（`pasta.log` の続き）も使う。`reloadShiori.ts`・`dumpVariables.ts`・`ghostFiles.ts` は Node の `path` を import するが、Vite の中には無いので、パスの組み立ても面に入れるか、小さな自前の関数にする。
   - Constraints の「`OnPastaSetSaveVariable` はデバッグが有効なときだけ効く」は誤り。`external_control.lua` 8 行のとおり、デバッグの有無によらず働き、SecurityLevel が external のときだけ何もしない（204）。デバッグが要るのは `OnPastaScene`・`OnPastaSceneAt`・`OnPastaDumpVariables`（`scene_play.lua` 10 行）。
+
+## 申し送り（pasta-recipe の要件ディスカッションより・2026-11-12）
+
+- アプリの名前は `pasta-recipe`（exe は `pasta-recipe.exe`）で確定。
+- アプリは単一インスタンス（2 つ目の起動は今の窓へパスを渡す。`pasta-recipe` の要件 2.11）。この spec で別の窓や別の起動の口を足さない。
+- ツリーには、ファイル・フォルダの作成と名前の変更の操作が入る（要件 4.14〜4.17。削除は無い）。▶ などのシーンの操作は、その操作と並べて足す。
+- ゴースト全体の検査のファイル集めは `pasta_check` のライブラリの opt-in の機能へ移る（要件 9.12）。ゴーストのファイルを Rust で集めるなら、これを使う。
