@@ -35,6 +35,66 @@ local function allowed(act, event, outcome)
     return debug
 end
 
+--- Reference2（TOML のインライン表）を読み、検査を通ったローカル変数の表か、失敗の応答を返す。act.var には触れない
+---@param act ShioriAct
+---@param event string
+---@param debug table 門が返した @pasta_debug（is_local_var_name を持つ）
+---@return boolean ok
+---@return table|string|nil  ok なら入れる表（Reference2 が無ければ nil）、ok でなければ FAILURE.reply の戻り値
+local function read_locals(act, event, debug)
+    local raw = act.req.reference[2]
+    if raw == nil or raw == "" then return true, nil end
+    -- @toml は Lua の仕様のテストのランナーに無いので、Reference2 があるときだけ読む
+    local doc, err = require("@toml").decode("v = " .. raw)
+    local reason
+    if not doc then
+        -- 位置の行は "v = " の分だけ列がずれるので、最後の空でない行（誤りの文）だけを載せる
+        for l in err:gmatch("[^\r\n]+") do
+            if l:match("%S") then reason = l end
+        end
+    -- @toml は配列も表にするので、インライン表かは先頭の { で見分ける（= の後に改行は置けないので %s は空白とタブだけになる）
+    elseif type(doc.v) ~= "table" or not raw:find("^%s*{") then
+        reason = "not an inline table"
+    else
+        for k in pairs(doc) do
+            if k ~= "v" then reason = "not an inline table" end
+        end
+    end
+    if reason then
+        return false, FAILURE.reply(act, {
+            label = FAILURE.LABEL.NOT_TABLE,
+            subject = event .. " Reference2",
+            detail = FAILURE.value_of(raw),
+            warning = event .. ": bad argument: Reference2=" .. FAILURE.quoted(raw) .. " (" .. reason .. ")",
+        })
+    end
+
+    local keys = {}
+    for k in pairs(doc.v) do keys[#keys + 1] = k end
+    table.sort(keys)
+    for _, k in ipairs(keys) do
+        if not debug.is_local_var_name(k) then
+            return false, FAILURE.reply(act, {
+                label = FAILURE.LABEL.BAD_NAME,
+                subject = event .. " Reference2",
+                detail = FAILURE.value_of(k),
+                warning = event .. ": bad argument: Reference2 key=" .. FAILURE.quoted(k)
+                    .. " (not a local variable name)",
+            })
+        end
+        if type(doc.v[k]) == "table" then
+            return false, FAILURE.reply(act, {
+                label = FAILURE.LABEL.NOT_ASSIGNABLE,
+                subject = event .. " Reference2 ＄" .. k,
+                detail = FAILURE.kind_of(doc.v[k]),
+                warning = event .. ": bad argument: Reference2 key=" .. FAILURE.quoted(k)
+                    .. " (table is not assignable)",
+            })
+        end
+    end
+    return true, doc.v
+end
+
 REG.OnPastaScene = REG.OnPastaScene or function(act)
     local event = "OnPastaScene"
     if not allowed(act, event, "scene not played") then return nil end
