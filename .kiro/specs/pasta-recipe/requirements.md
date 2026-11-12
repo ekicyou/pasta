@@ -248,7 +248,8 @@ hello\                      ← これを exe にドラッグドロップする
 2. The リリース CI shall `pasta-recipe.zip` の中身が、アプリの exe と `THIRD_PARTY_LICENSES.txt` の 2 つだけであることを確かめ、違えば止まる。
 3. The リリース CI shall `pasta-recipe.zip` の exe の版がタグの版と同じであることを確かめ、違えば止まる。
 4. The リリース CI shall `pasta-recipe.zip` の大きさが、決めた上限（値は設計で決める）を超えないことを確かめ、超えれば止まる。
-5. The アプリの `THIRD_PARTY_LICENSES.txt` shall exe に含まれるネイティブの部品と画面の部品（エディタ・着色の部品・文法）の、両方の第三者のライセンスの表示を含む。6. When GitHub Release を作った, the リリース CI shall 今までの 6 つの添付に `pasta-recipe.zip` を加えた 7 つを添付する。
+5. The アプリの `THIRD_PARTY_LICENSES.txt` shall exe に含まれるネイティブの部品と画面の部品（エディタ・着色の部品・文法）の、両方の第三者のライセンスの表示を含む。
+6. When GitHub Release を作った, the リリース CI shall 今までの 6 つの添付に `pasta-recipe.zip` を加えた 7 つを添付する。
 7. The リリースの手順の補助（リリースの状態の確かめ・添付の一覧・そのテスト）shall 添付が 7 つになったことに合わせる。
 8. When 失敗した job を再実行した, the リリース CI shall 今の配布物と同じく、続きから回復する。
 9. The リリース CI shall 今の配布物（`pasta.dll.zip`・`hello-pasta.nar`・VSIX・`pasta_check.zip`・`pasta-skills.zip`）の作り方と中身を変えない。

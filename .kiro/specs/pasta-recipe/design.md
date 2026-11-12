@@ -311,7 +311,7 @@ stateDiagram-v2
 | 5.9, 5.10 | 閉じる確かめ | Documents・Dialog・MainTs | `onCloseRequested` | — |
 | 6.1, 6.4 | 下地と柵の中の Lua | Editor | shiki（pasta・注入・lua） | — |
 | 6.2, 6.3 | セマンティックトークン・凡例 | Editor・Mapping・Commands・RepoParityTest | `legend`・`tokensToData` | 書く |
-| 6.5 | 解析に失敗しても書ける | Commands・Documents | `catch_unwind`・`Err` | 書く |
+| 6.5 | 解析に失敗しても書ける | Commands・Documents | `spawn_blocking` の `JoinError`・`Err` | 書く |
 | 6.6, 6.7 | 同じ種類・明暗 | Theme・Editor | `semanticRules`・`prefers-color-scheme` | — |
 | 7.1, 7.2, 7.5, 7.7 | 波線・1 秒以内・位置・止めない | Documents・Mapping・Editor | `diagnosticsToMarkers`・200 ms | 書く |
 | 7.3, 7.4, 7.6 | 診断の一覧 | Panels・Documents | `reveal` | — |
@@ -451,7 +451,7 @@ pub fn check_name(dir: &Path, name: &str, except: Option<&str>) -> Result<(), St
 
 ```rust
 pub struct TextFile { pub text: String, pub bom: bool }
-pub fn list_tree(master: &Path) -> Result<TreeListing, String>;        // ghost_files::list の相対パスだけ
+pub fn list_tree(master: &Path) -> Result<TreeListing, String>;        // ghost_files::list の相対パスから、最初の要素が profile（大文字・小文字を区別しない）のものを除く
 pub fn read_text(master: &Path, rel: &str) -> Result<TextFile, String>;  // BOM を外して覚える・UTF-8 でなければ Err
 pub fn write_text(master: &Path, rel: &str, text: &str, bom: bool) -> Result<(), String>;
 pub fn create_entry(master: &Path, parent_rel: &str, name: &str, kind: EntryKind) -> Result<String, String>; // 新しい相対パス
@@ -824,5 +824,5 @@ interface OpenRequest { path: string | null }
 - **Risk: shiki とセマンティックトークンの重なり**: ソースの上では重なる。最初のタスクで実物で確かめ、だめなら Editor の Risks の道へ。
 - **Risk: アプリの lock への `cargo deny`**: Tauri の木の勧告で止まることがある。1 件ずつ判断する。
 - **Risk: 大きさ**: 上限 30 MB は見積もり（zip 5 MB 前後）の 6 倍。最初のビルドの実測が 15 MB を超えたら、何が大きいかを調べる（Monaco の言語・shiki の言語の取り込み漏れなど）。
-- **Known limit**: ディスクの綴りが `Profile` のような最上位のフォルダは、ツリー（`pasta_check` の集めは大文字・小文字を区別する）には出るが、開こうとすると範囲の門が拒む。SSP が作るのは `profile` なので実害は無い。
+- **Known limit**: `pasta_check` の集めは最上位の `profile` を大文字・小文字を区別して飛ばす（移す前の振る舞いのまま）。アプリはツリー（`list_tree`）と範囲の門（`resolve_rel`）で大文字・小文字を区別せずに除くので、綴りが `Profile` でもツリーに出ず開けない（4.3・11.4）。検査の集めとの差は、`pasta.toml` の選び方に `Profile` の下が入る場合だけに残る。
 - **Known limit**: BOM 付きのファイルの 1 行目の検査の項目の列は、拡張と同じく BOM を 1 文字に数えた位置になる（拡張と同じ結果を優先）。
