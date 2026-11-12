@@ -47,7 +47,7 @@
 - 依存の向き: `pasta_dsl` → `pasta_lsp`（analysis → transport）→ WASM → `wasmBridge.ts` → `sceneOutline.ts` → `extension.ts`。コマンドの道は `extension.ts` → `devCommands.ts` → `runSceneAtCursor.ts`。逆向きの import は誤り。
 
 ### Revalidation Triggers
-- `SceneNode` の欄の名前・型・意味（範囲の式・見出しの列）を変える → 拡張の `SceneData` と `pasta-recipe` を確かめ直す。
+- `SceneNode` の欄の名前・型・意味（範囲の式・見出しの列）を変える → 拡張の `SceneNode`（wasmBridge.ts）と `pasta-recipe` を確かめ直す。
 - pasta.dll の行からシーンを引く規則（`scene_join.rs` の終わりの行の式・`OnPastaSceneAt` の Reference1）が変わる → 範囲の式と CodeLens の引数を確かめ直す。
 - `pasta.runSceneAtCursor` の引数の形・行の数え方を変える → CodeLens と、再生の流れを `editors/shared/` へ移す `pasta-recipe-dev-actions` を確かめ直す。
 - `AnalysisEngine::analyze` の公開の形（`pub`・戻りの型）を変える → `pasta-recipe` の `src-tauri` を確かめ直す。
@@ -125,7 +125,7 @@ editors/vscode/src/
 - `crates/pasta_lsp/src/analysis/mod.rs` — `mod scenes;`・`pub use scenes::{SceneKind, SceneNode};`。`AnalysisResult` に `pub scenes: Vec<SceneNode>` を足す（`tokens`・`diagnostics` の後ろ）。`analyze` の 2 つの分かれ（全体の解析・部分解析）で、着色に渡すのと同じ `items` から `scenes::collect_scenes(items, source)` を呼ぶ。
 - `crates/pasta_lsp/src/transport.rs` — `test_analysis_result_json_shape_stable` の期待に `scenes` を足す（子を 1 つ持つグローバルを 1 つ入れて、欄の名前・順・`kind` の綴りを固定する）。`wasm_analyze` 本体は変えない。
 - `crates/pasta_lsp/src/lib.rs` — 先頭の説明に「シーンの並び」を 1 行足す。
-- `editors/vscode/src/wasmBridge.ts` — `SceneData` 型と `WasmAnalysisResult.scenes` を足し、`isWasmAnalysisResult` に `Array.isArray(scenes)` を足す。
+- `editors/vscode/src/wasmBridge.ts` — `SceneNode` 型と `WasmAnalysisResult.scenes` を足し、`isWasmAnalysisResult` に `Array.isArray(scenes)` を足す。
 - `editors/vscode/src/extension.ts` — `wasmReady` の中で `SceneOutlineProvider` を作り、`registerDocumentSymbolProvider` と `registerCodeLensProvider`（どちらも `{ language: 'pasta' }`）で登録する。
 - `editors/vscode/src/devCommands.ts` — 登録を `(...args: unknown[]) => execute(cmd, args)` にし、`execute` が引数から対象（文書と 1 始まりの行）を決める。`Command.run` の第 2 引数を `editor` から対象へ変える。
 - `editors/vscode/src/test/mock/vscode.ts` — `SymbolKind`・`DocumentSymbol`・`CodeLens`・`languages.registerDocumentSymbolProvider`・`languages.registerCodeLensProvider`・`workspace.openTextDocument` を足す。
@@ -354,22 +354,19 @@ pub(super) fn collect_scenes(items: &[pasta_dsl::parser::ast::FileItem], source:
 
 ##### Service Interface
 ```typescript
-/** 範囲（DiagnosticData['range'] と同じ形） */
-export type RangeData = DiagnosticData['range'];
-
 /** シーンの並びの 1 項目（pasta_lsp の SceneNode と同じ形） */
-export interface SceneData {
+export interface SceneNode {
   name: string;
   kind: 'global' | 'local';
-  heading: RangeData;
-  range: RangeData;
-  children: ReadonlyArray<SceneData>;
+  heading: DiagnosticData['range'];
+  range: DiagnosticData['range'];
+  children: ReadonlyArray<SceneNode>;
 }
 
 export interface WasmAnalysisResult {
   tokens: ReadonlyArray<SemanticTokenData>;
   diagnostics: ReadonlyArray<DiagnosticData>;
-  scenes: ReadonlyArray<SceneData>;
+  scenes: ReadonlyArray<SceneNode>;
 }
 ```
 - `isWasmAnalysisResult` は `tokens`・`diagnostics`・`scenes` の 3 つが配列であることを確かめる（中身の 1 つずつは確かめない。今の浅さと同じ）。外れたら既存の `WASM analysis failed` の例外になる。
