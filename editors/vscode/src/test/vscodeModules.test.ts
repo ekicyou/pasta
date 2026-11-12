@@ -1002,6 +1002,9 @@ function ghostValidatorCreated(fromCollection: number, fromWatcher: number): { c
   };
 }
 
+/** 要件（requirements.md の Introduction）の例の文書 */
+const REQUIREMENT_EXAMPLE = '＊挨拶\n  さくら：やあ\n  ・朝\n    さくら：おはよう\n＊\n  さくら：またね\n';
+
 // 3 つのコマンドは activate が 1 回で登録する（4.1・5.1・6.1）
 const DEV_COMMANDS = ['pasta.runSceneAtCursor', 'pasta.reloadShiori', 'pasta.showSaveVariables'];
 function assertDevCommandsRegistered(): void {
@@ -1015,6 +1018,8 @@ test('activate loads the real WASM bridge and registers the ghost validator', as
   const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(ROOT) };
   const collectionsBefore = mock.createdDiagnosticCollections.length;
   const watchersBefore = mock.createdFileSystemWatchers.length;
+  const symbolsBefore = mock.registeredDocumentSymbolProviders.length;
+  const lensesBefore = mock.registeredCodeLensProviders.length;
   mock.registeredCommands.clear();
   await activate(context as never);
   // WASM が読めたら GhostValidator を作って登録する（11.12）
@@ -1024,6 +1029,18 @@ test('activate loads the real WASM bridge and registers the ghost validator', as
   // DAP の提示モードの切り替えはもう登録しない（要件 1.3）
   assert.ok(!mock.registeredCommands.has('pasta.debug.toggleSourcePresentation'), 'DAP toggle command must not be registered');
   assertDevCommandsRegistered();
+  // 5.1・1.13: 2 つのプロバイダが pasta に登録され、本物の WASM で要件の例から 2 つのグローバルと 1 つのローカルが出る
+  const symbols = mock.registeredDocumentSymbolProviders.slice(symbolsBefore);
+  const lenses = mock.registeredCodeLensProviders.slice(lensesBefore);
+  assert.deepStrictEqual(symbols.map((r) => r.selector), [{ language: 'pasta' }]);
+  assert.deepStrictEqual(lenses.map((r) => r.selector), [{ language: 'pasta' }]);
+  const doc = fakeDocument('file:///ghost/master/dic/a.pasta', 'pasta', REQUIREMENT_EXAMPLE);
+  const tree = (symbols[0].provider.provideDocumentSymbols(doc, dummyToken) as mock.DocumentSymbol[])
+    .map((s) => [s.name, s.children.map((c) => c.name)]);
+  assert.deepStrictEqual(tree, [['挨拶', ['朝']], ['挨拶', []]]);
+  const lensLines = (lenses[0].provider.provideCodeLenses(doc, dummyToken) as mock.CodeLens[])
+    .map((l) => l.command!.arguments![1]);
+  assert.deepStrictEqual(lensLines, [0, 2, 4]);
 });
 
 test('deactivate disposes cleanly', () => {
@@ -1035,9 +1052,14 @@ test('WASM が読めないときは GhostValidator を作らず、activate は�
   const context = { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: mock.Uri.file(path.join(ROOT, 'no-such-dir')) };
   const collectionsBefore = mock.createdDiagnosticCollections.length;
   const watchersBefore = mock.createdFileSystemWatchers.length;
+  const symbolsBefore = mock.registeredDocumentSymbolProviders.length;
+  const lensesBefore = mock.registeredCodeLensProviders.length;
   mock.registeredCommands.clear();
   await activate(context as never);
   assert.strictEqual(getActivationState().wasmReady, false);
+  // 5.1: アウトラインも見出しの上の ▶ も出さない
+  assert.strictEqual(mock.registeredDocumentSymbolProviders.length, symbolsBefore);
+  assert.strictEqual(mock.registeredCodeLensProviders.length, lensesBefore);
   assert.deepStrictEqual(ghostValidatorCreated(collectionsBefore, watchersBefore), { collections: 0, watchers: 0 });
   assertDevCommandsRegistered(); // WASM と関係なく登録する（1.5）
   deactivate();

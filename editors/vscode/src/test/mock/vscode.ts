@@ -419,6 +419,10 @@ export function createTextDocument(path: string, opts: { isDirty?: boolean; lang
 /** All diagnostic collections created via languages.createDiagnosticCollection (in order). */
 export const createdDiagnosticCollections: MockDiagnosticCollection[] = [];
 
+/** Providers registered via languages.registerDocumentSymbolProvider / registerCodeLensProvider (in order). */
+export const registeredDocumentSymbolProviders: { selector: any; provider: any }[] = [];
+export const registeredCodeLensProviders: { selector: any; provider: any }[] = [];
+
 export const languages = {
   createDiagnosticCollection: (name: string) => {
     const collection = new MockDiagnosticCollection(name);
@@ -426,8 +430,14 @@ export const languages = {
     return collection;
   },
   registerDocumentSemanticTokensProvider: () => ({ dispose: () => {} }),
-  registerDocumentSymbolProvider: () => ({ dispose: () => {} }),
-  registerCodeLensProvider: () => ({ dispose: () => {} }),
+  registerDocumentSymbolProvider: (selector: any, provider: any) => {
+    registeredDocumentSymbolProviders.push({ selector, provider });
+    return { dispose: () => {} };
+  },
+  registerCodeLensProvider: (selector: any, provider: any) => {
+    registeredCodeLensProviders.push({ selector, provider });
+    return { dispose: () => {} };
+  },
 };
 
 export const workspace = {

@@ -11,6 +11,7 @@ import { DiagnosticsManager } from './diagnosticsManager';
 import { GhostValidator } from './ghostValidator';
 import { activateWordRefDecorator } from './wordRefDecorator';
 import { registerDevCommands } from './devCommands';
+import { SceneOutlineProvider } from './sceneOutline';
 
 /** Activation state of the extension */
 export interface ActivationState {
@@ -77,6 +78,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const ghostValidator = new GhostValidator(wasmBridge, outputChannel);
     ghostValidator.register();
     context.subscriptions.push(ghostValidator);
+
+    // シーンの並びをアウトラインと見出しの上の ▶ に写す（WASM が読めないときは登録しない。5.1）
+    const sceneOutline = new SceneOutlineProvider(wasmBridge);
+    context.subscriptions.push(
+      vscode.languages.registerDocumentSymbolProvider({ language: 'pasta' }, sceneOutline),
+      vscode.languages.registerCodeLensProvider({ language: 'pasta' }, sceneOutline)
+    );
   }
 
   outputChannel.appendLine(

@@ -51,7 +51,7 @@
   - _Depends: 2_
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 3.1, 3.5, 3.6, 3.7, 4.5, 5.3_
 
-- [ ] 4. 結合: 解析器が読めたときだけプロバイダを登録し、本物の WASM で確かめる
+- [x] 4. 結合: 解析器が読めたときだけプロバイダを登録し、本物の WASM で確かめる
   - 解析器が読めたときの分かれの中でプロバイダを作り、`pasta` の言語に DocumentSymbol と CodeLens の両方で登録する。開発コマンドの登録は今までどおり WASM より前に置く
   - 下の本物の WASM の試験を走らせる前に、1 の変更を入れた WASM を `pwsh -NoProfile -File scripts/build-wasm.ps1 -Release` で作り直す（`editors/vscode/wasm/` は git に入っていない作り物。`wasm-pack` と `pwsh` が要る）。今の本物の WASM の試験は `analyzeDocument` を呼ばないので、古い WASM が害になるのはこのタスクの試験が初めて
   - 本物の WASM で `activate` したとき、2 つのプロバイダが `pasta` に登録され、要件の例の文書から 2 つのグローバルと 1 つのローカルの記号が出る試験が通る
