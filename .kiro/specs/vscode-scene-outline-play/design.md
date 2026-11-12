@@ -132,7 +132,7 @@ editors/vscode/src/
 - `editors/vscode/src/test/vscodeModules.test.ts` — `SceneOutlineProvider` の試験・`isWasmAnalysisResult` の期待（`scenes`）・`activate` が 2 つのプロバイダを登録すること。
 - `editors/vscode/src/test/devCommands.e2e.test.ts` — 引数付きの呼び出し・右クリックの形（`Uri` だけ）の呼び出しの試験。
 - `book/src/debug/dev-actions.md` — 「シーン再生（▶ シーンを実行）」の節の書き足し（見出しは変えない）。
-- `editors/vscode/README.md` — （OPEN QUESTION 1。仮定: 「開発支援コマンド」の行に一言足す）
+- `editors/vscode/README.md` — 「開発支援コマンド」の行に「シーンの見出しの上の ▶ からも再生できる」を足し、「アウトライン・パンくず・スティッキースクロールにシーンの並び（グローバルシーン ＞ ローカルシーン）」の行を足す（README はマーケットプレイスの機能の一覧で、右クリックだけを書いたままだと古くなる）
 
 > 並べて進められる塊: ① 解析器（`scenes.rs`・`mod.rs`・`transport.rs`・`lib.rs`・`scene_outline_test.rs`）／② 写し（`wasmBridge.ts`・`sceneOutline.ts`・`extension.ts`）／③ コマンド（`devCommands.ts`）／④ マニュアル。②は①の JSON の形（下の API Contract）だけに依存し、①の完成を待たずに偽の bridge で試験できる（本物の WASM での結合の試験だけは①の後）。`mock/vscode.ts` は②と③の両方が足すので、同じファイルを触るタスクは順に行う。
 
@@ -502,7 +502,7 @@ async function resolveTarget(args: readonly unknown[]): Promise<Target | undefin
 - **2 階層と順と位置**: 要件の例の文書で、上の API Contract の JSON と同じ木（名前・種類・`heading`・`range`・子）になる（1.1・1.2・1.4・1.7・1.9）。
 - **全角・半角**: `*挨拶`・`-朝` と `＊挨拶`・`・朝` が同じ木になる（1.3）。
 - **項目にしないもの**: 名前の無い最初の部分だけのグローバルシーンは `children` が空（1.5）。コードブロックの中の `＊…`・`・…` の行・`＃＊…` のコメントの行は項目にならない（1.6）。アクター辞書・単語定義・ファイル属性だけの文書と空の文書は `[]`（1.10・2.8）。
-- **範囲の式（pasta.dll と同じ）**: `scene_identity_index_test.rs` と同じ形の文書で、ローカルは次のローカルの前の行まで・最後のローカルは次のグローバルの前の行まで・続きのシーンは別の範囲・最後のシーンは文書の終わりまで（1.7）。シーンの後ろのアクター辞書の塊は、そのシーンの範囲に入る。改行で終わる／終わらない／CRLF の 3 通りで、終わりの位置が決まりどおり（1.9）。
+- **範囲の式（pasta.dll と同じ）**: `crates/pasta_lua/tests/scene_identity_index_test.rs` の試験の文書をそのまま写し（写した元を注記に書く）、同じ終わりの行になることを確かめる。ローカルは次のローカルの前の行まで・最後のローカルは次のグローバルの前の行まで・続きのシーンは別の範囲・最後のシーンは文書の終わりまで（1.7）。シーンの後ろのアクター辞書の塊は、そのシーンの範囲に入る。改行で終わる／終わらない／CRLF の 3 通りで、終わりの位置が決まりどおり（1.9）。
 - **不変条件**: 上のすべての文書で、`heading ⊂ range`・子の `range ⊂` 親の `range`・兄弟が重ならない（1.8）。
 - **UTF-16**: 名前と字下げにサロゲートペア（`𠮷`）・全角の空白を含む見出しの列（1.9）。
 - **書きかけ**: 3 つのシーンの真ん中に構文の誤りがある文書で、前後のシーンが出て、誤りのあるシーンが出ず、前のシーンの範囲は次に出たシーンの見出しの前の行まで（1.11）。
@@ -527,16 +527,16 @@ async function resolveTarget(args: readonly unknown[]): Promise<Target | undefin
 - `book` の検査（`verify-content.mjs`・`link-check.mjs`・mdbook build）が通る。`lua/shiori-events.md` から `dev-actions.md#シーン再生-シーンを実行` へのリンクが切れない（6.5）。
 
 ### 手での確かめ（自動化しない）
-- 実際の VSCode で、▶ を押して鳴ること、アウトライン・パンくず・`Ctrl+Shift+O`・スティッキースクロールに 2 階層が出ること、`"[pasta]": { "editor.codeLens": false }` で ▶ が消えること（2.2・3.8）。mock では VSCode の描画を確かめられないため。
+- 実際の VSCode で、▶ を押して鳴ること、アウトライン・パンくず・`Ctrl+Shift+O`・スティッキースクロールに 2 階層が出ること、`"[pasta]": { "editor.codeLens": false }` で ▶ が消えること（2.2・3.8）。mock では VSCode の描画を確かめられないため。この手順は tasks.md の確かめの欄にそのまま書き、飛ばさない。
 
 ## Performance & Scalability
 - 1 回の編集で増える解析は 1 回（`SceneOutlineProvider` の 1 枠の控えで、DocumentSymbol と CodeLens が共有する）。解析は同期で、辞書の 1 ファイルは小さい。目標は測っていない。遅さが見えたら、控えを `SemanticTokensProvider` と共有する（コードの shortcut の注記）。
 - 並びの計算は見出しの数に比例し、行の文字は見出しの行と各範囲の最後の行だけを読む。
 
 ## Open Questions / Risks
-- **OPEN QUESTION 1（仮定あり）**: `editors/vscode/README.md` の「機能」に一言足すか。仮定: 足す（「開発支援コマンド」の行に「シーンの見出しの上の ▶ からも再生できる」、別の行に「アウトライン・パンくずにシーンの並び」）。要件 6 はマニュアルだけを求める。
 - **OPEN QUESTION 2（仮定あり）**: アウトラインの記号の種類。仮定: グローバル＝`SymbolKind.Namespace`、ローカル＝`SymbolKind.Function`。
 - **Risk**: 右クリックの `Uri` だけの呼び出しを引数ありと取り違えると、右クリックの再生が壊れる → 見分けを「第 2 引数が数か」にし、e2e で守る。
 - **Risk**: 範囲の式が pasta.dll とずれる → 鳴るシーンは見出しの行だけで決まるので、ずれはアウトラインの見え方だけに出る。同じ形の文書で終わりの行を確かめる。
 - **Known limit**: 部分解析は Lua ブロックの本文の 0 桁目の `＊` でも塊を切る（`pasta_dsl` の shortcut）。別の誤りのある文書でだけ、コードブロックの後ろのシーンが並びから消えうる。誤りのある文書は再生まで進まないので、害は見え方だけ。
 - **Known limit**: 単独の `\r` の改行は数えない（トークン・診断と同じ）。
+- **Known limit**: シーンの後ろのアクター辞書・単語定義の塊は、前のシーンの範囲に入る（パンくずにそのシーンが出る）。pasta.dll の行からシーンを引く表と同じなので、そのままにする。
