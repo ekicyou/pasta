@@ -146,3 +146,128 @@
 6. ツリーからファイル・フォルダの作成と名前の変更をする（要件 4.14〜4.16）。削除はしない（要件 4.17）。
 7. Tauri 本体は MIT／Apache-2.0。MPL-2.0 は推移的な依存に入る見込みで、確かめていない。アプリ専用の `about.toml` を持ち、受け入れる並びは設計で `cargo about` を回して出てきたものに合わせる（要件 12.10）。ルートの `about.toml` は変えない。pasta.dll は Tauri に依存しない（ルートの `Cargo.lock` に Tauri は 0 件・`pasta_shiori` は `pasta_lsp`・`pasta_check` に依存しない）。`cargo deny` をアプリの lock にも当てる（要件 13.7）。
 8. spec は分けない。設計で 22 タスクを超えたら、リリース CI の部分を `pasta-recipe-release` へ出す。
+
+---
+
+# 設計フェーズの調査（2026-11-13・`/kiro-spec-design pasta-recipe -y`）
+
+## Summary
+
+- **Feature**: `pasta-recipe`
+- **Discovery Scope**: New Feature ＋ Complex Integration（full discovery。新しいツールチェーン Tauri・Monaco・shiki と、既存の解析器・検査の核・リリース CI へのつなぎ込み）
+- **使ったスキル・規則**: `kiro-spec-design`（`design-principles.md`・`design-discovery-full.md`・`design-synthesis.md`・`design-review-gate.md`）、`kiro-validate-design`（`design-review.md`）、steering の `tech.md`（全部）・`product.md`・`structure.md`（要点）。開発者の常設の方針（パスは `std::path::absolute`・移す前に特性化の試験・ルートに Tauri を入れない・小さく完全に）を当てた。
+- **Key Findings**:
+  1. **MPL-2.0 は Tauri 2.12 の依存の木に実際に入る（確かめた）**。`x86_64-pc-windows-msvc` の通常の依存 230 個のうち MPL-2.0 は 5 つ（`option-ext`・`cssparser`・`cssparser-macros`・`selectors`・`dtoa-short`）。`option-ext` は `dirs-sys` → `dirs` → `tauri` で実行時にリンクされる。フォルダの見張りに使う `notify` 8.2 は **CC0-1.0**。ほかは MIT・Apache-2.0・Unicode-3.0・Zlib・BSD-3-Clause と、それらを選べる OR の式だけ（`Unlicense OR MIT` など）。
+  2. **shiki とセマンティックトークンは、作りの上では重ねられる（ソースで確かめた・実物の画面では確かめていない）**。`@shikijs/monaco` 4.6.0 の `shikiToMonaco` は `setTokensProvider`（行ごとの下地）と `defineTheme`・`setTheme` の差し替えだけで、セマンティックトークンには触らない。Monaco のセマンティックトークンの色はテーマの `rules` を種類の名前で引くので、shiki に渡すテーマに種類の名前の規則を足せば、両方が同じテーマから色を取る。shiki は `injectTo`（VS Code の `contributes.grammars` と同じ）を型で持つので、拡張の注入の文法をそのまま使える。
+  3. **静的 CRT は Tauri の既定と同じ向き（ソースで確かめた・ビルドは確かめていない）**。Tauri の `build.windows.staticVCRuntime` は既定で true（`tauri-utils` 2.10.2）。`tauri-build` 2.7.4 は `static_vcruntime::metabuild()` を呼び、そのクレートは `+crt-static` を併せて使うことを勧めている。ルートの `.cargo/config.toml` の `+crt-static` とぶつからない。
+  4. **別ワークスペースからの path 依存は通る（確かめた）**。スクラッチの試しのプロジェクト（自前の `[workspace]`）から `crates/pasta_lsp`・`crates/pasta_check`（`default-features = false`）を path で引くと、`version.workspace = true` などの受け継ぎが解け、`pasta_lua` は入らない（ローカルは `pasta_check`・`pasta_core`・`pasta_dsl`・`pasta_lsp` の 4 つだけ）。ただし新しく作った lock は pest を 2.9.6 に解いた（ルートの `Cargo.lock` は 2.9.2 に据え置き。`pest-2-9-4-upgrade` の理由）。**アプリの lock を素直に作ると、拡張の WASM と別の版の pest で解析することになる**。
+
+## Research Log
+
+### Tauri 2.12 の依存の木とライセンス
+- **Context**: 要件 12.5・12.10・13.7。要件ディスカッションでは「MPL-2.0 は入る見込み・確かめていない」。
+- **Sources Consulted**: スクラッチの試しのプロジェクト（`tauri = "~2.12"`・`tauri-build = "2.7"`・`tauri-plugin-single-instance = "2"`・`tauri-plugin-dialog = "2"`・`notify = "8"`・`toml`・`serde`・`serde_json`）で `cargo metadata --filter-platform x86_64-pc-windows-msvc` と `cargo tree -e normal -i`。解けた版: tauri 2.12.5・tauri-build 2.7.4・wry 0.57.2・tao 0.37.2・webview2-com 0.39.1・windows 0.62.2・windows-sys 0.61.2・tauri-plugin-dialog 2.8.4（rfd 0.17.2・tauri-plugin-fs 2.7.1 を引く）・tauri-plugin-single-instance 2.5.5・notify 8.2.2。
+- **Findings**: 上の Key Findings 1。`tauri-build` は `^2.7.0` が要る（`~2.5` では解けない）。数は `cargo metadata` の通常の依存のたどり（proc-macro を含む）で、`cargo about` の数え方と同じとは限らない。
+- **Implications**: アプリ専用の `about.toml`・`deny.toml` の受け入れる並びに `MPL-2.0` と `CC0-1.0` を足す。ルートの並びは変えない（要件 12.10）。`cargo about` が実際に出す並びは最初のビルドで確かめ、足りなければ中身を読んでその場で足す（推測で広げない）。
+
+### shiki と Monaco のセマンティックトークン
+- **Context**: brief の制約「併用は確かめていない」・要件 6.1〜6.4・6.6。
+- **Sources Consulted**: `@shikijs/monaco` 4.6.0 の `dist/index.mjs`（全 153 行）、`@shikijs/types` 4.6.0 の `LanguageRegistration`（`embeddedLangs`・`injectTo`）。npm の版: `monaco-editor` 0.57.0（MIT）・`shiki`／`@shikijs/monaco`／`@shikijs/langs`／`@shikijs/themes` 4.6.0（MIT）・`@tauri-apps/cli` 2.12.4・`@tauri-apps/api` 2.12.4。
+- **Findings**:
+  - `shikiToMonaco` は **Monaco に登録済みの言語にだけ** 下地の着色を付ける（`monaco.languages.getLanguages()` に無い言語は飛ばす）。`pasta`・`lua` を先に `monaco.languages.register` する。
+  - 下地の着色は、shiki が出した色をテーマの規則の名前へ引き戻して Monaco に渡す作り。同じ色の規則が増えても下地の結果は変わらない。
+  - 拡張は `package.json` の `semanticTokenScopes` で種類 → TextMate のスコープに写している（17 種類すべて）。**同じ写しで「種類 → そのスコープのテーマの色」の規則を作れば、拡張と同じ部分が同じ種類として塗られる**（要件 6.6）。
+- **Implications**: 最初のタスクで、Monaco の上で両方が出ることを実物で確かめる。だめなときの道: shiki をやめ、`book/tools/highlight/` と同じ `vscode-textmate`＋`vscode-oniguruma` を自前の `setTokensProvider` でつなぐ（テーマと写しはそのまま使える）。
+
+### `.lua` のファイルの色
+- **Context**: brief は「`.lua` は Monaco 組み込みの Lua の Monarch」。要件 8.1 は「Lua の色分け」だけ。
+- **Findings**: 柵の中の Lua のために shiki の Lua の文法を読むと、`shikiToMonaco` は登録済みの `lua` の言語にもその文法で下地を付ける。Monarch を別に読む理由が無い。Monaco は `edcore.main`（エディタの部品だけ・言語なし）を読めば、Monarch の全言語を同梱しない分 exe も小さくなる。
+- **Implications**: `.lua` も柵の中も shiki の Lua の文法 1 つで塗る（brief の Approach からの単純化。要件は満たす）。
+
+### 静的 CRT・WebView2・データの置き場・版
+- **Sources Consulted**: `tauri-build` 2.7.4 `src/lib.rs`（`should_static_link_vc_runtime`）、`static_vcruntime` 3.0.0 の文書、`tauri-utils` 2.10.2 `src/config.rs`、`tauri` 2.12.5 `src/manager/webview.rs`・`src/path/desktop.rs`・`src/lib.rs`。
+- **Findings**:
+  - 上の Key Findings 3。
+  - `tauri::webview_version()` が公開されている（`tauri_runtime_wry::webview_version` の再公開）。窓を作る前に WebView2 の有無を確かめられる。新しい依存は要らない。
+  - Windows では WebView2 の作業用のデータを、指定が無ければ `app_local_data_dir()`（`%LOCALAPPDATA%\<識別子>`）に置く。`app_config_dir()` は `config_dir()`（`%APPDATA%`）`\<識別子>`。どちらも exe のそばでもゴーストの中でもない（要件 1.7・3.6・11.1）。
+  - `tauri.conf.json` の `version` は「semver の文字列か、`version` を持つ `package.json` へのパス」。exe の VERSIONINFO と `package_info().version` はこの値から作られる。
+- **Implications**: WebView2 の確かめは `tauri::webview_version()`＋`windows-sys`（既に木にある 0.61）の `MessageBoxW`。版は拡張の `editors/vscode/package.json` を指せる（Design Decisions と OQ-1）。
+
+### 別ワークスペースの path 依存と lock の版
+- **Sources Consulted**: スクラッチの試しのプロジェクトで `cargo metadata`（Key Findings 4）。ルートの `Cargo.toml`（`pest = "2.8.6"`）と `pest-2-9-4-upgrade` の brief（lock は 2.9.2 に据え置き）。
+- **Implications**: アプリの `Cargo.lock` は、**ルートの `Cargo.lock` を写した上で解いて作る**（cargo は既にある版で足りればそれを使う）。`pasta_lsp`・`pasta_check` が引くクレートの版がルートの lock と同じであることをテストで固定する（要件 13.4 の「同じ中身」を版の上でも守る）。path のクレートの版も lock に書かれるので、リリースの版の更新でアプリの lock も更新が要る（`--locked` のビルドが止まる）。
+
+### 既存のコードの確かめ
+- `crates/pasta_check/src/validate_cmd.rs` の `collect`・`walk`・`read_file` は単体テスト（`test_collect_entries`・`test_collect_dirs`・`test_collect_contents`・`test_collect_skips_symlinks`（unix だけ））を持つ。`walk` の `profile` の判定は大文字・小文字を区別する（`name == "profile"`）。`release.rs` は `run_on_master` を使う。
+- `pasta_check::validate::{Report, Finding}` は `serde::Serialize`（`camelCase`・`code` は kebab-case）。`Finding.column` はコードポイントで 1 始まり。
+- `pasta_lsp::analysis::{AnalysisEngine, AnalysisResult, SceneNode, SceneKind, TOKEN_TYPES, TOKEN_MODIFIERS}` が公開。`SemanticToken` の JSON の名前は `deltaLine`・`deltaStartCharacter`・`length`・`tokenType`・`tokenModifiers`。`char_column_to_utf16` は公開されていない。
+- 拡張の `semanticTokensProvider.ts` 18〜45 行の凡例は Rust と同じ並び（突き合わせのテストは無い）。
+- `release.yml` の build は `release.ps1`（dll・nar・`pasta_check.zip`・skills）と VSIX を別の step で作り、「Verify release assets」で中身を検査し、「Check Cargo.lock is unchanged」で lock の不変を確かめる。`github-release.ps1` 72 行に添付 6 つの名前の並び。CI の Node は 22（`node --test` が TypeScript の型を外して走らせられる版）。
+- 要件 12.5 と 12.6 が `requirements.md` の同じ行に続けて書かれている（改行の抜け。番号はそのまま 12.6 として扱う）。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| 薄い Rust の殻＋素の TypeScript の画面（採用） | Rust のコマンドは既存の核を呼ぶだけ・パスの検査は Rust の入口に 1 か所。画面はフレームワーク無しの TS のモジュール。写しは DOM に依らない関数 | 依存が最少・純粋な関数を `node --test` と `cargo test` で確かめられる・`pasta-recipe-dev-actions` が足し場所を得やすい | 画面の部品（ツリー・タブ・一覧・確かめの窓）を手で書く。どれも小さい | 状態は「開いたゴースト 1 つ＋タブの並び」だけ |
+| React などの UI フレームワーク | 部品と状態の管理を任せる | 部品が増えたとき楽 | 依存と第三者の表示が増える・今の規模では要らない | 退けた |
+| フロントでファイルを読む（plugin-fs） | 読み書きを JS から行う | Rust のコマンドが減る | 読み書きの範囲（要件 11）の守りが JS の許可の設定に散る・BOM と UTF-8 の判定が JS と Rust に分かれる | 退けた |
+
+## Design Decisions
+
+### Decision: ファイル集めを `pasta_check` のライブラリの `fs` の機能へ移す
+- **Context**: 要件 9.12・13.8（要件ディスカッションで案 C に確定）。
+- **Selected Approach**: `collect`・`walk`・`read_file` を新しいモジュール `pasta_check::ghost_files`（`#[cfg(feature = "fs")]`）へ移し、既存の単体テストも一緒に移す。`cli` は `fs` を含む。WASM の `--no-default-features` のビルドは `fs` を持たない。移す前に、バイナリの外から `pasta_check validate` の出力を固定する特性化の試験を足す（`profile` の飛ばし・入れ子の `profile`・UTF-8 でないファイル・`pasta.toml` 無し）。
+- **Trade-offs**: 公開クレートの面が増える（`fs` の機能の下の関数 3 つと型 1 つ）。`lib.rs` の「ファイルシステムに触れず」の説明を「`fs` の機能を除き」に直す。
+
+### Decision: 着色は shiki＋拡張の文法と写しを読むだけで使い、テーマは light-plus／dark-plus に種類の規則を足す
+- **Context**: 要件 6.1〜6.4・6.6・6.7・8.1。
+- **Selected Approach**: `editors/vscode/syntaxes/pasta.tmLanguage.json`・`pasta-lua-injection.tmLanguage.json` と `editors/vscode/package.json` の `contributes.semanticTokenScopes` を Vite で読み取りの import（`book/tools/highlight/` と同じ「拡張が正本・読むだけ」）。Lua の文法は `@shikijs/langs` の `lua`。テーマは `@shikijs/themes` の `light-plus`・`dark-plus`（VS Code の既定のテーマ）に、セマンティックトークンの種類ごとの規則（色は写し先のスコープのテーマの色）を足す純粋な関数で作る。明暗は `prefers-color-scheme` に合わせて `setTheme`。
+- **Trade-offs**: 拡張のファイルが変わるとアプリの見た目も変わる（それが狙い。Revalidation Triggers に書く）。
+
+### Decision: パスはすべて `ghost/master` からの相対の `/` 区切りでやり取りし、Rust の入口で検査する
+- **Context**: 要件 11.1〜11.4・2.4〜2.7。
+- **Selected Approach**: 画面は絶対パスを持たない（開く操作のときだけ渡す）。Rust の `resolve(master, rel)` が、空・`.`・`..`・`\`・`:`・予約されたデバイス名・末尾の `.` と空白の要素、最上位の `profile`（大文字・小文字を区別しない）、途中のシンボリックリンク（ジャンクションを含む）を拒む。`master` は `std::path::absolute` で 1 度だけ形を揃える（`fs::canonicalize` は使わない）。
+- **Rationale**: 守りが 1 か所。要素の検査で `..` を拒むので、正規化に頼らずに外へ出られない。
+
+### Decision: 外の変更は中身の比べで判定する
+- **Context**: 要件 10.2〜10.4・10.6。
+- **Selected Approach**: タブごとに「最後にディスクと揃えた中身（`diskText`・BOM の有無）」を持つ。見張りの知らせが来たら、開いているタブを全部ディスクから読み直して比べる。同じなら何もしない（自分の保存はここで消える）、無ければ消えた、未保存の書き換えが無ければ読み直す、あれば尋ねる。
+- **Rationale**: 時刻や「自分が書いた」の印を持たずに 10.6 を満たす。フォルダごと消されたときに子の知らせが届かなくても漏れない。
+
+### Decision: アプリの版は拡張の `package.json` から取る（仮定・OQ-1）
+- **Context**: 要件 1.6・12.3。別ワークスペースなのでルートの版を受け継げない。
+- **Alternatives Considered**: (1) アプリの `Cargo.toml` に版を書き、リリースの版の更新に足す（版のファイルが 5 → 6・`verify-tag.ps1`・`pretag-check.ps1` とそのテストも直す）。(2) `tauri.conf.json` の `version` を `../../vscode/package.json` に向ける（新しい版のファイルなし。`verify-tag.ps1` が既にタグとの一致を確かめている）。(3) リリースの CI で `--config` で版を渡す（日々のビルドの版が 0.0.0 になる）。
+- **Selected Approach**: (2)。どの案でも、アプリの `Cargo.lock` に path のクレートの版が書かれるので、リリースの版の更新の手順にアプリの lock の更新（`cargo update --workspace --manifest-path editors/recipe/src-tauri/Cargo.toml`）を足す。
+- **Follow-up**: `release` スキル（`SKILL.md`）の書き換えは分類器が止めることがある。止まったら入った分と残りを示して開発者に許可を求める。
+
+### Decision: パニックで落とさない
+- **Context**: 要件 6.5・5.8（書いた中身を失わない）。ルートの `[profile.release]` は `panic = "abort"`。
+- **Selected Approach**: アプリの `[profile.release]` は `panic` を書かない（unwind のまま）。`analyze` は `spawn_blocking` の中で走らせ、パニックは `JoinError` として `Err` で返す（`catch_unwind` を別に書かない）。画面は下地の色を残して書き続けられる。
+- **Rationale**: 解析器の思わぬパニックで、未保存の書き換えごと窓が消えるのを防ぐ。
+
+### Decision: JS の第三者の表示は Vite の小さな plugin で集める
+- **Context**: 要件 12.5。
+- **Selected Approach**: `vite build` のときに、出力に入ったモジュールの属するパッケージ（`node_modules/<名前>`）を集め、各パッケージの `license` の欄と `LICENSE*`・`ThirdPartyNotices*` の本文を 1 つのテキストに書き出す（新しい devDependency なし）。`package.ps1` が `cargo about` の出力の後ろに足して `THIRD_PARTY_LICENSES.txt` にする。拡張の文法（pasta 自身・MIT）は pasta の LICENSE の表示で足りる。
+- **Trade-offs**: 30 行ほどの自前の処理。束ねに入ったものだけを数えるので、devDependency を誤って載せない。
+
+## Synthesis
+
+- **一般化**: 開く手段は 5 つ（起動の引数・2 つ目の起動・窓へのドロップ・ダイアログ・最近開いたもの）あるが、どれも「パス 1 つ → `resolve_ghost` → 未保存の確かめ → `open_ghost`」の 1 本の流れに入れる。ツリー・診断の一覧・検査の一覧の押下も「相対パス＋位置 → タブを開いて位置へ」の 1 つの操作。外の変更・自分の保存・作成・名前の変更の後のツリーの作り直しも「ツリーを読み直し、足りないシーンを読む」の 1 つ。
+- **作るか使うか**: 解析・検査・ファイル集めは既存の核を使う。単一インスタンス・フォルダのダイアログは Tauri の公式の plugin、見張りは `notify`（plugin-fs の watch も中で `notify` を使う）、ドラッグドロップは Tauri の窓のイベント、WebView2 の確かめは `tauri::webview_version()`。確かめの窓（保存する・保存しない・取り消す）は 3 択と日本語の文言が要るので HTML の小さな窓で作る。
+- **単純化**: `.lua` の Monarch をやめる（上記）。最近開いたものの記録は Rust の側の 1 つの TOML。シーンは別のコマンドを作らず `read_text`＋`analyze` で作る。UI フレームワーク・状態管理のライブラリ・JS のファイルの読み書きは使わない。保存の改行は Monaco のモデルの改行に任せ、BOM だけを Rust が外して覚え、保存で戻す。
+
+## Risks & Mitigations
+
+- shiki の下地とセマンティックトークンが実物で重ならない — 最初のタスクで確かめる。だめなら `vscode-textmate`＋`vscode-oniguruma` の自前の下地へ（テーマ・写しはそのまま）。
+- アプリの依存に `cargo deny` を当てると、Tauri の木の勧告（unmaintained など）で止まる — アプリの `deny.toml` は `targets = ["x86_64-pc-windows-msvc"]` に絞り、出たものは中身を読んで 1 件ずつ判断する（まとめて無視しない）。
+- exe・zip の大きさ — 見積もりは exe 10 MB 前後・zip 5 MB 前後。上限は zip 30 MB（要件 12.4）。最初のビルドで実測して比べる。
+- `release.yml`・`build.yml`・`github-release.ps1`・`release-state.ps1`・`release-scripts-test.ps1`・`.gitignore` は `pasta-dll-multiarch` などと重なる — 同じウェーブに置かない（brief の棚卸どおり）。
+- 日々の CI の時間（Windows で Tauri のビルド） — `Swatinem/rust-cache` の `workspaces` にアプリを足す。
+
+## References
+
+- `@shikijs/monaco` 4.6.0 `dist/index.mjs`・`@shikijs/types` 4.6.0（npm の tarball をスクラッチに展開して読んだ）
+- `tauri` 2.12.5・`tauri-build` 2.7.4・`tauri-utils` 2.10.2・`static_vcruntime` 3.0.0（cargo の registry の展開済みのソース）
+- `cargo metadata`／`cargo tree` の結果（スクラッチの試しのプロジェクト。リポジトリには残さない）
+- `book/tools/highlight/`（VS Code の外で拡張の文法を読む先例）、`editors/vscode/package.json` の `semanticTokenScopes`
