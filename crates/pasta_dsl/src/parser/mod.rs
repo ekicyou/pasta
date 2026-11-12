@@ -191,6 +191,13 @@ pub fn parse_file(path: &Path) -> Result<PastaFile, ParseError> {
     Ok(ast)
 }
 
+/// `s` の全体が文法の `id` 規則に当たるか（`＄名前` のローカル変数名と同じ決まり）。
+pub fn is_id(s: &str) -> bool {
+    // pest は先頭だけ当たっても成功するため、当たった長さを比べる
+    PastaParser2::parse(Rule::id, s)
+        .is_ok_and(|mut pairs| pairs.next().is_some_and(|p| p.as_str().len() == s.len()))
+}
+
 // ============================================================================
 // AST Builder
 // ============================================================================
@@ -416,6 +423,26 @@ mod tests {
                 )
             )
         );
+    }
+
+    #[test]
+    fn test_is_id() {
+        for s in ["名前", "_x", "x1", "r0", "ｒ０", "天気"] {
+            assert!(is_id(s), "{s}");
+        }
+        for s in [
+            "",
+            "1",
+            "１",
+            "__名前__",
+            "a b",
+            "a-b",
+            "a.b",
+            "名前、",
+            "★",
+        ] {
+            assert!(!is_id(s), "{s}");
+        }
     }
 
     #[test]
