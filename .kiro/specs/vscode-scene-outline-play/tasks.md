@@ -67,9 +67,13 @@
   - _Boundary: Manual_
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 6. 確かめ: 全体の試験と、実際の VSCode での手での確かめ
+- [x] 6. 確かめ: 全体の試験と、実際の VSCode での手での確かめ
   - `cargo test -p pasta_lsp`・`cargo clippy -p pasta_lsp`・拡張の `npm test` と `npm run lint` が通る
   - 実際の VSCode で（mock では描画を確かめられないので飛ばさない）: 見出しの上の ▶ を押すとそのシーンが鳴る（グローバル・続き・ローカルの 3 つ）、アウトライン・パンくず・`Ctrl+Shift+O`・スティッキースクロールに 2 階層が出てカーソルのシーンが出る、`"[pasta]": { "editor.codeLens": false }` で ▶ が消える、右クリックの「▶ シーンを実行」は今までどおりカーソルの行で鳴る
   - 手での確かめの結果（できたこと・できなかったこと）を記録する
   - _Depends: 4, 5_
   - _Requirements: 2.2, 2.6, 3.5, 3.8_
+
+## Implementation Notes
+- 6 の手での確かめ（2026-11-12・開発者が試験用の VSCode で ghost_dev を開いて実施）: 見出しの上の ▶ でグローバル・続き・ローカルの 3 つが鳴る、アウトライン・パンくず・`Ctrl+Shift+O`・スティッキースクロールに 2 階層とカーソルのシーンが出る、`"[pasta]": { "editor.codeLens": false }` で ▶ が消える、右クリックの「▶ シーンを実行」はカーソルの行で鳴る、の 4 点すべてできた。できなかったことは無し
+- 6 の手での確かめの途中で「Actual command not found, wanted to execute pasta.runSceneAtCursor /274」が一時出て、その後出なくなった。試験用の VSCode を 2 回立ち上げ・拡張をコンパイルし直した間の古い CodeLens（引数の控えの番号が新しい拡張ホストに無い）が残った線が濃い。再現の条件は未特定
