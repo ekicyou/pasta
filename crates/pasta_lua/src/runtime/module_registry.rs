@@ -191,11 +191,13 @@ impl PastaLuaRuntime {
 
     /// Register the internal `@pasta_debug` module（scene-play-event 2.1/4.1/4.2）。
     ///
-    /// 関数は 3 つ: `enabled()` はシーンマップの有無（`debug_enabled()` と同じ値）、
+    /// 関数は 4 つ: `enabled()` はシーンマップの有無（`debug_enabled()` と同じ値）、
     /// `scene_at(file, line)` は位置を登録名の組 `(大域, ローカル)` に引く。マップが無い、
     /// 行が `1..=u32::MAX` の整数でない、見つからないときはエラーにせず nil を返す。
     /// `dump_variables(save)` は表を `profile/pasta/debug/variables.toml` にテキストの TOML で書く。
-    /// 書けなければ警告を 1 行書くだけでエラーを上げない。有効かは見ない（門は scene_play.lua）。
+    /// 書けなければ警告を 1 行書くだけでエラーを上げない。
+    /// `is_local_var_name(s)` は `s` の全体が `＄名前` のローカル変数名の決まりに当たるか（scene-play-locals 4.2）。
+    /// 有効かは見ない（門は scene_play.lua）。
     /// 本番の入口（`from_loader_with_scene_dic`）だけが呼ぶ。
     pub(crate) fn register_debug_module(
         lua: &Lua,
@@ -232,6 +234,9 @@ impl PastaLuaRuntime {
             Ok(found.unzip())
         })?;
         table.set("scene_at", scene_at)?;
+        let is_local_var_name =
+            lua.create_function(|_, s: String| Ok(pasta_dsl::parser::is_id(&s)))?;
+        table.set("is_local_var_name", is_local_var_name)?;
         set_loaded_module(lua, "@pasta_debug", table)
     }
 

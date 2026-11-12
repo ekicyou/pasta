@@ -22,6 +22,7 @@ FAILURE.LABEL = {
     BAD_TYPE           = "型の名前にならない値",
     NOT_ASSIGNABLE     = "代入できない値",
     SCENE_UNMET        = "条件に合うシーンが無い",
+    NOT_TABLE          = "表にできない値",
 }
 
 local ESCAPE = { ["\\"] = "\\\\", ["%"] = "\\%", ["\r"] = " ", ["\n"] = " " }
