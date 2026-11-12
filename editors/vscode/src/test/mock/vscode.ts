@@ -412,6 +412,14 @@ export const workspace = {
   onDidCloseTextDocument: didCloseTextDocumentEmitter.event,
   onDidSaveTextDocument: didSaveTextDocumentEmitter.event,
   fs: fakeFs,
+  // shortcut: only documents already in textDocuments open (no load from disk); anything else rejects like a missing file
+  openTextDocument: async (uri: Uri): Promise<any> => {
+    const doc = workspace.textDocuments.find((d) => d.uri.path === uri.path);
+    if (!doc) {
+      throw fakeNotFound(uri);
+    }
+    return doc;
+  },
   createFileSystemWatcher: (globPattern: unknown) => {
     const watcher = new MockFileSystemWatcher(globPattern);
     createdFileSystemWatchers.push(watcher);

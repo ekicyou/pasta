@@ -32,12 +32,28 @@ const ERROR_KINDS: ReadonlySet<CallResult['kind']> = new Set(['unreachable', 'ba
 
 type Report = { lines: string[]; notice?: string; failure?: CallResult };
 
+/** コマンドの対象（文書と、1 から数えた行） */
+interface Target {
+  readonly document: vscode.TextDocument;
+  readonly line1: number;
+}
+
 interface Command {
   readonly id: string;
   readonly title: string;
   readonly accepts: (doc: vscode.TextDocument) => boolean;
   readonly saves: boolean; // 読み込み直す 2 つだけが保存する（4.2・5.2・6.4）
-  readonly run: (ctx: FlowContext, editor: vscode.TextEditor) => Promise<Report>;
+  readonly run: (ctx: FlowContext, target: Target) => Promise<Report>;
+}
+
+/** 引数から対象を決める。(Uri, number) なら指定の文書と行、それ以外（右クリックの Uri だけを含む）はアクティブなエディタとカーソル */
+async function resolveTarget(args: readonly unknown[]): Promise<Target | undefined> {
+  if (args[0] instanceof vscode.Uri && typeof args[1] === 'number') {
+    const line0 = args[1];
+    return vscode.workspace.openTextDocument(args[0]).then((document) => ({ document, line1: line0 + 1 }), () => undefined);
+  }
+  const editor = vscode.window.activeTextEditor;
+  return editor && { document: editor.document, line1: editor.selection.active.line + 1 };
 }
 
 const isPasta = (doc: vscode.TextDocument) => doc.languageId === 'pasta';
@@ -47,8 +63,8 @@ const isGhostSource = (doc: vscode.TextDocument) =>
 const COMMANDS: readonly Command[] = [
   {
     id: 'pasta.runSceneAtCursor', title: '▶ シーンを実行', accepts: isPasta, saves: true,
-    run: async (ctx, editor) => {
-      const o = await runScene(ctx, editor.document.uri.fsPath, editor.selection.active.line + 1);
+    run: async (ctx, target) => {
+      const o = await runScene(ctx, target.document.uri.fsPath, target.line1);
       const failure = o.kind === 'failed' ? o.result : o.reload.kind === 'refused' ? o.reload.result : undefined;
       return { ...formatScene(o), failure };
     },
@@ -144,10 +160,11 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps: Part
     return chosen;
   }
 
-  async function execute(cmd: Command): Promise<void> {
-    const editor = vscode.window.activeTextEditor;
-    const doc = editor?.document;
-    if (!editor || !doc || doc.uri.scheme !== 'file' || doc.isUntitled || !cmd.accepts(doc)) {
+  async function execute(cmd: Command, args: readonly unknown[]): Promise<void> {
+    // この await は busy の確かめより前（7.5 の決まりは崩れない）
+    const target = await resolveTarget(args);
+    const doc = target?.document;
+    if (!target || !doc || doc.uri.scheme !== 'file' || doc.isUntitled || !cmd.accepts(doc)) {
       stop([`${clock()} ${cmd.title} — ${BAD_DOCUMENT}`], BAD_DOCUMENT);
       return;
     }
@@ -175,7 +192,7 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps: Part
         return;
       }
       const progress = { location: vscode.ProgressLocation.Window, title: `Pasta: ${cmd.title}` };
-      const report = await vscode.window.withProgress(progress, () => cmd.run({ endpoint, ghost, timing, sleep }, editor));
+      const report = await vscode.window.withProgress(progress, () => cmd.run({ endpoint, ghost, timing, sleep }, target));
       if (report.notice) {
         stop(report.lines, report.notice, report.failure !== undefined && ERROR_KINDS.has(report.failure.kind));
       } else {
@@ -187,6 +204,6 @@ export function registerDevCommands(context: vscode.ExtensionContext, deps: Part
   }
 
   for (const cmd of COMMANDS) {
-    context.subscriptions.push(vscode.commands.registerCommand(cmd.id, () => execute(cmd)));
+    context.subscriptions.push(vscode.commands.registerCommand(cmd.id, (...args: unknown[]) => execute(cmd, args)));
   }
 }
