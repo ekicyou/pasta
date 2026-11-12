@@ -149,3 +149,121 @@
 - `book/src/lua/shiori-events.md`、`book/src/internals/debug.md`（1 文）
 - `.claude/skills/pasta-lua-coding/references/shiori-events.md`（`node book/tools/gen-skill-refs.mjs` で作り直すだけ。手では書かない）
 - 触らない: `crates/pasta_lua/pasta_scripts/pasta/scene.lua`、`crates/pasta_lua/src/code_gen/`、`crates/pasta_lsp/`、`editors/vscode/`、`book/src/debug/dev-actions.md`
+
+---
+
+# 設計フェーズの調査と決定（2026-11-12、`/kiro-spec-design -y`）
+
+## Summary
+
+- **Feature**: `scene-play-locals`
+- **Discovery Scope**: Extension（既存のハンドラの拡張。軽い調査 `design-discovery-light` で足りる。外部の新しい依存は無い）
+- **Key Findings**:
+  - 文法の `id` 規則は、`pasta_dsl` の外から単独で呼べる。`pasta_dsl::parser::{PastaParser2, Rule}` は公開で、`crates/pasta_dsl/tests/choice_line_test.rs` が `PastaParser2::parse(Rule::choice_line, …)` を外から呼んでいる。`id` は `@{}` の原子規則なので、当たった範囲（`as_str()`）が入力の全体と同じ長さかで「全体が名前か」を判定できる（pest の `parse` は入力の先頭だけ当たっても `Ok` を返すため、長さの比較が要る）。
+  - `id` 規則だけで、要件 4.2 の例は全部はじける。数字（半角・全角）は XID_START でないので先頭に来られず、`__名前__` は `reserved_id` の否定先読みで、空白・`-`・`.`・`、`・`★` は全体に当たらないことで落ちる。`digit_id` を別に断る必要は無い。
+  - toml 1.1.8 の誤りの文は 1 行目が `TOML parse error at line 1, column N`、次に入力の抜き出しとキャレット、最後の行が理由（``invalid unquoted key, expected letters, numbers, `-`, `_` ``・``unexpected key or value, expected newline, `#` ``・`duplicate key`・``unclosed inline table, expected `}` ``）。`v = ` に包むので列は 4 ずれる。1 行の警告には最後の空でない行（理由）だけを載せるのが読みやすい。
+
+## Research Log
+
+### 文法の `id` 規則を外から呼べるか
+
+- **Context**: 要件 4.2 の「辞書で `＄名前` と書ける名前」を、辞書の決まりと 1 か所で揃えたい（ギャップ分析の案 B）。
+- **Sources Consulted**: `crates/pasta_dsl/src/parser/grammar.pest` 16〜22 行、`crates/pasta_dsl/src/parser/mod.rs` 45〜62 行、`crates/pasta_dsl/tests/choice_line_test.rs` 1〜20 行、`crates/pasta_lua/Cargo.toml`（`pest` に直接は依存しない）。
+- **Findings**:
+  - `#[derive(Parser)] pub struct PastaParser2` が `Rule` を同じモジュールに作り、`pub use` 無しで `pasta_dsl::parser::Rule` として外から見える。
+  - `pasta_lua` から直接呼ぶには `pest::Parser` のトレイトが要り、`pasta_lua` の `Cargo.toml` に `pest` を足すことになる。`pasta_dsl` に `pub fn` を 1 つ置けば、`pasta_lua` の依存は変わらない。
+- **Implications**: 判定は `pasta_dsl::parser::is_id(s: &str) -> bool` に置き、`@pasta_debug` から呼ぶ。
+
+### toml の誤りの文とインライン表の読み方
+
+- **Context**: ギャップ分析の持ち越し 2（`v = ` に包む読み方と、ログに載せる理由の量）。
+- **Sources Consulted**: スクラッチ（toml = "=1.1.8"、`toml::from_str::<toml::Table>`）で 10 通りを確かめた。
+- **Findings**:
+
+| 入力（`v = ` に続けたもの） | 結果 |
+| --------------------------- | ---- |
+| `{ 名前 = "ぱすた" }` | 誤り。理由の行は ``invalid unquoted key, expected letters, numbers, `-`, `_` `` |
+| `{ a = 1 } x` | 誤り。``unexpected key or value, expected newline, `#` `` |
+| `{ a = 1, a = 2 }` | 誤り。`duplicate key`（同じキーを 2 度書くと読めない） |
+| `{ a = 1` | 誤り。``unclosed inline table, expected `}` `` |
+| `3` | 読める（`v` が表でない） |
+| `{ a = [1] }` | 読める（`a` が配列） |
+| `{ "a" = 'C:\foo' }` | 読める（リテラル文字列。`C:\foo` のまま） |
+| `{ "a" = "C:\foo" }` | 読める（基本文字列。`\f` が改ページ文字になり `C:<FF>oo`） |
+| `{ a = 9007199254740993 }` | 読める（整数。`@toml` が `f64` にすると 9007199254740992 に丸まる） |
+| `{ a = 1 }` 改行 `b = 2` | 読める（文書に `v` と `b` の 2 つ） |
+
+- **Implications**:
+  - 「インライン表 1 つ」は、文書のキーが `v` だけで、`v` が表であることで確かめる。`b = 2` のように別のキーが増えた文書も表にできない値の誤りにする。
+  - 基本文字列の `\` はエスケープとして読まれ、`\f` のように誤りにならずに別の文字になることがある。マニュアルの例では `\` を含む値をリテラル文字列（`'…'`）で書く。
+  - 理由の行は `[^\r\n]+` の最後の 1 つを取れば得られる。
+
+### 届く範囲（ギャップ分析 1.2 の確かめ直し）
+
+- `EVENT.fire` は `create_act(req)` の中で `transfer_req_to_var`・`transfer_date_to_var` を済ませてからハンドラを呼ぶ（`shiori/event/init.lua` 99〜108 行）。返したコルーチンは同じ act で再開する（323 行）。ハンドラで `act.var` に入れれば、転記の後で、シーンの最初の行の前になる。
+- 生成するコードの `＄x` は `var.x`（`code_gen/element_gen.rs` 36〜40 行）。LuaJIT は 0x80 以上のバイトを名前に使えるので、`act.var["名前"]` と `var.名前` は同じ項目になる。
+- `scene.lua` は `act.var` を作り直さない（179・192 行で読むだけ）。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+| ------ | ----------- | --------- | ------------------- | ----- |
+| A: Lua で近似 | 名前の検査を Lua のパターンで近似 | Rust に触らない | `"名前、"`・`"★"` を通す。要件 4.2 と食い違う | 不採用 |
+| B: 文法の `id` に任せる | `pasta_dsl::parser::is_id` を `@pasta_debug.is_local_var_name` から呼ぶ | 辞書の決まりと 1 か所で揃う。依存は増えない | Rust の関数 2 つ（pasta_dsl に 1・登録に 1） | **採用** |
+| C: シーンの入口で受ける | `scene.lua`・`code_gen` に `locals` を通す | 名前どおりの形 | 結果はハンドラで入れるのと同じ。他 spec と重なる | 不採用（ギャップ分析のとおり） |
+
+## Design Decisions
+
+### Decision: 名前の検査は `pasta_dsl` の `id` 規則に任せる
+
+- **Context**: 要件 4.2。
+- **Alternatives Considered**: 1. Lua の近似（案 A） 2. `pasta_lua` に `pest` を足して `Rule::id` を直接呼ぶ 3. `pasta_dsl` に `pub fn is_id` を置く
+- **Selected Approach**: 3。`@pasta_debug.is_local_var_name(s)` がそれを呼ぶ。
+- **Rationale**: 文法の持ち主の中に置けば、文法を変えたときに検査も一緒に変わる。`pasta_lua` の依存は変わらない。`@pasta_debug` はデバッグの門の内側でしか使わない内部モジュールなので、置き場が合う。
+- **Trade-offs**: 公開の関数が `pasta_dsl` に 1 つ増える（足すだけで、壊す変更ではない）。
+- **Follow-up**: `pasta_dsl` の単体テストで、要件 4.2 の例と、通るべき名前（`名前`・`_x`・`x1`・`r0`・`ｒ０`）を確かめる。
+
+### Decision: 読み取りと検査は `scene_play.lua` の局所関数 1 つ
+
+- **Context**: 2 つのハンドラが同じ Reference2 を同じ規則で読む。
+- **Selected Approach**: `read_locals(act, event, debug)` を `scene_play.lua` に置き、2 つのハンドラが、シーンを引く直前に呼ぶ。値を `act.var` に入れるのは、コルーチンが得られた後だけ。
+- **Rationale**: 新しいモジュールを作るほどの量ではない（30 行ほど）。`scene.lua`・`code_gen` に触らない。
+- **Trade-offs**: 無し。
+
+### Decision: 誤りが複数あるときはキーを並べ替えて最初の 1 件
+
+- **Context**: 要件 4.5。`pairs` の順は決まらない。
+- **Selected Approach**: キーを `table.sort`（バイト順）で並べ、キーごとに「名前 → 型」の順で確かめ、最初の誤りを知らせる。
+- **Rationale**: 送り直したときに同じ誤りが出る。テストが決まった形になる。
+
+### Decision: ログの警告は今の `bad argument` の形に揃える
+
+- **Selected Approach**:
+  - 表にできない値: `<イベント名>: bad argument: Reference2='<届いた文字列>' (<理由>)`。理由は toml の誤りの文の最後の空でない行、表でないときと別のキーがあるときは `not an inline table`。
+  - 名前にならない値: `<イベント名>: bad argument: Reference2 key='<キー>' (not a local variable name)`
+  - 代入できない値: `<イベント名>: bad argument: Reference2 key='<キー>' (table is not assignable)`
+- **Rationale**: 今の `Reference0=''`・`Reference1='４２'` と同じく、引数の名前と引用符で包んだ値を先に置く。toml の位置の行は `v = ` の分だけ列がずれて誤解を招くので載せない。
+
+### Decision: 自動のテストは Rust の結合テストと `pasta_dsl` の単体テスト
+
+- **Context**: 要件 7.3。Lua の仕様のテストのランナーは `@toml` を登録していない（`register_toml_module` は `pub(crate)`）。
+- **Alternatives Considered**: 1. ランナーに `@toml` を足す（`pasta_lua` の公開の入口を 1 つ増やす） 2. Lua の仕様のテストで `@toml` を差し替える（本物の toml を通らない） 3. 本物のランタイムを使う結合テスト `tests/scene_play_event_test.rs` に足す
+- **Selected Approach**: 3 と、`pasta_dsl` の単体テスト。
+- **Rationale**: 本物の `@toml`・本物の `@pasta_debug`・生成したシーンの `＄名前` を一度に通る。`pasta_lua` の公開の口を増やさない。警告の文言は、`package.loaded["@pasta_log"]` を集める表に差し替えて確かめる（`FAILURE`・門は呼んだ時点で `require` する）。
+
+## Synthesis
+
+- **Generalization**: 2 つのハンドラの Reference2 は同じ問題なので、読み取りを 1 つの局所関数にまとめる。`OnPastaCallFunction` など他のイベントへ広げる口は作らない（要件に無い）。
+- **Build vs. Adopt**: TOML の読み取りは既存の `@toml.decode`、名前の判定は既存の文法の `id` 規則、失敗の出口は既存の `FAILURE.reply`。新しく作るのは、`id` 規則を文字列の全体に当てる 1 行の関数と、その登録だけ。
+- **Simplification**: `scene.lua`・`code_gen`・Lua の仕様のテストのランナーに触らない。ラベルの新設は「表にできない値」1 つだけ。配列と表は Lua では見分けないので、どちらも `（表）`。
+
+## 参照したスキル
+
+- `kiro-spec-design`（`design-principles.md`・`design-discovery-light.md`・`design-synthesis.md`・`design-review-gate.md`）
+- ponytail（最小の完全な変更）: 新しいモジュール・依存・抽象を足さない判断に使った。
+
+## Risks & Mitigations
+
+- `.claude/skills/pasta-lua-coding/references/shiori-events.md` の作り直しは、`.claude/skills` への書き込みとして分類器に拒まれることがある — 生成は `node book/tools/gen-skill-refs.mjs` だけで行い、拒まれたらそこで止めて開発者に許可を求める。
+- 結合テストのフィクスチャ（`FIXTURE`）に足すシーンが、今のテストの行番号（`LINE_*`）を動かす — 末尾にだけ足す。
+- `＄end` のような Lua の予約語の名前は `id` 規則を通るが、辞書の側でも同じ（`var.end`）で、この spec の外 — 触らない。
