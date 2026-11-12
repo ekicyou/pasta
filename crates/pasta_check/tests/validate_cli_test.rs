@@ -235,3 +235,75 @@ fn test_validate_hello_pasta_clean() {
     // 問題の行は 1 行も無い
     assert!(!stdout.contains("ghost/master/"), "{stdout}");
 }
+
+/// 特性化（ファイル集めを ghost_files へ移す前後で同じ・13.8）: 最上位の `profile` は飛ばし、
+/// 入れ子の `dic/profile` は飛ばさない。UTF-8 でない辞書と `pasta.toml` が無いときの行を、出力の全体で固定する
+#[test]
+fn test_validate_characterize_file_collection() {
+    let (_t, target, master) = ghost();
+    fs::remove_file(master.join("pasta.toml")).unwrap();
+    fs::create_dir_all(master.join("profile")).unwrap();
+    fs::write(master.join("profile/x.pasta"), "＊\n  ＠＠＠\n").unwrap();
+    fs::create_dir_all(master.join("dic/profile")).unwrap();
+    fs::write(master.join("dic/profile/b.pasta"), "＊\n  ＠＠＠\n").unwrap();
+    fs::write(master.join("dic/bad.pasta"), [0xffu8, 0xfe, 0x81]).unwrap();
+    let output = validate(&target);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert_eq!(
+        stdout_of(&output).lines().collect::<Vec<_>>(),
+        vec![
+            "ghost/master/dic/bad.pasta: 誤り: UTF-8 として読めません",
+            "ghost/master/dic/profile/b.pasta:2:4: 誤り: 構文エラー: expected id",
+            "ghost/master/pasta.toml: 誤り: pasta.toml がありません。pasta.dll はゴーストを読み込めません（辞書は既定の dic/**/*.pasta で集めました）",
+            "構文エラーと読めない辞書ファイルがあるため、飛び先の検査をしていません。",
+            "検査した辞書ファイル 2 個: 誤り 3 件、注意 0 件",
+        ]
+    );
+}
+
+/// 特性化（13.8）: 最上位の `profile` の飛ばしは大文字・小文字を区別する（`Profile` は飛ばさない）
+#[test]
+fn test_validate_characterize_profile_case_sensitive() {
+    let (_t, target, master) = ghost();
+    fs::create_dir_all(master.join("Profile")).unwrap();
+    fs::write(
+        master.join("pasta.toml"),
+        "[loader]\npasta_patterns = [\"Profile/*.pasta\"]\n",
+    )
+    .unwrap();
+    fs::write(master.join("Profile/x.pasta"), "＊\n  ＠＠＠\n").unwrap();
+    let output = validate(&target);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert_eq!(
+        stdout_of(&output).lines().collect::<Vec<_>>(),
+        vec![
+            "ghost/master/Profile/x.pasta:2:4: 誤り: 構文エラー: expected id",
+            "構文エラーがあるため、飛び先の検査をしていません。",
+            "検査した辞書ファイル 1 個: 誤り 1 件、注意 0 件",
+        ]
+    );
+}
+
+/// 特性化（13.8）: `pasta_patterns` が届く形でも、最上位の `profile` の下は一覧に入らず検査されない
+#[test]
+fn test_validate_characterize_top_profile_not_listed() {
+    let (_t, target, master) = ghost();
+    fs::write(
+        master.join("pasta.toml"),
+        "[loader]\npasta_patterns = [\"**/*.pasta\"]\n",
+    )
+    .unwrap();
+    fs::write(
+        master.join("dic/a.pasta"),
+        "＊挨拶\n  さくら：こんにちは。\n",
+    )
+    .unwrap();
+    fs::create_dir_all(master.join("profile")).unwrap();
+    fs::write(master.join("profile/x.pasta"), "＊\n  ＠＠＠\n").unwrap();
+    let output = validate(&target);
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert_eq!(
+        stdout_of(&output).lines().collect::<Vec<_>>(),
+        vec!["検査した辞書ファイル 1 個: 誤り 0 件、注意 0 件、飛び先を検査しなかった Call 0 件"]
+    );
+}

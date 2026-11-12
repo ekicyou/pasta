@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. ゴースト全体の検査のファイル集めを `pasta_check` のライブラリへ移す
-- [ ] 1.1 移す前の `pasta_check validate` の振る舞いを特性化の試験で固定する
+- [x] 1.1 移す前の `pasta_check validate` の振る舞いを特性化の試験で固定する
   - 最上位の `profile` を飛ばすこと・入れ子の `profile` は飛ばさないこと・UTF-8 でないファイルの扱い・`pasta.toml` が無いときの出力の行を、バイナリの出力で固定する
   - この段では製品のコードを変えず、試験だけを 1 つのコミットにする
   - `cargo test -p pasta_check` と `cargo clippy` が、足した試験を含めて緑になっている
