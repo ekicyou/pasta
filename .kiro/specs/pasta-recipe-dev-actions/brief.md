@@ -105,3 +105,12 @@ interface GhostIO {
 - VS Code 拡張の振る舞いを変えない（ポートの探し方・`Origin` を送らないこと・ログの待ち方）。
 - MCP の相手は SSP と areka の両方。今の拡張が通っている道（`get_property` で baseware を確かめる）をそのまま使う。
 - `OnPastaSceneAt`・`OnPastaSetSaveVariable` は、デバッグが有効で、SecurityLevel が external でないときだけ効く。効かないときの知らせ方は、拡張と揃える。
+
+## 申し送り（scene-play-locals より）
+
+2026-11-12 に `scene-play-locals` が実装済み。契約の正本はマニュアル `book/src/lua/shiori-events.md` の `OnPastaScene`・`OnPastaSceneAt` の節と「シーンを再生するイベントの共通の決まり」の「ローカル変数を入れる（Reference2）」。画面を組むときに見直す論点:
+
+- キーは `＄名前` と書ける名前だけ（`"1"`・`"__x__"`・`"a b"` は「名前にならない値」）。判定は `@pasta_debug.is_local_var_name` と同じ決まり（`pasta_dsl::parser::is_id`）なので、入力の欄で先に弾くならこれに揃える。
+- 誤りは 3 種（表にできない値・名前にならない値・代入できない値）で、1 件だけを表記とログの警告 1 行で返し、鳴らさない。文言の実例はマニュアルの誤りの表。配列 `[1]` も「表にできない値」。
+- グローバルシーンだけを指名して値を入れるときは、`OnPastaScene` の Reference1 を `""` にする。値の文字列は TOML のリテラル文字列 `'…'` で組み立てると `\` と `"` を気にしなくてよい。
+- 値はシーンが見つかったときだけ入り、次のイベントには持ち越さない。2^53 を超える整数は丸まる。
