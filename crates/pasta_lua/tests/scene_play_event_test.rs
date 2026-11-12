@@ -51,6 +51,37 @@ const FIXTURE: &str = "\
 
 ＊天気を言う
 　さくら：「今日は＄天気」
+
+＊型を言う
+```lua
+function SCENE.次の回数(act)
+    local save, var = act:init_scene(SCENE)
+    return tostring(var.回数 + 1) .. \"、\" .. type(var.晴れ)
+end
+```
+　さくら：「天気は＄天気、回数は＄回数、晴れは＄晴れ、日は＄日」
+　さくら：＠次の回数（）
+
+　・型のローカル
+　　さくら：「ローカルでは＄天気、回数は＄回数」
+
+＊呼ぶ元
+　＞呼ばれ先
+
+＊呼ばれ先
+　さくら：「呼ばれ先で＄天気」
+
+＊代入する
+　＄回数＝10
+　さくら：「代入の後は＄回数」
+
+＊続きで言う
+　さくら：「一言目」
+　＞チェイントーク
+　さくら：「続きで＄天気」
+
+＊参照を言う
+　さくら：「参照は＄r0」
 ";
 
 /// `＊再生大域` の本体の行
@@ -607,4 +638,130 @@ fn on_pasta_scene_reads_reference2_locals() {
         &["天気を言う", "", "{ '天気' = '雨' }"],
     ));
     assert!(value.contains("雨"), "Reference2 local is read: {value}");
+}
+
+/// 型を確かめる Reference2（文字列・整数・真偽値・日付）
+const TYPED_LOCALS: &str = "{ '天気' = '雨', '回数' = 3, '晴れ' = true, '日' = 1979-05-27 }";
+
+/// `needle` を含むフィクスチャの行の番号（1 始まり）を文字列で返す。
+fn line_of(needle: &str) -> String {
+    let at = FIXTURE
+        .lines()
+        .position(|l| l.contains(needle))
+        .unwrap_or_else(|| panic!("fixture line {needle:?}"));
+    (at + 1).to_string()
+}
+
+/// scene-play-locals 1.1・1.2・1.5・2.1〜2.4: 文字列・整数・真偽値・日付が、名前でも位置でも台詞と
+/// Lua のブロックから読め、整数は算術に使える。
+#[test]
+fn reference2_locals_typed_values_by_name_and_position() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_debug_ghost(temp.path());
+
+    let line = line_of("天気は＄天気");
+    for (id, refs) in [
+        ("OnPastaScene", ["型を言う", "", TYPED_LOCALS]),
+        ("OnPastaSceneAt", [REL_PATH, line.as_str(), TYPED_LOCALS]),
+    ] {
+        let value = value_of_200(&request(&runtime, id, &refs));
+        for expected in [
+            "天気は雨、",
+            "回数は3、",
+            "晴れはtrue、",
+            "日は1979-05-27」",
+            "」4、",
+            "boolean",
+        ] {
+            assert!(value.contains(expected), "{id}: {expected:?} in {value}");
+        }
+    }
+}
+
+/// scene-play-locals 1.3: `＞` の呼び先・ローカルシーン・チェイントークの続きでも同じ値が読める。
+#[test]
+fn reference2_locals_reach_call_local_scene_and_continuation() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_debug_ghost(temp.path());
+
+    let value = value_of_200(&request(
+        &runtime,
+        "OnPastaScene",
+        &["型を言う", "型のローカル", TYPED_LOCALS],
+    ));
+    assert!(
+        value.contains("ローカルでは雨、") && value.contains("回数は3」"),
+        "local scene: {value}"
+    );
+
+    let value = value_of_200(&request(
+        &runtime,
+        "OnPastaScene",
+        &["呼ぶ元", "", TYPED_LOCALS],
+    ));
+    assert!(value.contains("呼ばれ先で雨"), "call target: {value}");
+
+    let value = value_of_200(&request(
+        &runtime,
+        "OnPastaScene",
+        &["続きで言う", "", TYPED_LOCALS],
+    ));
+    assert!(value.contains("一言目"), "beat 1: {value}");
+    assert!(!value.contains("続きで"), "beat 2 not yet: {value}");
+    runtime
+        .exec(
+            r#"
+            local REG = require("pasta.shiori.event.register")
+            REG.OnTestContinue = function() return require("pasta.store").co_scene end
+            "#,
+        )
+        .unwrap();
+    let value = value_of_200(&request(&runtime, "OnTestContinue", &[]));
+    assert!(value.contains("続きで雨"), "continuation: {value}");
+}
+
+/// scene-play-locals 1.4・1.7: 本文の代入が勝ち、Reference2 は転記された `＄r0` に勝ち、
+/// 次の Reference2 無しの再生には残らない。
+#[test]
+fn reference2_locals_precedence_and_no_carry_over() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_debug_ghost(temp.path());
+
+    let value = value_of_200(&request(
+        &runtime,
+        "OnPastaScene",
+        &["代入する", "", TYPED_LOCALS],
+    ));
+    assert!(
+        value.contains("代入の後は10"),
+        "body assignment wins: {value}"
+    );
+
+    // 比べる元: Reference2 が無ければ ＄r0 は Reference0
+    let value = value_of_200(&request(&runtime, "OnPastaScene", &["参照を言う"]));
+    assert!(
+        value.contains("参照は参照を言う"),
+        "transcribed r0: {value}"
+    );
+    let value = value_of_200(&request(
+        &runtime,
+        "OnPastaScene",
+        &["参照を言う", "", "{ 'r0' = '上書き' }"],
+    ));
+    assert!(
+        value.contains("参照は上書き"),
+        "Reference2 wins over r0: {value}"
+    );
+
+    let value = value_of_200(&request(
+        &runtime,
+        "OnPastaScene",
+        &["天気を言う", "", TYPED_LOCALS],
+    ));
+    assert!(value.contains("今日は雨"), "with Reference2: {value}");
+    let value = value_of_200(&request(&runtime, "OnPastaScene", &["天気を言う"]));
+    assert!(
+        value.contains("【値の無い変数：＄天気】"),
+        "next playback without Reference2: {value}"
+    );
 }
