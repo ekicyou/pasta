@@ -123,7 +123,7 @@ graph TB
 
 **Dependency direction（違反は誤りとして扱う）**:
 - Rust: `paths` → `files`・`recent`・`check`・`watch`（互いに依らない。`files` と `check` は `pasta_check::ghost_files` を、`check` は `pasta_check::validate` を使う）→ `commands`（Tauri に触れる唯一のモジュール）→ `lib.rs`（`run()`）→ `main.rs`。`paths`・`files`・`recent`・`check` は Tauri に依らない。`watch` は知らせを閉包で受け、Tauri に依らない。
-- 画面: `ipc.ts`（型と呼び出し）・純粋なモジュール（`mapping.ts`・`theme.ts`・`sync.ts`・`scheduler.ts`。Monaco・DOM・Tauri を import しない）→ 画面のモジュール（`editor.ts`・`dialog.ts` → `documents.ts`・`tree.ts`・`panels.ts`・`start.ts`）→ `main.ts`。
+- 画面: `ipc.ts`（型と呼び出し）・純粋なモジュール（`mapping.ts`・`theme.ts`・`tabs.ts`・`sync.ts`・`scheduler.ts`。Monaco・DOM・Tauri を import しない）→ 画面のモジュール（`editor.ts`・`dialog.ts` → `documents.ts`・`tree.ts`・`panels.ts`・`start.ts`）→ `main.ts`。
 
 ### Technology Stack
 
@@ -160,6 +160,7 @@ editors/recipe/
 │   ├── editor.ts             # Monaco の用意（worker・言語の登録・shiki・テーマ・明暗・セマンティックトークンの提供者・波線）
 │   ├── theme.ts              # 純粋: テーマ＋semanticTokenScopes → 種類ごとの色の規則
 │   ├── mapping.ts            # 純粋: トークン → Uint32Array、診断 → 波線、シーン → ツリーの項目、並べ方、検査の項目の出し分け
+│   ├── tabs.ts               # 純粋: 閉じる・開き直すときの判断・名前の変更のタブの付け替え・全部保存（1 つ失敗で止める）
 │   ├── sync.ts               # 純粋: 外の変更の判定（タブの状態 × ディスクの中身 → 何もしない／読み直す／尋ねる／消えた）
 │   ├── scheduler.ts          # 純粋: まとめて 1 回・走っている間の求めは後で 1 回だけ（時計は注入）
 │   ├── documents.ts          # タブ・モデル・未保存の印・保存・閉じる・名前の付け替え・外の変更の適用・解析の結果の配り
@@ -168,7 +169,7 @@ editors/recipe/
 │   ├── start.ts              # 開始の画面・最近開いたもののメニュー
 │   ├── dialog.ts             # HTML の小さな窓（3 択の確かめ・名前の入力・知らせ）
 │   ├── style.css             # 明暗の両方（prefers-color-scheme）
-│   └── *.test.ts             # theme・mapping・sync・scheduler のテスト（node --test）
+│   └── *.test.ts             # theme・mapping・tabs・sync・scheduler のテスト（node --test）
 └── src-tauri/
     ├── Cargo.toml            # 自前の [workspace]・[profile.release]（panic は書かない）・依存
     ├── Cargo.lock            # ルートの Cargo.lock を種に作る・コミットする
@@ -355,6 +356,7 @@ stateDiagram-v2
 | Theme | 画面・純粋 | 種類ごとの色の規則 | 6.6, 6.7, 13.5 | — | Service |
 | Mapping | 画面・純粋 | 解析・検査・一覧の写し | 4.2, 4.4, 4.5, 4.11, 4.12, 4.13, 6.2, 7.1, 7.5, 9.6, 9.8, 13.5 | — | Service |
 | Sync | 画面・純粋 | 外の変更の判定 | 10.2, 10.3, 10.4, 10.6, 13.5 | — | Service |
+| Tabs | 画面・純粋 | 閉じる・開き直す・名前の変更・全部保存の判断 | 2.8, 4.15, 5.9, 5.10, 13.5 | — | Service |
 | Scheduler | 画面・純粋 | 検査の求めのまとめ | 9.9, 13.5 | — | Service |
 | Editor | 画面 | Monaco・shiki・テーマ・提供者 | 1.3, 6.1, 6.2, 6.4, 6.6, 6.7, 7.1, 8.1 | monaco・shiki（P0）・Theme・Mapping | Service |
 | Documents | 画面 | タブ・保存・閉じる・付け替え・外の変更の適用・解析の配り | 4.6, 4.7, 4.9, 4.10, 4.15, 5.1〜5.11, 6.5, 7.2, 7.6, 7.7, 8.2, 8.3, 10.2, 10.3, 10.4 | Editor・Ipc・Sync・Dialog | State |
@@ -571,7 +573,7 @@ pub fn start(master: PathBuf, on_batch: impl Fn(Vec<String>) + Send + 'static) -
 
 #### TauriConfig（`tauri.conf.json`・`capabilities/default.json`・`Cargo.toml`）
 
-- `identifier`: `io.github.ekicyou.pasta-recipe`。`productName`・`mainBinaryName`: `pasta-recipe`。`version`: `../../vscode/package.json`（仮定・OQ-1）。
+- `identifier`: `io.github.ekicyou.pasta-recipe`。`productName`・`mainBinaryName`: `pasta-recipe`。`version`: `../../vscode/package.json`（拡張・ワークスペース・タグの版はもう揃える決まりがあり、`verify-tag` が拡張の版とタグの一致を見ている。新しい版のファイルを作らない）。
 - `build.frontendDist`: `../dist`。`beforeBuildCommand`: `npm run build`。`bundle.active`: false（`--no-bundle` と同じ）。
 - 窓 1 つ（`label: main`・`dragDropEnabled: true`・既定の明暗は OS に従う）。題名は `run()` の `setup` で `pasta-recipe {version}` にし、ゴーストを開いたら `open_ghost` が `{name} - pasta-recipe {version}` にする（設定の題名は版を埋められないため・1.6）。
 - `app.security.csp`: `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; img-src 'self' data:; font-src 'self' data:; connect-src ipc: http://ipc.localhost`（外へつながない・1.3）。
@@ -586,7 +588,7 @@ pub fn start(master: PathBuf, on_batch: impl Fn(Vec<String>) + Send + 'static) -
 | Intent | リポジトリのファイル同士の一致を cargo test で固定する |
 | Requirements | 6.3, 13.4 |
 
-- (1) lock: アプリの `Cargo.lock` で `pasta_lsp`・`pasta_check` から通常の依存でたどれるクレート（path のものを除く）の版が、ルートの `Cargo.lock` の同じ名前の版と同じ（同じ名前が複数の版で在るときは集合で比べる）。`toml` で両方を読む。
+- (1) lock: アプリの `Cargo.lock` で `pasta_lsp`・`pasta_check` から通常の依存でたどれるクレート（path のものを除く）の版が、ルートの `Cargo.lock` の同じ名前の版と同じ（同じ名前が複数の版で在るときは集合で比べる）。`toml` で両方を読む。落ちたときのメッセージに、ずれたクレートの名前と版、直し方（`cargo update --manifest-path editors/recipe/src-tauri/Cargo.toml -p <名前> --precise <ルートの版>`）を出す。
 - (2) 凡例: `editors/vscode/src/semanticTokensProvider.ts` の `PASTA_TOKEN_TYPES`・`PASTA_TOKEN_MODIFIERS` の配列の引用符の中の名前を順に取り出し、`TOKEN_TYPES`・`TOKEN_MODIFIERS` と一致（6.3。拡張のファイルは読むだけ）。
 - (3) 写し: `editors/vscode/package.json` の `semanticTokenScopes[language=pasta].scopes` の鍵の集合が `TOKEN_TYPES` と一致（色の写しに漏れが無い）。
 - (4) 版: `tauri.conf.json` の `version` が指す `package.json` の版が、ルートの `[workspace.package].version` と同じ（1.6。日々の CI で崩れに気づく）。
@@ -656,7 +658,7 @@ class CoalescingRunner {
 - `.pasta`・`.lua` 以外は `plaintext`（色なし・5.2）。
 
 **Implementation Notes**
-- Validation: 最初のタスクで、実物の窓に `＊挨拶`・`＠単語`・柵の中の Lua を含む文書を開き、(a) 下地の色、(b) セマンティックトークンの色が下地の上に出ること（例: アクター名が拡張と同じ種類の色）、(c) 柵の中の Lua の色、を目で確かめ、スクリーンショットを残す。
+- Validation（関門）: アプリの最初のタスクを関門にし、合格するまで画面のタスク（Documents・TreeView・Panels・StartView・MainTs）に進まない。合格の条件は (1) `+crt-static` のまま `tauri build --no-bundle` が通り、VC++ の再頒布可能パッケージ無しで起動し、exe と zip の大きさを量って記録する、(2) 実物の窓に `＊挨拶`・`＠単語`・柵の中の Lua を含む文書を開き、(a) 下地の色、(b) セマンティックトークンの色が下地の上に出ること（例: アクター名が拡張と同じ種類の色）、(c) 柵の中の Lua の色、を目で確かめ、スクリーンショットを残す。だめなときは、そのタスクの中で下の道へ切り替え（色の重なり → 自前の `setTokensProvider`、静的 CRT → `staticVCRuntime` に任せる）、どちらにしたかを報告に書く。
 - Risks: だめなら下地を `vscode-textmate`＋`vscode-oniguruma`（`book/` と同じ版）の自前の `setTokensProvider` にする（テーマ・写し・提供者はそのまま）。
 
 #### Documents（`documents.ts`）
@@ -686,6 +688,14 @@ interface Tab {
 - 保存（`save(tab)`・`Ctrl+S` とメニュー）: `text = model.getValue()`（モデルの改行のまま・5.7）→ `write_text(rel, text, diskBom)` → 成功で `diskText = text`・`deleted = false`・`savedVersionId` を今に・ツリーのシーンを今の解析から作り直す（4.9）・ゴースト全体の検査を求める（9.2）。失敗は理由を出し、中身と印を残す（5.8）。自動では保存しない（5.11）。
 - 閉じる: 未保存なら 3 択（保存する → 保存してから閉じる／保存しない → 閉じる／取り消す → 閉じない）（5.9）。閉じたら波線・診断の一覧から消す（7.6）。そのファイルが `.pasta` なら、ツリーのシーンをディスクの中身から読み直す。
 - 窓を閉じる・別のゴーストを開く: 未保存のタブがあれば 1 回の 3 択（保存する＝全部保存し、1 つでも失敗したら止める／保存しない／取り消す）（2.8・5.10）。
+- 判断は `tabs.ts`（純粋）に置き、Documents は結果を Monaco とタブに当てるだけにする:
+  ```typescript
+  interface TabRef { id: number; rel: string; dirty: boolean }
+  function retargetTabs(tabs: readonly TabRef[], oldRel: string, newRel: string): Map<number, string>; // id → 新しい rel（フォルダは前方一致・大文字小文字を区別しない）
+  function needsConfirm(tabs: readonly TabRef[]): boolean;
+  async function saveAll(tabs: readonly TabRef[], save: (t: TabRef) => Promise<boolean>): Promise<'ok' | 'failed'>; // 失敗した所で止める
+  function afterChoice(choice: 'save' | 'discard' | 'cancel', saved: 'ok' | 'failed' | null): 'proceed' | 'stay';
+  ```
 - 名前の付け替え: `rename_entry` の結果で、その `rel`（フォルダなら前方一致・大文字・小文字を区別しない）のタブの `rel` を書き換える。モデル・未保存の書き換え・取り消しの履歴は保たれる（4.15）。拡張子が変わったら `setModelLanguage`。
 - 外の変更（`applyExternal()`）: 全タブで `read_text` → `DiskState` → `decideExternal`。`reload` はモデルの中身を `pushEditOperations` で置き換え（取り消し可能）、`diskText` を更新。`ask` は知らせの帯に「外で変わりました: 読み直す／今の中身を残す」（選ぶまで中身を変えない・10.3）。「今の中身を残す」は `diskText` を今のディスクに更新し未保存のまま。`deleted` は「外で消えました」の印を出し、未保存にする（10.4）。
 
@@ -728,7 +738,7 @@ interface Tab {
 - 「Check Cargo.lock is unchanged」に `editors/recipe/src-tauri/Cargo.lock` を足す。upload の一覧に `release/pasta-recipe.zip`。
 - `github-release.ps1`: 名前の並びに `pasta-recipe.zip`（7 つ・12.6）。冪等の作り（足りない添付だけを足す）はそのまま（12.8）。
 - `release-scripts-test.ps1`（項目 10・11）・`release-state.ps1`: 7 つに（12.7）。ほかの配布物の step・検査は触らない（12.9）。
-- `release` スキル: 版の更新の手順に `cargo update --workspace --manifest-path editors/recipe/src-tauri/Cargo.toml`（アプリの lock の path のクレートの版）を足す。添付の数の記述を 7 つに。
+- `release` スキル: 版の更新の手順に `cargo update --workspace --manifest-path editors/recipe/src-tauri/Cargo.toml`（アプリの lock の path のクレートの版）を足す。添付の数の記述を 7 つに。この書き換えは、リリース CI・補助スクリプトと同じタスクで行う。`.claude/skills/` の書き換えを分類器が止めたら、回避の道を探さず、入った分と残りを示して開発者の許可を求める。
 
 #### ManualChapter（`book/src/debug/recipe.md`）
 - 章題「VS Code を使わずに書く（pasta-recipe）」。`SUMMARY.md` の「VSCode 接続と拡張導入」の次。節: 入手（GitHub Release の `pasta-recipe.zip`）と置き方・初めての起動と SmartScreen の「詳細情報 → 実行」・WebView2（Windows 11 は入っている・無いときの入手先）・ゴーストの開き方 4 つ（ドラッグドロップ・窓へのドロップ・フォルダを選ぶ・最近開いたもの）・関連付け（「プログラムから開く」）と「送る」（`shell:sendto` にショートカット）で開くこと（動いていれば今の窓で開く）・できること（色分け・診断・ツリー・ゴースト全体の検査）とまだできないこと（シーンの実行などは拡張）。章の口調（クローディアの前置き）に合わせる。`link-check.mjs` を通す（14.1〜14.6）。
@@ -804,6 +814,7 @@ interface OpenRequest { path: string | null }
 - `theme`: 両方のテーマで写し先の色を持つ種類に規則が付く・選択子の最長一致（6.6）。
 - `sync`: 表の全組み合わせ（自分の保存は `none`・未保存なら `ask`・消えた・戻ってきた）（10.2〜10.4・10.6）。
 - `scheduler`: 300 ms 以内の 3 回の求めが 1 回・走っている間の 2 回の求めが後の 1 回（9.9）。
+- `tabs`: フォルダの名前の変更で中のタブが付け替わり、似た名前（`dic` と `dict`）は付け替わらない・大文字小文字違いも付け替わる（4.15）、全部保存が 2 つ目の失敗で止まり 3 つ目を呼ばない、失敗・取り消しでは `stay`（2.8・5.9・5.10）。
 - `js-licenses`: モジュールの id（`\0` 付きの仮想 id・`@scope/name`・入れ子の `node_modules`）から根を取り出す。
 
 ### E2E（手で確かめ・最後のタスク）
@@ -820,7 +831,7 @@ interface OpenRequest { path: string | null }
 
 ## Open Questions / Risks
 
-- **OQ-1（版の置き場）**: 仮定は `tauri.conf.json` の `version` を `../../vscode/package.json` に向ける。どの案でも、版の更新の手順にアプリの lock の更新が要り、`release` スキルのファイルを触る。
+- **決定（版の置き場・2026-11-13）**: `tauri.conf.json` の `version` は `../../vscode/package.json`。版の更新の手順にアプリの lock の更新を足し、lock の版の一致の試験は残す（ReleaseWorkflow・RepoParityTest）。
 - **Risk: shiki とセマンティックトークンの重なり**: ソースの上では重なる。最初のタスクで実物で確かめ、だめなら Editor の Risks の道へ。
 - **Risk: アプリの lock への `cargo deny`**: Tauri の木の勧告で止まることがある。1 件ずつ判断する。
 - **Risk: 大きさ**: 上限 30 MB は見積もり（zip 5 MB 前後）の 6 倍。最初のビルドの実測が 15 MB を超えたら、何が大きいかを調べる（Monaco の言語・shiki の言語の取り込み漏れなど）。

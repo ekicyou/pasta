@@ -271,3 +271,9 @@
 - `tauri` 2.12.5・`tauri-build` 2.7.4・`tauri-utils` 2.10.2・`static_vcruntime` 3.0.0（cargo の registry の展開済みのソース）
 - `cargo metadata`／`cargo tree` の結果（スクラッチの試しのプロジェクト。リポジトリには残さない）
 - `book/tools/highlight/`（VS Code の外で拡張の文法を読む先例）、`editors/vscode/package.json` の `semanticTokenScopes`
+
+## 設計ディスカッションの結論（2026-11-13 開発者の承認・全議題を推奨案で確定）
+
+1. 版は `tauri.conf.json` から `editors/vscode/package.json` を指す。`release` スキルの版の更新にアプリの lock の `cargo update --workspace` を足す。lock の版の一致の試験（pest の版のずれを捕まえる）は残し、落ちたときに直し方のコマンドを出す。スキルの書き換えはリリース CI と同じタスクで行い、分類器に止められたら開発者の許可を求める。
+2. アプリの最初のタスクを関門にする（静的 CRT の `--no-bundle` ビルド・大きさの実測・shiki とセマンティックトークンの色の重なりのスクリーンショット）。合格まで画面のタスクに進まず、だめなら同じタスクの中で代わりの道へ切り替えて報告する。
+3. タブの閉じる・開き直す・名前の変更・全部保存の判断を純粋な `tabs.ts` に出し、`node --test` で確かめる（書いた中身を失う所を手作業の確かめだけに任せない）。タスクの数は増やさない。
