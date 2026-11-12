@@ -18,7 +18,7 @@
 
 - 有効化の判定（`resolve_enabled`）と、ランタイムが有効を持つ形
 - 開発用のイベントの門（`pasta.shiori.event.scene_play` の `allowed`）と既定のハンドラ
-- 内部モジュール `@pasta_debug` の 3 つの関数（`enabled`・`scene_at`・`dump_variables`）
+- 内部モジュール `@pasta_debug` の 4 つの関数（`enabled`・`scene_at`・`dump_variables`・`is_local_var_name`）
 - シーンマップ: シーンの宣言の記録の作り方と、位置からシーンを引くシーン identity 索引
 - 保存変数の書き出し（`variables.toml`）
 - 止まるエラーの場所の決め方（`STOP.location` と `@pasta_chunks` の値）
@@ -49,7 +49,7 @@
 | シーンマップの構築 | `crates/pasta_lua/src/loader/source_map_build.rs` | `PastaLoader::build_source_map` |
 | 元のファイル | `crates/pasta_lua/src/loader/context.rs` | `LoaderContext::pasta_sources`（モジュール名 → `DicSource::Pasta`・`DicSource::Lua`） |
 | 読み込んだファイルの表 | `crates/pasta_lua/src/runtime/searcher.rs` | `register_chunk_table`・`record_chunk`（`@pasta_chunks` を書き足す）と `pasta_file_of`（候補パス → `.pasta`） |
-| `@pasta_debug` の登録 | `crates/pasta_lua/src/runtime/module_registry.rs` | `register_debug_module`。`enabled`・`scene_at`・`dump_variables` を持つ表を `package.loaded` に置く |
+| `@pasta_debug` の登録 | `crates/pasta_lua/src/runtime/module_registry.rs` | `register_debug_module`。`enabled`・`scene_at`・`dump_variables`・`is_local_var_name` を持つ表を `package.loaded` に置く |
 | 書き出し | `crates/pasta_lua/src/runtime/persistence.rs` | `dump_table`（セーブと同じ変換でテキストを書く）と `save_to_file`（一時ファイル → `rename`） |
 | 突合の呼び出し | `crates/pasta_lua/src/runtime/factory.rs` | `from_loader_with_scene_dic` の最後で `build_scene_index` を呼び、索引を書き込む |
 
@@ -100,12 +100,13 @@ allowed(act, event, outcome)
 | `enabled()` | シーンマップを持つかの値 |
 | `scene_at(file, line)` | 位置を登録名の組（グローバルシーンの登録名, ローカルシーンの登録名か `__start__`）に引く。見つからなければ `nil` |
 | `dump_variables(save)` | `save` の表を `profile/pasta/debug/variables.toml` に書く。返り値は無い |
+| `is_local_var_name(s)` | `s` の全体が `＄名前` と書けるローカル変数の名前に当たるかの値（`pasta_dsl::parser::is_id`）。Reference2 のキーの検査に使う |
 
-どの関数もエラーを Lua に上げない（引数の型の誤りを除く。`scene_at` の `file` が文字列か数でないとき、`dump_variables` に表でない値を渡したとき）。
+どの関数もエラーを Lua に上げない（引数の型の誤りを除く。`scene_at` の `file` が文字列か数でないとき、`dump_variables` に表でない値を渡したとき、`is_local_var_name` に文字列か数でない値を渡したとき）。
 
 ### 位置でのシーンの再生
 
-`OnPastaScene` は、名前を `SCENE.co_exec_exact` に渡してコルーチンを作る。シーンマップは使わない。`OnPastaSceneAt` は、ファイルと行を `@pasta_debug.scene_at` で登録名の組に引き、`SCENE.co_exec_registered` に渡す。どちらも、得たコルーチンに `STORE.co_preempt` の印を付けて返し、その要求の応答にする。行の文字列から数への変換と検査は、ハンドラが行う（半角数字だけの 1 以上）。
+`OnPastaScene` は、名前を `SCENE.co_exec_exact` に渡してコルーチンを作る。シーンマップは使わない。`OnPastaSceneAt` は、ファイルと行を `@pasta_debug.scene_at` で登録名の組に引き、`SCENE.co_exec_registered` に渡す。どちらも、得たコルーチンに `STORE.co_preempt` の印を付けて返し、その要求の応答にする。行の文字列から数への変換と検査は、ハンドラが行う（半角数字だけの 1 以上）。Reference2 は、シーンを探す前に局所関数 `read_locals` が `@toml` で読んで検査し、コルーチンを得たときだけ、その値を `act.var` に入れる。
 
 ```text
 scene_at(file, line)
