@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "画面に与える最小の許可（fs・shell・http は与えない）",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-open", "core:window:allow-destroy"]
+}

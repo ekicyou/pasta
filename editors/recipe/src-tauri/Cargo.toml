@@ -1,0 +1,40 @@
+# pasta-recipe: VS Code を使わずに .pasta を書くアプリの Rust の殻。
+# ルートのワークスペース（crates/*）に入れない自前のワークスペース。静的 CRT はルートの
+# .cargo/config.toml（+crt-static）を上へたどって受け継ぐ。
+[workspace]
+
+[package]
+name = "pasta-recipe"
+# 表に出る版は tauri.conf.json → editors/vscode/package.json。ここは cargo のための置き版
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[lib]
+name = "pasta_recipe"
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "~2.12", features = [] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-dialog = "2"
+notify = "8.2"
+toml = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+pasta_check = { path = "../../../crates/pasta_check", default-features = false, features = ["fs"] }
+pasta_lsp = { path = "../../../crates/pasta_lsp" }
+windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+# panic は書かない（unwind のまま。解析のパニックで窓を落とさない）
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

@@ -15,7 +15,7 @@
   - _Requirements: 4.3, 9.12, 13.8_
 
 - [ ] 2. アプリの土台と最初の関門
-- [ ] 2.1 アプリの Rust の殻と画面の骨組みを作り、exe 1 つのビルドを通す
+- [x] 2.1 アプリの Rust の殻と画面の骨組みを作り、exe 1 つのビルドを通す
   - `editors/recipe/` に、自前のワークスペースを持つ Rust の殻（依存・リリースのプロファイル・Tauri の設定・最小の許可・アイコン）と、Vite＋TypeScript（strict）の画面の骨組みを置く
   - アプリの lock はルートの lock を種にして作り、`dist/`・`build/` を git の対象から外す
   - 版はアプリの設定から拡張の `package.json` を指し、窓の題名に `pasta-recipe {版}` を出す
@@ -235,3 +235,6 @@
   - 同じ文書を拡張で開いたときと波線の位置・色の種類を見比べ、開いてからツリーとシーンが出るまで 1 秒以内を確かめる
   - ルートの `cargo test --workspace`・clippy、アプリの `cargo test`・clippy・`npm test` が緑で、確かめの結果とスクリーンショットを報告に残している
   - _Requirements: 1.1, 1.5, 2.1, 2.11, 4.6, 5.7, 5.10, 6.1, 6.2, 7.2, 7.5, 10.2, 10.3, 13.2_
+
+## Implementation Notes
+- 2.1: exe は 6,225,408 B（--no-bundle・+crt-static はルートの .cargo/config.toml を受け継ぐ）。vcruntime/msvcp は引かず UCRT（api-ms-win-crt-*）だけ。全依存を先に入れたので、使い始めるまで cargo の unused dependency 警告が出る（clippy -D warnings は止まらない）。cargo は env -u NoDefaultCurrentDirectoryInExePath で走らせる。

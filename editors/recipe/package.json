@@ -1,0 +1,16 @@
+{
+  "name": "pasta-recipe",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --test src/",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4",
+    "typescript": "7.0.2",
+    "vite": "8.3.8"
+  }
+}

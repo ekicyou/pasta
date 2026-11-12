@@ -1,0 +1,33 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, "Yu Gothic UI", sans-serif;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  background: Canvas;
+  color: CanvasText;
+}
+#workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+#tree {
+  width: 260px;
+  overflow: auto;
+}
+#editor-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+#editor {
+  flex: 1;
+}
