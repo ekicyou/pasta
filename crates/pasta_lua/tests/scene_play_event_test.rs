@@ -765,3 +765,304 @@ fn reference2_locals_precedence_and_no_carry_over() {
         "next playback without Reference2: {value}"
     );
 }
+
+/// `@pasta_log` を、`warn` を `_G.__warns` に集める表に差し替える（ほかの口は元のものへ渡す）。
+fn capture_warnings(runtime: &PastaLuaRuntime) {
+    runtime
+        .exec(
+            r#"
+            local orig = require("@pasta_log")
+            _G.__warns = {}
+            package.loaded["@pasta_log"] = setmetatable(
+                { warn = function(m) table.insert(_G.__warns, m) end },
+                { __index = orig })
+            "#,
+        )
+        .unwrap();
+}
+
+/// 集めた警告を取り出して空にする。
+fn take_warnings(runtime: &PastaLuaRuntime) -> Vec<String> {
+    runtime
+        .lua()
+        .load("local w = _G.__warns; _G.__warns = {}; return w")
+        .eval()
+        .unwrap()
+}
+
+/// 失敗の表記だけの Value（末尾の `\e` を含む）であることを確かめる。
+fn assert_failure_value(response: &str, notation: &str) {
+    assert_eq!(
+        value_of_200(response),
+        format!("{notation}\\e"),
+        "{response:?}"
+    );
+}
+
+/// scene-play-locals 3.1〜3.4・1.6: Reference2 が無い・`""`・`{}` では今と同じ台詞で警告が無く、
+/// Reference1 を `""` にすればグローバルシーンが鳴り、Reference1 の `{ … }` はローカルシーンの名前になる。
+#[test]
+fn reference2_absent_or_empty_keeps_current_behavior() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_debug_ghost(temp.path());
+    capture_warnings(&runtime);
+
+    let line = LINE_GLOBAL_BODY.to_string();
+    for (id, r0, r1) in [
+        ("OnPastaScene", "再生大域", ""),
+        ("OnPastaSceneAt", REL_PATH, line.as_str()),
+    ] {
+        let base = value_of_200(&request(&runtime, id, &[r0, r1]));
+        assert!(base.contains("大域の声"), "{id}: {base}");
+        // フィクスチャのアクターは未登録なので、再生ごとの警告は Reference2 が無いときと比べる
+        let base_warnings = take_warnings(&runtime);
+        for r2 in ["", "{}"] {
+            let value = value_of_200(&request(&runtime, id, &[r0, r1, r2]));
+            assert_eq!(
+                value, base,
+                "{id} Reference2 {r2:?} must not change the talk"
+            );
+            assert_eq!(take_warnings(&runtime), base_warnings, "{id} {r2:?}");
+        }
+    }
+
+    // 3.3: Reference1 を空にして Reference2 を付けるとグローバルシーン
+    let value = value_of_200(&request(
+        &runtime,
+        "OnPastaScene",
+        &["再生大域", "", "{ 'a' = 1 }"],
+    ));
+    assert!(value.contains("大域の声"), "global scene played: {value}");
+    take_warnings(&runtime); // 未登録アクターの警告を捨てる
+
+    // 3.4: Reference1 に表を書くと、その名前のローカルシーンを探す
+    let response = request(&runtime, "OnPastaScene", &["再生親", "{ '天気' = '雨' }"]);
+    assert_failure_value(
+        &response,
+        "【シーンが見つからない：OnPastaScene ＊再生親 ・{ '天気' = '雨' }】",
+    );
+    assert_eq!(
+        take_warnings(&runtime),
+        ["OnPastaScene: scene not found: global='再生親', local='{ '天気' = '雨' }'"]
+    );
+}
+
+/// scene-play-locals 4.1〜4.5・4.8: 誤りの 3 種が、両方のイベントで表記と警告 1 行になり、
+/// 何も再生せず場面の続きを変えない。複数の誤りでは並べ替えた最初のキーの 1 件だけ。
+#[test]
+fn reference2_errors_report_notation_and_one_warning() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_debug_ghost(temp.path());
+    capture_warnings(&runtime);
+    runtime
+        .exec(
+            r#"
+            _G.__old_co = coroutine.create(function() coroutine.yield("古い続き") end)
+            require("pasta.store").co_scene = _G.__old_co
+            "#,
+        )
+        .unwrap();
+
+    // (Reference2, 表記の <ラベル>：<E> の後ろ, 警告の <E>: の後ろ)
+    let cases: &[(&str, &str, &str)] = &[
+        (
+            r#"{ 天気 = "雨" }"#,
+            r#"表にできない値：{E} Reference2（"{ 天気 = "雨" }"）"#,
+            r#"bad argument: Reference2='{ 天気 = "雨" }' (invalid unquoted key, expected letters, numbers, `-`, `_`)"#,
+        ),
+        (
+            "3",
+            r#"表にできない値：{E} Reference2（"3"）"#,
+            "bad argument: Reference2='3' (not an inline table)",
+        ),
+        (
+            r#"{ "a" = 1 } x"#,
+            r#"表にできない値：{E} Reference2（"{ "a" = 1 } x"）"#,
+            r#"bad argument: Reference2='{ "a" = 1 } x' (unexpected key or value, expected newline, `#`)"#,
+        ),
+        (
+            "[]",
+            r#"表にできない値：{E} Reference2（"[]"）"#,
+            "bad argument: Reference2='[]' (not an inline table)",
+        ),
+        (
+            "[1]",
+            r#"表にできない値：{E} Reference2（"[1]"）"#,
+            "bad argument: Reference2='[1]' (not an inline table)",
+        ),
+        (
+            r#"{ "1" = 1 }"#,
+            r#"名前にならない値：{E} Reference2（"1"）"#,
+            "bad argument: Reference2 key='1' (not a local variable name)",
+        ),
+        (
+            r#"{ "__x__" = 1 }"#,
+            r#"名前にならない値：{E} Reference2（"__x__"）"#,
+            "bad argument: Reference2 key='__x__' (not a local variable name)",
+        ),
+        (
+            r#"{ "a b" = 1 }"#,
+            r#"名前にならない値：{E} Reference2（"a b"）"#,
+            "bad argument: Reference2 key='a b' (not a local variable name)",
+        ),
+        (
+            r#"{ "a" = [1] }"#,
+            "代入できない値：{E} Reference2 ＄a（表）",
+            "bad argument: Reference2 key='a' (table is not assignable)",
+        ),
+        (
+            r#"{ "a".b = 1 }"#,
+            "代入できない値：{E} Reference2 ＄a（表）",
+            "bad argument: Reference2 key='a' (table is not assignable)",
+        ),
+        // 4.5: "1" < "b" なので、"b" の型の誤りより先に "1" の名前の誤りだけが出る
+        (
+            r#"{ "b" = [1], "1" = 2 }"#,
+            r#"名前にならない値：{E} Reference2（"1"）"#,
+            "bad argument: Reference2 key='1' (not a local variable name)",
+        ),
+        // 4.8: 表記では `\` が `\\` になり、警告は届いたまま
+        (
+            r"{ 'C:\dic' = 1 }",
+            r#"名前にならない値：{E} Reference2（"C:\\dic"）"#,
+            r"bad argument: Reference2 key='C:\dic' (not a local variable name)",
+        ),
+    ];
+
+    let line = LINE_GLOBAL_BODY.to_string();
+    for (id, r0, r1) in [
+        ("OnPastaScene", "再生大域", ""),
+        ("OnPastaSceneAt", REL_PATH, line.as_str()),
+    ] {
+        for (r2, notation, warning) in cases {
+            let response = request(&runtime, id, &[r0, r1, r2]);
+            assert_failure_value(&response, &format!("【{}】", notation.replace("{E}", id)));
+            assert_eq!(
+                take_warnings(&runtime),
+                [format!("{id}: {warning}")],
+                "{id} {r2:?}: exactly one warning"
+            );
+        }
+    }
+
+    assert!(
+        lua_bool(
+            &runtime,
+            r#"
+            return require("pasta.store").co_scene == _G.__old_co
+                and coroutine.status(_G.__old_co) == "suspended"
+            "#,
+        ),
+        "continuation must remain after failures"
+    );
+}
+
+/// scene-play-locals 4.6: Reference0 → Reference1 → Reference2 → シーンの検索 の順に確かめ、最初の誤りだけを出す。
+#[test]
+fn reference2_checked_after_reference0_and_1_before_lookup() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_debug_ghost(temp.path());
+    capture_warnings(&runtime);
+
+    // Reference2 の誤りはシーンの検索より先
+    assert_failure_value(
+        &request(&runtime, "OnPastaScene", &["無い名前", "", "3"]),
+        r#"【表にできない値：OnPastaScene Reference2（"3"）】"#,
+    );
+    assert_eq!(
+        take_warnings(&runtime),
+        ["OnPastaScene: bad argument: Reference2='3' (not an inline table)"]
+    );
+    assert_failure_value(
+        &request(
+            &runtime,
+            "OnPastaSceneAt",
+            &["dic/test/無い.pasta", "1", "3"],
+        ),
+        r#"【表にできない値：OnPastaSceneAt Reference2（"3"）】"#,
+    );
+    assert_eq!(take_warnings(&runtime).len(), 1);
+
+    // Reference0 の誤りは Reference2 より先
+    let response = request(&runtime, "OnPastaScene", &["", "", "3"]);
+    assert!(
+        !value_of_200(&response).contains("Reference2"),
+        "Reference0 error first: {response:?}"
+    );
+    let warnings = take_warnings(&runtime);
+    assert_eq!(warnings.len(), 1, "{warnings:?}");
+    assert!(warnings[0].contains("Reference0"), "{warnings:?}");
+
+    // Reference1（行）の誤りは Reference2 より先
+    assert_failure_value(
+        &request(&runtime, "OnPastaSceneAt", &[REL_PATH, "x", "3"]),
+        r#"【数にできない値：OnPastaSceneAt Reference1（"x"）】"#,
+    );
+    assert_eq!(
+        take_warnings(&runtime),
+        ["OnPastaSceneAt: bad argument: Reference1='x'"]
+    );
+}
+
+/// scene-play-locals 5.1・5.2: `external`・デバッグ無効では、Reference2 が誤っていても 204 と門の警告 1 行だけ。
+#[test]
+fn reference2_not_read_when_gate_refuses() {
+    let enabled = tempfile::TempDir::new().unwrap();
+    let disabled = tempfile::TempDir::new().unwrap();
+    let line = LINE_GLOBAL_BODY.to_string();
+    for (temp, pasta_toml, level, reason) in [
+        (
+            &enabled,
+            "[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\n",
+            "external",
+            "SecurityLevel external is refused",
+        ),
+        (
+            &disabled,
+            "[loader]\ndebug_mode = true\n",
+            "local",
+            "debug is disabled",
+        ),
+    ] {
+        let runtime = load_ghost(temp.path(), pasta_toml);
+        capture_warnings(&runtime);
+        for (id, r0, r1) in [
+            ("OnPastaScene", "再生大域", ""),
+            ("OnPastaSceneAt", REL_PATH, line.as_str()),
+        ] {
+            assert_204(
+                &request_at_level(&runtime, id, &[r0, r1, "[1]"], level),
+                &format!("{id} {level}"),
+            );
+            assert_eq!(
+                take_warnings(&runtime),
+                [format!("{id}: {reason}; scene not played")],
+                "{id} {level}: only the gate warning"
+            );
+        }
+    }
+}
+
+/// scene-play-locals 4.7: `[logging] balloon_warning = false` では 204 で、警告は出る。
+#[test]
+fn reference2_error_with_balloon_warning_off_is_204_with_warning() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let runtime = load_ghost(
+        temp.path(),
+        "[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\n\n[logging]\nballoon_warning = false\n",
+    );
+    capture_warnings(&runtime);
+    let line = LINE_GLOBAL_BODY.to_string();
+    for (id, r0, r1) in [
+        ("OnPastaScene", "再生大域", ""),
+        ("OnPastaSceneAt", REL_PATH, line.as_str()),
+    ] {
+        assert_204(&request(&runtime, id, &[r0, r1, "3"]), id);
+        assert_eq!(
+            take_warnings(&runtime),
+            [format!(
+                "{id}: bad argument: Reference2='3' (not an inline table)"
+            )]
+        );
+    }
+}
