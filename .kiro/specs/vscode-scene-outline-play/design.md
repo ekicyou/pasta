@@ -384,7 +384,7 @@ export interface WasmAnalysisResult {
 
 **Responsibilities & Constraints**
 - 1 つのクラスが `vscode.DocumentSymbolProvider` と `vscode.CodeLensProvider` の両方を実装する。並びの意味（何が項目か・範囲）は解析器に任せ、ここでは写すだけ。
-- DocumentSymbol: `name = scene.name`、`detail = ''`、`kind = global → SymbolKind.Namespace / local → SymbolKind.Function`（仮定・OPEN QUESTION 2）、`range = scene.range`、`selectionRange = scene.heading`、`children` は子を同じく写す（2.1〜2.6）。パンくず・`Ctrl+Shift+O`・スティッキースクロール（既定の `editor.stickyScroll.defaultModel = "outlineModel"`）は VSCode がここから作る（2.2）。
+- DocumentSymbol: `name = scene.name`、`detail = ''`、`kind = global → SymbolKind.Namespace / local → SymbolKind.Function`（アイコンだけの違いで、再生には効かない。グローバルは着色の `namespace` に揃える。設計ディスカッションで確定）、`range = scene.range`、`selectionRange = scene.heading`、`children` は子を同じく写す（2.1〜2.6）。パンくず・`Ctrl+Shift+O`・スティッキースクロール（既定の `editor.stickyScroll.defaultModel = "outlineModel"`）は VSCode がここから作る（2.2）。
 - CodeLens: グローバルシーンとその子を文書の順に並べ、1 つの項目につき 1 つ。`range = scene.heading`（1 行）、`command = { title: '▶ シーンを実行', command: 'pasta.runSceneAtCursor', arguments: [document.uri, scene.heading.start.line] }`（3.1・3.4・4.5）。`resolveCodeLens` と `onDidChangeCodeLenses` は持たない（3.6・3.7。VSCode が書き換えのたびに問い合わせ直す）。CodeLens を消すのは VSCode の言語ごとの `editor.codeLens`（3.8。拡張のコードは要らない）。
 - 解析: `wasmBridge.analyzeDocument(document.getText())`。失敗（例外）なら `[]` を返し、通知も記録も出さない（5.3。`SemanticTokensProvider` と同じ扱い）。
 - 控え: 最後に解いた 1 つの文書（uri の文字・版・並び）だけを覚え、同じ uri・同じ版の問い合わせ（DocumentSymbol と CodeLens）では解き直さない。版が変われば解き直す（2.7・3.6）。`// shortcut: 1 枠の控え。DocumentSync・SemanticTokensProvider と解析を共有しない。大きな辞書で遅さが見えたら控えを結果ごとに共有する` の注記を置く。
@@ -534,7 +534,6 @@ async function resolveTarget(args: readonly unknown[]): Promise<Target | undefin
 - 並びの計算は見出しの数に比例し、行の文字は見出しの行と各範囲の最後の行だけを読む。
 
 ## Open Questions / Risks
-- **OPEN QUESTION 2（仮定あり）**: アウトラインの記号の種類。仮定: グローバル＝`SymbolKind.Namespace`、ローカル＝`SymbolKind.Function`。
 - **Risk**: 右クリックの `Uri` だけの呼び出しを引数ありと取り違えると、右クリックの再生が壊れる → 見分けを「第 2 引数が数か」にし、e2e で守る。
 - **Risk**: 範囲の式が pasta.dll とずれる → 鳴るシーンは見出しの行だけで決まるので、ずれはアウトラインの見え方だけに出る。同じ形の文書で終わりの行を確かめる。
 - **Known limit**: 部分解析は Lua ブロックの本文の 0 桁目の `＊` でも塊を切る（`pasta_dsl` の shortcut）。別の誤りのある文書でだけ、コードブロックの後ろのシーンが並びから消えうる。誤りのある文書は再生まで進まないので、害は見え方だけ。
