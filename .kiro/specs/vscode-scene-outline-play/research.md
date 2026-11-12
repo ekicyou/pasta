@@ -44,7 +44,7 @@
 - `package.json`: `engines.vscode ^1.85.0`（CodeLens・DocumentSymbol の API は十分に古くからある）。`activationEvents: onLanguage:pasta`。CodeLens・DocumentSymbol はコードで登録するので `contributes` の足し込みは要らない。試験は `test:unit`・`test:e2e` のスクリプトに esbuild の行を 1 本ずつ並べる形で、新しい試験のファイルを足すならこのスクリプトを直す（`vsce-4-upgrade` と同じファイル）。
 - `src/test/mock/vscode.ts`（488 行）: `languages` は `createDiagnosticCollection`・`registerDocumentSemanticTokensProvider` だけ。`commands.executeCommand(id, ...args)` は引数をそのまま渡すので、引数付きの呼び出しの試験はすぐ書ける。`workspace.openTextDocument` は無い。
 - `src/test/devCommands.e2e.test.ts`（419 行）: MCP を真似るサーバー（`fakeMcpServer.ts`）と `executeCommand('pasta.runSceneAtCursor')` で、保存・読み込み直し・`OnPastaSceneAt` の引数まで確かめている。引数付きの呼び出しの試験は、ここに足すのが近い。
-- `src/test/contributions.test.ts`: コマンドの題・右クリックのメニューの置き場所を確かめている（要件 4.7 は今の試験が守る）。
+- `src/test/contributions.test.ts`: コマンドの題・右クリックのメニューの置き場所を確かめている（要件 4.6 は今の試験が守る）。
 
 ### マニュアル
 - `book/src/debug/dev-actions.md` の「## シーン再生（▶ シーンを実行）」（89 行〜）。手順 3 が「カーソルの行」と書いている。`lua/shiori-events.md` の `OnPastaSceneAt` の節が `../debug/dev-actions.md#シーン再生-シーンを実行` へ飛ぶので、見出しは変えない（要件 6.5）。
@@ -74,8 +74,8 @@
 | 4.1 引数なし | `execute` | **Constraint**: 右クリックは uri を渡しうる（Research Needed 1）。「行があるか」で見分ける |
 | 4.2〜4.3 引数あり | `resolveGhost(fsPath, findGhostMaster(uri))` | **Missing**: 文書の指定から文書を得る処理（開いていない文書なら開く）、`run` への行の渡し方 |
 | 4.4 文書の誤り | `BAD_DOCUMENT` と `accepts` | なし（同じ確かめを指定の文書にかける） |
-| 4.5 行の誤り | — | **Missing**: 行の確かめと知らせの文言（仮定 1） |
-| 4.6〜4.7 コマンドを足さない | `contributions.test.ts` | なし |
+| （行の誤り） | pasta.dll の `OnPastaSceneAt` の引数の確かめ | なし（拡張では確かめない。要件ディスカッションで確定） |
+| 4.5〜4.6 コマンドを足さない | `contributions.test.ts` | なし |
 | 5.x 解析器が無いとき | `extension.ts` の `wasmReady` の分かれ | なし（登録の置き場所だけ） |
 | 6.x マニュアル | `dev-actions.md`・`verify-content.mjs` G 節 | **Missing**: 節の書き足し |
 
@@ -121,7 +121,7 @@
 5. 解析の結果の控えを着色・アウトライン・CodeLens で共有するか。
 6. コマンドの引数の形（`(uri, line)` の位置引数か、1 つの物か）と、行を 0 始まりで渡すか 1 始まりで渡すか。右クリックの `uri` だけの呼び出しとの見分け方。
 7. 指定の文書が開かれていないときに開くか（`openTextDocument`）。
-8. 行の誤りの知らせの文言（仮定 1）。
+8. （閉じた）行の誤りは pasta.dll に任せ、拡張の文言は作らない。
 9. `editors/vscode/README.md` に 1 行足すか。
 
 ### Research Needed
