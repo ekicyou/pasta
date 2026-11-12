@@ -26,7 +26,7 @@
   - `dumpbin /dependents`（か同じことのできる方法）で、exe が `vcruntime*.dll`・`msvcp*.dll` を引いていないことを確かめて記録する。だめなときはこのタスクの中で `staticVCRuntime` に任せる道へ切り替え、どちらにしたかを報告に書く
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.6, 1.7, 11.1_
 
-- [ ] 2.2 テーマにセマンティックトークンの種類ごとの色の規則を足す純粋な処理を作る
+- [x] 2.2 テーマにセマンティックトークンの種類ごとの色の規則を足す純粋な処理を作る
   - TextMate のテーマと拡張の `semanticTokenScopes` から、種類ごとの規則を足したテーマを返し、スコープの色を最長の先頭一致で解く
   - 写し先が色を持たない種類には規則を足さない
   - light-plus・dark-plus の両方で、写し先が色を持つ種類すべてに規則が付き、同じスコープへ写す種類が同じ色になることを `node --test` で確かめ、緑になっている
@@ -238,3 +238,4 @@
 
 ## Implementation Notes
 - 2.1: exe は 6,225,408 B（--no-bundle・+crt-static はルートの .cargo/config.toml を受け継ぐ）。vcruntime/msvcp は引かず UCRT（api-ms-win-crt-*）だけ。全依存を先に入れたので、使い始めるまで cargo の unused dependency 警告が出る（clippy -D warnings は止まらない）。cargo は env -u NoDefaultCurrentDirectoryInExePath で走らせる。
+- 2.2: npm test は明示の glob（"src/**/*.test.ts"）で走らせる。Node 22 で裸のフォルダの引数は .ts を拾う保証が無い。テストの型のため @types/node を devDependency に置いた。
