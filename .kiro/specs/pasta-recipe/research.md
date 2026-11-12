@@ -107,6 +107,9 @@
 5. フォルダの見張りの道具（`notify` クレートか Tauri の plugin-fs の watch）と、自分の保存の除外・まとめの方法。
 6. 版を 1 か所にする方法（`tauri.conf.json` の `version` を `Cargo.toml` から取る設定）と、`release` スキルの版の更新・`pretag-check.ps1` が見る版のファイルに加えるかどうか。
 7. `release.yml` の build job への Node（`editors/recipe/package-lock.json` のキャッシュ）と `tauri-cli` の入れ方（`@tauri-apps/cli` の npm の devDependency なら版の固定が lock でできる）。
+8. 保存で改行の種類と BOM を残す方法（要件 5.7）。読みで BOM を外して覚え、保存で戻すか、拡張と同じく文字として残すか。Monaco のモデルの `EndOfLineSequence` の当て方。
+9. `pasta-recipe.zip` の大きさの上限の値（要件 12.4）。最初のビルドの実測から決める。
+10. WebView2 の作業用のデータ（`EBWebView`）の置き場。Tauri の既定（`%LOCALAPPDATA%` の下の識別子のフォルダ）のままで要件 1.7・11.1 を満たすかを確かめる。
 
 ## 6. つなぎ込みの注意（Constraints）
 
