@@ -352,3 +352,16 @@ fn range_invariants_hold_for_all_test_documents() {
         assert_invariants(&scenes(doc), None);
     }
 }
+
+/// 真ん中のシーンに構文の誤りがある文書は、前後のシーンだけを出し、前のシーンの範囲を
+/// 次に出たシーンの見出しの前の行で終える（1.11）
+#[test]
+fn syntax_error_scene_is_skipped_and_ranges_use_emitted_headings() {
+    let source = "＊挨拶\n  さくら：やあ\n＊壊れ\n壊れた行\n＊別れ\n  さくら：またね\n";
+    let result = AnalysisEngine::analyze(source);
+    assert!(!result.diagnostics.is_empty(), "構文の誤りが診断に出る");
+    assert_eq!(
+        line_table(&result.scenes),
+        vec![row("挨拶", 1, 4), row("別れ", 5, 7)]
+    );
+}
