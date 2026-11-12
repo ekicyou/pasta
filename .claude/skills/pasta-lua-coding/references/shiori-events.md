@@ -668,6 +668,7 @@ end
 | --------- | ---- |
 | `act.req.reference[0]` | グローバルシーンの名前（必須）。`＊会話` なら `会話` |
 | `act.req.reference[1]` | ローカルシーンの名前（省略できる）。`・挨拶` なら `挨拶`。空の文字列は省略と同じ |
+| `act.req.reference[2]` | ローカル変数の TOML のインライン表（省略できる）。`{ '天気' = '雨' }` なら、再生するシーンの `＄天気` が `雨` になる。空の文字列は省略と同じ（[ローカル変数を入れる](#シーンを再生するイベントの共通の決まり)） |
 
 - Reference1 を省略すると、Reference0 のグローバルシーンを再生する。Reference1 を渡すと、Reference0 のグローバルシーンの中にある Reference1 のローカルシーンを再生する。
 - 名前は、辞書に書いたとおりの、番号の付かない名前で渡す。`会話_1` のような登録名では指名できない。
@@ -684,6 +685,10 @@ end
 | グローバルシーンはあるが、その中にローカルシーンが無い | `【シーンが見つからない：OnPastaScene ＊会話 ・挨拶】` | `OnPastaScene: scene not found: global='会話', local='挨拶'` |
 | Reference0 が無い | `【名前にならない値：OnPastaScene Reference0（値なし）】` | `OnPastaScene: bad argument: Reference0=nil` |
 | Reference0 が空の文字列 | `【名前にならない値：OnPastaScene Reference0（空文字列）】` | `OnPastaScene: bad argument: Reference0=''` |
+| Reference2 が TOML のインライン表として読めない | `【表にできない値：OnPastaScene Reference2（"{ 天気 = "雨" }"）】` | ``OnPastaScene: bad argument: Reference2='{ 天気 = "雨" }' (invalid unquoted key, expected letters, numbers, `-`, `_`)`` |
+| Reference2 が表でない | `【表にできない値：OnPastaScene Reference2（"3"）】` | `OnPastaScene: bad argument: Reference2='3' (not an inline table)` |
+| Reference2 のキーがローカル変数の名前にならない | `【名前にならない値：OnPastaScene Reference2（"1"）】` | `OnPastaScene: bad argument: Reference2 key='1' (not a local variable name)` |
+| Reference2 の値が配列か表 | `【代入できない値：OnPastaScene Reference2 ＄a（表）】` | `OnPastaScene: bad argument: Reference2 key='a' (table is not assignable)` |
 
 ```pasta
 ＊会話
@@ -691,9 +696,20 @@ end
 
     ・挨拶
         ぱすた：こんにちは。
+
+＊天気を言う
+    ぱすた：今日は＄天気、これで＄回数　回目だね。
 ```
 
 この辞書に `OnPastaScene` を Reference0 `会話`・Reference1 `挨拶` で送ると、`・挨拶` を再生し、その台詞が応答の `Value` になる。
+
+Reference2 でローカル変数を入れて再生するときは、次のように送る。
+
+```text
+raise_event(event = "OnPastaScene", references = ["天気を言う", "", "{ '天気' = '雨', '回数' = 3 }"], ghost_name = "<ルート>")
+```
+
+`＊天気を言う` を再生し、その台詞（`今日は雨、これで3回目だね。`）が応答の `Value` になる。Reference1 の空の文字列は、ローカルシーンを指名しないことを表す。
 
 ### OnPastaSceneAt（位置でシーンを再生）
 
@@ -703,6 +719,7 @@ end
 | --------- | ---- |
 | `act.req.reference[0]` | `.pasta` ファイルのパス（必須）。`ghost/master/` からの相対パスか、絶対パス |
 | `act.req.reference[1]` | 行（必須）。エディタと同じく 1 から数える。半角の数字だけで書いた 1 以上の整数 |
+| `act.req.reference[2]` | ローカル変数の TOML のインライン表（省略できる）。`OnPastaScene` の Reference2 と同じ（[ローカル変数を入れる](#シーンを再生するイベントの共通の決まり)） |
 
 - 相対パスは、ゴーストの `ghost/master/` からの相対パスとして扱う（`dic/boot.pasta`）。SSP の今のフォルダには左右されない。絶対パスは、そのパスのファイルとして扱う。
 - パスの区切りは `/` と `\` のどちらでもよい。ファイル名の大文字・小文字は、VSCode からのシーンの再生と同じ規則で突き合わせる（Windows では区別しない）。
@@ -721,6 +738,16 @@ end
 | Reference0 が空の文字列 | `【名前にならない値：OnPastaSceneAt Reference0（空文字列）】` | `OnPastaSceneAt: bad argument: Reference0=''` |
 | 行が 1 以上の整数でない | `【数にできない値：OnPastaSceneAt Reference1（"４２"）】` | `OnPastaSceneAt: bad argument: Reference1='４２'` |
 | 行が無い | `【数にできない値：OnPastaSceneAt Reference1（値なし）】` | `OnPastaSceneAt: bad argument: Reference1=nil` |
+| Reference2 が TOML のインライン表として読めない | `【表にできない値：OnPastaSceneAt Reference2（"{ 天気 = "雨" }"）】` | ``OnPastaSceneAt: bad argument: Reference2='{ 天気 = "雨" }' (invalid unquoted key, expected letters, numbers, `-`, `_`)`` |
+| Reference2 が表でない | `【表にできない値：OnPastaSceneAt Reference2（"3"）】` | `OnPastaSceneAt: bad argument: Reference2='3' (not an inline table)` |
+| Reference2 のキーがローカル変数の名前にならない | `【名前にならない値：OnPastaSceneAt Reference2（"1"）】` | `OnPastaSceneAt: bad argument: Reference2 key='1' (not a local variable name)` |
+| Reference2 の値が配列か表 | `【代入できない値：OnPastaSceneAt Reference2 ＄a（表）】` | `OnPastaSceneAt: bad argument: Reference2 key='a' (table is not assignable)` |
+
+```text
+raise_event(event = "OnPastaSceneAt", references = ["dic/boot.pasta", "42", "{ '天気' = '雨' }"], ghost_name = "<ルート>")
+```
+
+`dic/boot.pasta` の 42 行目のシーンを、`＄天気` が `雨` の状態で再生する。
 
 ### シーンを再生するイベントの共通の決まり
 
@@ -735,11 +762,43 @@ end
 - このイベントの応答には、再生したシーンの最初の[チェイントーク](https://ekicyou.github.io/pasta/grammar/call-jump.html#チェイントーク)までの出力だけが載る。残りは、ほかのイベントで実行したシーンと同じく、次の自然なおしゃべり（仮想ディスパッチャが起こす OnTalk）の機会に出る。
 - 再生したシーンの実行がエラーで止まったときは、ほかのイベントと同じく止まるエラーの応答になる（[エラーハンドリング](#エラーハンドリング)）。
 
+**ローカル変数を入れる（Reference2）**
+
+- Reference2 に TOML のインライン表を 1 つ渡すと、キーを名前、値をその値として、再生するシーンのローカル変数に入れる。`{ '天気' = '雨' }` なら、シーンの `＄天気` が `雨` になる。Lua のブロックからは `var.天気` で読める。
+- Reference2 が無いか空の文字列なら、何も入れない。`{}` も何も入れない。
+- 入れるのは、シーンが見つかったときだけである。見つからないときと引数の誤りでは、何も入れない。
+- キーは TOML のキーの書き方で書く。日本語のキーは引用符で包む（`'天気'`・`"天気"`）。包まない `{ 天気 = '雨' }` は、TOML として読めないので誤りになる。
+- キーは、`＄名前` と書けるローカル変数の名前でなければならない。`'1'`・`'__x__'`・`'a b'` は誤りになる。
+- `raise_event` の `references` は JSON の文字列である。キーと値を TOML のリテラル文字列 `'…'` で書けば、JSON の `\"` が要らない。`\` を含む値も、リテラル文字列なら書いたとおりに入る（`'C:\dic'`）。
+
+値の型は、次のように入る。
+
+| TOML の値 | `＄キー` に入る値 |
+| --------- | ----------------- |
+| 文字列（`'雨'`） | 文字列 |
+| 整数（`3`） | 数（2^53 を超える整数は丸まる） |
+| 浮動小数点数（`1.5`） | 数 |
+| 真偽値（`true`） | 真偽値。台詞では `true` と出る |
+| 日付・時刻（`1979-05-27`・`1979-05-27T07:32:00Z`・`07:32:00`） | 書いたとおりの文字列 |
+| 配列・表（`[1]`・`{}`・`'a'.b = 1`） | 誤り（代入できない値） |
+
+届く範囲と、ほかの値との後勝ちは次のとおりである。
+
+- 入れた値は、ふだんのローカル変数と同じく、`＞` で呼んだシーン・ローカルシーン・`＞チェイントーク` の後の続きでも読める（[ローカル変数](https://ekicyou.github.io/pasta/grammar/variables.html#ローカル変数)）。
+- 入れるのは、シーンを再生する前の 1 回だけである。本文で同じ名前に代入すると、代入した値が勝つ。
+- 転記された変数（[イベントのシーンを選ぶ前の転記](https://ekicyou.github.io/pasta/grammar/variables.html#イベントのシーンを選ぶ前の転記)）と同じ名前のキーでは、Reference2 の値が勝つ。`{ 'r0' = '上書き' }` なら、`＄r0` は `上書き` になる。
+- 次のイベントには持ち越さない。Reference2 を付けずに同じシーンを再生すると、`＄天気` は `【値の無い変数：＄天気】` になる。
+- グローバル変数（`＄＊名前`）には入らない。
+
+`OnPastaScene` で Reference2 を付けてグローバルシーンを再生するときは、Reference1 を空の文字列にする（`references = ["天気を言う", "", "{ '天気' = '雨' }"]`）。Reference1 に表を渡すと、それをローカルシーンの名前として探すので、シーンが見つからない失敗になる。
+
 **失敗の出方**
 
 - 見つからないときと引数の誤りは、ほかの実行時の失敗と同じ `【種類：対象（説明）】` の形の表記で出す。対象は、イベント名と、探した名前（`＊グローバルシーン名 ・ローカルシーン名`）・位置（`ファイル:行`）・誤った引数（`ReferenceN`）を半角の空白でつないだものである（[実行時の失敗の出力](https://ekicyou.github.io/pasta/reference/runtime-failures.html)）。
 - 表記は既定でこのイベントの応答（200 OK の `Value`）に載る。表記を出さない設定（`[logging]` の `balloon_warning = false`）では 204 No Content になる。ログの警告は、どちらの設定でも出る。
-- `Value` の中では、表記に入ったパスの `\` が `\\` になる（さくらスクリプトとして働かないように直す）。
+- 引数は Reference0・Reference1・Reference2 の順に確かめ、最初の誤りだけを出す。Reference2 の誤りは、シーンを探す前に出る。
+- Reference2 のキーに誤りが複数あれば、キーを並べ替えて、最初のキーの誤りだけを出す。`{ 'b' = [1], '1' = 2 }` では、`'1'` の名前の誤りだけが出る。
+- `Value` の中では、表記に入ったパスや Reference2 の `\` が `\\` になる（さくらスクリプトとして働かないように直す）。`{ 'C:\dic' = 1 }` の表記は `【名前にならない値：OnPastaScene Reference2（"C:\\dic"）】` になる。
 
 ### OnPastaDumpVariables（グローバル変数を書き出す）
 
