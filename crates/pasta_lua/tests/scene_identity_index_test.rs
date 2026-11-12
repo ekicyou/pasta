@@ -241,6 +241,25 @@ fn pasta_debug_module_reports_enabled_and_resolves_positions() {
     );
 }
 
+/// scene-play-locals task 1.2（requirements 4.2）: `@pasta_debug.is_local_var_name` は
+/// `＄名前` のローカル変数名の決まりに当たるかを返す。
+#[test]
+fn pasta_debug_is_local_var_name_checks_id_rule() {
+    let temp = tempfile::TempDir::new().expect("temp dir");
+    make_base_dir(temp.path(), false);
+    let runtime = PastaLoader::load_with_config(temp.path(), RuntimeConfig::new())
+        .expect("runtime must load");
+    let got: String = runtime
+        .lua()
+        .load(
+            r#"local D = require("@pasta_debug")
+            return tostring(D.is_local_var_name("天気")) .. "|" .. tostring(D.is_local_var_name("1"))"#,
+        )
+        .eval()
+        .expect("is_local_var_name must be callable");
+    assert_eq!(got, "true|false");
+}
+
 // ===========================================================================
 // task 6.1 統合/回帰テスト（pasta-scene-kick-from-cursor・requirements 3.1/3.3/3.4/7.1）。
 //
