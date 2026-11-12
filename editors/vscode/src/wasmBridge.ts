@@ -24,10 +24,23 @@ export interface DiagnosticData {
   severity: number;
 }
 
+/** シーンの並びの 1 項目（pasta_lsp の analysis::scenes::SceneNode の serde 形と同じ） */
+export interface SceneNode {
+  name: string;
+  kind: 'global' | 'local';
+  /** 見出しの行（0 始まりの行・UTF-16 の列） */
+  heading: DiagnosticData['range'];
+  /** シーン全体 */
+  range: DiagnosticData['range'];
+  /** ローカルシーン（グローバルシーンだけが持つ） */
+  children: ReadonlyArray<SceneNode>;
+}
+
 /** Result of WASM analysis */
 export interface WasmAnalysisResult {
   tokens: ReadonlyArray<SemanticTokenData>;
   diagnostics: ReadonlyArray<DiagnosticData>;
+  scenes: ReadonlyArray<SceneNode>;
 }
 
 // --- ゴースト全体の検査（pasta_check::validate の serde 形と同じ） ---
@@ -116,7 +129,7 @@ function isGhostReport(value: unknown): value is GhostReport {
 
 /**
  * Boundary validation for the untyped `wasm_analyze` result (cell 3.56 / G3):
- * the result must carry `tokens` and `diagnostics` arrays. Rejecting a
+ * the result must carry `tokens`, `diagnostics` and `scenes` arrays (items unchecked). Rejecting a
  * malformed shape HERE keeps the failure on the callers' established
  * `WASM analysis failed` exception path instead of escaping as a distant
  * TypeError when the result is spread/iterated later.
@@ -126,7 +139,8 @@ function isWasmAnalysisResult(value: unknown): value is WasmAnalysisResult {
     typeof value === 'object' &&
     value !== null &&
     Array.isArray((value as { tokens?: unknown }).tokens) &&
-    Array.isArray((value as { diagnostics?: unknown }).diagnostics)
+    Array.isArray((value as { diagnostics?: unknown }).diagnostics) &&
+    Array.isArray((value as { scenes?: unknown }).scenes)
   );
 }
 
@@ -187,7 +201,7 @@ export class WasmBridge {
     try {
       const result = this.wasmModule.wasm_analyze(text);
       if (!isWasmAnalysisResult(result)) {
-        throw new Error('malformed result (expected { tokens: [...], diagnostics: [...] })');
+        throw new Error('malformed result (expected { tokens: [...], diagnostics: [...], scenes: [...] })');
       }
       return result;
     } catch (error) {

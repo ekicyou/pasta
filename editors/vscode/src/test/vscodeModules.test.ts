@@ -71,6 +71,7 @@ interface FakeAnalysisResult {
     message: string;
     severity: number;
   }>;
+  scenes: unknown[];
 }
 
 /** Duck-typed WasmBridge double (real WasmBridge requires the vscode runtime). */
@@ -83,7 +84,7 @@ function fakeBridge(opts: { ready?: boolean; result?: FakeAnalysisResult; fail?:
       if (opts.fail) {
         throw new Error('simulated analysis failure');
       }
-      return opts.result ?? { tokens: [], diagnostics: [] };
+      return opts.result ?? { tokens: [], diagnostics: [], scenes: [] };
     },
   };
   return bridge;
@@ -198,6 +199,7 @@ test('provider converts delta-encoded tokens to absolute builder positions', () 
       { deltaLine: 0, deltaStartCharacter: 3, length: 1, tokenType: 13, tokenModifiers: 0 },
     ],
     diagnostics: [],
+    scenes: [],
   };
   const provider = new SemanticTokensProvider(fakeBridge({ result }) as never);
   const doc = fakeDocument('file:///delta.pasta', 'pasta', 'dummy');
@@ -214,7 +216,7 @@ test('provider converts delta-encoded tokens to absolute builder positions', () 
 });
 
 test('provider caches on-demand analysis (no re-analysis for same uri)', () => {
-  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [] } });
+  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [], scenes: [] } });
   const provider = new SemanticTokensProvider(bridge as never);
   const doc = fakeDocument('file:///cache.pasta', 'pasta', 'text');
   provider.provideDocumentSemanticTokens(doc as never, dummyToken);
@@ -223,7 +225,7 @@ test('provider caches on-demand analysis (no re-analysis for same uri)', () => {
 });
 
 test('clearTokens drops the cache and forces re-analysis', () => {
-  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [] } });
+  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [], scenes: [] } });
   const provider = new SemanticTokensProvider(bridge as never);
   const doc = fakeDocument('file:///clear.pasta', 'pasta', 'text');
   provider.provideDocumentSemanticTokens(doc as never, dummyToken);
@@ -233,7 +235,7 @@ test('clearTokens drops the cache and forces re-analysis', () => {
 });
 
 test('updateTokens replaces the cache and fires onDidChangeSemanticTokens', () => {
-  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [] } });
+  const bridge = fakeBridge({ result: { tokens: [], diagnostics: [], scenes: [] } });
   const provider = new SemanticTokensProvider(bridge as never);
   let fired = 0;
   provider.onDidChangeSemanticTokens(() => { fired++; });
@@ -256,7 +258,7 @@ test('provider returns null when analysis throws (TextMate fallback)', () => {
 // 要件 8.1: 控えは版つき。違う版の控えは返さず、その場で解き直す
 test('provider does not serve tokens cached for a different document version', () => {
   const fresh = { deltaLine: 0, deltaStartCharacter: 0, length: 3, tokenType: 1, tokenModifiers: 0 };
-  const bridge = fakeBridge({ result: { tokens: [fresh], diagnostics: [] } });
+  const bridge = fakeBridge({ result: { tokens: [fresh], diagnostics: [], scenes: [] } });
   const provider = new SemanticTokensProvider(bridge as never);
   const uri = 'file:///ver.pasta';
   provider.updateTokens(mock.Uri.parse(uri).toString(), 1, [
@@ -273,7 +275,7 @@ test('provider does not serve tokens cached for a different document version', (
 
 // 要件 8.2: 今の版の解析に失敗したら、前の版の色を返さず控えも消す
 test('provider failure on a new version returns null and drops the previous version', () => {
-  const opts = { result: { tokens: [], diagnostics: [] }, fail: false };
+  const opts = { result: { tokens: [], diagnostics: [], scenes: [] }, fail: false };
   const bridge = fakeBridge(opts);
   const provider = new SemanticTokensProvider(bridge as never);
   const uri = 'file:///ver-fail.pasta';
@@ -361,6 +363,7 @@ function makeSyncHarness(bridgeOpts: Parameters<typeof fakeBridge>[0] = {}) {
         message: 'diag',
         severity: 1,
       }],
+      scenes: [],
     },
     ...bridgeOpts,
   });
@@ -449,7 +452,7 @@ test('analysis failure logs to the output channel and clears diagnostics', () =>
 // 要件 8.2: 同期の解析に失敗したら、診断と一緒に色の控えも消す
 test('analysis failure in DocumentSync also drops the cached tokens', () => {
   const opts = {
-    result: { tokens: [{ deltaLine: 0, deltaStartCharacter: 0, length: 1, tokenType: 1, tokenModifiers: 0 }], diagnostics: [] },
+    result: { tokens: [{ deltaLine: 0, deltaStartCharacter: 0, length: 1, tokenType: 1, tokenModifiers: 0 }], diagnostics: [], scenes: [] },
     fail: false,
   };
   const h = makeSyncHarness(opts);
@@ -482,6 +485,7 @@ test('a wasm trap during sync is caught, logged, and clears diagnostics and toke
           message: 'diag',
           severity: 1,
         }],
+        scenes: [],
       };
     },
   });
@@ -562,7 +566,7 @@ test('WasmBridge is not ready before initialize and analyzeDocument throws', () 
 });
 
 test('WasmBridge.dispose makes the bridge not ready and analyzeDocument throw', () => {
-  const bridge = bridgeWithWasmResult({ tokens: [], diagnostics: [] });
+  const bridge = bridgeWithWasmResult({ tokens: [], diagnostics: [], scenes: [] });
   assert.strictEqual(bridge.isReady(), true);
   bridge.dispose();
   assert.strictEqual(bridge.isReady(), false);
@@ -579,8 +583,8 @@ test('analyzeDocument wraps a throwing wasm_analyze as "WASM analysis failed"', 
 });
 
 test('analyzeDocument passes an empty (but well-formed) wasm result through', () => {
-  const result = bridgeWithWasmResult({ tokens: [], diagnostics: [] }).analyzeDocument('');
-  assert.deepStrictEqual(result, { tokens: [], diagnostics: [] });
+  const result = bridgeWithWasmResult({ tokens: [], diagnostics: [], scenes: [] }).analyzeDocument('');
+  assert.deepStrictEqual(result, { tokens: [], diagnostics: [], scenes: [] });
 });
 
 test('analyzeDocument rejects a null/non-object wasm result at the boundary', () => {
@@ -591,15 +595,26 @@ test('analyzeDocument rejects a null/non-object wasm result at the boundary', ()
 
 test('analyzeDocument rejects a wasm result with non-array tokens/diagnostics', () => {
   assert.throws(
-    () => bridgeWithWasmResult({ tokens: 'oops', diagnostics: [] }).analyzeDocument('x'),
+    () => bridgeWithWasmResult({ tokens: 'oops', diagnostics: [], scenes: [] }).analyzeDocument('x'),
     /WASM analysis failed/
   );
   assert.throws(
-    () => bridgeWithWasmResult({ tokens: [], diagnostics: null }).analyzeDocument('x'),
+    () => bridgeWithWasmResult({ tokens: [], diagnostics: null, scenes: [] }).analyzeDocument('x'),
     /WASM analysis failed/
   );
   assert.throws(
-    () => bridgeWithWasmResult({ tokens: [] }).analyzeDocument('x'),
+    () => bridgeWithWasmResult({ tokens: [], scenes: [] }).analyzeDocument('x'),
+    /WASM analysis failed/
+  );
+});
+
+test('analyzeDocument rejects a wasm result without a scenes array', () => {
+  assert.throws(
+    () => bridgeWithWasmResult({ tokens: [], diagnostics: [] }).analyzeDocument('x'),
+    /WASM analysis failed/
+  );
+  assert.throws(
+    () => bridgeWithWasmResult({ tokens: [], diagnostics: [], scenes: null }).analyzeDocument('x'),
     /WASM analysis failed/
   );
 });
@@ -611,6 +626,19 @@ test('analyzeDocument passes a well-formed wasm result through unchanged', () =>
       range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
       message: 'syntax error',
       severity: 1,
+    }],
+    scenes: [{
+      name: 'メイン',
+      kind: 'global',
+      heading: { start: { line: 0, character: 0 }, end: { line: 0, character: 4 } },
+      range: { start: { line: 0, character: 0 }, end: { line: 2, character: 3 } },
+      children: [{
+        name: '続き',
+        kind: 'local',
+        heading: { start: { line: 1, character: 0 }, end: { line: 1, character: 3 } },
+        range: { start: { line: 1, character: 0 }, end: { line: 2, character: 3 } },
+        children: [],
+      }],
     }],
   };
   const result = bridgeWithWasmResult(wellFormed).analyzeDocument('x');
